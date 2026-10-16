@@ -124,7 +124,9 @@
 .an-c-knoepfe .knopf svg { width: 18px; height: 18px; }
 .an-c-knoepfe .knopf[hidden] { display: none; }
 .an-coach.brillant { border-color: transparent;
-  background: linear-gradient(100deg, rgba(25, 246, 232, .14), #10142a 62%) padding-box, var(--neon-rahmen) border-box; }
+  /* deckende Flaeche unter der Toenung: der Verlauf ist nur Rahmen (Kontrast des Klassenworts) */
+  background: linear-gradient(100deg, rgba(25, 246, 232, .14), transparent 62%) padding-box,
+    linear-gradient(#10142a, #10142a) padding-box, var(--neon-rahmen) border-box; }
 .an-coach.start .an-c-klasse { color: var(--ui-text); }
 .an-coach.variante { box-shadow: 0 0 0 1px rgba(62, 240, 138, .35), 0 0 26px rgba(62, 240, 138, .14); }
 

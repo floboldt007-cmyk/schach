@@ -4,7 +4,7 @@ import {
   ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne,
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
-  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck,
+  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
 } from '../js/storage.js';
 
 let ok = 0;
@@ -33,11 +33,13 @@ function fakeSpeicher(grenze = Infinity) {
 }
 
 let t = 0;
+// 20 Halbzuege (10 eigene), damit die Genauigkeit fuer den Bestwert zaehlt
+const ZWANZIG = Array.from({ length: 20 }, () => 'e2e4');
 function partie(teil) {
   t++;
   return {
     datum: new Date(Date.UTC(2026, 9, 16, 10, 0, t)).toISOString(), botId: 'benno', botStufe: 1,
-    spielerFarbe: 'w', zuege: ['e2e4'], san: ['e4'], ergebnis: 'sieg', grund: 'matt',
+    spielerFarbe: 'w', zuege: ZWANZIG, san: ['e4'], ergebnis: 'sieg', grund: 'matt',
     hinweise: 0, zuruecknahmen: 0, liveKlassen: ['buch'], genauigkeit: 90, ...teil,
   };
 }
@@ -92,6 +94,18 @@ r = speicherePartie(partie({ genauigkeit: 60 }));
 f = ladeFortschritt();
 pruefe('Stern 3 einzeln nachgeholt', JSON.stringify(r.neueSterne) === '[false,false,true]' && sterneZahl('benno', f) === 3 && !r.neuFreigeschaltet);
 
+// Bestwert: eine Aufgabe nach einem Zug zaehlt nicht
+pruefe('Eigene Zuege: Weiss 3 von 5, Schwarz 2 von 5, Schwarz ab FEN 3 von 5',
+  eigeneZuege({ zuege: [1, 2, 3, 4, 5], spielerFarbe: 'w' }) === 3 && eigeneZuege({ zuege: [1, 2, 3, 4, 5], spielerFarbe: 'b' }) === 2
+  && eigeneZuege({ zuege: [1, 2, 3, 4, 5], spielerFarbe: 'b', startFen: '8/8/8/8/8/8/8/K6k b - - 0 1' }) === 3);
+{
+  const vorherBest = ladeFortschritt().bots.benno.besteGenauigkeit;
+  const kurzId = speicherePartie(partie({ ergebnis: 'niederlage', grund: 'aufgabe', zuege: ['e2e4', 'e7e5'], genauigkeit: 97.6 })).partie.id;
+  pruefe('Bestwert: Aufgabe nach einem Zug zaehlt nicht', ladeFortschritt().bots.benno.besteGenauigkeit === vorherBest, ladeFortschritt().bots.benno.besteGenauigkeit);
+  pruefe('Bestwert: auch nicht in der Statistik', statistik().besteGenauigkeit !== 97.6, statistik().besteGenauigkeit);
+  loeschePartie(kurzId);
+}
+
 // ---------- Partien ----------
 const liste = ladePartien();
 pruefe('Partien: neueste zuerst', liste.length === 3 && liste[0].datum > liste[1].datum && liste[1].datum > liste[2].datum);
@@ -100,6 +114,36 @@ aktualisierePartie(id2, { eroeffnung: 'Italienisch', ergebnis: 'niederlage', ste
 pruefe('Aktualisieren: Zusatzfelder ja, Ergebnis/Sterne nein', ladePartie(id2).eroeffnung === 'Italienisch' && ladePartie(id2).ergebnis === 'sieg' && ladePartie(id2).sterne[0] === true);
 loeschePartie(id2);
 pruefe('Loeschen: Partie und Review weg', !ladePartie(id2) && !hatReview(id2) && ladePartien().length === 2);
+
+// ---------- Analyse nachtragen (Partie wird am Ende sofort gespeichert) ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const sofort = speicherePartie(partie({ genauigkeit: null, hinweise: 1 }));
+  let fs = ladeFortschritt();
+  pruefe('Sofort gespeichert: Sieg und Freischaltung gebucht, Stern 2 offen', JSON.stringify(sofort.neueSterne) === '[true,false,false]'
+    && sofort.neuFreigeschaltet && sofort.neuFreigeschaltet.id === 'hilde' && fs.bots.benno.sterne[1] === false);
+  const review = { genauigkeit: { w: 86.5, b: 70 }, spielstaerke: { w: 1600, b: 300 }, eroeffnung: 'Spanisch',
+    zuege: [{ ply: 4, farbe: 'w', san: 'Nxf7', klasse: 'brillant' }, { ply: 5, farbe: 'b', san: 'Kxf7', klasse: 'gut' }] };
+  const nach = ergaenzeAnalyse(sofort.partie.id, review);
+  fs = ladeFortschritt();
+  const pa = ladePartie(sofort.partie.id);
+  pruefe('Analyse nachgetragen: Genauigkeit, Spielstaerke, Eroeffnung, Review', pa.genauigkeit === 86.5 && pa.genauigkeitBot === 70
+    && pa.spielstaerke === 1600 && pa.eroeffnung === 'Spanisch' && hatReview(pa.id), pa);
+  pruefe('Analyse nachgetragen: Stern 2 neu verdient', JSON.stringify(nach.neueSterne) === '[false,true,false]' && fs.bots.benno.sterne[1] === true
+    && JSON.stringify(pa.sterne) === '[true,true,false]');
+  pruefe('Analyse nachgetragen: Brillant-Zug und Bestwert', nach.brillant === 1 && fs.brillanteZuege.length === 1 && fs.bots.benno.besteGenauigkeit === 86.5);
+  const nochmal = ergaenzeAnalyse(sofort.partie.id, { ...review, genauigkeit: { w: 60, b: 70 } });
+  fs = ladeFortschritt();
+  pruefe('Analyse nochmal: nichts doppelt, Stern bleibt', nochmal.brillant === 0 && fs.brillanteZuege.length === 1 && fs.bots.benno.sterne[1] === true
+    && fs.bots.benno.siege === 1 && fs.bots.benno.partien === 1);
+  const ohne = speicherePartie(partie({ genauigkeit: null }));
+  ergaenzeAnalyse(ohne.partie.id, null, { genauigkeit: 81 });
+  pruefe('Ohne Analyse: Live-Genauigkeit nachgetragen', ladePartie(ohne.partie.id).genauigkeit === 81);
+  ergaenzeAnalyse(ohne.partie.id, null, { genauigkeit: 50 });
+  pruefe('Ohne Analyse: vorhandene Genauigkeit bleibt', ladePartie(ohne.partie.id).genauigkeit === 81);
+  pruefe('Unbekannte Partie: null', ergaenzeAnalyse('gibtsnicht', review) === null);
+}
 
 // ---------- Reviews: Begrenzung und voller Speicher ----------
 s = fakeSpeicher();
@@ -122,6 +166,12 @@ setzeSpeicher(s);
 pruefe('Laufend: leer', ladeLaufendePartie() === null);
 speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'b', zuege: ['e2e4'], hinweise: 0, zuruecknahmen: 1, liveKlassen: [] });
 pruefe('Laufend: gespeichert', ladeLaufendePartie().botId === 'rudi' && ladeLaufendePartie().zuruecknahmen === 1);
+speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'], liveKlassen: 'x' });
+pruefe('Laufend: liveKlassen kein Array -> leer', JSON.stringify(ladeLaufendePartie().liveKlassen) === '[]');
+speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4'], liveKlassen: ['x"><img src=x onerror=alert(1)>', 'buch'] });
+pruefe('Laufend: unbekannte Klasse -> null', JSON.stringify(ladeLaufendePartie().liveKlassen) === '[null,"buch"]');
+speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4', '<b>'] });
+pruefe('Laufend: kaputter Zug -> keine laufende Partie', ladeLaufendePartie() === null);
 speichereLaufendePartie({ botId: 'unbekannt', zuege: [] });
 pruefe('Laufend: unbekannter Bot -> null', ladeLaufendePartie() === null);
 speichereLaufendePartie({ botId: 'rudi', zuege: [] });

@@ -1,10 +1,14 @@
 // Stockfish-Wrapper: ein Web Worker, eine Suche zur Zeit, Warteschlange, Abbruch, MultiPV.
 // Bewertungen kommen immer aus Sicht von Weiss zurueck ({cp, mate}, genau eins gesetzt).
+// analyse(..., { prioritaet }): 'sofort' bricht die laufende Suche ab und kommt als Naechste dran,
+// 'vorne' stellt sich nur vorne an (die laufende Suche rechnet zu Ende).
 import { Chess } from '../vendor/chess/chess.js';
 
 // Standardpfad relativ zu diesem Modul, damit es auch aus Unterordnern (tests/) klappt.
 const STANDARD_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.js', import.meta.url).href;
-const INIT_ZEITLIMIT_MS = 30000;
+// Startet die Engine nicht (z. B. Speicher), kommt die Meldung nach dieser Zeit (der Worker
+// meldet einen gescheiterten WebAssembly-Start nicht selbst)
+const INIT_ZEITLIMIT_MS = 15000;
 
 export class Engine {
   constructor(pfad = STANDARD_PFAD, { protokoll = false } = {}) {
@@ -84,6 +88,8 @@ export class Engine {
       if (prioritaet === 'sofort') {
         this._schlange.unshift(job);
         this._stoppeLaufende();
+      } else if (prioritaet === 'vorne') {
+        this._schlange.unshift(job);
       } else {
         this._schlange.push(job);
       }

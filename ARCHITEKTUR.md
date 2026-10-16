@@ -9,7 +9,8 @@ bessere Zuege zum Durchklicken). Wer einen Bot besiegt, schaltet den naechsten f
 - **Statische Web-App ohne Build-Schritt.** Vanilla JavaScript als ES-Module, HTML, CSS.
   Laeuft auf GitHub Pages (`https://floboldt007-cmyk.github.io/schach/`), also mit
   **relativen Pfaden** arbeiten (die App liegt in einem Unterordner).
-- **Ziel-Geraet: iPad Safari (iOS 16+)**, Hoch- und Querformat, auch als App vom
+- **Ziel-Geraet: iPad Safari (iPadOS 16.4+**, Stockfish braucht WebAssembly-SIMD; aeltere
+  Versionen bekommen beim Engine-Start eine klare Meldung), Hoch- und Querformat, auch als App vom
   Home-Bildschirm (PWA). Muss auch auf Handy (390 px) und Desktop funktionieren.
   Bedienung per Finger: Tippen-Tippen und Ziehen. Keine Hover-Abhaengigkeit.
 - **Offline-faehig** ueber Service Worker (`sw.js`), alles liegt lokal, keine CDNs.
@@ -60,7 +61,8 @@ export class Engine {
 //             lines: [{ multipv: 1, depth, eval: {cp, mate}, pv: ['e2e4', ...] }, ...] }
 ```
 - Eine Suche zur Zeit, weitere werden in eine Warteschlange gestellt. Neue Suche mit
-  `{prioritaet: 'sofort'}` bricht eine laufende ab.
+  `{prioritaet: 'sofort'}` bricht eine laufende ab, `{prioritaet: 'vorne'}` stellt sich nur
+  vorne an (Hinweis in der Partie).
 - `skill`/`elo` setzen `Skill Level` bzw. `UCI_LimitStrength`/`UCI_Elo` vor der Suche
   (und setzen sie danach zurueck, wenn eine andere Suche ohne diese Optionen kommt).
 - Matt- und Pattstellungen (keine legalen Zuege) ohne Engine beantworten.
@@ -120,16 +122,20 @@ export function analysierePartie(engine, zuege, { tiefe, beiFortschritt }): Prom
     gewonnen (< 0.95)
   - `stark` (!, "Grossartig") der einzige gute Zug: bester Zug und der zweitbeste Zug waere
     >= 0.10 schlechter, Stellung nicht schon entschieden
-  - `bester` stimmt mit dem Engine-Zug ueberein (oder Verlust <= 0.0)
+  - `bester` stimmt mit dem Engine-Zug ueberein (oder Verlust 0 und die Bewertung selbst ist nicht
+    schlechter; bei gesaettigter Gewinnchance, z. B. +84 -> +61, nur `exzellent`)
   - `exzellent` Verlust <= 0.02 · `gut` <= 0.05 · `ungenau` <= 0.10 · `fehler` <= 0.20 · `patzer` > 0.20
   - `verpasst` (Chance verpasst): der Gegner hatte gerade einen Fehler/Patzer gemacht, es gab
-    einen Zug mit Gewinnchance >= 0.70, der gespielte Zug laesst sie unter 0.55 fallen,
-    ist aber kein Patzer
+    einen Zug mit Gewinnchance >= 0.70, der gespielte Zug laesst sie unter 0.55 fallen, die
+    Stellung bleibt aber offen (>= 0.30, kein Matt gegen sich; sonst `patzer`). Ausserdem jedes
+    ausgelassene Matt in hoechstens 3 Zuegen ohne Matt danach (wie "Miss" bei chess.com).
   - Feinheiten: Ist die Stellung vorher und nachher klar entschieden (>= 0.97 oder <= 0.03),
     keine Strafe groesser als `ungenau` (wie chess.com).
 - **Zug-Genauigkeit** (Lichess): `103.1668 * exp(-0.04354 * (vorher% - nachher%)) - 3.1669`,
   in Prozentpunkten, begrenzt auf 0..100. **Partie-Genauigkeit**: Mittel aus
   volatilitaetsgewichtetem Mittel und harmonischem Mittel (Lichess-Verfahren, vereinfacht ok).
+- **Spielstaerke** (`schaetzeSpielstaerke`): fuer Flo die Menschen-Tabelle, fuer die Bot-Seite
+  (eigene Elo bekannt) eine an 80 Bot-Partien gemessene Bot-Tabelle, halber Weg zur Bot-Elo.
 - **Coach-Texte** konkret statt allgemein, aus der Hauptvariante abgeleitet: welches Material
   verloren geht ("verliert den Springer auf f6"), Matt-Drohungen ("laesst Matt in 2 zu",
   "verpasst Matt in 3"), der bessere Zug in deutscher Notation. Freundlich, kurz, Du-Form.
@@ -285,12 +291,15 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
    **Drehen**, **Aufgeben** (mit Rueckfrage), Einstellungen.
 6. Ende: Matt, Patt, dreifache Wiederholung, 50-Zuege-Regel, ungenuegendes Material,
    Aufgabe (chess.js `isCheckmate/isStalemate/isThreefoldRepetition/isDrawByFiftyMoves/
-   isInsufficientMaterial`). Dann `analysierePartie(..., { vorab: app.vorab, tiefe })`
-   (meist sofort fertig, weil alles schon gerechnet ist), Partie-Datensatz bauen
-   (`genauigkeit = review.genauigkeit[spielerFarbe]`, `spielstaerke`, `eroeffnung`,
-   `liveKlassen`), `speicherePartie(partie, review)`, `loescheLaufendePartie()`.
-   Schlaegt die Analyse fehl, Genauigkeit aus den Live-Bewertungen (`partieGenauigkeit`).
-7. **Ergebnis-Overlay** (Vorlage: Sieg-Screen aus `design/abenteuer`, in Neon uebersetzt):
+   isInsufficientMaterial`). **Sofort** `speicherePartie(partie)` ohne Analyse (Sieg, Sterne 1
+   und 3, Freischaltung sind damit sicher, auch wenn die App jetzt beendet wird), erst dann
+   `loescheLaufendePartie()`. Danach `analysierePartie(..., { vorab: app.vorab, vorabMerken,
+   tiefe })` und `ergaenzeAnalyse(id, review)` (Genauigkeit, Spielstaerke, Stern 2, Brillant-Zuege;
+   Sterne werden nur dazugewonnen). Schlaegt die Analyse fehl oder verlaesst Flo den Screen
+   vorher, Genauigkeit aus den Live-Bewertungen, aber nur wenn jeder eigene Zug bewertet ist.
+   Die Spielanalyse traegt eine spaeter gerechnete Analyse ebenso mit `ergaenzeAnalyse` nach.
+7. **Ergebnis-Overlay** (Vorlage: Sieg-Screen aus `design/abenteuer`, in Neon uebersetzt;
+   wartet hoechstens 2,5 s auf die Analyse, danach Knoepfe sofort und Genauigkeit/Stern 2 nachgereicht):
    "SIEG!" als Leuchtreklame, drei Sterne einzeln mit ihrer Bedingung (nicht erreichte grau
    mit Grund, neu verdiente leuchten auf), Genauigkeit zaehlt hoch, Abschiedssatz des Bots,
    Kachel "Neu freigeschaltet · Stufe n · Name" mit Avatar. Knoepfe "Zur Analyse" (primaer)

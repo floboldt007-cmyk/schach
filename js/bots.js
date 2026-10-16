@@ -646,6 +646,18 @@ export function botSatz(bot, anlass, zufall = Math.random) {
   return liste[i];
 }
 
+// Suche fuer den Bot. Ist der Engine-Worker abgestuerzt (leere Analyse mit 'fehler', ohne eigenen
+// Abbruch), einmal neu versuchen (die Engine startet dabei neu), sonst Fehler werfen: dann sagt
+// die App Bescheid, statt dass der Bot still einen Zufallszug spielt.
+async function suche(engine, fen, opts, signal) {
+  let a = null;
+  for (let versuch = 0; versuch < 2; versuch++) {
+    a = await engine.analyse(fen, opts);
+    if ((signal && signal.aborted) || !a || !a.abgebrochen || !a.fehler) return a;
+  }
+  throw new Error('Engine abgestürzt: ' + a.fehler);
+}
+
 // Zug des Bots. Wartet selbst eine menschliche Denkzeit ab (ausser ohnePause).
 // Rueckgabe { uci, san, denkzeitMs, art } oder null (keine legalen Zuege / abgebrochen).
 // art: 'erzwungen' | 'matt' | 'engine' | 'patzer' | 'kurz' | 'normal'
@@ -670,7 +682,7 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
     zug = mattZuege[Math.floor(zufall() * mattZuege.length)];
     art = 'matt';
   } else if (s.voll) {
-    const a = await engine.analyse(fen, { movetime: s.movetime ?? 1500, multipv: 1, elo: s.elo, skill: s.skill });
+    const a = await suche(engine, fen, { movetime: s.movetime ?? 1500, multipv: 1, elo: s.elo, skill: s.skill }, signal);
     if (signal && signal.aborted) return null;
     zug = zuege.find((z) => z.lan === a.bestmove) || null;
     art = 'engine';
@@ -687,11 +699,11 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
       const kurz = zufall() < (s.kurzChance || 0);
       let tiefe = kurz ? s.kurzTiefe : s.tiefe;
       if (endspiel && s.endspiel && !kurz) tiefe += s.endspiel.tiefePlus || 0;
-      const a = await engine.analyse(fen, {
+      const a = await suche(engine, fen, {
         depth: Math.max(1, tiefe),
         multipv: Math.min(s.breite || 1, zuege.length),
         movetime: s.maxZeit || 4000,
-      });
+      }, signal);
       if (signal && signal.aborted) return null;
       let rauschen = s.rauschen || 0;
       if (endspiel && s.endspiel) rauschen *= s.endspiel.rauschenFaktor ?? 1;

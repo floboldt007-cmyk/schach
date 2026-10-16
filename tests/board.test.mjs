@@ -557,6 +557,17 @@ async function testeTouch(browser) {
   await warte(200);
   pruefe('Umwandlung in Turm per Finger', (await h.figur('b8')) === 'wR' && (await h.fen()).startsWith('1Rr4k/'));
 
+  // Umwandlung per Tippen-Tippen: der Klick des zweiten Tipps (detail 0) waehlt nicht die Dame
+  await h.setzeFen(UMWANDLUNG);
+  await tippe('b7');
+  await tippe('b8');
+  await warte(250);
+  pruefe('Umwandlung per Tippen: Auswahl bleibt offen (keine sofortige Dame)', await seite.locator('.brett-umwandlung').isVisible() && (await h.figur('b8')) !== 'wQ');
+  const ks = await seite.locator('.umwandlung-figur[data-figur="n"]').boundingBox();
+  await seite.touchscreen.tap(ks.x + ks.width / 2, ks.y + ks.height / 2);
+  await warte(200);
+  pruefe('Umwandlung per Tippen in Springer', (await h.figur('b8')) === 'wN');
+
   // Schwarz unten per Finger
   await h.setzeFen(NACH_E4);
   await seite.evaluate(() => demo.brett.setzeAusrichtung('b'));

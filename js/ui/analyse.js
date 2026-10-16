@@ -8,12 +8,12 @@
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
 import { botNachId } from '../bots.js';
-import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch } from '../review.js';
+import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp } from '../review.js';
 import { SYMBOLE, KLASSEN_NAME } from '../symbole.js';
 import { klang } from '../sounds.js';
 import {
-  ladePartie, ladePartien, ladeReview, speichereReview, aktualisierePartie, naechsterGegner,
-  ladeLaufendePartie, loescheLaufendePartie,
+  ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
+  ladeLaufendePartie, loescheLaufendePartie, eigeneZuege, BESTWERT_MIN_ZUEGE,
 } from '../storage.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
@@ -44,7 +44,7 @@ const WORT = {
 const ZEICHEN = { brillant: '!!', stark: '!', ungenau: '?!', fehler: '?', patzer: '??' };
 const PUNKT_KLASSEN = new Set(['brillant', 'stark', 'fehler', 'patzer', 'verpasst']);
 const VERLUST_KLASSEN = new Set(['ungenau', 'fehler', 'patzer', 'verpasst']);
-const STERN_GRUND = ['Sieg', 'Genauigkeit ab 80 %', 'ohne Hinweis und Zurücknahme'];
+const STERN_GRUND = ['Sieg', 'Genauigkeit ab 80\u00a0%', 'ohne Hinweis und ohne Zurücknehmen'];
 
 // Kurzname des Bots fuer Beschriftungen ("Rudi")
 const KURZ = { benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm',
@@ -62,22 +62,28 @@ function esc(t) {
 const ohneStrich = (t) => String(t || '').replace(/\s*[–—]\s*/g, ': ');
 // Das Klassenwort steht schon gross in der Karte: am Anfang des Coach-Texts weglassen
 function coachOhneKopf(t) {
-  const text = ohneStrich(t);
+  const text = ohneStrich(t).replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
   const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug:|Erzwungen:)\s+/, '');
-  return rest.trim() ? rest.charAt(0).toUpperCase() + rest.slice(1) : text;
+  if (!rest.trim()) return text;
+  // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
+  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
 }
 const komma1 = (x) => x.toFixed(1).replace('.', ',');
 const sanDe = (san) => sanDeutsch(san || '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 const zugText = (z) => `${z.nummer}${z.farbe === 'w' ? '.' : '…'} ${sanDe(z.san)}`;
 const reduziert = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Bewertung (Sicht Weiss) als Text: "+4,7", "−0,3", "M2", "−M2"
-function evalText(ev, { vorzeichen = true } = {}) {
+// Bewertung als Text: "+4,7", "−0,3", "M2", "−M2". Gespeichert ist die Sicht von Weiss;
+// sicht 'b' dreht das Vorzeichen (Coach-Karte: Sicht der Seite, die gezogen hat, wie in der
+// Partie und im Coach-Satz). Gerundet wird der Betrag, wie in der Partie.
+function evalText(ev, { vorzeichen = true, sicht = 'w' } = {}) {
   if (!ev) return '';
-  if (ev.mate != null) return (ev.mate < 0 && vorzeichen ? '−' : '') + 'M' + Math.abs(ev.mate);
-  const w = Math.round((ev.cp || 0) / 10) / 10;
+  const vz = sicht === 'b' ? -1 : 1;
+  if (ev.mate != null) return (ev.mate * vz < 0 && vorzeichen ? '−' : '') + 'M' + Math.abs(ev.mate);
+  const cp = (ev.cp || 0) * vz;
+  const w = Math.round(Math.abs(cp) / 10) / 10;
   if (w === 0) return '0,0';
-  return (vorzeichen ? (w > 0 ? '+' : '−') : '') + Math.abs(w).toFixed(1).replace('.', ',');
+  return (vorzeichen ? (cp > 0 ? '+' : '−') : '') + w.toFixed(1).replace('.', ',');
 }
 
 function ergebnisInfo(partie, letzteNummer) {
@@ -88,8 +94,8 @@ function ergebnisInfo(partie, letzteNummer) {
   else if (e === 'niederlage') stand = sf === 'w' ? '0:1' : '1:0';
   const n = letzteNummer || 1;
   const grund = {
-    matt: `Matt im ${n}. Zug`,
-    aufgabe: e === 'sieg' ? 'Gegner gibt auf' : `Aufgegeben im ${n}. Zug`,
+    matt: `Matt im ${n}.\u00a0Zug`,
+    aufgabe: e === 'sieg' ? 'Gegner gibt auf' : `Aufgegeben im ${n}.\u00a0Zug`,
     patt: 'Patt',
     wiederholung: 'Dreifache Wiederholung',
     '50-zuege': '50-Züge-Regel',
@@ -220,7 +226,7 @@ export function zeige(root, params = {}, app) {
 
   function passt(r) {
     return Array.isArray(r.zuege) && r.zuege.length === (st.partie.zuege || []).length
-      && r.zuege.every((z) => z && z.fenVorher && z.fenNachher && z.klasse);
+      && r.zuege.every((z) => z && z.fenVorher && z.fenNachher && KLASSEN.includes(z.klasse));
   }
 
   function zeigeUnbekannt() {
@@ -245,9 +251,14 @@ export function zeige(root, params = {}, app) {
     const name = st.bot ? st.bot.name : 'Bot';
     sec.querySelector('.an-unter').textContent = [`Du gegen ${name}`, info.stand, info.grund].filter(Boolean).join(' · ');
     const ng = naechsterGegner();
-    const knoepfe = `
+    // Ist der naechste Gegner derselbe Bot (noch nicht besiegt), gibt es keinen "Nächsten Gegner":
+    // dann ist "Nochmal" der Hauptknopf und "Arena" der zweite
+    const derselbe = !ng || ng.id === p.botId;
+    const knoepfe = derselbe ? `
+      <button class="knopf" type="button" data-aktion="weiter" aria-label="Zur Arena">${icon('zurueck')} Arena</button>
+      <button class="knopf primaer" type="button" data-aktion="nochmal" aria-label="Nochmal gegen ${esc(name)}">${icon('nochmal')} Nochmal</button>` : `
       <button class="knopf" type="button" data-aktion="nochmal" aria-label="Nochmal gegen ${esc(name)}">${icon('nochmal')} Nochmal</button>
-      <button class="knopf primaer" type="button" data-aktion="weiter" aria-label="Nächster Gegner: ${esc(ng ? ng.name : '')}">Nächster Gegner ${icon('pfeil')}</button>`;
+      <button class="knopf primaer" type="button" data-aktion="weiter" aria-label="Nächster Gegner: ${esc(ng.name)}">Nächster Gegner ${icon('pfeil')}</button>`;
     sec.querySelector('.an-kopf-knoepfe').innerHTML = knoepfe;
     let leiste = sec.querySelector('.an-aktionsleiste');
     if (!leiste) {
@@ -292,19 +303,25 @@ export function zeige(root, params = {}, app) {
         elo, vorab: app.vorab, beiFortschritt: melde, signal: ac.signal,
       });
       if (beendet) return;
-      speichereReview(p.id, review);
-      // Partie-Datensatz ergaenzen, falls beim Speichern keine Analyse da war
-      const teil = {};
-      if (!Number.isFinite(p.genauigkeit) && Number.isFinite(review.genauigkeit[st.sf])) teil.genauigkeit = review.genauigkeit[st.sf];
-      if (!Number.isFinite(p.genauigkeitBot) && Number.isFinite(review.genauigkeit[st.bf])) teil.genauigkeitBot = review.genauigkeit[st.bf];
-      if (!Number.isFinite(p.spielstaerke) && Number.isFinite(review.spielstaerke[st.sf])) teil.spielstaerke = review.spielstaerke[st.sf];
-      if (!p.eroeffnung && review.eroeffnung) teil.eroeffnung = review.eroeffnung;
-      if (Object.keys(teil).length) st.partie = aktualisierePartie(p.id, teil) || st.partie;
+      // Review speichern und Partie-Datensatz nachtragen (Genauigkeit, Spielstaerke, Stern 2,
+      // Brillant-Zuege): die Partie wurde am Ende ohne fertige Analyse gesichert
+      const nach = ergaenzeAnalyse(p.id, review);
+      if (nach) {
+        st.partie = nach.partie;
+        if (nach.neueSterne.some(Boolean)) params.neueSterne = (params.neueSterne || [false, false, false]).map((x, i) => x || nach.neueSterne[i]);
+      }
       st.review = review;
       baueKopf();
       baue();
     } catch (e) {
-      if (beendet || (e && e.abgebrochen)) return;
+      if (beendet) return;
+      // abgebrochen ohne Verlassen des Screens: die Engine ist abgestuerzt. Sie startet beim
+      // naechsten Auftrag neu, also einmal still neu versuchen, dann die Fehlerkarte zeigen.
+      if (e && e.abgebrochen && !st.neuVersucht) {
+        st.neuVersucht = true;
+        rechne();
+        return;
+      }
       koerper.querySelector('.an-laden').classList.add('fehler');
       koerper.querySelector('.an-laden-titel').textContent = 'Die Analyse hat nicht geklappt.';
       text.textContent = 'Stockfish ist gerade nicht bereit. Versuch es gleich noch einmal.';
@@ -417,8 +434,10 @@ export function zeige(root, params = {}, app) {
     const info = ergebnisInfo(st.partie, nummer);
     const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
-    const alle = ladePartien().map((p) => p.genauigkeit).filter(Number.isFinite);
-    const rekord = Number.isFinite(eigen) && alle.length >= 2 && eigen >= Math.max(...alle) - 1e-9;
+    // Bestwert nur aus Partien mit genug eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
+    const zaehlt = (p) => eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
+    const alle = ladePartien().filter(zaehlt).map((p) => p.genauigkeit).filter(Number.isFinite);
+    const rekord = zaehlt(st.partie) && Number.isFinite(eigen) && alle.length >= 2 && eigen >= Math.max(...alle) - 1e-9;
     const wert = (g, ich) => (Number.isFinite(g)
       ? `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`
       : '<div class="an-g-wert an-g-leer">keine Züge</div>');
@@ -489,7 +508,7 @@ export function zeige(root, params = {}, app) {
       const du = z.farbe === st.sf;
       const l = (kx(i + 1) / KW) * 100;
       const t = (ky(st.kurve[i + 1]) / KH) * 100;
-      return `<i class="${du ? 'du' : ''}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;--kf:var(--k-${z.klasse})" title="${esc(zugText(z))} ${esc(KLASSEN_NAME[z.klasse])}"></i>`;
+      return `<i class="${du ? 'du' : ''}" style="left:${l.toFixed(2)}%;top:${t.toFixed(2)}%;--kf:var(--k-${esc(z.klasse)})" title="${esc(zugText(z))} ${esc(KLASSEN_NAME[z.klasse])}"></i>`;
     }).join('');
   }
 
@@ -501,7 +520,7 @@ export function zeige(root, params = {}, app) {
     const chips = plies.map((p) => {
       const z = st.zuege[p];
       const du = z.farbe === st.sf;
-      return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" style="--kf:var(--k-${z.klasse})"
+      return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" style="--kf:var(--k-${esc(z.klasse)})"
         aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}${du ? '' : ', Gegner'}">${symbol(z.klasse)}<span>${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
     }).join('');
     return `<div class="an-momente-box"><div class="an-momente-titel">Schlüsselmomente</div><div class="an-momente" role="group" aria-label="Schlüsselmomente">${chips}</div></div>`;
@@ -671,10 +690,15 @@ export function zeige(root, params = {}, app) {
       const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
       const info = ergebnisInfo(st.partie, nummer);
       const anzahlMomente = (st.review.schluesselmomente || []).length;
+      // "Knapp!" nur, wenn die Partie bis spaet offen war
+      const knapp = warKnapp(st.kurve, st.sf);
+      const momente = anzahlMomente === 1 ? 'den Schlüsselmoment' : `die ${anzahlMomente} Schlüsselmomente`;
       const satz = info.art === 'sieg'
         ? 'Stark, du hast gewonnen! Geh die Partie durch und schau, wo sie gekippt ist.'
         : info.art === 'niederlage'
-          ? (anzahlMomente ? `Knapp! Schau dir die ${anzahlMomente} Schlüsselmomente an, dort lag die Partie.` : 'Knapp! Geh die Partie Zug für Zug durch.')
+          ? (anzahlMomente
+            ? (knapp ? `Knapp! Schau dir ${momente} an, dort lag die Partie.` : `Kopf hoch! Schau dir ${momente} an, dort ist die Partie gekippt.`)
+            : (knapp ? 'Knapp! Geh die Partie Zug für Zug durch.' : 'Kopf hoch! Geh die Partie Zug für Zug durch.'))
           : 'Geh die Partie durch und finde die Stelle, an der mehr drin war.';
       el.innerHTML = `
         <div class="an-c-symbol an-c-start">${icon('ziel')}</div>
@@ -688,16 +712,18 @@ export function zeige(root, params = {}, app) {
     el.dataset.klasse = z.klasse;
     el.style.setProperty('--kf', `var(--k-${z.klasse})`);
     if (z.klasse === 'brillant') el.classList.add('brillant');
-    const nachTxt = /#$/.test(z.san) ? 'Matt' : evalText(z.evalNachher);
+    // Bewertung aus Sicht der Seite, die gezogen hat (wie der Coach-Satz und die Partie)
+    const sicht = z.farbe === 'b' ? 'b' : 'w';
+    const nachTxt = /#$/.test(z.san) ? 'Matt' : evalText(z.evalNachher, { sicht });
     const evalHtml = VERLUST_KLASSEN.has(z.klasse) && z.evalVorher
-      ? `${esc(evalText(z.evalVorher))} → ${esc(nachTxt)}`
+      ? `${esc(evalText(z.evalVorher, { sicht }))} → ${esc(nachTxt)}`
       : esc(nachTxt);
     const linie = Array.isArray(z.besteLinieSan) ? z.besteLinieSan : [];
     const andererZug = z.besterZug && z.besterZug !== z.uci;
     const linieHtml = linie.length ? `
       <div class="an-c-fuss">
         <div class="an-c-linie">
-          <span class="an-c-linie-titel">${andererZug ? 'Bester Zug' : 'Hauptvariante'} <b class="zahl">${esc(evalText(z.evalVorher))}</b></span>
+          <span class="an-c-linie-titel">${andererZug ? 'Bester Zug' : 'Hauptvariante'} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
           <span class="an-c-zuege">${linie.map((s, i) => `<span data-i="${i}">${esc(sanDe(s))}</span>`).join(' ')}${linie.length >= 8 ? ' …' : ''}</span>
         </div>
         <div class="an-c-knoepfe">

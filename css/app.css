@@ -311,7 +311,7 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 .coach .c-warte { border-radius: 50%; border: 1.5px dashed var(--ui-rand-stark); filter: none; }
 .coach .c-warte .denkt { margin: 0; }
 .coach .c-kopf { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
-.coach .c-klasse { font-family: var(--schrift-display); font-weight: 900; font-size: 20px; line-height: 1.15; color: var(--kf); }
+.coach .c-klasse { font-family: var(--schrift-display); font-weight: 900; font-size: 20px; line-height: 1.15; color: var(--kf); white-space: nowrap; }
 .coach .c-zug { font-weight: 800; font-size: 16px; white-space: nowrap; }
 .coach .c-buch { font-size: 14px; color: var(--ui-gedimmt); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .coach .c-text { grid-column: 2 / -1; margin: 0; font-size: 15px; line-height: 1.4; color: #d6def8; }
@@ -508,6 +508,8 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 .partie .brett-rahmen { padding: var(--rahmen); }
 .partie .seite { min-height: 0; min-width: 0; }
 .ergebnis-zeigen { position: absolute; left: 50%; bottom: 16px; z-index: 12; transform: translateX(-50%); }
+/* .knopf:active (scale) darf die Zentrierung nicht ersetzen, sonst springt der Knopf unter dem Finger weg */
+.ergebnis-zeigen:active { transform: translateX(-50%) scale(.97); }
 .ergebnis-zeigen[hidden] { display: none; }
 .partie.ist-ende .brett-rahmen > .brett { filter: saturate(.85); }
 
@@ -726,6 +728,9 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 
 /* ---------- Toast ---------- */
 .toast-ort { position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 70; display: grid; justify-items: center; pointer-events: none; padding: 0 16px; }
+/* In der Partie oben ueber dem Kopf: unten liegen Spielknoepfe und Brett (der Hinweis-Text
+   wuerde sonst genau den Hinweis-Knopf verdecken, den Flo nochmal tippen soll) */
+html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)); bottom: auto; }
 .toast { max-width: min(100%, 520px); padding: 12px 18px; border-radius: 14px; font-weight: 700; font-size: 15px; text-align: center;
   background: rgba(24, 29, 58, .96); border: 1px solid rgba(25, 246, 232, .45); box-shadow: 0 0 22px rgba(25, 246, 232, .2), 0 14px 40px rgba(0, 0, 0, .55);
   animation: toast-ein .3s cubic-bezier(.2, 1.3, .4, 1) both; }
@@ -826,6 +831,10 @@ html[data-brett="holz"] { --feld-hell: #f0d9b5; --feld-dunkel: #b58863; }
 @media (orientation: landscape) and (max-height: 790px) {
   .arena .detail:has(.fortsetzen) .bilanz { display: none; }
 }
+@media (orientation: landscape) and (max-height: 860px) {
+  /* "Mehr über …" (Avatar antippen) zeigt die ganze Bio, auch mit offener Partie; das Panel scrollt */
+  .arena .detail.offen .bio { display: block; -webkit-line-clamp: unset; overflow: visible; }
+}
 @media (orientation: landscape) and (max-height: 780px) {
   .arena .detail .bio { -webkit-line-clamp: 2; }
   .arena .bilanz b { font-size: 17px; }
@@ -897,7 +906,8 @@ html[data-brett="holz"] { --feld-hell: #f0d9b5; --feld-dunkel: #b58863; }
 .update-hinweis .icon-knopf { width: 44px; height: 44px; }
 @keyframes update-ein { from { transform: translate(-50%, -16px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 @media (max-width: 420px) {
-  .update-hinweis { gap: 6px; padding-left: 12px; }
+  /* unter den Kopf, damit Verlauf und Einstellungen frei bleiben */
+  .update-hinweis { gap: 6px; padding-left: 12px; top: calc(64px + env(safe-area-inset-top)); }
   .update-hinweis .u-text { font-size: 14px; }
   .update-hinweis .u-lang { display: none; }
 }

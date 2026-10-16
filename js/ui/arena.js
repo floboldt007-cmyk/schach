@@ -47,7 +47,10 @@ export function zeige(root, params, app) {
   const naechster = naechsterGegner(fortschritt);
   const alleBesiegt = BOTS.every((b) => fortschritt.bots[b.id].sterne[0]);
   const aktuellId = alleBesiegt ? null : naechster.id;
-  let gewaehlt = neuId || (params && params.waehle && BOTS.some((b) => b.id === params.waehle) ? params.waehle : null) || naechster.id;
+  // Alle besiegt: den ersten Bot mit fehlenden Sternen vorwaehlen (statt immer den Endgegner)
+  const fehlendeSterne = alleBesiegt ? BOTS.find((b) => fortschritt.bots[b.id].sterne.some((x) => !x)) : null;
+  let gewaehlt = neuId || (params && params.waehle && BOTS.some((b) => b.id === params.waehle) ? params.waehle : null)
+    || (fehlendeSterne ? fehlendeSterne.id : naechster.id);
   if (!istFreigeschaltet(BOTS.find((b) => b.id === gewaehlt).stufe, fortschritt)) gewaehlt = naechster.id;
 
   const zustandVon = (b) => {
@@ -62,7 +65,8 @@ export function zeige(root, params, app) {
   s.setAttribute('aria-label', 'Bot-Leiter');
   s.innerHTML = `
     <header class="kopf">
-      <div class="titel"><div class="logo">SCHACH·ARENA</div><div class="logo-unter">Besiege alle 10 Bots</div></div>
+      <div class="titel"><div class="logo">SCHACH·ARENA</div><div class="logo-unter">${alleBesiegt
+        ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne` : 'Besiege alle 10 Bots'}</div></div>
       <div class="kopf-chips">
         <span class="chip zahl" title="Gesammelte Sterne"><span class="stern" aria-hidden="true">★</span><span class="sr">Sterne:</span> ${gesamtSterne(fortschritt)}<span class="von"> / 30</span></span>
         <span class="chip zahl" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegteBots(fortschritt)}<span class="von"> / 10</span></span>
@@ -120,8 +124,11 @@ export function zeige(root, params, app) {
 
   function tippeKnoten(b, el) {
     if (el.classList.contains('gesperrt')) {
+      // den Bot nennen, den Flo jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
       const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
-      app.meldung(`Besiege erst ${vorher ? vorher.name : 'den Bot davor'}.`);
+      app.meldung(vorher && vorher.id === naechster.id
+        ? `Besiege erst ${vorher.name}.`
+        : `Gesperrt. Besiege zuerst ${naechster.name}, dann geht es Stufe für Stufe weiter.`);
       el.classList.remove('ruettel');
       void el.offsetWidth;
       el.classList.add('ruettel');
@@ -152,6 +159,7 @@ export function zeige(root, params, app) {
     const kh = karte.clientHeight;
     if (!kb || !kh) return;
     const quer = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && kh >= 420;
+    const vorher = modus;
     modus = quer ? 'quer' : 'hoch';
     s.classList.toggle('karte-quer', quer);
     s.classList.toggle('karte-hoch', !quer);
@@ -160,6 +168,8 @@ export function zeige(root, params, app) {
     let punkte;
     if (quer) {
       innen.style.height = '';
+      // im Querformat scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
+      karte.scrollTop = 0;
       // Knoten etwas anheben: die Beschriftung haengt unter dem Avatar
       punkte = POS_QUER.map(([x, y]) => [x / 100 * w, y / 100 * h - Math.min(34, h * 0.045)]);
     } else {
@@ -179,6 +189,8 @@ export function zeige(root, params, app) {
     });
     s.querySelectorAll('.stufe-label').forEach((el, i) => { el.style.top = (STUFEN_LABEL[i][1] * h).toFixed(0) + 'px'; });
     zeichneWeg(punkte, w, h);
+    // nach dem Drehen ins Hochformat den gewaehlten Gegner wieder ins Bild holen
+    if (!quer && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
   }
 
   function segmente(p) {
@@ -260,14 +272,14 @@ export function zeige(root, params, app) {
     const laufBot = laufend ? BOTS.find((x) => x.id === laufend.botId) : null;
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
     const satz = botSatz(b, 'begruessung') || '';
-    const ziele = [['Sieg', f.sterne[0]], ['Sieg mit ≥ 80 % Genauigkeit', f.sterne[1]], ['ohne Hinweis und Zurücknahme', f.sterne[2]]];
+    const ziele = [['Sieg', f.sterne[0]], ['Sieg mit ≥\u00a080\u00a0% Genauigkeit', f.sterne[1]], ['ohne Hinweis und ohne Zurücknehmen', f.sterne[2]]];
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
     detail.style.setProperty('--bf', b.farbe);
     detail.innerHTML = `
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${laufBot.farbe}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
-        <div class="ft-text"><b>Offene Partie</b><span>gegen ${esc(laufBot.name)}</span><span>${laufend.zuege.length} ${laufend.zuege.length === 1 ? 'Halbzug' : 'Halbzüge'} gespielt</span></div>
+        <div class="ft-text"><b>Offene Partie</b><span>gegen ${esc(laufBot.name)}</span><span>bei Zug ${Math.floor(laufend.zuege.length / 2) + 1}</span></div>
         <button class="knopf primaer" type="button" data-aktion="fortsetzen">${icon('play')} Fortsetzen</button>
       </div>` : ''}
       <div class="detail-links">

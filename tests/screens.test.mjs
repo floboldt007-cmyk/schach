@@ -180,7 +180,7 @@ async function testeAnalyse(browser, d) {
   pruefe('Mit Review sofort da', await seite.locator('.an-coach').isVisible() && !(await seite.locator('.an-laden').count()));
   pruefe('Kein Freischalt-Banner ohne Parameter', (await seite.locator('.an-banner').count()) === 0);
   const unter = await seite.locator('.an-unter').textContent();
-  pruefe('Kopf: Gegner, Ergebnis, Grund', unter.includes('Ritter Rudi') && unter.includes('1:0') && unter.includes('Matt im 17. Zug'), unter);
+  pruefe('Kopf: Gegner, Ergebnis, Grund', unter.includes('Ritter Rudi') && unter.includes('1:0') && /Matt im 17\.\sZug/.test(unter), unter);
   pruefe('Kein langer Gedankenstrich in den Texten', await seite.evaluate(() => !/[—–]/.test(document.querySelector('.screen').innerText)));
   pruefe('Startstellung, Stand "Start / 17"', (await stand(seite)) === 'Start / 17', await stand(seite));
   const chips = await seite.locator('.an-g-chips').textContent();
@@ -354,6 +354,85 @@ async function testeAnalyse(browser, d) {
   pruefe('Verlassen: Screen bleibt Verlauf', (await seite.evaluate(() => testseite.aktuell())) === 'verlauf' && !(await seite.locator('.an-screen').count()));
   await seite.evaluate((id) => testseite.speicher.loeschePartie(id), abbruchId);
 
+  pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+}
+
+// ---------------------------------------------------------------------------
+// Pruefrunde: Knoepfe nach einer Niederlage, Sicht der Bewertung, Rochade, Engine-Absturz
+async function testePruefrunde(browser, d) {
+  gruppe = 'Analyse (Prüfrunde)';
+  const { kontext, seite, fehler } = await neueSeite(browser);
+  await oeffne(seite);
+
+  // Niederlage gegen den noch unbesiegten Bot: "Nochmal" ist der Hauptknopf, kein "Nächster Gegner"
+  const verlorenId = await seite.evaluate((id) => {
+    const p0 = testseite.speicher.ladePartie(id);
+    const r = testseite.speicher.ladeReview(id);
+    return testseite.speichere({ ...p0, id: undefined, botId: 'benno', ergebnis: 'niederlage', grund: 'aufgabe',
+      datum: new Date(Date.now() - 864e5 * 9).toISOString() }, r).partie.id;
+  }, d.oper);
+  await oeffne(seite, `screen=analyse&partieId=${verlorenId}`);
+  const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.kopf .an-kopf-knoepfe .knopf')]
+    .map((k) => ({ a: k.dataset.aktion, primaer: k.classList.contains('primaer'), text: k.textContent.trim() })));
+  pruefe('Niederlage gegen Benno: "Nochmal" primär, "Arena" statt "Nächster Gegner"',
+    knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /Arena/.test(k.text))
+    && !knoepfe.some((k) => /Nächster Gegner/.test(k.text)), JSON.stringify(knoepfe));
+
+  // Bewertung in der Coach-Karte aus Sicht der Seite, die gezogen hat (wie im Coach-Satz)
+  const fall = await seite.evaluate((id) => {
+    const r = testseite.speicher.ladeReview(id);
+    const z = r.zuege.find((x) => x.farbe === 'b' && /sinkt von/.test(x.coach));
+    return z ? { ply: z.ply, coach: z.coach } : null;
+  }, d.oper);
+  if (fall) {
+    await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${fall.ply}`);
+    const chip = (await seite.locator('.an-coach .an-c-eval').textContent()).replace(/\s+/g, ' ').trim();
+    const m = /sinkt von (\S+) auf (\S+)\./.exec(fall.coach);
+    pruefe('Schwarz: Chip und Coach-Satz mit gleichen Zahlen', m && chip === `${m[1]} → ${m[2]}`, `${chip} | ${fall.coach}`);
+  } else {
+    const z = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.farbe === 'b' && x.evalNachher && x.evalNachher.cp), d.oper);
+    await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${z.ply}`);
+    const chip = (await seite.locator('.an-coach .an-c-eval').textContent()).trim();
+    const erwartet = -z.evalNachher.cp > 0 ? '+' : '−';
+    pruefe('Schwarz: Chip aus Sicht von Schwarz', chip.startsWith(erwartet), `${chip} (cp Weiß ${z.evalNachher.cp})`);
+  }
+
+  // Rochade als 0-0-0 (Zug, Coach-Text, beste Linie), nie O-O
+  const ooo = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.san === 'O-O-O').ply, d.oper);
+  await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${ooo}`);
+  pruefe('Rochade in der Analyse als 0-0-0', /0-0-0/.test(await seite.locator('.an-coach .an-c-zug').textContent())
+    && !/O-O/.test(await seite.locator('.an-coach').textContent()));
+  pruefe('Rochade: kein O-O in gespeicherten Coach-Texten', await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege
+    .every((x) => !/O-O/.test(x.coach) && !/O-O/.test(x.besterZugSanDe || '') && !(x.besteLinieSan || []).some((t) => /O-O/.test(t))), d.oper));
+
+  // Brillant-Karte: deckende Flaeche unter der Toenung (Kontrast des Klassenworts)
+  const brillant = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.klasse === 'brillant'), d.oper);
+  if (brillant) {
+    await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${brillant.ply}`);
+    const bg = await seite.evaluate(() => getComputedStyle(document.querySelector('.an-coach.brillant')).backgroundImage);
+    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /linear-gradient\(rgb\(16, 20, 42\), rgb\(16, 20, 42\)\)/.test(bg), bg.slice(0, 160));
+  }
+
+  // Engine stuerzt ab (leere Analyse mit Fehler): Fehlerkarte statt endlosem Warten, danach klappt es
+  const ohneId = await seite.evaluate((id) => {
+    const p0 = testseite.speicher.ladePartie(id);
+    return testseite.speichere({ ...p0, id: undefined, datum: new Date(Date.now() - 864e5 * 8).toISOString(), genauigkeit: null, spielstaerke: null }, null).partie.id;
+  }, d.oper);
+  await seite.evaluate(async () => {
+    const e = await testseite.app.engine('bewertung');
+    e.__echt = e.analyse;
+    e.analyse = async (fen) => ({ fen, turn: 'w', depth: 0, bestmove: null, lines: [], abgebrochen: true, fehler: 'Absturz (Test)' });
+  });
+  await seite.evaluate((id) => testseite.starte('analyse', { partieId: id }), ohneId);
+  await seite.waitForSelector('.an-laden.fehler [data-aktion="nochmal-rechnen"]', { timeout: 10000 }).catch(() => {});
+  pruefe('Engine-Absturz: Fehlerkarte mit "Nochmal versuchen"', await seite.locator('.an-laden.fehler [data-aktion="nochmal-rechnen"]').count() === 1);
+  await seite.evaluate(async () => { const e = await testseite.app.engine('bewertung'); e.analyse = e.__echt; });
+  await seite.click('[data-aktion="nochmal-rechnen"]');
+  await seite.waitForSelector('.an-coach', { timeout: 90000 });
+  const nach = await seite.evaluate((id) => testseite.speicher.ladePartie(id), ohneId);
+  pruefe('Nach dem Neuversuch: Analyse fertig, Genauigkeit nachgetragen', Number.isFinite(nach.genauigkeit) && Number.isFinite(nach.spielstaerke), JSON.stringify({ g: nach.genauigkeit, s: nach.spielstaerke }));
+  await seite.evaluate((ids) => ids.forEach((id) => testseite.speicher.loeschePartie(id)), [verlorenId, ohneId]);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 }
@@ -615,6 +694,7 @@ try {
   const d = await testeDaten(browser);
   await testeViewports(browser, d);
   await testeAnalyse(browser, d);
+  await testePruefrunde(browser, d);
   await testeTouch(browser, d);
   await testeWenigerBewegung(browser, d);
   await testeVerlauf(browser, d);

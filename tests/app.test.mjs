@@ -5,6 +5,7 @@
 //   node tests/app.test.mjs
 //   node tests/app.test.mjs --bilder=/pfad      Screenshots woanders hin
 //   node tests/app.test.mjs --schnell           ohne die Viewport-Runde
+//   node tests/app.test.mjs --pruefrunde        nur die Pruefrunde (Ergebnis sicher, Bedienung, Engine)
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import { spawn } from 'node:child_process';
@@ -20,6 +21,7 @@ const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
+const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
 mkdirSync(BILDER, { recursive: true });
 
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
@@ -441,7 +443,8 @@ async function testeOptionen(seite, h, fehler) {
   await seite.route('**/js/ui/verlauf.js', (r) => r.fulfill({ status: 404, body: 'fehlt' }));
   await seite.goto(BASIS + '#verlauf');
   await seite.waitForSelector('.screen.platzhalter', { timeout: 10000 });
-  pruefe('Platzhalter statt Absturz', /wird gerade gebaut/.test(await seite.locator('.platzhalter-karte p').innerText()));
+  pruefe('Platzhalter statt Absturz: "konnte nicht geladen werden"', /konnte nicht geladen werden/.test(await seite.locator('.platzhalter-karte p').innerText()));
+  pruefe('Platzhalter: Knopf "Neu laden"', await seite.locator('.platzhalter [data-aktion="neu-laden"]').count() === 1);
   await h.tippe('.platzhalter [data-aktion="arena"]');
   await seite.waitForSelector('.screen.arena');
   pruefe('Platzhalter: zurück zur Arena', (await seite.evaluate(() => location.hash)) === '#arena');
@@ -484,6 +487,269 @@ async function testeNebenlaeufig(seite, h, fehler) {
   pruefe('Veraltetes Ergebnis nach Zurücknahme verworfen', r2.uci === b && r2.abz <= 1, JSON.stringify(r2) + ' erwartet ' + b);
   await seite.evaluate(() => { window.__test = {}; });
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+}
+
+// ---------- 8. Pruefrunde: Ergebnis sicher, Auswertung im Hintergrund, Bedienung ----------
+// Laufende Partie (zum Fortsetzen) fuer den Speicher
+const LAUF = (zuege, extra = {}) => ({ botId: 'benno', spielerFarbe: 'w', startFen: null, zuege, hinweise: 0, zuruecknahmen: 0,
+  liveKlassen: zuege.map(() => null), gestartet: new Date().toISOString(), ...extra });
+const SCHAEFER = ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6'];   // danach Dxf7#
+const ITALIENISCH = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'f8c5', 'c2c3', 'g8f6', 'd2d3', 'd7d6', 'e1g1', 'e8g8'];
+
+// Bewertungs-Engine kuenstlich verlangsamen (Auswertung dauert dann laenger als das Overlay wartet)
+const bremse = (seite, ms) => seite.evaluate(async (m) => {
+  const e = await window.__app.engine('bewertung');
+  if (!e.__orig) e.__orig = e.analyse.bind(e);
+  e.analyse = (...a) => new Promise((r) => setTimeout(() => r(e.__orig(...a)), m));
+}, ms);
+
+async function testePruefrunde(browser) {
+  gruppe = 'Ergebnis sicher';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
+    await h.warteFlo();
+    await h.zugTippen('a1a8');
+    await warte(150);
+    // vor dem Overlay neu laden (App beendet waehrend "Coach wertet aus")
+    await seite.reload();
+    await seite.waitForSelector('.screen');
+    const liste = await h.gespeichert();
+    const f = await h.fortschritt();
+    pruefe('Sieg nach sofortigem Neuladen gespeichert', liste.length === 1 && liste[0].ergebnis === 'sieg', JSON.stringify(liste).slice(0, 120));
+    pruefe('Stern 1 und Freischaltung bleiben', f.bots && f.bots.benno && f.bots.benno.sterne[0] === true);
+    pruefe('Keine laufende Partie mehr', (await h.laufend()) === null);
+    await seite.waitForSelector('.screen.arena');
+    pruefe('Arena: Hilde frei', await seite.locator('.knoten[data-bot="hilde"]:not(.gesperrt)').count() === 1);
+
+    // Fortgesetzte Partie, Auswertung langsam: Overlay zeigt Knoepfe trotzdem gleich
+    gruppe = 'Auswertung im Hintergrund';
+    await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), LAUF(ITALIENISCH));
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w', fortsetzen: true }));
+    await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+    await h.warteFlo();
+    await bremse(seite, 700);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    const t0 = Date.now();
+    await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel="analyse"]', { timeout: 15000 });
+    const dauer = Date.now() - t0;
+    pruefe('Knöpfe nach höchstens 4 s, obwohl die Auswertung noch läuft', dauer < 4000, dauer + ' ms');
+    pruefe('Overlay vorläufig: "Coach wertet die Partie aus"', await seite.locator('.ergebnis-overlay.vorlaeufig .erg-rechnet').count() === 1);
+    const sofort = (await h.gespeichert())[0] || {};
+    pruefe('Partie schon gespeichert (ohne Genauigkeit)', sofort.ergebnis === 'niederlage' && sofort.genauigkeit == null, JSON.stringify(sofort).slice(0, 120));
+    await seite.waitForSelector('.ergebnis-overlay.gefuellt .erg-tipp', { timeout: 60000 });
+    const spaet = (await h.gespeichert())[0] || {};
+    pruefe('Genauigkeit nachgetragen', Number.isFinite(spaet.genauigkeit) && Number.isFinite(spaet.genauigkeitBot), JSON.stringify(spaet).slice(0, 160));
+    pruefe('Review nachgetragen', await seite.evaluate((id) => localStorage.getItem('schach-arena:v1:review:' + id) != null, spaet.id));
+    pruefe('Overlay zeigt danach die Genauigkeit', /\d+,\d\s*%/.test(await seite.locator('.erg-genau b').innerText()));
+
+    // Verlassen waehrend der Auswertung: Genauigkeit nur aus vollstaendiger Live-Bewertung
+    gruppe = 'Früh verlassen';
+    await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), LAUF(SCHAEFER));
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w', fortsetzen: true }));
+    await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+    await h.warteFlo();
+    await bremse(seite, 1500);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.zugTippen('h5f7');
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel="analyse"]', { timeout: 15000 });
+    await warte(900);
+    await h.tippe('.ergebnis-overlay .erg-zu');
+    await h.tippe('.screen.partie .kopf [data-aktion="zurueck"]');
+    await seite.waitForSelector('.screen.arena');
+    const p2 = (await h.gespeichert())[0] || {};
+    pruefe('Sieg gespeichert, Genauigkeit nicht aus einem einzigen Zug (100 %)', p2.ergebnis === 'sieg' && p2.genauigkeit !== 100 && p2.sterne && p2.sterne[1] === false, JSON.stringify({ g: p2.genauigkeit, s: p2.sterne }));
+    await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), null);
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  gruppe = 'Bedienung';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    // Knopf "Ergebnis" nach "Brett ansehen": Tipp in die Mitte
+    await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
+    await h.warteFlo();
+    await h.zugTippen('a1a8');
+    await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
+    await warte(900);   // Einblend-Animation der Karte abwarten
+    await h.tippe('.ergebnis-overlay .erg-zu');
+    await seite.waitForSelector('.ergebnis-zeigen', { state: 'visible', timeout: 3000 }).catch(() => {});
+    pruefe('Brett ansehen: Overlay weg, Knopf "Ergebnis" da', await seite.locator('.ergebnis-overlay').isHidden() && await seite.locator('.ergebnis-zeigen').isVisible());
+    const k = await seite.locator('.ergebnis-zeigen').boundingBox();
+    if (k) await seite.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
+    await warte(250);
+    pruefe('Ergebnis-Knopf: Tipp in die Mitte zeigt das Ergebnis wieder', await seite.locator('.ergebnis-overlay').isVisible());
+
+    // Rueckfrage "Wirklich aufgeben?" schliesst, wenn der Bot mattsetzt
+    await seite.evaluate(() => {
+      const plan = { f2f3: 'e7e5', g2g4: 'd8h4' };
+      window.__test = { botPause: 1600, botZug: (fen) => {
+        const c = window.__partie.chess();
+        const h = c.history({ verbose: true });
+        return plan[h[h.length - 1].lan];
+      } };
+    });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await h.zugTippen('f2f3');
+    await h.warteFlo();
+    await h.zugTippen('g2g4');
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
+    await warte(400);
+    pruefe('Bot setzt matt: Rückfrage "Aufgeben?" ist zu', await seite.locator('.dialog-ort').count() === 0);
+    pruefe('Bot setzt matt: Ergebnis Niederlage durch Matt', /matt/i.test(await seite.locator('.erg-unter').innerText()));
+    await seite.evaluate(() => { window.__test = {}; });
+
+    // Hinweis zweimal schnell tippen: nur Stufe 1
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    // erst die Analyse der Grundstellung (Balken) fertig werden lassen, dann neu und langsam rechnen
+    await seite.waitForFunction(() => window.__app.vorab.size > 0, null, { timeout: 30000 });
+    await bremse(seite, 900);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
+    await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
+    await seite.waitForFunction(() => window.__partie.protokoll.some((e) => e.typ === 'hinweis'), null, { timeout: 30000 });
+    await warte(300);
+    const hw = await seite.evaluate(() => window.__partie.protokoll.filter((e) => e.typ === 'hinweis').map((e) => e.stufe));
+    pruefe('Zweites Tippen während der Rechnung zeigt nicht sofort den Zug', JSON.stringify(hw) === '[1]' && await seite.locator('.screen.partie .brett-pfeile .pfeil').count() === 0, JSON.stringify(hw));
+    pruefe('Hinweis-Meldung oben (verdeckt die Spielknöpfe nicht)', await seite.evaluate(() => {
+      const t = document.querySelector('.toast');
+      const k = document.querySelector('.spielknoepfe').getBoundingClientRect();
+      return !!t && t.getBoundingClientRect().bottom < k.top;
+    }));
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    pruefe('Meldung verschwindet beim Screen-Wechsel', await seite.locator('.toast').count() === 0);
+
+    // Fortsetzen: Bewertung des letzten eigenen Zugs wird nachgeholt, keine neue Begruessung
+    await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), LAUF(['e2e4', 'e7e5', 'g1f3'], { liveKlassen: ['buch', null, null] }));
+    await seite.evaluate(() => { window.__test = { botAnhalten: true }; });
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w', fortsetzen: true }));
+    await seite.waitForFunction(() => window.__partie && window.__partie.z.liveKlassen[2], null, { timeout: 30000 });
+    pruefe('Fortsetzen: Bewertung des letzten Zugs nachgeholt', (await seite.locator('.zugliste .z.du .z-sym').count()) === 2);
+    pruefe('Fortsetzen: keine Begrüßung mitten in der Partie', !(await seite.evaluate(() => window.__partie.protokoll.some((e) => e.typ === 'blase' && e.anlass === 'begruessung'))));
+    const saetze = await seite.evaluate(() => Array.from({ length: 40 }, () => window.__partie.satzFuer('begruessung')));
+    pruefe('Benno sagt nicht "ich fang an", wenn Flo Weiß hat', saetze.every((t) => !/ich fang/i.test(t)), saetze.find((t) => /ich fang/i.test(t)));
+    await seite.evaluate(() => { window.__test = {}; });
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+
+    // Aufgabe gegen den Stockfisch: kein "Schachmatt"-Satz
+    await seite.evaluate(() => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: Object.fromEntries(
+      ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta'].map((id) => [id, { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) })));
+    await h.starte({ botId: 'stockfisch', farbe: 'w' });
+    await h.warteFlo();
+    await h.zugTippen('e2e4');
+    await h.warteFlo(60000);
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
+    const gew = await seite.evaluate(() => Array.from({ length: 30 }, () => window.__partie.satzFuer('gewinnt')));
+    pruefe('Aufgabe: kein "Schachmatt" im Abschiedssatz', gew.every((t) => !/matt/i.test(t)) && !/matt/i.test(await seite.locator('.erg-bot .sprechblase').innerText()), gew.find((t) => /matt/i.test(t)));
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  gruppe = 'Arena';
+  {
+    const { kontext, seite } = await neueSeite(browser, { w: 820, h: 1180, touch: true, saat: SAAT });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(500);
+    await seite.setViewportSize({ width: 1180, height: 820 });
+    await warte(800);
+    const lage = await seite.evaluate(() => {
+      const k = document.querySelector('.karte');
+      const boss = document.querySelector('.knoten.boss .avatar').getBoundingClientRect();
+      return { scroll: k.scrollTop, bossOben: boss.top - k.getBoundingClientRect().top };
+    });
+    pruefe('Drehen hoch → quer: Karte nicht verschoben, Endgegner sichtbar', lage.scroll === 0 && lage.bossOben >= 0, JSON.stringify(lage));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await h.tippe('.knoten[data-bot="lisa"]');
+    await seite.waitForSelector('.toast');
+    const t = await seite.locator('.toast').innerText();
+    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Bauer Benno/.test(t), t);
+    const alle = { bots: Object.fromEntries(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch']
+      .map((id, i) => [id, { sterne: [true, i > 0, i > 2], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) };
+    await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), alle);
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena .knoten');
+    pruefe('Alle besiegt: "Arena bezwungen!"', /Arena bezwungen/.test(await seite.locator('.arena .logo-unter').textContent()));
+    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Bauer Benno/.test(await seite.locator('.detail h2').innerText()));
+    await kontext.close();
+  }
+
+  gruppe = 'Engine';
+  {
+    // kaputte Engine-Datei: klare Meldung, Bot zieht sofort (kein 30-s-Warten je Zug)
+    const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/stockfish-19-lite-single.wasm', (r) => r.fulfill({ status: 200, contentType: 'application/wasm', body: Buffer.from('kaputt') }));
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+    await h.warteFlo();
+    await seite.waitForSelector('.dialog-ort .dialog', { timeout: 10000 }).catch(() => {});
+    pruefe('Kaputte Engine-Datei: Meldung "beschädigt"', /beschädigt/.test(await seite.locator('.dialog-ort').innerText().catch(() => '')));
+    await seite.locator('.dialog-knoepfe .knopf').click().catch(() => {});
+    await warte(300);
+    await h.zugTippen('e2e4');
+    const t0 = Date.now();
+    await seite.waitForFunction(() => window.__partie && window.__partie.z.zuege.length === 2, null, { timeout: 20000 }).catch(() => {});
+    const dauer = Date.now() - t0;
+    pruefe('Kaputte Engine-Datei: Bot zieht ohne langes Warten', dauer < 6000, dauer + ' ms');
+    pruefe('Kaputte Engine-Datei: nur eine Meldung', await seite.locator('.dialog-ort').count() === 0);
+    await kontext.close();
+  }
+  {
+    // ohne WebAssembly-SIMD (iPadOS < 16.4): Meldung mit Update-Hinweis
+    const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await kontext.addInitScript(() => {
+      const echt = WebAssembly.validate.bind(WebAssembly);
+      WebAssembly.validate = (b) => (b && b.byteLength === 31 ? false : echt(b));
+    });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.dialog-ort .dialog', { timeout: 10000 });
+    pruefe('Ohne SIMD: Meldung "iPadOS 16.4"', /iPadOS 16\.4/.test(await seite.locator('.dialog-ort').innerText()));
+    await kontext.close();
+  }
+
+  gruppe = 'Safari-Tab';
+  {
+    const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await kontext.addInitScript(() => { Object.defineProperty(navigator, 'standalone', { value: false, configurable: true }); });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.dialog-ort .dialog', { timeout: 10000 });
+    pruefe('Safari-Tab: Tipp "Zum Home-Bildschirm"', /Home-Bildschirm/.test(await seite.locator('.dialog-ort').innerText()));
+    await seite.locator('.dialog-knoepfe .knopf').click();
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena');
+    await warte(1800);
+    pruefe('Safari-Tab: Tipp nur einmal', await seite.locator('.dialog-ort').count() === 0);
+    await kontext.close();
+  }
 }
 
 // ---------- 7. Viewports ----------
@@ -590,7 +856,7 @@ try {
   await warteAufServer(BASIS);
   const { chromium } = ladePlaywright();
   browser = await chromium.launch();
-  {
+  if (!NUR_PRUEFRUNDE) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await testeArena(seite, h);
@@ -601,7 +867,8 @@ try {
     await testeNebenlaeufig(seite, h, fehler);
     await kontext.close();
   }
-  if (!SCHNELL) for (const vp of VIEWPORTS) await testeViewport(browser, vp);
+  await testePruefrunde(browser);
+  if (!SCHNELL && !NUR_PRUEFRUNDE) for (const vp of VIEWPORTS) await testeViewport(browser, vp);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));

@@ -11,7 +11,7 @@ export const KLASSEN = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch
 
 export const KLASSEN_NAMEN = {
   brillant: 'Brillant', stark: 'Großartig', bester: 'Bester Zug', exzellent: 'Exzellent',
-  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenauigkeit', fehler: 'Fehler',
+  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler',
   verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
 };
 
@@ -25,6 +25,8 @@ const ANGREIFER_WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
 const NOM = { p: 'der Bauer', n: 'der Springer', b: 'der Läufer', r: 'der Turm', q: 'die Dame', k: 'der König' };
 const AKK = { p: 'den Bauern', n: 'den Springer', b: 'den Läufer', r: 'den Turm', q: 'die Dame', k: 'den König' };
 const EIN_AKK = { p: 'einen Bauern', n: 'einen Springer', b: 'einen Läufer', r: 'einen Turm', q: 'eine Dame' };
+const NEU_AKK = { n: 'einen neuen Springer', b: 'einen neuen Läufer', r: 'einen neuen Turm', q: 'eine neue Dame' };
+const NEU_NOM = { n: 'ein neuer Springer', b: 'ein neuer Läufer', r: 'ein neuer Turm', q: 'eine neue Dame' };
 const ZAHLWORT = ['null', 'ein', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht'];
 const FEHLERKLASSEN = ['fehler', 'patzer', 'verpasst'];
 
@@ -92,32 +94,49 @@ export function partieGenauigkeit(liste) {
 const ELO_TABELLE = [[0, 100], [20, 200], [40, 400], [50, 550], [60, 750], [70, 1000], [75, 1150],
   [80, 1350], [85, 1600], [90, 1900], [94, 2250], [97, 2600], [100, 3000]];
 
-// anzahlZuege (optional): eigene Zuege; unter 20 wird zur Mitte (Gegner-Elo bzw. 1000) gezogen
-export function schaetzeSpielstaerke(genauigkeit, gegnerElo, anzahlZuege) {
+// Bots spielen anders als Menschen (seltene grobe Patzer, sonst fast Engine-Zuege) und erreichen
+// deshalb bei gleicher Staerke eine viel hoehere Genauigkeit. Tabelle aus den Medianen von
+// 80 Bot-gegen-Bot-Partien (Tiefe 14, MultiPV 2), monoton angepasst.
+const ELO_TABELLE_BOT = [[0, 100], [50, 150], [60, 200], [66, 250], [72, 350], [76, 500], [78, 750], [80, 1000],
+  [83, 1300], [86, 1600], [88, 1800], [91, 2000], [93, 2150], [96, 2500], [100, 3000]];
+
+function ausTabelle(tabelle, g) {
+  for (let i = 1; i < tabelle.length; i++) {
+    const [g0, e0] = tabelle[i - 1];
+    const [g1, e1] = tabelle[i];
+    if (g <= g1) return e0 + ((g - g0) / (g1 - g0)) * (e1 - e0);
+  }
+  return tabelle[tabelle.length - 1][1];
+}
+
+// anzahlZuege (optional): eigene Zuege; unter 20 wird zur Mitte (Gegner-Elo bzw. 1000) gezogen.
+// { eigeneElo } (optional, fuer Bots): Bot-Tabelle, halber Weg zur eigenen Elo (eine Partie
+// streut stark), kurze Partien zur eigenen Elo statt zur Mitte.
+export function schaetzeSpielstaerke(genauigkeit, gegnerElo, anzahlZuege, { eigeneElo } = {}) {
   if (typeof genauigkeit !== 'number' || !isFinite(genauigkeit)) return null;
   const g = Math.max(0, Math.min(100, genauigkeit));
-  let elo = ELO_TABELLE[ELO_TABELLE.length - 1][1];
-  for (let i = 1; i < ELO_TABELLE.length; i++) {
-    const [g0, e0] = ELO_TABELLE[i - 1];
-    const [g1, e1] = ELO_TABELLE[i];
-    if (g <= g1) {
-      elo = e0 + ((g - g0) / (g1 - g0)) * (e1 - e0);
-      break;
-    }
+  const kurz = typeof anzahlZuege === 'number' && anzahlZuege >= 0 && anzahlZuege < 20;
+  let elo;
+  if (typeof eigeneElo === 'number' && isFinite(eigeneElo)) {
+    elo = eigeneElo + 0.5 * (ausTabelle(ELO_TABELLE_BOT, g) - eigeneElo);
+    if (kurz) elo = (anzahlZuege / 20) * elo + (1 - anzahlZuege / 20) * eigeneElo;
+    return Math.max(100, Math.min(3200, Math.round(elo / 50) * 50));
   }
+  elo = ausTabelle(ELO_TABELLE, g);
   const gegnerBekannt = typeof gegnerElo === 'number' && isFinite(gegnerElo);
   if (gegnerBekannt) elo += 0.2 * Math.max(-500, Math.min(500, gegnerElo - elo));
-  if (typeof anzahlZuege === 'number' && anzahlZuege >= 0 && anzahlZuege < 20) {
+  if (kurz) {
     const w = anzahlZuege / 20;
     elo = w * elo + (1 - w) * (gegnerBekannt ? gegnerElo : 1000);
   }
   return Math.max(100, Math.min(3200, Math.round(elo / 50) * 50));
 }
 
-// SAN auf Deutsch: K D T L S statt K Q R B N
+// SAN auf Deutsch: K D T L S statt K Q R B N, Rochade mit Nullen (0-0, 0-0-0)
 export function sanDeutsch(san) {
   if (san == null) return '';
-  return String(san).replace(/[KQRBN]/g, (c) => ({ K: 'K', Q: 'D', R: 'T', B: 'L', N: 'S' }[c]));
+  return String(san).replace(/[KQRBN]/g, (c) => ({ K: 'K', Q: 'D', R: 'T', B: 'L', N: 'S' }[c]))
+    .replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 }
 
 // Material Weiss minus Schwarz in Bauerneinheiten (B1 S3 L3 T5 D9)
@@ -180,9 +199,11 @@ function cpFuer(ev, farbe) {
 
 // Spielt zuege ab fen und zaehlt Material aus Sicht von farbe. Laeuft mindestens
 // 'min' Halbzuege und verlaengert, solange zuletzt geschlagen wurde (ruhiges Ende).
+// Umwandlungen stehen getrennt in 'umwandlungen' (nie als Bauernzahl): Wird die neue Figur
+// geschlagen, zaehlt das wie ein geschlagener Bauer.
 function materialFolge(fen, zuege, farbe, { min = 6, max = 10 } = {}) {
   const c = neuesBrett(fen);
-  const ergebnis = { saldo: 0, verloren: [], gewonnen: [], schritte: [] };
+  const ergebnis = { saldo: 0, verloren: [], gewonnen: [], schritte: [], umwandlungen: [] };
   if (!c) return ergebnis;
   const liste = (zuege || []).slice(0, max);
   for (let i = 0; i < liste.length; i++) {
@@ -192,7 +213,16 @@ function materialFolge(fen, zuege, farbe, { min = 6, max = 10 } = {}) {
     if (!m) break;
     const eigener = m.color === farbe;
     const delta = (m.captured ? WERT[m.captured] : 0) + (m.promotion ? WERT[m.promotion] - 1 : 0);
-    if (m.captured) (eigener ? ergebnis.gewonnen : ergebnis.verloren).push({ figur: m.captured, feld: m.to, san: m.san, ply: i });
+    // neue Figur aus einer Umwandlung: zieht sie weiter, wandert die Marke mit
+    const neueFigur = ergebnis.umwandlungen.find((u) => u.feld === m.from);
+    if (neueFigur) neueFigur.feld = m.to;
+    if (m.captured) {
+      const geschlagen = ergebnis.umwandlungen.findIndex((u) => u.feld === m.to && u.eigener !== eigener);
+      const figur = geschlagen >= 0 ? 'p' : m.captured;
+      if (geschlagen >= 0) ergebnis.umwandlungen.splice(geschlagen, 1);
+      (eigener ? ergebnis.gewonnen : ergebnis.verloren).push({ figur, feld: m.to, san: m.san, ply: i });
+    }
+    if (m.promotion) ergebnis.umwandlungen.push({ eigener, figur: m.promotion, feld: m.to, san: m.san, ply: i });
     ergebnis.saldo += eigener ? delta : -delta;
     ergebnis.schritte.push({ san: m.san, captured: m.captured || null, saldo: ergebnis.saldo, farbe: m.color });
   }
@@ -251,14 +281,26 @@ function findeOpfer(fenVorher, uci, pvNachher, farbe) {
     const v = folge.verloren.find((x) => x.ply === 1);
     if (v && v.feld === zug.to) {
       const minimum = Math.min(...folge.schritte.slice(1, 5).map((s) => -s.saldo));
-      if (minimum >= 2 && minimum > schonVerloren) return { art: 'pv', figur: antwort.captured, feld: zug.to, wert: minimum, schlagzug: antwort.san };
+      if (minimum >= 2 && minimum > schonVerloren && !totNachSchlag(c, pvNachher[0])) {
+        return { art: 'pv', figur: antwort.captured, feld: zug.to, wert: minimum, schlagzug: antwort.san };
+      }
     }
     return null;
   }
   const h = haengendeFigur(c, farbe, zug.to);
   const wert = h ? h.gewinn - genommen : 0;
-  if (h && wert >= 2 && wert > schonVerloren) return { art: 'haengt', figur: h.figur, feld: h.feld, wert };
+  if (h && wert >= 2 && wert > schonVerloren && !totNachSchlag(c, h.san)) return { art: 'haengt', figur: h.figur, feld: h.feld, wert };
   return null;
+}
+
+// Nimmt der Gegner das Opfer an und bleibt danach zu wenig Material (totes Remis)? Kein Opfer.
+function totNachSchlag(c, zug) {
+  let m = null;
+  try { m = istUci(zug) ? spieleUci(c, zug) : c.move(zug); } catch (e) { m = null; }
+  if (!m) return false;
+  const tot = c.isInsufficientMaterial();
+  c.undo();
+  return tot;
 }
 
 // Was haette der Gegner gewonnen, wenn er vor dem Zug am Zug gewesen waere (Nullzug)?
@@ -281,6 +323,8 @@ function selbstverstaendlich(fenVorher, zug, vorigerZug, farbe) {
   if (zug.captured && vorigerZug && zug.to === String(vorigerZug).slice(2, 4)) return true;
   const c = neuesBrett(fenVorher);
   if (!c) return false;
+  // Schach abwehren mit hoechstens drei erlaubten Zuegen sieht jeder
+  if (c.inCheck() && c.moves().length <= 3) return true;
   const gegner = gegnerVon(farbe);
   if (zug.captured) {
     if (WERT[zug.captured] > WERT[zug.piece]) return true;
@@ -445,9 +489,16 @@ export function klassifiziere(eingabe) {
     }
   }
 
-  // 5. bester Zug
+  // Matt in hoechstens 3 ausgelassen und danach kein Matt mehr ("Miss" bei chess.com):
+  // mindestens "Chance verpasst", auch wenn die Stellung gewonnen bleibt
+  const mattVerpasst = !d.istBester && !d.matt && d.mattVorher != null && d.mattVorher > 0 && d.mattVorher <= 3
+    && !(d.mattNachher != null && d.mattNachher > 0);
+  const mattNotiz = mattVerpasst ? `Matt in ${d.mattVorher} verpasst` : '';
+
+  // 5. bester Zug: der Engine-Zug oder ein anderer Zug mit wirklich gleicher Bewertung
   if (d.istBester) return ergebnis('bester', 0, 'Engine-Zug');
   if (roh <= EPS) {
+    if (mattVerpasst) return ergebnis('verpasst', roh, mattNotiz);
     // Matt-Saettigung: beide Bewertungen Matt fuer dieselbe Seite -> Mattlaenge vergleichen
     const mv = d.mattVorher;
     const mn = d.mattNachher;
@@ -455,13 +506,17 @@ export function klassifiziere(eingabe) {
       if (mv > 0 && mn > mv + 2) return ergebnis(mn > mv + 5 ? 'gut' : 'exzellent', 0, 'Matt dauert länger');
       if (mv < 0 && -mn < -mv - 1) return ergebnis(-mn < -mv - 2 ? 'gut' : 'exzellent', 0, 'Matt kommt schneller');
     }
+    // Gewinnchance gesaettigt (klar gewonnen/verloren): dann zaehlt die Bewertung selbst
+    if (!gleichGut(d)) return ergebnis('exzellent', 0, 'fast so gut wie der Engine-Zug');
     return ergebnis('bester', 0, 'so gut wie der Engine-Zug');
   }
 
-  // 6. Chance verpasst: Gegner hatte gerade gepatzt, Vorteil >= 0.70 verspielt (< 0.55), kein Patzer
+  // 6. Chance verpasst: Gegner hatte gerade gepatzt, Vorteil >= 0.70 verspielt (< 0.55).
+  // Bleibt die Stellung danach offen (>= 0.30, kein Matt gegen sich), ist es kein Patzer.
   let klasse = basis;
   let notiz = `Gewinnchance −${Math.round(roh * 100)} %`;
-  if (d.gegnerFehler && d.wv >= 0.70 - EPS && d.wn < 0.55 && basis !== 'patzer') {
+  const offenDanach = d.wn >= 0.30 && !(d.mattNachher != null && d.mattNachher < 0);
+  if (d.gegnerFehler && d.wv >= 0.70 - EPS && d.wn < 0.55 && (basis !== 'patzer' || offenDanach)) {
     klasse = 'verpasst';
     notiz = 'Gegnerfehler nicht genutzt';
   }
@@ -472,7 +527,23 @@ export function klassifiziere(eingabe) {
     klasse = 'ungenau';
     notiz = 'Stellung bereits entschieden';
   }
+  if (mattVerpasst && RANG[klasse] < RANG.verpasst) {
+    klasse = 'verpasst';
+    notiz = mattNotiz;
+  }
   return ergebnis(klasse, roh, notiz);
+}
+
+// Ist der gespielte Zug wirklich so gut wie der Engine-Zug (gleiche oder bessere Bewertung)?
+function gleichGut(d) {
+  const mv = d.mattVorher;
+  const mn = d.mattNachher;
+  const rang = (m) => (m == null ? 0 : m > 0 ? 1 : -1);   // selbst Matt > Bewertung > wird matt
+  if (rang(mv) !== rang(mn)) return rang(mn) > rang(mv);
+  if (mv != null) return mv > 0 ? mn <= mv : -mn >= -mv;
+  const v = cpFuer(d.evalVorher, d.farbe);
+  const n = cpFuer(d.evalNachher, d.farbe);
+  return v == null || n == null || n >= v;
 }
 
 // ---------------------------------------------------------------------------
@@ -496,19 +567,26 @@ function bauernText(n, kasus) {
   return `${ZAHLWORT[n] || n} Bauern`;
 }
 
+// Betrag runden, damit -1,25 und +1,25 gleich lang werden (wie die Anzeige in Partie und Analyse)
 function cpText(cp) {
-  const w = Math.round(cp / 10) / 10;
+  const w = Math.round(Math.abs(cp) / 10) / 10;
   if (w === 0) return '0,0';
-  return (w > 0 ? '+' : '−') + Math.abs(w).toFixed(1).replace('.', ',');
+  return (cp > 0 ? '+' : '−') + w.toFixed(1).replace('.', ',');
 }
 
 // Materialtext aus einer materialFolge: 'gewinn' oder 'verlust' aus Sicht der Folge-Farbe
+// Liefert { text, mehrzahl } oder bei einer Umwandlung { umwandlung: { figur, san } }.
 function materialText(folge, art, kasus = 'akk') {
   const netto = art === 'verlust' ? -folge.saldo : folge.saldo;
   if (netto < 1) return null;
   const liste = art === 'verlust' ? folge.restVerloren : folge.restGewonnen;
   const gegen = art === 'verlust' ? folge.restGewonnen : folge.restVerloren;
   const figur = liste.find((x) => x.figur !== 'p' && x.figur !== 'k');
+  // Gewinn durch eine Umwandlung (eigene bei 'gewinn', gegnerische bei 'verlust')
+  const umw = (folge.umwandlungen || []).find((u) => u.eigener === (art === 'gewinn'));
+  if (umw && (!figur || WERT[umw.figur] - 1 > WERT[figur.figur])) {
+    return { text: `${(kasus === 'nom' ? NEU_NOM : NEU_AKK)[umw.figur]} (${sanDeutsch(umw.san)})`, mehrzahl: false, umwandlung: umw };
+  }
   if (figur) {
     if (figur.figur === 'r' && netto < 3 && gegen.some((x) => x.figur === 'n' || x.figur === 'b')) {
       return { text: 'die Qualität', mehrzahl: false };
@@ -546,6 +624,10 @@ function folgenText(d) {
     const besteFolge = materialFolge(d.fenVorher, d.pvVorher, d.farbe, { min: 5, max: 9 });
     if (besteFolge.saldo < 0 || besteFolge.saldo - folge.saldo < 1) return null;
   }
+  if (mt.umwandlung) {
+    const wer = d.du ? 'dein Gegner' : farbName(gegnerVon(d.farbe));
+    return `Danach wandelt ${wer} in ${EIN_AKK[mt.umwandlung.figur]} um (${sanDeutsch(mt.umwandlung.san)}).`;
+  }
   const erster = sanDeutsch(pvAlsSan(d.fenNachher, d.pvNachher, 1)[0] || '');
   if (d.du) return erster ? `Nach ${erster} verlierst du ${mt.text}.` : `Damit verlierst du ${mt.text}.`;
   const verb = mt.mehrzahl ? 'gehen' : 'geht';
@@ -563,7 +645,7 @@ function grundBester(d) {
   if (istRueckschlag(d, b)) return 'zurückschlagen';
   const folge = materialFolge(d.fenVorher, d.pvVorher, d.farbe, { min: 4 });
   const mt = materialText(folge, 'gewinn', 'akk');
-  return mt ? `das gewinnt ${mt.text}` : null;
+  return mt ? `das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}` : null;
 }
 
 function besserText(d) {
@@ -637,24 +719,32 @@ export function coachText(eingabe, ergebnis) {
       if (d.fenVorher && d.uci && d.pvNachher.length) {
         const folge = materialFolge(d.fenVorher, [d.uci, ...d.pvNachher], d.farbe, { min: 4 });
         const mt = materialText(folge, 'gewinn', 'akk');
-        if (mt) return `Bester Zug! Das gewinnt ${mt.text}.`;
+        if (mt) return `Bester Zug! Das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}.`;
       }
-      return auswahl(d, [
+      // "Genau das hätte auch die Engine gespielt" nur fuer den Engine-Zug selbst
+      return auswahl(d, d.istBester ? [
         'Bester Zug! Genau das hätte auch die Engine gespielt.',
         'Bester Zug! Präzise gespielt.',
         'Bester Zug! Stärker geht es in dieser Stellung nicht.',
+      ] : [
+        'Bester Zug! Präzise gespielt.',
+        'Bester Zug! Genauso stark wie der Engine-Zug.',
       ]);
     }
 
     case 'exzellent':
+    case 'gut': {
+      // ausgelassenes Matt immer nennen
+      if (d.mattVorher != null && d.mattVorher > 0 && !(d.mattNachher != null && d.mattNachher > 0) && besserB && !d.istBester) {
+        return `${e.klasse === 'gut' ? 'Guter Zug.' : 'Exzellent!'} Hier war aber Matt in ${d.mattVorher} mit ${besserB} möglich.`;
+      }
+      if (e.klasse === 'gut') {
+        return besserB && !d.istBester ? `Guter Zug. Noch etwas genauer war ${besserB}.` : 'Guter Zug.';
+      }
       return besserB && !d.istBester
         ? `Exzellent! Fast so stark wie ${besserB}.`
         : 'Exzellent! Ein sehr starker Zug.';
-
-    case 'gut':
-      return besserB && !d.istBester
-        ? `Guter Zug. Noch etwas genauer war ${besserB}.`
-        : 'Guter Zug.';
+    }
 
     default: {
       // ungenau, fehler, patzer, verpasst
@@ -752,8 +842,9 @@ function pruefeAnalyse(a, fen) {
 
 // Live-Bewertung eines einzelnen Zugs (Zusatz zur Spielanalyse).
 // Liefert den gleichen Eintrag wie in Review.zuege plus analyseVorher/analyseNachher.
+// opts.analyseVorher/analyseNachher: schon gerechnete Analysen, die Engine rechnet dann nur den Rest.
 export async function bewerteZug(engine, fenVorher, zug, opts = {}) {
-  const { tiefe = 14, multipv = 2, analyseVorher = null, buch = false, eroeffnung: name = null,
+  const { tiefe = 14, multipv = 2, analyseVorher = null, analyseNachher = null, buch = false, eroeffnung: name = null,
     gegnerKlasse = null, vorigerZug = null, vorigerSchlag, du = true, ply = null } = opts;
   const c = neuesBrett(fenVorher);
   if (!c) throw new Error('Ungültige Stellung: ' + fenVorher);
@@ -761,10 +852,14 @@ export async function bewerteZug(engine, fenVorher, zug, opts = {}) {
   const m = spieleZug(c, zug);
   if (!m) throw new Error('Ungültiger Zug: ' + JSON.stringify(zug));
   const fenNachher = c.fen();
-  const genug = analyseVorher && analyseVorher.lines && analyseVorher.lines.length >= Math.min(multipv, anzahl)
-    && stellungsSchluessel(analyseVorher.fen || fenVorher) === stellungsSchluessel(fenVorher);
-  const aV = pruefeAnalyse(genug ? analyseVorher : await engine.analyse(fenVorher, { depth: tiefe, multipv }), fenVorher);
-  const aN = pruefeAnalyse(await engine.analyse(fenNachher, { depth: tiefe, multipv }), fenNachher);
+  // schon gerechnete Analysen (z. B. aus der Live-Warteschlange) wiederverwenden
+  const passt = (a, fen, n) => a && !a.abgebrochen && a.lines && a.lines.length >= n
+    && stellungsSchluessel(a.fen || fen) === stellungsSchluessel(fen);
+  const aV = pruefeAnalyse(passt(analyseVorher, fenVorher, Math.min(multipv, anzahl)) ? analyseVorher
+    : await engine.analyse(fenVorher, { depth: tiefe, multipv }), fenVorher);
+  const anzahlNachher = c.moves().length;
+  const aN = pruefeAnalyse(passt(analyseNachher, fenNachher, Math.min(1, anzahlNachher)) ? analyseNachher
+    : await engine.analyse(fenNachher, { depth: tiefe, multipv }), fenNachher);
   const vorher = typeof vorigerZug === 'string' && vorigerSchlag != null
     ? { lan: vorigerZug, to: vorigerZug.slice(2, 4), captured: vorigerSchlag ? 'x' : undefined }
     : vorigerZug;
@@ -792,7 +887,8 @@ function ausVorab(vorab, fen, multipv, minTiefe) {
 // zuege: UCI-Liste (SAN oder {from,to,promotion} gehen auch)
 // opts: { tiefe = 16, multipv = 2, beiFortschritt(fertig, gesamt), startFen,
 //         spielerFarbe ('w'|'b': Du-Form nur fuer diese Seite), elo: { w, b }, signal,
-//         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1 }
+//         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
+//         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart) }
 // Abbruch: signal.abort() oder engine.stop() -> Promise wird mit Fehler (fehler.abgebrochen) abgelehnt.
 export async function analysierePartie(engine, zuege, opts = {}) {
   const tiefe = opts.tiefe ?? 16;
@@ -832,10 +928,11 @@ export async function analysierePartie(engine, zuege, opts = {}) {
   try {
     for (let k = 0; k < fens.length; k++) {
       if (signal && signal.aborted) throw abbruch();
-      const a = ausVorab(opts.vorab, fens[k], multipv, opts.vorabMinTiefe ?? 1)
-        || await engine.analyse(fens[k], { depth: tiefe, multipv });
+      const alt = ausVorab(opts.vorab, fens[k], multipv, opts.vorabMinTiefe ?? 1);
+      const a = alt || await engine.analyse(fens[k], { depth: tiefe, multipv });
       if (signal && signal.aborted) throw abbruch();
       analysen.push(pruefeAnalyse(a, fens[k]));
+      if (!alt && opts.vorabMerken && opts.vorab && typeof opts.vorab.set === 'function') opts.vorab.set(stellungsSchluessel(fens[k]), a);
       melde(k + 1);
     }
   } finally {
@@ -876,12 +973,17 @@ export async function analysierePartie(engine, zuege, opts = {}) {
   }
   for (const z of eintraege) anzahl[z.farbe][z.klasse]++;
 
+  // Bekannte eigene Elo (Bot-Seite): Bot-Tabelle und Zug zur eigenen Elo
   const elo = opts.elo || {};
   const zahl = (f) => eintraege.filter((z) => z.farbe === f).length;
-  const spielstaerke = {
-    w: schaetzeSpielstaerke(genauigkeit.w, elo.b, zahl('w')),
-    b: schaetzeSpielstaerke(genauigkeit.b, elo.w, zahl('b')),
+  const staerke = (f) => {
+    const eigene = elo[f];
+    if (typeof eigene === 'number' && isFinite(eigene) && opts.spielerFarbe !== f) {
+      return schaetzeSpielstaerke(genauigkeit[f], undefined, zahl(f), { eigeneElo: eigene });
+    }
+    return schaetzeSpielstaerke(genauigkeit[f], elo[gegnerVon(f)], zahl(f));
   };
+  const spielstaerke = { w: staerke('w'), b: staerke('b') };
 
   return {
     zuege: eintraege,
@@ -896,6 +998,18 @@ export async function analysierePartie(engine, zuege, opts = {}) {
     tiefe,
     startFen,
   };
+}
+
+// War die Partie fuer farbe knapp? Ja, wenn ihre Gewinnchance im letzten Drittel (vor der
+// Schlussstellung) noch mindestens 40 % betrug. kurve: Gewinnchancen Sicht Weiss je Stellung.
+export function warKnapp(kurve, farbe) {
+  if (!Array.isArray(kurve) || kurve.length < 3) return false;
+  const n = kurve.length - 1;
+  for (let i = Math.floor((n * 2) / 3); i < n; i++) {
+    const c = farbe === 'b' ? 1 - kurve[i] : kurve[i];
+    if (Number.isFinite(c) && c >= 0.4) return true;
+  }
+  return false;
 }
 
 // Wichtigste Momente: Brillanz, starke Zuege, Fehler, Patzer, verpasste Chancen (max. 8)

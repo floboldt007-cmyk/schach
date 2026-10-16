@@ -12,7 +12,7 @@ import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
-  sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN,
+  sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
 } from '../js/review.js';
 import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '../js/openings.js';
 
@@ -122,7 +122,7 @@ function nodeTests() {
   pruefe('Spielstaerke ohne Genauigkeit = null', schaetzeSpielstaerke(null) === null);
 
   // ---------- Deutsche SAN ----------
-  const san = [['Nf3', 'Sf3'], ['Qxd8+', 'Dxd8+'], ['exd8=Q#', 'exd8=D#'], ['O-O', 'O-O'], ['O-O-O+', 'O-O-O+'],
+  const san = [['Nf3', 'Sf3'], ['Qxd8+', 'Dxd8+'], ['exd8=Q#', 'exd8=D#'], ['O-O', '0-0'], ['O-O-O+', '0-0-0+'],
     ['Bb5', 'Lb5'], ['Rxe1', 'Txe1'], ['Kxf7', 'Kxf7'], ['e4', 'e4'], ['bxc6', 'bxc6'], ['Nbd7', 'Sbd7'], ['b8=N', 'b8=S']];
   for (const [a, b] of san) pruefe(`sanDeutsch ${a} -> ${b}`, sanDeutsch(a) === b, sanDeutsch(a));
   pruefe('sanDeutsch null -> leer', sanDeutsch(null) === '');
@@ -179,12 +179,26 @@ function nodeTests() {
   pruefe('verpasst: nicht, wenn danach >= 0.55', verp(0.72, 0.56, 'patzer').klasse === 'fehler');
   pruefe('verpasst: nicht, wenn vorher < 0.70', verp(0.69, 0.53, 'patzer').klasse === 'fehler');
   pruefe('verpasst: nicht ohne Gegnerfehler', verp(0.72, 0.54, 'gut').klasse === 'fehler');
-  pruefe('verpasst: Patzer bleibt patzer', verp(0.80, 0.50, 'patzer').klasse === 'patzer');
+  pruefe('verpasst: auch grosser Verlust, wenn die Stellung offen bleibt (0.80 -> 0.50)', verp(0.80, 0.50, 'patzer').klasse === 'verpasst');
+  pruefe('verpasst: danach verloren (< 0.30) bleibt patzer', verp(0.80, 0.25, 'patzer').klasse === 'patzer');
+  pruefe('verpasst: laesst Matt zu bleibt patzer', klassifiziere(basis(0, { evalVorher: evFuer(0.8), evalNachher: matt(-3), gegnerKlasse: 'patzer' })).klasse === 'patzer');
   pruefe('verpasst: auch mit gegnerFehler=true', klassifiziere(basis(0, { evalVorher: evFuer(0.72), evalNachher: evFuer(0.54), gegnerFehler: true })).klasse === 'verpasst');
 
   // entschiedene Stellungen: hoechstens ungenau
-  const rent = klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: ev(950) }));
-  pruefe('entschieden: Matt -> +9.5 hoechstens ungenau', ['exzellent', 'gut', 'ungenau'].includes(rent.klasse), rent.klasse);
+  const rent = klassifiziere(basis(0, { evalVorher: matt(5), evalNachher: ev(950) }));
+  pruefe('entschieden: Matt in 5 -> +9.5 hoechstens ungenau', ['exzellent', 'gut', 'ungenau'].includes(rent.klasse), rent.klasse);
+  pruefe('entschieden: Coach nennt das ausgelassene Matt', /Hier war aber Matt in 5 mit dxc5 möglich/.test(coachText(basis(0, { evalVorher: matt(5), evalNachher: ev(950) }))));
+  // ausgelassenes Matt in hoechstens 3: "Chance verpasst" (wie "Miss" bei chess.com)
+  const rm3 = klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: ev(950) }));
+  pruefe('Matt in 3 ausgelassen (+9,5) -> verpasst', rm3.klasse === 'verpasst' && /Matt in 3 verpasst/.test(rm3.notiz), rm3.klasse);
+  pruefe('Matt in 2 ausgelassen (+50,0, Gewinnchance gesaettigt) -> verpasst', klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: ev(5000) })).klasse === 'verpasst');
+  const MISS = 'r1b1k2B/ppqpp2Q/2p5/8/8/1P3P2/P1P2PPP/RN2KB1R w KQkq - 1 12';
+  const miss = { fenVorher: MISS, uci: 'h8d4', besterZug: 'h7g8', pvVorher: ['h7g8'], evalVorher: matt(1), evalNachher: ev(1604), pvNachher: [] };
+  const rmiss = klassifiziere(miss);
+  const tmiss = coachText(miss, rmiss);
+  pruefe('Matt in 1 ausgelassen (Lh8-d4 statt Dg8#) -> verpasst', rmiss.klasse === 'verpasst', rmiss.klasse);
+  pruefe('Coach: "Hier war Matt in 1 mit Dg8# möglich"', /^Chance verpasst! Hier war Matt in 1 mit Dg8# möglich/.test(tmiss), tmiss);
+  pruefe('Matt in 2 statt Matt in 1 bleibt gut (Matt-Saettigung)', klassifiziere({ ...miss, evalNachher: matt(2) }).klasse !== 'verpasst');
   const rmatt = klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: matt(5) }));
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 5 = exzellent', rmatt.klasse === 'exzellent', rmatt.klasse);
   const rmatt2 = klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: matt(1) }));
@@ -208,6 +222,51 @@ function nodeTests() {
   const NACH_E5 = fenNach(['e4', 'Nf6', 'e5']);
   const flucht = klassifiziere({ fenVorher: NACH_E5, uci: 'f6d5', besterZug: 'f6d5', evalVorher: ev(-30), evalNachher: ev(-30), evalZweiter: ev(250) });
   pruefe('stark: Flucht vor Bauernangriff -> bester', flucht.klasse === 'bester', flucht.klasse);
+  // Schachabwehr mit nur zwei erlaubten Zuegen (5.g3 nach 4...Dh4+) ist selbstverstaendlich
+  const SCHACH_G3 = 'r1b1kbnr/pppp1pp1/2n1p2p/8/4PP1q/8/PPPP2PP/RNBQKBNR w KQkq - 1 5';
+  const abwehr = klassifiziere({ fenVorher: SCHACH_G3, uci: 'g2g3', besterZug: 'g2g3', evalVorher: ev(0), evalNachher: ev(0), evalZweiter: ev(-236) });
+  pruefe('stark: Schachabwehr mit 2 Zuegen -> bester', abwehr.klasse === 'bester', abwehr.klasse);
+
+  // bester nur fuer den Engine-Zug oder gleiche Bewertung
+  const GLEICH = '8/5r2/p3k3/3p4/1P1P4/4K3/4R3/8 w - - 1 49';
+  const gleich = { fenVorher: GLEICH, uci: 'e2d2', besterZug: 'e2h2', evalVorher: ev(0), evalNachher: ev(0) };
+  const rgl = klassifiziere(gleich);
+  pruefe('bester: anderer Zug mit gleicher Bewertung', rgl.klasse === 'bester', rgl.klasse);
+  pruefe('bester: kein "Genau das hätte auch die Engine gespielt" fuer einen anderen Zug', !/hätte auch die Engine/.test(coachText(gleich, rgl)), coachText(gleich, rgl));
+  const kh1 = klassifiziere(basis(0, { evalVorher: ev(8400), evalNachher: ev(6100) }));
+  pruefe('exzellent: +84 -> +61 (Gewinnchance gesaettigt) ist nicht "bester"', kh1.klasse === 'exzellent', kh1.klasse);
+  pruefe('bester: Engine-Zug darf "hätte auch die Engine gespielt" sagen', [0, 1, 2, 3, 4, 5].some((i) =>
+    /hätte auch die Engine/.test(coachText(basis(0, { uci: 'd4c5', fenVorher: MITTE.replace(' 0 8', ` 0 ${8 + i}`) })))));
+
+  // Umwandlung nie als "acht Bauern"
+  const UMW = '8/1P6/8/8/8/2k5/8/K7 w - - 0 1';
+  const tumw = coachText({ fenVorher: UMW, uci: 'b7b8q', besterZug: 'b7b8q', pvVorher: ['b7b8q', 'c3d3'], evalVorher: ev(900), evalNachher: ev(900), pvNachher: ['c3d3', 'b8b3'] });
+  pruefe('Coach Umwandlung: "neue Dame (b8=D)", keine Bauernzahl', /neue Dame \(b8=D\)/.test(tumw) && !/Bauern/.test(tumw), tumw);
+  const UMW_G = '8/8/8/8/8/2K5/1p6/7k w - - 0 1';
+  const tumwG = coachText({ fenVorher: UMW_G, uci: 'c3d3', besterZug: 'c3b2', pvVorher: ['c3b2'], evalVorher: ev(0), evalNachher: ev(-900), pvNachher: ['b2b1q', 'd3e3'] });
+  pruefe('Coach Umwandlung des Gegners: "wandelt dein Gegner in eine Dame um"', /wandelt dein Gegner in eine Dame um \(b1=D\+?\)/.test(tumwG) && !/(sieben|acht|neun) Bauern/.test(tumwG), tumwG);
+  const tumwB = coachText({ fenVorher: UMW_G, uci: 'c3d3', besterZug: 'c3b2', pvVorher: ['c3b2'], evalVorher: ev(0), evalNachher: ev(-900), pvNachher: ['b2b1q', 'd3e3'], du: false });
+  pruefe('Coach Umwandlung (Bot-Sicht): "wandelt Schwarz in eine Dame um"', /wandelt Schwarz in eine Dame um/.test(tumwB), tumwB);
+
+  // kein Brillant, wenn nach dem Annehmen des Opfers totes Remis bleibt
+  const TOT = '5B2/8/7K/3k4/2b5/8/8/8 w - - 6 76';
+  const tot = klassifiziere({ fenVorher: TOT, uci: 'f8c5', besterZug: 'f8c5', evalVorher: ev(7), evalNachher: ev(0), evalZweiter: ev(0), pvNachher: ['d5c5'] });
+  pruefe('kein brillant: Laeufer einstellen ins tote Remis', tot.klasse !== 'brillant', tot.klasse);
+
+  // Spielstaerke der Bot-Seite (eigene Elo bekannt): Bot-Tabelle, halber Weg zur eigenen Elo
+  const bot = (g, elo, n = 40) => schaetzeSpielstaerke(g, undefined, n, { eigeneElo: elo });
+  pruefe('Spielstaerke Bot: Benno 65,7 % ~ 250', Math.abs(bot(65.7, 250) - 250) <= 50, bot(65.7, 250));
+  pruefe('Spielstaerke Bot: Hilde 75,9 % ~ 500', Math.abs(bot(75.9, 500) - 500) <= 50, bot(75.9, 500));
+  pruefe('Spielstaerke Bot: Kalle 78,5 % ~ 800', Math.abs(bot(78.5, 800) - 800) <= 100, bot(78.5, 800));
+  pruefe('Spielstaerke Bot: Greta 92,9 % ~ 2100', Math.abs(bot(92.9, 2100) - 2100) <= 100, bot(92.9, 2100));
+  pruefe('Spielstaerke Bot: kurze Partie zur eigenen Elo (nicht 1000)', bot(45, 500, 10) <= 500, bot(45, 500, 10));
+  pruefe('Spielstaerke Mensch unveraendert (80 % ~ 1350)', schaetzeSpielstaerke(80) === 1350);
+
+  // "Knapp!" nur, wenn die Partie im letzten Drittel noch offen war
+  pruefe('warKnapp: frueh gekippt -> nein', warKnapp([0.5, 0.5, 0.3, 0.2, 0.1, 0], 'w') === false);
+  pruefe('warKnapp: bis spaet offen -> ja', warKnapp([0.5, 0.5, 0.55, 0.5, 0.45, 0], 'w') === true);
+  pruefe('warKnapp: Sicht Schwarz', warKnapp([0.5, 0.5, 0.55, 0.5, 0.45, 1], 'b') === true && warKnapp([0.5, 0.6, 0.8, 0.9, 0.95, 1], 'b') === false);
+  pruefe('warKnapp: Matt im 1. Zug (nur Schlussstellung) -> nein', warKnapp([0.3, 0], 'w') === false);
 
   // brillant
   const ERSTICKT = '5r1k/pp4pp/7N/3Q4/8/8/5PPP/6K1 w - - 0 1';
@@ -432,6 +491,19 @@ async function asyncTests() {
   pruefe('bewerteZug: liefert beide Analysen', live.analyseVorher && live.analyseNachher && fake3.aufrufe.length === 2);
   const live2 = await bewerteZug(fake3, DAME, 'Nc6', { analyseVorher: live.analyseVorher });
   pruefe('bewerteZug: nutzt vorhandene Analyse, SAN-Eingabe', fake3.aufrufe.length === 3 && live2.uci === 'b8c6' && live2.klasse === 'bester');
+  const live3 = await bewerteZug(fake3, DAME, 'd8g5', { analyseVorher: live.analyseVorher, analyseNachher: live.analyseNachher });
+  pruefe('bewerteZug: beide Analysen vorhanden -> keine Engine-Suche', fake3.aufrufe.length === 3 && live3.klasse === 'patzer', fake3.aufrufe.length);
+  // vorabMerken: neu gerechnete Stellungen landen in vorab (Neustart nach Abbruch rechnet nichts doppelt)
+  const merk = new Map();
+  const fakeM = new FakeEngine();
+  await analysierePartie(fakeM, uciListe(['e4', 'e5', 'Nf3']), { vorab: merk, vorabMerken: true });
+  pruefe('Partie mit vorabMerken: 4 Stellungen in vorab', merk.size === 4 && fakeM.aufrufe.length === 4, merk.size);
+  const fakeM2 = new FakeEngine();
+  await analysierePartie(fakeM2, uciListe(['e4', 'e5', 'Nf3']), { vorab: merk });
+  pruefe('Partie danach: nichts neu gerechnet', fakeM2.aufrufe.length === 0, fakeM2.aufrufe.length);
+  // Bot-Seite mit bekannter Elo: Schaetzung nahe der eigenen Elo
+  const rBot = await analysierePartie(new FakeEngine(), uciListe(['e4', 'e5']), { elo: { b: 500 }, spielerFarbe: 'w' });
+  pruefe('Partie: kurze Partie, Bot-Seite nahe der eigenen Elo', Math.abs(rBot.spielstaerke.b - 500) <= 100, JSON.stringify(rBot.spielstaerke));
 }
 
 // ===========================================================================

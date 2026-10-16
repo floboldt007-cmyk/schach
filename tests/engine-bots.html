@@ -154,6 +154,16 @@ async function testEngine() {
   pruefe("prioritaet 'sofort' bricht laufende Suche ab", aErg.abgebrochen && b.fen === MITTE && b.depth === 8 && !b.abgebrochen,
     Math.round(jetzt() - t) + ' ms');
 
+  // Prioritaet 'vorne': laeuft nach der laufenden Suche, vor den wartenden, ohne Abbruch
+  const reihe = [];
+  const lauf = e.analyse(MITTE, { depth: 17 }).then((x) => { reihe.push('lauf'); return x; });
+  const wartend = e.analyse(NACH_E4, { depth: 8 }).then((x) => { reihe.push('wartend'); return x; });
+  await warte(60);
+  const vorne = e.analyse(START, { depth: 8, prioritaet: 'vorne' }).then((x) => { reihe.push('vorne'); return x; });
+  const [lErg] = await Promise.all([lauf, wartend, vorne]);
+  pruefe("prioritaet 'vorne': vor den Wartenden, laufende Suche rechnet zu Ende", reihe.join(',') === 'lauf,vorne,wartend' && !lErg.abgebrochen && lErg.depth === 17,
+    reihe.join(','));
+
   // Warteschlange
   const fens = [START, MITTE, NACH_E4];
   const res = await Promise.all(fens.map((f) => e.analyse(f, { depth: 9, multipv: 2 })));
@@ -284,6 +294,18 @@ async function testBots() {
   }
   pruefe('Jeder Bot liefert legale Zuege (uci + passende SAN)', alleLegal, info || (BOTS.length * stellungen.length + ' Zuege, ' + Math.round(jetzt() - t0) + ' ms'));
   pruefe('Keine legalen Zuege: null', (await botZug(e, MATT_SCHWARZ_IST_MATT, BOTS[0], { ohnePause: true })) === null);
+
+  // Abgestuerzter Worker (leere Analyse mit fehler): einmal neu versuchen, sonst Fehler statt Zufallszug
+  const greta = BOTS.find((b) => b.id === 'greta');
+  let aufrufe = 0;
+  const einmalKaputt = { analyse: (fen, o) => (++aufrufe === 1
+    ? Promise.resolve({ fen, lines: [], abgebrochen: true, fehler: 'Absturz (Test)' }) : e.analyse(fen, o)) };
+  const rNeu = await botZug(einmalKaputt, MITTE, greta, { ohnePause: true });
+  pruefe('Bot: nach einem Engine-Absturz neuer Versuch (Engine-Zug)', aufrufe === 2 && rNeu && legal(MITTE, rNeu.uci) && rNeu.art !== 'patzer', aufrufe + ' Aufrufe, ' + (rNeu && rNeu.art));
+  const immerKaputt = { analyse: (fen) => Promise.resolve({ fen, lines: [], abgebrochen: true, fehler: 'Absturz (Test)' }) };
+  let geworfen = false;
+  try { await botZug(immerKaputt, MITTE, greta, { ohnePause: true }); } catch (err) { geworfen = true; }
+  pruefe('Bot: Engine bleibt kaputt -> Fehler (die App meldet ihn) statt stillem Zufallszug', geworfen);
 
   // Matt in 1
   const mattStellungen = MATT_IN_1_STELLUNGEN.filter((f) => {

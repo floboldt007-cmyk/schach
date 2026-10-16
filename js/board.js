@@ -23,7 +23,7 @@ const UMWANDLUNG_REIHE = ['q', 'r', 'b', 'n']; // Vertrag: D T L S
 
 export const KLASSEN_TITEL = {
   brillant: 'Brillant', stark: 'Großartig', bester: 'Bester Zug', exzellent: 'Exzellent',
-  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenauigkeit', fehler: 'Fehler',
+  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler',
   verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
 };
 
@@ -847,7 +847,7 @@ export class Brett {
     wahl.append(...knoepfe);
     this._umwandlungEl.replaceChildren(wahl);
     this._umwandlungEl.hidden = false;
-    this._umwandlung = { von, nach, verdeckt, bauer, knopf: null };
+    this._umwandlung = { von, nach, verdeckt, bauer, knopf: null, seit: Date.now() };
     this._auswahl = von;
     this._zeichneLagen();
     document.addEventListener('keydown', this._h.taste);
@@ -901,6 +901,9 @@ export class Brett {
   _wahlKlick(e) {
     e.stopPropagation();
     if (e.detail !== 0 || !this._umwandlung) return; // nur Tastatur (Enter/Leertaste)
+    // Der Klick des Tipps, der die Auswahl geoeffnet hat, landet auf der Dame unter dem Finger
+    // (manche Touch-Browser melden ihn mit detail 0): kurz nach dem Oeffnen nicht als Wahl werten
+    if (Date.now() - this._umwandlung.seit < 500) return;
     const knopf = e.target.closest('.umwandlung-figur');
     if (knopf) this._waehleUmwandlung(knopf.dataset.figur);
   }

@@ -13,6 +13,10 @@ Deine Partien und Sterne liegen nur im Speicher des Browsers.
 
 ## Auf dem iPad installieren
 
+Voraussetzung ist **iPadOS 16.4 oder neuer** (Stockfish braucht WebAssembly mit SIMD). Auf einem
+älteren iPad sagt die App beim Start Bescheid; das Update gibt es unter Einstellungen → Allgemein →
+Softwareupdate.
+
 1. Den Link oben in **Safari** öffnen.
 2. Auf **Teilen** tippen (das Quadrat mit dem Pfeil nach oben).
 3. **Zum Home-Bildschirm** wählen und mit **Hinzufügen** bestätigen.
@@ -21,7 +25,8 @@ Deine Partien und Sterne liegen nur im Speicher des Browsers.
 
 Gut zu wissen:
 - Spiel am besten **immer über das Icon**. Die App vom Home-Bildschirm hat auf dem iPad ihren
-  eigenen Speicher, getrennt vom Safari-Tab. Dort bleibt dein Fortschritt auch dauerhaft erhalten.
+  eigenen Speicher, getrennt vom Safari-Tab: Was du im Tab spielst, wird nicht übernommen. In der
+  App bleibt dein Fortschritt auch dauerhaft erhalten. Im Safari-Tab erinnert die App einmal daran.
 - **Updates** kommen von selbst: Gibt es eine neue Version, erscheint oben der Hinweis
   „Neue Version verfügbar“. Tippe auf **Neu laden**, oder starte die App einfach später neu.
   Eine laufende Partie wird vorher gespeichert.
@@ -52,13 +57,13 @@ Gewinnchance.
 |---|---|---|
 | !! | **Brillant** | Bester oder fast bester Zug, bei dem du eine Figur opferst. Die Stellung bleibt danach gut und war vorher noch nicht entschieden. |
 | ! | **Großartig** | Der einzige gute Zug: Jeder andere Zug wäre mindestens 10 Punkte schlechter gewesen. |
-| ★ | **Bester Zug** | Genau der Zug, den auch Stockfish spielen würde. |
+| ★ | **Bester Zug** | Genau der Zug, den auch Stockfish spielen würde (oder ein Zug, der wirklich gleich gut ist). |
 | ⌃⌃ | **Exzellent** | Fast so gut wie der beste Zug (höchstens 2 Punkte schlechter). |
 | ⌃ | **Gut** | Ein solider Zug (höchstens 5 Punkte schlechter). |
 | B | **Buchzug** | Ein bekannter Eröffnungszug aus der Eröffnungstabelle (nur in den ersten Zügen). |
 | ?! | **Ungenau** | Verschenkt etwas (bis 10 Punkte). |
 | ? | **Fehler** | Verschenkt deutlich (bis 20 Punkte). |
-| Ø | **Chance verpasst** | Der Bot hatte gerade einen Fehler gemacht und du hättest klar besser stehen können, hast die Chance aber liegen lassen. |
+| Ø | **Chance verpasst** | Der Bot hatte gerade einen Fehler gemacht und du hättest klar besser stehen können, hast die Chance aber liegen lassen. Auch ein ausgelassenes Matt in 1 bis 3 Zügen zählt so. |
 | ?? | **Patzer** | Ein schwerer Fehler (mehr als 20 Punkte). |
 | → | **Erzwungen** | Es gab nur einen einzigen erlaubten Zug. |
 

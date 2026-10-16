@@ -5,7 +5,8 @@
 //   zeige(root, params, app) -> { verlasse() }
 // app = { gehe, zurueck, engine, einstellungen, setzeEinstellungen, meldung, vorab }
 // Zusaetze: app.frage({ titel, text, knoepfe: [{ text, wert, art }], abbrechen }) -> Promise<wert>
-//           (Rueckfrage-Dialog), app.test (true bei ?test in der URL).
+//           (Rueckfrage-Dialog), app.schliesseDialog() (offene Rueckfrage mit "abbrechen" schliessen),
+//           app.test (true bei ?test in der URL).
 // Ausserdem exportiert: icon(name, klasse) -> SVG-Text der gemeinsamen Strich-Icons.
 // Registriert sw.js (Offline-Cache) und zeigt bei einer neuen Version den Hinweis "Neu laden".
 import { Engine } from './engine.js';
@@ -64,14 +65,63 @@ function wendeEinstellungenAn(e) {
 
 // ---------- Engines (zwei Instanzen, lazy, einmal init) ----------
 
+// Stockfish braucht WebAssembly mit SIMD (Safari ab iOS/iPadOS 16.4). Einmal vorab pruefen:
+// Fehlt SIMD oder die Engine-Datei, gibt es sofort eine klare Meldung statt einer stillen
+// Wartezeit bei jedem Zug (ein gescheiterter Start im Worker meldet sich nicht von selbst).
+const WASM_PFAD = 'vendor/stockfish/stockfish-19-lite-single.wasm';
+// kleinstes Modul mit einem SIMD-Befehl (v128)
+const SIMD_TEST = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+const ENGINE_TEXT = {
+  'kein-simd': 'Für die Schach-Engine braucht dein iPad iPadOS 16.4 oder neuer (Einstellungen → Allgemein → Softwareupdate). Bis dahin spielen die Bots ohne Engine und es gibt keine Bewertung.',
+  'kein-wasm': 'Dieser Browser kann die Schach-Engine nicht starten. Bitte Safari oder einen aktuellen Browser nehmen.',
+  'wasm-kaputt': 'Die Datei der Schach-Engine ist beschädigt. Lade die App bitte neu.',
+};
+let wasmPruefung = null;
+let engineGemeldet = false;
+
+function dauerhafterFehler(code) {
+  const f = new Error(ENGINE_TEXT[code] || code);
+  f.code = code;
+  f.dauerhaft = true;
+  return f;
+}
+
+export function pruefeWasm({ simdTest = SIMD_TEST, pfad = WASM_PFAD } = {}) {
+  if (!wasmPruefung) {
+    const p = (async () => {
+      if (typeof WebAssembly !== 'object' || typeof WebAssembly.validate !== 'function') throw dauerhafterFehler('kein-wasm');
+      if (!WebAssembly.validate(simdTest)) throw dauerhafterFehler('kein-simd');
+      if (typeof fetch !== 'function') return;
+      const antwort = await fetch(pfad);   // kommt offline aus dem Cache des Service Workers
+      if (!antwort.ok) throw new Error('Engine-Datei nicht erreichbar (' + antwort.status + ')');
+      if (!WebAssembly.validate(new Uint8Array(await antwort.arrayBuffer()))) throw dauerhafterFehler('wasm-kaputt');
+    })();
+    // nur dauerhafte Fehler merken, sonst beim naechsten Mal neu versuchen
+    p.catch((e) => { if (!(e && e.dauerhaft) && wasmPruefung === p) wasmPruefung = null; });
+    wasmPruefung = p;
+  }
+  return wasmPruefung;
+}
+
+function meldeEngineFehler(e) {
+  if (!e || !e.dauerhaft || engineGemeldet) return;
+  engineGemeldet = true;
+  frage({ titel: 'Schach-Engine startet nicht', text: e.message, knoepfe: [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen: true });
+}
+
 const engines = new Map();
 function engine(name) {
   const schluessel = name === 'bot' ? 'bot' : 'bewertung';
   let p = engines.get(schluessel);
   if (!p) {
     const e = new Engine();
-    p = e.init().then(() => e);
-    p.catch(() => { if (engines.get(schluessel) === p) engines.delete(schluessel); try { e.terminate(); } catch (f) { /* egal */ } });
+    p = pruefeWasm().then(() => e.init()).then(() => e);
+    p.catch((f) => {
+      meldeEngineFehler(f);
+      // dauerhafte Fehler bleiben stehen (sofortige Absage statt neuer Versuche je Zug)
+      if (!(f && f.dauerhaft) && engines.get(schluessel) === p) engines.delete(schluessel);
+      try { e.terminate(); } catch (g) { /* egal */ }
+    });
     engines.set(schluessel, p);
   }
   return p;
@@ -115,6 +165,7 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
     const p = ort.querySelector('p');
     if (text) p.textContent = text; else p.remove();
     const leiste = ort.querySelector('.dialog-knoepfe');
+    const vorherFokus = document.activeElement;
     let fertig = false;
     const ende = (wert) => {
       if (fertig) return;
@@ -123,10 +174,23 @@ function frage({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art
       ort.classList.add('weg');
       setTimeout(() => ort.remove(), 200);
       if (offenerDialog && offenerDialog.ort === ort) offenerDialog = null;
+      // Fokus zurueck, wo er vorher war
+      if (vorherFokus && vorherFokus.isConnected && typeof vorherFokus.focus === 'function') {
+        try { vorherFokus.focus({ preventScroll: true }); } catch (e) { /* egal */ }
+      }
       resolve(wert);
     };
     const taste = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); }
+      if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
+      // Tab bleibt im Dialog (aria-modal): vom letzten Knopf zum ersten und umgekehrt
+      if (e.key === 'Tab') {
+        const k = [...leiste.querySelectorAll('button')];
+        if (!k.length) return;
+        const i = k.indexOf(document.activeElement);
+        const naechster = e.shiftKey ? (i <= 0 ? k[k.length - 1] : k[i - 1]) : (i < 0 || i === k.length - 1 ? k[0] : k[i + 1]);
+        e.preventDefault();
+        naechster.focus();
+      }
     };
     for (const k of knoepfe) {
       const b = document.createElement('button');
@@ -251,6 +315,8 @@ async function zeigeScreen(name, params, hash) {
   if (aktuell && aktuell.handle) {
     try { aktuell.handle.verlasse(); } catch (e) { console.error(e); }
   }
+  // Meldungen gehoeren zum alten Screen ("Zug zurückgenommen" nicht in der naechsten Partie)
+  if (toastOrt) { clearTimeout(toastUhr); toastOrt.replaceChildren(); }
   const root = document.getElementById('app');
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
@@ -258,7 +324,7 @@ async function zeigeScreen(name, params, hash) {
   document.title = name === 'arena' ? 'Schach-Arena' : `${TITEL[name]} · Schach-Arena`;
   window.scrollTo(0, 0);
   if (!modul) {
-    if (TEST) console.info('Screen fehlt noch: ' + name, ladeFehler && ladeFehler.message);
+    if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
     aktuell.handle = zeigePlatzhalter(root, name);
     return;
   }
@@ -271,7 +337,8 @@ async function zeigeScreen(name, params, hash) {
   }
 }
 
-// Freundlicher Ersatz, solange ein Screen-Modul fehlt (oder abstuerzt)
+// Freundlicher Ersatz, wenn ein Screen-Modul nicht laedt (Netz) oder abstuerzt. Ein gescheiterter
+// Modul-Import bleibt bis zum Neuladen im Browser haengen, deshalb der Knopf "Neu laden".
 function zeigePlatzhalter(root, name, kaputt = false) {
   const s = document.createElement('section');
   s.className = 'screen platzhalter';
@@ -283,17 +350,19 @@ function zeigePlatzhalter(root, name, kaputt = false) {
     </header>
     <div class="platzhalter-inhalt">
       <div class="platzhalter-karte flaeche">
-        <div class="platzhalter-icon">${icon('baustelle')}</div>
-        <div class="logo">BALD DA</div>
+        <div class="platzhalter-icon">${icon('ziel')}</div>
+        <div class="logo">HOPPLA</div>
         <p></p>
-        <button class="knopf primaer gross" type="button" data-aktion="arena">${icon('zurueck')} Zur Arena</button>
+        <button class="knopf primaer gross" type="button" data-aktion="neu-laden">${icon('nochmal')} Neu laden</button>
+        <button class="knopf gross" type="button" data-aktion="arena">${icon('zurueck')} Zur Arena</button>
       </div>
     </div>`;
   s.querySelector('h2').textContent = TITEL[name] || 'Bereich';
   s.querySelector('p').textContent = kaputt
     ? 'Hier ist etwas schiefgegangen. Versuch es gleich noch einmal.'
-    : `Der Bereich „${TITEL[name] || name}“ wird gerade gebaut. Schau bald wieder vorbei!`;
+    : `Der Bereich „${TITEL[name] || name}“ konnte nicht geladen werden. Prüfe die Internetverbindung und lade die App neu.`;
   s.querySelector('[data-aktion="zurueck"]').addEventListener('click', () => zurueck());
+  s.querySelector('[data-aktion="neu-laden"]').addEventListener('click', () => location.reload());
   s.querySelector('[data-aktion="arena"]').addEventListener('click', () => gehe('arena', {}, { ersetzen: true }));
   root.append(s);
   return { verlasse() {} };
@@ -313,6 +382,7 @@ export const app = {
   },
   meldung,
   frage,
+  schliesseDialog,
   vorab: new Map(),
   test: TEST,
 };
@@ -386,6 +456,31 @@ function zeigeUpdateHinweis(neuLaden) {
   updateHinweis = h;
 }
 
+// ---------- iPad: Safari-Tab oder Home-Bildschirm ----------
+// Auf iOS hat die App vom Home-Bildschirm einen eigenen Speicher, der Fortschritt aus dem
+// Safari-Tab wird nicht uebernommen (und Safari loescht Tab-Daten nach 7 Tagen ohne Besuch).
+// navigator.standalone gibt es nur auf iOS: false = Safari-Tab, true = Home-Bildschirm.
+const HINWEIS_MERKER = 'schach-arena:v1:hinweis-installieren';
+function pruefeInstallation() {
+  if (typeof navigator === 'undefined') return;
+  if (navigator.standalone === true) {
+    // Home-Bildschirm-App: Speicher als dauerhaft markieren (WebKit gewaehrt das)
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* egal */ }
+    return;
+  }
+  if (navigator.standalone !== false) return;
+  try {
+    if (localStorage.getItem(HINWEIS_MERKER)) return;
+    localStorage.setItem(HINWEIS_MERKER, '1');
+  } catch (e) { return; }
+  setTimeout(() => frage({
+    titel: 'Tipp: Als App speichern',
+    text: 'Tippe auf Teilen und dann auf „Zum Home-Bildschirm“. Als App bleibt dein Fortschritt dauerhaft erhalten. Was du hier im Safari-Tab spielst, wird nicht in die App übernommen.',
+    knoepfe: [{ text: 'Verstanden', wert: true, art: 'primaer' }],
+    abbrechen: true,
+  }), 1200);
+}
+
 // ---------- Start ----------
 
 function starte() {
@@ -407,6 +502,7 @@ function starte() {
   });
   if (TEST) window.__app = app;
   beiVerlauf();
+  pruefeInstallation();
   // erst nach dem Laden, damit das Vorladen des Caches den Start nicht bremst
   if (document.readyState === 'complete') registriereSW();
   else window.addEventListener('load', registriereSW, { once: true });

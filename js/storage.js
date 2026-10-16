@@ -5,6 +5,9 @@
 // Rein ohne DOM, in Node testbar (setzeSpeicher(fake)).
 import { BOTS } from './bots.js';
 
+// Zug-Klassen (wie review.js KLASSEN), zum Pruefen gespeicherter Daten
+const KLASSEN_LISTE = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
+
 export const SPEICHER_VERSION = 1;
 const P = 'schach-arena:v1:';
 const K = {
@@ -20,6 +23,8 @@ export const MAX_REVIEWS = 25;
 // So viele Partien bleiben in der Liste
 export const MAX_PARTIEN = 300;
 export const GENAUIGKEIT_STERN = 80;
+// Bestwert der Genauigkeit erst ab so vielen eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
+export const BESTWERT_MIN_ZUEGE = 10;
 
 export const STANDARD_EINSTELLUNGEN = Object.freeze({
   klang: true,           // Klaenge an
@@ -188,6 +193,18 @@ export function naechsterGegner(f = ladeFortschritt()) {
   return sortiert[sortiert.length - 1];
 }
 
+// Anzahl der eigenen Zuege einer Partie (Startfarbe aus startFen)
+export function eigeneZuege(p) {
+  const n = p && Array.isArray(p.zuege) ? p.zuege.length : 0;
+  const start = p && typeof p.startFen === 'string' && p.startFen.split(' ')[1] === 'b' ? 'b' : 'w';
+  const ich = p && p.spielerFarbe === 'b' ? 'b' : 'w';
+  return start === ich ? Math.ceil(n / 2) : Math.floor(n / 2);
+}
+
+function zaehltFuerBestwert(p) {
+  return Number.isFinite(p.genauigkeit) && eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
+}
+
 export function sterneFuerPartie(p) {
   const sieg = !!p && p.ergebnis === 'sieg';
   return [
@@ -257,7 +274,7 @@ export function speicherePartie(partie, review = null) {
     if (p.ergebnis === 'sieg') b.siege++;
     else if (p.ergebnis === 'remis') b.remis++;
     else b.niederlagen++;
-    if (Number.isFinite(p.genauigkeit) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
+    if (zaehltFuerBestwert(p) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
     p.sterne.forEach((s, i) => {
       if (s && !b.sterne[i]) {
         b.sterne[i] = true;
@@ -268,14 +285,63 @@ export function speicherePartie(partie, review = null) {
     const neuFrei = jetztFrei.filter((id) => !vorherFrei.includes(id));
     if (neuFrei.length) ergebnis.neuFreigeschaltet = BOTS.find((x) => x.id === neuFrei[0]) || null;
   }
-  // Brillant-Sammlung (Schatzkiste)
+  ergebnis.brillant = sammleBrillante(f, p, review);
+  speichereFortschritt(f);
+  return ergebnis;
+}
+
+// Brillant-Sammlung (Schatzkiste); jeder Zug nur einmal
+function sammleBrillante(f, p, review) {
+  let n = 0;
   const zuege = review && Array.isArray(review.zuege) ? review.zuege : [];
   for (const z of zuege) {
-    if (z && z.klasse === 'brillant' && z.farbe === p.spielerFarbe) {
+    if (z && z.klasse === 'brillant' && z.farbe === p.spielerFarbe
+      && !f.brillanteZuege.some((x) => x.partieId === p.id && x.ply === z.ply)) {
       f.brillanteZuege.push({ partieId: p.id, ply: z.ply, san: z.san, botId: p.botId, datum: p.datum });
-      ergebnis.brillant++;
+      n++;
     }
   }
+  return n;
+}
+
+// Traegt die Spielanalyse einer schon gespeicherten Partie nach (die Partie wird am Ende sofort
+// gesichert, die Analyse kommt spaeter): Genauigkeit, Spielstaerke, Eroeffnung, Review,
+// Brillant-Zuege und Bestwert. Sterne werden nur dazugewonnen, nie entzogen.
+// Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung) nur, wenn noch keine da ist.
+// Rueckgabe { partie, neueSterne, brillant } oder null.
+export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) {
+  const liste = ladeListe();
+  const i = liste.findIndex((x) => x.id === id);
+  if (i < 0) return null;
+  const p = { ...liste[i] };
+  const sf = p.spielerFarbe === 'b' ? 'b' : 'w';
+  const bf = sf === 'w' ? 'b' : 'w';
+  if (review && review.genauigkeit) {
+    if (Number.isFinite(review.genauigkeit[sf])) p.genauigkeit = review.genauigkeit[sf];
+    if (Number.isFinite(review.genauigkeit[bf])) p.genauigkeitBot = review.genauigkeit[bf];
+    if (review.spielstaerke && Number.isFinite(review.spielstaerke[sf])) p.spielstaerke = review.spielstaerke[sf];
+    if (review.eroeffnung) p.eroeffnung = review.eroeffnung;
+  } else if (Number.isFinite(genauigkeit) && !Number.isFinite(p.genauigkeit)) {
+    p.genauigkeit = genauigkeit;
+  }
+  p.sterne = sterneFuerPartie(p);
+  liste[i] = p;
+  schreib(K.partien, liste);
+  if (review) speichereReview(id, review);
+
+  const ergebnis = { partie: p, neueSterne: [false, false, false], brillant: 0 };
+  const f = ladeFortschritt();
+  const b = f.bots[p.botId];
+  if (b) {
+    if (zaehltFuerBestwert(p) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
+    p.sterne.forEach((s, k) => {
+      if (s && !b.sterne[k]) {
+        b.sterne[k] = true;
+        ergebnis.neueSterne[k] = true;
+      }
+    });
+  }
+  ergebnis.brillant = sammleBrillante(f, p, review);
   speichereFortschritt(f);
   return ergebnis;
 }
@@ -339,7 +405,11 @@ export function speichereLaufendePartie(stand) {
 export function ladeLaufendePartie() {
   const s = lies(K.laufend, null);
   if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || !BOTS.some((b) => b.id === s.botId)) return null;
-  return s;
+  // von Hand veraenderte Daten: nur bekannte Klassen und gueltige Zuege uebernehmen
+  const zuege = s.zuege.filter((u) => typeof u === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(u));
+  if (zuege.length !== s.zuege.length) return null;
+  const liveKlassen = Array.isArray(s.liveKlassen) ? s.liveKlassen.map((k) => (KLASSEN_LISTE.includes(k) ? k : null)) : [];
+  return { ...s, liveKlassen };
 }
 
 export function loescheLaufendePartie() {
@@ -360,7 +430,10 @@ export function statistik() {
     niederlagen: l.filter((p) => p.ergebnis === 'niederlage').length,
     schnittGenauigkeit: gen.length ? Math.round((gen.reduce((a, b) => a + b, 0) / gen.length) * 10) / 10 : null,
     spielstaerke: st.length ? Math.round(st.reduce((a, b) => a + b, 0) / st.length / 50) * 50 : null,
-    besteGenauigkeit: gen.length ? Math.max(...gen) : null,
+    besteGenauigkeit: (() => {
+      const best = l.filter(zaehltFuerBestwert).map((p) => p.genauigkeit);
+      return best.length ? Math.max(...best) : null;
+    })(),
   };
 }
 
