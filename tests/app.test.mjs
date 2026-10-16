@@ -6,6 +6,10 @@
 //   node tests/app.test.mjs --bilder=/pfad      Screenshots woanders hin
 //   node tests/app.test.mjs --schnell           ohne die Viewport-Runde
 //   node tests/app.test.mjs --pruefrunde        nur die Pruefrunde (Ergebnis sicher, Bedienung, Engine)
+//   node tests/app.test.mjs --erweiterungen     nur die Erweiterungspunkte (Runde 4: Ereignisse, Orte, Buehne)
+//
+// Erweiterungspunkte: ein Test-Paket (pakete/w0-test/index) liefert der Test selbst ueber page.route aus;
+// die App laedt es wie jedes Paket im Testmodus ueber ?test&erw=pakete/w0-test/index.
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import { spawn } from 'node:child_process';
@@ -22,6 +26,7 @@ const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
 const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
+const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
 mkdirSync(BILDER, { recursive: true });
 
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
@@ -30,6 +35,11 @@ const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleW
 const MATT_IN_1 = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1';
 // Legal-Motiv: Sf6+!! gxf6 Lxf7# (echte Engine: brillant)
 const BRILLANT = 'r2qkb1r/pp2nppp/3p4/2pNN1B1/2BnP3/3P4/PPP2PPP/R2bK2R w KQkq - 1 10';
+// Schaefermatt aus der Grundstellung (wertende Partie): Flo zieht SCHAEFER_ZUEGE, der Bot antwortet nach Plan.
+// Seit Runde 4 wertet eine Partie aus einer eigenen Stellung (z. B. MATT_IN_1) nicht mehr: keine Sterne,
+// keine Freischaltung, keine Statistik (BAUPLAN 3.1 Punkt 3). Siege mit Sternen brauchen deshalb diese Partie.
+const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
+const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const VIEWPORTS = [
   { name: 'ipad-quer', w: 1180, h: 820, touch: true },
   { name: 'ipad-hoch', w: 820, h: 1180, touch: true },
@@ -155,6 +165,22 @@ function hilfen(seite, { touch = true } = {}) {
       await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     },
     botAnhalten: (an) => seite.evaluate((a) => { window.__test = window.__test || {}; window.__test.botAnhalten = a; }, an),
+    // Schaefermatt gegen Benno in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
+    async schaefermatt() {
+      await seite.evaluate((plan) => {
+        localStorage.removeItem('schach-arena:v1:laufend');
+        window.__test = { botZug: () => {
+          const v = window.__partie.chess().history({ verbose: true });
+          return plan[v[v.length - 1].lan] || null;
+        } };
+      }, SCHAEFER_PLAN);
+      await h.starte({ botId: 'benno', farbe: 'w' });
+      for (const zug of SCHAEFER_ZUEGE) {
+        await h.warteFlo();
+        await h.zugTippen(zug);
+      }
+      await seite.evaluate(() => { window.__test = {}; });
+    },
     gespeichert: () => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]')),
     fortschritt: () => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:fortschritt') || '{}')),
     laufend: () => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:laufend') || 'null')),
@@ -325,15 +351,14 @@ async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
   await seite.goto(BASIS + '#arena');
   await seite.waitForSelector('.screen.arena');
-  await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
-  await h.warteFlo();
-  await h.zugTippen('a1a8');
+  await h.schaefermatt();
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 30000 });
   await warte(2600);
   pruefe('Sieg-Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Drei Sterne erreicht', await seite.locator('.erg-stern.an').count() === 3);
   pruefe('Sterne als neu markiert', await seite.locator('.erg-stern.neu').count() === 3);
-  pruefe('Genauigkeit zählt hoch (100,0 %)', /100,0\s*%/.test(await seite.locator('.erg-genau b').innerText()));
+  const genText = await seite.locator('.erg-genau b').innerText();
+  pruefe('Genauigkeit zählt hoch (mindestens 80 %)', /\d+,\d\s*%/.test(genText) && parseFloat(genText.replace(',', '.')) >= 80, genText);
   pruefe('Kachel "Neu freigeschaltet" mit Oma Hilde', /Oma Hilde/.test(await seite.locator('.erg-frei').innerText()));
   pruefe('Abschiedssatz des Bots', (await seite.locator('.erg-bot .sprechblase').innerText()).length > 5);
   const f = await h.fortschritt();
@@ -510,9 +535,11 @@ async function testePruefrunde(browser) {
     const h = hilfen(seite, { touch: true });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena');
-    await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
+    // wertende Partie (Grundstellung): fortgesetztes Schaefermatt, Flo setzt mit Dxf7# matt
+    await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), LAUF(SCHAEFER));
+    await h.starte({ botId: 'benno', farbe: 'w', fortsetzen: true });
     await h.warteFlo();
-    await h.zugTippen('a1a8');
+    await h.zugTippen('h5f7');
     await warte(150);
     // vor dem Overlay neu laden (App beendet waehrend "Coach wertet aus")
     await seite.reload();
@@ -566,6 +593,29 @@ async function testePruefrunde(browser) {
     const p2 = (await h.gespeichert())[0] || {};
     pruefe('Sieg gespeichert, Genauigkeit nicht aus einem einzigen Zug (100 %)', p2.ergebnis === 'sieg' && p2.genauigkeit !== 100 && p2.sterne && p2.sterne[1] === false, JSON.stringify({ g: p2.genauigkeit, s: p2.sterne }));
     await seite.evaluate((l) => localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)), null);
+
+    // Sieg aus einer eigenen Stellung wertet seit Runde 4 nicht (BAUPLAN 3.1 Punkt 3)
+    gruppe = 'Eigene Stellung';
+    const vorher = await h.fortschritt();
+    const statVorher = await seite.evaluate(async () => (await import('./js/storage.js')).statistik());
+    await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
+    await h.warteFlo();
+    await h.zugTippen('a1a8');
+    await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 30000 });
+    await warte(1200);
+    pruefe('Sieg aus eigener Stellung: Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
+    pruefe('Sieg aus eigener Stellung: kein Stern, keine Freischalt-Kachel', await seite.locator('.erg-stern.an').count() === 0
+      && await seite.locator('.erg-stern.neu').count() === 0 && await seite.locator('.erg-frei').count() === 0);
+    const p3 = (await h.gespeichert())[0] || {};
+    pruefe('Sieg aus eigener Stellung: gespeichert, ohne Sterne', p3.ergebnis === 'sieg' && p3.startFen === MATT_IN_1 && p3.modus === 'normal'
+      && JSON.stringify(p3.sterne) === '[false,false,false]', JSON.stringify(p3).slice(0, 200));
+    const nachher = await h.fortschritt();
+    pruefe('Sieg aus eigener Stellung: Fortschritt unverändert (Zähler, Sterne, Freischaltung)', JSON.stringify(nachher.bots) === JSON.stringify(vorher.bots));
+    const statNachher = await seite.evaluate(async () => (await import('./js/storage.js')).statistik());
+    pruefe('Sieg aus eigener Stellung: zählt nicht in der Statistik', JSON.stringify(statNachher) === JSON.stringify(statVorher), JSON.stringify([statVorher, statNachher]));
+    await h.tippe('.ergebnis-overlay .erg-zu');
+    await h.tippe('.screen.partie .kopf [data-aktion="zurueck"]');
+    await seite.waitForSelector('.screen.arena');
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -752,6 +802,487 @@ async function testePruefrunde(browser) {
   }
 }
 
+// ---------- 9. Erweiterungspunkte (Runde 4, BAUPLAN 3.10) ----------
+// Test-Paket, das der Test ueber page.route ausliefert (wie ein echtes Paket unter js/pakete/):
+// zeichnet alle Ereignisse auf, bietet an jedem DOM-Ort ein Element an, waehlt den ersten Screen
+// (?w0start=<screen>), die Begruessung (?w0gruss) und meldet Feiern nach dem Spielende (?w0feier).
+const TEST_PAKET = `
+import { EREIGNISSE, hoere } from '../../ereignisse.js';
+import { anbieten } from '../../orte.js';
+import { melde } from '../../feier.js';
+import { registriereSaetze } from '../../bots.js';
+const q = new URLSearchParams(location.search);
+const log = window.__w0 = { ereignisse: [], kontexte: {}, start: null, startVerlassen: 0, ersterScreen: null };
+const FELDER = ['laufId', 'ply', 'wer', 'uci', 'san', 'sanDe', 'klasse', 'trivial', 'serie', 'serieVorher', 'letzter', 'live',
+  'partieId', 'wertet', 'modus', 'quelle', 'amZug', 'plies', 'bisPly', 'stufe', 'art', 'ergebnis', 'grund', 'eigeneZuege',
+  'maxSerie', 'neuFreigeschaltet', 'fortgesetzt', 'sichtbar', 'moment', 'geschlagen', 'schach', 'matt', 'rochade',
+  'umwandlung', 'botId', 'botStufe', 'farbe', 'startFen', 'hinweise', 'zuruecknahmen', 'datum', 'dauerMs', 'fen', 'schluessel', 'grund'];
+for (const n of EREIGNISSE) hoere(n, (d) => {
+  const e = { name: n, eingefroren: Object.isFrozen(d) };
+  for (const k of FELDER) if (k in d) e[k] = d[k];
+  if (n === 'app:bereit') e.hatApp = !!(d.app && typeof d.app.gehe === 'function');
+  if (n === 'app:screen') e.screen = d.name;
+  if (d.buehne) e.buehne = Object.keys(d.buehne).sort();
+  if (d.neueSterne) e.neueSterne = d.neueSterne.slice();
+  if (d.liveKlassen) e.liveKlassen = d.liveKlassen.slice();
+  if (d.extra) e.extra = JSON.parse(JSON.stringify(d.extra));
+  if (d.ziel) e.ziel = JSON.parse(JSON.stringify(d.ziel));
+  if (d.analyse) e.linien = d.analyse.lines.length;
+  if (d.review) e.mitReview = Array.isArray(d.review.zuege);
+  if (d.partie) e.partieDatensatz = d.partie.id;
+  log.ereignisse.push(e);
+});
+const DOM = ['arena:kopf', 'arena:panel-oben', 'arena:panel-bot', 'ergebnis:karte', 'analyse:coach', 'analyse:oben', 'verlauf:seite', 'einstellungen:gruppen'];
+for (const ort of DOM) anbieten(ort, (k) => {
+  log.kontexte[ort] = Object.keys(k).sort();
+  const el = document.createElement('div');
+  el.className = 'w0-test';
+  el.dataset.ort = ort;
+  el.textContent = 'Test ' + ort;
+  return el;
+}, { paket: 'w0-test', reihenfolge: 50 });
+anbieten('arena:start', (k) => { log.start = Object.keys(k).sort(); return { verlasse() { log.startVerlassen++; } }; }, { paket: 'w0-test' });
+anbieten('app:erster-screen?', (k) => { log.ersterScreen = { ...k }; return q.get('w0start') || null; }, { paket: 'w0-test' });
+anbieten('partie:begruessung?', (k) => (q.has('w0gruss') ? { anlass: 'w0gruss', werte: { name: 'Flo', zuege: k.partienGegenBot.length } } : null), { paket: 'w0-test' });
+registriereSaetze('w0gruss', { benno: ['Hallo {name}, schön dich zu sehen!'] });
+registriereSaetze('w0blase', { benno: ['Blase leise', 'Blase leise'], hilde: ['x'] });
+registriereSaetze('w0laut', { benno: ['Blase laut'] });
+hoere('partie:beendet', (d) => {
+  if (!q.has('w0feier') || !d.wertet) return;
+  melde({ partieId: d.partieId, quelle: 'w0-a', art: 'gross', prio: 90, titel: 'GROSS A', symbol: 'stern' });
+  melde({ partieId: d.partieId, quelle: 'w0-b', art: 'gross', prio: 80, titel: 'GROSS B' });
+  melde({ partieId: d.partieId, quelle: 'w0-c', prio: 50, titel: 'Zeile C', text: 'Text C' });
+  melde({ partieId: d.partieId, quelle: 'w0-d', prio: 40, titel: 'Zeile D' });
+  melde({ partieId: d.partieId, quelle: 'w0-e', prio: 30, titel: 'Zeile E' });
+  melde({ partieId: d.partieId, quelle: 'w0-c', prio: 50, titel: 'Zeile C', text: 'doppelt' });
+});
+`;
+const MIT_PAKET = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0-test/index`;
+const namen = (log) => log.map((e) => e.name);
+
+async function testeErweiterungen(browser) {
+  // --- Router und ?erw ohne Paket ---
+  gruppe = 'Erweiterungen: Router';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const anfragen = [];
+    seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
+    await seite.goto(BASIS + '#training');
+    await seite.waitForSelector('.screen.arena');
+    pruefe('#training ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
+    await seite.evaluate(() => window.__app.gehe('start'));
+    await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Schach-Arena');
+    pruefe('gehe("start") ohne Paket-Screen: Arena, kein Platzhalter', await seite.locator('.screen.arena').count() === 1 && await seite.locator('.screen.platzhalter').count() === 0);
+    pruefe('Zurück nach dem Rückfall bleibt in der App', await seite.evaluate(() => history.state && history.state.schach === true && history.state.name === 'arena'));
+    // 404 der fehlenden Paket-Screens gehoert zum Test
+    const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/(training|start)\.js/.test(f));
+    pruefe('Rückfall: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
+    // ungueltige ?erw-Pfade werden ignoriert
+    anfragen.length = 0;
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&erw=../tests/app,Pakete/X,pakete/a.b,/abs#arena`);
+    await seite.waitForSelector('.screen.arena');
+    await warte(300);
+    pruefe('?erw: ungültige Pfade werden nicht geladen', !anfragen.some((a) => /tests\/app|Pakete|a\.b|\/abs/.test(a)), anfragen.filter((a) => /js\//.test(a) && !/js\/(ui\/)?[a-z]+\.js$/.test(a)).join(', '));
+    pruefe('Sichtbarkeit: html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
+    await kontext.close();
+  }
+  {
+    // ohne ?test laedt ?erw nichts (kein Weg fuer fremden Code in der normalen App)
+    const { kontext, seite } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const anfragen = [];
+    seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
+    await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?erw=pakete/w0-test/index#arena`);
+    await seite.waitForSelector('.screen.arena');
+    await warte(400);
+    pruefe('?erw ohne ?test wird ignoriert', !anfragen.some((a) => a.includes('/pakete/')) && await seite.evaluate(() => !window.__w0));
+    await kontext.close();
+  }
+
+  // --- Test-Paket: erster Screen, app:bereit, Orte, Ereignisse einer ganzen Partie ---
+  gruppe = 'Erweiterungen: Paket';
+  const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+  const h = hilfen(seite, { touch: true });
+  await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
+  const log = () => seite.evaluate(() => window.__w0.ereignisse);
+  await seite.goto(MIT_PAKET + '&w0start=verlauf&w0gruss&w0feier');
+  await seite.waitForSelector('.screen.vl-screen');
+  let l = await log();
+  pruefe('?erw lädt das Paket vor dem ersten Screen', l[0] && l[0].name === 'app:bereit' && l[0].hatApp && l.findIndex((e) => e.name === 'app:screen') > 0, JSON.stringify(namen(l)));
+  pruefe('app:erster-screen? (ohne Hash): Paket wählt den Verlauf', (await seite.evaluate(() => location.hash)) === '#verlauf'
+    && (await seite.evaluate(() => window.__w0.ersterScreen && window.__w0.ersterScreen.partienZahl)) === 0);
+  pruefe('app:screen nach zeige() mit Name', l.some((e) => e.name === 'app:screen' && e.screen === 'verlauf'));
+  pruefe('Ereignisdaten sind eingefroren', l.every((e) => e.eingefroren));
+  await seite.reload();
+  await seite.waitForSelector('.screen.vl-screen');
+  pruefe('app:erster-screen? nur ohne Verlaufseintrag (Neuladen bleibt)', (await seite.evaluate(() => location.hash)) === '#verlauf');
+
+  // Arena: Kopf, Panel oben, Panel Bot, Aufruf-Ort, Begruessung
+  await seite.evaluate(() => window.__app.gehe('arena'));
+  await seite.waitForSelector('.screen.arena .knoten');
+  const arena = await seite.evaluate(() => {
+    const chips = [...document.querySelector('.arena .kopf-chips').children];
+    const d = document.querySelector('.arena .detail');
+    const oben = d.querySelector('.ort-panel-oben');
+    const botOrt = d.querySelector('.ort-panel-bot');
+    return {
+      kopf: chips.length === 3 && chips[2].matches('.w0-test[data-ort="arena:kopf"]') && chips[0].matches('.chip') && chips[1].matches('.chip'),
+      oben: d.firstElementChild === oben && !oben.hidden && !!oben.querySelector('.w0-test[data-ort="arena:panel-oben"]'),
+      bot: !!botOrt && !botOrt.hidden && botOrt.previousElementSibling.matches('.ziel-sterne') && !!botOrt.querySelector('.w0-test[data-ort="arena:panel-bot"]'),
+      blase: d.querySelector('.sprechblase').textContent,
+      start: window.__w0.start,
+      kontexte: window.__w0.kontexte,
+    };
+  });
+  pruefe('Ort arena:kopf: nach den zwei Chips', arena.kopf);
+  pruefe('Ort arena:panel-oben: ganz oben im Panel', arena.oben);
+  pruefe('Ort arena:panel-bot: nach den Stern-Zielen', arena.bot);
+  pruefe('Aufruf-Ort arena:start mit kontext { app, karte, neuId, s, scrolleZu }', JSON.stringify(arena.start) === '["app","karte","neuId","s","scrolleZu"]', JSON.stringify(arena.start));
+  pruefe('Kontexte arena:kopf / panel', JSON.stringify(arena.kontexte['arena:kopf']) === '["app","fortschritt"]'
+    && JSON.stringify(arena.kontexte['arena:panel-oben']) === '["app","bot","fortschritt"]', JSON.stringify(arena.kontexte));
+  pruefe('Wahl-Ort partie:begruessung? auch im Arena-Panel (mit Platzhalter)', /Hallo Flo, schön dich zu sehen!/.test(arena.blase), arena.blase);
+
+  // Wertende Partie (Schaefermatt) mit Hinweis und Zuruecknahme
+  await seite.evaluate((plan) => {
+    window.__w0.ereignisse.length = 0;
+    window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } };
+  }, SCHAEFER_PLAN);
+  await h.starte({ botId: 'benno', farbe: 'w' });
+  pruefe('Begrüßung über partie:begruessung? mit Werten', /Hallo Flo, schön dich zu sehen!/.test(await seite.locator('.screen.partie .blase-ort .sprechblase').first().innerText()));
+  await h.warteFlo();
+  await h.zugTippen('e2e4');
+  await h.warteFlo();
+  await h.zugTippen('f1c4');
+  await h.warteFlo();
+  await seite.waitForFunction(() => window.__partie.z.live[2] && window.__partie.z.live[2].status === 'fertig', null, { timeout: 30000 });
+  await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
+  await seite.waitForFunction(() => window.__w0.ereignisse.some((e) => e.name === 'hilfe:genutzt'), null, { timeout: 30000 });
+  await h.tippe('.spielknoepfe [data-aktion="zuruecknehmen"]');
+  await h.warteFlo();
+  await h.zugTippen('f1c4');
+  await h.warteFlo();
+  await h.zugTippen('d1h5');
+  await h.warteFlo();
+  await h.zugTippen('h5f7');
+  await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
+  await seite.waitForFunction(() => window.__w0.ereignisse.some((e) => e.name === 'partie:analysiert'), null, { timeout: 60000 });
+  await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 30000 });
+  await warte(2400);
+  const serieAmScreen = await seite.evaluate(() => document.querySelector('.screen.partie').dataset.serie);
+  const ov = await seite.evaluate(() => {
+    const k = document.querySelector('.ergebnis-karte');
+    const kinder = [...k.children].map((c) => c.className.split(' ')[0]);
+    return {
+      kinder,
+      karte: !!k.querySelector('.erg-karte-ort > .w0-test[data-ort="ergebnis:karte"]'),
+      feier: [...k.querySelectorAll('.erg-feier .erg-f-zeile')].map((z) => (z.classList.contains('gross') ? 'G:' : '') + z.querySelector('b').textContent),
+      symbol: !!k.querySelector('.erg-f-zeile.gross .erg-f-symbol svg'),
+      kontext: window.__w0.kontexte['ergebnis:karte'],
+    };
+  });
+  const iF = ov.kinder.indexOf('erg-feier');
+  pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && ov.kinder[iF + 2] === 'erg-bot', ov.kinder.join(' '));
+  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
+  pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));
+  pruefe('Feier-Zeile groß mit Symbol (Icon)', ov.symbol);
+  await h.tippe('.ergebnis-karte .erg-wort');
+  pruefe('Antippen der Karte zeigt sofort alles', await seite.locator('.erg-feier.alles').count() === 1);
+  pruefe('Sterne und Freischaltung bleiben im festen Teil', await seite.locator('.erg-stern').count() === 3 && await seite.locator('.erg-stern.an').count() >= 1
+    && await seite.locator('.erg-frei').count() === 1);
+  await h.tippe('.erg-knoepfe [data-ziel="analyse"]');
+  await seite.waitForSelector('.an-inhalt', { timeout: 60000 });
+  l = await log();
+  const p = l.filter((e) => /^(partie|zug|stellung|hilfe):/.test(e.name));
+  const pn = namen(p);
+  // Reihenfolge laut BAUPLAN 3.10 (stellung:analysiert, hilfe:genutzt, zug:zurueckgenommen duerfen dazwischen liegen)
+  const kern = pn.filter((n) => /^(partie:|zug:gespielt|zug:bewertet)/.test(n));
+  const gest = p.find((e) => e.name === 'partie:gestartet') || {};
+  const ende = p.find((e) => e.name === 'partie:beendet') || {};
+  pruefe('Reihenfolge: partie:gestartet, zug:gespielt, …, partie:beendet, partie:analysiert, partie:verlassen',
+    kern[0] === 'partie:gestartet' && kern[1] === 'zug:gespielt' && kern.indexOf('zug:bewertet') > 1
+    && JSON.stringify(kern.slice(-3)) === '["partie:beendet","partie:analysiert","partie:verlassen"]'
+    && kern.filter((n) => n.startsWith('partie:')).length === 4, kern.join(' '));
+  pruefe('zug:bewertet nach zug:gespielt desselben Zugs', p.filter((e) => e.name === 'zug:bewertet').every((b) => pn.indexOf('zug:bewertet') > pn.indexOf('zug:gespielt')
+    && p.some((g) => g.name === 'zug:gespielt' && g.ply === b.ply && g.uci === b.uci)));
+  pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
+  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
+    'liveAn', 'merke', 'modus', 'phase', 'rahmen', 'reduziert', 'spaeter', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 1, JSON.stringify(gest));
+  const gesp = p.filter((e) => e.name === 'zug:gespielt');
+  pruefe('zug:gespielt für Flo und Bot, auch zurückgenommene', gesp.length === 9 && gesp.filter((e) => e.wer === 'bot').length === 4, gesp.map((e) => e.wer + ':' + e.uci).join(' '));
+  const matt = gesp[gesp.length - 1];
+  pruefe('zug:gespielt Dxf7#: geschlagen p, Schach, Matt', matt.uci === 'h5f7' && matt.geschlagen === 'p' && matt.schach === true && matt.matt === true && matt.rochade === false && matt.umwandlung === null, JSON.stringify(matt));
+  const bew = p.filter((e) => e.name === 'zug:bewertet');
+  pruefe('zug:bewertet mit Klasse, trivial, Serie, letzter, live', bew.length >= 4 && bew.every((e) => e.ply % 2 === 0 && typeof e.klasse === 'string' && typeof e.trivial === 'boolean'
+    && Number.isInteger(e.serie) && Number.isInteger(e.serieVorher) && typeof e.letzter === 'boolean' && e.live === true), JSON.stringify(bew).slice(0, 300));
+  pruefe('data-serie am Screen = Serie des letzten bewerteten Zugs', serieAmScreen === String(bew[bew.length - 1].serie), `${serieAmScreen} / ${bew[bew.length - 1].serie}`);
+  const hilfe = p.find((e) => e.name === 'hilfe:genutzt') || {};
+  pruefe('hilfe:genutzt { art: hinweis, stufe 1 }', hilfe.art === 'hinweis' && hilfe.stufe === 1);
+  const zur = p.find((e) => e.name === 'zug:zurueckgenommen') || {};
+  pruefe('zug:zurueckgenommen { bisPly 2, plies 2 }', zur.bisPly === 2 && zur.plies === 2, JSON.stringify(zur));
+  const st = p.filter((e) => e.name === 'stellung:analysiert');
+  pruefe('stellung:analysiert für die aktuelle Stellung (Flo am Zug)', st.some((e) => e.amZug === 'flo' && e.linien >= 1 && Number.isInteger(e.plies)), JSON.stringify(st.slice(0, 2)));
+  // je aktueller Stellung einmal (nach einer Zuruecknahme ist eine Stellung wieder neu aktuell)
+  const stSchl = st.map((e) => e.plies + e.fen);
+  pruefe('stellung:analysiert je aktueller Stellung einmal', st.length >= 6 && stSchl.every((k, i) => i === 0 || k !== stSchl[i - 1])
+    && new Set(stSchl.slice(0, 4)).size === 4, JSON.stringify(st.map((e) => e.plies + ':' + e.amZug)));
+  pruefe('partie:beendet: Daten', ende.wertet === true && ende.ergebnis === 'sieg' && ende.grund === 'matt' && ende.eigeneZuege === 4 && ende.hinweise === 1
+    && ende.zuruecknahmen === 1 && ende.neuFreigeschaltet === 'hilde' && ende.modus === 'normal' && Number.isInteger(ende.maxSerie)
+    && JSON.stringify(ende.neueSterne) === '[true,false,false]' && Number.isFinite(ende.dauerMs) && ende.liveKlassen.length === 7, JSON.stringify(ende));
+  const an = p.find((e) => e.name === 'partie:analysiert') || {};
+  pruefe('partie:analysiert (quelle partie) mit Review', an.quelle === 'partie' && an.mitReview && an.wertet === true && an.partieId === ende.partieId);
+  pruefe('app:screen analyse nach partie:verlassen', l.findIndex((e) => e.name === 'app:screen' && e.screen === 'analyse') > namen(l).indexOf('partie:verlassen'));
+
+  // Analyse: Orte und analyse:gesehen
+  const ana = await seite.evaluate(() => {
+    const r = document.querySelector('.an-rechts');
+    const o = r.querySelector('.an-ort-oben');
+    return { oben: !!o && !o.hidden && !!o.querySelector('.w0-test') && o.previousElementSibling && o.previousElementSibling.matches('.an-banner') };
+  });
+  pruefe('Ort analyse:oben: oben rechts nach dem Banner', ana.oben);
+  await h.tippe('.an-navi [data-aktion="vor-zug"]');
+  await warte(200);
+  await h.tippe('.an-navi [data-aktion="vor-zug"]');
+  await warte(200);
+  pruefe('Ort analyse:coach: in der Knopfzeile der Coach-Karte', await seite.locator('.an-coach .an-c-knoepfe .w0-test[data-ort="analyse:coach"]').count() === 1);
+  pruefe('Ort analyse:coach: je Zug neu, nur einmal', await seite.locator('.an-coach .w0-test').count() === 1);
+  pruefe('Kontext analyse:coach', JSON.stringify(await seite.evaluate(() => window.__w0.kontexte['analyse:coach'])) === '["app","du","partie","ply","review","zug"]');
+  await seite.evaluate(() => { window.__w0.ereignisse.length = 0; });
+  await h.tippe('.an-coach [data-aktion="variante"]');
+  await warte(1500);
+  await h.tippe('.an-navi [data-aktion="ende"]');
+  await warte(300);
+  l = await log();
+  const ges = l.filter((e) => e.name === 'analyse:gesehen');
+  pruefe('analyse:gesehen beim Zugwechsel (nicht beim Variantenspiel)', ges.length === 1 && ges[0].ply === 6 && ges[0].letzter === true && typeof ges[0].moment === 'boolean', JSON.stringify(ges));
+  // Analyse ohne gespeicherte Review: partie:analysiert mit quelle 'analyse'
+  await seite.evaluate((id) => { localStorage.removeItem('schach-arena:v1:review:' + id); window.__w0.ereignisse.length = 0; window.__app.gehe('verlauf'); }, ende.partieId);
+  await seite.waitForSelector('.screen.vl-screen');
+  await seite.evaluate((id) => window.__app.gehe('analyse', { partieId: id }), ende.partieId);
+  await seite.waitForFunction(() => window.__w0.ereignisse.some((e) => e.name === 'partie:analysiert'), null, { timeout: 60000 });
+  const an2 = (await log()).find((e) => e.name === 'partie:analysiert');
+  pruefe('partie:analysiert (quelle analyse) nach dem Nachrechnen', an2.quelle === 'analyse' && an2.mitReview && an2.partieId === ende.partieId && an2.wertet === true);
+
+  // Verlauf und Einstellungen
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await seite.waitForSelector('.screen.vl-screen .vl-statistik');
+  const vl = await seite.evaluate(() => {
+    const o = document.querySelector('.vl-seite .vl-ort');
+    return !!o && !o.hidden && o.previousElementSibling.matches('.vl-statistik') && o.nextElementSibling.matches('.vl-schatz') && !!o.querySelector('.w0-test');
+  });
+  pruefe('Ort verlauf:seite: zwischen Statistik und Schatzkiste', vl);
+  await seite.evaluate(() => window.__app.gehe('einstellungen'));
+  await seite.waitForSelector('.screen.es-screen');
+  const es = await seite.evaluate(() => {
+    const t = document.querySelector('.es-ort .w0-test');
+    const vorher = document.querySelector('.es-ort').previousElementSibling;
+    const nachher = document.querySelector('.es-ort').nextElementSibling;
+    return !!t && vorher.matches('.es-gruppe') && nachher.matches('.es-gefahr') && /Fortschritt/.test(nachher.querySelector('h3').textContent);
+  });
+  pruefe('Ort einstellungen:gruppen: vor der Gruppe „Fortschritt“', es);
+
+  // Nachlese: was nicht ins Ergebnis passte, steht oben im Arena-Panel
+  await seite.evaluate(() => window.__app.gehe('arena'));
+  await seite.waitForSelector('.screen.arena .detail');
+  const nl = await seite.evaluate(() => {
+    const n = document.querySelector('.detail .ort-panel-oben .nachlese');
+    return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent), vorDemOrt: n.nextElementSibling && n.nextElementSibling.matches('.w0-test') } : null;
+  });
+  pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, vor den Paketen', nl && /Seit deiner letzten Partie/.test(nl.titel)
+    && JSON.stringify(nl.zeilen) === '["GROSS B","Zeile E"]' && nl.vorDemOrt, JSON.stringify(nl));
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await seite.waitForSelector('.screen.vl-screen');
+  await seite.evaluate(() => window.__app.gehe('arena'));
+  await seite.waitForSelector('.screen.arena .detail');
+  pruefe('Nachlese nur einmal', await seite.locator('.detail .nachlese').count() === 0);
+  await h.tippe('.knoten[data-bot="hilde"]');
+  await h.tippe('.knoten[data-bot="benno"]');
+  pruefe('Panel neu gezeichnet: Orte je einmal', await seite.locator('.detail .w0-test').count() === 2);
+
+  // Uebungs-Partie: keine Sterne, Chip, Kopf, Knoepfe, extra ueber die Buehne
+  gruppe = 'Erweiterungen: Übung';
+  const vorher = await h.fortschritt();
+  const ZIEL = { partieId: 'pTest', ply: 16, besterZug: 'a1a8', alterZug: 'a1a7', alterSanDe: 'Ta7', gewinnVorher: 0.99 };
+  await seite.evaluate(() => { window.__w0.ereignisse.length = 0; window.__test = { botAnhalten: true }; });
+  await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1, modus: 'uebung', ziel: ZIEL });
+  pruefe('Kopf „Übung ab Zug 1“', /Übung ab Zug 1/.test(await seite.locator('.screen.partie .p-eroeffnung').innerText()));
+  const bu = await seite.evaluate(() => {
+    const b = window.__partie.buehne;
+    return {
+      frei: Object.isFrozen(b), feld: b.feld('e4'), feldA8: b.feld('a8'), falsch: b.feld('z9'), phase: b.phase(), live: b.liveAn(), modus: b.modus, ziel: b.ziel,
+      el: b.el === document.querySelector('.screen.partie'), eff: b.effekte === document.querySelector('.brett-effekte'), rahmen: b.rahmen === document.querySelector('.brett-rahmen'),
+      merke: b.merke('w0', { a: 1 }), zuGross: b.merke('w1', { x: 'y'.repeat(400) }), gemerkt: b.gemerkt('w0'), nichts: b.gemerkt('w1'),
+      laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')),
+    };
+  });
+  pruefe('Bühne eingefroren, feld() wie die Effekte', bu.frei && JSON.stringify(bu.feld) === '{"x":4,"y":4}' && JSON.stringify(bu.feldA8) === '{"x":0,"y":0}' && bu.falsch === null, JSON.stringify(bu));
+  pruefe('Bühne: phase, liveAn, modus, ziel, el, effekte, rahmen', bu.phase === 'flo' && bu.live === true && bu.modus === 'uebung' && bu.ziel.besterZug === 'a1a8' && bu.el && bu.eff && bu.rahmen);
+  pruefe('Bühne: merke/gemerkt, über EXTRA_MAX abgelehnt', bu.merke === true && bu.zuGross === false && JSON.stringify(bu.gemerkt) === '{"a":1}' && bu.nichts === null);
+  pruefe('Laufende Partie mit modus, ziel, extra, liveTrivial', bu.laufend.modus === 'uebung' && bu.laufend.ziel.besterZug === 'a1a8'
+    && JSON.stringify(bu.laufend.extra) === '{"w0":{"a":1}}' && Array.isArray(bu.laufend.liveTrivial), JSON.stringify(bu.laufend).slice(0, 300));
+  // Coach-Zusatz: hoechstens 2, hoehere prio gewinnt, weg mit dem naechsten Coach-Inhalt
+  const zu = await seite.evaluate(() => {
+    const b = window.__partie.buehne;
+    b.coachZusatz('Zusatz 30', { prio: 30, art: 'leise' });
+    b.coachZusatz('Zusatz 80', { prio: 80, art: 'gross' });
+    const d = b.coachZusatz('Zusatz 55', { prio: 55 });
+    return { zeilen: [...document.querySelectorAll('.coach .c-zusatz')].map((z) => z.textContent + ':' + z.dataset.art), dritter: d.isConnected };
+  });
+  pruefe('Coach-Zusatz: höchstens 2 Zeilen, höhere prio gewinnt', JSON.stringify(zu.zeilen) === '["Zusatz 80:gross","Zusatz 55:info"]' && zu.dritter, JSON.stringify(zu));
+  const bl = await seite.evaluate(() => {
+    const b = window.__partie.buehne;
+    const t = () => document.querySelector('.screen.partie .blase-ort .sprechblase').textContent;
+    const r = [b.blase('w0blase', { paar: 99, prio: 40 })];
+    const a = t();
+    r.push(b.blase('w0laut', { paar: 99, prio: 30 }));
+    r.push(b.blase('w0laut', { paar: 99, prio: 80 }));
+    return { r, a, b: t() };
+  });
+  pruefe('Bühne: blase je Zugpaar, höhere prio ersetzt', JSON.stringify(bl.r) === '[true,false,true]' && bl.a === 'Blase leise' && bl.b === 'Blase laut', JSON.stringify(bl));
+  await h.zugTippen('a1a8');
+  pruefe('Coach-Zusatz verschwindet mit dem nächsten Coach-Inhalt', await seite.locator('.coach .c-zusatz').count() === 0);
+  await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
+  await warte(1200);
+  const ue = await seite.evaluate(() => ({
+    sterne: document.querySelectorAll('.erg-sterne, .erg-stern').length,
+    chip: (document.querySelector('.erg-kopf .chip.uebung') || {}).textContent,
+    wort: document.querySelector('.erg-kopf .erg-wort') && document.querySelector('.erg-kopf .erg-wort').textContent,
+    knoepfe: [...document.querySelectorAll('.erg-knoepfe .knopf')].map((k) => k.dataset.ziel + ':' + k.textContent.trim()),
+    frei: document.querySelectorAll('.erg-frei').length,
+    genau: !!document.querySelector('.erg-genau'),
+  }));
+  pruefe('Übung: keine Sterne, keine Freischaltung', ue.sterne === 0 && ue.frei === 0 && ue.genau, JSON.stringify(ue));
+  pruefe('Übung: Chip „ÜBUNG“ neben dem Kopfwort', ue.chip === 'ÜBUNG' && ue.wort === 'SIEG!');
+  pruefe('Übung: Knöpfe „Zur Analyse“ und „Nochmal ab hier“', JSON.stringify(ue.knoepfe) === '["analyse:Zur Analyse","ab-hier:Nochmal ab hier"]', JSON.stringify(ue.knoepfe));
+  const gesp2 = (await h.gespeichert())[0] || {};
+  pruefe('Übung gespeichert: modus, ziel, extra, keine Sterne', gesp2.modus === 'uebung' && gesp2.ziel && gesp2.ziel.besterZug === 'a1a8'
+    && JSON.stringify(gesp2.extra) === '{"w0":{"a":1}}' && JSON.stringify(gesp2.sterne) === '[false,false,false]' && Number.isInteger(gesp2.maxSerie), JSON.stringify(gesp2).slice(0, 300));
+  pruefe('Übung: Fortschritt unverändert', JSON.stringify((await h.fortschritt()).bots) === JSON.stringify(vorher.bots));
+  const ende2 = (await log()).find((e) => e.name === 'partie:beendet') || {};
+  pruefe('partie:beendet der Übung: wertet false, extra, ziel', ende2.wertet === false && ende2.modus === 'uebung' && JSON.stringify(ende2.extra) === '{"w0":{"a":1}}' && ende2.neuFreigeschaltet === null, JSON.stringify(ende2));
+  pruefe('Übung: keine Feier (Paket feiert nur wertende Partien)', await seite.locator('.erg-feier').isHidden());
+  pruefe('Bühne nach dem Ende: merke schreibt in den Datensatz', await seite.evaluate(() => window.__partie.buehne.merke('w0', { b: 2 }))
+    && JSON.stringify(((await h.gespeichert())[0] || {}).extra) === '{"w0":{"b":2}}');
+  await seite.evaluate(() => { window.__test = {}; });
+  await h.tippe('.erg-knoepfe [data-ziel="ab-hier"]');
+  await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.z.zuege.length === 0, null, { timeout: 30000 });
+  const neu = await seite.evaluate(() => ({ modus: window.__partie.z.modus, fen: window.__partie.chess().fen(), ziel: window.__partie.z.ziel, farbe: window.__partie.z.farbe }));
+  pruefe('„Nochmal ab hier“: gleiche Params (Stellung, Modus, Ziel, Farbe)', neu.modus === 'uebung' && neu.fen === MATT_IN_1 && neu.farbe === 'w' && JSON.stringify(neu.ziel) === JSON.stringify(ZIEL), JSON.stringify(neu));
+  // Buehnen-Timer werden bei verlasse() abgeraeumt
+  await seite.evaluate(() => {
+    const b = window.__partie.buehne;
+    window.__w0b = b;
+    b.spaeter(() => { window.__kurz = 1; }, 30);
+    b.spaeter(() => { window.__lang = 1; }, 700);
+  });
+  await warte(250);
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await seite.waitForSelector('.screen.vl-screen');
+  await warte(900);
+  const tm = await seite.evaluate(() => ({ kurz: window.__kurz, lang: window.__lang, blase: window.__w0b.blase('w0laut', { prio: 99 }), zusatz: window.__w0b.coachZusatz('x').isConnected, spaeter: window.__w0b.spaeter(() => { window.__nach = 1; }, 10) }));
+  await warte(100);
+  pruefe('Bühne räumt ihre Timer bei verlasse() ab', tm.kurz === 1 && tm.lang === undefined && await seite.evaluate(() => window.__nach === undefined), JSON.stringify(tm));
+  pruefe('Bühne nach partie:verlassen ohne Wirkung', tm.blase === false && tm.zusatz === false && tm.spaeter === 0);
+  pruefe('Verlauf: Übungs-Partie zeigt „Übung“ statt Sternen', await seite.locator('.vl-zeile').first().locator('.vl-uebung').count() === 1
+    && await seite.locator('.vl-zeile').first().locator('.vl-sterne').count() === 0 && await seite.locator('.vl-zeile .vl-sterne').count() >= 1);
+  await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+
+  // Niederlage mit Paket am Ort ergebnis:karte: kein "Kopf hoch"-Tipp
+  await h.starte({ botId: 'benno', farbe: 'w' });
+  await h.warteFlo();
+  await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+  await seite.waitForSelector('.dialog-ort .dialog');
+  await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+  await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 30000 });
+  pruefe('.erg-tipp nur, wenn ergebnis:karte leer bleibt', await seite.locator('.erg-tipp').count() === 0 && await seite.locator('.erg-karte-ort .w0-test').count() === 1);
+  await h.tippe('.ergebnis-overlay .erg-zu');
+  await h.tippe('.screen.partie .kopf [data-aktion="zurueck"]');
+  await seite.waitForSelector('.screen.arena');
+
+  // COMBO: ein Rueckschlag zaehlt nicht (Zustand ueber die Test-Hooks, Chip mit data-stufe)
+  gruppe = 'Erweiterungen: COMBO';
+  await seite.evaluate(() => { window.__test = { botAnhalten: true }; });
+  await h.starte({ botId: 'benno', farbe: 'w' });
+  await h.warteFlo();
+  const combo = await seite.evaluate(() => {
+    const P = window.__partie;
+    const z = P.z;
+    for (let i = 0; i < 26; i++) {
+      z.liveKlassen[i] = i % 2 === 0 ? 'bester' : null;
+      z.liveTrivial[i] = false;
+      z.san[i] = i % 2 === 0 ? 'e4' : 'e5';
+    }
+    z.liveTrivial[6] = true;   // Flos 4. Zug ist ein Rueckschlag
+    const r = { s4: P.serieBis(4), s6: P.serieBis(6), s8: P.serieBis(8) };
+    z.liveKlassen[6] = 'fehler';
+    r.bruch = P.serieBis(8);
+    z.liveKlassen[6] = 'bester';
+    const fake = { klasse: 'bester', uci: 'e2e4', besterZug: 'e2e4', evalVorher: { cp: 20, mate: null }, evalNachher: { cp: 20, mate: null },
+      analyseNachher: { lines: [{ eval: { cp: 20, mate: null }, pv: [] }] }, coach: 'Bester Zug! Test.' };
+    const chip = (ply) => {
+      z.live[ply] = { status: 'fertig', erg: fake };
+      P.coachErgebnis(ply, { neu: false });
+      const c = document.querySelector('.coach .combo');
+      return c ? c.textContent.trim() + '|' + c.dataset.stufe : '';
+    };
+    r.chips = [6, 8, 12, 18, 24].map(chip);
+    return r;
+  });
+  pruefe('serieBis: Rückschlag (trivial) neutral, verschenkender Rückschlag bricht', combo.s4 === 3 && combo.s6 === 3 && combo.s8 === 4 && combo.bruch === 1, JSON.stringify(combo));
+  pruefe('COMBO-Chip: keiner beim Rückschlag, data-stufe leer/heiss/ueberladen/unaufhaltsam', JSON.stringify(combo.chips) === JSON.stringify(['', 'COMBO ×4|', 'COMBO ×6|heiss', 'COMBO ×9|ueberladen', 'COMBO ×12|unaufhaltsam']), JSON.stringify(combo.chips));
+  await seite.evaluate(() => { window.__test = {}; localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
+  await seite.waitForSelector('.screen.arena');
+  // echtes Zurueckschlagen: 1.e4 d5 2.exd5 (Bot) Dxd5 (Flo mit Schwarz) ist trivial, die Serie bleibt
+  await seite.evaluate(() => { window.__w0.ereignisse.length = 0; window.__test = { botZug: () => 'e4d5' }; });
+  await h.starte({ botId: 'benno', farbe: 'b', startFen: 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2' });
+  await h.warteFlo();
+  await seite.evaluate(() => { window.__test = { botAnhalten: true }; });
+  await h.zugTippen('d8d5');
+  await seite.waitForFunction(() => window.__w0.ereignisse.some((e) => e.name === 'zug:bewertet'), null, { timeout: 30000 });
+  const rs = (await log()).find((e) => e.name === 'zug:bewertet');
+  pruefe('Echter Rückschlag: trivial, zählt nicht für die COMBO', rs.trivial === true && rs.serie === rs.serieVorher && rs.ply === 1, JSON.stringify(rs));
+  await seite.evaluate(() => { window.__test = {}; localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
+  await seite.waitForSelector('.screen.arena');
+
+  // Sichtbarkeit und Speicher voll
+  gruppe = 'Erweiterungen: App';
+  await seite.evaluate(() => { window.__w0.ereignisse.length = 0; });
+  const sicht = await seite.evaluate(() => {
+    const setze = (w) => { Object.defineProperty(document, 'visibilityState', { value: w, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); };
+    setze('hidden');
+    const aus = document.documentElement.dataset.sichtbar;
+    setze('visible');
+    const an = document.documentElement.dataset.sichtbar;
+    delete document.visibilityState;
+    return { aus, an, ereignisse: window.__w0.ereignisse.filter((e) => e.name === 'app:sichtbar').map((e) => e.sichtbar) };
+  });
+  pruefe('app:sichtbar bei jedem Wechsel, html[data-sichtbar]', sicht.aus === 'nein' && sicht.an === 'ja' && JSON.stringify(sicht.ereignisse) === '[false,true]', JSON.stringify(sicht));
+  pruefe('Hintergrund hält Animationen an (CSS)', await seite.evaluate(() => {
+    document.documentElement.dataset.sichtbar = 'nein';
+    const s = getComputedStyle(document.querySelector('.knoten.aktuell .avatar')).animationPlayState;
+    document.documentElement.dataset.sichtbar = 'ja';
+    return s === 'paused';
+  }));
+  const voll = await seite.evaluate(async () => {
+    const orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function () { throw new DOMException('voll', 'QuotaExceededError'); };
+    try {
+      window.__app.setzeEinstellungen({ tiefe: 12 });
+      const t1 = (document.querySelector('.toast') || {}).textContent || '';
+      document.querySelector('.toast-ort').replaceChildren();
+      window.__app.setzeEinstellungen({ tiefe: 14 });
+      const t2 = document.querySelectorAll('.toast').length;
+      return { t1, t2, n: window.__w0.ereignisse.filter((e) => e.name === 'speicher:fehler').length };
+    } finally {
+      Storage.prototype.setItem = orig;
+    }
+  });
+  pruefe('speicher:fehler: Hinweis „Speicher des Geräts ist voll“, einmal je Sitzung', voll.t1 === 'Speichern hat nicht geklappt: Der Speicher des Geräts ist voll.' && voll.t2 === 0 && voll.n === 2, JSON.stringify(voll));
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ tiefe: 14 }));
+  pruefe('Aufruf-Ort arena:start: verlasse beim Screen-Wechsel', await seite.evaluate(() => window.__w0.startVerlassen) >= 1);
+  pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+}
+
 // ---------- 7. Viewports ----------
 async function testeViewport(browser, vp) {
   gruppe = vp.name;
@@ -832,17 +1363,27 @@ async function testeViewport(browser, vp) {
   await bild(seite, `brillant-${vp.name}`);
   await h.botAnhalten(false);
 
-  // Ergebnis-Overlay
-  await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
-  await h.warteFlo();
-  await h.zugTippen('a1a8');
+  // Ergebnis-Overlay einer wertenden Partie (mit Sternen; seit Runde 4 wertet ein Matt in 1 aus einer
+  // eigenen Stellung nicht mehr, deshalb das Schaefermatt aus der Grundstellung)
+  await h.schaefermatt();
   await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
   await warte(2600);
   const karte = await h.innen('.ergebnis-karte');
-  pruefe('Ergebnis-Karte passt ins Bild', karte && karte.l >= 0 && karte.r <= karte.iw + 1 && karte.t >= 0 && karte.b <= karte.ih + 1, JSON.stringify(karte));
+  pruefe('Ergebnis-Karte (mit Sternen) passt ins Bild', karte && karte.l >= 0 && karte.r <= karte.iw + 1 && karte.t >= 0 && karte.b <= karte.ih + 1
+    && await seite.locator('.erg-stern').count() === 3, JSON.stringify(karte));
   u = await h.ueberlauf();
   pruefe('Overlay ohne horizontalen Überlauf', u.seite <= 0, JSON.stringify(u));
   await bild(seite, `ergebnis-${vp.name}`);
+  // Ergebnis einer Uebung (Chip "ÜBUNG", ohne Sterne)
+  await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1, modus: 'uebung' });
+  await h.warteFlo();
+  await h.zugTippen('a1a8');
+  await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
+  await warte(1400);
+  const ue = await h.innen('.ergebnis-karte');
+  pruefe('Übungs-Ergebnis passt ins Bild', ue && ue.l >= 0 && ue.r <= ue.iw + 1 && ue.t >= 0 && ue.b <= ue.ih + 1 && await seite.locator('.erg-kopf .chip.uebung').isVisible(), JSON.stringify(ue));
+  const knopfTexte = await seite.evaluate(() => [...document.querySelectorAll('.erg-knoepfe .knopf')].every((k) => k.scrollWidth <= k.clientWidth + 1));
+  pruefe('Übungs-Ergebnis: Knopf-Beschriftungen passen', knopfTexte);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 }
@@ -856,7 +1397,7 @@ try {
   await warteAufServer(BASIS);
   const { chromium } = ladePlaywright();
   browser = await chromium.launch();
-  if (!NUR_PRUEFRUNDE) {
+  if (!NUR_PRUEFRUNDE && !NUR_ERWEITERUNGEN) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
     await testeArena(seite, h);
@@ -867,8 +1408,9 @@ try {
     await testeNebenlaeufig(seite, h, fehler);
     await kontext.close();
   }
-  await testePruefrunde(browser);
-  if (!SCHNELL && !NUR_PRUEFRUNDE) for (const vp of VIEWPORTS) await testeViewport(browser, vp);
+  if (!NUR_ERWEITERUNGEN) await testePruefrunde(browser);
+  if (!NUR_PRUEFRUNDE) await testeErweiterungen(browser);
+  if (!SCHNELL && !NUR_PRUEFRUNDE && !NUR_ERWEITERUNGEN) for (const vp of VIEWPORTS) await testeViewport(browser, vp);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));

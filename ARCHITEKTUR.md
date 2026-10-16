@@ -354,3 +354,227 @@ Bau B:
 - Keine externen Ressourcen, keine Webfonts, kein Build.
 - Tests mit Playwright/Chromium wie in Runde 1 (eigener Server auf eigenem Port, danach beenden).
   Ports: Bau A 8831, Bau B 8832, Bau C 8833.
+
+---
+
+# Runde 4: Erweiterungspunkte (Welle 0, verbindlich)
+
+Bauplan: `design/runde4/BAUPLAN.md` (Abschnitt 3). Pakete (`js/pakete/<paket>/`) schreiben nur neue
+Dateien und klinken sich **ausschliesslich** ueber diese API ein: Ereignisse, Anzeige-Orte,
+Feier-Warteschlange, Modul-Speicher, Klang-, Satz- und Icon-Register und die Partie-Buehne.
+Ohne Pakete verhaelt sich die App wie vorher (bis auf die vier bewussten Aenderungen aus BAUPLAN 3.1).
+Die genaue API steht zusaetzlich im Kopfkommentar jeder Datei.
+
+| Datei | Inhalt |
+|---|---|
+| `js/ereignisse.js` | Ereignis-Bus (rein, Node-testbar) |
+| `js/orte.js` | Anzeige-Orte (DOM-, Aufruf- und Wahl-Orte) |
+| `js/feier.js` | Feier-Warteschlange mit Budget und Nachlese (Speicher ueber `ladeModul('feier')`) |
+| `js/erweiterungen.js` | zentrale Importliste der Pakete, anfangs leer; nur die Integration schreibt hier |
+| `js/ui/icons.js` | `icon()` (aus `app.js` verschoben, `app.js` exportiert es weiter) und `registriereIcon()` |
+| `tests/ereignisse.test.mjs` | Bus, Orte (`waehle`), Feier-Budget (Node) |
+| `tests/fairness.test.mjs` | Fairness-Regeln (BAUPLAN Abschnitt 7) als Test |
+
+## Ereignis-Bus: js/ereignisse.js
+```js
+export const EREIGNISSE                  // eingefrorene Liste aller Namen (Tabelle unten)
+export function hoere(name, fn)          // -> abmelden() (idempotent). Unbekannter Name: Fehler
+export function sende(name, daten = {})  // synchron, Hoerer in Anmelde-Reihenfolge; die Hoerer bekommen
+                                         // eine flach eingefrorene Kopie; jeder Hoerer in try/catch
+                                         // (Fehler -> console.error). Unbekannter Name: Fehler
+export function protokoll()              // letzte 200 { name, t }; nur mit ?test bzw. in Node, sonst []
+export function zuruecksetzen()          // nur Tests
+```
+- Hoerer brauchen hoechstens 2 ms; schwere Arbeit per `setTimeout(fn, 0)` (kein `requestIdleCallback`).
+- Hoerer sind idempotent: `partie:analysiert` kann je `partieId` zweimal kommen. Jedes Paket merkt sich
+  verarbeitete IDs (Ringpuffer, hoechstens 300) in seinem Modul-Speicher.
+- Meldet ein Hoerer waehrend des Sendens einen anderen ab, bekommt der das laufende Ereignis noch
+  (Momentaufnahme), das naechste nicht.
+- Engine-Arbeit von Paketen nur ueber `app.engine('bewertung')`, nie waehrend einer Partie, nie eine dritte Instanz.
+- Gemessen (Node): `sende()` ohne Hoerer ca. 0,0003 ms, Ziel unter 0,05 ms.
+
+`laufId` = `'l' + z.gestartet` (eindeutig je Partie, auch vor dem Speichern).
+
+| Name | Daten | Wer sendet, wann |
+|---|---|---|
+| `app:bereit` | `{ app }` | `app.js` `starte()`, einmal vor dem ersten Screen |
+| `app:screen` | `{ name, params }` | `app.js` `zeigeScreen()`, nach `zeige()` des neuen Screens |
+| `app:sichtbar` | `{ sichtbar }` | `app.js` bei `visibilitychange`; setzt zusaetzlich `html[data-sichtbar]` |
+| `partie:gestartet` | `{ laufId, botId, botStufe, farbe, startFen, modus, ziel, fortgesetzt, buehne }` | `partie.js` `zeige()`, am Ende des synchronen Aufbaus |
+| `partie:verlassen` | `{ laufId }` | `partie.js` `verlasse()`, vor dem Abraeumen (danach `buehne` nicht mehr benutzen) |
+| `zug:gespielt` | `{ laufId, ply, wer: 'flo'/'bot', uci, san, fenVorher, fenNachher, geschlagen, schach, matt, umwandlung, rochade }` | nach `brett.setzeStellung()` |
+| `stellung:analysiert` | `{ laufId, fen, plies, amZug: 'flo'/'bot', analyse: { depth, lines: [{ eval, pv }] } }` | `beiAnalyse()`, nur fuer die aktuelle Stellung |
+| `zug:bewertet` | `{ laufId, ply, uci, sanDe, klasse, verlust, genauigkeit, gewinnVorher, gewinnNachher, gewinnZweiter, besterZug, besterZugSanDe, trivial, serie, serieVorher, letzter, live }` | `bewerte()`, direkt nach `zeigeBewertung(ply)`, nur wenn nicht veraltet |
+| `zug:zurueckgenommen` | `{ laufId, bisPly, plies }` | `zuruecknehmen()` |
+| `hilfe:genutzt` | `{ laufId, art: 'hinweis', stufe }` | `hinweis()` |
+| `partie:beendet` | `{ laufId, partieId, botId, botStufe, farbe, modus, wertet, ergebnis, grund, eigeneZuege, liveKlassen, maxSerie, hinweise, zuruecknahmen, neueSterne, neuFreigeschaltet, extra, datum, dauerMs }` | `partie.js` `speichere()`, nach `speicherePartie()`, vor dem Overlay |
+| `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse' }` | nach `ergaenzeAnalyse()` (Partie-Nachtrag mit Review, Analyse-Screen) |
+| `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
+| `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
+| `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }` | Paket 1C |
+| `training:stand` | `{ faellig, gesamt, gemeistert }` | Paket 1C |
+| `uebung:ergebnis` | `{ partieId, ply, getroffen }` | Paket 1B |
+| `bestmarke:neu` | `{ kategorie, wert, vorher, text, partieId }` | Pakete 1A und 2A |
+
+Stand Welle 0a: Bus, Liste und `speicher:fehler` sind gebaut; die Sender in `app.js`, `partie.js` und
+`analyse.js` baut Welle 0b ein.
+
+## Anzeige-Orte: js/orte.js
+```js
+export const ORTE                        // eingefroren: Ort -> 'dom' | 'aufruf' | 'wahl' (Wahl-Orte enden auf "?")
+export function anbieten(ort, anbieter, { reihenfolge = 50, paket } = {})  // -> abmelden()
+// DOM-Ort:    anbieter(kontext) -> HTMLElement | { el, verlasse() } | null
+// Aufruf-Ort: anbieter(kontext) -> { verlasse() } | null   (tut selbst etwas, z. B. eine Kamerafahrt)
+// Wahl-Ort:   anbieter(kontext) -> Wert | null
+export function fuelle(ort, container, kontext)  // nur Host-Screens; -> { anzahl, verlasse() }
+export function waehle(ort, kontext)             // erster Wert != null in der Reihenfolge
+export function zuruecksetzen()                  // nur Tests
+```
+- Reihenfolge: kleinere Zahl zuerst, bei Gleichstand die Anmelde-Reihenfolge.
+- `fuelle()` haengt hinten an den Container an und leert ihn **nicht** (`arena:kopf` hat schon zwei Chips).
+  Der Host ruft vor jedem Neuzeichnen `verlasse()` der alten Fuellung: das ruft die `verlasse()` der
+  Anbieter und nimmt deren Elemente wieder heraus. Fuer Aufruf-Orte darf der Container `null` sein.
+- Kontexte sind flach eingefroren. Ein werfender oder falsch liefernder Anbieter macht den Host nie
+  kaputt (console.error mit Ort und Paketname, die anderen laufen weiter). Unbekannter Ort: Fehler.
+- Anbieter rechnen nichts Schweres (nur Modul-Speicher lesen) und binden ihre Klicks selbst.
+
+| Ort | Art | Host (Datei, Stelle) | `kontext` | Reihenfolge |
+|---|---|---|---|---|
+| `arena:kopf` | DOM | `arena.js`, in `.kopf-chips` nach den zwei Chips | `{ app, fortschritt }` | 2A Rang 10 · 1D Kette 20 · 1C Training 30 |
+| `arena:panel-oben` | DOM | `arena.js` `zeigeDetail()`, oben in `.detail` | `{ app, bot, fortschritt }` | W0 Nachlese 5 · 1D Willkommen 10 · 1D Heute-Karte 20 · 2D Sicherungs-Tipp 90 |
+| `arena:panel-bot` | DOM | `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | 2A Bilanz 10 · 2B Geheimnis und Erzfeind 20 |
+| `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
+| `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
+| `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
+| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
+| `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
+| `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
+| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
+| `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
+
+Die Hosts baut Welle 0b ein (und ergaenzt hier die genaue Stelle, falls sie abweicht).
+
+## Feier-Warteschlange: js/feier.js
+```js
+export const BUDGET = { gross: 1, zeilen: 3, nachlese: 3 }   // eingefroren
+export const QUELLEN                                          // feste Prioritaeten (Tabelle unten)
+export function melde({ partieId, quelle, prio = 10, art = 'zeile', titel, text, symbol, klang }) // -> true | false
+export function fuerOverlay(partieId)   // -> Feier[] (hoechstens 3, davon hoechstens 1 'gross'), markiert als gezeigt
+export function nachlese()              // -> Feier[] (Ungezeigtes, hoechstens 3, juenger als 7 Tage), danach leer
+export function setzeUhr(fn | null)     // nur Tests
+// Feier = eingefroren { partieId, quelle, prio, art, titel, text, symbol, klang, zeit (ms) }
+```
+- `melde` ist idempotent (gleiche `partieId` + `quelle` + `titel` nur einmal). `partieId` darf `null` sein
+  (dann nur Nachlese). Fehlt `quelle` oder `titel` oder ist `art` nicht `'zeile'`/`'gross'`: TypeError.
+  Fuer die Quellen der Tabelle gelten deren `art` und `prio`, egal was das Paket schickt.
+- `fuerOverlay` wird bei jedem `fuelle` des Overlays aufgerufen (auch beim Nachtrag): Schon gezeigte
+  Eintraege bleiben, freie Plaetze fuellen neue Meldungen nach `prio`. Sortiert nach `prio` absteigend.
+- `nachlese` leert die Warteschlange; der Host merkt sich das Ergebnis fuer die Lebensdauer seines Screens.
+- Kein Zufall. Gespeichert in `modul:feier` (hoechstens 6.000 Zeichen, hoechstens 16 Eintraege,
+  aeltere als 7 Tage fallen weg; Texte gekuerzt: `titel` 80, `text` 200 Zeichen).
+
+| Quelle | Paket | Art | Prio |
+|---|---|---|---|
+| `erster-sieg` | 2D | gross | 95 |
+| `rang` | 2A | gross | 90 |
+| `erzfeind` | 2B | gross | 85 |
+| `bestmarke` | 2A | gross | 70 |
+| `tageskrone` | 1D | gross | 65 |
+| `serie-rekord` | 1A | zeile | 60 |
+| `kette` | 1D | zeile | 50 |
+| `tagesdreier` | 1D | zeile | 35 |
+| `karten` | 1C | zeile | 30 |
+
+Sterne und Freischaltung bleiben im festen Teil des Overlays und laufen nicht durch die Warteschlange.
+
+## Speicher: Modus, Wertungs-Schutz, Modul-Speicher und Budget (js/storage.js)
+```js
+export const MODI = ['normal', 'uebung']        // eingefroren; weitere Modi nur mit einer neuen Welle
+export function wertet(p)                       // (p.modus || 'normal') === 'normal' && !p.startFen
+export const EXTRA_MAX = 400                    // Zeichen fuer partie.extra (alle Pakete zusammen)
+export const MODUL_BUDGET = { kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
+                              taktik: 8000, start: 6000, feier: 6000, serie: 4000 }
+export const SPEICHER_GRENZE = 2500000
+export function ladeModul(name, standard)       // gespeicherte Daten oder tiefe Kopie von standard
+export function speichereModul(name, daten)     // -> { ok, zeichen, grund? }  grund: 'unbekannt' | 'budget' | 'voll'
+export function speicherStand()                 // -> { zeichen, grenze, teile: { partien, reviews, fortschritt,
+                                                //      module: { name: zeichen }, sonst, fremd } }
+export function rohSpeicher()                   // -> { praefix, schluessel(), lies(k), schreib(k, text), entferne(k) }
+```
+- Modul-Schluessel: `schach-arena:v1:modul:<name>`; `setzeZurueck()` erfasst sie ueber das Praefix.
+  Ein Modul ueber Budget wird **nicht** geschrieben (`grund: 'budget'`): das Paket duennt selbst aus.
+  `ladeModul` liefert den Standard auch bei kaputten Daten, unbekanntem Namen oder falscher Art
+  (Liste statt Objekt usw.).
+- `speicherStand()` zaehlt Schluessel plus Wert in Zeichen; `fortschritt` umfasst Fortschritt,
+  Einstellungen und laufende Partie, `fremd` andere Seiten derselben Herkunft (GitHub Pages teilt den
+  Speicher zwischen allen Seiten eines Kontos). `zeichen` ist die Summe aller Teile.
+- `rohSpeicher()` nur fuer die Sicherung (2D): nur eigene Schluessel, `schreib` nur Text.
+- **Partie-Datensatz neu:** `modus` (immer gesetzt, Standard `'normal'`), `ziel` (nur bei Uebung:
+  `{ partieId, ply, besterZug, alterZug, alterSanDe, gewinnVorher }`, sonst weggelassen), `extra`
+  (Objekt je Paket, als JSON hoechstens `EXTRA_MAX` Zeichen, sonst verworfen mit console.warn),
+  `maxSerie` (ganze Zahl). **Laufende Partie** zusaetzlich `modus`, `ziel`, `extra`, `liveTrivial`;
+  `ladeLaufendePartie()` prueft die Typen (falsches wird ersetzt: `modus` -> `'normal'`, `ziel` -> `null`,
+  `extra` -> `{}`, `liveTrivial` -> Booleans; `startFen` keine Zeichenkette -> keine laufende Partie).
+- **Wertungs-Schutz:** `speicherePartie()` und `ergaenzeAnalyse()`: ist `!wertet(p)`, dann
+  `p.sterne = [false, false, false]`, keine Bot-Zaehler, keine Freischaltung, kein Bestwert, keine
+  Schatzkiste. Rueckgabe zusaetzlich `wertet`. `sterneFuerPartie()` gibt fuer nicht wertende Partien
+  nie Sterne. `aktualisierePartie()` aendert `modus` und `startFen` nicht. `statistik()` zaehlt nur
+  wertende Partien, die Durchschnitts-Genauigkeit nur Partien ab `BESTWERT_MIN_ZUEGE` eigenen Zuegen.
+- **Analysen kompakt:** `MAX_REVIEWS` = 20. `speichereReview()` speichert ueber `kompaktReview()`
+  (ohne `sanDe`, `besterZugSanDe`, `besteLinieSan`, `nummer` und `fenNachher` ausser beim letzten Zug;
+  ca. 24 % kleiner), `ladeReview()` baut sie ueber `ergaenzeReviewFelder()` wieder auf. Fuer alle
+  Aufrufer aendert sich nichts. Alte, volle Reviews laden unveraendert.
+- **Sicherheitsnetz:** `schreib()` opfert bei vollem Speicher die aelteste Analyse und versucht es erneut.
+  Scheitert es trotzdem, kommt `speicher:fehler`. `speicherePartie` und `ergaenzeAnalyse` schreiben zuerst
+  den kleinen Fortschritt, dann die Liste, dann die Analyse.
+
+## Register fuer Klaenge, Saetze und Icons
+**`js/sounds.js`:**
+```js
+export { ton, klick, tock, huelle, rauschen, NOTEN }  // Bausteine fuer eigene Synthese (NOTEN eingefroren)
+export function registriereKlang(name, fn, { wichtig = true } = {})  // fn(ac, ziel, t, ...args) -> abmelden()
+klang.spiele(name, ...args)   // registrierter (geht vor) oder eingebauter Klang
+klang.klasse(k, ...args)      // ohne Register 'klasse' wie bisher: brillant -> brillant(), fehler/patzer -> fehler(), sonst still
+klang.stern(i, neu)           // ohne Register 'stern' wie bisher: zug()
+klang.stufe = 'alle'          // 'wichtig': spielt nur Klaenge mit wichtig: true (eingebaute gelten als wichtig)
+```
+`wichtig` darf auch eine Funktion `(...args) -> boolean` sein (z. B. fuer `klasse`: nur Brillant,
+Grossartig, Fehler, Patzer). `klangProbe(name, ...)` funktioniert auch fuer registrierte Klaenge.
+
+**`js/bots.js`:**
+```js
+export const PLATZHALTER = ['zuege', 'genauigkeit', 'name', 'tage']
+export function registriereSaetze(anlass, { [botId]: ['Satz', ...] })   // -> abmelden(); auch neue Anlaesse
+export function botSatz(bot, anlass, zufall = Math.random, werte = null)
+```
+`botSatz` sucht zuerst `bot.saetze[anlass]`, dann das Register, und ersetzt `{zuege}` `{genauigkeit}`
+`{name}` `{tage}` (Kommazahlen mit Komma). Fehlt ein Wert oder ist der Platzhalter unbekannt, wird
+der Satz uebersprungen. Ohne `werte` verhaelt sich `botSatz` wie bisher.
+
+**`js/ui/icons.js`:** `icon(name, klasse)` wie bisher, `registriereIcon(name, svgInhalt)` -> `true | false`
+(vorhandene Namen werden nicht ueberschrieben; Inhalte mit `<script>`, `on...=` oder `javascript:`
+werden abgelehnt), `iconNamen()`.
+
+## js/review.js: Zusaetze
+- Zug-Eintrag (`baueEintrag`, also Analyse und Live-Bewertung) neu: `gewinnZweiter` (Gewinnchance des
+  zweitbesten Zugs aus Sicht des Ziehenden, 0..1 oder `null`) und `trivial` (Schlagen auf dem Feld, auf
+  das der Gegner gerade gezogen hat, echtes Zurueckschlagen oder Schachabwehr mit hoechstens 3 erlaubten
+  Zuegen; die COMBO zaehlt solche Zuege neutral wie Buchzuege). `GRENZEN` und `klassifiziere()` bleiben
+  unveraendert (Fairness-Test).
+- `spielphasen(fens, buchEnde)` (frueher `phasen()` in `analyse.js`, das sie jetzt importiert).
+- `coachKern(text)`: Klassenwort am Anfang weg (auch „Buchzug.“ und „Buchzug:“), Gedankenstriche zu
+  „: “, `O-O` zu `0-0`; Bauernzug am Satzanfang bleibt klein. Die einzige Stelle, die die Klassenwoerter
+  der Coach-Texte kennt (`partie.js` `coachSatz()` und `analyse.js` `coachOhneKopf()` stellen in Welle 0b um).
+- `kompaktReview(review)` / `ergaenzeReviewFelder(review)` fuer den Speicher (siehe oben). Kompakt wird
+  nur ein Review, dessen Zuege alle Felder haben (Merker `kompakt: 1`). `besteLinieSan` braucht chess.js
+  (ca. 1 ms je Zug) und nur die Coach-Karte des gezeigten Zugs: `ergaenzeReviewFelder` legt es als Feld an,
+  das sich beim ersten Lesen selbst berechnet und danach ein normales Feld ist.
+
+## Partie-Buehne
+Kommt mit `partie:gestartet` (BAUPLAN 3.5); baut Welle 0b in `partie.js` ein und ergaenzt sie hier.
+
+## Tests
+`node tests/ereignisse.test.mjs` (Bus inkl. Messung, Orte, Feier-Budget) und `node tests/fairness.test.mjs`
+(Schnappschuss `GRENZEN` und Brillant-Bedingungen, Verbotsliste in den Texten aller `js/**/*.js`, kein
+`Math.random` in `feier.js` und den reinen Paket-Logik-Dateien, `feier.BUDGET`, Uebungen werten nie).
+Beide laufen in `node tests/alle.mjs` mit (Node, ohne Server).

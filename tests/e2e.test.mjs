@@ -33,7 +33,11 @@ const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 mkdirSync(BILDER, { recursive: true });
 
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
-const MATT_IN_1 = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1';
+// Schaefermatt aus der Grundstellung (wertende Partie): Flo zieht SCHAEFER_ZUEGE, der Bot antwortet nach Plan.
+// Seit Runde 4 wertet eine Partie aus einer eigenen Stellung nicht mehr (keine Sterne, keine Freischaltung),
+// deshalb gewinnt der Ablauf nicht mehr mit einem Matt in 1 aus einer Stellung.
+const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
+const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const SW = leseSw();
 let speicher = {};   // localStorage aus dem Hauptlauf (fuer die Schluss-Bilder)
 
@@ -202,6 +206,27 @@ function hilfen(seite) {
   return h;
 }
 
+// Schaefermatt gegen Benno in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
+async function schaefermatt(seite, h, { pruefeHash = false } = {}) {
+  await seite.evaluate((plan) => {
+    localStorage.removeItem('schach-arena:v1:laufend');
+    window.__test = { botZug: () => {
+      const v = window.__partie.chess().history({ verbose: true });
+      return plan[v[v.length - 1].lan] || null;
+    } };
+    window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+  }, SCHAEFER_PLAN);
+  await h.screen('partie');
+  await h.warteBereit();
+  await h.warteFlo();
+  if (pruefeHash) pruefe('Hash #partie', (await h.hash()) === '#partie');
+  for (const zug of SCHAEFER_ZUEGE) {
+    await h.warteFlo();
+    await h.zugTippen(zug);
+  }
+  await seite.evaluate(() => { window.__test = {}; });
+}
+
 // spielt einen sinnvollen Zug fuer Weiss per Tippen und wartet auf Bewertung und Bot
 async function spieleZug(seite, h, wunsch) {
   const legal = await h.legal();
@@ -280,12 +305,7 @@ async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
   pruefe('Benno ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="benno"]').count() === 1);
   pruefe('Hilde ist gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
-  await seite.evaluate((fen) => window.__app.gehe('partie', { botId: 'benno', farbe: 'w', startFen: fen }), MATT_IN_1);
-  await h.screen('partie');
-  await h.warteBereit();
-  await h.warteFlo();
-  pruefe('Hash #partie', (await h.hash()) === '#partie');
-  await h.zugTippen('a1a8');
+  await schaefermatt(seite, h, { pruefeHash: true });
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
   await warte(2600);
   pruefe('Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
@@ -302,7 +322,8 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Hash #analyse/<id>', (await h.hash()) === '#analyse/' + id);
   pruefe('Sofort fertig (kein Rechnen dank vorab)', await seite.locator('.an-laden').count() === 0 && await seite.locator('.an-inhalt').count() === 1);
   pruefe('Freischalt-Banner: Oma Hilde', /Oma Hilde/.test(await seite.locator('.an-banner').innerText()));
-  pruefe('Genauigkeit sichtbar', /100,0/.test(await seite.locator('.an-genau').innerText()), await seite.locator('.an-genau').innerText());
+  const genau = await seite.locator('.an-genau').innerText();
+  pruefe('Genauigkeit sichtbar (mindestens 80 %)', /\d+,\d/.test(genau) && parseFloat((genau.match(/\d+,\d/) || ['0'])[0].replace(',', '.')) >= 80, genau);
   await seite.reload();
   await h.screen('analyse');
   pruefe('Neuladen: Analyse bleibt', (await h.hash()) === '#analyse/' + id && await seite.locator('.an-inhalt').count() === 1);
@@ -596,11 +617,7 @@ async function bilder(browser, id) {
     await seite.screenshot({ path: path.join(BILDER, `final-partie-${vp.name}.png`) });
     await seite.evaluate(() => { window.__test = {}; });
 
-    await seite.evaluate((fen) => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'benno', farbe: 'w', startFen: fen }); }, MATT_IN_1);
-    await h.screen('partie');
-    await h.warteBereit();
-    await h.warteFlo();
-    await h.zugTippen('a1a8');
+    await schaefermatt(seite, h);
     await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 40000 });
     await warte(2600);
     await seite.screenshot({ path: path.join(BILDER, `final-ergebnis-${vp.name}.png`) });

@@ -4,10 +4,13 @@
 //   zeige(root, {}, app) -> { verlasse() }
 //
 // Klassen mit Praefix vl- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
+// Runde 4: Anzeige-Ort verlauf:seite (in .vl-seite zwischen Statistik und Schatzkiste); Partien, die
+// nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung".
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
-import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner } from '../storage.js';
+import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
+import { fuelle } from '../orte.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -72,6 +75,7 @@ export function zeige(root, params = {}, app) {
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   let offen = null;      // Zeile mit aufgewischter Loeschtaste
   let dialog = null;
+  let ortSeite = null;   // Fuellung des Orts verlauf:seite
 
   const sec = document.createElement('section');
   sec.className = 'screen scrollt vl-screen';
@@ -89,6 +93,7 @@ export function zeige(root, params = {}, app) {
       <div class="vl-inhalt">
         <aside class="vl-seite">
           ${statistikHtml()}
+          <div class="vl-ort" hidden></div>
           ${schatzHtml()}
         </aside>
         <div class="vl-haupt">
@@ -96,6 +101,11 @@ export function zeige(root, params = {}, app) {
         </div>
       </div>`;
     for (const z of sec.querySelectorAll('.vl-zeile')) verbindeWischen(z);
+    // Ort verlauf:seite (zwischen Statistik und Schatzkiste)
+    if (ortSeite) ortSeite.verlasse();
+    const ort = sec.querySelector('.vl-ort');
+    ortSeite = fuelle('verlauf:seite', ort, { app });
+    ort.hidden = ortSeite.anzahl === 0;
   }
 
   function statistikHtml() {
@@ -164,7 +174,8 @@ export function zeige(root, params = {}, app) {
             </span>
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
-              <span class="vl-sterne" aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</span>
+              ${wertet(p) ? `<span class="vl-sterne" aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</span>`
+                : '<span class="chip uebung vl-uebung" title="Zählt nicht für Sterne und Statistik">Übung</span>'}
             </span>
           </button>
           <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="Partie gegen ${esc(name)} löschen">${icon('muell')}</button>
@@ -186,7 +197,7 @@ export function zeige(root, params = {}, app) {
   // ---------- Bedienung ----------
   lausche(sec, 'click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !sec.contains(k) || k.disabled) return;
+    if (!k || !sec.contains(k) || k.disabled || k.closest('.vl-ort')) return;   // Pakete binden selbst
     const zeile = k.closest('.vl-zeile');
     if (zeile && zeile._gewischt) { zeile._gewischt = false; return; }
     switch (k.dataset.aktion) {
@@ -318,6 +329,7 @@ export function zeige(root, params = {}, app) {
       timer.clear();
       for (const f of aufraeumen.splice(0)) { try { f(); } catch (e) { /* egal */ } }
       if (dialog) { dialog.hg.remove(); dialog = null; }
+      if (ortSeite) { ortSeite.verlasse(); ortSeite = null; }
     },
   };
 }

@@ -2,12 +2,18 @@
 // Gegner-Panel (Avatar, Begruessung, Bio, Merkmale, Stern-Ziele, Farbwahl, Spielen, Bilanz).
 // Params: { neuFreigeschaltet?: botId } spielt die Freischalt-Animation,
 //         { waehle?: botId } (Zusatz) waehlt einen freien Bot im Panel vor.
+// Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips),
+// arena:panel-oben (ganz oben im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten
+// Partie"), arena:panel-bot (nach den Stern-Zielen), arena:start (einmal nach dem ersten Layout).
+// Die Begruessung im Panel waehlt wie in der Partie der Wahl-Ort partie:begruessung?.
 import { BOTS, botSatz } from '../bots.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, besiegteBots, statistik,
-  ladeLaufendePartie, loescheLaufendePartie,
+  ladeLaufendePartie, loescheLaufendePartie, ladePartien,
 } from '../storage.js';
 import { klang } from '../sounds.js';
+import { fuelle, waehle } from '../orte.js';
+import { nachlese } from '../feier.js';
 import { icon } from '../app.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
@@ -43,6 +49,10 @@ export function zeige(root, params, app) {
   let weg = false;
 
   const fortschritt = ladeFortschritt();
+  // Feier-Momente, die nicht ins Ergebnis passten: einmal holen, gilt fuer diesen Screen
+  let feierRest = [];
+  try { feierRest = nachlese(); } catch (e) { feierRest = []; }
+  const orte = { kopf: null, oben: null, bot: null, start: null };
   const neuId = params && params.neuFreigeschaltet && BOTS.some((b) => b.id === params.neuFreigeschaltet) ? params.neuFreigeschaltet : null;
   const naechster = naechsterGegner(fortschritt);
   const alleBesiegt = BOTS.every((b) => fortschritt.bots[b.id].sterne[0]);
@@ -98,6 +108,7 @@ export function zeige(root, params, app) {
 
   s.querySelector('[data-aktion="verlauf"]').addEventListener('click', () => app.gehe('verlauf'));
   s.querySelector('[data-aktion="einstellungen"]').addEventListener('click', () => app.gehe('einstellungen'));
+  orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
 
   // ---------- Knoten ----------
   const knoten = BOTS.map((b) => {
@@ -271,11 +282,14 @@ export function zeige(root, params, app) {
     const laufend = ladeLaufendePartie();
     const laufBot = laufend ? BOTS.find((x) => x.id === laufend.botId) : null;
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
-    const satz = botSatz(b, 'begruessung') || '';
+    const satz = begruessung(b);
     const ziele = [['Sieg', f.sterne[0]], ['Sieg mit ≥\u00a080\u00a0% Genauigkeit', f.sterne[1]], ['ohne Hinweis und ohne Zurücknehmen', f.sterne[2]]];
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
     detail.style.setProperty('--bf', b.farbe);
+    if (orte.oben) orte.oben.verlasse();
+    if (orte.bot) orte.bot.verlasse();
     detail.innerHTML = `
+      <div class="ort-panel-oben" hidden></div>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${laufBot.farbe}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
@@ -305,6 +319,7 @@ export function zeige(root, params, app) {
         <div class="ziel-sterne mehr">
           ${ziele.map(([t, an]) => `<div class="${an ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${an ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('')}
         </div>
+        <div class="ort-panel-bot" hidden></div>
         <div class="farbwahl" role="radiogroup" aria-label="Farbe wählen">
           ${farben.map(([k, t, fig]) => `<button type="button" role="radio" data-farbe="${k}" aria-checked="${letzteFarbe === k}" class="${letzteFarbe === k ? 'an' : ''}">
             <span class="fig-bg">${fig.map((x) => `<img src="assets/pieces/${x}.svg" alt="">`).join('')}</span>${t}</button>`).join('')}
@@ -335,6 +350,50 @@ export function zeige(root, params, app) {
     if (fort) {
       fort.addEventListener('click', () => app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true }));
     }
+    // Orte im Panel: oben (davor die Nachlese) und nach den Stern-Zielen
+    const oben = detail.querySelector('.ort-panel-oben');
+    const nl = nachleseKarte();
+    if (nl) oben.append(nl);
+    orte.oben = fuelle('arena:panel-oben', oben, { app, bot: b, fortschritt });
+    oben.hidden = !nl && orte.oben.anzahl === 0;
+    const botOrt = detail.querySelector('.ort-panel-bot');
+    orte.bot = fuelle('arena:panel-bot', botOrt, { app, bot: b, fortschritt });
+    botOrt.hidden = orte.bot.anzahl === 0;
+  }
+
+  // Begruessung im Panel: dieselbe Wahl wie in der Partie (Wahl-Ort partie:begruessung?)
+  function begruessung(b) {
+    let wahl = null;
+    try {
+      wahl = waehle('partie:begruessung?', {
+        bot: b, farbe: letzteFarbe === 'z' ? null : letzteFarbe, modus: 'normal',
+        partienGegenBot: ladePartien().filter((p) => p.botId === b.id),
+      });
+    } catch (e) { wahl = null; }
+    const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
+    return (anlass && botSatz(b, anlass, Math.random, wahl.werte || null)) || botSatz(b, 'begruessung') || '';
+  }
+
+  // Nachlese: was nach der letzten Partie nicht mehr ins Ergebnis passte (still, ohne Klang)
+  function nachleseKarte() {
+    if (!feierRest.length) return null;
+    const k = document.createElement('div');
+    k.className = 'nachlese';
+    k.setAttribute('role', 'status');
+    k.innerHTML = '<div class="nl-titel">Seit deiner letzten Partie</div>';
+    for (const f of feierRest) {
+      const z = document.createElement('div');
+      z.className = 'nl-zeile' + (f.art === 'gross' ? ' gross' : '');
+      z.innerHTML = '<b></b>';
+      z.querySelector('b').textContent = f.titel;
+      if (f.text) {
+        const t = document.createElement('span');
+        t.textContent = f.text;
+        z.append(' ', t);
+      }
+      k.append(z);
+    }
+    return k;
   }
 
   async function spielen(b) {
@@ -385,6 +444,10 @@ export function zeige(root, params, app) {
   layout();
   scrolleZu(neuId ? BOTS[Math.max(0, BOTS.findIndex((b) => b.id === neuId) - 1)].id : gewaehlt, false);
   if (neuId) freischalten();
+  // Aufruf-Ort arena:start (z. B. eine Kamerafahrt beim ersten Start), einmal nach dem ersten Layout
+  orte.start = fuelle('arena:start', null, {
+    app, s, karte, scrolleZu: (id, sanft) => scrolleZu(id, !!sanft), neuId,
+  });
   if (typeof ResizeObserver === 'function') {
     let letzte = '';
     beobachter = new ResizeObserver(() => {
@@ -410,6 +473,7 @@ export function zeige(root, params, app) {
       uhren.clear();
       if (beobachter) beobachter.disconnect();
       window.removeEventListener('orientationchange', beiGroesse);
+      for (const o of Object.values(orte)) if (o) o.verlasse();
     },
   };
 }

@@ -5,8 +5,10 @@
 //   zeige(root, {}, app) -> { verlasse() }
 //
 // Klassen mit Praefix es- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
+// Runde 4: Anzeige-Ort einstellungen:gruppen (Gruppen der Pakete, vor der Gruppe "Fortschritt").
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
+import { fuelle } from '../orte.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -46,6 +48,7 @@ export function zeige(root, params = {}, app) {
   const lausche = (ziel, typ, f, opt) => { ziel.addEventListener(typ, f, opt); aufraeumen.push(() => ziel.removeEventListener(typ, f, opt)); };
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   let resetStufe = 0;
+  let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
 
@@ -110,6 +113,8 @@ export function zeige(root, params = {}, app) {
           </div>
         </section>
 
+        <div class="es-ort"></div>
+
         <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-reset">
           <h3 class="es-titel" id="es-g-reset">Fortschritt</h3>
           <div class="es-reset" aria-live="polite"></div>
@@ -126,6 +131,9 @@ export function zeige(root, params = {}, app) {
           </ul>
         </section>
       </div>`;
+    // Ort einstellungen:gruppen (vor der Gruppe "Fortschritt"; der Behaelter ist display: contents)
+    if (ortGruppen) ortGruppen.verlasse();
+    ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
     zeigeStand();
     zeigeReset();
   }
@@ -133,6 +141,7 @@ export function zeige(root, params = {}, app) {
   function zeigeStand() {
     const e = lies();
     for (const k of sec.querySelectorAll('.es-schalter')) {
+      if (k.closest('.es-ort')) continue;   // Schalter der Pakete
       const an = e[k.dataset.key] !== false;
       k.setAttribute('aria-checked', an ? 'true' : 'false');
     }
@@ -177,7 +186,7 @@ export function zeige(root, params = {}, app) {
 
   lausche(sec, 'click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !sec.contains(k) || k.disabled) return;
+    if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort')) return;   // Pakete binden selbst
     const e0 = lies();
     switch (k.dataset.aktion) {
       case 'zurueck': app.zurueck(); break;
@@ -232,6 +241,7 @@ export function zeige(root, params = {}, app) {
       for (const t of timer) clearTimeout(t);
       timer.clear();
       for (const f of aufraeumen.splice(0)) { try { f(); } catch (e) { /* egal */ } }
+      if (ortGruppen) { ortGruppen.verlasse(); ortGruppen = null; }
     },
   };
 }

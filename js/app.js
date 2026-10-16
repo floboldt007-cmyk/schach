@@ -7,49 +7,39 @@
 // Zusaetze: app.frage({ titel, text, knoepfe: [{ text, wert, art }], abbrechen }) -> Promise<wert>
 //           (Rueckfrage-Dialog), app.schliesseDialog() (offene Rueckfrage mit "abbrechen" schliessen),
 //           app.test (true bei ?test in der URL).
-// Ausserdem exportiert: icon(name, klasse) -> SVG-Text der gemeinsamen Strich-Icons.
+// Ausserdem exportiert: icon(name, klasse) -> SVG-Text der gemeinsamen Strich-Icons (wohnt in js/ui/icons.js).
 // Registriert sw.js (Offline-Cache) und zeigt bei einer neuen Version den Hinweis "Neu laden".
+//
+// Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md):
+//   - laedt die Pakete statisch ueber ./erweiterungen.js; nur mit ?test zusaetzlich ?erw=pfad1,pfad2
+//     (relativ zu js/, ohne .js, nur [a-z0-9/-], z. B. ?test&erw=pakete/kartei/index), und zwar bevor
+//     der erste Screen erscheint
+//   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena
+//   - sendet app:bereit (einmal vor dem ersten Screen), app:screen (nach zeige() eines Screens) und
+//     app:sichtbar (bei visibilitychange; setzt html[data-sichtbar="ja"|"nein"])
+//   - Wahl-Ort app:erster-screen? (nur ohne Hash und ohne Verlaufseintrag), kontext { partienZahl }
+//   - speicher:fehler: einmal je Sitzung ein Hinweis, dass der Speicher voll ist
+import './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
 import { setzeSymbole } from './board.js';
 import { SYMBOLE } from './symbole.js';
-import { ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie } from './storage.js';
+import { ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien } from './storage.js';
+import { icon } from './ui/icons.js';
+import { hoere, sende } from './ereignisse.js';
+import { waehle } from './orte.js';
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen'];
-const TITEL = { arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen' };
-const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
+// icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
+export { icon };
 
-// ---------- Icons (24er Raster, Strich; Quelle design/neon/werkzeug/baue-mockup.mjs) ----------
-const ICONS = {
-  zurueck: '<path d="M15 5 8 12l7 7"/>',
-  vor: '<path d="M9 5l7 7-7 7"/>',
-  einst: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
-  verlauf: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
-  hinweis: '<path d="M9.2 17.5h5.6M10.2 20.5h3.6M12 3.2a6.2 6.2 0 0 0-3.7 11.2c.6.5 .9 1.2.9 2h5.6c0-.8.3-1.5.9-2A6.2 6.2 0 0 0 12 3.2z"/>',
-  undo: '<path d="M9 5 4 10l5 5M4 10h10.5a5 5 0 0 1 0 10H11"/>',
-  drehen: '<path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/>',
-  flagge: '<path d="M5.5 21V4M5.5 4.5h11l-2.2 4 2.2 4h-11"/>',
-  schloss: '<rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8.2 11V8.2a3.8 3.8 0 0 1 7.6 0V11"/>',
-  offen: '<rect x="5" y="11" width="14" height="9.5" rx="2.2"/><path d="M8.2 11V8.2a3.8 3.8 0 0 1 7.3-1.4"/>',
-  pokal: '<path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5.2a3 3 0 0 0 3 4M16 6h2.8a3 3 0 0 1-3 4M12 13v4M8.5 20.5h7M10 17h4v3.5h-4z"/>',
-  pfeil: '<path d="M5 12h14M13 6l6 6-6 6"/>',
-  nochmal: '<path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/>',
-  ziel: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
-  play: '<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
-  blitz: '<path d="M13 3 5 13.5h6L10 21l9-11h-6.2z" fill="currentColor" stroke="none"/>',
-  analyse: '<path d="M4 19h16M6 15l4-5 3 3 5-7"/>',
-  auge: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
-  kreuz: '<path d="M6 6l12 12M18 6 6 18"/>',
-  pause: '<path d="M9 5v14M15 5v14"/>',
-  stern: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor" stroke="none"/>',
-  baustelle: '<path d="M3 20h18M5 20l3.5-12h7L19 20M7.2 14h9.6M12 8V4"/>',
+const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start'];
+const TITEL = {
+  arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
+  training: 'Training', start: 'Willkommen',
 };
-
-export function icon(name, klasse = '') {
-  const inhalt = ICONS[name] || '';
-  return `<svg class="ico${klasse ? ' ' + klasse : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ` +
-    `stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${inhalt}</svg>`;
-}
+// Screens aus Paketen (Runde 4): fehlt die Datei, geht es ohne Hinweis zur Arena
+const PAKET_SCREENS = new Set(['training', 'start']);
+const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 
 // ---------- Einstellungen ----------
 
@@ -149,6 +139,14 @@ function meldung(text, { art = 'info', dauer = 3200 } = {}) {
     toastUhr = setTimeout(() => t.remove(), 320);
   }, dauer);
 }
+
+// Speicher voll (storage.js sendet speicher:fehler): einmal je Sitzung Bescheid sagen
+let speicherGemeldet = false;
+hoere('speicher:fehler', () => {
+  if (speicherGemeldet || typeof document === 'undefined' || !document.body) return;
+  speicherGemeldet = true;
+  meldung('Speichern hat nicht geklappt: Der Speicher des Geräts ist voll.', { art: 'fehler', dauer: 6000 });
+});
 
 // ---------- Rueckfrage-Dialog ----------
 
@@ -289,8 +287,17 @@ function ausVerlauf() {
   return pruefeZiel(ausHash(location.hash));
 }
 
+// Wahl-Ort app:erster-screen? (z. B. ein Willkommens-Screen beim allerersten Start): nur ohne Hash
+// und ohne eigenen Verlaufseintrag, also beim frischen Oeffnen der App
+function ersterScreen() {
+  if (String(location.hash || '').replace(/^#\/?/, '') || (history.state && history.state.schach)) return null;
+  let wahl = null;
+  try { wahl = waehle('app:erster-screen?', { partienZahl: ladePartien().length }); } catch (e) { wahl = null; }
+  return typeof wahl === 'string' && SCREENS.includes(wahl) ? pruefeZiel({ name: wahl, params: {} }) : null;
+}
+
 function beiVerlauf() {
-  const ziel = ausVerlauf();
+  const ziel = ersterScreen() || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
   if (aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
@@ -325,6 +332,13 @@ async function zeigeScreen(name, params, hash) {
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
+    // Screen eines Pakets, das (noch) nicht da ist: still zur Arena
+    if (PAKET_SCREENS.has(name)) {
+      aktuell.handle = { verlasse() {} };
+      try { history.replaceState({ schach: true, name: 'arena', params: {}, tiefe }, '', '#arena'); } catch (e) { /* egal */ }
+      zeigeScreen('arena', {}, '#arena');
+      return;
+    }
     aktuell.handle = zeigePlatzhalter(root, name);
     return;
   }
@@ -334,7 +348,9 @@ async function zeigeScreen(name, params, hash) {
     console.error(e);
     root.replaceChildren();
     aktuell.handle = zeigePlatzhalter(root, name, true);
+    return;
   }
+  sende('app:screen', { name, params: params || {} });
 }
 
 // Freundlicher Ersatz, wenn ein Screen-Modul nicht laedt (Netz) oder abstuerzt. Ein gescheiterter
@@ -481,11 +497,40 @@ function pruefeInstallation() {
   }), 1200);
 }
 
+// ---------- Pakete im Testmodus (?test&erw=pakete/x/index,pakete/y/index) ----------
+// Pfade relativ zu js/, ohne Endung, nur Kleinbuchstaben, Ziffern, "-" und "/" (kein "..", kein
+// fremder Server). Alles andere wird ignoriert. Ohne ?test gibt es diesen Weg nicht.
+const ERW_PFAD = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
+export function erwPfade(suche) {
+  let wert = null;
+  try { wert = new URLSearchParams(suche || '').get('erw'); } catch (e) { wert = null; }
+  if (!wert) return [];
+  return [...new Set(wert.split(',').map((t) => t.trim()).filter((t) => ERW_PFAD.test(t)))];
+}
+
+function ladeTestPakete() {
+  if (!TEST) return null;
+  const pfade = erwPfade(location.search);
+  if (!pfade.length) return null;
+  return Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
+    console.error('Paket nicht geladen: ' + p, e);
+  })));
+}
+
+// ---------- Sichtbarkeit (Tab im Hintergrund, iPad gesperrt) ----------
+function setzeSichtbar() {
+  const sichtbar = document.visibilityState !== 'hidden';
+  document.documentElement.dataset.sichtbar = sichtbar ? 'ja' : 'nein';
+  return sichtbar;
+}
+
 // ---------- Start ----------
 
 function starte() {
   setzeSymbole(SYMBOLE);
   wendeEinstellungenAn(ladeEinstellungen());
+  setzeSichtbar();
+  document.addEventListener('visibilitychange', () => sende('app:sichtbar', { sichtbar: setzeSichtbar() }));
   // Klang: der AudioContext darf auf iOS erst nach der ersten Beruehrung starten
   const entsperren = () => {
     klang.aktivieren();
@@ -494,13 +539,20 @@ function starte() {
     }
   };
   for (const t of ['pointerup', 'touchend', 'keydown']) document.addEventListener(t, entsperren, true);
+  if (TEST) window.__app = app;
+  // Pakete aus ?erw zuerst laden (nur Testmodus), dann app:bereit und der erste Screen
+  const pakete = ladeTestPakete();
+  if (pakete) pakete.then(ersterStart);
+  else ersterStart();
+}
 
+function ersterStart() {
   window.addEventListener('popstate', beiVerlauf);
   window.addEventListener('hashchange', () => {
     if (aktuell && location.hash === aktuell.hash) return;  // schon ueber popstate erledigt
     beiVerlauf();
   });
-  if (TEST) window.__app = app;
+  sende('app:bereit', { app });
   beiVerlauf();
   pruefeInstallation();
   // erst nach dem Laden, damit das Vorladen des Caches den Start nicht bremst

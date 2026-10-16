@@ -131,7 +131,7 @@ node tests/alle.mjs --schnell    kurze Fassung (ohne Viewport-Runden und Bilder)
 node tests/alle.mjs --nur=sw,e2e nur einzelne Suiten
 ```
 
-Einzeln: `storage`, `review`, `engine-bots --schnell`, `board`, `sw`, `app`, `screens`, `e2e`
+Einzeln: `storage`, `review`, `ereignisse`, `fairness`, `engine-bots --schnell`, `board`, `sw`, `app`, `screens`, `e2e`
 (jeweils `node tests/<name>.test.mjs`). Der Ende-zu-Ende-Test `e2e` liefert die App wie GitHub
 Pages unter `/schach/` aus, spielt einen ganzen Ablauf auf dem iPad-Viewport durch, lädt die App
 offline neu und prüft das Update auf eine neue Version. Bilder landen in `design/app-shots/`.

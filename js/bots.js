@@ -5,6 +5,11 @@
 // Engine-Bewertung + Charakter-Bonus + Rauschen, der hoechste gewinnt. Dazu kommen
 // Spontanzuege (Patzer) und manchmal zu flaches Rechnen (uebersehene Taktik).
 // Stufe 10 spielt mit voller Staerke.
+//
+// Saetze (Runde 4): botSatz(bot, anlass, zufall = Math.random, werte = null) -> Satz | null
+// sucht zuerst bot.saetze[anlass], dann das Register; registriereSaetze(anlass, { [botId]: [Satz] })
+// -> abmelden() meldet weitere Saetze an (auch neue Anlaesse). Platzhalter (PLATZHALTER):
+// {zuege} {genauigkeit} {name} {tage}; fehlt ein Wert in werte, wird der Satz uebersprungen.
 import { Chess } from '../vendor/chess/chess.js';
 
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -634,16 +639,92 @@ export function botNachStufe(stufe) {
   return BOTS.find((b) => b.stufe === stufe) || null;
 }
 
+// ---------------------------------------------------------------------------
+// Saetze der Bots
+// ---------------------------------------------------------------------------
+
+// Platzhalter in Saetzen (Runde 4): {zuege} {genauigkeit} {name} {tage}
+export const PLATZHALTER = Object.freeze(['zuege', 'genauigkeit', 'name', 'tage']);
+const PLATZHALTER_RE = /\{([a-zA-Z]+)\}/g;
+
+// Satz-Register der Pakete: anlass -> { botId: [Satz, ...] }
+const satzRegister = new Map();
+
+// Weitere Saetze fuer einen Anlass anmelden (auch neue Anlaesse), je Bot eine Liste.
+// Mehrere Anmeldungen fuer denselben Anlass und Bot werden zusammengefuehrt.
+// Rueckgabe: abmelden() (nimmt genau diese Saetze wieder heraus).
+export function registriereSaetze(anlass, jeBot) {
+  if (typeof anlass !== 'string' || !anlass) throw new TypeError('registriereSaetze: anlass fehlt');
+  if (!jeBot || typeof jeBot !== 'object') throw new TypeError('registriereSaetze(' + anlass + '): Saetze fehlen');
+  const ziel = satzRegister.get(anlass) || {};
+  const neu = [];
+  for (const [botId, liste] of Object.entries(jeBot)) {
+    if (!Array.isArray(liste)) throw new TypeError('registriereSaetze(' + anlass + '): ' + botId + ' ist keine Liste');
+    const gute = liste.filter((t) => typeof t === 'string' && t.trim());
+    ziel[botId] = [...(ziel[botId] || []), ...gute];
+    neu.push([botId, gute]);
+  }
+  satzRegister.set(anlass, ziel);
+  let aktiv = true;
+  return function abmelden() {
+    if (!aktiv) return;
+    aktiv = false;
+    const z = satzRegister.get(anlass);
+    if (!z) return;
+    for (const [botId, gute] of neu) {
+      const rest = (z[botId] || []).slice();
+      for (const t of gute) {
+        const i = rest.indexOf(t);
+        if (i >= 0) rest.splice(i, 1);
+      }
+      if (rest.length) z[botId] = rest;
+      else delete z[botId];
+    }
+    if (!Object.keys(z).length) satzRegister.delete(anlass);
+  };
+}
+
+function wertText(v) {
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(1).replace('.', ',');
+  return String(v);
+}
+
+// Satz mit allen Platzhaltern gefuellt, oder null (fehlt ein Wert oder ist der Platzhalter unbekannt)
+function fuelleSatz(satz, werte) {
+  let fehlt = false;
+  const text = satz.replace(PLATZHALTER_RE, (_, name) => {
+    const v = werte && Object.prototype.hasOwnProperty.call(werte, name) ? werte[name] : null;
+    if (!PLATZHALTER.includes(name) || v == null || v === '') {
+      fehlt = true;
+      return '';
+    }
+    return wertText(v);
+  });
+  return fehlt ? null : text;
+}
+
 // Zufaelliger Satz zum Anlass; vermeidet die direkte Wiederholung des letzten Satzes.
+// Sucht zuerst bot.saetze[anlass], dann das Satz-Register. werte (optional): { zuege, genauigkeit,
+// name, tage } fuer die Platzhalter; Saetze mit fehlendem Wert werden uebersprungen.
 const letzterSatz = new Map();
-export function botSatz(bot, anlass, zufall = Math.random) {
-  const liste = bot && bot.saetze && bot.saetze[anlass];
-  if (!Array.isArray(liste) || liste.length === 0) return null;
-  const schluessel = bot.id + ':' + anlass;
-  let i = Math.min(liste.length - 1, Math.floor(zufall() * liste.length));
-  if (liste.length > 1 && letzterSatz.get(schluessel) === i) i = (i + 1) % liste.length;
-  letzterSatz.set(schluessel, i);
-  return liste[i];
+export function botSatz(bot, anlass, zufall = Math.random, werte = null) {
+  if (!bot) return null;
+  const quellen = [bot.saetze && bot.saetze[anlass], (satzRegister.get(anlass) || {})[bot.id]];
+  for (const quelle of quellen) {
+    if (!Array.isArray(quelle) || quelle.length === 0) continue;
+    const liste = [];
+    for (const satz of quelle) {
+      const t = typeof satz === 'string' ? fuelleSatz(satz, werte) : null;
+      if (t != null) liste.push({ satz, t });
+    }
+    if (!liste.length) continue;
+    const schluessel = bot.id + ':' + anlass;
+    let i = Math.min(liste.length - 1, Math.floor(zufall() * liste.length));
+    if (liste.length > 1 && letzterSatz.get(schluessel) === liste[i].satz) i = (i + 1) % liste.length;
+    letzterSatz.set(schluessel, liste[i].satz);
+    return liste[i].t;
+  }
+  return null;
 }
 
 // Suche fuer den Bot. Ist der Engine-Worker abgestuerzt (leere Analyse mit 'fehler', ohne eigenen

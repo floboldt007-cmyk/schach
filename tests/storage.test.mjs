@@ -5,7 +5,11 @@ import {
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
+  MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
 } from '../js/storage.js';
+import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
+import { analysierePartie, kompaktReview, ergaenzeReviewFelder } from '../js/review.js';
+import { Chess } from '../vendor/chess/chess.js';
 
 let ok = 0;
 let fehler = 0;
@@ -192,6 +196,336 @@ pruefe('Zuruecksetzen mit Einstellungen', ladeEinstellungen().klang === true && 
 // ---------- Kein localStorage ----------
 setzeSpeicher(null);
 pruefe('Ohne localStorage: Arbeitsspeicher als Ersatz', (() => { speichereEinstellungen({ balken: false }); return ladeEinstellungen().balken === false; })());
+
+// =====================================================================
+// Runde 4 (Welle 0): Modus, Wertungs-Schutz, Modul-Speicher, Budget, kompakte Reviews
+// =====================================================================
+function still(fn) {
+  const alt = console.warn;
+  const w = [];
+  console.warn = (...a) => w.push(a.join(' '));
+  try { return { wert: fn(), warnungen: w }; } finally { console.warn = alt; }
+}
+const UEBUNG_FEN = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
+const ZIEL = { partieId: 'pquelle1', ply: 6, besterZug: 'h5f7', alterZug: 'h5f3', alterSanDe: 'Df3', gewinnVorher: 0.99 };
+
+// ---------- wertet / MODI ----------
+pruefe('MODI = normal, uebung (eingefroren)', JSON.stringify(MODI) === '["normal","uebung"]' && Object.isFrozen(MODI));
+pruefe('wertet: normale Partie ja, ohne modus ja', wertet({ modus: 'normal' }) && wertet({}));
+pruefe('wertet: Uebung, eigene Stellung, unbekannter Modus nein', !wertet({ modus: 'uebung', startFen: UEBUNG_FEN }) && !wertet({ startFen: UEBUNG_FEN })
+  && !wertet({ modus: 'uebung' }) && !wertet({ modus: 'boss' }) && !wertet(null));
+pruefe('wertet: startFen gleich der Grundstellung ist keine eigene Stellung', wertet({ startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1' })
+  && wertet({ startFen: ' rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 5 9 ' })
+  && !wertet({ startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1' })
+  && !wertet({ startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w Kkq - 0 1' }));
+pruefe('Sterne: Sieg aus eigener Stellung bringt keine Sterne', JSON.stringify(sterneFuerPartie(partie({ startFen: UEBUNG_FEN }))) === '[false,false,false]');
+
+// ---------- Wertungs-Schutz in speicherePartie ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const brillantReview = { zuege: [{ ply: 0, farbe: 'w', san: 'Qxf7#', klasse: 'brillant' }] };
+  const u = speicherePartie(partie({ modus: 'uebung', startFen: UEBUNG_FEN, ziel: ZIEL, genauigkeit: 95 }), brillantReview);
+  let fs = ladeFortschritt();
+  pruefe('Uebung: Rueckgabe wertet false, keine Sterne, keine Freischaltung', u.wertet === false && JSON.stringify(u.neueSterne) === '[false,false,false]'
+    && u.neuFreigeschaltet === null && JSON.stringify(u.partie.sterne) === '[false,false,false]', u);
+  pruefe('Uebung: keine Bot-Zaehler, kein Bestwert, keine Schatzkiste', fs.bots.benno.partien === 0 && fs.bots.benno.siege === 0
+    && fs.bots.benno.besteGenauigkeit === null && fs.brillanteZuege.length === 0 && u.brillant === 0, fs.bots.benno);
+  pruefe('Uebung: Partie mit modus und ziel gespeichert', ladePartie(u.partie.id).modus === 'uebung' && JSON.stringify(ladePartie(u.partie.id).ziel) === JSON.stringify(ZIEL));
+  pruefe('Freischaltung: Hilde bleibt gesperrt', !istFreigeschaltet(2, fs) && gesamtSterne(fs) === 0);
+  const e = ergaenzeAnalyse(u.partie.id, { genauigkeit: { w: 99, b: 20 }, zuege: brillantReview.zuege });
+  fs = ladeFortschritt();
+  pruefe('Uebung nachgetragen: Genauigkeit ja, Sterne/Bestwert/Schatzkiste nein, wertet false', e.wertet === false && e.partie.genauigkeit === 99
+    && JSON.stringify(e.neueSterne) === '[false,false,false]' && fs.bots.benno.besteGenauigkeit === null && fs.brillanteZuege.length === 0 && e.brillant === 0, e);
+
+  const st = speicherePartie(partie({ startFen: UEBUNG_FEN, genauigkeit: 100 }));
+  fs = ladeFortschritt();
+  pruefe('Partie aus Stellung (normal): bucht nichts, modus normal', st.wertet === false && st.partie.modus === 'normal' && fs.bots.benno.partien === 0
+    && gesamtSterne(fs) === 0 && !st.neuFreigeschaltet);
+
+  const n = speicherePartie(partie({ genauigkeit: 91, maxSerie: 7.2 }), brillantReview);
+  fs = ladeFortschritt();
+  pruefe('normale Partie: wertet true, bucht wie bisher', n.wertet === true && JSON.stringify(n.neueSterne) === '[true,true,true]'
+    && n.neuFreigeschaltet && n.neuFreigeschaltet.id === 'hilde' && fs.bots.benno.partien === 1 && n.brillant === 1);
+  pruefe('normale Partie: modus normal, maxSerie gerundet, kein ziel', ladePartie(n.partie.id).modus === 'normal' && ladePartie(n.partie.id).maxSerie === 7
+    && !('ziel' in ladePartie(n.partie.id)));
+  const nNochmal = ergaenzeAnalyse(n.partie.id, { genauigkeit: { w: 93, b: 10 }, zuege: [] });
+  pruefe('ergaenzeAnalyse normal: wertet true', nNochmal.wertet === true && ladeFortschritt().bots.benno.besteGenauigkeit === 93);
+
+  // Uebung mit ungueltigem Ziel, ziel bei normaler Partie
+  const kaputt = speicherePartie(partie({ modus: 'uebung', startFen: UEBUNG_FEN, ziel: { ...ZIEL, besterZug: '<b>' } }));
+  pruefe('Uebung mit ungueltigem ziel: ziel verworfen', !('ziel' in ladePartie(kaputt.partie.id)));
+  const ohneZiel = speicherePartie(partie({ ziel: ZIEL }));
+  pruefe('ziel nur bei Uebung', !('ziel' in ladePartie(ohneZiel.partie.id)));
+
+  // aktualisierePartie aendert nichts, was die Wertung bestimmt
+  aktualisierePartie(u.partie.id, { modus: 'normal', startFen: null, eroeffnung: 'Italienisch' });
+  pruefe('aktualisierePartie: modus und startFen bleiben', ladePartie(u.partie.id).modus === 'uebung' && ladePartie(u.partie.id).startFen === UEBUNG_FEN
+    && ladePartie(u.partie.id).eroeffnung === 'Italienisch');
+}
+
+// ---------- extra ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const klein = { uebung: { getroffen: true, versuche: 1 }, taktik: [{ ply: 12, g: 1 }] };
+  const a = speicherePartie(partie({ extra: klein }));
+  pruefe('extra bis EXTRA_MAX bleibt', EXTRA_MAX === 400 && JSON.stringify(ladePartie(a.partie.id).extra) === JSON.stringify(klein));
+  const r = still(() => speicherePartie(partie({ extra: { gross: 'x'.repeat(EXTRA_MAX) } })));
+  pruefe('extra ueber 400 Zeichen wird verworfen und gewarnt', !('extra' in ladePartie(r.wert.partie.id)) && r.warnungen.length === 1 && /extra/.test(r.warnungen[0]), r.warnungen);
+  const r2 = still(() => speicherePartie(partie({ extra: ['liste'] })));
+  pruefe('extra als Liste wird verworfen', !('extra' in ladePartie(r2.wert.partie.id)) && r2.warnungen.length === 1);
+  const r3 = speicherePartie(partie({ extra: {} }));
+  pruefe('leeres extra wird nicht gespeichert', !('extra' in ladePartie(r3.partie.id)));
+}
+
+// ---------- Statistik nur wertende Partien, Durchschnitt ohne Kurzpartien ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  speicherePartie(partie({ genauigkeit: 70 }));
+  speicherePartie(partie({ ergebnis: 'niederlage', genauigkeit: 80 }));
+  speicherePartie(partie({ modus: 'uebung', startFen: UEBUNG_FEN, ziel: ZIEL, genauigkeit: 100, ergebnis: 'sieg' }));
+  speicherePartie(partie({ startFen: UEBUNG_FEN, genauigkeit: 100 }));
+  speicherePartie(partie({ ergebnis: 'remis', zuege: ['e2e4'], genauigkeit: 100 }));
+  const st = statistik();
+  pruefe('Statistik: Uebung und eigene Stellung zaehlen nicht', st.partien === 3 && st.siege === 1 && st.niederlagen === 1 && st.remis === 1, st);
+  pruefe('Statistik: Ø Genauigkeit ohne Kurzpartie (1 Zug mit 100 %)', st.schnittGenauigkeit === 75, st.schnittGenauigkeit);
+  pruefe('Statistik: Bestwert ohne Uebung und Kurzpartie', st.besteGenauigkeit === 80, st.besteGenauigkeit);
+  pruefe('Verlauf zeigt trotzdem alle Partien', ladePartien().length === 5);
+}
+
+// ---------- Laufende Partie mit modus, ziel, extra, liveTrivial ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', startFen: UEBUNG_FEN, zuege: ['h5f7'], hinweise: 0, zuruecknahmen: 0,
+    liveKlassen: ['bester'], liveTrivial: [false], modus: 'uebung', ziel: ZIEL, extra: { uebung: { versuche: 2 } }, gestartet: '2026-10-16T10:00:00.000Z' });
+  const l = ladeLaufendePartie();
+  pruefe('Laufend: modus, ziel, extra, liveTrivial ueberstehen Speichern und Laden', l && l.modus === 'uebung' && JSON.stringify(l.ziel) === JSON.stringify(ZIEL)
+    && JSON.stringify(l.extra) === '{"uebung":{"versuche":2}}' && JSON.stringify(l.liveTrivial) === '[false]' && l.startFen === UEBUNG_FEN, l);
+  speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: ['e2e4'], liveKlassen: ['buch'] });
+  const alt = ladeLaufendePartie();
+  pruefe('Laufend ohne neue Felder (alter Stand): Standardwerte', alt.modus === 'normal' && alt.ziel === null && JSON.stringify(alt.extra) === '{}'
+    && JSON.stringify(alt.liveTrivial) === '[]', alt);
+  s.setItem('schach-arena:v1:laufend', JSON.stringify({ botId: 'rudi', zuege: ['e2e4'], modus: 'boss', ziel: ZIEL, extra: 'x', liveTrivial: [1, true, 'ja'] }));
+  const falsch = still(() => ladeLaufendePartie()).wert;
+  pruefe('Laufend: falsche Typen werden ersetzt (modus, ziel, extra, liveTrivial)', falsch.modus === 'normal' && falsch.ziel === null
+    && JSON.stringify(falsch.extra) === '{}' && JSON.stringify(falsch.liveTrivial) === '[false,true,false]', falsch);
+  s.setItem('schach-arena:v1:laufend', JSON.stringify({ botId: 'rudi', zuege: ['e2e4'], modus: 'uebung', ziel: { ...ZIEL, ply: -1 } }));
+  pruefe('Laufend: Uebung mit kaputtem ziel -> ziel null', ladeLaufendePartie().ziel === null && ladeLaufendePartie().modus === 'uebung');
+  s.setItem('schach-arena:v1:laufend', JSON.stringify({ botId: 'rudi', zuege: ['e2e4'], startFen: 42 }));
+  pruefe('Laufend: startFen keine Zeichenkette -> keine laufende Partie', ladeLaufendePartie() === null);
+  const gross = still(() => speichereLaufendePartie({ botId: 'rudi', zuege: [], extra: { x: 'y'.repeat(500) } }));
+  pruefe('Laufend: zu grosses extra wird beim Speichern verworfen', gross.warnungen.length === 1 && JSON.stringify(ladeLaufendePartie().extra) === '{}'
+    && !('extra' in JSON.parse(s.getItem('schach-arena:v1:laufend'))));
+}
+
+// ---------- Modul-Speicher ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  pruefe('MODUL_BUDGET wie im Bauplan (Summe 324.000)', Object.isFrozen(MODUL_BUDGET) && MODUL_BUDGET.kartei === 160000 && MODUL_BUDGET.feier === 6000
+    && MODUL_BUDGET.serie === 4000 && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 324000);
+  const std = { karten: [], stand: { n: 0 } };
+  const leer = ladeModul('kartei', std);
+  leer.stand.n = 5;
+  pruefe('ladeModul ohne Daten: tiefe Kopie des Standards', JSON.stringify(leer) === '{"karten":[],"stand":{"n":5}}' && std.stand.n === 0);
+  const r = speichereModul('kartei', { karten: [1, 2], stand: { n: 2 } });
+  pruefe('speichereModul: ok mit Zeichenzahl, Schluessel modul:kartei', r.ok === true && r.zeichen === 32 && !r.grund
+    && s.getItem('schach-arena:v1:modul:kartei') === '{"karten":[1,2],"stand":{"n":2}}', r);
+  pruefe('ladeModul: gespeicherte Daten', JSON.stringify(ladeModul('kartei', std)) === '{"karten":[1,2],"stand":{"n":2}}');
+  const zuGross = speichereModul('serie', { rekord: 'x'.repeat(MODUL_BUDGET.serie) });
+  pruefe('speichereModul ueber Budget: abgelehnt (budget), nichts geschrieben', zuGross.ok === false && zuGross.grund === 'budget'
+    && zuGross.zeichen > MODUL_BUDGET.serie && s.getItem('schach-arena:v1:modul:serie') === null, zuGross);
+  pruefe('speichereModul genau am Budget: ok', speichereModul('serie', 'x'.repeat(MODUL_BUDGET.serie - 2)).ok === true);
+  const unbekannt = speichereModul('kartie', { a: 1 });
+  pruefe('speichereModul mit unbekanntem Namen: unbekannt', unbekannt.ok === false && unbekannt.grund === 'unbekannt' && s.getItem('schach-arena:v1:modul:kartie') === null);
+  pruefe('ladeModul mit unbekanntem Namen: Standard (mit Warnung)', still(() => JSON.stringify(ladeModul('kartie', { a: 0 }))).wert === '{"a":0}');
+  s.setItem('schach-arena:v1:modul:profil', '{kaputt');
+  pruefe('ladeModul: kaputte Daten -> Standard', JSON.stringify(ladeModul('profil', { w: 800 })) === '{"w":800}');
+  speichereModul('profil', [1, 2, 3]);
+  pruefe('ladeModul: falsche Art (Liste statt Objekt) -> Standard', JSON.stringify(ladeModul('profil', { w: 800 })) === '{"w":800}');
+  pruefe('ladeModul: ohne Standard null', ladeModul('taktik') === null);
+  speichereModul('alltag', { tage: 3 });
+  setzeZurueck();
+  pruefe('setzeZurueck erfasst die Modul-Schluessel', s.getItem('schach-arena:v1:modul:kartei') === null && s.getItem('schach-arena:v1:modul:alltag') === null
+    && ladeModul('kartei', null) === null);
+}
+
+// ---------- speicherStand / rohSpeicher ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  speichereEinstellungen({ klang: false });
+  const r1 = speicherePartie(partie({}), { zuege: [{ ply: 0, farbe: 'w', klasse: 'gut' }] });
+  speichereLaufendePartie({ botId: 'rudi', zuege: [] });
+  speichereModul('kartei', { k: 'x'.repeat(100) });
+  speichereModul('feier', { e: [] });
+  s.setItem('andere-app:daten', 'abc');
+  s.setItem('schach-arena:v1:sonstwas', 'xy');
+  const stand = speicherStand();
+  const laenge = (k) => k.length + s.getItem(k).length;
+  const P = 'schach-arena:v1:';
+  const t = stand.teile;
+  pruefe('speicherStand: Grenze 2.500.000', stand.grenze === 2500000 && SPEICHER_GRENZE === 2500000);
+  pruefe('speicherStand: Partien und Reviews', t.partien === laenge(P + 'partien') && t.reviews === laenge(P + 'review:' + r1.partie.id), t);
+  pruefe('speicherStand: Fortschritt mit Einstellungen und laufender Partie', t.fortschritt === laenge(P + 'fortschritt') + laenge(P + 'einstellungen') + laenge(P + 'laufend'), t);
+  pruefe('speicherStand: Module einzeln, unbenutzte mit 0', t.module.kartei === laenge(P + 'modul:kartei') && t.module.feier === laenge(P + 'modul:feier')
+    && t.module.profil === 0 && Object.keys(t.module).length === Object.keys(MODUL_BUDGET).length, t.module);
+  pruefe('speicherStand: fremde Seiten und Sonstiges getrennt', t.fremd === laenge('andere-app:daten') && t.sonst === laenge(P + 'sonstwas'), t);
+  const summe = t.partien + t.reviews + t.fortschritt + t.sonst + t.fremd + Object.values(t.module).reduce((a, b) => a + b, 0);
+  const alles = [...s.m.keys()].reduce((a, k) => a + laenge(k), 0);
+  pruefe('speicherStand summiert richtig', stand.zeichen === summe && stand.zeichen === alles, { zeichen: stand.zeichen, summe, alles });
+
+  const roh = rohSpeicher();
+  const sch = roh.schluessel();
+  pruefe('rohSpeicher: nur eigene Schluessel, sortiert', roh.praefix === P && sch.every((k) => k.startsWith(P)) && !sch.includes('andere-app:daten')
+    && sch.includes(P + 'modul:kartei') && JSON.stringify(sch) === JSON.stringify([...sch].sort()), sch);
+  pruefe('rohSpeicher: lies liefert den Rohtext', roh.lies(P + 'modul:feier') === '{"e":[]}' && roh.lies('andere-app:daten') === null);
+  pruefe('rohSpeicher: schreib nur eigene Schluessel und nur Text', roh.schreib(P + 'modul:start', '{"fertig":true}') === true
+    && roh.schreib('andere-app:daten', 'x') === false && roh.schreib(P + 'modul:start', { a: 1 }) === false
+    && s.getItem('andere-app:daten') === 'abc' && ladeModul('start', {}).fertig === true);
+  roh.entferne(P + 'modul:start');
+  roh.entferne('andere-app:daten');
+  pruefe('rohSpeicher: entferne nur eigene Schluessel', s.getItem(P + 'modul:start') === null && s.getItem('andere-app:daten') === 'abc');
+}
+
+// ---------- speicher:fehler und Reihenfolge Fortschritt vor Liste ----------
+{
+  busZuruecksetzen();
+  const fehlerEreignisse = [];
+  hoere('speicher:fehler', (d) => fehlerEreignisse.push(d));
+  s = fakeSpeicher(400);
+  setzeSpeicher(s);
+  const r = speichereModul('kartei', { k: 'x'.repeat(1000) });
+  pruefe('voller Speicher: speichereModul meldet voll', r.ok === false && r.grund === 'voll', r);
+  pruefe('voller Speicher: Ereignis speicher:fehler mit Schluessel und Grund', fehlerEreignisse.length === 1
+    && fehlerEreignisse[0].schluessel === 'schach-arena:v1:modul:kartei' && fehlerEreignisse[0].grund === 'voll', fehlerEreignisse);
+
+  // Liste passt nicht mehr, der kleine Fortschritt schon: der Sieg bleibt gebucht
+  s = fakeSpeicher(Infinity);
+  const setze = s.setItem;
+  s.setItem = (k, v) => {
+    if (k === 'schach-arena:v1:partien') { const e = new Error('voll'); e.name = 'QuotaExceededError'; throw e; }
+    setze(k, v);
+  };
+  setzeSpeicher(s);
+  fehlerEreignisse.length = 0;
+  const sieg = speicherePartie(partie({ genauigkeit: 90 }));
+  const fs = ladeFortschritt();
+  pruefe('Reihenfolge: Fortschritt vor der Liste (Sieg und Freischaltung gebucht)', fs.bots.benno.sterne[0] === true && fs.bots.benno.siege === 1
+    && sieg.neuFreigeschaltet && sieg.neuFreigeschaltet.id === 'hilde', fs.bots.benno);
+  pruefe('Liste scheitert: speicher:fehler fuer die Partienliste', fehlerEreignisse.length === 1 && fehlerEreignisse[0].schluessel === 'schach-arena:v1:partien', fehlerEreignisse);
+
+  // anderer Fehler als "voll" (z. B. gesperrter Speicher): grund fehler
+  s = fakeSpeicher();
+  s.setItem = () => { throw new Error('SecurityError'); };
+  setzeSpeicher(s);
+  fehlerEreignisse.length = 0;
+  speichereEinstellungen({ klang: true });
+  pruefe('anderer Schreibfehler: speicher:fehler mit grund fehler', fehlerEreignisse.length === 1 && fehlerEreignisse[0].grund === 'fehler', fehlerEreignisse);
+  busZuruecksetzen();
+}
+
+// ---------- Kompakte Reviews ----------
+// Echte Analyse wie in den Review-Tests (analysierePartie), mit einer Fake-Engine, die lange
+// Hauptvarianten liefert (erste legale Zuege), damit besteLinie/besteLinieSan wirklich gefuellt sind.
+class LinienEngine {
+  async analyse(fen, opts = {}) {
+    const c = new Chess(fen);
+    const zuege = c.moves({ verbose: true });
+    if (!zuege.length) {
+      const e = c.inCheck() ? { cp: null, mate: c.turn() === 'w' ? -1 : 1 } : { cp: 0, mate: null };
+      return { fen, turn: c.turn(), depth: 0, bestmove: null, lines: [{ multipv: 1, depth: 0, eval: e, pv: [] }] };
+    }
+    const linie = (start) => {
+      const b = new Chess(fen);
+      const pv = [];
+      let m = start;
+      while (m && pv.length < 10) {
+        pv.push(b.move(m).lan);
+        const n = b.moves({ verbose: true });
+        m = n.length ? n[n.length - 1] : null;
+      }
+      return pv;
+    };
+    const lines = [zuege[0], zuege[zuege.length - 1]].slice(0, Math.min(opts.multipv || 1, zuege.length))
+      .map((m, i) => ({ multipv: i + 1, depth: opts.depth, eval: { cp: 30 - 25 * i + (fen.length % 7), mate: null }, pv: linie(m) }));
+    return { fen, turn: c.turn(), depth: opts.depth, bestmove: lines[0].pv[0], lines };
+  }
+}
+const OPER = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#';
+const operUci = (() => { const c = new Chess(); return OPER.split(' ').map((x) => c.move(x).lan); })();
+const operReview = await analysierePartie(new LinienEngine(), operUci, { spielerFarbe: 'w', elo: { b: 1500 }, tiefe: 12 });
+
+// tiefer Vergleich ohne Ruecksicht auf die Reihenfolge der Schluessel
+function gleich(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== 'object') return Number.isNaN(a) && Number.isNaN(b);
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && gleich(a[k], b[k]));
+}
+
+{
+  pruefe('MAX_REVIEWS = 20', MAX_REVIEWS === 20);
+  const z = operReview.zuege;
+  pruefe('Testanalyse: 33 Zuege mit langer bester Linie', z.length === 33 && z.filter((x) => x.besteLinie.length >= 6 && x.besteLinieSan.length === x.besteLinie.length).length >= 30,
+    z.map((x) => x.besteLinie.length));
+  const t0 = performance.now();
+  const k = kompaktReview(operReview);
+  const t1 = performance.now();
+  const voll = ergaenzeReviewFelder(JSON.parse(JSON.stringify(k)));
+  const t2 = performance.now();
+  console.log(`       Messung: 33 Zuege kompakt ${(t1 - t0).toFixed(1)} ms, ergaenzen ${(t2 - t1).toFixed(1)} ms; `
+    + `Zeichen ${JSON.stringify(operReview).length} -> ${JSON.stringify(k).length}`);
+  pruefe('kompakt: Merker kompakt, ableitbare Felder fehlen (fenNachher nur beim letzten Zug)', k.kompakt === 1
+    && k.zuege.every((x) => !('sanDe' in x) && !('besterZugSanDe' in x) && !('besteLinieSan' in x) && !('nummer' in x))
+    && k.zuege.slice(0, -1).every((x) => !('fenNachher' in x)) && 'fenNachher' in k.zuege[32]);
+  pruefe('kompakt: Original unveraendert', 'sanDe' in operReview.zuege[0] && !('kompakt' in operReview));
+  pruefe('kompakt: mindestens 20 % kleiner', JSON.stringify(k).length < 0.8 * JSON.stringify(operReview).length,
+    [JSON.stringify(k).length, JSON.stringify(operReview).length]);
+  pruefe('kompakt hin und zurueck: dieselben Felder (tiefer Vergleich)', gleich(voll, operReview));
+  pruefe('kompakt hin und zurueck: auch dieselbe Reihenfolge der Felder', JSON.stringify(voll) === JSON.stringify(operReview));
+
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  const id = speicherePartie(partie({}), operReview).partie.id;
+  const roh = JSON.parse(s.getItem('schach-arena:v1:review:' + id));
+  pruefe('speichereReview speichert kompakt', roh.kompakt === 1 && !('sanDe' in roh.zuege[0]));
+  pruefe('ladeReview liefert wieder die volle Analyse', gleich(ladeReview(id), operReview));
+  {
+    const geladen = ladeReview(id);
+    const art = (z) => (Object.getOwnPropertyDescriptor(z, 'besteLinieSan').get ? 'faul' : 'wert');
+    pruefe('besteLinieSan: erst beim Lesen berechnet (faules Feld)', geladen.zuege.every((z) => art(z) === 'faul' && 'besteLinieSan' in z));
+    const linie = geladen.zuege[22].besteLinieSan;
+    pruefe('besteLinieSan: beim Lesen richtig und danach ein normales Feld', JSON.stringify(linie) === JSON.stringify(operReview.zuege[22].besteLinieSan)
+      && art(geladen.zuege[22]) === 'wert' && art(geladen.zuege[21]) === 'faul');
+    const nochmal = kompaktReview(geladen);
+    pruefe('erneut kompakt: faule Felder werden nicht ausgerechnet', art(geladen.zuege[5]) === 'faul' && nochmal.zuege.every((z) => !('besteLinieSan' in z)));
+    geladen.zuege[3].besteLinieSan = ['x'];
+    pruefe('faules Feld laesst sich ueberschreiben', JSON.stringify(geladen.zuege[3].besteLinieSan) === '["x"]');
+    pruefe('Spread und JSON wie bei einem normalen Feld', JSON.stringify({ ...ladeReview(id).zuege[7] }) === JSON.stringify(operReview.zuege[7]));
+  }
+  // altes, volles Review (vor Runde 4 gespeichert) laedt unveraendert
+  s.setItem('schach-arena:v1:review:' + id, JSON.stringify(operReview));
+  pruefe('altes volles Review laedt unveraendert', JSON.stringify(ladeReview(id)) === JSON.stringify(operReview));
+  // unvollstaendige Eintraege (z. B. aus Tests) bleiben, wie sie sind
+  const teil = { genauigkeit: { w: 80, b: 70 }, zuege: [{ ply: 0, farbe: 'w', san: 'e4', klasse: 'gut' }] };
+  speichereReview(id, teil);
+  pruefe('unvollstaendiges Review: unveraendert hin und zurueck', JSON.stringify(ladeReview(id)) === JSON.stringify(teil) && !('kompakt' in JSON.parse(s.getItem('schach-arena:v1:review:' + id))));
+  pruefe('kompakt: doppelt kompakt aendert nichts, ergaenzen ohne Merker auch nicht', kompaktReview(k) === k && ergaenzeReviewFelder(operReview) === operReview);
+  pruefe('kompakt: leeres oder kaputtes Review bleibt', kompaktReview(null) === null && kompaktReview({ zuege: [] }).zuege.length === 0
+    && ergaenzeReviewFelder({ kompakt: 1, zuege: [null] }).zuege[0] === null);
+  // Rechenzeit einer langen Partie (80 Halbzuege) fuer das iPad abschaetzen
+  const lang = { ...operReview, zuege: [] };
+  for (let i = 0; i < 80; i++) lang.zuege.push({ ...operReview.zuege[i % 33], ply: i });
+  const tl0 = performance.now();
+  ergaenzeReviewFelder(kompaktReview(lang));
+  console.log(`       Messung: 80 Halbzuege kompakt und zurueck ${(performance.now() - tl0).toFixed(1)} ms`);
+}
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);
 process.exit(fehler ? 1 : 0);

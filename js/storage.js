@@ -3,7 +3,31 @@
 // Robust: kaputte oder fehlende Daten liefern Standardwerte, ein gesperrter Speicher
 // (privater Modus) faellt auf einen Speicher im Arbeitsspeicher zurueck.
 // Rein ohne DOM, in Node testbar (setzeSpeicher(fake)).
+//
+// Runde 4 (Welle 0), Zusaetze:
+//   MODI = ['normal', 'uebung']; wertet(p) -> boolean ((p.modus || 'normal') === 'normal' und keine eigene
+//     Stellung: startFen leer oder gleich der Grundstellung).
+//     Nicht wertende Partien (Uebung, Partie aus einer Stellung) buchen keine Sterne, keine Bot-Zaehler,
+//     keine Freischaltung, keinen Bestwert, keine Schatzkiste und zaehlen nicht in statistik().
+//     speicherePartie und ergaenzeAnalyse liefern zusaetzlich { wertet }.
+//   Partie-Datensatz zusaetzlich: modus, ziel (nur Uebung: { partieId, ply, besterZug, alterZug,
+//     alterSanDe, gewinnVorher }), extra (Objekt je Paket, JSON hoechstens EXTRA_MAX Zeichen, sonst
+//     verworfen mit Warnung), maxSerie. Laufende Partie zusaetzlich modus, ziel, extra, liveTrivial
+//     (ladeLaufendePartie prueft die Typen).
+//   Modul-Speicher der Pakete unter schach-arena:v1:modul:<name>, Budget je Modul in MODUL_BUDGET:
+//     ladeModul(name, standard) -> gespeicherte Daten oder tiefe Kopie von standard
+//     speichereModul(name, daten) -> { ok, zeichen, grund? }   grund: 'unbekannt' | 'budget' | 'voll'
+//   speicherStand() -> { zeichen, grenze, teile: { partien, reviews, fortschritt, module: { name: n },
+//     sonst, fremd } }   (Zeichen = Schluessel + Wert; fortschritt umfasst Einstellungen und laufende
+//     Partie; fremd = andere Seiten derselben Herkunft, die sich den Speicher teilen)
+//   rohSpeicher() -> { praefix, schluessel(), lies(k), schreib(k, text), entferne(k) }  nur eigene
+//     Schluessel, nur fuer die Sicherung
+//   Reviews werden kompakt gespeichert (review.js kompaktReview/ergaenzeReviewFelder), MAX_REVIEWS 20.
+//   Scheitert ein Schreiben trotz geopferter Analysen, kommt das Ereignis speicher:fehler
+//     { schluessel, grund: 'voll' | 'fehler' }. Fortschritt wird immer vor der Partienliste geschrieben.
 import { BOTS } from './bots.js';
+import { sende } from './ereignisse.js';
+import { kompaktReview, ergaenzeReviewFelder } from './review.js';
 
 // Zug-Klassen (wie review.js KLASSEN), zum Pruefen gespeicherter Daten
 const KLASSEN_LISTE = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
@@ -16,15 +40,40 @@ const K = {
   partien: P + 'partien',
   laufend: P + 'laufend',
   review: (id) => P + 'review:' + id,
+  modul: (name) => P + 'modul:' + name,
 };
 
 // So viele Spielanalysen bleiben gespeichert (aeltere lassen sich neu berechnen)
-export const MAX_REVIEWS = 25;
+export const MAX_REVIEWS = 20;
 // So viele Partien bleiben in der Liste
 export const MAX_PARTIEN = 300;
 export const GENAUIGKEIT_STERN = 80;
 // Bestwert der Genauigkeit erst ab so vielen eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
 export const BESTWERT_MIN_ZUEGE = 10;
+
+// Spielmodi (weitere Modi, z. B. 'boss', nur mit einer neuen Welle)
+export const MODI = Object.freeze(['normal', 'uebung']);
+// Zeichen fuer partie.extra (alle Pakete zusammen)
+export const EXTRA_MAX = 400;
+// Budget je Paket-Modul in Zeichen
+export const MODUL_BUDGET = Object.freeze({
+  kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
+  taktik: 8000, start: 6000, feier: 6000, serie: 4000,
+});
+// Grenze des Speichers (Safari ca. 5 MB je Herkunft, als UTF-16 ca. 2,5 Mio. Zeichen)
+export const SPEICHER_GRENZE = 2500000;
+
+// Zaehlt die Partie fuer Sterne, Freischaltung, Bestwerte und Statistik? Nur im Modus 'normal' und nicht
+// aus einer eigenen Stellung. Eine startFen gleich der Grundstellung (Stellung, Zugrecht, Rochaderechte,
+// en passant) ist keine eigene Stellung (wie in verlauf.js).
+const GRUNDSTELLUNG = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -';
+function eigeneStellung(fen) {
+  if (!fen) return false;
+  return String(fen).trim().split(/\s+/).slice(0, 4).join(' ') !== GRUNDSTELLUNG;
+}
+export function wertet(p) {
+  return !!p && (p.modus || 'normal') === 'normal' && !eigeneStellung(p.startFen);
+}
 
 export const STANDARD_EINSTELLUNGEN = Object.freeze({
   klang: true,           // Klaenge an
@@ -89,16 +138,26 @@ function istVoll(e) {
 }
 
 // Schreibt; bei vollem Speicher werden die aeltesten Analysen geopfert und erneut versucht.
+// Scheitert es trotzdem, kommt das Ereignis speicher:fehler.
 function schreib(k, v) {
-  const t = JSON.stringify(v);
+  return schreibText(k, JSON.stringify(v));
+}
+
+function schreibText(k, t) {
+  let grund = 'voll';
   for (let versuch = 0; versuch < 30; versuch++) {
     try {
       sp().setItem(k, t);
       return true;
     } catch (e) {
-      if (!istVoll(e) || !entferneAeltesteReview(k)) return false;
+      if (!istVoll(e)) {
+        grund = 'fehler';
+        break;
+      }
+      if (!entferneAeltesteReview(k)) break;
     }
   }
+  try { sende('speicher:fehler', { schluessel: k, grund }); } catch (e) { /* egal */ }
   return false;
 }
 
@@ -205,8 +264,9 @@ function zaehltFuerBestwert(p) {
   return Number.isFinite(p.genauigkeit) && eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
 }
 
+// Nicht wertende Partien (Uebung, eigene Stellung) bekommen nie Sterne
 export function sterneFuerPartie(p) {
-  const sieg = !!p && p.ergebnis === 'sieg';
+  const sieg = !!p && p.ergebnis === 'sieg' && wertet(p);
   return [
     sieg,
     sieg && Number.isFinite(p.genauigkeit) && p.genauigkeit >= GENAUIGKEIT_STERN,
@@ -221,9 +281,66 @@ export function sterneFuerPartie(p) {
 //            grund 'matt'|'aufgabe'|'patt'|'wiederholung'|'50-zuege'|'material',
 //            hinweise, zuruecknahmen, liveKlassen: [klasse|null je Ply],
 //            genauigkeit (Spieler, 0..100|null), genauigkeitBot, spielstaerke (Elo-Schaetzung|null),
-//            eroeffnung (Name|null), sterne [bool,bool,bool] (wird beim Speichern berechnet) }
+//            eroeffnung (Name|null), sterne [bool,bool,bool] (wird beim Speichern berechnet),
+//            modus 'normal'|'uebung', ziel (nur Uebung), extra (Objekt je Paket), maxSerie }
 // Die Spielanalyse (Review) liegt getrennt unter review:<id> (nur die letzten MAX_REVIEWS).
 // ---------------------------------------------------------------------------
+const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+
+// Ziel einer Uebung: { partieId, ply, besterZug, alterZug, alterSanDe, gewinnVorher } oder null
+function pruefeZiel(z) {
+  if (!z || typeof z !== 'object' || Array.isArray(z)) return null;
+  if (typeof z.partieId !== 'string' || !z.partieId || z.partieId.length > 40) return null;
+  if (!Number.isInteger(z.ply) || z.ply < 0 || z.ply > 2000) return null;
+  if (typeof z.besterZug !== 'string' || !UCI_RE.test(z.besterZug)) return null;
+  if (typeof z.alterZug !== 'string' || !UCI_RE.test(z.alterZug)) return null;
+  return {
+    partieId: z.partieId,
+    ply: z.ply,
+    besterZug: z.besterZug,
+    alterZug: z.alterZug,
+    alterSanDe: typeof z.alterSanDe === 'string' ? z.alterSanDe.slice(0, 16) : null,
+    gewinnVorher: Number.isFinite(z.gewinnVorher) ? Math.max(0, Math.min(1, z.gewinnVorher)) : null,
+  };
+}
+
+// Zusatzdaten der Pakete: einfaches Objekt, als JSON hoechstens EXTRA_MAX Zeichen, sonst null (mit Warnung)
+function pruefeExtra(extra) {
+  if (extra == null) return null;
+  if (typeof extra !== 'object' || Array.isArray(extra)) {
+    warne('extra ist kein Objekt und wird verworfen');
+    return null;
+  }
+  let t = '';
+  try { t = JSON.stringify(extra); } catch (e) { t = null; }
+  if (t == null) {
+    warne('extra laesst sich nicht speichern und wird verworfen');
+    return null;
+  }
+  if (t.length > EXTRA_MAX) {
+    warne(`extra hat ${t.length} Zeichen (hoechstens ${EXTRA_MAX}) und wird verworfen`);
+    return null;
+  }
+  return t === '{}' ? null : JSON.parse(t);
+}
+
+function warne(text) {
+  try { console.warn('Speicher: ' + text); } catch (e) { /* egal */ }
+}
+
+// Neue Felder einer Partie in Form bringen (modus, ziel, extra, maxSerie)
+function normalisiere(p) {
+  p.modus = p.modus == null || p.modus === '' ? 'normal' : String(p.modus);
+  const ziel = p.modus === 'uebung' ? pruefeZiel(p.ziel) : null;
+  if (ziel) p.ziel = ziel;
+  else delete p.ziel;
+  const extra = pruefeExtra(p.extra);
+  if (extra) p.extra = extra;
+  else delete p.extra;
+  if (Number.isFinite(p.maxSerie)) p.maxSerie = Math.max(0, Math.round(p.maxSerie));
+  else delete p.maxSerie;
+  return p;
+}
 export function neueId(datum = new Date()) {
   return 'p' + datum.getTime().toString(36) + Math.floor(Math.random() * 1296).toString(36).padStart(2, '0');
 }
@@ -242,14 +359,16 @@ export function ladePartie(id) {
   return ladeListe().find((p) => p.id === id) || null;
 }
 
-// Speichert eine beendete Partie und bucht den Fortschritt (nur beim ersten Speichern).
+// Speichert eine beendete Partie und bucht den Fortschritt (nur beim ersten Speichern und nur, wenn
+// die Partie wertet). Reihenfolge: erst der kleine Fortschritt, dann die Liste, dann die Analyse.
 // Rueckgabe { partie, neueSterne: [bool,bool,bool] (in dieser Partie neu verdient),
-//             neuFreigeschaltet: Bot|null, brillant: Anzahl neu gesammelter Brillant-Zuege }
+//             neuFreigeschaltet: Bot|null, brillant: Anzahl neu gesammelter Brillant-Zuege, wertet }
 export function speicherePartie(partie, review = null) {
   if (!partie || typeof partie !== 'object') throw new Error('Partie fehlt');
-  const p = { ...partie };
+  const p = normalisiere({ ...partie });
   if (!p.id) p.id = neueId();
   if (!p.datum) p.datum = new Date().toISOString();
+  const wert = wertet(p);
   p.sterne = sterneFuerPartie(p);
 
   const liste = ladeListe();
@@ -258,13 +377,18 @@ export function speicherePartie(partie, review = null) {
   neu.push(p);
   neu.sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
   const behalten = neu.slice(0, MAX_PARTIEN);
+
+  const ergebnis = { partie: p, neueSterne: [false, false, false], neuFreigeschaltet: null, brillant: 0, wertet: wert };
+  if (!schonDa && wert) bucheFortschritt(p, review, ergebnis);
   for (const weg of neu.slice(MAX_PARTIEN)) entferne(K.review(weg.id));
   schreib(K.partien, behalten);
   if (review) speichereReview(p.id, review);
+  return ergebnis;
+}
 
-  const ergebnis = { partie: p, neueSterne: [false, false, false], neuFreigeschaltet: null, brillant: 0 };
-  if (schonDa) return ergebnis;
-
+// Fortschritt einer neu gespeicherten, wertenden Partie buchen (Zaehler, Bestwert, Sterne,
+// Freischaltung, Schatzkiste) und sofort schreiben
+function bucheFortschritt(p, review, ergebnis) {
   const f = ladeFortschritt();
   const b = f.bots[p.botId];
   if (b) {
@@ -287,7 +411,6 @@ export function speicherePartie(partie, review = null) {
   }
   ergebnis.brillant = sammleBrillante(f, p, review);
   speichereFortschritt(f);
-  return ergebnis;
 }
 
 // Brillant-Sammlung (Schatzkiste); jeder Zug nur einmal
@@ -308,7 +431,8 @@ function sammleBrillante(f, p, review) {
 // gesichert, die Analyse kommt spaeter): Genauigkeit, Spielstaerke, Eroeffnung, Review,
 // Brillant-Zuege und Bestwert. Sterne werden nur dazugewonnen, nie entzogen.
 // Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung) nur, wenn noch keine da ist.
-// Rueckgabe { partie, neueSterne, brillant } oder null.
+// Nicht wertende Partien: keine Sterne, kein Bestwert, keine Schatzkiste.
+// Rueckgabe { partie, neueSterne, brillant, wertet } oder null.
 export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) {
   const liste = ladeListe();
   const i = liste.findIndex((x) => x.id === id);
@@ -324,25 +448,29 @@ export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) 
   } else if (Number.isFinite(genauigkeit) && !Number.isFinite(p.genauigkeit)) {
     p.genauigkeit = genauigkeit;
   }
+  const wert = wertet(p);
   p.sterne = sterneFuerPartie(p);
   liste[i] = p;
+
+  const ergebnis = { partie: p, neueSterne: [false, false, false], brillant: 0, wertet: wert };
+  // erst der kleine Fortschritt, dann die Liste
+  if (wert) {
+    const f = ladeFortschritt();
+    const b = f.bots[p.botId];
+    if (b) {
+      if (zaehltFuerBestwert(p) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
+      p.sterne.forEach((s, k) => {
+        if (s && !b.sterne[k]) {
+          b.sterne[k] = true;
+          ergebnis.neueSterne[k] = true;
+        }
+      });
+    }
+    ergebnis.brillant = sammleBrillante(f, p, review);
+    speichereFortschritt(f);
+  }
   schreib(K.partien, liste);
   if (review) speichereReview(id, review);
-
-  const ergebnis = { partie: p, neueSterne: [false, false, false], brillant: 0 };
-  const f = ladeFortschritt();
-  const b = f.bots[p.botId];
-  if (b) {
-    if (zaehltFuerBestwert(p) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
-    p.sterne.forEach((s, k) => {
-      if (s && !b.sterne[k]) {
-        b.sterne[k] = true;
-        ergebnis.neueSterne[k] = true;
-      }
-    });
-  }
-  ergebnis.brillant = sammleBrillante(f, p, review);
-  speichereFortschritt(f);
   return ergebnis;
 }
 
@@ -350,8 +478,8 @@ export function aktualisierePartie(id, teil) {
   const liste = ladeListe();
   const i = liste.findIndex((p) => p.id === id);
   if (i < 0) return null;
-  // Fortschritt-relevante Felder bleiben, wie sie beim Speichern waren
-  const { id: _i, sterne: _s, ergebnis: _e, botId: _b, ...rest } = teil || {};
+  // Fortschritt-relevante Felder bleiben, wie sie beim Speichern waren (auch alles, was wertet() prueft)
+  const { id: _i, sterne: _s, ergebnis: _e, botId: _b, modus: _m, startFen: _f, ...rest } = teil || {};
   liste[i] = { ...liste[i], ...rest };
   schreib(K.partien, liste);
   return liste[i];
@@ -365,14 +493,19 @@ export function loeschePartie(id) {
 // ---------------------------------------------------------------------------
 // Spielanalysen (Review-Objekte aus review.js analysierePartie)
 // ---------------------------------------------------------------------------
+// Gespeichert wird kompakt (ohne ableitbare Felder), geladen wird wieder vollstaendig.
+// Alte, volle Reviews laden unveraendert.
 export function ladeReview(id) {
   const r = lies(K.review(id), null);
-  return r && typeof r === 'object' && Array.isArray(r.zuege) ? r : null;
+  if (!r || typeof r !== 'object' || !Array.isArray(r.zuege)) return null;
+  try { return ergaenzeReviewFelder(r); } catch (e) { return r; }
 }
 
 export function speichereReview(id, review) {
   if (!review) return false;
-  const ok = schreib(K.review(id), review);
+  let kompakt = review;
+  try { kompakt = kompaktReview(review); } catch (e) { kompakt = review; }
+  const ok = schreib(K.review(id), kompakt);
   // Nur die neuesten MAX_REVIEWS behalten
   const ids = ladePartien().map((p) => p.id);
   const mitReview = ids.filter((x) => hatReview(x));
@@ -395,21 +528,33 @@ function entferneAeltesteReview(ausser) {
 // ---------------------------------------------------------------------------
 // Laufende Partie (zum Fortsetzen, wenn das iPad den Tab beendet)
 // Laufend = { botId, spielerFarbe, startFen, zuege: [uci], hinweise, zuruecknahmen,
-//             liveKlassen: [klasse|null], gestartet (ISO) }
+//             liveKlassen: [klasse|null], gestartet (ISO),
+//             modus 'normal'|'uebung', ziel (nur Uebung) | null, extra {}, liveTrivial: [bool] }
 // ---------------------------------------------------------------------------
 export function speichereLaufendePartie(stand) {
   if (!stand) return loescheLaufendePartie();
-  schreib(K.laufend, stand);
+  const s = { ...stand };
+  if (s.extra != null) {
+    const extra = pruefeExtra(s.extra);
+    if (extra) s.extra = extra;
+    else delete s.extra;
+  }
+  schreib(K.laufend, s);
 }
 
 export function ladeLaufendePartie() {
   const s = lies(K.laufend, null);
   if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || !BOTS.some((b) => b.id === s.botId)) return null;
+  if (s.startFen != null && typeof s.startFen !== 'string') return null;
   // von Hand veraenderte Daten: nur bekannte Klassen und gueltige Zuege uebernehmen
-  const zuege = s.zuege.filter((u) => typeof u === 'string' && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(u));
+  const zuege = s.zuege.filter((u) => typeof u === 'string' && UCI_RE.test(u));
   if (zuege.length !== s.zuege.length) return null;
   const liveKlassen = Array.isArray(s.liveKlassen) ? s.liveKlassen.map((k) => (KLASSEN_LISTE.includes(k) ? k : null)) : [];
-  return { ...s, liveKlassen };
+  const liveTrivial = Array.isArray(s.liveTrivial) ? s.liveTrivial.map((x) => x === true) : [];
+  const modus = MODI.includes(s.modus) ? s.modus : 'normal';
+  const ziel = modus === 'uebung' ? pruefeZiel(s.ziel) : null;
+  const extra = pruefeExtra(s.extra) || {};
+  return { ...s, liveKlassen, liveTrivial, modus, ziel, extra };
 }
 
 export function loescheLaufendePartie() {
@@ -417,11 +562,12 @@ export function loescheLaufendePartie() {
 }
 
 // ---------------------------------------------------------------------------
-// Statistik ueber alle Partien
+// Statistik ueber alle wertenden Partien (ohne Uebungen und Partien aus einer Stellung).
+// Durchschnitts-Genauigkeit nur aus Partien ab BESTWERT_MIN_ZUEGE eigenen Zuegen.
 // ---------------------------------------------------------------------------
 export function statistik() {
-  const l = ladePartien();
-  const gen = l.map((p) => p.genauigkeit).filter(Number.isFinite);
+  const l = ladePartien().filter(wertet);
+  const gen = l.filter(zaehltFuerBestwert).map((p) => p.genauigkeit);
   const st = l.slice(0, 10).map((p) => p.spielstaerke).filter(Number.isFinite);
   return {
     partien: l.length,
@@ -437,7 +583,97 @@ export function statistik() {
   };
 }
 
-// Alles loeschen (Einstellungen bleiben, wenn mitEinstellungen false)
+// ---------------------------------------------------------------------------
+// Modul-Speicher der Pakete (Runde 4): schach-arena:v1:modul:<name>, Budget in MODUL_BUDGET
+// ---------------------------------------------------------------------------
+const istModul = (name) => typeof name === 'string' && Object.prototype.hasOwnProperty.call(MODUL_BUDGET, name);
+
+// Gespeicherte Daten des Moduls oder eine tiefe Kopie von standard (auch bei kaputten Daten, bei
+// unbekanntem Namen oder wenn die Art nicht passt: Objekt, Liste, Zahl ...)
+export function ladeModul(name, standard = null) {
+  const kopie = () => (standard === undefined ? null : JSON.parse(JSON.stringify(standard)));
+  if (!istModul(name)) {
+    warne('unbekanntes Modul ' + String(name));
+    return kopie();
+  }
+  const v = lies(K.modul(name), null);
+  if (v == null) return kopie();
+  if (standard != null) {
+    const art = (x) => (Array.isArray(x) ? 'liste' : typeof x);
+    if (art(v) !== art(standard)) return kopie();
+  }
+  return v;
+}
+
+// Schreibt die Daten des Moduls. Ueber dem Budget wird nichts geschrieben (das Paket duennt selbst aus).
+export function speichereModul(name, daten) {
+  if (!istModul(name)) return { ok: false, zeichen: 0, grund: 'unbekannt' };
+  const t = JSON.stringify(daten === undefined ? null : daten);
+  const zeichen = t.length;
+  if (zeichen > MODUL_BUDGET[name]) return { ok: false, zeichen, grund: 'budget' };
+  return schreibText(K.modul(name), t) ? { ok: true, zeichen } : { ok: false, zeichen, grund: 'voll' };
+}
+
+// Belegung des Speichers in Zeichen (Schluessel + Wert)
+export function speicherStand() {
+  const teile = { partien: 0, reviews: 0, fortschritt: 0, module: {}, sonst: 0, fremd: 0 };
+  for (const name of Object.keys(MODUL_BUDGET)) teile.module[name] = 0;
+  let zeichen = 0;
+  const pm = P + 'modul:';
+  try {
+    const s = sp();
+    const schluessel = [];
+    for (let i = 0; i < s.length; i++) schluessel.push(s.key(i));
+    for (const k of schluessel) {
+      if (k == null) continue;
+      const v = s.getItem(k);
+      const n = k.length + (v == null ? 0 : String(v).length);
+      zeichen += n;
+      if (!k.startsWith(P)) teile.fremd += n;
+      else if (k === K.partien) teile.partien += n;
+      else if (k.startsWith(P + 'review:')) teile.reviews += n;
+      else if (k === K.fortschritt || k === K.einstellungen || k === K.laufend) teile.fortschritt += n;
+      else if (k.startsWith(pm)) {
+        const name = k.slice(pm.length);
+        teile.module[name] = (teile.module[name] || 0) + n;
+      } else teile.sonst += n;
+    }
+  } catch (e) { /* egal */ }
+  return { zeichen, grenze: SPEICHER_GRENZE, teile };
+}
+
+// Roher Zugang zu den eigenen Schluesseln (nur fuer die Sicherung, Paket 2D)
+export function rohSpeicher() {
+  const eigen = (k) => typeof k === 'string' && k.startsWith(P) && k.length > P.length;
+  return Object.freeze({
+    praefix: P,
+    schluessel() {
+      const l = [];
+      try {
+        const s = sp();
+        for (let i = 0; i < s.length; i++) {
+          const k = s.key(i);
+          if (eigen(k) && k !== P + 'test') l.push(k);
+        }
+      } catch (e) { /* egal */ }
+      return l.sort();
+    },
+    lies(k) {
+      if (!eigen(k)) return null;
+      try { return sp().getItem(k); } catch (e) { return null; }
+    },
+    schreib(k, text) {
+      if (!eigen(k) || typeof text !== 'string') return false;
+      return schreibText(k, text);
+    },
+    entferne(k) {
+      if (eigen(k)) entferne(k);
+    },
+  });
+}
+
+// Alles loeschen (Einstellungen bleiben, wenn mitEinstellungen false). Erfasst alle eigenen
+// Schluessel ueber das Praefix, also auch die Modul-Speicher der Pakete.
 export function setzeZurueck({ mitEinstellungen = false } = {}) {
   const s = sp();
   const weg = [];

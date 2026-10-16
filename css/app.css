@@ -912,3 +912,85 @@ html[data-brett="holz"] { --feld-hell: #f0d9b5; --feld-dunkel: #b58863; }
   .update-hinweis .u-lang { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .update-hinweis { animation: none; } }
+
+/* ============================================================
+   ERWEITERUNGSPUNKTE (Runde 4, Welle 0): Behaelter der Anzeige-Orte, Coach-Zusatz der Buehne,
+   Feier-Zeilen im Ergebnis, Chip "Übung", Nachlese im Arena-Panel. Ohne Pakete bleibt alles leer
+   und unsichtbar (leere Behaelter sind versteckt und erzeugen keinen Abstand).
+   ============================================================ */
+/* Behaelter der Anzeige-Orte */
+.ort-panel-oben[hidden], .ort-panel-bot[hidden], .an-ort-oben[hidden], .vl-ort[hidden],
+.erg-feier[hidden], .erg-karte-ort[hidden] { display: none; }
+.ort-panel-oben, .ort-panel-bot { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.arena .detail > .ort-panel-oben { grid-column: 1 / -1; }
+.an-ort-oben, .vl-ort { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vl-ort { gap: 14px; }
+.es-ort, .an-c-paket { display: contents; }
+.erg-karte-ort { display: grid; gap: 10px; min-width: 0; text-align: left; }
+@media (orientation: portrait) {
+  /* Analyse hoch: die rechte Spalte ist aufgeloest (display: contents), der Ort folgt dem Banner */
+  .an-ort-oben { order: 1; }
+}
+
+/* Nachlese oben im Arena-Panel: "Seit deiner letzten Partie" (still, ohne Klang) */
+.nachlese { display: grid; gap: 4px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--ui-rand); font-size: 14px; line-height: 1.35; color: #c9d2ef; }
+.nl-titel { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--ui-gedimmt); }
+.nl-zeile b { color: var(--ui-text); font-weight: 800; }
+.nl-zeile.gross b { color: var(--stern); }
+
+/* Coach-Zusatz (buehne.coachZusatz): hoechstens zwei Zeilen unter dem Coach-Satz */
+.c-zusatz { grid-column: 2 / -1; min-width: 0; font-size: 14px; line-height: 1.35; color: #d6def8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: zusatz-ein .25s ease-out both; }
+.c-zusatz[data-art="gut"] { color: var(--gut); font-weight: 750; }
+.c-zusatz[data-art="leise"] { color: var(--ui-gedimmt); }
+.c-zusatz[data-art="gross"] { font-family: var(--schrift-display); font-size: 16px; font-weight: 900; color: var(--akzent);
+  text-shadow: 0 0 12px rgba(25, 246, 232, .45); }
+.coach.kompakt .c-zusatz { display: none; }
+@keyframes zusatz-ein { from { transform: translateY(4px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (orientation: portrait) {
+  /* feste Coach-Hoehe im Hochformat: mit Zusatz nur eine Zeile Coach-Satz */
+  .partie .coach.mit-zusatz .c-text { -webkit-line-clamp: 1; }
+  .partie .coach.mit-zusatz { align-content: start; }
+}
+
+/* Feier-Zeilen im Ergebnis (feier.fuerOverlay): gleiten nacheinander ein (--t), gross als Stempel */
+.erg-feier { display: grid; gap: 6px; }
+.erg-f-zeile { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 7px 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); font-size: 14px; line-height: 1.3; color: #c9d2ef; text-align: left; }
+.erg-f-zeile.neu { animation: feier-ein .4s cubic-bezier(.2, 1.2, .4, 1) var(--t, 0ms) both; }
+.erg-f-text { display: grid; min-width: 0; }
+.erg-f-text b { color: var(--ui-text); font-weight: 800; }
+.erg-f-text small { font-size: 12.5px; color: var(--ui-gedimmt); }
+.erg-f-symbol { flex: none; display: grid; place-items: center; min-width: 26px; height: 26px; font-size: 18px; font-weight: 900; color: var(--akzent); }
+.erg-f-symbol .ico { width: 22px; height: 22px; }
+.erg-f-zeile.gross { padding: 9px 16px; border: 2px solid var(--stern); background: rgba(255, 210, 63, .08); transform: rotate(-1.5deg);
+  box-shadow: 0 0 18px rgba(255, 210, 63, .22); }
+.erg-f-zeile.gross b { font-family: var(--schrift-display); font-size: 17px; font-weight: 900; letter-spacing: .08em; color: var(--stern); }
+.erg-f-zeile.gross .erg-f-symbol { color: var(--stern); }
+.erg-f-zeile.gross.neu { animation: feier-stempel .45s cubic-bezier(.2, 1.4, .4, 1) var(--t, 0ms) both; }
+.erg-feier.alles .erg-f-zeile { animation: none; }
+@keyframes feier-ein { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes feier-stempel { 0% { transform: scale(1.6) rotate(-6deg); opacity: 0; } 70% { transform: scale(.96) rotate(-1.5deg); opacity: 1; }
+  100% { transform: rotate(-1.5deg); opacity: 1; } }
+/* Handy: die Feier-Zeilen werden zu einer Summenzeile (nur die Titel, mit Punkt getrennt) */
+@media (max-width: 600px) {
+  .erg-feier { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 6px; }
+  .erg-f-zeile.zeile { padding: 0; border: 0; background: none; gap: 4px; font-size: 13px; }
+  .erg-f-zeile.zeile .erg-f-symbol, .erg-f-zeile.zeile small { display: none; }
+  .erg-f-zeile.zeile + .erg-f-zeile.zeile::before { content: "·"; margin-right: 2px; color: var(--ui-gedimmt); }
+  .erg-f-zeile.gross { flex-basis: 100%; }
+}
+
+/* Chip "Übung": nicht wertende Partien (Ergebnis neben dem Kopfwort, Verlauf statt der Sterne) */
+.chip.uebung { height: 26px; padding: 0 10px; font-size: 12px; font-weight: 900; letter-spacing: .14em; color: #c4a6ff;
+  background: rgba(160, 107, 255, .14); border-color: rgba(160, 107, 255, .6); }
+.erg-kopf { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; }
+.vl-uebung { height: 22px; padding: 0 8px; font-size: 11px; letter-spacing: .08em; }
+
+/* Tab im Hintergrund (app.js setzt html[data-sichtbar]): Animationen anhalten */
+html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-sichtbar="nein"] *::after { animation-play-state: paused !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .c-zusatz, .erg-f-zeile.neu, .erg-f-zeile.gross.neu { animation: none; }
+}
