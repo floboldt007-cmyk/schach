@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Testseite: Analyse, Verlauf, Einstellungen</title>
+<link rel="stylesheet" href="../css/board.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/screens.css">
+<style>
+  /* nur fuer die Testseite: Hinweis-Toast der Fake-App */
+  #test-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 90; transform: translateX(-50%);
+    max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px; background: #1a1f40; border: 1px solid var(--ui-rand-stark);
+    color: var(--ui-text); font-size: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); pointer-events: none; }
+  #test-toast[hidden] { display: none; }
+  #test-toast.fehler { border-color: var(--schlecht); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="test-toast" role="status" aria-live="polite" hidden></div>
+<script type="module">
+// Testseite fuer die Screens von Bau B mit einer Fake-App, die das echte app-Objekt nachbaut:
+// gehe/zurueck werden protokolliert (und zwischen den drei Screens auch ausgefuehrt),
+// engine() liefert echte Engine-Instanzen, Einstellungen laufen ueber storage.js.
+//   screens.html?screen=analyse&partieId=...&ply=12&neuFreigeschaltet=turm&neueSterne=1,1,0
+//   screens.html?screen=verlauf | ?screen=einstellungen | ?screen=keiner (nur Testdaten-API)
+import { Chess } from '../vendor/chess/chess.js';
+import { Engine } from '../js/engine.js';
+import { setzeSymbole } from '../js/board.js';
+import { SYMBOLE } from '../js/symbole.js';
+import { BOTS, botNachId, botZug } from '../js/bots.js';
+import { klang } from '../js/sounds.js';
+import { analysierePartie } from '../js/review.js';
+import * as speicher from '../js/storage.js';
+import * as analyse from '../js/ui/analyse.js';
+import * as verlauf from '../js/ui/verlauf.js';
+import * as einstellungen from '../js/ui/einstellungen.js';
+
+setzeSymbole(SYMBOLE);
+const SCREENS = { analyse, verlauf, einstellungen };
+const root = document.getElementById('app');
+const protokoll = [];
+const engines = {};
+const fehler = [];
+window.addEventListener('error', (e) => fehler.push(String(e.message || e)));
+window.addEventListener('unhandledrejection', (e) => fehler.push('Promise: ' + String(e.reason && e.reason.message || e.reason)));
+
+let aktuell = null;
+let verlaufStapel = [];
+
+function wendeAn(e) {
+  klang.aus = !e.klang;
+  document.documentElement.dataset.brett = e.brett;
+  document.documentElement.dataset.balken = e.balken ? 'an' : 'aus';
+}
+
+const app = {
+  gehe(name, params = {}) {
+    protokoll.push({ art: 'gehe', name, params });
+    if (SCREENS[name]) {
+      if (aktuell) verlaufStapel.push({ name: aktuell.name, params: aktuell.params });
+      starte(name, params);
+    }
+  },
+  zurueck() {
+    protokoll.push({ art: 'zurueck' });
+    const vorher = verlaufStapel.pop();
+    if (vorher) starte(vorher.name, vorher.params);
+  },
+  engine(name) {
+    if (!engines[name]) {
+      const e = new Engine();
+      engines[name] = e.init().then(() => e);
+      engines[name].instanz = e;
+    }
+    return engines[name];
+  },
+  einstellungen: () => speicher.ladeEinstellungen(),
+  setzeEinstellungen(teil) {
+    const e = speicher.speichereEinstellungen(teil);
+    wendeAn(e);
+    protokoll.push({ art: 'einstellungen', teil });
+    return e;
+  },
+  meldung(text, { art = 'info' } = {}) {
+    protokoll.push({ art: 'meldung', text });
+    const t = document.getElementById('test-toast');
+    t.textContent = text;
+    t.className = art;
+    t.hidden = false;
+    clearTimeout(t._uhr);
+    t._uhr = setTimeout(() => { t.hidden = true; }, 2600);
+  },
+  vorab: new Map(),
+};
+
+function starte(name, params = {}) {
+  if (aktuell) {
+    protokoll.push({ art: 'verlasse', name: aktuell.name });
+    aktuell.handle.verlasse();
+  }
+  root.replaceChildren();
+  const handle = SCREENS[name].zeige(root, params, app);
+  aktuell = { name, params, handle };
+  protokoll.push({ art: 'zeige', name, params });
+}
+
+// ---------- Testdaten ----------
+const OPER = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#'.split(' ');
+
+function alsUci(sanListe, startFen) {
+  const c = new Chess(startFen);
+  const uci = [];
+  const san = [];
+  for (const s of sanListe) {
+    const m = c.move(s);
+    uci.push(m.lan);
+    san.push(m.san);
+  }
+  return { uci, san, chess: c };
+}
+
+function partieDatensatz({ botId, farbe, zuege, san, ergebnis, grund, datum, hinweise = 0, zuruecknahmen = 0, review = null }) {
+  const bf = farbe === 'w' ? 'b' : 'w';
+  return {
+    id: speicher.neueId(new Date(datum)), datum: new Date(datum).toISOString(), botId, botStufe: botNachId(botId).stufe,
+    spielerFarbe: farbe, startFen: new Chess().fen(), zuege, san, ergebnis, grund, hinweise, zuruecknahmen,
+    liveKlassen: review ? review.zuege.map((z) => (z.farbe === farbe ? z.klasse : null)) : zuege.map(() => null),
+    genauigkeit: review ? review.genauigkeit[farbe] : null,
+    genauigkeitBot: review ? review.genauigkeit[bf] : null,
+    spielstaerke: review ? review.spielstaerke[farbe] : null,
+    eroeffnung: review ? review.eroeffnung : null,
+  };
+}
+
+async function rechneReview(zuege, farbe, bot, tiefe = 12) {
+  const engine = await app.engine('bewertung');
+  const elo = { [farbe === 'w' ? 'b' : 'w']: bot.elo };
+  return analysierePartie(engine, zuege, { tiefe, multipv: 2, spielerFarbe: farbe, elo });
+}
+
+window.testseite = {
+  protokoll, fehler, app, speicher, BOTS,
+  starte,
+  aktuell: () => aktuell && aktuell.name,
+  leere() { speicher.setzeZurueck({ mitEinstellungen: true }); app.vorab.clear(); },
+  // Opernpartie (Morphy 1858): Flo spielt Weiss gegen Ritter Rudi
+  async opernpartie({ mitReview = false, tiefe = 12, datum = Date.now() - 3600e3, hinweise = 0 } = {}) {
+    const { uci, san } = alsUci(OPER);
+    const bot = botNachId('rudi');
+    const review = mitReview ? await rechneReview(uci, 'w', bot, tiefe) : null;
+    const p = partieDatensatz({ botId: 'rudi', farbe: 'w', zuege: uci, san, ergebnis: 'sieg', grund: 'matt', datum, hinweise, review });
+    const erg = speicher.speicherePartie(p, review);
+    return { id: erg.partie.id, ergebnis: erg };
+  },
+  // Kurze Bot-gegen-Bot-Partie: "Flo" ist Grossmeisterin Greta (Weiss) gegen den Gegner-Bot
+  async botPartie({ gegner = 'benno', flo = 'greta', maxPly = 70, mitReview = false, tiefe = 12, datum = Date.now() - 7200e3, farbe = 'w' } = {}) {
+    const engine = await app.engine('bot');
+    const c = new Chess();
+    const zuege = [];
+    const san = [];
+    while (!c.isGameOver() && zuege.length < maxPly) {
+      const amZug = c.turn();
+      const bot = botNachId(amZug === farbe ? flo : gegner);
+      const z = await botZug(engine, c.fen(), bot, { ohnePause: true });
+      if (!z) break;
+      const m = c.move({ from: z.uci.slice(0, 2), to: z.uci.slice(2, 4), promotion: z.uci[4] || undefined });
+      zuege.push(m.lan);
+      san.push(m.san);
+    }
+    let ergebnis = 'remis';
+    let grund = 'aufgabe';
+    if (c.isCheckmate()) { ergebnis = c.turn() === farbe ? 'niederlage' : 'sieg'; grund = 'matt'; }
+    else if (c.isStalemate()) grund = 'patt';
+    else if (c.isThreefoldRepetition()) grund = 'wiederholung';
+    else if (c.isInsufficientMaterial()) grund = 'material';
+    else if (c.isDrawByFiftyMoves()) grund = '50-zuege';
+    else { ergebnis = 'sieg'; grund = 'aufgabe'; }
+    const review = mitReview ? await rechneReview(zuege, farbe, botNachId(gegner), tiefe) : null;
+    const p = partieDatensatz({ botId: gegner, farbe, zuege, san, ergebnis, grund, datum, review });
+    const erg = speicher.speicherePartie(p, review);
+    return { id: erg.partie.id, ergebnis: erg, anzahl: zuege.length };
+  },
+  // Partie direkt mit fertiger Review speichern (z. B. aus einem vorigen Lauf)
+  speichere(partie, review) { return speicher.speicherePartie(partie, review); },
+  engineZustand() {
+    const e = engines.bewertung && engines.bewertung.instanz;
+    return e ? { laufend: !!e._laufend, schlange: e._schlange.length } : null;
+  },
+};
+
+wendeAn(speicher.ladeEinstellungen());
+const q = new URLSearchParams(location.search);
+const screen = q.get('screen') || 'keiner';
+if (SCREENS[screen]) {
+  const params = {};
+  for (const [k, v] of q) {
+    if (k === 'screen') continue;
+    if (k === 'ply') params.ply = Number(v);
+    else if (k === 'neueSterne') params.neueSterne = v.split(',').map((x) => x === '1' || x === 'true');
+    else params[k] = v;
+  }
+  starte(screen, params);
+}
+window.testseiteBereit = true;
+</script>
+</body>
+</html>

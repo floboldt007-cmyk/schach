@@ -1,0 +1,1304 @@
+// Partie: Brett gegen einen Bot mit Live-Bewertung jedes eigenen Zugs (Symbol, Lasur, Coach,
+// Effekte je Klasse), Bewertungsbalken, Bot-Karte mit Sprechblase, Zugliste, Hinweis,
+// Zuruecknehmen, Drehen, Aufgeben, Spielende-Erkennung, Auswertung und Ergebnis-Overlay.
+// Params: { botId, farbe: 'w'|'b', fortsetzen?: true, startFen? } (startFen: Partie ab Stellung,
+// dann ohne Eroeffnungsbuch). Test-Hooks (window.__partie, window.__test) nur mit ?test:
+// __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung) }.
+import { Chess } from '../../vendor/chess/chess.js';
+import { Brett, zielKarte, symbolSvg } from '../board.js';
+import { BOTS, botNachId, botZug, botSatz } from '../bots.js';
+import { bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, partieGenauigkeit, warKnapp } from '../review.js';
+import { eroeffnung, stellungsSchluessel } from '../openings.js';
+import { klang } from '../sounds.js';
+import {
+  speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
+  GENAUIGKEIT_STERN,
+} from '../storage.js';
+import { icon } from '../app.js';
+
+const KLASSEN_WORT = {
+  brillant: 'Brillant!', stark: 'Großartig!', bester: 'Bester Zug', exzellent: 'Exzellent', gut: 'Gut',
+  buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler', verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
+};
+const SERIE = new Set(['bester', 'stark', 'brillant']);
+const NEUTRAL = new Set(['buch', 'erzwungen']);
+const MIT_VERLUST = new Set(['ungenau', 'fehler', 'verpasst', 'patzer']);
+const SCHLECHT = new Set(['fehler', 'verpasst', 'patzer']);
+const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
+const GRUND_TEXT = {
+  matt: 'Schachmatt', aufgabe: 'Aufgabe', patt: 'Patt', wiederholung: 'Dreifache Stellungswiederholung',
+  '50-zuege': '50-Züge-Regel', material: 'Zu wenig Material zum Mattsetzen',
+};
+const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
+// Live-Bewertung: hoechstens so lange je Stellung; warten schon zwei Stellungen (Flo zieht
+// zuegig), nur noch kurz rechnen, damit sich nichts staut (die Analyse rechnet genauso)
+const LIVE_MAX_MS = 5000;
+const LIVE_STAU_MS = 1500;
+// So lange wartet das Ergebnis auf die Auswertung, dann erscheint es schon ohne Genauigkeit
+const AUSWERTUNG_WARTEN_MS = 2500;
+
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+const komma = (x, n = 1) => x.toFixed(n).replace('.', ',');
+
+// Coach-Satz fuer die Karte: das Klassenwort steht schon gross darueber, keine langen
+// Gedankenstriche in UI-Texten, Rochade wie in der Zugliste (0-0). Wie in der Analyse.
+function coachSatz(t) {
+  const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
+  const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/, '');
+  if (!rest.trim()) return text;
+  // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
+  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+// Bewertung als Text aus Sicht von farbe: "+1,2", "−0,4", "M3", "−M2"
+function evalText(ev, farbe) {
+  if (!ev) return '';
+  if (ev.mate != null) {
+    const m = farbe === 'b' ? -ev.mate : ev.mate;
+    return (m < 0 ? '−M' : 'M') + Math.abs(m);
+  }
+  // wie in der Analyse und im Coach-Text gerundet (Betrag auf eine Nachkommastelle)
+  const cp = farbe === 'b' ? -ev.cp : ev.cp;
+  const w = Math.round(Math.abs(cp) / 10) / 10;
+  if (w === 0) return '0,0';
+  return (cp > 0 ? '+' : '−') + komma(w);
+}
+
+export function zeige(root, params, app) {
+  const reduziert = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const einst = app.einstellungen();
+
+  // ---------- Partie bestimmen ----------
+  let laufend = null;
+  if (params && params.fortsetzen) {
+    laufend = ladeLaufendePartie();
+    if (laufend && params.botId && laufend.botId !== params.botId) laufend = null;
+  }
+  const bot = botNachId(laufend ? laufend.botId : params && params.botId) || null;
+  if (!bot) {
+    setTimeout(() => app.gehe('arena', {}, { ersetzen: true }), 0);
+    return { verlasse() {} };
+  }
+  const farbe = (laufend ? laufend.spielerFarbe : params.farbe) === 'b' ? 'b' : 'w';
+  const botFarbe = farbe === 'w' ? 'b' : 'w';
+  let startFen = laufend ? laufend.startFen || null : (params.startFen || null);
+  if (startFen) {
+    try { new Chess(startFen); } catch (e) { startFen = null; }
+  }
+
+  const z = {
+    bot, farbe, startFen,
+    chess: startFen ? new Chess(startFen) : new Chess(),
+    zuege: [], san: [], verbose: [], fens: [],
+    live: [],          // je Ply: { marke, status: 'rechnet'|'fertig'|'fehler', erg, fertig: Promise, gezeigtUm }
+    liveKlassen: [],
+    hinweise: laufend ? laufend.hinweise || 0 : 0,
+    zuruecknahmen: laufend ? laufend.zuruecknahmen || 0 : 0,
+    gestartet: laufend ? laufend.gestartet : new Date().toISOString(),
+    phase: 'start',
+    hinweisFen: null, hinweisStufe: 0,
+    blasePaar: undefined,
+    botCtrl: null,
+    ideeAn: null,
+    gespeichert: false,
+  };
+  z.fens.push(z.chess.fen());
+  const startFarbe = z.chess.turn();
+  const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
+  if (laufend) {
+    for (const u of laufend.zuege) {
+      let m = null;
+      try { m = z.chess.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || undefined }); } catch (e) { m = null; }
+      if (!m) break;
+      merkeZug(m);
+    }
+    (laufend.liveKlassen || []).forEach((k, i) => { if (i < z.zuege.length && k) z.liveKlassen[i] = k; });
+  }
+
+  // ---------- Hilfen fuer Plies ----------
+  function merkeZug(m) {
+    z.zuege.push(m.lan);
+    z.san.push(m.san);
+    z.verbose.push(m);
+    z.fens.push(m.after);
+    z.liveKlassen.push(null);
+    z.live.push(null);
+  }
+  const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
+  const istFlo = (i) => farbeVon(i) === farbe;
+  const nummerVon = (i) => startNummer + Math.floor((i + (startFarbe === 'b' ? 1 : 0)) / 2);
+  const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanDeutsch(z.san[i])}`;
+  const letzterFloPly = () => { for (let i = z.zuege.length - 1; i >= 0; i--) if (istFlo(i)) return i; return -1; };
+  const liveAn = () => app.einstellungen().liveBewertung;
+  const tiefe = () => app.einstellungen().tiefe;
+
+  // ---------- Timer, Listener ----------
+  const uhren = new Set();
+  const spaeter = (fn, ms) => { const u = setTimeout(() => { uhren.delete(u); if (!weg) fn(); }, ms); uhren.add(u); return u; };
+  const warte = (ms, signal) => new Promise((resolve) => {
+    if (signal && signal.aborted) { resolve(); return; }
+    const u = setTimeout(fertig, ms);
+    uhren.add(u);
+    function fertig() { clearTimeout(u); uhren.delete(u); if (signal) signal.removeEventListener('abort', fertig); resolve(); }
+    if (signal) signal.addEventListener('abort', fertig, { once: true });
+  });
+  let weg = false;
+  const endeCtrl = new AbortController();
+  const protokoll = [];
+  const melde = (eintrag) => { if (app.test) protokoll.push({ t: Math.round(jetzt()), ...eintrag }); };
+
+  // ---------- DOM ----------
+  const s = document.createElement('section');
+  s.className = 'screen partie';
+  s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
+  s.style.setProperty('--bf', bot.farbe);
+  const knopf = (aktion, ico, text, extra = '') =>
+    `<button class="knopf ${extra}" type="button" data-aktion="${aktion}">${icon(ico)}<span>${text}</span></button>`;
+  s.innerHTML = `
+    <header class="kopf">
+      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück zur Arena">${icon('zurueck')}</button>
+      <div class="titel"><h2>${esc(bot.name)} · Stufe ${bot.stufe}</h2><div class="unter"><span class="p-eroeffnung"></span> · Du spielst ${FARBE_NAME[farbe]}</div></div>
+      <button class="icon-knopf" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
+    </header>
+    <div class="inhalt">
+      <div class="botleiste-hoch">
+        <span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span>
+        <div class="info"><div class="bot-name">${esc(bot.name)}</div>
+          <div class="zeile"><span class="geschlagen-ort" data-wer="bot"></span><span class="bot-meta denkt-ort"></span></div></div>
+        <div class="blase-ort" data-spitze="links" data-leer="${esc(bot.kurz)}"></div>
+      </div>
+      <div class="brettzone">
+        <div class="evalbalken" role="img" aria-label="Bewertung"><div class="mitte"></div><div class="weiss"></div><span class="wert zahl"></span></div>
+        <div class="brett-rahmen"><div class="brett"></div><div class="brett-effekte" aria-hidden="true"></div>
+          <button class="knopf primaer ergebnis-zeigen" type="button" data-aktion="ergebnis" hidden>${icon('pokal')} Ergebnis</button></div>
+      </div>
+      <div class="seite">
+        <div class="botbox flaeche">
+          <div class="botkarte"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span>
+            <div class="info"><div class="bot-name">${esc(bot.name)}</div>
+              <div class="bot-meta">Stufe ${bot.stufe} · Elo ${bot.elo}<span class="denkt-ort"></span></div>
+              <span class="geschlagen-ort" data-wer="bot"></span></div></div>
+          <div class="blase-ort" data-spitze="oben" data-leer="${esc(bot.kurz)}"></div>
+        </div>
+        <div class="spielerleiste spieler-hoch"><span class="avatar ich">F</span><div class="name">Flo</div><span class="geschlagen-ort" data-wer="flo"></span></div>
+        <div class="coach leer" role="status" aria-live="polite"></div>
+        <div class="zugbox flaeche"><div class="zugliste" aria-label="Züge"></div></div>
+        <div class="zugleiste" aria-label="Züge"></div>
+        <div class="spielerleiste spieler-quer"><span class="avatar ich">F</span><div><div class="name">Flo</div><div class="bot-meta">${FARBE_NAME[farbe]}</div></div><span class="geschlagen-ort" data-wer="flo"></span></div>
+        <div class="spielknoepfe">
+          ${knopf('hinweis', 'hinweis', 'Hinweis', 'hinweis-k')}${knopf('zuruecknehmen', 'undo', 'Zurück&shy;nehmen')}
+          ${knopf('drehen', 'drehen', 'Drehen')}${knopf('aufgeben', 'flagge', 'Aufgeben', 'aufgeben')}
+        </div>
+      </div>
+    </div>`;
+  root.append(s);
+
+  const $ = (sel) => s.querySelector(sel);
+  const $$ = (sel) => [...s.querySelectorAll(sel)];
+  const rahmen = $('.brett-rahmen');
+  const effekteEl = $('.brett-effekte');
+  const balken = $('.evalbalken');
+  const coachEl = $('.coach');
+  s.classList.toggle('ohne-balken', !einst.balken);
+
+  const brett = new Brett($('.brett'), {
+    ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten,
+  });
+  brett.setzeStellung(z.chess.fen(), { animieren: false, letzterZug: letzterZugFelder(), schach: z.chess.inCheck() ? true : null });
+  brett.erlaubeZuege(null);
+
+  // ---------- Knoepfe ----------
+  s.addEventListener('click', (e) => {
+    const k = e.target.closest('[data-aktion]');
+    if (!k || !s.contains(k) || k.disabled) return;
+    const a = k.dataset.aktion;
+    if (a === 'zurueck') zurueckGedrueckt();
+    else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
+    else if (a === 'hinweis') hinweis();
+    else if (a === 'zuruecknehmen') zuruecknehmen();
+    else if (a === 'drehen') drehen();
+    else if (a === 'aufgeben') aufgebenFragen();
+    else if (a === 'idee') zeigeIdee(Number(k.dataset.ply));
+    else if (a === 'besser') zeigeBesser(Number(k.dataset.ply));
+    else if (a === 'ergebnis') zeigeOverlayWieder();
+  });
+  coachEl.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    const p = Number(coachEl.dataset.ply);
+    if (!Number.isFinite(p) || !z.live[p] || z.live[p].status !== 'fertig') return;
+    if (window.matchMedia('(max-width: 600px) and (orientation: portrait)').matches) {
+      const erster = coachEl.querySelector('.coach-knoepfe button');
+      if (erster) erster.click();
+      return;
+    }
+    coachEl.classList.toggle('kompakt');
+  });
+
+  // ---------- Darstellung ----------
+  function letzterZugFelder() {
+    const m = z.verbose[z.verbose.length - 1];
+    return m ? [m.from, m.to] : null;
+  }
+
+  function zeichneKopf() {
+    let name = 'Eigene Stellung';
+    if (!startFen) {
+      const er = eroeffnung(z.san);
+      name = er.name || (z.san.length ? 'Eröffnung' : 'Grundstellung');
+    }
+    $('.p-eroeffnung').textContent = name;
+  }
+
+  function zeichneGeschlagen() {
+    const vonFlo = [];
+    const vonBot = [];
+    for (const m of z.verbose) if (m.captured) (m.color === farbe ? vonFlo : vonBot).push(m.captured);
+    const sortiere = (l) => l.sort((a, b) => WERT[b] - WERT[a]);
+    const bilanz = materialBilanz(z.chess.fen()) * (farbe === 'w' ? 1 : -1);
+    const html = (liste, figFarbe, plus) => {
+      if (!liste.length && plus <= 0) return '<span class="geschlagen leer"></span>';
+      let vor = null;
+      const imgs = sortiere(liste).map((t) => {
+        const neu = vor !== null && vor !== t;
+        vor = t;
+        return `<img${neu ? ' class="neu-gruppe"' : ''} src="assets/pieces/${figFarbe}${t.toUpperCase()}.svg" alt="">`;
+      }).join('');
+      return `<span class="geschlagen">${imgs}${plus > 0 ? `<span class="plus zahl">+${plus}</span>` : ''}</span>`;
+    };
+    for (const ort of $$('.geschlagen-ort')) {
+      ort.innerHTML = ort.dataset.wer === 'flo' ? html(vonFlo, botFarbe, bilanz) : html(vonBot, farbe, -bilanz);
+    }
+  }
+
+  function zeichneZugliste() {
+    const letzter = z.zuege.length - 1;
+    const zelle = (i) => {
+      if (i == null) return '<span class="z leer"></span>';
+      let sym = '';
+      if (istFlo(i) && liveAn()) {
+        const k = z.liveKlassen[i];
+        const e = z.live[i];
+        if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
+        else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
+      }
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanDeutsch(z.san[i]))}</span>`;
+    };
+    const zeilen = new Map();
+    for (let i = 0; i < z.zuege.length; i++) {
+      const n = nummerVon(i);
+      if (!zeilen.has(n)) zeilen.set(n, { w: null, b: null });
+      zeilen.get(n)[farbeVon(i)] = i;
+    }
+    let liste = '';
+    for (const [n, r] of zeilen) {
+      liste += `<span class="nr">${n}.</span>${r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w)}${zelle(r.b)}`;
+    }
+    if (!z.zuege.length) liste = '<span class="zugliste-leer">Noch keine Züge</span>';
+    const listeEl = $('.zugliste');
+    listeEl.innerHTML = liste;
+    listeEl.scrollTop = listeEl.scrollHeight;
+
+    let leiste = '';
+    for (let i = 0; i < z.zuege.length; i++) {
+      if (farbeVon(i) === 'w' || i === 0) leiste += `<span class="nr">${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'}</span>`;
+      leiste += zelle(i);
+    }
+    const leisteEl = $('.zugleiste');
+    leisteEl.innerHTML = leiste || '<span class="zugliste-leer">Noch keine Züge</span>';
+    leisteEl.scrollLeft = leisteEl.scrollWidth;
+  }
+
+  function zeichneKnoepfe() {
+    const am = z.phase === 'flo';
+    const ende = z.phase === 'ende';
+    $('.spielknoepfe [data-aktion="hinweis"]').disabled = !am;
+    $('.spielknoepfe [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
+    $('.spielknoepfe [data-aktion="aufgeben"]').disabled = ende;
+    const h = $('.spielknoepfe [data-aktion="hinweis"]');
+    h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
+  }
+
+  function setzeDenkt(an) {
+    for (const ort of $$('.denkt-ort')) {
+      ort.innerHTML = an ? '<span class="denkt-text"><span class="denkt-punkt"> · </span>denkt</span><span class="denkt"><i></i><i></i><i></i></span>' : '';
+    }
+    s.classList.toggle('bot-denkt', !!an);
+  }
+
+  // Bewertungsbalken fuer die gerade gezeigte Stellung
+  function setzeBalken(a) {
+    if (!a || !a.lines || !a.lines.length) return;
+    const ev = a.lines[0].eval;
+    const w = Math.min(0.97, Math.max(0.03, gewinnChance(ev, 'w')));
+    let text;
+    let fuehrt;
+    if (a.ende === 'matt') { text = a.gewinner === 'w' ? '1-0' : '0-1'; fuehrt = a.gewinner || 'w'; }
+    else if (a.ende === 'patt') { text = '½'; fuehrt = 'w'; }
+    else if (ev.mate != null) { text = 'M' + Math.abs(ev.mate); fuehrt = ev.mate > 0 ? 'w' : 'b'; }
+    else { text = komma(Math.abs(ev.cp) / 100); fuehrt = ev.cp >= 0 ? 'w' : 'b'; }
+    balken.style.setProperty('--w', (w * 100).toFixed(1) + '%');
+    balken.dataset.fuehrt = fuehrt;
+    $('.evalbalken .wert').textContent = text;
+    balken.setAttribute('aria-label', `Bewertung ${evalText(ev, 'w') || text} aus Sicht von Weiß`);
+  }
+  function balkenAusrichtung() {
+    balken.classList.toggle('gedreht', brett.ausrichtung === 'b');
+    s.classList.toggle('vertauscht', brett.ausrichtung !== farbe);
+  }
+
+  // ---------- Sprechblase ----------
+  // Satz zum Anlass; Saetze, die nicht zur Lage passen, fallen weg
+  // (Matt-Saetze bei Aufgabe, "ich fang an", wenn Flo anfaengt)
+  function satzFuer(anlass) {
+    const liste = (bot.saetze && bot.saetze[anlass]) || [];
+    let passt = null;
+    if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !/matt/i.test(t);
+    if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !/ich fang/i.test(t);
+    const auswahl = passt ? liste.filter(passt) : liste;
+    if (passt && auswahl.length && auswahl.length < liste.length) return auswahl[Math.floor(Math.random() * auswahl.length)];
+    return botSatz(bot, anlass);
+  }
+  function zeigeBlase(anlass, paar, { dauer = 4500, immer = false } = {}) {
+    if (!immer && paar !== undefined && z.blasePaar === paar) return false;
+    const text = satzFuer(anlass);
+    if (!text) return false;
+    z.blasePaar = paar;
+    for (const ort of $$('.blase-ort')) {
+      ort.innerHTML = `<div class="sprechblase ${ort.dataset.spitze}">${esc(text)}</div>`;
+    }
+    s.classList.add('hat-blase');
+    melde({ typ: 'blase', anlass, text });
+    clearTimeout(z.blaseUhr);
+    if (dauer) z.blaseUhr = spaeter(versteckeBlase, dauer);
+    return true;
+  }
+  function versteckeBlase() {
+    clearTimeout(z.blaseUhr);
+    for (const ort of $$('.blase-ort')) {
+      const b = ort.querySelector('.sprechblase');
+      if (b) { b.classList.add('weg'); spaeter(() => { if (b.isConnected) b.remove(); }, 220); }
+    }
+    s.classList.remove('hat-blase');
+  }
+
+  // ---------- Coach ----------
+  function coachZeige(html, klassen, ply = null) {
+    coachEl.className = 'coach ' + klassen;
+    coachEl.innerHTML = html;
+    if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
+    clearTimeout(z.kompaktUhr);
+  }
+  function coachLeer() {
+    if (!liveAn()) {
+      coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Live-Bewertung aus</span></div>
+        <p class="c-text">Die Bewertung jedes Zugs siehst du nach der Partie in der Analyse.</p>`, 'leer');
+      return;
+    }
+    coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Dein Coach</span></div>
+      <p class="c-text">${z.zuege.length ? 'Weiter geht’s! Ich bewerte jeden deiner Züge.' : 'Ich bewerte jeden deiner Züge, sobald du ziehst.'}</p>`, 'leer');
+  }
+  function coachRechnet(ply) {
+    if (!liveAn()) return;
+    coachZeige(`<span class="c-symbol c-warte"><span class="denkt grau"><i></i><i></i><i></i></span></span>
+      <div class="c-kopf"><span class="c-klasse">Coach rechnet …</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
+      <p class="c-text">Gleich weißt du, wie gut dein Zug war.</p>`, 'wartet', ply);
+  }
+  function serieBis(ply) {
+    let n = 0;
+    for (let i = 0; i <= ply; i++) {
+      if (!istFlo(i)) continue;
+      const k = z.liveKlassen[i];
+      if (!k || NEUTRAL.has(k)) continue;
+      n = SERIE.has(k) ? n + 1 : 0;
+    }
+    return n;
+  }
+  function coachErgebnis(ply, { neu = true } = {}) {
+    const e = z.live[ply];
+    if (!e || e.status !== 'fertig' || !liveAn()) return;
+    const erg = e.erg;
+    const k = erg.klasse;
+    const ende = erg.analyseNachher && erg.analyseNachher.ende;
+    let evalT = ende === 'matt' ? 'Matt' : ende === 'patt' ? 'Patt' : evalText(erg.evalNachher, farbe);
+    if (MIT_VERLUST.has(k) && !ende) evalT = `${evalText(erg.evalVorher, farbe)} → ${evalText(erg.evalNachher, farbe)}`;
+    const serie = SERIE.has(k) ? serieBis(ply) : 0;
+    const combo = serie >= 3 ? `<span class="combo">${icon('blitz')}COMBO ×${serie}</span>` : '';
+    if (k === 'buch') {
+      coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">Buchzug</span><span class="c-zug">${esc(zugLabel(ply))}</span>
+        <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
+        <p class="c-text">Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.</p>`,
+      `k-${k} buch${neu ? ' neu' : ''}`, ply);
+      coachEl.style.setProperty('--kf', `var(--k-${k})`);
+      return;
+    }
+    const knoepfe = [];
+    const anders = erg.besterZug && erg.besterZug !== erg.uci;
+    if ((k === 'brillant' || k === 'stark' || k === 'bester') && erg.analyseNachher && erg.analyseNachher.lines && erg.analyseNachher.lines[0] && erg.analyseNachher.lines[0].pv.length) {
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="idee" data-ply="${ply}">${icon('pfeil')} Idee zeigen</button>`);
+    }
+    if (anders && !['brillant', 'stark', 'bester', 'erzwungen', 'buch'].includes(k)) {
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="besser" data-ply="${ply}">${icon('ziel')} Besser?</button>`);
+    }
+    if (SCHLECHT.has(k) && ply === letzterFloPly() && z.phase !== 'ende') {
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="Kostet den 3. Stern">${icon('undo')} Zurücknehmen</button>`);
+    }
+    coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
+      <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>${combo}</div>
+      <span class="c-eval zahl">${esc(evalT)}</span>
+      <p class="c-text">${esc(coachSatz(erg.coach))}</p>
+      ${knoepfe.length ? `<div class="coach-knoepfe">${knoepfe.join('')}</div>` : ''}`,
+    `k-${k}${neu ? ' neu' : ''}`, ply);
+    coachEl.style.setProperty('--kf', `var(--k-${k})`);
+  }
+
+  function zeigeIdee(ply) {
+    const e = z.live[ply];
+    if (!e || !e.erg) return;
+    if (z.ideeAn === 'idee' + ply) { brett.pfeile([]); z.ideeAn = null; return; }
+    const pv = (e.erg.analyseNachher.lines[0].pv || []).slice(0, 3);
+    const pf = [{ von: e.erg.uci.slice(0, 2), nach: e.erg.uci.slice(2, 4), farbe: e.erg.klasse, deckkraft: 0.9 }];
+    pv.forEach((u, i) => pf.push({ von: u.slice(0, 2), nach: u.slice(2, 4), farbe: i % 2 === 0 ? 'schlecht' : 'bester', deckkraft: 0.75 - i * 0.12 }));
+    brett.pfeile(pf);
+    z.ideeAn = 'idee' + ply;
+  }
+  function zeigeBesser(ply) {
+    const e = z.live[ply];
+    if (!e || !e.erg || !e.erg.besterZug) return;
+    if (z.ideeAn === 'besser' + ply) { brett.pfeile([]); z.ideeAn = null; return; }
+    const b = e.erg.besterZug;
+    brett.pfeile([{ von: b.slice(0, 2), nach: b.slice(2, 4), farbe: 'bester' }]);
+    z.ideeAn = 'besser' + ply;
+    if (e.erg.besterZugSanDe) app.meldung(`Besser war ${e.erg.besterZugSanDe}.`);
+  }
+
+  // ---------- Effekte am Brett ----------
+  function spalteZeile(feld) {
+    const d = feld.charCodeAt(0) - 97;
+    const r = Number(feld[1]) - 1;
+    return brett.ausrichtung === 'w' ? [d, 7 - r] : [7 - d, r];
+  }
+  function effekt(feld, klasse) {
+    if (reduziert) return;
+    const [x, y] = spalteZeile(feld);
+    const ort = document.createElement('div');
+    ort.className = 'effekt-ort k-' + klasse;
+    ort.style.setProperty('--x', x);
+    ort.style.setProperty('--y', y);
+    if (klasse === 'brillant') {
+      const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#ffffff'];
+      ort.innerHTML = '<i class="welle"></i><span class="funken">' + Array.from({ length: 12 }, (_, i) =>
+        `<i style="--a:${i * 30 + 8}deg;--r:${i % 2 ? 1.25 : 1.75};--c:${farben[i % farben.length]};animation-delay:${(i % 3) * 40}ms"></i>`).join('') + '</span>';
+      rahmen.classList.remove('prisma');
+      void rahmen.offsetWidth;
+      rahmen.classList.add('prisma');
+      spaeter(() => rahmen.classList.remove('prisma'), 1600);
+    } else if (klasse === 'stark') {
+      ort.innerHTML = '<i class="ring-puls"></i><i class="ring-puls zwei"></i>';
+    } else if (klasse === 'bester') {
+      ort.innerHTML = '<i class="ring-ping"></i>';
+    }
+    // Ungenau/Fehler bleiben ruhig, Patzer wackelt nur am Symbol (CSS)
+    if (ort.innerHTML) {
+      effekteEl.append(ort);
+      spaeter(() => ort.remove(), 1700);
+    }
+  }
+
+  // ---------- Analysen (Bewertungs-Engine) ----------
+  const laufendeAnalysen = new Map();
+  let engBewertung = null;
+  let engBot = null;
+  const bewertungsEngine = () => app.engine('bewertung').then((e) => { engBewertung = e; return e; });
+
+  // Jede Stellung nur einmal rechnen (laufendeAnalysen), hoechstens LIVE_MAX_MS lang.
+  // { vorne: true } (Hinweis): steht die Stellung noch in der Warteschlange, eine eigene Suche
+  // vor allen anderen einreihen, damit Flo nicht auf aeltere Bewertungen warten muss.
+  function analysiere(fen, { vorne = false } = {}) {
+    const key = stellungsSchluessel(fen);
+    const fertig = app.vorab.get(key);
+    if (fertig) return Promise.resolve(fertig);
+    const da = laufendeAnalysen.get(key);
+    if (da && (!vorne || da.laeuft)) return da;
+    const eintrag = { laeuft: false };
+    const stau = laufendeAnalysen.size >= 2;
+    const p = bewertungsEngine()
+      .then((e) => e.analyse(fen, {
+        depth: tiefe(), multipv: 2, movetime: stau ? LIVE_STAU_MS : LIVE_MAX_MS, prioritaet: vorne ? 'vorne' : undefined,
+        beiTiefe: () => { eintrag.laeuft = true; },
+      }))
+      .then((a) => {
+        if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key);
+        if (a && !a.abgebrochen && a.lines && a.lines.length) {
+          app.vorab.set(key, a);
+          beiAnalyse(fen, a);
+        }
+        return a;
+      }, (err) => { if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key); throw err; });
+    Object.defineProperty(p, 'laeuft', { get: () => eintrag.laeuft });
+    laufendeAnalysen.set(key, p);
+    return p;
+  }
+  function beiAnalyse(fen, a) {
+    if (weg) return;
+    if (stellungsSchluessel(fen) === stellungsSchluessel(z.chess.fen())) setzeBalken(a);
+  }
+  function balkenAktualisieren() {
+    const a = app.vorab.get(stellungsSchluessel(z.chess.fen()));
+    if (a) setzeBalken(a);
+    else analysiere(z.chess.fen()).catch(() => {});
+  }
+
+  function buchInfo(ply) {
+    if (startFen) return { buch: false, name: null };
+    const er = eroeffnung(z.san.slice(0, ply + 1));
+    return { buch: !!er.buch[ply], name: er.namen[ply] || er.name };
+  }
+
+  // Live-Bewertung eines eigenen Zugs; das Ergebnis ordnet sich ueber die Marke dem Ply zu
+  async function bewerte(ply) {
+    const eintrag = z.live[ply];
+    const marke = eintrag.marke;
+    const veraltet = () => weg || z.live[ply] !== eintrag || eintrag.marke !== marke;
+    const fenVorher = z.fens[ply];
+    const uci = z.zuege[ply];
+    try {
+      const e = await bewertungsEngine();
+      const aV = await analysiere(fenVorher);
+      if (veraltet()) return;
+      // Gegnerzug davor einordnen (fuer "Chance verpasst")
+      let gegnerKlasse = null;
+      let vorigerZug = null;
+      let vorigerSchlag = false;
+      if (ply > 0 && !istFlo(ply - 1)) {
+        vorigerZug = z.zuege[ply - 1];
+        vorigerSchlag = !!(z.verbose[ply - 1] && z.verbose[ply - 1].captured);
+        try {
+          const aB = await analysiere(z.fens[ply - 1]);
+          if (veraltet()) return;
+          if (aB && aB.lines && aB.lines.length && aV && aV.lines && aV.lines.length) {
+            gegnerKlasse = klassifiziere({ fenVorher: z.fens[ply - 1], uci: vorigerZug, analyseVorher: aB, analyseNachher: aV, du: false }).klasse;
+          }
+        } catch (err) { /* ohne Gegnerklasse weiter */ }
+      }
+      // Stellung nach dem Zug ueber dieselbe Warteschlange (wird so nur einmal gerechnet)
+      const aN = await analysiere(z.fens[ply + 1]);
+      if (veraltet()) return;
+      const b = buchInfo(ply);
+      const erg = await bewerteZug(e, fenVorher, uci, {
+        tiefe: tiefe(), multipv: 2, analyseVorher: aV, analyseNachher: aN, buch: b.buch, eroeffnung: b.name,
+        gegnerKlasse, vorigerZug, vorigerSchlag, du: true, ply,
+      });
+      app.vorab.set(stellungsSchluessel(fenVorher), erg.analyseVorher);
+      app.vorab.set(stellungsSchluessel(erg.fenNachher), erg.analyseNachher);
+      beiAnalyse(erg.fenNachher, erg.analyseNachher);
+      if (veraltet()) return;
+      eintrag.status = 'fertig';
+      eintrag.erg = erg;
+      z.liveKlassen[ply] = erg.klasse;
+      speichereLaufend();
+      zeigeBewertung(ply);
+    } catch (err) {
+      if (veraltet()) return;
+      eintrag.status = 'fehler';
+      if (!err || !err.abgebrochen) console.warn('Live-Bewertung fehlgeschlagen', err);
+      if (ply === letzterFloPly() && liveAn()) {
+        coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Coach</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
+          <p class="c-text">Diesen Zug konnte ich gerade nicht bewerten. In der Analyse siehst du ihn trotzdem.</p>`, 'leer', ply);
+        brett.markiere(null, 'bewertung');
+      }
+      zeichneZugliste();
+    } finally {
+      if (z.live[ply] === eintrag) eintrag.erledigt();
+    }
+  }
+
+  function zeigeBewertung(ply) {
+    const e = z.live[ply];
+    const k = e.erg.klasse;
+    zeichneZugliste();
+    if (ply !== letzterFloPly()) return;   // inzwischen weiter gezogen: nur die Zugliste
+    const botHatGezogen = z.zuege.length > ply + 1;
+    const an = liveAn();
+    if (an) coachErgebnis(ply);
+    if (!botHatGezogen && z.phase !== 'ende' || z.phase === 'ende' && z.zuege.length === ply + 1) {
+      const nach = e.erg.uci.slice(2, 4);
+      brett.markiere(null, 'bewertung');
+      if (an) {
+        brett.markiere([nach], 'k-' + k);
+        brett.zeigeAbzeichen(nach, k);
+        effekt(nach, k);
+        if (k === 'brillant') spaeter(() => klang.brillant(), 120);
+        else if (k === 'patzer' || k === 'fehler') spaeter(() => klang.fehler(), 120);
+        melde({ typ: 'abzeichen', ply, klasse: k });
+      }
+    }
+    e.gezeigtUm = jetzt();
+    if (an && z.phase !== 'ende') {
+      if (SCHLECHT.has(k)) zeigeBlase('spielerFehler', ply);
+      else if (k === 'brillant' || k === 'stark') zeigeBlase('spielerGut', ply);
+    }
+    if (botHatGezogen) planeKompakt();
+  }
+
+  function planeKompakt() {
+    clearTimeout(z.kompaktUhr);
+    z.kompaktUhr = spaeter(() => {
+      if (coachEl.classList.contains('wartet') || coachEl.classList.contains('leer')) return;
+      coachEl.classList.add('kompakt');
+      coachEl.classList.remove('neu');
+    }, 3500);
+  }
+
+  // ---------- Eigener Zug ----------
+  function beiZug(von, nach, umwandlung) {
+    if (z.phase !== 'flo' || weg) return false;
+    let m = null;
+    try { m = z.chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { m = null; }
+    if (!m) return false;
+    const ply = z.zuege.length;
+    merkeZug(m);
+    neuerLiveEintrag(ply);
+    z.phase = 'gezogen';
+    queueMicrotask(() => nachEigenemZug(ply, m));
+    return true;
+  }
+
+  function neuerLiveEintrag(ply) {
+    let erledigt;
+    const fertig = new Promise((r) => { erledigt = r; });
+    z.live[ply] = { marke: {}, status: 'rechnet', erg: null, fertig, erledigt, gezeigtUm: 0 };
+  }
+
+  function nachEigenemZug(ply, m) {
+    if (weg) return;
+    const an = liveAn();
+    brett.entferneAbzeichen();
+    brett.markiere(null);
+    brett.pfeile([]);
+    z.ideeAn = null;
+    brett.setzeStellung(z.chess.fen(), {
+      animieren: true, letzterZug: an ? [m.from, m.from] : [m.from, m.to], schach: z.chess.inCheck() ? true : null,
+    });
+    if (an) brett.markiere([m.to], 'bewertung');
+    spieleKlang(m);
+    versteckeBlase();
+    z.hinweisFen = null;
+    z.hinweisStufe = 0;
+    melde({ typ: 'zug', wer: 'flo', uci: m.lan, ply });
+    if (an) coachRechnet(ply);
+    zeichneKopf();
+    zeichneZugliste();
+    zeichneGeschlagen();
+    speichereLaufend();
+    bewerte(ply);
+    if (pruefeEnde()) return;
+    botAmZug();
+  }
+
+  function spieleKlang(m) {
+    if (z.chess.isGameOver()) return;  // Ende-Klang kommt mit dem Ergebnis
+    if (z.chess.inCheck()) klang.schach();
+    else if (m.promotion) klang.umwandlung();
+    else if (m.isKingsideCastle() || m.isQueensideCastle()) klang.rochade();
+    else if (m.captured) klang.schlagen();
+    else klang.zug();
+  }
+
+  // ---------- Bot ----------
+  function notZug() {
+    const liste = z.chess.moves({ verbose: true });
+    if (!liste.length) return null;
+    const schlag = liste.filter((x) => x.captured);
+    const w = (schlag.length ? schlag : liste)[Math.floor(Math.random() * (schlag.length || liste.length))];
+    return { uci: w.lan, san: w.san };
+  }
+
+  async function botAmZug() {
+    if (weg || z.phase === 'ende') return;
+    z.phase = 'bot';
+    brett.erlaubeZuege(null);
+    setzeDenkt(true);
+    zeichneKnoepfe();
+    const ctrl = new AbortController();
+    z.botCtrl = ctrl;
+    const fen = z.chess.fen();
+    let zug = null;
+    try {
+      const test = app.test && window.__test;
+      if (test && typeof test.botZug === 'function') {
+        await warte(test.botPause ?? 300, ctrl.signal);
+        const u = test.botZug(fen);
+        if (u) zug = { uci: u };
+      }
+      if (!zug && !ctrl.signal.aborted) {
+        const e = await app.engine('bot');
+        engBot = e;
+        if (ctrl.signal.aborted) return;
+        zug = await botZug(e, fen, bot, { zugNummer: z.zuege.length + 1, signal: ctrl.signal });
+      }
+    } catch (err) {
+      if (ctrl.signal.aborted || weg) return;
+      console.warn('Bot-Zug fehlgeschlagen, Ersatzzug', err);
+      if (!z.engineGemeldet) app.meldung('Die Engine hakt gerade. Der Bot zieht aus dem Bauch heraus.', { art: 'fehler' });
+      z.engineGemeldet = true;
+      zug = null;
+    }
+    if (ctrl.signal.aborted || weg) return;
+    if (!zug) zug = notZug();
+    if (!zug) return;
+    while (app.test && window.__test && window.__test.botAnhalten && !ctrl.signal.aborted && !weg) await warte(80, ctrl.signal);
+    // Flo soll sein Bewertungs-Symbol kurz sehen, bevor der Bot zieht
+    const fp = letzterFloPly();
+    const e = fp >= 0 ? z.live[fp] : null;
+    if (e && liveAn() && fp === z.zuege.length - 1) {
+      const maxWarten = (app.test && window.__test && window.__test.maxWarten) ?? 2500;
+      if (e.status === 'rechnet') await Promise.race([e.fertig, warte(maxWarten, ctrl.signal)]);
+      if (e.gezeigtUm && maxWarten > 0) {
+        const rest = 650 - (jetzt() - e.gezeigtUm);
+        if (rest > 0) await warte(rest, ctrl.signal);
+      }
+    }
+    if (ctrl.signal.aborted || weg || z.chess.fen() !== fen) return;
+    fuehreBotZugAus(zug.uci);
+  }
+
+  function fuehreBotZugAus(uci) {
+    let m = null;
+    try { m = z.chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined }); } catch (e) { m = null; }
+    if (!m) { const n = notZug(); if (n && n.uci !== uci) fuehreBotZugAus(n.uci); return; }
+    const ply = z.zuege.length;
+    merkeZug(m);
+    z.botCtrl = null;
+    setzeDenkt(false);
+    brett.entferneAbzeichen();
+    brett.markiere(null);
+    brett.pfeile([]);
+    z.ideeAn = null;
+    brett.setzeStellung(z.chess.fen(), { animieren: true, letzterZug: [m.from, m.to], schach: z.chess.inCheck() ? true : null });
+    spieleKlang(m);
+    melde({ typ: 'zug', wer: 'bot', uci: m.lan, ply });
+    const paar = ply - 1;
+    if (m.captured) zeigeBlase('schlagen', paar);
+    else if (z.chess.inCheck()) zeigeBlase('schach', paar);
+    const fp = letzterFloPly();
+    if (fp >= 0 && z.live[fp] && z.live[fp].status === 'fertig') planeKompakt();
+    zeichneKopf();
+    zeichneZugliste();
+    zeichneGeschlagen();
+    speichereLaufend();
+    if (pruefeEnde()) return;
+    z.phase = 'flo';
+    brett.erlaubeZuege(zielKarte(z.chess));
+    zeichneKnoepfe();
+    balkenAktualisieren();
+  }
+
+  function abbrechenBot() {
+    if (z.botCtrl) { z.botCtrl.abort(); z.botCtrl = null; }
+    if (engBot) { try { engBot.stop({ warteschlange: true }); } catch (e) { /* egal */ } }
+    setzeDenkt(false);
+  }
+
+  // ---------- Hinweis, Zuruecknehmen, Drehen ----------
+  async function hinweis() {
+    if (z.phase !== 'flo' || z.hinweisRechnet) return;   // zweites Tippen waehrend der Rechnung
+    const fen = z.chess.fen();
+    if (z.hinweisFen !== fen) { z.hinweisFen = fen; z.hinweisStufe = 0; }
+    const k = $('.spielknoepfe [data-aktion="hinweis"]');
+    k.classList.add('rechnet');
+    z.hinweisRechnet = true;
+    let a = null;
+    try { a = await analysiere(fen, { vorne: true }); } catch (e) { a = null; }
+    z.hinweisRechnet = false;
+    k.classList.remove('rechnet');
+    if (weg || z.chess.fen() !== fen || z.phase !== 'flo') return;
+    const best = a && a.lines && a.lines[0] && (a.lines[0].pv[0] || a.bestmove);
+    if (!best) { app.meldung('Gerade kein Hinweis möglich.'); return; }
+    if (z.hinweisStufe === 0) {
+      z.hinweisStufe = 1;
+      z.hinweise++;
+      brett.markiere([best.slice(0, 2)], 'hinweis');
+      if (z.hinweise === 1) app.meldung('Hinweis: diese Figur. Nochmal tippen zeigt den Zug. Der 3. Stern ist für diese Partie weg.');
+      melde({ typ: 'hinweis', stufe: 1, feld: best.slice(0, 2) });
+    } else {
+      z.hinweisStufe = 2;
+      brett.markiere([best.slice(0, 2)], 'hinweis');
+      brett.pfeile([{ von: best.slice(0, 2), nach: best.slice(2, 4), farbe: 'hinweis' }]);
+      z.ideeAn = 'hinweis';
+      melde({ typ: 'hinweis', stufe: 2, zug: best });
+    }
+    speichereLaufend();
+    zeichneKnoepfe();
+  }
+
+  function zuruecknehmen() {
+    if (z.phase === 'ende' || z.phase === 'start') return;
+    const fp = letzterFloPly();
+    if (fp < 0) { app.meldung('Es gibt noch keinen eigenen Zug zum Zurücknehmen.'); return; }
+    abbrechenBot();
+    const anzahl = z.zuege.length - fp;
+    for (let i = 0; i < anzahl; i++) {
+      z.chess.undo();
+      z.zuege.pop(); z.san.pop(); z.verbose.pop(); z.fens.pop(); z.liveKlassen.pop();
+      const e = z.live.pop();
+      if (e && e.erledigt) e.erledigt();   // wartende Bot-Pause loesen; Marke ist damit veraltet
+    }
+    z.zuruecknahmen++;
+    if (z.zuruecknahmen === 1) app.meldung('Zug zurückgenommen. Der 3. Stern ist für diese Partie weg.');
+    brett.entferneAbzeichen();
+    brett.markiere(null);
+    brett.pfeile([]);
+    z.ideeAn = null;
+    z.hinweisFen = null;
+    z.hinweisStufe = 0;
+    brett.setzeStellung(z.chess.fen(), { animieren: true, letzterZug: letzterZugFelder(), schach: z.chess.inCheck() ? true : null });
+    versteckeBlase();
+    const vorher = letzterFloPly();
+    if (vorher >= 0 && z.live[vorher] && z.live[vorher].status === 'fertig') { coachErgebnis(vorher, { neu: false }); coachEl.classList.add('kompakt'); }
+    else coachLeer();
+    melde({ typ: 'zuruecknahme', plies: anzahl });
+    zeichneKopf();
+    zeichneZugliste();
+    zeichneGeschlagen();
+    speichereLaufend();
+    if (z.chess.turn() === farbe) {
+      z.phase = 'flo';
+      brett.erlaubeZuege(zielKarte(z.chess));
+      zeichneKnoepfe();
+      balkenAktualisieren();
+    } else {
+      botAmZug();
+    }
+  }
+
+  function drehen() {
+    brett.dreheUm();
+    balkenAusrichtung();
+    melde({ typ: 'drehen', ausrichtung: brett.ausrichtung });
+  }
+
+  async function aufgebenFragen() {
+    if (z.phase === 'ende') return;
+    const ok = await app.frage({
+      titel: 'Wirklich aufgeben?',
+      text: `Die Partie gegen ${bot.name} zählt dann als Niederlage.`,
+      knoepfe: [{ text: 'Weiterspielen', wert: false }, { text: 'Aufgeben', wert: true, art: 'gefahr' }],
+      abbrechen: false,
+    });
+    if (ok && !weg) ende('niederlage', 'aufgabe');
+  }
+
+  async function zurueckGedrueckt() {
+    if (z.phase === 'ende') { app.gehe('arena'); return; }
+    let floZuege = 0;
+    for (let i = 0; i < z.zuege.length; i++) if (istFlo(i)) floZuege++;
+    if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe('arena'); return; }
+    const w = await app.frage({
+      titel: 'Partie unterbrechen?',
+      text: 'Pausieren: Die Partie bleibt gespeichert und du setzt sie später in der Arena fort.',
+      knoepfe: [{ text: 'Weiterspielen', wert: null }, { text: 'Aufgeben', wert: 'aufgeben', art: 'gefahr' }, { text: 'Pausieren', wert: 'pause', art: 'primaer' }],
+      abbrechen: null,
+    });
+    if (weg) return;
+    if (w === 'pause') { speichereLaufend(); app.gehe('arena'); }
+    else if (w === 'aufgeben') ende('niederlage', 'aufgabe');
+  }
+
+  // ---------- Speichern ----------
+  function stand() {
+    return {
+      botId: bot.id, spielerFarbe: farbe, startFen: startFen || null, zuege: z.zuege.slice(),
+      hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, liveKlassen: z.liveKlassen.slice(), gestartet: z.gestartet,
+    };
+  }
+  function speichereLaufend() {
+    if (z.phase === 'ende' || z.verworfen || weg) return;
+    speichereLaufendePartie(stand());
+  }
+
+  // ---------- Spielende ----------
+  function pruefeEnde() {
+    const c = z.chess;
+    if (c.isCheckmate()) { ende(c.turn() === farbe ? 'niederlage' : 'sieg', 'matt'); return true; }
+    if (c.isStalemate()) { ende('remis', 'patt'); return true; }
+    if (c.isInsufficientMaterial()) { ende('remis', 'material'); return true; }
+    if (c.isThreefoldRepetition()) { ende('remis', 'wiederholung'); return true; }
+    if (c.isDrawByFiftyMoves()) { ende('remis', '50-zuege'); return true; }
+    return false;
+  }
+
+  // Genauigkeit aus der Live-Bewertung, nur wenn jeder eigene Zug bewertet ist (sonst null:
+  // nach dem Fortsetzen fehlen die Zuege davor, das ergaebe zum Beispiel 100 % aus einem Zug)
+  function livGenauigkeit() {
+    const l = [];
+    for (let i = 0; i < z.zuege.length; i++) {
+      if (!istFlo(i)) continue;
+      const e = z.live[i];
+      if (!e || !e.erg || !Number.isFinite(e.erg.genauigkeit)) return null;
+      l.push(e.erg.genauigkeit);
+    }
+    const g = partieGenauigkeit(l);
+    return Number.isFinite(g) ? Math.round(g * 10) / 10 : null;
+  }
+  const liveKlassenListe = () => z.zuege.map((_, i) => (istFlo(i) ? z.liveKlassen[i] || null : null));
+
+  // Datensatz direkt beim Spielende, noch ohne Analyse (die traegt ergaenzeAnalyse nach)
+  function baueDatensatz(ergebnis, grund) {
+    return {
+      botId: bot.id, botStufe: bot.stufe, spielerFarbe: farbe, startFen: startFen || null,
+      zuege: z.zuege.slice(), san: z.san.slice(), ergebnis, grund,
+      hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen,
+      liveKlassen: liveKlassenListe(),
+      genauigkeit: null, genauigkeitBot: null, spielstaerke: null,
+      eroeffnung: startFen ? null : eroeffnung(z.san).name,
+      gestartet: z.gestartet,
+    };
+  }
+
+  let overlay = null;
+  let endeDaten = null;
+  let aktuellErg = null;
+  async function ende(ergebnis, grund) {
+    if (z.phase === 'ende') return;
+    z.phase = 'ende';
+    if (app.schliesseDialog) app.schliesseDialog();   // z. B. "Wirklich aufgeben?", wenn der Bot mattsetzt
+    abbrechenBot();
+    brett.erlaubeZuege(null);
+    brett.markiere(null, 'hinweis');
+    z.ideeAn = null;
+    zeichneKnoepfe();
+    clearTimeout(z.kompaktUhr);
+    endeDaten = { ergebnis, grund };
+    // Ergebnis sofort sichern (Sieg, Sterne 1 und 3, Freischaltung), erst danach die laufende
+    // Partie loeschen: Wird die App waehrend der Auswertung beendet, geht nichts verloren.
+    speichere(ergebnis, grund);
+    // Coach ohne "Zuruecknehmen" neu zeichnen (die Partie ist vorbei)
+    const fpEnde = letzterFloPly();
+    if (fpEnde >= 0 && z.live[fpEnde] && z.live[fpEnde].status === 'fertig' && liveAn()) {
+      const kompakt = coachEl.classList.contains('kompakt');
+      coachErgebnis(fpEnde, { neu: false });
+      if (kompakt) coachEl.classList.add('kompakt');
+    }
+    klang.ende(ergebnis === 'sieg' ? true : ergebnis === 'niederlage' ? false : null);
+    zeigeBlase(ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis', 'ende', { dauer: 0, immer: true });
+    melde({ typ: 'ende', ergebnis, grund });
+    s.classList.add('ist-ende');
+    if (grund !== 'aufgabe') balkenAktualisieren();
+    const auswertung = werteAus();
+    await warte(grund === 'aufgabe' ? 250 : 900);
+    if (weg) return;
+    overlay = baueOverlay(ergebnis, grund);
+    // Das Ergebnis wartet nur kurz auf die Auswertung (nach dem Fortsetzen kann sie lange
+    // dauern): Knoepfe und Sterne kommen sofort, die Genauigkeit wird nachgereicht.
+    const frueh = await Promise.race([auswertung, warte(AUSWERTUNG_WARTEN_MS).then(() => undefined)]);
+    if (weg) return;
+    if (frueh !== undefined) { overlay.fuelle(frueh || z.gespeichert, frueh ? frueh.review : null); return; }
+    overlay.fuelle(z.gespeichert, null, { rechnet: true });
+    const spaet = await auswertung;
+    if (weg) return;
+    overlay.fuelle(spaet || z.gespeichert, spaet ? spaet.review : null, { nachtrag: true });
+  }
+
+  function speichere(ergebnis, grund) {
+    if (z.gespeichert) return z.gespeichert;
+    const erg = speicherePartie(baueDatensatz(ergebnis, grund), null);
+    loescheLaufendePartie();
+    z.gespeichert = erg;
+    melde({ typ: 'gespeichert', id: erg.partie.id });
+    return erg;
+  }
+
+  // Spielanalyse rechnen und nachtragen. Liefert { partie, neueSterne, neuFreigeschaltet, review }
+  // (Sterne aus dem Speichern und dem Nachtrag zusammen) oder null.
+  async function werteAus() {
+    // ausstehende Live-Bewertungen abwarten (die Analyse nutzt sie ueber app.vorab)
+    const offen = [...z.live.filter((e) => e && e.status === 'rechnet').map((e) => e.fertig), ...laufendeAnalysen.values()];
+    if (offen.length) await Promise.race([Promise.allSettled(offen), warte(8000)]);
+    if (weg) return null;
+    let review = null;
+    try {
+      const e = await bewertungsEngine();
+      review = await analysierePartie(e, z.zuege, {
+        tiefe: tiefe(), multipv: 2, startFen: startFen || undefined, spielerFarbe: farbe,
+        elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMerken: true, signal: endeCtrl.signal,
+        beiFortschritt: (f, n) => overlay && overlay.fortschritt(n ? f / n : 1),
+      });
+    } catch (err) {
+      if (weg) return null;
+      if (!err || !err.abgebrochen) console.warn('Auswertung fehlgeschlagen', err);
+      review = null;
+    }
+    if (weg) return null;
+    return nachtragen(review);
+  }
+
+  function nachtragen(review) {
+    const g = z.gespeichert;
+    if (!g || z.nachgetragen) return null;
+    z.nachgetragen = true;
+    aktualisierePartie(g.partie.id, { liveKlassen: liveKlassenListe() });
+    const nach = review ? ergaenzeAnalyse(g.partie.id, review) : ergaenzeAnalyse(g.partie.id, null, { genauigkeit: livGenauigkeit() });
+    if (!nach) return null;
+    melde({ typ: 'nachgetragen', id: g.partie.id, mitAnalyse: !!review });
+    return {
+      partie: nach.partie, review,
+      neueSterne: g.neueSterne.map((x, i) => x || nach.neueSterne[i]),
+      neuFreigeschaltet: g.neuFreigeschaltet,
+    };
+  }
+
+  // ---------- Ergebnis-Overlay ----------
+  function baueOverlay(ergebnis, grund) {
+    const o = document.createElement('div');
+    o.className = `ergebnis-overlay ${ergebnis}`;
+    o.setAttribute('role', 'dialog');
+    o.setAttribute('aria-modal', 'true');
+    o.setAttribute('aria-labelledby', 'erg-wort');
+    const wort = { sieg: 'SIEG!', niederlage: 'VERLOREN', remis: 'REMIS' }[ergebnis];
+    const nr = nummerVon(Math.max(0, z.zuege.length - 1));
+    let unter;
+    if (grund === 'matt') unter = ergebnis === 'sieg' ? `Schachmatt im ${nr}. Zug gegen ${bot.name}` : `${bot.name} setzt dich im ${nr}. Zug matt`;
+    else if (grund === 'aufgabe') unter = `Aufgegeben gegen ${bot.name}. Nächstes Mal klappt’s!`;
+    else unter = `${GRUND_TEXT[grund] || 'Remis'} gegen ${bot.name}`;
+    const konfetti = ergebnis === 'sieg' && !reduziert
+      ? '<div class="konfetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, i) => {
+        const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#3ef08a', '#ffffff'];
+        return `<i style="--l:${(i * 37) % 100}%;--d:${(i % 7) * 0.18}s;--t:${2.6 + (i % 5) * 0.35}s;--c:${farben[i % farben.length]};--r:${(i * 47) % 360}deg"></i>`;
+      }).join('') + '</div>'
+      : '';
+    o.innerHTML = `${konfetti}
+      <div class="ergebnis-karte">
+        <button class="icon-knopf erg-zu" type="button" aria-label="Brett ansehen">${icon('auge')}</button>
+        <h2 class="erg-wort" id="erg-wort">${wort}</h2>
+        <p class="erg-unter">${esc(unter)}</p>
+        <div class="erg-mitte">
+          <div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
+            <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>
+        </div>
+        <div class="erg-bot"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span><div class="sprechblase links"></div></div>
+        <div class="erg-frei-ort"></div>
+        <div class="erg-knoepfe"></div>
+      </div>`;
+    o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
+    o.querySelector('.erg-zu').addEventListener('click', () => {
+      o.hidden = true;
+      $('.ergebnis-zeigen').hidden = false;
+    });
+    s.append(o);
+    const karte = o.querySelector('.ergebnis-karte');
+    karte.setAttribute('tabindex', '-1');
+    karte.focus({ preventScroll: true });
+
+    return {
+      el: o,
+      fortschritt(anteil) {
+        const b = o.querySelector('.erg-balken i');
+        if (b) b.style.width = Math.round(Math.max(0.05, Math.min(1, anteil)) * 100) + '%';
+      },
+      // erg: { partie, neueSterne, neuFreigeschaltet }. rechnet: Analyse laeuft noch (Genauigkeit
+      // folgt), nachtrag: zweiter Aufruf mit Analyse (nur Stern 2, Genauigkeit und Tipp neu).
+      fuelle(erg, review, { rechnet = false, nachtrag = false } = {}) {
+        aktuellErg = erg;
+        const p = erg.partie;
+        const sterne = p.sterne || [false, false, false];
+        const neueSterne = erg.neueSterne || [false, false, false];
+        const gen = p.genauigkeit;
+        const genText = Number.isFinite(gen) ? komma(gen) + ' %' : '-';
+        const hilfe = [];
+        if (p.hinweise > 0) hilfe.push(p.hinweise === 1 ? '1 Hinweis' : `${p.hinweise} Hinweise`);
+        if (p.zuruecknahmen > 0) hilfe.push(p.zuruecknahmen === 1 ? '1 Zurücknahme' : `${p.zuruecknahmen} Zurücknahmen`);
+        const ziele = [
+          ['Gewonnen', `${bot.name.split(' ').pop()} besiegt`],
+          rechnet ? ['Genauigkeit', 'wird berechnet …']
+            : [Number.isFinite(gen) ? `${genText} genau` : 'Genauigkeit', sterne[1] ? `mindestens ${GENAUIGKEIT_STERN} %` : `${GENAUIGKEIT_STERN} % nötig`],
+          ['Ohne Hilfe', hilfe.length ? hilfe.join(', ') : 'kein Hinweis, nichts zurückgenommen'],
+        ];
+        const sternHtml = (i) => {
+          const [t, u] = ziele[i];
+          const an = sterne[i] && !(rechnet && i === 1);
+          return `<div class="erg-stern${an ? ' an' : ' aus'}${an && neueSterne[i] ? ' neu' : ''}${rechnet && i === 1 ? ' wartet' : ''}" style="--i:${i}" data-i="${i}">
+              <span class="e-stern" aria-hidden="true">★</span><b>${esc(t)}</b><small>${esc(u)}</small>
+              ${an && neueSterne[i] ? '<span class="e-neu">NEU</span>' : ''}<span class="sr">${rechnet && i === 1 ? 'wird berechnet' : an ? 'erreicht' : 'nicht erreicht'}</span></div>`;
+        };
+        const rechnetHtml = `<div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
+            <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>`;
+        const mitte = o.querySelector('.erg-mitte');
+        const staerke = p.spielstaerke ? ` · spielte wie ≈ ${p.spielstaerke}` : '';
+        const genauHtml = (gross) => `<div class="erg-genau${gross ? ' gross' : ''}">Genauigkeit <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? '0,0 %' : '-'}</b>${gross ? (p.spielstaerke ? `<span>spielte wie ≈ ${p.spielstaerke}</span>` : '') : esc(staerke)}</div>`;
+        if (ergebnis === 'sieg') {
+          if (nachtrag && mitte.querySelector('.erg-sterne')) {
+            // nur Stern 2 und die Genauigkeit erneuern (die anderen Sterne nicht neu animieren)
+            mitte.querySelector('.erg-stern[data-i="1"]').outerHTML = sternHtml(1);
+            const alt = mitte.querySelector('.erg-rechnet, .erg-genau');
+            if (alt) alt.outerHTML = genauHtml(false);
+          } else {
+            mitte.innerHTML = `<div class="erg-sterne">${[0, 1, 2].map(sternHtml).join('')}</div>
+            ${rechnet ? rechnetHtml : genauHtml(false)}`;
+          }
+        } else {
+          // "Knapp!" nur, wenn die Partie bis spaet offen war
+          const momente = review && review.schluesselmomente ? review.schluesselmomente.length : 0;
+          const knapp = review && warKnapp(review.kurve, farbe);
+          const anzahl = Math.min(3, momente);
+          const tipp = ergebnis === 'niederlage'
+            ? (momente
+              ? `${knapp ? 'Knapp!' : 'Kopf hoch!'} Schau dir ${anzahl === 1 ? 'den Schlüsselmoment' : `die ${anzahl} Schlüsselmomente`} in der Analyse an.`
+              : (knapp ? 'Knapp! In der Analyse siehst du, wo mehr drin war.' : 'Kopf hoch! In der Analyse siehst du, wo die Partie gekippt ist.'))
+            : 'Ein halber Punkt! In der Analyse siehst du, wo mehr drin war.';
+          mitte.innerHTML = `${rechnet ? rechnetHtml : genauHtml(true)}
+            ${rechnet ? '' : `<p class="erg-tipp">${esc(tipp)}</p>`}`;
+        }
+        const neu = erg.neuFreigeschaltet;
+        if (neu && !nachtrag) {
+          o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${neu.farbe}">
+            <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
+            <div><div class="ef-titel">NEU FREIGESCHALTET · STUFE ${neu.stufe}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
+        }
+        if (!nachtrag) {
+          const knoepfe = o.querySelector('.erg-knoepfe');
+          const naechster = neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
+          knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} Zur Analyse</button>
+          ${naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">Nächster Gegner ${icon('pfeil')}</button>`
+            : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} Nochmal</button>`}`;
+          // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
+          knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
+            partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
+          }));
+          const w = knoepfe.querySelector('[data-ziel="weiter"]');
+          if (w) w.addEventListener('click', () => app.gehe('arena', neu ? { neuFreigeschaltet: neu.id } : { waehle: naechster.id }));
+          const n = knoepfe.querySelector('[data-ziel="nochmal"]');
+          if (n) n.addEventListener('click', () => app.gehe('partie', { botId: bot.id, farbe }));
+        }
+        o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
+        if (!rechnet) o.classList.remove('vorlaeufig');
+        // Genauigkeit zaehlt hoch
+        const zahl = o.querySelector('.erg-genau b');
+        const ziel = Number(zahl && zahl.dataset.ziel);
+        if (zahl && Number.isFinite(ziel) && zahl.dataset.ziel !== '') {
+          if (reduziert) zahl.textContent = komma(ziel) + ' %';
+          else {
+            const t0 = jetzt();
+            const schritt = () => {
+              if (weg) return;
+              const f = Math.min(1, (jetzt() - t0) / 1200);
+              zahl.textContent = komma(ziel * (1 - Math.pow(1 - f, 3))) + ' %';
+              if (f < 1) requestAnimationFrame(schritt);
+            };
+            requestAnimationFrame(schritt);
+          }
+        }
+        if (ergebnis === 'sieg' && !reduziert) {
+          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.zug(), 450 + i * 350); });
+          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.zug(), 800);
+        }
+        melde({ typ: 'overlay', ergebnis, sterne, neu: neu ? neu.id : null, rechnet, nachtrag });
+      },
+    };
+  }
+  function zeigeOverlayWieder() {
+    if (!overlay) return;
+    overlay.el.hidden = false;
+    $('.ergebnis-zeigen').hidden = true;
+  }
+
+  // ---------- Start ----------
+  balkenAusrichtung();
+  zeichneKopf();
+  zeichneZugliste();
+  zeichneGeschlagen();
+  zeichneKnoepfe();
+  const fpStart = letzterFloPly();
+  // Fortsetzen: lief die Bewertung des letzten eigenen Zugs noch, jetzt nachholen
+  const nachholen = !!(laufend && fpStart >= 0 && !z.liveKlassen[fpStart]);
+  if (nachholen) neuerLiveEintrag(fpStart);
+  if (nachholen && liveAn()) coachRechnet(fpStart);
+  else if (laufend && fpStart >= 0 && z.liveKlassen[fpStart] && liveAn()) {
+    coachZeige(`<span class="c-symbol">${symbolSvg(z.liveKlassen[fpStart])}</span><div class="c-kopf"><span class="c-klasse">Weiter geht’s</span>
+      <span class="c-zug">${esc(zugLabel(fpStart))}</span></div><p class="c-text">Dein letzter Zug: ${esc(KLASSEN_WORT[z.liveKlassen[fpStart]])}.</p>`,
+    `k-${z.liveKlassen[fpStart]} kompakt`, null);
+    coachEl.style.setProperty('--kf', `var(--k-${z.liveKlassen[fpStart]})`);
+  } else coachLeer();
+  if (nachholen) bewerte(fpStart);
+  setzeBalken({ lines: [{ eval: { cp: 0, mate: null } }] });
+
+  (async () => {
+    if (!laufend) {
+      app.vorab.clear();
+      speichereLaufend();
+    }
+    // Begruessung nur zum Start, nicht beim Fortsetzen mitten in der Partie
+    if (!laufend || z.zuege.length === 0) zeigeBlase('begruessung', 'start', { dauer: 6000 });
+    // Engines starten (neue Partie: beide newGame)
+    try {
+      const [eb, ew] = await Promise.all([app.engine('bot'), app.engine('bewertung')]);
+      engBot = eb;
+      engBewertung = ew;
+      if (!laufend) await Promise.all([eb.newGame(), ew.newGame()]);
+    } catch (err) {
+      // dauerhafte Fehler (z. B. iPadOS zu alt) meldet app.js selbst mit genauem Grund
+      if (!weg && !(err && err.dauerhaft)) app.meldung('Die Schach-Engine startet nicht. Der Bot spielt ohne sie, die Bewertung fehlt.', { art: 'fehler' });
+      z.engineGemeldet = true;
+    }
+    if (weg) return;
+    if (app.test && window.__partie) window.__partie.bereit = true;
+    if (z.phase !== 'start' && z.phase !== 'flo') return;
+    balkenAktualisieren();
+    if (z.phase === 'flo') return;
+    if (pruefeEnde()) return;
+    if (z.chess.turn() === farbe) {
+      z.phase = 'flo';
+      brett.erlaubeZuege(zielKarte(z.chess));
+      zeichneKnoepfe();
+    } else {
+      botAmZug();
+    }
+  })();
+
+  // Flo darf schon ziehen, waehrend die Engines noch laden (sie reihen sich ein)
+  if (z.chess.turn() === farbe && !z.chess.isGameOver()) {
+    z.phase = 'flo';
+    brett.erlaubeZuege(zielKarte(z.chess));
+    zeichneKnoepfe();
+  }
+
+  const beiEinstellungen = (e) => {
+    const d = e.detail || {};
+    brett.koordinaten(!!d.koordinaten);
+    s.classList.toggle('ohne-balken', !d.balken);
+  };
+  window.addEventListener('schach:einstellungen', beiEinstellungen);
+
+  if (app.test) {
+    window.__partie = {
+      z, brett, protokoll, bereit: false,
+      chess: () => z.chess,
+      phase: () => z.phase,
+      effekt, zeigeBewertung, satzFuer,
+    };
+  }
+
+  return {
+    verlasse() {
+      if (weg) return;
+      // Beendete Partie ist schon gespeichert; laeuft die Auswertung noch, die Genauigkeit aus der
+      // Live-Bewertung nachtragen (nur wenn vollstaendig). Die Analyse rechnet spaeter den Rest.
+      if (z.phase === 'ende' && z.gespeichert) {
+        try { nachtragen(null); } catch (e) { console.warn(e); }
+      } else if (z.phase !== 'ende' && !z.verworfen) {
+        speichereLaufendePartie(stand());
+      }
+      weg = true;
+      endeCtrl.abort();
+      abbrechenBot();
+      if (engBewertung && laufendeAnalysen.size) { try { engBewertung.stop({ warteschlange: true }); } catch (e) { /* egal */ } }
+      for (const u of uhren) clearTimeout(u);
+      uhren.clear();
+      clearTimeout(z.blaseUhr);
+      clearTimeout(z.kompaktUhr);
+      window.removeEventListener('schach:einstellungen', beiEinstellungen);
+      brett.zerstoere();
+      if (app.test && window.__partie && window.__partie.z === z) delete window.__partie;
+    },
+  };
+}

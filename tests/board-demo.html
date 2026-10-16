@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brett-Demo · Schach-Arena</title>
+<link rel="stylesheet" href="../css/board.css">
+<style>
+  :root {
+    color-scheme: dark;
+    --ui-bg: #1b1736; --ui-flaeche: #28234d; --ui-text: #fff7e8; --ui-gedimmt: #aba4cf; --akzent: #ffc83d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--ui-bg); color: var(--ui-text);
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+  }
+  .buehne { display: flex; gap: 24px; align-items: flex-start; max-width: 1200px; margin: 0 auto; }
+  .brett-platz { flex: none; width: min(calc(100dvh - 48px), calc(100vw - 420px)); min-width: 280px; padding: 14px; }
+  .seite { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  @media (max-width: 860px) {
+    .buehne { flex-direction: column; }
+    .brett-platz { width: 100%; padding: 10px; }
+    .seite { width: 100%; }
+  }
+  h1 { font-size: 20px; margin: 0; }
+  .karte { background: var(--ui-flaeche); border-radius: 14px; padding: 12px 14px; }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+  button, select {
+    min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06); color: inherit; font: inherit; font-weight: 600; cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:active { background: rgba(255,255,255,.16); }
+  label { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; margin-right: 12px; }
+  input[type=checkbox] { width: 22px; height: 22px; }
+  #fen { width: 100%; min-height: 40px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.25); color: inherit; padding: 6px 8px; font: 13px ui-monospace, Menlo, monospace; }
+  #status { font-weight: 800; font-size: 17px; }
+  #zuege { font-variant-numeric: tabular-nums; color: var(--ui-gedimmt); min-height: 1.4em; word-break: break-word; }
+  #ereignis { color: var(--ui-gedimmt); font-size: 13px; }
+  .galerie { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .galerie div { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--ui-gedimmt); text-align: center; }
+  .galerie span.sym { width: 34px; height: 34px; display: block; }
+  .galerie span.sym svg { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+<div class="buehne">
+  <div class="brett-platz"><div id="brett"></div></div>
+  <div class="seite">
+    <h1>Brett-Demo</h1>
+    <div class="karte">
+      <div id="status">Weiß am Zug</div>
+      <div id="zuege"></div>
+      <div id="ereignis">Tippe eine Figur an oder zieh sie mit dem Finger.</div>
+    </div>
+    <div class="karte knoepfe">
+      <button id="neu">Neue Partie</button>
+      <button id="zurueck">Zurück</button>
+      <button id="drehen">Brett drehen</button>
+      <button id="hinweis">Hinweis</button>
+      <button id="pfeile">Beispiel-Pfeile</button>
+      <button id="leeren">Pfeile/Abzeichen weg</button>
+    </div>
+    <div class="karte">
+      <label><input type="checkbox" id="koord" checked> Koordinaten</label>
+      <label><input type="checkbox" id="abz" checked> Abzeichen nach jedem Zug</label>
+      <label><input type="checkbox" id="ton" checked> Klang</label>
+    </div>
+    <div class="karte knoepfe">
+      <select id="stellung" aria-label="Teststellung">
+        <option value="">Teststellung …</option>
+        <option value="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">Grundstellung</option>
+        <option value="r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 6 8">Rochade (beide Seiten)</option>
+        <option value="rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3">En passant (exf6)</option>
+        <option value="2r4k/1P4pp/8/8/8/8/5PPP/6K1 w - - 0 1">Umwandlung (b8 oder bxc8)</option>
+        <option value="rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3">Schachmatt</option>
+        <option value="4k3/8/8/8/8/8/1p6/4K3 b - - 0 1">Umwandlung Schwarz</option>
+      </select>
+      <select id="design" aria-label="Farben">
+        <option value="abenteuer">Farben: Abenteuer</option>
+        <option value="edel">Farben: Klub-Edel</option>
+        <option value="neon">Farben: Neon</option>
+        <option value="ohne">Farben: nur Grundstil</option>
+      </select>
+      <select id="symbole" aria-label="Symbole">
+        <option value="">Symbole: Platzhalter</option>
+        <option value="neon">Symbole: Neon (Datei)</option>
+        <option value="abenteuer">Symbole: Abenteuer (Datei)</option>
+      </select>
+    </div>
+    <div class="karte">
+      <input id="fen" aria-label="FEN" spellcheck="false">
+    </div>
+    <div class="karte"><div class="galerie" id="galerie"></div></div>
+  </div>
+</div>
+
+<script type="module">
+import { Chess } from '../vendor/chess/chess.js';
+import { Brett, zielKarte, setzeSymbole, symbolSvg, KLASSEN_TITEL } from '../js/board.js';
+import { klang } from '../js/sounds.js';
+
+const KLASSEN = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
+
+const PALETTEN = {
+  abenteuer: {
+    '--feld-hell': '#F1E6C8', '--feld-dunkel': '#7EA35B', '--zuletzt': 'rgba(255,212,64,.55)',
+    '--auswahl': 'rgba(255,166,43,.62)', '--hinweis': 'rgba(79,123,247,.55)', '--schach': '#FF4646',
+    '--punkt': 'rgba(27,23,54,.28)', '--ui-bg': '#1B1736', '--ui-flaeche': '#28234D', '--ui-text': '#FFF7E8',
+    '--ui-gedimmt': '#ABA4CF', '--akzent': '#FFC83D', '--gut': '#46CF7E', '--schlecht': '#FF6262',
+    '--k-brillant': '#14B8C8', '--k-stark': '#4F7BF7', '--k-bester': '#2DB45D', '--k-exzellent': '#7CC242',
+    '--k-gut': '#97AD7B', '--k-buch': '#C38D5E', '--k-ungenau': '#E9B21B', '--k-fehler': '#FF8B2C',
+    '--k-verpasst': '#B266EA', '--k-patzer': '#F0474B', '--k-erzwungen': '#8A93A8',
+  },
+  edel: {
+    '--feld-hell': '#EBDCC2', '--feld-dunkel': '#A67D5C', '--zuletzt': 'rgba(240,200,84,.46)',
+    '--auswahl': 'rgba(250,216,110,.62)', '--hinweis': 'rgba(78,150,228,.55)', '--schach': '#E2463B',
+    '--punkt': 'rgba(32,22,12,.26)', '--ui-bg': '#131417', '--ui-flaeche': '#1C1E22', '--ui-text': '#EFEBE4',
+    '--ui-gedimmt': '#9D988F', '--akzent': '#D8B46C', '--gut': '#6EBF7B', '--schlecht': '#E5675E',
+    '--k-brillant': '#22C2DA', '--k-stark': '#4B83E6', '--k-bester': '#4FAE68', '--k-exzellent': '#86BA4C',
+    '--k-gut': '#84A08F', '--k-buch': '#AC8763', '--k-ungenau': '#E4B23F', '--k-fehler': '#E7833A',
+    '--k-verpasst': '#CF6497', '--k-patzer': '#D8443F', '--k-erzwungen': '#858D98',
+  },
+  neon: {
+    '--feld-hell': '#e4e8f6', '--feld-dunkel': '#7c87b6', '--zuletzt': 'rgba(25,246,232,.40)',
+    '--auswahl': 'rgba(160,107,255,.55)', '--hinweis': 'rgba(255,138,30,.58)', '--schach': '#ff2d55',
+    '--punkt': 'rgba(12,14,34,.30)', '--ui-bg': '#070914', '--ui-flaeche': '#11152b', '--ui-text': '#eaf0ff',
+    '--ui-gedimmt': '#8d97bd', '--akzent': '#19f6e8', '--gut': '#3ef08a', '--schlecht': '#ff2d55',
+    '--k-brillant': '#19f6e8', '--k-stark': '#a06bff', '--k-bester': '#3ef08a', '--k-exzellent': '#b4ec5c',
+    '--k-gut': '#8fbcaa', '--k-buch': '#d6a874', '--k-ungenau': '#ffd23f', '--k-fehler': '#ff8a1e',
+    '--k-verpasst': '#ff5fc8', '--k-patzer': '#ff2d4d', '--k-erzwungen': '#9aa4c8',
+  },
+};
+
+const $ = (id) => document.getElementById(id);
+const chess = new Chess();
+const zugLog = [];
+let abzeichenNr = 0;
+let letzterZug = null;
+
+const brett = new Brett($('brett'), {
+  figurenPfad: '../assets/pieces/',
+  beiZug(von, nach, umwandlung) {
+    let zug = null;
+    try { zug = chess.move({ from: von, to: nach, promotion: umwandlung }); } catch (e) { zug = null; }
+    zugLog.push({ von, nach, umwandlung: umwandlung || null, ok: !!zug });
+    if (!zug) {
+      $('ereignis').textContent = `beiZug(${von}, ${nach}) abgewiesen`;
+      if ($('ton').checked) klang.fehler();
+      return false;
+    }
+    $('ereignis').textContent = `beiZug(${von}, ${nach}${umwandlung ? ', ' + umwandlung : ''}) angenommen: ${zug.san}`;
+    nachZug(zug, true);
+    return true;
+  },
+});
+
+function schachFeld() {
+  if (!chess.inCheck()) return null;
+  const farbe = chess.turn();
+  for (const reihe of chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === farbe) return f.square;
+  return null;
+}
+
+function spieleKlang(zug) {
+  if (!$('ton').checked || !zug) return;
+  if (chess.isGameOver()) klang.ende(chess.isCheckmate() ? true : null);
+  else if (chess.inCheck()) klang.schach();
+  else if (zug.promotion) klang.umwandlung();
+  else if (zug.isKingsideCastle() || zug.isQueensideCastle()) klang.rochade();
+  else if (zug.captured) klang.schlagen();
+  else klang.zug();
+}
+
+function nachZug(zug, vomBrett) {
+  letzterZug = zug ? [zug.from, zug.to] : null;
+  brett.setzeStellung(chess.fen(), { animieren: true, letzterZug, schach: schachFeld() });
+  brett.erlaubeZuege(chess.isGameOver() ? null : zielKarte(chess));
+  brett.pfeile([]);
+  brett.markiere(null);
+  if (zug && $('abz').checked) {
+    const k = KLASSEN[abzeichenNr++ % KLASSEN.length];
+    brett.zeigeAbzeichen(zug.to, k);
+    if (k === 'brillant' && $('ton').checked) setTimeout(() => klang.brillant(), 160);
+  } else brett.entferneAbzeichen();
+  if (vomBrett) spieleKlang(zug);
+  zeigeStatus();
+}
+
+function zeigeStatus() {
+  const farbe = chess.turn() === 'w' ? 'Weiß' : 'Schwarz';
+  let s = `${farbe} am Zug`;
+  if (chess.isCheckmate()) s = `Schachmatt – ${chess.turn() === 'w' ? 'Schwarz' : 'Weiß'} gewinnt`;
+  else if (chess.isDraw()) s = 'Remis';
+  else if (chess.inCheck()) s += ' · Schach!';
+  $('status').textContent = s;
+  $('zuege').textContent = chess.history().map((z, i) => (i % 2 === 0 ? (i / 2 + 1) + '. ' : '') + z).join(' ');
+  $('fen').value = chess.fen();
+}
+
+function setzeFen(fen) {
+  chess.load(fen);
+  letzterZug = null;
+  brett.entferneAbzeichen();
+  brett.pfeile([]);
+  brett.markiere(null);
+  brett.setzeStellung(chess.fen(), { animieren: false, schach: schachFeld() });
+  brett.erlaubeZuege(chess.isGameOver() ? null : zielKarte(chess));
+  zeigeStatus();
+}
+
+function setzePalette(name) {
+  const wurzel = document.documentElement.style;
+  for (const p of Object.values(PALETTEN)) for (const k of Object.keys(p)) wurzel.removeProperty(k);
+  for (const [k, v] of Object.entries(PALETTEN[name] || {})) wurzel.setProperty(k, v);
+}
+
+async function ladeSymbole(variante) {
+  if (!variante) { setzeSymbole(Object.fromEntries(KLASSEN.map((k) => [k, null]))); zeigeGalerie(); return; }
+  const karte = {};
+  await Promise.all(KLASSEN.map(async (k) => {
+    try {
+      const r = await fetch(`../design/${variante}/symbole/${k}.svg`);
+      if (r.ok) karte[k] = await r.text();
+    } catch (e) { /* Datei fehlt: Platzhalter bleibt */ }
+  }));
+  setzeSymbole(karte);
+  zeigeGalerie();
+}
+
+function zeigeGalerie() {
+  $('galerie').innerHTML = KLASSEN.map((k) =>
+    `<div><span class="sym">${symbolSvg(k)}</span>${KLASSEN_TITEL[k]}</div>`).join('');
+}
+
+$('neu').onclick = () => setzeFen(new Chess().fen());
+$('zurueck').onclick = () => {
+  const z = chess.undo();
+  if (!z) return;
+  const vorher = chess.history({ verbose: true }).at(-1);
+  letzterZug = vorher ? [vorher.from, vorher.to] : null;
+  brett.entferneAbzeichen();
+  brett.setzeStellung(chess.fen(), { animieren: true, letzterZug, schach: schachFeld() });
+  brett.erlaubeZuege(zielKarte(chess));
+  zeigeStatus();
+};
+$('drehen').onclick = () => brett.dreheUm();
+$('koord').onchange = (e) => brett.koordinaten(e.target.checked);
+$('ton').onchange = (e) => { klang.aus = !e.target.checked; };
+$('hinweis').onclick = () => {
+  const z = chess.moves({ verbose: true });
+  if (!z.length) return;
+  const w = z[Math.floor(Math.random() * z.length)];
+  brett.markiere([w.from], 'hinweis');
+  brett.pfeile([{ von: w.from, nach: w.to, farbe: 'hinweis' }]);
+};
+$('pfeile').onclick = () => {
+  const z = chess.moves({ verbose: true });
+  const springer = z.find((m) => m.piece === 'n');
+  const andere = z.filter((m) => m.piece !== 'n');
+  const liste = [];
+  if (springer) liste.push({ von: springer.from, nach: springer.to, farbe: 'bester' });
+  if (andere[0]) liste.push({ von: andere[0].from, nach: andere[0].to, farbe: 'fehler' });
+  if (andere.at(-1)) liste.push({ von: andere.at(-1).from, nach: andere.at(-1).to, farbe: 'stark' });
+  if (andere[1]) liste.push({ von: andere[1].to, nach: andere[1].to, farbe: 'patzer' });
+  brett.pfeile(liste);
+};
+$('leeren').onclick = () => { brett.pfeile([]); brett.entferneAbzeichen(); brett.markiere(null); };
+$('stellung').onchange = (e) => { if (e.target.value) setzeFen(e.target.value); e.target.value = ''; };
+$('design').onchange = (e) => setzePalette(e.target.value);
+$('symbole').onchange = (e) => ladeSymbole(e.target.value);
+$('fen').onchange = (e) => { try { setzeFen(e.target.value.trim()); } catch (err) { $('ereignis').textContent = 'FEN ungültig'; } };
+
+setzePalette('abenteuer');
+zeigeGalerie();
+setzeFen(chess.fen());
+
+window.demo = { brett, chess, setzeFen, zugLog, klang, setzeSymbole, symbolSvg, setzePalette, ladeSymbole, KLASSEN,
+  abzeichenAus() { $('abz').checked = false; } };
+window.bereit = true;
+</script>
+</body>
+</html>
