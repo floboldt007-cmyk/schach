@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B1736">
+<title>Schach-Reise – Mockup</title>
+<style>
+/* ============ Variablen (Vertrag aus ARCHITEKTUR.md) ============ */
+:root{
+  /* Brett */
+  --feld-hell:#F1E6C8; --feld-dunkel:#7EA35B;
+  --zuletzt:rgba(255,212,64,.55); --auswahl:rgba(255,166,43,.62); --hinweis:rgba(79,123,247,.55);
+  --schach:#FF4646; --punkt:rgba(27,23,54,.28);
+  /* Oberflaeche */
+  --ui-bg:#1B1736; --ui-flaeche:#28234D; --ui-text:#FFF7E8; --ui-gedimmt:#ABA4CF;
+  --akzent:#FFC83D; --gut:#46CF7E; --schlecht:#FF6262;
+  /* Zug-Klassen */
+  --k-brillant:#14B8C8; --k-stark:#4F7BF7; --k-bester:#2DB45D; --k-exzellent:#7CC242; --k-gut:#97AD7B;
+  --k-buch:#C38D5E; --k-ungenau:#E9B21B; --k-fehler:#FF8B2C; --k-verpasst:#B266EA; --k-patzer:#F0474B; --k-erzwungen:#8A93A8;
+  /* Design-intern (nur Abenteuer-Variante) */
+  --ui-flaeche-2:#353064; --ui-tief:#14112B; --ui-rand:rgba(255,247,232,.09);
+  --akzent-hell:#FFDA6E; --akzent-dunkel:#D99A12; --akzent-text:#2B1E00;
+  --eval-weiss:#FFF7E8; --eval-schwarz:#3A3368;
+  --blase:#FFF7E8; --blase-text:#1B1736;
+  --schrift: ui-rounded, "SF Pro Rounded", "Nunito", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-gross:24px; --r:18px; --r-klein:12px;
+  --schatten:0 12px 32px rgba(8,6,26,.45);
+  --tasten-schatten:0 4px 0 #120F28;
+  --pad:20px; --spalte:376px; --bar:26px; --bar-abstand:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--schrift); color:var(--ui-text); font-size:16px; line-height:1.35;
+  background:
+    radial-gradient(900px 520px at 12% -8%, #2E2766 0%, transparent 62%),
+    radial-gradient(800px 520px at 108% 112%, #2A2160 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cg fill='%23FFF7E8'%3E%3Ccircle cx='20' cy='30' r='1.1' opacity='.35'/%3E%3Ccircle cx='120' cy='16' r='.8' opacity='.25'/%3E%3Ccircle cx='160' cy='110' r='1.2' opacity='.3'/%3E%3Ccircle cx='70' cy='140' r='.9' opacity='.22'/%3E%3Ccircle cx='96' cy='76' r='.7' opacity='.2'/%3E%3C/g%3E%3C/svg%3E"),
+    var(--ui-bg);
+  -webkit-font-smoothing:antialiased; overflow-x:hidden; min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
+}
+img,svg{display:block}
+a{color:inherit;text-decoration:none}
+b,strong,h1,h2,h3{font-weight:800}
+.zahlen{font-variant-numeric:tabular-nums}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* Screens (per Anker umschaltbar) */
+.screen{display:none;min-height:100vh;min-height:100dvh}
+.screen:target{display:grid}
+body:not(:has(.screen:target)) #leiter{display:grid}
+
+/* ============ Bausteine ============ */
+.karte{background:var(--ui-flaeche);border:1px solid var(--ui-rand);border-radius:var(--r-gross);box-shadow:var(--schatten)}
+.knopf{
+  min-height:52px;padding:0 20px;border:0;border-radius:16px;font:inherit;font-weight:800;font-size:17px;
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;user-select:none;
+  transition:transform .08s ease, box-shadow .08s ease;
+}
+.knopf svg{width:22px;height:22px}
+.knopf.primaer{background:linear-gradient(180deg,var(--akzent-hell),var(--akzent));color:var(--akzent-text);box-shadow:0 5px 0 var(--akzent-dunkel),0 12px 26px rgba(255,200,61,.28)}
+.knopf.zweit{background:var(--ui-flaeche-2);color:var(--ui-text);box-shadow:0 5px 0 #1A1638}
+.knopf:active{transform:translateY(4px)}
+.knopf.primaer:active{box-shadow:0 1px 0 var(--akzent-dunkel)}
+.knopf.gross{min-height:64px;font-size:20px;border-radius:20px}
+.ikon-knopf{width:52px;height:52px;flex:none;border-radius:16px;background:var(--ui-flaeche);border:1px solid var(--ui-rand);display:grid;place-items:center;color:var(--ui-text);box-shadow:var(--tasten-schatten)}
+.ikon-knopf svg{width:24px;height:24px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;background:var(--ui-flaeche);border:1px solid var(--ui-rand);font-weight:700;color:var(--ui-gedimmt);white-space:nowrap}
+.chip b{color:var(--ui-text)}
+.chip svg{width:20px;height:20px}
+.chip .gold{color:var(--akzent)}
+.avatar{border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--ui-text),0 6px 16px rgba(0,0,0,.35)}
+
+/* Sprechblase */
+.blase{position:relative;background:var(--blase);color:var(--blase-text);border-radius:20px;padding:11px 15px;font-weight:700;font-size:15.5px;line-height:1.3;box-shadow:4px 5px 0 rgba(8,6,26,.35);transform-origin:var(--ursprung, 0 0);animation:blase-auf .38s cubic-bezier(.34,1.56,.64,1) both}
+.blase::before{content:"";position:absolute;width:20px;height:20px;background:inherit;border-radius:3px;transform:rotate(45deg)}
+.blase.links::before{left:-7px;top:22px}
+.blase.oben::before{top:-7px;left:30px}
+.blase em{font-style:normal;color:#C8102E}
+@keyframes blase-auf{from{opacity:0;transform:scale(.6) rotate(-4deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+
+/* ============ Brett ============ */
+.brett{position:relative;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:var(--b);height:var(--b);border-radius:14px;box-shadow:0 0 0 6px #3A2E1E,0 0 0 9px #5C4A30,0 18px 40px rgba(6,4,20,.55);touch-action:none;user-select:none}
+.feld{position:relative}
+.feld.h{background:var(--feld-hell)}
+.feld.d{background:var(--feld-dunkel)}
+.ecke-lo{border-top-left-radius:14px}.ecke-ro{border-top-right-radius:14px}.ecke-lu{border-bottom-left-radius:14px}.ecke-ru{border-bottom-right-radius:14px}
+.feld.zuletzt::before{content:"";position:absolute;inset:0;background:var(--zuletzt);border-radius:inherit}
+.feld.schach::before{content:"";position:absolute;inset:0;background:radial-gradient(circle, var(--schach) 0%, rgba(255,70,70,.65) 35%, rgba(255,70,70,0) 72%)}
+.feld img{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.koord{position:absolute;z-index:1;font-weight:800;font-size:max(9px,calc(var(--b) * .021));line-height:1;pointer-events:none}
+.koord.zahl{top:5%;left:6%}
+.koord.buchst{bottom:5%;right:7%}
+.feld.h .koord{color:var(--feld-dunkel)}
+.feld.d .koord{color:var(--feld-hell)}
+.punkt{position:absolute;left:50%;top:50%;width:30%;height:30%;margin:-15% 0 0 -15%;border-radius:50%;background:var(--punkt);z-index:2}
+.abzeichen{position:absolute;z-index:4;top:-17%;right:-17%;width:max(24px,48%);height:max(24px,48%);filter:drop-shadow(0 3px 4px rgba(10,8,30,.45))}
+.abzeichen.plopp{animation:plopp .55s cubic-bezier(.34,1.7,.6,1) both}
+@keyframes plopp{0%{transform:scale(0) rotate(-30deg)}60%{transform:scale(1.28) rotate(8deg)}100%{transform:scale(1) rotate(0)}}
+.welle{position:absolute;z-index:3;top:-17%;right:-17%;width:48%;height:48%;border-radius:50%;border:3px solid var(--k, var(--k-brillant));animation:welle 2.4s ease-out .2s infinite;opacity:0}
+@keyframes welle{0%{transform:scale(.8);opacity:.9}70%{transform:scale(2.6);opacity:0}100%{opacity:0}}
+.funken{position:absolute;z-index:5;top:-17%;right:-17%;width:48%;height:48%;pointer-events:none}
+.funken i{position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-6.5px;background:#fff;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:funkeln 1.8s ease-in-out infinite}
+.funken i:nth-child(1){transform:translate(-120%,-110%) scale(.9);animation-delay:.1s}
+.funken i:nth-child(2){transform:translate(140%,-60%) scale(.7);animation-delay:.5s;background:#9FF5FF}
+.funken i:nth-child(3){transform:translate(110%,130%) scale(.8);animation-delay:.9s}
+.funken i:nth-child(4){transform:translate(-140%,90%) scale(.6);animation-delay:1.2s;background:#FFE58A}
+.funken i:nth-child(5){transform:translate(10%,-190%) scale(.55);animation-delay:.7s;background:#9FF5FF}
+.funken i:nth-child(6){transform:translate(-200%,10%) scale(.5);animation-delay:1.5s}
+@keyframes funkeln{0%,100%{opacity:.15;scale:.6}50%{opacity:1;scale:1.15}}
+.pfeile{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
+.pfeil{opacity:.85}
+
+/* Bewertungsbalken */
+.evalbalken{position:relative;width:var(--bar);height:var(--b);flex:none;border-radius:calc(var(--bar) / 2);background:var(--eval-schwarz);overflow:hidden;box-shadow:inset 0 0 0 2px rgba(255,247,232,.08)}
+.eb-weiss{position:absolute;left:0;right:0;bottom:0;height:var(--w);background:linear-gradient(180deg,#FFFFFF,var(--eval-weiss));transition:height .5s cubic-bezier(.22,1,.36,1)}
+.eb-weiss::before{content:"";position:absolute;left:0;right:0;top:-2px;height:4px;background:var(--akzent);box-shadow:0 0 8px var(--akzent)}
+.evalbalken::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:rgba(140,132,184,.55)}
+.eb-zahl{position:absolute;left:0;right:0;bottom:7px;text-align:center;font-size:10.5px;font-weight:900;color:#3A3368;writing-mode:horizontal-tb;z-index:1;letter-spacing:-.3px}
+
+/* Mini-Abzeichen */
+.mini{width:20px;height:20px;flex:none}
+
+/* ============ Screen 1: Reisekarte / Bot-Leiter ============ */
+.leiter{grid-template-columns:1fr 372px;grid-template-rows:auto 1fr;grid-template-areas:"kopf kopf" "karte gegner";gap:16px 18px;padding:16px 20px 20px;height:100vh;height:100dvh}
+.l-kopf{grid-area:kopf;display:flex;align-items:center;gap:14px}
+.logo{display:flex;align-items:center;gap:12px;margin-right:auto}
+.logo-zeichen{width:52px;height:52px;border-radius:16px;background:linear-gradient(160deg,#FFDA6E,#FF9F1C);display:grid;place-items:center;box-shadow:0 4px 0 #C9760A;color:#2B1E00}
+.logo-zeichen img{width:40px;height:40px}
+.logo b{display:block;font-size:24px;letter-spacing:-.3px;line-height:1.1;white-space:nowrap}
+.logo small{display:block;color:var(--ui-gedimmt);font-weight:600;font-size:14px}
+.l-stats{display:flex;gap:8px}
+.l-knoepfe{display:flex;gap:10px}
+.karten-rahmen{grid-area:karte;position:relative;border-radius:28px;overflow:hidden;background:#3A9AD3;box-shadow:0 0 0 4px rgba(255,247,232,.12),var(--schatten);min-height:0}
+.weltkarte{width:100%;height:100%}
+.region{font-family:var(--schrift);font-weight:900;font-size:23px;fill:#2F5A27;opacity:.5;letter-spacing:.6px}
+.region.see{fill:#CFEFFF;opacity:.6}
+.kompass-n{font-family:var(--schrift);font-weight:900;font-size:20px;fill:#FFF7E8}
+.weg-schatten{fill:none;stroke:#6E4F12;stroke-width:17;stroke-linecap:round;opacity:.45}
+.weg-fertig{fill:none;stroke:#FFC83D;stroke-width:11;stroke-linecap:round}
+.weg-offen-grund{fill:none;stroke:#E9D9A6;stroke-width:13;stroke-linecap:round;opacity:.55}
+.weg-offen{fill:none;stroke:#8A6A3A;stroke-width:5;stroke-linecap:round;stroke-dasharray:1 17;opacity:.7}
+.weg-see{fill:none;stroke:#FFF7E8;stroke-width:5;stroke-linecap:round;stroke-dasharray:1 16;opacity:.8}
+.station{cursor:pointer}
+.st-ring{fill:#FFF7E8;filter:url(#schatten)}
+.station.aktuell .st-ring{fill:#FFC83D}
+.station.gesperrt .st-ring{fill:#5E5890}
+.st-voll{color:#FFC83D}
+.st-leer{color:#4B4580}
+.st-name rect{fill:#FFF7E8;filter:url(#schatten)}
+.st-name text{font-family:var(--schrift);font-weight:800;font-size:19px;fill:#1B1736}
+.station.gesperrt .st-name rect{fill:#3B3570}
+.station.gesperrt .st-name text{fill:#C9C3EA}
+.st-nr circle{fill:#1B1736;stroke:#FFF7E8;stroke-width:3}
+.st-nr text{font-family:var(--schrift);font-weight:900;font-size:17px;fill:#FFF7E8}
+.station.aktuell .st-nr circle{stroke:#FFC83D}
+.station.gesperrt .st-nr circle{stroke:#8C86B8}
+.neu-sticker text{font-family:var(--schrift);font-weight:900;font-size:14px;fill:#fff}
+.neu-sticker{animation:wackeln 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.puls{fill:none;stroke:#FFC83D;stroke-width:5;animation:puls 2.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+.puls.p2{animation-delay:1.1s}
+@keyframes puls{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.55);opacity:0}}
+.hier rect{fill:#FFC83D;filter:url(#schatten)}
+.hier-spitze{fill:#FFC83D}
+.hier text{font-family:var(--schrift);font-weight:900;font-size:19px;fill:#2B1E00}
+.hier{animation:huepfen 1.6s ease-in-out infinite}
+@keyframes huepfen{0%,100%{translate:0 0}50%{translate:0 -6px}}
+@keyframes wackeln{0%,100%{rotate:0deg}50%{rotate:-8deg}}
+
+.gegner{grid-area:gegner;display:flex;flex-direction:column;padding:18px 20px 20px;gap:14px;min-height:0;overflow:auto;position:relative}
+.g-band{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.g-station{font-weight:800;color:var(--ui-gedimmt);font-size:14px;text-transform:uppercase;letter-spacing:1.2px}
+.g-neu{background:#FF5C8A;color:#fff;font-weight:900;font-size:13px;padding:6px 11px;border-radius:999px;box-shadow:0 3px 0 #B8335C;transform:rotate(2deg)}
+.g-held{display:grid;grid-template-columns:112px 1fr;gap:14px;align-items:start}
+.g-avatar{width:112px;height:112px;box-shadow:0 0 0 4px #FFF7E8,0 0 0 9px #3FBF9F,0 12px 26px rgba(0,0,0,.4);margin:6px 0 0 5px}
+.g-held .blase{margin-top:8px;font-size:15px}
+.g-name h2{font-size:28px;line-height:1.1;letter-spacing:-.4px}
+.g-meta{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;color:var(--ui-gedimmt);font-weight:700;font-size:15px}
+.g-meta .elo{color:var(--akzent)}
+.g-bio{color:#D9D3F2;font-size:15.5px}
+.g-ziele{list-style:none;display:flex;flex-direction:column;gap:7px;background:var(--ui-tief);border-radius:16px;padding:12px 14px}
+.g-ziele li{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+.g-ziele .sterne{display:flex;gap:2px;width:66px;flex:none;color:#4B4580}
+.g-ziele .sterne svg{width:20px;height:20px}
+.g-ziele .sterne .an{color:var(--akzent)}
+.g-farbe{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.farbwahl{min-height:62px;border-radius:16px;background:var(--ui-tief);border:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:800;font-size:14px;color:var(--ui-gedimmt)}
+.farbwahl img,.farbwahl svg{width:30px;height:30px}
+.farbwahl.an{border-color:var(--akzent);color:var(--ui-text);background:#2E2858;box-shadow:0 0 0 4px rgba(255,200,61,.15)}
+.g-titel{font-size:13px;font-weight:800;color:var(--ui-gedimmt);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:-6px}
+
+/* ============ Screen 2: Partie ============ */
+.partie{
+  --b:min(calc(100dvh - 2 * var(--pad)), calc(100vw - 3 * var(--pad) - var(--spalte) - var(--bar) - var(--bar-abstand)));
+  grid-template-columns:auto var(--spalte);
+  grid-template-rows:auto auto auto minmax(0,1fr) auto auto;
+  grid-template-areas:"brett kopf" "brett bot" "brett coach" "brett zuege" "brett spieler" "brett aktionen";
+  gap:12px var(--pad);padding:var(--pad);height:100vh;height:100dvh;justify-content:center;align-content:center;
+}
+.p-brett{grid-area:brett;align-self:center;display:flex;gap:var(--bar-abstand);position:relative}
+.p-brett.moment-brillant .brett{box-shadow:0 0 0 6px #3A2E1E,0 0 0 9px #5C4A30,0 0 0 13px rgba(20,184,200,.35),0 0 60px 6px rgba(20,184,200,.38),0 18px 40px rgba(6,4,20,.55);animation:brett-glanz 1.2s ease-out both}
+@keyframes brett-glanz{0%{box-shadow:0 0 0 6px #3A2E1E,0 0 0 9px #5C4A30,0 0 0 9px rgba(20,184,200,.9),0 0 0 0 rgba(20,184,200,.0),0 18px 40px rgba(6,4,20,.55)}}
+.p-kopf{grid-area:kopf;display:flex;align-items:center;gap:12px}
+.p-titel{flex:1;min-width:0}
+.p-titel small{display:block;color:var(--ui-gedimmt);font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-titel b{display:block;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.botkarte{grid-area:bot;display:grid;grid-template-columns:auto 1fr;grid-template-areas:"av info" "blase blase";gap:10px 12px;align-items:center}
+.bk-avatar{grid-area:av;width:64px;height:64px;box-shadow:0 0 0 3px #FFF7E8,0 0 0 7px #3FBF9F,0 8px 18px rgba(0,0,0,.4);margin-left:4px}
+.bk-info{grid-area:info;min-width:0}
+.bk-info b{font-size:19px}
+.bk-zeile{display:flex;align-items:center;gap:8px;margin-top:3px}
+.elo-chip{font-size:13px;font-weight:800;color:var(--akzent);background:rgba(255,200,61,.12);padding:3px 8px;border-radius:8px}
+.geschlagen{display:flex;align-items:center;background:rgba(255,247,232,.88);border-radius:10px;padding:2px 10px 2px 5px;min-height:28px}
+.geschlagen img{width:22px;height:22px;margin-right:-6px}
+.geschlagen .plus{margin-left:12px;font-size:13px;font-weight:900;color:#1B1736}
+.bk-blase{grid-area:blase;--ursprung:30px 0}
+.coach{grid-area:coach;--k:var(--k-brillant);display:grid;grid-template-columns:auto 1fr;gap:4px 14px;padding:14px 16px;border-radius:var(--r-gross);background:linear-gradient(135deg,rgba(20,184,200,.16),rgba(20,184,200,0) 60%),var(--ui-flaeche);border:2px solid var(--k);box-shadow:0 0 0 5px rgba(20,184,200,.14),0 0 34px rgba(20,184,200,.25),var(--schatten);animation:coach-rein .45s cubic-bezier(.22,1,.36,1) both;position:relative;overflow:hidden}
+@keyframes coach-rein{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.c-symbol{width:58px;height:58px;position:relative;align-self:start;margin-top:2px}
+.c-symbol svg{width:100%;height:100%;animation:plopp .55s cubic-bezier(.34,1.7,.6,1) .1s both;filter:drop-shadow(0 4px 6px rgba(0,0,0,.35))}
+.c-kopf{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.c-klasse{font-size:22px;color:var(--k);letter-spacing:-.2px;line-height:1.1}
+.glanz{background:linear-gradient(100deg,var(--k) 0%,#B8FBFF 40%,var(--k) 60%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:glanz 2.6s linear infinite}
+@keyframes glanz{from{background-position:120% 0}to{background-position:-100% 0}}
+.c-zug{font-size:14px;font-weight:800;background:var(--ui-tief);padding:3px 9px;border-radius:8px}
+.c-eval{margin-left:auto;font-size:13.5px;font-weight:800;color:var(--gut);display:flex;align-items:center;gap:4px}
+.c-eval svg{width:16px;height:16px}
+.c-text p{font-size:15.5px;line-height:1.38;color:#EDE8FF;margin-top:5px}
+.c-text p b{color:#fff}
+.c-ella{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ui-gedimmt);font-weight:700;margin-top:8px}
+.c-ella svg{width:24px;height:24px}
+.zugliste{grid-area:zuege;background:var(--ui-flaeche);border:1px solid var(--ui-rand);border-radius:var(--r-gross);padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;min-height:0;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 28px);mask-image:linear-gradient(180deg,transparent 0,#000 28px)}
+.zeile{display:grid;grid-template-columns:34px 1fr 1fr;align-items:center;min-height:42px;border-radius:12px}
+.zeile:nth-child(even){background:rgba(255,247,232,.035)}
+.nr{color:var(--ui-gedimmt);font-weight:700;font-size:14px;padding-left:6px}
+.zug{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 10px;border-radius:11px;font-weight:700;font-size:16px;justify-self:start;white-space:nowrap}
+.zug.aktuell{background:var(--ui-flaeche-2);box-shadow:inset 0 0 0 2px var(--akzent)}
+.spielerleiste{grid-area:spieler;display:flex;align-items:center;gap:12px;padding:0 4px}
+.spielerleiste .avatar{width:44px;height:44px}
+.spielerleiste b{font-size:17px}
+.farb-chip{font-size:12.5px;font-weight:800;background:#FFF7E8;color:#1B1736;padding:3px 8px;border-radius:8px}
+.spielerleiste .geschlagen{margin-left:auto}
+.aktionen{grid-area:aktionen;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.aktion{min-height:62px;border-radius:18px;background:var(--ui-flaeche);border:1px solid var(--ui-rand);box-shadow:var(--tasten-schatten);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:800;font-size:13.5px;color:var(--ui-gedimmt)}
+.aktion svg{width:24px;height:24px;color:var(--ui-text)}
+.aktion.hinweis svg{color:var(--akzent)}
+.aktion.aufgeben svg{color:#FF8A8A}
+.zugstreifen{display:none}
+
+/* ============ Screen 3: Spielanalyse ============ */
+.analyse{
+  --b:min(calc(100dvh - 2 * var(--pad) - 244px), 560px);
+  grid-template-columns:auto minmax(0,1fr);grid-template-areas:"links rechts";gap:var(--pad);padding:var(--pad);height:100vh;height:100dvh;justify-content:center;align-content:center
+}
+.a-links{grid-area:links;display:flex;flex-direction:column;gap:12px;align-self:center}
+.a-brettzeile{display:flex;gap:var(--bar-abstand)}
+.a-nav{display:flex;gap:10px;align-items:center}
+.a-nav .ikon-knopf{width:60px;height:54px}
+.a-nav .stand{flex:1;text-align:center;font-weight:800;color:var(--ui-gedimmt);font-size:14.5px}
+.a-nav .stand b{color:var(--ui-text);display:block;font-size:17px}
+.kurve{padding:12px 12px 12px;border-radius:var(--r-gross)}
+.kurve-kopf{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-weight:800;font-size:14px;color:var(--ui-gedimmt)}
+.kurve-feld{position:relative;height:84px;border-radius:12px;overflow:hidden}
+.kurve-etikett{position:absolute;left:10px;font-size:11.5px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
+.kurve-etikett.oben{top:6px;color:#8C84B8}
+.kurve-etikett.unten{bottom:6px;color:#8C84B8}
+.kurve-svg{width:100%;height:100%}
+.kurve-marker{position:absolute;inset:0}
+.km{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--k);box-shadow:0 0 0 3px #fff,0 2px 6px rgba(0,0,0,.4)}
+.km.aktiv{width:20px;height:20px;margin:-10px 0 0 -10px;box-shadow:0 0 0 3px #fff,0 0 0 7px rgba(255,200,61,.6)}
+.momente{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.momente::-webkit-scrollbar{display:none}
+.moment{flex:none}
+.moment{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border-radius:14px;background:var(--ui-tief);font-weight:800;font-size:14.5px;white-space:nowrap}
+.moment.an{box-shadow:inset 0 0 0 2px var(--akzent);background:#2E2858}
+.a-rechts{grid-area:rechts;display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;max-width:560px}
+.a-kopf{display:flex;align-items:center;gap:12px}
+.a-kopf > div{min-width:0}
+.a-kopf h1{font-size:24px;line-height:1.1}
+.a-kopf p{color:var(--ui-gedimmt);font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ergebnis{white-space:nowrap;flex:none;margin-left:auto;font-size:22px;font-weight:900;background:var(--akzent);color:var(--akzent-text);padding:6px 14px;border-radius:14px;box-shadow:0 4px 0 var(--akzent-dunkel)}
+.genau{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g-karte{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:20px}
+.ring{width:76px;height:76px;flex:none;position:relative}
+.ring > svg:first-child{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .r-grund{fill:none;stroke:var(--ui-tief);stroke-width:7}
+.ring .r-wert{fill:none;stroke-width:7;stroke-linecap:round}
+.ring .av{position:absolute;left:12px;top:12px;width:52px;height:52px;border-radius:50%}
+.g-wert b{display:block;font-size:28px;line-height:1;letter-spacing:-.5px}
+.g-wert b small{font-size:17px}
+.g-wert span{display:block;color:var(--ui-gedimmt);font-weight:700;font-size:14px;margin-top:4px}
+.g-wert em{display:inline-block;font-style:normal;font-weight:800;font-size:12.5px;color:var(--akzent);background:rgba(255,200,61,.12);padding:2px 8px;border-radius:7px;margin-top:5px}
+.infozeile{display:flex;gap:8px;flex-wrap:wrap}
+.infozeile .chip{min-height:36px;font-size:14px}
+.a-coach{--k:var(--k-gut);display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px 14px;border-radius:20px;border:2px solid var(--k)}
+.a-coach .c-symbol{width:46px;height:46px}
+.a-coach .c-klasse{font-size:19px}
+.a-coach p{font-size:15px;margin-top:3px;color:#EDE8FF}
+.a-coach p b.besser-text{color:#8FF0B0}
+.tabelle{padding:6px 10px;border-radius:20px;min-height:0;overflow:auto}
+.t-kopf,.t-zeile{display:grid;grid-template-columns:62px 1fr 62px;align-items:center}
+.t-kopf{font-size:13px;font-weight:800;color:var(--ui-gedimmt);text-transform:uppercase;letter-spacing:1px;padding:4px 0 2px}
+.t-kopf span:first-child,.t-kopf span:last-child{text-align:center}
+.t-zeile{min-height:30px}
+.t-k{display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px;color:#E6E1FA}
+.t-badge{width:22px;height:22px}
+.t-n{text-align:center;font-weight:900;font-size:17px;color:var(--k)}
+.t-n.null{color:#58528A;font-weight:700}
+.a-knoepfe{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:auto}
+.a-knoepfe .knopf{min-height:56px}
+.mini-av{width:30px;height:30px;border-radius:50%;box-shadow:0 0 0 2px #2B1E00}
+
+/* ============ Screen 4: Sieg ============ */
+.sieg{place-items:center;position:relative;overflow:hidden;height:100vh;height:100dvh}
+.sieg-hinten{--b:min(calc(100dvh - 40px), calc(100vw - 480px));position:absolute;left:20px;top:50%;transform:translateY(-50%);display:flex;gap:10px;filter:blur(2px) saturate(.8);opacity:.75}
+.sieg-geist{position:absolute;right:20px;top:20px;bottom:20px;width:376px;display:flex;flex-direction:column;gap:12px;filter:blur(2px);opacity:.6}
+.sieg-geist i{display:block;border-radius:22px;background:var(--ui-flaeche);border:1px solid var(--ui-rand)}
+.sieg-dunkel{position:absolute;inset:0;background:radial-gradient(circle at 50% 45%,rgba(27,23,54,.5),rgba(14,11,32,.86) 75%)}
+.konfetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.konfetti i{position:absolute;left:var(--x);top:var(--y);width:10px;height:14px;background:var(--c);transform:rotate(var(--r));border-radius:2px;animation:fallen var(--t) linear var(--d) infinite}
+.konfetti i.rund{width:10px;height:10px;border-radius:50%}
+.konfetti i.streifen{width:6px;height:18px;border-radius:3px}
+@keyframes fallen{0%{translate:0 -30px;rotate:0deg}100%{translate:-10px 70px;rotate:200deg}}
+.sieg-karte{position:relative;width:min(560px,calc(100vw - 32px));padding:0 28px 26px;border-radius:30px;background:linear-gradient(180deg,#332D63,#27224C);border:2px solid rgba(255,200,61,.55);box-shadow:0 0 0 8px rgba(255,200,61,.1),0 30px 80px rgba(0,0,0,.6);text-align:center;animation:sieg-auf .6s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes sieg-auf{from{opacity:0;transform:scale(.7) translateY(40px)}to{opacity:1;transform:none}}
+.sieg-band{position:relative;margin:-30px auto 0;width:300px;height:72px;display:grid;place-items:center;font-size:40px;font-weight:900;letter-spacing:3px;color:#2B1E00;background:linear-gradient(180deg,#FFE27A,#FFB81C);clip-path:polygon(0 0,100% 0,93% 50%,100% 100%,0 100%,7% 50%);filter:drop-shadow(0 6px 0 #C9860A)}
+.sieg-unter{margin-top:14px;color:#E6E1FA;font-weight:700;font-size:17px}
+.sieg-sterne{position:relative;display:flex;justify-content:center;gap:16px;margin:18px 0 8px}
+.strahlen{position:absolute;left:50%;top:150px;width:520px;height:520px;margin:-260px 0 0 -260px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(255,200,61,.17) 0deg 9deg,transparent 9deg 18deg);-webkit-mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 62%);mask-image:radial-gradient(circle,#000 0,#000 18%,transparent 62%);animation:drehen 24s linear infinite;pointer-events:none}
+@keyframes drehen{to{transform:rotate(360deg)}}
+.strahlen-rahmen{position:absolute!important;inset:0;border-radius:28px;overflow:hidden;pointer-events:none}
+.sieg-karte > *:not(.strahlen-rahmen){position:relative}
+.s-stern{display:flex;flex-direction:column;align-items:center;gap:8px;width:136px}
+.s-stern svg{width:76px;height:76px;color:var(--akzent);filter:drop-shadow(0 0 14px rgba(255,200,61,.65)) drop-shadow(0 5px 0 #C9860A);animation:stern-flug .7s cubic-bezier(.34,1.56,.64,1) both}
+.s-stern:nth-child(2) svg{width:92px;height:92px;margin-top:-14px;animation-delay:.25s}
+.s-stern:nth-child(3) svg{animation-delay:.5s}
+@keyframes stern-flug{from{opacity:0;transform:scale(2.4) rotate(-40deg)}to{opacity:1;transform:none}}
+.s-stern span{font-size:13.5px;font-weight:800;color:var(--ui-gedimmt);line-height:1.25}
+.s-stern span b{color:var(--ui-text);display:block;font-size:14.5px}
+.sieg-bot{display:flex;align-items:center;gap:14px;text-align:left;margin:14px 0 6px}
+.sieg-bot .avatar{width:64px;height:64px;box-shadow:0 0 0 3px #FFF7E8,0 0 0 7px #3FBF9F}
+.sieg-bot .blase{flex:1;--ursprung:0 50%}
+.freischalt{display:flex;align-items:center;gap:14px;text-align:left;margin-top:16px;padding:14px 16px;border-radius:20px;background:linear-gradient(90deg,rgba(156,126,234,.35),rgba(156,126,234,.08));border:2px dashed rgba(201,186,255,.55)}
+.freischalt .fs-av{position:relative;width:64px;height:64px;flex:none}
+.freischalt .fs-av .avatar{width:64px;height:64px;box-shadow:0 0 0 3px #FFF7E8,0 0 0 7px #9C7EEA;animation:farbe-rein 1.4s ease .6s both}
+@keyframes farbe-rein{from{filter:grayscale(1) brightness(.6)}to{filter:none}}
+.fs-schloss{position:absolute;right:-10px;bottom:-8px;width:32px;height:32px;border-radius:50%;background:#46CF7E;color:#fff;display:grid;place-items:center;box-shadow:0 0 0 3px #27224C}
+.fs-schloss svg{width:18px;height:18px}
+.freischalt small{display:block;color:#D4C8FF;font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:1.2px}
+.freischalt b{font-size:20px}
+.freischalt .elo-chip{margin-left:6px}
+.sieg-knoepfe{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+
+/* ============ Screen 5: Stil-Uebersicht ============ */
+.stil{padding:22px 26px 40px;max-width:1240px;margin:0 auto}
+.stil:target{display:block}
+.stil h1{font-size:26px}
+.stil h2{font-size:15px;color:var(--ui-gedimmt);text-transform:uppercase;letter-spacing:1.3px;margin:18px 0 10px}
+.stil-unter{color:var(--ui-gedimmt);font-weight:600;margin-top:2px}
+.legende{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.leg{display:flex;gap:12px;align-items:flex-start;background:var(--ui-flaeche);border:1px solid var(--ui-rand);border-left:5px solid var(--k);border-radius:16px;padding:10px 12px}
+.leg-badge{width:48px;height:48px;flex:none}
+.leg b{display:block;font-size:16px;color:var(--k)}
+.leg small{display:block;color:var(--ui-gedimmt);font-weight:700;font-size:12.5px}
+.leg p{font-size:13px;color:#E6E1FA;margin-top:3px;line-height:1.3}
+.leg.lesehilfe{border-left-color:var(--akzent);background:#2E2858}
+.leg.lesehilfe b{color:var(--akzent)}
+.leg.lesehilfe p b{display:inline;color:var(--ui-text);font-size:13px}
+.leg code{display:block;font-size:11px;color:#8C86B8;margin-top:4px;font-family:ui-monospace,Menlo,monospace}
+.auf-brett{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.musterfeld{position:relative;width:88px;height:88px;border-radius:10px}
+.musterfeld img{width:100%;height:100%}
+.musterfeld .abzeichen{animation:none}
+.avatare{display:grid;grid-template-columns:repeat(12,1fr);gap:8px}
+.av-fig{text-align:center}
+.av-fig svg{width:100%;aspect-ratio:1;max-width:84px;margin:0 auto;border-radius:50%;box-shadow:0 0 0 3px #FFF7E8}
+.av-fig:last-child svg{box-shadow:none}
+.av-fig b{display:block;font-size:12.5px;margin-top:6px;line-height:1.15}
+.av-fig small{display:block;font-size:11px;color:var(--ui-gedimmt);font-weight:700}
+.palette{display:grid;grid-template-columns:repeat(9,1fr);gap:8px}
+.farbe{border-radius:12px;overflow:hidden;border:1px solid var(--ui-rand);background:var(--ui-flaeche)}
+.farbe i{display:block;height:34px}
+.farbe span{display:block;padding:5px 7px;font-size:11px;font-weight:700;color:var(--ui-gedimmt);font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ============ Mockup-Umschalter (nur im Mockup) ============ */
+.mockup-nav{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:50;display:flex;gap:4px;padding:5px;border-radius:999px;background:rgba(20,17,43,.92);border:1px solid var(--ui-rand);box-shadow:var(--schatten);backdrop-filter:blur(8px)}
+.mockup-nav a{min-height:44px;display:grid;place-items:center;padding:0 14px;border-radius:999px;font-weight:800;font-size:14px;color:var(--ui-gedimmt)}
+.mockup-nav a:hover{color:var(--ui-text)}
+
+/* ============ Hochformat (iPad hoch) ============ */
+@media (orientation: portrait){
+  :root{--pad:16px;--bar:26px;--bar-abstand:16px}
+  .partie{
+    --b:min(calc(100vw - 2 * var(--pad) - var(--bar) - var(--bar-abstand)), calc(100dvh - 500px));
+    --breite:calc(var(--b) + var(--bar) + var(--bar-abstand));
+    grid-template-columns:var(--breite);
+    grid-template-rows:auto auto auto auto auto auto auto;
+    grid-template-areas:"kopf" "bot" "brett" "spieler" "coach" "zuege" "aktionen";
+    gap:10px;align-content:start;padding-top:calc(var(--pad) + env(safe-area-inset-top));
+  }
+  .p-brett{margin:6px 0}
+  .botkarte{grid-template-columns:auto auto 1fr;grid-template-areas:"av info blase";gap:14px}
+  .bk-blase{align-self:center;--ursprung:0 50%}
+  .bk-blase.oben::before{top:50%;left:-7px;margin-top:-10px}
+  .zugliste{display:none}
+  .zugstreifen{grid-area:zuege;display:flex;align-items:center;gap:4px;justify-content:flex-end;overflow:hidden;background:var(--ui-flaeche);border:1px solid var(--ui-rand);border-radius:18px;padding:4px 8px;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 60px);mask-image:linear-gradient(90deg,transparent 0,#000 60px)}
+  .zugstreifen .snr{color:var(--ui-gedimmt);font-weight:700;font-size:14px;margin-left:6px}
+  .zugstreifen .zug{height:40px;flex:none}
+  .coach{padding:12px 14px}
+  .c-text p{font-size:15px}
+  .c-ella{display:none}
+  .aktionen{gap:10px}
+  .aktion{min-height:60px}
+
+  .leiter{grid-template-columns:1fr;grid-template-rows:auto auto auto;grid-template-areas:"kopf" "karte" "gegner";height:auto}
+  .karten-rahmen{aspect-ratio:1000/900}
+  .analyse{--b:min(calc(100vw - 2 * var(--pad) - var(--bar) - var(--bar-abstand)), 640px);grid-template-columns:minmax(0,calc(var(--b) + var(--bar) + var(--bar-abstand)));grid-template-areas:none;gap:12px;height:auto;align-content:start}
+  .a-links,.a-rechts{display:contents}
+  .a-kopf{order:1}.genau{order:2}.a-brettzeile{order:3}.a-nav{order:4}.a-coach{order:5}.kurve{order:6}.infozeile{order:7}.tabelle{order:8}.a-knoepfe{order:9}
+  .logo small{display:none}
+  .l-stats .chip:nth-child(2){display:none}
+  .sieg-hinten{left:50%;transform:translate(-50%,-50%)}
+}
+
+/* ============ Handy ============ */
+@media (max-width: 600px){
+  :root{--pad:10px;--bar:12px;--bar-abstand:9px}
+  .partie{--b:min(calc(100vw - 2 * var(--pad) - var(--bar) - var(--bar-abstand)), calc(100dvh - 430px));gap:8px}
+  .p-kopf .ikon-knopf{width:44px;height:44px;border-radius:14px}
+  .p-titel b{font-size:16px}
+  .p-titel small{font-size:12px}
+  .botkarte{gap:10px}
+  .bk-avatar{width:46px;height:46px;box-shadow:0 0 0 2px #FFF7E8,0 0 0 5px #3FBF9F}
+  .bk-info b{font-size:15px}
+  .bk-info .geschlagen{display:none}
+  .bk-blase{font-size:13.5px;padding:8px 11px;border-radius:16px}
+  .bk-blase.oben::before{width:14px;height:14px;left:-5px;margin-top:-7px}
+  .brett{border-radius:8px;box-shadow:0 0 0 4px #3A2E1E,0 10px 24px rgba(6,4,20,.55)}
+  .p-brett.moment-brillant .brett{box-shadow:0 0 0 4px #3A2E1E,0 0 0 7px rgba(20,184,200,.45),0 0 26px 2px rgba(20,184,200,.4);animation:none}
+  .p-brett{margin:4px 0}
+  .ecke-lo{border-top-left-radius:8px}.ecke-ro{border-top-right-radius:8px}.ecke-lu{border-bottom-left-radius:8px}.ecke-ru{border-bottom-right-radius:8px}
+  .eb-zahl{display:none}
+  .spielerleiste .avatar{width:34px;height:34px}
+  .spielerleiste b{font-size:15px}
+  .geschlagen img{width:18px;height:18px;margin-right:-6px}
+  .coach{grid-template-columns:auto 1fr;padding:10px 12px;gap:2px 10px}
+  .c-symbol{width:44px;height:44px}
+  .c-klasse{font-size:18px}
+  .c-zug{font-size:12.5px}
+  .c-eval{font-size:12px}
+  .c-text p{font-size:13.5px;margin-top:3px}
+  .zugstreifen .zug{height:36px;font-size:14.5px;padding:0 8px}
+  .aktion{min-height:56px;font-size:12px;border-radius:16px}
+  .leiter{padding:12px}
+  .l-stats{display:none}
+  .genau{grid-template-columns:1fr}
+  .a-nav .ikon-knopf{width:48px;height:48px}
+  .a-nav .stand{font-size:12.5px}
+  .a-kopf h1{font-size:20px}
+  .ergebnis{font-size:18px;padding:5px 10px}
+  .legende{grid-template-columns:1fr}
+  .avatare{grid-template-columns:repeat(4,1fr)}
+  .palette{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .konfetti{display:none}
+}
+</style>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false"><defs><symbol id="k-brillant" viewBox="0 0 40 40"><path d="M20.00 1.75 L20.94 2.07 L21.80 2.92 L22.54 3.98 L23.21 4.89 L23.92 5.37 L24.77 5.31 L25.81 4.86 L26.99 4.31 L28.15 4.00 L29.13 4.20 L29.78 4.94 L30.10 6.10 L30.21 7.39 L30.34 8.52 L30.71 9.29 L31.48 9.66 L32.61 9.79 L33.90 9.90 L35.06 10.22 L35.80 10.87 L36.00 11.85 L35.69 13.01 L35.14 14.19 L34.69 15.23 L34.63 16.08 L35.11 16.79 L36.02 17.46 L37.08 18.20 L37.93 19.06 L38.25 20.00 L37.93 20.94 L37.08 21.80 L36.02 22.54 L35.11 23.21 L34.63 23.92 L34.69 24.77 L35.14 25.81 L35.69 26.99 L36.00 28.15 L35.80 29.12 L35.06 29.78 L33.90 30.10 L32.61 30.21 L31.48 30.34 L30.71 30.71 L30.34 31.48 L30.21 32.61 L30.10 33.90 L29.78 35.06 L29.13 35.80 L28.15 36.00 L26.99 35.69 L25.81 35.14 L24.77 34.69 L23.92 34.63 L23.21 35.11 L22.54 36.02 L21.80 37.08 L20.94 37.93 L20.00 38.25 L19.06 37.93 L18.20 37.08 L17.46 36.02 L16.79 35.11 L16.08 34.63 L15.23 34.69 L14.19 35.14 L13.01 35.69 L11.85 36.00 L10.87 35.80 L10.22 35.06 L9.90 33.90 L9.79 32.61 L9.66 31.48 L9.29 30.71 L8.52 30.34 L7.39 30.21 L6.10 30.10 L4.94 29.78 L4.20 29.13 L4.00 28.15 L4.31 26.99 L4.86 25.81 L5.31 24.77 L5.37 23.92 L4.89 23.21 L3.98 22.54 L2.92 21.80 L2.07 20.94 L1.75 20.00 L2.07 19.06 L2.92 18.20 L3.98 17.46 L4.89 16.79 L5.37 16.08 L5.31 15.23 L4.86 14.19 L4.31 13.01 L4.00 11.85 L4.20 10.87 L4.94 10.22 L6.10 9.90 L7.39 9.79 L8.52 9.66 L9.29 9.29 L9.66 8.52 L9.79 7.39 L9.90 6.10 L10.22 4.94 L10.87 4.20 L11.85 4.00 L13.01 4.31 L14.19 4.86 L15.23 5.31 L16.08 5.37 L16.79 4.89 L17.46 3.98 L18.20 2.92 L19.06 2.07 Z" style="fill:var(--k-brillant, #14B8C8)" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M12.3 16.2 L16.4 11 H23.6 L27.7 16.2 L20 29.8 Z" fill="#fff"/>
+      <path d="M12.6 16.2 H27.4 M16.4 11 L18.3 16.2 L20 29.2 L21.7 16.2 L23.6 11" fill="none" style="stroke:var(--k-brillant, #14B8C8)" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M29.6 6.4 L30.5 9.3 L33.4 10.2 L30.5 11.1 L29.6 14 L28.7 11.1 L25.8 10.2 L28.7 9.3 Z" fill="#fff"/></symbol><symbol id="k-stark" viewBox="0 0 40 40"><path d="M20.00 1.75 L20.94 2.07 L21.80 2.92 L22.54 3.98 L23.21 4.89 L23.92 5.37 L24.77 5.31 L25.81 4.86 L26.99 4.31 L28.15 4.00 L29.13 4.20 L29.78 4.94 L30.10 6.10 L30.21 7.39 L30.34 8.52 L30.71 9.29 L31.48 9.66 L32.61 9.79 L33.90 9.90 L35.06 10.22 L35.80 10.87 L36.00 11.85 L35.69 13.01 L35.14 14.19 L34.69 15.23 L34.63 16.08 L35.11 16.79 L36.02 17.46 L37.08 18.20 L37.93 19.06 L38.25 20.00 L37.93 20.94 L37.08 21.80 L36.02 22.54 L35.11 23.21 L34.63 23.92 L34.69 24.77 L35.14 25.81 L35.69 26.99 L36.00 28.15 L35.80 29.12 L35.06 29.78 L33.90 30.10 L32.61 30.21 L31.48 30.34 L30.71 30.71 L30.34 31.48 L30.21 32.61 L30.10 33.90 L29.78 35.06 L29.13 35.80 L28.15 36.00 L26.99 35.69 L25.81 35.14 L24.77 34.69 L23.92 34.63 L23.21 35.11 L22.54 36.02 L21.80 37.08 L20.94 37.93 L20.00 38.25 L19.06 37.93 L18.20 37.08 L17.46 36.02 L16.79 35.11 L16.08 34.63 L15.23 34.69 L14.19 35.14 L13.01 35.69 L11.85 36.00 L10.87 35.80 L10.22 35.06 L9.90 33.90 L9.79 32.61 L9.66 31.48 L9.29 30.71 L8.52 30.34 L7.39 30.21 L6.10 30.10 L4.94 29.78 L4.20 29.13 L4.00 28.15 L4.31 26.99 L4.86 25.81 L5.31 24.77 L5.37 23.92 L4.89 23.21 L3.98 22.54 L2.92 21.80 L2.07 20.94 L1.75 20.00 L2.07 19.06 L2.92 18.20 L3.98 17.46 L4.89 16.79 L5.37 16.08 L5.31 15.23 L4.86 14.19 L4.31 13.01 L4.00 11.85 L4.20 10.87 L4.94 10.22 L6.10 9.90 L7.39 9.79 L8.52 9.66 L9.29 9.29 L9.66 8.52 L9.79 7.39 L9.90 6.10 L10.22 4.94 L10.87 4.20 L11.85 4.00 L13.01 4.31 L14.19 4.86 L15.23 5.31 L16.08 5.37 L16.79 4.89 L17.46 3.98 L18.20 2.92 L19.06 2.07 Z" style="fill:var(--k-stark, #4F7BF7)" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M22.8 8.2 L12.8 22.2 H19.3 L16.9 31.8 L27.3 17.3 H20.9 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/></symbol><symbol id="k-bester" viewBox="0 0 40 40"><path d="M20.00 1.75 L20.94 2.07 L21.80 2.92 L22.54 3.98 L23.21 4.89 L23.92 5.37 L24.77 5.31 L25.81 4.86 L26.99 4.31 L28.15 4.00 L29.13 4.20 L29.78 4.94 L30.10 6.10 L30.21 7.39 L30.34 8.52 L30.71 9.29 L31.48 9.66 L32.61 9.79 L33.90 9.90 L35.06 10.22 L35.80 10.87 L36.00 11.85 L35.69 13.01 L35.14 14.19 L34.69 15.23 L34.63 16.08 L35.11 16.79 L36.02 17.46 L37.08 18.20 L37.93 19.06 L38.25 20.00 L37.93 20.94 L37.08 21.80 L36.02 22.54 L35.11 23.21 L34.63 23.92 L34.69 24.77 L35.14 25.81 L35.69 26.99 L36.00 28.15 L35.80 29.12 L35.06 29.78 L33.90 30.10 L32.61 30.21 L31.48 30.34 L30.71 30.71 L30.34 31.48 L30.21 32.61 L30.10 33.90 L29.78 35.06 L29.13 35.80 L28.15 36.00 L26.99 35.69 L25.81 35.14 L24.77 34.69 L23.92 34.63 L23.21 35.11 L22.54 36.02 L21.80 37.08 L20.94 37.93 L20.00 38.25 L19.06 37.93 L18.20 37.08 L17.46 36.02 L16.79 35.11 L16.08 34.63 L15.23 34.69 L14.19 35.14 L13.01 35.69 L11.85 36.00 L10.87 35.80 L10.22 35.06 L9.90 33.90 L9.79 32.61 L9.66 31.48 L9.29 30.71 L8.52 30.34 L7.39 30.21 L6.10 30.10 L4.94 29.78 L4.20 29.13 L4.00 28.15 L4.31 26.99 L4.86 25.81 L5.31 24.77 L5.37 23.92 L4.89 23.21 L3.98 22.54 L2.92 21.80 L2.07 20.94 L1.75 20.00 L2.07 19.06 L2.92 18.20 L3.98 17.46 L4.89 16.79 L5.37 16.08 L5.31 15.23 L4.86 14.19 L4.31 13.01 L4.00 11.85 L4.20 10.87 L4.94 10.22 L6.10 9.90 L7.39 9.79 L8.52 9.66 L9.29 9.29 L9.66 8.52 L9.79 7.39 L9.90 6.10 L10.22 4.94 L10.87 4.20 L11.85 4.00 L13.01 4.31 L14.19 4.86 L15.23 5.31 L16.08 5.37 L16.79 4.89 L17.46 3.98 L18.20 2.92 L19.06 2.07 Z" style="fill:var(--k-bester, #2DB45D)" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><circle cx="20" cy="20" r="8.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/><circle cx="20" cy="20" r="3.3" fill="#fff"/></symbol><symbol id="k-exzellent" viewBox="0 0 40 40"><path d="M20.00 1.75 L20.94 2.07 L21.80 2.92 L22.54 3.98 L23.21 4.89 L23.92 5.37 L24.77 5.31 L25.81 4.86 L26.99 4.31 L28.15 4.00 L29.13 4.20 L29.78 4.94 L30.10 6.10 L30.21 7.39 L30.34 8.52 L30.71 9.29 L31.48 9.66 L32.61 9.79 L33.90 9.90 L35.06 10.22 L35.80 10.87 L36.00 11.85 L35.69 13.01 L35.14 14.19 L34.69 15.23 L34.63 16.08 L35.11 16.79 L36.02 17.46 L37.08 18.20 L37.93 19.06 L38.25 20.00 L37.93 20.94 L37.08 21.80 L36.02 22.54 L35.11 23.21 L34.63 23.92 L34.69 24.77 L35.14 25.81 L35.69 26.99 L36.00 28.15 L35.80 29.12 L35.06 29.78 L33.90 30.10 L32.61 30.21 L31.48 30.34 L30.71 30.71 L30.34 31.48 L30.21 32.61 L30.10 33.90 L29.78 35.06 L29.13 35.80 L28.15 36.00 L26.99 35.69 L25.81 35.14 L24.77 34.69 L23.92 34.63 L23.21 35.11 L22.54 36.02 L21.80 37.08 L20.94 37.93 L20.00 38.25 L19.06 37.93 L18.20 37.08 L17.46 36.02 L16.79 35.11 L16.08 34.63 L15.23 34.69 L14.19 35.14 L13.01 35.69 L11.85 36.00 L10.87 35.80 L10.22 35.06 L9.90 33.90 L9.79 32.61 L9.66 31.48 L9.29 30.71 L8.52 30.34 L7.39 30.21 L6.10 30.10 L4.94 29.78 L4.20 29.13 L4.00 28.15 L4.31 26.99 L4.86 25.81 L5.31 24.77 L5.37 23.92 L4.89 23.21 L3.98 22.54 L2.92 21.80 L2.07 20.94 L1.75 20.00 L2.07 19.06 L2.92 18.20 L3.98 17.46 L4.89 16.79 L5.37 16.08 L5.31 15.23 L4.86 14.19 L4.31 13.01 L4.00 11.85 L4.20 10.87 L4.94 10.22 L6.10 9.90 L7.39 9.79 L8.52 9.66 L9.29 9.29 L9.66 8.52 L9.79 7.39 L9.90 6.10 L10.22 4.94 L10.87 4.20 L11.85 4.00 L13.01 4.31 L14.19 4.86 L15.23 5.31 L16.08 5.37 L16.79 4.89 L17.46 3.98 L18.20 2.92 L19.06 2.07 Z" style="fill:var(--k-exzellent, #7CC242)" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M12.6 20.6 L20 13.4 L27.4 20.6 M12.6 27.4 L20 20.2 L27.4 27.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.6"/></symbol><symbol id="k-gut" viewBox="0 0 40 40"><path d="M20.00 1.75 L20.94 2.07 L21.80 2.92 L22.54 3.98 L23.21 4.89 L23.92 5.37 L24.77 5.31 L25.81 4.86 L26.99 4.31 L28.15 4.00 L29.13 4.20 L29.78 4.94 L30.10 6.10 L30.21 7.39 L30.34 8.52 L30.71 9.29 L31.48 9.66 L32.61 9.79 L33.90 9.90 L35.06 10.22 L35.80 10.87 L36.00 11.85 L35.69 13.01 L35.14 14.19 L34.69 15.23 L34.63 16.08 L35.11 16.79 L36.02 17.46 L37.08 18.20 L37.93 19.06 L38.25 20.00 L37.93 20.94 L37.08 21.80 L36.02 22.54 L35.11 23.21 L34.63 23.92 L34.69 24.77 L35.14 25.81 L35.69 26.99 L36.00 28.15 L35.80 29.12 L35.06 29.78 L33.90 30.10 L32.61 30.21 L31.48 30.34 L30.71 30.71 L30.34 31.48 L30.21 32.61 L30.10 33.90 L29.78 35.06 L29.13 35.80 L28.15 36.00 L26.99 35.69 L25.81 35.14 L24.77 34.69 L23.92 34.63 L23.21 35.11 L22.54 36.02 L21.80 37.08 L20.94 37.93 L20.00 38.25 L19.06 37.93 L18.20 37.08 L17.46 36.02 L16.79 35.11 L16.08 34.63 L15.23 34.69 L14.19 35.14 L13.01 35.69 L11.85 36.00 L10.87 35.80 L10.22 35.06 L9.90 33.90 L9.79 32.61 L9.66 31.48 L9.29 30.71 L8.52 30.34 L7.39 30.21 L6.10 30.10 L4.94 29.78 L4.20 29.13 L4.00 28.15 L4.31 26.99 L4.86 25.81 L5.31 24.77 L5.37 23.92 L4.89 23.21 L3.98 22.54 L2.92 21.80 L2.07 20.94 L1.75 20.00 L2.07 19.06 L2.92 18.20 L3.98 17.46 L4.89 16.79 L5.37 16.08 L5.31 15.23 L4.86 14.19 L4.31 13.01 L4.00 11.85 L4.20 10.87 L4.94 10.22 L6.10 9.90 L7.39 9.79 L8.52 9.66 L9.29 9.29 L9.66 8.52 L9.79 7.39 L9.90 6.10 L10.22 4.94 L10.87 4.20 L11.85 4.00 L13.01 4.31 L14.19 4.86 L15.23 5.31 L16.08 5.37 L16.79 4.89 L17.46 3.98 L18.20 2.92 L19.06 2.07 Z" style="fill:var(--k-gut, #97AD7B)" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M12.4 24 L20 16.4 L27.6 24" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.9"/></symbol><symbol id="k-buch" viewBox="0 0 40 40"><rect x="3.2" y="3.2" width="33.6" height="33.6" rx="10" style="fill:var(--k-buch, #C38D5E)" stroke="#fff" stroke-width="2.4"/><path d="M9.8 13.2 L15.9 10.6 L24.1 13.6 L30.2 11 V27 L24.1 29.6 L15.9 26.6 L9.8 29.2 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M15.9 10.8 V26.4 M24.1 13.8 V29.4" style="stroke:var(--k-buch, #C38D5E)" stroke-width="1.5"/>
+      <path d="M12 23.5 C14 21 18 22 19.5 19.5 S24.5 16.5 27.6 17" fill="none" style="stroke:var(--k-buch, #C38D5E)" stroke-width="1.4" stroke-dasharray="1.6 1.8" stroke-linecap="round"/></symbol><symbol id="k-erzwungen" viewBox="0 0 40 40"><rect x="3.2" y="3.2" width="33.6" height="33.6" rx="10" style="fill:var(--k-erzwungen, #8A93A8)" stroke="#fff" stroke-width="2.4"/><path d="M10.4 17 H21 V12 L29.6 20 L21 28 V23 H10.4 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/></symbol><symbol id="k-ungenau" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.6" style="fill:var(--k-ungenau, #E9B21B)" stroke="#fff" stroke-width="2.4"/><path d="M10.4 21.6 C13.4 15.4 16.9 15.4 20 20 C23.1 24.6 26.6 24.6 29.6 18.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.9"/></symbol><symbol id="k-fehler" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.6" style="fill:var(--k-fehler, #FF8B2C)" stroke="#fff" stroke-width="2.4"/><path d="M12.4 16.4 L20 24 L27.6 16.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.9"/></symbol><symbol id="k-verpasst" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.6" style="fill:var(--k-verpasst, #B266EA)" stroke="#fff" stroke-width="2.4"/><path d="M10.2 17.4 C14.8 24.8 25.2 24.8 29.8 17.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.4"/>
+      <path d="M14 22.6 L12 26.2 M20 24.4 V28.6 M26 22.6 L28 26.2" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"/></symbol><symbol id="k-patzer" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.6" style="fill:var(--k-patzer, #F0474B)" stroke="#fff" stroke-width="2.4"/><path d="M12.6 12.6 L20 19.8 L27.4 12.6 M12.6 19.4 L20 26.6 L27.4 19.4" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.6"/></symbol><symbol id="av-benno" viewBox="0 0 100 100"><defs><clipPath id="kreis-benno"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#7CC86B"/>
+  <g clip-path="url(#kreis-benno)">
+      <circle cx="18" cy="22" r="9" fill="#fff" opacity=".18"/><circle cx="84" cy="30" r="6" fill="#fff" opacity=".14"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#E25B4F"/>
+      <path d="M34 80 H66 V104 H34 Z" fill="#3E6FB0"/><path d="M36 79 L31 104 M64 79 L69 104" stroke="#2F5890" stroke-width="5"/>
+      <circle cx="40" cy="88" r="2.2" fill="#FFD25A"/><circle cx="60" cy="88" r="2.2" fill="#FFD25A"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#EDB892"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFD6B3"/><circle cx="72.6" cy="54" r="5.4" fill="#FFD6B3"/>
+  <circle cx="50" cy="52" r="23" fill="#FFD6B3"/>
+      <path d="M30 44 C29 50 31 52 33 52 M70 44 C71 50 69 52 67 52" stroke="#C9772E" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <ellipse cx="42" cy="53" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="51.9" r="1" fill="#fff"/><ellipse cx="58" cy="53" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="58.9" cy="51.9" r="1" fill="#fff"/>
+      <path d="M38 46.5 Q42 44.5 46 46.5 M54 46.5 Q58 44.5 62 46.5" stroke="#9A5A26" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.45"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.45"/>
+      <circle cx="33.5" cy="58" r=".9" fill="#C9772E"/><circle cx="36.5" cy="56.8" r=".9" fill="#C9772E"/><circle cx="66.5" cy="58" r=".9" fill="#C9772E"/><circle cx="63.5" cy="56.8" r=".9" fill="#C9772E"/>
+      <path d="M41.5 60.5 Q50 72 58.5 60.5 Z" fill="#7A2E2E"/>
+      <rect x="43.6" y="60.4" width="4.6" height="3.6" rx=".8" fill="#fff"/><rect x="51.8" y="60.4" width="4.6" height="3.6" rx=".8" fill="#fff"/>
+      <path d="M57 63 L78 56" stroke="#E9C447" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M76 56.6 L80 54 M76.6 57.8 L80.6 57.4" stroke="#E9C447" stroke-width="1.6" stroke-linecap="round"/>
+      <ellipse cx="50" cy="35" rx="34" ry="7.5" fill="#F2C94C" stroke="#D3A633" stroke-width="1.5"/>
+      <path d="M31 35 C31 19 38 13 50 13 C62 13 69 19 69 35 Z" fill="#F6D261" stroke="#D3A633" stroke-width="1.5"/>
+      <path d="M31.4 27.5 H68.6 V34 H31.4 Z" fill="#E25B4F"/>
+      <path d="M38 18 L40 26 M46 15 L46.5 26 M55 15 L54 26 M62 18 L60 26" stroke="#D9B13E" stroke-width="1.1" opacity=".7"/></g></symbol><symbol id="av-hilde" viewBox="0 0 100 100"><defs><clipPath id="kreis-hilde"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#F49CBB"/>
+  <g clip-path="url(#kreis-hilde)">
+      <circle cx="82" cy="20" r="8" fill="#fff" opacity=".2"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#8E63B0"/>
+      <path d="M38 77 L50 92 L62 77" fill="#F7F0FA"/>
+      <path d="M34 84 Q50 96 66 84" fill="none" stroke="#fff" stroke-width="3.2" stroke-dasharray=".1 4.6" stroke-linecap="round"/>
+      <circle cx="50" cy="48" r="27" fill="#D8D3E6"/>
+      <path d="M33 13 L66 33" stroke="#C0763A" stroke-width="2.4" stroke-linecap="round"/><circle cx="32.4" cy="12.6" r="2.6" fill="#FF7E5F"/>
+      <circle cx="50" cy="23" r="11.5" fill="#E2DEEE" stroke="#BDB6D1" stroke-width="1.5"/>
+      <path d="M43 19 Q50 15 57 20 M42 25 Q50 21 58 26" stroke="#BDB6D1" stroke-width="1.3" fill="none"/>
+      <path d="M38 33 L62 15" stroke="#C0763A" stroke-width="2.4" stroke-linecap="round"/><circle cx="62.6" cy="14.6" r="2.6" fill="#FF7E5F"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#EFBFA2"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFDCC4"/><circle cx="72.6" cy="54" r="5.4" fill="#FFDCC4"/>
+  <circle cx="50" cy="52" r="23" fill="#FFDCC4"/>
+      <path d="M26.6 52 C26 33 38 28 50 28.5 C62 28 74 33 73.4 52 C70 42 62 37.5 50 39 C38 37.5 30 42 26.6 52 Z" fill="#E2DEEE"/>
+      <path d="M36 37 Q44 34 50 39 Q56 34 64 37" stroke="#BDB6D1" stroke-width="1.3" fill="none"/>
+      <path d="M38.4 54.6 Q41 51.6 43.6 54.6 M56.4 54.6 Q59 51.6 61.6 54.6" stroke="#2A2238" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <circle cx="41" cy="54" r="7.2" fill="#fff" fill-opacity=".22" stroke="#7B4F9D" stroke-width="2.2"/>
+      <circle cx="59" cy="54" r="7.2" fill="#fff" fill-opacity=".22" stroke="#7B4F9D" stroke-width="2.2"/>
+      <path d="M48.2 53.6 Q50 51.8 51.8 53.6" stroke="#7B4F9D" stroke-width="2" fill="none"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.5"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.5"/>
+      <path d="M43.5 64 Q50 69.5 56.5 64" stroke="#A3474F" stroke-width="2.4" fill="none" stroke-linecap="round"/></g></symbol><symbol id="av-kalle" viewBox="0 0 100 100"><defs><clipPath id="kreis-kalle"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#F4A84A"/>
+  <g clip-path="url(#kreis-kalle)">
+      <circle cx="16" cy="70" r="7" fill="#fff" opacity=".16"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#2F6E8E"/>
+      <path d="M40 77 L50 89 L60 77 Z" fill="#F2EEE6"/><path d="M40 77 L46 90 M60 77 L54 90" stroke="#24566F" stroke-width="2"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#E0A47A"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#F4BE95"/><circle cx="72.6" cy="54" r="5.4" fill="#F4BE95"/>
+  <circle cx="50" cy="52" r="23" fill="#F4BE95"/>
+      <path d="M33 66 Q50 82 67 66" fill="#E7AE84" opacity=".55"/>
+      <path d="M35.5 46.8 L46.5 49.6 M64.5 46.8 L53.5 49.6" stroke="#6E4426" stroke-width="3.4" stroke-linecap="round"/>
+      <ellipse cx="42" cy="54" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="52.9" r="1" fill="#fff"/><ellipse cx="58" cy="54" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="58.9" cy="52.9" r="1" fill="#fff"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.3"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.3"/>
+      <circle cx="50" cy="59.5" r="5.2" fill="#E5675A"/><circle cx="48.4" cy="58" r="1.4" fill="#fff" opacity=".6"/>
+      <path d="M44 68.4 Q50 74 56 68.4" stroke="#6E2A2A" stroke-width="2.4" fill="#8C3A3A" stroke-linecap="round"/>
+      <path d="M36.5 66.5 C40 61.5 46 62 50 65.2 C54 62 60 61.5 63.5 66.5 C59 69.2 54 68.8 50 67.2 C46 68.8 41 69.2 36.5 66.5 Z" fill="#7A4B2A"/>
+      <path d="M24.5 44.5 C24.5 28 36 23 51 23 C66 23 76.5 29 77.5 40 L87 45 C72 50.5 40 50 24.5 44.5 Z" fill="#6B5747"/>
+      <path d="M51 23.5 C50 30 50 38 51 47 M25 44.5 C40 41 62 41 78 41.5" stroke="#584536" stroke-width="1.4" fill="none"/>
+      <circle cx="51" cy="24.2" r="2.3" fill="#584536"/>
+      <g transform="rotate(-8 78 84)">
+        <rect x="69" y="74" width="16" height="20" rx="2.5" fill="#F7C948" stroke="#fff" stroke-width="1.5"/>
+        <path d="M85 78 C91 78 91 89 85 89" stroke="#fff" stroke-width="2.4" fill="none"/>
+        <circle cx="71.5" cy="74" r="3.6" fill="#fff"/><circle cx="76.5" cy="72.6" r="4" fill="#fff"/><circle cx="82" cy="74" r="3.4" fill="#fff"/>
+        <path d="M74 80 V90 M79.5 80 V90" stroke="#E0A92A" stroke-width="1.4"/>
+      </g></g></symbol><symbol id="av-lisa" viewBox="0 0 100 100"><defs><clipPath id="kreis-lisa"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#5BB6F0"/>
+  <g clip-path="url(#kreis-lisa)">
+      <circle cx="16" cy="24" r="6" fill="#fff" opacity=".2"/>
+      <path d="M68 33 C86 27 95 44 88 64 C86 52 79 44 70 42 Z" fill="#8B4A2B"/>
+      <circle cx="70" cy="35" r="4" fill="#FF6F91"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#FF7A59"/>
+      <path d="M44 80 V92 M56 80 V92" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="44" cy="93" r="1.8" fill="#fff"/><circle cx="56" cy="93" r="1.8" fill="#fff"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#F2C3A3"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFE0C7"/><circle cx="72.6" cy="54" r="5.4" fill="#FFE0C7"/>
+  <circle cx="50" cy="52" r="23" fill="#FFE0C7"/>
+      <path d="M26.6 53 C25.5 33 37 26.5 50 26.5 C64 26.5 75 33 73.4 51 C70 43 63 38.5 56 37 C51 42 41 44.5 33 43.5 C30 46 28 49 26.6 53 Z" fill="#8B4A2B"/>
+      <path d="M58.5 31 L60.1 34.6 L64 35 L61 37.6 L61.9 41.4 L58.5 39.4 L55.1 41.4 L56 37.6 L53 35 L56.9 34.6 Z" fill="#FFD23F" stroke="#E0A92A" stroke-width=".8"/>
+      <ellipse cx="42" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="52.4" r="1" fill="#fff"/><ellipse cx="58" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="58.9" cy="52.4" r="1" fill="#fff"/>
+      <path d="M37.5 47 Q42 44.5 46 46.6 M54 46.6 Q58 44.5 62.5 47" stroke="#6B3720" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.42"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.42"/>
+      <circle cx="34" cy="57.4" r=".9" fill="#B5652F"/><circle cx="37" cy="58.6" r=".9" fill="#B5652F"/><circle cx="66" cy="57.4" r=".9" fill="#B5652F"/><circle cx="63" cy="58.6" r=".9" fill="#B5652F"/>
+      <path d="M41.5 61 Q50 72 58.5 61 Z" fill="#7A2E2E"/><path d="M42.6 61 H57.4 L56.6 63.6 H43.4 Z" fill="#fff"/>
+      <path d="M50 81.5 C47.6 81.5 46 84 46 86.4 C46 88 47 89 47.6 89.6 H52.4 C53 89 54 88 54 86.4 C54 84 52.4 81.5 50 81.5 Z M45 91 H55" fill="#fff" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle cx="50" cy="80" r="1.3" fill="#fff"/><path d="M50.8 83 L48.8 86" stroke="#FF7A59" stroke-width="1.1"/></g></symbol><symbol id="av-rudi" viewBox="0 0 100 100"><defs><clipPath id="kreis-rudi"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#3FBF9F"/>
+  <g clip-path="url(#kreis-rudi)">
+      <circle cx="84" cy="70" r="7" fill="#fff" opacity=".16"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#AEB8C4"/>
+      <path d="M22 92 C30 84 40 81 50 81 C60 81 70 84 78 92" stroke="#8A95A3" stroke-width="1.6" fill="none"/>
+      <path d="M44 85 V90 A6 6 0 0 0 56 90 V85" fill="none" stroke="#FFC83D" stroke-width="3.2" stroke-linecap="round"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#EDB892"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFD7B5"/><circle cx="72.6" cy="54" r="5.4" fill="#FFD7B5"/>
+  <circle cx="50" cy="52" r="23" fill="#FFD7B5"/>
+      <path d="M50 23 C46 10 56 2 70 5 C62 8 58 14 57 23 Z" fill="#EF5B5B"/>
+      <path d="M53 21 C53 13 58 9 64 8" stroke="#C8434A" stroke-width="1.3" fill="none"/>
+      <path d="M23.5 66 C21 34 33 21.5 50 21.5 C67 21.5 79 34 76.5 66 L69 66 C70 47 62 41 50 41 C38 41 30 47 31 66 Z" fill="#C6CFD8" stroke="#8A95A3" stroke-width="1.5"/>
+      <path d="M27 36 C33 27.5 67 27.5 73 36 L73 42 C65 35.5 35 35.5 27 42 Z" fill="#9EA9B6" stroke="#8A95A3" stroke-width="1.2"/>
+      <path d="M38 33.6 H44 M47 33 H53 M56 33.6 H62" stroke="#6F7A88" stroke-width="1.6" stroke-linecap="round"/>
+      <ellipse cx="42" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="52.4" r="1" fill="#fff"/><ellipse cx="58" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="58.9" cy="52.4" r="1" fill="#fff"/>
+      <path d="M37.5 46.4 Q42 44 46 46 M54 46 Q58 44 62.5 46.4" stroke="#7A4B2A" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.4"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.4"/>
+      <path d="M42 62.4 C45 60.4 48 61 50 62.4 C52 61 55 60.4 58 62.4 C55 63.8 52 63.6 50 63 C48 63.6 45 63.8 42 62.4 Z" fill="#9A5A26"/>
+      <path d="M43.5 65.5 Q50 71.5 56.5 65.5" stroke="#7A2E2E" stroke-width="2.4" fill="none" stroke-linecap="round"/></g></symbol><symbol id="av-turm" viewBox="0 0 100 100"><defs><clipPath id="kreis-turm"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#9C7EEA"/>
+  <g clip-path="url(#kreis-turm)">
+      <circle cx="16" cy="30" r="6" fill="#fff" opacity=".18"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#6B5A4E"/>
+      <path d="M41 77 L50 90 L59 77 Z" fill="#F7F3EA"/>
+      <path d="M50 81.5 L42 77.5 V85.5 Z M50 81.5 L58 77.5 V85.5 Z" fill="#E8505B"/><circle cx="50" cy="81.5" r="2.2" fill="#C83E49"/>
+      <path d="M36 80 L44 98 M64 80 L56 98" stroke="#5A4A3F" stroke-width="2"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#EFBE9E"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFDCC0"/><circle cx="72.6" cy="54" r="5.4" fill="#FFDCC0"/>
+  <circle cx="50" cy="52" r="23" fill="#FFDCC0"/>
+      <circle cx="27.5" cy="46" r="5" fill="#F4F2FA"/><circle cx="25.5" cy="52" r="5.5" fill="#F4F2FA"/><circle cx="27.5" cy="58" r="4.5" fill="#F4F2FA"/>
+      <circle cx="72.5" cy="46" r="5" fill="#F4F2FA"/><circle cx="74.5" cy="52" r="5.5" fill="#F4F2FA"/><circle cx="72.5" cy="58" r="4.5" fill="#F4F2FA"/>
+      <path d="M29.5 37 H70.5 V31 H29.5 Z" fill="#2F2858"/>
+      <path d="M33.5 31 H66.5 V15.5 H33.5 Z" fill="#3E3570"/>
+      <path d="M33.5 15.5 V9 H40 V12.4 H46.8 V9 H53.2 V12.4 H60 V9 H66.5 V15.5 Z" fill="#3E3570"/>
+      <path d="M33.5 26 H66.5 V29 H33.5 Z" fill="#FFC83D"/>
+      <path d="M45 18.5 H55 M47 22 H53" stroke="#5B4F98" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M36.5 46 Q41 42.6 46 45.2 M54 44.2 Q58.8 41 63.5 43.8" stroke="#F4F2FA" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+      <ellipse cx="41.2" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.1" cy="52.4" r="1" fill="#fff"/><ellipse cx="58.8" cy="53.5" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="59.699999999999996" cy="52.4" r="1" fill="#fff"/>
+      <rect x="34.4" y="48.4" width="13.4" height="10.4" rx="3" fill="#fff" fill-opacity=".18" stroke="#2A2238" stroke-width="2"/>
+      <rect x="52.2" y="48.4" width="13.4" height="10.4" rx="3" fill="#fff" fill-opacity=".18" stroke="#2A2238" stroke-width="2"/>
+      <path d="M47.8 52 Q50 50.4 52.2 52" stroke="#2A2238" stroke-width="1.8" fill="none"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.32"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.32"/>
+      <path d="M43 63 Q50 61 57 63 C55 66 45 66 43 63 Z" fill="#F4F2FA"/>
+      <path d="M44.5 67 Q51 70.6 56 66.4" stroke="#8C4A4A" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <path d="M46.5 71 Q50 76.5 53.5 71 Z" fill="#F4F2FA"/></g></symbol><symbol id="av-delia" viewBox="0 0 100 100"><defs><clipPath id="kreis-delia"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#E9566E"/>
+  <g clip-path="url(#kreis-delia)">
+      <circle cx="84" cy="26" r="7" fill="#fff" opacity=".16"/>
+      <path d="M17 76 C10 44 27 22 50 22 C73 22 90 44 83 76 C77 70 73 64 71 56 L29 56 C27 64 23 70 17 76 Z" fill="#5A1E36"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#6B1E3A"/>
+      <path d="M38 77.5 L50 94 L62 77.5" fill="#F6CDB0"/>
+      <path d="M40 79 Q50 90 60 79" fill="none" stroke="#FFC83D" stroke-width="1.8"/><circle cx="50" cy="88.6" r="2.6" fill="#FFC83D"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#E5B391"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#F6CDB0"/><circle cx="72.6" cy="54" r="5.4" fill="#F6CDB0"/>
+  <circle cx="50" cy="52" r="23" fill="#F6CDB0"/>
+      <circle cx="27.4" cy="61.5" r="2.6" fill="#FFC83D"/><circle cx="72.6" cy="61.5" r="2.6" fill="#FFC83D"/>
+      <path d="M26.6 52 C26 32 40 25.5 53 26.5 C66 27.5 75 37 73.4 51 C69 41 61 36.5 52.5 38.5 C46 33.5 34 39 26.6 52 Z" fill="#6E2442"/>
+      <path d="M52 38 C46 34 40 36 35 41" stroke="#8C3556" stroke-width="1.6" fill="none"/>
+      <path d="M34.5 31 L37 20.5 L43.2 27.2 L50 15.6 L56.8 27.2 L63 20.5 L65.5 31 Z" fill="#FFC83D" stroke="#E0A21C" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle cx="50" cy="25" r="2.2" fill="#5BB6F0"/><circle cx="41" cy="28.4" r="1.4" fill="#E9566E"/><circle cx="59" cy="28.4" r="1.4" fill="#E9566E"/>
+      <ellipse cx="42" cy="53.6" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="52.5" r="1" fill="#fff"/>
+      <path d="M38.6 50.2 L36.8 48.6 M40.6 49.4 L39.6 47.4" stroke="#2A2238" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M54.4 54.2 Q58 50.8 61.6 54.2" stroke="#2A2238" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M61.4 54 L63.6 52.8" stroke="#2A2238" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M37.4 46.2 Q42 43.4 46 45.6 M54.4 45.2 Q58.6 42.4 63 44.8" stroke="#4A1A2E" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.42"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.42"/>
+      <path d="M43.2 63.4 C46 62 48.6 62.6 50.6 63.4 C53 62 56 62 58.6 61 C57 66 53 68.4 49.6 68 C46.4 67.6 44.4 65.8 43.2 63.4 Z" fill="#C8102E"/>
+      <path d="M44 63.6 Q51 65.4 58 61.6" stroke="#8E0B21" stroke-width="1" fill="none"/></g></symbol><symbol id="av-koenig" viewBox="0 0 100 100"><defs><clipPath id="kreis-koenig"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#3C8C99"/>
+  <g clip-path="url(#kreis-koenig)">
+      <circle cx="16" cy="28" r="7" fill="#fff" opacity=".14"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#C9A66B"/>
+      <path d="M44 77 L50 84 L56 77 L54 104 H46 Z" fill="#3B3A4A"/>
+      <path d="M29 82 L41 75 L47 98 L31 104 Z M71 82 L59 75 L53 98 L69 104 Z" fill="#B8945A"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#DAA67F"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#EDC29C"/><circle cx="72.6" cy="54" r="5.4" fill="#EDC29C"/>
+  <circle cx="50" cy="52" r="23" fill="#EDC29C"/>
+      <path d="M36 48 Q41.5 45.5 47 47.4 M53 47.4 Q58.5 45.5 64 48" stroke="#4A3428" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <ellipse cx="42" cy="54" rx="3" ry="2.6" fill="#2A2238"/><ellipse cx="58" cy="54" rx="3" ry="2.6" fill="#2A2238"/>
+      <path d="M37.6 52.6 H46.4 M53.6 52.6 H62.4" stroke="#DAA67F" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M37.8 53.6 H46.2 M53.8 53.6 H62.2" stroke="#4A3428" stroke-width="1.3" stroke-linecap="round"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.25"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.25"/>
+      <path d="M48.6 56 Q50 60 51.8 59.4" stroke="#C98E68" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M40.6 64.4 C44 61.4 56 61.4 59.4 64.4 C55 65.8 45 65.8 40.6 64.4 Z" fill="#4A3428"/>
+      <path d="M45.5 68.6 H54.5" stroke="#8C4A4A" stroke-width="2.2" stroke-linecap="round"/>
+      <ellipse cx="50" cy="37" rx="33" ry="6.8" fill="#3B3A4A"/>
+      <path d="M31.5 37.5 C31.5 22 39.5 17.5 50 19.5 C60.5 17.5 68.5 22 68.5 37.5 Z" fill="#45445A"/>
+      <path d="M44 20 Q50 25 56 20" stroke="#32313F" stroke-width="1.6" fill="none"/>
+      <path d="M31.6 31.5 H68.4 V36.6 H31.6 Z" fill="#C9A227"/>
+      <path d="M58.6 31 L59.6 26.6 L61.6 29 L63 25.6 L64.4 29 L66.4 26.6 L67.4 31 Z" fill="#FFC83D"/>
+      <g transform="rotate(-24 76 84)">
+        <path d="M76 93 V104" stroke="#6B5A3A" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="76" cy="83" r="9.5" fill="#D9F3FF" fill-opacity=".7" stroke="#8C7A55" stroke-width="3.4"/>
+        <path d="M71.5 80 Q74 77 77 77.4" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </g></g></symbol><symbol id="av-greta" viewBox="0 0 100 100"><defs><clipPath id="kreis-greta"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#4B5BD6"/>
+  <g clip-path="url(#kreis-greta)">
+      <circle cx="84" cy="74" r="6" fill="#fff" opacity=".14"/><circle cx="18" cy="22" r="1.6" fill="#fff" opacity=".7"/><circle cx="82" cy="18" r="1.2" fill="#fff" opacity=".7"/>
+      <path d="M22.5 70 C18 38 31 23 50 23 C69 23 82 38 77.5 70 Z" fill="#1D1A2B"/>
+      <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#22202E"/>
+      <path d="M38 76 C40 81 60 81 62 76 L62 72 H38 Z" fill="#2E2B3E"/>
+      <path d="M40 90 L42.5 85 L46 88.4 L50 83.4 L54 88.4 L57.5 85 L60 90 Z" fill="#FFC83D"/>
+      <rect x="44" y="66" width="12" height="13" rx="4" fill="#8F5A3D"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#A86B4A"/><circle cx="72.6" cy="54" r="5.4" fill="#A86B4A"/>
+  <circle cx="50" cy="52" r="23" fill="#A86B4A"/>
+      <circle cx="27.2" cy="61" r="1.8" fill="#FFC83D"/><circle cx="72.8" cy="61" r="1.8" fill="#FFC83D"/>
+      <path d="M26.8 56 C24.6 34 36 25.5 50 25.5 C64 25.5 75.4 34 73.2 56 L70.4 56 C71 48 69.6 43 67 41.6 C60 44 40 44 33 41.6 C30.4 43 29 48 29.6 56 Z" fill="#1D1A2B"/>
+      <path d="M36 47 Q41 44.6 46 46 M54 45.2 Q59.4 42.2 64.4 44.4" stroke="#1D1A2B" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      <ellipse cx="41.6" cy="53.6" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.5" cy="52.5" r="1" fill="#fff"/><ellipse cx="58.4" cy="53.6" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="59.3" cy="52.5" r="1" fill="#fff"/>
+      <path d="M33.6 51.6 Q35 48.6 41.6 49 Q47.6 49.4 48 53 Q47.4 58.6 41.6 58.6 Q35.4 58.4 33.6 51.6 Z M66.4 51.6 Q65 48.6 58.4 49 Q52.4 49.4 52 53 Q52.6 58.6 58.4 58.6 Q64.6 58.4 66.4 51.6 Z" fill="#fff" fill-opacity=".14" stroke="#FFC83D" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M48 52.4 Q50 51 52 52.4" stroke="#FFC83D" stroke-width="1.6" fill="none"/>
+      <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.22"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.22"/>
+      <path d="M44.6 64.6 Q50.6 68.4 56 63.6" stroke="#5E2020" stroke-width="2.4" fill="none" stroke-linecap="round"/></g></symbol><symbol id="av-stockfisch" viewBox="0 0 100 100"><defs><clipPath id="kreis-stockfisch"><circle cx="50" cy="50" r="50"/></clipPath><radialGradient id="see-stockfisch" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#2A6CC4"/><stop offset=".7" stop-color="#123F86"/><stop offset="1" stop-color="#0A2556"/></radialGradient></defs>
+  <circle cx="50" cy="50" r="50" fill="url(#see-stockfisch)"/>
+  <g clip-path="url(#kreis-stockfisch)">
+      <circle cx="20" cy="22" r="3.4" fill="none" stroke="#9FE8FF" stroke-width="1.3" opacity=".7"/>
+      <circle cx="28" cy="13" r="2" fill="none" stroke="#9FE8FF" stroke-width="1.1" opacity=".6"/>
+      <circle cx="80" cy="84" r="2.6" fill="none" stroke="#9FE8FF" stroke-width="1.2" opacity=".5"/>
+      <path d="M8 92 C20 86 30 98 44 92 S70 86 92 94 V104 H8 Z" fill="#0A2556" opacity=".7"/>
+      <path d="M73 52 L92 36 C89 49 89 61 92 74 L73 60 Z" fill="#7D97B0" stroke="#5F7B96" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M14 56 C20 37 50 31 74 46 C78 50 78 58 74 62 C50 80 20 76 14 56 Z" fill="#A3BACE" stroke="#6E8AA3" stroke-width="1.6"/>
+      <path d="M18 60 C32 70 54 71 70 61 C54 67 32 67 18 60 Z" fill="#DCE7EF"/>
+      <circle cx="52" cy="50" r="1.6" fill="#7D97B0"/><circle cx="58" cy="54" r="1.4" fill="#7D97B0"/><circle cx="62" cy="48" r="1.5" fill="#7D97B0"/><circle cx="47" cy="44" r="1.3" fill="#7D97B0"/>
+      <path d="M46 46 C42 52 42 59 46 65" stroke="#6E8AA3" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <path d="M50 68 L58 78 L60 66 Z" fill="#7D97B0"/>
+      <circle cx="31" cy="50" r="9.4" fill="#5FF3FF" opacity=".28"/>
+      <circle cx="31" cy="50" r="7" fill="#fff" stroke="#2A2238" stroke-width="1.4"/>
+      <circle cx="29.2" cy="50.8" r="3.6" fill="#0F1530"/><circle cx="28" cy="49.4" r="1.2" fill="#fff"/>
+      <path d="M22 40.8 L39.6 45.6" stroke="#1B2140" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M14.6 57.4 L25 57.6" stroke="#2A2238" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M16 57.6 L17.4 60.2 L18.8 57.6 L20.2 60.2 L21.6 57.6 L23 60.2 L24.4 57.6" fill="#fff" stroke="#fff" stroke-width=".8" stroke-linejoin="round"/>
+      <g transform="rotate(-12 50 30)">
+        <path d="M38 36 L40 24 L45.4 30.6 L50 21 L54.6 30.6 L60 24 L62 36 Z" fill="#FFC83D" stroke="#E0A21C" stroke-width="1.3" stroke-linejoin="round"/>
+        <circle cx="50" cy="31.6" r="2" fill="#E9566E"/>
+      </g></g></symbol><symbol id="av-du" viewBox="0 0 100 100"><defs><clipPath id="kreis-du"><circle cx="50" cy="50" r="50"/></clipPath></defs>
+  <circle cx="50" cy="50" r="50" fill="#FFC83D"/>
+  <g clip-path="url(#kreis-du)">
+  <circle cx="82" cy="24" r="7" fill="#fff" opacity=".25"/>
+  <path d="M13 104 C14 84 30 76.5 50 76.5 C70 76.5 86 84 87 104 Z" fill="#8E9A5B"/>
+  <path d="M38 76 L50 86 L62 76 L56 92 L50 88 L44 92 Z" fill="#E8505B"/>
+  <rect x="44" y="66" width="12" height="13" rx="4" fill="#EDB892"/>
+  <circle cx="27.4" cy="54" r="5.4" fill="#FFD9B8"/><circle cx="72.6" cy="54" r="5.4" fill="#FFD9B8"/>
+  <circle cx="50" cy="52" r="23" fill="#FFD9B8"/>
+  <path d="M28 50 C27 42 31 38 36 38 M72 50 C73 42 69 38 64 38" stroke="#7A4524" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <ellipse cx="42" cy="54" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="42.9" cy="52.9" r="1" fill="#fff"/><ellipse cx="58" cy="54" rx="2.7" ry="3.3" fill="#2A2238"/><circle cx="58.9" cy="52.9" r="1" fill="#fff"/>
+  <circle cx="35.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.45"/><circle cx="64.5" cy="60.5" r="4.2" fill="#FF6F86" opacity="0.45"/>
+  <path d="M43 62 Q50 70 57 62" stroke="#7A2E2E" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <ellipse cx="50" cy="39" rx="31" ry="6.5" fill="#B88A4E"/>
+  <path d="M30 39 C30 24 38 17 50 17 C62 17 70 24 70 39 Z" fill="#D4A762"/>
+  <path d="M30.4 33 H69.6 V38.4 H30.4 Z" fill="#7A5A2E"/>
+  <path d="M50 18 V33" stroke="#C0924F" stroke-width="1.4"/></g></symbol><symbol id="av-ella" viewBox="0 0 100 100">
+  <path d="M26 30 L33 14 L41 27 Z M74 30 L67 14 L59 27 Z" fill="#9A6A42"/>
+  <ellipse cx="50" cy="58" rx="30" ry="34" fill="#B5835A"/>
+  <ellipse cx="50" cy="68" rx="19" ry="21" fill="#F2DDBF"/>
+  <path d="M40 62 q3 3 6 0 M48 70 q3 3 6 0 M54 62 q3 3 6 0 M42 78 q3 3 6 0 M52 80 q3 3 6 0" stroke="#D2B48C" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  <circle cx="38" cy="42" r="12" fill="#fff" stroke="#9A6A42" stroke-width="2.4"/><circle cx="62" cy="42" r="12" fill="#fff" stroke="#9A6A42" stroke-width="2.4"/>
+  <circle cx="39.5" cy="43" r="5.4" fill="#2A2238"/><circle cx="60.5" cy="43" r="5.4" fill="#2A2238"/>
+  <circle cx="41" cy="41.2" r="1.7" fill="#fff"/><circle cx="62" cy="41.2" r="1.7" fill="#fff"/>
+  <path d="M45.5 52 L50 59 L54.5 52 Z" fill="#FF9F1C"/>
+  <path d="M22 60 C14 70 18 84 28 88 C26 78 26 68 30 62 Z M78 60 C86 70 82 84 72 88 C74 78 74 68 70 62 Z" fill="#9A6A42"/>
+  <path d="M40 92 v5 M46 93 v5 M54 93 v5 M60 92 v5" stroke="#FF9F1C" stroke-width="2.6" stroke-linecap="round"/></symbol><symbol id="i-hinweis" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.8.6 1.1 1.3 1.1 2.2h5c0-.9.3-1.6 1.1-2.2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-zurueck" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-drehen" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-aufgeben" viewBox="0 0 24 24"><path d="M5 21V4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 4h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-zahnrad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9"/></symbol><symbol id="i-karte" viewBox="0 0 24 24"><path d="M9 4L3 6.5v13.5L9 17.5l6 2.5 6-2.5V4L15 6.5 9 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 4v13.5M15 6.5V20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-verlauf" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"/></symbol><symbol id="i-schloss_offen" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6"/></symbol><symbol id="i-stern" viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5-4.7-4.6 6.5-.9z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol><symbol id="i-anfang" viewBox="0 0 24 24"><path d="M6 5v14M18 5l-8 7 8 7z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/></symbol><symbol id="i-vor" viewBox="0 0 24 24"><path d="M8 5l9 7-9 7z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/></symbol><symbol id="i-rueck" viewBox="0 0 24 24"><path d="M16 5l-9 7 9 7z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/></symbol><symbol id="i-ende" viewBox="0 0 24 24"><path d="M18 5v14M6 5l8 7-8 7z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/></symbol><symbol id="i-nochmal" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 15.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-pfeil_rechts" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-pfeil_links" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-analyse" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 15l4-5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-kompass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.5 8.5l-2 5-5 2 2-5z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol><symbol id="i-zufall" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="15" cy="15" r="1.4" fill="currentColor"/><circle cx="15" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></symbol><symbol id="i-klang" viewBox="0 0 24 24"><path d="M4 9.5v5h4l5 4V5.5l-5 4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol></defs></svg>
+
+<!-- ================= 1. Reisekarte (Bot-Leiter) ================= -->
+<section id="leiter" class="screen leiter" aria-label="Reisekarte">
+  <header class="l-kopf">
+    <div class="logo">
+      <div class="logo-zeichen"><img src="../../assets/pieces/wN.svg" alt=""></div>
+      <div><b>Schach-Reise</b><small>Von Bauer Benno bis zum Stockfisch</small></div>
+    </div>
+    <div class="l-stats">
+      <span class="chip"><svg class="gold"><use href="#i-stern"/></svg><b class="zahlen">9</b>/ 30 Sterne</span>
+      <span class="chip"><b class="zahlen">4</b> Siege</span>
+      <span class="chip"><svg><use href="#i-kompass"/></svg>Stärke <b class="zahlen">≈ 1150</b></span>
+    </div>
+    <div class="l-knoepfe">
+      <a class="ikon-knopf" href="#analyse" aria-label="Verlauf"><svg><use href="#i-verlauf"/></svg></a>
+      <a class="ikon-knopf" href="#stil" aria-label="Einstellungen"><svg><use href="#i-zahnrad"/></svg></a>
+    </div>
+  </header>
+
+  <div class="karten-rahmen">
+    <svg class="weltkarte" viewBox="0 0 1000 900" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Reisekarte mit zehn Stationen">
+  <defs>
+    <radialGradient id="tief" cx="88%" cy="18%" r="45%"><stop offset="0" stop-color="#173F8A"/><stop offset=".55" stop-color="#2463AE"/><stop offset="1" stop-color="#2F86C8" stop-opacity="0"/></radialGradient>
+    <radialGradient id="licht" cx="40%" cy="45%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="grau"><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope=".9"/><feFuncG type="linear" slope=".9"/><feFuncB type="linear" slope="1"/></feComponentTransfer></filter>
+    <filter id="schatten" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#0B1430" flood-opacity=".35"/></filter>
+    <pattern id="acker" width="34" height="34" patternUnits="userSpaceOnUse"><rect width="34" height="34" fill="#B6DD7C"/><rect width="17" height="17" fill="#86BF57"/><rect x="17" y="17" width="17" height="17" fill="#86BF57"/></pattern>
+  </defs>
+  <rect width="1000" height="900" fill="#3A9AD3"/>
+  <rect width="1000" height="900" fill="url(#tief)"/>
+  <path d="M820 470 q8 -7 16 0 q8 -7 16 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M880 560 q6.4 -5.6000000000000005 12.8 0 q6.4 -5.6000000000000005 12.8 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M850 700 q8 -7 16 0 q8 -7 16 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M920 380 q5.6 -4.8999999999999995 11.2 0 q5.6 -4.8999999999999995 11.2 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M30 120 q6.4 -5.6000000000000005 12.8 0 q6.4 -5.6000000000000005 12.8 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M940 820 q6.4 -5.6000000000000005 12.8 0 q6.4 -5.6000000000000005 12.8 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M70 50 q4.8 -4.2 9.6 0 q4.8 -4.2 9.6 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/><path d="M900 290 q4.8 -4.2 9.6 0 q4.8 -4.2 9.6 0" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.35"/>
+  <path d="M95.0,862.0 C65.7,830.7 50.2,757.0 44.0,700.0 C37.8,643.0 49.3,573.3 58.0,520.0 C66.7,466.7 92.7,425.0 96.0,380.0 C99.3,335.0 69.0,290.3 78.0,250.0 C87.0,209.7 118.0,167.7 150.0,138.0 C182.0,108.3 225.0,85.7 270.0,72.0 C315.0,58.3 370.7,59.3 420.0,56.0 C469.3,52.7 522.0,47.0 566.0,52.0 C610.0,57.0 655.7,66.7 684.0,86.0 C712.3,105.3 732.3,138.7 736.0,168.0 C739.7,197.3 704.0,230.0 706.0,262.0 C708.0,294.0 733.3,325.3 748.0,360.0 C762.7,394.7 784.3,429.3 794.0,470.0 C803.7,510.7 809.3,560.0 806.0,604.0 C802.7,648.0 793.3,695.7 774.0,734.0 C754.7,772.3 729.0,810.0 690.0,834.0 C651.0,858.0 593.0,871.7 540.0,878.0 C487.0,884.3 425.3,870.3 372.0,872.0 C318.7,873.7 266.2,889.7 220.0,888.0 C173.8,886.3 124.3,893.3 95.0,862.0Z" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="46" stroke-linejoin="round"/>
+  <path d="M95.0,862.0 C65.7,830.7 50.2,757.0 44.0,700.0 C37.8,643.0 49.3,573.3 58.0,520.0 C66.7,466.7 92.7,425.0 96.0,380.0 C99.3,335.0 69.0,290.3 78.0,250.0 C87.0,209.7 118.0,167.7 150.0,138.0 C182.0,108.3 225.0,85.7 270.0,72.0 C315.0,58.3 370.7,59.3 420.0,56.0 C469.3,52.7 522.0,47.0 566.0,52.0 C610.0,57.0 655.7,66.7 684.0,86.0 C712.3,105.3 732.3,138.7 736.0,168.0 C739.7,197.3 704.0,230.0 706.0,262.0 C708.0,294.0 733.3,325.3 748.0,360.0 C762.7,394.7 784.3,429.3 794.0,470.0 C803.7,510.7 809.3,560.0 806.0,604.0 C802.7,648.0 793.3,695.7 774.0,734.0 C754.7,772.3 729.0,810.0 690.0,834.0 C651.0,858.0 593.0,871.7 540.0,878.0 C487.0,884.3 425.3,870.3 372.0,872.0 C318.7,873.7 266.2,889.7 220.0,888.0 C173.8,886.3 124.3,893.3 95.0,862.0Z" fill="#98CD66" stroke="#F2DCA0" stroke-width="24" stroke-linejoin="round"/>
+  <path d="M95.0,862.0 C65.7,830.7 50.2,757.0 44.0,700.0 C37.8,643.0 49.3,573.3 58.0,520.0 C66.7,466.7 92.7,425.0 96.0,380.0 C99.3,335.0 69.0,290.3 78.0,250.0 C87.0,209.7 118.0,167.7 150.0,138.0 C182.0,108.3 225.0,85.7 270.0,72.0 C315.0,58.3 370.7,59.3 420.0,56.0 C469.3,52.7 522.0,47.0 566.0,52.0 C610.0,57.0 655.7,66.7 684.0,86.0 C712.3,105.3 732.3,138.7 736.0,168.0 C739.7,197.3 704.0,230.0 706.0,262.0 C708.0,294.0 733.3,325.3 748.0,360.0 C762.7,394.7 784.3,429.3 794.0,470.0 C803.7,510.7 809.3,560.0 806.0,604.0 C802.7,648.0 793.3,695.7 774.0,734.0 C754.7,772.3 729.0,810.0 690.0,834.0 C651.0,858.0 593.0,871.7 540.0,878.0 C487.0,884.3 425.3,870.3 372.0,872.0 C318.7,873.7 266.2,889.7 220.0,888.0 C173.8,886.3 124.3,893.3 95.0,862.0Z" fill="url(#licht)"/>
+  <!-- Wiesental: Schachbrett-Aecker -->
+  <g transform="rotate(-9 250 690)"><rect x="196" y="640" width="136" height="85" rx="10" fill="url(#acker)" opacity=".95"/></g>
+  <!-- See -->
+  <ellipse cx="430" cy="615" rx="70" ry="36" fill="#5CC0EA" stroke="#F2DCA0" stroke-width="8"/>
+  <path d="M398 610 q10 -6 20 0 M440 624 q10 -6 20 0" stroke="#fff" stroke-width="3" fill="none" opacity=".6" stroke-linecap="round"/>
+  <!-- Berge -->
+  <g>
+    <path d="M378 300 L455 160 L520 270 Z" fill="#9C8FC9"/><path d="M455 160 L433 200 L446 196 L456 206 L468 194 L476 198 Z" fill="#fff"/>
+    <path d="M590 290 L640 175 L700 280 Z" fill="#8F82BD"/><path d="M640 175 L625 210 L640 204 L654 212 Z" fill="#fff"/>
+    <path d="M430 290 L522 96 L620 290 Z" fill="#A99DD6"/><path d="M522 96 L497 148 L512 142 L524 156 L538 142 L549 152 Z" fill="#fff"/>
+    <path d="M522 96 L620 290 L560 290 Z" fill="#8C7FBF" opacity=".55"/>
+  </g>
+  <!-- Waelder -->
+  <g transform="translate(652 330)"><rect x="-3" y="11" width="6" height="14" rx="2" fill="#7A5233"/><circle r="20" fill="#4E9A50"/><circle cx="-6" cy="-6" r="9" fill="#67B562"/></g><g transform="translate(690 360)"><rect x="-3" y="9.350000000000001" width="6" height="11.899999999999999" rx="2" fill="#7A5233"/><circle r="17" fill="#4E9A50"/><circle cx="-5.1" cy="-5.1" r="7.65" fill="#67B562"/></g><g transform="translate(716 318)"><rect x="-3" y="8.8" width="6" height="11.2" rx="2" fill="#7A5233"/><circle r="16" fill="#4E9A50"/><circle cx="-4.8" cy="-4.8" r="7.2" fill="#67B562"/></g><g transform="translate(672 292)"><rect x="-3" y="8.25" width="6" height="10.5" rx="2" fill="#7A5233"/><circle r="15" fill="#4E9A50"/><circle cx="-4.5" cy="-4.5" r="6.75" fill="#67B562"/></g><g transform="translate(96 480)"><rect x="-3" y="10.450000000000001" width="6" height="13.299999999999999" rx="2" fill="#7A5233"/><circle r="19" fill="#4E9A50"/><circle cx="-5.7" cy="-5.7" r="8.55" fill="#67B562"/></g><g transform="translate(128 512)"><rect x="-3" y="8.8" width="6" height="11.2" rx="2" fill="#7A5233"/><circle r="16" fill="#4E9A50"/><circle cx="-4.8" cy="-4.8" r="7.2" fill="#67B562"/></g><g transform="translate(84 540)"><rect x="-3" y="8.25" width="6" height="10.5" rx="2" fill="#7A5233"/><circle r="15" fill="#4E9A50"/><circle cx="-4.5" cy="-4.5" r="6.75" fill="#67B562"/></g><g transform="translate(432 346)"><rect x="-3" y="9.350000000000001" width="6" height="11.899999999999999" rx="2" fill="#7A5233"/><circle r="17" fill="#4E9A50"/><circle cx="-5.1" cy="-5.1" r="7.65" fill="#67B562"/></g><g transform="translate(460 328)"><rect x="-3" y="7.700000000000001" width="6" height="9.799999999999999" rx="2" fill="#7A5233"/><circle r="14" fill="#4E9A50"/><circle cx="-4.2" cy="-4.2" r="6.3" fill="#67B562"/></g><g transform="translate(404 330)"><rect x="-3" y="8.25" width="6" height="10.5" rx="2" fill="#7A5233"/><circle r="15" fill="#4E9A50"/><circle cx="-4.5" cy="-4.5" r="6.75" fill="#67B562"/></g><g transform="translate(600 650)"><rect x="-3" y="7.700000000000001" width="6" height="9.799999999999999" rx="2" fill="#7A5233"/><circle r="14" fill="#4E9A50"/><circle cx="-4.2" cy="-4.2" r="6.3" fill="#67B562"/></g><g transform="translate(636 742)"><rect x="-3" y="8.8" width="6" height="11.2" rx="2" fill="#7A5233"/><circle r="16" fill="#4E9A50"/><circle cx="-4.8" cy="-4.8" r="7.2" fill="#67B562"/></g><g transform="translate(668 770)"><rect x="-3" y="7.15" width="6" height="9.1" rx="2" fill="#7A5233"/><circle r="13" fill="#4E9A50"/><circle cx="-3.9" cy="-3.9" r="5.8500000000000005" fill="#67B562"/></g><g transform="translate(300 120)"><rect x="-3" y="8.25" width="6" height="10.5" rx="2" fill="#7A5233"/><circle r="15" fill="#4E9A50"/><circle cx="-4.5" cy="-4.5" r="6.75" fill="#67B562"/></g><g transform="translate(330 100)"><rect x="-3" y="6.6000000000000005" width="6" height="8.399999999999999" rx="2" fill="#7A5233"/><circle r="12" fill="#4E9A50"/><circle cx="-3.5999999999999996" cy="-3.5999999999999996" r="5.4" fill="#67B562"/></g>
+  <!-- Gebaeude -->
+  <g transform="translate(78 676)" filter="url(#schatten)"><path d="M-30 6 L0 -24 L30 6 V34 H-30 Z" fill="#D9534F"/><path d="M-34 8 L0 -28 L34 8" stroke="#7A2E2E" stroke-width="5" fill="none" stroke-linejoin="round"/><rect x="-11" y="12" width="22" height="22" fill="#fff"/><path d="M-11 12 L11 34 M11 12 L-11 34" stroke="#D9534F" stroke-width="3"/></g>
+  <g transform="translate(450 820)" filter="url(#schatten)"><rect x="-24" y="-6" width="48" height="34" rx="3" fill="#FFF3E0"/><path d="M-30 -4 L0 -30 L30 -4 Z" fill="#F07AA0"/><rect x="10" y="-30" width="8" height="16" fill="#B36A4A"/><circle cx="18" cy="-40" r="5" fill="#fff" opacity=".7"/><circle cx="25" cy="-50" r="6.5" fill="#fff" opacity=".5"/><rect x="-6" y="8" width="12" height="20" rx="5" fill="#9A6A42"/><rect x="-19" y="2" width="9" height="9" fill="#9AD3F5"/></g>
+  <g transform="translate(616 806)" filter="url(#schatten)"><rect x="-26" y="-10" width="52" height="38" rx="3" fill="#C98B55"/><path d="M-32 -8 L0 -32 L32 -8 Z" fill="#7A4B2A"/><rect x="-7" y="8" width="14" height="20" fill="#5A3A20"/><rect x="18" y="-4" width="20" height="18" rx="3" fill="#FFF7E8" stroke="#7A4B2A" stroke-width="2"/><rect x="23" y="-1" width="9" height="11" rx="1.5" fill="#F7C948"/></g>
+  <g transform="translate(770 536)" filter="url(#schatten)"><rect x="-28" y="-6" width="56" height="34" rx="3" fill="#FFD25A"/><path d="M-32 -4 L0 -26 L32 -4 Z" fill="#E25B4F"/><rect x="-7" y="-46" width="14" height="22" fill="#FFD25A"/><path d="M-10 -46 L0 -56 L10 -46 Z" fill="#E25B4F"/><circle cy="-36" r="3.5" fill="#B5652F"/><rect x="-20" y="4" width="10" height="10" fill="#5BB6F0"/><rect x="10" y="4" width="10" height="10" fill="#5BB6F0"/><rect x="-5" y="12" width="10" height="16" fill="#B5652F"/></g>
+  <g transform="translate(660 418)" filter="url(#schatten)"><path d="M-40 30 V-6 H-30 V-14 H-24 V-6 H-16 V-14 H-10 V-6 H10 V-14 H16 V-6 H24 V-14 H30 V-6 H40 V30 Z" fill="#B8C2CC"/><rect x="-46" y="-30" width="18" height="60" fill="#C6CFD8"/><path d="M-48 -30 L-37 -46 L-26 -30 Z" fill="#3FBF9F"/><rect x="28" y="-30" width="18" height="60" fill="#C6CFD8"/><path d="M26 -30 L37 -46 L48 -30 Z" fill="#3FBF9F"/><path d="M-10 30 V12 A10 10 0 0 1 10 12 V30 Z" fill="#5E6B7A"/><path d="M37 -46 V-62" stroke="#5E6B7A" stroke-width="2.5"/><path d="M37 -62 L52 -57 L37 -52 Z" fill="#FF5C8A"/></g>
+  <g transform="translate(262 430)" filter="url(#schatten)"><rect x="-17" y="-48" width="34" height="78" fill="#7A63C9"/><path d="M-21 -48 V-62 H-13 V-55 H-4 V-62 H4 V-55 H13 V-62 H21 V-48 Z" fill="#6550B4"/><rect x="-6" y="-34" width="12" height="16" rx="6" fill="#FFE9A8"/><rect x="-7" y="10" width="14" height="20" rx="7" fill="#3E3570"/><rect x="-17" y="-8" width="34" height="5" fill="#FFC83D"/></g>
+  <g transform="translate(94 318)" filter="url(#schatten)"><rect x="-36" y="-10" width="72" height="40" rx="4" fill="#FFF0F3"/><path d="M-22 -10 A22 22 0 0 1 22 -10 Z" fill="#E9566E"/><circle cy="-36" r="5" fill="#FFC83D"/><path d="M-36 -10 A9 9 0 0 1 -18 -10 Z M18 -10 A9 9 0 0 1 36 -10 Z" fill="#FFC83D"/><rect x="-8" y="8" width="16" height="22" rx="8" fill="#E9566E"/><rect x="-28" y="2" width="9" height="12" rx="4" fill="#9AD3F5"/><rect x="19" y="2" width="9" height="12" rx="4" fill="#9AD3F5"/></g>
+  <g transform="translate(176 186)" filter="url(#schatten)"><rect x="-44" y="-8" width="28" height="40" fill="#5E7F8C"/><path d="M-46 -8 L-30 -22 L-14 -8 Z" fill="#3C5C69"/><rect x="-14" y="-26" width="30" height="58" fill="#6E95A3"/><path d="M-16 -26 L1 -42 L18 -26 Z" fill="#3C8C99"/><rect x="16" y="2" width="26" height="30" fill="#5E7F8C"/><rect x="-36" y="0" width="7" height="8" fill="#FFE9A8"/><rect x="-6" y="-16" width="7" height="8" fill="#FFE9A8"/><rect x="5" y="-2" width="7" height="8" fill="#FFE9A8"/><rect x="24" y="10" width="7" height="8" fill="#FFE9A8"/></g>
+  <g transform="translate(586 112)" filter="url(#schatten)"><rect x="-16" y="-2" width="32" height="20" fill="#E8E4F6"/><path d="M-18 -2 A18 18 0 0 1 18 -2 Z" fill="#4B5BD6"/><path d="M2 -12 L22 -30" stroke="#2A2238" stroke-width="6" stroke-linecap="round"/></g>
+  <!-- Wirbel des Stockfischs -->
+  <g transform="translate(872 182)"><ellipse rx="96" ry="40" fill="#0F2F6E" opacity=".55" transform="translate(0 30)"/>
+    <path d="M-80 30 C-60 -4 60 -4 80 30 C60 60 -50 62 -64 32 C-46 6 46 6 56 30 C42 48 -30 50 -40 32" fill="none" stroke="#9FE8FF" stroke-width="4" opacity=".55" stroke-linecap="round" transform="translate(0 6)"/></g>
+  <!-- Boot -->
+  <g transform="translate(748 132) rotate(-6)" filter="url(#schatten)"><path d="M-22 6 H22 L14 18 H-14 Z" fill="#9A6A42"/><path d="M0 6 V-24" stroke="#5A3A20" stroke-width="3"/><path d="M2 -22 L22 2 H2 Z" fill="#FFF7E8"/></g>
+  <!-- Kompassrose -->
+  <g transform="translate(920 810)" opacity=".85"><circle r="38" fill="#2F86C8" stroke="#FFF7E8" stroke-width="3" opacity=".7"/><path d="M0 -34 L8 0 L0 34 L-8 0 Z" fill="#FFF7E8"/><path d="M-34 0 L0 -8 L34 0 L0 8 Z" fill="#FFF7E8" opacity=".7"/><path d="M0 -34 L8 0 L-8 0 Z" fill="#FF5C8A"/><text y="-44" text-anchor="middle" class="kompass-n">N</text></g>
+  <!-- Regionsnamen -->
+  <text x="268" y="622" class="region" text-anchor="middle">Wiesental</text>
+  <text x="398" y="424" class="region" text-anchor="middle">Burgenland</text>
+  <text x="156" y="262" class="region" text-anchor="middle">Nebelstadt</text>
+  <text x="522" y="42" class="region" text-anchor="middle">Greta-Gipfel</text>
+  <text x="890" y="300" class="region see" text-anchor="middle">Tiefsee</text>
+  <!-- Weg -->
+  <path d="M150.0,752.0 C182.5,755.3 280.8,776.0 345.0,772.0 C409.2,768.0 477.5,756.7 535.0,728.0 C592.5,699.3 685.8,641.7 690.0,600.0 C694.2,558.3 614.7,496.0 560.0,478.0" class="weg-schatten"/>
+  <path d="M150.0,752.0 C182.5,755.3 280.8,776.0 345.0,772.0 C409.2,768.0 477.5,756.7 535.0,728.0 C592.5,699.3 685.8,641.7 690.0,600.0 C694.2,558.3 614.7,496.0 560.0,478.0" class="weg-fertig"/>
+  <path d="M560.0,478.0 C505.3,460.0 426.7,505.7 362.0,492.0 C297.3,478.3 183.7,438.7 172.0,396.0 C160.3,353.3 233.7,273.7 292.0,236.0 C350.3,198.3 425.3,179.0 522.0,170.0" class="weg-offen-grund"/>
+  <path d="M560.0,478.0 C505.3,460.0 426.7,505.7 362.0,492.0 C297.3,478.3 183.7,438.7 172.0,396.0 C160.3,353.3 233.7,273.7 292.0,236.0 C350.3,198.3 425.3,179.0 522.0,170.0" class="weg-offen"/>
+  <path d="M522.0,170.0 C618.7,161.0 813.7,180.0 872.0,182.0" class="weg-see"/>
+  <g class="station" transform="translate(150 752)"><circle r="51" class="st-ring"/><g ><use href="#av-benno" x="-45" y="-45" width="90" height="90"/></g><g transform="translate(0 47)"><rect x="-41" y="-14" width="82" height="28" rx="14" fill="#1B1736" stroke="#FFC83D" stroke-width="2"/><use href="#i-stern" x="-34.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="-10.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="13.5" y="-10.5" width="21" height="21" class="st-voll"/></g><g transform="translate(0 82)" class="st-name"><rect x="-46.25" y="-15" width="92.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Benno</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">1</text></g></g><g class="station" transform="translate(345 772)"><circle r="51" class="st-ring"/><g ><use href="#av-hilde" x="-45" y="-45" width="90" height="90"/></g><g transform="translate(0 47)"><rect x="-41" y="-14" width="82" height="28" rx="14" fill="#1B1736" stroke="#FFC83D" stroke-width="2"/><use href="#i-stern" x="-34.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="-10.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="13.5" y="-10.5" width="21" height="21" class="st-voll"/></g><g transform="translate(0 82)" class="st-name"><rect x="-46.25" y="-15" width="92.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Hilde</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">2</text></g></g><g class="station" transform="translate(535 728)"><circle r="51" class="st-ring"/><g ><use href="#av-kalle" x="-45" y="-45" width="90" height="90"/></g><g transform="translate(0 47)"><rect x="-41" y="-14" width="82" height="28" rx="14" fill="#1B1736" stroke="#FFC83D" stroke-width="2"/><use href="#i-stern" x="-34.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="-10.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="13.5" y="-10.5" width="21" height="21" class="st-leer"/></g><g transform="translate(0 82)" class="st-name"><rect x="-46.25" y="-15" width="92.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Kalle</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">3</text></g></g><g class="station" transform="translate(690 600)"><circle r="51" class="st-ring"/><g ><use href="#av-lisa" x="-45" y="-45" width="90" height="90"/></g><g transform="translate(0 47)"><rect x="-41" y="-14" width="82" height="28" rx="14" fill="#1B1736" stroke="#FFC83D" stroke-width="2"/><use href="#i-stern" x="-34.5" y="-10.5" width="21" height="21" class="st-voll"/><use href="#i-stern" x="-10.5" y="-10.5" width="21" height="21" class="st-leer"/><use href="#i-stern" x="13.5" y="-10.5" width="21" height="21" class="st-leer"/></g><g transform="translate(0 82)" class="st-name"><rect x="-43" y="-15" width="86" height="30" rx="15"/><text y="6.5" text-anchor="middle">Lisa</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">4</text></g></g><g class="station gesperrt" transform="translate(362 492)"><circle r="51" class="st-ring"/><g filter="url(#grau)"><use href="#av-turm" x="-45" y="-45" width="90" height="90"/></g><circle r="45" fill="#1B1736" opacity=".18"/><g class="st-schloss"><circle r="17" fill="#1B1736" stroke="#A9A2CC" stroke-width="3"/><use href="#i-schloss" x="-10" y="-11" width="20" height="20" color="#D8D3F0"/></g><g transform="translate(0 70)" class="st-name"><rect x="-77.5" y="-15" width="155" height="30" rx="15"/><text y="6.5" text-anchor="middle">Prof. Turm</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">6</text></g></g><g class="station gesperrt" transform="translate(172 396)"><circle r="51" class="st-ring"/><g filter="url(#grau)"><use href="#av-delia" x="-45" y="-45" width="90" height="90"/></g><circle r="45" fill="#1B1736" opacity=".18"/><g class="st-schloss"><circle r="17" fill="#1B1736" stroke="#A9A2CC" stroke-width="3"/><use href="#i-schloss" x="-10" y="-11" width="20" height="20" color="#D8D3F0"/></g><g transform="translate(0 70)" class="st-name"><rect x="-46.25" y="-15" width="92.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Delia</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">7</text></g></g><g class="station gesperrt" transform="translate(292 236)"><circle r="51" class="st-ring"/><g filter="url(#grau)"><use href="#av-koenig" x="-45" y="-45" width="90" height="90"/></g><circle r="45" fill="#1B1736" opacity=".18"/><g class="st-schloss"><circle r="17" fill="#1B1736" stroke="#A9A2CC" stroke-width="3"/><use href="#i-schloss" x="-10" y="-11" width="20" height="20" color="#D8D3F0"/></g><g transform="translate(0 70)" class="st-name"><rect x="-71.25" y="-15" width="142.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Kommissar</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">8</text></g></g><g class="station gesperrt" transform="translate(522 170)"><circle r="51" class="st-ring"/><g filter="url(#grau)"><use href="#av-greta" x="-45" y="-45" width="90" height="90"/></g><circle r="45" fill="#1B1736" opacity=".18"/><g class="st-schloss"><circle r="17" fill="#1B1736" stroke="#A9A2CC" stroke-width="3"/><use href="#i-schloss" x="-10" y="-11" width="20" height="20" color="#D8D3F0"/></g><g transform="translate(0 70)" class="st-name"><rect x="-46.25" y="-15" width="92.5" height="30" rx="15"/><text y="6.5" text-anchor="middle">Greta</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">9</text></g></g><g class="station gesperrt" transform="translate(872 182)"><circle r="51" class="st-ring"/><g filter="url(#grau)"><use href="#av-stockfisch" x="-45" y="-45" width="90" height="90"/></g><circle r="45" fill="#1B1736" opacity=".18"/><g class="st-schloss"><circle r="17" fill="#1B1736" stroke="#A9A2CC" stroke-width="3"/><use href="#i-schloss" x="-10" y="-11" width="20" height="20" color="#D8D3F0"/></g><g transform="translate(0 70)" class="st-name"><rect x="-77.5" y="-15" width="155" height="30" rx="15"/><text y="6.5" text-anchor="middle">Stockfisch</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">10</text></g></g><g class="station aktuell" transform="translate(560 478)"><circle class="puls" r="50"/><circle class="puls p2" r="50"/><circle r="51" class="st-ring"/><g ><use href="#av-rudi" x="-45" y="-45" width="90" height="90"/></g><g class="neu-sticker" transform="translate(40 -40) rotate(14)"><path d="M0.0 -26.0 L4.9 -18.4 L13.0 -22.5 L13.4 -13.4 L22.5 -13.0 L18.4 -4.9 L26.0 -0.0 L18.4 4.9 L22.5 13.0 L13.4 13.4 L13.0 22.5 L4.9 18.4 L0.0 26.0 L-4.9 18.4 L-13.0 22.5 L-13.4 13.4 L-22.5 13.0 L-18.4 4.9 L-26.0 0.0 L-18.4 -4.9 L-22.5 -13.0 L-13.4 -13.4 L-13.0 -22.5 L-4.9 -18.4Z" fill="#FF5C8A" stroke="#fff" stroke-width="3"/><text y="6" text-anchor="middle">Neu!</text></g><g transform="translate(0 70)" class="st-name"><rect x="-43" y="-15" width="86" height="30" rx="15"/><text y="6.5" text-anchor="middle">Rudi</text></g><g transform="translate(-40 -38)" class="st-nr"><circle r="15"/><text y="6" text-anchor="middle">5</text></g><g class="hier" transform="translate(0 -84)"><rect x="-74" y="-22" width="148" height="44" rx="22"/><path d="M-10 21 L0 34 L10 21 Z" class="hier-spitze"/><use href="#av-du" x="-68" y="-18" width="36" height="36"/><text x="12" y="7" text-anchor="middle">Du bist hier</text></g></g>
+  </svg>
+  </div>
+
+  <aside class="gegner karte" aria-label="Nächster Gegner">
+    <div class="g-band"><span class="g-station">Nächster Gegner</span><span class="g-neu">Neu · Station 5</span></div>
+    <div class="g-held">
+      <svg class="avatar g-avatar" viewBox="0 0 100 100"><use href="#av-rudi"/></svg>
+      <div class="blase links">Mein Pferdchen scharrt schon mit den Hufen. Pass bloß auf deine <em>Gabeln</em> auf!</div>
+    </div>
+    <div class="g-name">
+      <h2>Ritter Rudi</h2>
+      <div class="g-meta"><span class="elo">Elo 1200</span><span>Burg Springerstein</span></div>
+    </div>
+    <p class="g-bio">Springer-Fan durch und durch. Sucht überall Gabeln und vergisst dabei gern seine Läufer.</p>
+    <div class="g-titel">Sterne holen</div>
+    <ul class="g-ziele">
+      <li><span class="sterne"><svg class="an"><use href="#i-stern"/></svg><svg><use href="#i-stern"/></svg><svg><use href="#i-stern"/></svg></span>Rudi besiegen</li>
+      <li><span class="sterne"><svg class="an"><use href="#i-stern"/></svg><svg class="an"><use href="#i-stern"/></svg><svg><use href="#i-stern"/></svg></span>… mit mindestens 80 % Genauigkeit</li>
+      <li><span class="sterne"><svg class="an"><use href="#i-stern"/></svg><svg class="an"><use href="#i-stern"/></svg><svg class="an"><use href="#i-stern"/></svg></span>… ohne Hinweis und ohne Zurück</li>
+    </ul>
+    <div class="g-titel">Deine Farbe</div>
+    <div class="g-farbe" role="radiogroup" aria-label="Farbe wählen">
+      <a class="farbwahl an" role="radio" aria-checked="true"><img src="../../assets/pieces/wK.svg" alt="">Weiß</a>
+      <a class="farbwahl" role="radio" aria-checked="false"><svg><use href="#i-zufall"/></svg>Zufall</a>
+      <a class="farbwahl" role="radio" aria-checked="false"><img src="../../assets/pieces/bK.svg" alt="">Schwarz</a>
+    </div>
+    <a class="knopf primaer gross" href="#partie">Los geht’s!<svg><use href="#i-pfeil_rechts"/></svg></a>
+  </aside>
+</section>
+
+<!-- ================= 2. Partie ================= -->
+<section id="partie" class="screen partie" aria-label="Partie">
+  <div class="p-brett moment-brillant">
+    <div class="evalbalken" style="--w:79.9%" aria-label="Bewertung +3,7"><div class="eb-weiss"></div><span class="eb-zahl zahlen">+3,7</span></div>
+    <div class="brett "><div class="feld h ecke-lo"><span class="koord zahl">8</span><img src="../../assets/pieces/bR.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bN.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/bK.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bB.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d ecke-ro"><img src="../../assets/pieces/bR.svg" alt="" draggable="false"></div><div class="feld d"><span class="koord zahl">7</span><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bQ.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord zahl">6</span></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bN.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">5</span></div><div class="feld h zuletzt"><img src="../../assets/pieces/wN.svg" alt="" draggable="false"><svg class="abzeichen plopp k-brillant" viewBox="0 0 40 40" aria-label="brillant"><use href="#k-brillant"/></svg><span class="funken"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="welle"></span></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/wB.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">4</span></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/wB.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">3</span></div><div class="feld h"><img src="../../assets/pieces/wQ.svg" alt="" draggable="false"></div><div class="feld d zuletzt"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">2</span><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d ecke-lu"><span class="koord zahl">1</span><span class="koord buchst">a</span><img src="../../assets/pieces/wR.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord buchst">b</span></div><div class="feld d"><span class="koord buchst">c</span></div><div class="feld h"><span class="koord buchst">d</span></div><div class="feld d"><span class="koord buchst">e</span><img src="../../assets/pieces/wK.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord buchst">f</span></div><div class="feld d"><span class="koord buchst">g</span></div><div class="feld h ecke-ru"><span class="koord buchst">h</span><img src="../../assets/pieces/wR.svg" alt="" draggable="false"></div></div>
+  </div>
+
+  <header class="p-kopf">
+    <a class="ikon-knopf" href="#leiter" aria-label="Zur Reisekarte"><svg><use href="#i-karte"/></svg></a>
+    <div class="p-titel"><small>Station 5 · Burg Springerstein</small><b>Du gegen Ritter Rudi</b></div>
+    <a class="ikon-knopf" href="#stil" aria-label="Einstellungen"><svg><use href="#i-zahnrad"/></svg></a>
+  </header>
+
+  <div class="botkarte">
+    <svg class="avatar bk-avatar" viewBox="0 0 100 100"><use href="#av-rudi"/></svg>
+    <div class="bk-info">
+      <b>Ritter Rudi</b>
+      <div class="bk-zeile"><span class="elo-chip zahlen">1200</span><span class="geschlagen"><img src="../../assets/pieces/wN.svg" alt=""><img src="../../assets/pieces/wP.svg" alt=""></span></div>
+    </div>
+    <div class="blase oben bk-blase">Ein Springeropfer?! Hey, Springer sind <em>MEIN</em> Ding!</div>
+  </div>
+
+  <div class="coach" role="status" aria-live="polite">
+    <div class="c-symbol"><svg viewBox="0 0 40 40" aria-hidden="true"><use href="#k-brillant"/></svg></div>
+    <div class="c-text">
+      <div class="c-kopf"><b class="c-klasse glanz">Brillant!</b><span class="c-zug zahlen">10. Sxb5</span><span class="c-eval zahlen">Bewertung +3,7</span></div>
+      <p>Ein Juwel! Du opferst den Springer: Nach <b>10…cxb5 11.Lxb5+ Sbd7</b> steht Rudis Springer gefesselt und dein Angriff rollt.</p>
+      <div class="c-ella"><svg viewBox="0 0 100 100"><use href="#av-ella"/></svg>Eule Ella, deine Trainerin</div>
+    </div>
+  </div>
+
+  <div class="zugliste" aria-label="Zugliste">
+    <div class="zeile"><span class="nr">3.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-buch"/></svg>d4</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-buch"/></svg>Lg4</span></div><div class="zeile"><span class="nr">4.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-exzellent"/></svg>dxe5</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-gut"/></svg>Lxf3</span></div><div class="zeile"><span class="nr">5.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>Dxf3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>dxe5</span></div><div class="zeile"><span class="nr">6.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-exzellent"/></svg>Lc4</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>Sf6</span></div><div class="zeile"><span class="nr">7.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-stark"/></svg>Db3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>De7</span></div><div class="zeile"><span class="nr">8.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-gut"/></svg>Sc3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>c6</span></div><div class="zeile"><span class="nr">9.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>Lg5</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>b5</span></div><div class="zeile"><span class="nr">10.</span><span class="zug aktuell"><svg class="mini" viewBox="0 0 40 40"><use href="#k-brillant"/></svg>Sxb5</span><span class="zug leer"></span></div>
+  </div>
+  <div class="zugstreifen" aria-label="Zugliste">
+    <span class="snr">5.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>Dxf3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>dxe5</span><span class="snr">6.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-exzellent"/></svg>Lc4</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>Sf6</span><span class="snr">7.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-stark"/></svg>Db3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>De7</span><span class="snr">8.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-gut"/></svg>Sc3</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>c6</span><span class="snr">9.</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-bester"/></svg>Lg5</span><span class="zug"><svg class="mini" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>b5</span><span class="snr">10.</span><span class="zug aktuell"><svg class="mini" viewBox="0 0 40 40"><use href="#k-brillant"/></svg>Sxb5</span>
+  </div>
+
+  <div class="spielerleiste">
+    <svg class="avatar" viewBox="0 0 100 100"><use href="#av-du"/></svg>
+    <b>Du</b><span class="farb-chip">Weiß</span>
+    <span class="geschlagen"><img src="../../assets/pieces/bB.svg" alt=""><img src="../../assets/pieces/bP.svg" alt=""><img src="../../assets/pieces/bP.svg" alt=""><span class="plus">+1</span></span>
+  </div>
+
+  <nav class="aktionen" aria-label="Aktionen">
+    <a class="aktion hinweis"><svg><use href="#i-hinweis"/></svg>Hinweis</a>
+    <a class="aktion"><svg><use href="#i-zurueck"/></svg>Zurück</a>
+    <a class="aktion"><svg><use href="#i-drehen"/></svg>Drehen</a>
+    <a class="aktion aufgeben" href="#sieg"><svg><use href="#i-aufgeben"/></svg>Aufgeben</a>
+  </nav>
+</section>
+
+<!-- ================= 3. Spielanalyse ================= -->
+<section id="analyse" class="screen analyse" aria-label="Spielanalyse">
+  <div class="a-links">
+    <div class="a-brettzeile">
+      <div class="evalbalken" style="--w:73.1%"><div class="eb-weiss"></div><span class="eb-zahl zahlen">+2,7</span></div>
+      <div class="brett "><div class="feld h ecke-lo"><span class="koord zahl">8</span><img src="../../assets/pieces/bR.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bN.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/bK.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bB.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d ecke-ro"><img src="../../assets/pieces/bR.svg" alt="" draggable="false"></div><div class="feld d"><span class="koord zahl">7</span><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bQ.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord zahl">6</span></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bN.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">5</span></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">4</span></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/wB.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">3</span></div><div class="feld h"><img src="../../assets/pieces/wQ.svg" alt="" draggable="false"></div><div class="feld d zuletzt"><img src="../../assets/pieces/wN.svg" alt="" draggable="false"><svg class="abzeichen plopp k-gut" viewBox="0 0 40 40" aria-label="gut"><use href="#k-gut"/></svg><span class="welle"></span></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">2</span><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d ecke-lu"><span class="koord zahl">1</span><span class="koord buchst">a</span><img src="../../assets/pieces/wR.svg" alt="" draggable="false"></div><div class="feld h zuletzt"><span class="koord buchst">b</span></div><div class="feld d"><span class="koord buchst">c</span><img src="../../assets/pieces/wB.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord buchst">d</span></div><div class="feld d"><span class="koord buchst">e</span><img src="../../assets/pieces/wK.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord buchst">f</span></div><div class="feld d"><span class="koord buchst">g</span></div><div class="feld h ecke-ru"><span class="koord buchst">h</span><img src="../../assets/pieces/wR.svg" alt="" draggable="false"></div><svg class="pfeile" viewBox="0 0 800 800" aria-hidden="true"><polygon class="pfeil bester" points="159.5,532.0 159.5,202.0 174.0,202.0 150.0,162.0 126.0,202.0 140.5,202.0 140.5,532.0" style="fill:var(--k-bester)"/></svg></div>
+    </div>
+    <div class="a-nav">
+      <a class="ikon-knopf" aria-label="Zum Anfang"><svg><use href="#i-anfang"/></svg></a>
+      <a class="ikon-knopf" aria-label="Zug zurück"><svg><use href="#i-rueck"/></svg></a>
+      <div class="stand zahlen"><b>8. Sc3</b>Halbzug 15 von 33</div>
+      <a class="ikon-knopf" aria-label="Nächster Zug"><svg><use href="#i-vor"/></svg></a>
+      <a class="ikon-knopf" aria-label="Zum Ende"><svg><use href="#i-ende"/></svg></a>
+    </div>
+    <div class="kurve karte">
+      <div class="kurve-feld" aria-label="Bewertungskurve, antippen zum Springen"><svg class="kurve-svg" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-label="Bewertungskurve">
+    <rect width="1000" height="200" style="fill:var(--eval-schwarz)"/>
+    <path d="M0,93.0 C15.2,93.0 15.2,94.1 30.3,94.1 C45.5,94.1 45.5,93.2 60.6,93.2 C75.8,93.2 75.8,92.8 90.9,92.8 C106.1,92.8 106.1,88.3 121.2,88.3 C136.4,88.3 136.4,91.2 151.5,91.2 C166.7,91.2 166.7,81.6 181.8,81.6 C197.0,81.6 197.0,85.0 212.1,85.0 C227.3,85.0 227.3,75.8 242.4,75.8 C257.6,75.8 257.6,70.2 272.7,70.2 C287.9,70.2 287.9,71.9 303.0,71.9 C318.2,71.9 318.2,75.3 333.3,75.3 C348.5,75.3 348.5,58.8 363.6,58.8 C378.8,58.8 378.8,57.6 393.9,57.6 C409.1,57.6 409.1,46.4 424.2,46.4 C439.4,46.4 439.4,53.7 454.5,53.7 C469.7,53.7 469.7,52.2 484.8,52.2 C500.0,52.2 500.0,52.0 515.2,52.0 C530.3,52.0 530.3,39.6 545.5,39.6 C560.6,39.6 560.6,40.3 575.8,40.3 C590.9,40.3 590.9,16.8 606.1,16.8 C621.2,16.8 621.2,15.7 636.4,15.7 C651.5,15.7 651.5,14.3 666.7,14.3 C681.8,14.3 681.8,11.5 697.0,11.5 C712.1,11.5 712.1,11.5 727.3,11.5 C742.4,11.5 742.4,12.1 757.6,12.1 C772.7,12.1 772.7,9.0 787.9,9.0 C803.0,9.0 803.0,9.0 818.2,9.0 C833.3,9.0 833.3,2.8 848.5,2.8 C863.6,2.8 863.6,3.2 878.8,3.2 C893.9,3.2 893.9,0.0 909.1,0.0 C924.2,0.0 924.2,0.0 939.4,0.0 C954.5,0.0 954.5,0.0 969.7,0.0 C984.8,0.0 984.8,0.0 1000.0,0.0 L1000,200 L0,200 Z" style="fill:var(--eval-weiss)"/>
+    <line x1="0" y1="100" x2="1000" y2="100" stroke="#8C84B8" stroke-width="1.5" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/>
+    <rect x="451.5" y="0" width="6" height="200" style="fill:var(--akzent)"/>
+  </svg>
+  <div class="kurve-marker"><span class="km" style="left:39.39%;top:28.79%;--k:var(--k-stark)"></span><span class="km aktiv" style="left:45.45%;top:26.86%;--k:var(--k-gut)"></span><span class="km" style="left:57.58%;top:20.15%;--k:var(--k-brillant)"></span><span class="km" style="left:60.61%;top:8.40%;--k:var(--k-fehler)"></span><span class="km" style="left:63.64%;top:7.85%;--k:var(--k-stark)"></span><span class="km" style="left:69.70%;top:5.76%;--k:var(--k-stark)"></span><span class="km" style="left:75.76%;top:6.03%;--k:var(--k-brillant)"></span></div><span class="kurve-etikett oben">Weiß</span><span class="kurve-etikett unten">Schwarz</span></div>
+      <div class="momente" aria-label="Schlüsselmomente">
+        <a class="moment"><svg class="mini" viewBox="0 0 40 40"><use href="#k-stark"/></svg>7. Db3</a>
+        <a class="moment an"><svg class="mini" viewBox="0 0 40 40"><use href="#k-gut"/></svg>8. Sc3</a>
+        <a class="moment"><svg class="mini" viewBox="0 0 40 40"><use href="#k-brillant"/></svg>10. Sxb5</a>
+        <a class="moment"><svg class="mini" viewBox="0 0 40 40"><use href="#k-fehler"/></svg>10… cxb5</a>
+        <a class="moment"><svg class="mini" viewBox="0 0 40 40"><use href="#k-brillant"/></svg>13. Txd7</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="a-rechts">
+    <header class="a-kopf">
+      <a class="ikon-knopf" href="#leiter" aria-label="Zur Reisekarte"><svg><use href="#i-karte"/></svg></a>
+      <div><h1>Spielanalyse</h1><p>Sieg gegen Ritter Rudi · Matt im 17. Zug</p></div>
+      <span class="ergebnis zahlen">1–0</span>
+    </header>
+
+    <div class="genau">
+      <div class="g-karte karte">
+        <div class="ring"><svg viewBox="0 0 76 76"><circle class="r-grund" cx="38" cy="38" r="33"/><circle class="r-wert" cx="38" cy="38" r="33" style="stroke:var(--gut)" stroke-dasharray="199.7 207.3"/></svg><svg class="av" viewBox="0 0 100 100"><use href="#av-du"/></svg></div>
+        <div class="g-wert"><b class="zahlen">96,3<small> %</small></b><span>Du · Genauigkeit</span><em>spielte wie ≈ 1900</em></div>
+      </div>
+      <div class="g-karte karte">
+        <div class="ring"><svg viewBox="0 0 76 76"><circle class="r-grund" cx="38" cy="38" r="33"/><circle class="r-wert" cx="38" cy="38" r="33" style="stroke:var(--k-ungenau)" stroke-dasharray="162.7 207.3"/></svg><svg class="av" viewBox="0 0 100 100"><use href="#av-rudi"/></svg></div>
+        <div class="g-wert"><b class="zahlen">78,5<small> %</small></b><span>Rudi · Genauigkeit</span><em>spielte wie ≈ 1050</em></div>
+      </div>
+    </div>
+    <div class="infozeile">
+      <span class="chip"><svg class="mini" viewBox="0 0 40 40"><use href="#k-buch"/></svg>Eröffnung <b>Philidor-Verteidigung</b></span>
+      <span class="chip"><svg class="gold"><use href="#i-stern"/></svg><b>3 von 3</b> Sternen</span>
+    </div>
+
+    <div class="a-coach karte">
+      <div class="c-symbol"><svg viewBox="0 0 40 40"><use href="#k-gut"/></svg></div>
+      <div>
+        <div class="c-kopf"><b class="c-klasse">Gut</b><span class="c-zug zahlen">8. Sc3</span><span class="c-eval zahlen" style="color:var(--ui-gedimmt)">+3,3 → +2,7</span></div>
+        <p>Solide entwickelt. Noch stärker war <b class="besser-text">8.Dxb7</b> (grüner Pfeil): Du gewinnst sofort einen Bauern und bedrohst den Turm auf a8.</p>
+      </div>
+    </div>
+
+    <div class="tabelle karte" aria-label="Zug-Klassen">
+      <div class="t-kopf"><span>Du</span><span></span><span>Rudi</span></div>
+      <div class="t-zeile" style="--k:var(--k-brillant)"><span class="t-n">2</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-brillant"/></svg>Brillant</span><span class="t-n null">0</span></div><div class="t-zeile" style="--k:var(--k-stark)"><span class="t-n">3</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-stark"/></svg>Großartig</span><span class="t-n null">0</span></div><div class="t-zeile" style="--k:var(--k-bester)"><span class="t-n">6</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-bester"/></svg>Bester Zug</span><span class="t-n">2</span></div><div class="t-zeile" style="--k:var(--k-exzellent)"><span class="t-n">2</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-exzellent"/></svg>Exzellent</span><span class="t-n">3</span></div><div class="t-zeile" style="--k:var(--k-gut)"><span class="t-n">1</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-gut"/></svg>Gut</span><span class="t-n">2</span></div><div class="t-zeile" style="--k:var(--k-buch)"><span class="t-n">3</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-buch"/></svg>Buchzug</span><span class="t-n">3</span></div><div class="t-zeile" style="--k:var(--k-erzwungen)"><span class="t-n null">0</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-erzwungen"/></svg>Erzwungen</span><span class="t-n">1</span></div><div class="t-zeile" style="--k:var(--k-ungenau)"><span class="t-n null">0</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg>Ungenau</span><span class="t-n">4</span></div><div class="t-zeile" style="--k:var(--k-fehler)"><span class="t-n null">0</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-fehler"/></svg>Fehler</span><span class="t-n">1</span></div><div class="t-zeile" style="--k:var(--k-verpasst)"><span class="t-n null">0</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-verpasst"/></svg>Chance verpasst</span><span class="t-n null">0</span></div><div class="t-zeile" style="--k:var(--k-patzer)"><span class="t-n null">0</span><span class="t-k"><svg class="t-badge" viewBox="0 0 40 40"><use href="#k-patzer"/></svg>Patzer</span><span class="t-n null">0</span></div>
+    </div>
+
+    <div class="a-knoepfe">
+      <a class="knopf zweit" href="#partie"><svg><use href="#i-nochmal"/></svg>Nochmal</a>
+      <a class="knopf primaer" href="#leiter"><svg class="mini-av" viewBox="0 0 100 100"><use href="#av-turm"/></svg>Nächster Bot</a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 4. Sieg + Freischaltung ================= -->
+<section id="sieg" class="screen sieg" aria-label="Sieg">
+  <div class="sieg-hinten" aria-hidden="true">
+    <div class="evalbalken" style="--w:100%"><div class="eb-weiss"></div><span class="eb-zahl">1–0</span></div>
+    <div class="brett "><div class="feld h ecke-lo"><span class="koord zahl">8</span></div><div class="feld d"><img src="../../assets/pieces/bN.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d zuletzt"><img src="../../assets/pieces/wR.svg" alt="" draggable="false"><svg class="abzeichen plopp k-bester" viewBox="0 0 40 40" aria-label="bester"><use href="#k-bester"/></svg><span class="welle"></span></div><div class="feld h schach"><img src="../../assets/pieces/bK.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bB.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d ecke-ro"><img src="../../assets/pieces/bR.svg" alt="" draggable="false"></div><div class="feld d"><span class="koord zahl">7</span><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"><span class="koord zahl">6</span></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/bQ.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">5</span></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/bP.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/wB.svg" alt="" draggable="false"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">4</span></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld d"><span class="koord zahl">3</span></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"></div><div class="feld h"></div><div class="feld h"><span class="koord zahl">2</span><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"></div><div class="feld h"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld h"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d"><img src="../../assets/pieces/wP.svg" alt="" draggable="false"></div><div class="feld d ecke-lu"><span class="koord zahl">1</span><span class="koord buchst">a</span></div><div class="feld h"><span class="koord buchst">b</span></div><div class="feld d"><span class="koord buchst">c</span><img src="../../assets/pieces/wK.svg" alt="" draggable="false"></div><div class="feld h zuletzt"><span class="koord buchst">d</span></div><div class="feld d"><span class="koord buchst">e</span></div><div class="feld h"><span class="koord buchst">f</span></div><div class="feld d"><span class="koord buchst">g</span></div><div class="feld h ecke-ru"><span class="koord buchst">h</span></div></div>
+  </div>
+  <div class="sieg-geist" aria-hidden="true"><i style="height:52px"></i><i style="height:120px"></i><i style="height:210px"></i><i style="flex:1"></i><i style="height:62px"></i></div>
+  <div class="sieg-dunkel"></div>
+  <div class="konfetti" aria-hidden="true"><i class="rund" style="--x:49.0%;--y:56.1%;--r:42deg;--c:#FFC83D;--d:0.59s;--t:3.40s"></i><i class="streifen" style="--x:50.6%;--y:7.9%;--r:316deg;--c:#FF5C8A;--d:1.41s;--t:3.34s"></i><i class="eck" style="--x:28.4%;--y:78.1%;--r:237deg;--c:#14B8C8;--d:0.18s;--t:3.50s"></i><i class="rund" style="--x:23.5%;--y:67.2%;--r:57deg;--c:#7CC242;--d:1.34s;--t:3.48s"></i><i class="streifen" style="--x:17.6%;--y:5.0%;--r:338deg;--c:#4F7BF7;--d:2.33s;--t:2.82s"></i><i class="eck" style="--x:44.4%;--y:95.6%;--r:68deg;--c:#FF8B2C;--d:1.01s;--t:3.59s"></i><i class="rund" style="--x:67.2%;--y:28.1%;--r:61deg;--c:#FFF7E8;--d:2.37s;--t:3.40s"></i><i class="streifen" style="--x:23.3%;--y:54.7%;--r:119deg;--c:#B266EA;--d:0.37s;--t:3.99s"></i><i class="eck" style="--x:35.2%;--y:35.0%;--r:29deg;--c:#FFC83D;--d:2.22s;--t:3.03s"></i><i class="rund" style="--x:88.4%;--y:47.1%;--r:85deg;--c:#FF5C8A;--d:1.45s;--t:3.32s"></i><i class="streifen" style="--x:75.9%;--y:65.3%;--r:49deg;--c:#14B8C8;--d:0.54s;--t:3.41s"></i><i class="eck" style="--x:9.0%;--y:4.8%;--r:148deg;--c:#7CC242;--d:1.63s;--t:3.76s"></i><i class="rund" style="--x:95.5%;--y:32.5%;--r:158deg;--c:#4F7BF7;--d:1.19s;--t:3.39s"></i><i class="streifen" style="--x:83.8%;--y:45.1%;--r:158deg;--c:#FF8B2C;--d:0.63s;--t:3.03s"></i><i class="eck" style="--x:74.3%;--y:13.2%;--r:97deg;--c:#FFF7E8;--d:1.84s;--t:4.15s"></i><i class="rund" style="--x:96.8%;--y:92.7%;--r:310deg;--c:#B266EA;--d:1.79s;--t:3.75s"></i><i class="streifen" style="--x:55.5%;--y:2.4%;--r:117deg;--c:#FFC83D;--d:0.86s;--t:2.99s"></i><i class="eck" style="--x:39.4%;--y:68.6%;--r:265deg;--c:#FF5C8A;--d:0.64s;--t:4.32s"></i><i class="rund" style="--x:0.7%;--y:36.0%;--r:211deg;--c:#14B8C8;--d:1.06s;--t:2.76s"></i><i class="streifen" style="--x:99.1%;--y:45.6%;--r:314deg;--c:#7CC242;--d:1.41s;--t:3.44s"></i><i class="eck" style="--x:12.5%;--y:79.3%;--r:323deg;--c:#4F7BF7;--d:0.63s;--t:2.64s"></i><i class="rund" style="--x:15.4%;--y:70.7%;--r:251deg;--c:#FF8B2C;--d:1.58s;--t:4.17s"></i><i class="streifen" style="--x:23.0%;--y:83.1%;--r:61deg;--c:#FFF7E8;--d:0.09s;--t:2.75s"></i><i class="eck" style="--x:2.1%;--y:53.7%;--r:299deg;--c:#B266EA;--d:2.02s;--t:2.86s"></i><i class="rund" style="--x:49.4%;--y:5.2%;--r:101deg;--c:#FFC83D;--d:1.17s;--t:2.72s"></i><i class="streifen" style="--x:35.6%;--y:23.0%;--r:107deg;--c:#FF5C8A;--d:1.90s;--t:2.85s"></i><i class="eck" style="--x:16.5%;--y:0.1%;--r:225deg;--c:#14B8C8;--d:0.21s;--t:3.33s"></i><i class="rund" style="--x:10.9%;--y:47.8%;--r:149deg;--c:#7CC242;--d:0.02s;--t:3.96s"></i><i class="streifen" style="--x:45.1%;--y:73.9%;--r:122deg;--c:#4F7BF7;--d:2.23s;--t:3.89s"></i><i class="eck" style="--x:63.9%;--y:26.8%;--r:129deg;--c:#FF8B2C;--d:0.19s;--t:4.19s"></i><i class="rund" style="--x:8.3%;--y:6.8%;--r:67deg;--c:#FFF7E8;--d:0.73s;--t:2.65s"></i><i class="streifen" style="--x:60.0%;--y:44.0%;--r:136deg;--c:#B266EA;--d:1.30s;--t:4.23s"></i><i class="eck" style="--x:52.8%;--y:42.2%;--r:43deg;--c:#FFC83D;--d:2.16s;--t:3.79s"></i><i class="rund" style="--x:49.9%;--y:90.6%;--r:244deg;--c:#FF5C8A;--d:1.10s;--t:4.34s"></i><i class="streifen" style="--x:88.6%;--y:41.6%;--r:179deg;--c:#14B8C8;--d:1.69s;--t:4.02s"></i><i class="eck" style="--x:91.5%;--y:54.5%;--r:356deg;--c:#7CC242;--d:1.52s;--t:4.09s"></i><i class="rund" style="--x:44.0%;--y:7.5%;--r:350deg;--c:#4F7BF7;--d:1.33s;--t:3.77s"></i><i class="streifen" style="--x:39.1%;--y:75.1%;--r:282deg;--c:#FF8B2C;--d:1.21s;--t:3.40s"></i><i class="eck" style="--x:88.2%;--y:72.2%;--r:19deg;--c:#FFF7E8;--d:0.89s;--t:3.44s"></i><i class="rund" style="--x:99.0%;--y:65.9%;--r:55deg;--c:#B266EA;--d:1.62s;--t:2.90s"></i><i class="streifen" style="--x:20.0%;--y:52.8%;--r:113deg;--c:#FFC83D;--d:0.05s;--t:4.33s"></i><i class="eck" style="--x:51.4%;--y:3.5%;--r:140deg;--c:#FF5C8A;--d:0.44s;--t:3.78s"></i><i class="rund" style="--x:23.3%;--y:74.0%;--r:110deg;--c:#14B8C8;--d:2.18s;--t:3.68s"></i><i class="streifen" style="--x:39.5%;--y:83.0%;--r:64deg;--c:#7CC242;--d:0.83s;--t:3.35s"></i><i class="eck" style="--x:89.4%;--y:56.8%;--r:31deg;--c:#4F7BF7;--d:0.39s;--t:3.47s"></i><i class="rund" style="--x:25.1%;--y:40.2%;--r:184deg;--c:#FF8B2C;--d:0.79s;--t:2.65s"></i><i class="streifen" style="--x:6.1%;--y:74.2%;--r:164deg;--c:#FFF7E8;--d:1.33s;--t:4.22s"></i><i class="eck" style="--x:10.5%;--y:40.5%;--r:80deg;--c:#B266EA;--d:0.94s;--t:2.66s"></i><i class="rund" style="--x:12.7%;--y:72.8%;--r:306deg;--c:#FFC83D;--d:0.07s;--t:3.57s"></i><i class="streifen" style="--x:27.9%;--y:34.5%;--r:83deg;--c:#FF5C8A;--d:1.76s;--t:3.49s"></i><i class="eck" style="--x:23.0%;--y:62.8%;--r:319deg;--c:#14B8C8;--d:2.28s;--t:3.29s"></i><i class="rund" style="--x:94.6%;--y:80.3%;--r:148deg;--c:#7CC242;--d:0.21s;--t:2.98s"></i><i class="streifen" style="--x:13.4%;--y:72.4%;--r:212deg;--c:#4F7BF7;--d:2.32s;--t:3.10s"></i><i class="eck" style="--x:35.3%;--y:32.1%;--r:57deg;--c:#FF8B2C;--d:2.21s;--t:3.71s"></i><i class="rund" style="--x:79.0%;--y:70.8%;--r:99deg;--c:#FFF7E8;--d:1.40s;--t:2.84s"></i><i class="streifen" style="--x:70.9%;--y:96.2%;--r:219deg;--c:#B266EA;--d:0.80s;--t:3.20s"></i><i class="eck" style="--x:55.6%;--y:56.7%;--r:45deg;--c:#FFC83D;--d:0.94s;--t:4.09s"></i><i class="rund" style="--x:74.3%;--y:52.7%;--r:190deg;--c:#FF5C8A;--d:1.46s;--t:3.29s"></i><i class="streifen" style="--x:8.7%;--y:14.2%;--r:136deg;--c:#14B8C8;--d:2.21s;--t:3.96s"></i><i class="eck" style="--x:92.5%;--y:45.0%;--r:311deg;--c:#7CC242;--d:1.06s;--t:2.76s"></i><i class="rund" style="--x:88.8%;--y:34.4%;--r:89deg;--c:#4F7BF7;--d:0.58s;--t:2.69s"></i><i class="streifen" style="--x:35.2%;--y:34.7%;--r:352deg;--c:#FF8B2C;--d:1.95s;--t:3.71s"></i><i class="eck" style="--x:54.0%;--y:5.3%;--r:167deg;--c:#FFF7E8;--d:0.38s;--t:3.47s"></i><i class="rund" style="--x:30.9%;--y:24.3%;--r:188deg;--c:#B266EA;--d:1.37s;--t:2.99s"></i><i class="streifen" style="--x:58.6%;--y:66.1%;--r:177deg;--c:#FFC83D;--d:0.22s;--t:2.60s"></i><i class="eck" style="--x:48.7%;--y:45.9%;--r:1deg;--c:#FF5C8A;--d:1.49s;--t:2.78s"></i><i class="rund" style="--x:8.8%;--y:30.5%;--r:156deg;--c:#14B8C8;--d:1.61s;--t:4.33s"></i><i class="streifen" style="--x:87.4%;--y:16.7%;--r:1deg;--c:#7CC242;--d:2.02s;--t:4.39s"></i><i class="eck" style="--x:84.8%;--y:75.1%;--r:205deg;--c:#4F7BF7;--d:2.19s;--t:2.63s"></i><i class="rund" style="--x:31.0%;--y:61.6%;--r:23deg;--c:#FF8B2C;--d:1.51s;--t:3.27s"></i></div>
+  <div class="sieg-karte" role="dialog" aria-label="Sieg">
+    <div class="sieg-band">SIEG!</div>
+    <p class="sieg-unter">Schachmatt im 17. Zug gegen Ritter Rudi</p>
+    <div class="strahlen-rahmen" aria-hidden="true"><div class="strahlen"></div></div>
+    <div class="sieg-sterne">
+      <div class="s-stern"><svg><use href="#i-stern"/></svg><span><b>Gewonnen</b>Rudi besiegt</span></div>
+      <div class="s-stern"><svg><use href="#i-stern"/></svg><span><b>96,3 % genau</b>mindestens 80 %</span></div>
+      <div class="s-stern"><svg><use href="#i-stern"/></svg><span><b>Ohne Hilfe</b>kein Hinweis, kein Zurück</span></div>
+    </div>
+    <div class="sieg-bot">
+      <svg class="avatar" viewBox="0 0 100 100"><use href="#av-rudi"/></svg>
+      <div class="blase links">Mein Pferdchen … geschlagen! Respekt. Der Professor wartet schon im Turm auf dich.</div>
+    </div>
+    <div class="freischalt">
+      <div class="fs-av"><svg class="avatar" viewBox="0 0 100 100"><use href="#av-turm"/></svg><span class="fs-schloss"><svg><use href="#i-schloss_offen"/></svg></span></div>
+      <div><small>Neu freigeschaltet · Station 6</small><b>Professor Turm</b><span class="elo-chip zahlen">1400</span></div>
+    </div>
+    <div class="sieg-knoepfe">
+      <a class="knopf zweit" href="#analyse"><svg><use href="#i-analyse"/></svg>Analyse ansehen</a>
+      <a class="knopf primaer" href="#leiter">Nächster Gegner<svg><use href="#i-pfeil_rechts"/></svg></a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 5. Stil-Uebersicht ================= -->
+<section id="stil" class="screen stil" aria-label="Stil-Übersicht">
+  <h1>Stil-Übersicht · Abenteuer-Reise</h1>
+  <p class="stil-unter">Elf Zug-Klassen, zehn Charaktere, eine Farbpalette. Form + Zeichen + Farbe tragen jede Klasse dreifach.</p>
+  <h2>Zug-Klassen (Orden = gut · Plakette = neutral · Kreis = Warnung)</h2>
+  <div class="legende"><div class="leg" style="--k:var(--k-brillant)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-brillant"/></svg><div><b>Brillant</b><small>Juwel · Orden</small><p>Bester oder fast bester Zug mit Figurenopfer</p><code>--k-brillant: #14B8C8</code></div></div><div class="leg" style="--k:var(--k-stark)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-stark"/></svg><div><b>Großartig</b><small>Geistesblitz · Orden</small><p>Der einzige gute Zug (Zweitbester ≥ 10 % schlechter)</p><code>--k-stark: #4F7BF7</code></div></div><div class="leg" style="--k:var(--k-bester)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-bester"/></svg><div><b>Bester Zug</b><small>Volltreffer · Orden</small><p>Genau der Zug der Engine</p><code>--k-bester: #2DB45D</code></div></div><div class="leg" style="--k:var(--k-exzellent)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-exzellent"/></svg><div><b>Exzellent</b><small>Doppelwinkel hoch · Orden</small><p>Verlust höchstens 2 %</p><code>--k-exzellent: #7CC242</code></div></div><div class="leg" style="--k:var(--k-gut)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-gut"/></svg><div><b>Gut</b><small>Winkel hoch · Orden</small><p>Verlust höchstens 5 %</p><code>--k-gut: #97AD7B</code></div></div><div class="leg" style="--k:var(--k-buch)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-buch"/></svg><div><b>Buchzug</b><small>Landkarte · Plakette</small><p>Bekannte Eröffnung, steht „auf der Karte“</p><code>--k-buch: #C38D5E</code></div></div><div class="leg" style="--k:var(--k-erzwungen)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-erzwungen"/></svg><div><b>Erzwungen</b><small>Einbahnpfeil · Plakette</small><p>Einziger legaler Zug</p><code>--k-erzwungen: #8A93A8</code></div></div><div class="leg" style="--k:var(--k-ungenau)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg><div><b>Ungenau</b><small>Tilde (ungefähr) · Kreis</small><p>Verlust höchstens 10 %</p><code>--k-ungenau: #E9B21B</code></div></div><div class="leg" style="--k:var(--k-fehler)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-fehler"/></svg><div><b>Fehler</b><small>Winkel runter · Kreis</small><p>Verlust höchstens 20 %</p><code>--k-fehler: #FF8B2C</code></div></div><div class="leg" style="--k:var(--k-verpasst)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-verpasst"/></svg><div><b>Chance verpasst</b><small>Geschlossenes Auge · Kreis</small><p>Gegner patzte, Gewinnchance liegen gelassen</p><code>--k-verpasst: #B266EA</code></div></div><div class="leg" style="--k:var(--k-patzer)"><svg class="leg-badge" viewBox="0 0 40 40"><use href="#k-patzer"/></svg><div><b>Patzer</b><small>Doppelwinkel runter · Kreis</small><p>Verlust über 20 %</p><code>--k-patzer: #F0474B</code></div></div><div class="leg lesehilfe"><div><b>So liest man die Symbole</b><p><b>Form:</b> Orden = gut, Plakette = neutral, Kreis = Warnung.<br><b>Zeichen:</b> Winkel hoch = Gewinn, Winkel runter = Verlust.<br><b>Farbe:</b> Grün → Gelb → Orange → Rot.</p></div></div></div>
+  <h2>Auf dem Brett</h2>
+  <div class="auf-brett">
+    <div class="musterfeld feld h"><img src="../../assets/pieces/wN.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-brillant"/></svg></div>
+    <div class="musterfeld feld d"><img src="../../assets/pieces/wQ.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-bester"/></svg></div>
+    <div class="musterfeld feld h"><img src="../../assets/pieces/bB.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-ungenau"/></svg></div>
+    <div class="musterfeld feld d"><img src="../../assets/pieces/bR.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-patzer"/></svg></div>
+    <div class="musterfeld feld h"><img src="../../assets/pieces/wP.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-buch"/></svg></div>
+    <div class="musterfeld feld d"><img src="../../assets/pieces/bK.svg" alt=""><svg class="abzeichen" viewBox="0 0 40 40"><use href="#k-verpasst"/></svg></div>
+  </div>
+  <h2>Charaktere</h2>
+  <div class="avatare"><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-benno"/></svg><figcaption><b>Bauer Benno</b><small>Stufe 1 · 250</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-hilde"/></svg><figcaption><b>Oma Hilde</b><small>Stufe 2 · 500</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-kalle"/></svg><figcaption><b>Kalle vom Stammtisch</b><small>Stufe 3 · 800</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-lisa"/></svg><figcaption><b>Lisa Läufer</b><small>Stufe 4 · 1000</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-rudi"/></svg><figcaption><b>Ritter Rudi</b><small>Stufe 5 · 1200</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-turm"/></svg><figcaption><b>Professor Turm</b><small>Stufe 6 · 1400</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-delia"/></svg><figcaption><b>Dame Delia</b><small>Stufe 7 · 1600</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-koenig"/></svg><figcaption><b>Kommissar König</b><small>Stufe 8 · 1800</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-greta"/></svg><figcaption><b>Großmeisterin Greta</b><small>Stufe 9 · 2100</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-stockfisch"/></svg><figcaption><b>Der Stockfisch</b><small>Stufe 10 · 3000</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-du"/></svg><figcaption><b>Du</b><small>Spieler-Figur</small></figcaption></figure><figure class="av-fig"><svg viewBox="0 0 100 100"><use href="#av-ella"/></svg><figcaption><b>Eule Ella</b><small>Coach</small></figcaption></figure></div>
+  <h2>Farben</h2>
+  <div class="palette">
+    <div class="farbe"><i style="background:var(--feld-hell)"></i><span>--feld-hell</span></div>
+    <div class="farbe"><i style="background:var(--feld-dunkel)"></i><span>--feld-dunkel</span></div>
+    <div class="farbe"><i style="background:var(--feld-hell);box-shadow:inset 0 0 0 40px var(--zuletzt)"></i><span>--zuletzt</span></div>
+    <div class="farbe"><i style="background:var(--feld-hell);box-shadow:inset 0 0 0 40px var(--auswahl)"></i><span>--auswahl</span></div>
+    <div class="farbe"><i style="background:var(--feld-hell);box-shadow:inset 0 0 0 40px var(--hinweis)"></i><span>--hinweis</span></div>
+    <div class="farbe"><i style="background:var(--schach)"></i><span>--schach</span></div>
+    <div class="farbe"><i style="background:var(--feld-hell);box-shadow:inset 0 0 0 40px var(--punkt)"></i><span>--punkt</span></div>
+    <div class="farbe"><i style="background:var(--ui-bg)"></i><span>--ui-bg</span></div>
+    <div class="farbe"><i style="background:var(--ui-flaeche)"></i><span>--ui-flaeche</span></div>
+    <div class="farbe"><i style="background:var(--ui-text)"></i><span>--ui-text</span></div>
+    <div class="farbe"><i style="background:var(--ui-gedimmt)"></i><span>--ui-gedimmt</span></div>
+    <div class="farbe"><i style="background:var(--akzent)"></i><span>--akzent</span></div>
+    <div class="farbe"><i style="background:var(--gut)"></i><span>--gut</span></div>
+    <div class="farbe"><i style="background:var(--schlecht)"></i><span>--schlecht</span></div>
+    <div class="farbe"><i style="background:var(--eval-weiss)"></i><span>--eval-weiss</span></div>
+    <div class="farbe"><i style="background:var(--eval-schwarz)"></i><span>--eval-schwarz</span></div>
+    <div class="farbe"><i style="background:var(--blase)"></i><span>--blase</span></div>
+    <div class="farbe"><i style="background:var(--ui-flaeche-2)"></i><span>--ui-flaeche-2</span></div>
+  </div>
+</section>
+
+<nav class="mockup-nav" aria-label="Mockup-Screens">
+  <a href="#leiter">Karte</a><a href="#partie">Partie</a><a href="#analyse">Analyse</a><a href="#sieg">Sieg</a><a href="#stil">Stil</a>
+</nav>
+</body>
+</html>

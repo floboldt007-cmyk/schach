@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Engine und Bots</title>
+<style>
+  :root { --bg: #f6f6f4; --text: #1b1b1b; --gut: #1a7f37; --schlecht: #c62828; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #15171c; --text: #e8e8e8; --gut: #5ccf7a; --schlecht: #ff6b6b; } }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; margin: 16px; }
+  button { font: inherit; padding: 8px 14px; margin: 0 8px 8px 0; }
+  pre { white-space: pre-wrap; word-break: break-word; }
+  .ok { color: var(--gut); } .fehler { color: var(--schlecht); }
+</style>
+</head>
+<body>
+<h1>Engine und Bots</h1>
+<p>
+  <button id="schnell">Schnelltests</button>
+  <button id="alles">Alles inkl. Kalibrierung</button>
+</p>
+<pre id="aus"></pre>
+<script type="module">
+import { Engine } from '../js/engine.js';
+import { BOTS, ANLAESSE, botZug, botSatz } from '../js/bots.js';
+import { Chess } from '../vendor/chess/chess.js';
+
+const aus = document.getElementById('aus');
+function log(text, klasse) {
+  const zeile = document.createElement('div');
+  zeile.textContent = text;
+  if (klasse) zeile.className = klasse;
+  aus.appendChild(zeile);
+  console.log(text);
+}
+
+const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+const MITTE = 'r1bq1rk1/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQ1RK1 w - - 0 8';
+const NACH_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
+const SCHWARZ_DAME_MEHR = '4k3/8/8/3q4/8/8/8/4K3 b - - 0 1';
+const WEISS_DAME_MEHR = '4k3/8/8/3Q4/8/8/8/4K3 w - - 0 1';
+const SCHWARZ_MATT_IN_1 = 'r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1';   // Ta1#
+const WEISS_MATT_IN_1 = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1';     // Ta8#
+const MATT_SCHWARZ_IST_MATT = 'R5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1';
+const MATT_WEISS_IST_MATT = '6k1/5ppp/8/8/8/8/5PPP/r5K1 w - - 0 1';
+const PATT = '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1';
+const MATT_IN_1_STELLUNGEN = [
+  'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4',  // Dxf7#
+  WEISS_MATT_IN_1,
+  SCHWARZ_MATT_IN_1,
+  '6k1/5ppp/8/8/q7/8/5PPP/3R2K1 b - - 0 1',  // Dxd1#
+];
+
+const ERGEBNISSE = [];
+function pruefe(name, ok, detail = '') {
+  ERGEBNISSE.push({ name, ok: !!ok, detail });
+  log((ok ? 'OK     ' : 'FEHLER ') + name + (detail ? '  (' + detail + ')' : ''), ok ? 'ok' : 'fehler');
+  return !!ok;
+}
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+const jetzt = () => performance.now();
+
+function legal(fen, uci) {
+  const c = new Chess(fen);
+  return c.moves({ verbose: true }).find((m) => m.lan === uci) || null;
+}
+
+// Gewinnchance aus Sicht von Weiss (Lichess-Formel); Matt = 1/0
+function chanceWeiss(ev) {
+  if (ev.mate != null) return ev.mate > 0 ? 1 : 0;
+  return 0.5 + 0.5 * (2 / (1 + Math.exp(-0.00368208 * ev.cp)) - 1);
+}
+function cpWeiss(ev) {
+  if (ev.mate != null) return ev.mate > 0 ? 1000 : -1000;
+  return Math.max(-1000, Math.min(1000, ev.cp));
+}
+
+// ---------------- Engine ----------------
+async function testEngine() {
+  log('--- Engine ---');
+  const e = new Engine(undefined, { protokoll: true });
+
+  const p1 = e.init();
+  const p2 = e.init();
+  pruefe('init ist idempotent (gleiches Promise)', p1 === p2);
+  await p1;
+  pruefe('UCI-Optionen gelesen (UCI_Elo, Skill Level, MultiPV)',
+    e.optionen.UCI_Elo && e.optionen['Skill Level'] && e.optionen.MultiPV,
+    'UCI_Elo ' + e.optionen.UCI_Elo?.min + '..' + e.optionen.UCI_Elo?.max);
+
+  // Startstellung, MultiPV 3
+  let a = await e.analyse(START, { depth: 12, multipv: 3 });
+  const erste = a.lines.map((l) => l.pv[0]);
+  pruefe('Startstellung: 3 Varianten, Tiefe 12', a.lines.length === 3 && a.depth === 12 && a.lines.every((l) => l.depth === 12),
+    'depth ' + a.depth + ', lines ' + a.lines.length);
+  pruefe('MultiPV: verschiedene erste Zuege, bestmove = erste Variante', new Set(erste).size === 3 && a.bestmove === erste[0],
+    erste.join(' '));
+  pruefe('Startstellung: Bewertung ausgeglichen', a.lines[0].eval.cp != null && a.lines[0].eval.cp > -80 && a.lines[0].eval.cp < 120,
+    'cp ' + a.lines[0].eval.cp);
+  pruefe('Weiss am Zug: Varianten absteigend (Weiss-Sicht)', a.lines[0].eval.cp >= a.lines[1].eval.cp && a.lines[1].eval.cp >= a.lines[2].eval.cp,
+    a.lines.map((l) => l.eval.cp).join(' >= '));
+  pruefe('Analyse-Felder vollstaendig', a.fen === START && a.turn === 'w' && Array.isArray(a.lines[0].pv) && a.lines[0].multipv === 1);
+
+  // Weiss-Sicht mit Schwarz am Zug
+  a = await e.analyse(NACH_E4, { depth: 12, multipv: 3 });
+  pruefe('Schwarz am Zug nach 1.e4: Bewertung leicht fuer Weiss', a.turn === 'b' && a.lines[0].eval.cp > -40 && a.lines[0].eval.cp < 120,
+    'cp ' + a.lines[0].eval.cp);
+  pruefe('Schwarz am Zug: Varianten aufsteigend (beste fuer Schwarz = kleinste Zahl)',
+    a.lines[0].eval.cp <= a.lines[1].eval.cp && a.lines[1].eval.cp <= a.lines[2].eval.cp,
+    a.lines.map((l) => l.eval.cp).join(' <= '));
+  a = await e.analyse(SCHWARZ_DAME_MEHR, { depth: 10 });
+  const evS = a.lines[0].eval;
+  pruefe('Schwarz am Zug, Schwarz Dame mehr: negativ (Weiss-Sicht)', (evS.cp != null && evS.cp < -500) || (evS.mate != null && evS.mate < 0),
+    JSON.stringify(evS));
+  a = await e.analyse(WEISS_DAME_MEHR, { depth: 10 });
+  const evW = a.lines[0].eval;
+  pruefe('Weiss am Zug, Weiss Dame mehr: positiv', (evW.cp != null && evW.cp > 500) || (evW.mate != null && evW.mate > 0),
+    JSON.stringify(evW));
+  a = await e.analyse(SCHWARZ_MATT_IN_1, { depth: 8 });
+  pruefe('Schwarz setzt matt in 1: mate = -1, bestmove a8a1', a.lines[0].eval.mate === -1 && a.bestmove === 'a8a1',
+    JSON.stringify(a.lines[0].eval) + ' ' + a.bestmove);
+  a = await e.analyse(WEISS_MATT_IN_1, { depth: 8 });
+  pruefe('Weiss setzt matt in 1: mate = +1, bestmove a1a8', a.lines[0].eval.mate === 1 && a.bestmove === 'a1a8',
+    JSON.stringify(a.lines[0].eval) + ' ' + a.bestmove);
+
+  // Matt/Patt ohne Engine, auch wenn die Engine gerade rechnet
+  const lang = e.analyse(START, { depth: 40 });
+  let t = jetzt();
+  a = await e.analyse(MATT_SCHWARZ_IST_MATT, { depth: 20 });
+  const mattZeit = jetzt() - t;
+  pruefe('Mattstellung ohne Engine (sofort, trotz laufender Suche)', mattZeit < 50 && a.ende === 'matt' && a.bestmove === null,
+    Math.round(mattZeit) + ' ms');
+  pruefe('Mattstellung: Gewinner Weiss, mate = +1', a.gewinner === 'w' && a.lines[0].eval.mate === 1 && a.lines[0].eval.cp === null);
+  a = await e.analyse(MATT_WEISS_IST_MATT, {});
+  pruefe('Mattstellung: Gewinner Schwarz, mate = -1', a.gewinner === 'b' && a.lines[0].eval.mate === -1);
+  a = await e.analyse(PATT, {});
+  pruefe('Pattstellung: cp 0, ende patt', a.ende === 'patt' && a.lines[0].eval.cp === 0 && a.lines[0].eval.mate === null && a.bestmove === null);
+
+  // Abbruch der laufenden langen Suche
+  await warte(400);
+  t = jetzt();
+  e.stop();
+  a = await lang;
+  const stopZeit = jetzt() - t;
+  pruefe('stop(): Suche endet schnell mit Stand', stopZeit < 1000 && a.abgebrochen && a.depth >= 5 && a.lines.length === 1 && legal(START, a.bestmove),
+    Math.round(stopZeit) + ' ms, Tiefe ' + a.depth + ', ' + a.bestmove);
+
+  // Prioritaet 'sofort'
+  const langA = e.analyse(START, { depth: 40 });
+  await warte(300);
+  t = jetzt();
+  const b = await e.analyse(MITTE, { depth: 8, prioritaet: 'sofort' });
+  const aErg = await langA;
+  pruefe("prioritaet 'sofort' bricht laufende Suche ab", aErg.abgebrochen && b.fen === MITTE && b.depth === 8 && !b.abgebrochen,
+    Math.round(jetzt() - t) + ' ms');
+
+  // Warteschlange
+  const fens = [START, MITTE, NACH_E4];
+  const res = await Promise.all(fens.map((f) => e.analyse(f, { depth: 9, multipv: 2 })));
+  pruefe('Warteschlange: jede Antwort gehoert zu ihrer Stellung',
+    res.every((r, i) => r.fen === fens[i] && r.depth === 9 && r.lines.length === 2 && legal(fens[i], r.bestmove)));
+
+  // MultiPV mit Zeitlimit: nur vollstaendige Tiefen
+  e.protokoll.length = 0;
+  a = await e.analyse(MITTE, { movetime: 700, multipv: 4 });
+  pruefe('Zeitlimit + MultiPV 4: vier Varianten derselben (vollstaendigen) Tiefe',
+    a.lines.length === 4 && a.lines.every((l) => l.depth === a.depth) && new Set(a.lines.map((l) => l.pv[0])).size === 4 && a.depth >= 8,
+    'Tiefe ' + a.depth + ', ' + a.zeitMs + ' ms');
+
+  // Weniger legale Zuege als MultiPV
+  const zwei = '7k/8/8/8/8/8/r7/K7 w - - 0 1';
+  const anzahlZwei = new Chess(zwei).moves().length;
+  a = await e.analyse(zwei, { depth: 8, multipv: 5 });
+  pruefe('MultiPV wird auf Anzahl legaler Zuege begrenzt', a.lines.length === anzahlZwei, anzahlZwei + ' legale Zuege');
+
+  // Skill/Elo setzen und zuruecksetzen
+  e.protokoll.length = 0;
+  await e.analyse(START, { depth: 5, elo: 1500 });
+  await e.analyse(START, { depth: 5, elo: 900 });
+  await e.analyse(START, { depth: 5 });
+  await e.analyse(START, { depth: 5, skill: 5 });
+  await e.analyse(START, { depth: 5 });
+  const p = e.protokoll.filter((z) => z.startsWith('setoption'));
+  pruefe('Elo: LimitStrength an, UCI_Elo 1500, danach 1320 (Minimum), dann wieder aus',
+    p.includes('setoption name UCI_LimitStrength value true') && p.includes('setoption name UCI_Elo value 1500')
+      && p.includes('setoption name UCI_Elo value 1320') && p.includes('setoption name UCI_LimitStrength value false'),
+    p.join(' | '));
+  pruefe('Skill Level 5, danach wieder 20', p.includes('setoption name Skill Level value 5') && p[p.length - 1] === 'setoption name Skill Level value 20');
+
+  // beiTiefe
+  const tiefen = [];
+  a = await e.analyse(MITTE, { depth: 10, multipv: 2, beiTiefe: (z) => tiefen.push(z.depth) });
+  pruefe('beiTiefe meldet jede fertige Tiefe aufsteigend', tiefen.length >= 8 && tiefen.every((d, i) => i === 0 || d > tiefen[i - 1]) && tiefen[tiefen.length - 1] === 10,
+    tiefen.join(','));
+
+  // newGame
+  e.protokoll.length = 0;
+  await e.newGame();
+  pruefe('newGame sendet ucinewgame', e.protokoll.includes('ucinewgame'));
+
+  // Ungueltige FEN
+  let abgelehnt = false;
+  try { await e.analyse('kein fen', {}); } catch (err) { abgelehnt = true; }
+  pruefe('Ungueltige FEN wird abgelehnt', abgelehnt);
+
+  // stop mit Warteschlange
+  const q1 = e.analyse(START, { depth: 40 });
+  const q2 = e.analyse(MITTE, { depth: 40 });
+  await warte(200);
+  e.stop({ warteschlange: true });
+  const [r1, r2] = await Promise.all([q1, q2]);
+  pruefe('stop({warteschlange:true}) leert auch wartende Suchen', r1.abgebrochen && r2.abgebrochen && r2.lines.length === 0);
+
+  // terminate und Neustart
+  const offen = e.analyse(START, { depth: 40 });
+  await warte(150);
+  e.terminate();
+  const rOffen = await offen;
+  a = await e.analyse(START, { depth: 6 });
+  pruefe('terminate loest offene Suchen auf, danach startet die Engine neu', rOffen.abgebrochen && a.depth === 6 && a.lines.length === 1);
+  e.terminate();
+}
+
+// ---------------- Bots ----------------
+const TABELLE = [
+  [1, 'Bauer Benno', 250], [2, 'Oma Hilde', 500], [3, 'Kalle vom Stammtisch', 800], [4, 'Lisa Läufer', 1000],
+  [5, 'Ritter Rudi', 1200], [6, 'Professor Turm', 1400], [7, 'Dame Delia', 1600], [8, 'Kommissar König', 1800],
+  [9, 'Großmeisterin Greta', 2100], [10, 'Der Stockfisch', 3000],
+];
+
+async function testBots() {
+  log('--- Bots ---');
+  pruefe('10 Bots in der Leiter', BOTS.length === 10);
+  pruefe('Stufen, Namen und Ziel-Elo laut Bauplan',
+    TABELLE.every(([s, n, elo], i) => BOTS[i].stufe === s && BOTS[i].name === n && BOTS[i].elo === elo));
+  const felder = ['id', 'stufe', 'name', 'elo', 'titel', 'avatar', 'farbe', 'kurz', 'bio', 'staerke', 'saetze'];
+  pruefe('Alle Felder vorhanden', BOTS.every((b) => felder.every((f) => b[f] != null && b[f] !== '')));
+  pruefe('ids eindeutig', new Set(BOTS.map((b) => b.id)).size === 10);
+  let satzOk = true;
+  let satzInfo = '';
+  for (const b of BOTS) {
+    for (const an of ANLAESSE) {
+      const l = b.saetze[an];
+      if (!Array.isArray(l) || l.length < 3 || l.length > 6 || l.some((s) => typeof s !== 'string' || s.length < 2)) {
+        satzOk = false;
+        satzInfo += b.id + '.' + an + ' ';
+      }
+    }
+  }
+  pruefe('Je Bot und Anlass 3 bis 6 Saetze', satzOk, satzInfo);
+  const alleSaetze = BOTS.flatMap((b) => ANLAESSE.flatMap((an) => b.saetze[an]));
+  pruefe('Saetze mit echten Umlauten, keine ae/oe/ue-Ersatzschreibung in typischen Woertern',
+    !alleSaetze.some((s) => /\b(fuer|schoen|ueber|Koenig|Laeufer|gruess|zurueck|muess)/i.test(s)), alleSaetze.length + ' Saetze');
+
+  const hilde = BOTS[1];
+  const s1 = botSatz(hilde, 'begruessung', () => 0);
+  const s2 = botSatz(hilde, 'begruessung', () => 0);
+  pruefe('botSatz liefert Satz aus der Liste', hilde.saetze.begruessung.includes(s1));
+  pruefe('botSatz wiederholt nicht direkt denselben Satz', s1 !== s2);
+  pruefe('botSatz mit unbekanntem Anlass liefert null', botSatz(hilde, 'quatsch') === null && botSatz(null, 'schach') === null);
+
+  // Legale Zuege aus verschiedenen Stellungen
+  const stellungen = [
+    START, MITTE, NACH_E4,
+    '8/P5k1/8/8/8/8/6K1/8 w - - 0 50',                                   // Umwandlung
+    'rnbqkbnr/ppp2ppp/8/3pp3/4P3/5Q2/PPPP1PPP/RNB1KBNR b KQkq - 1 3',     // Mittelspiel frueh
+    '4k3/8/8/8/8/8/4r3/4K3 w - - 0 1',                                    // im Schach
+    '8/5pk1/6p1/7p/3R3P/6P1/r4PK1/8 b - - 0 40',                         // Turmendspiel
+  ];
+  const e = new Engine();
+  await e.init();
+  let alleLegal = true;
+  let info = '';
+  const t0 = jetzt();
+  for (const b of BOTS) {
+    for (const f of stellungen) {
+      const r = await botZug(e, f, b, { ohnePause: true });
+      const m = r && legal(f, r.uci);
+      if (!m || m.san !== r.san || typeof r.denkzeitMs !== 'number') {
+        alleLegal = false;
+        info += b.id + '@' + f.split(' ')[0].slice(0, 12) + '=' + (r && r.uci) + ' ';
+      }
+    }
+  }
+  pruefe('Jeder Bot liefert legale Zuege (uci + passende SAN)', alleLegal, info || (BOTS.length * stellungen.length + ' Zuege, ' + Math.round(jetzt() - t0) + ' ms'));
+  pruefe('Keine legalen Zuege: null', (await botZug(e, MATT_SCHWARZ_IST_MATT, BOTS[0], { ohnePause: true })) === null);
+
+  // Matt in 1
+  const mattStellungen = MATT_IN_1_STELLUNGEN.filter((f) => {
+    try { return new Chess(f).moves().some((m) => m.endsWith('#')); } catch (err) { return false; }
+  });
+  let ab4 = true;
+  for (const b of BOTS.slice(3)) {
+    for (const f of mattStellungen) {
+      for (let i = 0; i < 3; i++) {
+        const r = await botZug(e, f, b, { ohnePause: true });
+        if (!r.san.endsWith('#')) ab4 = false;
+      }
+    }
+  }
+  pruefe('Ab Stufe 4 wird Matt in 1 nie uebersehen', ab4, mattStellungen.length + ' Stellungen x 3 je Bot');
+  const raten = [];
+  for (const b of BOTS.slice(0, 3)) {
+    let n = 0;
+    let treffer = 0;
+    for (const f of mattStellungen) {
+      for (let i = 0; i < 12; i++) {
+        const r = await botZug(e, f, b, { ohnePause: true });
+        n++;
+        if (r.san.endsWith('#')) treffer++;
+      }
+    }
+    raten.push(b.name + ' ' + Math.round(100 * treffer / n) + ' %');
+    BOTS_MATT[b.id] = treffer / n;
+  }
+  pruefe('Stufe 1 bis 3 uebersehen Matt in 1 manchmal', BOTS_MATT.benno < 1 && BOTS_MATT.benno > 0 && BOTS_MATT.kalle >= BOTS_MATT.benno, raten.join(', '));
+
+  // Denkzeit (mit Pause)
+  let t = jetzt();
+  let r = await botZug(e, START, BOTS[0], {});
+  const dz = jetzt() - t;
+  pruefe('Denkzeit: menschliche Pause 400 bis 1500 ms', dz >= 390 && dz <= 1700 && Math.abs(r.denkzeitMs - dz) < 50, Math.round(dz) + ' ms');
+  t = jetzt();
+  r = await botZug(e, '4k3/8/8/8/8/8/4r3/4K3 w - - 0 1', BOTS[5], {});
+  pruefe('Denkzeit auch bei fast erzwungenem Zug mindestens 400 ms', jetzt() - t >= 390, Math.round(jetzt() - t) + ' ms');
+  const ac = new AbortController();
+  t = jetzt();
+  const abbruch = botZug(e, START, BOTS[2], { signal: ac.signal });
+  setTimeout(() => ac.abort(), 100);
+  r = await abbruch;
+  pruefe('Abbruch per signal liefert null', r === null && jetzt() - t < 400, Math.round(jetzt() - t) + ' ms');
+
+  // Charakter: freie Dame schlagen
+  const freieDame = 'rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3'; // Sxh4
+  const quoten = [];
+  for (const b of [BOTS[0], BOTS[1], BOTS[3], BOTS[6]]) {
+    let n = 0;
+    for (let i = 0; i < 20; i++) {
+      const z = await botZug(e, freieDame, b, { ohnePause: true });
+      if (z.uci === 'f3h4') n++;
+    }
+    quoten.push(b.name + ' ' + n * 5 + ' %');
+    BOTS_DAME[b.id] = n / 20;
+  }
+  // Charakter: Anteil des Lieblingszugs mit Vorliebe gegen denselben Bot ohne Vorliebe
+  const merkmale = {
+    hilde: ['Schlagen', (m) => !!m.captured],
+    kalle: ['Schach', (m) => /[+#]/.test(m.san)],
+    lisa: ['Läuferzüge', (m) => m.piece === 'b'],
+    rudi: ['Springerzüge', (m) => m.piece === 'n'],
+    delia: ['Schach', (m) => /[+#]/.test(m.san)],
+    turm: ['Rochade/Turmzüge', (m) => m.piece === 'r' || m.flags.includes('k') || m.flags.includes('q')],
+  };
+  const charStellungen = testStellungen();
+  let mit = 0;
+  let ohne = 0;
+  for (const [id, [wort, passt]] of Object.entries(merkmale)) {
+    const bot = BOTS.find((b) => b.id === id);
+    const zwilling = { ...bot, staerke: { ...bot.staerke, vorlieben: {} } };
+    const anteil = async (b) => {
+      let n = 0;
+      let t = 0;
+      for (const f of charStellungen) {
+        for (let i = 0; i < 3; i++) {
+          const r = await botZug(e, f, b, { ohnePause: true });
+          const m = new Chess(f).move({ from: r.uci.slice(0, 2), to: r.uci.slice(2, 4), promotion: r.uci[4] });
+          n++;
+          if (passt(m)) t++;
+        }
+      }
+      return t / n;
+    };
+    const a = await anteil(bot);
+    const b = await anteil(zwilling);
+    mit += a;
+    ohne += b;
+    CHARAKTER[id] = { merkmal: wort, mitVorliebe: Math.round(100 * a), ohneVorliebe: Math.round(100 * b) };
+    log(`Charakter ${bot.name.padEnd(22)} ${wort}: ${Math.round(100 * a)} % (ohne Vorliebe ${Math.round(100 * b)} %)`);
+  }
+  pruefe('Charakter färbt die Zugwahl (Lieblingszüge häufiger als ohne Vorliebe)', mit > ohne,
+    `${Math.round(100 * mit / 6)} % gegen ${Math.round(100 * ohne / 6)} % im Mittel`);
+
+  pruefe('Freie Dame: Hilde nimmt sie fast immer, Benno oft, Lisa fast immer, Delia immer',
+    BOTS_DAME.hilde >= 0.7 && BOTS_DAME.benno >= 0.3 && BOTS_DAME.lisa >= 0.9 && BOTS_DAME.delia === 1, quoten.join(', '));
+  e.terminate();
+}
+const BOTS_MATT = {};
+const BOTS_DAME = {};
+const CHARAKTER = {};
+
+// ---------------- Staerke-Kurve ----------------
+const ERÖFFNUNGEN = [
+  'e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O',
+  'd4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 Nbd7',
+  'e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6',
+  'e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d4 exd4 cxd4 Bb4+ Bd2 Bxd2+ Nbxd2 d5',
+  'd4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7',
+  'e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3 Bxc3+ bxc3 Ne7 Qg4 O-O',
+  'e4 c6 d4 d5 e5 Bf5 Nf3 e6 Be2 c5 Be3 Nd7 O-O Ne7',
+  'c4 e5 Nc3 Nf6 Nf3 Nc6 g3 d5 cxd5 Nxd5 Bg2 Nb6 O-O Be7',
+  'e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Nf6 Nxc6 bxc6 e5 Qe7 Qe2 Nd5 c4',
+  'd4 d5 Bf4 Nf6 e3 c5 c3 Nc6 Nd2 e6 Ngf3 Bd6 Bg3 O-O Bd3',
+  'e4 d5 exd5 Qxd5 Nc3 Qa5 d4 Nf6 Nf3 Bf5 Bc4 e6 Bd2 c6',
+  'e4 e5 Nf3 d6 d4 Nf6 Nc3 Nbd7 Bc4 Be7 O-O O-O Re1 c6 a4',
+  'e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Na5 Bb5+ c6 dxc6 bxc6 Be2 h6 Nf3 e4 Ne5',
+  'd4 Nf6 c4 e6 Nc3 Bb4 Qc2 O-O a3 Bxc3+ Qxc3 b6 Bg5 Bb7 f3 h6 Bh4 d5',
+];
+const STELLUNGEN_FEN = [
+  '8/5pk1/6p1/7p/3R3P/6P1/r4PK1/8 w - - 0 40',
+  'r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10',
+  '2r2rk1/pp1bqppp/2n1pn2/3p4/3P4/P1NBPN2/1PQ2PPP/R4RK1 b - - 0 13',
+  '8/2k5/1pp5/p2p4/P2P1K2/1P3P2/8/8 w - - 0 45',
+  '6k1/pp3ppp/4p3/3n4/3P4/P3BP2/1P3KPP/8 w - - 0 30',
+  'r1b2rk1/ppq1bppp/2n1pn2/3p4/2PP4/2N1PN2/PPQ1BPPP/R1B2RK1 w - - 0 10',
+];
+function testStellungen() {
+  const liste = [];
+  for (const zeile of ERÖFFNUNGEN) {
+    const c = new Chess();
+    try {
+      for (const z of zeile.split(' ')) c.move(z);
+      liste.push(c.fen());
+    } catch (err) {
+      log('Eroeffnung ungueltig: ' + zeile, 'fehler');
+    }
+  }
+  for (const f of STELLUNGEN_FEN) {
+    try { new Chess(f); liste.push(f); } catch (err) { log('FEN ungueltig: ' + f, 'fehler'); }
+  }
+  return liste;
+}
+
+// Durchschnittlicher Verlust je Bot gegen eine Referenzanalyse (Tiefe 11)
+async function testStaerke({ proben = 3, parallel = 4 } = {}) {
+  log('--- Staerke-Kurve (Verlust je Zug gegen Referenz Tiefe 11) ---');
+  const stellungen = testStellungen();
+  const ref = new Engine();
+  const referenz = new Map();
+  for (const f of stellungen) referenz.set(f, await ref.analyse(f, { depth: 11 }));
+  ref.terminate();
+  const aufgaben = [];
+  for (const b of BOTS) for (const f of stellungen) for (let i = 0; i < proben; i++) aufgaben.push({ b, f });
+  const werte = new Map(BOTS.map((b) => [b.id, { cp: [], chance: [], patzer: 0, n: 0 }]));
+  let naechste = 0;
+  async function arbeiter() {
+    const eBot = new Engine();
+    const eRef = new Engine();
+    while (naechste < aufgaben.length) {
+      const { b, f } = aufgaben[naechste++];
+      const vorher = referenz.get(f);
+      const farbe = vorher.turn;
+      const r = await botZug(eBot, f, b, { ohnePause: true });
+      const c = new Chess(f);
+      c.move({ from: r.uci.slice(0, 2), to: r.uci.slice(2, 4), promotion: r.uci[4] });
+      const nach = await eRef.analyse(c.fen(), { depth: 10 });
+      const vz = farbe === 'w' ? 1 : -1;
+      const cpVerlust = Math.max(0, vz * (cpWeiss(vorher.lines[0].eval) - cpWeiss(nach.lines[0].eval)));
+      const wv = farbe === 'w' ? chanceWeiss(vorher.lines[0].eval) : 1 - chanceWeiss(vorher.lines[0].eval);
+      const wn = farbe === 'w' ? chanceWeiss(nach.lines[0].eval) : 1 - chanceWeiss(nach.lines[0].eval);
+      const w = werte.get(b.id);
+      w.cp.push(cpVerlust);
+      w.chance.push(Math.max(0, wv - wn));
+      if (wv - wn > 0.2) w.patzer++;
+      w.n++;
+    }
+    eBot.terminate();
+    eRef.terminate();
+  }
+  await Promise.all(Array.from({ length: parallel }, arbeiter));
+  const kurve = [];
+  for (const b of BOTS) {
+    const w = werte.get(b.id);
+    const acpl = Math.round(w.cp.reduce((x, y) => x + y, 0) / w.n);
+    const chance = w.chance.reduce((x, y) => x + y, 0) / w.n;
+    kurve.push({ stufe: b.stufe, name: b.name, acpl, chanceVerlust: +chance.toFixed(3), patzerQuote: +(w.patzer / w.n).toFixed(2), n: w.n });
+    log(`Stufe ${String(b.stufe).padStart(2)} ${b.name.padEnd(22)} Ø-Verlust ${String(acpl).padStart(4)} cp  Ø-Chancenverlust ${chance.toFixed(3)}  Patzer ${Math.round(100 * w.patzer / w.n)} %  (n=${w.n})`);
+  }
+  const k = (s) => kurve[s - 1];
+  // Gruppen statt Einzelstufen: einzelne Stufen schwanken bei wenigen Proben zu stark
+  const gruppen = [[1, 2], [3, 4], [5, 6], [7, 8, 9], [10]];
+  const mittel = gruppen.map((g) => g.reduce((x, s) => x + k(s).chanceVerlust, 0) / g.length);
+  pruefe('Staerke-Kurve faellt: Stufe 1-2 > 3-4 > 5-6 > 7-9 > 10 (Chancenverlust)',
+    mittel.every((m, i) => i === 0 || m < mittel[i - 1]), mittel.map((m) => m.toFixed(3)).join(' > '));
+  pruefe('Stufe 1 laesst oft Material haengen (Patzer >= 20 %)', k(1).patzerQuote >= 0.2, Math.round(100 * k(1).patzerQuote) + ' %');
+  pruefe('Stufe 10 spielt nahezu fehlerfrei (Patzer 0 %, Ø-Verlust < 20 cp)', k(10).patzerQuote === 0 && k(10).acpl < 20, k(10).acpl + ' cp');
+  return kurve;
+}
+
+// ---------------- Kalibrierung: Bots gegeneinander ----------------
+function material(fen) {
+  const W = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+  let s = 0;
+  for (const c of fen.split(' ')[0]) {
+    const t = c.toLowerCase();
+    if (W[t] != null) s += c === t ? -W[t] : W[t];
+  }
+  return s;
+}
+
+async function spielePartie(e, botW, botB, zuglimit) {
+  const c = new Chess();
+  await e.newGame();
+  const arten = {};
+  let ply = 0;
+  while (ply < zuglimit && !c.isGameOver()) {
+    const bot = c.turn() === 'w' ? botW : botB;
+    const r = await botZug(e, c.fen(), bot, { zugNummer: ply, ohnePause: true });
+    c.move({ from: r.uci.slice(0, 2), to: r.uci.slice(2, 4), promotion: r.uci[4] });
+    arten[bot.id + ':' + r.art] = (arten[bot.id + ':' + r.art] || 0) + 1;
+    ply++;
+  }
+  let ergebnis;  // 1 = Weiss gewinnt, 0 = Schwarz, 0.5 = remis
+  let grund;
+  const mat = material(c.fen());
+  if (c.isCheckmate()) { ergebnis = c.turn() === 'w' ? 0 : 1; grund = 'Matt'; }
+  else if (c.isGameOver()) { ergebnis = 0.5; grund = c.isStalemate() ? 'Patt' : c.isThreefoldRepetition() ? 'Wiederholung' : c.isInsufficientMaterial() ? 'zu wenig Material' : '50 Zuege'; }
+  else { ergebnis = mat > 0 ? 1 : mat < 0 ? 0 : 0.5; grund = 'Zuglimit, Material ' + (mat > 0 ? '+' : '') + mat; }
+  return { ergebnis, grund, ply, material: mat, arten };
+}
+
+// Pruefung: je Paar liegt die staerkere Stufe nicht hinten (>= 50 %), ueber alle Paare zusammen klar (>= 70 %).
+// Einzelne Paare mit nur 4 bis 6 Partien schwanken stark, deshalb die Summe als harte Grenze.
+async function testKalibrierung({ paare = [[1, 3], [3, 5], [5, 7], [7, 9]], partien = 6, zuglimit = 120, parallel = 4, minPaar = 0.5, minGesamt = 0.7 } = {}) {
+  log(`--- Kalibrierung: ${partien} Partien je Paar, Zuglimit ${zuglimit} Halbzuege ---`);
+  const aufgaben = [];
+  for (const [schwach, stark] of paare) {
+    for (let i = 0; i < partien; i++) {
+      const starkWeiss = i % 2 === 0;
+      aufgaben.push({ schwach, stark, starkWeiss, index: i });
+    }
+  }
+  const ergebnisse = [];
+  let naechste = 0;
+  async function arbeiter() {
+    const e = new Engine();
+    while (naechste < aufgaben.length) {
+      const a = aufgaben[naechste++];
+      const bS = BOTS[a.stark - 1];
+      const bW = BOTS[a.schwach - 1];
+      const t = jetzt();
+      const p = a.starkWeiss ? await spielePartie(e, bS, bW, zuglimit) : await spielePartie(e, bW, bS, zuglimit);
+      const punkteStark = a.starkWeiss ? p.ergebnis : 1 - p.ergebnis;
+      ergebnisse.push({ ...a, punkteStark, grund: p.grund, ply: p.ply, sekunden: Math.round((jetzt() - t) / 1000) });
+      log(`  Stufe ${a.stark} (${a.starkWeiss ? 'Weiss' : 'Schwarz'}) gegen Stufe ${a.schwach}: ${punkteStark === 1 ? 'Sieg' : punkteStark === 0 ? 'Niederlage' : 'Remis'} fuer Stufe ${a.stark}, ${p.grund}, ${p.ply} Halbzuege, ${Math.round((jetzt() - t) / 1000)} s`);
+    }
+    e.terminate();
+  }
+  await Promise.all(Array.from({ length: parallel }, arbeiter));
+  const zusammen = [];
+  for (const [schwach, stark] of paare) {
+    const liste = ergebnisse.filter((r) => r.schwach === schwach && r.stark === stark);
+    const pkt = liste.reduce((s, r) => s + r.punkteStark, 0);
+    const siege = liste.filter((r) => r.punkteStark === 1).length;
+    const remis = liste.filter((r) => r.punkteStark === 0.5).length;
+    const nied = liste.filter((r) => r.punkteStark === 0).length;
+    zusammen.push({ stark, schwach, punkte: pkt, partien: liste.length, siege, remis, niederlagen: nied, gruende: liste.map((r) => r.grund) });
+    pruefe(`Stufe ${stark} holt gegen Stufe ${schwach} mindestens die Hälfte`, pkt / liste.length >= minPaar,
+      `${pkt} aus ${liste.length} (+${siege} =${remis} -${nied})`);
+  }
+  const summe = zusammen.reduce((s, z) => s + z.punkte, 0);
+  const anzahl = zusammen.reduce((s, z) => s + z.partien, 0);
+  pruefe('Staerkere Stufe gewinnt insgesamt klar', summe / anzahl >= minGesamt,
+    `${summe} aus ${anzahl} = ${Math.round(100 * summe / anzahl)} %`);
+  return zusammen;
+}
+
+// Grober Vergleich mit Stockfishs eigener Bremse (UCI_Elo). Nur Bericht, keine Pruefung:
+// der Elo-Regler ist bei kurzer Bedenkzeit selbst nicht sauber gestaffelt.
+async function testAnker({ paare = [[4, 1320], [6, 1400], [7, 1600], [8, 1800], [9, 2100]], partien = 4, parallel = 4 } = {}) {
+  log(`--- Vergleich mit Stockfish UCI_Elo (${partien} Partien je Paar) ---`);
+  const sf = (elo) => ({ id: 'sf' + elo, stufe: 10, name: 'Stockfish ' + elo, staerke: { voll: true, movetime: 200, elo } });
+  const aufgaben = [];
+  for (const [stufe, elo] of paare) for (let i = 0; i < partien; i++) aufgaben.push({ stufe, elo, botWeiss: i % 2 === 0 });
+  const erg = [];
+  let naechste = 0;
+  async function arbeiter() {
+    const e = new Engine();
+    while (naechste < aufgaben.length) {
+      const a = aufgaben[naechste++];
+      const bot = BOTS[a.stufe - 1];
+      const p = a.botWeiss ? await spielePartie(e, bot, sf(a.elo), 140) : await spielePartie(e, sf(a.elo), bot, 140);
+      erg.push({ ...a, punkte: a.botWeiss ? p.ergebnis : 1 - p.ergebnis, grund: p.grund });
+    }
+    e.terminate();
+  }
+  await Promise.all(Array.from({ length: parallel }, arbeiter));
+  return paare.map(([stufe, elo]) => {
+    const l = erg.filter((r) => r.stufe === stufe && r.elo === elo);
+    const pkt = l.reduce((s, r) => s + r.punkte, 0);
+    log(`Stufe ${stufe} (${BOTS[stufe - 1].elo}) gegen Stockfish UCI_Elo ${elo}: ${pkt} aus ${l.length}`);
+    return { stufe, elo, punkte: pkt, partien: l.length };
+  });
+}
+
+window.tests = {
+  async alle({ schnell = false, kalibrierung = {}, staerke = {}, anker = null } = {}) {
+    ERGEBNISSE.length = 0;
+    aus.textContent = '';
+    const t = jetzt();
+    const bericht = {};
+    await testEngine();
+    await testBots();
+    bericht.mattInEins = { ...BOTS_MATT };
+    bericht.freieDame = { ...BOTS_DAME };
+    bericht.charakter = { ...CHARAKTER };
+    if (!schnell) {
+      bericht.staerke = await testStaerke(staerke);
+      bericht.kalibrierung = await testKalibrierung(kalibrierung);
+      if (anker) bericht.anker = await testAnker(anker);
+    }
+    const fehler = ERGEBNISSE.filter((r) => !r.ok);
+    log(`--- ${ERGEBNISSE.length - fehler.length} von ${ERGEBNISSE.length} Pruefungen bestanden, ${Math.round((jetzt() - t) / 1000)} s ---`, fehler.length ? 'fehler' : 'ok');
+    return { ergebnisse: [...ERGEBNISSE], bericht, sekunden: Math.round((jetzt() - t) / 1000) };
+  },
+  testEngine, testBots, testStaerke, testKalibrierung, testAnker, spielePartie,
+};
+window.T = { Engine, BOTS, botZug, botSatz, Chess };
+window.bereit = true;
+
+document.getElementById('schnell').onclick = () => window.tests.alle({ schnell: true });
+document.getElementById('alles').onclick = () => window.tests.alle();
+</script>
+</body>
+</html>

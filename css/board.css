@@ -1,0 +1,236 @@
+/* Grundstil fuer js/board.js. Nutzt nur die Vertrags-Variablen (mit Ersatzwerten),
+   css/app.css darf alles ueberschreiben. Laden vor css/app.css. */
+
+.brett {
+  /* Ersatzwerte, falls das Design (noch) nichts setzt */
+  --b-hell: var(--feld-hell, #f1e6c8);
+  --b-dunkel: var(--feld-dunkel, #7ea35b);
+  --b-zuletzt: var(--zuletzt, rgba(255, 212, 64, .5));
+  --b-auswahl: var(--auswahl, rgba(255, 166, 43, .6));
+  --b-hinweis: var(--hinweis, rgba(79, 123, 247, .55));
+  --b-schach: var(--schach, #ff4646);
+  --b-punkt: var(--punkt, rgba(20, 20, 40, .28));
+  /* Stellschrauben fuer das Design */
+  --brett-radius: 6px;
+  --brett-dauer: 150ms;
+  --abzeichen-groesse: .48;   /* Anteil der Feldbreite */
+  --abzeichen-versatz: .17;   /* ueber die Feldecke hinaus, Anteil der Feldbreite */
+  --brett-zieh-maus: 1;       /* Vergroesserung der gezogenen Figur */
+  --brett-zieh-finger: 1.35;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* kein overflow: hidden, sonst werden die Abzeichen am Rand abgeschnitten */
+}
+.brett.greifbar { cursor: grab; }
+.brett.zieht { cursor: grabbing; }
+
+/* ---------- Felder ---------- */
+.brett-felder {
+  position: absolute;
+  inset: 0;
+  container-type: inline-size;  /* cqw = Prozent der Brettbreite (Koordinaten, Ringe) */
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border-radius: var(--brett-radius);
+  overflow: hidden;
+}
+.brett .feld { position: relative; min-width: 0; min-height: 0; }
+.brett .feld.h { background: var(--b-hell); }
+.brett .feld.d { background: var(--b-dunkel); }
+
+.brett .koord {
+  position: absolute;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 700;
+  line-height: 1;
+  font-size: 11px;
+  font-size: max(9px, 1.75cqw);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.brett .koord.zahl { top: 5%; left: 6%; }
+.brett .koord.buchst { bottom: 5%; right: 7%; }
+.brett .feld.h .koord { color: var(--b-dunkel); }
+.brett .feld.d .koord { color: var(--b-hell); }
+
+/* ---------- Ueberlagerungen (unter den Figuren) ---------- */
+.brett-lagen { position: absolute; inset: 0; pointer-events: none; }
+.brett .lage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 12.5%;
+  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
+}
+.brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; }
+.brett .lage[class*="mark-"] { z-index: 2; }
+.brett .lage.schach {
+  z-index: 3;
+  background: radial-gradient(circle at center, var(--b-schach) 0%, var(--b-schach) 22%, rgba(255, 70, 70, 0) 72%);
+}
+.brett .lage.auswahl { background: var(--b-auswahl); z-index: 4; }
+.brett .lage.ziel { z-index: 5; }
+.brett .lage.ziel::after {
+  content: "";
+  position: absolute;
+  inset: 36%;
+  border-radius: 50%;
+  background: var(--b-punkt);
+}
+.brett .lage.ziel.schlag::after {
+  inset: 3%;
+  background: none;
+  border: 6px solid var(--b-punkt);
+  border-width: max(3px, 1.05cqw);
+}
+.brett .lage.ueber {
+  z-index: 6;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .8);
+  box-shadow: inset 0 0 0 max(3px, .6cqw) rgba(255, 255, 255, .8);
+}
+
+/* Markierungen ueber markiere(felder, art) */
+.brett .lage.mark-hinweis { background: var(--b-hinweis); }
+.brett .lage.mark-auswahl { background: var(--b-auswahl); }
+.brett .lage.mark-zuletzt { background: var(--b-zuletzt); }
+.brett .lage.mark-fehler { background: var(--schlecht, #e5675e); opacity: .5; }
+.brett .lage.mark-gut { background: var(--gut, #46cf7e); opacity: .45; }
+.brett .lage.mark-bewertung {
+  box-shadow: inset 0 0 0 max(3px, .55cqw) var(--akzent, #ffc83d);
+  animation: brett-puls 1s ease-in-out infinite;
+}
+.brett .lage.mark-k-brillant { background: var(--k-brillant, #14b8c8); opacity: .5; }
+.brett .lage.mark-k-stark { background: var(--k-stark, #4f7bf7); opacity: .5; }
+.brett .lage.mark-k-bester { background: var(--k-bester, #2db45d); opacity: .5; }
+.brett .lage.mark-k-exzellent { background: var(--k-exzellent, #7cc242); opacity: .5; }
+.brett .lage.mark-k-gut { background: var(--k-gut, #97ad7b); opacity: .5; }
+.brett .lage.mark-k-buch { background: var(--k-buch, #c38d5e); opacity: .5; }
+.brett .lage.mark-k-ungenau { background: var(--k-ungenau, #e9b21b); opacity: .5; }
+.brett .lage.mark-k-fehler { background: var(--k-fehler, #ff8b2c); opacity: .5; }
+.brett .lage.mark-k-verpasst { background: var(--k-verpasst, #b266ea); opacity: .5; }
+.brett .lage.mark-k-patzer { background: var(--k-patzer, #f0474b); opacity: .5; }
+.brett .lage.mark-k-erzwungen { background: var(--k-erzwungen, #8a93a8); opacity: .5; }
+
+/* ---------- Figuren ---------- */
+.brett > .figur {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 2;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
+}
+.brett > .figur.gleitet {
+  z-index: 3;
+  transition: transform var(--brett-dauer) cubic-bezier(.25, .8, .35, 1);
+}
+.brett > .figur.gezogen {
+  z-index: 9;
+  transition: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
+}
+.brett > .figur.geht {
+  z-index: 1;
+  opacity: 0;
+  transition: opacity var(--brett-dauer) ease;
+}
+.brett > .figur.kommt { animation: brett-ein var(--brett-dauer) ease; }
+.brett > .figur.verdeckt { opacity: 0; }
+
+/* ---------- Pfeile ---------- */
+.brett-pfeile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+}
+.brett-pfeile .pfeil { opacity: .82; }
+
+/* ---------- Abzeichen (Zug-Klassen-Symbol) ---------- */
+.brett > .abzeichen-ort {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  width: calc(12.5% * var(--abzeichen-groesse));
+  min-width: 20px;
+  aspect-ratio: 1 / 1;
+  right: calc((7 - var(--x) - var(--abzeichen-versatz)) * 12.5%);
+  top: calc((var(--y) - var(--abzeichen-versatz)) * 12.5%);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+}
+.brett > .abzeichen-ort > svg { display: block; width: 100%; height: 100%; }
+.brett > .abzeichen-ort.plopp { animation: brett-plopp .55s ease-out both; }
+
+/* ---------- Umwandlung ---------- */
+.brett-umwandlung {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: var(--brett-radius);
+  background: rgba(10, 12, 24, .42);
+}
+.brett-umwandlung[hidden] { display: none; }
+.umwandlung-wahl {
+  position: absolute;
+  left: calc(var(--x) * 12.5%);
+  top: calc(var(--y) * 12.5%);
+  width: 12.5%;
+  height: 50%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--b-hell);
+  box-shadow: 0 0 0 2px var(--akzent, #ffc83d), 0 10px 30px rgba(0, 0, 0, .5);
+  animation: brett-ein .12s ease;
+}
+.umwandlung-figur {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--b-hell);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.umwandlung-figur + .umwandlung-figur { border-top: 1px solid rgba(0, 0, 0, .12); }
+.umwandlung-figur:active { background: var(--b-auswahl); }
+.umwandlung-figur:focus-visible { outline: 3px solid var(--akzent, #ffc83d); outline-offset: -3px; }
+.umwandlung-figur img { width: 92%; height: 92%; pointer-events: none; }
+
+/* ---------- Animationen ---------- */
+@keyframes brett-ein { from { opacity: 0; } }
+@keyframes brett-puls { 50% { opacity: .35; } }
+@keyframes brett-plopp {
+  0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+  55% { transform: scale(1.25) rotate(6deg); opacity: 1; }
+  80% { transform: scale(.94) rotate(-2deg); }
+  100% { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brett > .abzeichen-ort.plopp { animation-duration: 1ms; }
+  .brett .lage.mark-bewertung { animation: none; }
+}
