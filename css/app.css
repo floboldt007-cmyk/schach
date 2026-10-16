@@ -985,7 +985,10 @@ html[data-brett="holz"] { --feld-hell: #f0d9b5; --feld-dunkel: #b58863; }
 /* Chip "Übung": nicht wertende Partien (Ergebnis neben dem Kopfwort, Verlauf statt der Sterne) */
 .chip.uebung { height: 26px; padding: 0 10px; font-size: 12px; font-weight: 900; letter-spacing: .14em; color: #c4a6ff;
   background: rgba(160, 107, 255, .14); border-color: rgba(160, 107, 255, .6); }
-.erg-kopf { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; }
+/* Platz fuer den Knopf "Brett ansehen" oben rechts (symmetrisch, damit das Wort mittig bleibt); wird es eng,
+   rutscht der Chip unter das Wort */
+.erg-kopf { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 0 48px; }
+.erg-kopf .erg-wort { padding: 0 0 0 .16em; }
 .vl-uebung { height: 22px; padding: 0 8px; font-size: 11px; letter-spacing: .08em; }
 
 /* Tab im Hintergrund (app.js setzt html[data-sichtbar]): Animationen anhalten */
