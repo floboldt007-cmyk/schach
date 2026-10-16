@@ -319,7 +319,7 @@ export function zeige(root, params, app) {
         <div class="ziel-sterne mehr">
           ${ziele.map(([t, an]) => `<div class="${an ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${an ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('')}
         </div>
-        <div class="ort-panel-bot" hidden></div>
+        <div class="ort-panel-bot mehr" hidden></div>
         <div class="farbwahl" role="radiogroup" aria-label="Farbe wählen">
           ${farben.map(([k, t, fig]) => `<button type="button" role="radio" data-farbe="${k}" aria-checked="${letzteFarbe === k}" class="${letzteFarbe === k ? 'an' : ''}">
             <span class="fig-bg">${fig.map((x) => `<img src="assets/pieces/${x}.svg" alt="">`).join('')}</span>${t}</button>`).join('')}

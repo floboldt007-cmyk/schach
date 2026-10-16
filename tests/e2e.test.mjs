@@ -315,6 +315,13 @@ async function testeSieg(seite, h, fehler) {
   const id = partien[0] && partien[0].id;
   pruefe('Partie gespeichert', partien.length === 1 && partien[0].ergebnis === 'sieg', JSON.stringify(partien).slice(0, 120));
   pruefe('Analyse vorab gespeichert', await seite.evaluate((i) => localStorage.getItem('schach-arena:v1:review:' + i) != null, id));
+  // Erweiterungspunkte (Runde 4): Ereignisse einer echten Partie im Protokoll des Busses (gleiches Modul wie die App)
+  const ereignisse = await seite.evaluate(async () => (await import('./js/ereignisse.js')).protokoll().map((e) => e.name));
+  const kern = ereignisse.filter((n) => /^(app:bereit|partie:|zug:gespielt|zug:bewertet)/.test(n));
+  pruefe('Ereignisse: app:bereit, partie:gestartet, Züge, partie:beendet (ohne Pakete)', kern[0] === 'app:bereit' && kern.includes('partie:gestartet')
+    && kern.filter((n) => n === 'zug:gespielt').length === 7 && kern.indexOf('partie:beendet') > kern.lastIndexOf('zug:gespielt'), kern.join(' '));
+  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
+  pruefe('html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
 
   gruppe = 'Analyse';
   await h.tippe('.erg-knoepfe [data-ziel="analyse"]');

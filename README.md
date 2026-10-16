@@ -136,6 +136,11 @@ Einzeln: `storage`, `review`, `ereignisse`, `fairness`, `engine-bots --schnell`,
 Pages unter `/schach/` aus, spielt einen ganzen Ablauf auf dem iPad-Viewport durch, lädt die App
 offline neu und prüft das Update auf eine neue Version. Bilder landen in `design/app-shots/`.
 
+**Pakete (Runde 4):** Erweiterungen klinken sich nur über die Erweiterungspunkte ein (`ARCHITEKTUR.md`,
+Abschnitt „Runde 4: Erweiterungspunkte“). Im Testmodus lädt `index.html?test&erw=pakete/<paket>/index`
+ein Paket auch ohne die Importliste `js/erweiterungen.js`. Nur die Erweiterungspunkte prüfen:
+`node tests/app.test.mjs --erweiterungen`.
+
 **Neue Version veröffentlichen:** Der Offline-Cache liefert immer die gespeicherte Version aus.
 Damit das iPad ein Update bekommt, muss sich `sw.js` ändern. Nach jeder Änderung an einer
 App-Datei deshalb:

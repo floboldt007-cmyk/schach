@@ -402,12 +402,12 @@ export function zuruecksetzen()          // nur Tests
 | `app:sichtbar` | `{ sichtbar }` | `app.js` bei `visibilitychange`; setzt zusaetzlich `html[data-sichtbar]` |
 | `partie:gestartet` | `{ laufId, botId, botStufe, farbe, startFen, modus, ziel, fortgesetzt, buehne }` | `partie.js` `zeige()`, am Ende des synchronen Aufbaus |
 | `partie:verlassen` | `{ laufId }` | `partie.js` `verlasse()`, vor dem Abraeumen (danach `buehne` nicht mehr benutzen) |
-| `zug:gespielt` | `{ laufId, ply, wer: 'flo'/'bot', uci, san, fenVorher, fenNachher, geschlagen, schach, matt, umwandlung, rochade }` | nach `brett.setzeStellung()` |
-| `stellung:analysiert` | `{ laufId, fen, plies, amZug: 'flo'/'bot', analyse: { depth, lines: [{ eval, pv }] } }` | `beiAnalyse()`, nur fuer die aktuelle Stellung |
+| `zug:gespielt` | `{ laufId, ply, wer: 'flo'/'bot', uci, san, fenVorher, fenNachher, geschlagen (Figurtyp oder null), schach, matt, umwandlung (Figurtyp oder null), rochade (boolean) }` | `nachEigenemZug()` und `fuehreBotZugAus()`, nach `brett.setzeStellung()` (vor dem Zugklang) |
+| `stellung:analysiert` | `{ laufId, fen, plies, amZug: 'flo'/'bot', analyse: { depth, lines: [{ eval, pv }] } }` | `beiAnalyse()`, nur fuer die aktuelle Stellung, je aktueller Stellung einmal (auch aus dem Zwischenspeicher, z. B. nach einer Zuruecknahme) |
 | `zug:bewertet` | `{ laufId, ply, uci, sanDe, klasse, verlust, genauigkeit, gewinnVorher, gewinnNachher, gewinnZweiter, besterZug, besterZugSanDe, trivial, serie, serieVorher, letzter, live }` | `bewerte()`, direkt nach `zeigeBewertung(ply)`, nur wenn nicht veraltet |
-| `zug:zurueckgenommen` | `{ laufId, bisPly, plies }` | `zuruecknehmen()` |
+| `zug:zurueckgenommen` | `{ laufId, bisPly, plies }` (`bisPly`: erster entfernter Ply, `plies`: Anzahl entfernter Halbzuege) | `zuruecknehmen()` |
 | `hilfe:genutzt` | `{ laufId, art: 'hinweis', stufe }` | `hinweis()` |
-| `partie:beendet` | `{ laufId, partieId, botId, botStufe, farbe, modus, wertet, ergebnis, grund, eigeneZuege, liveKlassen, maxSerie, hinweise, zuruecknahmen, neueSterne, neuFreigeschaltet, extra, datum, dauerMs }` | `partie.js` `speichere()`, nach `speicherePartie()`, vor dem Overlay |
+| `partie:beendet` | `{ laufId, partieId, botId, botStufe, farbe, modus, wertet, ergebnis, grund, eigeneZuege, liveKlassen, maxSerie, hinweise, zuruecknahmen, neueSterne, neuFreigeschaltet, extra, datum, dauerMs }` | `partie.js` nach `speicherePartie()`, sobald die Live-Bewertung des letzten eigenen Zugs da ist (hoechstens 2,5 s), immer vor den Feier-Zeilen des Overlays und vor `partie:analysiert`; verlaesst Flo den Screen vorher, in `verlasse()` vor `partie:verlassen` |
 | `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse' }` | nach `ergaenzeAnalyse()` (Partie-Nachtrag mit Review, Analyse-Screen) |
 | `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
 | `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
@@ -416,8 +416,8 @@ export function zuruecksetzen()          // nur Tests
 | `uebung:ergebnis` | `{ partieId, ply, getroffen }` | Paket 1B |
 | `bestmarke:neu` | `{ kategorie, wert, vorher, text, partieId }` | Pakete 1A und 2A |
 
-Stand Welle 0a: Bus, Liste und `speicher:fehler` sind gebaut; die Sender in `app.js`, `partie.js` und
-`analyse.js` baut Welle 0b ein.
+`hilfe:genutzt` kommt bei beiden Hinweis-Stufen. `zug:bewertet` traegt `serie` (laufende COMBO nach diesem Zug) und
+`serieVorher` (vor diesem Zug); ein trivialer Zug laesst beide gleich.
 
 ## Anzeige-Orte: js/orte.js
 ```js
@@ -452,7 +452,23 @@ export function zuruecksetzen()                  // nur Tests
 | `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
 
-Die Hosts baut Welle 0b ein (und ergaenzt hier die genaue Stelle, falls sie abweicht).
+**Hosts im Detail (Welle 0b).** Jeder DOM-Ort hat einen eigenen Behaelter; leer ist er versteckt (`hidden`
+bzw. `display: contents`), ohne Pakete aendert sich also kein Pixel. Die Hosts leiten Klicks auf Elemente in
+diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete binden ihre Klicks selbst.
+
+| Ort | Behaelter | genaue Stelle | gefuellt |
+|---|---|---|---|
+| `arena:kopf` | `.kopf-chips` selbst | nach den Chips Sterne und Pokal | einmal beim Aufbau |
+| `arena:panel-oben` | `.detail > .ort-panel-oben` | erstes Kind des Panels (vor „Offene Partie“), zuerst die Nachlese | bei jedem `zeigeDetail()` (Botwahl) |
+| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (im Handy-Hochformat nur mit „Mehr“ sichtbar wie die Ziele) | bei jedem `zeigeDetail()` |
+| `arena:start` | keiner (Aufruf) | nach dem ersten `layout()` und der Freischalt-Animation | einmal; `verlasse()` beim Screen-Wechsel |
+| `partie:begruessung?` | Wahl | `partie.js` vor der Begruessungs-Blase; ebenso die Sprechblase im Arena-Panel (`farbe` dort `null` bei Zufall, `modus` `'normal'`) | Start einer Partie bzw. Botwahl |
+| `ergebnis:karte` | `.erg-karte-ort` | zwischen `.erg-feier` und `.erg-bot` | bei jedem `fuelle()` des Overlays |
+| `analyse:coach` | `.an-c-knoepfe > .an-c-paket` | Knopfzeile der Coach-Karte nach „Variante zeigen“; ohne Hauptvariante bekommt die Karte eine eigene Zeile (nur wenn gefuellt) | bei jedem Zug (`zeigeCoach()`), nur fuer Zuege, nicht fuer die Startstellung |
+| `analyse:oben` | `.an-rechts > .an-ort-oben` | nach dem Banner (Hochformat: `order: 1`) | bei jedem `baue()` |
+| `verlauf:seite` | `.vl-seite > .vl-ort` | zwischen Statistik und Schatzkiste | bei jedem `baue()` (auch nach dem Loeschen) |
+| `einstellungen:gruppen` | `.es-ort` (`display: contents`) | vor der Gruppe „Fortschritt“ | bei jedem `baue()` |
+| `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`; jeder Screen-Name aus `SCREENS` geht, sonst der normale Weg | beim frischen Start |
 
 ## Feier-Warteschlange: js/feier.js
 ```js
@@ -571,10 +587,84 @@ werden abgelehnt), `iconNamen()`.
   das sich beim ersten Lesen selbst berechnet und danach ein normales Feld ist.
 
 ## Partie-Buehne
-Kommt mit `partie:gestartet` (BAUPLAN 3.5); baut Welle 0b in `partie.js` ein und ergaenzt sie hier.
+Kommt mit `partie:gestartet` (BAUPLAN 3.5), ist eingefroren und gilt bis `partie:verlassen`; danach tut sie
+nichts mehr (`blase` -> `false`, `spaeter` -> `0`, `coachZusatz` liefert ein Element, das nirgends haengt).
+Im Testmodus auch als `window.__partie.buehne`.
+```js
+buehne = {
+  laufId, bot, farbe, modus, ziel,                 // ziel eingefroren oder null
+  el,                                              // section.screen.partie
+  effekte,                                         // .brett-effekte (gleiche Lage wie die Felder)
+  rahmen,                                          // .brett-rahmen
+  brett,                                           // Brett-Instanz: nur lesen und Effekte, nie Zuege setzen
+  reduziert,                                       // prefers-reduced-motion
+  feld(feld) -> { x, y } | null,                   // 0..7 in der aktuellen Brett-Ausrichtung (wie --x/--y)
+  liveAn() -> boolean,
+  phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
+  coachZusatz(inhalt, { prio = 50, art = 'info' }) -> HTMLElement,
+      // Zeile .c-zusatz[data-art] unter dem Coach-Satz (art 'info' | 'gut' | 'leise' | 'gross'; inhalt Text
+      // oder Element); hoechstens 2, nach prio geordnet, bei Gleichstand bleibt die aeltere; verschwindet mit
+      // dem naechsten Coach-Inhalt; im eingeklappten Coach versteckt
+  blase(anlass, { paar, prio = 50, werte }) -> boolean,
+      // Sprechblase (botSatz mit werte); eine je Zugpaar (paar: Standard Flos letzter Ply), eine hoehere prio
+      // ersetzt eine niedrigere. Eingebaut: spielerFehler/spielerGut 70, Begruessung 60, schlagen/schach 50
+  merke(paket, daten) -> boolean, gemerkt(paket) -> Kopie | null,
+      // paket: [a-z][a-z0-9-]*; daten als JSON in partie.extra[paket] (null loescht), alle Pakete zusammen
+      // hoechstens EXTRA_MAX Zeichen, sonst false und console.warn. Waehrend der Partie in der laufenden Partie,
+      // nach dem Ende direkt im gespeicherten Datensatz
+  spaeter(fn, ms) -> Timer,                        // raeumt verlasse() ab; Fehler in fn landen in der Konsole
+}
+```
+**COMBO.** Serie aus Bester Zug, Grossartig, Brillant. Neutral (zaehlt nicht, bricht nicht) sind Buch, Erzwungen
+und triviale Zuege (`trivial` aus `review.js`), solange sie nichts verschenken: ein trivialer Zug der Klassen
+Ungenau, Fehler, Chance verpasst oder Patzer bricht die Serie wie jeder andere. Der Chip `.combo` traegt
+`data-stufe` (`''` bei 3 bis 4, `heiss` 5 bis 7, `ueberladen` 8 bis 11, `unaufhaltsam` ab 12), der Screen
+`data-serie` (laufende Serie; 0 bei Live-Bewertung aus) und `data-serie-stufe`. `maxSerie` landet in der
+laufenden Partie, im Datensatz und in `partie:beendet`. Klang zur Klasse ueber `klang.klasse(k, { serie,
+serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu)` (auch bei reduzierter Bewegung).
+
+**Uebung und eigene Stellung.** `app.gehe('partie', { botId, farbe, startFen, modus: 'uebung', ziel })` startet
+eine Uebung (Kopf „Übung ab Zug n“, n = Zugnummer der Startstellung). Partien, die nicht werten
+(`storage.wertet`), zeigen im Ergebnis keine Sterne und keine Freischaltung, den Chip „ÜBUNG“ neben dem
+Kopfwort und die Knoepfe „Zur Analyse“ und „Nochmal ab hier“ (gleiche Params); im Verlauf statt der Sterne den
+Chip „Übung“.
+
+## Ergebnis-Overlay (partie.js)
+`.ergebnis-karte` = Kopfwort (bei nicht wertenden Partien `.erg-kopf` mit Chip), Unterzeile, `.erg-mitte`
+(Sterne bzw. Genauigkeit und Tipp), `.erg-feier`, `.erg-karte-ort` (Ort `ergebnis:karte`), `.erg-bot`,
+`.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
+- `.erg-feier` zeigt `feier.fuerOverlay(partieId)`: neue Zeilen gleiten im Abstand von 200 ms ein (`--t`),
+  die erste ab 1,5 s (Sieg mit Sternen) bzw. 0,7 s, schon gezeigte stehen ruhig. Jede neue Zeile spielt ihren
+  `klang` (sonst den eingebauten Tick `'feier'` mit steigender Tonhoehe); bei `klang.stufe === 'wichtig'` nur
+  grosse. Antippen der Karte zeigt sofort alles. `symbol`: Icon-Name aus `ui/icons.js` oder kurzer Text.
+  Handy (bis 600 px): die Zeilen werden zu einer Summenzeile (nur Titel), grosse bleiben eigene Zeilen.
+- `ergebnis:karte` wird neu gefuellt; `.erg-tipp` („Kopf hoch! …“) erscheint nur, wenn der Ort leer bleibt.
+- Sterne und Freischaltung bleiben im festen Teil und laufen nicht durch die Feier-Warteschlange.
+Waehrend Flo am Zug ist, gibt es kein Overlay (es erscheint nur nach dem Spielende).
+
+**Nachlese (arena.js).** Beim Aufbau der Arena einmal `feier.nachlese()`; ist etwas da, steht oben im Panel (erstes
+Element von `.ort-panel-oben`, vor den Paketen) still die Karte `.nachlese` „Seit deiner letzten Partie“.
+
+## app.js: Pakete, Screens, Ereignisse
+- `import './erweiterungen.js'` (statisch, oben). Nur mit `?test` zusaetzlich `?erw=pfad1,pfad2`: Pfade relativ zu
+  `js/`, ohne `.js`, nur `[a-z0-9-]` mit `/` dazwischen (sonst ignoriert), z. B.
+  `index.html?test&erw=pakete/kartei/index`. Sie laden vor `app:bereit` und dem ersten Screen; ein Ladefehler
+  landet in der Konsole, die App startet trotzdem.
+- `SCREENS` zusaetzlich `training` („Training“) und `start` („Willkommen“). Fehlt deren Datei (noch kein Paket),
+  geht es ohne Platzhalter still zur Arena (Verlaufseintrag wird `#arena`).
+- `app:bereit { app }` einmal vor dem ersten Screen; `app:screen { name, params }` nach erfolgreichem `zeige()`
+  (nicht fuer den Platzhalter); `app:sichtbar { sichtbar }` bei jedem `visibilitychange`, dazu
+  `html[data-sichtbar="ja"|"nein"]` (schon beim Start gesetzt; CSS haelt im Hintergrund alle Animationen an).
+- `speicher:fehler`: einmal je Sitzung der Hinweis „Speichern hat nicht geklappt: Der Speicher des Geräts ist voll.“
 
 ## Tests
 `node tests/ereignisse.test.mjs` (Bus inkl. Messung, Orte, Feier-Budget) und `node tests/fairness.test.mjs`
 (Schnappschuss `GRENZEN` und Brillant-Bedingungen, Verbotsliste in den Texten aller `js/**/*.js`, kein
 `Math.random` in `feier.js` und den reinen Paket-Logik-Dateien, `feier.BUDGET`, Uebungen werten nie).
 Beide laufen in `node tests/alle.mjs` mit (Node, ohne Server).
+
+`node tests/app.test.mjs --erweiterungen` prueft die Hosts im Browser mit einem Test-Paket, das der Test per
+`page.route` als `js/pakete/w0-test/index.js` ausliefert und ueber `?test&erw=` laedt (so testen auch die Pakete
+selbst): Reihenfolge und Daten der Ereignisse einer ganzen Partie, ein Test-Anbieter an jedem Ort an der
+richtigen Stelle, Wahl-Orte, Feier im Ergebnis und Nachlese, Uebungs-Partie ohne Sterne, COMBO ohne
+Rueckschlag, die Buehne (Zusatz, Blase, merke, Timer nach `verlasse()`), Sichtbarkeit, Speicher voll, Router.

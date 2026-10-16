@@ -132,9 +132,15 @@ function main() {
   const avatare = [...bots.matchAll(/avatar:\s*'([^']+)'/g)].map((m) => m[1]);
   pruefe('Alle Bot-Avatare im Cache', avatare.length === 10 && avatare.every((a) => menge.has(a)), avatare.filter((a) => !menge.has(a)).join(', '));
   const app = readFileSync(path.join(WURZEL, 'js/app.js'), 'utf8');
-  const screens = (app.match(/const SCREENS = \[([^\]]+)\]/) || [, ''])[1].match(/'([^']+)'/g) || [];
-  const screenFehlt = screens.map((s) => `js/ui/${s.slice(1, -1)}.js`).filter((d) => !menge.has(d));
-  pruefe('Alle Screen-Module im Cache', screens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
+  const screens = ((app.match(/const SCREENS = \[([^\]]+)\]/) || [, ''])[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
+  // Screens der Pakete (Runde 4: training, start): ihre Datei kommt erst mit dem Paket; ist sie da, muss sie in den Cache
+  const paketScreens = ((app.match(/const PAKET_SCREENS = new Set\(\[([^\]]+)\]\)/) || [, ''])[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
+  const kernScreens = screens.filter((s) => !paketScreens.includes(s));
+  const screenFehlt = kernScreens.map((s) => `js/ui/${s}.js`).filter((d) => !menge.has(d));
+  pruefe('Alle Screen-Module im Cache', kernScreens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
+  const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => existsSync(path.join(WURZEL, d)) && !menge.has(d));
+  pruefe('Paket-Screens (training, start) im Router, vorhandene im Cache', JSON.stringify(paketScreens) === '["training","start"]'
+    && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');
   const sfPfad = (engine.match(/new URL\('([^']+stockfish[^']+\.js)'/) || [])[1];
   const sf = sfPfad ? relativ('js/engine.js', sfPfad) : null;
