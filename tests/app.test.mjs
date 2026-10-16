@@ -1384,6 +1384,14 @@ async function testeViewport(browser, vp) {
   pruefe('Übungs-Ergebnis passt ins Bild', ue && ue.l >= 0 && ue.r <= ue.iw + 1 && ue.t >= 0 && ue.b <= ue.ih + 1 && await seite.locator('.erg-kopf .chip.uebung').isVisible(), JSON.stringify(ue));
   const knopfTexte = await seite.evaluate(() => [...document.querySelectorAll('.erg-knoepfe .knopf')].every((k) => k.scrollWidth <= k.clientWidth + 1));
   pruefe('Übungs-Ergebnis: Knopf-Beschriftungen passen', knopfTexte);
+  const frei = await seite.evaluate(() => {
+    const a = document.querySelector('.erg-kopf .chip.uebung').getBoundingClientRect();
+    const b = document.querySelector('.erg-zu').getBoundingClientRect();
+    const w = document.querySelector('.erg-kopf .erg-wort').getBoundingClientRect();
+    const schneidet = (x, y) => x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+    return !schneidet(a, b) && !schneidet(w, b) && !schneidet(a, w);
+  });
+  pruefe('Übungs-Ergebnis: Chip und Kopfwort frei vom Knopf „Brett ansehen“', frei);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 }
