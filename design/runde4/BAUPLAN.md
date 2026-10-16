@@ -913,6 +913,19 @@ weiter tippen, alle Effekte laufen über `transform` und `opacity`.
 
 ## 9. Offene Fragen an Flo
 
+**Entschieden am 16.10.2026** (Flo hat alle Empfehlungen angenommen, Punkte 2 und 4 hat Claude nach Rat festgelegt):
+
+| Frage | Entscheidung |
+|---|---|
+| Tempo | Welle 0 und 1 bauen, dann das Tor (Flo spielt mindestens 5 Tage auf dem iPad), erst danach Welle 2. |
+| 1. Funken | Erst ohne. Neu entscheiden nach der Testwoche. |
+| 2. Startwert | 800 „vorläufig“ (Welle 2). Keine Eingabe einer Online-Wertung. |
+| 3. Spürnase | Standardmäßig an, abschaltbar (Welle 2). |
+| 4. Lichterkette | Ruhetag standardmäßig „keiner“ (frei wählbar). Der Kopf-Chip erscheint erst ab dem ersten zählenden Tag. |
+| 5. Bot-Ton | Leichte Sticheleien erlaubt, mit den Grenzen aus Regel 10 (höchstens eine je Partie, nie nach 3 Niederlagen in Folge). |
+
+Die Fragen im Wortlaut:
+
 1. **Funken ja oder nein?** Willst du zusätzlich zur ehrlichen Wertung eine XP-Leiste („Funken“, 12 Neon-Ränge), die
    auch bei Niederlagen wächst? Mein Rat: erst ohne, nach der Woche mit Welle 1 entscheiden.
 2. **Startwert der Arena-Wertung:** bei 800 „vorläufig“ starten, oder soll man beim ersten Start seine Online-Wertung
