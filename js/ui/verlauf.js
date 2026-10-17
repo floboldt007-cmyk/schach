@@ -4,6 +4,8 @@
 //   zeige(root, {}, app) -> { verlasse() }
 //
 // Klassen mit Praefix vl- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
+// Premium-Umbau U2: Kopf aus js/ui/seite.js (Titel "Verlauf", Unterzeile mit der Anzahl, Zurueck nur ohne Reiter Verlauf,
+// dazu Chips, Hell/Dunkel, Klang, Zahnrad); als Zwischenreiter (Flo D2) traegt der Kopf die Reiter-Pille.
 // Runde 4: Anzeige-Ort verlauf:seite (in .vl-seite zwischen Statistik und Schatzkiste); Partien, die
 // nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung". Die Statistik zaehlt nur
 // wertende Partien; die Kopfzeile nennt deshalb die Uebungen extra ("12 Partien, davon 2 Übungen").
@@ -17,6 +19,7 @@ import { eroeffnung } from '../openings.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { botFarbe } from '../thema.js';
+import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
 const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast' };
@@ -107,10 +110,7 @@ export function zeige(root, params = {}, app) {
     const partien = ladePartien();
     const n = partien.length;
     sec.innerHTML = `
-      <header class="kopf">
-        <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
-        <div class="titel"><h2>Verlauf</h2><div class="unter">${anzahlText(partien)}</div></div>
-      </header>
+      ${hauptKopf({ titel: 'Verlauf', unter: anzahlText(partien), marke: false, zurueck: true })}
       <div class="vl-inhalt">
         <aside class="vl-seite">
           ${statistikHtml()}
@@ -237,6 +237,7 @@ export function zeige(root, params = {}, app) {
     if (zeile && zeile._gewischt) { zeile._gewischt = false; return; }
     switch (k.dataset.aktion) {
       case 'zurueck': app.zurueck(); break;
+      case 'einstellungen': app.gehe('einstellungen'); break;
       case 'arena': app.gehe('arena'); break;
       case 'oeffnen':
         if (offen) { schliesse(offen); return; }
@@ -355,6 +356,9 @@ export function zeige(root, params = {}, app) {
   }
 
   baue();
+  // Premium-Umbau U2: Klang-Schalter und Hell/Dunkel im Hauptseiten-Kopf (Delegation, ueberlebt baue())
+  const kopf = verbindeKopf(sec, app);
+  aufraeumen.push(() => kopf.verlasse());
 
   return {
     verlasse() {

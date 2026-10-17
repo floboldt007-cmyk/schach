@@ -2,4 +2,61 @@
    Schach-Arena · Training-Huelle (Premium-Umbau, Look A)
    Angelegt von U1 (leer), gefuellt von Paket U2 (PLAN 2.10).
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Struktur: js/ui/training.js. Die Karten liefern Pakete ueber training:karten; die Bausteine
+   .t-karte, .t-held, .t-marke, .t-zahl, .t-fuss, .kartei-stapel stehen ihnen hier zur Verfuegung
+   (Mini-Brett: .mini in css/bauteile.css, miniBrett() in js/ui/bauteile.js).
    ============================================================ */
+.training-screen .training-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; padding-bottom: var(--a6); }
+
+/* Gitter: ab drei Karten links eine grosse ueber zwei Zeilen (Entwurf A), auf dem Handy eine Spalte */
+.training-gitter { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-auto-rows: auto; gap: 18px;
+  padding: 16px var(--rand) 8px; align-items: stretch; }
+.training-gitter[hidden] { display: none; }
+.training-gitter[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+.training-gitter:not([data-anzahl="1"]):not([data-anzahl="2"]) > :first-child { grid-row: span 2; }
+.training-gitter > * { min-width: 0; }
+
+/* Karten-Bausteine (aus A) */
+.t-karte { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 22px; overflow: hidden; text-align: left;
+  border: 0; border-radius: var(--r-xl); background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
+  box-shadow: var(--s2), var(--kante); color: var(--text); font: inherit; }
+button.t-karte { cursor: pointer; width: 100%; }
+.t-karte h2 { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 28px; letter-spacing: -.025em; line-height: 1.05; }
+.t-karte p { margin: 0; color: var(--text-2); font-weight: 600; font-size: 14.5px; }
+.t-held { gap: 18px; }
+.t-held .mini { width: min(100%, 300px); align-self: center; border-radius: 14px; box-shadow: var(--s2); }
+.t-fuss { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.t-zahl { font-family: var(--display); font-weight: var(--gw-titel); font-size: 54px; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.t-zahl small { margin-left: 6px; font-family: var(--schrift); font-size: 14px; font-weight: 700; letter-spacing: 0; color: var(--text-2); }
+.t-marke { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: var(--r-pille);
+  font-size: 12px; font-weight: 800; background: var(--akzent-weich); color: var(--akzent-text); }
+.t-marke .ico { width: 14px; height: 14px; }
+.kartei-stapel { position: relative; height: 128px; margin: 4px 0 2px; }
+.kartei-stapel .kk { position: absolute; top: 6px; width: 104px; height: 116px; padding: 7px; border-radius: 16px; background: var(--flaeche);
+  box-shadow: var(--s2), var(--kante); }
+.kartei-stapel .kk .mini { width: 100%; }
+.kartei-stapel .kk:nth-child(1) { left: 0; transform: rotate(-7deg); }
+.kartei-stapel .kk:nth-child(2) { left: 64px; transform: rotate(-2deg); }
+.kartei-stapel .kk:nth-child(3) { left: 128px; transform: rotate(3deg); }
+.kartei-stapel .kk:nth-child(4) { left: 192px; transform: rotate(8deg); }
+
+/* ohne Anbieter: eine ruhige Karte */
+.training-leer { margin: 16px var(--rand) 0; max-width: 640px; flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.training-leer[hidden] { display: none; }
+.training-leer > div:not(.t-fuss) { flex: 1 1 240px; min-width: 0; }
+.training-leer h2 { font-size: 24px; }
+.training-leer p { margin-top: 6px; }
+.training-leer .t-symbol { width: 52px; height: 52px; flex: none; border-radius: 17px; display: grid; place-items: center; background: var(--flaeche-3);
+  color: var(--text-2); }
+.training-leer .t-symbol .ico { width: 28px; height: 28px; }
+.training-leer .t-fuss { flex-basis: 100%; justify-content: flex-start; }
+
+@media (max-width: 700px) {
+  .training-gitter, .training-gitter[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
+  .training-gitter > :first-child { grid-row: auto; }
+  .training-gitter:not([data-anzahl="1"]):not([data-anzahl="2"]) > :first-child { grid-row: auto; }
+  .t-karte { padding: 18px; }
+  .kartei-stapel .kk:nth-child(4) { display: none; }
+  .training-leer { padding: 18px; }
+}

@@ -1,5 +1,132 @@
 /* ============================================================
    Schach-Arena · Navigation: Reiter-Pille, Kopf der Hauptseiten (Premium-Umbau, Look A)
-   Angelegt von U1 (leer), gefuellt von Paket U2 (PLAN 2.1).
+   Angelegt von U1 (leer), gefuellt von Paket U2 (PLAN 2.1, Flo D2 und D5).
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Struktur: js/ui/seite.js (header.kopf.haupt-kopf), js/app.js (nav.reiter-leiste, html[data-reiter]).
+   Die Selektoren beginnen mit .screen, wo alte Regeln aus app.css/screens.css
+   (z. B. .arena .kopf, .vl-screen .kopf) sonst gewinnen wuerden.
    ============================================================ */
+
+/* ---------- Kopf der Hauptseiten ---------- */
+.screen .kopf.haupt-kopf {
+  height: auto; min-height: var(--kopf-hoehe); padding: 18px var(--rand) 0; gap: 12px;
+  display: flex; align-items: center; flex: none;
+}
+.haupt-kopf .kopf-links { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.haupt-kopf .rechts { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; }
+/* mit der Reiter-Pille in der Mitte: beide Seiten gleich breit, damit die Pille mittig steht */
+.haupt-kopf.mit-reiter .kopf-links { flex: 1 0 0; }
+.haupt-kopf.mit-reiter .rechts { flex: 1 1 0; }
+/* reicht es dafuer nicht (viele Reiter, viele Knoepfe): die Pille steht mittig im freien Platz zwischen beiden Seiten */
+.haupt-kopf.mit-reiter.reiter-frei .kopf-links { flex: 0 0 auto; }
+.haupt-kopf.mit-reiter.reiter-frei .rechts { flex: 0 1 auto; }
+.haupt-kopf.mit-reiter.reiter-frei .kopf-reiter-platz { flex: 1 1 auto; }
+.haupt-kopf .kopf-reiter-platz { flex: none; display: flex; justify-content: center; }
+.haupt-kopf .kopf-reiter-platz:empty { display: none; }
+
+/* Marke: Bauer auf Tinte, Titel (nie gekuerzt, bricht nicht um), Unterzeile */
+.haupt-kopf .marke { display: flex; align-items: center; gap: 12px; }
+.haupt-kopf .marke-zeichen { width: 44px; height: 44px; border-radius: 14px; flex: none; display: grid; place-items: center;
+  background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s1); }
+.haupt-kopf .marke-zeichen .ico { width: 26px; height: 26px; }
+.haupt-kopf .marke-text { min-width: 0; }
+.screen .haupt-kopf .marke-titel { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 23px; letter-spacing: var(--lw-titel);
+  line-height: 1.05; color: var(--text); white-space: nowrap; overflow: visible; text-overflow: clip; text-transform: none; }
+.screen .haupt-kopf .unter { margin-top: 4px; font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-2);
+  white-space: normal; overflow: visible; text-overflow: clip; max-width: 34ch; }
+
+/* Rechte Seite: Chips (Ort arena:kopf haengt weitere an; werden es zu viele, scrollen sie waagrecht, nie Umbruch), Knoepfe */
+.screen .haupt-kopf .kopf-chips { flex: 0 1 auto; min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 8px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 3px 2px; }
+.screen .haupt-kopf .kopf-chips::-webkit-scrollbar { display: none; }
+/* passt nicht einmal der erste Chip, blendet js/ui/seite.js die Chips aus (kein abgeschnittener Stummel) */
+.screen .haupt-kopf.ohne-chips .kopf-chips { display: none; }
+.haupt-kopf.ohne-chips .rechts > .kopf-knopf:first-of-type { margin-left: auto; }
+.screen .haupt-kopf .kopf-chips > * { flex: none; }
+.screen .haupt-kopf .chip { height: 40px; padding: 0 14px; gap: 7px; font-size: 14.5px; font-weight: var(--gw-stark); border: 0;
+  box-shadow: var(--s1), var(--kante); }
+.screen .haupt-kopf .chip .ico { width: 18px; height: 18px; }
+.screen .haupt-kopf .chip .ico.stern { color: var(--gold); }
+.haupt-kopf .chip .von { color: var(--text-2); }
+.screen .haupt-kopf .kopf-knopf { flex: none; width: 46px; height: 46px; border-radius: var(--r-m); border: 0; box-shadow: var(--s1), var(--kante); }
+.haupt-kopf .kopf-knopf .ico { width: 22px; height: 22px; }
+.haupt-kopf .kopf-zurueck { margin-right: 2px; }
+
+/* Klang-Schalter: an = Wellen, aus = Kreuz */
+.knopf-klang .klang-welle, .knopf-klang .klang-strich { transition: opacity var(--d-s) var(--sanft); }
+.knopf-klang .klang-strich { opacity: 0; }
+.knopf-klang[aria-pressed="false"] .klang-welle { opacity: 0; }
+.knopf-klang[aria-pressed="false"] .klang-strich { opacity: 1; }
+
+/* Verlauf ist ein Reiter (Flo D2): kein eigener Verlauf-Knopf; auf dem Screen eines Reiters kein Zurueck */
+html[data-reiter-liste~="verlauf"] .haupt-kopf [data-aktion="verlauf"] { display: none; }
+html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
+
+/* Seitentitel unter dem Kopf (Training, spaeter Verlauf und Pakete) */
+.seiten-kopf { padding: 14px var(--rand) 8px; }
+.seiten-kopf h1 { margin: 0; font-size: min(var(--fs-display), 52px); color: var(--text); }
+.seiten-kopf .ueberzeile { margin-bottom: 4px; }
+.seiten-kopf p { margin: 8px 0 0; color: var(--text-2); font-weight: 600; font-size: 15px; max-width: 60ch; }
+
+/* ---------- Reiter-Leiste: schwebende Glas-Pille ---------- */
+.reiter-leiste[hidden] { display: none; }
+.reiter-leiste { position: fixed; z-index: 40; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom, 0px)); margin: 0 auto;
+  width: max-content; max-width: calc(100% - 2 * var(--rand)); display: flex; padding: 5px; border-radius: var(--r-pille);
+  background: var(--glas); -webkit-backdrop-filter: var(--glas-filter); backdrop-filter: var(--glas-filter);
+  box-shadow: var(--s2), var(--kante); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .reiter-leiste { background: var(--flaeche); }
+}
+.reiter-leiste .reiter { position: relative; z-index: 1; flex: none; height: var(--reiter-hoehe); min-width: var(--tipp); margin: 0; padding: 0 20px;
+  border: 0; border-radius: var(--r-pille); background: none; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-weight: var(--gw-stark); font-size: 14.5px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
+  transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
+.reiter-leiste .reiter .ico { width: 18px; height: 18px; }
+.reiter-leiste .reiter[aria-current="page"] { color: var(--text); }
+.reiter-leiste .reiter:focus-visible { outline: var(--fokus); outline-offset: -2px; }
+.reiter-pille { position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: var(--r-pille); pointer-events: none;
+  background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+:root[data-modus="dunkel"] .reiter-pille { background: var(--flaeche-3); }
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .reiter-pille { background: var(--flaeche-3); }
+}
+/* enger, wenn sie oben nicht passt (app.js misst): erst schmaler, dann ohne Symbole */
+.reiter-leiste.eng .reiter { padding: 0 14px; font-size: 14px; }
+.reiter-leiste.enger .reiter .ico { display: none; }
+/* unten zu breit (Handy mit vier Reitern): volle Breite, Symbol ueber dem Wort */
+.reiter-leiste.gestapelt { left: var(--rand); right: var(--rand); width: auto; max-width: none; }
+.reiter-leiste.gestapelt .reiter { flex: 1 1 0; min-width: 0; height: calc(var(--reiter-hoehe) + 8px); padding: 0 4px; flex-direction: column; gap: 2px;
+  font-size: 11.5px; }
+.reiter-leiste.gestapelt .reiter .ico { width: 20px; height: 20px; }
+/* oben: in der Kopfzeile (Platz aus js/ui/seite.js) */
+.reiter-leiste[data-lage="oben"] { position: relative; left: auto; right: auto; bottom: auto; margin: 0; max-width: none; z-index: 1; }
+/* weg (Partie, Analyse, Einstellungen): faehrt nach unten, solange nicht bedienbar */
+.reiter-leiste.weg { pointer-events: none; }
+
+/* Platz fuer die Leiste unten: die Screens werden um ihre Hoehe kuerzer (oben braucht es keinen zusaetzlichen Platz).
+   --reiter-h = Pille (Reiter + 2 x 5) + Abstand zum Rand (mindestens 14, sonst die sichere Zone) + 10 Luft */
+:root { --reiter-h: calc(var(--reiter-hoehe) + 10px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
+html[data-reiter-form="gestapelt"] { --reiter-h: calc(var(--reiter-hoehe) + 18px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
+html[data-reiter="unten"] #app > .screen { height: calc(100vh - var(--reiter-h)); height: calc(100dvh - var(--reiter-h)); }
+
+/* ---------- Handy ---------- */
+@media (max-width: 700px) {
+  .screen .kopf.haupt-kopf { padding-top: 12px; gap: 8px; }
+  .haupt-kopf.mit-marke .unter { display: none; }
+  .screen .haupt-kopf .marke-titel { font-size: 19px; }
+  .haupt-kopf .marke { gap: 10px; }
+  .haupt-kopf .marke-zeichen { width: 40px; height: 40px; border-radius: 13px; }
+  .screen .haupt-kopf .chip { height: 38px; padding: 0 11px; font-size: 13.5px; }
+  .haupt-kopf .chip .von, .haupt-kopf .knopf-thema { display: none; }
+  .haupt-kopf .rechts, .screen .haupt-kopf .kopf-chips { gap: 6px; }
+  .screen .haupt-kopf .kopf-knopf { width: var(--tipp); height: var(--tipp); border-radius: 15px; }
+  .seiten-kopf { padding-top: 22px; }
+  .reiter-leiste .reiter { padding: 0 16px; }
+}
+@media (max-width: 440px) {
+  .screen .haupt-kopf .marke-titel { font-size: 18px; }
+  .haupt-kopf .rechts, .screen .haupt-kopf .kopf-chips { gap: 4px; }
+  /* drei Knoepfe: das Zeichen und der zweite Chip machen Platz (der Titel bleibt ganz) */
+  .haupt-kopf.voll .marke-zeichen, .haupt-kopf.voll .chip-pokal { display: none; }
+  html[data-reiter-liste~="verlauf"] .haupt-kopf.voll-durch-verlauf .marke-zeichen { display: grid; }
+}
