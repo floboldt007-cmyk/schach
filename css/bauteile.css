@@ -1,0 +1,130 @@
+/* ============================================================
+   Schach-Arena · Bauteile: Knoepfe, Chips, Segment, Schalter, Regler, Sheet, Toast, Halte-Knopf, Coach-Karte (Premium-Umbau, Look A)
+   Angelegt von U1 (leer), gefuellt von Paket U2 (PLAN 2.1, 6.3).
+   Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Struktur: js/ui/bauteile.js. Knoepfe und Chips selbst stehen in css/app.css (BASIS, von U1 in A-Optik).
+   Neue Optik kommt als neue Klassen (z. B. .coach-karte), damit alte Screens unveraendert bleiben,
+   bis ihr Paket sie umstellt.
+   ============================================================ */
+
+/* Strichstaerke der Icons aus dem Theme (das Attribut stroke-width="2" ist der Rueckfall) */
+.ico { stroke-width: var(--ic-strich, 2); }
+
+/* ---------- Segment (gleitende Pille, gleich breite Spalten) ---------- */
+.segment { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); padding: 4px; border-radius: var(--r-knopf);
+  background: var(--grund-2); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .05); }
+.seg { position: relative; z-index: 1; min-width: 0; min-height: var(--tipp); margin: 0; padding: 4px 6px; border: 0; border-radius: 11px; background: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer;
+  font: inherit; font-weight: var(--gw-stark); font-size: 14px; line-height: 1.15; text-align: center; color: var(--text-2);
+  transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
+.seg small { font-size: 11.5px; font-weight: 650; color: var(--text-2); }
+.seg[aria-checked="true"] { color: var(--text); }
+.seg:disabled { opacity: .4; cursor: default; }
+.seg .fig, .seg img { width: 24px; height: 24px; }
+.seg-zeile { flex-direction: row; gap: 7px; }
+.seg:focus-visible { outline: var(--fokus); outline-offset: -1px; }
+.seg-pille { position: absolute; z-index: 0; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--n, 2)); border-radius: 11px;
+  background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante);
+  transition: transform var(--d-l) var(--feder-weich); pointer-events: none; }
+:root[data-modus="dunkel"] .seg-pille { background: var(--flaeche-3); }
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .seg-pille { background: var(--flaeche-3); }
+}
+
+/* ---------- Schalter (58 x 44, Tinte wenn an) ---------- */
+.schalter { position: relative; flex: none; width: 58px; height: var(--tipp); margin: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.schalter::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 34px; border-radius: var(--r-pille); background: var(--flaeche-3);
+  box-shadow: inset 0 0 0 1px var(--linie), inset 0 1px 2px rgba(0, 0, 0, .06);
+  transition: background-color var(--d-m) var(--sanft), box-shadow var(--d-m) var(--sanft); }
+.schalter i { position: absolute; top: 8px; left: 3px; width: 28px; height: 28px; border-radius: var(--r-pille); background: var(--flaeche);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .14), 0 3px 8px -2px rgba(0, 0, 0, .2);
+  transition: transform var(--d-l) var(--feder), width var(--d-m) var(--feder), background-color var(--d-m) var(--sanft); }
+.schalter[aria-checked="true"]::before { background: var(--schalter-an); box-shadow: none; }
+.schalter[aria-checked="true"] i { transform: translateX(24px); background: var(--knauf-an); }
+.schalter.gedrueckt i { width: 34px; }
+.schalter.gedrueckt[aria-checked="true"] i { transform: translateX(18px); }
+.schalter.dr.gedrueckt { transform: none; }
+.schalter:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-pille); }
+
+/* ---------- Regler (Bahn, Fuellung in Tinte, Knauf) ---------- */
+.regler-zeile { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.regler-zeile > .ico { color: var(--text-2); }
+.regler { position: relative; flex: 1; min-width: 0; height: var(--tipp); display: flex; align-items: center; touch-action: none; cursor: pointer; }
+.regler-innen { position: relative; flex: 1; height: 100%; margin: 0 14px; display: flex; align-items: center; }
+.regler .bahn { position: absolute; left: -14px; right: -14px; height: 8px; border-radius: 8px; background: var(--flaeche-3); overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--linie); }
+.regler .fuell { position: absolute; top: 0; bottom: 0; left: 0; width: calc(14px + var(--w, .5) * (100% - 28px)); background: var(--text); }
+.regler .knauf { position: absolute; left: calc(var(--w, .5) * 100%); width: 28px; height: 28px; margin-left: -14px; border-radius: 50%;
+  background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .16), 0 4px 10px -2px rgba(0, 0, 0, .22), 0 0 0 .5px rgba(0, 0, 0, .06);
+  transform: scale(var(--ks, 1)); transition: transform var(--d-m) var(--feder); }
+.regler.zieht .knauf { --ks: 1.18; }
+.regler:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-s); }
+.regler-wert { min-width: 48px; text-align: right; font-weight: 800; color: var(--text); }
+:root[data-modus="dunkel"] .schalter::before, :root[data-modus="dunkel"] .regler .bahn { background: var(--flaeche-3); }
+
+/* ---------- Sheet (Blatt von unten, Schleier ohne Weichzeichner) ---------- */
+.sheet-ort { position: fixed; inset: 0; z-index: 65; display: flex; align-items: flex-end; justify-content: center; }
+.sheet-schleier { position: absolute; inset: 0; background: var(--schleier); }
+.sheet-karte { position: relative; width: min(520px, calc(100% - 24px)); margin: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 22px 22px; border-radius: var(--r-xl); text-align: center; background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
+  box-shadow: var(--s3), var(--kante); }
+.sheet-griff { width: 40px; height: 5px; margin: 0 auto 16px; border-radius: 3px; background: var(--linie-2); }
+.sheet-karte h3 { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 26px; letter-spacing: -.025em; line-height: 1.1; color: var(--text); }
+.sheet-karte p { margin: 8px 0 0; color: var(--text-2); font-weight: 600; }
+.sheet-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.sheet-knoepfe .knopf { width: 100%; }
+.sheet-ort.weg { pointer-events: none; }
+@media (max-width: 440px) {
+  .sheet-knoepfe { grid-template-columns: 1fr; }
+  .sheet-knoepfe .knopf.gefahr, .sheet-knoepfe .knopf.primaer { order: -1; }
+}
+
+/* ---------- Halte-Knopf (1 s halten, Ring fuellt sich) ---------- */
+.halte-knopf { position: relative; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.halte-symbol { position: relative; display: grid; place-items: center; width: 30px; height: 30px; flex: none; }
+.halte-symbol > .ico { width: 18px; height: 18px; }
+.halte-knopf .halte-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.halte-ring circle { fill: none; stroke-width: 3; }
+.halte-bahn { stroke: var(--linie-2); }
+.halte-fuell { stroke: var(--warn); stroke-dasharray: 100; stroke-dashoffset: 100; stroke-linecap: round; opacity: 0; }
+.halte-knopf.haelt .halte-fuell, .halte-knopf.ausgeloest .halte-fuell { opacity: 1; }
+.halte-knopf.haelt { background: var(--warn-weich); }
+.halte-knopf.ausgeloest .halte-fuell { stroke-dashoffset: 0; }
+
+/* ---------- Toast (Meldung) ---------- */
+/* Grundform steht in css/app.css (.toast-ort, .toast); hier nur die Feder aus A */
+.toast { animation-timing-function: var(--feder); }
+
+/* ---------- Coach-Karte (gemeinsam fuer Partie und Analyse; die Screens setzen die Klasse mit U7/U9) ---------- */
+.coach-karte { position: relative; border-radius: 22px; padding: 16px 16px 14px; overflow: hidden; background-color: var(--flaeche);
+  background-image: var(--textur-flaeche, none); box-shadow: var(--s2), var(--kante); }
+.coach-karte .coach-zeile { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.coach-karte .coach-zeile .sym { width: 34px; height: 34px; flex: none; }
+.coach-karte .coach-zeile .sym svg { width: 100%; height: 100%; }
+.coach-karte .coach-zeile b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; }
+.coach-karte .coach-zeile .san { font-weight: 800; font-size: 15px; color: var(--text-2); }
+.coach-karte .coach-zeile b.pille { padding: 3px 13px 4px; border-radius: var(--r-pille); background: var(--k-brillant); color: var(--kg-brillant); font-size: 21px; }
+.coach-karte p { margin: 8px 0 0; color: var(--text); font-size: 14.5px; font-weight: var(--gw-text); line-height: 1.45; }
+.coach-karte .bot-satz { display: flex; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--linie);
+  color: var(--text-2); font-size: var(--fs-klein); font-weight: 600; }
+.coach-karte .bot-satz .av { width: 24px; height: 24px; border-radius: 8px; overflow: hidden; flex: none; }
+.coach-karte .combo { position: absolute; top: 12px; right: 12px; }
+.coach-karte.ist-brillant { box-shadow: 0 0 0 2px var(--k-brillant), var(--s2); }
+@media (max-width: 700px) {
+  .coach-karte { padding: 12px 14px; border-radius: 18px; }
+  .coach-karte .coach-zeile b { font-size: 17px; }
+  .coach-karte p { font-size: var(--fs-klein); margin-top: 5px; }
+  .coach-karte .bot-satz { display: none; }
+}
+
+/* ---------- Mini-Brett (Vorschau, Felder in Flos Brettfarben) ---------- */
+.mini { display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1; border-radius: 10px; overflow: hidden; box-shadow: var(--s1); }
+.mini i { position: relative; font-style: normal; }
+.mini i.h { background: var(--feld-hell); }
+.mini i.d { background: var(--feld-dunkel); }
+.mini i.z { box-shadow: inset 0 0 0 100px var(--zuletzt); }
+.mini img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-pille, .schalter i, .regler .knauf { transition: none; }
+}

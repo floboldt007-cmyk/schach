@@ -1694,6 +1694,11 @@ S2           Training und Rhythmus        S3  Wettkampf (braucht fertige Eichung
 PHASE 2      2a Store, Konto, Abo, Freunde online · 2b offene Arena · 2c sichtbare Kosmetik und Werkstatt · 2d Ligen
 ```
 
+**Geändert am 17.10. (Flo: „Freunde früher“):** Nach dem TOR kommt zuerst **2a-Freunde**: Konto (E-Mail-Code, später
+Google), Benutzername mit Namensfilter, Freunde per Benutzername oder Einladungslink, Partien gegen Freunde mit
+Schnell-Chat und Emotes, Melden und Stummschalten, ohne Fremde und ohne offene Wertung. Danach S2 bis S4, Store und Abo
+aus 2a, dann 2b bis 2d.
+
 Hinweis für die Ausführung: Die Wellen S1 bis S4 setzen jeweils mehrere Agenten parallel ein. Nach Flos Regel
 („Vor dem Einsatz vieler Agenten immer zuerst fragen“) braucht jede Welle vorher sein OK.
 

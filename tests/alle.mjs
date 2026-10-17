@@ -8,6 +8,7 @@
 // Jede Suite startet ihren eigenen Server auf ihrem eigenen Port und beendet ihn wieder.
 // Exitcode 0 nur, wenn alle Suiten bestehen.
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -26,6 +27,9 @@ const SUITEN = [
   { name: 'engine-bots', datei: 'engine-bots.test.mjs', args: ['--schnell'], was: 'Stockfish-Wrapper und Bots' },
   { name: 'board', datei: 'board.test.mjs', args: [], was: 'Brett: Tippen, Ziehen, Effekte' },
   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
+  { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
+  { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
+  { name: 'navigation', datei: 'navigation.test.mjs', args: [], was: 'Reiter-Leiste, Kopf, Bauteile, Training-Hülle' },
   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },
   { name: 'e2e', datei: 'e2e.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Ganzer Ablauf, offline, Update' },
@@ -34,6 +38,11 @@ const SUITEN = [
 function lauf(suite) {
   return new Promise((resolve) => {
     const t0 = Date.now();
+    // eine fehlende Suite-Datei ist ein Fehler, nie ein stilles Ueberspringen
+    if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
+      resolve({ ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] });
+      return;
+    }
     const kind = spawn(process.execPath, [path.join(WURZEL, 'tests', suite.datei), ...suite.args], {
       cwd: WURZEL, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
     });
