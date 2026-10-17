@@ -807,11 +807,12 @@ Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie 
 | `js/orte.js` | acht neue Orte, `angeboten(ort)`, Aufruf-Orte mit `{ fertig }` |
 | `js/feier.js` | Quellen und Prioritaeten aus SPIELKONZEPT 3.10, `BRETT_FEIER` |
 | `js/app.js`, `js/erweiterungen.js` | sieben neue Paket-Screens, untere Leiste (nur vorbereitet, `REITER`), Start: Speicher dauerhaft, Analysen ausduennen |
-| `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss`, Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz` |
+| `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss` (Boss-Staerke, Lebensleiste statt Balken), Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz` |
+| `js/ui/analyse.js`, `js/ui/verlauf.js` | Spielstaerke gegen die Boss-Staerke; Chip je Modus im Verlauf |
 | `js/ui/arena.js` | Host der Heute-Karte (`arena:heute`); „Offene Partie“ auch gegen angemeldete Bots |
-| `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })` |
+| `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })`, `staerkeFuerElo(elo)` |
 | `js/board.js` | `beiAbgelehnt`, `striche()`, `kippeKoenig()` |
-| `tests/spiel.test.mjs` (neu) | Node: tag.js, inhalte.js, Spielplan, Bot-Register, nodes, Vorliebe, Seed |
+| `tests/spiel.test.mjs` (neu) | Node: tag.js, inhalte.js, Spielplan, Bot-Register, nodes, Vorliebe, Seed, Boss-Staerke |
 | `tests/orte-huelle.html` (neu) | Test-Huelle im Browser fuer die vier Orte, deren Screens erst mit Paketen kommen |
 
 ## js/tag.js
@@ -836,9 +837,9 @@ zugZufall(seed, ply) -> () => [0, 1)                   // = zufallAus(seedAus(se
 ```js
 RECHENSTAND = 1, VORLAUF_TAGE = 28, THEMEN = ['gambit', 'endspiel', 'taktik', 'eroeffnung', 'uhr']
 ladeInhalt(name, { art, neu = false }) -> Promise<{ ok: true, kopf, daten, veraltet } | { ok: false, grund, text }>
-SPIELPLAN_NAME = 'boss/spielplan', ladeSpielplan({ neu = false }) -> wie ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' })
     // daten/<name>.json relativ zum Modul; grund 'name' | 'netz' | 'json' | 'kopf' | 'art' | 'format' | 'rechenstand'
     // | 'inhalt'; wirft nie; Erfolge bleiben im Arbeitsspeicher, Fehler werden beim naechsten Mal neu versucht
+SPIELPLAN_NAME = 'boss/spielplan', ladeSpielplan({ neu = false }) -> wie ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' })
 pruefeKopf(json, { art }), pruefeInhalt(json, { art }) -> { ok, kopf, veraltet, fehler }
 registriereInhaltsart(art, { formate: [1], pruefe(json) -> [Fehlertext] }) -> abmelden()   // Pakete: eigene Dateiarten
 setzeHoler(fn | null), leereZwischenspeicher()        // nur Tests
@@ -952,9 +953,12 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
    dem Ende, sobald die Live-Bewertung des letzten Zugs da ist).
 2. `fuelle('partie:matt', null, kontext)`. Liefert ein Anbieter `{ fertig }`, wartet die Partie darauf, hoechstens
    `feier.BRETT_FEIER.dauerMs` (1.800 ms). Ein Tipp irgendwo auf den Partie-Screen bricht ab (`kontext.signal` feuert
-   `abort`; spaetestens nach dem Warten feuert es immer, dann springen die Finisher auf ihr Endbild).
+   `abort`; spaetestens nach dem Warten feuert es immer, dann springen die Finisher auf ihr Endbild). Der Tipp gilt ab dem
+   Mattzug: Kam er, bevor der Ort gefuellt wird, ist `signal` schon abgebrochen (`signal.aborted`), der Finisher zeigt
+   hoechstens sein Endbild und das Ergebnis wartet nicht.
 3. Danach das Ergebnis (wie bisher fruehestens 900 ms nach dem Ende). Laeuft ein Finisher, entfaellt der Klassen-Effekt
-   des Mattzugs (der Finisher ersetzt jeden Brett-Effekt; das Symbol am Feld bleibt). `verlasse()` der Anbieter beim
+   des Mattzugs (der Finisher ersetzt jeden Brett-Effekt; das Symbol am Feld bleibt). Bis feststeht, ob einer laeuft, wird
+   der Effekt gemerkt: Liefern alle Anbieter `null` (z. B. „Finisher aus“), kommt er nach dem Fuellen doch. `verlasse()` der Anbieter beim
    Verlassen der Partie (das Endbild darf bis dahin stehen bleiben). Ohne Anbieter aendert sich nichts am Ablauf.
 `kurzMs` (800) ist die Laenge der Kurzfassung (3.9, „Saft nach Verdienst“); welche Fassung laeuft, entscheidet das Paket.
 
@@ -962,6 +966,9 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 - **Params** zusaetzlich: `modus: 'boss' | 'frei' | 'spiel'`, `boss: { id, stufe: 'standard' | 'meister', woche?, staerke? }`
   (nur Modus `boss`), `seed` (sonst neu gewuerfelt), `liga: { saison, runde }`. Angemeldete Bots (`registriereBot`) gehen
   wie Leiter-Bots (`botId`); ihre `startFen` gilt, wenn die Params keine nennen.
+- **Boss-Staerke**: Nennt `boss.staerke` eine Zahl (S1-6 legt sie beim ersten Versuch der Woche fest), spielt der Boss
+  mit `staerkeFuerElo(staerke)` statt mit seinem Profil; Kopf „Baron · Standard ≈ 1080“, Bot-Zeile „Wochen-Boss · ≈ 1080“,
+  die Spielanalyse rechnet die Spielstaerke gegen diese Zahl. Ohne `staerke` gilt das Profil des Bosses.
 - **Modus `boss`**: wertet nie (keine Sterne, keine Freischaltung, keine Statistik). Kopf „Testboss · Meister“, Unterzeile
   „Regel: …“ (`bot.regel`), Bot-Zeile mit `bot.titel` statt „Stufe n · Elo“. Ergebnis mit dem Chip `BOSS`
   (`.chip.uebung[data-modus="boss"]`) und „Nochmal“ (gleiche Params, neuer Seed). `frei` und `spiel` zeigen die Chips
@@ -986,6 +993,7 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 registriereBot(profil) -> abmelden()     // { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo,
                                          //   saetze, regel, startFen, vorliebe, nodes, archiv }
 botNachId(id), alleBots(), BOT_ARTEN = ['boss', 'sparring', 'gast']
+staerkeFuerElo(elo) -> { staerke, botId } | null  // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080")
 botZug(engine, fen, bot, { zugNummer, ohnePause, zufall, signal, nodes, vorliebe }) -> { uci, san, denkzeitMs, art, vorliebe? }
 vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
 ```
@@ -1003,6 +1011,9 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
   der Bot ohnehin einen Zug aus diesem Fenster gespielt haette; Spontanzuege und Fehler bleiben. So macht der Stil einen Bot
   weder heimlich staerker noch schwaecher. Bei voller Staerke rechnet die Engine dafuer 5 Linien (MultiPV).
 - Ohne `nodes` und `vorliebe` und mit `zufall = Math.random` spielt jeder Bot genau wie vorher (Test in `spiel`).
+- `staerkeFuerElo(elo)`: das Staerke-Profil fuer eine offen angesagte Zahl (Wochen-Boss Standard „≈ deine Wertung“,
+  Meister „+150“, 3.8). Vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo (Gleichstand: der
+  schwaechere), als Kopie. **Die Eichung ersetzt nur diese Funktion** (geeichte Profile), die Aufrufer bleiben.
 
 ## Brett (js/board.js)
 - `new Brett(el, { ..., beiAbgelehnt(von, nach, art) })`: nur waehrend `erlaubeZuege()` gesetzt ist. Gemeldet werden: eine

@@ -38,7 +38,8 @@
 //   ihre startFen gilt, wenn die Params keine nennen. Der Datensatz traegt seed, boss, liga (tempo und zeiten
 //   bringt W0+b). Bot-Zuege: zufall = tag.zugZufall(seed, ply), nodes und vorliebe aus dem Bot-Profil.
 //   Modus boss: Kopf mit Boss-Name und Stufe, Unterzeile mit der Regel, keine Sterne, im Ergebnis der Chip "BOSS"
-//   und "Nochmal" (gleiche Params, neuer Seed). frei/spiel: Chip "FREI"/"SPIELHALLE".
+//   und "Nochmal" (gleiche Params, neuer Seed). frei/spiel: Chip "FREI"/"SPIELHALLE". boss.staerke (offen angesagte
+//   Zahl, z. B. 1080): der Boss spielt mit bots.staerkeFuerElo(staerke), Kopf "Name · Stufe ≈ 1080".
 //   DOM-Ort partie:gegner-leiste: .ort-gegner-leiste ueber dem Gegner (quer: erstes Kind von .botbox, hoch: erstes
 //   Kind von .botleiste-hoch .info; das Element wandert beim Drehen des Geraets mit). Einmal beim Start gefuellt,
 //   Kontext { app, buehne, bot, farbe, modus, boss, lage() -> 'hoch' | 'quer' }, ohne Anbieter versteckt.
@@ -46,8 +47,9 @@
 //   Kontext { app, buehne, laufId, partieId, ergebnis, gewinner: 'flo' | 'bot', koenigFeld, letzterZug { von,
 //   nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }. Liefert ein Anbieter { fertig: Promise },
 //   wartet das Ergebnis darauf, hoechstens feier.BRETT_FEIER.dauerMs (1,8 s); ein Tipp irgendwo auf den Screen
-//   bricht ab (signal), danach kommt sofort das Ergebnis. Ohne Anbieter aendert sich am Ablauf nichts. Laeuft
-//   ein Finisher, entfaellt der Klassen-Effekt des Mattzugs (der Finisher ersetzt jeden Brett-Effekt).
+//   bricht ab (signal, gilt schon ab dem Mattzug), danach kommt sofort das Ergebnis. Ohne Anbieter aendert sich am
+//   Ablauf nichts. Laeuft ein Finisher, entfaellt der Klassen-Effekt des Mattzugs (der Finisher ersetzt jeden
+//   Brett-Effekt); liefern alle Anbieter null, kommt der gemerkte Effekt doch.
 //   zug:abgelehnt { laufId, von, nach, art, figur, fen }: aus board.js beiAbgelehnt, nur wenn Flo am Zug ist.
 //   ergebnis:karte-Kontext zusaetzlich boss; die Abrechnungs-Huelle (ergebnis:abrechnung) haengt sich dort mit
 //   Reihenfolge 3 ein (js/ui/abrechnung.js).
@@ -59,7 +61,7 @@
 //   (.ohne-balken wie bei Balken aus; "Lebensleiste statt Balken", SPIELKONZEPT 3.18).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
-import { BOTS, botNachId, botZug, botSatz } from '../bots.js';
+import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
@@ -190,8 +192,14 @@ export function zeige(root, params, app) {
     tempo: pruefeTempo(quelle.tempo),
     zeiten: pruefeZeiten(laufend && laufend.zeiten),
     finisher: false,
+    effektGemerkt: null,
   };
   z.fens.push(z.chess.fen());
+  // W0+a: Boss mit offen angesagter Staerke (boss.staerke, z. B. 1080): gespielt wird mit staerkeFuerElo (vor der
+  // Eichung der naechstliegende Leiter-Bot), Kopf und Analyse nennen diese Zahl. Sonst das Profil des Bots.
+  const bossStaerke = z.boss && Number.isFinite(z.boss.staerke) ? staerkeFuerElo(z.boss.staerke) : null;
+  const zugBot = bossStaerke ? Object.freeze({ ...bot, staerke: bossStaerke.staerke }) : bot;
+  const botElo = bossStaerke ? z.boss.staerke : bot.elo;
   const laufId = 'l' + z.gestartet;
   const startFarbe = z.chess.turn();
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
@@ -242,13 +250,17 @@ export function zeige(root, params, app) {
   // ---------- DOM ----------
   // W0+a: Kopf und Bot-Zeile auch fuer angemeldete Bots (ohne Stufe) und Bosse
   function kopfTitel() {
-    if (z.modus === 'boss') return z.boss ? `${bot.name} · ${STUFE_NAME[z.boss.stufe]}` : bot.name;
+    if (z.modus === 'boss') {
+      if (!z.boss) return bot.name;
+      return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${z.boss.staerke}` : ''}`;
+    }
     return bot.stufe ? `${bot.name} · Stufe ${bot.stufe}` : bot.name;
   }
   function botMeta() {
     if (bot.stufe) return `Stufe ${bot.stufe} · Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
-    if (Number.isFinite(bot.elo)) teile.push(`Elo ${bot.elo}`);
+    if (bossStaerke) teile.push(`≈ ${z.boss.staerke}`);
+    else if (Number.isFinite(bot.elo)) teile.push(`Elo ${bot.elo}`);
     return teile.filter(Boolean).join(' · ');
   }
   const s = document.createElement('section');
@@ -640,7 +652,10 @@ export function zeige(root, params, app) {
     return brett.ausrichtung === 'w' ? [d, 7 - r] : [7 - d, r];
   }
   function effekt(feld, klasse) {
-    if (reduziert || z.finisher) return;   // ein laufender Finisher ersetzt jeden Brett-Effekt
+    if (reduziert) return;
+    // W0+a: ein Finisher ersetzt jeden Brett-Effekt. Bis feststeht, ob einer laeuft (ein Anbieter darf null liefern,
+    // z. B. "Finisher aus"), wird der Effekt gemerkt; laeuft keiner, holt der Matt-Hook ihn nach
+    if (z.finisher) { z.effektGemerkt = [feld, klasse]; return; }
     const [x, y] = spalteZeile(feld);
     const ort = document.createElement('div');
     ort.className = 'effekt-ort k-' + klasse;
@@ -938,7 +953,7 @@ export function zeige(root, params, app) {
         engBot = e;
         if (ctrl.signal.aborted) return;
         // W0+a: Zufall aus dem Seed (je Halbzug), feste Knoten und Vorliebe aus dem Bot-Profil
-        zug = await botZug(e, fen, bot, {
+        zug = await botZug(e, fen, zugBot, {
           zugNummer: z.zuege.length + 1, signal: ctrl.signal,
           zufall: z.seed != null ? zugZufall(z.seed, z.zuege.length) : Math.random,
           nodes: bot.nodes || null, vorliebe: bot.vorliebe || null,
@@ -1272,16 +1287,18 @@ export function zeige(root, params, app) {
   // planeBeendet), dann auf die Anbieter mit { fertig }, hoechstens BRETT_FEIER.dauerMs; ein Tipp bricht ab.
   let mattOrt = null;
   async function mattHook(ergebnis) {
-    await Promise.race([beendetDa, warte(AUSWERTUNG_WARTEN_MS + 500)]);
-    if (weg) return;
+    // Ein Tipp gilt ab dem Mattzug: auch waehrend noch auf partie:beendet gewartet wird (der Finisher bekommt dann ein
+    // schon abgebrochenes signal, zeigt hoechstens sein Endbild, und das Ergebnis wartet nicht)
     const ctrl = new AbortController();
     const tipp = () => ctrl.abort();
     s.addEventListener('pointerdown', tipp, true);
-    const m = z.verbose[z.verbose.length - 1] || null;
-    const matt = z.chess.turn();
-    let koenigFeld = null;
-    for (const reihe of z.chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === matt) koenigFeld = f.square;
     try {
+      await Promise.race([beendetDa, warte(AUSWERTUNG_WARTEN_MS + 500)]);
+      if (weg) return;
+      const m = z.verbose[z.verbose.length - 1] || null;
+      const matt = z.chess.turn();
+      let koenigFeld = null;
+      for (const reihe of z.chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === matt) koenigFeld = f.square;
       mattOrt = fuelle('partie:matt', null, {
         app, buehne, laufId, partieId: z.gespeichert ? z.gespeichert.partie.id : null, ergebnis,
         gewinner: ergebnis === 'sieg' ? 'flo' : 'bot', koenigFeld, fen: z.chess.fen(), reduziert: !!reduziert,
@@ -1289,6 +1306,12 @@ export function zeige(root, params, app) {
         signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
       });
       melde({ typ: 'matt-hook', anzahl: mattOrt.anzahl, wartend: mattOrt.wartend });
+      if (!mattOrt.anzahl) {
+        // kein Finisher (alle Anbieter lieferten null): der Klassen-Effekt des Mattzugs kommt doch
+        z.finisher = false;
+        if (z.effektGemerkt) effekt(...z.effektGemerkt);
+      }
+      z.effektGemerkt = null;
       if (mattOrt.wartend > 0) await Promise.race([mattOrt.fertig, warte(BRETT_FEIER.dauerMs, ctrl.signal)]);
     } finally {
       melde({ typ: 'matt-hook-ende', abgebrochen: ctrl.signal.aborted });
@@ -1317,7 +1340,7 @@ export function zeige(root, params, app) {
       // Tiefe: nur ausreichend tiefe wiederverwenden, flachere rechnet die Analyse neu (vorabMinTiefe)
       review = await analysierePartie(e, z.zuege, {
         tiefe: tiefe(), multipv: 2, startFen: startFen || undefined, spielerFarbe: farbe,
-        elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMinTiefe: tiefe(), vorabMerken: true, signal: endeCtrl.signal,
+        elo: { [botFarbe]: botElo }, vorab: app.vorab, vorabMinTiefe: tiefe(), vorabMerken: true, signal: endeCtrl.signal,
         beiFortschritt: (f, n) => overlay && overlay.fortschritt(n ? f / n : 1),
       });
     } catch (err) {
@@ -1765,7 +1788,7 @@ export function zeige(root, params, app) {
       chess: () => z.chess,
       phase: () => z.phase,
       effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
-      gegnerLeiste, mattOrt: () => mattOrt,
+      gegnerLeiste, mattOrt: () => mattOrt, zugBot: () => zugBot,
     };
   }
 

@@ -21,6 +21,8 @@
 //     regel hoechstens 140 Zeichen, nodes eine positive ganze Zahl. Angemeldete Bots haben stufe null und
 //     zaehlen nie zur Leiter (keine Sterne, keine Freischaltung). Falsches Profil: Fehler.
 //   botNachId(id) findet auch angemeldete Bots; alleBots() -> [...BOTS, ...angemeldete].
+//   staerkeFuerElo(elo) -> { staerke, botId } | null   Staerke fuer eine offen angesagte Zahl (Boss-Stufe "≈ 1080"):
+//     vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo; die Eichung ersetzt nur diese Funktion.
 //   botZug(..., { zufall, nodes, vorliebe }):
 //     zufall    Zufallsquelle (Standard Math.random; pruefbare Partien: tag.js zufallAus(seed))
 //     nodes     feste Knotenzahl statt Zeitlimit fuer jede Suche (gleicher Seed, gleiche Knoten, ein Thread:
@@ -719,6 +721,17 @@ export function registriereBot(profil) {
 
 export function botNachStufe(stufe) {
   return BOTS.find((b) => b.stufe === stufe) || null;
+}
+
+// W0+a: Staerke fuer eine offen angesagte Zahl (z. B. ein Wochen-Boss "spielt mit ungefaehr deiner Wertung",
+// SPIELKONZEPT 3.8). Bis die Eichung geeichte Profile liefert: das Staerke-Profil des Leiter-Bots mit der
+// naechstliegenden Elo (bei Gleichstand der schwaechere). Die Eichung ersetzt nur diese Funktion.
+// -> { staerke (tiefe Kopie), botId (woher) } oder null
+export function staerkeFuerElo(elo) {
+  if (!Number.isFinite(elo)) return null;
+  let bester = BOTS[0];
+  for (const b of BOTS) if (Math.abs(b.elo - elo) < Math.abs(bester.elo - elo)) bester = b;
+  return { staerke: JSON.parse(JSON.stringify(bester.staerke)), botId: bester.id };
 }
 
 // ---------------------------------------------------------------------------

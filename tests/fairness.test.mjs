@@ -293,7 +293,14 @@ function jsonDateien(ordner) {
   const orte = jsDateien('js').filter((d) => /spielplan|boss|werkstatt/i.test(d));
   const cd = [];
   for (const d of orte) for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) if (COUNTDOWN.test(t)) cd.push(`${d}: "${t.slice(0, 60)}"`);
-  pruefe(`Kein Uhrzeit-Countdown in Spielplan, Boss, Werkstatt (${orte.length} Dateien)`, cd.length === 0, cd);
+  // dazu die Inhalte (daten/boss/..., Spielplaene, Werkstatt-Katalog)
+  const inhalte = jsonDateien('daten').filter((d) => /spielplan|boss|werkstatt/i.test(d));
+  for (const d of inhalte) {
+    let json = null;
+    try { json = JSON.parse(readFileSync(path.join(WURZEL, d), 'utf8')); } catch (e) { continue; }
+    for (const t of texteVon(json)) if (COUNTDOWN.test(t)) cd.push(`${d}: "${t.slice(0, 60)}"`);
+  }
+  pruefe(`Kein Uhrzeit-Countdown in Spielplan, Boss, Werkstatt (${orte.length} Code-Dateien, ${inhalte.length} Inhalte)`, cd.length === 0 && COUNTDOWN.test('noch 2 h') && COUNTDOWN.test('3 Std') && !COUNTDOWN.test('Level 12'), cd);
 }
 {
   // Boss: Boss-Partien werten nie, jeder Boss bleibt im Archiv spielbar

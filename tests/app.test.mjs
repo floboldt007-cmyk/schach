@@ -1862,7 +1862,7 @@ async function testeErweiterungenFix(browser) {
 
 // ---------- 10. Spiel-Fundament (W0+a, SPIELKONZEPT 6.2) ----------
 // Test-Paket fuer die neuen Orte, den Matt-Hook, die Abrechnung und den Boss-Modus (per page.route ausgeliefert).
-// Schalter in der Adresse: wpheute, wpleiste, wpmatt, wpabr, wpabr5, wpboss.
+// Schalter in der Adresse: wpheute, wpleiste, wpmatt, wpmattnull, wpabr, wpabr5, wpboss.
 const TEST_PAKET_W0PLUS = `
 import { hoere } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
@@ -1911,7 +1911,8 @@ if (q.has('wpmatt')) {
     log.kontexte['partie:matt'] = Object.keys(k).sort();
     const gespeichert = JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]');
     log.matt.push({ t: jetzt(), gewinner: k.gewinner, koenigFeld: k.koenigFeld, nach: k.letzterZug && k.letzterZug.nach, figur: k.letzterZug && k.letzterZug.figur,
-      gespeichert: gespeichert.length > 0 && gespeichert[0].id === k.partieId, dauerMs: k.dauerMs, kurzMs: k.kurzMs, eingefroren: Object.isFrozen(k) });
+      gespeichert: gespeichert.length > 0 && gespeichert[0].id === k.partieId, dauerMs: k.dauerMs, kurzMs: k.kurzMs, eingefroren: Object.isFrozen(k),
+      schonAbgebrochen: k.signal.aborted });
     k.buehne.brett.kippeKoenig(k.koenigFeld, { langsam: true });
     const st = k.buehne.brett.striche([{ von: 'f7', nach: 'e7' }, { nach: 'd8', art: 'haken', verzoegerung: 120 }], { ebene: k.buehne.effekte });
     const beob = new MutationObserver(() => { if (document.querySelector('.ergebnis-overlay') && !log.overlayT) { log.overlayT = jetzt(); beob.disconnect(); } });
@@ -1922,6 +1923,10 @@ if (q.has('wpmatt')) {
       verlasse() { st.entferne(); log.mattWeg++; },
     };
   }, { paket: 'wp' });
+}
+if (q.has('wpmattnull')) {
+  // Finisher-Anbieter, der nichts startet (z. B. Einstellung "Finisher aus")
+  anbieten('partie:matt', () => { log.mattNull = (log.mattNull || 0) + 1; return null; }, { paket: 'wp' });
 }
 if (q.has('wpabr')) {
   const zeile = (titel, schluessel) => (k) => {
@@ -2214,6 +2219,42 @@ async function testeSpielFundament(browser) {
       protokoll: window.__partie.protokoll.filter((e) => e.typ === 'matt-hook-ende') }));
     const tippZeit = r2.overlayT - r2.mattT;
     pruefe('Matt-Hook: ein Tipp überspringt (Ergebnis kurz danach, signal bricht ab)', tippZeit < 1500 && r2.abbruch < r2.overlayT && r2.protokoll[0].abgebrochen === true, `${Math.round(tippZeit)} ms`);
+    // dritte Partie: Tipp schon vor dem Start des Finishers (die Auswertung des Mattzugs ist gebremst, partie:beendet kommt
+    // spaet): der Finisher bekommt ein abgebrochenes signal, das Ergebnis wartet nicht auf ihn
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    await schaeferBisMatt(seite, h);
+    await bremse(seite, 1500);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.zugTippen('h5f7');
+    await seite.waitForFunction(() => window.__partie && window.__partie.phase() === 'ende', null, { timeout: 10000 });
+    const brett3 = await seite.locator('.partie .brett').boundingBox();
+    await seite.touchscreen.tap(brett3.x + brett3.width / 2, brett3.y + 20);
+    const tippT = await seite.evaluate(() => performance.now());
+    await seite.waitForFunction(() => window.__wp.matt.length === 3, null, { timeout: 15000 });
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 10000 });
+    await seite.waitForFunction(() => window.__wp.overlayT > 0, null, { timeout: 5000 });
+    const r3 = await seite.evaluate(() => ({ m: window.__wp.matt[2], overlayT: window.__wp.overlayT,
+      ende: window.__partie.protokoll.filter((e) => e.typ === 'matt-hook-ende').pop() }));
+    pruefe('Matt-Hook: ein Tipp vor dem Start des Finishers gilt auch (signal schon abgebrochen, Ergebnis ohne Warten)',
+      r3.m.t > tippT && r3.m.schonAbgebrochen === true && r3.ende.abgebrochen === true && r3.overlayT - r3.m.t < 700, JSON.stringify({ ...r3, tippT }));
+    pruefe('Matt-Hook: keine Konsolenfehler (drei Partien)', fehler.length === 0, fehler.join(' | '));
+    // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Bester Zug") kommt doch
+    await seite.goto(MIT_W0PLUS('wpmattnull') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await schaeferBisMatt(seite, h);
+    await h.zugTippen('h5f7');
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 15000 });
+    await seite.waitForFunction(() => window.__partie.protokoll.some((e) => e.typ === 'matt-hook-ende'), null, { timeout: 5000 });
+    await warte(300);
+    const r4 = await seite.evaluate(() => {
+      const w = window.__wp;
+      const mattZug = w.ereignisse.find((e) => e.name === 'zug:gespielt' && e.matt);
+      return { aufrufe: w.mattNull, effekte: w.effekte.filter((t) => t >= mattZug.t).length,
+        hook: window.__partie.protokoll.filter((e) => /matt-hook/.test(e.typ)).map((e) => e.typ + ':' + (e.anzahl ?? e.abgebrochen)).join() };
+    });
+    pruefe('Matt-Hook: liefert der Anbieter null, kommt der Klassen-Effekt des Mattzugs doch (kein Warten)', r4.aufrufe === 1 && r4.effekte === 1
+      && r4.hook === 'matt-hook:0,matt-hook-ende:false', JSON.stringify(r4));
     pruefe('Matt-Hook: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -2305,6 +2346,19 @@ async function testeSpielFundament(browser) {
     const weiter = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet')[2]);
     pruefe('Boss: "Fortsetzen" in der Arena setzt die Boss-Partie mit Boss, Stufe und Seed fort', weiter.fortgesetzt === true && weiter.modus === 'boss'
       && weiter.seed === neu.seed && JSON.stringify(weiter.boss) === JSON.stringify(k.gest.boss), JSON.stringify(weiter));
+    // offen angesagte Staerke (3.8 "Ich spiele heute mit ≈ 1080"): Kopf nennt sie, gespielt wird mit staerkeFuerElo
+    await seite.evaluate(() => { window.__test = { botZug: () => 'f8e7' }; });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard', staerke: 1080 } });
+    await h.warteFlo();
+    const st = await seite.evaluate(async () => {
+      const lisa = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'lisa');
+      const zb = window.__partie.zugBot();
+      return { h2: document.querySelector('.partie .kopf h2').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
+        wieLisa: JSON.stringify(zb.staerke) === JSON.stringify(lisa.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
+    });
+    await seite.evaluate(() => { window.__test = {}; });
+    pruefe('Boss: offen angesagte Stärke im Kopf ("Standard ≈ 1080"), gespielt mit dem nächstliegenden Leiter-Profil, gespeichert',
+      st.h2 === 'Testboss · Standard ≈ 1080' && st.meta.startsWith('Wochen-Boss · ≈ 1080') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

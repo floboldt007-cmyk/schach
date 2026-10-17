@@ -18,7 +18,7 @@ import {
   SPIELPLAN_NAME, ladeSpielplan,
 } from '../js/inhalte.js';
 import {
-  BOTS, botNachId, alleBots, registriereBot, botZug, botSatz, vorliebeWert, VORLIEBE_FENSTER_CP, BOT_ARTEN,
+  BOTS, botNachId, alleBots, registriereBot, botZug, botSatz, vorliebeWert, VORLIEBE_FENSTER_CP, BOT_ARTEN, staerkeFuerElo,
 } from '../js/bots.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -294,6 +294,17 @@ const PROFIL = {
   pruefe('registriereBot: Sparring ohne archiv geht, Standardwerte', botNachId('sparring-1').archiv === false && botNachId('sparring-1').farbe === '#8a93a8'
     && botNachId('sparring-1').startFen === null && botNachId('sparring-1').nodes === null);
   gast();
+}
+{
+  // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080"): vor der Eichung der naechstliegende Leiter-Bot
+  const w = (elo) => (staerkeFuerElo(elo) || {}).botId;
+  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1080 Lisa, 1150 Rudi, 1100 Gleichstand: der schwaechere, 0 Benno, 5000 Stockfisch)',
+    w(1080) === 'lisa' && w(1150) === 'rudi' && w(1100) === 'lisa' && w(0) === 'benno' && w(5000) === 'stockfisch' && staerkeFuerElo(NaN) === null
+    && staerkeFuerElo('1080') === null, [1080, 1150, 1100, 0, 5000].map(w));
+  const lisa = BOTS.find((b) => b.id === 'lisa');
+  const st = staerkeFuerElo(1080).staerke;
+  st.tiefe = 99;
+  pruefe('staerkeFuerElo: Kopie des Profils (die Leiter bleibt unveraendert)', JSON.stringify(staerkeFuerElo(1080).staerke) === JSON.stringify(lisa.staerke) && lisa.staerke.tiefe !== 99);
 }
 
 // Fake-Engine: feste Linien, merkt sich die Suchoptionen
