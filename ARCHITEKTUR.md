@@ -411,11 +411,11 @@ export function zuruecksetzen()          // nur Tests
 | `partie:verlassen` | `{ laufId }` | `partie.js` `verlasse()`, vor dem Abraeumen (danach `buehne` nicht mehr benutzen) |
 | `zug:gespielt` | `{ laufId, ply, wer: 'flo'/'bot', uci, san, fenVorher, fenNachher, geschlagen (Figurtyp oder null), schach, matt, umwandlung (Figurtyp oder null), rochade (boolean) }` | `nachEigenemZug()` und `fuehreBotZugAus()`, nach `brett.setzeStellung()` (vor dem Zugklang) |
 | `stellung:analysiert` | `{ laufId, fen, plies, amZug: 'flo'/'bot', analyse: { depth, lines: [{ eval, pv }] } }` | `beiAnalyse()`, nur fuer die aktuelle Stellung, je aktueller Stellung einmal (auch aus dem Zwischenspeicher, z. B. nach einer Zuruecknahme) |
-| `zug:bewertet` | `{ laufId, ply, uci, sanDe, klasse, verlust, genauigkeit, gewinnVorher, gewinnNachher, gewinnZweiter, besterZug, besterZugSanDe, trivial, serie, serieVorher, letzter, live }` | `bewerte()`, direkt nach `zeigeBewertung(ply)`, nur wenn nicht veraltet |
+| `zug:bewertet` | `{ laufId, ply, uci, sanDe, klasse, verlust, genauigkeit, gewinnVorher, gewinnNachher, gewinnZweiter, gewinnVorigerZug, besterZug, besterZugSanDe, trivial, serie, serieVorher, letzter, live }` (`gewinnVorigerZug`, w0plus-a-fix: Flos Gewinnchance nach seinem vorigen eigenen Zug, also vor dem letzten Bot-Zug; `null` beim ersten eigenen Zug oder ohne Bewertung) | `bewerte()`, direkt nach `zeigeBewertung(ply)`, nur wenn nicht veraltet |
 | `zug:zurueckgenommen` | `{ laufId, bisPly, plies }` (`bisPly`: erster entfernter Ply, `plies`: Anzahl entfernter Halbzuege) | `zuruecknehmen()` |
 | `hilfe:genutzt` | `{ laufId, art: 'hinweis', stufe }` | `hinweis()` |
 | `partie:beendet` | `{ laufId, partieId, botId, botStufe, farbe, modus, wertet, ergebnis, grund, eigeneZuege, liveKlassen, maxSerie, hinweise, zuruecknahmen, neueSterne, neuFreigeschaltet, extra, datum, dauerMs }` | `partie.js` nach `speicherePartie()`, sobald die Live-Bewertung des letzten eigenen Zugs da ist (hoechstens 2,5 s), immer vor den Feier-Zeilen des Overlays und vor `partie:analysiert`; verlaesst Flo den Screen vorher, in `verlasse()` vor `partie:verlassen` |
-| `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse'/'nachholen' }` | nach `ergaenzeAnalyse()` mit Review (Partie-Nachtrag, Analyse-Screen, Nachholen in der Arena). Kommt fuer jede wertende Partie mit eigenem Zug: verlaesst Flo das Ergebnis, bevor die Analyse fertig ist, holt die Arena sie nach (`quelle: 'nachholen'`) |
+| `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse'/'nachholen' }` | nach `ergaenzeAnalyse()` mit Review (Partie-Nachtrag, Analyse-Screen, Nachholen in der Arena). Kommt fuer jede wertende Partie mit eigenem Zug und (w0plus-a-fix) fuer jede Partie der Modi `boss`, `frei`, `spiel` (Funken, Boss-Tafel, Tageswerk; `wertet: false`): verlaesst Flo das Ergebnis, bevor die Analyse fertig ist, holt die Arena sie nach (`quelle: 'nachholen'`). Uebungen nie |
 | `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
 | `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
 | `speicher:zurueckgesetzt` | `{ mitEinstellungen }` | `storage.js` `setzeZurueck()` („Fortschritt zurücksetzen“), nach dem Loeschen; Pakete leeren ihren Zustand im Arbeitsspeicher (w0-fix) |
@@ -719,7 +719,8 @@ Ergebnis verlassen, bevor die Analyse fertig war, nach einer fortgesetzten Parti
 die Arena sie still nach. Damit kommt `partie:analysiert` fuer jede wertende Partie (die Pakete verdichten ihre
 Lerndaten genau dann, BAUPLAN 3.7):
 ```js
-offenePartien({ max = 2, aus = 10 })   // wertend, ohne Review, mit eigenem Zug, ohne volle Analyse: ab Runde 4
+offenePartien({ max = 2, aus = 10 })   // wertend oder Modus boss/frei/spiel (NACHHOLEN_MODI, w0plus-a-fix), ohne Review,
+                                       // mit eigenem Zug, ohne volle Analyse: ab Runde 4
                                        // (Feld modus) ohne analysiert, auch mit Live-Genauigkeit; aeltere nur ohne
                                        // Genauigkeit. Nur unter den `aus` neuesten, neueste zuerst; in dieser
                                        // Sitzung schon versuchte nicht
@@ -793,8 +794,16 @@ Erweitert die Erweiterungspunkte aus Welle 0 fuer die erste spielige Welle S1 (F
 Bauernmarsch, Tagesraetsel, Wochen-Boss, Finisher, Lektionen). Ohne Pakete sieht die App aus und verhaelt sich wie
 vorher: Alle neuen Behaelter sind leer und versteckt, der Matt-Hook laeuft nur mit einem Anbieter, die untere Leiste
 erscheint erst mit `REITER`. Bewusste Aenderungen ohne Pakete: `MAX_REVIEWS` 12 (aeltere Analysen fallen still weg und
-werden beim Oeffnen neu gerechnet), dauerhafter Speicher wird bei jedem Start angefragt, jede neue Partie bekommt einen
-Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie mit `Math.random`).
+werden beim Oeffnen neu gerechnet), dauerhafter Speicher wird bei jedem Start angefragt (w0plus-a-fix: nur wo kein Dialog
+droht, also nicht im Firefox-Tab), jede neue Partie bekommt einen Seed (die Bot-Zuege ziehen ihren Zufall daraus, die
+Verteilung ist dieselbe wie mit `Math.random`).
+
+**w0plus-a-fix** (Befunde des W0+a-Pruefers, 17.10.): Modul `finisher` und die Pakete aus Schub 2b (Module `ausdruck`,
+`siegeslauf`, `werkstatt`, Screen `werkstatt`, Orte `partie:spieler-leiste` und `partie:aktionen`), Boss-Partien werden
+nachgeholt, Boss-Staerke ehrlich im Kopf, Gaeste werten nie, Leiste verdeckt nichts, Vorliebe hoechstens 0,1 Bauern je
+Zug, Lebensleiste auf dem Handy, Countdowns und gestrichene Wochen im Spielplan, Matt-Hook wartet hoechstens 300 ms,
+Antippen der Ergebnis-Karte zeigt die Abrechnung, Verlauf-Kopf je Art, `gewinnVorigerZug` fuer `boss:treffer`, `persist()`
+ohne Dialog. Einzelheiten in den Abschnitten unten.
 
 | Datei | Neu |
 |---|---|
@@ -802,15 +811,16 @@ Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie 
 | `js/inhalte.js` (neu, rein bis auf `fetch`) | statische JSON-Dateien unter `daten/`, Dateikopf mit Rechenstand, Format und Ort der Spielplan-Datei |
 | `js/ui/abrechnung.js` (neu) | Abrechnungs-Huelle an `ergebnis:karte` (Reihenfolge 3), darin der Zeilen-Ort `ergebnis:abrechnung` |
 | `daten/beispiel/spielplan.json` (neu) | Beispiel des Spielplan-Formats (wird nicht ausgeliefert, nur Format und Tests) |
-| `js/storage.js` | Modi `boss`, `frei`, `spiel`; Datensatz `seed`, `tempo`, `zeiten`, `boss`, `liga`; `MODUL_BUDGET` +8; `MAX_REVIEWS` 12; `duenneAnalysenAus()`, `dauerhaftAnfragen()`; Anzeige-Einstellungen |
+| `js/storage.js` | Modi `boss`, `frei`, `spiel`; Datensatz `seed`, `tempo`, `zeiten`, `boss`, `liga`; `MODUL_BUDGET` +8 (w0plus-a-fix: +4); `MAX_REVIEWS` 12; `duenneAnalysenAus()`, `dauerhaftAnfragen()`, `persistOhneDialog()`; Anzeige-Einstellungen; `wertet()` nur gegen Leiter-Bots |
 | `js/ereignisse.js` | zehn neue Ereignisse (Tabelle unten) |
-| `js/orte.js` | acht neue Orte, `angeboten(ort)`, Aufruf-Orte mit `{ fertig }` |
+| `js/orte.js` | acht neue Orte (w0plus-a-fix: zehn, dazu `partie:spieler-leiste` und `partie:aktionen`), `angeboten(ort)`, Aufruf-Orte mit `{ fertig }` |
 | `js/feier.js` | Quellen und Prioritaeten aus SPIELKONZEPT 3.10, `BRETT_FEIER` |
-| `js/app.js`, `js/erweiterungen.js` | sieben neue Paket-Screens, untere Leiste (nur vorbereitet, `REITER`), Start: Speicher dauerhaft, Analysen ausduennen |
-| `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss` (Boss-Staerke, Lebensleiste statt Balken), Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz` |
+| `js/app.js`, `js/erweiterungen.js` | sieben neue Paket-Screens (w0plus-a-fix: acht, dazu `werkstatt`), untere Leiste (nur vorbereitet, `REITER`), Start: Speicher dauerhaft, Analysen ausduennen |
+| `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss` (Boss-Staerke, Lebensleiste statt Balken), Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz`; w0plus-a-fix: Spieler-Leiste, Aktionen, `gewinnVorigerZug` |
 | `js/ui/analyse.js`, `js/ui/verlauf.js` | Spielstaerke gegen die Boss-Staerke; Chip je Modus im Verlauf |
 | `js/ui/arena.js` | Host der Heute-Karte (`arena:heute`); „Offene Partie“ auch gegen angemeldete Bots |
-| `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })`, `staerkeFuerElo(elo)` |
+| `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })`, `staerkeFuerElo(elo)`, `eloDerPartie(p)` (w0plus-a-fix) |
+| `js/nachholen.js` | w0plus-a-fix: holt auch Partien der Modi `boss`, `frei`, `spiel` nach (`NACHHOLEN_MODI`) |
 | `js/board.js` | `beiAbgelehnt`, `striche()`, `kippeKoenig()` |
 | `tests/spiel.test.mjs` (neu) | Node: tag.js, inhalte.js, Spielplan, Bot-Register, nodes, Vorliebe, Seed, Boss-Staerke |
 | `tests/orte-huelle.html` (neu) | Test-Huelle im Browser fuer die vier Orte, deren Screens erst mit Paketen kommen |
@@ -863,7 +873,11 @@ ausgeliefert (der sw-Test lehnt es in `DATEIEN` ab). Der Service Worker liefert 
 **Der Spielplan** liegt beim Wochen-Boss-Paket: `daten/boss/spielplan.json` (`SPIELPLAN_NAME = 'boss/spielplan'`, S1-6 legt
 die Datei an). Beide Leser holen ihn ueber `ladeSpielplan()`: S1-6 (Boss der Woche, Spielplan-Screen) und S1-1
 (Funken-Wochenende). Fehlt die Datei (Paket noch nicht da, `grund: 'netz'`), gibt es keinen Wochen-Boss und kein
-Funken-Wochenende, sonst aendert sich nichts.
+Funken-Wochenende, sonst aendert sich nichts. Der Browser meldet den 404 dann bei jedem Laden in der Konsole (laesst sich
+nicht abschalten), und die App-Tests werten ihn als Konsolenfehler: **S1-1 (Schub 1) liefert den Spielplan in seinen
+Browser-Tests per `page.route('**/daten/boss/spielplan.json', ...)` aus** (z. B. mit dem Inhalt von
+`daten/beispiel/spielplan.json`) oder filtert genau diesen 404, solange S1-6 fehlt. Nach der Integration (beide Pakete in
+`PAKETE`) gibt es ihn nicht mehr (w0plus-a-fix, Befund des Pruefers).
 
 **Spielplan** (`art: 'spielplan'`, `format: 1`, eine Datei je Quartal oder Saison; Beispiel `daten/beispiel/spielplan.json`):
 ```json
@@ -881,9 +895,14 @@ Funken-Wochenende, sonst aendert sich nichts.
 | `klassiker` | optional, hoechstens 2 Boss-IDs aus dem Archiv im Rampenlicht |
 | `text` | optional, Steckbrief, hoechstens 140 Zeichen |
 Regeln (Fairness 19): Themen-Wochen und Funken-Wochenenden beginnen mindestens 28 Tage nach `kopf.stand`; unbekannte
-Felder (z. B. `verfuegbarBis`, `bis`) und Uhrzeit-Countdowns (`\d+\s*(h|Std|min)`) werden abgelehnt;
+Felder (z. B. `verfuegbarBis`, `bis`) und Uhrzeit-Countdowns (`COUNTDOWN_RE`, exportiert, dasselbe Muster prueft
+`fairness`) werden abgelehnt: Kurzformen (`\d+\s*(h|Std|min)`), seit w0plus-a-fix auch ausgeschriebene Restzeiten nach
+„noch“ oder „endet (in)“ („noch 10 Minuten“, „noch 3 Tage“, „noch 2 T 04:13“) und Enduhrzeiten („endet um 23:59“,
+„bis 23:59“); Anfaenge („ab 16 Uhr“, „Montag 4:00“) und Dauern ohne „noch“ („5 Minuten Bedenkzeit“) bleiben erlaubt.
 `pruefeSpielplanFolge` meldet jede Aenderung an einer Woche, die vor `neu.kopf.stand + 28 Tage` beginnt (schon
-angekuendigt: der Spielplan-Screen zeigt die naechsten 4 Wochen). Nur der Steckbrief-Text darf sich aendern.
+angekuendigt: der Spielplan-Screen zeigt die naechsten 4 Wochen), und (w0plus-a-fix) jede solche Woche, die im neuen Plan
+fehlt, solange sie am Stand des neuen Plans nicht vorbei ist (die laufende Woche gehoert dazu; vergangene duerfen fehlen).
+Nur der Steckbrief-Text darf sich aendern.
 
 ## Ereignisse (js/ereignisse.js)
 | Name | Daten | Wer sendet, wann |
@@ -893,7 +912,7 @@ angekuendigt: der Spielplan-Screen zeigt die naechsten 4 Wochen). Nur der Steckb
 | `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
 | `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
-| `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1 vor und nach Flos Zug; Treffer ab 0,03) | S1-6, nach `zug:bewertet` in Boss-Partien |
+| `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1, also der Stand der Lebensleiste: `vorher` nach Flos vorigem Zug, d. h. vor dem letzten Boss-Zug, = `1 - (gewinnVorigerZug ?? gewinnVorher)` aus `zug:bewertet`; `nachher` nach Flos Zug = `1 - gewinnNachher`; Treffer ab `vorher - nachher >= 0,03`). So zaehlt ein sofort bestrafter Boss-Fehler als Treffer (3.8); ein guter Zug in ruhiger Stellung haelt die Leiste nur. w0plus-a-fix: vorher stand hier „vor Flos Zug“, mit `gewinnVorher` gab es praktisch nie einen Treffer, auch nicht beim Matt | S1-6, nach `zug:bewertet` in Boss-Partien |
 | `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
 | `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`) | S1-3 (spaeter S2-2), nach dem Eintrag |
 | `uhr:knapp` | `{ laufId, rest }` (`rest` Restzeit von Flo in ms) | W0+b, einmal je Partie, wenn Flos Uhr unter 30 s faellt |
@@ -912,13 +931,15 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 | Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
 |---|---|---|---|---|
 | `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
-| `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch .info` (wandert beim Drehen mit, `data-lage`); ohne Anbieter `hidden` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
-| `partie:matt` | Aufruf | `partie.js` `ende()` bei Matt: nach `speicherePartie`, nach `partie:beendet`, vor dem Ergebnis (Ablauf unten) | `{ app, buehne, laufId, partieId, ergebnis, gewinner, koenigFeld, letzterZug { von, nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }` | Finisher (S1-7) |
+| `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch` als eigene Zeile ueber Avatar und Namen, hoechstens 16 px hoch (w0plus-a-fix: vorher in `.info`, das auf dem Handy mit der Sprechblase verschwand); wandert beim Drehen mit, `data-lage`; ohne Anbieter `hidden`, mit Anbieter `.partie.mit-gegner-leiste` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
+| `partie:spieler-leiste` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-spieler-leiste` an Flos Namen, quer in `.spieler-quer` nach dem Namensblock, hoch in `.spieler-hoch` nach `.name` (wandert mit, `data-lage`); eine Zeile, nicht hoeher als der Name; ohne Anbieter `hidden` | wie `partie:gegner-leiste` | Flamme des Siegeslaufs (Paket `siegeslauf`) · Level-Emblem (S1-1) |
+| `partie:aktionen` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-aktionen` (`display: contents`) in `.spielknoepfe` vor „Aufgeben“; hoechstens 2 Knoepfe (weitere: console.warn, entfernt), die Reihe bekommt je Knopf eine Spalte (`data-aktionen`, engere Beschriftung); Klicks binden die Pakete selbst (auch ein `data-aktion` im Paket loest nie eine Aktion des Hosts aus); ohne Anbieter `hidden`, Reihe unveraendert | `{ app, buehne, bot, farbe, modus, boss }` | Emote-Rad und Schnell-Chat (Paket `ausdruck`) |
+| `partie:matt` | Aufruf | `partie.js` `ende()` bei Matt: nach `speicherePartie`, nach `partie:beendet` (darauf wartet der Hook hoechstens 300 ms, w0plus-a-fix), vor dem Ergebnis (Ablauf unten) | `{ app, buehne, laufId, partieId, ergebnis, gewinner, koenigFeld, letzterZug { von, nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }` | Finisher (S1-7) |
 | `ergebnis:abrechnung` | DOM | `js/ui/abrechnung.js`: Huelle `div.abrechnung[role=list]`, die selbst an `ergebnis:karte` (Reihenfolge 3) haengt | wie `ergebnis:karte` (mit `boss`) | Punkte 10 (S1-3) · Funken 20 (S1-1) · Wertung 30 (S1-2) · Serie 40 (S1-4) |
 | `bestenliste:reiter` | DOM | Screen `bestenliste` (S1-3 `punkte`), Reiterzeile der Bestenliste; bis dahin nur die Node-Pruefung in `tests/ereignisse.test.mjs` | `{ app, reiter, fenster }` (`reiter`: gewaehlter Reiter, `fenster`: `'woche'` \| `'monat'` \| `'allzeit'`) | Ich 10 · Bots 20 (S1-3) · Liga 30 (S3-2) · Raetsel 40 (S2-2) · Freunde 50 (S3-3) |
 | `training:karten` | DOM | Screen `training` (S2-1 `kartei`), Karten des Trainings | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
 | `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
-| `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeInhalt('spielplan')`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
+| `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeSpielplan()`, also `daten/boss/spielplan.json`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
 Die vier Screen-Orte haben noch keinen Host in der App: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau
 diesem Kontext auf (und schreiben die Stelle in ihren Kopfkommentar). Bis dahin gibt es zwei Test-Huellen:
 - **Browser:** `tests/orte-huelle.html?ort=<ort>&erw=pakete/<paket>/index` baut den Behaelter wie der spaetere Host
@@ -935,6 +956,7 @@ Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
 |---|---|---|
 | `arena:heute` | `js/ui/arena.js` (W0+a) | bleibt; S1-4 setzt die Heute-Karte zusammen (Integration) |
 | `partie:gegner-leiste`, `partie:matt` | `js/ui/partie.js` (W0+a) | bleibt |
+| `partie:spieler-leiste`, `partie:aktionen` | `js/ui/partie.js` (w0plus-a-fix) | bleibt |
 | `ergebnis:abrechnung` | `js/ui/abrechnung.js` an `ergebnis:karte` (W0+a) | bleibt |
 | `bestenliste:reiter` | `tests/orte-huelle.html` | Screen `bestenliste` (`js/ui/bestenliste.js`, S1-3 `punkte`) |
 | `training:karten` | `tests/orte-huelle.html` | Screen `training` (`js/ui/training.js`, S2-1 `kartei`) |
@@ -943,14 +965,18 @@ Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
 
 **Abrechnung.** Hoechstens `ABRECHNUNG_MAX` = 4 Zeilen (weitere: console.warn, nicht gezeigt). Neue Zeilen rollen im
 Abstand von 200 ms ein (`.abr-rollt`, `--t` ab 300 ms), reduzierte Bewegung sofort, Antippen der Huelle zeigt alles
-(`.alles`). Die Huelle wird bei jedem `fuelle()` des Overlays neu gebaut (vorlaeufig, fertig, Nachtrag); Zeilen, die fuer
+(`.alles`), ebenso Antippen irgendwo auf der Ergebnis-Karte (w0plus-a-fix, 3.10: `partie.js` setzt `.alles` an Karte und
+Huelle; `.ergebnis-karte.alles` gilt auch fuer eine Huelle, die der Nachtrag neu baut). Die Huelle wird bei jedem `fuelle()` des Overlays neu gebaut (vorlaeufig, fertig, Nachtrag); Zeilen, die fuer
 diese Partie schon gezeigt wurden (erkannt an `data-zeile`, sonst an der Stelle), stehen dann still da. Ohne Zeilen liefert
 die Huelle `null`: `ergebnis:karte` bleibt leer und der Tipp „Kopf hoch!“ erscheint wie vorher. Waehrend die Analyse noch
 rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sache des Pakets).
 
 **Matt-Hook (Finisher).** In `ende()` bei Grund `matt` und `angeboten('partie:matt') > 0`:
 1. Das Ergebnis ist schon gespeichert (`speicherePartie`), dann kommt `partie:beendet` (wie bisher hoechstens 2,5 s nach
-   dem Ende, sobald die Live-Bewertung des letzten Zugs da ist).
+   dem Ende, sobald die Live-Bewertung des letzten Zugs da ist). Der Hook wartet darauf hoechstens `MATT_HOOK_WARTEN_MS`
+   (300 ms; w0plus-a-fix, vorher bis 3 s): Bei einem Matt ist die Bewertung meist nach ca. 25 ms da, rechnet sie laenger,
+   startet der Finisher trotzdem und `partie:beendet` kommt waehrend des Finishers (Partie und `partieId` sind dann schon
+   gespeichert). Im Testmodus aendert `window.__test.mattHookWarten` die Wartezeit.
 2. `fuelle('partie:matt', null, kontext)`. Liefert ein Anbieter `{ fertig }`, wartet die Partie darauf, hoechstens
    `feier.BRETT_FEIER.dauerMs` (1.800 ms). Ein Tipp irgendwo auf den Partie-Screen bricht ab (`kontext.signal` feuert
    `abort`; spaetestens nach dem Warten feuert es immer, dann springen die Finisher auf ihr Endbild). Der Tipp gilt ab dem
@@ -967,8 +993,13 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
   (nur Modus `boss`), `seed` (sonst neu gewuerfelt), `liga: { saison, runde }`. Angemeldete Bots (`registriereBot`) gehen
   wie Leiter-Bots (`botId`); ihre `startFen` gilt, wenn die Params keine nennen.
 - **Boss-Staerke**: Nennt `boss.staerke` eine Zahl (S1-6 legt sie beim ersten Versuch der Woche fest), spielt der Boss
-  mit `staerkeFuerElo(staerke)` statt mit seinem Profil; Kopf „Baron · Standard ≈ 1080“, Bot-Zeile „Wochen-Boss · ≈ 1080“,
-  die Spielanalyse rechnet die Spielstaerke gegen diese Zahl. Ohne `staerke` gilt das Profil des Bosses.
+  mit `staerkeFuerElo(staerke)` statt mit seinem Profil. Kopf, Bot-Zeile und Spielanalyse nennen die Elo, mit der er
+  wirklich spielt (`staerkeFuerElo(staerke).elo`; w0plus-a-fix, Fairness 12): vor der Eichung die des naechstliegenden
+  Leiter-Bots, fuer die Anfrage 1080 also „Baron · Standard ≈ 1000“, Bot-Zeile „Wochen-Boss · ≈ 1000“. Vorher stand dort die
+  Anfrage, bei Flos Staerke bis zu 100 daneben, oben bis zu 450 (2550 spielt wie Greta mit 2100). `boss.staerke` bleibt
+  als Anfrage im Datensatz (Wochen-Tafel: gleiche Anfrage, gleiche Woche). Ohne `staerke` gilt das Profil des Bosses.
+- **Angemeldete Bots im Modus `normal`** (Gaeste, Sparring; w0plus-a-fix): werten nie (`storage.wertet` mit `botId`), das
+  Ergebnis zeigt den Chip `GAST` statt Sterne und „Nochmal“ statt „Nächster Gegner“ (den gibt es nur auf der Leiter).
 - **Modus `boss`**: wertet nie (keine Sterne, keine Freischaltung, keine Statistik). Kopf „Testboss · Meister“, Unterzeile
   „Regel: …“ (`bot.regel`), Bot-Zeile mit `bot.titel` statt „Stufe n · Elo“. Ergebnis mit dem Chip `BOSS`
   (`.chip.uebung[data-modus="boss"]`) und „Nochmal“ (gleiche Params, neuer Seed). `frei` und `spiel` zeigen die Chips
@@ -993,9 +1024,11 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 registriereBot(profil) -> abmelden()     // { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo,
                                          //   saetze, regel, startFen, vorliebe, nodes, archiv }
 botNachId(id), alleBots(), BOT_ARTEN = ['boss', 'sparring', 'gast']
-staerkeFuerElo(elo) -> { staerke, botId } | null  // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080")
+staerkeFuerElo(elo) -> { staerke, botId, elo } | null  // Staerke fuer eine offen angesagte Zahl (Boss "≈ deine Wertung");
+                                                       // elo: mit dieser Elo spielt der Bot wirklich (w0plus-a-fix)
+eloDerPartie(partie) -> Zahl | null      // w0plus-a-fix: Elo, mit der der Bot dieser Partie spielte (Analyse, Nachholen)
 botZug(engine, fen, bot, { zugNummer, ohnePause, zufall, signal, nodes, vorliebe }) -> { uci, san, denkzeitMs, art, vorliebe? }
-vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
+vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_CP = 10
 ```
 - Profil: `id` [a-z][a-z0-9-] (nicht wie ein Leiter-Bot), `name`, `avatar` (Pfad oder `data:`-URL, z. B. das SVG-Wappen eines
   Bosses) und `staerke` (Format wie `BOTS[i].staerke`; vor der Eichung die des naechstliegenden Leiter-Bots) sind Pflicht.
@@ -1007,13 +1040,20 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
   abstimmen; geprueft in der Determinismus-Probe S3-0.
 - `vorliebe`: Funktion `(zug, { fen, farbe, vollzug, punkte, bestePunkte }) -> Zahl` oder Gewichte (`schlagen`, `schach`,
   `rochade`, `rochadeKurz`, `rochadeLang`, `bauer`, `springer`, `laeufer`, `turm`, `dame`, `koenig`, `vorwaerts`, `tausch`).
-  Gewaehlt wird nur unter den Zuegen der Bot-Analyse, die hoechstens 0,3 Bauern schlechter sind als der beste, und nur, wenn
-  der Bot ohnehin einen Zug aus diesem Fenster gespielt haette; Spontanzuege und Fehler bleiben. So macht der Stil einen Bot
-  weder heimlich staerker noch schwaecher. Bei voller Staerke rechnet die Engine dafuer 5 Linien (MultiPV).
+  Gewaehlt wird nur unter den Zuegen der Bot-Analyse, die hoechstens 0,3 Bauern schlechter sind als der beste
+  (`VORLIEBE_FENSTER_CP`, SPIELKONZEPT 3.8) und (w0plus-a-fix) hoechstens 0,1 Bauern besser oder schlechter als der Zug, den
+  der Bot ohnehin gespielt haette (`VORLIEBE_NAEHE_CP`), und nur, wenn dieser selbst im Fenster liegt; Spontanzuege und
+  Fehler bleiben. Ein Tausch verschiebt die Staerke so je Zug um hoechstens 0,1 Bauern. Vorher stand hier „weder staerker
+  noch schwaecher“, gemessen war das falsch: Mit dem ganzen Fenster lag die mittlere Bewertung der gewaehlten Zuege mit
+  Springer-Vorliebe bei 20 statt 37,6 cp (Pruefer-Probe, 2000 Zuege, Rauschen 40), der Bot spielte also heimlich
+  schwaecher (Fairness 6). Jetzt prueft `spiel` dieselbe Probe: Abstand der Mittelwerte hoechstens 10 cp. Den verbleibenden
+  Effekt eines Stil-Bosses misst die Eichung (S3-0). Bei voller Staerke rechnet die Engine dafuer 5 Linien (MultiPV).
 - Ohne `nodes` und `vorliebe` und mit `zufall = Math.random` spielt jeder Bot genau wie vorher (Test in `spiel`).
 - `staerkeFuerElo(elo)`: das Staerke-Profil fuer eine offen angesagte Zahl (Wochen-Boss Standard „≈ deine Wertung“,
   Meister „+150“, 3.8). Vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo (Gleichstand: der
-  schwaechere), als Kopie. **Die Eichung ersetzt nur diese Funktion** (geeichte Profile), die Aufrufer bleiben.
+  schwaechere), als Kopie, dazu `elo` (die Elo dieses Profils; Kopf, Bot-Zeile und Analyse zeigen sie). **Die Eichung
+  ersetzt nur diese Funktion** (geeichte Profile, `elo` dann die geeichte Staerke), die Aufrufer bleiben. Solange die
+  Eichung fehlt, ist die Zahl das Etikett des Leiter-Bots (wie auf der Leiter); S1 zeigt bis dahin keine Wertungszahl (6.1).
 
 ## Brett (js/board.js)
 - `new Brett(el, { ..., beiAbgelehnt(von, nach, art) })`: nur waehrend `erlaubeZuege()` gesetzt ist. Gemeldet werden: eine
@@ -1028,19 +1068,32 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
   stellt gekippte Koenige wieder auf.
 
 ## Speicher (js/storage.js)
-- `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()` unveraendert (nur `normal` aus der Grundstellung).
+- `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)
+  nur gegen Leiter-Bots. Partien gegen angemeldete Bots (Bosse, Sparring, Gaeste; `stufe: null`) werten nie, auch im
+  Modus `normal`: vorher bekam ein Gast drei Sterne, zaehlte in der Statistik und bot „Nächster Gegner“ (Benno) an. Ohne
+  `botId` (`wertet({ modus, startFen })`) zaehlen nur Modus und Stellung. Ob eine spaetere Art (z. B. geeichte Gaeste aus
+  S3-1) fuer die Arena-Wertung von S1-2 zaehlt, entscheidet ein eigenes Feld, nicht `wertet()`; bis dahin zaehlen
+  Gast-Partien nirgends (wie Bosse).
 - Datensatz und laufende Partie: `seed` (0..2^32-1), `tempo` `{ grund, zuschlag }` (Sekunden, 1..10.800 und 0..600), `zeiten`
   (Zehntelsekunden je Halbzug, hoechstens so viele wie Zuege), `boss` `{ id, stufe, woche?, staerke? }` (nur Modus `boss`),
   `liga` `{ saison, runde }`. Falsches faellt still weg (`pruefeSeed`, `pruefeTempo`, `pruefeZeiten`, `pruefeBoss`,
   `pruefeLiga` sind exportiert). Eine laufende Partie gegen einen angemeldeten Bot laedt nur, solange er angemeldet ist.
 - `MODUL_BUDGET` neu (6.6): `funken` 25.000 · `punkte` 40.000 · `boss` 12.000 · `raetsel` 30.000 · `lernen` 30.000 ·
-  `liga` 10.000 · `sammeln` 20.000 · `freunde` 15.000 (zusammen 182.000; mit Welle 0 506.000). Einstellungen der Pakete
-  weiter ueber `speichereModulEinstellungen(name, ...)`.
+  `liga` 10.000 · `sammeln` 20.000 · `freunde` 15.000 (zusammen 182.000). w0plus-a-fix: dazu `finisher` 10.000 (S1-7:
+  Matt-Atlas mit 64 Feldern, Mattbilder, verarbeitete IDs; vorher gab es das Modul nicht, Speichern lieferte „unbekannt“)
+  und die Pakete aus Schub 2b: `ausdruck` 6.000 (Emote-Rad, Schnell-Chat, Banner mit Zeichen), `siegeslauf` 6.000,
+  `werkstatt` 8.000 (Anprobe-Zaehler, freigespielte Stuecke). Zusammen 212.000, mit Welle 0 536.000. Jedes Paket hat sein
+  eigenes Modul: Zwei Pakete in einem Modul (z. B. `sammeln`) wuerden sich gegenseitig ueberschreiben. Einstellungen der
+  Pakete weiter ueber `speichereModulEinstellungen(name, ...)` (z. B. „Finisher: voll · kurz · aus“ unter `finisher`,
+  Stummschalten unter `ausdruck`).
 - `MAX_REVIEWS` 12. `duenneAnalysenAus(max = MAX_REVIEWS) -> Zahl` entfernt still alles darueber (liest nur Schluessel,
   Analysen ohne Partie zuerst, die neuesten Partien behalten ihre); `app.js` ruft es kurz nach dem ersten Screen.
 - `dauerhaftAnfragen() -> Promise<true | false | null>` (fragt `persist()` nur an, wenn `persisted()` nicht schon `true`
   ist; Fehler still, `null` = unbekannt), `dauerhaftStatus()`; `app.js` ruft es bei jedem Start (vorher nur in der
-  Home-Bildschirm-App). Die Speicheranzeige der Sicherung (S1-9) liest den Status.
+  Home-Bildschirm-App). Die Speicheranzeige der Sicherung (S1-9) liest den Status. w0plus-a-fix: angefragt wird nur, wo
+  kein Dialog droht (`persistOhneDialog({ userAgent, standalone })`): in der installierten App und in WebKit/Chromium.
+  Firefox (Gecko, Desktop und Android) fragt den Nutzer per Berechtigungs-Dialog; dort wird im Browser-Tab nur der Stand
+  gelesen (`false`). Fuer Flo auf dem iPad (Safari, Home-Bildschirm) aendert sich nichts.
 - `STANDARD_EINSTELLUNGEN` zusaetzlich `zaehlwerk: false`, `funkenlinie: false`, `lebensleiste: true` (Anzeigen in der
   Partie, 3.18; die Schalter baut der Premium-Umbau, die Buehne liest sie mit `zeigt()`).
 
@@ -1054,14 +1107,21 @@ Zeile 38 (vorher gross 65) · `tagesdreier` Zeile 35 · `karten` Zeile 30. `rang
 dem Ergebnis laeuft und nicht ins Budget zaehlt.
 
 ## App (js/app.js, js/erweiterungen.js)
-- `SCREENS` zusaetzlich `bestenliste`, `raetsel`, `lernen`, `lektion`, `ich`, `spielplan`, `spielhalle`, alle in
-  `PAKET_SCREENS` (fehlt die Datei: still zur Arena). Zuordnung zu Paketen fuer den sw-Test (`SCREEN_PAKET`):
-  bestenliste `punkte`, raetsel `raetsel`, lernen und lektion `lernen`, ich `ich`, spielplan `boss`, spielhalle
-  `spielhalle`; baut ein anderes Paket den Screen, aendert die Integration die Zuordnung.
+- `SCREENS` zusaetzlich `bestenliste`, `raetsel`, `lernen`, `lektion`, `ich`, `spielplan`, `spielhalle` und (w0plus-a-fix,
+  Schub 2b) `werkstatt` („Werkstatt“), alle in `PAKET_SCREENS` (fehlt die Datei: still zur Arena). Zuordnung zu Paketen
+  fuer den sw-Test (`SCREEN_PAKET`): bestenliste `punkte`, raetsel `raetsel`, lernen und lektion `lernen`, ich `ich`,
+  spielplan `boss`, spielhalle `spielhalle`, werkstatt `werkstatt`; baut ein anderes Paket den Screen, aendert die
+  Integration die Zuordnung. Die Werkstatt gehoert zum Reiter Ich (3.17).
+- **Pakete aus Schub 2b** (Entscheidung 17.10., SPIELKONZEPT 6.3) docken so an, ohne fremde Dateien zu aendern:
+  `ausdruck` (Emote-Rad und Schnell-Chat mit Bot-Antworten am Ort `partie:aktionen`, Banner mit Zeichen; Modul und
+  Einstellungen `ausdruck`), `siegeslauf` (Flamme an Flos Namen am Ort `partie:spieler-leiste`, Modul `siegeslauf`),
+  `werkstatt` (Screen `werkstatt`, Modul `werkstatt`). Ihre Fairness-Pruefungen stehen in der Tabelle unten.
 - **Untere Leiste** (`nav.reiter-leiste`, Reiter Arena, Training, Bestenliste, Ich): nur vorbereitet. Sie erscheint erst,
   wenn `REITER` in `js/erweiterungen.js` Screens nennt (`'training'`, `'bestenliste'`, `'ich'`; Arena ist immer dabei;
   im Testmodus auch `?reiter=training,ich`), und nur auf den Reiter-Screens (`arena`; `training`, `raetsel`, `lernen`;
-  `bestenliste`; `ich`). Dann `html[data-reiter="an"]` (Platz unten fuer `#app`), `aria-current="page"` am aktiven Reiter,
+  `bestenliste`; `ich`, `werkstatt`). Dann `html[data-reiter="an"]`: die Screens werden um die Hoehe der Leiste kuerzer
+  (`--reiter-h`, w0plus-a-fix: vorher bekam `#app` Platz unten, die Screens sind aber selbst `100dvh` hoch, und die Leiste lag
+  im Querformat und auf dem Handy ueber dem SPIELEN-Knopf), `aria-current="page"` am aktiven Reiter,
   Wechsel ersetzt den Verlaufseintrag. Die Optik kommt mit dem Premium-Umbau. `app.js` liest `PAKETE` und `REITER` ueber
   den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Flos Entscheidung
   D5 (17.10.: auf dem iPad quer in der Kopfzeile, sonst unten schwebend) setzt der Premium-Umbau nur mit CSS um; Aufbau,
@@ -1072,8 +1132,10 @@ dem Ergebnis laeuft und nicht ins Budget zaehlt.
 `node tests/spiel.test.mjs` (Node, Zeitzone Europe/Berlin): Tagesgrenze, Sommerzeit-Ende 25.10.2026 und -Beginn,
 Jahreswechsel, Kalenderwoche, Uhr springt zurueck, Zeitzonenwechsel, mulberry32, Dateikopf, `ladeInhalt` mit allen
 Fehlergruenden, Spielplan-Format und -Folge, Funken-Wochenende ueber die Zeitumstellung, `registriereBot`, `nodes`,
-`vorliebe` (Fenster, nie staerker), Seed je Halbzug, `ladeSpielplan`. `ereignisse`: neue Ereignisse, Orte, Quellen,
-`angeboten`, `fertig`. `storage`: Modi, Felder, Budgets, Ausduennen, dauerhafter Speicher. `fairness`: Zusaetze aus 5.3
+`vorliebe` (Fenster, nie staerker; w0plus-a-fix: Naehe 0,1 Bauern, Mittelwert mit und ohne Vorliebe), Seed je Halbzug,
+`ladeSpielplan`, `staerkeFuerElo(...).elo` und `eloDerPartie`, ausgeschriebene Countdowns, gestrichene Wochen. `ereignisse`: neue Ereignisse, Orte, Quellen,
+`angeboten`, `fertig`. `storage`: Modi, Felder, Budgets (w0plus-a-fix: `finisher` und Schub 2b), Ausduennen, dauerhafter
+Speicher (Firefox ohne Dialog), Gast-Partien werten nie, Nachholen von Boss-, freien und Spielhallen-Partien. `fairness`: Zusaetze aus 5.3
 (Verbotsliste erweitert, auch fuer `daten/`; kein Ablauf-Feld; Spielplaene gueltig; kein Countdown in Spielplan, Boss,
 Werkstatt; Bosse werten nie und haben `archiv: true`; Finisher-Grenzen; kein `Math.random` in den reinen Logik-Dateien der
 neuen Pakete und in `tag.js`/`inhalte.js`; `bots.js`/`engine.js` importieren nichts aus Paketen; Schnell-Chat ohne „Wow“,
@@ -1083,6 +1145,12 @@ Bewegung. `app --spiel` (auch in `--erweiterungen` und im vollen Lauf): neue Scr
 ausduennen), Heute-Karte, Gegner-Leiste (quer und hoch), Plaetze der Buehne, `zug:abgelehnt`, Abrechnung (Reihenfolge,
 Einrollen, Nachtrag, hoechstens 4), Matt-Hook (Reihenfolge, 1,8 s, Tipp, Effekt ersetzt), Boss-Modus (Kopf, Startstellung,
 Satzbuch, Fortsetzen nach Neuladen und aus der Arena, Chip, Datensatz, „Nochmal“), Test-Huelle der vier Screen-Orte.
+w0plus-a-fix: Leiste verdeckt in keinem Format etwas (Screen endet ueber der Leiste, jedes bedienbare Element erreichbar),
+Screen `werkstatt`, `partie:spieler-leiste` (quer und hoch) und `partie:aktionen` (Spalten, Klick nur ans Paket, hoechstens
+2, Beschriftungen passen), Lebensleiste auf dem Handy bei sprechendem Bot, `gewinnVorigerZug`, Matt-Hook bei langsamer
+Auswertung (Finisher nach hoechstens 0,5 s), Antippen der Karte zeigt die Abrechnung, Gast im Modus normal (keine Sterne,
+Chip GAST, „Nochmal“), Verlauf-Kopf je Art, Boss-Staerke im Kopf („≈ 1000“). `app --nachpruefung`: Boss-Partie nach einem
+Abbruch nachgeholt.
 
 **Rest aus SPIELKONZEPT 5.3: wer welche Fairness-Pruefung mitbringt.** Was das Fundament pruefen kann, steht oben. Die
 uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket schreibt seine Zeilen in
@@ -1097,5 +1165,8 @@ uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket 
 | Liga: Bot-gegen-Bot-Partien einer Saison identisch, egal wie Flo spielt | S3-2 |
 | Uhr: gleiche Stellung, gleicher Seed, verschiedene Uhren, derselbe Bot-Zug | W0+b |
 | Finisher: die Verlierer-Fassung ohne Klang | S1-7 `finisher` |
+| Emote-Rad: hoechstens ein Emote je 8 s und 6 je Partie, nur in den Zeitfenstern (vor dem ersten Zug, nach einem Bot-Zug, nach der Partie); Bot-Antwort hoechstens 3-mal je Partie; kein Emote, das verspottet (Liste ohne Lachen, Weinen, Gaehnen). Schnell-Chat: nur feste Saetze, hoechstens einer je 3 eigene Zuege und 3 je Minute, kein Satz haengt an der Engine; Stummschalten wirkt sofort und bleibt (Einstellung `ausdruck`). Banner: Zeichen nur erspielt, jedes mit Beleg (Datum, Partie) | Schub 2b `ausdruck` |
+| Siegeslauf: zaehlt nur gegen ungefaehr gleich starke oder staerkere Gegner (geeichte Staerke mindestens Wertung minus 150; vor der Eichung hoechster freigeschalteter Bot minus eine Stufe); Partien mit Hilfe, gegen Schwaechere, Uebungen, freie und Boss-Partien pausieren den Lauf; Remis oder Niederlage beenden ihn still; keine Funken, kein Bonus in Wertung oder Liga; Flamme erst ab 3 Siegen | Schub 2b `siegeslauf` |
+| Werkstatt: jedes Stueck `nurOptik: true` und `immerErhaeltlich: true`, kein Feld `verfuegbarBis`; keine Preise im Repo; Kaufknopf nur „bald verfügbar“; kein Kaufhinweis nach einer Niederlage, in der Partie oder im Ergebnis; in jeder Kategorie erspielbare Stuecke; kein Countdown (schon im Fundament fuer Dateien mit `werkstatt` im Namen) | Schub 2b `werkstatt` |
 | hoechstens eine Bot-Stichelei je Partie, keine nach 3 Niederlagen in Folge | S3-5 (Bots mit Gedaechtnis) |
 | kein Raetsel-Tageslimit in der Gratis-Konfiguration | S1-5 `raetsel` (Abo-Schalter: S4-1) |

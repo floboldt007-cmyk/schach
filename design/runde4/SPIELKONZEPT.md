@@ -1842,8 +1842,8 @@ Feier-Zeilen, Texte). Sonst wird zuerst nachjustiert (Funken-Werte, Lautstärken
 | Partien und Fortschritt | ca. 0,85 Mio. | gleich |
 | Analysen (Reviews) | 20 × ca. 47.000 = 0,94 Mio. | **12 × 47.000 = 0,56 Mio.** (ältere rechnet die Analyse beim Öffnen neu) |
 | Module Welle 0 | 0,33 Mio. | gleich |
-| neue Module | | `funken` 25.000 · `punkte` 40.000 · `boss` 12.000 · `raetsel` 30.000 · `lernen` 30.000 · `liga` 10.000 · `sammeln` 20.000 · `freunde` 15.000 = **0,18 Mio.** |
-| **Summe** | ca. 2,12 Mio. (85 %) | **ca. 1,92 Mio. (77 %)** |
+| neue Module | | `funken` 25.000 · `punkte` 40.000 · `boss` 12.000 · `raetsel` 30.000 · `lernen` 30.000 · `liga` 10.000 · `sammeln` 20.000 · `freunde` 15.000 · `finisher` 10.000 (S1-7: Matt-Atlas, Mattbilder) · `ausdruck` 6.000 (Emote-Rad, Schnell-Chat, Banner) · `siegeslauf` 6.000 · `werkstatt` 8.000 (die drei aus Schub 2b) = **0,21 Mio.** (jedes Paket ein eigenes Modul, damit sich keine Daten überschreiben) |
+| **Summe** | ca. 2,12 Mio. (85 %) | **ca. 1,95 Mio. (78 %)** |
 
 Ohne das Kürzen der Analysen läge die Summe bei ca. 93 %. Zusätzlich fragt die App beim Start dauerhaften Speicher an
 (`navigator.storage.persist()`), denn Safari löscht Speicher von Web-Apps, die nicht auf dem Home-Bildschirm liegen,

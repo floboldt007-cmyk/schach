@@ -2039,6 +2039,9 @@ async function testeSpielFundament(browser) {
     const falsch = [];
     for (const name of ['bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']) {
       await seite.goto(BASIS + '#' + name);
+      // w0plus-a-fix: nur der Hash aendert sich (gleiches Dokument), die alte Arena steht noch, bis der Router den Import
+      // des fehlenden Screens abgeschlossen hat; deshalb auf den Hash warten (vorher Wackler unter Last: "raetsel")
+      await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'), null, { timeout: 8000 }).catch(() => {});
       await seite.waitForSelector('.screen.arena');
       const r = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
       if (r.hash !== '#arena' || r.platzhalter) falsch.push(name);
