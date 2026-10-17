@@ -1195,7 +1195,7 @@ angelegt) -> `css/screens.css` (Rest, verschwindet mit U8/U9).
   `--kt-<id>` (Text, >= 4,5:1). Namen kommen mit U4 aus `js/zugklassen.js`.
 
 **`js/thema.js`** (rein bis auf `wendeThemaAn`): `THEMEN` (eingefroren, `modern`), `MODI` (`system`, `hell`, `dunkel`),
-`registriereThema(def) -> abmelden()` (prueft id, name, `css: 'css/themes/<id>.css'`, modi hell+dunkel, metaFarbe,
+`registriereThema(def) -> abmelden()` (prueft id, name, `css` genau `'css/themes/<id>.css'`, modi hell+dunkel, metaFarbe,
 klang.standard), `themaListe()`, `themaVon(id)`, `wendeThemaAn({ thema, modus }) -> Promise` (laedt ein
 nachgeladenes Theme-CSS zuerst, setzt `html[data-thema|data-modus]`, Federn, `<meta name="theme-color">`; Unbekanntes
 -> modern/system; der spaetere Aufruf gewinnt), `aufgeloesterModus()`, `aktuellesThema()`, `standardKlangpaket(id)`
@@ -1205,7 +1205,8 @@ Systemwechsel im Modus `system`. Gegen Aufblitzen setzt ein kleines Inline-Skrip
 Modus `hell`/`dunkel` vor dem ersten Bild; `system` braucht kein JS.
 
 **`js/bewegung.js`:** `TEMPI` (langsam 1,5, normal 1, schnell 0,6, aus 0), `setzeBewegung(stufe)` (setzt `--tempo` und
-`html[data-bewegung]`; `prefers-reduced-motion` wirkt wie `aus`), `tempo()`, `reduziert()`, `bewegungStufe()`,
+`html[data-bewegung]`; `prefers-reduced-motion` wirkt wie `aus`; bei `aus` kuerzt `css/tokens.css` auch alle festen
+CSS-Animationen und Uebergaenge auf 0,01 ms und einen Durchlauf, `animationend`/`transitionend` kommen weiter), `tempo()`, `reduziert()`, `bewegungStufe()`,
 `taktFaktor()`/`takt(ms)` (Pausen zum Mitlesen, nie unter 0,6), `warte(ms)`, `federKurve(k, d)` (rein),
 `setzeFedern({ feder, weich, hupf })` (`linear()` wo moeglich, sonst die cubic-bezier-Werte des Themes), `KURVEN`,
 `anim(el, frames, { d, v, k, fill, it, dir })` (Web-Animation mit Tempo, bei Tempo 0 sofort am Ende),
@@ -1222,7 +1223,8 @@ aendert nur die genannte Gruppe. Standards: `klangpaket ''`, `lautstaerke 0.8`, 
 `modus 'system'`, `koordLage 'ecke'`, `pfeile true`, `duellIntro 'besondere'` (Flo, D3), `figuren 'cburnett'`,
 `coachStil 'ausfuehrlich'`, `sprueche 'an'`. `app.js wendeEinstellungenAn(e)` ruft `setzeBewegung`, `wendeThemaAn` und,
 sobald es sie gibt (U3), `klang.einstellen(e)`; Hell/Dunkel wechselt ueber `app.setzeEinstellungen({ modus })` ohne
-Neuladen.
+Neuladen. Nach dem Laden der Pakete wendet `app.js` das gespeicherte Theme noch einmal an (ein Paket-Theme kennt
+`thema.js` erst dann), ohne den Start darauf warten zu lassen.
 
 **Schriften:** `assets/schriften/manrope.woff2` und `bricolage-grotesque.woff2` (SIL OFL 1.1, Lizenztexte daneben,
 Quelle im Kopf von `modern.css`), vorgeladen in `index.html`, im Service-Worker-Cache. Es fehlen `≈ ▲ ★ ♙ ♔ ✓ →`

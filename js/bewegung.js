@@ -3,6 +3,7 @@
 //
 //   TEMPI                      { langsam: 1.5, normal: 1, schnell: 0.6, aus: 0 }  (Einstellung `bewegung`)
 //   setzeBewegung(stufe)       setzt die Stufe und --tempo am <html>; "weniger Bewegung" des Geraets wirkt wie 'aus'
+//                              (html[data-bewegung="aus"]: css/tokens.css kuerzt dann auch feste CSS-Animationen)
 //   bewegungStufe()            -> gewaehlte Stufe ('normal' ...)
 //   tempo()                    -> Faktor fuer Dauern (0 bei 'aus' oder reduzierter Bewegung)
 //   reduziert()                -> true, wenn Tempo 0 ist (Systemwunsch oder Einstellung)

@@ -282,6 +282,9 @@ function nodeTeil() {
   pruefe('registriereThema prueft id, name, css, modi, metaFarbe, klang', wirft(null) && wirft({ ...gut, id: 'Edel!' }) && wirft({ ...gut, id: 'modern' })
     && wirft({ ...gut, name: '' }) && wirft({ ...gut, css: 'https://x.org/a.css' }) && wirft({ ...gut, css: '../edel.css' }) && wirft({ ...gut, modi: ['hell'] })
     && wirft({ ...gut, metaFarbe: { hell: 'weiss', dunkel: '#000000' } }) && wirft({ ...gut, klang: { standard: 'neon' } }));
+  // Codex-Befund (PR #4): css ist genau css/themes/<id>.css, keine fremde Theme-Datei
+  pruefe('registriereThema: css muss genau css/themes/<id>.css sein (fremde Theme-Datei -> TypeError)', wirft({ ...gut, css: 'css/themes/modern.css' })
+    && wirft({ ...gut, css: 'css/themes/verspielt.css' }) && wirft({ ...gut, id: 'edel-2', css: 'css/themes/edel.css' }));
   const ab = registriereThema(gut);
   const ab2 = registriereThema({ ...gut, id: 'verspielt', name: 'Verspielt', css: 'css/themes/verspielt.css', klang: { standard: 'arcade' }, frei: false });
   pruefe('registriereThema: Liste, themaVon, standardKlangpaket', themaListe().map((t) => t.id).join() === 'modern,edel,verspielt'
@@ -507,6 +510,31 @@ async function browserTeil(browser) {
   await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'normal' }));
   pruefe('Einstellung bewegung setzt --tempo (schnell 0,6, aus 0) und die Dauern', t1 === '0.6' && t2 === '0' && /^calc\(320ms \* 0\)$/.test(dauer)
     && await stil(seite, 'html', '--tempo') === '1', `${t1} ${t2} ${dauer}`);
+  // Codex-Befund (PR #4): "aus" wirkt wie prefers-reduced-motion auch auf feste CSS-Animationen und Uebergaenge
+  // (Puls des naechsten Gegners, Coach, Ergebnis); animationend und transitionend kommen trotzdem
+  const cssBewegung = (st) => seite.evaluate(async (stufe) => {
+    window.__app.setzeEinstellungen({ bewegung: stufe });
+    const av = document.querySelector('.knoten.aktuell .avatar');
+    const cs = av ? getComputedStyle(av) : null;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:0;top:0;width:10px;height:10px;opacity:1;animation:puls 1.8s ease-in-out infinite;transition:opacity 2s linear';
+    document.body.appendChild(el);
+    const ende = (typ) => new Promise((r) => { el.addEventListener(typ, () => r(true), { once: true }); setTimeout(() => r(false), 800); });
+    const an = ende('animationend');
+    void el.offsetWidth;
+    el.style.opacity = '0';
+    const [animationend, transitionend] = await Promise.all([an, ende('transitionend')]);
+    el.remove();
+    return { puls: cs ? `${cs.animationName} ${cs.animationDuration} ${cs.animationIterationCount}` : null, n: cs ? cs.animationIterationCount : null,
+      d: cs ? parseFloat(cs.animationDuration) : null, animationend, transitionend };
+  }, st);
+  const bNormal = await cssBewegung('normal');
+  const bAus = await cssBewegung('aus');
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ bewegung: 'normal' }));
+  pruefe('Bewegung aus: feste CSS-Animationen fast ohne Dauer, einmal (Puls des naechsten Gegners), Ereignisse kommen',
+    bNormal.n === 'infinite' && !bNormal.animationend && !bNormal.transitionend
+    && bAus.n === '1' && bAus.d < 0.001 && bAus.animationend && bAus.transitionend
+    && await seite.evaluate(() => document.documentElement.dataset.bewegung) === 'normal', JSON.stringify({ normal: bNormal, aus: bAus }));
   const druck = await seite.evaluate(async () => {
     const b = document.createElement('button');
     b.className = 'dr';
@@ -558,6 +586,27 @@ async function browserTeil(browser) {
   await seite.evaluate(() => window.__app.setzeEinstellungen({ thema: 'modern' }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+
+  // Codex-Befund (PR #4): ein Paket meldet sein Theme erst beim Laden an (registriereThema); die gespeicherte
+  // Ansicht gilt trotzdem, sobald die Pakete geladen sind
+  gruppe = 'Theme aus einem Paket';
+  {
+    const speicher = { cookies: [], origins: [{ origin: `http://127.0.0.1:${PORT}`,
+      localStorage: [{ name: 'schach-arena:v1:einstellungen', value: JSON.stringify({ thema: 'probe' }) }] }] };
+    const { kontext: k6, seite: s6, fehler: f6 } = await neueSeite(browser, { speicher });
+    await s6.route('**/css/themes/probe.css', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: probeCss }));
+    await s6.route('**/js/pakete/probe-thema/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
+      body: "import { registriereThema } from '../../thema.js';\n"
+        + "registriereThema({ id: 'probe', name: 'Probe', css: 'css/themes/probe.css', modi: ['hell', 'dunkel'], metaFarbe: { hell: '#E8E2F4', dunkel: '#101114' } });\n" }));
+    await s6.goto(START + '&erw=pakete/probe-thema/index#arena');
+    await s6.waitForSelector('.screen.arena .knoten');
+    const da = await s6.waitForFunction(() => document.documentElement.dataset.thema === 'probe', null, { timeout: 5000 }).then(() => true, () => false);
+    pruefe('gespeichertes Theme eines Pakets wird nach dem Laden der Pakete angewandt', da && await bisStil(s6, 'body', 'background-color', 'rgb(232, 226, 244)')
+      && await s6.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute('content')).join()) === '#E8E2F4,#101114',
+      `data-thema ${await s6.evaluate(() => document.documentElement.dataset.thema)}`);
+    pruefe('Keine Konsolenfehler', f6.length === 0, f6.join(' | '));
+    await k6.close();
+  }
 
   // ---------- dunkel nach System ----------
   gruppe = 'Dunkel (System)';

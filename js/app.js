@@ -37,6 +37,7 @@
 // Premium-Umbau U1 (Theme-Fundament): wendeEinstellungenAn(e) ruft zusaetzlich setzeBewegung(e.bewegung) (bewegung.js),
 //   wendeThemaAn({ thema, modus }) (thema.js) und, sobald es sie gibt, klang.einstellen(e) (sounds.js, U3). Start:
 //   starteDruck() (Druck-Rueckmeldung fuer .dr). Hell/Dunkel wechselt ueber app.setzeEinstellungen({ modus }) ohne Neuladen.
+//   Nach ladePakete() gilt die gespeicherte Ansicht noch einmal (Themes aus Paketen kennt thema.js erst dann).
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -48,7 +49,7 @@ import {
 import { icon } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
-import { wendeThemaAn } from './thema.js';
+import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck } from './bewegung.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
@@ -89,6 +90,14 @@ function wendeEinstellungenAn(e) {
   html.dataset.balken = e.balken ? 'an' : 'aus';
   html.dataset.live = e.liveBewertung ? 'an' : 'aus';
   window.dispatchEvent(new CustomEvent('schach:einstellungen', { detail: e }));
+}
+
+// Themes aus Paketen (registriereThema) kennt thema.js erst nach ladePakete(): die gespeicherte Ansicht dann noch
+// einmal anwenden. Nicht abwarten (bremst den Start nicht); wendeThemaAn schaltet erst um, wenn das CSS da ist.
+function themaNachPaketen() {
+  const e = ladeEinstellungen();
+  if (e.thema === aktuellesThema().thema || !themaVon(e.thema)) return;
+  wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
 }
 
 // ---------- Engines (zwei Instanzen, lazy, einmal init) ----------
@@ -718,7 +727,7 @@ function starte() {
   dauerhaftAnfragen();
   // Pakete zuerst laden (PAKETE, im Testmodus dazu ?erw), dann app:bereit und der erste Screen
   const pakete = ladePakete();
-  if (pakete) pakete.then(ersterStart);
+  if (pakete) pakete.then(() => { themaNachPaketen(); ersterStart(); });
   else ersterStart();
 }
 

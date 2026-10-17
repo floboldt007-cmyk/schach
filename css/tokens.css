@@ -67,3 +67,12 @@ html[data-brett="holz"] {
 
 /* Zahlen ueberall mit gleich breiten Ziffern */
 .zahl { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* ---------- Bewegung aus (Einstellung oder "weniger Bewegung" des Geraets: js/bewegung.js setzt dann
+   html[data-bewegung="aus"]) ----------
+   Wirkt wie die prefers-reduced-motion-Bloecke, aber auf alle festen CSS-Animationen und Uebergaenge. Fast keine
+   Dauer und ein Durchlauf statt animation: none, damit animationend und transitionend weiter kommen. */
+html[data-bewegung="aus"] *, html[data-bewegung="aus"] *::before, html[data-bewegung="aus"] *::after {
+  animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important; transition-delay: 0s !important;
+}

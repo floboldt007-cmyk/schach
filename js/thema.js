@@ -67,7 +67,7 @@ export function registriereThema(def) {
   if (!d || typeof d.id !== 'string' || !ID.test(d.id)) throw new TypeError('registriereThema: id fehlt oder ist ungueltig');
   if (Object.prototype.hasOwnProperty.call(THEMEN, d.id)) throw new TypeError('registriereThema(' + d.id + '): eingebautes Theme');
   if (typeof d.name !== 'string' || !d.name.trim()) throw new TypeError('registriereThema(' + d.id + '): name fehlt');
-  if (typeof d.css !== 'string' || !/^css\/themes\/[a-z0-9-]+\.css$/.test(d.css)) throw new TypeError('registriereThema(' + d.id + '): css muss css/themes/<id>.css sein');
+  if (d.css !== 'css/themes/' + d.id + '.css') throw new TypeError('registriereThema(' + d.id + '): css muss css/themes/<id>.css sein');
   if (!Array.isArray(d.modi) || !d.modi.includes('hell') || !d.modi.includes('dunkel')) throw new TypeError('registriereThema(' + d.id + '): modi braucht hell und dunkel');
   if (!d.metaFarbe || !HEX.test(d.metaFarbe.hell || '') || !HEX.test(d.metaFarbe.dunkel || '')) throw new TypeError('registriereThema(' + d.id + '): metaFarbe { hell, dunkel } als #rrggbb');
   const standard = d.klang && d.klang.standard;
