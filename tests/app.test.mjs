@@ -2273,10 +2273,102 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.vl-screen');
     pruefe('Boss: Verlauf zeigt die Boss-Partie mit Namen (angemeldeter Bot) und dem Chip "Boss"', await seite.evaluate(() => document.querySelector('.screen.vl-screen').textContent.includes('Testboss')
       && [...document.querySelectorAll('.vl-uebung')].some((c) => c.textContent === 'Boss' && c.dataset.modus === 'boss')));
+    // Arena mit offener Boss-Partie (die zweite, nach "Nochmal" verlassen): Karte "Offene Partie" mit dem Boss,
+    // der Dialog vor einer neuen Partie nennt ihn, "Fortsetzen" setzt sie mit Boss und Seed fort
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena .detail .fortsetzen', { timeout: 10000 }).catch(() => {});
+    const offen = await seite.evaluate(() => {
+      const f = document.querySelector('.screen.arena .detail .fortsetzen');
+      return f ? { text: f.querySelector('.ft-text').textContent, avatar: f.querySelector('img').getAttribute('src') } : null;
+    });
+    pruefe('Boss: Arena zeigt die offene Boss-Partie mit Namen und Bild des Bosses', !!offen && offen.text.includes('gegen Testboss')
+      && offen.avatar.endsWith('06-professor-turm.svg'), JSON.stringify(offen));
+    await seite.locator('.screen.arena .detail [data-aktion="spielen"]').click();
+    await seite.waitForSelector('.dialog-ort .dialog');
+    const frage = await seite.evaluate(() => document.querySelector('.dialog-ort .dialog p').textContent);
+    await seite.locator('.dialog-knoepfe .knopf', { hasText: 'Abbrechen' }).click();
+    pruefe('Boss: der Dialog vor einer neuen Partie nennt den Boss', frage.includes('gegen Testboss'), frage);
+    await seite.locator('.screen.arena .detail [data-aktion="fortsetzen"]').click();
+    await seite.waitForFunction(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet').length === 3 && window.__partie && window.__partie.bereit, null, { timeout: 30000 });
+    const weiter = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet')[2]);
+    pruefe('Boss: "Fortsetzen" in der Arena setzt die Boss-Partie mit Boss, Stufe und Seed fort', weiter.fortgesetzt === true && weiter.modus === 'boss'
+      && weiter.seed === neu.seed && JSON.stringify(weiter.boss) === JSON.stringify(k.gest.boss), JSON.stringify(weiter));
     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
+
+  // --- Test-Huelle der Orte, deren Screens erst mit spaeteren Paketen kommen (tests/orte-huelle.html) ---
+  gruppe = 'W0+a: Test-Hülle';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: false });
+    await seite.route('**/js/pakete/huelle-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_HUELLE }));
+    const huelle = async (abfrage) => {
+      await seite.goto(`http://127.0.0.1:${PORT}/tests/orte-huelle.html?${abfrage}`);
+      await seite.waitForFunction(() => window.__huelle && window.__huelle.bereit, null, { timeout: 15000 });
+    };
+    const ERWARTET = { 'bestenliste:reiter': '["app","fenster","reiter"]', 'training:karten': '["app"]', 'ich:vitrine': '["app"]', 'spielplan:tage': '["app","plan","tag","woche"]' };
+    const falsch = [];
+    for (const [ort, schluessel] of Object.entries(ERWARTET)) {
+      await huelle(`ort=${ort}&erw=pakete/huelle-test/index`);
+      const r = await seite.evaluate((o) => {
+        const h = window.__huelle;
+        const b = document.querySelector(`.ort-huelle[data-ort="${o}"] > .huelle-ort`);
+        return { anzahl: h.anzahl, kontext: JSON.stringify(h.kontext), paket: JSON.stringify(window.__ht.kontexte[o]), host: h.host, fehler: h.fehler.slice(),
+          sichtbar: !!b && !b.hidden && b.querySelectorAll('.ht-karte').length === 1 && b.getBoundingClientRect().height > 0, eingefroren: window.__ht.werte[o].eingefroren };
+      }, ort);
+      if (r.anzahl !== 1 || r.kontext !== schluessel || r.paket !== schluessel || !r.host || r.fehler.length || !r.sichtbar || !r.eingefroren) falsch.push(`${ort} ${JSON.stringify(r)}`);
+    }
+    pruefe('Hülle: bestenliste:reiter, training:karten, ich:vitrine, spielplan:tage mit dem Kontext aus ARCHITEKTUR.md (Paket per ?erw)', falsch.length === 0, falsch.join(' | '));
+    // Kontext-Werte: Standard und aus der Adresse
+    await huelle('ort=bestenliste:reiter&erw=pakete/huelle-test/index');
+    const b1 = await seite.evaluate(() => window.__ht.werte['bestenliste:reiter']);
+    await huelle('ort=bestenliste:reiter&erw=pakete/huelle-test/index&reiter=bots&fenster=allzeit');
+    const b2 = await seite.evaluate(() => window.__ht.werte['bestenliste:reiter']);
+    pruefe('Hülle: bestenliste:reiter mit reiter (Standard "ich") und fenster (Standard "woche")', b1.reiter === 'ich' && b1.fenster === 'woche'
+      && b2.reiter === 'bots' && b2.fenster === 'allzeit', JSON.stringify([b1, b2]));
+    await huelle('ort=spielplan:tage&erw=pakete/huelle-test/index');
+    const s1 = await seite.evaluate(() => ({ w: window.__ht.werte['spielplan:tage'], plan: window.__huelle.plan }));
+    await huelle('ort=spielplan:tage&erw=pakete/huelle-test/index&woche=2026-11-30&tag=2026-12-04');
+    const s2 = await seite.evaluate(() => window.__ht.werte['spielplan:tage']);
+    pruefe('Hülle: spielplan:tage mit dem Beispiel-Spielplan (geladen über inhalte.js), Woche und Tag aus der Adresse', s1.plan === true && s1.w.wochen === 6
+      && /^\d{4}-\d\d-\d\d$/.test(s1.w.woche) && /^\d{4}-\d\d-\d\d$/.test(s1.w.tag) && s2.woche === '2026-11-30' && s2.tag === '2026-12-04' && s2.wochen === 6, JSON.stringify([s1, s2]));
+    // Klicks bindet das Paket selbst; die Fake-App protokolliert; neu() raeumt ab und fuellt wieder
+    await seite.locator('.huelle-ort .ht-karte').click();
+    const r = await seite.evaluate(() => {
+      const gehe = window.__huelle.gehe.slice();
+      const anzahl = window.__huelle.neu();
+      return { gehe, anzahl, weg: window.__ht.weg, karten: document.querySelectorAll('.huelle-ort .ht-karte').length };
+    });
+    pruefe('Hülle: Klick des Pakets erreicht app.gehe, neu() ruft verlasse() und füllt genau einmal neu', r.gehe.length === 1 && r.gehe[0].name === 'raetsel'
+      && r.gehe[0].params.von === 'spielplan:tage' && r.anzahl === 1 && r.weg === 1 && r.karten === 1, JSON.stringify(r));
+    await huelle('ort=ich:vitrine');
+    const leer = await seite.evaluate(() => ({ anzahl: window.__huelle.anzahl, hidden: document.querySelector('.huelle-ort').hidden, fehler: window.__huelle.fehler.length }));
+    pruefe('Hülle: ohne Paket leer und versteckt (wie der spätere Host)', leer.anzahl === 0 && leer.hidden && leer.fehler === 0, JSON.stringify(leer));
+    await huelle('ort=arena:kopf');
+    const fremd = await seite.evaluate(() => ({ host: window.__huelle.host, fehler: window.__huelle.fehler.join() }));
+    pruefe('Hülle: Orte mit echtem Host in der App werden abgelehnt (mit Hinweis)', fremd.host === null && /echten Host/.test(fremd.fehler), JSON.stringify(fremd));
+    pruefe('Hülle: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
 }
+
+// Test-Paket fuer die Test-Huelle: je Screen-Ort eine Karte, die Kontext und Klick mitschreibt
+const TEST_PAKET_HUELLE = `
+import { anbieten } from '../../orte.js';
+const log = window.__ht = { kontexte: {}, werte: {}, weg: 0 };
+for (const ort of ['bestenliste:reiter', 'training:karten', 'ich:vitrine', 'spielplan:tage']) {
+  anbieten(ort, (k) => {
+    log.kontexte[ort] = Object.keys(k).sort();
+    log.werte[ort] = { reiter: k.reiter, fenster: k.fenster, woche: k.woche, tag: k.tag, wochen: k.plan ? k.plan.wochen.length : null, eingefroren: Object.isFrozen(k) };
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'ht-karte';
+    el.textContent = 'Karte für ' + ort;
+    el.addEventListener('click', () => k.app.gehe('raetsel', { von: ort }));
+    return { el, verlasse() { log.weg++; } };
+  }, { reihenfolge: 20, paket: 'huelle-test' });
+}
+`;
 
 // ---------- 7. Viewports ----------
 async function testeViewport(browser, vp) {

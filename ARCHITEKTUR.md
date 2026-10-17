@@ -799,7 +799,7 @@ Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie 
 | Datei | Neu |
 |---|---|
 | `js/tag.js` (neu, rein) | Tag (Grenze 4:00 lokal), Woche (Montag 4:00), Kalenderwoche, Zufall aus einem Seed (mulberry32) |
-| `js/inhalte.js` (neu, rein bis auf `fetch`) | statische JSON-Dateien unter `daten/`, Dateikopf mit Rechenstand, Format der Spielplan-Datei |
+| `js/inhalte.js` (neu, rein bis auf `fetch`) | statische JSON-Dateien unter `daten/`, Dateikopf mit Rechenstand, Format und Ort der Spielplan-Datei |
 | `js/ui/abrechnung.js` (neu) | Abrechnungs-Huelle an `ergebnis:karte` (Reihenfolge 3), darin der Zeilen-Ort `ergebnis:abrechnung` |
 | `daten/beispiel/spielplan.json` (neu) | Beispiel des Spielplan-Formats (wird nicht ausgeliefert, nur Format und Tests) |
 | `js/storage.js` | Modi `boss`, `frei`, `spiel`; Datensatz `seed`, `tempo`, `zeiten`, `boss`, `liga`; `MODUL_BUDGET` +8; `MAX_REVIEWS` 12; `duenneAnalysenAus()`, `dauerhaftAnfragen()`; Anzeige-Einstellungen |
@@ -808,10 +808,11 @@ Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie 
 | `js/feier.js` | Quellen und Prioritaeten aus SPIELKONZEPT 3.10, `BRETT_FEIER` |
 | `js/app.js`, `js/erweiterungen.js` | sieben neue Paket-Screens, untere Leiste (nur vorbereitet, `REITER`), Start: Speicher dauerhaft, Analysen ausduennen |
 | `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss`, Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz` |
-| `js/ui/arena.js` | Host der Heute-Karte (`arena:heute`) |
+| `js/ui/arena.js` | Host der Heute-Karte (`arena:heute`); „Offene Partie“ auch gegen angemeldete Bots |
 | `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })` |
 | `js/board.js` | `beiAbgelehnt`, `striche()`, `kippeKoenig()` |
 | `tests/spiel.test.mjs` (neu) | Node: tag.js, inhalte.js, Spielplan, Bot-Register, nodes, Vorliebe, Seed |
+| `tests/orte-huelle.html` (neu) | Test-Huelle im Browser fuer die vier Orte, deren Screens erst mit Paketen kommen |
 
 ## js/tag.js
 ```js
@@ -835,6 +836,7 @@ zugZufall(seed, ply) -> () => [0, 1)                   // = zufallAus(seedAus(se
 ```js
 RECHENSTAND = 1, VORLAUF_TAGE = 28, THEMEN = ['gambit', 'endspiel', 'taktik', 'eroeffnung', 'uhr']
 ladeInhalt(name, { art, neu = false }) -> Promise<{ ok: true, kopf, daten, veraltet } | { ok: false, grund, text }>
+SPIELPLAN_NAME = 'boss/spielplan', ladeSpielplan({ neu = false }) -> wie ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' })
     // daten/<name>.json relativ zum Modul; grund 'name' | 'netz' | 'json' | 'kopf' | 'art' | 'format' | 'rechenstand'
     // | 'inhalt'; wirft nie; Erfolge bleiben im Arbeitsspeicher, Fehler werden beim naechsten Mal neu versucht
 pruefeKopf(json, { art }), pruefeInhalt(json, { art }) -> { ok, kopf, veraltet, fehler }
@@ -849,8 +851,18 @@ texteVon(json) -> [Text]                               // alle Texte (Pruefungen
 **Dateikopf** jeder Datei unter `daten/`: `{ "kopf": { "art", "format", "rechenstand", "stand", "titel"? }, ... }`.
 `rechenstand` hoeher als `RECHENSTAND`: abgelehnt ("braucht eine neuere App"); niedriger: geladen mit
 `veraltet: true` (Tafeln rechnen auf Wunsch neu, 3.13). `RECHENSTAND` zaehlt hoch, wenn Punkte-Formel, Analysetiefe oder
-Bot-Einstellungen sich aendern. Dateien direkt unter `daten/` stehen in `DATEIEN` (sw.js, Offline-Cache; der sw-Test
-verlangt das), `daten/beispiel/` wird nicht ausgeliefert.
+Bot-Einstellungen sich aendern.
+
+**Ablage und Offline-Cache.** Inhalte eines Pakets liegen unter `daten/<paket>/` (z. B. `daten/raetsel/jahr-2027.json`,
+geladen mit `ladeInhalt('raetsel/jahr-2027', { art: 'raetsel-jahr' })`). Sie gehoeren wie die anderen Paket-Dateien erst in
+`DATEIEN` (sw.js), wenn das Paket in `PAKETE` steht; vorher meldet der sw-Test nur einen Hinweis (ein Paket aendert `sw.js`
+nicht). Dateien direkt unter `daten/` gehoeren keinem Paket und muessen sofort in `DATEIEN`. `daten/beispiel/` wird nie
+ausgeliefert (der sw-Test lehnt es in `DATEIEN` ab). Der Service Worker liefert die Dateien danach offline aus dem Cache.
+
+**Der Spielplan** liegt beim Wochen-Boss-Paket: `daten/boss/spielplan.json` (`SPIELPLAN_NAME = 'boss/spielplan'`, S1-6 legt
+die Datei an). Beide Leser holen ihn ueber `ladeSpielplan()`: S1-6 (Boss der Woche, Spielplan-Screen) und S1-1
+(Funken-Wochenende). Fehlt die Datei (Paket noch nicht da, `grund: 'netz'`), gibt es keinen Wochen-Boss und kein
+Funken-Wochenende, sonst aendert sich nichts.
 
 **Spielplan** (`art: 'spielplan'`, `format: 1`, eine Datei je Quartal oder Saison; Beispiel `daten/beispiel/spielplan.json`):
 ```json
@@ -906,9 +918,27 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 | `training:karten` | DOM | Screen `training` (S2-1 `kartei`), Karten des Trainings | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
 | `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
 | `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeInhalt('spielplan')`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
-Die vier Screen-Orte haben noch keinen Host: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau diesem Kontext
-auf (und schreiben die Stelle in ihren Kopfkommentar); bis dahin pruefen die Node-Tests der Orte (Mini-DOM) Reihenfolge
-und Abraeumen. Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
+Die vier Screen-Orte haben noch keinen Host in der App: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau
+diesem Kontext auf (und schreiben die Stelle in ihren Kopfkommentar). Bis dahin gibt es zwei Test-Huellen:
+- **Browser:** `tests/orte-huelle.html?ort=<ort>&erw=pakete/<paket>/index` baut den Behaelter wie der spaetere Host
+  (`section.ort-huelle[data-ort] > .huelle-ort`, leer `hidden`), laedt die Pakete per `import()`, ruft `fuelle()` mit dem
+  Kontext oben (Fake-App: `gehe`, `zurueck`, `meldung` werden protokolliert, `einstellungen()` liest `storage.js`, keine
+  Engine) und legt alles in `window.__huelle` (`anzahl`, `kontext`, `gehe`, `fehler`, `neu()`, `verlasse()`). Zusaetzlich:
+  `reiter`, `fenster` (bestenliste:reiter), `plan` (Name unter `daten/`, Standard `beispiel/spielplan`), `woche`, `tag`
+  (spielplan:tage). Nur diese vier Orte; die anderen haben einen echten Host. So pruefen Pakete aus Schub 1 (z. B. S1-2
+  mit `ich:vitrine`, S1-5 mit `training:karten`, S1-1 mit `spielplan:tage`) ihre Anbieter, bevor der Screen da ist.
+- **Node:** `tests/ereignisse.test.mjs` prueft Reihenfolge, `null`-Anbieter und Abraeumen aller W0+a-Orte (Mini-DOM).
+Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
+
+| Ort | Host jetzt | Host spaeter (wer ihn baut) |
+|---|---|---|
+| `arena:heute` | `js/ui/arena.js` (W0+a) | bleibt; S1-4 setzt die Heute-Karte zusammen (Integration) |
+| `partie:gegner-leiste`, `partie:matt` | `js/ui/partie.js` (W0+a) | bleibt |
+| `ergebnis:abrechnung` | `js/ui/abrechnung.js` an `ergebnis:karte` (W0+a) | bleibt |
+| `bestenliste:reiter` | `tests/orte-huelle.html` | Screen `bestenliste` (`js/ui/bestenliste.js`, S1-3 `punkte`) |
+| `training:karten` | `tests/orte-huelle.html` | Screen `training` (`js/ui/training.js`, S2-1 `kartei`) |
+| `ich:vitrine` | `tests/orte-huelle.html` | Screen `ich` (`js/ui/ich.js`, Paket `ich` mit der Integration S1) |
+| `spielplan:tage` | `tests/orte-huelle.html` | Screen `spielplan` (`js/ui/spielplan.js`, S1-6 `boss`) |
 
 **Abrechnung.** Hoechstens `ABRECHNUNG_MAX` = 4 Zeilen (weitere: console.warn, nicht gezeigt). Neue Zeilen rollen im
 Abstand von 200 ms ein (`.abr-rollt`, `--t` ab 300 ms), reduzierte Bewegung sofort, Antippen der Huelle zeigt alles
@@ -946,6 +976,8 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
   `'zaehlwerk'` (`.p-zaehlwerk` im Kopf vor dem Zahnrad) und `'funkenlinie'` (`.p-funkenlinie` am unteren Rand des
   Brett-Rahmens). Der Platz entsteht beim ersten Aufruf, ist versteckt, solange die Einstellung aus ist, und folgt ihr.
 - **Ergebnis**: Kontext von `ergebnis:karte` zusaetzlich `boss`.
+- **Arena**: Die Karte „Offene Partie“ und der Dialog „Neue Partie starten?“ finden auch angemeldete Bots (`botNachId`),
+  eine verlassene Boss-Partie laesst sich also wie jede andere fortsetzen (solange ihr Paket geladen ist).
 
 ## Bots (js/bots.js)
 ```js
@@ -1018,19 +1050,39 @@ dem Ergebnis laeuft und nicht ins Budget zaehlt.
   im Testmodus auch `?reiter=training,ich`), und nur auf den Reiter-Screens (`arena`; `training`, `raetsel`, `lernen`;
   `bestenliste`; `ich`). Dann `html[data-reiter="an"]` (Platz unten fuer `#app`), `aria-current="page"` am aktiven Reiter,
   Wechsel ersetzt den Verlaufseintrag. Die Optik kommt mit dem Premium-Umbau. `app.js` liest `PAKETE` und `REITER` ueber
-  den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt.
+  den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Flos Entscheidung
+  D5 (17.10.: auf dem iPad quer in der Kopfzeile, sonst unten schwebend) setzt der Premium-Umbau nur mit CSS um; Aufbau,
+  Reiter und `aria-current` bleiben.
 - Start: `dauerhaftAnfragen()` vor dem Laden der Pakete, `duenneAnalysenAus()` per `setTimeout(0)` nach dem ersten Screen.
 
 ## Tests (W0+a)
 `node tests/spiel.test.mjs` (Node, Zeitzone Europe/Berlin): Tagesgrenze, Sommerzeit-Ende 25.10.2026 und -Beginn,
 Jahreswechsel, Kalenderwoche, Uhr springt zurueck, Zeitzonenwechsel, mulberry32, Dateikopf, `ladeInhalt` mit allen
 Fehlergruenden, Spielplan-Format und -Folge, Funken-Wochenende ueber die Zeitumstellung, `registriereBot`, `nodes`,
-`vorliebe` (Fenster, nie staerker), Seed je Halbzug. `ereignisse`: neue Ereignisse, Orte, Quellen, `angeboten`, `fertig`.
-`storage`: Modi, Felder, Budgets, Ausduennen, dauerhafter Speicher. `fairness`: Zusaetze aus 5.3 (Verbotsliste
-erweitert, auch fuer `daten/`; kein Ablauf-Feld; Spielplaene gueltig; kein Countdown in Spielplan, Boss, Werkstatt;
-Bosse werten nie und haben `archiv: true`; Finisher-Grenzen; kein `Math.random` in den reinen Logik-Dateien der neuen
-Pakete und in `tag.js`/`inhalte.js`; `bots.js`/`engine.js` importieren nichts aus Paketen). `board`: abgelehnte Zuege
-(Maus und Finger), Striche, Koenigsfall, reduzierte Bewegung. `app --spiel` (auch in `--erweiterungen` und im vollen
-Lauf): neue Screens, untere Leiste, Start (persist, ausduennen), Heute-Karte, Gegner-Leiste (quer und hoch), Plaetze der
-Buehne, `zug:abgelehnt`, Abrechnung (Reihenfolge, Einrollen, Nachtrag, hoechstens 4), Matt-Hook (Reihenfolge, 1,8 s,
-Tipp, Effekt ersetzt), Boss-Modus (Kopf, Startstellung, Satzbuch, Fortsetzen, Chip, Datensatz, „Nochmal“).
+`vorliebe` (Fenster, nie staerker), Seed je Halbzug, `ladeSpielplan`. `ereignisse`: neue Ereignisse, Orte, Quellen,
+`angeboten`, `fertig`. `storage`: Modi, Felder, Budgets, Ausduennen, dauerhafter Speicher. `fairness`: Zusaetze aus 5.3
+(Verbotsliste erweitert, auch fuer `daten/`; kein Ablauf-Feld; Spielplaene gueltig; kein Countdown in Spielplan, Boss,
+Werkstatt; Bosse werten nie und haben `archiv: true`; Finisher-Grenzen; kein `Math.random` in den reinen Logik-Dateien der
+neuen Pakete und in `tag.js`/`inhalte.js`; `bots.js`/`engine.js` importieren nichts aus Paketen; Schnell-Chat ohne „Wow“,
+„Hoppla“, „Knapp“, „Glück gehabt“, „Endlich“ in jeder Datei mit `chat` oder `emote` im Namen). `sw`: Inhalte unter
+`daten/<paket>/` folgen der Paket-Regel. `board`: abgelehnte Zuege (Maus und Finger), Striche, Koenigsfall, reduzierte
+Bewegung. `app --spiel` (auch in `--erweiterungen` und im vollen Lauf): neue Screens, untere Leiste, Start (persist,
+ausduennen), Heute-Karte, Gegner-Leiste (quer und hoch), Plaetze der Buehne, `zug:abgelehnt`, Abrechnung (Reihenfolge,
+Einrollen, Nachtrag, hoechstens 4), Matt-Hook (Reihenfolge, 1,8 s, Tipp, Effekt ersetzt), Boss-Modus (Kopf, Startstellung,
+Satzbuch, Fortsetzen nach Neuladen und aus der Arena, Chip, Datensatz, „Nochmal“), Test-Huelle der vier Screen-Orte.
+
+**Rest aus SPIELKONZEPT 5.3: wer welche Fairness-Pruefung mitbringt.** Was das Fundament pruefen kann, steht oben. Die
+uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket schreibt seine Zeilen in
+`tests/fairness.test.mjs` (Node, ohne Browser), bevor es eingebunden wird:
+
+| Pruefung (5.3) | Paket |
+|---|---|
+| Funken nie negativ; Zuege ausserhalb 10 bis 90 % bringen 0; hoechstens 40 offene Zuege; Rueckenwind und Funken-Wochenende zusammen hoechstens ×2; Tagesbogen mit den Funken vor der Verdopplung; Uebung erhoeht Funken, nie die Wertung; Level sinkt nie; Level-Titel ohne „Meister“, „Großmeister“, „Profi“, „Experte“, „Elo“; Tafel-Rekord-Funken nur fuer Allzeit-Rekorde; Treppenlauf bucht keine Einzel-Funken | S1-1 `funken` (Treppenlauf: S2-2) |
+| Punkte nie negativ; „120 Zuege Schieben gegen Benno“ unter der zuegig verwerteten Fassung; ohne Hilfe-Flag kein Tafeleintrag | S1-3 `punkte` |
+| Serie zeigt nach einer Pause nie „0“; Pause nur fuer kuenftige Tage; Reise-Regel; keine Funken aus `tag:gezaehlt`; „Willkommen zurueck“ hoechstens einmal je Kalendermonat | S1-4 `alltag` (Pause: S2-6) |
+| Boss-Leiste ist eine reine Funktion der Bewertung; Boss-Staerke innerhalb einer Woche fuer denselben Spieler gleich | S1-6 `boss` |
+| Liga: Bot-gegen-Bot-Partien einer Saison identisch, egal wie Flo spielt | S3-2 |
+| Uhr: gleiche Stellung, gleicher Seed, verschiedene Uhren, derselbe Bot-Zug | W0+b |
+| Finisher: die Verlierer-Fassung ohne Klang | S1-7 `finisher` |
+| hoechstens eine Bot-Stichelei je Partie, keine nach 3 Niederlagen in Folge | S3-5 (Bots mit Gedaechtnis) |
+| kein Raetsel-Tageslimit in der Gratis-Konfiguration | S1-5 `raetsel` (Abo-Schalter: S4-1) |

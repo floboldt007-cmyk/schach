@@ -15,6 +15,7 @@ import {
 import {
   RECHENSTAND, VORLAUF_TAGE, THEMEN, ladeInhalt, pruefeKopf, pruefeInhalt, registriereInhaltsart, setzeHoler, leereZwischenspeicher,
   pruefeSpielplan, pruefeSpielplanFolge, spielplanWoche, naechsteWochen, funkenWochenendeAktiv, funkenWochenendeVon, texteVon,
+  SPIELPLAN_NAME, ladeSpielplan,
 } from '../js/inhalte.js';
 import {
   BOTS, botNachId, alleBots, registriereBot, botZug, botSatz, vorliebeWert, VORLIEBE_FENSTER_CP, BOT_ARTEN,
@@ -180,6 +181,18 @@ pruefe('Beispiel-Spielplan (daten/beispiel/spielplan.json) ist gueltig', pruefeI
   await ladeInhalt('fehlt');
   pruefe('ladeInhalt: ein Fehler wird nicht gemerkt (beim naechsten Mal neu versucht)', anfragen.length === vorher + 1);
   pruefe('ladeInhalt: ungueltige Namen fragen nie an', !anfragen.some((a) => a.includes('..') || a.includes('Gross')));
+  // Ort des Spielplans: daten/boss/spielplan.json (S1-6 legt ihn an, S1-1 und S1-6 lesen ihn ueber ladeSpielplan)
+  const vorSpielplan = anfragen.length;
+  const ohne = await ladeSpielplan();
+  dateien['daten/boss/spielplan.json'] = JSON.stringify(BEISPIEL);
+  const mit = await ladeSpielplan();
+  const nochmal = await ladeSpielplan();
+  pruefe('ladeSpielplan: daten/boss/spielplan.json (art spielplan); fehlt die Datei: grund netz, beim naechsten Mal neu versucht',
+    SPIELPLAN_NAME === 'boss/spielplan' && ohne.ok === false && ohne.grund === 'netz' && mit.ok === true && mit.daten.wochen.length === 6
+    && nochmal === mit && JSON.stringify(anfragen.slice(vorSpielplan)) === '["daten/boss/spielplan.json","daten/boss/spielplan.json"]', anfragen.slice(vorSpielplan));
+  dateien['daten/boss/spielplan.json'] = JSON.stringify({ ...BEISPIEL, kopf: { ...BEISPIEL.kopf, art: 'raetsel-jahr' } });
+  const falscheArt = await ladeSpielplan({ neu: true });
+  pruefe('ladeSpielplan: prueft die Art (eine andere Datei an diesem Ort wird abgelehnt)', falscheArt.ok === false && falscheArt.grund === 'art', falscheArt);
   setzeHoler(null);
   leereZwischenspeicher();
 }
