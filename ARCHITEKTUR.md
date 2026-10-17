@@ -965,7 +965,9 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 - **Modus `boss`**: wertet nie (keine Sterne, keine Freischaltung, keine Statistik). Kopf „Testboss · Meister“, Unterzeile
   „Regel: …“ (`bot.regel`), Bot-Zeile mit `bot.titel` statt „Stufe n · Elo“. Ergebnis mit dem Chip `BOSS`
   (`.chip.uebung[data-modus="boss"]`) und „Nochmal“ (gleiche Params, neuer Seed). `frei` und `spiel` zeigen die Chips
-  `FREI` und `SPIELHALLE`, Uebungen weiter `ÜBUNG` und „Nochmal ab hier“.
+  `FREI` und `SPIELHALLE`, Uebungen weiter `ÜBUNG` und „Nochmal ab hier“. **Lebensleiste statt Balken** (3.17, 3.18):
+  Fuellt ein Paket in einer Boss-Partie die Gegner-Leiste und ist die Anzeige `lebensleiste` an (Standard), entfaellt der
+  Bewertungsbalken (`.partie.ohne-balken`, wie bei Balken aus; folgt der Einstellung). Ohne Anbieter bleibt der Balken.
 - **Seed**: jede neue Partie bekommt einen 32-Bit-Seed (`Math.random` in `partie.js`), gespeichert in laufender Partie und
   Datensatz. Jeder Bot-Zug zieht seinen Zufall aus `zugZufall(seed, ply)` (unabhaengig von Zuruecknahmen: so rechnet
   ein Code spaeter jeden Bot-Zug nach). Alte laufende Partien ohne Seed spielen mit `Math.random` weiter.

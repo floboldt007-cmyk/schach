@@ -145,7 +145,10 @@ Im Testmodus lädt `index.html?test&erw=pakete/<paket>/index` ein Paket auch ohn
 `node tests/app.test.mjs --nachpruefung`. Nur das Spiel-Fundament W0+a (neue Orte, Matt-Hook, Abrechnung, Boss-Modus,
 untere Leiste): `node tests/app.test.mjs --spiel`; Tag, Inhalte, Spielplan und Bot-Register ohne Browser:
 `node tests/spiel.test.mjs`. Statische Inhalte (Spielplan, später Rätsel und Bosse) liegen als JSON unter `daten/`
-(Format in `ARCHITEKTUR.md`, Abschnitt „W0+a: Spiel-Fundament“) und gehören wie jede App-Datei in `DATEIEN` in `sw.js`.
+(Format in `ARCHITEKTUR.md`, Abschnitt „W0+a: Spiel-Fundament“): die eines Pakets unter `daten/<paket>/`, sie kommen mit
+dem Paket in `DATEIEN` in `sw.js`; Dateien direkt unter `daten/` sofort. Anbieter für Orte, deren Screen es noch nicht
+gibt (`bestenliste:reiter`, `training:karten`, `ich:vitrine`, `spielplan:tage`), lassen sich im Browser in der Test-Hülle
+ansehen: `tests/orte-huelle.html?ort=ich:vitrine&erw=pakete/<paket>/index` (lokaler Server wie oben).
 
 **Neue Version veröffentlichen:** Der Offline-Cache liefert immer die gespeicherte Version aus.
 Damit das iPad ein Update bekommt, muss sich `sw.js` ändern. Nach jeder Änderung an einer

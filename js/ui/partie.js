@@ -55,6 +55,8 @@
 //   'zaehlwerk' | 'funkenlinie' | 'lebensleiste' | 'balken' (Einstellungen der App), platz(name) -> HTMLElement
 //   fuer 'zaehlwerk' (.p-zaehlwerk im Kopf) und 'funkenlinie' (.p-funkenlinie unten am Brett-Rahmen); der Platz
 //   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
+//   Boss-Partie mit einer Gegner-Leiste (Anbieter da) und Anzeige lebensleiste an: kein Bewertungsbalken
+//   (.ohne-balken wie bei Balken aus; "Lebensleiste statt Balken", SPIELKONZEPT 3.18).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz } from '../bots.js';
@@ -1683,6 +1685,10 @@ export function zeige(root, params, app) {
     app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
   });
   gegnerLeiste.hidden = gegnerOrt.anzahl === 0;
+  // W0+a: In Boss-Partien ersetzt die Gegner-Leiste eines Pakets (die Lebensleiste) den Bewertungsbalken, solange die
+  // Anzeige "lebensleiste" an ist (SPIELKONZEPT 3.17, 3.18). Ohne Anbieter steht der Balken wie eingestellt.
+  const ohneBalken = (e) => !e.balken || (z.modus === 'boss' && e.lebensleiste !== false && gegnerOrt.anzahl > 0);
+  s.classList.toggle('ohne-balken', ohneBalken(einst));
 
   // ---------- Start ----------
   balkenAusrichtung();
@@ -1748,7 +1754,7 @@ export function zeige(root, params, app) {
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
     brett.koordinaten(!!d.koordinaten);
-    s.classList.toggle('ohne-balken', !d.balken);
+    s.classList.toggle('ohne-balken', ohneBalken(d));
     for (const [name, el] of plaetze) el.hidden = d[name] !== true;
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);

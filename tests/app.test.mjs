@@ -2082,6 +2082,8 @@ async function testeSpielFundament(browser) {
     pruefe('partie:gegner-leiste: quer erstes Kind der Bot-Karte, mit dem Element des Pakets', leiste.da && !leiste.hidden && leiste.inBotbox && leiste.lage === 'quer'
       && leiste.inhalt && leiste.paketLage === 'quer', JSON.stringify(leiste));
     pruefe('partie:gegner-leiste: Kontext { app, boss, bot, buehne, farbe, lage, modus }', JSON.stringify(leiste.kontext) === '["app","boss","bot","buehne","farbe","lage","modus"]', JSON.stringify(leiste.kontext));
+    pruefe('partie:gegner-leiste: in normalen Partien bleibt der Bewertungsbalken', await seite.evaluate(() => !document.querySelector('.screen.partie').classList.contains('ohne-balken')
+      && getComputedStyle(document.querySelector('.partie .evalbalken')).display !== 'none'));
     await seite.setViewportSize({ width: 820, height: 1180 });
     await seite.waitForFunction(() => document.querySelector('.partie .ort-gegner-leiste').dataset.lage === 'hoch');
     const hoch = await seite.evaluate(() => {
@@ -2240,6 +2242,16 @@ async function testeSpielFundament(browser) {
       && JSON.stringify(k.gest.boss) === '{"id":"test-boss","stufe":"meister","woche":"2026-10-12"}' && Number.isInteger(k.gest.seed)
       && JSON.stringify(k.gest.buehneBoss) === JSON.stringify(k.gest.boss), JSON.stringify(k.gest));
     pruefe('Boss: Gegner-Leiste bekommt boss im Kontext', await seite.evaluate(() => window.__wp.kontexte['partie:gegner-leiste'].includes('boss')));
+    // Lebensleiste statt Balken (SPIELKONZEPT 3.18): mit Gegner-Leiste und Anzeige "lebensleiste" kein Bewertungsbalken
+    const balken = await seite.evaluate(() => {
+      const sicht = () => getComputedStyle(document.querySelector('.partie .evalbalken')).display !== 'none';
+      const mit = sicht();
+      window.__app.setzeEinstellungen({ lebensleiste: false });
+      const aus = sicht();
+      window.__app.setzeEinstellungen({ lebensleiste: true });
+      return { mit, aus, wieder: sicht() };
+    });
+    pruefe('Boss: die Lebensleiste ersetzt den Bewertungsbalken (Anzeige "lebensleiste" aus: Balken zurück)', !balken.mit && balken.aus && !balken.wieder, JSON.stringify(balken));
     const lauf = await h.laufend();
     pruefe('Boss: laufende Partie mit modus, boss und seed', lauf.modus === 'boss' && lauf.boss.stufe === 'meister' && lauf.seed === k.gest.seed, JSON.stringify(lauf).slice(0, 300));
     // Fortsetzen nach Neuladen (echtes Neuladen, nicht nur der Hash): gleicher Boss, gleicher Seed
