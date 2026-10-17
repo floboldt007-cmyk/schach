@@ -172,6 +172,15 @@ function main() {
   pruefe('Keine App-Datei fehlt in der Liste', nichtGelistet.length === 0, nichtGelistet.join(', '));
   const ueberzaehlig = liste.filter((d) => !soll.includes(d) && !pk.erlaubt.includes(d));
   pruefe('Keine fremden Dateien (Tests, Design) in der Liste', ueberzaehlig.length === 0, ueberzaehlig.join(', '));
+  // Premium-Umbau U3: beide Klangpakete vollstaendig (gleiche Namen), Lizenz dabei, Werkzeug-Ausgaben nicht
+  const klangNamen = (p) => alleDateien(`assets/klang/${p}`, /\.mp3$/).map((d) => d.slice(d.lastIndexOf('/') + 1)).sort();
+  const holz = klangNamen('holz');
+  const arcade = klangNamen('arcade');
+  pruefe('Klang: Holz und Arcade mit denselben Dateinamen (je mindestens 40) im Cache', holz.length >= 40
+    && JSON.stringify(holz) === JSON.stringify(arcade) && [...holz.map((n) => 'assets/klang/holz/' + n), ...arcade.map((n) => 'assets/klang/arcade/' + n)].every((d) => menge.has(d)),
+    `holz ${holz.length}, arcade ${arcade.length}`);
+  pruefe('Klang: LIZENZEN.md im Cache, pegel.json (Werkzeug-Ausgabe) liegt nicht im Repo und nicht in der Liste',
+    menge.has('assets/klang/LIZENZEN.md') && !existsSync(path.join(WURZEL, 'assets/klang/pegel.json')) && !liste.some((d) => /pegel\.json$/.test(d)));
   const warten = pk.wartend.filter((d) => !menge.has(d));
   if (warten.length) console.log(`Hinweis: Paket-Dateien noch nicht im Cache (ihr Paket steht noch nicht in PAKETE, das macht die Integration): ${warten.join(', ')}`);
   const paketEinstiege = (pakete || []).map((p) => `js/${p}.js`);
