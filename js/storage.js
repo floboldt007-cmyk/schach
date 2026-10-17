@@ -57,6 +57,14 @@
 //   persistOhneDialog({ userAgent, standalone }) -> boolean
 //   Einstellungen zusaetzlich (Anzeigen in der Partie, SPIELKONZEPT 3.18): zaehlwerk (aus), funkenlinie (aus),
 //     lebensleiste (an: Lebensleiste statt Balken bei Bossen).
+//
+// Premium-Umbau U1 (PLAN 4): alle neuen Einstellungen auf einmal, ladeEinstellungen() prueft erlaubte Werte
+//   (EINSTELLUNG_WERTE), Bereiche (lautstaerke 0..1 in 0,05, tiefe 8..20) und die Teilschluessel von klanggruppen;
+//   Falsches faellt still auf den Standard. Neu: klangpaket, lautstaerke, klangstufe ('alle', D4), klanggruppen
+//   { brett, bewertung, feier, uhr, boss, finisher, bedienung }, zugBestaetigen, haltenAufgeben, turmRochade, autoDame,
+//   steuerung, bewegung (Animationstempo), thema, modus, koordLage, pfeile, duellIntro ('besondere', D3), figuren,
+//   coachStil, sprueche. speichereEinstellungen({ klanggruppen: { uhr: false } }) aendert nur diese Gruppe.
+//   Alte Speicherstaende brauchen nichts: fehlende Schluessel bekommen ihren Standard.
 import { BOTS, botNachId } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder } from './review.js';
@@ -130,7 +138,48 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   zaehlwerk: false,      // Zaehlwerk der Pakete (z. B. Punkte) waehrend der Partie
   funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
   lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
+  // Premium-Umbau (PLAN 4): Klang
+  klangpaket: '',        // '' (Standard der Ansicht, modern: Holz) | 'holz' | 'arcade'
+  lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
+  klangstufe: 'alle',    // 'alle' | 'wichtig' | 'aus' (Flo, D4: Standard alle)
+  klanggruppen: Object.freeze({ brett: true, bewertung: true, feier: true, uhr: true, boss: true, finisher: true, bedienung: true }),
+  // Spiel (Fingerschutz)
+  zugBestaetigen: 'ohneUhr', // 'aus' | 'ohneUhr' | 'immer'
+  haltenAufgeben: true,  // Aufgeben und Remis anbieten nur durch Halten
+  turmRochade: false,    // Turm auf Koenig tippen rochiert
+  autoDame: true,        // Umwandlung ohne Auswahl (Halten zeigt D T L S)
+  steuerung: 'beides',   // 'beides' | 'ziehen' | 'tippen'
+  // Bewegung (heisst nicht "tempo": das ist im Partie-Datensatz die Bedenkzeit)
+  bewegung: 'normal',    // 'langsam' | 'normal' | 'schnell' | 'aus'
+  // Anzeige
+  thema: 'modern',       // Ansicht (Theme): modern, spaeter edel, verspielt (unbekannt: thema.js nimmt modern)
+  modus: 'system',       // 'system' | 'hell' | 'dunkel'
+  koordLage: 'ecke',     // 'ecke' | 'rand'
+  pfeile: true,          // Pfeile malen
+  duellIntro: 'besondere', // 'immer' | 'besondere' | 'aus' (Flo, D3)
+  figuren: 'cburnett',   // Figuren-Satz (vorbereitet)
+  // Coach
+  coachStil: 'ausfuehrlich', // 'ausfuehrlich' | 'knapp'
+  sprueche: 'an',        // 'an' | 'wenig' | 'aus'
 });
+
+// Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
+export const EINSTELLUNG_WERTE = Object.freeze({
+  brett: Object.freeze(['nacht', 'gruen', 'holz']),
+  klangpaket: Object.freeze(['', 'holz', 'arcade']),
+  klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
+  zugBestaetigen: Object.freeze(['aus', 'ohneUhr', 'immer']),
+  steuerung: Object.freeze(['beides', 'ziehen', 'tippen']),
+  bewegung: Object.freeze(['langsam', 'normal', 'schnell', 'aus']),
+  modus: Object.freeze(['system', 'hell', 'dunkel']),
+  koordLage: Object.freeze(['ecke', 'rand']),
+  duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
+  figuren: Object.freeze(['cburnett']),
+  coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
+  sprueche: Object.freeze(['an', 'wenig', 'aus']),
+});
+// Theme-IDs wie in js/thema.js (registriereThema); welche es gibt, weiss erst thema.js
+const THEMA_ID = /^[a-z][a-z0-9-]{1,31}$/;
 
 // ---------------------------------------------------------------------------
 // Speicher-Zugang
@@ -218,19 +267,34 @@ function entferne(k) {
 // ---------------------------------------------------------------------------
 export function ladeEinstellungen() {
   const roh = lies(K.einstellungen, {});
-  const e = { ...STANDARD_EINSTELLUNGEN };
-  if (roh && typeof roh === 'object') {
+  const e = { ...STANDARD_EINSTELLUNGEN, klanggruppen: { ...STANDARD_EINSTELLUNGEN.klanggruppen } };
+  if (roh && typeof roh === 'object' && !Array.isArray(roh)) {
     for (const [k, std] of Object.entries(STANDARD_EINSTELLUNGEN)) {
+      if (k === 'klanggruppen') continue;
       if (typeof roh[k] === typeof std) e[k] = roh[k];
     }
+    // Teilschluessel einzeln: fehlende oder falsche Gruppen bleiben an
+    const g = roh.klanggruppen;
+    if (g && typeof g === 'object' && !Array.isArray(g)) {
+      for (const k of Object.keys(e.klanggruppen)) if (typeof g[k] === 'boolean') e.klanggruppen[k] = g[k];
+    }
   }
-  if (!['nacht', 'gruen', 'holz'].includes(e.brett)) e.brett = STANDARD_EINSTELLUNGEN.brett;
-  e.tiefe = Math.max(8, Math.min(20, Math.round(e.tiefe)));
+  for (const [k, werte] of Object.entries(EINSTELLUNG_WERTE)) {
+    if (!werte.includes(e[k])) e[k] = STANDARD_EINSTELLUNGEN[k];
+  }
+  if (!THEMA_ID.test(e.thema)) e.thema = STANDARD_EINSTELLUNGEN.thema;
+  e.tiefe = Number.isFinite(e.tiefe) ? Math.max(8, Math.min(20, Math.round(e.tiefe))) : STANDARD_EINSTELLUNGEN.tiefe;
+  e.lautstaerke = Number.isFinite(e.lautstaerke)
+    ? Math.round(Math.max(0, Math.min(1, e.lautstaerke)) * 20) / 20 : STANDARD_EINSTELLUNGEN.lautstaerke;
   return e;
 }
 
+// Speichert einen Teil der Einstellungen; klanggruppen darf auch nur einzelne Gruppen nennen
 export function speichereEinstellungen(teil) {
-  const e = { ...ladeEinstellungen(), ...(teil || {}) };
+  const alt = ladeEinstellungen();
+  const t = teil && typeof teil === 'object' ? teil : {};
+  const e = { ...alt, ...t };
+  if (t.klanggruppen && typeof t.klanggruppen === 'object') e.klanggruppen = { ...alt.klanggruppen, ...t.klanggruppen };
   schreib(K.einstellungen, e);
   return ladeEinstellungen();
 }

@@ -1,0 +1,208 @@
+/* ============================================================
+   Theme "modern" (Look A "Modern und klar"): Papier hell, Schiefer dunkel.
+   Ein Theme setzt NUR Custom Properties und @font-face (Regeln in
+   tests/thema.test.mjs, PLAN 1.8): keine Layout-Eigenschaften, keine festen
+   Tokens aus css/tokens.css, keine Feldfarben. Jeder Token steht fuer hell
+   und dunkel; dunkel gilt fuer data-modus="dunkel" und, ueber das System,
+   fuer data-modus="system" (beide Bloecke muessen gleich bleiben).
+   Ohne data-thema (Testseiten) gilt dieses Theme als Standard.
+   Schriften (SIL OFL 1.1, Lizenztexte daneben in assets/schriften/):
+     Manrope: npm @fontsource-variable/manrope@5.3.0, files/manrope-latin-wght-normal.woff2
+     Bricolage Grotesque: npm @fontsource-variable/bricolage-grotesque@5.3.0, files/bricolage-grotesque-latin-opsz-normal.woff2
+   ============================================================ */
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../../assets/schriften/manrope.woff2") format("woff2-variations"), url("../../assets/schriften/manrope.woff2") format("woff2");
+  font-weight: 200 800; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Bricolage";
+  src: url("../../assets/schriften/bricolage-grotesque.woff2") format("woff2-variations"), url("../../assets/schriften/bricolage-grotesque.woff2") format("woff2");
+  font-weight: 200 800; font-style: normal; font-display: swap;
+}
+
+/* ---------- hell (Papier) ---------- */
+:root:not([data-thema]), :root[data-thema="modern"] {
+  /* Flaechen und Text */
+  --grund: #F4F1EC; --grund-2: #ECE8E1; --grund-0: rgba(244, 241, 236, 0);
+  --flaeche: #FFFFFF; --flaeche-2: #F8F6F2; --flaeche-3: #F1EEE8;
+  --linie: rgba(28, 25, 20, .08); --linie-2: rgba(28, 25, 20, .14);
+  --text: #1C1B19; --text-2: #6E6A63; --text-3: #7A746B;
+  --tinte: #1C1B19; --auf-tinte: #F4F1EC;
+  --akzent: #CC4820; --akzent-text: #B83E1A; --akzent-weich: rgba(204, 72, 32, .11); --akzent-tief: #B53D18; --auf-akzent: #FFFFFF;
+  --gold: #E0A22B; --gold-weich: rgba(224, 162, 43, .16);
+  --gut: #2E9E63;
+  --warn: #D2453A; --warn-weich: rgba(210, 69, 58, .12);
+  --glas: rgba(250, 248, 244, .72); --glas-filter: saturate(1.6) blur(18px);
+  --schleier: rgba(28, 24, 18, .44);
+  --schalter-an: #1C1B19; --knauf-an: #FFFFFF;
+  --flo-grund: #23262C;
+  --sockel: #FFFFFF;
+  --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+  --meta-farbe: #F4F1EC;
+
+  /* Zugklassen: Fuellung (in hell und dunkel gleich), Zeichen auf der Fuellung, Textfassung (>= 4,5:1) */
+  --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #6234C2;
+  --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #2456BF;
+  --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #0E7553;
+  --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #43772F;
+  --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #56675F;
+  --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #7A5A36;
+  --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #8A6508;
+  --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #A65314;
+  --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #963676;
+  --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #A3233F;
+  --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #5C6373;
+
+  /* Bot-Farben (gedaempft) und ihre Toenung hinter dem Portraet */
+  --bot-benno: #5FAE4E; --bot-benno-tint: #DCEFD3;
+  --bot-hilde: #D77CA8; --bot-hilde-tint: #F6DCE8;
+  --bot-kalle: #D6A52E; --bot-kalle-tint: #F5E8C2;
+  --bot-lisa: #3D8DC0; --bot-lisa-tint: #D6EBF6;
+  --bot-rudi: #E07B39; --bot-rudi-tint: #F7E0CD;
+  --bot-turm: #6A7FD0; --bot-turm-tint: #DFE4F7;
+  --bot-delia: #C93C6E; --bot-delia-tint: #F6D8E3;
+  --bot-koenig: #A88B52; --bot-koenig-tint: #ECE3D1;
+  --bot-greta: #7E5FCF; --bot-greta-tint: #E5DDF6;
+  --bot-stockfisch: #1F9E94; --bot-stockfisch-tint: #D2EEEB;
+
+  /* Schriften */
+  --schrift: "Manrope", -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --display: "Bricolage", "Manrope", -apple-system, "SF Pro Display", system-ui, sans-serif;
+  --gw-text: 550; --gw-stark: 750; --gw-titel: 800;
+  --lw-titel: -.03em; --lw-ueber: .09em;
+  --fs-display: clamp(36px, 4.6vw, 64px); --fs-h1: 30px; --fs-h2: 22px; --fs-text: 16px; --fs-klein: 13.5px; --fs-ueber: 11.5px;
+
+  /* Radien */
+  --r-s: 10px; --r-m: 16px; --r-l: 24px; --r-xl: 30px; --r-pille: 999px;
+  --r-knopf: 15px; --r-knopf-gross: 18px; --r-brett: 12px; --r-sockel: 19px;
+
+  /* Schatten und Rahmen (Werte 1:1 aus Entwurf A) */
+  --s1: 0 1px 2px rgba(48, 36, 20, .06), 0 1px 1px rgba(48, 36, 20, .04);
+  --s2: 0 1px 2px rgba(48, 36, 20, .05), 0 4px 10px -2px rgba(48, 36, 20, .07), 0 12px 24px -8px rgba(48, 36, 20, .09);
+  --s3: 0 2px 4px rgba(48, 36, 20, .05), 0 10px 24px -6px rgba(48, 36, 20, .12), 0 32px 64px -16px rgba(48, 36, 20, .2);
+  --s-brett: 0 1px 2px rgba(40, 32, 60, .08), 0 12px 28px -8px rgba(40, 32, 60, .22), 0 44px 80px -28px rgba(40, 32, 60, .34);
+  --kante: inset 0 0 0 1px var(--linie);
+  --sockel-rand: 7px;
+  /* Achtung: var(--bf) loest sich dort auf, wo der Token steht (hier :root, also Rueckfall). Wer den Ring in
+     Bot-Farbe braucht, setzt --avatar-ring am Element neu oder schreibt den Schatten mit var(--bf) selbst. */
+  --avatar-ring: 0 0 0 2px var(--grund), 0 0 0 3.5px var(--bf, var(--linie-2));
+  --fokus: 2.5px solid var(--akzent);
+
+  /* Bewegung: Kurven (js/bewegung.js ersetzt die Federn zur Laufzeit durch linear(), wo es geht) und Dauern */
+  --feder: cubic-bezier(.34, 1.36, .64, 1);
+  --feder-weich: cubic-bezier(.22, 1.12, .36, 1);
+  --feder-hupf: cubic-bezier(.34, 1.7, .5, 1);
+  --gleiten: cubic-bezier(.16, 1, .3, 1);
+  --sanft: cubic-bezier(.65, 0, .35, 1);
+  --raus: cubic-bezier(.55, 0, .8, .2);
+  --d-xs: calc(120ms * var(--tempo)); --d-s: calc(200ms * var(--tempo)); --d-m: calc(320ms * var(--tempo));
+  --d-l: calc(520ms * var(--tempo)); --d-xl: calc(800ms * var(--tempo)); --d-zug: calc(300ms * var(--tempo));
+
+  /* Texturen (modern: keine) und Strichstaerke der Icons */
+  --textur-grund: none; --textur-flaeche: none; --textur-sockel: none; --textur-banner: none;
+  --ic-strich: 2;
+}
+@media (max-width: 600px) {
+  :root:not([data-thema]), :root[data-thema="modern"] { --r-sockel: 14px; --sockel-rand: 4px; }
+}
+
+/* ---------- dunkel (Schiefer), ausdruecklich gewaehlt ---------- */
+:root:not([data-thema])[data-modus="dunkel"], :root[data-thema="modern"][data-modus="dunkel"] {
+  --grund: #15171B; --grund-2: #0F1114; --grund-0: rgba(21, 23, 27, 0);
+  --flaeche: #1E2126; --flaeche-2: #252930; --flaeche-3: #2C3038;
+  --linie: rgba(255, 255, 255, .07); --linie-2: rgba(255, 255, 255, .13);
+  --text: #F3F1EC; --text-2: #A4A7AE; --text-3: #8B8F97;
+  --tinte: #F3F1EC; --auf-tinte: #15171B;
+  --akzent: #C8441E; --akzent-text: #FF825F; --akzent-weich: rgba(255, 106, 66, .15); --akzent-tief: #B03A18; --auf-akzent: #FFFFFF;
+  --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
+  --gut: #4CC488;
+  --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);
+  --glas: rgba(24, 26, 31, .7); --glas-filter: saturate(1.6) blur(18px);
+  --schleier: rgba(0, 0, 0, .6);
+  --schalter-an: #F3F1EC; --knauf-an: #15171B;
+  --flo-grund: #2C3038;
+  --sockel: #2A2E36;
+  --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+  --meta-farbe: #15171B;
+  --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #B9A0FF;
+  --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #8EAEFF;
+  --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #5FD3A6;
+  --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #9ED08B;
+  --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #B2C3BB;
+  --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #D4B08A;
+  --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #E9C35A;
+  --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #F3A464;
+  --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #F09AD0;
+  --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #FF8FA0;
+  --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B1B6C3;
+  /* Toenung im Dunkeln: 26 % Bot-Farbe auf --flaeche */
+  --bot-benno: #5FAE4E; --bot-benno-tint: #2F4630;
+  --bot-hilde: #D77CA8; --bot-hilde-tint: #4E3948;
+  --bot-kalle: #D6A52E; --bot-kalle-tint: #4E4328;
+  --bot-lisa: #3D8DC0; --bot-lisa-tint: #263D4E;
+  --bot-rudi: #E07B39; --bot-rudi-tint: #50382B;
+  --bot-turm: #6A7FD0; --bot-turm-tint: #323952;
+  --bot-delia: #C93C6E; --bot-delia-tint: #4A2839;
+  --bot-koenig: #A88B52; --bot-koenig-tint: #423D31;
+  --bot-greta: #7E5FCF; --bot-greta-tint: #373152;
+  --bot-stockfisch: #1F9E94; --bot-stockfisch-tint: #1E4243;
+  --s1: 0 1px 2px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .03);
+  --s2: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 14px -4px rgba(0, 0, 0, .35), 0 16px 32px -10px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .045);
+  --s3: 0 2px 4px rgba(0, 0, 0, .3), 0 12px 28px -6px rgba(0, 0, 0, .45), 0 36px 72px -18px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .05);
+  --s-brett: 0 1px 2px rgba(0, 0, 0, .4), 0 14px 30px -8px rgba(0, 0, 0, .5), 0 48px 90px -30px rgba(0, 0, 0, .7);
+  --kante: inset 0 0 0 1px var(--linie);
+  --avatar-ring: 0 0 0 2px var(--grund), 0 0 0 3.5px var(--bf, var(--linie-2));
+  --fokus: 2.5px solid var(--akzent);
+}
+
+/* ---------- dunkel ueber das System (data-modus="system"): gleiche Werte wie oben ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-thema])[data-modus="system"], :root[data-thema="modern"][data-modus="system"] {
+    --grund: #15171B; --grund-2: #0F1114; --grund-0: rgba(21, 23, 27, 0);
+    --flaeche: #1E2126; --flaeche-2: #252930; --flaeche-3: #2C3038;
+    --linie: rgba(255, 255, 255, .07); --linie-2: rgba(255, 255, 255, .13);
+    --text: #F3F1EC; --text-2: #A4A7AE; --text-3: #8B8F97;
+    --tinte: #F3F1EC; --auf-tinte: #15171B;
+    --akzent: #C8441E; --akzent-text: #FF825F; --akzent-weich: rgba(255, 106, 66, .15); --akzent-tief: #B03A18; --auf-akzent: #FFFFFF;
+    --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
+    --gut: #4CC488;
+    --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);
+    --glas: rgba(24, 26, 31, .7); --glas-filter: saturate(1.6) blur(18px);
+    --schleier: rgba(0, 0, 0, .6);
+    --schalter-an: #F3F1EC; --knauf-an: #15171B;
+    --flo-grund: #2C3038;
+    --sockel: #2A2E36;
+    --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
+    --meta-farbe: #15171B;
+    --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #B9A0FF;
+    --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #8EAEFF;
+    --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #5FD3A6;
+    --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #9ED08B;
+    --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #B2C3BB;
+    --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #D4B08A;
+    --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #E9C35A;
+    --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #F3A464;
+    --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #F09AD0;
+    --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #FF8FA0;
+    --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B1B6C3;
+    --bot-benno: #5FAE4E; --bot-benno-tint: #2F4630;
+    --bot-hilde: #D77CA8; --bot-hilde-tint: #4E3948;
+    --bot-kalle: #D6A52E; --bot-kalle-tint: #4E4328;
+    --bot-lisa: #3D8DC0; --bot-lisa-tint: #263D4E;
+    --bot-rudi: #E07B39; --bot-rudi-tint: #50382B;
+    --bot-turm: #6A7FD0; --bot-turm-tint: #323952;
+    --bot-delia: #C93C6E; --bot-delia-tint: #4A2839;
+    --bot-koenig: #A88B52; --bot-koenig-tint: #423D31;
+    --bot-greta: #7E5FCF; --bot-greta-tint: #373152;
+    --bot-stockfisch: #1F9E94; --bot-stockfisch-tint: #1E4243;
+    --s1: 0 1px 2px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .03);
+    --s2: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 14px -4px rgba(0, 0, 0, .35), 0 16px 32px -10px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .045);
+    --s3: 0 2px 4px rgba(0, 0, 0, .3), 0 12px 28px -6px rgba(0, 0, 0, .45), 0 36px 72px -18px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .05);
+    --s-brett: 0 1px 2px rgba(0, 0, 0, .4), 0 14px 30px -8px rgba(0, 0, 0, .5), 0 48px 90px -30px rgba(0, 0, 0, .7);
+    --kante: inset 0 0 0 1px var(--linie);
+    --avatar-ring: 0 0 0 2px var(--grund), 0 0 0 3.5px var(--bf, var(--linie-2));
+    --fokus: 2.5px solid var(--akzent);
+  }
+}

@@ -22,6 +22,7 @@ import {
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
+import { botFarbe } from '../thema.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
 const WURZEL = new URL('../../', import.meta.url);
@@ -320,7 +321,7 @@ export function zeige(root, params = {}, app) {
 
   function avatarHtml(bot, extra = '') {
     if (!bot) return `<div class="an-avatar ${extra}" aria-hidden="true"></div>`;
-    return `<div class="an-avatar ${extra}" style="--bf:${esc(bot.farbe)}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
+    return `<div class="an-avatar ${extra}" style="--bf:${esc(botFarbe(bot))}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
   }
 
   // ---------- Aufbau der Analyse ----------
@@ -407,7 +408,7 @@ export function zeige(root, params = {}, app) {
     const name = neuBot ? `Stufe ${neuBot.stufe} · ${neuBot.name}` : (st.bot ? st.bot.name : '');
     const b = neuBot || st.bot;
     return `
-      <div class="an-banner" style="--bf:${esc(b ? b.farbe : '#8fa8ff')}" role="status">
+      <div class="an-banner" style="--bf:${esc(b ? botFarbe(b) : 'var(--linie-2)')}" role="status">
         ${avatarHtml(b)}
         <div class="an-banner-text"><div class="an-ft-titel">${esc(titel)}</div><div class="an-ft-name">${esc(name)}</div></div>
         <div class="an-ft-sterne"><b aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</b><span>${esc(grund)}</span></div>

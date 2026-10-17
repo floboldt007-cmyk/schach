@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 13;
-const STAND = 'd8fff8c3fcea';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 14;
+const STAND = '945834a0a8ad';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -18,10 +18,23 @@ const DATEIEN = [
   'index.html',
   'manifest.webmanifest',
   'LICENSE',
+  'css/tokens.css',
+  'css/themes/modern.css',
   'css/board.css',
   'css/app.css',
+  'css/bauteile.css',
+  'css/navigation.css',
+  'css/arena.css',
+  'css/duell.css',
+  'css/partie.css',
+  'css/ergebnis.css',
+  'css/analyse.css',
+  'css/verlauf.css',
+  'css/einstellungen.css',
+  'css/training.css',
   'css/screens.css',
   'js/app.js',
+  'js/bewegung.js',
   'js/board.js',
   'js/bots.js',
   'js/engine.js',
@@ -37,6 +50,7 @@ const DATEIEN = [
   'js/storage.js',
   'js/symbole.js',
   'js/tag.js',
+  'js/thema.js',
   'js/ui/abrechnung.js',
   'js/ui/analyse.js',
   'js/ui/arena.js',
@@ -69,6 +83,10 @@ const DATEIEN = [
   'assets/avatare/08-kommissar-koenig.svg',
   'assets/avatare/09-grossmeisterin-greta.svg',
   'assets/avatare/10-der-stockfisch.svg',
+  'assets/schriften/manrope.woff2',
+  'assets/schriften/bricolage-grotesque.woff2',
+  'assets/schriften/OFL-Manrope.txt',
+  'assets/schriften/OFL-Bricolage-Grotesque.txt',
   'assets/icons/favicon.svg',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',

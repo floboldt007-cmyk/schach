@@ -98,6 +98,7 @@ import { fuerOverlay, BRETT_FEIER } from '../feier.js';
 import './abrechnung.js';
 import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
+import { botFarbe as themaBotFarbe } from '../thema.js';
 
 const KLASSEN_WORT = {
   brillant: 'Brillant!', stark: 'Großartig!', bester: 'Bester Zug', exzellent: 'Exzellent', gut: 'Gut',
@@ -302,7 +303,7 @@ export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen partie';
   s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
-  s.style.setProperty('--bf', bot.farbe);
+  s.style.setProperty('--bf', themaBotFarbe(bot));
   const knopf = (aktion, ico, text, extra = '') =>
     `<button class="knopf ${extra}" type="button" data-aktion="${aktion}">${icon(ico)}<span>${text}</span></button>`;
   s.innerHTML = `
@@ -1604,7 +1605,7 @@ export function zeige(root, params, app) {
         }
         const neu = wertet ? erg.neuFreigeschaltet : null;
         if (neu && !nachtrag) {
-          o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${neu.farbe}">
+          o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${themaBotFarbe(neu)}">
             <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
             <div><div class="ef-titel">NEU FREIGESCHALTET · STUFE ${neu.stufe}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
         }

@@ -33,6 +33,10 @@
 //     Screen, storage.duenneAnalysenAus() (MAX_REVIEWS 12; aeltere Speicherstaende hatten bis zu 20)
 //   - w0plus-a-fix: Screen werkstatt (Werkstatt-Vorschau aus Schub 2b, Paket werkstatt), gehoert zum Reiter Ich.
 //     dauerhaftAnfragen fragt nur dort an, wo kein Dialog droht (Firefox ausserhalb der installierten App nicht).
+//
+// Premium-Umbau U1 (Theme-Fundament): wendeEinstellungenAn(e) ruft zusaetzlich setzeBewegung(e.bewegung) (bewegung.js),
+//   wendeThemaAn({ thema, modus }) (thema.js) und, sobald es sie gibt, klang.einstellen(e) (sounds.js, U3). Start:
+//   starteDruck() (Druck-Rueckmeldung fuer .dr). Hell/Dunkel wechselt ueber app.setzeEinstellungen({ modus }) ohne Neuladen.
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -44,6 +48,8 @@ import {
 import { icon } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
+import { wendeThemaAn } from './thema.js';
+import { setzeBewegung, starteDruck } from './bewegung.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -70,6 +76,13 @@ const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.searc
 
 function wendeEinstellungenAn(e) {
   klang.aus = !e.klang;
+  // Premium-Umbau: Klang-Einstellungen (Paket, Lautstaerke, Stufe, Gruppen), sobald sounds.js sie kennt (U3)
+  if (typeof klang.einstellen === 'function') {
+    try { klang.einstellen(e); } catch (f) { console.error(f); }
+  }
+  // Theme (Ansicht, Hell/Dunkel) und Animationstempo; ein Fehler darf die App nie anhalten
+  setzeBewegung(e.bewegung);
+  wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
   const html = document.documentElement;
   html.dataset.brett = e.brett;
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
@@ -689,6 +702,7 @@ function setzeSichtbar() {
 function starte() {
   setzeSymbole(SYMBOLE);
   wendeEinstellungenAn(ladeEinstellungen());
+  starteDruck();
   setzeSichtbar();
   document.addEventListener('visibilitychange', () => sende('app:sichtbar', { sichtbar: setzeSichtbar() }));
   // Klang: der AudioContext darf auf iOS erst nach der ersten Beruehrung starten
