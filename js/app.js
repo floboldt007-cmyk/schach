@@ -114,6 +114,10 @@ function themaNachPaketen() {
   const e = ladeEinstellungen();
   if (e.thema === aktuellesThema().thema || !themaVon(e.thema)) return;
   wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
+  // Codex-Befund (PR #4): ohne gewaehltes Klangpaket bestimmt das Theme den Standard, der gilt erst jetzt
+  if (typeof klang.einstellen === 'function') {
+    try { klang.einstellen(e); } catch (f) { console.error(f); }
+  }
 }
 
 // ---------- Engines (zwei Instanzen, lazy, einmal init) ----------

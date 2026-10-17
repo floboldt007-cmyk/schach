@@ -597,13 +597,16 @@ async function browserTeil(browser) {
     await s6.route('**/css/themes/probe.css', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: probeCss }));
     await s6.route('**/js/pakete/probe-thema/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
       body: "import { registriereThema } from '../../thema.js';\n"
-        + "registriereThema({ id: 'probe', name: 'Probe', css: 'css/themes/probe.css', modi: ['hell', 'dunkel'], metaFarbe: { hell: '#E8E2F4', dunkel: '#101114' } });\n" }));
+        + "registriereThema({ id: 'probe', name: 'Probe', css: 'css/themes/probe.css', modi: ['hell', 'dunkel'], metaFarbe: { hell: '#E8E2F4', dunkel: '#101114' }, klang: { standard: 'holz' } });\n" }));
     await s6.goto(START + '&erw=pakete/probe-thema/index#arena');
     await s6.waitForSelector('.screen.arena .knoten');
     const da = await s6.waitForFunction(() => document.documentElement.dataset.thema === 'probe', null, { timeout: 5000 }).then(() => true, () => false);
     pruefe('gespeichertes Theme eines Pakets wird nach dem Laden der Pakete angewandt', da && await bisStil(s6, 'body', 'background-color', 'rgb(232, 226, 244)')
       && await s6.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute('content')).join()) === '#E8E2F4,#101114',
       `data-thema ${await s6.evaluate(() => document.documentElement.dataset.thema)}`);
+    // Codex-Befund (PR #4): ohne gewaehltes Klangpaket gilt der Standard des Paket-Themes (hier holz statt arcade)
+    const paket6 = await s6.evaluate(async () => (await import('./js/sounds.js')).klang.vorrat().paket);
+    pruefe('Standard-Klangpaket des Paket-Themes gilt nach dem Laden der Pakete', paket6 === 'holz', `paket ${paket6}`);
     pruefe('Keine Konsolenfehler', f6.length === 0, f6.join(' | '));
     await k6.close();
   }
