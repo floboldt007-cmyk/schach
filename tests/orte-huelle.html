@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Testseite: Orte ohne eigenen Screen</title>
+<link rel="stylesheet" href="../css/board.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/screens.css">
+<style>
+  /* nur fuer die Testseite */
+  .ort-huelle { max-width: 760px; margin: 16px auto; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+  .ort-huelle > h2 { margin: 0; font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--ui-gedimmt); }
+  .ort-huelle > .huelle-host { margin: 0; font-size: 13px; color: var(--ui-gedimmt); }
+  .huelle-ort { display: grid; gap: 8px; min-width: 0; }
+  .huelle-ort[hidden] { display: none; }
+  .huelle-fehler { color: var(--schlecht); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+// Test-Huelle (W0+a "Spiel-Fundament") fuer die DOM-Orte, deren Screens erst mit spaeteren Paketen kommen. Ein Paket
+// prueft hier seine Anbieter im Browser (mit dem CSS der App), bevor der Screen da ist, der den Ort spaeter hostet:
+//   bestenliste:reiter   Screen bestenliste (S1-3 punkte)    Kontext { app, reiter, fenster }
+//   training:karten      Screen training (S2-1 kartei)       Kontext { app }
+//   ich:vitrine          Screen ich (Integration S1)         Kontext { app }
+//   spielplan:tage       Screen spielplan (S1-6 boss)        Kontext { app, plan, woche, tag }
+// Aufruf (wie die App laedt sie die Pakete per import(), Pfade wie in js/erweiterungen.js):
+//   tests/orte-huelle.html?ort=ich:vitrine&erw=pakete/<paket>/index[,pakete/<anderes>/index]
+//   bestenliste:reiter: &reiter=ich (Standard) &fenster=woche | monat | allzeit (Standard woche)
+//   spielplan:tage:     &plan=<Name unter daten/> (Standard beispiel/spielplan) &woche=JJJJ-MM-TT &tag=JJJJ-MM-TT
+//                       (Standard: die laufende Woche, wenn der Plan sie hat, sonst seine erste; tag = woche)
+// Die Huelle baut den Behaelter wie der spaetere Host (section.ort-huelle[data-ort] > .huelle-ort, leer: hidden), ruft
+// fuelle() mit genau dem Kontext aus ARCHITEKTUR.md ("W0+a: Orte und wer sie hostet") und legt alles in window.__huelle:
+//   { bereit, ort, host, anzahl, kontext: [Schluessel], plan (nur spielplan:tage: geladen?), fehler: [Text],
+//     gehe: [{ name, params }], meldungen: [Text], neu() (verlasse und neu fuellen), verlasse() }
+// Die Fake-App: gehe/zurueck/meldung werden nur protokolliert, einstellungen() liest storage.js, engine() gibt es hier
+// nicht (Anbieter rechnen nichts Schweres).
+import { ORTE, fuelle } from '../js/orte.js';
+import { ladeInhalt } from '../js/inhalte.js';
+import { tagSchluessel, wochenSchluessel, istSchluessel, wochentag } from '../js/tag.js';
+import { ladeEinstellungen, speichereEinstellungen } from '../js/storage.js';
+import { setzeSymbole } from '../js/board.js';
+import { SYMBOLE } from '../js/symbole.js';
+
+setzeSymbole(SYMBOLE);
+const HOSTS = {
+  'bestenliste:reiter': 'Screen bestenliste (S1-3 punkte), Reiterzeile der Bestenliste',
+  'training:karten': 'Screen training (S2-1 kartei), Karten des Trainings',
+  'ich:vitrine': 'Screen ich (Integration S1), Vitrine unter der Spielerkarte',
+  'spielplan:tage': 'Screen spielplan (S1-6 boss), Steckbrief des angetippten Tages',
+};
+const FENSTER = ['woche', 'monat', 'allzeit'];
+const PFAD_RE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
+const q = new URLSearchParams(location.search);
+const fehler = [];
+const gehe = [];
+const meldungen = [];
+window.addEventListener('error', (e) => fehler.push(String(e.message || e)));
+window.addEventListener('unhandledrejection', (e) => fehler.push('Promise: ' + String((e.reason && e.reason.message) || e.reason)));
+const altError = console.error.bind(console);
+console.error = (...a) => { fehler.push(a.map((x) => String((x && x.message) || x)).join(' ')); altError(...a); };
+
+const app = {
+  gehe(name, params = {}) { gehe.push({ name, params }); },
+  zurueck() { gehe.push({ name: 'zurueck', params: {} }); },
+  engine: () => Promise.reject(new Error('Keine Engine in der Test-Hülle')),
+  einstellungen: () => ladeEinstellungen(),
+  setzeEinstellungen: (teil) => speichereEinstellungen(teil),
+  meldung(text) { meldungen.push(String(text)); },
+  frage: async () => false,
+  schliesseDialog() {},
+  vorab: new Map(),
+  test: true,
+};
+
+async function ladePakete() {
+  const pfade = (q.get('erw') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  for (const p of pfade) {
+    if (!PFAD_RE.test(p)) { fehler.push('Paket-Pfad ungültig: ' + p); continue; }
+    try { await import(`../js/${p}.js`); } catch (e) { fehler.push('Paket nicht geladen: ' + p + ' (' + (e && e.message) + ')'); }
+  }
+}
+
+async function kontextFuer(ort) {
+  if (ort === 'bestenliste:reiter') {
+    const fenster = FENSTER.includes(q.get('fenster')) ? q.get('fenster') : 'woche';
+    return { app, reiter: q.get('reiter') || 'ich', fenster };
+  }
+  if (ort === 'spielplan:tage') {
+    const r = await ladeInhalt(q.get('plan') || 'beispiel/spielplan', { art: 'spielplan' });
+    const plan = r.ok ? r.daten : null;
+    if (!r.ok) fehler.push('Spielplan nicht geladen: ' + r.text);
+    const jetzt = wochenSchluessel();
+    const wochen = plan ? plan.wochen.map((w) => w.montag) : [];
+    let woche = q.get('woche');
+    if (!istSchluessel(woche) || wochentag(woche) !== 0) woche = wochen.includes(jetzt) || !wochen.length ? jetzt : wochen[0];
+    const tag = istSchluessel(q.get('tag')) ? q.get('tag') : (woche === jetzt ? tagSchluessel() : woche);
+    return { app, plan, woche, tag };
+  }
+  return { app };
+}
+
+async function start() {
+  const ort = q.get('ort') || '';
+  const s = document.createElement('section');
+  s.className = 'ort-huelle';
+  s.dataset.ort = ort;
+  s.innerHTML = '<h2></h2><p class="huelle-host"></p><div class="huelle-ort" hidden></div>';
+  s.querySelector('h2').textContent = 'Test-Hülle · ' + (ort || 'kein Ort');
+  document.getElementById('app').append(s);
+  const behaelter = s.querySelector('.huelle-ort');
+  const zustand = { bereit: false, ort, host: HOSTS[ort] || null, anzahl: 0, kontext: [], plan: null, fehler, gehe, meldungen };
+  window.__huelle = zustand;
+  if (!HOSTS[ort]) {
+    const gibt = ORTE[ort] ? `Der Ort ${ort} hat einen echten Host in der App.` : `Unbekannter Ort: ${ort || '(leer)'}.`;
+    fehler.push('Test-Hülle: ' + gibt);
+    s.querySelector('.huelle-host').textContent = gibt + ' Erlaubt: ' + Object.keys(HOSTS).join(', ');
+    s.querySelector('.huelle-host').classList.add('huelle-fehler');
+    zustand.bereit = true;
+    return;
+  }
+  s.querySelector('.huelle-host').textContent = 'Später gehostet von: ' + HOSTS[ort];
+  await ladePakete();
+  const kontext = await kontextFuer(ort);
+  let gefuellt = null;
+  const fuellen = () => {
+    gefuellt = fuelle(ort, behaelter, kontext);
+    behaelter.hidden = gefuellt.anzahl === 0;
+    zustand.anzahl = gefuellt.anzahl;
+  };
+  fuellen();
+  zustand.kontext = Object.keys(kontext).sort();
+  zustand.plan = ort === 'spielplan:tage' ? !!kontext.plan : null;
+  zustand.woche = kontext.woche || null;
+  zustand.tag = kontext.tag || null;
+  zustand.neu = () => { gefuellt.verlasse(); fuellen(); return zustand.anzahl; };
+  zustand.verlasse = () => { gefuellt.verlasse(); behaelter.hidden = true; zustand.anzahl = 0; };
+  zustand.bereit = true;
+}
+start().catch((e) => { fehler.push('Test-Hülle: ' + (e && e.message)); if (window.__huelle) window.__huelle.bereit = true; });
+</script>
+</body>
+</html>

@@ -91,6 +91,9 @@ export function paketDateien(dateien, pakete) {
     if (m) return m[1];
     m = d.match(/^js\/ui\/([^/]+)\.js$/);
     if (m && SCREEN_PAKET[m[1]]) return SCREEN_PAKET[m[1]];
+    // W0+a: Inhalte eines Pakets unter daten/<paket>/ (daten/beispiel/ gehoert keinem Paket und wird nie ausgeliefert)
+    m = d.match(/^daten\/([a-z0-9-]+)\//);
+    if (m && m[1] !== 'beispiel') return m[1];
     return null;
   };
   const pflicht = [];
@@ -134,6 +137,8 @@ function main() {
   const paketKandidaten = [
     ...alleDateienTief('js/pakete', /\.(js|json|svg|png)$/),
     ...alleDateienTief('css/pakete', /\.(css|svg|png)$/),
+    // W0+a: Inhalte der Pakete (daten/<paket>/**), erst Pflicht, wenn das Paket in PAKETE steht
+    ...alleDateienTief('daten', /\.json$/).filter((d) => /^daten\/[^/]+\//.test(d) && !d.startsWith('daten/beispiel/')),
     ...Object.keys(SCREEN_PAKET).map((n) => `js/ui/${n}.js`).filter((d) => existsSync(path.join(WURZEL, d))),
   ];
   const pk = paketDateien(paketKandidaten, pakete || []);
@@ -148,8 +153,8 @@ function main() {
     ...alleDateien('assets/pieces', /\.(svg|png)$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
-    // W0+a: statische Inhalte (Spielplan, spaeter Raetsel, Bosse ...) direkt unter daten/ gehoeren in den Cache;
-    // daten/beispiel/ (Format-Beispiele) wird nicht ausgeliefert
+    // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte
+    // eines Pakets unter daten/<paket>/ erst mit dem Paket (pk.pflicht); daten/beispiel/ wird nie ausgeliefert
     ...alleDateien('daten', /\.json$/),
     ...pk.pflicht,
   ];
@@ -179,6 +184,14 @@ function main() {
       JSON.stringify(nach.pflicht) === JSON.stringify(['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css'])
       && JSON.stringify(paketDateien(probe, ['pakete/einstieg/index']).pflicht) === JSON.stringify(['js/ui/start.js', 'js/pakete/einstieg/sub/x.js']),
       JSON.stringify(nach.pflicht));
+    // W0+a: Inhalte unter daten/<paket>/ gehoeren zum Paket; direkt unter daten/ und daten/beispiel/ zu keinem
+    const daten = ['daten/spielplan.json', 'daten/beispiel/spielplan.json', 'daten/raetsel/jahr-2027.json', 'daten/boss/saison/1.json'];
+    const dVor = paketDateien(daten, []);
+    const dNach = paketDateien(daten, ['pakete/raetsel/index']);
+    pruefe('Paket-Regel (W0+a): Inhalte unter daten/<paket>/ erst mit dem Paket Pflicht; daten/ direkt und daten/beispiel/ gehoeren keinem Paket',
+      dVor.pflicht.length === 0 && JSON.stringify(dVor.wartend) === '["daten/raetsel/jahr-2027.json","daten/boss/saison/1.json"]'
+      && JSON.stringify(dNach.pflicht) === '["daten/raetsel/jahr-2027.json"]' && !dNach.erlaubt.includes('daten/beispiel/spielplan.json')
+      && !dNach.erlaubt.includes('daten/spielplan.json'), JSON.stringify({ dVor, dNach }));
     pruefe('Paket-Regel: Liste PAKETE wird ohne Kommentare gelesen', JSON.stringify(lesePakete("// export const PAKETE = ['x'];\nexport const PAKETE = Object.freeze([\n  // 'pakete/alt/index',\n  'pakete/kartei/index',\n]);")) === '["pakete/kartei/index"]');
   }
 

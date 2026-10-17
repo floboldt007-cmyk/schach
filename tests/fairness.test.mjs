@@ -315,6 +315,25 @@ function jsonDateien(ordner) {
     && !/partie:matt[\s\S]{0,400}warte\((?!BRETT_FEIER)\d/.test(partie));
 }
 {
+  // Schnell-Chat (Phase 2, SPIELKONZEPT 5.3 und Regel 21): keine Saetze "Wow", "Hoppla", "Knapp", "Glück gehabt",
+  // "Endlich" (wirken nach einem Fehler des Gegners wie Spott). Gilt fuer jede Datei mit "chat" oder "emote" im Namen
+  // unter js/ und daten/; bisher gibt es keine, die Pruefung greift mit dem Paket.
+  const CHAT_VERBOTEN = /(^|[^a-zäöüß])(wow|hoppla|knapp|endlich)(?![a-zäöüß])|glück gehabt/i;
+  const chatJs = jsDateien('js').filter((d) => /chat|emote/i.test(path.basename(d)));
+  const chatJson = jsonDateien('daten').filter((d) => /chat|emote/i.test(path.basename(d)));
+  const treffer = [];
+  for (const d of chatJs) for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) if (CHAT_VERBOTEN.test(t)) treffer.push(`${d}: "${t.slice(0, 60)}"`);
+  for (const d of chatJson) {
+    let json = null;
+    try { json = JSON.parse(readFileSync(path.join(WURZEL, d), 'utf8')); } catch (e) { treffer.push(`${d}: kein JSON`); continue; }
+    for (const t of texteVon(json)) if (CHAT_VERBOTEN.test(t)) treffer.push(`${d}: "${t.slice(0, 60)}"`);
+  }
+  // Selbstprobe des Musters (sonst prueft die leere Liste nichts)
+  const probe = ['Wow!', 'Hoppla', 'Knapp!', 'Glück gehabt', 'Endlich.'].every((t) => CHAT_VERBOTEN.test(t))
+    && !['Gut gespielt!', 'Knapper Sieg für dich', 'Danke für die Partie'].some((t) => CHAT_VERBOTEN.test(t));
+  pruefe(`Schnell-Chat ohne "Wow", "Hoppla", "Knapp", "Glück gehabt", "Endlich" (${chatJs.length + chatJson.length} Dateien)`, probe && treffer.length === 0, treffer);
+}
+{
   // Level ohne Spielwirkung (Regel 18): bots.js und engine.js importieren nichts aus Paketen (Funken, Level ...)
   const imp = ['js/bots.js', 'js/engine.js'].filter((d) => /from\s+['"][^'"]*pakete\//.test(readFileSync(path.join(WURZEL, d), 'utf8')));
   pruefe('bots.js und engine.js importieren nichts aus den Paketen (Level und Funken ohne Spielwirkung)', imp.length === 0, imp);
