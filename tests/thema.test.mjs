@@ -605,6 +605,17 @@ async function browserTeil(browser) {
         await s4.waitForTimeout(400);
         const l = await lesbarkeit(s4);
         pruefe(`${name}: jeder Text mindestens 3:1 gegen seinen Hintergrund`, l.gezaehlt > 5 && l.fehler.length === 0, `${l.gezaehlt} Texte; ${l.fehler.slice(0, 6).join(' | ')}`);
+        if (name === 'Einstellungen' && schema === 'light' && breite === 1180) {
+          // Schriften unter OFL: in "Info und Lizenzen" genannt, beide Lizenztexte verlinkt (PLAN 1.7)
+          const ofl = await s4.evaluate(() => {
+            const info = document.querySelector('.es-info');
+            const links = info ? [...info.querySelectorAll('a')].map((a) => new URL(a.href).pathname) : [];
+            return { text: info ? info.innerText : '', links };
+          });
+          pruefe('Info und Lizenzen: Manrope und Bricolage Grotesque unter der SIL Open Font License, Lizenztexte verlinkt',
+            /Manrope/.test(ofl.text) && /Bricolage Grotesque/.test(ofl.text) && /Open Font License/.test(ofl.text)
+            && ofl.links.includes('/assets/schriften/OFL-Manrope.txt') && ofl.links.includes('/assets/schriften/OFL-Bricolage-Grotesque.txt'), ofl.links.join(', '));
+        }
       }
       // Partie (Start) und gesperrter Bot in der Arena
       await s4.goto(START + '#arena');
@@ -614,6 +625,34 @@ async function browserTeil(browser) {
       await s4.waitForTimeout(800);
       const lp = await lesbarkeit(s4);
       pruefe('Partie: jeder Text mindestens 3:1 gegen seinen Hintergrund', lp.gezaehlt > 5 && lp.fehler.length === 0, `${lp.gezaehlt} Texte; ${lp.fehler.slice(0, 6).join(' | ')}`);
+      // Rueckfrage, Ergebnis und Analyse (die Screens, die erst spaeter einzeln umgebaut werden, muessen schon lesbar sein)
+      await s4.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+      if (await s4.evaluate(() => window.__partie.phase() === 'flo')) {
+        for (const f of ['e2', 'e4']) {
+          const p = await s4.evaluate((x) => {
+            const r = document.querySelector(`.screen.partie .brett .feld[data-feld="${x}"]`).getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          }, f);
+          await s4.mouse.click(p.x, p.y);
+          await s4.waitForTimeout(120);
+        }
+        await s4.waitForFunction(() => window.__partie.protokoll.some((e) => e.typ === 'abzeichen'), null, { timeout: 30000 }).catch(() => {});
+      }
+      await s4.evaluate(() => { window.__test = { botAnhalten: true }; document.querySelector('.spielknoepfe [data-aktion="aufgeben"]').click(); });
+      await s4.waitForSelector('.dialog-ort .dialog');
+      await s4.waitForTimeout(500);
+      const ld = await lesbarkeit(s4, '.dialog-ort');
+      pruefe('Rückfrage „Wirklich aufgeben?“: jeder Text mindestens 3:1', ld.gezaehlt >= 3 && ld.fehler.length === 0, `${ld.gezaehlt} Texte; ${ld.fehler.slice(0, 6).join(' | ')}`);
+      await s4.locator('.dialog-knoepfe .knopf.gefahr').click();
+      await s4.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 40000 });
+      await s4.waitForTimeout(2500);
+      const le = await lesbarkeit(s4, '.ergebnis-overlay');
+      pruefe('Ergebnis (Niederlage): jeder Text mindestens 3:1', le.gezaehlt > 5 && le.fehler.length === 0, `${le.gezaehlt} Texte; ${le.fehler.slice(0, 6).join(' | ')}`);
+      await s4.evaluate(() => { window.__test = {}; document.querySelector('.erg-knoepfe [data-ziel="analyse"]').click(); });
+      await s4.waitForSelector('.an-screen');
+      await s4.waitForTimeout(1500);
+      const la = await lesbarkeit(s4);
+      pruefe('Analyse: jeder Text mindestens 3:1 gegen seinen Hintergrund', la.gezaehlt > 5 && la.fehler.length === 0, `${la.gezaehlt} Texte; ${la.fehler.slice(0, 6).join(' | ')}`);
       pruefe('Keine Konsolenfehler', f4.length === 0, f4.join(' | '));
       await k4.close();
     }

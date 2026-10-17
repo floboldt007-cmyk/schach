@@ -700,7 +700,8 @@ export function zeige(root, params, app) {
     ort.style.setProperty('--x', x);
     ort.style.setProperty('--y', y);
     if (klasse === 'brillant') {
-      const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#ffffff'];
+      // Premium-Umbau U1: Funken in den Theme-Farben (Amethyst, Gold, Weiss, Kobalt), kein Neon
+      const farben = ['var(--k-brillant)', 'var(--gold)', '#FFFFFF', 'var(--k-stark)', 'var(--kt-brillant)', 'var(--gold)'];
       ort.innerHTML = '<i class="welle"></i><span class="funken">' + Array.from({ length: 12 }, (_, i) =>
         `<i style="--a:${i * 30 + 8}deg;--r:${i % 2 ? 1.25 : 1.75};--c:${farben[i % farben.length]};animation-delay:${(i % 3) * 40}ms"></i>`).join('') + '</span>';
       rahmen.classList.remove('prisma');
@@ -1439,7 +1440,8 @@ export function zeige(root, params, app) {
     else unter = `${GRUND_TEXT[grund] || 'Remis'} gegen ${bot.name}`;
     const konfetti = ergebnis === 'sieg' && !reduziert
       ? '<div class="konfetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, i) => {
-        const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#3ef08a', '#ffffff'];
+        // Premium-Umbau U1: Konfetti in den Theme-Farben statt Neon
+        const farben = ['var(--akzent)', 'var(--gold)', 'var(--gut)', 'var(--k-stark)', 'var(--k-brillant)', 'var(--tinte)', 'var(--k-ungenau)'];
         return `<i style="--l:${(i * 37) % 100}%;--d:${(i % 7) * 0.18}s;--t:${2.6 + (i % 5) * 0.35}s;--c:${farben[i % farben.length]};--r:${(i * 47) % 360}deg"></i>`;
       }).join('') + '</div>'
       : '';

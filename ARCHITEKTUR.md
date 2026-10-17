@@ -1170,3 +1170,64 @@ uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket 
 | Werkstatt: jedes Stueck `nurOptik: true` und `immerErhaeltlich: true`, kein Feld `verfuegbarBis`; keine Preise im Repo; Kaufknopf nur „bald verfügbar“; kein Kaufhinweis nach einer Niederlage, in der Partie oder im Ergebnis; in jeder Kategorie erspielbare Stuecke; kein Countdown (schon im Fundament fuer Dateien mit `werkstatt` im Namen) | Schub 2b `werkstatt` |
 | hoechstens eine Bot-Stichelei je Partie, keine nach 3 Niederlagen in Folge | S3-5 (Bots mit Gedaechtnis) |
 | kein Raetsel-Tageslimit in der Gratis-Konfiguration | S1-5 `raetsel` (Abo-Schalter: S4-1) |
+
+# Premium-Umbau U1: Theme-Fundament (Look A „Modern und klar“, verbindlich)
+
+Alle Farben, Schriften, Radien, Schatten und Kurven sind Tokens. Kein Modul und kein Screen-CSS schreibt mehr feste
+Farben fuer Flaechen und Text; Screen-Pakete benutzen nur die Tokens (Liste: Kopf von `css/themes/modern.css`,
+Bedeutung: PLAN 1.2 im Umbau-Plan). Ladereihenfolge in `index.html` (und in `tests/screens.html`, `tests/orte-huelle.html`):
+`css/tokens.css` -> `css/themes/modern.css` -> `css/board.css` -> `css/app.css` -> `css/bauteile.css`, `navigation`,
+`arena`, `duell`, `partie`, `ergebnis`, `analyse`, `verlauf`, `einstellungen`, `training` (je Screen-Paket, von U1 leer
+angelegt) -> `css/screens.css` (Rest, verschwindet mit U8/U9).
+
+- **`css/tokens.css` (fest):** Abstaende `--a1..--a7`, `--rand`, `--rand-brett-handy`, `--tipp`, `--reiter-hoehe`,
+  `--kopf-hoehe(-partie)`, `--tempo`; Feldfarben und Markierungen je `html[data-brett]` (`--feld-hell`, `--feld-dunkel`,
+  `--zuletzt`, `--auswahl`, `--punkt`, dazu `--hinweis`, `--schach`); `color-scheme` je `data-modus`; die **Bruecke**
+  der alten Namen (`--ui-bg` -> `--grund`, `--ui-text` -> `--text`, `--stern` -> `--gold`, `--schlecht` -> `--warn`,
+  `--neon-*` ruhig gestellt). Die Bruecke entfernt U10, sobald grep keine Nutzung mehr findet.
+- **`css/themes/<id>.css` (Theme):** nur Custom Properties und `@font-face` (dazu Zierde in `::before/::after` mit
+  `background-image`, `border-image`, `mask-image`, `opacity`), jeder Token fuer hell und dunkel, dunkel zweimal
+  (`[data-modus="dunkel"]` und `[data-modus="system"]` in `prefers-color-scheme: dark`), keine festen Tokens, keine
+  Feldfarben, Textkontraste >= 4,5:1. `tests/thema.test.mjs` prueft das fuer jede Datei im Ordner.
+- **Bot-Farben:** `--bf` immer ueber `botFarbe(bot)` aus `js/thema.js` setzen (`var(--bot-<id>, <bot.farbe>)`), damit
+  registrierte Bosse ohne Theme-Eintrag funktionieren. Toenung hinter dem Portraet: `--bot-<id>-tint`.
+- **Zugklassen-Farben:** `--k-<id>` (Fuellung, hell und dunkel gleich), `--kg-<id>` (Zeichen auf der Fuellung),
+  `--kt-<id>` (Text, >= 4,5:1). Namen kommen mit U4 aus `js/zugklassen.js`.
+
+**`js/thema.js`** (rein bis auf `wendeThemaAn`): `THEMEN` (eingefroren, `modern`), `MODI` (`system`, `hell`, `dunkel`),
+`registriereThema(def) -> abmelden()` (prueft id, name, `css: 'css/themes/<id>.css'`, modi hell+dunkel, metaFarbe,
+klang.standard), `themaListe()`, `themaVon(id)`, `wendeThemaAn({ thema, modus }) -> Promise` (laedt ein
+nachgeladenes Theme-CSS zuerst, setzt `html[data-thema|data-modus]`, Federn, `<meta name="theme-color">`; Unbekanntes
+-> modern/system; der spaetere Aufruf gewinnt), `aufgeloesterModus()`, `aktuellesThema()`, `standardKlangpaket(id)`
+(modern: holz), `avatarVon(bot)` (Portraet des Themes nur fuer Bots in `portraets`, sonst `bot.avatar`), `botFarbe(bot)`,
+`floAvatar(farbe)`. Ereignis `window 'schach:thema'` `{ thema, modus, aufgeloest }` nach jedem Wechsel und bei
+Systemwechsel im Modus `system`. Gegen Aufblitzen setzt ein kleines Inline-Skript in `index.html` den gespeicherten
+Modus `hell`/`dunkel` vor dem ersten Bild; `system` braucht kein JS.
+
+**`js/bewegung.js`:** `TEMPI` (langsam 1,5, normal 1, schnell 0,6, aus 0), `setzeBewegung(stufe)` (setzt `--tempo` und
+`html[data-bewegung]`; `prefers-reduced-motion` wirkt wie `aus`), `tempo()`, `reduziert()`, `bewegungStufe()`,
+`taktFaktor()`/`takt(ms)` (Pausen zum Mitlesen, nie unter 0,6), `warte(ms)`, `federKurve(k, d)` (rein),
+`setzeFedern({ feder, weich, hupf })` (`linear()` wo moeglich, sonst die cubic-bezier-Werte des Themes), `KURVEN`,
+`anim(el, frames, { d, v, k, fill, it, dir })` (Web-Animation mit Tempo, bei Tempo 0 sofort am Ende),
+`staffel(els, o)`, `starteDruck()` (jedes `.dr` bekommt beim Druecken `.gedrueckt`). Dauern im CSS immer ueber
+`--d-xs .. --d-xl`, `--d-zug` (skalieren mit `--tempo`), Kurven `--feder`, `--feder-weich`, `--feder-hupf`, `--gleiten`,
+`--sanft`, `--raus`.
+
+**Einstellungen (`js/storage.js`, PLAN 4):** alle Schluessel des Umbaus stehen in `STANDARD_EINSTELLUNGEN`, die
+erlaubten Werte in `EINSTELLUNG_WERTE`; `ladeEinstellungen()` faellt bei Falschem still auf den Standard (auch
+`lautstaerke` 0..1 in 0,05, `klanggruppen` je Teilschluessel), `speichereEinstellungen({ klanggruppen: { uhr: false } })`
+aendert nur die genannte Gruppe. Standards: `klangpaket ''`, `lautstaerke 0.8`, `klangstufe 'alle'` (Flo, D4),
+`klanggruppen` alle an, `zugBestaetigen 'ohneUhr'`, `haltenAufgeben true`, `turmRochade false`, `autoDame true`,
+`steuerung 'beides'`, `bewegung 'normal'` (heisst nicht `tempo`, das ist die Bedenkzeit), `thema 'modern'`,
+`modus 'system'`, `koordLage 'ecke'`, `pfeile true`, `duellIntro 'besondere'` (Flo, D3), `figuren 'cburnett'`,
+`coachStil 'ausfuehrlich'`, `sprueche 'an'`. `app.js wendeEinstellungenAn(e)` ruft `setzeBewegung`, `wendeThemaAn` und,
+sobald es sie gibt (U3), `klang.einstellen(e)`; Hell/Dunkel wechselt ueber `app.setzeEinstellungen({ modus })` ohne
+Neuladen.
+
+**Schriften:** `assets/schriften/manrope.woff2` und `bricolage-grotesque.woff2` (SIL OFL 1.1, Lizenztexte daneben,
+Quelle im Kopf von `modern.css`), vorgeladen in `index.html`, im Service-Worker-Cache. Es fehlen `≈ ▲ ★ ♙ ♔ ✓ →`
+(Systemschrift springt ein); Sterne und Bauer deshalb als SVG-Icon.
+
+**Tests:** `tests/thema.test.mjs` (Node: Token-Vollstaendigkeit, Theme-Regeln, Kontraste, Schriften, thema.js,
+bewegung.js; Browser: hell/dunkel nach System, Wechsel ohne Neuladen, kein Aufblitzen, Schriften lokal, Probe-Theme
+aendert kein Layout, Lesbarkeit aller Hauptscreens mindestens 3:1 in hell und dunkel, keine externen Anfragen).
