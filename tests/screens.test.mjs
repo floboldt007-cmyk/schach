@@ -410,8 +410,18 @@ async function testePruefrunde(browser, d) {
   const brillant = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.klasse === 'brillant'), d.oper);
   if (brillant) {
     await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${brillant.ply}`);
-    const bg = await seite.evaluate(() => getComputedStyle(document.querySelector('.an-coach.brillant')).backgroundImage);
-    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /linear-gradient\(rgb\(16, 20, 42\), rgb\(16, 20, 42\)\)/.test(bg), bg.slice(0, 160));
+    // Premium-Umbau U1: die deckende Flaeche ist die Kartenfarbe des Themes (--flaeche), nicht mehr das Neon-Blau
+    const bg = await seite.evaluate(() => {
+      const el = document.querySelector('.an-coach.brillant');
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--flaeche)';
+      el.appendChild(probe);
+      const flaeche = getComputedStyle(probe).color;
+      probe.remove();
+      return { bild: getComputedStyle(el).backgroundImage, flaeche };
+    });
+    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /^rgb\(/.test(bg.flaeche) && bg.bild.includes(`linear-gradient(${bg.flaeche}, ${bg.flaeche})`),
+      JSON.stringify(bg).slice(0, 200));
   }
 
   // Engine stuerzt ab (leere Analyse mit Fehler): Fehlerkarte statt endlosem Warten, danach klappt es

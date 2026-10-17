@@ -149,6 +149,13 @@ function main() {
   const soll = [
     'index.html', 'manifest.webmanifest', 'LICENSE',
     ...alleDateien('css', /\.css$/),
+    // Premium-Umbau (PLAN 3.8): Themes, Schriften mit Lizenztext, Klangpakete, Portraets des Themes
+    ...alleDateien('css/themes', /\.css$/),
+    ...alleDateien('assets/schriften', /\.(woff2|txt)$/),
+    ...alleDateien('assets/klang/holz', /\.mp3$/),
+    ...alleDateien('assets/klang/arcade', /\.mp3$/),
+    ...alleDateien('assets/klang', /^LIZENZEN\.md$/),
+    ...alleDateien('assets/avatare/modern', /\.(svg|png)$/),
     ...alleDateien('js', /\.js$/),
     ...alleDateien('js/ui', /\.js$/).filter((d) => !pk.erlaubt.includes(d)),
     ...alleDateien('vendor/chess', /\.js$/),
@@ -206,6 +213,35 @@ function main() {
   for (const n of ['manifest.webmanifest', 'assets/icons/apple-touch-icon.png', 'assets/icons/favicon.svg']) {
     pruefe(`index.html verlinkt ${n}`, ausHtml.includes(n));
   }
+  // Premium-Umbau U1: Tokens und Theme vor allen anderen Stylesheets, jede CSS-Datei verlinkt, Schriften vorgeladen
+  const css = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
+  const cssDateien = [...alleDateien('css', /\.css$/), ...alleDateien('css/themes', /\.css$/)];
+  pruefe('index.html: css/tokens.css und css/themes/modern.css zuerst, css/screens.css zuletzt',
+    css[0] === 'css/tokens.css' && css[1] === 'css/themes/modern.css' && css[css.length - 1] === 'css/screens.css', css.join(', '));
+  pruefe('index.html: jede CSS-Datei in css/ verlinkt (weitere Themes laedt js/thema.js nach)',
+    cssDateien.filter((d) => !d.startsWith('css/themes/') || d === 'css/themes/modern.css').every((d) => css.includes(d)), cssDateien.filter((d) => !css.includes(d)).join(', '));
+  const vorab = [...html.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="font\/woff2" crossorigin>/g)].map((m) => m[1]);
+  pruefe('index.html: beide Schriften vorgeladen (as=font, crossorigin)', vorab.includes('assets/schriften/manrope.woff2')
+    && vorab.includes('assets/schriften/bricolage-grotesque.woff2'), vorab.join(', '));
+  pruefe('index.html: data-thema, data-modus, theme-color hell und dunkel, color-scheme light dark, Statusleiste default',
+    /<html[^>]*data-thema="modern"[^>]*data-modus="system"/.test(html)
+    && /<meta name="theme-color" content="#F4F1EC" media="\(prefers-color-scheme: light\)">/.test(html)
+    && /<meta name="theme-color" content="#15171B" media="\(prefers-color-scheme: dark\)">/.test(html)
+    && /<meta name="color-scheme" content="light dark">/.test(html)
+    && /<meta name="apple-mobile-web-app-status-bar-style" content="default">/.test(html));
+  // Verweise in den Stylesheets (url(...), z. B. @font-face) muessen im Cache stehen, sonst fehlen sie offline
+  const cssFehlt = [];
+  let cssVerweise = 0;
+  for (const d of liste.filter((x) => x.endsWith('.css'))) {
+    const t = readFileSync(path.join(WURZEL, d), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of t.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) {
+      if (/^(#|data:)/.test(m[1])) continue;
+      cssVerweise++;
+      const ziel = relativ(d, m[1]);
+      if (!ziel || !menge.has(ziel)) cssFehlt.push(`${d} -> ${m[1]}`);
+    }
+  }
+  pruefe('Stylesheets: alle url()-Verweise im Cache (Schriften offline)', cssVerweise >= 4 && cssFehlt.length === 0, cssFehlt.join(', ') || String(cssVerweise));
 
   // Manifest
   let man = null;
@@ -213,7 +249,7 @@ function main() {
   pruefe('Manifest ist gültiges JSON', !!man);
   if (man) {
     pruefe('Manifest: Name, Kurzname, Start, Bereich', man.name === 'Schach-Arena' && man.short_name === 'Schach' && man.start_url === './' && man.scope === './');
-    pruefe('Manifest: standalone, Farben, Ausrichtung', man.display === 'standalone' && man.background_color === '#070914' && man.theme_color === '#070914' && man.orientation === 'any');
+    pruefe('Manifest: standalone, Farben, Ausrichtung', man.display === 'standalone' && man.background_color === '#F4F1EC' && man.theme_color === '#F4F1EC' && man.orientation === 'any');
     const icons = man.icons || [];
     const hat = (g, zweck) => icons.some((i) => i.sizes === g && (i.purpose || 'any').split(' ').includes(zweck));
     pruefe('Manifest: Icons 192, 512 und maskable', hat('192x192', 'any') && hat('512x512', 'any') && hat('512x512', 'maskable'));

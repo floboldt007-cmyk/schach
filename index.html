@@ -1,30 +1,53 @@
 <!doctype html>
-<html lang="de" data-brett="nacht">
+<html lang="de" data-thema="modern" data-modus="system" data-brett="nacht">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#070914">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Schach-Arena">
 <meta name="format-detection" content="telephone=no">
 <meta name="description" content="Schach gegen zehn Bots mit Live-Bewertung jedes Zugs und Spielanalyse.">
 <title>Schach-Arena</title>
+<script>
+  // Hell oder Dunkel schon vor dem ersten Bild setzen (gespeicherte Einstellung "modus"), sonst blitzt beim
+  // Start das falsche Erscheinungsbild auf. js/thema.js uebernimmt danach.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/icons/icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="preload" href="assets/schriften/manrope.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/schriften/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
 <link rel="stylesheet" href="css/board.css">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/bauteile.css">
+<link rel="stylesheet" href="css/navigation.css">
+<link rel="stylesheet" href="css/arena.css">
+<link rel="stylesheet" href="css/duell.css">
+<link rel="stylesheet" href="css/partie.css">
+<link rel="stylesheet" href="css/ergebnis.css">
+<link rel="stylesheet" href="css/analyse.css">
+<link rel="stylesheet" href="css/verlauf.css">
+<link rel="stylesheet" href="css/einstellungen.css">
+<link rel="stylesheet" href="css/training.css">
 <link rel="stylesheet" href="css/screens.css">
 <script type="module" src="js/app.js"></script>
 </head>
 <body>
 <div id="app">
   <section class="screen lade-screen" aria-label="Schach-Arena wird geladen">
-    <div class="lade-inhalt"><div class="logo">SCHACH·ARENA</div><div class="logo-unter">wird geladen</div></div>
+    <div class="lade-inhalt"><div class="logo">Schach-Arena</div><div class="logo-unter">wird geladen</div></div>
   </section>
 </div>
 <noscript><p class="ohne-js">Die Schach-Arena braucht JavaScript.</p></noscript>

@@ -1,0 +1,69 @@
+/* ============================================================
+   Schach-Arena · feste Tokens (Premium-Umbau, Look A, PLAN 1.2/1.3/1.6)
+   Hier stehen nur Werte, die KEIN Theme aendern darf: Abstaende, Groessen,
+   Brettfarben je html[data-brett], Farbschema je html[data-modus] und die
+   Bruecke fuer die alten Variablen. Farben, Schriften, Radien, Schatten und
+   Kurven setzt das Theme (css/themes/<id>.css). tests/thema.test.mjs prueft,
+   dass ein Theme keinen dieser Werte anfasst.
+   Reihenfolge: tokens.css -> themes/<id>.css -> board.css -> app.css -> ...
+   ============================================================ */
+
+:root {
+  /* 4er-Raster */
+  --a1: 4px; --a2: 8px; --a3: 12px; --a4: 16px; --a5: 24px; --a6: 32px; --a7: 48px;
+  /* Seitenrand, Rand neben dem Brett auf dem Handy, kleinste Tippflaeche */
+  --rand: 28px;
+  --rand-brett-handy: 10px;
+  --tipp: 44px;
+  --reiter-hoehe: 44px;
+  /* Kopfzeilen: Hauptseiten und Partie */
+  --kopf-hoehe: 82px;
+  --kopf-hoehe-partie: 76px;
+  /* Animationstempo (js/bewegung.js setzt es: langsam 1.5, normal 1, schnell 0.6, aus 0) */
+  --tempo: 1;
+}
+@media (max-width: 700px) {
+  :root { --rand: 16px; --kopf-hoehe: 64px; --kopf-hoehe-partie: 52px; }
+}
+
+/* Farbschema der Bedienelemente (Scrollbalken, Formulare) passend zum Modus, ohne JavaScript */
+:root { color-scheme: light; }
+:root[data-modus="dunkel"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] { color-scheme: dark; }
+}
+
+/* ---------- Brettfarben (Flos Einstellung, unabhaengig vom Theme) ----------
+   Feldfarben bleiben exakt wie bisher; dazu die Markierungen aus Entwurf A je Brett. */
+:root, html[data-brett="nacht"] {
+  --feld-hell: #e4e8f6; --feld-dunkel: #7c87b6;
+  --zuletzt: rgba(118, 206, 255, .5); --auswahl: rgba(28, 34, 92, .26); --punkt: rgba(28, 30, 60, .2);
+}
+html[data-brett="gruen"] {
+  --feld-hell: #eeeed2; --feld-dunkel: #769656;
+  --zuletzt: rgba(255, 236, 80, .5); --auswahl: rgba(24, 58, 12, .24); --punkt: rgba(20, 30, 10, .2);
+}
+html[data-brett="holz"] {
+  --feld-hell: #f0d9b5; --feld-dunkel: #b58863;
+  --zuletzt: rgba(214, 220, 92, .52); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
+}
+:root {
+  --hinweis: rgba(76, 110, 245, .34);
+  --schach: rgba(226, 60, 60, .85);
+}
+
+/* ---------- Bruecke: alte Variablen auf die neuen Tokens ----------
+   Damit nicht umgebaute Screens lesbar bleiben und board.css seine Vertrags-Variablen behaelt.
+   Entfernt wird sie im letzten Paket (U10), sobald grep keine Nutzung mehr findet. */
+:root {
+  --ui-bg: var(--grund); --ui-flaeche: var(--flaeche); --ui-flaeche-2: var(--flaeche-2);
+  --ui-text: var(--text); --ui-gedimmt: var(--text-2); --ui-rand: var(--linie); --ui-rand-stark: var(--linie-2);
+  --stern: var(--gold); --schlecht: var(--warn); --eval-weiss: var(--balken-weiss); --eval-schwarz: var(--balken-schwarz);
+  --schrift-display: var(--display); --radius: var(--r-m); --tap: var(--tipp);
+  /* Neon-Reste ruhig stellen, bis ihr Abschnitt geloescht ist */
+  --neon-cyan: var(--text-2); --neon-violett: var(--text-2); --neon-pink: var(--akzent); --neon-orange: var(--akzent);
+  --neon-verlauf: linear-gradient(var(--linie-2), var(--linie-2)); --neon-rahmen: linear-gradient(var(--linie-2), var(--linie-2));
+}
+
+/* Zahlen ueberall mit gleich breiten Ziffern */
+.zahl { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }

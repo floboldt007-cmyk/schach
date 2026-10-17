@@ -25,6 +25,7 @@ import { fuelle, waehle } from '../orte.js';
 import { nachlese } from '../feier.js';
 import { starteNachholen } from '../nachholen.js';
 import { icon } from '../app.js';
+import { botFarbe } from '../thema.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
 const MERKMALE = {
@@ -133,7 +134,7 @@ export function zeige(root, params, app) {
     el.type = 'button';
     el.className = `knoten ${z}${b.stufe === 10 ? ' boss' : ''}`;
     el.dataset.bot = b.id;
-    el.style.setProperty('--bf', b.farbe);
+    el.style.setProperty('--bf', botFarbe(b));
     const sterne = fortschritt.bots[b.id].sterne;
     el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
@@ -306,7 +307,7 @@ export function zeige(root, params, app) {
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
     const satz = begruessung(b);
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
-    detail.style.setProperty('--bf', b.farbe);
+    detail.style.setProperty('--bf', botFarbe(b));
     if (orte.oben) orte.oben.verlasse();
     if (orte.heute) orte.heute.verlasse();
     if (orte.bot) orte.bot.verlasse();
@@ -314,7 +315,7 @@ export function zeige(root, params, app) {
       <div class="ort-panel-oben" hidden></div>
       <section class="heute-karte" aria-label="Heute" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
-      <div class="fortsetzen" style="--bf:${laufBot.farbe}">
+      <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
         <div class="ft-text"><b>Offene Partie</b><span>gegen ${esc(laufBot.name)}</span><span>bei Zug ${Math.floor(laufend.zuege.length / 2) + 1}</span></div>
         <button class="knopf primaer" type="button" data-aktion="fortsetzen">${icon('play')} Fortsetzen</button>
