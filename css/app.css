@@ -948,10 +948,10 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 }
 
 /* ============================================================
-   W0+a "Spiel-Fundament": Behaelter der neuen Orte, Abrechnung, Plaetze der Buehne, untere Leiste.
+   W0+a "Spiel-Fundament": Behaelter der neuen Orte, Abrechnung, Plaetze der Buehne (die Leiste: css/navigation.css).
    Ohne Pakete bleibt alles versteckt (hidden) und erzeugt keinen Abstand. Die Optik kommt mit dem Premium-Umbau.
    ============================================================ */
-.heute-karte[hidden], .ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden], .reiter-leiste[hidden],
+.heute-karte[hidden], .ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden],
 .ort-spieler-leiste[hidden], .ort-aktionen[hidden] { display: none; }
 /* Heute-Karte im Arena-Panel (Ort arena:heute) */
 .heute-karte { display: grid; gap: 6px; padding: 10px 14px; border-radius: var(--r-l); background: var(--flaeche-2);
@@ -987,19 +987,7 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 .p-funkenlinie { position: absolute; left: 4px; right: 4px; bottom: 0; height: 4px; z-index: 6; pointer-events: none; }
 /* Chip je Modus im Ergebnis (BOSS, FREI, SPIELHALLE) */
 .chip.uebung[data-modus="boss"] { color: var(--text); background: var(--gold-weich); border-color: var(--gold); }
-/* Untere Leiste mit den Reitern (nur, wenn erweiterungen.js REITER nennt) */
-.reiter-leiste { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 4px;
-  padding: 4px max(8px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left));
-  background: var(--flaeche); border-top: 1px solid var(--linie); }
-.reiter-leiste .reiter { flex: 1 1 0; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; margin: 0; padding: 0; border: 0; background: none; color: var(--text-2); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
-.reiter-leiste .reiter .ico { width: 22px; height: 22px; }
-.reiter-leiste .reiter[aria-current="page"] { color: var(--text); }
-/* w0plus-a-fix: Platz fuer die Leiste in der Hoehe der Screens (vorher padding an #app: die Screens sind selbst 100dvh
-   hoch, die Leiste lag ueber dem SPIELEN-Knopf). --reiter-h = Hoehe der Leiste (52 + 2 * 4 + 1 Rand + sichere Zone). */
-:root { --reiter-h: calc(61px + env(safe-area-inset-bottom, 0px)); }
-.reiter-leiste { min-height: var(--reiter-h); }
-html[data-reiter="an"] #app > .screen { height: calc(100vh - var(--reiter-h)); height: calc(100dvh - var(--reiter-h)); }
+/* Reiter-Leiste (nur, wenn erweiterungen.js REITER nennt): seit dem Premium-Umbau (U2) in css/navigation.css */
 @media (prefers-reduced-motion: reduce) {
   .abrechnung > .abr-rollt { animation: none; }
 }

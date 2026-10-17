@@ -2,6 +2,8 @@
 // Gegner-Panel (Avatar, Begruessung, Bio, Merkmale, Stern-Ziele, Farbwahl, Spielen, Bilanz).
 // Params: { neuFreigeschaltet?: botId } spielt die Freischalt-Animation,
 //         { waehle?: botId } (Zusatz) waehlt einen freien Bot im Panel vor.
+// Premium-Umbau U2: Kopf aus js/ui/seite.js (hauptKopf: Marke, Platz fuer die Reiter-Pille, Chips, Verlauf, Hell/Dunkel,
+// Klang, Zahnrad); .logo, .logo-unter, .kopf-chips und die data-aktion-Knoepfe bleiben.
 // Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips),
 // arena:panel-oben (ganz oben im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten
 // Partie"), arena:panel-bot (nach den Stern-Zielen), arena:start (einmal nach dem ersten Layout).
@@ -26,6 +28,7 @@ import { nachlese } from '../feier.js';
 import { starteNachholen } from '../nachholen.js';
 import { icon } from '../app.js';
 import { botFarbe } from '../thema.js';
+import { hauptKopf, standardChips, verbindeKopf } from './seite.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
 const MERKMALE = {
@@ -91,16 +94,11 @@ export function zeige(root, params, app) {
   s.className = 'screen arena';
   s.setAttribute('aria-label', 'Bot-Leiter');
   s.innerHTML = `
-    <header class="kopf">
-      <div class="titel"><div class="logo">SCHACH·ARENA</div><div class="logo-unter">${alleBesiegt
-        ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne` : 'Besiege alle 10 Bots'}</div></div>
-      <div class="kopf-chips">
-        <span class="chip zahl" title="Gesammelte Sterne"><span class="stern" aria-hidden="true">★</span><span class="sr">Sterne:</span> ${gesamtSterne(fortschritt)}<span class="von"> / 30</span></span>
-        <span class="chip zahl" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegteBots(fortschritt)}<span class="von"> / 10</span></span>
-      </div>
-      <button class="icon-knopf" type="button" data-aktion="verlauf" aria-label="Verlauf">${icon('verlauf')}</button>
-      <button class="icon-knopf" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
-    </header>
+    ${hauptKopf({
+    unter: alleBesiegt ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne` : 'Besiege alle 10 Bots',
+    chips: standardChips(fortschritt),
+    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: 'Verlauf' }],
+  })}
     <div class="inhalt">
       <div class="karte" tabindex="-1">
         <div class="karte-innen">
@@ -125,6 +123,8 @@ export function zeige(root, params, app) {
 
   s.querySelector('[data-aktion="verlauf"]').addEventListener('click', () => app.gehe('verlauf'));
   s.querySelector('[data-aktion="einstellungen"]').addEventListener('click', () => app.gehe('einstellungen'));
+  // Premium-Umbau U2: Hauptseiten-Kopf (Klang-Schalter, Hell/Dunkel), js/ui/seite.js
+  const kopfHandle = verbindeKopf(s, app);
   orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
 
   // ---------- Knoten ----------
@@ -540,6 +540,7 @@ export function zeige(root, params, app) {
       if (beobachter) beobachter.disconnect();
       window.removeEventListener('orientationchange', beiGroesse);
       for (const o of Object.values(orte)) if (o) o.verlasse();
+      kopfHandle.verlasse();
     },
   };
 }
