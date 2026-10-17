@@ -16,3 +16,9 @@
 // Modul-Speicher (js/storage.js) und die Register (Klang, Saetze, Icons) ein.
 // Anfangs leer: ohne Pakete verhaelt sich die App wie vorher.
 export const PAKETE = Object.freeze([]);
+
+// W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
+// 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
+// traegt hier etwas ein, sobald der Screen des Reiters da ist, z. B.
+//   export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
+export const REITER = Object.freeze([]);

@@ -10,6 +10,29 @@
 // sucht zuerst bot.saetze[anlass], dann das Register; registriereSaetze(anlass, { [botId]: [Satz] })
 // -> abmelden() meldet weitere Saetze an (auch neue Anlaesse). Platzhalter (PLATZHALTER):
 // {zuege} {genauigkeit} {name} {tage}; fehlt ein Wert in werte, wird der Satz uebersprungen.
+//
+// W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2):
+//   registriereBot(profil) -> abmelden()   weitere Gegner neben der Leiter (Bosse, Sparring, Gaeste). Profil:
+//     { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo, saetze, regel, startFen,
+//       vorliebe, nodes, archiv }
+//     id [a-z][a-z0-9-] (2 bis 40 Zeichen, nicht wie ein Leiter-Bot), name, avatar (Pfad oder data:-URL) und
+//     staerke (wie bei BOTS, z. B. die Staerke des naechstliegenden Leiter-Bots) sind Pflicht. art 'boss' braucht
+//     archiv: true (Fairness 5.3: jeder Boss bleibt im Archiv spielbar). startFen wird mit chess.js geprueft,
+//     regel hoechstens 140 Zeichen, nodes eine positive ganze Zahl. Angemeldete Bots haben stufe null und
+//     zaehlen nie zur Leiter (keine Sterne, keine Freischaltung). Falsches Profil: Fehler.
+//   botNachId(id) findet auch angemeldete Bots; alleBots() -> [...BOTS, ...angemeldete].
+//   botZug(..., { zufall, nodes, vorliebe }):
+//     zufall    Zufallsquelle (Standard Math.random; pruefbare Partien: tag.js zufallAus(seed))
+//     nodes     feste Knotenzahl statt Zeitlimit fuer jede Suche (gleicher Seed, gleiche Knoten, ein Thread:
+//               derselbe Zug auf jedem Geraet; mit der Eichung abstimmen, geprueft in S3-0)
+//     vorliebe  Stil eines Bots: Funktion (zug, { fen, farbe, vollzug, punkte, bestePunkte }) -> Zahl oder
+//               Gewichte { schlagen, schach, rochade, rochadeKurz, rochadeLang, bauer, springer, laeufer, turm,
+//               dame, koenig, vorwaerts, tausch }. Gewaehlt wird nur unter Zuegen, die hoechstens
+//               VORLIEBE_FENSTER_CP (0,3 Bauern) schlechter sind als der beste Zug der Bot-Analyse, und nur, wenn
+//               der Bot ohnehin einen Zug aus diesem Fenster gewaehlt haette: Seine Fehler bleiben, die Vorliebe
+//               macht ihn weder heimlich staerker noch schwaecher. Der hoechste Wert ueber 0 gewinnt (bei
+//               Gleichstand der bessere Zug). Rueckgabe dann zusaetzlich vorliebe: true.
+//   Ohne diese drei Angaben spielt jeder Bot genau wie vorher.
 import { Chess } from '../vendor/chess/chess.js';
 
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -631,8 +654,67 @@ export const BOTS = [
   },
 ];
 
+// Angemeldete Bots (W0+a): id -> eingefrorenes Profil
+const angemeldet = new Map();
+
 export function botNachId(id) {
-  return BOTS.find((b) => b.id === id) || null;
+  return BOTS.find((b) => b.id === id) || angemeldet.get(id) || null;
+}
+
+export function alleBots() {
+  return [...BOTS, ...angemeldet.values()];
+}
+
+const BOT_ID_RE = /^[a-z][a-z0-9-]{1,39}$/;
+export const BOT_ARTEN = Object.freeze(['boss', 'sparring', 'gast']);
+const VORLIEBE_SCHLUESSEL = ['schlagen', 'schach', 'rochade', 'rochadeKurz', 'rochadeLang', 'bauer', 'springer', 'laeufer',
+  'turm', 'dame', 'koenig', 'vorwaerts', 'tausch'];
+
+// Weiteren Gegner anmelden (Boss, Sparring, Gast). Falsche Profile werfen sofort (Tippfehler fallen auf).
+export function registriereBot(profil) {
+  const p = profil;
+  const nein = (text) => { throw new TypeError('registriereBot: ' + text); };
+  if (!p || typeof p !== 'object') nein('Profil fehlt');
+  if (typeof p.id !== 'string' || !BOT_ID_RE.test(p.id)) nein('ungültige id ' + String(p.id));
+  if (BOTS.some((b) => b.id === p.id) || angemeldet.has(p.id)) nein('id schon vergeben: ' + p.id);
+  if (typeof p.name !== 'string' || !p.name.trim() || p.name.length > 60) nein(p.id + ': name fehlt');
+  if (typeof p.avatar !== 'string' || !p.avatar) nein(p.id + ': avatar fehlt');
+  if (!p.staerke || typeof p.staerke !== 'object' || Array.isArray(p.staerke)) nein(p.id + ': staerke fehlt');
+  const art = p.art == null ? 'gast' : p.art;
+  if (!BOT_ARTEN.includes(art)) nein(p.id + ': unbekannte art ' + String(art));
+  if (art === 'boss' && p.archiv !== true) nein(p.id + ': ein Boss braucht archiv: true (bleibt im Archiv spielbar)');
+  if (p.regel != null && (typeof p.regel !== 'string' || p.regel.length > 140)) nein(p.id + ': regel höchstens 140 Zeichen');
+  if (p.nodes != null && (!Number.isInteger(p.nodes) || p.nodes < 1)) nein(p.id + ': nodes muss eine positive ganze Zahl sein');
+  if (p.vorliebe != null && typeof p.vorliebe !== 'function' && (typeof p.vorliebe !== 'object' || Array.isArray(p.vorliebe))) {
+    nein(p.id + ': vorliebe ist weder Funktion noch Gewichte');
+  }
+  if (p.startFen != null) {
+    try { new Chess(p.startFen); } catch (e) { nein(p.id + ': startFen ungültig'); }
+  }
+  const saetze = {};
+  if (p.saetze != null) {
+    if (typeof p.saetze !== 'object' || Array.isArray(p.saetze)) nein(p.id + ': saetze ist kein Objekt');
+    for (const [anlass, liste] of Object.entries(p.saetze)) {
+      if (!Array.isArray(liste)) nein(p.id + ': saetze.' + anlass + ' ist keine Liste');
+      saetze[anlass] = Object.freeze(liste.filter((t) => typeof t === 'string' && t.trim()));
+    }
+  }
+  const bot = Object.freeze({
+    id: p.id, stufe: null, art, name: p.name, avatar: p.avatar,
+    farbe: typeof p.farbe === 'string' && p.farbe ? p.farbe : '#8a93a8',
+    titel: typeof p.titel === 'string' ? p.titel : '', kurz: typeof p.kurz === 'string' ? p.kurz : '',
+    bio: typeof p.bio === 'string' ? p.bio : '', elo: Number.isFinite(p.elo) ? p.elo : null,
+    staerke: Object.freeze({ ...p.staerke }), saetze: Object.freeze(saetze),
+    regel: p.regel || null, startFen: p.startFen || null, vorliebe: p.vorliebe || null,
+    nodes: p.nodes || null, archiv: p.archiv === true,
+  });
+  angemeldet.set(bot.id, bot);
+  let aktiv = true;
+  return function abmelden() {
+    if (!aktiv) return;
+    aktiv = false;
+    if (angemeldet.get(bot.id) === bot) angemeldet.delete(bot.id);
+  };
 }
 
 export function botNachStufe(stufe) {
@@ -742,8 +824,16 @@ async function suche(engine, fen, opts, signal) {
 // Zug des Bots. Wartet selbst eine menschliche Denkzeit ab (ausser ohnePause).
 // Rueckgabe { uci, san, denkzeitMs, art } oder null (keine legalen Zuege / abgebrochen).
 // art: 'erzwungen' | 'matt' | 'engine' | 'patzer' | 'kurz' | 'normal'
-export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, zufall = Math.random, signal = null } = {}) {
+// So viel schlechter als der beste Zug darf ein Zug der Vorliebe hoechstens sein (0,3 Bauern)
+export const VORLIEBE_FENSTER_CP = 30;
+
+export async function botZug(engine, fen, bot, {
+  zugNummer, ohnePause = false, zufall = Math.random, signal = null, nodes = null, vorliebe = null,
+} = {}) {
   const start = jetzt();
+  const knoten = Number.isInteger(nodes) && nodes > 0 ? nodes : null;
+  const stil = typeof vorliebe === 'function' || (vorliebe && typeof vorliebe === 'object') ? vorliebe : null;
+  let mitVorliebe = false;
   const chess = new Chess(fen);
   const zuege = chess.moves({ verbose: true });
   if (zuege.length === 0) return null;
@@ -763,10 +853,16 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
     zug = mattZuege[Math.floor(zufall() * mattZuege.length)];
     art = 'matt';
   } else if (s.voll) {
-    const a = await suche(engine, fen, { movetime: s.movetime ?? 1500, multipv: 1, elo: s.elo, skill: s.skill }, signal);
+    const multipv = stil ? Math.min(5, zuege.length) : 1;
+    const opts = knoten ? { nodes: knoten, multipv, elo: s.elo, skill: s.skill } : { movetime: s.movetime ?? 1500, multipv, elo: s.elo, skill: s.skill };
+    const a = await suche(engine, fen, opts, signal);
     if (signal && signal.aborted) return null;
     zug = zuege.find((z) => z.lan === a.bestmove) || null;
     art = 'engine';
+    if (stil && zug) {
+      const v = waehleMitVorliebe(zuege, a, zug, stil, { farbe, vollzug, fen, verboten: new Set() });
+      if (v !== zug) { zug = v; mitVorliebe = true; }
+    }
   } else {
     // Matt in 1 nicht gesehen: dann auch nicht "zufaellig" ueber die Bewertung finden
     const verboten = new Set(siehtMatt ? [] : mattZuege.map((z) => z.lan));
@@ -780,10 +876,11 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
       const kurz = zufall() < (s.kurzChance || 0);
       let tiefe = kurz ? s.kurzTiefe : s.tiefe;
       if (endspiel && s.endspiel && !kurz) tiefe += s.endspiel.tiefePlus || 0;
+      const grenze = knoten ? { nodes: knoten } : { movetime: s.maxZeit || 4000 };
       const a = await suche(engine, fen, {
         depth: Math.max(1, tiefe),
         multipv: Math.min(s.breite || 1, zuege.length),
-        movetime: s.maxZeit || 4000,
+        ...grenze,
       }, signal);
       if (signal && signal.aborted) return null;
       let rauschen = s.rauschen || 0;
@@ -791,6 +888,10 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
       if (vollzug <= 8) rauschen += 10;  // etwas Abwechslung in der Eroeffnung
       zug = waehleKandidat(chess, zuege, a, bot, { farbe, vollzug, endspiel, rauschen, zufall, verboten });
       art = kurz ? 'kurz' : 'normal';
+      if (stil && zug) {
+        const v = waehleMitVorliebe(zuege, a, zug, stil, { farbe, vollzug, fen, verboten });
+        if (v !== zug) { zug = v; mitVorliebe = true; }
+      }
     }
   }
   if (!zug) {
@@ -807,7 +908,70 @@ export async function botZug(engine, fen, bot, { zugNummer, ohnePause = false, z
     if (rest > 0) await warte(rest, signal);
     if (signal && signal.aborted) return null;
   }
-  return { uci: zug.lan, san: zug.san, denkzeitMs: Math.round(jetzt() - start), art };
+  const aus = { uci: zug.lan, san: zug.san, denkzeitMs: Math.round(jetzt() - start), art };
+  if (mitVorliebe) aus.vorliebe = true;
+  return aus;
+}
+
+// ---------- Vorliebe (W0+a) ----------
+
+// Wert eines Zugs fuer die Vorliebe: Funktion oder Gewichte (unbekannte Schluessel zaehlen nicht)
+export function vorliebeWert(vorliebe, z, kontext = {}) {
+  if (typeof vorliebe === 'function') {
+    try {
+      const w = vorliebe(z, kontext);
+      return Number.isFinite(w) ? w : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  if (!vorliebe || typeof vorliebe !== 'object') return 0;
+  const g = (k) => (Number.isFinite(vorliebe[k]) ? vorliebe[k] : 0);
+  const kurz = z.flags.includes('k');
+  const lang = z.flags.includes('q');
+  let w = 0;
+  if (z.captured) w += g('schlagen');
+  if (/[+#]/.test(z.san)) w += g('schach');
+  if (kurz || lang) w += g('rochade');
+  if (kurz) w += g('rochadeKurz');
+  if (lang) w += g('rochadeLang');
+  const figur = { p: 'bauer', n: 'springer', b: 'laeufer', r: 'turm', q: 'dame', k: 'koenig' }[z.piece];
+  if (figur && !kurz && !lang) w += g(figur);
+  if (z.captured && WERT[z.captured] === WERT[z.piece] && z.piece !== 'k') w += g('tausch');
+  if (z.piece !== 'k') {
+    const reihe = Number(z.to[1]);
+    if (kontext.farbe === 'w' ? reihe >= 5 : reihe <= 4) w += g('vorwaerts');
+  }
+  return w;
+}
+
+// Unter den Zuegen im Fenster (hoechstens VORLIEBE_FENSTER_CP schlechter als der beste) den mit der hoechsten
+// Vorliebe waehlen, aber nur, wenn der gewaehlte Zug selbst im Fenster liegt. Sonst bleibt der gewaehlte Zug.
+function waehleMitVorliebe(zuege, analyse, gewaehlt, vorliebe, ctx) {
+  const nachLan = new Map(zuege.map((z) => [z.lan, z]));
+  const bewertet = new Map();
+  for (const l of analyse.lines || []) {
+    const z = nachLan.get(l.pv && l.pv[0]);
+    if (z && !bewertet.has(z.lan)) bewertet.set(z.lan, punkte(l.eval, ctx.farbe));
+  }
+  if (!bewertet.size || !bewertet.has(gewaehlt.lan)) return gewaehlt;
+  const beste = Math.max(...bewertet.values());
+  const grenze = beste - VORLIEBE_FENSTER_CP;
+  if (bewertet.get(gewaehlt.lan) < grenze) return gewaehlt;
+  let sieger = gewaehlt;
+  let siegerWert = 0;
+  let siegerPunkte = bewertet.get(gewaehlt.lan);
+  for (const [lan, p] of bewertet) {
+    if (p < grenze || ctx.verboten.has(lan)) continue;
+    const z = nachLan.get(lan);
+    const w = vorliebeWert(vorliebe, z, { fen: ctx.fen, farbe: ctx.farbe, vollzug: ctx.vollzug, punkte: p, bestePunkte: beste });
+    if (w > siegerWert || (w === siegerWert && w > 0 && p > siegerPunkte)) {
+      sieger = z;
+      siegerWert = w;
+      siegerPunkte = p;
+    }
+  }
+  return siegerWert > 0 ? sieger : gewaehlt;
 }
 
 // ---------- Zugwahl ----------

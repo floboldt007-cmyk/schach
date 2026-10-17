@@ -7,7 +7,9 @@ import {
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
+  duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN,
 } from '../js/storage.js';
+import { registriereBot, botNachId } from '../js/bots.js';
 import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
 import { analysierePartie, kompaktReview, ergaenzeReviewFelder } from '../js/review.js';
 import { Chess } from '../vendor/chess/chess.js';
@@ -327,7 +329,7 @@ const UEBUNG_FEN = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQk
 const ZIEL = { partieId: 'pquelle1', ply: 6, besterZug: 'h5f7', alterZug: 'h5f3', alterSanDe: 'Df3', gewinnVorher: 0.99 };
 
 // ---------- wertet / MODI ----------
-pruefe('MODI = normal, uebung (eingefroren)', JSON.stringify(MODI) === '["normal","uebung"]' && Object.isFrozen(MODI));
+pruefe('MODI = normal, uebung, boss, frei, spiel (W0+a, eingefroren)', JSON.stringify(MODI) === '["normal","uebung","boss","frei","spiel"]' && Object.isFrozen(MODI));
 pruefe('wertet: normale Partie ja, ohne modus ja', wertet({ modus: 'normal' }) && wertet({}));
 pruefe('wertet: Uebung, eigene Stellung, unbekannter Modus nein', !wertet({ modus: 'uebung', startFen: UEBUNG_FEN }) && !wertet({ startFen: UEBUNG_FEN })
   && !wertet({ modus: 'uebung' }) && !wertet({ modus: 'boss' }) && !wertet(null));
@@ -429,7 +431,8 @@ setzeSpeicher(s);
   const alt = ladeLaufendePartie();
   pruefe('Laufend ohne neue Felder (alter Stand): Standardwerte', alt.modus === 'normal' && alt.ziel === null && JSON.stringify(alt.extra) === '{}'
     && JSON.stringify(alt.liveTrivial) === '[]', alt);
-  s.setItem('schach-arena:v1:laufend', JSON.stringify({ botId: 'rudi', zuege: ['e2e4'], modus: 'boss', ziel: ZIEL, extra: 'x', liveTrivial: [1, true, 'ja'] }));
+  // W0+a: 'boss' ist jetzt ein Modus; ein unbekannter Modus ist hier 'turnier'
+  s.setItem('schach-arena:v1:laufend', JSON.stringify({ botId: 'rudi', zuege: ['e2e4'], modus: 'turnier', ziel: ZIEL, extra: 'x', liveTrivial: [1, true, 'ja'] }));
   const falsch = still(() => ladeLaufendePartie()).wert;
   pruefe('Laufend: falsche Typen werden ersetzt (modus, ziel, extra, liveTrivial)', falsch.modus === 'normal' && falsch.ziel === null
     && JSON.stringify(falsch.extra) === '{}' && JSON.stringify(falsch.liveTrivial) === '[false,true,false]', falsch);
@@ -446,8 +449,12 @@ setzeSpeicher(s);
 s = fakeSpeicher();
 setzeSpeicher(s);
 {
-  pruefe('MODUL_BUDGET wie im Bauplan (Summe 324.000)', Object.isFrozen(MODUL_BUDGET) && MODUL_BUDGET.kartei === 160000 && MODUL_BUDGET.feier === 6000
-    && MODUL_BUDGET.serie === 4000 && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 324000);
+  pruefe('MODUL_BUDGET wie im Bauplan (Welle 0: 324.000, unveraendert)', Object.isFrozen(MODUL_BUDGET) && MODUL_BUDGET.kartei === 160000 && MODUL_BUDGET.feier === 6000
+    && MODUL_BUDGET.serie === 4000 && ['kartei', 'profil', 'alltag', 'uebung', 'bots', 'taktik', 'start', 'feier', 'serie'].reduce((a, k) => a + MODUL_BUDGET[k], 0) === 324000);
+  const NEU = { funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000 };
+  pruefe('MODUL_BUDGET W0+a (SPIELKONZEPT 6.6): neue Module, zusammen 182.000, alles 506.000',
+    Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 17
+    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 506000);
   const std = { karten: [], stand: { n: 0 } };
   const leer = ladeModul('kartei', std);
   leer.stand.n = 5;
@@ -631,7 +638,7 @@ function gleich(a, b) {
 }
 
 {
-  pruefe('MAX_REVIEWS = 20', MAX_REVIEWS === 20);
+  pruefe('MAX_REVIEWS = 12 (W0+a, vorher 20)', MAX_REVIEWS === 12);
   const z = operReview.zuege;
   pruefe('Testanalyse: 33 Zuege mit langer bester Linie', z.length === 33 && z.filter((x) => x.besteLinie.length >= 6 && x.besteLinieSan.length === x.besteLinie.length).length >= 30,
     z.map((x) => x.besteLinie.length));
@@ -810,6 +817,100 @@ function gleich(a, b) {
   l5.stop();
   pruefe('Nachholen: stop() vor dem ersten Schritt', (await l5.fertig) === 0);
   abmelden();
+}
+
+
+// =====================================================================
+// W0+a "Spiel-Fundament": neue Felder, Modi, Ausduennen, dauerhafter Speicher
+// =====================================================================
+{
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  pruefe('Einstellungen W0+a: zaehlwerk und funkenlinie aus, lebensleiste an', STANDARD_EINSTELLUNGEN.zaehlwerk === false
+    && STANDARD_EINSTELLUNGEN.funkenlinie === false && STANDARD_EINSTELLUNGEN.lebensleiste === true && ladeEinstellungen().lebensleiste === true);
+  // Datensatz: gueltige Felder bleiben, falsche fallen still weg
+  const BOSS = { id: 'bergwirt', stufe: 'meister', woche: '2026-11-16', staerke: 1080.4 };
+  const gut = speicherePartie(partie({
+    modus: 'boss', seed: 4294967295, tempo: { grund: 900, zuschlag: 10 }, zeiten: [12, 40, 0], boss: BOSS, liga: { saison: 'saison-1', runde: 5 },
+  })).partie;
+  const gelesen = ladePartie(gut.id);
+  pruefe('Datensatz W0+a: seed, tempo, zeiten, boss, liga bleiben', gelesen.seed === 4294967295 && JSON.stringify(gelesen.tempo) === '{"grund":900,"zuschlag":10}'
+    && JSON.stringify(gelesen.zeiten) === '[12,40,0]' && JSON.stringify(gelesen.boss) === '{"id":"bergwirt","stufe":"meister","woche":"2026-11-16","staerke":1080}'
+    && JSON.stringify(gelesen.liga) === '{"saison":"saison-1","runde":5}', gelesen);
+  const schlecht = speicherePartie(partie({
+    seed: -1, tempo: { grund: 0, zuschlag: 5 }, zeiten: [1, 2.5], boss: BOSS, liga: { saison: 'X', runde: 0 },
+  })).partie;
+  const g2 = ladePartie(schlecht.id);
+  pruefe('Datensatz W0+a: falsche Felder fallen still weg (boss nur im Modus boss)', !('seed' in g2) && !('tempo' in g2) && !('zeiten' in g2)
+    && !('boss' in g2) && !('liga' in g2), Object.keys(g2));
+  pruefe('Datensatz W0+a: mehr Zeiten als Zuege fallen weg', !('zeiten' in ladePartie(speicherePartie(partie({ zeiten: Array(21).fill(5) })).partie.id)));
+  pruefe('Datensatz W0+a: Boss-Stufe nur standard oder meister', JSON.stringify(BOSS_STUFEN) === '["standard","meister"]'
+    && !('boss' in ladePartie(speicherePartie(partie({ modus: 'boss', boss: { id: 'bergwirt', stufe: 'leicht' } })).partie.id)));
+  // Boss, frei, Spielhalle: werten nie (keine Sterne, kein Fortschritt, nicht in der Statistik)
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  const vorher = statistik().partien;
+  const erg = ['boss', 'frei', 'spiel'].map((m) => speicherePartie(partie({ modus: m, boss: m === 'boss' ? BOSS : undefined })));
+  pruefe('Modi boss, frei, spiel: werten nie (keine Sterne, keine Freischaltung, nicht in der Statistik)', erg.every((e) => e.wertet === false
+    && JSON.stringify(e.partie.sterne) === '[false,false,false]' && e.neuFreigeschaltet === null) && gesamtSterne() === 0
+    && statistik().partien === vorher && !istFreigeschaltet(2), erg.map((e) => e.wertet));
+  pruefe('wertet: boss, frei, spiel nie, auch aus der Grundstellung', ['boss', 'frei', 'spiel'].every((m) => !wertet({ modus: m })));
+
+  // laufende Partie: Felder und angemeldete Bots
+  const ab = registriereBot({ id: 'bergwirt', art: 'boss', archiv: true, name: 'Der Bergwirt', avatar: 'assets/avatare/06-professor-turm.svg',
+    staerke: { ...botNachId('turm').staerke } });
+  speichereLaufendePartie({ botId: 'bergwirt', spielerFarbe: 'w', zuege: ['e2e4'], modus: 'boss', boss: BOSS, seed: 7, tempo: { grund: 600, zuschlag: 5 },
+    zeiten: [30, 99], liga: null });
+  const l = ladeLaufendePartie();
+  pruefe('Laufend W0+a: angemeldeter Bot (Boss) wird geladen, mit seed, boss und tempo', l && l.botId === 'bergwirt' && l.seed === 7
+    && l.boss && l.boss.stufe === 'meister' && l.tempo.grund === 600 && !('zeiten' in l), l);
+  ab();
+  pruefe('Laufend W0+a: Bot nicht mehr angemeldet -> keine laufende Partie', ladeLaufendePartie() === null);
+  speichereLaufendePartie({ botId: 'rudi', spielerFarbe: 'w', zuege: [], modus: 'normal', boss: BOSS, seed: 1.5 });
+  const l2 = ladeLaufendePartie();
+  pruefe('Laufend W0+a: boss ausserhalb des Boss-Modus und ein krummer Seed fallen weg', l2 && !('boss' in l2) && !('seed' in l2), l2);
+
+  // alte Speicherstaende: 20 Analysen -> still auf 12 ausduennen, die neuesten bleiben
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  const alt = [];
+  for (let i = 0; i < 20; i++) alt.push(speicherePartie(partie({}), null).partie.id);
+  // wie vor W0+a gespeichert: 20 Analysen direkt in den Speicher (speichereReview kuerzt schon auf 12)
+  for (const id of alt) s.setItem('schach-arena:v1:review:' + id, JSON.stringify({ zuege: [{ ply: 0, farbe: 'w', klasse: 'gut' }] }));
+  s.setItem('schach-arena:v1:review:pverwaist', JSON.stringify({ zuege: [] }));
+  const neueste = ladePartien().map((p) => p.id);
+  let gelesenReviews = 0;
+  const getItem = s.getItem;
+  s.getItem = (k) => { if (String(k).includes(':review:')) gelesenReviews++; return getItem(k); };
+  const weg = duenneAnalysenAus();
+  s.getItem = getItem;
+  const uebrig = neueste.filter((id) => hatReview(id));
+  pruefe('Ausduennen: 21 Analysen (eine ohne Partie) -> 12, die neuesten bleiben', weg === 9 && uebrig.length === 12
+    && JSON.stringify(uebrig) === JSON.stringify(neueste.slice(0, 12)) && s.getItem('schach-arena:v1:review:pverwaist') === null, { weg, n: uebrig.length });
+  pruefe('Ausduennen liest keine Analysen (nur Schluessel)', gelesenReviews === 0, gelesenReviews);
+  pruefe('Ausduennen: zweites Mal nichts zu tun, alte Analysen laden weiter', duenneAnalysenAus() === 0 && ladeReview(neueste[0]) && ladeReview(neueste[0]).zuege.length === 1);
+  pruefe('Ausduennen: Partien bleiben alle', ladePartien().length === 20);
+
+  // dauerhafter Speicher (navigator.storage.persist), Fehler still
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const setzeNavi = (storage) => Object.defineProperty(globalThis, 'navigator', { value: storage === undefined ? {} : { storage }, configurable: true, writable: true });
+  let persistAufrufe = 0;
+  setzeNavi({ persisted: async () => false, persist: async () => { persistAufrufe++; return true; } });
+  const a1 = await dauerhaftAnfragen();
+  setzeNavi({ persisted: async () => true, persist: async () => { persistAufrufe++; return true; } });
+  const a2 = await dauerhaftAnfragen();
+  pruefe('dauerhaftAnfragen: fragt an, wenn noch nicht dauerhaft, sonst nicht', a1 === true && a2 === true && persistAufrufe === 1 && dauerhaftStatus() === true);
+  setzeNavi({ persisted: async () => false, persist: async () => false });
+  pruefe('dauerhaftAnfragen: abgelehnt -> false', (await dauerhaftAnfragen()) === false && dauerhaftStatus() === false);
+  setzeNavi({ persisted: async () => { throw new Error('x'); }, persist: async () => true });
+  let still = true;
+  let a3;
+  try { a3 = await dauerhaftAnfragen(); } catch (e) { still = false; }
+  pruefe('dauerhaftAnfragen: Fehler still (null)', still && a3 === null && dauerhaftStatus() === null);
+  setzeNavi(undefined);
+  pruefe('dauerhaftAnfragen: ohne navigator.storage -> null', (await dauerhaftAnfragen()) === null);
+  if (original) Object.defineProperty(globalThis, 'navigator', original);
+  else delete globalThis.navigator;
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

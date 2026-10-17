@@ -72,8 +72,13 @@ export function lesePakete(text) {
   return [...m[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map((x) => x[1]);
 }
 
-// Paket-Screens und ihr Paket (BAUPLAN: 1C Kartei -> training, 2D Einstieg -> start)
-export const SCREEN_PAKET = Object.freeze({ training: 'kartei', start: 'einstieg' });
+// Paket-Screens und ihr Paket (BAUPLAN: 1C Kartei -> training, 2D Einstieg -> start; W0+a nach SPIELKONZEPT 6.3/6.4:
+// bestenliste S1-3 punkte, raetsel S1-5, lernen und lektion S1-10/S2-3, ich (eigenes Paket "ich"), spielplan S1-6 boss,
+// spielhalle S3-4). Baut ein anderes Paket den Screen, aendert die Integration die Zuordnung hier.
+export const SCREEN_PAKET = Object.freeze({
+  training: 'kartei', start: 'einstieg',
+  bestenliste: 'punkte', raetsel: 'raetsel', lernen: 'lernen', lektion: 'lernen', ich: 'ich', spielplan: 'boss', spielhalle: 'spielhalle',
+});
 
 // Welche Paket-Dateien muessen in die Liste? dateien: vorhandene Dateien (relativ), pakete: Liste PAKETE.
 // -> { pflicht: [...], erlaubt: [...], wartend: [...] }  (wartend: da, aber Paket noch nicht eingebunden)
@@ -143,6 +148,9 @@ function main() {
     ...alleDateien('assets/pieces', /\.(svg|png)$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
+    // W0+a: statische Inhalte (Spielplan, spaeter Raetsel, Bosse ...) direkt unter daten/ gehoeren in den Cache;
+    // daten/beispiel/ (Format-Beispiele) wird nicht ausgeliefert
+    ...alleDateien('daten', /\.json$/),
     ...pk.pflicht,
   ];
   const nichtGelistet = soll.filter((d) => !menge.has(d));
@@ -228,7 +236,8 @@ function main() {
   pruefe('Alle Screen-Module im Cache', kernScreens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
-  pruefe('Paket-Screens (training, start) im Router, die eingebundener Pakete im Cache', JSON.stringify(paketScreens) === '["training","start"]'
+  pruefe('Paket-Screens (training, start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle) im Router, die eingebundener Pakete im Cache',
+    JSON.stringify(paketScreens) === '["training","start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle"]'
     && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');

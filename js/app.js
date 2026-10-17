@@ -21,12 +21,24 @@
 //     app:sichtbar (bei visibilitychange; setzt html[data-sichtbar="ja"|"nein"])
 //   - Wahl-Ort app:erster-screen? (nur ohne Hash und ohne Verlaufseintrag), kontext { partienZahl }
 //   - speicher:fehler: einmal je Sitzung ein Hinweis, dass der Speicher voll ist
-import { PAKETE } from './erweiterungen.js';
+//
+// W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2):
+//   - SCREENS zusaetzlich bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle: alle gehoeren Paketen
+//     (PAKET_SCREENS); fehlt ihre Datei, geht es wie bei training und start still zur Arena
+//   - untere Leiste mit den Reitern Arena, Training, Bestenliste, Ich (nav.reiter-leiste), nur vorbereitet: Sie
+//     erscheint erst, wenn REITER in ./erweiterungen.js Screens nennt (das macht die Integration; im Testmodus
+//     auch ?reiter=training,ich), und nur auf den Reiter-Screens. Ohne Pakete bleibt sie unsichtbar
+//     (hidden, html[data-reiter] fehlt). Die Optik kommt mit dem Premium-Umbau.
+//   - beim Start: storage.dauerhaftAnfragen() (navigator.storage.persist, Fehler still) und, kurz nach dem ersten
+//     Screen, storage.duenneAnalysenAus() (MAX_REVIEWS 12; aeltere Speicherstaende hatten bis zu 20)
+import { PAKETE, REITER } from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
 import { setzeSymbole } from './board.js';
 import { SYMBOLE } from './symbole.js';
-import { ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien } from './storage.js';
+import {
+  ladeEinstellungen, speichereEinstellungen, ladeLaufendePartie, ladePartien, dauerhaftAnfragen, duenneAnalysenAus,
+} from './storage.js';
 import { icon } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
@@ -34,13 +46,16 @@ import { waehle } from './orte.js';
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start'];
+const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start',
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen',
+  bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
+  spielhalle: 'Spielhalle',
 };
-// Screens aus Paketen (Runde 4): fehlt die Datei, geht es ohne Hinweis zur Arena
-const PAKET_SCREENS = new Set(['training', 'start']);
+// Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena
+const PAKET_SCREENS = new Set(['training', 'start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 
 // ---------- Einstellungen ----------
@@ -292,6 +307,54 @@ function schliesseDialog() {
   offenerDialog = null;
 }
 
+// ---------- Untere Leiste (W0+a, nur vorbereitet) ----------
+// Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt.
+const REITER_ALLE = [['arena', 'Arena', 'play'], ['training', 'Training', 'ziel'], ['bestenliste', 'Bestenliste', 'pokal'], ['ich', 'Ich', 'stern']];
+// Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt)
+const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich' };
+let reiterLeiste = null;
+export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
+  const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));
+  const aus = new Set((Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
+  if (TEST) {
+    let test = null;
+    try { test = new URLSearchParams(suche || '').get('reiter'); } catch (e) { test = null; }
+    if (test) for (const n of test.split(',')) if (erlaubt.has(n.trim())) aus.add(n.trim());
+  }
+  return aus.size ? REITER_ALLE.filter(([n]) => n === 'arena' || aus.has(n)).map(([n]) => n) : [];
+}
+function zeigeReiter(screen) {
+  const liste = reiterListe();
+  const aktiv = REITER_VON[screen] || null;
+  const sichtbar = liste.length > 0 && !!aktiv;
+  if (!sichtbar) {
+    if (reiterLeiste) reiterLeiste.hidden = true;
+    delete document.documentElement.dataset.reiter;
+    return;
+  }
+  if (!reiterLeiste) {
+    reiterLeiste = document.createElement('nav');
+    reiterLeiste.className = 'reiter-leiste';
+    reiterLeiste.setAttribute('aria-label', 'Bereiche');
+    reiterLeiste.innerHTML = REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, t, ic]) =>
+      `<button type="button" class="reiter" data-reiter="${n}">${icon(ic)}<span>${t}</span></button>`).join('');
+    reiterLeiste.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-reiter]');
+      if (!k) return;
+      const ziel = k.dataset.reiter;
+      if (aktuell && REITER_VON[aktuell.name] === ziel && aktuell.name === ziel) return;
+      gehe(ziel, {}, { ersetzen: true });
+    });
+    document.body.append(reiterLeiste);
+  }
+  reiterLeiste.hidden = false;
+  document.documentElement.dataset.reiter = 'an';
+  for (const k of reiterLeiste.querySelectorAll('[data-reiter]')) {
+    if (k.dataset.reiter === aktiv) k.setAttribute('aria-current', 'page');
+    else k.removeAttribute('aria-current');
+  }
+}
+
 // ---------- Routing ----------
 
 let aktuell = null;    // { name, params, hash, handle }
@@ -420,6 +483,7 @@ async function zeigeScreen(name, params, hash) {
       return;
     }
     aktuell.handle = zeigePlatzhalter(root, name);
+    zeigeReiter(null);
     return;
   }
   try {
@@ -428,8 +492,10 @@ async function zeigeScreen(name, params, hash) {
     console.error(e);
     root.replaceChildren();
     aktuell.handle = zeigePlatzhalter(root, name, true);
+    zeigeReiter(null);
     return;
   }
+  zeigeReiter(name);
   sende('app:screen', { name, params: params || {} });
 }
 
@@ -559,11 +625,8 @@ function zeigeUpdateHinweis(neuLaden) {
 const HINWEIS_MERKER = 'schach-arena:v1:hinweis-installieren';
 function pruefeInstallation() {
   if (typeof navigator === 'undefined') return;
-  if (navigator.standalone === true) {
-    // Home-Bildschirm-App: Speicher als dauerhaft markieren (WebKit gewaehrt das)
-    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* egal */ }
-    return;
-  }
+  // Home-Bildschirm-App: dauerhaften Speicher fragt starte() an (W0+a: storage.dauerhaftAnfragen, fuer alle)
+  if (navigator.standalone === true) return;
   if (navigator.standalone !== false) return;
   try {
     if (localStorage.getItem(HINWEIS_MERKER)) return;
@@ -628,6 +691,8 @@ function starte() {
   };
   for (const t of ['pointerup', 'touchend', 'keydown']) document.addEventListener(t, entsperren, true);
   if (TEST) window.__app = app;
+  // W0+a: dauerhaften Speicher anfragen (Safari loescht Web-App-Speicher sonst nach Tagen ohne Nutzung)
+  dauerhaftAnfragen();
   // Pakete zuerst laden (PAKETE, im Testmodus dazu ?erw), dann app:bereit und der erste Screen
   const pakete = ladePakete();
   if (pakete) pakete.then(ersterStart);
@@ -643,6 +708,8 @@ function ersterStart() {
   sende('app:bereit', { app });
   beiVerlauf();
   pruefeInstallation();
+  // W0+a: Analysen ueber MAX_REVIEWS still entfernen (nach dem ersten Screen, bremst den Start nicht)
+  setTimeout(() => { try { duenneAnalysenAus(); } catch (e) { /* egal */ } }, 0);
   // erst nach dem Laden, damit das Vorladen des Caches den Start nicht bremst
   if (document.readyState === 'complete') registriereSW();
   else window.addEventListener('load', registriereSW, { once: true });

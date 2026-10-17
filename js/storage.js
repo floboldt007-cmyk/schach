@@ -22,7 +22,7 @@
 //     Partie; fremd = andere Seiten derselben Herkunft, die sich den Speicher teilen)
 //   rohSpeicher() -> { praefix, schluessel(), lies(k), schreib(k, text), entferne(k) }  nur eigene
 //     Schluessel, nur fuer die Sicherung
-//   Reviews werden kompakt gespeichert (review.js kompaktReview/ergaenzeReviewFelder), MAX_REVIEWS 20.
+//   Reviews werden kompakt gespeichert (review.js kompaktReview/ergaenzeReviewFelder), MAX_REVIEWS 12 (W0+a).
 //   Scheitert ein Schreiben trotz geopferter Analysen, kommt das Ereignis speicher:fehler
 //     { schluessel, grund: 'voll' | 'fehler' }. Fortschritt wird immer vor der Partienliste geschrieben.
 //   Einstellungen der Pakete (w0-fix) unter schach-arena:v1:einstellungen:<name> (Namen wie MODUL_BUDGET),
@@ -33,7 +33,24 @@
 //   Partie-Datensatz (w0-fix): analysiert (true, sobald ergaenzeAnalyse eine Review bekam; Nachholen sucht
 //     wertende Partien ohne dieses Feld) und genauigkeitQuelle ('live' | 'analyse'). Eine Genauigkeit aus
 //     der Live-Bewertung ersetzt die erste volle Analyse genau einmal; eine aus einer Analyse bleibt.
-import { BOTS } from './bots.js';
+//
+// W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 6.6):
+//   MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']; nur 'normal' aus der Grundstellung wertet (Bosse,
+//     freie Partien und die Spielhalle buchen nie Sterne, Freischaltung oder Statistik).
+//   Partie-Datensatz und laufende Partie zusaetzlich (alle optional, Falsches wird still weggelassen):
+//     seed     ganze Zahl 0..2^32-1: Zufall der Bot-Zuege (tag.js zufallAus), fuer pruefbare Partien
+//     tempo    { grund, zuschlag } in Sekunden (Schachuhr, W0+b); ohne: ohne Uhr
+//     zeiten   [Zehntelsekunden je Halbzug] (verbrauchte Bedenkzeit, W0+b), hoechstens so viele wie Zuege
+//     boss     { id, stufe: 'standard' | 'meister', woche?: 'JJJJ-MM-TT', staerke?: Zahl } nur im Modus 'boss'
+//     liga     { saison, runde } (Vereinsmeisterschaft, S3-2)
+//   MODUL_BUDGET neu (6.6): funken, punkte, boss, raetsel, lernen, liga, sammeln, freunde.
+//   MAX_REVIEWS 12 (vorher 20); duenneAnalysenAus() entfernt still, was darueber liegt (app.js beim Start).
+//   dauerhaftAnfragen() -> Promise<true | false | null>: navigator.storage.persist() (app.js beim Start;
+//     Safari loescht sonst Speicher von Web-Apps nach Tagen ohne Nutzung), dauerhaftStatus() -> letzter Stand.
+//     Fehler bleiben still (null: unbekannt).
+//   Einstellungen zusaetzlich (Anzeigen in der Partie, SPIELKONZEPT 3.18): zaehlwerk (aus), funkenlinie (aus),
+//     lebensleiste (an: Lebensleiste statt Balken bei Bossen).
+import { BOTS, botNachId } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder } from './review.js';
 
@@ -52,22 +69,24 @@ const K = {
   modul: (name) => P + 'modul:' + name,
 };
 
-// So viele Spielanalysen bleiben gespeichert (aeltere lassen sich neu berechnen)
-export const MAX_REVIEWS = 20;
+// So viele Spielanalysen bleiben gespeichert (aeltere lassen sich neu berechnen; W0+a: 20 -> 12, SPIELKONZEPT 6.6)
+export const MAX_REVIEWS = 12;
 // So viele Partien bleiben in der Liste
 export const MAX_PARTIEN = 300;
 export const GENAUIGKEIT_STERN = 80;
 // Bestwert der Genauigkeit erst ab so vielen eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
 export const BESTWERT_MIN_ZUEGE = 10;
 
-// Spielmodi (weitere Modi, z. B. 'boss', nur mit einer neuen Welle)
-export const MODI = Object.freeze(['normal', 'uebung']);
+// Spielmodi (W0+a: boss, frei, spiel; weitere nur mit einer neuen Fundament-Runde)
+export const MODI = Object.freeze(['normal', 'uebung', 'boss', 'frei', 'spiel']);
 // Zeichen fuer partie.extra (alle Pakete zusammen)
 export const EXTRA_MAX = 400;
 // Budget je Paket-Modul in Zeichen
 export const MODUL_BUDGET = Object.freeze({
   kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
   taktik: 8000, start: 6000, feier: 6000, serie: 4000,
+  // W0+a (SPIELKONZEPT 6.6): zusammen 182.000
+  funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;
@@ -93,6 +112,10 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   brett: 'nacht',        // 'nacht' | 'gruen' | 'holz'
   koordinaten: true,
   tiefe: 14,             // Rechentiefe der Live-Bewertung
+  // W0+a: Anzeigen in der Partie (SPIELKONZEPT 3.18; die Schalter baut der Premium-Umbau)
+  zaehlwerk: false,      // Zaehlwerk der Pakete (z. B. Punkte) waehrend der Partie
+  funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
+  lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
 });
 
 // ---------------------------------------------------------------------------
@@ -294,7 +317,8 @@ export function sterneFuerPartie(p) {
 //            genauigkeit (Spieler, 0..100|null), genauigkeitBot, spielstaerke (Elo-Schaetzung|null),
 //            eroeffnung (Name|null), sterne [bool,bool,bool] (wird beim Speichern berechnet),
 //            modus 'normal'|'uebung', ziel (nur Uebung), extra (Objekt je Paket), maxSerie,
-//            genauigkeitQuelle 'live'|'analyse' (sobald genauigkeit gesetzt), analysiert true (Review nachgetragen) }
+//            genauigkeitQuelle 'live'|'analyse' (sobald genauigkeit gesetzt), analysiert true (Review nachgetragen),
+//            W0+a: seed, tempo, zeiten, boss (nur Modus 'boss'), liga }
 // Die Spielanalyse (Review) liegt getrennt unter review:<id> (nur die letzten MAX_REVIEWS).
 // ---------------------------------------------------------------------------
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -340,7 +364,55 @@ function warne(text) {
   try { console.warn('Speicher: ' + text); } catch (e) { /* egal */ }
 }
 
-// Neue Felder einer Partie in Form bringen (modus, ziel, extra, maxSerie)
+// ---------- W0+a: Seed, Tempo, Zeiten, Boss, Liga ----------
+const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
+const TAG_RE = /^\d{4}-\d{2}-\d{2}$/;
+export const BOSS_STUFEN = Object.freeze(['standard', 'meister']);
+
+export function pruefeSeed(x) {
+  return Number.isInteger(x) && x >= 0 && x <= 4294967295 ? x : null;
+}
+// Bedenkzeit in Sekunden: Grundzeit 1 s bis 3 Stunden, Zuschlag 0 bis 10 Minuten
+export function pruefeTempo(t) {
+  if (!t || typeof t !== 'object' || Array.isArray(t)) return null;
+  if (!Number.isInteger(t.grund) || t.grund < 1 || t.grund > 10800) return null;
+  if (!Number.isInteger(t.zuschlag) || t.zuschlag < 0 || t.zuschlag > 600) return null;
+  return { grund: t.grund, zuschlag: t.zuschlag };
+}
+// verbrauchte Bedenkzeit je Halbzug in Zehntelsekunden (kompakt: ganze Zahlen)
+export function pruefeZeiten(z, maxLaenge = 2000) {
+  if (!Array.isArray(z) || z.length > maxLaenge) return null;
+  if (!z.every((x) => Number.isInteger(x) && x >= 0 && x <= 864000)) return null;
+  return z.slice();
+}
+export function pruefeBoss(b) {
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
+  if (typeof b.id !== 'string' || !ID_RE.test(b.id) || !BOSS_STUFEN.includes(b.stufe)) return null;
+  const aus = { id: b.id, stufe: b.stufe };
+  if (typeof b.woche === 'string' && TAG_RE.test(b.woche)) aus.woche = b.woche;
+  if (Number.isFinite(b.staerke)) aus.staerke = Math.round(b.staerke);
+  return aus;
+}
+export function pruefeLiga(l) {
+  if (!l || typeof l !== 'object' || Array.isArray(l)) return null;
+  if (typeof l.saison !== 'string' || !ID_RE.test(l.saison) || !Number.isInteger(l.runde) || l.runde < 1 || l.runde > 99) return null;
+  return { saison: l.saison, runde: l.runde };
+}
+// Felder setzen oder (falsch/leer) entfernen
+function setzeOderWeg(p, feld, wert) {
+  if (wert == null) delete p[feld];
+  else p[feld] = wert;
+}
+function normalisiereSpiel(p) {
+  setzeOderWeg(p, 'seed', pruefeSeed(p.seed));
+  setzeOderWeg(p, 'tempo', pruefeTempo(p.tempo));
+  setzeOderWeg(p, 'zeiten', pruefeZeiten(p.zeiten, Array.isArray(p.zuege) ? p.zuege.length : 2000));
+  setzeOderWeg(p, 'boss', p.modus === 'boss' ? pruefeBoss(p.boss) : null);
+  setzeOderWeg(p, 'liga', pruefeLiga(p.liga));
+  return p;
+}
+
+// Neue Felder einer Partie in Form bringen (modus, ziel, extra, maxSerie; W0+a: seed, tempo, zeiten, boss, liga)
 function normalisiere(p) {
   p.modus = p.modus == null || p.modus === '' ? 'normal' : String(p.modus);
   const ziel = p.modus === 'uebung' ? pruefeZiel(p.ziel) : null;
@@ -351,7 +423,7 @@ function normalisiere(p) {
   else delete p.extra;
   if (Number.isFinite(p.maxSerie)) p.maxSerie = Math.max(0, Math.round(p.maxSerie));
   else delete p.maxSerie;
-  return p;
+  return normalisiereSpiel(p);
 }
 export function neueId(datum = new Date()) {
   return 'p' + datum.getTime().toString(36) + Math.floor(Math.random() * 1296).toString(36).padStart(2, '0');
@@ -564,6 +636,45 @@ export function hatReview(id) {
   try { return sp().getItem(K.review(id)) != null; } catch (e) { return false; }
 }
 
+// W0+a: Analysen ueber MAX_REVIEWS still entfernen (alte Speicherstaende hatten bis zu 20). Liest nur die
+// Schluessel, nicht die grossen Werte. Die neuesten Partien behalten ihre Analyse; Analysen ohne Partie gehen
+// zuerst. -> Zahl der entfernten Analysen
+export function duenneAnalysenAus(max = MAX_REVIEWS) {
+  const praefix = P + 'review:';
+  const ids = [];
+  try {
+    const s = sp();
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k && k.startsWith(praefix)) ids.push(k.slice(praefix.length));
+    }
+  } catch (e) { return 0; }
+  if (ids.length <= max) return 0;
+  const rang = new Map(ladePartien().map((p, i) => [p.id, i]));
+  const wo = (id) => (rang.has(id) ? rang.get(id) : 1e9);
+  ids.sort((a, b) => wo(a) - wo(b));
+  const weg = ids.slice(Math.max(0, max));
+  for (const id of weg) entferne(K.review(id));
+  return weg.length;
+}
+
+// W0+a: dauerhaften Speicher anfragen (navigator.storage.persist), Fehler still
+let dauerhaft = null;
+export async function dauerhaftAnfragen() {
+  try {
+    const st = globalThis.navigator && globalThis.navigator.storage;
+    if (!st || typeof st.persist !== 'function') { dauerhaft = null; return dauerhaft; }
+    if (typeof st.persisted === 'function' && (await st.persisted()) === true) { dauerhaft = true; return dauerhaft; }
+    dauerhaft = (await st.persist()) === true;
+  } catch (e) {
+    dauerhaft = null;
+  }
+  return dauerhaft;
+}
+export function dauerhaftStatus() {
+  return dauerhaft;
+}
+
 function entferneAeltesteReview(ausser) {
   const ids = ladePartien().map((p) => p.id).filter((x) => K.review(x) !== ausser && hatReview(x));
   const alt = ids[ids.length - 1];
@@ -576,7 +687,10 @@ function entferneAeltesteReview(ausser) {
 // Laufende Partie (zum Fortsetzen, wenn das iPad den Tab beendet)
 // Laufend = { botId, spielerFarbe, startFen, zuege: [uci], hinweise, zuruecknahmen,
 //             liveKlassen: [klasse|null], gestartet (ISO),
-//             modus 'normal'|'uebung', ziel (nur Uebung) | null, extra {}, liveTrivial: [bool] }
+//             modus 'normal'|'uebung', ziel (nur Uebung) | null, extra {}, liveTrivial: [bool],
+//             W0+a: seed, tempo, zeiten, boss (nur Modus 'boss'), liga }
+// Der Bot einer laufenden Partie kann auch ein angemeldeter sein (registriereBot, z. B. ein Boss); fehlt er
+// (Paket nicht geladen), gibt es keine laufende Partie.
 // ---------------------------------------------------------------------------
 export function speichereLaufendePartie(stand) {
   if (!stand) return loescheLaufendePartie();
@@ -591,7 +705,7 @@ export function speichereLaufendePartie(stand) {
 
 export function ladeLaufendePartie() {
   const s = lies(K.laufend, null);
-  if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || !BOTS.some((b) => b.id === s.botId)) return null;
+  if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || !botNachId(s.botId)) return null;
   if (s.startFen != null && typeof s.startFen !== 'string') return null;
   // von Hand veraenderte Daten: nur bekannte Klassen und gueltige Zuege uebernehmen
   const zuege = s.zuege.filter((u) => typeof u === 'string' && UCI_RE.test(u));
@@ -601,7 +715,7 @@ export function ladeLaufendePartie() {
   const modus = MODI.includes(s.modus) ? s.modus : 'normal';
   const ziel = modus === 'uebung' ? pruefeZiel(s.ziel) : null;
   const extra = pruefeExtra(s.extra) || {};
-  return { ...s, liveKlassen, liveTrivial, modus, ziel, extra };
+  return normalisiereSpiel({ ...s, liveKlassen, liveTrivial, modus, ziel, extra });
 }
 
 export function loescheLaufendePartie() {

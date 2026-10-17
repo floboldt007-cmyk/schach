@@ -997,3 +997,39 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 @media (prefers-reduced-motion: reduce) {
   .c-zusatz, .erg-f-zeile.neu, .erg-f-zeile.gross.neu { animation: none; }
 }
+
+/* ============================================================
+   W0+a "Spiel-Fundament": Behaelter der neuen Orte, Abrechnung, Plaetze der Buehne, untere Leiste.
+   Ohne Pakete bleibt alles versteckt (hidden) und erzeugt keinen Abstand. Die Optik kommt mit dem Premium-Umbau.
+   ============================================================ */
+.heute-karte[hidden], .ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden], .reiter-leiste[hidden] { display: none; }
+/* Heute-Karte im Arena-Panel (Ort arena:heute) */
+.heute-karte { display: grid; gap: 6px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--ui-rand); min-width: 0; }
+.arena .detail > .heute-karte { grid-column: 1 / -1; }
+.heute-karte .hk-kopf { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--ui-gedimmt); }
+.ort-heute { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* Gegner-Leiste (Ort partie:gegner-leiste) ueber der Bot-Karte bzw. im Hochformat ueber dem Bot-Namen */
+.ort-gegner-leiste { display: block; min-width: 0; }
+/* Abrechnung im Ergebnis (Ort ergebnis:abrechnung, Huelle aus js/ui/abrechnung.js): Zeilen rollen ein */
+.abrechnung { display: grid; gap: 4px; min-width: 0; }
+.abrechnung > .abr-rollt { animation: abr-rollen .3s ease-out var(--t, 0ms) both; }
+.abrechnung.alles > * { animation: none; }
+@keyframes abr-rollen { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Plaetze der Buehne: Zaehlwerk im Kopf, Funkenlinie am unteren Rand des Bretts */
+.p-zaehlwerk { flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.p-funkenlinie { position: absolute; left: 4px; right: 4px; bottom: 0; height: 4px; z-index: 6; pointer-events: none; }
+/* Chip je Modus im Ergebnis (BOSS, FREI, SPIELHALLE) */
+.chip.uebung[data-modus="boss"] { color: var(--stern); background: rgba(255, 210, 63, .1); border-color: rgba(255, 210, 63, .55); }
+/* Untere Leiste mit den Reitern (nur, wenn erweiterungen.js REITER nennt) */
+.reiter-leiste { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 4px;
+  padding: 4px max(8px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left));
+  background: var(--ui-flaeche, #141833); border-top: 1px solid var(--ui-rand); }
+.reiter-leiste .reiter { flex: 1 1 0; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; margin: 0; padding: 0; border: 0; background: none; color: var(--ui-gedimmt); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.reiter-leiste .reiter .ico { width: 22px; height: 22px; }
+.reiter-leiste .reiter[aria-current="page"] { color: var(--akzent); }
+html[data-reiter="an"] #app { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+@media (prefers-reduced-motion: reduce) {
+  .abrechnung > .abr-rollt { animation: none; }
+}

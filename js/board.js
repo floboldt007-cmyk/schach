@@ -12,7 +12,22 @@
 //     svg.brett-pfeile > g.pfeil[data-von][data-nach]    Pfeile (viewBox 0 0 8 8)
 //     .abzeichen-ort.k-<klasse>[data-feld][data-klasse]  Klassen-Symbol oben rechts am Feld
 //     .brett-umwandlung > .umwandlung-wahl > button.umwandlung-figur[data-figur="q"]
+//     svg.brett-striche > g.strich[data-art][data-von][data-nach]   W0+a: Striche (im Brett oder in einer Effekt-Ebene)
 // Alles, was auf einem Feld sitzt, traegt --x/--y (Spalte/Zeile am Bildschirm, 0..7).
+//
+// W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2, 3.9, 3.18):
+//   new Brett(el, { ..., beiAbgelehnt(von, nach, art) })   meldet einen Zugversuch, den die Zielkarte nicht
+//       erlaubt (nur waehrend erlaubeZuege() gesetzt ist): Figur auf ein nicht erlaubtes Feld gezogen oder getippt
+//       (nach = Feld, art 'ziehen' | 'tippen'), oder eine eigene Figur ohne erlaubten Zug angetippt oder gezogen
+//       (nach = null beim Antippen). Am Bild aendert sich dabei nichts. partie.js sendet daraus zug:abgelehnt.
+//   striche(liste, { ebene = null, animieren = true }) -> { el, entferne() }
+//       liste: [{ von, nach, art = 'linie' | 'haken' | 'kreuz', farbe, breite = 0.07, verzoegerung = 0 (ms) }]
+//       'linie' von Feldmitte zu Feldmitte (Mattnetz: die Figur, die ein Fluchtfeld deckt), 'haken' und 'kreuz'
+//       auf dem Feld nach (bzw. von). Gezeichnet in ebene (z. B. buehne.effekte, gleiche Lage wie die Felder)
+//       oder im Brett ueber den Figuren; folgt dem Drehen des Bretts. Nur transform und opacity werden animiert,
+//       reduzierte Bewegung zeigt sofort das fertige Bild.
+//   kippeKoenig(feld, { langsam = false }) -> boolean   der Koenig auf feld kippt (Matt, Finisher); setzeStellung
+//       und richteAuf() stellen ihn wieder auf. false, wenn dort kein Koenig steht.
 
 const DATEIEN = 'abcdefgh';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -181,11 +196,15 @@ function svgEl(name, attr) {
 
 export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
-    koordinaten = true, animation = 150, fen = null } = {}) {
+    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
     this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
     this.beiZug = beiZug;
+    this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
+    this._stumm = null;          // Geste auf einer eigenen Figur ohne erlaubten Zug (nur fuer beiAbgelehnt)
+    this._striche = new Set();   // gezeichnete Striche (W0+a)
+    this._gekippt = new Set();   // gekippte Koenige (img)
     this.ausrichtung = ausrichtung === 'b' ? 'b' : 'w';
     this.dauer = animation;
 
@@ -218,6 +237,7 @@ export class Brett {
   setzeStellung(fen, { animieren = true, letzterZug = null, schach = null } = {}) {
     const { figuren, amZug } = leseFen(fen);
     this._stellungVersion++;
+    if (this._gekippt.size) this.richteAuf();
     if (this._umwandlung) this._brichUmwandlungAb(false);
     if (this._geste) this._brichGesteAb(false);
     this._auswahl = null;
@@ -242,6 +262,7 @@ export class Brett {
     for (const el of this._lagen.values()) this._platziere(el, el.dataset.feld);
     if (this._abzeichenEl) this._platziere(this._abzeichenEl, this._abzeichen.feld);
     this._zeichnePfeile();
+    for (const h of this._striche) this._zeichneStriche(h);
   }
 
   // Bequemlichkeit: Brett drehen
@@ -304,6 +325,75 @@ export class Brett {
     this._beschrifte();
   }
 
+  // ----- W0+a: Striche und Koenigsfall -----
+
+  striche(liste, { ebene = null, animieren = true } = {}) {
+    const gut = (liste || []).filter((x) => x && gueltigesFeld(x.nach || x.von) && (x.von == null || gueltigesFeld(x.von)));
+    const svg = svgEl('svg', { class: 'brett-striche', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
+    if (!animieren) svg.classList.add('still');
+    const h = { liste: gut, el: svg };
+    if (ebene && typeof ebene.appendChild === 'function') ebene.appendChild(svg);
+    else this.el.insertBefore(svg, this._umwandlungEl);
+    this._zeichneStriche(h);
+    this._striche.add(h);
+    return {
+      el: svg,
+      entferne: () => {
+        this._striche.delete(h);
+        svg.remove();
+      },
+    };
+  }
+
+  _zeichneStriche(h) {
+    h.el.replaceChildren();
+    const mitte = (feld) => {
+      const [x, y] = this._spalteZeile(feld);
+      return [x + 0.5, y + 0.5];
+    };
+    const r = (n) => Number(n.toFixed(3));
+    for (const s of h.liste) {
+      const nach = s.nach || s.von;
+      const von = s.von || nach;
+      const art = ['linie', 'haken', 'kreuz'].includes(s.art) ? s.art : 'linie';
+      const breite = Number(s.breite) > 0 ? Number(s.breite) : 0.07;
+      const g = svgEl('g', { class: 'strich', 'data-art': art, 'data-von': von, 'data-nach': nach });
+      g.style.color = farbeAus(s.farbe || 'akzent');
+      g.style.setProperty('--v', Math.max(0, Number(s.verzoegerung) || 0) + 'ms');
+      const strich = { fill: 'none', stroke: 'currentColor', 'stroke-width': breite, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+      if (art === 'linie' && von !== nach) {
+        const [x1, y1] = mitte(von);
+        const [x2, y2] = mitte(nach);
+        const winkel = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        const laenge = Math.hypot(x2 - x1, y2 - y1);
+        const lage = svgEl('g', { transform: `translate(${r(x1)} ${r(y1)}) rotate(${r(winkel)})` });
+        lage.append(svgEl('line', { ...strich, x1: 0, y1: 0, x2: r(laenge), y2: 0, class: 'strich-zug' }));
+        g.append(lage);
+      } else {
+        const [x, y] = mitte(nach);
+        const lage = svgEl('g', { transform: `translate(${r(x)} ${r(y)})` });
+        const d = art === 'kreuz' ? 'M -0.2 -0.2 L 0.2 0.2 M 0.2 -0.2 L -0.2 0.2' : 'M -0.22 0.02 L -0.07 0.17 L 0.23 -0.17';
+        lage.append(svgEl('path', { ...strich, d, class: 'strich-marke' }));
+        g.append(lage);
+      }
+      h.el.append(g);
+    }
+  }
+
+  kippeKoenig(feld, { langsam = false } = {}) {
+    const el = gueltigesFeld(feld) ? this._figuren.get(feld) : null;
+    if (!el || !/K$/.test(el.dataset.figur || '')) return false;
+    el.classList.add('kippt');
+    el.classList.toggle('langsam', !!langsam);
+    this._gekippt.add(el);
+    return true;
+  }
+
+  richteAuf() {
+    for (const el of this._gekippt) el.classList.remove('kippt', 'langsam');
+    this._gekippt.clear();
+  }
+
   // ----- Zusatz -----
 
   figurAuf(feld) {
@@ -313,6 +403,8 @@ export class Brett {
 
   zerstoere() {
     alleBretter.delete(this);
+    for (const h of this._striche) h.el.remove();
+    this._striche.clear();
     const el = this.el;
     el.removeEventListener('pointerdown', this._h.runter);
     el.removeEventListener('pointermove', this._h.bewege);
@@ -650,6 +742,7 @@ export class Brett {
   _runter(e) {
     if (this._geste || this._umwandlung) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    this._stumm = null;
     const feld = this._feldAusPunkt(e.clientX, e.clientY);
     if (!feld) return;
     e.preventDefault();
@@ -669,10 +762,31 @@ export class Brett {
       try { this.el.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
       return;
     }
+    // W0+a: nicht erlaubter Zugversuch (am Bild aendert sich nichts)
+    if (this.beiAbgelehnt && this._erlaubt) {
+      if (this._eigeneFigur(feld)) this._stumm = { id: e.pointerId, von: feld };
+      else if (this._auswahl) this._meldeAbgelehnt(this._auswahl, feld, 'tippen');
+    }
     if (this._auswahl) {
       this._auswahl = null;
       this._zeichneLagen();
     }
+  }
+
+  // Figur der Seite am Zug (Farbe aus der Zielkarte), die selbst keinen erlaubten Zug hat
+  _eigeneFigur(feld) {
+    const code = this.figurAuf(feld);
+    if (!code || !this._erlaubt) return false;
+    for (const von of this._erlaubt.keys()) {
+      const f = this.figurAuf(von);
+      if (f) return f[0] === code[0];
+    }
+    return false;
+  }
+
+  _meldeAbgelehnt(von, nach, art) {
+    if (!this.beiAbgelehnt) return;
+    try { this.beiAbgelehnt(von, nach, art); } catch (err) { console.error(err); }
   }
 
   _bewege(e) {
@@ -707,6 +821,13 @@ export class Brett {
   }
 
   _hoch(e) {
+    const st = this._stumm;
+    if (st && e.pointerId === st.id) {
+      this._stumm = null;
+      const ziel = this._feldAusPunkt(e.clientX, e.clientY);
+      if (ziel && this._erlaubt && !this._wartet) this._meldeAbgelehnt(st.von, ziel === st.von ? null : ziel, ziel === st.von ? 'tippen' : 'ziehen');
+      return;
+    }
     const g = this._geste;
     if (!g || e.pointerId !== g.id) return;
     this._geste = null;
@@ -720,6 +841,7 @@ export class Brett {
       } else {
         this._schnappeZurueck(g.el, g.von);
         this._zeichneLagen();
+        if (ziel && ziel !== g.von) this._meldeAbgelehnt(g.von, ziel, 'ziehen');
       }
     } else if (g.warSchon) {
       this._auswahl = null; // zweites Tippen auf dieselbe Figur hebt die Auswahl auf

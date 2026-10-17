@@ -163,6 +163,31 @@
 }
 .brett-pfeile .pfeil { opacity: .82; }
 
+/* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
+/* im Brett ueber den Figuren, in einer Effekt-Ebene ueber deren ganzer Flaeche (gleiche Lage wie die Felder) */
+.brett-striche {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 8;
+  pointer-events: none;
+  overflow: visible;
+}
+.brett-striche .strich { animation: strich-ein .16s ease-out var(--v, 0ms) both; }
+.brett-striche .strich-zug { transform-box: fill-box; transform-origin: 0% 50%; animation: strich-zug .22s ease-out var(--v, 0ms) both; }
+.brett-striche .strich-marke { transform-box: fill-box; transform-origin: 50% 50%; animation: strich-marke .2s ease-out var(--v, 0ms) both; }
+.brett-striche.still .strich, .brett-striche.still .strich-zug, .brett-striche.still .strich-marke { animation: none; }
+@keyframes strich-ein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes strich-zug { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes strich-marke { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.brett > .figur.kippt {
+  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%)) rotate(var(--kipp-winkel, -78deg));
+  transform-origin: 50% 88%;
+  transition: transform .45s cubic-bezier(.5, 0, .75, .4);
+}
+.brett > .figur.kippt.langsam { transition-duration: 1.4s; }
+
 /* ---------- Abzeichen (Zug-Klassen-Symbol) ---------- */
 .brett > .abzeichen-ort {
   position: absolute;
@@ -231,6 +256,8 @@
   100% { transform: none; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .brett-striche .strich, .brett-striche .strich-zug, .brett-striche .strich-marke { animation: none; }
+  .brett > .figur.kippt { transition: none; }
   .brett > .abzeichen-ort.plopp { animation-duration: 1ms; }
   .brett .lage.mark-bewertung { animation: none; }
 }

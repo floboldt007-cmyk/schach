@@ -24,6 +24,9 @@
 //   seedAus(wert) -> ganze Zahl 0..2^32-1                  Zahl bleibt (auf 32 Bit), Text wird gehasht (FNV-1a)
 //   zufallAus(seed) -> () => Zahl in [0, 1)                mulberry32; gleicher Seed, gleiche Folge, auf jedem
 //                                                          Geraet. seed: Zahl oder Text (z. B. ein Tagesschluessel)
+//   zugZufall(seed, ply) -> () => Zahl in [0, 1)           Zufall fuer den Bot-Zug im Halbzug ply einer Partie mit
+//                                                          diesem Seed (= zufallAus(seed + '/' + ply)): unabhaengig
+//                                                          von Zuruecknahmen, so rechnet ein Code jeden Bot-Zug nach
 //
 // Uhr springt zurueck (Hand-Einstellung, Zeitzone): Die Schluessel sind dann frueher als der zuletzt gemerkte.
 // Wer zaehlt (Serie, Tagesbogen), vergleicht mit tageZwischen und zaehlt bei Werten <= 0 nichts neu.
@@ -131,4 +134,9 @@ export function zufallAus(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+export function zugZufall(seed, ply) {
+  if (!Number.isInteger(ply) || ply < 0) throw new TypeError('zugZufall: ply muss eine ganze Zahl ab 0 sein');
+  return zufallAus(`${seedAus(seed)}/${ply}`);
 }

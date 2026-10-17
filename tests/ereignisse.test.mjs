@@ -3,8 +3,8 @@
 // (js/sounds.js, mit einer Fake-AudioContext), Saetze (js/bots.js) und Icons (js/ui/icons.js).
 // Node, ohne Browser: node tests/ereignisse.test.mjs
 import { EREIGNISSE, hoere, sende, protokoll, zuruecksetzen } from '../js/ereignisse.js';
-import { ORTE, anbieten, fuelle, waehle, zuruecksetzen as orteZuruecksetzen } from '../js/orte.js';
-import { BUDGET, QUELLEN, melde, fuerOverlay, nachlese, setzeUhr } from '../js/feier.js';
+import { ORTE, anbieten, fuelle, waehle, angeboten, zuruecksetzen as orteZuruecksetzen } from '../js/orte.js';
+import { BUDGET, QUELLEN, BRETT_FEIER, melde, fuerOverlay, nachlese, setzeUhr } from '../js/feier.js';
 import { setzeSpeicher, MODUL_BUDGET } from '../js/storage.js';
 import { BOTS, botSatz, registriereSaetze, PLATZHALTER } from '../js/bots.js';
 import { icon, registriereIcon, iconNamen } from '../js/ui/icons.js';
@@ -36,8 +36,11 @@ const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet',
   'stellung:analysiert', 'zug:bewertet', 'zug:zurueckgenommen', 'hilfe:genutzt', 'partie:beendet', 'partie:analysiert',
   'analyse:gesehen', 'speicher:fehler', 'training:geloest', 'training:stand', 'uebung:ergebnis', 'bestmarke:neu',
   // w0-fix: "Fortschritt zuruecksetzen" meldet sich (Pakete leeren ihren Zustand im Arbeitsspeicher)
-  'speicher:zurueckgesetzt'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+  'speicher:zurueckgesetzt',
+  // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18)
+  'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
+  'rekord:neu', 'uhr:knapp', 'zug:abgelehnt'];
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt und W0+a)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();
@@ -176,6 +179,9 @@ const ORT_TABELLE = {
   'arena:kopf': 'dom', 'arena:panel-oben': 'dom', 'arena:panel-bot': 'dom', 'arena:start': 'aufruf',
   'partie:begruessung?': 'wahl', 'ergebnis:karte': 'dom', 'analyse:coach': 'dom', 'analyse:oben': 'dom',
   'verlauf:seite': 'dom', 'einstellungen:gruppen': 'dom', 'app:erster-screen?': 'wahl',
+  // W0+a (SPIELKONZEPT 6.2)
+  'arena:heute': 'dom', 'partie:gegner-leiste': 'dom', 'partie:matt': 'aufruf', 'ergebnis:abrechnung': 'dom',
+  'bestenliste:reiter': 'dom', 'training:karten': 'dom', 'ich:vitrine': 'dom', 'spielplan:tage': 'dom',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));
@@ -291,8 +297,24 @@ function fakeSpeicher() {
 const FEIER_KEY = 'schach-arena:v1:modul:feier';
 
 pruefe('BUDGET = { gross: 1, zeilen: 3, nachlese: 3 }, eingefroren', JSON.stringify(BUDGET) === '{"gross":1,"zeilen":3,"nachlese":3}' && Object.isFrozen(BUDGET));
-pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6', QUELLEN['erster-sieg'].prio === 95 && QUELLEN.rang.art === 'gross' && QUELLEN.karten.prio === 30
-  && QUELLEN['serie-rekord'].art === 'zeile' && Object.keys(QUELLEN).length === 9 && Object.isFrozen(QUELLEN));
+pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELKONZEPT 3.10 plus die alten Namen rang und kette)',
+  QUELLEN['erster-sieg'].prio === 95 && QUELLEN.rang.art === 'gross' && QUELLEN.karten.prio === 30
+  && QUELLEN['serie-rekord'].art === 'zeile' && Object.keys(QUELLEN).length === 23 && Object.isFrozen(QUELLEN));
+{
+  // SPIELKONZEPT 3.10, Tabelle "Feste Feier-Prioritaeten"
+  const TAB = {
+    'erster-sieg': ['gross', 95], klasse: ['gross', 90], 'boss-siegel': ['gross', 88], erzfeind: ['gross', 85], 'liga-saison': ['gross', 82],
+    'bot-rekord': ['gross', 78], 'medaille-gold': ['gross', 76], 'level-titel': ['gross', 75], meilenstein: ['gross', 72], bestmarke: ['gross', 70],
+    umwandlung: ['gross', 66], 'serie-rekord': ['zeile', 60], rekord: ['zeile', 58], level: ['zeile', 55], marsch: ['zeile', 50], liga: ['zeile', 45],
+    siegeslauf: ['zeile', 44], medaille: ['zeile', 40], tageskrone: ['zeile', 38], tagesdreier: ['zeile', 35], karten: ['zeile', 30],
+  };
+  const falsch = Object.entries(TAB).filter(([q, [art, prio]]) => !QUELLEN[q] || QUELLEN[q].art !== art || QUELLEN[q].prio !== prio || !Object.isFrozen(QUELLEN[q]));
+  pruefe('QUELLEN (W0+a): alle 21 Quellen aus SPIELKONZEPT 3.10 mit Art und Prioritaet', falsch.length === 0, falsch.map(([q]) => q));
+  pruefe('QUELLEN (W0+a): rang und kette sind die alten Namen von klasse und marsch (gleiche Werte)',
+    JSON.stringify(QUELLEN.rang) === JSON.stringify(QUELLEN.klasse) && JSON.stringify(QUELLEN.kette) === JSON.stringify(QUELLEN.marsch));
+  pruefe('QUELLEN (W0+a): tageskrone ist jetzt eine Zeile (38)', QUELLEN.tageskrone.art === 'zeile' && QUELLEN.tageskrone.prio === 38);
+  pruefe('BRETT_FEIER = { dauerMs: 1800, kurzMs: 800 }, eingefroren', JSON.stringify(BRETT_FEIER) === '{"dauerMs":1800,"kurzMs":800}' && Object.isFrozen(BRETT_FEIER));
+}
 
 {
   let s = fakeSpeicher();
@@ -331,11 +353,12 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6', QUELLEN['erster-sieg'].pri
   melde({ partieId: P2, quelle: 'karten', titel: '1 neue Karte' });
   pruefe('Nachtrag: zuerst zwei Zeilen', fuerOverlay(P2).length === 2);
   melde({ partieId: P2, quelle: 'bestmarke', titel: 'NEUE BESTMARKE: 91,2 %' });
-  melde({ partieId: P2, quelle: 'tageskrone', titel: 'Tageskrone!' });
+  // W0+a: tageskrone ist seit SPIELKONZEPT 3.10 eine Zeile; der zweite grosse Moment ist hier die Umwandlung
+  melde({ partieId: P2, quelle: 'umwandlung', titel: 'Umwandlung!' });
   const o3 = fuerOverlay(P2);
   pruefe('Nachtrag: alte bleiben, ein grosser kommt dazu, Budget 3', o3.length === 3 && o3[0].quelle === 'bestmarke'
     && o3.filter((x) => x.art === 'gross').length === 1 && o3.some((x) => x.quelle === 'kette') && o3.some((x) => x.quelle === 'karten'), o3.map((x) => x.quelle));
-  pruefe('Nachtrag: der zweite grosse wandert in die Nachlese', nachlese().map((x) => x.quelle).join(',') === 'tageskrone');
+  pruefe('Nachtrag: der zweite grosse wandert in die Nachlese', nachlese().map((x) => x.quelle).join(',') === 'umwandlung');
 
   // feste Tabelle schlaegt die Angaben des Pakets; unbekannte Quelle nimmt die Angaben
   melde({ partieId: 'p3', quelle: 'kette', titel: 'Lichterkette: Tag 2', art: 'gross', prio: 99 });
@@ -520,6 +543,52 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6', QUELLEN['erster-sieg'].pri
   log.length = 0;
   klang.klasse('gut');
   pruefe('nach dem Abmelden: Standard wieder aktiv', log.length === 0);
+}
+
+// =====================================================================
+// W0+a: angeboten() und Aufruf-Orte mit { fertig }
+// =====================================================================
+{
+  orteZuruecksetzen();
+  pruefe('angeboten: 0 ohne Anbieter, unbekannter Ort wirft', angeboten('partie:matt') === 0 && wirft(() => angeboten('partie:gibtsnicht')));
+  const leer = fuelle('partie:matt', null, {});
+  let sofort = false;
+  await leer.fertig.then(() => { sofort = true; });
+  pruefe('Aufruf-Ort ohne Anbieter: wartend 0, fertig sofort erfuellt', leer.anzahl === 0 && leer.wartend === 0 && sofort);
+  let erfuelle;
+  let verlassen = 0;
+  const ab1 = anbieten('partie:matt', () => ({ fertig: new Promise((r) => { erfuelle = r; }), verlasse() { verlassen++; } }), { paket: 'finisher' });
+  const ab2 = anbieten('partie:matt', () => ({ verlasse() { verlassen++; } }), { paket: 'ohne-warten' });
+  const ab3 = anbieten('partie:matt', () => ({ fertig: Promise.reject(new Error('kaputt')) }), { paket: 'kaputt' });
+  pruefe('angeboten zaehlt die Anbieter', angeboten('partie:matt') === 3);
+  const altError = console.error;
+  const fehlerLog = [];
+  console.error = (...a) => fehlerLog.push(a.map(String).join(' '));
+  const g = fuelle('partie:matt', null, { x: 1 });
+  let fertig = false;
+  g.fertig.then(() => { fertig = true; });
+  await new Promise((r) => setTimeout(r, 10));
+  pruefe('Aufruf-Ort: wartend zaehlt nur Anbieter mit fertig', g.anzahl === 3 && g.wartend === 2);
+  pruefe('Aufruf-Ort: fertig wartet auf alle Promises (ein kaputtes zaehlt als fertig)', fertig === false);
+  erfuelle();
+  await new Promise((r) => setTimeout(r, 10));
+  pruefe('Aufruf-Ort: fertig nach dem letzten Promise', fertig === true);
+  console.error = altError;
+  pruefe('Aufruf-Ort: abgelehntes fertig landet als Fehler mit Paketname in der Konsole', fehlerLog.some((t) => /"kaputt" an partie:matt/.test(t)), fehlerLog);
+  g.verlasse();
+  pruefe('Aufruf-Ort: verlasse ruft die Anbieter', verlassen === 2);
+  [ab1, ab2, ab3].forEach((f) => f());
+  pruefe('angeboten nach dem Abmelden: 0', angeboten('partie:matt') === 0);
+  // DOM-Orte der W0+a mit Mini-DOM: Reihenfolge der Abrechnung (Punkte 10, Funken 20, Wertung 30, Serie 40)
+  const c = el('huelle');
+  anbieten('ergebnis:abrechnung', () => el('serie'), { reihenfolge: 40, paket: 'alltag' });
+  anbieten('ergebnis:abrechnung', () => el('punkte'), { reihenfolge: 10, paket: 'punkte' });
+  anbieten('ergebnis:abrechnung', () => el('wertung'), { reihenfolge: 30, paket: 'wertung' });
+  anbieten('ergebnis:abrechnung', () => el('funken'), { reihenfolge: 20, paket: 'funken' });
+  const gef = fuelle('ergebnis:abrechnung', c, {});
+  pruefe('ergebnis:abrechnung: Zeilen in der Reihenfolge Punkte, Funken, Wertung, Serie', namen(c) === 'punkte,funken,wertung,serie' && gef.fertig instanceof Promise && gef.wartend === 0, namen(c));
+  gef.verlasse();
+  orteZuruecksetzen();
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

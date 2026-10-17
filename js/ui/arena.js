@@ -9,7 +9,12 @@
 // w0c: Fehlt gespeicherten Partien die Analyse (App waehrend der Auswertung beendet), rechnet die Arena sie
 // still nach (js/nachholen.js, Start nach ARENA_NACHHOLEN_MS, Ende mit verlasse()) und zeichnet die Sterne
 // danach ohne Animation neu.
+// W0+a: Host des Orts arena:heute (Heute-Karte): section.heute-karte direkt nach .ort-panel-oben im Panel, mit
+// der Kopfzeile "Heute · <Wochentag>" (Tag mit Grenze 4:00, tag.js) und den Zeilen der Pakete in .ort-heute.
+// Gefuellt bei jedem zeigeDetail(); ohne Anbieter versteckt (kein Pixel anders). Kontext:
+// { app, bot, fortschritt, tag, woche } (tag/woche: tagSchluessel/wochenSchluessel).
 import { BOTS, botSatz } from '../bots.js';
+import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, besiegteBots, statistik,
   ladeLaufendePartie, loescheLaufendePartie, ladePartien,
@@ -39,6 +44,7 @@ const POS_QUER = [[11, 86], [31, 80], [51, 86], [72, 79], [86, 56], [64, 50], [4
 // Hochformat: Serpentine von unten nach oben (x in Prozent, y gleichmaessig verteilt)
 const X_HOCH = [22, 60, 80, 50, 20, 56, 82, 50, 20, 58];
 const STUFEN_LABEL = [['Anfänger', 0.965], ['Fortgeschritten', 0.6], ['Meister', 0.045]];
+const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten
 // Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
@@ -61,7 +67,7 @@ export function zeige(root, params, app) {
   // Feier-Momente, die nicht ins Ergebnis passten: einmal holen, gilt fuer diesen Screen
   let feierRest = [];
   try { feierRest = nachlese(); } catch (e) { feierRest = []; }
-  const orte = { kopf: null, oben: null, bot: null, start: null };
+  const orte = { kopf: null, oben: null, heute: null, bot: null, start: null };
   const neuId = params && params.neuFreigeschaltet && BOTS.some((b) => b.id === params.neuFreigeschaltet) ? params.neuFreigeschaltet : null;
   const naechster = naechsterGegner(fortschritt);
   const alleBesiegt = BOTS.every((b) => fortschritt.bots[b.id].sterne[0]);
@@ -300,9 +306,11 @@ export function zeige(root, params, app) {
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
     detail.style.setProperty('--bf', b.farbe);
     if (orte.oben) orte.oben.verlasse();
+    if (orte.heute) orte.heute.verlasse();
     if (orte.bot) orte.bot.verlasse();
     detail.innerHTML = `
       <div class="ort-panel-oben" hidden></div>
+      <section class="heute-karte" aria-label="Heute" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${laufBot.farbe}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
@@ -364,6 +372,12 @@ export function zeige(root, params, app) {
     if (nl) oben.append(nl);
     orte.oben = fuelle('arena:panel-oben', oben, { app, bot: b, fortschritt });
     oben.hidden = !nl && orte.oben.anzahl === 0;
+    // W0+a: Heute-Karte (Ort arena:heute), nur mit Zeilen sichtbar
+    const heute = detail.querySelector('.heute-karte');
+    const tag = tagSchluessel();
+    heute.querySelector('.hk-kopf').textContent = `Heute · ${WOCHENTAGE[wochentag(tag)]}`;
+    orte.heute = fuelle('arena:heute', heute.querySelector('.ort-heute'), { app, bot: b, fortschritt, tag, woche: wochenSchluessel() });
+    heute.hidden = orte.heute.anzahl === 0;
     const botOrt = detail.querySelector('.ort-panel-bot');
     orte.bot = fuelle('arena:panel-bot', botOrt, { app, bot: b, fortschritt });
     botOrt.hidden = orte.bot.anzahl === 0;
