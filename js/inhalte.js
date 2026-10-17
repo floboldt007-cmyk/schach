@@ -29,6 +29,14 @@
 //       Pakete melden ihre eigenen Dateiarten an (z. B. 'raetsel-jahr'); 'spielplan' ist eingebaut.
 //   setzeHoler(fn | null)               nur Tests: eigenes fetch (url) -> Promise<{ ok, status, text() }>
 //   leereZwischenspeicher()             nur Tests
+//   SPIELPLAN_NAME = 'boss/spielplan'   Ort der Spielplan-Datei: daten/boss/spielplan.json (legt S1-6 an)
+//   ladeSpielplan({ neu = false } = {}) -> wie ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' }); die beiden Leser
+//                                       (S1-6 Boss und Spielplan-Screen, S1-1 Funken-Wochenende) holen ihn nur hierueber.
+//                                       Fehlt die Datei (grund 'netz'): kein Wochen-Boss, kein Funken-Wochenende.
+//
+// Ablage: Inhalte eines Pakets unter daten/<paket>/ (z. B. daten/raetsel/jahr-2027.json, Name 'raetsel/jahr-2027');
+// sie kommen wie die Paket-Dateien erst mit dem Eintrag in PAKETE in DATEIEN (sw.js). Dateien direkt unter daten/
+// gehoeren keinem Paket und stehen sofort in DATEIEN. daten/beispiel/ wird nie ausgeliefert (tests/sw.test.mjs).
 //
 // Spielplan (art 'spielplan', format 1), eine Datei je Quartal oder Saison:
 //   { "kopf": {...}, "saison": { "id": "vorsaison-2026", "name": "Vorsaison" },
@@ -51,6 +59,8 @@ import { istSchluessel, wochentag, addiereTage, tageZwischen, wochenSchluessel, 
 
 export const RECHENSTAND = 1;
 export const VORLAUF_TAGE = 28;
+// Ort der Spielplan-Datei (daten/boss/spielplan.json, Paket S1-6 boss); gelesen nur ueber ladeSpielplan()
+export const SPIELPLAN_NAME = 'boss/spielplan';
 export const THEMEN = Object.freeze(['gambit', 'endspiel', 'taktik', 'eroeffnung', 'uhr']);
 
 const NAME_RE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
@@ -140,6 +150,10 @@ export function ladeInhalt(name, { art = null, neu = false } = {}) {
 // ---------------------------------------------------------------------------
 // Spielplan
 // ---------------------------------------------------------------------------
+export function ladeSpielplan({ neu = false } = {}) {
+  return ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan', neu });
+}
+
 const WOCHE_FELDER = new Set(['montag', 'boss', 'thema', 'funkenWochenende', 'klassiker', 'text']);
 const PLAN_FELDER = new Set(['kopf', 'saison', 'wochen']);
 

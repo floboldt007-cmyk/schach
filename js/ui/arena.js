@@ -12,8 +12,9 @@
 // W0+a: Host des Orts arena:heute (Heute-Karte): section.heute-karte direkt nach .ort-panel-oben im Panel, mit
 // der Kopfzeile "Heute · <Wochentag>" (Tag mit Grenze 4:00, tag.js) und den Zeilen der Pakete in .ort-heute.
 // Gefuellt bei jedem zeigeDetail(); ohne Anbieter versteckt (kein Pixel anders). Kontext:
-// { app, bot, fortschritt, tag, woche } (tag/woche: tagSchluessel/wochenSchluessel).
-import { BOTS, botSatz } from '../bots.js';
+// { app, bot, fortschritt, tag, woche } (tag/woche: tagSchluessel/wochenSchluessel). Die Karte "Offene Partie" und der
+// Dialog vor einer neuen Partie finden auch angemeldete Bots (botNachId, z. B. eine verlassene Boss-Partie).
+import { BOTS, botSatz, botNachId } from '../bots.js';
 import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, besiegteBots, statistik,
@@ -300,7 +301,8 @@ export function zeige(root, params, app) {
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
     const st = statistik();
     const laufend = ladeLaufendePartie();
-    const laufBot = laufend ? BOTS.find((x) => x.id === laufend.botId) : null;
+    // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
+    const laufBot = laufend ? botNachId(laufend.botId) : null;
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
     const satz = begruessung(b);
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
@@ -458,7 +460,7 @@ export function zeige(root, params, app) {
   async function spielen(b) {
     const laufend = ladeLaufendePartie();
     if (laufend) {
-      const lb = BOTS.find((x) => x.id === laufend.botId);
+      const lb = botNachId(laufend.botId);
       const ok = await app.frage({
         titel: 'Neue Partie starten?',
         text: `Du hast noch eine offene Partie gegen ${lb ? lb.name : 'einen Bot'}. Sie wird verworfen.`,

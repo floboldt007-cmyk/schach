@@ -23,7 +23,8 @@
 //       fertig ist dann ein Promise, das sich erfuellt, sobald alle diese Promises fertig sind (auch bei Fehlern),
 //       wartend die Zahl dieser Anbieter (0: fertig ist sofort erfuellt, der Host wartet nicht).
 //   angeboten(ort) -> Zahl der Anbieter an diesem Ort (W0+a; ein Host spart sich damit Wartezeiten, wenn
-//       niemand etwas anbietet). Unbekannter Ort: Fehler.//   waehle(ort, kontext) -> Wert | null   nur Wahl-Orte: erster Wert != null in der Reihenfolge
+//       niemand etwas anbietet). Unbekannter Ort: Fehler.
+//   waehle(ort, kontext) -> Wert | null   nur Wahl-Orte: erster Wert != null in der Reihenfolge
 //   zuruecksetzen()                alle Anbieter entfernen (nur fuer Tests)
 //
 // Regeln: Kontexte sind flach eingefroren. Ein Anbieter rechnet nichts Schweres (nur Modul-Speicher
