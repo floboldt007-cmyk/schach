@@ -145,6 +145,10 @@ function main() {
   const sfPfad = (engine.match(/new URL\('([^']+stockfish[^']+\.js)'/) || [])[1];
   const sf = sfPfad ? relativ('js/engine.js', sfPfad) : null;
   pruefe('Stockfish .js und .wasm im Cache', sf && menge.has(sf) && menge.has(sf.replace(/\.js$/, '.wasm')), String(sf));
+  // w0c: app.js holt Engine-Skript und .wasm relativ zum Modul (klappt unter / und unter /schach/), nie relativ zum Dokument
+  const appPfade = [...app.matchAll(/new URL\('([^']+stockfish[^']+)', import\.meta\.url\)/g)].map((m) => relativ('js/app.js', m[1]));
+  pruefe('app.js: Engine-Skript und .wasm relativ zum Modul, beide im Cache', appPfade.length === 2 && appPfade.every((d) => menge.has(d))
+    && !/['"]vendor\/stockfish/.test(app), JSON.stringify(appPfade));
   pruefe('app.js registriert sw.js', /serviceWorker[\s\S]{0,400}register\('sw\.js'\)/.test(app) || /\.register\('sw\.js'\)/.test(app));
 
   // Pruefsumme: Inhalt geaendert, ohne VERSION hochzuzaehlen?

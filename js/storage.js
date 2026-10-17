@@ -366,12 +366,16 @@ export function ladePartie(id) {
 export function speicherePartie(partie, review = null) {
   if (!partie || typeof partie !== 'object') throw new Error('Partie fehlt');
   const p = normalisiere({ ...partie });
-  if (!p.id) p.id = neueId();
+  const liste = ladeListe();
+  // neue ID nie doppelt (zwei Partien in derselben Millisekunde haetten sonst in 1 von 1296 Faellen dieselbe)
+  if (!p.id) {
+    p.id = neueId();
+    for (let n = 1; liste.some((x) => x.id === p.id); n++) p.id = neueId() + (n > 8 ? n.toString(36) : '');
+  }
   if (!p.datum) p.datum = new Date().toISOString();
   const wert = wertet(p);
   p.sterne = sterneFuerPartie(p);
 
-  const liste = ladeListe();
   const schonDa = liste.some((x) => x.id === p.id);
   const neu = liste.filter((x) => x.id !== p.id);
   neu.push(p);
@@ -429,8 +433,13 @@ function sammleBrillante(f, p, review) {
 
 // Traegt die Spielanalyse einer schon gespeicherten Partie nach (die Partie wird am Ende sofort
 // gesichert, die Analyse kommt spaeter): Genauigkeit, Spielstaerke, Eroeffnung, Review,
-// Brillant-Zuege und Bestwert. Sterne werden nur dazugewonnen, nie entzogen.
-// Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung) nur, wenn noch keine da ist.
+// Brillant-Zuege und Bestwert.
+// Regel (w0c): Es werden nur LEERE Felder gefuellt (genauigkeit, genauigkeitBot, spielstaerke,
+// eroeffnung). Die erste Genauigkeit einer Partie (Analyse am Spielende, sonst Live-Bewertung, sonst die
+// erste spaetere Analyse) bleibt; auf ihr beruht Stern 2. Eine spaetere Neuberechnung (z. B. wenn die
+// Review aus der Liste gefallen ist) speichert nur ihre eigene Review. Sterne werden nur dazugewonnen,
+// nie entzogen, im Partie-Datensatz wie im Fortschritt.
+// Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung), ebenfalls nur, wenn noch keine da ist.
 // Nicht wertende Partien: keine Sterne, kein Bestwert, keine Schatzkiste.
 // Rueckgabe { partie, neueSterne, brillant, wertet } oder null.
 export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) {
@@ -440,16 +449,18 @@ export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) 
   const p = { ...liste[i] };
   const sf = p.spielerFarbe === 'b' ? 'b' : 'w';
   const bf = sf === 'w' ? 'b' : 'w';
+  const leer = (x) => !Number.isFinite(x);
   if (review && review.genauigkeit) {
-    if (Number.isFinite(review.genauigkeit[sf])) p.genauigkeit = review.genauigkeit[sf];
-    if (Number.isFinite(review.genauigkeit[bf])) p.genauigkeitBot = review.genauigkeit[bf];
-    if (review.spielstaerke && Number.isFinite(review.spielstaerke[sf])) p.spielstaerke = review.spielstaerke[sf];
-    if (review.eroeffnung) p.eroeffnung = review.eroeffnung;
-  } else if (Number.isFinite(genauigkeit) && !Number.isFinite(p.genauigkeit)) {
+    if (leer(p.genauigkeit) && Number.isFinite(review.genauigkeit[sf])) p.genauigkeit = review.genauigkeit[sf];
+    if (leer(p.genauigkeitBot) && Number.isFinite(review.genauigkeit[bf])) p.genauigkeitBot = review.genauigkeit[bf];
+    if (leer(p.spielstaerke) && review.spielstaerke && Number.isFinite(review.spielstaerke[sf])) p.spielstaerke = review.spielstaerke[sf];
+    if (!p.eroeffnung && review.eroeffnung) p.eroeffnung = review.eroeffnung;
+  } else if (Number.isFinite(genauigkeit) && leer(p.genauigkeit)) {
     p.genauigkeit = genauigkeit;
   }
   const wert = wertet(p);
-  p.sterne = sterneFuerPartie(p);
+  const alt = Array.isArray(liste[i].sterne) ? liste[i].sterne : [];
+  p.sterne = wert ? sterneFuerPartie(p).map((s, k) => s || alt[k] === true) : [false, false, false];
   liste[i] = p;
 
   const ergebnis = { partie: p, neueSterne: [false, false, false], brillant: 0, wertet: wert };

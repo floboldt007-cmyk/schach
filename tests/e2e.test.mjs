@@ -122,9 +122,20 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
     seite.on('response', (r) => { if (r.status() >= 400) fehlgeschlagen.push(`${r.status()} ${r.url()}`); });
   };
   kontext.on('page', beobachte);
+  // Abrufe der 1,8-MB-.wasm ueber ihre Adresse (Seite und Worker; Blob-Abrufe zaehlen nicht)
+  kontext.on('request', (r) => {
+    if (/\.wasm$/.test(r.url().split(/[?#]/)[0]) && !/^blob:/.test(r.url())) wasmAbrufe.push({ url: r.url(), sw: !!r.serviceWorker() });
+  });
   const seite = await kontext.newPage();
   return { kontext, seite, fehler, fehlgeschlagen };
 }
+const wasmAbrufe = [];
+// beide Engines bereit: Adresse der Worker und eine kurze Suche
+const engineInfo = (seite) => seite.evaluate(async () => {
+  const [a, b] = await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]);
+  const r = await b.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
+  return { pfade: [a.pfad, b.pfad], tiefe: r.depth, direkt: localStorage.getItem('schach-arena:wasm-direkt') };
+});
 
 function hilfen(seite) {
   const h = {
@@ -296,6 +307,14 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   pruefe('Keine 404 beim Vorladen', server404.length === 0, server404.join(', '));
   const lizenz = await seite.evaluate(async () => { const r = await fetch('LICENSE'); return { status: r.status, typ: r.headers.get('content-type'), text: (await r.text()).slice(0, 300) }; });
   pruefe('LICENSE kommt als Text (nicht als Download)', lizenz.status === 200 && /text\/plain/.test(lizenz.typ) && /GNU GENERAL PUBLIC LICENSE/.test(lizenz.text), JSON.stringify(lizenz));
+  // w0c: die .wasm kommt beim ersten Start genau einmal (Hauptthread, Adresse relativ zum Modul unter /schach/),
+  // beide Worker starten als Blob mit den geprueften Bytes (vorher 3 Abrufe: Pruefung plus je Worker einer)
+  const info = await engineInfo(seite);
+  const eigene = wasmAbrufe.filter((a) => !a.sw);
+  pruefe('Engine-Datei beim ersten Start nur einmal geholt (Worker per Blob)', eigene.length === 1
+    && eigene[0].url === START + 'vendor/stockfish/stockfish-19-lite-single.wasm', JSON.stringify(eigene));
+  pruefe('Beide Engines laufen als Blob-Worker mit der .wasm als Blob-URL', info.tiefe === 6 && info.direkt == null
+    && info.pfade.every((p) => /^blob:/.test(p) && /#blob%3A/.test(p)), JSON.stringify(info));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
 }
@@ -473,10 +492,16 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   const vorher = serverLog.length;
   const anfragenVorher = fehlgeschlagen.length;
   await kontext.setOffline(true);
+  const wasmVorher = wasmAbrufe.length;
   await seite.reload();
   await h.screen('partie');
   await h.warteBereit(60000);
   pruefe('Offline neu geladen: Partie da', await seite.locator('.screen.partie .brett > img.figur').count() > 20);
+  // w0c: offline holt nur der Hauptthread die .wasm (aus dem Cache), die Worker laufen per Blob
+  const infoOffline = await engineInfo(seite);
+  const offlineAbrufe = wasmAbrufe.slice(wasmVorher).filter((a) => !a.sw);
+  pruefe('Offline: Engines als Blob-Worker, .wasm nur einmal aus dem Cache', infoOffline.tiefe === 6
+    && infoOffline.pfade.every((p) => /^blob:/.test(p)) && offlineAbrufe.length === 1, JSON.stringify({ infoOffline, offlineAbrufe }));
   const zuege = await h.zuege();
   await h.warteFlo();
   const z = await spieleZug(seite, h, ['e1g1', 'd2d3', 'd2d4', 'b1c3', 'c2c3', 'h2h3']);

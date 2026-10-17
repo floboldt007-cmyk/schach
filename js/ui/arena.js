@@ -6,6 +6,9 @@
 // arena:panel-oben (ganz oben im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten
 // Partie"), arena:panel-bot (nach den Stern-Zielen), arena:start (einmal nach dem ersten Layout).
 // Die Begruessung im Panel waehlt wie in der Partie der Wahl-Ort partie:begruessung?.
+// w0c: Fehlt gespeicherten Partien die Analyse (App waehrend der Auswertung beendet), rechnet die Arena sie
+// still nach (js/nachholen.js, Start nach ARENA_NACHHOLEN_MS, Ende mit verlasse()) und zeichnet die Sterne
+// danach ohne Animation neu.
 import { BOTS, botSatz } from '../bots.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, besiegteBots, statistik,
@@ -14,6 +17,7 @@ import {
 import { klang } from '../sounds.js';
 import { fuelle, waehle } from '../orte.js';
 import { nachlese } from '../feier.js';
+import { starteNachholen } from '../nachholen.js';
 import { icon } from '../app.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
@@ -37,7 +41,12 @@ const X_HOCH = [22, 60, 80, 50, 20, 56, 82, 50, 20, 58];
 const STUFEN_LABEL = [['Anfänger', 0.965], ['Fortgeschritten', 0.6], ['Meister', 0.045]];
 
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten
+// Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
+const ARENA_NACHHOLEN_MS = 2500;
+const ZIEL_TEXTE = ['Sieg', 'Sieg mit ≥\u00a080\u00a0% Genauigkeit', 'ohne Hinweis und ohne Zurücknehmen'];
 
+const kSterneHtml = (sterne) => sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('');
+const zielSterneHtml = (sterne) => ZIEL_TEXTE.map((t, i) => `<div class="${sterne[i] ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${sterne[i] ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('');
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const prozent = (x) => (Number.isFinite(x) ? String(Math.round(x * 10) / 10).replace('.', ',') + ' %' : '-');
 
@@ -119,12 +128,11 @@ export function zeige(root, params, app) {
     el.dataset.bot = b.id;
     el.style.setProperty('--bf', b.farbe);
     const sterne = fortschritt.bots[b.id].sterne;
-    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', gesperrt: 'gesperrt' }[z];
-    el.setAttribute('aria-label', `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`);
+    el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
       ${z === 'aktuell' && b.id === aktuellId ? '<span class="fahne">NÄCHSTER GEGNER</span>' : ''}
       ${b.stufe === 10 ? '<span class="boss-krone">ENDGEGNER</span>' : ''}
-      ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('')}</span>` : ''}
+      ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${kSterneHtml(sterne)}</span>` : ''}
       <span class="avatar"><img src="${esc(b.avatar)}" alt="" draggable="false"><span class="k-nr">${b.stufe}</span>${z === 'gesperrt' || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}</span>
       <span class="k-name">${esc(b.name)}</span>
       <span class="k-meta zahl">Elo ${b.elo}</span>`;
@@ -132,6 +140,12 @@ export function zeige(root, params, app) {
     knotenOrt.append(el);
     return el;
   });
+
+  function knotenLabel(b, z) {
+    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', gesperrt: 'gesperrt' }[z];
+    const sterne = fortschritt.bots[b.id].sterne;
+    return `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`;
+  }
 
   function tippeKnoten(b, el) {
     if (el.classList.contains('gesperrt')) {
@@ -283,7 +297,6 @@ export function zeige(root, params, app) {
     const laufBot = laufend ? BOTS.find((x) => x.id === laufend.botId) : null;
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
     const satz = begruessung(b);
-    const ziele = [['Sieg', f.sterne[0]], ['Sieg mit ≥\u00a080\u00a0% Genauigkeit', f.sterne[1]], ['ohne Hinweis und ohne Zurücknehmen', f.sterne[2]]];
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
     detail.style.setProperty('--bf', b.farbe);
     if (orte.oben) orte.oben.verlasse();
@@ -303,7 +316,7 @@ export function zeige(root, params, app) {
             <span class="stufe">STUFE ${b.stufe} · ${status}</span>
             <h2>${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>
-            <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${f.sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('')}</div>
+            <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${kSterneHtml(f.sterne)}</div>
           </div>
           <button class="icon-knopf mehr-knopf" type="button" data-aktion="mehr" aria-label="Mehr über ${esc(b.name)}" aria-expanded="false">${icon('vor')}</button>
         </div>
@@ -317,7 +330,7 @@ export function zeige(root, params, app) {
           <div class="merkmal"><span class="m-label">Schwäche</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
         </div>
         <div class="ziel-sterne mehr">
-          ${ziele.map(([t, an]) => `<div class="${an ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${an ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('')}
+          ${zielSterneHtml(f.sterne)}
         </div>
         <div class="ort-panel-bot mehr" hidden></div>
         <div class="farbwahl" role="radiogroup" aria-label="Farbe wählen">
@@ -325,12 +338,7 @@ export function zeige(root, params, app) {
             <span class="fig-bg">${fig.map((x) => `<img src="assets/pieces/${x}.svg" alt="">`).join('')}</span>${t}</button>`).join('')}
         </div>
         <button class="knopf primaer gross spielen" type="button" data-aktion="spielen">${icon('play')} Spielen</button>
-        <div class="bilanz">
-          <div><b>${st.partien}</b><span>Partien</span></div>
-          <div><b>${st.siege}</b><span>Siege</span></div>
-          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>Ø Genauigkeit</span></div>
-          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>Spielstärke</span></div>
-        </div>
+        <div class="bilanz">${bilanzHtml(st)}</div>
       </div>`;
 
     detail.querySelectorAll('.farbwahl button').forEach((k) => k.addEventListener('click', () => {
@@ -359,6 +367,43 @@ export function zeige(root, params, app) {
     const botOrt = detail.querySelector('.ort-panel-bot');
     orte.bot = fuelle('arena:panel-bot', botOrt, { app, bot: b, fortschritt });
     botOrt.hidden = orte.bot.anzahl === 0;
+  }
+
+  function bilanzHtml(st) {
+    return `
+          <div><b>${st.partien}</b><span>Partien</span></div>
+          <div><b>${st.siege}</b><span>Siege</span></div>
+          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>Ø Genauigkeit</span></div>
+          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>Spielstärke</span></div>
+        `;
+  }
+
+  // Nachgeholte Analyse (w0c): Sterne, Kopf-Chip und Bilanz still neu zeichnen, ohne Animation und ohne
+  // das Panel neu aufzubauen. Nur Stern 2 kann sich so aendern (Sieg und Freischaltung sind schon gebucht).
+  function sterneNeu() {
+    if (weg) return;
+    const neu = ladeFortschritt();
+    for (const b of BOTS) fortschritt.bots[b.id] = neu.bots[b.id];
+    const zahl = s.querySelector('.kopf-chips .chip .sr');
+    if (zahl && zahl.nextSibling && zahl.nextSibling.nodeType === 3) zahl.nextSibling.textContent = ' ' + gesamtSterne(fortschritt);
+    if (alleBesiegt) s.querySelector('.logo-unter').textContent = `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne`;
+    BOTS.forEach((b, i) => {
+      const el = knoten[i];
+      const z = b.id === neuId ? 'aktuell' : zustandVon(b);
+      const ks = el.querySelector('.k-sterne');
+      if (ks) ks.innerHTML = kSterneHtml(fortschritt.bots[b.id].sterne);
+      el.setAttribute('aria-label', knotenLabel(b, z));
+    });
+    const f = fortschritt.bots[gewaehlt];
+    const mini = detail.querySelector('.mini-sterne');
+    if (f && mini) {
+      mini.innerHTML = kSterneHtml(f.sterne);
+      mini.setAttribute('aria-label', `${f.sterne.filter(Boolean).length} von 3 Sternen`);
+    }
+    const ziele = detail.querySelector('.ziel-sterne');
+    if (f && ziele) ziele.innerHTML = `\n          ${zielSterneHtml(f.sterne)}\n        `;
+    const bilanz = detail.querySelector('.bilanz');
+    if (bilanz) bilanz.innerHTML = bilanzHtml(statistik());
   }
 
   // Begruessung im Panel: dieselbe Wahl wie in der Partie (Wahl-Ort partie:begruessung?)
@@ -465,10 +510,14 @@ export function zeige(root, params, app) {
 
   // Engines im Hintergrund vorwaermen, damit die erste Partie sofort startet
   spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); }, 900);
+  // Fehlende Analysen still nachholen (Stern 2); endet mit verlasse(), also auch beim Start einer Partie
+  let nachholLauf = null;
+  spaeter(() => { if (!weg) nachholLauf = starteNachholen(app, { beiPartie: sterneNeu }); }, ARENA_NACHHOLEN_MS + (neuId && !reduziert ? 1000 : 0));
 
   return {
     verlasse() {
       weg = true;
+      if (nachholLauf) nachholLauf.stop();
       for (const u of uhren) clearTimeout(u);
       uhren.clear();
       if (beobachter) beobachter.disconnect();

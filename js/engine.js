@@ -2,6 +2,9 @@
 // Bewertungen kommen immer aus Sicht von Weiss zurueck ({cp, mate}, genau eins gesetzt).
 // analyse(..., { prioritaet }): 'sofort' bricht die laufende Suche ab und kommt als Naechste dran,
 // 'vorne' stellt sich nur vorne an (die laufende Suche rechnet zu Ende).
+// vorziehen(fen) -> boolean (w0c): eine schon wartende Suche dieser Stellung (Figuren, Zugrecht, Rochade,
+// en passant) an den Anfang der Warteschlange stellen, statt eine zweite einzureihen; false, wenn keine
+// wartet (laufende Suchen zaehlen nicht).
 import { Chess } from '../vendor/chess/chess.js';
 
 // Standardpfad relativ zu diesem Modul, damit es auch aus Unterordnern (tests/) klappt.
@@ -95,6 +98,16 @@ export class Engine {
       }
       this._weiter();
     });
+  }
+
+  // wartende Suche dieser Stellung nach vorne holen (z. B. der Hinweis in der Partie); true, wenn gefunden
+  vorziehen(fen) {
+    const key = stellung(fen);
+    if (!key) return false;
+    const i = this._schlange.findIndex((job) => job.typ === 'suche' && stellung(job.uciFen) === key);
+    if (i < 0) return false;
+    if (i > 0) this._schlange.unshift(...this._schlange.splice(i, 1));
+    return true;
   }
 
   // laufende Suche abbrechen; ihr Promise loest mit dem bisherigen Stand auf.
@@ -343,6 +356,11 @@ export class Engine {
 
 function jetzt() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+// Stellung ohne Zugzaehler (wie stellungsSchluessel in openings.js)
+function stellung(fen) {
+  return typeof fen === 'string' ? fen.trim().split(/\s+/).slice(0, 4).join(' ') : '';
 }
 
 function zahlOderNull(x) {

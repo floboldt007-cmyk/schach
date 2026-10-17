@@ -141,12 +141,70 @@ setzeSpeicher(s);
   fs = ladeFortschritt();
   pruefe('Analyse nochmal: nichts doppelt, Stern bleibt', nochmal.brillant === 0 && fs.brillanteZuege.length === 1 && fs.bots.benno.sterne[1] === true
     && fs.bots.benno.siege === 1 && fs.bots.benno.partien === 1);
+  // w0c: eine spaetere Analyse ersetzt die Genauigkeit nicht, auf der Stern 2 beruht
+  const pn = ladePartie(sofort.partie.id);
+  pruefe('Analyse nochmal: Genauigkeit, Spielstaerke und Partie-Sterne bleiben (nur leere Felder werden gefuellt)', pn.genauigkeit === 86.5
+    && pn.genauigkeitBot === 70 && pn.spielstaerke === 1600 && JSON.stringify(pn.sterne) === '[true,true,false]'
+    && JSON.stringify(nochmal.partie.sterne) === '[true,true,false]' && JSON.stringify(nochmal.neueSterne) === '[false,false,false]', pn);
+  pruefe('Analyse nochmal: Review ist die neue (eigene Zahlen), Bestwert bleibt', ladeReview(sofort.partie.id).genauigkeit.w === 60
+    && fs.bots.benno.besteGenauigkeit === 86.5);
   const ohne = speicherePartie(partie({ genauigkeit: null }));
   ergaenzeAnalyse(ohne.partie.id, null, { genauigkeit: 81 });
   pruefe('Ohne Analyse: Live-Genauigkeit nachgetragen', ladePartie(ohne.partie.id).genauigkeit === 81);
   ergaenzeAnalyse(ohne.partie.id, null, { genauigkeit: 50 });
   pruefe('Ohne Analyse: vorhandene Genauigkeit bleibt', ladePartie(ohne.partie.id).genauigkeit === 81);
   pruefe('Unbekannte Partie: null', ergaenzeAnalyse('gibtsnicht', review) === null);
+}
+
+// ---------- w0c: einmal verdiente Sterne bleiben, Genauigkeit wird nicht still ersetzt ----------
+// Beleg vorher: 85 % -> Stern 2, dann neue Analyse mit 75 % (Review war aus der Liste gefallen):
+// Partie-Sterne [T,F,T], Fortschritt [T,T,T]
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const p = speicherePartie(partie({ genauigkeit: null }));
+  const r85 = { genauigkeit: { w: 85, b: 60 }, spielstaerke: { w: 1500, b: 300 }, zuege: [] };
+  const erst = ergaenzeAnalyse(p.partie.id, r85);
+  pruefe('Erste Analyse: 85 %, Stern 2 verdient', erst.partie.genauigkeit === 85 && JSON.stringify(erst.neueSterne) === '[false,true,false]'
+    && JSON.stringify(ladePartie(p.partie.id).sterne) === '[true,true,true]');
+  // Review faellt aus der Liste, die Analyse wird neu gerechnet und liefert weniger
+  s.removeItem('schach-arena:v1:review:' + p.partie.id);
+  const neu = ergaenzeAnalyse(p.partie.id, { genauigkeit: { w: 75, b: 70 }, spielstaerke: { w: 1100, b: 400 }, eroeffnung: 'Andere', zuege: [] });
+  const pa = ladePartie(p.partie.id);
+  const fs = ladeFortschritt();
+  pruefe('Neue Analyse mit 75 %: Genauigkeit bleibt 85 %', pa.genauigkeit === 85 && pa.genauigkeitBot === 60 && pa.spielstaerke === 1500, pa);
+  pruefe('Neue Analyse: Partie-Sterne und Fortschritt passen zusammen ([T,T,T])', JSON.stringify(pa.sterne) === '[true,true,true]'
+    && JSON.stringify(fs.bots.benno.sterne) === '[true,true,true]' && JSON.stringify(neu.partie.sterne) === '[true,true,true]');
+  pruefe('Neue Analyse: Review gespeichert, Eroeffnung nur wenn leer', hatReview(p.partie.id) && ladeReview(p.partie.id).genauigkeit.w === 75
+    && pa.eroeffnung === 'Andere');
+  // Sterne im Datensatz bleiben auch, wenn die gespeicherte Genauigkeit fehlt (z. B. alte Daten)
+  const alt = speicherePartie(partie({ genauigkeit: 90 }));
+  const roh = JSON.parse(s.getItem('schach-arena:v1:partien'));
+  roh.find((x) => x.id === alt.partie.id).genauigkeit = null;
+  s.setItem('schach-arena:v1:partien', JSON.stringify(roh));
+  const e2 = ergaenzeAnalyse(alt.partie.id, { genauigkeit: { w: 70, b: 70 }, zuege: [] });
+  pruefe('Leere Genauigkeit wird gefuellt (70 %), verdienter Stern 2 bleibt im Datensatz', e2.partie.genauigkeit === 70
+    && JSON.stringify(ladePartie(alt.partie.id).sterne) === '[true,true,true]');
+  // nicht wertende Partie: nie Sterne, auch nicht aus alten Daten
+  const u = speicherePartie(partie({ modus: 'uebung', startFen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', genauigkeit: null }));
+  const rohU = JSON.parse(s.getItem('schach-arena:v1:partien'));
+  rohU.find((x) => x.id === u.partie.id).sterne = [true, true, true];
+  s.setItem('schach-arena:v1:partien', JSON.stringify(rohU));
+  pruefe('Uebung: Sterne bleiben aus, auch bei alten Daten', JSON.stringify(ergaenzeAnalyse(u.partie.id, r85).partie.sterne) === '[false,false,false]');
+}
+
+// ---------- w0c: neue IDs nie doppelt (Beleg vorher: in ca. 2 % der Laeufe zwei gleiche IDs unter 8 Partien) ----------
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const echt = Math.random;
+  Math.random = () => 0.5;   // erzwingt denselben Zufallsteil: ohne Pruefung kaemen lauter gleiche IDs heraus
+  let ids3;
+  try {
+    ids3 = [];
+    for (let i = 0; i < 3; i++) ids3.push(speicherePartie(partie({})).partie.id);
+  } catch (e) { ids3 = [String(e)]; } finally { Math.random = echt; }
+  pruefe('Neue Partie-IDs sind eindeutig, auch in derselben Millisekunde', new Set(ids3).size === 3 && ladePartien().length === 3, ids3);
 }
 
 // ---------- Reviews: Begrenzung und voller Speicher ----------
@@ -235,7 +293,9 @@ setzeSpeicher(s);
   pruefe('Freischaltung: Hilde bleibt gesperrt', !istFreigeschaltet(2, fs) && gesamtSterne(fs) === 0);
   const e = ergaenzeAnalyse(u.partie.id, { genauigkeit: { w: 99, b: 20 }, zuege: brillantReview.zuege });
   fs = ladeFortschritt();
-  pruefe('Uebung nachgetragen: Genauigkeit ja, Sterne/Bestwert/Schatzkiste nein, wertet false', e.wertet === false && e.partie.genauigkeit === 99
+  // w0c: vorhandene Genauigkeit (95) bleibt, das leere Feld genauigkeitBot wird gefuellt
+  pruefe('Uebung nachgetragen: Genauigkeit ja, Sterne/Bestwert/Schatzkiste nein, wertet false', e.wertet === false && e.partie.genauigkeit === 95
+    && e.partie.genauigkeitBot === 20
     && JSON.stringify(e.neueSterne) === '[false,false,false]' && fs.bots.benno.besteGenauigkeit === null && fs.brillanteZuege.length === 0 && e.brillant === 0, e);
 
   const st = speicherePartie(partie({ startFen: UEBUNG_FEN, genauigkeit: 100 }));
@@ -250,7 +310,9 @@ setzeSpeicher(s);
   pruefe('normale Partie: modus normal, maxSerie gerundet, kein ziel', ladePartie(n.partie.id).modus === 'normal' && ladePartie(n.partie.id).maxSerie === 7
     && !('ziel' in ladePartie(n.partie.id)));
   const nNochmal = ergaenzeAnalyse(n.partie.id, { genauigkeit: { w: 93, b: 10 }, zuege: [] });
-  pruefe('ergaenzeAnalyse normal: wertet true', nNochmal.wertet === true && ladeFortschritt().bots.benno.besteGenauigkeit === 93);
+  // w0c: die Genauigkeit 91 vom Speichern bleibt (vorher wurde sie durch 93 ersetzt, Bestwert 93)
+  pruefe('ergaenzeAnalyse normal: wertet true, vorhandene Genauigkeit bleibt', nNochmal.wertet === true
+    && ladeFortschritt().bots.benno.besteGenauigkeit === 91 && ladePartie(n.partie.id).genauigkeit === 91 && ladePartie(n.partie.id).genauigkeitBot === 10);
 
   // Uebung mit ungueltigem Ziel, ziel bei normaler Partie
   const kaputt = speicherePartie(partie({ modus: 'uebung', startFen: UEBUNG_FEN, ziel: { ...ZIEL, besterZug: '<b>' } }));
@@ -525,6 +587,113 @@ function gleich(a, b) {
   const tl0 = performance.now();
   ergaenzeReviewFelder(kompaktReview(lang));
   console.log(`       Messung: 80 Halbzuege kompakt und zurueck ${(performance.now() - tl0).toFixed(1)} ms`);
+}
+
+// ---------- w0c: fehlende Analysen im Hintergrund nachholen (js/nachholen.js) ----------
+// Beleg vorher: App waehrend der Auswertung beendet -> Genauigkeit null, Stern 2 fehlt, bis Flo genau diese
+// Analyse oeffnet. Die Arena holt das jetzt nach (hier mit einer Fake-Engine, im Browser in app.test).
+{
+  const { offenePartien, starteNachholen, zustand } = await import('../js/nachholen.js');
+  const { nachlese } = await import('../js/feier.js');
+  const { stellungsSchluessel } = await import('../js/openings.js');
+  // Fake-Engine: gleiche Bewertung ueberall (jeder Zug Verlust 0), optional langsam, stop() bricht ab
+  class Fake {
+    constructor(ms = 0) { this.ms = ms; this.aufrufe = []; this.stops = 0; this.offen = null; }
+    analyse(fen, o = {}) {
+      this.aufrufe.push({ fen, ...o });
+      const c = new Chess(fen);
+      const zuege = c.moves({ verbose: true });
+      const fertig = () => {
+        if (!zuege.length) {
+          const m = c.inCheck() ? (c.turn() === 'w' ? -1 : 1) : null;
+          return { fen, depth: 0, lines: [{ multipv: 1, depth: 0, eval: m ? { cp: null, mate: m } : { cp: 0, mate: null }, pv: [] }] };
+        }
+        const lines = zuege.slice(0, Math.min(o.multipv || 1, zuege.length)).map((z, i) => ({ multipv: i + 1, depth: o.depth, eval: { cp: 20, mate: null }, pv: [z.lan] }));
+        return { fen, depth: o.depth, bestmove: lines[0].pv[0], lines };
+      };
+      if (!this.ms) return Promise.resolve(fertig());
+      return new Promise((r) => {
+        const u = setTimeout(() => { this.offen = null; r(fertig()); }, this.ms);
+        this.offen = () => { clearTimeout(u); this.offen = null; r({ fen, depth: 1, lines: [], abgebrochen: true }); };
+      });
+    }
+    stop() { this.stops++; if (this.offen) this.offen(); }
+  }
+  const SCHAEFER = ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6', 'h5f7'];
+  let n = 0;
+  const datum = () => new Date(Date.UTC(2026, 9, 17, 9, 0, ++n)).toISOString();
+  const sieg = (teil = {}) => ({ datum: datum(), botId: 'benno', botStufe: 1, spielerFarbe: 'w', zuege: SCHAEFER, ergebnis: 'sieg',
+    grund: 'matt', hinweise: 0, zuruecknahmen: 0, genauigkeit: null, ...teil });
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  busZuruecksetzen();
+  const kaputt = speicherePartie(sieg({ zuege: ['e2e4', 'e2e4'] })).partie.id;          // ungueltig: wird einmal versucht
+  const alt = speicherePartie(sieg()).partie.id;                                         // aelteste offene
+  const fertigP = speicherePartie(sieg({ genauigkeit: 70 })).partie.id;                 // hat Genauigkeit
+  const uebung = speicherePartie(sieg({ modus: 'uebung', startFen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', zuege: ['a1a8'] })).partie.id;
+  const ohneZug = speicherePartie(sieg({ zuege: [] })).partie.id;
+  const mitReview = speicherePartie(sieg(), { genauigkeit: { w: null, b: null }, zuege: [] }).partie.id;
+  const neu = speicherePartie(sieg({ botId: 'hilde', botStufe: 2 })).partie.id;          // neueste offene
+  pruefe('Nachholen: Fortschritt vorher wie nach einem Abbruch (Stern 2 fehlt)', JSON.stringify(ladeFortschritt().bots.benno.sterne) === '[true,false,true]');
+  const offen = offenePartien({ max: 5 }).map((p) => p.id);
+  pruefe('Nachholen: offen sind nur wertende Partien ohne Genauigkeit, ohne Review, mit eigenem Zug, neueste zuerst',
+    JSON.stringify(offen) === JSON.stringify([neu, alt, kaputt]), { offen, neu, alt, kaputt, fertigP, uebung, ohneZug, mitReview });
+  pruefe('Nachholen: hoechstens max, nur unter den neuesten', offenePartien({ max: 1 }).map((p) => p.id)[0] === neu
+    && offenePartien({ max: 5, aus: 1 }).length === 1 && offenePartien({ max: 5, aus: 0 }).length === 0);
+
+  const ereignisse = [];
+  const abmelden = hoere('partie:analysiert', (d) => ereignisse.push(d));
+  const fake = new Fake();
+  const vorab = new Map();
+  // die Stellung nach 1.e4 liegt schon tief genug vor, die Grundstellung nur flach (Zeitlimit): wird neu gerechnet
+  const START = new Chess().fen();
+  const NACH_E4 = (() => { const c = new Chess(); c.move('e4'); return c.fen(); })();
+  vorab.set(stellungsSchluessel(NACH_E4), { fen: NACH_E4, depth: 12, lines: [{ multipv: 1, depth: 12, eval: { cp: 20, mate: null }, pv: ['e7e5'] }, { multipv: 2, depth: 12, eval: { cp: 25, mate: null }, pv: ['c7c5'] }] });
+  vorab.set(stellungsSchluessel(START), { fen: START, depth: 5, lines: [{ multipv: 1, depth: 5, eval: { cp: 20, mate: null }, pv: ['e2e4'] }, { multipv: 2, depth: 5, eval: { cp: 20, mate: null }, pv: ['d2d4'] }] });
+  const app = { engine: async () => fake, einstellungen: () => ({ tiefe: 12 }), vorab };
+  const gezeichnet = [];
+  const lauf = starteNachholen(app, { max: 3, beiPartie: (x) => gezeichnet.push(x.partie.id) });
+  pruefe('Nachholen: zustand() laeuft', zustand().laeuft === true);
+  const anzahl = await lauf.fertig;
+  const pn = ladePartie(neu);
+  const pa = ladePartie(alt);
+  pruefe('Nachholen: zwei Partien nachgerechnet (die kaputte nicht), neueste zuerst', anzahl === 2 && JSON.stringify(zustand().fertig.slice(-2)) === JSON.stringify([neu, alt])
+    && JSON.stringify(gezeichnet) === JSON.stringify([neu, alt]), { anzahl, z: zustand(), gezeichnet });
+  pruefe('Nachholen: Genauigkeit, Review und Stern 2 da (Datensatz und Fortschritt)', pa.genauigkeit === 100 && hatReview(alt)
+    && JSON.stringify(pa.sterne) === '[true,true,true]' && JSON.stringify(ladeFortschritt().bots.benno.sterne) === '[true,true,true]'
+    && JSON.stringify(ladeFortschritt().bots.hilde.sterne) === '[true,true,true]', pa);
+  pruefe('Nachholen: Ereignis partie:analysiert mit quelle "nachholen" je Partie', ereignisse.length === 2 && ereignisse.every((e) => e.quelle === 'nachholen' && e.wertet === true && e.review)
+    && ereignisse[0].partieId === neu && JSON.stringify(ereignisse[1].neueSterne) === '[false,true,false]', ereignisse.map((e) => [e.partieId, e.quelle, e.neueSterne]));
+  const tiefen = fake.aufrufe.map((a) => a.depth);
+  pruefe('Nachholen: eingestellte Tiefe, flache Vorab-Analyse neu, tiefe wiederverwendet', tiefen.every((t) => t === 12)
+    && fake.aufrufe.some((a) => stellungsSchluessel(a.fen) === stellungsSchluessel(START))
+    && !fake.aufrufe.some((a) => stellungsSchluessel(a.fen) === stellungsSchluessel(NACH_E4)), fake.aufrufe.length);
+  const nl = nachlese();
+  pruefe('Nachholen: neu verdienter Stern kommt in die Nachlese (still, nicht ins Overlay)', nl.length === 2 && nl.every((f) => f.quelle === 'stern-nachgeholt' && f.art === 'zeile')
+    && nl.some((f) => f.titel === 'Neuer Stern gegen Bauer Benno' && /Nachträglich ausgewertet: 100 % Genauigkeit\./.test(f.text)), nl);
+  pruefe('Nachholen: kaputte Partie nur einmal versucht', offenePartien({ max: 5 }).length === 0 && zustand().laeuft === false);
+
+  // Abbruch (Arena verlassen, Partie startet): laufende Suche gestoppt, nichts gespeichert, spaeter weiter
+  const spaet = speicherePartie(sieg({ botId: 'kalle', botStufe: 3 })).partie.id;
+  const lahm = new Fake(40);
+  const app2 = { engine: async () => lahm, einstellungen: () => ({ tiefe: 12 }), vorab: new Map() };
+  const l2 = starteNachholen(app2, { max: 2 });
+  await new Promise((r) => setTimeout(r, 100));
+  const vorStop = lahm.aufrufe.length;
+  l2.stop();
+  const anz2 = await l2.fertig;
+  pruefe('Nachholen: stop() bricht die laufende Suche ab, nichts gespeichert', anz2 === 0 && lahm.stops >= 1 && vorStop >= 1 && vorStop < 7
+    && ladePartie(spaet).genauigkeit === null && !hatReview(spaet) && zustand().laeuft === false, { anz2, stops: lahm.stops, vorStop });
+  pruefe('Nachholen: abgebrochene Partie bleibt offen (wird spaeter nachgeholt)', offenePartien().some((p) => p.id === spaet));
+  // ein neuer Start stoppt den alten; stop() vor dem ersten Schritt wirkt sofort
+  const l3 = starteNachholen(app2, { max: 2 });
+  const l4 = starteNachholen({ ...app2, engine: async () => fake }, { max: 2 });
+  const [a3, a4] = await Promise.all([l3.fertig, l4.fertig]);
+  pruefe('Nachholen: neuer Start beendet den alten', a3 === 0 && a4 === 1 && Number.isFinite(ladePartie(spaet).genauigkeit), { a3, a4 });
+  const l5 = starteNachholen(app2);
+  l5.stop();
+  pruefe('Nachholen: stop() vor dem ersten Schritt', (await l5.fertig) === 0);
+  abmelden();
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

@@ -601,21 +601,28 @@ export function zeige(root, params, app) {
   const bewertungsEngine = () => app.engine('bewertung').then((e) => { engBewertung = e; return e; });
 
   // Jede Stellung nur einmal rechnen (laufendeAnalysen), hoechstens LIVE_MAX_MS lang.
-  // { vorne: true } (Hinweis): steht die Stellung noch in der Warteschlange, eine eigene Suche
-  // vor allen anderen einreihen, damit Flo nicht auf aeltere Bewertungen warten muss.
+  // { vorne: true } (Hinweis): steht die Stellung schon in der Warteschlange, wird genau diese Suche vor
+  // alle anderen geholt (engine.vorziehen), sonst eine neue vorne eingereiht. Nie zwei Suchen derselben
+  // Stellung (im Stau waere das doppelte Engine-Arbeit).
   function analysiere(fen, { vorne = false } = {}) {
     const key = stellungsSchluessel(fen);
     const fertig = app.vorab.get(key);
     if (fertig) return Promise.resolve(fertig);
     const da = laufendeAnalysen.get(key);
-    if (da && (!vorne || da.laeuft)) return da;
-    const eintrag = { laeuft: false };
+    if (da) {
+      if (vorne) da.vorziehen();
+      return da;
+    }
+    const eintrag = { laeuft: false, vorne, engine: null };
     const stau = laufendeAnalysen.size >= 2;
     const p = bewertungsEngine()
-      .then((e) => e.analyse(fen, {
-        depth: tiefe(), multipv: 2, movetime: stau ? LIVE_STAU_MS : LIVE_MAX_MS, prioritaet: vorne ? 'vorne' : undefined,
-        beiTiefe: () => { eintrag.laeuft = true; },
-      }))
+      .then((e) => {
+        eintrag.engine = e;
+        return e.analyse(fen, {
+          depth: tiefe(), multipv: 2, movetime: stau ? LIVE_STAU_MS : LIVE_MAX_MS, prioritaet: eintrag.vorne ? 'vorne' : undefined,
+          beiTiefe: () => { eintrag.laeuft = true; },
+        });
+      })
       .then((a) => {
         if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key);
         if (a && !a.abgebrochen && a.lines && a.lines.length) {
@@ -625,6 +632,11 @@ export function zeige(root, params, app) {
         return a;
       }, (err) => { if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key); throw err; });
     Object.defineProperty(p, 'laeuft', { get: () => eintrag.laeuft });
+    // noch nicht bei der Engine (startet gerade): mit 'vorne' einreihen; wartet schon: nach vorne holen
+    p.vorziehen = () => {
+      eintrag.vorne = true;
+      if (eintrag.engine && !eintrag.laeuft && typeof eintrag.engine.vorziehen === 'function') eintrag.engine.vorziehen(fen);
+    };
     laufendeAnalysen.set(key, p);
     return p;
   }
@@ -1171,9 +1183,11 @@ export function zeige(root, params, app) {
     let review = null;
     try {
       const e = await bewertungsEngine();
+      // Live-Suchen mit Zeitlimit (LIVE_MAX_MS, im Stau LIVE_STAU_MS) erreichen nicht immer die eingestellte
+      // Tiefe: nur ausreichend tiefe wiederverwenden, flachere rechnet die Analyse neu (vorabMinTiefe)
       review = await analysierePartie(e, z.zuege, {
         tiefe: tiefe(), multipv: 2, startFen: startFen || undefined, spielerFarbe: farbe,
-        elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMerken: true, signal: endeCtrl.signal,
+        elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMinTiefe: tiefe(), vorabMerken: true, signal: endeCtrl.signal,
         beiFortschritt: (f, n) => overlay && overlay.fortschritt(n ? f / n : 1),
       });
     } catch (err) {

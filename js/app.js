@@ -58,7 +58,16 @@ function wendeEinstellungenAn(e) {
 // Stockfish braucht WebAssembly mit SIMD (Safari ab iOS/iPadOS 16.4). Einmal vorab pruefen:
 // Fehlt SIMD oder die Engine-Datei, gibt es sofort eine klare Meldung statt einer stillen
 // Wartezeit bei jedem Zug (ein gescheiterter Start im Worker meldet sich nicht von selbst).
-const WASM_PFAD = 'vendor/stockfish/stockfish-19-lite-single.wasm';
+// w0c: SIMD prueft ein kleines Test-Modul; die 1,8-MB-.wasm wird nur EINMAL geholt (offline aus dem Cache
+// des Service Workers), geprueft und beiden Workern als Blob-URL uebergeben. stockfish.js liest die Adresse
+// der .wasm aus dem #-Teil seiner eigenen Adresse; den verliert ein Worker-Skript aus dem Cache des Service
+// Workers (seine Adresse ist dann die der Cache-Antwort), deshalb startet auch das Skript (28 KB) als Blob.
+// So laden die Worker nichts mehr selbst und haengen offline nicht davon ab, ob das Geraet ihre Anfragen
+// ueber den Service Worker leitet. Klappt der Start so nicht, laden die Worker wie bisher selbst (das merkt
+// sich das Geraet, WASM_DIREKT). Pfade relativ zu diesem Modul (klappt unter / und unter /schach/).
+const ENGINE_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.js', import.meta.url).href;
+const WASM_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.wasm', import.meta.url).href;
+const WASM_DIREKT = 'schach-arena:wasm-direkt';
 // kleinstes Modul mit einem SIMD-Befehl (v128)
 const SIMD_TEST = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
 const ENGINE_TEXT = {
@@ -76,15 +85,22 @@ function dauerhafterFehler(code) {
   return f;
 }
 
+// -> Promise<string|null>: Blob-URL der geprueften .wasm fuer die Worker (null: ohne fetch/Blob, dann
+// laden die Worker selbst). Wirft dauerhafte Fehler (kein-wasm, kein-simd, wasm-kaputt) oder, wenn die
+// Datei nicht erreichbar ist, einen voruebergehenden (dann beim naechsten Mal neu versuchen).
 export function pruefeWasm({ simdTest = SIMD_TEST, pfad = WASM_PFAD } = {}) {
   if (!wasmPruefung) {
     const p = (async () => {
       if (typeof WebAssembly !== 'object' || typeof WebAssembly.validate !== 'function') throw dauerhafterFehler('kein-wasm');
       if (!WebAssembly.validate(simdTest)) throw dauerhafterFehler('kein-simd');
-      if (typeof fetch !== 'function') return;
+      if (typeof fetch !== 'function') return null;
       const antwort = await fetch(pfad);   // kommt offline aus dem Cache des Service Workers
       if (!antwort.ok) throw new Error('Engine-Datei nicht erreichbar (' + antwort.status + ')');
-      if (!WebAssembly.validate(new Uint8Array(await antwort.arrayBuffer()))) throw dauerhafterFehler('wasm-kaputt');
+      const bytes = new Uint8Array(await antwort.arrayBuffer());
+      if (!WebAssembly.validate(bytes)) throw dauerhafterFehler('wasm-kaputt');
+      if (typeof Blob !== 'function' || typeof URL.createObjectURL !== 'function') return null;
+      // Typ application/wasm: der Worker kompiliert per instantiateStreaming
+      return URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
     })();
     // nur dauerhafte Fehler merken, sonst beim naechsten Mal neu versuchen
     p.catch((e) => { if (!(e && e.dauerhaft) && wasmPruefung === p) wasmPruefung = null; });
@@ -99,18 +115,58 @@ function meldeEngineFehler(e) {
   frage({ titel: 'Schach-Engine startet nicht', text: e.message, knoepfe: [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen: true });
 }
 
+// Die Worker bekommen Skript und gepruefte Bytes als Blob-URL. Hat das einmal nicht geklappt (der Worker
+// startet dann nicht), laden sie wie bisher selbst; das merkt sich das Geraet (WASM_DIREKT).
+function direktLaden() {
+  try { return localStorage.getItem(WASM_DIREKT) === '1'; } catch (e) { return false; }
+}
+let skriptBlob = null;
+function engineSkript() {
+  if (!skriptBlob) {
+    const p = fetch(ENGINE_PFAD).then((r) => {
+      if (!r.ok) throw new Error('Engine-Skript nicht erreichbar (' + r.status + ')');
+      return r.blob();
+    }).then((b) => URL.createObjectURL(new Blob([b], { type: 'text/javascript' })));
+    p.catch(() => { if (skriptBlob === p) skriptBlob = null; });
+    skriptBlob = p;
+  }
+  return skriptBlob;
+}
+async function starteEngine(wasmUrl, merke) {
+  let skript = null;
+  if (wasmUrl && !direktLaden()) {
+    try { skript = await engineSkript(); } catch (f) { skript = null; }
+  }
+  if (skript) {
+    const e = new Engine(skript + '#' + encodeURIComponent(wasmUrl));
+    merke(e);
+    try {
+      await e.init();
+      return e;
+    } catch (f) {
+      try { e.terminate(); } catch (g) { /* egal */ }
+      console.warn('Engine mit Blob-URL startet nicht, lade die .wasm direkt', f);
+      try { localStorage.setItem(WASM_DIREKT, '1'); } catch (g) { /* egal */ }
+    }
+  }
+  const e = new Engine(ENGINE_PFAD);
+  merke(e);
+  await e.init();
+  return e;
+}
+
 const engines = new Map();
 function engine(name) {
   const schluessel = name === 'bot' ? 'bot' : 'bewertung';
   let p = engines.get(schluessel);
   if (!p) {
-    const e = new Engine();
-    p = pruefeWasm().then(() => e.init()).then(() => e);
+    let e = null;
+    p = pruefeWasm().then((wasmUrl) => starteEngine(wasmUrl, (x) => { e = x; }));
     p.catch((f) => {
       meldeEngineFehler(f);
       // dauerhafte Fehler bleiben stehen (sofortige Absage statt neuer Versuche je Zug)
       if (!(f && f.dauerhaft) && engines.get(schluessel) === p) engines.delete(schluessel);
-      try { e.terminate(); } catch (g) { /* egal */ }
+      try { if (e) e.terminate(); } catch (g) { /* egal */ }
     });
     engines.set(schluessel, p);
   }

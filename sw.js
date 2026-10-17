@@ -28,6 +28,7 @@ const DATEIEN = [
   'js/ereignisse.js',
   'js/erweiterungen.js',
   'js/feier.js',
+  'js/nachholen.js',
   'js/openings.js',
   'js/orte.js',
   'js/review.js',

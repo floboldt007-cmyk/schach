@@ -274,7 +274,7 @@ export function zeige(root, params = {}, app) {
       if (st.bot) elo[st.bf] = st.bot.elo;
       const review = await analysierePartie(engine, p.zuege || [], {
         tiefe: einst.tiefe || 14, multipv: 2, startFen: p.startFen || undefined, spielerFarbe: st.sf,
-        elo, vorab: app.vorab, beiFortschritt: melde, signal: ac.signal,
+        elo, vorab: app.vorab, vorabMinTiefe: einst.tiefe || 14, beiFortschritt: melde, signal: ac.signal,
       });
       if (beendet) return;
       // Review speichern und Partie-Datensatz nachtragen (Genauigkeit, Spielstaerke, Stern 2,
@@ -418,6 +418,8 @@ export function zeige(root, params = {}, app) {
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
     const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
+    // gezeigt wird die Genauigkeit der Partie (auf ihr beruht Stern 2; eine spaetere Neuberechnung ersetzt
+    // sie nicht, storage.ergaenzeAnalyse), sonst die der Review
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
     // Bestwert nur aus Partien mit genug eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
     const zaehlt = (p) => eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
@@ -431,7 +433,7 @@ export function zeige(root, params = {}, app) {
       <div class="an-genau flaeche">
         <div class="an-seite">
           <div class="an-avatar an-ich" aria-hidden="true">F</div>
-          <div class="an-seite-text">${wert(du, true)}<div class="an-g-label"><span class="an-g-zusatz">Deine </span>Genauigkeit</div></div>
+          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label"><span class="an-g-zusatz">Deine </span>Genauigkeit</div></div>
         </div>
         <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>
         <div class="an-seite an-re">
