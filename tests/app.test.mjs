@@ -1861,8 +1861,8 @@ async function testeErweiterungenFix(browser) {
     await kontext.close();
   }
 
-  // Sternklang ohne registrierten Klang 'stern': bei reduzierter Bewegung still wie vor Runde 4, sonst zug();
-  // ein registrierter Klang (Paket 1A) klingt auch bei reduzierter Bewegung (Klang ist keine Bewegung)
+  // Sternklang: ein registrierter Klang (Paket 1A) und seit dem Premium-Umbau (U3, PLAN 3.6) auch die Dateien stern,
+  // stern-2, stern-3 klingen auch bei reduzierter Bewegung (Klang ist keine Bewegung; die Ausnahme von Runde 4 entfaellt)
   gruppe = 'Erweiterungen: Sternklang';
   for (const fall of [{ reduziert: false, register: false }, { reduziert: true, register: false }, { reduziert: true, register: true }]) {
     const kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, userAgent: IPAD_UA,
@@ -1898,7 +1898,7 @@ async function testeErweiterungenFix(browser) {
     const name = `${fall.reduziert ? 'reduzierte Bewegung' : 'normal'}${fall.register ? ', registrierter Klang' : ''}`;
     const laeuft = st.sterne.length === 3 && st.sterne.every((x) => x.laeuft === 'bereit');
     if (!fall.reduziert) pruefe(`${name}: drei Sterne klingen (zug)`, laeuft && st.sterne.every((x) => x.toene > 0 && !x.reduziert), JSON.stringify(st));
-    else if (!fall.register) pruefe(`${name}: drei Sterne still wie vor Runde 4`, laeuft && st.sterne.every((x) => x.toene === 0 && x.reduziert), JSON.stringify(st));
+    else if (!fall.register) pruefe(`${name}: drei Sterne klingen trotzdem (PLAN 3.6)`, laeuft && st.sterne.every((x) => x.toene > 0 && x.reduziert), JSON.stringify(st));
     else pruefe(`${name}: der registrierte Klang spielt dreimal`, laeuft && st.register === 3, JSON.stringify(st));
     await kontext.close();
   }

@@ -467,8 +467,11 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   const aufrufe = [];
   class FakeParam { constructor() { this.value = 0; } setValueAtTime() {} exponentialRampToValueAtTime() {} }
   class FakeKnoten { constructor() { this.gain = new FakeParam(); this.frequency = new FakeParam(); this.threshold = new FakeParam(); this.ratio = new FakeParam(); this.Q = new FakeParam(); } connect() {} start() {} stop() {} }
+  // Die Uhr laeuft (wie ein echter Kontext): sonst blieben die Stimmen ewig belegt und das Mischen nach Vorrang
+  // (hoechstens 4 Stimmen, Premium-Umbau U3) verwuerfe spaetere Klaenge
   class FakeAC {
-    constructor() { this.state = 'running'; this.currentTime = 1; this.destination = new FakeKnoten(); this.sampleRate = 22050; }
+    constructor() { this.state = 'running'; this.uhr = 1; this.destination = new FakeKnoten(); this.sampleRate = 22050; }
+    get currentTime() { this.uhr += 5; return this.uhr; }
     resume() { return Promise.resolve(); }
     createGain() { return new FakeKnoten(); }
     createDynamicsCompressor() { return new FakeKnoten(); }
@@ -491,12 +494,13 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   pruefe('Fake-Kontext bereit', klang.zustand() === 'bereit');
   const log = [];
   const spion = (name) => (ac, ziel, t, ...args) => log.push([name, ...args]);
-  // Standard ohne Register 'klasse': brillant -> brillant, fehler/patzer -> fehler, sonst still
+  // Standard ohne Register 'klasse' und ohne Dateien (PLAN 3.6): brillant -> brillant, fehler und verpasst -> fehler,
+  // patzer -> Datei patzer, ohne Datei Rueckfall wie vor dem Umbau auf fehler; sonst kein registrierter Klang
   const abB = registriereKlang('brillant', spion('brillant'));
   const abF = registriereKlang('fehler', spion('fehler'));
   const abZ = registriereKlang('zug', spion('zug'));
   for (const k of ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen']) klang.klasse(k);
-  pruefe('klang.klasse Standard: brillant, fehler, patzer klingen, sonst still', JSON.stringify(log) === '[["brillant"],["fehler"],["fehler"]]', log);
+  pruefe('klang.klasse Standard (PLAN 3.6): brillant -> brillant, fehler/verpasst/patzer -> fehler (ohne Dateien), sonst still', JSON.stringify(log) === '[["brillant"],["fehler"],["fehler"],["fehler"]]', log);
   log.length = 0;
   klang.stern(0, true);
   klang.stern(2, false);
