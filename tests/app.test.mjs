@@ -2350,7 +2350,8 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.arena');
     const sterneVorher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
-    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'meister', woche: '2026-10-12' } });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'meister', woche: '2026-10-12' },
+      tempo: { grund: 600, zuschlag: 5 }, liga: { saison: 'test-saison', runde: 3 } });
     await h.warteFlo();
     const k = await seite.evaluate(() => ({
       h2: document.querySelector('.partie .kopf h2').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
@@ -2403,6 +2404,9 @@ async function testeSpielFundament(browser) {
     const neu = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet')[1]);
     pruefe('Boss: "Nochmal" startet denselben Boss mit derselben Stufe und neuem Seed', neu.modus === 'boss' && JSON.stringify(neu.boss) === JSON.stringify(k.gest.boss)
       && neu.seed !== k.gest.seed, JSON.stringify(neu));
+    const wieder = await seite.evaluate(() => ({ tempo: window.__partie.z.tempo, liga: window.__partie.z.liga }));
+    pruefe('Boss: "Nochmal" behält Bedenkzeit und Liga (Codex-Befund)', JSON.stringify(wieder.tempo) === '{"grund":600,"zuschlag":5}'
+      && JSON.stringify(wieder.liga) === '{"saison":"test-saison","runde":3}', JSON.stringify(wieder));
     await seite.evaluate(() => { window.__test = {}; window.__app.gehe('verlauf'); });
     await seite.waitForSelector('.screen.vl-screen');
     pruefe('Boss: Verlauf zeigt die Boss-Partie mit Namen (angemeldeter Bot) und dem Chip "Boss"', await seite.evaluate(() => document.querySelector('.screen.vl-screen').textContent.includes('Testboss')

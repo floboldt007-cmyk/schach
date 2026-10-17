@@ -1624,13 +1624,15 @@ export function zeige(root, params, app) {
           const w = knoepfe.querySelector('[data-ziel="weiter"]');
           if (w) w.addEventListener('click', () => app.gehe('arena', neu ? { neuFreigeschaltet: neu.id } : { waehle: naechster.id }));
           const n = knoepfe.querySelector('[data-ziel="nochmal"]');
-          if (n) n.addEventListener('click', () => app.gehe('partie', { botId: bot.id, farbe }));
+          // Bedenkzeit bleibt beim Wiederholen (eine Liga-Runde nicht: die plant die Liga selbst)
+          if (n) n.addEventListener('click', () => app.gehe('partie', { botId: bot.id, farbe, tempo: z.tempo ? { ...z.tempo } : undefined }));
           const ab = knoepfe.querySelector('[data-ziel="ab-hier"]');
           if (ab) {
-            // W0+a: Boss mit derselben Stufe und Woche, neuer Seed
+            // W0+a: Boss mit derselben Stufe und Woche, neuer Seed; Bedenkzeit und Liga wie gehabt
             ab.addEventListener('click', () => app.gehe('partie', {
               botId: bot.id, farbe, startFen: startFen || undefined, modus: z.modus, ziel: z.ziel || undefined,
-              boss: z.boss ? { ...z.boss } : undefined,
+              boss: z.boss ? { ...z.boss } : undefined, tempo: z.tempo ? { ...z.tempo } : undefined,
+              liga: z.liga ? { ...z.liga } : undefined,
             }));
           }
         }
