@@ -1769,6 +1769,12 @@ einer von Flos zwei Hauptwünschen ist und sonst erst nach dem Test käme. Die S
    S1-5 Tagesrätsel, S1-9 Sicherung.
 2. **Schub 2** (braucht Teile aus Schub 1): S1-3 Punkte und Bestenliste, S1-6 Wochen-Boss, S1-7 Finisher,
    S1-8 Zweite Chance, S1-10 Lektions-Probe.
+2b. **Schub 2b „Ausdruck und Werkstatt“** (Flo, 17.10.: vorgezogen, damit beim ersten Test alles da ist, was er
+   genannt hat): aus S3-5 das Emote-Rad und der Schnell-Chat mit Bot-Antworten (Abklingzeit, stumm schalten) und
+   Banner mit Zeichen; aus S2-5 der Siegeslauf mit Flamme am Namen ab 3 Siegen gegen ungefähr gleich starke Gegner
+   (Regel 7 in `ENTSCHEIDUNGEN.md`); aus S4-7 die Werkstatt-Vorschau (Designs, Finisher, Banner, Emotes mit Anprobe,
+   Kaufknopf „bald verfügbar“, in der Testphase alles freispielbar, keine Preise im Repo). Was diese Pakete aus S2 bis
+   S4 sonst noch enthalten, bleibt in ihrer Welle.
 3. **Schub 3:** Integration mit Gesamtprobe.
 Jeder Schub hat 4 bis 5 Pakete der Größe S bis M. Mit Flos Test-Rückmeldung dazwischen sind 1 bis 2 Wochen realistisch;
 wenn das Nutzungslimit greift, wird Schub 2 geteilt, nicht gestrichen.
