@@ -7,11 +7,16 @@
 // Runde 4: Anzeige-Ort verlauf:seite (in .vl-seite zwischen Statistik und Schatzkiste); Partien, die
 // nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung". Die Statistik zaehlt nur
 // wertende Partien; die Kopfzeile nennt deshalb die Uebungen extra ("12 Partien, davon 2 Übungen").
+// W0+a: der Chip nennt den Modus (Boss, Frei, Spielhalle; sonst Übung). Boss-Partien gegen angemeldete Bots finden
+// ihren Namen ueber botNachId, solange das Paket geladen ist.
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
 import { fuelle } from '../orte.js';
+
+// W0+a: Chip nicht wertender Partien je Modus
+const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle' };
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -186,7 +191,7 @@ export function zeige(root, params = {}, app) {
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
               ${wertet(p) ? `<span class="vl-sterne" aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</span>`
-                : '<span class="chip uebung vl-uebung" title="Zählt nicht für Sterne und Statistik">Übung</span>'}
+                : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="Zählt nicht für Sterne und Statistik">${CHIP_TEXT[p.modus] || 'Übung'}</span>`}
             </span>
           </button>
           <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="Partie gegen ${esc(name)} löschen">${icon('muell')}</button>

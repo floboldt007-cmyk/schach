@@ -39,6 +39,10 @@ in Flos privatem Repo.
 | 17.10. | Shop: erst Vorschau | Werkstatt mit Preisen, Vorschau und Anprobieren, Kaufknopf „bald verfügbar“, in der Testphase alles freispielbar. Echte Zahlung erst mit Gewerbe, Impressum und Zahlungskonto. |
 | 17.10. | Online gegen Menschen | nach Flos iPad-Test; bis dahin reagieren die Bots auf Emotes und Schnell-Chat. |
 | 17.10. | „Die Sounds kann man ändern, auch die Ansichten, oder?“ | Ja. Klangpakete (Holz, Arcade, später mehr), Brettfarben, Hell/Dunkel, später Figuren-Sets. Der Premium-Umbau baut A **theme-fähig**: Farben, Schriften, Texturen, Rahmen und Klänge hängen an einer zentralen Stelle (Design-Tokens), damit die Entwürfe B „Edel“ und C „Verspielt“ später als wählbare Ansichten dazukommen können (erspielbar oder in der Werkstatt), ohne das Layout umzubauen. |
+| 17.10. | Zugklassen-Namen: Variante „Klartext“ | Genial · Goldrichtig · Präzise · Sauber · Solide · Theorie · Unscharf · Daneben · Verschenkt · Weit daneben · Pflichtzug, Brillant-Farbe Amethyst `#7A4FD6` |
+| 17.10. | Duell-Intro nur bei besonderen Partien | Einstellung „immer · besondere · aus“, Standard „besondere“ (Boss, Liga, erste Partie gegen einen Bot), sonst kurze Fassung |
+| 17.10. | Klangstufe „Alle“ für den Test | Standard `alle` (Brett, große Momente, Zeitwarnung und Bedien-Klicks), wählbar bleiben „Nur wichtige“ und „Aus“ |
+| 17.10. | Reiter-Leiste: iPad quer oben, sonst unten | im Querformat auf dem iPad in der Kopfzeile, sonst unten schwebend |
 
 ## 2. Die Richtung in einem Satz
 

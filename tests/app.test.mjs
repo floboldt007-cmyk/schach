@@ -29,6 +29,8 @@ const SCHNELL = process.argv.includes('--schnell');
 const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
 const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
 const NUR_NACHPRUEFUNG = process.argv.includes('--nachpruefung');
+// W0+a: nur das Spiel-Fundament pruefen (laeuft auch mit --erweiterungen und im vollen Lauf)
+const NUR_SPIEL = process.argv.includes('--spiel');
 mkdirSync(BILDER, { recursive: true });
 
 // Wartet, bis ein Element ruhig steht (Lage in drei Bildern gleich, hoechstens 1,5 s). Ohne das trifft ein Tipp
@@ -1858,6 +1860,424 @@ async function testeErweiterungenFix(browser) {
   }
 }
 
+// ---------- 10. Spiel-Fundament (W0+a, SPIELKONZEPT 6.2) ----------
+// Test-Paket fuer die neuen Orte, den Matt-Hook, die Abrechnung und den Boss-Modus (per page.route ausgeliefert).
+// Schalter in der Adresse: wpheute, wpleiste, wpmatt, wpabr, wpabr5, wpboss.
+const TEST_PAKET_W0PLUS = `
+import { hoere } from '../../ereignisse.js';
+import { anbieten } from '../../orte.js';
+import { registriereBot, botNachId } from '../../bots.js';
+const q = new URLSearchParams(location.search);
+const log = window.__wp = { ereignisse: [], kontexte: {}, matt: [], effekte: [], leisteWeg: 0, mattWeg: 0 };
+const jetzt = () => performance.now();
+for (const n of ['partie:gestartet', 'partie:beendet', 'zug:abgelehnt', 'zug:gespielt', 'partie:verlassen']) {
+  hoere(n, (d) => {
+    const e = { name: n, t: jetzt() };
+    for (const k of ['laufId', 'von', 'nach', 'art', 'figur', 'fen', 'modus', 'wertet', 'seed', 'matt', 'partieId', 'ergebnis', 'startFen', 'fortgesetzt']) if (k in d) e[k] = d[k];
+    if (d.boss !== undefined) e.boss = d.boss ? { ...d.boss } : null;
+    if (d.buehne) {
+      e.buehneBoss = d.buehne.boss ? { ...d.buehne.boss } : null;
+      e.buehneSeed = d.buehne.seed;
+      // Effekte am Brett mitschreiben (der Finisher ersetzt jeden Brett-Effekt)
+      const beob = new MutationObserver((m) => { for (const x of m) for (const k of x.addedNodes) if (k.classList && k.classList.contains('effekt-ort')) log.effekte.push(jetzt()); });
+      beob.observe(d.buehne.effekte, { childList: true });
+      log.buehne = d.buehne;
+    }
+    log.ereignisse.push(e);
+  });
+}
+if (q.has('wpheute')) {
+  anbieten('arena:heute', (k) => {
+    log.kontexte['arena:heute'] = Object.keys(k).sort();
+    log.tag = k.tag;
+    const el = document.createElement('div');
+    el.className = 'wp-heute';
+    el.textContent = 'Rätsel des Tages';
+    return el;
+  }, { reihenfolge: 20, paket: 'wp' });
+}
+if (q.has('wpleiste')) {
+  anbieten('partie:gegner-leiste', (k) => {
+    log.kontexte['partie:gegner-leiste'] = Object.keys(k).sort();
+    log.lage = k.lage();
+    const el = document.createElement('div');
+    el.className = 'wp-leiste';
+    el.textContent = 'Lebensleiste';
+    return { el, verlasse() { log.leisteWeg++; } };
+  }, { paket: 'wp' });
+}
+if (q.has('wpmatt')) {
+  anbieten('partie:matt', (k) => {
+    log.kontexte['partie:matt'] = Object.keys(k).sort();
+    const gespeichert = JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]');
+    log.matt.push({ t: jetzt(), gewinner: k.gewinner, koenigFeld: k.koenigFeld, nach: k.letzterZug && k.letzterZug.nach, figur: k.letzterZug && k.letzterZug.figur,
+      gespeichert: gespeichert.length > 0 && gespeichert[0].id === k.partieId, dauerMs: k.dauerMs, kurzMs: k.kurzMs, eingefroren: Object.isFrozen(k) });
+    k.buehne.brett.kippeKoenig(k.koenigFeld, { langsam: true });
+    const st = k.buehne.brett.striche([{ von: 'f7', nach: 'e7' }, { nach: 'd8', art: 'haken', verzoegerung: 120 }], { ebene: k.buehne.effekte });
+    const beob = new MutationObserver(() => { if (document.querySelector('.ergebnis-overlay') && !log.overlayT) { log.overlayT = jetzt(); beob.disconnect(); } });
+    log.overlayT = 0;
+    beob.observe(document.body, { childList: true, subtree: true });
+    return {
+      fertig: new Promise((r) => { k.signal.addEventListener('abort', () => { log.abbruch = jetzt(); r(); }); setTimeout(r, 6000); }),
+      verlasse() { st.entferne(); log.mattWeg++; },
+    };
+  }, { paket: 'wp' });
+}
+if (q.has('wpabr')) {
+  const zeile = (titel, schluessel) => (k) => {
+    log.kontexte['ergebnis:abrechnung'] = Object.keys(k).sort();
+    const el = document.createElement('div');
+    el.className = 'wp-abr';
+    el.dataset.zeile = schluessel;
+    el.textContent = titel + (k.rechnet ? ' …' : '');
+    return el;
+  };
+  anbieten('ergebnis:abrechnung', zeile('FUNKEN', 'funken'), { reihenfolge: 20, paket: 'funken' });
+  anbieten('ergebnis:abrechnung', zeile('PUNKTE', 'punkte'), { reihenfolge: 10, paket: 'punkte' });
+  if (q.has('wpabr5')) {
+    anbieten('ergebnis:abrechnung', zeile('WERTUNG', 'wertung'), { reihenfolge: 30, paket: 'wertung' });
+    anbieten('ergebnis:abrechnung', zeile('SERIE', 'serie'), { reihenfolge: 40, paket: 'alltag' });
+    anbieten('ergebnis:abrechnung', zeile('FUENFTE', 'fuenfte'), { reihenfolge: 50, paket: 'x' });
+  }
+}
+if (q.has('wpboss')) {
+  registriereBot({
+    id: 'test-boss', art: 'boss', archiv: true, name: 'Testboss', avatar: 'assets/avatare/06-professor-turm.svg', titel: 'Wochen-Boss',
+    regel: 'Startet aus dem Spanier.', startFen: 'r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 5',
+    staerke: { ...botNachId('benno').staerke }, saetze: { begruessung: ['Willkommen beim Boss!'] },
+  });
+}
+`;
+const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0plus-test/index${flags ? '&' + flags : ''}`;
+const FAKE_ICH = `export function zeige(root) { const s = document.createElement('section'); s.className = 'screen ich-test'; s.textContent = 'Ich'; root.append(s); return { verlasse() {} }; }`;
+const BOSS_START = 'r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 5';
+
+async function testeSpielFundament(browser) {
+  // --- Router und untere Leiste ---
+  gruppe = 'W0+a: Router';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const falsch = [];
+    for (const name of ['bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']) {
+      await seite.goto(BASIS + '#' + name);
+      await seite.waitForSelector('.screen.arena');
+      const r = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
+      if (r.hash !== '#arena' || r.platzhalter) falsch.push(name);
+    }
+    pruefe('Neue Paket-Screens (bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle) ohne Datei: still zur Arena, kein Platzhalter', falsch.length === 0, falsch.join());
+    await seite.evaluate(() => window.__app.gehe('spielplan'));
+    await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
+    pruefe('gehe("spielplan") ohne Paket: Arena', await seite.locator('.screen.platzhalter').count() === 0);
+    pruefe('Untere Leiste ohne Pakete: nicht da, html ohne data-reiter', await seite.evaluate(() => {
+      const n = document.querySelector('.reiter-leiste');
+      return (!n || n.hidden) && !document.documentElement.dataset.reiter;
+    }));
+    const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/(bestenliste|raetsel|lernen|lektion|ich|spielplan|spielhalle)\.js/.test(f));
+    pruefe('Router: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'W0+a: Leiste';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,ich#arena`);
+    await seite.waitForSelector('.screen.arena');
+    const l1 = await seite.evaluate(() => {
+      const n = document.querySelector('.reiter-leiste');
+      return n && { hidden: n.hidden, reiter: [...n.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join(),
+        html: document.documentElement.dataset.reiter, unten: Math.round(innerHeight - n.getBoundingClientRect().bottom) };
+    });
+    pruefe('Leiste (Testmodus ?reiter=training,ich): Arena, Training, Ich, Arena aktiv, unten', !!l1 && !l1.hidden && l1.reiter === 'arena*,training,ich' && l1.html === 'an' && l1.unten === 0, JSON.stringify(l1));
+    await seite.locator('.reiter-leiste [data-reiter="ich"]').click();
+    await seite.waitForSelector('.screen.ich-test');
+    pruefe('Leiste: Reiter Ich öffnet den Ich-Screen und ist aktiv', (await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter)) === 'ich'
+      && (await seite.evaluate(() => document.title)) === 'Ich · Schach-Arena' && (await seite.evaluate(() => location.hash)) === '#ich');
+    await seite.locator('.reiter-leiste [data-reiter="training"]').click();
+    await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
+    pruefe('Leiste: Training ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
+    await seite.evaluate(() => window.__app.gehe('verlauf'));
+    await seite.waitForSelector('.screen.vl-screen');
+    pruefe('Leiste: auf Screens ohne Reiter (Verlauf) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
+    await seite.waitForSelector('.screen.arena');
+    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste') || document.querySelector('.reiter-leiste').hidden));
+    const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/training\.js/.test(f));
+    pruefe('Leiste: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
+    await kontext.close();
+  }
+
+  // --- Start: dauerhafter Speicher und Ausduennen der Analysen ---
+  gruppe = 'W0+a: Start';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await kontext.addInitScript(() => {
+      window.__persist = { anfragen: 0, geprueft: 0 };
+      try {
+        const st = navigator.storage;
+        st.persisted = async () => { window.__persist.geprueft++; return false; };
+        st.persist = async () => { window.__persist.anfragen++; return true; };
+      } catch (e) { /* egal */ }
+      if (sessionStorage.getItem('wp-saat')) return;
+      sessionStorage.setItem('wp-saat', '1');
+      const partien = [];
+      for (let i = 0; i < 18; i++) {
+        const id = 'pwp' + String(i).padStart(2, '0');
+        partien.push({ id, datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: 'benno', botStufe: 1, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'],
+          san: ['e4', 'e5'], ergebnis: 'remis', grund: 'aufgabe', hinweise: 0, zuruecknahmen: 0, liveKlassen: ['buch', null], genauigkeit: 70 });
+        localStorage.setItem('schach-arena:v1:review:' + id, JSON.stringify({ zuege: [{ ply: 0, farbe: 'w', klasse: 'buch' }] }));
+      }
+      localStorage.setItem('schach-arena:v1:partien', JSON.stringify(partien));
+    });
+    await seite.goto(BASIS + '#verlauf');
+    await seite.waitForSelector('.screen.vl-screen');
+    await seite.waitForFunction(() => Object.keys(localStorage).filter((k) => k.startsWith('schach-arena:v1:review:')).length <= 12, null, { timeout: 5000 }).catch(() => {});
+    const r = await seite.evaluate(() => ({
+      reviews: Object.keys(localStorage).filter((k) => k.startsWith('schach-arena:v1:review:')).sort(),
+      partien: JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length, persist: window.__persist,
+    }));
+    pruefe('Start: 18 alte Analysen still auf 12 ausgedünnt (die neuesten bleiben), Partien bleiben', r.reviews.length === 12 && r.reviews[0].endsWith('pwp06')
+      && r.reviews[11].endsWith('pwp17') && r.partien === 18, JSON.stringify(r.reviews));
+    pruefe('Start: dauerhafter Speicher angefragt (navigator.storage.persist)', r.persist.anfragen === 1 && r.persist.geprueft === 1, JSON.stringify(r.persist));
+    pruefe('Start: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // --- Heute-Karte, Gegner-Leiste, abgelehnter Zug, Abrechnung ---
+  gruppe = 'W0+a: Orte';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .detail');
+    pruefe('Heute-Karte ohne Paket: versteckt (kein Pixel anders)', await seite.evaluate(() => {
+      const k = document.querySelector('.arena .detail > .heute-karte');
+      return !!k && k.hidden && getComputedStyle(k).display === 'none' && k.previousElementSibling.matches('.ort-panel-oben');
+    }));
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpheute&wpleiste&wpabr') + '#arena');
+    await seite.waitForSelector('.screen.arena .detail .wp-heute');
+    const heute = await seite.evaluate(() => {
+      const k = document.querySelector('.arena .detail > .heute-karte');
+      return { sichtbar: !k.hidden, kopf: k.querySelector('.hk-kopf').textContent, zeile: !!k.querySelector('.ort-heute > .wp-heute'),
+        nachOben: k.previousElementSibling.matches('.ort-panel-oben'), kontext: window.__wp.kontexte['arena:heute'], tag: window.__wp.tag };
+    });
+    const tage = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    pruefe('arena:heute: Heute-Karte nach .ort-panel-oben, Kopf "Heute · Wochentag", Zeile des Pakets', heute.sichtbar && heute.zeile && heute.nachOben
+      && /^Heute · (Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)$/.test(heute.kopf), JSON.stringify(heute));
+    pruefe('arena:heute: Kontext { app, bot, fortschritt, tag, woche }, Wochentag passt zum Tag', JSON.stringify(heute.kontext) === '["app","bot","fortschritt","tag","woche"]'
+      && /^\d{4}-\d\d-\d\d$/.test(heute.tag) && heute.kopf.endsWith(tage[(new Date(heute.tag + 'T12:00:00').getDay() + 6) % 7]), JSON.stringify(heute));
+    await seite.locator('.arena .knoten[data-bot="benno"]').click();
+    pruefe('arena:heute: bei jeder Botwahl neu gefüllt (genau eine Zeile)', await seite.locator('.arena .detail .wp-heute').count() === 1);
+
+    // Partie: Gegner-Leiste, Plaetze, abgelehnter Zug
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    const leiste = await seite.evaluate(() => {
+      const el = document.querySelector('.partie .ort-gegner-leiste');
+      return { da: !!el, hidden: el.hidden, inBotbox: el.parentNode === document.querySelector('.partie .botbox') && el === el.parentNode.firstElementChild,
+        lage: el.dataset.lage, inhalt: !!el.querySelector('.wp-leiste'), kontext: window.__wp.kontexte['partie:gegner-leiste'], paketLage: window.__wp.lage };
+    });
+    pruefe('partie:gegner-leiste: quer erstes Kind der Bot-Karte, mit dem Element des Pakets', leiste.da && !leiste.hidden && leiste.inBotbox && leiste.lage === 'quer'
+      && leiste.inhalt && leiste.paketLage === 'quer', JSON.stringify(leiste));
+    pruefe('partie:gegner-leiste: Kontext { app, boss, bot, buehne, farbe, lage, modus }', JSON.stringify(leiste.kontext) === '["app","boss","bot","buehne","farbe","lage","modus"]', JSON.stringify(leiste.kontext));
+    await seite.setViewportSize({ width: 820, height: 1180 });
+    await seite.waitForFunction(() => document.querySelector('.partie .ort-gegner-leiste').dataset.lage === 'hoch');
+    const hoch = await seite.evaluate(() => {
+      const el = document.querySelector('.partie .ort-gegner-leiste');
+      const r = el.getBoundingClientRect();
+      return { inInfo: el.parentNode === document.querySelector('.partie .botleiste-hoch .info'), sichtbar: r.width > 0 && r.height > 0,
+        ueberBrett: r.bottom <= document.querySelector('.partie .brett').getBoundingClientRect().top + 1 };
+    });
+    pruefe('partie:gegner-leiste: hoch wandert das Element in die Bot-Leiste über dem Brett', hoch.inInfo && hoch.sichtbar && hoch.ueberBrett, JSON.stringify(hoch));
+    await seite.setViewportSize({ width: 1180, height: 820 });
+    await seite.waitForFunction(() => document.querySelector('.partie .ort-gegner-leiste').dataset.lage === 'quer');
+    const platz = await seite.evaluate(() => {
+      const b = window.__wp.buehne;
+      const z = b.platz('zaehlwerk');
+      const f = b.platz('funkenlinie');
+      const vorher = { z: z.hidden, f: f.hidden, zeigt: b.zeigt('zaehlwerk'), balken: b.zeigt('balken'), leiste: b.zeigt('lebensleiste'), fremd: b.platz('quatsch'), gleich: b.platz('zaehlwerk') === z };
+      window.__app.setzeEinstellungen({ zaehlwerk: true });
+      const nachher = { z: z.hidden, f: f.hidden, zeigt: b.zeigt('zaehlwerk'), imKopf: z.parentNode === document.querySelector('.partie .kopf'), amRahmen: f.parentNode === document.querySelector('.partie .brett-rahmen') };
+      window.__app.setzeEinstellungen({ zaehlwerk: false });
+      return { vorher, nachher, wieder: z.hidden };
+    });
+    pruefe('Bühne: zeigt() liest die Anzeigen, platz() liefert Zählwerk (Kopf) und Funkenlinie (Brett-Rahmen), versteckt bis zur Einstellung',
+      platz.vorher.z && platz.vorher.f && !platz.vorher.zeigt && platz.vorher.balken && platz.vorher.leiste && platz.vorher.fremd === null && platz.vorher.gleich
+      && !platz.nachher.z && platz.nachher.f && platz.nachher.zeigt && platz.nachher.imKopf && platz.nachher.amRahmen && platz.wieder, JSON.stringify(platz));
+    const gest = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet').pop());
+    pruefe('partie:gestartet: seed (ganze Zahl) und boss null in normalen Partien', Number.isInteger(gest.seed) && gest.seed >= 0 && gest.boss === null
+      && gest.buehneSeed === gest.seed && gest.buehneBoss === null, JSON.stringify(gest));
+    // abgelehnter Zug: Bauer drei Felder weit
+    await h.zugZiehen('e2e5');
+    await seite.waitForFunction(() => window.__wp.ereignisse.some((e) => e.name === 'zug:abgelehnt'), null, { timeout: 5000 }).catch(() => {});
+    const ab = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'zug:abgelehnt'));
+    pruefe('zug:abgelehnt { laufId, von, nach, art, figur, fen } bei einem nicht erlaubten Zug', ab.length === 1 && ab[0].von === 'e2' && ab[0].nach === 'e5' && ab[0].art === 'ziehen'
+      && ab[0].figur === 'wP' && ab[0].laufId === gest.laufId && ab[0].fen.startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w'), JSON.stringify(ab));
+    pruefe('zug:abgelehnt: Stellung und Brett unverändert', (await h.zuege()).length === 0 && (await h.phase()) === 'flo');
+
+    // Schaefermatt ohne Finisher: Abrechnung im Ergebnis, kein Matt-Hook. Die Auswertung wird gebremst, damit das
+    // Ergebnis erst vorlaeufig erscheint und dann der Nachtrag kommt (zweimal fuelle)
+    await schaeferBisMatt(seite, h);
+    await bremse(seite, 900);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.zugTippen('h5f7');
+    await seite.waitForSelector('.ergebnis-overlay.vorlaeufig .erg-karte-ort .abrechnung', { timeout: 20000 });
+    const abr = await seite.evaluate(() => {
+      const a = document.querySelector('.ergebnis-overlay .erg-karte-ort .abrechnung');
+      const z = [...a.children];
+      return { zeilen: z.map((x) => x.dataset.zeile).join(), t: z.map((x) => x.style.getPropertyValue('--t')).join(), rollt: z.every((x) => x.classList.contains('abr-rollt')),
+        rollen: z.map((x) => x.getAttribute('role')).join(), erstes: a.parentNode.firstElementChild === a, kontext: window.__wp.kontexte['ergebnis:abrechnung'],
+        tipp: !!document.querySelector('.ergebnis-overlay .erg-tipp'), hook: window.__partie.protokoll.some((e) => e.typ === 'matt-hook') };
+    });
+    pruefe('Abrechnung: Hülle an ergebnis:karte, Zeilen Punkte vor Funken, rollen im Abstand von 200 ms ein', abr.zeilen === 'punkte,funken' && abr.t === '300ms,500ms'
+      && abr.rollt && abr.rollen === 'listitem,listitem' && abr.erstes && !abr.tipp, JSON.stringify(abr));
+    pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
+    pruefe('Matt ohne Finisher-Anbieter: kein Matt-Hook, Ablauf wie vorher', abr.hook === false);
+    await seite.evaluate(() => { window.__abrVorher = document.querySelector('.ergebnis-overlay .abrechnung'); });
+    await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 90000 });
+    const nach = await seite.evaluate(() => {
+      const a = document.querySelector('.ergebnis-overlay .erg-karte-ort .abrechnung');
+      return { neu: a !== window.__abrVorher, zeilen: [...a.children].map((x) => x.dataset.zeile).join(), rollt: [...a.children].some((x) => x.classList.contains('abr-rollt')),
+        rechnet: [...a.children].some((x) => x.textContent.includes('…')) };
+    });
+    pruefe('Abrechnung: Nachtrag baut die Hülle neu, dieselben Zeilen stehen still (ohne erneutes Einrollen)', nach.neu && nach.zeilen === 'punkte,funken' && !nach.rollt && !nach.rechnet, JSON.stringify(nach));
+    await seite.locator('.ergebnis-overlay .abrechnung').click();
+    pruefe('Abrechnung: Antippen zeigt sofort alles', await seite.evaluate(() => document.querySelector('.ergebnis-overlay .abrechnung').classList.contains('alles')));
+    const datensatz = (await h.gespeichert())[0];
+    const beendet = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:beendet').pop());
+    pruefe('Datensatz und partie:beendet: seed (wie beim Start), kein boss', datensatz.seed === beendet.seed && Number.isInteger(datensatz.seed) && !('boss' in datensatz)
+      && beendet.boss === null, JSON.stringify(datensatz).slice(0, 200));
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    pruefe('partie:gegner-leiste: verlasse() beim Verlassen der Partie', (await seite.evaluate(() => window.__wp.leisteWeg)) >= 1);
+    // fuenf Zeilen: hoechstens vier
+    await seite.goto(MIT_W0PLUS('wpabr&wpabr5') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await h.schaefermatt();
+    await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .abrechnung', { timeout: 20000 });
+    pruefe('Abrechnung: höchstens vier Zeilen (Punkte, Funken, Wertung, Serie)', (await seite.evaluate(() => [...document.querySelector('.ergebnis-overlay .abrechnung').children]
+      .map((x) => x.dataset.zeile).join())) === 'punkte,funken,wertung,serie');
+    pruefe('Orte: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // --- Matt-Hook (Finisher) ---
+  gruppe = 'W0+a: Matt-Hook';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpmatt') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await schaeferBisMatt(seite, h);
+    await h.zugTippen('h5f7');
+    await seite.waitForFunction(() => window.__wp.matt.length === 1, null, { timeout: 15000 });
+    const zwischen = await seite.evaluate(() => ({
+      overlay: !!document.querySelector('.ergebnis-overlay'), gekippt: !!document.querySelector('.partie .brett > img.figur.kippt[data-feld="e8"]'),
+      striche: document.querySelectorAll('.partie .brett-effekte svg.brett-striche g.strich').length,
+    }));
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 10000 });
+    await seite.waitForFunction(() => window.__wp.overlayT > 0, null, { timeout: 5000 });
+    const r = await seite.evaluate(() => {
+      const w = window.__wp;
+      const beendet = w.ereignisse.find((e) => e.name === 'partie:beendet');
+      const mattZug = w.ereignisse.find((e) => e.name === 'zug:gespielt' && e.matt);
+      return { m: w.matt[0], kontext: w.kontexte['partie:matt'], beendetT: beendet && beendet.t, mattT: w.matt[0].t, overlayT: w.overlayT, abbruch: w.abbruch,
+        effekteNachMatt: w.effekte.filter((t) => t >= mattZug.t).length, protokoll: window.__partie.protokoll.filter((e) => /matt-hook/.test(e.typ)) };
+    });
+    pruefe('Matt-Hook: Kontext { app, buehne, dauerMs, ergebnis, fen, gewinner, koenigFeld, kurzMs, laufId, letzterZug, partieId, reduziert, signal }',
+      JSON.stringify(r.kontext) === '["app","buehne","dauerMs","ergebnis","fen","gewinner","koenigFeld","kurzMs","laufId","letzterZug","partieId","reduziert","signal"]', JSON.stringify(r.kontext));
+    pruefe('Matt-Hook: nach dem Speichern und nach partie:beendet, mit den Daten des Matts', r.m.gespeichert === true && r.beendetT <= r.mattT && r.m.gewinner === 'flo'
+      && r.m.koenigFeld === 'e8' && r.m.nach === 'f7' && r.m.figur === 'wQ' && r.m.dauerMs === 1800 && r.m.kurzMs === 800 && r.m.eingefroren, JSON.stringify(r));
+    pruefe('Matt-Hook: vor dem Ergebnis; Brett-Werkzeuge (König kippt, Striche in der Effekt-Ebene) gehen', !zwischen.overlay && zwischen.gekippt && zwischen.striche === 2, JSON.stringify(zwischen));
+    const warteZeit = r.overlayT - r.mattT;
+    pruefe('Matt-Hook: Ergebnis spätestens nach 1,8 s (der Finisher wollte 6 s)', warteZeit >= 1700 && warteZeit < 2600 && r.abbruch >= r.mattT + 1700, `${Math.round(warteZeit)} ms`);
+    pruefe('Matt-Hook: der Finisher ersetzt den Klassen-Effekt des Mattzugs', r.effekteNachMatt === 0, String(r.effekteNachMatt));
+    pruefe('Matt-Hook: im Protokoll der Partie', r.protokoll.length === 2 && r.protokoll[0].wartend === 1 && r.protokoll[1].abgebrochen === false, JSON.stringify(r.protokoll));
+    // zweite Partie: Tipp ueberspringt
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    pruefe('Matt-Hook: verlasse() des Finishers beim Verlassen der Partie', (await seite.evaluate(() => window.__wp.mattWeg)) === 1);
+    await schaeferBisMatt(seite, h);
+    await h.zugTippen('h5f7');
+    await seite.waitForFunction(() => window.__wp.matt.length === 2, null, { timeout: 15000 });
+    await warte(250);
+    const brett = await seite.locator('.partie .brett').boundingBox();
+    await seite.touchscreen.tap(brett.x + brett.width / 2, brett.y + 20);
+    await seite.waitForSelector('.ergebnis-overlay', { timeout: 10000 });
+    await seite.waitForFunction(() => window.__wp.overlayT > 0, null, { timeout: 5000 });
+    const r2 = await seite.evaluate(() => ({ mattT: window.__wp.matt[1].t, overlayT: window.__wp.overlayT, abbruch: window.__wp.abbruch,
+      protokoll: window.__partie.protokoll.filter((e) => e.typ === 'matt-hook-ende') }));
+    const tippZeit = r2.overlayT - r2.mattT;
+    pruefe('Matt-Hook: ein Tipp überspringt (Ergebnis kurz danach, signal bricht ab)', tippZeit < 1500 && r2.abbruch < r2.overlayT && r2.protokoll[0].abgebrochen === true, `${Math.round(tippZeit)} ms`);
+    pruefe('Matt-Hook: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // --- Boss-Modus ---
+  gruppe = 'W0+a: Boss';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true, saat: SAAT });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpboss&wpleiste') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    const sterneVorher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'meister', woche: '2026-10-12' } });
+    await h.warteFlo();
+    const k = await seite.evaluate(() => ({
+      h2: document.querySelector('.partie .kopf h2').textContent, unter: document.querySelector('.partie .kopf .unter').textContent,
+      meta: document.querySelector('.partie .botkarte .bot-meta').textContent, gest: window.__wp.ereignisse.find((e) => e.name === 'partie:gestartet'),
+      zuege: window.__partie.z.zuege.slice(), blase: (document.querySelector('.partie .blase-ort .sprechblase') || {}).textContent,
+    }));
+    pruefe('Boss: Kopf mit Boss-Name und Stufe, Unterzeile mit der Regel, Bot-Zeile "Wochen-Boss"', k.h2 === 'Testboss · Meister' && k.unter.startsWith('Regel: Startet aus dem Spanier.')
+      && k.meta.startsWith('Wochen-Boss'), JSON.stringify(k));
+    pruefe('Boss: Startstellung aus dem Profil, Satzbuch des Bosses', k.gest.startFen === BOSS_START && k.zuege[0] === 'f8e7' && k.blase === 'Willkommen beim Boss!', JSON.stringify(k));
+    pruefe('Boss: partie:gestartet modus boss, wertet nicht, mit boss und seed; die Bühne kennt boss', k.gest.modus === 'boss' && k.gest.wertet === false
+      && JSON.stringify(k.gest.boss) === '{"id":"test-boss","stufe":"meister","woche":"2026-10-12"}' && Number.isInteger(k.gest.seed)
+      && JSON.stringify(k.gest.buehneBoss) === JSON.stringify(k.gest.boss), JSON.stringify(k.gest));
+    pruefe('Boss: Gegner-Leiste bekommt boss im Kontext', await seite.evaluate(() => window.__wp.kontexte['partie:gegner-leiste'].includes('boss')));
+    const lauf = await h.laufend();
+    pruefe('Boss: laufende Partie mit modus, boss und seed', lauf.modus === 'boss' && lauf.boss.stufe === 'meister' && lauf.seed === k.gest.seed, JSON.stringify(lauf).slice(0, 300));
+    // Fortsetzen nach Neuladen (echtes Neuladen, nicht nur der Hash): gleicher Boss, gleicher Seed
+    await seite.evaluate(() => { window.__test = {}; });
+    await seite.reload();
+    await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
+    const fort = await seite.evaluate(() => ({ g: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet'), h2: document.querySelector('.partie .kopf h2').textContent }));
+    pruefe('Boss: Fortsetzen nach Neuladen behält Boss, Stufe und Seed', fort.h2 === 'Testboss · Meister' && fort.g.length === 1 && fort.g[0].fortgesetzt === true
+      && fort.g[0].modus === 'boss' && fort.g[0].seed === k.gest.seed && !!fort.g[0].boss && fort.g[0].boss.stufe === 'meister', JSON.stringify(fort));
+    await h.warteFlo();
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel="ab-hier"]', { timeout: 15000 });
+    const erg = await seite.evaluate(() => ({
+      chip: document.querySelector('.ergebnis-overlay .erg-kopf .chip.uebung').textContent, modus: document.querySelector('.ergebnis-overlay .erg-kopf .chip').dataset.modus,
+      sterne: document.querySelectorAll('.ergebnis-overlay .erg-stern').length, knopf: document.querySelector('.ergebnis-overlay [data-ziel="ab-hier"]').textContent.trim(),
+    }));
+    pruefe('Boss: Ergebnis mit Chip BOSS, ohne Sterne, Knopf "Nochmal"', erg.chip === 'BOSS' && erg.modus === 'boss' && erg.sterne === 0 && erg.knopf === 'Nochmal', JSON.stringify(erg));
+    const d = (await h.gespeichert())[0];
+    const sterneNachher = await seite.evaluate(async () => (await import('./js/storage.js')).gesamtSterne());
+    pruefe('Boss: Datensatz mit modus, boss und seed; keine Sterne, Fortschritt unverändert', d.modus === 'boss' && d.boss.id === 'test-boss' && d.seed === k.gest.seed
+      && JSON.stringify(d.sterne) === '[false,false,false]' && sterneNachher === sterneVorher, JSON.stringify(d).slice(0, 300));
+    await seite.evaluate(() => { window.__test = { botZug: () => 'f8e7' }; });
+    await seite.locator('.ergebnis-overlay [data-ziel="ab-hier"]').click();
+    await seite.waitForFunction(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet').length === 2 && window.__partie && window.__partie.bereit, null, { timeout: 30000 });
+    const neu = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet')[1]);
+    pruefe('Boss: "Nochmal" startet denselben Boss mit derselben Stufe und neuem Seed', neu.modus === 'boss' && JSON.stringify(neu.boss) === JSON.stringify(k.gest.boss)
+      && neu.seed !== k.gest.seed, JSON.stringify(neu));
+    await seite.evaluate(() => { window.__test = {}; window.__app.gehe('verlauf'); });
+    await seite.waitForSelector('.screen.vl-screen');
+    pruefe('Boss: Verlauf zeigt die Boss-Partie mit Namen (angemeldeter Bot) und dem Chip "Boss"', await seite.evaluate(() => document.querySelector('.screen.vl-screen').textContent.includes('Testboss')
+      && [...document.querySelectorAll('.vl-uebung')].some((c) => c.textContent === 'Boss' && c.dataset.modus === 'boss')));
+    pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
 // ---------- 7. Viewports ----------
 async function testeViewport(browser, vp) {
   gruppe = vp.name;
@@ -1980,7 +2400,7 @@ try {
   await warteAufServer(BASIS);
   const { chromium } = ladePlaywright();
   browser = await chromium.launch();
-  const NUR = NUR_PRUEFRUNDE || NUR_ERWEITERUNGEN || NUR_NACHPRUEFUNG;
+  const NUR = NUR_PRUEFRUNDE || NUR_ERWEITERUNGEN || NUR_NACHPRUEFUNG || NUR_SPIEL;
   if (!NUR) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const h = hilfen(seite, { touch: true });
@@ -1995,6 +2415,7 @@ try {
   if (!NUR || NUR_PRUEFRUNDE) await testePruefrunde(browser);
   if (!NUR || NUR_ERWEITERUNGEN) await testeErweiterungen(browser);
   if (!NUR || NUR_NACHPRUEFUNG) await testeNachpruefung(browser);
+  if (!NUR || NUR_ERWEITERUNGEN || NUR_SPIEL) await testeSpielFundament(browser);
   if (!SCHNELL && !NUR) for (const vp of VIEWPORTS) await testeViewport(browser, vp);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

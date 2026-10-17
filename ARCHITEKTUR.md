@@ -514,11 +514,12 @@ Sterne und Freischaltung bleiben im festen Teil des Overlays und laufen nicht du
 ## Speicher: Modus, Wertungs-Schutz, Modul-Speicher und Budget (js/storage.js)
 ```js
 export const MODI = ['normal', 'uebung']        // eingefroren; weitere Modi nur mit einer neuen Welle
+                                                // (W0+a: dazu 'boss', 'frei', 'spiel', siehe unten)
 export function wertet(p)                       // (p.modus || 'normal') === 'normal' und keine eigene Stellung:
                                                 // startFen leer oder gleich der Grundstellung (Stellung, Zugrecht,
                                                 // Rochade, en passant; die Zugzaehler zaehlen nicht)
 export const EXTRA_MAX = 400                    // Zeichen fuer partie.extra (alle Pakete zusammen)
-export const MODUL_BUDGET = { kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
+export const MODUL_BUDGET = { kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,   // W0+a: + 8 Module
                               taktik: 8000, start: 6000, feier: 6000, serie: 4000 }
 export const SPEICHER_GRENZE = 2500000
 export function ladeModul(name, standard)       // gespeicherte Daten oder tiefe Kopie von standard
@@ -561,7 +562,7 @@ export function speichereModulEinstellungen(name, daten)      // -> { ok, zeiche
   Schatzkiste. Rueckgabe zusaetzlich `wertet`. `sterneFuerPartie()` gibt fuer nicht wertende Partien
   nie Sterne. `aktualisierePartie()` aendert `modus` und `startFen` nicht. `statistik()` zaehlt nur
   wertende Partien, die Durchschnitts-Genauigkeit nur Partien ab `BESTWERT_MIN_ZUEGE` eigenen Zuegen.
-- **Analysen kompakt:** `MAX_REVIEWS` = 20. `speichereReview()` speichert ueber `kompaktReview()`
+- **Analysen kompakt:** `MAX_REVIEWS` = 20 (W0+a: 12, siehe unten). `speichereReview()` speichert ueber `kompaktReview()`
   (ohne `sanDe`, `besterZugSanDe`, `besteLinieSan`, `nummer` und `fenNachher` ausser beim letzten Zug;
   ca. 24 % kleiner), `ladeReview()` baut sie ueber `ergaenzeReviewFelder()` wieder auf. Fuer alle
   Aufrufer aendert sich nichts. Alte, volle Reviews laden unveraendert.
@@ -783,3 +784,253 @@ App startet, das heile Paket laedt), den Sternklang bei reduzierter Bewegung, `c
 erst in `DATEIEN`, wenn ihr Paket in `PAKETE` steht (vorher nur ein Hinweis; ein Paket darf `sw.js` nicht aendern und
 haelt den Test so trotzdem gruen); danach jede Datei, auch in Unterordnern. Jeder Eintrag in `PAKETE` muss existieren
 und im Cache stehen.
+
+---
+
+# W0+a: Spiel-Fundament (verbindlich, SPIELKONZEPT 6.2 und 6.6)
+
+Erweitert die Erweiterungspunkte aus Welle 0 fuer die erste spielige Welle S1 (Funken, Wertung, Bestenliste,
+Bauernmarsch, Tagesraetsel, Wochen-Boss, Finisher, Lektionen). Ohne Pakete sieht die App aus und verhaelt sich wie
+vorher: Alle neuen Behaelter sind leer und versteckt, der Matt-Hook laeuft nur mit einem Anbieter, die untere Leiste
+erscheint erst mit `REITER`. Bewusste Aenderungen ohne Pakete: `MAX_REVIEWS` 12 (aeltere Analysen fallen still weg und
+werden beim Oeffnen neu gerechnet), dauerhafter Speicher wird bei jedem Start angefragt, jede neue Partie bekommt einen
+Seed (die Bot-Zuege ziehen ihren Zufall daraus, die Verteilung ist dieselbe wie mit `Math.random`).
+
+| Datei | Neu |
+|---|---|
+| `js/tag.js` (neu, rein) | Tag (Grenze 4:00 lokal), Woche (Montag 4:00), Kalenderwoche, Zufall aus einem Seed (mulberry32) |
+| `js/inhalte.js` (neu, rein bis auf `fetch`) | statische JSON-Dateien unter `daten/`, Dateikopf mit Rechenstand, Format der Spielplan-Datei |
+| `js/ui/abrechnung.js` (neu) | Abrechnungs-Huelle an `ergebnis:karte` (Reihenfolge 3), darin der Zeilen-Ort `ergebnis:abrechnung` |
+| `daten/beispiel/spielplan.json` (neu) | Beispiel des Spielplan-Formats (wird nicht ausgeliefert, nur Format und Tests) |
+| `js/storage.js` | Modi `boss`, `frei`, `spiel`; Datensatz `seed`, `tempo`, `zeiten`, `boss`, `liga`; `MODUL_BUDGET` +8; `MAX_REVIEWS` 12; `duenneAnalysenAus()`, `dauerhaftAnfragen()`; Anzeige-Einstellungen |
+| `js/ereignisse.js` | zehn neue Ereignisse (Tabelle unten) |
+| `js/orte.js` | acht neue Orte, `angeboten(ort)`, Aufruf-Orte mit `{ fertig }` |
+| `js/feier.js` | Quellen und Prioritaeten aus SPIELKONZEPT 3.10, `BRETT_FEIER` |
+| `js/app.js`, `js/erweiterungen.js` | sieben neue Paket-Screens, untere Leiste (nur vorbereitet, `REITER`), Start: Speicher dauerhaft, Analysen ausduennen |
+| `js/ui/partie.js` | Matt-Hook, Gegner-Leiste, Modus `boss`, Seed je Partie, `zug:abgelehnt`, Buehne `boss`/`seed`/`zeigt`/`platz` |
+| `js/ui/arena.js` | Host der Heute-Karte (`arena:heute`) |
+| `js/bots.js` | `registriereBot(profil)`, `botZug(..., { zufall, nodes, vorliebe })` |
+| `js/board.js` | `beiAbgelehnt`, `striche()`, `kippeKoenig()` |
+| `tests/spiel.test.mjs` (neu) | Node: tag.js, inhalte.js, Spielplan, Bot-Register, nodes, Vorliebe, Seed |
+
+## js/tag.js
+```js
+TAG_GRENZE_STUNDE = 4
+tagSchluessel(datum = new Date()) -> 'JJJJ-MM-TT'     // vor 4:00 lokal: der Vortag (Wanduhr, nie toISOString)
+wochenSchluessel(datum = new Date()) -> 'JJJJ-MM-TT'  // der Montag, an dem die Woche um 4:00 begann
+istSchluessel(text), addiereTage(schluessel, n), tageZwischen(von, bis), wochentag(schluessel) -> 0 (Mo) .. 6 (So)
+kalenderwoche(schluessel) -> { jahr, kw }             // ISO, fuer "KW 2 · 2027"
+beginnVon(schluessel) -> Date                          // 4:00 lokal
+seedAus(wert) -> 0..2^32-1                             // Zahl bleibt, Text wird gehasht (FNV-1a)
+zufallAus(seed) -> () => [0, 1)                        // mulberry32; gleicher Seed, gleiche Folge auf jedem Geraet
+zugZufall(seed, ply) -> () => [0, 1)                   // = zufallAus(seedAus(seed) + '/' + ply): Bot-Zug im Halbzug ply
+```
+- Gerechnet wird mit der Wanduhr: Am Ende der Sommerzeit (25.10.2026) gehoeren 2:00 bis 3:59 (beide Stunden 2) noch
+  zum 24.10.; der Tag der Umstellung hat 25 Stunden. Springt die Uhr zurueck (Hand-Einstellung, Zeitzone), liegen die
+  Schluessel frueher als gemerkte: Wer zaehlt (Serie, Tagesbogen), vergleicht mit `tageZwischen` und zaehlt bei Werten
+  `<= 0` nichts neu. Ein Zeitzonenwechsel folgt der Wanduhr des Geraets (die Reise-Regel 3.14 ist Sache von S1-4).
+- Kein `Math.random` in `tag.js` (Fairness-Test).
+
+## js/inhalte.js und das Format der Inhalte
+```js
+RECHENSTAND = 1, VORLAUF_TAGE = 28, THEMEN = ['gambit', 'endspiel', 'taktik', 'eroeffnung', 'uhr']
+ladeInhalt(name, { art, neu = false }) -> Promise<{ ok: true, kopf, daten, veraltet } | { ok: false, grund, text }>
+    // daten/<name>.json relativ zum Modul; grund 'name' | 'netz' | 'json' | 'kopf' | 'art' | 'format' | 'rechenstand'
+    // | 'inhalt'; wirft nie; Erfolge bleiben im Arbeitsspeicher, Fehler werden beim naechsten Mal neu versucht
+pruefeKopf(json, { art }), pruefeInhalt(json, { art }) -> { ok, kopf, veraltet, fehler }
+registriereInhaltsart(art, { formate: [1], pruefe(json) -> [Fehlertext] }) -> abmelden()   // Pakete: eigene Dateiarten
+setzeHoler(fn | null), leereZwischenspeicher()        // nur Tests
+// Spielplan
+pruefeSpielplan(json) -> [Fehlertext], pruefeSpielplanFolge(alt, neu) -> [Fehlertext]
+spielplanWoche(plan, wochenSchluessel), naechsteWochen(plan, datum, n = 4)
+funkenWochenendeVon(woche) -> { beginn, ende } | null, funkenWochenendeAktiv(plan, datum) -> boolean
+texteVon(json) -> [Text]                               // alle Texte (Pruefungen)
+```
+**Dateikopf** jeder Datei unter `daten/`: `{ "kopf": { "art", "format", "rechenstand", "stand", "titel"? }, ... }`.
+`rechenstand` hoeher als `RECHENSTAND`: abgelehnt ("braucht eine neuere App"); niedriger: geladen mit
+`veraltet: true` (Tafeln rechnen auf Wunsch neu, 3.13). `RECHENSTAND` zaehlt hoch, wenn Punkte-Formel, Analysetiefe oder
+Bot-Einstellungen sich aendern. Dateien direkt unter `daten/` stehen in `DATEIEN` (sw.js, Offline-Cache; der sw-Test
+verlangt das), `daten/beispiel/` wird nicht ausgeliefert.
+
+**Spielplan** (`art: 'spielplan'`, `format: 1`, eine Datei je Quartal oder Saison; Beispiel `daten/beispiel/spielplan.json`):
+```json
+{ "kopf": { "art": "spielplan", "format": 1, "rechenstand": 1, "stand": "2026-10-19" },
+  "saison": { "id": "vorsaison-2026", "name": "Vorsaison" },
+  "wochen": [ { "montag": "2026-11-23", "boss": "baron-gambit", "thema": "gambit", "funkenWochenende": false,
+                "klassiker": [], "text": "Gambit-Woche: Der Baron hat einen Bauern geopfert." } ] }
+```
+| Feld | Regel |
+|---|---|
+| `montag` | Wochenschluessel (ein Montag), Wochen lueckenlos und aufsteigend, hoechstens 26 |
+| `boss` | ID des Wochen-Bosses (ein mit `registriereBot` angemeldeter Boss; Wechsel Montag 4:00) |
+| `thema` | `null` oder eine der `THEMEN` (Themen-Woche ab Montag 4:00) |
+| `funkenWochenende` | `true`: Freitag 16:00 bis Montag 4:00 zaehlen Partie- und Lern-Funken doppelt (S1-1 liest das) |
+| `klassiker` | optional, hoechstens 2 Boss-IDs aus dem Archiv im Rampenlicht |
+| `text` | optional, Steckbrief, hoechstens 140 Zeichen |
+Regeln (Fairness 19): Themen-Wochen und Funken-Wochenenden beginnen mindestens 28 Tage nach `kopf.stand`; unbekannte
+Felder (z. B. `verfuegbarBis`, `bis`) und Uhrzeit-Countdowns (`\d+\s*(h|Std|min)`) werden abgelehnt;
+`pruefeSpielplanFolge` meldet jede Aenderung an einer Woche, die vor `neu.kopf.stand + 28 Tage` beginnt (schon
+angekuendigt: der Spielplan-Screen zeigt die naechsten 4 Wochen). Nur der Steckbrief-Text darf sich aendern.
+
+## Ereignisse (js/ereignisse.js)
+| Name | Daten | Wer sendet, wann |
+|---|---|---|
+| `funken:gebucht` | `{ quelle, menge, gesamt, level }` (`quelle`: `'partie'` \| `'lernen'` \| `'tag'` \| `'meilenstein'` wie die Tabellen A, B, C in 3.3; `menge` ganze Zahl >= 0 nach Faktor, Rueckenwind und Tagesbogen; `gesamt` alle Funken bisher; `level` nach der Buchung) | S1-1, nach jeder Buchung |
+| `level:aufstieg` | `{ level, titel, neu }` (`titel`: Text bei jedem 5. Level, sonst `null`; `neu`: `[{ art, id, name }]` freigeschaltete Stuecke) | S1-1, nach der Buchung, die das Level hebt (nie mitten in einer Partie gezeigt) |
+| `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
+| `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
+| `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
+| `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1 vor und nach Flos Zug; Treffer ab 0,03) | S1-6, nach `zug:bewertet` in Boss-Partien |
+| `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
+| `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`) | S1-3 (spaeter S2-2), nach dem Eintrag |
+| `uhr:knapp` | `{ laufId, rest }` (`rest` Restzeit von Flo in ms) | W0+b, einmal je Partie, wenn Flos Uhr unter 30 s faellt |
+| `zug:abgelehnt` | `{ laufId, von, nach, art, figur, fen }` (`nach`: Feld oder `null`, wenn nur eine Figur ohne erlaubten Zug angetippt wurde; `art`: `'ziehen'` \| `'tippen'`; `figur` z. B. `'wN'`; `fen` die Stellung) | `partie.js` aus `board.js` `beiAbgelehnt`, nur wenn Flo am Zug ist (3.18; den Grund rechnet S2-8 mit chess.js) |
+`partie:gestartet` traegt zusaetzlich `boss` (Kopie oder `null`) und `seed`, `partie:beendet` ebenso `boss` und `seed`.
+Hinweis fuer S2-8: `zug:abgelehnt` kommt auch, wenn Flo mit gewaehlter Figur ein beliebiges anderes Feld antippt (z. B.
+zum Abwaehlen); erklaeren sollte das Paket nur Versuche, die eine Figur dieser Art geometrisch ziehen koennte.
+
+## Orte (js/orte.js) und wer sie hostet
+```js
+angeboten(ort) -> Zahl der Anbieter             // neu; ein Host spart Wartezeiten, wenn niemand anbietet
+fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
+// Aufruf-Anbieter duerfen { verlasse(), fertig: Promise } liefern; fertig erfuellt sich, wenn alle fertig sind
+// (auch bei Fehlern, die mit Paketname in der Konsole landen), wartend = Zahl dieser Anbieter
+```
+| Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
+|---|---|---|---|---|
+| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
+| `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch .info` (wandert beim Drehen mit, `data-lage`); ohne Anbieter `hidden` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
+| `partie:matt` | Aufruf | `partie.js` `ende()` bei Matt: nach `speicherePartie`, nach `partie:beendet`, vor dem Ergebnis (Ablauf unten) | `{ app, buehne, laufId, partieId, ergebnis, gewinner, koenigFeld, letzterZug { von, nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }` | Finisher (S1-7) |
+| `ergebnis:abrechnung` | DOM | `js/ui/abrechnung.js`: Huelle `div.abrechnung[role=list]`, die selbst an `ergebnis:karte` (Reihenfolge 3) haengt | wie `ergebnis:karte` (mit `boss`) | Punkte 10 (S1-3) · Funken 20 (S1-1) · Wertung 30 (S1-2) · Serie 40 (S1-4) |
+| `bestenliste:reiter` | DOM | Screen `bestenliste` (S1-3 `punkte`), Reiterzeile der Bestenliste; bis dahin nur die Node-Pruefung in `tests/ereignisse.test.mjs` | `{ app, reiter, fenster }` (`reiter`: gewaehlter Reiter, `fenster`: `'woche'` \| `'monat'` \| `'allzeit'`) | Ich 10 · Bots 20 (S1-3) · Liga 30 (S3-2) · Raetsel 40 (S2-2) · Freunde 50 (S3-3) |
+| `training:karten` | DOM | Screen `training` (S2-1 `kartei`), Karten des Trainings | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
+| `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
+| `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeInhalt('spielplan')`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
+Die vier Screen-Orte haben noch keinen Host: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau diesem Kontext
+auf (und schreiben die Stelle in ihren Kopfkommentar); bis dahin pruefen die Node-Tests der Orte (Mini-DOM) Reihenfolge
+und Abraeumen. Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
+
+**Abrechnung.** Hoechstens `ABRECHNUNG_MAX` = 4 Zeilen (weitere: console.warn, nicht gezeigt). Neue Zeilen rollen im
+Abstand von 200 ms ein (`.abr-rollt`, `--t` ab 300 ms), reduzierte Bewegung sofort, Antippen der Huelle zeigt alles
+(`.alles`). Die Huelle wird bei jedem `fuelle()` des Overlays neu gebaut (vorlaeufig, fertig, Nachtrag); Zeilen, die fuer
+diese Partie schon gezeigt wurden (erkannt an `data-zeile`, sonst an der Stelle), stehen dann still da. Ohne Zeilen liefert
+die Huelle `null`: `ergebnis:karte` bleibt leer und der Tipp „Kopf hoch!“ erscheint wie vorher. Waehrend die Analyse noch
+rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sache des Pakets).
+
+**Matt-Hook (Finisher).** In `ende()` bei Grund `matt` und `angeboten('partie:matt') > 0`:
+1. Das Ergebnis ist schon gespeichert (`speicherePartie`), dann kommt `partie:beendet` (wie bisher hoechstens 2,5 s nach
+   dem Ende, sobald die Live-Bewertung des letzten Zugs da ist).
+2. `fuelle('partie:matt', null, kontext)`. Liefert ein Anbieter `{ fertig }`, wartet die Partie darauf, hoechstens
+   `feier.BRETT_FEIER.dauerMs` (1.800 ms). Ein Tipp irgendwo auf den Partie-Screen bricht ab (`kontext.signal` feuert
+   `abort`; spaetestens nach dem Warten feuert es immer, dann springen die Finisher auf ihr Endbild).
+3. Danach das Ergebnis (wie bisher fruehestens 900 ms nach dem Ende). Laeuft ein Finisher, entfaellt der Klassen-Effekt
+   des Mattzugs (der Finisher ersetzt jeden Brett-Effekt; das Symbol am Feld bleibt). `verlasse()` der Anbieter beim
+   Verlassen der Partie (das Endbild darf bis dahin stehen bleiben). Ohne Anbieter aendert sich nichts am Ablauf.
+`kurzMs` (800) ist die Laenge der Kurzfassung (3.9, „Saft nach Verdienst“); welche Fassung laeuft, entscheidet das Paket.
+
+## Partie (js/ui/partie.js)
+- **Params** zusaetzlich: `modus: 'boss' | 'frei' | 'spiel'`, `boss: { id, stufe: 'standard' | 'meister', woche?, staerke? }`
+  (nur Modus `boss`), `seed` (sonst neu gewuerfelt), `liga: { saison, runde }`. Angemeldete Bots (`registriereBot`) gehen
+  wie Leiter-Bots (`botId`); ihre `startFen` gilt, wenn die Params keine nennen.
+- **Modus `boss`**: wertet nie (keine Sterne, keine Freischaltung, keine Statistik). Kopf „Testboss · Meister“, Unterzeile
+  „Regel: …“ (`bot.regel`), Bot-Zeile mit `bot.titel` statt „Stufe n · Elo“. Ergebnis mit dem Chip `BOSS`
+  (`.chip.uebung[data-modus="boss"]`) und „Nochmal“ (gleiche Params, neuer Seed). `frei` und `spiel` zeigen die Chips
+  `FREI` und `SPIELHALLE`, Uebungen weiter `ÜBUNG` und „Nochmal ab hier“.
+- **Seed**: jede neue Partie bekommt einen 32-Bit-Seed (`Math.random` in `partie.js`), gespeichert in laufender Partie und
+  Datensatz. Jeder Bot-Zug zieht seinen Zufall aus `zugZufall(seed, ply)` (unabhaengig von Zuruecknahmen: so rechnet
+  ein Code spaeter jeden Bot-Zug nach). Alte laufende Partien ohne Seed spielen mit `Math.random` weiter.
+  `nodes` und `vorliebe` kommen aus dem Bot-Profil (`bot.nodes`, `bot.vorliebe`; die Leiter-Bots haben keine).
+- **Datensatz und laufende Partie** tragen `seed`, `boss`, `liga`, `tempo`, `zeiten` (die letzten beiden fuellt W0+b).
+- **Buehne** zusaetzlich: `boss` (eingefroren oder `null`), `seed`, `zeigt(name) -> boolean` fuer `'zaehlwerk'`,
+  `'funkenlinie'`, `'lebensleiste'`, `'balken'` (Einstellungen der App), `platz(name) -> HTMLElement | null` fuer
+  `'zaehlwerk'` (`.p-zaehlwerk` im Kopf vor dem Zahnrad) und `'funkenlinie'` (`.p-funkenlinie` am unteren Rand des
+  Brett-Rahmens). Der Platz entsteht beim ersten Aufruf, ist versteckt, solange die Einstellung aus ist, und folgt ihr.
+- **Ergebnis**: Kontext von `ergebnis:karte` zusaetzlich `boss`.
+
+## Bots (js/bots.js)
+```js
+registriereBot(profil) -> abmelden()     // { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo,
+                                         //   saetze, regel, startFen, vorliebe, nodes, archiv }
+botNachId(id), alleBots(), BOT_ARTEN = ['boss', 'sparring', 'gast']
+botZug(engine, fen, bot, { zugNummer, ohnePause, zufall, signal, nodes, vorliebe }) -> { uci, san, denkzeitMs, art, vorliebe? }
+vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30
+```
+- Profil: `id` [a-z][a-z0-9-] (nicht wie ein Leiter-Bot), `name`, `avatar` (Pfad oder `data:`-URL, z. B. das SVG-Wappen eines
+  Bosses) und `staerke` (Format wie `BOTS[i].staerke`; vor der Eichung die des naechstliegenden Leiter-Bots) sind Pflicht.
+  `art: 'boss'` braucht `archiv: true` (jeder Boss bleibt im Archiv spielbar, Fairness 5.3). `startFen` wird geprueft,
+  `regel` hoechstens 140 Zeichen, `nodes` positive ganze Zahl. Falsches Profil: Fehler. Angemeldete Bots haben
+  `stufe: null`, sind eingefroren und gehoeren nie zur Leiter. Die Formstufen (S3-1) kommen als weiteres Feld dazu.
+- `nodes`: jede Suche mit fester Knotenzahl statt Zeitlimit (voll: `{ nodes }` statt `movetime`; sonst `depth` plus
+  `nodes`). Zusammen mit dem Seed und einem Thread spielt ein Bot so auf jedem Geraet denselben Zug. Mit der Eichung
+  abstimmen; geprueft in der Determinismus-Probe S3-0.
+- `vorliebe`: Funktion `(zug, { fen, farbe, vollzug, punkte, bestePunkte }) -> Zahl` oder Gewichte (`schlagen`, `schach`,
+  `rochade`, `rochadeKurz`, `rochadeLang`, `bauer`, `springer`, `laeufer`, `turm`, `dame`, `koenig`, `vorwaerts`, `tausch`).
+  Gewaehlt wird nur unter den Zuegen der Bot-Analyse, die hoechstens 0,3 Bauern schlechter sind als der beste, und nur, wenn
+  der Bot ohnehin einen Zug aus diesem Fenster gespielt haette; Spontanzuege und Fehler bleiben. So macht der Stil einen Bot
+  weder heimlich staerker noch schwaecher. Bei voller Staerke rechnet die Engine dafuer 5 Linien (MultiPV).
+- Ohne `nodes` und `vorliebe` und mit `zufall = Math.random` spielt jeder Bot genau wie vorher (Test in `spiel`).
+
+## Brett (js/board.js)
+- `new Brett(el, { ..., beiAbgelehnt(von, nach, art) })`: nur waehrend `erlaubeZuege()` gesetzt ist. Gemeldet werden: eine
+  Figur auf ein nicht erlaubtes Feld gezogen (`art 'ziehen'`), mit gewaehlter Figur ein nicht erlaubtes Feld angetippt
+  (`'tippen'`), eine eigene Figur ohne erlaubten Zug angetippt (`nach: null`) oder gezogen (eine stille Geste, die Figur
+  bewegt sich dabei nicht). Am Bild aendert sich nichts.
+- `striche(liste, { ebene = null, animieren = true }) -> { el, entferne() }`: `[{ von, nach, art: 'linie' | 'haken' |
+  'kreuz', farbe, breite, verzoegerung }]` als `svg.brett-striche` (viewBox 0 0 8 8) im Brett ueber den Figuren oder in
+  `ebene` (z. B. `buehne.effekte`, gleiche Lage wie die Felder); folgt dem Drehen. Animiert werden nur `transform` und
+  `opacity`, reduzierte Bewegung zeigt das fertige Bild.
+- `kippeKoenig(feld, { langsam = false }) -> boolean` (`.figur.kippt`, langsam 1,4 s), `richteAuf()`; `setzeStellung`
+  stellt gekippte Koenige wieder auf.
+
+## Speicher (js/storage.js)
+- `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()` unveraendert (nur `normal` aus der Grundstellung).
+- Datensatz und laufende Partie: `seed` (0..2^32-1), `tempo` `{ grund, zuschlag }` (Sekunden, 1..10.800 und 0..600), `zeiten`
+  (Zehntelsekunden je Halbzug, hoechstens so viele wie Zuege), `boss` `{ id, stufe, woche?, staerke? }` (nur Modus `boss`),
+  `liga` `{ saison, runde }`. Falsches faellt still weg (`pruefeSeed`, `pruefeTempo`, `pruefeZeiten`, `pruefeBoss`,
+  `pruefeLiga` sind exportiert). Eine laufende Partie gegen einen angemeldeten Bot laedt nur, solange er angemeldet ist.
+- `MODUL_BUDGET` neu (6.6): `funken` 25.000 · `punkte` 40.000 · `boss` 12.000 · `raetsel` 30.000 · `lernen` 30.000 ·
+  `liga` 10.000 · `sammeln` 20.000 · `freunde` 15.000 (zusammen 182.000; mit Welle 0 506.000). Einstellungen der Pakete
+  weiter ueber `speichereModulEinstellungen(name, ...)`.
+- `MAX_REVIEWS` 12. `duenneAnalysenAus(max = MAX_REVIEWS) -> Zahl` entfernt still alles darueber (liest nur Schluessel,
+  Analysen ohne Partie zuerst, die neuesten Partien behalten ihre); `app.js` ruft es kurz nach dem ersten Screen.
+- `dauerhaftAnfragen() -> Promise<true | false | null>` (fragt `persist()` nur an, wenn `persisted()` nicht schon `true`
+  ist; Fehler still, `null` = unbekannt), `dauerhaftStatus()`; `app.js` ruft es bei jedem Start (vorher nur in der
+  Home-Bildschirm-App). Die Speicheranzeige der Sicherung (S1-9) liest den Status.
+- `STANDARD_EINSTELLUNGEN` zusaetzlich `zaehlwerk: false`, `funkenlinie: false`, `lebensleiste: true` (Anzeigen in der
+  Partie, 3.18; die Schalter baut der Premium-Umbau, die Buehne liest sie mit `zeigt()`).
+
+## Feier (js/feier.js)
+Quellen nach SPIELKONZEPT 3.10 (`art`, `prio`): `erster-sieg` gross 95 · `klasse` gross 90 · `boss-siegel` gross 88 ·
+`erzfeind` gross 85 · `liga-saison` gross 82 · `bot-rekord` gross 78 · `medaille-gold` gross 76 · `level-titel` gross 75 ·
+`meilenstein` gross 72 · `bestmarke` gross 70 · `umwandlung` gross 66 · `serie-rekord` Zeile 60 · `rekord` Zeile 58 ·
+`level` Zeile 55 · `marsch` Zeile 50 · `liga` Zeile 45 · `siegeslauf` Zeile 44 · `medaille` Zeile 40 · `tageskrone`
+Zeile 38 (vorher gross 65) · `tagesdreier` Zeile 35 · `karten` Zeile 30. `rang` und `kette` bleiben als alte Namen von
+`klasse` und `marsch` mit denselben Werten. `BRETT_FEIER = { dauerMs: 1800, kurzMs: 800 }`: Grenzen des Finishers, der vor
+dem Ergebnis laeuft und nicht ins Budget zaehlt.
+
+## App (js/app.js, js/erweiterungen.js)
+- `SCREENS` zusaetzlich `bestenliste`, `raetsel`, `lernen`, `lektion`, `ich`, `spielplan`, `spielhalle`, alle in
+  `PAKET_SCREENS` (fehlt die Datei: still zur Arena). Zuordnung zu Paketen fuer den sw-Test (`SCREEN_PAKET`):
+  bestenliste `punkte`, raetsel `raetsel`, lernen und lektion `lernen`, ich `ich`, spielplan `boss`, spielhalle
+  `spielhalle`; baut ein anderes Paket den Screen, aendert die Integration die Zuordnung.
+- **Untere Leiste** (`nav.reiter-leiste`, Reiter Arena, Training, Bestenliste, Ich): nur vorbereitet. Sie erscheint erst,
+  wenn `REITER` in `js/erweiterungen.js` Screens nennt (`'training'`, `'bestenliste'`, `'ich'`; Arena ist immer dabei;
+  im Testmodus auch `?reiter=training,ich`), und nur auf den Reiter-Screens (`arena`; `training`, `raetsel`, `lernen`;
+  `bestenliste`; `ich`). Dann `html[data-reiter="an"]` (Platz unten fuer `#app`), `aria-current="page"` am aktiven Reiter,
+  Wechsel ersetzt den Verlaufseintrag. Die Optik kommt mit dem Premium-Umbau. `app.js` liest `PAKETE` und `REITER` ueber
+  den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt.
+- Start: `dauerhaftAnfragen()` vor dem Laden der Pakete, `duenneAnalysenAus()` per `setTimeout(0)` nach dem ersten Screen.
+
+## Tests (W0+a)
+`node tests/spiel.test.mjs` (Node, Zeitzone Europe/Berlin): Tagesgrenze, Sommerzeit-Ende 25.10.2026 und -Beginn,
+Jahreswechsel, Kalenderwoche, Uhr springt zurueck, Zeitzonenwechsel, mulberry32, Dateikopf, `ladeInhalt` mit allen
+Fehlergruenden, Spielplan-Format und -Folge, Funken-Wochenende ueber die Zeitumstellung, `registriereBot`, `nodes`,
+`vorliebe` (Fenster, nie staerker), Seed je Halbzug. `ereignisse`: neue Ereignisse, Orte, Quellen, `angeboten`, `fertig`.
+`storage`: Modi, Felder, Budgets, Ausduennen, dauerhafter Speicher. `fairness`: Zusaetze aus 5.3 (Verbotsliste
+erweitert, auch fuer `daten/`; kein Ablauf-Feld; Spielplaene gueltig; kein Countdown in Spielplan, Boss, Werkstatt;
+Bosse werten nie und haben `archiv: true`; Finisher-Grenzen; kein `Math.random` in den reinen Logik-Dateien der neuen
+Pakete und in `tag.js`/`inhalte.js`; `bots.js`/`engine.js` importieren nichts aus Paketen). `board`: abgelehnte Zuege
+(Maus und Finger), Striche, Koenigsfall, reduzierte Bewegung. `app --spiel` (auch in `--erweiterungen` und im vollen
+Lauf): neue Screens, untere Leiste, Start (persist, ausduennen), Heute-Karte, Gegner-Leiste (quer und hoch), Plaetze der
+Buehne, `zug:abgelehnt`, Abrechnung (Reihenfolge, Einrollen, Nachtrag, hoechstens 4), Matt-Hook (Reihenfolge, 1,8 s,
+Tipp, Effekt ersetzt), Boss-Modus (Kopf, Startstellung, Satzbuch, Fortsetzen, Chip, Datensatz, „Nochmal“).

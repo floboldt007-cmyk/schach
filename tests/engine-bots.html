@@ -636,6 +636,36 @@ async function testAnker({ paare = [[4, 1320], [6, 1400], [7, 1600], [8, 1800], 
   });
 }
 
+
+// ---------------- W0+a: feste Knotenzahl und Seed (pruefbare Bot-Zuege) ----------------
+// Gleicher Seed (zugZufall je Halbzug), gleiche Knotenzahl, frische Engine mit ucinewgame: derselbe Zug. Das ist die
+// Grundlage fuer "bot-geprueft" (Codes, S3-3); die Determinismus-Probe ueber Geraete hinweg folgt in S3-0.
+async function testFundament() {
+  const { zugZufall } = await import('../js/tag.js');
+  const stellungen = [MITTE, NACH_E4, ...STELLUNGEN_FEN.slice(0, 3)];
+  const lauf = async (bot, nodes) => {
+    const e = new Engine(undefined, { protokoll: true });
+    await e.init();
+    await e.newGame();
+    const zuege = [];
+    for (let i = 0; i < stellungen.length; i++) {
+      const z = await botZug(e, stellungen[i], bot, { ohnePause: true, zufall: zugZufall(4711, i), nodes });
+      zuege.push(z.uci + ':' + z.art);
+      await e.newGame();
+    }
+    const gos = e.protokoll.filter((b) => b.startsWith('go'));
+    e.terminate();
+    return { zuege, gos };
+  };
+  for (const [id, nodes] of [['kalle', 20000], ['turm', 30000], ['stockfisch', 60000]]) {
+    const bot = BOTS.find((b) => b.id === id);
+    const a = await lauf(bot, nodes);
+    const b = await lauf(bot, nodes);
+    pruefe(`Fundament: ${bot.name} mit Seed und ${nodes} Knoten spielt zweimal dieselben Zuege`, JSON.stringify(a.zuege) === JSON.stringify(b.zuege), a.zuege.join(' ') + ' | ' + b.zuege.join(' '));
+    pruefe(`Fundament: ${bot.name} sucht mit nodes statt movetime`, a.gos.length > 0 && a.gos.every((g) => g.includes('nodes ' + nodes) && !g.includes('movetime')), a.gos.slice(0, 2).join(' | '));
+  }
+}
+
 window.tests = {
   async alle({ schnell = false, kalibrierung = {}, staerke = {}, anker = null } = {}) {
     ERGEBNISSE.length = 0;
@@ -644,6 +674,7 @@ window.tests = {
     const bericht = {};
     await testEngine();
     await testBots();
+    await testFundament();
     bericht.mattInEins = { ...BOTS_MATT };
     bericht.freieDame = { ...BOTS_DAME };
     bericht.charakter = { ...CHARAKTER };
@@ -656,7 +687,7 @@ window.tests = {
     log(`--- ${ERGEBNISSE.length - fehler.length} von ${ERGEBNISSE.length} Pruefungen bestanden, ${Math.round((jetzt() - t) / 1000)} s ---`, fehler.length ? 'fehler' : 'ok');
     return { ergebnisse: [...ERGEBNISSE], bericht, sekunden: Math.round((jetzt() - t) / 1000) };
   },
-  testEngine, testBots, testStaerke, testKalibrierung, testAnker, spielePartie,
+  testEngine, testBots, testFundament, testStaerke, testKalibrierung, testAnker, spielePartie,
 };
 window.T = { Engine, BOTS, botZug, botSatz, Chess };
 window.bereit = true;

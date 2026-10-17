@@ -588,6 +588,23 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   const gef = fuelle('ergebnis:abrechnung', c, {});
   pruefe('ergebnis:abrechnung: Zeilen in der Reihenfolge Punkte, Funken, Wertung, Serie', namen(c) === 'punkte,funken,wertung,serie' && gef.fertig instanceof Promise && gef.wartend === 0, namen(c));
   gef.verlasse();
+  // Test-Huelle der Screen-Orte (die Hosts kommen mit den Screens der Pakete): Reihenfolge und Abraeumen
+  const falsch = [];
+  for (const ort of ['bestenliste:reiter', 'training:karten', 'ich:vitrine', 'spielplan:tage', 'arena:heute', 'partie:gegner-leiste']) {
+    const h = el('host');
+    const ab1 = anbieten(ort, () => el('zweiter'), { reihenfolge: 20, paket: 'b' });
+    const ab2 = anbieten(ort, (k) => (k.leer ? null : el('erster')), { reihenfolge: 10, paket: 'a' });
+    const g = fuelle(ort, h, {});
+    const ok1 = namen(h) === 'erster,zweiter' && g.anzahl === 2 && angeboten(ort) === 2;
+    g.verlasse();
+    const g2 = fuelle(ort, h, { leer: true });
+    const ok2 = namen(h) === 'zweiter' && g2.anzahl === 1;
+    g2.verlasse();
+    ab1();
+    ab2();
+    if (!ok1 || !ok2 || namen(h) !== '' || angeboten(ort) !== 0) falsch.push(ort);
+  }
+  pruefe('Test-Huelle der W0+a-DOM-Orte: Reihenfolge, null-Anbieter, Abraeumen', falsch.length === 0, falsch);
   orteZuruecksetzen();
 }
 
