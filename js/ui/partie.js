@@ -1400,7 +1400,8 @@ export function zeige(root, params, app) {
     const g = z.gespeichert;
     if (!g || z.nachgetragen) return null;
     z.nachgetragen = true;
-    aktualisierePartie(g.partie.id, { liveKlassen: liveKlassenListe() });
+    // maxSerie mit: die Live-Bewertung des letzten Zugs kann nach dem Speichern kommen (Codex-Befund)
+    aktualisierePartie(g.partie.id, { liveKlassen: liveKlassenListe(), maxSerie: z.maxSerie });
     const nach = review ? ergaenzeAnalyse(g.partie.id, review) : ergaenzeAnalyse(g.partie.id, null, { genauigkeit: livGenauigkeit() });
     if (!nach) return null;
     melde({ typ: 'nachgetragen', id: g.partie.id, mitAnalyse: !!review });

@@ -2657,6 +2657,16 @@ async function testeSpielFundament(browser) {
         animation: [...a.children].map((x) => getComputedStyle(x).animationName).join() };
     });
     pruefe('Antippen der Ergebnis-Karte (nicht der Abrechnung) zeigt auch die Abrechnung sofort ganz', abr.alles && abr.karte && /^none(,none)*$/.test(abr.animation), JSON.stringify(abr));
+    // Codex-Befund: der Mattzug wird erst nach dem Speichern bewertet; der Datensatz muss danach die endgueltige
+    // laengste Serie tragen, nicht die vom Spielende
+    await seite.waitForFunction(() => window.__partie.protokoll.some((e) => e.typ === 'nachgetragen'), null, { timeout: 30000 });
+    const serie = await seite.evaluate(async () => {
+      const st = await import('./js/storage.js');
+      const p = st.ladePartien()[0];
+      return { gespeichert: p.maxSerie, z: window.__partie.z.maxSerie, klassen: p.liveKlassen };
+    });
+    pruefe('Langsame Auswertung: gespeicherte maxSerie = endgültige Serie nach dem Nachtragen (Codex-Befund)',
+      Number.isInteger(serie.gespeichert) && serie.gespeichert === serie.z, JSON.stringify(serie));
     pruefe('Matt-Hook-Zeit: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
