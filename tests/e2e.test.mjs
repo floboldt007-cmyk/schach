@@ -134,9 +134,26 @@ const wasmAbrufe = [];
 const engineInfo = (seite) => seite.evaluate(async () => {
   const [a, b] = await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]);
   const r = await b.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
-  return { pfade: [a.pfad, b.pfad], tiefe: r.depth, direkt: localStorage.getItem('schach-arena:wasm-direkt') };
+  return { pfade: [a.pfad, b.pfad], tiefe: r.depth, direkt: localStorage.getItem('schach-arena:v1:wasm-direkt') };
 });
 
+// Wartet, bis ein Element ruhig steht (Lage in drei Bildern gleich, hoechstens 1,5 s). Ohne das trifft ein Tipp
+// waehrend einer Einblend-Animation daneben, z. B. die Ergebnis-Karte (karte-ein: 0,1 s Verzoegerung plus 0,5 s,
+// verschoben und verkleinert): der kleine Knopf "Brett ansehen" lag dann woanders, der Tipp ging ins Leere.
+const stehtStill = (loc) => loc.evaluate((el) => new Promise((fertig) => {
+  const t0 = performance.now();
+  let alt = '';
+  let gleich = 0;
+  const schritt = () => {
+    const b = el.getBoundingClientRect();
+    const k = [b.x, b.y, b.width, b.height].map((x) => Math.round(x * 4)).join();
+    gleich = k === alt ? gleich + 1 : 0;
+    alt = k;
+    if (gleich >= 2 || performance.now() - t0 > 1500) fertig();
+    else requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+})).catch(() => {});
 function hilfen(seite) {
   const h = {
     async mitte(feld) {
@@ -160,6 +177,7 @@ function hilfen(seite) {
         const el = alle.nth(i);
         if (!(await el.isVisible())) continue;
         await el.scrollIntoViewIfNeeded();
+        await stehtStill(el);
         const b = await el.boundingBox();
         if (!b) continue;
         await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
@@ -348,8 +366,11 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Hash #analyse/<id>', (await h.hash()) === '#analyse/' + id);
   pruefe('Sofort fertig (kein Rechnen dank vorab)', await seite.locator('.an-laden').count() === 0 && await seite.locator('.an-inhalt').count() === 1);
   pruefe('Freischalt-Banner: Oma Hilde', /Oma Hilde/.test(await seite.locator('.an-banner').innerText()));
-  const genau = await seite.locator('.an-genau').innerText();
-  pruefe('Genauigkeit sichtbar (mindestens 80 %)', /\d+,\d/.test(genau) && parseFloat((genau.match(/\d+,\d/) || ['0'])[0].replace(',', '.')) >= 80, genau);
+  // gezeigt wird genau die gespeicherte Genauigkeit der Partie (auf ihr beruht Stern 2), mit Komma
+  const genau = await seite.locator('.an-genau .an-ich-wert').innerText();
+  const gespeichert = ((await h.partien())[0] || {}).genauigkeit;
+  pruefe('Genauigkeit sichtbar: genau der gespeicherte Wert (mindestens 80 %)', Number.isFinite(gespeichert) && gespeichert >= 80
+    && genau.trim() === gespeichert.toFixed(1).replace('.', ','), `${genau} / ${gespeichert}`);
   await seite.reload();
   await h.screen('analyse');
   pruefe('Neuladen: Analyse bleibt', (await h.hash()) === '#analyse/' + id && await seite.locator('.an-inhalt').count() === 1);

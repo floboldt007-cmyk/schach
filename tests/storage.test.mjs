@@ -6,6 +6,7 @@ import {
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
+  ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
 } from '../js/storage.js';
 import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
 import { analysierePartie, kompaktReview, ergaenzeReviewFelder } from '../js/review.js';
@@ -193,6 +194,62 @@ setzeSpeicher(s);
   pruefe('Uebung: Sterne bleiben aus, auch bei alten Daten', JSON.stringify(ergaenzeAnalyse(u.partie.id, r85).partie.sterne) === '[false,false,false]');
 }
 
+// ---------- w0-fix: eine Genauigkeit aus der Live-Bewertung ist vorlaeufig ----------
+// Beleg vorher: Flo tippt im vorlaeufigen Ergebnis auf "Zur Analyse": Live 78 % blieb fuer immer, die volle
+// Analyse (82 %) wurde verworfen, Stern 2 fehlte (origin/main ersetzte sie noch und gab Stern 2)
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  const p = speicherePartie(partie({ genauigkeit: null }));
+  const live = ergaenzeAnalyse(p.partie.id, null, { genauigkeit: 78 });
+  pruefe('Live 78: Genauigkeit vorlaeufig gesetzt (Quelle live), Stern 2 offen, nicht analysiert', live.partie.genauigkeit === 78
+    && live.partie.genauigkeitQuelle === 'live' && live.partie.analysiert !== true && JSON.stringify(live.partie.sterne) === '[true,false,true]', live.partie);
+  const voll = ergaenzeAnalyse(p.partie.id, { genauigkeit: { w: 82, b: 60 }, spielstaerke: { w: 1300, b: 300 }, zuege: [] });
+  const pa = ladePartie(p.partie.id);
+  pruefe('Live 78, dann Analyse 82: Genauigkeit 82 (Quelle analyse), Stern 2 neu, analysiert', pa.genauigkeit === 82 && pa.genauigkeitQuelle === 'analyse'
+    && pa.analysiert === true && JSON.stringify(pa.sterne) === '[true,true,true]' && JSON.stringify(voll.neueSterne) === '[false,true,false]'
+    && JSON.stringify(ladeFortschritt().bots.benno.sterne) === '[true,true,true]' && ladeFortschritt().bots.benno.besteGenauigkeit === 82, pa);
+  ergaenzeAnalyse(p.partie.id, { genauigkeit: { w: 70, b: 60 }, zuege: [] });
+  pruefe('Danach: eine weitere Analyse ersetzt die aus der Analyse nie', ladePartie(p.partie.id).genauigkeit === 82
+    && JSON.stringify(ladePartie(p.partie.id).sterne) === '[true,true,true]');
+  ergaenzeAnalyse(p.partie.id, null, { genauigkeit: 50 });
+  pruefe('Danach: ein Live-Wert ersetzt sie auch nicht', ladePartie(p.partie.id).genauigkeit === 82 && ladePartie(p.partie.id).genauigkeitQuelle === 'analyse');
+
+  // Live 85 (Stern 2 schon da), Analyse 75: Stern bleibt, Bestwert kommt nicht mehr aus dem ersetzten Live-Wert
+  const q = speicherePartie(partie({ genauigkeit: null, botId: 'hilde', botStufe: 2 }));
+  const r = speicherePartie(partie({ genauigkeit: 71, botId: 'hilde', botStufe: 2 }));
+  ergaenzeAnalyse(q.partie.id, null, { genauigkeit: 85 });
+  pruefe('Live 85: Stern 2 und Bestwert 85 (vorlaeufig)', ladeFortschritt().bots.hilde.sterne[1] === true && ladeFortschritt().bots.hilde.besteGenauigkeit === 85);
+  const e75 = ergaenzeAnalyse(q.partie.id, { genauigkeit: { w: 75, b: 60 }, zuege: [] });
+  const fh = ladeFortschritt().bots.hilde;
+  pruefe('Live 85, dann Analyse 75: Genauigkeit 75, Stern 2 bleibt (nie entzogen), Bestwert aus den Partien neu (75)', e75.partie.genauigkeit === 75
+    && JSON.stringify(e75.partie.sterne) === '[true,true,true]' && fh.sterne[1] === true && fh.besteGenauigkeit === 75 && r.partie.genauigkeit === 71, fh);
+
+  // alte Datensaetze ohne Quelle: nur Genauigkeit gesetzt (wie aus der Live-Bewertung) -> einmal ersetzt
+  const alt = speicherePartie(partie({ genauigkeit: null, botId: 'kalle', botStufe: 3 }));
+  const roh = JSON.parse(s.getItem('schach-arena:v1:partien'));
+  const x = roh.find((y) => y.id === alt.partie.id);
+  x.genauigkeit = 79;
+  delete x.genauigkeitQuelle;
+  const y = { ...x, id: 'palt2', genauigkeit: 79, genauigkeitBot: 50, spielstaerke: 900 };
+  roh.push(y);
+  s.setItem('schach-arena:v1:partien', JSON.stringify(roh));
+  ergaenzeAnalyse(alt.partie.id, { genauigkeit: { w: 81, b: 50 }, zuege: [] });
+  ergaenzeAnalyse('palt2', { genauigkeit: { w: 81, b: 50 }, zuege: [] });
+  pruefe('Alter Datensatz ohne Quelle, nur Genauigkeit: gilt als live und wird einmal ersetzt', ladePartie(alt.partie.id).genauigkeit === 81
+    && ladePartie(alt.partie.id).genauigkeitQuelle === 'analyse');
+  pruefe('Alter Datensatz ohne Quelle, aus einer Analyse (genauigkeitBot, spielstaerke): bleibt', ladePartie('palt2').genauigkeit === 79);
+
+  // analysiert: kommt nur mit einer Review (auch beim Speichern mit Review)
+  const z1 = speicherePartie(partie({ genauigkeit: null }));
+  ergaenzeAnalyse(z1.partie.id, null, { genauigkeit: 90 });
+  const z2 = speicherePartie(partie({ genauigkeit: null }), { zuege: [] });
+  pruefe('analysiert nur mit Review (ergaenzeAnalyse ohne Review nicht, speicherePartie mit Review ja)', ladePartie(z1.partie.id).analysiert !== true
+    && ladePartie(z2.partie.id).analysiert === true && z2.partie.genauigkeitQuelle === undefined);
+  pruefe('Genauigkeit schon beim Speichern gilt als endgueltig (Quelle analyse)', speicherePartie(partie({ genauigkeit: 91 })).partie.genauigkeitQuelle === 'analyse'
+    && speicherePartie(partie({ genauigkeit: 91, genauigkeitQuelle: 'live' })).partie.genauigkeitQuelle === 'live');
+}
+
 // ---------- w0c: neue IDs nie doppelt (Beleg vorher: in ca. 2 % der Laeufe zwei gleiche IDs unter 8 Partien) ----------
 s = fakeSpeicher();
 setzeSpeicher(s);
@@ -215,7 +272,9 @@ for (let i = 0; i < MAX_REVIEWS + 5; i++) ids.push(speicherePartie(partie({}), {
 const mit = ids.filter(hatReview);
 pruefe('Reviews: nur die neuesten ' + MAX_REVIEWS, mit.length === MAX_REVIEWS && !hatReview(ids[0]) && hatReview(ids[ids.length - 1]), mit.length);
 
-s = fakeSpeicher(6000);
+// Grenze 6500 (vorher 6000): seit w0-fix traegt jeder Datensatz genauigkeitQuelle und analysiert (ca. 48 Zeichen),
+// sonst passte nicht einmal die neueste Analyse neben die Liste; die Pruefung selbst bleibt gleich
+s = fakeSpeicher(6500);
 setzeSpeicher(s);
 const gross = { zuege: Array.from({ length: 10 }, (_, i) => ({ ply: i, farbe: 'w', klasse: 'gut', coach: 'x'.repeat(100) })) };
 const ids2 = [];
@@ -413,6 +472,46 @@ setzeSpeicher(s);
   setzeZurueck();
   pruefe('setzeZurueck erfasst die Modul-Schluessel', s.getItem('schach-arena:v1:modul:kartei') === null && s.getItem('schach-arena:v1:modul:alltag') === null
     && ladeModul('kartei', null) === null);
+}
+
+// ---------- w0-fix: Einstellungen der Pakete ueberstehen "Fortschritt zuruecksetzen" ----------
+// Beleg vorher: Reset loeschte modul:serie (Klangstufe) und modul:alltag (Ruhetag, Anzeige), obwohl daneben
+// "Die Einstellungen bleiben." steht, und kein Paket erfuhr davon
+s = fakeSpeicher();
+setzeSpeicher(s);
+{
+  busZuruecksetzen();
+  const resets = [];
+  hoere('speicher:zurueckgesetzt', (d) => resets.push(d));
+  const std = { stufe: 'alle' };
+  const leer = ladeModulEinstellungen('serie', std);
+  leer.stufe = 'x';
+  pruefe('ladeModulEinstellungen ohne Daten: tiefe Kopie des Standards', JSON.stringify(ladeModulEinstellungen('serie', std)) === '{"stufe":"alle"}' && std.stufe === 'alle');
+  const r = speichereModulEinstellungen('serie', { stufe: 'wichtig' });
+  pruefe('speichereModulEinstellungen: Schluessel einstellungen:serie', r.ok === true && r.zeichen === 19
+    && s.getItem('schach-arena:v1:einstellungen:serie') === '{"stufe":"wichtig"}', r);
+  pruefe('speichereModulEinstellungen: Budget, unbekannter Name, falsche Art', speichereModulEinstellungen('alltag', { x: 'y'.repeat(MODUL_EINSTELLUNGEN_MAX) }).grund === 'budget'
+    && speichereModulEinstellungen('kartie', {}).grund === 'unbekannt' && still(() => ladeModulEinstellungen('kartie', { a: 1 })).wert.a === 1
+    && (speichereModulEinstellungen('taktik', [1]).ok && JSON.stringify(ladeModulEinstellungen('taktik', { an: true })) === '{"an":true}'));
+  speichereModulEinstellungen('alltag', { ruhetag: 0, anzeigen: false });
+  speichereModul('serie', { rekord: 7 });
+  speichereModul('alltag', { tage: [1, 2] });
+  speichereEinstellungen({ klang: false });
+  speicherePartie(partie({}));
+  const stand = speicherStand();
+  const laenge = (k) => k.length + s.getItem(k).length;
+  const P = 'schach-arena:v1:';
+  pruefe('speicherStand: Einstellungen der Pakete zaehlen zu fortschritt', stand.teile.fortschritt === laenge(P + 'fortschritt') + laenge(P + 'einstellungen')
+    + laenge(P + 'einstellungen:serie') + laenge(P + 'einstellungen:alltag') + laenge(P + 'einstellungen:taktik') && stand.teile.sonst === 0, stand.teile);
+  setzeZurueck();
+  pruefe('Reset: Modul-Daten weg, Einstellungen der App und der Pakete bleiben', ladeModul('serie', null) === null && ladeModul('alltag', null) === null
+    && ladePartien().length === 0 && ladeEinstellungen().klang === false && ladeModulEinstellungen('serie', std).stufe === 'wichtig'
+    && ladeModulEinstellungen('alltag', {}).ruhetag === 0);
+  pruefe('Reset: Ereignis speicher:zurueckgesetzt { mitEinstellungen: false }', resets.length === 1 && resets[0].mitEinstellungen === false, resets);
+  setzeZurueck({ mitEinstellungen: true });
+  pruefe('Reset mit Einstellungen: auch die der Pakete weg', ladeModulEinstellungen('serie', std).stufe === 'alle' && ladeEinstellungen().klang === true
+    && [...s.m.keys()].length === 0 && resets.length === 2 && resets[1].mitEinstellungen === true, [...s.m.keys()]);
+  busZuruecksetzen();
 }
 
 // ---------- speicherStand / rohSpeicher ----------
@@ -629,15 +728,26 @@ function gleich(a, b) {
   busZuruecksetzen();
   const kaputt = speicherePartie(sieg({ zuege: ['e2e4', 'e2e4'] })).partie.id;          // ungueltig: wird einmal versucht
   const alt = speicherePartie(sieg()).partie.id;                                         // aelteste offene
-  const fertigP = speicherePartie(sieg({ genauigkeit: 70 })).partie.id;                 // hat Genauigkeit
+  const fertigP = speicherePartie(sieg({ genauigkeit: 70, analysiert: true })).partie.id;   // schon analysiert (Review weg)
+  // w0-fix: Ergebnis verlassen, bevor die Analyse fertig war: Genauigkeit nur aus der Live-Bewertung
+  const nurLive = speicherePartie(sieg({ botId: 'lisa', botStufe: 4, genauigkeit: 99.6, genauigkeitQuelle: 'live' })).partie.id;
+  // vor Runde 4 gespeichert (ohne modus): mit Genauigkeit gilt sie als fertig, wie bisher
+  const vorRunde4 = speicherePartie(sieg({ genauigkeit: 72 })).partie.id;
+  {
+    const roh = JSON.parse(s.getItem('schach-arena:v1:partien'));
+    delete roh.find((x) => x.id === vorRunde4).modus;
+    s.setItem('schach-arena:v1:partien', JSON.stringify(roh));
+  }
   const uebung = speicherePartie(sieg({ modus: 'uebung', startFen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', zuege: ['a1a8'] })).partie.id;
   const ohneZug = speicherePartie(sieg({ zuege: [] })).partie.id;
   const mitReview = speicherePartie(sieg(), { genauigkeit: { w: null, b: null }, zuege: [] }).partie.id;
   const neu = speicherePartie(sieg({ botId: 'hilde', botStufe: 2 })).partie.id;          // neueste offene
   pruefe('Nachholen: Fortschritt vorher wie nach einem Abbruch (Stern 2 fehlt)', JSON.stringify(ladeFortschritt().bots.benno.sterne) === '[true,false,true]');
   const offen = offenePartien({ max: 5 }).map((p) => p.id);
-  pruefe('Nachholen: offen sind nur wertende Partien ohne Genauigkeit, ohne Review, mit eigenem Zug, neueste zuerst',
-    JSON.stringify(offen) === JSON.stringify([neu, alt, kaputt]), { offen, neu, alt, kaputt, fertigP, uebung, ohneZug, mitReview });
+  // w0-fix (Befund: partie:analysiert kam nie, wenn Flo das Ergebnis vor dem Ende der Analyse verliess): offen ist
+  // jede wertende Partie ohne volle Analyse (Feld analysiert), auch mit Live-Genauigkeit; alte ohne modus nur ohne Genauigkeit
+  pruefe('Nachholen: offen sind wertende Partien ohne volle Analyse (auch mit Live-Genauigkeit), ohne Review, mit eigenem Zug, neueste zuerst',
+    JSON.stringify(offen) === JSON.stringify([neu, nurLive, alt, kaputt]), { offen, neu, nurLive, alt, kaputt, fertigP, vorRunde4, uebung, ohneZug, mitReview });
   pruefe('Nachholen: hoechstens max, nur unter den neuesten', offenePartien({ max: 1 }).map((p) => p.id)[0] === neu
     && offenePartien({ max: 5, aus: 1 }).length === 1 && offenePartien({ max: 5, aus: 0 }).length === 0);
 
@@ -652,18 +762,24 @@ function gleich(a, b) {
   vorab.set(stellungsSchluessel(START), { fen: START, depth: 5, lines: [{ multipv: 1, depth: 5, eval: { cp: 20, mate: null }, pv: ['e2e4'] }, { multipv: 2, depth: 5, eval: { cp: 20, mate: null }, pv: ['d2d4'] }] });
   const app = { engine: async () => fake, einstellungen: () => ({ tiefe: 12 }), vorab };
   const gezeichnet = [];
-  const lauf = starteNachholen(app, { max: 3, beiPartie: (x) => gezeichnet.push(x.partie.id) });
+  const lauf = starteNachholen(app, { max: 4, beiPartie: (x) => gezeichnet.push(x.partie.id) });
   pruefe('Nachholen: zustand() laeuft', zustand().laeuft === true);
   const anzahl = await lauf.fertig;
   const pn = ladePartie(neu);
   const pa = ladePartie(alt);
-  pruefe('Nachholen: zwei Partien nachgerechnet (die kaputte nicht), neueste zuerst', anzahl === 2 && JSON.stringify(zustand().fertig.slice(-2)) === JSON.stringify([neu, alt])
-    && JSON.stringify(gezeichnet) === JSON.stringify([neu, alt]), { anzahl, z: zustand(), gezeichnet });
-  pruefe('Nachholen: Genauigkeit, Review und Stern 2 da (Datensatz und Fortschritt)', pa.genauigkeit === 100 && hatReview(alt)
+  const pl = ladePartie(nurLive);
+  pruefe('Nachholen: drei Partien nachgerechnet (die kaputte nicht), neueste zuerst', anzahl === 3 && JSON.stringify(zustand().fertig.slice(-3)) === JSON.stringify([neu, nurLive, alt])
+    && JSON.stringify(gezeichnet) === JSON.stringify([neu, nurLive, alt]), { anzahl, z: zustand(), gezeichnet });
+  pruefe('Nachholen: Genauigkeit, Review und Stern 2 da (Datensatz und Fortschritt)', pa.genauigkeit === 100 && hatReview(alt) && pa.analysiert === true
+    && pa.genauigkeitQuelle === 'analyse'
     && JSON.stringify(pa.sterne) === '[true,true,true]' && JSON.stringify(ladeFortschritt().bots.benno.sterne) === '[true,true,true]'
     && JSON.stringify(ladeFortschritt().bots.hilde.sterne) === '[true,true,true]', pa);
-  pruefe('Nachholen: Ereignis partie:analysiert mit quelle "nachholen" je Partie', ereignisse.length === 2 && ereignisse.every((e) => e.quelle === 'nachholen' && e.wertet === true && e.review)
-    && ereignisse[0].partieId === neu && JSON.stringify(ereignisse[1].neueSterne) === '[false,true,false]', ereignisse.map((e) => [e.partieId, e.quelle, e.neueSterne]));
+  pruefe('Nachholen: Live-Genauigkeit durch die volle Analyse ersetzt (einmal), Review gespeichert', pl.genauigkeit === 100 && pl.genauigkeitQuelle === 'analyse'
+    && pl.analysiert === true && hatReview(nurLive), pl);
+  pruefe('Nachholen: Ereignis partie:analysiert mit quelle "nachholen" je Partie (auch fuer die mit Live-Genauigkeit)', ereignisse.length === 3
+    && ereignisse.every((e) => e.quelle === 'nachholen' && e.wertet === true && e.review)
+    && ereignisse[0].partieId === neu && ereignisse[1].partieId === nurLive && JSON.stringify(ereignisse[2].neueSterne) === '[false,true,false]',
+    ereignisse.map((e) => [e.partieId, e.quelle, e.neueSterne]));
   const tiefen = fake.aufrufe.map((a) => a.depth);
   pruefe('Nachholen: eingestellte Tiefe, flache Vorab-Analyse neu, tiefe wiederverwendet', tiefen.every((t) => t === 12)
     && fake.aufrufe.some((a) => stellungsSchluessel(a.fen) === stellungsSchluessel(START))

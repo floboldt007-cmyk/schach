@@ -9,6 +9,10 @@
 //     Rochade als 0-0 (die einzige Stelle, die die Klassenwoerter der Coach-Texte kennt)
 //   kompaktReview(review) / ergaenzeReviewFelder(review): Review ohne die ableitbaren Felder
 //     (sanDe, besterZugSanDe, besteLinieSan, nummer, fenNachher ausser beim letzten Zug) und zurueck
+// Zusaetze w0-fix:
+//   seitenGenauigkeit(eintraege, farbe, plies) -> Genauigkeit einer Seite aus Zug-Eintraegen (Live-Bewertung)
+//     nach demselben Verfahren wie analysierePartie (volatilitaetsgewichtet)
+//   analysierePartie(..., { stueckeln: true }) gibt beim Einordnen der Zuege den Hauptthread frei (Nachholen)
 import { Chess } from '../vendor/chess/chess.js';
 import { eroeffnung, stellungsSchluessel } from './openings.js';
 
@@ -97,6 +101,46 @@ export function partieGenauigkeit(liste) {
     : eintraege.reduce((a, x) => a + x.g, 0) / eintraege.length;
   const harmonisch = eintraege.length / eintraege.reduce((a, x) => a + 1 / Math.max(1, x.g), 0);
   return Math.max(0, Math.min(100, (gewichtet + harmonisch) / 2));
+}
+
+// Genauigkeit einer Seite aus einzelnen Zug-Eintraegen (z. B. der Live-Bewertung), nach demselben Verfahren
+// wie analysierePartie (volatilitaetsgewichtet + harmonisch, auf eine Nachkommastelle).
+// eintraege: Liste je Ply (Eintraege mit farbe, genauigkeit, evalVorher, evalNachher; fehlende Plies
+// null), plies: Anzahl der Halbzuege der Partie. Die Kurve der Gewinnchancen setzt sich aus evalVorher und
+// evalNachher zusammen; Stellungen ohne Bewertung (z. B. vor dem ersten Bot-Zug) uebernehmen den naechsten
+// bekannten Wert. Mit allen Eintraegen einer Analyse ergibt das genau review.genauigkeit[farbe].
+// Fehlt einem Zug der Seite die Genauigkeit oder hat die Seite keinen Zug: null.
+export function seitenGenauigkeit(eintraege, farbe, plies = (eintraege || []).length) {
+  const liste = eintraege || [];
+  const n = Math.max(plies, liste.length);
+  const kurve = new Array(n + 1).fill(null);
+  for (let i = 0; i < liste.length; i++) {
+    const e = liste[i];
+    if (!e) continue;
+    if (e.evalVorher) kurve[i] = gewinnChance(e.evalVorher, 'w');
+    if (e.evalNachher) kurve[i + 1] = gewinnChance(e.evalNachher, 'w');
+  }
+  let letzter = null;
+  for (let i = 0; i <= n; i++) {
+    if (kurve[i] == null) kurve[i] = letzter;
+    else letzter = kurve[i];
+  }
+  letzter = null;
+  for (let i = n; i >= 0; i--) {
+    if (kurve[i] == null) kurve[i] = letzter;
+    else letzter = kurve[i];
+  }
+  if (kurve.some((x) => x == null)) return null;
+  const gewichte = volatilitaetsGewichte(kurve);
+  const eigene = [];
+  for (let i = 0; i < liste.length; i++) {
+    const e = liste[i];
+    if (!e || e.farbe !== farbe) continue;
+    if (typeof e.genauigkeit !== 'number' || !isFinite(e.genauigkeit)) return null;
+    eigene.push({ genauigkeit: e.genauigkeit, gewicht: gewichte[i] ?? 1 });
+  }
+  const g = partieGenauigkeit(eigene);
+  return g == null ? null : runde(g, 1);
 }
 
 // Grobe Schaetzung der Spielstaerke einer Partie (wie "Game Rating" bei chess.com)
@@ -556,12 +600,16 @@ export function klassifiziere(eingabe) {
 }
 
 // Ist der gespielte Zug wirklich so gut wie der Engine-Zug (gleiche oder bessere Bewertung)?
+// Matt fuer sich: der beste Zug verkuerzt "Matt in n" auf n - 1 (Stockfish zaehlt ganze Zuege). Bleibt es bei
+// "Matt in n", dauert das Matt einen Zug laenger (an 62 Stellungen mit Tiefe 20 nachgeprueft: in 50 Faellen
+// wirklich langsamer, w0c); nur ein Zug, der selbst mattsetzt, ist dann so gut. Wird man selbst matt, haelt die
+// beste Verteidigung "Matt in n".
 function gleichGut(d) {
   const mv = d.mattVorher;
   const mn = d.mattNachher;
   const rang = (m) => (m == null ? 0 : m > 0 ? 1 : -1);   // selbst Matt > Bewertung > wird matt
   if (rang(mv) !== rang(mn)) return rang(mn) > rang(mv);
-  if (mv != null) return mv > 0 ? mn <= mv : -mn >= -mv;
+  if (mv != null) return mv > 0 ? (d.matt || mn < mv) : -mn >= -mv;
   const v = cpFuer(d.evalVorher, d.farbe);
   const n = cpFuer(d.evalNachher, d.farbe);
   return v == null || n == null || n >= v;
@@ -907,11 +955,16 @@ function ausVorab(vorab, fen, multipv, minTiefe) {
   return a;
 }
 
+// So viele Zuege ordnet analysierePartie mit stueckeln am Stueck ein (ca. 25 ms im Desktop-Browser)
+const STUECK_ZUEGE = 10;
+
 // zuege: UCI-Liste (SAN oder {from,to,promotion} gehen auch)
 // opts: { tiefe = 16, multipv = 2, beiFortschritt(fertig, gesamt), startFen,
 //         spielerFarbe ('w'|'b': Du-Form nur fuer diese Seite), elo: { w, b }, signal,
 //         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
-//         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart) }
+//         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart),
+//         stueckeln (true: beim Nachspielen und Einordnen der Zuege den Hauptthread regelmaessig per
+//         setTimeout freigeben, fuer das stille Nachholen; das Ergebnis ist dasselbe) }
 // Abbruch: signal.abort() oder engine.stop() -> Promise wird mit Fehler (fehler.abgebrochen) abgelehnt.
 export async function analysierePartie(engine, zuege, opts = {}) {
   const tiefe = opts.tiefe ?? 16;
@@ -921,8 +974,11 @@ export async function analysierePartie(engine, zuege, opts = {}) {
 
   const chess = neuesBrett(startFen);
   if (!chess) throw new Error('Ungültige Startstellung: ' + startFen);
+  // stueckeln: zwischendurch den Hauptthread freigeben (setTimeout, nicht requestIdleCallback)
+  const pause = () => new Promise((r) => setTimeout(r, 0));
   const daten = [];
   for (const z of zuege || []) {
+    if (opts.stueckeln && daten.length && daten.length % (2 * STUECK_ZUEGE) === 0) await pause();
     const fenVorher = chess.fen();
     const m = spieleZug(chess, z);
     if (!m) throw new Error('Ungültiger Zug: ' + JSON.stringify(z));
@@ -931,6 +987,8 @@ export async function analysierePartie(engine, zuege, opts = {}) {
   const fens = daten.length ? [...daten.map((x) => x.fenVorher), daten[daten.length - 1].fenNachher] : [startFen];
 
   const ausStart = stellungsSchluessel(startFen) === stellungsSchluessel(START_FEN);
+  // die Eroeffnungstabelle baut beim ersten Aufruf ihren Index (einmalig, ca. 50 ms)
+  if (opts.stueckeln) await pause();
   const er = ausStart ? eroeffnung(daten.map((x) => x.zug.san)) : { name: null, buch: [], namen: [] };
 
   // Alle Stellungen nacheinander bewerten
@@ -962,9 +1020,13 @@ export async function analysierePartie(engine, zuege, opts = {}) {
     if (signal) signal.removeEventListener('abort', stopp);
   }
 
-  // Zuege einordnen
+  // Zuege einordnen (mit stueckeln in Portionen, dazwischen ist der Hauptthread frei)
   const eintraege = [];
   for (let i = 0; i < daten.length; i++) {
+    if (opts.stueckeln && i > 0 && i % STUECK_ZUEGE === 0) {
+      await pause();
+      if (signal && signal.aborted) throw abbruch();
+    }
     const x = daten[i];
     const du = !opts.spielerFarbe || opts.spielerFarbe === x.zug.color;
     eintraege.push(baueEintrag({

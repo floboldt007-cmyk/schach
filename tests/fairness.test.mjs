@@ -155,6 +155,26 @@ pruefe('GRENZEN unveraendert (0,02 / 0,05 / 0,10 / 0,20)', JSON.stringify(GRENZE
   const fehlt = zeilen.filter((z) => !review.includes(z));
   pruefe('Brillant-Bedingungen in klassifiziere() unveraendert (Schnappschuss)', fehlt.length === 0, fehlt);
 
+  // "bester" fuer einen anderen Zug als den Engine-Zug (gleichGut). Bewusst nachgezogen in w0c, nur STRENGER:
+  // bei eigenem Matt muss der Zug "Matt in n" verkuerzen oder selbst mattsetzen (vorher reichte "bleibt Matt in n",
+  // also ein Zug langsamer; Tiefe-20-Nachpruefung an 62 echten Stellungen: 50 davon wirklich langsamer).
+  // Bewertung in Bauerneinheiten: nachher mindestens so gut wie vorher (unveraendert).
+  const bester = [
+    'if (d.istBester) return ergebnis(\'bester\', 0, \'Engine-Zug\');',
+    'if (roh <= EPS) {',
+    "if (!gleichGut(d)) return ergebnis('exzellent', 0, 'fast so gut wie der Engine-Zug');",
+    'if (mv != null) return mv > 0 ? (d.matt || mn < mv) : -mn >= -mv;',
+    'return v == null || n == null || n >= v;',
+  ];
+  const fehltB = bester.filter((z) => !review.includes(z));
+  pruefe('Regel fuer "bester" ohne Engine-Zug (gleichGut) unveraendert (Schnappschuss, w0c strenger)', fehltB.length === 0, fehltB);
+  const MITTE = 'r1bq1rk1/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQ1RK1 w - - 0 8';
+  const anders = (vorher, nachher) => klassifiziere({ fenVorher: MITTE, uci: 'h2h3', besterZug: 'd4c5', pvVorher: ['d4c5'], pvNachher: [],
+    evalVorher: vorher, evalNachher: nachher }).klasse;
+  pruefe('"bester" ohne Engine-Zug: nicht bei schlechterer Bewertung und nicht, wenn das eigene Matt einen Zug laenger dauert',
+    anders({ cp: 40, mate: null }, { cp: 39, mate: null }) !== 'bester' && anders({ cp: null, mate: 3 }, { cp: null, mate: 3 }) !== 'bester'
+    && anders({ cp: 40, mate: null }, { cp: 40, mate: null }) === 'bester' && anders({ cp: null, mate: 3 }, { cp: null, mate: 2 }) === 'bester');
+
   // dasselbe am Verhalten: das ersticke Matt Dg8+!! und seine Grenzfaelle
   const ERSTICKT = '5r1k/pp4pp/7N/3Q4/8/8/5PPP/6K1 w - - 0 1';
   const basis = {

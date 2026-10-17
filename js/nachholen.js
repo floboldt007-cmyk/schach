@@ -1,17 +1,22 @@
 // Nachholen: fehlende Spielanalysen gespeicherter Partien still im Hintergrund nachrechnen (Runde 4, w0c).
-// Fehlt einer Partie die Genauigkeit (App waehrend der Auswertung beendet, nach einer fortgesetzten Partie
-// frueh "Nächster Gegner" getippt), fehlt sonst Stern 2, bis Flo genau diese Analyse oeffnet. Die Arena
-// rechnet solche Partien nach, solange sie offen ist. Nie waehrend einer Partie: der Host startet es nur in
-// der Arena und stoppt es in verlasse() (also auch beim Start einer Partie). Keine dritte Engine-Instanz,
-// gerechnet wird ueber app.engine('bewertung').
+// Fehlt einer Partie die volle Analyse (App waehrend der Auswertung beendet, Ergebnis verlassen, bevor die
+// Auswertung fertig war, nach einer fortgesetzten Partie frueh "Nächster Gegner" getippt), fehlen sonst
+// Stern 2 und das Ereignis partie:analysiert (die Pakete verdichten ihre Lerndaten genau dann), bis Flo
+// genau diese Analyse oeffnet. Die Arena rechnet solche Partien nach, solange sie offen ist. Nie waehrend
+// einer Partie: der Host startet es nur in der Arena und stoppt es in verlasse() (also auch beim Start einer
+// Partie). Keine dritte Engine-Instanz, gerechnet wird ueber app.engine('bewertung').
 //
 //   offenePartien({ max = 2, aus = 10 }) -> Partie[]
-//       wertende Partien ohne Genauigkeit, ohne gespeicherte Review und mit mindestens einem eigenen Zug,
-//       nur unter den `aus` neuesten, neueste zuerst, hoechstens `max`; ohne die, die in dieser Sitzung
-//       schon versucht wurden (eine kaputte Partie wird nicht bei jedem Arena-Besuch neu gerechnet)
+//       wertende Partien ohne gespeicherte Review und mit mindestens einem eigenen Zug, die noch keine volle
+//       Analyse hatten: ab Runde 4 (Feld modus gesetzt) ohne das Feld analysiert, auch wenn schon eine
+//       Genauigkeit aus der Live-Bewertung da ist; aeltere nur ohne Genauigkeit. Nur unter den `aus`
+//       neuesten, neueste zuerst, hoechstens `max`; ohne die, die in dieser Sitzung schon versucht wurden
+//       (eine kaputte Partie wird nicht bei jedem Arena-Besuch neu gerechnet)
 //   starteNachholen(app, { max = 2, beiPartie }) -> { stop(), fertig: Promise<anzahl> }
 //       rechnet die offenen Partien nacheinander (analysierePartie mit app.vorab, vorabMinTiefe = eingestellte
-//       Tiefe, vorabMerken: ein Abbruch verliert nichts), dann ergaenzeAnalyse, das Ereignis partie:analysiert
+//       Tiefe, vorabMerken: nach einem Abbruch rechnet der naechste Versuch nur den Rest, solange keine Partie
+//       dazwischen lag; stueckeln: das Einordnen der Zuege gibt den Hauptthread regelmaessig frei, Speichern
+//       und Senden laufen je in einer eigenen Aufgabe), dann ergaenzeAnalyse, das Ereignis partie:analysiert
 //       (quelle 'nachholen') und je Partie mit neu verdientem Stern eine Feier-Meldung fuer die Nachlese
 //       (quelle 'stern-nachgeholt', Zeile, prio 40). beiPartie({ partie, neueSterne, review }) nach jeder
 //       fertigen Partie (die Arena zeichnet damit die Sterne still neu). stop() bricht sofort ab (die laufende
@@ -31,10 +36,20 @@ export function zustand() {
   return { laeuft: stand.laeuft, partieId: stand.partieId, fertig: stand.fertig.slice() };
 }
 
+// Fehlt der Partie die volle Analyse? Ab Runde 4 (modus gesetzt) zaehlt das Feld analysiert, eine Genauigkeit
+// aus der Live-Bewertung reicht nicht; aeltere Datensaetze kennen das Feld nicht, dort nur ohne Genauigkeit.
+function ohneAnalyse(p) {
+  if (p.analysiert === true) return false;
+  return p.modus != null || !Number.isFinite(p.genauigkeit);
+}
+
 export function offenePartien({ max = 2, aus = 10 } = {}) {
-  return ladePartien().slice(0, aus).filter((p) => wertet(p) && !Number.isFinite(p.genauigkeit)
+  return ladePartien().slice(0, aus).filter((p) => wertet(p) && ohneAnalyse(p)
     && Array.isArray(p.zuege) && eigeneZuege(p) > 0 && !versucht.has(p.id) && !hatReview(p.id)).slice(0, max);
 }
+
+// eine eigene Aufgabe im Hauptthread (die Arena bleibt bedienbar)
+const frei = () => new Promise((r) => setTimeout(r, 0));
 
 const komma = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
 
@@ -59,7 +74,7 @@ export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
     for (const kandidat of offenePartien({ max })) {
       if (ctrl.signal.aborted) break;
       const p = ladePartie(kandidat.id);
-      if (!p || Number.isFinite(p.genauigkeit)) continue;
+      if (!p || !ohneAnalyse(p) || hatReview(p.id)) continue;
       stand.partieId = p.id;
       let engine;
       try { engine = await app.engine('bewertung'); } catch (e) { break; }
@@ -72,7 +87,7 @@ export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
         review = await analysierePartie(engine, p.zuege, {
           tiefe, multipv: 2, startFen: p.startFen || undefined, spielerFarbe: sf,
           elo: bot ? { [sf === 'w' ? 'b' : 'w']: bot.elo } : {},
-          vorab: app.vorab, vorabMinTiefe: tiefe, vorabMerken: true, signal: ctrl.signal,
+          vorab: app.vorab, vorabMinTiefe: tiefe, vorabMerken: true, signal: ctrl.signal, stueckeln: true,
         });
       } catch (e) {
         if (ctrl.signal.aborted) break;
@@ -81,11 +96,14 @@ export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
         continue;
       }
       if (ctrl.signal.aborted) break;
+      await frei();
+      if (ctrl.signal.aborted) break;
       versucht.add(p.id);
       const nach = ergaenzeAnalyse(p.id, review);
       if (!nach) continue;
       n++;
       stand.fertig.push(p.id);
+      await frei();
       sende('partie:analysiert', {
         partieId: p.id, botId: p.botId, modus: nach.partie.modus || 'normal', wertet: nach.wertet !== false,
         partie: nach.partie, review, neueSterne: nach.neueSterne.slice(), quelle: 'nachholen',

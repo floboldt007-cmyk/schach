@@ -29,7 +29,7 @@ export const EREIGNISSE = Object.freeze([
   'hilfe:genutzt',
   'partie:beendet', 'partie:analysiert',
   'analyse:gesehen',
-  'speicher:fehler',
+  'speicher:fehler', 'speicher:zurueckgesetzt',
   'training:geloest', 'training:stand',
   'uebung:ergebnis',
   'bestmarke:neu',

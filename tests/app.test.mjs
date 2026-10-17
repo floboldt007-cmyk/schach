@@ -31,6 +31,23 @@ const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
 const NUR_NACHPRUEFUNG = process.argv.includes('--nachpruefung');
 mkdirSync(BILDER, { recursive: true });
 
+// Wartet, bis ein Element ruhig steht (Lage in drei Bildern gleich, hoechstens 1,5 s). Ohne das trifft ein Tipp
+// waehrend einer Einblend-Animation daneben, z. B. die Ergebnis-Karte (karte-ein: 0,1 s Verzoegerung plus 0,5 s,
+// verschoben und verkleinert): der kleine Knopf "Brett ansehen" lag dann woanders, der Tipp ging ins Leere.
+const stehtStill = (loc) => loc.evaluate((el) => new Promise((fertig) => {
+  const t0 = performance.now();
+  let alt = '';
+  let gleich = 0;
+  const schritt = () => {
+    const b = el.getBoundingClientRect();
+    const k = [b.x, b.y, b.width, b.height].map((x) => Math.round(x * 4)).join();
+    gleich = k === alt ? gleich + 1 : 0;
+    alt = k;
+    if (gleich >= 2 || performance.now() - t0 > 1500) fertig();
+    else requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+})).catch(() => {});
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
 // Weiss setzt matt in 1 (Ta8#)
@@ -132,6 +149,7 @@ function hilfen(seite, { touch = true } = {}) {
       await warte(90);
     },
     async tippe(sel) {
+      await stehtStill(seite.locator(sel).first());
       const b = await seite.locator(sel).first().boundingBox();
       if (!b) throw new Error('nicht sichtbar: ' + sel);
       if (touch) await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
@@ -359,19 +377,38 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Sieg-Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Drei Sterne erreicht', await seite.locator('.erg-stern.an').count() === 3);
   pruefe('Sterne als neu markiert', await seite.locator('.erg-stern.neu').count() === 3);
+  // nach dem Hochzaehlen steht genau der gespeicherte Wert da (mit Komma), mindestens 80 % (Stern 2)
   const genText = await seite.locator('.erg-genau b').innerText();
-  pruefe('Genauigkeit zählt hoch (mindestens 80 %)', /\d+,\d\s*%/.test(genText) && parseFloat(genText.replace(',', '.')) >= 80, genText);
+  const genGespeichert = ((await h.gespeichert())[0] || {}).genauigkeit;
+  pruefe('Genauigkeit zählt hoch bis zum gespeicherten Wert (mindestens 80 %)', Number.isFinite(genGespeichert) && genGespeichert >= 80
+    && genText.trim() === genGespeichert.toFixed(1).replace('.', ',') + ' %', `${genText} / ${genGespeichert}`);
   pruefe('Kachel "Neu freigeschaltet" mit Oma Hilde', /Oma Hilde/.test(await seite.locator('.erg-frei').innerText()));
   pruefe('Abschiedssatz des Bots', (await seite.locator('.erg-bot .sprechblase').innerText()).length > 5);
   const f = await h.fortschritt();
   pruefe('Fortschritt: Benno drei Sterne', JSON.stringify(f.bots && f.bots.benno && f.bots.benno.sterne) === '[true,true,true]');
   await bild(seite, 'test-sieg');
+  // Beginn und Ende der Freischalt-Animation in der Seite mitschreiben (Seitenzeit). Vorher wartete der Test
+  // fest 3000 ms auf das Ende bei 2700 ms; die Pruefungen davor kosten Zeit, unter Last reichte das nicht immer.
+  await seite.evaluate(() => {
+    const t = { an: null, aus: null };
+    window.__frei = t;
+    const mo = new MutationObserver(() => {
+      const k = document.querySelector('.knoten[data-bot="hilde"]');
+      if (!k) return;
+      if (t.an == null && k.classList.contains('wird-frei')) t.an = performance.now();
+      if (t.an != null && t.aus == null && !k.classList.contains('wird-frei')) { t.aus = performance.now(); mo.disconnect(); }
+    });
+    mo.observe(document.getElementById('app'), { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  });
   await h.tippe('.erg-knoepfe [data-ziel="weiter"]');
   await seite.waitForSelector('.screen.arena');
   pruefe('Nächster Gegner führt zur Arena', (await seite.evaluate(() => location.hash)) === '#arena');
   pruefe('Freischalt-Animation läuft', await seite.locator('.knoten.wird-frei[data-bot="hilde"]').count() === 1);
   pruefe('Hilde im Panel', /Oma Hilde/.test(await seite.locator('.detail h2').innerText()));
-  await warte(3000);
+  await seite.waitForFunction(() => window.__frei.aus != null, null, { timeout: 15000 });
+  const frei = await seite.evaluate(() => window.__frei);
+  pruefe('Freischalt-Animation endet nach ihren 2,7 s (nicht früher, höchstens 1 s später)', frei.aus - frei.an >= 2650 && frei.aus - frei.an <= 3700,
+    Math.round(frei.aus - frei.an) + ' ms');
   pruefe('Hilde freigeschaltet und aktuell', await seite.locator('.knoten.aktuell[data-bot="hilde"]:not(.gesperrt)').count() === 1);
   pruefe('Schloss ist weg', await seite.locator('.knoten[data-bot="hilde"] .schloss').count() === 0);
   pruefe('Benno mit drei Sternen', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 3);
@@ -835,8 +872,10 @@ for (const n of EREIGNISSE) hoere(n, (d) => {
   log.ereignisse.push(e);
 });
 const DOM = ['arena:kopf', 'arena:panel-oben', 'arena:panel-bot', 'ergebnis:karte', 'analyse:coach', 'analyse:oben', 'verlauf:seite', 'einstellungen:gruppen'];
+log.aufrufe = {};
 for (const ort of DOM) anbieten(ort, (k) => {
   log.kontexte[ort] = Object.keys(k).sort();
+  log.aufrufe[ort] = (log.aufrufe[ort] || 0) + 1;
   const el = document.createElement('div');
   el.className = 'w0-test';
   el.dataset.ort = ort;
@@ -882,6 +921,16 @@ async function schaeferBisMatt(seite, h) {
   await h.warteFlo();
 }
 const nachholZustand = (seite) => seite.evaluate(async () => (await import('./js/nachholen.js')).zustand());
+// Wartet (von Node aus abgefragt), bis zustand() von nachholen.js die Bedingung erfuellt; liefert den Zustand
+async function warteAufNachholen(seite, bedingung, ms) {
+  const ende = Date.now() + ms;
+  let z = await nachholZustand(seite);
+  while (!bedingung(z) && Date.now() < ende) {
+    await warte(50);
+    z = await nachholZustand(seite);
+  }
+  return z;
+}
 
 async function testeNachpruefung(browser) {
   // 1. Spielanalyse nach der Partie: Live-Suchen mit Zeitlimit, die die eingestellte Tiefe nicht erreichen,
@@ -892,7 +941,8 @@ async function testeNachpruefung(browser) {
     const h = hilfen(seite, { touch: true });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena');
-    // Live-Suchen (mit movetime) aufzeichnen; flach: sie enden bei Tiefe 4 wie eine Suche, die das Zeitlimit kappt
+    // Live-Suchen (mit movetime) aufzeichnen; flach: sie enden bei Tiefe 4 wie eine Suche, die das Zeitlimit kappt.
+    // Matt- und Pattstellungen beantwortet die Engine ohne Suche (Tiefe 0), die zaehlen nicht als flach.
     await seite.evaluate(async () => {
       const e = await window.__app.engine('bewertung');
       const orig = e.analyse.bind(e);
@@ -901,7 +951,7 @@ async function testeNachpruefung(browser) {
         const t = window.__tiefe;
         const k = fen.split(' ').slice(0, 4).join(' ');
         if (!o.movetime) { t.nachher.push(k); return orig(fen, o); }
-        return orig(fen, t.flach ? { ...o, depth: 4 } : o).then((a) => { if (a && !a.abgebrochen) t.live[k] = a.depth; return a; });
+        return orig(fen, t.flach ? { ...o, depth: 4 } : o).then((a) => { if (a && !a.abgebrochen && !a.ende) t.live[k] = a.depth; return a; });
       };
     });
     for (const flach of [true, false]) {
@@ -989,7 +1039,10 @@ async function testeNachpruefung(browser) {
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena');
     await schaeferBisMatt(seite, h);
+    // Auswertung langsam und ohne Vorab-Analysen (sonst ist sie bei der Schaefermatt-Partie sofort fertig):
+    // 8 Stellungen zu je mindestens 700 ms, neu geladen wird nach 1200 ms
     await bremse(seite, 700);
+    await seite.evaluate(() => window.__app.vorab.clear());
     await h.zugTippen('h5f7');
     await warte(1200);
     await seite.reload();
@@ -1024,7 +1077,7 @@ async function testeNachpruefung(browser) {
     pruefe('Still: kein Dialog, keine Nachlese-Karte im laufenden Screen', await seite.locator('.dialog-ort').count() === 0 && await seite.locator('.nachlese').count() === 0);
     pruefe('Nachholen beendet', (await nachholZustand(seite)).laeuft === false);
     await seite.evaluate(() => window.__app.gehe('verlauf'));
-    await seite.waitForSelector('.screen.verlauf');
+    await seite.waitForSelector('.screen.vl-screen');
     await seite.evaluate(() => window.__app.gehe('arena'));
     await seite.waitForSelector('.screen.arena');
     pruefe('Nächster Arena-Besuch: Nachlese "Neuer Stern gegen Bauer Benno"', /Neuer Stern gegen Bauer Benno/.test(await seite.locator('.nachlese').innerText().catch(() => '')));
@@ -1033,13 +1086,17 @@ async function testeNachpruefung(browser) {
     gruppe = 'Nachholen: Abbruch';
     await schaeferBisMatt(seite, h);
     await bremse(seite, 700);
+    await seite.evaluate(() => window.__app.vorab.clear());
     await h.zugTippen('h5f7');
     await warte(1200);
     await seite.reload();
     await seite.waitForSelector('.screen.arena');
     await bremse(seite, 600);
     const offen = (await h.gespeichert())[0] || {};
-    await seite.waitForFunction(async () => (await import('./js/nachholen.js')).zustand().partieId != null, null, { timeout: 20000 });
+    pruefe('Zweiter Abbruch: Sieg gespeichert, Genauigkeit fehlt', offen.ergebnis === 'sieg' && offen.genauigkeit == null, JSON.stringify({ g: offen.genauigkeit }));
+    // w0-fix: waitForFunction mit einer async-Funktion wartete nicht (das Promise gilt als wahr); deshalb von Node aus abfragen
+    const vorStart = await warteAufNachholen(seite, (z) => z.partieId != null, 20000);
+    pruefe('Nachholen läuft vor dem Start (rechnet gerade die offene Partie)', vorStart.laeuft === true && vorStart.partieId === offen.id, JSON.stringify(vorStart));
     await seite.evaluate(() => { window.__test = { maxWarten: 60000 }; window.__app.gehe('partie', { botId: 'hilde', farbe: 'w' }); });
     await seite.waitForSelector('.screen.partie');
     const z = await nachholZustand(seite);
@@ -1054,6 +1111,50 @@ async function testeNachpruefung(browser) {
     await seite.waitForSelector('.screen.arena');
     await seite.waitForFunction((id) => JSON.parse(localStorage.getItem('schach-arena:v1:partien')).some((p) => p.id === id && p.genauigkeit != null), offen.id, { timeout: 60000 });
     pruefe('Zurück in der Arena: Nachholen geht weiter und wird fertig', true);
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // 3b. w0-fix: Ergebnis verlassen, bevor die Spielanalyse fertig ist. verlasse() traegt die Genauigkeit aus der
+  //     Live-Bewertung ein; vorher liess Nachholen solche Partien aus, partie:analysiert kam nie (die Pakete
+  //     verdichten ihre Lerndaten genau dann). Jetzt holt die Arena die volle Analyse nach, und die ersetzt die
+  //     vorlaeufige Live-Genauigkeit genau einmal.
+  gruppe = 'Nachholen: Ergebnis früh verlassen';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await schaeferBisMatt(seite, h);
+    // alle eigenen Zuege sind live bewertet; die Schluss-Analyse langsam und ohne Vorab-Analysen
+    await seite.waitForFunction(() => [0, 2, 4].every((i) => window.__partie.z.live[i] && window.__partie.z.live[i].status === 'fertig'), null, { timeout: 30000 });
+    await bremse(seite, 700);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.zugTippen('h5f7');
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel="analyse"]', { timeout: 15000 });
+    pruefe('Ausgangslage: Ergebnis noch vorläufig (Analyse läuft)', await seite.locator('.ergebnis-overlay.vorlaeufig').count() === 1);
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(async () => {
+      const { hoere } = await import('./js/ereignisse.js');
+      window.__an = [];
+      hoere('partie:analysiert', (d) => window.__an.push({ quelle: d.quelle, partieId: d.partieId, mitReview: !!(d.review && d.review.zuege) }));
+    });
+    await bremse(seite, 0);
+    const vorher = (await h.gespeichert())[0] || {};
+    pruefe('Nach dem Verlassen: Genauigkeit aus der Live-Bewertung (Quelle live), keine Review, nicht analysiert', Number.isFinite(vorher.genauigkeit)
+      && vorher.genauigkeitQuelle === 'live' && vorher.analysiert !== true
+      && !(await seite.evaluate((id) => localStorage.getItem('schach-arena:v1:review:' + id) != null, vorher.id)), JSON.stringify(vorher).slice(0, 200));
+    await seite.waitForFunction(() => window.__an.length > 0, null, { timeout: 60000 }).catch(() => {});
+    const an = await seite.evaluate(() => window.__an);
+    pruefe('partie:analysiert kommt (quelle "nachholen") für diese Partie', an.length === 1 && an[0].quelle === 'nachholen' && an[0].partieId === vorher.id && an[0].mitReview,
+      JSON.stringify(an));
+    const nach = (await h.gespeichert())[0] || {};
+    const rev = await seite.evaluate(async (id) => { const r = (await import('./js/storage.js')).ladeReview(id); return r ? r.genauigkeit : null; }, vorher.id);
+    pruefe('Danach: Genauigkeit aus der vollen Analyse (ersetzt die Live-Zahl einmal), analysiert, Review gespeichert', nach.analysiert === true
+      && nach.genauigkeitQuelle === 'analyse' && rev && nach.genauigkeit === rev.w && Number.isFinite(nach.genauigkeitBot), JSON.stringify({ nach: [nach.genauigkeit, nach.genauigkeitQuelle], rev }));
+    pruefe('Nachholen danach fertig, nichts mehr offen', (await warteAufNachholen(seite, (z) => !z.laeuft, 10000)).laeuft === false
+      && (await seite.evaluate(async () => (await import('./js/nachholen.js')).offenePartien({ max: 5 }).length)) === 0);
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -1076,16 +1177,85 @@ async function testeNachpruefung(browser) {
     const info = () => seite.evaluate(async () => {
       const e = await window.__app.engine('bewertung');
       const a = await e.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
-      return { pfad: e.pfad, tiefe: a.depth, direkt: localStorage.getItem('schach-arena:wasm-direkt'), blobs: window.__skriptBlobs };
+      return { pfad: e.pfad, tiefe: a.depth, direkt: localStorage.getItem('schach-arena:v1:wasm-direkt'), blobs: window.__skriptBlobs };
     });
     const i1 = await info();
-    pruefe('Blob-Start scheitert: Engine läuft trotzdem (lädt selbst), Gerät merkt es sich', i1.tiefe === 6 && /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(i1.pfad)
-      && i1.direkt === '1' && i1.blobs === 1, JSON.stringify(i1));
+    // w0-fix: gemerkt wird der Zeitpunkt unter dem Praefix der App (vorher '1' ohne Ablauf unter schach-arena:wasm-direkt)
+    const merkAlter = Date.now() - Number(i1.direkt);
+    pruefe('Blob-Start scheitert: Engine läuft trotzdem (lädt selbst), Gerät merkt es sich (mit Zeitpunkt)', i1.tiefe === 6 && /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(i1.pfad)
+      && merkAlter >= 0 && merkAlter < 120000 && i1.blobs === 1, JSON.stringify(i1));
     await seite.reload();
     await seite.waitForSelector('.screen.arena');
     const i2 = await info();
     pruefe('Nächster Start: gleich direkt, kein neuer Blob-Versuch', i2.tiefe === 6 && !/^blob:/.test(i2.pfad) && i2.blobs === 0, JSON.stringify(i2));
+    // nach 30 Tagen (oder nach "Fortschritt zuruecksetzen") versucht es das Geraet wieder per Blob
+    await seite.evaluate(() => localStorage.setItem('schach-arena:v1:wasm-direkt', String(Date.now() - 31 * 86400000)));
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena');
+    const i3 = await info();
+    pruefe('Nach 30 Tagen: wieder ein Blob-Versuch (scheitert hier erneut, neu gemerkt)', i3.tiefe === 6 && i3.blobs === 1 && Date.now() - Number(i3.direkt) < 120000, JSON.stringify(i3));
     pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Zeitlimit beim Blob-Start (iPad gesperrt, Speicherdruck): diesmal direkt laden, aber NICHT fuer immer merken
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await kontext.addInitScript(() => {
+      window.__test = { engineZeitlimit: 1500 };
+      window.__blobWorker = 0;
+      const Echt = window.Worker;
+      // ein Blob-Worker, der nie antwortet (wie ein haengender Start)
+      window.Worker = function (url, opt) {
+        if (/^blob:/.test(String(url))) {
+          window.__blobWorker++;
+          return { postMessage() {}, terminate() {}, addEventListener() {}, removeEventListener() {}, onmessage: null, onerror: null };
+        }
+        return new Echt(url, opt);
+      };
+    });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    // beide Engines (die Arena startet sie vorab): je ein Blob-Versuch, der am Zeitlimit scheitert
+    const z1 = await seite.evaluate(async () => {
+      const [b, e] = await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]);
+      const a = await e.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
+      return { tiefe: a.depth, pfade: [b.pfad, e.pfad], direkt: localStorage.getItem('schach-arena:v1:wasm-direkt'), blob: window.__blobWorker };
+    });
+    pruefe('Zeitlimit beim Blob-Start: beide Engines laufen direkt, nichts gemerkt', z1.tiefe === 6 && z1.blob === 2 && z1.direkt === null
+      && z1.pfade.every((p) => /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(p)), JSON.stringify(z1));
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena');
+    const z2 = await seite.evaluate(async () => { await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]); return window.__blobWorker; });
+    pruefe('Nach einem Zeitlimit: nächster Start versucht es wieder per Blob', z2 === 2, String(z2));
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Der Worker startet, kann die .wasm aber nicht laden (hier: Blob-Adresse ungueltig). Das meldet sich nicht als
+  // Fehler-Ereignis, nur als Zeile "Aborted(...)": der Rueckfall muss trotzdem sofort kommen, nicht erst nach 15 s.
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await kontext.addInitScript(() => {
+      const echt = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = (b) => {
+        const u = echt(b);
+        if (b && b.type === 'application/wasm') URL.revokeObjectURL(u);
+        return u;
+      };
+    });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    const i3 = await seite.evaluate(async () => {
+      const t0 = performance.now();
+      const e = await window.__app.engine('bewertung');
+      const ms = Math.round(performance.now() - t0);
+      const a = await e.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
+      return { ms, pfad: e.pfad, tiefe: a.depth, direkt: localStorage.getItem('schach-arena:v1:wasm-direkt') };
+    });
+    pruefe('.wasm im Worker nicht ladbar: Rückfall nach höchstens 8 s (nicht erst nach dem Zeitlimit von 15 s), gemerkt', i3.ms < 8000 && i3.tiefe === 6
+      && /\/vendor\/stockfish\/stockfish-19-lite-single\.js$/.test(i3.pfad) && Number(i3.direkt) > 0, JSON.stringify(i3));
+    // erwartbar: der Abruf der ungueltigen Blob-Adresse im Worker; sonst darf nichts in der Konsole stehen
+    const fremd = fehler.filter((t) => !/blob:|ERR_FILE_NOT_FOUND|Failed to fetch|wasm/i.test(t));
+    pruefe('Keine weiteren Konsolenfehler', fremd.length === 0, fremd.join(' | '));
     await kontext.close();
   }
 }
@@ -1237,6 +1407,7 @@ async function testeErweiterungen(browser) {
   pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
   pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
     'liveAn', 'merke', 'modus', 'phase', 'rahmen', 'reduziert', 'spaeter', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 1, JSON.stringify(gest));
+  pruefe('partie:gestartet: wertet, hinweise und zuruecknahmen (Stand beim Start)', gest.wertet === true && gest.hinweise === 0 && gest.zuruecknahmen === 0, JSON.stringify(gest));
   const gesp = p.filter((e) => e.name === 'zug:gespielt');
   pruefe('zug:gespielt für Flo und Bot, auch zurückgenommene', gesp.length === 9 && gesp.filter((e) => e.wer === 'bot').length === 4, gesp.map((e) => e.wer + ':' + e.uci).join(' '));
   const matt = gesp[gesp.length - 1];
@@ -1335,6 +1506,8 @@ async function testeErweiterungen(browser) {
   await seite.evaluate(() => { window.__w0.ereignisse.length = 0; window.__test = { botAnhalten: true }; });
   await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1, modus: 'uebung', ziel: ZIEL });
   pruefe('Kopf „Übung ab Zug 1“', /Übung ab Zug 1/.test(await seite.locator('.screen.partie .p-eroeffnung').innerText()));
+  const gestU = (await log()).find((e) => e.name === 'partie:gestartet') || {};
+  pruefe('partie:gestartet der Übung: wertet false', gestU.wertet === false && gestU.modus === 'uebung', JSON.stringify(gestU));
   const bu = await seite.evaluate(() => {
     const b = window.__partie.buehne;
     return {
@@ -1414,6 +1587,15 @@ async function testeErweiterungen(browser) {
   pruefe('Bühne nach partie:verlassen ohne Wirkung', tm.blase === false && tm.zusatz === false && tm.spaeter === 0);
   pruefe('Verlauf: Übungs-Partie zeigt „Übung“ statt Sternen', await seite.locator('.vl-zeile').first().locator('.vl-uebung').count() === 1
     && await seite.locator('.vl-zeile').first().locator('.vl-sterne').count() === 0 && await seite.locator('.vl-zeile .vl-sterne').count() >= 1);
+  // w0-fix: die Statistik zaehlt nur wertende Partien, der Kopf nennt die Uebungen deshalb extra
+  const vlZahlen = await seite.evaluate(async () => {
+    const st = await import('./js/storage.js');
+    const alle = st.ladePartien();
+    return { n: alle.length, u: alle.filter((p) => !st.wertet(p)).length, kachel: st.statistik().partien };
+  });
+  const vlKopf = (await seite.locator('.vl-screen .kopf .unter').innerText()).trim();
+  pruefe('Verlauf: Kopf „n Partien, davon u Übung(en)“ passt zur Kachel (nur wertende)', vlZahlen.u >= 1 && vlZahlen.kachel === vlZahlen.n - vlZahlen.u
+    && vlKopf === `${vlZahlen.n} Partien, davon ${vlZahlen.u === 1 ? '1 Übung' : vlZahlen.u + ' Übungen'}`, `${vlKopf} ${JSON.stringify(vlZahlen)}`);
   await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
 
   // Niederlage mit Paket am Ort ergebnis:karte: kein "Kopf hoch"-Tipp
@@ -1473,6 +1655,54 @@ async function testeErweiterungen(browser) {
   await seite.evaluate(() => { window.__test = {}; localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
   await seite.waitForSelector('.screen.arena');
 
+  // Fortgesetzte Partie: partie:gestartet nennt die bisherigen Hinweise und Zuruecknahmen
+  gruppe = 'Erweiterungen: Fortsetzen und Coach';
+  await seite.evaluate((l) => { window.__w0.ereignisse.length = 0; window.__test = { botAnhalten: true }; localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(l)); },
+    LAUF(['e2e4', 'e7e5'], { hinweise: 2, zuruecknahmen: 1, liveKlassen: ['buch', null] }));
+  await h.starte({ botId: 'benno', farbe: 'w', fortsetzen: true });
+  const gestF = (await log()).find((e) => e.name === 'partie:gestartet') || {};
+  pruefe('partie:gestartet (fortgesetzt): hinweise 2, zuruecknahmen 1, wertet', gestF.fortgesetzt === true && gestF.hinweise === 2 && gestF.zuruecknahmen === 1
+    && gestF.wertet === true, JSON.stringify(gestF));
+  await seite.evaluate(() => { window.__test = {}; localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
+  await seite.waitForSelector('.screen.arena');
+  // Coach-Zusatz mit bleibt: der Coach klappt nicht von selbst ein (sonst waere die Zeile nach 3,5 s weg)
+  await seite.evaluate(() => { window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return { e2e4: 'e7e5', g1f3: 'b8c6' }[v[v.length - 1].lan] || null; } }; });
+  await h.starte({ botId: 'benno', farbe: 'w' });
+  await h.warteFlo();
+  await h.zugTippen('e2e4');
+  await h.warteFlo();
+  await seite.waitForFunction(() => window.__partie.z.live[0] && window.__partie.z.live[0].status === 'fertig', null, { timeout: 30000 });
+  await seite.waitForFunction(() => document.querySelector('.coach').classList.contains('kompakt'), null, { timeout: 8000 }).catch(() => {});
+  const vorZusatz = await seite.evaluate(() => document.querySelector('.coach').classList.contains('kompakt'));
+  const zb = await seite.evaluate(() => {
+    const b = window.__partie.buehne;
+    const leise = b.coachZusatz('ohne bleibt', { prio: 20 });
+    const knopf = document.createElement('button');
+    knopf.textContent = 'Nochmal ab hier';
+    const bleibt = b.coachZusatz(knopf, { prio: 80, bleibt: true });
+    return { kompakt: document.querySelector('.coach').classList.contains('kompakt'), da: bleibt.isConnected && leise.isConnected };
+  });
+  pruefe('Coach-Zusatz mit bleibt: ein eingeklappter Coach klappt wieder auf', vorZusatz === true && zb.kompakt === false && zb.da, JSON.stringify({ vorZusatz, zb }));
+  await warte(4200);
+  const zb2 = await seite.evaluate(() => ({
+    kompakt: document.querySelector('.coach').classList.contains('kompakt'),
+    sichtbar: [...document.querySelectorAll('.coach .c-zusatz')].map((z) => getComputedStyle(z).display !== 'none' && z.getBoundingClientRect().height > 0),
+  }));
+  pruefe('Coach-Zusatz mit bleibt: nach 4 s noch offen und sichtbar', zb2.kompakt === false && zb2.sichtbar.length === 2 && zb2.sichtbar.every(Boolean), JSON.stringify(zb2));
+  await h.zugTippen('g1f3');
+  await h.warteFlo();
+  await seite.waitForFunction(() => window.__partie.z.live[2] && window.__partie.z.live[2].status === 'fertig', null, { timeout: 30000 });
+  await seite.waitForFunction(() => document.querySelector('.coach').classList.contains('kompakt'), null, { timeout: 8000 }).catch(() => {});
+  pruefe('Nächster Coach-Inhalt: Zusatz weg, Coach klappt wieder von selbst ein', await seite.locator('.coach .c-zusatz').count() === 0
+    && await seite.evaluate(() => document.querySelector('.coach').classList.contains('kompakt')));
+  const ohne = await seite.evaluate(() => {
+    const z = window.__partie.buehne.coachZusatz('nur info');
+    return { kompakt: document.querySelector('.coach').classList.contains('kompakt'), versteckt: getComputedStyle(z).display === 'none' };
+  });
+  pruefe('Coach-Zusatz ohne bleibt: im eingeklappten Coach versteckt (wie bisher)', ohne.kompakt === true && ohne.versteckt === true, JSON.stringify(ohne));
+  await seite.evaluate(() => { window.__test = {}; localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
+  await seite.waitForSelector('.screen.arena');
+
   // Sichtbarkeit und Speicher voll
   gruppe = 'Erweiterungen: App';
   await seite.evaluate(() => { window.__w0.ereignisse.length = 0; });
@@ -1511,6 +1741,119 @@ async function testeErweiterungen(browser) {
   pruefe('Aufruf-Ort arena:start: verlasse beim Screen-Wechsel', await seite.evaluate(() => window.__w0.startVerlassen) >= 1);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+  await testeErweiterungenFix(browser);
+}
+
+// w0-fix: "Fortschritt zuruecksetzen" mit Paketen, kaputtes Paket in der Importliste, Sternklang bei reduzierter Bewegung
+async function testeErweiterungenFix(browser) {
+  gruppe = 'Erweiterungen: Zurücksetzen';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
+    await seite.goto(MIT_PAKET + '#einstellungen');
+    await seite.waitForSelector('.screen.es-screen .es-ort .w0-test');
+    await seite.evaluate(async () => {
+      const st = await import('./js/storage.js');
+      st.speichereModulEinstellungen('serie', { stufe: 'wichtig' });
+      st.speichereModulEinstellungen('alltag', { ruhetag: 0, anzeigen: false });
+      st.speichereModul('serie', { rekord: 7 });
+      st.speichereModul('alltag', { tage: [1] });
+      window.__w0.ereignisse.length = 0;
+    });
+    const vorher = await seite.evaluate(() => window.__w0.aufrufe['einstellungen:gruppen']);
+    // die Gruppe "Fortschritt" liegt unten im scrollenden Screen: click() scrollt sie ins Bild
+    for (const a of ['reset-1', 'reset-2', 'reset-ok']) {
+      await seite.locator(`[data-aktion="${a}"]`).click();
+      await warte(120);
+    }
+    const r = await seite.evaluate(async () => {
+      const st = await import('./js/storage.js');
+      return {
+        ereignisse: window.__w0.ereignisse.filter((e) => e.name === 'speicher:zurueckgesetzt').length,
+        aufrufe: window.__w0.aufrufe['einstellungen:gruppen'],
+        gruppen: document.querySelectorAll('.es-ort .w0-test').length,
+        serie: st.ladeModul('serie', null), alltag: st.ladeModul('alltag', null),
+        eSerie: st.ladeModulEinstellungen('serie', {}), eAlltag: st.ladeModulEinstellungen('alltag', {}),
+        text: document.querySelector('.es-reset').textContent,
+      };
+    });
+    pruefe('Reset: Ereignis speicher:zurueckgesetzt kommt einmal', r.ereignisse === 1, JSON.stringify(r));
+    pruefe('Reset: Gruppen der Pakete neu gefüllt (frischer Stand, je einmal)', r.aufrufe === vorher + 1 && r.gruppen === 1, `${vorher} -> ${r.aufrufe}, ${r.gruppen}`);
+    pruefe('Reset: Daten der Pakete weg, ihre Einstellungen bleiben („Die Einstellungen bleiben.“)', r.serie === null && r.alltag === null
+      && r.eSerie.stufe === 'wichtig' && r.eAlltag.ruhetag === 0 && /Die Einstellungen bleiben/.test(r.text), JSON.stringify(r));
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // Ein Paket, das beim Laden scheitert, legt die App nicht lahm: in Produktion (ohne ?test, Liste PAKETE) wie im Test
+  gruppe = 'Erweiterungen: kaputtes Paket';
+  for (const mitTest of [false, true]) {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const seitenfehler = [];
+    seite.on('pageerror', (e) => seitenfehler.push(e.message));
+    const ERW = "export const PAKETE = Object.freeze(['pakete/zz-kaputt/index', 'pakete/zz-syntax/index', 'pakete/zz-fehlt/index', 'pakete/w0-test/index']);";
+    await seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: ERW }));
+    await seite.route('**/js/pakete/zz-kaputt/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
+      body: "import { hoere } from '../../ereignisse.js';\nhoere('zug:bewerte', () => {});\n" }));
+    await seite.route('**/js/pakete/zz-syntax/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export const x = ;\n' }));
+    await seite.route('**/js/pakete/zz-fehlt/index.js', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'nicht da' }));
+    await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
+    const t0 = Date.now();
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html${mitTest ? '?test' : ''}#arena`);
+    const da = await seite.waitForSelector('.screen.arena .knoten', { timeout: 15000 }).then(() => true).catch(() => false);
+    const ms = Date.now() - t0;
+    const w0 = await seite.evaluate(() => (window.__w0 ? { bereit: window.__w0.ereignisse.some((e) => e.name === 'app:bereit' && e.hatApp), kopf: !!document.querySelector('.kopf-chips .w0-test') } : null));
+    const art = mitTest ? 'Testmodus' : 'Produktion';
+    pruefe(`${art}: Arena startet trotz kaputter Pakete (in ${ms} ms)`, da && ms < 10000, String(ms));
+    pruefe(`${art}: das heile Paket aus PAKETE ist geladen (app:bereit, Ort arena:kopf)`, w0 && w0.bereit && w0.kopf, JSON.stringify(w0));
+    const geladen = fehler.filter((f) => /Paket nicht geladen: pakete\/zz-(kaputt|syntax|fehlt)\/index/.test(f));
+    pruefe(`${art}: je kaputtem Paket ein console.error, kein Seitenfehler`, ['kaputt', 'syntax', 'fehlt'].every((n) => geladen.some((f) => f.includes('zz-' + n)))
+      && seitenfehler.length === 0, JSON.stringify({ geladen: geladen.length, seitenfehler }));
+    await kontext.close();
+  }
+
+  // Sternklang ohne registrierten Klang 'stern': bei reduzierter Bewegung still wie vor Runde 4, sonst zug();
+  // ein registrierter Klang (Paket 1A) klingt auch bei reduzierter Bewegung (Klang ist keine Bewegung)
+  gruppe = 'Erweiterungen: Sternklang';
+  for (const fall of [{ reduziert: false, register: false }, { reduziert: true, register: false }, { reduziert: true, register: true }]) {
+    const kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, userAgent: IPAD_UA,
+      reducedMotion: fall.reduziert ? 'reduce' : 'no-preference' });
+    await kontext.addInitScript(() => {
+      window.__toene = 0;
+      for (const K of [window.OscillatorNode, window.AudioBufferSourceNode]) {
+        if (!K) continue;
+        const start = K.prototype.start;
+        K.prototype.start = function (...a) { window.__toene++; return start.apply(this, a); };
+      }
+    });
+    const seite = await kontext.newPage();
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(async (reg) => {
+      const { klang, registriereKlang } = await import('./js/sounds.js');
+      window.__sterne = [];
+      if (reg) registriereKlang('stern', () => { window.__sterneRegister = (window.__sterneRegister || 0) + 1; });
+      const orig = klang.stern;
+      klang.stern = function (...a) {
+        const vor = window.__toene;
+        const r = orig.apply(this, a);
+        window.__sterne.push({ i: a[0], reduziert: !!(a[2] && a[2].reduziert), toene: window.__toene - vor, laeuft: klang.zustand() });
+        return r;
+      };
+    }, fall.register);
+    await h.schaefermatt();
+    await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 30000 });
+    await warte(2200);
+    const st = await seite.evaluate(() => ({ sterne: window.__sterne, register: window.__sterneRegister || 0 }));
+    const name = `${fall.reduziert ? 'reduzierte Bewegung' : 'normal'}${fall.register ? ', registrierter Klang' : ''}`;
+    const laeuft = st.sterne.length === 3 && st.sterne.every((x) => x.laeuft === 'bereit');
+    if (!fall.reduziert) pruefe(`${name}: drei Sterne klingen (zug)`, laeuft && st.sterne.every((x) => x.toene > 0 && !x.reduziert), JSON.stringify(st));
+    else if (!fall.register) pruefe(`${name}: drei Sterne still wie vor Runde 4`, laeuft && st.sterne.every((x) => x.toene === 0 && x.reduziert), JSON.stringify(st));
+    else pruefe(`${name}: der registrierte Klang spielt dreimal`, laeuft && st.register === 3, JSON.stringify(st));
+    await kontext.close();
+  }
 }
 
 // ---------- 7. Viewports ----------

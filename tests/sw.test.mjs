@@ -2,6 +2,10 @@
 // jede gelistete Datei existiert, keine App-Datei fehlt, alles, worauf index.html, das Manifest
 // und die Module verweisen, ist dabei, und STAND passt zum Inhalt (sonst bekaeme das iPad das
 // Update nie, weil der Cache die alte Version liefert).
+// Pakete (Runde 4): Dateien unter js/pakete/** und css/pakete/** sowie die Paket-Screens (js/ui/training.js,
+// js/ui/start.js) muessen erst in die Liste, wenn ihr Paket in PAKETE in js/erweiterungen.js steht (das macht
+// die Integration). Vorher sind sie erlaubt, aber nicht verlangt: Ein Paket darf nach BAUPLAN 3.11 weder
+// sw.js noch erweiterungen.js aendern und muss trotzdem diesen Test gruen halten. Dann steht nur ein Hinweis da.
 //
 //   node tests/sw.test.mjs
 //   node tests/sw.test.mjs --aktualisieren    nach einer Aenderung: VERSION + 1, STAND neu
@@ -47,6 +51,56 @@ function alleDateien(ordner, filter) {
   return readdirSync(voll).filter((n) => statSync(path.join(voll, n)).isFile() && filter.test(n)).map((n) => `${ordner}/${n}`);
 }
 
+// alle Dateien unter einem Ordner (rekursiv), relativ zur Wurzel
+function alleDateienTief(ordner, filter) {
+  const voll = path.join(WURZEL, ordner);
+  if (!existsSync(voll)) return [];
+  const aus = [];
+  for (const n of readdirSync(voll)) {
+    const rel = `${ordner}/${n}`;
+    if (statSync(path.join(WURZEL, rel)).isDirectory()) aus.push(...alleDateienTief(rel, filter));
+    else if (filter.test(n)) aus.push(rel);
+  }
+  return aus;
+}
+
+// Eintraege der Liste PAKETE aus js/erweiterungen.js (Kommentare werden ignoriert)
+export function lesePakete(text) {
+  const ohne = String(text || '').replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((z) => z.replace(/\/\/.*$/, '')).join('\n');
+  const m = ohne.match(/export\s+const\s+PAKETE\s*=\s*(?:Object\.freeze\(\s*)?\[([^\]]*)\]/);
+  if (!m) return null;
+  return [...m[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map((x) => x[1]);
+}
+
+// Paket-Screens und ihr Paket (BAUPLAN: 1C Kartei -> training, 2D Einstieg -> start)
+export const SCREEN_PAKET = Object.freeze({ training: 'kartei', start: 'einstieg' });
+
+// Welche Paket-Dateien muessen in die Liste? dateien: vorhandene Dateien (relativ), pakete: Liste PAKETE.
+// -> { pflicht: [...], erlaubt: [...], wartend: [...] }  (wartend: da, aber Paket noch nicht eingebunden)
+export function paketDateien(dateien, pakete) {
+  const drin = new Set((pakete || []).map((p) => (String(p).match(/^pakete\/([a-z0-9-]+)\//) || [])[1]).filter(Boolean));
+  const paketVon = (d) => {
+    let m = d.match(/^js\/pakete\/([^/]+)\//);
+    if (m) return m[1];
+    m = d.match(/^css\/pakete\/([^/.]+)(?:\.css$|\/)/);
+    if (m) return m[1];
+    m = d.match(/^js\/ui\/([^/]+)\.js$/);
+    if (m && SCREEN_PAKET[m[1]]) return SCREEN_PAKET[m[1]];
+    return null;
+  };
+  const pflicht = [];
+  const erlaubt = [];
+  const wartend = [];
+  for (const d of dateien) {
+    const p = paketVon(d);
+    if (!p) continue;
+    erlaubt.push(d);
+    if (drin.has(p)) pflicht.push(d);
+    else wartend.push(d);
+  }
+  return { pflicht, erlaubt, wartend };
+}
+
 // relative Verweise aufloesen (von einer Datei aus), nur innerhalb des Projekts
 function relativ(von, ziel) {
   if (/^(https?:|data:|blob:|#|mailto:)/.test(ziel)) return null;
@@ -69,22 +123,56 @@ function main() {
   const fehlt = liste.filter((d) => !existsSync(path.join(WURZEL, d)) || !statSync(path.join(WURZEL, d)).isFile());
   pruefe('Jede gelistete Datei existiert (kein 404)', fehlt.length === 0, fehlt.join(', '));
 
+  // Pakete: erst Pflicht, wenn sie in PAKETE (js/erweiterungen.js) stehen
+  const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8'));
+  pruefe('js/erweiterungen.js: Liste PAKETE lesbar', Array.isArray(pakete), 'export const PAKETE = Object.freeze([...]) fehlt');
+  const paketKandidaten = [
+    ...alleDateienTief('js/pakete', /\.(js|json|svg|png)$/),
+    ...alleDateienTief('css/pakete', /\.(css|svg|png)$/),
+    ...Object.keys(SCREEN_PAKET).map((n) => `js/ui/${n}.js`).filter((d) => existsSync(path.join(WURZEL, d))),
+  ];
+  const pk = paketDateien(paketKandidaten, pakete || []);
   // Alles, was zur App gehoert, muss im Cache stehen
   const soll = [
     'index.html', 'manifest.webmanifest', 'LICENSE',
     ...alleDateien('css', /\.css$/),
     ...alleDateien('js', /\.js$/),
-    ...alleDateien('js/ui', /\.js$/),
+    ...alleDateien('js/ui', /\.js$/).filter((d) => !pk.erlaubt.includes(d)),
     ...alleDateien('vendor/chess', /\.js$/),
     ...alleDateien('vendor/stockfish', /\.(js|wasm)$/),
     ...alleDateien('assets/pieces', /\.(svg|png)$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
+    ...pk.pflicht,
   ];
   const nichtGelistet = soll.filter((d) => !menge.has(d));
   pruefe('Keine App-Datei fehlt in der Liste', nichtGelistet.length === 0, nichtGelistet.join(', '));
-  const ueberzaehlig = liste.filter((d) => !soll.includes(d));
+  const ueberzaehlig = liste.filter((d) => !soll.includes(d) && !pk.erlaubt.includes(d));
   pruefe('Keine fremden Dateien (Tests, Design) in der Liste', ueberzaehlig.length === 0, ueberzaehlig.join(', '));
+  const warten = pk.wartend.filter((d) => !menge.has(d));
+  if (warten.length) console.log(`Hinweis: Paket-Dateien noch nicht im Cache (ihr Paket steht noch nicht in PAKETE, das macht die Integration): ${warten.join(', ')}`);
+  const paketEinstiege = (pakete || []).map((p) => `js/${p}.js`);
+  const einstiegFehlt = paketEinstiege.filter((d) => !menge.has(d) || !existsSync(path.join(WURZEL, d)));
+  pruefe('Pakete aus js/erweiterungen.js: Einstieg vorhanden und im Cache', einstiegFehlt.length === 0, einstiegFehlt.join(', '));
+  const ungueltig = (pakete || []).filter((p) => !/^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(p));
+  pruefe('Pakete aus js/erweiterungen.js: Pfade wie in app.js erlaubt (ohne .js, [a-z0-9-] mit /)', ungueltig.length === 0, ungueltig.join(', '));
+  const statisch = /(?:^|\n)\s*import\s+['"]|(?:^|\n)\s*import\s[^'"]*from\s*['"]/.test(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8')
+    .split('\n').filter((z) => !/^\s*\/\//.test(z)).join('\n'));
+  pruefe('js/erweiterungen.js importiert kein Paket statisch (ein Ladefehler legte sonst die App lahm)', !statisch);
+
+  // Selbstprobe der Paket-Regel (wie bei 1C: js/ui/training.js liegt da, bevor die Integration es einbindet)
+  {
+    const probe = ['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css',
+      'js/pakete/klang-serie/index.js', 'css/pakete/klang-serie.css', 'js/ui/start.js', 'js/pakete/einstieg/sub/x.js'];
+    const vor = paketDateien(probe, []);
+    const nach = paketDateien(probe, ['pakete/kartei/index']);
+    pruefe('Paket-Regel: vor der Integration ist keine Paket-Datei Pflicht', vor.pflicht.length === 0 && vor.wartend.length === probe.length);
+    pruefe('Paket-Regel: nach der Integration sind genau die Dateien des Pakets Pflicht (auch der Screen, auch tiefer)',
+      JSON.stringify(nach.pflicht) === JSON.stringify(['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css'])
+      && JSON.stringify(paketDateien(probe, ['pakete/einstieg/index']).pflicht) === JSON.stringify(['js/ui/start.js', 'js/pakete/einstieg/sub/x.js']),
+      JSON.stringify(nach.pflicht));
+    pruefe('Paket-Regel: Liste PAKETE wird ohne Kommentare gelesen', JSON.stringify(lesePakete("// export const PAKETE = ['x'];\nexport const PAKETE = Object.freeze([\n  // 'pakete/alt/index',\n  'pakete/kartei/index',\n]);")) === '["pakete/kartei/index"]');
+  }
 
   // Verweise aus index.html
   const html = readFileSync(path.join(WURZEL, 'index.html'), 'utf8');
@@ -138,8 +226,10 @@ function main() {
   const kernScreens = screens.filter((s) => !paketScreens.includes(s));
   const screenFehlt = kernScreens.map((s) => `js/ui/${s}.js`).filter((d) => !menge.has(d));
   pruefe('Alle Screen-Module im Cache', kernScreens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
-  const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => existsSync(path.join(WURZEL, d)) && !menge.has(d));
-  pruefe('Paket-Screens (training, start) im Router, vorhandene im Cache', JSON.stringify(paketScreens) === '["training","start"]'
+  // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
+  const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
+  pruefe('Paket-Screens (training, start) im Router, die eingebundener Pakete im Cache', JSON.stringify(paketScreens) === '["training","start"]'
+    && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');
   const sfPfad = (engine.match(/new URL\('([^']+stockfish[^']+\.js)'/) || [])[1];

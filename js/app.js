@@ -11,15 +11,17 @@
 // Registriert sw.js (Offline-Cache) und zeigt bei einer neuen Version den Hinweis "Neu laden".
 //
 // Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md):
-//   - laedt die Pakete statisch ueber ./erweiterungen.js; nur mit ?test zusaetzlich ?erw=pfad1,pfad2
-//     (relativ zu js/, ohne .js, nur [a-z0-9/-], z. B. ?test&erw=pakete/kartei/index), und zwar bevor
-//     der erste Screen erscheint
+//   - laedt die Pakete aus der Liste PAKETE in ./erweiterungen.js per dynamischem import(), nur mit ?test
+//     zusaetzlich ?erw=pfad1,pfad2 (relativ zu js/, ohne .js, nur [a-z0-9/-], z. B.
+//     ?test&erw=pakete/kartei/index), und zwar bevor app:bereit kommt und der erste Screen erscheint. Ein
+//     Paket, das nicht laedt, landet als console.error in der Konsole; die App startet trotzdem (nach
+//     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird)
 //   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena
 //   - sendet app:bereit (einmal vor dem ersten Screen), app:screen (nach zeige() eines Screens) und
 //     app:sichtbar (bei visibilitychange; setzt html[data-sichtbar="ja"|"nein"])
 //   - Wahl-Ort app:erster-screen? (nur ohne Hash und ohne Verlaufseintrag), kontext { partienZahl }
 //   - speicher:fehler: einmal je Sitzung ein Hinweis, dass der Speicher voll ist
-import './erweiterungen.js';
+import { PAKETE } from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
 import { setzeSymbole } from './board.js';
@@ -63,11 +65,15 @@ function wendeEinstellungenAn(e) {
 // der .wasm aus dem #-Teil seiner eigenen Adresse; den verliert ein Worker-Skript aus dem Cache des Service
 // Workers (seine Adresse ist dann die der Cache-Antwort), deshalb startet auch das Skript (28 KB) als Blob.
 // So laden die Worker nichts mehr selbst und haengen offline nicht davon ab, ob das Geraet ihre Anfragen
-// ueber den Service Worker leitet. Klappt der Start so nicht, laden die Worker wie bisher selbst (das merkt
-// sich das Geraet, WASM_DIREKT). Pfade relativ zu diesem Modul (klappt unter / und unter /schach/).
+// ueber den Service Worker leitet. Klappt der Start so nicht, laden die Worker wie bisher selbst. Das merkt
+// sich das Geraet (WASM_DIREKT, Zeitpunkt), aber nur bei einem echten Fehler (Fehler-Ereignis, "Aborted(...)"),
+// nicht beim Zeitlimit (iPad gesperrt, Speicherdruck), und nur WASM_DIREKT_TAGE lang; danach, nach
+// "Fortschritt zuruecksetzen" oder wenn der Wert fehlt, versucht es der naechste Start wieder per Blob.
+// Pfade relativ zu diesem Modul (klappt unter / und unter /schach/).
 const ENGINE_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.js', import.meta.url).href;
 const WASM_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.wasm', import.meta.url).href;
-const WASM_DIREKT = 'schach-arena:wasm-direkt';
+const WASM_DIREKT = 'schach-arena:v1:wasm-direkt';
+const WASM_DIREKT_TAGE = 30;
 // kleinstes Modul mit einem SIMD-Befehl (v128)
 const SIMD_TEST = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
 const ENGINE_TEXT = {
@@ -98,7 +104,8 @@ export function pruefeWasm({ simdTest = SIMD_TEST, pfad = WASM_PFAD } = {}) {
       if (!antwort.ok) throw new Error('Engine-Datei nicht erreichbar (' + antwort.status + ')');
       const bytes = new Uint8Array(await antwort.arrayBuffer());
       if (!WebAssembly.validate(bytes)) throw dauerhafterFehler('wasm-kaputt');
-      if (typeof Blob !== 'function' || typeof URL.createObjectURL !== 'function') return null;
+      // Geraet laedt direkt (Blob-Start scheiterte einmal): die Bytes nicht als Blob festhalten
+      if (direktLaden() || typeof Blob !== 'function' || typeof URL.createObjectURL !== 'function') return null;
       // Typ application/wasm: der Worker kompiliert per instantiateStreaming
       return URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
     })();
@@ -115,18 +122,31 @@ function meldeEngineFehler(e) {
   frage({ titel: 'Schach-Engine startet nicht', text: e.message, knoepfe: [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen: true });
 }
 
-// Die Worker bekommen Skript und gepruefte Bytes als Blob-URL. Hat das einmal nicht geklappt (der Worker
-// startet dann nicht), laden sie wie bisher selbst; das merkt sich das Geraet (WASM_DIREKT).
+// Die Worker bekommen Skript und gepruefte Bytes als Blob-URL. Hat das nicht geklappt (der Worker
+// startet dann nicht), laden sie wie bisher selbst; das merkt sich das Geraet WASM_DIREKT_TAGE lang
+// (WASM_DIREKT = Zeitpunkt in ms).
 function direktLaden() {
-  try { return localStorage.getItem(WASM_DIREKT) === '1'; } catch (e) { return false; }
+  try {
+    const t = Number(localStorage.getItem(WASM_DIREKT));
+    const alter = Date.now() - t;
+    return t > 0 && alter >= 0 && alter < WASM_DIREKT_TAGE * 86400000;
+  } catch (e) { return false; }
 }
+function merkeDirekt() {
+  try { localStorage.setItem(WASM_DIREKT, String(Date.now())); } catch (e) { /* egal */ }
+}
+// Laedt der Worker die .wasm nicht (z. B. Blob-Adresse dort ungueltig), endet das bei stockfish.js still in einem
+// unbehandelten Promise-Fehler. Der Vorspann meldet ihn als Zeile "Aborted(...)" wie ein Emscripten-Abbruch;
+// dann sagt engine.init() sofort ab und der Rueckfall kommt gleich, nicht erst nach dem Zeitlimit.
+const SKRIPT_VORSPANN = "self.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; "
+  + "postMessage('Aborted(' + String(r && r.message || r) + ')'); });\n";
 let skriptBlob = null;
 function engineSkript() {
   if (!skriptBlob) {
     const p = fetch(ENGINE_PFAD).then((r) => {
       if (!r.ok) throw new Error('Engine-Skript nicht erreichbar (' + r.status + ')');
       return r.blob();
-    }).then((b) => URL.createObjectURL(new Blob([b], { type: 'text/javascript' })));
+    }).then((b) => URL.createObjectURL(new Blob([SKRIPT_VORSPANN, b], { type: 'text/javascript' })));
     p.catch(() => { if (skriptBlob === p) skriptBlob = null; });
     skriptBlob = p;
   }
@@ -137,8 +157,11 @@ async function starteEngine(wasmUrl, merke) {
   if (wasmUrl && !direktLaden()) {
     try { skript = await engineSkript(); } catch (f) { skript = null; }
   }
+  // nur Tests: kuerzeres Zeitlimit fuer den Engine-Start (?test, window.__test.engineZeitlimit in ms)
+  const testZeit = TEST && window.__test && Number(window.__test.engineZeitlimit);
+  const opt = testZeit > 0 ? { zeitlimitMs: testZeit } : {};
   if (skript) {
-    const e = new Engine(skript + '#' + encodeURIComponent(wasmUrl));
+    const e = new Engine(skript + '#' + encodeURIComponent(wasmUrl), opt);
     merke(e);
     try {
       await e.init();
@@ -146,10 +169,11 @@ async function starteEngine(wasmUrl, merke) {
     } catch (f) {
       try { e.terminate(); } catch (g) { /* egal */ }
       console.warn('Engine mit Blob-URL startet nicht, lade die .wasm direkt', f);
-      try { localStorage.setItem(WASM_DIREKT, '1'); } catch (g) { /* egal */ }
+      // ein Zeitlimit (gesperrtes iPad, Speicherdruck) ist kein Grund, es nie wieder per Blob zu versuchen
+      if (!(f && f.zeitlimit)) merkeDirekt();
     }
   }
-  const e = new Engine(ENGINE_PFAD);
+  const e = new Engine(ENGINE_PFAD, opt);
   merke(e);
   await e.init();
   return e;
@@ -553,10 +577,12 @@ function pruefeInstallation() {
   }), 1200);
 }
 
-// ---------- Pakete im Testmodus (?test&erw=pakete/x/index,pakete/y/index) ----------
+// ---------- Pakete (PAKETE aus erweiterungen.js, im Testmodus dazu ?test&erw=pakete/x/index) ----------
 // Pfade relativ zu js/, ohne Endung, nur Kleinbuchstaben, Ziffern, "-" und "/" (kein "..", kein
-// fremder Server). Alles andere wird ignoriert. Ohne ?test gibt es diesen Weg nicht.
+// fremder Server). Alles andere wird ignoriert. Ohne ?test gibt es den Weg ueber ?erw nicht.
 const ERW_PFAD = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
+// So lange wartet der Start hoechstens auf die Pakete (ein Paket, das nie fertig wird, haelt die App nicht auf)
+const PAKETE_WARTEN_MS = 10000;
 export function erwPfade(suche) {
   let wert = null;
   try { wert = new URLSearchParams(suche || '').get('erw'); } catch (e) { wert = null; }
@@ -564,13 +590,19 @@ export function erwPfade(suche) {
   return [...new Set(wert.split(',').map((t) => t.trim()).filter((t) => ERW_PFAD.test(t)))];
 }
 
-function ladeTestPakete() {
-  if (!TEST) return null;
-  const pfade = erwPfade(location.search);
+// Jedes Paket einzeln per import(): ein Fehler in einem Paket stoppt weder die anderen noch die App
+function ladePakete() {
+  const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p)) : [];
+  const pfade = [...new Set([...liste, ...(TEST ? erwPfade(location.search) : [])])];
   if (!pfade.length) return null;
-  return Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
+  const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
     console.error('Paket nicht geladen: ' + p, e);
   })));
+  let uhr = 0;
+  const zeit = new Promise((r) => {
+    uhr = setTimeout(() => { console.error('Pakete laden zu lange, die App startet ohne zu warten'); r(); }, PAKETE_WARTEN_MS);
+  });
+  return Promise.race([alle, zeit]).then(() => clearTimeout(uhr));
 }
 
 // ---------- Sichtbarkeit (Tab im Hintergrund, iPad gesperrt) ----------
@@ -596,8 +628,8 @@ function starte() {
   };
   for (const t of ['pointerup', 'touchend', 'keydown']) document.addEventListener(t, entsperren, true);
   if (TEST) window.__app = app;
-  // Pakete aus ?erw zuerst laden (nur Testmodus), dann app:bereit und der erste Screen
-  const pakete = ladeTestPakete();
+  // Pakete zuerst laden (PAKETE, im Testmodus dazu ?erw), dann app:bereit und der erste Screen
+  const pakete = ladePakete();
   if (pakete) pakete.then(ersterStart);
   else ersterStart();
 }

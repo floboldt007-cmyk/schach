@@ -5,7 +5,8 @@
 //
 // Klassen mit Praefix vl- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
 // Runde 4: Anzeige-Ort verlauf:seite (in .vl-seite zwischen Statistik und Schatzkiste); Partien, die
-// nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung".
+// nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung". Die Statistik zaehlt nur
+// wertende Partien; die Kopfzeile nennt deshalb die Uebungen extra ("12 Partien, davon 2 Übungen").
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
@@ -88,7 +89,7 @@ export function zeige(root, params = {}, app) {
     sec.innerHTML = `
       <header class="kopf">
         <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
-        <div class="titel"><h2>Verlauf</h2><div class="unter">${n === 1 ? '1 Partie' : `${n} Partien`}</div></div>
+        <div class="titel"><h2>Verlauf</h2><div class="unter">${anzahlText(partien)}</div></div>
       </header>
       <div class="vl-inhalt">
         <aside class="vl-seite">
@@ -106,6 +107,16 @@ export function zeige(root, params = {}, app) {
     const ort = sec.querySelector('.vl-ort');
     ortSeite = fuelle('verlauf:seite', ort, { app });
     ort.hidden = ortSeite.anzahl === 0;
+  }
+
+  // Kopfzeile: alle Partien; Uebungen (nicht wertend) extra genannt, weil die Statistik nur wertende zaehlt
+  function anzahlText(partien) {
+    const n = partien.length;
+    const u = partien.filter((p) => !wertet(p)).length;
+    const uebungen = (k) => (k === 1 ? '1 Übung' : `${k} Übungen`);
+    if (u && u === n) return uebungen(u);
+    const alle = n === 1 ? '1 Partie' : `${n} Partien`;
+    return u ? `${alle}, davon ${uebungen(u)}` : alle;
   }
 
   function statistikHtml() {

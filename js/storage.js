@@ -25,6 +25,14 @@
 //   Reviews werden kompakt gespeichert (review.js kompaktReview/ergaenzeReviewFelder), MAX_REVIEWS 20.
 //   Scheitert ein Schreiben trotz geopferter Analysen, kommt das Ereignis speicher:fehler
 //     { schluessel, grund: 'voll' | 'fehler' }. Fortschritt wird immer vor der Partienliste geschrieben.
+//   Einstellungen der Pakete (w0-fix) unter schach-arena:v1:einstellungen:<name> (Namen wie MODUL_BUDGET),
+//     hoechstens MODUL_EINSTELLUNGEN_MAX Zeichen; setzeZurueck() ohne mitEinstellungen verschont sie:
+//     ladeModulEinstellungen(name, standard) -> gespeicherte Daten oder tiefe Kopie von standard
+//     speichereModulEinstellungen(name, daten) -> { ok, zeichen, grund? }   grund: 'unbekannt' | 'budget' | 'voll'
+//   setzeZurueck() sendet danach speicher:zurueckgesetzt { mitEinstellungen } (Pakete leeren ihren Zustand).
+//   Partie-Datensatz (w0-fix): analysiert (true, sobald ergaenzeAnalyse eine Review bekam; Nachholen sucht
+//     wertende Partien ohne dieses Feld) und genauigkeitQuelle ('live' | 'analyse'). Eine Genauigkeit aus
+//     der Live-Bewertung ersetzt die erste volle Analyse genau einmal; eine aus einer Analyse bleibt.
 import { BOTS } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder } from './review.js';
@@ -36,6 +44,7 @@ export const SPEICHER_VERSION = 1;
 const P = 'schach-arena:v1:';
 const K = {
   einstellungen: P + 'einstellungen',
+  modulEinstellungen: (name) => P + 'einstellungen:' + name,
   fortschritt: P + 'fortschritt',
   partien: P + 'partien',
   laufend: P + 'laufend',
@@ -60,6 +69,8 @@ export const MODUL_BUDGET = Object.freeze({
   kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
   taktik: 8000, start: 6000, feier: 6000, serie: 4000,
 });
+// Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
+export const MODUL_EINSTELLUNGEN_MAX = 2000;
 // Grenze des Speichers (Safari ca. 5 MB je Herkunft, als UTF-16 ca. 2,5 Mio. Zeichen)
 export const SPEICHER_GRENZE = 2500000;
 
@@ -282,7 +293,8 @@ export function sterneFuerPartie(p) {
 //            hinweise, zuruecknahmen, liveKlassen: [klasse|null je Ply],
 //            genauigkeit (Spieler, 0..100|null), genauigkeitBot, spielstaerke (Elo-Schaetzung|null),
 //            eroeffnung (Name|null), sterne [bool,bool,bool] (wird beim Speichern berechnet),
-//            modus 'normal'|'uebung', ziel (nur Uebung), extra (Objekt je Paket), maxSerie }
+//            modus 'normal'|'uebung', ziel (nur Uebung), extra (Objekt je Paket), maxSerie,
+//            genauigkeitQuelle 'live'|'analyse' (sobald genauigkeit gesetzt), analysiert true (Review nachgetragen) }
 // Die Spielanalyse (Review) liegt getrennt unter review:<id> (nur die letzten MAX_REVIEWS).
 // ---------------------------------------------------------------------------
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -373,6 +385,10 @@ export function speicherePartie(partie, review = null) {
     for (let n = 1; liste.some((x) => x.id === p.id); n++) p.id = neueId() + (n > 8 ? n.toString(36) : '');
   }
   if (!p.datum) p.datum = new Date().toISOString();
+  // Genauigkeit schon beim Speichern (ohne Quelle): gilt als endgueltig wie eine aus einer Analyse
+  if (!Number.isFinite(p.genauigkeit)) delete p.genauigkeitQuelle;
+  else if (p.genauigkeitQuelle !== 'live') p.genauigkeitQuelle = 'analyse';
+  if (review) p.analysiert = true;
   const wert = wertet(p);
   p.sterne = sterneFuerPartie(p);
 
@@ -435,11 +451,17 @@ function sammleBrillante(f, p, review) {
 // gesichert, die Analyse kommt spaeter): Genauigkeit, Spielstaerke, Eroeffnung, Review,
 // Brillant-Zuege und Bestwert.
 // Regel (w0c): Es werden nur LEERE Felder gefuellt (genauigkeit, genauigkeitBot, spielstaerke,
-// eroeffnung). Die erste Genauigkeit einer Partie (Analyse am Spielende, sonst Live-Bewertung, sonst die
-// erste spaetere Analyse) bleibt; auf ihr beruht Stern 2. Eine spaetere Neuberechnung (z. B. wenn die
-// Review aus der Liste gefallen ist) speichert nur ihre eigene Review. Sterne werden nur dazugewonnen,
+// eroeffnung). Die erste Genauigkeit einer Partie aus einer Analyse (am Spielende, sonst die erste
+// spaetere, z. B. beim Nachholen) bleibt; auf ihr beruht Stern 2. Eine spaetere Neuberechnung (z. B. wenn
+// die Review aus der Liste gefallen ist) speichert nur ihre eigene Review. Sterne werden nur dazugewonnen,
 // nie entzogen, im Partie-Datensatz wie im Fortschritt.
-// Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung), ebenfalls nur, wenn noch keine da ist.
+// Ausnahme (w0-fix): Eine Genauigkeit aus der Live-Bewertung (genauigkeitQuelle 'live') ist vorlaeufig, die
+// erste volle Analyse ersetzt sie genau einmal (sonst haenge Stern 2 davon ab, wann Flo das Ergebnis
+// verlaesst). Alte Datensaetze ohne Quelle gelten als live, wenn nur die Genauigkeit gesetzt ist (die
+// Live-Bewertung fuellt weder genauigkeitBot noch spielstaerke). War der ersetzte Live-Wert der Bestwert
+// des Bots, wird der Bestwert aus den gespeicherten Partien neu bestimmt.
+// Ohne Review: { genauigkeit } (z. B. aus der Live-Bewertung), nur, wenn noch keine da ist.
+// Mit Review: analysiert = true (Nachholen laesst die Partie dann aus).
 // Nicht wertende Partien: keine Sterne, kein Bestwert, keine Schatzkiste.
 // Rueckgabe { partie, neueSterne, brillant, wertet } oder null.
 export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) {
@@ -450,14 +472,23 @@ export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) 
   const sf = p.spielerFarbe === 'b' ? 'b' : 'w';
   const bf = sf === 'w' ? 'b' : 'w';
   const leer = (x) => !Number.isFinite(x);
+  const ausLive = !leer(p.genauigkeit) && (p.genauigkeitQuelle === 'live'
+    || (p.genauigkeitQuelle == null && leer(p.genauigkeitBot) && leer(p.spielstaerke)));
+  let ersetzt = null;   // ersetzter Live-Wert
   if (review && review.genauigkeit) {
-    if (leer(p.genauigkeit) && Number.isFinite(review.genauigkeit[sf])) p.genauigkeit = review.genauigkeit[sf];
+    if ((leer(p.genauigkeit) || ausLive) && Number.isFinite(review.genauigkeit[sf])) {
+      if (ausLive) ersetzt = p.genauigkeit;
+      p.genauigkeit = review.genauigkeit[sf];
+      p.genauigkeitQuelle = 'analyse';
+    }
     if (leer(p.genauigkeitBot) && Number.isFinite(review.genauigkeit[bf])) p.genauigkeitBot = review.genauigkeit[bf];
     if (leer(p.spielstaerke) && review.spielstaerke && Number.isFinite(review.spielstaerke[sf])) p.spielstaerke = review.spielstaerke[sf];
     if (!p.eroeffnung && review.eroeffnung) p.eroeffnung = review.eroeffnung;
   } else if (Number.isFinite(genauigkeit) && leer(p.genauigkeit)) {
     p.genauigkeit = genauigkeit;
+    p.genauigkeitQuelle = 'live';
   }
+  if (review) p.analysiert = true;
   const wert = wertet(p);
   const alt = Array.isArray(liste[i].sterne) ? liste[i].sterne : [];
   p.sterne = wert ? sterneFuerPartie(p).map((s, k) => s || alt[k] === true) : [false, false, false];
@@ -469,6 +500,11 @@ export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {}) 
     const f = ladeFortschritt();
     const b = f.bots[p.botId];
     if (b) {
+      // Bestwert aus einem jetzt ersetzten Live-Wert: aus den gespeicherten Partien neu bestimmen
+      if (ersetzt != null && b.besteGenauigkeit === ersetzt) {
+        const werte = liste.filter((x) => x.botId === p.botId && wertet(x) && zaehltFuerBestwert(x)).map((x) => x.genauigkeit);
+        b.besteGenauigkeit = werte.length ? Math.max(...werte) : null;
+      }
       if (zaehltFuerBestwert(p) && (b.besteGenauigkeit == null || p.genauigkeit > b.besteGenauigkeit)) b.besteGenauigkeit = p.genauigkeit;
       p.sterne.forEach((s, k) => {
         if (s && !b.sterne[k]) {
@@ -625,7 +661,31 @@ export function speichereModul(name, daten) {
   return schreibText(K.modul(name), t) ? { ok: true, zeichen } : { ok: false, zeichen, grund: 'voll' };
 }
 
-// Belegung des Speichers in Zeichen (Schluessel + Wert)
+// Einstellungen eines Pakets (getrennt vom Modul-Speicher, damit "Fortschritt zuruecksetzen" sie verschont)
+export function ladeModulEinstellungen(name, standard = {}) {
+  const kopie = () => (standard === undefined ? null : JSON.parse(JSON.stringify(standard)));
+  if (!istModul(name)) {
+    warne('unbekanntes Modul ' + String(name));
+    return kopie();
+  }
+  const v = lies(K.modulEinstellungen(name), null);
+  if (v == null) return kopie();
+  if (standard != null) {
+    const art = (x) => (Array.isArray(x) ? 'liste' : typeof x);
+    if (art(v) !== art(standard)) return kopie();
+  }
+  return v;
+}
+
+export function speichereModulEinstellungen(name, daten) {
+  if (!istModul(name)) return { ok: false, zeichen: 0, grund: 'unbekannt' };
+  const t = JSON.stringify(daten === undefined ? null : daten);
+  const zeichen = t.length;
+  if (zeichen > MODUL_EINSTELLUNGEN_MAX) return { ok: false, zeichen, grund: 'budget' };
+  return schreibText(K.modulEinstellungen(name), t) ? { ok: true, zeichen } : { ok: false, zeichen, grund: 'voll' };
+}
+
+// Belegung des Speichers in Zeichen (Schluessel + Wert); Einstellungen der Pakete zaehlen zu fortschritt
 export function speicherStand() {
   const teile = { partien: 0, reviews: 0, fortschritt: 0, module: {}, sonst: 0, fremd: 0 };
   for (const name of Object.keys(MODUL_BUDGET)) teile.module[name] = 0;
@@ -643,7 +703,7 @@ export function speicherStand() {
       if (!k.startsWith(P)) teile.fremd += n;
       else if (k === K.partien) teile.partien += n;
       else if (k.startsWith(P + 'review:')) teile.reviews += n;
-      else if (k === K.fortschritt || k === K.einstellungen || k === K.laufend) teile.fortschritt += n;
+      else if (k === K.fortschritt || k === K.einstellungen || k === K.laufend || k.startsWith(K.einstellungen + ':')) teile.fortschritt += n;
       else if (k.startsWith(pm)) {
         const name = k.slice(pm.length);
         teile.module[name] = (teile.module[name] || 0) + n;
@@ -683,16 +743,19 @@ export function rohSpeicher() {
   });
 }
 
-// Alles loeschen (Einstellungen bleiben, wenn mitEinstellungen false). Erfasst alle eigenen
-// Schluessel ueber das Praefix, also auch die Modul-Speicher der Pakete.
+// Alles loeschen (Einstellungen bleiben, wenn mitEinstellungen false: die der App und die der Pakete).
+// Erfasst alle eigenen Schluessel ueber das Praefix, also auch die Modul-Speicher der Pakete. Danach kommt
+// speicher:zurueckgesetzt { mitEinstellungen }, damit Pakete ihren Zustand im Arbeitsspeicher leeren.
 export function setzeZurueck({ mitEinstellungen = false } = {}) {
   const s = sp();
   const weg = [];
+  const istEinstellung = (k) => k === K.einstellungen || k.startsWith(K.einstellungen + ':');
   try {
     for (let i = 0; i < s.length; i++) {
       const k = s.key(i);
-      if (k && k.startsWith(P) && (mitEinstellungen || k !== K.einstellungen)) weg.push(k);
+      if (k && k.startsWith(P) && (mitEinstellungen || !istEinstellung(k))) weg.push(k);
     }
   } catch (e) { /* egal */ }
   for (const k of weg) entferne(k);
+  try { sende('speicher:zurueckgesetzt', { mitEinstellungen: !!mitEinstellungen }); } catch (e) { /* egal */ }
 }

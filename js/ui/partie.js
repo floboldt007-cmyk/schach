@@ -9,16 +9,18 @@
 // Test-Hooks (window.__partie, window.__test) nur mit ?test:
 // __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung) }.
 //
-// Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md): sendet partie:gestartet (mit der Buehne), zug:gespielt,
+// Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md): sendet partie:gestartet (mit der Buehne, dazu wertet und der
+// Stand von hinweise und zuruecknahmen beim Start), zug:gespielt,
 // stellung:analysiert, zug:bewertet, zug:zurueckgenommen, hilfe:genutzt, partie:beendet,
 // partie:analysiert und partie:verlassen. laufId = 'l' + gestartet. Wahl-Ort partie:begruessung?,
 // DOM-Ort ergebnis:karte, Feier-Zeilen aus feier.fuerOverlay(). Die Buehne (eingefroren):
 //   { laufId, bot, farbe, modus, ziel, el, effekte, rahmen, brett (nur lesen), reduziert,
 //     feld(feld) -> { x, y } | null           0..7 in der aktuellen Brett-Ausrichtung (wie die Effekte)
 //     liveAn() -> boolean, phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
-//     coachZusatz(inhalt, { prio = 50, art = 'info' }) -> HTMLElement   Zeile unter dem Coach-Satz
-//         (art 'info' | 'gut' | 'leise' | 'gross'; Text oder Element); hoechstens 2, die hoehere prio
-//         gewinnt (bei Gleichstand die aeltere); verschwindet mit dem naechsten Coach-Inhalt
+//     coachZusatz(inhalt, { prio = 50, art = 'info', bleibt = false }) -> HTMLElement   Zeile unter dem
+//         Coach-Satz (art 'info' | 'gut' | 'leise' | 'gross'; Text oder Element); hoechstens 2, die hoehere
+//         prio gewinnt (bei Gleichstand die aeltere); verschwindet mit dem naechsten Coach-Inhalt; im
+//         eingeklappten Coach versteckt; bleibt: true haelt den Coach offen, solange die Zeile da ist
 //     blase(anlass, { paar, prio = 50, werte }) -> boolean   Sprechblase, eine je Zugpaar (paar:
 //         Standard ist Flos letzter Ply), hoehere prio ersetzt eine niedrigere
 //     merke(paket, daten) -> boolean, gemerkt(paket) -> Kopie | null   landet in partie.extra (alle
@@ -33,7 +35,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz } from '../bots.js';
 import {
-  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, partieGenauigkeit, warKnapp, coachKern,
+  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
 } from '../review.js';
 import { eroeffnung, stellungsSchluessel } from '../openings.js';
 import { klang } from '../sounds.js';
@@ -440,23 +442,30 @@ export function zeige(root, params, app) {
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
   }
-  // Zeile unter dem Coach-Satz (Buehne): hoechstens ZUSATZ_MAX, die hoehere prio gewinnt
-  function coachZusatz(inhalt, { prio = 50, art = 'info' } = {}) {
+  // Zeile unter dem Coach-Satz (Buehne): hoechstens ZUSATZ_MAX, die hoehere prio gewinnt. bleibt: der Coach
+  // klappt nicht von selbst ein, solange die Zeile da ist (ein schon eingeklappter klappt wieder auf), z. B.
+  // fuer eine Zeile mit Knopf; sonst ist die Zeile im eingeklappten Coach versteckt
+  function coachZusatz(inhalt, { prio = 50, art = 'info', bleibt = false } = {}) {
     const el = document.createElement('div');
     el.className = 'c-zusatz';
     el.dataset.art = ZUSATZ_ARTEN.includes(art) ? art : 'info';
     if (inhalt && typeof inhalt === 'object' && inhalt.nodeType) el.append(inhalt);
     else el.textContent = String(inhalt ?? '');
     if (weg) return el;
-    zusaetze.push({ el, prio: Number.isFinite(prio) ? prio : 50, nr: zusatzNr++ });
+    zusaetze.push({ el, prio: Number.isFinite(prio) ? prio : 50, nr: zusatzNr++, bleibt: bleibt === true });
     zusaetze.sort((a, b) => b.prio - a.prio || a.nr - b.nr);
     for (const alt of zusaetze.splice(ZUSATZ_MAX)) alt.el.remove();
     // unter dem Coach-Satz, vor den Knoepfen, nach prio geordnet
     const vor = coachEl.querySelector(':scope > .coach-knoepfe');
     for (const x of zusaetze) coachEl.insertBefore(x.el, vor);
     coachEl.classList.add('mit-zusatz');
+    if (zusatzBleibt()) {
+      clearTimeout(z.kompaktUhr);
+      coachEl.classList.remove('kompakt');
+    }
     return el;
   }
+  const zusatzBleibt = () => zusaetze.some((x) => x.bleibt && x.el.isConnected);
   function coachLeer() {
     if (!liveAn()) {
       coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Live-Bewertung aus</span></div>
@@ -765,7 +774,7 @@ export function zeige(root, params, app) {
   function planeKompakt() {
     clearTimeout(z.kompaktUhr);
     z.kompaktUhr = spaeter(() => {
-      if (coachEl.classList.contains('wartet') || coachEl.classList.contains('leer')) return;
+      if (coachEl.classList.contains('wartet') || coachEl.classList.contains('leer') || zusatzBleibt()) return;
       coachEl.classList.add('kompakt');
       coachEl.classList.remove('neu');
     }, 3500);
@@ -1065,17 +1074,19 @@ export function zeige(root, params, app) {
   }
 
   // Genauigkeit aus der Live-Bewertung, nur wenn jeder eigene Zug bewertet ist (sonst null:
-  // nach dem Fortsetzen fehlen die Zuege davor, das ergaebe zum Beispiel 100 % aus einem Zug)
+  // nach dem Fortsetzen fehlen die Zuege davor, das ergaebe zum Beispiel 100 % aus einem Zug).
+  // Gleiches Verfahren wie die Spielanalyse (volatilitaetsgewichtet); der Wert ist vorlaeufig, die erste
+  // volle Analyse ersetzt ihn (storage.ergaenzeAnalyse, genauigkeitQuelle 'live').
   function livGenauigkeit() {
     const l = [];
     for (let i = 0; i < z.zuege.length; i++) {
-      if (!istFlo(i)) continue;
+      if (!istFlo(i)) { l.push(null); continue; }
       const e = z.live[i];
       if (!e || !e.erg || !Number.isFinite(e.erg.genauigkeit)) return null;
-      l.push(e.erg.genauigkeit);
+      l.push(e.erg);
     }
-    const g = partieGenauigkeit(l);
-    return Number.isFinite(g) ? Math.round(g * 10) / 10 : null;
+    const g = seitenGenauigkeit(l, farbe, z.zuege.length);
+    return Number.isFinite(g) ? g : null;
   }
   const liveKlassenListe = () => z.zuege.map((_, i) => (istFlo(i) ? z.liveKlassen[i] || null : null));
 
@@ -1439,11 +1450,12 @@ export function zeige(root, params, app) {
             requestAnimationFrame(schritt);
           }
         }
-        // Klang je Stern (Standard wie bisher: zug; Pakete: registriereKlang('stern')); Klang ist keine
-        // Bewegung und bleibt deshalb auch bei reduzierter Bewegung
+        // Klang je Stern (Pakete: registriereKlang('stern'), der klingt auch bei reduzierter Bewegung; ohne
+        // Register wie vor Runde 4: zug, bei reduzierter Bewegung still)
         if (ergebnis === 'sieg' && wertet) {
-          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i]), 450 + i * 350); });
-          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true), 800);
+          const opt = { reduziert: !!reduziert };
+          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i], opt), 450 + i * 350); });
+          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true, opt), 800);
         }
         melde({ typ: 'overlay', ergebnis, sterne, neu: neu ? neu.id : null, rechnet, nachtrag, wertet, feier: feierBox.children.length, karten });
       },
@@ -1592,9 +1604,10 @@ export function zeige(root, params, app) {
     };
   }
 
+  // hinweise und zuruecknahmen: Stand beim Start (bei einer fortgesetzten Partie die bisherigen)
   sende('partie:gestartet', {
     laufId, botId: bot.id, botStufe: bot.stufe, farbe, startFen: startFen || null, modus: z.modus, ziel: buehne.ziel,
-    fortgesetzt: !!laufend, buehne,
+    wertet: wertet({ modus: z.modus, startFen }), fortgesetzt: !!laufend, hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, buehne,
   });
 
   return {

@@ -13,7 +13,7 @@ import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
   sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
-  GRENZEN, spielphasen, coachKern,
+  GRENZEN, spielphasen, coachKern, seitenGenauigkeit,
 } from '../js/review.js';
 import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '../js/openings.js';
 
@@ -204,6 +204,17 @@ function nodeTests() {
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 5 = exzellent', rmatt.klasse === 'exzellent', rmatt.klasse);
   const rmatt2 = klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: matt(1) }));
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 1 = bester', rmatt2.klasse === 'bester', rmatt2.klasse);
+  // w0c: Der beste Zug verkuerzt Matt in n auf n - 1. Bleibt es bei Matt in n, dauert das Matt einen Zug laenger:
+  // nicht mehr "bester" (vorher ja; Tiefe-20-Nachpruefung an 62 echten Stellungen: 50 wirklich langsamer)
+  const rmatt3 = klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: matt(3) }));
+  pruefe('Matt-Saettigung: Matt in 3 -> Matt in 3 (anderer Zug) = exzellent, nicht bester', rmatt3.klasse === 'exzellent', rmatt3.klasse);
+  pruefe('Matt-Saettigung: Matt in 3 -> Matt in 2 (anderer Zug) = bester', klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: matt(2) })).klasse === 'bester');
+  pruefe('Matt-Saettigung: Engine-Zug bleibt bester, auch wenn Matt in 3 bleibt', klassifiziere(basis(0, { uci: 'd4c5', evalVorher: matt(3), evalNachher: matt(3) })).klasse === 'bester');
+  const ZWEI_MATT = 'k7/8/1K6/8/8/8/8/6RR w - - 0 1';   // Tg8# und Th8#
+  const rmatt4 = klassifiziere({ fenVorher: ZWEI_MATT, uci: 'h1h8', besterZug: 'g1g8', pvVorher: ['g1g8'], pvNachher: [], evalVorher: matt(1), evalNachher: matt(1) });
+  pruefe('Matt-Saettigung: ein anderer Zug, der selbst mattsetzt, ist bester', rmatt4.klasse === 'bester', rmatt4.klasse);
+  pruefe('Matt-Saettigung: wer matt wird und Matt in 3 haelt, spielt bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-3) })).klasse === 'bester');
+  pruefe('Matt-Saettigung: wer matt wird und es auf Matt in 2 verkuerzt, nicht bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-2) })).klasse !== 'bester');
 
   // stark
   const STARK = START_FEN;
@@ -772,11 +783,67 @@ async function browserTests() {
   }
 }
 
+// ---------- w0-fix: Live-Genauigkeit wie die Analyse, Nachholen in Portionen ----------
+async function w0fixTests() {
+  // Partie mit starken Schwankungen (Morphys Operpartie), feste Bewertungen je Stellung
+  const sans = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#'.split(' ');
+  const zuege = uciListe(sans);
+  const c = new Chess();
+  const tabelle = {};
+  const cps = [30, 40, 20, 90, 60, 150, 140, 320, 300, 280, 260, 400, 380, 500, 420, 300, 350, 700, 650, 600, 900, 850, 1200, 1100, 1500, 1400];
+  for (let i = 0; i < zuege.length; i++) {
+    const fen = c.fen();
+    const legal = c.moves({ verbose: true });
+    const cp = cps[i % cps.length] * (i % 3 === 0 ? 1 : 0.8);
+    tabelle[fen] = [{ eval: ev(Math.round(cp)), pv: [legal[0].lan] }, { eval: ev(Math.round(cp) - 60), pv: [(legal[1] || legal[0]).lan] }];
+    c.move(sans[i]);
+  }
+  const r = await analysierePartie(new FakeEngine(tabelle), zuege, { spielerFarbe: 'w' });
+  const voll = (f) => seitenGenauigkeit(r.zuege, f, r.zuege.length);
+  pruefe('seitenGenauigkeit: mit allen Eintraegen genau die Genauigkeit der Analyse (beide Seiten)', voll('w') === r.genauigkeit.w && voll('b') === r.genauigkeit.b,
+    `${voll('w')}/${r.genauigkeit.w} ${voll('b')}/${r.genauigkeit.b}`);
+  // wie in der Partie: nur Flos Eintraege (der letzte Zug ist seiner, alle Stellungen sind bekannt)
+  const nurFlo = r.zuege.map((z) => (z.farbe === 'w' ? z : null));
+  pruefe('seitenGenauigkeit: nur die eigenen Eintraege (Live-Bewertung) ergeben dieselbe Zahl', seitenGenauigkeit(nurFlo, 'w', zuege.length) === r.genauigkeit.w,
+    `${seitenGenauigkeit(nurFlo, 'w', zuege.length)} / ${r.genauigkeit.w}`);
+  const ungewichtet = Math.round(partieGenauigkeit(r.zuege.filter((z) => z.farbe === 'w').map((z) => z.genauigkeit)) * 10) / 10;
+  pruefe('seitenGenauigkeit: gewichtet wie die Analyse (das alte ungewichtete Mittel weicht hier ab)', Math.abs(ungewichtet - r.genauigkeit.w) >= 0.1,
+    `ungewichtet ${ungewichtet}, Analyse ${r.genauigkeit.w}`);
+  const luecke = nurFlo.slice();
+  luecke[4] = { ...luecke[4], genauigkeit: null };
+  pruefe('seitenGenauigkeit: null, wenn einem eigenen Zug die Genauigkeit fehlt oder es keinen gibt', seitenGenauigkeit(luecke, 'w', zuege.length) === null
+    && seitenGenauigkeit([], 'w', 0) === null && seitenGenauigkeit(nurFlo, 'b', zuege.length) === null);
+  // Flo mit Schwarz: die Stellung vor dem ersten Bot-Zug fehlt, sie uebernimmt den naechsten Wert (keine Luecke)
+  const nurSchwarz = r.zuege.map((z) => (z.farbe === 'b' ? z : null));
+  const gs = seitenGenauigkeit(nurSchwarz, 'b', zuege.length);
+  pruefe('seitenGenauigkeit: mit Luecken am Anfang (Bot zieht zuerst) eine Zahl nahe der Analyse', Number.isFinite(gs) && Math.abs(gs - r.genauigkeit.b) < 3,
+    `${gs} / ${r.genauigkeit.b}`);
+
+  // stueckeln: gleiches Ergebnis, der Hauptthread wird beim Einordnen regelmaessig frei
+  const echt = globalThis.setTimeout;
+  let frei = 0;
+  globalThis.setTimeout = (fn, ms, ...a) => { if (!ms) frei++; return echt(fn, ms, ...a); };
+  let rs;
+  try {
+    rs = await analysierePartie(new FakeEngine(tabelle), zuege, { spielerFarbe: 'w', stueckeln: true });
+  } finally { globalThis.setTimeout = echt; }
+  pruefe('stueckeln: dasselbe Ergebnis wie ohne', JSON.stringify(rs) === JSON.stringify(r));
+  pruefe('stueckeln: gibt beim Einordnen von 33 Zuegen mindestens 3-mal frei', frei >= 3, frei);
+  const ac = new AbortController();
+  let fehler = null;
+  globalThis.setTimeout = (fn, ms, ...a) => { if (!ms) ac.abort(); return echt(fn, ms, ...a); };
+  try {
+    await analysierePartie(new FakeEngine(tabelle), zuege, { stueckeln: true, signal: ac.signal });
+  } catch (e) { fehler = e; } finally { globalThis.setTimeout = echt; }
+  pruefe('stueckeln: Abbruch waehrend einer Pause bricht ab (abgebrochen)', fehler && fehler.abgebrochen === true, fehler && fehler.message);
+}
+
 // ===========================================================================
 const start = Date.now();
 nodeTests();
 await asyncTests();
 await runde4Tests();
+await w0fixTests();
 if (!process.argv.includes('--nur-node')) await browserTests();
 const fehlgeschlagen = ergebnisse.filter((r) => !r.ok);
 console.log(`\n${ergebnisse.length - fehlgeschlagen.length}/${ergebnisse.length} bestanden in ${Math.round((Date.now() - start) / 100) / 10} s`);

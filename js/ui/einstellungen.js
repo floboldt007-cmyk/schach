@@ -5,7 +5,9 @@
 //   zeige(root, {}, app) -> { verlasse() }
 //
 // Klassen mit Praefix es- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
-// Runde 4: Anzeige-Ort einstellungen:gruppen (Gruppen der Pakete, vor der Gruppe "Fortschritt").
+// Runde 4: Anzeige-Ort einstellungen:gruppen (Gruppen der Pakete, vor der Gruppe "Fortschritt"), nach
+// "Fortschritt zuruecksetzen" neu gefuellt. Die Einstellungen bleiben dabei, auch die der Pakete
+// (storage.ladeModulEinstellungen).
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
@@ -203,8 +205,12 @@ export function zeige(root, params = {}, app) {
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
       case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
       case 'reset-ok':
+        // setzeZurueck sendet speicher:zurueckgesetzt (Pakete leeren ihren Zustand); danach die Gruppen der
+        // Pakete neu fuellen, damit sie den frischen Stand zeigen
         setzeZurueck();
         resetStufe = 0;
+        if (ortGruppen) ortGruppen.verlasse();
+        ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
         zeigeReset();
         try { app.meldung('Fortschritt zurückgesetzt. Bauer Benno wartet schon!'); } catch (f) { /* egal */ }
         break;

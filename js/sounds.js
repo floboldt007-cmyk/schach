@@ -21,7 +21,9 @@
 //   klang.spiele(name, ...args)   registrierter oder eingebauter Klang
 //   klang.klasse(k, ...args)      Klang zur Zugklasse; ohne Register 'klasse' wie bisher: brillant spielt
 //                                 brillant(), fehler und patzer spielen fehler(), sonst still
-//   klang.stern(i, neu)           Klang je Stern im Ergebnis; ohne Register 'stern' wie bisher zug()
+//   klang.stern(i, neu, { reduziert = false } = {})   Klang je Stern im Ergebnis; ohne Register 'stern' wie
+//                                 bisher zug(), bei reduzierter Bewegung still (wie vor Runde 4); ein
+//                                 registrierter 'stern' klingt immer (Klang ist keine Bewegung)
 //   klang.stufe = 'alle'          'alle' | 'wichtig' (eingebaute Klaenge gelten als wichtig)
 //   Eingebaut zusaetzlich 'feier' (stufe): leiser Tick je Feier-Zeile im Ergebnis, Tonhoehe steigt.
 
@@ -256,10 +258,10 @@ export const klang = {
     else if (k === 'brillant') spiele('brillant');
     else if (k === 'fehler' || k === 'patzer') spiele('fehler');
   },
-  // Klang je Stern im Ergebnis (Standard wie bisher: zug)
-  stern(i, neu) {
+  // Klang je Stern im Ergebnis (Standard wie bisher: zug, bei reduzierter Bewegung still)
+  stern(i, neu, { reduziert = false } = {}) {
     if (REGISTER.has('stern')) spiele('stern', i, neu);
-    else spiele('zug');
+    else if (!reduziert) spiele('zug');
   },
   aktivieren() { if (!this.aus) entsperre(); },
   zustand() {

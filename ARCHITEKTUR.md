@@ -63,6 +63,10 @@ export class Engine {
 - Eine Suche zur Zeit, weitere werden in eine Warteschlange gestellt. Neue Suche mit
   `{prioritaet: 'sofort'}` bricht eine laufende ab, `{prioritaet: 'vorne'}` stellt sich nur
   vorne an (Hinweis in der Partie).
+- `vorziehen(fen) -> boolean` (Runde 4, w0c): holt eine schon **wartende** Suche derselben Stellung
+  (Figuren, Zugrecht, Rochade, en passant) an den Anfang der Warteschlange, statt eine zweite einzureihen;
+  `false`, wenn keine wartet (eine laufende zaehlt nicht). Der Hinweis in der Partie nutzt das, damit im Stau
+  keine Stellung doppelt gerechnet wird.
 - `skill`/`elo` setzen `Skill Level` bzw. `UCI_LimitStrength`/`UCI_Elo` vor der Suche
   (und setzen sie danach zurueck, wenn eine andere Suche ohne diese Optionen kommt).
 - Matt- und Pattstellungen (keine legalen Zuege) ohne Engine beantworten.
@@ -123,7 +127,8 @@ export function analysierePartie(engine, zuege, { tiefe, beiFortschritt }): Prom
   - `stark` (!, "Grossartig") der einzige gute Zug: bester Zug und der zweitbeste Zug waere
     >= 0.10 schlechter, Stellung nicht schon entschieden
   - `bester` stimmt mit dem Engine-Zug ueberein (oder Verlust 0 und die Bewertung selbst ist nicht
-    schlechter; bei gesaettigter Gewinnchance, z. B. +84 -> +61, nur `exzellent`)
+    schlechter; bei gesaettigter Gewinnchance, z. B. +84 -> +61, nur `exzellent`; bei eigenem Matt muss der
+    Zug "Matt in n" verkuerzen oder selbst mattsetzen, sonst `exzellent` (w0c, nur strenger))
   - `exzellent` Verlust <= 0.02 · `gut` <= 0.05 · `ungenau` <= 0.10 · `fehler` <= 0.20 · `patzer` > 0.20
   - `verpasst` (Chance verpasst): der Gegner hatte gerade einen Fehler/Patzer gemacht, es gab
     einen Zug mit Gewinnchance >= 0.70, der gespielte Zug laesst sie unter 0.55 fallen, die
@@ -260,10 +265,11 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
 ## Parameter der Screens
 - `arena`: `{ neuFreigeschaltet?: botId }` (spielt die Freischalt-Animation).
 - `partie`: `{ botId, farbe: 'w'|'b', fortsetzen?: true }` (Zufall loest die Arena auf).
-- `analyse`: `{ partieId, neuFreigeschaltet?: botId, neueSterne?: [bool,bool,bool] }`.
+- `analyse`: `{ partieId, neuFreigeschaltet?: botId, neueSterne?: [bool,bool,bool], ply? }` (`ply`: die Analyse
+  oeffnet an diesem Halbzug, z. B. fuer „Ansehen“ aus einem Paket; ohne `ply` an der Startstellung).
   Laedt `ladePartie(id)` und `ladeReview(id)`. Fehlt die Review: `analysierePartie(await
   app.engine('bewertung'), partie.zuege, { tiefe: einstellungen.tiefe, multipv: 2, startFen,
-  spielerFarbe, elo: { [botFarbe]: bot.elo }, vorab: app.vorab, beiFortschritt, signal })`,
+  spielerFarbe, elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMinTiefe: einstellungen.tiefe, beiFortschritt, signal })`,
   danach `speichereReview(id, review)`. Fortschrittsbalken waehrend der Rechnung.
 - `verlauf`, `einstellungen`: `{}`.
 
@@ -294,7 +300,7 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
    isInsufficientMaterial`). **Sofort** `speicherePartie(partie)` ohne Analyse (Sieg, Sterne 1
    und 3, Freischaltung sind damit sicher, auch wenn die App jetzt beendet wird), erst dann
    `loescheLaufendePartie()`. Danach `analysierePartie(..., { vorab: app.vorab, vorabMerken,
-   tiefe })` und `ergaenzeAnalyse(id, review)` (Genauigkeit, Spielstaerke, Stern 2, Brillant-Zuege;
+   tiefe, vorabMinTiefe: tiefe })` und `ergaenzeAnalyse(id, review)` (Genauigkeit, Spielstaerke, Stern 2, Brillant-Zuege;
    Sterne werden nur dazugewonnen). Schlaegt die Analyse fehl oder verlaesst Flo den Screen
    vorher, Genauigkeit aus den Live-Bewertungen, aber nur wenn jeder eigene Zug bewertet ist.
    Die Spielanalyse traegt eine spaeter gerechnete Analyse ebenso mit `ergaenzeAnalyse` nach.
@@ -370,8 +376,9 @@ Die genaue API steht zusaetzlich im Kopfkommentar jeder Datei.
 | `js/ereignisse.js` | Ereignis-Bus (rein, Node-testbar) |
 | `js/orte.js` | Anzeige-Orte (DOM-, Aufruf- und Wahl-Orte) |
 | `js/feier.js` | Feier-Warteschlange mit Budget und Nachlese (Speicher ueber `ladeModul('feier')`) |
-| `js/erweiterungen.js` | zentrale Importliste der Pakete, anfangs leer; nur die Integration schreibt hier |
+| `js/erweiterungen.js` | zentrale Liste `PAKETE` der Paket-Einstiege (Pfade), anfangs leer; nur die Integration schreibt hier; `app.js` laedt sie per dynamischem `import()` (w0-fix, siehe „app.js: Pakete“) |
 | `js/ui/icons.js` | `icon()` (aus `app.js` verschoben, `app.js` exportiert es weiter) und `registriereIcon()` |
+| `js/nachholen.js` | fehlende Spielanalysen in der Arena still nachrechnen (Nachbesserung w0c, Abschnitt unten) |
 | `tests/ereignisse.test.mjs` | Bus, Orte (`waehle`), Feier-Budget (Node) |
 | `tests/fairness.test.mjs` | Fairness-Regeln (BAUPLAN Abschnitt 7) als Test |
 
@@ -400,7 +407,7 @@ export function zuruecksetzen()          // nur Tests
 | `app:bereit` | `{ app }` | `app.js` `starte()`, einmal vor dem ersten Screen |
 | `app:screen` | `{ name, params }` | `app.js` `zeigeScreen()`, nach `zeige()` des neuen Screens |
 | `app:sichtbar` | `{ sichtbar }` | `app.js` bei `visibilitychange`; setzt zusaetzlich `html[data-sichtbar]` |
-| `partie:gestartet` | `{ laufId, botId, botStufe, farbe, startFen, modus, ziel, fortgesetzt, buehne }` | `partie.js` `zeige()`, am Ende des synchronen Aufbaus |
+| `partie:gestartet` | `{ laufId, botId, botStufe, farbe, startFen, modus, ziel, wertet, fortgesetzt, hinweise, zuruecknahmen, buehne }` (`hinweise`/`zuruecknahmen`: Stand beim Start, bei einer fortgesetzten Partie die bisherigen) | `partie.js` `zeige()`, am Ende des synchronen Aufbaus |
 | `partie:verlassen` | `{ laufId }` | `partie.js` `verlasse()`, vor dem Abraeumen (danach `buehne` nicht mehr benutzen) |
 | `zug:gespielt` | `{ laufId, ply, wer: 'flo'/'bot', uci, san, fenVorher, fenNachher, geschlagen (Figurtyp oder null), schach, matt, umwandlung (Figurtyp oder null), rochade (boolean) }` | `nachEigenemZug()` und `fuehreBotZugAus()`, nach `brett.setzeStellung()` (vor dem Zugklang) |
 | `stellung:analysiert` | `{ laufId, fen, plies, amZug: 'flo'/'bot', analyse: { depth, lines: [{ eval, pv }] } }` | `beiAnalyse()`, nur fuer die aktuelle Stellung, je aktueller Stellung einmal (auch aus dem Zwischenspeicher, z. B. nach einer Zuruecknahme) |
@@ -408,9 +415,10 @@ export function zuruecksetzen()          // nur Tests
 | `zug:zurueckgenommen` | `{ laufId, bisPly, plies }` (`bisPly`: erster entfernter Ply, `plies`: Anzahl entfernter Halbzuege) | `zuruecknehmen()` |
 | `hilfe:genutzt` | `{ laufId, art: 'hinweis', stufe }` | `hinweis()` |
 | `partie:beendet` | `{ laufId, partieId, botId, botStufe, farbe, modus, wertet, ergebnis, grund, eigeneZuege, liveKlassen, maxSerie, hinweise, zuruecknahmen, neueSterne, neuFreigeschaltet, extra, datum, dauerMs }` | `partie.js` nach `speicherePartie()`, sobald die Live-Bewertung des letzten eigenen Zugs da ist (hoechstens 2,5 s), immer vor den Feier-Zeilen des Overlays und vor `partie:analysiert`; verlaesst Flo den Screen vorher, in `verlasse()` vor `partie:verlassen` |
-| `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse' }` | nach `ergaenzeAnalyse()` (Partie-Nachtrag mit Review, Analyse-Screen) |
+| `partie:analysiert` | `{ partieId, botId, modus, wertet, partie, review, neueSterne, quelle: 'partie'/'analyse'/'nachholen' }` | nach `ergaenzeAnalyse()` mit Review (Partie-Nachtrag, Analyse-Screen, Nachholen in der Arena). Kommt fuer jede wertende Partie mit eigenem Zug: verlaesst Flo das Ergebnis, bevor die Analyse fertig ist, holt die Arena sie nach (`quelle: 'nachholen'`) |
 | `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
 | `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
+| `speicher:zurueckgesetzt` | `{ mitEinstellungen }` | `storage.js` `setzeZurueck()` („Fortschritt zurücksetzen“), nach dem Loeschen; Pakete leeren ihren Zustand im Arbeitsspeicher (w0-fix) |
 | `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }` | Paket 1C |
 | `training:stand` | `{ faellig, gesamt, gemeistert }` | Paket 1C |
 | `uebung:ergebnis` | `{ partieId, ply, getroffen }` | Paket 1B |
@@ -506,7 +514,9 @@ Sterne und Freischaltung bleiben im festen Teil des Overlays und laufen nicht du
 ## Speicher: Modus, Wertungs-Schutz, Modul-Speicher und Budget (js/storage.js)
 ```js
 export const MODI = ['normal', 'uebung']        // eingefroren; weitere Modi nur mit einer neuen Welle
-export function wertet(p)                       // (p.modus || 'normal') === 'normal' && !p.startFen
+export function wertet(p)                       // (p.modus || 'normal') === 'normal' und keine eigene Stellung:
+                                                // startFen leer oder gleich der Grundstellung (Stellung, Zugrecht,
+                                                // Rochade, en passant; die Zugzaehler zaehlen nicht)
 export const EXTRA_MAX = 400                    // Zeichen fuer partie.extra (alle Pakete zusammen)
 export const MODUL_BUDGET = { kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
                               taktik: 8000, start: 6000, feier: 6000, serie: 4000 }
@@ -516,8 +526,20 @@ export function speichereModul(name, daten)     // -> { ok, zeichen, grund? }  g
 export function speicherStand()                 // -> { zeichen, grenze, teile: { partien, reviews, fortschritt,
                                                 //      module: { name: zeichen }, sonst, fremd } }
 export function rohSpeicher()                   // -> { praefix, schluessel(), lies(k), schreib(k, text), entferne(k) }
+export const MODUL_EINSTELLUNGEN_MAX = 2000     // w0-fix: Zeichen fuer die Einstellungen eines Pakets
+export function ladeModulEinstellungen(name, standard = {})   // wie ladeModul, Schluessel einstellungen:<name>
+export function speichereModulEinstellungen(name, daten)      // -> { ok, zeichen, grund? } wie speichereModul
 ```
 - Modul-Schluessel: `schach-arena:v1:modul:<name>`; `setzeZurueck()` erfasst sie ueber das Praefix.
+- **Einstellungen der Pakete gehoeren nicht in den Modul-Speicher** (w0-fix), sondern in
+  `speichereModulEinstellungen(name, daten)` (Schluessel `schach-arena:v1:einstellungen:<name>`, Namen wie in
+  `MODUL_BUDGET`, hoechstens `MODUL_EINSTELLUNGEN_MAX` Zeichen). Gemeint ist alles, was Flo selbst einstellt:
+  Klangstufe (1A), „Lichterkette anzeigen“ und Ruhetag (1D), Spuernase und Finale-Hinweis an/aus (2C),
+  Bot-Sprueche (2B). „Fortschritt zurücksetzen“ (`setzeZurueck()` ohne `mitEinstellungen`) verschont sie wie die
+  Einstellungen der App, denn daneben steht „Die Einstellungen bleiben.“; Daten und Zaehler im Modul-Speicher
+  (Rekorde, Kette, Karten, verarbeitete IDs) loescht es. Danach kommt `speicher:zurueckgesetzt`: Pakete mit
+  Zustand im Arbeitsspeicher (z. B. Kartei-Stand fuer `training:stand`, gemerkter Rekord) laden ihn neu;
+  `einstellungen.js` fuellt den Ort `einstellungen:gruppen` neu. `speicherStand()` zaehlt diese Schluessel zu `fortschritt`.
   Ein Modul ueber Budget wird **nicht** geschrieben (`grund: 'budget'`): das Paket duennt selbst aus.
   `ladeModul` liefert den Standard auch bei kaputten Daten, unbekanntem Namen oder falscher Art
   (Liste statt Objekt usw.).
@@ -528,7 +550,10 @@ export function rohSpeicher()                   // -> { praefix, schluessel(), l
 - **Partie-Datensatz neu:** `modus` (immer gesetzt, Standard `'normal'`), `ziel` (nur bei Uebung:
   `{ partieId, ply, besterZug, alterZug, alterSanDe, gewinnVorher }`, sonst weggelassen), `extra`
   (Objekt je Paket, als JSON hoechstens `EXTRA_MAX` Zeichen, sonst verworfen mit console.warn),
-  `maxSerie` (ganze Zahl). **Laufende Partie** zusaetzlich `modus`, `ziel`, `extra`, `liveTrivial`;
+  `maxSerie` (ganze Zahl), `genauigkeitQuelle` (`'live'`/`'analyse'`, sobald `genauigkeit` gesetzt ist; beim
+  Speichern mitgegeben gilt als `'analyse'`) und `analysiert` (`true`, sobald `ergaenzeAnalyse` oder
+  `speicherePartie` eine Review bekam; Nachholen sucht Partien ohne dieses Feld) (w0-fix).
+  **Laufende Partie** zusaetzlich `modus`, `ziel`, `extra`, `liveTrivial`;
   `ladeLaufendePartie()` prueft die Typen (falsches wird ersetzt: `modus` -> `'normal'`, `ziel` -> `null`,
   `extra` -> `{}`, `liveTrivial` -> Booleans; `startFen` keine Zeichenkette -> keine laufende Partie).
 - **Wertungs-Schutz:** `speicherePartie()` und `ergaenzeAnalyse()`: ist `!wertet(p)`, dann
@@ -551,7 +576,8 @@ export { ton, klick, tock, huelle, rauschen, NOTEN }  // Bausteine fuer eigene S
 export function registriereKlang(name, fn, { wichtig = true } = {})  // fn(ac, ziel, t, ...args) -> abmelden()
 klang.spiele(name, ...args)   // registrierter (geht vor) oder eingebauter Klang
 klang.klasse(k, ...args)      // ohne Register 'klasse' wie bisher: brillant -> brillant(), fehler/patzer -> fehler(), sonst still
-klang.stern(i, neu)           // ohne Register 'stern' wie bisher: zug()
+klang.stern(i, neu, { reduziert })   // ohne Register 'stern' wie bisher: zug(), bei reduzierter Bewegung still
+                              // (wie vor Runde 4); ein registrierter 'stern' klingt immer
 klang.stufe = 'alle'          // 'wichtig': spielt nur Klaenge mit wichtig: true (eingebaute gelten als wichtig)
 ```
 `wichtig` darf auch eine Funktion `(...args) -> boolean` sein (z. B. fuer `klasse`: nur Brillant,
@@ -601,10 +627,13 @@ buehne = {
   feld(feld) -> { x, y } | null,                   // 0..7 in der aktuellen Brett-Ausrichtung (wie --x/--y)
   liveAn() -> boolean,
   phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
-  coachZusatz(inhalt, { prio = 50, art = 'info' }) -> HTMLElement,
+  coachZusatz(inhalt, { prio = 50, art = 'info', bleibt = false }) -> HTMLElement,
       // Zeile .c-zusatz[data-art] unter dem Coach-Satz (art 'info' | 'gut' | 'leise' | 'gross'; inhalt Text
       // oder Element); hoechstens 2, nach prio geordnet, bei Gleichstand bleibt die aeltere; verschwindet mit
-      // dem naechsten Coach-Inhalt; im eingeklappten Coach versteckt
+      // dem naechsten Coach-Inhalt. Der Coach klappt 3,5 s nach dem Bot-Zug von selbst ein, dann ist die Zeile
+      // versteckt. bleibt: true (w0-fix) haelt den Coach offen, solange die Zeile da ist (ein schon
+      // eingeklappter klappt wieder auf): fuer Zeilen mit Knopf (1B „Nochmal ab hier“) oder eine Meldung, die
+      // Flo lesen soll (1D „Tagesaufgabe geschafft“)
   blase(anlass, { paar, prio = 50, werte }) -> boolean,
       // Sprechblase (botSatz mit werte); eine je Zugpaar (paar: Standard Flos letzter Ply), eine hoehere prio
       // ersetzt eine niedrigere. Eingebaut: spielerFehler/spielerGut 70, Begruessung 60, schlagen/schach 50
@@ -621,13 +650,15 @@ Ungenau, Fehler, Chance verpasst oder Patzer bricht die Serie wie jeder andere. 
 `data-stufe` (`''` bei 3 bis 4, `heiss` 5 bis 7, `ueberladen` 8 bis 11, `unaufhaltsam` ab 12), der Screen
 `data-serie` (laufende Serie; 0 bei Live-Bewertung aus) und `data-serie-stufe`. `maxSerie` landet in der
 laufenden Partie, im Datensatz und in `partie:beendet`. Klang zur Klasse ueber `klang.klasse(k, { serie,
-serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu)` (auch bei reduzierter Bewegung).
+serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu, { reduziert })` (ein registrierter
+Klang `stern` auch bei reduzierter Bewegung, der eingebaute dann nicht, wie vor Runde 4).
 
 **Uebung und eigene Stellung.** `app.gehe('partie', { botId, farbe, startFen, modus: 'uebung', ziel })` startet
 eine Uebung (Kopf „Übung ab Zug n“, n = Zugnummer der Startstellung). Partien, die nicht werten
 (`storage.wertet`), zeigen im Ergebnis keine Sterne und keine Freischaltung, den Chip „ÜBUNG“ neben dem
 Kopfwort und die Knoepfe „Zur Analyse“ und „Nochmal ab hier“ (gleiche Params); im Verlauf statt der Sterne den
-Chip „Übung“.
+Chip „Übung“. Die Statistik im Verlauf zaehlt nur wertende Partien; der Kopf nennt die Uebungen deshalb
+extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne Statistik-Kacheln).
 
 ## Ergebnis-Overlay (partie.js)
 `.ergebnis-karte` = Kopfwort (bei nicht wertenden Partien `.erg-kopf` mit Chip), Unterzeile, `.erg-mitte`
@@ -646,16 +677,84 @@ Waehrend Flo am Zug ist, gibt es kein Overlay (es erscheint nur nach dem Spielen
 Element von `.ort-panel-oben`, vor den Paketen) still die Karte `.nachlese` „Seit deiner letzten Partie“.
 
 ## app.js: Pakete, Screens, Ereignisse
-- `import './erweiterungen.js'` (statisch, oben). Nur mit `?test` zusaetzlich `?erw=pfad1,pfad2`: Pfade relativ zu
-  `js/`, ohne `.js`, nur `[a-z0-9-]` mit `/` dazwischen (sonst ignoriert), z. B.
-  `index.html?test&erw=pakete/kartei/index`. Sie laden vor `app:bereit` und dem ersten Screen; ein Ladefehler
-  landet in der Konsole, die App startet trotzdem.
+- **Pakete (w0-fix):** `import { PAKETE } from './erweiterungen.js'`. `PAKETE` ist eine Liste von Pfaden (relativ zu
+  `js/`, ohne `.js`, nur `[a-z0-9-]` mit `/` dazwischen, sonst ignoriert), z. B. `'pakete/kartei/index'`. `app.js`
+  laedt jedes Paket einzeln per `import()`, vor `app:bereit` und dem ersten Screen. Nur mit `?test` kommen
+  `?erw=pfad1,pfad2` dazu, z. B. `index.html?test&erw=pakete/kartei/index` (derselbe Weg). Ein Ladefehler (Syntax,
+  Fehler beim Auswerten, Datei fehlt, etwas, das nur Safari nicht kann) landet als „Paket nicht geladen“ in der
+  Konsole, die App startet trotzdem; spaetestens nach 10 s auch ohne ein haengendes Paket. Frueher war
+  `erweiterungen.js` als Liste statischer Importe gedacht: ein Fehler in einem Paket haette dort den ganzen
+  Modulgraphen abgebrochen (App bleibt auf „wird geladen“, im Test mit `?erw` aber nicht). Deshalb: **nie ein
+  Paket statisch importieren**, auch nicht in `erweiterungen.js` (`tests/sw.test.mjs` prueft das).
 - `SCREENS` zusaetzlich `training` („Training“) und `start` („Willkommen“). Fehlt deren Datei (noch kein Paket),
   geht es ohne Platzhalter still zur Arena (Verlaufseintrag wird `#arena`).
 - `app:bereit { app }` einmal vor dem ersten Screen; `app:screen { name, params }` nach erfolgreichem `zeige()`
   (nicht fuer den Platzhalter); `app:sichtbar { sichtbar }` bei jedem `visibilitychange`, dazu
   `html[data-sichtbar="ja"|"nein"]` (schon beim Start gesetzt; CSS haelt im Hintergrund alle Animationen an).
 - `speicher:fehler`: einmal je Sitzung der Hinweis „Speichern hat nicht geklappt: Der Speicher des Geräts ist voll.“
+
+## Spielanalyse und Engine-Start: Nachbesserung w0c
+**Tiefe der Vorab-Analysen.** Live-Suchen in der Partie haben ein Zeitlimit (`movetime` 5000 ms, im Stau 1500 ms)
+und erreichen die eingestellte Tiefe nicht immer (Beleg: `r1bQ1k1r/pp5p/2p1p3/8/1n1P4/P4N2/P1P1P3/R3KB2 b Q - 2 18`
+mit 5000 ms nur Tiefe 12, +15,06 statt +13,84). Jede Spielanalyse ruft `analysierePartie(..., { vorab: app.vorab,
+vorabMinTiefe: <eingestellte Tiefe> })` (Partie-Ende, Analyse-Screen, Nachholen): flachere Vorab-Analysen werden neu
+gerechnet, Matt und Patt gelten immer. Im Normalfall erreichen die Live-Suchen die Tiefe, die Analyse bleibt schnell.
+
+**Genauigkeit und Sterne (`storage.ergaenzeAnalyse`).** Regel: Es werden nur **leere** Felder gefuellt
+(`genauigkeit`, `genauigkeitBot`, `spielstaerke`, `eroeffnung`). Die erste Genauigkeit einer Partie aus einer vollen
+Analyse bleibt fuer immer (Analyse am Partie-Ende, sonst die erste spaetere, z. B. beim Nachholen); auf ihr beruht
+Stern 2. **Ausnahme (w0-fix):** Die Genauigkeit aus der Live-Bewertung, die `verlasse()` eintraegt, wenn Flo das
+Ergebnis vor dem Ende der Analyse verlaesst (`genauigkeitQuelle: 'live'`), ist vorlaeufig: Die erste volle Analyse
+ersetzt sie genau einmal (sonst haenge Stern 2 davon ab, wann Flo tippt). Alte Datensaetze ohne Quelle gelten als
+live, wenn nur `genauigkeit` gesetzt ist. War der ersetzte Live-Wert der Bestwert des Bots, wird der Bestwert aus den
+gespeicherten Partien neu bestimmt. Die Live-Genauigkeit rechnet `review.seitenGenauigkeit()` nach demselben
+Verfahren wie die Analyse (volatilitaetsgewichtet), sie liegt also meist nah an der spaeteren Zahl. Eine spaetere Neuberechnung (die Review ist aus der Liste der 20 gefallen) speichert nur ihre eigene
+Review. Sterne werden nur dazugewonnen, nie entzogen, und zwar im Partie-Datensatz (`p.sterne` = alte ODER neue)
+genauso wie im Fortschritt; beide passen also immer zusammen. Nicht wertende Partien bekommen nie Sterne. Der
+Analyse-Screen zeigt als grosse Zahl die Genauigkeit der Partie (worauf Stern 2 beruht), sonst die der Review.
+
+**Nachholen: `js/nachholen.js`.** Fehlt einer wertenden Partie die volle Analyse (App waehrend der Auswertung beendet,
+Ergebnis verlassen, bevor die Analyse fertig war, nach einer fortgesetzten Partie frueh „Nächster Gegner“), rechnet
+die Arena sie still nach. Damit kommt `partie:analysiert` fuer jede wertende Partie (die Pakete verdichten ihre
+Lerndaten genau dann, BAUPLAN 3.7):
+```js
+offenePartien({ max = 2, aus = 10 })   // wertend, ohne Review, mit eigenem Zug, ohne volle Analyse: ab Runde 4
+                                       // (Feld modus) ohne analysiert, auch mit Live-Genauigkeit; aeltere nur ohne
+                                       // Genauigkeit. Nur unter den `aus` neuesten, neueste zuerst; in dieser
+                                       // Sitzung schon versuchte nicht
+starteNachholen(app, { max = 2, beiPartie })  // -> { stop(), fertig: Promise<anzahl> }; ein neuer Start stoppt den alten
+zustand()                              // -> { laeuft, partieId, fertig: [partieId] } (Tests)
+```
+- `arena.js` startet es 2,5 s nach dem Aufbau (nach einer Freischalt-Animation 1 s spaeter) und stoppt es in
+  `verlasse()`, also bei jedem Screen-Wechsel und beim Start einer Partie. Nie waehrend einer Partie, keine dritte
+  Engine: gerechnet wird nur ueber `app.engine('bewertung')`, eine Partie nach der anderen. `stop()` stoppt die
+  laufende Suche sofort; eine abgebrochene Partie bleibt offen und kommt beim naechsten Arena-Besuch wieder dran.
+- `analysierePartie(..., { stueckeln: true })`: das Einordnen der Zuege gibt alle 10 Zuege den Hauptthread frei,
+  Speichern und Senden laufen je in einer eigenen Aufgabe (eine lange Partie blockierte am Ende sonst ca. 200 ms die
+  Arena, auf dem iPad mehr).
+- Je fertiger Partie: `ergaenzeAnalyse(id, review)`, dann `partie:analysiert` mit `quelle: 'nachholen'`, dann
+  `beiPartie({ partie, neueSterne, review })`: die Arena zeichnet Knoten-Sterne, Kopf-Chip, Panel und Bilanz still
+  neu (ohne Animation, ohne Dialog). Ein neu verdienter Stern geht als Feier-Zeile (`quelle: 'stern-nachgeholt'`,
+  `prio` 40, nicht in der festen Tabelle) in die Warteschlange und erscheint in der Nachlese beim naechsten
+  Arena-Besuch („Neuer Stern gegen …“). Das ist die einzige Ausnahme von „Sterne laufen nicht durch die
+  Warteschlange“, weil es kein Overlay mehr gibt.
+
+**Hinweis ohne doppelte Suche.** Fordert der Hinweis eine Stellung an, die schon in der Warteschlange der
+Live-Bewertung steht, holt `partie.js` genau diese Suche nach vorne (`engine.vorziehen(fen)`), statt eine zweite
+einzureihen. Laeuft sie schon, wartet der Hinweis auf sie.
+
+**Engine-Start (`app.js`).** `pruefeWasm()` prueft SIMD mit einem kleinen Test-Modul, holt die .wasm genau einmal
+(offline aus dem Cache des Service Workers), prueft sie mit `WebAssembly.validate` und liefert eine Blob-URL der
+Bytes. Beide Worker starten mit dem Engine-Skript als Blob (davor ein kurzer Vorspann, der einen unbehandelten
+Promise-Fehler im Worker als Zeile `Aborted(...)` meldet) und der .wasm-Blob-URL im `#`-Teil der Adresse (so liest
+stockfish.js den Pfad). Die Worker laden also nichts mehr selbst und haengen offline nicht davon ab, ob das Geraet
+ihre Anfragen ueber den Service Worker leitet. Erster Start: 1 Abruf der .wasm statt 3. Alle Pfade per
+`new URL(..., import.meta.url)` (klappt unter `/` und unter `/schach/`). Startet ein Blob-Worker nicht (Fehler-Ereignis,
+`Aborted(...)` oder 15 s ohne Antwort), laedt die Engine wie bisher selbst. Gemerkt wird das (w0-fix) nur bei einem echten
+Fehler (Fehler-Ereignis, `Aborted(...)`), nicht beim Zeitlimit (gesperrtes iPad, Speicherdruck; der Fehler traegt dann
+`zeitlimit: true`), und zwar als Zeitpunkt unter `schach-arena:v1:wasm-direkt` fuer 30 Tage; danach und nach „Fortschritt
+zurücksetzen“ versucht es das Geraet wieder per Blob. `engine.init()` sagt bei `Aborted(...)` sofort ab.
+`new Engine(pfad, { zeitlimitMs })` aendert das Zeitlimit (nur Tests: `?test` mit `window.__test.engineZeitlimit`).
 
 ## Tests
 `node tests/ereignisse.test.mjs` (Bus inkl. Messung, Orte, Feier-Budget) und `node tests/fairness.test.mjs`
@@ -668,3 +767,19 @@ Beide laufen in `node tests/alle.mjs` mit (Node, ohne Server).
 selbst): Reihenfolge und Daten der Ereignisse einer ganzen Partie, ein Test-Anbieter an jedem Ort an der
 richtigen Stelle, Wahl-Orte, Feier im Ergebnis und Nachlese, Uebungs-Partie ohne Sterne, COMBO ohne
 Rueckschlag, die Buehne (Zusatz, Blase, merke, Timer nach `verlasse()`), Sichtbarkeit, Speicher voll, Router.
+
+`node tests/app.test.mjs --nachpruefung` prueft nur die Nachbesserung w0c im Browser: flache Live-Suchen werden in der
+Analyse neu gerechnet, tiefe wiederverwendet; der Hinweis rechnet eine wartende Stellung nicht doppelt; Nachholen nach
+einem Abbruch (Stern 2, stille Arena, Nachlese, Abbruch beim Partie-Start); Ergebnis frueh verlassen (Live-Genauigkeit,
+dann Nachholen mit `partie:analysiert` und der Genauigkeit der vollen Analyse); Engine-Rueckfall, wenn der Blob-Start
+scheitert (gemerkt mit Ablauf, nicht beim Zeitlimit).
+
+`node tests/app.test.mjs --erweiterungen` prueft zusaetzlich (w0-fix): „Fortschritt zurücksetzen“ mit Paketen
+(Ereignis, Gruppen neu, Paket-Einstellungen bleiben), ein kaputtes Paket in `PAKETE` (Produktion und Testmodus: die
+App startet, das heile Paket laedt), den Sternklang bei reduzierter Bewegung, `coachZusatz` mit `bleibt`,
+`partie:gestartet` einer fortgesetzten Partie und den Verlauf-Kopf mit Uebungen.
+
+`node tests/sw.test.mjs`: Paket-Dateien (`js/pakete/**`, `css/pakete/**`, die Screens `training` und `start`) muessen
+erst in `DATEIEN`, wenn ihr Paket in `PAKETE` steht (vorher nur ein Hinweis; ein Paket darf `sw.js` nicht aendern und
+haelt den Test so trotzdem gruen); danach jede Datei, auch in Unterordnern. Jeder Eintrag in `PAKETE` muss existieren
+und im Cache stehen.

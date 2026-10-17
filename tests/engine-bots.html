@@ -164,6 +164,28 @@ async function testEngine() {
   pruefe("prioritaet 'vorne': vor den Wartenden, laufende Suche rechnet zu Ende", reihe.join(',') === 'lauf,vorne,wartend' && !lErg.abgebrochen && lErg.depth === 17,
     reihe.join(','));
 
+  // vorziehen (w0c): eine wartende Suche derselben Stellung kommt nach vorne, es wird keine zweite gerechnet
+  {
+    const reihe2 = [];
+    e.protokoll.length = 0;
+    // lange Suche (Tiefe 40, wird unten gestoppt), damit die beiden anderen sicher noch warten
+    const lauf2 = e.analyse(MITTE, { depth: 40 }).then((x) => { reihe2.push('lauf'); return x; });
+    const w1 = e.analyse(NACH_E4, { depth: 8 }).then((x) => { reihe2.push('e4'); return x; });
+    const w2 = e.analyse(START, { depth: 8 }).then((x) => { reihe2.push('start'); return x; });
+    await warte(60);
+    // Zugzaehler duerfen anders sein (gleiche Stellung)
+    const gefunden = e.vorziehen(START.replace(/ 0 1$/, ' 3 7'));
+    const keine = e.vorziehen('8/8/8/4k3/8/8/4K3/8 w - - 0 1');
+    const laufend = e.vorziehen(MITTE);
+    await warte(200);
+    e.stop();
+    await Promise.all([lauf2, w1, w2]);
+    const positionen = e.protokoll.filter((z) => z.startsWith('position fen ')).map((z) => z.slice(13));
+    pruefe('vorziehen: wartende Suche derselben Stellung kommt nach vorne', gefunden === true && reihe2.join(',') === 'lauf,start,e4', reihe2.join(',') + ' gefunden=' + gefunden);
+    pruefe('vorziehen: keine zweite Suche, false ohne Wartende (auch fuer die laufende)', keine === false && laufend === false
+      && positionen.length === 3 && positionen.filter((p) => p.startsWith(START.split(' ')[0])).length === 1, JSON.stringify({ keine, laufend, positionen }));
+  }
+
   // Warteschlange
   const fens = [START, MITTE, NACH_E4];
   const res = await Promise.all(fens.map((f) => e.analyse(f, { depth: 9, multipv: 2 })));

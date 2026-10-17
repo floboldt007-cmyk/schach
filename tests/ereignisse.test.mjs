@@ -34,8 +34,10 @@ function stillMit(fn) {
 // =====================================================================
 const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet', 'partie:verlassen', 'zug:gespielt',
   'stellung:analysiert', 'zug:bewertet', 'zug:zurueckgenommen', 'hilfe:genutzt', 'partie:beendet', 'partie:analysiert',
-  'analyse:gesehen', 'speicher:fehler', 'training:geloest', 'training:stand', 'uebung:ergebnis', 'bestmarke:neu'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3)', EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+  'analyse:gesehen', 'speicher:fehler', 'training:geloest', 'training:stand', 'uebung:ergebnis', 'bestmarke:neu',
+  // w0-fix: "Fortschritt zuruecksetzen" meldet sich (Pakete leeren ihren Zustand im Arbeitsspeicher)
+  'speicher:zurueckgesetzt'];
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();

@@ -5,6 +5,9 @@
 // vorziehen(fen) -> boolean (w0c): eine schon wartende Suche dieser Stellung (Figuren, Zugrecht, Rochade,
 // en passant) an den Anfang der Warteschlange stellen, statt eine zweite einzureihen; false, wenn keine
 // wartet (laufende Suchen zaehlen nicht).
+// init() sagt ab bei einem Fehler-Ereignis des Workers, bei der Zeile "Aborted(...)" (WebAssembly-Start
+// gescheitert, z. B. .wasm nicht ladbar) oder nach dem Zeitlimit ohne Antwort (Fehler mit zeitlimit: true;
+// Standard INIT_ZEITLIMIT_MS, anders ueber new Engine(pfad, { zeitlimitMs })).
 import { Chess } from '../vendor/chess/chess.js';
 
 // Standardpfad relativ zu diesem Modul, damit es auch aus Unterordnern (tests/) klappt.
@@ -14,8 +17,9 @@ const STANDARD_PFAD = new URL('../vendor/stockfish/stockfish-19-lite-single.js',
 const INIT_ZEITLIMIT_MS = 15000;
 
 export class Engine {
-  constructor(pfad = STANDARD_PFAD, { protokoll = false } = {}) {
+  constructor(pfad = STANDARD_PFAD, { protokoll = false, zeitlimitMs = INIT_ZEITLIMIT_MS } = {}) {
     this.pfad = pfad;
+    this.zeitlimitMs = zeitlimitMs > 0 ? zeitlimitMs : INIT_ZEITLIMIT_MS;
     this.optionen = {};            // aus der 'uci'-Antwort: Name -> { typ, standard, min, max }
     this.protokoll = protokoll ? [] : null;  // gesendete Befehle (fuer Tests/Fehlersuche)
     this._worker = null;
@@ -38,7 +42,11 @@ export class Engine {
         return;
       }
       this._worker = worker;
-      const uhr = setTimeout(() => reject(new Error('Engine antwortet nicht')), INIT_ZEITLIMIT_MS);
+      const uhr = setTimeout(() => {
+        const f = new Error('Engine antwortet nicht');
+        f.zeitlimit = true;
+        reject(f);
+      }, this.zeitlimitMs);
       worker.onmessage = (ev) => {
         if (typeof ev.data !== 'string') return;  // Ladefortschritt o. ae.
         for (const z of ev.data.split(/\r?\n/)) if (z) this._zeile(z);
@@ -49,12 +57,24 @@ export class Engine {
         reject(fehler);
         this._absturz(fehler);
       };
+      // Scheitert das Laden der .wasm im Worker, kommt kein Fehler-Ereignis, nur die Textzeile "Aborted(...)"
+      // (Emscripten): dann sofort absagen statt das Zeitlimit abzuwarten
+      const abbruch = (z) => {
+        if (!z.startsWith('Aborted(')) return;
+        this._lauscher.delete(abbruch);
+        clearTimeout(uhr);
+        const fehler = new Error('Engine-Fehler: ' + z);
+        reject(fehler);
+        if (this._worker === worker) this._absturz(fehler);
+        try { worker.terminate(); } catch (e) { /* egal */ }
+      };
+      this._lauscher.add(abbruch);
       this._warteAuf((z) => z === 'uciok')
         .then(() => {
           this._sende('isready');
           return this._warteAuf((z) => z === 'readyok');
         })
-        .then(() => { clearTimeout(uhr); resolve(); });
+        .then(() => { clearTimeout(uhr); this._lauscher.delete(abbruch); resolve(); });
       this._sende('uci');
     });
     this._initPromise = p;
