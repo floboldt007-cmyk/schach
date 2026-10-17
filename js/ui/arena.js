@@ -511,14 +511,23 @@ export function zeige(root, params, app) {
     app, s, karte, scrolleZu: (id, sanft) => scrolleZu(id, !!sanft), neuId,
   });
   if (typeof ResizeObserver === 'function') {
-    let letzte = '';
+    // Groesse schon jetzt merken: kommt die Reiter-Leiste erst nach dem ersten Layout, ist schon die erste Meldung
+    // eine Aenderung (frueher wurde sie uebersprungen, die Karte wurde niedriger und der Gegner rutschte aus dem Bild)
+    let letzteB = karte.clientWidth;
+    let letzteH = karte.clientHeight;
     beobachter = new ResizeObserver(() => {
-      const g = karte.clientWidth + 'x' + karte.clientHeight;
-      if (g === letzte) return;
-      const ersterLauf = letzte === '';
-      letzte = g;
-      if (ersterLauf) return;
+      const kb = karte.clientWidth;
+      const kh = karte.clientHeight;
+      if (kb === letzteB && kh === letzteH) return;
+      const diff = letzteH - kh;
+      const warHoch = modus === 'hoch' && letzteH > 0;
+      letzteB = kb;
+      letzteH = kh;
       layout();
+      // Hochformat: unten verankert (die Leiter waechst von unten), so bleibt der naechste Gegner im Bild
+      if (warHoch && modus === 'hoch' && diff && kh) {
+        karte.scrollTop = Math.max(0, Math.min(karte.scrollHeight - kh, karte.scrollTop + diff));
+      }
     });
     beobachter.observe(karte);
   }

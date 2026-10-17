@@ -245,6 +245,14 @@ async function testeLeiste(browser) {
       pruefe('schwebt ueber dem Rand (14 px Abstand) und mittig', nah(m.ih - m.nav.b, 14, 1) && Math.abs((m.nav.l + m.nav.r) / 2 - m.iw / 2) < 2,
         JSON.stringify(m.nav));
       pruefe('der Screen endet ueber der Leiste', m.screen.b <= m.nav.t + 0.5, JSON.stringify({ s: m.screen.b, n: m.nav.t }));
+      // Schub 2: die Leiste kuerzt die Karte erst nach dem ersten Layout; der gewaehlte Gegner muss trotzdem ganz im Bild sein
+      await warte(300);
+      const g = await seite.evaluate(() => {
+        const k = document.querySelector('.screen.arena .karte').getBoundingClientRect();
+        const n = document.querySelector('.screen.arena .knoten.gewaehlt').getBoundingClientRect();
+        return { kt: Math.round(k.top), kb: Math.round(k.bottom), nt: Math.round(n.top), nb: Math.round(n.bottom) };
+      });
+      pruefe('gewaehlter Gegner ganz im sichtbaren Teil der Karte (nicht unter der gekuerzten Kante)', g.nt >= g.kt - 1 && g.nb <= g.kb + 1, JSON.stringify(g));
     }
     pruefe('Pille unter dem aktiven Reiter', pilleUnterAktivem(m), JSON.stringify({ p: m.pille, a: m.aktiv }));
     pruefe('Reiter mindestens 44 x 44, Leiste im Bild', m.reiterKlein === 0 && m.nav.l >= 0 && m.nav.r <= m.iw, JSON.stringify(m.nav));
