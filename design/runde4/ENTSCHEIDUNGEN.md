@@ -28,6 +28,10 @@ in Flos privatem Repo.
 | 17.10. | Alter: ab 16 | Zielgruppe ab 16 |
 | 17.10. | „Coaches, die man nur kostenpflichtig bekommt“ | Coach-Figuren im Abo, die einfache Zugbewertung bleibt für alle |
 | 17.10. | „Mit Google-Konto anmelden oder iCloud einrichten“ | Anmelden mit Google und Apple, Fortschritt auf allen Geräten, Konto freiwillig |
+| 17.10. | Look: **A „Modern und klar“** | Premium-Umbau nach Entwurf A (warmes Papier und Schiefer, ein Zinnober-Akzent, Leiter mit 10 Stufen, Duell-Intro). Entwurf: https://claude.ai/artifact/3WUZyHgvbLhAtrJLNTLEeZ |
+| 17.10. | Gratis und Abo wie empfohlen | Gratis: alle 10 Bots, Analyse, Fehler-Kartei, Rätsel ohne Tageslimit. Abo: Coaches, Lernpfad ab Einheit 5, Spezial-Training |
+| 17.10. | Zugklassen umbenennen | eigene Namen und eigene Brillant-Farbe, im Premium-Umbau vor S1 |
+| 17.10. | Erste spielige Welle mit Agenten bauen | ja, in 3 Schüben mit je 4 bis 5 Agenten, danach 5 Tage Test auf dem iPad |
 
 ## 2. Die Richtung in einem Satz
 
