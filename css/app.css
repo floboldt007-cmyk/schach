@@ -1025,6 +1025,10 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 .ort-aktionen { display: contents; }
 .spielknoepfe[data-aktionen="1"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* mit Knoepfen der Pakete etwas enger, damit alle Beschriftungen passen (gemessen 375 bis 1366 px Breite) */
+.partie .spielknoepfe[data-aktionen] { gap: 5px; }
+.partie .spielknoepfe[data-aktionen] .knopf { font-size: 11px; padding: 6px 1px; letter-spacing: -.02em; }
+.partie .spielknoepfe[data-aktionen="2"] .knopf { font-size: 10.5px; letter-spacing: -.03em; }
 /* Abrechnung im Ergebnis (Ort ergebnis:abrechnung, Huelle aus js/ui/abrechnung.js): Zeilen rollen ein */
 .abrechnung { display: grid; gap: 4px; min-width: 0; }
 .abrechnung > .abr-rollt { animation: abr-rollen .3s ease-out var(--t, 0ms) both; }

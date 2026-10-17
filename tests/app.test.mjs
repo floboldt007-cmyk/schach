@@ -1161,6 +1161,50 @@ async function testeNachpruefung(browser) {
     await kontext.close();
   }
 
+  // 3c. w0plus-a-fix: Boss-Partie, App waehrend der Auswertung beendet. Vorher holte die Arena nur wertende Partien nach;
+  //     Funken (S1-1) und die Boss-Tafel (S1-3) haengen aber an partie:analysiert.
+  gruppe = 'Nachholen: Boss-Partie';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpboss') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard', staerke: 1080 } });
+    await h.warteFlo();
+    await seite.evaluate(() => { window.__test = { botZug: () => 'e8g8' }; });
+    await h.zugTippen('f1e1');
+    await h.warteFlo();
+    await seite.evaluate(() => { window.__test = {}; });
+    // Auswertung langsam und ohne Vorab-Analysen, neu geladen wird, bevor sie fertig ist
+    await bremse(seite, 2000);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+    await warte(800);
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(async () => {
+      const { hoere } = await import('./js/ereignisse.js');
+      window.__an = [];
+      hoere('partie:analysiert', (d) => window.__an.push({ quelle: d.quelle, partieId: d.partieId, modus: d.modus, wertet: d.wertet }));
+    });
+    const vorher = (await h.gespeichert())[0] || {};
+    pruefe('Boss-Partie nach dem Abbruch: gespeichert (modus boss), ohne Analyse', vorher.modus === 'boss' && vorher.analysiert !== true
+      && !(await seite.evaluate((id) => localStorage.getItem('schach-arena:v1:review:' + id) != null, vorher.id)), JSON.stringify(vorher).slice(0, 200));
+    await seite.waitForFunction(() => window.__an.length > 0, null, { timeout: 60000 }).catch(() => {});
+    const an = await seite.evaluate(() => window.__an);
+    const nach = (await h.gespeichert())[0] || {};
+    pruefe('Nachholen: auch die Boss-Partie bekommt partie:analysiert (quelle "nachholen", modus boss, wertet false), Review gespeichert, keine Sterne',
+      an.length === 1 && an[0].partieId === vorher.id && an[0].quelle === 'nachholen' && an[0].modus === 'boss' && an[0].wertet === false && nach.analysiert === true
+      && JSON.stringify(nach.sterne) === '[false,false,false]' && await seite.evaluate((id) => localStorage.getItem('schach-arena:v1:review:' + id) != null, vorher.id),
+      JSON.stringify({ an, analysiert: nach.analysiert, sterne: nach.sterne }));
+    pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // 4. Startet die Engine mit Skript und .wasm als Blob nicht, laden die Worker die Dateien wie bisher selbst
   gruppe = 'Engine-Rückfall';
   {
@@ -2257,7 +2301,9 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.arena');
     await schaeferBisMatt(seite, h);
     await bremse(seite, 1500);
-    await seite.evaluate(() => window.__app.vorab.clear());
+    // w0plus-a-fix: der Hook wartet jetzt hoechstens 300 ms auf partie:beendet; damit der Tipp sicher davor liegt, wartet er
+    // in diesem Fall (nur im Testmodus) wie frueher auf die gebremste Auswertung
+    await seite.evaluate(() => { window.__app.vorab.clear(); window.__test.mattHookWarten = 2500; });
     await h.zugTippen('h5f7');
     await seite.waitForFunction(() => window.__partie && window.__partie.phase() === 'ende', null, { timeout: 10000 });
     const brett3 = await seite.locator('.partie .brett').boundingBox();
@@ -2394,6 +2440,273 @@ async function testeSpielFundament(browser) {
     pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1000"), Anfrage gespeichert',
       st.h2 === 'Testboss · Standard ≈ 1000' && st.meta.startsWith('Wochen-Boss · ≈ 1000') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // --- w0plus-a-fix: Befunde des W0+a-Pruefers ---
+  // Untere Leiste: der Platz gehoert in die Hoehe der Screens (vorher padding an #app, die Screens sind selbst 100dvh hoch:
+  // die Leiste lag im Querformat und auf dem Handy ueber dem SPIELEN-Knopf)
+  gruppe = 'w0plus-a-fix: Leiste';
+  {
+    const FORMATE = [{ name: 'quer', w: 1180, h: 820 }, { name: 'hoch', w: 820, h: 1180 }, { name: 'handy', w: 390, h: 844, handy: true }];
+    const falsch = [];
+    for (const vp of FORMATE) {
+      const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, touch: true, handy: !!vp.handy });
+      await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+      await seite.goto(MIT_W0PLUS('wpheute&reiter=training,bestenliste,ich') + '#arena');
+      await seite.waitForSelector('.screen.arena .detail .wp-heute');
+      await warte(400);
+      const r = await seite.evaluate(() => {
+        const leiste = document.querySelector('.reiter-leiste').getBoundingClientRect();
+        const screen = document.querySelector('#app > .screen').getBoundingClientRect();
+        const verdeckt = [];
+        let geprueft = 0;
+        for (const el of document.querySelectorAll('#app > .screen button, #app > .screen a[href], #app > .screen [role="button"]')) {
+          el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const b = el.getBoundingClientRect();
+          if (!b.width || !b.height || getComputedStyle(el).visibility === 'hidden') continue;
+          const x = b.left + b.width / 2;
+          const y = b.top + b.height / 2;
+          if (x < 0 || x >= innerWidth || y < 0 || y >= innerHeight) continue;
+          geprueft++;
+          const treffer = document.elementFromPoint(x, y);
+          if (treffer && treffer.closest('.reiter-leiste')) verdeckt.push(String(el.className || el.tagName) + ': ' + (el.textContent || '').trim().slice(0, 20));
+        }
+        const sp = document.querySelector('.arena .detail [data-aktion="spielen"]');
+        sp.scrollIntoView({ block: 'nearest' });
+        const sb = sp.getBoundingClientRect();
+        const spTreffer = document.elementFromPoint(sb.left + sb.width / 2, sb.top + sb.height / 2);
+        return { leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt, spielen: !!spTreffer && sp.contains(spTreffer) };
+      });
+      if (r.screenUnten > r.leisteOben || r.verdeckt.length || r.geprueft < 5 || !r.spielen) falsch.push(`${vp.name} ${JSON.stringify(r)}`);
+      if (fehler.length) falsch.push(`${vp.name} Konsole: ${fehler.join(' | ')}`);
+      await kontext.close();
+    }
+    pruefe('Untere Leiste (quer, hoch, Handy): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
+      falsch.length === 0, falsch.join(' || '));
+  }
+  // Schub 2b (Entscheidung 17.10.): Screen werkstatt (Paket werkstatt), gehoert zum Reiter Ich
+  gruppe = 'w0plus-a-fix: Werkstatt';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    await seite.goto(BASIS + '#werkstatt');
+    await seite.waitForSelector('.screen.arena');
+    const ohne = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
+    pruefe('Screen werkstatt ohne Datei: still zur Arena, kein Platzhalter', ohne.hash === '#arena' && !ohne.platzhalter, JSON.stringify(ohne));
+    const FAKE_WERKSTATT = FAKE_ICH.replace('ich-test', 'werkstatt-test').replace("'Ich'", "'Werkstatt'");
+    await seite.route('**/js/ui/werkstatt.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_WERKSTATT }));
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=ich#werkstatt`);
+    await seite.waitForSelector('.screen.werkstatt-test');
+    const r = await seite.evaluate(() => {
+      const aktiv = document.querySelector('.reiter-leiste [aria-current="page"]');
+      return { titel: document.title, hash: location.hash, aktiv: aktiv ? aktiv.dataset.reiter : null, leiste: !document.querySelector('.reiter-leiste').hidden };
+    });
+    pruefe('Screen werkstatt mit Datei (Paket werkstatt): wird gezeigt und gehört zum Reiter Ich', r.titel === 'Werkstatt · Schach-Arena' && r.hash === '#werkstatt'
+      && r.aktiv === 'ich' && r.leiste, JSON.stringify(r));
+    const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/werkstatt\.js/.test(f));
+    pruefe('Werkstatt: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
+    await kontext.close();
+  }
+  // Schub 2b: Ort partie:spieler-leiste (Flamme an Flos Namen) und partie:aktionen (Emote-Rad, Schnell-Chat)
+  gruppe = 'w0plus-a-fix: Spieler-Leiste und Aktionen';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    const ohne = await seite.evaluate(() => {
+      const reihe = document.querySelector('.spielknoepfe');
+      const sl = document.querySelector('.ort-spieler-leiste');
+      const ak = document.querySelector('.ort-aktionen');
+      return { spieler: sl.hidden && getComputedStyle(sl).display === 'none', aktionen: ak.hidden && getComputedStyle(ak).display === 'none',
+        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button').length,
+        klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
+    });
+    pruefe('Ohne Paket: Spieler-Leiste und Aktionen versteckt, Knopfreihe mit 4 Spalten wie vorher', ohne.spieler && ohne.aktionen && ohne.spalten === 4 && ohne.attr
+      && ohne.knoepfe === 4 && !ohne.klasse, JSON.stringify(ohne));
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpspieler&wpaktion') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    const quer = await seite.evaluate(() => {
+      const el = document.querySelector('.partie .ort-spieler-leiste');
+      const b = el.getBoundingClientRect();
+      const reihe = document.querySelector('.spielknoepfe');
+      const ak = reihe.querySelector('.ort-aktionen');
+      const kb = ak.querySelector('.wp-emote').getBoundingClientRect();
+      const rb = reihe.getBoundingClientRect();
+      return { inQuer: el.parentNode === document.querySelector('.partie .spieler-quer') && el.previousElementSibling === document.querySelector('.partie .spieler-quer > div'),
+        sichtbar: !el.hidden && b.width > 0 && b.height > 0, lage: el.dataset.lage, paketLage: window.__wp.spielerLage, kontext: window.__wp.kontexte['partie:spieler-leiste'],
+        aktionenKontext: window.__wp.kontexte['partie:aktionen'], vorAufgeben: ak.nextElementSibling === reihe.querySelector(':scope > [data-aktion="aufgeben"]'),
+        attr: reihe.dataset.aktionen, spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length,
+        imRaster: kb.width > 0 && kb.top >= rb.top - 1 && kb.bottom <= rb.bottom + 1 && kb.left >= rb.left - 1 && kb.right <= rb.right + 1 };
+    });
+    pruefe('partie:spieler-leiste: quer in der Spielerleiste nach dem Namen, sichtbar, Kontext { app, boss, bot, buehne, farbe, lage, modus }',
+      quer.inQuer && quer.sichtbar && quer.lage === 'quer' && quer.paketLage === 'quer'
+      && JSON.stringify(quer.kontext) === '["app","boss","bot","buehne","farbe","lage","modus"]', JSON.stringify(quer));
+    pruefe('partie:aktionen: Knopf des Pakets in der Knopfreihe vor "Aufgeben", eine Spalte mehr (5), Kontext { app, boss, bot, buehne, farbe, modus }',
+      quer.vorAufgeben && quer.attr === '1' && quer.spalten === 5 && quer.imRaster
+      && JSON.stringify(quer.aktionenKontext) === '["app","boss","bot","buehne","farbe","modus"]', JSON.stringify(quer));
+    await h.tippe('.spielknoepfe .wp-emote');
+    const klick = await seite.evaluate(() => ({ emote: window.__wp.emote, dialog: !!document.querySelector('.dialog-ort .dialog') }));
+    pruefe('partie:aktionen: der Klick erreicht das Paket, nie die Aktion des Hosts (kein "Aufgeben"-Dialog)', klick.emote === 1 && !klick.dialog, JSON.stringify(klick));
+    await seite.setViewportSize({ width: 820, height: 1180 });
+    await seite.waitForFunction(() => document.querySelector('.partie .ort-spieler-leiste').dataset.lage === 'hoch');
+    const hoch = await seite.evaluate(() => {
+      const el = document.querySelector('.partie .ort-spieler-leiste');
+      const b = el.getBoundingClientRect();
+      const zeile = document.querySelector('.partie .spieler-hoch').getBoundingClientRect();
+      const sc = document.querySelector('.screen.partie');
+      return { inHoch: el.parentNode === document.querySelector('.partie .spieler-hoch') && el.previousElementSibling === document.querySelector('.partie .spieler-hoch > .name'),
+        sichtbar: b.width > 0 && b.height > 0, inZeile: b.top >= zeile.top - 1 && b.bottom <= zeile.bottom + 1, ueberlauf: sc.scrollHeight - sc.clientHeight };
+    });
+    pruefe('partie:spieler-leiste: hoch wandert das Element in die Spielerleiste unter dem Brett, eine Zeile, kein Überlauf', hoch.inHoch && hoch.sichtbar
+      && hoch.inZeile && hoch.ueberlauf <= 0, JSON.stringify(hoch));
+    await seite.setViewportSize({ width: 1180, height: 820 });
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena');
+    pruefe('Spieler-Leiste und Aktionen: verlasse() beim Verlassen der Partie', await seite.evaluate(() => window.__wp.spielerWeg === 1 && window.__wp.aktionWeg === 1));
+    // drei Anbieter: hoechstens zwei Knoepfe (6 Spalten), kein Ueberlauf
+    await seite.goto(MIT_W0PLUS('wpaktion&wpaktion3') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    const drei = await seite.evaluate(() => {
+      const reihe = document.querySelector('.spielknoepfe');
+      return { knoepfe: reihe.querySelectorAll('.wp-emote').length, attr: reihe.dataset.aktionen, spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length,
+        ueberlauf: reihe.scrollWidth - reihe.clientWidth,
+        zuEng: [...reihe.querySelectorAll('button')].filter((b) => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1).map((b) => b.textContent.trim()) };
+    });
+    pruefe('partie:aktionen: höchstens zwei Knöpfe (6 Spalten), kein Überlauf, alle Beschriftungen passen', drei.knoepfe === 2 && drei.attr === '2' && drei.spalten === 6
+      && drei.ueberlauf <= 0 && drei.zuEng.length === 0, JSON.stringify(drei));
+    pruefe('Spieler-Leiste und Aktionen: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Handy hoch: die Sprechblase versteckt .info; die Lebensleiste (Gegner-Leiste) bleibt trotzdem sichtbar
+  gruppe = 'w0plus-a-fix: Lebensleiste auf dem Handy';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, touch: true, handy: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpboss&wpleiste') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard' } });
+    await seite.waitForSelector('.screen.partie.hat-blase', { timeout: 10000 });
+    const r = await seite.evaluate(() => {
+      const el = document.querySelector('.partie .ort-gegner-leiste');
+      const b = el.getBoundingClientRect();
+      const sc = document.querySelector('.screen.partie');
+      return { infoWeg: getComputedStyle(document.querySelector('.partie .botleiste-hoch .info')).display === 'none', hoehe: Math.round(b.height), breite: Math.round(b.width),
+        ueberBrett: b.bottom <= document.querySelector('.partie .brett').getBoundingClientRect().top + 1, ueberlauf: sc.scrollHeight - sc.clientHeight,
+        knoepfe: document.querySelector('.spielknoepfe').getBoundingClientRect().bottom <= innerHeight + 0.5 };
+    });
+    await seite.evaluate(() => { window.__test = {}; });
+    pruefe('Handy, Bot spricht: die Lebensleiste bleibt sichtbar (eigene Zeile über der Sprechblase), Brett und Knöpfe passen', r.infoWeg && r.hoehe > 0 && r.breite > 100
+      && r.ueberBrett && r.ueberlauf <= 0 && r.knoepfe, JSON.stringify(r));
+    pruefe('Lebensleiste Handy: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // zug:bewertet gewinnVorigerZug (fuer boss:treffer), Matt-Hook bei langsamer Auswertung, Antippen der Ergebnis-Karte
+  gruppe = 'w0plus-a-fix: Matt-Hook-Zeit, zug:bewertet, Abrechnung';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpmatt&wpabr') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    await schaeferBisMatt(seite, h);
+    await seite.waitForFunction(() => window.__wp.ereignisse.filter((e) => e.name === 'zug:bewertet').length >= 3, null, { timeout: 30000 });
+    const bew = await seite.evaluate(() => window.__wp.ereignisse.filter((e) => e.name === 'zug:bewertet')
+      .map((e) => ({ ply: e.ply, nachher: e.gewinnNachher, vorig: e.gewinnVorigerZug })));
+    pruefe('zug:bewertet: gewinnVorigerZug = Gewinnchance nach dem vorigen eigenen Zug (vor dem Bot-Zug), beim ersten Zug null',
+      bew.length >= 3 && bew[0].ply === 0 && bew[0].vorig === null && bew[1].ply === 2 && bew[1].vorig === bew[0].nachher && bew[2].ply === 4
+      && bew[2].vorig === bew[1].nachher && Number.isFinite(bew[1].vorig), JSON.stringify(bew));
+    // Auswertung stark gebremst (1,8 s je Suche): partie:beendet kommt erst nach bis zu 2,5 s
+    await bremse(seite, 1800);
+    await seite.evaluate(() => window.__app.vorab.clear());
+    await h.zugTippen('h5f7');
+    await seite.waitForFunction(() => window.__wp.matt.length === 1, null, { timeout: 15000 });
+    await seite.waitForFunction(() => window.__wp.overlayT > 0, null, { timeout: 10000 });
+    await seite.waitForFunction(() => window.__wp.ereignisse.some((e) => e.name === 'partie:beendet'), null, { timeout: 10000 });
+    const t = await seite.evaluate(() => {
+      const w = window.__wp;
+      const matt = w.ereignisse.find((e) => e.name === 'zug:gespielt' && e.matt);
+      const beendet = w.ereignisse.find((e) => e.name === 'partie:beendet');
+      return { hook: Math.round(w.matt[0].t - matt.t), ergebnis: Math.round(w.overlayT - matt.t), beendet: Math.round(beendet.t - matt.t),
+        hookVorBeendet: window.__partie.protokoll.filter((e) => e.typ === 'matt-hook').map((e) => e.beendet) };
+    });
+    pruefe('Matt-Hook bei langsamer Auswertung: Finisher spätestens 0,5 s nach dem Matt (vorher 1,7 s), Ergebnis nach höchstens 2,6 s (vorher 3,5 s)',
+      t.hook < 500 && t.ergebnis < 2600 && t.hookVorBeendet[0] === false && t.beendet > t.hook, JSON.stringify(t));
+    await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .abrechnung', { timeout: 20000 });
+    await h.tippe('.ergebnis-overlay .erg-unter');
+    const abr = await seite.evaluate(() => {
+      const a = document.querySelector('.ergebnis-overlay .abrechnung');
+      return { alles: a.classList.contains('alles'), karte: document.querySelector('.ergebnis-overlay .ergebnis-karte').classList.contains('alles'),
+        animation: [...a.children].map((x) => getComputedStyle(x).animationName).join() };
+    });
+    pruefe('Antippen der Ergebnis-Karte (nicht der Abrechnung) zeigt auch die Abrechnung sofort ganz', abr.alles && abr.karte && /^none(,none)*$/.test(abr.animation), JSON.stringify(abr));
+    pruefe('Matt-Hook-Zeit: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Angemeldeter Gast im Modus normal: wertet nie (vorher 3 Sterne, Statistik und "Nächster Gegner" Benno); Verlauf-Kopf je Art
+  gruppe = 'w0plus-a-fix: Gast und Verlauf';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true, saat: SAAT });
+    const h = hilfen(seite, { touch: true });
+    await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
+    await seite.goto(MIT_W0PLUS('wpgast&wpboss') + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    const stand = () => seite.evaluate(async () => {
+      const st = await import('./js/storage.js');
+      return { sterne: st.gesamtSterne(), partien: st.statistik().partien, fortschritt: localStorage.getItem('schach-arena:v1:fortschritt'), d: st.ladePartien()[0] || null };
+    });
+    const vorher = await stand();
+    await seite.evaluate((plan) => {
+      localStorage.removeItem('schach-arena:v1:laufend');
+      window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return plan[v[v.length - 1].lan] || null; } };
+    }, SCHAEFER_PLAN);
+    await h.starte({ botId: 'test-gast', farbe: 'w' });
+    for (const zug of SCHAEFER_ZUEGE) {
+      await h.warteFlo();
+      await h.zugTippen(zug);
+    }
+    await seite.evaluate(() => { window.__test = {}; });
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel]', { timeout: 20000 });
+    const erg = await seite.evaluate(() => {
+      const chip = document.querySelector('.ergebnis-overlay .erg-kopf .chip');
+      const knopf = document.querySelector('.ergebnis-overlay [data-ziel="ab-hier"]');
+      return { chip: chip ? chip.textContent : null, sterne: document.querySelectorAll('.ergebnis-overlay .erg-stern').length,
+        weiter: !!document.querySelector('.ergebnis-overlay [data-ziel="weiter"]'), knopf: knopf ? knopf.textContent.trim() : null,
+        gestartet: window.__wp.ereignisse.filter((e) => e.name === 'partie:gestartet').pop().wertet,
+        beendet: (window.__wp.ereignisse.filter((e) => e.name === 'partie:beendet').pop() || {}).wertet };
+    });
+    pruefe('Gast im Modus normal: wertet nicht (Chip GAST, keine Sterne, kein "Nächster Gegner", Knopf "Nochmal")', erg.chip === 'GAST' && erg.sterne === 0 && !erg.weiter
+      && erg.knopf === 'Nochmal' && erg.gestartet === false && erg.beendet === false, JSON.stringify(erg));
+    const nachher = await stand();
+    pruefe('Gast: Datensatz ohne Sterne, Sterne, Statistik und Fortschritt unverändert', !!nachher.d && nachher.d.botId === 'test-gast'
+      && JSON.stringify(nachher.d.sterne) === '[false,false,false]' && nachher.sterne === vorher.sterne && nachher.partien === vorher.partien
+      && nachher.fortschritt === vorher.fortschritt, JSON.stringify({ vorher: [vorher.sterne, vorher.partien], nachher: [nachher.sterne, nachher.partien] }));
+    // dazu eine Boss-Partie (aufgegeben): der Verlauf zaehlt beide je Art, nicht als "Übungen"
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botZug: () => 'f8e7' }; });
+    await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard' } });
+    await h.warteFlo();
+    await seite.evaluate(() => { window.__test = {}; });
+    await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+    await seite.waitForSelector('.dialog-ort .dialog');
+    await seite.locator('.dialog-knoepfe .knopf.gefahr').click();
+    await seite.waitForSelector('.ergebnis-overlay .erg-knoepfe [data-ziel="ab-hier"]', { timeout: 15000 });
+    await seite.evaluate(() => window.__app.gehe('verlauf'));
+    await seite.waitForSelector('.screen.vl-screen');
+    const vl = await seite.evaluate(() => ({ kopf: document.querySelector('.vl-screen .kopf .unter').textContent.trim(),
+      chips: [...document.querySelectorAll('.vl-uebung')].map((c) => c.textContent) }));
+    pruefe('Verlauf: Kopf zählt nicht wertende Partien je Art ("1 Boss-Partie und 1 Gast-Partie", vorher "2 Übungen"), Chips Boss und Gast',
+      vl.kopf === '1 Boss-Partie und 1 Gast-Partie' && vl.chips.includes('Boss') && vl.chips.includes('Gast'), JSON.stringify(vl));
+    pruefe('Gast und Verlauf: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
 

@@ -334,8 +334,9 @@ function jsonDateien(ordner) {
     && !/partie:matt[\s\S]{0,400}warte\((?!BRETT_FEIER)\d/.test(partie));
   // w0plus-a-fix: vor dem Finisher wartet die Partie hoechstens MATT_HOOK_WARTEN_MS (300 ms) auf partie:beendet
   const m = partie.match(/MATT_HOOK_WARTEN_MS\s*=\s*(\d+)/);
-  pruefe('Finisher: vor dem Start hoechstens 300 ms Warten auf partie:beendet (vorher bis 3 s)', !!m && Number(m[1]) <= 300
-    && /Promise\.race\(\[beendetDa, warte\(MATT_HOOK_WARTEN_MS\)\]\)/.test(partie), m && m[1]);
+  pruefe('Finisher: vor dem Start hoechstens 300 ms Warten auf partie:beendet (vorher bis 3 s; anders nur im Testmodus)', !!m && Number(m[1]) <= 300
+    && /Promise\.race\(\[beendetDa, warte\(mattHookWarten\(\)\)\]\)/.test(partie)
+    && /const t = app\.test && window\.__test \? window\.__test\.mattHookWarten : undefined;\s*return Number\.isFinite\(t\) \? t : MATT_HOOK_WARTEN_MS;/.test(partie), m && m[1]);
 }
 {
   // Schnell-Chat (Phase 2, SPIELKONZEPT 5.3 und Regel 21): keine Saetze "Wow", "Hoppla", "Knapp", "Glück gehabt",

@@ -7,7 +7,8 @@
 // werten (Uebung oder eigene Stellung, storage.wertet), buchen nichts: das Ergebnis zeigt dann keine
 // Sterne, den Chip "ÜBUNG" und "Nochmal ab hier" (gleiche Params).
 // Test-Hooks (window.__partie, window.__test) nur mit ?test:
-// __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung) }.
+// __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung),
+//            mattHookWarten (ms, Warten des Matt-Hooks auf partie:beendet, sonst MATT_HOOK_WARTEN_MS) }.
 //
 // Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md): sendet partie:gestartet (mit der Buehne, dazu wertet und der
 // Stand von hinweise und zuruecknahmen beim Start), zug:gespielt,
@@ -469,10 +470,10 @@ export function zeige(root, params, app) {
   function zeichneKnoepfe() {
     const am = z.phase === 'flo';
     const ende = z.phase === 'ende';
-    $('.spielknoepfe [data-aktion="hinweis"]').disabled = !am;
-    $('.spielknoepfe [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
-    $('.spielknoepfe [data-aktion="aufgeben"]').disabled = ende;
-    const h = $('.spielknoepfe [data-aktion="hinweis"]');
+    $('.spielknoepfe > [data-aktion="hinweis"]').disabled = !am;
+    $('.spielknoepfe > [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
+    $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
+    const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
   }
 
@@ -1065,7 +1066,7 @@ export function zeige(root, params, app) {
     if (z.phase !== 'flo' || z.hinweisRechnet) return;   // zweites Tippen waehrend der Rechnung
     const fen = z.chess.fen();
     if (z.hinweisFen !== fen) { z.hinweisFen = fen; z.hinweisStufe = 0; }
-    const k = $('.spielknoepfe [data-aktion="hinweis"]');
+    const k = $('.spielknoepfe > [data-aktion="hinweis"]');
     k.classList.add('rechnet');
     z.hinweisRechnet = true;
     let a = null;
@@ -1324,6 +1325,11 @@ export function zeige(root, params, app) {
   // bis AUSWERTUNG_WARTEN_MS + 500), dann auf die Anbieter mit { fertig }, hoechstens BRETT_FEIER.dauerMs; ein Tipp
   // bricht ab. Kommt partie:beendet spaeter, laeuft der Finisher schon (partieId und Datensatz sind gespeichert).
   let mattOrt = null;
+  // w0plus-a-fix: so lange wartet der Hook auf partie:beendet (nur im Testmodus per __test.mattHookWarten anders)
+  const mattHookWarten = () => {
+    const t = app.test && window.__test ? window.__test.mattHookWarten : undefined;
+    return Number.isFinite(t) ? t : MATT_HOOK_WARTEN_MS;
+  };
   async function mattHook(ergebnis) {
     // Ein Tipp gilt ab dem Mattzug: auch waehrend noch auf partie:beendet gewartet wird (der Finisher bekommt dann ein
     // schon abgebrochenes signal, zeigt hoechstens sein Endbild, und das Ergebnis wartet nicht)
@@ -1331,7 +1337,7 @@ export function zeige(root, params, app) {
     const tipp = () => ctrl.abort();
     s.addEventListener('pointerdown', tipp, true);
     try {
-      await Promise.race([beendetDa, warte(MATT_HOOK_WARTEN_MS)]);
+      await Promise.race([beendetDa, warte(mattHookWarten())]);
       if (weg) return;
       const m = z.verbose[z.verbose.length - 1] || null;
       const matt = z.chess.turn();
@@ -1780,7 +1786,7 @@ export function zeige(root, params, app) {
   const aktionen = document.createElement('div');
   aktionen.className = 'ort-aktionen';
   aktionen.hidden = true;
-  $('.spielknoepfe').insertBefore(aktionen, $('.spielknoepfe [data-aktion="aufgeben"]'));
+  $('.spielknoepfe').insertBefore(aktionen, $('.spielknoepfe > [data-aktion="aufgeben"]'));
   const aktionenOrt = fuelle('partie:aktionen', aktionen, { app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss });
   const aktionsKnoepfe = [...aktionen.children];
   for (const el of aktionsKnoepfe.slice(AKTIONEN_MAX)) el.remove();
