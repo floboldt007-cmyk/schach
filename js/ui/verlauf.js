@@ -9,14 +9,28 @@
 // wertende Partien; die Kopfzeile nennt deshalb die Uebungen extra ("12 Partien, davon 2 Übungen").
 // W0+a: der Chip nennt den Modus (Boss, Frei, Spielhalle; sonst Übung). Boss-Partien gegen angemeldete Bots finden
 // ihren Namen ueber botNachId, solange das Paket geladen ist.
+// w0plus-a-fix: Partien gegen angemeldete Bots im Modus normal heissen "Gast" (sie werten nie). Die Kopfzeile zaehlt die
+// nicht wertenden Partien je Art ("3 Partien, davon 1 Übung und 1 Boss-Partie"); vorher hiess jede davon "Übung".
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
 import { fuelle } from '../orte.js';
 
-// W0+a: Chip nicht wertender Partien je Modus
-const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle' };
+// W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
+const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast' };
+const ART_TEXT = {
+  uebung: ['Übung', 'Übungen'], boss: ['Boss-Partie', 'Boss-Partien'], frei: ['freie Partie', 'freie Partien'],
+  spiel: ['Spielhallen-Partie', 'Spielhallen-Partien'], gast: ['Gast-Partie', 'Gast-Partien'],
+};
+const LEITER = new Set(BOTS.map((b) => b.id));
+// Art einer nicht wertenden Partie: Modus boss, frei, spiel; Modus normal gegen einen angemeldeten Bot: gast; sonst
+// (Uebung, eigene Stellung) uebung
+function artVon(p) {
+  if (CHIP_TEXT[p.modus]) return p.modus;
+  if ((p.modus || 'normal') === 'normal' && p.botId != null && !LEITER.has(p.botId)) return 'gast';
+  return 'uebung';
+}
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -114,14 +128,18 @@ export function zeige(root, params = {}, app) {
     ort.hidden = ortSeite.anzahl === 0;
   }
 
-  // Kopfzeile: alle Partien; Uebungen (nicht wertend) extra genannt, weil die Statistik nur wertende zaehlt
+  // Kopfzeile: alle Partien; nicht wertende extra genannt, je Art (Übung, Boss-Partie, freie Partie, Spielhallen-Partie,
+  // Gast-Partie), weil die Statistik nur wertende zaehlt
   function anzahlText(partien) {
     const n = partien.length;
-    const u = partien.filter((p) => !wertet(p)).length;
-    const uebungen = (k) => (k === 1 ? '1 Übung' : `${k} Übungen`);
-    if (u && u === n) return uebungen(u);
+    const zaehl = new Map();
+    for (const p of partien) if (!wertet(p)) { const a = artVon(p); zaehl.set(a, (zaehl.get(a) || 0) + 1); }
+    const u = [...zaehl.values()].reduce((a, b) => a + b, 0);
+    const teile = Object.keys(ART_TEXT).filter((a) => zaehl.has(a)).map((a) => `${zaehl.get(a)} ${ART_TEXT[a][zaehl.get(a) === 1 ? 0 : 1]}`);
+    const liste = teile.length > 1 ? `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}` : teile[0];
+    if (u && u === n) return liste;
     const alle = n === 1 ? '1 Partie' : `${n} Partien`;
-    return u ? `${alle}, davon ${uebungen(u)}` : alle;
+    return u ? `${alle}, davon ${liste}` : alle;
   }
 
   function statistikHtml() {
@@ -191,7 +209,7 @@ export function zeige(root, params = {}, app) {
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
               ${wertet(p) ? `<span class="vl-sterne" aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</span>`
-                : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="Zählt nicht für Sterne und Statistik">${CHIP_TEXT[p.modus] || 'Übung'}</span>`}
+                : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="Zählt nicht für Sterne und Statistik">${CHIP_TEXT[artVon(p)] || 'Übung'}</span>`}
             </span>
           </button>
           <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="Partie gegen ${esc(name)} löschen">${icon('muell')}</button>

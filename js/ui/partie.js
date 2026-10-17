@@ -41,7 +41,7 @@
 //   und "Nochmal" (gleiche Params, neuer Seed). frei/spiel: Chip "FREI"/"SPIELHALLE". boss.staerke (offen angesagte
 //   Zahl, z. B. 1080): der Boss spielt mit bots.staerkeFuerElo(staerke), Kopf "Name · Stufe ≈ 1080".
 //   DOM-Ort partie:gegner-leiste: .ort-gegner-leiste ueber dem Gegner (quer: erstes Kind von .botbox, hoch: erstes
-//   Kind von .botleiste-hoch .info; das Element wandert beim Drehen des Geraets mit). Einmal beim Start gefuellt,
+//   Kind von .botleiste-hoch; das Element wandert beim Drehen des Geraets mit). Einmal beim Start gefuellt,
 //   Kontext { app, buehne, bot, farbe, modus, boss, lage() -> 'hoch' | 'quer' }, ohne Anbieter versteckt.
 //   Aufruf-Ort partie:matt (Finisher): bei Matt, nach dem Speichern und nach partie:beendet, vor dem Ergebnis.
 //   Kontext { app, buehne, laufId, partieId, ergebnis, gewinner: 'flo' | 'bot', koenigFeld, letzterZug { von,
@@ -59,6 +59,25 @@
 //   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
 //   Boss-Partie mit einer Gegner-Leiste (Anbieter da) und Anzeige lebensleiste an: kein Bewertungsbalken
 //   (.ohne-balken wie bei Balken aus; "Lebensleiste statt Balken", SPIELKONZEPT 3.18).
+//
+// w0plus-a-fix (Befunde des W0+a-Pruefers):
+//   Boss-Staerke: Kopf, Bot-Zeile und Spielanalyse nennen die Elo des Profils, mit dem der Boss wirklich spielt
+//   (staerkeFuerElo(boss.staerke).elo, vor der Eichung z. B. "≈ 1000" fuer die Anfrage 1080); boss.staerke bleibt als
+//   Anfrage im Datensatz. Partien gegen angemeldete Bots werten nie (storage.wertet mit botId): Chip "GAST" bzw.
+//   "BOSS", "Nochmal" statt "Nächster Gegner".
+//   Matt-Hook: wartet hoechstens MATT_HOOK_WARTEN_MS (300 ms) auf partie:beendet (vorher bis 3 s); dauert die
+//   Live-Bewertung des Mattzugs laenger, kommt partie:beendet waehrend des Finishers.
+//   Gegner-Leiste im Hochformat: erstes eigenes Kind von .botleiste-hoch (eigene Zeile ueber Avatar und Namen, bleibt
+//   sichtbar, waehrend der Bot spricht; vorher in .info, das auf dem Handy mit der Sprechblase verschwand).
+//   DOM-Ort partie:spieler-leiste: .ort-spieler-leiste an Flos Namen (quer in .spieler-quer, hoch in .spieler-hoch,
+//   wandert beim Drehen mit), z. B. Flamme des Siegeslaufs oder Level; Kontext wie partie:gegner-leiste. Eine Zeile,
+//   nicht hoeher als der Name. Ohne Anbieter versteckt.
+//   DOM-Ort partie:aktionen: .ort-aktionen in der Knopfreihe vor "Aufgeben" (z. B. Emote-Rad, Schnell-Chat),
+//   hoechstens AKTIONEN_MAX (2) Knoepfe, die Reihe bekommt dafuer Spalten dazu (data-aktionen). Kontext { app,
+//   buehne, bot, farbe, modus, boss }. Klicks binden die Pakete selbst. Ohne Anbieter aendert sich nichts.
+//   zug:bewertet zusaetzlich gewinnVorigerZug: Flos Gewinnchance nach seinem vorigen eigenen Zug (also vor dem
+//   letzten Bot-Zug), null beim ersten eigenen Zug oder ohne Bewertung. Damit rechnet S1-6 boss:treffer.
+//   Antippen der Ergebnis-Karte zeigt auch die Abrechnung sofort ganz (.alles an Karte und Huelle).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
@@ -114,6 +133,10 @@ const ANZEIGEN = ['zaehlwerk', 'funkenlinie', 'lebensleiste', 'balken'];
 const neuerSeed = () => Math.floor(Math.random() * 4294967296) >>> 0;
 const ZUSATZ_MAX = 2;
 const PAKET_NAME = /^[a-z][a-z0-9-]{0,30}$/;
+// w0plus-a-fix: so lange wartet der Matt-Hook hoechstens auf partie:beendet (die Live-Bewertung des Mattzugs)
+const MATT_HOOK_WARTEN_MS = 300;
+// w0plus-a-fix: hoechstens so viele Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen)
+const AKTIONEN_MAX = 2;
 
 // Stufe der COMBO (Chip data-stufe): leer bei 3 bis 4, dann heiss, ueberladen, unaufhaltsam
 function serienStufe(n) {
@@ -196,10 +219,13 @@ export function zeige(root, params, app) {
   };
   z.fens.push(z.chess.fen());
   // W0+a: Boss mit offen angesagter Staerke (boss.staerke, z. B. 1080): gespielt wird mit staerkeFuerElo (vor der
-  // Eichung der naechstliegende Leiter-Bot), Kopf und Analyse nennen diese Zahl. Sonst das Profil des Bots.
+  // Eichung der naechstliegende Leiter-Bot). Sonst das Profil des Bots. w0plus-a-fix: Kopf, Bot-Zeile und Analyse
+  // nennen die Elo dieses Profils (vor der Eichung z. B. 1000 fuer 1080), nie die Anfrage (Fairness 12).
   const bossStaerke = z.boss && Number.isFinite(z.boss.staerke) ? staerkeFuerElo(z.boss.staerke) : null;
   const zugBot = bossStaerke ? Object.freeze({ ...bot, staerke: bossStaerke.staerke }) : bot;
-  const botElo = bossStaerke ? z.boss.staerke : bot.elo;
+  const botElo = bossStaerke ? bossStaerke.elo : bot.elo;
+  // w0plus-a-fix: wertet nur gegen Leiter-Bots (angemeldete Bots nie, auch im Modus normal)
+  const wertetJetzt = () => wertet({ modus: z.modus, startFen, botId: bot.id });
   const laufId = 'l' + z.gestartet;
   const startFarbe = z.chess.turn();
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
@@ -229,6 +255,15 @@ export function zeige(root, params, app) {
   const nummerVon = (i) => startNummer + Math.floor((i + (startFarbe === 'b' ? 1 : 0)) / 2);
   const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanDeutsch(z.san[i])}`;
   const letzterFloPly = () => { for (let i = z.zuege.length - 1; i >= 0; i--) if (istFlo(i)) return i; return -1; };
+  // w0plus-a-fix: Flos Gewinnchance nach seinem vorigen eigenen Zug (vor dem letzten Bot-Zug), null ohne Bewertung
+  const gewinnNachVorigemZug = (ply) => {
+    for (let i = ply - 1; i >= 0; i--) {
+      if (!istFlo(i)) continue;
+      const e = z.live[i];
+      return e && e.status === 'fertig' && e.erg && Number.isFinite(e.erg.gewinnNachher) ? e.erg.gewinnNachher : null;
+    }
+    return null;
+  };
   const liveAn = () => app.einstellungen().liveBewertung;
   const tiefe = () => app.einstellungen().tiefe;
 
@@ -252,14 +287,14 @@ export function zeige(root, params, app) {
   function kopfTitel() {
     if (z.modus === 'boss') {
       if (!z.boss) return bot.name;
-      return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${z.boss.staerke}` : ''}`;
+      return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${bossStaerke.elo}` : ''}`;
     }
     return bot.stufe ? `${bot.name} · Stufe ${bot.stufe}` : bot.name;
   }
   function botMeta() {
     if (bot.stufe) return `Stufe ${bot.stufe} · Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
-    if (bossStaerke) teile.push(`≈ ${z.boss.staerke}`);
+    if (bossStaerke) teile.push(`≈ ${bossStaerke.elo}`);
     else if (Number.isFinite(bot.elo)) teile.push(`Elo ${bot.elo}`);
     return teile.filter(Boolean).join(' · ');
   }
@@ -330,7 +365,8 @@ export function zeige(root, params, app) {
   // ---------- Knoepfe ----------
   s.addEventListener('click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !s.contains(k) || k.disabled || k.closest('.c-zusatz, .erg-karte-ort, .erg-feier')) return;   // Pakete binden selbst
+    if (!k || !s.contains(k) || k.disabled
+      || k.closest('.c-zusatz, .erg-karte-ort, .erg-feier, .ort-gegner-leiste, .ort-spieler-leiste, .ort-aktionen')) return;   // Pakete binden selbst
     const a = k.dataset.aktion;
     if (a === 'zurueck') zurueckGedrueckt();
     else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
@@ -802,6 +838,7 @@ export function zeige(root, params, app) {
       sende('zug:bewertet', {
         laufId, ply, uci: erg.uci, sanDe: erg.sanDe, klasse: erg.klasse, verlust: erg.verlust, genauigkeit: erg.genauigkeit,
         gewinnVorher: erg.gewinnVorher, gewinnNachher: erg.gewinnNachher, gewinnZweiter: erg.gewinnZweiter ?? null,
+        gewinnVorigerZug: gewinnNachVorigemZug(ply),
         besterZug: erg.besterZug, besterZugSanDe: erg.besterZugSanDe, trivial: erg.trivial === true,
         serie: serieBis(ply), serieVorher: serieBis(ply - 1), letzter: ply === letzterFloPly(), live: liveAn(),
       });
@@ -1283,8 +1320,9 @@ export function zeige(root, params, app) {
   let beendetGemeldet = () => {};
   const beendetDa = new Promise((r) => { beendetGemeldet = r; });
 
-  // W0+a: Aufruf-Ort partie:matt. Wartet auf partie:beendet (hoechstens AUSWERTUNG_WARTEN_MS, das sichert
-  // planeBeendet), dann auf die Anbieter mit { fertig }, hoechstens BRETT_FEIER.dauerMs; ein Tipp bricht ab.
+  // W0+a: Aufruf-Ort partie:matt. Wartet auf partie:beendet (w0plus-a-fix: hoechstens MATT_HOOK_WARTEN_MS, vorher
+  // bis AUSWERTUNG_WARTEN_MS + 500), dann auf die Anbieter mit { fertig }, hoechstens BRETT_FEIER.dauerMs; ein Tipp
+  // bricht ab. Kommt partie:beendet spaeter, laeuft der Finisher schon (partieId und Datensatz sind gespeichert).
   let mattOrt = null;
   async function mattHook(ergebnis) {
     // Ein Tipp gilt ab dem Mattzug: auch waehrend noch auf partie:beendet gewartet wird (der Finisher bekommt dann ein
@@ -1293,7 +1331,7 @@ export function zeige(root, params, app) {
     const tipp = () => ctrl.abort();
     s.addEventListener('pointerdown', tipp, true);
     try {
-      await Promise.race([beendetDa, warte(AUSWERTUNG_WARTEN_MS + 500)]);
+      await Promise.race([beendetDa, warte(MATT_HOOK_WARTEN_MS)]);
       if (weg) return;
       const m = z.verbose[z.verbose.length - 1] || null;
       const matt = z.chess.turn();
@@ -1305,7 +1343,7 @@ export function zeige(root, params, app) {
         letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
         signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
       });
-      melde({ typ: 'matt-hook', anzahl: mattOrt.anzahl, wartend: mattOrt.wartend });
+      melde({ typ: 'matt-hook', anzahl: mattOrt.anzahl, wartend: mattOrt.wartend, beendet: !!z.beendetGesendet });
       if (!mattOrt.anzahl) {
         // kein Finisher (alle Anbieter lieferten null): der Klassen-Effekt des Mattzugs kommt doch
         z.finisher = false;
@@ -1371,6 +1409,13 @@ export function zeige(root, params, app) {
     return { partie: nach.partie, review, neueSterne, neuFreigeschaltet: g.neuFreigeschaltet, wertet: nach.wertet !== false };
   }
 
+  // Chip nicht wertender Partien: je Modus, gegen angemeldete Bots im Modus normal "GAST" (w0plus-a-fix)
+  function chipText() {
+    if (MODUS_CHIP[z.modus] && z.modus !== 'uebung') return MODUS_CHIP[z.modus];
+    if (z.modus === 'normal' && bot.stufe == null && !startFen) return 'GAST';
+    return 'ÜBUNG';
+  }
+
   // ---------- Ergebnis-Overlay ----------
   function baueOverlay(ergebnis, grund) {
     const o = document.createElement('div');
@@ -1391,12 +1436,12 @@ export function zeige(root, params, app) {
       }).join('') + '</div>'
       : '';
     // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne
-    const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertet({ modus: z.modus, startFen });
+    const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
     const kopfWort = `<h2 class="erg-wort" id="erg-wort">${wort}</h2>`;
     o.innerHTML = `${konfetti}
       <div class="ergebnis-karte">
         <button class="icon-knopf erg-zu" type="button" aria-label="Brett ansehen">${icon('auge')}</button>
-        ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${MODUS_CHIP[z.modus] || 'ÜBUNG'}</span></div>`}
+        ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${chipText()}</span></div>`}
         <p class="erg-unter">${esc(unter)}</p>
         <div class="erg-mitte">
           <div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
@@ -1425,6 +1470,10 @@ export function zeige(root, params, app) {
     const feierUhren = new Set();
     karte.addEventListener('click', () => {
       feierBox.classList.add('alles');
+      // w0plus-a-fix: auch die Abrechnung (SPIELKONZEPT 3.10 "Antippen zeigt sofort alles"); .alles an der Karte gilt
+      // auch fuer eine Huelle, die der Nachtrag neu baut
+      karte.classList.add('alles');
+      for (const a of karte.querySelectorAll('.abrechnung')) a.classList.add('alles');
       for (const u of feierUhren) clearTimeout(u);
       feierUhren.clear();
     });
@@ -1554,10 +1603,12 @@ export function zeige(root, params, app) {
         }
         if (!nachtrag) {
           const knoepfe = o.querySelector('.erg-knoepfe');
-          const naechster = !wertet ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
-          // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung)
+          // w0plus-a-fix: "Nächster Gegner" nur auf der Leiter (angemeldete Bots haben stufe null)
+          const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
+          // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
+          const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
           knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} Zur Analyse</button>
-          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${z.modus === 'uebung' || z.modus === 'normal' ? 'Nochmal ab hier' : 'Nochmal'}</button>`
+          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${abHier ? 'Nochmal ab hier' : 'Nochmal'}</button>`
             : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">Nächster Gegner ${icon('pfeil')}</button>`
               : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} Nochmal</button>`}`;
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
@@ -1692,15 +1743,26 @@ export function zeige(root, params, app) {
 
   // ---------- W0+a: Ort partie:gegner-leiste (ueber dem Gegner, z. B. die Lebensleiste eines Bosses) ----------
   // Ein Behaelter, der beim Drehen des Geraets zwischen Bot-Karte (quer) und Bot-Leiste (hoch) wandert.
+  // w0plus-a-fix: im Hochformat erstes eigenes Kind von .botleiste-hoch (eigene Zeile, .mit-gegner-leiste), nicht mehr
+  // in .info: Das verschwindet auf dem Handy, solange der Bot spricht, und mit ihm die Lebensleiste.
   const gegnerLeiste = document.createElement('div');
   gegnerLeiste.className = 'ort-gegner-leiste';
   gegnerLeiste.hidden = true;
+  // w0plus-a-fix: Ort partie:spieler-leiste an Flos Namen (quer in .spieler-quer, hoch in .spieler-hoch)
+  const spielerLeiste = document.createElement('div');
+  spielerLeiste.className = 'ort-spieler-leiste';
+  spielerLeiste.hidden = true;
   const hochMq = window.matchMedia ? window.matchMedia('(orientation: portrait)') : null;
   const lage = () => (hochMq && hochMq.matches ? 'hoch' : 'quer');
   function setzeGegnerLeiste() {
-    const anker = lage() === 'hoch' ? $('.botleiste-hoch .info') : $('.botbox');
+    const hoch = lage() === 'hoch';
+    const anker = hoch ? $('.botleiste-hoch') : $('.botbox');
     if (anker && gegnerLeiste.parentNode !== anker) anker.insertBefore(gegnerLeiste, anker.firstChild);
     gegnerLeiste.dataset.lage = lage();
+    // nach dem Namen (hoch) bzw. nach dem Namensblock (quer), vor den geschlagenen Figuren
+    const nach = hoch ? $('.spieler-hoch > .name') : $('.spieler-quer > div');
+    if (nach && spielerLeiste.previousSibling !== nach) nach.after(spielerLeiste);
+    spielerLeiste.dataset.lage = lage();
   }
   setzeGegnerLeiste();
   if (hochMq && hochMq.addEventListener) hochMq.addEventListener('change', setzeGegnerLeiste);
@@ -1708,6 +1770,24 @@ export function zeige(root, params, app) {
     app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
   });
   gegnerLeiste.hidden = gegnerOrt.anzahl === 0;
+  s.classList.toggle('mit-gegner-leiste', gegnerOrt.anzahl > 0);
+  const spielerOrt = fuelle('partie:spieler-leiste', spielerLeiste, {
+    app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
+  });
+  spielerLeiste.hidden = spielerOrt.anzahl === 0;
+  // w0plus-a-fix: Ort partie:aktionen in der Knopfreihe vor "Aufgeben" (display: contents, die Knoepfe der Pakete
+  // werden Spalten der Reihe; hoechstens AKTIONEN_MAX)
+  const aktionen = document.createElement('div');
+  aktionen.className = 'ort-aktionen';
+  aktionen.hidden = true;
+  $('.spielknoepfe').insertBefore(aktionen, $('.spielknoepfe [data-aktion="aufgeben"]'));
+  const aktionenOrt = fuelle('partie:aktionen', aktionen, { app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss });
+  const aktionsKnoepfe = [...aktionen.children];
+  for (const el of aktionsKnoepfe.slice(AKTIONEN_MAX)) el.remove();
+  if (aktionsKnoepfe.length > AKTIONEN_MAX) console.warn(`Partie: ${aktionsKnoepfe.length} Knöpfe an partie:aktionen, gezeigt werden ${AKTIONEN_MAX}`);
+  const aktionenZahl = Math.min(AKTIONEN_MAX, aktionen.children.length);
+  aktionen.hidden = aktionenZahl === 0;
+  if (aktionenZahl) $('.spielknoepfe').dataset.aktionen = String(aktionenZahl);
   // W0+a: In Boss-Partien ersetzt die Gegner-Leiste eines Pakets (die Lebensleiste) den Bewertungsbalken, solange die
   // Anzeige "lebensleiste" an ist (SPIELKONZEPT 3.17, 3.18). Ohne Anbieter steht der Balken wie eingestellt.
   const ohneBalken = (e) => !e.balken || (z.modus === 'boss' && e.lebensleiste !== false && gegnerOrt.anzahl > 0);
@@ -1788,14 +1868,14 @@ export function zeige(root, params, app) {
       chess: () => z.chess,
       phase: () => z.phase,
       effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
-      gegnerLeiste, mattOrt: () => mattOrt, zugBot: () => zugBot,
+      gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
     };
   }
 
   // hinweise und zuruecknahmen: Stand beim Start (bei einer fortgesetzten Partie die bisherigen)
   sende('partie:gestartet', {
     laufId, botId: bot.id, botStufe: bot.stufe, farbe, startFen: startFen || null, modus: z.modus, ziel: buehne.ziel,
-    wertet: wertet({ modus: z.modus, startFen }), fortgesetzt: !!laufend, hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, buehne,
+    wertet: wertetJetzt(), fortgesetzt: !!laufend, hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, buehne,
     boss: buehne.boss, seed: z.seed,
   });
 
@@ -1821,8 +1901,10 @@ export function zeige(root, params, app) {
       clearTimeout(z.blaseUhr);
       clearTimeout(z.kompaktUhr);
       if (overlay) overlay.verlasse();
-      // W0+a: Gegner-Leiste und Finisher abraeumen
+      // W0+a: Gegner-Leiste und Finisher abraeumen (w0plus-a-fix: auch Spieler-Leiste und Aktionen)
       gegnerOrt.verlasse();
+      spielerOrt.verlasse();
+      aktionenOrt.verlasse();
       if (mattOrt) mattOrt.verlasse();
       if (hochMq && hochMq.removeEventListener) hochMq.removeEventListener('change', setzeGegnerLeiste);
       plaetze.clear();

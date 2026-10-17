@@ -15,10 +15,11 @@ import {
 import {
   RECHENSTAND, VORLAUF_TAGE, THEMEN, ladeInhalt, pruefeKopf, pruefeInhalt, registriereInhaltsart, setzeHoler, leereZwischenspeicher,
   pruefeSpielplan, pruefeSpielplanFolge, spielplanWoche, naechsteWochen, funkenWochenendeAktiv, funkenWochenendeVon, texteVon,
-  SPIELPLAN_NAME, ladeSpielplan,
+  SPIELPLAN_NAME, ladeSpielplan, COUNTDOWN_RE,
 } from '../js/inhalte.js';
 import {
   BOTS, botNachId, alleBots, registriereBot, botZug, botSatz, vorliebeWert, VORLIEBE_FENSTER_CP, BOT_ARTEN, staerkeFuerElo,
+  VORLIEBE_NAEHE_CP, eloDerPartie,
 } from '../js/bots.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -211,6 +212,17 @@ pruefe('Beispiel-Spielplan (daten/beispiel/spielplan.json) ist gueltig', pruefeI
     && p((x) => { x.kopf.stand = '2026-10-26'; }).length === 0);
   pruefe('Spielplan: kein Uhrzeit-Countdown im Text', hat(p((x) => { x.wochen[0].text = 'Nur noch 3 h!'; }), /Countdown/)
     && hat(p((x) => { x.wochen[0].text = 'Start in 10 min'; }), /Countdown/) && hat(p((x) => { x.saison.name = 'Saison 2 Std'; }), /Countdown/));
+  // w0plus-a-fix (Befund des Pruefers): ausgeschriebene Restzeiten gingen durch, auch das Beispiel aus 3.17
+  const COUNTDOWNS = ['noch 10 Minuten', 'noch 2 Stunden', 'noch 2 T 04:13', 'endet um 23:59', 'noch 3 Tage', 'endet in 3 Tagen', 'bis 23:59',
+    'noch 1 Std.', 'Nur noch 45min', 'noch 2 h', '2h'];
+  const ERLAUBT = ['ab 16 Uhr doppelt', 'Woche 2 hat einen Boss', 'Wechsel Montag 4:00', 'Regel: 5 Minuten Bedenkzeit', '3 Tage lang Endspiele',
+    'KW 2 · 2027', 'Level 12', 'noch 2 Turniere'];
+  const durch = COUNTDOWNS.filter((t) => !hat(p((x) => { x.wochen[0].text = t; }), /Countdown/));
+  const falschAbgelehnt = ERLAUBT.filter((t) => p((x) => { x.wochen[0].text = t; }).length > 0);
+  pruefe('Spielplan: auch ausgeschriebene Countdowns ("noch 10 Minuten", "noch 2 T 04:13", "endet um 23:59", "noch 3 Tage") abgelehnt',
+    durch.length === 0 && COUNTDOWNS.every((t) => COUNTDOWN_RE.test(t)), durch);
+  pruefe('Spielplan: Anfaenge und Dauern ohne "noch" bleiben erlaubt ("ab 16 Uhr", "Montag 4:00", "5 Minuten Bedenkzeit")',
+    falschAbgelehnt.length === 0 && !ERLAUBT.some((t) => COUNTDOWN_RE.test(t)), falschAbgelehnt);
   pruefe('Spielplan: hoechstens 2 Klassiker, Text hoechstens 140 Zeichen', hat(p((x) => { x.wochen[0].klassiker = ['a1', 'b1', 'c1']; }), /klassiker/)
     && hat(p((x) => { x.wochen[0].text = 'x'.repeat(141); }), /140/));
   pruefe('Spielplan: leer oder kaputt', pruefeSpielplan({ kopf: BEISPIEL.kopf, wochen: [] }).length > 0 && pruefeSpielplan(null).length > 0);
@@ -250,6 +262,18 @@ pruefe('Beispiel-Spielplan (daten/beispiel/spielplan.json) ist gueltig', pruefeI
   pruefe('pruefeSpielplanFolge: Angekuendigtes bleibt (Thema, Funken-Wochenende), spaetere Wochen duerfen sich aendern',
     pruefeSpielplanFolge(BEISPIEL, verschoben).some((t) => /2026-11-23/.test(t)) && pruefeSpielplanFolge(BEISPIEL, weg).some((t) => /2026-11-30/.test(t))
     && pruefeSpielplanFolge(BEISPIEL, spaet).length === 0, [pruefeSpielplanFolge(BEISPIEL, verschoben), pruefeSpielplanFolge(BEISPIEL, weg), pruefeSpielplanFolge(BEISPIEL, spaet)]);
+  // w0plus-a-fix (Befund des Pruefers): eine angekuendigte Woche darf auch nicht wegfallen; vergangene Wochen duerfen fehlen
+  const gestrichen = kopie(neu);
+  gestrichen.wochen.splice(1, 1);                  // Woche 23.11. fehlt (am 02.11. angekuendigt)
+  const neueDatei = kopie(neu);
+  neueDatei.kopf.stand = '2026-11-24';             // neue Datei ab der laufenden Woche: 16.11. ist vorbei, darf fehlen
+  neueDatei.wochen = neueDatei.wochen.slice(1);
+  const ohneLaufende = kopie(neueDatei);
+  ohneLaufende.wochen = ohneLaufende.wochen.slice(1);   // die laufende Woche 23.11. fehlt: gestrichen
+  const fg = pruefeSpielplanFolge(BEISPIEL, gestrichen);
+  pruefe('pruefeSpielplanFolge: eine angekuendigte Woche zu streichen meldet sie; vergangene Wochen duerfen fehlen, die laufende nicht',
+    fg.some((t) => /2026-11-23.*gestrichen/.test(t)) && pruefeSpielplanFolge(BEISPIEL, neueDatei).length === 0
+    && pruefeSpielplanFolge(BEISPIEL, ohneLaufende).some((t) => /2026-11-23.*gestrichen/.test(t)), [fg, pruefeSpielplanFolge(BEISPIEL, neueDatei), pruefeSpielplanFolge(BEISPIEL, ohneLaufende)]);
 }
 
 // =====================================================================
@@ -305,6 +329,14 @@ const PROFIL = {
   const st = staerkeFuerElo(1080).staerke;
   st.tiefe = 99;
   pruefe('staerkeFuerElo: Kopie des Profils (die Leiter bleibt unveraendert)', JSON.stringify(staerkeFuerElo(1080).staerke) === JSON.stringify(lisa.staerke) && lisa.staerke.tiefe !== 99);
+  // w0plus-a-fix: die Elo, mit der der Bot wirklich spielt (Kopf und Analyse zeigen sie, nie die Anfrage)
+  const e = (elo) => (staerkeFuerElo(elo) || {}).elo;
+  pruefe('staerkeFuerElo: elo des gespielten Profils (1080 -> 1000 Lisa, 1150 -> 1200 Rudi, 2550 -> 2100 Greta)', e(1080) === 1000 && e(1150) === 1200
+    && e(2550) === 2100 && e(5000) === 3000, [1080, 1150, 2550, 5000].map(e));
+  pruefe('eloDerPartie: Boss mit boss.staerke spielt mit der Elo des Profils, sonst die Elo des Bots',
+    eloDerPartie({ modus: 'boss', botId: 'unbekannter-boss', boss: { id: 'x', stufe: 'standard', staerke: 1080 } }) === 1000
+    && eloDerPartie({ modus: 'normal', botId: 'rudi' }) === 1200 && eloDerPartie({ modus: 'boss', botId: 'kalle', boss: { id: 'kalle', stufe: 'meister' } }) === 800
+    && eloDerPartie({ botId: 'gibt-es-nicht' }) === null && eloDerPartie(null) === null);
 }
 
 // Fake-Engine: feste Linien, merkt sich die Suchoptionen
@@ -319,6 +351,11 @@ const ITAL = 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 12'
 const LINIEN = [
   { pv: ['f1c4'], eval: { cp: 40, mate: null } }, { pv: ['f1b5'], eval: { cp: 35, mate: null } },
   { pv: ['b1c3'], eval: { cp: 20, mate: null } }, { pv: ['f3e5'], eval: { cp: -100, mate: null } },
+];
+// w0plus-a-fix: Sc3 nur 0,05 Bauern schlechter als Lc4 (im Fenster und nah am gewaehlten Zug)
+const LINIEN_NAH = [
+  { pv: ['f1c4'], eval: { cp: 40, mate: null } }, { pv: ['f1b5'], eval: { cp: 35, mate: null } },
+  { pv: ['b1c3'], eval: { cp: 35, mate: null } }, { pv: ['f3e5'], eval: { cp: -100, mate: null } },
 ];
 const RUHIG = { tiefe: 2, kurzTiefe: 2, kurzChance: 0, breite: 4, intuition: 4, blick: 0, rauschen: 0, patzer: 0, mattInEins: 1, zeit: [0, 0], maxZeit: 3000 };
 const testBot = (staerke) => ({ id: 'test', stufe: 5, name: 'Test', staerke });
@@ -340,10 +377,13 @@ const testBot = (staerke) => ({ id: 'test', stufe: 5, name: 'Test', staerke });
   await botZug(e3, ITAL, sf, { ohnePause: true });
   pruefe('botZug (volle Staerke) ohne nodes: movetime 1500 wie vorher', e3.optionen[0].movetime === 1500 && !e3.optionen[0].nodes && e3.optionen[0].multipv === 1);
 
-  // Vorliebe: nur im Fenster von 0,3 Bauern um den besten Zug
-  const mit = async (vorliebe, staerke = RUHIG) => botZug(fakeEngine(LINIEN), ITAL, testBot(staerke), { ohnePause: true, zufall: () => 0.5, vorliebe });
-  const springer = await mit({ springer: 1 });
-  pruefe('Vorliebe Springer: Sc3 (0,2 schlechter, im Fenster) statt Lc4', springer.uci === 'b1c3' && springer.vorliebe === true, springer);
+  // Vorliebe: nur im Fenster von 0,3 Bauern um den besten Zug und (w0plus-a-fix) hoechstens 0,1 Bauern vom gewaehlten Zug
+  const mit = async (vorliebe, staerke = RUHIG, linien = LINIEN) => botZug(fakeEngine(linien), ITAL, testBot(staerke), { ohnePause: true, zufall: () => 0.5, vorliebe });
+  pruefe('VORLIEBE_NAEHE_CP = 10 (0,1 Bauern)', VORLIEBE_NAEHE_CP === 10);
+  const springer = await mit({ springer: 1 }, RUHIG, LINIEN_NAH);
+  pruefe('Vorliebe Springer: Sc3 (0,05 schlechter, im Fenster und nah am gewaehlten Zug) statt Lc4', springer.uci === 'b1c3' && springer.vorliebe === true, springer);
+  const weit = await mit({ springer: 1 });
+  pruefe('Vorliebe Springer: Sc3 im Fenster, aber 0,2 Bauern vom gewaehlten Zug: Lc4 bleibt (der Stil schwaecht den Bot nicht)', weit.uci === 'f1c4' && !weit.vorliebe, weit);
   const bauer = await mit((z) => (z.piece === 'p' ? 1 : 0));
   pruefe('Vorliebe ohne passenden Zug im Fenster: der beste Zug bleibt', bauer.uci === 'f1c4' && !bauer.vorliebe, bauer);
   const schlagen = await mit({ schlagen: 5 });
@@ -361,9 +401,33 @@ const testBot = (staerke) => ({ id: 'test', stufe: 5, name: 'Test', staerke });
     && vorliebeWert({ rochadeLang: 4, koenig: 9 }, { piece: 'k', flags: 'q', san: 'O-O-O', to: 'c1' }, { farbe: 'w' }) === 4
     && vorliebeWert(() => { throw new Error('x'); }, { piece: 'p', flags: 'n', san: 'e4', to: 'e4' }) === 0 && vorliebeWert(() => 'viel', {}) === 0);
   // Vorliebe bei voller Staerke: mehrere Linien, dann Auswahl im Fenster
-  const e4 = fakeEngine(LINIEN);
+  const e4 = fakeEngine(LINIEN_NAH);
   const v = await botZug(e4, ITAL, sf, { ohnePause: true, vorliebe: { springer: 1 } });
   pruefe('Vorliebe bei voller Staerke: MultiPV 5, Sc3 im Fenster', v.uci === 'b1c3' && v.vorliebe === true && e4.optionen[0].multipv === 5, [v, e4.optionen]);
+  const e5 = fakeEngine(LINIEN);
+  const v5 = await botZug(e5, ITAL, sf, { ohnePause: true, vorliebe: { springer: 1 } });
+  pruefe('Vorliebe bei voller Staerke: Sc3 0,2 Bauern schlechter als der Engine-Zug bleibt aus', v5.uci === 'f1c4' && !v5.vorliebe, v5);
+  // w0plus-a-fix (Befund des Pruefers): Mittlere Bewertung der gewaehlten Zuege mit und ohne Vorliebe (2000 Zuege, Rauschen
+  // 40). Vorher: ohne 37,6 cp, Springer 20, Bauer 15 (bis 0,2 Bauern je Zug schwaecher). Jetzt hoechstens 0,1 Bauern Abstand.
+  const LINIEN5 = [...LINIEN.slice(0, 3), { pv: ['d2d3'], eval: { cp: 15, mate: null } }, LINIEN[3]];
+  const CP = Object.fromEntries(LINIEN5.map((l) => [l.pv[0], l.eval.cp]));
+  const RAUSCHEN = { ...RUHIG, breite: 5, intuition: 2, rauschen: 40 };
+  const mittel = async (vorliebe) => {
+    const zf = zufallAus(7);
+    let summe = 0;
+    for (let i = 0; i < 2000; i++) {
+      const r = await botZug(fakeEngine(LINIEN5), ITAL, testBot(RAUSCHEN), { ohnePause: true, zufall: zf, vorliebe });
+      summe += CP[r.uci] ?? -999;
+    }
+    return summe / 2000;
+  };
+  const ohne = await mittel(null);
+  const abstaende = {};
+  for (const [name, vl] of [['laeufer', { laeufer: 1 }], ['springer', { springer: 1 }], ['bauer', { bauer: 1 }], ['rochade', { rochade: 1 }]]) {
+    abstaende[name] = Math.round((await mittel(vl)) - ohne);
+  }
+  pruefe('Vorliebe aendert die mittlere Zugstaerke um hoechstens 0,1 Bauern (Laeufer, Springer, Bauer, Rochade)',
+    Object.values(abstaende).every((d) => Math.abs(d) <= VORLIEBE_NAEHE_CP), { ohne: Math.round(ohne * 10) / 10, abstaende });
 }
 {
   // Seed: gleicher Seed und Halbzug ergeben denselben Zug (auch mit Rauschen und Spontanzuegen), Math.random wird nicht benutzt

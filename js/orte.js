@@ -52,6 +52,9 @@ export const ORTE = Object.freeze({
   'training:karten': 'dom',
   'ich:vitrine': 'dom',
   'spielplan:tage': 'dom',
+  // w0plus-a-fix: Schub 2b (Emote-Rad, Schnell-Chat, Flamme des Siegeslaufs an Flos Namen), Host partie.js
+  'partie:spieler-leiste': 'dom',
+  'partie:aktionen': 'dom',
 });
 
 let anbieterListe = new Map();   // ort -> [{ fn, reihenfolge, paket, nr }]

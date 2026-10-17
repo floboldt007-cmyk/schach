@@ -21,8 +21,13 @@
 //     regel hoechstens 140 Zeichen, nodes eine positive ganze Zahl. Angemeldete Bots haben stufe null und
 //     zaehlen nie zur Leiter (keine Sterne, keine Freischaltung). Falsches Profil: Fehler.
 //   botNachId(id) findet auch angemeldete Bots; alleBots() -> [...BOTS, ...angemeldete].
-//   staerkeFuerElo(elo) -> { staerke, botId } | null   Staerke fuer eine offen angesagte Zahl (Boss-Stufe "≈ 1080"):
-//     vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo; die Eichung ersetzt nur diese Funktion.
+//   staerkeFuerElo(elo) -> { staerke, botId, elo } | null   Staerke fuer eine offen angesagte Zahl (Boss-Stufe
+//     "≈ deine Wertung"): vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo; die Eichung ersetzt
+//     nur diese Funktion. elo ist die Staerke, mit der der Bot WIRKLICH spielt (die Elo dieses Profils, vor der Eichung
+//     z. B. 1000 fuer die Anfrage 1080): Kopf, Bot-Zeile und Spielanalyse zeigen diese Zahl, nie die Anfrage
+//     (Fairness 12, ehrliche Zahlen).
+//   eloDerPartie(partie) -> Zahl | null   mit welcher Elo der Bot dieser Partie gespielt hat (Boss mit boss.staerke:
+//     staerkeFuerElo(boss.staerke).elo, sonst die Elo des Bots); fuer Spielanalyse und Nachholen
 //   botZug(..., { zufall, nodes, vorliebe }):
 //     zufall    Zufallsquelle (Standard Math.random; pruefbare Partien: tag.js zufallAus(seed))
 //     nodes     feste Knotenzahl statt Zeitlimit fuer jede Suche (gleicher Seed, gleiche Knoten, ein Thread:
@@ -30,10 +35,13 @@
 //     vorliebe  Stil eines Bots: Funktion (zug, { fen, farbe, vollzug, punkte, bestePunkte }) -> Zahl oder
 //               Gewichte { schlagen, schach, rochade, rochadeKurz, rochadeLang, bauer, springer, laeufer, turm,
 //               dame, koenig, vorwaerts, tausch }. Gewaehlt wird nur unter Zuegen, die hoechstens
-//               VORLIEBE_FENSTER_CP (0,3 Bauern) schlechter sind als der beste Zug der Bot-Analyse, und nur, wenn
-//               der Bot ohnehin einen Zug aus diesem Fenster gewaehlt haette: Seine Fehler bleiben, die Vorliebe
-//               macht ihn weder heimlich staerker noch schwaecher. Der hoechste Wert ueber 0 gewinnt (bei
-//               Gleichstand der bessere Zug). Rueckgabe dann zusaetzlich vorliebe: true.
+//               VORLIEBE_FENSTER_CP (0,3 Bauern) schlechter sind als der beste Zug der Bot-Analyse UND hoechstens
+//               VORLIEBE_NAEHE_CP (0,1 Bauern) besser oder schlechter als der Zug, den der Bot ohnehin gewaehlt
+//               haette, und nur, wenn dieser selbst im Fenster liegt: Seine Fehler bleiben, ein Tausch verschiebt
+//               die Staerke je Zug um hoechstens 0,1 Bauern (w0plus-a-fix: vorher bis 0,3, im Mittel bis 0,2 Bauern
+//               je Zug schwaecher, also heimlich schwaecher). Den verbleibenden Effekt misst die Eichung (S3-0).
+//               Der hoechste Wert ueber 0 gewinnt (bei Gleichstand der bessere Zug). Rueckgabe dann zusaetzlich
+//               vorliebe: true.
 //   Ohne diese drei Angaben spielt jeder Bot genau wie vorher.
 import { Chess } from '../vendor/chess/chess.js';
 
@@ -726,12 +734,24 @@ export function botNachStufe(stufe) {
 // W0+a: Staerke fuer eine offen angesagte Zahl (z. B. ein Wochen-Boss "spielt mit ungefaehr deiner Wertung",
 // SPIELKONZEPT 3.8). Bis die Eichung geeichte Profile liefert: das Staerke-Profil des Leiter-Bots mit der
 // naechstliegenden Elo (bei Gleichstand der schwaechere). Die Eichung ersetzt nur diese Funktion.
-// -> { staerke (tiefe Kopie), botId (woher) } oder null
+// -> { staerke (tiefe Kopie), botId (woher), elo (mit dieser Elo spielt der Bot wirklich) } oder null
 export function staerkeFuerElo(elo) {
   if (!Number.isFinite(elo)) return null;
   let bester = BOTS[0];
   for (const b of BOTS) if (Math.abs(b.elo - elo) < Math.abs(bester.elo - elo)) bester = b;
-  return { staerke: JSON.parse(JSON.stringify(bester.staerke)), botId: bester.id };
+  return { staerke: JSON.parse(JSON.stringify(bester.staerke)), botId: bester.id, elo: bester.elo };
+}
+
+// w0plus-a-fix: Elo, mit der der Bot einer gespeicherten Partie gespielt hat (Spielanalyse, Nachholen). Ein Boss mit
+// offen angesagter Staerke spielte mit dem Profil aus staerkeFuerElo, also mit dessen Elo, nicht mit der Anfrage.
+export function eloDerPartie(p) {
+  if (!p || typeof p !== 'object') return null;
+  if (p.modus === 'boss' && p.boss && Number.isFinite(p.boss.staerke)) {
+    const st = staerkeFuerElo(p.boss.staerke);
+    if (st) return st.elo;
+  }
+  const bot = botNachId(p.botId);
+  return bot && Number.isFinite(bot.elo) ? bot.elo : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -839,6 +859,9 @@ async function suche(engine, fen, opts, signal) {
 // art: 'erzwungen' | 'matt' | 'engine' | 'patzer' | 'kurz' | 'normal'
 // So viel schlechter als der beste Zug darf ein Zug der Vorliebe hoechstens sein (0,3 Bauern)
 export const VORLIEBE_FENSTER_CP = 30;
+// w0plus-a-fix: so weit darf ein Zug der Vorliebe hoechstens vom gewaehlten Zug abweichen (0,1 Bauern, nach oben und
+// unten): Der Stil aendert die Staerke je Zug hoechstens um diesen Betrag
+export const VORLIEBE_NAEHE_CP = 10;
 
 export async function botZug(engine, fen, bot, {
   zugNummer, ohnePause = false, zufall = Math.random, signal = null, nodes = null, vorliebe = null,
@@ -958,8 +981,9 @@ export function vorliebeWert(vorliebe, z, kontext = {}) {
   return w;
 }
 
-// Unter den Zuegen im Fenster (hoechstens VORLIEBE_FENSTER_CP schlechter als der beste) den mit der hoechsten
-// Vorliebe waehlen, aber nur, wenn der gewaehlte Zug selbst im Fenster liegt. Sonst bleibt der gewaehlte Zug.
+// Unter den Zuegen im Fenster (hoechstens VORLIEBE_FENSTER_CP schlechter als der beste) und nahe am gewaehlten Zug
+// (hoechstens VORLIEBE_NAEHE_CP Abstand) den mit der hoechsten Vorliebe waehlen, aber nur, wenn der gewaehlte Zug
+// selbst im Fenster liegt. Sonst bleibt der gewaehlte Zug.
 function waehleMitVorliebe(zuege, analyse, gewaehlt, vorliebe, ctx) {
   const nachLan = new Map(zuege.map((z) => [z.lan, z]));
   const bewertet = new Map();
@@ -973,9 +997,10 @@ function waehleMitVorliebe(zuege, analyse, gewaehlt, vorliebe, ctx) {
   if (bewertet.get(gewaehlt.lan) < grenze) return gewaehlt;
   let sieger = gewaehlt;
   let siegerWert = 0;
-  let siegerPunkte = bewertet.get(gewaehlt.lan);
+  const eigene = bewertet.get(gewaehlt.lan);
+  let siegerPunkte = eigene;
   for (const [lan, p] of bewertet) {
-    if (p < grenze || ctx.verboten.has(lan)) continue;
+    if (p < grenze || ctx.verboten.has(lan) || Math.abs(p - eigene) > VORLIEBE_NAEHE_CP) continue;
     const z = nachLan.get(lan);
     const w = vorliebeWert(vorliebe, z, { fen: ctx.fen, farbe: ctx.farbe, vollzug: ctx.vollzug, punkte: p, bestePunkte: beste });
     if (w > siegerWert || (w === siegerWert && w > 0 && p > siegerPunkte)) {

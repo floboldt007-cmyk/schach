@@ -2,8 +2,8 @@
 // spaeter Tagesraetsel-Jahr, Bosse, Lektionen, Bot-Laeufe, Liga-Saisons). Sie liegen im Offline-Cache des Service
 // Workers (Liste DATEIEN in sw.js), nie im Speicher des Browsers. Rein bis auf fetch, in Node testbar (setzeHoler).
 //
-//   import { ladeInhalt, spielplanWoche, funkenWochenendeAktiv } from './inhalte.js';
-//   const r = await ladeInhalt('spielplan', { art: 'spielplan' });
+//   import { ladeSpielplan, spielplanWoche, funkenWochenendeAktiv } from './inhalte.js';
+//   const r = await ladeSpielplan();                 // = ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' })
 //   if (r.ok) spielplanWoche(r.daten, wochenSchluessel());
 //
 // Jede Datei hat einen Dateikopf:
@@ -33,6 +33,14 @@
 //   ladeSpielplan({ neu = false } = {}) -> wie ladeInhalt(SPIELPLAN_NAME, { art: 'spielplan' }); die beiden Leser
 //                                       (S1-6 Boss und Spielplan-Screen, S1-1 Funken-Wochenende) holen ihn nur hierueber.
 //                                       Fehlt die Datei (grund 'netz'): kein Wochen-Boss, kein Funken-Wochenende.
+//                                       Der Browser meldet den 404 dann in der Konsole (nicht abschaltbar). Pakete, die
+//                                       den Spielplan lesen, bevor S1-6 da ist (S1-1), liefern ihn in ihren Browser-Tests
+//                                       per page.route aus (z. B. daten/beispiel/spielplan.json), sonst werten die
+//                                       App-Tests den 404 als Konsolenfehler.
+//   COUNTDOWN_RE                        Muster fuer Uhrzeit-Countdowns (Spielplan, Boss, Werkstatt; Fairness 3 und 19):
+//                                       "noch 2 h", "45min", "noch 10 Minuten", "noch 3 Tage", "noch 2 T 04:13",
+//                                       "endet um 23:59", "bis 23:59". Erlaubt bleiben Anfaenge ("ab 16 Uhr",
+//                                       "Montag 4:00") und Dauern ohne "noch" ("5 Minuten Bedenkzeit", "3 Tage lang").
 //
 // Ablage: Inhalte eines Pakets unter daten/<paket>/ (z. B. daten/raetsel/jahr-2027.json, Name 'raetsel/jahr-2027');
 // sie kommen wie die Paket-Dateien erst mit dem Eintrag in PAKETE in DATEIEN (sw.js). Dateien direkt unter daten/
@@ -50,8 +58,8 @@
 //   text              optional, Steckbrief der Woche (hoechstens 140 Zeichen)
 //   Regeln (Fairness 19 "Events ohne Druck"): Themen-Wochen und Funken-Wochenenden beginnen mindestens
 //   VORLAUF_TAGE nach kopf.stand (mindestens 4 Wochen vorher sichtbar); keine Felder fuer ein Ende ("bis",
-//   "verfuegbarBis"), keine Uhrzeit-Countdowns in Texten; eine neue Plan-Datei aendert keine Woche, die schon
-//   angekuendigt war (pruefeSpielplanFolge).
+//   "verfuegbarBis"), keine Uhrzeit-Countdowns in Texten; eine neue Plan-Datei aendert und streicht keine Woche, die
+//   schon angekuendigt war und noch nicht vorbei ist (pruefeSpielplanFolge).
 //   Hilfen: spielplanWoche(plan, wochenSchluessel), naechsteWochen(plan, datum, n = 4),
 //   funkenWochenendeAktiv(plan, datum) -> boolean, funkenWochenendeVon(woche) -> { beginn: Date, ende: Date }
 //   pruefeSpielplan(json) -> [Fehlertext], pruefeSpielplanFolge(alt, neu) -> [Fehlertext]
@@ -65,8 +73,15 @@ export const THEMEN = Object.freeze(['gambit', 'endspiel', 'taktik', 'eroeffnung
 
 const NAME_RE = /^[a-z0-9-]+(\/[a-z0-9-]+)*$/;
 const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
-// Uhrzeit-Countdowns ("noch 2 h", "3 Std", "10 min") haben in Spielplan und Boss nichts zu suchen
-const COUNTDOWN_RE = /\d+\s*(h|Std|min)\b/i;
+// Uhrzeit-Countdowns haben in Spielplan, Boss und Werkstatt nichts zu suchen: Kurzformen ("noch 2 h", "3 Std", "45min"),
+// ausgeschriebene Restzeiten nach "noch" oder "endet (in)" ("noch 10 Minuten", "noch 3 Tage", "noch 2 T 04:13") und
+// Uhrzeiten als Ende ("endet um 23:59", "bis 23:59"). Anfaenge ("ab 16 Uhr", "Montag 4:00") und Dauern ohne "noch"
+// ("5 Minuten Bedenkzeit") bleiben erlaubt (w0plus-a-fix: vorher gingen "noch 10 Minuten" und "noch 2 T 04:13" durch)
+export const COUNTDOWN_RE = new RegExp([
+  '\\d+\\s*(h|Std|min)\\b',
+  '\\b(noch|endet(\\s+in)?)\\s+\\d+\\s*(T|Tage?n?|Std\\.?|Stunden?|Min\\.?|Minuten?)(?![a-zäöüß])',
+  '\\b(noch|endet(\\s+um)?|bis)\\s+(um\\s+)?(\\d+\\s*T\\s+)?\\d{1,2}:\\d{2}\\b',
+].join('|'), 'i');
 
 const standardHoler = (url) => fetch(url);
 let holer = standardHoler;
@@ -209,6 +224,8 @@ registriereInhaltsart('spielplan', { formate: [1], pruefe: pruefeSpielplan });
 
 // Eine neue Plan-Datei darf keine Woche aendern, die in der alten schon angekuendigt war: alles vor
 // neu.kopf.stand + VORLAUF_TAGE war sichtbar und bleibt, wie es war (nie kurzfristig verschoben).
+// w0plus-a-fix: Gestrichen werden darf eine solche Woche auch nicht, solange sie am Stand der neuen Datei nicht vorbei
+// ist (die laufende Woche und alle angekuendigten danach muessen in der neuen Datei stehen; vergangene duerfen fehlen).
 export function pruefeSpielplanFolge(alt, neu) {
   const f = [];
   const stand = neu && neu.kopf && neu.kopf.stand;
@@ -218,6 +235,7 @@ export function pruefeSpielplanFolge(alt, neu) {
     if (!a || !istSchluessel(a.montag) || tageZwischen(a.montag, grenze) <= 0) continue;
     const n = neu.wochen.find((x) => x && x.montag === a.montag);
     if (n && JSON.stringify(normWoche(a)) !== JSON.stringify(normWoche(n))) f.push(`Woche ${a.montag} war schon angekündigt und wurde geändert`);
+    else if (!n && tageZwischen(stand, addiereTage(a.montag, 7)) > 0) f.push(`Woche ${a.montag} war schon angekündigt und wurde gestrichen`);
   }
   return f;
 }

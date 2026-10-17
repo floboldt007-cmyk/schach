@@ -74,10 +74,13 @@ export function lesePakete(text) {
 
 // Paket-Screens und ihr Paket (BAUPLAN: 1C Kartei -> training, 2D Einstieg -> start; W0+a nach SPIELKONZEPT 6.3/6.4:
 // bestenliste S1-3 punkte, raetsel S1-5, lernen und lektion S1-10/S2-3, ich (eigenes Paket "ich"), spielplan S1-6 boss,
-// spielhalle S3-4). Baut ein anderes Paket den Screen, aendert die Integration die Zuordnung hier.
+// spielhalle S3-4; w0plus-a-fix: werkstatt, Werkstatt-Vorschau aus Schub 2b). Baut ein anderes Paket den Screen,
+// aendert die Integration die Zuordnung hier.
 export const SCREEN_PAKET = Object.freeze({
   training: 'kartei', start: 'einstieg',
   bestenliste: 'punkte', raetsel: 'raetsel', lernen: 'lernen', lektion: 'lernen', ich: 'ich', spielplan: 'boss', spielhalle: 'spielhalle',
+  // w0plus-a-fix: Werkstatt-Vorschau (Schub 2b)
+  werkstatt: 'werkstatt',
 });
 
 // Welche Paket-Dateien muessen in die Liste? dateien: vorhandene Dateien (relativ), pakete: Liste PAKETE.
@@ -249,8 +252,8 @@ function main() {
   pruefe('Alle Screen-Module im Cache', kernScreens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
-  pruefe('Paket-Screens (training, start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle) im Router, die eingebundener Pakete im Cache',
-    JSON.stringify(paketScreens) === '["training","start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle"]'
+  pruefe('Paket-Screens (training, start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt) im Router, die eingebundener Pakete im Cache',
+    JSON.stringify(paketScreens) === '["training","start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt"]'
     && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');

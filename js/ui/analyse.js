@@ -8,10 +8,11 @@
 // Runde 4: Anzeige-Orte analyse:oben (oben rechts nach dem Banner) und analyse:coach (Knopfzeile der
 // Coach-Karte, je Zug neu gefuellt); Ereignisse analyse:gesehen (Zug gewechselt, nicht beim
 // Variantenspiel) und partie:analysiert (nach dem Nachrechnen, quelle 'analyse').
-// W0+a: Boss-Partien mit boss.staerke rechnen die Spielstaerke gegen diese Zahl (wie partie.js).
+// W0+a: Boss-Partien mit boss.staerke rechnen die Spielstaerke gegen die Elo, mit der der Boss wirklich spielte
+// (w0plus-a-fix: bots.eloDerPartie, die Elo des Profils aus staerkeFuerElo, nicht die Anfrage; wie partie.js).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
-import { botNachId } from '../bots.js';
+import { botNachId, eloDerPartie } from '../bots.js';
 import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp, spielphasen, coachKern } from '../review.js';
 import { SYMBOLE, KLASSEN_NAME } from '../symbole.js';
 import { klang } from '../sounds.js';
@@ -273,8 +274,9 @@ export function zeige(root, params = {}, app) {
       if (beendet) return;
       const elo = {};
       if (st.bot) elo[st.bf] = st.bot.elo;
-      // W0+a: ein Boss mit offen angesagter Staerke spielte mit dieser Zahl (wie in partie.js)
-      if (p.boss && Number.isFinite(p.boss.staerke)) elo[st.bf] = p.boss.staerke;
+      // W0+a: ein Boss mit offen angesagter Staerke spielte mit dem Profil aus staerkeFuerElo (wie in partie.js)
+      const gespielt = eloDerPartie(p);
+      if (Number.isFinite(gespielt)) elo[st.bf] = gespielt;
       const review = await analysierePartie(engine, p.zuege || [], {
         tiefe: einst.tiefe || 14, multipv: 2, startFen: p.startFen || undefined, spielerFarbe: st.sf,
         elo, vorab: app.vorab, vorabMinTiefe: einst.tiefe || 14, beiFortschritt: melde, signal: ac.signal,

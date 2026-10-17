@@ -1870,10 +1870,11 @@ import { registriereBot, botNachId } from '../../bots.js';
 const q = new URLSearchParams(location.search);
 const log = window.__wp = { ereignisse: [], kontexte: {}, matt: [], effekte: [], leisteWeg: 0, mattWeg: 0 };
 const jetzt = () => performance.now();
-for (const n of ['partie:gestartet', 'partie:beendet', 'zug:abgelehnt', 'zug:gespielt', 'partie:verlassen']) {
+for (const n of ['partie:gestartet', 'partie:beendet', 'zug:abgelehnt', 'zug:gespielt', 'partie:verlassen', 'zug:bewertet']) {
   hoere(n, (d) => {
     const e = { name: n, t: jetzt() };
-    for (const k of ['laufId', 'von', 'nach', 'art', 'figur', 'fen', 'modus', 'wertet', 'seed', 'matt', 'partieId', 'ergebnis', 'startFen', 'fortgesetzt']) if (k in d) e[k] = d[k];
+    for (const k of ['laufId', 'von', 'nach', 'art', 'figur', 'fen', 'modus', 'wertet', 'seed', 'matt', 'partieId', 'ergebnis', 'startFen', 'fortgesetzt',
+      'ply', 'gewinnVorher', 'gewinnNachher', 'gewinnVorigerZug']) if (k in d) e[k] = d[k];
     if (d.boss !== undefined) e.boss = d.boss ? { ...d.boss } : null;
     if (d.buehne) {
       e.buehneBoss = d.buehne.boss ? { ...d.buehne.boss } : null;
@@ -1944,6 +1945,35 @@ if (q.has('wpabr')) {
     anbieten('ergebnis:abrechnung', zeile('SERIE', 'serie'), { reihenfolge: 40, paket: 'alltag' });
     anbieten('ergebnis:abrechnung', zeile('FUENFTE', 'fuenfte'), { reihenfolge: 50, paket: 'x' });
   }
+}
+// w0plus-a-fix: Spieler-Leiste an Flos Namen und Knoepfe in der Knopfreihe (Schub 2b), ein angemeldeter Gast
+if (q.has('wpspieler')) {
+  anbieten('partie:spieler-leiste', (k) => {
+    log.kontexte['partie:spieler-leiste'] = Object.keys(k).sort();
+    log.spielerLage = k.lage();
+    const el = document.createElement('span');
+    el.className = 'wp-flamme';
+    el.textContent = 'Flamme 3';
+    return { el, verlasse() { log.spielerWeg = (log.spielerWeg || 0) + 1; } };
+  }, { paket: 'wp' });
+}
+if (q.has('wpaktion')) {
+  const anzahl = q.has('wpaktion3') ? 3 : 1;
+  for (let i = 0; i < anzahl; i++) {
+    anbieten('partie:aktionen', (k) => {
+      log.kontexte['partie:aktionen'] = Object.keys(k).sort();
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'knopf wp-emote';
+      b.dataset.aktion = 'aufgeben';   // darf nie die Aktion des Hosts ausloesen (Pakete binden selbst)
+      b.innerHTML = '<span>Emote ' + (i + 1) + '</span>';
+      b.addEventListener('click', () => { log.emote = (log.emote || 0) + 1; });
+      return { el: b, verlasse() { log.aktionWeg = (log.aktionWeg || 0) + 1; } };
+    }, { reihenfolge: 10 + i, paket: 'wp' });
+  }
+}
+if (q.has('wpgast')) {
+  registriereBot({ id: 'test-gast', art: 'gast', name: 'Gast Gustav', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('benno').staerke } });
 }
 if (q.has('wpboss')) {
   registriereBot({
@@ -2094,10 +2124,12 @@ async function testeSpielFundament(browser) {
     const hoch = await seite.evaluate(() => {
       const el = document.querySelector('.partie .ort-gegner-leiste');
       const r = el.getBoundingClientRect();
-      return { inInfo: el.parentNode === document.querySelector('.partie .botleiste-hoch .info'), sichtbar: r.width > 0 && r.height > 0,
-        ueberBrett: r.bottom <= document.querySelector('.partie .brett').getBoundingClientRect().top + 1 };
+      // w0plus-a-fix: erstes eigenes Kind der Bot-Leiste (nicht mehr in .info, das auf dem Handy mit der Sprechblase verschwindet)
+      return { inLeiste: el.parentNode === document.querySelector('.partie .botleiste-hoch') && el === el.parentNode.firstElementChild,
+        sichtbar: r.width > 0 && r.height > 0, ueberBrett: r.bottom <= document.querySelector('.partie .brett').getBoundingClientRect().top + 1,
+        klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
     });
-    pruefe('partie:gegner-leiste: hoch wandert das Element in die Bot-Leiste über dem Brett', hoch.inInfo && hoch.sichtbar && hoch.ueberBrett, JSON.stringify(hoch));
+    pruefe('partie:gegner-leiste: hoch wandert das Element in die Bot-Leiste über dem Brett', hoch.inLeiste && hoch.sichtbar && hoch.ueberBrett && hoch.klasse, JSON.stringify(hoch));
     await seite.setViewportSize({ width: 1180, height: 820 });
     await seite.waitForFunction(() => document.querySelector('.partie .ort-gegner-leiste').dataset.lage === 'quer');
     const platz = await seite.evaluate(() => {
@@ -2357,8 +2389,10 @@ async function testeSpielFundament(browser) {
         wieLisa: JSON.stringify(zb.staerke) === JSON.stringify(lisa.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
     });
     await seite.evaluate(() => { window.__test = {}; });
-    pruefe('Boss: offen angesagte Stärke im Kopf ("Standard ≈ 1080"), gespielt mit dem nächstliegenden Leiter-Profil, gespeichert',
-      st.h2 === 'Testboss · Standard ≈ 1080' && st.meta.startsWith('Wochen-Boss · ≈ 1080') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
+    // w0plus-a-fix (Befund des Pruefers): Kopf und Bot-Zeile nennen die Elo des Profils, mit dem der Boss wirklich spielt
+    // (vor der Eichung Lisa, 1000), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
+    pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1000"), Anfrage gespeichert',
+      st.h2 === 'Testboss · Standard ≈ 1000' && st.meta.startsWith('Wochen-Boss · ≈ 1000') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

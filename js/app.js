@@ -31,6 +31,8 @@
 //     (hidden, html[data-reiter] fehlt). Die Optik kommt mit dem Premium-Umbau.
 //   - beim Start: storage.dauerhaftAnfragen() (navigator.storage.persist, Fehler still) und, kurz nach dem ersten
 //     Screen, storage.duenneAnalysenAus() (MAX_REVIEWS 12; aeltere Speicherstaende hatten bis zu 20)
+//   - w0plus-a-fix: Screen werkstatt (Werkstatt-Vorschau aus Schub 2b, Paket werkstatt), gehoert zum Reiter Ich.
+//     dauerhaftAnfragen fragt nur dort an, wo kein Dialog droht (Firefox ausserhalb der installierten App nicht).
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -52,15 +54,16 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
-  spielhalle: 'Spielhalle',
+  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt',
 };
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena
-const PAKET_SCREENS = new Set(['training', 'start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']);
+const PAKET_SCREENS = new Set(['training', 'start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
+  'werkstatt']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 
 // ---------- Einstellungen ----------
@@ -316,7 +319,8 @@ function schliesseDialog() {
 // Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt.
 const REITER_ALLE = [['arena', 'Arena', 'play'], ['training', 'Training', 'ziel'], ['bestenliste', 'Bestenliste', 'pokal'], ['ich', 'Ich', 'stern']];
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt)
-const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich' };
+const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich',
+  werkstatt: 'ich' };
 let reiterLeiste = null;
 export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
   const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));

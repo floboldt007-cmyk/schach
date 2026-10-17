@@ -7,7 +7,7 @@ import {
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
-  duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN,
+  duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog,
 } from '../js/storage.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
@@ -452,9 +452,26 @@ setzeSpeicher(s);
   pruefe('MODUL_BUDGET wie im Bauplan (Welle 0: 324.000, unveraendert)', Object.isFrozen(MODUL_BUDGET) && MODUL_BUDGET.kartei === 160000 && MODUL_BUDGET.feier === 6000
     && MODUL_BUDGET.serie === 4000 && ['kartei', 'profil', 'alltag', 'uebung', 'bots', 'taktik', 'start', 'feier', 'serie'].reduce((a, k) => a + MODUL_BUDGET[k], 0) === 324000);
   const NEU = { funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000 };
-  pruefe('MODUL_BUDGET W0+a (SPIELKONZEPT 6.6): neue Module, zusammen 182.000, alles 506.000',
-    Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 17
-    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 506000);
+  pruefe('MODUL_BUDGET W0+a (SPIELKONZEPT 6.6): neue Module, zusammen 182.000',
+    Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(NEU).reduce((a, k) => a + MODUL_BUDGET[k], 0) === 182000);
+  // w0plus-a-fix: S1-7 (Matt-Atlas) und Schub 2b bekommen eigene Module (vorher hatte finisher keins: "unbekanntes Modul")
+  const FIX = { finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000 };
+  pruefe('MODUL_BUDGET w0plus-a-fix: finisher, ausdruck, siegeslauf, werkstatt (zusammen 30.000), alles 21 Module, 536.000',
+    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21
+    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000, MODUL_BUDGET);
+  const neuePakete = Object.keys(FIX).map((name) => {
+    const m = speichereModul(name, { probe: name });
+    const e = speichereModulEinstellungen(name, { stil: 'voll' });
+    return [name, m.ok && e.ok && ladeModul(name, {}).probe === name && ladeModulEinstellungen(name, {}).stil === 'voll'];
+  }).filter(([, gut]) => !gut);
+  pruefe('w0plus-a-fix: finisher und die Pakete aus Schub 2b speichern Modul und Einstellungen (S1-7: Matt-Atlas und "Finisher: voll · kurz · aus")',
+    neuePakete.length === 0, neuePakete);
+  const atlas = {};
+  for (const r of '12345678') for (const sp of 'abcdefgh') atlas[sp + r] = { figur: 'wQ', metall: 'weissgold', partieId: 'p' + 'x'.repeat(10) };
+  const ids = Array.from({ length: 300 }, (_, i) => 'p' + String(i).padStart(10, '0'));
+  pruefe('w0plus-a-fix: Matt-Atlas mit allen 64 Feldern (Figur, Metall, Partie) und 300 verarbeiteten IDs passt ins finisher-Budget',
+    speichereModul('finisher', { atlas, mattbilder: ['grundreihe', 'erstickt', 'anastasia'], ids }).ok === true);
+  for (const name of Object.keys(FIX)) s.removeItem('schach-arena:v1:modul:' + name);
   const std = { karten: [], stand: { n: 0 } };
   const leer = ladeModul('kartei', std);
   leer.stand.n = 5;
@@ -816,6 +833,25 @@ function gleich(a, b) {
   const l5 = starteNachholen(app2);
   l5.stop();
   pruefe('Nachholen: stop() vor dem ersten Schritt', (await l5.fertig) === 0);
+  // w0plus-a-fix (Befund des Pruefers): Boss-Partien (und frei, Spielhalle) wurden nie nachgeholt; Funken und Boss-Tafel
+  // haengen an partie:analysiert. Uebungen bleiben aussen vor.
+  s = fakeSpeicher();
+  setzeSpeicher(s);
+  ereignisse.length = 0;
+  const bossP = speicherePartie(sieg({ botId: 'baron-pruef', botStufe: null, modus: 'boss', boss: { id: 'baron-pruef', stufe: 'standard', staerke: 1080 } })).partie.id;
+  const freiP = speicherePartie(sieg({ modus: 'frei' })).partie.id;
+  const spielP = speicherePartie(sieg({ modus: 'spiel' })).partie.id;
+  const uebungP = speicherePartie(sieg({ modus: 'uebung', startFen: '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1', zuege: ['a1a8'] })).partie.id;
+  const offen2 = offenePartien({ max: 5 }).map((p) => p.id);
+  pruefe('Nachholen: auch Boss-, freie und Spielhallen-Partien sind offen, Uebungen nie', JSON.stringify(offen2) === JSON.stringify([spielP, freiP, bossP])
+    && !offen2.includes(uebungP), { offen2, bossP, freiP, spielP, uebungP });
+  const fake3 = new Fake();
+  const n3 = await starteNachholen({ engine: async () => fake3, einstellungen: () => ({ tiefe: 12 }), vorab: new Map() }, { max: 5 }).fertig;
+  const bossEreignis = ereignisse.find((e) => e.partieId === bossP);
+  pruefe('Nachholen: Boss-Partie bekommt partie:analysiert (modus boss, wertet false, keine Sterne), Review gespeichert',
+    n3 === 3 && !!bossEreignis && bossEreignis.modus === 'boss' && bossEreignis.wertet === false && JSON.stringify(bossEreignis.neueSterne) === '[false,false,false]'
+    && hatReview(bossP) && ladePartie(bossP).analysiert === true && JSON.stringify(ladePartie(bossP).sterne) === '[false,false,false]'
+    && offenePartien({ max: 5 }).length === 0, { n3, bossEreignis: bossEreignis && [bossEreignis.modus, bossEreignis.wertet] });
   abmelden();
 }
 
@@ -855,6 +891,18 @@ function gleich(a, b) {
     && JSON.stringify(e.partie.sterne) === '[false,false,false]' && e.neuFreigeschaltet === null) && gesamtSterne() === 0
     && statistik().partien === vorher && !istFreigeschaltet(2), erg.map((e) => e.wertet));
   pruefe('wertet: boss, frei, spiel nie, auch aus der Grundstellung', ['boss', 'frei', 'spiel'].every((m) => !wertet({ modus: m })));
+  // w0plus-a-fix (Befund des Pruefers): ein angemeldeter Gast im Modus normal wertete wie ein Leiter-Bot (3 Sterne,
+  // Statistik, "Nächster Gegner" Benno). Angemeldete Bots gehoeren nie zur Leiter.
+  const abGast = registriereBot({ id: 'pruefer-gast', art: 'gast', name: 'Gast Gustav', avatar: 'assets/avatare/01-bauer-benno.svg',
+    staerke: { ...botNachId('benno').staerke } });
+  const vorGast = statistik().partien;
+  const gastErg = speicherePartie(partie({ botId: 'pruefer-gast', botStufe: null, modus: 'normal' }));
+  pruefe('wertet: Partie gegen einen angemeldeten Gast (Modus normal, Grundstellung) wertet nie: keine Sterne, nicht in der Statistik',
+    gastErg.wertet === false && JSON.stringify(gastErg.partie.sterne) === '[false,false,false]' && statistik().partien === vorGast
+    && !wertet({ modus: 'normal', botId: 'pruefer-gast' }) && wertet({ modus: 'normal', botId: 'rudi' }) && wertet({ modus: 'normal' }),
+    { wertet: gastErg.wertet, sterne: gastErg.partie.sterne });
+  abGast();
+  pruefe('wertet: auch nach dem Abmelden (Paket nicht geladen) wertet die Gast-Partie nicht', !wertet(ladePartie(gastErg.partie.id)));
 
   // laufende Partie: Felder und angemeldete Bots
   const ab = registriereBot({ id: 'bergwirt', art: 'boss', archiv: true, name: 'Der Bergwirt', avatar: 'assets/avatare/06-professor-turm.svg',
@@ -909,6 +957,25 @@ function gleich(a, b) {
   pruefe('dauerhaftAnfragen: Fehler still (null)', still && a3 === null && dauerhaftStatus() === null);
   setzeNavi(undefined);
   pruefe('dauerhaftAnfragen: ohne navigator.storage -> null', (await dauerhaftAnfragen()) === null);
+  // w0plus-a-fix: Firefox (Gecko) fragt per Dialog; dort nur in der installierten App anfragen, sonst nur den Stand lesen
+  const FIREFOX = 'Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0';
+  const FX_ANDROID = 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0';
+  const FX_IOS = 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/131.0 Mobile/15E148 Safari/605.1.15';
+  const SAFARI = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
+  const CHROME = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+  pruefe('persistOhneDialog: Safari, Chrome, Firefox auf iOS ja; Firefox (Gecko) nur als installierte App',
+    persistOhneDialog({ userAgent: SAFARI }) && persistOhneDialog({ userAgent: CHROME }) && persistOhneDialog({ userAgent: FX_IOS })
+    && !persistOhneDialog({ userAgent: FIREFOX }) && !persistOhneDialog({ userAgent: FX_ANDROID })
+    && persistOhneDialog({ userAgent: FIREFOX, standalone: true }) && persistOhneDialog({}));
+  let fxAufrufe = 0;
+  Object.defineProperty(globalThis, 'navigator', { value: { userAgent: FIREFOX, storage: { persisted: async () => false, persist: async () => { fxAufrufe++; return true; } } },
+    configurable: true, writable: true });
+  const fx = await dauerhaftAnfragen();
+  Object.defineProperty(globalThis, 'navigator', { value: { userAgent: FIREFOX, standalone: true, storage: { persisted: async () => false, persist: async () => { fxAufrufe++; return true; } } },
+    configurable: true, writable: true });
+  const fxApp = await dauerhaftAnfragen();
+  pruefe('dauerhaftAnfragen in Firefox: kein persist() im Browser-Tab (Stand false), in der installierten App schon', fx === false && fxApp === true && fxAufrufe === 1,
+    { fx, fxApp, fxAufrufe });
   if (original) Object.defineProperty(globalThis, 'navigator', original);
   else delete globalThis.navigator;
 }

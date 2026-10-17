@@ -43,11 +43,18 @@
 //     zeiten   [Zehntelsekunden je Halbzug] (verbrauchte Bedenkzeit, W0+b), hoechstens so viele wie Zuege
 //     boss     { id, stufe: 'standard' | 'meister', woche?: 'JJJJ-MM-TT', staerke?: Zahl } nur im Modus 'boss'
 //     liga     { saison, runde } (Vereinsmeisterschaft, S3-2)
-//   MODUL_BUDGET neu (6.6): funken, punkte, boss, raetsel, lernen, liga, sammeln, freunde.
+//   MODUL_BUDGET neu (6.6): funken, punkte, boss, raetsel, lernen, liga, sammeln, freunde; dazu (w0plus-a-fix) finisher
+//     (S1-7, Matt-Atlas) und die Pakete aus Schub 2b: ausdruck (Emote-Rad, Schnell-Chat, Banner), siegeslauf, werkstatt.
+//     Jedes Paket hat sein eigenes Modul: Zwei Pakete in einem Modul wuerden sich gegenseitig ueberschreiben.
+//   wertet(p) zusaetzlich (w0plus-a-fix): Partien gegen angemeldete Bots (registriereBot: Bosse, Sparring, Gaeste,
+//     stufe null) werten nie, auch im Modus 'normal' aus der Grundstellung. Ohne botId zaehlen nur Modus und Stellung.
 //   MAX_REVIEWS 12 (vorher 20); duenneAnalysenAus() entfernt still, was darueber liegt (app.js beim Start).
 //   dauerhaftAnfragen() -> Promise<true | false | null>: navigator.storage.persist() (app.js beim Start;
 //     Safari loescht sonst Speicher von Web-Apps nach Tagen ohne Nutzung), dauerhaftStatus() -> letzter Stand.
-//     Fehler bleiben still (null: unbekannt).
+//     Fehler bleiben still (null: unbekannt). Angefragt wird nur, wo kein Dialog droht (persistOhneDialog): in der
+//     Home-Bildschirm-App und in WebKit/Chromium. Firefox (Gecko) fragt den Nutzer per Dialog, dort wird nur der
+//     Stand gelesen (persisted()).
+//   persistOhneDialog({ userAgent, standalone }) -> boolean
 //   Einstellungen zusaetzlich (Anzeigen in der Partie, SPIELKONZEPT 3.18): zaehlwerk (aus), funkenlinie (aus),
 //     lebensleiste (an: Lebensleiste statt Balken bei Bossen).
 import { BOTS, botNachId } from './bots.js';
@@ -87,6 +94,8 @@ export const MODUL_BUDGET = Object.freeze({
   taktik: 8000, start: 6000, feier: 6000, serie: 4000,
   // W0+a (SPIELKONZEPT 6.6): zusammen 182.000
   funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000,
+  // w0plus-a-fix: Matt-Finisher (S1-7: Matt-Atlas, Mattbilder) und Schub 2b, zusammen 30.000
+  finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;
@@ -101,8 +110,13 @@ function eigeneStellung(fen) {
   if (!fen) return false;
   return String(fen).trim().split(/\s+/).slice(0, 4).join(' ') !== GRUNDSTELLUNG;
 }
+// Angemeldete Bots (Bosse, Sparring, Gaeste) gehoeren nie zur Leiter: ihre Partien werten nie (keine Sterne, keine
+// Freischaltung, keine Statistik, kein "Naechster Gegner"). Ob eine spaetere Art (z. B. geeichte Gaeste aus S3-1) fuer
+// die Arena-Wertung zaehlt, entscheidet ein eigenes Feld, nie wertet().
+const LEITER_IDS = new Set(BOTS.map((b) => b.id));
 export function wertet(p) {
-  return !!p && (p.modus || 'normal') === 'normal' && !eigeneStellung(p.startFen);
+  return !!p && (p.modus || 'normal') === 'normal' && !eigeneStellung(p.startFen)
+    && (p.botId == null || LEITER_IDS.has(p.botId));
 }
 
 export const STANDARD_EINSTELLUNGEN = Object.freeze({
@@ -658,13 +672,36 @@ export function duenneAnalysenAus(max = MAX_REVIEWS) {
   return weg.length;
 }
 
-// W0+a: dauerhaften Speicher anfragen (navigator.storage.persist), Fehler still
+// W0+a: dauerhaften Speicher anfragen (navigator.storage.persist), Fehler still.
+// w0plus-a-fix: Firefox (Gecko) zeigt dafuer einen Berechtigungs-Dialog; dort nur in der installierten App anfragen.
+// Safari und Chrome entscheiden still. Firefox auf iOS (FxiOS) ist WebKit und meldet kein "Firefox/".
+export function persistOhneDialog({ userAgent = '', standalone = false } = {}) {
+  if (standalone) return true;
+  const ua = String(userAgent || '');
+  const gecko = /\bFirefox\//.test(ua) && !/like Gecko/.test(ua);
+  return !gecko;
+}
+function istStandalone() {
+  try {
+    const nav = globalThis.navigator;
+    if (nav && nav.standalone === true) return true;
+    const mq = typeof globalThis.matchMedia === 'function' ? globalThis.matchMedia('(display-mode: standalone)') : null;
+    return !!(mq && mq.matches);
+  } catch (e) {
+    return false;
+  }
+}
 let dauerhaft = null;
 export async function dauerhaftAnfragen() {
   try {
     const st = globalThis.navigator && globalThis.navigator.storage;
     if (!st || typeof st.persist !== 'function') { dauerhaft = null; return dauerhaft; }
     if (typeof st.persisted === 'function' && (await st.persisted()) === true) { dauerhaft = true; return dauerhaft; }
+    if (!persistOhneDialog({ userAgent: globalThis.navigator.userAgent, standalone: istStandalone() })) {
+      // kein Dialog: nur den Stand merken (false, sonst unbekannt)
+      dauerhaft = typeof st.persisted === 'function' ? false : null;
+      return dauerhaft;
+    }
     dauerhaft = (await st.persist()) === true;
   } catch (e) {
     dauerhaft = null;

@@ -9,7 +9,7 @@ import { Chess } from '../vendor/chess/chess.js';
 import { GRENZEN, klassifiziere, START_FEN } from '../js/review.js';
 import { BUDGET, BRETT_FEIER } from '../js/feier.js';
 import { wertet, sterneFuerPartie, MODI } from '../js/storage.js';
-import { pruefeInhalt, pruefeSpielplan, texteVon } from '../js/inhalte.js';
+import { pruefeInhalt, pruefeSpielplan, texteVon, COUNTDOWN_RE } from '../js/inhalte.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -288,8 +288,9 @@ function jsonDateien(ordner) {
     && pruefeSpielplan({ kopf, wochen: [woche] }).length === 0);
   pruefe('Regel 19: Uhrzeit-Countdown und Ablauf-Feld werden abgelehnt', pruefeSpielplan({ kopf, wochen: [{ ...woche, text: 'Nur noch 3 h' }] }).length > 0
     && pruefeSpielplan({ kopf, wochen: [{ ...woche, verfuegbarBis: '2026-11-20' }] }).length > 0);
-  // kein Uhrzeit-Countdown in den Texten von Spielplan, Boss und Werkstatt (Code)
-  const COUNTDOWN = /\d+\s*(h|Std|min)\b/i;
+  // kein Uhrzeit-Countdown in den Texten von Spielplan, Boss und Werkstatt (Code); dasselbe Muster wie inhalte.js
+  // (w0plus-a-fix: vorher nur Kurzformen, "noch 10 Minuten" und "noch 2 T 04:13" gingen durch)
+  const COUNTDOWN = COUNTDOWN_RE;
   const orte = jsDateien('js').filter((d) => /spielplan|boss|werkstatt/i.test(d));
   const cd = [];
   for (const d of orte) for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) if (COUNTDOWN.test(t)) cd.push(`${d}: "${t.slice(0, 60)}"`);
@@ -301,6 +302,11 @@ function jsonDateien(ordner) {
     for (const t of texteVon(json)) if (COUNTDOWN.test(t)) cd.push(`${d}: "${t.slice(0, 60)}"`);
   }
   pruefe(`Kein Uhrzeit-Countdown in Spielplan, Boss, Werkstatt (${orte.length} Code-Dateien, ${inhalte.length} Inhalte)`, cd.length === 0 && COUNTDOWN.test('noch 2 h') && COUNTDOWN.test('3 Std') && !COUNTDOWN.test('Level 12'), cd);
+  // Selbstprobe des Musters (w0plus-a-fix): auch ausgeschriebene Restzeiten, Anfaenge bleiben erlaubt
+  const fang = ['noch 10 Minuten', 'noch 2 Stunden', 'noch 2 T 04:13', 'endet um 23:59', 'noch 3 Tage', 'bis 23:59', 'Nur noch 45min', '2h'];
+  const frei = ['ab 16 Uhr', 'Montag 4:00', '5 Minuten Bedenkzeit', 'KW 2 · 2027', 'Woche 2 hat einen Boss'];
+  pruefe('Countdown-Muster: faengt ausgeschriebene Restzeiten und Enduhrzeiten, laesst Anfaenge durch',
+    fang.every((t) => COUNTDOWN.test(t)) && !frei.some((t) => COUNTDOWN.test(t)), { durch: fang.filter((t) => !COUNTDOWN.test(t)), falsch: frei.filter((t) => COUNTDOWN.test(t)) });
 }
 {
   // Boss: Boss-Partien werten nie, jeder Boss bleibt im Archiv spielbar
@@ -312,6 +318,12 @@ function jsonDateien(ordner) {
   try { registriereBot(profil); } catch (e) { ohneArchiv = /archiv/.test(e.message); }
   const ab = registriereBot({ ...profil, archiv: true });
   pruefe('Jedes Boss-Objekt hat archiv: true (ohne wird es abgelehnt)', ohneArchiv && botNachId('fairness-boss').archiv === true);
+  // w0plus-a-fix: angemeldete Bots gehoeren nie zur Leiter, auch nicht im Modus normal aus der Grundstellung
+  const gast = registriereBot({ id: 'fairness-gast', art: 'gast', name: 'Gast', avatar: 'x.svg', staerke: { ...botNachId('benno').staerke } });
+  pruefe('Partien gegen angemeldete Bots (Boss, Sparring, Gast) werten nie und bringen nie Sterne, auch im Modus normal',
+    !wertet({ ...sieg, botId: 'fairness-gast' }) && !wertet({ ...sieg, botId: 'fairness-boss', modus: 'normal' })
+    && JSON.stringify(sterneFuerPartie({ ...sieg, botId: 'fairness-gast' })) === '[false,false,false]' && wertet({ ...sieg, botId: 'rudi' }));
+  gast();
   ab();
 }
 {
@@ -320,6 +332,10 @@ function jsonDateien(ordner) {
   const partie = zerlege(readFileSync(path.join(WURZEL, 'js/ui/partie.js'), 'utf8')).code;
   pruefe('Finisher: partie.js wartet am Ort partie:matt hoechstens BRETT_FEIER.dauerMs', /warte\(BRETT_FEIER\.dauerMs,/.test(partie)
     && !/partie:matt[\s\S]{0,400}warte\((?!BRETT_FEIER)\d/.test(partie));
+  // w0plus-a-fix: vor dem Finisher wartet die Partie hoechstens MATT_HOOK_WARTEN_MS (300 ms) auf partie:beendet
+  const m = partie.match(/MATT_HOOK_WARTEN_MS\s*=\s*(\d+)/);
+  pruefe('Finisher: vor dem Start hoechstens 300 ms Warten auf partie:beendet (vorher bis 3 s)', !!m && Number(m[1]) <= 300
+    && /Promise\.race\(\[beendetDa, warte\(MATT_HOOK_WARTEN_MS\)\]\)/.test(partie), m && m[1]);
 }
 {
   // Schnell-Chat (Phase 2, SPIELKONZEPT 5.3 und Regel 21): keine Saetze "Wow", "Hoppla", "Knapp", "Glück gehabt",
