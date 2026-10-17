@@ -44,6 +44,8 @@ in Flos privatem Repo.
 | 17.10. | Klangstufe „Alle“ für den Test | Standard `alle` (Brett, große Momente, Zeitwarnung und Bedien-Klicks), wählbar bleiben „Nur wichtige“ und „Aus“ |
 | 17.10. | Reiter-Leiste: iPad quer oben, sonst unten | im Querformat auf dem iPad in der Kopfzeile, sonst unten schwebend |
 | 17.10. | Emotes, Schnell-Chat, Banner, Win-Streak und Shop-Vorschau vorziehen | Zusätzlicher Schub 2b in S1 (nach Schub 2, vor der Integration), siehe `SPIELKONZEPT.md` 6.3. Beim ersten iPad-Test ist damit fast alles da, was Flo genannt hat; ausgenommen sind nur Online-Partien gegen Menschen und der App Store. Der Test kommt dadurch einige Tage später. |
+| 17.10. | Klangpakete angehört: „Arcade ist besser“ | Standard-Klangpaket der Ansicht „Modern“ ist Arcade, Holz bleibt in den Einstellungen wählbar |
+| 17.10. | Online: „Freunde früher“ | Direkt nach dem 5-Tage-Test kommt ein erster Online-Teil: Konto (E-Mail-Code, später Google), Benutzername mit Namensfilter, Freunde hinzufügen (Benutzername oder Einladungslink), Partien gegen Freunde mit Schnell-Chat und Emotes, Melden und Stummschalten. Noch ohne Fremde und ohne offene Wertung. Die Wellen S2 bis S4 kommen dafür etwas später. Die offene Arena mit Spielersuche bleibt in Phase 2b. |
 
 ## 2. Die Richtung in einem Satz
 
