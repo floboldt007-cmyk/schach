@@ -1,0 +1,2562 @@
+{
+ "stand": "2026-10-17T11:55:16.556Z",
+ "skala": "Lichess-Rapid-Wertung (Glicko-2), Januar 2024. Nicht FIDE, nicht chess.com, nicht Vereins-Elo.",
+ "quellen": {
+  "appPipeline": "Stockfish 19 lite WASM der App, Tiefe 14, MultiPV 2, App-Regeln (review.js), 330 Partien (30 je Band)",
+  "referenz": "Stockfish 18 nativ avx2, Tiefe 14, MultiPV 2, App-Regeln, dieselben 330 Partien",
+  "lichess": "Lichess-Serverbewertung (%eval) durch dieselbe App-Funktion, 2833 Partien, ohne \"besten Zug\"",
+  "bots": "botZug() unveraendert (App-Stockfish), Zuege in 3035 echten Menschen-Stellungen, Bewertung mit der Referenz"
+ },
+ "hinweis": "Intervalle: 95 % Bootstrap ueber ganze Partien (1000 Wiederholungen). Band 400 duenn (53/118 Seiten). Labels 250 und 500 sind auf dieser Skala nicht eichbar.",
+ "menschen": {
+  "400": {
+   "eloMittel": 543,
+   "seiten": {
+    "appPipeline": 53,
+    "lichess": 118,
+    "referenz": 53
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 62.6,
+    "ki95": [
+     55.3,
+     69
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 65.5,
+    "ki95": [
+     58.6,
+     72
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 63.5,
+    "ki95": [
+     59.5,
+     67.2
+    ]
+   },
+   "acplLichess": {
+    "wert": 117,
+    "ki95": [
+     98,
+     142
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 6.32,
+    "ki95": [
+     5.34,
+     7.51
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 8.5,
+     "ki95": [
+      7,
+      10.3
+     ]
+    },
+    "fehler": {
+     "wert": 5.7,
+     "ki95": [
+      4.6,
+      6.8
+     ]
+    },
+    "ungenau": {
+     "wert": 9.5,
+     "ki95": [
+      8.2,
+      11
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 63.9,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     63.9,
+     10.8,
+     9.9,
+     5.7,
+     4.9,
+     4.8
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 11.4,
+    "Mittelspiel": 8.6,
+    "Endspiel": 3.8
+   },
+   "anteilGroberPatzerUeber40Lichess": 49,
+   "ungenauJePatzerLichess": 1.12
+  },
+  "600": {
+   "eloMittel": 718,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 478,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 64.5,
+    "ki95": [
+     58.9,
+     70.1
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 67.3,
+    "ki95": [
+     62.1,
+     72.5
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 65.7,
+    "ki95": [
+     63.7,
+     67.8
+    ]
+   },
+   "acplLichess": {
+    "wert": 106,
+    "ki95": [
+     98,
+     113
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 5.94,
+    "ki95": [
+     5.48,
+     6.42
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 7.6,
+     "ki95": [
+      6.8,
+      8.3
+     ]
+    },
+    "fehler": {
+     "wert": 6.8,
+     "ki95": [
+      6.2,
+      7.4
+     ]
+    },
+    "ungenau": {
+     "wert": 10.1,
+     "ki95": [
+      9.4,
+      10.9
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 60.8,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     60.8,
+     13.2,
+     10.4,
+     6.9,
+     5.3,
+     3.5
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 9,
+    "Mittelspiel": 8.5,
+    "Endspiel": 4.4
+   },
+   "anteilGroberPatzerUeber40Lichess": 40.1,
+   "ungenauJePatzerLichess": 1.34
+  },
+  "800": {
+   "eloMittel": 913,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 66.1,
+    "ki95": [
+     61.3,
+     71
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 69.4,
+    "ki95": [
+     65,
+     73.9
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 67.7,
+    "ki95": [
+     66,
+     69.3
+    ]
+   },
+   "acplLichess": {
+    "wert": 93,
+    "ki95": [
+     88,
+     98
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 5.48,
+    "ki95": [
+     5.13,
+     5.85
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 6.9,
+     "ki95": [
+      6.3,
+      7.5
+     ]
+    },
+    "fehler": {
+     "wert": 7.2,
+     "ki95": [
+      6.6,
+      7.7
+     ]
+    },
+    "ungenau": {
+     "wert": 9.8,
+     "ki95": [
+      9.1,
+      10.3
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 61.1,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     61.1,
+     13.6,
+     10,
+     7.3,
+     5.2,
+     2.7
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 7.6,
+    "Mittelspiel": 8.3,
+    "Endspiel": 4.1
+   },
+   "anteilGroberPatzerUeber40Lichess": 35.1,
+   "ungenauJePatzerLichess": 1.41
+  },
+  "1000": {
+   "eloMittel": 1107,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 71.1,
+    "ki95": [
+     66.2,
+     75.4
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 75.2,
+    "ki95": [
+     71.1,
+     78.8
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 70.3,
+    "ki95": [
+     68.8,
+     71.7
+    ]
+   },
+   "acplLichess": {
+    "wert": 82,
+    "ki95": [
+     78,
+     87
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 4.98,
+    "ki95": [
+     4.71,
+     5.28
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 5.8,
+     "ki95": [
+      5.3,
+      6.4
+     ]
+    },
+    "fehler": {
+     "wert": 7.2,
+     "ki95": [
+      6.6,
+      7.7
+     ]
+    },
+    "ungenau": {
+     "wert": 10.1,
+     "ki95": [
+      9.5,
+      10.8
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 61.8,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     61.8,
+     13.9,
+     10.4,
+     7.3,
+     4.4,
+     2.2
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 5.3,
+    "Mittelspiel": 7.5,
+    "Endspiel": 4.4
+   },
+   "anteilGroberPatzerUeber40Lichess": 34.5,
+   "ungenauJePatzerLichess": 1.74
+  },
+  "1200": {
+   "eloMittel": 1303,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 74.3,
+    "ki95": [
+     71,
+     77.4
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 76.9,
+    "ki95": [
+     74,
+     79.5
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 74,
+    "ki95": [
+     72.7,
+     75.4
+    ]
+   },
+   "acplLichess": {
+    "wert": 73,
+    "ki95": [
+     69,
+     77
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 4.46,
+    "ki95": [
+     4.17,
+     4.73
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 5.2,
+     "ki95": [
+      4.7,
+      5.7
+     ]
+    },
+    "fehler": {
+     "wert": 6.6,
+     "ki95": [
+      6,
+      7.1
+     ]
+    },
+    "ungenau": {
+     "wert": 9.8,
+     "ki95": [
+      9.2,
+      10.4
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 63.3,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     63.3,
+     14.2,
+     10,
+     6.6,
+     4.2,
+     1.7
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 4.2,
+    "Mittelspiel": 7.3,
+    "Endspiel": 4
+   },
+   "anteilGroberPatzerUeber40Lichess": 28.7,
+   "ungenauJePatzerLichess": 1.9
+  },
+  "1400": {
+   "eloMittel": 1501,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 75.5,
+    "ki95": [
+     70.8,
+     79.8
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 78.4,
+    "ki95": [
+     74.3,
+     82.3
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 75.5,
+    "ki95": [
+     74.3,
+     76.7
+    ]
+   },
+   "acplLichess": {
+    "wert": 66,
+    "ki95": [
+     63,
+     69
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 4.18,
+    "ki95": [
+     3.95,
+     4.41
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 4.5,
+     "ki95": [
+      4.1,
+      4.9
+     ]
+    },
+    "fehler": {
+     "wert": 6.2,
+     "ki95": [
+      5.7,
+      6.6
+     ]
+    },
+    "ungenau": {
+     "wert": 10.3,
+     "ki95": [
+      9.7,
+      10.9
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 63.8,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     63.8,
+     14.3,
+     10.5,
+     6.2,
+     3.6,
+     1.5
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 3.1,
+    "Mittelspiel": 5.8,
+    "Endspiel": 4.6
+   },
+   "anteilGroberPatzerUeber40Lichess": 28.9,
+   "ungenauJePatzerLichess": 2.29
+  },
+  "1600": {
+   "eloMittel": 1698,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 79.8,
+    "ki95": [
+     77.4,
+     82.2
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 81.5,
+    "ki95": [
+     79.3,
+     83.6
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 78.1,
+    "ki95": [
+     77,
+     79.2
+    ]
+   },
+   "acplLichess": {
+    "wert": 58,
+    "ki95": [
+     55,
+     61
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 3.78,
+    "ki95": [
+     3.58,
+     3.98
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 3.7,
+     "ki95": [
+      3.3,
+      4
+     ]
+    },
+    "fehler": {
+     "wert": 6.1,
+     "ki95": [
+      5.6,
+      6.6
+     ]
+    },
+    "ungenau": {
+     "wert": 10.6,
+     "ki95": [
+      10,
+      11.2
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 63.7,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     63.7,
+     15.2,
+     10.8,
+     6.2,
+     3.1,
+     1
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 2,
+    "Mittelspiel": 5.2,
+    "Endspiel": 3.6
+   },
+   "anteilGroberPatzerUeber40Lichess": 23.5,
+   "ungenauJePatzerLichess": 2.88
+  },
+  "1800": {
+   "eloMittel": 1895,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 79.3,
+    "ki95": [
+     76.2,
+     82.1
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 81.2,
+    "ki95": [
+     78.2,
+     83.6
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 79,
+    "ki95": [
+     78.1,
+     80
+    ]
+   },
+   "acplLichess": {
+    "wert": 55,
+    "ki95": [
+     52,
+     57
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 3.63,
+    "ki95": [
+     3.45,
+     3.8
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 3.3,
+     "ki95": [
+      3,
+      3.7
+     ]
+    },
+    "fehler": {
+     "wert": 5.8,
+     "ki95": [
+      5.4,
+      6.3
+     ]
+    },
+    "ungenau": {
+     "wert": 9.8,
+     "ki95": [
+      9.3,
+      10.4
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 64.7,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     64.7,
+     15.6,
+     10,
+     5.9,
+     2.8,
+     1
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 1.3,
+    "Mittelspiel": 4.8,
+    "Endspiel": 3.6
+   },
+   "anteilGroberPatzerUeber40Lichess": 24.5,
+   "ungenauJePatzerLichess": 2.93
+  },
+  "2000": {
+   "eloMittel": 2084,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 600,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 81.9,
+    "ki95": [
+     79.3,
+     84.5
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 83.9,
+    "ki95": [
+     81.5,
+     86.2
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 81.9,
+    "ki95": [
+     81,
+     82.7
+    ]
+   },
+   "acplLichess": {
+    "wert": 47,
+    "ki95": [
+     45,
+     49
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 3.12,
+    "ki95": [
+     2.98,
+     3.25
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 2.7,
+     "ki95": [
+      2.5,
+      3
+     ]
+    },
+    "fehler": {
+     "wert": 4.8,
+     "ki95": [
+      4.5,
+      5.2
+     ]
+    },
+    "ungenau": {
+     "wert": 8.5,
+     "ki95": [
+      8.1,
+      9
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 67.5,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     67.5,
+     15.7,
+     8.7,
+     4.9,
+     2.5,
+     0.6
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 0.9,
+    "Mittelspiel": 3.8,
+    "Endspiel": 3.1
+   },
+   "anteilGroberPatzerUeber40Lichess": 19.8,
+   "ungenauJePatzerLichess": 3.17
+  },
+  "2200": {
+   "eloMittel": 2292,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 598,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 83.9,
+    "ki95": [
+     81.9,
+     85.9
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 85.8,
+    "ki95": [
+     84.1,
+     87.5
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 84,
+    "ki95": [
+     83.2,
+     84.9
+    ]
+   },
+   "acplLichess": {
+    "wert": 40,
+    "ki95": [
+     39,
+     42
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 2.7,
+    "ki95": [
+     2.56,
+     2.84
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 2.2,
+     "ki95": [
+      1.9,
+      2.4
+     ]
+    },
+    "fehler": {
+     "wert": 4.2,
+     "ki95": [
+      3.8,
+      4.5
+     ]
+    },
+    "ungenau": {
+     "wert": 7.9,
+     "ki95": [
+      7.5,
+      8.4
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 70.8,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     70.8,
+     14.5,
+     8.1,
+     4.2,
+     2,
+     0.5
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 0.4,
+    "Mittelspiel": 2.9,
+    "Endspiel": 2.9
+   },
+   "anteilGroberPatzerUeber40Lichess": 17.8,
+   "ungenauJePatzerLichess": 3.64
+  },
+  "2400": {
+   "eloMittel": 2473,
+   "seiten": {
+    "appPipeline": 60,
+    "lichess": 200,
+    "referenz": 60
+   },
+   "genauigkeitAppPipeline": {
+    "wert": 85.3,
+    "ki95": [
+     82.6,
+     87.6
+    ]
+   },
+   "genauigkeitReferenz": {
+    "wert": 86.4,
+    "ki95": [
+     84,
+     88.6
+    ]
+   },
+   "genauigkeitLichess": {
+    "wert": 85.1,
+    "ki95": [
+     83.5,
+     86.6
+    ]
+   },
+   "acplLichess": {
+    "wert": 36,
+    "ki95": [
+     33,
+     39
+    ]
+   },
+   "verlustProzentpunkteJeZugLichess": {
+    "wert": 2.43,
+    "ki95": [
+     2.21,
+     2.66
+    ]
+   },
+   "je100ZuegeLichess": {
+    "patzer": {
+     "wert": 2.1,
+     "ki95": [
+      1.7,
+      2.5
+     ]
+    },
+    "fehler": {
+     "wert": 3.5,
+     "ki95": [
+      2.9,
+      4.1
+     ]
+    },
+    "ungenau": {
+     "wert": 6.3,
+     "ki95": [
+      5.6,
+      7
+     ]
+    }
+   },
+   "exzellentOderBesserProzentLichess": 74.3,
+   "verteilungVerlustLichess": {
+    "grenzen": "Verlust in Prozentpunkten Gewinnchance: bis 2, 2 bis 5, 5 bis 10 (ungenau), 10 bis 20 (Fehler), 20 bis 40 (Patzer), ueber 40 (grober Patzer)",
+    "anteile": [
+     74.3,
+     13.4,
+     6.4,
+     3.5,
+     1.8,
+     0.5
+    ]
+   },
+   "patzerJe100NachPhaseLichess": {
+    "Eröffnung": 0.4,
+    "Mittelspiel": 2.6,
+    "Endspiel": 2.9
+   },
+   "anteilGroberPatzerUeber40Lichess": 21.2,
+   "ungenauJePatzerLichess": 3.02
+  }
+ },
+ "appSchaetzung": {
+  "400": {
+   "echteEloMittel": 535,
+   "appSagtMittel": 934,
+   "abweichungAppPipeline": {
+    "mittel": 399,
+    "median": 315,
+    "ki95": [
+     245,
+     559
+    ],
+    "sdEinzelpartie": 517
+   },
+   "abweichungLichess": {
+    "mittel": 400,
+    "ki95": [
+     302,
+     498
+    ],
+    "sdEinzelpartie": 493
+   },
+   "arena10": {
+    "abwMedian": 402.20000000000005,
+    "p10": 198.53000000000003,
+    "p90": 617.1600000000001
+   }
+  },
+  "600": {
+   "echteEloMittel": 733,
+   "appSagtMittel": 983,
+   "abweichungAppPipeline": {
+    "mittel": 250,
+    "median": 76,
+    "ki95": [
+     83,
+     431
+    ],
+    "sdEinzelpartie": 556
+   },
+   "abweichungLichess": {
+    "mittel": 276,
+    "ki95": [
+     221,
+     330
+    ],
+    "sdEinzelpartie": 494
+   },
+   "arena10": {
+    "abwMedian": 228.5,
+    "p10": 28.070000000000018,
+    "p90": 476.2200000000001
+   }
+  },
+  "800": {
+   "echteEloMittel": 916,
+   "appSagtMittel": 997,
+   "abweichungAppPipeline": {
+    "mittel": 81,
+    "median": 34,
+    "ki95": [
+     -27,
+     197
+    ],
+    "sdEinzelpartie": 393
+   },
+   "abweichungLichess": {
+    "mittel": 140,
+    "ki95": [
+     96,
+     183
+    ],
+    "sdEinzelpartie": 451
+   },
+   "arena10": {
+    "abwMedian": 79.19999999999999,
+    "p10": -71.90999999999998,
+    "p90": 249.12000000000018
+   }
+  },
+  "1000": {
+   "echteEloMittel": 1099,
+   "appSagtMittel": 1145,
+   "abweichungAppPipeline": {
+    "mittel": 46,
+    "median": -9,
+    "ki95": [
+     -84,
+     183
+    ],
+    "sdEinzelpartie": 417
+   },
+   "abweichungLichess": {
+    "mittel": 19,
+    "ki95": [
+     -20,
+     57
+    ],
+    "sdEinzelpartie": 413
+   },
+   "arena10": {
+    "abwMedian": 40.799999999999955,
+    "p10": -118.59999999999991,
+    "p90": 224.12999999999997
+   }
+  },
+  "1200": {
+   "echteEloMittel": 1301,
+   "appSagtMittel": 1239,
+   "abweichungAppPipeline": {
+    "mittel": -61,
+    "median": -90,
+    "ki95": [
+     -166,
+     43
+    ],
+    "sdEinzelpartie": 372
+   },
+   "abweichungLichess": {
+    "mittel": -42,
+    "ki95": [
+     -83,
+     -3
+    ],
+    "sdEinzelpartie": 424
+   },
+   "arena10": {
+    "abwMedian": -63.10000000000002,
+    "p10": -208.61999999999992,
+    "p90": 92.9100000000001
+   }
+  },
+  "1400": {
+   "echteEloMittel": 1493,
+   "appSagtMittel": 1338,
+   "abweichungAppPipeline": {
+    "mittel": -154,
+    "median": -193,
+    "ki95": [
+     -290,
+     -21
+    ],
+    "sdEinzelpartie": 460
+   },
+   "abweichungLichess": {
+    "mittel": -176,
+    "ki95": [
+     -214,
+     -135
+    ],
+    "sdEinzelpartie": 416
+   },
+   "arena10": {
+    "abwMedian": -151.04999999999995,
+    "p10": -335.25000000000006,
+    "p90": 34.84000000000002
+   }
+  },
+  "1600": {
+   "echteEloMittel": 1714,
+   "appSagtMittel": 1467,
+   "abweichungAppPipeline": {
+    "mittel": -247,
+    "median": -240,
+    "ki95": [
+     -332,
+     -161
+    ],
+    "sdEinzelpartie": 324
+   },
+   "abweichungLichess": {
+    "mittel": -273,
+    "ki95": [
+     -310,
+     -236
+    ],
+    "sdEinzelpartie": 385
+   },
+   "arena10": {
+    "abwMedian": -245.19999999999993,
+    "p10": -377,
+    "p90": -116.0899999999999
+   }
+  },
+  "1800": {
+   "echteEloMittel": 1915,
+   "appSagtMittel": 1473,
+   "abweichungAppPipeline": {
+    "mittel": -441,
+    "median": -427,
+    "ki95": [
+     -558,
+     -336
+    ],
+    "sdEinzelpartie": 361
+   },
+   "abweichungLichess": {
+    "mittel": -421,
+    "ki95": [
+     -456,
+     -387
+    ],
+    "sdEinzelpartie": 383
+   },
+   "arena10": {
+    "abwMedian": -433.70000000000005,
+    "p10": -584.4200000000001,
+    "p90": -297.0999999999999
+   }
+  },
+  "2000": {
+   "echteEloMittel": 2103,
+   "appSagtMittel": 1617,
+   "abweichungAppPipeline": {
+    "mittel": -486,
+    "median": -476,
+    "ki95": [
+     -596,
+     -368
+    ],
+    "sdEinzelpartie": 441
+   },
+   "abweichungLichess": {
+    "mittel": -481,
+    "ki95": [
+     -514,
+     -446
+    ],
+    "sdEinzelpartie": 393
+   },
+   "arena10": {
+    "abwMedian": -481.6500000000001,
+    "p10": -662.1199999999999,
+    "p90": -297.0999999999999
+   }
+  },
+  "2200": {
+   "echteEloMittel": 2288,
+   "appSagtMittel": 1691,
+   "abweichungAppPipeline": {
+    "mittel": -597,
+    "median": -575,
+    "ki95": [
+     -691,
+     -503
+    ],
+    "sdEinzelpartie": 333
+   },
+   "abweichungLichess": {
+    "mittel": -570,
+    "ki95": [
+     -606,
+     -532
+    ],
+    "sdEinzelpartie": 413
+   },
+   "arena10": {
+    "abwMedian": -595.4000000000001,
+    "p10": -737.2699999999999,
+    "p90": -460.14999999999975
+   }
+  },
+  "2400": {
+   "echteEloMittel": 2472,
+   "appSagtMittel": 1792,
+   "abweichungAppPipeline": {
+    "mittel": -680,
+    "median": -647,
+    "ki95": [
+     -811,
+     -559
+    ],
+    "sdEinzelpartie": 427
+   },
+   "abweichungLichess": {
+    "mittel": -674,
+    "ki95": [
+     -749,
+     -606
+    ],
+    "sdEinzelpartie": 450
+   },
+   "arena10": {
+    "abwMedian": -671.0999999999999,
+    "p10": -849.68,
+    "p90": -500.9599999999999
+   }
+  }
+ },
+ "bots": {
+  "1": {
+   "name": "Bauer Benno",
+   "label": 250,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": -350,
+    "ki95": [
+     -760,
+     -50
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": -120,
+    "ki95": [
+     -500,
+     130
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 15.22,
+    "ki95": [
+     14.56,
+     15.84
+    ]
+   },
+   "patzerJe100": {
+    "wert": 28.5,
+    "ki95": [
+     26.8,
+     29.9
+    ]
+   },
+   "gleicherZugWieMenschProzent": 15,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 50.6,
+     "verlust": 13.19,
+     "patzerJe100": 23.6
+    },
+    "patzer": {
+     "anteilProzent": 49.2,
+     "verlust": 17.35,
+     "patzerJe100": 33.5
+    },
+    "matt": {
+     "anteilProzent": 0.1,
+     "verlust": 0,
+     "patzerJe100": 0
+    }
+   }
+  },
+  "2": {
+   "name": "Oma Hilde",
+   "label": 500,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 430,
+    "ki95": [
+     150,
+     630
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 390,
+    "ki95": [
+     90,
+     600
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 9.7,
+    "ki95": [
+     9.23,
+     10.24
+    ]
+   },
+   "patzerJe100": {
+    "wert": 16.9,
+    "ki95": [
+     15.7,
+     18.3
+    ]
+   },
+   "gleicherZugWieMenschProzent": 23.6,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 62.8,
+     "verlust": 6.31,
+     "patzerJe100": 8.9
+    },
+    "patzer": {
+     "anteilProzent": 36.9,
+     "verlust": 15.54,
+     "patzerJe100": 30.7
+    },
+    "matt": {
+     "anteilProzent": 0.3,
+     "verlust": 0,
+     "patzerJe100": 0
+    }
+   }
+  },
+  "3": {
+   "name": "Kalle vom Stammtisch",
+   "label": 800,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 760,
+    "ki95": [
+     490,
+     930
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 650,
+    "ki95": [
+     310,
+     860
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 7.94,
+    "ki95": [
+     7.48,
+     8.42
+    ]
+   },
+   "patzerJe100": {
+    "wert": 12.3,
+    "ki95": [
+     11.1,
+     13.4
+    ]
+   },
+   "gleicherZugWieMenschProzent": 23.8,
+   "nachZugart": {
+    "patzer": {
+     "anteilProzent": 21.4,
+     "verlust": 17.07,
+     "patzerJe100": 32.7
+    },
+    "kurz": {
+     "anteilProzent": 34.7,
+     "verlust": 5.49,
+     "patzerJe100": 7
+    },
+    "normal": {
+     "anteilProzent": 43.6,
+     "verlust": 5.48,
+     "patzerJe100": 6.6
+    },
+    "matt": {
+     "anteilProzent": 0.4,
+     "verlust": 0,
+     "patzerJe100": 0
+    }
+   }
+  },
+  "4": {
+   "name": "Lisa Läufer",
+   "label": 1000,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 1080,
+    "ki95": [
+     880,
+     1220
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1150,
+    "ki95": [
+     930,
+     1320
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 6.32,
+    "ki95": [
+     5.91,
+     6.73
+    ]
+   },
+   "patzerJe100": {
+    "wert": 7.8,
+    "ki95": [
+     6.9,
+     8.8
+    ]
+   },
+   "gleicherZugWieMenschProzent": 24.8,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 49.6,
+     "verlust": 4.65,
+     "patzerJe100": 4.1
+    },
+    "patzer": {
+     "anteilProzent": 14.8,
+     "verlust": 15.36,
+     "patzerJe100": 27.5
+    },
+    "kurz": {
+     "anteilProzent": 35.2,
+     "verlust": 4.95,
+     "patzerJe100": 5
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    }
+   }
+  },
+  "5": {
+   "name": "Ritter Rudi",
+   "label": 1200,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 1400,
+    "ki95": [
+     1280,
+     1510
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1390,
+    "ki95": [
+     1220,
+     1540
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 5.1,
+    "ki95": [
+     4.73,
+     5.5
+    ]
+   },
+   "patzerJe100": {
+    "wert": 6.2,
+    "ki95": [
+     5.3,
+     7.2
+    ]
+   },
+   "gleicherZugWieMenschProzent": 26.6,
+   "nachZugart": {
+    "kurz": {
+     "anteilProzent": 32.5,
+     "verlust": 4.58,
+     "patzerJe100": 4.6
+    },
+    "normal": {
+     "anteilProzent": 58.2,
+     "verlust": 3.67,
+     "patzerJe100": 2.9
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    },
+    "patzer": {
+     "anteilProzent": 8.8,
+     "verlust": 16.81,
+     "patzerJe100": 34.5
+    }
+   }
+  },
+  "6": {
+   "name": "Professor Turm",
+   "label": 1400,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 1650,
+    "ki95": [
+     1530,
+     1780
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1650,
+    "ki95": [
+     1490,
+     1830
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 4.17,
+    "ki95": [
+     3.88,
+     4.45
+    ]
+   },
+   "patzerJe100": {
+    "wert": 4.5,
+    "ki95": [
+     3.7,
+     5.2
+    ]
+   },
+   "gleicherZugWieMenschProzent": 28.5,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 62.6,
+     "verlust": 3.15,
+     "patzerJe100": 2.5
+    },
+    "kurz": {
+     "anteilProzent": 30.6,
+     "verlust": 4.31,
+     "patzerJe100": 4.4
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    },
+    "patzer": {
+     "anteilProzent": 6.4,
+     "verlust": 13.81,
+     "patzerJe100": 24.9
+    }
+   }
+  },
+  "7": {
+   "name": "Dame Delia",
+   "label": 1600,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 1840,
+    "ki95": [
+     1730,
+     1960
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1980,
+    "ki95": [
+     1800,
+     2230
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 3.52,
+    "ki95": [
+     3.27,
+     3.78
+    ]
+   },
+   "patzerJe100": {
+    "wert": 2.8,
+    "ki95": [
+     2.2,
+     3.4
+    ]
+   },
+   "gleicherZugWieMenschProzent": 29.2,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 67.5,
+     "verlust": 2.82,
+     "patzerJe100": 1.2
+    },
+    "patzer": {
+     "anteilProzent": 3.6,
+     "verlust": 14.77,
+     "patzerJe100": 26.6
+    },
+    "kurz": {
+     "anteilProzent": 28.5,
+     "verlust": 3.8,
+     "patzerJe100": 3.6
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    }
+   }
+  },
+  "8": {
+   "name": "Kommissar König",
+   "label": 1800,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 2170,
+    "ki95": [
+     2030,
+     2380
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 2300,
+    "ki95": [
+     2070,
+     2710
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 2.86,
+    "ki95": [
+     2.65,
+     3.1
+    ]
+   },
+   "patzerJe100": {
+    "wert": 1.9,
+    "ki95": [
+     1.4,
+     2.4
+    ]
+   },
+   "gleicherZugWieMenschProzent": 31.3,
+   "nachZugart": {
+    "kurz": {
+     "anteilProzent": 25.6,
+     "verlust": 3.95,
+     "patzerJe100": 3.2
+    },
+    "normal": {
+     "anteilProzent": 71.7,
+     "verlust": 2.2,
+     "patzerJe100": 0.9
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    },
+    "patzer": {
+     "anteilProzent": 2.3,
+     "verlust": 11.74,
+     "patzerJe100": 18.6
+    }
+   }
+  },
+  "9": {
+   "name": "Großmeisterin Greta",
+   "label": 2100,
+   "zuegeInMenschenStellungen": 3035,
+   "gemesseneEloNachVerlust": {
+    "wert": 2320,
+    "ki95": [
+     2190,
+     2540
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 2410,
+    "ki95": [
+     2200,
+     2810
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 2.06,
+    "ki95": [
+     1.9,
+     2.23
+    ]
+   },
+   "patzerJe100": {
+    "wert": 1,
+    "ki95": [
+     0.7,
+     1.3
+    ]
+   },
+   "gleicherZugWieMenschProzent": 32,
+   "nachZugart": {
+    "normal": {
+     "anteilProzent": 84.1,
+     "verlust": 1.77,
+     "patzerJe100": 0.4
+    },
+    "kurz": {
+     "anteilProzent": 14.3,
+     "verlust": 2.87,
+     "patzerJe100": 2.3
+    },
+    "matt": {
+     "anteilProzent": 0.5,
+     "verlust": 0,
+     "patzerJe100": 0
+    },
+    "patzer": {
+     "anteilProzent": 1.2,
+     "verlust": 13.25,
+     "patzerJe100": 25
+    }
+   }
+  },
+  "M600": {
+   "name": "Maia-3 600",
+   "label": 600,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 430,
+    "ki95": [
+     -260,
+     780
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 500,
+    "ki95": [
+     -90,
+     820
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 9.08,
+    "ki95": [
+     8.26,
+     9.97
+    ]
+   },
+   "patzerJe100": {
+    "wert": 13.8,
+    "ki95": [
+     12,
+     15.9
+    ]
+   },
+   "gleicherZugWieMenschProzent": 29.8,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 9.08,
+     "patzerJe100": 13.8
+    }
+   }
+  },
+  "M800": {
+   "name": "Maia-3 800",
+   "label": 800,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 510,
+    "ki95": [
+     -430,
+     920
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 420,
+    "ki95": [
+     -1180,
+     890
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 7.85,
+    "ki95": [
+     6.95,
+     8.76
+    ]
+   },
+   "patzerJe100": {
+    "wert": 11,
+    "ki95": [
+     9.3,
+     13
+    ]
+   },
+   "gleicherZugWieMenschProzent": 34.5,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 7.85,
+     "patzerJe100": 11
+    }
+   }
+  },
+  "M1000": {
+   "name": "Maia-3 1000",
+   "label": 1000,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1140,
+    "ki95": [
+     910,
+     1330
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1140,
+    "ki95": [
+     880,
+     1340
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 6.23,
+    "ki95": [
+     5.58,
+     6.99
+    ]
+   },
+   "patzerJe100": {
+    "wert": 8.6,
+    "ki95": [
+     7.2,
+     10.3
+    ]
+   },
+   "gleicherZugWieMenschProzent": 37,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 6.23,
+     "patzerJe100": 8.6
+    }
+   }
+  },
+  "M1200": {
+   "name": "Maia-3 1200",
+   "label": 1200,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1280,
+    "ki95": [
+     940,
+     1470
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1250,
+    "ki95": [
+     880,
+     1520
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 5.58,
+    "ki95": [
+     4.95,
+     6.21
+    ]
+   },
+   "patzerJe100": {
+    "wert": 7.3,
+    "ki95": [
+     5.9,
+     8.8
+    ]
+   },
+   "gleicherZugWieMenschProzent": 37.4,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 5.58,
+     "patzerJe100": 7.3
+    }
+   }
+  },
+  "M1400": {
+   "name": "Maia-3 1400",
+   "label": 1400,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1330,
+    "ki95": [
+     1100,
+     1500
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1230,
+    "ki95": [
+     960,
+     1460
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 5.45,
+    "ki95": [
+     4.87,
+     6.05
+    ]
+   },
+   "patzerJe100": {
+    "wert": 7.5,
+    "ki95": [
+     6.1,
+     9.2
+    ]
+   },
+   "gleicherZugWieMenschProzent": 39.3,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 5.45,
+     "patzerJe100": 7.5
+    }
+   }
+  },
+  "M1600": {
+   "name": "Maia-3 1600",
+   "label": 1600,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1430,
+    "ki95": [
+     1190,
+     1600
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1310,
+    "ki95": [
+     1010,
+     1560
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 5.02,
+    "ki95": [
+     4.45,
+     5.67
+    ]
+   },
+   "patzerJe100": {
+    "wert": 6.5,
+    "ki95": [
+     5.2,
+     8
+    ]
+   },
+   "gleicherZugWieMenschProzent": 41.5,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 5.02,
+     "patzerJe100": 6.5
+    }
+   }
+  },
+  "M1800": {
+   "name": "Maia-3 1800",
+   "label": 1800,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1560,
+    "ki95": [
+     1340,
+     1750
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1560,
+    "ki95": [
+     1230,
+     1860
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "verlustJeZug": {
+    "wert": 4.6,
+    "ki95": [
+     4.09,
+     5.16
+    ]
+   },
+   "patzerJe100": {
+    "wert": 5.5,
+    "ki95": [
+     4.1,
+     7.1
+    ]
+   },
+   "gleicherZugWieMenschProzent": 40.3,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 4.6,
+     "patzerJe100": 5.5
+    }
+   }
+  },
+  "M2100": {
+   "name": "Maia-3 2100",
+   "label": 2100,
+   "zuegeInMenschenStellungen": 1100,
+   "gemesseneEloNachVerlust": {
+    "wert": 1680,
+    "ki95": [
+     1450,
+     1860
+    ],
+    "bootstrapOhneKreuzung": 0
+   },
+   "gemesseneEloNachPatzer": {
+    "wert": 1770,
+    "ki95": [
+     1340,
+     2520
+    ],
+    "bootstrapOhneKreuzung": 2
+   },
+   "verlustJeZug": {
+    "wert": 4.23,
+    "ki95": [
+     3.65,
+     4.86
+    ]
+   },
+   "patzerJe100": {
+    "wert": 4.6,
+    "ki95": [
+     3.5,
+     6
+    ]
+   },
+   "gleicherZugWieMenschProzent": 38.5,
+   "nachZugart": {
+    "maia": {
+     "anteilProzent": 100,
+     "verlust": 4.23,
+     "patzerJe100": 4.6
+    }
+   }
+  }
+ },
+ "leiterNachbarn": {
+  "1-2": {
+   "partien": 40,
+   "punkte": 30,
+   "quote": 0.75,
+   "abstand": 190.84850188786498,
+   "ki": [
+    117.1648421767207,
+    269.3663599454522
+   ],
+   "remis": 18,
+   "zuglimit": 1,
+   "labelAbstand": 250
+  },
+  "2-3": {
+   "partien": 40,
+   "punkte": 25.5,
+   "quote": 0.6375,
+   "abstand": 98.06887127959209,
+   "ki": [
+    8.687699877294484,
+    190.84850188786498
+   ],
+   "remis": 15,
+   "zuglimit": 2,
+   "labelAbstand": 300
+  },
+  "3-4": {
+   "partien": 40,
+   "punkte": 32,
+   "quote": 0.8,
+   "abstand": 240.823996531185,
+   "ki": [
+    136.9690723288825,
+    381.69700377572997
+   ],
+   "remis": 6,
+   "zuglimit": 2,
+   "labelAbstand": 200
+  },
+  "4-5": {
+   "partien": 40,
+   "punkte": 29,
+   "quote": 0.725,
+   "abstand": 168.40212509629242,
+   "ki": [
+    52.51156585572756,
+    301.33106666344463
+   ],
+   "remis": 2,
+   "zuglimit": 1,
+   "labelAbstand": 200
+  },
+  "5-6": {
+   "partien": 40,
+   "punkte": 34,
+   "quote": 0.85,
+   "abstand": 301.33106666344463,
+   "ki": [
+    168.40212509629242,
+    511.50144038113143
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "labelAbstand": 200
+  },
+  "6-7": {
+   "partien": 40,
+   "punkte": 26,
+   "quote": 0.65,
+   "abstand": 107.53812491703201,
+   "ki": [
+    -8.687699877294502,
+    240.823996531185
+   ],
+   "remis": 2,
+   "zuglimit": 1,
+   "labelAbstand": 200
+  },
+  "7-8": {
+   "partien": 40,
+   "punkte": 30.5,
+   "quote": 0.7625,
+   "abstand": 202.63049362317517,
+   "ki": [
+    98.06887127959209,
+    338.0392160057027
+   ],
+   "remis": 3,
+   "zuglimit": 1,
+   "labelAbstand": 200
+  },
+  "8-9": {
+   "partien": 40,
+   "punkte": 22.5,
+   "quote": 0.5625,
+   "abstand": 43.657787770027234,
+   "ki": [
+    -61.433567223132016,
+    147.19071411783773
+   ],
+   "remis": 5,
+   "zuglimit": 1,
+   "labelAbstand": 300
+  }
+ },
+ "ankerStockfishUciElo": {
+  "5@1320": {
+   "partien": 16,
+   "punkte": 9,
+   "quote": 0.5625,
+   "abstand": 43.657787770027234,
+   "ki": [
+    -136.9690723288825,
+    254.72883903486974
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 5,
+   "uciElo": 1320,
+   "impliziert": 1363.6577877700272,
+   "kiImpliziert": [
+    1183.0309276711175,
+    1574.7288390348697
+   ]
+  },
+  "6@1320": {
+   "partien": 16,
+   "punkte": 12,
+   "quote": 0.75,
+   "abstand": 190.84850188786498,
+   "ki": [
+    0,
+    470.43650362227254
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 6,
+   "uciElo": 1320,
+   "impliziert": 1510.848501887865,
+   "kiImpliziert": [
+    1320,
+    1790.4365036222725
+   ]
+  },
+  "7@1320": {
+   "partien": 16,
+   "punkte": 13,
+   "quote": 0.8125,
+   "abstand": 254.72883903486974,
+   "ki": [
+    88.73949984654254,
+    null
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 7,
+   "uciElo": 1320,
+   "impliziert": 1574.7288390348697,
+   "kiImpliziert": [
+    1408.7394998465425,
+    null
+   ]
+  },
+  "7@1600": {
+   "partien": 16,
+   "punkte": 12,
+   "quote": 0.75,
+   "abstand": 190.84850188786498,
+   "ki": [
+    0,
+    470.43650362227254
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 7,
+   "uciElo": 1600,
+   "impliziert": 1790.848501887865,
+   "kiImpliziert": [
+    1600,
+    2070.4365036222725
+   ]
+  },
+  "8@1600": {
+   "partien": 16,
+   "punkte": 13.5,
+   "quote": 0.84375,
+   "abstand": 292.9575039291874,
+   "ki": [
+    112.3306438302777,
+    null
+   ],
+   "remis": 1,
+   "zuglimit": 1,
+   "stufe": 8,
+   "uciElo": 1600,
+   "impliziert": 1892.9575039291874,
+   "kiImpliziert": [
+    1712.3306438302777,
+    null
+   ]
+  },
+  "9@1600": {
+   "partien": 16,
+   "punkte": 16,
+   "quote": 1,
+   "abstand": null,
+   "ki": [
+    null,
+    null
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 9,
+   "uciElo": 1600,
+   "impliziert": null,
+   "kiImpliziert": [
+    null,
+    null
+   ]
+  },
+  "9@1900": {
+   "partien": 16,
+   "punkte": 14.5,
+   "quote": 0.90625,
+   "abstand": 394.1106972717174,
+   "ki": [
+    190.84850188786498,
+    null
+   ],
+   "remis": 1,
+   "zuglimit": 0,
+   "stufe": 9,
+   "uciElo": 1900,
+   "impliziert": 2294.1106972717175,
+   "kiImpliziert": [
+    2090.848501887865,
+    null
+   ]
+  }
+ },
+ "ankerMaia": {
+  "1@600": {
+   "partien": 12,
+   "punkte": 1,
+   "quote": 0.08333333333333333,
+   "abstand": -416.55707406329,
+   "ki": [
+    null,
+    -231.91343864672405
+   ],
+   "remis": 2,
+   "zuglimit": 0,
+   "stufe": 1,
+   "maiaElo": 600,
+   "impliziert": 183.44292593671003,
+   "kiImpliziert": [
+    null,
+    368.08656135327595
+   ],
+   "maiaEffektiv": 427.71084204160235,
+   "maiaEffektivKi": [
+    -262.68996235527203,
+    779.7409042718948
+   ],
+   "implizitEffektiv": 11.153767978312374
+  },
+  "2@600": {
+   "partien": 12,
+   "punkte": 5.5,
+   "quote": 0.4583333333333333,
+   "abstand": -29.02026685944471,
+   "ki": [
+    -190.84850188786498,
+    120.41199826559246
+   ],
+   "remis": 5,
+   "zuglimit": 0,
+   "stufe": 2,
+   "maiaElo": 600,
+   "impliziert": 570.9797331405553,
+   "kiImpliziert": [
+    409.151498112135,
+    720.4119982655925
+   ],
+   "maiaEffektiv": 427.71084204160235,
+   "maiaEffektivKi": [
+    -262.68996235527203,
+    779.7409042718948
+   ],
+   "implizitEffektiv": 398.69057518215766
+  },
+  "3@800": {
+   "partien": 12,
+   "punkte": 3.5,
+   "quote": 0.2916666666666667,
+   "abstand": -154.14035254560682,
+   "ki": [
+    -416.55707406329,
+    29.02026685944467
+   ],
+   "remis": 1,
+   "zuglimit": 0,
+   "stufe": 3,
+   "maiaElo": 800,
+   "impliziert": 645.8596474543932,
+   "kiImpliziert": [
+    383.44292593671,
+    829.0202668594446
+   ],
+   "maiaEffektiv": 509.7205467170246,
+   "maiaEffektivKi": [
+    -427.9506954701658,
+    916.1620386670251
+   ],
+   "implizitEffektiv": 355.5801941714178
+  },
+  "4@1000": {
+   "partien": 12,
+   "punkte": 6,
+   "quote": 0.5,
+   "abstand": 0,
+   "ki": [
+    -190.84850188786498,
+    190.84850188786498
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 4,
+   "maiaElo": 1000,
+   "impliziert": 1000,
+   "kiImpliziert": [
+    809.151498112135,
+    1190.848501887865
+   ],
+   "maiaEffektiv": 1140.8438020814765,
+   "maiaEffektivKi": [
+    911.1369034190786,
+    1327.7591939801323
+   ],
+   "implizitEffektiv": 1140.8438020814765
+  },
+  "5@1200": {
+   "partien": 12,
+   "punkte": 4.5,
+   "quote": 0.375,
+   "abstand": -88.73949984654254,
+   "ki": [
+    -338.03921600570277,
+    88.73949984654254
+   ],
+   "remis": 1,
+   "zuglimit": 0,
+   "stufe": 5,
+   "maiaElo": 1200,
+   "impliziert": 1111.2605001534575,
+   "kiImpliziert": [
+    861.9607839942972,
+    1288.7394998465425
+   ],
+   "maiaEffektiv": 1278.354243598581,
+   "maiaEffektivKi": [
+    939.4534366263177,
+    1474.9309259364463
+   ],
+   "implizitEffektiv": 1189.6147437520385
+  },
+  "6@1400": {
+   "partien": 12,
+   "punkte": 9.5,
+   "quote": 0.7916666666666666,
+   "abstand": 231.913438646724,
+   "ki": [
+    58.45121427129523,
+    null
+   ],
+   "remis": 1,
+   "zuglimit": 0,
+   "stufe": 6,
+   "maiaElo": 1400,
+   "impliziert": 1631.913438646724,
+   "kiImpliziert": [
+    1458.4512142712952,
+    null
+   ],
+   "maiaEffektiv": 1332.9703423154253,
+   "maiaEffektivKi": [
+    1101.6821313986493,
+    1499.1596125754015
+   ],
+   "implizitEffektiv": 1564.8837809621493
+  },
+  "7@1600": {
+   "partien": 12,
+   "punkte": 8.5,
+   "quote": 0.7083333333333334,
+   "abstand": 154.14035254560685,
+   "ki": [
+    -29.02026685944471,
+    416.55707406329
+   ],
+   "remis": 1,
+   "zuglimit": 0,
+   "stufe": 7,
+   "maiaElo": 1600,
+   "impliziert": 1754.140352545607,
+   "kiImpliziert": [
+    1570.9797331405553,
+    2016.55707406329
+   ],
+   "maiaEffektiv": 1425.872017266257,
+   "maiaEffektivKi": [
+    1191.6964771570847,
+    1596.8095364124038
+   ],
+   "implizitEffektiv": 1580.012369811864
+  },
+  "8@1800": {
+   "partien": 12,
+   "punkte": 11,
+   "quote": 0.9166666666666666,
+   "abstand": 416.55707406329,
+   "ki": [
+    190.84850188786498,
+    null
+   ],
+   "remis": 0,
+   "zuglimit": 0,
+   "stufe": 8,
+   "maiaElo": 1800,
+   "impliziert": 2216.55707406329,
+   "kiImpliziert": [
+    1990.848501887865,
+    null
+   ],
+   "maiaEffektiv": 1556.0696445302003,
+   "maiaEffektivKi": [
+    1344.1916754224033,
+    1749.9123156502533
+   ],
+   "implizitEffektiv": 1972.6267185934903
+  },
+  "9@2100": {
+   "partien": 12,
+   "punkte": 10,
+   "quote": 0.8333333333333334,
+   "abstand": 279.5880017344076,
+   "ki": [
+    88.73949984654254,
+    null
+   ],
+   "remis": 2,
+   "zuglimit": 0,
+   "stufe": 9,
+   "maiaElo": 2100,
+   "impliziert": 2379.5880017344075,
+   "kiImpliziert": [
+    2188.7394998465425,
+    null
+   ],
+   "maiaEffektiv": 1676.2687519526237,
+   "maiaEffektivKi": [
+    1452.6409242013833,
+    1855.2854630401432
+   ],
+   "implizitEffektiv": 1955.8567536870314
+  }
+ }
+}

@@ -1,0 +1,152 @@
+diff --git a/js/storage.js b/js/storage.js
+index 7e53f70..caf57fa 100644
+--- a/js/storage.js
++++ b/js/storage.js
+@@ -57,9 +57,18 @@
+ //   persistOhneDialog({ userAgent, standalone }) -> boolean
+ //   Einstellungen zusaetzlich (Anzeigen in der Partie, SPIELKONZEPT 3.18): zaehlwerk (aus), funkenlinie (aus),
+ //     lebensleiste (an: Lebensleiste statt Balken bei Bossen).
++//
++// Eichung (Oktober 2026, Spielstaerke an Lichess-Schnellschach geeicht):
++//   Partie-Datensatz zusaetzlich staerkeBeleg ({ genauigkeit, zuege }: Zuggenauigkeit in offenen Stellungen, aus
++//     review.belege der ersten vollen Analyse) und spielstaerkeSpanne ([von, bis] fuer "Spielte wie").
++//   spielstaerkeDetail(liste = wertende Partien, { ohneId }) -> { elo, spanne, sd, partien, vorlaeufig } | null
++//     aus den letzten SPIELSTAERKE_PARTIEN wertenden Partien mit Beleg (review.js spielstaerkeAusPartien); Partien
++//     mit Hinweisen oder Zuruecknahmen zaehlen nicht, Partien gegen deutlich schwaechere Bots weniger, und jeder Beleg
++//     wird um den Bot-Aufschlag gesenkt (gegen die Bots spielt man genauer als gegen Menschen gleicher Staerke).
++//   statistik().spielstaerke ist dann diese geeichte Zahl, statistik().spielstaerkeDetail das ganze Ergebnis.
+ import { BOTS, botNachId } from './bots.js';
+ import { sende } from './ereignisse.js';
+-import { kompaktReview, ergaenzeReviewFelder } from './review.js';
++import { kompaktReview, ergaenzeReviewFelder, spielstaerkeAusPartien } from './review.js';
+ 
+ // Zug-Klassen (wie review.js KLASSEN), zum Pruefen gespeicherter Daten
+ const KLASSEN_LISTE = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
+@@ -329,6 +338,7 @@ export function sterneFuerPartie(p) {
+ //            grund 'matt'|'aufgabe'|'patt'|'wiederholung'|'50-zuege'|'material',
+ //            hinweise, zuruecknahmen, liveKlassen: [klasse|null je Ply],
+ //            genauigkeit (Spieler, 0..100|null), genauigkeitBot, spielstaerke (Elo-Schaetzung|null),
++//            staerkeBeleg ({ genauigkeit, zuege } in offenen Stellungen, fuer die Spielstaerke), spielstaerkeSpanne,
+ //            eroeffnung (Name|null), sterne [bool,bool,bool] (wird beim Speichern berechnet),
+ //            modus 'normal'|'uebung', ziel (nur Uebung), extra (Objekt je Paket), maxSerie,
+ //            genauigkeitQuelle 'live'|'analyse' (sobald genauigkeit gesetzt), analysiert true (Review nachgetragen),
+@@ -569,6 +579,11 @@ export function ergaenzeAnalyse(id, review = null, { genauigkeit = null } = {})
+     }
+     if (leer(p.genauigkeitBot) && Number.isFinite(review.genauigkeit[bf])) p.genauigkeitBot = review.genauigkeit[bf];
+     if (leer(p.spielstaerke) && review.spielstaerke && Number.isFinite(review.spielstaerke[sf])) p.spielstaerke = review.spielstaerke[sf];
++    // Eichung: Beleg fuer die Spielstaerke und Spanne von "Spielte wie" aus der ersten vollen Analyse
++    if (!p.staerkeBeleg && review.belege && review.belege[sf]) {
++      p.staerkeBeleg = review.belege[sf];
++      if (review.staerke && review.staerke[sf] && Array.isArray(review.staerke[sf].spanne)) p.spielstaerkeSpanne = review.staerke[sf].spanne;
++    }
+     if (!p.eroeffnung && review.eroeffnung) p.eroeffnung = review.eroeffnung;
+   } else if (Number.isFinite(genauigkeit) && leer(p.genauigkeit)) {
+     p.genauigkeit = genauigkeit;
+@@ -763,17 +778,34 @@ export function loescheLaufendePartie() {
+ // Statistik ueber alle wertenden Partien (ohne Uebungen und Partien aus einer Stellung).
+ // Durchschnitts-Genauigkeit nur aus Partien ab BESTWERT_MIN_ZUEGE eigenen Zuegen.
+ // ---------------------------------------------------------------------------
++// Spielstaerke (geeicht, review.js spielstaerkeAusPartien) aus den letzten SPIELSTAERKE_PARTIEN wertenden Partien
++// mit Beleg. Partien mit Hinweisen oder Zuruecknahmen zaehlen nicht, Partien gegen deutlich schwaechere Bots
++// weniger; alle sind Partien gegen App-Bots (gegenBot: Bot-Aufschlag). Rueckgabe { elo, spanne, sd, partien,
++// vorlaeufig } oder null. ohneId: diese Partie auslassen.
++export const SPIELSTAERKE_PARTIEN = 20;
++export function spielstaerkeDetail(liste = ladePartien(), { ohneId = null } = {}) {
++  const mit = liste.filter((p) => p && wertet(p) && p.staerkeBeleg && p.id !== ohneId).slice(0, SPIELSTAERKE_PARTIEN);
++  if (!mit.length) return null;
++  return spielstaerkeAusPartien(mit.map((p) => {
++    const bot = botNachId(p.botId);
++    return { beleg: p.staerkeBeleg, gegnerElo: bot ? bot.elo : null, gegenBot: true, hilfe: p.hinweise > 0 || p.zuruecknahmen > 0 };
++  }));
++}
++
+ export function statistik() {
+   const l = ladePartien().filter(wertet);
+   const gen = l.filter(zaehltFuerBestwert).map((p) => p.genauigkeit);
+   const st = l.slice(0, 10).map((p) => p.spielstaerke).filter(Number.isFinite);
++  const detail = spielstaerkeDetail(l);
+   return {
+     partien: l.length,
+     siege: l.filter((p) => p.ergebnis === 'sieg').length,
+     remis: l.filter((p) => p.ergebnis === 'remis').length,
+     niederlagen: l.filter((p) => p.ergebnis === 'niederlage').length,
+     schnittGenauigkeit: gen.length ? Math.round((gen.reduce((a, b) => a + b, 0) / gen.length) * 10) / 10 : null,
+-    spielstaerke: st.length ? Math.round(st.reduce((a, b) => a + b, 0) / st.length / 50) * 50 : null,
++    // geeicht, wenn Partien mit Beleg da sind; sonst wie frueher (Mittel der letzten 10 Schaetzungen)
++    spielstaerke: detail ? detail.elo : (st.length ? Math.round(st.reduce((a, b) => a + b, 0) / st.length / 50) * 50 : null),
++    spielstaerkeDetail: detail,
+     besteGenauigkeit: (() => {
+       const best = l.filter(zaehltFuerBestwert).map((p) => p.genauigkeit);
+       return best.length ? Math.max(...best) : null;
+diff --git a/js/ui/analyse.js b/js/ui/analyse.js
+index 062bf8a..670685d 100644
+--- a/js/ui/analyse.js
++++ b/js/ui/analyse.js
+@@ -17,7 +17,7 @@ import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp, spielpha
+ import { SYMBOLE, KLASSEN_NAME } from '../symbole.js';
+ import { klang } from '../sounds.js';
+ import {
+-  ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
++  ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner, spielstaerkeDetail,
+   ladeLaufendePartie, loescheLaufendePartie, eigeneZuege, BESTWERT_MIN_ZUEGE,
+ } from '../storage.js';
+ import { sende } from '../ereignisse.js';
+@@ -280,6 +280,7 @@ export function zeige(root, params = {}, app) {
+       const review = await analysierePartie(engine, p.zuege || [], {
+         tiefe: einst.tiefe || 14, multipv: 2, startFen: p.startFen || undefined, spielerFarbe: st.sf,
+         elo, vorab: app.vorab, vorabMinTiefe: einst.tiefe || 14, beiFortschritt: melde, signal: ac.signal,
++        vorwissen: (() => { const d = spielstaerkeDetail(undefined, { ohneId: p.id }); return d ? { elo: d.elo, sd: d.sd } : null; })(),
+       });
+       if (beendet) return;
+       // Review speichern und Partie-Datensatz nachtragen (Genauigkeit, Spielstaerke, Stern 2,
+diff --git a/js/ui/partie.js b/js/ui/partie.js
+index 4f96893..53e3980 100644
+--- a/js/ui/partie.js
++++ b/js/ui/partie.js
+@@ -91,6 +91,7 @@ import { klang } from '../sounds.js';
+ import {
+   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
+   ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
++  spielstaerkeDetail,
+ } from '../storage.js';
+ import { sende } from '../ereignisse.js';
+ import { fuelle, waehle, angeboten } from '../orte.js';
+@@ -990,11 +991,12 @@ export function zeige(root, params, app) {
+         const e = await app.engine('bot');
+         engBot = e;
+         if (ctrl.signal.aborted) return;
+-        // W0+a: Zufall aus dem Seed (je Halbzug), feste Knoten und Vorliebe aus dem Bot-Profil
++        // W0+a: Zufall aus dem Seed (je Halbzug), feste Knoten und Vorliebe aus dem Bot-Profil; Eichung: vorigerZug
+         zug = await botZug(e, fen, zugBot, {
+           zugNummer: z.zuege.length + 1, signal: ctrl.signal,
+           zufall: z.seed != null ? zugZufall(z.seed, z.zuege.length) : Math.random,
+           nodes: bot.nodes || null, vorliebe: bot.vorliebe || null,
++          vorigerZug: z.zuege.length ? z.zuege[z.zuege.length - 1] : null,
+         });
+       }
+     } catch (err) {
+@@ -1370,6 +1372,16 @@ export function zeige(root, params, app) {
+     Promise.race([e.fertig, warte(AUSWERTUNG_WARTEN_MS)]).then(() => { if (!weg) sendeBeendet(); });
+   }
+ 
++  // Bisherige Spielstaerke als Vorwissen fuer "Spielte wie" (ohne die gerade gespielte Partie)
++  function vorwissenFuer(ohneId) {
++    try {
++      const d = spielstaerkeDetail(undefined, { ohneId });
++      return d && Number.isFinite(d.elo) && Number.isFinite(d.sd) ? { elo: d.elo, sd: d.sd } : null;
++    } catch (e) {
++      return null;
++    }
++  }
++
+   // Spielanalyse rechnen und nachtragen. Liefert { partie, neueSterne, neuFreigeschaltet, review }
+   // (Sterne aus dem Speichern und dem Nachtrag zusammen) oder null.
+   async function werteAus() {
+@@ -1385,6 +1397,7 @@ export function zeige(root, params, app) {
+       review = await analysierePartie(e, z.zuege, {
+         tiefe: tiefe(), multipv: 2, startFen: startFen || undefined, spielerFarbe: farbe,
+         elo: { [botFarbe]: botElo }, vorab: app.vorab, vorabMinTiefe: tiefe(), vorabMerken: true, signal: endeCtrl.signal,
++        vorwissen: vorwissenFuer(z.gespeichert && z.gespeichert.partie ? z.gespeichert.partie.id : null),
+         beiFortschritt: (f, n) => overlay && overlay.fortschritt(n ? f / n : 1),
+       });
+     } catch (err) {

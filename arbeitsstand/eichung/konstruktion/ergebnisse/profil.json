@@ -1,0 +1,468 @@
+{
+ "benno": {
+  "label": 250,
+  "baender": [
+   400
+  ],
+  "neu": {
+   "n": 165,
+   "verlust": 8.711897445556582,
+   "patzer": 12.727272727272727,
+   "fehler": 7.878787878787878,
+   "ungenau": 16.969696969696972,
+   "exzellent": 46.06060606060606,
+   "grobAnteil": 42.857142857142854,
+   "patzer_eroeffnung": 16.923076923076923,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 10.144927536231885,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 9.67741935483871,
+   "n_endspiel": 31
+  },
+  "mensch": {
+   "n": 165,
+   "verlust": 7.224997902564577,
+   "patzer": 12.121212121212121,
+   "fehler": 6.0606060606060606,
+   "ungenau": 12.727272727272727,
+   "exzellent": 47.878787878787875,
+   "grobAnteil": 35.0,
+   "patzer_eroeffnung": 15.384615384615385,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 8.695652173913043,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 12.903225806451612,
+   "n_endspiel": 31
+  },
+  "alt": {
+   "n": 165,
+   "verlust": 9.353015181123023,
+   "patzer": 16.363636363636363,
+   "fehler": 7.2727272727272725,
+   "ungenau": 15.151515151515152,
+   "exzellent": 37.57575757575757,
+   "grobAnteil": 37.03703703703704,
+   "patzer_eroeffnung": 26.153846153846157,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 10.144927536231885,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 9.67741935483871,
+   "n_endspiel": 31
+  }
+ },
+ "hilde": {
+  "label": 500,
+  "baender": [
+   400
+  ],
+  "neu": {
+   "n": 165,
+   "verlust": 6.220999071086201,
+   "patzer": 9.090909090909092,
+   "fehler": 6.666666666666667,
+   "ungenau": 8.484848484848486,
+   "exzellent": 60.60606060606061,
+   "grobAnteil": 53.333333333333336,
+   "patzer_eroeffnung": 10.76923076923077,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 7.246376811594203,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 9.67741935483871,
+   "n_endspiel": 31
+  },
+  "mensch": {
+   "n": 165,
+   "verlust": 7.224997902564577,
+   "patzer": 12.121212121212121,
+   "fehler": 6.0606060606060606,
+   "ungenau": 12.727272727272727,
+   "exzellent": 47.878787878787875,
+   "grobAnteil": 35.0,
+   "patzer_eroeffnung": 15.384615384615385,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 8.695652173913043,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 12.903225806451612,
+   "n_endspiel": 31
+  },
+  "alt": {
+   "n": 165,
+   "verlust": 6.0424531601075335,
+   "patzer": 7.2727272727272725,
+   "fehler": 6.666666666666667,
+   "ungenau": 10.909090909090908,
+   "exzellent": 54.54545454545454,
+   "grobAnteil": 58.333333333333336,
+   "patzer_eroeffnung": 6.153846153846154,
+   "n_eroeffnung": 65,
+   "patzer_mittelspiel": 8.695652173913043,
+   "n_mittelspiel": 69,
+   "patzer_endspiel": 6.451612903225806,
+   "n_endspiel": 31
+  }
+ },
+ "kalle": {
+  "label": 800,
+  "baender": [
+   600,
+   800
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 6.045747253767276,
+   "patzer": 9.5,
+   "fehler": 6.833333333333333,
+   "ungenau": 10.166666666666666,
+   "exzellent": 58.333333333333336,
+   "grobAnteil": 38.59649122807018,
+   "patzer_eroeffnung": 11.398963730569948,
+   "n_eroeffnung": 193,
+   "patzer_mittelspiel": 10.034602076124568,
+   "n_mittelspiel": 289,
+   "patzer_endspiel": 5.084745762711865,
+   "n_endspiel": 118
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 6.861688830962036,
+   "patzer": 10.333333333333334,
+   "fehler": 10.333333333333334,
+   "ungenau": 10.666666666666668,
+   "exzellent": 53.5,
+   "grobAnteil": 35.483870967741936,
+   "patzer_eroeffnung": 9.844559585492227,
+   "n_eroeffnung": 193,
+   "patzer_mittelspiel": 11.072664359861593,
+   "n_mittelspiel": 289,
+   "patzer_endspiel": 9.322033898305085,
+   "n_endspiel": 118
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 5.964142864042763,
+   "patzer": 9.0,
+   "fehler": 8.166666666666666,
+   "ungenau": 13.166666666666666,
+   "exzellent": 54.0,
+   "grobAnteil": 24.074074074074073,
+   "patzer_eroeffnung": 9.844559585492227,
+   "n_eroeffnung": 193,
+   "patzer_mittelspiel": 7.612456747404845,
+   "n_mittelspiel": 289,
+   "patzer_endspiel": 11.016949152542372,
+   "n_endspiel": 118
+  }
+ },
+ "lisa": {
+  "label": 1000,
+  "baender": [
+   800,
+   1000
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 5.302160958627163,
+   "patzer": 8.166666666666666,
+   "fehler": 5.666666666666666,
+   "ungenau": 12.5,
+   "exzellent": 59.5,
+   "grobAnteil": 34.69387755102041,
+   "patzer_eroeffnung": 3.5502958579881656,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 12.162162162162163,
+   "n_mittelspiel": 296,
+   "patzer_endspiel": 5.185185185185185,
+   "n_endspiel": 135
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 5.719785899348701,
+   "patzer": 8.166666666666666,
+   "fehler": 9.666666666666666,
+   "ungenau": 11.833333333333334,
+   "exzellent": 53.666666666666664,
+   "grobAnteil": 28.571428571428573,
+   "patzer_eroeffnung": 7.6923076923076925,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 10.135135135135135,
+   "n_mittelspiel": 296,
+   "patzer_endspiel": 4.444444444444445,
+   "n_endspiel": 135
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 5.100526296322912,
+   "patzer": 5.166666666666667,
+   "fehler": 7.833333333333334,
+   "ungenau": 14.666666666666666,
+   "exzellent": 52.5,
+   "grobAnteil": 35.483870967741936,
+   "patzer_eroeffnung": 9.467455621301776,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 4.054054054054054,
+   "n_mittelspiel": 296,
+   "patzer_endspiel": 2.2222222222222223,
+   "n_endspiel": 135
+  }
+ },
+ "rudi": {
+  "label": 1200,
+  "baender": [
+   1000,
+   1200
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 4.770132261043896,
+   "patzer": 6.666666666666667,
+   "fehler": 6.166666666666667,
+   "ungenau": 11.5,
+   "exzellent": 57.833333333333336,
+   "grobAnteil": 22.5,
+   "patzer_eroeffnung": 3.5502958579881656,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 8.8339222614841,
+   "n_mittelspiel": 283,
+   "patzer_endspiel": 6.081081081081082,
+   "n_endspiel": 148
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 4.523603472983622,
+   "patzer": 4.666666666666667,
+   "fehler": 8.5,
+   "ungenau": 14.166666666666666,
+   "exzellent": 55.833333333333336,
+   "grobAnteil": 25.0,
+   "patzer_eroeffnung": 4.142011834319527,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 6.36042402826855,
+   "n_mittelspiel": 283,
+   "patzer_endspiel": 2.027027027027027,
+   "n_endspiel": 148
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 4.090288608951817,
+   "patzer": 3.6666666666666665,
+   "fehler": 6.666666666666667,
+   "ungenau": 13.5,
+   "exzellent": 56.99999999999999,
+   "grobAnteil": 27.272727272727273,
+   "patzer_eroeffnung": 1.7751479289940828,
+   "n_eroeffnung": 169,
+   "patzer_mittelspiel": 3.180212014134275,
+   "n_mittelspiel": 283,
+   "patzer_endspiel": 6.756756756756757,
+   "n_endspiel": 148
+  }
+ },
+ "turm": {
+  "label": 1400,
+  "baender": [
+   1200,
+   1400
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 4.8956360422602545,
+   "patzer": 7.166666666666667,
+   "fehler": 6.833333333333333,
+   "ungenau": 9.666666666666666,
+   "exzellent": 57.833333333333336,
+   "grobAnteil": 25.58139534883721,
+   "patzer_eroeffnung": 8.64864864864865,
+   "n_eroeffnung": 185,
+   "patzer_mittelspiel": 7.116104868913857,
+   "n_mittelspiel": 267,
+   "patzer_endspiel": 5.405405405405405,
+   "n_endspiel": 148
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 4.078808359982021,
+   "patzer": 4.333333333333334,
+   "fehler": 7.000000000000001,
+   "ungenau": 12.0,
+   "exzellent": 59.5,
+   "grobAnteil": 19.23076923076923,
+   "patzer_eroeffnung": 3.783783783783784,
+   "n_eroeffnung": 185,
+   "patzer_mittelspiel": 4.868913857677903,
+   "n_mittelspiel": 267,
+   "patzer_endspiel": 4.054054054054054,
+   "n_endspiel": 148
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 3.8150562377831343,
+   "patzer": 3.3333333333333335,
+   "fehler": 6.833333333333333,
+   "ungenau": 13.333333333333334,
+   "exzellent": 56.166666666666664,
+   "grobAnteil": 20.0,
+   "patzer_eroeffnung": 4.864864864864865,
+   "n_eroeffnung": 185,
+   "patzer_mittelspiel": 2.9962546816479403,
+   "n_mittelspiel": 267,
+   "patzer_endspiel": 2.027027027027027,
+   "n_endspiel": 148
+  }
+ },
+ "delia": {
+  "label": 1600,
+  "baender": [
+   1400,
+   1600
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 4.469538826714532,
+   "patzer": 5.666666666666666,
+   "fehler": 6.833333333333333,
+   "ungenau": 10.0,
+   "exzellent": 60.333333333333336,
+   "grobAnteil": 32.35294117647059,
+   "patzer_eroeffnung": 2.312138728323699,
+   "n_eroeffnung": 173,
+   "patzer_mittelspiel": 8.088235294117647,
+   "n_mittelspiel": 272,
+   "patzer_endspiel": 5.161290322580645,
+   "n_endspiel": 155
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 3.68264737734693,
+   "patzer": 4.0,
+   "fehler": 6.333333333333334,
+   "ungenau": 10.833333333333334,
+   "exzellent": 61.16666666666667,
+   "grobAnteil": 12.5,
+   "patzer_eroeffnung": 4.624277456647398,
+   "n_eroeffnung": 173,
+   "patzer_mittelspiel": 4.044117647058823,
+   "n_mittelspiel": 272,
+   "patzer_endspiel": 3.225806451612903,
+   "n_endspiel": 155
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 3.5345303180525844,
+   "patzer": 1.6666666666666667,
+   "fehler": 8.833333333333334,
+   "ungenau": 11.666666666666666,
+   "exzellent": 58.333333333333336,
+   "grobAnteil": 30.0,
+   "patzer_eroeffnung": 0.5780346820809248,
+   "n_eroeffnung": 173,
+   "patzer_mittelspiel": 2.5735294117647056,
+   "n_mittelspiel": 272,
+   "patzer_endspiel": 1.2903225806451613,
+   "n_endspiel": 155
+  }
+ },
+ "koenig": {
+  "label": 1800,
+  "baender": [
+   1600,
+   1800
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 3.685298650607186,
+   "patzer": 3.6666666666666665,
+   "fehler": 6.666666666666667,
+   "ungenau": 10.333333333333334,
+   "exzellent": 62.66666666666667,
+   "grobAnteil": 31.818181818181817,
+   "patzer_eroeffnung": 1.3793103448275863,
+   "n_eroeffnung": 145,
+   "patzer_mittelspiel": 5.434782608695652,
+   "n_mittelspiel": 276,
+   "patzer_endspiel": 2.793296089385475,
+   "n_endspiel": 179
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 3.4860240267745204,
+   "patzer": 4.166666666666666,
+   "fehler": 6.166666666666667,
+   "ungenau": 11.5,
+   "exzellent": 63.5,
+   "grobAnteil": 8.0,
+   "patzer_eroeffnung": 4.137931034482759,
+   "n_eroeffnung": 145,
+   "patzer_mittelspiel": 4.3478260869565215,
+   "n_mittelspiel": 276,
+   "patzer_endspiel": 3.910614525139665,
+   "n_endspiel": 179
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 3.2034330539613407,
+   "patzer": 2.166666666666667,
+   "fehler": 5.5,
+   "ungenau": 12.666666666666668,
+   "exzellent": 63.5,
+   "grobAnteil": 46.15384615384615,
+   "patzer_eroeffnung": 2.7586206896551726,
+   "n_eroeffnung": 145,
+   "patzer_mittelspiel": 1.4492753623188406,
+   "n_mittelspiel": 276,
+   "patzer_endspiel": 2.793296089385475,
+   "n_endspiel": 179
+  }
+ },
+ "greta": {
+  "label": 2100,
+  "baender": [
+   2000,
+   2200
+  ],
+  "neu": {
+   "n": 600,
+   "verlust": 3.4996319495708055,
+   "patzer": 5.5,
+   "fehler": 2.666666666666667,
+   "ungenau": 6.833333333333333,
+   "exzellent": 68.66666666666667,
+   "grobAnteil": 27.272727272727273,
+   "patzer_eroeffnung": 3.4482758620689653,
+   "n_eroeffnung": 116,
+   "patzer_mittelspiel": 7.2202166064981945,
+   "n_mittelspiel": 277,
+   "patzer_endspiel": 4.3478260869565215,
+   "n_endspiel": 207
+  },
+  "mensch": {
+   "n": 600,
+   "verlust": 2.7418887204970384,
+   "patzer": 2.0,
+   "fehler": 5.333333333333334,
+   "ungenau": 9.333333333333334,
+   "exzellent": 66.33333333333333,
+   "grobAnteil": 8.333333333333334,
+   "patzer_eroeffnung": 0.8620689655172413,
+   "n_eroeffnung": 116,
+   "patzer_mittelspiel": 1.444043321299639,
+   "n_mittelspiel": 277,
+   "patzer_endspiel": 3.3816425120772946,
+   "n_endspiel": 207
+  },
+  "alt": {
+   "n": 600,
+   "verlust": 2.2157108779447254,
+   "patzer": 1.0,
+   "fehler": 3.3333333333333335,
+   "ungenau": 8.833333333333334,
+   "exzellent": 70.0,
+   "grobAnteil": 0.0,
+   "patzer_eroeffnung": 3.4482758620689653,
+   "n_eroeffnung": 116,
+   "patzer_mittelspiel": 0.36101083032490977,
+   "n_mittelspiel": 277,
+   "patzer_endspiel": 0.4830917874396135,
+   "n_endspiel": 207
+  }
+ }
+}

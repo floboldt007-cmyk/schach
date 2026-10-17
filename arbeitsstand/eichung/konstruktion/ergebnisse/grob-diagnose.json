@@ -1,0 +1,191 @@
+{
+ "benno": {
+  "stellungen": 100,
+  "verlust": 7.8,
+  "patzer100": 10.5,
+  "grob100": 5.2,
+  "grobGesehen100": 3.1,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 2.1,
+  "mensch": {
+   "verlust": 6.3,
+   "patzer100": 10,
+   "grob100": 3
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 10.3,
+   "grob100": 6.1,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "hilde": {
+  "stellungen": 100,
+  "verlust": 6.3,
+  "patzer100": 8.4,
+  "grob100": 4.1,
+  "grobGesehen100": 2.4,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 1.7,
+  "mensch": {
+   "verlust": 6.3,
+   "patzer100": 10,
+   "grob100": 3
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 8,
+   "grob100": 4.8,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "kalle": {
+  "stellungen": 200,
+  "verlust": 5.9,
+  "patzer100": 8.8,
+  "grob100": 3.8,
+  "grobGesehen100": 2.5,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 1.3,
+  "mensch": {
+   "verlust": 7.3,
+   "patzer100": 10,
+   "grob100": 5
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 6.6,
+   "grob100": 3.4,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "lisa": {
+  "stellungen": 200,
+  "verlust": 5.9,
+  "patzer100": 9.1,
+  "grob100": 3.4,
+  "grobGesehen100": 2.8,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 0.6,
+  "mensch": {
+   "verlust": 6.1,
+   "patzer100": 9,
+   "grob100": 3.5
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 6.3,
+   "grob100": 3.1,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "rudi": {
+  "stellungen": 200,
+  "verlust": 4.6,
+  "patzer100": 5.9,
+  "grob100": 2.2,
+  "grobGesehen100": 1.8,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 0.4,
+  "mensch": {
+   "verlust": 4.2,
+   "patzer100": 5,
+   "grob100": 1
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 5.5,
+   "grob100": 2.5,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "turm": {
+  "stellungen": 200,
+  "verlust": 4.3,
+  "patzer100": 4.8,
+  "grob100": 1.5,
+  "grobGesehen100": 1.1,
+  "grobUngelistet100": 0,
+  "grobHorizont100": 0.4,
+  "mensch": {
+   "verlust": 3.6,
+   "patzer100": 4,
+   "grob100": 0.5
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 5,
+   "grob100": 2.1,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "delia": {
+  "stellungen": 200,
+  "verlust": 4.5,
+  "patzer100": 6.4,
+  "grob100": 1.8,
+  "grobGesehen100": 0.4,
+  "grobUngelistet100": 1.2,
+  "grobHorizont100": 0.2,
+  "mensch": {
+   "verlust": 4.1,
+   "patzer100": 4.5,
+   "grob100": 0.5
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 4.2,
+   "grob100": 1.7,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "koenig": {
+  "stellungen": 200,
+  "verlust": 4.1,
+  "patzer100": 5.2,
+  "grob100": 1.7,
+  "grobGesehen100": 0.1,
+  "grobUngelistet100": 0.8,
+  "grobHorizont100": 0.7,
+  "mensch": {
+   "verlust": 4,
+   "patzer100": 4.5,
+   "grob100": 0
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 3.3,
+   "grob100": 1.1,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ },
+ "greta": {
+  "stellungen": 200,
+  "verlust": 3.2,
+  "patzer100": 4.2,
+  "grob100": 1.1,
+  "grobGesehen100": 0,
+  "grobUngelistet100": 1,
+  "grobHorizont100": 0,
+  "mensch": {
+   "verlust": 3,
+   "patzer100": 2.5,
+   "grob100": 0
+  },
+  "alle": {
+   "stellungen": 1100,
+   "verlust": 2.6,
+   "grob100": 0.7,
+   "menschVerlust": 4.6,
+   "menschGrob100": 1.5
+  }
+ }
+}

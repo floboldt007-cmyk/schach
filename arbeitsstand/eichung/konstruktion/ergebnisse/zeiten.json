@@ -1,0 +1,24 @@
+{
+ "alt": {
+  "benno": 5.0,
+  "hilde": 4.7,
+  "kalle": 6.6,
+  "lisa": 6.7,
+  "rudi": 9.9,
+  "turm": 13.2,
+  "delia": 20.1,
+  "koenig": 34.1,
+  "greta": 27.4
+ },
+ "neu": {
+  "benno": 12.8,
+  "hilde": 7.6,
+  "kalle": 9.1,
+  "lisa": 13.3,
+  "rudi": 18.3,
+  "turm": 24.2,
+  "delia": 28.1,
+  "koenig": 38.5,
+  "greta": 62.7
+ }
+}

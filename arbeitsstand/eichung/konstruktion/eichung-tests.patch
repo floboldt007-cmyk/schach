@@ -1,0 +1,429 @@
+diff --git a/tests/alle.mjs b/tests/alle.mjs
+index 1f58306..648dbe8 100644
+--- a/tests/alle.mjs
++++ b/tests/alle.mjs
+@@ -24,6 +24,7 @@ const SUITEN = [
+   { name: 'fairness', datei: 'fairness.test.mjs', args: [], was: 'Fairness-Regeln (Runde 4)' },
+   { name: 'spiel', datei: 'spiel.test.mjs', args: [], was: 'Spiel-Fundament: Tag, Inhalte, Spielplan, Bot-Register' },
+   { name: 'engine-bots', datei: 'engine-bots.test.mjs', args: ['--schnell'], was: 'Stockfish-Wrapper und Bots' },
++  { name: 'bots-mensch', datei: 'bots-mensch.test.mjs', args: [], was: 'Menschliche Zugwahl der Bots (ohne Engine)' },
+   { name: 'board', datei: 'board.test.mjs', args: [], was: 'Brett: Tippen, Ziehen, Effekte' },
+   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
+   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
+diff --git a/tests/app.test.mjs b/tests/app.test.mjs
+index 7737b83..88f06f2 100644
+--- a/tests/app.test.mjs
++++ b/tests/app.test.mjs
+@@ -2436,16 +2436,18 @@ async function testeSpielFundament(browser) {
+     await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard', staerke: 1080 } });
+     await h.warteFlo();
+     const st = await seite.evaluate(async () => {
+-      const lisa = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'lisa');
++      const bots = await import('./js/bots.js');
+       const zb = window.__partie.zugBot();
+       return { h2: document.querySelector('.partie .kopf h2').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
+-        wieLisa: JSON.stringify(zb.staerke) === JSON.stringify(lisa.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
++        wieProfil: JSON.stringify(zb.staerke) === JSON.stringify(bots.staerkeFuerElo(1080).staerke), id: zb.id,
++        laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
+     });
+     await seite.evaluate(() => { window.__test = {}; });
+-    // w0plus-a-fix (Befund des Pruefers): Kopf und Bot-Zeile nennen die Elo des Profils, mit dem der Boss wirklich spielt
+-    // (vor der Eichung Lisa, 1000), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
+-    pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1000"), Anfrage gespeichert',
+-      st.h2 === 'Testboss · Standard ≈ 1000' && st.meta.startsWith('Wochen-Boss · ≈ 1000') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
++    // w0plus-a-fix (Befund des Pruefers): Kopf und Bot-Zeile nennen die Elo des Profils, mit dem der Boss wirklich spielt,
++    // nicht die Anfrage; die Anfrage bleibt im Datensatz. Eichung 10/2026: staerkeFuerElo(1080) spielt geeicht mit 1100
++    // (Lisas Profil mit hoeherer sorgfalt), vorher mit Lisas Profil und 1000
++    pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem geeichten Profil aus staerkeFuerElo, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1100"), Anfrage gespeichert',
++      st.h2 === 'Testboss · Standard ≈ 1100' && st.meta.startsWith('Wochen-Boss · ≈ 1100') && st.wieProfil && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
+     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+     await kontext.close();
+   }
+diff --git a/tests/bots-mensch.test.mjs b/tests/bots-mensch.test.mjs
+new file mode 100644
+index 0000000..84039d7
+--- /dev/null
++++ b/tests/bots-mensch.test.mjs
+@@ -0,0 +1,160 @@
++// Tests fuer die menschliche Zugwahl in js/bots.js (Eichung Oktober 2026), ohne Browser und ohne Stockfish:
++// eine Fake-Engine liefert feste Bewertungen. Ergaenzt tests/engine-bots.test.mjs (echte Engine im Browser).
++//   node tests/bots-mensch.test.mjs
++import { Chess } from '../vendor/chess/chess.js';
++import {
++  BOTS, botZug, menschenReize, naturMerkmale, NATUR, NATUR_MERKMALE, phaseVon, verlusteAusAnalyse, STIL_FENSTER_PP,
++  staerkeFuerElo,
++} from '../js/bots.js';
++
++const ergebnisse = [];
++function pruefe(name, ok, detail = '') {
++  ergebnisse.push({ name, ok: !!ok });
++  console.log((ok ? 'OK     ' : 'FEHLER ') + name + (detail && !ok ? '  (' + detail + ')' : ''));
++}
++// feste Zufallsquelle
++function zufallAus(seed) {
++  let s = seed >>> 0;
++  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
++}
++// Fake-Engine: Materialbilanz nach dem besten Zurueckschlagen (1 Halbzug tief), alle Zuege als MultiPV
++const W = { p: 100, n: 300, b: 300, r: 500, q: 900, k: 0 };
++function material(fen) {
++  let s = 0;
++  for (const c of fen.split(' ')[0]) { const t = c.toLowerCase(); if (W[t] != null) s += c === t ? -W[t] : W[t]; }
++  return s;
++}
++class FakeEngine {
++  constructor() { this.aufrufe = []; }
++  async analyse(fen, opts = {}) {
++    this.aufrufe.push(opts);
++    const c = new Chess(fen);
++    const vz = c.turn() === 'w' ? 1 : -1;
++    const lines = c.moves({ verbose: true }).map((m) => {
++      c.move(m);
++      let schlecht = Infinity;
++      for (const r of c.moves({ verbose: true })) { c.move(r); schlecht = Math.min(schlecht, vz * material(c.fen())); c.undo(); }
++      if (schlecht === Infinity) schlecht = vz * material(c.fen());
++      c.undo();
++      return { pv: [m.lan], eval: { cp: vz * schlecht, mate: null } };
++    }).sort((a, b) => vz * (b.eval.cp - a.eval.cp));
++    return { fen, bestmove: lines[0].pv[0], depth: opts.depth, lines: lines.slice(0, opts.multipv || 1) };
++  }
++}
++
++// ---------- Aufbau ----------
++pruefe('Stufe 1 bis 9 nutzen die menschliche Zugwahl (staerke.mensch)', BOTS.slice(0, 9).every((b) => b.staerke.mensch && Number.isFinite(b.staerke.mensch.sorgfalt)));
++pruefe('Keine Spontanzuege mehr in der Leiter (patzer/rauschen nicht gesetzt)', BOTS.slice(0, 9).every((b) => !b.staerke.patzer && !b.staerke.rauschen));
++pruefe('Stufe 10 bleibt volle Engine', BOTS[9].staerke.voll === true);
++pruefe('Natur-Gewichte vollstaendig und endlich', NATUR_MERKMALE.every((k) => Number.isFinite(NATUR.basis[k]) && Number.isFinite(NATUR.steigung[k])));
++// Eichung Oktober 2026: sorgfalt, biss und Kandidaten sind je Stufe gemeinsam geeicht (steigen nicht einzeln mit der
++// Stufe); eloJeLn = lokale Steigung der Eichkurve fuer staerkeFuerElo
++pruefe('Eichwerte Stufe 2 bis 9 gueltig (sorgfalt > 0, biss 0 bis 1,5, Kandidaten 0 bis 8, eloJeLn > 0)', BOTS.slice(1, 9).every((b) => {
++  const m = b.staerke.mensch;
++  return m.sorgfalt > 0 && m.biss > 0 && m.biss <= 1.5 && Number.isInteger(m.kandidaten) && m.kandidaten >= 0 && m.kandidaten <= 8 && m.eloJeLn > 0;
++}));
++pruefe('Kandidaten: schwache Stufen betrachten mehr Zuege (Benno alle, Hilde und Kalle 8), starke 3', BOTS[0].staerke.mensch.kandidaten === 0
++  && BOTS[1].staerke.mensch.kandidaten === 8 && BOTS[2].staerke.mensch.kandidaten === 8 && BOTS.slice(6, 9).every((b) => b.staerke.mensch.kandidaten === 3));
++pruefe('Rechentiefe steigt nicht ab (Stufe 1 bis 9)', BOTS.slice(0, 9).every((b, i, a) => i === 0 || b.staerke.tiefe >= a[i - 1].staerke.tiefe));
++
++// ---------- staerkeFuerElo (Boss "etwa deine Wertung") ----------
++{
++  const s1300 = staerkeFuerElo(1300);
++  const rudi = BOTS.find((b) => b.id === 'rudi').staerke.mensch.sorgfalt;
++  const turm = BOTS.find((b) => b.id === 'turm').staerke.mensch.sorgfalt;
++  pruefe('staerkeFuerElo(1300): Profil von Rudi (naeher), nur sorgfalt entlang seiner Eichkurve hoeher',
++    s1300.elo === 1300 && s1300.botId === 'rudi' && s1300.staerke.mensch.elo === 1200 && s1300.staerke.mensch.sorgfalt > rudi
++    && Math.abs(s1300.staerke.mensch.sorgfalt - rudi * Math.exp(100 / BOTS.find((b) => b.id === 'rudi').staerke.mensch.eloJeLn)) < 1e-9
++    && s1300.staerke.mensch.biss === BOTS.find((b) => b.id === 'rudi').staerke.mensch.biss && turm > 0
++    && JSON.stringify(s1300.staerke.vorlieben) === JSON.stringify(BOTS.find((b) => b.id === 'rudi').staerke.vorlieben), JSON.stringify(s1300.staerke.mensch));
++  const reihe = [1000, 1050, 1100].map((e) => staerkeFuerElo(e).staerke.mensch.sorgfalt);
++  pruefe('staerkeFuerElo: innerhalb eines Nachbarn steigt sorgfalt mit der Elo', reihe[0] < reihe[1] && reihe[1] < reihe[2], reihe);
++  pruefe('staerkeFuerElo: Leiter-Elo gibt den Leiter-Bot, ausserhalb 500 bis 2100 der naechstliegende (wie vor der Eichung)', staerkeFuerElo(1400).botId === 'turm' && staerkeFuerElo(3000).botId === 'stockfisch' && staerkeFuerElo(2400).botId === 'greta' && staerkeFuerElo(100).botId === 'benno' && staerkeFuerElo(450).botId === 'hilde' && staerkeFuerElo(NaN) === null);
++  pruefe('staerkeFuerElo: Kopie, Leiter bleibt unveraendert', (() => { const x = staerkeFuerElo(1600); x.staerke.mensch.sorgfalt = 99; return BOTS.find((b) => b.id === 'delia').staerke.mensch.sorgfalt !== 99; })());
++}
++
++// ---------- Phasen und Merkmale ----------
++pruefe('phaseVon: Startstellung = eroeffnung', phaseVon(new Chess().fen()) === 'eroeffnung');
++pruefe('phaseVon: Turmendspiel = endspiel', phaseVon('8/5pk1/6p1/7p/3R3P/6P1/r4PK1/8 w - - 0 40') === 'endspiel');
++pruefe('phaseVon: Halbzug 30+ = mittelspiel', phaseVon('r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 16') === 'mittelspiel');
++const DAME = 'rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3';   // Sxh4 nimmt die freie Dame
++{
++  const c = new Chess(DAME);
++  const z = c.moves({ verbose: true }).find((m) => m.lan === 'f3h4');
++  const f = naturMerkmale(c, z, { farbe: 'w', vollzug: 3, phase: 'eroeffnung', vorigerZug: 'd8h4' });
++  const i = (k) => f[NATUR_MERKMALE.indexOf(k)];
++  pruefe('Merkmale: Sxh4 ist Schlagen, Materialgewinn, Flucht nicht', i('schlag') === 1 && i('gewinnSchlag') === 3 && i('flucht') === 0, JSON.stringify(f));
++  pruefe('Merkmale: Stellung unveraendert nach naturMerkmale', c.fen() === DAME);
++  const h = c.moves({ verbose: true }).find((m) => m.lan === 'f1a6');   // Laeufer haengt auf a6 (b7xa6)
++  const fh = naturMerkmale(c, h, { farbe: 'w', vollzug: 3, phase: 'eroeffnung' });
++  pruefe('Merkmale: La6 haengt (vom Bauern angegriffen)', fh[NATUR_MERKMALE.indexOf('haengt')] === 1 && fh[NATUR_MERKMALE.indexOf('bauernAngriff')] === 1);
++}
++{
++  const c = new Chess('4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1');
++  const z = c.moves({ verbose: true }).find((m) => m.lan === 'e4d5');
++  const f = naturMerkmale(c, z, { farbe: 'w', vollzug: 1, phase: 'endspiel', vorigerZug: 'd7d5' });
++  pruefe('Merkmale: Zurueckschlagen erkannt (vorigerZug)', f[NATUR_MERKMALE.indexOf('rueckSchlag')] === 1);
++}
++
++// ---------- Verluste und Reize ----------
++{
++  const c = new Chess(DAME);
++  const zuege = c.moves({ verbose: true });
++  const analyse = await new FakeEngine().analyse(DAME, { multipv: 256 });
++  const v = verlusteAusAnalyse(zuege, analyse, 'w');
++  pruefe('Verluste: bester Zug 0, alle Zuege bewertet, nie negativ', v.get('f3h4') === 0 && v.size === zuege.length && [...v.values()].every((x) => x >= 0));
++  const lisa = BOTS.find((b) => b.id === 'lisa');
++  const r = menschenReize(c, zuege, analyse, lisa, { farbe: 'w', vollzug: 3, fen: DAME, verboten: new Set() });
++  const kandidaten = new Set(r.map((x) => x.zug.lan));
++  pruefe('Kandidaten: Lisa betrachtet nicht alle Zuege (beste 5 + forcierende)', kandidaten.size < zuege.length && kandidaten.has('f3h4'), kandidaten.size + ' von ' + zuege.length);
++  const benno = BOTS.find((b) => b.id === 'benno');
++  const rb = menschenReize(c, zuege, analyse, benno, { farbe: 'w', vollzug: 3, fen: DAME, verboten: new Set() });
++  pruefe('Kandidaten: Benno (Anfaenger) betrachtet alle Zuege', rb.length === zuege.length);
++  const reizDame = (rr) => rr.find((x) => x.zug.lan === 'f3h4').reiz - Math.max(...rr.filter((x) => x.zug.lan !== 'f3h4').map((x) => x.reiz));
++  pruefe('Reize: die freie Dame reizt Lisa staerker als Benno', reizDame(r) > reizDame(rb));
++  const ohne = menschenReize(c, zuege, analyse, lisa, { farbe: 'w', vollzug: 3, fen: DAME, verboten: new Set(['f3h4']) });
++  pruefe('Reize: verbotene Zuege fehlen', !ohne.some((x) => x.zug.lan === 'f3h4'));
++  // Begrenzte MultiPV (Delia, Koenig, Greta): Zuege ausserhalb der Liste sind keine Kandidaten, auch nicht als Schlag-
++  // oder Schachzug (vorher "schlechtester + 5" und oft gewaehlt: die meisten groben Patzer der oberen Stufen)
++  const kurz = { ...analyse, lines: analyse.lines.slice(0, 4) };
++  const gelistet = new Set(kurz.lines.map((l) => l.pv[0]));
++  const delia = BOTS.find((b) => b.id === 'delia');
++  const rd = menschenReize(c, zuege, kurz, delia, { farbe: 'w', vollzug: 3, fen: DAME, verboten: new Set() });
++  pruefe('Kandidaten: bei begrenzter MultiPV nur bewertete Zuege', rd.length > 0 && rd.every((x) => gelistet.has(x.zug.lan)),
++    rd.map((x) => x.zug.lan).join(','));
++}
++
++// ---------- botZug ----------
++{
++  const e = new FakeEngine();
++  const anteil = async (bot, n = 60) => {
++    let t = 0;
++    for (let i = 0; i < n; i++) {
++      const r = await botZug(e, DAME, bot, { ohnePause: true, zufall: zufallAus(100 + i), vorigerZug: 'd8h4' });
++      if (r.uci === 'f3h4') t++;
++    }
++    return t / n;
++  };
++  const a = await anteil(BOTS.find((b) => b.id === 'hilde'));
++  const d = await anteil(BOTS.find((b) => b.id === 'delia'));
++  pruefe('Freie Dame: Hilde nimmt sie meistens, Delia (fast) immer', a >= 0.6 && d >= 0.95, `Hilde ${Math.round(100 * a)} %, Delia ${Math.round(100 * d)} %`);
++  const r1 = await botZug(e, DAME, BOTS[4], { ohnePause: true, zufall: zufallAus(7) });
++  const r2 = await botZug(e, DAME, BOTS[4], { ohnePause: true, zufall: zufallAus(7) });
++  pruefe('Gleicher Zufall, gleiche Analyse: gleicher Zug (pruefbare Partien)', r1.uci === r2.uci);
++  let arten = new Set();
++  for (const b of BOTS.slice(0, 9)) for (let i = 0; i < 5; i++) arten.add((await botZug(e, DAME, b, { ohnePause: true, zufall: zufallAus(i) })).art);
++  pruefe('Stufe 1 bis 9: keine Spontanzuege (art nie "patzer")', !arten.has('patzer'), [...arten].join(','));
++  const breiten = e.aufrufe.map((o) => o.multipv);
++  pruefe('Suche mit MultiPV ueber alle Zuege fuer die unteren Stufen', breiten.some((m) => m >= 20));
++  // Matt in 1: ab Stufe 4 immer
++  const MATT = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1';
++  let immer = true;
++  for (const b of BOTS.slice(3, 9)) for (let i = 0; i < 5; i++) if ((await botZug(e, MATT, b, { ohnePause: true, zufall: zufallAus(i) })).uci !== 'a1a8') immer = false;
++  pruefe('Matt in 1 ab Stufe 4 immer gesehen', immer);
++  // Stil nur im Fenster: Vorlieben machen den Bot nicht schwaecher
++  pruefe('Stil-Fenster 3 Prozentpunkte', STIL_FENSTER_PP === 3);
++}
++
++const fehler = ergebnisse.filter((r) => !r.ok);
++console.log(`\n${ergebnisse.length - fehler.length}/${ergebnisse.length} bestanden`);
++process.exit(fehler.length ? 1 : 0);
+diff --git a/tests/engine-bots.html b/tests/engine-bots.html
+index 4b3de59..db98836 100644
+--- a/tests/engine-bots.html
++++ b/tests/engine-bots.html
+@@ -315,6 +315,21 @@ async function testBots() {
+     }
+   }
+   pruefe('Jeder Bot liefert legale Zuege (uci + passende SAN)', alleLegal, info || (BOTS.length * stellungen.length + ' Zuege, ' + Math.round(jetzt() - t0) + ' ms'));
++  // Menschliche Zugwahl: keine Spontanzuege (art 'patzer') mehr in der Leiter, Suchzeit je Zug begrenzt
++  let spontan = 0;
++  const zeiten = [];
++  for (const b of BOTS.slice(0, 9)) {
++    for (const f of stellungen) {
++      const t1 = jetzt();
++      const r = await botZug(e, f, b, { ohnePause: true });
++      zeiten.push({ b: b.id, ms: jetzt() - t1 });
++      if (r && r.art === 'patzer') spontan++;
++    }
++  }
++  pruefe('Leiter-Bots (Stufe 1 bis 9) ziehen ohne Spontanzuege', spontan === 0, spontan + ' Spontanzuege');
++  const gretaZeiten = zeiten.filter((x) => x.b === 'greta').map((x) => x.ms);
++  const gretaMittel = gretaZeiten.reduce((a, x) => a + x, 0) / gretaZeiten.length;
++  pruefe('Suchzeit je Bot-Zug: Greta im Mittel unter 1500 ms (Denkpause 800 bis 1500 ms)', gretaMittel < 1500, Math.round(gretaMittel) + ' ms');
+   pruefe('Keine legalen Zuege: null', (await botZug(e, MATT_SCHWARZ_IST_MATT, BOTS[0], { ohnePause: true })) === null);
+ 
+   // Abgestuerzter Worker (leere Analyse mit fehler): einmal neu versuchen, sonst Fehler statt Zufallszug
+@@ -380,7 +395,7 @@ async function testBots() {
+   for (const b of [BOTS[0], BOTS[1], BOTS[3], BOTS[6]]) {
+     let n = 0;
+     for (let i = 0; i < 20; i++) {
+-      const z = await botZug(e, freieDame, b, { ohnePause: true });
++      const z = await botZug(e, freieDame, b, { ohnePause: true, vorigerZug: 'd8h4' });
+       if (z.uci === 'f3h4') n++;
+     }
+     quoten.push(b.name + ' ' + n * 5 + ' %');
+@@ -424,8 +439,12 @@ async function testBots() {
+   pruefe('Charakter färbt die Zugwahl (Lieblingszüge häufiger als ohne Vorliebe)', mit > ohne,
+     `${Math.round(100 * mit / 6)} % gegen ${Math.round(100 * ohne / 6)} % im Mittel`);
+ 
+-  pruefe('Freie Dame: Hilde nimmt sie fast immer, Benno oft, Lisa fast immer, Delia immer',
+-    BOTS_DAME.hilde >= 0.7 && BOTS_DAME.benno >= 0.3 && BOTS_DAME.lisa >= 0.9 && BOTS_DAME.delia === 1, quoten.join(', '));
++  // Menschliche Zugwahl (Eichung 10/2026): Menschen um Lichess 600 nehmen diese Dame laut Maia-3 in etwa 62 %
++  // der Faelle, um 1500 in 54 %. Genaue Wahrscheinlichkeiten der Bots mit der App-Engine (skripte/dame_exakt.mjs der
++  // Eichung, mit vorigerZug wie in der App): Benno 70 %, Hilde 81 %, Lisa 94 %, Delia 98,5 %. Grenzen so, dass die
++  // Pruefung mit je 20 Proben in mehr als 99 % der Laeufe haelt (die Reihenfolge prueft bots-mensch.test.mjs ohne Zufall).
++  pruefe('Freie Dame: Benno oft, Hilde meistens, Lisa und Delia fast immer',
++    BOTS_DAME.benno >= 0.4 && BOTS_DAME.hilde >= 0.55 && BOTS_DAME.lisa >= 0.75 && BOTS_DAME.delia >= 0.9, quoten.join(', '));
+   e.terminate();
+ }
+ const BOTS_MATT = {};
+@@ -525,7 +544,9 @@ async function testStaerke({ proben = 3, parallel = 4 } = {}) {
+   const mittel = gruppen.map((g) => g.reduce((x, s) => x + k(s).chanceVerlust, 0) / g.length);
+   pruefe('Staerke-Kurve faellt: Stufe 1-2 > 3-4 > 5-6 > 7-9 > 10 (Chancenverlust)',
+     mittel.every((m, i) => i === 0 || m < mittel[i - 1]), mittel.map((m) => m.toFixed(3)).join(' > '));
+-  pruefe('Stufe 1 laesst oft Material haengen (Patzer >= 20 %)', k(1).patzerQuote >= 0.2, Math.round(100 * k(1).patzerQuote) + ' %');
++  // Menschen im untersten Lichess-Band (um 540) verlieren in etwa 9 von 100 Zuegen mehr als 20 Prozentpunkte
++  // Gewinnchance; Benno (250, Anfaenger) soll klar darueber liegen.
++  pruefe('Stufe 1 laesst oft Material haengen (Patzer >= 10 %)', k(1).patzerQuote >= 0.1, Math.round(100 * k(1).patzerQuote) + ' %');
+   pruefe('Stufe 10 spielt nahezu fehlerfrei (Patzer 0 %, Ø-Verlust < 20 cp)', k(10).patzerQuote === 0 && k(10).acpl < 20, k(10).acpl + ' cp');
+   return kurve;
+ }
+diff --git a/tests/review.test.mjs b/tests/review.test.mjs
+index c003b32..9b9c5ae 100644
+--- a/tests/review.test.mjs
++++ b/tests/review.test.mjs
+@@ -14,6 +14,7 @@ import {
+   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
+   sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
+   GRENZEN, spielphasen, coachKern, seitenGenauigkeit,
++  STAERKE_MODELL, staerkeBeleg, staerkeMittel, spielteWie, spielstaerkeAusPartien, gegnerGewicht,
+ } from '../js/review.js';
+ import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '../js/openings.js';
+ 
+@@ -122,6 +123,53 @@ function nodeTests() {
+   pruefe('Spielstaerke kurze Partie zur Mitte', schaetzeSpielstaerke(100, undefined, 2) < 1500);
+   pruefe('Spielstaerke ohne Genauigkeit = null', schaetzeSpielstaerke(null) === null);
+ 
++
++  // ---------- Spielstaerke, geeicht (Oktober 2026) ----------
++  const SM = STAERKE_MODELL;
++  pruefe('Staerke: Mittelkurve steigt mit der Wertung', SM.knoten.every((k, i) => i === 0 || k[1] > SM.knoten[i - 1][1]));
++  pruefe('Staerke: staerkeMittel trifft die Stuetzpunkte', SM.knoten.every(([r, a]) => nahe(staerkeMittel(r), a, 1e-9)));
++  const eintr = (liste) => liste.map(([klasse, g, wv, buch = false]) => ({ farbe: 'w', klasse, genauigkeit: g, gewinnVorher: wv, buch }));
++  const beleg1 = staerkeBeleg(eintr([['buch', 100, 0.5, true], ['erzwungen', 100, 0.5], ['bester', 100, 0.5], ['patzer', 10, 0.5], ['gut', 90, 0.95]]), 'w');
++  pruefe('Staerke: Beleg nur aus offenen Stellungen (ohne Buch, erzwungen, entschieden)', beleg1 && beleg1.zuege === 2 && nahe(beleg1.genauigkeit, 55), JSON.stringify(beleg1));
++  pruefe('Staerke: kein offener Zug -> null', staerkeBeleg(eintr([['gut', 90, 0.99]]), 'w') === null);
++  const sw = (g, n = 25, o = {}) => spielteWie({ genauigkeit: g, zuege: n }, o);
++  pruefe('Spielte wie: hoehere Genauigkeit -> hoeher', sw(75).elo < sw(85).elo && sw(85).elo < sw(92).elo);
++  pruefe('Spielte wie: ohne Vorwissen vorlaeufig, Spanne um den Wert', sw(80).vorlaeufig && sw(80).spanne[0] < sw(80).elo && sw(80).elo < sw(80).spanne[1]);
++  pruefe('Spielte wie: Referenzwerte (Python-Prototyp py/schaetzer.py)', [[70, 12], [78, 20], [84, 25], [88, 30], [92, 35]].map(([g, n]) => sw(g, n).elo).join() === '950,1200,1450,1700,2050',
++    [[70, 12], [78, 20], [84, 25], [88, 30], [92, 35]].map(([g, n]) => sw(g, n).elo).join());
++  const vw = { elo: 1200, sd: 120 };
++  pruefe('Spielte wie: mit Vorwissen nahe am eigenen Schnitt', Math.abs(sw(staerkeMittel(1200), 25, { vorwissen: vw }).elo - 1200) <= 50 && !sw(80, 25, { vorwissen: vw }).vorlaeufig);
++  pruefe('Spielte wie: Tendenz besser / schwaecher', sw(95, 25, { vorwissen: vw }).tendenz === 'besser' && sw(60, 25, { vorwissen: vw }).tendenz === 'schwaecher');
++  pruefe('Spielte wie: eine Glanzpartie verschiebt nur begrenzt', sw(95, 25, { vorwissen: vw }).elo < 1700, sw(95, 25, { vorwissen: vw }).elo);
++  pruefe('Gegner-Gewicht: gleich stark 1, sehr viel schwaecher Minimum, dazwischen fallend',
++    gegnerGewicht(1200, 1200) === 1 && gegnerGewicht(200, 1200) === SM.schwacherGegner[2] && gegnerGewicht(600, 1200) < 1 && gegnerGewicht(600, 1200) > gegnerGewicht(400, 1200));
++  const partien = (g, n, o = {}) => Array.from({ length: n }, () => ({ beleg: { genauigkeit: g, zuege: 25 }, gegnerElo: 1500, ...o }));
++  const s20 = spielstaerkeAusPartien(partien(staerkeMittel(1500), 20));
++  pruefe('Spielstaerke: 20 Partien wie ein 1500er -> 1500 +- 100, Spanne enthaelt 1500, nicht vorlaeufig',
++    Math.abs(s20.elo - 1500) <= 100 && !s20.vorlaeufig && s20.spanne[0] < 1500 && s20.spanne[1] > 1500, JSON.stringify(s20));
++  pruefe('Spielstaerke: 3 Partien -> vorlaeufig', spielstaerkeAusPartien(partien(85, 3)).vorlaeufig);
++  pruefe('Spielstaerke: Partien mit Hilfe (Hinweis, Zuruecknahme) zaehlen nicht', spielstaerkeAusPartien(partien(85, 5, { hilfe: true })) === null);
++  const breite = (x) => x.spanne[1] - x.spanne[0];
++  pruefe('Spielstaerke: Spanne schrumpft mit mehr Partien', breite(spielstaerkeAusPartien(partien(85, 20))) < breite(spielstaerkeAusPartien(partien(85, 5))));
++  const gegenSchwach = spielstaerkeAusPartien([...partien(staerkeMittel(1200), 10), ...partien(95, 10, { gegnerElo: 250 })]);
++  const gegenGleich = spielstaerkeAusPartien([...partien(staerkeMittel(1200), 10), ...partien(95, 10, { gegnerElo: 1300 })]);
++  pruefe('Spielstaerke: Glanzpartien gegen sehr schwache Bots heben weniger', gegenSchwach.elo < gegenGleich.elo, `${gegenSchwach.elo} < ${gegenGleich.elo}`);
++  pruefe('Spielstaerke: Ueber- und Unterschaetzung der alten Tabelle behoben (Band-Mittel 543 bzw. 2473)',
++    Math.abs(spielstaerkeAusPartien(partien(staerkeMittel(543), 20)).elo - 543) <= 150 && Math.abs(spielstaerkeAusPartien(partien(staerkeMittel(2473), 20)).elo - 2473) <= 150);
++  // Bot-Aufschlag (Messung E3 mit Maia-3 als Stellvertreter): gegen die App-Bots spielt man in offenen Stellungen
++  // genauer als gegen Menschen gleicher Staerke; Partien gegen Bots (gegenBot) werden darum gesenkt
++  pruefe('Bot-Aufschlag: Modellwert gesetzt (0 bis 6 Genauigkeitspunkte)', Number.isFinite(SM.botAufschlag) && SM.botAufschlag > 0 && SM.botAufschlag <= 6, SM.botAufschlag);
++  const mitBot = spielstaerkeAusPartien(partien(staerkeMittel(1500), 20, { gegenBot: true }));
++  pruefe('Bot-Aufschlag: dieselben Belege gegen Bots ergeben eine niedrigere Spielstaerke', mitBot.elo < s20.elo, `${mitBot.elo} < ${s20.elo}`);
++  const genauBot = spielstaerkeAusPartien(partien(staerkeMittel(1500) + SM.botAufschlag, 20, { gegenBot: true }));
++  pruefe('Bot-Aufschlag: ein 1500er, der gegen Bots um den Aufschlag genauer spielt -> 1500 +- 100', Math.abs(genauBot.elo - 1500) <= 100, genauBot.elo);
++  pruefe('Bot-Aufschlag: Spielte wie gegen einen Bot niedriger', sw(85, 25, { gegenBot: true }).elo < sw(85).elo);
++  const breiteBot = (x) => x.spanne[1] - x.spanne[0];
++  pruefe('Bot-Aufschlag: seine Unsicherheit verbreitert die Spanne, nach 20 Partien trotzdem nicht vorlaeufig',
++    SM.botAufschlagSd > 0 && breiteBot(genauBot) > breiteBot(s20) && !genauBot.vorlaeufig, `${breiteBot(genauBot)} > ${breiteBot(s20)}`);
++  pruefe('Bot-Aufschlag: nur mit gegenBot, eine Gegner-Elo allein senkt nicht',
++    spielstaerkeAusPartien(partien(85, 20, { gegnerElo: null })).elo === spielstaerkeAusPartien(partien(85, 20)).elo);
++
+   // ---------- Deutsche SAN ----------
+   const san = [['Nf3', 'Sf3'], ['Qxd8+', 'Dxd8+'], ['exd8=Q#', 'exd8=D#'], ['O-O', '0-0'], ['O-O-O+', '0-0-0+'],
+     ['Bb5', 'Lb5'], ['Rxe1', 'Txe1'], ['Kxf7', 'Kxf7'], ['e4', 'e4'], ['bxc6', 'bxc6'], ['Nbd7', 'Sbd7'], ['b8=N', 'b8=S']];
+@@ -425,7 +473,10 @@ async function asyncTests() {
+   pruefe('Partie: Genauigkeit 0..100', r.genauigkeit.w >= 0 && r.genauigkeit.w <= 100 && r.genauigkeit.b >= 0 && r.genauigkeit.b < r.genauigkeit.w, JSON.stringify(r.genauigkeit));
+   pruefe('Partie: Zaehler je Klasse', r.anzahl.b.patzer === 1 && r.anzahl.w.buch === 2 && KLASSEN.every((k) => k in r.anzahl.w && k in r.anzahl.b), JSON.stringify(r.anzahl.b));
+   pruefe('Partie: Schluesselmoment Sf6 (ply 5)', r.schluesselmomente.includes(5), JSON.stringify(r.schluesselmomente));
+-  pruefe('Partie: Spielstaerke beider Seiten', typeof r.spielstaerke.w === 'number' && typeof r.spielstaerke.b === 'number' && r.spielstaerke.b < r.spielstaerke.w);
++  pruefe('Partie: Spielstaerke beider Seiten', typeof r.spielstaerke.w === 'number' && typeof r.spielstaerke.b === 'number');
++  pruefe('Partie: Spieler (Patzer Sf6) unter 1300, Bot-Seite nahe ihrer Elo 800', r.staerke.b.elo < 1300 && Math.abs(r.spielstaerke.w - 800) <= 200 && r.staerke.b.vorlaeufig,
++    JSON.stringify(r.staerke));
++  pruefe('Partie: Belege je Seite (offene Stellungen)', r.belege.b && r.belege.b.zuege === 2 && r.belege.w && r.belege.w.zuege >= 1, JSON.stringify(r.belege));
+   pruefe('Partie: Kurve (n+1 Werte, Ende 1.0)', r.kurve.length === 8 && r.kurve[7] === 1);
+   pruefe('Partie: Du-Form nur fuer spielerFarbe', /verlierst|deine/.test(r.zuege[5].coach) || !/deinen Gegner/.test(r.zuege[6].coach));
+ 
+diff --git a/tests/spiel.test.mjs b/tests/spiel.test.mjs
+index 27da0e1..58b06e4 100644
+--- a/tests/spiel.test.mjs
++++ b/tests/spiel.test.mjs
+@@ -320,21 +320,31 @@ const PROFIL = {
+   gast();
+ }
+ {
+-  // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080"): vor der Eichung der naechstliegende Leiter-Bot
++  // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080"), geeicht: zwischen 500 und 2100 das Profil des naeheren
++  // Leiter-Bots (bei Gleichstand der schwaechere) mit verschobener sorgfalt, ausserhalb der naechstliegende
+   const w = (elo) => (staerkeFuerElo(elo) || {}).botId;
+-  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1080 Lisa, 1150 Rudi, 1100 Gleichstand: der schwaechere, 0 Benno, 5000 Stockfisch)',
++  pruefe('staerkeFuerElo: naeherer Leiter-Bot (1080 Lisa, 1150 Rudi, 1100 Gleichstand: der schwaechere, 0 Benno, 5000 Stockfisch)',
+     w(1080) === 'lisa' && w(1150) === 'rudi' && w(1100) === 'lisa' && w(0) === 'benno' && w(5000) === 'stockfisch' && staerkeFuerElo(NaN) === null
+     && staerkeFuerElo('1080') === null, [1080, 1150, 1100, 0, 5000].map(w));
+   const lisa = BOTS.find((b) => b.id === 'lisa');
++  const rudi = BOTS.find((b) => b.id === 'rudi');
+   const st = staerkeFuerElo(1080).staerke;
+   st.tiefe = 99;
+-  pruefe('staerkeFuerElo: Kopie des Profils (die Leiter bleibt unveraendert)', JSON.stringify(staerkeFuerElo(1080).staerke) === JSON.stringify(lisa.staerke) && lisa.staerke.tiefe !== 99);
+-  // w0plus-a-fix: die Elo, mit der der Bot wirklich spielt (Kopf und Analyse zeigen sie, nie die Anfrage)
++  st.mensch.sorgfalt = 99;
++  const st2 = staerkeFuerElo(1080).staerke;
++  pruefe('staerkeFuerElo: Kopie des Profils von Lisa (naeher), nur sorgfalt hoeher (Richtung Rudi), Leiter unveraendert',
++    st2.tiefe === lisa.staerke.tiefe && st2.mensch.sorgfalt > lisa.staerke.mensch.sorgfalt && st2.mensch.sorgfalt < rudi.staerke.mensch.sorgfalt
++    && JSON.stringify(st2.vorlieben) === JSON.stringify(lisa.staerke.vorlieben) && lisa.staerke.tiefe !== 99 && lisa.staerke.mensch.sorgfalt !== 99,
++    { tiefe: st2.tiefe, sorgfalt: st2.mensch.sorgfalt });
++  pruefe('staerkeFuerElo: Leiter-Elo gibt genau das Profil des Leiter-Bots',
++    JSON.stringify(staerkeFuerElo(1000).staerke) === JSON.stringify(lisa.staerke) && staerkeFuerElo(1000).elo === 1000);
++  // Die Elo, mit der der Bot wirklich spielt (Kopf und Analyse zeigen sie): geeicht die Anfrage auf 50 gerundet,
++  // ausserhalb 500 bis 2100 die Elo des naechstliegenden Leiter-Bots
+   const e = (elo) => (staerkeFuerElo(elo) || {}).elo;
+-  pruefe('staerkeFuerElo: elo des gespielten Profils (1080 -> 1000 Lisa, 1150 -> 1200 Rudi, 2550 -> 2100 Greta)', e(1080) === 1000 && e(1150) === 1200
++  pruefe('staerkeFuerElo: elo des gespielten Profils (1080 -> 1100, 1150 -> 1150, 2550 -> 2100 Greta, 5000 -> 3000)', e(1080) === 1100 && e(1150) === 1150
+     && e(2550) === 2100 && e(5000) === 3000, [1080, 1150, 2550, 5000].map(e));
+   pruefe('eloDerPartie: Boss mit boss.staerke spielt mit der Elo des Profils, sonst die Elo des Bots',
+-    eloDerPartie({ modus: 'boss', botId: 'unbekannter-boss', boss: { id: 'x', stufe: 'standard', staerke: 1080 } }) === 1000
++    eloDerPartie({ modus: 'boss', botId: 'unbekannter-boss', boss: { id: 'x', stufe: 'standard', staerke: 1080 } }) === 1100
+     && eloDerPartie({ modus: 'normal', botId: 'rudi' }) === 1200 && eloDerPartie({ modus: 'boss', botId: 'kalle', boss: { id: 'kalle', stufe: 'meister' } }) === 800
+     && eloDerPartie({ botId: 'gibt-es-nicht' }) === null && eloDerPartie(null) === null);
+ }
+diff --git a/tests/storage.test.mjs b/tests/storage.test.mjs
+index e15b47f..35c4d2e 100644
+--- a/tests/storage.test.mjs
++++ b/tests/storage.test.mjs
+@@ -4,14 +4,14 @@ import {
+   ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne,
+   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
+   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
+-  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
++  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege, spielstaerkeDetail,
+   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
+   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
+   duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog,
+ } from '../js/storage.js';
+ import { registriereBot, botNachId } from '../js/bots.js';
+ import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
+-import { analysierePartie, kompaktReview, ergaenzeReviewFelder } from '../js/review.js';
++import { analysierePartie, kompaktReview, ergaenzeReviewFelder, STAERKE_MODELL } from '../js/review.js';
+ import { Chess } from '../vendor/chess/chess.js';
+ 
+ let ok = 0;
+@@ -307,6 +307,19 @@ speicherePartie(partie({ ergebnis: 'remis', genauigkeit: 80, spielstaerke: 1000
+ speichereEinstellungen({ klang: false });
+ const st = statistik();
+ pruefe('Statistik', st.partien === 2 && st.siege === 1 && st.remis === 1 && st.schnittGenauigkeit === 75 && st.spielstaerke === 950 && st.besteGenauigkeit === 80, st);
++// Geeichte Spielstaerke (review.js spielstaerkeAusPartien): Partien mit Beleg, Hilfe zaehlt nicht. Ein 1500er hat
++// gegen Menschen im Mittel 84,3 offene Genauigkeit, gegen die App-Bots um den Bot-Aufschlag mehr.
++setzeZurueck();
++for (let i = 0; i < 6; i++) speicherePartie(partie({ botId: 'turm', botStufe: 6, genauigkeit: 80, spielstaerke: 2000, staerkeBeleg: { genauigkeit: 84.3 + STAERKE_MODELL.botAufschlag, zuege: 25 } }));
++speicherePartie(partie({ botId: 'turm', botStufe: 6, hinweise: 2, staerkeBeleg: { genauigkeit: 99, zuege: 25 } }));
++const st2 = statistik();
++pruefe('Statistik: Spielstaerke geeicht aus Belegen (6 Partien wie ein 1500er gegen Bots), Hilfe-Partie zaehlt nicht',
++  st2.spielstaerkeDetail && st2.spielstaerkeDetail.partien === 6 && Math.abs(st2.spielstaerke - 1500) <= 150 && Array.isArray(st2.spielstaerkeDetail.spanne), st2.spielstaerkeDetail);
++pruefe('Statistik: spielstaerkeDetail ohne die genannte Partie', spielstaerkeDetail(undefined, { ohneId: ladePartien().find((p) => p.staerkeBeleg && !p.hinweise).id }).partien === 5);
++const idB = speicherePartie(partie({ genauigkeit: null, spielstaerke: null })).partie.id;
++const nachB = ergaenzeAnalyse(idB, { genauigkeit: { w: 80, b: 60 }, spielstaerke: { w: 1400, b: 900 }, belege: { w: { genauigkeit: 83, zuege: 20 }, b: null },
++  staerke: { w: { elo: 1400, spanne: [1100, 1700] }, b: null }, eroeffnung: null, zuege: [] });
++pruefe('ergaenzeAnalyse: Beleg und Spanne der Spielerseite gespeichert', nachB.partie.staerkeBeleg && nachB.partie.staerkeBeleg.zuege === 20 && nachB.partie.spielstaerkeSpanne[1] === 1700, nachB.partie);
+ setzeZurueck();
+ pruefe('Zuruecksetzen: Fortschritt weg, Einstellungen bleiben', ladePartien().length === 0 && gesamtSterne() === 0 && ladeEinstellungen().klang === false);
+ setzeZurueck({ mitEinstellungen: true });
