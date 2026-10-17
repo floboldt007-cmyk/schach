@@ -14,11 +14,16 @@
 //       Aufruf-Ort: anbieter(kontext) -> { verlasse() } | null   (macht selbst etwas, z. B. eine Kamerafahrt)
 //       Wahl-Ort:   anbieter(kontext) -> Wert | null
 //       Unbekannter Ort oder anbieter keine Funktion: Fehler (Tippfehler fallen sofort auf).
-//   fuelle(ort, container, kontext) -> { anzahl, verlasse() }   nur Host-Screens, nur DOM- und Aufruf-Orte.
+//   fuelle(ort, container, kontext) -> { anzahl, verlasse(), fertig, wartend }   nur Host-Screens, nur DOM- und
+//       Aufruf-Orte.
 //       Ruft die Anbieter in ihrer Reihenfolge (kleinere Zahl zuerst, bei Gleichstand Anmelde-Reihenfolge)
 //       und haengt die Elemente hinten an den Container an (der Container wird NICHT geleert).
 //       verlasse() ruft die verlasse() der Anbieter und nimmt deren Elemente wieder heraus (idempotent).
-//   waehle(ort, kontext) -> Wert | null   nur Wahl-Orte: erster Wert != null in der Reihenfolge
+//       W0+a: Ein Aufruf-Anbieter darf zusaetzlich { fertig: Promise } liefern (z. B. ein Finisher, der laeuft);
+//       fertig ist dann ein Promise, das sich erfuellt, sobald alle diese Promises fertig sind (auch bei Fehlern),
+//       wartend die Zahl dieser Anbieter (0: fertig ist sofort erfuellt, der Host wartet nicht).
+//   angeboten(ort) -> Zahl der Anbieter an diesem Ort (W0+a; ein Host spart sich damit Wartezeiten, wenn
+//       niemand etwas anbietet). Unbekannter Ort: Fehler.//   waehle(ort, kontext) -> Wert | null   nur Wahl-Orte: erster Wert != null in der Reihenfolge
 //   zuruecksetzen()                alle Anbieter entfernen (nur fuer Tests)
 //
 // Regeln: Kontexte sind flach eingefroren. Ein Anbieter rechnet nichts Schweres (nur Modul-Speicher
@@ -37,6 +42,15 @@ export const ORTE = Object.freeze({
   'verlauf:seite': 'dom',
   'einstellungen:gruppen': 'dom',
   'app:erster-screen?': 'wahl',
+  // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2), Hosts und Kontexte in ARCHITEKTUR.md "W0+a: Spiel-Fundament"
+  'arena:heute': 'dom',
+  'partie:gegner-leiste': 'dom',
+  'partie:matt': 'aufruf',
+  'ergebnis:abrechnung': 'dom',
+  'bestenliste:reiter': 'dom',
+  'training:karten': 'dom',
+  'ich:vitrine': 'dom',
+  'spielplan:tage': 'dom',
 });
 
 let anbieterListe = new Map();   // ort -> [{ fn, reihenfolge, paket, nr }]
@@ -83,6 +97,7 @@ export function fuelle(ort, container, kontext) {
   const k = einfrieren(kontext);
   const elemente = [];
   const aufraeumer = [];
+  const laeuft = [];
   let anzahl = 0;
   for (const e of anbieterListe.get(ort) || []) {
     let r = null;
@@ -96,6 +111,9 @@ export function fuelle(ort, container, kontext) {
     if (art === 'aufruf') {
       anzahl++;
       if (typeof r.verlasse === 'function') aufraeumer.push({ e, fn: () => r.verlasse() });
+      if (r.fertig && typeof r.fertig.then === 'function') {
+        laeuft.push(Promise.resolve(r.fertig).catch((f) => meldeFehler(ort, e, f)));
+      }
       continue;
     }
     const el = istElement(r) ? r : (r && istElement(r.el) ? r.el : null);
@@ -117,6 +135,8 @@ export function fuelle(ort, container, kontext) {
   let offen = true;
   return {
     anzahl,
+    wartend: laeuft.length,
+    fertig: laeuft.length ? Promise.all(laeuft).then(() => undefined) : Promise.resolve(),
     verlasse() {
       if (!offen) return;
       offen = false;
@@ -143,6 +163,11 @@ export function waehle(ort, kontext) {
     }
   }
   return null;
+}
+
+export function angeboten(ort) {
+  artVon(ort);
+  return (anbieterListe.get(ort) || []).length;
 }
 
 export function zuruecksetzen() {

@@ -7,7 +7,8 @@
 //
 // API:
 //   EREIGNISSE                     eingefrorene Liste aller erlaubten Namen (Vertrag: BAUPLAN 3.3,
-//                                  ARCHITEKTUR.md "Runde 4: Erweiterungspunkte")
+//                                  ARCHITEKTUR.md "Runde 4: Erweiterungspunkte"; W0+a: SPIELKONZEPT 6.2,
+//                                  ARCHITEKTUR.md "W0+a: Spiel-Fundament")
 //   hoere(name, fn) -> abmelden()  unbekannter Name oder fn keine Funktion: Fehler (Tippfehler fallen
 //                                  sofort auf). Abmelden ist idempotent.
 //   sende(name, daten = {})        synchron, Hoerer in Anmelde-Reihenfolge. Die Hoerer bekommen eine
@@ -33,6 +34,9 @@ export const EREIGNISSE = Object.freeze([
   'training:geloest', 'training:stand',
   'uebung:ergebnis',
   'bestmarke:neu',
+  // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18), Datenvertrag in ARCHITEKTUR.md
+  'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet',
+  'boss:treffer', 'boss:siegel', 'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);

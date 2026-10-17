@@ -9,8 +9,11 @@
 // API:
 //   BUDGET = { gross: 1, zeilen: 3, nachlese: 3 }   je Partie hoechstens 3 Eintraege im Overlay, davon
 //                                                   hoechstens 1 grosser; Nachlese hoechstens 3
-//   QUELLEN                                         feste Prioritaeten (BAUPLAN 3.6): quelle -> { art, prio }.
-//                                                   Fuer diese Quellen gelten art und prio aus der Tabelle.
+//   QUELLEN                                         feste Prioritaeten (BAUPLAN 3.6, W0+a: SPIELKONZEPT 3.10):
+//                                                   quelle -> { art, prio }. Fuer diese Quellen gelten art und
+//                                                   prio aus der Tabelle (rang und kette: alte Namen von klasse
+//                                                   und marsch, gleiche Werte).
+//   BRETT_FEIER = { dauerMs: 1800, kurzMs: 800 }    W0+a: Grenzen des Matt-Finishers (Ort partie:matt)
 //   melde({ partieId, quelle, prio = 10, art = 'zeile', titel, text, symbol, klang }) -> true | false
 //       idempotent: gleiche partieId + quelle + titel nur einmal (false beim zweiten Mal).
 //       partieId darf null sein (dann nur Nachlese). quelle und titel Pflicht, art 'zeile' | 'gross',
@@ -26,17 +29,39 @@ import { ladeModul, speichereModul, MODUL_BUDGET } from './storage.js';
 
 export const BUDGET = Object.freeze({ gross: 1, zeilen: 3, nachlese: 3 });
 
+// Feste Prioritaeten fuer alle Pakete (SPIELKONZEPT 3.10, W0+a; ergaenzt die Tabelle aus Welle 0).
+// klasse ersetzt rang, marsch ersetzt kette: die alten Namen bleiben mit denselben Werten gueltig.
+// tageskrone ist seit 3.10 eine Zeile (vorher gross).
 export const QUELLEN = Object.freeze({
   'erster-sieg': Object.freeze({ art: 'gross', prio: 95 }),
+  klasse: Object.freeze({ art: 'gross', prio: 90 }),
   rang: Object.freeze({ art: 'gross', prio: 90 }),
+  'boss-siegel': Object.freeze({ art: 'gross', prio: 88 }),
   erzfeind: Object.freeze({ art: 'gross', prio: 85 }),
+  'liga-saison': Object.freeze({ art: 'gross', prio: 82 }),
+  'bot-rekord': Object.freeze({ art: 'gross', prio: 78 }),
+  'medaille-gold': Object.freeze({ art: 'gross', prio: 76 }),
+  'level-titel': Object.freeze({ art: 'gross', prio: 75 }),
+  meilenstein: Object.freeze({ art: 'gross', prio: 72 }),
   bestmarke: Object.freeze({ art: 'gross', prio: 70 }),
-  tageskrone: Object.freeze({ art: 'gross', prio: 65 }),
+  umwandlung: Object.freeze({ art: 'gross', prio: 66 }),
   'serie-rekord': Object.freeze({ art: 'zeile', prio: 60 }),
+  rekord: Object.freeze({ art: 'zeile', prio: 58 }),
+  level: Object.freeze({ art: 'zeile', prio: 55 }),
+  marsch: Object.freeze({ art: 'zeile', prio: 50 }),
   kette: Object.freeze({ art: 'zeile', prio: 50 }),
+  liga: Object.freeze({ art: 'zeile', prio: 45 }),
+  siegeslauf: Object.freeze({ art: 'zeile', prio: 44 }),
+  medaille: Object.freeze({ art: 'zeile', prio: 40 }),
+  tageskrone: Object.freeze({ art: 'zeile', prio: 38 }),
   tagesdreier: Object.freeze({ art: 'zeile', prio: 35 }),
   karten: Object.freeze({ art: 'zeile', prio: 30 }),
 });
+
+// Feier auf dem Brett (Matt-Finisher, SPIELKONZEPT 3.9): laeuft vor dem Ergebnis, zaehlt nicht ins Budget und
+// ersetzt jeden anderen Brett-Effekt. Hoechstens dauerMs (volle Laenge), Kurzfassung hoechstens kurzMs.
+// partie.js wartet am Aufruf-Ort partie:matt nie laenger als dauerMs (Fairness-Test 5.3).
+export const BRETT_FEIER = Object.freeze({ dauerMs: 1800, kurzMs: 800 });
 
 const MODUL = 'feier';
 const TAG_MS = 24 * 60 * 60 * 1000;
