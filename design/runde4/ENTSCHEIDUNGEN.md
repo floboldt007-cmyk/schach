@@ -51,6 +51,7 @@ in Flos privatem Repo.
 | 17.10. | Elo-Bezug: chess.com | Die Eichung misst auf der Lichess-Skala. Bot-Zahlen und Selbsteinschätzung werden auf eine chess.com-ähnliche Skala umgerechnet und so benannt, dass klar ist, worauf sie sich beziehen. |
 | 17.10. | Name: international, „Crownmate“ | Arbeitstitel „Schach-Arena“ wird ersetzt. Name in der App (Titel, Manifest, Icon) mit dem Abschluss des Umbaus. Marke und Domain prüft Flo; vor einem Domainwechsel kommt Export und Import des Spielstands, weil eine neue Adresse mit leerem Speicher startet. |
 | 17.10. | Eigene Klänge und Bilder | Nicht CC0: „Eigene Werke, alle Rechte vorbehalten, Nutzung nur in der App“. Der Code bleibt GPL-3.0. Freigeben geht später immer noch, zurücknehmen nicht. |
+| 18.10. | „Das Premoven fehlt“ (erster Test des neuen Looks) | Vorzüge kommen in **jede** Partie, nicht nur mit Uhr (bisher an W0+b gebunden). Standard an, abschaltbar. Mehrere Vorzüge hintereinander möglich, Abbrechen durch Tippen neben das Brett oder auf ein leeres Feld, die geplanten Züge sind deutlich markiert. Ein Vorzug, der nach dem Gegenzug nicht mehr geht, verfällt still. Vorgezogen vor den Rest des Umbaus. |
 
 ## 2. Die Richtung in einem Satz
 
