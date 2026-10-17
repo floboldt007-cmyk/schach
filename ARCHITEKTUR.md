@@ -30,11 +30,12 @@ js/bots.js                 Bot-Leiter + Zugwahl mit Schwaechen
 js/review.js               Bewertung: Zug-Klassen, Genauigkeit, Coach-Texte (rein, ohne DOM)
 js/openings.js             Eroeffnungs-Tabelle (Buchzuege + Namen)
 js/board.js                Brett-Komponente (DOM, Touch, Pfeile, Abzeichen)
-js/sounds.js               Klaenge per WebAudio (keine Audiodateien)
+js/sounds.js               Klaenge per WebAudio: Klangpakete (MP3), Synth als Rueckfall
 js/storage.js              localStorage: Fortschritt, Partien, Einstellungen
 vendor/chess/chess.js      chess.js 1.4.0 (ESM): import { Chess } from '../vendor/chess/chess.js'
 vendor/stockfish/          stockfish-19-lite-single.js + .wasm (Worker, UCI)
 assets/pieces/{w,b}{K,Q,R,B,N,P}.svg   Figuren (cburnett)
+assets/klang/{holz,arcade}/*.mp3        Klangpakete (je 40 Dateien, eigene Werke, assets/klang/LIZENZEN.md)
 tests/*.test.mjs           Node-Tests (node tests/x.test.mjs), ohne Browser
 ```
 
@@ -181,8 +182,9 @@ export class Brett {
 
 ## js/sounds.js
 `export const klang = { zug(), schlagen(), schach(), rochade(), umwandlung(), ende(gewonnen),
-fehler(), brillant(), aus: false }` per WebAudio, kurze angenehme Toene, erst nach erster
-Beruehrung aktiv (iOS).
+fehler(), brillant(), aus: false }` per WebAudio, erst nach erster Beruehrung aktiv (iOS). Seit dem
+Premium-Umbau spielen die gemasterten Dateien der Klangpakete, die eingebauten Synth-Klaenge sind der
+Rueckfall (Vertrag im Abschnitt "Premium-Umbau", Absatz "Klang").
 
 ## CSS-Variablen (Design fuellt sie, Module benutzen nur diese)
 `--feld-hell, --feld-dunkel, --zuletzt, --auswahl, --hinweis, --schach, --punkt,
@@ -576,13 +578,17 @@ export function speichereModulEinstellungen(name, daten)      // -> { ok, zeiche
 export { ton, klick, tock, huelle, rauschen, NOTEN }  // Bausteine fuer eigene Synthese (NOTEN eingefroren)
 export function registriereKlang(name, fn, { wichtig = true } = {})  // fn(ac, ziel, t, ...args) -> abmelden()
 klang.spiele(name, ...args)   // registrierter (geht vor) oder eingebauter Klang
-klang.klasse(k, ...args)      // ohne Register 'klasse' wie bisher: brillant -> brillant(), fehler/patzer -> fehler(), sonst still
-klang.stern(i, neu, { reduziert })   // ohne Register 'stern' wie bisher: zug(), bei reduzierter Bewegung still
-                              // (wie vor Runde 4); ein registrierter 'stern' klingt immer
-klang.stufe = 'alle'          // 'wichtig': spielt nur Klaenge mit wichtig: true (eingebaute gelten als wichtig)
+klang.klasse(k, ...args)      // ohne Register 'klasse' seit U3 nach PLAN 3.6 (brillant, bester/combo, ungenau,
+                              // fehler auch fuer verpasst, patzer; exzellent, gut, buch, erzwungen still)
+klang.stern(i, neu, { reduziert })   // ohne Register 'stern' seit U3 die Dateien stern, stern-2, stern-3, auch bei
+                              // reduzierter Bewegung; ein registrierter 'stern' bekommt (i, neu)
+klang.stufe = 'alle'          // 'alle' | 'wichtig' | 'aus'; 'wichtig': registrierte Klaenge nach ihrem wichtig,
+                              // alle anderen nach der Spalte im KATALOG
 ```
 `wichtig` darf auch eine Funktion `(...args) -> boolean` sein (z. B. fuer `klasse`: nur Brillant,
-Grossartig, Fehler, Patzer). `klangProbe(name, ...)` funktioniert auch fuer registrierte Klaenge.
+Grossartig, Fehler, Patzer). `klangProbe(name, ...)` funktioniert auch fuer registrierte Klaenge und (seit U3)
+fuer Dateiklaenge. Ein registrierter Klang geht immer vor die Datei gleichen Namens und bekommt die Argumente
+unveraendert.
 
 **`js/bots.js`:**
 ```js
@@ -651,8 +657,8 @@ Ungenau, Fehler, Chance verpasst oder Patzer bricht die Serie wie jeder andere. 
 `data-stufe` (`''` bei 3 bis 4, `heiss` 5 bis 7, `ueberladen` 8 bis 11, `unaufhaltsam` ab 12), der Screen
 `data-serie` (laufende Serie; 0 bei Live-Bewertung aus) und `data-serie-stufe`. `maxSerie` landet in der
 laufenden Partie, im Datensatz und in `partie:beendet`. Klang zur Klasse ueber `klang.klasse(k, { serie,
-serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu, { reduziert })` (ein registrierter
-Klang `stern` auch bei reduzierter Bewegung, der eingebaute dann nicht, wie vor Runde 4).
+serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu, { reduziert })` (klingt seit U3 auch
+bei reduzierter Bewegung, registriert oder nicht: Klang ist keine Bewegung).
 
 **Uebung und eigene Stellung.** `app.gehe('partie', { botId, farbe, startFen, modus: 'uebung', ziel })` startet
 eine Uebung (Kopf „Übung ab Zug n“, n = Zugnummer der Startstellung). Partien, die nicht werten
@@ -667,7 +673,7 @@ extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne 
 `.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
 - `.erg-feier` zeigt `feier.fuerOverlay(partieId)`: neue Zeilen gleiten im Abstand von 200 ms ein (`--t`),
   die erste ab 1,5 s (Sieg mit Sternen) bzw. 0,7 s, schon gezeigte stehen ruhig. Jede neue Zeile spielt ihren
-  `klang` (sonst den eingebauten Tick `'feier'` mit steigender Tonhoehe); bei `klang.stufe === 'wichtig'` nur
+  `klang` (sonst `'feier'`: die Datei mit steigender Tonhoehe, ohne Datei der eingebaute Tick); bei `klang.stufe === 'wichtig'` nur
   grosse. Antippen der Karte zeigt sofort alles. `symbol`: Icon-Name aus `ui/icons.js` oder kurzer Text.
   Handy (bis 600 px): die Zeilen werden zu einer Summenzeile (nur Titel), grosse bleiben eigene Zeilen.
 - `ergebnis:karte` wird neu gefuellt; `.erg-tipp` („Kopf hoch! …“) erscheint nur, wenn der Ort leer bleibt.
@@ -1220,9 +1226,40 @@ aendert nur die genannte Gruppe. Standards: `klangpaket ''`, `lautstaerke 0.8`, 
 `klanggruppen` alle an, `zugBestaetigen 'ohneUhr'`, `haltenAufgeben true`, `turmRochade false`, `autoDame true`,
 `steuerung 'beides'`, `bewegung 'normal'` (heisst nicht `tempo`, das ist die Bedenkzeit), `thema 'modern'`,
 `modus 'system'`, `koordLage 'ecke'`, `pfeile true`, `duellIntro 'besondere'` (Flo, D3), `figuren 'cburnett'`,
-`coachStil 'ausfuehrlich'`, `sprueche 'an'`. `app.js wendeEinstellungenAn(e)` ruft `setzeBewegung`, `wendeThemaAn` und,
-sobald es sie gibt (U3), `klang.einstellen(e)`; Hell/Dunkel wechselt ueber `app.setzeEinstellungen({ modus })` ohne
-Neuladen.
+`coachStil 'ausfuehrlich'`, `sprueche 'an'`. `app.js wendeEinstellungenAn(e)` ruft `setzeBewegung`, `wendeThemaAn` und
+`klang.einstellen(e)` (U3); Hell/Dunkel wechselt ueber `app.setzeEinstellungen({ modus })` ohne Neuladen.
+
+**Klang (`js/sounds.js`, PLAN 3, U3):** Klangpakete `holz` und `arcade` unter `assets/klang/<paket>/` (je 40 MP3,
+44,1 kHz, 128 kbit/s, gemastert: die Lautstaerke-Rangfolge steckt in den Dateien), Lizenz: eigene Werke von Flo, alle
+Rechte vorbehalten, Nutzung nur in der Schach-Arena (`assets/klang/LIZENZEN.md`, `assets/LIZENZ-KUNST.md`).
+- `KATALOG` (eingefroren, 33 Namen): `name -> { gruppe, vorrang 0..3, wichtig, varianten, wechselnd, tonhoehe }`.
+  Gruppen `brett`, `bewertung`, `feier`, `uhr`, `boss`, `finisher`, `bedienung` (Einstellung `klanggruppen`, je
+  ein Schalter) und `moment` (start, sieg, niederlage, remis, stern: ohne Schalter). Varianten: `zug` (3) und
+  `schlagen` (2) wechseln ab, `stern` (nach Index) und `combo` (nach Serie) waehlt die Option `stufe`.
+  `PAKETE_KLANG`, `KLANGGRUPPEN`, `KLANGSTUFEN`, `klassenKlang(k, info)` (rein).
+- Abspielen: (1) registrierter Klang, (2) dekodierte Datei des aktiven Pakets, (3) Synth (`zug`, `schlagen`,
+  `rochade`, `schach`, `umwandlung`, `fehler`, `brillant`, `feier`, `ende`) bzw. der Ersatz wie vor dem Umbau
+  (`stern` -> `zug`, `patzer` -> `fehler`, `sieg`/`niederlage`/`remis` -> `ende`), sonst still. Optionen als letztes
+  Argument (nur diese Schluessel): `{ wann, gain, genau, stufe, paket }`; `wann` plant per WebAudio genau (Landung).
+- Filter: `klang.aus` (Schalter, Lautstaerke bleibt), `klang.stufe` (`alle` | `wichtig` | `aus`), Gruppen. Master =
+  `lautstaerke` hoch 2 (`setzeLautstaerke`, 15 ms). Hoechstens 4 Stimmen: Vorrang 3 wird nie abgebrochen, sonst
+  das aelteste mit dem niedrigsten Vorrang; ist nichts zu opfern, wird der neue Klang verworfen (Vorrang 3 darf
+  ueberziehen). Begrenzer -6 dB, Ratio 4.
+- `klang.einstellen(e)` (aus `wendeEinstellungenAn`): `klang`, `klangpaket` (`''` = `standardKlangpaket(thema)`,
+  modern: arcade), `lautstaerke`, `klangstufe`, `klanggruppen`, `thema`; 1 s spaeter `vorladen()`: `fetch` (4
+  voraus, Reihenfolge Brett, start, brillant, stern, Ergebnis, Rest), Dekodieren der Reihe nach mit
+  `setTimeout(0)` dazwischen, vor der ersten Beruehrung ueber einen `OfflineAudioContext` (keine Warnung, der erste
+  Zug klingt schon aus der Datei). Nur das aktive Paket bleibt dekodiert; `setzePaket(id)` gibt die alten Puffer frei.
+- iOS: ein `AudioContext`, entsperrt auf `touchend`, `click`, `keydown`, `pointerup` (Hoerer bleiben angemeldet),
+  fortgesetzt bei `visibilitychange` und beim naechsten Klang; `navigator.audioSession.type = 'ambient'`, wo es
+  das gibt. `zustand()`: `aus`, `nicht-verfuegbar`, `gesperrt`, `laedt`, `bereit`.
+- Weiteres: `probe(id)` (Zug, Schlagen, Bester Zug, Stern im Paket id, auch wenn es nicht aktiv ist), `stille()`,
+  `vorrat()` (Paket, dekodiert, fehlt, laedt, Stimmen, Master), `protokoll()` (nur `?test`: letzte 50 mit laufender
+  `nr`, `aktion` `spielt`/`opfert`/`verworfen`/`still`, `quelle`, `datei`, `grund`, `start`).
+- Takt in der Partie (Landung mit `wann`, ein fuehrender Klang pro Moment) verdrahtet U7; die Bedien-Klaenge die
+  Bauteile. Tests: `tests/klang.test.mjs` (Node: Katalog gegen Dateien, Format, Laenge, Messwerte an sha256
+  gebunden, Logik mit Fake-Kontext; Browser: Vorladen, jeder Name in beiden Paketen, Wechsel, Probe, Stufe,
+  Gruppen, Stumm, Stimmen, Rueckfall, Register, Abbildung, klangProbe, wann, Fortsetzen, Spitze jeder Datei).
 
 **Schriften:** `assets/schriften/manrope.woff2` und `bricolage-grotesque.woff2` (SIL OFL 1.1, Lizenztexte daneben,
 Quelle im Kopf von `modern.css`), vorgeladen in `index.html`, im Service-Worker-Cache. Es fehlen `≈ ▲ ★ ♙ ♔ ✓ →`

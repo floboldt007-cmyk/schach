@@ -132,8 +132,8 @@ node tests/alle.mjs --schnell    kurze Fassung (ohne Viewport-Runden und Bilder)
 node tests/alle.mjs --nur=sw,e2e nur einzelne Suiten
 ```
 
-Einzeln: `storage`, `review`, `ereignisse`, `fairness`, `spiel`, `engine-bots --schnell`, `board`, `sw`, `app`, `screens`, `e2e`
-(jeweils `node tests/<name>.test.mjs`). Der Ende-zu-Ende-Test `e2e` liefert die App wie GitHub
+Einzeln: `storage`, `review`, `ereignisse`, `fairness`, `spiel`, `engine-bots --schnell`, `board`, `sw`, `thema`, `klang`,
+`navigation`, `app`, `screens`, `e2e` (jeweils `node tests/<name>.test.mjs`; `klang --nur-node` ohne Browser). Der Ende-zu-Ende-Test `e2e` liefert die App wie GitHub
 Pages unter `/schach/` aus, spielt einen ganzen Ablauf auf dem iPad-Viewport durch, lädt die App
 offline neu und prüft das Update auf eine neue Version. Bilder landen in `design/app-shots/`.
 
@@ -168,7 +168,8 @@ in `sw.js` (auch das prüft der Test).
 
 ## Lizenzen
 
-Die Schach-Arena ist freie Software unter der **GPL-3.0** (siehe `LICENSE`).
+Der Code der Schach-Arena ist freie Software unter der **GPL-3.0** (siehe `LICENSE`). Ausgenommen sind Flos
+eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
 
 - **Stockfish 19** als WebAssembly ([stockfish.js](https://github.com/nmrugg/stockfish.js),
   lite, single-threaded): GPL-3.0, siehe `vendor/stockfish/COPYING.txt`. Quellen:
@@ -182,5 +183,8 @@ Die Schach-Arena ist freie Software unter der **GPL-3.0** (siehe `LICENSE`).
   `@fontsource-variable/manrope@5.3.0` (`manrope-latin-wght-normal.woff2`) und
   `@fontsource-variable/bricolage-grotesque@5.3.0` (`bricolage-grotesque-latin-opsz-normal.woff2`), unverändert.
   Die Schriften liegen im Repo und im Offline-Cache, es gibt keine Anfrage an fremde Server.
+- **Klänge** (Klangpakete „Holz“ und „Arcade“, `assets/klang/`): eigene Werke von Flo, eigene Synthese ohne
+  fremde Aufnahmen. **Alle Rechte vorbehalten**, Nutzung nur in der Schach-Arena; sie stehen nicht unter der
+  GPL-3.0. Einzelheiten in `assets/klang/LIZENZEN.md` und `assets/LIZENZ-KUNST.md`.
 - Avatare, Zug-Symbole, App-Icon und Design sind für dieses Projekt entstanden und stehen
   ebenfalls unter der GPL-3.0.

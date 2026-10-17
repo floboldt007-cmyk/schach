@@ -330,6 +330,7 @@ function erzeuge() {
       begrenzer.ratio.value = 4;
       ausgang.connect(begrenzer);
       begrenzer.connect(kontext.destination);
+      dekoder = null;   // ab jetzt dekodiert der Live-Kontext
     } catch (e) {
       kontext = null;
       ausgang = null;
