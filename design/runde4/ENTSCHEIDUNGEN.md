@@ -32,6 +32,11 @@ in Flos privatem Repo.
 | 17.10. | Gratis und Abo wie empfohlen | Gratis: alle 10 Bots, Analyse, Fehler-Kartei, Rätsel ohne Tageslimit. Abo: Coaches, Lernpfad ab Einheit 5, Spezial-Training |
 | 17.10. | Zugklassen umbenennen | eigene Namen und eigene Brillant-Farbe, im Premium-Umbau vor S1 |
 | 17.10. | Erste spielige Welle mit Agenten bauen | ja, in 3 Schüben mit je 4 bis 5 Agenten, danach 5 Tage Test auf dem iPad |
+| 17.10. | „Du kannst Seite A schon mal bauen, im Internet veröffentlichen, aber es muss alles da sein, was ich erwähnt habe: die Bosse, die kaufbaren Animationen, dass man sich mit Google-Konto anmelden kann. Alles, was ich in den Chat geschrieben habe. Wenn du Verbesserungsvorschläge hast, frag mich.“ | Alles aus dieser Liste wird gebaut. Was Flos Konten oder Recht braucht, wird vorbereitet und als ehrliche Vorschau gezeigt, bis die Voraussetzungen da sind. Verbesserungen werden vorher gefragt. |
+| 17.10. | Live gehen: Claude darf selbst mergen | Nach jedem fertigen und geprüften Schritt merged Claude selbst in `main` (Live-Seite), nur wenn alle Testsuiten grün sind. |
+| 17.10. | Google-Anmeldung jetzt einrichten | Supabase (Server in Frankfurt, Gratis-Stufe) und Google-Zugang; Flo legt die Konten an, Claude baut Anmeldung und Cloud-Speicher des Spielstands. Apple-Anmeldung kommt mit der App (braucht das Apple-Entwicklerkonto). |
+| 17.10. | Shop: erst Vorschau | Werkstatt mit Preisen, Vorschau und Anprobieren, Kaufknopf „bald verfügbar“, in der Testphase alles freispielbar. Echte Zahlung erst mit Gewerbe, Impressum und Zahlungskonto. |
+| 17.10. | Online gegen Menschen | nach Flos iPad-Test; bis dahin reagieren die Bots auf Emotes und Schnell-Chat. |
 | 17.10. | „Die Sounds kann man ändern, auch die Ansichten, oder?“ | Ja. Klangpakete (Holz, Arcade, später mehr), Brettfarben, Hell/Dunkel, später Figuren-Sets. Der Premium-Umbau baut A **theme-fähig**: Farben, Schriften, Texturen, Rahmen und Klänge hängen an einer zentralen Stelle (Design-Tokens), damit die Entwürfe B „Edel“ und C „Verspielt“ später als wählbare Ansichten dazukommen können (erspielbar oder in der Werkstatt), ohne das Layout umzubauen. |
 
 ## 2. Die Richtung in einem Satz
