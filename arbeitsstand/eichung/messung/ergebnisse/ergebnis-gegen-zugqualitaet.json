@@ -1,0 +1,172 @@
+{
+ "hinweis": "Bot gegen Maia-3 (Zug aus Maias Verteilung, Temperatur 1). Maia ist ein Modell, kein Mensch. 12 Partien je Stufe (Stufe 1 und 2 beide gegen Maia-600).",
+ "paare": {
+  "1@600": {
+   "stufe": 1,
+   "maiaR": 600,
+   "partien": 12,
+   "punkteIst": 1,
+   "punkteErwartet": 0.13766326057733763,
+   "botEloZugqualitaet": -346.4300366114125,
+   "maiaEloZugqualitaet": 427.71084204160235
+  },
+  "2@600": {
+   "stufe": 2,
+   "maiaR": 600,
+   "partien": 12,
+   "punkteIst": 5.5,
+   "punkteErwartet": 5.970106174876255,
+   "botEloZugqualitaet": 425.9797979455037,
+   "maiaEloZugqualitaet": 427.71084204160235
+  },
+  "3@800": {
+   "stufe": 3,
+   "maiaR": 800,
+   "partien": 12,
+   "punkteIst": 3.5,
+   "punkteErwartet": 9.654124949676575,
+   "botEloZugqualitaet": 755.4837623594793,
+   "maiaEloZugqualitaet": 509.7205467170246
+  },
+  "4@1000": {
+   "stufe": 4,
+   "maiaR": 1000,
+   "partien": 12,
+   "punkteIst": 6,
+   "punkteErwartet": 5.012321013908431,
+   "botEloZugqualitaet": 1083.1261750021695,
+   "maiaEloZugqualitaet": 1140.8438020814765
+  },
+  "5@1200": {
+   "stufe": 5,
+   "maiaR": 1200,
+   "partien": 12,
+   "punkteIst": 4.5,
+   "punkteErwartet": 8.026112476625933,
+   "botEloZugqualitaet": 1400.4701119442475,
+   "maiaEloZugqualitaet": 1278.354243598581
+  },
+  "6@1400": {
+   "stufe": 6,
+   "maiaR": 1400,
+   "partien": 12,
+   "punkteIst": 9.5,
+   "punkteErwartet": 10.349635835672714,
+   "botEloZugqualitaet": 1651.90845591755,
+   "maiaEloZugqualitaet": 1332.9703423154253
+  },
+  "7@1600": {
+   "stufe": 7,
+   "maiaR": 1600,
+   "partien": 12,
+   "punkteIst": 8.5,
+   "punkteErwartet": 10.986047055511225,
+   "botEloZugqualitaet": 1839.801478917635,
+   "maiaEloZugqualitaet": 1425.872017266257
+  },
+  "8@1800": {
+   "stufe": 8,
+   "maiaR": 1800,
+   "partien": 12,
+   "punkteIst": 11,
+   "punkteErwartet": 11.659939862769235,
+   "botEloZugqualitaet": 2170.12587843902,
+   "maiaEloZugqualitaet": 1556.0696445302003
+  },
+  "9@2100": {
+   "stufe": 9,
+   "maiaR": 2100,
+   "partien": 12,
+   "punkteIst": 10,
+   "punkteErwartet": 11.719451287036723,
+   "botEloZugqualitaet": 2324.6283509512823,
+   "maiaEloZugqualitaet": 1676.2687519526237
+  }
+ },
+ "stufen4bis9": {
+  "stufen": [
+   4,
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "partien": 72,
+  "punkteIst": 49.5,
+  "punkteErwartet": 57.753507531524264,
+  "versatz": -148.9859811989337,
+  "ki95": [
+   -299.4459678038746,
+   36.49665017099062
+  ],
+  "ki95NurErgebnisse": [
+   -250.4384327661504,
+   -34.59417392527837
+  ]
+ },
+ "stufen2bis9": {
+  "stufen": [
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "partien": 96,
+  "punkteIst": 58.5,
+  "punkteErwartet": 73.37773865607709,
+  "versatz": -172.65219696490647,
+  "ki95": [
+   -341.41975595880024,
+   7.808712565828159
+  ],
+  "ki95NurErgebnisse": [
+   -252.51267719461651,
+   -83.69491598004407
+  ]
+ },
+ "stufen2bis5": {
+  "stufen": [
+   2,
+   3,
+   4,
+   5
+  ],
+  "partien": 48,
+  "punkteIst": 19.5,
+  "punkteErwartet": 28.662664615087195,
+  "versatz": -149.23087534539246,
+  "ki95": [
+   -461.0765287242763,
+   109.73252643177977
+  ],
+  "ki95NurErgebnisse": [
+   -256.61610647547286,
+   -51.637008729254774
+  ]
+ },
+ "stufen6bis9": {
+  "stufen": [
+   6,
+   7,
+   8,
+   9
+  ],
+  "partien": 48,
+  "punkteIst": 39,
+  "punkteErwartet": 44.71507404098989,
+  "versatz": -210.7633832725412,
+  "ki95": [
+   -373.19161219388445,
+   22.132383233409087
+  ],
+  "ki95NurErgebnisse": [
+   -332.3058073815606,
+   -61.911880668282606
+  ]
+ }
+}

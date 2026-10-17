@@ -1,0 +1,305 @@
+{
+ "app14": {
+  "400": {
+   "seiten": 53,
+   "genauigkeitSd": 21.217594090377798,
+   "einzelIn200": 35.84905660377358,
+   "einzelIn100": 13.20754716981132,
+   "einzelUeber200ZuHoch": 56.60377358490566,
+   "arenaIn200": 9.3,
+   "arenaIn100": 2.05
+  },
+  "600": {
+   "seiten": 60,
+   "genauigkeitSd": 17.70671702161685,
+   "einzelIn200": 38.333333333333336,
+   "einzelIn100": 18.333333333333332,
+   "einzelUeber200ZuHoch": 43.333333333333336,
+   "arenaIn200": 40.9,
+   "arenaIn100": 18.7
+  },
+  "800": {
+   "seiten": 60,
+   "genauigkeitSd": 15.847559472768603,
+   "einzelIn200": 43.333333333333336,
+   "einzelIn100": 16.666666666666668,
+   "einzelUeber200ZuHoch": 30,
+   "arenaIn200": 82,
+   "arenaIn100": 50.8
+  },
+  "1000": {
+   "seiten": 60,
+   "genauigkeitSd": 14.091522775211123,
+   "einzelIn200": 46.666666666666664,
+   "einzelIn100": 21.666666666666668,
+   "einzelUeber200ZuHoch": 25,
+   "arenaIn200": 84.75,
+   "arenaIn100": 53.8
+  },
+  "1200": {
+   "seiten": 60,
+   "genauigkeitSd": 11.050170512783136,
+   "einzelIn200": 45,
+   "einzelIn100": 25,
+   "einzelUeber200ZuHoch": 16.666666666666668,
+   "arenaIn200": 87.65,
+   "arenaIn100": 54.2
+  },
+  "1400": {
+   "seiten": 60,
+   "genauigkeitSd": 13.867476481133915,
+   "einzelIn200": 36.666666666666664,
+   "einzelIn100": 16.666666666666668,
+   "einzelUeber200ZuHoch": 15,
+   "arenaIn200": 59.6,
+   "arenaIn100": 32.4
+  },
+  "1600": {
+   "seiten": 60,
+   "genauigkeitSd": 8.554770532869746,
+   "einzelIn200": 33.333333333333336,
+   "einzelIn100": 15,
+   "einzelUeber200ZuHoch": 6.666666666666667,
+   "arenaIn200": 32.6,
+   "arenaIn100": 7.6
+  },
+  "1800": {
+   "seiten": 60,
+   "genauigkeitSd": 9.809964955563224,
+   "einzelIn200": 21.666666666666668,
+   "einzelIn100": 10,
+   "einzelUeber200ZuHoch": 3.3333333333333335,
+   "arenaIn200": 1.5,
+   "arenaIn100": 0.2
+  },
+  "2000": {
+   "seiten": 60,
+   "genauigkeitSd": 9.923563665297314,
+   "einzelIn200": 15,
+   "einzelIn100": 10,
+   "einzelUeber200ZuHoch": 8.333333333333334,
+   "arenaIn200": 2.75,
+   "arenaIn100": 0.5
+  },
+  "2200": {
+   "seiten": 60,
+   "genauigkeitSd": 7.062925203439334,
+   "einzelIn200": 15,
+   "einzelIn100": 5,
+   "einzelUeber200ZuHoch": 0,
+   "arenaIn200": 0,
+   "arenaIn100": 0
+  },
+  "2400": {
+   "seiten": 60,
+   "genauigkeitSd": 8.182462988915487,
+   "einzelIn200": 16.666666666666668,
+   "einzelIn100": 5,
+   "einzelUeber200ZuHoch": 0,
+   "arenaIn200": 0.05,
+   "arenaIn100": 0.05
+  }
+ },
+ "nativ14": {
+  "400": {
+   "seiten": 53,
+   "genauigkeitSd": 20.541686879486356,
+   "einzelIn200": 26.41509433962264,
+   "einzelIn100": 15.09433962264151,
+   "einzelUeber200ZuHoch": 66.0377358490566,
+   "arenaIn200": 3.9,
+   "arenaIn100": 0.7
+  },
+  "600": {
+   "seiten": 60,
+   "genauigkeitSd": 16.775363291425972,
+   "einzelIn200": 45,
+   "einzelIn100": 15,
+   "einzelUeber200ZuHoch": 45,
+   "arenaIn200": 26.35,
+   "arenaIn100": 10.1
+  },
+  "800": {
+   "seiten": 60,
+   "genauigkeitSd": 14.648055249720697,
+   "einzelIn200": 41.666666666666664,
+   "einzelIn100": 20,
+   "einzelUeber200ZuHoch": 38.333333333333336,
+   "arenaIn200": 64.4,
+   "arenaIn100": 30.8
+  },
+  "1000": {
+   "seiten": 60,
+   "genauigkeitSd": 12.19215455809028,
+   "einzelIn200": 40,
+   "einzelIn100": 23.333333333333332,
+   "einzelUeber200ZuHoch": 43.333333333333336,
+   "arenaIn200": 63.55,
+   "arenaIn100": 32.1
+  },
+  "1200": {
+   "seiten": 60,
+   "genauigkeitSd": 9.936955364743467,
+   "einzelIn200": 53.333333333333336,
+   "einzelIn100": 36.666666666666664,
+   "einzelUeber200ZuHoch": 20,
+   "arenaIn200": 94.55,
+   "arenaIn100": 67.2
+  },
+  "1400": {
+   "seiten": 60,
+   "genauigkeitSd": 12.265119690282242,
+   "einzelIn200": 50,
+   "einzelIn100": 28.333333333333332,
+   "einzelUeber200ZuHoch": 18.333333333333332,
+   "arenaIn200": 79.55,
+   "arenaIn100": 46.9
+  },
+  "1600": {
+   "seiten": 60,
+   "genauigkeitSd": 8.152040401756139,
+   "einzelIn200": 33.333333333333336,
+   "einzelIn100": 15,
+   "einzelUeber200ZuHoch": 15,
+   "arenaIn200": 57.8,
+   "arenaIn100": 19.75
+  },
+  "1800": {
+   "seiten": 60,
+   "genauigkeitSd": 8.967463314956174,
+   "einzelIn200": 25,
+   "einzelIn100": 13.333333333333334,
+   "einzelUeber200ZuHoch": 5,
+   "arenaIn200": 5.95,
+   "arenaIn100": 0.7
+  },
+  "2000": {
+   "seiten": 60,
+   "genauigkeitSd": 8.725658636691433,
+   "einzelIn200": 25,
+   "einzelIn100": 8.333333333333334,
+   "einzelUeber200ZuHoch": 6.666666666666667,
+   "arenaIn200": 5.8,
+   "arenaIn100": 1.15
+  },
+  "2200": {
+   "seiten": 60,
+   "genauigkeitSd": 6.217348382064078,
+   "einzelIn200": 15,
+   "einzelIn100": 11.666666666666666,
+   "einzelUeber200ZuHoch": 1.6666666666666667,
+   "arenaIn200": 0.15,
+   "arenaIn100": 0
+  },
+  "2400": {
+   "seiten": 60,
+   "genauigkeitSd": 7.572484199333305,
+   "einzelIn200": 15,
+   "einzelIn100": 5,
+   "einzelUeber200ZuHoch": 1.6666666666666667,
+   "arenaIn200": 0.1,
+   "arenaIn100": 0.05
+  }
+ },
+ "lichess": {
+  "400": {
+   "seiten": 118,
+   "genauigkeitSd": 18.78923272916633,
+   "einzelIn200": 38.13559322033898,
+   "einzelIn100": 22.88135593220339,
+   "einzelUeber200ZuHoch": 58.47457627118644,
+   "arenaIn200": 10.05,
+   "arenaIn100": 1.3
+  },
+  "600": {
+   "seiten": 478,
+   "genauigkeitSd": 17.2669286675382,
+   "einzelIn200": 37.23849372384937,
+   "einzelIn100": 17.782426778242677,
+   "einzelUeber200ZuHoch": 48.74476987447699,
+   "arenaIn200": 33.15,
+   "arenaIn100": 13.35
+  },
+  "800": {
+   "seiten": 600,
+   "genauigkeitSd": 15.866022107400479,
+   "einzelIn200": 38.333333333333336,
+   "einzelIn100": 19,
+   "einzelUeber200ZuHoch": 36.333333333333336,
+   "arenaIn200": 67.1,
+   "arenaIn100": 39.25
+  },
+  "1000": {
+   "seiten": 600,
+   "genauigkeitSd": 14.226444417239914,
+   "einzelIn200": 40.833333333333336,
+   "einzelIn100": 22,
+   "einzelUeber200ZuHoch": 27.5,
+   "arenaIn200": 87.1,
+   "arenaIn100": 55.6
+  },
+  "1200": {
+   "seiten": 600,
+   "genauigkeitSd": 13.508290880408909,
+   "einzelIn200": 38.5,
+   "einzelIn100": 20.333333333333332,
+   "einzelUeber200ZuHoch": 24.833333333333332,
+   "arenaIn200": 84.75,
+   "arenaIn100": 51.35
+  },
+  "1400": {
+   "seiten": 600,
+   "genauigkeitSd": 12.697374644841059,
+   "einzelIn200": 34.5,
+   "einzelIn100": 17.833333333333332,
+   "einzelUeber200ZuHoch": 16.333333333333332,
+   "arenaIn200": 56.1,
+   "arenaIn100": 25.7
+  },
+  "1600": {
+   "seiten": 600,
+   "genauigkeitSd": 11.332869680603913,
+   "einzelIn200": 32.166666666666664,
+   "einzelIn100": 15.5,
+   "einzelUeber200ZuHoch": 10.833333333333334,
+   "arenaIn200": 29,
+   "arenaIn100": 8.7
+  },
+  "1800": {
+   "seiten": 600,
+   "genauigkeitSd": 10.523149295277856,
+   "einzelIn200": 23.5,
+   "einzelIn100": 11,
+   "einzelUeber200ZuHoch": 5.166666666666667,
+   "arenaIn200": 3.95,
+   "arenaIn100": 0.5
+  },
+  "2000": {
+   "seiten": 600,
+   "genauigkeitSd": 9.379939520838066,
+   "einzelIn200": 17.5,
+   "einzelIn100": 9.833333333333334,
+   "einzelUeber200ZuHoch": 4.5,
+   "arenaIn200": 1.4,
+   "arenaIn100": 0.05
+  },
+  "2200": {
+   "seiten": 598,
+   "genauigkeitSd": 9.004993334788232,
+   "einzelIn200": 17.725752508361204,
+   "einzelIn100": 7.357859531772576,
+   "einzelUeber200ZuHoch": 2.3411371237458196,
+   "arenaIn200": 0.4,
+   "arenaIn100": 0
+  },
+  "2400": {
+   "seiten": 200,
+   "genauigkeitSd": 9.442358732976158,
+   "einzelIn200": 14.5,
+   "einzelIn100": 7.5,
+   "einzelUeber200ZuHoch": 0.5,
+   "arenaIn200": 0.05,
+   "arenaIn100": 0
+  }
+ }
+}

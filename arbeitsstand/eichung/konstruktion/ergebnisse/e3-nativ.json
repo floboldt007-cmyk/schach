@@ -1,0 +1,304 @@
+{
+ "aufschlagGemessen": 6.229254997733264,
+ "ki95": [
+  1.9384888923608372,
+  9.817628877742635
+ ],
+ "aufschlagVerwendet": 6.2,
+ "selbst": {
+  "seiten": 14,
+  "beleg": 82.68318032786885
+ },
+ "gegner": {
+  "benno": {
+   "label": 250,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 87.05632653061225,
+   "alt": 1741.6666666666667,
+   "ohne": {
+    "elo": 1700,
+    "spanne": [
+     950,
+     2700
+    ],
+    "sd": 663,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1400,
+    "spanne": [
+     700,
+     2350
+    ],
+    "sd": 631,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "hilde": {
+   "label": 500,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 85.57091954022988,
+   "alt": 1616.6666666666667,
+   "ohne": {
+    "elo": 1650,
+    "spanne": [
+     1000,
+     2500
+    ],
+    "sd": 570,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1150,
+    "spanne": [
+     700,
+     1850
+    ],
+    "sd": 448,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "kalle": {
+   "label": 800,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 92.32938461538461,
+   "alt": 2208.3333333333335,
+   "ohne": {
+    "elo": 2200,
+    "spanne": [
+     1400,
+     2900
+    ],
+    "sd": 564,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1700,
+    "spanne": [
+     950,
+     2550
+    ],
+    "sd": 601,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "lisa": {
+   "label": 1000,
+   "partien": 6,
+   "punkte": 5.5,
+   "beleg": 89.34209523809524,
+   "alt": 1700,
+   "ohne": {
+    "elo": 1950,
+    "spanne": [
+     1250,
+     2700
+    ],
+    "sd": 536,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1400,
+    "spanne": [
+     950,
+     2050
+    ],
+    "sd": 419,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "rudi": {
+   "label": 1200,
+   "partien": 6,
+   "punkte": 5,
+   "beleg": 90.61960199004976,
+   "alt": 1575,
+   "ohne": {
+    "elo": 2150,
+    "spanne": [
+     1450,
+     2800
+    ],
+    "sd": 503,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1500,
+    "spanne": [
+     1050,
+     2050
+    ],
+    "sd": 372,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "turm": {
+   "label": 1400,
+   "partien": 6,
+   "punkte": 4,
+   "beleg": 89.55482269503547,
+   "alt": 1641.6666666666667,
+   "ohne": {
+    "elo": 2150,
+    "spanne": [
+     1550,
+     2750
+    ],
+    "sd": 462,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1450,
+    "spanne": [
+     1000,
+     2050
+    ],
+    "sd": 385,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "delia": {
+   "label": 1600,
+   "partien": 6,
+   "punkte": 5,
+   "beleg": 89.5097435897436,
+   "alt": 1783.3333333333333,
+   "ohne": {
+    "elo": 2150,
+    "spanne": [
+     1500,
+     2750
+    ],
+    "sd": 460,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1450,
+    "spanne": [
+     1000,
+     2100
+    ],
+    "sd": 428,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "koenig": {
+   "label": 1800,
+   "partien": 6,
+   "punkte": 3,
+   "beleg": 87.67810344827588,
+   "alt": 1575,
+   "ohne": {
+    "elo": 1900,
+    "spanne": [
+     1450,
+     2400
+    ],
+    "sd": 373,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1250,
+    "spanne": [
+     900,
+     1700
+    ],
+    "sd": 325,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "greta": {
+   "label": 2100,
+   "partien": 6,
+   "punkte": 0,
+   "beleg": 88.22877828054298,
+   "alt": 1725,
+   "ohne": {
+    "elo": 1950,
+    "spanne": [
+     1450,
+     2400
+    ],
+    "sd": 362,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1250,
+    "spanne": [
+     900,
+     1700
+    ],
+    "sd": 317,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "selbst": {
+   "label": null,
+   "partien": 14,
+   "punkte": 5.5,
+   "beleg": 82.68318032786885,
+   "alt": 1246.4285714285713,
+   "ohne": {
+    "elo": 1350,
+    "spanne": [
+     1100,
+     1700
+    ],
+    "sd": 242,
+    "partien": 14,
+    "vorlaeufig": false
+   },
+   "mit": {
+    "elo": 1350,
+    "spanne": [
+     1100,
+     1700
+    ],
+    "sd": 242,
+    "partien": 14,
+    "vorlaeufig": false
+   }
+  }
+ },
+ "alleBotsohne": {
+  "elo": 2100,
+  "spanne": [
+   1750,
+   2450
+  ],
+  "sd": 283,
+  "partien": 54,
+  "vorlaeufig": false
+ },
+ "alleBotsmit": {
+  "elo": 1300,
+  "spanne": [
+   1000,
+   1700
+  ],
+  "sd": 259,
+  "partien": 54,
+  "vorlaeufig": false
+ }
+}
