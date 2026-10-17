@@ -18,7 +18,7 @@ export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen training-screen';
   s.setAttribute('aria-label', 'Training');
-  s.innerHTML = `${hauptKopf({ zurueck: true })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
     <div class="training-rumpf">
       ${seitenKopf({ ueber: 'Üben ohne Druck', titel: 'Training', text: 'Kurze Rätsel, deine eigenen Fehler als Karten und nichts, was abläuft.' })}
       <div class="training-gitter" data-anzahl="0"></div>

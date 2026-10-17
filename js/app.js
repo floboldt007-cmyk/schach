@@ -358,7 +358,7 @@ export function reiterVon(screen, liste = reiterListe()) {
 }
 
 const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleX: null, pilleB: null,
-  ro: null, mo: null, rahmen: 0 };
+  ro: null, mo: null, rahmen: 0, fokusFolgt: false };
 
 function baueReiter(liste) {
   if (leiste.el) return;
@@ -374,6 +374,8 @@ function baueReiter(liste) {
     const ziel = k.dataset.reiter;
     if (aktuell && aktuell.name === ziel && reiterVon(aktuell.name) === ziel) return;
     try { klang.spiele('wechsel'); } catch (f) { /* still */ }
+    // Tastatur (Klick ohne Zeiger): der Fokus folgt auf den neuen Reiter (oben zieht die Leiste in einen neuen Kopf um)
+    leiste.fokusFolgt = e.detail === 0;
     gehe(ziel, {}, { ersetzen: true });
   });
   leiste.el = nav;
@@ -551,6 +553,11 @@ function zeigeReiter(screen) {
     anim(nav, [{ transform: 'translateY(160%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { d: 520, k: 'gleiten' });
   }
   leiste.gezeigt = true;
+  if (leiste.fokusFolgt) {
+    leiste.fokusFolgt = false;
+    const a = nav.querySelector('[aria-current="page"]');
+    if (a) { try { a.focus({ preventScroll: true }); } catch (e) { /* egal */ } }
+  }
 }
 
 // ---------- Routing ----------

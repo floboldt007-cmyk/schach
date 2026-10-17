@@ -4,7 +4,8 @@
 // Importiert app.js NICHT (Testseiten laden Screens ohne App); die App kommt als Parameter.
 //
 //   hauptKopf({ titel = 'Schach-Arena', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
-//               modus = true, klang = true, einstellungen = true }) -> HTML (header.kopf.haupt-kopf)
+//               modus = true, klang = true, einstellungen = true, titelElement = 'h1' }) -> HTML (header.kopf.haupt-kopf)
+//       titelElement: 'h1' | 'h2' | 'div' (Seiten mit eigenem Seitentitel, z. B. Training, nehmen 'div')
 //       titel/unter: Titel (.marke-titel.logo) und Unterzeile (.unter.logo-unter); der Titel wird nie gekuerzt (kein
 //       Auslassungszeichen): er bricht nicht um, eng wird zuerst die Unterzeile, dann das Zeichen, dann die Chips.
 //       chips: HTML in .kopf-chips (null: Sterne und besiegte Bots aus dem Fortschritt, standardChips()).
@@ -38,7 +39,8 @@ export function standardChips(fortschritt = null) {
 }
 
 export function hauptKopf({ titel = 'Schach-Arena', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
-  modus = true, klang = true, einstellungen = true } = {}) {
+  modus = true, klang = true, einstellungen = true, titelElement = 'h1' } = {}) {
+  const tt = ['h1', 'h2', 'div'].includes(titelElement) ? titelElement : 'h1';
   const eigene = (Array.isArray(knoepfe) ? knoepfe : []).filter((k) => k && /^[a-z][a-z0-9-]*$/.test(String(k.aktion || '')));
   const zahl = eigene.length + (klang ? 1 : 0) + (einstellungen ? 1 : 0) + (zurueck ? 1 : 0);
   const klassen = ['kopf', 'haupt-kopf'];
@@ -57,7 +59,7 @@ export function hauptKopf({ titel = 'Schach-Arena', unter = '', marke = true, zu
         ${zurueck ? knopf('zurueck', 'zurueck', 'Zurück', 'kopf-zurueck') : ''}
         <div class="marke">
           ${marke ? `<span class="marke-zeichen" aria-hidden="true">${icon('bauer')}</span>` : ''}
-          <div class="marke-text"><h1 class="marke-titel logo">${esc(titel)}</h1>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}</div>
+          <div class="marke-text"><${tt} class="marke-titel logo">${esc(titel)}</${tt}>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}</div>
         </div>
       </div>
       <div class="kopf-reiter-platz"></div>

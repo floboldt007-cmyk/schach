@@ -186,9 +186,22 @@ async function testeLeiste(browser) {
     m = await lageMessen(seite);
     pruefe('Drehen auf hochkant: Lage unten, Leiste nicht mehr im Kopf, Pille unter Verlauf', m.html === 'unten' && !m.imKopf && pilleUnterAktivem(m),
       JSON.stringify({ h: m.html, k: m.imKopf }));
+    // unten: eine Meldung steht ueber der Leiste, nicht darauf
+    await seite.evaluate(() => window.__app.meldung('Test-Meldung'));
+    const t = await seite.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().bottom, n: document.querySelector('.reiter-leiste').getBoundingClientRect().top }));
+    pruefe('unten: Meldung ueber der Leiste', t.t <= t.n, JSON.stringify(t));
     await seite.setViewportSize({ width: 1180, height: 820 });
     await seite.waitForFunction(() => document.documentElement.dataset.reiter === 'oben', null, { timeout: 3000 }).catch(() => {});
     pruefe('zurueck ins Querformat: wieder oben', (await lageMessen(seite)).html === 'oben');
+    // Tastatur: der Fokus folgt auf den neuen Reiter, obwohl die Leiste dabei in den Kopf des neuen Screens umzieht
+    await seite.locator('.reiter-leiste [data-reiter="arena"]').focus();
+    await seite.keyboard.press('Enter');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(100);
+    pruefe('Tastatur: Enter auf einem Reiter, der Fokus liegt danach auf dem neuen aktiven Reiter', await seite.evaluate(() => {
+      const a = document.activeElement;
+      return !!a && a.matches('.reiter-leiste [data-reiter="arena"][aria-current="page"]');
+    }));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -388,7 +401,8 @@ async function testeTraining(browser) {
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
     pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Schach-Arena' && !r.platzhalter, JSON.stringify(r));
-    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training', JSON.stringify(r));
+    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
+      && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();
     await seite.waitForSelector('.screen.arena .knoten');

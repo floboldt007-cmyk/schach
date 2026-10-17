@@ -1313,9 +1313,14 @@ async function testeErweiterungen(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const anfragen = [];
     seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
-    await seite.goto(BASIS + '#training');
+    // Premium-Umbau U2 (PLAN 2.10): training ist Kern-Screen (Training-Huelle); der Rueckfall gilt weiter fuer start
+    await seite.goto(BASIS + '#start');
     await seite.waitForSelector('.screen.arena');
-    pruefe('#training ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
+    pruefe('#start ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
+    await seite.goto(BASIS + '#training');
+    await seite.waitForSelector('.screen.training-screen');
+    pruefe('#training (Kern-Screen seit U2): Training-Huelle, kein Platzhalter', (await seite.evaluate(() => location.hash)) === '#training'
+      && await seite.locator('.screen.platzhalter').count() === 0);
     await seite.evaluate(() => window.__app.gehe('start'));
     await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Schach-Arena');
     pruefe('gehe("start") ohne Paket-Screen: Arena, kein Platzhalter', await seite.locator('.screen.arena').count() === 1 && await seite.locator('.screen.platzhalter').count() === 0);
@@ -2062,25 +2067,39 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
       return n && { hidden: n.hidden, reiter: [...n.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join(),
-        html: document.documentElement.dataset.reiter, unten: Math.round(innerHeight - n.getBoundingClientRect().bottom) };
+        html: document.documentElement.dataset.reiter, imKopf: !!n.closest('.haupt-kopf'), oben: Math.round(n.getBoundingClientRect().top) };
     });
-    pruefe('Leiste (Testmodus ?reiter=training,ich): Arena, Training, Ich, Arena aktiv, unten', !!l1 && !l1.hidden && l1.reiter === 'arena*,training,ich' && l1.html === 'an' && l1.unten === 0, JSON.stringify(l1));
+    // Premium-Umbau U2 (Flo D5): im Querformat ab 1021 px sitzt die Leiste oben in der Kopfzeile (vorher unten, html "an")
+    pruefe('Leiste (Testmodus ?reiter=training,bestenliste,ich): Arena, Training, Bestenliste, Ich, Arena aktiv, quer oben im Kopf', !!l1 && !l1.hidden
+      && l1.reiter === 'arena*,training,bestenliste,ich' && l1.html === 'oben' && l1.imKopf && l1.oben < 82, JSON.stringify(l1));
     await seite.locator('.reiter-leiste [data-reiter="ich"]').click();
     await seite.waitForSelector('.screen.ich-test');
     pruefe('Leiste: Reiter Ich öffnet den Ich-Screen und ist aktiv', (await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter)) === 'ich'
       && (await seite.evaluate(() => document.title)) === 'Ich · Schach-Arena' && (await seite.evaluate(() => location.hash)) === '#ich');
-    await seite.locator('.reiter-leiste [data-reiter="training"]').click();
+    await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
     await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
-    pruefe('Leiste: Training ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+    pruefe('Leiste: Bestenliste ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
       && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
+    // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle), der Reiter oeffnet ihn
+    await seite.locator('.reiter-leiste [data-reiter="training"]').click();
+    await seite.waitForSelector('.screen.training-screen');
+    pruefe('Leiste: Reiter Training oeffnet die Training-Huelle und ist aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'training' && location.hash === '#training'));
+    // Premium-Umbau U2 (Flo D2): mit Ich gehoert der Verlauf zum Reiter Ich; versteckt ist die Leiste auf Screens ohne Reiter
+    // (Einstellungen), dort faehrt sie weg und ist danach hidden
     await seite.evaluate(() => window.__app.gehe('verlauf'));
     await seite.waitForSelector('.screen.vl-screen');
-    pruefe('Leiste: auf Screens ohne Reiter (Verlauf) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
+    pruefe('Leiste: Verlauf gehoert zu Ich (Reiter Ich aktiv)', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'ich'));
+    await seite.evaluate(() => window.__app.gehe('einstellungen'));
+    await seite.waitForSelector('.screen.es-screen');
+    await seite.waitForFunction(() => document.querySelector('.reiter-leiste').hidden, null, { timeout: 2000 }).catch(() => {});
+    pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste') || document.querySelector('.reiter-leiste').hidden));
@@ -2469,6 +2488,8 @@ async function testeSpielFundament(browser) {
         const verdeckt = [];
         let geprueft = 0;
         for (const el of document.querySelectorAll('#app > .screen button, #app > .screen a[href], #app > .screen [role="button"]')) {
+          // Premium-Umbau U2: quer liegen die Reiter selbst im Kopf (#app); sie verdecken sich nicht selbst
+          if (el.closest('.reiter-leiste')) continue;
           el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
           const b = el.getBoundingClientRect();
           if (!b.width || !b.height || getComputedStyle(el).visibility === 'hidden') continue;
@@ -2483,13 +2504,18 @@ async function testeSpielFundament(browser) {
         sp.scrollIntoView({ block: 'nearest' });
         const sb = sp.getBoundingClientRect();
         const spTreffer = document.elementFromPoint(sb.left + sb.width / 2, sb.top + sb.height / 2);
-        return { leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt, spielen: !!spTreffer && sp.contains(spTreffer) };
+        return { lage: document.documentElement.dataset.reiter, leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt,
+          spielen: !!spTreffer && sp.contains(spTreffer) };
       });
-      if (r.screenUnten > r.leisteOben || r.verdeckt.length || r.geprueft < 5 || !r.spielen) falsch.push(`${vp.name} ${JSON.stringify(r)}`);
+      // Premium-Umbau U2 (Flo D5): quer (1180) oben in der Kopfzeile, hoch und Handy unten; unten endet der Screen ueber ihr
+      const lageSoll = vp.name === 'quer' ? 'oben' : 'unten';
+      if (r.lage !== lageSoll || (r.lage === 'unten' && r.screenUnten > r.leisteOben) || r.verdeckt.length || r.geprueft < 5 || !r.spielen) {
+        falsch.push(`${vp.name} ${JSON.stringify(r)}`);
+      }
       if (fehler.length) falsch.push(`${vp.name} Konsole: ${fehler.join(' | ')}`);
       await kontext.close();
     }
-    pruefe('Untere Leiste (quer, hoch, Handy): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
+    pruefe('Leiste (quer oben im Kopf, hoch und Handy unten): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
       falsch.length === 0, falsch.join(' || '));
   }
   // Schub 2b (Entscheidung 17.10.): Screen werkstatt (Paket werkstatt), gehoert zum Reiter Ich

@@ -108,6 +108,8 @@ html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
 :root { --reiter-h: calc(var(--reiter-hoehe) + 10px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
 html[data-reiter-form="gestapelt"] { --reiter-h: calc(var(--reiter-hoehe) + 18px + max(14px, env(safe-area-inset-bottom, 0px)) + 10px); }
 html[data-reiter="unten"] #app > .screen { height: calc(100vh - var(--reiter-h)); height: calc(100dvh - var(--reiter-h)); }
+/* Meldungen ueber der Leiste, nicht darauf */
+html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
 
 /* ---------- Handy ---------- */
 @media (max-width: 700px) {

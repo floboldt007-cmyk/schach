@@ -937,7 +937,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 | `partie:matt` | Aufruf | `partie.js` `ende()` bei Matt: nach `speicherePartie`, nach `partie:beendet` (darauf wartet der Hook hoechstens 300 ms, w0plus-a-fix), vor dem Ergebnis (Ablauf unten) | `{ app, buehne, laufId, partieId, ergebnis, gewinner, koenigFeld, letzterZug { von, nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }` | Finisher (S1-7) |
 | `ergebnis:abrechnung` | DOM | `js/ui/abrechnung.js`: Huelle `div.abrechnung[role=list]`, die selbst an `ergebnis:karte` (Reihenfolge 3) haengt | wie `ergebnis:karte` (mit `boss`) | Punkte 10 (S1-3) · Funken 20 (S1-1) · Wertung 30 (S1-2) · Serie 40 (S1-4) |
 | `bestenliste:reiter` | DOM | Screen `bestenliste` (S1-3 `punkte`), Reiterzeile der Bestenliste; bis dahin nur die Node-Pruefung in `tests/ereignisse.test.mjs` | `{ app, reiter, fenster }` (`reiter`: gewaehlter Reiter, `fenster`: `'woche'` \| `'monat'` \| `'allzeit'`) | Ich 10 · Bots 20 (S1-3) · Liga 30 (S3-2) · Raetsel 40 (S2-2) · Freunde 50 (S3-3) |
-| `training:karten` | DOM | Screen `training` (S2-1 `kartei`), Karten des Trainings | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
+| `training:karten` | DOM | Screen `training` (seit U2 Kern-Screen, `js/ui/training.js`): `.training-gitter`, Karten des Trainings; ohne Anbieter eine ruhige Karte | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
 | `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
 | `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeSpielplan()`, also `daten/boss/spielplan.json`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
 Die vier Screen-Orte haben noch keinen Host in der App: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau
@@ -959,7 +959,7 @@ Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
 | `partie:spieler-leiste`, `partie:aktionen` | `js/ui/partie.js` (w0plus-a-fix) | bleibt |
 | `ergebnis:abrechnung` | `js/ui/abrechnung.js` an `ergebnis:karte` (W0+a) | bleibt |
 | `bestenliste:reiter` | `tests/orte-huelle.html` | Screen `bestenliste` (`js/ui/bestenliste.js`, S1-3 `punkte`) |
-| `training:karten` | `tests/orte-huelle.html` | Screen `training` (`js/ui/training.js`, S2-1 `kartei`) |
+| `training:karten` | `js/ui/training.js` (Premium-Umbau U2, Training-Huelle); `tests/orte-huelle.html` bleibt | bleibt |
 | `ich:vitrine` | `tests/orte-huelle.html` | Screen `ich` (`js/ui/ich.js`, Paket `ich` mit der Integration S1) |
 | `spielplan:tage` | `tests/orte-huelle.html` | Screen `spielplan` (`js/ui/spielplan.js`, S1-6 `boss`) |
 
@@ -1122,10 +1122,10 @@ dem Ergebnis laeuft und nicht ins Budget zaehlt.
   `bestenliste`; `ich`, `werkstatt`). Dann `html[data-reiter="an"]`: die Screens werden um die Hoehe der Leiste kuerzer
   (`--reiter-h`, w0plus-a-fix: vorher bekam `#app` Platz unten, die Screens sind aber selbst `100dvh` hoch, und die Leiste lag
   im Querformat und auf dem Handy ueber dem SPIELEN-Knopf), `aria-current="page"` am aktiven Reiter,
-  Wechsel ersetzt den Verlaufseintrag. Die Optik kommt mit dem Premium-Umbau. `app.js` liest `PAKETE` und `REITER` ueber
-  den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Flos Entscheidung
-  D5 (17.10.: auf dem iPad quer in der Kopfzeile, sonst unten schwebend) setzt der Premium-Umbau nur mit CSS um; Aufbau,
-  Reiter und `aria-current` bleiben.
+  Wechsel ersetzt den Verlaufseintrag. `app.js` liest `PAKETE` und `REITER` ueber den Namensraum
+  (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Seit dem Premium-Umbau U2 ist sie
+  eine schwebende Glas-Pille mit Lage nach Flo D5 (`html[data-reiter="oben"|"unten"]` statt `"an"`), dazu der
+  Zwischenreiter Verlauf (D2) und `training` als Kern-Screen: Abschnitt „Premium-Umbau U2“ am Ende.
 - Start: `dauerhaftAnfragen()` vor dem Laden der Pakete, `duenneAnalysenAus()` per `setTimeout(0)` nach dem ersten Screen.
 
 ## Tests (W0+a)
@@ -1231,3 +1231,66 @@ Quelle im Kopf von `modern.css`), vorgeladen in `index.html`, im Service-Worker-
 **Tests:** `tests/thema.test.mjs` (Node: Token-Vollstaendigkeit, Theme-Regeln, Kontraste, Schriften, thema.js,
 bewegung.js; Browser: hell/dunkel nach System, Wechsel ohne Neuladen, kein Aufblitzen, Schriften lokal, Probe-Theme
 aendert kein Layout, Lesbarkeit aller Hauptscreens mindestens 3:1 in hell und dunkel, keine externen Anfragen).
+
+# Premium-Umbau U2: Navigation, Kopf, Bauteile, Training-Huelle
+
+**Reiter-Leiste** (`js/app.js`, Optik `css/navigation.css`): schwebende Glas-Pille (`--glas`, `--glas-filter`, `--s2`)
+mit `button.reiter[data-reiter]` (Symbol und Wort) und einer gleitenden `.reiter-pille` unter dem aktiven Reiter
+(`aria-current="page"`); gemessen ueber `offsetLeft/offsetWidth`, ein `ResizeObserver` (Leiste und Fenster) misst neu,
+die Pille gleitet per Web-Animation (`--feder-weich`), auch wenn die Leiste dabei in einen neuen Kopf umzieht.
+- **Wann:** nur wenn `REITER` (oder im Testmodus `?reiter=`) Reiter nennt und der Screen einem Reiter gehoert
+  (`reiterVon(screen)`), sonst keine Leiste und kein Abstand. Erlaubt in `REITER`: `training`, `verlauf`, `bestenliste`, `ich`.
+- **Zwischenreiter Verlauf (Flo D2):** `REITER = ['verlauf']` ergibt „Arena · Verlauf“. Steht `ich` in `REITER`,
+  verschwindet er; der Verlauf gehoert dann zum Reiter Ich (Leiste sichtbar, Ich aktiv, Zurueck bleibt).
+- **Lage (Flo D5):** Querformat ab 1021 px (`(min-width: 1021px) and (orientation: landscape)`) oben in der Kopfzeile,
+  und zwar in `.kopf-reiter-platz` des Hauptseiten-Kopfs (DOM-Umzug; zeichnet ein Screen seinen Kopf neu, holt ein
+  `MutationObserver` sie zurueck). Passt sie dort nicht, wird sie schmaler (`.eng`), dann ohne Symbole (`.enger`), dann
+  steht sie nicht mehr genau mittig (`.reiter-frei`), sonst unten. Ein Screen ohne `.kopf-reiter-platz` (z. B. ein
+  Paket-Screen ohne `hauptKopf`) bekommt sie unten. Unten schwebt sie 14 px ueber dem Rand (oder der sicheren Zone),
+  zu breit fuer eine Zeile (Handy mit vier Reitern) wird sie `.gestapelt` (volle Breite, Symbol ueber dem Wort,
+  `html[data-reiter-form="gestapelt"]`).
+- **Attribute:** `html[data-reiter="oben"|"unten"]` (nur unten werden die Screens um `--reiter-h` kuerzer),
+  `html[data-reiter-wurzel="ja"]` auf dem Screen des Reiters selbst (der Kopf blendet dort seinen Zurueck-Knopf aus),
+  `html[data-reiter-liste]` (die Reiter, durch Leerzeichen getrennt; ein Reiter Verlauf blendet den Verlauf-Knopf im
+  Kopf aus).
+- **Wegfahren:** auf Screens ohne Reiter (Partie, Analyse, Einstellungen) ist der Platz sofort frei (`data-reiter`
+  weg), die Leiste faehrt unten weg (`.weg`, dann `hidden`); zurueck faehrt sie wieder ein. Tempo 0 (Einstellung oder
+  „weniger Bewegung“): sofort.
+
+**Hauptseiten-Kopf** (`js/ui/seite.js`, importiert `app.js` nicht): `hauptKopf({ titel = 'Schach-Arena', unter, marke,
+zurueck, chips, knoepfe, modus, klang, einstellungen })` -> `header.kopf.haupt-kopf` mit Marke (Bauer auf Tinte),
+`h1.marke-titel.logo` und `.unter.logo-unter`, `.kopf-reiter-platz`, rechts `.kopf-chips` (Standard `standardChips()`:
+Sterne und besiegte Bots; Ort `arena:kopf` haengt dort an), eigene `.icon-knopf[data-aktion]`, Mond/Sonne
+(`data-aktion="modus"`), Klang-Schalter (`.knopf-klang[data-aktion="klang"][aria-pressed]`), Zahnrad. Der Titel wird nie
+gekuerzt (kein Auslassungszeichen, kein Umbruch): eng werden zuerst die Unterzeile, auf dem Handy der Mond, dann das
+Zeichen und der zweite Chip; viele Chips scrollen waagrecht, passt nicht einmal der erste, blendet der Kopf sie aus
+(`.ohne-chips`). `verbindeKopf(wurzel, app, { beiZurueck, beiEinstellungen })` bindet Klang (`app.setzeEinstellungen({
+klang })`, Meldung) und Hell/Dunkel (`app.setzeEinstellungen({ modus })`, Kreis-Aufdecken ueber View Transitions, wo es
+sie gibt) als Delegation an den Screen. `seitenKopf({ ueber, titel, text })` -> `.seiten-kopf` (grosser Seitentitel).
+Benutzer: Arena, Verlauf (Titel „Verlauf“, Unterzeile mit der Anzahl, Zurueck), Training; Pakete mit eigenen
+Hauptseiten sollen ihn benutzen, damit die Leiste im Querformat oben sitzt.
+
+**Bauteile** (`js/ui/bauteile.js`, Optik `css/bauteile.css`): `segment({ name, optionen, wert, beiWahl })` (Radiogruppe,
+gleitende `.seg-pille`, Pfeiltasten, Pos1/Ende), `schalter({ an, beiWechsel })` (`role="switch"`), `regler({ wert, min,
+max, schritt, beiAenderung, format })` (`role="slider"`, Ziehen und Tasten), `sheet({ titel, text, knoepfe, abbrechen })
+-> Promise` und `schliesseSheet()` (Blatt von unten, Fokus bleibt drin; ein Screen-Wechsel schliesst es),
+`halteKnopf({ text, icon, dauer = 1000, beiAusloesen, frage, hinweis })` (Ring fuellt sich, frueher loslassen bricht ab,
+Klick ohne Zeiger, also Tastatur oder Bedienhilfe, oeffnet die Rueckfrage als Blatt; die Haltezeit haengt nicht am
+Tempo), `toast(text, { art, dauer })`/`toastLeeren()` (dahinter steht `app.meldung`), `miniBrett(fen, { zuletzt })`.
+Dazu die Klasse `.coach-karte` (Coach-Karte aus A fuer U7 und U9) und `.ico { stroke-width: var(--ic-strich) }`.
+Testseite: `tests/bauteile.html`.
+
+**Training-Huelle** (`js/ui/training.js`, `css/training.css`): Kern-Screen (nicht mehr in `PAKET_SCREENS`, im sw-Test
+nicht mehr in `SCREEN_PAKET`), Hauptseiten-Kopf, Seitentitel „Üben ohne Druck / Training“, `.training-gitter` als
+Behaelter von `training:karten` (Kontext `{ app }`, `data-anzahl`; ab drei Karten ist die erste gross ueber zwei
+Zeilen, Handy eine Spalte), ohne Anbieter `.training-leer` („Training kommt mit der nächsten Welle“, Knopf zur Arena).
+Bausteine fuer die Karten der Pakete: `.t-karte`, `.t-held`, `.t-marke`, `.t-zahl`, `.t-fuss`, `.kartei-stapel`, `.mini`.
+Der Reiter Training erscheint erst, wenn die Integration `training` in `REITER` eintraegt.
+
+**Icons** (`js/ui/icons.js`): die Strich-Icons aus Entwurf A unter den bisherigen Namen, neu `mond`, `sonne`, `laut`,
+`leise`, `klang` (mit `.klang-welle` und `.klang-strich`), `regler`, `haken`, `bauer` (gefuellt), `podest`, `person`.
+
+**Tests:** `node tests/navigation.test.mjs` (Node: Icons, Router-Quelltext, CSS ohne feste Farben und Neon; Browser:
+Leiste mit und ohne `REITER`, oben/unten bei 1180 x 820, 1024 x 768, 820 x 1180, 390 x 844, 375 x 667, Drehen, Pille,
+Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekuerzt, Chips scrollen, Training leer und
+mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
