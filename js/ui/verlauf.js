@@ -16,6 +16,7 @@ import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
 import { fuelle } from '../orte.js';
+import { botFarbe } from '../thema.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
 const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast' };
@@ -84,7 +85,7 @@ function eroeffnungsName(p) {
 
 function avatarHtml(bot, klein = false) {
   if (!bot) return `<span class="an-avatar${klein ? ' vl-klein' : ''}" aria-hidden="true"></span>`;
-  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(bot.farbe)}" aria-hidden="true"><img src="${esc(pfad(bot.avatar))}" alt=""></span>`;
+  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(botFarbe(bot))}" aria-hidden="true"><img src="${esc(pfad(bot.avatar))}" alt=""></span>`;
 }
 
 export function zeige(root, params = {}, app) {
@@ -221,7 +222,7 @@ export function zeige(root, params = {}, app) {
     const g = naechsterGegner();
     return `
       <div class="vl-leer flaeche">
-        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(g.farbe)}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
+        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
         <h3>Noch keine Partien.</h3>
         <p>Fordere ${esc(g ? g.name : 'Bauer Benno')} heraus!</p>
         <button class="knopf primaer" type="button" data-aktion="arena">Zur Arena ${icon('pfeil')}</button>

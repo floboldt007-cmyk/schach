@@ -114,6 +114,24 @@ const kleineKnoepfe = (seite) => seite.evaluate(() => [...document.querySelector
   return r.height < 43.5 || r.width < 43.5;
 }).map((b) => `${b.className || b.tagName} ${Math.round(b.getBoundingClientRect().width)}x${Math.round(b.getBoundingClientRect().height)}`));
 
+// Premium-Umbau Schub 1: Text-Links brauchen ebenfalls >= 44 px Tippflaeche
+const kleineLinks = (seite) => seite.evaluate(() => [...document.querySelectorAll('.screen a[href]')].filter((a) => {
+  const r = a.getBoundingClientRect();
+  if (!r.width || !r.height || getComputedStyle(a).visibility === 'hidden') return false;
+  return r.height < 43.5 || r.width < 43.5;
+}).map((a) => `"${a.textContent.trim().slice(0, 24)}" ${Math.round(a.getBoundingClientRect().width)}x${Math.round(a.getBoundingClientRect().height)}`));
+
+// Premium-Umbau Schub 1 (Flos iPhone-Befund): kein Text wird abgeschnitten, weder per Ellipse noch still per
+// overflow hidden. Nur Elemente mit eigenem Text; .sr (nur fuer Screenreader) ist absichtlich 1 px gross.
+const gekuerzt = (seite) => seite.evaluate(() => [...document.querySelectorAll('.screen *')].filter((el) => {
+  if (el.closest('.sr, svg, [hidden]')) return false;
+  if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return false;
+  const cs = getComputedStyle(el);
+  if (cs.visibility === 'hidden' || !el.getBoundingClientRect().width) return false;
+  if (cs.textOverflow !== 'ellipsis' && !/(hidden|clip)/.test(cs.overflowX)) return false;
+  return el.scrollWidth > el.clientWidth + 1;
+}).slice(0, 4).map((el) => `${String(el.className.baseVal ?? el.className) || el.tagName} "${el.textContent.trim().slice(0, 30)}"`));
+
 // ---------------------------------------------------------------------------
 // Testdaten einmal anlegen (Opernpartie mit Review, Bot-Partie ohne Review)
 // ---------------------------------------------------------------------------
@@ -410,8 +428,18 @@ async function testePruefrunde(browser, d) {
   const brillant = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.klasse === 'brillant'), d.oper);
   if (brillant) {
     await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${brillant.ply}`);
-    const bg = await seite.evaluate(() => getComputedStyle(document.querySelector('.an-coach.brillant')).backgroundImage);
-    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /linear-gradient\(rgb\(16, 20, 42\), rgb\(16, 20, 42\)\)/.test(bg), bg.slice(0, 160));
+    // Premium-Umbau U1: die deckende Flaeche ist die Kartenfarbe des Themes (--flaeche), nicht mehr das Neon-Blau
+    const bg = await seite.evaluate(() => {
+      const el = document.querySelector('.an-coach.brillant');
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--flaeche)';
+      el.appendChild(probe);
+      const flaeche = getComputedStyle(probe).color;
+      probe.remove();
+      return { bild: getComputedStyle(el).backgroundImage, flaeche };
+    });
+    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /^rgb\(/.test(bg.flaeche) && bg.bild.includes(`linear-gradient(${bg.flaeche}, ${bg.flaeche})`),
+      JSON.stringify(bg).slice(0, 200));
   }
 
   // Engine stuerzt ab (leere Analyse mit Fehler): Fehlerkarte statt endlosem Warten, danach klappt es
@@ -647,6 +675,10 @@ async function testeViewports(browser, d) {
       pruefe(`${name} ${screen}: kein waagrechter Überlauf`, u.doc <= 0 && u.scr <= 0 && !u.raus.length, JSON.stringify(u));
       const klein = await kleineKnoepfe(seite);
       pruefe(`${name} ${screen}: Tippflächen ≥ 44 px`, !klein.length, klein.slice(0, 4).join(', '));
+      const links = await kleineLinks(seite);
+      pruefe(`${name} ${screen}: Text-Links mit Tippfläche ≥ 44 px`, !links.length, links.slice(0, 4).join(', '));
+      const kurz = await gekuerzt(seite);
+      pruefe(`${name} ${screen}: keine abgeschnittenen Namen oder Titel`, !kurz.length, kurz.join(', '));
       if (screen === 'analyse') {
         const brett = await seite.locator('.an-brett').boundingBox();
         const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * 0.5;

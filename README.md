@@ -176,5 +176,11 @@ Die Schach-Arena ist freie Software unter der **GPL-3.0** (siehe `LICENSE`).
 - **chess.js** 1.4.0 ([jhlywa/chess.js](https://github.com/jhlywa/chess.js)): BSD-2-Clause,
   siehe `vendor/chess/LICENSE`.
 - **Figuren** „cburnett“ von Colin M.L. Burnett: GPLv2 oder neuer (derselbe Satz wie bei Lichess).
+- **Schriften** (Look „Modern und klar“): **Manrope** (The Manrope Project Authors) und **Bricolage Grotesque**
+  (The Bricolage Grotesque Project Authors), beide unter der SIL Open Font License 1.1, Lizenztexte in
+  `assets/schriften/OFL-Manrope.txt` und `assets/schriften/OFL-Bricolage-Grotesque.txt`. Quelle: npm
+  `@fontsource-variable/manrope@5.3.0` (`manrope-latin-wght-normal.woff2`) und
+  `@fontsource-variable/bricolage-grotesque@5.3.0` (`bricolage-grotesque-latin-opsz-normal.woff2`), unverändert.
+  Die Schriften liegen im Repo und im Offline-Cache, es gibt keine Anfrage an fremde Server.
 - Avatare, Zug-Symbole, App-Icon und Design sind für dieses Projekt entstanden und stehen
   ebenfalls unter der GPL-3.0.
