@@ -139,7 +139,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
   lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
   // Premium-Umbau (PLAN 4): Klang
-  klangpaket: '',        // '' (Standard der Ansicht, modern: Holz) | 'holz' | 'arcade'
+  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade'
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
   klangstufe: 'alle',    // 'alle' | 'wichtig' | 'aus' (Flo, D4: Standard alle)
   klanggruppen: Object.freeze({ brett: true, bewertung: true, feier: true, uhr: true, boss: true, finisher: true, bedienung: true }),

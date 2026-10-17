@@ -273,7 +273,7 @@ function nodeTeil() {
 
   gruppe = 'thema.js';
   pruefe('THEMEN eingefroren, modern vollstaendig (PLAN 1.4)', Object.isFrozen(THEMEN) && Object.isFrozen(THEMEN.modern) && THEMEN.modern.css === 'css/themes/modern.css'
-    && THEMEN.modern.klang.standard === 'holz' && THEMEN.modern.figuren === 'assets/pieces/' && THEMEN.modern.federn.feder.join() === '420,30'
+    && THEMEN.modern.klang.standard === 'arcade' && THEMEN.modern.figuren === 'assets/pieces/' && THEMEN.modern.federn.feder.join() === '420,30'
     && THEMEN.modern.frei === true && JSON.stringify(THEMEN.modern.modi) === '["hell","dunkel"]');
   pruefe('MODI wie die Einstellung modus', JSON.stringify(MODI) === JSON.stringify(EINSTELLUNG_WERTE.modus));
   pruefe('themaListe ohne Pakete: nur modern', JSON.stringify(themaListe()) === '[{"id":"modern","name":"Modern und klar","frei":true}]');
@@ -286,7 +286,7 @@ function nodeTeil() {
   const ab2 = registriereThema({ ...gut, id: 'verspielt', name: 'Verspielt', css: 'css/themes/verspielt.css', klang: { standard: 'arcade' }, frei: false });
   pruefe('registriereThema: Liste, themaVon, standardKlangpaket', themaListe().map((t) => t.id).join() === 'modern,edel,verspielt'
     && themaVon('edel').name === 'Edel' && standardKlangpaket('verspielt') === 'arcade' && standardKlangpaket('edel') === 'holz'
-    && standardKlangpaket('modern') === 'holz' && standardKlangpaket('gibtsnicht') === 'holz' && themaListe()[2].frei === false && Object.isFrozen(themaVon('edel')));
+    && standardKlangpaket('modern') === 'arcade' && standardKlangpaket('gibtsnicht') === 'arcade' && standardKlangpaket() === 'arcade' && themaListe()[2].frei === false && Object.isFrozen(themaVon('edel')));
   ab();
   ab2();
   pruefe('abmelden() entfernt das Theme', themaListe().length === 1 && themaVon('edel') === null && themaVon('modern') === THEMEN.modern);

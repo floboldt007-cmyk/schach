@@ -1199,7 +1199,7 @@ angelegt) -> `css/screens.css` (Rest, verschwindet mit U8/U9).
 klang.standard), `themaListe()`, `themaVon(id)`, `wendeThemaAn({ thema, modus }) -> Promise` (laedt ein
 nachgeladenes Theme-CSS zuerst, setzt `html[data-thema|data-modus]`, Federn, `<meta name="theme-color">`; Unbekanntes
 -> modern/system; der spaetere Aufruf gewinnt), `aufgeloesterModus()`, `aktuellesThema()`, `standardKlangpaket(id)`
-(modern: holz), `avatarVon(bot)` (Portraet des Themes nur fuer Bots in `portraets`, sonst `bot.avatar`), `botFarbe(bot)`,
+(modern: arcade, Flo D6), `avatarVon(bot)` (Portraet des Themes nur fuer Bots in `portraets`, sonst `bot.avatar`), `botFarbe(bot)`,
 `floAvatar(farbe)`. Ereignis `window 'schach:thema'` `{ thema, modus, aufgeloest }` nach jedem Wechsel und bei
 Systemwechsel im Modus `system`. Gegen Aufblitzen setzt ein kleines Inline-Skript in `index.html` den gespeicherten
 Modus `hell`/`dunkel` vor dem ersten Bild; `system` braucht kein JS.

@@ -35,7 +35,7 @@ const MODERN = Object.freeze({
     Object.freeze({ familie: 'Manrope', datei: 'assets/schriften/manrope.woff2', lizenz: 'assets/schriften/OFL-Manrope.txt' }),
     Object.freeze({ familie: 'Bricolage', datei: 'assets/schriften/bricolage-grotesque.woff2', lizenz: 'assets/schriften/OFL-Bricolage-Grotesque.txt' }),
   ]),
-  klang: Object.freeze({ standard: 'holz' }),
+  klang: Object.freeze({ standard: 'arcade' }), // Flo, D6: "Arcade ist besser"; Holz bleibt waehlbar
   avatare: 'assets/avatare/modern/',       // <bot.id>.svg; nur fuer die Bots in portraets (U5 fuellt die Liste)
   portraets: Object.freeze([]),
   figuren: 'assets/pieces/',               // bleibt cburnett
@@ -108,7 +108,7 @@ export function aktuellesThema() {
 
 export function standardKlangpaket(themaId = aktuell.thema) {
   const t = themaVon(themaId) || MODERN;
-  return (t.klang && t.klang.standard) || 'holz';
+  return (t.klang && t.klang.standard) || MODERN.klang.standard;
 }
 
 export function avatarVon(bot) {
