@@ -77,7 +77,8 @@ export function lesePakete(text) {
 // spielhalle S3-4; w0plus-a-fix: werkstatt, Werkstatt-Vorschau aus Schub 2b). Baut ein anderes Paket den Screen,
 // aendert die Integration die Zuordnung hier.
 export const SCREEN_PAKET = Object.freeze({
-  training: 'kartei', start: 'einstieg',
+  // Premium-Umbau U2 (PLAN 2.10): training ist Kern-Screen (Training-Huelle), kein Paket-Screen mehr
+  start: 'einstieg',
   bestenliste: 'punkte', raetsel: 'raetsel', lernen: 'lernen', lektion: 'lernen', ich: 'ich', spielplan: 'boss', spielhalle: 'spielhalle',
   // w0plus-a-fix: Werkstatt-Vorschau (Schub 2b)
   werkstatt: 'werkstatt',
@@ -192,15 +193,17 @@ function main() {
     .split('\n').filter((z) => !/^\s*\/\//.test(z)).join('\n'));
   pruefe('js/erweiterungen.js importiert kein Paket statisch (ein Ladefehler legte sonst die App lahm)', !statisch);
 
-  // Selbstprobe der Paket-Regel (wie bei 1C: js/ui/training.js liegt da, bevor die Integration es einbindet)
+  // Selbstprobe der Paket-Regel (wie bei 1C: die Dateien liegen da, bevor die Integration das Paket einbindet;
+  // seit U2 ist js/ui/training.js Kern-Screen und gehoert keinem Paket)
   {
     const probe = ['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css',
       'js/pakete/klang-serie/index.js', 'css/pakete/klang-serie.css', 'js/ui/start.js', 'js/pakete/einstieg/sub/x.js'];
     const vor = paketDateien(probe, []);
     const nach = paketDateien(probe, ['pakete/kartei/index']);
-    pruefe('Paket-Regel: vor der Integration ist keine Paket-Datei Pflicht', vor.pflicht.length === 0 && vor.wartend.length === probe.length);
+    pruefe('Paket-Regel: vor der Integration ist keine Paket-Datei Pflicht', vor.pflicht.length === 0 && vor.wartend.length === probe.length - 1
+      && !vor.erlaubt.includes('js/ui/training.js'));
     pruefe('Paket-Regel: nach der Integration sind genau die Dateien des Pakets Pflicht (auch der Screen, auch tiefer)',
-      JSON.stringify(nach.pflicht) === JSON.stringify(['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css'])
+      JSON.stringify(nach.pflicht) === JSON.stringify(['js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css'])
       && JSON.stringify(paketDateien(probe, ['pakete/einstieg/index']).pflicht) === JSON.stringify(['js/ui/start.js', 'js/pakete/einstieg/sub/x.js']),
       JSON.stringify(nach.pflicht));
     // W0+a: Inhalte unter daten/<paket>/ gehoeren zum Paket; direkt unter daten/ und daten/beispiel/ zu keinem
@@ -294,11 +297,12 @@ function main() {
   const paketScreens = ((app.match(/const PAKET_SCREENS = new Set\(\[([^\]]+)\]\)/) || [, ''])[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
   const kernScreens = screens.filter((s) => !paketScreens.includes(s));
   const screenFehlt = kernScreens.map((s) => `js/ui/${s}.js`).filter((d) => !menge.has(d));
-  pruefe('Alle Screen-Module im Cache', kernScreens.length === 5 && screenFehlt.length === 0, screenFehlt.join(', '));
+  // Kern: arena, partie, analyse, verlauf, einstellungen und (seit U2) training
+  pruefe('Alle Screen-Module im Cache', kernScreens.length === 6 && kernScreens.includes('training') && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
-  pruefe('Paket-Screens (training, start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt) im Router, die eingebundener Pakete im Cache',
-    JSON.stringify(paketScreens) === '["training","start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt"]'
+  pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
+    JSON.stringify(paketScreens) === '["start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt"]'
     && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');
