@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
 import { GRENZEN, klassifiziere, START_FEN } from '../js/review.js';
-import { BUDGET } from '../js/feier.js';
-import { wertet, sterneFuerPartie } from '../js/storage.js';
+import { BUDGET, BRETT_FEIER } from '../js/feier.js';
+import { wertet, sterneFuerPartie, MODI } from '../js/storage.js';
+import { pruefeInhalt, pruefeSpielplan, texteVon } from '../js/inhalte.js';
+import { registriereBot, botNachId } from '../js/bots.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -210,7 +212,10 @@ pruefe('GRENZEN unveraendert (0,02 / 0,05 / 0,10 / 0,20)', JSON.stringify(GRENZE
 pruefe('feier.BUDGET = { gross: 1, zeilen: 3, nachlese: 3 }', JSON.stringify(BUDGET) === '{"gross":1,"zeilen":3,"nachlese":3}', BUDGET);
 
 // ---------- Regel 9 und 10: keine Druck- und Schuldgefuehl-Texte ----------
-const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verpasst du', 'verlierst deine', 'Wir vermissen dich', 'Nein, ich will'];
+const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verpasst du', 'verlierst deine', 'Wir vermissen dich', 'Nein, ich will',
+  // W0+a: Zusaetze aus SPIELKONZEPT 5.3 (dazu aus dem Lektorat: die Serie zeigt nie "am Stück")
+  'Serie in Gefahr', 'rette deine', 'wartet auf dich', 'hat dich überholt', 'Abstieg', 'endet in', 'läuft ab', 'verfällt', 'knapp verpasst',
+  'nur heute', 'limitiert', 'Leben verloren', 'Game Over', 'Funken verfallen', 'Boost kaufen', 'am Stück'];
 {
   const dateien = jsDateien('js');
   const treffer = [];
@@ -226,10 +231,93 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
 
 // ---------- Regel 1: kein Zufall in Feier und Paket-Logik ----------
 {
-  const REIN = ['serie.js', 'logik.js', 'kartei.js', 'alltag.js', 'profil.js', 'taktik.js'];
-  const dateien = ['js/feier.js', ...jsDateien(path.join('js', 'pakete')).filter((d) => REIN.includes(path.basename(d)))];
+  // W0+a: dazu die reinen Logik-Dateien der neuen Pakete (SPIELKONZEPT 5.3) und tag.js, inhalte.js
+  const REIN = ['serie.js', 'logik.js', 'kartei.js', 'alltag.js', 'profil.js', 'taktik.js',
+    'funken.js', 'punkte.js', 'marsch.js', 'boss.js', 'raetsel.js', 'liga.js', 'code.js'];
+  const dateien = ['js/feier.js', 'js/tag.js', 'js/inhalte.js', ...jsDateien(path.join('js', 'pakete')).filter((d) => REIN.includes(path.basename(d)))];
   const treffer = dateien.filter((d) => /Math\s*\.\s*random|crypto\s*\.\s*getRandomValues/.test(zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).code));
   pruefe(`Kein Math.random in feier.js und den reinen Paket-Logik-Dateien (${dateien.length} Dateien)`, treffer.length === 0, treffer);
+}
+
+
+// =====================================================================
+// W0+a: Zusaetze aus SPIELKONZEPT 5.3, soweit das Fundament sie traegt
+// =====================================================================
+// alle JSON-Dateien unter daten/ (auch die Beispiele)
+function jsonDateien(ordner) {
+  const voll = path.join(WURZEL, ordner);
+  if (!existsSync(voll)) return [];
+  const aus = [];
+  for (const name of readdirSync(voll)) {
+    const p = path.join(voll, name);
+    if (statSync(p).isDirectory()) aus.push(...jsonDateien(path.join(ordner, name)));
+    else if (name.endsWith('.json')) aus.push(path.join(ordner, name));
+  }
+  return aus;
+}
+{
+  const daten = jsonDateien('daten');
+  const treffer = [];
+  const kaputt = [];
+  let felder = [];
+  for (const d of daten) {
+    let json = null;
+    try { json = JSON.parse(readFileSync(path.join(WURZEL, d), 'utf8')); } catch (e) { kaputt.push(d); continue; }
+    for (const t of texteVon(json)) for (const w of VERBOTEN) if (t.toLowerCase().includes(w.toLowerCase())) treffer.push(`${d}: "${w}"`);
+    // kein Feld fuer ein Ablaufdatum (Fairness 20: kein verfuegbarBis; Events ohne Druck)
+    const schluessel = [];
+    const sammle = (x) => {
+      if (Array.isArray(x)) x.forEach(sammle);
+      else if (x && typeof x === 'object') for (const [k, v] of Object.entries(x)) { schluessel.push(k); sammle(v); }
+    };
+    sammle(json);
+    felder = felder.concat(schluessel.filter((k) => /^(verfuegbarBis|endetAm|ablauf|laeuftAb)$/i.test(k)).map((k) => `${d}: ${k}`));
+  }
+  pruefe(`Inhalte (${daten.length} Dateien unter daten/): gueltiges JSON, Verbotsliste ohne Treffer`, daten.length >= 1 && kaputt.length === 0 && treffer.length === 0, { kaputt, treffer });
+  pruefe('Inhalte: kein Feld fuer ein Ablaufdatum (verfuegbarBis, endetAm ...)', felder.length === 0, felder);
+  // jeder Spielplan unter daten/ ist gueltig (Vorlauf 28 Tage, keine Countdowns, lueckenlose Wochen)
+  const plaene = daten.filter((d) => /spielplan/.test(path.basename(d)));
+  const ungueltig = plaene.map((d) => [d, pruefeInhalt(JSON.parse(readFileSync(path.join(WURZEL, d), 'utf8')), { art: 'spielplan' })]).filter(([, r]) => !r.ok);
+  pruefe(`Spielplaene (${plaene.length}) gueltig: Events mindestens 28 Tage vorher, keine Countdowns`, plaene.length >= 1 && ungueltig.length === 0, ungueltig.map(([d, r]) => [d, r.fehler]));
+}
+{
+  // Events ohne Druck (Regel 19): die Pruefung lehnt kurzfristige Events, Countdowns und Ablauf-Felder ab
+  const kopf = { art: 'spielplan', format: 1, rechenstand: 1, stand: '2026-11-01' };
+  const woche = { montag: '2026-11-16', boss: 'bergwirt', thema: null, funkenWochenende: false };
+  pruefe('Regel 19: Funken-Wochenende weniger als 4 Wochen vorher wird abgelehnt', pruefeSpielplan({ kopf, wochen: [{ ...woche, funkenWochenende: true }] }).length > 0
+    && pruefeSpielplan({ kopf, wochen: [woche] }).length === 0);
+  pruefe('Regel 19: Uhrzeit-Countdown und Ablauf-Feld werden abgelehnt', pruefeSpielplan({ kopf, wochen: [{ ...woche, text: 'Nur noch 3 h' }] }).length > 0
+    && pruefeSpielplan({ kopf, wochen: [{ ...woche, verfuegbarBis: '2026-11-20' }] }).length > 0);
+  // kein Uhrzeit-Countdown in den Texten von Spielplan, Boss und Werkstatt (Code)
+  const COUNTDOWN = /\d+\s*(h|Std|min)\b/i;
+  const orte = jsDateien('js').filter((d) => /spielplan|boss|werkstatt/i.test(d));
+  const cd = [];
+  for (const d of orte) for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) if (COUNTDOWN.test(t)) cd.push(`${d}: "${t.slice(0, 60)}"`);
+  pruefe(`Kein Uhrzeit-Countdown in Spielplan, Boss, Werkstatt (${orte.length} Dateien)`, cd.length === 0, cd);
+}
+{
+  // Boss: Boss-Partien werten nie, jeder Boss bleibt im Archiv spielbar
+  const sieg = { ergebnis: 'sieg', genauigkeit: 95, hinweise: 0, zuruecknahmen: 0, zuege: Array(30).fill('e2e4'), spielerFarbe: 'w' };
+  pruefe('Boss, freie Partie und Spielhalle werten nie und bringen nie Sterne', MODI.includes('boss') && ['boss', 'frei', 'spiel'].every((m) => !wertet({ ...sieg, modus: m })
+    && JSON.stringify(sterneFuerPartie({ ...sieg, modus: m })) === '[false,false,false]'));
+  const profil = { id: 'fairness-boss', art: 'boss', name: 'Testboss', avatar: 'x.svg', staerke: { ...botNachId('rudi').staerke } };
+  let ohneArchiv = false;
+  try { registriereBot(profil); } catch (e) { ohneArchiv = /archiv/.test(e.message); }
+  const ab = registriereBot({ ...profil, archiv: true });
+  pruefe('Jedes Boss-Objekt hat archiv: true (ohne wird es abgelehnt)', ohneArchiv && botNachId('fairness-boss').archiv === true);
+  ab();
+}
+{
+  // Finisher: hoechstens 1,8 s, Kurzfassung hoechstens 0,8 s; die Partie wartet nie laenger
+  pruefe('Finisher: dauerMs <= 1800, Kurzfassung <= 800', BRETT_FEIER.dauerMs <= 1800 && BRETT_FEIER.kurzMs <= 800 && BRETT_FEIER.kurzMs <= BRETT_FEIER.dauerMs);
+  const partie = zerlege(readFileSync(path.join(WURZEL, 'js/ui/partie.js'), 'utf8')).code;
+  pruefe('Finisher: partie.js wartet am Ort partie:matt hoechstens BRETT_FEIER.dauerMs', /warte\(BRETT_FEIER\.dauerMs,/.test(partie)
+    && !/partie:matt[\s\S]{0,400}warte\((?!BRETT_FEIER)\d/.test(partie));
+}
+{
+  // Level ohne Spielwirkung (Regel 18): bots.js und engine.js importieren nichts aus Paketen (Funken, Level ...)
+  const imp = ['js/bots.js', 'js/engine.js'].filter((d) => /from\s+['"][^'"]*pakete\//.test(readFileSync(path.join(WURZEL, d), 'utf8')));
+  pruefe('bots.js und engine.js importieren nichts aus den Paketen (Level und Funken ohne Spielwirkung)', imp.length === 0, imp);
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

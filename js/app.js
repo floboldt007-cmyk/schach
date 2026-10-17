@@ -31,7 +31,7 @@
 //     (hidden, html[data-reiter] fehlt). Die Optik kommt mit dem Premium-Umbau.
 //   - beim Start: storage.dauerhaftAnfragen() (navigator.storage.persist, Fehler still) und, kurz nach dem ersten
 //     Screen, storage.duenneAnalysenAus() (MAX_REVIEWS 12; aeltere Speicherstaende hatten bis zu 20)
-import { PAKETE, REITER } from './erweiterungen.js';
+import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
 import { setzeSymbole } from './board.js';
@@ -45,6 +45,11 @@ import { waehle } from './orte.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
+
+// Listen aus erweiterungen.js ueber den Namensraum: fehlt eine (z. B. eine aeltere Datei ohne REITER), startet die
+// App trotzdem (ein fehlender benannter Import braeche sonst den ganzen Modulgraphen ab)
+const PAKETE = erweiterungen.PAKETE;
+const REITER = erweiterungen.REITER;
 
 const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start',
   'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle'];

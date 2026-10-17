@@ -138,6 +138,8 @@ const PALETTEN = {
 const $ = (id) => document.getElementById(id);
 const chess = new Chess();
 const zugLog = [];
+// W0+a: abgelehnte Zugversuche (beiAbgelehnt)
+const abgelehntLog = [];
 let abzeichenNr = 0;
 let letzterZug = null;
 
@@ -156,6 +158,7 @@ const brett = new Brett($('brett'), {
     nachZug(zug, true);
     return true;
   },
+  beiAbgelehnt(von, nach, art) { abgelehntLog.push({ von, nach, art }); },
 });
 
 function schachFeld() {
@@ -278,7 +281,7 @@ setzePalette('abenteuer');
 zeigeGalerie();
 setzeFen(chess.fen());
 
-window.demo = { brett, chess, setzeFen, zugLog, klang, setzeSymbole, symbolSvg, setzePalette, ladeSymbole, KLASSEN,
+window.demo = { brett, chess, setzeFen, zugLog, abgelehntLog, klang, setzeSymbole, symbolSvg, setzePalette, ladeSymbole, KLASSEN,
   abzeichenAus() { $('abz').checked = false; } };
 window.bereit = true;
 </script>

@@ -1382,7 +1382,8 @@ async function testeErweiterungen(browser) {
   });
   const iF = ov.kinder.indexOf('erg-feier');
   pruefe('Ort ergebnis:karte zwischen .erg-feier und .erg-bot', ov.karte && iF >= 0 && ov.kinder[iF + 1] === 'erg-karte-ort' && ov.kinder[iF + 2] === 'erg-bot', ov.kinder.join(' '));
-  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
+  // W0+a: dazu boss (Modus boss, sonst null)
+  pruefe('Kontext ergebnis:karte', JSON.stringify(ov.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(ov.kontext));
   pruefe('Feier im Ergebnis: höchstens 3, höchstens 1 groß, nach prio (doppelte Meldung zählt einmal)', JSON.stringify(ov.feier) === JSON.stringify(['G:GROSS A', 'Zeile C', 'Zeile D']), JSON.stringify(ov.feier));
   pruefe('Feier-Zeile groß mit Symbol (Icon)', ov.symbol);
   await h.tippe('.ergebnis-karte .erg-wort');
@@ -1405,8 +1406,9 @@ async function testeErweiterungen(browser) {
   pruefe('zug:bewertet nach zug:gespielt desselben Zugs', p.filter((e) => e.name === 'zug:bewertet').every((b) => pn.indexOf('zug:bewertet') > pn.indexOf('zug:gespielt')
     && p.some((g) => g.name === 'zug:gespielt' && g.ply === b.ply && g.uci === b.uci)));
   pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
-  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
-    'liveAn', 'merke', 'modus', 'phase', 'rahmen', 'reduziert', 'spaeter', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 1, JSON.stringify(gest));
+  // W0+a: dazu boss, seed, zeigt, platz
+  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
+    'liveAn', 'merke', 'modus', 'phase', 'platz', 'rahmen', 'reduziert', 'seed', 'spaeter', 'zeigt', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 1, JSON.stringify(gest));
   pruefe('partie:gestartet: wertet, hinweise und zuruecknahmen (Stand beim Start)', gest.wertet === true && gest.hinweise === 0 && gest.zuruecknahmen === 0, JSON.stringify(gest));
   const gesp = p.filter((e) => e.name === 'zug:gespielt');
   pruefe('zug:gespielt für Flo und Bot, auch zurückgenommene', gesp.length === 9 && gesp.filter((e) => e.wer === 'bot').length === 4, gesp.map((e) => e.wer + ':' + e.uci).join(' '));
