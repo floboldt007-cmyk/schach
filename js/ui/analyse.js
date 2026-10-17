@@ -5,16 +5,23 @@
 //   zeige(root, { partieId, neuFreigeschaltet?, neueSterne?, ply? }, app) -> { verlasse() }
 //
 // Klassen mit Praefix an- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
+// Runde 4: Anzeige-Orte analyse:oben (oben rechts nach dem Banner) und analyse:coach (Knopfzeile der
+// Coach-Karte, je Zug neu gefuellt); Ereignisse analyse:gesehen (Zug gewechselt, nicht beim
+// Variantenspiel) und partie:analysiert (nach dem Nachrechnen, quelle 'analyse').
+// W0+a: Boss-Partien mit boss.staerke rechnen die Spielstaerke gegen die Elo, mit der der Boss wirklich spielte
+// (w0plus-a-fix: bots.eloDerPartie, die Elo des Profils aus staerkeFuerElo, nicht die Anfrage; wie partie.js).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
-import { botNachId } from '../bots.js';
-import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp } from '../review.js';
+import { botNachId, eloDerPartie } from '../bots.js';
+import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp, spielphasen, coachKern } from '../review.js';
 import { SYMBOLE, KLASSEN_NAME } from '../symbole.js';
 import { klang } from '../sounds.js';
 import {
   ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
   ladeLaufendePartie, loescheLaufendePartie, eigeneZuege, BESTWERT_MIN_ZUEGE,
 } from '../storage.js';
+import { sende } from '../ereignisse.js';
+import { fuelle } from '../orte.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
 const WURZEL = new URL('../../', import.meta.url);
@@ -58,16 +65,8 @@ const KR = 6;
 function esc(t) {
   return String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-// keine langen Gedankenstriche in UI-Texten
-const ohneStrich = (t) => String(t || '').replace(/\s*[–—]\s*/g, ': ');
-// Das Klassenwort steht schon gross in der Karte: am Anfang des Coach-Texts weglassen
-function coachOhneKopf(t) {
-  const text = ohneStrich(t).replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
-  const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug:|Erzwungen:)\s+/, '');
-  if (!rest.trim()) return text;
-  // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
-  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
-}
+// Das Klassenwort steht schon gross in der Karte: review.js coachKern laesst es am Anfang des
+// Coach-Texts weg (keine langen Gedankenstriche, Rochade als 0-0)
 const komma1 = (x) => x.toFixed(1).replace('.', ',');
 const sanDe = (san) => sanDeutsch(san || '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 const zugText = (z) => `${z.nummer}${z.farbe === 'w' ? '.' : '…'} ${sanDe(z.san)}`;
@@ -105,30 +104,6 @@ function ergebnisInfo(partie, letzteNummer) {
   return { stand, grund, wort, art: e === 'sieg' ? 'sieg' : e === 'niederlage' ? 'niederlage' : 'remis' };
 }
 
-// Spielphasen grob nach Lichess (Divider): Mittelspiel ab wenigen Leichtfiguren/duenner
-// Grundreihe, Endspiel ab hoechstens 6 Leicht- und Schwerfiguren.
-function phasen(fens, buchEnde) {
-  let mitte = null;
-  let ende = null;
-  fens.forEach((fen, i) => {
-    const reihen = fen.split(' ')[0].split('/');
-    const figuren = (reihen.join('').match(/[nbrqNBRQ]/g) || []).length;
-    const weissHinten = (reihen[7].match(/[A-Z]/g) || []).length;
-    const schwarzHinten = (reihen[0].match(/[a-z]/g) || []).length;
-    if (ende == null && figuren <= 6) ende = i;
-    if (mitte == null && i >= buchEnde && (figuren <= 10 || weissHinten < 4 || schwarzHinten < 4 || i >= 30)) mitte = i;
-  });
-  const n = fens.length - 1;
-  const liste = [];
-  const m = mitte == null ? n + 1 : mitte;
-  const en = ende == null ? n + 1 : Math.max(ende, 1);
-  const mEff = Math.min(m, en);
-  if (mEff > 0) liste.push({ name: 'Eröffnung', von: 0, bis: Math.min(mEff, n) });
-  if (en > mEff && mEff <= n) liste.push({ name: 'Mittelspiel', von: mEff, bis: Math.min(en, n) });
-  if (en <= n) liste.push({ name: 'Endspiel', von: en, bis: n });
-  return liste.filter((p) => p.bis > p.von || n === 0);
-}
-
 export function zeige(root, params = {}, app) {
   const ac = new AbortController();
   let beendet = false;
@@ -139,6 +114,7 @@ export function zeige(root, params = {}, app) {
     ply: -1, brett: null, variante: null, phasen: [],
   };
   const einst = (() => { try { return app.einstellungen(); } catch (e) { return {}; } })();
+  const orte = { oben: null, coach: null };   // Fuellungen der Anzeige-Orte (verlasse vor dem Neuzeichnen)
 
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   const lausche = (ziel, typ, f, opt) => { ziel.addEventListener(typ, f, opt); aufraeumen.push(() => ziel.removeEventListener(typ, f, opt)); };
@@ -158,7 +134,7 @@ export function zeige(root, params = {}, app) {
   const koerper = sec.querySelector('.an-koerper');
   lausche(sec, 'click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !sec.contains(k) || k.disabled) return;
+    if (!k || !sec.contains(k) || k.disabled || k.closest('.an-ort-oben, .an-c-paket')) return;   // Pakete binden selbst
     aktion(k.dataset.aktion, k);
   });
 
@@ -298,9 +274,12 @@ export function zeige(root, params = {}, app) {
       if (beendet) return;
       const elo = {};
       if (st.bot) elo[st.bf] = st.bot.elo;
+      // W0+a: ein Boss mit offen angesagter Staerke spielte mit dem Profil aus staerkeFuerElo (wie in partie.js)
+      const gespielt = eloDerPartie(p);
+      if (Number.isFinite(gespielt)) elo[st.bf] = gespielt;
       const review = await analysierePartie(engine, p.zuege || [], {
         tiefe: einst.tiefe || 14, multipv: 2, startFen: p.startFen || undefined, spielerFarbe: st.sf,
-        elo, vorab: app.vorab, beiFortschritt: melde, signal: ac.signal,
+        elo, vorab: app.vorab, vorabMinTiefe: einst.tiefe || 14, beiFortschritt: melde, signal: ac.signal,
       });
       if (beendet) return;
       // Review speichern und Partie-Datensatz nachtragen (Genauigkeit, Spielstaerke, Stern 2,
@@ -309,6 +288,10 @@ export function zeige(root, params = {}, app) {
       if (nach) {
         st.partie = nach.partie;
         if (nach.neueSterne.some(Boolean)) params.neueSterne = (params.neueSterne || [false, false, false]).map((x, i) => x || nach.neueSterne[i]);
+        sende('partie:analysiert', {
+          partieId: p.id, botId: nach.partie.botId, modus: nach.partie.modus || 'normal', wertet: nach.wertet !== false,
+          partie: nach.partie, review, neueSterne: nach.neueSterne.slice(), quelle: 'analyse',
+        });
       }
       st.review = review;
       baueKopf();
@@ -352,7 +335,7 @@ export function zeige(root, params = {}, app) {
     st.kurve = Array.isArray(r.kurve) && r.kurve.length === st.fens.length ? r.kurve : st.evals.map((e) => gewinnChance(e, 'w'));
     let buchEnde = 0;
     st.zuege.forEach((z, i) => { if (z.klasse === 'buch') buchEnde = i + 1; });
-    st.phasen = phasen(st.fens, buchEnde);
+    st.phasen = spielphasen(st.fens, buchEnde);
 
     koerper.innerHTML = `
       <div class="an-inhalt">
@@ -374,12 +357,19 @@ export function zeige(root, params = {}, app) {
         </div>
         <div class="an-rechts">
           ${bannerHtml()}
+          <div class="an-ort-oben" hidden></div>
           ${genauHtml()}
           ${kurveHtml()}
           ${momenteHtml()}
           ${klassenHtml()}
         </div>
       </div>`;
+
+    // Ort analyse:oben (oben rechts nach dem Banner)
+    if (orte.oben) orte.oben.verlasse();
+    const obenEl = koerper.querySelector('.an-ort-oben');
+    orte.oben = fuelle('analyse:oben', obenEl, { app, partie: st.partie, review: r });
+    obenEl.hidden = orte.oben.anzahl === 0;
 
     const brettEl = koerper.querySelector('.an-brett');
     st.brett = new Brett(brettEl, {
@@ -433,6 +423,8 @@ export function zeige(root, params = {}, app) {
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
     const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
+    // gezeigt wird die Genauigkeit der Partie (auf ihr beruht Stern 2; eine spaetere Neuberechnung ersetzt
+    // sie nicht, storage.ergaenzeAnalyse), sonst die der Review
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
     // Bestwert nur aus Partien mit genug eigenen Zuegen (eine Aufgabe nach einem Zug zaehlt nicht)
     const zaehlt = (p) => eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
@@ -446,7 +438,7 @@ export function zeige(root, params = {}, app) {
       <div class="an-genau flaeche">
         <div class="an-seite">
           <div class="an-avatar an-ich" aria-hidden="true">F</div>
-          <div class="an-seite-text">${wert(du, true)}<div class="an-g-label"><span class="an-g-zusatz">Deine </span>Genauigkeit</div></div>
+          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label"><span class="an-g-zusatz">Deine </span>Genauigkeit</div></div>
         </div>
         <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>
         <div class="an-seite an-re">
@@ -560,6 +552,7 @@ export function zeige(root, params = {}, app) {
     const neu = Math.max(-1, Math.min(n - 1, Number.isFinite(ply) ? ply : -1));
     const schritt = neu - st.ply;
     st.ply = neu;
+    const gewechselt = schritt !== 0;
     const z = neu >= 0 ? st.zuege[neu] : null;
     const fen = st.fens[neu + 1];
     const b = st.brett;
@@ -587,6 +580,11 @@ export function zeige(root, params = {}, app) {
     zeigeCoach();
     zeigeCursor();
     zeigeMomente();
+    if (gewechselt && neu >= 0) {
+      sende('analyse:gesehen', {
+        partieId: st.partie.id, ply: neu, moment: (st.review.schluesselmomente || []).includes(neu), letzter: neu === n - 1,
+      });
+    }
   }
 
   function spieleKlang(z) {
@@ -681,6 +679,7 @@ export function zeige(root, params = {}, app) {
   function zeigeCoach() {
     const el = koerper.querySelector('.an-coach');
     if (!el) return;
+    if (orte.coach) { orte.coach.verlasse(); orte.coach = null; }
     const z = st.ply >= 0 ? st.zuege[st.ply] : null;
     el.classList.remove('brillant', 'start', 'variante');
     if (!z) {
@@ -735,9 +734,31 @@ export function zeige(root, params = {}, app) {
       <div class="an-c-symbol">${symbol(z.klasse)}</div>
       <div class="an-c-kopf"><span class="an-c-klasse">${esc(WORT[z.klasse] || KLASSEN_NAME[z.klasse])}</span><span class="an-c-zug">${esc(zugText(z))}${du ? '' : ` (${esc(kurz)})`}</span></div>
       <span class="an-c-eval zahl">${evalHtml}</span>
-      <p class="an-c-text">${esc(coachOhneKopf(z.coach))}</p>
+      <p class="an-c-text">${esc(coachKern(z.coach))}</p>
       ${linieHtml}`;
+    fuelleCoachOrt(el, z, du);
     neuAnimieren(el);
+  }
+
+  // Ort analyse:coach: in die Knopfzeile der Coach-Karte; ohne Hauptvariante bekommt die Karte
+  // eine eigene Knopfzeile (nur, wenn ein Paket etwas zeigt)
+  function fuelleCoachOrt(el, z, du) {
+    let zeile = el.querySelector('.an-c-knoepfe');
+    let eigene = null;
+    if (!zeile) {
+      eigene = document.createElement('div');
+      eigene.className = 'an-c-fuss an-c-ort';
+      zeile = document.createElement('div');
+      zeile.className = 'an-c-knoepfe';
+      eigene.append(zeile);
+    }
+    // Behaelter ohne eigenes Layout (display: contents): die Elemente stehen in der Knopfzeile
+    const paket = document.createElement('span');
+    paket.className = 'an-c-paket';
+    zeile.append(paket);
+    orte.coach = fuelle('analyse:coach', paket, { app, partie: st.partie, review: st.review, zug: z, ply: st.ply, du });
+    if (!orte.coach.anzahl) paket.remove();
+    else if (eigene) el.append(eigene);
   }
 
   function neuAnimieren(el) {
@@ -908,6 +929,7 @@ export function zeige(root, params = {}, app) {
       for (const t of timer) clearTimeout(t);
       timer.clear();
       for (const f of aufraeumen.splice(0)) { try { f(); } catch (e) { /* egal */ } }
+      for (const o of Object.values(orte)) if (o) o.verlasse();
       if (st.brett) { try { st.brett.zerstoere(); } catch (e) { /* egal */ } st.brett = null; }
       st.variante = null;
     },

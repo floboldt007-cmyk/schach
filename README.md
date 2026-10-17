@@ -117,6 +117,7 @@ dem Netz. Bauplan und Schnittstellen stehen in `ARCHITEKTUR.md`.
 | `css/` | `board.css`, `app.css`, `screens.css` (Design „Neon-Arena“) |
 | `sw.js`, `manifest.webmanifest`, `assets/icons/` | Offline-Cache, App-Daten und Icons fürs iPad |
 | `vendor/` | Stockfish 19 (WebAssembly) und chess.js |
+| `daten/` | Statische Inhalte als JSON (Spielplan, später Rätsel, Bosse); `daten/beispiel/` nur Format-Beispiele |
 | `tests/` | Alle Tests |
 
 **Lokal starten:** im Projektordner `python3 -m http.server 8000` und dann
@@ -131,10 +132,23 @@ node tests/alle.mjs --schnell    kurze Fassung (ohne Viewport-Runden und Bilder)
 node tests/alle.mjs --nur=sw,e2e nur einzelne Suiten
 ```
 
-Einzeln: `storage`, `review`, `engine-bots --schnell`, `board`, `sw`, `app`, `screens`, `e2e`
+Einzeln: `storage`, `review`, `ereignisse`, `fairness`, `spiel`, `engine-bots --schnell`, `board`, `sw`, `app`, `screens`, `e2e`
 (jeweils `node tests/<name>.test.mjs`). Der Ende-zu-Ende-Test `e2e` liefert die App wie GitHub
 Pages unter `/schach/` aus, spielt einen ganzen Ablauf auf dem iPad-Viewport durch, lädt die App
 offline neu und prüft das Update auf eine neue Version. Bilder landen in `design/app-shots/`.
+
+**Pakete (Runde 4):** Erweiterungen klinken sich nur über die Erweiterungspunkte ein (`ARCHITEKTUR.md`,
+Abschnitt „Runde 4: Erweiterungspunkte“). In der App lädt `js/app.js` die Pakete aus der Liste `PAKETE` in
+`js/erweiterungen.js` einzeln per `import()`: Ein kaputtes Paket landet nur in der Konsole, die App startet trotzdem.
+Im Testmodus lädt `index.html?test&erw=pakete/<paket>/index` ein Paket auch ohne Eintrag in dieser Liste. Nur die Erweiterungspunkte prüfen:
+`node tests/app.test.mjs --erweiterungen`. Nur die Nachbesserungen an Analyse, Nachholen und Engine-Start:
+`node tests/app.test.mjs --nachpruefung`. Nur das Spiel-Fundament W0+a (neue Orte, Matt-Hook, Abrechnung, Boss-Modus,
+untere Leiste): `node tests/app.test.mjs --spiel`; Tag, Inhalte, Spielplan und Bot-Register ohne Browser:
+`node tests/spiel.test.mjs`. Statische Inhalte (Spielplan, später Rätsel und Bosse) liegen als JSON unter `daten/`
+(Format in `ARCHITEKTUR.md`, Abschnitt „W0+a: Spiel-Fundament“): die eines Pakets unter `daten/<paket>/`, sie kommen mit
+dem Paket in `DATEIEN` in `sw.js`; Dateien direkt unter `daten/` sofort. Anbieter für Orte, deren Screen es noch nicht
+gibt (`bestenliste:reiter`, `training:karten`, `ich:vitrine`, `spielplan:tage`), lassen sich im Browser in der Test-Hülle
+ansehen: `tests/orte-huelle.html?ort=ich:vitrine&erw=pakete/<paket>/index` (lokaler Server wie oben).
 
 **Neue Version veröffentlichen:** Der Offline-Cache liefert immer die gespeicherte Version aus.
 Damit das iPad ein Update bekommt, muss sich `sw.js` ändern. Nach jeder Änderung an einer

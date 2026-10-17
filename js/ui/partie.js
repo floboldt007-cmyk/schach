@@ -1,19 +1,102 @@
 // Partie: Brett gegen einen Bot mit Live-Bewertung jedes eigenen Zugs (Symbol, Lasur, Coach,
 // Effekte je Klasse), Bewertungsbalken, Bot-Karte mit Sprechblase, Zugliste, Hinweis,
 // Zuruecknehmen, Drehen, Aufgeben, Spielende-Erkennung, Auswertung und Ergebnis-Overlay.
-// Params: { botId, farbe: 'w'|'b', fortsetzen?: true, startFen? } (startFen: Partie ab Stellung,
-// dann ohne Eroeffnungsbuch). Test-Hooks (window.__partie, window.__test) nur mit ?test:
-// __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung) }.
+// Params: { botId, farbe: 'w'|'b', fortsetzen?: true, startFen?, modus?: 'normal'|'uebung', ziel? }
+// (startFen: Partie ab Stellung, dann ohne Eroeffnungsbuch; modus 'uebung' mit ziel { partieId, ply,
+// besterZug, alterZug, alterSanDe, gewinnVorher } startet z. B. "Ab hier nochmal"). Partien, die nicht
+// werten (Uebung oder eigene Stellung, storage.wertet), buchen nichts: das Ergebnis zeigt dann keine
+// Sterne, den Chip "ÜBUNG" und "Nochmal ab hier" (gleiche Params).
+// Test-Hooks (window.__partie, window.__test) nur mit ?test:
+// __test = { botAnhalten, botZug(fen) -> uci, botPause, maxWarten (ms, Bot wartet auf die Bewertung),
+//            mattHookWarten (ms, Warten des Matt-Hooks auf partie:beendet, sonst MATT_HOOK_WARTEN_MS) }.
+//
+// Runde 4 (Erweiterungspunkte, ARCHITEKTUR.md): sendet partie:gestartet (mit der Buehne, dazu wertet und der
+// Stand von hinweise und zuruecknahmen beim Start), zug:gespielt,
+// stellung:analysiert, zug:bewertet, zug:zurueckgenommen, hilfe:genutzt, partie:beendet,
+// partie:analysiert und partie:verlassen. laufId = 'l' + gestartet. Wahl-Ort partie:begruessung?,
+// DOM-Ort ergebnis:karte, Feier-Zeilen aus feier.fuerOverlay(). Die Buehne (eingefroren):
+//   { laufId, bot, farbe, modus, ziel, el, effekte, rahmen, brett (nur lesen), reduziert,
+//     feld(feld) -> { x, y } | null           0..7 in der aktuellen Brett-Ausrichtung (wie die Effekte)
+//     liveAn() -> boolean, phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
+//     coachZusatz(inhalt, { prio = 50, art = 'info', bleibt = false }) -> HTMLElement   Zeile unter dem
+//         Coach-Satz (art 'info' | 'gut' | 'leise' | 'gross'; Text oder Element); hoechstens 2, die hoehere
+//         prio gewinnt (bei Gleichstand die aeltere); verschwindet mit dem naechsten Coach-Inhalt; im
+//         eingeklappten Coach versteckt; bleibt: true haelt den Coach offen, solange die Zeile da ist
+//     blase(anlass, { paar, prio = 50, werte }) -> boolean   Sprechblase, eine je Zugpaar (paar:
+//         Standard ist Flos letzter Ply), hoehere prio ersetzt eine niedrigere
+//     merke(paket, daten) -> boolean, gemerkt(paket) -> Kopie | null   landet in partie.extra (alle
+//         Pakete zusammen hoechstens EXTRA_MAX Zeichen als JSON; null loescht den Eintrag)
+//     spaeter(fn, ms) -> Timer, den verlasse() abraeumt }
+//   Nach partie:verlassen tut die Buehne nichts mehr.
+// COMBO: Serie aus Bester Zug, Großartig, Brillant; neutral sind Buch, Erzwungen und triviale Zuege
+// (Zurueckschlagen, erzwungene Schachabwehr), solange sie nichts verschenken. Der Chip traegt
+// data-stufe ('' bei 3 bis 4, 'heiss' 5 bis 7, 'ueberladen' 8 bis 11, 'unaufhaltsam' ab 12), der Screen
+// data-serie (laufende Serie) und data-serie-stufe.
+//
+// W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2, ARCHITEKTUR.md "W0+a: Spiel-Fundament"):
+//   Params zusaetzlich: modus 'boss' | 'frei' | 'spiel' (werten nie), boss { id, stufe, woche, staerke } (Modus boss),
+//   seed (sonst neu gewuerfelt), liga { saison, runde }. Angemeldete Bots (registriereBot) gehen wie Leiter-Bots;
+//   ihre startFen gilt, wenn die Params keine nennen. Der Datensatz traegt seed, boss, liga (tempo und zeiten
+//   bringt W0+b). Bot-Zuege: zufall = tag.zugZufall(seed, ply), nodes und vorliebe aus dem Bot-Profil.
+//   Modus boss: Kopf mit Boss-Name und Stufe, Unterzeile mit der Regel, keine Sterne, im Ergebnis der Chip "BOSS"
+//   und "Nochmal" (gleiche Params, neuer Seed). frei/spiel: Chip "FREI"/"SPIELHALLE". boss.staerke (offen angesagte
+//   Zahl, z. B. 1080): der Boss spielt mit bots.staerkeFuerElo(staerke), Kopf "Name · Stufe ≈ 1080".
+//   DOM-Ort partie:gegner-leiste: .ort-gegner-leiste ueber dem Gegner (quer: erstes Kind von .botbox, hoch: erstes
+//   Kind von .botleiste-hoch; das Element wandert beim Drehen des Geraets mit). Einmal beim Start gefuellt,
+//   Kontext { app, buehne, bot, farbe, modus, boss, lage() -> 'hoch' | 'quer' }, ohne Anbieter versteckt.
+//   Aufruf-Ort partie:matt (Finisher): bei Matt, nach dem Speichern und nach partie:beendet, vor dem Ergebnis.
+//   Kontext { app, buehne, laufId, partieId, ergebnis, gewinner: 'flo' | 'bot', koenigFeld, letzterZug { von,
+//   nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }. Liefert ein Anbieter { fertig: Promise },
+//   wartet das Ergebnis darauf, hoechstens feier.BRETT_FEIER.dauerMs (1,8 s); ein Tipp irgendwo auf den Screen
+//   bricht ab (signal, gilt schon ab dem Mattzug), danach kommt sofort das Ergebnis. Ohne Anbieter aendert sich am
+//   Ablauf nichts. Laeuft ein Finisher, entfaellt der Klassen-Effekt des Mattzugs (der Finisher ersetzt jeden
+//   Brett-Effekt); liefern alle Anbieter null, kommt der gemerkte Effekt doch.
+//   zug:abgelehnt { laufId, von, nach, art, figur, fen }: aus board.js beiAbgelehnt, nur wenn Flo am Zug ist.
+//   ergebnis:karte-Kontext zusaetzlich boss; die Abrechnungs-Huelle (ergebnis:abrechnung) haengt sich dort mit
+//   Reihenfolge 3 ein (js/ui/abrechnung.js).
+//   Buehne zusaetzlich: boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
+//   'zaehlwerk' | 'funkenlinie' | 'lebensleiste' | 'balken' (Einstellungen der App), platz(name) -> HTMLElement
+//   fuer 'zaehlwerk' (.p-zaehlwerk im Kopf) und 'funkenlinie' (.p-funkenlinie unten am Brett-Rahmen); der Platz
+//   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
+//   Boss-Partie mit einer Gegner-Leiste (Anbieter da) und Anzeige lebensleiste an: kein Bewertungsbalken
+//   (.ohne-balken wie bei Balken aus; "Lebensleiste statt Balken", SPIELKONZEPT 3.18).
+//
+// w0plus-a-fix (Befunde des W0+a-Pruefers):
+//   Boss-Staerke: Kopf, Bot-Zeile und Spielanalyse nennen die Elo des Profils, mit dem der Boss wirklich spielt
+//   (staerkeFuerElo(boss.staerke).elo, vor der Eichung z. B. "≈ 1000" fuer die Anfrage 1080); boss.staerke bleibt als
+//   Anfrage im Datensatz. Partien gegen angemeldete Bots werten nie (storage.wertet mit botId): Chip "GAST" bzw.
+//   "BOSS", "Nochmal" statt "Nächster Gegner".
+//   Matt-Hook: wartet hoechstens MATT_HOOK_WARTEN_MS (300 ms) auf partie:beendet (vorher bis 3 s); dauert die
+//   Live-Bewertung des Mattzugs laenger, kommt partie:beendet waehrend des Finishers.
+//   Gegner-Leiste im Hochformat: erstes eigenes Kind von .botleiste-hoch (eigene Zeile ueber Avatar und Namen, bleibt
+//   sichtbar, waehrend der Bot spricht; vorher in .info, das auf dem Handy mit der Sprechblase verschwand).
+//   DOM-Ort partie:spieler-leiste: .ort-spieler-leiste an Flos Namen (quer in .spieler-quer, hoch in .spieler-hoch,
+//   wandert beim Drehen mit), z. B. Flamme des Siegeslaufs oder Level; Kontext wie partie:gegner-leiste. Eine Zeile,
+//   nicht hoeher als der Name. Ohne Anbieter versteckt.
+//   DOM-Ort partie:aktionen: .ort-aktionen in der Knopfreihe vor "Aufgeben" (z. B. Emote-Rad, Schnell-Chat),
+//   hoechstens AKTIONEN_MAX (2) Knoepfe, die Reihe bekommt dafuer Spalten dazu (data-aktionen). Kontext { app,
+//   buehne, bot, farbe, modus, boss }. Klicks binden die Pakete selbst. Ohne Anbieter aendert sich nichts.
+//   zug:bewertet zusaetzlich gewinnVorigerZug: Flos Gewinnchance nach seinem vorigen eigenen Zug (also vor dem
+//   letzten Bot-Zug), null beim ersten eigenen Zug oder ohne Bewertung. Damit rechnet S1-6 boss:treffer.
+//   Antippen der Ergebnis-Karte zeigt auch die Abrechnung sofort ganz (.alles an Karte und Huelle).
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
-import { BOTS, botNachId, botZug, botSatz } from '../bots.js';
-import { bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, partieGenauigkeit, warKnapp } from '../review.js';
+import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
+import { zugZufall } from '../tag.js';
+import {
+  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
+} from '../review.js';
 import { eroeffnung, stellungsSchluessel } from '../openings.js';
 import { klang } from '../sounds.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
-  GENAUIGKEIT_STERN,
+  ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
 } from '../storage.js';
+import { sende } from '../ereignisse.js';
+import { fuelle, waehle, angeboten } from '../orte.js';
+import { fuerOverlay, BRETT_FEIER } from '../feier.js';
+import './abrechnung.js';
+import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
 
 const KLASSEN_WORT = {
@@ -40,15 +123,28 @@ const AUSWERTUNG_WARTEN_MS = 2500;
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const komma = (x, n = 1) => x.toFixed(n).replace('.', ',');
+// tiefe Kopie einfacher Daten (Params, extra), sonst null
+const kopie = (x) => { try { return x == null ? null : JSON.parse(JSON.stringify(x)); } catch (e) { return null; } };
+const ZUSATZ_ARTEN = ['info', 'gut', 'leise', 'gross'];
+// W0+a: Chip im Ergebnis nicht wertender Partien je Modus, Name der Boss-Stufe, Anzeigen der Buehne
+const MODUS_CHIP = { uebung: 'ÜBUNG', boss: 'BOSS', frei: 'FREI', spiel: 'SPIELHALLE' };
+const STUFE_NAME = { standard: 'Standard', meister: 'Meister' };
+const ANZEIGEN = ['zaehlwerk', 'funkenlinie', 'lebensleiste', 'balken'];
+// neuer Seed fuer die Bot-Zuege einer Partie (32 Bit)
+const neuerSeed = () => Math.floor(Math.random() * 4294967296) >>> 0;
+const ZUSATZ_MAX = 2;
+const PAKET_NAME = /^[a-z][a-z0-9-]{0,30}$/;
+// w0plus-a-fix: so lange wartet der Matt-Hook hoechstens auf partie:beendet (die Live-Bewertung des Mattzugs)
+const MATT_HOOK_WARTEN_MS = 300;
+// w0plus-a-fix: hoechstens so viele Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen)
+const AKTIONEN_MAX = 2;
 
-// Coach-Satz fuer die Karte: das Klassenwort steht schon gross darueber, keine langen
-// Gedankenstriche in UI-Texten, Rochade wie in der Zugliste (0-0). Wie in der Analyse.
-function coachSatz(t) {
-  const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
-  const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/, '');
-  if (!rest.trim()) return text;
-  // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
-  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
+// Stufe der COMBO (Chip data-stufe): leer bei 3 bis 4, dann heiss, ueberladen, unaufhaltsam
+function serienStufe(n) {
+  if (n >= 12) return 'unaufhaltsam';
+  if (n >= 8) return 'ueberladen';
+  if (n >= 5) return 'heiss';
+  return '';
 }
 
 // Bewertung als Text aus Sicht von farbe: "+1,2", "−0,4", "M3", "−M2"
@@ -86,9 +182,20 @@ export function zeige(root, params, app) {
   if (startFen) {
     try { new Chess(startFen); } catch (e) { startFen = null; }
   }
+  const modus = laufend ? laufend.modus || 'normal' : (MODI.includes(params.modus) ? params.modus : 'normal');
+  // W0+a: angemeldete Bots (z. B. ein Boss) bringen ihre Startstellung mit
+  if (!laufend && !startFen && bot.stufe == null && bot.startFen) {
+    try { new Chess(bot.startFen); startFen = bot.startFen; } catch (e) { /* ungueltig: Grundstellung */ }
+  }
+  const quelle = laufend || params;
 
   const z = {
-    bot, farbe, startFen,
+    bot, farbe, startFen, modus,
+    ziel: modus === 'uebung' ? kopie(laufend ? laufend.ziel : params.ziel) : null,
+    extra: (laufend && kopie(laufend.extra)) || {},
+    liveTrivial: [],   // je Ply: selbstverstaendlicher Zug (fuer die COMBO neutral)
+    maxSerie: 0,
+    blasePrio: 0,
     chess: startFen ? new Chess(startFen) : new Chess(),
     zuege: [], san: [], verbose: [], fens: [],
     live: [],          // je Ply: { marke, status: 'rechnet'|'fertig'|'fehler', erg, fertig: Promise, gezeigtUm }
@@ -102,8 +209,25 @@ export function zeige(root, params, app) {
     botCtrl: null,
     ideeAn: null,
     gespeichert: false,
+    // W0+a: Seed der Bot-Zuege (alte laufende Partien ohne Seed: Zufall wie vorher), Boss, Liga, Uhr
+    seed: laufend ? pruefeSeed(laufend.seed) : (pruefeSeed(params.seed) ?? neuerSeed()),
+    boss: modus === 'boss' ? pruefeBoss(quelle.boss) : null,
+    liga: pruefeLiga(quelle.liga),
+    tempo: pruefeTempo(quelle.tempo),
+    zeiten: pruefeZeiten(laufend && laufend.zeiten),
+    finisher: false,
+    effektGemerkt: null,
   };
   z.fens.push(z.chess.fen());
+  // W0+a: Boss mit offen angesagter Staerke (boss.staerke, z. B. 1080): gespielt wird mit staerkeFuerElo (vor der
+  // Eichung der naechstliegende Leiter-Bot). Sonst das Profil des Bots. w0plus-a-fix: Kopf, Bot-Zeile und Analyse
+  // nennen die Elo dieses Profils (vor der Eichung z. B. 1000 fuer 1080), nie die Anfrage (Fairness 12).
+  const bossStaerke = z.boss && Number.isFinite(z.boss.staerke) ? staerkeFuerElo(z.boss.staerke) : null;
+  const zugBot = bossStaerke ? Object.freeze({ ...bot, staerke: bossStaerke.staerke }) : bot;
+  const botElo = bossStaerke ? bossStaerke.elo : bot.elo;
+  // w0plus-a-fix: wertet nur gegen Leiter-Bots (angemeldete Bots nie, auch im Modus normal)
+  const wertetJetzt = () => wertet({ modus: z.modus, startFen, botId: bot.id });
+  const laufId = 'l' + z.gestartet;
   const startFarbe = z.chess.turn();
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
   if (laufend) {
@@ -114,6 +238,7 @@ export function zeige(root, params, app) {
       merkeZug(m);
     }
     (laufend.liveKlassen || []).forEach((k, i) => { if (i < z.zuege.length && k) z.liveKlassen[i] = k; });
+    (laufend.liveTrivial || []).forEach((t, i) => { if (i < z.zuege.length) z.liveTrivial[i] = t === true; });
   }
 
   // ---------- Hilfen fuer Plies ----------
@@ -123,6 +248,7 @@ export function zeige(root, params, app) {
     z.verbose.push(m);
     z.fens.push(m.after);
     z.liveKlassen.push(null);
+    z.liveTrivial.push(false);
     z.live.push(null);
   }
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
@@ -130,6 +256,15 @@ export function zeige(root, params, app) {
   const nummerVon = (i) => startNummer + Math.floor((i + (startFarbe === 'b' ? 1 : 0)) / 2);
   const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanDeutsch(z.san[i])}`;
   const letzterFloPly = () => { for (let i = z.zuege.length - 1; i >= 0; i--) if (istFlo(i)) return i; return -1; };
+  // w0plus-a-fix: Flos Gewinnchance nach seinem vorigen eigenen Zug (vor dem letzten Bot-Zug), null ohne Bewertung
+  const gewinnNachVorigemZug = (ply) => {
+    for (let i = ply - 1; i >= 0; i--) {
+      if (!istFlo(i)) continue;
+      const e = z.live[i];
+      return e && e.status === 'fertig' && e.erg && Number.isFinite(e.erg.gewinnNachher) ? e.erg.gewinnNachher : null;
+    }
+    return null;
+  };
   const liveAn = () => app.einstellungen().liveBewertung;
   const tiefe = () => app.einstellungen().tiefe;
 
@@ -149,6 +284,21 @@ export function zeige(root, params, app) {
   const melde = (eintrag) => { if (app.test) protokoll.push({ t: Math.round(jetzt()), ...eintrag }); };
 
   // ---------- DOM ----------
+  // W0+a: Kopf und Bot-Zeile auch fuer angemeldete Bots (ohne Stufe) und Bosse
+  function kopfTitel() {
+    if (z.modus === 'boss') {
+      if (!z.boss) return bot.name;
+      return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${bossStaerke.elo}` : ''}`;
+    }
+    return bot.stufe ? `${bot.name} · Stufe ${bot.stufe}` : bot.name;
+  }
+  function botMeta() {
+    if (bot.stufe) return `Stufe ${bot.stufe} · Elo ${bot.elo}`;
+    const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
+    if (bossStaerke) teile.push(`≈ ${bossStaerke.elo}`);
+    else if (Number.isFinite(bot.elo)) teile.push(`Elo ${bot.elo}`);
+    return teile.filter(Boolean).join(' · ');
+  }
   const s = document.createElement('section');
   s.className = 'screen partie';
   s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
@@ -158,7 +308,7 @@ export function zeige(root, params, app) {
   s.innerHTML = `
     <header class="kopf">
       <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück zur Arena">${icon('zurueck')}</button>
-      <div class="titel"><h2>${esc(bot.name)} · Stufe ${bot.stufe}</h2><div class="unter"><span class="p-eroeffnung"></span> · Du spielst ${FARBE_NAME[farbe]}</div></div>
+      <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span> · Du spielst ${FARBE_NAME[farbe]}</div></div>
       <button class="icon-knopf" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
     </header>
     <div class="inhalt">
@@ -177,7 +327,7 @@ export function zeige(root, params, app) {
         <div class="botbox flaeche">
           <div class="botkarte"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span>
             <div class="info"><div class="bot-name">${esc(bot.name)}</div>
-              <div class="bot-meta">Stufe ${bot.stufe} · Elo ${bot.elo}<span class="denkt-ort"></span></div>
+              <div class="bot-meta">${esc(botMeta())}<span class="denkt-ort"></span></div>
               <span class="geschlagen-ort" data-wer="bot"></span></div></div>
           <div class="blase-ort" data-spitze="oben" data-leer="${esc(bot.kurz)}"></div>
         </div>
@@ -203,15 +353,21 @@ export function zeige(root, params, app) {
   s.classList.toggle('ohne-balken', !einst.balken);
 
   const brett = new Brett($('.brett'), {
-    ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten,
+    ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
   });
+  // W0+a: nicht erlaubter Zugversuch (den Grund rechnet ein Paket mit chess.js aus, SPIELKONZEPT 3.18)
+  function beiAbgelehnt(von, nach, art) {
+    if (weg || z.phase !== 'flo') return;
+    sende('zug:abgelehnt', { laufId, von, nach: nach || null, art, figur: brett.figurAuf(von), fen: z.chess.fen() });
+  }
   brett.setzeStellung(z.chess.fen(), { animieren: false, letzterZug: letzterZugFelder(), schach: z.chess.inCheck() ? true : null });
   brett.erlaubeZuege(null);
 
   // ---------- Knoepfe ----------
   s.addEventListener('click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !s.contains(k) || k.disabled) return;
+    if (!k || !s.contains(k) || k.disabled
+      || k.closest('.c-zusatz, .erg-karte-ort, .erg-feier, .ort-gegner-leiste, .ort-spieler-leiste, .ort-aktionen')) return;   // Pakete binden selbst
     const a = k.dataset.aktion;
     if (a === 'zurueck') zurueckGedrueckt();
     else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
@@ -243,7 +399,9 @@ export function zeige(root, params, app) {
 
   function zeichneKopf() {
     let name = 'Eigene Stellung';
-    if (!startFen) {
+    if (z.modus === 'boss') name = bot.regel ? `Regel: ${bot.regel}` : 'Boss-Partie';
+    else if (z.modus === 'uebung') name = `Übung ab Zug ${startNummer}`;
+    else if (!startFen) {
       const er = eroeffnung(z.san);
       name = er.name || (z.san.length ? 'Eröffnung' : 'Grundstellung');
     }
@@ -312,10 +470,10 @@ export function zeige(root, params, app) {
   function zeichneKnoepfe() {
     const am = z.phase === 'flo';
     const ende = z.phase === 'ende';
-    $('.spielknoepfe [data-aktion="hinweis"]').disabled = !am;
-    $('.spielknoepfe [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
-    $('.spielknoepfe [data-aktion="aufgeben"]').disabled = ende;
-    const h = $('.spielknoepfe [data-aktion="hinweis"]');
+    $('.spielknoepfe > [data-aktion="hinweis"]').disabled = !am;
+    $('.spielknoepfe > [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
+    $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
+    const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
   }
 
@@ -350,20 +508,24 @@ export function zeige(root, params, app) {
   // ---------- Sprechblase ----------
   // Satz zum Anlass; Saetze, die nicht zur Lage passen, fallen weg
   // (Matt-Saetze bei Aufgabe, "ich fang an", wenn Flo anfaengt)
-  function satzFuer(anlass) {
+  function satzFuer(anlass, werte = null) {
     const liste = (bot.saetze && bot.saetze[anlass]) || [];
     let passt = null;
     if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !/matt/i.test(t);
     if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !/ich fang/i.test(t);
     const auswahl = passt ? liste.filter(passt) : liste;
     if (passt && auswahl.length && auswahl.length < liste.length) return auswahl[Math.floor(Math.random() * auswahl.length)];
-    return botSatz(bot, anlass);
+    return botSatz(bot, anlass, Math.random, werte);
   }
-  function zeigeBlase(anlass, paar, { dauer = 4500, immer = false } = {}) {
-    if (!immer && paar !== undefined && z.blasePaar === paar) return false;
-    const text = satzFuer(anlass);
+  // Hoechstens eine Blase je Zugpaar; eine hoehere prio ersetzt eine niedrigere (BAUPLAN 3.5:
+  // spielerFehler/spielerGut 70, Begruessung 60, schlagen/schach des Bots 50)
+  function zeigeBlase(anlass, paar, { dauer = 4500, immer = false, prio = 50, werte = null } = {}) {
+    const p = Number.isFinite(prio) ? prio : 50;
+    if (!immer && paar !== undefined && z.blasePaar === paar && p <= z.blasePrio) return false;
+    const text = satzFuer(anlass, werte);
     if (!text) return false;
     z.blasePaar = paar;
+    z.blasePrio = p;
     for (const ort of $$('.blase-ort')) {
       ort.innerHTML = `<div class="sprechblase ${ort.dataset.spitze}">${esc(text)}</div>`;
     }
@@ -383,12 +545,39 @@ export function zeige(root, params, app) {
   }
 
   // ---------- Coach ----------
+  let zusaetze = [];   // Coach-Zusaetze der Pakete: { el, prio, nr }
+  let zusatzNr = 0;
   function coachZeige(html, klassen, ply = null) {
     coachEl.className = 'coach ' + klassen;
     coachEl.innerHTML = html;
+    zusaetze = [];
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
   }
+  // Zeile unter dem Coach-Satz (Buehne): hoechstens ZUSATZ_MAX, die hoehere prio gewinnt. bleibt: der Coach
+  // klappt nicht von selbst ein, solange die Zeile da ist (ein schon eingeklappter klappt wieder auf), z. B.
+  // fuer eine Zeile mit Knopf; sonst ist die Zeile im eingeklappten Coach versteckt
+  function coachZusatz(inhalt, { prio = 50, art = 'info', bleibt = false } = {}) {
+    const el = document.createElement('div');
+    el.className = 'c-zusatz';
+    el.dataset.art = ZUSATZ_ARTEN.includes(art) ? art : 'info';
+    if (inhalt && typeof inhalt === 'object' && inhalt.nodeType) el.append(inhalt);
+    else el.textContent = String(inhalt ?? '');
+    if (weg) return el;
+    zusaetze.push({ el, prio: Number.isFinite(prio) ? prio : 50, nr: zusatzNr++, bleibt: bleibt === true });
+    zusaetze.sort((a, b) => b.prio - a.prio || a.nr - b.nr);
+    for (const alt of zusaetze.splice(ZUSATZ_MAX)) alt.el.remove();
+    // unter dem Coach-Satz, vor den Knoepfen, nach prio geordnet
+    const vor = coachEl.querySelector(':scope > .coach-knoepfe');
+    for (const x of zusaetze) coachEl.insertBefore(x.el, vor);
+    coachEl.classList.add('mit-zusatz');
+    if (zusatzBleibt()) {
+      clearTimeout(z.kompaktUhr);
+      coachEl.classList.remove('kompakt');
+    }
+    return el;
+  }
+  const zusatzBleibt = () => zusaetze.some((x) => x.bleibt && x.el.isConnected);
   function coachLeer() {
     if (!liveAn()) {
       coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Live-Bewertung aus</span></div>
@@ -404,15 +593,36 @@ export function zeige(root, params, app) {
       <div class="c-kopf"><span class="c-klasse">Coach rechnet …</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
       <p class="c-text">Gleich weißt du, wie gut dein Zug war.</p>`, 'wartet', ply);
   }
+  // COMBO: Bester Zug, Großartig und Brillant zaehlen; Buch, Erzwungen und triviale Zuege
+  // (Zurueckschlagen, Schachabwehr) sind neutral, solange sie nichts verschenken
+  const neutral = (i) => NEUTRAL.has(z.liveKlassen[i]) || (z.liveTrivial[i] === true && !MIT_VERLUST.has(z.liveKlassen[i]));
   function serieBis(ply) {
     let n = 0;
     for (let i = 0; i <= ply; i++) {
       if (!istFlo(i)) continue;
       const k = z.liveKlassen[i];
-      if (!k || NEUTRAL.has(k)) continue;
+      if (!k || neutral(i)) continue;
       n = SERIE.has(k) ? n + 1 : 0;
     }
     return n;
+  }
+  // laengste Serie der Partie und die laufende Serie am Screen (data-serie, data-serie-stufe)
+  function merkeSerie() {
+    let n = 0;
+    let max = 0;
+    for (let i = 0; i < z.zuege.length; i++) {
+      if (!istFlo(i)) continue;
+      const k = z.liveKlassen[i];
+      if (!k || neutral(i)) continue;
+      n = SERIE.has(k) ? n + 1 : 0;
+      if (n > max) max = n;
+    }
+    z.maxSerie = max;
+    const jetzt = liveAn() ? n : 0;
+    s.dataset.serie = String(jetzt);
+    const stufe = serienStufe(jetzt);
+    if (stufe) s.dataset.serieStufe = stufe;
+    else delete s.dataset.serieStufe;
   }
   function coachErgebnis(ply, { neu = true } = {}) {
     const e = z.live[ply];
@@ -422,8 +632,8 @@ export function zeige(root, params, app) {
     const ende = erg.analyseNachher && erg.analyseNachher.ende;
     let evalT = ende === 'matt' ? 'Matt' : ende === 'patt' ? 'Patt' : evalText(erg.evalNachher, farbe);
     if (MIT_VERLUST.has(k) && !ende) evalT = `${evalText(erg.evalVorher, farbe)} → ${evalText(erg.evalNachher, farbe)}`;
-    const serie = SERIE.has(k) ? serieBis(ply) : 0;
-    const combo = serie >= 3 ? `<span class="combo">${icon('blitz')}COMBO ×${serie}</span>` : '';
+    const serie = SERIE.has(k) && !neutral(ply) ? serieBis(ply) : 0;
+    const combo = serie >= 3 ? `<span class="combo" data-stufe="${serienStufe(serie)}">${icon('blitz')}COMBO ×${serie}</span>` : '';
     if (k === 'buch') {
       coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">Buchzug</span><span class="c-zug">${esc(zugLabel(ply))}</span>
         <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
@@ -446,7 +656,7 @@ export function zeige(root, params, app) {
     coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
       <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>${combo}</div>
       <span class="c-eval zahl">${esc(evalT)}</span>
-      <p class="c-text">${esc(coachSatz(erg.coach))}</p>
+      <p class="c-text">${esc(coachKern(erg.coach))}</p>
       ${knoepfe.length ? `<div class="coach-knoepfe">${knoepfe.join('')}</div>` : ''}`,
     `k-${k}${neu ? ' neu' : ''}`, ply);
     coachEl.style.setProperty('--kf', `var(--k-${k})`);
@@ -480,6 +690,9 @@ export function zeige(root, params, app) {
   }
   function effekt(feld, klasse) {
     if (reduziert) return;
+    // W0+a: ein Finisher ersetzt jeden Brett-Effekt. Bis feststeht, ob einer laeuft (ein Anbieter darf null liefern,
+    // z. B. "Finisher aus"), wird der Effekt gemerkt; laeuft keiner, holt der Matt-Hook ihn nach
+    if (z.finisher) { z.effektGemerkt = [feld, klasse]; return; }
     const [x, y] = spalteZeile(feld);
     const ort = document.createElement('div');
     ort.className = 'effekt-ort k-' + klasse;
@@ -512,21 +725,28 @@ export function zeige(root, params, app) {
   const bewertungsEngine = () => app.engine('bewertung').then((e) => { engBewertung = e; return e; });
 
   // Jede Stellung nur einmal rechnen (laufendeAnalysen), hoechstens LIVE_MAX_MS lang.
-  // { vorne: true } (Hinweis): steht die Stellung noch in der Warteschlange, eine eigene Suche
-  // vor allen anderen einreihen, damit Flo nicht auf aeltere Bewertungen warten muss.
+  // { vorne: true } (Hinweis): steht die Stellung schon in der Warteschlange, wird genau diese Suche vor
+  // alle anderen geholt (engine.vorziehen), sonst eine neue vorne eingereiht. Nie zwei Suchen derselben
+  // Stellung (im Stau waere das doppelte Engine-Arbeit).
   function analysiere(fen, { vorne = false } = {}) {
     const key = stellungsSchluessel(fen);
     const fertig = app.vorab.get(key);
     if (fertig) return Promise.resolve(fertig);
     const da = laufendeAnalysen.get(key);
-    if (da && (!vorne || da.laeuft)) return da;
-    const eintrag = { laeuft: false };
+    if (da) {
+      if (vorne) da.vorziehen();
+      return da;
+    }
+    const eintrag = { laeuft: false, vorne, engine: null };
     const stau = laufendeAnalysen.size >= 2;
     const p = bewertungsEngine()
-      .then((e) => e.analyse(fen, {
-        depth: tiefe(), multipv: 2, movetime: stau ? LIVE_STAU_MS : LIVE_MAX_MS, prioritaet: vorne ? 'vorne' : undefined,
-        beiTiefe: () => { eintrag.laeuft = true; },
-      }))
+      .then((e) => {
+        eintrag.engine = e;
+        return e.analyse(fen, {
+          depth: tiefe(), multipv: 2, movetime: stau ? LIVE_STAU_MS : LIVE_MAX_MS, prioritaet: eintrag.vorne ? 'vorne' : undefined,
+          beiTiefe: () => { eintrag.laeuft = true; },
+        });
+      })
       .then((a) => {
         if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key);
         if (a && !a.abgebrochen && a.lines && a.lines.length) {
@@ -536,16 +756,31 @@ export function zeige(root, params, app) {
         return a;
       }, (err) => { if (laufendeAnalysen.get(key) === p) laufendeAnalysen.delete(key); throw err; });
     Object.defineProperty(p, 'laeuft', { get: () => eintrag.laeuft });
+    // noch nicht bei der Engine (startet gerade): mit 'vorne' einreihen; wartet schon: nach vorne holen
+    p.vorziehen = () => {
+      eintrag.vorne = true;
+      if (eintrag.engine && !eintrag.laeuft && typeof eintrag.engine.vorziehen === 'function') eintrag.engine.vorziehen(fen);
+    };
     laufendeAnalysen.set(key, p);
     return p;
   }
+  // Analyse der aktuellen Stellung: Balken und Ereignis stellung:analysiert (je Stellung einmal)
   function beiAnalyse(fen, a) {
     if (weg) return;
-    if (stellungsSchluessel(fen) === stellungsSchluessel(z.chess.fen())) setzeBalken(a);
+    const key = stellungsSchluessel(fen);
+    if (key !== stellungsSchluessel(z.chess.fen())) return;
+    setzeBalken(a);
+    const marke = z.zuege.length + '|' + key;
+    if (z.analyseGesendet === marke || !a || !Array.isArray(a.lines) || !a.lines.length) return;
+    z.analyseGesendet = marke;
+    sende('stellung:analysiert', {
+      laufId, fen: z.chess.fen(), plies: z.zuege.length, amZug: z.chess.turn() === farbe ? 'flo' : 'bot',
+      analyse: { depth: a.depth ?? null, lines: a.lines.map((l) => ({ eval: l.eval, pv: Array.isArray(l.pv) ? l.pv.slice() : [] })) },
+    });
   }
   function balkenAktualisieren() {
     const a = app.vorab.get(stellungsSchluessel(z.chess.fen()));
-    if (a) setzeBalken(a);
+    if (a) beiAnalyse(z.chess.fen(), a);
     else analysiere(z.chess.fen()).catch(() => {});
   }
 
@@ -596,8 +831,18 @@ export function zeige(root, params, app) {
       eintrag.status = 'fertig';
       eintrag.erg = erg;
       z.liveKlassen[ply] = erg.klasse;
+      z.liveTrivial[ply] = erg.trivial === true;
+      merkeSerie();
       speichereLaufend();
       zeigeBewertung(ply);
+      if (veraltet()) return;
+      sende('zug:bewertet', {
+        laufId, ply, uci: erg.uci, sanDe: erg.sanDe, klasse: erg.klasse, verlust: erg.verlust, genauigkeit: erg.genauigkeit,
+        gewinnVorher: erg.gewinnVorher, gewinnNachher: erg.gewinnNachher, gewinnZweiter: erg.gewinnZweiter ?? null,
+        gewinnVorigerZug: gewinnNachVorigemZug(ply),
+        besterZug: erg.besterZug, besterZugSanDe: erg.besterZugSanDe, trivial: erg.trivial === true,
+        serie: serieBis(ply), serieVorher: serieBis(ply - 1), letzter: ply === letzterFloPly(), live: liveAn(),
+      });
     } catch (err) {
       if (veraltet()) return;
       eintrag.status = 'fehler';
@@ -628,15 +873,16 @@ export function zeige(root, params, app) {
         brett.markiere([nach], 'k-' + k);
         brett.zeigeAbzeichen(nach, k);
         effekt(nach, k);
-        if (k === 'brillant') spaeter(() => klang.brillant(), 120);
-        else if (k === 'patzer' || k === 'fehler') spaeter(() => klang.fehler(), 120);
+        // Standard wie bisher: Brillant, Fehler und Patzer klingen, sonst still (Pakete: registriereKlang('klasse'))
+        const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
+        spaeter(() => klang.klasse(k, info), 120);
         melde({ typ: 'abzeichen', ply, klasse: k });
       }
     }
     e.gezeigtUm = jetzt();
     if (an && z.phase !== 'ende') {
-      if (SCHLECHT.has(k)) zeigeBlase('spielerFehler', ply);
-      else if (k === 'brillant' || k === 'stark') zeigeBlase('spielerGut', ply);
+      if (SCHLECHT.has(k)) zeigeBlase('spielerFehler', ply, { prio: 70 });
+      else if (k === 'brillant' || k === 'stark') zeigeBlase('spielerGut', ply, { prio: 70 });
     }
     if (botHatGezogen) planeKompakt();
   }
@@ -644,7 +890,7 @@ export function zeige(root, params, app) {
   function planeKompakt() {
     clearTimeout(z.kompaktUhr);
     z.kompaktUhr = spaeter(() => {
-      if (coachEl.classList.contains('wartet') || coachEl.classList.contains('leer')) return;
+      if (coachEl.classList.contains('wartet') || coachEl.classList.contains('leer') || zusatzBleibt()) return;
       coachEl.classList.add('kompakt');
       coachEl.classList.remove('neu');
     }, 3500);
@@ -681,6 +927,7 @@ export function zeige(root, params, app) {
       animieren: true, letzterZug: an ? [m.from, m.from] : [m.from, m.to], schach: z.chess.inCheck() ? true : null,
     });
     if (an) brett.markiere([m.to], 'bewertung');
+    sendeZug(ply, m, 'flo');
     spieleKlang(m);
     versteckeBlase();
     z.hinweisFen = null;
@@ -694,6 +941,14 @@ export function zeige(root, params, app) {
     bewerte(ply);
     if (pruefeEnde()) return;
     botAmZug();
+  }
+
+  function sendeZug(ply, m, wer) {
+    sende('zug:gespielt', {
+      laufId, ply, wer, uci: m.lan, san: m.san, fenVorher: m.before, fenNachher: m.after,
+      geschlagen: m.captured || null, schach: z.chess.inCheck(), matt: z.chess.isCheckmate(),
+      umwandlung: m.promotion || null, rochade: !!(m.isKingsideCastle() || m.isQueensideCastle()),
+    });
   }
 
   function spieleKlang(m) {
@@ -735,7 +990,12 @@ export function zeige(root, params, app) {
         const e = await app.engine('bot');
         engBot = e;
         if (ctrl.signal.aborted) return;
-        zug = await botZug(e, fen, bot, { zugNummer: z.zuege.length + 1, signal: ctrl.signal });
+        // W0+a: Zufall aus dem Seed (je Halbzug), feste Knoten und Vorliebe aus dem Bot-Profil
+        zug = await botZug(e, fen, zugBot, {
+          zugNummer: z.zuege.length + 1, signal: ctrl.signal,
+          zufall: z.seed != null ? zugZufall(z.seed, z.zuege.length) : Math.random,
+          nodes: bot.nodes || null, vorliebe: bot.vorliebe || null,
+        });
       }
     } catch (err) {
       if (ctrl.signal.aborted || weg) return;
@@ -776,11 +1036,12 @@ export function zeige(root, params, app) {
     brett.pfeile([]);
     z.ideeAn = null;
     brett.setzeStellung(z.chess.fen(), { animieren: true, letzterZug: [m.from, m.to], schach: z.chess.inCheck() ? true : null });
+    sendeZug(ply, m, 'bot');
     spieleKlang(m);
     melde({ typ: 'zug', wer: 'bot', uci: m.lan, ply });
     const paar = ply - 1;
-    if (m.captured) zeigeBlase('schlagen', paar);
-    else if (z.chess.inCheck()) zeigeBlase('schach', paar);
+    if (m.captured) zeigeBlase('schlagen', paar, { prio: 50 });
+    else if (z.chess.inCheck()) zeigeBlase('schach', paar, { prio: 50 });
     const fp = letzterFloPly();
     if (fp >= 0 && z.live[fp] && z.live[fp].status === 'fertig') planeKompakt();
     zeichneKopf();
@@ -805,7 +1066,7 @@ export function zeige(root, params, app) {
     if (z.phase !== 'flo' || z.hinweisRechnet) return;   // zweites Tippen waehrend der Rechnung
     const fen = z.chess.fen();
     if (z.hinweisFen !== fen) { z.hinweisFen = fen; z.hinweisStufe = 0; }
-    const k = $('.spielknoepfe [data-aktion="hinweis"]');
+    const k = $('.spielknoepfe > [data-aktion="hinweis"]');
     k.classList.add('rechnet');
     z.hinweisRechnet = true;
     let a = null;
@@ -828,6 +1089,7 @@ export function zeige(root, params, app) {
       z.ideeAn = 'hinweis';
       melde({ typ: 'hinweis', stufe: 2, zug: best });
     }
+    sende('hilfe:genutzt', { laufId, art: 'hinweis', stufe: z.hinweisStufe });
     speichereLaufend();
     zeichneKnoepfe();
   }
@@ -840,11 +1102,13 @@ export function zeige(root, params, app) {
     const anzahl = z.zuege.length - fp;
     for (let i = 0; i < anzahl; i++) {
       z.chess.undo();
-      z.zuege.pop(); z.san.pop(); z.verbose.pop(); z.fens.pop(); z.liveKlassen.pop();
+      z.zuege.pop(); z.san.pop(); z.verbose.pop(); z.fens.pop(); z.liveKlassen.pop(); z.liveTrivial.pop();
       const e = z.live.pop();
       if (e && e.erledigt) e.erledigt();   // wartende Bot-Pause loesen; Marke ist damit veraltet
     }
     z.zuruecknahmen++;
+    merkeSerie();
+    sende('zug:zurueckgenommen', { laufId, bisPly: fp, plies: anzahl });
     if (z.zuruecknahmen === 1) app.meldung('Zug zurückgenommen. Der 3. Stern ist für diese Partie weg.');
     brett.entferneAbzeichen();
     brett.markiere(null);
@@ -910,7 +1174,20 @@ export function zeige(root, params, app) {
     return {
       botId: bot.id, spielerFarbe: farbe, startFen: startFen || null, zuege: z.zuege.slice(),
       hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, liveKlassen: z.liveKlassen.slice(), gestartet: z.gestartet,
+      modus: z.modus, ziel: z.ziel, extra: z.extra, maxSerie: z.maxSerie,
+      liveTrivial: z.zuege.map((_, i) => z.liveTrivial[i] === true),
+      ...spielFelder(),
     };
+  }
+  // W0+a: seed, boss, liga, tempo, zeiten (nur gesetzte; storage prueft sie)
+  function spielFelder() {
+    const f = {};
+    if (z.seed != null) f.seed = z.seed;
+    if (z.boss) f.boss = { ...z.boss };
+    if (z.liga) f.liga = { ...z.liga };
+    if (z.tempo) f.tempo = { ...z.tempo };
+    if (z.zeiten) f.zeiten = z.zeiten.slice();
+    return f;
   }
   function speichereLaufend() {
     if (z.phase === 'ende' || z.verworfen || weg) return;
@@ -929,17 +1206,19 @@ export function zeige(root, params, app) {
   }
 
   // Genauigkeit aus der Live-Bewertung, nur wenn jeder eigene Zug bewertet ist (sonst null:
-  // nach dem Fortsetzen fehlen die Zuege davor, das ergaebe zum Beispiel 100 % aus einem Zug)
+  // nach dem Fortsetzen fehlen die Zuege davor, das ergaebe zum Beispiel 100 % aus einem Zug).
+  // Gleiches Verfahren wie die Spielanalyse (volatilitaetsgewichtet); der Wert ist vorlaeufig, die erste
+  // volle Analyse ersetzt ihn (storage.ergaenzeAnalyse, genauigkeitQuelle 'live').
   function livGenauigkeit() {
     const l = [];
     for (let i = 0; i < z.zuege.length; i++) {
-      if (!istFlo(i)) continue;
+      if (!istFlo(i)) { l.push(null); continue; }
       const e = z.live[i];
       if (!e || !e.erg || !Number.isFinite(e.erg.genauigkeit)) return null;
-      l.push(e.erg.genauigkeit);
+      l.push(e.erg);
     }
-    const g = partieGenauigkeit(l);
-    return Number.isFinite(g) ? Math.round(g * 10) / 10 : null;
+    const g = seitenGenauigkeit(l, farbe, z.zuege.length);
+    return Number.isFinite(g) ? g : null;
   }
   const liveKlassenListe = () => z.zuege.map((_, i) => (istFlo(i) ? z.liveKlassen[i] || null : null));
 
@@ -953,6 +1232,8 @@ export function zeige(root, params, app) {
       genauigkeit: null, genauigkeitBot: null, spielstaerke: null,
       eroeffnung: startFen ? null : eroeffnung(z.san).name,
       gestartet: z.gestartet,
+      modus: z.modus, ziel: z.ziel || undefined, extra: Object.keys(z.extra).length ? z.extra : undefined, maxSerie: z.maxSerie,
+      ...spielFelder(),
     };
   }
 
@@ -970,9 +1251,12 @@ export function zeige(root, params, app) {
     zeichneKnoepfe();
     clearTimeout(z.kompaktUhr);
     endeDaten = { ergebnis, grund };
+    // W0+a: Bietet jemand einen Finisher an, ersetzt er den Klassen-Effekt des Mattzugs
+    z.finisher = grund === 'matt' && angeboten('partie:matt') > 0;
     // Ergebnis sofort sichern (Sieg, Sterne 1 und 3, Freischaltung), erst danach die laufende
     // Partie loeschen: Wird die App waehrend der Auswertung beendet, geht nichts verloren.
     speichere(ergebnis, grund);
+    planeBeendet();
     // Coach ohne "Zuruecknehmen" neu zeichnen (die Partie ist vorbei)
     const fpEnde = letzterFloPly();
     if (fpEnde >= 0 && z.live[fpEnde] && z.live[fpEnde].status === 'fertig' && liveAn()) {
@@ -986,13 +1270,17 @@ export function zeige(root, params, app) {
     s.classList.add('ist-ende');
     if (grund !== 'aufgabe') balkenAktualisieren();
     const auswertung = werteAus();
+    // W0+a: Finisher (Aufruf-Ort partie:matt) nach partie:beendet und vor dem Ergebnis, hoechstens BRETT_FEIER.dauerMs
+    const finisher = z.finisher ? mattHook(ergebnis) : null;
     await warte(grund === 'aufgabe' ? 250 : 900);
+    if (finisher) await finisher;
     if (weg) return;
     overlay = baueOverlay(ergebnis, grund);
     // Das Ergebnis wartet nur kurz auf die Auswertung (nach dem Fortsetzen kann sie lange
     // dauern): Knoepfe und Sterne kommen sofort, die Genauigkeit wird nachgereicht.
     const frueh = await Promise.race([auswertung, warte(AUSWERTUNG_WARTEN_MS).then(() => undefined)]);
     if (weg) return;
+    sendeBeendet();   // spaetestens jetzt, vor den Feier-Zeilen
     if (frueh !== undefined) { overlay.fuelle(frueh || z.gespeichert, frueh ? frueh.review : null); return; }
     overlay.fuelle(z.gespeichert, null, { rechnet: true });
     const spaet = await auswertung;
@@ -1006,7 +1294,80 @@ export function zeige(root, params, app) {
     loescheLaufendePartie();
     z.gespeichert = erg;
     melde({ typ: 'gespeichert', id: erg.partie.id });
+    z.beendetDaten = { ergebnis, grund, dauerMs: Date.now() - Date.parse(z.gestartet) };
     return erg;
+  }
+
+  // partie:beendet: nach dem Speichern, sobald die Live-Bewertung des letzten eigenen Zugs da ist
+  // (dann stimmen liveKlassen und maxSerie), hoechstens AUSWERTUNG_WARTEN_MS spaeter, immer vor den
+  // Feier-Zeilen des Overlays. Verlaesst Flo den Screen vorher, kommt es in verlasse(). Nur einmal.
+  function sendeBeendet() {
+    const g = z.gespeichert;
+    if (!g || z.beendetGesendet) return;
+    z.beendetGesendet = true;
+    beendetGemeldet();
+    const p = g.partie;
+    const d = z.beendetDaten || {};
+    sende('partie:beendet', {
+      laufId, partieId: p.id, botId: bot.id, botStufe: bot.stufe, farbe, modus: z.modus, wertet: g.wertet !== false,
+      ergebnis: d.ergebnis, grund: d.grund, eigeneZuege: z.zuege.filter((_, i) => istFlo(i)).length, liveKlassen: liveKlassenListe(),
+      maxSerie: z.maxSerie, hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, neueSterne: g.neueSterne.slice(),
+      neuFreigeschaltet: g.neuFreigeschaltet ? g.neuFreigeschaltet.id : null, extra: kopie(z.extra) || {},
+      datum: p.datum, dauerMs: Number.isFinite(d.dauerMs) ? Math.max(0, d.dauerMs) : null,
+      boss: z.boss ? { ...z.boss } : null, seed: z.seed,
+    });
+  }
+  // W0+a: Promise auf partie:beendet (fuer den Matt-Hook)
+  let beendetGemeldet = () => {};
+  const beendetDa = new Promise((r) => { beendetGemeldet = r; });
+
+  // W0+a: Aufruf-Ort partie:matt. Wartet auf partie:beendet (w0plus-a-fix: hoechstens MATT_HOOK_WARTEN_MS, vorher
+  // bis AUSWERTUNG_WARTEN_MS + 500), dann auf die Anbieter mit { fertig }, hoechstens BRETT_FEIER.dauerMs; ein Tipp
+  // bricht ab. Kommt partie:beendet spaeter, laeuft der Finisher schon (partieId und Datensatz sind gespeichert).
+  let mattOrt = null;
+  // w0plus-a-fix: so lange wartet der Hook auf partie:beendet (nur im Testmodus per __test.mattHookWarten anders)
+  const mattHookWarten = () => {
+    const t = app.test && window.__test ? window.__test.mattHookWarten : undefined;
+    return Number.isFinite(t) ? t : MATT_HOOK_WARTEN_MS;
+  };
+  async function mattHook(ergebnis) {
+    // Ein Tipp gilt ab dem Mattzug: auch waehrend noch auf partie:beendet gewartet wird (der Finisher bekommt dann ein
+    // schon abgebrochenes signal, zeigt hoechstens sein Endbild, und das Ergebnis wartet nicht)
+    const ctrl = new AbortController();
+    const tipp = () => ctrl.abort();
+    s.addEventListener('pointerdown', tipp, true);
+    try {
+      await Promise.race([beendetDa, warte(mattHookWarten())]);
+      if (weg) return;
+      const m = z.verbose[z.verbose.length - 1] || null;
+      const matt = z.chess.turn();
+      let koenigFeld = null;
+      for (const reihe of z.chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === matt) koenigFeld = f.square;
+      mattOrt = fuelle('partie:matt', null, {
+        app, buehne, laufId, partieId: z.gespeichert ? z.gespeichert.partie.id : null, ergebnis,
+        gewinner: ergebnis === 'sieg' ? 'flo' : 'bot', koenigFeld, fen: z.chess.fen(), reduziert: !!reduziert,
+        letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
+        signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
+      });
+      melde({ typ: 'matt-hook', anzahl: mattOrt.anzahl, wartend: mattOrt.wartend, beendet: !!z.beendetGesendet });
+      if (!mattOrt.anzahl) {
+        // kein Finisher (alle Anbieter lieferten null): der Klassen-Effekt des Mattzugs kommt doch
+        z.finisher = false;
+        if (z.effektGemerkt) effekt(...z.effektGemerkt);
+      }
+      z.effektGemerkt = null;
+      if (mattOrt.wartend > 0) await Promise.race([mattOrt.fertig, warte(BRETT_FEIER.dauerMs, ctrl.signal)]);
+    } finally {
+      melde({ typ: 'matt-hook-ende', abgebrochen: ctrl.signal.aborted });
+      ctrl.abort();   // spaetestens jetzt springen die Finisher ans Ende
+      s.removeEventListener('pointerdown', tipp, true);
+    }
+  }
+  function planeBeendet() {
+    const fp = letzterFloPly();
+    const e = fp >= 0 ? z.live[fp] : null;
+    if (!e || e.status !== 'rechnet') { sendeBeendet(); return; }
+    Promise.race([e.fertig, warte(AUSWERTUNG_WARTEN_MS)]).then(() => { if (!weg) sendeBeendet(); });
   }
 
   // Spielanalyse rechnen und nachtragen. Liefert { partie, neueSterne, neuFreigeschaltet, review }
@@ -1019,9 +1380,11 @@ export function zeige(root, params, app) {
     let review = null;
     try {
       const e = await bewertungsEngine();
+      // Live-Suchen mit Zeitlimit (LIVE_MAX_MS, im Stau LIVE_STAU_MS) erreichen nicht immer die eingestellte
+      // Tiefe: nur ausreichend tiefe wiederverwenden, flachere rechnet die Analyse neu (vorabMinTiefe)
       review = await analysierePartie(e, z.zuege, {
         tiefe: tiefe(), multipv: 2, startFen: startFen || undefined, spielerFarbe: farbe,
-        elo: { [botFarbe]: bot.elo }, vorab: app.vorab, vorabMerken: true, signal: endeCtrl.signal,
+        elo: { [botFarbe]: botElo }, vorab: app.vorab, vorabMinTiefe: tiefe(), vorabMerken: true, signal: endeCtrl.signal,
         beiFortschritt: (f, n) => overlay && overlay.fortschritt(n ? f / n : 1),
       });
     } catch (err) {
@@ -1037,15 +1400,27 @@ export function zeige(root, params, app) {
     const g = z.gespeichert;
     if (!g || z.nachgetragen) return null;
     z.nachgetragen = true;
-    aktualisierePartie(g.partie.id, { liveKlassen: liveKlassenListe() });
+    // maxSerie mit: die Live-Bewertung des letzten Zugs kann nach dem Speichern kommen (Codex-Befund)
+    aktualisierePartie(g.partie.id, { liveKlassen: liveKlassenListe(), maxSerie: z.maxSerie });
     const nach = review ? ergaenzeAnalyse(g.partie.id, review) : ergaenzeAnalyse(g.partie.id, null, { genauigkeit: livGenauigkeit() });
     if (!nach) return null;
     melde({ typ: 'nachgetragen', id: g.partie.id, mitAnalyse: !!review });
-    return {
-      partie: nach.partie, review,
-      neueSterne: g.neueSterne.map((x, i) => x || nach.neueSterne[i]),
-      neuFreigeschaltet: g.neuFreigeschaltet,
-    };
+    const neueSterne = g.neueSterne.map((x, i) => x || nach.neueSterne[i]);
+    if (review) {
+      sendeBeendet();   // Reihenfolge: partie:beendet immer vor partie:analysiert
+      sende('partie:analysiert', {
+        partieId: g.partie.id, botId: bot.id, modus: nach.partie.modus || 'normal', wertet: nach.wertet !== false,
+        partie: nach.partie, review, neueSterne, quelle: 'partie',
+      });
+    }
+    return { partie: nach.partie, review, neueSterne, neuFreigeschaltet: g.neuFreigeschaltet, wertet: nach.wertet !== false };
+  }
+
+  // Chip nicht wertender Partien: je Modus, gegen angemeldete Bots im Modus normal "GAST" (w0plus-a-fix)
+  function chipText() {
+    if (MODUS_CHIP[z.modus] && z.modus !== 'uebung') return MODUS_CHIP[z.modus];
+    if (z.modus === 'normal' && bot.stufe == null && !startFen) return 'GAST';
+    return 'ÜBUNG';
   }
 
   // ---------- Ergebnis-Overlay ----------
@@ -1067,15 +1442,19 @@ export function zeige(root, params, app) {
         return `<i style="--l:${(i * 37) % 100}%;--d:${(i % 7) * 0.18}s;--t:${2.6 + (i % 5) * 0.35}s;--c:${farben[i % farben.length]};--r:${(i * 47) % 360}deg"></i>`;
       }).join('') + '</div>'
       : '';
+    // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne
+    const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
+    const kopfWort = `<h2 class="erg-wort" id="erg-wort">${wort}</h2>`;
     o.innerHTML = `${konfetti}
       <div class="ergebnis-karte">
         <button class="icon-knopf erg-zu" type="button" aria-label="Brett ansehen">${icon('auge')}</button>
-        <h2 class="erg-wort" id="erg-wort">${wort}</h2>
+        ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${chipText()}</span></div>`}
         <p class="erg-unter">${esc(unter)}</p>
         <div class="erg-mitte">
           <div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
             <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>
         </div>
+        <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
         <div class="erg-bot"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
         <div class="erg-knoepfe"></div>
@@ -1090,6 +1469,73 @@ export function zeige(root, params, app) {
     karte.setAttribute('tabindex', '-1');
     karte.focus({ preventScroll: true });
 
+    // ---------- Feier-Zeilen (feier.fuerOverlay) ----------
+    // Neue Zeilen gleiten im Abstand von 200 ms ein und spielen ihren Klang (Klangstufe "Nur wichtige":
+    // nur grosse). Antippen der Karte zeigt sofort alles. Schon gezeigte Zeilen bleiben ruhig stehen.
+    const feierBox = o.querySelector('.erg-feier');
+    const feierGezeigt = new Set();
+    const feierUhren = new Set();
+    karte.addEventListener('click', () => {
+      feierBox.classList.add('alles');
+      // w0plus-a-fix: auch die Abrechnung (SPIELKONZEPT 3.10 "Antippen zeigt sofort alles"); .alles an der Karte gilt
+      // auch fuer eine Huelle, die der Nachtrag neu baut
+      karte.classList.add('alles');
+      for (const a of karte.querySelectorAll('.abrechnung')) a.classList.add('alles');
+      for (const u of feierUhren) clearTimeout(u);
+      feierUhren.clear();
+    });
+    function feierSymbol(symbol) {
+      if (!symbol) return '';
+      if (iconNamen().includes(symbol)) return `<span class="erg-f-symbol">${icon(symbol)}</span>`;
+      return `<span class="erg-f-symbol">${esc(String(symbol).slice(0, 4))}</span>`;
+    }
+    function zeigeFeier(partieId) {
+      let liste = [];
+      try { liste = fuerOverlay(partieId); } catch (e) { console.error('Feier', e); liste = []; }
+      feierBox.hidden = !liste.length;
+      if (!liste.length) { feierBox.replaceChildren(); return; }
+      const basis = feierGezeigt.size ? 0 : (ergebnis === 'sieg' && wertend ? 1500 : 700);
+      let nr = 0;
+      feierBox.replaceChildren(...liste.map((f) => {
+        const schl = f.quelle + '|' + f.titel;
+        const neu = !feierGezeigt.has(schl);
+        const el = document.createElement('div');
+        el.className = `erg-f-zeile ${f.art === 'gross' ? 'gross' : 'zeile'}${neu ? ' neu' : ''}`;
+        el.dataset.quelle = f.quelle;
+        el.innerHTML = `${feierSymbol(f.symbol)}<span class="erg-f-text"><b></b>${f.text ? '<small></small>' : ''}</span>`;
+        el.querySelector('b').textContent = f.titel;
+        if (f.text) el.querySelector('small').textContent = f.text;
+        if (neu) {
+          feierGezeigt.add(schl);
+          const t = basis + nr * 200;
+          const stufe = nr;
+          el.style.setProperty('--t', t + 'ms');
+          nr++;
+          const u = spaeter(() => {
+            feierUhren.delete(u);
+            if (klang.stufe === 'wichtig' && f.art !== 'gross') return;
+            if (f.klang) klang.spiele(f.klang, stufe);
+            else klang.spiele('feier', stufe);
+          }, t);
+          feierUhren.add(u);
+        }
+        return el;
+      }));
+    }
+
+    // ---------- Ort ergebnis:karte (bei jedem fuelle neu) ----------
+    const karteOrtEl = o.querySelector('.erg-karte-ort');
+    let karteOrt = null;
+    function fuelleKarte(erg, review, rechnet, nachtrag, wertet) {
+      if (karteOrt) karteOrt.verlasse();
+      karteOrt = fuelle('ergebnis:karte', karteOrtEl, {
+        app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus: z.modus, ziel: z.ziel,
+        boss: z.boss ? Object.freeze({ ...z.boss }) : null,
+      });
+      karteOrtEl.hidden = karteOrt.anzahl === 0;
+      return karteOrt.anzahl;
+    }
+
     return {
       el: o,
       fortschritt(anteil) {
@@ -1098,9 +1544,14 @@ export function zeige(root, params, app) {
       },
       // erg: { partie, neueSterne, neuFreigeschaltet }. rechnet: Analyse laeuft noch (Genauigkeit
       // folgt), nachtrag: zweiter Aufruf mit Analyse (nur Stern 2, Genauigkeit und Tipp neu).
+      // Aufraeumen beim Verlassen des Screens (Fuellung des Orts ergebnis:karte)
+      verlasse() { if (karteOrt) karteOrt.verlasse(); karteOrt = null; },
       fuelle(erg, review, { rechnet = false, nachtrag = false } = {}) {
         aktuellErg = erg;
         const p = erg.partie;
+        const wertet = erg.wertet !== false && wertend;
+        zeigeFeier(p.id);
+        const karten = fuelleKarte(erg, review, rechnet, nachtrag, wertet);
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
         const gen = p.genauigkeit;
@@ -1126,7 +1577,7 @@ export function zeige(root, params, app) {
         const mitte = o.querySelector('.erg-mitte');
         const staerke = p.spielstaerke ? ` · spielte wie ≈ ${p.spielstaerke}` : '';
         const genauHtml = (gross) => `<div class="erg-genau${gross ? ' gross' : ''}">Genauigkeit <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? '0,0 %' : '-'}</b>${gross ? (p.spielstaerke ? `<span>spielte wie ≈ ${p.spielstaerke}</span>` : '') : esc(staerke)}</div>`;
-        if (ergebnis === 'sieg') {
+        if (ergebnis === 'sieg' && wertet) {
           if (nachtrag && mitte.querySelector('.erg-sterne')) {
             // nur Stern 2 und die Genauigkeit erneuern (die anderen Sterne nicht neu animieren)
             mitte.querySelector('.erg-stern[data-i="1"]').outerHTML = sternHtml(1);
@@ -1141,15 +1592,17 @@ export function zeige(root, params, app) {
           const momente = review && review.schluesselmomente ? review.schluesselmomente.length : 0;
           const knapp = review && warKnapp(review.kurve, farbe);
           const anzahl = Math.min(3, momente);
+          // Sieg einer nicht wertenden Partie: ohne Tipp
           const tipp = ergebnis === 'niederlage'
             ? (momente
               ? `${knapp ? 'Knapp!' : 'Kopf hoch!'} Schau dir ${anzahl === 1 ? 'den Schlüsselmoment' : `die ${anzahl} Schlüsselmomente`} in der Analyse an.`
               : (knapp ? 'Knapp! In der Analyse siehst du, wo mehr drin war.' : 'Kopf hoch! In der Analyse siehst du, wo die Partie gekippt ist.'))
-            : 'Ein halber Punkt! In der Analyse siehst du, wo mehr drin war.';
+            : ergebnis === 'remis' ? 'Ein halber Punkt! In der Analyse siehst du, wo mehr drin war.' : '';
+          // der Tipp nur, wenn kein Paket am Ort ergebnis:karte etwas zeigt
           mitte.innerHTML = `${rechnet ? rechnetHtml : genauHtml(true)}
-            ${rechnet ? '' : `<p class="erg-tipp">${esc(tipp)}</p>`}`;
+            ${rechnet || !tipp || karten ? '' : `<p class="erg-tipp">${esc(tipp)}</p>`}`;
         }
-        const neu = erg.neuFreigeschaltet;
+        const neu = wertet ? erg.neuFreigeschaltet : null;
         if (neu && !nachtrag) {
           o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${neu.farbe}">
             <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
@@ -1157,10 +1610,14 @@ export function zeige(root, params, app) {
         }
         if (!nachtrag) {
           const knoepfe = o.querySelector('.erg-knoepfe');
-          const naechster = neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
+          // w0plus-a-fix: "Nächster Gegner" nur auf der Leiter (angemeldete Bots haben stufe null)
+          const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
+          // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
+          const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
           knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} Zur Analyse</button>
-          ${naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">Nächster Gegner ${icon('pfeil')}</button>`
-            : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} Nochmal</button>`}`;
+          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${abHier ? 'Nochmal ab hier' : 'Nochmal'}</button>`
+            : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">Nächster Gegner ${icon('pfeil')}</button>`
+              : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} Nochmal</button>`}`;
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
           knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
             partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
@@ -1168,7 +1625,17 @@ export function zeige(root, params, app) {
           const w = knoepfe.querySelector('[data-ziel="weiter"]');
           if (w) w.addEventListener('click', () => app.gehe('arena', neu ? { neuFreigeschaltet: neu.id } : { waehle: naechster.id }));
           const n = knoepfe.querySelector('[data-ziel="nochmal"]');
-          if (n) n.addEventListener('click', () => app.gehe('partie', { botId: bot.id, farbe }));
+          // Bedenkzeit bleibt beim Wiederholen (eine Liga-Runde nicht: die plant die Liga selbst)
+          if (n) n.addEventListener('click', () => app.gehe('partie', { botId: bot.id, farbe, tempo: z.tempo ? { ...z.tempo } : undefined }));
+          const ab = knoepfe.querySelector('[data-ziel="ab-hier"]');
+          if (ab) {
+            // W0+a: Boss mit derselben Stufe und Woche, neuer Seed; Bedenkzeit und Liga wie gehabt
+            ab.addEventListener('click', () => app.gehe('partie', {
+              botId: bot.id, farbe, startFen: startFen || undefined, modus: z.modus, ziel: z.ziel || undefined,
+              boss: z.boss ? { ...z.boss } : undefined, tempo: z.tempo ? { ...z.tempo } : undefined,
+              liga: z.liga ? { ...z.liga } : undefined,
+            }));
+          }
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
         if (!rechnet) o.classList.remove('vorlaeufig');
@@ -1188,11 +1655,14 @@ export function zeige(root, params, app) {
             requestAnimationFrame(schritt);
           }
         }
-        if (ergebnis === 'sieg' && !reduziert) {
-          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.zug(), 450 + i * 350); });
-          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.zug(), 800);
+        // Klang je Stern (Pakete: registriereKlang('stern'), der klingt auch bei reduzierter Bewegung; ohne
+        // Register wie vor Runde 4: zug, bei reduzierter Bewegung still)
+        if (ergebnis === 'sieg' && wertet) {
+          const opt = { reduziert: !!reduziert };
+          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i], opt), 450 + i * 350); });
+          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true, opt), 800);
         }
-        melde({ typ: 'overlay', ergebnis, sterne, neu: neu ? neu.id : null, rechnet, nachtrag });
+        melde({ typ: 'overlay', ergebnis, sterne, neu: neu ? neu.id : null, rechnet, nachtrag, wertet, feier: feierBox.children.length, karten });
       },
     };
   }
@@ -1202,8 +1672,139 @@ export function zeige(root, params, app) {
     $('.ergebnis-zeigen').hidden = true;
   }
 
+  // ---------- Begruessung (Wahl-Ort partie:begruessung? -> { anlass, werte }) ----------
+  function begruesse() {
+    let wahl = null;
+    try {
+      wahl = waehle('partie:begruessung?', {
+        bot, farbe, modus: z.modus, partienGegenBot: ladePartien().filter((p) => p.botId === bot.id),
+      });
+    } catch (e) { wahl = null; }
+    const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
+    if (anlass && anlass !== 'begruessung' && zeigeBlase(anlass, 'start', { dauer: 6000, prio: 60, werte: wahl.werte || null })) return;
+    zeigeBlase('begruessung', 'start', { dauer: 6000, prio: 60, werte: (anlass === 'begruessung' && wahl.werte) || null });
+  }
+
+  // ---------- Buehne fuer die Pakete (kommt mit partie:gestartet) ----------
+  // W0+a: Plaetze fuer Zaehlwerk (im Kopf) und Funkenlinie (unten am Brett-Rahmen), nur mit Einstellung sichtbar
+  const plaetze = new Map();
+  const zeigt = (name) => ANZEIGEN.includes(name) && app.einstellungen()[name] === true;
+  function platz(name) {
+    if (weg || (name !== 'zaehlwerk' && name !== 'funkenlinie')) return null;
+    let el = plaetze.get(name);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = name === 'zaehlwerk' ? 'p-zaehlwerk' : 'p-funkenlinie';
+      if (name === 'zaehlwerk') $('.kopf').insertBefore(el, $('.kopf [data-aktion="einstellungen"]'));
+      else rahmen.append(el);
+      plaetze.set(name, el);
+    }
+    el.hidden = !zeigt(name);
+    return el;
+  }
+  const buehne = Object.freeze({
+    laufId, bot, farbe, modus: z.modus, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
+    boss: z.boss ? Object.freeze({ ...z.boss }) : null, seed: z.seed,
+    zeigt, platz,
+    el: s, effekte: effekteEl, rahmen, brett, reduziert: !!reduziert,
+    feld(f) {
+      if (typeof f !== 'string' || !/^[a-h][1-8]$/.test(f)) return null;
+      const [x, y] = spalteZeile(f);
+      return { x, y };
+    },
+    liveAn: () => liveAn(),
+    phase: () => z.phase,
+    coachZusatz: (inhalt, opt) => coachZusatz(inhalt, opt),
+    blase(anlass, { paar, prio = 50, werte = null } = {}) {
+      if (weg || typeof anlass !== 'string' || !anlass) return false;
+      return zeigeBlase(anlass, paar === undefined ? letzterFloPly() : paar, { prio, werte });
+    },
+    merke(paket, daten) {
+      if (weg || typeof paket !== 'string' || !PAKET_NAME.test(paket)) return false;
+      const neu = { ...z.extra };
+      if (daten == null) delete neu[paket];
+      else {
+        const d = kopie(daten);
+        if (d == null) return false;
+        neu[paket] = d;
+      }
+      const zeichen = JSON.stringify(neu).length;
+      if (zeichen > EXTRA_MAX) {
+        console.warn(`Partie: extra von "${paket}" verworfen (${zeichen} Zeichen, höchstens ${EXTRA_MAX})`);
+        return false;
+      }
+      z.extra = neu;
+      // nach dem Ende in den gespeicherten Datensatz, sonst in die laufende Partie
+      if (z.gespeichert) aktualisierePartie(z.gespeichert.partie.id, { extra: Object.keys(neu).length ? neu : undefined });
+      else speichereLaufend();
+      return true;
+    },
+    gemerkt(paket) {
+      return Object.prototype.hasOwnProperty.call(z.extra, paket) ? kopie(z.extra[paket]) : null;
+    },
+    spaeter(fn, ms) {
+      if (weg || typeof fn !== 'function') return 0;
+      return spaeter(() => {
+        try { fn(); } catch (e) { console.error('Buehne: Timer fehlgeschlagen', e); }
+      }, Math.max(0, Number(ms) || 0));
+    },
+  });
+
+  // ---------- W0+a: Ort partie:gegner-leiste (ueber dem Gegner, z. B. die Lebensleiste eines Bosses) ----------
+  // Ein Behaelter, der beim Drehen des Geraets zwischen Bot-Karte (quer) und Bot-Leiste (hoch) wandert.
+  // w0plus-a-fix: im Hochformat erstes eigenes Kind von .botleiste-hoch (eigene Zeile, .mit-gegner-leiste), nicht mehr
+  // in .info: Das verschwindet auf dem Handy, solange der Bot spricht, und mit ihm die Lebensleiste.
+  const gegnerLeiste = document.createElement('div');
+  gegnerLeiste.className = 'ort-gegner-leiste';
+  gegnerLeiste.hidden = true;
+  // w0plus-a-fix: Ort partie:spieler-leiste an Flos Namen (quer in .spieler-quer, hoch in .spieler-hoch)
+  const spielerLeiste = document.createElement('div');
+  spielerLeiste.className = 'ort-spieler-leiste';
+  spielerLeiste.hidden = true;
+  const hochMq = window.matchMedia ? window.matchMedia('(orientation: portrait)') : null;
+  const lage = () => (hochMq && hochMq.matches ? 'hoch' : 'quer');
+  function setzeGegnerLeiste() {
+    const hoch = lage() === 'hoch';
+    const anker = hoch ? $('.botleiste-hoch') : $('.botbox');
+    if (anker && gegnerLeiste.parentNode !== anker) anker.insertBefore(gegnerLeiste, anker.firstChild);
+    gegnerLeiste.dataset.lage = lage();
+    // nach dem Namen (hoch) bzw. nach dem Namensblock (quer), vor den geschlagenen Figuren
+    const nach = hoch ? $('.spieler-hoch > .name') : $('.spieler-quer > div');
+    if (nach && spielerLeiste.previousSibling !== nach) nach.after(spielerLeiste);
+    spielerLeiste.dataset.lage = lage();
+  }
+  setzeGegnerLeiste();
+  if (hochMq && hochMq.addEventListener) hochMq.addEventListener('change', setzeGegnerLeiste);
+  const gegnerOrt = fuelle('partie:gegner-leiste', gegnerLeiste, {
+    app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
+  });
+  gegnerLeiste.hidden = gegnerOrt.anzahl === 0;
+  s.classList.toggle('mit-gegner-leiste', gegnerOrt.anzahl > 0);
+  const spielerOrt = fuelle('partie:spieler-leiste', spielerLeiste, {
+    app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
+  });
+  spielerLeiste.hidden = spielerOrt.anzahl === 0;
+  // w0plus-a-fix: Ort partie:aktionen in der Knopfreihe vor "Aufgeben" (display: contents, die Knoepfe der Pakete
+  // werden Spalten der Reihe; hoechstens AKTIONEN_MAX)
+  const aktionen = document.createElement('div');
+  aktionen.className = 'ort-aktionen';
+  aktionen.hidden = true;
+  $('.spielknoepfe').insertBefore(aktionen, $('.spielknoepfe > [data-aktion="aufgeben"]'));
+  const aktionenOrt = fuelle('partie:aktionen', aktionen, { app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss });
+  const aktionsKnoepfe = [...aktionen.children];
+  for (const el of aktionsKnoepfe.slice(AKTIONEN_MAX)) el.remove();
+  if (aktionsKnoepfe.length > AKTIONEN_MAX) console.warn(`Partie: ${aktionsKnoepfe.length} Knöpfe an partie:aktionen, gezeigt werden ${AKTIONEN_MAX}`);
+  const aktionenZahl = Math.min(AKTIONEN_MAX, aktionen.children.length);
+  aktionen.hidden = aktionenZahl === 0;
+  if (aktionenZahl) $('.spielknoepfe').dataset.aktionen = String(aktionenZahl);
+  // W0+a: In Boss-Partien ersetzt die Gegner-Leiste eines Pakets (die Lebensleiste) den Bewertungsbalken, solange die
+  // Anzeige "lebensleiste" an ist (SPIELKONZEPT 3.17, 3.18). Ohne Anbieter steht der Balken wie eingestellt.
+  const ohneBalken = (e) => !e.balken || (z.modus === 'boss' && e.lebensleiste !== false && gegnerOrt.anzahl > 0);
+  s.classList.toggle('ohne-balken', ohneBalken(einst));
+
   // ---------- Start ----------
   balkenAusrichtung();
+  merkeSerie();
   zeichneKopf();
   zeichneZugliste();
   zeichneGeschlagen();
@@ -1228,7 +1829,7 @@ export function zeige(root, params, app) {
       speichereLaufend();
     }
     // Begruessung nur zum Start, nicht beim Fortsetzen mitten in der Partie
-    if (!laufend || z.zuege.length === 0) zeigeBlase('begruessung', 'start', { dauer: 6000 });
+    if (!laufend || z.zuege.length === 0) begruesse();
     // Engines starten (neue Partie: beide newGame)
     try {
       const [eb, ew] = await Promise.all([app.engine('bot'), app.engine('bewertung')]);
@@ -1265,22 +1866,34 @@ export function zeige(root, params, app) {
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
     brett.koordinaten(!!d.koordinaten);
-    s.classList.toggle('ohne-balken', !d.balken);
+    s.classList.toggle('ohne-balken', ohneBalken(d));
+    for (const [name, el] of plaetze) el.hidden = d[name] !== true;
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
 
   if (app.test) {
     window.__partie = {
-      z, brett, protokoll, bereit: false,
+      z, brett, protokoll, bereit: false, buehne, laufId,
       chess: () => z.chess,
       phase: () => z.phase,
-      effekt, zeigeBewertung, satzFuer,
+      effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
+      gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
     };
   }
+
+  // hinweise und zuruecknahmen: Stand beim Start (bei einer fortgesetzten Partie die bisherigen)
+  sende('partie:gestartet', {
+    laufId, botId: bot.id, botStufe: bot.stufe, farbe, startFen: startFen || null, modus: z.modus, ziel: buehne.ziel,
+    wertet: wertetJetzt(), fortgesetzt: !!laufend, hinweise: z.hinweise, zuruecknahmen: z.zuruecknahmen, buehne,
+    boss: buehne.boss, seed: z.seed,
+  });
 
   return {
     verlasse() {
       if (weg) return;
+      // vor dem Abraeumen: Pakete raeumen ihre Buehnen-Sachen ab (danach tut die Buehne nichts mehr)
+      sendeBeendet();
+      sende('partie:verlassen', { laufId });
       // Beendete Partie ist schon gespeichert; laeuft die Auswertung noch, die Genauigkeit aus der
       // Live-Bewertung nachtragen (nur wenn vollstaendig). Die Analyse rechnet spaeter den Rest.
       if (z.phase === 'ende' && z.gespeichert) {
@@ -1296,6 +1909,14 @@ export function zeige(root, params, app) {
       uhren.clear();
       clearTimeout(z.blaseUhr);
       clearTimeout(z.kompaktUhr);
+      if (overlay) overlay.verlasse();
+      // W0+a: Gegner-Leiste und Finisher abraeumen (w0plus-a-fix: auch Spieler-Leiste und Aktionen)
+      gegnerOrt.verlasse();
+      spielerOrt.verlasse();
+      aktionenOrt.verlasse();
+      if (mattOrt) mattOrt.verlasse();
+      if (hochMq && hochMq.removeEventListener) hochMq.removeEventListener('change', setzeGegnerLeiste);
+      plaetze.clear();
       window.removeEventListener('schach:einstellungen', beiEinstellungen);
       brett.zerstoere();
       if (app.test && window.__partie && window.__partie.z === z) delete window.__partie;

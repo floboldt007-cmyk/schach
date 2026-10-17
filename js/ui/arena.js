@@ -2,12 +2,28 @@
 // Gegner-Panel (Avatar, Begruessung, Bio, Merkmale, Stern-Ziele, Farbwahl, Spielen, Bilanz).
 // Params: { neuFreigeschaltet?: botId } spielt die Freischalt-Animation,
 //         { waehle?: botId } (Zusatz) waehlt einen freien Bot im Panel vor.
-import { BOTS, botSatz } from '../bots.js';
+// Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips),
+// arena:panel-oben (ganz oben im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten
+// Partie"), arena:panel-bot (nach den Stern-Zielen), arena:start (einmal nach dem ersten Layout).
+// Die Begruessung im Panel waehlt wie in der Partie der Wahl-Ort partie:begruessung?.
+// w0c: Fehlt gespeicherten Partien die Analyse (App waehrend der Auswertung beendet), rechnet die Arena sie
+// still nach (js/nachholen.js, Start nach ARENA_NACHHOLEN_MS, Ende mit verlasse()) und zeichnet die Sterne
+// danach ohne Animation neu.
+// W0+a: Host des Orts arena:heute (Heute-Karte): section.heute-karte direkt nach .ort-panel-oben im Panel, mit
+// der Kopfzeile "Heute · <Wochentag>" (Tag mit Grenze 4:00, tag.js) und den Zeilen der Pakete in .ort-heute.
+// Gefuellt bei jedem zeigeDetail(); ohne Anbieter versteckt (kein Pixel anders). Kontext:
+// { app, bot, fortschritt, tag, woche } (tag/woche: tagSchluessel/wochenSchluessel). Die Karte "Offene Partie" und der
+// Dialog vor einer neuen Partie finden auch angemeldete Bots (botNachId, z. B. eine verlassene Boss-Partie).
+import { BOTS, botSatz, botNachId } from '../bots.js';
+import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, besiegteBots, statistik,
-  ladeLaufendePartie, loescheLaufendePartie,
+  ladeLaufendePartie, loescheLaufendePartie, ladePartien,
 } from '../storage.js';
 import { klang } from '../sounds.js';
+import { fuelle, waehle } from '../orte.js';
+import { nachlese } from '../feier.js';
+import { starteNachholen } from '../nachholen.js';
 import { icon } from '../app.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
@@ -29,9 +45,15 @@ const POS_QUER = [[11, 86], [31, 80], [51, 86], [72, 79], [86, 56], [64, 50], [4
 // Hochformat: Serpentine von unten nach oben (x in Prozent, y gleichmaessig verteilt)
 const X_HOCH = [22, 60, 80, 50, 20, 56, 82, 50, 20, 58];
 const STUFEN_LABEL = [['Anfänger', 0.965], ['Fortgeschritten', 0.6], ['Meister', 0.045]];
+const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten
+// Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
+const ARENA_NACHHOLEN_MS = 2500;
+const ZIEL_TEXTE = ['Sieg', 'Sieg mit ≥\u00a080\u00a0% Genauigkeit', 'ohne Hinweis und ohne Zurücknehmen'];
 
+const kSterneHtml = (sterne) => sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('');
+const zielSterneHtml = (sterne) => ZIEL_TEXTE.map((t, i) => `<div class="${sterne[i] ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${sterne[i] ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('');
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const prozent = (x) => (Number.isFinite(x) ? String(Math.round(x * 10) / 10).replace('.', ',') + ' %' : '-');
 
@@ -43,6 +65,10 @@ export function zeige(root, params, app) {
   let weg = false;
 
   const fortschritt = ladeFortschritt();
+  // Feier-Momente, die nicht ins Ergebnis passten: einmal holen, gilt fuer diesen Screen
+  let feierRest = [];
+  try { feierRest = nachlese(); } catch (e) { feierRest = []; }
+  const orte = { kopf: null, oben: null, heute: null, bot: null, start: null };
   const neuId = params && params.neuFreigeschaltet && BOTS.some((b) => b.id === params.neuFreigeschaltet) ? params.neuFreigeschaltet : null;
   const naechster = naechsterGegner(fortschritt);
   const alleBesiegt = BOTS.every((b) => fortschritt.bots[b.id].sterne[0]);
@@ -98,6 +124,7 @@ export function zeige(root, params, app) {
 
   s.querySelector('[data-aktion="verlauf"]').addEventListener('click', () => app.gehe('verlauf'));
   s.querySelector('[data-aktion="einstellungen"]').addEventListener('click', () => app.gehe('einstellungen'));
+  orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
 
   // ---------- Knoten ----------
   const knoten = BOTS.map((b) => {
@@ -108,12 +135,11 @@ export function zeige(root, params, app) {
     el.dataset.bot = b.id;
     el.style.setProperty('--bf', b.farbe);
     const sterne = fortschritt.bots[b.id].sterne;
-    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', gesperrt: 'gesperrt' }[z];
-    el.setAttribute('aria-label', `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`);
+    el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
       ${z === 'aktuell' && b.id === aktuellId ? '<span class="fahne">NÄCHSTER GEGNER</span>' : ''}
       ${b.stufe === 10 ? '<span class="boss-krone">ENDGEGNER</span>' : ''}
-      ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('')}</span>` : ''}
+      ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${kSterneHtml(sterne)}</span>` : ''}
       <span class="avatar"><img src="${esc(b.avatar)}" alt="" draggable="false"><span class="k-nr">${b.stufe}</span>${z === 'gesperrt' || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}</span>
       <span class="k-name">${esc(b.name)}</span>
       <span class="k-meta zahl">Elo ${b.elo}</span>`;
@@ -121,6 +147,12 @@ export function zeige(root, params, app) {
     knotenOrt.append(el);
     return el;
   });
+
+  function knotenLabel(b, z) {
+    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', gesperrt: 'gesperrt' }[z];
+    const sterne = fortschritt.bots[b.id].sterne;
+    return `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`;
+  }
 
   function tippeKnoten(b, el) {
     if (el.classList.contains('gesperrt')) {
@@ -269,13 +301,18 @@ export function zeige(root, params, app) {
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
     const st = statistik();
     const laufend = ladeLaufendePartie();
-    const laufBot = laufend ? BOTS.find((x) => x.id === laufend.botId) : null;
+    // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
+    const laufBot = laufend ? botNachId(laufend.botId) : null;
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
-    const satz = botSatz(b, 'begruessung') || '';
-    const ziele = [['Sieg', f.sterne[0]], ['Sieg mit ≥\u00a080\u00a0% Genauigkeit', f.sterne[1]], ['ohne Hinweis und ohne Zurücknehmen', f.sterne[2]]];
+    const satz = begruessung(b);
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
     detail.style.setProperty('--bf', b.farbe);
+    if (orte.oben) orte.oben.verlasse();
+    if (orte.heute) orte.heute.verlasse();
+    if (orte.bot) orte.bot.verlasse();
     detail.innerHTML = `
+      <div class="ort-panel-oben" hidden></div>
+      <section class="heute-karte" aria-label="Heute" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${laufBot.farbe}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
@@ -289,7 +326,7 @@ export function zeige(root, params, app) {
             <span class="stufe">STUFE ${b.stufe} · ${status}</span>
             <h2>${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>
-            <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${f.sterne.map((x) => `<span class="${x ? 'stern' : 'aus'}">★</span>`).join('')}</div>
+            <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${kSterneHtml(f.sterne)}</div>
           </div>
           <button class="icon-knopf mehr-knopf" type="button" data-aktion="mehr" aria-label="Mehr über ${esc(b.name)}" aria-expanded="false">${icon('vor')}</button>
         </div>
@@ -303,19 +340,15 @@ export function zeige(root, params, app) {
           <div class="merkmal"><span class="m-label">Schwäche</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
         </div>
         <div class="ziel-sterne mehr">
-          ${ziele.map(([t, an]) => `<div class="${an ? 'an' : ''}"><b aria-hidden="true">★</b>${t}${an ? '<span class="sr"> (erreicht)</span>' : ''}</div>`).join('')}
+          ${zielSterneHtml(f.sterne)}
         </div>
+        <div class="ort-panel-bot mehr" hidden></div>
         <div class="farbwahl" role="radiogroup" aria-label="Farbe wählen">
           ${farben.map(([k, t, fig]) => `<button type="button" role="radio" data-farbe="${k}" aria-checked="${letzteFarbe === k}" class="${letzteFarbe === k ? 'an' : ''}">
             <span class="fig-bg">${fig.map((x) => `<img src="assets/pieces/${x}.svg" alt="">`).join('')}</span>${t}</button>`).join('')}
         </div>
         <button class="knopf primaer gross spielen" type="button" data-aktion="spielen">${icon('play')} Spielen</button>
-        <div class="bilanz">
-          <div><b>${st.partien}</b><span>Partien</span></div>
-          <div><b>${st.siege}</b><span>Siege</span></div>
-          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>Ø Genauigkeit</span></div>
-          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>Spielstärke</span></div>
-        </div>
+        <div class="bilanz">${bilanzHtml(st)}</div>
       </div>`;
 
     detail.querySelectorAll('.farbwahl button').forEach((k) => k.addEventListener('click', () => {
@@ -335,12 +368,99 @@ export function zeige(root, params, app) {
     if (fort) {
       fort.addEventListener('click', () => app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true }));
     }
+    // Orte im Panel: oben (davor die Nachlese) und nach den Stern-Zielen
+    const oben = detail.querySelector('.ort-panel-oben');
+    const nl = nachleseKarte();
+    if (nl) oben.append(nl);
+    orte.oben = fuelle('arena:panel-oben', oben, { app, bot: b, fortschritt });
+    oben.hidden = !nl && orte.oben.anzahl === 0;
+    // W0+a: Heute-Karte (Ort arena:heute), nur mit Zeilen sichtbar
+    const heute = detail.querySelector('.heute-karte');
+    const tag = tagSchluessel();
+    heute.querySelector('.hk-kopf').textContent = `Heute · ${WOCHENTAGE[wochentag(tag)]}`;
+    orte.heute = fuelle('arena:heute', heute.querySelector('.ort-heute'), { app, bot: b, fortschritt, tag, woche: wochenSchluessel() });
+    heute.hidden = orte.heute.anzahl === 0;
+    const botOrt = detail.querySelector('.ort-panel-bot');
+    orte.bot = fuelle('arena:panel-bot', botOrt, { app, bot: b, fortschritt });
+    botOrt.hidden = orte.bot.anzahl === 0;
+  }
+
+  function bilanzHtml(st) {
+    return `
+          <div><b>${st.partien}</b><span>Partien</span></div>
+          <div><b>${st.siege}</b><span>Siege</span></div>
+          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>Ø Genauigkeit</span></div>
+          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>Spielstärke</span></div>
+        `;
+  }
+
+  // Nachgeholte Analyse (w0c): Sterne, Kopf-Chip und Bilanz still neu zeichnen, ohne Animation und ohne
+  // das Panel neu aufzubauen. Nur Stern 2 kann sich so aendern (Sieg und Freischaltung sind schon gebucht).
+  function sterneNeu() {
+    if (weg) return;
+    const neu = ladeFortschritt();
+    for (const b of BOTS) fortschritt.bots[b.id] = neu.bots[b.id];
+    const zahl = s.querySelector('.kopf-chips .chip .sr');
+    if (zahl && zahl.nextSibling && zahl.nextSibling.nodeType === 3) zahl.nextSibling.textContent = ' ' + gesamtSterne(fortschritt);
+    if (alleBesiegt) s.querySelector('.logo-unter').textContent = `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne`;
+    BOTS.forEach((b, i) => {
+      const el = knoten[i];
+      const z = b.id === neuId ? 'aktuell' : zustandVon(b);
+      const ks = el.querySelector('.k-sterne');
+      if (ks) ks.innerHTML = kSterneHtml(fortschritt.bots[b.id].sterne);
+      el.setAttribute('aria-label', knotenLabel(b, z));
+    });
+    const f = fortschritt.bots[gewaehlt];
+    const mini = detail.querySelector('.mini-sterne');
+    if (f && mini) {
+      mini.innerHTML = kSterneHtml(f.sterne);
+      mini.setAttribute('aria-label', `${f.sterne.filter(Boolean).length} von 3 Sternen`);
+    }
+    const ziele = detail.querySelector('.ziel-sterne');
+    if (f && ziele) ziele.innerHTML = `\n          ${zielSterneHtml(f.sterne)}\n        `;
+    const bilanz = detail.querySelector('.bilanz');
+    if (bilanz) bilanz.innerHTML = bilanzHtml(statistik());
+  }
+
+  // Begruessung im Panel: dieselbe Wahl wie in der Partie (Wahl-Ort partie:begruessung?)
+  function begruessung(b) {
+    let wahl = null;
+    try {
+      wahl = waehle('partie:begruessung?', {
+        bot: b, farbe: letzteFarbe === 'z' ? null : letzteFarbe, modus: 'normal',
+        partienGegenBot: ladePartien().filter((p) => p.botId === b.id),
+      });
+    } catch (e) { wahl = null; }
+    const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
+    return (anlass && botSatz(b, anlass, Math.random, wahl.werte || null)) || botSatz(b, 'begruessung') || '';
+  }
+
+  // Nachlese: was nach der letzten Partie nicht mehr ins Ergebnis passte (still, ohne Klang)
+  function nachleseKarte() {
+    if (!feierRest.length) return null;
+    const k = document.createElement('div');
+    k.className = 'nachlese';
+    k.setAttribute('role', 'status');
+    k.innerHTML = '<div class="nl-titel">Seit deiner letzten Partie</div>';
+    for (const f of feierRest) {
+      const z = document.createElement('div');
+      z.className = 'nl-zeile' + (f.art === 'gross' ? ' gross' : '');
+      z.innerHTML = '<b></b>';
+      z.querySelector('b').textContent = f.titel;
+      if (f.text) {
+        const t = document.createElement('span');
+        t.textContent = f.text;
+        z.append(' ', t);
+      }
+      k.append(z);
+    }
+    return k;
   }
 
   async function spielen(b) {
     const laufend = ladeLaufendePartie();
     if (laufend) {
-      const lb = BOTS.find((x) => x.id === laufend.botId);
+      const lb = botNachId(laufend.botId);
       const ok = await app.frage({
         titel: 'Neue Partie starten?',
         text: `Du hast noch eine offene Partie gegen ${lb ? lb.name : 'einen Bot'}. Sie wird verworfen.`,
@@ -385,6 +505,10 @@ export function zeige(root, params, app) {
   layout();
   scrolleZu(neuId ? BOTS[Math.max(0, BOTS.findIndex((b) => b.id === neuId) - 1)].id : gewaehlt, false);
   if (neuId) freischalten();
+  // Aufruf-Ort arena:start (z. B. eine Kamerafahrt beim ersten Start), einmal nach dem ersten Layout
+  orte.start = fuelle('arena:start', null, {
+    app, s, karte, scrolleZu: (id, sanft) => scrolleZu(id, !!sanft), neuId,
+  });
   if (typeof ResizeObserver === 'function') {
     let letzte = '';
     beobachter = new ResizeObserver(() => {
@@ -402,14 +526,19 @@ export function zeige(root, params, app) {
 
   // Engines im Hintergrund vorwaermen, damit die erste Partie sofort startet
   spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); }, 900);
+  // Fehlende Analysen still nachholen (Stern 2); endet mit verlasse(), also auch beim Start einer Partie
+  let nachholLauf = null;
+  spaeter(() => { if (!weg) nachholLauf = starteNachholen(app, { beiPartie: sterneNeu }); }, ARENA_NACHHOLEN_MS + (neuId && !reduziert ? 1000 : 0));
 
   return {
     verlasse() {
       weg = true;
+      if (nachholLauf) nachholLauf.stop();
       for (const u of uhren) clearTimeout(u);
       uhren.clear();
       if (beobachter) beobachter.disconnect();
       window.removeEventListener('orientationchange', beiGroesse);
+      for (const o of Object.values(orte)) if (o) o.verlasse();
     },
   };
 }

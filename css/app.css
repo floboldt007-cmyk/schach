@@ -567,15 +567,16 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 }
 
 @media (orientation: portrait) {
-  .partie { --coach-h: 120px; --bl-h: 60px; --sp-h: 44px; --zl-h: 44px; --kn-h: 62px; --gap: 12px; }
+  /* --gl: Zeile der Gegner-Leiste (Ort partie:gegner-leiste) in der Bot-Leiste, ohne Anbieter 0 (w0plus-a-fix) */
+  .partie { --coach-h: 120px; --bl-h: 60px; --sp-h: 44px; --zl-h: 44px; --kn-h: 62px; --gap: 12px; --gl: 0px; }
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }
   .partie .inhalt > * {
-    --reserve: calc(var(--bl-h) + var(--sp-h) + var(--coach-h) + var(--zl-h) + var(--kn-h) + 5 * var(--gap) + 2 * var(--rahmen));
+    --reserve: calc(var(--bl-h) + var(--gl) + var(--sp-h) + var(--coach-h) + var(--zl-h) + var(--kn-h) + 5 * var(--gap) + 2 * var(--rahmen));
     --brett: min(calc(100cqw - var(--balken) - var(--spalt) - 2 * var(--rahmen)), calc(100cqh - var(--reserve))); }
   .partie .inhalt > *, .partie .seite > * { width: calc(var(--brett) + var(--balken) + var(--spalt) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
   .partie .seite { display: contents; }
   .partie .botbox, .partie .zugbox, .partie .spieler-quer { display: none; }
-  .partie .botleiste-hoch { order: 1; height: var(--bl-h); display: grid; grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr); gap: 14px; align-items: center; }
+  .partie .botleiste-hoch { order: 1; height: calc(var(--bl-h) + var(--gl)); display: grid; grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr); gap: 14px; align-items: center; }
   .partie .botleiste-hoch .avatar { --g: 56px; }
   .partie .botleiste-hoch .info { min-width: 0; }
   .partie .botleiste-hoch .zeile { display: flex; align-items: center; gap: 10px; margin-top: 4px; min-width: 0; }
@@ -639,7 +640,7 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 @media (orientation: portrait) and (max-width: 600px) and (max-height: 720px) {
   .partie { --coach-h: 78px; --zl-h: 0px; --bl-h: 48px; --sp-h: 36px; --kn-h: 52px; --gap: 7px; }
   .partie .zugleiste { display: none; }
-  .partie .inhalt > * { --reserve: calc(var(--bl-h) + var(--sp-h) + var(--coach-h) + var(--kn-h) + 4 * var(--gap) + 2 * var(--rahmen)); }
+  .partie .inhalt > * { --reserve: calc(var(--bl-h) + var(--gl) + var(--sp-h) + var(--coach-h) + var(--kn-h) + 4 * var(--gap) + 2 * var(--rahmen)); }
   .partie .coach .c-text { -webkit-line-clamp: 2; font-size: 13px; }
   .partie .coach .c-symbol, .partie .coach.kompakt .c-symbol, .partie .coach.buch .c-symbol { width: 32px; height: 32px; }
   .partie .botleiste-hoch .avatar { --g: 42px; }
@@ -912,3 +913,145 @@ html[data-brett="holz"] { --feld-hell: #f0d9b5; --feld-dunkel: #b58863; }
   .update-hinweis .u-lang { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .update-hinweis { animation: none; } }
+
+/* ============================================================
+   ERWEITERUNGSPUNKTE (Runde 4, Welle 0): Behaelter der Anzeige-Orte, Coach-Zusatz der Buehne,
+   Feier-Zeilen im Ergebnis, Chip "Übung", Nachlese im Arena-Panel. Ohne Pakete bleibt alles leer
+   und unsichtbar (leere Behaelter sind versteckt und erzeugen keinen Abstand).
+   ============================================================ */
+/* Behaelter der Anzeige-Orte */
+.ort-panel-oben[hidden], .ort-panel-bot[hidden], .an-ort-oben[hidden], .vl-ort[hidden],
+.erg-feier[hidden], .erg-karte-ort[hidden] { display: none; }
+.ort-panel-oben, .ort-panel-bot { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.arena .detail > .ort-panel-oben { grid-column: 1 / -1; }
+.an-ort-oben, .vl-ort { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vl-ort { gap: 14px; }
+.es-ort, .an-c-paket { display: contents; }
+.erg-karte-ort { display: grid; gap: 10px; min-width: 0; text-align: left; }
+@media (orientation: portrait) {
+  /* Analyse hoch: die rechte Spalte ist aufgeloest (display: contents), der Ort folgt dem Banner */
+  .an-ort-oben { order: 1; }
+}
+
+/* Nachlese oben im Arena-Panel: "Seit deiner letzten Partie" (still, ohne Klang) */
+.nachlese { display: grid; gap: 4px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--ui-rand); font-size: 14px; line-height: 1.35; color: #c9d2ef; }
+.nl-titel { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--ui-gedimmt); }
+.nl-zeile b { color: var(--ui-text); font-weight: 800; }
+.nl-zeile.gross b { color: var(--stern); }
+
+/* Coach-Zusatz (buehne.coachZusatz): hoechstens zwei Zeilen unter dem Coach-Satz */
+.c-zusatz { grid-column: 2 / -1; min-width: 0; font-size: 14px; line-height: 1.35; color: #d6def8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: zusatz-ein .25s ease-out both; }
+.c-zusatz[data-art="gut"] { color: var(--gut); font-weight: 750; }
+.c-zusatz[data-art="leise"] { color: var(--ui-gedimmt); }
+.c-zusatz[data-art="gross"] { font-family: var(--schrift-display); font-size: 16px; font-weight: 900; color: var(--akzent);
+  text-shadow: 0 0 12px rgba(25, 246, 232, .45); }
+.coach.kompakt .c-zusatz { display: none; }
+@keyframes zusatz-ein { from { transform: translateY(4px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (orientation: portrait) {
+  /* feste Coach-Hoehe im Hochformat: mit Zusatz nur eine Zeile Coach-Satz */
+  .partie .coach.mit-zusatz .c-text { -webkit-line-clamp: 1; }
+  .partie .coach.mit-zusatz { align-content: start; }
+}
+
+/* Feier-Zeilen im Ergebnis (feier.fuerOverlay): gleiten nacheinander ein (--t), gross als Stempel */
+.erg-feier { display: grid; gap: 6px; }
+.erg-f-zeile { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 7px 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); font-size: 14px; line-height: 1.3; color: #c9d2ef; text-align: left; }
+.erg-f-zeile.neu { animation: feier-ein .4s cubic-bezier(.2, 1.2, .4, 1) var(--t, 0ms) both; }
+.erg-f-text { display: grid; min-width: 0; }
+.erg-f-text b { color: var(--ui-text); font-weight: 800; }
+.erg-f-text small { font-size: 12.5px; color: var(--ui-gedimmt); }
+.erg-f-symbol { flex: none; display: grid; place-items: center; min-width: 26px; height: 26px; font-size: 18px; font-weight: 900; color: var(--akzent); }
+.erg-f-symbol .ico { width: 22px; height: 22px; }
+.erg-f-zeile.gross { padding: 9px 16px; border: 2px solid var(--stern); background: rgba(255, 210, 63, .08); transform: rotate(-1.5deg);
+  box-shadow: 0 0 18px rgba(255, 210, 63, .22); }
+.erg-f-zeile.gross b { font-family: var(--schrift-display); font-size: 17px; font-weight: 900; letter-spacing: .08em; color: var(--stern); }
+.erg-f-zeile.gross .erg-f-symbol { color: var(--stern); }
+.erg-f-zeile.gross.neu { animation: feier-stempel .45s cubic-bezier(.2, 1.4, .4, 1) var(--t, 0ms) both; }
+.erg-feier.alles .erg-f-zeile { animation: none; }
+@keyframes feier-ein { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes feier-stempel { 0% { transform: scale(1.6) rotate(-6deg); opacity: 0; } 70% { transform: scale(.96) rotate(-1.5deg); opacity: 1; }
+  100% { transform: rotate(-1.5deg); opacity: 1; } }
+/* Handy: die Feier-Zeilen werden zu einer Summenzeile (nur die Titel, mit Punkt getrennt) */
+@media (max-width: 600px) {
+  .erg-feier { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 6px; }
+  .erg-f-zeile.zeile { padding: 0; border: 0; background: none; gap: 4px; font-size: 13px; }
+  .erg-f-zeile.zeile .erg-f-symbol, .erg-f-zeile.zeile small { display: none; }
+  .erg-f-zeile.zeile + .erg-f-zeile.zeile::before { content: "·"; margin-right: 2px; color: var(--ui-gedimmt); }
+  .erg-f-zeile.gross { flex-basis: 100%; }
+}
+
+/* Chip "Übung": nicht wertende Partien (Ergebnis neben dem Kopfwort, Verlauf statt der Sterne) */
+.chip.uebung { height: 26px; padding: 0 10px; font-size: 12px; font-weight: 900; letter-spacing: .14em; color: #c4a6ff;
+  background: rgba(160, 107, 255, .14); border-color: rgba(160, 107, 255, .6); }
+/* Platz fuer den Knopf "Brett ansehen" oben rechts (symmetrisch, damit das Wort mittig bleibt); wird es eng,
+   rutscht der Chip unter das Wort */
+.erg-kopf { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 0 48px; }
+.erg-kopf .erg-wort { padding: 0 0 0 .16em; }
+.vl-uebung { height: 22px; padding: 0 8px; font-size: 11px; letter-spacing: .08em; }
+
+/* Tab im Hintergrund (app.js setzt html[data-sichtbar]): Animationen anhalten */
+html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-sichtbar="nein"] *::after { animation-play-state: paused !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .c-zusatz, .erg-f-zeile.neu, .erg-f-zeile.gross.neu { animation: none; }
+}
+
+/* ============================================================
+   W0+a "Spiel-Fundament": Behaelter der neuen Orte, Abrechnung, Plaetze der Buehne, untere Leiste.
+   Ohne Pakete bleibt alles versteckt (hidden) und erzeugt keinen Abstand. Die Optik kommt mit dem Premium-Umbau.
+   ============================================================ */
+.heute-karte[hidden], .ort-gegner-leiste[hidden], .p-zaehlwerk[hidden], .p-funkenlinie[hidden], .reiter-leiste[hidden],
+.ort-spieler-leiste[hidden], .ort-aktionen[hidden] { display: none; }
+/* Heute-Karte im Arena-Panel (Ort arena:heute) */
+.heute-karte { display: grid; gap: 6px; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--ui-rand); min-width: 0; }
+.arena .detail > .heute-karte { grid-column: 1 / -1; }
+.heute-karte .hk-kopf { font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--ui-gedimmt); }
+.ort-heute { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* Gegner-Leiste (Ort partie:gegner-leiste) ueber der Bot-Karte bzw. im Hochformat als eigene Zeile oben in der Bot-Leiste
+   (w0plus-a-fix: nicht mehr in .info, das auf dem Handy mit der Sprechblase verschwindet). Hoch hoechstens 16 px hoch. */
+.ort-gegner-leiste { display: block; min-width: 0; }
+@media (orientation: portrait) {
+  .partie.mit-gegner-leiste { --gl: 20px; }
+  .partie.mit-gegner-leiste .botleiste-hoch { grid-template-rows: 16px minmax(0, 1fr); row-gap: 4px; }
+  .partie .botleiste-hoch > .ort-gegner-leiste { grid-column: 1 / -1; align-self: stretch; height: 16px; overflow: hidden; }
+}
+/* Spieler-Leiste (Ort partie:spieler-leiste) an Flos Namen, eine Zeile (z. B. Flamme des Siegeslaufs, Level) */
+.ort-spieler-leiste { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; overflow: hidden; white-space: nowrap; }
+/* Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen, z. B. Emote-Rad): je Knopf eine Spalte mehr */
+.ort-aktionen { display: contents; }
+.spielknoepfe[data-aktionen="1"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* mit Knoepfen der Pakete etwas enger, damit alle Beschriftungen passen (gemessen 375 bis 1366 px Breite) */
+.partie .spielknoepfe[data-aktionen] { gap: 5px; }
+.partie .spielknoepfe[data-aktionen] .knopf { font-size: 11px; padding: 6px 1px; letter-spacing: -.02em; }
+.partie .spielknoepfe[data-aktionen="2"] .knopf { font-size: 10.5px; letter-spacing: -.03em; }
+/* Abrechnung im Ergebnis (Ort ergebnis:abrechnung, Huelle aus js/ui/abrechnung.js): Zeilen rollen ein */
+.abrechnung { display: grid; gap: 4px; min-width: 0; }
+.abrechnung > .abr-rollt { animation: abr-rollen .3s ease-out var(--t, 0ms) both; }
+.abrechnung.alles > *, .ergebnis-karte.alles .abrechnung > * { animation: none; }
+@keyframes abr-rollen { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Plaetze der Buehne: Zaehlwerk im Kopf, Funkenlinie am unteren Rand des Bretts */
+.p-zaehlwerk { flex: none; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.p-funkenlinie { position: absolute; left: 4px; right: 4px; bottom: 0; height: 4px; z-index: 6; pointer-events: none; }
+/* Chip je Modus im Ergebnis (BOSS, FREI, SPIELHALLE) */
+.chip.uebung[data-modus="boss"] { color: var(--stern); background: rgba(255, 210, 63, .1); border-color: rgba(255, 210, 63, .55); }
+/* Untere Leiste mit den Reitern (nur, wenn erweiterungen.js REITER nennt) */
+.reiter-leiste { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; gap: 4px;
+  padding: 4px max(8px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left));
+  background: var(--ui-flaeche, #141833); border-top: 1px solid var(--ui-rand); }
+.reiter-leiste .reiter { flex: 1 1 0; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; margin: 0; padding: 0; border: 0; background: none; color: var(--ui-gedimmt); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.reiter-leiste .reiter .ico { width: 22px; height: 22px; }
+.reiter-leiste .reiter[aria-current="page"] { color: var(--akzent); }
+/* w0plus-a-fix: Platz fuer die Leiste in der Hoehe der Screens (vorher padding an #app: die Screens sind selbst 100dvh
+   hoch, die Leiste lag ueber dem SPIELEN-Knopf). --reiter-h = Hoehe der Leiste (52 + 2 * 4 + 1 Rand + sichere Zone). */
+:root { --reiter-h: calc(61px + env(safe-area-inset-bottom, 0px)); }
+.reiter-leiste { min-height: var(--reiter-h); }
+html[data-reiter="an"] #app > .screen { height: calc(100vh - var(--reiter-h)); height: calc(100dvh - var(--reiter-h)); }
+@media (prefers-reduced-motion: reduce) {
+  .abrechnung > .abr-rollt { animation: none; }
+}

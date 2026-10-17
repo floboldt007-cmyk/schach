@@ -6,7 +6,26 @@
 //
 // Zusatz: klang.lautstaerke (0..1), klang.aktivieren() (manuell entsperren),
 // klang.zustand() -> 'aus' | 'gesperrt' | 'bereit' | 'nicht-verfuegbar',
-// klangProbe(name, ...args) rendert einen Klang offline (fuer Tests: Spitze und Dauer).
+// klangProbe(name, ...args) rendert einen Klang offline (fuer Tests: Spitze und Dauer), auch
+// registrierte Klaenge.
+//
+// Register (Runde 4, fuer Pakete):
+//   export { ton, klick, tock, huelle, rauschen, NOTEN }   Bausteine fuer eigene Synthese
+//       (ton(ac, ziel, t0, { f, fEnde, typ, start, dauer, laut, anstieg }), klick(ac, ziel, t0, { start,
+//       dauer, laut, frequenz, q }), tock(ac, ziel, t0, start, hoehe, laut), huelle(ac, ziel, t, laut,
+//       anstieg, dauer) -> GainNode, rauschen(ac) -> AudioBuffer, NOTEN: Name -> Hz, eingefroren)
+//   registriereKlang(name, fn, { wichtig = true } = {}) -> abmelden()
+//       fn(ac, ziel, t, ...args) spielt auf einem beliebigen BaseAudioContext (auch offline).
+//       Ein registrierter Klang geht vor einen eingebauten gleichen Namens. wichtig: true | false |
+//       (...args) -> boolean (bei klang.stufe 'wichtig' spielen nur wichtige Klaenge).
+//   klang.spiele(name, ...args)   registrierter oder eingebauter Klang
+//   klang.klasse(k, ...args)      Klang zur Zugklasse; ohne Register 'klasse' wie bisher: brillant spielt
+//                                 brillant(), fehler und patzer spielen fehler(), sonst still
+//   klang.stern(i, neu, { reduziert = false } = {})   Klang je Stern im Ergebnis; ohne Register 'stern' wie
+//                                 bisher zug(), bei reduzierter Bewegung still (wie vor Runde 4); ein
+//                                 registrierter 'stern' klingt immer (Klang ist keine Bewegung)
+//   klang.stufe = 'alle'          'alle' | 'wichtig' (eingebaute Klaenge gelten als wichtig)
+//   Eingebaut zusaetzlich 'feier' (stufe): leiser Tick je Feier-Zeile im Ergebnis, Tonhoehe steigt.
 
 const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
 const OAC = typeof window !== 'undefined' ? (window.OfflineAudioContext || window.webkitOfflineAudioContext) : null;
@@ -73,8 +92,10 @@ function tock(ac, ziel, t0, start = 0, hoehe = 1, laut = 1) {
   ton(ac, ziel, t0, { f: 230 * hoehe, fEnde: 120 * hoehe, start, dauer: 0.07, laut: 0.45 * laut, anstieg: 0.003 });
 }
 
-const NOTEN = { C4: 261.63, Eb4: 311.13, E4: 329.63, G4: 392, Ab4: 415.3, B4: 493.88, C5: 523.25, E5: 659.25,
-  G5: 783.99, Gis5: 830.61, B5: 987.77, C6: 1046.5, E6: 1318.51, G6: 1567.98, B6: 1975.53, E7: 2637.02 };
+const NOTEN = Object.freeze({ C4: 261.63, Eb4: 311.13, E4: 329.63, G4: 392, Ab4: 415.3, B4: 493.88, C5: 523.25, E5: 659.25,
+  G5: 783.99, Gis5: 830.61, B5: 987.77, C6: 1046.5, E6: 1318.51, G6: 1567.98, B6: 1975.53, E7: 2637.02 });
+
+export { ton, klick, tock, huelle, rauschen, NOTEN };
 
 const KLAENGE = {
   zug(ac, z, t) { tock(ac, z, t); },
@@ -105,6 +126,12 @@ const KLAENGE = {
     });
     ton(ac, z, t, { f: NOTEN.B6, start: 0.3, dauer: 0.35, laut: 0.09 });
     ton(ac, z, t, { f: NOTEN.E7, start: 0.36, dauer: 0.3, laut: 0.06 });
+  },
+  // Feier-Zeile im Ergebnis (Runde 4): leiser Tick, je Zeile etwas hoeher (stufe 0, 1, 2, ...)
+  feier(ac, z, t, stufe = 0) {
+    const h = Math.pow(2, (Math.min(6, Math.max(0, Number(stufe) || 0)) * 2) / 12);
+    ton(ac, z, t, { f: NOTEN.E6 * h, typ: 'triangle', dauer: 0.08, laut: 0.12, anstieg: 0.003 });
+    klick(ac, z, t, { dauer: 0.03, laut: 0.16, frequenz: 3200 * h, q: 2 });
   },
   ende(ac, z, t, gewonnen) {
     if (gewonnen === true) {
@@ -167,8 +194,40 @@ if (typeof document !== 'undefined') {
   }
 }
 
+// ---------- Register (Pakete) ----------
+
+const REGISTER = new Map();   // name -> { fn, wichtig }
+
+export function registriereKlang(name, fn, { wichtig = true } = {}) {
+  if (typeof name !== 'string' || !name) throw new TypeError('registriereKlang: name fehlt');
+  if (typeof fn !== 'function') throw new TypeError('registriereKlang(' + name + '): fn ist keine Funktion');
+  const eintrag = { fn, wichtig };
+  REGISTER.set(name, eintrag);
+  return function abmelden() {
+    if (REGISTER.get(name) === eintrag) REGISTER.delete(name);
+  };
+}
+
+function klangFn(name) {
+  const r = REGISTER.get(name);
+  if (r) return r.fn;
+  return Object.prototype.hasOwnProperty.call(KLAENGE, name) ? KLAENGE[name] : null;
+}
+
+function istWichtig(name, args) {
+  const r = REGISTER.get(name);
+  if (!r) return true;
+  if (typeof r.wichtig === 'function') {
+    try { return !!r.wichtig(...args); } catch (e) { return true; }
+  }
+  return r.wichtig !== false;
+}
+
 function spiele(name, ...args) {
   if (klang.aus || !kontext) return;
+  const fn = klangFn(name);
+  if (!fn) return;
+  if (klang.stufe === 'wichtig' && !istWichtig(name, args)) return;
   if (kontext.state !== 'running') {
     const p = kontext.resume();
     if (p && p.catch) p.catch(() => {});
@@ -176,7 +235,7 @@ function spiele(name, ...args) {
   }
   try {
     ausgang.gain.value = Math.max(0, Math.min(1, Number(klang.lautstaerke) || 0));
-    KLAENGE[name](kontext, ausgang, kontext.currentTime + 0.005, ...args);
+    fn(kontext, ausgang, kontext.currentTime + 0.005, ...args);
   } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ }
 }
 
@@ -191,6 +250,19 @@ export const klang = {
   ende(gewonnen) { spiele('ende', gewonnen); },  // true = Sieg, false = Niederlage, sonst Remis
   fehler() { spiele('fehler'); },
   brillant() { spiele('brillant'); },
+  stufe: 'alle',   // 'alle' | 'wichtig'
+  spiele(name, ...args) { spiele(name, ...args); },
+  // Klang zur Zugklasse (Standard wie bisher in der Partie)
+  klasse(k, ...args) {
+    if (REGISTER.has('klasse')) spiele('klasse', k, ...args);
+    else if (k === 'brillant') spiele('brillant');
+    else if (k === 'fehler' || k === 'patzer') spiele('fehler');
+  },
+  // Klang je Stern im Ergebnis (Standard wie bisher: zug, bei reduzierter Bewegung still)
+  stern(i, neu, { reduziert = false } = {}) {
+    if (REGISTER.has('stern')) spiele('stern', i, neu);
+    else if (!reduziert) spiele('zug');
+  },
   aktivieren() { if (!this.aus) entsperre(); },
   zustand() {
     if (this.aus) return 'aus';
@@ -201,10 +273,11 @@ export const klang = {
 
 // Rendert einen Klang offline und misst ihn (fuer Tests): { spitze, dauer } in 0..1 bzw. Sekunden
 export async function klangProbe(name, ...args) {
-  if (!OAC || !KLAENGE[name]) return null;
+  const fn = klangFn(name);
+  if (!OAC || !fn) return null;
   const rate = 22050;
   const ac = new OAC(1, Math.floor(rate * 2), rate);
-  KLAENGE[name](ac, ac.destination, 0.01, ...args);
+  fn(ac, ac.destination, 0.01, ...args);
   const puffer = await ac.startRendering();
   const d = puffer.getChannelData(0);
   let spitze = 0;

@@ -1,5 +1,18 @@
 // Bewertung: Zug-Klassen, Genauigkeit, Coach-Texte, Spielanalyse.
 // Rein, ohne DOM (laeuft auch in Node). Bewertungen {cp, mate} immer aus Sicht von Weiss.
+// API siehe ARCHITEKTUR.md (js/review.js). Zusaetze Runde 4:
+//   Zug-Eintrag zusaetzlich mit gewinnZweiter (Gewinnchance des zweitbesten Zugs, 0..1 oder null)
+//     und trivial (selbstverstaendlicher Zug: Schlagen auf dem Feld, auf das der Gegner gerade
+//     gezogen hat, oder Schachabwehr mit hoechstens 3 erlaubten Zuegen; die COMBO zaehlt ihn neutral)
+//   spielphasen(fens, buchEnde) -> [{ name: 'Eröffnung'|'Mittelspiel'|'Endspiel', von, bis }]
+//   coachKern(text) -> Coach-Satz ohne Klassenwort am Anfang, Gedankenstriche als Doppelpunkt,
+//     Rochade als 0-0 (die einzige Stelle, die die Klassenwoerter der Coach-Texte kennt)
+//   kompaktReview(review) / ergaenzeReviewFelder(review): Review ohne die ableitbaren Felder
+//     (sanDe, besterZugSanDe, besteLinieSan, nummer, fenNachher ausser beim letzten Zug) und zurueck
+// Zusaetze w0-fix:
+//   seitenGenauigkeit(eintraege, farbe, plies) -> Genauigkeit einer Seite aus Zug-Eintraegen (Live-Bewertung)
+//     nach demselben Verfahren wie analysierePartie (volatilitaetsgewichtet)
+//   analysierePartie(..., { stueckeln: true }) gibt beim Einordnen der Zuege den Hauptthread frei (Nachholen)
 import { Chess } from '../vendor/chess/chess.js';
 import { eroeffnung, stellungsSchluessel } from './openings.js';
 
@@ -88,6 +101,46 @@ export function partieGenauigkeit(liste) {
     : eintraege.reduce((a, x) => a + x.g, 0) / eintraege.length;
   const harmonisch = eintraege.length / eintraege.reduce((a, x) => a + 1 / Math.max(1, x.g), 0);
   return Math.max(0, Math.min(100, (gewichtet + harmonisch) / 2));
+}
+
+// Genauigkeit einer Seite aus einzelnen Zug-Eintraegen (z. B. der Live-Bewertung), nach demselben Verfahren
+// wie analysierePartie (volatilitaetsgewichtet + harmonisch, auf eine Nachkommastelle).
+// eintraege: Liste je Ply (Eintraege mit farbe, genauigkeit, evalVorher, evalNachher; fehlende Plies
+// null), plies: Anzahl der Halbzuege der Partie. Die Kurve der Gewinnchancen setzt sich aus evalVorher und
+// evalNachher zusammen; Stellungen ohne Bewertung (z. B. vor dem ersten Bot-Zug) uebernehmen den naechsten
+// bekannten Wert. Mit allen Eintraegen einer Analyse ergibt das genau review.genauigkeit[farbe].
+// Fehlt einem Zug der Seite die Genauigkeit oder hat die Seite keinen Zug: null.
+export function seitenGenauigkeit(eintraege, farbe, plies = (eintraege || []).length) {
+  const liste = eintraege || [];
+  const n = Math.max(plies, liste.length);
+  const kurve = new Array(n + 1).fill(null);
+  for (let i = 0; i < liste.length; i++) {
+    const e = liste[i];
+    if (!e) continue;
+    if (e.evalVorher) kurve[i] = gewinnChance(e.evalVorher, 'w');
+    if (e.evalNachher) kurve[i + 1] = gewinnChance(e.evalNachher, 'w');
+  }
+  let letzter = null;
+  for (let i = 0; i <= n; i++) {
+    if (kurve[i] == null) kurve[i] = letzter;
+    else letzter = kurve[i];
+  }
+  letzter = null;
+  for (let i = n; i >= 0; i--) {
+    if (kurve[i] == null) kurve[i] = letzter;
+    else letzter = kurve[i];
+  }
+  if (kurve.some((x) => x == null)) return null;
+  const gewichte = volatilitaetsGewichte(kurve);
+  const eigene = [];
+  for (let i = 0; i < liste.length; i++) {
+    const e = liste[i];
+    if (!e || e.farbe !== farbe) continue;
+    if (typeof e.genauigkeit !== 'number' || !isFinite(e.genauigkeit)) return null;
+    eigene.push({ genauigkeit: e.genauigkeit, gewicht: gewichte[i] ?? 1 });
+  }
+  const g = partieGenauigkeit(eigene);
+  return g == null ? null : runde(g, 1);
 }
 
 // Grobe Schaetzung der Spielstaerke einer Partie (wie "Game Rating" bei chess.com)
@@ -352,6 +405,18 @@ function istRueckschlag(d, zug) {
   return !!(zug && zug.captured && d.vorigerSchlag && d.vorigerZug && zug.to === String(d.vorigerZug).slice(2, 4));
 }
 
+// Selbstverstaendlicher Zug (Eintrag "trivial", fuer die COMBO neutral wie ein Buchzug): wie in
+// selbstverstaendlich() das Schlagen auf dem Feld, auf das der Gegner gerade gezogen hat, oder die
+// Schachabwehr mit hoechstens drei erlaubten Zuegen; ausserdem jedes echte Zurueckschlagen.
+function trivialerZug(d) {
+  const zug = d.zug;
+  if (!zug) return false;
+  if (zug.captured && d.vorigerZug && zug.to === String(d.vorigerZug).slice(2, 4)) return true;
+  if (istRueckschlag(d, zug)) return true;
+  const c = d.fenVorher ? neuesBrett(d.fenVorher) : null;
+  return !!(c && c.inCheck() && c.moves().length <= 3);
+}
+
 function pvAlsSan(fen, pv, max = 8) {
   const c = neuesBrett(fen);
   const aus = [];
@@ -535,12 +600,16 @@ export function klassifiziere(eingabe) {
 }
 
 // Ist der gespielte Zug wirklich so gut wie der Engine-Zug (gleiche oder bessere Bewertung)?
+// Matt fuer sich: der beste Zug verkuerzt "Matt in n" auf n - 1 (Stockfish zaehlt ganze Zuege). Bleibt es bei
+// "Matt in n", dauert das Matt einen Zug laenger (an 62 Stellungen mit Tiefe 20 nachgeprueft: in 50 Faellen
+// wirklich langsamer, w0c); nur ein Zug, der selbst mattsetzt, ist dann so gut. Wird man selbst matt, haelt die
+// beste Verteidigung "Matt in n".
 function gleichGut(d) {
   const mv = d.mattVorher;
   const mn = d.mattNachher;
   const rang = (m) => (m == null ? 0 : m > 0 ? 1 : -1);   // selbst Matt > Bewertung > wird matt
   if (rang(mv) !== rang(mn)) return rang(mn) > rang(mv);
-  if (mv != null) return mv > 0 ? mn <= mv : -mn >= -mv;
+  if (mv != null) return mv > 0 ? (d.matt || mn < mv) : -mn >= -mv;
   const v = cpFuer(d.evalVorher, d.farbe);
   const n = cpFuer(d.evalNachher, d.farbe);
   return v == null || n == null || n >= v;
@@ -818,7 +887,9 @@ function baueEintrag(p) {
     genauigkeit: genauigkeit == null ? null : runde(genauigkeit, 1),
     gewinnVorher: runde(d.wv, 4),
     gewinnNachher: runde(d.wn, 4),
+    gewinnZweiter: d.w2 == null ? null : runde(d.w2, 4),
     buch: !!buch,
+    trivial: trivialerZug(d),
     notiz: erg.notiz,
     coach: coachText(eingabe, erg),
   };
@@ -884,11 +955,16 @@ function ausVorab(vorab, fen, multipv, minTiefe) {
   return a;
 }
 
+// So viele Zuege ordnet analysierePartie mit stueckeln am Stueck ein (ca. 25 ms im Desktop-Browser)
+const STUECK_ZUEGE = 10;
+
 // zuege: UCI-Liste (SAN oder {from,to,promotion} gehen auch)
 // opts: { tiefe = 16, multipv = 2, beiFortschritt(fertig, gesamt), startFen,
 //         spielerFarbe ('w'|'b': Du-Form nur fuer diese Seite), elo: { w, b }, signal,
 //         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
-//         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart) }
+//         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart),
+//         stueckeln (true: beim Nachspielen und Einordnen der Zuege den Hauptthread regelmaessig per
+//         setTimeout freigeben, fuer das stille Nachholen; das Ergebnis ist dasselbe) }
 // Abbruch: signal.abort() oder engine.stop() -> Promise wird mit Fehler (fehler.abgebrochen) abgelehnt.
 export async function analysierePartie(engine, zuege, opts = {}) {
   const tiefe = opts.tiefe ?? 16;
@@ -898,8 +974,11 @@ export async function analysierePartie(engine, zuege, opts = {}) {
 
   const chess = neuesBrett(startFen);
   if (!chess) throw new Error('Ungültige Startstellung: ' + startFen);
+  // stueckeln: zwischendurch den Hauptthread freigeben (setTimeout, nicht requestIdleCallback)
+  const pause = () => new Promise((r) => setTimeout(r, 0));
   const daten = [];
   for (const z of zuege || []) {
+    if (opts.stueckeln && daten.length && daten.length % (2 * STUECK_ZUEGE) === 0) await pause();
     const fenVorher = chess.fen();
     const m = spieleZug(chess, z);
     if (!m) throw new Error('Ungültiger Zug: ' + JSON.stringify(z));
@@ -908,6 +987,8 @@ export async function analysierePartie(engine, zuege, opts = {}) {
   const fens = daten.length ? [...daten.map((x) => x.fenVorher), daten[daten.length - 1].fenNachher] : [startFen];
 
   const ausStart = stellungsSchluessel(startFen) === stellungsSchluessel(START_FEN);
+  // die Eroeffnungstabelle baut beim ersten Aufruf ihren Index (einmalig, ca. 50 ms)
+  if (opts.stueckeln) await pause();
   const er = ausStart ? eroeffnung(daten.map((x) => x.zug.san)) : { name: null, buch: [], namen: [] };
 
   // Alle Stellungen nacheinander bewerten
@@ -939,9 +1020,13 @@ export async function analysierePartie(engine, zuege, opts = {}) {
     if (signal) signal.removeEventListener('abort', stopp);
   }
 
-  // Zuege einordnen
+  // Zuege einordnen (mit stueckeln in Portionen, dazwischen ist der Hauptthread frei)
   const eintraege = [];
   for (let i = 0; i < daten.length; i++) {
+    if (opts.stueckeln && i > 0 && i % STUECK_ZUEGE === 0) {
+      await pause();
+      if (signal && signal.aborted) throw abbruch();
+    }
     const x = daten[i];
     const du = !opts.spielerFarbe || opts.spielerFarbe === x.zug.color;
     eintraege.push(baueEintrag({
@@ -1022,4 +1107,151 @@ function schluesselmomente(eintraege) {
     .slice(0, 8)
     .map((x) => x.ply)
     .sort((a, b) => a - b);
+}
+
+// ---------------------------------------------------------------------------
+// Spielphasen (aus analyse.js phasen() hierher verschoben, Runde 4)
+// ---------------------------------------------------------------------------
+
+// Spielphasen grob nach Lichess (Divider): Mittelspiel ab wenigen Leichtfiguren/duenner
+// Grundreihe, Endspiel ab hoechstens 6 Leicht- und Schwerfiguren.
+// fens: alle Stellungen der Partie (Laenge = Zuege + 1), buchEnde: erster Ply nach dem Buch.
+export function spielphasen(fens, buchEnde) {
+  let mitte = null;
+  let ende = null;
+  fens.forEach((fen, i) => {
+    const reihen = fen.split(' ')[0].split('/');
+    const figuren = (reihen.join('').match(/[nbrqNBRQ]/g) || []).length;
+    const weissHinten = (reihen[7].match(/[A-Z]/g) || []).length;
+    const schwarzHinten = (reihen[0].match(/[a-z]/g) || []).length;
+    if (ende == null && figuren <= 6) ende = i;
+    if (mitte == null && i >= buchEnde && (figuren <= 10 || weissHinten < 4 || schwarzHinten < 4 || i >= 30)) mitte = i;
+  });
+  const n = fens.length - 1;
+  const liste = [];
+  const m = mitte == null ? n + 1 : mitte;
+  const en = ende == null ? n + 1 : Math.max(ende, 1);
+  const mEff = Math.min(m, en);
+  if (mEff > 0) liste.push({ name: 'Eröffnung', von: 0, bis: Math.min(mEff, n) });
+  if (en > mEff && mEff <= n) liste.push({ name: 'Mittelspiel', von: mEff, bis: Math.min(en, n) });
+  if (en <= n) liste.push({ name: 'Endspiel', von: en, bis: n });
+  return liste.filter((p) => p.bis > p.von || n === 0);
+}
+
+// ---------------------------------------------------------------------------
+// Coach-Kern: der Coach-Satz ohne das Klassenwort am Anfang (das steht in Partie und Analyse
+// schon gross ueber dem Satz). Die einzige Stelle, die die Klassenwoerter der Coach-Texte kennt.
+// Keine langen Gedankenstriche in UI-Texten (werden zu ": "), Rochade wie in der Zugliste (0-0).
+// ---------------------------------------------------------------------------
+const KLASSENWORT_AM_ANFANG = /^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/;
+
+export function coachKern(t) {
+  const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
+  const rest = text.replace(KLASSENWORT_AM_ANFANG, '');
+  if (!rest.trim()) return text;
+  // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
+  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+// ---------------------------------------------------------------------------
+// Kompakte Reviews fuer den Speicher (storage.js speichereReview/ladeReview)
+// Weggelassen werden nur Felder, die sich wieder genau gleich ableiten lassen: sanDe,
+// besterZugSanDe, besteLinieSan, nummer und fenNachher (= fenVorher des naechsten Zugs; beim
+// letzten Zug bleibt er stehen). Kompakt wird nur ein Review, dessen Zuege alle diese Felder haben
+// (Merker kompakt: 1); alles andere bleibt unveraendert. Alte, volle Reviews laden wie bisher.
+// besteLinieSan braucht chess.js (teuer, ca. 1 ms je Zug) und nur die Coach-Karte des gezeigten
+// Zugs: ergaenzeReviewFelder legt es deshalb als Feld an, das sich beim ersten Lesen selbst
+// berechnet und danach ein normales Feld ist (JSON.stringify, Spread und "in" wie gewohnt).
+// ---------------------------------------------------------------------------
+const ABLEITBAR = ['sanDe', 'besterZugSanDe', 'besteLinieSan', 'nummer', 'fenNachher'];
+// Reihenfolge der Felder wie in baueEintrag (fuer einen gleich aussehenden Eintrag nach dem Ergaenzen)
+const EINTRAG_FELDER = ['ply', 'farbe', 'nummer', 'san', 'sanDe', 'uci', 'fenVorher', 'fenNachher', 'evalVorher',
+  'evalNachher', 'besterZug', 'besterZugSan', 'besterZugSanDe', 'besteLinie', 'besteLinieSan', 'klasse', 'verlust',
+  'genauigkeit', 'gewinnVorher', 'gewinnNachher', 'gewinnZweiter', 'buch', 'trivial', 'notiz', 'coach'];
+const FAUL = Symbol('faul');
+
+// Ist besteLinieSan so ableitbar? Faules Feld: ja (ohne es auszurechnen). Sonst: gleiche Laenge
+// wie besteLinie (pvAlsSan bricht nur an einem ungueltigen Zug ab; dann bleibt das Feld stehen).
+function linieAbleitbar(z) {
+  const d = Object.getOwnPropertyDescriptor(z, 'besteLinieSan');
+  if (d && d.get && d.get[FAUL]) return true;
+  return Array.isArray(z.besteLinieSan) && Array.isArray(z.besteLinie) && z.besteLinieSan.length === Math.min(8, z.besteLinie.length)
+    && z.besteLinieSan.every((x) => typeof x === 'string');
+}
+
+function istAbleitbar(feld, z, naechster) {
+  switch (feld) {
+    case 'sanDe': return z.sanDe === sanDeutsch(z.san);
+    case 'besterZugSanDe': return z.besterZugSanDe === (z.besterZugSan ? sanDeutsch(z.besterZugSan) : null);
+    case 'besteLinieSan': return linieAbleitbar(z);
+    case 'nummer': return z.nummer === (Number(String(z.fenVorher).split(' ')[5]) || 1);
+    case 'fenNachher': return !!naechster && z.fenNachher === naechster.fenVorher;
+    default: return false;
+  }
+}
+
+export function kompaktReview(review) {
+  if (!review || typeof review !== 'object' || review.kompakt || !Array.isArray(review.zuege) || !review.zuege.length) return review;
+  const zuege = review.zuege;
+  const voll = zuege.every((z) => z && typeof z === 'object' && typeof z.fenVorher === 'string' && typeof z.san === 'string'
+    && Array.isArray(z.besteLinie) && ABLEITBAR.every((f) => f in z));
+  if (!voll) return review;
+  const neu = zuege.map((z, i) => {
+    const naechster = zuege[i + 1] && zuege[i + 1].ply === z.ply + 1 && typeof zuege[i + 1].fenVorher === 'string' ? zuege[i + 1] : null;
+    const weg = ABLEITBAR.filter((f) => istAbleitbar(f, z, naechster));
+    const k = {};
+    for (const f of Object.keys(z)) if (!weg.includes(f)) k[f] = z[f];
+    return k;
+  });
+  const aus = {};
+  for (const [schl, wert] of Object.entries(review)) aus[schl] = schl === 'zuege' ? neu : wert;
+  aus.kompakt = 1;
+  return aus;
+}
+
+// besteLinieSan als Feld, das sich beim ersten Lesen berechnet
+function faulesLinienFeld(ziel, fenVorher, besteLinie) {
+  const feld = (obj, wert) => Object.defineProperty(obj, 'besteLinieSan', { value: wert, enumerable: true, configurable: true, writable: true });
+  const get = function () {
+    const wert = pvAlsSan(fenVorher, besteLinie, 8).map(sanDeutsch);
+    try { feld(this, wert); } catch (e) { /* eingefroren: dann jedes Mal neu */ }
+    return wert;
+  };
+  get[FAUL] = true;
+  Object.defineProperty(ziel, 'besteLinieSan', {
+    enumerable: true, configurable: true, get,
+    set(wert) { feld(this, wert); },
+  });
+}
+
+export function ergaenzeReviewFelder(review) {
+  if (!review || typeof review !== 'object' || !review.kompakt || !Array.isArray(review.zuege)) return review;
+  const zuege = review.zuege;
+  const neu = zuege.map((z, i) => {
+    if (!z || typeof z !== 'object') return z;
+    const naechster = zuege[i + 1];
+    const fehlt = (f) => !(f in z);
+    const wert = {
+      sanDe: () => sanDeutsch(z.san),
+      besterZugSanDe: () => (z.besterZugSan ? sanDeutsch(z.besterZugSan) : null),
+      nummer: () => Number(String(z.fenVorher).split(' ')[5]) || 1,
+      fenNachher: () => (naechster && typeof naechster.fenVorher === 'string' ? naechster.fenVorher : undefined),
+    };
+    const aus = {};
+    const setze = (f) => {
+      if (!fehlt(f)) { aus[f] = z[f]; return; }
+      if (f === 'besteLinieSan') {
+        if (typeof z.fenVorher === 'string' && Array.isArray(z.besteLinie)) faulesLinienFeld(aus, z.fenVorher, z.besteLinie);
+        return;
+      }
+      const w = wert[f] ? wert[f]() : undefined;
+      if (w !== undefined) aus[f] = w;
+    };
+    for (const f of EINTRAG_FELDER) setze(f);
+    for (const f of Object.keys(z)) if (!(f in aus)) aus[f] = z[f];
+    return aus;
+  });
+  const aus = {};
+  for (const [schl, wert] of Object.entries(review)) if (schl !== 'kompakt') aus[schl] = schl === 'zuege' ? neu : wert;
+  return aus;
 }

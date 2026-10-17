@@ -13,6 +13,7 @@ import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
   sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
+  GRENZEN, spielphasen, coachKern, seitenGenauigkeit,
 } from '../js/review.js';
 import { EROEFFNUNGEN, eroeffnung, tabellenFehler, stellungsSchluessel } from '../js/openings.js';
 
@@ -203,6 +204,17 @@ function nodeTests() {
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 5 = exzellent', rmatt.klasse === 'exzellent', rmatt.klasse);
   const rmatt2 = klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: matt(1) }));
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 1 = bester', rmatt2.klasse === 'bester', rmatt2.klasse);
+  // w0c: Der beste Zug verkuerzt Matt in n auf n - 1. Bleibt es bei Matt in n, dauert das Matt einen Zug laenger:
+  // nicht mehr "bester" (vorher ja; Tiefe-20-Nachpruefung an 62 echten Stellungen: 50 wirklich langsamer)
+  const rmatt3 = klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: matt(3) }));
+  pruefe('Matt-Saettigung: Matt in 3 -> Matt in 3 (anderer Zug) = exzellent, nicht bester', rmatt3.klasse === 'exzellent', rmatt3.klasse);
+  pruefe('Matt-Saettigung: Matt in 3 -> Matt in 2 (anderer Zug) = bester', klassifiziere(basis(0, { evalVorher: matt(3), evalNachher: matt(2) })).klasse === 'bester');
+  pruefe('Matt-Saettigung: Engine-Zug bleibt bester, auch wenn Matt in 3 bleibt', klassifiziere(basis(0, { uci: 'd4c5', evalVorher: matt(3), evalNachher: matt(3) })).klasse === 'bester');
+  const ZWEI_MATT = 'k7/8/1K6/8/8/8/8/6RR w - - 0 1';   // Tg8# und Th8#
+  const rmatt4 = klassifiziere({ fenVorher: ZWEI_MATT, uci: 'h1h8', besterZug: 'g1g8', pvVorher: ['g1g8'], pvNachher: [], evalVorher: matt(1), evalNachher: matt(1) });
+  pruefe('Matt-Saettigung: ein anderer Zug, der selbst mattsetzt, ist bester', rmatt4.klasse === 'bester', rmatt4.klasse);
+  pruefe('Matt-Saettigung: wer matt wird und Matt in 3 haelt, spielt bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-3) })).klasse === 'bester');
+  pruefe('Matt-Saettigung: wer matt wird und es auf Matt in 2 verkuerzt, nicht bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-2) })).klasse !== 'bester');
 
   // stark
   const STARK = START_FEN;
@@ -506,6 +518,151 @@ async function asyncTests() {
   pruefe('Partie: kurze Partie, Bot-Seite nahe der eigenen Elo', Math.abs(rBot.spielstaerke.b - 500) <= 100, JSON.stringify(rBot.spielstaerke));
 }
 
+// ---------- Runde 4: gewinnZweiter, trivial, spielphasen, coachKern ----------
+// Die alten Funktionen aus analyse.js (phasen) und partie.js (coachSatz) vor dem Umzug, als Massstab
+function altePhasen(fens, buchEnde) {
+  let mitte = null;
+  let ende = null;
+  fens.forEach((fen, i) => {
+    const reihen = fen.split(' ')[0].split('/');
+    const figuren = (reihen.join('').match(/[nbrqNBRQ]/g) || []).length;
+    const weissHinten = (reihen[7].match(/[A-Z]/g) || []).length;
+    const schwarzHinten = (reihen[0].match(/[a-z]/g) || []).length;
+    if (ende == null && figuren <= 6) ende = i;
+    if (mitte == null && i >= buchEnde && (figuren <= 10 || weissHinten < 4 || schwarzHinten < 4 || i >= 30)) mitte = i;
+  });
+  const n = fens.length - 1;
+  const liste = [];
+  const m = mitte == null ? n + 1 : mitte;
+  const en = ende == null ? n + 1 : Math.max(ende, 1);
+  const mEff = Math.min(m, en);
+  if (mEff > 0) liste.push({ name: 'Eröffnung', von: 0, bis: Math.min(mEff, n) });
+  if (en > mEff && mEff <= n) liste.push({ name: 'Mittelspiel', von: mEff, bis: Math.min(en, n) });
+  if (en <= n) liste.push({ name: 'Endspiel', von: en, bis: n });
+  return liste.filter((p) => p.bis > p.von || n === 0);
+}
+function alterCoachSatz(t) {
+  const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
+  const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/, '');
+  if (!rest.trim()) return text;
+  return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+function fensAus(sans, start = START_FEN) {
+  const c = new Chess(start);
+  const fens = [c.fen()];
+  for (const x of sans) { c.move(x); fens.push(c.fen()); }
+  return fens;
+}
+
+async function runde4Tests() {
+  const runde = (x) => Math.round(x * 1e4) / 1e4;
+  // gewinnZweiter: Gewinnchance der zweiten Linie aus Sicht des Ziehenden
+  const sans = ['e4', 'd5', 'exd5', 'Qxd5', 'Nc3'];
+  const r = await analysierePartie(new FakeEngine(), uciListe(sans), { spielerFarbe: 'w' });
+  pruefe('gewinnZweiter: aus der zweiten Linie (Sicht des Ziehenden), 0..1', r.zuege.every((z) => z.gewinnZweiter === runde(gewinnChance(ev(10), z.farbe))),
+    r.zuege.map((z) => z.gewinnZweiter).join(','));
+  const r1 = await analysierePartie(new FakeEngine(), uciListe(['e4']), { multipv: 1 });
+  pruefe('gewinnZweiter: null ohne zweite Linie', r1.zuege[0].gewinnZweiter === null, r1.zuege[0].gewinnZweiter);
+  const zweiter = await bewerteZug(new FakeEngine(), START_FEN, 'e2e4', { tiefe: 8 });
+  pruefe('gewinnZweiter: auch in der Live-Bewertung', zweiter.gewinnZweiter === runde(gewinnChance(ev(10), 'w')) && zweiter.trivial === false);
+
+  // trivial: Zurueckschlagen und Schachabwehr mit hoechstens 3 Zuegen, sonst nicht
+  pruefe('trivial: Eintrag hat das Feld (boolean)', r.zuege.every((z) => typeof z.trivial === 'boolean'));
+  pruefe('trivial: 1.e4 und 1...d5 nicht', r.zuege[0].trivial === false && r.zuege[1].trivial === false);
+  pruefe('trivial: 2.exd5 (schlaegt die gerade gezogene Figur) ja', r.zuege[2].trivial === true);
+  pruefe('trivial: 2...Dxd5 (Zurueckschlagen) ja', r.zuege[3].trivial === true);
+  pruefe('trivial: 3.Sc3 (greift die Dame an, kein Schlagen) nein', r.zuege[4].trivial === false);
+  const rueck = await bewerteZug(new FakeEngine(), fenNach(['e4', 'd5', 'exd5']), 'd8d5', { vorigerZug: 'e4d5', vorigerSchlag: true });
+  pruefe('trivial: Zurueckschlagen in der Live-Bewertung (vorigerZug als UCI)', rueck.trivial === true);
+  const ohneVorher = await bewerteZug(new FakeEngine(), fenNach(['e4', 'd5', 'exd5']), 'd8d5');
+  pruefe('trivial: ohne vorigen Zug kein Zurueckschlagen', ohneVorher.trivial === false);
+  // Schach mit 2 erlaubten Zuegen (Kxd2, Kf1)
+  const SCHACH_ZWEI = '4k3/8/8/8/8/8/3q4/4K3 w - - 0 1';
+  const kf1 = await bewerteZug(new FakeEngine(), SCHACH_ZWEI, 'e1f1');
+  pruefe('trivial: Schachabwehr mit 2 erlaubten Zuegen ja', new Chess(SCHACH_ZWEI).moves().length === 2 && kf1.trivial === true);
+  // Schach mit 5 erlaubten Zuegen (Kd2, Ke2, Kf2, Sf1, Sxh1)
+  const SCHACH_FUENF = '4k3/8/8/8/8/6N1/8/4K2r w - - 0 1';
+  const kd2 = await bewerteZug(new FakeEngine(), SCHACH_FUENF, 'e1d2');
+  pruefe('trivial: Schachabwehr mit 5 erlaubten Zuegen nein', new Chess(SCHACH_FUENF).moves().length === 5 && kd2.trivial === false, new Chess(SCHACH_FUENF).moves().join(' '));
+  // Schach mit genau 3 Zuegen (Kd2, Ke2, Kf2)
+  const SCHACH_DREI = '4k3/8/8/8/8/8/8/4K2r w - - 0 1';
+  const ke2 = await bewerteZug(new FakeEngine(), SCHACH_DREI, 'e1e2');
+  pruefe('trivial: Schachabwehr mit genau 3 erlaubten Zuegen ja', new Chess(SCHACH_DREI).moves().length === 3 && ke2.trivial === true);
+
+  // spielphasen = altes phasen() aus analyse.js
+  const OPER_SAN = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#'.split(' ');
+  const LANG = ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Ba4', 'Nf6', 'O-O', 'Be7', 'Re1', 'b5', 'Bb3', 'd6', 'c3', 'O-O', 'h3', 'Nb8', 'd4', 'Nbd7',
+    'c4', 'c6', 'cxb5', 'axb5', 'Nc3', 'Bb7', 'Bg5', 'b4', 'Nb1', 'h6', 'Bh4', 'c5', 'dxe5', 'Nxe4', 'Bxe7', 'Qxe7', 'exd6', 'Qf6', 'Nbd2', 'Nxd6'];
+  const ENDSPIEL = '8/5k2/8/3K4/8/8/5P2/8 w - - 0 1';
+  const faelle = [
+    ['Operpartie, Buch bis 4', fensAus(OPER_SAN), 4],
+    ['Operpartie, kein Buch', fensAus(OPER_SAN), 0],
+    ['Operpartie, Buch bis 12', fensAus(OPER_SAN), 12],
+    ['lange Partie (40 Halbzuege)', fensAus(LANG), 8],
+    ['nur Startstellung', [START_FEN], 0],
+    ['ein Zug', fensAus(['e4']), 1],
+    ['Endspiel ab Stellung', fensAus(['Kd4', 'Ke6', 'f4'], ENDSPIEL), 0],
+    ['Mattpartie Narrenmatt', fensAus(['f3', 'e5', 'g4', 'Qh4#']), 3],
+  ];
+  for (const [name, fens, buchEnde] of faelle) {
+    const neu = spielphasen(fens, buchEnde);
+    const alt = altePhasen(fens, buchEnde);
+    pruefe('spielphasen = altes phasen(): ' + name, JSON.stringify(neu) === JSON.stringify(alt), JSON.stringify(neu) + ' / ' + JSON.stringify(alt));
+  }
+  pruefe('spielphasen: Operpartie hat alle drei Phasen (Endspiel ab dem Matt-Opfer)', JSON.stringify(spielphasen(fensAus(OPER_SAN), 4))
+    === '[{"name":"Eröffnung","von":0,"bis":17},{"name":"Mittelspiel","von":17,"bis":32},{"name":"Endspiel","von":32,"bis":33}]',
+  JSON.stringify(spielphasen(fensAus(OPER_SAN), 4)));
+  pruefe('spielphasen: ab einer Endspielstellung ohne Eroeffnung', spielphasen(fensAus(['Kd4', 'Ke6', 'f4'], ENDSPIEL), 0).map((x) => x.name).join(',') === 'Mittelspiel,Endspiel');
+
+  // coachKern: Klassenwort am Anfang weg, Gedankenstriche zu Doppelpunkt, O-O zu 0-0
+  const BEISPIELE = [
+    ['Brillant! Du opferst den Springer auf f7, und die Rechnung geht auf.', 'Du opferst den Springer auf f7, und die Rechnung geht auf.'],
+    ['Großartig! e5 ist der einzige Zug, der den Vorteil hält.', 'e5 ist der einzige Zug, der den Vorteil hält.'],
+    ['Großartig! Sf3 ist der einzige Zug, der die Stellung hält.', 'Sf3 ist der einzige Zug, der die Stellung hält.'],
+    ['Bester Zug! Genau das hätte auch die Engine gespielt.', 'Genau das hätte auch die Engine gespielt.'],
+    ['Exzellent! Fast so stark wie Sf3.', 'Fast so stark wie Sf3.'],
+    ['Guter Zug. Noch etwas genauer war d4.', 'Noch etwas genauer war d4.'],
+    ['Ungenau. Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.', 'Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.'],
+    ['Ein Fehler. Nach Sxf7 verlierst du den Turm auf h8.', 'Nach Sxf7 verlierst du den Turm auf h8.'],
+    ['Patzer! Das erlaubt Matt in 1: Dh4#. Besser war Sf3.', 'Das erlaubt Matt in 1: Dh4#. Besser war Sf3.'],
+    ['Chance verpasst! Nach dem Fehler deines Gegners war Dxd5 stark.', 'Nach dem Fehler deines Gegners war Dxd5 stark.'],
+    ['Buchzug: Spanische Partie. Ein bewährter Theoriezug.', 'Spanische Partie. Ein bewährter Theoriezug.'],
+    ['Buchzug. So spielen es auch die Profis.', 'So spielen es auch die Profis.'],
+    ['Erzwungen: Das war der einzige legale Zug.', 'Das war der einzige legale Zug.'],
+    ['Bester Zug! exd5 gewinnt einen Bauern.', 'exd5 gewinnt einen Bauern.'],
+    ['Exzellent! fast perfekt.', 'Fast perfekt.'],
+    ['Patt – die Partie endet remis.', 'Patt: die Partie endet remis.'],
+    ['Patzer! Patt — damit ist der Sieg weg.', 'Patt: damit ist der Sieg weg.'],
+    ['Bester Zug! O-O-O bringt den König in Sicherheit, O-O ging nicht.', '0-0-0 bringt den König in Sicherheit, 0-0 ging nicht.'],
+    ['Schachmatt! Dxf7# beendet die Partie.', 'Schachmatt! Dxf7# beendet die Partie.'],
+    ['Guter Zug.', 'Guter Zug.'],
+    ['', ''],
+  ];
+  for (const [ein, aus] of BEISPIELE) pruefe('coachKern: ' + (ein.slice(0, 22) || '(leer)'), coachKern(ein) === aus, coachKern(ein));
+  pruefe('coachKern: null und undefined -> leer', coachKern(null) === '' && coachKern(undefined) === '');
+  // Alle Klassen: echte Coach-Texte beginnen nach coachKern nie mit einem Klassenwort, und coachKern
+  // liefert dasselbe wie das alte coachSatz() aus partie.js
+  const KOPF = /^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug|Erzwungen)/;
+  const eingaben = [
+    { fenVorher: START_FEN, uci: 'e2e4', evalVorher: ev(30), evalNachher: ev(25), besterZug: 'd2d4', pvVorher: ['d2d4'], pvNachher: ['e7e5'], eroeffnung: 'Königsbauernspiel' },
+    { fenVorher: fenNach(['e4', 'e5', 'Nf3']), uci: 'd8g5', evalVorher: ev(40), evalNachher: ev(900), besterZug: 'b8c6', pvVorher: ['b8c6'], pvNachher: ['f3g5'] },
+    { fenVorher: fenNach(['e4', 'e5', 'Nf3', 'Nc6']), uci: 'e1g1', evalVorher: ev(40), evalNachher: ev(30), besterZug: 'f1b5', pvVorher: ['f1b5'], pvNachher: [] },
+  ];
+  let geprueft = 0;
+  let gleichAlt = 0;
+  for (const k of KLASSEN) {
+    for (const e of eingaben) {
+      const t = coachText(e, { klasse: k, verlust: 0.12, notiz: '' });
+      geprueft++;
+      if (alterCoachSatz(t) === coachKern(t)) gleichAlt++;
+      if (KOPF.test(coachKern(t))) pruefe(`coachKern: ${k} ohne Klassenwort`, false, t);
+    }
+  }
+  pruefe(`coachKern: alle ${KLASSEN.length} Klassen ohne Klassenwort am Anfang (${geprueft} Texte)`, geprueft === KLASSEN.length * eingaben.length);
+  pruefe('coachKern = altes coachSatz() aus partie.js fuer alle Texte', gleichAlt === geprueft, `${gleichAlt}/${geprueft}`);
+  pruefe('GRENZEN unveraendert', JSON.stringify(GRENZEN) === '{"exzellent":0.02,"gut":0.05,"ungenau":0.1,"fehler":0.2}');
+}
+
 // ===========================================================================
 // Realitaets-Test im Browser mit echter Engine
 // ===========================================================================
@@ -626,10 +783,67 @@ async function browserTests() {
   }
 }
 
+// ---------- w0-fix: Live-Genauigkeit wie die Analyse, Nachholen in Portionen ----------
+async function w0fixTests() {
+  // Partie mit starken Schwankungen (Morphys Operpartie), feste Bewertungen je Stellung
+  const sans = 'e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3 Qe7 Nc3 c6 Bg5 b5 Nxb5 cxb5 Bxb5+ Nbd7 O-O-O Rd8 Rxd7 Rxd7 Rd1 Qe6 Bxd7+ Nxd7 Qb8+ Nxb8 Rd8#'.split(' ');
+  const zuege = uciListe(sans);
+  const c = new Chess();
+  const tabelle = {};
+  const cps = [30, 40, 20, 90, 60, 150, 140, 320, 300, 280, 260, 400, 380, 500, 420, 300, 350, 700, 650, 600, 900, 850, 1200, 1100, 1500, 1400];
+  for (let i = 0; i < zuege.length; i++) {
+    const fen = c.fen();
+    const legal = c.moves({ verbose: true });
+    const cp = cps[i % cps.length] * (i % 3 === 0 ? 1 : 0.8);
+    tabelle[fen] = [{ eval: ev(Math.round(cp)), pv: [legal[0].lan] }, { eval: ev(Math.round(cp) - 60), pv: [(legal[1] || legal[0]).lan] }];
+    c.move(sans[i]);
+  }
+  const r = await analysierePartie(new FakeEngine(tabelle), zuege, { spielerFarbe: 'w' });
+  const voll = (f) => seitenGenauigkeit(r.zuege, f, r.zuege.length);
+  pruefe('seitenGenauigkeit: mit allen Eintraegen genau die Genauigkeit der Analyse (beide Seiten)', voll('w') === r.genauigkeit.w && voll('b') === r.genauigkeit.b,
+    `${voll('w')}/${r.genauigkeit.w} ${voll('b')}/${r.genauigkeit.b}`);
+  // wie in der Partie: nur Flos Eintraege (der letzte Zug ist seiner, alle Stellungen sind bekannt)
+  const nurFlo = r.zuege.map((z) => (z.farbe === 'w' ? z : null));
+  pruefe('seitenGenauigkeit: nur die eigenen Eintraege (Live-Bewertung) ergeben dieselbe Zahl', seitenGenauigkeit(nurFlo, 'w', zuege.length) === r.genauigkeit.w,
+    `${seitenGenauigkeit(nurFlo, 'w', zuege.length)} / ${r.genauigkeit.w}`);
+  const ungewichtet = Math.round(partieGenauigkeit(r.zuege.filter((z) => z.farbe === 'w').map((z) => z.genauigkeit)) * 10) / 10;
+  pruefe('seitenGenauigkeit: gewichtet wie die Analyse (das alte ungewichtete Mittel weicht hier ab)', Math.abs(ungewichtet - r.genauigkeit.w) >= 0.1,
+    `ungewichtet ${ungewichtet}, Analyse ${r.genauigkeit.w}`);
+  const luecke = nurFlo.slice();
+  luecke[4] = { ...luecke[4], genauigkeit: null };
+  pruefe('seitenGenauigkeit: null, wenn einem eigenen Zug die Genauigkeit fehlt oder es keinen gibt', seitenGenauigkeit(luecke, 'w', zuege.length) === null
+    && seitenGenauigkeit([], 'w', 0) === null && seitenGenauigkeit(nurFlo, 'b', zuege.length) === null);
+  // Flo mit Schwarz: die Stellung vor dem ersten Bot-Zug fehlt, sie uebernimmt den naechsten Wert (keine Luecke)
+  const nurSchwarz = r.zuege.map((z) => (z.farbe === 'b' ? z : null));
+  const gs = seitenGenauigkeit(nurSchwarz, 'b', zuege.length);
+  pruefe('seitenGenauigkeit: mit Luecken am Anfang (Bot zieht zuerst) eine Zahl nahe der Analyse', Number.isFinite(gs) && Math.abs(gs - r.genauigkeit.b) < 3,
+    `${gs} / ${r.genauigkeit.b}`);
+
+  // stueckeln: gleiches Ergebnis, der Hauptthread wird beim Einordnen regelmaessig frei
+  const echt = globalThis.setTimeout;
+  let frei = 0;
+  globalThis.setTimeout = (fn, ms, ...a) => { if (!ms) frei++; return echt(fn, ms, ...a); };
+  let rs;
+  try {
+    rs = await analysierePartie(new FakeEngine(tabelle), zuege, { spielerFarbe: 'w', stueckeln: true });
+  } finally { globalThis.setTimeout = echt; }
+  pruefe('stueckeln: dasselbe Ergebnis wie ohne', JSON.stringify(rs) === JSON.stringify(r));
+  pruefe('stueckeln: gibt beim Einordnen von 33 Zuegen mindestens 3-mal frei', frei >= 3, frei);
+  const ac = new AbortController();
+  let fehler = null;
+  globalThis.setTimeout = (fn, ms, ...a) => { if (!ms) ac.abort(); return echt(fn, ms, ...a); };
+  try {
+    await analysierePartie(new FakeEngine(tabelle), zuege, { stueckeln: true, signal: ac.signal });
+  } catch (e) { fehler = e; } finally { globalThis.setTimeout = echt; }
+  pruefe('stueckeln: Abbruch waehrend einer Pause bricht ab (abgebrochen)', fehler && fehler.abgebrochen === true, fehler && fehler.message);
+}
+
 // ===========================================================================
 const start = Date.now();
 nodeTests();
 await asyncTests();
+await runde4Tests();
+await w0fixTests();
 if (!process.argv.includes('--nur-node')) await browserTests();
 const fehlgeschlagen = ergebnisse.filter((r) => !r.ok);
 console.log(`\n${ergebnisse.length - fehlgeschlagen.length}/${ergebnisse.length} bestanden in ${Math.round((Date.now() - start) / 100) / 10} s`);

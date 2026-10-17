@@ -33,7 +33,11 @@ const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 mkdirSync(BILDER, { recursive: true });
 
 const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1';
-const MATT_IN_1 = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1';
+// Schaefermatt aus der Grundstellung (wertende Partie): Flo zieht SCHAEFER_ZUEGE, der Bot antwortet nach Plan.
+// Seit Runde 4 wertet eine Partie aus einer eigenen Stellung nicht mehr (keine Sterne, keine Freischaltung),
+// deshalb gewinnt der Ablauf nicht mehr mit einem Matt in 1 aus einer Stellung.
+const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
+const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const SW = leseSw();
 let speicher = {};   // localStorage aus dem Hauptlauf (fuer die Schluss-Bilder)
 
@@ -118,10 +122,38 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
     seite.on('response', (r) => { if (r.status() >= 400) fehlgeschlagen.push(`${r.status()} ${r.url()}`); });
   };
   kontext.on('page', beobachte);
+  // Abrufe der 1,8-MB-.wasm ueber ihre Adresse (Seite und Worker; Blob-Abrufe zaehlen nicht)
+  kontext.on('request', (r) => {
+    if (/\.wasm$/.test(r.url().split(/[?#]/)[0]) && !/^blob:/.test(r.url())) wasmAbrufe.push({ url: r.url(), sw: !!r.serviceWorker() });
+  });
   const seite = await kontext.newPage();
   return { kontext, seite, fehler, fehlgeschlagen };
 }
+const wasmAbrufe = [];
+// beide Engines bereit: Adresse der Worker und eine kurze Suche
+const engineInfo = (seite) => seite.evaluate(async () => {
+  const [a, b] = await Promise.all([window.__app.engine('bot'), window.__app.engine('bewertung')]);
+  const r = await b.analyse('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1', { depth: 6 });
+  return { pfade: [a.pfad, b.pfad], tiefe: r.depth, direkt: localStorage.getItem('schach-arena:v1:wasm-direkt') };
+});
 
+// Wartet, bis ein Element ruhig steht (Lage in drei Bildern gleich, hoechstens 1,5 s). Ohne das trifft ein Tipp
+// waehrend einer Einblend-Animation daneben, z. B. die Ergebnis-Karte (karte-ein: 0,1 s Verzoegerung plus 0,5 s,
+// verschoben und verkleinert): der kleine Knopf "Brett ansehen" lag dann woanders, der Tipp ging ins Leere.
+const stehtStill = (loc) => loc.evaluate((el) => new Promise((fertig) => {
+  const t0 = performance.now();
+  let alt = '';
+  let gleich = 0;
+  const schritt = () => {
+    const b = el.getBoundingClientRect();
+    const k = [b.x, b.y, b.width, b.height].map((x) => Math.round(x * 4)).join();
+    gleich = k === alt ? gleich + 1 : 0;
+    alt = k;
+    if (gleich >= 2 || performance.now() - t0 > 1500) fertig();
+    else requestAnimationFrame(schritt);
+  };
+  requestAnimationFrame(schritt);
+})).catch(() => {});
 function hilfen(seite) {
   const h = {
     async mitte(feld) {
@@ -145,6 +177,7 @@ function hilfen(seite) {
         const el = alle.nth(i);
         if (!(await el.isVisible())) continue;
         await el.scrollIntoViewIfNeeded();
+        await stehtStill(el);
         const b = await el.boundingBox();
         if (!b) continue;
         await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
@@ -200,6 +233,27 @@ function hilfen(seite) {
     },
   };
   return h;
+}
+
+// Schaefermatt gegen Benno in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
+async function schaefermatt(seite, h, { pruefeHash = false } = {}) {
+  await seite.evaluate((plan) => {
+    localStorage.removeItem('schach-arena:v1:laufend');
+    window.__test = { botZug: () => {
+      const v = window.__partie.chess().history({ verbose: true });
+      return plan[v[v.length - 1].lan] || null;
+    } };
+    window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+  }, SCHAEFER_PLAN);
+  await h.screen('partie');
+  await h.warteBereit();
+  await h.warteFlo();
+  if (pruefeHash) pruefe('Hash #partie', (await h.hash()) === '#partie');
+  for (const zug of SCHAEFER_ZUEGE) {
+    await h.warteFlo();
+    await h.zugTippen(zug);
+  }
+  await seite.evaluate(() => { window.__test = {}; });
 }
 
 // spielt einen sinnvollen Zug fuer Weiss per Tippen und wartet auf Bewertung und Bot
@@ -271,6 +325,14 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   pruefe('Keine 404 beim Vorladen', server404.length === 0, server404.join(', '));
   const lizenz = await seite.evaluate(async () => { const r = await fetch('LICENSE'); return { status: r.status, typ: r.headers.get('content-type'), text: (await r.text()).slice(0, 300) }; });
   pruefe('LICENSE kommt als Text (nicht als Download)', lizenz.status === 200 && /text\/plain/.test(lizenz.typ) && /GNU GENERAL PUBLIC LICENSE/.test(lizenz.text), JSON.stringify(lizenz));
+  // w0c: die .wasm kommt beim ersten Start genau einmal (Hauptthread, Adresse relativ zum Modul unter /schach/),
+  // beide Worker starten als Blob mit den geprueften Bytes (vorher 3 Abrufe: Pruefung plus je Worker einer)
+  const info = await engineInfo(seite);
+  const eigene = wasmAbrufe.filter((a) => !a.sw);
+  pruefe('Engine-Datei beim ersten Start nur einmal geholt (Worker per Blob)', eigene.length === 1
+    && eigene[0].url === START + 'vendor/stockfish/stockfish-19-lite-single.wasm', JSON.stringify(eigene));
+  pruefe('Beide Engines laufen als Blob-Worker mit der .wasm als Blob-URL', info.tiefe === 6 && info.direkt == null
+    && info.pfade.every((p) => /^blob:/.test(p) && /#blob%3A/.test(p)), JSON.stringify(info));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
 }
@@ -280,12 +342,7 @@ async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
   pruefe('Benno ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="benno"]').count() === 1);
   pruefe('Hilde ist gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
-  await seite.evaluate((fen) => window.__app.gehe('partie', { botId: 'benno', farbe: 'w', startFen: fen }), MATT_IN_1);
-  await h.screen('partie');
-  await h.warteBereit();
-  await h.warteFlo();
-  pruefe('Hash #partie', (await h.hash()) === '#partie');
-  await h.zugTippen('a1a8');
+  await schaefermatt(seite, h, { pruefeHash: true });
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
   await warte(2600);
   pruefe('Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
@@ -295,6 +352,13 @@ async function testeSieg(seite, h, fehler) {
   const id = partien[0] && partien[0].id;
   pruefe('Partie gespeichert', partien.length === 1 && partien[0].ergebnis === 'sieg', JSON.stringify(partien).slice(0, 120));
   pruefe('Analyse vorab gespeichert', await seite.evaluate((i) => localStorage.getItem('schach-arena:v1:review:' + i) != null, id));
+  // Erweiterungspunkte (Runde 4): Ereignisse einer echten Partie im Protokoll des Busses (gleiches Modul wie die App)
+  const ereignisse = await seite.evaluate(async () => (await import('./js/ereignisse.js')).protokoll().map((e) => e.name));
+  const kern = ereignisse.filter((n) => /^(app:bereit|partie:|zug:gespielt|zug:bewertet)/.test(n));
+  pruefe('Ereignisse: app:bereit, partie:gestartet, Züge, partie:beendet (ohne Pakete)', kern[0] === 'app:bereit' && kern.includes('partie:gestartet')
+    && kern.filter((n) => n === 'zug:gespielt').length === 7 && kern.indexOf('partie:beendet') > kern.lastIndexOf('zug:gespielt'), kern.join(' '));
+  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
+  pruefe('html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
 
   gruppe = 'Analyse';
   await h.tippe('.erg-knoepfe [data-ziel="analyse"]');
@@ -302,7 +366,11 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Hash #analyse/<id>', (await h.hash()) === '#analyse/' + id);
   pruefe('Sofort fertig (kein Rechnen dank vorab)', await seite.locator('.an-laden').count() === 0 && await seite.locator('.an-inhalt').count() === 1);
   pruefe('Freischalt-Banner: Oma Hilde', /Oma Hilde/.test(await seite.locator('.an-banner').innerText()));
-  pruefe('Genauigkeit sichtbar', /100,0/.test(await seite.locator('.an-genau').innerText()), await seite.locator('.an-genau').innerText());
+  // gezeigt wird genau die gespeicherte Genauigkeit der Partie (auf ihr beruht Stern 2), mit Komma
+  const genau = await seite.locator('.an-genau .an-ich-wert').innerText();
+  const gespeichert = ((await h.partien())[0] || {}).genauigkeit;
+  pruefe('Genauigkeit sichtbar: genau der gespeicherte Wert (mindestens 80 %)', Number.isFinite(gespeichert) && gespeichert >= 80
+    && genau.trim() === gespeichert.toFixed(1).replace('.', ','), `${genau} / ${gespeichert}`);
   await seite.reload();
   await h.screen('analyse');
   pruefe('Neuladen: Analyse bleibt', (await h.hash()) === '#analyse/' + id && await seite.locator('.an-inhalt').count() === 1);
@@ -445,10 +513,16 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   const vorher = serverLog.length;
   const anfragenVorher = fehlgeschlagen.length;
   await kontext.setOffline(true);
+  const wasmVorher = wasmAbrufe.length;
   await seite.reload();
   await h.screen('partie');
   await h.warteBereit(60000);
   pruefe('Offline neu geladen: Partie da', await seite.locator('.screen.partie .brett > img.figur').count() > 20);
+  // w0c: offline holt nur der Hauptthread die .wasm (aus dem Cache), die Worker laufen per Blob
+  const infoOffline = await engineInfo(seite);
+  const offlineAbrufe = wasmAbrufe.slice(wasmVorher).filter((a) => !a.sw);
+  pruefe('Offline: Engines als Blob-Worker, .wasm nur einmal aus dem Cache', infoOffline.tiefe === 6
+    && infoOffline.pfade.every((p) => /^blob:/.test(p)) && offlineAbrufe.length === 1, JSON.stringify({ infoOffline, offlineAbrufe }));
   const zuege = await h.zuege();
   await h.warteFlo();
   const z = await spieleZug(seite, h, ['e1g1', 'd2d3', 'd2d4', 'b1c3', 'c2c3', 'h2h3']);
@@ -596,11 +670,7 @@ async function bilder(browser, id) {
     await seite.screenshot({ path: path.join(BILDER, `final-partie-${vp.name}.png`) });
     await seite.evaluate(() => { window.__test = {}; });
 
-    await seite.evaluate((fen) => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('partie', { botId: 'benno', farbe: 'w', startFen: fen }); }, MATT_IN_1);
-    await h.screen('partie');
-    await h.warteBereit();
-    await h.warteFlo();
-    await h.zugTippen('a1a8');
+    await schaefermatt(seite, h);
     await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 40000 });
     await warte(2600);
     await seite.screenshot({ path: path.join(BILDER, `final-ergebnis-${vp.name}.png`) });

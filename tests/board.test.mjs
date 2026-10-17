@@ -621,6 +621,152 @@ async function testeHandy(browser) {
   await kontext.close();
 }
 
+// ---------- W0+a: abgelehnte Zuege, Striche, Koenigsfall ----------
+
+const GEFESSELT = 'rnbqk1nr/pppp1ppp/8/4p3/1b6/2NP4/PPP1PPPP/R1BQKBNR w KQkq - 1 3';   // Sc3 gefesselt durch Lb4
+
+async function testeFundament(browser) {
+  gruppe = 'W0+a';
+  const { kontext, seite, fehler } = await neueSeite(browser, { viewport: { width: 1280, height: 860 } });
+  const h = hilfen(seite);
+  const log = () => seite.evaluate(() => demo.abgelehntLog.splice(0));
+  await h.setzeFen(START);
+  await log();
+
+  // Ziehen auf ein nicht erlaubtes Feld
+  await h.zieheMaus('e2', 'e5');
+  await warte(250);
+  let l = await log();
+  pruefe('abgelehnt: Ziehen e2-e5 meldet { von, nach, art: ziehen }, Stellung bleibt', JSON.stringify(l) === '[{"von":"e2","nach":"e5","art":"ziehen"}]'
+    && (await h.fen()) === START && (await h.figurSitzt('e2')), l);
+  // Tippen: Figur gewaehlt, dann ein nicht erlaubtes Feld (nach dem missglueckten Ziehen bliebe e2 gewaehlt)
+  await h.setzeFen(START);
+  await log();
+  await h.klickFeld('e2');
+  await h.klickFeld('e6');
+  l = await log();
+  pruefe('abgelehnt: Tippen e2, dann e6 meldet art tippen, Auswahl weg wie vorher', JSON.stringify(l) === '[{"von":"e2","nach":"e6","art":"tippen"}]'
+    && (await h.anzahl('.lage.auswahl')) === 0, l);
+  // erlaubte Zuege und Auswahlwechsel melden nichts
+  await h.klickFeld('g1');
+  await h.klickFeld('b1');
+  await h.klickFeld('b1');
+  await h.klickFeld('a5');
+  await h.klickFeld('h8');
+  l = await log();
+  pruefe('abgelehnt: Auswahlwechsel, Abwaehlen, leeres Feld ohne Auswahl, fremde Figur ohne Auswahl melden nichts', l.length === 0, l);
+  await h.klickFeld('e2');
+  await h.klickFeld('e4');
+  await warte(200);
+  pruefe('abgelehnt: ein erlaubter Zug meldet nichts und zieht', (await log()).length === 0 && (await h.figur('e4')) === 'wP');
+
+  // gefesselte Figur: Antippen und Ziehen
+  await h.setzeFen(GEFESSELT);
+  await log();
+  await h.klickFeld('c3');
+  l = await log();
+  pruefe('abgelehnt: gefesselten Springer antippen meldet { von: c3, nach: null }, keine Auswahl', JSON.stringify(l) === '[{"von":"c3","nach":null,"art":"tippen"}]'
+    && (await h.anzahl('.lage.auswahl')) === 0, l);
+  await h.zieheMaus('c3', 'd5');
+  await warte(200);
+  l = await log();
+  pruefe('abgelehnt: gefesselten Springer ziehen meldet c3-d5, Figur bleibt still stehen', JSON.stringify(l) === '[{"von":"c3","nach":"d5","art":"ziehen"}]'
+    && (await h.figurSitzt('c3')) && (await h.anzahl('#brett > img.figur.gezogen')) === 0, l);
+  await h.klickFeld('d3');
+  await h.klickFeld('c3');
+  l = await log();
+  pruefe('abgelehnt: mit Auswahl auf den gefesselten Springer tippen meldet den Springer', JSON.stringify(l) === '[{"von":"c3","nach":null,"art":"tippen"}]', l);
+  await seite.evaluate(() => demo.brett.erlaubeZuege(null));
+  await h.klickFeld('c3');
+  await h.zieheMaus('d3', 'd5');
+  pruefe('abgelehnt: gesperrtes Brett (Bot am Zug) meldet nichts', (await log()).length === 0);
+
+  // Koenigsfall
+  await h.setzeFen(START);
+  const kipp = await seite.evaluate(() => {
+    const ok = demo.brett.kippeKoenig('e1', { langsam: true });
+    const keinKoenig = demo.brett.kippeKoenig('e2');
+    const el = document.querySelector('#brett > img.figur[data-feld="e1"]');
+    return { ok, keinKoenig, klasse: el.className, dauer: getComputedStyle(el).transitionDuration };
+  });
+  await warte(1600);
+  const winkel = await seite.evaluate(() => {
+    const m = new DOMMatrix(getComputedStyle(document.querySelector('#brett > img.figur[data-feld="e1"]')).transform);
+    return Math.round(Math.atan2(m.b, m.a) * 180 / Math.PI);
+  });
+  pruefe('kippeKoenig: der Koenig kippt (langsam), auf einem Bauern nicht', kipp.ok === true && kipp.keinKoenig === false && /kippt/.test(kipp.klasse)
+    && /langsam/.test(kipp.klasse) && kipp.dauer === '1.4s' && winkel < -60, { kipp, winkel });
+  await h.setzeFen(START);
+  pruefe('kippeKoenig: setzeStellung stellt ihn wieder auf', (await seite.evaluate(() => !document.querySelector('#brett > img.figur.kippt'))) && (await h.figurSitzt('e1')));
+  await seite.evaluate(() => { demo.brett.kippeKoenig('e8'); demo.brett.richteAuf(); });
+  pruefe('richteAuf: wieder aufrecht', await seite.evaluate(() => !document.querySelector('#brett > img.figur.kippt')));
+
+  // Striche (Mattnetz)
+  const st = await seite.evaluate(() => {
+    window.__striche = demo.brett.striche([
+      { von: 'd1', nach: 'd7', farbe: 'akzent' }, { nach: 'f2', art: 'haken', verzoegerung: 120 }, { nach: 'e2', art: 'kreuz', verzoegerung: 240 },
+    ]);
+    const svg = document.querySelector('#brett > svg.brett-striche');
+    const g = [...svg.querySelectorAll('g.strich')];
+    const linie = svg.querySelector('g.strich[data-art="linie"] g').getAttribute('transform');
+    return { da: !!svg, n: g.length, arten: g.map((x) => x.dataset.art).join(), v: g[1].style.getPropertyValue('--v'), linie,
+      ueber: Number(getComputedStyle(svg).zIndex) > 2, anim: getComputedStyle(svg.querySelector('.strich-zug')).animationName };
+  });
+  pruefe('striche: drei Striche im Brett (Linie, Haken, Kreuz) ueber den Figuren, mit Verzoegerung', st.da && st.n === 3 && st.arten === 'linie,haken,kreuz'
+    && st.v === '120ms' && st.ueber && st.anim === 'strich-zug' && /translate\(3.5 7.5\) rotate\(-90\)/.test(st.linie), st);
+  const gedreht = await seite.evaluate(() => { demo.brett.dreheUm(); const t = document.querySelector('#brett svg.brett-striche g.strich[data-art="linie"] g').getAttribute('transform'); demo.brett.dreheUm(); return t; });
+  pruefe('striche: folgen dem Drehen des Bretts', /translate\(4.5 0.5\) rotate\(90\)/.test(gedreht), gedreht);
+  const ebene = await seite.evaluate(() => {
+    window.__striche.entferne();
+    const e = document.createElement('div');
+    e.className = 'test-ebene';
+    document.querySelector('.brett-platz').append(e);
+    const h2 = demo.brett.striche([{ von: 'g1', nach: 'f3' }], { ebene: e, animieren: false });
+    const r = { weg: !document.querySelector('#brett > svg.brett-striche'), inEbene: !!e.querySelector('svg.brett-striche'),
+      still: h2.el.classList.contains('still') && getComputedStyle(h2.el.querySelector('.strich-zug')).animationName === 'none' };
+    h2.entferne();
+    r.leer = !e.querySelector('svg');
+    e.remove();
+    return r;
+  });
+  pruefe('striche: entferne() raeumt ab; eigene Ebene (z. B. Buehne.effekte), animieren: false zeigt sofort alles', ebene.weg && ebene.inEbene && ebene.still && ebene.leer, ebene);
+  await seite.emulateMedia({ reducedMotion: 'reduce' });
+  const reduziert = await seite.evaluate(() => {
+    const x = demo.brett.striche([{ von: 'a1', nach: 'a3' }]);
+    const a = getComputedStyle(x.el.querySelector('.strich-zug')).animationName;
+    x.entferne();
+    demo.brett.kippeKoenig('e1');
+    const d = getComputedStyle(document.querySelector('#brett > img.figur[data-feld="e1"]')).transitionDuration;
+    demo.brett.richteAuf();
+    return { a, d };
+  });
+  pruefe('reduzierte Bewegung: Striche und Koenigsfall ohne Animation', reduziert.a === 'none' && reduziert.d === '0s', reduziert);
+  await seite.emulateMedia({ reducedMotion: 'no-preference' });
+  pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+
+  // Finger: gefesselte Figur ziehen (ohne Zeiger-Fang am Brett kommt das Loslassen trotzdem an)
+  const t = await neueSeite(browser, { viewport: { width: 820, height: 1180 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPAD_UA });
+  const ht = hilfen(t.seite);
+  const cdp = await t.kontext.newCDPSession(t.seite);
+  const finger = async (typ, x, y) => cdp.send('Input.dispatchTouchEvent', {
+    type: typ, touchPoints: typ === 'touchEnd' ? [] : [{ x, y, id: 1, radiusX: 8, radiusY: 8, force: 1 }],
+  });
+  await ht.setzeFen(GEFESSELT);
+  await t.seite.evaluate(() => demo.abgelehntLog.splice(0));
+  const a = await ht.mitte('c3');
+  const b = await ht.mitte('d5');
+  await finger('touchStart', a.x, a.y);
+  for (let i = 1; i <= 8; i++) await finger('touchMove', a.x + (b.x - a.x) * i / 8, a.y + (b.y - a.y) * i / 8);
+  await finger('touchEnd');
+  await warte(150);
+  const lt = await t.seite.evaluate(() => demo.abgelehntLog.splice(0));
+  pruefe('abgelehnt per Finger: gefesselten Springer ziehen meldet c3-d5', JSON.stringify(lt) === '[{"von":"c3","nach":"d5","art":"ziehen"}]'
+    && (await ht.figurSitzt('c3')), lt);
+  pruefe('Keine Konsolenfehler (Finger)', t.fehler.length === 0, t.fehler.join(' | '));
+  await t.kontext.close();
+}
+
 // ---------- Ablauf ----------
 
 const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
@@ -634,6 +780,7 @@ try {
   await testeDesktop(browser);
   await testeTouch(browser);
   await testeHandy(browser);
+  await testeFundament(browser);
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));

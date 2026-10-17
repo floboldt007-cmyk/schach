@@ -1,0 +1,23 @@
+{
+  "kopf": {
+    "art": "spielplan",
+    "format": 1,
+    "rechenstand": 1,
+    "stand": "2026-10-19",
+    "titel": "Beispiel: Vorsaison (nur Format, wird nicht ausgeliefert)"
+  },
+  "saison": { "id": "vorsaison-2026", "name": "Vorsaison" },
+  "wochen": [
+    { "montag": "2026-11-16", "boss": "bergwirt", "thema": null, "funkenWochenende": false,
+      "text": "Der Bergwirt startet aus dem Spanier nach sechs Zügen und bietet nie Remis an." },
+    { "montag": "2026-11-23", "boss": "baron-gambit", "thema": "gambit", "funkenWochenende": false,
+      "text": "Gambit-Woche: Der Baron hat einen Bauern geopfert." },
+    { "montag": "2026-11-30", "boss": "springerzuechterin", "thema": null, "funkenWochenende": true,
+      "text": "Vier Springer statt der Läufer. Am Wochenende zählen Funken doppelt." },
+    { "montag": "2026-12-07", "boss": "festungsbauer", "thema": "endspiel", "funkenWochenende": false,
+      "text": "Endspiel-Woche: Verwerte deinen Mehrbauern gegen die Festung." },
+    { "montag": "2026-12-14", "boss": "eiserne-dame", "thema": null, "funkenWochenende": false },
+    { "montag": "2026-12-21", "boss": "bergwirt", "thema": null, "funkenWochenende": false,
+      "klassiker": ["baron-gambit", "festungsbauer"], "text": "Klassiker-Wochenende mit zwei Bossen aus dem Archiv." }
+  ]
+}
