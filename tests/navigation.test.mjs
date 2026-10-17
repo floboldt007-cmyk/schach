@@ -382,7 +382,7 @@ for (const [i, titel] of ['Matt in 2', 'Rätsel-Serie', 'Patzer-Kartei'].entries
     log.kontexte.push({ schluessel: Object.keys(k).sort().join(), eingefroren: Object.isFrozen(k), hatApp: !!(k.app && k.app.gehe) });
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = 't-karte' + (i === 0 ? ' t-held' : '');
+    el.className = 't-karte' + (i === 1 ? ' t-held' : '');
     el.dataset.karte = String(i);
     el.innerHTML = '<span class="ueberzeile">Test</span><h2>' + titel + '</h2><p>Karte ' + (i + 1) + ' aus dem Test-Paket.</p>';
     return { el, verlasse() { log.weg++; } };
@@ -428,8 +428,10 @@ async function testeTraining(browser) {
     pruefe('Kontext { app }, eingefroren, wie in ARCHITEKTUR.md', r.kontexte.length === 3 && r.kontexte.every((x) => x.schluessel === 'app' && x.eingefroren && x.hatApp),
       JSON.stringify(r.kontexte));
     if (vp.w > 700) {
-      pruefe('quer: grosse Karte links ueber zwei Zeilen, zwei kleine rechts', r.k[0].l < r.k[1].l && r.k[1].l === r.k[2].l && r.k[2].t > r.k[1].t
-        && Math.abs(r.k[0].h - (r.k[2].t + r.k[2].h - r.k[1].t)) <= 2, JSON.stringify(r.k));
+      // die Karte mit .t-held (hier die zweite) steht gross links ueber zwei Zeilen, die anderen rechts untereinander
+      const [g, a, b] = [r.k[1], r.k[0], r.k[2]];
+      pruefe('quer: die Karte mit .t-held gross links ueber zwei Zeilen, die zwei anderen rechts', g.l < a.l && a.l === b.l && b.t > a.t
+        && Math.abs(g.t - a.t) <= 1 && Math.abs(g.h - (b.t + b.h - a.t)) <= 2, JSON.stringify(r.k));
     } else {
       pruefe('Handy: eine Spalte, alle Karten gleich breit', r.k.every((x) => x.l === r.k[0].l && x.w === r.k[0].w) && r.k[1].t > r.k[0].t, JSON.stringify(r.k));
     }

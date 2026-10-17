@@ -1282,8 +1282,8 @@ Testseite: `tests/bauteile.html`.
 
 **Training-Huelle** (`js/ui/training.js`, `css/training.css`): Kern-Screen (nicht mehr in `PAKET_SCREENS`, im sw-Test
 nicht mehr in `SCREEN_PAKET`), Hauptseiten-Kopf, Seitentitel „Üben ohne Druck / Training“, `.training-gitter` als
-Behaelter von `training:karten` (Kontext `{ app }`, `data-anzahl`; ab drei Karten ist die erste gross ueber zwei
-Zeilen, Handy eine Spalte), ohne Anbieter `.training-leer` („Training kommt mit der nächsten Welle“, Knopf zur Arena).
+Behaelter von `training:karten` (Kontext `{ app }`, `data-anzahl`; ab drei Karten steht die Karte mit `.t-held`, sonst
+die erste, gross links ueber zwei Zeilen, Handy eine Spalte), ohne Anbieter `.training-leer` („Training kommt mit der nächsten Welle“, Knopf zur Arena).
 Bausteine fuer die Karten der Pakete: `.t-karte`, `.t-held`, `.t-marke`, `.t-zahl`, `.t-fuss`, `.kartei-stapel`, `.mini`.
 Der Reiter Training erscheint erst, wenn die Integration `training` in `REITER` eintraegt.
 

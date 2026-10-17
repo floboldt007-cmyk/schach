@@ -9,12 +9,13 @@
 .training-screen .training-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; padding-bottom: var(--a6); }
 
-/* Gitter: ab drei Karten links eine grosse ueber zwei Zeilen (Entwurf A), auf dem Handy eine Spalte */
-.training-gitter { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-auto-rows: auto; gap: 18px;
-  padding: 16px var(--rand) 8px; align-items: stretch; }
+/* Gitter: ab drei Karten links eine grosse ueber zwei Zeilen (die mit .t-held, sonst die erste; js/ui/training.js setzt
+   .ist-gross), die anderen fuellen rechts auf (dense), auf dem Handy eine Spalte */
+.training-gitter { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-auto-rows: auto; grid-auto-flow: row dense;
+  gap: 18px; padding: 16px var(--rand) 8px; align-items: stretch; }
 .training-gitter[hidden] { display: none; }
 .training-gitter[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
-.training-gitter:not([data-anzahl="1"]):not([data-anzahl="2"]) > :first-child { grid-row: span 2; }
+.training-gitter[data-gross] > .ist-gross { grid-column: 1; grid-row: 1 / span 2; }
 .training-gitter > * { min-width: 0; }
 
 /* Karten-Bausteine (aus A) */
@@ -54,8 +55,7 @@ button.t-karte { cursor: pointer; width: 100%; }
 
 @media (max-width: 700px) {
   .training-gitter, .training-gitter[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
-  .training-gitter > :first-child { grid-row: auto; }
-  .training-gitter:not([data-anzahl="1"]):not([data-anzahl="2"]) > :first-child { grid-row: auto; }
+  .training-gitter[data-gross] > .ist-gross { grid-column: auto; grid-row: auto; }
   .t-karte { padding: 18px; }
   .kartei-stapel .kk:nth-child(4) { display: none; }
   .training-leer { padding: 18px; }

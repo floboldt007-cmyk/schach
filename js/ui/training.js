@@ -6,8 +6,8 @@
 //
 // Aufbau: header.kopf.haupt-kopf (js/ui/seite.js), darunter .training-rumpf (scrollt) mit .seiten-kopf ("Üben ohne
 // Druck", "Training", Satz) und dem Gitter .training-gitter (Behaelter des Orts training:karten, Kontext { app }).
-// Das Gitter zaehlt seine Karten in data-anzahl: ab drei Karten ist die erste gross und reicht ueber zwei Zeilen
-// (Entwurf A), auf dem Handy eine Spalte. Ohne Karten: .training-leer. Bausteine fuer die Karten der Pakete stehen in
+// Das Gitter zaehlt seine Karten in data-anzahl: ab drei Karten steht eine gross links ueber zwei Zeilen (Entwurf A):
+// die Karte mit .t-held, sonst die erste (sie bekommt .ist-gross, das Gitter data-gross); auf dem Handy eine Spalte. Ohne Karten: .training-leer. Bausteine fuer die Karten der Pakete stehen in
 // css/training.css (.t-karte, .t-held, .t-marke, .t-zahl, .t-fuss, .kartei-stapel) und js/ui/bauteile.js (miniBrett).
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
@@ -48,6 +48,12 @@ export function zeige(root, params, app) {
   }
   gitter.dataset.anzahl = String(ort.anzahl);
   gitter.hidden = ort.anzahl === 0;
+  // ab drei Karten eine grosse links ueber zwei Zeilen: die Karte mit .t-held (z. B. das Tagesraetsel), sonst die erste
+  if (ort.anzahl >= 3) {
+    const gross = [...gitter.children].find((k) => k.classList.contains('t-held')) || gitter.firstElementChild;
+    if (gross) gross.classList.add('ist-gross');
+    gitter.dataset.gross = '';
+  }
   leer.hidden = ort.anzahl > 0;
 
   // Eintritt wie im Entwurf: Kopf, Seitentitel, dann die Karten (bei Tempo 0 nichts)
