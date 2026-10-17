@@ -32,6 +32,7 @@ in Flos privatem Repo.
 | 17.10. | Gratis und Abo wie empfohlen | Gratis: alle 10 Bots, Analyse, Fehler-Kartei, Rätsel ohne Tageslimit. Abo: Coaches, Lernpfad ab Einheit 5, Spezial-Training |
 | 17.10. | Zugklassen umbenennen | eigene Namen und eigene Brillant-Farbe, im Premium-Umbau vor S1 |
 | 17.10. | Erste spielige Welle mit Agenten bauen | ja, in 3 Schüben mit je 4 bis 5 Agenten, danach 5 Tage Test auf dem iPad |
+| 17.10. | „Die Sounds kann man ändern, auch die Ansichten, oder?“ | Ja. Klangpakete (Holz, Arcade, später mehr), Brettfarben, Hell/Dunkel, später Figuren-Sets. Der Premium-Umbau baut A **theme-fähig**: Farben, Schriften, Texturen, Rahmen und Klänge hängen an einer zentralen Stelle (Design-Tokens), damit die Entwürfe B „Edel“ und C „Verspielt“ später als wählbare Ansichten dazukommen können (erspielbar oder in der Werkstatt), ohne das Layout umzubauen. |
 
 ## 2. Die Richtung in einem Satz
 
