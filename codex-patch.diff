@@ -1,0 +1,1494 @@
+diff --git a/codex-auftraege/u8-u9-screens.md b/codex-auftraege/u8-u9-screens.md
+deleted file mode 100644
+index e8763b9f8e16e58530d7578993e78ab1b309efd3..0000000000000000000000000000000000000000
+--- a/codex-auftraege/u8-u9-screens.md
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# Auftrag für Codex: Einstellungen, Analyse und Verlauf (Umbau-Pakete U8 und U9)
+-
+-Basis: Zweig `codex/u8-u9-screens`, abgezweigt von `main`.
+-Der Umbau-Plan liegt jetzt im Repo: `design/runde4/umbau/PLAN.md`. Pfade darin übersetzen:
+-`entwuerfe/a-modern/...` = `design/runde4/umbau/entwurf-a/...`, `entwuerfe/c-arcade/...` = `design/runde4/umbau/entwurf-c/...`
+-(Bilder von C unter `entwurf-c/vorschau/`), `umbau-a/shots/soll-*.png` = `design/runde4/umbau/soll/`.
+-Entscheidungen des Besitzers: `design/runde4/ENTSCHEIDUNGEN.md` (gilt vor dem Plan). Zeilenangaben im Plan sind alt, selbst suchen.
+-Schon fertig und live, nicht neu bauen: U1, U2, U3, U4 (Klartext-Namen), Vorzüge (Premoves), Sicherung (Export/Import).
+-Andere Pakete nicht anfassen. Speicherformat nur erweitern, alte Spielstände müssen gültig bleiben.
+-
+-Pflicht am Ende: `node tests/sw.test.mjs --aktualisieren`, dann `node tests/alle.mjs` komplett grün (Chromium).
+-Keine Prüfung abschwächen oder überspringen; Selektoren nur dort anpassen, wo der Plan es vorsieht.
+-Du kannst nicht pushen: setze ans Ende deiner Antwort eine kurze Liste der geänderten Dateien und der Testergebnisse.
+-Diese Auftragsdatei löschen. Halte dich an `AGENTS.md`.
+-
+-## Was zu tun ist
+-
+-Plan Abschnitt 6, Pakete **U8 Einstellungen** und **U9 Analyse und Verlauf**, mit den dort genannten Abschnitten
+-(2.7, 2.8, 2.9, 4). Die Konto-Gruppe in den Einstellungen (falls schon vorhanden) und die Gruppe „Sicherung“
+-bleiben erhalten. Lizenzen: Schriften OFL, eigene Klänge und Bilder „alle Rechte vorbehalten“ (nicht GPL).
+-`js/board.js`, `js/ui/partie.js` und die Arena nicht anfassen (dort arbeiten parallel andere Pakete).
+-- Unter WebKit hat die Analyse auf dem kleinen Handy 8 px waagrechten Überlauf (`tests/WEBKIT-STAND.md`): beim Analyse-Umbau beheben.
+diff --git a/css/analyse.css b/css/analyse.css
+index dc88d60dcb3fe01ce3dda46dfb20b358d0ed6264..ffa92466e8144742d986a07417d3bb19d14abdb1 100644
+--- a/css/analyse.css
++++ b/css/analyse.css
+@@ -1,5 +1,356 @@
++/* Spielanalyse – Premium-Umbau (PLAN 2.7) */
+ /* ============================================================
+-   Schach-Arena · Spielanalyse (Premium-Umbau, Look A)
+-   Angelegt von U1 (leer), gefuellt von Paket U9 (PLAN 2.7).
+-   Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
++   Schach-Arena · Screens von Bau B: Spielanalyse (an-), Verlauf (vl-),
++   Einstellungen (es-). Vorlage: design/neon/werkzeug/mockup.css,
++   Abschnitt Spielanalyse. Nutzt die BASIS aus css/app.css
++   (.screen, .kopf, .knopf, .icon-knopf, .chip, .flaeche, .zahl, .stern).
++   Reihenfolge der Dateien: tokens.css -> themes/<id>.css -> board.css -> app.css -> ... -> screens.css
++   Premium-Umbau U1: alle Farben auf Tokens (hell und dunkel lesbar), kein Leuchten,
++   keine Neon-Verlaeufe. Aufbau unveraendert; U8 (Einstellungen) und U9 (Analyse,
++   Verlauf) ersetzen ihre Abschnitte durch eigene Dateien.
+    ============================================================ */
++
++/* Brettfarben (html[data-brett]) setzt css/tokens.css; die Vorschau in den Einstellungen
++   setzt ihre Farben selbst (.es-mini). */
++
++/* ---------- Gemeinsam ---------- */
++.an-screen :focus-visible, .vl-screen :focus-visible, .es-screen :focus-visible {
++  outline: var(--fokus); outline-offset: 2px; }
++.an-screen button, .vl-screen button, .es-screen button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
++.an-screen .knopf:disabled, .vl-screen .knopf:disabled { opacity: .38; cursor: default; transform: none; }
++
++/* Avatar (Pixel-Portraet im abgerundeten Quadrat, Rahmen in Bot-Farbe --bf) */
++.an-avatar { --g: 64px; --bf: var(--linie-2); position: relative; flex: none; width: var(--g); height: var(--g); border-radius: 22%;
++  background: var(--flaeche-2);
++  border: 2px solid var(--bf); box-shadow: var(--s1);
++  display: grid; place-items: center; overflow: hidden; }
++@supports (color: color-mix(in srgb, red 50%, blue)) {
++  .an-avatar { background: color-mix(in srgb, var(--bf) 24%, var(--flaeche)); }
++}
++.an-avatar img { width: 84%; height: 84%; image-rendering: pixelated; }
++.an-avatar.an-ich { background: var(--flo-grund); border-color: var(--flo-grund); color: #F3F1EC;
++  font-family: var(--display); font-weight: var(--gw-titel); font-size: calc(var(--g) * .46); line-height: 1; }
++
++/* ============================================================
++   SPIELANALYSE
++   ============================================================ */
++.an-screen {
++  --an-balken: 26px;  /* Balken 18 px + Abstand 8 px */
++  --an-sicher: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
++  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
++  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
++}
++.an-screen.ohne-balken { --an-balken: 0px; }
++.an-screen.ohne-balken .an-evalbalken { display: none; }
++.an-koerper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
++.an-kopf-knoepfe { display: flex; gap: 10px; flex: none; }
++.an-inhalt { flex: 1; min-height: 0; width: 100%; max-width: 1480px; margin: 0 auto; display: grid;
++  grid-template-columns: auto minmax(0, 1fr); gap: 20px; padding: 0 18px 16px; }
++.an-links { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); min-height: 0; overflow-y: auto; scrollbar-width: none; }
++.an-links::-webkit-scrollbar { display: none; }
++.an-rechts { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain;
++  padding: 2px 4px 8px 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; scrollbar-color: var(--linie-2) transparent; }
++.an-rechts > * { flex: none; }
++.an-rechts.mehr { -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
++
++/* ---------- Brett ---------- */
++.an-brettzone { position: relative; display: flex; gap: 8px; align-items: stretch; flex: none; }
++.an-brett-rahmen { position: relative; flex: none; width: calc(var(--an-brett) + 8px); padding: 4px; border-radius: 18px; background-color: var(--sockel);
++  background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); transition: box-shadow .3s ease; }
++.an-brett-rahmen::after { content: ""; position: absolute; inset: 3px; border-radius: 15px; box-shadow: 0 0 0 1px var(--linie); pointer-events: none; }
++.an-brett-rahmen .brett { --brett-radius: 14px; touch-action: pan-y; }
++.an-screen .brett > .figur { filter: drop-shadow(0 2px 1.5px rgba(10, 12, 30, .28)); }
++.an-screen .brett > .abzeichen-ort { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3)); }
++.an-screen .abzeichen-ort.k-brillant { --kf: var(--k-brillant); } .an-screen .abzeichen-ort.k-stark { --kf: var(--k-stark); }
++.an-screen .abzeichen-ort.k-bester { --kf: var(--k-bester); } .an-screen .abzeichen-ort.k-exzellent { --kf: var(--k-exzellent); }
++.an-screen .abzeichen-ort.k-gut { --kf: var(--k-gut); } .an-screen .abzeichen-ort.k-buch { --kf: var(--k-buch); }
++.an-screen .abzeichen-ort.k-ungenau { --kf: var(--k-ungenau); } .an-screen .abzeichen-ort.k-fehler { --kf: var(--k-fehler); }
++.an-screen .abzeichen-ort.k-verpasst { --kf: var(--k-verpasst); } .an-screen .abzeichen-ort.k-patzer { --kf: var(--k-patzer); }
++.an-screen .abzeichen-ort.k-erzwungen { --kf: var(--k-erzwungen); }
++/* Variante: Sockel in der Farbe des staerksten Zugs, Etikett oben auf dem Brett */
++.an-brettzone.variante .an-brett-rahmen { background: var(--k-bester); box-shadow: var(--s-brett); }
++.an-c-eval.an-c-variante { background: var(--flaeche-3); color: var(--kt-bester); box-shadow: inset 0 0 0 1.5px var(--k-bester); }
++
++/* ---------- Bewertungsbalken ---------- */
++.an-evalbalken { position: relative; flex: none; width: 18px; border-radius: 10px; overflow: hidden; background: var(--balken-schwarz);
++  border: 1px solid var(--linie-2); box-shadow: var(--s1); }
++.an-evalbalken[data-unten="b"] { background: var(--eval-weiss); }
++.an-eb-unten { position: absolute; left: 0; right: 0; bottom: 0; height: var(--w, 50%); background: var(--eval-weiss);
++  transition: height .7s cubic-bezier(.2, .9, .2, 1); }
++.an-evalbalken[data-unten="b"] .an-eb-unten { background: var(--eval-schwarz); }
++.an-eb-unten::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(128, 128, 128, .5); }
++.an-eb-mitte { position: absolute; z-index: 2; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .55); }
++.an-eb-wert { position: absolute; z-index: 3; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 10px; font-weight: 800; line-height: 1;
++  writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .02em; color: var(--balken-schwarz); }
++.an-eb-wert[data-seite="oben"] { bottom: auto; top: 6px; }
++.an-eb-wert[data-farbe="b"] { color: var(--balken-weiss); }
++
++/* ---------- Navigation ---------- */
++.an-navi { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: center; }
++.an-navi .knopf { padding: 0; min-height: 52px; }
++.an-stand { min-width: 84px; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; text-align: right; }
++
++/* ---------- Coach-Karte ---------- */
++.an-coach { --kf: var(--k-bester); --kt: var(--text); position: relative; flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
++  padding: 14px 16px; border-radius: var(--radius); background: var(--flaeche); color: var(--text); border: 1.5px solid var(--linie);
++  box-shadow: var(--s2); }
++@supports (color: color-mix(in srgb, red 50%, blue)) {
++  .an-coach { border-color: color-mix(in srgb, var(--kf) 45%, var(--linie)); }
++}
++/* Textfassung der Klasse (Kontrast >= 4,5:1) fuer Coach-Wort und Zaehler; data-klasse setzt analyse.js */
++.an-screen [data-klasse="brillant"] { --kt: var(--kt-brillant); }
++.an-screen [data-klasse="stark"] { --kt: var(--kt-stark); }
++.an-screen [data-klasse="bester"] { --kt: var(--kt-bester); }
++.an-screen [data-klasse="exzellent"] { --kt: var(--kt-exzellent); }
++.an-screen [data-klasse="gut"] { --kt: var(--kt-gut); }
++.an-screen [data-klasse="buch"] { --kt: var(--kt-buch); }
++.an-screen [data-klasse="ungenau"] { --kt: var(--kt-ungenau); }
++.an-screen [data-klasse="fehler"] { --kt: var(--kt-fehler); }
++.an-screen [data-klasse="verpasst"] { --kt: var(--kt-verpasst); }
++.an-screen [data-klasse="patzer"] { --kt: var(--kt-patzer); }
++.an-screen [data-klasse="erzwungen"] { --kt: var(--kt-erzwungen); }
++.an-coach.ein { animation: an-coach-ein .4s cubic-bezier(.2, 1.2, .4, 1) both; }
++.an-coach.ein .an-c-symbol { animation: an-pop .55s cubic-bezier(.2, 1.4, .4, 1) .08s both; }
++@keyframes an-coach-ein { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
++@keyframes an-pop { 0% { transform: scale(0) rotate(-35deg); opacity: 0; } 55% { transform: scale(1.22) rotate(8deg); opacity: 1; }
++  78% { transform: scale(.94) rotate(-2deg); } 100% { transform: none; } }
++.an-c-symbol { width: 46px; height: 46px; grid-row: span 2; align-self: start; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .18)); }
++.an-c-symbol svg { display: block; width: 100%; height: 100%; }
++.an-c-start { display: grid; place-items: center; border-radius: 50%; background: var(--flaeche-2); border: 1.5px solid var(--linie-2); color: var(--text); }
++.an-c-start svg { width: 26px; height: 26px; }
++.an-c-kopf { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
++.an-c-klasse { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; line-height: 1.15; color: var(--kt); }
++.an-c-zug { font-weight: 800; font-size: 16px; }
++.an-c-eval { align-self: start; padding: 4px 9px; border-radius: 9px; background: var(--flaeche-3); color: var(--text); font-weight: 800; font-size: 14px; white-space: nowrap;
++  font-variant-numeric: tabular-nums; }
++.an-c-text { grid-column: 2 / 4; margin: 0; font-size: 15px; line-height: 1.4; color: var(--text); }
++.an-c-fuss { grid-column: 2 / 4; display: flex; align-items: center; gap: 6px 10px; margin-top: 4px; }
++.an-c-linie { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; color: var(--text-2); }
++.an-c-linie-titel { font-weight: 800; color: var(--kt-bester); white-space: nowrap; }
++.an-c-linie-titel b { margin-left: 3px; padding: 1px 6px; border-radius: 6px; background: var(--flaeche-3); color: var(--text); font-size: 13px; }
++.an-c-zuege { color: var(--text); font-weight: 650; word-spacing: 2px; }
++.an-c-zuege span { border-radius: 5px; padding: 0 2px; transition: background .2s, color .2s; }
++.an-c-zuege span.an { background: var(--flaeche-3); color: var(--text); box-shadow: 0 0 0 1.5px var(--k-bester); }
++.an-c-knoepfe { flex: none; display: flex; gap: 8px; }
++.an-c-knoepfe .knopf { min-height: 44px; font-size: 14px; padding: 0 14px; background: var(--flaeche-2); box-shadow: none; }
++.an-c-knoepfe .knopf.an-nur-icon { width: 44px; padding: 0; }
++.an-c-knoepfe .knopf svg { width: 18px; height: 18px; }
++.an-c-knoepfe .knopf[hidden] { display: none; }
++.an-coach.brillant { border-color: var(--k-brillant);
++  /* deckende Flaeche unter der Toenung: die Klassenfarbe ist nur Rahmen (Kontrast des Klassenworts) */
++  background: linear-gradient(var(--flaeche), var(--flaeche)) padding-box; box-shadow: var(--s2), 0 0 0 1px var(--k-brillant); }
++.an-coach.start .an-c-klasse { color: var(--text); }
++.an-coach.variante { box-shadow: var(--s2), 0 0 0 1.5px var(--k-bester); }
++
++/* ---------- Freischalt-Banner ---------- */
++.an-banner { --bf: var(--linie-2); position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: var(--radius); overflow: hidden;
++  background-color: var(--flaeche); background-image: var(--textur-banner, none); color: var(--text); border: 1.5px solid var(--linie); box-shadow: var(--s2); }
++@supports (color: color-mix(in srgb, red 50%, blue)) {
++  .an-banner { border-color: color-mix(in srgb, var(--bf) 55%, var(--linie)); }
++}
++.an-banner::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -50%; pointer-events: none;
++  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .22), transparent); animation: an-streif 1.6s ease-out .4s 1 both; }
++@keyframes an-streif { to { left: 120%; } }
++.an-banner .an-avatar { --g: 52px; }
++.an-banner-text { min-width: 0; }
++.an-ft-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--akzent-text); }
++.an-ft-name { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; }
++.an-ft-sterne { margin-left: auto; flex: none; text-align: right; font-size: 12px; color: var(--text-2); max-width: 45%; }
++.an-ft-sterne b { display: block; font-size: 24px; letter-spacing: 2px; line-height: 1; margin-bottom: 3px; }
++.an-ft-sterne b span { display: inline-block; }
++.an-ft-sterne b .an { color: var(--gold); }
++.an-ft-sterne b .aus { color: var(--linie-2); }
++.an-ft-sterne b .neu { animation: an-stern-ein .55s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i, 0) * .3s); }
++@keyframes an-stern-ein { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
++
++/* ---------- Genauigkeit ---------- */
++.an-genau { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px 18px; }
++.an-seite { display: flex; align-items: center; gap: 12px; min-width: 0; }
++.an-seite.an-re { flex-direction: row-reverse; text-align: right; }
++.an-seite-text { min-width: 0; }
++.an-genau .an-avatar { --g: 48px; border-radius: 14px; }
++.an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
++.an-ich-wert { color: var(--text); }
++.an-g-leer { font-size: 16px; color: var(--text-2); }
++.an-g-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.an-g-label.an-g-zweit { margin-top: 1px; }
++.an-vs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; min-width: 64px; }
++.an-vs-wort { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
++.an-vs.an-sieg .an-vs-wort { color: var(--kt-bester); }
++.an-vs.an-niederlage .an-vs-wort { color: var(--text-2); }
++.an-vs.an-remis .an-vs-wort { color: var(--text); }
++.an-vs b { font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); line-height: 1.1; }
++.an-vs-grund { font-size: 12px; color: var(--text-2); max-width: 120px; }
++.an-g-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 2px; }
++.an-chip-staerke { color: var(--text-2); background: var(--flaeche-2); }
++.an-chip-staerke b { font-weight: 800; color: var(--text); }
++.an-chip-rekord { color: var(--text); border-color: var(--gold); background: var(--gold-weich); }
++.an-eroeffnung { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--text-2); }
++.an-eroeffnung svg { width: 18px; height: 18px; flex: none; color: var(--k-buch); }
++
++/* ---------- Bewertungskurve ---------- */
++.an-kurve-box { padding: 10px 12px 6px; }
++.an-kurve-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; letter-spacing: .04em; }
++.an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
++.an-k-titel b { font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
++.an-k-legende { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
++.an-kurve-wrap { position: relative; height: 112px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
++.an-kurve { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
++.an-kurve:focus-visible { outline: var(--fokus); outline-offset: 3px; }
++/* Kurve wie der Bewertungsbalken: Weiss-Anteil hell auf Schiefer (Farben der SVG-Attribute per CSS ersetzt) */
++.an-kurve > rect { fill: var(--balken-schwarz); }
++.an-kurve > line:not(.an-k-phase):not(.an-k-cursor) { stroke: rgba(255, 255, 255, .28); }
++.an-k-linie { stroke: #9A9EA8; filter: none; }
++.an-k-phase { stroke: rgba(255, 255, 255, .22); stroke-width: 1; stroke-dasharray: 2 4; }
++.an-k-cursor { stroke: var(--akzent); stroke-width: 2; filter: none; }
++.an-k-punkte { position: absolute; inset: 0; pointer-events: none; }
++.an-k-punkte i { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--kf);
++  border: 1.5px solid var(--balken-schwarz); opacity: .9; }
++.an-k-punkte i.du { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; border-color: #FFFFFF; }
++.an-k-marke { position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: #FFFFFF;
++  border: 3px solid var(--akzent); box-shadow: var(--s1); pointer-events: none; transition: left .15s ease, top .15s ease; }
++.an-phasen { position: relative; height: 20px; margin-top: 2px; }
++.an-phasen span { position: absolute; top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px;
++  font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); text-align: center; }
++
++/* ---------- Schluesselmomente ---------- */
++.an-momente-titel { margin: 0 0 6px 2px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
++.an-momente { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px;
++  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
++.an-momente::-webkit-scrollbar { display: none; }
++.an-momente::after { content: ""; flex: 0 0 28px; }
++.an-moment.knopf { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; gap: 6px; background: var(--flaeche); }
++.an-moment.knopf svg { width: 18px; height: 18px; }
++.an-moment:not(.du) { color: var(--text-2); font-weight: 600; }
++.an-moment.an { box-shadow: inset 0 0 0 1.5px var(--text); background: var(--flaeche-3); color: var(--text); }
++.an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; -webkit-mask-image: none; mask-image: none; }
++
++/* ---------- Klassen-Zaehler ---------- */
++.an-klassen { padding: 8px 16px 6px; }
++.an-kl-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(7, auto) auto; grid-auto-flow: column; column-gap: 18px; }
++.an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 11px; font-weight: 750; letter-spacing: .1em;
++  text-transform: uppercase; color: var(--text-2); }
++.an-kl-kopf span:first-child { flex: none; width: 34px; text-align: center; }
++.an-kl-kopf span:last-child { min-width: 34px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; }
++.an-kl { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; width: 100%; min-height: 44px; padding: 0; margin: 0;
++  background: none; border: 0; border-bottom: 1px solid var(--linie); border-radius: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
++.an-kl:active:not(.leer) { background: var(--flaeche-2); }
++.an-kl.leer { cursor: default; }
++.an-n { font-weight: 850; font-size: 16px; text-align: center; font-variant-numeric: tabular-nums; }
++.an-n.du { color: var(--kt, var(--text)); }
++.an-n.nul { color: var(--text-3); }
++.an-kl-mitte { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 650; }
++.an-kl-mitte span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
++.an-kl-mitte svg { width: 22px; height: 22px; flex: none; }
++.an-kl.null .an-kl-mitte { opacity: .45; }
++.an-kl-gesamt { grid-column: 1 / -1; grid-row: 8; cursor: default; border-bottom: 0; border-top: 1px solid var(--linie-2); min-height: 40px;
++  grid-template-columns: 34px minmax(0, 1fr) 34px; }
++.an-kl-gesamt .an-kl-mitte { justify-content: center; font-size: 13px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
++.an-kl-platz { border-bottom: 1px solid var(--linie); }
++
++/* ---------- Kopf-Knoepfe unten (Handy) ---------- */
++.an-aktionsleiste { display: none; }
++
++/* ---------- Laden / Fehler / unbekannte Partie ---------- */
++.an-laden, .an-meldung { width: min(520px, calc(100% - 36px)); margin: 6vh auto 24px; padding: 26px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
++.an-laden-duell { display: flex; align-items: center; gap: 16px; }
++.an-laden-duell .an-avatar { --g: 72px; }
++.an-laden-vs { font-size: 12px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
++.an-laden-titel, .an-meldung h3 { margin: 0; font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
++.an-fortschritt { position: relative; width: 100%; height: 12px; border-radius: 999px; overflow: hidden; background: var(--flaeche-3); border: 1px solid var(--linie); }
++.an-fortschritt i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--wert, 0%); border-radius: inherit; background: var(--tinte);
++  transition: width .3s ease; }
++.an-fortschritt i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .3), transparent);
++  background-size: 60px 100%; background-repeat: no-repeat; animation: an-glanz 1.3s linear infinite; }
++@keyframes an-glanz { from { background-position: -60px 0; } to { background-position: 520px 0; } }
++.an-laden-text, .an-meldung p { margin: 0; font-size: 14px; color: var(--text-2); }
++.an-laden.fehler .an-laden-titel { color: var(--warn); }
++.an-meldung-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: var(--flaeche-2); color: var(--text); border: 1.5px solid var(--linie-2); }
++.an-meldung-icon svg { width: 32px; height: 32px; }
++
++/* ---------- Niedriges Querformat (Handy quer): Brett nach der Hoehe, linke Spalte scrollt ---------- */
++@media (orientation: landscape) and (max-height: 560px) {
++  .an-screen { --tap: 44px;
++    --an-brett: min(calc(100vh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
++    --an-brett: min(calc(100dvh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
++  .an-screen .kopf { height: 56px; padding: 0 10px; }
++  .an-inhalt { padding: 0 10px 12px; gap: 16px; }
++  .an-kopf-knoepfe .knopf { padding: 0 12px; font-size: 14px; }
++}
++
++/* ---------- Hochformat (iPad hoch, Handy): eine Spalte, die Seite scrollt ---------- */
++@media (orientation: portrait) {
++  .an-screen { --an-brett: min(calc(100vw - 36px - 34px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 720px); }
++  .an-koerper { flex: none; display: block; }
++  .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
++  .an-links, .an-rechts { display: contents; }
++  .an-banner { order: 1; } .an-genau { order: 2; } .an-kurve-box { order: 3; }
++  .an-brettzone { order: 4; } .an-navi { order: 5; } .an-coach { order: 6; }
++  .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
++  .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
++}
++@media (orientation: portrait) and (max-width: 520px) {
++  .an-screen { --tap: 44px; --an-balken: 20px; --an-brett: calc(100vw - 20px - 6px - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); }
++  .an-screen.ohne-balken { --an-brett: calc(100vw - 20px - 6px); }
++  .an-screen .kopf { height: 56px; padding: 0 10px; }
++  .an-kopf-knoepfe { display: none; }
++  .an-inhalt { gap: 10px; padding-bottom: 6px; }
++  .an-brettzone { gap: 6px; }
++  .an-evalbalken { width: 14px; }
++  .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
++  .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }
++  .an-brett-rahmen .brett { --brett-radius: 11px; }
++  .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
++  .an-stand { display: none; }
++  .an-banner { padding: 10px 12px; gap: 10px; }
++  .an-banner .an-avatar { --g: 44px; }
++  .an-ft-titel { font-size: 10px; letter-spacing: .08em; }
++  .an-ft-name { font-size: 15px; }
++  .an-ft-sterne span { display: none; }
++  .an-ft-sterne b { font-size: 20px; margin: 0; }
++  .an-genau { padding: 12px; gap: 8px 6px; }
++  .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
++  .an-seite { gap: 8px; }
++  .an-g-wert { font-size: 27px; }
++  .an-g-label { font-size: 11px; }
++  .an-vs { min-width: 52px; }
++  .an-vs b { font-size: 18px; }
++  .an-vs-wort { font-size: 10px; letter-spacing: .1em; }
++  .an-vs-grund { font-size: 11px; max-width: 84px; }
++  .an-kurve-wrap { height: 92px; }
++  .an-k-legende { display: none; }
++  .an-g-zusatz { display: none; }
++  .an-c-fuss { flex-wrap: wrap; }
++  .an-c-linie { flex-basis: 100%; }
++  .an-coach { padding: 10px 12px; gap: 2px 10px; }
++  .an-c-symbol { width: 38px; height: 38px; }
++  .an-c-klasse { font-size: 17px; }
++  .an-c-zug { font-size: 15px; }
++  .an-c-text { font-size: 14px; }
++  .an-c-linie { font-size: 13px; }
++  .an-klassen { padding: 6px 12px; }
++  .an-kl-raster { display: flex; flex-direction: column; }
++  .an-kl-kopf2, .an-kl-platz { display: none; }
++  .an-aktionsleiste { order: 99; display: grid; grid-template-columns: auto 1fr; gap: 8px; position: sticky; bottom: 0; z-index: 20;
++    padding: 12px 10px calc(10px + env(safe-area-inset-bottom, 0px)); margin-top: auto;
++    background: linear-gradient(var(--grund-0), var(--grund) 34%); }
++  .an-aktionsleiste .knopf { min-height: 50px; }
++  .an-laden, .an-meldung { width: calc(100% - 20px); padding: 22px 16px; }
++}
++
++/* ============================================================
++   BAU C (Integration): Die Coach-Karte der Analyse passte im
++   Querformat mit Hauptvariante oft nicht ganz unter das Brett und
++   wurde am unteren Rand abgeschnitten. Etwas mehr Platz einplanen,
++   bei sehr langem Text schrumpft die Karte und scrollt innen.
++   Zuege nicht am Bindestrich umbrechen (0-0, 0-0-0).
++   ============================================================ */
++.an-c-zuege span { white-space: nowrap; }
++@media (orientation: landscape) and (min-height: 561px) {
++  .an-screen {
++    --an-brett: min(calc(100vh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
++    --an-brett: min(calc(100dvh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
++  }
++  .an-navi .knopf { min-height: 48px; }
++  .an-coach { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; }
++}
+diff --git a/css/einstellungen.css b/css/einstellungen.css
+index 65bfcae3c0c0e55383696db4a73c411f3b5a38de..3452da9ae8074d4d8b282eaf4b4e30c379232af8 100644
+--- a/css/einstellungen.css
++++ b/css/einstellungen.css
+@@ -1,5 +1,110 @@
++/* Einstellungen – Premium-Umbau (PLAN 2.9 und 4) */
+ /* ============================================================
+-   Schach-Arena · Einstellungen (Premium-Umbau, Look A)
+-   Angelegt von U1 (leer), gefuellt von Paket U8 (PLAN 2.9).
+-   Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
++   EINSTELLUNGEN
+    ============================================================ */
++.es-inhalt { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 18px 36px; display: flex; flex-direction: column; gap: 14px; }
++.es-gruppe { padding: 14px 16px; }
++.es-titel { margin: 2px 0 8px; padding-left: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
++  text-transform: uppercase; color: var(--text-2); }
++.es-hilfe { margin: 0 0 12px; font-size: 14px; color: var(--text-2); }
++.es-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 64px; padding: 6px 0;
++  border-bottom: 1px solid var(--linie); }
++.es-zeile:last-child { border-bottom: 0; }
++.es-text { min-width: 0; cursor: pointer; }
++.es-text b { display: block; font-size: 16px; font-weight: 750; }
++.es-text span { display: block; font-size: 13px; color: var(--text-2); margin-top: 1px; }
++.es-schalter { width: 68px; height: 48px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; border-radius: 14px; }
++.es-schalter i { position: relative; width: 54px; height: 32px; border-radius: 999px; background: var(--flaeche-3); border: 1px solid var(--linie-2);
++  transition: background .2s ease, box-shadow .2s ease; }
++.es-schalter i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF;
++  box-shadow: 0 1px 3px rgba(0, 0, 0, .25), 0 0 0 .5px rgba(0, 0, 0, .06); transition: transform .2s cubic-bezier(.2, .9, .3, 1.2), background .2s; }
++.es-schalter[aria-checked="true"] i { background: var(--schalter-an); border-color: transparent; }
++.es-schalter[aria-checked="true"] i::after { transform: translateX(22px); background: var(--knauf-an); }
++.es-probe.knopf { min-height: 44px; padding: 0 14px; font-size: 14px; background: var(--flaeche-2); box-shadow: none; }
++.es-probe.knopf svg { width: 16px; height: 16px; }
++.es-probe.knopf:disabled { opacity: .38; cursor: default; }
++
++.es-bretter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
++.es-brett { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 44px; padding: 10px 10px 8px; border-radius: 16px; cursor: pointer;
++  background: var(--flaeche-2); border: 1.5px solid var(--linie); color: inherit; font: inherit; }
++.es-brett[aria-checked="true"] { border-color: var(--text); background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--text); }
++.es-mini { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; max-width: 136px; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
++  box-shadow: var(--s2); }
++.es-mini i { position: relative; display: block; }
++.es-mini i.h { background: var(--feld-hell); }
++.es-mini i.d { background: var(--feld-dunkel); }
++.es-mini img { position: absolute; inset: 4%; width: 92%; height: 92%; filter: drop-shadow(0 1px 1px rgba(10, 12, 30, .3)); }
++.es-brett-name { font-size: 15px; font-weight: 800; }
++.es-brett[aria-checked="true"] .es-brett-name { color: var(--text); }
++
++.es-segment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: 16px; background: var(--grund-2); border: 1px solid var(--linie); }
++.es-seg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 58px; padding: 4px; border: 0; border-radius: 12px;
++  background: none; color: inherit; font: inherit; cursor: pointer; }
++.es-seg b { font-size: 15px; font-weight: 800; }
++.es-seg { color: var(--text-2); }
++.es-seg span { font-size: 12px; color: var(--text-2); }
++.es-seg[aria-checked="true"] { background: var(--flaeche); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
++.es-seg[aria-checked="true"] b { color: var(--text); }
++
++.es-rot-rand { border-color: var(--warn); color: var(--warn); }
++.es-rot { background: var(--warn); border-color: var(--warn); color: #FFFFFF; box-shadow: none; }
++.es-warnung { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; padding: 12px; border-radius: 12px;
++  background: var(--gold-weich); border: 1px solid var(--gold); }
++.es-warnung svg { width: 24px; height: 24px; flex: none; color: var(--text); }
++.es-warnung p { margin: 0; font-size: 14px; color: var(--text); }
++.es-warnung.stark { background: var(--warn-weich); border-color: var(--warn); }
++.es-warnung.stark svg { color: var(--warn); }
++.es-warnung.stark p { color: var(--text); }
++.es-knoepfe { display: flex; flex-wrap: wrap; gap: 10px; }
++.es-knoepfe .knopf, .es-reset > .knopf { white-space: normal; text-align: center; }
++
++.es-info p { margin: 0 0 10px; font-size: 14px; color: var(--text-2); }
++.es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
++  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
++  padding-block: 13px; }
++.es-lizenzen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
++.es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
++.es-lizenzen b { font-size: 14px; }
++.es-lizenzen span { font-size: 13px; color: var(--text-2); }
++
++@media (max-width: 520px) {
++  .es-screen .kopf { height: 56px; padding: 0 10px; }
++  .es-inhalt { padding: 0 10px 28px; gap: 12px; }
++  .es-gruppe { padding: 12px; }
++  .es-zeile { gap: 6px; }
++  .es-probe.knopf { padding: 0 10px; }
++  .es-bretter { gap: 8px; }
++  .es-brett { padding: 8px 6px 6px; }
++}
++
++/* ---------- Weniger Bewegung ---------- */
++@media (prefers-reduced-motion: reduce) {
++  .an-screen *, .an-screen *::before, .an-screen *::after,
++  .vl-screen *, .vl-screen *::before, .vl-screen *::after,
++  .es-screen *, .es-screen *::before, .es-screen *::after {
++    animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
++}
++
++
++/* Zweispaltige iPad-Navigation; auf dem Handy bleibt nur der Inhalt. */
++.es-layout { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 18px 36px; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; align-items: start; }
++.es-layout .es-inhalt { width: auto; max-width: none; margin: 0; padding: 0; }
++.es-nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); box-shadow: var(--s1); }
++.es-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 12px; color: var(--text-2); font-weight: 750; text-decoration: none; }
++.es-nav a:hover, .es-nav a:focus-visible, .es-nav a.an { color: var(--text); background: var(--flaeche-2); }
++.es-block, .es-untergruppe { margin: 12px 0; }
++.es-block h4, .es-untergruppe h4, .es-gruppe > h4 { margin: 14px 0 8px; font-size: 15px; }
++.es-regler { display: block; padding: 12px 0; }
++.es-regler > span { display: flex; justify-content: space-between; margin-bottom: 8px; }
++.es-regler output { color: var(--text-2); font-variant-numeric: tabular-nums; }
++.es-regler input { width: 100%; min-height: 44px; accent-color: var(--akzent); }
++.es-tempo-vorschau { height: 54px; overflow: hidden; border-radius: 12px; background: var(--flaeche-2); }
++.es-tempo-vorschau span { display: block; width: 44px; font-size: 36px; animation: es-springer calc(2s * var(--tempo, 1)) var(--gleiten) infinite alternate; }
++@keyframes es-springer { to { transform: translateX(min(520px, calc(100vw - 120px))); } }
++.es-coach-vorschau { margin-top: 14px; padding: 14px; border-left: 4px solid var(--akzent); border-radius: 12px; background: var(--flaeche-2); }
++.es-coach-vorschau p { margin: 4px 0 0; color: var(--text-2); }
++@media (max-width: 700px) {
++  .es-layout { display: block; padding: 0 10px 28px; }
++  .es-nav { display: none; }
++  .es-layout .es-inhalt { padding: 0; }
++}
+diff --git a/css/screens.css b/css/screens.css
+index ed2b8400e838a98ea595f30f9319c46961ed1646..3f2e727b941ffb9ccdb28d8d70c0313fcac3d76a 100644
+--- a/css/screens.css
++++ b/css/screens.css
+@@ -1,550 +1 @@
+-/* ============================================================
+-   Schach-Arena · Screens von Bau B: Spielanalyse (an-), Verlauf (vl-),
+-   Einstellungen (es-). Vorlage: design/neon/werkzeug/mockup.css,
+-   Abschnitt Spielanalyse. Nutzt die BASIS aus css/app.css
+-   (.screen, .kopf, .knopf, .icon-knopf, .chip, .flaeche, .zahl, .stern).
+-   Reihenfolge der Dateien: tokens.css -> themes/<id>.css -> board.css -> app.css -> ... -> screens.css
+-   Premium-Umbau U1: alle Farben auf Tokens (hell und dunkel lesbar), kein Leuchten,
+-   keine Neon-Verlaeufe. Aufbau unveraendert; U8 (Einstellungen) und U9 (Analyse,
+-   Verlauf) ersetzen ihre Abschnitte durch eigene Dateien.
+-   ============================================================ */
+-
+-/* Brettfarben (html[data-brett]) setzt css/tokens.css; die Vorschau in den Einstellungen
+-   setzt ihre Farben selbst (.es-mini). */
+-
+-/* ---------- Gemeinsam ---------- */
+-.an-screen :focus-visible, .vl-screen :focus-visible, .es-screen :focus-visible {
+-  outline: var(--fokus); outline-offset: 2px; }
+-.an-screen button, .vl-screen button, .es-screen button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+-.an-screen .knopf:disabled, .vl-screen .knopf:disabled { opacity: .38; cursor: default; transform: none; }
+-
+-/* Avatar (Pixel-Portraet im abgerundeten Quadrat, Rahmen in Bot-Farbe --bf) */
+-.an-avatar { --g: 64px; --bf: var(--linie-2); position: relative; flex: none; width: var(--g); height: var(--g); border-radius: 22%;
+-  background: var(--flaeche-2);
+-  border: 2px solid var(--bf); box-shadow: var(--s1);
+-  display: grid; place-items: center; overflow: hidden; }
+-@supports (color: color-mix(in srgb, red 50%, blue)) {
+-  .an-avatar { background: color-mix(in srgb, var(--bf) 24%, var(--flaeche)); }
+-}
+-.an-avatar img { width: 84%; height: 84%; image-rendering: pixelated; }
+-.an-avatar.an-ich { background: var(--flo-grund); border-color: var(--flo-grund); color: #F3F1EC;
+-  font-family: var(--display); font-weight: var(--gw-titel); font-size: calc(var(--g) * .46); line-height: 1; }
+-
+-/* ============================================================
+-   SPIELANALYSE
+-   ============================================================ */
+-.an-screen {
+-  --an-balken: 26px;  /* Balken 18 px + Abstand 8 px */
+-  --an-sicher: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+-  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+-  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+-}
+-.an-screen.ohne-balken { --an-balken: 0px; }
+-.an-screen.ohne-balken .an-evalbalken { display: none; }
+-.an-koerper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+-.an-kopf-knoepfe { display: flex; gap: 10px; flex: none; }
+-.an-inhalt { flex: 1; min-height: 0; width: 100%; max-width: 1480px; margin: 0 auto; display: grid;
+-  grid-template-columns: auto minmax(0, 1fr); gap: 20px; padding: 0 18px 16px; }
+-.an-links { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); min-height: 0; overflow-y: auto; scrollbar-width: none; }
+-.an-links::-webkit-scrollbar { display: none; }
+-.an-rechts { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain;
+-  padding: 2px 4px 8px 2px; margin: -2px -4px 0 -2px; scrollbar-width: thin; scrollbar-color: var(--linie-2) transparent; }
+-.an-rechts > * { flex: none; }
+-.an-rechts.mehr { -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
+-
+-/* ---------- Brett ---------- */
+-.an-brettzone { position: relative; display: flex; gap: 8px; align-items: stretch; flex: none; }
+-.an-brett-rahmen { position: relative; flex: none; width: calc(var(--an-brett) + 8px); padding: 4px; border-radius: 18px; background-color: var(--sockel);
+-  background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); transition: box-shadow .3s ease; }
+-.an-brett-rahmen::after { content: ""; position: absolute; inset: 3px; border-radius: 15px; box-shadow: 0 0 0 1px var(--linie); pointer-events: none; }
+-.an-brett-rahmen .brett { --brett-radius: 14px; touch-action: pan-y; }
+-.an-screen .brett > .figur { filter: drop-shadow(0 2px 1.5px rgba(10, 12, 30, .28)); }
+-.an-screen .brett > .abzeichen-ort { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3)); }
+-.an-screen .abzeichen-ort.k-brillant { --kf: var(--k-brillant); } .an-screen .abzeichen-ort.k-stark { --kf: var(--k-stark); }
+-.an-screen .abzeichen-ort.k-bester { --kf: var(--k-bester); } .an-screen .abzeichen-ort.k-exzellent { --kf: var(--k-exzellent); }
+-.an-screen .abzeichen-ort.k-gut { --kf: var(--k-gut); } .an-screen .abzeichen-ort.k-buch { --kf: var(--k-buch); }
+-.an-screen .abzeichen-ort.k-ungenau { --kf: var(--k-ungenau); } .an-screen .abzeichen-ort.k-fehler { --kf: var(--k-fehler); }
+-.an-screen .abzeichen-ort.k-verpasst { --kf: var(--k-verpasst); } .an-screen .abzeichen-ort.k-patzer { --kf: var(--k-patzer); }
+-.an-screen .abzeichen-ort.k-erzwungen { --kf: var(--k-erzwungen); }
+-/* Variante: Sockel in der Farbe des staerksten Zugs, Etikett oben auf dem Brett */
+-.an-brettzone.variante .an-brett-rahmen { background: var(--k-bester); box-shadow: var(--s-brett); }
+-.an-c-eval.an-c-variante { background: var(--flaeche-3); color: var(--kt-bester); box-shadow: inset 0 0 0 1.5px var(--k-bester); }
+-
+-/* ---------- Bewertungsbalken ---------- */
+-.an-evalbalken { position: relative; flex: none; width: 18px; border-radius: 10px; overflow: hidden; background: var(--balken-schwarz);
+-  border: 1px solid var(--linie-2); box-shadow: var(--s1); }
+-.an-evalbalken[data-unten="b"] { background: var(--eval-weiss); }
+-.an-eb-unten { position: absolute; left: 0; right: 0; bottom: 0; height: var(--w, 50%); background: var(--eval-weiss);
+-  transition: height .7s cubic-bezier(.2, .9, .2, 1); }
+-.an-evalbalken[data-unten="b"] .an-eb-unten { background: var(--eval-schwarz); }
+-.an-eb-unten::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(128, 128, 128, .5); }
+-.an-eb-mitte { position: absolute; z-index: 2; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .55); }
+-.an-eb-wert { position: absolute; z-index: 3; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 10px; font-weight: 800; line-height: 1;
+-  writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .02em; color: var(--balken-schwarz); }
+-.an-eb-wert[data-seite="oben"] { bottom: auto; top: 6px; }
+-.an-eb-wert[data-farbe="b"] { color: var(--balken-weiss); }
+-
+-/* ---------- Navigation ---------- */
+-.an-navi { flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: center; }
+-.an-navi .knopf { padding: 0; min-height: 52px; }
+-.an-stand { min-width: 84px; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; text-align: right; }
+-
+-/* ---------- Coach-Karte ---------- */
+-.an-coach { --kf: var(--k-bester); --kt: var(--text); position: relative; flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: center;
+-  padding: 14px 16px; border-radius: var(--radius); background: var(--flaeche); color: var(--text); border: 1.5px solid var(--linie);
+-  box-shadow: var(--s2); }
+-@supports (color: color-mix(in srgb, red 50%, blue)) {
+-  .an-coach { border-color: color-mix(in srgb, var(--kf) 45%, var(--linie)); }
+-}
+-/* Textfassung der Klasse (Kontrast >= 4,5:1) fuer Coach-Wort und Zaehler; data-klasse setzt analyse.js */
+-.an-screen [data-klasse="brillant"] { --kt: var(--kt-brillant); }
+-.an-screen [data-klasse="stark"] { --kt: var(--kt-stark); }
+-.an-screen [data-klasse="bester"] { --kt: var(--kt-bester); }
+-.an-screen [data-klasse="exzellent"] { --kt: var(--kt-exzellent); }
+-.an-screen [data-klasse="gut"] { --kt: var(--kt-gut); }
+-.an-screen [data-klasse="buch"] { --kt: var(--kt-buch); }
+-.an-screen [data-klasse="ungenau"] { --kt: var(--kt-ungenau); }
+-.an-screen [data-klasse="fehler"] { --kt: var(--kt-fehler); }
+-.an-screen [data-klasse="verpasst"] { --kt: var(--kt-verpasst); }
+-.an-screen [data-klasse="patzer"] { --kt: var(--kt-patzer); }
+-.an-screen [data-klasse="erzwungen"] { --kt: var(--kt-erzwungen); }
+-.an-coach.ein { animation: an-coach-ein .4s cubic-bezier(.2, 1.2, .4, 1) both; }
+-.an-coach.ein .an-c-symbol { animation: an-pop .55s cubic-bezier(.2, 1.4, .4, 1) .08s both; }
+-@keyframes an-coach-ein { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+-@keyframes an-pop { 0% { transform: scale(0) rotate(-35deg); opacity: 0; } 55% { transform: scale(1.22) rotate(8deg); opacity: 1; }
+-  78% { transform: scale(.94) rotate(-2deg); } 100% { transform: none; } }
+-.an-c-symbol { width: 46px; height: 46px; grid-row: span 2; align-self: start; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .18)); }
+-.an-c-symbol svg { display: block; width: 100%; height: 100%; }
+-.an-c-start { display: grid; place-items: center; border-radius: 50%; background: var(--flaeche-2); border: 1.5px solid var(--linie-2); color: var(--text); }
+-.an-c-start svg { width: 26px; height: 26px; }
+-.an-c-kopf { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
+-.an-c-klasse { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; line-height: 1.15; color: var(--kt); }
+-.an-c-zug { font-weight: 800; font-size: 16px; }
+-.an-c-eval { align-self: start; padding: 4px 9px; border-radius: 9px; background: var(--flaeche-3); color: var(--text); font-weight: 800; font-size: 14px; white-space: nowrap;
+-  font-variant-numeric: tabular-nums; }
+-.an-c-text { grid-column: 2 / 4; margin: 0; font-size: 15px; line-height: 1.4; color: var(--text); }
+-.an-c-fuss { grid-column: 2 / 4; display: flex; align-items: center; gap: 6px 10px; margin-top: 4px; }
+-.an-c-linie { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; color: var(--text-2); }
+-.an-c-linie-titel { font-weight: 800; color: var(--kt-bester); white-space: nowrap; }
+-.an-c-linie-titel b { margin-left: 3px; padding: 1px 6px; border-radius: 6px; background: var(--flaeche-3); color: var(--text); font-size: 13px; }
+-.an-c-zuege { color: var(--text); font-weight: 650; word-spacing: 2px; }
+-.an-c-zuege span { border-radius: 5px; padding: 0 2px; transition: background .2s, color .2s; }
+-.an-c-zuege span.an { background: var(--flaeche-3); color: var(--text); box-shadow: 0 0 0 1.5px var(--k-bester); }
+-.an-c-knoepfe { flex: none; display: flex; gap: 8px; }
+-.an-c-knoepfe .knopf { min-height: 44px; font-size: 14px; padding: 0 14px; background: var(--flaeche-2); box-shadow: none; }
+-.an-c-knoepfe .knopf.an-nur-icon { width: 44px; padding: 0; }
+-.an-c-knoepfe .knopf svg { width: 18px; height: 18px; }
+-.an-c-knoepfe .knopf[hidden] { display: none; }
+-.an-coach.brillant { border-color: var(--k-brillant);
+-  /* deckende Flaeche unter der Toenung: die Klassenfarbe ist nur Rahmen (Kontrast des Klassenworts) */
+-  background: linear-gradient(var(--flaeche), var(--flaeche)) padding-box; box-shadow: var(--s2), 0 0 0 1px var(--k-brillant); }
+-.an-coach.start .an-c-klasse { color: var(--text); }
+-.an-coach.variante { box-shadow: var(--s2), 0 0 0 1.5px var(--k-bester); }
+-
+-/* ---------- Freischalt-Banner ---------- */
+-.an-banner { --bf: var(--linie-2); position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: var(--radius); overflow: hidden;
+-  background-color: var(--flaeche); background-image: var(--textur-banner, none); color: var(--text); border: 1.5px solid var(--linie); box-shadow: var(--s2); }
+-@supports (color: color-mix(in srgb, red 50%, blue)) {
+-  .an-banner { border-color: color-mix(in srgb, var(--bf) 55%, var(--linie)); }
+-}
+-.an-banner::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -50%; pointer-events: none;
+-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .22), transparent); animation: an-streif 1.6s ease-out .4s 1 both; }
+-@keyframes an-streif { to { left: 120%; } }
+-.an-banner .an-avatar { --g: 52px; }
+-.an-banner-text { min-width: 0; }
+-.an-ft-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--akzent-text); }
+-.an-ft-name { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; }
+-.an-ft-sterne { margin-left: auto; flex: none; text-align: right; font-size: 12px; color: var(--text-2); max-width: 45%; }
+-.an-ft-sterne b { display: block; font-size: 24px; letter-spacing: 2px; line-height: 1; margin-bottom: 3px; }
+-.an-ft-sterne b span { display: inline-block; }
+-.an-ft-sterne b .an { color: var(--gold); }
+-.an-ft-sterne b .aus { color: var(--linie-2); }
+-.an-ft-sterne b .neu { animation: an-stern-ein .55s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i, 0) * .3s); }
+-@keyframes an-stern-ein { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+-
+-/* ---------- Genauigkeit ---------- */
+-.an-genau { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px 18px; }
+-.an-seite { display: flex; align-items: center; gap: 12px; min-width: 0; }
+-.an-seite.an-re { flex-direction: row-reverse; text-align: right; }
+-.an-seite-text { min-width: 0; }
+-.an-genau .an-avatar { --g: 48px; border-radius: 14px; }
+-.an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+-.an-ich-wert { color: var(--text); }
+-.an-g-leer { font-size: 16px; color: var(--text-2); }
+-.an-g-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+-.an-g-label.an-g-zweit { margin-top: 1px; }
+-.an-vs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; min-width: 64px; }
+-.an-vs-wort { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+-.an-vs.an-sieg .an-vs-wort { color: var(--kt-bester); }
+-.an-vs.an-niederlage .an-vs-wort { color: var(--text-2); }
+-.an-vs.an-remis .an-vs-wort { color: var(--text); }
+-.an-vs b { font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); line-height: 1.1; }
+-.an-vs-grund { font-size: 12px; color: var(--text-2); max-width: 120px; }
+-.an-g-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 2px; }
+-.an-chip-staerke { color: var(--text-2); background: var(--flaeche-2); }
+-.an-chip-staerke b { font-weight: 800; color: var(--text); }
+-.an-chip-rekord { color: var(--text); border-color: var(--gold); background: var(--gold-weich); }
+-.an-eroeffnung { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--text-2); }
+-.an-eroeffnung svg { width: 18px; height: 18px; flex: none; color: var(--k-buch); }
+-
+-/* ---------- Bewertungskurve ---------- */
+-.an-kurve-box { padding: 10px 12px 6px; }
+-.an-kurve-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; letter-spacing: .04em; }
+-.an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+-.an-k-titel b { font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
+-.an-k-legende { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+-.an-kurve-wrap { position: relative; height: 112px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+-.an-kurve { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
+-.an-kurve:focus-visible { outline: var(--fokus); outline-offset: 3px; }
+-/* Kurve wie der Bewertungsbalken: Weiss-Anteil hell auf Schiefer (Farben der SVG-Attribute per CSS ersetzt) */
+-.an-kurve > rect { fill: var(--balken-schwarz); }
+-.an-kurve > line:not(.an-k-phase):not(.an-k-cursor) { stroke: rgba(255, 255, 255, .28); }
+-.an-k-linie { stroke: #9A9EA8; filter: none; }
+-.an-k-phase { stroke: rgba(255, 255, 255, .22); stroke-width: 1; stroke-dasharray: 2 4; }
+-.an-k-cursor { stroke: var(--akzent); stroke-width: 2; filter: none; }
+-.an-k-punkte { position: absolute; inset: 0; pointer-events: none; }
+-.an-k-punkte i { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--kf);
+-  border: 1.5px solid var(--balken-schwarz); opacity: .9; }
+-.an-k-punkte i.du { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; border-color: #FFFFFF; }
+-.an-k-marke { position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: #FFFFFF;
+-  border: 3px solid var(--akzent); box-shadow: var(--s1); pointer-events: none; transition: left .15s ease, top .15s ease; }
+-.an-phasen { position: relative; height: 20px; margin-top: 2px; }
+-.an-phasen span { position: absolute; top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px;
+-  font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); text-align: center; }
+-
+-/* ---------- Schluesselmomente ---------- */
+-.an-momente-titel { margin: 0 0 6px 2px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+-.an-momente { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px;
+-  -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+-.an-momente::-webkit-scrollbar { display: none; }
+-.an-momente::after { content: ""; flex: 0 0 28px; }
+-.an-moment.knopf { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; gap: 6px; background: var(--flaeche); }
+-.an-moment.knopf svg { width: 18px; height: 18px; }
+-.an-moment:not(.du) { color: var(--text-2); font-weight: 600; }
+-.an-moment.an { box-shadow: inset 0 0 0 1.5px var(--text); background: var(--flaeche-3); color: var(--text); }
+-.an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; -webkit-mask-image: none; mask-image: none; }
+-
+-/* ---------- Klassen-Zaehler ---------- */
+-.an-klassen { padding: 8px 16px 6px; }
+-.an-kl-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(7, auto) auto; grid-auto-flow: column; column-gap: 18px; }
+-.an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 11px; font-weight: 750; letter-spacing: .1em;
+-  text-transform: uppercase; color: var(--text-2); }
+-.an-kl-kopf span:first-child { flex: none; width: 34px; text-align: center; }
+-.an-kl-kopf span:last-child { min-width: 34px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; }
+-.an-kl { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; width: 100%; min-height: 44px; padding: 0; margin: 0;
+-  background: none; border: 0; border-bottom: 1px solid var(--linie); border-radius: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+-.an-kl:active:not(.leer) { background: var(--flaeche-2); }
+-.an-kl.leer { cursor: default; }
+-.an-n { font-weight: 850; font-size: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+-.an-n.du { color: var(--kt, var(--text)); }
+-.an-n.nul { color: var(--text-3); }
+-.an-kl-mitte { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 650; }
+-.an-kl-mitte span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+-.an-kl-mitte svg { width: 22px; height: 22px; flex: none; }
+-.an-kl.null .an-kl-mitte { opacity: .45; }
+-.an-kl-gesamt { grid-column: 1 / -1; grid-row: 8; cursor: default; border-bottom: 0; border-top: 1px solid var(--linie-2); min-height: 40px;
+-  grid-template-columns: 34px minmax(0, 1fr) 34px; }
+-.an-kl-gesamt .an-kl-mitte { justify-content: center; font-size: 13px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+-.an-kl-platz { border-bottom: 1px solid var(--linie); }
+-
+-/* ---------- Kopf-Knoepfe unten (Handy) ---------- */
+-.an-aktionsleiste { display: none; }
+-
+-/* ---------- Laden / Fehler / unbekannte Partie ---------- */
+-.an-laden, .an-meldung { width: min(520px, calc(100% - 36px)); margin: 6vh auto 24px; padding: 26px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+-.an-laden-duell { display: flex; align-items: center; gap: 16px; }
+-.an-laden-duell .an-avatar { --g: 72px; }
+-.an-laden-vs { font-size: 12px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+-.an-laden-titel, .an-meldung h3 { margin: 0; font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
+-.an-fortschritt { position: relative; width: 100%; height: 12px; border-radius: 999px; overflow: hidden; background: var(--flaeche-3); border: 1px solid var(--linie); }
+-.an-fortschritt i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--wert, 0%); border-radius: inherit; background: var(--tinte);
+-  transition: width .3s ease; }
+-.an-fortschritt i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .3), transparent);
+-  background-size: 60px 100%; background-repeat: no-repeat; animation: an-glanz 1.3s linear infinite; }
+-@keyframes an-glanz { from { background-position: -60px 0; } to { background-position: 520px 0; } }
+-.an-laden-text, .an-meldung p { margin: 0; font-size: 14px; color: var(--text-2); }
+-.an-laden.fehler .an-laden-titel { color: var(--warn); }
+-.an-meldung-icon { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 50%; background: var(--flaeche-2); color: var(--text); border: 1.5px solid var(--linie-2); }
+-.an-meldung-icon svg { width: 32px; height: 32px; }
+-
+-/* ---------- Niedriges Querformat (Handy quer): Brett nach der Hoehe, linke Spalte scrollt ---------- */
+-@media (orientation: landscape) and (max-height: 560px) {
+-  .an-screen { --tap: 44px;
+-    --an-brett: min(calc(100vh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+-    --an-brett: min(calc(100dvh - 56px - 12px - 8px - var(--an-sicher)), calc(100vw - 20px - 20px - 34px - 300px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
+-  .an-screen .kopf { height: 56px; padding: 0 10px; }
+-  .an-inhalt { padding: 0 10px 12px; gap: 16px; }
+-  .an-kopf-knoepfe .knopf { padding: 0 12px; font-size: 14px; }
+-}
+-
+-/* ---------- Hochformat (iPad hoch, Handy): eine Spalte, die Seite scrollt ---------- */
+-@media (orientation: portrait) {
+-  .an-screen { --an-brett: min(calc(100vw - 36px - 34px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 720px); }
+-  .an-koerper { flex: none; display: block; }
+-  .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
+-  .an-links, .an-rechts { display: contents; }
+-  .an-banner { order: 1; } .an-genau { order: 2; } .an-kurve-box { order: 3; }
+-  .an-brettzone { order: 4; } .an-navi { order: 5; } .an-coach { order: 6; }
+-  .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
+-  .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
+-}
+-@media (orientation: portrait) and (max-width: 520px) {
+-  .an-screen { --tap: 44px; --an-balken: 20px; --an-brett: calc(100vw - 20px - 6px - 20px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); }
+-  .an-screen.ohne-balken { --an-brett: calc(100vw - 20px - 6px); }
+-  .an-screen .kopf { height: 56px; padding: 0 10px; }
+-  .an-kopf-knoepfe { display: none; }
+-  .an-inhalt { gap: 10px; padding-bottom: 6px; }
+-  .an-brettzone { gap: 6px; }
+-  .an-evalbalken { width: 14px; }
+-  .an-brett-rahmen { width: calc(var(--an-brett) + 6px); padding: 3px; border-radius: 14px; }
+-  .an-brett-rahmen::after { inset: 2px; border-radius: 12px; }
+-  .an-brett-rahmen .brett { --brett-radius: 11px; }
+-  .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+-  .an-stand { display: none; }
+-  .an-banner { padding: 10px 12px; gap: 10px; }
+-  .an-banner .an-avatar { --g: 44px; }
+-  .an-ft-titel { font-size: 10px; letter-spacing: .08em; }
+-  .an-ft-name { font-size: 15px; }
+-  .an-ft-sterne span { display: none; }
+-  .an-ft-sterne b { font-size: 20px; margin: 0; }
+-  .an-genau { padding: 12px; gap: 8px 6px; }
+-  .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
+-  .an-seite { gap: 8px; }
+-  .an-g-wert { font-size: 27px; }
+-  .an-g-label { font-size: 11px; }
+-  .an-vs { min-width: 52px; }
+-  .an-vs b { font-size: 18px; }
+-  .an-vs-wort { font-size: 10px; letter-spacing: .1em; }
+-  .an-vs-grund { font-size: 11px; max-width: 84px; }
+-  .an-kurve-wrap { height: 92px; }
+-  .an-k-legende { display: none; }
+-  .an-g-zusatz { display: none; }
+-  .an-c-fuss { flex-wrap: wrap; }
+-  .an-c-linie { flex-basis: 100%; }
+-  .an-coach { padding: 10px 12px; gap: 2px 10px; }
+-  .an-c-symbol { width: 38px; height: 38px; }
+-  .an-c-klasse { font-size: 17px; }
+-  .an-c-zug { font-size: 15px; }
+-  .an-c-text { font-size: 14px; }
+-  .an-c-linie { font-size: 13px; }
+-  .an-klassen { padding: 6px 12px; }
+-  .an-kl-raster { display: flex; flex-direction: column; }
+-  .an-kl-kopf2, .an-kl-platz { display: none; }
+-  .an-aktionsleiste { order: 99; display: grid; grid-template-columns: auto 1fr; gap: 8px; position: sticky; bottom: 0; z-index: 20;
+-    padding: 12px 10px calc(10px + env(safe-area-inset-bottom, 0px)); margin-top: auto;
+-    background: linear-gradient(var(--grund-0), var(--grund) 34%); }
+-  .an-aktionsleiste .knopf { min-height: 50px; }
+-  .an-laden, .an-meldung { width: calc(100% - 20px); padding: 22px 16px; }
+-}
+-
+-/* ============================================================
+-   VERLAUF
+-   ============================================================ */
+-.vl-inhalt { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 18px 28px; display: grid; gap: 16px; align-items: start; }
+-.vl-seite { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+-.vl-haupt { min-width: 0; }
+-.vl-titel, .vl-schatz-kopf h3 { margin: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+-.vl-titel { margin: 4px 0 10px; padding-left: 2px; }
+-@media (min-width: 900px) and (orientation: landscape) {
+-  .vl-inhalt { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; }
+-}
+-
+-.vl-statistik { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px 8px; }
+-.vl-kachel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; padding: 4px 2px; text-align: center; min-width: 0; }
+-.vl-kachel b { font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
+-.vl-kachel > span { font-size: 11px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
+-.vl-kachel b .stern { font-size: .85em; }
+-.vl-kachel.sieg b { color: var(--kt-bester); }
+-.vl-kachel.remis b { color: var(--text); }
+-.vl-kachel.niederlage b { color: var(--text-2); }
+-
+-.vl-schatz { padding: 14px; background: var(--flaeche); border-color: var(--linie); }
+-.vl-schatz-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+-.vl-schatz-kopf > svg { width: 24px; height: 24px; color: var(--k-brillant); flex: none; }
+-.vl-schatz-kopf h3 { flex: 1; color: var(--text); }
+-.vl-schatz-kopf .chip { height: 28px; font-size: 12px; color: var(--kt-brillant); border-color: var(--linie-2); box-shadow: none; }
+-.vl-schatz-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+-.vl-juwel { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; border-radius: 14px; text-align: left; cursor: pointer;
+-  background: var(--flaeche-2); border: 1px solid var(--linie); color: inherit; font: inherit; min-width: 0; }
+-.vl-juwel:active { transform: scale(.98); background: var(--flaeche-3); }
+-.vl-juwel:disabled { opacity: .5; cursor: default; }
+-.vl-juwel-symbol { width: 32px; height: 32px; flex: none; }
+-.vl-juwel-symbol svg { display: block; width: 100%; height: 100%; }
+-.vl-juwel-text { display: flex; flex-direction: column; min-width: 0; }
+-.vl-juwel-text b { font-size: 16px; color: var(--kt-brillant); }
+-/* Gegner und Datum nicht abschneiden (Flos iPhone-Befund): lieber zweizeilig */
+-.vl-juwel-text span { font-size: 12px; line-height: 1.3; color: var(--text-2); overflow-wrap: break-word; }
+-.vl-schatz-leer { margin: 0; font-size: 14px; color: var(--text-2); }
+-
+-.vl-liste { display: flex; flex-direction: column; gap: 10px; }
+-.vl-zeile { position: relative; border-radius: 18px; overflow: hidden; }
+-/* 2 px eingerueckt: sonst blitzt das Rot an den runden Ecken der hellen Karte durch */
+-.vl-hinten { position: absolute; top: 2px; right: 2px; bottom: 2px; width: 118px; padding-left: 16px; border: 0; border-radius: 18px; cursor: pointer;
+-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--warn); color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 800; }
+-.vl-hinten svg { width: 22px; height: 22px; }
+-.vl-vorne { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border-radius: 18px; touch-action: pan-y;
+-  background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); transition: transform .25s cubic-bezier(.2, .9, .2, 1); }
+-.vl-zeile.offen .vl-vorne { transform: translateX(-104px); }
+-.vl-zeile.zieht .vl-vorne { transition: none; }
+-.vl-zeile.weg { animation: vl-weg .26s ease-in forwards; }
+-@keyframes vl-weg { to { opacity: 0; transform: translateX(-30px); } }
+-.vl-oeffnen { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 4px 6px; border: 0; border-radius: 14px;
+-  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+-.vl-oeffnen:active { background: var(--flaeche-2); }
+-.vl-oeffnen .an-avatar { --g: 52px; border-radius: 14px; }
+-.vl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+-.vl-z1 { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; min-width: 0; }
+-/* Namen nie abschneiden (Flos iPhone-Befund): lieber zweizeilig */
+-.vl-name { font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
+-.vl-ergebnis { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; line-height: 1.35; }
+-.vl-ergebnis.sieg { color: #FFFFFF; background: #23794C; }
+-.vl-ergebnis.niederlage { color: var(--text-2); background: var(--flaeche-3); }
+-.vl-ergebnis.remis { color: #1C1B19; background: var(--gold); }
+-/* Nebenzeilen (Eroeffnungsname, Datum) ebenfalls nie abschneiden: umbrechen statt Ellipse */
+-.vl-z2, .vl-z3 { font-size: 13px; line-height: 1.3; color: var(--text-2); overflow-wrap: break-word; }
+-.vl-z2 { color: var(--text-2); font-weight: 600; }
+-.vl-werte { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-left: 4px; }
+-.vl-genau { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+-.vl-genau.offen { font-size: 13px; font-weight: 700; color: var(--text-2); }
+-.vl-sterne { font-size: 15px; letter-spacing: 1px; line-height: 1; }
+-.vl-sterne .an { color: var(--gold); }
+-.vl-sterne .aus { color: var(--linie-2); }
+-.vl-muell { color: var(--text-2); background: var(--flaeche-2); box-shadow: none; }
+-.vl-muell:active { color: var(--warn); }
+-
+-.vl-leer { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 20px; text-align: center; }
+-.vl-leer h3 { margin: 6px 0 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
+-.vl-leer p { margin: 0 0 8px; font-size: 16px; color: var(--text-2); }
+-.vl-leer-avatar { --g: 88px; }
+-
+-.vl-dialog-hg { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px;
+-  background: var(--schleier); animation: vl-ein .18s ease both; }
+-.vl-dialog { width: min(420px, 100%); padding: 20px; background: var(--flaeche); border-radius: var(--r-l); box-shadow: var(--s3); }
+-.vl-dialog h3 { margin: 0 0 8px; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
+-.vl-dialog p { margin: 0 0 18px; font-size: 15px; color: var(--text-2); }
+-.vl-dialog-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+-.vl-rot { background: var(--warn); border-color: var(--warn); color: #FFFFFF; box-shadow: none; }
+-@keyframes vl-ein { from { opacity: 0; } }
+-
+-@media (max-width: 520px) {
+-  .vl-screen .kopf { height: 56px; padding: 0 10px; }
+-  .vl-inhalt { padding: 0 10px 20px; gap: 12px; }
+-  .vl-statistik { padding: 8px 4px; }
+-  .vl-kachel { min-height: 56px; }
+-  .vl-kachel b { font-size: 17px; }
+-  .vl-kachel > span { font-size: 10px; }
+-  .vl-oeffnen { gap: 10px; padding: 4px 2px; }
+-  .vl-oeffnen .an-avatar { --g: 44px; border-radius: 12px; }
+-  .vl-name { font-size: 16px; }
+-  .vl-z3 { display: none; }
+-  .vl-genau { font-size: 16px; }
+-  .vl-sterne { font-size: 13px; }
+-  .vl-screen .vl-muell { --tap: 44px; }
+-  .vl-schatz-liste { grid-template-columns: 1fr 1fr; }
+-  .vl-juwel { padding: 8px; gap: 8px; }
+-  .vl-juwel-symbol { width: 26px; height: 26px; }
+-  .vl-juwel-text b { font-size: 14px; }
+-}
+-
+-/* ============================================================
+-   EINSTELLUNGEN
+-   ============================================================ */
+-.es-inhalt { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 18px 36px; display: flex; flex-direction: column; gap: 14px; }
+-.es-gruppe { padding: 14px 16px; }
+-.es-titel { margin: 2px 0 8px; padding-left: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
+-  text-transform: uppercase; color: var(--text-2); }
+-.es-hilfe { margin: 0 0 12px; font-size: 14px; color: var(--text-2); }
+-.es-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; min-height: 64px; padding: 6px 0;
+-  border-bottom: 1px solid var(--linie); }
+-.es-zeile:last-child { border-bottom: 0; }
+-.es-text { min-width: 0; cursor: pointer; }
+-.es-text b { display: block; font-size: 16px; font-weight: 750; }
+-.es-text span { display: block; font-size: 13px; color: var(--text-2); margin-top: 1px; }
+-.es-schalter { width: 68px; height: 48px; padding: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; border-radius: 14px; }
+-.es-schalter i { position: relative; width: 54px; height: 32px; border-radius: 999px; background: var(--flaeche-3); border: 1px solid var(--linie-2);
+-  transition: background .2s ease, box-shadow .2s ease; }
+-.es-schalter i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF;
+-  box-shadow: 0 1px 3px rgba(0, 0, 0, .25), 0 0 0 .5px rgba(0, 0, 0, .06); transition: transform .2s cubic-bezier(.2, .9, .3, 1.2), background .2s; }
+-.es-schalter[aria-checked="true"] i { background: var(--schalter-an); border-color: transparent; }
+-.es-schalter[aria-checked="true"] i::after { transform: translateX(22px); background: var(--knauf-an); }
+-.es-probe.knopf { min-height: 44px; padding: 0 14px; font-size: 14px; background: var(--flaeche-2); box-shadow: none; }
+-.es-probe.knopf svg { width: 16px; height: 16px; }
+-.es-probe.knopf:disabled { opacity: .38; cursor: default; }
+-
+-.es-bretter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+-.es-brett { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 44px; padding: 10px 10px 8px; border-radius: 16px; cursor: pointer;
+-  background: var(--flaeche-2); border: 1.5px solid var(--linie); color: inherit; font: inherit; }
+-.es-brett[aria-checked="true"] { border-color: var(--text); background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--text); }
+-.es-mini { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; max-width: 136px; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+-  box-shadow: var(--s2); }
+-.es-mini i { position: relative; display: block; }
+-.es-mini i.h { background: var(--feld-hell); }
+-.es-mini i.d { background: var(--feld-dunkel); }
+-.es-mini img { position: absolute; inset: 4%; width: 92%; height: 92%; filter: drop-shadow(0 1px 1px rgba(10, 12, 30, .3)); }
+-.es-brett-name { font-size: 15px; font-weight: 800; }
+-.es-brett[aria-checked="true"] .es-brett-name { color: var(--text); }
+-
+-.es-segment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: 16px; background: var(--grund-2); border: 1px solid var(--linie); }
+-.es-seg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 58px; padding: 4px; border: 0; border-radius: 12px;
+-  background: none; color: inherit; font: inherit; cursor: pointer; }
+-.es-seg b { font-size: 15px; font-weight: 800; }
+-.es-seg { color: var(--text-2); }
+-.es-seg span { font-size: 12px; color: var(--text-2); }
+-.es-seg[aria-checked="true"] { background: var(--flaeche); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
+-.es-seg[aria-checked="true"] b { color: var(--text); }
+-
+-.es-rot-rand { border-color: var(--warn); color: var(--warn); }
+-.es-rot { background: var(--warn); border-color: var(--warn); color: #FFFFFF; box-shadow: none; }
+-.es-warnung { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; padding: 12px; border-radius: 12px;
+-  background: var(--gold-weich); border: 1px solid var(--gold); }
+-.es-warnung svg { width: 24px; height: 24px; flex: none; color: var(--text); }
+-.es-warnung p { margin: 0; font-size: 14px; color: var(--text); }
+-.es-warnung.stark { background: var(--warn-weich); border-color: var(--warn); }
+-.es-warnung.stark svg { color: var(--warn); }
+-.es-warnung.stark p { color: var(--text); }
+-.es-knoepfe { display: flex; flex-wrap: wrap; gap: 10px; }
+-.es-knoepfe .knopf, .es-reset > .knopf { white-space: normal; text-align: center; }
+-
+-.es-info p { margin: 0 0 10px; font-size: 14px; color: var(--text-2); }
+-.es-info a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere;
+-  /* Tippflaeche >= 44 px: Polster nur fuer den Finger, die Zeilenhoehe bleibt (Polster an inline-Elementen zaehlt nicht zur Zeile) */
+-  padding-block: 13px; }
+-.es-lizenzen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+-.es-lizenzen li { display: flex; flex-direction: column; padding: 8px 10px; border-radius: 12px; background: var(--flaeche-2); border: 1px solid var(--linie); }
+-.es-lizenzen b { font-size: 14px; }
+-.es-lizenzen span { font-size: 13px; color: var(--text-2); }
+-
+-@media (max-width: 520px) {
+-  .es-screen .kopf { height: 56px; padding: 0 10px; }
+-  .es-inhalt { padding: 0 10px 28px; gap: 12px; }
+-  .es-gruppe { padding: 12px; }
+-  .es-zeile { gap: 6px; }
+-  .es-probe.knopf { padding: 0 10px; }
+-  .es-bretter { gap: 8px; }
+-  .es-brett { padding: 8px 6px 6px; }
+-}
+-
+-/* ---------- Weniger Bewegung ---------- */
+-@media (prefers-reduced-motion: reduce) {
+-  .an-screen *, .an-screen *::before, .an-screen *::after,
+-  .vl-screen *, .vl-screen *::before, .vl-screen *::after,
+-  .es-screen *, .es-screen *::before, .es-screen *::after {
+-    animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
+-}
+-
+-/* ============================================================
+-   BAU C (Integration): Die Coach-Karte der Analyse passte im
+-   Querformat mit Hauptvariante oft nicht ganz unter das Brett und
+-   wurde am unteren Rand abgeschnitten. Etwas mehr Platz einplanen,
+-   bei sehr langem Text schrumpft die Karte und scrollt innen.
+-   Zuege nicht am Bindestrich umbrechen (0-0, 0-0-0).
+-   ============================================================ */
+-.an-c-zuege span { white-space: nowrap; }
+-@media (orientation: landscape) and (min-height: 561px) {
+-  .an-screen {
+-    --an-brett: min(calc(100vh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+-    --an-brett: min(calc(100dvh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+-  }
+-  .an-navi .knopf { min-height: 48px; }
+-  .an-coach { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; }
+-}
++/* Alle Screen-Regeln wurden in analyse.css, verlauf.css und einstellungen.css umgezogen. */
+diff --git a/css/verlauf.css b/css/verlauf.css
+index 0d0ade74659c9833c28bf45f26a9e82769e63d18..26b8f79a2a6f2f377d71234b2348ef926e83a65b 100644
+--- a/css/verlauf.css
++++ b/css/verlauf.css
+@@ -1,5 +1,109 @@
++/* Verlauf – Premium-Umbau (PLAN 2.8) */
+ /* ============================================================
+-   Schach-Arena · Verlauf (Premium-Umbau, Look A)
+-   Angelegt von U1 (leer), gefuellt von Paket U9 (PLAN 2.8).
+-   Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
++   VERLAUF
+    ============================================================ */
++.vl-inhalt { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 18px 28px; display: grid; gap: 16px; align-items: start; }
++.vl-seite { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
++.vl-haupt { min-width: 0; }
++.vl-titel, .vl-schatz-kopf h3 { margin: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
++.vl-titel { margin: 4px 0 10px; padding-left: 2px; }
++@media (min-width: 900px) and (orientation: landscape) {
++  .vl-inhalt { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; }
++}
++
++.vl-statistik { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px 8px; }
++.vl-kachel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; padding: 4px 2px; text-align: center; min-width: 0; }
++.vl-kachel b { font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
++.vl-kachel > span { font-size: 11px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
++.vl-kachel b .stern { font-size: .85em; }
++.vl-kachel.sieg b { color: var(--kt-bester); }
++.vl-kachel.remis b { color: var(--text); }
++.vl-kachel.niederlage b { color: var(--text-2); }
++
++.vl-schatz { padding: 14px; background: var(--flaeche); border-color: var(--linie); }
++.vl-schatz-kopf { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
++.vl-schatz-kopf > svg { width: 24px; height: 24px; color: var(--k-brillant); flex: none; }
++.vl-schatz-kopf h3 { flex: 1; color: var(--text); }
++.vl-schatz-kopf .chip { height: 28px; font-size: 12px; color: var(--kt-brillant); border-color: var(--linie-2); box-shadow: none; }
++.vl-schatz-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
++.vl-juwel { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 12px; border-radius: 14px; text-align: left; cursor: pointer;
++  background: var(--flaeche-2); border: 1px solid var(--linie); color: inherit; font: inherit; min-width: 0; }
++.vl-juwel:active { transform: scale(.98); background: var(--flaeche-3); }
++.vl-juwel:disabled { opacity: .5; cursor: default; }
++.vl-juwel-symbol { width: 32px; height: 32px; flex: none; }
++.vl-juwel-symbol svg { display: block; width: 100%; height: 100%; }
++.vl-juwel-text { display: flex; flex-direction: column; min-width: 0; }
++.vl-juwel-text b { font-size: 16px; color: var(--kt-brillant); }
++/* Gegner und Datum nicht abschneiden (Flos iPhone-Befund): lieber zweizeilig */
++.vl-juwel-text span { font-size: 12px; line-height: 1.3; color: var(--text-2); overflow-wrap: break-word; }
++.vl-schatz-leer { margin: 0; font-size: 14px; color: var(--text-2); }
++
++.vl-liste { display: flex; flex-direction: column; gap: 10px; }
++.vl-zeile { position: relative; border-radius: 18px; overflow: hidden; }
++/* 2 px eingerueckt: sonst blitzt das Rot an den runden Ecken der hellen Karte durch */
++.vl-hinten { position: absolute; top: 2px; right: 2px; bottom: 2px; width: 118px; padding-left: 16px; border: 0; border-radius: 18px; cursor: pointer;
++  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: var(--warn); color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 800; }
++.vl-hinten svg { width: 22px; height: 22px; }
++.vl-vorne { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 6px; border-radius: 18px; touch-action: pan-y;
++  background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); transition: transform .25s cubic-bezier(.2, .9, .2, 1); }
++.vl-zeile.offen .vl-vorne { transform: translateX(-104px); }
++.vl-zeile.zieht .vl-vorne { transition: none; }
++.vl-zeile.weg { animation: vl-weg .26s ease-in forwards; }
++@keyframes vl-weg { to { opacity: 0; transform: translateX(-30px); } }
++.vl-oeffnen { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 4px 6px; border: 0; border-radius: 14px;
++  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
++.vl-oeffnen:active { background: var(--flaeche-2); }
++.vl-oeffnen .an-avatar { --g: 52px; border-radius: 14px; }
++.vl-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
++.vl-z1 { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; min-width: 0; }
++/* Namen nie abschneiden (Flos iPhone-Befund): lieber zweizeilig */
++.vl-name { font-family: var(--display); font-size: 17px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; max-width: 100%; }
++.vl-ergebnis { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; line-height: 1.35; }
++.vl-ergebnis.sieg { color: #FFFFFF; background: #23794C; }
++.vl-ergebnis.niederlage { color: var(--text-2); background: var(--flaeche-3); }
++.vl-ergebnis.remis { color: #1C1B19; background: var(--gold); }
++/* Nebenzeilen (Eroeffnungsname, Datum) ebenfalls nie abschneiden: umbrechen statt Ellipse */
++.vl-z2, .vl-z3 { font-size: 13px; line-height: 1.3; color: var(--text-2); overflow-wrap: break-word; }
++.vl-z2 { color: var(--text-2); font-weight: 600; }
++.vl-werte { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding-left: 4px; }
++.vl-genau { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
++.vl-genau.offen { font-size: 13px; font-weight: 700; color: var(--text-2); }
++.vl-sterne { font-size: 15px; letter-spacing: 1px; line-height: 1; }
++.vl-sterne .an { color: var(--gold); }
++.vl-sterne .aus { color: var(--linie-2); }
++.vl-muell { color: var(--text-2); background: var(--flaeche-2); box-shadow: none; }
++.vl-muell:active { color: var(--warn); }
++
++.vl-leer { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 20px; text-align: center; }
++.vl-leer h3 { margin: 6px 0 0; font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
++.vl-leer p { margin: 0 0 8px; font-size: 16px; color: var(--text-2); }
++.vl-leer-avatar { --g: 88px; }
++
++.vl-dialog-hg { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px;
++  background: var(--schleier); animation: vl-ein .18s ease both; }
++.vl-dialog { width: min(420px, 100%); padding: 20px; background: var(--flaeche); border-radius: var(--r-l); box-shadow: var(--s3); }
++.vl-dialog h3 { margin: 0 0 8px; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
++.vl-dialog p { margin: 0 0 18px; font-size: 15px; color: var(--text-2); }
++.vl-dialog-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
++.vl-rot { background: var(--warn); border-color: var(--warn); color: #FFFFFF; box-shadow: none; }
++@keyframes vl-ein { from { opacity: 0; } }
++
++@media (max-width: 520px) {
++  .vl-screen .kopf { height: 56px; padding: 0 10px; }
++  .vl-inhalt { padding: 0 10px 20px; gap: 12px; }
++  .vl-statistik { padding: 8px 4px; }
++  .vl-kachel { min-height: 56px; }
++  .vl-kachel b { font-size: 17px; }
++  .vl-kachel > span { font-size: 10px; }
++  .vl-oeffnen { gap: 10px; padding: 4px 2px; }
++  .vl-oeffnen .an-avatar { --g: 44px; border-radius: 12px; }
++  .vl-name { font-size: 16px; }
++  .vl-z3 { display: none; }
++  .vl-genau { font-size: 16px; }
++  .vl-sterne { font-size: 13px; }
++  .vl-screen .vl-muell { --tap: 44px; }
++  .vl-schatz-liste { grid-template-columns: 1fr 1fr; }
++  .vl-juwel { padding: 8px; gap: 8px; }
++  .vl-juwel-symbol { width: 26px; height: 26px; }
++  .vl-juwel-text b { font-size: 14px; }
++}
+diff --git a/js/ui/einstellungen.js b/js/ui/einstellungen.js
+index 089af38c5943e8c34a1d2dab2227bf97d9adc8f1..211c1a098b7da821ab7d770fcdd34fc642015837 100644
+--- a/js/ui/einstellungen.js
++++ b/js/ui/einstellungen.js
+@@ -56,192 +56,238 @@ export function zeige(root, params = {}, app) {
+ 
+   const sec = document.createElement('section');
+   sec.className = 'screen scrollt es-screen';
+   sec.setAttribute('aria-label', 'Einstellungen');
+   root.append(sec);
+ 
+   const schalter = (key, titel, text, extra = '') => `
+     <div class="es-zeile" data-zeile="${key}">
+       <div class="es-text" data-aktion="schalte" data-key="${key}"><b id="es-l-${key}">${titel}</b><span id="es-t-${key}">${text}</span></div>
+       ${extra}
+       <button class="es-schalter" type="button" role="switch" data-aktion="schalte" data-key="${key}"
+         aria-labelledby="es-l-${key}" aria-describedby="es-t-${key}" aria-checked="false"><i></i></button>
+     </div>`;
+ 
+   const miniBrett = (b) => {
+     let felder = '';
+     for (let i = 0; i < 16; i++) {
+       const zeile = Math.floor(i / 4);
+       const dunkel = (zeile + (i % 4)) % 2 === 1;
+       const fig = MINI[i] ? `<img src="${esc(pfad(`assets/pieces/${MINI[i]}.svg`))}" alt="">` : '';
+       felder += `<i class="${dunkel ? 'd' : 'h'}">${fig}</i>`;
+     }
+     return `<span class="es-mini" style="--feld-hell:${b.hell};--feld-dunkel:${b.dunkel}" aria-hidden="true">${felder}</span>`;
+   };
+ 
++  const segment = (key, titel, werte, hilfe = '') => `
++    <div class="es-block" data-einstellung="${key}">
++      <h4>${titel}</h4>${hilfe ? `<p class="es-hilfe">${hilfe}</p>` : ''}
++      <div class="es-segment" role="radiogroup" aria-label="${titel}">
++        ${werte.map(([wert, name, text = '']) => `<button class="es-seg" type="button" role="radio" aria-checked="false"
++          data-aktion="wahl" data-key="${key}" data-wert="${wert}"><b>${name}</b>${text ? `<span>${text}</span>` : ''}</button>`).join('')}
++      </div>
++    </div>`;
++
+   function baue() {
+     sec.innerHTML = `
+       <header class="kopf">
+         <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
+         <div class="titel"><h2>Einstellungen</h2><div class="unter">Wirkt sofort und bleibt gespeichert</div></div>
+       </header>
+-      <div class="es-inhalt">
+-        <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
+-          <h3 class="es-titel" id="es-g-anzeige">Klang und Anzeige</h3>
++      <div class="es-layout">
++       <nav class="es-nav" aria-label="Einstellungsbereiche">
++        ${[['klang','Klang'],['spiel','Spiel'],['bewegung','Bewegung'],['anzeige','Anzeige'],['coach','Coach'],['fortschritt','Fortschritt'],['info','Info']].map(([id,n], i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${n}</a>`).join('')}
++       </nav>
++       <div class="es-inhalt">
++        <section class="es-gruppe flaeche" aria-labelledby="es-g-klang">
++          <h3 class="es-titel" id="es-g-klang">Klang</h3>
+           ${schalter('klang', 'Klang', 'Zugklänge und Effekte',
+-            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probeton</button>`)}
+-          ${schalter('balken', 'Bewertungsbalken', 'Zeigt neben dem Brett, wer besser steht.')}
+-          ${schalter('liveBewertung', 'Live-Bewertung', 'Symbol und Coach nach jedem eigenen Zug. Gerechnet wird immer, damit Sterne und Analyse stimmen.')}
+-          ${schalter('vorzuege', 'Vorzüge', 'Züge vormerken, während der Gegner denkt')}
+-          ${schalter('koordinaten', 'Koordinaten', 'Buchstaben und Zahlen am Brettrand.')}
++            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probe</button>`)}
++          ${segment('klangpaket', 'Klangpaket', [['','Arcade (Ansicht)'],['arcade','Arcade'],['holz','Holz']])}
++          <label class="es-regler"><span><b>Lautstärke</b><output>80 %</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
++          ${segment('klangstufe', 'Klangstufe', [['alle','Alle'],['wichtig','Wichtig'],['aus','Aus']])}
++          <div class="es-untergruppe"><h4>Klänge einzeln</h4>${[['brett','Züge'],['bewertung','Bewertung'],['feier','Feier'],['uhr','Uhr'],['boss','Boss-Treffer'],['finisher','Finisher'],['bedienung','Bedienung']].map(([k,n]) => schalter(`klanggruppe-${k}`,n,'')).join('')}</div>
++        </section>
++
++        <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">Spiel</h3>
++          ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']])}
++          ${schalter('haltenAufgeben','Aufgeben und Remis halten','Schützt vor versehentlichem Antippen.')}
++          ${schalter('turmRochade','Turm auf König rochiert','Erlaubt die kurze Eingabe der Rochade.')}
++          ${schalter('autoDame','Automatisch Dame','Halten am Zielfeld zeigt andere Figuren.')}
++          ${schalter('vorzuege','Vorzüge','Züge vormerken, während der Gegner denkt.')}
++          ${segment('steuerung','Figuren bewegen',[['beides','Beides'],['ziehen','Ziehen'],['tippen','Tippen']])}
++        </section>
++
++        <section class="es-gruppe flaeche" aria-labelledby="es-g-bewegung"><h3 class="es-titel" id="es-g-bewegung">Bewegung</h3>
++          ${segment('bewegung','Animationstempo',[['langsam','Langsam'],['normal','Normal'],['schnell','Schnell'],['aus','Aus']],'Die Systemeinstellung „weniger Bewegung“ hat Vorrang.')}
++          <div class="es-tempo-vorschau" aria-hidden="true"><span>♞</span></div>
+         </section>
+ 
+-        <section class="es-gruppe flaeche" aria-labelledby="es-g-brett">
+-          <h3 class="es-titel" id="es-g-brett">Brettfarbe</h3>
++        <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
++          <h3 class="es-titel" id="es-g-anzeige">Anzeige</h3>
++          ${segment('thema','Ansicht',[['modern','Modern und klar']])}
++          ${segment('modus','Erscheinungsbild',[['system','System'],['hell','Hell'],['dunkel','Dunkel']])}
++          <h4>Brettfarbe</h4>
+           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
+             ${BRETTER.map((b) => `
+               <button class="es-brett" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
+                 ${miniBrett(b)}<span class="es-brett-name">${b.name}</span>
+               </button>`).join('')}
+           </div>
++          ${schalter('koordinaten','Koordinaten','Buchstaben und Zahlen am Brett.')}
++          ${segment('koordLage','Lage der Koordinaten',[['ecke','Ecke'],['rand','Rand']])}
++          ${schalter('balken','Bewertungsbalken','Zeigt, wer besser steht.')}${schalter('liveBewertung','Live-Bewertung','Coach nach jedem eigenen Zug.')}
++          ${schalter('pfeile','Pfeile malen','Feld halten und ziehen.')}
++          ${segment('duellIntro','Duell-Intro',[['immer','Immer'],['besondere','Besondere'],['aus','Aus']])}
++          ${schalter('lebensleiste','Lebensleiste','Bei Boss-Partien.')}${schalter('zaehlwerk','Zählwerk','Wenn ein Spielmodus es anbietet.')}${schalter('funkenlinie','Funkenlinie','Wenn ein Spielmodus es anbietet.')}
+         </section>
+ 
+-        <section class="es-gruppe flaeche" aria-labelledby="es-g-tiefe">
+-          <h3 class="es-titel" id="es-g-tiefe">Rechentiefe</h3>
+-          <p class="es-hilfe" id="es-h-tiefe">Wie tief Stockfish deine Züge prüft. Gründlich ist genauer, braucht auf dem iPad aber etwas länger.</p>
+-          <div class="es-segment" role="radiogroup" aria-labelledby="es-g-tiefe" aria-describedby="es-h-tiefe">
+-            ${TIEFEN.map((t) => `
+-              <button class="es-seg" type="button" role="radio" aria-checked="false" data-aktion="tiefe" data-wert="${t.wert}">
+-                <b>${t.name}</b><span class="zahl">${t.text}</span>
+-              </button>`).join('')}
+-          </div>
++        <section class="es-gruppe flaeche" aria-labelledby="es-g-coach"><h3 class="es-titel" id="es-g-coach">Coach</h3>
++          ${segment('coachStil','Erklärungen',[['ausfuehrlich','Ausführlich'],['knapp','Knapp']])}
++          ${segment('sprueche','Bot-Sprüche',[['an','An'],['wenig','Wenig'],['aus','Aus']])}
++          ${segment('tiefe','Rechentiefe',TIEFEN.map(t => [String(t.wert),t.name,t.text]),'Gründlich ist genauer, braucht aber länger.')}
++          <div class="es-coach-vorschau"><b>Coach-Vorschau</b><p>Dieser Zug entwickelt eine Figur und bereitet die Rochade vor.</p></div>
+         </section>
+ 
+         <div class="es-ort"></div>
+ 
+-        <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-reset">
+-          <h3 class="es-titel" id="es-g-reset">Fortschritt</h3>
++        <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-fortschritt">
++          <h3 class="es-titel" id="es-g-fortschritt">Fortschritt</h3>
+           <div class="es-reset" aria-live="polite"></div>
+         </section>
+ 
+         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
+           <h3 class="es-titel" id="es-g-info">Info und Lizenzen</h3>
+           <p><b>Crownmate</b> ist freie Software unter der <a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>. Alles läuft auf deinem Gerät, auch offline.</p>
+           <ul class="es-lizenzen">
+             <li><b>Stockfish 19</b><span>Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a></span></li>
+             <li><b>chess.js 1.4.0</b><span>Schachregeln, BSD-2-Clause</span></li>
+             <li><b>Figuren „cburnett“</b><span>von Colin M. L. Burnett, GPLv2+</span></li>
+             <li><b>Schriften Manrope und Bricolage Grotesque</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
+-            <li><b>Avatare, Symbole, Klänge</b><span>eigens für Crownmate gemacht</span></li>
++            <li><b>Avatare, Symbole und Klänge</b><span>Eigene Werke, alle Rechte vorbehalten</span></li>
+           </ul>
+         </section>
++       </div>
+       </div>`;
+     // Ort einstellungen:gruppen (vor der Gruppe "Fortschritt"; der Behaelter ist display: contents)
+     if (ortGruppen) ortGruppen.verlasse();
+     ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
+     zeigeStand();
+     zeigeReset();
+   }
+ 
+   function zeigeStand() {
+     const e = lies();
+     for (const k of sec.querySelectorAll('.es-schalter')) {
+       if (k.closest('.es-ort')) continue;   // Schalter der Pakete
+-      const an = e[k.dataset.key] !== false;
++      const an = k.dataset.key.startsWith('klanggruppe-') ? e.klanggruppen?.[k.dataset.key.slice(12)] !== false : e[k.dataset.key] !== false;
+       k.setAttribute('aria-checked', an ? 'true' : 'false');
+     }
+     const probe = sec.querySelector('.es-probe');
+     if (probe) probe.disabled = e.klang === false;
+     for (const b of sec.querySelectorAll('.es-brett')) b.setAttribute('aria-checked', b.dataset.wert === (e.brett || 'nacht') ? 'true' : 'false');
+-    for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', Number(b.dataset.wert) === Number(e.tiefe) ? 'true' : 'false');
++    for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', String(b.dataset.wert) === String(e[b.dataset.key]) ? 'true' : 'false');
++    const regler = sec.querySelector('[data-key="lautstaerke"]');
++    if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = `${Math.round(regler.value * 100)} %`; }
+   }
+ 
+   function zeigeReset() {
+     const box = sec.querySelector('.es-reset');
+     if (!box) return;
+     if (resetStufe === 0) {
+       const s = statistik();
+       box.innerHTML = `
+         <p class="es-hilfe">Löscht alle Sterne, Freischaltungen, Partien, Analysen und die Schatzkiste. Die Einstellungen bleiben.
+           Im Moment: <b class="zahl">${s.partien}</b> ${s.partien === 1 ? 'Partie' : 'Partien'}, <b class="zahl">${gesamtSterne()}</b> Sterne.</p>
+         <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} Fortschritt zurücksetzen</button>`;
+     } else if (resetStufe === 1) {
+       box.innerHTML = `
+         <div class="es-warnung" role="alert">${icon('warnung')}<p><b>Wirklich alles zurücksetzen?</b> Alle Sterne, Partien und Analysen sind dann weg, und die Leiter beginnt wieder bei Bauer Benno.</p></div>
+         <div class="es-knoepfe">
+           <button class="knopf" type="button" data-aktion="reset-ab">Abbrechen</button>
+           <button class="knopf es-rot-rand" type="button" data-aktion="reset-2">Ja, weiter</button>
+         </div>`;
+       box.querySelector('[data-aktion="reset-ab"]').focus();
+     } else {
+       box.innerHTML = `
+         <div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>Letzte Rückfrage.</b> Das lässt sich nicht rückgängig machen.</p></div>
+         <div class="es-knoepfe">
+           <button class="knopf" type="button" data-aktion="reset-ab">Abbrechen</button>
+           <button class="knopf es-rot" type="button" data-aktion="reset-ok">${icon('muell')} Endgültig löschen</button>
+         </div>`;
+       box.querySelector('[data-aktion="reset-ab"]').focus();
+     }
+   }
+ 
+   function setze(teil) {
+     try { app.setzeEinstellungen(teil); } catch (e) { try { app.meldung('Speichern hat nicht geklappt', { art: 'fehler' }); } catch (f) { /* egal */ } }
+     zeigeStand();
+   }
+ 
+   lausche(sec, 'click', (e) => {
+     const k = e.target.closest('[data-aktion]');
+     if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort')) return;   // Pakete binden selbst
+     const e0 = lies();
+     switch (k.dataset.aktion) {
+       case 'zurueck': app.zurueck(); break;
+       case 'schalte': {
+         const key = k.dataset.key;
+-        setze({ [key]: e0[key] === false });
++        if (key.startsWith('klanggruppe-')) {
++          const gruppe = key.slice(12);
++          setze({ klanggruppen: { [gruppe]: e0.klanggruppen?.[gruppe] === false } });
++        } else setze({ [key]: e0[key] === false });
+         if (key === 'klang' && e0.klang === false) probeton();
+         break;
+       }
+       case 'probe': probeton(); break;
+       case 'brett': setze({ brett: k.dataset.wert }); break;
+       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
++      case 'wahl': setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert }); break;
+       case 'reset-1': resetStufe = 1; zeigeReset(); break;
+       case 'reset-2': resetStufe = 2; zeigeReset(); break;
+       case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
+       case 'reset-ok':
+         // setzeZurueck sendet speicher:zurueckgesetzt (Pakete leeren ihren Zustand); danach die Gruppen der
+         // Pakete neu fuellen, damit sie den frischen Stand zeigen
+         setzeZurueck();
+         resetStufe = 0;
+         if (ortGruppen) ortGruppen.verlasse();
+         ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
+         zeigeReset();
+         try { app.meldung('Fortschritt zurückgesetzt. Bauer Benno wartet schon!'); } catch (f) { /* egal */ }
+         break;
+       default: break;
+     }
+   });
+ 
++  lausche(sec, 'input', (e) => {
++    const regler = e.target.closest('input[type="range"][data-key]');
++    if (!regler) return;
++    regler.previousElementSibling.querySelector('output').value = `${Math.round(Number(regler.value) * 100)} %`;
++    setze({ [regler.dataset.key]: Number(regler.value) });
++  });
++
+   // Pfeiltasten in den Auswahlgruppen (Radiogruppen-Verhalten)
+   lausche(sec, 'keydown', (e) => {
+     const k = e.target.closest('[role="radio"]');
+     if (!k || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+     const gruppe = [...k.parentElement.querySelectorAll('[role="radio"]')];
+     const i = gruppe.indexOf(k);
+     const neu = gruppe[(i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + gruppe.length) % gruppe.length];
+     e.preventDefault();
+     neu.focus();
+     neu.click();
+   });
+ 
+   function probeton() {
+     try {
+       klang.aktivieren();
+       klang.zug();
+       nach(260, () => { try { klang.brillant(); } catch (e) { /* egal */ } });
+     } catch (e) { /* Klang nicht verfuegbar */ }
+   }
+ 
+   baue();
+ 
+   return {
+     verlasse() {
+       if (beendet) return;
+diff --git a/sw.js b/sw.js
+index 261dd68672dbf4d19d3d246b20c1b278da668244..300e8c7b28b2ba66a434e740fcb1016bb139f7f8 100644
+--- a/sw.js
++++ b/sw.js
+@@ -1,36 +1,36 @@
+ // Service Worker der Schach-Arena: legt alle App-Dateien in einen Cache, damit die App
+ // (samt Stockfish) auch ohne Netz laeuft.
+ //   Installation: laedt alle DATEIEN vor (eine fehlt = Installation scheitert).
+ //   Aktivierung:  loescht alte Caches, uebernimmt offene Seiten.
+ //   Abruf:        Cache zuerst, sonst Netz (und das Ergebnis in den Cache legen).
+ // Update: Bei jeder Aenderung an einer App-Datei VERSION hochzaehlen, am einfachsten mit
+ //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
+ // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
+ // (Nachricht 'aktivieren', siehe js/app.js).
+-const VERSION = 25;
+-const STAND = '3628eddf4876';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
++const VERSION = 26;
++const STAND = '91ab3f268bea';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+ const PRAEFIX = 'schach-arena-';
+ const CACHE = PRAEFIX + 'v' + VERSION;
+ const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
+ 
+ // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
+ const DATEIEN = [
+   'index.html',
+   'manifest.webmanifest',
+   'LICENSE',
+   'css/tokens.css',
+   'css/themes/modern.css',
+   'css/board.css',
+   'css/app.css',
+   'css/bauteile.css',
+   'css/navigation.css',
+   'css/arena.css',
+   'css/duell.css',
+   'css/partie.css',
+   'css/ergebnis.css',
+   'css/analyse.css',
+   'css/verlauf.css',
+   'css/einstellungen.css',
+   'css/training.css',
+   'css/sicherung.css',
+   'css/screens.css',
