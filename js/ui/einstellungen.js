@@ -78,48 +78,80 @@ export function zeige(root, params = {}, app) {
     return `<span class="es-mini" style="--feld-hell:${b.hell};--feld-dunkel:${b.dunkel}" aria-hidden="true">${felder}</span>`;
   };
 
+  const segment = (key, titel, werte, hilfe = '') => `
+    <div class="es-block" data-einstellung="${key}">
+      <h4>${titel}</h4>${hilfe ? `<p class="es-hilfe">${hilfe}</p>` : ''}
+      <div class="es-segment" role="radiogroup" aria-label="${titel}">
+        ${werte.map(([wert, name, text = '']) => `<button class="es-seg" type="button" role="radio" aria-checked="false"
+          data-aktion="wahl" data-key="${key}" data-wert="${wert}"><b>${name}</b>${text ? `<span>${text}</span>` : ''}</button>`).join('')}
+      </div>
+    </div>`;
+
   function baue() {
     sec.innerHTML = `
       <header class="kopf">
         <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
         <div class="titel"><h2>Einstellungen</h2><div class="unter">Wirkt sofort und bleibt gespeichert</div></div>
       </header>
-      <div class="es-inhalt">
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
-          <h3 class="es-titel" id="es-g-anzeige">Klang und Anzeige</h3>
+      <div class="es-layout">
+       <nav class="es-nav" aria-label="Einstellungsbereiche">
+        ${[['klang','Klang'],['spiel','Spiel'],['bewegung','Bewegung'],['anzeige','Anzeige'],['coach','Coach'],['fortschritt','Fortschritt'],['info','Info']].map(([id,n], i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${n}</a>`).join('')}
+       </nav>
+       <div class="es-inhalt">
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-klang">
+          <h3 class="es-titel" id="es-g-klang">Klang</h3>
           ${schalter('klang', 'Klang', 'Zugklänge und Effekte',
-            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probeton</button>`)}
-          ${schalter('balken', 'Bewertungsbalken', 'Zeigt neben dem Brett, wer besser steht.')}
-          ${schalter('liveBewertung', 'Live-Bewertung', 'Symbol und Coach nach jedem eigenen Zug. Gerechnet wird immer, damit Sterne und Analyse stimmen.')}
-          ${schalter('vorzuege', 'Vorzüge', 'Züge vormerken, während der Gegner denkt')}
-          ${schalter('koordinaten', 'Koordinaten', 'Buchstaben und Zahlen am Brettrand.')}
+            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probe</button>`)}
+          ${segment('klangpaket', 'Klangpaket', [['','Arcade (Ansicht)'],['arcade','Arcade'],['holz','Holz']])}
+          <label class="es-regler"><span><b>Lautstärke</b><output>80 %</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
+          ${segment('klangstufe', 'Klangstufe', [['alle','Alle'],['wichtig','Wichtig'],['aus','Aus']])}
+          <div class="es-untergruppe"><h4>Klänge einzeln</h4>${[['brett','Züge'],['bewertung','Bewertung'],['feier','Feier'],['uhr','Uhr'],['boss','Boss-Treffer'],['finisher','Finisher'],['bedienung','Bedienung']].map(([k,n]) => schalter(`klanggruppe-${k}`,n,'')).join('')}</div>
         </section>
 
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-brett">
-          <h3 class="es-titel" id="es-g-brett">Brettfarbe</h3>
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">Spiel</h3>
+          ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']])}
+          ${schalter('haltenAufgeben','Aufgeben und Remis halten','Schützt vor versehentlichem Antippen.')}
+          ${schalter('turmRochade','Turm auf König rochiert','Erlaubt die kurze Eingabe der Rochade.')}
+          ${schalter('autoDame','Automatisch Dame','Halten am Zielfeld zeigt andere Figuren.')}
+          ${schalter('vorzuege','Vorzüge','Züge vormerken, während der Gegner denkt.')}
+          ${segment('steuerung','Figuren bewegen',[['beides','Beides'],['ziehen','Ziehen'],['tippen','Tippen']])}
+        </section>
+
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-bewegung"><h3 class="es-titel" id="es-g-bewegung">Bewegung</h3>
+          ${segment('bewegung','Animationstempo',[['langsam','Langsam'],['normal','Normal'],['schnell','Schnell'],['aus','Aus']],'Die Systemeinstellung „weniger Bewegung“ hat Vorrang.')}
+          <div class="es-tempo-vorschau" aria-hidden="true"><span>♞</span></div>
+        </section>
+
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
+          <h3 class="es-titel" id="es-g-anzeige">Anzeige</h3>
+          ${segment('thema','Ansicht',[['modern','Modern und klar']])}
+          ${segment('modus','Erscheinungsbild',[['system','System'],['hell','Hell'],['dunkel','Dunkel']])}
+          <h4>Brettfarbe</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
             ${BRETTER.map((b) => `
               <button class="es-brett" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
                 ${miniBrett(b)}<span class="es-brett-name">${b.name}</span>
               </button>`).join('')}
           </div>
+          ${schalter('koordinaten','Koordinaten','Buchstaben und Zahlen am Brett.')}
+          ${segment('koordLage','Lage der Koordinaten',[['ecke','Ecke'],['rand','Rand']])}
+          ${schalter('balken','Bewertungsbalken','Zeigt, wer besser steht.')}${schalter('liveBewertung','Live-Bewertung','Coach nach jedem eigenen Zug.')}
+          ${schalter('pfeile','Pfeile malen','Feld halten und ziehen.')}
+          ${segment('duellIntro','Duell-Intro',[['immer','Immer'],['besondere','Besondere'],['aus','Aus']])}
+          ${schalter('lebensleiste','Lebensleiste','Bei Boss-Partien.')}${schalter('zaehlwerk','Zählwerk','Wenn ein Spielmodus es anbietet.')}${schalter('funkenlinie','Funkenlinie','Wenn ein Spielmodus es anbietet.')}
         </section>
 
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-tiefe">
-          <h3 class="es-titel" id="es-g-tiefe">Rechentiefe</h3>
-          <p class="es-hilfe" id="es-h-tiefe">Wie tief Stockfish deine Züge prüft. Gründlich ist genauer, braucht auf dem iPad aber etwas länger.</p>
-          <div class="es-segment" role="radiogroup" aria-labelledby="es-g-tiefe" aria-describedby="es-h-tiefe">
-            ${TIEFEN.map((t) => `
-              <button class="es-seg" type="button" role="radio" aria-checked="false" data-aktion="tiefe" data-wert="${t.wert}">
-                <b>${t.name}</b><span class="zahl">${t.text}</span>
-              </button>`).join('')}
-          </div>
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-coach"><h3 class="es-titel" id="es-g-coach">Coach</h3>
+          ${segment('coachStil','Erklärungen',[['ausfuehrlich','Ausführlich'],['knapp','Knapp']])}
+          ${segment('sprueche','Bot-Sprüche',[['an','An'],['wenig','Wenig'],['aus','Aus']])}
+          ${segment('tiefe','Rechentiefe',TIEFEN.map(t => [String(t.wert),t.name,t.text]),'Gründlich ist genauer, braucht aber länger.')}
+          <div class="es-coach-vorschau"><b>Coach-Vorschau</b><p>Dieser Zug entwickelt eine Figur und bereitet die Rochade vor.</p></div>
         </section>
 
         <div class="es-ort"></div>
 
-        <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-reset">
-          <h3 class="es-titel" id="es-g-reset">Fortschritt</h3>
+        <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-fortschritt">
+          <h3 class="es-titel" id="es-g-fortschritt">Fortschritt</h3>
           <div class="es-reset" aria-live="polite"></div>
         </section>
 
@@ -131,9 +163,10 @@ export function zeige(root, params = {}, app) {
             <li><b>chess.js 1.4.0</b><span>Schachregeln, BSD-2-Clause</span></li>
             <li><b>Figuren „cburnett“</b><span>von Colin M. L. Burnett, GPLv2+</span></li>
             <li><b>Schriften Manrope und Bricolage Grotesque</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
-            <li><b>Avatare, Symbole, Klänge</b><span>eigens für Crownmate gemacht</span></li>
+            <li><b>Avatare, Symbole und Klänge</b><span>Eigene Werke, alle Rechte vorbehalten</span></li>
           </ul>
         </section>
+       </div>
       </div>`;
     // Ort einstellungen:gruppen (vor der Gruppe "Fortschritt"; der Behaelter ist display: contents)
     if (ortGruppen) ortGruppen.verlasse();
@@ -146,13 +179,15 @@ export function zeige(root, params = {}, app) {
     const e = lies();
     for (const k of sec.querySelectorAll('.es-schalter')) {
       if (k.closest('.es-ort')) continue;   // Schalter der Pakete
-      const an = e[k.dataset.key] !== false;
+      const an = k.dataset.key.startsWith('klanggruppe-') ? e.klanggruppen?.[k.dataset.key.slice(12)] !== false : e[k.dataset.key] !== false;
       k.setAttribute('aria-checked', an ? 'true' : 'false');
     }
     const probe = sec.querySelector('.es-probe');
     if (probe) probe.disabled = e.klang === false;
     for (const b of sec.querySelectorAll('.es-brett')) b.setAttribute('aria-checked', b.dataset.wert === (e.brett || 'nacht') ? 'true' : 'false');
-    for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', Number(b.dataset.wert) === Number(e.tiefe) ? 'true' : 'false');
+    for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', String(b.dataset.wert) === String(e[b.dataset.key]) ? 'true' : 'false');
+    const regler = sec.querySelector('[data-key="lautstaerke"]');
+    if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = `${Math.round(regler.value * 100)} %`; }
   }
 
   function zeigeReset() {
@@ -196,13 +231,17 @@ export function zeige(root, params = {}, app) {
       case 'zurueck': app.zurueck(); break;
       case 'schalte': {
         const key = k.dataset.key;
-        setze({ [key]: e0[key] === false });
+        if (key.startsWith('klanggruppe-')) {
+          const gruppe = key.slice(12);
+          setze({ klanggruppen: { [gruppe]: e0.klanggruppen?.[gruppe] === false } });
+        } else setze({ [key]: e0[key] === false });
         if (key === 'klang' && e0.klang === false) probeton();
         break;
       }
       case 'probe': probeton(); break;
       case 'brett': setze({ brett: k.dataset.wert }); break;
       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
+      case 'wahl': setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert }); break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
       case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
@@ -218,6 +257,13 @@ export function zeige(root, params = {}, app) {
         break;
       default: break;
     }
+  });
+
+  lausche(sec, 'input', (e) => {
+    const regler = e.target.closest('input[type="range"][data-key]');
+    if (!regler) return;
+    regler.previousElementSibling.querySelector('output').value = `${Math.round(Number(regler.value) * 100)} %`;
+    setze({ [regler.dataset.key]: Number(regler.value) });
   });
 
   // Pfeiltasten in den Auswahlgruppen (Radiogruppen-Verhalten)
