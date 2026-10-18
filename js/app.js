@@ -66,6 +66,7 @@ import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
+import './konto.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
