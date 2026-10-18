@@ -167,6 +167,8 @@ export class Brett {
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
+  zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
+  setzeAutoDame(boolean)          // Umwandlung bei der Eingabe sofort als Dame ausfuehren
   zeigeAbzeichen(feld, klasse)    // Klassen-Symbol oben rechts am Feld (siehe Design)
   entferneAbzeichen()
   pfeile([{ von, nach, farbe }])  // SVG-Pfeile ueber dem Brett

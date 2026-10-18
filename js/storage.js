@@ -145,6 +145,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   klanggruppen: Object.freeze({ brett: true, bewertung: true, feier: true, uhr: true, boss: true, finisher: true, bedienung: true }),
   // Spiel (Fingerschutz)
   zugBestaetigen: 'ohneUhr', // 'aus' | 'ohneUhr' | 'immer'
+  vorzuege: true,        // eigene Zuege vormerken, waehrend der Gegner denkt
   haltenAufgeben: true,  // Aufgeben und Remis anbieten nur durch Halten
   turmRochade: false,    // Turm auf Koenig tippen rochiert
   autoDame: true,        // Umwandlung ohne Auswahl (Halten zeigt D T L S)

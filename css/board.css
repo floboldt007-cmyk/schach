@@ -105,6 +105,8 @@
 .brett .lage.mark-zuletzt { background: var(--b-zuletzt); }
 .brett .lage.mark-fehler { background: var(--schlecht, #e5675e); opacity: .5; }
 .brett .lage.mark-gut { background: var(--gut, #46cf7e); opacity: .45; }
+.brett .lage.mark-vorzug-start { background: var(--vorzug-start); }
+.brett .lage.mark-vorzug-ziel { background: var(--vorzug-ziel); }
 .brett .lage.mark-bewertung {
   box-shadow: inset 0 0 0 max(3px, .55cqw) var(--akzent, #ffc83d);
   animation: brett-puls 1s ease-in-out infinite;

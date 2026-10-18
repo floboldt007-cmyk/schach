@@ -49,6 +49,8 @@ html[data-brett="holz"] {
 }
 :root {
   --hinweis: rgba(76, 110, 245, .34);
+  --vorzug-start: rgba(70, 87, 120, .34);
+  --vorzug-ziel: rgba(204, 72, 32, .36);
   --schach: rgba(226, 60, 60, .85);
 }
 

@@ -91,6 +91,7 @@ export function zeige(root, params = {}, app) {
             `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probeton</button>`)}
           ${schalter('balken', 'Bewertungsbalken', 'Zeigt neben dem Brett, wer besser steht.')}
           ${schalter('liveBewertung', 'Live-Bewertung', 'Symbol und Coach nach jedem eigenen Zug. Gerechnet wird immer, damit Sterne und Analyse stimmen.')}
+          ${schalter('vorzuege', 'Vorzüge', 'Züge vormerken, während der Gegner denkt')}
           ${schalter('koordinaten', 'Koordinaten', 'Buchstaben und Zahlen am Brettrand.')}
         </section>
 

@@ -196,12 +196,15 @@ function svgEl(name, attr) {
 
 export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
-    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null } = {}) {
+    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null, beiLeer = null,
+    autoDame = false } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
     this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
     this.beiZug = beiZug;
     this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
+    this.beiLeer = typeof beiLeer === 'function' ? beiLeer : null;
+    this.autoDame = !!autoDame;
     this._stumm = null;          // Geste auf einer eigenen Figur ohne erlaubten Zug (nur fuer beiAbgelehnt)
     this._striche = new Set();   // gezeichnete Striche (W0+a)
     this._gekippt = new Set();   // gekippte Koenige (img)
@@ -288,6 +291,18 @@ export class Brett {
     this._zeichneLagen();
   }
 
+  // Zeigt eine Folge vorgemerkter Zuege, ohne beiZug aufzurufen. Die echte Stellung
+  // bleibt Aufgabe der App und wird mit dem naechsten setzeStellung wiederhergestellt.
+  zeigeVorzuege(liste) {
+    let figuren = this._stellungKarte();
+    for (const z of liste || []) {
+      if (!z || !gueltigesFeld(z.von) || !gueltigesFeld(z.nach)) continue;
+      figuren = wendeZugAn(figuren, z.von, z.nach, z.umwandlung || 'q');
+    }
+    this._zeigeFiguren(figuren, false);
+    this._zeichneLagen();
+  }
+
   zeigeAbzeichen(feld, klasse) {
     if (!gueltigesFeld(feld) || !klasse) { this.entferneAbzeichen(); return; }
     this._abzeichen = { feld, klasse };
@@ -324,6 +339,8 @@ export class Brett {
     this.el.classList.toggle('ohne-koordinaten', !this._koord);
     this._beschrifte();
   }
+
+  setzeAutoDame(an = true) { this.autoDame = !!an; }
 
   // ----- W0+a: Striche und Koenigsfall -----
 
@@ -771,6 +788,9 @@ export class Brett {
       this._auswahl = null;
       this._zeichneLagen();
     }
+    if (this.beiLeer) {
+      try { this.beiLeer(feld); } catch (err) { console.error(err); }
+    }
   }
 
   // Figur der Seite am Zug (Farbe aus der Zielkarte), die selbst keinen erlaubten Zug hat
@@ -809,11 +829,16 @@ export class Brett {
     e.preventDefault();
     const r = this._felderEl.getBoundingClientRect();
     const s = r.width / 8;
-    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
-    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
-    g.el.style.transform = `translate(${(e.clientX - r.left - s / 2).toFixed(1)}px, ${(e.clientY - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
     const f = this._feldAusPunkt(e.clientX, e.clientY);
     const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
+    // Touchmove-Ereignisse koennen auf iPadOS bei schneller Bewegung einen Frame hinterherhinken.
+    // Ueber einem gueltigen Ziel bleibt die Vorschau deshalb mittig unter diesem Feld statt sichtbar nachzulaufen.
+    const [spalte, zeile] = ueber && g.typ !== 'mouse' ? this._spalteZeile(ueber) : [null, null];
+    const x = spalte == null ? e.clientX : r.left + (spalte + 0.5) * s;
+    const y = zeile == null ? e.clientY : r.top + (zeile + 0.5) * s;
+    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
+    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
+    g.el.style.transform = `translate(${(x - r.left - s / 2).toFixed(1)}px, ${(y - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
     if (ueber !== this._ueber) {
       this._ueber = ueber;
       this._zeichneLagen();
@@ -885,6 +910,7 @@ export class Brett {
   _versucheZug(von, nach, art) {
     const fig = this.figurAuf(von);
     if (fig && fig[1] === 'P' && ((fig[0] === 'w' && nach[1] === '8') || (fig[0] === 'b' && nach[1] === '1'))) {
+      if (this.autoDame) { this._fuehreAus(von, nach, 'q', art); return; }
       this._oeffneUmwandlung(von, nach, art);
       return;
     }
