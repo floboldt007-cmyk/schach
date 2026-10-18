@@ -108,7 +108,7 @@ export function dateiFuer(sicherung) {
 
 export async function speichereDatei(datei) {
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [datei] })) {
-    await navigator.share({ files: [datei], title: 'Schach-Arena Sicherung' });
+    await navigator.share({ files: [datei], title: 'Crownmate Sicherung' });
     return 'geteilt';
   }
   const url = URL.createObjectURL(datei);

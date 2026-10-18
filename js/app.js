@@ -1,4 +1,4 @@
-// Schach-Arena: App-Rahmen. Routing per location.hash, Screens als Module (js/ui/<name>.js),
+// Crownmate: App-Rahmen. Routing per location.hash, Screens als Module (js/ui/<name>.js),
 // gemeinsame Dienste fuer alle Screens (Engines, Einstellungen, Meldungen, Rueckfragen).
 //
 // Vertrag (ARCHITEKTUR.md "Runde 2"): jedes Screen-Modul exportiert
@@ -690,7 +690,7 @@ async function zeigeScreen(name, params, hash) {
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
   document.documentElement.dataset.screen = name;
-  document.title = name === 'arena' ? 'Schach-Arena' : `${TITEL[name]} · Schach-Arena`;
+  document.title = name === 'arena' ? 'Crownmate' : `${TITEL[name]} · Crownmate`;
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);

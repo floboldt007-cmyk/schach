@@ -260,7 +260,7 @@ function main() {
   try { man = JSON.parse(readFileSync(path.join(WURZEL, 'manifest.webmanifest'), 'utf8')); } catch (e) { /* unten */ }
   pruefe('Manifest ist gültiges JSON', !!man);
   if (man) {
-    pruefe('Manifest: Name, Kurzname, Start, Bereich', man.name === 'Schach-Arena' && man.short_name === 'Schach' && man.start_url === './' && man.scope === './');
+    pruefe('Manifest: Name, Kurzname, Start, Bereich', man.name === 'Crownmate' && man.short_name === 'Crownmate' && man.start_url === './' && man.scope === './');
     pruefe('Manifest: standalone, Farben, Ausrichtung', man.display === 'standalone' && man.background_color === '#F4F1EC' && man.theme_color === '#F4F1EC' && man.orientation === 'any');
     const icons = man.icons || [];
     const hat = (g, zweck) => icons.some((i) => i.sizes === g && (i.purpose || 'any').split(' ').includes(zweck));

@@ -260,7 +260,7 @@ async function testeLeiste(browser) {
     if (vp.reiter.split(',').length > 2 && vp.w < 700) pruefe('vier Reiter auf dem Handy: gestapelt (Symbol ueber dem Wort), volle Breite', m.form === 'gestapelt' && /gestapelt/.test(m.klasse));
     const titel = await seite.evaluate(() => { const t = document.querySelector('.haupt-kopf .marke-titel'); const b = t.getBoundingClientRect();
       return { ganz: t.scrollWidth <= t.clientWidth + 1, eineZeile: b.height < 34, ellipse: getComputedStyle(t).textOverflow, text: t.textContent, r: b.right, iw: innerWidth }; });
-    pruefe('Titel „Schach-Arena“ ganz, einzeilig, ohne Auslassungszeichen, im Bild', titel.ganz && titel.eineZeile && titel.ellipse !== 'ellipsis' && titel.r <= titel.iw,
+    pruefe('Titel „Crownmate“ ganz, einzeilig, ohne Auslassungszeichen, im Bild', titel.ganz && titel.eineZeile && titel.ellipse !== 'ellipsis' && titel.r <= titel.iw,
       JSON.stringify(titel));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -408,7 +408,7 @@ async function testeTraining(browser) {
       leer: !document.querySelector('.training-leer').hidden, gitter: document.querySelector('.training-gitter').hidden,
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
-    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Schach-Arena' && !r.platzhalter, JSON.stringify(r));
+    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Crownmate' && !r.platzhalter, JSON.stringify(r));
     pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
       && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));

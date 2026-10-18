@@ -274,7 +274,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   await seite.goto(APP + '#arena');
   await h.screen('arena');
   pruefe('Arena unter /schach/ geladen', await seite.locator('.screen.arena .knoten').count() === 10);
-  pruefe('Seitentitel', (await seite.title()) === 'Schach-Arena');
+  pruefe('Seitentitel', (await seite.title()) === 'Crownmate');
   const links = await seite.evaluate(() => ({
     manifest: document.querySelector('link[rel="manifest"]')?.href,
     apple: document.querySelector('link[rel="apple-touch-icon"]')?.href,
@@ -300,7 +300,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
     return { typ: r.headers.get('content-type'), name: j.name, kurz: j.short_name, start: new URL(j.start_url, r.url).href, scope: new URL(j.scope, r.url).href, display: j.display, icons };
   });
   pruefe('Manifest: Typ application/manifest+json', /manifest\+json/.test(man.typ), man.typ);
-  pruefe('Manifest: Name und Kurzname', man.name === 'Schach-Arena' && man.kurz === 'Schach');
+  pruefe('Manifest: Name und Kurzname', man.name === 'Crownmate' && man.kurz === 'Crownmate');
   pruefe('Manifest: start_url und scope = /schach/', man.start === START && man.scope === START, `${man.start} ${man.scope}`);
   pruefe('Manifest: standalone', man.display === 'standalone');
   pruefe('Manifest: alle Icons laden', man.icons.length >= 3 && man.icons.every((i) => i.status === 200), JSON.stringify(man.icons.filter((i) => i.status !== 200)));

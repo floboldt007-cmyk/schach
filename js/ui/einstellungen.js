@@ -125,13 +125,13 @@ export function zeige(root, params = {}, app) {
 
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
           <h3 class="es-titel" id="es-g-info">Info und Lizenzen</h3>
-          <p><b>Schach-Arena</b> ist freie Software unter der <a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>. Alles läuft auf deinem Gerät, auch offline.</p>
+          <p><b>Crownmate</b> ist freie Software unter der <a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>. Alles läuft auf deinem Gerät, auch offline.</p>
           <ul class="es-lizenzen">
             <li><b>Stockfish 19</b><span>Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a></span></li>
             <li><b>chess.js 1.4.0</b><span>Schachregeln, BSD-2-Clause</span></li>
             <li><b>Figuren „cburnett“</b><span>von Colin M. L. Burnett, GPLv2+</span></li>
             <li><b>Schriften Manrope und Bricolage Grotesque</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
-            <li><b>Avatare, Symbole, Klänge</b><span>eigens für die Schach-Arena gemacht</span></li>
+            <li><b>Avatare, Symbole, Klänge</b><span>eigens für Crownmate gemacht</span></li>
           </ul>
         </section>
       </div>`;

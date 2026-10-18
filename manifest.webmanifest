@@ -1,6 +1,6 @@
 {
-  "name": "Schach-Arena",
-  "short_name": "Schach",
+  "name": "Crownmate",
+  "short_name": "Crownmate",
   "description": "Schach gegen zehn Bots mit Live-Bewertung jedes Zugs und Spielanalyse.",
   "lang": "de",
   "dir": "ltr",

@@ -70,7 +70,7 @@ if (!auswahl.length) {
   console.log('Keine passende Suite. Namen: ' + SUITEN.map((s) => s.name).join(', '));
   process.exit(2);
 }
-console.log(`Schach-Arena: ${auswahl.length} Testsuiten${SCHNELL ? ' (schnell)' : ''}\n`);
+console.log(`Crownmate: ${auswahl.length} Testsuiten${SCHNELL ? ' (schnell)' : ''}\n`);
 const t0 = Date.now();
 const ergebnisse = [];
 for (const s of auswahl) {

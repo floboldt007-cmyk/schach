@@ -3,7 +3,7 @@
 // (.kopf-chips, Ort arena:kopf), eigene Knoepfe, Mond/Sonne, Klang-Schalter und Zahnrad. Optik: css/navigation.css.
 // Importiert app.js NICHT (Testseiten laden Screens ohne App); die App kommt als Parameter.
 //
-//   hauptKopf({ titel = 'Schach-Arena', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
+//   hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
 //               modus = true, klang = true, einstellungen = true, titelElement = 'h1' }) -> HTML (header.kopf.haupt-kopf)
 //       titelElement: 'h1' | 'h2' | 'div' (Seiten mit eigenem Seitentitel, z. B. Training, nehmen 'div')
 //       titel/unter: Titel (.marke-titel.logo) und Unterzeile (.unter.logo-unter); der Titel wird nie gekuerzt (kein
@@ -38,7 +38,7 @@ export function standardChips(fortschritt = null) {
     `<span class="chip zahl chip-pokal" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegt}<span class="von"> / 10</span></span>`;
 }
 
-export function hauptKopf({ titel = 'Schach-Arena', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
+export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
   modus = true, klang = true, einstellungen = true, titelElement = 'h1' } = {}) {
   const tt = ['h1', 'h2', 'div'].includes(titelElement) ? titelElement : 'h1';
   const eigene = (Array.isArray(knoepfe) ? knoepfe : []).filter((k) => k && /^[a-z][a-z0-9-]*$/.test(String(k.aktion || '')));

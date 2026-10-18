@@ -1323,7 +1323,7 @@ async function testeErweiterungen(browser) {
     pruefe('#training (Kern-Screen seit U2): Training-Huelle, kein Platzhalter', (await seite.evaluate(() => location.hash)) === '#training'
       && await seite.locator('.screen.platzhalter').count() === 0);
     await seite.evaluate(() => window.__app.gehe('start'));
-    await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Schach-Arena');
+    await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Crownmate');
     pruefe('gehe("start") ohne Paket-Screen: Arena, kein Platzhalter', await seite.locator('.screen.arena').count() === 1 && await seite.locator('.screen.platzhalter').count() === 0);
     pruefe('Zurück nach dem Rückfall bleibt in der App', await seite.evaluate(() => history.state && history.state.schach === true && history.state.name === 'arena'));
     // 404 der fehlenden Paket-Screens gehoert zum Test
@@ -2081,7 +2081,7 @@ async function testeSpielFundament(browser) {
     await seite.locator('.reiter-leiste [data-reiter="ich"]').click();
     await seite.waitForSelector('.screen.ich-test');
     pruefe('Leiste: Reiter Ich öffnet den Ich-Screen und ist aktiv', (await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter)) === 'ich'
-      && (await seite.evaluate(() => document.title)) === 'Ich · Schach-Arena' && (await seite.evaluate(() => location.hash)) === '#ich');
+      && (await seite.evaluate(() => document.title)) === 'Ich · Crownmate' && (await seite.evaluate(() => location.hash)) === '#ich');
     await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
     await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
     pruefe('Leiste: Bestenliste ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
@@ -2535,7 +2535,7 @@ async function testeSpielFundament(browser) {
       const aktiv = document.querySelector('.reiter-leiste [aria-current="page"]');
       return { titel: document.title, hash: location.hash, aktiv: aktiv ? aktiv.dataset.reiter : null, leiste: !document.querySelector('.reiter-leiste').hidden };
     });
-    pruefe('Screen werkstatt mit Datei (Paket werkstatt): wird gezeigt und gehört zum Reiter Ich', r.titel === 'Werkstatt · Schach-Arena' && r.hash === '#werkstatt'
+    pruefe('Screen werkstatt mit Datei (Paket werkstatt): wird gezeigt und gehört zum Reiter Ich', r.titel === 'Werkstatt · Crownmate' && r.hash === '#werkstatt'
       && r.aktiv === 'ich' && r.leiste, JSON.stringify(r));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/werkstatt\.js/.test(f));
     pruefe('Werkstatt: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
