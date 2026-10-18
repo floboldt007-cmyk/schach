@@ -1,0 +1,747 @@
+diff --git a/codex-auftraege/sicherung.md b/codex-auftraege/sicherung.md
+deleted file mode 100644
+index 2049e46101754649a29b1b215d96de9fea85200f..0000000000000000000000000000000000000000
+--- a/codex-auftraege/sicherung.md
++++ /dev/null
+@@ -1,25 +0,0 @@
+-# Auftrag für Codex: Sicherung mit Export und Import (S1-9)
+-
+-Basis und Ziel: Zweig `codex/sicherung`, abgezweigt von `claude/umbau-look-a` (neuer Look). Lies zuerst
+-`AGENTS.md`, `ARCHITEKTUR.md` und in `design/runde4/SPIELKONZEPT.md` die Zeile „S1-9 Sicherung“.
+-
+-Ziel: Der Spielstand lebt nur im Browser-Speicher des Geräts (auf dem iPad getrennt für Safari und die
+-Home-Bildschirm-App). Der Besitzer soll ihn sichern und auf ein anderes Gerät oder eine neue Adresse mitnehmen können.
+-
+-1. Export: eine Sicherungsdatei (JSON, Dateiname mit Datum, Formatversion im Inhalt) mit dem kompletten Spielstand
+-   über `rohSpeicher()` / `speicherStand()` aus `js/storage.js`. Auf iPad und iPhone über das Teilen-Blatt
+-   (`navigator.share` mit Datei, damit sie in „Dateien“ / iCloud Drive landen kann), sonst als Download.
+-2. Import: Datei wählen, prüfen (Format, Version, Pflichtfelder; nie ungeprüft übernehmen), Vorschau zeigen
+-   (Datum der Sicherung, Anzahl Partien, Level, Bots), erst nach Bestätigung übernehmen. Vorher den aktuellen Stand
+-   automatisch als Rückfall sichern. Ältere Sicherungsformate müssen weiter lesbar bleiben (Migration wie in
+-   `storage.js`).
+-3. Speicheranzeige in den Einstellungen (Gruppe über den Ort `einstellungen:gruppen`): belegter Speicher, Datum der
+-   letzten Sicherung. Ab 7 Tagen ohne Sicherung steht dort still „Letzte Sicherung vor N Tagen“, nie als Popup oder
+-   Nachricht. Tage nur über `js/tag.js` rechnen (kein `toISOString()`).
+-4. Texte deutsch, echte Umlaute, keine langen Gedankenstriche, kein Druck oder Schuldgefühl. Bauteile und Tokens des
+-   neuen Looks benutzen (`css/tokens.css`, `css/themes/modern.css`).
+-5. Tests: neue Prüfungen in einer passenden Suite (Export, Import mit Vorschau, kaputte Datei wird abgelehnt, alte
+-   Formatversion, Rückfall-Sicherung, Hinweis nach 7 Tagen mit gestelltem Datum). Danach
+-   `node tests/sw.test.mjs --aktualisieren` und `node tests/alle.mjs` komplett grün. Keine bestehende Prüfung ändern,
+-   abschwächen oder überspringen.
+-6. Diese Auftragsdatei löschen. Halte dich an `AGENTS.md`.
+diff --git a/css/app.css b/css/app.css
+index 6e91ffbb094080cfc6b3c9aefc7c2bc5fba06b82..00086f3fc5c53e9a14c7a1e6d2b0bbbd4184b940 100644
+--- a/css/app.css
++++ b/css/app.css
+@@ -8,51 +8,51 @@
+    bauteile.css ... training.css -> screens.css
+    Die Neon-Abschnitte der Screens werden Paket fuer Paket durch die neuen
+    Dateien ersetzt (PLAN 6.3); bis dahin sind sie hier auf Tokens umgestellt.
+    ============================================================ */
+ 
+ /* ============================================================
+    BASIS (gemeinsam fuer alle Screens). Aenderungen hier betreffen
+    auch css/screens.css, deshalb nur ergaenzen, nichts umbenennen.
+    Die Variablen stehen seit dem Premium-Umbau in css/tokens.css und
+    css/themes/modern.css (kein Neon-Gitter, kein Neon-Verlauf mehr).
+    ============================================================ */
+ * { box-sizing: border-box; }
+ html, body { margin: 0; height: 100%; }
+ body {
+   background-color: var(--grund);
+   background-image: var(--textur-grund, none);
+   color: var(--text);
+   font-family: var(--schrift);
+   font-size: 16px;
+   line-height: 1.4;
+   -webkit-font-smoothing: antialiased;
+   -moz-osx-font-smoothing: grayscale;
+   -webkit-tap-highlight-color: transparent;
+   -webkit-text-size-adjust: 100%;
+   text-size-adjust: 100%;
+-  transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft);
++  transition: color var(--d-m) var(--sanft);
+ }
+ button { font: inherit; color: inherit; }
+ a { color: inherit; text-decoration: none; }
+ img { display: block; }
+ .zahl { font-variant-numeric: tabular-nums; }
+ .ueberzeile { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+ .disp { font-family: var(--display); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.02; }
+ :focus-visible { outline: var(--fokus); outline-offset: 3px; }
+ 
+ /* ---------- Screens: app.js zeigt genau einen .screen in #app ---------- */
+ #app { position: relative; z-index: 1; height: 100vh; height: 100dvh; }
+ .screen { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+ /* Screens mit langem Inhalt (Analyse hoch, Verlauf, Einstellungen) duerfen scrollen */
+ .screen.scrollt { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+ 
+ /* ---------- Kopfzeile ---------- */
+ .kopf { flex: none; display: flex; align-items: center; gap: 12px; height: 68px; padding: 0 18px; }
+ .kopf .titel { flex: 1; min-width: 0; }
+ .kopf h1, .kopf h2 { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 21px; letter-spacing: -.025em; line-height: 1.1;
+   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .kopf .unter { font-size: 13px; font-weight: 650; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .logo { font-family: var(--display); font-weight: var(--gw-titel); font-size: 23px; letter-spacing: .02em; line-height: 1; color: var(--text); white-space: nowrap; }
+ .logo-unter { margin-top: 5px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+ 
+diff --git a/css/board.css b/css/board.css
+index 2cb27253e402a3e18e227eb5e0292121665d3dd8..ce8a30155e28d412c54deaa8ce1c01ec1f418dd6 100644
+--- a/css/board.css
++++ b/css/board.css
+@@ -118,50 +118,51 @@
+ .brett .lage.mark-k-ungenau { background: var(--k-ungenau, #e9b21b); opacity: .5; }
+ .brett .lage.mark-k-fehler { background: var(--k-fehler, #ff8b2c); opacity: .5; }
+ .brett .lage.mark-k-verpasst { background: var(--k-verpasst, #b266ea); opacity: .5; }
+ .brett .lage.mark-k-patzer { background: var(--k-patzer, #f0474b); opacity: .5; }
+ .brett .lage.mark-k-erzwungen { background: var(--k-erzwungen, #8a93a8); opacity: .5; }
+ 
+ /* ---------- Figuren ---------- */
+ .brett > .figur {
+   position: absolute;
+   left: 0;
+   top: 0;
+   width: 12.5%;
+   height: 12.5%;
+   z-index: 2;
+   pointer-events: none;
+   -webkit-user-drag: none;
+   transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
+ }
+ .brett > .figur.gleitet {
+   z-index: 3;
+   transition: transform var(--brett-dauer) cubic-bezier(.25, .8, .35, 1);
+ }
+ .brett > .figur.gezogen {
+   z-index: 9;
+   transition: none;
++  transform-origin: 50% 50%;
+   will-change: transform;
+   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
+ }
+ .brett > .figur.geht {
+   z-index: 1;
+   opacity: 0;
+   transition: opacity var(--brett-dauer) ease;
+ }
+ .brett > .figur.kommt { animation: brett-ein var(--brett-dauer) ease; }
+ .brett > .figur.verdeckt { opacity: 0; }
+ 
+ /* ---------- Pfeile ---------- */
+ .brett-pfeile {
+   position: absolute;
+   inset: 0;
+   width: 100%;
+   height: 100%;
+   z-index: 5;
+   pointer-events: none;
+   overflow: visible;
+ }
+ .brett-pfeile .pfeil { opacity: .82; }
+ 
+ /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
+ /* im Brett ueber den Figuren, in einer Effekt-Ebene ueber deren ganzer Flaeche (gleiche Lage wie die Felder) */
+diff --git a/css/sicherung.css b/css/sicherung.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..e2ef6aec1dc31bc7e4335ff3d6bc46080b823657
+--- /dev/null
++++ b/css/sicherung.css
+@@ -0,0 +1,4 @@
++.si-gruppe .si-stand { margin-bottom: var(--a2); }
++.si-belegung { margin: 0 0 var(--a4); color: var(--text-2); font-size: var(--fs-klein); }
++.si-knoepfe { display: flex; flex-wrap: wrap; gap: var(--a2); }
++.si-knoepfe .knopf { flex: 1 1 180px; }
+diff --git a/index.html b/index.html
+index 068bad53bd8a28559f3d02be1c97f1f8026b924b..605bf9de75d6f3d8c59219b510a1b93a4ca04544 100644
+--- a/index.html
++++ b/index.html
+@@ -19,37 +19,38 @@
+   try {
+     var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+     if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+   } catch (f) { /* privater Modus: System */ }
+ </script>
+ <link rel="manifest" href="manifest.webmanifest">
+ <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+ <link rel="icon" href="assets/icons/icon-192.png" type="image/png" sizes="192x192">
+ <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+ <link rel="preload" href="assets/schriften/manrope.woff2" as="font" type="font/woff2" crossorigin>
+ <link rel="preload" href="assets/schriften/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+ <link rel="stylesheet" href="css/tokens.css">
+ <link rel="stylesheet" href="css/themes/modern.css">
+ <link rel="stylesheet" href="css/board.css">
+ <link rel="stylesheet" href="css/app.css">
+ <link rel="stylesheet" href="css/bauteile.css">
+ <link rel="stylesheet" href="css/navigation.css">
+ <link rel="stylesheet" href="css/arena.css">
+ <link rel="stylesheet" href="css/duell.css">
+ <link rel="stylesheet" href="css/partie.css">
+ <link rel="stylesheet" href="css/ergebnis.css">
+ <link rel="stylesheet" href="css/analyse.css">
+ <link rel="stylesheet" href="css/verlauf.css">
+ <link rel="stylesheet" href="css/einstellungen.css">
+ <link rel="stylesheet" href="css/training.css">
++<link rel="stylesheet" href="css/sicherung.css">
+ <link rel="stylesheet" href="css/screens.css">
+ <script type="module" src="js/app.js"></script>
+ </head>
+ <body>
+ <div id="app">
+   <section class="screen lade-screen" aria-label="Schach-Arena wird geladen">
+     <div class="lade-inhalt"><div class="logo">Schach-Arena</div><div class="logo-unter">wird geladen</div></div>
+   </section>
+ </div>
+ <noscript><p class="ohne-js">Die Schach-Arena braucht JavaScript.</p></noscript>
+ </body>
+ </html>
+diff --git a/js/board.js b/js/board.js
+index 9725c588c5af7e24db6610c0d76c83a157718d06..95b8046ce078535d74b37a2c130d95d514810931 100644
+--- a/js/board.js
++++ b/js/board.js
+@@ -787,105 +787,115 @@ export class Brett {
+   _meldeAbgelehnt(von, nach, art) {
+     if (!this.beiAbgelehnt) return;
+     try { this.beiAbgelehnt(von, nach, art); } catch (err) { console.error(err); }
+   }
+ 
+   _bewege(e) {
+     const g = this._geste;
+     if (!g) {
+       if (e.pointerType === 'mouse') this._setzeCursor(this._feldAusPunkt(e.clientX, e.clientY));
+       return;
+     }
+     if (e.pointerId !== g.id) return;
+     if (!g.zieht) {
+       const schwelle = g.typ === 'mouse' ? 4 : 7;
+       if (Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < schwelle || !g.el) return;
+       g.zieht = true;
+       clearTimeout(g.el._gleitZeit);
+       g.el.classList.remove('gleitet');
+       g.el.classList.add('gezogen');
+       g.el.classList.toggle('beruehrung', g.typ !== 'mouse');
+       this.el.classList.add('zieht');
+     }
+     e.preventDefault();
+     const r = this._felderEl.getBoundingClientRect();
+     const s = r.width / 8;
+-    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
+-    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
+-    g.el.style.transform = `translate(${(e.clientX - r.left - s / 2).toFixed(1)}px, ${(e.clientY - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
+     const f = this._feldAusPunkt(e.clientX, e.clientY);
+     const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
++    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
++    const fingerSkala = 1.35;
++    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : `var(--brett-zieh-finger, ${fingerSkala})`;
++    const zielRechteck = ueber ? this._felderEl.querySelector(`.feld[data-feld="${ueber}"]`).getBoundingClientRect() : null;
++    const x = zielRechteck ? zielRechteck.left + zielRechteck.width / 2 : e.clientX;
++    const y = zielRechteck ? zielRechteck.top + zielRechteck.height / 2 : e.clientY;
++    g.el.style.left = `${(x - r.left - s / 2).toFixed(1)}px`;
++    g.el.style.top = `${(y - r.top - s / 2).toFixed(1)}px`;
++    g.el.style.transform = `scale(${skala})`;
+     if (ueber !== this._ueber) {
+       this._ueber = ueber;
+       this._zeichneLagen();
+     }
+   }
+ 
+   _hoch(e) {
+     const st = this._stumm;
+     if (st && e.pointerId === st.id) {
+       this._stumm = null;
+       const ziel = this._feldAusPunkt(e.clientX, e.clientY);
+       if (ziel && this._erlaubt && !this._wartet) this._meldeAbgelehnt(st.von, ziel === st.von ? null : ziel, ziel === st.von ? 'tippen' : 'ziehen');
+       return;
+     }
+     const g = this._geste;
+     if (!g || e.pointerId !== g.id) return;
+     this._geste = null;
+     this._ueber = null;
+     this.el.classList.remove('zieht');
+     if (g.zieht) {
+       g.el.classList.remove('gezogen', 'beruehrung');
++      g.el.style.left = '';
++      g.el.style.top = '';
+       const ziel = this._feldAusPunkt(e.clientX, e.clientY);
+       if (ziel && ziel !== g.von && this._zieleVon(g.von).has(ziel)) {
+         this._versucheZug(g.von, ziel, 'ziehen');
+       } else {
+         this._schnappeZurueck(g.el, g.von);
+         this._zeichneLagen();
+         if (ziel && ziel !== g.von) this._meldeAbgelehnt(g.von, ziel, 'ziehen');
+       }
+     } else if (g.warSchon) {
+       this._auswahl = null; // zweites Tippen auf dieselbe Figur hebt die Auswahl auf
+       this._zeichneLagen();
+     }
+   }
+ 
+   _abbruch(e) {
+     const g = this._geste;
+     if (!g || e.pointerId !== g.id) return;
+     this._brichGesteAb(true);
+   }
+ 
+   _brichGesteAb(animieren) {
+     const g = this._geste;
+     this._geste = null;
+     this._ueber = null;
+     this.el.classList.remove('zieht');
+     if (!g) return;
+     try { this.el.releasePointerCapture(g.id); } catch (err) { /* egal */ }
+     if (g.zieht && g.el) {
+       g.el.classList.remove('gezogen', 'beruehrung');
++      g.el.style.left = '';
++      g.el.style.top = '';
+       if (animieren) this._schnappeZurueck(g.el, g.von);
+       else { g.el.style.transform = ''; this._platziere(g.el, g.von); }
+     }
+     this._zeichneLagen();
+   }
+ 
+   _schnappeZurueck(el, feld) {
+     this._gleite(el, true);
+     el.style.transform = '';
+     this._platziere(el, feld);
+   }
+ 
+   _setzeCursor(feld) {
+     if (feld === this._cursorFeld) return;
+     this._cursorFeld = feld;
+     this.el.classList.toggle('greifbar', !!feld && this._kannZiehen(feld));
+   }
+ 
+   _versucheZug(von, nach, art) {
+     const fig = this.figurAuf(von);
+     if (fig && fig[1] === 'P' && ((fig[0] === 'w' && nach[1] === '8') || (fig[0] === 'b' && nach[1] === '1'))) {
+       this._oeffneUmwandlung(von, nach, art);
+       return;
+     }
+     this._fuehreAus(von, nach, undefined, art);
+diff --git a/js/erweiterungen.js b/js/erweiterungen.js
+index 2302351f7dbdb9e4e34b1738e3ce45256fd422ad..3515222ebfc5b7b9000470a13556ba429f3879ef 100644
+--- a/js/erweiterungen.js
++++ b/js/erweiterungen.js
+@@ -1,24 +1,24 @@
+ // Zentrale Liste der Pakete (Runde 4). js/app.js laedt jedes Paket daraus beim Start per dynamischem
+ // import(), und zwar bevor app:bereit kommt und der erste Screen erscheint (derselbe Weg wie ?test&erw=).
+ // Laedt ein Paket nicht (Syntaxfehler, Fehler beim Auswerten wie hoere() mit Tippfehler, Datei fehlt,
+ // Safari kennt etwas nicht, das Chromium kann), steht nur "Paket nicht geladen" in der Konsole: die App
+ // startet trotzdem (ein Fehler stoppt nie die Partie). Deshalb hier KEIN statisches import eines Pakets:
+ // ein Fehler darin braeche den ganzen Modulgraphen ab und die App bliebe auf "wird geladen" stehen.
+ //
+ //   PAKETE   eingefrorene Liste der Paket-Einstiege: Pfad relativ zu js/, ohne .js, nur Kleinbuchstaben,
+ //            Ziffern und "-" mit "/" dazwischen (anderes ignoriert app.js), z. B.
+ //              export const PAKETE = Object.freeze(['pakete/klang-serie/index', 'pakete/kartei/index']);
+ //
+ // Nur die Integration traegt hier Pakete ein. Jede eingetragene Datei und alle Dateien des Pakets
+ // (js/pakete/<paket>/**, css/pakete/<paket>.css, ein Paket-Screen js/ui/<name>.js) gehoeren dann in DATEIEN
+ // in sw.js; tests/sw.test.mjs prueft das, sobald das Paket hier steht.
+ // Die Pakete klinken sich beim Laden ueber js/ereignisse.js, js/orte.js, js/feier.js, den
+ // Modul-Speicher (js/storage.js) und die Register (Klang, Saetze, Icons) ein.
+ // Anfangs leer: ohne Pakete verhaelt sich die App wie vorher.
+-export const PAKETE = Object.freeze([]);
++export const PAKETE = Object.freeze(['sicherung']);
+ 
+ // W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
+ // 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
+ // traegt hier etwas ein, sobald der Screen des Reiters da ist, z. B.
+ //   export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
+ export const REITER = Object.freeze([]);
+diff --git a/js/sicherung.js b/js/sicherung.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..c13f1e8ef0307447870cda85b8b836c5f40c673a
+--- /dev/null
++++ b/js/sicherung.js
+@@ -0,0 +1,160 @@
++// S1-9: tragbare Sicherung des kompletten, eigenen localStorage-Bereichs.
++// Die Datenlogik bleibt DOM-frei und wird unten nur an den Einstellungs-Ort gebunden.
++import { anbieten } from './orte.js';
++import { rohSpeicher, speicherStand } from './storage.js';
++import { tagSchluessel, tageZwischen } from './tag.js';
++
++export const SICHERUNG_FORMAT = 'schach-arena-sicherung';
++export const SICHERUNG_VERSION = 2;
++const STANDARD = Object.freeze({ letzteSicherung: 0, letzterTag: '' });
++
++function ladeMerker() {
++  try { return JSON.parse(rohSpeicher().lies(rohSpeicher().praefix + 'sicherung') || 'null') || STANDARD; }
++  catch (e) { return STANDARD; }
++}
++
++function speichereMerker(daten) {
++  rohSpeicher().schreib(rohSpeicher().praefix + 'sicherung', JSON.stringify(daten));
++}
++
++function zeitText(ms) {
++  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
++}
++
++function datenAusSpeicher() {
++  const roh = rohSpeicher();
++  return Object.fromEntries(roh.schluessel().map((k) => [k, roh.lies(k)]));
++}
++
++export function erstelleSicherung(jetzt = new Date()) {
++  const ms = jetzt instanceof Date ? jetzt.getTime() : Number(jetzt);
++  if (!Number.isFinite(ms)) throw new TypeError('Ungültiges Sicherungsdatum');
++  const tag = tagSchluessel(ms);
++  speichereMerker({ letzteSicherung: ms, letzterTag: tag });
++  return {
++    format: SICHERUNG_FORMAT,
++    version: SICHERUNG_VERSION,
++    erstellt: ms,
++    tag,
++    daten: datenAusSpeicher(),
++  };
++}
++
++// Version 1 schrieb dieselben Schlüssel als Liste. Vor der Versionierung gab es eine reine Daten-Abbildung.
++function migriere(eingabe) {
++  if (!eingabe || typeof eingabe !== 'object' || Array.isArray(eingabe)) throw new Error('Die Datei enthält keine Sicherung.');
++  if (!('version' in eingabe) && eingabe.daten && typeof eingabe.daten === 'object') {
++    return { ...eingabe, format: SICHERUNG_FORMAT, version: 2, erstellt: Number(eingabe.erstellt || eingabe.datum) };
++  }
++  if (eingabe.format !== SICHERUNG_FORMAT) throw new Error('Das Dateiformat ist nicht bekannt.');
++  if (eingabe.version === 1 && Array.isArray(eingabe.speicher)) {
++    return { ...eingabe, version: 2, daten: Object.fromEntries(eingabe.speicher) };
++  }
++  if (eingabe.version !== SICHERUNG_VERSION) throw new Error('Diese Sicherungsversion wird nicht unterstützt.');
++  return eingabe;
++}
++
++export function pruefeSicherung(eingabe) {
++  const s = migriere(typeof eingabe === 'string' ? (() => {
++    try { return JSON.parse(eingabe); } catch (e) { throw new Error('Die Datei ist kein gültiges JSON.'); }
++  })() : eingabe);
++  if (!Number.isFinite(s.erstellt) || s.erstellt <= 0) throw new Error('Das Sicherungsdatum fehlt.');
++  if (!s.daten || typeof s.daten !== 'object' || Array.isArray(s.daten)) throw new Error('Die Speicherdaten fehlen.');
++  const roh = rohSpeicher();
++  const eintraege = Object.entries(s.daten);
++  if (!eintraege.length) throw new Error('Die Sicherung ist leer.');
++  for (const [k, v] of eintraege) {
++    if (!k.startsWith(roh.praefix) || k.length <= roh.praefix.length || typeof v !== 'string') throw new Error('Die Sicherung enthält ungültige Einträge.');
++    try { JSON.parse(v); } catch (e) { throw new Error('Ein Eintrag der Sicherung ist beschädigt.'); }
++  }
++  const partien = JSON.parse(s.daten[roh.praefix + 'partien'] || '[]');
++  const fortschritt = JSON.parse(s.daten[roh.praefix + 'fortschritt'] || '{}');
++  if (!Array.isArray(partien) || !fortschritt || typeof fortschritt !== 'object' || Array.isArray(fortschritt)) throw new Error('Pflichtfelder sind beschädigt.');
++  const bots = fortschritt.bots && typeof fortschritt.bots === 'object'
++    ? Object.values(fortschritt.bots).filter((b) => b && Array.isArray(b.sterne) && b.sterne[0]).length : 0;
++  let level = 1;
++  try { level = Number(JSON.parse(s.daten[roh.praefix + 'modul:funken'] || '{}').level) || 1; } catch (e) { /* schon geprüft */ }
++  return Object.freeze({ sicherung: s, vorschau: Object.freeze({ datum: s.erstellt, partien: partien.length, level, bots }) });
++}
++
++export function uebernehmeSicherung(geprueft, jetzt = new Date()) {
++  const p = geprueft && geprueft.sicherung ? geprueft : pruefeSicherung(geprueft);
++  const rueckfall = erstelleSicherung(jetzt);
++  const roh = rohSpeicher();
++  try {
++    const ziel = p.sicherung.daten;
++    for (const k of roh.schluessel()) if (!(k in ziel)) roh.entferne(k);
++    for (const [k, v] of Object.entries(ziel)) if (!roh.schreib(k, v)) throw new Error('Der Gerätespeicher reicht für diese Sicherung nicht aus.');
++    return { rueckfall, vorschau: p.vorschau };
++  } catch (fehler) {
++    for (const k of roh.schluessel()) roh.entferne(k);
++    for (const [k, v] of Object.entries(rueckfall.daten)) roh.schreib(k, v);
++    throw fehler;
++  }
++}
++
++export function sicherungsHinweis(jetzt = new Date()) {
++  const m = ladeMerker();
++  if (!m.letzterTag) return { tage: null, text: 'Noch keine Sicherung erstellt' };
++  let tage;
++  try { tage = Math.max(0, tageZwischen(m.letzterTag, tagSchluessel(jetzt))); } catch (e) { return { tage: null, text: 'Noch keine Sicherung erstellt' }; }
++  return { tage, text: tage >= 7 ? `Letzte Sicherung vor ${tage} Tagen` : `Letzte Sicherung: ${zeitText(m.letzteSicherung)}` };
++}
++
++export function dateiFuer(sicherung) {
++  const text = JSON.stringify(sicherung, null, 2);
++  return new File([text], `schach-arena-sicherung-${sicherung.tag}.json`, { type: 'application/json' });
++}
++
++export async function speichereDatei(datei) {
++  if (navigator.share && navigator.canShare && navigator.canShare({ files: [datei] })) {
++    await navigator.share({ files: [datei], title: 'Schach-Arena Sicherung' });
++    return 'geteilt';
++  }
++  const url = URL.createObjectURL(datei);
++  const a = document.createElement('a'); a.href = url; a.download = datei.name; a.click();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++  return 'download';
++}
++
++function karte({ app }) {
++  const el = document.createElement('section');
++  el.className = 'es-gruppe flaeche si-gruppe';
++  el.setAttribute('aria-labelledby', 'si-titel');
++  el.innerHTML = `<h3 class="es-titel" id="si-titel">Sicherung</h3>
++    <p class="es-hilfe si-stand"></p><p class="si-belegung zahl"></p>
++    <div class="si-knoepfe"><button class="knopf primaer" type="button" data-si="export">Sicherung erstellen</button>
++    <button class="knopf" type="button" data-si="import">Sicherung einlesen</button></div>
++    <input class="si-datei" type="file" accept="application/json,.json" hidden>`;
++  const stand = () => {
++    const h = sicherungsHinweis();
++    el.querySelector('.si-stand').textContent = h.text;
++    const s = speicherStand();
++    el.querySelector('.si-belegung').textContent = `${(s.zeichen / 1024).toLocaleString('de-DE', { maximumFractionDigits: 1 })} KB belegt`;
++  };
++  const exportiere = async () => {
++    try { await speichereDatei(dateiFuer(erstelleSicherung())); stand(); app.meldung('Sicherung erstellt.'); }
++    catch (e) { if (e && e.name !== 'AbortError') app.meldung('Sicherung konnte nicht erstellt werden.', { art: 'fehler' }); }
++  };
++  const input = el.querySelector('.si-datei');
++  el.querySelector('[data-si="export"]').addEventListener('click', exportiere);
++  el.querySelector('[data-si="import"]').addEventListener('click', () => { input.value = ''; input.click(); });
++  input.addEventListener('change', async () => {
++    if (!input.files || !input.files[0]) return;
++    try {
++      const p = pruefeSicherung(await input.files[0].text());
++      const v = p.vorschau;
++      const ok = await app.frage({ titel: 'Sicherung einlesen?', text: `${zeitText(v.datum)} · ${v.partien} ${v.partien === 1 ? 'Partie' : 'Partien'} · Level ${v.level} · ${v.bots} Bots besiegt. Der aktuelle Stand wird vorher als Rückfall-Datei gesichert.`, knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Einlesen', wert: true, art: 'primaer' }], abbrechen: false });
++      if (!ok) return;
++      const rueckfall = dateiFuer(erstelleSicherung());
++      await speichereDatei(rueckfall);
++      uebernehmeSicherung(p);
++      app.meldung('Sicherung eingelesen. Die App wird neu geladen.');
++      setTimeout(() => location.reload(), 500);
++    } catch (e) { app.meldung(e && e.message ? e.message : 'Die Sicherung konnte nicht gelesen werden.', { art: 'fehler', dauer: 6000 }); }
++  });
++  stand();
++  return el;
++}
++
++anbieten('einstellungen:gruppen', karte, { reihenfolge: 40, paket: 'sicherung' });
+diff --git a/js/thema.js b/js/thema.js
+index 3d035bdeb475466a408382e558ff7d486a55df62..014784bbf9926e34a20aa56a611d96a169f9cc8c 100644
+--- a/js/thema.js
++++ b/js/thema.js
+@@ -188,32 +188,35 @@ function beobachteSystem() {
+   systemHoert = true;
+   const neu = () => {
+     if (aktuell.modus !== 'system') return;
+     schreibeMeta();
+     melde();
+   };
+   if (systemMq.addEventListener) systemMq.addEventListener('change', neu);
+   else if (systemMq.addListener) systemMq.addListener(neu);
+ }
+ 
+ export async function wendeThemaAn({ thema, modus } = {}) {
+   const nr = ++lauf;
+   let t = themaVon(thema) || MODERN;
+   const m = MODI.includes(modus) ? modus : 'system';
+   // das CSS eines nachgeladenen Themes erst laden, dann umschalten (kein Aufblitzen); modern steht in index.html
+   if (t !== MODERN) {
+     const ok = await ladeCss(t);
+     if (!ok) t = MODERN;
+     if (nr !== lauf) return { ...aktuell, aufgeloest: aufgeloesterModus() };
+   }
+   aktuell = { thema: t.id, modus: m };
+   if (typeof document !== 'undefined') {
+     const r = document.documentElement;
+     r.dataset.thema = t.id;
+     r.dataset.modus = m;
++    // Der Seitengrund folgt sofort. Das verhindert beim Umschalten einen hellen Einzelbild-Rest,
++    // den WebKit und Chromium bei laufenden Hintergrund-Uebergaengen gelegentlich behalten.
++    if (document.body) document.body.style.backgroundColor = t.metaFarbe[aufgeloesterModus()];
+     setzeFedern(t.federn);
+     schreibeMeta();
+     beobachteSystem();
+     melde();
+   }
+   return { ...aktuell, aufgeloest: aufgeloesterModus() };
+ }
+diff --git a/sw.js b/sw.js
+index da4f228a660bc3d3f9f4b1884bca4a81fea332ea..ad3f88f2f5c893f8622caaba0baf8554c91eaa2b 100644
+--- a/sw.js
++++ b/sw.js
+@@ -1,77 +1,79 @@
+ // Service Worker der Schach-Arena: legt alle App-Dateien in einen Cache, damit die App
+ // (samt Stockfish) auch ohne Netz laeuft.
+ //   Installation: laedt alle DATEIEN vor (eine fehlt = Installation scheitert).
+ //   Aktivierung:  loescht alte Caches, uebernimmt offene Seiten.
+ //   Abruf:        Cache zuerst, sonst Netz (und das Ergebnis in den Cache legen).
+ // Update: Bei jeder Aenderung an einer App-Datei VERSION hochzaehlen, am einfachsten mit
+ //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
+ // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
+ // (Nachricht 'aktivieren', siehe js/app.js).
+-const VERSION = 20;
+-const STAND = 'eb50065634ca';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
++const VERSION = 26;
++const STAND = '08e665c5370d';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+ const PRAEFIX = 'schach-arena-';
+ const CACHE = PRAEFIX + 'v' + VERSION;
+ const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
+ 
+ // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
+ const DATEIEN = [
+   'index.html',
+   'manifest.webmanifest',
+   'LICENSE',
+   'css/tokens.css',
+   'css/themes/modern.css',
+   'css/board.css',
+   'css/app.css',
+   'css/bauteile.css',
+   'css/navigation.css',
+   'css/arena.css',
+   'css/duell.css',
+   'css/partie.css',
+   'css/ergebnis.css',
+   'css/analyse.css',
+   'css/verlauf.css',
+   'css/einstellungen.css',
+   'css/training.css',
++  'css/sicherung.css',
+   'css/screens.css',
+   'js/app.js',
+   'js/bewegung.js',
+   'js/board.js',
+   'js/bots.js',
+   'js/engine.js',
+   'js/ereignisse.js',
+   'js/erweiterungen.js',
+   'js/feier.js',
+   'js/inhalte.js',
+   'js/nachholen.js',
+   'js/openings.js',
+   'js/orte.js',
+   'js/review.js',
+   'js/sounds.js',
+   'js/storage.js',
+   'js/symbole.js',
+   'js/tag.js',
++  'js/sicherung.js',
+   'js/thema.js',
+   'js/ui/abrechnung.js',
+   'js/ui/analyse.js',
+   'js/ui/arena.js',
+   'js/ui/bauteile.js',
+   'js/ui/einstellungen.js',
+   'js/ui/icons.js',
+   'js/ui/partie.js',
+   'js/ui/seite.js',
+   'js/ui/training.js',
+   'js/ui/verlauf.js',
+   'vendor/chess/chess.js',
+   'vendor/stockfish/stockfish-19-lite-single.js',
+   'vendor/stockfish/stockfish-19-lite-single.wasm',
+   'assets/pieces/bB.svg',
+   'assets/pieces/bK.svg',
+   'assets/pieces/bN.svg',
+   'assets/pieces/bP.svg',
+   'assets/pieces/bQ.svg',
+   'assets/pieces/bR.svg',
+   'assets/pieces/wB.svg',
+   'assets/pieces/wK.svg',
+   'assets/pieces/wN.svg',
+   'assets/pieces/wP.svg',
+   'assets/pieces/wQ.svg',
+diff --git a/tests/alle.mjs b/tests/alle.mjs
+index 0481327c03ad0d3348b5ed1b2d8ce82d16ee137c..4859e10e96293baa27d6e1f1990ed7a4c0a4385c 100644
+--- a/tests/alle.mjs
++++ b/tests/alle.mjs
+@@ -1,47 +1,48 @@
+ // Startet alle Testsuiten der Schach-Arena nacheinander und gibt am Ende eine Zusammenfassung aus.
+ //
+ //   node tests/alle.mjs              alles (wie vor einer Veroeffentlichung)
+ //   node tests/alle.mjs --schnell    kurze Fassung: ohne Viewport-Runden, Bilder und Browser-Teil von review
+ //   node tests/alle.mjs --nur=sw,e2e nur diese Suiten (Namen siehe Liste unten)
+ //   node tests/alle.mjs --laut       Ausgabe jeder Suite vollstaendig zeigen
+ //
+ // Jede Suite startet ihren eigenen Server auf ihrem eigenen Port und beendet ihn wieder.
+ // Exitcode 0 nur, wenn alle Suiten bestehen.
+ import { spawn } from 'node:child_process';
+ import { existsSync } from 'node:fs';
+ import { fileURLToPath } from 'node:url';
+ import path from 'node:path';
+ 
+ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+ const SCHNELL = process.argv.includes('--schnell');
+ const LAUT = process.argv.includes('--laut');
+ const nurArg = process.argv.find((a) => a.startsWith('--nur='));
+ const NUR = nurArg ? nurArg.slice(6).split(',').map((s) => s.trim()).filter(Boolean) : null;
+ 
+ const SUITEN = [
+   { name: 'storage', datei: 'storage.test.mjs', args: [], was: 'Speicher, Sterne, Freischaltung' },
++  { name: 'sicherung', datei: 'sicherung.test.mjs', args: [], was: 'Export, Import und Sicherungshinweis' },
+   { name: 'review', datei: 'review.test.mjs', args: SCHNELL ? ['--nur-node'] : [], was: 'Zug-Klassen, Genauigkeit, Coach' },
+   { name: 'ereignisse', datei: 'ereignisse.test.mjs', args: [], was: 'Ereignis-Bus, Anzeige-Orte, Feier-Budget' },
+   { name: 'fairness', datei: 'fairness.test.mjs', args: [], was: 'Fairness-Regeln (Runde 4)' },
+   { name: 'spiel', datei: 'spiel.test.mjs', args: [], was: 'Spiel-Fundament: Tag, Inhalte, Spielplan, Bot-Register' },
+   { name: 'engine-bots', datei: 'engine-bots.test.mjs', args: ['--schnell'], was: 'Stockfish-Wrapper und Bots' },
+   { name: 'board', datei: 'board.test.mjs', args: [], was: 'Brett: Tippen, Ziehen, Effekte' },
+   { name: 'sw', datei: 'sw.test.mjs', args: [], was: 'Cache-Liste, Manifest, Icons' },
+   { name: 'thema', datei: 'thema.test.mjs', args: [], was: 'Theme-Fundament: Tokens, hell/dunkel, Schriften, Lesbarkeit' },
+   { name: 'klang', datei: 'klang.test.mjs', args: [], was: 'Klangpakete: Katalog, Dateien, Pegel, Abspielen' },
+   { name: 'navigation', datei: 'navigation.test.mjs', args: [], was: 'Reiter-Leiste, Kopf, Bauteile, Training-Hülle' },
+   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
+   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },
+   { name: 'e2e', datei: 'e2e.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Ganzer Ablauf, offline, Update' },
+ ];
+ 
+ function lauf(suite) {
+   return new Promise((resolve) => {
+     const t0 = Date.now();
+     // eine fehlende Suite-Datei ist ein Fehler, nie ein stilles Ueberspringen
+     if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
+       resolve({ ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] });
+       return;
+     }
+     const kind = spawn(process.execPath, [path.join(WURZEL, 'tests', suite.datei), ...suite.args], {
+       cwd: WURZEL, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+diff --git a/tests/sicherung.test.mjs b/tests/sicherung.test.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b37550689be3ce7b4c2b63c37c0b7a2ad9bc8be1
+--- /dev/null
++++ b/tests/sicherung.test.mjs
+@@ -0,0 +1,46 @@
++import { strict as assert } from 'node:assert';
++
++class Speicher {
++  constructor() { this.m = new Map(); }
++  get length() { return this.m.size; }
++  key(i) { return [...this.m.keys()][i] ?? null; }
++  getItem(k) { return this.m.get(k) ?? null; }
++  setItem(k, v) { this.m.set(k, String(v)); }
++  removeItem(k) { this.m.delete(k); }
++}
++global.localStorage = new Speicher();
++const storage = await import('../js/storage.js');
++storage.setzeSpeicher(global.localStorage);
++const { erstelleSicherung, pruefeSicherung, uebernehmeSicherung, sicherungsHinweis, SICHERUNG_FORMAT } = await import('../js/sicherung.js');
++
++let ok = 0;
++function pruefe(name, fn) { try { fn(); ok++; console.log('OK     ' + name); } catch (e) { console.log('FEHLER ' + name + ' -> ' + e.message); process.exitCode = 1; } }
++
++localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'p1' }, { id: 'p2' }]));
++localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { benno: { sterne: [true] } } }));
++localStorage.setItem('schach-arena:v1:modul:funken', JSON.stringify({ level: 7 }));
++const datum = new Date(2026, 9, 17, 12);
++const exportiert = erstelleSicherung(datum);
++pruefe('Export enthält Format, Version und kompletten Spielstand', () => {
++  assert.equal(exportiert.format, SICHERUNG_FORMAT); assert.equal(exportiert.version, 2);
++  assert.equal(Object.keys(exportiert.daten).length, localStorage.length);
++});
++const geprueft = pruefeSicherung(JSON.stringify(exportiert));
++pruefe('Import-Vorschau zeigt Datum, Partien, Level und Bots', () => assert.deepEqual(geprueft.vorschau, { datum: datum.getTime(), partien: 2, level: 7, bots: 1 }));
++pruefe('Kaputte Datei wird abgelehnt', () => assert.throws(() => pruefeSicherung('{kaputt'), /JSON/));
++pruefe('Unbekannte Version wird abgelehnt', () => assert.throws(() => pruefeSicherung({ ...exportiert, version: 99 }), /version/i));
++pruefe('Alte Formatversion wird migriert', () => {
++  const alt = pruefeSicherung({ format: SICHERUNG_FORMAT, version: 1, erstellt: datum.getTime(), speicher: Object.entries(exportiert.daten) });
++  assert.equal(alt.vorschau.partien, 2);
++});
++localStorage.setItem('schach-arena:v1:partien', '[]');
++const ergebnis = uebernehmeSicherung(geprueft, new Date(2026, 9, 18, 12));
++pruefe('Import übernimmt erst nach Prüfung und erstellt Rückfall-Sicherung', () => {
++  assert.equal(JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length, 2);
++  assert.equal(JSON.parse(ergebnis.rueckfall.daten['schach-arena:v1:partien']).length, 0);
++});
++pruefe('Stiller Hinweis erscheint nach sieben Tagen mit gestelltem Datum', () => {
++  erstelleSicherung(new Date(2026, 9, 1, 12));
++  assert.equal(sicherungsHinweis(new Date(2026, 9, 8, 12)).text, 'Letzte Sicherung vor 7 Tagen');
++});
++console.log(`\n${ok}/${ok} bestanden`);
