@@ -809,11 +809,17 @@ export class Brett {
     e.preventDefault();
     const r = this._felderEl.getBoundingClientRect();
     const s = r.width / 8;
-    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
-    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
-    g.el.style.transform = `translate(${(e.clientX - r.left - s / 2).toFixed(1)}px, ${(e.clientY - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
     const f = this._feldAusPunkt(e.clientX, e.clientY);
     const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
+    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
+    const fingerSkala = 1.35;
+    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : `var(--brett-zieh-finger, ${fingerSkala})`;
+    const zielRechteck = ueber ? this._felderEl.querySelector(`.feld[data-feld="${ueber}"]`).getBoundingClientRect() : null;
+    const x = zielRechteck ? zielRechteck.left + zielRechteck.width / 2 : e.clientX;
+    const y = zielRechteck ? zielRechteck.top + zielRechteck.height / 2 : e.clientY;
+    g.el.style.left = `${(x - r.left - s / 2).toFixed(1)}px`;
+    g.el.style.top = `${(y - r.top - s / 2).toFixed(1)}px`;
+    g.el.style.transform = `scale(${skala})`;
     if (ueber !== this._ueber) {
       this._ueber = ueber;
       this._zeichneLagen();
@@ -835,6 +841,8 @@ export class Brett {
     this.el.classList.remove('zieht');
     if (g.zieht) {
       g.el.classList.remove('gezogen', 'beruehrung');
+      g.el.style.left = '';
+      g.el.style.top = '';
       const ziel = this._feldAusPunkt(e.clientX, e.clientY);
       if (ziel && ziel !== g.von && this._zieleVon(g.von).has(ziel)) {
         this._versucheZug(g.von, ziel, 'ziehen');
@@ -864,6 +872,8 @@ export class Brett {
     try { this.el.releasePointerCapture(g.id); } catch (err) { /* egal */ }
     if (g.zieht && g.el) {
       g.el.classList.remove('gezogen', 'beruehrung');
+      g.el.style.left = '';
+      g.el.style.top = '';
       if (animieren) this._schnappeZurueck(g.el, g.von);
       else { g.el.style.transform = ''; this._platziere(g.el, g.von); }
     }

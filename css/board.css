@@ -140,6 +140,7 @@
 .brett > .figur.gezogen {
   z-index: 9;
   transition: none;
+  transform-origin: 50% 50%;
   will-change: transform;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
 }

@@ -30,7 +30,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft);
+  transition: color var(--d-m) var(--sanft);
 }
 button { font: inherit; color: inherit; }
 a { color: inherit; text-decoration: none; }
