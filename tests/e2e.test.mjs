@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { leseSw } from './sw.test.mjs';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,7 +29,7 @@ const PRAEFIX = '/schach/';
 const START = `http://127.0.0.1:${PORT}${PRAEFIX}`;
 const APP = START + '?test&sw';
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
+const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 mkdirSync(BILDER, { recursive: true });
 
@@ -710,8 +711,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); });
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
   const h = hilfen(seite);
   await testeStart(seite, h, fehler, fehlgeschlagen);

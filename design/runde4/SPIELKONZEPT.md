@@ -1,8 +1,8 @@
-# Spielkonzept Schach-Arena: ein Spiel statt einer Sammlung von Funktionen
+# Spielkonzept Crownmate: ein Spiel statt einer Sammlung von Funktionen
 
 Stand 17.10.2026 · Chef-Spieldesign, Lektorat 17.10. (Lücken, Widersprüche, Zahlen und Machbarkeit geprüft; die
-Änderungen stehen an Ort und Stelle) · Arbeitstitel „Schach-Arena“ (der Name ist offen, „Neonturm“ ist mit dem
-Neon-Look weggefallen).
+Änderungen stehen an Ort und Stelle) · Name: **Crownmate**. Look A „Modern und klar“ ist verbindlich; Neon wird
+nicht verwendet.
 
 **Grundlage:** `LAGE.md` (Flos verbindliche Entscheidungen bis 17.10.), `design/runde4/ENTSCHEIDUNGEN.md`,
 README, `ARCHITEKTUR.md` (Welle-0-API, Abschnitt „Runde 4: Erweiterungspunkte“), `design/runde4/BAUPLAN.md`, der
@@ -15,10 +15,13 @@ Bewertung der drei Juroren (Spieler, Skeptiker, Geschäft). Im Code ist nichts g
 
 **Diese Datei wird später öffentlich.** Preise und Geschäftszahlen stehen deshalb nur in `GESCHAEFT.md` (privat).
 Wo hier „Preis“ steht, ist nur die Regel gemeint, nie eine Zahl.
+Eigene Klänge und Bilder sind **eigene Werke; alle Rechte vorbehalten, Nutzung nur in der App**. Sie sind nicht CC0;
+der Code bleibt GPL-3.0.
 
-**Zeichen für Platzhalter:** `[E]` heißt „Zahl kommt aus der Eichung“ (Lichess-Skala, unter ca. 600 kaum echte
-Spieler). Die Elo-Zahlen der Bots in dieser Datei (Benno 250 bis Stockfisch 3000) sind die **heutigen Etiketten**;
-nach der Eichung gelten die geeichten Werte.
+**Zeichen für Platzhalter:** `[E]` heißt „Zahl kommt aus der Eichung“. Die Messung erfolgt gegen Lichess-Daten; für
+die Anzeige werden die Ergebnisse auf eine chess.com-ähnliche Skala umgerechnet und als **Arena-Wertung** mit einem
+entsprechenden Hinweis bezeichnet. Die heutigen Bot-Etiketten sind nur Platzhalter; nach der Eichung gelten die
+umgerechneten Werte.
 
 ---
 
@@ -75,10 +78,10 @@ Rätsel bleiben für alle frei. Die App ist für Menschen ab 16.
 | **Tafel** | eine Bestenliste, z. B. „Rudis Tafel“ mit den besten Partien gegen Rudi |
 | **Abrechnung** | die eine Karte nach jeder Partie: Punkte, Funken, Wertung, Serie |
 | **Finisher** | der kurze Effekt, wenn du mattsetzt |
-| **Werkstatt** | der Shop (erst in Phase 2) |
+| **Werkstatt** | Vorschau und Anprobe vor dem ersten Test; echte Käufe später |
 
 **Wann kann ich es spielen?** Vor der ersten spieligen Fassung stehen noch drei Schritte: Welle 0 abschließen, der
-neue Look mit Klang und Komfort (nach deiner Wahl A, B oder C) und eine kleine Erweiterung des Fundaments. Danach
+neue Look A „Modern und klar“ mit Klang und Komfort und eine kleine Erweiterung des Fundaments. Danach
 dauert die erste spielige Welle 1 bis 2 Wochen. Realistisch liegt sie also in **3 bis 4 Wochen** auf deinem iPad,
 dann testest du 5 Tage. Die erste Saison mit zwölf Bossen ist für Januar 2027 geplant, bis dahin wechseln sich fünf
 Bosse ab.
@@ -97,11 +100,11 @@ Flo steht auf Level 12, Arena-Wertung ≈ 1080, Bauernmarsch Tag 11, Wochen-Boss
 | 20:30 | iPad auf, die Arena öffnet sich. Oben die **Heute-Karte**: „♙ Tag 11 · heute noch offen“, „Rätsel des Tages · Donnerstag ●●●●○○○“, „Wochen-Boss: Baron von Gambit · Bronze ✓ · Silber ◯ · Gold ◯“, „Tagesaufgaben 0 von 3“, „Rückenwind: 1 Karte“. | Ein Blick, und er weiß, was heute los ist. Kein Menü. |
 | 20:31 | Tagesrätsel (Donnerstag ist mittelschwer): Springergabel in zwei Zügen, im ersten Versuch. Frage „Ein Wort?“, er tippt **Gabel**. +13 Funken. Eine Zeile: „Tag 12 der Serie“, der Bauer zieht auf die 7. Reihe: „noch 1 Feld bis zur Umwandlung“. | Zwei Minuten, und der Tag ist schon gezählt. |
 | 20:34 | Er zündet die **Rückenwind-Karte** (die nächsten 3 Einheiten zählen doppelt) und tritt gegen den Boss an, Stufe Standard. Über dem Baron läuft die **Lebensleiste** (seine Gewinnchance). Drei starke Züge, drei Treffer mit trockenem Holz-Klack, die Leiste fällt auf 38 %. Kerbe bei 66 %: „Jetzt wird es ernst, mein Freund.“ | Boss-Kampf-Gefühl, und jeder Treffer ist ein echter guter Zug. |
-| 20:51 | In Zug 24 ein Patzer, die Leiste wächst still zurück, Niederlage in Zug 37. **Abrechnung:** Zugwerte 71, Kampfgeist 10, Lichtblick „so lange wie noch nie gegen den Baron“ 10, Rückenwind ×2: **+182 Funken**. Der Balken rückt sichtbar vor. | Verloren, aber nicht umsonst. |
+| 20:51 | In Zug 24 ein „Weit daneben“-Zug, die Leiste wächst still zurück, Niederlage in Zug 37. **Abrechnung:** Zugwerte 71, Kampfgeist 10, Lichtblick „so lange wie noch nie gegen den Baron“ 10, Rückenwind ×2: **+182 Funken**. Der Balken rückt sichtbar vor. | Verloren, aber nicht umsonst. |
 | 20:53 | Lernpunkt-Karte: „Dein Lernpunkt: 24. … Dxb2? ließ Sxc7 zu.“ Er tippt **Ab hier nochmal**, findet 24. … Dd7: „Geschichte umgeschrieben!“ (+30 mit Rückenwind). Tagesaufgabe „Sieh dir einen Schlüsselmoment an“ erfüllt. | Der Fehler ist repariert, solange er noch weh tut. |
 | 21:00 | **Vereinsmeisterschaft, Runde 4:** Du gegen Ritter Rudi, Weiß. Das zählt für Wertung, Liga und Rudis Tafel. | Turniergefühl. |
 | 21:22 | Matt in Zug 33. Die Uhr steht, die Fluchtfelder des Königs werden abgehakt, der **Glocke-Finisher** schlägt, am Brettrand steht „Grundreihenmatt“. Rudi: „Das hab ich nicht kommen sehen. Schon wieder nicht.“ | Der Moment des Abends. |
-| 21:23 | **Abrechnung:** Punkte 21.300, „Platz 3 auf Rudis Tafel ▲ 2“ (deine Zeile gleitet an zwei anderen vorbei, die alte Zahl bleibt durchgestrichen stehen). Funken +410, der Balken läuft über: **LEVEL 13**, darunter „Seit Level 12: Patzer je 10 Züge 1,3 → 1,0“ und „Neu: Brett-Rahmen Ahorn · Ausprobieren“. Danach laufen die anderen Liga-Ergebnisse ein: „Oma Hilde schlägt Kalle mit Schwarz!“ Tabelle: Du Platz 3, ▲ 1. Am Avatar ein Lorbeerzweig mit „2“ (Siegeslauf). | Mehrere Uhren bewegen sich, jede aus einem ehrlichen Grund. |
+| 21:23 | **Abrechnung:** Punkte 21.300, „Platz 3 auf Rudis Tafel ▲ 2“ (deine Zeile gleitet an zwei anderen vorbei, die alte Zahl bleibt durchgestrichen stehen). Funken +410, der Balken läuft über: **LEVEL 13**, darunter „Seit Level 12: „Weit daneben“-Zug je 10 Züge 1,3 → 1,0“ und „Neu: Brett-Rahmen Ahorn · Ausprobieren“. Danach laufen die anderen Liga-Ergebnisse ein: „Oma Hilde schlägt Kalle mit Schwarz!“ Tabelle: Du Platz 3, ▲ 1. Am Namen eine Flamme mit „3“ (Siegeslauf). | Mehrere Uhren bewegen sich, jede aus einem ehrlichen Grund. |
 | 21:25 | Heute-Karte: „Tageswerk geschafft. Alles Weitere ist Kür.“ Tagesaufgaben 2 von 3. Er legt das iPad weg. | Die App sagt, wann es genug ist. |
 
 Zusammen ca. 55 Minuten, rund 680 Funken, ein Level, ein Rekord, ein Liga-Sieg, ein reparierter Fehler, und kein
@@ -118,7 +121,7 @@ einziger Moment, in dem ihn etwas gedrängt hat.
    wirklich besser geworden ist, und ein neues Stück wartet aufs Ausprobieren.
 4. **Überholt.** Auf Rudis Tafel gleitet die eigene Zeile an den anderen vorbei, die alte Bestmarke bleibt
    durchgestrichen stehen, und der überholte Bot sagt etwas dazu.
-5. **Geschichte umgeschrieben.** Der eigene Patzer, im zweiten Anlauf richtig gespielt, und Wochen später der
+5. **Geschichte umgeschrieben.** Der eigene „Weit daneben“-Zug, im zweiten Anlauf richtig gespielt, und Wochen später der
    Stempel „Muster gebrochen“, wenn der Fehler in echten Partien nicht mehr vorkommt.
 
 Warum gerade diese: Dopamin meldet „besser als erwartet“, nicht „noch eine Belohnung“ (Schultz 1997, siehe
@@ -182,8 +185,8 @@ Partie reicht, um mitzuspielen. Wer mehr will, findet mehr. Wer eine Woche fehlt
 
 ## 2b. Zwei Phasen
 
-Flos Reihenfolge: **erst Spaß ohne Server (Phase 1), dann online (Phase 2).** Alles in Phase 1 läuft auf dem Gerät,
-offline, ohne Konto. Phase 2 bringt Konten, Menschen, Shop und Abo.
+Flos Reihenfolge: **erst Spaß, dann online gegen Menschen.** Das Konto light mit E-Mail-Code ist vor dem ersten
+Test zunächst nur für den Besitzer verfügbar; alle Spielinhalte funktionieren weiterhin im Gast-Modus.
 
 ### 2b.1 Was in welche Phase gehört
 
@@ -193,10 +196,10 @@ offline, ohne Konto. Phase 2 bringt Konten, Menschen, Shop und Abo.
 | Events | Wochen-Boss, Funken-Wochenenden (Doppel-Funken), Themen-Wochen, Feste, Saison-Weg | dieselben, dazu weltweite Wochen-Tafeln für Boss und Tagesrätsel |
 | Rätsel | Tagesrätsel für alle gleich (aus dem Datum), Treppenlauf, Kartei | Lösequote aller Spieler („41 % im ersten Versuch“) |
 | Wettkampf | Bot-Tafeln, Vereinsmeisterschaft gegen die Bots, Wochen-Fünfkampf, Freunde per Code | Online-Wertung, Wochen-Kreise mit Menschen, Welt-Tafeln nur für Prüfbares |
-| Serien | Bauernmarsch (Tages-Streak), Siegeslauf (Win-Streak) | Lorbeer des Siegeslaufs für andere sichtbar; die Tages-Streak bleibt privat |
-| Ausdruck | Finisher, Banner, Kartenrahmen, Zugspuren, Emotes: alles **erspielt**, gegen Bots gezeigt, Bots reagieren darauf | für den Gegner sichtbar; Schnell-Chat; Werkstatt (Shop) mit Euro-Preisen |
+| Serien | Bauernmarsch (Tages-Streak), Siegeslauf (Win-Streak) | Flamme des Siegeslaufs für andere sichtbar; die Tages-Streak bleibt privat |
+| Ausdruck | Finisher, Banner, Kartenrahmen, Zugspuren, Emotes: alles **erspielt**, gegen Bots gezeigt, Bots reagieren darauf | für den Gegner sichtbar; Schnell-Chat; Werkstatt (Shop), Preise nur für den Besitzer aus dem Konto |
 | Lernen | Lernpfad, Lektionen, Kartei, Zweite Chance, Analyse | Abo mit Coaches |
-| Daten | nur auf dem Gerät; Sicherung als Datei (Export und Import) | Konto freiwillig (Apple oder Google), Fortschritt in der Cloud, auf allen Geräten gleich |
+| Daten | nur auf dem Gerät; Sicherung als Datei (Export und Import) | Konto light per E-Mail-Code über Supabase (zunächst nur für den Besitzer), Fortschritt in der Cloud; Google später als Zusatz |
 | Geld | keins | Abo (Training, Coaches) und Werkstatt (nur Optik) |
 
 ### 2b.2 Was aus Phase 1 in Phase 2 trägt
@@ -223,9 +226,10 @@ Lernpfad mit Lektionen und Übungen · Schachuhr und Spielmodi · Komfort · neu
 
 ### 2b.4 Die Werkstatt (Shop-Katalog)
 
-Die Werkstatt öffnet in Phase 2, weil Kosmetik vor allem gekauft wird, wenn andere sie sehen (Abschnitt 8). In
-Phase 1 gibt es sie als **Vorschau-Katalog mit Anprobe**: jedes Stück eine ganze Partie lang gegen einen Bot tragen,
-ohne Kaufknopf. Ein lokaler Anprobe-Zähler zeigt Flo, welche Stücke gewollt sind (nichts verlässt das Gerät).
+Die Werkstatt ist vor dem 5-Tage-Test als **Vorschau-Katalog mit Anprobe** verfügbar. Zwei Finisher sind als
+Kaufstücke vorbereitet, Figurensätze lassen sich eine ganze Partie lang gegen einen Bot anprobieren. Der Kaufknopf
+zeigt „bald verfügbar“. Preise werden ausschließlich dem Besitzer aus seinem Konto geladen und stehen nie im
+öffentlichen Code; alle anderen sehen „Preis folgt“. Ein lokaler Anprobe-Zähler bleibt auf dem Gerät.
 
 **Was jeder sieht und was nur du siehst** (Brett und Figuren sieht jeder nach eigenem Geschmack, aus Gründen der
 Lesbarkeit):
@@ -244,16 +248,18 @@ Lesbarkeit):
 | **Klang** | nur du | Holz und Arcade sind **immer frei** (Flos Entscheidung) | weitere Klangpakete |
 
 **Regeln der Werkstatt** (gelten ab dem ersten Tag des Shops):
-1. Preis in Euro inklusive Umsatzsteuer, direkt am Stück. **Keine Währung**, keine Pakete mit Restguthaben.
+1. Preise werden dem Besitzer in Euro inklusive Umsatzsteuer direkt am Stück aus seinem Konto angezeigt. Alle anderen
+   sehen „Preis folgt“; im öffentlichen Code stehen keine Preise. **Keine Währung**, keine Pakete mit Restguthaben.
 2. Alles **immer erhältlich**. Keine Rotation, kein „nur heute“, kein Countdown. „Neu“ ist eine Sortierung.
    Saison-Stücke kehren jedes Jahr wieder.
 3. **Nur Optik.** Jedes Stück trägt das Siegel „Nur Optik, kein Spielvorteil“.
-4. **Prestige nie kaufbar:** Zeichen, Titel, Siegel, Wimpel, Lorbeer, Medaillen.
+4. **Prestige nie kaufbar:** Zeichen, Titel, Siegel, Wimpel, Flamme, Medaillen.
 5. **Gekauft und erspielt sind unterscheidbar:** In der Detailansicht steht bei gekauften Stücken „Werkstatt“, bei
    erspielten der Beleg („Level 30“, „10 Mattbilder“).
 6. **In jeder Kategorie gibt es erspielbare Stücke gleicher Qualität.** Nie „das schönste nur gegen Geld“. (Nicht
    für jedes Kaufstück ein Zwilling, das würde den Shop aushöhlen; aber nie eine Kategorie, in der nur Geld hilft.)
-7. **Anprobe vor dem Kauf** (eine Partie lang), Kauf in zwei Schritten, Kaufknopf nie an der Stelle eines
+7. **Anprobe vor dem Kauf** (eine Partie lang), Kauf in zwei Schritten; bis zur Zahlungsfreigabe lautet der Kaufknopf
+   „bald verfügbar“ und steht nie an der Stelle eines
    Spielknopfs. Im eigenen Web-Shop Widerrufs-Häkchen nie vorausgewählt und Bestätigung per E-Mail.
 8. **Pakete werden um Besessenes billiger.** Keine Sammel-Belohnung für den Kauf aller Teile.
 9. **Nie ein Kaufhinweis** nach einer Niederlage, in einer Partie, im Ergebnis oder in einer Lektion. Die Werkstatt
@@ -269,7 +275,7 @@ Mein Vorschlag für die Grenze (alle Grenzen per Konfiguration verstellbar):
 |---|---|---|
 | Spielen | **alle 10 Leiter-Bots**, Schachuhr, Wochen-Boss samt Archiv, Vereinsmeisterschaft der laufenden Saison, Bestenliste, Codes, Online-Partien | ältere Liga-Saisons zum Nachspielen, Sondermodi unbegrenzt |
 | Analyse | Live-Bewertung, Spielanalyse unbegrenzt, Lernpunkt, „Ab hier nochmal“, Kurve, Genauigkeit | Coach-Erklärungen in ganzen Sätzen (Warum, Plan, Motiv) |
-| Training | Patzer-Kartei, Tagesrätsel mit 30 Tagen Archiv, **Rätsel aus dem Grundpool und Treppenlauf ohne Tageslimit**, Lernpfad-Einheiten 1 bis 4 | Einheiten 5 bis 10, Rätsel mit Themen-Wahl und Rätsel-Pakete (Nachschub), Spezial-Modi („Gibt's hier was?“, Kreistraining, Repertoire-Rätsel über die häufigste Eröffnung hinaus), Boss-Akte, Heimbringer, Ich gegen Ich, Zwillings-Rätsel |
+| Training | Fehler-Kartei, Tagesrätsel mit 30 Tagen Archiv, **Rätsel aus dem Grundpool und Treppenlauf ohne Tageslimit**, Lernpfad-Einheiten 1 bis 4 | Einheiten 5 bis 10, Rätsel mit Themen-Wahl und Rätsel-Pakete (Nachschub), Spezial-Modi („Gibt's hier was?“, Kreistraining, Repertoire-Rätsel über die häufigste Eröffnung hinaus), Boss-Akte, Heimbringer, Ich gegen Ich, Zwillings-Rätsel |
 | Coaches | der kurze Coach-Satz wie heute | drei Coach-Figuren mit Mappe, Wochenplan, Sparring, später Stimme und „Frag den Coach“ |
 | Fortschritt | Level, Wertung, Spielklasse, Serie, Medaillen, Fortschritts-Karte | ausführlicher Formspiegel |
 | Saison | Saison-Weg, alle Gratis-Stationen | Abo-Extras an 6 Stationen (Kosmetik, nicht einzeln käuflich) |
@@ -385,9 +391,9 @@ iPad / Handy / Browser (heutige App, offline wie bisher)
   js/online/ wird erst geladen, wenn man "Online" antippt
      |  WebSocket (JSON, laufende Nummer je Ereignis, Wiederkehr in unter 1 s)
      v
-Server in Deutschland (kleiner Rechner bei Hetzner)
-  Caddy (HTTPS) · Node 22: Partie-Räume, Suche, Konten, Ranglisten, Kauf-Belege
-  chess.js 1.4.0 (dieselbe Datei wie in der App) · SQLite (WAL) + Litestream-Sicherung
+Supabase (Region Frankfurt): E-Mail-Code-Anmeldung und Cloud-Spielstand
+  zunächst Konto light nur für den Besitzer; Google später als Zusatz
+  OFFEN: Serverarchitektur für Partie-Räume, Suche, Ranglisten, Kauf-Belege und Fair Play festlegen
   Prüf-Arbeiter: Stockfish nativ rechnet jede gewertete Partie nach (Fair Play)
   Prüfpult: private Seite für Flo (Meldungen, Fälle, Begründungen)
 Store-Apps: Capacitor-Hülle um dieselbe Web-App; Käufe und Abo über Apple/Google, ein Berechtigungs-Dienst (z. B. RevenueCat)
@@ -401,9 +407,10 @@ Store-Apps: Capacitor-Hülle um dieselbe Web-App; Käufe und Abo über Apple/Goo
 - **Kaltstart:** Mit 1.000 aktiven Spielern sind im Mittel nur ca. 4 gleichzeitig online. Deshalb startet Phase 2 mit
   Freundes-Link, Brief-Duell und Duplikat-Duell, offene Suche erst in festen Zeitfenstern, Lückenfüller-Bots nur als
   Angebot und immer mit Schild „BOT“.
-- **Konto:** Gast-Modus bleibt. Anmelden mit **Apple und Google** (Flos „mit Google-Konto anmelden oder iCloud
-  einrichten“; Apple verlangt seine Anmeldung, sobald eine fremde angeboten wird), Fortschritt und Käufe in der Cloud
-  auf allen Geräten (iPad, iPhone, Android, Web) gleich, beim ersten Anmelden wird der Gast-Fortschritt übernommen, „Konto löschen“ als ein Knopf in der App,
+- **Konto:** Gast-Modus bleibt. Die erste Anmeldung nutzt einen **6-stelligen E-Mail-Code über Supabase** statt
+  Passwort oder Anmelde-Link und steht zunächst nur dem Besitzer zur Verfügung. Google kommt später als Zusatz; Apple
+  erst mit der App, sofern dann erforderlich. Fortschritt und Käufe sind in der Cloud auf allen Geräten gleich, beim
+  ersten Anmelden wird der Gast-Fortschritt übernommen, „Konto löschen“ ist ein Knopf in der App,
   „Käufe wiederherstellen“, so wenig Daten wie möglich.
 - **Plan B**, falls der Betrieb zu viel wird: Partie-Räume bei einem Anbieter mit EU-Rechtsraum, Prüf-Arbeiter bleibt
   in Deutschland; das Protokoll ist dafür geschnitten.
@@ -460,20 +467,20 @@ werden die Züge wieder offen: Comebacks lohnen sich.
 
 | Baustein | Funken | Partie-Punkte | Regel |
 |---|---|---|---|
-| Brillant | 12 | 1.200 | je offenem Zug |
-| Großartig | 8 | 800 | |
-| Bester Zug | 5 | 500 | |
-| Exzellent | 4 | 400 | |
-| Gut | 3 | 300 | |
-| Ungenau | 1 | 100 | |
-| Fehler, Chance verpasst, Patzer | 0 | 0 | nie Abzug; belegen einen der 40 Plätze |
-| Erzwungen, trivial (Zurückschlagen, Schachabwehr), Zug nach Hinweis oder Zurücknehmen | 0 | 0 | belegen keinen Platz |
+| Genial | 12 | 1.200 | je offenem Zug |
+| Goldrichtig | 8 | 800 | |
+| Präzise | 5 | 500 | |
+| Sauber | 4 | 400 | |
+| Solide | 3 | 300 | |
+| Unscharf | 1 | 100 | |
+| Daneben, Verschenkt, Weit daneben | 0 | 0 | nie Abzug; belegen einen der 40 Plätze |
+| Pflichtzug, trivial (Zurückschlagen, Schachabwehr), Zug nach Hinweis oder Zurücknehmen | 0 | 0 | belegen keinen Platz |
 | **Deckel** | höchstens 40 offene Züge | | |
-| Buchzug | 1 | 100 | höchstens 8 je Partie, zählen immer |
+| Theorie | 1 | 100 | höchstens 8 je Partie, zählen immer |
 | **Ergebnis** Sieg / Remis / Niederlage ab 15 eigenen Zügen („Kampfgeist“) | 40 / 25 / 10 | 4.000 / 2.500 / 1.000 | Ende vor dem 10. eigenen Zug: 0 |
 | **Verwertung** (nur bei Sieg) | bis 30 | bis 3.000 | ab dem ersten Erreichen von 90 %: Par = Mattdistanz + 3, sonst 30 Züge; 3.000 minus 100 je Zug über Par, nie unter 0 |
 | **Lichtblick** (nur Remis und Niederlage, höchstens 2) | je 10 | nein | nur aus echten Daten: so lange wie noch nie gegen diesen Gegner, Genauigkeit mindestens 5 Punkte über der letzten Partie gegen ihn, Bot-Fehler sofort bestraft |
-| **Kür** (nur Punkte): COMBO-Zuschlag, Weiße Weste, Glanzmomente | nein | ja | COMBO: Züge in laufender Serie bekommen +50 % (ab ×3), +100 % (ab ×5), +150 % (ab ×8), +200 % (ab ×12) ihrer Zugpunkte. Weiße Weste (Sieg ohne Fehler, Verpasst, Patzer, ab 20 offenen Zügen) +2.000. Glanzmomente ab Welle S3 |
+| **Kür** (nur Punkte): COMBO-Zuschlag, Weiße Weste, Glanzmomente | nein | ja | COMBO: Züge in laufender Serie bekommen +50 % (ab ×3), +100 % (ab ×5), +150 % (ab ×8), +200 % (ab ×12) ihrer Zugpunkte. Weiße Weste (Sieg ohne Fehler, Verschenkt, „Weit daneben“-Zug, ab 20 offenen Zügen) +2.000. Glanzmomente ab Welle S3 |
 | **Hilfe** (Hinweis oder Zurücknehmen in der Partie) | Ergebnis halbiert | kein Tafeleintrag | Abrechnung gibt es trotzdem |
 
 **Funken einer Partie** = (Zugwerte + Buch + Ergebnis + Verwertung + Lichtblicke) × Herausforderungs-Faktor
@@ -483,11 +490,11 @@ aus der Spielanalyse mit fester Rechenmenge (Knoten statt Zeit), damit jedes Ger
 nachrechnet. Die Kür geht bewusst nicht ins Level, damit die Funken nicht aufgebläht werden.
 
 **Vier Rechenbeispiele** (Flo hat Arena-Wertung 1080, Bot-Stärken heutige Etiketten `[E]`; die Namen der Zugklassen
-sind die heutigen, nach der Umbenennung aus Abschnitt 9 gelten dieselben Werte unter den neuen Namen):
+sind verbindlich festgelegt):
 
 1. **Tapfere Niederlage gegen Ritter Rudi** (Abstand +120, Faktor ×1,25), 38 eigene Züge, ab Zug 33 verloren:
-   4 Buchzüge (4), offen: 1 Großartig (8), 6 Bester Zug (30), 8 Exzellent (32), 6 Gut (18), 2 Ungenau (2),
-   1 Fehler, 1 Patzer, 3 triviale Züge (0) = 94. Kampfgeist 10, Lichtblick „so lange wie noch nie gegen Rudi“ 10.
+   4 Theorie-Züge (4), offen: 1 Goldrichtig (8), 6 Präzise (30), 8 Sauber (32), 6 Solide (18), 2 Unscharf (2),
+   1 Daneben, 1 Weit daneben, 3 triviale Züge (0) = 94. Kampfgeist 10, Lichtblick „so lange wie noch nie gegen Rudi“ 10.
    (94 + 10 + 10) × 1,25 = **143 Funken**. Punkte: 9.000 + 400 + 1.000 = **10.400**.
 2. **Pflichtsieg gegen Bauer Benno** (Abstand ab −500, Faktor ×0,25), 22 Züge, ab Zug 9 entschieden: 3 Buch (3),
    6 offene Züge (30), Sieg 40, Verwertung 30. (103) × 0,25 = **26 Funken**. Die tapfere Niederlage gegen Rudi bringt
@@ -635,7 +642,7 @@ gibt es dazu einen **Können-Satz** aus echten Daten (3.3, „Der Level-Aufstieg
 | 7 | Brett-Rahmen Eiche |
 | 8 | Emote „Hut ab“ |
 | 9 | Kartenrahmen Leder |
-| 10 | Titel **Flamme** · Finisher-Stil Glocke · **Wahl 1 aus 3:** Figurensatz Chessnut, Merida oder Celtic (Option) |
+| 10 | Titel **Fackelträger** · Finisher-Stil Glocke · **Wahl 1 aus 3:** Figurensatz Chessnut, Merida oder Celtic (Option) |
 | 11 | Banner-Stoff Wolle |
 | 12 | Zugspur Federkiel |
 | 13 | Brett-Rahmen Ahorn |
@@ -687,7 +694,7 @@ verboten (Fairness-Test).
 Läuft der Balken in der Abrechnung über: Das Emblem schließt seinen Ring, die Zahl klappt wie ein Fallblatt um,
 ein kurzer Klang (aus dem gewählten Klangpaket, nur „wichtig“), Text „LEVEL 13“ und darunter:
 - **Können-Satz:** Vergleich der letzten 15 wertenden Partien mit den 15 vor dem vorigen Meilenstein, die größte
-  Verbesserung ab Mindestmenge, z. B. „Seit Level 6: Patzer je 10 Züge 1,6 → 1,1“ oder „Du rochierst jetzt 3 Züge
+  Verbesserung ab Mindestmenge, z. B. „Seit Level 6: „Weit daneben“-Zug je 10 Züge 1,6 → 1,1“ oder „Du rochierst jetzt 3 Züge
   früher“. Ist nichts besser, ein neutraler Fakt („214 Züge gespielt, die meisten mit dem Springer“). Antippen zeigt,
   woher die Zahl kommt.
 - **Neues Stück:** „Neu: Brett-Rahmen Ahorn · Ausprobieren“.
@@ -709,16 +716,16 @@ nächste Freischaltung, Link „So entstehen Funken“ mit allen Tabellen dieser
   chess.com oder Lichess gleichgesetzt.
 - **Spielklasse** (ersetzt den Neon-Rang aus 2A): sechs Klassen aus der Wertung, Bild „vom Bauern zur Dame“:
   **Bauernklasse · Springerklasse · Läuferklasse · Turmklasse · Damenklasse · Königsklasse.** Grenzen `[E]`
-  (Platzhalter in Lichess-Skala: ab 1000, 1200, 1400, 1600, 1900; endgültig so, dass sich die zehn Bots ungefähr
+  (Platzhalter auf der chess.com-ähnlichen Arena-Skala: ab 1000, 1200, 1400, 1600, 1900; endgültig so, dass sich die zehn Bots ungefähr
   gleichmäßig verteilen). Angezeigt wird die **höchste je erreichte** Klasse, die Zahl daneben bleibt ehrlich.
   Aufstieg erst ab 10 wertenden Partien, je Klasse genau einmal ein großer Moment („AUFSTIEG: Läuferklasse“). Die
   Klasse färbt den Rahmen der Wertung auf der Spielerkarte (eine ruhige Farbe je Klasse, kein Leuchten).
 - **Bilanz je Bot** im Bot-Panel („Du gegen Rudi: 3 Siege · 1 Remis · 5 Niederlagen“) und die **Fortschritts-Karte**
   im Ich-Bereich (Median-Kurve, Phasen-Balken, „Größter Hebel: Endspiel“) bleiben wie in 2A.
 - **Plateau-Lupe** (ab S2): Bewegt sich die Wertung über 20 wertende Partien um weniger als ±30, schaltet die
-  Fortschritts-Karte auf „Lupe“ und vergleicht die letzten 10 mit den 10 davor in fünf Untermessern (Patzer je 10 Züge,
+  Fortschritts-Karte auf „Lupe“ und vergleicht die letzten 10 mit den 10 davor in fünf Untermessern („Weit daneben“-Zug je 10 Züge,
   Zug des ersten Fehlers, Endspiel-Genauigkeit, aufgespürte Witterungen, Karten „für immer gelöst“): „Deine Wertung
-  steht seit 3 Wochen bei ≈ 1080. Darunter bewegt sich was: Patzer je 10 Züge 1,1 → 0,7 · erster Fehler im Schnitt
+  steht seit 3 Wochen bei ≈ 1080. Darunter bewegt sich was: „Weit daneben“-Zug je 10 Züge 1,1 → 0,7 · erster Fehler im Schnitt
   Zug 14 → 19.“ Ohne Verbesserung ehrlich: „Gerade bewegt sich wenig. Das ist normal. Oft hilft ein Wechsel: zwei Wochen
   langsamer spielen.“ Keine Funken, nur echte Zahlen mit Mindestmengen. Das Plateau ist der Moment, in dem viele
   aufhören; genau dann zeigt die App, dass es weitergeht.
@@ -779,7 +786,7 @@ verteilt. Das ist für ein Ein-Mann-Projekt machbar, solange Flo nur Stichproben
 
 **Übungen aus eigenen Partien** (alle landen im **Trainingsstapel**, 3.6):
 - **Zweite Chance „Ab hier nochmal“** (BAUPLAN 1B): jeder eigene Fehler wird spielbar, Lernpunkt-Karte im Ergebnis.
-- **Patzer-Kartei** (1C): eigene Fehler mit eindeutiger Lösung als Karteikarten, Fächer 1, 3, 7, 14, 30 Tage, dann
+- **Fehler-Kartei** (1C): eigene Fehler mit eindeutiger Lösung als Karteikarten, Fächer 1, 3, 7, 14, 30 Tage, dann
   „für immer gelöst“. Später die **Rückseite**: dieselbe Stellung als „Bestrafe dich selbst“ aus Sicht des Bots.
 - **Heimbringer** (Abo): Stellungen, in denen du mindestens 3 Züge lang 85 % hattest und trotzdem nicht gewonnen hast,
   werden zur Aufgabe gegen denselben Bot: „Du standest +4,1 und hast remisiert. Bring es diesmal nach Hause.“
@@ -805,7 +812,7 @@ Sonntagsrätsel**. Der erste Zug der Datenbank läuft als Gegnerzug davor ab. Da
 Wörter zur Wahl (Gabel, Fesselung, Abzug); die zwei falschen stammen aus Themen, die das Rätsel nicht trägt, und
 Rätsel mit zwei gleich starken Motiv-Themen kommen nicht ins Tagesrätsel-Jahr. Ergebnis zum Teilen als Text ohne Link und ohne Spoiler:
 ```
-Schach-Arena · Rätsel 291 · Donnerstag ●●●●○○○
+Crownmate · Rätsel 291 · Donnerstag ●●●●○○○
 ♞ in 2 Zügen · ■■□■ · Motiv: Gabel
 ```
 Fehlversuche ohne Abzug, keine Uhr, Archiv (gratis 30 Tage, im Abo alles) zählt für Funken, aber nicht als
@@ -859,7 +866,7 @@ deinem Repertoire** (die App kennt deine Eröffnungen aus deinen Partien; ab 5 P
   Zug-Bestätigen, Coach kompakt.
 - Große Ziffern in den Spielerleisten, ab 30 s in der Warnfarbe des Looks, ab 10 s ruhiges Atmen der Ziffern, einmal
   der Klang `uhr-warnung`. Zeitende ruhig und grau, Remis bei fehlendem Mattmaterial.
-- **Analyse:** Zeitbalken je Zug, „Zeitfresser: Bei Zug 23 hast du 48 s überlegt, danach kamen drei Ungenauigkeiten“
+- **Analyse:** Zeitbalken je Zug, „Zeitfresser: Bei Zug 23 hast du 48 s überlegt, danach kamen drei unscharfe Züge“
   und „Eröffnung 18 % · Mittelspiel 62 % · Endspiel 20 % deiner Zeit“.
 
 **Ansage vor der Partie:** Segment „zählt · frei“ über dem Spielen-Knopf. Eine freie Partie zählt nicht für Wertung,
@@ -901,7 +908,7 @@ Arena-Karte (die Leiter als Weg) bleibt der Hauptbildschirm.
   vor dem Store-Start (Material-Bericht, Abschnitt 5). So kostet ein neuer Boss Text und eine Stellung, keine Malerei.
 - **Lebensleiste** über dem Boss-Porträt statt des Bewertungsbalkens: Sie zeigt **seine** Gewinnchance (dieselbe Formel
   wie der Balken). Jeder deiner Züge, der ihm mindestens 3 Punkte nimmt, ist ein sichtbarer **Treffer** (die Leiste
-  ruckt, Klang aus dem Klangpaket). Eigene Patzer lassen sie **still** wachsen. Kerben bei 66 % und 33 % sind Phasen
+  ruckt, Klang aus dem Klangpaket). Eigene „Weit daneben“-Zug lassen sie **still** wachsen. Kerben bei 66 % und 33 % sind Phasen
   mit einem Boss-Satz („Jetzt wird es ernst, mein Freund.“). Matt leert die Leiste. Schalter „Lebensleiste statt
   Balken“.
 - **Boss-Siegel:** **Bronze** = Sieg auf Standard · **Silber** = Sieg auf Standard ohne Hinweis und Zurücknehmen mit
@@ -947,8 +954,8 @@ nebeneinander):
 
 **Spielerkarte** (Ich-Bereich und Bestenliste; Phase 2 sieht sie der Gegner beim Start): Avatar im Kartenrahmen,
 Name in der gewählten Namensfarbe, Level-Emblem mit Titel (Feuer-Titel oder Ehrentitel), Wertung im Rahmen der
-Spielklasse (die Zahl darf man ausblenden), Banner, Lorbeer des Siegeslaufs, **3 selbst gewählte Beweis-Zähler**
-(„Brillante Züge 14“, „Bester Siegeslauf 7“, „Boss-Siegel Gold 3“). **Duell-Intro** (1,2 s, deine Karte links, die
+Spielklasse (die Zahl darf man ausblenden), Banner, Flamme des Siegeslaufs, **3 selbst gewählte Beweis-Zähler**
+(„Geniale Züge 14“, „Bester Siegeslauf 7“, „Boss-Siegel Gold 3“). **Duell-Intro** (1,2 s, deine Karte links, die
 des Gegners rechts, Antippen überspringt) nur vor Boss- und Liga-Partien, nicht vor jeder Partie.
 
 **Avatar** (Lektorat, war nirgends festgelegt): Du baust ihn aus einem Baukasten mit frei lizenziertem Zeichenstil
@@ -965,7 +972,7 @@ höchstens 6 je Partie. **Kein Emote, das verspottet** (kein Lachen, Weinen, Gä
 Charakter, höchstens 3-mal je Partie (Oma Hilde auf die Teetasse: „Mit Zucker, Kind?“). Phase 2: Stummschalten je
 Gegner und global, Standard für neue Online-Spieler „nur nach der Partie“.
 
-**Schnell-Chat** (nur Phase 2, Flos Entscheidung: kein freier Text): 12 feste Sätze in drei Gruppen (Begrüßung
+**Schnell-Chat** (ab Schub 2b gegen Bots; online später gegen Menschen; vorerst kein freier Text): 12 feste Sätze in drei Gruppen (Begrüßung
 „Hallo!“, „Viel Glück!“ · Partie „Schöner Zug!“, „Ich überlege kurz.“ · Ende „Gut gespielt!“, „Danke für die
 Partie!“, „Revanche?“). **Kein Satz hängt an der Engine** (ein „Guter Zug!“, das nur nach einem guten Zug geht, würde
 in laufenden Partien die Bewertung verraten). Bewusst nicht dabei: alles, was sich höhnisch benutzen lässt („Wow“,
@@ -1009,7 +1016,7 @@ ersetzt aber jeden anderen Brett-Effekt.
 | `level` | Zeile | 55 | „Level 13 · Neu: Brett-Rahmen Ahorn“ |
 | `marsch` (ersetzt `kette`) | Zeile | 50 | „Tag 12 der Serie“ |
 | `liga` | Zeile | 45 | „Liga: Runde 5 gespielt, Platz 3 ▲ 1“ |
-| `siegeslauf` | Zeile | 44 | „Siegeslauf 5 · Silberner Lorbeer“ |
+| `siegeslauf` | Zeile | 44 | „Siegeslauf 5 · Flamme“ |
 | `medaille` (Bronze, Silber) | Zeile | 40 | „Bronze: Zähe Burg“ |
 | `tageskrone` | Zeile | 38 | „Tageskrone: 3 von 3“ |
 | `tagesdreier` | Zeile | 35 | „Tagesaufgaben 2 von 3“ |
@@ -1024,13 +1031,13 @@ Partien (Lern-Medaillen naturgemäß aus Übungen). Bronze und Silber sind eine 
 | Medaille | Bedingung | Bronze | Silber | Gold |
 |---|---|---|---|---|
 | Feine Klinge | Partien mit mindestens 90 % Genauigkeit (ab 20 eigenen Zügen, ohne Hinweis) | 1 | 5 | 20 |
-| Weiße Weste | Siege ohne Fehler, Chance verpasst oder Patzer (ab 20 eigenen Zügen) | 1 | 5 | 15 |
+| Weiße Weste | Siege ohne Fehler, Verschenkt oder „Weit daneben“-Zug (ab 20 eigenen Zügen) | 1 | 5 | 15 |
 | Kettenreaktion | höchste COMBO in einer wertenden Partie | ×5 | ×8 | ×12 |
 | Leiterkletterer | verschiedene Bots besiegt | 3 | 6 | 9 |
 | Schwarzkünstler | verschiedene Bots mit Schwarz besiegt | 2 | 5 | 9 |
 | Zähe Burg | Remis oder Sieg nach eigener Gewinnchance unter 20 % | 1 | 3 | 10 |
 | Langer Atem | Siege ab 60 eigenen Zügen | 1 | 3 | 10 |
-| Konterschlag | Bot-Patzer sofort mit Bester Zug oder besser bestraft | 3 | 15 | 50 |
+| Konterschlag | Bot-„Weit daneben“-Zug sofort mit Präzise oder besser bestraft | 3 | 15 | 50 |
 | Fehlerfresser | Karteikarten „für immer gelöst“ | 5 | 25 | 100 |
 | Neu geschrieben | „Ab hier nochmal“ getroffen | 3 | 15 | 50 |
 | Spürnase | Witterungen aufgespürt (Taktik-Momente) | 5 | 20 | 60 |
@@ -1090,7 +1097,7 @@ hängt sich an sie:
 | Lehrmeister-Einheit („Rudis Reitschule: 2 von 6“) | Lernpfad (3.5) |
 | Bilanz und Erzfeind | 2A, 2B |
 | Bot-Geheimnis nach 3 Niederlagen | 2B |
-| Beipackzettel: gemessene Stärke statt Etikett („Spielt wie Lichess-Schnellschach ca. 1150 ± 60, geeicht an 10.666 echten Partien“), Fehlerprofil, Änderungsprotokoll | Eichung (ab S3) |
+| Beipackzettel: gemessene Stärke statt Etikett („Arena-Wertung ca. 1150 ± 60 (chess.com-ähnliche Anzeige, aus Lichess-Eichdaten umgerechnet)“), Fehlerprofil, Änderungsprotokoll | Eichung (ab S3) |
 | Vorgabe-Stufen | Spielhalle |
 
 Die Leiter-Bots spielen außerdem in der Vereinsmeisterschaft gegeneinander (echte, vorab gespielte Partien) und
@@ -1106,8 +1113,8 @@ Na, dann wird's ja endlich spannend.“ ist die Stichelei dieser Partie. Bot-Spr
 | Befund (180 Selbstpartien und 320 Nachbar-Partien der Bots, dieselbe Analyse wie für die Lichess-Partien) | Folge im Konzept |
 |---|---|
 | **Die Sprossen sind ungleich.** Gegen die Nachbarstufe holt die höhere Stufe zwischen 54 % (Greta gegen Kommissar König, Abstand ca. +30) und 84 % (Professor Turm gegen Ritter Rudi, ca. +290); laut Etikett wären es überall 200 bis 300. | Alle Mechaniken rechnen mit dem **Abstand zur geeichten Stärke**, nie mit dem Etikett: Herausforderungs-Faktor, Augenhöhe im Siegeslauf, Boss-Stufen, Lernzone, Spielklassen-Grenzen. Bleiben große Sprünge, bekommt jeder Bot außer dem Stockfisch drei offen wählbare **Formstufen** („locker“, „normal“, „in Topform“, je ca. 100 auseinander, gemessen, nie automatisch). Sterne und Freischaltung bleiben an „normal“, ein Topform-Sieg gibt einen Goldrand am Bot-Pokal, Rudi in Topform: „Heute hab ich gut geschlafen. Pass auf.“ Aus 9 Sprossen werden 27, der Flow-Kanal wird enger. |
-| **Die Bots patzen anders als Menschen.** Auf den Stufen 1 bis 7 kommen 44 bis 68 % ihrer Patzer aus eingestreuten Spontanzügen, und nach einem Bot-Patzer schlägt die beste Antwort viel öfter genau die gerade gezogene Figur (Stufen 1 bis 6: 34 bis 48 %, Menschen aller Bänder: 12 bis 30 %). Genau das beklagt die Community („fast perfekt, dann ein Zufallspatzer“). | Menschlichere Fehler sind Sache der Eichung. Das Konzept verlangt nur: Die Fehlerart steht im **Beipackzettel** des Bots, sie hängt nie von Flos Ergebnissen ab, und Rätsel, Tafeln und Liga funktionieren mit jeder Fehlerart. |
-| **Etikett und Lichess-Skala passen nicht zusammen.** Nach Kennzahlen (Genauigkeit, Verlust je Zug) liegt Bauer Benno unter dem schwächsten Band mit Daten (ca. 550), die Stufen ab Oma Hilde deutlich über ihrem Etikett. | Die Skala der Wertung, der Spielklassen und der Boss-Stufen kommt aus der Konstruktion `[E]`. Die Spielklassen-Grenzen werden so gesetzt, dass sich die Bots ungefähr gleichmäßig auf die sechs Klassen verteilen. |
+| **Die Bots patzen anders als Menschen.** Auf den Stufen 1 bis 7 kommen 44 bis 68 % ihrer „Weit daneben“-Zug aus eingestreuten Spontanzügen, und nach einem Bot-„Weit daneben“-Zug schlägt die beste Antwort viel öfter genau die gerade gezogene Figur (Stufen 1 bis 6: 34 bis 48 %, Menschen aller Bänder: 12 bis 30 %). Genau das beklagt die Community („fast perfekt, dann ein Zufallspatzer“). | Menschlichere Fehler sind Sache der Eichung. Das Konzept verlangt nur: Die Fehlerart steht im **Beipackzettel** des Bots, sie hängt nie von Flos Ergebnissen ab, und Rätsel, Tafeln und Liga funktionieren mit jeder Fehlerart. |
+| **Etikett und Messskala passen nicht zusammen.** Nach Kennzahlen (Genauigkeit, Verlust je Zug) liegt Bauer Benno unter dem schwächsten Band mit Daten (ca. 550), die Stufen ab Oma Hilde deutlich über ihrem Etikett. | Die Skala der Wertung, der Spielklassen und der Boss-Stufen kommt aus der Konstruktion `[E]`. Die Spielklassen-Grenzen werden so gesetzt, dass sich die Bots ungefähr gleichmäßig auf die sechs Klassen verteilen. |
 
 Eine Bitte des Spielkonzepts an die Konstruktion: Für Codes, Bot-Läufe und Liga muss ein Bot bei gleichem Seed **auf
 jedem Gerät denselben Zug** spielen (feste Knotenzahl statt fester Zeit, ein Thread, dieselbe Engine-Datei in App und
@@ -1126,9 +1133,9 @@ Server braucht, steht schon in Version 1 fest.
 Partie-Punkte (Tafelwert) aus 3.2, hier als Merkzettel:
 
 ```
-Tafelwert = Zugpunkte der offenen Züge (Brillant 1.200 · Großartig 800 · Bester Zug 500 · Exzellent 400 ·
-            Gut 300 · Ungenau 100 · Fehler, Verpasst, Patzer 0; höchstens 40 offene Züge)
-          + Buchzüge (je 100, höchstens 8)
+Tafelwert = Zugpunkte der offenen Züge (Genial 1.200 · Goldrichtig 800 · Präzise 500 · Sauber 400 ·
+            Gut 300 · Unscharf 100 · Fehler, Verschenkt, „Weit daneben“-Zug 0; höchstens 40 offene Züge)
+          + Theorie-Züge (je 100, höchstens 8)
           + Ergebnis (Sieg 4.000 · Remis 2.500 · Niederlage ab 15 Zügen 1.000)
           + Verwertung (nur Sieg: 3.000 minus 100 je Zug über Par; Par = Mattdistanz + 3, sonst 30)
           + Kür (COMBO-Zuschlag +50 bis +200 % · Weiße Weste +2.000 · Glanzmomente ab S3)
@@ -1152,7 +1159,7 @@ Phase 2, Welt-Tafeln) gibt es intern **Leistungspunkte** = Tafelwert × (0,5 + g
 | **Rätsel-Tafeln** | Treppenlauf 3 und 5 Minuten (gelöste Stufen), Wochen-Treppe (erster Versuch), Rätsel-Blick (Höchststand), Tagesrätsel im ersten Versuch (Anzahl in Folge) | Bot-Läufe ab S3, Freunde | S2 |
 | **Spielhalle** | Stockfisch-Sturm (überlebte Züge), Vorgabe-Leiter (höchste Stufe je Bot), Zeit-Rausch (Siege) | Bot-Läufe | S3 |
 | **Vereinsmeisterschaft** | Rundenturnier gegen die neun Bots: 1 / ½ / 0, Feinwertung Sonneborn-Berger, Kreuztabelle | die Bots mit echten Partien | S3 |
-| **Ich** | Bestmarken (höchste Genauigkeit, sauberste Partie, längste Strecke ohne Fehler, meiste Brillant-Züge, größtes Comeback, Tiefenrekord gegen den Stockfisch), Rekord-Serie, Siegeslauf-Rekord, Liga-Chronik, **Wochen-Fünfkampf gegen dein früheres Ich** | dein früheres Ich | S1 (Bestmarken), S3 (Fünfkampf) |
+| **Ich** | Bestmarken (höchste Genauigkeit, sauberste Partie, längste Strecke ohne Fehler, meiste Genial-Züge, größtes Comeback, Tiefenrekord gegen den Stockfisch), Rekord-Serie, Siegeslauf-Rekord, Liga-Chronik, **Wochen-Fünfkampf gegen dein früheres Ich** | dein früheres Ich | S1 (Bestmarken), S3 (Fünfkampf) |
 | **Freunde** | dieselben Tafeln mit den Einträgen aus Codes | Freunde | S3 |
 | **Welt** (Phase 2) | nur Prüfbares: Rätsel, Boss, Bot-Tafeln, Liga-Saisons; als Perzentil und Nachbarschaft | Menschen | Phase 2 |
 
@@ -1169,7 +1176,7 @@ Säulen), nichts wird gelöscht.
 | Disziplin | Messgröße | Mindestmenge | Punkt ab |
 |---|---|---|---|
 | Form | Median Genauigkeit (Partien ab 10 eigenen Zügen) | 3 Partien | +1,5 Prozentpunkte |
-| Sauberkeit | Fehler plus Patzer je 10 offene Züge | 3 Partien | −0,2 |
+| Sauberkeit | Fehler plus „Weit daneben“-Zug je 10 offene Züge | 3 Partien | −0,2 |
 | Mut | Median Abstand Bot-Stärke minus eigene Wertung | 3 Partien | +50 |
 | Verwertung | Anteil der Partien mit 90 % Gewinnchance, die du gewonnen hast | 2 solche Partien | +5 Prozentpunkte |
 | Treffsicherheit | Rätsel und fällige Karten im 1. Versuch richtig | 15 Aufgaben | +3 Prozentpunkte |
@@ -1342,7 +1349,7 @@ Bauer läuft nie zurück.**
 
 | Art | Wann | Was |
 |---|---|---|
-| **in Serie** | 3, 5, 7, 10, 14, 21, 30, 50, 66, 100, 150, 200, 365, danach alle 100 (früh dicht, später weiter auseinander) | Plakette mit Zeitraum („30 Schachtage in Serie, 14.09. bis 18.10.“); ab 7 Tagen eine **Beweis-Karte** mit echten Zahlen aus genau diesem Zeitraum gegen die Zeit davor, nur Verbesserungen plus neutrale Fakten: „Genauigkeit (Median) 64 % → 71 % · Patzer je 10 Züge 1,4 → 0,8 · Karten für immer gelöst 46“. Hat sich nichts verbessert: „30 Tage Schach: 41 Partien, 120 Karten, 18 Lektionen. Auf diesem Boden wächst die Form.“ Bei 7, 30, 100, 365 schreibt ein Bot einen kurzen Brief (Oma Hilde: „Dreißig Tage! Das ist länger, als mein Sauerteig je durchgehalten hat.“). Ab 100 Tagen: Serien-Plakette als Banner-Zeichen. |
+| **in Serie** | 3, 5, 7, 10, 14, 21, 30, 50, 66, 100, 150, 200, 365, danach alle 100 (früh dicht, später weiter auseinander) | Plakette mit Zeitraum („30 Schachtage in Serie, 14.09. bis 18.10.“); ab 7 Tagen eine **Beweis-Karte** mit echten Zahlen aus genau diesem Zeitraum gegen die Zeit davor, nur Verbesserungen plus neutrale Fakten: „Genauigkeit (Median) 64 % → 71 % · „Weit daneben“-Zug je 10 Züge 1,4 → 0,8 · Karten für immer gelöst 46“. Hat sich nichts verbessert: „30 Tage Schach: 41 Partien, 120 Karten, 18 Lektionen. Auf diesem Boden wächst die Form.“ Bei 7, 30, 100, 365 schreibt ein Bot einen kurzen Brief (Oma Hilde: „Dreißig Tage! Das ist länger, als mein Sauerteig je durchgehalten hat.“). Ab 100 Tagen: Serien-Plakette als Banner-Zeichen. |
 | **Tag 66** | einmal | ruhige Karte: „66 Tage, laut einer Studie der Median, ab dem eine Gewohnheit von selbst läuft. Deine Serie darf jetzt leiser werden.“ mit dem Angebot, im Kopf nur noch den Wochen-Ring zu zeigen |
 | **Spieltage gesamt** (sinken nie) | 10, 25, 50, 100, 250, 500, 1.000 | ein Stück aus dem Level-Katalog vorziehen (frei wählbar). Greifbare Belohnungen hängen also nie an einer ununterbrochenen Serie. |
 
@@ -1404,14 +1411,14 @@ Doppelschritt (Bauernmarsch). So fühlt sich Zurückkommen gut an, Wegbleiben ab
   Wertung minus 150 `[E]` (bewusst weiter als der Chip „Augenhöhe“ mit ±99, damit ein Lauf nicht an 20 Punkten Wertung
   hängt)
   (in den ersten 10 Partien: ab dem höchsten freigeschalteten Bot minus eine Stufe). Damit lohnt Benno-Farmen nicht.
-- Ab 2 Siegen ein gezeichneter **Lorbeerzweig** mit Zahl am Avatar (Bronze ab 3, Silber ab 5, Gold ab 10). **Keine
-  Flamme** (das Feuer gehört den Funken, der Bauer der Tages-Streak).
+- Ab 3 Siegen gegen ungefähr gleich starke Gegner erscheint eine **Flamme** mit Zahl am Namen. Sie ist reines
+  Prestige und gibt keinen Wertungsbonus.
 - Partien mit Hinweis oder Zurücknehmen, gegen schwächere Gegner, Übungen, freie Partien und Boss-Partien **pausieren**
   den Lauf (zählen nicht, brechen nicht).
 - Ein Remis oder eine Niederlage beendet den Lauf **still**: „Siegeslauf beendet bei 4. Dein Rekord: 7.“ Kein Ton,
   keine Farbe. Meilensteine 3, 5, 10, 15 je einmal als Feier-Zeile; der Rekord steht im Ich-Reiter.
 - Keine Funken, kein Bonus in Wertung oder Liga (die Liga bleibt ein echtes Rundenturnier mit 1 / ½ / 0).
-- Phase 2: Der Lorbeer ist für den Gegner sichtbar (Siege gegen Menschen auf Augenhöhe). Kein „Lauf-Schutz“ zu kaufen.
+- Online ist die Flamme für den Gegner sichtbar (Siege gegen Menschen auf Augenhöhe). Kein „Lauf-Schutz“ zu kaufen.
 
 ### 3.16 Die ersten 5 Minuten und der Entdeckungs-Fahrplan
 
@@ -1448,7 +1455,7 @@ Spielmechaniken sinkt nach etwa 4 Wochen und erholt sich ab Woche 6 bis 10 (Absc
 
 ### 3.17 Bildschirme und Navigation
 
-Flo stören Menüs am meisten. Deshalb **vier Reiter** in der unteren Leiste, Einstellungen über das Zahnrad im Kopf:
+Flo stören Menüs am meisten. Deshalb **vier Reiter**: auf dem iPad im Querformat oben in der Kopfzeile, sonst in der unteren Leiste, Einstellungen über das Zahnrad im Kopf:
 
 | Reiter | Inhalt |
 |---|---|
@@ -1459,8 +1466,8 @@ Flo stören Menüs am meisten. Deshalb **vier Reiter** in der unteren Leiste, Ei
 
 Alle Bildschirme sind **richtungsneutral** beschrieben: Sie nutzen nur die Tokens der Design-Systeme (Grund, Fläche,
 Akzent, Gold nur für Sterne und Siegel, Zugklassen-Farben, Radien, Schatten-Ebenen, Bewegung „Feder“ und „Gleiten“).
-Flo wählt A „Modern und klar“, B „Edel und echt“ oder C „Verspielt und saftig“; jede Skizze unten funktioniert in allen
-dreien. Das Brett (Figuren cburnett, Feldfarben Nacht, Grün, Holz) bleibt unverändert.
+Festgelegt ist Look A **„Modern und klar“**: warmes Papier, Schiefer und ein Zinnober-Akzent, ohne Neon. Das Brett
+(Figuren cburnett, Feldfarben Nacht, Grün, Holz) bleibt unverändert; die Theme-Tokens erlauben spätere Ansichten.
 
 **Arena (iPad quer):**
 ```
@@ -1483,10 +1490,10 @@ dreien. Das Brett (Figuren cburnett, Feldfarben Nacht, Grün, Holz) bleibt unver
 ```
  BARON VON GAMBIT · Standard ≈ 1080        Regel: Er hat einen Bauern geopfert.
  Lebensleiste [██████████████▌·····|·····|·····]  62 %   (Kerben bei 66 und 33)
- ┌──────────── Brett (unverändert) ────────────┐   Coach: „Bester Zug. Der Mehrbauer bleibt.“
+ ┌──────────── Brett (unverändert) ────────────┐   Coach: „Präzise. Der Mehrbauer bleibt.“
  │                                              │   Zusatz: „Treffer! −4 Punkte für den Baron.“
  └──────────────────────────────────────────────┘
- Flo ≈ 1080 · Lorbeer 2                              [Hinweis] [Zurück] [Drehen] [Aufgeben]
+ Flo ≈ 1080 · Flamme 3                              [Hinweis] [Zurück] [Drehen] [Aufgeben]
 ```
 Keine Punkte, keine Funken über dem Brett. In normalen Partien steht dort der Bewertungsbalken wie heute.
 
@@ -1529,7 +1536,7 @@ und Klänge Flo am meisten stören:
 | | Zwei Finger auf dem Brett ergeben nie einen Zug; Zieh-Schwelle 8 px, damit Antippen nie als Ziehen zählt | immer |
 | | Automatisch Dame; Finger halten zeigt die Unterverwandlung | an |
 | **Warum geht das nicht?** (Paket S2-8) | Statt stillem Zurückspringen ein Satz in der Coach-Zeile und ein grauer Pfeil für 1 s: „Geht nicht: Dein Springer ist gefesselt. Der Läufer b5 würde sonst deinen König angreifen.“ · „Du stehst im Schach durch die Dame h5. Drei Wege: König ziehen, dazwischenstellen, schlagen.“ · Rochade nicht erlaubt mit Grund. Nach zwei gleichen Versuchen zeigt die Figur alle erlaubten Felder. Kein Fehlerklang. Verrät nur Regeln, nie einen besseren Zug | an |
-| **Klang** | Paket Holz oder Arcade (beide immer frei), Lautstärke, Stufe „Alle · Nur wichtige · Aus“, dazu jede Gruppe einzeln abschaltbar: Züge, Bewertung, Feier, Uhr, Boss-Treffer, Finisher | Nur wichtige |
+| **Klang** | Paket Holz oder Arcade (beide immer frei), Lautstärke, Stufe „Alle · Nur wichtige · Aus“, dazu jede Gruppe einzeln abschaltbar: Züge, Bewertung, Feier, Uhr, Boss-Treffer, Finisher | Alle; Paket Arcade |
 | **Bewegung** | Animationstempo langsam · normal · schnell · aus; „reduzierte Bewegung“ des Geräts wird übernommen | normal |
 | **Anzeigen** | Pfeile und Markierungen, Koordinaten, Bewertungsbalken, Lebensleiste statt Balken (Boss), Zählwerk und Funkenlinie in der Partie | Balken an, Zählwerk und Funkenlinie aus |
 
@@ -1548,9 +1555,9 @@ und 2 sind noch **nicht** gebaut.
 | Paket | Bleibt | Ändert sich (mit Grund) | Fällt weg |
 |---|---|---|---|
 | **Welle 0 Fundament** | alles: Ereignisse, Orte, Feier-Warteschlange, Modul-Speicher, Register, Bühne, Modus „Übung“, Wertungs-Schutz | Erweiterung W0+a und W0+b (Abschnitt 6): neue Modi, Ereignisse, Orte, Screens, Bot-Register, Matt-Hook, Schachuhr; `MAX_REVIEWS` 20 → 12 (Speicher, siehe 6.6); Feier-Quellen nach 3.10 | nichts |
-| **1A Klang und Serie** | COMBO-Stufen am Chip (×5, ×8, ×12), sanfter Bruch ab ×3, Serien-Rekord, Klangstufe | Klänge kommen aus den Klangpaketen Holz und Arcade (Premium-Umbau) statt eigener Synthese; die Serien-Treppe nutzt `combo`, `combo-2`, `combo-3`; **Klangstufe-Standard „Nur wichtige“** statt „Alle“, weil Klänge Flo am meisten stören; Stufen ohne Leuchten (Farbe und Schriftgewicht statt Glow) | eigene Synthese-Signaturen je Klasse |
+| **1A Klang und Serie** | COMBO-Stufen am Chip (×5, ×8, ×12), sanfter Bruch ab ×3, Serien-Rekord, Klangstufe | Klänge kommen aus den Klangpaketen Holz und Arcade (Premium-Umbau) statt eigener Synthese; die Serien-Treppe nutzt `combo`, `combo-2`, `combo-3`; **Klangstufe-Standard „Alle“**; Arcade ist das Standardpaket, Holz bleibt wählbar; Stufen ohne Leuchten (Farbe und Schriftgewicht statt Glow) | eigene Synthese-Signaturen je Klasse |
 | **1B Zweite Chance** | alles (Ab hier nochmal, Lernpunkt, Lichtblicke, Häkchen in der Analyse) | Rückspul-Moment ohne VHS-Streifen: die Zugliste spult sichtbar zurück (passt zu allen drei Looks); Lern-Funken 15 / 5 | VHS-Optik |
-| **1C Patzer-Kartei** | Auswahlregel, Fächer 1, 3, 7, 14, 30 Tage, „für immer gelöst“, höchstens 8 am Tag, nie rote Zahl | wird Teil des **Trainingsstapels** (Deckel 10 für alles, was wiederkommt); der Einstieg wandert in den Reiter Training; Lern-Funken | eigener Kopf-Chip „Training · 4“ (die Kopfzeile bleibt bei drei Zahlen) |
+| **1C Fehler-Kartei** | Auswahlregel, Fächer 1, 3, 7, 14, 30 Tage, „für immer gelöst“, höchstens 8 am Tag, nie rote Zahl | wird Teil des **Trainingsstapels** (Deckel 10 für alles, was wiederkommt); der Einstieg wandert in den Reiter Training; Lern-Funken | eigener Kopf-Chip „Training · 4“ (die Kopfzeile bleibt bei drei Zahlen) |
 | **1D Tagesrhythmus** | Tagesgrenze 4:00, Ruhetag (Standard keiner), ruhen statt verlieren, Rekord für immer, Tagesdreier, Willkommen zurück, rückwirkender Aufbau aus vorhandenen Partien | Lichterkette → **Bauernmarsch**, Neon-Perle → Bauer; Tageswerk um Rätsel und Lektion erweitert, Partie ab 10 Zügen; **2 Schonungstage → Nie-zweimal-Regel** (Vorschlag, „Strenge Serie“ behält die Schonungstage); die Heute-Karte wird Gastgeber für andere Pakete (`arena:heute`); Tagesaufgaben bringen Funken | Perlen-Raster in Cyan und Violett |
 | **Integration W1** | Gesamtprobe, e2e, iPad-Probe, Feier-Budget | Kopfzeile zeigt Level, Wertung, Serie | |
 | **2A Dein Fortschritt** | Arena-Wertung mit Unsicherheit, Bestmarken, Fortschritts-Karte, Bilanz je Bot, erwartete Punkte je Bot | **in die erste spielige Welle vorgezogen** (der Funken-Faktor braucht die Wertung); auf der geeichten Skala `[E]`; **Neon-Rang → Spielklasse** (6 Klassen, sinkt nie); Bestmarken im Ich-Reiter der Bestenliste; Tiefenrekord auch als Modus Stockfisch-Sturm | Neon-Rang-Farben (Kreide bis Prisma) |
@@ -1558,7 +1565,7 @@ und 2 sind noch **nicht** gebaut.
 | **2C Taktik-Momente** | Spürnase (Standard an, abschaltbar), Matt in Sicht, Schlag-Impact | „Matt in Sicht“ dimmt den Hintergrund statt eines Neon-Gitters; der Königsfall geht im Matt-Finisher auf; Schlag-Impact leiser (nur ab Wert 3, Damenschlag mit kurzem Ruck) | eigener Königsfall-Effekt |
 | **2D Erster Eindruck und Sicherung** | Sicherung (Export, Import, Vorschau), Speicheranzeige, Tester-Bericht, Abzeichen-Lexikon, „Dein erster Sieg“ | **Sicherung in die erste spielige Welle vorgezogen** (sobald Level und Serie Wert haben, darf ein Datenverlust nicht Wochen kosten); Start-Bildschirm im gewählten Look; erste 5 Minuten mit Einstufung, schnellem Sieg, Finisher, Level | Leuchtreklame, Neon-Brummen |
 | **Integration W2** | wie geplant | | |
-| **Juice-Liste (Abschnitt 6)** | Lautstärke-Hierarchie, „Nichts blockiert das Spiel“, nur `transform` und `opacity`, höchstens 12 Teilchen | Klänge aus den Paketen; jedes „Neon“, „Prisma“, „Leuchten“ wird durch Look-Tokens ersetzt (z. B. Brillant: Rahmen in Klassenfarbe und ein einmaliger Glanz über Metall oder Papier) | |
+| **Juice-Liste (Abschnitt 6)** | Lautstärke-Hierarchie, „Nichts blockiert das Spiel“, nur `transform` und `opacity`, höchstens 12 Teilchen | Klänge aus den Paketen; jedes „Neon“, „Prisma“, „Leuchten“ wird durch Look-Tokens ersetzt (z. B. Genial: Rahmen in Klassenfarbe und ein einmaliger Glanz über Metall oder Papier) | |
 | **Abschnitt 7 Fairness** | siehe Abschnitt 5 | | |
 
 **Was aus BAUPLAN Abschnitt 8 („Bewusst NICHT jetzt“) wird:**
@@ -1674,15 +1681,15 @@ Schuldgefühl-Texte, heimlich schwächere Bots, Werbung.
 JETZT        Welle 0 abschließen (Prüfer, Rest-Reparatur)
    |
    v
-VORHER       Premium-Umbau (Flos Look-Wahl A/B/C, Klangpakete Holz/Arcade mit Lautstärke, Komfort 3.18,
-             eigene Namen der Zugklassen und eigene Brillant-Farbe, falls Flo zustimmt)
+VORHER       Premium-Umbau (Look A „Modern und klar“, Arcade als Standard, Komfort 3.18,
+             verbindliche Klartext-Zugklassen und Amethyst #7A4FD6)
              + Bot-Eichung einbauen (geeichte Stärken, Skala der Wertung, gleicher Zug bei gleichem Seed)
    |
    v
 W0+          Fundament-Erweiterung: W0+a Spiel-Fundament, W0+b Schachuhr       (1 bis 2 Fundament-Agenten, nacheinander)
    |
    v
-S1           ERSTE SPIELIGE WELLE (9 Pakete parallel + Integration)          ca. 1 bis 2 Wochen bis zum iPad
+S1           ERSTE SPIELIGE WELLE + SCHUB 2b + KONTO LIGHT                  danach 5-Tage-Test
    |
    v
 TOR          Flo spielt mindestens 5 Tage auf dem iPad, Tester-Bericht, Nachjustieren
@@ -1707,7 +1714,7 @@ Hinweis für die Ausführung: Die Wellen S1 bis S4 setzen jeweils mehrere Agente
 bis zur spieligen Fassung auf dem iPad sind es also realistisch **3 bis 4 Wochen** (Mitte November 2026). Der größte
 Unsicherheitsfaktor ist nicht die Bauzeit, sondern das Nutzungslimit: Welle 0 und die Design-Werkstatt sind schon
 einmal daran abgebrochen. Deshalb läuft S1 in drei kleinen Schüben (6.3) statt mit zehn Agenten auf einmal.
-**W0+a braucht die Look-Wahl nicht** und kann direkt nach Welle 0 starten, während Flo wählt; der Premium-Umbau folgt
+**W0+a braucht die Look-Wahl nicht** und kann direkt nach Welle 0 starten, während der Premium-Umbau vorbereitet wird; dieser folgt
 danach (beide ändern `partie.js` und `board.js`, deshalb nacheinander, nicht gleichzeitig).
 Die **Eichung** wird eingebaut, sobald `eichung/konstruktion/VORSCHLAG.md` fertig ist. S1 wartet nicht darauf; ist
 sie bis S1 nicht drin, zeigt S1 **keine** Wertungszahl (Flo hat genau die zu hohe Schätzung bemängelt), der
@@ -1728,7 +1735,7 @@ ein Paket in fremden Dateien.
 | `js/storage.js` | `MODI` + `'boss'`, `'frei'`, `'spiel'`; Datensatz neu `tempo`, `seed`, `zeiten`, `boss`, `liga`; `MODUL_BUDGET` neu (6.6); `MAX_REVIEWS` 20 → 12; beim Start `navigator.storage.persist()` anfragen | alle |
 | `js/ereignisse.js` | `funken:gebucht { quelle, menge, gesamt, level }`, `level:aufstieg { level, titel, neu }`, `tag:gezaehlt { tag, quelle, serie, kapitel }`, `raetsel:geloest { id, richtig, versuch, quelle, wertung }`, `lektion:beendet { id, ringe }`, `boss:treffer { laufId, ply, vorher, nachher }`, `boss:siegel { bossId, stufe, woche }`, `rekord:neu { tafel, wert, vorher, platz }`, `uhr:knapp { laufId, rest }` | Funken, Serie, Tafeln, Boss, Medaillen |
 | `js/orte.js` | `arena:heute` (DOM, Heute-Karte; Reihenfolge Serie 10, Tagesrätsel 20, Boss 30, Tagesaufgaben 40, Rückenwind 50, Überhol-Kompass 60, Neu für dich 70), `partie:gegner-leiste` (DOM, über dem Gegner, für die Lebensleiste), `partie:matt` (Aufruf, für den Finisher), `bestenliste:reiter` (DOM), `training:karten` (DOM), `ich:vitrine` (DOM), `spielplan:tage` (DOM); dazu **`ergebnis:abrechnung`** (DOM, Zeilen-Ort in einer kleinen Abrechnungs-Hülle, die W0+a selbst an `ergebnis:karte` Reihenfolge 3 hängt; Reihenfolge Punkte 10, Funken 20, Wertung 30, Serie 40; die Hülle rollt die Zeilen im Abstand von 200 ms ein). Sonst müssten vier Pakete gemeinsam an einer Karte bauen | Heute-Karte, Boss, Finisher, Bestenliste, Training, Ich, Abrechnung |
-| `js/app.js` | `SCREENS` + `bestenliste`, `raetsel`, `lernen`, `lektion`, `ich`, `spielplan`, `spielhalle` (ohne Datei still zur Arena, wie bei Welle 0); untere Leiste mit 4 Reitern (Optik aus dem Premium-Umbau) | Screens der Pakete |
+| `js/app.js` | `SCREENS` + `bestenliste`, `raetsel`, `lernen`, `lektion`, `ich`, `spielplan`, `spielhalle` (ohne Datei still zur Arena, wie bei Welle 0); Reiter-Leiste auf dem iPad quer oben, sonst unten (Optik aus dem Premium-Umbau) | Screens der Pakete |
 | `js/ui/partie.js` | Matt-Hook: nach `partie:beendet` und vor dem Overlay wartet die Partie auf den Aufruf-Ort `partie:matt` (höchstens 1,8 s, Tipp überspringt, Speichern ist dann schon passiert); Ort `partie:gegner-leiste`; Modus `boss` (keine Sterne, Kopf mit Boss-Name, Bühne `boss`); Einstellungen Zählwerk und Funkenlinie als Bühnen-Zugriff | Finisher, Boss |
 | `js/bots.js` | `registriereBot(profil)` (Bosse: Porträt, Satzbuch, Stärke, Regel, Startstellung); `botZug(…, { zufall, nodes, vorliebe })`: Vorliebe wählt nur unter Zügen, die höchstens 0,3 Bauern schlechter sind als der beste (Stil-Bosse, Sparring); `nodes` statt `movetime` für prüfbare Partien (ein Thread, Seed im Datensatz), **mit der Eichung abstimmen**, geprüft in S3-0 | Boss, Codes, Bot-Läufe |
 | `js/feier.js` | Quellen und Prioritäten aus 3.10 | alle |
@@ -1750,10 +1757,11 @@ seiner Liste „Funktionen zuerst“). Bis S2-4 die Blitz-Wertung bringt, werten
 
 ### 6.3 S1: die erste spielige Welle (Ziel: nach 1 bis 2 Wochen spürbar ein Spiel auf dem iPad)
 
-Für Flos 5-Tage-Test höchstens etwa zehn neue Dinge, und zwar genau die, die er an den ersten Abenden sehen soll:
-Funken mit Abrechnung, Level-Aufstieg, Wertung und Spielklasse, Bot-Tafeln, Bauernmarsch, Tagesrätsel, Wochen-Boss,
-Finisher, Zweite Chance, Sicherung, dazu (Lektorat) eine **kleine Lektions-Probe**, weil „Übungen und Lektionen“
-einer von Flos zwei Hauptwünschen ist und sonst erst nach dem Test käme. Die Schachuhr kommt schon mit W0+b.
+Vor Flos 5-Tage-Test stehen die Kernsysteme und die ausdrücklich vorgezogenen Teile bereit: Funken mit Abrechnung,
+Level-Aufstieg, Wertung und Spielklasse, Bot-Tafeln, Bauernmarsch, Wochen-Boss, Finisher, Zweite Chance und Sicherung;
+zusätzlich Konto light per Supabase-E-Mail-Code nur für den Besitzer, Rätsel ohne Tageslimit, zwei vorbereitete
+Kauf-Finisher, Figurensätze zum Anprobieren sowie ehrliche Vorschau-Karten für Liga und Coaches. Dazu kommt eine
+kleine Lektions-Probe. Die Schachuhr kommt schon mit W0+b.
 
 | Paket | Inhalt | Größe | hängt ab von | nutzt (Welle 0) | braucht neu (W0+) |
 |---|---|---|---|---|---|
@@ -1778,9 +1786,12 @@ einer von Flos zwei Hauptwünschen ist und sonst erst nach dem Test käme. Die S
    genannt hat): aus S3-5 das Emote-Rad und der Schnell-Chat mit Bot-Antworten (Abklingzeit, stumm schalten) und
    Banner mit Zeichen; aus S2-5 der Siegeslauf mit Flamme am Namen ab 3 Siegen gegen ungefähr gleich starke Gegner
    (Regel 7 in `ENTSCHEIDUNGEN.md`); aus S4-7 die Werkstatt-Vorschau (Designs, Finisher, Banner, Emotes mit Anprobe,
-   Kaufknopf „bald verfügbar“, in der Testphase alles freispielbar, keine Preise im Repo). Was diese Pakete aus S2 bis
-   S4 sonst noch enthalten, bleibt in ihrer Welle.
-3. **Schub 3:** Integration mit Gesamtprobe.
+   Kaufknopf „bald verfügbar“, zwei Kauf-Finisher und Figurensätze zum Anprobieren). Besitzerpreise werden aus dem
+   Konto geladen; alle anderen sehen „Preis folgt“, und im Repo stehen keine Preise. Ebenfalls vor dem Test kommen
+   Konto light (nur Besitzer), Rätsel ohne Tageslimit sowie ehrliche Vorschau-Karten für Liga und Coaches. Was diese
+   Pakete aus S2 bis S4 sonst noch enthalten, bleibt in ihrer Welle.
+3. **Schub 3:** Integration mit Gesamtprobe. Claude merged jeden geprüften Schritt selbst, aber nur bei grünen Tests;
+   es gibt keinen einzigen Sammel-PR am Ende.
 Jeder Schub hat 4 bis 5 Pakete der Größe S bis M. Mit Flos Test-Rückmeldung dazwischen sind 1 bis 2 Wochen realistisch;
 wenn das Nutzungslimit greift, wird Schub 2 geteilt, nicht gestrichen.
 
@@ -1804,9 +1815,9 @@ Feier-Zeilen, Texte). Sonst wird zuerst nachjustiert (Funken-Werte, Lautstärken
 |---|---|---|---|---|---|
 | **S2 Training und Rhythmus** | S2-1 Kartei und Trainingsstapel | BAUPLAN 1C plus gemeinsamer Stapel mit Deckel 10 | M | S1 | `partie:analysiert`, `training:geloest`, `training:stand`, Screen `training` (W0), `training:karten` |
 | | S2-2 Rätsel-Grundpool und Treppenlauf | 4.000 Rätsel aus der Fabrik, Treppenlauf ohne Leben, Wochen-Treppe, Rätsel-Blick, Rätsel-Tafeln | M | S1-5 | Screen `raetsel`, `inhalte.js`, `raetsel:geloest`, `rekord:neu` |
-| | S2-3 Lernpfad-Rahmen (als erstes Paket von S2) | die übrigen 6 Aufgabentypen im Lektions-Spieler aus S1-10, Ring „Gemeistert“, Einstiegsprüfung, Prüfwerkzeug `werkzeuge/pruefe-lektionen.mjs`, **Einheit 1 und 5** (96 Aufgaben, die Probe-Lektionen gehen in Einheit 4 und 5 auf), Prüfung beim Lehrmeister | L | S1, S1-10 | Screens `lernen`, `lektion`; Partie mit `startFen`, `modus: 'uebung'`, `ziel`; `lektion:beendet` |
+| | S2-3 Lernpfad-Rahmen (als erstes Paket von S2) | die übrigen 6 Aufgabentypen im Lektions-Spieler aus S1-10, Ring „Gemeistert“, Einstiegsprüfung, Prüfwerkzeug `werkzeuge/pruefe-lektionen.mjs`, **Einheit 1 und 4** (96 Aufgaben); **VORSCHLAG:** alle Probe-Lektionen gehen in der kostenlosen Einheit 4 auf, nicht in der Abo-Einheit 5; Prüfung beim Lehrmeister | L | S1, S1-10 | Screens `lernen`, `lektion`; Partie mit `startFen`, `modus: 'uebung'`, `ziel`; `lektion:beendet` |
 | | S2-4 Uhr-Partien und Zu zweit | Uhr-Tafeln, Zeitfresser-Analyse, Blitz-Wertung, Finisher Fahnenfall, Modus „Zu zweit am Brett“ (die einfache Tempo-Wahl gibt es schon seit W0+b) | S bis M | W0+b | `arena:panel-bot`, `analyse:oben`, `uhr:knapp` |
-| | S2-5 Siegeslauf und Medaillen | Lorbeer, Rekord, 20 Medaillen (soweit Daten da sind), Vitrine | M | S1 | `partie:beendet`, Feier `siegeslauf`, `medaille`, `ich:vitrine` |
+| | S2-5 Siegeslauf und Medaillen | Flamme ab 3 Siegen, Rekord, 20 Medaillen (soweit Daten da sind), Vitrine | M | S1 | `partie:beendet`, Feier `siegeslauf`, `medaille`, `ich:vitrine` |
 | | S2-6 Serie, Ausbau | Pause ansagen, Wochen-Ring, Beweis-Karte, Tag 66, Spieltage-Wahl, Urkunde als Canvas-Bild | S | S1-4 | Modul `alltag` |
 | | S2-7 Erste 5 Minuten und Entdeckung | Start-Bildschirm, Einstufung, Erste-Schritte-Liste, Entdeckungs-Fahrplan | S bis M | S1 | `app:erster-screen?`, Screen `start` (W0), `arena:heute` (70) |
 | | S2-8 Ruhe und Vertrauen | „zählt · frei“, Ruhige Partie, Zahlen, die sich selbst erklären („Offene Karten“), „Warum geht das nicht?“ (3.18) und Regel-Überraschungen (en passant mit Augenzwinkern), Kühler Kopf (Pause nach 2 Niederlagen als Angebot), Plateau-Lupe (3.4) | M | S1 | Modus `frei`, `analyse:coach`, `ergebnis:karte`, `zug:abgelehnt` (W0+a) |
@@ -1816,7 +1827,7 @@ Feier-Zeilen, Texte). Sonst wird zuerst nachjustiert (Funken-Werte, Lautstärken
 | | S3-2 Vereinsmeisterschaft | Rundenturnier mit Berger-Tabelle, echte Bot-Partien (`werkzeuge/liga-saisons.mjs`, 12 Saisons ca. 55 KB), Tabelle, Kreuztabelle, Turnierleiter-Sätze, Wimpel, Chronik | L | S3-0, Eichung | Bestenliste-Reiter Liga, `arena:heute` (Runde offen), Feier `liga`, `liga-saison` |
 | | S3-3 Codes und Freunde | `SA1`-Format, drei Prüfstufen, Freunde in den Tafeln, Überhol-Post, Boss-Karte mit Nachrechnen | L | S3-0, S1-3 | Screen für „Code einfügen“, `bestenliste:reiter` |
 | | S3-4 Spielhalle | Vorgabe-Leiter mit Tiefgang, Stockfisch-Sturm, Spielhalle-Karte | M | S1 | Modus `spiel`, Screen `spielhalle` |
-| | S3-5 Ausdruck | Spielerkarte mit Beweis-Zählern, Banner mit Zeichen, Emote-Rad mit Bot-Antworten, Ehrentitel, Vitrine mit Matt-Atlas, Duell-Intro vor Boss und Liga; BAUPLAN 2B Bots mit Gedächtnis | M bis L | S1, S2-5 | `partie:begruessung?`, `registriereSaetze`, `ich:vitrine` |
+| | S3-5 Ausdruck | Spielerkarte mit Beweis-Zählern, Banner mit Zeichen, Emote-Rad mit Bot-Antworten, Ehrentitel, Vitrine mit Matt-Atlas, Duell-Intro vor besonderen Partien (Boss, Liga und erste Partie gegen einen Bot), sonst Kurzfassung; BAUPLAN 2B Bots mit Gedächtnis | M bis L | S1, S2-5 | `partie:begruessung?`, `registriereSaetze`, `ich:vitrine` |
 | | S3-6 Saison-Weg und Katalog | Saison-Weg (20 Stationen à 400 Funken, kein Ablauf, Archiv), Katalog Level 31 bis 50 | M | S1-1 | `funken:gebucht` |
 | | S3-7 Wochen-Fünfkampf und Überhol-Kompass | Fünfkampf gegen das Vor-Ich, Kompass-Zeile | S | S1-2, S1-3 | `arena:heute` (60), Bestenliste |
 | | S3-8 Glanzmomente | 12 benannte Momente mit sicherer Erkennung als Kür der Punkte | M | S1-3 | `zug:bewertet`, `partie:analysiert` |
@@ -1826,16 +1837,16 @@ Feier-Zeilen, Texte). Sonst wird zuerst nachjustiert (Funken-Werte, Lautstärken
 | | S4-4 Ich gegen Ich | Entscheidungs-Duell gegen das eigene frühere Ich (Stellungen frühestens 28 Tage alt) | M | S1 | Modul `profil` |
 | | S4-5 Lernpfad Ausbau | Einheiten 2, 3, 4, 6 bis 10 (je ca. 1 bis 2 Abende plus Prüfung) | L, verteilt | S2-3 | |
 | | S4-6 Sparring nach Maß, Code-Duell | Bot mit offenem Auftrag in deine schwache Phase; Duell gegen Freunde per Code ohne Server | M + M | Eichung, `vorliebe`, S3-3 | |
-| | S4-7 Zeit-Rausch und Werkstatt-Vorschau | Zeit-Rausch; Katalog mit Anprobe ohne Kaufknopf, lokaler Anprobe-Zähler | S bis M | S3-4, S3-5 | Modus `spiel` |
+| | S4-7 Zeit-Rausch und Werkstatt-Ausbau | Zeit-Rausch; Ausbau des schon vor dem Test vorhandenen Katalogs und Anprobe-Zählers | S bis M | S3-4, S3-5 | Modus `spiel` |
 | | S4-8 Rätsel-Modi | „Gibt's hier was?“ (10 Stellungen je Runde: 6 Taktiken, 2 ruhige Stellungen, 2 Köder, am PC vorberechnet, ca. 3.000 Stellungen, 200 KB), Kreistraining (30 bis 120 Rätsel in Runden, „Kreis geschlossen“-Stempel), Zwei-Züge-Probe, Rätsel aus deinem Repertoire (Eröffnungs-Einträge der Lichess-Rätsel, `openings.js`) | M + M | S2-2, Rätsel-Fabrik | Screen `raetsel`, `inhalte.js`, `raetsel:geloest`, `rekord:neu` |
 
 ### 6.5 Phase 2 in Etappen (nach der Online-Recherche, Startbedingungen in `GESCHAEFT.md`)
 
 | Etappe | Inhalt | Startbedingung |
 |---|---|---|
-| **2a Store, Konto, Abo, Freunde** | Capacitor-Hülle (iOS, Android) neben der Web-App; eigene Zugklassen-Namen und Brillant-Farbe spätestens jetzt (falls nicht schon im Premium-Umbau); Konto mit Apple und Google (Gast bleibt), Cloud-Sicherung (IndexedDB-Umbau), Konto löschen; Abo mit Coaches (Berechtigungs-Dienst); Server in Deutschland; Link-Duell live und Brief-Duell (ungewertet oder unter Freunden); Engine-Schloss; Schnell-Chat und Emotes unter Freunden; Melden, Blockieren, Prüfpult; Sammelbrief; Not-Aus | Phase 1 stabil, S1 bis S3 fertig; **für das Abo zusätzlich S4-1 (Coaches) und S2-3 (Lernpfad-Rahmen)**, denn ohne sie hätte das Abo nichts, was es trägt (Lektorat: vorher fehlte diese Bedingung) |
+| **2a Freunde** | Direkt nach dem 5-Tage-Test: E-Mail-Code-Konto über Supabase (Google später), Benutzername mit Filter, Freunde per Name oder Einladungslink, Partien mit Schnell-Chat und Emotes, Melden und Stummschalten; noch keine Fremden und keine offene Wertung | 5-Tage-Test abgeschlossen und nachjustiert |
 | **2b Offene Arena** | Online-Wertung (Glicko-2 mit ±), Vertrauensstufen mit offener Probezeit, Fair-Play-Wache, Lückenfüller-Bots mit Schild, Arena-Stunde (feste Zeitfenster), Revanche mit Bilanz, Duplikat-Duell weltweit | in den Zeitfenstern regelmäßig mehr als 20 gleichzeitig |
-| **2c Sichtbare Kosmetik und Werkstatt** | Kosmetik-Belege serverseitig geprüft, Werkstatt mit Euro-Preisen, Anprobe, Kauf-Bremse und Ausgabenbuch, Finisher, Banner, Rahmen und Zugspur für den Gegner sichtbar (mit Verlierer-Schutz); Welt-Tafeln für Prüfbares mit Nachbarschafts-Ansicht | 2b läuft 4 Wochen ohne große Fair-Play-Last |
+| **2c Sichtbare Kosmetik und Werkstatt** | Kosmetik-Belege serverseitig geprüft; Besitzerpreise aus dem Konto, für andere „Preis folgt“; Anprobe, Kauf-Bremse und Ausgabenbuch; Finisher, Banner, Rahmen und Zugspur für den Gegner sichtbar (mit Verlierer-Schutz); Welt-Tafeln für Prüfbares | 2b läuft 4 Wochen ohne große Fair-Play-Last |
 | **2d Ligen** | Wochen-Kreise ohne Abstieg, Tribüne für Freunde, positive Rückmeldung zwischen Spielern | genug verlässliche Spieler für volle Gruppen |
 
 ### 6.6 Speicher und Inhalte
@@ -1915,7 +1926,7 @@ und kommt nie in die App.
 | Arena-Stunde als einzige Live-Suche | Spätabendspieler fänden niemanden | Zeitfenster plus Freundes- und Brief-Duelle |
 | Stammtisch (Haus-Liga): bis zu 6 Profile auf einem iPad mit gemeinsamer Tafel (3.13) | braucht Speicher je Profil, der heutige Browser-Speicher reicht nicht | nach dem IndexedDB-Umbau, vor Phase 2a |
 | Meisterpartien zum Mitraten (eine gemeinfreie Meisterpartie Zug für Zug erraten, Punkte für Züge nahe am Meisterzug) | klassische, beliebte Trainingsform, aber eigener Bildschirm und Inhaltspflege | S4 als Kandidat fürs Abo |
-| Schutzengel (Warnung vor einem groben Patzer, bevor der Zug gilt, mit Abbau-Plan) | hilft Anfängern, verfälscht aber jede Partie; zählt deshalb immer als Hilfe | nach S4, als freiwillige Trainingshilfe |
+| Schutzengel (Warnung vor einem groben „Weit daneben“-Zug, bevor der Zug gilt, mit Abbau-Plan) | hilft Anfängern, verfälscht aber jede Partie; zählt deshalb immer als Hilfe | nach S4, als freiwillige Trainingshilfe |
 
 ---
 
@@ -1933,7 +1944,7 @@ Suchergebnissen und ihren Adressen.
 | Tempo-Rätsel machen nach 14 Tagen zum Schnellschuss-Spieler; Rush endet nach 3 Fehlern (gehasst) | Treppenlauf ohne Leben, Ruhe zuerst, Rätsel-Blick nur aus Ruhe-Rätseln | 3.6 | https://saychess.substack.com/p/will-14-days-of-puzzle-rush-or-storm |
 | Rätsel mit mehreren Gewinnzügen, nur einer zählt | Auch-stark-Regel mit Stockfish im Gerät, halber Punkt für „gewinnt langsamer“ | 3.6 | https://lichess.org/forum/general-chess-discussion/puzzles-with-more-than-one-good-solution |
 | Lichess „Learn from your mistakes“: selbst finden statt vorgesagt | Zweite Chance „Ab hier nochmal“, Lösung erst nach dem eigenen Versuch | 3.5 | https://lichess.org/blog/WFvLpiQAACMA8e9D/learn-from-your-mistakes |
-| Aimchess und Noctie: Training aus den eigenen Fehlern (geliebt), aber Konto, Import, Bezahlgrenzen | Patzer-Kartei, Heimbringer, Coach-Mappe, offline und ohne Konto | 3.5, 2b.5 | https://www.stork.ai/en/aimchess |
+| Aimchess und Noctie: Training aus den eigenen Fehlern (geliebt), aber Konto, Import, Bezahlgrenzen | Fehler-Kartei, Heimbringer, Coach-Mappe, offline und ohne Konto | 3.5, 2b.5 | https://www.stork.ai/en/aimchess |
 | Maia: menschenähnliche Bots, in der ersten Woche über 40.000-mal gespielt | Eichung an 10.666 echten Partien, Beipackzettel mit gemessener Stärke | 3.12 | https://www.engadget.com/chess-ai-maia-microsoft-cornell-university-of-toronto-164500790.html |
 | Häufigste Bot-Klage: „Bots 500 bis 1000 schlage ich leicht, Menschen mit 400 nicht“ | geeichte Stärken statt Etiketten, Lernzone-Band, Herausforderungs-Faktor auf geeichter Skala | 3.3, 3.12 | https://chess.com/forum/view/general/why-am-i-able-to-easily-beat-500-1000-bots-easily-but-400-elo-players-are-much-harder |
 | Ein Konkurrent wirbt mit „geeichten“ Bots, legt aber nichts offen | Beipackzettel mit Messgrundlage, Fehlerprofil und Änderungsprotokoll | 3.12 | https://chessiverse.com/compare/chess-bot-rating-accuracy |
@@ -1953,7 +1964,7 @@ Suchergebnissen und ihren Adressen.
 | Kauf stornieren, solange das Stück nicht getragen wurde | Anprobe eine ganze Partie lang vor dem Kauf | 2b.4 | https://www.fortnite.com/cancel-purchase |
 | Sammlung von 24 Event-Teilen für eine Sonder-Belohnung (Aufschrei) | keine Sammel-Belohnung für den Kauf aller Teile | 2b.4 | https://pcgamer.com/apex-legends-heirloom-items |
 | Pass ohne Ablaufdatum gelobt, zu langsamer Fortschritt kritisiert | Saison-Weg ohne Ablauf, 8.000 Funken (in 3 bis 8 Wochen schaffbar) | 2.2, 6.4 | https://www.techradar.com/news/halo-infinite-multiplayer-reveal-was-a-massive-win-for-343-industries-and-players-alike |
-| Ein Sieg nach zwei Siegen in Folge schaltet in Lichess-Arenen eine Flamme an | Siegeslauf mit Lorbeer, nur gegen Augenhöhe, ohne Bonus in der Wertung | 3.15 | https://lichess.org/tournament/help |
+| Ein Sieg nach zwei Siegen in Folge schaltet in Lichess-Arenen eine Flamme an | Siegeslauf mit Flamme ab 3 Siegen, nur gegen Augenhöhe, ohne Bonus in der Wertung | 3.15 | https://lichess.org/tournament/help |
 | Serien-Bonus wird in den oberen Rängen abgeschaltet, damit er die Spitze nicht verzerrt | Siegeslauf zählt nur gegen ungefähr gleich starke Gegner | 3.15 | https://hearthstone.wiki.gg/wiki/Ranked |
 | Liga ohne Abstieg, nur wenige Partien je Gegner und Tag zählen | Wochen-Kreise ohne Abstieg, höchstens 3 Partien je Gegner und Tag | 3.13 | https://support.chess.com/article/2813-what-are-leagues-how-do-i-join-one |
 | XP- und Liga-Jagd ohne Lernen („lernte null“) | Funken nur für Qualität, Liga zählt die besten Partien statt der meisten | 3.2, 3.13 | https://www.pcworld.com/article/2924235/duolingo-got-easier-when-i-paid-for-it-that-was-the-problem.html |
@@ -1984,7 +1995,7 @@ Suchergebnissen und ihren Adressen.
 | Lichess schließt Bots von Pools und Ranglisten aus | Lückenfüller-Bots nur mit Schild und nie in Menschen-Ranglisten | 2b.7 | https://ca.lichess.org/blog/WvDNticAAMu_mHKP/welcome-lichess-bots |
 | Fair Play im großen Maßstab, aber kaum erfolgreiche Einsprüche | Nachrechnen auf dem Server, Mensch vor jeder Sperre, Begründung und Einspruch | 2b.7 | https://www.chess.com/fair-play |
 | Lag-Ausgleich mit Kontingent statt Grenze je Zug | Partie-Raum mit fairer Uhr, Start ohne Bullet | 2b.7 | https://lichess.org/lag |
-| Community: Bots „spielen fast perfekt und patzen dann zufällig“; „1000er-Bots schlage ich, gegen 400er-Menschen verliere ich“ | Fehlerart der Bots im Beipackzettel, Messung der Patzer-Herkunft an die Eichung übergeben, Mechaniken nur auf gemessenen Abständen | 3.12 | https://talkchess.com/viewtopic.php?p=924136 · https://www.chess.com/forum/view/general/why-can-i-beat-1000-rated-bots-but-cannot-beat-400-rated-humans |
+| Community: Bots „spielen fast perfekt und patzen dann zufällig“; „1000er-Bots schlage ich, gegen 400er-Menschen verliere ich“ | Fehlerart der Bots im Beipackzettel, Messung der „Weit daneben“-Zug-Herkunft an die Eichung übergeben, Mechaniken nur auf gemessenen Abständen | 3.12 | https://talkchess.com/viewtopic.php?p=924136 · https://www.chess.com/forum/view/general/why-can-i-beat-1000-rated-bots-but-cannot-beat-400-rated-humans |
 | Gegen einen Weltmeister „in jedem Alter“ spielen ist beliebt, aber die Altersstufen springen zu stark in der Stärke | drei offen wählbare, gemessene Formstufen je Bot statt großer Sprünge | 3.12, 6.4 | https://openculture.com/2014/02/free-app-lets-you-play-chess-with-magnus-carlsen.html |
 | Fortschritt kommt in Schüben, lange Plateaus sind normal; viele hören auf, weil sie lange nichts merken | Plateau-Lupe zeigt Untermesser genau dann, wenn die Wertung steht | 3.4 | https://www.chess.com/blog/Armand_Spenser/the-elo-plateau-s · https://lichess.org/forum/lichess-feedback/discouraging-new-players |
 | Lob für Rätsel nach Eröffnung und Farbe; Ärger, dass man die Variante selbst suchen muss | Rätsel aus deinem Repertoire, automatisch aus deinen Partien, mit „Fallen für deine Seite“ | 3.6 | https://lichess.org/forum/lichess-feedback/puzzle-system-by-openings-filter-by-depth-of-starting-position |
@@ -1992,48 +2003,16 @@ Suchergebnissen und ihren Adressen.
 
 ---
 
-## 9. Offene Entscheidungen für Flo
+## 9. Offene Punkte und Vorschläge
 
-Alles andere folgt aus seinen Entscheidungen in `LAGE.md`. Das Lektorat hat die elf früheren Fragen zu zehn
-wichtigen (nach Dringlichkeit) und einer Liste kleinerer Punkte geordnet. Die Empfehlung steht jeweils zuerst.
+Die in `ENTSCHEIDUNGEN.md` festgelegten Punkte sind in diesem Konzept keine offenen Fragen mehr. Offen bleiben nur
+Punkte, zu denen die verbindliche Datei keine abschließende Vorgabe enthält:
 
-1. **Look A, B oder C** (blockiert den Premium-Umbau und damit S1). Empfehlung: nach Gefühl auf dem iPad wählen. Zur
-   Orientierung: Die Spielwelt dieses Konzepts (Tinte, Siegel, Banner aus Stoff, Holzklang, Feuer-Titel) passt am
-   natürlichsten zu B „Edel und echt“, funktioniert in A „Modern und klar“ und braucht in C „Verspielt und saftig“
-   buntere Fassungen der Stücke. Bis zur Wahl kann W0+a schon laufen (6.1).
-2. **Start und Umfang von S1:** die bisherigen 9 Pakete plus Lektions-Probe (S1-10), gebaut in drei Schüben mit je 4 bis
-   5 Agenten (braucht vorher dein OK nach der Agenten-Regel). Empfehlung: ja, mit Lektions-Probe, weil „Übungen und
-   Lektionen“ einer deiner zwei Hauptwünsche ist und sonst erst nach dem 5-Tage-Test käme.
-3. **Serie-Regel:** „Ein freier Tag ist nie schlimm, erst zwei hintereinander lassen die Serie ruhen“ statt 2
-   Schonungstagen im Monat? Empfehlung: ja; die Zahl heißt dann ehrlich „Schachtage in Serie“, und „Strenge Serie“ mit
-   Schonungstagen bleibt als Option.
-4. **Gratis und Abo:** ganze Leiter, Analyse, Kartei, Tagesrätsel und Rätsel ohne Tageslimit bleiben für alle frei;
-   das Abo bringt Coaches, Lernpfad-Einheiten 5 bis 10, Themen-Wahl und Spezial-Training. Empfehlung: ja. (Das
-   Gegenstück aus dem FAHRPLAN, Bots 5 bis 10 im Abo, nur als Plan B und nur für neue Spieler.)
-5. **Eichung und S1:** S1 wartet nicht auf die Eichung, zeigt ohne sie aber **keine** Wertungszahl (Funken-Faktor ×1)
-   statt einer Zahl, die du schon als zu hoch erkannt hast. Empfehlung: ja.
-6. **Alte Spielstände:** deine bisherigen Sterne und Siege werden einmalig als Funken gutgeschrieben (Beispiel: 6 Bots
-   und 14 Sterne ergeben Level 7), Wertung, Serie und Tafeln werden rückwirkend aufgebaut. Empfehlung: ja.
-7. **Zugklassen umbenennen und eigene Brillant-Farbe**, weil Namen und Türkis heute denen des größten Anbieters
-   gleichen; jetzt mit dem Premium-Umbau, vor S1, damit alle neuen Texte gleich die eigenen Namen tragen. Vorschlag:
-   Geniestreich (!!), Volltreffer (!), Bester Zug, Stark, Solide, Theorie, Ungenau, Fehler, Ausgelassen, Patzer,
-   Erzwungen. Empfehlung: ja.
-8. **Wochen-Boss:** zwei offen gewählte Stufen (Standard ungefähr deine Wertung, Meister +150), die Stärke gilt die
-   ganze Woche. Empfehlung: ja.
-9. **Namen:** „Funken“, Feuer-Titel von Funke bis Morgenstern, Spielklassen von Bauern- bis Königsklasse,
-   „Bauernmarsch“, „Siegeslauf“, „Rückenwind“, „Treppenlauf“, „Werkstatt“, dazu der App-Name. Empfehlung: die Namen
-   ja; den App-Namen erst vor Phase 2a mit Markenprüfung festlegen, bis dahin bleibt „Schach-Arena“ Arbeitstitel.
-10. **Wann online (Phase 2)?** Empfehlung: erst wenn S1 bis S3 laufen und für das Abo S2-3 und S4-1 fertig sind. Online
-    startet mit Freundes-Link und Brief-Duell, nicht mit offener Suche, weil bei wenigen Spielern sonst niemand da ist
-    (bei 1.000 aktiven Spielern sind im Mittel nur ca. 4 gleichzeitig online, 2b.7).
-
-**Kleinere Punkte** (Empfehlung jeweils zuerst):
-- Saison-Weg mit 6 Abo-Extras (Kosmetik, nicht einzeln käuflich) statt eines Wegs ganz ohne Abo-Teil: ja, kein
-  eigener Pass als dritter Geldweg.
-- Tageswerk-Partie ab 10 eigenen Zügen (statt 5 wie im BAUPLAN), damit eine früh aufgegebene Partie nicht zählt: ja.
-- Coaches Henrike, Mats und Yusuf mit den Rollen aus 2b.5: ja, Namen und Ton sind frei änderbar.
-- Finisher höchstens 1,8 s, online sieht der Gegner standardmäßig die Kurzfassung: ja.
-- Formstufen „locker · normal · in Topform“, falls die Eichung große Sprünge zwischen Nachbar-Bots lässt (gemessen
-  heute zwischen ca. +30 und ca. +290): ja, als Teil von S3-1; Sterne und Freischaltung bleiben an „normal“.
-- Stammtisch (Haus-Liga) nach dem IndexedDB-Umbau: ja, weil er im FAHRPLAN das Familien-Abo trägt.
-- Nach S1 das Tor mit 5 Tagen iPad, danach S2 mit dem Lernpfad als erstem Paket: ja.
+1. **OFFEN: Web-Verkauf vor dem Store entscheiden.** Käufe im Web sollen über einen Zahlungsanbieter laufen. Vor dem
+   Store-Bau sind Anbieter, Rechtsprüfung, Widerrufsablauf und die gemeinsame Berechtigungsverwaltung festzulegen.
+   Bis dahin bleibt der Kaufknopf „bald verfügbar“.
+2. **VORSCHLAG: Alle vier Probe-Lektionen in Einheit 4 einordnen.** Einheit 5 gehört zum Abo; eine Probe dort würde
+   die Gratis-/Abo-Grenze verwischen. Einheit 4 bleibt gratis und kann die vier Taktik-Proben geschlossen aufnehmen.
+3. **OFFEN: Online-Serverarchitektur nach dem Freunde-Start festlegen.** Supabase ist für Anmeldung und Cloud-Spielstand
+   entschieden. Ob Partie-Räume, Suche, Ranglisten und Fair-Play-Prüfung ebenfalls dort oder in einem getrennten
+   Dienst laufen, wird vor der offenen Arena entschieden.

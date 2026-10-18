@@ -2,7 +2,7 @@
 
 Schach gegen eine Leiter von zehn Bots, von **Bauer Benno** bis zum Endgegner **Der Stockfisch**.
 Jeder deiner Züge wird sofort bewertet wie bei chess.com: ein Symbol erscheint auf dem Brett
-(Brillant, Bester Zug, Ungenau, Patzer …) und der Coach sagt dir in einem Satz, was los war.
+(Genial, Präzise, Unscharf, Weit daneben …) und der Coach sagt dir in einem Satz, was los war.
 Nach der Partie gibt es eine Spielanalyse mit Genauigkeit, Bewertungskurve, Schlüsselmomenten
 und den besseren Zügen zum Durchklicken. Wer einen Bot besiegt, schaltet den nächsten frei.
 
@@ -40,7 +40,7 @@ Gut zu wissen:
 - Nach jedem deiner Züge erscheint das **Symbol** der Zug-Klasse am Zielfeld, das Feld leuchtet
   in der Klassenfarbe und der **Coach** erklärt den Zug. Bei einem Fehler zeigt er die Bewertung
   vorher und nachher (zum Beispiel „+3,3 → +2,7“) und mit **Besser?** den stärkeren Zug.
-- Drei sehr gute Züge in Folge (Bester Zug, Großartig oder Brillant) starten eine **COMBO**.
+- Drei sehr gute Züge in Folge (Präzise, Goldrichtig oder Genial) starten eine **COMBO**.
 - Knöpfe: **Hinweis** (1. Tippen markiert die Figur, 2. Tippen zeigt den Zug),
   **Zurücknehmen**, **Drehen**, **Aufgeben**. Hinweis und Zurücknehmen kosten den 3. Stern.
 - Über **Zurück** kannst du eine Partie pausieren und später in der Arena fortsetzen.
@@ -55,19 +55,19 @@ Gewinnchance.
 
 | Symbol | Klasse | Bedeutung |
 |---|---|---|
-| !! | **Brillant** | Bester oder fast bester Zug, bei dem du eine Figur opferst. Die Stellung bleibt danach gut und war vorher noch nicht entschieden. |
-| ! | **Großartig** | Der einzige gute Zug: Jeder andere Zug wäre mindestens 10 Punkte schlechter gewesen. |
-| ★ | **Bester Zug** | Genau der Zug, den auch Stockfish spielen würde (oder ein Zug, der wirklich gleich gut ist). |
-| ⌃⌃ | **Exzellent** | Fast so gut wie der beste Zug (höchstens 2 Punkte schlechter). |
-| ⌃ | **Gut** | Ein solider Zug (höchstens 5 Punkte schlechter). |
-| B | **Buchzug** | Ein bekannter Eröffnungszug aus der Eröffnungstabelle (nur in den ersten Zügen). |
-| ?! | **Ungenau** | Verschenkt etwas (bis 10 Punkte). |
-| ? | **Fehler** | Verschenkt deutlich (bis 20 Punkte). |
-| Ø | **Chance verpasst** | Der Bot hatte gerade einen Fehler gemacht und du hättest klar besser stehen können, hast die Chance aber liegen lassen. Auch ein ausgelassenes Matt in 1 bis 3 Zügen zählt so. |
-| ?? | **Patzer** | Ein schwerer Fehler (mehr als 20 Punkte). |
-| → | **Erzwungen** | Es gab nur einen einzigen erlaubten Zug. |
+| !! | **Genial** | Bester oder fast bester Zug, bei dem du eine Figur opferst. Die Stellung bleibt danach gut und war vorher noch nicht entschieden. |
+| ! | **Goldrichtig** | Der einzige gute Zug: Jeder andere Zug wäre mindestens 10 Punkte schlechter gewesen. |
+| ⊙ | **Präzise** | Genau der Zug, den auch Stockfish spielen würde (oder ein Zug, der wirklich gleich gut ist). |
+| ✓ | **Sauber** | Fast so gut wie der beste Zug (höchstens 2 Punkte schlechter). |
+| = | **Solide** | Ein solider Zug (höchstens 5 Punkte schlechter). |
+| ▮ | **Theorie** | Ein bekannter Eröffnungszug aus der Eröffnungstabelle (nur in den ersten Zügen). |
+| ?! | **Unscharf** | Verschenkt etwas (bis 10 Punkte). |
+| ? | **Daneben** | Verschenkt deutlich (bis 20 Punkte). |
+| 🎁 | **Verschenkt** | Der Bot hatte gerade einen Fehler gemacht und du hättest klar besser stehen können, hast die Chance aber liegen lassen. Auch ein ausgelassenes Matt in 1 bis 3 Zügen zählt so. |
+| ?? | **Weit daneben** | Ein schwerer Fehler (mehr als 20 Punkte). |
+| → | **Pflichtzug** | Es gab nur einen einzigen erlaubten Zug. |
 
-Ist eine Stellung schon klar gewonnen oder klar verloren, gibt es höchstens „Ungenau“, wie bei
+Ist eine Stellung schon klar gewonnen oder klar verloren, gibt es höchstens „Unscharf“, wie bei
 chess.com. Aus allen Zügen zusammen ergibt sich deine **Genauigkeit** (0 bis 100 %) und daraus
 eine Schätzung, wie stark du gespielt hast („spielte wie ≈ 1150“).
 
@@ -86,7 +86,7 @@ Partie holen:
 3. ★ **Sieg ohne Hinweis und ohne Zurücknehmen.**
 
 Besiegst du einen Bot, ist der **nächste Bot frei**. Insgesamt gibt es 30 Sterne. Deine
-brillanten Züge sammelt die **Schatzkiste** im Verlauf.
+genialen Züge sammelt die **Schatzkiste** im Verlauf.
 
 | Stufe | Bot | Elo |
 |---|---|---|

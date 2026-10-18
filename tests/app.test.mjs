@@ -18,13 +18,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8831);
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
+const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
 const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
 const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
@@ -282,7 +283,7 @@ async function testePartie(seite, h, fehler) {
   pruefe('Abzeichen am Brett auf e4', await seite.locator('.screen.partie .brett > .abzeichen-ort[data-feld="e4"]').count() === 1);
   pruefe('Zielfeld in Klassenfarbe lasiert', await seite.locator(`.screen.partie .lage.mark-k-${k0}`).count() === 1);
   const coach0 = await seite.locator('.screen.partie .coach .c-klasse').innerText();
-  pruefe('Coach zeigt die Klasse', /Buchzug/.test(coach0), coach0);
+  pruefe('Coach zeigt die Klasse', /Theorie/.test(coach0), coach0);
   pruefe('Coach mit role=status und aria-live', (await seite.locator('.coach[role="status"][aria-live="polite"]').count()) === 1);
   pruefe('Zugliste: Symbol an Flos Zug', await seite.locator('.zugliste .z.du .z-sym').count() >= 1);
 
@@ -2339,7 +2340,7 @@ async function testeSpielFundament(browser) {
     pruefe('Matt-Hook: ein Tipp vor dem Start des Finishers gilt auch (signal schon abgebrochen, Ergebnis ohne Warten)',
       r3.m.t > tippT && r3.m.schonAbgebrochen === true && r3.ende.abgebrochen === true && r3.overlayT - r3.m.t < 700, JSON.stringify({ ...r3, tippT }));
     pruefe('Matt-Hook: keine Konsolenfehler (drei Partien)', fehler.length === 0, fehler.join(' | '));
-    // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Bester Zug") kommt doch
+    // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Stärkster Zug") kommt doch
     await seite.goto(MIT_W0PLUS('wpmattnull') + '#arena');
     await seite.waitForSelector('.screen.arena');
     await schaeferBisMatt(seite, h);
@@ -2887,14 +2888,14 @@ async function testeViewport(browser, vp) {
   await bild(seite, `partie-${vp.name}`);
   await h.botAnhalten(false);
 
-  // Brillant-Moment
+  // Genial-Moment
   await h.starte({ botId: 'benno', farbe: 'w', startFen: BRILLANT });
   await h.botAnhalten(true);
   await h.warteFlo();
   await h.zugTippen('d5f6');
   const kb = await h.warteAbzeichen(0);
   await warte(330);
-  pruefe('Brillant erkannt (Sf6+!!)', kb === 'brillant', kb);
+  pruefe('Genial erkannt (Sf6+!!)', kb === 'brillant', kb);
   pruefe('Prisma-Rahmen, Welle, Funken', await seite.locator('.screen.partie .brett-rahmen.prisma').count() === 1
     && await seite.locator('.screen.partie .effekt-ort .welle').count() === 1 && await seite.locator('.screen.partie .effekt-ort .funken i').count() === 12);
   const wort = await seite.evaluate(() => {
@@ -2902,7 +2903,7 @@ async function testeViewport(browser, vp) {
     const st = getComputedStyle(el);
     return { text: el.textContent, farbe: st.color, clip: st.webkitBackgroundClip || st.backgroundClip };
   });
-  pruefe('Klassenwort vollfarbig (keine Verlaufsschrift)', wort.text === 'Brillant!' && wort.clip !== 'text' && wort.farbe !== 'rgba(0, 0, 0, 0)', JSON.stringify(wort));
+  pruefe('Klassenwort vollfarbig (keine Verlaufsschrift)', wort.text === 'Genial!' && wort.clip !== 'text' && wort.farbe !== 'rgba(0, 0, 0, 0)', JSON.stringify(wort));
   await bild(seite, `brillant-${vp.name}`);
   await h.botAnhalten(false);
 
@@ -2946,8 +2947,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const NUR = NUR_PRUEFRUNDE || NUR_ERWEITERUNGEN || NUR_NACHPRUEFUNG || NUR_SPIEL;
   if (!NUR) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });

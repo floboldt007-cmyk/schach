@@ -210,6 +210,9 @@ export async function wendeThemaAn({ thema, modus } = {}) {
     const r = document.documentElement;
     r.dataset.thema = t.id;
     r.dataset.modus = m;
+    // Der Seitengrund folgt sofort. Das verhindert beim Umschalten einen hellen Einzelbild-Rest,
+    // den WebKit und Chromium bei laufenden Hintergrund-Uebergaengen gelegentlich behalten.
+    if (document.body) document.body.style.backgroundColor = t.metaFarbe[aufgeloesterModus()];
     setzeFedern(t.federn);
     schreibeMeta();
     beobachteSystem();

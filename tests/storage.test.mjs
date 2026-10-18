@@ -55,8 +55,11 @@ function partie(teil) {
 let s = fakeSpeicher();
 setzeSpeicher(s);
 pruefe('Einstellungen: Standard', JSON.stringify(ladeEinstellungen()) === JSON.stringify(STANDARD_EINSTELLUNGEN));
+pruefe('Vorzüge: bei alten Speicherständen standardmäßig an', ladeEinstellungen().vorzuege === true);
 speichereEinstellungen({ klang: false, brett: 'holz' });
 pruefe('Einstellungen: speichern + mischen', ladeEinstellungen().klang === false && ladeEinstellungen().brett === 'holz' && ladeEinstellungen().balken === true);
+speichereEinstellungen({ vorzuege: false });
+pruefe('Vorzüge: erlaubter boolescher Wert bleibt gespeichert', ladeEinstellungen().vorzuege === false);
 s.setItem('schach-arena:v1:einstellungen', '{kaputt');
 pruefe('Einstellungen: kaputtes JSON -> Standard', ladeEinstellungen().klang === true);
 s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'lila', klang: 'ja', tiefe: 99 }));

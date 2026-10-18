@@ -103,23 +103,25 @@
 .brett .lage.mark-hinweis { background: var(--b-hinweis); }
 .brett .lage.mark-auswahl { background: var(--b-auswahl); }
 .brett .lage.mark-zuletzt { background: var(--b-zuletzt); }
-.brett .lage.mark-fehler { background: var(--schlecht, #e5675e); opacity: .5; }
+.brett .lage.mark-fehler { background: var(--schlecht, #e5675e); opacity: .45; }
 .brett .lage.mark-gut { background: var(--gut, #46cf7e); opacity: .45; }
+.brett .lage.mark-vorzug-start { background: var(--vorzug-start); }
+.brett .lage.mark-vorzug-ziel { background: var(--vorzug-ziel); }
 .brett .lage.mark-bewertung {
   box-shadow: inset 0 0 0 max(3px, .55cqw) var(--akzent, #ffc83d);
   animation: brett-puls 1s ease-in-out infinite;
 }
-.brett .lage.mark-k-brillant { background: var(--k-brillant, #14b8c8); opacity: .5; }
-.brett .lage.mark-k-stark { background: var(--k-stark, #4f7bf7); opacity: .5; }
-.brett .lage.mark-k-bester { background: var(--k-bester, #2db45d); opacity: .5; }
-.brett .lage.mark-k-exzellent { background: var(--k-exzellent, #7cc242); opacity: .5; }
-.brett .lage.mark-k-gut { background: var(--k-gut, #97ad7b); opacity: .5; }
-.brett .lage.mark-k-buch { background: var(--k-buch, #c38d5e); opacity: .5; }
-.brett .lage.mark-k-ungenau { background: var(--k-ungenau, #e9b21b); opacity: .5; }
-.brett .lage.mark-k-fehler { background: var(--k-fehler, #ff8b2c); opacity: .5; }
-.brett .lage.mark-k-verpasst { background: var(--k-verpasst, #b266ea); opacity: .5; }
-.brett .lage.mark-k-patzer { background: var(--k-patzer, #f0474b); opacity: .5; }
-.brett .lage.mark-k-erzwungen { background: var(--k-erzwungen, #8a93a8); opacity: .5; }
+.brett .lage.mark-k-brillant { background: var(--k-brillant, #7A4FD6); opacity: .45; }
+.brett .lage.mark-k-stark { background: var(--k-stark, #2F67D8); opacity: .45; }
+.brett .lage.mark-k-bester { background: var(--k-bester, #14936A); opacity: .45; }
+.brett .lage.mark-k-exzellent { background: var(--k-exzellent, #5E9C4E); opacity: .45; }
+.brett .lage.mark-k-gut { background: var(--k-gut, #7F928A); opacity: .45; }
+.brett .lage.mark-k-buch { background: var(--k-buch, #A07A52); opacity: .45; }
+.brett .lage.mark-k-ungenau { background: var(--k-ungenau, #D6A21C); opacity: .45; }
+.brett .lage.mark-k-fehler { background: var(--k-fehler, #DD7A2A); opacity: .45; }
+.brett .lage.mark-k-verpasst { background: var(--k-verpasst, #B4468F); opacity: .45; }
+.brett .lage.mark-k-patzer { background: var(--k-patzer, #BC2A4C); opacity: .45; }
+.brett .lage.mark-k-erzwungen { background: var(--k-erzwungen, #878E9E); opacity: .45; }
 
 /* ---------- Figuren ---------- */
 .brett > .figur {
@@ -140,6 +142,7 @@
 .brett > .figur.gezogen {
   z-index: 9;
   transition: none;
+  transform-origin: 50% 50%;
   will-change: transform;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
 }

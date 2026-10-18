@@ -12,13 +12,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8832);
 const BASIS = `http://127.0.0.1:${PORT}/tests/screens.html`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design/app-shots'));
+const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design/app-shots'));
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 
 const VIEWPORTS = [
@@ -153,7 +154,7 @@ async function testeDaten(browser) {
   const t0 = Date.now();
   const d = await legeDatenAn(seite);
   pruefe('Opernpartie (mit Review) und Bot-Partie (ohne) angelegt', d.oper && d.bot && d.botAnzahl > 4, JSON.stringify(d));
-  pruefe('Opernpartie hat einen Brillant-Zug für die Schatzkiste', d.brillant >= 1, String(d.brillant));
+  pruefe('Opernpartie hat einen Genial-Zug für die Schatzkiste', d.brillant >= 1, String(d.brillant));
   console.log(`     (Testdaten in ${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   SPEICHER = await kontext.storageState();
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -270,7 +271,7 @@ async function testeAnalyse(browser, d) {
   const besterPlies = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege
     .filter((z) => z.farbe === 'w' && z.klasse === 'bester').map((z) => z.ply), d.oper);
   await seite.click('.an-kl[data-klasse="bester"]');
-  pruefe('Klasse "Bester Zug": erster eigener', (await aktuellerPly(seite)) === besterPlies[0], `${await aktuellerPly(seite)} vs ${besterPlies[0]}`);
+  pruefe('Klasse "Stärkster Zug": erster eigener', (await aktuellerPly(seite)) === besterPlies[0], `${await aktuellerPly(seite)} vs ${besterPlies[0]}`);
   await seite.click('.an-kl[data-klasse="bester"]');
   pruefe('Nochmal antippen: der nächste', (await aktuellerPly(seite)) === besterPlies[1], `${await aktuellerPly(seite)} vs ${besterPlies[1]}`);
   const kl = await seite.locator('.an-coach').getAttribute('data-klasse');
@@ -295,7 +296,7 @@ async function testeAnalyse(browser, d) {
   const pfeil = await seite.evaluate(() => [...document.querySelectorAll('.an-brett .pfeil')].map((g) => g.dataset.von + g.dataset.nach));
   pruefe('Pfeil des besten Zugs', pfeil.includes(mitAnderemBesten.von + mitAnderemBesten.nach), pfeil.join(','));
   const linie = await seite.locator('.an-c-linie').textContent();
-  pruefe('Zeile "Bester Zug +x,y · Züge"', /Bester Zug\s+[+−]\d+,\d/.test(linie) && /[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
+  pruefe('Zeile "Stärkster Zug +x,y · Züge"', /Stärkster Zug\s+[+−]\d+,\d/.test(linie) && /[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
   const evalChip = await seite.locator('.an-c-eval').textContent();
   pruefe('Bewertungs-Chip', /[+−]?\d+,\d|M\d/.test(evalChip), evalChip);
   await bild(seite, 'analyse-bester-zug');
@@ -424,7 +425,7 @@ async function testePruefrunde(browser, d) {
   pruefe('Rochade: kein O-O in gespeicherten Coach-Texten', await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege
     .every((x) => !/O-O/.test(x.coach) && !/O-O/.test(x.besterZugSanDe || '') && !(x.besteLinieSan || []).some((t) => /O-O/.test(t))), d.oper));
 
-  // Brillant-Karte: deckende Flaeche unter der Toenung (Kontrast des Klassenworts)
+  // Genial-Karte: deckende Flaeche unter der Toenung (Kontrast des Klassenworts)
   const brillant = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.klasse === 'brillant'), d.oper);
   if (brillant) {
     await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${brillant.ply}`);
@@ -438,7 +439,7 @@ async function testePruefrunde(browser, d) {
       probe.remove();
       return { bild: getComputedStyle(el).backgroundImage, flaeche };
     });
-    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /^rgb\(/.test(bg.flaeche) && bg.bild.includes(`linear-gradient(${bg.flaeche}, ${bg.flaeche})`),
+    pruefe('Genial-Karte: deckende Fläche unter dem Verlauf', /^rgb\(/.test(bg.flaeche) && bg.bild.includes(`linear-gradient(${bg.flaeche}, ${bg.flaeche})`),
       JSON.stringify(bg).slice(0, 200));
   }
 
@@ -478,8 +479,8 @@ async function testeTouch(browser, d) {
   await seite.touchscreen.tap(kl.x + kl.width / 2, kl.y + kl.height / 2);
   await warte(500);
   const z = await seite.locator('.an-coach').getAttribute('data-klasse');
-  pruefe('Klassen-Zeile mit dem Finger: Brillant', z === 'brillant', z);
-  pruefe('Brillant-Coach mit Verlaufsrahmen, Wort vollfarbig', await seite.evaluate(() => {
+  pruefe('Klassen-Zeile mit dem Finger: Genial', z === 'brillant', z);
+  pruefe('Genial-Coach mit Verlaufsrahmen, Wort vollfarbig', await seite.evaluate(() => {
     const c = document.querySelector('.an-coach.brillant .an-c-klasse');
     const st = c && getComputedStyle(c);
     return !!st && st.color !== 'rgba(0, 0, 0, 0)' && !/text/.test(st.backgroundClip || st.webkitBackgroundClip || '');
@@ -515,7 +516,7 @@ async function testeVerlauf(browser, d) {
   pruefe('Statistik oben', stat.includes('Partien') && stat.includes('Siege') && stat.includes('Genauigkeit'), stat.replace(/\s+/g, ' '));
   const juwelen = await seite.locator('.vl-juwel').count();
   const brillant = await seite.evaluate(() => testseite.speicher.ladeFortschritt().brillanteZuege.length);
-  pruefe('Schatzkiste mit allen Brillant-Zügen', juwelen === brillant, `${juwelen} vs ${brillant}`);
+  pruefe('Schatzkiste mit allen Genial-Zügen', juwelen === brillant, `${juwelen} vs ${brillant}`);
   await bild(seite, 'verlauf-ipad-quer');
 
   // Antippen -> Analyse
@@ -535,7 +536,7 @@ async function testeVerlauf(browser, d) {
     await seite.locator('.vl-juwel').first().click();
     await seite.waitForSelector('.an-coach');
     g = (await protokoll(seite)).filter((x) => x.art === 'gehe').pop();
-    pruefe('Brillant-Zug antippen: Analyse an diesem Zug', g.params.ply === ply && (await aktuellerPly(seite)) === ply
+    pruefe('Genial-Zug antippen: Analyse an diesem Zug', g.params.ply === ply && (await aktuellerPly(seite)) === ply
       && (await seite.locator('.an-coach').getAttribute('data-klasse')) === 'brillant', JSON.stringify(g));
     await seite.click('.kopf [data-aktion="zurueck"]');
     await seite.waitForSelector('.vl-liste');
@@ -721,8 +722,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const d = await testeDaten(browser);
   await testeViewports(browser, d);
   await testeAnalyse(browser, d);
