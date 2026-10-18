@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
@@ -743,7 +744,7 @@ async function browserTests() {
   let browser;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/js/review.js`);
-    browser = await pw.chromium.launch();
+    browser = await browserTyp(pw).launch();
     const seite = await browser.newPage();
     seite.on('pageerror', (e) => console.log('Seitenfehler: ' + e.message));
     await seite.goto(`http://127.0.0.1:${PORT}/`);

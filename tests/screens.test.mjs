@@ -12,13 +12,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8832);
 const BASIS = `http://127.0.0.1:${PORT}/tests/screens.html`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design/app-shots'));
+const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design/app-shots'));
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 
 const VIEWPORTS = [
@@ -689,8 +690,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const d = await testeDaten(browser);
   await testeViewports(browser, d);
   await testeAnalyse(browser, d);

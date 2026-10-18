@@ -12,6 +12,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -62,8 +63,7 @@ let browser;
 let code = 1;
 try {
   await warteAufServer(`http://127.0.0.1:${PORT}/tests/engine-bots.html`);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const seite = await browser.newPage();
   seite.on('console', (m) => console.log(m.text()));
   seite.on('pageerror', (e) => console.log('Seitenfehler: ' + e.message));

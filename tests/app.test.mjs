@@ -18,13 +18,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8831);
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
+const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
 const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
 const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
@@ -2920,8 +2921,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   const NUR = NUR_PRUEFRUNDE || NUR_ERWEITERUNGEN || NUR_NACHPRUEFUNG || NUR_SPIEL;
   if (!NUR) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });

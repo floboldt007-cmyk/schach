@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -775,8 +776,7 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(URL_DEMO);
-  const { chromium } = ladePlaywright();
-  browser = await chromium.launch();
+  browser = await browserTyp(ladePlaywright()).launch();
   await testeDesktop(browser);
   await testeTouch(browser);
   await testeHandy(browser);
