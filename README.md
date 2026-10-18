@@ -173,9 +173,11 @@ eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
 
 - **Stockfish 19** als WebAssembly ([stockfish.js](https://github.com/nmrugg/stockfish.js),
   lite, single-threaded): GPL-3.0, siehe `vendor/stockfish/COPYING.txt`. Quellen:
-  https://github.com/nmrugg/stockfish.js und https://github.com/official-stockfish/Stockfish
+  https://github.com/nmrugg/stockfish.js und https://github.com/official-stockfish/Stockfish. Genaue Herkunft,
+  Prüfsummen, NNUE-Netz und Nachbau: [`vendor/stockfish/QUELLE.md`](vendor/stockfish/QUELLE.md).
 - **chess.js** 1.4.0 ([jhlywa/chess.js](https://github.com/jhlywa/chess.js)): BSD-2-Clause,
-  siehe `vendor/chess/LICENSE`.
+  siehe `vendor/chess/LICENSE`. Herkunft und Prüfsumme:
+  [`vendor/chess/QUELLE.md`](vendor/chess/QUELLE.md).
 - **Figuren** „cburnett“ von Colin M.L. Burnett: GPLv2 oder neuer (derselbe Satz wie bei Lichess).
 - **Schriften** (Look „Modern und klar“): **Manrope** (The Manrope Project Authors) und **Bricolage Grotesque**
   (The Bricolage Grotesque Project Authors), beide unter der SIL Open Font License 1.1, Lizenztexte in
@@ -188,3 +190,6 @@ eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
   GPL-3.0. Einzelheiten in `assets/klang/LIZENZEN.md` und `assets/LIZENZ-KUNST.md`.
 - Avatare, Zug-Symbole, App-Icon und Design sind für dieses Projekt entstanden und stehen
   ebenfalls unter der GPL-3.0.
+
+Zu jeder veröffentlichten Version der Schach-Arena gibt es einen Git-Tag mit dem dazugehörigen Quellcode und den
+Quellangaben der ausgelieferten Drittsoftware.
