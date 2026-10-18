@@ -3,7 +3,7 @@
 // Bots. Der Bot betrachtet nur einige Kandidaten: die besten n laut Engine ("Intuition") plus
 // ein paar "naheliegende" Zuege (Schlagen, Schach, Entwicklung). Jeder Kandidat bekommt die
 // Engine-Bewertung + Charakter-Bonus + Rauschen, der hoechste gewinnt. Dazu kommen
-// Spontanzuege (Patzer) und manchmal zu flaches Rechnen (uebersehene Taktik).
+// Spontanzuege (grober Fehlzug) und manchmal zu flaches Rechnen (uebersehene Taktik).
 // Stufe 10 spielt mit voller Staerke.
 //
 // Saetze (Runde 4): botSatz(bot, anlass, zufall = Math.random, werte = null) -> Satz | null
@@ -451,7 +451,7 @@ export const BOTS = [
         'Oh là là, das war ein Fehltritt, Schätzchen.',
         'Das riecht nach einem Königsangriff …',
         'Du lässt mir die Tür offen? Wie charmant!',
-        'Ein Fehler! Jetzt wird es dramatisch.',
+        'Daneben! Jetzt wird es dramatisch.',
       ],
       spielerGut: [
         'Bravo! So spielt man gegen eine Dame.',
@@ -571,12 +571,12 @@ export const BOTS = [
       ],
       spielerFehler: [
         'Das wird teuer.',
-        'Ein Fehler. Ich habe ihn gesehen.',
+        'Daneben. Ich habe ihn gesehen.',
         'Den Zug schaust du dir besser später in der Analyse an.',
         'Hm. Das bestrafe ich jetzt. Nichts Persönliches.',
       ],
       spielerGut: [
-        'Guter Zug. Wirklich.',
+        'Solide. Wirklich.',
         'Präzise. Das gefällt mir.',
         'Nicht schlecht. Du lernst schnell.',
         'Stark. Damit hatte ich nicht gerechnet.',
@@ -632,7 +632,7 @@ export const BOTS = [
         'Interessant. Für mich.',
       ],
       spielerGut: [
-        'Bester Zug. Ich bin überrascht. Ein bisschen.',
+        'Präzise. Ich bin überrascht. Ein bisschen.',
         'Korrekt. Weiter so, Mensch.',
         'Den hätte ich auch gespielt.',
         'Beeindruckend. Für einen Menschen.',

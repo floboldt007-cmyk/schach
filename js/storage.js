@@ -524,7 +524,7 @@ export function ladePartie(id) {
 // Speichert eine beendete Partie und bucht den Fortschritt (nur beim ersten Speichern und nur, wenn
 // die Partie wertet). Reihenfolge: erst der kleine Fortschritt, dann die Liste, dann die Analyse.
 // Rueckgabe { partie, neueSterne: [bool,bool,bool] (in dieser Partie neu verdient),
-//             neuFreigeschaltet: Bot|null, brillant: Anzahl neu gesammelter Brillant-Zuege, wertet }
+//             neuFreigeschaltet: Bot|null, brillant: Anzahl neu gesammelter geniale Züge, wertet }
 export function speicherePartie(partie, review = null) {
   if (!partie || typeof partie !== 'object') throw new Error('Partie fehlt');
   const p = normalisiere({ ...partie });
@@ -583,7 +583,7 @@ function bucheFortschritt(p, review, ergebnis) {
   speichereFortschritt(f);
 }
 
-// Brillant-Sammlung (Schatzkiste); jeder Zug nur einmal
+// Genial-Sammlung (Schatzkiste); jeder Zug nur einmal
 function sammleBrillante(f, p, review) {
   let n = 0;
   const zuege = review && Array.isArray(review.zuege) ? review.zuege : [];
@@ -599,7 +599,7 @@ function sammleBrillante(f, p, review) {
 
 // Traegt die Spielanalyse einer schon gespeicherten Partie nach (die Partie wird am Ende sofort
 // gesichert, die Analyse kommt spaeter): Genauigkeit, Spielstaerke, Eroeffnung, Review,
-// Brillant-Zuege und Bestwert.
+// geniale Züge und Bestwert.
 // Regel (w0c): Es werden nur LEERE Felder gefuellt (genauigkeit, genauigkeitBot, spielstaerke,
 // eroeffnung). Die erste Genauigkeit einer Partie aus einer Analyse (am Spielende, sonst die erste
 // spaetere, z. B. beim Nachholen) bleibt; auf ihr beruht Stern 2. Eine spaetere Neuberechnung (z. B. wenn

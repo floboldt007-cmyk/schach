@@ -349,7 +349,7 @@ async function testeDesktop(browser) {
       svg: !!el.querySelector('svg'), pe: getComputedStyle(el).pointerEvents };
   });
   const s = e4.b.width;
-  pruefe('Abzeichen sichtbar mit Symbol', abz.klasse === 'brillant' && abz.svg && abz.r.w > 10 && abz.label === 'Brillant');
+  pruefe('Abzeichen sichtbar mit Symbol', abz.klasse === 'brillant' && abz.svg && abz.r.w > 10 && abz.label === 'Genial');
   pruefe('Abzeichen oben rechts am Feld (48 %, 17 % Versatz)',
     Math.abs(abz.r.w - 0.48 * s) < 1.5 && Math.abs(abz.r.x + abz.r.w - (e4.b.x + s + 0.17 * s)) < 1.5 &&
     Math.abs(abz.r.y - (e4.b.y - 0.17 * s)) < 1.5, JSON.stringify({ abz: abz.r, feld: e4.b }));

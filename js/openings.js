@@ -324,7 +324,7 @@ export function tabellenFehler() {
 
 // eroeffnung(['e4','e5','Nf3', ...]) -> { name, buch: [true, true, ...], namen: [...] }
 // name: tiefste erkannte benannte Stellung (null, wenn keine); buch[i]: Halbzug i ist ein
-// Buchzug; namen[i]: Name nach Halbzug i (Zusatzfeld fuer die Live-Anzeige).
+// Theoriezug; namen[i]: Name nach Halbzug i (Zusatzfeld fuer die Live-Anzeige).
 export function eroeffnung(sanListe) {
   const idx = index();
   const liste = Array.isArray(sanListe)

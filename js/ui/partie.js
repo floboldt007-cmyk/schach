@@ -28,7 +28,7 @@
 //         Pakete zusammen hoechstens EXTRA_MAX Zeichen als JSON; null loescht den Eintrag)
 //     spaeter(fn, ms) -> Timer, den verlasse() abraeumt }
 //   Nach partie:verlassen tut die Buehne nichts mehr.
-// COMBO: Serie aus Bester Zug, Großartig, Brillant; neutral sind Buch, Erzwungen und triviale Zuege
+// COMBO: Serie aus Präzise, Goldrichtig und Genial; neutral sind Buch, Pflichtzug und triviale Zuege
 // (Zurueckschlagen, erzwungene Schachabwehr), solange sie nichts verschenken. Der Chip traegt
 // data-stufe ('' bei 3 bis 4, 'heiss' 5 bis 7, 'ueberladen' 8 bis 11, 'unaufhaltsam' ab 12), der Screen
 // data-serie (laufende Serie) und data-serie-stufe.
@@ -99,11 +99,9 @@ import './abrechnung.js';
 import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
 import { botFarbe as themaBotFarbe } from '../thema.js';
+import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
 
-const KLASSEN_WORT = {
-  brillant: 'Brillant!', stark: 'Großartig!', bester: 'Bester Zug', exzellent: 'Exzellent', gut: 'Gut',
-  buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler', verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
-};
+
 const SERIE = new Set(['bester', 'stark', 'brillant']);
 const NEUTRAL = new Set(['buch', 'erzwungen']);
 const MIT_VERLUST = new Set(['ungenau', 'fehler', 'verpasst', 'patzer']);
@@ -594,7 +592,7 @@ export function zeige(root, params, app) {
       <div class="c-kopf"><span class="c-klasse">Coach rechnet …</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
       <p class="c-text">Gleich weißt du, wie gut dein Zug war.</p>`, 'wartet', ply);
   }
-  // COMBO: Bester Zug, Großartig und Brillant zaehlen; Buch, Erzwungen und triviale Zuege
+  // COMBO: Präzise, Goldrichtig und Genial zaehlen; Buch, Pflichtzug und triviale Zuege
   // (Zurueckschlagen, Schachabwehr) sind neutral, solange sie nichts verschenken
   const neutral = (i) => NEUTRAL.has(z.liveKlassen[i]) || (z.liveTrivial[i] === true && !MIT_VERLUST.has(z.liveKlassen[i]));
   function serieBis(ply) {
@@ -636,7 +634,7 @@ export function zeige(root, params, app) {
     const serie = SERIE.has(k) && !neutral(ply) ? serieBis(ply) : 0;
     const combo = serie >= 3 ? `<span class="combo" data-stufe="${serienStufe(serie)}">${icon('blitz')}COMBO ×${serie}</span>` : '';
     if (k === 'buch') {
-      coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">Buchzug</span><span class="c-zug">${esc(zugLabel(ply))}</span>
+      coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_NAME.buch)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>
         <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
         <p class="c-text">Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
@@ -713,7 +711,7 @@ export function zeige(root, params, app) {
     } else if (klasse === 'bester') {
       ort.innerHTML = '<i class="ring-ping"></i>';
     }
-    // Ungenau/Fehler bleiben ruhig, Patzer wackelt nur am Symbol (CSS)
+    // Unscharf/Fehler bleiben ruhig, grober Fehlzug wackelt nur am Symbol (CSS)
     if (ort.innerHTML) {
       effekteEl.append(ort);
       spaeter(() => ort.remove(), 1700);
@@ -803,7 +801,7 @@ export function zeige(root, params, app) {
       const e = await bewertungsEngine();
       const aV = await analysiere(fenVorher);
       if (veraltet()) return;
-      // Gegnerzug davor einordnen (fuer "Chance verpasst")
+      // Gegnerzug davor einordnen (fuer "Verschenkt")
       let gegnerKlasse = null;
       let vorigerZug = null;
       let vorigerSchlag = false;
@@ -875,7 +873,7 @@ export function zeige(root, params, app) {
         brett.markiere([nach], 'k-' + k);
         brett.zeigeAbzeichen(nach, k);
         effekt(nach, k);
-        // Standard wie bisher: Brillant, Fehler und Patzer klingen, sonst still (Pakete: registriereKlang('klasse'))
+        // Standard wie bisher: Genial, Fehler und grober Fehlzug klingen, sonst still (Pakete: registriereKlang('klasse'))
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
         spaeter(() => klang.klasse(k, info), 120);
         melde({ typ: 'abzeichen', ply, klasse: k });

@@ -46,7 +46,7 @@
 //   klang.setzeLautstaerke(v)     0..1, Master = v * v (setTargetAtTime, 15 ms)
 //   klang.vorladen()              holt die Dateien des aktiven Pakets (fetch, 4 voraus) und dekodiert sie der
 //                                 Reihe nach (Brett, start, brillant, stern, Ergebnis, Rest) -> Promise<vorrat()>
-//   klang.probe(id)               kurze Szene (Zug, Schlagen, Bester Zug, Stern) im Paket id, auch wenn es nicht
+//   klang.probe(id)               kurze Szene (Zug, Schlagen, präziser Zug, Stern) im Paket id, auch wenn es nicht
 //                                 aktiv ist -> Promise
 //   klang.stille()                alle laufenden Stimmen sanft beenden
 //   klang.vorrat()                { paket, gewaehlt, dateien, dekodiert, fehlt, laedt, fremd, stimmen, master,

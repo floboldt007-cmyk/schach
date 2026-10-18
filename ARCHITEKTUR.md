@@ -1334,3 +1334,5 @@ Der Reiter Training erscheint erst, wenn die Integration `training` in `REITER` 
 Leiste mit und ohne `REITER`, oben/unten bei 1180 x 820, 1024 x 768, 820 x 1180, 390 x 844, 375 x 667, Drehen, Pille,
 Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekuerzt, Chips scrollen, Training leer und
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
+
+**Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.

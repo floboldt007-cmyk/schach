@@ -36,17 +36,15 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const FIGUR_NAMEN = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
 const UMWANDLUNG_REIHE = ['q', 'r', 'b', 'n']; // Vertrag: D T L S
 
-export const KLASSEN_TITEL = {
-  brillant: 'Brillant', stark: 'Großartig', bester: 'Bester Zug', exzellent: 'Exzellent',
-  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler',
-  verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
-};
+import { KLASSEN_NAME } from './zugklassen.js';
+
+export const KLASSEN_TITEL = KLASSEN_NAME;
 
 // Ersatzfarben, falls die Design-Variablen --k-* fehlen
 const KLASSEN_ERSATZ = {
-  brillant: '#14b8c8', stark: '#4f7bf7', bester: '#2db45d', exzellent: '#7cc242', gut: '#97ad7b',
-  buch: '#c38d5e', ungenau: '#e9b21b', fehler: '#ff8b2c', verpasst: '#b266ea', patzer: '#f0474b',
-  erzwungen: '#8a93a8',
+  brillant: '#7A4FD6', stark: '#2F67D8', bester: '#14936A', exzellent: '#5E9C4E', gut: '#7F928A',
+  buch: '#A07A52', ungenau: '#D6A21C', fehler: '#DD7A2A', verpasst: '#B4468F', patzer: '#BC2A4C',
+  erzwungen: '#878E9E',
 };
 
 // Farbnamen fuer Pfeile, die auf Vertrags-Variablen zeigen

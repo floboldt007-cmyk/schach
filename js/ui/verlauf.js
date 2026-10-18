@@ -1,4 +1,4 @@
-// Screen "Verlauf": Statistik, Schatzkiste (alle eigenen Brillant-Zuege) und die Liste aller
+// Screen "Verlauf": Statistik, Schatzkiste (alle eigenen geniale Züge) und die Liste aller
 // gespeicherten Partien. Antippen oeffnet die Analyse, Loeschen per Wischen oder Knopf (mit Rueckfrage).
 //
 //   zeige(root, {}, app) -> { verlasse() }
@@ -170,15 +170,15 @@ export function zeige(root, params = {}, app) {
         const nr = Math.floor((b.ply || 0) / 2) + 1;
         const zug = `${nr}${(b.ply || 0) % 2 ? '…' : '.'} ${sanDe(b.san)}!!`;
         return `<button class="vl-juwel" type="button" role="listitem" data-aktion="juwel" data-id="${esc(b.partieId)}" data-ply="${Number(b.ply) || 0}"
-          ${da ? '' : 'disabled'} aria-label="Brillant ${esc(zug)} gegen ${esc(bot ? bot.name : 'Bot')}${da ? '' : ', Partie gelöscht'}">
+          ${da ? '' : 'disabled'} aria-label="Genialer Zug ${esc(zug)} gegen ${esc(bot ? bot.name : 'Bot')}${da ? '' : ', Partie gelöscht'}">
           <span class="vl-juwel-symbol">${SYMBOLE.brillant}</span>
           <span class="vl-juwel-text"><b class="zahl">${esc(zug)}</b><span>${da ? `gegen ${esc(bot ? bot.name : 'Bot')} · ${esc(datumKurz(b.datum))}` : 'Partie gelöscht'}</span></span>
         </button>`;
       }).join('')}</div>`
-      : '<p class="vl-schatz-leer">Noch kein Brillant-Zug. Opfere eine Figur, wenn die Rechnung aufgeht, dann landet er hier.</p>';
+      : '<p class="vl-schatz-leer">Noch kein genialer Zug. Opfere eine Figur, wenn die Rechnung aufgeht, dann landet er hier.</p>';
     return `
       <section class="vl-schatz flaeche" aria-label="Schatzkiste">
-        <div class="vl-schatz-kopf">${icon('kiste')}<h3>Schatzkiste</h3><span class="chip zahl">${liste.length} ${liste.length === 1 ? 'Brillant-Zug' : 'Brillant-Züge'}</span></div>
+        <div class="vl-schatz-kopf">${icon('kiste')}<h3>Schatzkiste</h3><span class="chip zahl">${liste.length} ${liste.length === 1 ? 'genialer Zug' : 'Geniale Züge'}</span></div>
         ${inhalt}
       </section>`;
   }
