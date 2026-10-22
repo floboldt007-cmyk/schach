@@ -130,7 +130,7 @@ export const BOTS = [
     staerke: {
       tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3,
       rauschen: 270, patzer: 0.38, mattInEins: 0.6, gier: 0.95,
-      vorlieben: { schlagen: 60 }, zeit: [500, 1100],
+      vorlieben: { schlagen: 150 }, zeit: [500, 1100],
     },
     saetze: {
       begruessung: [
