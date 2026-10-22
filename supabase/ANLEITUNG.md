@@ -64,7 +64,10 @@ von Stripe ausprobieren: Dort fließt kein Geld.
    „Kunden auf deine Website weiterleiten“ wählen und `https://floboldt007-cmyk.github.io/schach/#einstellungen`
    eintragen. Mengenänderung aus lassen. Die App hängt beim Kaufen selbst
    `?client_reference_id=<Nutzer-ID>&prefilled_email=<E-Mail>` an den Link: Daran erkennt der Webhook, welches Konto
-   bezahlt hat. Deshalb kann man nur angemeldet abschließen. Den fertigen Link (`https://buy.stripe.com/...`) kopieren.
+   bezahlt hat. Deshalb kann man nur angemeldet abschließen. Unter den erweiterten Optionen die **Zustimmung zu den
+   AGB** verlangen (das Häkchen ist nie vorausgewählt); für digitale Inhalte braucht es die ausdrückliche Zustimmung
+   zum sofortigen Beginn und die Bestätigung, dass damit das Widerrufsrecht erlischt (§ 356 Abs. 5 BGB), dazu eine
+   Bestätigung per E-Mail (Stripe-Belege einschalten). Den fertigen Link (`https://buy.stripe.com/...`) kopieren.
 5. **Kundenportal:** **Einstellungen > Billing > Kundenportal** aktivieren: Kündigen erlauben (zum Ende der
    Laufzeit), Zahlungsmethode ändern und Rechnungen ansehen erlauben, Links zu AGB und Datenschutz eintragen. Den
    **Login-Link** des Portals (`https://billing.stripe.com/p/login/...`) kopieren. „Abo verwalten“ in der App öffnet ihn.

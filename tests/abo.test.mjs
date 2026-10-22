@@ -345,8 +345,15 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Preis aus der Tabelle, Hinweis aufs Konto, Knopf "Zum Konto" statt Kauf', z.zustand === 'abgemeldet' && z.preis === PRODUKT.preis_text
       && /brauchst du ein Konto/.test(z.stand) && z.knoepfe[0] === 'Zum Konto' && !z.knoepfe.includes('Trainer abschließen'), z);
+    // weit nach unten rollen, damit "Zum Konto" wirklich zur Gruppe Konto fuehren muss
+    await seite.evaluate(() => document.querySelector('.es-info').scrollIntoView({ block: 'end' }));
+    const kontoVorher = await seite.evaluate(() => document.querySelector('.konto-gruppe').getBoundingClientRect().top);
     await seite.click('.trainer-knoepfe [data-trainer="konto"]');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
+    await seite.waitForFunction(() => { const t = document.querySelector('.konto-gruppe').getBoundingClientRect().top; return t >= -1 && t < innerHeight / 2; }, null, { timeout: 3000 })
+      .catch(() => {});
+    const kontoNachher = await seite.evaluate(() => document.querySelector('.konto-gruppe').getBoundingClientRect().top);
+    pruefe('"Zum Konto" rollt zur Gruppe Konto', kontoVorher < 0 && kontoNachher >= -1 && kontoNachher < 410, { kontoVorher, kontoNachher });
     pruefe('"Zum Konto" schliesst das Blatt und bleibt in den Einstellungen', (await seite.evaluate(() => document.documentElement.dataset.screen)) === 'einstellungen'
       && (await seite.evaluate(() => window.__geoeffnet.length)) === 0);
     pruefe('keine Fehler', fehler.length === 0, fehler);
@@ -379,7 +386,6 @@ async function browserTeil(browser) {
     // Zahlung fertig: der Webhook hat das Abo eingetragen; Flo kommt in die App zurueck
     srv.premium = true;
     srv.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(Date.now() + 30 * 86400000).toISOString(), quelle: 'stripe' }];
-    await seite.keyboard.press('Escape');
     await seite.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -387,6 +393,12 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.toast', { timeout: 5000 });
     const toast = await seite.locator('.toast').innerText();
     pruefe('Rueckkehr: neu gefragt, einmal Danke', /Crownmate Trainer ist aktiv/.test(toast) && /Danke/.test(toast), toast);
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium', null, { timeout: 3000 }).catch(() => {});
+    const offen = await blattZustand(seite);
+    pruefe('offenes Blatt zeichnet nach der Rueckkehr neu (aktiv, Meldung zum Kauf weg)', offen && offen.zustand === 'premium'
+      && /^Dein Trainer ist aktiv bis/.test(offen.stand) && offen.knoepfe[0] === 'Abo verwalten', offen);
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     await seite.waitForFunction(() => /aktiv bis/.test(document.querySelector('.abo-gruppe .abo-stand').textContent));
     pruefe('Gruppe zeichnet neu: aktiv bis, verlängert sich automatisch, Knopf "Mein Trainer"',
       /verlängert sich automatisch/.test(await seite.locator('.abo-gruppe .abo-stand').innerText())

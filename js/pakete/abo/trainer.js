@@ -11,7 +11,8 @@
 //
 // Fairness (SPIELKONZEPT 5, AGENTS.md): kein Countdown, keine Knappheit, kein "nur heute", keine Streichpreise, kein
 // Kaufhinweis in der Partie (das Blatt wird nur aus den Einstellungen oder einem ruhigen premiumHinweis geoeffnet).
-// Schliessen: Knopf, Escape, Tipp auf den Schleier, jeder Screen-Wechsel (app:screen).
+// Schliessen: Knopf, Escape, Tipp auf den Schleier, jeder Screen-Wechsel (app:screen). Das DOM-Ereignis "abo:stand"
+// (nach einem Kauf) zeichnet ein offenes Blatt neu.
 import { hoere } from '../../ereignisse.js';
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
@@ -146,7 +147,16 @@ export function zeigeTrainer({ app = null } = {}) {
     const a = e.target.closest('[data-trainer]')?.dataset.trainer;
     if (!a) return;
     if (a === 'schliessen') { ende(); return; }
-    if (a === 'konto') { ende(); app.gehe('einstellungen'); return; }
+    if (a === 'konto') {
+      ende();
+      if (document.documentElement.dataset.screen !== 'einstellungen') app.gehe('einstellungen');
+      // zur Gruppe Konto (dort meldet man sich an); nach dem Zeichnen des Screens
+      requestAnimationFrame(() => {
+        const k = document.querySelector('.konto-gruppe');
+        if (k) k.scrollIntoView({ block: 'start', behavior: tempo() === 0 ? 'auto' : 'smooth' });
+      });
+      return;
+    }
     if (a === 'kaufen') {
       // ohne await bis zum Oeffnen (Nutzergeste)
       kaufen({ produkt: produkt || null }).then((r) => {
@@ -176,10 +186,13 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   };
   let abScreen = null;
+  // Neuer Stand (z. B. nach der Rueckkehr von Stripe, js/pakete/abo/index.js): Meldung zum Kauf weg, neu zeichnen
+  const beiStand = () => { if (premiumStand().premium) meldung = ''; aktualisiere(); };
   function ende() {
     if (fertig) return;
     fertig = true;
     document.removeEventListener('keydown', taste, true);
+    document.removeEventListener('abo:stand', beiStand);
     if (abScreen) abScreen();
     if (offen && offen.el === ort) offen = null;
     ort.classList.add('weg');
@@ -196,6 +209,7 @@ export function zeigeTrainer({ app = null } = {}) {
 
   schleier.addEventListener('pointerdown', () => ende());
   document.addEventListener('keydown', taste, true);
+  document.addEventListener('abo:stand', beiStand);
   try { abScreen = hoere('app:screen', () => ende()); } catch (e) { /* egal */ }
   document.body.append(ort);
   offen = { el: ort, ende };
