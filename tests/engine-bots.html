@@ -322,11 +322,13 @@ async function testBots() {
   let aufrufe = 0;
   const einmalKaputt = { analyse: (fen, o) => (++aufrufe === 1
     ? Promise.resolve({ fen, lines: [], abgebrochen: true, fehler: 'Absturz (Test)' }) : e.analyse(fen, o)) };
-  const rNeu = await botZug(einmalKaputt, MITTE, greta, { ohnePause: true });
+  // Fester Zufall ueber der Patzer-Schwelle: ein Spontanzug kaeme ohne Engine aus und wuerde den Fehlerpfad nie pruefen
+  const keinPatzer = () => 0.99;
+  const rNeu = await botZug(einmalKaputt, MITTE, greta, { ohnePause: true, zufall: keinPatzer });
   pruefe('Bot: nach einem Engine-Absturz neuer Versuch (Engine-Zug)', aufrufe === 2 && rNeu && legal(MITTE, rNeu.uci) && rNeu.art !== 'patzer', aufrufe + ' Aufrufe, ' + (rNeu && rNeu.art));
   const immerKaputt = { analyse: (fen) => Promise.resolve({ fen, lines: [], abgebrochen: true, fehler: 'Absturz (Test)' }) };
   let geworfen = false;
-  try { await botZug(immerKaputt, MITTE, greta, { ohnePause: true }); } catch (err) { geworfen = true; }
+  try { await botZug(immerKaputt, MITTE, greta, { ohnePause: true, zufall: keinPatzer }); } catch (err) { geworfen = true; }
   pruefe('Bot: Engine bleibt kaputt -> Fehler (die App meldet ihn) statt stillem Zufallszug', geworfen);
 
   // Matt in 1
@@ -386,6 +388,17 @@ async function testBots() {
     quoten.push(b.name + ' ' + n * 5 + ' %');
     BOTS_DAME[b.id] = n / 20;
   }
+  // Reproduzierbarer Zufall (mulberry32)
+  function saatZufall(saat) {
+    let a = saat >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let x = a;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
   // Charakter: Anteil des Lieblingszugs mit Vorliebe gegen denselben Bot ohne Vorliebe
   const merkmale = {
     hilde: ['Schlagen', (m) => !!m.captured],
@@ -404,9 +417,11 @@ async function testBots() {
     const anteil = async (b) => {
       let n = 0;
       let t = 0;
+      // Gleiche Zufallsfolge fuer Bot und Zwilling: so macht nur die Vorliebe den Unterschied, nicht das Wuerfelglueck
+      const zufall = saatZufall(20261018);
       for (const f of charStellungen) {
         for (let i = 0; i < 3; i++) {
-          const r = await botZug(e, f, b, { ohnePause: true });
+          const r = await botZug(e, f, b, { ohnePause: true, zufall });
           const m = new Chess(f).move({ from: r.uci.slice(0, 2), to: r.uci.slice(2, 4), promotion: r.uci[4] });
           n++;
           if (passt(m)) t++;
