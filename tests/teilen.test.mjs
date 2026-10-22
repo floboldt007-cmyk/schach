@@ -384,8 +384,9 @@ async function browserTeil(browser) {
   const fd = hexRgb(p1.feldDunkel);
   pruefe('leeres helles Feld d3 = --feld-hell, leeres dunkles Feld e3 = --feld-dunkel', nah(p1.d3, [...fh, 255]) && nah(p1.e3, [...fd, 255]), JSON.stringify({ d3: p1.d3, e3: p1.e3, fh, fd }));
   const h5Soll = mische(fh, p1.zuletzt);
-  const f7Soll = mische(fd, p1.zuletzt);
-  pruefe('letzter Zug: h5 (leer) und f7 (Ecke neben der Dame) mit --zuletzt getoent', nah(p1.h5, [...h5Soll, 255], 3) && nah(p1.f7, [...f7Soll, 255], 3), JSON.stringify({ h5: p1.h5, h5Soll, f7: p1.f7, f7Soll }));
+  const f7Soll = mische(fh, p1.zuletzt);   // h5 und f7 sind beide helle Felder
+  pruefe('letzter Zug: h5 (leer) und f7 (Ecke neben der Dame) mit --zuletzt getoent, andere Felder nicht', nah(p1.h5, [...h5Soll, 255], 3) && nah(p1.f7, [...f7Soll, 255], 3)
+    && !nah(p1.h5, [...fh, 255], 6), JSON.stringify({ h5: p1.h5, h5Soll, f7: p1.f7, f7Soll }));
   pruefe('Texte im Bild: Sieg, "gegen Bauer Benno", Schachmatt im 4. Zug, Genauigkeit, Datum, crownmate, Adresse', z1.texte.includes('Sieg') && z1.texte.includes('gegen Bauer Benno')
     && z1.texte.includes('SCHACHMATT IM 4. ZUG') && z1.texte.some((t) => /^\d{1,3},\d %$/.test(t)) && z1.texte.some((t) => /^\d\d\.\d\d\.\d{4}$/.test(t))
     && z1.texte.includes('crownmate') && z1.texte.includes(`127.0.0.1:${PORT}`), z1.texte.join(' | '));
@@ -401,6 +402,7 @@ async function browserTeil(browser) {
   pruefe('Blatt: Titel, Vorschau 4:5, ganz im Fenster, Bildbeschreibung fuer VoiceOver', blatt.titel === 'Siegesbild teilen' && Math.abs(blatt.verhaeltnis - 0.8) < 0.01 && blatt.imFenster
     && /Sieg gegen Bauer Benno/.test(blatt.label || ''), JSON.stringify(blatt));
   pruefe('ohne navigator.share: Knopf "Bild speichern", ohne Konto kein Namensschalter', blatt.share === 'undefined' && /Bild speichern/.test(blatt.los) && blatt.aktiv && !blatt.name, JSON.stringify(blatt));
+  await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-hell.png') });
 
   // ---------- Speichern (Rueckfall ohne share) ----------
@@ -441,6 +443,7 @@ async function browserTeil(browser) {
   pruefe('Feldfarben bleiben (Flos Brettfarbe, nicht der Modus)', nah(p2.d3, [...fh, 255]) && nah(p2.e3, [...fd, 255]), JSON.stringify([p2.d3, p2.e3]));
   const app2 = await seite.evaluate(() => ({ modus: document.documentElement.dataset.modus || '', grund: getComputedStyle(document.body).backgroundColor }));
   pruefe('die App selbst bleibt im eigenen Modus (kein Umschalten fuer das Bild)', app2.modus === appModus && app2.grund === 'rgb(244, 241, 236)', JSON.stringify(app2));
+  await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-dunkel.png') });
   // Abbrechen im Teilen-Blatt des Geraets: unser Blatt bleibt offen, keine Fehlermeldung
   await seite.evaluate(() => { window.__teilenAntwort = 'abbruch'; });
@@ -488,6 +491,7 @@ async function browserTeil(browser) {
   await blattBereit(seite, 'dunkel');
   const n2 = await zustand(seite);
   pruefe('Schalter an: "Gespielt von FloTest" im Bild, nie die E-Mail', n2.texte.includes('Gespielt von FloTest') && !n2.texte.some((t) => /@|privat/.test(t)), n2.texte.join(' | '));
+  await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-name.png') });
   await seite.locator('.tl-blatt .tl-name .schalter').click();
   await seite.waitForFunction(async () => (await import('/js/pakete/teilen/index.js')).zustand().name === null, null, { timeout: 10000 });
@@ -504,8 +508,9 @@ async function browserTeil(browser) {
   // ---------- Analyse (der Verlauf oeffnet jede Partie dort) ----------
   gruppe = 'Analyse und Verlauf';
   await seite.evaluate(() => window.__app.gehe('verlauf'));
-  await seite.waitForSelector('.screen .vl-zeile, .screen [data-id]', { timeout: 10000 }).catch(() => {});
-  await seite.evaluate((id) => window.__app.gehe('analyse', { partieId: id }), partie.id);
+  await seite.waitForSelector(`.vl-zeile[data-id="${partie.id}"] .vl-oeffnen`, { timeout: 10000 });
+  pruefe('Verlauf: kein eigener Knopf in der Liste (dort gibt es keinen Ort je Zeile)', await seite.locator('.vl-seite .tl-teilen').count() === 0);
+  await seite.locator(`.vl-zeile[data-id="${partie.id}"] .vl-oeffnen`).click();
   await seite.waitForSelector('.an-ort-oben .tl-teilen', { timeout: 30000 });
   pruefe('Spielanalyse der Partie (aus dem Verlauf): Knopf "Als Bild teilen" im Ort analyse:oben', /Als Bild teilen/.test(await seite.locator('.an-ort-oben .tl-teilen').innerText())
     && await seite.locator('.an-ort-oben').isVisible());
@@ -559,6 +564,8 @@ async function browserTeil(browser) {
       m.oeffneBlatt({ partie: { ...p, botId: 'koenig' } });
     }, { p: partie, modus });
     await blattBereit(h.seite, modus);
+    // erst messen, wenn das Blatt eingeglitten ist (mit Bewegung 480 ms)
+    await h.seite.waitForFunction(() => document.querySelector('.tl-karte').getAnimations().every((a) => a.playState === 'finished'), null, { timeout: 5000 });
     const lage = await h.seite.evaluate(() => {
       const k = document.querySelector('.tl-karte').getBoundingClientRect();
       const c = document.querySelector('.tl-blatt canvas').getBoundingClientRect();

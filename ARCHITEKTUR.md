@@ -1338,3 +1338,40 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+---
+
+# Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
+
+Jedes Paket haengt sich nur ueber Orte, Ereignisse, Register, Modul-Speicher und eigene Paket-Screens ein. Bis die
+Integration es in `PAKETE` (`js/erweiterungen.js`) eintraegt, laedt es nur im Test (`?test&erw=pakete/<name>/index`).
+
+## Paket teilen (A1): Siegesbild
+
+Dateien: `js/pakete/teilen/index.js` (Orte, Blatt, Teilen), `logik.js` (rein, Node-testbar, kein `Math.random`),
+`bild.js` (Zeichnen auf Canvas 2D, Lader fuer Farben, Bilder, Schriften), `css/pakete/teilen.css` (nur Tokens; das
+Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/teilen.test.mjs`.
+
+- **Orte:** `ergebnis:karte` (Reihenfolge 60, nach der Abrechnungs-Huelle 3) und `analyse:oben` (60) zeigen
+  `.tl-knopf-zeile[data-ort] > button.knopf.tl-teilen` („Siegesbild teilen“ bzw. „Als Bild teilen“), nur wenn
+  `teilbar(p)`: Sieg oder Remis mit mindestens einem Zug, keine Uebung, keine Partie aus einer eigenen Stellung
+  (Bosse, freie Partien und Spielhalle ja, dann ohne Sterne). Niederlagen bekommen keinen Knopf (Fairness 10), dort
+  bleibt der Tipp „Kopf hoch!“. Der Verlauf hat keinen Ort je Zeile: jede Partie ist ueber Verlauf -> Analyse teilbar.
+- **Blatt:** `.sheet-ort.tl-blatt` (Grundform der Bauteile) mit Vorschau-Canvas, Wahl Hell/Dunkel (`segment`), Schalter
+  „Benutzername zeigen“ (nur mit Konto-Sitzung und Benutzernamen im Profil, ein GET je Sitzung, Standard aus), Hinweis,
+  was im Bild steht, „Teilen“ (`navigator.share({ files, title, text })`, wenn `canShare` die Datei nimmt) sonst
+  „Bild speichern“ (Download `crownmate-<sieg|remis>-<Tag>.png`). Die PNG-Datei liegt schon bereit, bevor der Knopf
+  aktiv wird, damit `share()` direkt im Klick laeuft (Safari). Abbruch im Teilen-Blatt laesst das Blatt offen.
+  `app:screen` und Escape schliessen es. `data-bereit="ja"` und `data-modus` am Blatt, sobald das Bild steht.
+- **Bild (RECHENSTAND 1):** 1080 x 1350, `logik.layout()`; Marke (Bauer auf Tinte) und „Crownmate“, Datum (Tag aus
+  `tag.js`), Ueberzeile (z. B. „Schachmatt im 23. Zug“, Boss mit „Boss · …“), „Sieg“ mit goldenem „!“ bzw. „Remis“,
+  „gegen <Bot>“, optional „Gespielt von <Benutzername>“, Portraet (`thema.avatarVon`) auf der Bot-Toenung, Endstellung im
+  Sockel (Feldfarben und `--zuletzt` aus Flos Brettfarbe, Figuren aus dem Figuren-Pfad des Themes, Brett gedreht bei
+  Schwarz), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt), Zuege; Fuss „crownmate“ und die
+  Adresse der App (`adresseAus(location.href)`). Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
+  dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
+- **Speicher:** Modul `teilen` (Budget 2.000) `{ v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] }`
+  (hoechstens 20, je Partie eine Zeile); Modul-Einstellungen `teilen` `{ bild: '' | 'hell' | 'dunkel', name: false }`.
+- **Ereignisse:** hoert `app:screen` (Blatt zu) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
+  sendet nichts. **Register:** Icon `teilen`. **Test-Schnittstelle:** `zustand()` (offen, modus, bereit, texte, datei,
+  weg, name) und `oeffneBlatt({ partie | partieId, bot })`.

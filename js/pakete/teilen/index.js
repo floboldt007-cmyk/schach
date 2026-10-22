@@ -199,6 +199,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   stand.name = null;
 
   let daten = null;
+  let erstesBild = true;
   async function neu() {
     const nr = ++lauf;
     stand.bereit = false;
@@ -228,6 +229,10 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
       stand.name = daten.name;
       stand.bereit = true;
       leinwand.setAttribute('aria-label', [daten.titel, daten.ueber, daten.datum].filter(Boolean).join(', '));
+      // das fertige Bild federt ein (beim ersten Mal weich, nach einem Wechsel nur kurz); Tempo 0: still
+      anim(leinwand, [{ transform: erstesBild ? 'scale(.94)' : 'scale(.985)', opacity: erstesBild ? 0.4 : 0.85 }, { transform: 'none', opacity: 1 }],
+        { d: erstesBild ? 520 : 320, k: erstesBild ? 'weich' : 'feder' });
+      erstesBild = false;
       laden.hidden = true;
       los.disabled = false;
       ort.dataset.bereit = 'ja';
@@ -298,7 +303,9 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     anim(karte, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { d: 480, k: 'gleiten' });
     anim(schleier, [{ opacity: 0 }, { opacity: 1 }], { d: 260, k: 'sanft' });
   }
-  try { (karte.querySelector('[aria-checked="true"]') || los).focus({ preventScroll: true }); } catch (f) { /* egal */ }
+  // Fokus auf das Blatt selbst (VoiceOver liest den Titel; der Hauptknopf ist noch gesperrt, bis das Bild steht)
+  karte.tabIndex = -1;
+  try { karte.focus({ preventScroll: true }); } catch (f) { /* egal */ }
   neu();
   // Benutzername nur mit Konto und nur, wenn das Profil einen hat; der Schalter erscheint erst dann
   profilName().then((n) => {
