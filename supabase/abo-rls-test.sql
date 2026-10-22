@@ -123,6 +123,11 @@ begin
   exception when insufficient_privilege then null;
   end;
   begin
+    perform public.abo_hole_nach('cus_B1');
+    raise exception 'FEHLER: Nutzer A darf abo_hole_nach aufrufen';
+  exception when insufficient_privilege then null;
+  end;
+  begin
     perform 1 from public.stripe_ereignisse;
     raise exception 'FEHLER: Nutzer A kann stripe_ereignisse lesen';
   exception when insufficient_privilege then null;
@@ -180,6 +185,11 @@ begin
   begin
     perform public.abo_wende_an('b2222222-2222-4222-8222-222222222222', 'invoice.paid', now(), null, 'aktiv', now() + interval '1 year', null);
     raise exception 'FEHLER: abo_wende_an ist auch fuer die Service-Rolle direkt aufrufbar';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.abo_hole_nach('cus_B1');
+    raise exception 'FEHLER: abo_hole_nach ist fuer die Service-Rolle aufrufbar (nur Besitzer)';
   exception when insufficient_privilege then null;
   end;
 
@@ -303,6 +313,12 @@ begin
   if r <> 'ohne_nutzer' or exists (select 1 from public.abos where kunde_id = 'cus_X1') then
     raise exception 'FEHLER: Kauf ohne bekannten Nutzer falsch verbucht (%)', r;
   end if;
+  -- 11b. ... und ein spaeteres Abo-Ereignis desselben Kunden wartet (Flo ordnet es unten von Hand zu)
+  r := public.abo_stripe_ereignis('evt_x2', 'customer.subscription.updated', t0 + interval '1 second', 'cus_X1', 'sub_X1',
+    null, 'aktiv', t0 + interval '30 days', 'monat');
+  if r <> 'wartet' then
+    raise exception 'FEHLER: Ereignis nach einem Kauf ohne Nutzer wartet nicht (%)', r;
+  end if;
 
   -- 12. Ein neuer Kauf verkuerzt ein laengeres manuelles Abo nicht (A: manuell 30 Tage)
   r := public.abo_stripe_ereignis('evt_a1', 'checkout.session.completed', t0, 'cus_A1', 'sub_A1',
@@ -330,6 +346,39 @@ begin
     raise exception 'FEHLER: Ereignis ohne gueltig_bis angenommen';
   exception when raise_exception then
     if sqlerrm <> 'ABO_EREIGNIS_UNGUELTIG' then raise; end if;
+  end;
+end
+$$;
+
+-- ---------- Besitzer (Flo im SQL Editor): Kauf ohne Nutzer von Hand zuordnen und nachholen ----------
+reset role;
+do $$
+declare
+  n integer;
+  a public.abos;
+begin
+  -- Flo traegt bei D (gekuendigt, Datum vorbei) den Stripe-Kunden aus dem Kauf 'ohne_nutzer' ein
+  update public.abos set kunde_id = 'cus_X1' where user_id = 'd4444444-4444-4444-8444-444444444444';
+  if public.ist_premium_von('d4444444-4444-4444-8444-444444444444') then
+    raise exception 'FEHLER: die Handzeile allein hat schon Premium gegeben';
+  end if;
+  n := public.abo_hole_nach('cus_X1');
+  select * into a from public.abos where user_id = 'd4444444-4444-4444-8444-444444444444';
+  if n <> 1 or a.status <> 'aktiv' or a.plan <> 'monat' or a.quelle <> 'stripe' or a.abo_id <> 'sub_X1'
+    or a.gueltig_bis < now() + interval '29 days' or not public.ist_premium_von('d4444444-4444-4444-8444-444444444444')
+    or (select ergebnis from public.stripe_ereignisse where id = 'evt_x2') <> 'neu'
+    or (select user_id from public.stripe_ereignisse where id = 'evt_x2') <> 'd4444444-4444-4444-8444-444444444444' then
+    raise exception 'FEHLER: abo_hole_nach hat das wartende Ereignis nicht angewendet (%, %)', n, row_to_json(a);
+  end if;
+  -- ein zweiter Aufruf findet nichts mehr
+  if public.abo_hole_nach('cus_X1') <> 0 then
+    raise exception 'FEHLER: abo_hole_nach wendet ein Ereignis zweimal an';
+  end if;
+  begin
+    perform public.abo_hole_nach('cus_NIEMAND');
+    raise exception 'FEHLER: abo_hole_nach ohne Zeile in abos angenommen';
+  exception when raise_exception then
+    if sqlerrm <> 'ABO_KUNDE_UNBEKANNT' then raise; end if;
   end;
 end
 $$;

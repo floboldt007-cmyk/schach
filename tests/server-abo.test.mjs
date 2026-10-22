@@ -270,7 +270,26 @@ const json = (r) => JSON.parse(r.koerper);
   pruefe('Policies: Produkte nur aktive, Abo nur das eigene', /on public\.produkte for select\s+to anon, authenticated\s+using \(aktiv\);/.test(ohneKommentar)
     && /on public\.abos for select\s+to authenticated\s+using \(\(select auth\.uid\(\)\) = user_id\);/.test(ohneKommentar));
   pruefe('ist_premium: Status aktiv/gekuendigt UND gueltig_bis in der Zukunft', (ohneKommentar.match(/t\.status in \('aktiv', 'gekuendigt'\)\s+and t\.gueltig_bis > now\(\)/g) || []).length === 2);
+  // Gleichzeitige Zustellung (Pruefer-Befund B1): ohne Sperre je Kunde sieht ein Abo-Ereignis den parallel laufenden,
+  // noch nicht festgeschriebenen Kauf nicht (und umgekehrt) und bleibt fuer immer 'wartet'. Nachgestellt mit zwei
+  // psql-Sitzungen gegen echtes Postgres 16 (PGlite hat nur eine Verbindung); hier der Vertrag, dass die Sperre vor
+  // dem ersten Lesen oder Schreiben steht.
+  const rumpf = (name) => (ohneKommentar.match(new RegExp(`create or replace function public\\.${name}\\([\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$;`)) || [])[1] || '';
+  const ereignis = rumpf('abo_stripe_ereignis');
+  const sperre = ereignis.indexOf("perform pg_advisory_xact_lock(hashtextextended('abo:' || v_kunde, 0));");
+  pruefe('Gleichzeitigkeit: abo_stripe_ereignis sperrt je Kunde, bevor es stripe_ereignisse oder abos liest oder schreibt',
+    sperre > 0 && sperre < ereignis.indexOf('insert into public.stripe_ereignisse') && sperre < ereignis.indexOf('public.abos')
+    && sperre > ereignis.indexOf("raise exception 'ABO_EREIGNIS_UNGUELTIG'"), sperre);
+  const nach = rumpf('abo_hole_nach');
+  const sperre2 = nach.indexOf("perform pg_advisory_xact_lock(hashtextextended('abo:' || kunde, 0));");
+  pruefe('abo_hole_nach: dieselbe Sperre zuerst, der Kauf holt ueber abo_hole_nach nach', sperre2 > 0 && sperre2 < nach.indexOf('public.abos')
+    && sperre2 < nach.indexOf('public.stripe_ereignisse') && /perform public\.abo_hole_nach\(v_kunde, v_abo\);/.test(ereignis), sperre2);
+  pruefe('abo_hole_nach: nur fuer den Besitzer (Flo im SQL Editor), nicht security definer',
+    /revoke all on function public\.abo_hole_nach\(text, text\) from anon, authenticated, public, service_role;/.test(ohneKommentar)
+    && !/grant execute on function public\.abo_hole_nach/.test(ohneKommentar)
+    && !/function public\.abo_hole_nach[^$]*security definer/.test(ohneKommentar));
   const test = lies('supabase/abo-rls-test.sql');
+  pruefe('abo-rls-test.sql: Kauf ohne Nutzer, Handzeile und abo_hole_nach als Fall', /abo_hole_nach\('cus_X1'\)/.test(test) && test.includes('ABO_KUNDE_UNBEKANNT'));
   pruefe('abo-rls-test.sql: in einer Transaktion, rollt zurueck, meldet Erfolg', /^begin;/m.test(test) && /rollback;\s*$/.test(test) && test.includes("'Abo-RLS-Test erfolgreich'"));
 }
 {

@@ -113,9 +113,18 @@ derselben Person verkürzt das nie.
 mit gültiger Stripe-Signatur (höchstens 5 Minuten alt). Doppelt zugestellte Ereignisse zählen einmal, die Reihenfolge
 ist egal (ein älteres Ereignis ändert nichts), und Ereignisse, die vor dem Kauf ankommen, warten, bis der Kauf sie
 einem Konto zuordnet. Fehlt die Datenbank, antwortet die Function mit 500 und Stripe stellt bis zu 3 Tage erneut zu.
+Ereignisse desselben Kunden laufen nacheinander, auch wenn Stripe sie gleichzeitig schickt.
 Kommt ein Kauf ohne Nutzer-ID an (z. B. weil jemand den Zahlungslink direkt geteilt hat), steht er in
-`stripe_ereignisse` mit dem Ergebnis `ohne_nutzer`; dann die Zeile in `abos` von Hand anlegen und dort `kunde_id`
-(`cus_...` aus Stripe) eintragen, damit spätere Ereignisse ankommen.
+`stripe_ereignisse` mit dem Ergebnis `ohne_nutzer`, und die folgenden Ereignisse dieses Kunden warten (`wartet`). Dann:
+1. In `abos` die Zeile von Hand anlegen: `user_id` (aus **Authentication > Users**), `status` = `aktiv`,
+   `gueltig_bis` = morgen, `quelle` = `manuell`, `kunde_id` = `cus_...` (aus Stripe, beim Kauf).
+2. Im **SQL Editor** `select public.abo_hole_nach('cus_...');` ausführen (derselbe Wert). Das wendet die wartenden
+   Ereignisse in ihrer Reihenfolge an und setzt das echte Laufzeitende aus Stripe; die Zahl sagt, wie viele es waren.
+   Spätere Ereignisse kommen danach von selbst an. Ohne diesen Schritt bliebe es beim Datum aus Schritt 1.
+
+**Hängende Ereignisse finden** (z. B. einmal im Monat im SQL Editor):
+`select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer') and eingegangen_am < now() - interval '1 hour';`
+Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen.
 **Konto löschen** entfernt die Zeile in `abos`, kündigt aber **nicht** das Stripe-Abo: vorher im Kundenportal kündigen.
 
 **App Store und Google Play:** In einer iOS-App aus dem App Store müssen digitale Abos über Apples In-App-Kauf laufen

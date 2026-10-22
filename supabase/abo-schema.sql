@@ -23,6 +23,14 @@
 --                                 supabase/functions/_gemeinsam/stripe.js; Rueckgabe ist ein kurzes Ergebnis:
 --                                 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer'
 --   abo_wende_an(...)             intern (kein Recht fuer irgendwen ausser dem Besitzer)
+--   abo_hole_nach(kunde, abo)     wartende Ereignisse eines Stripe-Kunden auf seine Zeile in abos anwenden. Ruft der Kauf
+--                                 selbst auf; Flo ruft es im SQL Editor (als Besitzer) nach einer von Hand angelegten
+--                                 Zeile auf (Kauf 'ohne_nutzer', siehe ANLEITUNG). Kein Recht fuer anon, Nutzer, Service.
+--
+-- Gleichzeitigkeit: Stripe schickt beim Abschluss mehrere Ereignisse fast gleichzeitig. Alle Ereignisse EINES Kunden
+-- laufen deshalb nacheinander (Transaktions-Sperre pg_advisory_xact_lock je Kunde). Sonst koennte ein Abo-Ereignis, das
+-- parallel zum Kauf ankommt, den noch nicht festgeschriebenen Kauf nicht sehen und sich als 'wartet' ablegen, waehrend
+-- der Kauf es beim Nachholen ebenfalls noch nicht sieht: es bliebe fuer immer liegen.
 --
 -- Reihenfolge der Ereignisse: Jede Zeile in abos merkt sich in stand_zeit den Zeitpunkt (Stripe event.created) des
 -- Ereignisses, das ihren Stand gesetzt hat. Ein aelteres Ereignis aendert nichts mehr ('veraltet'), bei gleicher
@@ -205,6 +213,47 @@ begin
 end;
 $$;
 
+-- Ereignisse nachholen (intern und fuer Flo im SQL Editor): wendet die Ereignisse eines Stripe-Kunden, die vor der
+-- Zuordnung ankamen, in ihrer Reihenfolge auf seine Zeile in abos an. Das sind die wartenden (Kunde war noch unbekannt)
+-- und, wenn abo genannt ist (ein bekannter Kunde schliesst ein zweites Mal ab), die schon als 'fremdes_abo' abgelegten
+-- Ereignisse genau dieses Abos. Rueckgabe: Anzahl der nachgeholten Ereignisse. Die Zeile in abos muss kunde_id tragen.
+create or replace function public.abo_hole_nach(kunde text, abo text default null)
+returns integer
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_ziel uuid;
+  e record;
+  n integer := 0;
+begin
+  if kunde is null or kunde !~ '^cus_[A-Za-z0-9]{1,200}$' or (abo is not null and abo !~ '^sub_[A-Za-z0-9]{1,200}$') then
+    raise exception 'ABO_EREIGNIS_UNGUELTIG';
+  end if;
+  -- dieselbe Sperre wie abo_stripe_ereignis (in derselben Transaktion wiederholbar), damit ein Aufruf von Hand nicht
+  -- mit einem gerade eintreffenden Ereignis desselben Kunden zusammenfaellt
+  perform pg_advisory_xact_lock(hashtextextended('abo:' || kunde, 0));
+  select t.user_id into v_ziel from public.abos t where t.kunde_id = kunde for update;
+  if v_ziel is null then
+    raise exception 'ABO_KUNDE_UNBEKANNT';
+  end if;
+  for e in
+    select w.id, w.typ, w.erstellt, w.abo_id, w.status, w.gueltig_bis, w.plan
+    from public.stripe_ereignisse w
+    where w.kunde_id = kunde
+      and (w.ergebnis = 'wartet' or (w.ergebnis = 'fremdes_abo' and abo is not null and w.abo_id = abo))
+    order by w.erstellt, w.eingegangen_am
+  loop
+    update public.stripe_ereignisse t
+    set ergebnis = public.abo_wende_an(v_ziel, e.typ, e.erstellt, e.abo_id, e.status, e.gueltig_bis, e.plan),
+        user_id = v_ziel
+    where t.id = e.id;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
 -- Ein ausgewertetes Stripe-Ereignis verbuchen (nur Service-Rolle). Die Parameter liefert
 -- supabase/functions/_gemeinsam/stripe.js (auswerten): bei checkout.session.completed nutzer (client_reference_id) und
 -- der vorlaeufige Stand (status, gueltig_bis), bei den uebrigen der Stand aus dem Abo bzw. der Rechnung.
@@ -236,7 +285,6 @@ declare
   v_ziel uuid;
   v_ergebnis text;
   n integer;
-  e record;
 begin
   -- Form pruefen (die Auswertung im Modul prueft dasselbe; hier zur Sicherheit noch einmal)
   if v_id is null or v_id !~ '^evt_[A-Za-z0-9]{1,200}$'
@@ -249,6 +297,11 @@ begin
     or v_bis is null then
     raise exception 'ABO_EREIGNIS_UNGUELTIG';
   end if;
+
+  -- Alle Ereignisse eines Kunden nacheinander (bis zum Ende der Transaktion). Ein Ereignis, das gleichzeitig mit dem Kauf
+  -- ankommt, wartet hier, bis der Kauf festgeschrieben ist, und findet dann die Zeile (oder umgekehrt: der Kauf findet
+  -- danach das festgeschriebene 'wartet' und holt es nach).
+  perform pg_advisory_xact_lock(hashtextextended('abo:' || v_kunde, 0));
 
   -- Idempotenz: dasselbe Ereignis (Stripe stellt manchmal doppelt zu) nur einmal. Ein gleichzeitiger zweiter
   -- Aufruf wartet am Primaerschluessel, bis der erste fertig ist, und findet dann die Zeile.
@@ -282,18 +335,7 @@ begin
       -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
       -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
       -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
-      for e in
-        select w.id, w.typ, w.erstellt, w.abo_id, w.status, w.gueltig_bis, w.plan
-        from public.stripe_ereignisse w
-        where w.kunde_id = v_kunde
-          and (w.ergebnis = 'wartet' or (w.ergebnis = 'fremdes_abo' and v_abo is not null and w.abo_id = v_abo))
-        order by w.erstellt, w.eingegangen_am
-      loop
-        update public.stripe_ereignisse t
-        set ergebnis = public.abo_wende_an(v_nutzer, e.typ, e.erstellt, e.abo_id, e.status, e.gueltig_bis, e.plan),
-            user_id = v_nutzer
-        where t.id = e.id;
-      end loop;
+      perform public.abo_hole_nach(v_kunde, v_abo);
       v_ergebnis := 'zugeordnet';
     end if;
   else
@@ -342,6 +384,7 @@ grant select, insert, update, delete on table public.produkte, public.abos, publ
 revoke all on function public.ist_premium() from anon, public;
 revoke all on function public.ist_premium_von(uuid) from anon, authenticated, public;
 revoke all on function public.abo_wende_an(uuid, text, timestamptz, text, text, timestamptz, text) from anon, authenticated, public, service_role;
+revoke all on function public.abo_hole_nach(text, text) from anon, authenticated, public, service_role;
 revoke all on function public.abo_stripe_ereignis(text, text, timestamptz, text, text, uuid, text, timestamptz, text)
   from anon, authenticated, public;
 grant execute on function public.ist_premium() to authenticated, service_role;
