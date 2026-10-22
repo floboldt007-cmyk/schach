@@ -183,10 +183,11 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 /* ---------- Bewertungsbalken (A: 18 px, --balken-*, Haarlinie, gleitet; dreht mit dem Brett) ---------- */
 .evalbalken { position: relative; flex: none; width: 18px; border-radius: 9px; overflow: hidden; background: var(--balken-schwarz);
   box-shadow: 0 0 0 1px var(--linie-2), var(--s1); }
-.evalbalken .weiss { position: absolute; left: 0; right: 0; bottom: 0; height: var(--w, 50%); background: var(--balken-weiss);
-  transition: height calc(900ms * var(--tempo, 1)) var(--gleiten); }
+/* Weiss-Anteil: volle Hoehe, per transform verschoben (nur transform wird animiert); --w setzt die Partie in Prozent */
+.evalbalken .weiss { position: absolute; inset: 0; background: var(--balken-weiss); transform: translateY(calc(100% - var(--w, 50%)));
+  transition: transform calc(900ms * var(--tempo, 1)) var(--gleiten); }
 .evalbalken .weiss::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(0, 0, 0, .14); }
-.evalbalken.gedreht .weiss { bottom: auto; top: 0; }
+.evalbalken.gedreht .weiss { transform: translateY(calc(var(--w, 50%) - 100%)); }
 .evalbalken.gedreht .weiss::before { top: auto; bottom: -1px; }
 .evalbalken .mitte { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .5); z-index: 1; }
 .evalbalken .wert { position: absolute; z-index: 2; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 9px; font-weight: 800;

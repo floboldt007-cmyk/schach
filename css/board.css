@@ -97,7 +97,8 @@
 .brett .lage[class*="mark-"] { z-index: 2; }
 .brett .lage.schach {
   z-index: 3;
-  background: radial-gradient(circle at 50% 55%, var(--b-schach) 0, var(--b-schach) 18%, transparent 72%);
+  /* ruhiger Hof wie in A: voll in der Mitte, weich auslaufend, bevor er den Feldrand erreicht */
+  background: radial-gradient(circle at 50% 55%, var(--b-schach) 0, transparent 68%);
   animation: brett-ein var(--b-d-m) var(--b-sanft) both;
 }
 /* Auswahl: ruhige Abdunklung mit heller Innenkante (A, Runde 2) */

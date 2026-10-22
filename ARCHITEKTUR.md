@@ -1106,7 +1106,10 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
   zweiter Finger bricht ab. Eigene Ebene `svg.brett-nutzer` (`g.pfeil[data-von][data-nach]`, `rect.marke[data-feld]`,
   Farben `--pfeil-nutzer`/`--marke-nutzer`), getrennt von den Coach-Pfeilen: `pfeile([])` der Partie loescht Flos
   Zeichnungen nicht. `nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }]`, `loescheNutzerPfeile()`.
-  `contextmenu` am Brett ist unterdrueckt.
+  `contextmenu` am Brett ist unterdrueckt. Ausserhalb des Bretts losgelassen bricht eine Zeichnung ab.
+- `beiLeer(feld)` (Tipp ohne Zug, die Partie bricht damit Vorzuege ab): Maus beim Druecken, Finger erst beim Loslassen
+  und nur, wenn kein Halten (Marke) daraus wurde. `setzeTurmRochade(true)` ergaenzt auch eine einfache `zielKarte(chess)`
+  um den Turm und wirkt sofort.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)

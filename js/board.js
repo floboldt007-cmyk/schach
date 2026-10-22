@@ -35,11 +35,16 @@
 //   autoDame: Umwandlung ohne Auswahl; Finger/Maus 450 ms auf dem Zielfeld halten zeigt D T L S.
 //   steuerung: 'beides' | 'ziehen' (kein Tipp-Zug) | 'tippen' (kein Ziehen). Ein zweiter Zeiger bricht jede Geste ab,
 //       zwei Finger ergeben nie einen Zug. Zieh-Schwelle 8 px (Maus 4 px).
-//   turmRochade: ein Zug Koenig -> eigener Turm (aus der Zielkarte) wird als Rochade ausgefuehrt.
+//   turmRochade: ein Zug Koenig -> eigener Turm (aus der Zielkarte) wird als Rochade ausgefuehrt. Mit setzeTurmRochade(true)
+//       ergaenzt das Brett jede Zielkarte selbst um den Turm (auch zielKarte(chess) ohne Option); bei Zug bestaetigen
+//       macht der zweite Tipp auf das Ziel (g1/c1) oder auf den Turm fest.
 //   pfeile: Maus Rechtsklick ziehen = Pfeil, Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett
 //       ohne Auswahl loescht alles. Finger: 400 ms halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht.
-//       Nie waehrend einer laufenden Zieh-Geste. Die Partie loescht Coach-Pfeile mit pfeile([]), Flos Zeichnungen
-//       bleiben davon unberuehrt.
+//       Nie waehrend einer laufenden Zieh-Geste (auch nicht beim Setzen eines Vorzugs). Die Partie loescht Coach-Pfeile
+//       mit pfeile([]), Flos Zeichnungen bleiben davon unberuehrt (auch ueber setzeStellung hinweg). Rechtsklick ziehen und
+//       ausserhalb des Bretts loslassen bricht ab.
+//   beiLeer(feld): Maus sofort beim Druecken; Finger (bei erlaubten Pfeilen) erst beim Loslassen und nur, wenn daraus
+//       keine Marke wurde, damit Halten zum Markieren die Vorzuege der Partie stehen laesst.
 //
 // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2, 3.9, 3.18):
 //   new Brett(el, { ..., beiAbgelehnt(von, nach, art) })   meldet einen Zugversuch, den die Zielkarte nicht
@@ -297,6 +302,8 @@ export class Brett {
 
     this._figuren = new Map();   // feld -> img
     this._erlaubt = null;        // Map feld -> Set(ziele) oder null
+    this._karte = null;          // Zielkarte, wie die App sie uebergeben hat (fuer setzeTurmRochade)
+    this._leerOffen = null;      // Finger auf einem Feld ohne Zug: beiLeer erst beim Loslassen { id, feld }
     this._erlaubtVersion = 0;
     this._stellungVersion = 0;
     this._letzter = null;
@@ -370,15 +377,8 @@ export class Brett {
 
   erlaubeZuege(karte) {
     this._erlaubtVersion++;
-    if (!karte) this._erlaubt = null;
-    else {
-      this._erlaubt = new Map();
-      const eintraege = karte instanceof Map ? [...karte] : Object.entries(karte);
-      for (const [von, ziele] of eintraege) {
-        const s = new Set([...(ziele || [])].map((z) => String(z).slice(0, 2)).filter(gueltigesFeld));
-        if (gueltigesFeld(von) && s.size) this._erlaubt.set(von, s);
-      }
-    }
+    this._karte = karte || null;
+    this._baueErlaubt();
     if (this._geste && !this._kannZiehen(this._geste.von)) this._brichGesteAb(true);
     const u = this._umwandlung;
     if (u && !this._zieleVon(u.von).has(u.nach)) this._brichUmwandlungAb(true);
@@ -388,6 +388,32 @@ export class Brett {
     if (h && !this._zieleVon(h.von).has(h.nach)) this._loescheHalten();
     if (this._auswahl && !this._kannZiehen(this._auswahl)) this._auswahl = null;
     this._zeichneLagen();
+  }
+
+  // Zielkarte -> Map feld -> Set(ziele). Mit turmRochade kommt zu jeder erlaubten Rochade (Koenig zwei Felder seitwaerts)
+  // der eigene Turm als Ziel dazu, auch wenn die App eine einfache zielKarte(chess) liefert.
+  _baueErlaubt() {
+    const karte = this._karte;
+    if (!karte) { this._erlaubt = null; return; }
+    this._erlaubt = new Map();
+    const eintraege = karte instanceof Map ? [...karte] : Object.entries(karte);
+    for (const [von, ziele] of eintraege) {
+      const s = new Set([...(ziele || [])].map((z) => String(z).slice(0, 2)).filter(gueltigesFeld));
+      if (!gueltigesFeld(von) || !s.size) continue;
+      if (this.turmRochade) this._ergaenzeTurmRochade(von, s);
+      this._erlaubt.set(von, s);
+    }
+  }
+
+  _ergaenzeTurmRochade(von, ziele) {
+    const fig = this.figurAuf(von);
+    if (!fig || fig[1] !== 'K') return;
+    for (const z of [...ziele]) {
+      const dd = z.charCodeAt(0) - von.charCodeAt(0);
+      if (z[1] !== von[1] || Math.abs(dd) !== 2) continue;
+      const turm = (dd > 0 ? 'h' : 'a') + von[1];
+      if (this.figurAuf(turm) === fig[0] + 'R') ziele.add(turm);
+    }
   }
 
   // Zeigt eine Folge vorgemerkter Zuege, ohne beiZug aufzurufen. Die echte Stellung
@@ -461,7 +487,14 @@ export class Brett {
     if (this.steuerung === 'tippen' && this._geste && this._geste.zieht) this._brichGesteAb(true);
   }
 
-  setzeTurmRochade(an = true) { this.turmRochade = !!an; }
+  // Koenig auf den eigenen Turm = Rochade; wirkt sofort auf die aktuelle Zielkarte (ohne neue Freigabe der App)
+  setzeTurmRochade(an = true) {
+    this.turmRochade = !!an;
+    if (!this._erlaubt) return;
+    this._baueErlaubt();
+    if (this._auswahl && !this._kannZiehen(this._auswahl)) this._auswahl = null;
+    this._zeichneLagen();
+  }
 
   // Gleitdauer in ms (ohne Tempo); gleitDauer() liefert die wirksame Dauer mit Tempo (0 = das Brett setzt sofort)
   setzeDauer(ms) {
@@ -1053,7 +1086,7 @@ export class Brett {
     if (this._wartet) return;
     const v = this._vorschau;
     if (v) {
-      if (feld === v.nach) { this._tippAufZiel(v.von, v.nach, e); return; }
+      if (feld === v.nach || feld === v.eingabe) { this._tippAufZiel(v.von, v.nach, e); return; }
       this._brichVorschauAb(true);   // Tipp anderswo nimmt zurueck, der Tipp wirkt danach normal
     }
     if (this._auswahl && this._auswahl !== feld && this._zieleVon(this._auswahl).has(feld)) {
@@ -1089,13 +1122,23 @@ export class Brett {
       this._zeichneLagen();
     }
     // Tipp ins Brett ohne Auswahl loescht Flos Pfeile und Marken (Maus sofort, Finger beim Loslassen ohne Halten)
+    let spaeter = false;
     if (!hatteAuswahl) {
       if (maus) this.loescheNutzerPfeile();
-      else this._starteHalteMal(e, feld, { loeschtBeimTipp: true });
+      else {
+        this._starteHalteMal(e, feld, { loeschtBeimTipp: true });
+        // Ob der Finger tippt (beiLeer, z. B. Vorzuege abbrechen) oder haelt (Marke malen), zeigt erst das Loslassen:
+        // eine Marke laesst die Vorzuege stehen
+        spaeter = this.pfeileErlaubt;
+      }
     }
-    if (this.beiLeer) {
-      try { this.beiLeer(feld); } catch (err) { console.error(err); }
-    }
+    if (spaeter) this._leerOffen = { id: e.pointerId, feld };
+    else this._meldeLeer(feld);
+  }
+
+  _meldeLeer(feld) {
+    if (!this.beiLeer) return;
+    try { this.beiLeer(feld); } catch (err) { console.error(err); }
   }
 
   // Tipp auf ein Zielfeld: bei Umwandlung mit autoDame erst 450 ms warten (Halten zeigt D T L S), sonst sofort
@@ -1134,6 +1177,7 @@ export class Brett {
         this._zeichneLagen();
       }
       if (this._stumm && this._stumm.id === id) this._stumm = null;
+      if (this._leerOffen && this._leerOffen.id === id) this._leerOffen = null;
       this._starteMalen(id, feld);
     }, HALTEN_MALEN) : null;
     this._halteMal = { id, feld, x0: e.clientX, y0: e.clientY, timer, loeschtBeimTipp };
@@ -1156,9 +1200,10 @@ export class Brett {
     this._malen = null;
     if (!m) return;
     try { this.el.releasePointerCapture(m.id); } catch (err) { /* egal */ }
-    const nach = e ? this._feldAusPunkt(e.clientX, e.clientY) : m.nach;
-    if (e && nach && nach !== m.von) this._schaltePfeil(m.von, nach);
-    else if (e) this._schalteMarke(m.von);
+    // ausserhalb des Bretts losgelassen: nichts (so bricht man eine Zeichnung ab)
+    const nach = e ? this._feldAusPunkt(e.clientX, e.clientY) : null;
+    if (nach && nach !== m.von) this._schaltePfeil(m.von, nach);
+    else if (nach) this._schalteMarke(m.von);
     this._zeichneNutzer();
   }
 
@@ -1166,6 +1211,7 @@ export class Brett {
     this._loescheHalten();
     this._loescheHalteMal();
     this._stumm = null;
+    this._leerOffen = null;
     if (this._malen) { this._malen = null; this._zeichneNutzer(); }
     if (this._geste) this._brichGesteAb(true);
     if (this._auswahl) {
@@ -1258,6 +1304,11 @@ export class Brett {
       // kurzer Tipp (kein Halten) ohne Auswahl: Flos Pfeile und Marken weg
       if (hm.loeschtBeimTipp && !this._geste) this.loescheNutzerPfeile();
     }
+    const leer = this._leerOffen;
+    if (leer && e.pointerId === leer.id) {
+      this._leerOffen = null;
+      this._meldeLeer(leer.feld);
+    }
     const h = this._halten;
     if (h && e.pointerId === h.id) {
       this._loescheHalten();
@@ -1295,6 +1346,7 @@ export class Brett {
   _abbruch(e) {
     if (this._malen && e.pointerId === this._malen.id) { this._malen = null; this._zeichneNutzer(); }
     if (this._halteMal && e.pointerId === this._halteMal.id) this._loescheHalteMal();
+    if (this._leerOffen && e.pointerId === this._leerOffen.id) this._leerOffen = null;
     if (this._halten && e.pointerId === this._halten.id) this._loescheHalten();
     const g = this._geste;
     if (!g || e.pointerId !== g.id) return;
@@ -1408,6 +1460,7 @@ export class Brett {
         }
       } else if (this._erlaubtVersion === erlaubtVersion) {
         this._erlaubt = null; // alte Zielkarte gilt nicht mehr; die App gibt die naechste frei
+        this._karte = null;
         this._zeichneLagen();
       }
     };

@@ -965,6 +965,35 @@ async function testeOptik(browser) {
   await seite.evaluate(() => demo.brett.setzeDauer(150));
   pruefe('Tempo normal: wieder 150', (await seite.evaluate(() => demo.brett.gleitDauer())) === 150);
   pruefe('setzeDauer mit Unsinn faellt auf den Standard zurueck', (await seite.evaluate(() => { demo.brett.setzeDauer('x'); return demo.brett.dauer; })) === 150);
+
+  // Bewertungsbalken (A, css/app.css): Weiss-Anteil von unten (gedreht von oben), gleitet nur per transform
+  const balken = await seite.evaluate(async () => {
+    const neu = (gedreht) => {
+      const b = document.createElement('div');
+      b.className = 'evalbalken' + (gedreht ? ' gedreht' : '');
+      b.style.cssText = 'position:fixed;left:4px;top:40px;height:200px;--w:70%';
+      b.innerHTML = '<div class="mitte"></div><div class="weiss"></div><span class="wert zahl">0,8</span>';
+      document.body.append(b);
+      return b;
+    };
+    const sichtbar = (b) => {
+      const r = b.getBoundingClientRect();
+      const w = b.querySelector('.weiss').getBoundingClientRect();
+      return { oben: Math.round(Math.max(w.top, r.top) - r.top), unten: Math.round(r.bottom - Math.min(w.bottom, r.bottom)) };
+    };
+    const b1 = neu(false);
+    const b2 = neu(true);
+    const vorher = { normal: sichtbar(b1), gedreht: sichtbar(b2), breite: b1.getBoundingClientRect().width, ueber: getComputedStyle(b1.querySelector('.weiss')).transitionProperty };
+    b1.style.setProperty('--w', '40%');
+    await new Promise((r) => setTimeout(r, 60));
+    const laeuft = b1.querySelector('.weiss').getAnimations().map((a) => a.transitionProperty).join();
+    b1.remove();
+    b2.remove();
+    return { ...vorher, laeuft };
+  });
+  pruefe('Bewertungsbalken: 18 px breit, Weiss 70 % von unten bzw. gedreht von oben', balken.breite === 18 && balken.normal.oben === 60 && balken.normal.unten === 0
+    && balken.gedreht.oben === 0 && balken.gedreht.unten === 60, JSON.stringify(balken));
+  pruefe('Bewertungsbalken: gleitet per transform (keine Hoehen-Animation)', balken.ueber === 'transform' && balken.laeuft === 'transform', JSON.stringify(balken));
   await bild(seite, 'optik-markierungen');
 
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -1119,6 +1148,30 @@ async function testeKomfort(browser) {
   await h.klickFeld('e1');
   pruefe('Turm-Rochade aus: h1 kein Ziel', (await h.anzahl('.lage.ziel[data-feld="h1"]')) === 0);
   await h.klickFeld('e1');
+  // der Setter wirkt auch auf eine einfache Zielkarte (ohne Option) und sofort, ohne neue Freigabe
+  await seite.evaluate(async () => {
+    const { zielKarte } = await import('../js/board.js');
+    demo.brett.setzeTurmRochade(true);
+    demo.brett.erlaubeZuege(zielKarte(demo.chess));
+  });
+  await h.klickFeld('e1');
+  const mitSetter = (await h.anzahl('.lage.ziel.rochade[data-feld="h1"]')) === 1 && (await h.anzahl('.lage.ziel.rochade[data-feld="a1"]')) === 1;
+  await seite.evaluate(() => demo.brett.setzeTurmRochade(false));
+  pruefe('setzeTurmRochade: ergaenzt auch zielKarte(chess) ohne Option um h1/a1, aus nimmt sie sofort weg', mitSetter
+    && (await h.anzahl('.lage.ziel[data-feld="h1"]')) === 0 && (await h.anzahl('.lage.ziel[data-feld="g1"]')) === 1);
+  await h.klickFeld('e1');
+  // Zug bestaetigen mit Turm-Rochade: Vorschau zeigt den Koenig auf g1, der zweite Tipp darf auch auf den Turm gehen
+  await h.setzeFen(ROCHADE);
+  await seite.evaluate(() => { demo.setzeTurmRochade(true); demo.brett.setzeBestaetigen(true); });
+  await h.klickFeld('e1');
+  await h.klickFeld('h1');
+  await warte(220);
+  const rochVorschau = (await h.anzahl('#brett > img.figur.vorschau[data-feld="g1"][data-figur="wK"]')) === 1 && (await h.fen()) === ROCHADE;
+  await h.klickFeld('h1');
+  await warte(250);
+  pruefe('Bestaetigen mit Turm-Rochade: Vorschau Koenig g1, Tipp auf den Turm macht fest (Rochade)', rochVorschau && (await h.figur('g1')) === 'wK'
+    && (await h.figur('f1')) === 'wR' && (await h.figurSitzt('g1')) && (await h.anzahl('#brett > img.figur.vorschau')) === 0);
+  await seite.evaluate(() => { demo.brett.setzeBestaetigen(false); demo.setzeTurmRochade(false); });
 
   pruefe('contextmenu am Brett unterdrueckt', await seite.evaluate(() => {
     const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
@@ -1262,6 +1315,25 @@ async function testePfeile(browser) {
   await seite.evaluate(() => demo.brett.setzePfeileErlaubt(true));
   await rechtsKlick('e4');
   pruefe('setzePfeileErlaubt(true): Malen geht wieder', (await nutzer(seite)).marken.join() === 'e4');
+  // ausserhalb des Bretts losgelassen: die Zeichnung ist abgebrochen (kein Pfeil, keine Marke am Start)
+  const d2m = await h.mitte('d2');
+  const aussen = await seite.evaluate(() => { const r = document.querySelector('#brett').getBoundingClientRect(); return { x: r.right + 30, y: r.top + r.height * 0.8 }; });
+  await seite.mouse.move(d2m.x, d2m.y);
+  await seite.mouse.down({ button: 'right' });
+  await seite.mouse.move((d2m.x + aussen.x) / 2, d2m.y);
+  await seite.mouse.move(aussen.x, aussen.y);
+  await seite.mouse.up({ button: 'right' });
+  n = await nutzer(seite);
+  pruefe('Rechtsklick ziehen und ausserhalb loslassen malt nichts', n.liste.length === 1 && n.marken.join() === 'e4' && n.vorschau === 0
+    && !(await seite.evaluate(() => document.querySelector('#brett').classList.contains('malt'))), JSON.stringify(n));
+  // Rechtsklick meldet kein leeres Feld (Vorzuege bleiben), ein Linksklick ins Leere schon (beiLeer, die Partie bricht damit Vorzuege ab)
+  await seite.evaluate(() => { window.__leer = []; demo.brett.beiLeer = (f) => window.__leer.push(f); });
+  await rechtsKlick('d5');
+  const leerRechts = await seite.evaluate(() => window.__leer.length);
+  await h.klickFeld('d5');
+  pruefe('Maus: Rechtsklick (Marke) meldet kein leeres Feld, Linksklick ins Leere meldet es und loescht', leerRechts === 0
+    && (await seite.evaluate(() => window.__leer.join())) === 'd5' && (await nutzer(seite)).liste.length === 0);
+  await seite.evaluate(() => { demo.brett.beiLeer = null; });
   await bild(seite, 'pfeile-maus');
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
@@ -1339,6 +1411,50 @@ async function testePfeile(browser) {
   await finger.hoch(a.x, a.y);
   pruefe('Finger, Pfeile aus: Halten markiert nichts', (await nutzer(s)).liste.length === 0 && !(await s.evaluate(() => document.querySelector('#brett').classList.contains('malt'))));
   await s.evaluate(() => demo.brett.setzePfeileErlaubt(true));
+
+  // Vorzuege wie in der Partie (Bot am Zug): beiZug merkt den Vorzug, beiLeer bricht alle ab. Ein Vorzug, der gerade
+  // gesetzt wird, wird nie zum Pfeil; Halten auf einem leeren Feld malt eine Marke und laesst die Vorzuege stehen.
+  await ht.setzeFen(NACH_E4);
+  await s.evaluate(() => {
+    window.__leer = [];
+    window.__vorzuege = [];
+    window.__beiZug = demo.brett.beiZug;
+    const karte = { g1: ['f3', 'h3'], d2: ['d3', 'd4'] };
+    const zeichne = () => {
+      demo.brett.markiere(window.__vorzuege.map((v) => v.slice(0, 2)), 'vorzug-start');
+      demo.brett.markiere(window.__vorzuege.map((v) => v.slice(2, 4)), 'vorzug-ziel');
+    };
+    demo.brett.beiLeer = (f) => { window.__leer.push(f); window.__vorzuege.length = 0; zeichne(); };
+    demo.brett.beiZug = (von, nach) => { window.__vorzuege.push(von + nach); zeichne(); demo.brett.erlaubeZuege({ d2: ['d3', 'd4'] }); return true; };
+    demo.brett.erlaubeZuege(karte);
+  });
+  a = await ht.mitte('g1');
+  b = await ht.mitte('f3');
+  await finger.runter(a.x, a.y);
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  await warte(520);
+  const vorzugMalt = await s.evaluate(() => document.querySelector('#brett').classList.contains('malt'));
+  await finger.hoch(b.x, b.y);
+  await warte(150);
+  const vz = await s.evaluate(() => ({ vorzuege: window.__vorzuege.join(), start: document.querySelectorAll('.lage.mark-vorzug-start[data-feld="g1"]').length,
+    ziel: document.querySelectorAll('.lage.mark-vorzug-ziel[data-feld="f3"]').length, leer: window.__leer.length }));
+  pruefe('Vorzug: waehrend ein Vorzug gesetzt wird, malt das Brett nie (auch nach 400 ms ueber dem Ziel)', !vorzugMalt && vz.vorzuege === 'g1f3'
+    && vz.start === 1 && vz.ziel === 1 && (await nutzer(s)).liste.length === 0, JSON.stringify(vz));
+  a = await ht.mitte('h5');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  await finger.hoch(a.x, a.y);
+  const nachMarke = await s.evaluate(() => ({ vorzuege: window.__vorzuege.join(), leer: window.__leer.length,
+    marken: document.querySelectorAll('.lage.mark-vorzug-start, .lage.mark-vorzug-ziel').length }));
+  pruefe('Vorzug: Halten auf einem leeren Feld malt eine Marke, die Vorzuege bleiben (kein beiLeer)', (await nutzer(s)).marken.join() === 'h5'
+    && nachMarke.vorzuege === 'g1f3' && nachMarke.leer === 0 && nachMarke.marken === 2, JSON.stringify(nachMarke));
+  await tippe('a5');
+  await warte(80);
+  const nachTipp = await s.evaluate(() => ({ vorzuege: window.__vorzuege.length, leer: window.__leer.join(),
+    marken: document.querySelectorAll('.lage.mark-vorzug-start, .lage.mark-vorzug-ziel').length }));
+  pruefe('Vorzug: ein kurzer Tipp ins Leere meldet beiLeer (Vorzuege weg) und loescht die Zeichnungen', nachTipp.vorzuege === 0 && nachTipp.leer === 'a5'
+    && nachTipp.marken === 0 && (await nutzer(s)).liste.length === 0, JSON.stringify(nachTipp));
+  await s.evaluate(() => { demo.brett.beiZug = window.__beiZug; demo.brett.beiLeer = null; });
 
   gruppe = 'Zwei Finger';
   await ht.setzeFen(START);
