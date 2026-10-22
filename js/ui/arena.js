@@ -347,6 +347,7 @@ export function zeige(root, params, app) {
 
   // ---------- Karte: Layout, Zeichnung ----------
   let modus = null;
+  let letzteKh = 0;
   let masse = { w: 0, h: 0, s: 1, y0: 0, hy: 0 };
   const yVon = (f) => masse.y0 + f * masse.hy;   // Anteil (0..1) -> Pixel in der Welt
   // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar; ohne Bewegung von Anfang an (kein Ausblenden, das
@@ -399,8 +400,21 @@ export function zeige(root, params, app) {
     stelleFlo(floPosition());
     // im Querformat scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
-    // nach dem Drehen ins Hochformat den gewaehlten Gegner wieder ins Bild holen
+    // nach dem Drehen ins Hochformat den gewaehlten Gegner wieder ins Bild holen; ebenso, wenn sich nur die Hoehe der
+    // Karte aendert (die Reiter-Pille kuerzt sie nach dem ersten Layout, die Karte waechst in freien Platz) und er dabei
+    // aus dem sichtbaren Teil geraten ist
     if (!quer && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
+    else if (!quer && vorher && kh !== letzteKh && !ganzImBild(gewaehlt)) scrolleZu(gewaehlt, false);
+    letzteKh = kh;
+  }
+
+  // steht die Station ganz im sichtbaren Teil der Karte?
+  function ganzImBild(id) {
+    const el = knoten[idx(id)];
+    if (!el) return true;
+    const k = karte.getBoundingClientRect();
+    const n = el.getBoundingClientRect();
+    return n.top >= k.top - 1 && n.bottom <= k.bottom + 1;
   }
 
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
