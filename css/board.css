@@ -1,22 +1,34 @@
-/* Grundstil fuer js/board.js. Nutzt nur die Vertrags-Variablen (mit Ersatzwerten),
-   css/app.css darf alles ueberschreiben. Laden vor css/app.css. */
+/* Grundstil fuer js/board.js (Premium-Umbau U6, Look A "Modern und klar").
+   Nutzt nur die Vertrags-Variablen (mit Ersatzwerten), css/app.css darf alles ueberschreiben. Laden vor css/app.css.
+   Lagen: alles, was auf einem Feld sitzt, bekommt left/top in Prozent aus board.js (keine calc(var(--x) * ...)-
+   Rechnung im Browser, WebKit rundete anders). Animiert werden nur transform und opacity; die Kurven und Dauern
+   kommen aus den Tokens (--gleiten, --feder, --feder-hupf, --d-*), mit Ersatz, wenn sie fehlen (Demo-Seite). */
 
 .brett {
   /* Ersatzwerte, falls das Design (noch) nichts setzt */
-  --b-hell: var(--feld-hell, #f1e6c8);
-  --b-dunkel: var(--feld-dunkel, #7ea35b);
-  --b-zuletzt: var(--zuletzt, rgba(255, 212, 64, .5));
-  --b-auswahl: var(--auswahl, rgba(255, 166, 43, .6));
-  --b-hinweis: var(--hinweis, rgba(79, 123, 247, .55));
-  --b-schach: var(--schach, #ff4646);
-  --b-punkt: var(--punkt, rgba(20, 20, 40, .28));
+  --b-hell: var(--feld-hell, #e4e8f6);
+  --b-dunkel: var(--feld-dunkel, #7c87b6);
+  --b-zuletzt: var(--zuletzt, rgba(118, 206, 255, .5));
+  --b-auswahl: var(--auswahl, rgba(28, 34, 92, .26));
+  --b-hinweis: var(--hinweis, rgba(76, 110, 245, .34));
+  --b-schach: var(--schach, rgba(226, 60, 60, .85));
+  --b-punkt: var(--punkt, rgba(28, 30, 60, .2));
+  --b-pfeil-nutzer: var(--pfeil-nutzer, rgba(230, 126, 34, .82));
+  --b-marke-nutzer: var(--marke-nutzer, rgba(230, 126, 34, .45));
+  --b-kante: var(--auswahl-kante, rgba(255, 255, 255, .82));   /* helle Innenkante von Auswahl, Vorschau, Ziel unter dem Finger */
+  --b-gleiten: var(--gleiten, cubic-bezier(.16, 1, .3, 1));
+  --b-feder: var(--feder, cubic-bezier(.34, 1.36, .64, 1));
+  --b-hupf: var(--feder-hupf, cubic-bezier(.34, 1.7, .5, 1));
+  --b-sanft: var(--sanft, cubic-bezier(.65, 0, .35, 1));
+  --b-d-xs: var(--d-xs, 120ms);
+  --b-d-m: var(--d-m, 320ms);
+  --b-d-l: var(--d-l, 520ms);
   /* Stellschrauben fuer das Design */
-  --brett-radius: 6px;
-  --brett-dauer: 150ms;
-  --abzeichen-groesse: .48;   /* Anteil der Feldbreite */
-  --abzeichen-versatz: .17;   /* ueber die Feldecke hinaus, Anteil der Feldbreite */
-  --brett-zieh-maus: 1;       /* Vergroesserung der gezogenen Figur */
+  --brett-radius: var(--r-brett, 12px);
+  --brett-dauer: 300ms;         /* setzt board.js je Zug (Gleitdauer mal Tempo) */
+  --brett-zieh-maus: 1;         /* Vergroesserung der gezogenen Figur */
   --brett-zieh-finger: 1.35;
+  --koord-rand: 12px;           /* Streifen fuer die Koordinaten bei Lage "rand" (ausserhalb, im Sockel) */
 
   position: relative;
   display: block;
@@ -27,76 +39,96 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  /* kein overflow: hidden, sonst werden die Abzeichen am Rand abgeschnitten */
+  /* kein overflow: hidden, sonst werden Rand-Koordinaten und Nutzer-Pfeile am Rand abgeschnitten */
 }
 .brett.greifbar { cursor: grab; }
 .brett.zieht { cursor: grabbing; }
+.brett.malt { cursor: crosshair; }
+/* Nichts im Brett geht per Transition ueber, auch nicht bei "Bewegung aus" (html[data-bewegung="aus"] * in tokens.css
+   macht aus jeder Eigenschaft eine 0,01-ms-Transition; left/top einer Figur muessen aber sofort gelten, sonst steht
+   sie einen Frame lang falsch). Zustaende mit eigener Transition (.angehoben, .kippt, .geht) setzen ihre Eigenschaft selbst. */
+.brett, .brett * { transition-property: none; }
 
-/* ---------- Felder ---------- */
+/* ---------- Felder (absolut, Lage in Prozent aus board.js) ---------- */
 .brett-felder {
   position: absolute;
   inset: 0;
   container-type: inline-size;  /* cqw = Prozent der Brettbreite (Koordinaten, Ringe) */
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(8, 1fr);
   border-radius: var(--brett-radius);
   overflow: hidden;
 }
-.brett .feld { position: relative; min-width: 0; min-height: 0; }
+.brett .feld { position: absolute; width: 12.5%; height: 12.5%; }
 .brett .feld.h { background: var(--b-hell); }
 .brett .feld.d { background: var(--b-dunkel); }
 
+/* Koordinaten, Lage "ecke": klein in der Feldecke, Zahlen oben links, Buchstaben unten rechts (PLAN 2.5 Regel 4) */
 .brett .koord {
   position: absolute;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--schrift, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
   font-weight: 700;
   line-height: 1;
   font-size: 11px;
-  font-size: max(9px, 1.75cqw);
+  font-size: clamp(8.5px, 2.4cqw, 12px);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
-.brett .koord.zahl { top: 5%; left: 6%; }
-.brett .koord.buchst { bottom: 5%; right: 7%; }
+.brett .koord.zahl { top: 2px; left: 3px; }
+.brett .koord.buchst { bottom: 1px; right: 3px; }
 .brett .feld.h .koord { color: var(--b-dunkel); }
 .brett .feld.d .koord { color: var(--b-hell); }
 
+/* Koordinaten, Lage "rand": ausserhalb der Felder im Sockel (der Sockel bekommt links und unten --koord-rand Platz,
+   css/app.css .brett-rahmen:has(> .brett.koord-rand)) */
+.brett-koord-rand { position: absolute; inset: 0; pointer-events: none; }
+.brett-koord-rand:empty { display: none; }
+.brett-koord-rand .koord {
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  color: var(--text-2, #6E6A63);
+}
+.brett-koord-rand .koord.zahl { left: calc(-1 * var(--koord-rand)); width: var(--koord-rand); height: 12.5%; }
+.brett-koord-rand .koord.buchst { top: 100%; width: 12.5%; height: var(--koord-rand); }
+
 /* ---------- Ueberlagerungen (unter den Figuren) ---------- */
 .brett-lagen { position: absolute; inset: 0; pointer-events: none; }
-.brett .lage {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 12.5%;
-  height: 12.5%;
-  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
-}
-.brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; }
+.brett .lage { position: absolute; width: 12.5%; height: 12.5%; }
+.brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; animation: brett-ein var(--b-d-m) var(--b-sanft) both; }
 .brett .lage[class*="mark-"] { z-index: 2; }
 .brett .lage.schach {
   z-index: 3;
-  background: radial-gradient(circle at center, var(--b-schach) 0%, var(--b-schach) 22%, rgba(255, 70, 70, 0) 72%);
+  background: radial-gradient(circle at 50% 55%, var(--b-schach) 0, var(--b-schach) 18%, transparent 72%);
+  animation: brett-ein var(--b-d-m) var(--b-sanft) both;
 }
-.brett .lage.auswahl { background: var(--b-auswahl); z-index: 4; }
+/* Auswahl: ruhige Abdunklung mit heller Innenkante (A, Runde 2) */
+.brett .lage.auswahl { background: var(--b-auswahl); z-index: 4; box-shadow: inset 0 0 0 max(3px, .55cqw) var(--b-kante); }
+/* Zug bestaetigen: das Ziel leuchtet in der warmen Toenung des letzten Zugs, mit heller Innenkante */
+.brett .lage.vorschau { background: var(--b-zuletzt); z-index: 4; box-shadow: inset 0 0 0 max(3px, .55cqw) var(--b-kante); }
+/* Zielpunkte als weiche Scheiben, federn gestaffelt ein (--v aus board.js) */
 .brett .lage.ziel { z-index: 5; }
 .brett .lage.ziel::after {
   content: "";
   position: absolute;
-  inset: 36%;
+  inset: 37%;
   border-radius: 50%;
   background: var(--b-punkt);
+  animation: brett-punkt var(--b-d-m) var(--b-hupf) var(--v, 0ms) both;
 }
+/* Schlagziele als Ringecken */
 .brett .lage.ziel.schlag::after {
-  inset: 3%;
-  background: none;
-  border: 6px solid var(--b-punkt);
-  border-width: max(3px, 1.05cqw);
+  inset: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 0 0, var(--b-punkt) 0 22%, transparent 23%),
+    radial-gradient(circle at 100% 0, var(--b-punkt) 0 22%, transparent 23%),
+    radial-gradient(circle at 0 100%, var(--b-punkt) 0 22%, transparent 23%),
+    radial-gradient(circle at 100% 100%, var(--b-punkt) 0 22%, transparent 23%);
 }
+/* Turm auf Koenig: der eigene Turm ist ein Ziel (Rochade), kein Schlag */
+.brett .lage.ziel.rochade::after { inset: 37%; border-radius: 50%; background: var(--b-punkt); }
 .brett .lage.ueber {
   z-index: 6;
-  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .8);
-  box-shadow: inset 0 0 0 max(3px, .6cqw) rgba(255, 255, 255, .8);
+  box-shadow: inset 0 0 0 max(3px, .6cqw) var(--b-kante);
 }
 
 /* Markierungen ueber markiere(felder, art) */
@@ -108,7 +140,7 @@
 .brett .lage.mark-vorzug-start { background: var(--vorzug-start); }
 .brett .lage.mark-vorzug-ziel { background: var(--vorzug-ziel); }
 .brett .lage.mark-bewertung {
-  box-shadow: inset 0 0 0 max(3px, .55cqw) var(--akzent, #ffc83d);
+  box-shadow: inset 0 0 0 max(3px, .55cqw) var(--akzent, #CC4820);
   animation: brett-puls 1s ease-in-out infinite;
 }
 .brett .lage.mark-k-brillant { background: var(--k-brillant, #7A4FD6); opacity: .45; }
@@ -123,39 +155,43 @@
 .brett .lage.mark-k-patzer { background: var(--k-patzer, #BC2A4C); opacity: .45; }
 .brett .lage.mark-k-erzwungen { background: var(--k-erzwungen, #878E9E); opacity: .45; }
 
-/* ---------- Figuren ---------- */
+/* ---------- Figuren (Lage per left/top, Gleiten per transform aus board.js) ---------- */
 .brett > .figur {
   position: absolute;
-  left: 0;
-  top: 0;
   width: 12.5%;
   height: 12.5%;
   z-index: 2;
   pointer-events: none;
   -webkit-user-drag: none;
-  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
 }
-.brett > .figur.gleitet {
+/* gewaehlte Figur steht leicht angehoben (A); weicher Schatten statt Leuchten. Die Feder gilt nur beim Anheben:
+   ohne die Klasse (Zug, Aufrichten nach dem Koenigsfall, setzeStellung ohne Animation) steht die Figur sofort. */
+.brett > .figur.angehoben {
   z-index: 3;
-  transition: transform var(--brett-dauer) cubic-bezier(.25, .8, .35, 1);
+  transition: transform var(--b-d-xs) var(--b-feder);
+  transform: translateY(-4%) scale(1.06);
+  filter: drop-shadow(0 6px 5px rgba(0, 0, 0, .22));
 }
+.brett > .figur.gleitet { z-index: 3; transition: none; }
 .brett > .figur.gezogen {
   z-index: 9;
   transition: none;
   transform-origin: 50% 50%;
   will-change: transform;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .3));
 }
 .brett > .figur.geht {
   z-index: 1;
   opacity: 0;
-  transition: opacity var(--brett-dauer) ease;
+  transition: opacity var(--brett-dauer) var(--b-sanft);
 }
-.brett > .figur.kommt { animation: brett-ein var(--brett-dauer) ease; }
+.brett > .figur.kommt { animation: brett-ein var(--brett-dauer) var(--b-sanft); }
 .brett > .figur.verdeckt { opacity: 0; }
+/* Zug bestaetigen: die Figur steht halb durchsichtig auf dem Ziel */
+.brett > .figur.vorschau { z-index: 3; opacity: .55; }
 
-/* ---------- Pfeile ---------- */
-.brett-pfeile {
+/* ---------- Pfeile: Coach (brett-pfeile) und Flos eigene (brett-nutzer) ---------- */
+.brett-pfeile, .brett-nutzer {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -165,6 +201,10 @@
   overflow: visible;
 }
 .brett-pfeile .pfeil { opacity: .82; }
+.brett-nutzer { z-index: 4; }
+.brett-nutzer .pfeil { color: var(--b-pfeil-nutzer); opacity: .9; animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
+.brett-nutzer .marke { fill: var(--b-marke-nutzer); animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
+.brett-nutzer .vorschau { opacity: .55; animation: none; }
 
 /* ---------- W0+a: Striche (Mattnetz) und Koenigsfall ---------- */
 /* im Brett ueber den Figuren, in einer Effekt-Ebene ueber deren ganzer Flaeche (gleiche Lage wie die Felder) */
@@ -185,26 +225,26 @@
 @keyframes strich-zug { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes strich-marke { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .brett > .figur.kippt {
-  transform: translate(calc(var(--x) * 100%), calc(var(--y) * 100%)) rotate(var(--kipp-winkel, -78deg));
+  transform: rotate(var(--kipp-winkel, -78deg));
   transform-origin: 50% 88%;
   transition: transform .45s cubic-bezier(.5, 0, .75, .4);
 }
 .brett > .figur.kippt.langsam { transition-duration: 1.4s; }
 
-/* ---------- Abzeichen (Zug-Klassen-Symbol) ---------- */
+/* ---------- Abzeichen (Zug-Klassen-Symbol): federt ein, bleibt in der Brett-Box ---------- */
 .brett > .abzeichen-ort {
   position: absolute;
   z-index: 6;
   pointer-events: none;
-  width: calc(12.5% * var(--abzeichen-groesse));
   min-width: 20px;
   aspect-ratio: 1 / 1;
-  right: calc((7 - var(--x) - var(--abzeichen-versatz)) * 12.5%);
-  top: calc((var(--y) - var(--abzeichen-versatz)) * 12.5%);
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3));
 }
 .brett > .abzeichen-ort > svg { display: block; width: 100%; height: 100%; }
-.brett > .abzeichen-ort.plopp { animation: brett-plopp .55s ease-out both; }
+.brett > .abzeichen-ort.plopp { animation: brett-plopp var(--b-d-l) var(--b-hupf) both; }
+/* Unscharf, Daneben, Verschenkt, Weit daneben: ruhig einblenden, kein Wackeln (A: Patzer ruhig) */
+.brett > .abzeichen-ort.plopp.k-ungenau, .brett > .abzeichen-ort.plopp.k-fehler,
+.brett > .abzeichen-ort.plopp.k-verpasst, .brett > .abzeichen-ort.plopp.k-patzer { animation: brett-ruhig var(--b-d-m) var(--b-sanft) both; }
 
 /* ---------- Umwandlung ---------- */
 .brett-umwandlung {
@@ -212,22 +252,20 @@
   inset: 0;
   z-index: 10;
   border-radius: var(--brett-radius);
-  background: rgba(10, 12, 24, .42);
+  background: var(--schleier, rgba(28, 24, 18, .44));
 }
 .brett-umwandlung[hidden] { display: none; }
 .umwandlung-wahl {
   position: absolute;
-  left: calc(var(--x) * 12.5%);
-  top: calc(var(--y) * 12.5%);
   width: 12.5%;
   height: 50%;
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
+  border-radius: var(--r-s, 10px);
   overflow: hidden;
-  background: var(--b-hell);
-  box-shadow: 0 0 0 2px var(--akzent, #ffc83d), 0 10px 30px rgba(0, 0, 0, .5);
-  animation: brett-ein .12s ease;
+  background: var(--flaeche, #FFFFFF);
+  box-shadow: var(--s3, 0 10px 30px rgba(0, 0, 0, .35)), 0 0 0 1px var(--linie-2, rgba(28, 25, 20, .14));
+  animation: brett-ein var(--b-d-xs) var(--b-sanft);
 }
 .umwandlung-figur {
   flex: 1 1 0;
@@ -238,29 +276,28 @@
   border-radius: 0;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--b-hell);
+  background: var(--flaeche, #FFFFFF);
   display: grid;
   place-items: center;
   cursor: pointer;
   touch-action: none;
 }
-.umwandlung-figur + .umwandlung-figur { border-top: 1px solid rgba(0, 0, 0, .12); }
-.umwandlung-figur:active { background: var(--b-auswahl); }
-.umwandlung-figur:focus-visible { outline: 3px solid var(--akzent, #ffc83d); outline-offset: -3px; }
+.umwandlung-figur + .umwandlung-figur { border-top: 1px solid var(--linie, rgba(28, 25, 20, .08)); }
+.umwandlung-figur:active { background: var(--flaeche-3, #F1EEE8); }
+.umwandlung-figur:focus-visible { outline: var(--fokus, 2.5px solid #CC4820); outline-offset: -3px; }
 .umwandlung-figur img { width: 92%; height: 92%; pointer-events: none; }
 
-/* ---------- Animationen ---------- */
+/* ---------- Animationen (nur transform und opacity) ---------- */
 @keyframes brett-ein { from { opacity: 0; } }
 @keyframes brett-puls { 50% { opacity: .35; } }
-@keyframes brett-plopp {
-  0% { transform: scale(0) rotate(-30deg); opacity: 0; }
-  55% { transform: scale(1.25) rotate(6deg); opacity: 1; }
-  80% { transform: scale(.94) rotate(-2deg); }
-  100% { transform: none; opacity: 1; }
-}
+@keyframes brett-punkt { from { transform: scale(0); opacity: 0; } }
+@keyframes brett-plopp { from { transform: scale(0) rotate(-35deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes brett-ruhig { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .brett-striche .strich, .brett-striche .strich-zug, .brett-striche .strich-marke { animation: none; }
-  .brett > .figur.kippt { transition: none; }
-  .brett > .abzeichen-ort.plopp { animation-duration: 1ms; }
+  /* !important gegen die 0,01 ms aus html[data-bewegung="aus"] (bewegung.js setzt das bei Systemwunsch ebenfalls) */
+  .brett > .figur.kippt { transition: none; transition-duration: 0s !important; }
+  .brett > .figur { transition: none; }
+  .brett > .abzeichen-ort.plopp, .brett .lage.ziel::after, .brett .lage.zuletzt, .brett .lage.schach, .brett-nutzer .pfeil, .brett-nutzer .marke { animation-duration: 1ms; animation-delay: 0s; }
   .brett .lage.mark-bewertung { animation: none; }
 }

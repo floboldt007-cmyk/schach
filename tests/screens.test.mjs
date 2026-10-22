@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
+import { browserTyp, fingerTreiber } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -485,16 +485,14 @@ async function testeTouch(browser, d) {
     const st = c && getComputedStyle(c);
     return !!st && st.color !== 'rgba(0, 0, 0, 0)' && !/text/.test(st.backgroundClip || st.webkitBackgroundClip || '');
   }));
-  // Wischen mit echten Touch-Ereignissen (CDP)
-  const cdp = await kontext.newCDPSession(seite);
+  // Wischen mit Finger-Ereignissen ohne CDP (synthetische Pointer-Ereignisse, pointerType touch; laeuft auch in WebKit)
+  const finger = fingerTreiber(seite);
   await seite.locator('.an-brett').scrollIntoViewIfNeeded();
   const br = await seite.locator('.an-brett').boundingBox();
   const vor = await aktuellerPly(seite);
   const y = br.y + br.height / 2;
-  const punkte = [0.8, 0.65, 0.5, 0.35, 0.2].map((f) => ({ x: br.x + br.width * f, y }));
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [punkte[0]] });
-  for (const pt of punkte.slice(1)) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [pt] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const punkte = [0.8, 0.65, 0.5, 0.35, 0.2].map((f) => [br.x + br.width * f, y]);
+  await finger.ziehe(punkte, { schritte: 2 });
   await warte(200);
   pruefe('Wischen mit dem Finger: Zug vor', (await aktuellerPly(seite)) === vor + 1, `${vor} -> ${await aktuellerPly(seite)}`);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));

@@ -125,76 +125,75 @@ button, a, [role="radio"] { touch-action: manipulation; }
   background: var(--akzent-weich); }
 .platzhalter-icon .ico { width: 34px; height: 34px; }
 
-/* ---------- Brett-Rahmen (Sockel in Kartenfarbe; die A-Optik baut U6) ---------- */
+/* ---------- Brett-Rahmen: der A-Sockel (Premium-Umbau U6) ----------
+   .brett-rahmen ist der Sockel: Kartenfarbe (--sockel), Haarlinie (--kante), dreistufiger Schatten (--s-brett),
+   Radius --r-sockel, Rand --sockel-rand (7 px, Handy 4 px); die Partie setzt --rahmen (SCREEN: PARTIE), das gilt dann.
+   .brett-effekte liegt exakt ueber den 8x8 Feldern (gleicher Abstand wie der Sockel-Rand, beide Ausrichtungen).
+   Koordinaten am Rand (.brett.koord-rand aus board.js, Einstellung koordLage): links und unten 12 px Sockel. */
 .brettzone { position: relative; display: flex; gap: 8px; align-items: stretch; flex: none; }
-.brett-rahmen { position: relative; flex: none; padding: 4px; border-radius: 18px; background-color: var(--sockel);
-  background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); }
-.brett-rahmen::after { content: ""; position: absolute; inset: 3px; border-radius: 15px; box-shadow: 0 0 0 1px var(--linie); pointer-events: none; z-index: 8; }
-.brett-rahmen > .brett { width: var(--brett, 100%); --brett-radius: 14px; }
-.brett .koord { font-family: var(--schrift); font-weight: 800; }
+.brett-rahmen { --sockel-abstand: var(--rahmen, var(--sockel-rand)); position: relative; flex: none; padding: var(--sockel-abstand);
+  border-radius: var(--r-sockel); background-color: var(--sockel); background-image: var(--textur-sockel, none);
+  box-shadow: var(--s-brett), var(--kante); }
+.brett-rahmen > .brett { width: var(--brett, 100%); --brett-radius: var(--r-brett); }
+.brett-rahmen:has(> .brett.koord-rand) { padding-left: 12px; padding-bottom: 12px; }
 html[data-koordinaten="aus"] .brett .koord { display: none; }
 .brett > .figur { filter: drop-shadow(0 2px 1.5px rgba(10, 12, 30, .28)); }
-.brett > .figur.gezogen { filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .45)); }
-.brett .lage.mark-hinweis { box-shadow: inset 0 0 0 max(3px, .5cqw) rgba(76, 110, 245, .75); }
+.brett > .figur.angehoben { filter: drop-shadow(0 6px 5px rgba(10, 12, 30, .26)); }
+.brett > .figur.gezogen { filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .3)); }
+.brett .lage.mark-hinweis { box-shadow: inset 0 0 0 max(3px, .5cqw) var(--k-stark); }
 
-/* Klassen-Abzeichen: weicher Schatten statt Leuchten, Auftritt je Klasse abgestuft */
-.brett > .abzeichen-ort { --kf: var(--k-bester); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3)); }
+/* Klassen-Farbe fuer Effekte (Welle, Ringe, Funken) je Abzeichen- bzw. Effekt-Klasse */
+.brett > .abzeichen-ort, .effekt-ort { --kf: var(--k-bester); }
 .k-brillant { --kf: var(--k-brillant); } .k-stark { --kf: var(--k-stark); } .k-bester { --kf: var(--k-bester); }
 .k-exzellent { --kf: var(--k-exzellent); } .k-gut { --kf: var(--k-gut); } .k-buch { --kf: var(--k-buch); }
 .k-ungenau { --kf: var(--k-ungenau); } .k-fehler { --kf: var(--k-fehler); } .k-verpasst { --kf: var(--k-verpasst); }
 .k-patzer { --kf: var(--k-patzer); } .k-erzwungen { --kf: var(--k-erzwungen); }
-.brett > .abzeichen-ort.plopp { animation: abz-pop .55s cubic-bezier(.2, 1.4, .4, 1) both; }
-.brett > .abzeichen-ort.plopp.k-brillant { animation-duration: .65s; }
-.brett > .abzeichen-ort.plopp.k-bester { animation: abz-feder .75s cubic-bezier(.2, 1.7, .35, 1) both; }
-.brett > .abzeichen-ort.plopp.k-ungenau, .brett > .abzeichen-ort.plopp.k-fehler, .brett > .abzeichen-ort.plopp.k-verpasst,
-.brett > .abzeichen-ort.plopp.k-buch, .brett > .abzeichen-ort.plopp.k-gut, .brett > .abzeichen-ort.plopp.k-erzwungen { animation: abz-ruhig .4s ease-out both; }
-.brett > .abzeichen-ort.plopp.k-patzer { animation: abz-wackeln .55s ease-out both; }
+/* Auftritt des Symbols in der Coach-Zeile (Abschnitt "Coach-Zeile" nutzt diese Namen; am Brett federt board.css) */
 @keyframes abz-pop { 0% { transform: scale(0) rotate(-35deg); opacity: 0; } 55% { transform: scale(1.28) rotate(8deg); opacity: 1; }
   78% { transform: scale(.92) rotate(-2deg); } 100% { transform: none; opacity: 1; } }
-@keyframes abz-feder { 0% { transform: translateY(-40%) scale(.3); opacity: 0; } 50% { transform: translateY(6%) scale(1.15); opacity: 1; }
-  72% { transform: translateY(-4%) scale(.96); } 100% { transform: none; opacity: 1; } }
 @keyframes abz-ruhig { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes abz-wackeln { 0% { opacity: 0; transform: scale(.8); } 25% { opacity: 1; transform: rotate(-12deg); } 45% { transform: rotate(10deg); }
   65% { transform: rotate(-6deg); } 82% { transform: rotate(3deg); } 100% { transform: none; opacity: 1; } }
 
 /* Effekte ueber dem Brett (Welle, Funken, Ringe); Lage wie die Felder */
-.brett-effekte { position: absolute; inset: 4px; z-index: 7; pointer-events: none; }
+.brett-effekte { position: absolute; inset: var(--sockel-abstand); z-index: 7; pointer-events: none; }
+.brett-rahmen:has(> .brett.koord-rand) > .brett-effekte { inset: var(--sockel-abstand) var(--sockel-abstand) 12px 12px; }
 .effekt-ort { position: absolute; left: calc(var(--x) * 12.5%); top: calc(var(--y) * 12.5%); width: 12.5%; height: 12.5%; }
-.welle { position: absolute; inset: -10%; border-radius: 50%; border: 3px solid var(--kf); animation: welle 1s ease-out both; }
+.welle { position: absolute; inset: -10%; border-radius: 50%; border: 3px solid var(--kf); animation: welle 1s var(--gleiten) both; }
 @keyframes welle { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(2.3); opacity: 0; } }
 .funken { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .funken i { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; background: var(--c, var(--kf));
   clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 0; animation: funke .9s cubic-bezier(.1, .8, .3, 1) both; }
+  transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 0; animation: funke .9s var(--gleiten) both; }
 @keyframes funke { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(.4); } 70% { opacity: 1; }
   100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--r) * var(--feld, 60px) * -1)) scale(1); } }
 .ring-puls, .ring-ping { position: absolute; inset: 4%; border-radius: 50%; border: 3px solid var(--kf); opacity: 0; }
-.ring-puls { animation: ring-puls .95s ease-out both; }
+.ring-puls { animation: ring-puls .95s var(--gleiten) both; }
 .ring-puls.zwei { animation-delay: .28s; }
-.ring-ping { border-width: 2px; animation: ring-ping .7s ease-out both; }
+.ring-ping { border-width: 2px; animation: ring-ping .7s var(--gleiten) both; }
 @keyframes ring-puls { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(1.75); opacity: 0; } }
 @keyframes ring-ping { 0% { transform: scale(.5); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
 
-/* Brillant (grosser Moment): das Brett hebt sich kurz, der Sockel zeigt einmal die Klassenfarbe (kein Prisma mehr) */
+/* Genial (grosser Moment): das Brett hebt sich kurz, der Sockel zeigt einmal die Klassenfarbe (kein Prisma mehr) */
 .brett-rahmen.prisma { animation: prisma 1s var(--gleiten) 1 both; }
 @keyframes prisma { 0% { transform: none; box-shadow: var(--s-brett), 0 0 0 0 var(--k-brillant); }
   35% { transform: scale(1.012); box-shadow: var(--s-brett), 0 0 0 3px var(--k-brillant); }
   100% { transform: none; box-shadow: var(--s-brett), var(--kante); } }
 
-/* ---------- Bewertungsbalken (dreht mit dem Brett) ---------- */
-.evalbalken { position: relative; flex: none; width: 18px; border-radius: 10px; overflow: hidden; background: var(--balken-schwarz);
-  border: 1px solid var(--linie-2); box-shadow: var(--s1); }
+/* ---------- Bewertungsbalken (A: 18 px, --balken-*, Haarlinie, gleitet; dreht mit dem Brett) ---------- */
+.evalbalken { position: relative; flex: none; width: 18px; border-radius: 9px; overflow: hidden; background: var(--balken-schwarz);
+  box-shadow: 0 0 0 1px var(--linie-2), var(--s1); }
 .evalbalken .weiss { position: absolute; left: 0; right: 0; bottom: 0; height: var(--w, 50%); background: var(--balken-weiss);
-  transition: height .7s cubic-bezier(.2, .9, .25, 1.12); }
-.evalbalken .weiss::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(0, 0, 0, .18); }
+  transition: height calc(900ms * var(--tempo, 1)) var(--gleiten); }
+.evalbalken .weiss::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: rgba(0, 0, 0, .14); }
 .evalbalken.gedreht .weiss { bottom: auto; top: 0; }
 .evalbalken.gedreht .weiss::before { top: auto; bottom: -1px; }
-.evalbalken .mitte { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .55); z-index: 1; }
-.evalbalken .wert { position: absolute; z-index: 2; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 10px; font-weight: 800;
-  color: var(--balken-schwarz); writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: .02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.evalbalken[data-fuehrt="b"] .wert { bottom: auto; top: 6px; color: var(--balken-weiss); }
-.evalbalken.gedreht[data-fuehrt="w"] .wert { bottom: auto; top: 6px; }
-.evalbalken.gedreht[data-fuehrt="b"] .wert { top: auto; bottom: 6px; }
+.evalbalken .mitte { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .5); z-index: 1; }
+.evalbalken .wert { position: absolute; z-index: 2; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 9px; font-weight: 800;
+  color: var(--balken-schwarz); writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.evalbalken[data-fuehrt="b"] .wert { bottom: auto; top: 7px; color: var(--balken-weiss); }
+.evalbalken.gedreht[data-fuehrt="w"] .wert { bottom: auto; top: 7px; }
+.evalbalken.gedreht[data-fuehrt="b"] .wert { top: auto; bottom: 7px; }
 
 /* ---------- Avatare (Toenung in Bot-Farbe hinter dem Portraet, Ring in Bot-Farbe; kein Leuchten) ---------- */
 .avatar { --g: 64px; position: relative; flex: none; width: var(--g); height: var(--g); border-radius: 22%; padding: 0;

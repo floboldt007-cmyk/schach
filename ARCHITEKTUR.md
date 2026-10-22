@@ -162,24 +162,35 @@ Review = { zuege: [{ ply, farbe, san, uci, fenVorher, fenNachher, evalVorher, ev
 ## js/board.js
 ```js
 export class Brett {
-  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug })
+  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug, koordinaten = true,
+    koordLage = 'ecke', animation = 150, autoDame = false, bestaetigen = false, steuerung = 'beides',
+    turmRochade = false, pfeile = true, beiAbgelehnt, beiLeer })
   // beiZug(von, nach, umwandlung?) -> true wenn angenommen
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
   zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
-  setzeAutoDame(boolean)          // Umwandlung bei der Eingabe sofort als Dame ausfuehren
+  setzeAutoDame(boolean)          // Umwandlung ohne Auswahl als Dame; 450 ms auf dem Zielfeld halten zeigt D T L S
+  setzeBestaetigen(boolean)       // Zug bestaetigen: Vorschau, zweiter Tipp aufs Ziel macht fest, Tipp anderswo nimmt zurueck
+  setzeSteuerung('beides' | 'ziehen' | 'tippen')
+  setzeTurmRochade(boolean)       // Koenig auf den eigenen Turm = Rochade (zielKarte(chess, { turmRochade }))
+  setzeDauer(ms), gleitDauer()    // Gleitdauer; gleitDauer() mit Tempo (0 = das Brett setzt sofort), fuer den Klang bei der Landung
+  setzeKoordLage('ecke' | 'rand') // Koordinaten klein in der Feldecke oder aussen im Sockel (.brett.koord-rand)
+  setzePfeileErlaubt(boolean), nutzerPfeile(), loescheNutzerPfeile()   // Flos Pfeile und Marken (svg.brett-nutzer)
   zeigeAbzeichen(feld, klasse)    // Klassen-Symbol oben rechts am Feld (siehe Design)
   entferneAbzeichen()
-  pfeile([{ von, nach, farbe }])  // SVG-Pfeile ueber dem Brett
+  pfeile([{ von, nach, farbe }])  // Coach-Pfeile (svg.brett-pfeile), getrennt von Flos Zeichnungen
   markiere(felder, art)           // z. B. Hinweis, Fehlerfeld
-  koordinaten(an)                 // a-h / 1-8 am Rand
+  koordinaten(an)                 // a-h / 1-8 an oder aus
 }
 ```
-- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ring), Tippen auf Ziel zieht.
-  Ziehen mit dem Finger (Pointer Events), Figur folgt dem Finger, Abwurf auf Feld.
+- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ringecken), Tippen auf Ziel zieht.
+  Ziehen mit dem Finger (Pointer Events, Schwelle 8 px, Maus 4 px), Figur folgt dem Finger, Abwurf auf Feld.
+  Ein zweiter Zeiger bricht jede Geste ab, zwei Finger ergeben nie einen Zug.
 - Umwandlung: kleine Auswahl D T L S direkt am Feld.
-- Animation 150 ms, Rochade bewegt beide Figuren, en passant entfernt den Bauern.
+- Gleiten 150 ms (Standard; die Partie setzt `setzeDauer(300)` aus `--d-zug`) mal Tempo aus `js/bewegung.js`,
+  Rochade bewegt beide Figuren, en passant entfernt den Bauern. Lage von Figuren, Feldern und Lagen als fertige
+  Prozentwerte (`left`/`top`), animiert werden nur `transform` und `opacity` (keine Browser-Rundung, WebKit).
 - Groesse: quadratisch, fuellt den verfuegbaren Platz (CSS `aspect-ratio`), scharf auf Retina.
 
 ## js/sounds.js
@@ -1074,6 +1085,28 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
   `opacity`, reduzierte Bewegung zeigt das fertige Bild.
 - `kippeKoenig(feld, { langsam = false }) -> boolean` (`.figur.kippt`, langsam 1,4 s), `richteAuf()`; `setzeStellung`
   stellt gekippte Koenige wieder auf.
+- **Premium-Umbau U6 (Look A):** `.brett-rahmen` ist der Sockel (`--sockel`, `--s-brett`, `--r-sockel`, Haarlinie
+  `--kante`, Rand `--sockel-abstand` = `--rahmen` der Partie, sonst `--sockel-rand`); `.brett-effekte` liegt mit
+  demselben Abstand exakt ueber den 8x8 Feldern. Bei `koordLage: 'rand'` traegt das Brett `.brett.koord-rand`, der
+  Sockel bekommt links und unten 12 px, die Koordinaten stehen in `.brett-koord-rand`. Markierungen: `.lage.zuletzt`
+  (`--zuletzt`), `.lage.auswahl` (Abdunklung `--auswahl` mit heller Innenkante, Figur `.figur.angehoben`),
+  `.lage.ziel` (Scheibe), `.lage.ziel.schlag` (Ringecken), `.lage.ziel.rochade` (Turm-auf-Koenig), `.lage.schach`
+  (roter Hof), `.lage.vorschau` (Zug bestaetigen, Figur `.figur.vorschau` halb durchsichtig). Abzeichen federn mit
+  `--feder-hupf` ein (`.abzeichen-ort.plopp`), bleiben in der Brett-Box und verschwinden (`.weg`), sobald ihre Figur
+  das Feld verlaesst oder geschlagen wird.
+- Komfort (Einstellungen aus PLAN 4, die Partie verdrahtet sie): `setzeBestaetigen(bool)` (Vorschau: erster
+  Tipp/Abwurf stellt die Figur halb durchsichtig aufs Ziel, zweiter Tipp aufs Ziel macht fest, erst dann `beiZug`;
+  Tipp anderswo nimmt zurueck, `setzeStellung` und `erlaubeZuege` raeumen eine Vorschau weg), `setzeAutoDame(bool)`
+  (450 ms auf dem Zielfeld halten, auch beim Ziehen, zeigt D T L S), `setzeSteuerung('beides' | 'ziehen' | 'tippen')`,
+  `setzeTurmRochade(bool)` zusammen mit `zielKarte(chess, { turmRochade })`, `setzeDauer(ms)` und `gleitDauer()`
+  (Dauer mal Tempo; der Zug-Klang gehoert auf die Landung), `setzeKoordLage('ecke' | 'rand')`.
+- Flos Pfeile und Marken (`pfeile`-Einstellung, `setzePfeileErlaubt(bool)`): Maus Rechtsklick ziehen = Pfeil,
+  Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett ohne Auswahl loescht alles; Finger 400 ms
+  halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht. Nie waehrend einer laufenden Zieh-Geste, ein
+  zweiter Finger bricht ab. Eigene Ebene `svg.brett-nutzer` (`g.pfeil[data-von][data-nach]`, `rect.marke[data-feld]`,
+  Farben `--pfeil-nutzer`/`--marke-nutzer`), getrennt von den Coach-Pfeilen: `pfeile([])` der Partie loescht Flos
+  Zeichnungen nicht. `nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }]`, `loescheNutzerPfeile()`.
+  `contextmenu` am Brett ist unterdrueckt.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)
