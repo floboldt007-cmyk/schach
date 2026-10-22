@@ -149,6 +149,8 @@ function main() {
   // Alles, was zur App gehoert, muss im Cache stehen
   const soll = [
     'index.html', 'manifest.webmanifest', 'LICENSE',
+    // Daten-Fundament: Datenschutzerklaerung und Impressum muessen auch offline erreichbar sein
+    'datenschutz.html', 'impressum.html',
     ...alleDateien('css', /\.css$/),
     // Premium-Umbau (PLAN 3.8): Themes, Schriften mit Lizenztext, Klangpakete, Portraets des Themes
     ...alleDateien('css/themes', /\.css$/),
@@ -224,6 +226,15 @@ function main() {
   pruefe('index.html: alle Verweise im Cache', ausHtml.length >= 7 && htmlFehlt.length === 0, htmlFehlt.join(', ') || String(ausHtml.length));
   for (const n of ['manifest.webmanifest', 'assets/icons/apple-touch-icon.png', 'assets/icons/favicon.svg']) {
     pruefe(`index.html verlinkt ${n}`, ausHtml.includes(n));
+  }
+  // Daten-Fundament: Datenschutzerklaerung und Impressum vorhanden, ihre Verweise (Tokens, Theme, Icon) im Cache
+  for (const seite of ['datenschutz.html', 'impressum.html']) {
+    const t = existsSync(path.join(WURZEL, seite)) ? readFileSync(path.join(WURZEL, seite), 'utf8') : '';
+    // "./" (zurueck zur App) ist index.html
+    const verweise = [...t.matchAll(/(?:href|src)="([^"]+)"/g)].map((m) => relativ(seite, m[1])).filter(Boolean).map((d) => (d === './' ? 'index.html' : d));
+    const weg = verweise.filter((d) => !menge.has(d));
+    pruefe(`${seite}: im Cache, Verweise im Cache, Tokens und Theme der App`, menge.has(seite) && weg.length === 0
+      && verweise.includes('css/tokens.css') && verweise.includes('css/themes/modern.css'), weg.join(', ') || String(verweise.length));
   }
   // Premium-Umbau U1: Tokens und Theme vor allen anderen Stylesheets, jede CSS-Datei verlinkt, Schriften vorgeladen
   const css = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);

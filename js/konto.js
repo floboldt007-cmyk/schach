@@ -1,4 +1,9 @@
-// Freiwilliges Konto: E-Mail-OTP und Cloud-Sicherung ohne Supabase-Bibliothek.
+// Freiwilliges Konto: E-Mail-OTP, Anmeldung mit Google und Cloud-Sicherung ohne Supabase-Bibliothek.
+// Daten-Fundament (DSGVO): aktiveSitzung() und userId() sind fuer js/daten.js exportiert; Konto loeschen und
+// Datenauskunft wohnen dort (Gruppe "Daten" direkt unter dieser Gruppe).
+// Google (Supabase OAuth, impliziter Ablauf): googleAnmeldeUrl(basis) -> Adresse von /auth/v1/authorize,
+// meldeMitGoogleAn(ort) leitet dorthin. Zurueck kommt der Browser mit #konto#access_token=...; das liest
+// uebernimmLinkSitzung() wie den Anmelde-Link (auch ohne das vorangestellte #konto).
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
@@ -41,7 +46,7 @@ export async function fordereCodeAn(email) {
   await anfrage('/auth/v1/otp', { methode: 'POST', daten: { email, create_user: true } });
   return true;
 }
-function userId(s) {
+export function userId(s) {
   if (s?.user?.id) return s.user.id;
   try { return JSON.parse(atob(String(s.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; }
 }
@@ -61,7 +66,7 @@ export async function erneuereSitzung() {
   const s = sitzung(); if (!s?.refresh_token) throw new Error('Nicht angemeldet.');
   return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
 }
-async function aktiveSitzung() {
+export async function aktiveSitzung() {
   const s = sitzung(); if (!s) throw new Error('Nicht angemeldet.');
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
@@ -143,7 +148,10 @@ export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTime
 // Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite.
 let abgleichOffen = false;
 export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = globalThis.history) {
-  const h = String(ort?.hash || '');
+  let h = String(ort?.hash || '');
+  // Google-Anmeldung: Supabase haengt die Antwort mit einem weiteren "#" an redirect_to an (#konto#access_token=...)
+  const letztes = h.lastIndexOf('#');
+  if (letztes > 0) h = h.slice(letztes);
   if (!/^#(?:.*&)?(?:access_token|error)=/.test(h)) return false;
   const p = new URLSearchParams(h.slice(1));
   if (p.get('access_token')) {
@@ -158,6 +166,17 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
   }
   try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen'); } catch (e) { /* egal */ }
   return true;
+}
+
+// Anmeldung mit Google ueber Supabase (OAuth). basis: Adresse der App ohne Hash (im Test frei waehlbar).
+function basisAdresse(ort = globalThis.location) { return String(ort?.href || '').split('#')[0]; }
+export function googleAnmeldeUrl(basis = basisAdresse()) {
+  return SUPABASE_URL + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(basis + '#konto');
+}
+export function meldeMitGoogleAn(ort = globalThis.location) {
+  const url = googleAnmeldeUrl(basisAdresse(ort));
+  ort.assign(url);
+  return url;
 }
 
 export function kontoFreigeschaltet(hash = globalThis.location?.hash || '', speicher = lager()) {
@@ -178,12 +197,12 @@ export function kontoGruppe({ app } = {}) {
     const s = sitzung();
     el.innerHTML = `<h3 class="es-titel">Konto</h3>${s ? `<p>Angemeldet als <b>${escapeHtml(s.email || email)}</b></p>
       <label>Benutzername <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">Jetzt sichern</button><button class="knopf" data-konto="abmelden">Abmelden</button></div>
-      <button class="knopf es-rot-rand" data-konto="loeschen">Konto löschen</button>` : `<label>E-Mail <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">Jetzt sichern</button><button class="knopf" data-konto="abmelden">Abmelden</button></div>` : `<label>E-Mail <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <button class="knopf primaer" data-konto="code">Code senden</button><div class="konto-code" hidden><fieldset><legend>6-stelliger Code</legend><div class="konto-ziffern">
-      ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="Ziffer ${i + 1}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">Anmelden</button></div>`}
+      ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="Ziffer ${i + 1}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">Anmelden</button></div>
+      <p class="es-hilfe konto-oder">oder</p><button class="knopf konto-google" type="button" data-konto="google">Mit Google anmelden</button>`}
       <p class="konto-status" aria-live="polite">${zuletzt ? `Zuletzt gesichert: ${zuletzt}` : 'Noch nicht mit der Cloud abgeglichen.'}</p>
-      <p class="es-hilfe">Gespeichert werden E-Mail, Benutzername, Spielstand und der Browser-Typ des Geräts. Der Server steht in Frankfurt.</p>`;
+      <p class="es-hilfe">Gespeichert werden E-Mail, Benutzername, Spielstand und der Browser-Typ des Geräts, bei Anmeldung mit Google auch Name und Profilbild-Adresse aus dem Google-Konto. Der Server steht in Frankfurt.${s ? ' Deine Daten herunterladen oder das Konto löschen kannst du unter „Daten“.' : ''}</p>`;
   };
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
@@ -192,7 +211,7 @@ export function kontoGruppe({ app } = {}) {
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }
       if (a === 'sichern') { const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name); const d = await speichereCloudStand(); zuletzt = d.toLocaleString('de-DE'); render(); }
       if (a === 'abmelden') { await abmelden(); render(); }
-      if (a === 'loeschen') await app?.frage?.({ titel: 'Konto löschen', text: 'Die Löschung geht vorerst per E-Mail an den Besitzer. Eine direkte Löschung folgt später.', knoepfe: [{ text: 'Verstanden', wert: true, art: 'primaer' }], abbrechen: true });
+      if (a === 'google') { melden('Weiter zu Google …'); meldeMitGoogleAn(); }
     } catch (f) { melden(f.message || 'Das hat nicht geklappt.', true); }
   });
   el.addEventListener('input', (e) => {

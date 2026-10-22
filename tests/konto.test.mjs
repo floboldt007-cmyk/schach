@@ -1,7 +1,8 @@
 import { setzeSpeicher } from '../js/storage.js';
 import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudStand, ladeCloudStand,
   speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
-  SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung } from '../js/konto.js';
+  SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId } from '../js/konto.js';
+import { SUPABASE_URL } from '../js/konto-config.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) ok++; else console.error('FEHLER ' + name, extra); }
@@ -35,5 +36,31 @@ setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} }))
   neu = null; const fehler = uebernimmLinkSitzung({ hash: '#error=access_denied&error_code=otp_expired', pathname: '/', search: '' }, { replaceState: (_, __, u) => { neu = u; } });
   pruefe('Abgelaufener Link: Fehler aus der Adresse entfernt, Sitzung unverändert', fehler && neu === '/#einstellungen' && sitzung()?.refresh_token === 'rl');
   pruefe('Normale Adresse bleibt unberührt', uebernimmLinkSitzung({ hash: '#arena', pathname: '/', search: '' }, { replaceState: () => { throw new Error('nicht aufrufen'); } }) === false);
+}
+{ // Anmeldung mit Google (Supabase OAuth): Adresse, Weiterleitung, Rueckkehr mit #konto#access_token=...
+  const url = googleAnmeldeUrl('https://floboldt007-cmyk.github.io/schach/');
+  pruefe('Google: Adresse von /auth/v1/authorize mit provider=google und redirect_to auf #konto',
+    url === SUPABASE_URL + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent('https://floboldt007-cmyk.github.io/schach/#konto')
+    && url.startsWith('https://usaamcqypmvgqmsbfecb.supabase.co/auth/v1/authorize?provider=google&redirect_to=https%3A%2F%2Ffloboldt007-cmyk.github.io%2Fschach%2F%23konto'), url);
+  const q = new URL(url).searchParams;
+  pruefe('Google: genau provider und redirect_to, kein Geheimnis in der Adresse', [...q.keys()].join(',') === 'provider,redirect_to'
+    && q.get('redirect_to') === 'https://floboldt007-cmyk.github.io/schach/#konto' && !/secret|client_id|apikey|sb_/i.test(url), url);
+  let ziel = null; const ort = { href: 'http://127.0.0.1:9500/schach/?test#einstellungen', assign: (u) => { ziel = u; } };
+  const geliefert = meldeMitGoogleAn(ort);
+  pruefe('Google: Basis aus location ohne Hash (Suche bleibt), location.assign aufgerufen', ziel === geliefert
+    && new URL(ziel).searchParams.get('redirect_to') === 'http://127.0.0.1:9500/schach/?test#konto', ziel);
+  const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u7', email: 'g@gmail.example' })).toString('base64url') + '.x';
+  let neu = null;
+  const genommen = uebernimmLinkSitzung({ hash: `#konto#access_token=${tok}&expires_at=9999999999&expires_in=3600&provider_token=GOOGLE&refresh_token=rg&token_type=bearer`, pathname: '/schach/', search: '' },
+    { replaceState: (_, __, u) => { neu = u; } });
+  pruefe('Google: Rückkehr mit #konto#access_token übernommen, Tokens (auch provider_token) aus der Adresse entfernt',
+    genommen && sitzung()?.refresh_token === 'rg' && sitzung()?.email === 'g@gmail.example' && neu === '/schach/#einstellungen'
+    && !JSON.stringify(sitzung()).includes('GOOGLE') && localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1', JSON.stringify({ neu, s: sitzung() }));
+  neu = null;
+  pruefe('Google: abgebrochene Anmeldung (#error=...) räumt die Adresse auf, Sitzung bleibt', uebernimmLinkSitzung({ hash: '#error=access_denied&error_description=abgebrochen', pathname: '/schach/', search: '' },
+    { replaceState: (_, __, u) => { neu = u; } }) && neu === '/schach/#einstellungen' && sitzung()?.refresh_token === 'rg');
+  pruefe('Google: #konto allein ist keine Rückkehr', uebernimmLinkSitzung({ hash: '#konto', pathname: '/', search: '' }, { replaceState: () => { throw new Error('nicht aufrufen'); } }) === false);
+  // fuer js/daten.js exportiert
+  pruefe('aktiveSitzung und userId exportiert (Sitzung, Benutzer-ID aus dem Token)', userId(sitzung()) === 'u7' && (await aktiveSitzung()).refresh_token === 'rg');
 }
 console.log(`${ok}/${gesamt} bestanden`); process.exit(ok === gesamt ? 0 : 1);
