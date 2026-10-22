@@ -456,6 +456,7 @@ export function oeffneSpiegel(inhalt, { titel = 'Funken-Spiegel' } = {}) {
   ort.querySelector('h3').textContent = titel;
   ort.querySelector('.fk-spiegel-rumpf').append(inhalt);
   const karte = ort.querySelector('.sheet-karte');
+  const schleier = ort.querySelector('.sheet-schleier');
   const vorher = document.activeElement;
   let zu = false;
   const taste = (e) => { if (e.key === 'Escape') { e.preventDefault(); schliesse(); } };
@@ -466,15 +467,23 @@ export function oeffneSpiegel(inhalt, { titel = 'Funken-Spiegel' } = {}) {
     if (offen && offen.ort === ort) offen = null;
     ort.classList.add('weg');
     if (tempo() === 0) ort.remove();
-    else Promise.resolve(anim(karte, [{ transform: 'none' }, { transform: 'translateY(110%)' }], { d: 260, k: 'raus', fill: 'forwards' }).finished)
-      .catch(() => {}).then(() => ort.remove());
+    else {
+      // wie das Blatt in js/ui/bauteile.js: Karte faehrt weg, Schleier blendet aus; spaetestens nach der doppelten
+      // Dauer ist das Blatt weg, auch wenn die Animation nie fertig meldet (Tab im Hintergrund, Last)
+      const a = anim(karte, [{ transform: 'none' }, { transform: 'translateY(110%)' }], { d: 260, k: 'raus', fill: 'forwards' });
+      anim(schleier, [{ opacity: 1 }, { opacity: 0 }], { d: 220, k: 'sanft', fill: 'forwards' });
+      const weg = () => { if (ort.isConnected) ort.remove(); };
+      Promise.resolve(a.finished).catch(() => {}).then(weg);
+      setTimeout(weg, 520 * tempo() + 100);
+    }
     if (vorher && vorher.isConnected && typeof vorher.focus === 'function') { try { vorher.focus({ preventScroll: true }); } catch (f) { /* egal */ } }
   }
-  ort.querySelector('.sheet-schleier').addEventListener('pointerdown', schliesse);
+  schleier.addEventListener('pointerdown', schliesse);
   ort.querySelector('.fk-schliessen').addEventListener('click', schliesse);
   document.addEventListener('keydown', taste, true);
   document.body.append(ort);
   anim(karte, [{ transform: 'translateY(100%)' }, { transform: 'none' }], { d: 480, k: 'gleiten' });
+  anim(schleier, [{ opacity: 0 }, { opacity: 1 }], { d: 260, k: 'sanft' });
   try { ort.querySelector('.fk-schliessen').focus({ preventScroll: true }); } catch (f) { /* egal */ }
   offen = { ort, schliesse };
   return offen;

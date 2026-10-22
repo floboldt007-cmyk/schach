@@ -785,7 +785,8 @@ async function testeBrowser(browser) {
     && /1 Rückenwind-Karte im Fach/.test(spiegel) && /Level 2: Zugspur Bleistift/.test(spiegel) && /So entstehen Funken/.test(spiegel), spiegel.slice(0, 300));
   await bild(seite, 'spiegel');
   await seite.keyboard.press('Escape');
-  await warte(500);
+  // wie navigation.test.mjs beim Blatt: hoechstens 2 s auf das Wegfahren warten (unter Last laeuft es spaeter aus)
+  await seite.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
   pruefe('Escape schließt den Spiegel', await seite.locator('.fk-spiegel-ort').count() === 0);
   await h.tippe('.fk-heute .fk-zuenden');
   await warte(300);
