@@ -1338,3 +1338,65 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# Online gegen Freunde: Fundament (Stufe 2, ohne Oberflaeche)
+
+**Was es ist:** Partien gegen Freunde per Einladungscode oder -link, kein Chat, keine Fremden, kein Matchmaking.
+Der Server (Supabase, Frankfurt) ist Schiedsrichter fuer Reihenfolge und Uhr, nicht fuer die Schachregeln (beide
+Clients pruefen mit chess.js; fuer Fremde spaeter eine Edge Function). Verbindung weg: Die Partie steht in der
+Datenbank und geht beim naechsten Oeffnen weiter. Echtzeit vorerst per Abfrage alle 2 s ueber REST (kein Websocket,
+keine Bibliothek); Realtime kann spaeter dazukommen.
+
+**Dateien:** `supabase/online-schema.sql` (Tabelle `partien_online`, Trigger, Funktionen, RLS, Rechte; mehrfach
+ausfuehrbar), `supabase/online-rls-test.sql` (Pruefung mit drei Nutzern, rollt alles zurueck), `js/online.js`
+(Modul, nur fetch, Sitzung aus `konto.js`), `tests/online.test.mjs` (gefaelschtes fetch, Suite `online` in
+`tests/alle.mjs` nach `konto`), Anleitung in `supabase/ANLEITUNG.md`. **Noch nicht:** Oberflaeche, Einbindung in
+`app.js` (die Datei wird nirgends importiert, liegt aber schon im Offline-Cache), Aenderungen an `partie.js` oder
+`arena.js`.
+
+**Datensatz (Zeile `partien_online`, Feldnamen wie in der Datenbank):** `id` (uuid), `code` (6 Zeichen aus
+`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, immer vom Server), `weiss`, `schwarz`, `erstellt_von` (Nutzer-IDs), `status`
+`'offen' | 'laeuft' | 'beendet'`, `fen` (aktuelle Stellung), `zuege` (UCI durch Leerzeichen, wie `zuege: [uci]` im
+Partie-Datensatz von `storage.js`), `am_zug` `'w' | 'b'`, `ergebnis` `'1-0' | '0-1' | '1/2-1/2' | null`, `grund`
+(vom Client z. B. `'matt'`, `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'`; vom Server `'zeit'`, `'aufgabe'`,
+`'remis'`, `'abgebrochen'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
+`uhr_weiss_ms`, `uhr_schwarz_ms`, `letzter_zug_am`, `erstellt_am`, `aktualisiert_am` (Trigger; Grundlage der Abfrage).
+Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
+
+**Server-Funktionen (nur `authenticated`, `security definer`; direktes `update` und `delete` sind gesperrt, direktes
+`insert` nur fuer eine eigene offene Einladung, der Trigger setzt dann Code und Anfangszustand):**
+`online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
+`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug), `online_zug(partie, zug,
+fen_danach, am_zug_danach, ergebnis, grund)` (prueft Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel),
+`online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`), `online_biete_remis(partie)`
+(liegt das Angebot des Gegners schon vor: Annahme), `online_nimm_remis_an(partie)`, `online_meine()` (offen und
+laufend, zuletzt geaendert zuerst, laeuft unter RLS). Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
+in der SQL-Datei); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`), `tests/online.test.mjs` prueft, dass
+keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
+
+**Uhr-Regeln:** Beide starten beim Beitritt mit `bedenkzeit_s * 1000` ms. Der jeweils erste Zug von Weiss und von
+Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden). Ab dem dritten Halbzug zieht
+`online_zug` `clock_timestamp() - letzter_zug_am` von der Uhr des Ziehenden ab und addiert `inkrement_s`; bei <= 0
+endet die Partie durch `'zeit'`, der Zug wird nicht verbucht und der Verlierer bleibt mit leerer Uhr `am_zug`. Der
+Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerechnet an; massgeblich ist der Server.
+Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck).
+
+**Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
+`tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
+`sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
+`nimmRemisAn(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler }) -> { stop(),
+laeuft(), stand() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`, pausiert bei `document.hidden` und fragt
+beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, Fehler gehen an `beiFehler`, derselbe Text nur einmal
+hintereinander, nichts wirft), `einladungsLink(code, basis?)` -> `https://floboldt007-cmyk.github.io/schach/#online/CODE`
+(Basis aus `location`, sonst die Live-Adresse), `codeAusLink(text)`, `uebernimmEinladungsLink()`,
+`gemerkteEinladung()`, `vergissEinladung()` (Merker `schach-arena:online:einladung`), `meineFarbe(partie)`,
+`binAmZug(partie)`, `zuegeListe(partie)`, `normalisiereCode(text)`, `setzeOnlineFetch(fn)` (Tests). Alle Aufrufe
+brauchen die Sitzung aus `konto.js` (`sitzung()`, kurz vor Ablauf `erneuereSitzung()`); ohne Sitzung ein lesbarer
+Fehler ohne Anfrage, offline „Keine Verbindung …“, 401 „neu anmelden“, 404 „noch nicht eingerichtet“. Jede Anfrage
+traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Funktionen laufen als
+`POST /rest/v1/rpc/<name>`, Lesen als `GET /rest/v1/partien_online?id=eq.<id>&select=*`.
+
+**Fuer die Oberflaeche (naechster Schritt):** `app.js` kennt `#online/CODE` nicht: `ausHash` faellt auf die Arena
+zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
+`beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
+und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
