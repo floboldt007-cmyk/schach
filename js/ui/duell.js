@@ -11,9 +11,10 @@
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
-//       duellArt(). bereit erfuellt sich, sobald die Buehne den Screen deckt (arena.js ruft dann app.gehe('partie')),
-//       bei 'kurz' und 'aus' sofort. fertig erfuellt sich am Ende (auch beim Ueberspringen), hoechstens DAUER_MAX ms
-//       nach dem Start.
+//       duellArt(). bereit erfuellt sich am Ende der Haltephase (0,86 s; arena.js ruft dann app.gehe('partie'), die
+//       Portraets fliegen, sobald die Partie da ist), bei 'kurz' und 'aus' sofort. fertig erfuellt sich am Ende (auch
+//       beim Ueberspringen), hoechstens DAUER_MAX ms nach dem Start. Tippen ueberspringt die Vollfassung, solange die
+//       Buehne steht; waehrend des Portraetflugs (Buehne loest sich auf) und in der Kurzfassung gehen Tipps durch.
 //   aktivesDuell() -> { fertig } | null     laeuft gerade ein Intro (fuer die Partie: Uhr und Bot-Zug erst danach)
 //
 // Vertrag mit der Partie (U7 baut die andere Seite): solange das Intro laeuft, steht
@@ -32,8 +33,11 @@ import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 export const BESONDERE = Object.freeze(['boss', 'liga', 'erste']);
 export const DAUER_MAX = 1400;          // haerteste Grenze fuer das ganze Intro (ms, unabhaengig vom Tempo)
 const KURZ_DAUER = 400;                  // Kurzfassung: nur der Portraetflug
-const HALTE_BIS = 860;                   // Ende der Haltephase (ms * Tempo), danach fliegen die Portraets
-const BEREIT_NACH = 460;                 // die Buehne deckt den Screen (ms * Tempo)
+// Ende der Haltephase (ms * Tempo): erst dann erfuellt sich `bereit`, die Arena wechselt zur Partie, und sobald
+// app:screen partie kommt, fliegen die Portraets (Phase 2). Die Partie steht also nie laenger als den Flug unter der
+// Buehne, und waehrend des Flugs (die Buehne loest sich auf) faengt die Ueberlagerung keine Tipps mehr ab: ein Tipp
+// aufs Brett kommt an (tests/app.test.mjs tippt direkt nach "bereit" der Partie).
+const HALTE_BIS = 860;
 const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * Tempo)
 const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
 const ANLASS_TEXT = { boss: 'Endgegner', liga: 'Liga', erste: 'Erste Partie' };
@@ -199,7 +203,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     for (const fl of flieg) { try { fl.a.finish(); } catch (e) { /* egal */ } }
     ende();
   };
-  ueber.addEventListener('pointerdown', (e) => { e.preventDefault(); ueberspringe(); }, { passive: false });
+  // Tippen ueberspringt (nur die Vollfassung faengt Tipps ab; die Kurzfassung liegt mit pointer-events: none darueber)
+  ueber.addEventListener('pointerdown', ueberspringe, { passive: true });
   ueber.addEventListener('click', ueberspringe);
   ueber.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') ueberspringe(); });
   aktiv = { ueber, fertig, ueberspringe };
@@ -209,6 +214,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const phase2 = () => {
     if (zuEnde || phase2Lief) return;
     phase2Lief = true;
+    ueber.classList.add('phase-2');   // ab jetzt gehen Tipps durch (css/duell.css: pointer-events: none)
     const partie = document.querySelector('.screen.partie');
     const zielBot = partie ? partie.querySelector('.spieler.gegner .av') : null;
     const zielFlo = partie ? partie.querySelector('.spieler.ich .av') : null;
@@ -240,14 +246,12 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     }
     spaeter(ende, (ziele.length ? dauerFlug + 40 : (voll ? 420 : 0)) * tempo());
   };
-  // Die Partie ist da (app:screen partie): nach dem Ende der Haltephase geht es weiter
+  // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar),
+  // dann Phase 2
   const beiPartie = (d) => {
     if (!d || d.name !== 'partie' || zuEnde) return;
     if (abPartie) { try { abPartie(); } catch (e) { /* egal */ } abPartie = null; }
-    const vergangen = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-    const rest = voll ? Math.max(0, HALTE_BIS * tempo() - vergangen) : 0;
-    // ein Bild warten, damit die Partie ihr Layout hat (Ziele messbar)
-    spaeter(() => requestAnimationFrame(() => { if (!zuEnde) phase2(); }), rest);
+    requestAnimationFrame(() => { if (!zuEnde) phase2(); });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
   // haerteste Grenze: hoechstens DAUER_MAX ms, auch wenn die Partie nicht kommt
@@ -297,9 +301,9 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const zu = (px) => (hoch() ? `translateY(${px}px)` : `translateX(${px}px)`);
   anim(seiteBot, [{ transform: 'none' }, { transform: zu(11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
   anim(ueber.querySelector('.duell-seite.flo'), [{ transform: 'none' }, { transform: zu(-11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
-  // die Buehne deckt den Screen: die Arena darf zur Partie wechseln (die Ueberlagerung bleibt davor)
-  spaeter(() => bereitLoes(), BEREIT_NACH * tempo());
-  // Phase 2 spaetestens, wenn die Partie bis dahin nicht gekommen ist, stoesst die harte Grenze oben an
+  // Ende der Haltephase: die Arena darf zur Partie wechseln (die Buehne bleibt davor, bis die Portraets geflogen sind);
+  // kommt die Partie nicht, stoesst die harte Grenze oben an
+  spaeter(() => bereitLoes(), HALTE_BIS * tempo());
 
   return { bereit, fertig, ueberspringe, art: gewaehlteArt };
 }

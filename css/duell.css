@@ -12,7 +12,8 @@
 .duell { position: fixed; inset: 0; z-index: 60; overflow: hidden; outline: none; -webkit-tap-highlight-color: transparent; touch-action: none;
   /* Text auf der Bot-Farbe: weiss (--auf-akzent ist in beiden Modi weiss) oder Schiefer (--flo-grund), js/ui/duell.js waehlt */
   --duell-text-hell: var(--auf-akzent); --duell-text-dunkel: var(--flo-grund); --duell-auf-flo: var(--auf-akzent); }
-.duell.kurz { background: transparent; }
+/* Kurzfassung: nur die Flieger, kein Abfangen; Phase 2 der Vollfassung (Buehne loest sich auf): Tipps gehen zur Partie durch */
+.duell.kurz, .duell.phase-2 { pointer-events: none; }
 /* Bot-Seite: satte Bot-Farbe, waechst aus der Detail-Karte (nur transform) */
 .duell-buehne { position: absolute; inset: 0; background: var(--bf, var(--tinte)); }
 /* Flos Seite: Schiefer, schiebt sich mit schraeger Naht herein */

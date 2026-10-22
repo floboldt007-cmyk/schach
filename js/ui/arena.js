@@ -76,7 +76,7 @@ const LAGEN = {
   quer: {
     himmel: 0.15,
     baender: [0.15, 0.36, 0.56, 0.76],
-    stationen: [[0.13, 0.86], [0.36, 0.80], [0.60, 0.86], [0.84, 0.74], [0.70, 0.56], [0.45, 0.60], [0.20, 0.52], [0.26, 0.32], [0.52, 0.28], [0.78, 0.22]],
+    stationen: [[0.13, 0.86], [0.36, 0.80], [0.60, 0.86], [0.84, 0.75], [0.70, 0.545], [0.45, 0.60], [0.20, 0.52], [0.26, 0.32], [0.52, 0.28], [0.78, 0.22]],
     start: [0.03, 0.96],
     boss: [0.92, 0.42],
     event: [0.06, 0.40],
@@ -183,21 +183,24 @@ function berg(x, y, s, w) {
 }
 
 // Die ganze Zeichnung. punkte: Stationen in Pixel; bis: Index des naechsten Gegners (Fortschritt bis dorthin);
-// neuIdx: Station, die gerade frei wird (ihr Stueck Weg zeichnet sich spaeter, Klasse .w-fortschritt-neu)
-export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1 }) {
-  const himmel = lage.himmel * h;
+// neuIdx: Station, die gerade frei wird (ihr Stueck Weg zeichnet sich spaeter, Klasse .w-fortschritt-neu).
+// y0/hy: senkrechte Abbildung der Anteile auf Pixel, Y(f) = y0 + f * hy (Hochformat: Rand oben fuer Krone und Fahne
+// des Endgegners, unten fuer das Schild der ersten Station; die Flaeche darunter bleibt Wiese, darueber Himmel)
+export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0, hy = h }) {
+  const Y = (f) => y0 + f * hy;
+  const himmel = Y(lage.himmel);
   const amp = Math.max(8, Math.min(16, 14 * s));
   const teile = [`<rect width="${r1(w)}" height="${r1(h)}" class="w-gras"/>`, `<rect width="${r1(w)}" height="${r1(himmel + amp)}" class="w-himmel"/>`];
   for (const [fx, bs] of lage.berge) teile.push(berg(fx * w, himmel + amp * 0.6, bs * s, w));
   teile.push(band(himmel, w, h, 'w-strand', amp));
   teile.push(band(himmel + Math.max(14, 18 * s), w, h, 'w-gras-4', amp));
   const klassen = ['w-gras-3', 'w-gras-2', 'w-gras'];
-  lage.baender.slice(1).forEach((f, i) => teile.push(band(f * h, w, h, klassen[i] || 'w-gras', amp * (1 + i * 0.3))));
+  lage.baender.slice(1).forEach((f, i) => teile.push(band(Y(f), w, h, klassen[i] || 'w-gras', amp * (1 + i * 0.3))));
   // Szenerie: hintere (hoehere) zuerst, damit Vorderes ueberdeckt
   const szene = [...lage.szene].sort((a, b) => a[2] - b[2]);
   for (const [art, fx, fy, gr = 1, v = 1] of szene) {
     const fn = SZENE[art];
-    if (fn) teile.push(fn(fx * w, fy * h, gr * s, v));
+    if (fn) teile.push(fn(fx * w, Y(fy), gr * s, v));
   }
   // Pfad: drei Lagen (Rand, Weg, gestrichelte Mitte), dann der Fortschritt in Akzentfarbe
   const alle = [start, ...punkte];
@@ -344,7 +347,8 @@ export function zeige(root, params, app) {
 
   // ---------- Karte: Layout, Zeichnung ----------
   let modus = null;
-  let masse = { w: 0, h: 0, s: 1 };
+  let masse = { w: 0, h: 0, s: 1, y0: 0, hy: 0 };
+  const yVon = (f) => masse.y0 + f * masse.hy;   // Anteil (0..1) -> Pixel in der Welt
   let wegGezeichnet = false;   // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar
   function layout() {
     if (weg) return;
@@ -358,27 +362,38 @@ export function zeige(root, params, app) {
     s.classList.toggle('karte-hoch', !quer);
     const lage = LAGEN[modus];
     const w = kw;
-    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.9 : 1.45)));
+    // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C
+    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 2.3 : 1.45)));
     const sk = Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
-    masse = { w, h, s: sk };
+    // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
+    // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
+    let y0 = 0;
+    let hy = h;
+    if (!quer) {
+      const kn = 76 * sk;
+      const ys = lage.stationen.map((p) => p[1]);
+      const fMin = Math.min(...ys);
+      const fMax = Math.max(...ys);
+      const oben = kn * 0.65 + 72;
+      const unten = kn * 0.61 + 36;
+      hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
+      y0 = oben - fMin * hy;
+    }
+    masse = { w, h, s: sk, y0, hy };
     welt.style.width = w + 'px';
     welt.style.height = h + 'px';
     welt.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
-    const punkte = lage.stationen.map(([fx, fy]) => [fx * w, fy * h]);
-    const start = [lage.start[0] * w, lage.start[1] * h];
+    const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
+    const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
-    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx });
+    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy });
     const neuWeg = bild.querySelector('.w-fortschritt-neu');
     if (neuWeg && !wegGezeichnet) neuWeg.style.opacity = '0';
-    if (vorher !== modus) {
-      lage.stationen.forEach(([fx, fy], i) => {
-        knoten[i].style.left = (fx * 100).toFixed(2) + '%';
-        knoten[i].style.top = (fy * 100).toFixed(2) + '%';
-      });
-      const setzeOrt = (el, [fx, fy]) => { el.style.left = (fx * 100).toFixed(2) + '%'; el.style.top = (fy * 100).toFixed(2) + '%'; };
-      setzeOrt(s.querySelector('.ort-karte-boss'), lage.boss);
-      setzeOrt(s.querySelector('.ort-karte-event'), lage.event);
-    }
+    // Stationen und Orte in Prozent der Welt (folgen damit jeder Groesse; hoch haengt y an der Abbildung)
+    const setze = (el, [fx, fy]) => { el.style.left = (fx * 100).toFixed(2) + '%'; el.style.top = (yVon(fy) / h * 100).toFixed(2) + '%'; };
+    lage.stationen.forEach((p, i) => setze(knoten[i], p));
+    setze(s.querySelector('.ort-karte-boss'), lage.boss);
+    setze(s.querySelector('.ort-karte-event'), lage.event);
     stelleFlo(floPosition());
     // im Querformat scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
@@ -391,10 +406,10 @@ export function zeige(root, params, app) {
     const lage = LAGEN[modus];
     const i = vorStation != null ? vorStation : (neuId && !wegGezeichnet ? idx(neuId) - 1 : aktuellIdx) - 1;
     const kn = 76 * masse.s;
-    if (i < 0) return [lage.start[0] * masse.w + kn * 0.1, lage.start[1] * masse.h - kn * 0.45];
+    if (i < 0) return [lage.start[0] * masse.w + kn * 0.1, yVon(lage.start[1]) - kn * 0.45];
     const [fx, fy] = lage.stationen[i];
     const gross = BOTS[i].id === aktuellId ? 1.22 : 1;
-    return [fx * masse.w + kn * gross * 0.52, fy * masse.h - kn * gross * 0.28];
+    return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
   }
   function stelleFlo([x, y]) {
     floFigur.style.left = x.toFixed(1) + 'px';
@@ -405,7 +420,7 @@ export function zeige(root, params, app) {
     if (modus !== 'hoch') return;
     const i = idx(id);
     if (i < 0) return;
-    const y = LAGEN.hoch.stationen[i][1] * masse.h;
+    const y = yVon(LAGEN.hoch.stationen[i][1]);
     const ziel = Math.max(0, Math.min(welt.offsetHeight - karte.clientHeight, y - karte.clientHeight * 0.55));
     if (sanft && !reduziert() && karte.scrollTo) {
       try { karte.scrollTo({ top: ziel, behavior: 'smooth' }); } catch (e) { karte.scrollTop = ziel; }

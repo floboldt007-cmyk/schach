@@ -91,8 +91,6 @@
 .arena.karte-hoch .karte::-webkit-scrollbar { display: none; }
 .arena .welt { position: relative; width: 100%; height: 100%; --kn-basis: 76px; }
 .arena .welt-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-/* feiner heller Rand innen wie ein Passepartout */
-.arena .karte::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 1px var(--welt-weiss); z-index: 6; }
 
 /* Farben der Zeichnung (Klassen im SVG, js/ui/arena.js weltSvg) */
 .welt-svg .w-himmel { fill: var(--welt-himmel); }
@@ -139,14 +137,14 @@
   transition: box-shadow var(--d-m) var(--sanft), transform var(--d-m) var(--feder); }
 .arena .knoten .avatar img { width: 100%; height: 100%; display: block; image-rendering: auto; transition: opacity var(--d-l) var(--sanft), filter var(--d-l) var(--sanft); }
 .arena .knoten:not(.aktuell):active .avatar { transform: scale(.94); }
-/* Zustaende: besiegt = Tinte mit Sternen, naechster Gegner = Zinnober mit Fahne, gesperrt = hell mit Schloss */
-.arena .knoten.besiegt { --bf: var(--tinte); }
-.arena .knoten.aktuell { --bf: var(--akzent); }
-.arena .knoten.gesperrt { --bf: var(--linie-2); }
+/* Zustaende (Ring ums Portraet): besiegt = Bot-Farbe mit Sternen und Nummer in Tinte, naechster Gegner = Zinnober mit
+   Fahne, gesperrt = hell mit Schloss. --bf (Bot-Farbe) setzt js/ui/arena.js an jeder Station. */
 .arena .knoten.gesperrt .avatar { background: var(--flaeche-3); box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 4px var(--linie-2), var(--s1); }
 .arena .knoten.gesperrt .avatar img { filter: grayscale(1) contrast(.9); opacity: .55; }
 /* Endgegner gesperrt: Silhouette (tests/app.test.mjs verlangt brightness(0)), erst beim Freischalten das Gesicht */
 .arena .knoten.boss.gesperrt .avatar img { filter: brightness(0) invert(.35); opacity: .7; }
+.arena .knoten.boss.gesperrt .avatar::after { content: "?"; position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--display); font-weight: var(--gw-titel); font-size: calc(var(--kn) * .46); line-height: 1; color: var(--flaeche); opacity: .92; }
 .arena .knoten.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), var(--s3); animation: atmen 2.6s var(--sanft) infinite; }
 .arena .knoten.gewaehlt .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--bf), 0 0 0 11px var(--flaeche), var(--s3); }
 .arena .knoten.gewaehlt.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), 0 0 0 11px var(--flaeche), var(--s3); }
@@ -251,7 +249,7 @@
 .arena .cta-platz { position: sticky; bottom: 0; z-index: 5; margin: auto -22px 0; padding: 10px 22px 18px; background-color: var(--flaeche); }
 .arena .spielen { width: 100%; min-height: 64px; font-size: 18px; border-radius: 20px; justify-content: space-between; padding: 0 18px 0 22px; gap: 10px; }
 .arena .spielen .sp-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.arena .spielen .pf { flex: none; width: 36px; height: 36px; border-radius: 12px; background: rgba(255, 255, 255, .18); display: grid; place-items: center; }
+.arena .spielen .pf { flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--akzent-tief); display: grid; place-items: center; }
 .arena .spielen .pf .ico { width: 20px; height: 20px; }
 /* Bilanz */
 .arena .bilanz { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 0 18px; border-top: 1px solid var(--linie); }
@@ -270,6 +268,7 @@
 
 /* ---------- Hochformat (iPad hoch, Handy): Karte oben, Panel darunter, die Seite scrollt ---------- */
 .arena.karte-hoch .detail { flex: none; overflow: visible; }
+.arena.karte-hoch .inhalt { padding-bottom: 0; }
 .arena.karte-hoch .cta-platz { bottom: 0; }
 @media (min-width: 700px) {
   /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt */
@@ -296,7 +295,7 @@
   .arena .merkmal { padding: 8px 10px; }
   .arena .m-wert { font-size: 13px; }
   .arena .ziel-sterne > div { font-size: 12px; }
-  .arena .cta-platz { margin: auto -16px 0; padding: 8px 16px 14px; }
+  .arena .cta-platz { margin: auto -16px 0; padding: 8px 16px 14px; border-radius: 0 0 var(--r-l) var(--r-l); }
   .arena .spielen { min-height: 60px; font-size: 17px; }
   .arena .bilanz { display: none; }
   .arena .knoten .k-schild { font-size: 12px; padding: 2px 9px 3px; }
