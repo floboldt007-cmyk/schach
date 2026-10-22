@@ -436,6 +436,11 @@ async function browserAblauf(browser) {
     text: document.querySelector('.daten-gruppe')?.textContent || '', toast: document.querySelector('.toast')?.textContent || '' }));
   pruefe('Browser: nach Stufe 2 rpc/konto_loeschen, abgemeldet, Freigabe aus, Meldung', netz.some((x) => x.url.endsWith('/rest/v1/rpc/konto_loeschen') && x.methode === 'POST')
     && nachLoeschen.s === null && nachLoeschen.e === 'aus' && /Konto gelöscht/.test(nachLoeschen.text + nachLoeschen.toast) && /Zum Teilen erst anmelden/.test(nachLoeschen.text), nachLoeschen);
+  await seite.waitForSelector('.konto-gruppe .konto-email', { timeout: 3000 }).catch(() => {});
+  pruefe('Browser: Konto-Gruppe zeigt danach wieder die Anmeldung (nicht mehr "Angemeldet als")', await seite.evaluate(() => {
+    const kg = document.querySelector('.konto-gruppe');
+    return !!kg.querySelector('.konto-email') && !/Angemeldet als/.test(kg.textContent);
+  }));
 
   // Datenschutzerklaerung und Impressum: erreichbar, Entwurf-Kasten, nur Platzhalter
   for (const [datei, muss] of [['datenschutz.html', ['Entwurf', 'fachkundigen Person', 'Frankfurt', 'GitHub', 'Google', 'Art. 6 Abs. 1 lit. a', 'Art. 6 Abs. 1 lit. b', 'Eltern', 'Werbung', 'Beschwerde']],

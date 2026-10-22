@@ -193,8 +193,10 @@ export function kontoGruppe({ app } = {}) {
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche konto-gruppe';
   let email = sitzung()?.email || ''; let zuletzt = '';
   const melden = (t, fehler = false) => { const x = el.querySelector('.konto-status'); if (x) { x.textContent = t; x.dataset.fehler = fehler ? 'ja' : 'nein'; } };
+  let gezeichnetMit = null;   // angemeldet beim letzten Zeichnen (die Gruppe "Daten" kann das Konto loeschen)
   const render = () => {
     const s = sitzung();
+    gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">Konto</h3>${s ? `<p>Angemeldet als <b>${escapeHtml(s.email || email)}</b></p>
       <label>Benutzername <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">Jetzt sichern</button><button class="knopf" data-konto="abmelden">Abmelden</button></div>` : `<label>E-Mail <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
@@ -235,7 +237,9 @@ export function kontoGruppe({ app } = {}) {
     abgleichOffen = false;
     gleicheNachAnmeldung().then((abgleich) => { render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }).catch((f) => melden(f.message || 'Das hat nicht geklappt.', true));
   }
-  return { el, verlasse() { if (sitzung()) speichereCloudStand().catch(() => {}); } };
+  // Abmelden von aussen (Konto loeschen in der Gruppe "Daten"): neu zeichnen
+  const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) render(); }, 1000);
+  return { el, verlasse() { clearInterval(uhr); if (sitzung()) speichereCloudStand().catch(() => {}); } };
 }
 function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
