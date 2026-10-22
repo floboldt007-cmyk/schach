@@ -145,10 +145,10 @@
 .arena .knoten.boss.gesperrt .avatar img { filter: brightness(0) invert(.35); opacity: .7; }
 .arena .knoten.boss.gesperrt .avatar::after { content: "?"; position: absolute; inset: 0; display: grid; place-items: center;
   font-family: var(--display); font-weight: var(--gw-titel); font-size: calc(var(--kn) * .46); line-height: 1; color: var(--flaeche); opacity: .92; }
-.arena .knoten.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), var(--s3); animation: atmen 2.6s var(--sanft) infinite; }
+.arena .knoten.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), var(--s3); animation: puls 2.6s var(--sanft) infinite; }
 .arena .knoten.gewaehlt .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--bf), 0 0 0 11px var(--flaeche), var(--s3); }
 .arena .knoten.gewaehlt.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), 0 0 0 11px var(--flaeche), var(--s3); }
-@keyframes atmen { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes puls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 /* Nummer unten links, Schloss unten rechts (ausserhalb des runden Portraets) */
 .arena .knoten .k-nr { position: absolute; left: -7px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
   font-family: var(--display); font-weight: var(--gw-titel); font-size: 13px; line-height: 1; color: var(--auf-tinte); background: var(--tinte);

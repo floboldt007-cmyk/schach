@@ -97,7 +97,8 @@ function nodeTeil() {
   pruefe('css/arena.css: feste Farben nur in --welt-* (die Karte ist ein Bild), Bedienung nur mit Tokens', fremdeFarben.length === 0, fremdeFarben.slice(0, 3).join(' | '));
   pruefe('css/arena.css: Palette hell und dunkel (Abendstimmung) fuer --welt-himmel', (arena.match(/--welt-himmel:/g) || []).length >= 3 && /data-modus="dunkel"\] \.arena/.test(arena) && /prefers-color-scheme: dark/.test(arena));
   pruefe('css/arena.css: kein Neon, kein Glow, keine Verlaeufe, keine Pixel', !/neon|glow|linear-gradient|radial-gradient|pixelated(?! *;?\s*\})/i.test(arena.replace(/image-rendering: auto/g, '')) && !/image-rendering:\s*pixelated/.test(arena));
-  pruefe('css/arena.css: Atmen der aktuellen Station als CSS-Animation (pausiert ueber html[data-sichtbar="nein"] in app.css)', /\.knoten\.aktuell \.avatar \{[^}]*animation: atmen/.test(arena) && /@keyframes atmen/.test(arena)
+  // die Keyframes heissen puls wie vor dem Umbau (tests/thema.test.mjs prueft "Bewegung aus" mit animation: puls)
+  pruefe('css/arena.css: Atmen (Puls) der aktuellen Station als CSS-Animation (pausiert ueber html[data-sichtbar="nein"] in app.css)', /\.knoten\.aktuell \.avatar \{[^}]*animation: puls/.test(arena) && /@keyframes puls/.test(arena)
     && /html\[data-sichtbar="nein"\] \*[^{]*\{[^}]*animation-play-state: paused/.test(ohneKommentar(lies('css/app.css'))));
   pruefe('css/arena.css: Spielen-Knopf klebt (position: sticky) im Panel', /\.cta-platz \{[^}]*position: sticky/.test(arena));
   const duell = ohneKommentar(lies('css/duell.css'));
