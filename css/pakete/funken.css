@@ -47,7 +47,11 @@
 .fk-abr.aufgestiegen .fk-level { color: var(--text); }
 
 /* ---------- Kopf-Chip (arena:kopf) und Spieler-Leiste (partie:spieler-leiste) ---------- */
-.chip.fk-chip { gap: 7px; cursor: pointer; font: inherit; color: var(--text); background: var(--flaeche); }
+/* Antippbarer Chip (role="button"): sichtbar so hoch wie Sterne und Pokal, die Tippflaeche (::before) reicht 3 px darueber
+   und darunter, genau so weit wie der Rand der Chip-Reihe (navigation.css: padding 3px); 40 + 6 = 46, Handy 38 + 6 = 44 */
+.chip.fk-chip { position: relative; gap: 7px; cursor: pointer; color: var(--text); background: var(--flaeche); -webkit-tap-highlight-color: transparent; }
+.chip.fk-chip::before { content: ''; position: absolute; inset: -3px -2px; border-radius: var(--r-pille); }
+.chip.fk-chip:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .fk-chip-text { white-space: nowrap; }
 .fk-chip-text b { font-weight: var(--gw-titel); }
 .fk-mini { position: relative; display: block; width: 30px; height: 5px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; flex: none; }
@@ -113,10 +117,13 @@
 
 /* ---------- Handy ---------- */
 @media (max-width: 600px) {
-  /* Kopf auf dem Handy: Funke und Zahl reichen (das Wort steht im aria-label), damit der Chip nicht angeschnitten wird */
-  .screen .haupt-kopf .chip.fk-chip { gap: 4px; padding: 0 9px; }
-  .fk-chip .fk-ico { width: 15px; height: 15px; }
-  .fk-chip .fk-chip-wort, .fk-chip .fk-mini { display: none; }
+  /* Kopf auf dem Handy: nur die Level-Zahl im Emblem (SPIELKONZEPT 3.1 "kleine Zahl im Emblem", wie in Abrechnung,
+     Verlauf und Spieler-Leiste; Wort und Titel stehen im aria-label), damit der Chip neben dem Sterne-Chip bei 390 px
+     ganz zu sehen ist, auch mit zweistelligem Level. Die Tippflaeche bleibt ueber ::before mindestens 44 px breit. */
+  .screen .haupt-kopf .chip.fk-chip { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
+  .fk-chip .fk-ico, .fk-chip .fk-chip-wort, .fk-chip .fk-mini { display: none; }
+  .fk-chip .fk-chip-text b { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 5px;
+    border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); font-size: 14px; line-height: 1; }
   .fk-abr-knopf { gap: 10px; padding: 9px 10px; }
   .fk-emblem { width: 34px; height: 34px; }
   .fk-zahl > b { font-size: 15px; }

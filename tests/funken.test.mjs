@@ -788,6 +788,31 @@ const kontrast = (seite, textSel, grundSel) => seite.evaluate(([t, g]) => {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }, [textSel, grundSel]);
 
+// Mass des Level-Chips im Kopf (im Browser ausgewertet): sichtbarer Chip, Sterne-Chip daneben, echte Tippflaeche (Punkte,
+// an denen elementFromPoint den Chip trifft, senkrecht durch die Mitte und waagrecht auf halber Hoehe), Oberkanten der
+// Chip-Reihe (eine Zeile, wie navigation.test.mjs), ganz sichtbar in der Reihe; knoepfeKopf: alle Knoepfe im Kopf >= 44 x 44
+const kopfChipMass = () => {
+  const r = (e) => { const b = e ? e.getBoundingClientRect() : { width: 0, height: 0 }; return { w: Math.round(b.width), h: Math.round(b.height) }; };
+  const chip = document.querySelector('.haupt-kopf .fk-chip');
+  const chips = document.querySelector('.haupt-kopf .kopf-chips');
+  if (!chip || !chips) return { fehlt: true };
+  const b = chip.getBoundingClientRect();
+  const trifft = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && !!e.closest('.fk-chip'); };
+  let hoch = 0;
+  for (let y = Math.floor(b.top) - 12; y <= Math.ceil(b.bottom) + 12; y++) if (trifft(b.left + b.width / 2, y + 0.5)) hoch++;
+  let breit = 0;
+  for (let x = Math.floor(b.left) - 12; x <= Math.ceil(b.right) + 12; x++) if (trifft(x + 0.5, b.top + b.height / 2)) breit++;
+  const c = chips.getBoundingClientRect();
+  return {
+    sicht: r(chip), sterne: r(chips.querySelector('.chip:not(.fk-chip)')), tipp: { w: breit, h: hoch },
+    rolle: chip.getAttribute('role') === 'button' && chip.tabIndex === 0 && /^Level \d+/.test(chip.getAttribute('aria-label') || ''),
+    oben: new Set([...chips.children].filter((x) => x.getBoundingClientRect().width > 0).map((x) => Math.round(x.getBoundingClientRect().top))).size,
+    ganz: b.left >= c.left - 1 && b.right <= c.right + 1,
+    knoepfeKopf: [...document.querySelectorAll('.haupt-kopf button')].filter((x) => x.getBoundingClientRect().width)
+      .every((x) => x.getBoundingClientRect().width >= 44 && x.getBoundingClientRect().height >= 44),
+  };
+};
+
 async function testeBrowser(browser) {
   // ---------- 1. Arena frisch: Chip, Spiegel, Heute-Zeile, Faktor, Zuenden ----------
   gruppe = 'Arena';
@@ -801,6 +826,10 @@ async function testeBrowser(browser) {
     && await seite.locator('.fk-chip .fk-mini > i').count() === 1 && kopf.findIndex((k) => /fk-chip/.test(k)) > kopf.findIndex((k) => /chip-pokal/.test(k)), kopf);
   pruefe('arena:heute: Rückenwind-Zeile mit „Zünden“ (erste Karte liegt im Fach)', /1 Karte im Fach/.test(await seite.locator('.heute-karte:not([hidden]) .fk-heute').innerText())
     && await seite.locator('.fk-heute .fk-zuenden').count() === 1);
+  const kopfMass = await seite.evaluate(kopfChipMass);
+  pruefe('arena:kopf: Level-Chip antippbar (role=button, Tastatur) mit Tippfläche mindestens 44 x 44, sichtbar so hoch wie der Sterne-Chip, '
+    + 'eine Oberkante in der Chip-Reihe, Kopf-Knöpfe weiter mindestens 44 x 44', kopfMass.rolle && kopfMass.tipp.w >= 44 && kopfMass.tipp.h >= 44
+    && Math.abs(kopfMass.sicht.h - kopfMass.sterne.h) <= 1 && kopfMass.oben === 1 && kopfMass.ganz && kopfMass.knoepfeKopf, kopfMass);
   const tipp = await seite.evaluate(() => Math.round(document.querySelector('.fk-heute .fk-zuenden').getBoundingClientRect().height));
   pruefe('Tippfläche „Zünden“ mindestens 44 px', tipp >= 44, tipp);
   pruefe('arena:panel-bot: Faktor vor der Partie („Einstieg · Funken × 1“)', (await seite.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Einstieg · Funken × 1');
@@ -817,6 +846,14 @@ async function testeBrowser(browser) {
   // wie navigation.test.mjs beim Blatt: hoechstens 2 s auf das Wegfahren warten (unter Last laeuft es spaeter aus)
   await seite.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
   pruefe('Escape schließt den Spiegel', await seite.locator('.fk-spiegel-ort').count() === 0);
+  // Tastatur: der Chip ist fokussierbar, Enter oeffnet den Spiegel, nach Escape steht der Fokus wieder auf dem Chip
+  await seite.locator('.fk-chip').focus();
+  await seite.keyboard.press('Enter');
+  const perTaste = await seite.waitForSelector('.fk-spiegel-ort .fk-spiegel', { timeout: 3000 }).then(() => true).catch(() => false);
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
+  pruefe('Tastatur: Enter auf dem Level-Chip öffnet den Spiegel, Escape schließt ihn, Fokus zurück auf dem Chip', perTaste
+    && await seite.locator('.fk-spiegel-ort').count() === 0 && await seite.evaluate(() => document.activeElement && document.activeElement.matches('.fk-chip')));
   await h.tippe('.fk-heute .fk-zuenden');
   await warte(300);
   const nachZuenden = await h.stand();
@@ -1073,6 +1110,9 @@ async function testeBrowser(browser) {
     await bild(s, `arena-${name}`);
     const ueber = await s.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     pruefe(`${name}: Arena ohne waagrechten Überlauf`, ueber <= 0, ueber);
+    const chip = await s.evaluate(kopfChipMass);
+    pruefe(`${name}: Level-Chip im Kopf ganz sichtbar, Tippfläche mindestens 44 x 44, so hoch wie der Sterne-Chip, eine Oberkante`,
+      chip.rolle && chip.tipp.w >= 44 && chip.tipp.h >= 44 && Math.abs(chip.sicht.h - chip.sterne.h) <= 1 && chip.oben === 1 && chip.ganz, chip);
     await hh.schaefermatt();
     await hh.abrFertig();
     await warte(800);

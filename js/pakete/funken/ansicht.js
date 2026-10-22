@@ -6,7 +6,8 @@
 //       div.fk-abr[data-zeile="funken"]; data-aufstieg="n" bei einem Aufstieg, data-fertig="1", sobald das Endbild steht
 //       Zeile "FUNKEN +410" mit Formel, Level-Balken (laeuft vom alten zum neuen Stand, bei Aufstieg ueber den Rand:
 //       der Ring schliesst sich, die Zahl klappt um, Klang "level") und Aufschluesselung auf Antippen.
-//   kopfChip({ st, beiTipp }) -> HTMLElement            Chip "Level 12" mit Mini-Balken (arena:kopf)
+//   kopfChip({ st, beiTipp }) -> HTMLElement            Chip .fk-chip[role=button] "Level 12" mit Mini-Balken (arena:kopf),
+//                                                        Tippflaeche >= 44 px ueber ::before
 //   spielerEmblem({ st }) -> HTMLElement                 kleines Level-Emblem an Flos Namen (partie:spieler-leiste)
 //   verlaufKarte({ st, botName, beiMehr }) -> HTMLElement Karte "Level und Funken" (verlauf:seite)
 //   heuteZeile({ st, wochenende, beiZuenden }) -> HTMLElement | null   Rueckenwind in der Heute-Karte (arena:heute)
@@ -240,17 +241,28 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
 }
 
 // ---------- Kopf, Spieler-Leiste ----------
+// Der Chip steht in einer Reihe mit den Chips Sterne und Pokal (gleiche Hoehe, gleiche Oberkante) und ist trotzdem
+// antippbar: role="button" mit Tastatur (Enter, Leertaste); die Tippflaeche reicht per ::before 3 px ueber und unter den
+// Chip (40 px Chip -> 46 px, auf dem Handy 38 px -> 44 px; --tipp), so viel Rand laesst die Chip-Reihe.
 export function kopfChip({ st, beiTipp } = {}) {
   const fs = L.fortschritt(st.gesamt);
-  const b = el('button', 'chip fk-chip dr');
-  b.type = 'button';
+  const b = el('span', 'chip fk-chip dr');
+  b.setAttribute('role', 'button');
+  b.tabIndex = 0;
   b.dataset.paket = 'funken';
   b.dataset.level = String(fs.level);
   b.title = `Level ${fs.level} · ${fs.titel}`;
   b.setAttribute('aria-label', `Level ${fs.level}, ${fs.titel}: ${zahlText(fs.inLevel)} von ${zahlText(fs.kostet)} Funken bis Level ${fs.level + 1}`);
   b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">Level </span><b class="zahl">${fs.level}</b></span>`
     + `<span class="fk-mini" aria-hidden="true"><i style="transform:scaleX(${fs.anteil.toFixed(4)})"></i></span>`;
-  if (typeof beiTipp === 'function') b.addEventListener('click', beiTipp);
+  if (typeof beiTipp === 'function') {
+    b.addEventListener('click', beiTipp);
+    b.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      beiTipp(e);
+    });
+  }
   return b;
 }
 

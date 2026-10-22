@@ -1385,8 +1385,9 @@ Andere Pakete lesen Funken nie aus dem Modul, sondern ueber diese Ereignisse.
 
 **Orte.** `ergebnis:abrechnung` 20 (`.fk-abr[data-zeile="funken"]`: "+Funken", Formel, Level-Balken vom alten zum neuen
 Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um, Klang `level`; `data-aufstieg`,
-`data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip` "Level n" mit Mini-Balken, oeffnet
-den Funken-Spiegel), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
+`data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip[role=button]` "Level n" mit
+Mini-Balken, oeffnet per Antippen, Enter oder Leertaste den Funken-Spiegel; so hoch wie die Chips Sterne und Pokal, die
+Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; auf dem Handy nur die Zahl im Emblem), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
 z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
 (`.fk-spieler`), `spielplan:tage` 20 (`.fk-spielplan`), `partie:begruessung?` 40 (Anlass `funken-level`, einmal nach einem
 Aufstieg). Funkenlinie `.fk-linie` in `buehne.platz('funkenlinie')`, nur mit der Anzeige "Funkenlinie" (Standard aus).
@@ -1399,7 +1400,15 @@ Lern-Aufstiege gehen ohne `partieId` in die Nachlese.
 **Spielplan.** Das Funken-Wochenende kommt aus `daten/boss/spielplan.json` (Paket boss). Ohne angemeldeten Boss fragt
 das Paket nicht danach (kein 404).
 
-**Integration.** Mit `pakete/funken/index` in `PAKETE` aendern sich zwei Annahmen in `tests/app.test.mjs`: der Test
-"Auswertung im Hintergrund" wartet auf `.erg-tipp`, das nur ohne Abrechnungszeile erscheint, und "Abrechnung: hoechstens
-vier Zeilen" bietet selbst eine Zeile `funken` an Reihenfolge 20 an. Beide brauchen bei der Integration eine Anpassung.
+**Integration.** Das Paket steht bewusst noch nicht in `PAKETE` (Kopfkommentar von `js/erweiterungen.js` und
+`tests/sw.test.mjs`: das macht die Integration). Probelauf am 22.10. mit `pakete/funken/index` in `PAKETE` und den fuenf
+Dateien in `DATEIEN` von `sw.js`: sw, navigation, screens, thema, klang, funken gruen; rot sind nur Pruefungen, die den
+Kern ausdruecklich ohne Pakete pruefen: `tests/e2e.test.mjs` "Ohne Pakete: keine Feier, kein Ort im Ergebnis" und
+`tests/app.test.mjs` (bricht bei "Auswertung im Hintergrund" ab, weil `.erg-tipp` nur ohne Abrechnungszeile erscheint;
+dahinter dieselbe Annahme in "Kopf: genau 3 Chips", "Heute-Karte ohne Paket: versteckt" und `wpabr`, das selbst eine
+Zeile `funken` an Reihenfolge 20 anbietet). Vorschlag: diese Kern-Pruefungen laden `js/erweiterungen.js` per
+`page.route` mit `PAKETE = ['sicherung']`, damit sie weiter den Kern ohne Spiel-Pakete pruefen. Kopf auf schmalen
+Handys: neben dem Sterne-Chip passt der Level-Chip ab 390 px ganz, bei 375 px fehlen 12 px, bei 360 px 27 px, und
+zwischen 441 und etwa 510 px (Pokal-Chip wieder sichtbar) ist er angeschnitten oder liegt ganz im waagrechten
+Scrollbereich; das entscheidet die Integration mit der Auswahl der Kopf-Chips (Zahlenruhe 3.1).
 Tests: `node tests/funken.test.mjs` (Node und Browser, `PORT`, `BILDER`), Fairness-Zeilen in `tests/fairness.test.mjs`.
