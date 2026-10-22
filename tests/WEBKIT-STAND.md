@@ -32,6 +32,14 @@ WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirkli
     (`right: 0` bzw. `top: 0`); Prüfungen für h8, a1 und h1 verlangen jetzt „bleibt in der Box“.
   - „`setzeStellung` ohne Animation“: `animieren: false` setzt `--brett-dauer: 0ms` und platziert ohne jede
     Animation; die Grund-Transition auf `.figur` ist weg.
+- **Schichten ohne Browser-Zufall.** `.brett-felder` ist ausdrücklich ein eigener Stapelkontext (`z-index: 0`), die
+  Überlagerungen (Auswahl, Schach-Hof, letzter Zug, Flos Marken) liegen darin und damit unter den Figuren. Vorher hing
+  das daran, ob `container-type` einen Stapelkontext bildet (Chromium tut es nicht, für WebKit ist das nicht
+  gesichert): in Chromium lagen Auswahl und Schach-Hof über der Figur. Prüfung per Pixelvergleich
+  (Teil „Optik“).
+- **Finger-Tipp aufs Ziel zieht beim Loslassen** (vorher beim Aufsetzen), damit ein zweiter Finger oder ein
+  `pointercancel` von iPadOS (Systemgeste) den Zug noch zurücknehmen kann. `page.touchscreen.tap` und der
+  `fingerTreiber` liefern beide `pointerup`, die Tests laufen in beiden Engines gleich.
 - **Bewertungsbalken** (`css/app.css`): der Weiß-Anteil ist volle Höhe und wird per `translateY(calc(100% - var(--w)))`
   verschoben, statt `height` zu animieren (nur `transform`); `--w` setzt die Partie wie bisher.
 
@@ -44,6 +52,9 @@ WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirkli
   Paket U9/U7, nicht zum Brett).
 - `:has()` in `css/app.css` (`.brett-rahmen:has(> .brett.koord-rand)` für die Rand-Koordinaten) braucht Safari ab
   15.4; Zielgerät ist iPadOS ab 16.4, das reicht.
+- Ob ein echter Finger auf dem iPad beim Malen (Halten 400 ms, dann ziehen) dieselben Ereignisse liefert wie der
+  Treiber; die Zeichen-Geste stoppt `pointermove`/`pointerup` an der Brett-Grenze (`stopPropagation`), das Aufsetzen
+  geht noch an die Umgebung (Wischen der Analyse setzt dort nur seinen Startpunkt).
 - Synthetische Ereignisse lösen keine Standard-Aktionen des Browsers aus (Scrollen, Zoom, Klick-Nachzügler). Ob ein
   echter Finger auf dem iPad dabei etwas anderes tut, zeigt erst Flos Test auf dem Gerät (`touch-action: none` am
   Brett soll genau das verhindern).
