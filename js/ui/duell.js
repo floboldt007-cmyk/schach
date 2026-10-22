@@ -172,6 +172,10 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     ueber.innerHTML = '';
   }
   document.body.append(ueber);
+  // Sicherheitsnetz fuer langsame Geraete: blockiert der Aufbau der Partie den Hauptfaden, kann die harte Grenze (ein
+  // Timer) nicht rechtzeitig feuern; die Ueberlagerung ist dann trotzdem zur harten Grenze ausgeblendet (Opazitaet
+  // laeuft im Compositor). Absolute Zeit: anim() rechnet mit Tempo, deshalb durch tempo() geteilt.
+  anim(ueber, [{ opacity: 1 }, { opacity: 1, offset: (DAUER_MAX - 160) / DAUER_MAX }, { opacity: 0 }], { d: DAUER_MAX / Math.max(tempo(), 0.01), k: 'linear', fill: 'forwards' });
 
   const zeigeZiele = () => {
     for (const z of versteckt) { try { z.style.visibility = ''; } catch (e) { /* egal */ } }

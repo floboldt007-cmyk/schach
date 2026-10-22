@@ -267,6 +267,11 @@ const MIT_PAKET = `${BASIS}&erw=pakete/u5-test/index`;
 const duellHorcher = (seite) => seite.evaluate(() => {
   window.__fertig = [];
   window.__duellGesehen = 0;
+  // Last-Sonde: wie lange der Hauptfaden am Stueck blockiert war (die harte Grenze ist ein Timer und kann nicht
+  // feuern, solange z. B. die Partie aufbaut; auf dem geteilten Testrechner kostet das unter Last mehrere 100 ms)
+  window.__block = 0;
+  let letzt = performance.now();
+  setInterval(() => { const n = performance.now(); window.__block = Math.max(window.__block, n - letzt - 25); letzt = n; }, 25);
   window.__fliegerMax = 0;
   document.addEventListener('duell:fertig', (e) => window.__fertig.push({ ...(e.detail || {}), t: Math.round(performance.now()), attr: document.documentElement.dataset.duell || null }));
   const mo = new MutationObserver(() => {
@@ -662,11 +667,12 @@ async function testeDuell(browser) {
       const { aktivesDuell } = await import('./js/ui/duell.js');
       const { klang } = await import('./js/sounds.js');
       return { fertig: window.__fertig, duell: document.querySelectorAll('.duell').length, flieger: document.querySelectorAll('.duell-flieger').length, attr: document.documentElement.dataset.duell || null,
-        screen: document.documentElement.dataset.screen, aktiv: aktivesDuell(), prot: window.__duellProtokoll, start: klang.protokoll().filter((e) => e.name === 'start').length };
+        screen: document.documentElement.dataset.screen, aktiv: aktivesDuell(), prot: window.__duellProtokoll, start: klang.protokoll().filter((e) => e.name === 'start').length, block: Math.round(window.__block) };
     });
     pruefe('duell:fertig genau einmal (art voll, nicht uebersprungen), Attribut beim Ereignis schon weg', danach.fertig.length === 1 && danach.fertig[0].art === 'voll' && danach.fertig[0].uebersprungen === false && danach.fertig[0].attr === null, JSON.stringify(danach.fertig));
     pruefe('danach: Ueberlagerung und Flieger weg, aktivesDuell() null, Partie-Screen', danach.duell === 0 && danach.flieger === 0 && danach.attr === null && danach.screen === 'partie' && danach.aktiv === null, JSON.stringify(danach));
-    pruefe('Dauer hoechstens 1,4 s (plus Last), Start-Klang genau einmal', danach.prot && danach.prot.length === 1 && danach.prot[0].dauer <= 1500 && danach.prot[0].dauer >= 1000 && danach.start === 1, JSON.stringify(danach.prot) + ' start=' + danach.start);
+    pruefe('Dauer hoechstens 1,4 s (plus 100 ms und die gemessene Blockade des Hauptfadens), Start-Klang genau einmal', danach.prot && danach.prot.length === 1
+      && danach.prot[0].dauer <= 1500 + danach.block && danach.prot[0].dauer >= 1000 && danach.start === 1, JSON.stringify(danach.prot) + ' start=' + danach.start + ' block=' + danach.block);
     await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     pruefe('Partie gegen Ritter Rudi laeuft', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:laufend') || 'null')?.botId === 'rudi'));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -719,8 +725,8 @@ async function testeDuell(browser) {
     await duellHorcher(seite);
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
-    const k = await seite.evaluate(() => ({ fertig: window.__fertig, prot: window.__duellProtokoll, voll: window.__duellGesehen, screen: document.documentElement.dataset.screen }));
-    pruefe('nicht die erste Partie: Kurzfassung (art kurz, keine Buehne), Vertrag erfuellt, Partie da', k.fertig.length === 1 && k.fertig[0].art === 'kurz' && k.prot[0].art === 'kurz' && k.prot[0].dauer <= 1500 && k.screen === 'partie'
+    const k = await seite.evaluate(() => ({ fertig: window.__fertig, prot: window.__duellProtokoll, voll: window.__duellGesehen, screen: document.documentElement.dataset.screen, block: Math.round(window.__block) }));
+    pruefe('nicht die erste Partie: Kurzfassung (art kurz, keine Buehne), Vertrag erfuellt, Partie da', k.fertig.length === 1 && k.fertig[0].art === 'kurz' && k.prot[0].art === 'kurz' && k.prot[0].dauer <= 1500 + k.block && k.screen === 'partie'
       && (await seite.evaluate(() => document.querySelectorAll('.duell.voll, .duell-buehne').length === 0)), JSON.stringify(k));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -821,10 +827,10 @@ async function testeDuell(browser) {
       const nurEins = document.querySelectorAll('.duell').length === 1 && document.querySelector('.duell').dataset.bot === 'benno';
       const drittesFertig = await Promise.race([d3.fertig.then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
       d4.ueberspringe();
-      return { bereitSofort, aktiv1, huelle, t1: Math.round(t1), aktiv2, lief, sofortWeg, warteZeit: Math.round(performance.now() - t2), nurEins, drittesFertig, fertig: window.__fertig.map((f) => f.art + (f.uebersprungen ? '!' : '')).join(), prot: window.__duellProtokoll.map((p) => p.art + ':' + p.ziele).join() };
+      return { bereitSofort, aktiv1, huelle, t1: Math.round(t1), block: Math.round(window.__block), aktiv2, lief, sofortWeg, warteZeit: Math.round(performance.now() - t2), nurEins, drittesFertig, fertig: window.__fertig.map((f) => f.art + (f.uebersprungen ? '!' : '')).join(), prot: window.__duellProtokoll.map((p) => p.art + ':' + p.ziele).join() };
     });
     pruefe('Kurzfassung ohne Partie: bereit sofort, aktivesDuell() gesetzt, nur eine unsichtbare Huelle, Ende an der harten Grenze (1,4 s), danach null',
-      r.bereitSofort && r.aktiv1 && r.huelle && r.t1 >= 1380 && r.t1 <= 1700 && r.aktiv2 === null, JSON.stringify(r));
+      r.bereitSofort && r.aktiv1 && r.huelle && r.t1 >= 1380 && r.t1 <= 1700 + r.block && r.aktiv2 === null, JSON.stringify(r));
     pruefe('ueberspringe(): sofort weg, fertig erfuellt sich', r.lief && r.sofortWeg && r.warteZeit < 200, JSON.stringify(r));
     pruefe('ein neues Intro beendet das laufende (hoechstens eine Ueberlagerung)', r.nurEins && r.drittesFertig && r.fertig === 'kurz,voll!,voll!,voll!', JSON.stringify(r));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
