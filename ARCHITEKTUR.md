@@ -1358,17 +1358,26 @@ Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/
   (Bosse, freie Partien und Spielhalle ja, dann ohne Sterne). Niederlagen bekommen keinen Knopf (Fairness 10), dort
   bleibt der Tipp „Kopf hoch!“. Der Verlauf hat keinen Ort je Zeile: jede Partie ist ueber Verlauf -> Analyse teilbar.
 - **Blatt:** `.sheet-ort.tl-blatt` (Grundform der Bauteile) mit Vorschau-Canvas, Wahl Hell/Dunkel (`segment`), Schalter
-  „Benutzername zeigen“ (nur mit Konto-Sitzung und Benutzernamen im Profil, ein GET je Sitzung, Standard aus), Hinweis,
+  „Benutzername zeigen“ (nur mit Konto-Sitzung und Benutzernamen im Profil, Standard aus; der Name wird je Konto der
+  Sitzung gemerkt, ein Kontowechsel ohne Neuladen fragt neu, ohne Namen wird beim naechsten Blatt neu gefragt), Hinweis,
   was im Bild steht, „Teilen“ (`navigator.share({ files, title, text })`, wenn `canShare` die Datei nimmt) sonst
   „Bild speichern“ (Download `crownmate-<sieg|remis>-<Tag>.png`). Die PNG-Datei liegt schon bereit, bevor der Knopf
-  aktiv wird, damit `share()` direkt im Klick laeuft (Safari). Abbruch im Teilen-Blatt laesst das Blatt offen.
-  `app:screen` und Escape schliessen es. `data-bereit="ja"` und `data-modus` am Blatt, sobald das Bild steht.
-- **Bild (RECHENSTAND 1):** 1080 x 1350, `logik.layout()`; Marke (Bauer auf Tinte) und „Crownmate“, Datum (Tag aus
-  `tag.js`), Ueberzeile (z. B. „Schachmatt im 23. Zug“, Boss mit „Boss · …“), „Sieg“ mit goldenem „!“ bzw. „Remis“,
+  aktiv wird, damit `share()` direkt im Klick laeuft (Safari). Abbruch im Teilen-Blatt (`AbortError`) laesst das Blatt
+  offen; lehnt das Geraet ab (jeder andere Fehler, z. B. `NotAllowedError`), wird die Datei gespeichert („Teilen ging
+  hier nicht, das Bild ist gespeichert.“, Weg `datei`). Scheitert das Bild, steht „Das Bild konnte nicht entstehen.“
+  da, jeder neue Versuch zeigt wieder „Bild entsteht …“. Tab bleibt im Blatt und laeuft wie bei den Bauteilen nur ueber
+  die gewaehlte Segment-Option. `app:screen` und Escape schliessen es. `data-bereit="ja"` und `data-modus` am Blatt,
+  sobald das Bild steht (die Karte kann dann noch eingleiten: Lage erst nach `getAnimations()` messen).
+- **Bild (RECHENSTAND 1):** 1080 x 1350, `logik.layout()`; Marke (Bauer auf Tinte) und „Crownmate“, Datum (Kalendertag
+  lokal wie im Verlauf, `kalenderTag()`; bewusst nicht die Tagesgrenze 4:00 aus `tag.js`, die gilt fuer Schluessel),
+  Ueberzeile (z. B. „Schachmatt im 23. Zug“, Boss mit „Boss · …“), „Sieg“ mit goldenem „!“ bzw. „Remis“,
   „gegen <Bot>“, optional „Gespielt von <Benutzername>“, Portraet (`thema.avatarVon`) auf der Bot-Toenung, Endstellung im
   Sockel (Feldfarben und `--zuletzt` aus Flos Brettfarbe, Figuren aus dem Figuren-Pfad des Themes, Brett gedreht bei
-  Schwarz), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt), Zuege; Fuss „crownmate“ und die
-  Adresse der App (`adresseAus(location.href)`). Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
+  Schwarz, Koordinaten ueber den Figuren), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt),
+  Zuege; Fuss „crownmate“ und die Adresse der App (`appAdresse(location.href)`: `MARKEN_ADRESSE` in `logik.js`, solange
+  leer die Adresse der Seite; in einer App-Huelle wie `capacitor://localhost`, `https://localhost` oder `file:` keine).
+  Sperrt ein Browser die Leinwand wegen der SVG-Bilder (`toBlob` wirft), entsteht das Bild neu ohne Figurenbilder
+  (Kreis mit Buchstabe); in WebKitGTK 2.52 und Chromium sperrt nichts. Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
   dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
 - **Speicher:** Modul `teilen` (Budget 2.000) `{ v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] }`
   (hoechstens 20, je Partie eine Zeile); Modul-Einstellungen `teilen` `{ bild: '' | 'hell' | 'dunkel', name: false }`.

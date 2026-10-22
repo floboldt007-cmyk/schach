@@ -2,8 +2,10 @@
 // Farben aus den Tokens, Zeichnen mit einem Fake-Kontext, keine persoenlichen Daten), danach Browser-Teil
 // (Playwright, Chromium) gegen die echte App mit dem Paket ueber ?test&erw=pakete/teilen/index: Knopf im Ergebnis nach
 // einem echten Sieg, Leinwand 1080 x 1350 mit Feldfarben aus den Tokens, Hell und Dunkel, Speichern ohne
-// navigator.share, Teilen mit Datei, Abbrechen im Teilen-Blatt, Benutzername nur mit Schalter, Analyse und Verlauf,
-// kein Knopf nach Niederlage oder Uebung, Handy-Bilder, Laden ueber die Liste PAKETE (Produktion).
+// navigator.share, Teilen mit Datei, Abbrechen im Teilen-Blatt, vom Geraet abgelehntes Teilen (Datei wird gespeichert),
+// Benutzername nur mit Schalter und je Konto, Analyse und Verlauf, kein Knopf nach Niederlage oder Uebung (erst gezaehlt,
+// wenn die Analyse fertig gezeichnet ist), Handy-Bilder, Fehlerpfade (gesperrte Leinwand, Bild scheitert, Tab-Lauf),
+// Laden ueber die Liste PAKETE (Produktion).
 //
 //   node tests/teilen.test.mjs              alles
 //   node tests/teilen.test.mjs --nur-node   ohne Browser
@@ -124,10 +126,20 @@ async function nodeTeil() {
 
   gruppe = 'Datum und Adresse';
   pruefe('Datum TT.MM.JJJJ', L.datumText(new Date(2026, 9, 22, 12).toISOString()) === '22.10.2026');
-  pruefe('vor 4:00 Uhr: Vortag (Tagesgrenze aus tag.js)', L.datumText(new Date(2026, 9, 23, 3, 30).toISOString()) === '22.10.2026');
+  // ein angezeigtes Datum ist der Kalendertag wie im Verlauf (toLocaleDateString), nicht die Tagesgrenze 4:00 aus tag.js
+  pruefe('01:30 Uhr am 23.10.: 23.10.2026 (Kalendertag wie im Verlauf), auch im Dateinamen', L.datumText(new Date(2026, 9, 23, 1, 30).toISOString()) === '23.10.2026'
+    && L.kalenderTag(new Date(2026, 9, 23, 1, 30).toISOString()) === '2026-10-23'
+    && L.bildDaten({ ...sieg, datum: new Date(2026, 9, 23, 1, 30).toISOString() }, {}).dateiname === 'crownmate-sieg-2026-10-23.png');
+  pruefe('23:59 Uhr bleibt am selben Tag, Monatsanfang zweistellig', L.datumText(new Date(2026, 9, 22, 23, 59).toISOString()) === '22.10.2026'
+    && L.datumText(new Date(2027, 0, 3, 9).toISOString()) === '03.01.2027');
   pruefe('kaputtes Datum: null', L.datumText('gestern') === null && L.datumText(null) === null);
   pruefe('Adresse ohne Protokoll, index.html, Suche und Anker', L.adresseAus('https://floboldt007-cmyk.github.io/schach/index.html?test&erw=x#arena') === 'floboldt007-cmyk.github.io/schach'
     && L.adresseAus('http://127.0.0.1:9700/index.html?test') === '127.0.0.1:9700' && L.adresseAus('https://www.crownmate.de/') === 'crownmate.de' && L.adresseAus('kaputt') === '');
+  pruefe('App-Huelle (capacitor://localhost, https://localhost) und Dateien: keine Adresse statt einer nutzlosen',
+    L.adresseAus('capacitor://localhost/index.html#arena') === '' && L.adresseAus('https://localhost/index.html') === '' && L.adresseAus('http://localhost:8000/') === ''
+    && L.adresseAus('file:///C:/Spiele/schach/index.html') === '');
+  pruefe('appAdresse: ohne feste Markenadresse die Adresse der Seite (eine Stelle zum Umstellen: MARKEN_ADRESSE)', L.MARKEN_ADRESSE === ''
+    && L.appAdresse('https://floboldt007-cmyk.github.io/schach/') === L.adresseAus('https://floboldt007-cmyk.github.io/schach/') && L.appAdresse('capacitor://localhost/') === '');
   pruefe('Benutzername nur wie im Konto (3 bis 20 Zeichen A-Z, 0-9, _), keine E-Mail, kein Klarname mit Leerzeichen',
     L.gueltigerName('FloTest') === 'FloTest' && L.gueltigerName('flo@example.org') === null && L.gueltigerName('Max Mustermann') === null && L.gueltigerName('ab') === null && L.gueltigerName(42) === null);
 
@@ -241,6 +253,15 @@ async function nodeTeil() {
   pruefe('Schwarz unten: Brett gedreht (Reihe 8 und Linie h unten links, schwarzer Koenig e8 unten)', rSchwarz.felder === 64 && textAn('8', ...untenLinks) && textAn('h', ...linieLinks)
     && L.feldRechteck('e8', 'b', l).y === l.brett.y + 7 * l.brett.feld);
   pruefe('ohne Figurenbilder: Ersatz mit deutschen Buchstaben (K, D, T, L, S, B)', ['K', 'D', 'T', 'L', 'S', 'B'].every((t) => r.texte.includes(t)));
+  // Figurenbilder fuellen das ganze Feld: die Koordinaten kommen danach, sonst verdecken Turm, Springer usw. sie
+  aufrufe.length = 0;
+  const attrappe = { attrappe: true };
+  const alleFiguren = Object.fromEntries(['w', 'b'].flatMap((c) => ['K', 'Q', 'R', 'B', 'N', 'P'].map((t) => [c + t, attrappe])));
+  B.zeichne(fake(), d, farben, { figuren: alleFiguren });
+  const figurIdx = aufrufe.map((a, i) => (a.k === 'drawImage' && a.a[0] === attrappe && a.a[3] === l.brett.feld ? i : -1)).filter((i) => i >= 0);
+  const koordIdx = aufrufe.map((a, i) => (a.k === 'fillText' && /^[a-h1-8]$/.test(a.a[0]) && /\b17px\b/.test(a.font) ? i : -1)).filter((i) => i >= 0);
+  pruefe('Koordinaten nach den Figuren gezeichnet (31 Figurenbilder, 16 Koordinaten danach)', figurIdx.length === 31 && koordIdx.length === 16
+    && Math.max(...figurIdx) < Math.min(...koordIdx), JSON.stringify({ figuren: figurIdx.length, koord: koordIdx.length, letzteFigur: Math.max(...figurIdx), ersteKoord: Math.min(...koordIdx) }));
   aufrufe.length = 0;
   B.zeichne(fake(), L.bildDaten(sieg, { bot: { id: 'x', name: 'Ein sehr langer Gegnername mit vielen Worten und noch mehr' } }), farben, {});
   const gz = aufrufe.find((a) => a.k === 'fillText' && String(a.a[0]).startsWith('gegen'));
@@ -339,6 +360,12 @@ const blattBereit = (seite, modus) => seite.waitForFunction((m) => {
   const b = document.querySelector('.tl-blatt:not(.weg)');
   return b && b.dataset.bereit === 'ja' && (!m || b.dataset.modus === m);
 }, modus || null, { timeout: 20000 });
+// erst messen, wenn das Blatt eingeglitten ist (mit Bewegung 480 ms): das Bild steht oft schon nach 200 ms (data-bereit),
+// waehrend die Karte noch von unten hereingleitet
+const eingeglitten = (seite) => seite.waitForFunction(() => {
+  const k = document.querySelector('.tl-blatt:not(.weg) .tl-karte');
+  return !!k && k.getAnimations().every((a) => a.playState === 'finished');
+}, null, { timeout: 5000 });
 const zustand = (seite) => seite.evaluate(async () => (await import('/js/pakete/teilen/index.js')).zustand());
 // wartet, bis fn() (in Node, darf async sein) wahr wird; true oder nach ms false
 async function bis(fn, ms = 10000) {
@@ -386,6 +413,7 @@ async function browserTeil(browser) {
   gruppe = 'Bild hell';
   await seite.locator('.erg-karte-ort .tl-teilen').click();
   await blattBereit(seite, 'hell');
+  await eingeglitten(seite);
   const z1 = await zustand(seite);
   const p1 = await leinwand(seite);
   pruefe('Leinwand 1080 x 1350', p1 && p1.w === 1080 && p1.h === 1350, JSON.stringify(p1 && [p1.w, p1.h]));
@@ -439,6 +467,7 @@ async function browserTeil(browser) {
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => !!(d && Array.isArray(d.files) && d.files.length && d.files.every((f) => f instanceof File)) });
     Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => {
       if (window.__teilenAntwort === 'abbruch') throw new DOMException('abgebrochen', 'AbortError');
+      if (window.__teilenAntwort === 'verboten') throw new DOMException('nicht erlaubt', 'NotAllowedError');
       const f = d.files[0];
       const daten = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
       window.__geteilt.push({ title: d.title, text: d.text, anzahl: d.files.length, name: f.name, type: f.type, size: f.size, daten });
@@ -476,6 +505,25 @@ async function browserTeil(browser) {
   }));
   pruefe('gemerkt (eine Zeile je Partie, Weg teilen), Wahl Dunkel bleibt fuers naechste Bild', nachTeilen.modul.geteilt.length === 1 && nachTeilen.modul.geteilt[0].weg === 'teilen'
     && nachTeilen.einst && nachTeilen.einst.bild === 'dunkel' && nachTeilen.einst.name === false, JSON.stringify(nachTeilen));
+  // Das Geraet lehnt das Teilen ab (nicht der Nutzer, z. B. NotAllowedError): die fertige Datei wird gespeichert
+  await seite.evaluate(() => { window.__teilenAntwort = 'verboten'; });
+  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await blattBereit(seite, 'dunkel');
+  const [dl2] = await Promise.all([seite.waitForEvent('download', { timeout: 10000 }).catch(() => null), seite.locator('.tl-blatt [data-tl="los"]').click()]);
+  const zuNachAblehnen = await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 }).then(() => true, () => false);
+  const abgelehnt = await seite.evaluate(() => ({
+    toast: [...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | '), fehler: !!document.querySelector('.toast[data-art="fehler"], .toast.fehler'),
+    modul: JSON.parse(localStorage.getItem('schach-arena:v1:modul:teilen') || 'null'), geteilt: window.__geteilt.length,
+  }));
+  const dl2Name = dl2 ? dl2.suggestedFilename() : '';
+  pruefe('Teilen vom Geraet abgelehnt: Bild wird gespeichert (Download), Meldung ohne Fehler, Blatt zu, gemerkt mit Weg datei', zuNachAblehnen
+    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(dl2Name) && /das Bild ist gespeichert/.test(abgelehnt.toast) && !abgelehnt.fehler
+    && abgelehnt.geteilt === 1 && abgelehnt.modul.geteilt.length === 1 && abgelehnt.modul.geteilt[0].weg === 'datei', JSON.stringify({ ...abgelehnt, datei: dl2Name }));
+  await seite.evaluate(() => { window.__teilenAntwort = 'ok'; });
+  if (!zuNachAblehnen) {   // damit die folgenden Gruppen weiterlaufen (die Pruefung oben ist dann schon rot)
+    await seite.keyboard.press('Escape');
+    await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
+  }
 
   // ---------- Benutzername: nur mit Konto, nur mit Schalter, nie die E-Mail ----------
   gruppe = 'Benutzername';
@@ -484,7 +532,7 @@ async function browserTeil(browser) {
     window.__kontoAnfragen = [];
     k.setzeKontoFetch(async (url, opt) => {
       window.__kontoAnfragen.push(String(url).replace(/^https?:\/\/[^/]+/, '') + ' ' + ((opt && opt.method) || 'GET'));
-      const daten = /\/rest\/v1\/profile/.test(url) ? [{ user_id: 'u1', benutzername: 'FloTest', email: 'flo.privat@example.org' }] : [];
+      const daten = /\/rest\/v1\/profile/.test(url) ? [{ user_id: 'u1', benutzername: window.__profilName || 'FloTest', email: 'flo.privat@example.org' }] : [];
       return { ok: true, status: 200, json: async () => daten };
     });
     localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: 'a.b.c', refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1' }, email: 'flo.privat@example.org' }));
@@ -511,8 +559,21 @@ async function browserTeil(browser) {
   const anfragen = await seite.evaluate(() => window.__kontoAnfragen.filter((a) => /profile/.test(a)));
   pruefe('Profil nur gelesen (GET), einmal je Sitzung', anfragen.length === 1 && / GET$/.test(anfragen[0]), JSON.stringify(anfragen));
   await seite.keyboard.press('Escape');
+  const escZu = await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 }).then(() => true, () => false);
+  pruefe('Escape schliesst das Blatt', escZu);
+  // Kontowechsel ohne Neuladen (abmelden, anderes Konto an): der Name des alten Kontos erscheint nie
+  await seite.evaluate(() => {
+    window.__profilName = 'Zweitkonto';
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: 'd.e.f', refresh_token: 'r2', expires_at: 9999999999, user: { id: 'u2' }, email: 'zweit@example.org' }));
+  });
+  await seite.locator('.erg-karte-ort .tl-teilen').click();
+  await blattBereit(seite, 'dunkel');
+  const zweitName = await bis(async () => /Zweitkonto/.test(await seite.locator('.tl-blatt .tl-name').innerText().catch(() => '')), 6000);
+  const zweit = await seite.evaluate(() => ({ zeile: document.querySelector('.tl-blatt .tl-name').textContent, sichtbar: !document.querySelector('.tl-blatt .tl-name').hidden,
+    anfragen: window.__kontoAnfragen.filter((a) => /profile/.test(a)).length }));
+  pruefe('anderes Konto: dessen Benutzername, nie der des alten Kontos (neue Anfrage je Konto)', zweitName && zweit.sichtbar && !/FloTest/.test(zweit.zeile) && zweit.anfragen === 2, JSON.stringify(zweit));
+  await seite.keyboard.press('Escape');
   await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
-  pruefe('Escape schliesst das Blatt', true);
   await seite.evaluate(async () => {
     localStorage.removeItem('schach-arena:konto:sitzung');
     (await import('/js/konto.js')).setzeKontoFetch(null);
@@ -583,10 +644,24 @@ async function browserTeil(browser) {
   }, partie);
   pruefe('Ergebnis: kein Knopf nach Niederlage oder Übung, Knopf nach Remis', ohne.niederlage === 0 && ohne.uebung === 0 && ohne.remis === 1, JSON.stringify(ohne));
   for (const [nr, was] of [['n', 'Niederlage'], ['u', 'Übung']]) {
-    await seite.evaluate((id) => window.__app.gehe('analyse', { partieId: id }), partie.id + nr);
-    await seite.waitForFunction((id) => location.hash.includes('analyse') && document.querySelector('.screen.analyse, .an-koerper'), partie.id + nr, { timeout: 15000 });
-    await warte(800);
-    pruefe(`Analyse einer ${was}: kein Teilen-Knopf`, await seite.locator('.an-ort-oben .tl-teilen').count() === 0);
+    const id = partie.id + nr;
+    // Die Kopie hat dieselben Zuege: die gespeicherte Analyse der Sieg-Partie gilt auch fuer sie (dann ist die Analyse
+    // sofort fertig). Der Inhalt der Analyse davor wird markiert, damit nur der neu gezeichnete zaehlt.
+    const vorab = await seite.evaluate(({ von, nach }) => {
+      const r = localStorage.getItem('schach-arena:v1:review:' + von);
+      if (r) localStorage.setItem('schach-arena:v1:review:' + nach, r);
+      for (const el of document.querySelectorAll('.an-inhalt')) el.dataset.alt = 'ja';
+      return !!r;
+    }, { von: partie.id, nach: id });
+    await seite.evaluate((i) => window.__app.gehe('analyse', { partieId: i }), id);
+    const fertig = await seite.waitForFunction((i) => location.hash === '#analyse/' + i && !!document.querySelector('.an-inhalt:not([data-alt]) .an-ort-oben'), id, { timeout: 90000 })
+      .then(() => true, () => false);
+    const lage = await seite.evaluate(() => {
+      const o = document.querySelector('.an-inhalt:not([data-alt]) .an-ort-oben');
+      return { ort: !!o, knopf: o ? o.querySelectorAll('.tl-teilen').length : -1, laden: document.querySelectorAll('.an-laden').length };
+    });
+    pruefe(`Analyse einer ${was} (fertig gezeichnet, Ort analyse:oben gefuellt): kein Teilen-Knopf`, fertig && lage.ort && lage.knopf === 0 && lage.laden === 0,
+      JSON.stringify({ vorab, fertig, ...lage }));
   }
   await seite.evaluate(() => window.__app.gehe('arena'));
   pruefe('keine Konsolenfehler (iPad)', fehler.length === 0, fehler.join(' | '));
@@ -605,8 +680,7 @@ async function browserTeil(browser) {
       m.oeffneBlatt({ partie: { ...p, botId: 'koenig' } });
     }, { p: partie, modus });
     await blattBereit(h.seite, modus);
-    // erst messen, wenn das Blatt eingeglitten ist (mit Bewegung 480 ms)
-    await h.seite.waitForFunction(() => document.querySelector('.tl-karte').getAnimations().every((a) => a.playState === 'finished'), null, { timeout: 5000 });
+    await eingeglitten(h.seite);
     const lage = await h.seite.evaluate(() => {
       const k = document.querySelector('.tl-karte').getBoundingClientRect();
       const c = document.querySelector('.tl-blatt canvas').getBoundingClientRect();
@@ -621,6 +695,76 @@ async function browserTeil(browser) {
     pruefe(`${modus}: keine Konsolenfehler`, h.fehler.length === 0, h.fehler.join(' | '));
     await h.kontext.close();
   }
+
+  // ---------- Fehlerpfade: gesperrte Leinwand (Safari), Bild scheitert, Tab-Lauf ----------
+  gruppe = 'Fehlerpfade';
+  const fp = await neueSeite(browser);
+  await fp.seite.goto(BASIS + '#arena');
+  await fp.seite.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
+  await fp.seite.waitForSelector('.screen.arena');
+  // 1. toBlob wirft einmal SecurityError (so sperrt ein Browser eine Leinwand mit SVG-Bildern): neu ohne Figurenbilder
+  await fp.seite.evaluate(async (p) => {
+    localStorage.setItem('schach-arena:v1:einstellungen:teilen', JSON.stringify({ bild: 'hell', name: false }));
+    const orig = HTMLCanvasElement.prototype.toBlob;
+    window.__toBlobSperre = 1;
+    window.__toBlobAufrufe = 0;
+    HTMLCanvasElement.prototype.toBlob = function (...a) {
+      window.__toBlobAufrufe++;
+      if (window.__toBlobSperre > 0) { window.__toBlobSperre--; throw new DOMException('Tainted canvases may not be exported.', 'SecurityError'); }
+      return orig.apply(this, a);
+    };
+    (await import('/js/pakete/teilen/index.js')).oeffneBlatt({ partie: p });
+  }, partie);
+  await blattBereit(fp.seite, 'hell');
+  const gesperrt = await zustand(fp.seite);
+  const pg = await leinwand(fp.seite);
+  const fpAufrufe = await fp.seite.evaluate(() => window.__toBlobAufrufe);
+  pruefe('gesperrte Leinwand: Bild entsteht neu ohne Figurenbilder (Buchstaben), Datei liegt bereit, Knopf aktiv', gesperrt.bereit && gesperrt.datei && gesperrt.datei.type === 'image/png'
+    && gesperrt.datei.size > 20000 && ['K', 'D', 'T', 'L', 'S', 'B'].every((t) => gesperrt.texte.includes(t)) && fpAufrufe === 2
+    && await fp.seite.locator('.tl-blatt [data-tl="los"]').isEnabled(), JSON.stringify({ ...gesperrt, texte: gesperrt.texte.join(' ') , fpAufrufe }));
+  pruefe('gesperrte Leinwand: Brett trotzdem in den Feldfarben, Texte vollstaendig', nah(pg.d3, [...fh, 255]) && nah(pg.e3, [...fd, 255]) && gesperrt.texte.includes('gegen Bauer Benno')
+    && gesperrt.texte.includes('crownmate'), JSON.stringify({ d3: pg.d3, e3: pg.e3 }));
+  // 2. Tab-Lauf wie die Bauteile: im Segment nur die gewaehlte Option (roving tabindex), dazu Abbrechen und der Hauptknopf
+  await eingeglitten(fp.seite);
+  const besucht = [];
+  for (let i = 0; i < 6; i++) {
+    await fp.seite.keyboard.press('Tab');
+    besucht.push(await fp.seite.evaluate(() => {
+      const a = document.activeElement;
+      return { im: !!a.closest('.tl-karte'), tab: a.tabIndex, was: a.dataset.wert || a.dataset.tl || a.className };
+    }));
+  }
+  const tabZiele = [...new Set(besucht.map((b) => b.was))].sort();
+  pruefe('Tab bleibt im Blatt und laeuft ueber Hell (gewaehlt), Abbrechen, Bild speichern; nie ueber die nicht gewaehlte Option', besucht.every((b) => b.im && b.tab >= 0)
+    && JSON.stringify(tabZiele) === JSON.stringify(['abbrechen', 'hell', 'los']), JSON.stringify(besucht));
+  // 3. Das Bild scheitert (kein 2D-Kontext): Meldung; der naechste Versuch zeigt wieder "Bild entsteht …", dann das Bild
+  await fp.seite.keyboard.press('Escape');
+  await fp.seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
+  await fp.seite.evaluate(async (p) => {
+    const orig = HTMLCanvasElement.prototype.getContext;
+    window.__ohneKontext = 1;
+    HTMLCanvasElement.prototype.getContext = function (...a) {
+      // nur die Leinwand, auf die das Paket zeichnet (frei, schon 1080 x 1350), nicht die Vorschau oder andere
+      if (window.__ohneKontext > 0 && !this.isConnected && this.width === 1080 && this.height === 1350) { window.__ohneKontext--; return null; }
+      return orig.apply(this, a);
+    };
+    (await import('/js/pakete/teilen/index.js')).oeffneBlatt({ partie: p });
+  }, partie);
+  const meldung = await fp.seite.waitForFunction(() => /konnte nicht entstehen/.test((document.querySelector('.tl-blatt .tl-laden') || {}).textContent || ''), null, { timeout: 15000 })
+    .then(() => true, () => false);
+  const nachFehler = await fp.seite.evaluate(() => {
+    const b = document.querySelector('.tl-blatt');
+    const vorher = { bereit: b.dataset.bereit, los: b.querySelector('[data-tl="los"]').disabled };
+    b.querySelector('.segment .seg[data-wert="dunkel"]').click();
+    const l = b.querySelector('.tl-laden');
+    return { ...vorher, text: l.textContent, sichtbar: !l.hidden };
+  });
+  pruefe('Bild scheitert: Meldung, Knopf bleibt gesperrt; beim neuen Versuch steht wieder "Bild entsteht …" da', meldung && nachFehler.bereit === 'nein' && nachFehler.los
+    && nachFehler.text === 'Bild entsteht …' && nachFehler.sichtbar, JSON.stringify(nachFehler));
+  await blattBereit(fp.seite, 'dunkel');
+  pruefe('danach entsteht das Bild (Ladehinweis weg)', await fp.seite.locator('.tl-blatt .tl-laden').isHidden());
+  pruefe('Konsole: nur die eine erwartete Meldung "teilen: Bild"', fp.fehler.length === 1 && /teilen: Bild/.test(fp.fehler[0]), fp.fehler.join(' | '));
+  await fp.kontext.close();
 
   // ---------- Produktion: das Paket aus der Liste PAKETE (wie nach der Integration) ----------
   gruppe = 'PAKETE';

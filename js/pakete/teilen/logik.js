@@ -13,8 +13,15 @@
 //   endstellung(startFen, zuege) -> { fen, zuletzt: [von, nach] | [], plies }   spielt die UCI-Zuege nach (chess.js);
 //                                    ein ungueltiger Zug beendet das Nachspielen (das Bild zeigt den Stand davor)
 //   zugZahl(startFen, plies) -> Zahl Nummer des letzten Zugs (wie "Schachmatt im 23. Zug" im Ergebnis), 0 ohne Zug
-//   datumText(iso) -> 'TT.MM.JJJJ' | null   Tag nach tag.js (Grenze 4:00 Uhr lokal), nie ueber toISOString
-//   adresseAus(href) -> Text         Adresse der App ohne Protokoll, index.html, Suche und Anker
+//   kalenderTag(iso) -> 'JJJJ-MM-TT' | null   Kalendertag lokal (wie der Verlauf), nie ueber toISOString; bewusst NICHT
+//                                    die Tagesgrenze 4:00 aus tag.js (die gilt fuer Tagesschluessel, nicht fuer ein
+//                                    angezeigtes Datum: eine Partie um 01:30 am 23.10. steht im Verlauf am 23.)
+//   datumText(iso) -> 'TT.MM.JJJJ' | null   derselbe Kalendertag fuers Bild (der Dateiname nimmt ihn auch)
+//   MARKEN_ADRESSE                   feste Adresse fuer den Fuss des Bildes; leer: die Adresse der Seite (Flo entscheidet,
+//                                    z. B. spaeter die Crownmate-Domain statt der GitHub-Adresse)
+//   adresseAus(href) -> Text         Adresse der App ohne Protokoll, index.html, Suche und Anker; leer fuer alles, was
+//                                    keine Web-Adresse ist (App-Huelle capacitor://localhost, https://localhost, file:)
+//   appAdresse(href) -> Text         MARKEN_ADRESSE, sonst adresseAus(href)
 //   gueltigerName(x) -> Text | null  nur ein Benutzername wie im Konto (3 bis 20 Zeichen A-Z, a-z, 0-9, _)
 //   bildDaten(p, { bot, name, adresse }) -> eingefrorenes Objekt mit genau FELDERN (siehe unten)
 //   layout() -> eingefrorene Lage aller Bereiche (Karte, Marke, Kopf, Portraet, Brett, Werte, Fuss)
@@ -25,10 +32,10 @@
 //
 // Kein Math.random (Fairness-Test: logik.js zaehlt zu den reinen Paket-Logik-Dateien).
 import { Chess } from '../../../vendor/chess/chess.js';
-import { tagSchluessel } from '../../tag.js';
 import { wertet } from '../../storage.js';
 
 export const RECHENSTAND = 1;
+export const MARKEN_ADRESSE = '';
 export const BREITE = 1080;
 export const HOEHE = 1350;
 
@@ -94,23 +101,37 @@ export function zugZahl(startFen, plies) {
   return startNummer + Math.floor((n - 1 + (startFarbe === 'b' ? 1 : 0)) / 2);
 }
 
-export function datumText(iso) {
+export function kalenderTag(iso) {
   if (iso == null || iso === '') return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const [j, m, t] = tagSchluessel(d).split('-');
+  const zwei = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}`;
+}
+
+export function datumText(iso) {
+  const tag = kalenderTag(iso);
+  if (!tag) return null;
+  const [j, m, t] = tag.split('-');
   return `${t}.${m}.${j}`;
 }
 
 export function adresseAus(href) {
   try {
     const u = new URL(String(href));
+    // in einer App-Huelle waere die Adresse nutzlos (localhost) oder gar keine (capacitor:, file:): dann keine
+    if (!/^https?:$/.test(u.protocol) || u.hostname === 'localhost') return '';
     let pfad = u.pathname.replace(/\/index\.html$/, '/').replace(/\/+$/, '');
     if (pfad === '/') pfad = '';
     return (u.host.replace(/^www\./, '') + pfad).slice(0, 80);
   } catch (e) {
     return '';
   }
+}
+
+export function appAdresse(href) {
+  const fest = typeof MARKEN_ADRESSE === 'string' ? MARKEN_ADRESSE.trim() : '';
+  return fest ? fest.slice(0, 80) : adresseAus(href);
 }
 
 export function gueltigerName(x) {
@@ -138,8 +159,7 @@ export function bildDaten(p, { bot = null, name = null, adresse = '' } = {}) {
     ? [0, 1, 2].map((i) => partie.sterne[i] === true) : null;
   const genau = Number(partie.genauigkeit);
   const datum = datumText(partie.datum);
-  let tag = '';
-  try { tag = partie.datum ? tagSchluessel(new Date(partie.datum)) : ''; } catch (e) { tag = ''; }
+  const tag = kalenderTag(partie.datum) || '';
   const daten = {
     stand: RECHENSTAND,
     ergebnis,

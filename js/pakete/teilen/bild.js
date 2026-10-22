@@ -163,7 +163,7 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
   }
   ctx.restore();
 
-  // 5. Sockel und Brett (Feldfarben fest je Brettfarbe, letzter Zug als Toenung, Koordinaten klein innen)
+  // 5. Sockel und Brett (Feldfarben fest je Brettfarbe, letzter Zug als Toenung, Figuren, darueber klein die Koordinaten)
   const sb = l.sockelBox;
   const b = l.brett;
   rundesRechteck(ctx, sb.x, sb.y, sb.w, sb.h, b.rs);
@@ -193,18 +193,6 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
       felder++;
     }
   }
-  // Koordinaten: Reihen links oben in der linken Spalte, Linien rechts unten in der unteren Reihe
-  font(750, 17, schrift);
-  for (let i = 0; i < 8; i++) {
-    const reihe = daten.unten === 'b' ? i + 1 : 8 - i;
-    const linie = daten.unten === 'b' ? 'hgfedcba'[i] : 'abcdefgh'[i];
-    const qr = feldRechteck('abcdefgh'[daten.unten === 'b' ? 7 : 0] + reihe, daten.unten, l);
-    const rDunkel = ((daten.unten === 'b' ? 7 : 0) + reihe) % 2 === 1;
-    text(String(reihe), qr.x + 6, qr.y + 6, { farbe: rDunkel ? hell : dunkel, grundlinie: 'top' });
-    const ql = feldRechteck(linie + (daten.unten === 'b' ? 8 : 1), daten.unten, l);
-    const lDunkel = ('abcdefgh'.indexOf(linie) + (daten.unten === 'b' ? 8 : 1)) % 2 === 1;
-    text(linie, ql.x + ql.s - 6, ql.y + ql.s - 5, { farbe: lDunkel ? hell : dunkel, ausrichtung: 'right', grundlinie: 'bottom' });
-  }
   for (const fig of figurenAus(daten.fen)) {
     const q = feldRechteck(fig.feld, daten.unten, l);
     const bild = bilder.figuren && bilder.figuren[fig.farbe + fig.typ];
@@ -223,6 +211,19 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
     ctx.stroke();
     font(800, 30, schrift);
     text(FIGUR_BUCHSTABE[fig.typ], q.x + q.s / 2, q.y + q.s / 2 + 1, { farbe: fig.farbe === 'w' ? schwarz : weiss, ausrichtung: 'center', grundlinie: 'middle' });
+  }
+  // Koordinaten nach den Figuren (die Figurenbilder fuellen das ganze Feld und wuerden sie sonst verdecken): Reihen
+  // links oben in der linken Spalte, Linien rechts unten in der unteren Reihe
+  font(750, 17, schrift);
+  for (let i = 0; i < 8; i++) {
+    const reihe = daten.unten === 'b' ? i + 1 : 8 - i;
+    const linie = daten.unten === 'b' ? 'hgfedcba'[i] : 'abcdefgh'[i];
+    const qr = feldRechteck('abcdefgh'[daten.unten === 'b' ? 7 : 0] + reihe, daten.unten, l);
+    const rDunkel = ((daten.unten === 'b' ? 7 : 0) + reihe) % 2 === 1;
+    text(String(reihe), qr.x + 6, qr.y + 6, { farbe: rDunkel ? hell : dunkel, grundlinie: 'top' });
+    const ql = feldRechteck(linie + (daten.unten === 'b' ? 8 : 1), daten.unten, l);
+    const lDunkel = ('abcdefgh'.indexOf(linie) + (daten.unten === 'b' ? 8 : 1)) % 2 === 1;
+    text(linie, ql.x + ql.s - 6, ql.y + ql.s - 5, { farbe: lDunkel ? hell : dunkel, ausrichtung: 'right', grundlinie: 'bottom' });
   }
   ctx.restore();
 

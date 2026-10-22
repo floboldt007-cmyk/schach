@@ -13,11 +13,12 @@
 .tl-teilen .ico { width: 20px; height: 20px; }
 
 /* ---------- Blatt ---------- */
-.tl-blatt .tl-karte { width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto;
+.tl-blatt .tl-karte { width: min(560px, calc(100% - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto;
   overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .tl-blatt .tl-karte:focus { outline: none; }
 .tl-vorschau { position: relative; display: grid; place-items: center; margin-top: var(--a4); }
-.tl-leinwand { display: block; width: min(100%, calc(48dvh * .8)); height: auto; aspect-ratio: 1080 / 1350;
+/* Rueckfall ohne dvh (Safari < 15.4) immer davor, wie in app.css */
+.tl-leinwand { display: block; width: min(100%, calc(48vh * .8)); width: min(100%, calc(48dvh * .8)); height: auto; aspect-ratio: 1080 / 1350;
   border-radius: var(--r-l); background-color: var(--grund-2); box-shadow: var(--s2), var(--kante); }
 .tl-laden { position: absolute; inset: auto 0 50% 0; transform: translateY(50%); color: var(--text-2); font-weight: var(--gw-stark);
   font-size: var(--fs-klein); }
@@ -32,6 +33,6 @@
 .tl-blatt .tl-los .ico { width: 20px; height: 20px; }
 
 @media (max-width: 440px) {
-  .tl-leinwand { width: min(100%, calc(42dvh * .8)); }
+  .tl-leinwand { width: min(100%, calc(42vh * .8)); width: min(100%, calc(42dvh * .8)); }
   .tl-zeile-option .segment { flex-basis: 180px; }
 }

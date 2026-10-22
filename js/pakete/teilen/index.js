@@ -3,7 +3,8 @@
 // jede Partie in der Analyse). Der Knopf oeffnet ein Blatt mit der Vorschau des Bildes (1080 x 1350, Look A), der
 // Wahl Hell oder Dunkel und, nur mit Konto und Benutzernamen, dem Schalter "Benutzername zeigen" (Standard aus).
 // "Teilen" geht ueber das Teilen-Blatt des Geraets (navigator.share mit Datei), wo es das nicht gibt, wird das Bild
-// als PNG heruntergeladen ("Bild speichern"). Im Bild stehen nur die Felder aus logik.js FELDER: Ergebnis, Gegner,
+// als PNG heruntergeladen ("Bild speichern"); lehnt das Geraet das Teilen ab (nicht der Nutzer), wird es ebenfalls
+// gespeichert. Im Bild stehen nur die Felder aus logik.js FELDER: Ergebnis, Gegner,
 // Endstellung mit letztem Zug, Sterne, Genauigkeit, Zuege, Datum, die Marke und die Adresse der App; keine E-Mail,
 // kein Klarname, nichts aus dem Konto ausser dem freiwillig gezeigten Benutzernamen.
 //
@@ -25,7 +26,7 @@ import { segment, schalter, toast } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
 import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
-import { teilbar, bildDaten, adresseAus, gueltigerName, RECHENSTAND } from './logik.js';
+import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND } from './logik.js';
 import { rendere, alsDatei } from './bild.js';
 
 const MODUL = 'teilen';
@@ -50,21 +51,36 @@ function merkeGeteilt(partieId, weg) {
   speichereModul(MODUL, { v: RECHENSTAND, geteilt: liste.slice(-20) });
 }
 
-// ---------- Benutzername (nur mit Konto, einmal je Sitzung gefragt) ----------
-let profilAnfrage = null;
+// ---------- Benutzername (nur mit Konto, einmal je Sitzung und Konto gefragt) ----------
+// Gemerkt wird der Name zum Konto der Sitzung: wechselt das Konto ohne Neuladen (abmelden, anderes Konto an), wird neu
+// gefragt, der alte Name erscheint nie. Kein Name (Fehler, kein Netz, Profil noch ohne Benutzernamen): beim naechsten
+// Blatt neu fragen, damit ein gerade gewaehlter Benutzername ohne Neuladen erscheint (ein GET nur beim Oeffnen).
+let profil = { konto: null, anfrage: null };
+function kontoVon(s) {
+  if (!s || typeof s !== 'object') return null;
+  return String((s.user && s.user.id) || s.access_token || '?');
+}
 function profilName() {
   let s = null;
   try { s = sitzung(); } catch (e) { s = null; }
-  if (!s) return Promise.resolve(null);
-  if (!profilAnfrage) {
-    profilAnfrage = Promise.race([
+  const konto = kontoVon(s);
+  if (!konto) return Promise.resolve(null);
+  if (profil.konto !== konto || !profil.anfrage) {
+    const eintrag = { konto, anfrage: null };
+    eintrag.anfrage = Promise.race([
       Promise.resolve().then(() => ladeProfil()).then((p) => gueltigerName(p && p.benutzername)).catch(() => null),
       new Promise((r) => setTimeout(() => r(null), PROFIL_WARTEN_MS)),
-    ]);
-    // kein Name (Fehler, kein Netz): beim naechsten Blatt neu fragen
-    profilAnfrage.then((n) => { if (!n) profilAnfrage = null; });
+    ]).then((n) => {
+      if (!n && profil === eintrag) profil = { konto: null, anfrage: null };
+      return n;
+    });
+    profil = eintrag;
   }
-  return profilAnfrage;
+  // gilt die Antwort noch fuer das Konto, das jetzt angemeldet ist?
+  return profil.anfrage.then((n) => (kontoVon(sitzungOderNull()) === konto ? n : null));
+}
+function sitzungOderNull() {
+  try { return sitzung(); } catch (e) { return null; }
 }
 
 // ---------- Teilen oder Speichern ----------
@@ -147,7 +163,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   let nameAn = e.name;
   let name = null;
   let lauf = 0;
-  const adresse = adresseAus(globalThis.location && globalThis.location.href);
+  const adresse = appAdresse(globalThis.location && globalThis.location.href);
   const sieg = p.ergebnis === 'sieg';
   const id = 'tl' + Date.now().toString(36);
   const teilenGeht = kannTeilen(probeDatei());
@@ -215,6 +231,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     los.disabled = true;
     ort.dataset.bereit = 'nein';
     ort.dataset.modus = modus;
+    laden.textContent = 'Bild entsteht …';
     laden.hidden = false;
     try {
       daten = bildDaten(p, { bot: gegner, name: nameAn ? name : null, adresse });
@@ -286,7 +303,8 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   function taste(ev) {
     if (ev.key === 'Escape') { ev.preventDefault(); ende(); return; }
     if (ev.key !== 'Tab') return;
-    const ziele = [...karte.querySelectorAll('button:not([disabled]), [tabindex="0"]')].filter((x) => !x.closest('[hidden]'));
+    // wie die Bauteile: im Segment ist nur die gewaehlte Option im Tab-Lauf (roving tabindex, Pfeile waehlen)
+    const ziele = [...karte.querySelectorAll('button:not([disabled]), [tabindex="0"]')].filter((x) => !x.closest('[hidden]') && x.tabIndex >= 0);
     if (!ziele.length) return;
     const i = ziele.indexOf(document.activeElement);
     const naechstes = ev.shiftKey ? (i <= 0 ? ziele[ziele.length - 1] : ziele[i - 1]) : (i < 0 || i === ziele.length - 1 ? ziele[0] : ziele[i + 1]);
@@ -296,20 +314,29 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
 
   schleier.addEventListener('pointerdown', () => ende());
   ort.querySelector('[data-tl="abbrechen"]').addEventListener('click', () => ende());
+  function erledigt(weg, meldung) {
+    stand.weg = weg;
+    try { merkeGeteilt(p.id, weg); } catch (f) { /* Merken ist nie wichtig genug */ }
+    toast(meldung);
+    ende();
+  }
   los.addEventListener('click', () => {
     const datei = stand.datei;
     if (!datei || !stand.bereit) return;
     let laeuft;
     try { laeuft = teileDatei(datei, daten ? daten.titel : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
-    laeuft.then((weg) => {
-      stand.weg = weg;
-      try { merkeGeteilt(p.id, weg); } catch (f) { /* Merken ist nie wichtig genug */ }
-      toast(weg === 'teilen' ? 'Bild geteilt.' : 'Bild gespeichert.');
-      ende();
-    }).catch((f) => {
+    laeuft.then((weg) => erledigt(weg, weg === 'teilen' ? 'Bild geteilt.' : 'Bild gespeichert.')).catch((f) => {
       if (f && f.name === 'AbortError') return;   // im Teilen-Blatt abgebrochen: unser Blatt bleibt offen
-      console.error('teilen', f);
-      toast('Teilen hat nicht geklappt. Versuch es noch einmal.', { art: 'fehler' });
+      // das Geraet lehnt das Teilen ab (z. B. NotAllowedError, Dateityp): die Datei liegt bereit, also speichern
+      try { console.warn('teilen: Teilen abgelehnt, Bild wird gespeichert', (f && f.name) || f); } catch (x) { /* egal */ }
+      try {
+        speichereDatei(datei);
+      } catch (g) {
+        console.error('teilen', g);
+        toast('Teilen hat nicht geklappt. Versuch es noch einmal.', { art: 'fehler' });
+        return;
+      }
+      erledigt('datei', 'Teilen ging hier nicht, das Bild ist gespeichert.');
     });
   });
   document.addEventListener('keydown', taste, true);
@@ -399,7 +426,7 @@ try {
       return null;
     }
   }, { reihenfolge: 60, paket: 'teilen' });
-  hoere('speicher:zurueckgesetzt', () => { profilAnfrage = null; });
+  hoere('speicher:zurueckgesetzt', () => { profil = { konto: null, anfrage: null }; });
 } catch (e) {
   console.error('Paket teilen nicht eingehaengt:', e);
 }
