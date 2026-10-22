@@ -521,9 +521,13 @@ setzeSpeicher(s);
     Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(NEU).reduce((a, k) => a + MODUL_BUDGET[k], 0) === 182000);
   // w0plus-a-fix: S1-7 (Matt-Atlas) und Schub 2b bekommen eigene Module (vorher hatte finisher keins: "unbekanntes Modul")
   const FIX = { finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000 };
-  pruefe('MODUL_BUDGET w0plus-a-fix: finisher, ausdruck, siegeslauf, werkstatt (zusammen 30.000), alles 21 Module, 536.000',
-    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21
-    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000, MODUL_BUDGET);
+  // Welle A: jedes Paket mit eigenem Modul traegt sich hier ein (A1 teilen); alle anderen Zahlen bleiben fest
+  const WELLE_A = { teilen: 2000 };
+  const summeA = Object.values(WELLE_A).reduce((a, b) => a + b, 0);
+  pruefe('MODUL_BUDGET w0plus-a-fix: finisher, ausdruck, siegeslauf, werkstatt (zusammen 30.000), alles 21 Module, 536.000 (ohne Welle A)',
+    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21 + Object.keys(WELLE_A).length
+    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000 + summeA, MODUL_BUDGET);
+  pruefe('MODUL_BUDGET Welle A: teilen 2.000 (A1 Siegesbild)', Object.entries(WELLE_A).every(([k, v]) => MODUL_BUDGET[k] === v));
   const neuePakete = Object.keys(FIX).map((name) => {
     const m = speichereModul(name, { probe: name });
     const e = speichereModulEinstellungen(name, { stil: 'voll' });

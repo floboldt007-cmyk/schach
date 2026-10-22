@@ -1,0 +1,36 @@
+/* ============================================================
+   Paket "teilen" (Welle A, A1): Siegesbild
+   Knopf im Ergebnis (Ort ergebnis:karte) und in der Analyse (Ort analyse:oben), Blatt mit Vorschau.
+   Nur Tokens aus css/tokens.css und css/themes/modern.css (hell und dunkel ueber das Theme).
+   Das Blatt nutzt die Grundform der Bauteile (.sheet-ort, .sheet-schleier, .sheet-karte, .sheet-knoepfe).
+   ============================================================ */
+
+/* ---------- Knopf an den Orten ---------- */
+.tl-knopf-zeile { display: flex; min-width: 0; }
+.tl-knopf-zeile[data-ort="ergebnis"] .tl-teilen { width: 100%; }
+.tl-knopf-zeile[data-ort="analyse"] { justify-content: flex-start; }
+.tl-teilen { gap: var(--a2); background-color: var(--flaeche-2); color: var(--text); box-shadow: var(--kante); }
+.tl-teilen .ico { width: 20px; height: 20px; }
+
+/* ---------- Blatt ---------- */
+.tl-blatt .tl-karte { width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.tl-vorschau { position: relative; display: grid; place-items: center; margin-top: var(--a4); }
+.tl-leinwand { display: block; width: min(100%, calc(48dvh * .8)); height: auto; aspect-ratio: 1080 / 1350;
+  border-radius: var(--r-l); background-color: var(--grund-2); box-shadow: var(--s2), var(--kante); }
+.tl-laden { position: absolute; inset: auto 0 50% 0; transform: translateY(50%); color: var(--text-2); font-weight: var(--gw-stark);
+  font-size: var(--fs-klein); }
+.tl-laden[hidden] { display: none; }
+.tl-optionen { display: grid; gap: var(--a2); margin-top: var(--a4); text-align: left; }
+.tl-zeile-option { display: flex; align-items: center; justify-content: space-between; gap: var(--a3); min-height: var(--tipp); }
+.tl-zeile-option[hidden] { display: none; }
+.tl-zeile-option .segment { flex: 0 1 240px; }
+.tl-label { display: grid; color: var(--text); font-weight: var(--gw-stark); }
+.tl-label small { color: var(--text-2); font-weight: var(--gw-text); font-size: var(--fs-klein); }
+.tl-hinweis { margin: var(--a3) 0 0; color: var(--text-2); font-size: var(--fs-klein); line-height: 1.4; text-align: left; }
+.tl-blatt .tl-los .ico { width: 20px; height: 20px; }
+
+@media (max-width: 440px) {
+  .tl-leinwand { width: min(100%, calc(42dvh * .8)); }
+  .tl-zeile-option .segment { flex-basis: 180px; }
+}
