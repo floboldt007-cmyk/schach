@@ -65,7 +65,7 @@
 .fk-heute { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); }
 .fk-h-symbol { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--r-pille); background: var(--gold-weich); }
 .fk-h-text { flex: 1; min-width: 0; }
-.knopf.fk-zuenden { flex: none; min-height: 40px; padding: 0 14px; font-size: 14px; }
+.knopf.fk-zuenden { flex: none; min-height: var(--tipp); padding: 0 14px; font-size: 14px; }
 
 /* ---------- Verlauf: Karte "Level und Funken" (verlauf:seite) ---------- */
 .fk-karte { display: grid; gap: 10px; padding: 14px; border-radius: var(--r-l); border: 1px solid var(--linie); box-shadow: var(--s1); min-width: 0; }

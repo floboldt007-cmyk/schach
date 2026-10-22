@@ -760,6 +760,8 @@ async function testeBrowser(browser) {
     && await seite.locator('.fk-chip .fk-mini > i').count() === 1 && kopf.findIndex((k) => /fk-chip/.test(k)) > kopf.findIndex((k) => /chip-pokal/.test(k)), kopf);
   pruefe('arena:heute: Rückenwind-Zeile mit „Zünden“ (erste Karte liegt im Fach)', /1 Karte im Fach/.test(await seite.locator('.heute-karte:not([hidden]) .fk-heute').innerText())
     && await seite.locator('.fk-heute .fk-zuenden').count() === 1);
+  const tipp = await seite.evaluate(() => Math.round(document.querySelector('.fk-heute .fk-zuenden').getBoundingClientRect().height));
+  pruefe('Tippfläche „Zünden“ mindestens 44 px', tipp >= 44, tipp);
   pruefe('arena:panel-bot: Faktor vor der Partie („Einstieg · Funken × 1“)', (await seite.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Einstieg · Funken × 1');
   await bild(seite, 'arena-frisch');
   await h.tippe('.fk-chip');
@@ -908,7 +910,23 @@ async function testeBrowser(browser) {
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
     pruefe('Kalle: „Herausforderung · Funken × 1,25“ (Abstand +150)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
-    await hh.schaefermatt();
+    // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
+    await hh.planBot();
+    await hh.starte({ botId: 'benno', farbe: 'w' });
+    for (const zug of SCHAEFER_ZUEGE) {
+      await hh.warteFlo();
+      await hh.zugTippen(zug);
+    }
+    await s.waitForSelector('.ergebnis-overlay .erg-karte-ort .fk-abr', { timeout: 40000 });
+    const vorTipp = await s.evaluate(() => !!document.querySelector('.fk-abr[data-fertig="1"]'));
+    await s.locator('.ergebnis-overlay .erg-unter').click();
+    await warte(250);
+    const st6 = await hh.stand();
+    const nachTipp = await s.evaluate(() => ({ fertig: !!document.querySelector('.fk-abr[data-fertig="1"]'), wert: document.querySelector('.fk-wert').textContent.trim() }));
+    pruefe('Antippen der Ergebnis-Karte zeigt die Funken-Zeile sofort fertig', !vorTipp && nachTipp.fertig && nachTipp.wert === '+' + zahlText(st6.verlauf[0].f), { vorTipp, nachTipp });
+    const hoehe = await s.evaluate(() => Math.round(document.querySelector('.fk-abr-knopf').getBoundingClientRect().height));
+    pruefe('Tippfläche der Abrechnungszeile mindestens 44 px', hoehe >= 44, hoehe);
+    await s.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
     const { e } = await hh.abrFertig();
     pruefe('Die Partie gegen Benno rechnet mit dem angesagten Faktor × 0,5', e.fa === 0.5 && e.fn === 'Training' && /× 0,5/.test(await s.locator('.fk-formel').innerText()), e);
     pruefe('Keine Konsolenfehler', f.length === 0, f.join(' | '));

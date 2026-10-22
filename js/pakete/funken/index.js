@@ -68,6 +68,11 @@ function botNameVon(id) {
   const b = typeof id === 'string' ? botNachId(id) : null;
   return b && b.name ? b.name : 'den Bot';
 }
+// in Listen (Verlauf, Spiegel): unbekannte Gegner (z. B. ein Boss, dessen Paket fehlt) heissen neutral "Gegner"
+function listenName(id) {
+  const b = typeof id === 'string' ? botNachId(id) : null;
+  return b && b.name ? b.name : 'Gegner';
+}
 function eloVon(p) {
   const b = p && botNachId(p.botId);
   return b && Number.isFinite(b.elo) ? b.elo : null;
@@ -279,7 +284,7 @@ function lernEreignis(fn, d, { partieId = null } = {}) {
 // ---------- Oberflaeche ----------
 function zeigeSpiegel() {
   const st = ladeStand();
-  A.oeffneSpiegel(A.spiegelInhalt({ st, botName: botNameVon, wochenende: wochenende() }), { titel: 'Funken-Spiegel' });
+  A.oeffneSpiegel(A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() }), { titel: 'Funken-Spiegel' });
 }
 
 const gezeigt = new Set();   // Partien, deren Abrechnungszeile schon gelaufen ist (der Nachtrag rollt nicht neu)
@@ -422,7 +427,7 @@ function registriere() {
     if (!k || !k.bot || k.bot.stufe == null) return null;
     return A.faktorChip(faktorFuer({ botId: k.bot.id }));
   }, 'Panel'), { reihenfolge: 30, paket: PAKET });
-  anbieten('verlauf:seite', () => sicher(() => A.verlaufKarte({ st: ladeStand(), botName: botNameVon, beiMehr: () => sicher(zeigeSpiegel, 'Spiegel') }), 'Verlauf'),
+  anbieten('verlauf:seite', () => sicher(() => A.verlaufKarte({ st: ladeStand(), botName: listenName, beiMehr: () => sicher(zeigeSpiegel, 'Spiegel') }), 'Verlauf'),
     { reihenfolge: 5, paket: PAKET });
   anbieten('partie:spieler-leiste', () => sicher(() => A.spielerEmblem({ st: ladeStand() }), 'Spieler-Leiste'), { reihenfolge: 20, paket: PAKET });
   anbieten('spielplan:tage', (k) => sicher(() => anbieterSpielplan(k), 'Spielplan'), { reihenfolge: 20, paket: PAKET });
