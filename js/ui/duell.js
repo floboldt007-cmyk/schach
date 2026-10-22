@@ -12,10 +12,14 @@
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
-//       duellArt(). bereit erfuellt sich am Ende der Haltephase (0,76 s; arena.js ruft dann app.gehe('partie'), die
-//       Portraets fliegen, sobald die Partie da ist), bei 'kurz' und 'aus' sofort. fertig erfuellt sich am Ende (auch
-//       beim Ueberspringen), hoechstens DAUER_MAX ms nach dem Start. Tippen ueberspringt die Vollfassung, solange die
-//       Buehne steht; waehrend des Portraetflugs (Buehne loest sich auf) und in der Kurzfassung gehen Tipps durch.
+//       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (WECHSEL_BEI, 0,47 s; arena.js ruft
+//       dann app.gehe('partie'), die Partie baut sich unter der Buehne auf), bei 'kurz' und 'aus' sofort. Die Portraets
+//       fliegen, sobald die Partie da ist, fruehestens am Ende der Haltephase (HALTE_BIS, 0,82 s), so bleibt dem Flug
+//       seine volle Dauer. fertig erfuellt sich am Ende (auch beim Ueberspringen), hoechstens DAUER_MAX ms nach dem Start.
+//       Tippen ueberspringt immer: solange nur die Arena darunter liegt, faengt die Buehne den Tipp ab; ist die Partie
+//       da (und in der Kurzfassung), geht der Tipp zusaetzlich an die Partie durch.
+//       Tempo: die Vollfassung laeuft hoechstens im normalen Tempo (Bewegung "langsam" dehnt sie nicht, sie muss in
+//       1,4 s passen), "schnell" verkuerzt sie.
 //   aktivesDuell() -> { fertig } | null     laeuft gerade ein Intro (fuer die Partie: Uhr und Bot-Zug erst danach)
 //
 // Vertrag mit der Partie (U7 baut die andere Seite): solange das Intro laeuft, steht
@@ -25,7 +29,8 @@
 // Die Ueberlagerung haengt an document.body (ausserhalb #app), wartet auf das Ereignis app:screen mit name 'partie'
 // (js/ereignisse.js) und fliegt die Portraets auf .screen.partie .spieler.gegner .av und .screen.partie .spieler.ich .av;
 // fehlen die Ziele (heutiger Partie-Screen), blendet sie nur aus. Tippen ueberspringt. Nur transform und opacity werden
-// bewegt (bewegung.js anim mit Tempo). Im Testmodus (?test) protokolliert window.__duellProtokoll jeden Lauf.
+// bewegt (bewegung.js anim mit Tempo). Im Testmodus (?test) protokolliert window.__duellProtokoll jeden Lauf
+// ({ art, anlass, bot, uebersprungen, ziele, dauer, wechsel, partieAb, flugAb, flug }: Zeiten in ms ab dem Start).
 import { klang } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { anim, tempo } from '../bewegung.js';
@@ -34,14 +39,20 @@ import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 export const BESONDERE = Object.freeze(['boss', 'liga', 'erste']);
 export const DAUER_MAX = 1400;          // haerteste Grenze fuer das ganze Intro (ms, unabhaengig vom Tempo)
 const KURZ_DAUER = 400;                  // Kurzfassung: nur der Portraetflug
-// Ende der Haltephase (ms * Tempo): erst dann erfuellt sich `bereit`, die Arena wechselt zur Partie, und sobald
-// app:screen partie kommt, fliegen die Portraets (Phase 2). Die Partie steht also nie laenger als den Flug unter der
-// Buehne, und waehrend des Flugs (die Buehne loest sich auf) faengt die Ueberlagerung keine Tipps mehr ab: ein Tipp
-// aufs Brett kommt an (tests/app.test.mjs tippt direkt nach "bereit" der Partie).
-const HALTE_BIS = 760;
+// Zeitplan der Vollfassung (ms bei normalem Tempo, mal Zeitfaktor zf = min(tempo(), 1)):
+// Die Buehne waechst in 460 ms auf den ganzen Schirm. Danach (WECHSEL_BEI) erfuellt sich `bereit` und die Arena wechselt
+// zur Partie, die sich unter der deckenden Buehne aufbaut, waehrend "gegen" einschlaegt und die Haltephase laeuft. Die
+// Portraets fliegen, sobald die Partie da ist, fruehestens bei HALTE_BIS; so hat der Flug (FLUG) seine volle Dauer und
+// das Intro endet vor der harten Grenze, auch wenn der Aufbau der Partie dauert (Pruefer-Befund U5: mit dem Wechsel
+// erst am Ende der Haltephase blieben dem Flug 160 bis 215 ms).
+export const WECHSEL_BEI = 470;
+export const HALTE_BIS = 820;
+export const FLUG = 440;
+const FLUG_VERSATZ = 30;                 // Flos Portraet startet etwas spaeter
+export const FLUG_MIN = 180;             // kuerzer lohnt kein Flug: dann blendet die Buehne nur aus
 const PUFFER = 60;                       // Abstand zur harten Grenze: der Flug endet spaetestens DAUER_MAX - PUFFER ms
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * Tempo)
+const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * zf)
 const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
 const ANLASS_TEXT = { boss: 'Endgegner', liga: 'Liga', erste: 'Erste Partie' };
 
@@ -99,6 +110,9 @@ function flip(el, von, { d = 560, v = 0, k = 'weich' } = {}) {
   const ziel = rect(el);
   if (!von || !ziel || !ziel.width) return;
   const s = von.width / ziel.width;
+  // die Formel rechnet von der linken oberen Ecke aus (wie flieger()); mit dem Standard "center" laege der Start
+  // daneben (Pruefer-Befund U5: 48 px)
+  el.style.transformOrigin = '0 0';
   anim(el, [{ transform: `translate(${(von.left - ziel.left).toFixed(1)}px, ${(von.top - ziel.top).toFixed(1)}px) scale(${s.toFixed(4)})` }, { transform: 'none' }], { d, v, k });
 }
 
@@ -119,12 +133,18 @@ function flieger(html, von, nach, { d = 440, v = 0, k = 'weich', rund = true } =
 export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere' } = {}) {
   const f = farbe === 'b' ? 'b' : 'w';
   const gewaehlteArt = ['voll', 'kurz', 'aus'].includes(art) ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0 });
-  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const t0 = jetzt();
+  // Zeitfaktor: hoechstens normales Tempo (das Intro muss in DAUER_MAX passen). A() bewegt mit diesem Faktor statt mit
+  // tempo() (anim rechnet selbst mit tempo(), daher der Ausgleich tk); absolut() rechnet absolute ms fuer anim um.
+  const zf = Math.min(Math.max(tempo(), 0), 1);
+  const tk = tempo() > 0 ? zf / tempo() : 0;
+  const A = (el, frames, o = {}) => anim(el, frames, { ...o, d: (o.d ?? 320) * tk, v: (o.v ?? 0) * tk });
+  const absolut = (x) => x / Math.max(tempo(), 0.01);
 
   // 'aus': kein Intro, nur der Start-Klang (Klang ist keine Bewegung)
   if (gewaehlteArt === 'aus' || !bot || typeof document === 'undefined') {
     try { klang.spiele('start'); } catch (e) { /* still */ }
-    protokolliere({ art: 'aus', anlass, bot: bot ? bot.id : null, uebersprungen: false, ziele: 0, dauer: 0 });
+    protokolliere({ art: 'aus', anlass, bot: bot ? bot.id : null, uebersprungen: false, ziele: 0, dauer: 0, wechsel: 0, partieAb: null, flugAb: null, flug: 0 });
     const sofort = Promise.resolve();
     return { bereit: sofort, fertig: sofort, ueberspringe() {}, art: 'aus' };
   }
@@ -148,6 +168,10 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   let zuEnde = false;
   let uebersprungen = false;
   let abPartie = null;
+  let wechsel = null;      // wann sich `bereit` erfuellt hat (ms ab Start)
+  let partieAb = null;     // wann die Partie da war (app:screen partie)
+  let flugAb = null;       // wann der Portraetflug begann
+  let flugDauer = 0;
   const flieg = [];
   const versteckt = [];
   const html = document.documentElement;
@@ -188,14 +212,15 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
       ${stufeText || anlassText ? `<div class="duell-oben"><span class="duell-chip">${esc([stufeText, anlassText].filter(Boolean).join(' · '))}</span></div>` : ''}
       <div class="duell-tipp">Tippen zum Überspringen</div>`;
   } else {
-    // Kurzfassung: nur eine unsichtbare Huelle, die das Tippen auffaengt; die Portraets fliegen aus der Arena
+    // Kurzfassung: nur eine unsichtbare Huelle (Tipps gehen durch und beenden das Intro); die Portraets fliegen aus der Arena
     ueber.innerHTML = '';
   }
   document.body.append(ueber);
   // Sicherheitsnetz fuer langsame Geraete: blockiert der Aufbau der Partie den Hauptfaden, kann die harte Grenze (ein
   // Timer) nicht rechtzeitig feuern; die Ueberlagerung ist dann trotzdem zur harten Grenze ausgeblendet (Opazitaet
   // laeuft im Compositor). Absolute Zeit: anim() rechnet mit Tempo, deshalb durch tempo() geteilt.
-  anim(ueber, [{ opacity: 1 }, { opacity: 1, offset: (DAUER_MAX - 160) / DAUER_MAX }, { opacity: 0 }], { d: DAUER_MAX / Math.max(tempo(), 0.01), k: 'linear', fill: 'forwards' });
+  anim(ueber, [{ opacity: 1 }, { opacity: 1, offset: (DAUER_MAX - 160) / DAUER_MAX }, { opacity: 0 }], { d: absolut(DAUER_MAX), k: 'linear', fill: 'forwards' });
+  const meldeBereit = () => { if (wechsel == null) wechsel = Math.round(jetzt() - t0); bereitLoes(); };
 
   const zeigeZiele = () => {
     for (const z of versteckt) { try { z.style.visibility = ''; } catch (e) { /* egal */ } }
@@ -211,11 +236,12 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     flieg.length = 0;
     zeigeZiele();
     try { ueber.remove(); } catch (e) { /* egal */ }
+    try { document.removeEventListener('pointerdown', tipp, true); } catch (e) { /* egal */ }
     if (aktiv && aktiv.ueber === ueber) aktiv = null;
     if (html.dataset.duell === 'laeuft' && !aktiv) delete html.dataset.duell;
-    const dauer = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
-    protokolliere({ art: gewaehlteArt, anlass, bot: bot.id, uebersprungen, ziele: zieleZahl, dauer });
-    bereitLoes();
+    const dauer = Math.round(jetzt() - t0);
+    protokolliere({ art: gewaehlteArt, anlass, bot: bot.id, uebersprungen, ziele: zieleZahl, dauer, wechsel, partieAb, flugAb, flug: Math.round(flugDauer) });
+    meldeBereit();
     fertigLoes();
     try { document.dispatchEvent(new CustomEvent('duell:fertig', { detail: { art: gewaehlteArt, uebersprungen, bot: bot.id } })); } catch (e) { /* egal */ }
   };
@@ -229,8 +255,12 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     for (const fl of flieg) { try { fl.a.finish(); } catch (e) { /* egal */ } }
     ende();
   };
-  // Tippen ueberspringt (nur die Vollfassung faengt Tipps ab; die Kurzfassung liegt mit pointer-events: none darueber)
-  ueber.addEventListener('pointerdown', ueberspringe, { passive: true });
+  // Tippen ueberspringt, in jeder Phase. Solange nur die Arena unter der Buehne liegt, faengt die Ueberlagerung den Tipp
+  // ab (die Arena bekommt ihn nicht). Ist die Partie da (Klasse .durch) und in der Kurzfassung liegt sie mit
+  // pointer-events: none darueber: der Tipp beendet das Intro und kommt zusaetzlich bei der Partie an (z. B. der erste
+  // Tipp aufs Brett, tests/app.test.mjs tippt direkt nach "bereit" der Partie).
+  const tipp = () => ueberspringe();
+  document.addEventListener('pointerdown', tipp, { capture: true, passive: true });
   ueber.addEventListener('click', ueberspringe);
   ueber.addEventListener('keydown', (e) => { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') ueberspringe(); });
   aktiv = { ueber, fertig, ueberspringe };
@@ -240,17 +270,21 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const phase2 = () => {
     if (zuEnde || phase2Lief) return;
     phase2Lief = true;
-    ueber.classList.add('phase-2');   // ab jetzt gehen Tipps durch (css/duell.css: pointer-events: none)
+    ueber.classList.add('phase-2', 'durch');
     const partie = document.querySelector('.screen.partie');
     const zielBot = partie ? partie.querySelector('.spieler.gegner .av') : null;
     const zielFlo = partie ? partie.querySelector('.spieler.ich .av') : null;
     const ziele = [zielBot, zielFlo].filter((z) => z && imBild(rect(z)));
     zieleZahl = ziele.length;
-    // Flugdauer (ms, schon mit Tempo): wie im Entwurf, aber so gekuerzt, dass das Intro vor der harten Grenze endet
-    // (die Partie braucht je nach Geraet unterschiedlich lange zum Aufbau)
+    // Flugdauer (absolute ms): wie im Entwurf, aber so gekuerzt, dass das Intro vor der harten Grenze endet; reicht die
+    // Zeit nicht fuer FLUG_MIN (Partie kam sehr spaet), fliegt nichts und die Buehne blendet nur aus
     const rest = DAUER_MAX - PUFFER - (jetzt() - t0);
-    const dauerFlug = Math.max(160, Math.min((voll ? 440 : KURZ_DAUER) * tempo(), rest - 40));
-    if (ziele.length) {
+    const versatz = FLUG_VERSATZ * zf;
+    const moeglich = Math.min((voll ? FLUG : KURZ_DAUER) * zf, rest - versatz - 40);
+    const fliegt = ziele.length > 0 && moeglich >= FLUG_MIN * zf;
+    if (fliegt) {
+      flugAb = Math.round(jetzt() - t0);
+      flugDauer = moeglich;
       // Quellen: in der Vollfassung die Buehnen-Portraets, in der Kurzfassung Station und Flos Figur auf der Karte
       // (beim Start gemessen); fehlt eine Quelle, kommt das Portraet von knapp ueber seinem Ziel
       const qBot = voll ? rect(ueber.querySelector('[data-rolle="bot"]')) : quelleBot;
@@ -260,39 +294,54 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
         const q = quelle || { left: nach.left, top: nach.top - 40, width: nach.width, height: nach.height };
         ziel.style.visibility = 'hidden';
         versteckt.push(ziel);
-        flieg.push(flieger(inhalt, q, nach, { d: dauerFlug / Math.max(tempo(), 0.01), v, k: 'weich' }));
+        flieg.push(flieger(inhalt, q, nach, { d: absolut(flugDauer), v: absolut(v), k: 'weich' }));
         // das Buehnen-Portraet weicht dem Flieger (sonst bleibt es und blendet mit dem Inhalt aus)
         const p = voll ? ueber.querySelector(`[data-rolle="${rolle}"]`) : null;
         if (p) p.style.opacity = '0';
       };
       if (zielBot && ziele.includes(zielBot)) bild(zielBot, qBot, `<img src="${esc(avatarVon(bot))}" alt="">`, 0, 'bot');
-      if (zielFlo && ziele.includes(zielFlo)) bild(zielFlo, qFlo, floAvatar(f), 30, 'flo');
+      if (zielFlo && ziele.includes(zielFlo)) bild(zielFlo, qFlo, floAvatar(f), versatz, 'flo');
     }
     if (voll) {
-      anim(ueber.querySelector('.duell-inhalt'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.98)' }], { d: 200, k: 'sanft', fill: 'forwards' });
-      for (const e of ueber.querySelectorAll('.duell-oben, .duell-tipp')) anim(e, [{ opacity: 1 }, { opacity: 0 }], { d: 160, k: 'sanft', fill: 'forwards' });
-      anim(ueber.querySelector('.duell-buehne'), [{ opacity: 1 }, { opacity: 0 }], { d: 380, v: 40, k: 'sanft', fill: 'forwards' });
-      anim(ueber.querySelector('.duell-flo'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: hoch() ? 'translateY(8%)' : 'translateX(8%)' }], { d: 360, k: 'sanft', fill: 'forwards' });
+      A(ueber.querySelector('.duell-inhalt'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.98)' }], { d: 200, k: 'sanft', fill: 'forwards' });
+      for (const e of ueber.querySelectorAll('.duell-oben, .duell-tipp')) A(e, [{ opacity: 1 }, { opacity: 0 }], { d: 160, k: 'sanft', fill: 'forwards' });
+      A(ueber.querySelector('.duell-buehne'), [{ opacity: 1 }, { opacity: 0 }], { d: 380, v: 40, k: 'sanft', fill: 'forwards' });
+      A(ueber.querySelector('.duell-flo'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: hoch() ? 'translateY(8%)' : 'translateX(8%)' }], { d: 360, k: 'sanft', fill: 'forwards' });
     }
-    spaeter(ende, ziele.length ? dauerFlug + 40 : (voll ? Math.min(380 * tempo(), Math.max(0, rest)) : 0));
+    // Nachlauf bis zum Ende: Flug, sonst das Ausblenden der Buehne (hoechstens bis zur harten Grenze); ist keine Zeit
+    // mehr, sofort (die Ueberlagerung ist dann ohnehin ueber die Sicherheits-Animation ausgeblendet)
+    const nachlauf = fliegt ? flugDauer + versatz + 40 : (voll ? Math.min(420 * zf, rest) : 0);
+    if (nachlauf > 12) spaeter(ende, nachlauf);
+    else ende();
   };
-  // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar),
-  // dann Phase 2
+  // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar).
+  // Ab dann gehen Tipps zur Partie durch (.durch); die Portraets fliegen am Ende der Haltephase, oder sofort, wenn sie
+  // schon vorbei ist
+  const halteEnde = voll ? HALTE_BIS * zf : 0;
   const beiPartie = (d) => {
     if (!d || d.name !== 'partie' || zuEnde) return;
     if (abPartie) { try { abPartie(); } catch (e) { /* egal */ } abPartie = null; }
-    requestAnimationFrame(() => { if (!zuEnde) phase2(); });
+    partieAb = Math.round(jetzt() - t0);
+    ueber.classList.add('durch');
+    // kam die Partie so spaet, dass kein Flug mehr passt (langsames Geraet), nicht noch ein Bild warten
+    if (DAUER_MAX - PUFFER - (jetzt() - t0) < (FLUG_MIN + FLUG_VERSATZ + 40) * zf) { phase2(); return; }
+    requestAnimationFrame(() => {
+      if (zuEnde) return;
+      const warten = halteEnde - (jetzt() - t0);
+      if (warten > 8) spaeter(phase2, warten);
+      else phase2();
+    });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
   // haerteste Grenze: hoechstens DAUER_MAX ms, auch wenn die Partie nicht kommt
-  spaeter(() => { if (!zuEnde) { if (!phase2Lief) phase2(); spaeter(ende, 0); } }, DAUER_MAX);
+  spaeter(() => { if (!zuEnde) ende(); }, DAUER_MAX);
 
   const hoch = () => innerHeight > innerWidth;
 
   if (!voll) {
     // Kurzfassung: Start-Klang sofort, die Arena darf sofort zur Partie
     try { klang.spiele('start'); } catch (e) { /* still */ }
-    bereitLoes();
+    meldeBereit();
     return { bereit, fertig, ueberspringe, art: gewaehlteArt };
   }
 
@@ -312,28 +361,28 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const bw = Math.max(1, Math.min(W, dr.right) - bx);
   const bh = Math.max(1, Math.min(H, dr.bottom) - by);
   buehne.style.transformOrigin = '0 0';
-  anim(buehne, [{ transform: `translate(${bx.toFixed(1)}px, ${by.toFixed(1)}px) scale(${(bw / W).toFixed(4)}, ${(bh / H).toFixed(4)})`, opacity: 0 }, { opacity: 1, offset: 0.12 }, { transform: 'none', opacity: 1 }], { d: 460, k: 'gleiten' });
-  anim(ueber.querySelector('.duell-flo'), [{ transform: hoch() ? 'translateY(64%)' : 'translateX(64%)' }, { transform: 'none' }], { d: 480, v: 40, k: 'gleiten' });
+  A(buehne, [{ transform: `translate(${bx.toFixed(1)}px, ${by.toFixed(1)}px) scale(${(bw / W).toFixed(4)}, ${(bh / H).toFixed(4)})`, opacity: 0 }, { opacity: 1, offset: 0.12 }, { transform: 'none', opacity: 1 }], { d: 460, k: 'gleiten' });
+  A(ueber.querySelector('.duell-flo'), [{ transform: hoch() ? 'translateY(64%)' : 'translateX(64%)' }, { transform: 'none' }], { d: 480, v: 40, k: 'gleiten' });
   // beide Portraets fliegen von ihrer Quelle zur Mitte (Bot aus der Karte, Flo aus dem Pfeil des Spielen-Knopfs)
   const qBot = imBild(rect(von)) ? rect(von) : null;
   const pf = document.querySelector('.screen.arena .detail .spielen .pf');
   const qFlo = pf && imBild(rect(pf)) ? rect(pf) : { left: W - 80, top: H - 80, width: 36, height: 36 };
-  flip(ueber.querySelector('[data-rolle="bot"]'), qBot, { d: 560, k: 'weich' });
-  flip(ueber.querySelector('[data-rolle="flo"]'), qFlo, { d: 600, v: 40, k: 'weich' });
-  ueber.querySelectorAll('.duell-name, .duell-unter').forEach((t, n) => anim(t, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 220 + (n % 2) * 40 + (n > 1 ? 40 : 0), k: 'weich' }));
+  flip(ueber.querySelector('[data-rolle="bot"]'), qBot, { d: 560 * tk, k: 'weich' });
+  flip(ueber.querySelector('[data-rolle="flo"]'), qFlo, { d: 600 * tk, v: 40 * tk, k: 'weich' });
+  ueber.querySelectorAll('.duell-name, .duell-unter').forEach((t, n) => A(t, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 220 + (n % 2) * 40 + (n > 1 ? 40 : 0), k: 'weich' }));
   // "gegen" schlaegt auf der Naht ein, genau dann der Start-Klang
-  anim(ueber.querySelector('.duell-gegen'), [{ opacity: 0, transform: 'scale(2.1) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { d: 460, v: 300, k: 'hupf' });
-  spaeter(() => { try { klang.spiele('start'); } catch (e) { /* still */ } }, KLANG_BEI * tempo());
+  A(ueber.querySelector('.duell-gegen'), [{ opacity: 0, transform: 'scale(2.1) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { d: 460, v: 300, k: 'hupf' });
+  spaeter(() => { try { klang.spiele('start'); } catch (e) { /* still */ } }, KLANG_BEI * zf);
   const oben = ueber.querySelector('.duell-oben');
-  if (oben) anim(oben, [{ opacity: 0, transform: 'translateY(-12px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 200, k: 'weich' });
-  anim(ueber.querySelector('.duell-tipp'), [{ opacity: 0 }, { opacity: 1 }], { d: 300, v: 420, k: 'sanft' });
+  if (oben) A(oben, [{ opacity: 0, transform: 'translateY(-12px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 200, k: 'weich' });
+  A(ueber.querySelector('.duell-tipp'), [{ opacity: 0 }, { opacity: 1 }], { d: 300, v: 420, k: 'sanft' });
   // Haltephase: beide Seiten treiben 11 px aufeinander zu
   const zu = (px) => (hoch() ? `translateY(${px}px)` : `translateX(${px}px)`);
-  anim(seiteBot, [{ transform: 'none' }, { transform: zu(11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
-  anim(ueber.querySelector('.duell-seite.flo'), [{ transform: 'none' }, { transform: zu(-11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
-  // Ende der Haltephase: die Arena darf zur Partie wechseln (die Buehne bleibt davor, bis die Portraets geflogen sind);
-  // kommt die Partie nicht, stoesst die harte Grenze oben an
-  spaeter(() => bereitLoes(), HALTE_BIS * tempo());
+  A(seiteBot, [{ transform: 'none' }, { transform: zu(11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
+  A(ueber.querySelector('.duell-seite.flo'), [{ transform: 'none' }, { transform: zu(-11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
+  // Die Buehne deckt den Schirm: die Arena darf zur Partie wechseln, die sich darunter aufbaut (die Buehne bleibt davor,
+  // bis die Portraets geflogen sind); kommt die Partie nicht, stoesst die harte Grenze oben an
+  spaeter(meldeBereit, WECHSEL_BEI * zf);
 
   return { bereit, fertig, ueberspringe, art: gewaehlteArt };
 }

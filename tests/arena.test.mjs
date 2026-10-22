@@ -19,7 +19,7 @@ import path from 'node:path';
 import { BOTS } from '../js/bots.js';
 import { ORTE } from '../js/orte.js';
 import { THEMEN, avatarVon } from '../js/thema.js';
-import { duellArt, BESONDERE, DAUER_MAX } from '../js/ui/duell.js';
+import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN } from '../js/ui/duell.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -51,6 +51,8 @@ const SAAT = {
 };
 // nur Benno besiegt (fuer das Freischalten von Hilde)
 const SAAT_BENNO = { bots: { benno: { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 } }, brillanteZuege: [] };
+// alle besiegt, Sterne gemischt (Revanche gegen jeden Bot)
+const SAAT_ALLE = { bots: Object.fromEntries(BOTS.map((b, i) => [b.id, { sterne: [true, i % 2 === 0, i % 3 === 0], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 85 }])), brillanteZuege: [] };
 // alle bis auf den Endgegner besiegt (Anlass boss)
 const SAAT_BOSS = { bots: Object.fromEntries(BOTS.filter((b) => b.stufe < 10).map((b) => [b.id, { sterne: [true, true, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 85 }])), brillanteZuege: [] };
 const IDS = BOTS.map((b) => b.id);
@@ -67,6 +69,10 @@ function nodeTeil() {
     && duellArt({ einstellung: 'besondere', anlass: null }) === 'kurz' && duellArt({ einstellung: 'besondere', anlass: 'revanche' }) === 'kurz');
   pruefe('aus -> aus; reduzierte Bewegung -> aus, egal was eingestellt ist', duellArt({ einstellung: 'aus', anlass: 'boss' }) === 'aus'
     && duellArt({ einstellung: 'immer', anlass: 'boss', reduziert: true }) === 'aus' && duellArt({ einstellung: 'besondere', anlass: null, reduziert: true }) === 'aus');
+  // Pruefer-Befund U5: der Wechsel zur Partie kam erst am Ende der Haltephase, dem Flug blieben 160 bis 215 ms
+  pruefe('Zeitplan: Wechsel zur Partie, sobald die Buehne deckt (nach ihren 460 ms), lange vor dem Flug; der volle Flug passt vor die harte Grenze',
+    WECHSEL_BEI >= 460 && WECHSEL_BEI <= 520 && HALTE_BIS - WECHSEL_BEI >= 300 && FLUG >= 400 && HALTE_BIS + FLUG + 30 + 40 <= DAUER_MAX - 60 && FLUG_MIN >= 150 && FLUG_MIN < FLUG,
+    JSON.stringify({ WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN }));
   pruefe('unbekannte Einstellung wirkt wie besondere (Standard)', duellArt({ einstellung: 'xyz', anlass: 'erste' }) === 'voll' && duellArt({ einstellung: 'xyz', anlass: null }) === 'kurz' && duellArt() === 'kurz');
 
   gruppe = 'Portraets';
@@ -101,6 +107,11 @@ function nodeTeil() {
   pruefe('css/arena.css: Atmen (Puls) der aktuellen Station als CSS-Animation (pausiert ueber html[data-sichtbar="nein"] in app.css)', /\.knoten\.aktuell \.avatar \{[^}]*animation: puls/.test(arena) && /@keyframes puls/.test(arena)
     && /html\[data-sichtbar="nein"\] \*[^{]*\{[^}]*animation-play-state: paused/.test(ohneKommentar(lies('css/app.css'))));
   pruefe('css/arena.css: Spielen-Knopf klebt (position: sticky) im Panel', /\.cta-platz \{[^}]*position: sticky/.test(arena));
+  const spText = (arena.match(/\.spielen \.sp-text \{[^}]*\}/) || [''])[0];
+  pruefe('css/arena.css: Text des Spielen-Knopfs wird nie abgeschnitten (kein overflow: hidden, keine Ellipse, darf umbrechen), der Name bleibt zusammen',
+    /white-space: normal/.test(spText) && !/ellipsis|overflow: hidden|nowrap/.test(spText) && /\.spielen \.sp-name \{[^}]*white-space: nowrap/.test(arena), spText);
+  pruefe('css/arena.css: kurzes Querformat (Handy quer) stellt Karte und Panel nebeneinander, das Panel scrollt selbst',
+    /@media \(orientation: landscape\) and \(max-height: 559px\)[\s\S]*\.karte-hoch \.inhalt \{[^}]*grid-template-columns[\s\S]*\.karte-hoch \.detail \{[^}]*overflow-y: auto/.test(arena));
   const duell = ohneKommentar(lies('css/duell.css'));
   pruefe('css/duell.css: keine festen Farben (nur Tokens), kein Neon, kein Weichzeichner, kein Verlauf', !/#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(duell) && !/neon|glow|gradient|backdrop-filter|blur\(/i.test(duell), (duell.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g) || []).join());
   pruefe('css/duell.css: Naht schraeg (quer) und waagrecht (hoch), Buehne in Bot-Farbe', /polygon\(56% 0/.test(duell) && /orientation: portrait\)[\s\S]*polygon\(0 53%/.test(duell) && /\.duell-buehne \{[^}]*background: var\(--bf/.test(duell));
@@ -125,6 +136,8 @@ function nodeTeil() {
     && /fuelle\('arena:karte-boss'/.test(arenaJs) && /fuelle\('arena:karte-event'/.test(arenaJs) && /fuelle\('arena:start'/.test(arenaJs));
   pruefe('arena.js: Portraets ueber avatarVon, Flos Figur ueber floAvatar, Farbe als Segment, Duell ueber spieleDuell', /avatarVon\(/.test(arenaJs) && /floAvatar\(/.test(arenaJs) && /segment\(\{/.test(arenaJs) && /spieleDuell\(/.test(arenaJs));
   pruefe('arena.js: nach bereit app.gehe(\'partie\', ...)', /await duell\.bereit;[\s\S]{0,80}app\.gehe\('partie'/.test(arenaJs));
+  pruefe('arena.js: laedt den Partie-Screen vorab (beim Vorwaermen und beim Tipp auf Spielen), damit er sich unter der Buehne schnell aufbaut',
+    /import\('\.\/partie\.js'\)/.test(arenaJs) && /async function spielen\(b\) \{\s*ladePartieScreen\(\);/.test(arenaJs) && /ladePartieScreen\(\); \}, 900\)/.test(arenaJs));
   const duellJs = lies('js/ui/duell.js');
   pruefe('duell.js: Vertrag (html[data-duell="laeuft"], duell:fertig, aktivesDuell, app:screen partie, Ziele .spieler.gegner .av / .spieler.ich .av, Start-Klang)',
     /dataset\.duell = 'laeuft'/.test(duellJs) && /new CustomEvent\('duell:fertig'/.test(duellJs) && /export function aktivesDuell/.test(duellJs) && /hoere\('app:screen'/.test(duellJs)
@@ -208,16 +221,36 @@ const ueberlauf = (seite) => seite.evaluate(() => {
   const k = document.querySelector('.karte');
   return { seite: document.documentElement.scrollWidth - innerWidth, screen: sc ? sc.scrollWidth - sc.clientWidth : 0, karte: k ? k.scrollWidth - k.clientWidth : 0 };
 });
-// abgeschnittene Texte: Schilder auf der Karte, Namen im Panel und der Text des Spielen-Knopfs. Abgeschnitten ist ein
-// Text, der ueber seine Box hinaus will und dort weggeschnitten wird (overflow nicht sichtbar oder Ellipse); ein Text
-// mit sichtbarem Ueberlauf wird ueber die Lage-Pruefung unten erfasst (innerhalb der Karte, nichts ueberdeckt)
-const abgeschnitten = (seite) => seite.evaluate(() => [...document.querySelectorAll('.k-schild, .k-name, .k-meta, .spielen .sp-text, .fahne, .boss-krone, .detail h2, .detail .elo, .detail-ueber')]
+// abgeschnittene Texte: Schilder auf der Karte, Namen im Panel, der Text des Spielen-Knopfs, Steckbrief, Bedingungen und
+// die Karte "Offene Partie". Abgeschnitten ist ein Text, der ueber seine Box hinaus will: weggeschnitten (overflow nicht
+// sichtbar oder Ellipse) oder aus ihr herausragend (waagrecht, auch bei sichtbarem Ueberlauf: er laege dann auf dem
+// Nachbarn). Die Lage auf der Karte prueft kartenLage() unten (innerhalb der Karte, nichts ueberdeckt).
+const abgeschnitten = (seite) => seite.evaluate(() => [...document.querySelectorAll('.k-schild, .k-name, .k-meta, .spielen .sp-text, .fahne, .boss-krone, .detail h2, .detail .elo, .detail-ueber, '
+  + '.merkmal, .m-label, .m-wert, .ziel-sterne > div, .fortsetzen .ft-text, .fortsetzen .ft-text > *, .farbwahl .seg')]
   .filter((el) => {
     const cs = getComputedStyle(el);
-    const schneidetX = cs.overflowX !== 'visible' || cs.textOverflow === 'ellipsis';
     const schneidetY = cs.overflowY !== 'visible';
-    return (schneidetX && el.scrollWidth > el.clientWidth + 1) || (schneidetY && el.scrollHeight > el.clientHeight + 2) || cs.display === 'none' && el.matches('.k-name');
+    return el.scrollWidth > el.clientWidth + 1 || (schneidetY && el.scrollHeight > el.clientHeight + 2) || cs.textOverflow === 'ellipsis' || cs.display === 'none' && el.matches('.k-name');
   }).map((el) => el.className + ':' + el.textContent.trim()));
+// Spielen-Knopf: der Text steht ganz im Knopf (links vom Pfeil), hoechstens zwei Zeilen, der Rufname (.sp-name) ist nie
+// getrennt, und der Knopf bleibt mindestens 56 px hoch
+const spielenPasst = (seite) => seite.evaluate(() => {
+  const sp = document.querySelector('.detail [data-aktion="spielen"]');
+  const t = sp.querySelector('.sp-text');
+  const b = sp.getBoundingClientRect();
+  const r = t.getBoundingClientRect();
+  const pf = sp.querySelector('.pf').getBoundingClientRect();
+  const zeilen = Math.round(r.height / parseFloat(getComputedStyle(t).lineHeight));
+  const name = t.querySelector('.sp-name');
+  const fehler = [];
+  if (t.scrollWidth > t.clientWidth + 1) fehler.push('zu breit');
+  if (r.right > pf.left + 0.5 || r.left < b.left || r.top < b.top - 0.5 || r.bottom > b.bottom + 0.5) fehler.push('ragt heraus');
+  if (zeilen > 2) fehler.push(zeilen + ' Zeilen');
+  if (!name || name.getClientRects().length !== 1) fehler.push('Name getrennt');
+  if (b.height < 56) fehler.push('Knopf ' + Math.round(b.height) + ' px');
+  if (getComputedStyle(t).textOverflow === 'ellipsis') fehler.push('Ellipse');
+  return fehler.length ? t.textContent.trim() + ': ' + fehler.join(', ') : null;
+});
 // Beschriftungen auf der Karte: jedes Schild, jede Fahne, Krone, Sterne-Pille und jedes Portraet liegt innerhalb der
 // Karte (waagrecht im sichtbaren Ausschnitt, senkrecht in der Welt) und ueberdeckt keines einer anderen Station
 const kartenLage = (seite) => seite.evaluate(() => {
@@ -263,6 +296,9 @@ anbieten('arena:start', (k) => { log.start = { schluessel: Object.keys(k).sort()
 `;
 const MIT_PAKET = `${BASIS}&erw=pakete/u5-test/index`;
 
+// Passt der volle Portraetflug noch vor die harte Grenze, wenn er bei flugAb (ms ab Start) beginnt? (js/ui/duell.js: Ende
+// spaetestens DAUER_MAX - 60, Flos Portraet startet 30 ms spaeter, 40 ms Nachlauf; zf = Zeitfaktor, hoechstens 1)
+const vollerFlugMoeglich = (flugAb, zf) => DAUER_MAX - 60 - (flugAb + 1) - 30 * zf - 40 >= FLUG * zf;
 // Horcher fuer das Duell: duell:fertig, jede .duell-Ueberlagerung, die je im DOM war, Flieger
 const duellHorcher = (seite) => seite.evaluate(() => {
   window.__fertig = [];
@@ -291,11 +327,14 @@ const duellHorcher = (seite) => seite.evaluate(() => {
 // Ziele fuer den Portraetflug in den (heutigen) Partie-Screen einsetzen, sobald er kommt (U7 baut sie spaeter selbst)
 const zieleEinsetzen = (seite) => seite.evaluate(async () => {
   const { hoere } = await import('./js/ereignisse.js');
-  window.__ziele = { sichtbarWaehrendFlug: null };
+  window.__ziele = { sichtbarWaehrendFlug: null, deckt: null };
   hoere('app:screen', (d) => {
     if (d.name !== 'partie') return;
     const p = document.querySelector('.screen.partie');
     if (!p) return;
+    // deckt die Buehne den ganzen Schirm, wenn die Partie darunter erscheint?
+    const b = document.querySelector('.duell-buehne');
+    if (b) { const r = b.getBoundingClientRect(); window.__ziele.deckt = r.left <= 0.5 && r.top <= 0.5 && r.right >= innerWidth - 0.5 && r.bottom >= innerHeight - 0.5; }
     for (const [rolle, top] of [['gegner', 90], ['ich', 520]]) {
       const sp = document.createElement('div');
       sp.className = 'spieler ' + rolle;
@@ -423,6 +462,17 @@ async function testeKarteQuer(browser) {
     const farben = await d.seite.evaluate(() => ({ himmel: getComputedStyle(document.querySelector('.welt-svg .w-himmel')).fill, grund: getComputedStyle(document.body).backgroundColor,
       fenster: getComputedStyle(document.querySelector('.welt-svg .w-fenster')).fill, panel: getComputedStyle(document.querySelector('.detail')).backgroundColor }));
     pruefe('dunkel: Abendhimmel, erleuchtete Fenster, Panel in --flaeche, Schiefer', farben.himmel === 'rgb(43, 53, 80)' && farben.fenster === 'rgb(242, 201, 106)' && farben.panel === 'rgb(30, 33, 38)' && farben.grund === 'rgb(21, 23, 27)', JSON.stringify(farben));
+    // Pruefer-Befund U5: der schwarze Koenig der Farbwahl war auf dem dunklen Segment kaum zu sehen. Jetzt stehen die
+    // Figuren auf einem hellen Feld; Kontrast schwarzer Koenig (#000) zu diesem Feld mindestens 7:1
+    const felder = await d.seite.evaluate(() => [...document.querySelectorAll('.farbwahl .seg')].map((k) => {
+      const f = k.querySelector('.fig-bg');
+      const rgb = f ? getComputedStyle(f).backgroundColor.match(/[\d.]+/g).map(Number) : [0, 0, 0];
+      const l = (x) => { const c = x / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+      const L = 0.2126 * l(rgb[0]) + 0.7152 * l(rgb[1]) + 0.0722 * l(rgb[2]);
+      return { farbe: k.dataset.farbe, figuren: f ? f.querySelectorAll('img').length : 0, kontrast: Math.round((L + 0.05) / 0.05 * 10) / 10 };
+    }));
+    pruefe('dunkel: Figuren der Farbwahl auf hellem Feld, der schwarze Koenig ist lesbar (Kontrast mindestens 7:1)', felder.length === 3 && felder.every((x) => x.figuren >= 1 && x.kontrast >= 7)
+      && felder.map((x) => x.figuren).join() === '1,2,1', JSON.stringify(felder));
     await bild(d.seite, 'arena-1180x820-dunkel');
     pruefe('keine Konsolenfehler', d.fehler.length === 0, d.fehler.join(' | '));
     await d.kontext.close();
@@ -568,6 +618,104 @@ async function testeHochformate(browser) {
       pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
       await kontext.close();
     }
+  }
+}
+
+// Handy quer (Pruefer-Befund U5: bei 844 × 390 lag der Spielen-Knopf unter dem Bildrand, sticky griff nicht): Karte
+// links, Panel rechts mit eigenem Scrollen, der Knopf klebt unten im Panel und ist ohne Scrollen zu sehen
+async function testeHandyQuer(browser) {
+  for (const vp of [{ w: 844, h: 390, schema: 'light' }, { w: 667, h: 375, schema: 'dark' }]) {
+    gruppe = `Handy quer ${vp.w} × ${vp.h} ${vp.schema === 'dark' ? 'dunkel' : 'hell'}`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, handy: true, schema: vp.schema });
+    await seite.goto(BASIS + '&reiter=verlauf#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1500);
+    const m = await seite.evaluate(() => {
+      const k = document.querySelector('.karte');
+      const kb = k.getBoundingClientRect();
+      const d = document.querySelector('.detail').getBoundingClientRect();
+      const kn = document.querySelector('.knoten.aktuell');
+      const teile = [kn, kn.querySelector('.k-schild'), kn.querySelector('.fahne')].map((t) => t.getBoundingClientRect());
+      const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
+      const nb = document.querySelector('.reiter-leiste').getBoundingClientRect();
+      return { klasse: document.querySelector('.arena').className, scrollbar: k.scrollHeight > k.clientHeight + 20, nebeneinander: d.left >= kb.right - 1 && Math.abs(d.top - kb.top) <= 2,
+        aktuellDrin: teile.every((r) => r.top >= kb.top - 1 && r.bottom <= kb.bottom + 1), panelScrollt: getComputedStyle(document.querySelector('.detail')).overflowY === 'auto',
+        spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: { t: nb.top }, reiter: document.documentElement.dataset.reiter || null, iw: innerWidth };
+    });
+    pruefe('Karte links (senkrecht scrollbar, beim naechsten Gegner samt Schild und Fahne), Panel rechts daneben und scrollt selbst', /karte-hoch/.test(m.klasse) && m.scrollbar && m.nebeneinander && m.aktuellDrin && m.panelScrollt, JSON.stringify(m));
+    pruefe('Spielen-Knopf ohne Scrollen sichtbar, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
+    await seite.evaluate(() => { document.querySelector('.detail').scrollTop = 160; });
+    await warte(300);
+    const sp2 = await box(seite, '.detail [data-aktion="spielen"]');
+    pruefe('nach dem Scrollen des Panels weiter sichtbar (sticky)', sp2 && sp2.t >= 0 && sp2.b <= m.leiste.t + 1, JSON.stringify(sp2));
+    await seite.evaluate(() => { document.querySelector('.detail').scrollTop = 0; window.__app.meldung('Test-Meldung'); });
+    await seite.waitForSelector('.toast');
+    await warte(400);
+    const tm = await seite.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().bottom, sp: document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect().top }));
+    pruefe('eine Meldung steht ueber dem Spielen-Knopf', tm.t <= tm.sp, JSON.stringify(tm));
+    await seite.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
+    const u = await ueberlauf(seite);
+    pruefe('kein waagrechter Ueberlauf', u.seite <= 0 && u.screen <= 0 && u.karte <= 0, JSON.stringify(u));
+    const ab = await abgeschnitten(seite);
+    pruefe('kein Name und kein Schild abgeschnitten', ab.length === 0, ab.join(' | '));
+    const kl = await kartenLage(seite);
+    pruefe('Beschriftungen innerhalb der Karte, keine ueberdeckt eine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
+    const klein = await kleineTippflaechen(seite);
+    pruefe('alle Tippflaechen mindestens 44 px', klein.length === 0, klein.join(', '));
+    await bild(seite, `arena-${vp.w}x${vp.h}-${vp.schema === 'dark' ? 'dunkel' : 'hell'}`);
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
+// Pruefer-Befund U5 (blockierend): der Text des Spielen-Knopfs wurde gekuerzt ("Spielen gegen den Stockfis…" auf dem
+// Handy, "Revanche gegen den Kommissar" auf dem iPad), geprueft war nur Rudi. Jetzt alle zehn Bots in beiden Fassungen
+// in allen Ziel-Lagen: echte Panels (alle besiegt, jede Station antippen: "Revanche gegen …") und der Spielen-Text jedes
+// Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
+async function testeKnopftext(browser) {
+  for (const vp of [{ w: 375, h: 667, handy: true }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
+    gruppe = `Knopftext ${vp.w} × ${vp.h}`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, handy: !!vp.handy, saat: SAAT_ALLE });
+    await seite.goto(BASIS + (vp.handy ? '&reiter=verlauf' : '') + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(900);
+    const echt = [];
+    const texte = [];
+    const ab = new Set();
+    for (const id of IDS) {
+      await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
+      texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
+      const r = await spielenPasst(seite);
+      if (r) echt.push(r);
+      for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);
+    }
+    const erwartet = await seite.evaluate(async () => {
+      const { spielenText } = await import('./js/ui/arena.js');
+      const { BOTS } = await import('./js/bots.js');
+      const tmp = document.createElement('span');
+      return BOTS.map((b) => { tmp.innerHTML = spielenText(b, true); return tmp.textContent; });
+    });
+    pruefe('echte Panels: „Revanche gegen …“ fuer jeden der zehn Bots ganz im Knopf (hoechstens zwei Zeilen, Rufname nie getrennt)',
+      echt.length === 0 && texte.join('|') === erwartet.join('|') && texte.includes('Revanche gegen den Stockfisch'), echt.join(' | ') + ' ' + texte.join('|'));
+    const synth = [];
+    for (const b of BOTS) {
+      for (const besiegt of [false, true]) {
+        await seite.evaluate(async ({ id, v }) => {
+          const { spielenText } = await import('./js/ui/arena.js');
+          const { BOTS: alle } = await import('./js/bots.js');
+          document.querySelector('.detail [data-aktion="spielen"] .sp-text').innerHTML = spielenText(alle.find((x) => x.id === id), v);
+        }, { id: b.id, v: besiegt });
+        const r = await spielenPasst(seite);
+        if (r) synth.push(r);
+      }
+    }
+    pruefe('„Spielen gegen …“ und „Revanche gegen …“ fuer jeden der zehn Bots ganz im echten Knopf', synth.length === 0, synth.join(' | '));
+    pruefe('alle zehn Panels: kein Name, kein Steckbrief, keine Bedingung und keine Farbwahl abgeschnitten oder herausragend', ab.size === 0, [...ab].slice(0, 6).join(' | '));
+    await seite.evaluate(() => document.querySelector('.knoten[data-bot="stockfisch"]').click());
+    await warte(800);
+    await bild(seite, `knopftext-${vp.w}x${vp.h}`);
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
   }
 }
 
@@ -767,11 +915,13 @@ async function testeDuell(browser) {
     await duellHorcher(seite);
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForSelector('.duell.voll', { timeout: 5000 });
+    await seite.evaluate(() => { window.__arenaTipp = 0; const a = document.querySelector('.screen.arena'); if (a) a.addEventListener('pointerdown', () => { window.__arenaTipp++; }); });
     await warte(150);
     await seite.touchscreen.tap(600, 400);
     await warte(80);
-    const u = await seite.evaluate(() => ({ duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig, prot: window.__duellProtokoll }));
+    const u = await seite.evaluate(() => ({ duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig, prot: window.__duellProtokoll, arenaTipp: window.__arenaTipp }));
     pruefe('Tippen: Ueberlagerung sofort weg, Attribut weg, duell:fertig mit uebersprungen', u.duell === 0 && u.attr === null && u.fertig.length === 1 && u.fertig[0].uebersprungen === true && u.prot[0].uebersprungen === true && u.prot[0].dauer < 1000, JSON.stringify(u));
+    pruefe('solange die Arena unter der Buehne liegt, faengt die Buehne den Tipp ab (die Arena bekommt ihn nicht)', u.arenaTipp === 0, JSON.stringify(u));
     await seite.waitForFunction(() => document.documentElement.dataset.screen === 'partie' && window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     pruefe('die Partie startet trotzdem', true);
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -792,8 +942,16 @@ async function testeDuell(browser) {
     pruefe('waehrend des Flugs: zwei Flieger (Bot-Portraet, Flos Koenig), die Ziele sind verborgen, Attribut steht', flug.flieger === 2 && flug.inhalt === 'img,svg' && flug.versteckt === 'hidden,hidden' && flug.attr === 'laeuft', JSON.stringify(flug));
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
     await warte(60);
-    const nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(), prot: window.__duellProtokoll }));
+    const nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(), prot: window.__duellProtokoll,
+      deckt: window.__ziele.deckt, block: Math.round(window.__block) }));
     pruefe('danach: Flieger weg, Ziele wieder sichtbar, Protokoll meldet 2 Ziele', nach.flieger === 0 && nach.sichtbar === 'sichtbar,sichtbar' && nach.prot[0].ziele === 2, JSON.stringify(nach));
+    // Pruefer-Befund U5 (wichtig): die Arena wechselte erst am Ende der Haltephase, der Flug schrumpfte auf 160 bis 215 ms.
+    // Jetzt wechselt sie, sobald die Buehne deckt; war die Partie vor dem Ende der Haltephase da, fliegt das Portraet
+    // seine volle Dauer, sonst so lang, wie es bis zur harten Grenze geht (oder gar nicht, nie ein Mini-Flug)
+    const pz = nach.prot[0];
+    pruefe('Zeitplan echt: Wechsel zur Partie, als die Buehne deckte; Flug in voller Laenge ab dem Ende der Haltephase (kam die Partie spaet: gekuerzt, nie unter FLUG_MIN)',
+      nach.deckt === true && pz.wechsel >= WECHSEL_BEI - 5 && pz.wechsel <= WECHSEL_BEI + 150 + nach.block && pz.flugAb >= HALTE_BIS - 5
+      && (vollerFlugMoeglich(pz.flugAb, 1) ? Math.abs(pz.flug - FLUG) <= 1 : pz.flug >= FLUG_MIN) && pz.dauer <= DAUER_MAX + 100 + nach.block, JSON.stringify(nach));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -826,6 +984,95 @@ async function testeDuell(browser) {
       prot: window.__duellProtokoll, fertig: window.__fertig, block: Math.round(window.__block) }));
     pruefe('danach: Flieger weg, Ziele sichtbar, art kurz mit 2 Zielen, innerhalb der harten Grenze', nach.flieger === 0 && nach.sichtbar === 'sichtbar,sichtbar' && nach.prot[0].art === 'kurz' && nach.prot[0].ziele === 2
       && nach.fertig.length === 1 && nach.fertig[0].art === 'kurz' && nach.prot[0].dauer <= 1500 + nach.block, JSON.stringify(nach));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Zeitplan der Vollfassung mit einer Schein-Partie (unabhaengig davon, wie lange die echte Partie zum Aufbau braucht):
+  // normal, Bewegung "langsam" (dehnt das Intro nicht ueber die Grenze), "schnell", und eine sehr spaete Partie
+  gruppe = 'Duell Zeitplan';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(600);
+    await duellHorcher(seite);
+    const lauf = (stufe, partieBei) => seite.evaluate(async ({ stufe: st, partieBei: bei }) => {
+      const { spieleDuell } = await import('./js/ui/duell.js');
+      const { setzeBewegung, tempo } = await import('./js/bewegung.js');
+      const { sende } = await import('./js/ereignisse.js');
+      const { BOTS } = await import('./js/bots.js');
+      setzeBewegung(st);
+      const t = tempo();
+      window.__duellProtokoll = [];
+      window.__fliegerMax = 0;
+      window.__block = 0;
+      const t0 = performance.now();
+      const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
+      await d.bereit;
+      const tBereit = Math.round(performance.now() - t0);
+      const r = document.querySelector('.duell-buehne').getBoundingClientRect();
+      const deckt = r.left <= 0.5 && r.top <= 0.5 && r.right >= innerWidth - 0.5 && r.bottom >= innerHeight - 0.5;
+      const rest = bei - (performance.now() - t0);
+      if (rest > 0) await new Promise((res) => setTimeout(res, rest));
+      const p = document.createElement('section');
+      p.className = 'screen partie schein-partie';
+      p.style.cssText = 'position:fixed;inset:0;z-index:1';
+      p.innerHTML = '<div class="spieler gegner" style="position:fixed;left:1060px;top:90px"><div class="av" style="width:56px;height:56px"></div></div>'
+        + '<div class="spieler ich" style="position:fixed;left:1060px;top:520px"><div class="av" style="width:56px;height:56px"></div></div>';
+      document.body.append(p);
+      sende('app:screen', { name: 'partie', params: {} });
+      await d.fertig;
+      p.remove();
+      setzeBewegung('normal');
+      return { tempo: t, tBereit, deckt, prot: window.__duellProtokoll[0], flieger: window.__fliegerMax, block: Math.round(window.__block) };
+    }, { stufe, partieBei });
+    const normal = await lauf('normal', 600);
+    const langsam = await lauf('langsam', 600);
+    const schnell = await lauf('schnell', 400);
+    const spaet = await lauf('normal', 1250);
+    const ok = (x, zf) => x.deckt && x.tBereit >= WECHSEL_BEI * zf - 5 && x.tBereit <= WECHSEL_BEI * zf + 120 + x.block && x.prot.flugAb >= HALTE_BIS * zf - 5
+      && x.prot.flugAb <= HALTE_BIS * zf + 80 + x.block && x.flieger === 2
+      && (vollerFlugMoeglich(x.prot.flugAb, zf) ? Math.abs(x.prot.flug - FLUG * zf) <= 1 : x.prot.flug >= FLUG_MIN * zf) && x.prot.dauer <= DAUER_MAX + 60 + x.block;
+    pruefe('normal: bereit (Wechsel zur Partie), sobald die Buehne den Schirm deckt; Flug ab dem Ende der Haltephase in voller Laenge (440 ms), Ende vor 1,4 s', ok(normal, 1), JSON.stringify(normal));
+    pruefe('Bewegung langsam: das Intro laeuft im normalen Tempo (Wechsel nicht spaeter, Flug nicht gekuerzt), Ende vor 1,4 s', langsam.tempo === 1.5 && ok(langsam, 1), JSON.stringify(langsam));
+    pruefe('Bewegung schnell: alles im Tempo 0,6 (Wechsel, Haltephase, Flug)', schnell.tempo === 0.6 && ok(schnell, 0.6), JSON.stringify(schnell));
+    pruefe('sehr spaete Partie: kein Mini-Flug (gar keiner oder mindestens FLUG_MIN), Ende spaetestens an der harten Grenze', (spaet.prot.flug === 0 ? spaet.flieger === 0 : spaet.prot.flug >= FLUG_MIN)
+      && spaet.prot.dauer <= DAUER_MAX + 60 + spaet.block && (spaet.prot.partieAb == null || spaet.prot.partieAb >= 1200), JSON.stringify(spaet));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Ist die Partie unter der Buehne da, geht ein Tipp zur Partie durch und beendet das Intro (z. B. der erste Tipp aufs
+  // Brett direkt nach dem Wechsel; tests/app.test.mjs tippt so)
+  gruppe = 'Duell Tipp zur Partie';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(600);
+    await duellHorcher(seite);
+    await seite.evaluate(async () => {
+      const { spieleDuell } = await import('./js/ui/duell.js');
+      const { sende } = await import('./js/ereignisse.js');
+      const { BOTS } = await import('./js/bots.js');
+      window.__tipps = 0;
+      const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
+      d.bereit.then(() => {
+        const p = document.createElement('section');
+        p.className = 'screen partie schein-partie';
+        p.style.cssText = 'position:fixed;inset:0;z-index:1';
+        p.addEventListener('pointerdown', () => { window.__tipps++; });
+        document.body.append(p);
+        sende('app:screen', { name: 'partie', params: {} });
+      });
+    });
+    await seite.waitForSelector('.duell.voll.durch', { timeout: 5000 });
+    const vorher = await seite.evaluate(() => ({ laeuft: document.documentElement.dataset.duell, buehne: !!document.querySelector('.duell-buehne') }));
+    await seite.touchscreen.tap(300, 400);
+    await warte(100);
+    const r = await seite.evaluate(() => ({ tipps: window.__tipps, duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig }));
+    pruefe('Partie unter der Buehne: der Tipp kommt bei der Partie an und beendet das Intro (uebersprungen)', vorher.laeuft === 'laeuft' && vorher.buehne && r.tipps === 1 && r.duell === 0 && r.attr === null
+      && r.fertig.length === 1 && r.fertig[0].uebersprungen === true, JSON.stringify({ vorher, r }));
+    await seite.evaluate(() => { for (const p of document.querySelectorAll('.schein-partie')) p.remove(); });
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -880,6 +1127,8 @@ async function browserTeil(browser) {
   await testeKarteQuer(browser);
   await testeOrte(browser);
   await testeHochformate(browser);
+  await testeHandyQuer(browser);
+  await testeKnopftext(browser);
   await testeFreischalten(browser);
   await testeDuell(browser);
   gruppe = 'Netz';

@@ -4,7 +4,7 @@
    Struktur: js/ui/duell.js spieleDuell(): div.duell (an document.body, ueber allem) > .duell-buehne (Bot-Farbe --bf),
    .duell-flo (Schiefer mit schraeger Naht; Hochformat waagrecht), .duell-inhalt > .duell-paar > .duell-seite.bot
    (.duell-av[data-rolle="bot"], .duell-name, .duell-unter) + .duell-gegen + .duell-seite.flo; .duell-oben (Chip),
-   .duell-tipp. Die Kurzfassung (.duell.kurz) ist nur eine unsichtbare Huelle, die das Tippen auffaengt.
+   .duell-tipp. Die Kurzfassung (.duell.kurz) ist nur eine unsichtbare Huelle (Tipps gehen durch).
    .duell-flieger: Kopie eines Portraets auf dem Weg in die Partie (js/ui/duell.js flieger()).
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben; bewegt werden nur transform und
    opacity (Web-Animationen mit Tempo aus js/bewegung.js). Kein Neon, kein Weichzeichner, kein Verlauf als Farbe.
@@ -12,8 +12,9 @@
 .duell { position: fixed; inset: 0; z-index: 60; overflow: hidden; outline: none; -webkit-tap-highlight-color: transparent; touch-action: none;
   /* Text auf der Bot-Farbe: weiss (--auf-akzent ist in beiden Modi weiss) oder Schiefer (--flo-grund), js/ui/duell.js waehlt */
   --duell-text-hell: var(--auf-akzent); --duell-text-dunkel: var(--flo-grund); --duell-auf-flo: var(--auf-akzent); }
-/* Kurzfassung: nur die Flieger, kein Abfangen; Phase 2 der Vollfassung (Buehne loest sich auf): Tipps gehen zur Partie durch */
-.duell.kurz, .duell.phase-2 { pointer-events: none; }
+/* Kurzfassung: nur die Flieger, kein Abfangen; Vollfassung, sobald die Partie darunter steht (.durch, js/ui/duell.js) und
+   im Portraetflug (.phase-2): Tipps gehen zur Partie durch (und beenden das Intro, Horcher am document) */
+.duell.kurz, .duell.durch, .duell.phase-2 { pointer-events: none; }
 /* Bot-Seite: satte Bot-Farbe, waechst aus der Detail-Karte (nur transform) */
 .duell-buehne { position: absolute; inset: 0; background: var(--bf, var(--tinte)); }
 /* Flos Seite: Schiefer, schiebt sich mit schraeger Naht herein */

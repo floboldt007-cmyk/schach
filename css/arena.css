@@ -225,13 +225,21 @@
   color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.4; animation: none; transform-origin: 32px 0; }
 .arena .detail .sprechblase::before { top: -7px; left: 32px; width: 14px; height: 14px; border: 0; border-radius: 3px 0 0 0; background: var(--flaeche-2);
   box-shadow: -1px -1px 0 0 var(--linie); transform: rotate(45deg); }
-/* Steckbrief: drei Kacheln */
-.arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+/* Steckbrief: drei Kacheln. Kein Text ragt aus seiner Kachel: in schmalen Panels (Container unter 330 px: iPad 1024 quer,
+   Handy, Handy quer) werden die Kacheln kompakter, und reicht es dann noch nicht, rutscht der Wert unter das Figurzeichen */
+.arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
 .arena .m-label { display: block; font-size: 11.5px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
-.arena .m-wert { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text); }
+.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text); }
 .arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
 .arena .m-figur img { width: 20px; height: 20px; }
+@container (max-width: 330px) {
+  .arena .merkmal { padding: 8px; }
+  .arena .m-label { font-size: 10.5px; letter-spacing: 0; }
+  .arena .m-wert { font-size: 12.5px; gap: 2px 3px; }
+  .arena .m-figur { width: 15px; height: 15px; }
+  .arena .m-figur img { width: 15px; height: 15px; }
+}
 /* Bedingungen: drei Sterne (Hook .ziel-sterne > div, .an) */
 .arena .ziel-sterne { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .arena .ziel-sterne > div { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 650; color: var(--text-2); line-height: 1.2; }
@@ -242,14 +250,20 @@
 /* Wahl: Farbe als Segment (js/ui/bauteile.js), Platz fuer die Bedenkzeit (W0+b fuellt .ort-tempo) */
 .arena .wahl-titel { font-size: 13px; font-weight: var(--gw-stark); color: var(--text-2); margin-bottom: 8px; }
 .arena .farbwahl .seg img { width: 24px; height: 24px; }
-.arena .farbwahl .seg .fig-paar { display: flex; }
+/* Figuren stehen auf einem kleinen hellen Feld (Brett-Token --feld-hell): so bleibt der schwarze Koenig auch im
+   dunklen Modus auf dem dunklen Segment lesbar */
+.arena .farbwahl .seg .fig-bg { display: flex; flex: none; padding: 2px 3px; border-radius: 8px; background: var(--feld-hell); box-shadow: var(--kante); }
 .arena .farbwahl .seg .fig-paar img + img { margin-left: -10px; }
 .arena .ort-tempo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .arena .ort-tempo[hidden] { display: none; }
 /* Hauptaktion: klebt am unteren Rand des Panels (quer) bzw. der Seite (hoch), nie unter der Reiter-Pille */
 .arena .cta-platz { position: sticky; bottom: 0; z-index: 5; margin: auto -22px 0; padding: 10px 22px 18px; background-color: var(--flaeche); }
-.arena .spielen { width: 100%; min-height: 64px; font-size: 18px; border-radius: 20px; justify-content: space-between; padding: 0 18px 0 22px; gap: 10px; }
-.arena .spielen .sp-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.arena .spielen { width: 100%; min-height: 64px; font-size: 18px; line-height: 1.15; border-radius: 20px; justify-content: space-between; padding: 8px 18px 8px 22px; gap: 10px;
+  text-align: left; }
+/* Nie abschneiden: wird es eng (schmales Panel, langer Rufname wie "den Stockfisch"), bricht der Text vor dem Namen auf
+   zwei Zeilen um; der Name (.sp-name) bleibt zusammen (tests/arena.test.mjs prueft alle zehn Bots in allen Lagen) */
+.arena .spielen .sp-text { min-width: 0; white-space: normal; text-wrap: balance; }
+.arena .spielen .sp-name { white-space: nowrap; }
 .arena .spielen .pf { flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--akzent-tief); display: grid; place-items: center; }
 .arena .spielen .pf .ico { width: 20px; height: 20px; }
 /* Bilanz */
@@ -257,14 +271,18 @@
 .arena .bilanz div { text-align: center; min-width: 0; }
 .arena .bilanz b { display: block; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
 .arena .bilanz span { font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; white-space: nowrap; }
-/* Offene Partie */
-.arena .fortsetzen { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border-radius: 16px;
+/* Offene Partie: Bild, Text, Knopf in einer Zeile; reicht der Platz nicht (Handy, schmales Panel), steht der Knopf in
+   voller Breite darunter (nichts wird abgeschnitten oder ueberdeckt) */
+.arena .fortsetzen { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px; border-radius: 16px;
   background: var(--flaeche-2); box-shadow: var(--kante); }
+.arena .fortsetzen .avatar { flex: none; }
+.arena .fortsetzen .ft-text { flex: 1 1 120px; }
+.arena .fortsetzen .knopf { flex: 1 0 auto; }
 .arena .fortsetzen .avatar { --g: 44px; border: 0; border-radius: 12px; overflow: hidden; background: var(--flaeche-3); box-shadow: var(--kante); }
 .arena .fortsetzen .avatar img { width: 100%; height: 100%; image-rendering: auto; }
 .arena .fortsetzen .ft-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .arena .fortsetzen .ft-text b { white-space: nowrap; }
-.arena .fortsetzen .ft-text span { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena .fortsetzen .ft-text span { font-size: 13px; color: var(--text-2); }
 .arena .fortsetzen .knopf { padding: 0 14px; font-size: 15px; }
 
 /* ---------- Hochformat (iPad hoch, Handy): Karte oben, Panel darunter, die Seite scrollt ---------- */
@@ -284,8 +302,6 @@
    ueber der Reiter-Pille bzw. dem Rand, css/app.css und css/navigation.css) */
 html[data-screen="arena"]:has(.screen.arena.karte-hoch) .toast-ort { bottom: calc(98px + env(safe-area-inset-bottom)); }
 html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .toast-ort { bottom: calc(var(--reiter-h) + 98px); }
-/* kurze Querformate (Handy quer, unter 420 px Kartenhoehe): js/ui/arena.js layout() waehlt .karte-hoch, die Karte
-   scrollt also auch hier senkrecht und das Panel steht darunter (die Seite scrollt) */
 
 /* ---------- Handy ---------- */
 @media (max-width: 700px) {
@@ -313,6 +329,24 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 }
 @media (max-width: 380px) {
   .arena .knoten .k-meta { display: none; }
+}
+
+/* ---------- Kurzes Querformat (Handy quer, flache Fenster) ----------
+   js/ui/arena.js layout() zeichnet hier die hohe Karte (.karte-hoch, unter 420 px Kartenhoehe). Untereinander gestellt
+   laege das Panel samt Spielen-Knopf unter dem Bildrand (sticky greift erst, wenn das Panel im Bild ist). Deshalb wie
+   auf dem iPad quer nebeneinander: Karte links (scrollt senkrecht), Panel rechts mit eigenem Scrollen, der
+   Spielen-Knopf klebt unten im Panel und ist immer zu sehen. Steht nach den Handy-Regeln, damit es sie ueberschreibt. */
+@media (orientation: landscape) and (max-height: 559px) {
+  .arena { --panel: clamp(330px, 46vw, 380px); }
+  .arena.karte-hoch .inhalt { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel); grid-template-rows: minmax(0, 1fr); gap: 12px;
+    overflow: hidden; padding: 4px var(--rand) 10px; }
+  .arena.karte-hoch .karte { flex: none; height: auto; min-height: 0; }
+  .arena.karte-hoch .detail { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-height: 0; padding: 14px 14px 0;
+    border-radius: var(--r-l); overflow-y: auto; overflow-x: hidden; }
+  .arena.karte-hoch .detail-links, .arena.karte-hoch .detail-rechts { display: contents; }
+  .arena.karte-hoch .cta-platz { margin: auto -14px 0; padding: 8px 14px 12px; border-radius: 0; }
+  .arena.karte-hoch .bilanz { display: none; }
+  /* Meldungen bleiben wie im Hochformat ueber dem Spielen-Knopf (Regel oben) */
 }
 
 /* ---------- Weniger Bewegung ---------- */

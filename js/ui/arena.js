@@ -7,7 +7,7 @@
 // (SVG-Zeichnung .welt-svg, Orte .ort-karte-boss/.ort-karte-event, Flos Figur .flo-figur, je Bot eine Station
 // button.stufe.knoten[data-bot] mit Zustand besiegt | aktuell | gesperrt, Endgegner .boss) und aside.detail.
 // Die Zeichnung entsteht in Pixelmass (viewBox = Groesse der Karte): weltSvg() legt Himmel, Berge, Huegelbaender,
-// Baeume, Haeuser, Fluss, Zaun und den Pfad (Bezier durch die Stationen, Fortschritt in Akzentfarbe bis zum naechsten
+// Baeume, Haeuser, See, Zaun und den Pfad (Bezier durch die Stationen, Fortschritt in Akzentfarbe bis zum naechsten
 // Gegner) je Lage neu an; die Stationen stehen in Prozent (LAGEN.quer / LAGEN.hoch).
 // Lagen: iPad quer = Karte links, passt ganz ohne Scrollen (Endgegner oben), Panel rechts; iPad hoch = Karte oben,
 // Panel zweispaltig darunter; Handy = Karte senkrecht scrollbar (startet beim naechsten Gegner), Panel darunter,
@@ -67,6 +67,12 @@ const KURZ = {
   delia: 'Delia', koenig: 'König', greta: 'Greta', stockfisch: 'Stockfisch',
 };
 const RUF = { ...KURZ, turm: 'den Professor', koenig: 'den Kommissar', stockfisch: 'den Stockfisch' };
+// Text des Spielen-Knopfs ("Spielen gegen Kalle", besiegt "Revanche gegen ..."). Der Rufname steht in .sp-name und
+// bricht nie in sich um; wird es eng (schmales Panel, langer Rufname), bricht der Knopf vor dem Namen auf zwei Zeilen
+// um, statt etwas abzuschneiden (css/arena.css .spielen .sp-text, tests/arena.test.mjs prueft alle zehn Bots)
+export function spielenText(b, besiegt) {
+  return `${besiegt ? 'Revanche' : 'Spielen'} gegen <span class="sp-name">${esc((b && (RUF[b.id] || b.name)) || '')}</span>`;
+}
 
 // Lagen der Karte: Stationen und Szenerie in Anteilen der Kartengroesse (0..1). quer = fast quadratische Karte
 // (iPad quer, passt ganz), hoch = schmale, hohe Karte (Entwurf C: 400 x 760, scrollt). start = wo Flos Weg beginnt,
@@ -112,12 +118,22 @@ const LAGEN = {
   },
 };
 
+// Partie-Screen vorab laden (dasselbe Modul, das app.js beim Wechsel importiert: danach kommt es aus dem Modul-Speicher).
+// Ein Fehler hier ist egal, app.js zeigt beim Wechsel selbst den Platzhalter.
+let partieVorab = null;
+function ladePartieScreen() {
+  if (!partieVorab) partieVorab = import('./partie.js').catch(() => { partieVorab = null; });
+  return partieVorab;
+}
+
 const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten ('w' | 'zufall' | 'b')
 // Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
 const ARENA_NACHHOLEN_MS = 2500;
 const ZIELE = [['Sieg', 'Sieg'], ['80 % genau', 'Sieg mit mindestens 80 % Genauigkeit'], ['Ohne Hilfe', 'Ohne Hinweis und ohne Zurücknehmen']];
+// Mindesthoehe der hohen Welt auf schmalen Karten (px): Stationen mit Sternen, Fahne und Schild ueberdecken sich nicht
+const WELT_MIN_H = 820;
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
@@ -243,7 +259,6 @@ export function zeige(root, params, app) {
     return 'gesperrt';
   };
   const kurzName = (b) => KURZ[b.id] || b.name;
-  const rufName = (b) => RUF[b.id] || b.name;
 
   // ---------- Aufbau ----------
   const s = document.createElement('section');
@@ -333,7 +348,9 @@ export function zeige(root, params, app) {
     gewaehlt = b.id;
     markiereGewaehlt();
     try { klang.spiele('wechsel'); } catch (e) { /* still */ }
-    anim(el.querySelector('.avatar'), [{ transform: 'scale(.86)' }, { transform: 'none' }], { d: 560, k: 'hupf' });
+    // Station federt (Portraet hebt sich kurz), das Namensschild federt auf (entwurf-a/SYSTEM.md "Bot waehlen")
+    anim(el.querySelector('.avatar'), [{ transform: 'scale(.86)' }, { transform: 'translateY(-5px) scale(1.04)', offset: 0.55 }, { transform: 'none' }], { d: 560, k: 'hupf' });
+    anim(el.querySelector('.k-schild'), [{ transform: 'translateX(-50%) scale(.84)' }, { transform: 'translateX(-50%)' }], { d: 460, k: 'feder' });
     zeigeDetail(true, true);
   }
 
@@ -365,8 +382,10 @@ export function zeige(root, params, app) {
     s.classList.toggle('karte-hoch', !quer);
     const lage = LAGEN[modus];
     const w = kw;
-    // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C
-    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 2.3 : 1.45)));
+    // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C;
+    // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
+    // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen
+    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 2.3 : 1.45)), kw < 600 ? WELT_MIN_H : 0);
     const sk = Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
@@ -408,13 +427,13 @@ export function zeige(root, params, app) {
     letzteKh = kh;
   }
 
-  // steht die Station ganz im sichtbaren Teil der Karte?
+  // steht die Station samt Schild (darunter) und Fahne (darueber) ganz im sichtbaren Teil der Karte?
   function ganzImBild(id) {
     const el = knoten[idx(id)];
     if (!el) return true;
     const k = karte.getBoundingClientRect();
-    const n = el.getBoundingClientRect();
-    return n.top >= k.top - 1 && n.bottom <= k.bottom + 1;
+    const teile = [el, el.querySelector('.k-schild'), el.querySelector('.fahne')].filter(Boolean).map((t) => t.getBoundingClientRect());
+    return teile.every((n) => n.top >= k.top - 1 && n.bottom <= k.bottom + 1);
   }
 
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
@@ -499,7 +518,7 @@ export function zeige(root, params, app) {
         <div class="ort-panel-bot" hidden></div>
         <div class="wahl wahl-farbe"><div class="wahl-titel">Deine Farbe</div><div class="farbwahl-ort"></div></div>
         <div class="ort-tempo" hidden></div>
-        <div class="cta-platz"><button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${z === 'besiegt' ? 'Revanche' : 'Spielen'} gegen ${esc(rufName(b))}</span><span class="pf">${icon('pfeil')}</span></button></div>
+        <div class="cta-platz"><button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button></div>
         <div class="bilanz">${bilanzHtml(st)}</div>
       </div>`;
 
@@ -508,9 +527,9 @@ export function zeige(root, params, app) {
       const seg = segment({
         name: 'farbe', label: 'Deine Farbe', wert: letzteFarbe,
         optionen: [
-          { id: 'w', zeile: true, label: 'Weiß', html: `${fig('wK')}Weiß` },
-          { id: 'zufall', zeile: true, label: 'Zufall', html: `<span class="fig-paar">${fig('wK')}${fig('bK')}</span>Zufall` },
-          { id: 'b', zeile: true, label: 'Schwarz', html: `${fig('bK')}Schwarz` },
+          { id: 'w', zeile: true, label: 'Weiß', html: `<span class="fig-bg">${fig('wK')}</span>Weiß` },
+          { id: 'zufall', zeile: true, label: 'Zufall', html: `<span class="fig-bg fig-paar">${fig('wK')}${fig('bK')}</span>Zufall` },
+          { id: 'b', zeile: true, label: 'Schwarz', html: `<span class="fig-bg">${fig('bK')}</span>Schwarz` },
         ],
         beiWahl: (id) => { letzteFarbe = id; floFigur.innerHTML = floAvatar(id === 'b' ? 'b' : 'w'); },
       });
@@ -623,6 +642,7 @@ export function zeige(root, params, app) {
 
   // Spielen: Rueckfrage bei offener Partie, dann das Duell-Intro (js/ui/duell.js) und nach dessen `bereit` die Partie
   async function spielen(b) {
+    ladePartieScreen();
     const laufend = ladeLaufendePartie();
     if (laufend) {
       const lb = botNachId(laufend.botId);
@@ -801,8 +821,9 @@ export function zeige(root, params, app) {
   const beiGroesse = () => layout();
   window.addEventListener('orientationchange', beiGroesse);
 
-  // Engines im Hintergrund vorwaermen, damit die erste Partie sofort startet
-  spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); }, 900);
+  // Engines und den Partie-Screen im Hintergrund vorwaermen, damit die erste Partie sofort startet (der Partie-Screen
+  // baut sich waehrend des Duell-Intros unter der Buehne auf; je schneller, desto laenger der Portraetflug)
+  spaeter(() => { app.engine('bot').catch(() => {}); app.engine('bewertung').catch(() => {}); ladePartieScreen(); }, 900);
   // Fehlende Analysen still nachholen (Stern 2); endet mit verlasse(), also auch beim Start einer Partie
   let nachholLauf = null;
   spaeter(() => { if (!weg) nachholLauf = starteNachholen(app, { beiPartie: sterneNeu }); }, ARENA_NACHHOLEN_MS + (neuId && !reduziert() ? 1000 : 0));
