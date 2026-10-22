@@ -449,10 +449,10 @@ async function testeOrte(browser) {
   await warte(700);
   const n = await seite.evaluate(() => ({ panel: document.querySelectorAll('.detail .u5-test').length, karte: document.querySelectorAll('.karte .u5-test').length, kopf: document.querySelectorAll('.kopf-chips .u5-test').length }));
   pruefe('nach dem Botwechsel: je ein Element je Ort (nichts doppelt)', n.panel === 3 && n.karte === 2 && n.kopf === 1, JSON.stringify(n));
+  await bild(seite, 'arena-orte-1180x820');
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await seite.waitForFunction(() => document.documentElement.dataset.screen === 'verlauf');
   pruefe('arena:start wird beim Verlassen abgemeldet', await seite.evaluate(() => window.__u5.startVerlassen === 1 && document.querySelectorAll('.u5-test').length === 0));
-  await bild(seite, 'arena-orte-1180x820');
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 }
@@ -582,11 +582,14 @@ async function testeFreischalten(browser) {
       return { schloss: document.querySelectorAll('.knoten[data-bot="hilde"] .schloss').length, sterne: document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length,
         fahne: (document.querySelector('.knoten.aktuell[data-bot="hilde"] .fahne') || {}).textContent, bunt: getComputedStyle(document.querySelector('.knoten[data-bot="hilde"] .avatar img')).filter,
         toast: [...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | '), imBild: h.top >= k.top && h.bottom <= k.bottom,
-        sternKlang: klang.protokoll().some((e) => e.name === 'stern'), floX: document.querySelector('.flo-figur').style.left };
+        sternKlang: klang.protokoll().some((e) => e.name === 'stern'), floX: document.querySelector('.flo-figur').style.left,
+        floBeiBenno: (() => { const f = document.querySelector('.flo-figur').getBoundingClientRect(); const b = document.querySelector('.knoten[data-bot="benno"] .avatar').getBoundingClientRect();
+          return Math.hypot(f.left + f.width / 2 - (b.left + b.width / 2), f.top + f.height / 2 - (b.top + b.height / 2)) < b.width; })() };
     });
     pruefe('Ende: Schloss weg, Hilde bunt mit Fahne, Benno drei Sterne, Meldung „Neu freigeschaltet“, Stern-Klang', ende.schloss === 0 && ende.sterne === 3 && /NÄCHSTER GEGNER/.test(ende.fahne || '') && ende.bunt === 'none'
       && /Neu freigeschaltet: Oma Hilde/.test(ende.toast) && ende.sternKlang, JSON.stringify(ende));
     pruefe('Handy: die Karte hat zur neuen Station gescrollt', ende.imBild, JSON.stringify(ende));
+    pruefe('Flo ist zur gerade bezwungenen Station (Benno) weitergezogen', ende.floBeiBenno, JSON.stringify(ende));
     await bild(seite, 'arena-freigeschaltet-390x844');
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();

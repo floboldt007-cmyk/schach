@@ -349,7 +349,9 @@ export function zeige(root, params, app) {
   let modus = null;
   let masse = { w: 0, h: 0, s: 1, y0: 0, hy: 0 };
   const yVon = (f) => masse.y0 + f * masse.hy;   // Anteil (0..1) -> Pixel in der Welt
-  let wegGezeichnet = false;   // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar
+  // das neue Stueck Fortschritt (Freischalten) ist schon sichtbar; ohne Bewegung von Anfang an (kein Ausblenden, das
+  // sonst ueber eine Transition wieder einblendet)
+  let wegGezeichnet = reduziert();
   function layout() {
     if (weg) return;
     const kw = karte.clientWidth;
@@ -404,7 +406,10 @@ export function zeige(root, params, app) {
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
   function floPosition(vorStation = null) {
     const lage = LAGEN[modus];
-    const i = vorStation != null ? vorStation : (neuId && !wegGezeichnet ? idx(neuId) - 1 : aktuellIdx) - 1;
+    // zuletzt bezwungen: die Station vor dem naechsten Gegner (alle besiegt: der Endgegner); waehrend des Freischaltens
+    // noch die Station davor
+    const letzte = alleBesiegt ? BOTS.length - 1 : aktuellIdx - 1;
+    const i = vorStation != null ? vorStation : (neuId && !wegGezeichnet ? idx(neuId) - 2 : letzte);
     const kn = 76 * masse.s;
     if (i < 0) return [lage.start[0] * masse.w + kn * 0.1, yVon(lage.start[1]) - kn * 0.45];
     const [fx, fy] = lage.stationen[i];
@@ -704,8 +709,9 @@ export function zeige(root, params, app) {
         }
       }
       wegGezeichnet = true;
-      const von = floPosition(i - 1);
-      const nach = floPosition(i);
+      // Flo zieht vom Platz vor dem Sieg (Station i - 2, sonst der Start) zur gerade bezwungenen Station i - 1
+      const von = floPosition(i - 2);
+      const nach = floPosition(i - 1);
       const dx = von[0] - nach[0];
       const dy = von[1] - nach[1];
       stelleFlo(nach);
