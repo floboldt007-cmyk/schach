@@ -30,7 +30,7 @@ const abmelden = () => localStorage.removeItem(SITZUNG_SCHLUESSEL);
 
 const calls = []; const antworten = []; let fetchKaputt = null;
 setzeOnlineFetch(async (url, opt = {}) => {
-  calls.push({ url, methode: opt.method, headers: opt.headers || {}, body: opt.body });
+  calls.push({ url, methode: opt.method, headers: opt.headers || {}, body: opt.body, t: Date.now() });
   if (fetchKaputt) throw fetchKaputt;
   const x = antworten.shift() || { status: 200, body: [] };
   if (x.warte) await new Promise((r) => setTimeout(r, x.warte));
@@ -225,15 +225,14 @@ anmelden();
   await warte(5);
   pruefe('beobachte: nach dem Sichtbarwerden sofort wieder eine Abfrage', calls.length === nVerborgen + 1);
   const nVorOffline = calls.length;
-  const zeitenOffline = []; const zaehle = () => zeitenOffline.push(Date.now());
   fetchKaputt = new Error('offline');
-  const kaputtAb = Date.now();
-  const beobachter = setInterval(() => { if (calls.length - nVorOffline > zeitenOffline.length) zaehle(); }, 1);
   await warte(160);
-  clearInterval(beobachter);
   pruefe('beobachte: offline meldet einmal freundlich und fragt weiter', fehler.length === 1 && /Keine Verbindung/.test(fehler[0]) && calls.length >= nVorOffline + 3 && b.laeuft());
+  // Zeitpunkte aus dem Fake-Fetch: Last verspaetet Timer nur, sie feuern nie frueher. Darum Untergrenzen
+  // (10 ms Takt, dann 20 und 40 ms), nicht "zweiter Abstand groesser als der erste".
+  const zeitenOffline = calls.slice(nVorOffline).map((c) => c.t);
   const abstaende = zeitenOffline.slice(1).map((t, i) => t - zeitenOffline[i]);
-  pruefe('beobachte: bei Fehlern waechst der Abstand (nicht alle 10 ms weiter)', calls.length - nVorOffline <= 5 && abstaende.length >= 2 && abstaende[1] > abstaende[0], `${calls.length - nVorOffline} Abfragen in 160 ms, Abstaende ${abstaende.join(',')} ab ${kaputtAb}`);
+  pruefe('beobachte: bei Fehlern waechst der Abstand (nicht alle 10 ms weiter)', zeitenOffline.length <= 5 && abstaende.length >= 2 && abstaende[0] >= 18 && abstaende[1] >= 36, `${zeitenOffline.length} Abfragen in 160 ms, Abstaende ${abstaende.join(',')}`);
   fetchKaputt = null;
   await warte(250); // der letzte Fehler-Abstand kann bis 160 ms dauern
   const nWieder = calls.length; await warte(35);
