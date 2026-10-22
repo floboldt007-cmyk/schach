@@ -8,10 +8,12 @@
 //       .feld.h | .feld.d [data-feld]                    Felder, darin .koord.zahl / .koord.buchst (Lage "ecke")
 //       .brett-lagen > .lage.<art>[data-feld]            Ueberlagerungen: zuletzt, auswahl, vorschau, schach,
 //                                                        ziel (Punkt), ziel.schlag (Ringecken), ziel.rochade, ueber, mark-<art>
+//       svg.brett-nutzer.brett-marken > rect.marke[data-feld]   Flos Marken (faerben das Feld, nicht die Figur)
+//     (.brett-felder ist ein eigener Stapelkontext: alles darin liegt UNTER den Figuren, wie in Entwurf A)
 //     .brett-koord-rand > .koord.zahl / .koord.buchst    Koordinaten bei Lage "rand" (ausserhalb, im Sockel)
 //     img.figur[data-feld][data-figur="wN"]              Figuren; Zustaende .angehoben .gleitet .gezogen .geht .kommt .vorschau
 //     svg.brett-pfeile > g.pfeil[data-von][data-nach]    Coach-Pfeile (viewBox 0 0 8 8), pfeile(liste)
-//     svg.brett-nutzer > g.pfeil / rect.marke            Flos eigene Pfeile und Marken (getrennt von den Coach-Pfeilen)
+//     svg.brett-nutzer > g.pfeil[data-von][data-nach]    Flos eigene Pfeile ueber den Figuren (getrennt von den Coach-Pfeilen)
 //     .abzeichen-ort.k-<klasse>[data-feld][data-klasse]  Klassen-Symbol oben rechts am Feld (bleibt in der Brett-Box)
 //     .brett-umwandlung > .umwandlung-wahl > button.umwandlung-figur[data-figur="q"]
 //     svg.brett-striche > g.strich[data-art][data-von][data-nach]   W0+a: Striche (im Brett oder in einer Effekt-Ebene)
@@ -34,18 +36,25 @@
 //
 // Komfort (Premium-Umbau U6, PLAN Abschnitt 4):
 //   bestaetigen: Zug bestaetigen. Erster Tipp/Abwurf zeigt die Figur halb durchsichtig auf dem Ziel (Vorschau),
-//       zweiter Tipp aufs Ziel macht fest (erst dann beiZug), Tipp anderswo nimmt zurueck.
-//   autoDame: Umwandlung ohne Auswahl; Finger/Maus 450 ms auf dem Zielfeld halten zeigt D T L S.
+//       zweiter Tipp aufs Ziel macht fest (erst dann beiZug), Tipp anderswo nimmt zurueck. Ist das eine eigene ziehbare
+//       Figur, wird sie gewaehlt; sonst tut der Tipp nichts weiter (kein beiLeer, Flos Zeichnungen bleiben).
+//   autoDame: Umwandlung ohne Auswahl; Finger/Maus 450 ms auf dem Zielfeld halten zeigt D T L S. Verrutscht der Finger
+//       dabei (8 px), gilt das Loslassen auf dem Zielfeld als Tipp (Dame), daneben passiert nichts (Auswahl bleibt).
 //   steuerung: 'beides' | 'ziehen' (kein Tipp-Zug) | 'tippen' (kein Ziehen). Ein zweiter Zeiger bricht jede Geste ab,
-//       zwei Finger ergeben nie einen Zug. Zieh-Schwelle 8 px (Maus 4 px).
+//       zwei Finger ergeben nie einen Zug: deshalb zieht ein Finger-Tipp aufs Ziel erst beim Loslassen (die Maus beim
+//       Druecken), ein zweiter Finger oder pointercancel bis dahin nimmt ihn zurueck. Zieh-Schwelle 8 px (Maus 4 px).
 //   turmRochade: ein Zug Koenig -> eigener Turm (aus der Zielkarte) wird als Rochade ausgefuehrt. Mit setzeTurmRochade(true)
 //       ergaenzt das Brett jede Zielkarte selbst um den Turm (auch zielKarte(chess) ohne Option); bei Zug bestaetigen
 //       macht der zweite Tipp auf das Ziel (g1/c1) oder auf den Turm fest.
 //   pfeile: Maus Rechtsklick ziehen = Pfeil, Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett
 //       ohne Auswahl loescht alles. Finger: 400 ms halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht.
-//       Nie waehrend einer laufenden Zieh-Geste (auch nicht beim Setzen eines Vorzugs). Die Partie loescht Coach-Pfeile
-//       mit pfeile([]), Flos Zeichnungen bleiben davon unberuehrt (auch ueber setzeStellung hinweg). Rechtsklick ziehen und
-//       ausserhalb des Bretts loslassen bricht ab.
+//       Nie aus einer eigenen Zug-Geste: ein Finger auf einer Figur, die gerade ziehen darf (auch ein Vorzug), bleibt
+//       immer Tippen/Ziehen, auch wenn er lange liegt. Malen beginnt also auf leeren Feldern, gegnerischen Figuren und
+//       eigenen Figuren ohne Zug (mit der Maus per Rechtsklick ueberall). Die Partie loescht Coach-Pfeile mit pfeile([]),
+//       Flos Zeichnungen bleiben davon unberuehrt (auch ueber setzeStellung hinweg). Rechtsklick ziehen und ausserhalb des
+//       Bretts loslassen bricht ab. Die Zeiger-Ereignisse einer Zeichen-Geste (Rechtsklick-Druck, Bewegen, Loslassen)
+//       gibt das Brett nicht an die Umgebung weiter (stopPropagation), damit z. B. das Wischen der Analyse beim Malen
+//       nicht springt; Lauscher in der Capture-Phase (Klang entsperren) bekommen sie weiter.
 //   beiLeer(feld): Maus sofort beim Druecken; Finger (bei erlaubten Pfeilen) erst beim Loslassen und nur, wenn daraus
 //       keine Marke wurde, damit Halten zum Markieren die Vorzuege der Partie stehen laesst.
 //
@@ -320,7 +329,7 @@ export class Brett {
     this._abzeichen = null;
     this._abzeichenEl = null;
     this._geste = null;          // laufende Tipp-/Zieh-Geste { id, von, x0, y0, typ, zieht, warSchon, el, ueberSeit }
-    this._halten = null;         // Zielfeld gehalten (Umwandlung trotz autoDame) { id, von, nach, art, x0, y0, timer }
+    this._halten = null;         // Tipp aufs Ziel bis zum Loslassen (Finger; Umwandlung mit autoDame auch Maus) { id, von, nach, x0, y0, timer, bewegt }
     this._halteMal = null;       // Finger liegt auf einem Feld (400 ms -> malen) { id, feld, x0, y0, timer, geste }
     this._malen = null;          // laufende Zeichen-Geste { id, von, nach }
     this._vorschau = null;       // Zug bestaetigen: { von, nach, art, el }
@@ -655,7 +664,9 @@ export class Brett {
     }
     this._lagenEl = document.createElement('div');
     this._lagenEl.className = 'brett-lagen';
-    this._felderEl.append(this._lagenEl);
+    // Flos Marken liegen wie die Ueberlagerungen unter den Figuren (Pfeile darueber, siehe _nutzerEl)
+    this._markenEl = svgEl('svg', { class: 'brett-nutzer brett-marken', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
+    this._felderEl.append(this._lagenEl, this._markenEl);
 
     this._koordRandEl = document.createElement('div');
     this._koordRandEl.className = 'brett-koord-rand';
@@ -997,7 +1008,8 @@ export class Brett {
     if (!ms) { el.remove(); return; }
     el.classList.remove('plopp');
     el.classList.add('weg');
-    const a = anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], { d: Math.min(180, ms), k: 'sanft', fill: 'forwards' });
+    // anim() rechnet das Tempo selbst ein, ms ist schon gleitDauer() (mit Tempo): deshalb die Grunddauer
+    const a = anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], { d: Math.min(180, this.dauer), k: 'sanft', fill: 'forwards' });
     const raus = () => el.remove();
     if (a && a.finished) a.finished.then(raus, raus);
     setTimeout(raus, ms + 60);
@@ -1024,6 +1036,7 @@ export class Brett {
   _zeichneNutzer() {
     const svg = this._nutzerEl;
     svg.replaceChildren();
+    this._markenEl.replaceChildren();
     const mitte = (feld) => {
       const [x, y] = this._spalteZeile(feld);
       return [x + 0.5, y + 0.5];
@@ -1031,7 +1044,7 @@ export class Brett {
     const marke = (feld, vorschau) => {
       const [x, y] = this._spalteZeile(feld);
       const r = svgEl('rect', { class: 'marke' + (vorschau ? ' vorschau' : ''), 'data-feld': feld, x, y, width: 1, height: 1 });
-      svg.append(r);
+      this._markenEl.append(r);
     };
     const pfeil = (von, nach, vorschau) => {
       const g = pfeilElement(von, nach, mitte(von), mitte(nach), 0.2);
@@ -1078,6 +1091,7 @@ export class Brett {
       const feld = this._feldAusPunkt(e.clientX, e.clientY);
       if (!feld || !this.pfeileErlaubt) return;
       e.preventDefault();
+      e.stopPropagation();   // Zeichen-Geste: die Umgebung (Wischen der Analyse) bekommt sie nicht
       this._starteMalen(e.pointerId, feld);
       return;
     }
@@ -1090,7 +1104,10 @@ export class Brett {
     const v = this._vorschau;
     if (v) {
       if (feld === v.nach || feld === v.eingabe) { this._tippAufZiel(v.von, v.nach, e); return; }
-      this._brichVorschauAb(true);   // Tipp anderswo nimmt zurueck, der Tipp wirkt danach normal
+      // Tipp anderswo nimmt zurueck. Auf einer eigenen ziehbaren Figur wirkt er danach normal (waehlt sie), sonst tut er
+      // nichts weiter: kein beiLeer (die Partie bricht damit Vorzuege ab), Flos Zeichnungen bleiben stehen
+      this._brichVorschauAb(true);
+      if (!this._kannZiehen(feld)) return;
     }
     if (this._auswahl && this._auswahl !== feld && this._zieleVon(this._auswahl).has(feld)) {
       if (this.steuerung === 'ziehen') {
@@ -1111,7 +1128,8 @@ export class Brett {
         zieht: false, warSchon, el: this._figuren.get(feld), ueberSeit: 0,
       };
       try { this.el.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
-      if (!maus) this._starteHalteMal(e, feld);
+      // kein Halte-Malen: eine Figur, die ziehen darf (auch als Vorzug), bleibt immer eine Zug-Geste, auch wenn der
+      // Finger lange liegt (Figur antippen, nachdenken, ziehen ergibt einen Zug, nie einen Pfeil)
       return;
     }
     // W0+a: nicht erlaubter Zugversuch (am Bild aendert sich nichts)
@@ -1144,14 +1162,16 @@ export class Brett {
     try { this.beiLeer(feld); } catch (err) { console.error(err); }
   }
 
-  // Tipp auf ein Zielfeld: bei Umwandlung mit autoDame erst 450 ms warten (Halten zeigt D T L S), sonst sofort
+  // Tipp auf ein Zielfeld: bei Umwandlung mit autoDame erst 450 ms warten (Halten zeigt D T L S). Ein Finger zieht erst
+  // beim Loslassen (ein zweiter Finger bis dahin bricht ab: zwei Finger ergeben nie einen Zug), die Maus sofort.
   _tippAufZiel(von, nach, e) {
     const fuehrtAus = !this.bestaetigen || (this._vorschau && this._vorschau.von === von && this._vorschau.nach === nach);
-    if (fuehrtAus && this.autoDame && this._istUmwandlung(von, this._echtesZiel(von, nach))) {
-      const timer = setTimeout(() => {
+    const umwandlung = fuehrtAus && this.autoDame && this._istUmwandlung(von, this._echtesZiel(von, nach));
+    if (umwandlung || e.pointerType !== 'mouse') {
+      const timer = umwandlung ? setTimeout(() => {
         this._halten = null;
         this._eingabe(von, nach, 'tippen', { gehalten: true });
-      }, HALTEN_UMWANDLUNG);
+      }, HALTEN_UMWANDLUNG) : null;
       this._halten = { id: e.pointerId, von, nach, x0: e.clientX, y0: e.clientY, timer };
       try { this.el.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
       return;
@@ -1164,7 +1184,7 @@ export class Brett {
     this._halten = null;
   }
 
-  // Finger liegt auf einem Feld: nach 400 ms wird daraus Malen (Pfeil oder Marke), sonst war es ein Tipp
+  // Finger liegt auf einem Feld ohne eigene Zug-Geste: nach 400 ms wird daraus Malen (Pfeil oder Marke), sonst war es ein Tipp
   _starteHalteMal(e, feld, { loeschtBeimTipp = false } = {}) {
     this._loescheHalteMal();
     if (!this.pfeileErlaubt && !loeschtBeimTipp) return;
@@ -1173,12 +1193,7 @@ export class Brett {
       const h = this._halteMal;
       this._halteMal = null;
       if (!h || this._malen || this._halten) return;
-      if (this._geste && this._geste.id === id) {
-        if (this._geste.zieht) return;           // laufender Zug: nie malen
-        this._brichGesteAb(false);
-        this._auswahl = null;
-        this._zeichneLagen();
-      }
+      if (this._geste) return;                   // laufende Zug-Geste: nie malen
       if (this._stumm && this._stumm.id === id) this._stumm = null;
       if (this._leerOffen && this._leerOffen.id === id) this._leerOffen = null;
       this._starteMalen(id, feld);
@@ -1244,6 +1259,7 @@ export class Brett {
     if (m) {
       if (e.pointerId !== m.id) return;
       e.preventDefault();
+      e.stopPropagation();
       const nach = this._feldAusPunkt(e.clientX, e.clientY);
       if (nach !== m.nach) { m.nach = nach; this._zeichneNutzer(); }
       return;
@@ -1251,7 +1267,11 @@ export class Brett {
     const hm = this._halteMal;
     if (hm && e.pointerId === hm.id && Math.hypot(e.clientX - hm.x0, e.clientY - hm.y0) >= SCHWELLE_FINGER) this._loescheHalteMal();
     const h = this._halten;
-    if (h && e.pointerId === h.id && Math.hypot(e.clientX - h.x0, e.clientY - h.y0) >= SCHWELLE_FINGER) this._loescheHalten();
+    if (h && e.pointerId === h.id && !h.bewegt && Math.hypot(e.clientX - h.x0, e.clientY - h.y0) >= SCHWELLE_FINGER) {
+      // verrutscht: kein Halten mehr (keine Auswahl D T L S), das Loslassen auf dem Zielfeld bleibt ein Tipp
+      clearTimeout(h.timer);
+      h.bewegt = true;
+    }
     const g = this._geste;
     if (!g) {
       if (e.pointerType === 'mouse') this._setzeCursor(this._feldAusPunkt(e.clientX, e.clientY));
@@ -1298,7 +1318,10 @@ export class Brett {
 
   _hoch(e) {
     if (this._malen) {
-      if (e.pointerId === this._malen.id) this._beendeMalen(e);
+      if (e.pointerId === this._malen.id) {
+        e.stopPropagation();   // Ende einer Zeichen-Geste: kein Wischen in der Umgebung
+        this._beendeMalen(e);
+      }
       return;
     }
     const hm = this._halteMal;
@@ -1315,7 +1338,9 @@ export class Brett {
     const h = this._halten;
     if (h && e.pointerId === h.id) {
       this._loescheHalten();
-      this._eingabe(h.von, h.nach, 'tippen');   // vor 450 ms losgelassen: Dame
+      // Finger-Tipp aufs Ziel losgelassen (bei Umwandlung vor 450 ms: Dame). Ist der Finger verrutscht, zaehlt das nur auf
+      // dem Zielfeld (sonst bleibt die Auswahl, kein Zug)
+      if (!h.bewegt || this._feldAusPunkt(e.clientX, e.clientY) === h.nach) this._eingabe(h.von, h.nach, 'tippen');
       return;
     }
     const st = this._stumm;

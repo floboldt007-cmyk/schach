@@ -71,10 +71,10 @@ function hilfen(seite) {
       const el = document.querySelector(`#brett > img.figur[data-feld="${f}"]:not(.geht)`);
       return el ? el.dataset.figur : null;
     }, feld),
-    // liegt das Figurenbild sichtbar und ruhig auf dem Feld? (keine laufende Gleit-Animation, kein Zieh-Transform,
-    // volle Deckung). Eine gewaehlte Figur steht nach Look A angehoben (.angehoben: 4 % hoch, Skala 1,06), nur dann
-    // darf das Bild ueber dem Feld stehen, sonst exakt darauf.
-    figurSitzt: (feld) => seite.evaluate((f) => {
+    // liegt das Figurenbild JETZT sichtbar und ruhig auf dem Feld? (keine laufende Gleit-Animation, kein Zieh-Transform,
+    // volle Deckung). Eine gewaehlte Figur steht nach Look A angehoben (.angehoben: 5 % hoch, Skala 1,09), nur dann
+    // steht das Bild genau so viel ueber dem Feld, sonst exakt darauf.
+    figurSitztJetzt: (feld) => seite.evaluate((f) => {
       const el = document.querySelector(`#brett > img.figur[data-feld="${f}"]:not(.geht)`);
       const q = document.querySelector(`.feld[data-feld="${f}"]`).getBoundingClientRect();
       if (!el || el.classList.contains('gleitet') || el.style.transform) return false;
@@ -82,9 +82,20 @@ function hilfen(seite) {
       const hebung = el.classList.contains('angehoben');
       const dx = Math.abs(r.left + r.width / 2 - (q.left + q.width / 2));
       const dy = r.top + r.height / 2 - (q.top + q.height / 2);
-      const lage = hebung ? dy < -1 && dy > -q.height * 0.06 : Math.abs(dy) < 1.5;
-      return dx < 1.5 && lage && Math.abs(r.width - q.width * (hebung ? 1.06 : 1)) < 1.5 && getComputedStyle(el).opacity === '1';
+      const lage = Math.abs(dy - (hebung ? -q.height * 0.05 : 0)) < 1.5;
+      return dx < 1.5 && lage && Math.abs(r.width - q.width * (hebung ? 1.09 : 1)) < 1.5 && getComputedStyle(el).opacity === '1';
     }, feld),
+    // dieselbe Pruefung, wartet aber das Ende einer laufenden Gleit- oder Feder-Animation ab (hoechstens bis ms): unter
+    // Last (geteilter Rechner) dauert das Zurueckfedern laenger als eine feste Wartezeit. Wo es auf den Zeitpunkt
+    // ankommt (Figur noch unterwegs, Bewegung aus = sofort), pruefen die Tests mit figurSitztJetzt.
+    async figurSitzt(feld, ms = 1500) {
+      const ende = Date.now() + ms;
+      for (;;) {
+        if (await h.figurSitztJetzt(feld)) return true;
+        if (Date.now() > ende) return false;
+        await warte(25);
+      }
+    },
     anzahl: (sel) => seite.locator(sel).count(),
     setzeFen: (fen) => seite.evaluate((f) => demo.setzeFen(f), fen),
     log: () => seite.evaluate(() => demo.zugLog.slice()),
@@ -454,7 +465,7 @@ async function testeDesktop(browser) {
   await warte(220);
   pruefe('setzeStellung animiert den Zug', gleitetBot && (await h.figurSitzt('f3')));
   await seite.evaluate(() => demo.brett.setzeStellung('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', { animieren: false }));
-  pruefe('setzeStellung ohne Animation', (await h.figurSitzt('g1')) && (await h.anzahl('#brett > img.figur.gleitet')) === 0);
+  pruefe('setzeStellung ohne Animation', (await h.figurSitztJetzt('g1')) && (await h.anzahl('#brett > img.figur.gleitet')) === 0);
   pruefe('Ungueltige FEN wirft Fehler', await seite.evaluate(() => { try { demo.brett.setzeStellung('kaputt'); return false; } catch (e) { return true; } }));
 
   // Klaenge
@@ -916,6 +927,52 @@ async function testeOptik(browser) {
   pruefe('Schach als ruhiger roter Hof (radialer Verlauf)', /radial-gradient/.test(marken.schach), JSON.stringify(marken));
   await h.klickFeld('b5');
 
+  // Ueberlagerungen liegen UNTER den Figuren (Entwurf A): Auswahl, Schach-Hof, letzter Zug und Flos Marke faerben das Feld,
+  // nie die Figur. Pixelvergleich im Bildschirmfoto: Farbe mitten auf der Figur mit und ohne die Ueberlagerung.
+  const pixel = async (feld, fx, fy) => {
+    const r = await seite.locator(`.feld[data-feld="${feld}"]`).boundingBox();
+    const buf = await seite.screenshot({ clip: { x: r.x + r.width * fx - 1, y: r.y + r.height * fy - 1, width: 2, height: 2 } });
+    return seite.evaluate(async (d) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + d;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0);
+      return [...x.getImageData(0, 0, 1, 1).data.slice(0, 3)].join(',');
+    }, buf.toString('base64'));
+  };
+  const mitOhne = async (sel, feld, fx, fy) => {
+    const mit = await pixel(feld, fx, fy);
+    await seite.evaluate((s) => document.querySelectorAll(s).forEach((e) => { e.style.visibility = 'hidden'; }), sel);
+    const ohne = await pixel(feld, fx, fy);
+    await seite.evaluate((s) => document.querySelectorAll(s).forEach((e) => { e.style.visibility = ''; }), sel);
+    return { mit, ohne, gleich: mit === ohne };
+  };
+  const SCHACH_FEN = 'rnb1kbnr/pppp1ppp/8/4p3/7q/5P2/PPPPP1PP/RNBQKBNR w KQkq - 1 3';
+  await h.setzeFen(SCHACH_FEN);
+  await seite.evaluate((f) => demo.brett.setzeStellung(f, { animieren: false, schach: 'e1', letzterZug: ['d8', 'h4'] }), SCHACH_FEN);
+  await h.klickFeld('g2');
+  const f1 = await h.mitte('f1');
+  await seite.mouse.click(f1.x, f1.y, { button: 'right' });
+  await warte(450);
+  const schichten = {
+    auswahl: await mitOhne('.lage.auswahl', 'g2', 0.5, 0.62),
+    schach: await mitOhne('.lage.schach', 'e1', 0.5, 0.62),
+    zuletzt: await mitOhne('.lage.zuletzt[data-feld="h4"]', 'h4', 0.5, 0.62),
+    marke: await mitOhne('svg.brett-nutzer rect.marke', 'f1', 0.5, 0.62),
+    markeEcke: await mitOhne('svg.brett-nutzer rect.marke', 'f1', 0.1, 0.1),
+    auswahlEcke: await mitOhne('.lage.auswahl', 'g2', 0.1, 0.1),
+  };
+  pruefe('Ueberlagerungen liegen unter den Figuren: Auswahl, Schach-Hof, letzter Zug und Marke faerben die Figur nicht (Pixel)',
+    schichten.auswahl.gleich && schichten.schach.gleich && schichten.zuletzt.gleich && schichten.marke.gleich, JSON.stringify(schichten));
+  pruefe('Ueberlagerungen bleiben auf dem freien Teil des Feldes sichtbar (Ecke von Marke und Auswahl)', !schichten.markeEcke.gleich && !schichten.auswahlEcke.gleich,
+    JSON.stringify(schichten));
+  await seite.evaluate(() => demo.brett.loescheNutzerPfeile());
+  await h.setzeFen(SCHAUFENSTER);
+
   // Abzeichen: federt ein (Hupf-Feder), ruhig bei den schlechten Klassen, verschwindet mit dem Feld
   await seite.evaluate(() => demo.brett.zeigeAbzeichen('f3', 'bester'));
   const feder = await seite.evaluate(() => {
@@ -955,21 +1012,21 @@ async function testeOptik(browser) {
   const lang = await seite.evaluate(() => ({ d: demo.brett.gleitDauer(), css: document.querySelector('#brett').style.getPropertyValue('--brett-dauer'),
     gleitet: !!document.querySelector('#brett > img.figur[data-feld="f3"].gleitet') }));
   await warte(220);
-  const nochUnterwegs = await h.figurSitzt('f3');
+  const nochUnterwegs = await h.figurSitztJetzt('f3');
   await warte(300);
   pruefe('setzeDauer(400): gleitDauer 400, --brett-dauer 400ms, Figur nach 220 ms noch unterwegs, nach 520 ms da',
-    lang.d === 400 && lang.css === '400ms' && lang.gleitet && !nochUnterwegs && (await h.figurSitzt('f3')), JSON.stringify({ lang, nochUnterwegs }));
+    lang.d === 400 && lang.css === '400ms' && lang.gleitet && !nochUnterwegs && (await h.figurSitztJetzt('f3')), JSON.stringify({ lang, nochUnterwegs }));
   await seite.evaluate(() => demo.setzeTempo('schnell'));
   pruefe('Tempo schnell: gleitDauer 240 (400 x 0,6)', (await seite.evaluate(() => demo.brett.gleitDauer())) === 240);
   await seite.evaluate(() => demo.setzeTempo('aus'));
   await seite.evaluate(() => demo.brett.setzeStellung('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', { letzterZug: ['f3', 'g1'] }));
   pruefe('Bewegung aus: gleitDauer 0, das Brett setzt sofort (kein .gleitet, Figur sitzt)', (await seite.evaluate(() => demo.brett.gleitDauer())) === 0
-    && (await h.anzahl('#brett > img.figur.gleitet')) === 0 && (await h.figurSitzt('g1')));
+    && (await h.anzahl('#brett > img.figur.gleitet')) === 0 && (await h.figurSitztJetzt('g1')));
   await seite.evaluate(() => demo.setzeTempo('normal'));
   await seite.emulateMedia({ reducedMotion: 'reduce' });
   await seite.evaluate(() => demo.brett.setzeStellung('rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1', { letzterZug: ['g1', 'f3'] }));
   pruefe('prefers-reduced-motion: gleitDauer 0, das Brett setzt sofort', (await seite.evaluate(() => demo.brett.gleitDauer())) === 0
-    && (await h.anzahl('#brett > img.figur.gleitet')) === 0 && (await h.figurSitzt('f3')));
+    && (await h.anzahl('#brett > img.figur.gleitet')) === 0 && (await h.figurSitztJetzt('f3')));
   await seite.emulateMedia({ reducedMotion: 'no-preference' });
   await seite.evaluate(() => demo.brett.setzeDauer(150));
   pruefe('Tempo normal: wieder 150', (await seite.evaluate(() => demo.brett.gleitDauer())) === 150);
@@ -1205,6 +1262,112 @@ async function testeKomfort(browser) {
   }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+
+  // ----- dasselbe mit dem Finger (iPad) -----
+  gruppe = 'Komfort (Finger)';
+  const t = await neueSeite(browser, { viewport: { width: 820, height: 1180 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPAD_UA });
+  const s = t.seite;
+  const hf = hilfen(s);
+  const finger = fingerTreiber(s);
+  const tippe = async (feld) => { const m = await hf.mitte(feld); await s.touchscreen.tap(m.x, m.y); };
+  const halte = async (feld, ms) => { const m = await hf.mitte(feld); await finger.runter(m.x, m.y); await warte(ms); await finger.hoch(m.x, m.y); };
+  const offenF = () => s.locator('.brett-umwandlung').isVisible();
+
+  // Zug bestaetigen per Finger: Tipp, Tipp = Vorschau; dritter Tipp aufs Ziel macht fest
+  await hf.setzeFen(START);
+  await s.evaluate(() => demo.brett.setzeBestaetigen(true));
+  await tippe('e2');
+  await tippe('e4');
+  await warte(220);
+  const vf = await s.evaluate(() => ({ fig: document.querySelector('#brett > img.figur.vorschau')?.dataset.feld, lage: document.querySelectorAll('.lage.vorschau[data-feld="e4"]').length }));
+  await tippe('e4');
+  await warte(220);
+  pruefe('Bestaetigen per Finger: Vorschau auf e4, zweiter Tipp aufs Ziel macht fest', vf.fig === 'e4' && vf.lage === 1 && (await hf.fen()) === NACH_E4
+    && (await hf.figurSitzt('e4')) && (await hf.anzahl('#brett > img.figur.vorschau, .lage.vorschau')) === 0, JSON.stringify(vf));
+  // Tipp anderswo (leeres Feld) nimmt die Vorschau zurueck, sonst nichts: kein beiLeer (die Partie bricht damit Vorzuege ab),
+  // Flos Marke bleibt stehen
+  await hf.setzeFen(START);
+  await halte('h5', 520);
+  await s.evaluate(() => { window.__leer = []; demo.brett.beiLeer = (f) => window.__leer.push(f); });
+  await tippe('d2');
+  await tippe('d4');
+  await warte(220);
+  const vorZurueck = await hf.anzahl('#brett > img.figur.vorschau[data-feld="d4"]');
+  await tippe('a5');
+  await warte(250);
+  const nf = await nutzer(s);
+  pruefe('Bestaetigen per Finger: Tipp aufs leere a5 nimmt zurueck, meldet kein beiLeer, Marke bleibt', vorZurueck === 1 && (await hf.figurSitzt('d2'))
+    && (await hf.anzahl('#brett > img.figur.vorschau, .lage.vorschau')) === 0 && (await s.evaluate(() => window.__leer.length)) === 0
+    && nf.marken.join() === 'h5' && (await hf.fen()) === START, JSON.stringify(nf));
+  await s.evaluate(() => { demo.brett.beiLeer = null; demo.brett.setzeBestaetigen(false); demo.brett.loescheNutzerPfeile(); });
+
+  // Auto-Dame per Finger: kurzer Tipp = Dame, 450 ms halten zeigt D T L S (auch nach dem Loslassen offen)
+  await s.evaluate(() => demo.brett.setzeAutoDame(true));
+  await hf.setzeFen(UMWANDLUNG);
+  await tippe('b7');
+  await tippe('b8');
+  await warte(220);
+  pruefe('Auto-Dame per Finger: kurzer Tipp wandelt in eine Dame um', (await hf.figur('b8')) === 'wQ' && !(await offenF()) && (await hf.log()).at(-1).umwandlung === 'q');
+  await hf.setzeFen(UMWANDLUNG);
+  await tippe('b7');
+  const b8f = await hf.mitte('b8');
+  await finger.runter(b8f.x, b8f.y);
+  await warte(150);
+  const frueh = await offenF();
+  await warte(400);
+  const spaet = await offenF();
+  await finger.hoch(b8f.x, b8f.y);
+  await warte(100);
+  const nachHoch = await offenF();
+  const tk = await s.locator('.umwandlung-figur[data-figur="b"]').boundingBox();
+  await s.touchscreen.tap(tk.x + tk.width / 2, tk.y + tk.height / 2);
+  await warte(220);
+  pruefe('Auto-Dame per Finger: 450 ms halten zeigt D T L S, bleibt nach dem Loslassen offen, Wahl Laeufer', !frueh && spaet && nachHoch
+    && (await hf.figur('b8')) === 'wB' && (await hf.log()).at(-1).umwandlung === 'b', JSON.stringify({ frueh, spaet, nachHoch }));
+  // ein verrutschender Finger (ueber die 8-px-Schwelle, aber auf dem Zielfeld losgelassen) bleibt ein Tipp: Dame
+  await hf.setzeFen(UMWANDLUNG);
+  await tippe('b7');
+  await finger.runter(b8f.x, b8f.y);
+  await finger.bewege(b8f.x + 12, b8f.y + 4);
+  await warte(520);
+  const verrutschtOffen = await offenF();
+  await finger.hoch(b8f.x + 12, b8f.y + 4);
+  await warte(220);
+  pruefe('Auto-Dame per Finger: verrutscht (12 px) und auf dem Ziel losgelassen = Dame, keine Auswahl', !verrutschtOffen && (await hf.figur('b8')) === 'wQ'
+    && !(await offenF()), JSON.stringify({ verrutschtOffen }));
+  // verrutscht und neben dem Ziel losgelassen: kein Zug, die Auswahl bleibt
+  await hf.setzeFen(UMWANDLUNG);
+  await tippe('b7');
+  const a8f = await hf.mitte('a8');
+  await finger.runter(b8f.x, b8f.y);
+  await finger.bewege((b8f.x + a8f.x) / 2, b8f.y);
+  await finger.bewege(a8f.x, a8f.y);
+  await finger.hoch(a8f.x, a8f.y);
+  await warte(220);
+  pruefe('Auto-Dame per Finger: auf ein anderes Feld gerutscht = kein Zug, b7 bleibt gewaehlt', (await hf.fen()) === UMWANDLUNG && !(await offenF())
+    && (await hf.anzahl('.lage.auswahl[data-feld="b7"]')) === 1);
+  await s.evaluate(() => demo.brett.setzeAutoDame(false));
+
+  // Steuerung per Finger
+  await hf.setzeFen(START);
+  await s.evaluate(() => demo.brett.setzeSteuerung('tippen'));
+  const e2f = await hf.mitte('e2');
+  const e4f = await hf.mitte('e4');
+  await finger.ziehe([[e2f.x, e2f.y], [e4f.x, e4f.y]]);
+  await warte(220);
+  const tippenZieht = (await hf.fen()) !== START || (await hf.anzahl('#brett > img.figur.gezogen')) > 0;
+  await hf.setzeFen(START);
+  await s.evaluate(() => demo.brett.setzeSteuerung('ziehen'));
+  await tippe('e2');
+  await tippe('e4');
+  await warte(220);
+  const ziehenTippt = (await hf.fen()) !== START;
+  await finger.ziehe([[e2f.x, e2f.y], [e4f.x, e4f.y]]);
+  await warte(220);
+  pruefe('Steuerung per Finger: "tippen" zieht beim Ziehen nicht, "ziehen" nicht beim Tippen, Ziehen zieht', !tippenZieht && !ziehenTippt && (await hf.fen()) === NACH_E4);
+  await s.evaluate(() => demo.brett.setzeSteuerung('beides'));
+  pruefe('Keine Konsolenfehler (Finger)', t.fehler.length === 0, t.fehler.join(' | '));
+  await t.kontext.close();
 }
 
 // ---------- Premium-Umbau U6: Pfeile malen und Felder markieren (Maus und Finger), Zwei-Finger-Schutz, Schwelle ----------
@@ -1359,6 +1522,36 @@ async function testePfeile(browser) {
   pruefe('Maus: Rechtsklick (Marke) meldet kein leeres Feld, Linksklick ins Leere meldet es und loescht', leerRechts === 0
     && (await seite.evaluate(() => window.__leer.join())) === 'd5' && (await nutzer(seite)).liste.length === 0);
   await seite.evaluate(() => { demo.brett.beiLeer = null; });
+  // Zeichen-Gesten gehen nicht an die Umgebung (das Wischen der Analyse sprang sonst beim waagrechten Pfeil einen Zug),
+  // Lauscher in der Capture-Phase (Klang entsperren) sehen sie weiter; ein normaler Zug geht wie immer an die Umgebung
+  await seite.evaluate(() => {
+    window.__blase = [];
+    window.__fang = [];
+    const platz = document.querySelector('.brett-platz');
+    for (const typ of ['pointerdown', 'pointermove', 'pointerup']) {
+      platz.addEventListener(typ, (e) => window.__blase.push(e.type));
+      document.addEventListener(typ, (e) => { if (e.target.closest && e.target.closest('#brett')) window.__fang.push(e.type); }, true);
+    }
+  });
+  const a4 = await h.mitte('a4');
+  const h4 = await h.mitte('h4');
+  await seite.mouse.move(a4.x, a4.y);
+  await seite.evaluate(() => { window.__blase.length = 0; window.__fang.length = 0; });
+  await seite.mouse.down({ button: 'right' });
+  await seite.mouse.move(h4.x, h4.y, { steps: 6 });
+  await seite.mouse.up({ button: 'right' });
+  const malWeg = await seite.evaluate(() => ({ blase: window.__blase.slice(), fang: window.__fang.length }));
+  const malPfeil = (await nutzer(seite)).pfeile.join();
+  await h.setzeFen(START);
+  const g1m = await h.mitte('g1');
+  await seite.mouse.move(g1m.x, g1m.y);
+  await seite.evaluate(() => { window.__blase.length = 0; });
+  await h.zieheMaus('g1', 'f3');
+  await warte(200);
+  const zugWeg = await seite.evaluate(() => window.__blase.slice());
+  pruefe('Rechtsklick-Zeichnen gibt keine Zeiger-Ereignisse an die Umgebung (Capture sieht sie), ein Zug schon', malPfeil.includes('a4h4')
+    && malWeg.blase.length === 0 && malWeg.fang >= 8 && zugWeg.includes('pointerdown') && zugWeg.includes('pointerup') && (await h.figur('f3')) === 'wN',
+  JSON.stringify({ malWeg, zugWeg, malPfeil }));
   await bild(seite, 'pfeile-maus');
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
@@ -1371,28 +1564,30 @@ async function testePfeile(browser) {
   const finger = fingerTreiber(s);
   const tippe = async (feld) => { const m = await ht.mitte(feld); await s.touchscreen.tap(m.x, m.y); };
   await ht.setzeFen(START);
-  // 400 ms halten und ziehen = Pfeil (auch von einer eigenen Figur aus, dann kein Zug)
-  let a = await ht.mitte('e2');
-  let b = await ht.mitte('e4');
+  const zustand = () => s.evaluate(() => ({ auswahl: document.querySelectorAll('.lage.auswahl').length, malt: document.querySelector('#brett').classList.contains('malt'),
+    vorschau: document.querySelectorAll('svg.brett-nutzer .vorschau').length }));
+  // 400 ms halten und ziehen = Pfeil, hier von einer gegnerischen Figur aus (Weiss am Zug, e7 ist schwarz): kein Zug
+  let a = await ht.mitte('e7');
+  let b = await ht.mitte('e5');
   await finger.runter(a.x, a.y);
   await warte(150);
-  const vorHalten = await s.evaluate(() => ({ auswahl: !!document.querySelector('.lage.auswahl[data-feld="e2"]'), malt: document.querySelector('#brett').classList.contains('malt') }));
+  const vorHalten = await zustand();
   await warte(350);
-  const nachHalten = await s.evaluate(() => ({ auswahl: !!document.querySelector('.lage.auswahl'), malt: document.querySelector('#brett').classList.contains('malt'), vorschau: document.querySelectorAll('svg.brett-nutzer .vorschau').length }));
+  const nachHalten = await zustand();
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
   await warte(100);
   let nt = await nutzer(s);
-  pruefe('Finger: vor 400 ms ist die Figur gewaehlt, danach malt das Brett (Marken-Vorschau, Auswahl weg)', vorHalten.auswahl && !vorHalten.malt && nachHalten.malt && !nachHalten.auswahl && nachHalten.vorschau === 1,
-    JSON.stringify({ vorHalten, nachHalten }));
-  pruefe('Finger: halten und ziehen malt den Pfeil e2-e4, kein Zug', nt.pfeile.join() === 'e2e4' && (await ht.fen()) === START && (await ht.figurSitzt('e2')), JSON.stringify(nt));
+  pruefe('Finger: vor 400 ms malt das Brett nicht, danach schon (Marken-Vorschau, keine Auswahl)', !vorHalten.malt && vorHalten.vorschau === 0 && vorHalten.auswahl === 0
+    && nachHalten.malt && nachHalten.auswahl === 0 && nachHalten.vorschau === 1, JSON.stringify({ vorHalten, nachHalten }));
+  pruefe('Finger: halten und ziehen malt den Pfeil e7-e5, kein Zug', nt.pfeile.join() === 'e7e5' && (await ht.fen()) === START && (await ht.figurSitzt('e7')), JSON.stringify(nt));
   // halten ohne ziehen = Marke (leeres Feld)
   a = await ht.mitte('d5');
   await finger.runter(a.x, a.y);
   await warte(520);
   await finger.hoch(a.x, a.y);
   nt = await nutzer(s);
-  pruefe('Finger: halten ohne Ziehen markiert das Feld', nt.marken.join() === 'd5' && nt.pfeile.join() === 'e2e4', JSON.stringify(nt));
+  pruefe('Finger: halten ohne Ziehen markiert das Feld', nt.marken.join() === 'd5' && nt.pfeile.join() === 'e7e5', JSON.stringify(nt));
   // kurzer Tipp auf ein leeres Feld ohne Auswahl loescht alles; mit Auswahl nicht
   await tippe('g1');
   nt = await nutzer(s);
@@ -1403,6 +1598,33 @@ async function testePfeile(browser) {
   await tippe('h5');
   nt = await nutzer(s);
   pruefe('Finger: Tipp ins Brett ohne Auswahl loescht alle Zeichnungen', nt.liste.length === 0, JSON.stringify(nt));
+  // eine eigene Figur ohne Zug (Ta1 in der Grundstellung) laesst sich markieren wie ein leeres Feld
+  a = await ht.mitte('a1');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  await finger.hoch(a.x, a.y);
+  nt = await nutzer(s);
+  pruefe('Finger: eigene Figur ohne Zug (Ta1) halten markiert das Feld, kein Zug', nt.marken.join() === 'a1' && nt.liste.length === 1 && (await ht.fen()) === START
+    && (await ht.anzahl('.lage.auswahl')) === 0, JSON.stringify(nt));
+  // eine eigene Figur, die ziehen darf, bleibt immer eine Zug-Geste: lange halten (nachdenken) und dann ziehen ergibt den Zug,
+  // nie einen Pfeil (sonst ginge ein Zug in einer Partie mit Uhr verloren)
+  a = await ht.mitte('e2');
+  b = await ht.mitte('e4');
+  await finger.runter(a.x, a.y);
+  await warte(150);
+  const eigenVor = await zustand();
+  await warte(400);
+  const eigenNach = await zustand();
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  await finger.hoch(b.x, b.y);
+  await warte(100);
+  nt = await nutzer(s);
+  pruefe('Finger: eigene ziehbare Figur 550 ms halten bleibt gewaehlt, das Brett malt nie', eigenVor.auswahl === 1 && !eigenVor.malt && eigenNach.auswahl === 1
+    && !eigenNach.malt && eigenNach.vorschau === 0 && (await ht.anzahl('.lage.auswahl[data-feld="e2"]')) === 0, JSON.stringify({ eigenVor, eigenNach }));
+  pruefe('Finger: danach ziehen ist der Zug e2-e4, kein Pfeil, die Marke bleibt', (await ht.fen()) === NACH_E4 && (await ht.figurSitzt('e4'))
+    && nt.pfeile.length === 0 && nt.marken.join() === 'a1', JSON.stringify(nt));
+  await s.evaluate(() => demo.brett.loescheNutzerPfeile());
+  await ht.setzeFen(START);
   // ein laufender Zug (Finger zieht schon) wird nie zum Pfeil, auch wenn der Finger lange ueber dem Ziel liegt
   a = await ht.mitte('g1');
   b = await ht.mitte('f3');
@@ -1414,20 +1636,36 @@ async function testePfeile(browser) {
   await warte(220);
   nt = await nutzer(s);
   pruefe('Finger: waehrend eines Zugs wird nie gemalt, der Zug kommt an', ziehtNoch.gezogen && !ziehtNoch.malt && (await ht.figur('f3')) === 'wN' && nt.liste.length === 0, JSON.stringify({ ziehtNoch, nt }));
-  // gedreht: Pfeil per Finger
+  // gedreht: Pfeil per Finger (Schwarz am Zug, Schwarz unten; der Pfeil beginnt auf der weissen Figur e2 oben)
   await s.evaluate(() => demo.brett.setzeAusrichtung('b'));
-  a = await ht.mitte('e7');
-  b = await ht.mitte('e5');
+  a = await ht.mitte('e2');
+  b = await ht.mitte('e4');
   await finger.runter(a.x, a.y);
   await warte(520);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
   const pbF = await s.locator('svg.brett-nutzer g.pfeil').boundingBox();
-  const e5 = await ht.mitte('e5');
-  const e7 = await ht.mitte('e7');
-  pruefe('Finger, gedreht: Pfeil e7-e5 (e7 unten) liegt zwischen den Feldern', (await nutzer(s)).pfeile.join() === 'e7e5' && pbF.y >= e5.b.y - 1 && pbF.y + pbF.height <= e7.b.y + e7.b.height + 1
-    && Math.abs(pbF.x + pbF.width / 2 - e5.x) < 3, JSON.stringify({ pbF, e5: e5.b, e7: e7.b }));
+  const e4f = await ht.mitte('e4');
+  const e2f = await ht.mitte('e2');
+  pruefe('Finger, gedreht: Pfeil e2-e4 (e2 oben) liegt zwischen den Feldern', (await nutzer(s)).pfeile.join() === 'e2e4' && e2f.y < e4f.y && pbF.y >= e2f.b.y - 1
+    && pbF.y + pbF.height <= e4f.b.y + e4f.b.height + 1 && pbF.height > e4f.b.height && Math.abs(pbF.x + pbF.width / 2 - e4f.x) < 3, JSON.stringify({ pbF, e2: e2f.b, e4: e4f.b }));
   await s.evaluate(() => { demo.brett.setzeAusrichtung('w'); demo.brett.loescheNutzerPfeile(); });
+  // Finger-Zeichnung: sobald gemalt wird, gehen Bewegen und Loslassen nicht mehr an die Umgebung (Wischen der Analyse)
+  await s.evaluate(() => {
+    window.__blase = [];
+    const platz = document.querySelector('.brett-platz');
+    for (const typ of ['pointerdown', 'pointermove', 'pointerup']) platz.addEventListener(typ, (e) => window.__blase.push(e.type));
+  });
+  a = await ht.mitte('a4');
+  b = await ht.mitte('h4');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y);
+  await finger.hoch(b.x, b.y);
+  const fingerWeg = await s.evaluate(() => window.__blase.join());
+  pruefe('Finger: beim Malen gehen Bewegen und Loslassen nicht an die Umgebung (nur das Aufsetzen)', (await nutzer(s)).pfeile.join() === 'a4h4'
+    && fingerWeg === 'pointerdown', fingerWeg);
+  await s.evaluate(() => demo.brett.loescheNutzerPfeile());
   // aus-Schalter per Finger: Halten malt nichts, Tippen und Ziehen gehen weiter
   await s.evaluate(() => demo.brett.setzePfeileErlaubt(false));
   a = await ht.mitte('d4');
@@ -1505,8 +1743,26 @@ async function testePfeile(browser) {
   await finger.hoch(a.x, a.y, 1);
   await warte(200);
   pruefe('Zwei Finger (Figur und Ziel) ergeben keinen Zug', (await ht.fen()) === START && (await ht.anzahl('.lage.auswahl')) === 0);
-  // zweiter Finger waehrend des Haltens (Umwandlung) und des Malens: alles abgebrochen
-  await finger.runter(a.x, a.y, 1);
+  // mit gewaehlter Figur: ein Finger-Tipp aufs Ziel zieht erst beim Loslassen; kommt vorher ein zweiter Finger dazu, kein Zug
+  await tippe('e2');
+  await finger.runter(b.x, b.y, 1);
+  const beimAufsetzen = await ht.fen();
+  await finger.runter(c.x, c.y, 2);
+  await finger.hoch(c.x, c.y, 2);
+  await finger.hoch(b.x, b.y, 1);
+  await warte(200);
+  pruefe('Mit Auswahl: Finger auf dem Ziel plus zweiter Finger ergibt keinen Zug (Auswahl weg)', beimAufsetzen === START && (await ht.fen()) === START
+    && (await ht.anzahl('.lage.auswahl')) === 0 && (await ht.figurSitzt('e2')));
+  await tippe('e2');
+  await finger.runter(b.x, b.y, 1);
+  const vorLoslassen = await ht.fen();
+  await finger.hoch(b.x, b.y, 1);
+  await warte(220);
+  pruefe('Finger-Tipp aufs Ziel zieht beim Loslassen (vorher nicht)', vorLoslassen === START && (await ht.fen()) === NACH_E4 && (await ht.figurSitzt('e4')));
+  await ht.setzeFen(START);
+  // zweiter Finger waehrend des Malens (Halten auf dem leeren Feld e3): alles abgebrochen
+  const e3 = await ht.mitte('e3');
+  await finger.runter(e3.x, e3.y, 1);
   await warte(450);
   const maltVorher = await s.evaluate(() => document.querySelector('#brett').classList.contains('malt'));
   await finger.runter(c.x, c.y, 2);
@@ -1514,7 +1770,7 @@ async function testePfeile(browser) {
   await finger.bewege(b.x, b.y, 1);
   await finger.hoch(b.x, b.y, 1);
   await finger.hoch(c.x, c.y, 2);
-  pruefe('Zweiter Finger bricht das Malen ab', maltVorher && !maltNachher && (await nutzer(s)).liste.length === 0);
+  pruefe('Zweiter Finger bricht das Malen ab', maltVorher && !maltNachher && (await nutzer(s)).liste.length === 0 && (await ht.fen()) === START);
   // danach geht ein normaler Zug
   await tippe('e2');
   await tippe('e4');

@@ -53,6 +53,9 @@
 .brett-felder {
   position: absolute;
   inset: 0;
+  /* Eigener Stapelkontext (z-index 0): alle Ueberlagerungen (.lage, Flos Marken) liegen UNTER den Figuren (z 2) wie in
+     A. container-type bildet in Chromium keinen Stapelkontext, ohne z-index lagen Auswahl und Schach-Hof ueber der Figur. */
+  z-index: 0;
   container-type: inline-size;  /* cqw = Prozent der Brettbreite (Koordinaten, Ringe) */
   border-radius: var(--brett-radius);
   overflow: hidden;
@@ -90,7 +93,7 @@
 .brett-koord-rand .koord.zahl { left: calc(-1 * var(--koord-rand)); width: var(--koord-rand); height: 12.5%; }
 .brett-koord-rand .koord.buchst { top: 100%; width: 12.5%; height: var(--koord-rand); }
 
-/* ---------- Ueberlagerungen (unter den Figuren) ---------- */
+/* ---------- Ueberlagerungen (unter den Figuren; z-index nur fuer die Reihenfolge untereinander, .brett-felder kapselt) ---------- */
 .brett-lagen { position: absolute; inset: 0; pointer-events: none; }
 .brett .lage { position: absolute; width: 12.5%; height: 12.5%; }
 .brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; animation: brett-ein var(--b-d-m) var(--b-sanft) both; }
@@ -170,7 +173,7 @@
 .brett > .figur.angehoben {
   z-index: 3;
   transition: transform var(--b-d-xs) var(--b-feder);
-  transform: translateY(-4%) scale(1.06);
+  transform: translateY(-5%) scale(1.09);
   filter: drop-shadow(0 6px 5px rgba(0, 0, 0, .22));
 }
 .brett > .figur.gleitet { z-index: 3; transition: none; }
@@ -203,6 +206,9 @@
 }
 .brett-pfeile .pfeil { opacity: .82; }
 .brett-nutzer { z-index: 4; }
+/* Flos Marken faerben das Feld, nicht die Figur: eigene Ebene in .brett-felder, unter den Figuren (ueber Zug-Toenung und
+   mark-*, unter Auswahl und Zielpunkten) */
+.brett-nutzer.brett-marken { z-index: 2; }
 .brett-nutzer .pfeil { color: var(--b-pfeil-nutzer); opacity: .9; animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
 .brett-nutzer .marke { fill: var(--b-marke-nutzer); animation: brett-ein var(--b-d-xs) var(--b-sanft) both; }
 .brett-nutzer .vorschau { opacity: .55; animation: none; }
