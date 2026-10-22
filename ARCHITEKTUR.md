@@ -1389,7 +1389,8 @@ Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Ex
 `schach-arena:abo:stand` `{ uid, premium, status, plan, gueltigBis, quelle, geprueftAm }`,
 `schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts).
 
-**Paket** `pakete/abo/index` (in `PAKETE`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 6 direkt
+**Paket** `pakete/abo/index` (noch nicht in `PAKETE`: das trägt die Integration ein, die Dateien stehen schon in `sw.js`; der
+Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 6 direkt
 unter dem Konto, nur wenn das Konto sichtbar ist); `app:bereit` und `app:sichtbar` prüfen nach einem Kauf (höchstens 30
 min) sofort neu und sagen einmal Danke (Toast); DOM-Ereignis `abo:stand` auf `document` lässt offene Gruppen neu
 zeichnen. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen plus

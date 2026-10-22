@@ -4,13 +4,14 @@
 // allen Zustaenden, Kauf und Rueckkehr, premiumHinweis, Fairness der sichtbaren Texte. Stripe wird nie aufgerufen
 // (window.open ist im Test ersetzt), die echte Supabase auch nicht.
 //
+// Das Paket wird ueber ?test&erw=pakete/abo/index geladen, bis die Integration es in PAKETE eintraegt.
 //   node tests/abo.test.mjs              alles
 //   node tests/abo.test.mjs --nur-node   ohne Browser
 //   PORT=9800 BILDER=<ordner> node tests/abo.test.mjs   eigener Port (Standard 8873), Bildschirmfotos in <ordner>
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { setzeSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.js';
@@ -19,13 +20,13 @@ import {
   kaufGestartet, pruefeProdukt, inStoreHuelle, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
 } from '../js/abo.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
-import { PAKETE } from '../js/erweiterungen.js';
 import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8873);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// Das Paket steht noch nicht in PAKETE (das macht die Integration, js/erweiterungen.js): im Test ueber ?erw laden
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/abo/index`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'abo') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
@@ -192,7 +193,9 @@ async function nodeTeil() {
   pruefe('Capacitor im Browser (nicht nativ): normal', !inStoreHuelle());
   delete globalThis.Capacitor;
   pruefe('premiumHinweis ohne DOM (Node): null', premiumHinweis(null, 'x') === null);
-  pruefe('Paket steht in PAKETE (js/erweiterungen.js)', PAKETE.includes('pakete/abo/index'));
+  const sw = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
+  pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
+    ['js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css'].every((d) => sw.includes(`'${d}'`)));
   vergiss();
   pruefe('vergiss: Stand, Produkt und Kauf-Merker weg', !localStorage.getItem(STAND_SCHLUESSEL) && !localStorage.getItem(PRODUKT_SCHLUESSEL) && kaufGestartet() === null);
   setzeAboFetch(null);
