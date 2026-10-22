@@ -1338,3 +1338,53 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
+
+Strategie und Grenzen: `design/runde4/DATEN.md`. Server: `supabase/schema.sql` (Konto light) und
+`supabase/daten-schema.sql`, Einrichtung in `supabase/ANLEITUNG.md`. Supabase wird nur über `fetch` angesprochen, ohne
+Bibliothek; im Browser steht nur der öffentliche Schlüssel (`js/konto-config.js`).
+
+**Konto** (`js/konto.js`, statisch aus `app.js` geladen, Registrierung defensiv): E-Mail mit 6-stelligem Code oder
+„Mit Google anmelden“ (`googleAnmeldeUrl(basis)` -> `SUPABASE_URL/auth/v1/authorize?provider=google&redirect_to=<basis>#konto`,
+`meldeMitGoogleAn(ort)` ruft `ort.assign`). Die Rückkehr `#konto#access_token=...&refresh_token=...` (Supabase hängt die
+Antwort mit einem zweiten `#` an) wie auch `#access_token=...` vom Anmelde-Link übernimmt `uebernimmLinkSitzung()`, entfernt
+die Tokens (auch `provider_token`) per `replaceState` und springt zu `#einstellungen`. Die Konto-Gruppe am Ort
+`einstellungen:gruppen` (Reihenfolge 5) erscheint erst nach einmal `#konto` (`kontoFreigeschaltet`). Für `daten.js`
+exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `userId`, `abmelden`, `lokalerStand`.
+
+**Datenfreigabe** (`js/daten.js`, Paket `daten` in `PAKETE`, Stil `css/daten.css`):
+- Einstellung `datenfreigabe` `'aus' | 'an'` (Standard aus, `EINSTELLUNG_WERTE`). Wirksam nur, wenn angemeldet und die
+  Zustimmung (`schach-arena:daten:zustimmung` = `{ konto, datum, fassung }`) von genau diesem Konto stammt
+  (`darfTeilen()`); ein anderes Konto auf demselben Gerät muss selbst zustimmen. `setzeFreigabe(an, app)` schaltet.
+- Hört `app:screen` (`screen` mit `{ name }`), `partie:gestartet` (`partie_start`), `partie:beendet` (nach `setTimeout 0`:
+  Archiv-Zeile aus dem gespeicherten Partie-Datensatz, `archivDatensatz(d, p)`, und `partie_ende`), `window` `error` und
+  `unhandledrejection` (`fehler`: Typ + Meldung <= 200 Zeichen ohne Adressen, höchstens 10 je Sitzung).
+- Warteschlange `schach-arena:daten:warteschlange` (höchstens 100, älteste fallen weg), jede Zeile mit `id` (uuid aus dem
+  Browser) und `user_id`. Versand je Tabelle als ein POST (`/rest/v1/partien_archiv`, `/rest/v1/nutzung`, höchstens 25
+  Zeilen), `Prefer: return=minimal`, höchstens alle 20 s und bei `visibilitychange` (hidden) und `pagehide` (`keepalive`
+  bis 60 000 Zeichen). Offline, 5xx, 401, 408, 429: Zeilen bleiben; andere 4xx (auch 409 bei doppelter `id`): Zeilen fallen
+  weg. Zeilen eines anderen Kontos werden nie gesendet. Ausschalten verwirft die Warteschlange.
+- `meineDaten()` = `rpc/meine_daten` + `lokalerStand()` + Warteschlange + Zustimmung, `dateiFuerAuskunft()` ->
+  `crownmate-meine-daten-JJJJ-MM-TT.json`, `speichereAuskunft()` teilt oder lädt herunter (wie `js/sicherung.js`).
+- `loescheKonto(app)` = `rpc/konto_loeschen`, dann `abmelden()`, Warteschlange und Zustimmung weg, Freigabe aus;
+  `loescheKontoDialog(app)` fragt zweistufig (Sheet). Der Spielstand auf dem Gerät bleibt.
+- Gruppe „Daten“ am Ort `einstellungen:gruppen` (Reihenfolge 6, direkt nach Konto, nur wenn das Konto freigeschaltet ist):
+  `.daten-gruppe`, Schalter `.schalter[data-schalter="datenfreigabe"]` (ohne Anmeldung gesperrt mit „Zum Teilen erst
+  anmelden“), Erklärtext `.daten-text`, Knöpfe `[data-daten="auskunft"]` und `[data-daten="loeschen"]`, `.daten-status`,
+  Links auf `datenschutz.html` und `impressum.html` (auch unter Info und Lizenzen).
+
+**Server** (`supabase/daten-schema.sql`): `partien_archiv` (insert/select/delete nur eigene, kein update, Größen- und
+Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
+dann genau vergeben (Supabase gäbe sonst auch update und truncate). `konto_loeschen()` und `meine_daten()` sind
+`security definer` mit `search_path = public, auth`, nur für `authenticated`. Neue Tabellen mit Konto-Bezug brauchen
+`on delete cascade` und gehören in beide Funktionen.
+
+**Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
+(`css/tokens.css`, `css/themes/modern.css`, hell und dunkel wie die App), im Offline-Cache. Beide sind Entwürfe mit
+Platzhaltern in eckigen Klammern.
+
+**Tests:** `node tests/daten.test.mjs` (Node: falsches `fetch` und der echte Ereignis-Bus; Browser: die echte App mit
+abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
+in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
+(`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
