@@ -1101,20 +1101,27 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
 - Komfort (Einstellungen aus PLAN 4, die Partie verdrahtet sie): `setzeBestaetigen(bool)` (Vorschau: erster
   Tipp/Abwurf stellt die Figur halb durchsichtig aufs Ziel, zweiter Tipp aufs Ziel macht fest, erst dann `beiZug`;
   Tipp anderswo nimmt zurueck und tut sonst nichts, ausser er trifft eine eigene ziehbare Figur, die er waehlt; kein
-  `beiLeer`), `setzeStellung` und `erlaubeZuege` raeumen eine Vorschau weg), `setzeAutoDame(bool)`
+  `beiLeer`), `setzeStellung` und `erlaubeZuege` raeumen eine Vorschau weg; was die Vorschau schlagen wuerde (auch en
+  passant), ist solange `.figur.verdeckt`, ein Abzeichen auf dem verlassenen oder geschlagenen Feld `.verdeckt`
+  (visibility)), `setzeAutoDame(bool)`
   (450 ms auf dem Zielfeld halten, auch beim Ziehen, zeigt D T L S; verrutscht der Finger ueber 8 px, zaehlt das
   Loslassen auf dem Zielfeld als Tipp = Dame), `setzeSteuerung('beides' | 'ziehen' | 'tippen')`,
   `setzeTurmRochade(bool)` zusammen mit `zielKarte(chess, { turmRochade })`, `setzeDauer(ms)` und `gleitDauer()`
   (Dauer mal Tempo; der Zug-Klang gehoert auf die Landung), `setzeKoordLage('ecke' | 'rand')`.
 - Flos Pfeile und Marken (`pfeile`-Einstellung, `setzePfeileErlaubt(bool)`): Maus Rechtsklick ziehen = Pfeil,
   Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett ohne Auswahl loescht alles; Finger 400 ms
-  halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht. Nie aus einer eigenen Zug-Geste: ein Finger auf
-  einer Figur, die ziehen darf (auch als Vorzug), bleibt Tippen/Ziehen, auch wenn er lange liegt; Malen per Finger
-  beginnt auf leeren Feldern, gegnerischen Figuren und eigenen Figuren ohne Zug. Ein zweiter Finger bricht ab.
+  halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht. Das gilt auch auf der eigenen Figur, die
+  gerade ziehen darf (auch als Vorzug, waehrend der Bot zieht), damit Flo seinen Plan einzeichnen kann: liegt der Finger
+  dort 400 ms still, gehen Zielpunkte und Anheben aus (malbereit), Ziehen malt den Pfeil und die Figur bleibt stehen;
+  Loslassen ohne Ziehen bleibt ein Tipp (Auswahl, keine Marke). Wer sofort zieht (8 px vor Ablauf der 400 ms), zieht
+  die Figur. Nie aus einer laufenden Zug-Geste: Finger zieht schon, eine andere Figur ist gewaehlt (Tipp-Tipp) oder eine
+  Vorschau wurde eben zurueckgenommen. Ein zweiter Finger bricht ab.
   Pfeile in `svg.brett-nutzer` ueber den Figuren (`g.pfeil[data-von][data-nach]`), Marken in
   `svg.brett-nutzer.brett-marken` unter den Figuren (`rect.marke[data-feld]`), Farben `--pfeil-nutzer`/`--marke-nutzer`,
   getrennt von den Coach-Pfeilen: `pfeile([])` der Partie loescht Flos
   Zeichnungen nicht. `nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }]`, `loescheNutzerPfeile()`.
+  Flos Zeichnungen bleiben ueber `setzeStellung` stehen; ob sie nach einem Zug oder beim Blaettern in der Analyse
+  verschwinden, entscheidet die Partie bzw. Analyse (dann `loescheNutzerPfeile()` rufen).
   `contextmenu` am Brett ist unterdrueckt. Ausserhalb des Bretts losgelassen bricht eine Zeichnung ab. Die
   Zeiger-Ereignisse einer Zeichen-Geste (Rechtsklick-Druck, Bewegen, Loslassen) gehen nicht an die Umgebung
   (`stopPropagation`, sonst sprang das Wischen der Analyse beim waagrechten Pfeil); Capture-Lauscher sehen sie.
