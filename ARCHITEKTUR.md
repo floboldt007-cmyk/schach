@@ -474,7 +474,7 @@ diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete bin
 |---|---|---|---|
 | `arena:kopf` | `.kopf-chips` selbst | nach den Chips Sterne und Pokal | einmal beim Aufbau |
 | `arena:panel-oben` | `.detail > .ort-panel-oben` | erstes Kind des Panels (vor „Offene Partie“), zuerst die Nachlese | bei jedem `zeigeDetail()` (Botwahl) |
-| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (im Handy-Hochformat nur mit „Mehr“ sichtbar wie die Ziele) | bei jedem `zeigeDetail()` |
+| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (seit U5 in jeder Lage sichtbar, das Panel scrollt) | bei jedem `zeigeDetail()` |
 | `arena:start` | keiner (Aufruf) | nach dem ersten `layout()` und der Freischalt-Animation | einmal; `verlasse()` beim Screen-Wechsel |
 | `arena:karte-boss`, `arena:karte-event` | `.welt > .ort-karte-boss` bzw. `.ort-karte-event` (absolut, Mitte am Platz) | auf der Karte (Zelt bzw. Burgturm), ohne Anbieter `hidden` | einmal beim Aufbau |
 | `partie:begruessung?` | Wahl | `partie.js` vor der Begruessungs-Blase; ebenso die Sprechblase im Arena-Panel (`farbe` dort `null` bei Zufall, `modus` `'normal'`) | Start einer Partie bzw. Botwahl |

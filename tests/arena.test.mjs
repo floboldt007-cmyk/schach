@@ -405,6 +405,8 @@ async function testeKarteQuer(browser) {
     && /bK\.svg/.test(document.querySelector('.flo-figur image').getAttribute('href'))));
   await tippe(seite, '.knoten[data-bot="rudi"]');
   await warte(600);
+  // Meldungen der Sperr-Tipps vor dem Bild entfernen (sonst verdecken sie Schilder am unteren Kartenrand)
+  await seite.evaluate(() => { for (const t of document.querySelectorAll('.toast')) t.remove(); });
   await bild(seite, 'arena-1180x820-hell');
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
@@ -700,7 +702,7 @@ async function testeDuell(browser) {
   // besondere: Boss -> voll; Revanche nach einer gespeicherten Partie -> kurz
   gruppe = 'Duell besondere';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_BOSS, einstellungen: { duellIntro: 'besondere', klang: false } });
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, schema: 'dark', saat: SAAT_BOSS, einstellungen: { duellIntro: 'besondere', klang: false } });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="stockfisch"]');
     await warte(800);
@@ -709,6 +711,8 @@ async function testeDuell(browser) {
     await seite.waitForSelector('.duell.voll', { timeout: 5000 });
     const b = await seite.evaluate(() => ({ anlass: document.querySelector('.duell').dataset.anlass, chip: (document.querySelector('.duell-chip') || {}).textContent }));
     pruefe('Endgegner: Anlass boss, volle Buehne mit Chip „Stufe 10 · Endgegner“', b.anlass === 'boss' && b.chip === 'Stufe 10 · Endgegner', JSON.stringify(b));
+    await warte(300);
+    await bild(seite, 'duell-boss-1180x820-dunkel');
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
