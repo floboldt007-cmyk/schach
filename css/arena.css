@@ -1,5 +1,316 @@
 /* ============================================================
-   Schach-Arena · Arena: Leiter-Treppe und Detail-Panel (Premium-Umbau, Look A)
-   Angelegt von U1 (leer), gefuellt von Paket U5 (PLAN 2.2).
-   Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Schach-Arena · Arena: Weltkarte und Detail-Panel (Premium-Umbau, Look A)
+   Angelegt von U1 (leer), gefuellt von Paket U5 (PLAN 2.2; Flo 18.10.: Weltkarte aus Entwurf C statt Treppe).
+   Struktur: js/ui/arena.js (section.screen.arena > .inhalt > .karte > .welt > svg.welt-svg + button.stufe.knoten ...
+   und aside.detail). Lagen (Klasse am Screen, js/ui/arena.js layout()):
+     .karte-quer  iPad quer: Karte links, passt ganz (kein Scrollen), Panel rechts (scrollt selbst)
+     .karte-hoch  iPad hoch und Handy: Karte oben, senkrecht scrollbar, Panel darunter, die Seite (.inhalt) scrollt,
+                  der Spielen-Knopf klebt unten (position: sticky) ueber der Reiter-Pille
+   Bedienung (Stationen, Schilder, Sterne, Schloss, Fahne, Panel) nur mit Tokens aus css/tokens.css und
+   css/themes/<id>.css. Die Karte selbst ist ein Bild und hat ihre eigene Palette --welt-* (hell: Sommertag,
+   dunkel: Abendstimmung, gedaempft). Nur hier duerfen feste Farben stehen.
    ============================================================ */
+
+/* ---------- Palette der Weltkarte (hell) ---------- */
+.arena {
+  --welt-himmel: #BFE0F7; --welt-wolke: rgba(255, 255, 255, .78);
+  --welt-berg: #A9B7D8; --welt-berg-2: #93A3CB; --welt-schnee: #FFFFFF;
+  --welt-strand: #F7E4B5;
+  --welt-gras: #A6D683; --welt-gras-2: #B2DC8F; --welt-gras-3: #BFE29C; --welt-gras-4: #CBE7A9;
+  --welt-laub: #5DB866; --welt-laub-2: #6CC070; --welt-laub-3: #79C97A;
+  --welt-tanne: #3E9A68; --welt-tanne-2: #4AAA74;
+  --welt-stamm: #9A6A43; --welt-stamm-2: #8A5E3B;
+  --welt-wasser: #8FD3EF; --welt-glanz: rgba(255, 255, 255, .55);
+  --welt-wand: #FFF3E0; --welt-wand-2: #FFF6E6;
+  --welt-dach: #E14E6E; --welt-dach-2: #7A6250; --welt-dach-3: #E25B45; --welt-kuppel: #8597EA;
+  --welt-tuer: #6B5B4B; --welt-tuer-2: #3E8E6A; --welt-fenster: #8FD3EF; --welt-saeule: #E9DFCB;
+  --welt-stein: #C9CCDA; --welt-stein-2: #5E6A8A; --welt-fahne: #E2483F;
+  --welt-zelt: #E14E6E; --welt-zelt-2: #B5304F;
+  --welt-weg-rand: #DDBF86; --welt-weg: #FFF1CF; --welt-weg-strich: #EBCF97;
+  --welt-zaun: #D9B98A; --welt-ring: #E8875A; --welt-ring-2: #9ED27E;
+  --welt-blume-1: #FFD25A; --welt-blume-2: #FF8FA8; --welt-blume-3: #FFFFFF;
+  --welt-sonne: #F2CF6A; --welt-sonne-2: #DDB24A; --welt-lampe: #FFC531;
+  --welt-schatten: rgba(0, 0, 0, .1); --welt-weiss: rgba(255, 255, 255, .2);
+}
+/* ---------- Abendstimmung (dunkel): tiefer Himmel, gedaempftes Gruen, erleuchtete Fenster ---------- */
+:root[data-modus="dunkel"] .arena {
+  --welt-himmel: #2B3550; --welt-wolke: rgba(255, 255, 255, .16);
+  --welt-berg: #4C5674; --welt-berg-2: #3E4760; --welt-schnee: #D8DCE8;
+  --welt-strand: #B99A6E;
+  --welt-gras: #5E8A4E; --welt-gras-2: #65934F; --welt-gras-3: #6E9C57; --welt-gras-4: #78A560;
+  --welt-laub: #3E8A4C; --welt-laub-2: #47934F; --welt-laub-3: #4E9A55;
+  --welt-tanne: #2D6E4C; --welt-tanne-2: #357A55;
+  --welt-stamm: #6E4A2E; --welt-stamm-2: #624128;
+  --welt-wasser: #4E86B0; --welt-glanz: rgba(255, 255, 255, .25);
+  --welt-wand: #D9C8AC; --welt-wand-2: #DCCDB4;
+  --welt-dach: #A63A52; --welt-dach-2: #5A4639; --welt-dach-3: #A8432F; --welt-kuppel: #5C6AB0;
+  --welt-tuer: #4A3F35; --welt-tuer-2: #2E6A50; --welt-fenster: #F2C96A; --welt-saeule: #B8AE98;
+  --welt-stein: #8A8FA3; --welt-stein-2: #46506A; --welt-fahne: #B23A33;
+  --welt-zelt: #A63A52; --welt-zelt-2: #7F2438;
+  --welt-weg-rand: #9E8A62; --welt-weg: #D9C7A0; --welt-weg-strich: #B8A479;
+  --welt-zaun: #9E8862; --welt-ring: #B86A46; --welt-ring-2: #6E9A58;
+  --welt-blume-1: #D1AC48; --welt-blume-2: #C8728A; --welt-blume-3: #CFCFCF;
+  --welt-sonne: #E8E2C8; --welt-sonne-2: #CFC8A8; --welt-lampe: #FFC531;
+  --welt-schatten: rgba(0, 0, 0, .25); --welt-weiss: rgba(255, 255, 255, .12);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .arena {
+    --welt-himmel: #2B3550; --welt-wolke: rgba(255, 255, 255, .16);
+    --welt-berg: #4C5674; --welt-berg-2: #3E4760; --welt-schnee: #D8DCE8;
+    --welt-strand: #B99A6E;
+    --welt-gras: #5E8A4E; --welt-gras-2: #65934F; --welt-gras-3: #6E9C57; --welt-gras-4: #78A560;
+    --welt-laub: #3E8A4C; --welt-laub-2: #47934F; --welt-laub-3: #4E9A55;
+    --welt-tanne: #2D6E4C; --welt-tanne-2: #357A55;
+    --welt-stamm: #6E4A2E; --welt-stamm-2: #624128;
+    --welt-wasser: #4E86B0; --welt-glanz: rgba(255, 255, 255, .25);
+    --welt-wand: #D9C8AC; --welt-wand-2: #DCCDB4;
+    --welt-dach: #A63A52; --welt-dach-2: #5A4639; --welt-dach-3: #A8432F; --welt-kuppel: #5C6AB0;
+    --welt-tuer: #4A3F35; --welt-tuer-2: #2E6A50; --welt-fenster: #F2C96A; --welt-saeule: #B8AE98;
+    --welt-stein: #8A8FA3; --welt-stein-2: #46506A; --welt-fahne: #B23A33;
+    --welt-zelt: #A63A52; --welt-zelt-2: #7F2438;
+    --welt-weg-rand: #9E8A62; --welt-weg: #D9C7A0; --welt-weg-strich: #B8A479;
+    --welt-zaun: #9E8862; --welt-ring: #B86A46; --welt-ring-2: #6E9A58;
+    --welt-blume-1: #D1AC48; --welt-blume-2: #C8728A; --welt-blume-3: #CFCFCF;
+    --welt-sonne: #E8E2C8; --welt-sonne-2: #CFC8A8; --welt-lampe: #FFC531;
+    --welt-schatten: rgba(0, 0, 0, .25); --welt-weiss: rgba(255, 255, 255, .12);
+  }
+}
+
+/* ---------- Layout: Kopf (seite.js), Inhalt mit Karte und Panel ---------- */
+.arena { --panel: clamp(360px, 34vw, 404px); --karte-h: clamp(380px, 56vh, 700px); }
+.arena .inhalt { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--panel); gap: 24px; padding: 12px var(--rand) 24px; }
+.arena.karte-hoch .inhalt { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain; scrollbar-width: none; }
+.arena.karte-hoch .inhalt::-webkit-scrollbar { display: none; }
+
+/* ---------- Karte ---------- */
+.arena .karte { position: relative; min-height: 0; border-radius: var(--r-xl); overflow: hidden; outline: none;
+  background: var(--welt-gras); box-shadow: var(--s2), var(--kante); }
+.arena.karte-hoch .karte { flex: none; height: var(--karte-h); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; scrollbar-width: none; }
+.arena.karte-hoch .karte::-webkit-scrollbar { display: none; }
+.arena .welt { position: relative; width: 100%; height: 100%; --kn-basis: 76px; }
+.arena .welt-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* feiner heller Rand innen wie ein Passepartout */
+.arena .karte::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 1px var(--welt-weiss); z-index: 6; }
+
+/* Farben der Zeichnung (Klassen im SVG, js/ui/arena.js weltSvg) */
+.welt-svg .w-himmel { fill: var(--welt-himmel); }
+.welt-svg .w-wolke { fill: none; stroke: var(--welt-wolke); stroke-width: 3; stroke-linecap: round; }
+.welt-svg .w-berg { fill: var(--welt-berg); } .welt-svg .w-berg-2 { fill: var(--welt-berg-2); } .welt-svg .w-schnee { fill: var(--welt-schnee); }
+.welt-svg .w-strand { fill: var(--welt-strand); }
+.welt-svg .w-gras { fill: var(--welt-gras); } .welt-svg .w-gras-2 { fill: var(--welt-gras-2); }
+.welt-svg .w-gras-3 { fill: var(--welt-gras-3); } .welt-svg .w-gras-4 { fill: var(--welt-gras-4); }
+.welt-svg .w-laub { fill: var(--welt-laub); } .welt-svg .w-laub-2 { fill: var(--welt-laub-2); } .welt-svg .w-laub-3 { fill: var(--welt-laub-3); }
+.welt-svg .w-tanne { fill: var(--welt-tanne); } .welt-svg .w-tanne-2 { fill: var(--welt-tanne-2); }
+.welt-svg .w-stamm { fill: var(--welt-stamm); } .welt-svg .w-stamm-2 { fill: var(--welt-stamm-2); }
+.welt-svg .w-wasser { fill: var(--welt-wasser); } .welt-svg .w-glanz { fill: var(--welt-glanz); }
+.welt-svg .w-glanz-linie { fill: none; stroke: var(--welt-glanz); stroke-width: 1.4; }
+.welt-svg .w-wand { fill: var(--welt-wand); } .welt-svg .w-wand-2 { fill: var(--welt-wand-2); }
+.welt-svg .w-dach { fill: var(--welt-dach); } .welt-svg .w-dach-2 { fill: var(--welt-dach-2); } .welt-svg .w-dach-3 { fill: var(--welt-dach-3); }
+.welt-svg .w-kuppel { fill: var(--welt-kuppel); }
+.welt-svg .w-tuer { fill: var(--welt-tuer); } .welt-svg .w-tuer-2 { fill: var(--welt-tuer-2); }
+.welt-svg .w-fenster { fill: var(--welt-fenster); } .welt-svg .w-saeule { fill: var(--welt-saeule); }
+.welt-svg .w-stein { fill: var(--welt-stein); } .welt-svg .w-stein-2 { fill: var(--welt-stein-2); }
+.welt-svg .w-fahne { fill: var(--welt-fahne); } .welt-svg .w-mast { fill: none; stroke: var(--welt-tuer); stroke-width: 2; }
+.welt-svg .w-zelt { fill: var(--welt-zelt); } .welt-svg .w-zelt-2 { fill: var(--welt-zelt-2); }
+.welt-svg .w-weg-rand { fill: none; stroke: var(--welt-weg-rand); stroke-linecap: round; stroke-linejoin: round; }
+.welt-svg .w-weg { fill: none; stroke: var(--welt-weg); stroke-linecap: round; stroke-linejoin: round; }
+.welt-svg .w-weg-strich { fill: none; stroke: var(--welt-weg-strich); stroke-linecap: round; }
+.welt-svg .w-fortschritt, .welt-svg .w-fortschritt-neu { fill: none; stroke: var(--akzent); stroke-linecap: round; stroke-linejoin: round; }
+.welt-svg .w-zaun { fill: none; stroke: var(--welt-zaun); stroke-width: 3; stroke-linecap: round; }
+.welt-svg .w-ring { fill: var(--welt-ring); } .welt-svg .w-ring-2 { fill: var(--welt-ring-2); }
+.welt-svg .w-blume-1 { fill: var(--welt-blume-1); } .welt-svg .w-blume-2 { fill: var(--welt-blume-2); } .welt-svg .w-blume-3 { fill: var(--welt-blume-3); }
+.welt-svg .w-sonne { fill: var(--welt-sonne); } .welt-svg .w-sonne-2 { fill: none; stroke: var(--welt-sonne-2); stroke-width: 2; }
+.welt-svg .w-lampe { fill: var(--welt-lampe); }
+.welt-svg .w-schatten { fill: var(--welt-schatten); } .welt-svg .w-weiss { fill: var(--welt-weiss); }
+
+/* ---------- Stationen (button.stufe.knoten[data-bot]) ---------- */
+.arena .knoten { --kn: var(--kn-basis); --bf: var(--linie-2); position: absolute; width: var(--kn); height: var(--kn);
+  margin: calc(var(--kn) / -2) 0 0 calc(var(--kn) / -2); padding: 0; border: 0; background: none; color: inherit; font: inherit;
+  cursor: pointer; z-index: 2; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.arena .knoten.aktuell { --kn: calc(var(--kn-basis) * 1.22); z-index: 3; }
+.arena .knoten.boss { --kn: calc(var(--kn-basis) * 1.1); }
+.arena .knoten.boss.aktuell { --kn: calc(var(--kn-basis) * 1.3); }
+.arena .knoten.gewaehlt { z-index: 4; }
+.arena .knoten .avatar { --g: auto; position: absolute; inset: 0; width: auto; height: auto; border: 0; border-radius: 50%; overflow: hidden;
+  display: block; padding: 0; background: var(--flaeche-2);
+  box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 5px var(--bf), var(--s2);
+  transition: box-shadow var(--d-m) var(--sanft), transform var(--d-m) var(--feder); }
+.arena .knoten .avatar img { width: 100%; height: 100%; display: block; image-rendering: auto; transition: opacity var(--d-l) var(--sanft), filter var(--d-l) var(--sanft); }
+.arena .knoten:not(.aktuell):active .avatar { transform: scale(.94); }
+/* Zustaende: besiegt = Tinte mit Sternen, naechster Gegner = Zinnober mit Fahne, gesperrt = hell mit Schloss */
+.arena .knoten.besiegt { --bf: var(--tinte); }
+.arena .knoten.aktuell { --bf: var(--akzent); }
+.arena .knoten.gesperrt { --bf: var(--linie-2); }
+.arena .knoten.gesperrt .avatar { background: var(--flaeche-3); box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 4px var(--linie-2), var(--s1); }
+.arena .knoten.gesperrt .avatar img { filter: grayscale(1) contrast(.9); opacity: .55; }
+/* Endgegner gesperrt: Silhouette (tests/app.test.mjs verlangt brightness(0)), erst beim Freischalten das Gesicht */
+.arena .knoten.boss.gesperrt .avatar img { filter: brightness(0) invert(.35); opacity: .7; }
+.arena .knoten.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), var(--s3); animation: atmen 2.6s var(--sanft) infinite; }
+.arena .knoten.gewaehlt .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--bf), 0 0 0 11px var(--flaeche), var(--s3); }
+.arena .knoten.gewaehlt.aktuell .avatar { box-shadow: 0 0 0 3px var(--flaeche), 0 0 0 6px var(--akzent), 0 0 0 11px var(--flaeche), var(--s3); }
+@keyframes atmen { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+/* Nummer unten links, Schloss unten rechts (ausserhalb des runden Portraets) */
+.arena .knoten .k-nr { position: absolute; left: -7px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--display); font-weight: var(--gw-titel); font-size: 13px; line-height: 1; color: var(--auf-tinte); background: var(--tinte);
+  box-shadow: 0 0 0 2.5px var(--flaeche), var(--s1); z-index: 2; pointer-events: none; }
+.arena .knoten.aktuell .k-nr { background: var(--akzent); color: var(--auf-akzent); }
+.arena .knoten.gesperrt .k-nr { background: var(--flaeche-3); color: var(--text-2); box-shadow: 0 0 0 2px var(--flaeche); }
+.arena .knoten .schloss { position: absolute; right: -7px; bottom: -4px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--flaeche); color: var(--text-2); box-shadow: var(--s1), var(--kante); z-index: 2; pointer-events: none; }
+.arena .knoten .schloss .ico { width: 15px; height: 15px; }
+/* Sterne ueber der Station */
+.arena .knoten .k-sterne { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); display: flex; gap: 1px; padding: 3px 6px;
+  border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); z-index: 3; pointer-events: none; }
+.arena .knoten .k-sterne .ico { width: 14px; height: 14px; }
+.arena .knoten .k-sterne .stern { color: var(--gold); }
+.arena .knoten .k-sterne .aus { color: var(--linie-2); }
+/* Namensschild unter der Station: Pille, gewaehlt in Tinte */
+.arena .knoten .k-schild { position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); display: inline-flex; align-items: baseline; gap: 5px;
+  white-space: nowrap; padding: 3px 10px 4px; border-radius: var(--r-pille); background: var(--flaeche); color: var(--text);
+  font-size: 13px; font-weight: var(--gw-titel); line-height: 1.2; box-shadow: var(--s1), var(--kante); pointer-events: none; z-index: 2;
+  transition: background-color var(--d-s) var(--sanft), color var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
+.arena .knoten .k-meta { font-size: 11px; font-weight: 700; color: var(--text-2); }
+.arena .knoten.gesperrt .k-schild { color: var(--text-2); }
+.arena .knoten.gewaehlt .k-schild { background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s2); }
+.arena .knoten.gewaehlt .k-meta { color: var(--auf-tinte); opacity: .72; }
+/* Fahne "Naechster Gegner" ueber der aktuellen Station */
+.arena .knoten .fahne { position: absolute; left: 50%; bottom: calc(100% + 13px); transform: translateX(-50%); white-space: nowrap; padding: 5px 11px 6px;
+  border-radius: 10px; font-size: 11px; font-weight: var(--gw-titel); letter-spacing: .1em; color: var(--auf-akzent); background: var(--akzent);
+  box-shadow: var(--s2); z-index: 4; pointer-events: none; }
+.arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
+/* Endgegner: Krone ueber der Station (ueber der Fahne, wenn er der naechste ist) */
+.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 2px 9px 3px;
+  border-radius: var(--r-pille); font-size: 10.5px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
+  box-shadow: var(--kante); z-index: 3; pointer-events: none; }
+.arena .knoten.besiegt .boss-krone { bottom: calc(100% + 30px); }
+.arena .knoten.aktuell .boss-krone { bottom: calc(100% + 46px); }
+/* Tipp auf eine gesperrte Station: kurzes Ruetteln */
+.arena .knoten.ruettel .avatar { animation: ruettel .45s var(--sanft); }
+@keyframes ruettel { 20% { transform: translateX(-5px) rotate(-3deg); } 40% { transform: translateX(5px) rotate(3deg); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+/* Freischalten (js/ui/arena.js freischalten(): Web-Animationen): bis das Schloss abspringt, bleibt die Station grau */
+.arena .knoten.wird-frei .avatar img { filter: grayscale(1) contrast(.9); opacity: .55; }
+.arena .knoten.wird-frei .fahne { opacity: 0; }
+.arena .knoten.wird-frei.frei .avatar img { filter: none; opacity: 1; }
+
+/* Flos Figur auf dem Pfad (sein Koenig auf Schiefer, thema.floAvatar) */
+.arena .flo-figur { position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; overflow: hidden; z-index: 4; pointer-events: none;
+  box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 4px var(--flo-grund), var(--s2); }
+.arena .flo-figur svg { width: 100%; height: 100%; display: block; }
+/* Plaetze auf der Karte fuer spaeter (Orte arena:karte-boss am Zelt, arena:karte-event an der Fahne) */
+.arena .ort-karte-boss, .arena .ort-karte-event { position: absolute; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.arena .ort-karte-boss[hidden], .arena .ort-karte-event[hidden] { display: none; }
+
+/* ---------- Detail-Panel (aside.detail) ---------- */
+.arena .detail { position: relative; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 22px 22px 0; border-radius: var(--r-xl);
+  background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s3), var(--kante);
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; }
+.arena .detail::-webkit-scrollbar { display: none; }
+.arena .detail > *, .arena .detail-links > *, .arena .detail-rechts > * { flex-shrink: 0; }
+.arena .detail-links, .arena .detail-rechts { display: contents; }
+.arena .detail-kopf { display: flex; gap: 16px; align-items: center; min-width: 0; }
+.arena .detail-kopf .av { width: 84px; height: 84px; flex: none; border-radius: 26px; overflow: hidden; background: var(--flaeche-2); box-shadow: var(--s1), var(--kante); }
+.arena .detail-kopf .av img { width: 100%; height: 100%; display: block; }
+.arena .detail-name { min-width: 0; }
+.arena .detail-ueber { margin-bottom: 5px; }
+.arena .detail-ueber.akz { color: var(--akzent-text); }
+.arena .detail h2 { margin: 0; font-size: 28px; color: var(--text); overflow-wrap: anywhere; }
+.arena .detail .elo { margin-top: 5px; font-size: 14px; font-weight: 650; color: var(--text-2); }
+.arena .mini-sterne { display: inline-flex; gap: 2px; margin-top: 6px; vertical-align: middle; }
+.arena .mini-sterne .ico { width: 15px; height: 15px; }
+.arena .mini-sterne .stern { color: var(--gold); }
+.arena .mini-sterne .aus { color: var(--linie-2); }
+/* Spruch-Karte (Hook .sprechblase bleibt; Optik nach A, keine CSS-Animation: das Panel wechselt gestaffelt per JS) */
+.arena .detail .sprechblase { margin-top: 2px; padding: 13px 15px; border: 0; border-radius: 18px; background: var(--flaeche-2); box-shadow: var(--kante);
+  color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.4; animation: none; transform-origin: 32px 0; }
+.arena .detail .sprechblase::before { top: -7px; left: 32px; width: 14px; height: 14px; border: 0; border-radius: 3px 0 0 0; background: var(--flaeche-2);
+  box-shadow: -1px -1px 0 0 var(--linie); transform: rotate(45deg); }
+/* Steckbrief: drei Kacheln */
+.arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
+.arena .m-label { display: block; font-size: 11.5px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
+.arena .m-wert { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text); }
+.arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
+.arena .m-figur img { width: 20px; height: 20px; }
+/* Bedingungen: drei Sterne (Hook .ziel-sterne > div, .an) */
+.arena .ziel-sterne { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.arena .ziel-sterne > div { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 650; color: var(--text-2); line-height: 1.2; }
+.arena .ziel-sterne b { display: flex; flex: none; color: var(--linie-2); }
+.arena .ziel-sterne b .ico { width: 17px; height: 17px; }
+.arena .ziel-sterne .an { color: var(--text); }
+.arena .ziel-sterne .an b { color: var(--gold); }
+/* Wahl: Farbe als Segment (js/ui/bauteile.js), Platz fuer die Bedenkzeit (W0+b fuellt .ort-tempo) */
+.arena .wahl-titel { font-size: 13px; font-weight: var(--gw-stark); color: var(--text-2); margin-bottom: 8px; }
+.arena .farbwahl .seg img { width: 24px; height: 24px; }
+.arena .farbwahl .seg .fig-paar { display: flex; }
+.arena .farbwahl .seg .fig-paar img + img { margin-left: -10px; }
+.arena .ort-tempo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.arena .ort-tempo[hidden] { display: none; }
+/* Hauptaktion: klebt am unteren Rand des Panels (quer) bzw. der Seite (hoch), nie unter der Reiter-Pille */
+.arena .cta-platz { position: sticky; bottom: 0; z-index: 5; margin: auto -22px 0; padding: 10px 22px 18px; background-color: var(--flaeche); }
+.arena .spielen { width: 100%; min-height: 64px; font-size: 18px; border-radius: 20px; justify-content: space-between; padding: 0 18px 0 22px; gap: 10px; }
+.arena .spielen .sp-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.arena .spielen .pf { flex: none; width: 36px; height: 36px; border-radius: 12px; background: rgba(255, 255, 255, .18); display: grid; place-items: center; }
+.arena .spielen .pf .ico { width: 20px; height: 20px; }
+/* Bilanz */
+.arena .bilanz { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 0 18px; border-top: 1px solid var(--linie); }
+.arena .bilanz div { text-align: center; min-width: 0; }
+.arena .bilanz b { display: block; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
+.arena .bilanz span { font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; white-space: nowrap; }
+/* Offene Partie */
+.arena .fortsetzen { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px; border-radius: 16px;
+  background: var(--flaeche-2); box-shadow: var(--kante); }
+.arena .fortsetzen .avatar { --g: 44px; border: 0; border-radius: 12px; overflow: hidden; background: var(--flaeche-3); box-shadow: var(--kante); }
+.arena .fortsetzen .avatar img { width: 100%; height: 100%; image-rendering: auto; }
+.arena .fortsetzen .ft-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.arena .fortsetzen .ft-text b { white-space: nowrap; }
+.arena .fortsetzen .ft-text span { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena .fortsetzen .knopf { padding: 0 14px; font-size: 15px; }
+
+/* ---------- Hochformat (iPad hoch, Handy): Karte oben, Panel darunter, die Seite scrollt ---------- */
+.arena.karte-hoch .detail { flex: none; overflow: visible; }
+.arena.karte-hoch .cta-platz { bottom: 0; }
+@media (min-width: 700px) {
+  /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt */
+  .arena.karte-hoch .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; align-items: start; padding-bottom: 0; }
+  .arena.karte-hoch .detail > .ort-panel-oben, .arena.karte-hoch .detail > .heute-karte, .arena.karte-hoch .detail > .fortsetzen { grid-column: 1 / -1; }
+  .arena.karte-hoch .detail-links, .arena.karte-hoch .detail-rechts { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .arena.karte-hoch .cta-platz { margin: 0 -22px 0; }
+  .arena.karte-hoch .bilanz { border-top: 0; padding-top: 0; }
+}
+/* kurze Querformate (Handy quer, unter 420 px Kartenhoehe): js/ui/arena.js layout() waehlt .karte-hoch, die Karte
+   scrollt also auch hier senkrecht und das Panel steht darunter (die Seite scrollt) */
+
+/* ---------- Handy ---------- */
+@media (max-width: 700px) {
+  .arena { --karte-h: clamp(260px, 46vh, 460px); }
+  .arena .inhalt { padding: 0 var(--rand) 12px; gap: 12px; }
+  .arena .detail { padding: 16px 16px 0; gap: 14px; border-radius: var(--r-l); }
+  .arena .detail-kopf { gap: 12px; }
+  .arena .detail-kopf .av { width: 68px; height: 68px; border-radius: 20px; }
+  .arena .detail h2 { font-size: 24px; }
+  .arena .detail .elo { font-size: 13px; }
+  .arena .detail .sprechblase { font-size: 14.5px; }
+  .arena .merkmale { gap: 6px; }
+  .arena .merkmal { padding: 8px 10px; }
+  .arena .m-wert { font-size: 13px; }
+  .arena .ziel-sterne > div { font-size: 12px; }
+  .arena .cta-platz { margin: auto -16px 0; padding: 8px 16px 14px; }
+  .arena .spielen { min-height: 60px; font-size: 17px; }
+  .arena .bilanz { display: none; }
+  .arena .knoten .k-schild { font-size: 12px; padding: 2px 9px 3px; }
+  .arena .knoten .fahne { font-size: 10px; letter-spacing: .08em; padding: 4px 9px 5px; bottom: calc(100% + 10px); }
+  .arena .knoten .boss-krone { font-size: 10px; letter-spacing: .16em; }
+  .arena .knoten .k-nr { width: 23px; height: 23px; font-size: 12px; left: -6px; }
+  .arena .knoten .schloss { width: 25px; height: 25px; right: -6px; }
+  .arena .flo-figur { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+}
+@media (max-width: 380px) {
+  .arena .knoten .k-meta { display: none; }
+}
+
+/* ---------- Weniger Bewegung ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .arena .knoten.aktuell .avatar, .arena .knoten.ruettel .avatar { animation: none; }
+}
