@@ -340,6 +340,15 @@ const blattBereit = (seite, modus) => seite.waitForFunction((m) => {
   return b && b.dataset.bereit === 'ja' && (!m || b.dataset.modus === m);
 }, modus || null, { timeout: 20000 });
 const zustand = (seite) => seite.evaluate(async () => (await import('/js/pakete/teilen/index.js')).zustand());
+// wartet, bis fn() (in Node, darf async sein) wahr wird; true oder nach ms false
+async function bis(fn, ms = 10000) {
+  const ende = Date.now() + ms;
+  while (Date.now() < ende) {
+    if (await fn()) return true;
+    await warte(100);
+  }
+  return false;
+}
 
 async function browserTeil(browser) {
   mkdirSync(BILDER, { recursive: true });
@@ -487,14 +496,14 @@ async function browserTeil(browser) {
     && await seite.locator('.tl-blatt .tl-name .schalter').getAttribute('aria-checked') === 'false', nameZeile);
   pruefe('Schalter aus: kein Name im Bild, keine E-Mail', !n1.texte.some((t) => /FloTest|@|privat/.test(t)) && n1.name === null, n1.texte.join(' | '));
   await seite.locator('.tl-blatt .tl-name .schalter').click();
-  await seite.waitForFunction(async () => (await import('/js/pakete/teilen/index.js')).zustand().name === 'FloTest', null, { timeout: 10000 });
+  await bis(async () => (await zustand(seite)).name === 'FloTest');
   await blattBereit(seite, 'dunkel');
   const n2 = await zustand(seite);
   pruefe('Schalter an: "Gespielt von FloTest" im Bild, nie die E-Mail', n2.texte.includes('Gespielt von FloTest') && !n2.texte.some((t) => /@|privat/.test(t)), n2.texte.join(' | '));
   await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-name.png') });
   await seite.locator('.tl-blatt .tl-name .schalter').click();
-  await seite.waitForFunction(async () => (await import('/js/pakete/teilen/index.js')).zustand().name === null, null, { timeout: 10000 });
+  await bis(async () => (await zustand(seite)).name === null && (await zustand(seite)).bereit);
   const anfragen = await seite.evaluate(() => window.__kontoAnfragen.filter((a) => /profile/.test(a)));
   pruefe('Profil nur gelesen (GET), einmal je Sitzung', anfragen.length === 1 && / GET$/.test(anfragen[0]), JSON.stringify(anfragen));
   await seite.keyboard.press('Escape');
@@ -518,8 +527,34 @@ async function browserTeil(browser) {
   await blattBereit(seite, 'dunkel');
   const p3 = await leinwand(seite);
   pruefe('Analyse: dasselbe Bild (1080 x 1350, Feldfarben aus den Tokens)', p3.w === 1080 && p3.h === 1350 && nah(p3.d3, [...fh, 255]) && nah(p3.e3, [...fd, 255]));
+  // Genauigkeit, die erst nach dem Oeffnen kommt (partie:analysiert), steht gleich im Bild
+  await seite.evaluate(async (id) => {
+    const liste = JSON.parse(localStorage.getItem('schach-arena:v1:partien'));
+    liste.find((x) => x.id === id).genauigkeit = 55.55;
+    localStorage.setItem('schach-arena:v1:partien', JSON.stringify(liste));
+    (await import('/js/ereignisse.js')).sende('partie:analysiert', { partieId: id, botId: 'benno', modus: 'normal', wertet: true, quelle: 'analyse' });
+  }, partie.id);
+  await bis(async () => (await zustand(seite)).texte.includes('55,6 %'));
+  pruefe('partie:analysiert: offenes Bild neu mit der neuen Genauigkeit', (await zustand(seite)).texte.includes('55,6 %'), (await zustand(seite)).texte.join(' | '));
+  // Tasten im Blatt erreichen den Screen dahinter nicht (Gegenprobe nach dem Schliessen: dann schon). Gezaehlt wird
+  // wie die Analyse selbst hoert: keydown am Dokument.
+  await seite.evaluate(() => { window.__tasten = 0; document.addEventListener('keydown', () => { window.__tasten++; }); });
+  const gesehen = () => seite.evaluate(() => window.__tasten);
+  const g0 = await gesehen();
+  for (const t of ['ArrowLeft', 'ArrowLeft', 'ArrowRight', 'Home']) await seite.keyboard.press(t);
+  await warte(250);
+  const g1 = await gesehen();
+  await seite.evaluate(async (id) => {
+    const liste = JSON.parse(localStorage.getItem('schach-arena:v1:partien'));
+    liste.find((x) => x.id === id).genauigkeit = 88.6;
+    localStorage.setItem('schach-arena:v1:partien', JSON.stringify(liste));
+  }, partie.id);
   await seite.locator('.tl-blatt [data-tl="abbrechen"]').click();
   await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
+  for (const t of ['ArrowLeft', 'ArrowLeft']) await seite.keyboard.press(t);
+  await warte(250);
+  const g2 = await gesehen();
+  pruefe('Tasten im Blatt erreichen die Analyse dahinter nicht (danach wieder)', g1 === g0 && g2 === g1 + 2, JSON.stringify({ g0, g1, g2 }));
   // Niederlage und Uebung: kein Knopf (Analyse und Ergebnis)
   const ohne = await seite.evaluate(async (p) => {
     const liste = JSON.parse(localStorage.getItem('schach-arena:v1:partien'));

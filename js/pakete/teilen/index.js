@@ -8,7 +8,8 @@
 // kein Klarname, nichts aus dem Konto ausser dem freiwillig gezeigten Benutzernamen.
 //
 // Orte:       ergebnis:karte (Reihenfolge 60, nach der Abrechnungs-Huelle 3), analyse:oben (Reihenfolge 60)
-// Ereignisse: app:screen (offenes Blatt schliessen), speicher:zurueckgesetzt (gemerkten Benutzernamen vergessen)
+// Ereignisse: app:screen (offenes Blatt schliessen), partie:analysiert (offenes Bild mit der Genauigkeit neu zeichnen),
+//             speicher:zurueckgesetzt (gemerkten Benutzernamen vergessen)
 // Register:   Icon "teilen"
 // Speicher:   Modul "teilen" { v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] } (hoechstens 20)
 //             Einstellungen "teilen" { bild: '' | 'hell' | 'dunkel', name: false } (Wahl im Blatt, bleibt)
@@ -133,7 +134,7 @@ function figurenPfad() {
 export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = null } = {}) {
   schliesseBlatt();
   // die neueste Fassung der Partie (die Genauigkeit kommt oft erst nach dem ersten Fuellen des Ergebnisses)
-  const p = (partieId && ladePartie(partieId)) || partie;
+  let p = (partieId && ladePartie(partieId)) || partie;
   if (!teilbar(p)) return null;
   const gegner = botFuer(p, bot);
   const e = einstellungen();
@@ -295,7 +296,20 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     });
   });
   document.addEventListener('keydown', taste, true);
-  try { abmelden.push(hoere('app:screen', () => ende())); } catch (f) { /* egal */ }
+  // Tasten im Blatt erreichen den Screen dahinter nicht (z. B. Pfeile der Analyse)
+  ort.addEventListener('keydown', (ev) => ev.stopPropagation());
+  try {
+    abmelden.push(hoere('app:screen', () => ende()));
+    // kommt die Analyse der Partie erst jetzt (Ergebnis noch "wird berechnet"), steht die Genauigkeit gleich im Bild
+    abmelden.push(hoere('partie:analysiert', (d) => {
+      if (!d || d.partieId !== p.id) return;
+      setTimeout(() => {
+        if (fertig) return;
+        const frisch = ladePartie(p.id);
+        if (frisch && teilbar(frisch)) { p = frisch; neu(); }
+      }, 0);
+    }));
+  } catch (f) { /* egal */ }
 
   document.body.append(ort);
   offenesBlatt = { ort, ende };

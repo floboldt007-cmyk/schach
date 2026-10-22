@@ -1372,6 +1372,7 @@ Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/
   dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
 - **Speicher:** Modul `teilen` (Budget 2.000) `{ v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] }`
   (hoechstens 20, je Partie eine Zeile); Modul-Einstellungen `teilen` `{ bild: '' | 'hell' | 'dunkel', name: false }`.
-- **Ereignisse:** hoert `app:screen` (Blatt zu) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
+- **Ereignisse:** hoert `app:screen` (Blatt zu), `partie:analysiert` (offenes Bild bekommt die Genauigkeit, die erst
+  nach dem Oeffnen kam) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
   sendet nichts. **Register:** Icon `teilen`. **Test-Schnittstelle:** `zustand()` (offen, modus, bereit, texte, datei,
   weg, name) und `oeffneBlatt({ partie | partieId, bot })`.
