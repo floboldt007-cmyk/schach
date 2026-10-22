@@ -203,6 +203,10 @@ async function testeDesktop(browser) {
   await h.zieheMaus('d2', 'h8', { schritte: 12 });
   await warte(250);
   pruefe('Ziehen ueber den Rand hinaus: zurueck', (await h.figurSitzt('d2')) && (await h.fen()) === fenVorher);
+  // Zeitpunkt: das Zurueckfedern dauert hoechstens 260 ms (mal Tempo); nach 600 ms sitzt die Figur ohne weiteres Warten
+  await h.zieheMaus('d2', 'd5');
+  await warte(600);
+  pruefe('Zurueckschnappen ist nach 600 ms fertig', (await h.figurSitztJetzt('d2')) && (await h.fen()) === fenVorher);
   // zweimal tippen hebt die Auswahl auf
   await h.klickFeld('b1');
   const gewaehlt = (await h.anzahl('.lage.auswahl[data-feld="b1"]')) === 1;
@@ -566,6 +570,9 @@ async function testeTouch(browser) {
   await zieheFinger('d2', 'd6');
   await warte(250);
   pruefe('Illegales Ziehen per Finger: zurueck', (await h.figurSitzt('d2')) && (await h.fen()) === fenVorher);
+  await zieheFinger('d2', 'd6');
+  await warte(600);
+  pruefe('Illegales Ziehen per Finger: nach 600 ms sitzt die Figur', (await h.figurSitztJetzt('d2')) && (await h.fen()) === fenVorher);
 
   // kurzes Wackeln beim Tippen zaehlt nicht als Ziehen
   const a = await h.mitte('b1');
@@ -864,6 +871,24 @@ async function testeOptik(browser) {
   pruefe('Koordinate "a" sitzt unten rechts innerhalb von 20 %', ecke.buchstLinks <= 0.2 && ecke.buchstOben <= 0.2, JSON.stringify(ecke));
   pruefe('Koordinaten Gewicht 700, Groesse 8,5 bis 12 px', ecke.gewicht === '700' && ecke.groesse >= 8.5 && ecke.groesse <= 12, JSON.stringify(ecke));
   pruefe('Koordinaten in der Gegenfeldfarbe', ecke.zahlFarbe === ecke.dunkel && ecke.buchstFarbe === ecke.hell, JSON.stringify(ecke));
+  // Feld unten rechts (h1, gedreht a8): das Brett-Eck ist abgerundet; der Buchstabe (unteres Viertel seiner Box, wo der Fuss
+  // des Zeichens steht) liegt ganz innerhalb des Rundes (Pruefer U6: das "h" wurde angeschnitten), beide Ausrichtungen
+  const imRund = (feld) => seite.evaluate((f) => {
+    const fe = document.querySelector(`.feld[data-feld="${f}"]`);
+    const b = fe.querySelector('.koord.buchst').getBoundingClientRect();
+    const q = fe.getBoundingClientRect();
+    const r = parseFloat(getComputedStyle(document.querySelector('#brett > .brett-felder')).borderBottomRightRadius);
+    const dx = q.right - b.right;
+    const dy = q.bottom - (b.top + b.height * 0.75);
+    const drin = dx >= r || dy >= r || Math.hypot(r - dx, r - dy) <= r;
+    return { drin, dx: +dx.toFixed(2), dy: +dy.toFixed(2), r, ecke: fe.querySelector('.koord.buchst').classList.contains('ecke') };
+  }, feld);
+  const rundW = await imRund('h1');
+  await seite.evaluate(() => demo.brett.setzeAusrichtung('b'));
+  const rundB = await imRund('a8');
+  await seite.evaluate(() => demo.brett.setzeAusrichtung('w'));
+  pruefe('Koordinate im Feld unten rechts bleibt im abgerundeten Brett-Eck (h1, gedreht a8)', rundW.drin && rundB.drin && rundW.ecke && rundB.ecke && rundW.r > 0,
+    JSON.stringify({ rundW, rundB }));
 
   // Koordinaten am Rand: ausserhalb der Felder im Sockel, Sockel links und unten 12 px, Effekt-Ebene bleibt deckungsgleich
   await seite.evaluate(() => demo.brett.setzeKoordLage('rand'));
@@ -1131,6 +1156,60 @@ async function testeKomfort(browser) {
   await h.klickFeld('f3');
   await warte(220);
   pruefe('Bestaetigen: Tipp aufs Ziel nach dem Ziehen macht fest', (await h.figur('f3')) === 'wN' && (await h.fen()).startsWith('rnbqkbnr/pppppppp/8/8/8/5N2/'));
+  // Schlag in der Vorschau: die geschlagene Figur verschwindet (kein Mischklumpen), Zuruecknehmen zeigt sie wieder, Festmachen schlaegt
+  const SCHLAG = 'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+  const aufFeld = (feld) => seite.evaluate((f) => [...document.querySelectorAll(`#brett > img.figur[data-feld="${f}"]`)]
+    .map((el) => el.dataset.figur + ':' + getComputedStyle(el).opacity + (el.classList.contains('vorschau') ? ':vorschau' : '')).sort().join(), feld);
+  await h.setzeFen(SCHLAG);
+  await h.klickFeld('e4');
+  await h.klickFeld('d5');
+  await warte(220);
+  const schlagVorschau = await aufFeld('d5');
+  await h.klickFeld('a3');   // anderswo: zurueck
+  await warte(250);
+  const schlagZurueck = await aufFeld('d5');
+  pruefe('Bestaetigen: in der Vorschau eines Schlags ist die geschlagene Figur unsichtbar, Zuruecknehmen zeigt sie wieder', schlagVorschau === 'bP:0,wP:0.55:vorschau'
+    && schlagZurueck === 'bP:1' && (await h.figurSitzt('e4')) && (await h.fen()) === SCHLAG, JSON.stringify({ schlagVorschau, schlagZurueck }));
+  await h.klickFeld('e4');
+  await h.klickFeld('d5');
+  await warte(120);
+  await h.klickFeld('d5');
+  await warte(300);
+  pruefe('Bestaetigen: der bestaetigte Schlag nimmt die Figur, nichts bleibt verdeckt', (await aufFeld('d5')) === 'wP:1' && (await h.anzahl('#brett > img.figur.verdeckt:not(.geht)')) === 0
+    && (await h.fen()).startsWith('rnbqkbnr/ppp1pppp/8/3P4/8/'));
+  // en passant: der geschlagene Bauer steht nicht auf dem Ziel, verschwindet aber genauso
+  await h.setzeFen(EN_PASSANT);
+  await h.klickFeld('e5');
+  await h.klickFeld('f6');
+  await warte(220);
+  const epVorschau = await aufFeld('f5');
+  await h.klickFeld('a3');
+  await warte(250);
+  pruefe('Bestaetigen: en passant verdeckt den Bauern auf f5 nur waehrend der Vorschau', epVorschau === 'bP:0' && (await aufFeld('f5')) === 'bP:1', epVorschau);
+  // Abzeichen: verlaesst die Vorschau sein Feld, ist es weg; zuruecknehmen zeigt es wieder, festmachen blendet es aus
+  await h.setzeFen(NACH_E4.replace(' b ', ' w '));
+  await seite.evaluate(() => demo.brett.zeigeAbzeichen('e4', 'bester'));
+  await warte(300);
+  const abzeichenSichtbar = () => seite.evaluate(() => {
+    const el = document.querySelector('#brett > .abzeichen-ort[data-feld="e4"]');
+    return el ? getComputedStyle(el).visibility : 'fehlt';
+  });
+  await h.klickFeld('e4');
+  await h.klickFeld('e5');
+  await warte(200);
+  const abzVorschau = await abzeichenSichtbar();
+  await h.klickFeld('a3');
+  await warte(200);
+  const abzZurueck = await abzeichenSichtbar();
+  await h.klickFeld('e4');
+  await h.klickFeld('e5');
+  await warte(120);
+  await h.klickFeld('e5');
+  // das Ausblenden dauert die Gleitdauer; unter Last etwas laenger, deshalb bis 1,5 s warten
+  let abzFest = await abzeichenSichtbar();
+  for (let i = 0; i < 30 && abzFest !== 'fehlt'; i++) { await warte(50); abzFest = await abzeichenSichtbar(); }
+  pruefe('Bestaetigen: Abzeichen auf dem verlassenen Feld ist waehrend der Vorschau weg, zurueck wieder da, nach dem Festmachen weg',
+    abzVorschau === 'hidden' && abzZurueck === 'visible' && abzFest === 'fehlt' && (await h.figur('e5')) === 'wP', JSON.stringify({ abzVorschau, abzZurueck, abzFest }));
   // setzeStellung (Bot) und Abschalten raeumen eine Vorschau weg
   await h.setzeFen(START);
   await h.klickFeld('e2');
@@ -1606,23 +1685,84 @@ async function testePfeile(browser) {
   nt = await nutzer(s);
   pruefe('Finger: eigene Figur ohne Zug (Ta1) halten markiert das Feld, kein Zug', nt.marken.join() === 'a1' && nt.liste.length === 1 && (await ht.fen()) === START
     && (await ht.anzahl('.lage.auswahl')) === 0, JSON.stringify(nt));
-  // eine eigene Figur, die ziehen darf, bleibt immer eine Zug-Geste: lange halten (nachdenken) und dann ziehen ergibt den Zug,
-  // nie einen Pfeil (sonst ginge ein Zug in einer Partie mit Uhr verloren)
+  // Flos Plan auf der eigenen Figur, die ziehen darf (Pruefer U6: sonst in der Partie mit Vorzuegen nie moeglich): 400 ms still
+  // halten, dann ziehen = Pfeil. Vor Ablauf ist es die normale Zug-Geste (gewaehlt, angehoben, Zielpunkte), danach gehen
+  // Zielpunkte und Anheben aus (malbereit), die Auswahl bleibt. Sofort ziehen bleibt ein Zug (Pruefung weiter unten).
+  const eigenZustand = (feld) => s.evaluate((f) => ({ auswahl: document.querySelectorAll(`.lage.auswahl[data-feld="${f}"]`).length,
+    ziele: document.querySelectorAll('.lage.ziel').length, angehoben: !!document.querySelector(`#brett > img.figur.angehoben[data-feld="${f}"]`),
+    malt: document.querySelector('#brett').classList.contains('malt'), vorschau: document.querySelectorAll('svg.brett-nutzer .vorschau').length }), feld);
   a = await ht.mitte('e2');
   b = await ht.mitte('e4');
   await finger.runter(a.x, a.y);
   await warte(150);
-  const eigenVor = await zustand();
+  const eigenVor = await eigenZustand('e2');
   await warte(400);
-  const eigenNach = await zustand();
+  const eigenNach = await eigenZustand('e2');
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  const eigenMalt = await eigenZustand('e2');
   await finger.hoch(b.x, b.y);
   await warte(100);
   nt = await nutzer(s);
-  pruefe('Finger: eigene ziehbare Figur 550 ms halten bleibt gewaehlt, das Brett malt nie', eigenVor.auswahl === 1 && !eigenVor.malt && eigenNach.auswahl === 1
-    && !eigenNach.malt && eigenNach.vorschau === 0 && (await ht.anzahl('.lage.auswahl[data-feld="e2"]')) === 0, JSON.stringify({ eigenVor, eigenNach }));
-  pruefe('Finger: danach ziehen ist der Zug e2-e4, kein Pfeil, die Marke bleibt', (await ht.fen()) === NACH_E4 && (await ht.figurSitzt('e4'))
-    && nt.pfeile.length === 0 && nt.marken.join() === 'a1', JSON.stringify(nt));
+  pruefe('Finger: eigene ziehbare Figur vor 400 ms normal gewaehlt, danach malbereit (Auswahl bleibt, Zielpunkte und Anheben aus)',
+    eigenVor.auswahl === 1 && eigenVor.ziele === 2 && eigenVor.angehoben && !eigenVor.malt
+    && eigenNach.auswahl === 1 && eigenNach.ziele === 0 && !eigenNach.angehoben && !eigenNach.malt && eigenNach.vorschau === 0, JSON.stringify({ eigenVor, eigenNach }));
+  pruefe('Finger: eigene ziehbare Figur halten und ziehen malt den Pfeil e2-e4 (Vorschau beim Ziehen), kein Zug, Figur bleibt, die Marke bleibt',
+    eigenMalt.malt && eigenMalt.vorschau === 1 && eigenMalt.auswahl === 0 && nt.pfeile.join() === 'e2e4' && nt.marken.join() === 'a1'
+    && (await ht.fen()) === START && (await ht.figurSitzt('e2')) && (await ht.anzahl('.lage.auswahl')) === 0, JSON.stringify({ eigenMalt, nt }));
+  // lange halten und ohne Ziehen loslassen ist ein Tipp: Auswahl mit Zielpunkten, keine Marke; der Tipp aufs Ziel zieht dann
+  a = await ht.mitte('g1');
+  await finger.runter(a.x, a.y);
+  await warte(550);
+  await finger.hoch(a.x, a.y);
+  await warte(80);
+  const langerTipp = await eigenZustand('g1');
+  nt = await nutzer(s);
+  await tippe('f3');
+  await warte(250);
+  pruefe('Finger: eigene Figur lange halten und loslassen bleibt ein Tipp (Auswahl, Zielpunkte, keine Marke), dann zieht der Tipp aufs Ziel',
+    langerTipp.auswahl === 1 && langerTipp.ziele === 2 && langerTipp.angehoben && !langerTipp.malt && nt.marken.join() === 'a1' && nt.pfeile.join() === 'e2e4'
+    && (await ht.figur('f3')) === 'wN' && (await ht.figurSitzt('f3')), JSON.stringify({ langerTipp, nt }));
+  await s.evaluate(() => demo.brett.loescheNutzerPfeile());
+  await ht.setzeFen(START);
+  // malbereit, wieder zurueck aufs Startfeld und loslassen: nichts (kein Pfeil, keine Marke, kein Zug)
+  a = await ht.mitte('d2');
+  b = await ht.mitte('d4');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  for (let i = 1; i <= 4; i++) await finger.bewege(a.x + (b.x - a.x) * i / 4, a.y + (b.y - a.y) * i / 4);
+  for (let i = 3; i >= 0; i--) await finger.bewege(a.x + (b.x - a.x) * i / 4, a.y + (b.y - a.y) * i / 4);
+  const zurueckVorschau = await eigenZustand('d2');
+  await finger.hoch(a.x, a.y);
+  await warte(100);
+  pruefe('Finger: Pfeil von der eigenen Figur zurueck aufs Startfeld gezogen: nichts (keine Marke, kein Zug)', (await nutzer(s)).liste.length === 0
+    && zurueckVorschau.malt && zurueckVorschau.vorschau === 0 && (await ht.fen()) === START && (await ht.figurSitzt('d2')), JSON.stringify(zurueckVorschau));
+  // laufende Tipp-Geste: ist schon eine andere Figur gewaehlt, malt die naechste nie; halten und ziehen ist dann ein Zug
+  await tippe('b1');
+  a = await ht.mitte('g1');
+  b = await ht.mitte('f3');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  const tippLaeuft = await eigenZustand('g1');
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  await finger.hoch(b.x, b.y);
+  await warte(250);
+  pruefe('Finger: mit gewaehlter anderer Figur (Tipp-Geste laeuft) wird nie gemalt, halten und ziehen ist der Zug', tippLaeuft.ziele === 2 && tippLaeuft.angehoben
+    && (await ht.figur('f3')) === 'wN' && (await ht.figurSitzt('f3')) && (await nutzer(s)).liste.length === 0, JSON.stringify(tippLaeuft));
+  // Freigabe waehrend des Haltens (Bot hat gezogen, Vorzuege aus): dieselbe Regel wie auf einer ziehbaren Figur, keine Marken-Vorschau
+  await ht.setzeFen(START);
+  await s.evaluate(() => demo.brett.erlaubeZuege(null));
+  a = await ht.mitte('g1');
+  b = await ht.mitte('f3');
+  await finger.runter(a.x, a.y);
+  await warte(150);
+  await s.evaluate(() => demo.brett.erlaubeZuege({ g1: ['f3', 'h3'] }));
+  await warte(370);
+  const freigabe = await zustand();
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  await finger.hoch(b.x, b.y);
+  await warte(150);
+  pruefe('Finger: Freigabe waehrend des Haltens: Ziehen malt den Pfeil g1-f3 (keine Marken-Vorschau), kein Zug', freigabe.malt && freigabe.vorschau === 0
+    && (await nutzer(s)).pfeile.join() === 'g1f3' && !(await ht.figur('f3')) && (await ht.figurSitzt('g1')), JSON.stringify(freigabe));
   await s.evaluate(() => demo.brett.loescheNutzerPfeile());
   await ht.setzeFen(START);
   // ein laufender Zug (Finger zieht schon) wird nie zum Pfeil, auch wenn der Finger lange ueber dem Ziel liegt
@@ -1703,6 +1843,18 @@ async function testePfeile(browser) {
     ziel: document.querySelectorAll('.lage.mark-vorzug-ziel[data-feld="f3"]').length, leer: window.__leer.length }));
   pruefe('Vorzug: waehrend ein Vorzug gesetzt wird, malt das Brett nie (auch nach 400 ms ueber dem Ziel)', !vorzugMalt && vz.vorzuege === 'g1f3'
     && vz.start === 1 && vz.ziel === 1 && (await nutzer(s)).liste.length === 0, JSON.stringify(vz));
+  // Bot am Zug, eigene Figur mit Vorzug-Zielen (d2): 400 ms halten und ziehen malt Flos Plan, setzt keinen Vorzug, laesst die Vorzuege stehen
+  a = await ht.mitte('d2');
+  b = await ht.mitte('d4');
+  await finger.runter(a.x, a.y);
+  await warte(520);
+  for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
+  await finger.hoch(b.x, b.y);
+  await warte(150);
+  const planVz = await s.evaluate(() => ({ vorzuege: window.__vorzuege.join(), leer: window.__leer.length,
+    marken: document.querySelectorAll('.lage.mark-vorzug-start, .lage.mark-vorzug-ziel').length }));
+  pruefe('Vorzug: eigene Figur halten und ziehen malt den Pfeil d2-d4, kein neuer Vorzug, die Vorzuege bleiben', (await nutzer(s)).pfeile.join() === 'd2d4'
+    && planVz.vorzuege === 'g1f3' && planVz.leer === 0 && planVz.marken === 2 && (await ht.figurSitzt('d2')), JSON.stringify(planVz));
   a = await ht.mitte('h5');
   await finger.runter(a.x, a.y);
   await warte(520);
