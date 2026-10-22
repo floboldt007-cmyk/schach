@@ -530,12 +530,9 @@ export function zeige(root, params, app) {
         anim(detail.querySelector('.detail-kopf .av'), [{ transform: 'scale(.7) rotate(-6deg)' }, { transform: 'none' }], { d: 640, k: 'hupf' });
       }
     };
-    // Bot wechseln: das alte Panel blendet kurz aus (130 ms), das neue kommt gestaffelt
-    if (animiert && tempo() > 0 && detail.children.length) {
-      const alt = [...detail.children];
-      Promise.all(alt.map((k, n) => anim(k, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-8px)' }], { d: 130, v: n * 10, k: 'sanft', fill: 'forwards' }).finished))
-        .then(bau, bau);
-    } else bau();
+    // Bot wechseln: das neue Panel steht sofort (Orte und Hooks gleich da, tests/app.test.mjs zaehlt direkt nach dem
+    // Tipp) und kommt gestaffelt herein (bau() oben)
+    bau();
   }
 
   function bilanzHtml(st) {
@@ -728,8 +725,21 @@ export function zeige(root, params, app) {
         anim(schloss, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(-10px) rotate(-18deg) scale(1.15)', opacity: 1, offset: 0.4 }, { transform: 'translateY(16px) rotate(30deg) scale(.4)', opacity: 0 }],
           { d: 560, k: 'sanft', fill: 'forwards' }).finished.then(() => schloss.remove(), () => schloss.remove());
       }
+      // die Fahne wandert von der bezwungenen Station zur neuen (Versatz der beiden Stationen, gleiche Kante oben)
       const fahne = el.querySelector('.fahne');
-      if (fahne) anim(fahne, [{ opacity: 0, transform: 'translateX(-50%) translateY(12px) scale(.4)' }, { opacity: 1, transform: 'translateX(-50%)' }], { d: 620, v: 420, k: 'hupf', fill: 'forwards' });
+      if (fahne) {
+        let dx = 0;
+        let dy = 12;
+        if (alt) {
+          const a = alt.getBoundingClientRect();
+          const n = el.getBoundingClientRect();
+          dx = a.left + a.width / 2 - (n.left + n.width / 2);
+          dy = a.top - n.top;
+        }
+        const weg = `translateX(-50%) translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        anim(fahne, [{ opacity: 0, transform: weg + ' scale(.6)' }, { opacity: 1, transform: weg, offset: 0.18 }, { opacity: 1, transform: 'translateX(-50%) translateY(-10px)', offset: 0.78 }, { opacity: 1, transform: 'translateX(-50%)' }],
+          { d: 760, v: 60, k: 'sanft', fill: 'forwards' });
+      }
     }, T(1700));
     // 5. Ende der Choreografie (feste 2,7 s, tests/app.test.mjs)
     spaeter(() => {

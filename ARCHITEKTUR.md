@@ -1384,7 +1384,7 @@ die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`,
 - `spieleDuell({ bot, farbe, anlass, von, art?, einstellung? })` -> `{ bereit, fertig, ueberspringe(), art }`.
   Ueberlagerung `div.duell` an `document.body`: Bot-Haelfte in Bot-Farbe waechst aus der Detail-Karte (`von`), Flos
   Haelfte (Schiefer, sein Koenig) mit schraeger Naht (Hochformat waagrecht), „gegen“ schlaegt ein, genau dann
-  `klang.spiele('start')`. `bereit` erfuellt sich am Ende der Haltephase (0,86 s; Kurzfassung sofort), dann ruft
+  `klang.spiele('start')`. `bereit` erfuellt sich am Ende der Haltephase (0,76 s; Kurzfassung sofort), dann ruft
   `arena.js` `app.gehe('partie', …)`. Auf `app:screen` mit `name: 'partie'` fliegen die Portraets (`.duell-flieger`) auf
   `.screen.partie .spieler.gegner .av` und `.screen.partie .spieler.ich .av` (die Ziele sind waehrenddessen
   `visibility: hidden`); fehlen sie, blendet die Ueberlagerung nur aus. Hoechstens 1,4 s (`DAUER_MAX`), Tippen

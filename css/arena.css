@@ -278,6 +278,10 @@
   .arena.karte-hoch .cta-platz { margin: 0 -22px 0; }
   .arena.karte-hoch .bilanz { border-top: 0; padding-top: 0; }
 }
+/* Meldungen (app.meldung) stehen im Hochformat ueber dem klebenden Spielen-Knopf, nicht darauf (sonst wie gehabt
+   ueber der Reiter-Pille bzw. dem Rand, css/app.css und css/navigation.css) */
+html[data-screen="arena"]:has(.screen.arena.karte-hoch) .toast-ort { bottom: calc(98px + env(safe-area-inset-bottom)); }
+html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .toast-ort { bottom: calc(var(--reiter-h) + 98px); }
 /* kurze Querformate (Handy quer, unter 420 px Kartenhoehe): js/ui/arena.js layout() waehlt .karte-hoch, die Karte
    scrollt also auch hier senkrecht und das Panel steht darunter (die Seite scrollt) */
 

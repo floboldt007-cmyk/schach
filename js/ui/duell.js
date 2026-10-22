@@ -11,7 +11,7 @@
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
-//       duellArt(). bereit erfuellt sich am Ende der Haltephase (0,86 s; arena.js ruft dann app.gehe('partie'), die
+//       duellArt(). bereit erfuellt sich am Ende der Haltephase (0,76 s; arena.js ruft dann app.gehe('partie'), die
 //       Portraets fliegen, sobald die Partie da ist), bei 'kurz' und 'aus' sofort. fertig erfuellt sich am Ende (auch
 //       beim Ueberspringen), hoechstens DAUER_MAX ms nach dem Start. Tippen ueberspringt die Vollfassung, solange die
 //       Buehne steht; waehrend des Portraetflugs (Buehne loest sich auf) und in der Kurzfassung gehen Tipps durch.
@@ -37,7 +37,9 @@ const KURZ_DAUER = 400;                  // Kurzfassung: nur der Portraetflug
 // app:screen partie kommt, fliegen die Portraets (Phase 2). Die Partie steht also nie laenger als den Flug unter der
 // Buehne, und waehrend des Flugs (die Buehne loest sich auf) faengt die Ueberlagerung keine Tipps mehr ab: ein Tipp
 // aufs Brett kommt an (tests/app.test.mjs tippt direkt nach "bereit" der Partie).
-const HALTE_BIS = 860;
+const HALTE_BIS = 760;
+const PUFFER = 60;                       // Abstand zur harten Grenze: der Flug endet spaetestens DAUER_MAX - PUFFER ms
+const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * Tempo)
 const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
 const ANLASS_TEXT = { boss: 'Endgegner', liga: 'Liga', erste: 'Erste Partie' };
@@ -220,7 +222,10 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     const zielFlo = partie ? partie.querySelector('.spieler.ich .av') : null;
     const ziele = [zielBot, zielFlo].filter((z) => z && imBild(rect(z)));
     zieleZahl = ziele.length;
-    const dauerFlug = voll ? 440 : KURZ_DAUER;
+    // Flugdauer (ms, schon mit Tempo): wie im Entwurf, aber so gekuerzt, dass das Intro vor der harten Grenze endet
+    // (die Partie braucht je nach Geraet unterschiedlich lange zum Aufbau)
+    const rest = DAUER_MAX - PUFFER - (jetzt() - t0);
+    const dauerFlug = Math.max(160, Math.min((voll ? 440 : KURZ_DAUER) * tempo(), rest - 40));
     if (ziele.length) {
       // Quellen: in der Vollfassung die Buehnen-Portraets, in der Kurzfassung das Portraet der Arena (von)
       const qBot = voll ? rect(ueber.querySelector('[data-rolle="bot"]')) : (imBild(rect(von)) ? rect(von) : null);
@@ -230,7 +235,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
         const q = quelle || { left: nach.left, top: nach.top - 40, width: nach.width, height: nach.height };
         ziel.style.visibility = 'hidden';
         versteckt.push(ziel);
-        flieg.push(flieger(inhalt, q, nach, { d: dauerFlug, v, k: 'weich' }));
+        flieg.push(flieger(inhalt, q, nach, { d: dauerFlug / Math.max(tempo(), 0.01), v, k: 'weich' }));
         // das Buehnen-Portraet weicht dem Flieger (sonst bleibt es und blendet mit dem Inhalt aus)
         const p = voll ? ueber.querySelector(`[data-rolle="${rolle}"]`) : null;
         if (p) p.style.opacity = '0';
@@ -244,7 +249,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
       anim(ueber.querySelector('.duell-buehne'), [{ opacity: 1 }, { opacity: 0 }], { d: 380, v: 40, k: 'sanft', fill: 'forwards' });
       anim(ueber.querySelector('.duell-flo'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: hoch() ? 'translateY(8%)' : 'translateX(8%)' }], { d: 360, k: 'sanft', fill: 'forwards' });
     }
-    spaeter(ende, (ziele.length ? dauerFlug + 40 : (voll ? 420 : 0)) * tempo());
+    spaeter(ende, ziele.length ? dauerFlug + 40 : (voll ? Math.min(380 * tempo(), Math.max(0, rest)) : 0));
   };
   // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar),
   // dann Phase 2

@@ -270,7 +270,13 @@ const duellHorcher = (seite) => seite.evaluate(() => {
   document.addEventListener('duell:fertig', (e) => window.__fertig.push({ ...(e.detail || {}), t: Math.round(performance.now()), attr: document.documentElement.dataset.duell || null }));
   const mo = new MutationObserver(() => {
     if (document.querySelector('.duell')) window.__duellGesehen++;
-    window.__fliegerMax = Math.max(window.__fliegerMax, document.querySelectorAll('.duell-flieger').length);
+    const fl = [...document.querySelectorAll('.duell-flieger')];
+    window.__fliegerMax = Math.max(window.__fliegerMax, fl.length);
+    // erster Blick auf den Flug mit zwei Fliegern (der Flug ist kurz und unter Last noch kuerzer: festhalten statt pollen)
+    if (fl.length === 2 && !window.__flugBlick) {
+      window.__flugBlick = { flieger: fl.length, inhalt: fl.map((f) => (f.querySelector('img') ? 'img' : f.querySelector('svg') ? 'svg' : '?')).join(),
+        versteckt: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility).join(), attr: document.documentElement.dataset.duell || null };
+    }
   });
   mo.observe(document.body, { childList: true, subtree: true });
 });
@@ -532,6 +538,13 @@ async function testeHochformate(browser) {
       await warte(300);
       const sp2 = await box(seite, '.detail [data-aktion="spielen"]');
       pruefe('nach dem Scrollen weiter sichtbar (sticky)', sp2 && sp2.t >= 0 && sp2.b <= m.leiste.t + 1, JSON.stringify(sp2));
+      // eine Meldung (z. B. "Besiege erst …") steht ueber dem klebenden Spielen-Knopf, nicht darauf
+      await seite.evaluate(() => window.__app.meldung('Test-Meldung'));
+      await seite.waitForSelector('.toast');
+      await warte(400);
+      const tm = await seite.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().bottom, sp: document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect().top }));
+      pruefe('eine Meldung steht ueber dem Spielen-Knopf', tm.t <= tm.sp, JSON.stringify(tm));
+      await seite.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
       await seite.evaluate(() => { document.querySelector('.arena .inhalt').scrollTop = 0; });
       const u = await ueberlauf(seite);
       pruefe('kein waagrechter Ueberlauf', u.seite <= 0 && u.screen <= 0 && u.karte <= 0, JSON.stringify(u));
@@ -761,12 +774,8 @@ async function testeDuell(browser) {
     await duellHorcher(seite);
     await zieleEinsetzen(seite);
     await tippe(seite, '.detail [data-aktion="spielen"]');
-    await seite.waitForFunction(() => document.querySelectorAll('.duell-flieger').length === 2, null, { timeout: 4000 }).catch(() => {});
-    const flug = await seite.evaluate(() => {
-      const fl = [...document.querySelectorAll('.duell-flieger')];
-      const ziele = [...document.querySelectorAll('.screen.partie .spieler .av')];
-      return { flieger: fl.length, inhalt: fl.map((f) => (f.querySelector('img') ? 'img' : f.querySelector('svg') ? 'svg' : '?')).join(), versteckt: ziele.map((z) => z.style.visibility).join(), attr: document.documentElement.dataset.duell || null };
-    });
+    await seite.waitForFunction(() => !!window.__flugBlick || window.__fertig.length > 0, null, { timeout: 6000 }).catch(() => {});
+    const flug = await seite.evaluate(() => window.__flugBlick || { flieger: window.__fliegerMax });
     pruefe('waehrend des Flugs: zwei Flieger (Bot-Portraet, Flos Koenig), die Ziele sind verborgen, Attribut steht', flug.flieger === 2 && flug.inhalt === 'img,svg' && flug.versteckt === 'hidden,hidden' && flug.attr === 'laeuft', JSON.stringify(flug));
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
     await warte(60);
