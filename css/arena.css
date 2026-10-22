@@ -86,7 +86,8 @@
 /* ---------- Karte ---------- */
 .arena .karte { position: relative; min-height: 0; border-radius: var(--r-xl); overflow: hidden; outline: none;
   background: var(--welt-gras); box-shadow: var(--s2), var(--kante); }
-.arena.karte-hoch .karte { flex: none; height: var(--karte-h); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+/* Hochformat: mindestens --karte-h hoch; bleibt unter dem Panel Platz (iPad hoch), waechst die Karte in ihn hinein */
+.arena.karte-hoch .karte { flex: 1 0 var(--karte-h); height: auto; min-height: var(--karte-h); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; scrollbar-width: none; }
 .arena.karte-hoch .karte::-webkit-scrollbar { display: none; }
 .arena .welt { position: relative; width: 100%; height: 100%; --kn-basis: 76px; }
@@ -271,7 +272,8 @@
 .arena.karte-hoch .inhalt { padding-bottom: 0; }
 .arena.karte-hoch .cta-platz { bottom: 0; }
 @media (min-width: 700px) {
-  /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt */
+  /* iPad hoch: Panel zweispaltig, damit die Karte viel Platz behaelt; unten etwas Luft unter dem Panel */
+  .arena.karte-hoch .inhalt { padding-bottom: 20px; }
   .arena.karte-hoch .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; align-items: start; padding-bottom: 0; }
   .arena.karte-hoch .detail > .ort-panel-oben, .arena.karte-hoch .detail > .heute-karte, .arena.karte-hoch .detail > .fortsetzen { grid-column: 1 / -1; }
   .arena.karte-hoch .detail-links, .arena.karte-hoch .detail-rechts { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
