@@ -450,7 +450,7 @@ async function browserAblauf(browser) {
     const t = await s2.evaluate(() => document.body.innerText);
     const css = await s2.evaluate(() => ({ grund: getComputedStyle(document.body).backgroundColor, text: getComputedStyle(document.body).color }));
     pruefe(`Browser: ${datei} erreichbar, Entwurf-Hinweis und Pflichtinhalte`, r.status() === 200 && muss.every((w) => t.includes(w)), muss.filter((w) => !t.includes(w)).join(', '));
-    pruefe(`Browser: ${datei} ohne echte persönliche Daten (nur Platzhalter in eckigen Klammern)`, !/floboldt|@gmail|Boldt|\+49|\b\d{5}\s+[A-ZÄÖÜ][a-zäöü]+/.test(t) && /\[[^\]]+\]/.test(t));
+    pruefe(`Browser: ${datei} ohne echte persönliche Daten (nur Platzhalter in eckigen Klammern)`, !/[A-Za-z0-9._%+-]+@(?!example\b)[A-Za-z0-9-]+\.[a-z]{2,}|\+49|\b\d{5}\s+[A-ZÄÖÜ][a-zäöü]+/.test(t) && /\[[^\]]+\]/.test(t));
     pruefe(`Browser: ${datei} nutzt die Farben der App (Tokens)`, css.grund !== 'rgba(0, 0, 0, 0)' && css.grund !== css.text, css);
     await s2.close();
   }
