@@ -52,6 +52,12 @@ die Stripe über jede Änderung informiert. Preise stehen nie im Code (öffentli
 nennen), AGB mit Widerrufsbelehrung für digitale Inhalte und geklärter Umsatzsteuer. Bis dahin alles im **Testmodus**
 von Stripe ausprobieren: Dort fließt kein Geld.
 
+**Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; 16-
+und 17-Jährige brauchen dafür die Zustimmung der Eltern (§§ 107, 108 BGB, das „Taschengeld“ nach § 110 BGB deckt ein
+laufendes Abo in der Regel nicht). Das Blatt „Crownmate Trainer“ sagt das ruhig neben dem Kauf-Knopf. In die AGB
+gehört dieselbe Regel; in den Store-Apps läuft das später über die Familienfreigabe von Apple und Google
+(`design/runde4/SPIELKONZEPT.md`, Regel 22). Vor dem Start mit der Fachperson klären, die die AGB prüft.
+
 1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/abo-schema.sql` ausführen (nach `schema.sql`; ein
    erneuter Lauf ist erlaubt). Danach `supabase/abo-rls-test.sql` ausführen: Am Ende muss
    `Abo-RLS-Test erfolgreich` stehen. Der Test rollt alles zurück und hinterlässt nichts.

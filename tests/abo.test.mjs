@@ -281,6 +281,7 @@ const blattZustand = (seite) => seite.evaluate(() => {
     zustand: k.dataset.zustand, preis: k.querySelector('.trainer-preis-text').textContent, stand: k.querySelector('.trainer-stand').textContent,
     knoepfe: [...k.querySelectorAll('.trainer-knoepfe button')].map((b) => b.textContent + (b.disabled ? ' (aus)' : '')),
     vorteile: k.querySelectorAll('.trainer-im-abo li').length, gratis: k.querySelectorAll('.trainer-gratis li').length,
+    alter: (() => { const a = k.querySelector('.trainer-alter'); return a && !a.hidden && a.getClientRects().length ? a.textContent : ''; })(),
     fokusDrin: k.contains(document.activeElement), links: r.left, rechts: r.right, breite: innerWidth, ueber: document.scrollingElement.scrollWidth - innerWidth,
     dialog: k.getAttribute('role') === 'dialog' && k.getAttribute('aria-modal') === 'true',
   };
@@ -374,6 +375,8 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     const z = await blattZustand(seite);
     pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
+    pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (ab 16, unter 18 nur mit den Eltern)', /ab 16/.test(z.alter) && /Unter 18/.test(z.alter)
+      && /Eltern/.test(z.alter), z.alter);
     await warte(600);
     await bild(seite, 'abo-kaufbar-hell');
     await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
@@ -433,6 +436,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium');
     const z = await blattZustand(seite);
     pruefe('Blatt: "Abo verwalten" statt Kauf', z.knoepfe[0] === 'Abo verwalten' && !z.knoepfe.includes('Trainer abschließen'), z);
+    pruefe('Premium: kein Satz zum Alter (nichts mehr abzuschließen)', z.alter === '', z.alter);
     pruefe('Handy: Blatt passt in die Breite, keine waagrechte Rolle', z.links >= 0 && z.rechts <= z.breite + 0.5 && z.ueber <= 0, z);
     await warte(600);
     await bild(seite, 'abo-premium-dunkel-handy');
@@ -489,6 +493,7 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('in der Huelle: kein Kauf-Knopf, "Bald verfügbar" aus, ruhiger Text', JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen'])
       && /In dieser App ist der Trainer noch nicht verfügbar/.test(z.stand), z);
+    pruefe('in der Huelle: kein Satz zum Alter (dort spaeter die Familienfreigabe des Stores)', z.alter === '', z.alter);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

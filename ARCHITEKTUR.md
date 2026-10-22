@@ -1397,6 +1397,7 @@ unter dem Konto, nur wenn das Konto sichtbar ist); `app:bereit` und `app:sichtba
 min) sofort neu und sagen einmal Danke (Toast); DOM-Ereignis `abo:stand` auf `document` lässt offene Gruppen neu
 zeichnen. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen plus
 `.trainer-*`, Zustände in `data-zustand`: laedt, vorschau, abgemeldet, kaufbar, premium, store; schließt bei Escape,
-Schleier und jedem Screen-Wechsel). Optik `css/pakete/abo.css` (nur Tokens), lädt `stelleAboCssSicher()` nach.
+Schleier und jedem Screen-Wechsel; `.trainer-alter` mit `ALTER_HINWEIS` „ab 16, unter 18 nur mit den Eltern“, außer bei
+premium und store). Optik `css/pakete/abo.css` (nur Tokens), lädt `stelleAboCssSicher()` nach.
 Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
 `page.route`, `window.open` ersetzt).

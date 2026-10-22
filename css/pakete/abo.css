@@ -33,6 +33,7 @@
 .trainer-liste li::before { content: ""; position: absolute; left: 3px; top: .42em; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
 .trainer-gratis li::before { background: var(--gut); }
 .trainer-zusagen { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.trainer-karte .trainer-alter { margin-top: 4px; font-size: 13px; font-weight: inherit; color: var(--text-2); }
 .trainer-knoepfe { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .trainer-knoepfe[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
 .trainer-knoepfe .knopf { width: 100%; white-space: normal; text-align: center; }

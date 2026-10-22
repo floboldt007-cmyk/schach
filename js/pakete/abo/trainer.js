@@ -6,6 +6,7 @@
 //   zeigeTrainer({ app }) -> { el, ende(), aktualisiere() } | null   ein offenes Blatt wird vorher geschlossen
 //   schliesseTrainer()
 //   VORTEILE, GRATIS   die beiden Listen (SPIELKONZEPT 2b.5), auch fuer Tests
+//   ALTER_HINWEIS      Satz zum Alter (ab 16, unter 18 nur mit den Eltern), .trainer-alter, ausser bei premium und store
 //   Zustaende (data-zustand an .trainer-karte): laedt, vorschau (kein aktives Produkt), abgemeldet, kaufbar, premium,
 //   store (App-Store-Huelle: kein Kauf ausserhalb des Stores, inStoreHuelle in js/abo.js)
 //
@@ -39,6 +40,10 @@ const ZUSAGEN = Object.freeze([
   'Das Abo bringt nie mehr Funken, Punkte oder Wertung.',
   'Bezahlt wird über Stripe. Die App sieht keine Kartendaten.',
 ]);
+// Crownmate ist ab 16 (ENTSCHEIDUNGEN 17.10., SPIELKONZEPT Regel 22). Ein Abo ist ein Vertrag mit laufenden Kosten:
+// 16- und 17-Jaehrige brauchen dafuer die Zustimmung der Eltern. Ruhiger Satz ueberall, wo man abschliessen koennte
+// (nicht bei aktivem Abo und nicht in der Store-Huelle, dort laeuft das spaeter ueber die Familienfreigabe).
+export const ALTER_HINWEIS = 'Crownmate ist ab 16. Unter 18 schließt du das Abo bitte nur mit dem Einverständnis deiner Eltern ab.';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const datum = (ms) => new Date(ms).toLocaleDateString('de-DE');
@@ -78,6 +83,7 @@ export function zeigeTrainer({ app = null } = {}) {
         <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">Immer gratis</h4><ul>${GRATIS.map(li).join('')}</ul></section>
       </div>
       <ul class="trainer-zusagen">${ZUSAGEN.map(li).join('')}</ul>
+      <p class="trainer-alter">${esc(ALTER_HINWEIS)}</p>
       <div class="trainer-knoepfe"></div>
     </div>`;
   const karte = ort.querySelector('.trainer-karte');
@@ -115,6 +121,7 @@ export function zeigeTrainer({ app = null } = {}) {
     else if (!st.angemeldet) zustand = 'abgemeldet';
     else zustand = 'kaufbar';
     karte.dataset.zustand = zustand;
+    ort.querySelector('.trainer-alter').hidden = zustand === 'premium' || zustand === 'store';
     const stand = meldung || standText(st) || ({
       vorschau: 'Der Trainer ist noch in Vorbereitung. Bis dahin ist alles frei.',
       abgemeldet: 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).',
