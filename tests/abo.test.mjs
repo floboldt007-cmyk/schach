@@ -389,6 +389,16 @@ async function browserTeil(browser) {
       /verlängert sich automatisch/.test(await seite.locator('.abo-gruppe .abo-stand').innerText())
       && (await seite.locator('.abo-gruppe [data-abo="zeigen"]').innerText()) === 'Mein Trainer');
     pruefe('Kauf-Merker nach Erfolg weg', (await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf'))) === null);
+    // Tastatur: Fokus auf dem Knopf der Gruppe ueberlebt das Neuzeichnen und kommt aus dem Blatt zurueck
+    await seite.focus('.abo-gruppe [data-abo="zeigen"]');
+    await seite.evaluate(() => document.dispatchEvent(new CustomEvent('abo:stand')));
+    await seite.keyboard.press('Enter');
+    await seite.waitForSelector('.trainer-karte');
+    await seite.evaluate(() => document.dispatchEvent(new CustomEvent('abo:stand')));
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
+    pruefe('Fokus bleibt beim Neuzeichnen auf dem Knopf und kommt aus dem Blatt zurueck',
+      await seite.evaluate(() => document.activeElement && document.activeElement.dataset.abo === 'zeigen' && document.activeElement.isConnected));
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

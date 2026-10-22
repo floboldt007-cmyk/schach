@@ -25,14 +25,16 @@ export function aboGruppe({ app } = {}) {
   const el = document.createElement('section');
   el.className = 'es-gruppe flaeche abo-gruppe';
   el.setAttribute('aria-labelledby', 'es-g-abo');
+  // Einmal bauen, danach nur Texte aendern: so bleibt der Fokus auf dem Knopf (auch fuer die Rueckkehr aus dem Blatt)
+  el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
+    <p class="abo-stand" aria-live="polite"></p>
+    <p class="es-hilfe">Coaches, Erklärungen in ganzen Sätzen und mehr Lernstoff. Alle Bots, die Analyse und Rätsel ohne
+      Tageslimit bleiben gratis.</p>
+    <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button></div>`;
   const render = () => {
     const st = premiumStand();
     el.dataset.premium = st.premium ? 'ja' : 'nein';
-    el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
-      <p class="abo-stand" aria-live="polite"></p>
-      <p class="es-hilfe">Coaches, Erklärungen in ganzen Sätzen und mehr Lernstoff. Alle Bots, die Analyse und Rätsel ohne
-        Tageslimit bleiben gratis.</p>
-      <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen">${st.premium ? 'Mein Trainer' : 'Mehr zum Trainer'}</button></div>`;
+    el.querySelector('[data-abo="zeigen"]').textContent = st.premium ? 'Mein Trainer' : 'Mehr zum Trainer';
     el.querySelector('.abo-stand').textContent = standText(st)
       || (st.angemeldet ? 'Kein Abo aktiv. Das Spiel bleibt gratis.' : 'Zum Abschließen brauchst du ein Konto.');
   };
