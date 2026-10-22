@@ -131,6 +131,11 @@ function figurenPfad() {
   }
 }
 
+// Was im Bild steht, ehrlich und vollstaendig (wie die Felder in logik.js)
+function hinweisText(mitName) {
+  return `Im Bild stehen nur Ergebnis, Gegner, Endstellung, Sterne, Genauigkeit, Züge, Datum${mitName ? ', dein Benutzername' : ''} und die Adresse der App.`;
+}
+
 export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = null } = {}) {
   schliesseBlatt();
   // die neueste Fassung der Partie (die Genauigkeit kommt oft erst nach dem ersten Fuellen des Ergebnisses)
@@ -156,7 +161,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
       <h3 id="${id}-t">${sieg ? 'Siegesbild teilen' : 'Partie als Bild teilen'}</h3>
       <div class="tl-vorschau"><canvas class="tl-leinwand" role="img"></canvas><span class="tl-laden" role="status">Bild entsteht …</span></div>
       <div class="tl-optionen"></div>
-      <p class="tl-hinweis">Im Bild stehen nur Ergebnis, Gegner, Endstellung, Sterne, Genauigkeit, Züge, Datum und die Adresse der App.</p>
+      <p class="tl-hinweis">${esc(hinweisText(false))}</p>
       <div class="sheet-knoepfe">
         <button class="knopf gross dr" type="button" data-tl="abbrechen">Abbrechen</button>
         <button class="knopf gross primaer dr tl-los" type="button" data-tl="los" disabled>${icon('teilen')} ${teilenGeht ? 'Teilen' : 'Bild speichern'}</button>
@@ -168,6 +173,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   const laden = ort.querySelector('.tl-laden');
   const los = ort.querySelector('[data-tl="los"]');
   const optionen = ort.querySelector('.tl-optionen');
+  const hinweis = ort.querySelector('.tl-hinweis');
 
   const wahl = segment({
     name: 'tl-modus', label: 'Bild hell oder dunkel',
@@ -212,19 +218,30 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     laden.hidden = false;
     try {
       daten = bildDaten(p, { bot: gegner, name: nameAn ? name : null, adresse });
-      const r = await rendere(leinwand, daten, modus, { figurenPfad: figurenPfad() });
+      // gezeichnet wird auf eine eigene Leinwand, die Vorschau wechselt erst, wenn das neue Bild steht (kein Aufblitzen)
+      let fern = document.createElement('canvas');
+      const r = await rendere(fern, daten, modus, { figurenPfad: figurenPfad() });
       if (nr !== lauf || !stand.offen) return;
       let datei;
       try {
-        datei = await alsDatei(leinwand, daten.dateiname);
+        datei = await alsDatei(fern, daten.dateiname);
       } catch (f) {
         // eine Leinwand, die ein Browser wegen der SVG-Bilder sperrt: ohne Bilder neu (Figuren als Buchstaben)
-        const r2 = await rendere(leinwand, daten, modus, { ohneBilder: true });
+        fern = document.createElement('canvas');
+        const r2 = await rendere(fern, daten, modus, { ohneBilder: true });
         if (nr !== lauf || !stand.offen) return;
         r.texte = r2.texte;
-        datei = await alsDatei(leinwand, daten.dateiname);
+        datei = await alsDatei(fern, daten.dateiname);
       }
       if (nr !== lauf || !stand.offen) return;
+      if (leinwand.width !== fern.width || leinwand.height !== fern.height) {
+        leinwand.width = fern.width;
+        leinwand.height = fern.height;
+      }
+      const lctx = leinwand.getContext('2d');
+      lctx.clearRect(0, 0, leinwand.width, leinwand.height);
+      lctx.drawImage(fern, 0, 0);
+      hinweis.textContent = hinweisText(!!daten.name);
       stand.texte = r.texte;
       stand.datei = datei;
       stand.name = daten.name;

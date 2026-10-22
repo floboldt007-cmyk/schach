@@ -376,6 +376,8 @@ async function browserTeil(browser) {
   });
   pruefe('Knopf "Siegesbild teilen" im Ort ergebnis:karte (mit Icon)', knopf.sichtbar && knopf.text === 'Siegesbild teilen' && knopf.zeile && knopf.icon, JSON.stringify(knopf));
   await seite.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
+  await warte(2600);   // Sterne und Genauigkeit fertig eingeblendet
+  await seite.screenshot({ path: path.join(BILDER, 'ergebnis-ipad.png') });
   const partie = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:partien'))[0]);
   pruefe('Partie gespeichert mit Genauigkeit (die das Bild zeigt)', partie && partie.ergebnis === 'sieg' && Number.isFinite(partie.genauigkeit), JSON.stringify(partie).slice(0, 160));
   const appModus = await seite.evaluate(() => document.documentElement.dataset.modus || '');
@@ -495,11 +497,13 @@ async function browserTeil(browser) {
   pruefe('mit Konto und Benutzernamen: Schalter "Benutzername zeigen" (aus), der Name steht daneben', /Benutzername zeigen/.test(nameZeile) && /FloTest/.test(nameZeile)
     && await seite.locator('.tl-blatt .tl-name .schalter').getAttribute('aria-checked') === 'false', nameZeile);
   pruefe('Schalter aus: kein Name im Bild, keine E-Mail', !n1.texte.some((t) => /FloTest|@|privat/.test(t)) && n1.name === null, n1.texte.join(' | '));
+  pruefe('Hinweis ohne Benutzername, solange er nicht im Bild steht', !/Benutzername/.test(await seite.locator('.tl-blatt .tl-hinweis').innerText()));
   await seite.locator('.tl-blatt .tl-name .schalter').click();
   await bis(async () => (await zustand(seite)).name === 'FloTest');
   await blattBereit(seite, 'dunkel');
   const n2 = await zustand(seite);
   pruefe('Schalter an: "Gespielt von FloTest" im Bild, nie die E-Mail', n2.texte.includes('Gespielt von FloTest') && !n2.texte.some((t) => /@|privat/.test(t)), n2.texte.join(' | '));
+  pruefe('Hinweis nennt den Benutzernamen, sobald er im Bild steht', /dein Benutzername/.test(await seite.locator('.tl-blatt .tl-hinweis').innerText()));
   await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-name.png') });
   await seite.locator('.tl-blatt .tl-name .schalter').click();
@@ -521,6 +525,8 @@ async function browserTeil(browser) {
   pruefe('Verlauf: kein eigener Knopf in der Liste (dort gibt es keinen Ort je Zeile)', await seite.locator('.vl-seite .tl-teilen').count() === 0);
   await seite.locator(`.vl-zeile[data-id="${partie.id}"] .vl-oeffnen`).click();
   await seite.waitForSelector('.an-ort-oben .tl-teilen', { timeout: 30000 });
+  await warte(600);
+  await seite.screenshot({ path: path.join(BILDER, 'analyse-ipad.png') });
   pruefe('Spielanalyse der Partie (aus dem Verlauf): Knopf "Als Bild teilen" im Ort analyse:oben', /Als Bild teilen/.test(await seite.locator('.an-ort-oben .tl-teilen').innerText())
     && await seite.locator('.an-ort-oben').isVisible());
   await seite.locator('.an-ort-oben .tl-teilen').click();
