@@ -1380,7 +1380,8 @@ die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`,
 **Duell-Intro** (`js/ui/duell.js`, `css/duell.css`, PLAN 2.3):
 - `duellArt({ einstellung, anlass, reduziert })` -> `'voll' | 'kurz' | 'aus'`: `aus` bei Einstellung `duellIntro: 'aus'`
   oder reduzierter Bewegung (nur Start-Klang); `voll` bei `immer` oder bei `besondere` mit Anlass `boss` | `liga` |
-  `erste` (erste Partie gegen diesen Bot); sonst `kurz` (0,4 s, nur der Portraetflug).
+  `erste` (erste Partie gegen diesen Bot); sonst `kurz` (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von
+  seiner Figur auf der Karte, beide beim Start gemessen, weil die Arena beim Flug schon weg ist).
 - `spieleDuell({ bot, farbe, anlass, von, art?, einstellung? })` -> `{ bereit, fertig, ueberspringe(), art }`.
   Ueberlagerung `div.duell` an `document.body`: Bot-Haelfte in Bot-Farbe waechst aus der Detail-Karte (`von`), Flos
   Haelfte (Schiefer, sein Koenig) mit schraeger Naht (Hochformat waagrecht), „gegen“ schlaegt ein, genau dann

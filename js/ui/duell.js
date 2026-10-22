@@ -7,7 +7,8 @@
 //       einstellung = duellIntro aus den Einstellungen ('immer' | 'besondere' | 'aus', Flo D3), anlass = 'boss' |
 //       'liga' | 'erste' | null (erste Partie gegen diesen Bot), reduziert = bewegung.js reduziert().
 //       'aus' bei reduzierter Bewegung oder Einstellung aus (kein Intro, nur Start-Klang); 'voll' bei 'immer' oder bei
-//       'besondere' mit besonderem Anlass; sonst 'kurz' (0,4 s, nur der Portraetflug).
+//       'besondere' mit besonderem Anlass; sonst 'kurz' (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von
+//       seiner Figur auf der Karte in die Spielerleisten).
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
@@ -70,6 +71,18 @@ const rect = (el) => {
   return { left: r.left, top: r.top, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
 };
 const imBild = (r) => !!r && r.width > 0 && r.height > 0 && r.top < innerHeight && r.bottom > 0 && r.left < innerWidth && r.right > 0;
+// Rechteck eines Elements, wenn es wirklich zu sehen ist: im Bild und, falls es in einem scrollenden Behaelter steht
+// (die Karte der Arena), mit seiner Mitte in dessen sichtbarem Ausschnitt; sonst null
+function sichtbar(el) {
+  const r = rect(el);
+  if (!imBild(r)) return null;
+  const huelle = el.closest ? el.closest('.karte') : null;
+  const h = huelle ? rect(huelle) : null;
+  const mx = r.left + r.width / 2;
+  const my = r.top + r.height / 2;
+  if (h && (mx < h.left || mx > h.right || my < h.top || my > h.bottom)) return null;
+  return r;
+}
 
 // Schwarzer oder weisser Text auf der Bot-Farbe (Kontrast nach WCAG, aus der gerechneten Hintergrundfarbe)
 function hellerText(el) {
@@ -115,6 +128,13 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     const sofort = Promise.resolve();
     return { bereit: sofort, fertig: sofort, ueberspringe() {}, art: 'aus' };
   }
+
+  // Quellen fuer den Portraetflug der Kurzfassung, solange die Arena noch steht (beim Flug ist sie schon durch die
+  // Partie ersetzt): die Station des Bots auf der Karte ("von der Stufe", PLAN 2.3) und Flos Figur auf dem Pfad; sind
+  // sie nicht zu sehen, das Portraet der Detail-Karte (von) bzw. der Pfeil des Spielen-Knopfs
+  const station = [...document.querySelectorAll('.screen.arena .knoten')].find((k) => k.dataset.bot === bot.id);
+  const quelleBot = sichtbar(station && station.querySelector('.avatar')) || sichtbar(von);
+  const quelleFlo = sichtbar(document.querySelector('.screen.arena .flo-figur')) || sichtbar(document.querySelector('.screen.arena .detail .spielen .pf'));
 
   // ein laufendes Intro (Doppeltipp) zuerst beenden
   if (aktiv) aktiv.ueberspringe();
@@ -231,9 +251,10 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     const rest = DAUER_MAX - PUFFER - (jetzt() - t0);
     const dauerFlug = Math.max(160, Math.min((voll ? 440 : KURZ_DAUER) * tempo(), rest - 40));
     if (ziele.length) {
-      // Quellen: in der Vollfassung die Buehnen-Portraets, in der Kurzfassung das Portraet der Arena (von)
-      const qBot = voll ? rect(ueber.querySelector('[data-rolle="bot"]')) : (imBild(rect(von)) ? rect(von) : null);
-      const qFlo = voll ? rect(ueber.querySelector('[data-rolle="flo"]')) : null;
+      // Quellen: in der Vollfassung die Buehnen-Portraets, in der Kurzfassung Station und Flos Figur auf der Karte
+      // (beim Start gemessen); fehlt eine Quelle, kommt das Portraet von knapp ueber seinem Ziel
+      const qBot = voll ? rect(ueber.querySelector('[data-rolle="bot"]')) : quelleBot;
+      const qFlo = voll ? rect(ueber.querySelector('[data-rolle="flo"]')) : quelleFlo;
       const bild = (ziel, quelle, inhalt, v, rolle) => {
         const nach = rect(ziel);
         const q = quelle || { left: nach.left, top: nach.top - 40, width: nach.width, height: nach.height };

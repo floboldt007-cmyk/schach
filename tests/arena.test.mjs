@@ -281,6 +281,8 @@ const duellHorcher = (seite) => seite.evaluate(() => {
     // erster Blick auf den Flug mit zwei Fliegern (der Flug ist kurz und unter Last noch kuerzer: festhalten statt pollen)
     if (fl.length === 2 && !window.__flugBlick) {
       window.__flugBlick = { flieger: fl.length, inhalt: fl.map((f) => (f.querySelector('img') ? 'img' : f.querySelector('svg') ? 'svg' : '?')).join(),
+        // Lage der Flieger beim Abflug (Mitte und Breite; die Animation steht dabei noch auf ihrem ersten Bild)
+        lage: fl.map((f) => { const r = f.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; }),
         versteckt: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility).join(), attr: document.documentElement.dataset.duell || null };
     }
   });
@@ -792,6 +794,38 @@ async function testeDuell(browser) {
     await warte(60);
     const nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(), prot: window.__duellProtokoll }));
     pruefe('danach: Flieger weg, Ziele wieder sichtbar, Protokoll meldet 2 Ziele', nach.flieger === 0 && nach.sichtbar === 'sichtbar,sichtbar' && nach.prot[0].ziele === 2, JSON.stringify(nach));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Kurzfassung (besondere, nicht die erste Partie) mit Zielen: die Portraets fliegen von der Station und von Flos
+  // Figur auf der Karte in die Spielerleisten (PLAN 2.3 "von der Stufe"), obwohl die Arena beim Flug schon weg ist
+  gruppe = 'Duell Kurzfassung Portraetflug';
+  {
+    const partie = { id: 'u5-p2', datum: '2026-10-20T10:00:00.000Z', botId: 'rudi', botStufe: 5, spielerFarbe: 'w', startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'],
+      ergebnis: 'niederlage', grund: 'aufgabe', hinweise: 0, zuruecknahmen: 0, liveKlassen: [null, null], genauigkeit: null, genauigkeitBot: null, spielstaerke: null, eroeffnung: null, sterne: [false, false, false], modus: 'normal' };
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, partien: [partie], einstellungen: { duellIntro: 'besondere', klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="rudi"]');
+    await warte(1500);
+    await duellHorcher(seite);
+    await zieleEinsetzen(seite);
+    const quellen = await seite.evaluate(() => {
+      const m = (el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; };
+      return { bot: m(document.querySelector('.knoten[data-bot="rudi"] .avatar')), flo: m(document.querySelector('.flo-figur')) };
+    });
+    await tippe(seite, '.detail [data-aktion="spielen"]');
+    await seite.waitForFunction(() => !!window.__flugBlick || window.__fertig.length > 0, null, { timeout: 6000 }).catch(() => {});
+    const flug = await seite.evaluate(() => window.__flugBlick || { flieger: window.__fliegerMax });
+    const nah = (a, b) => !!a && !!b && Math.abs(a.x - b.x) <= 8 && Math.abs(a.y - b.y) <= 8 && Math.abs(a.w - b.w) <= 8;
+    pruefe('Kurzfassung: zwei Flieger, Bot-Portraet startet an seiner Station, Flos Koenig an seiner Figur auf der Karte',
+      flug.flieger === 2 && flug.inhalt === 'img,svg' && flug.versteckt === 'hidden,hidden' && flug.attr === 'laeuft' && !!flug.lage && nah(flug.lage[0], quellen.bot) && nah(flug.lage[1], quellen.flo),
+      JSON.stringify({ flug, quellen }));
+    await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
+    await warte(60);
+    const nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(),
+      prot: window.__duellProtokoll, fertig: window.__fertig, block: Math.round(window.__block) }));
+    pruefe('danach: Flieger weg, Ziele sichtbar, art kurz mit 2 Zielen, innerhalb der harten Grenze', nach.flieger === 0 && nach.sichtbar === 'sichtbar,sichtbar' && nach.prot[0].art === 'kurz' && nach.prot[0].ziele === 2
+      && nach.fertig.length === 1 && nach.fertig[0].art === 'kurz' && nach.prot[0].dauer <= 1500 + nach.block, JSON.stringify(nach));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
