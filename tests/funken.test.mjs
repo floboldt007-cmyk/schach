@@ -505,6 +505,35 @@ gruppe = 'Speicher-Budget';
 }
 
 // =====================================================================
+// Optik (Look A): tests/thema.test.mjs liest nur css/*.css, deshalb prueft das Paket seine eigene Datei
+// =====================================================================
+gruppe = 'Optik (Look A)';
+{
+  const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
+  const css = lies('css/pakete/funken.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const tokens = lies('css/tokens.css') + '\n' + lies('css/themes/modern.css');
+  const feste = css.match(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix)\(/gi) || [];
+  pruefe('css/pakete/funken.css: keine festen Farben (nur Tokens)', feste.length === 0, feste);
+  const namen = [...new Set((css.match(/var\(--[a-z0-9-]+/gi) || []).map((v) => v.slice(4)))];
+  const fehlen = namen.filter((n) => !new RegExp(`${n}\\s*:`).test(tokens));
+  pruefe(`css/pakete/funken.css: alle ${namen.length} Variablen stehen in tokens.css oder themes/modern.css`, namen.length > 10 && fehlen.length === 0, fehlen);
+  pruefe('css/pakete/funken.css: kein Neon, kein Glow (keine --neon-Variablen, kein text-shadow, kein filter/blur)',
+    !/var\(--neon-|text-shadow|filter\s*:|blur\(|drop-shadow/i.test(css));
+  const uebergaenge = [...css.matchAll(/transition(?:-property)?\s*:\s*([^;}]+)/gi)].map((m) => m[1].trim()).filter((t) => t !== 'none');
+  pruefe('css/pakete/funken.css: Übergänge nur auf transform oder opacity', uebergaenge.every((t) => t.split(',').every((teil) => /^(transform|opacity)\b/.test(teil.trim()))) &&!/@keyframes/.test(css), uebergaenge);
+  pruefe('css/pakete/funken.css: Funkenlinie ohne Übergang bei reduzierter Bewegung und Bewegung „aus“',
+    /prefers-reduced-motion:\s*reduce\)\s*\{[^}]*\.fk-linie\s*\{\s*transition:\s*none/.test(css) && /\[data-bewegung="aus"\]\s*\.fk-linie\s*\{\s*transition:\s*none/.test(css));
+  // Bewegung in ansicht.js nur ueber anim() aus js/bewegung.js und nur mit transform/opacity (Schluessel der Keyframes)
+  const js = lies('js/pakete/funken/ansicht.js');
+  const bilder = [...js.matchAll(/anim\(\s*[a-zA-Z.]+\s*,\s*\[([^\]]*)\]/g)].map((m) => m[1]);
+  const schluessel = new Set(bilder.flatMap((b) => [...b.matchAll(/([a-zA-Z]+)\s*:/g)].map((m) => m[1])));
+  pruefe(`ansicht.js: ${bilder.length} Animationen über anim(), Keyframes nur transform, opacity, offset`, bilder.length >= 8
+    && [...schluessel].every((k) => ['transform', 'opacity', 'offset'].includes(k)) && !/\.animate\(/.test(js), [...schluessel]);
+  pruefe('ansicht.js: Inline-Stile nur für transform (Balken), kein Layout aus dem Code', [...js.matchAll(/style(?:\.([a-zA-Z]+)\s*=|="([a-z-]+):)/g)]
+    .every((m) => (m[1] || m[2]) === 'transform'));
+}
+
+// =====================================================================
 // Verdrahtung ueber den Ereignis-Bus (index.js in Node)
 // =====================================================================
 gruppe = 'Ereignisse';
