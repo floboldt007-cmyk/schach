@@ -28,7 +28,8 @@
 -- Ereignisses, das ihren Stand gesetzt hat. Ein aelteres Ereignis aendert nichts mehr ('veraltet'), bei gleicher
 -- Sekunde nimmt nur customer.subscription.deleted ein laufendes Premium weg. Ein Kauf
 -- (checkout.session.completed) setzt nur die Zuordnung Nutzer <-> Stripe-Kunde und einen vorlaeufigen Stand
--- (stand_zeit null), den das naechste Abo-Ereignis immer ueberschreibt.
+-- (stand_zeit null), den das naechste Abo-Ereignis immer ueberschreibt. Dabei werden die Ereignisse nachgeholt, die vor
+-- dem Kauf ankamen ('wartet', und bei einem zweiten Abo desselben Kunden die 'fremdes_abo' dieses neuen Abos).
 --
 -- Fehler melden die Funktionen als Kennungen (ABO_EREIGNIS_UNGUELTIG); die Edge Function antwortet dann mit 500 und
 -- Stripe wiederholt die Zustellung. Die Kennungen sind ein Vertrag mit supabase/functions/_gemeinsam/stripe.js.
@@ -278,11 +279,14 @@ begin
                         then t.status else excluded.status end,
           gueltig_bis = case when t.status in ('aktiv', 'gekuendigt')
                              then greatest(t.gueltig_bis, excluded.gueltig_bis) else excluded.gueltig_bis end;
-      -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden
+      -- Ereignisse, die vor dem Kauf ankamen, jetzt in ihrer Reihenfolge anwenden: wartende (Kunde noch unbekannt) und,
+      -- wenn ein bekannter Kunde ein zweites Mal abschliesst, die schon als 'fremdes_abo' abgelegten Ereignisse genau
+      -- dieses neuen Abos (sonst gaelte nur der vorlaeufige Tag bis zur naechsten Verlaengerung)
       for e in
         select w.id, w.typ, w.erstellt, w.abo_id, w.status, w.gueltig_bis, w.plan
         from public.stripe_ereignisse w
-        where w.kunde_id = v_kunde and w.ergebnis = 'wartet'
+        where w.kunde_id = v_kunde
+          and (w.ergebnis = 'wartet' or (w.ergebnis = 'fremdes_abo' and v_abo is not null and w.abo_id = v_abo))
         order by w.erstellt, w.eingegangen_am
       loop
         update public.stripe_ereignisse t

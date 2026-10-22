@@ -278,6 +278,25 @@ begin
     raise exception 'FEHLER: Ende des Abos in derselben Sekunde nicht verbucht (%)', r;
   end if;
 
+  -- 10c. Zweites Abo desselben Kunden (C schliesst nach dem Ende wieder ab), Abo-Ereignis kommt VOR dem Kauf: erst
+  -- 'fremdes_abo' (altes Abo sub_C1 steht noch in der Zeile), beim Kauf nachgeholt; ein Ereignis eines dritten Abos bleibt
+  r := public.abo_stripe_ereignis('evt_c6', 'customer.subscription.updated', t0 + interval '60 seconds', 'cus_C1', 'sub_C2',
+    null, 'aktiv', t0 + interval '30 days', 'monat');
+  if r <> 'fremdes_abo' or public.ist_premium_von('c3333333-3333-4333-8333-333333333333') then
+    raise exception 'FEHLER: Ereignis eines neuen Abos vor dem Kauf falsch verbucht (%)', r;
+  end if;
+  r := public.abo_stripe_ereignis('evt_c7', 'customer.subscription.updated', t0 + interval '61 seconds', 'cus_C1', 'sub_C3',
+    null, 'aktiv', t0 + interval '9 years', 'jahr');
+  r := public.abo_stripe_ereignis('evt_c8', 'checkout.session.completed', t0 + interval '59 seconds', 'cus_C1', 'sub_C2',
+    'c3333333-3333-4333-8333-333333333333', 'aktiv', t0 + interval '1 day', null);
+  select * into a from public.abos where user_id = 'c3333333-3333-4333-8333-333333333333';
+  if r <> 'zugeordnet' or a.abo_id <> 'sub_C2' or a.gueltig_bis <> t0 + interval '30 days' or a.plan <> 'monat'
+    or a.stand_zeit <> t0 + interval '60 seconds' or not public.ist_premium_von('c3333333-3333-4333-8333-333333333333')
+    or (select ergebnis from public.stripe_ereignisse where id = 'evt_c6') <> 'neu'
+    or (select ergebnis from public.stripe_ereignisse where id = 'evt_c7') <> 'fremdes_abo' then
+    raise exception 'FEHLER: Ereignis des neuen Abos beim zweiten Kauf nicht nachgeholt (%, %)', r, row_to_json(a);
+  end if;
+
   -- 11. Kauf mit unbekannter Nutzer-ID: verbucht, aber keine Zeile
   r := public.abo_stripe_ereignis('evt_x1', 'checkout.session.completed', t0, 'cus_X1', 'sub_X1',
     'deadbeef-0000-4000-8000-000000000000', 'aktiv', t0 + interval '1 day', null);

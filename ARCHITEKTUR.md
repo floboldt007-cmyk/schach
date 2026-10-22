@@ -1366,7 +1366,8 @@ Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur u
 gleicher Sekunde nimmt nur `customer.subscription.deleted` ein laufendes Premium weg (Stripe schickt beim Abschluss
 mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
-  Kunden werden dabei in ihrer Reihenfolge angewendet; `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
+  Kunden werden dabei in ihrer Reihenfolge angewendet (bei einem zweiten Abo desselben Kunden auch dessen schon als
+  `fremdes_abo` abgelegte Ereignisse); `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
   ein neuer Kauf verkürzt nie ein längeres Abo.
 
 **Edge Function** `supabase/functions/stripe-webhook/index.ts` (nur Hülle, Deploy mit `--no-verify-jwt`) und die Logik
