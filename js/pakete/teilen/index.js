@@ -325,7 +325,8 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     if (!datei || !stand.bereit) return;
     let laeuft;
     try { laeuft = teileDatei(datei, daten ? daten.titel : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
-    laeuft.then((weg) => erledigt(weg, weg === 'teilen' ? 'Bild geteilt.' : 'Bild gespeichert.')).catch((f) => {
+    // zwei Zweige statt then().catch(): nur ein Fehler von share() selbst fuehrt zum Speichern
+    laeuft.then((weg) => erledigt(weg, weg === 'teilen' ? 'Bild geteilt.' : 'Bild gespeichert.'), (f) => {
       if (f && f.name === 'AbortError') return;   // im Teilen-Blatt abgebrochen: unser Blatt bleibt offen
       // das Geraet lehnt das Teilen ab (z. B. NotAllowedError, Dateityp): die Datei liegt bereit, also speichern
       try { console.warn('teilen: Teilen abgelehnt, Bild wird gespeichert', (f && f.name) || f); } catch (x) { /* egal */ }
@@ -337,7 +338,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
         return;
       }
       erledigt('datei', 'Teilen ging hier nicht, das Bild ist gespeichert.');
-    });
+    }).catch((f) => console.error('teilen', f));
   });
   document.addEventListener('keydown', taste, true);
   // Tasten im Blatt erreichen den Screen dahinter nicht (z. B. Pfeile der Analyse)
