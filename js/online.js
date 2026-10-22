@@ -11,12 +11,20 @@
 //   sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null }) -> Partie
 //       ergebnis '1-0' | '0-1' | '1/2-1/2' beendet die Partie (grund z. B. 'matt', 'patt', 'wiederholung')
 //   gibAuf(id), bieteRemis(id), nimmRemisAn(id) -> Partie   (gibAuf auf einer offenen Einladung: zurueckziehen)
+//   pruefeZeit(id) -> Partie             Zeit reklamieren: ist die Uhr der Seite am Zug abgelaufen, endet die
+//       Partie auf dem Server (grund 'zeit'); sonst kommt die unveraenderte Partie zurueck. Die Oberflaeche ruft das,
+//       wenn die heruntergerechnete Uhr des Gegners bei 0 steht.
 //   meinePartien() -> [Partie]           offen und laufend, zuletzt geaenderte zuerst
-//   beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler }) -> { stop(), laeuft(), stand() }
+//   beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler, bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }
 //       fragt alle `alle` ms nach einer neueren Zeile (aktualisiert_am) und ruft beiAenderung(partie) nur bei
 //       einer Aenderung; pausiert, solange document.hidden, und fragt beim Sichtbarwerden sofort wieder;
-//       Fehler (auch offline) gehen an beiFehler(fehler), derselbe Fehlertext nur einmal hintereinander;
-//       nichts wirft, die App laeuft weiter.
+//       Fehler (auch offline) gehen an beiFehler(fehler), derselbe Fehlertext nur einmal hintereinander, und der
+//       Abstand waechst bei Fehlern bis 30 s (danach wieder `alle`). Nach stop() kommt kein Hoerer-Aufruf mehr,
+//       auch nicht aus einer Anfrage, die gerade unterwegs war. Die Abfrage haelt von selbst an (grund()):
+//       'beendet' (Partie beendet, mit bisEnde), 'unbekannt' (Partie gibt es nicht oder sie gehoert Fremden; einmal
+//       gemeldet), 'abgemeldet' (keine Sitzung, oder das Erneuern scheitert: einmal "Bitte neu anmelden", fehler.abgemeldet
+//       = true; die Oberflaeche startet nach dem Anmelden eine neue Abfrage). Ein 401 bei lokal noch gueltiger Sitzung
+//       fuehrt zu genau einem Erneuern und sofortigem neuem Versuch. Nichts wirft, die App laeuft weiter.
 //   einladungsLink(code, basis?) -> 'https://floboldt007-cmyk.github.io/schach/#online/ABC234'
 //   codeAusLink(hashOderAdresse) -> 'ABC234' | null
 //   uebernimmEinladungsLink(ort?) -> Code | null   merkt den Code aus #online/CODE fuer die spaetere Oberflaeche
@@ -61,22 +69,34 @@ export const FEHLER_TEXTE = Object.freeze({
   ONLINE_AM_ZUG_FORM: 'Nach dem Zug muss die andere Seite am Zug sein.',
   ONLINE_ERGEBNIS_FORM: 'Das Ergebnis hat ein ungültiges Format.',
   ONLINE_KEIN_REMISANGEBOT: 'Es liegt kein Remisangebot deines Gegners vor.',
+  ONLINE_CODE_ABGELAUFEN: 'Diese Einladung ist abgelaufen (Einladungen gelten 24 Stunden). Bitte deinen Freund um einen neuen Code.',
 });
 const TEXT_OFFLINE = 'Keine Verbindung. Die Partie bleibt auf dem Server gespeichert, versuch es gleich noch einmal.';
 const TEXT_ABGELAUFEN = 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.';
 const TEXT_NICHT_EINGERICHTET = 'Der Online-Teil ist auf dem Server noch nicht eingerichtet.';
 
 function lager() { return globalThis.localStorage; }
+// Unbekannte Antworten des Servers (Englisch, technisch) gehen nie roh an den Nutzer: Die Meldung ist ein ganzer
+// deutscher Satz, der Originaltext bleibt in fehler.detail (fuer die Konsole und Tests).
+function allgemeinerText(status, code) {
+  if (status === 403 || code === '42501') return 'Dafür fehlt dir auf dem Server die Berechtigung.';
+  if (status === 429) return 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.';
+  if (status >= 500) return `Der Server antwortet gerade nicht (${status}). Bitte gleich noch einmal versuchen.`;
+  if (code === '23514' || code === '22001' || code === '23502') return 'Der Server hat die Daten abgelehnt (zu groß oder unvollständig).';
+  if (code === '23505') return 'Das gibt es auf dem Server schon.';
+  return `Der Server hat die Anfrage abgelehnt (${status}).`;
+}
 function fehlerText(d, status) {
   const kennung = String(d?.message || d?.msg || '');
   let text = FEHLER_TEXTE[kennung];
   if (!text) {
     if (status === 401) text = TEXT_ABGELAUFEN;
     else if (status === 404) text = TEXT_NICHT_EINGERICHTET;
-    else text = kennung || d?.error_description || `Serverfehler (${status})`;
+    else text = allgemeinerText(status, d?.code);
   }
   const e = new Error(text);
   e.status = status; e.code = d?.code; e.kennung = FEHLER_TEXTE[kennung] ? kennung : undefined;
+  e.detail = kennung || d?.error_description || '';
   return e;
 }
 async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
@@ -154,6 +174,7 @@ export async function sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = nul
 export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', { partie: id })); }
 export async function bieteRemis(id) { return partieAus(await rpc('online_biete_remis', { partie: id })); }
 export async function nimmRemisAn(id) { return partieAus(await rpc('online_nimm_remis_an', { partie: id })); }
+export async function pruefeZeit(id) { return partieAus(await rpc('online_pruefe_zeit', { partie: id })); }
 export async function meinePartien() {
   const d = await rpc('online_meine', {});
   return Array.isArray(d) ? d : [];
@@ -161,45 +182,91 @@ export async function meinePartien() {
 
 // Abfrage statt Websocket: alle 2 s eine kleine Anfrage, die nur dann eine Zeile liefert, wenn sich seit dem
 // letzten bekannten Stand (aktualisiert_am) etwas geaendert hat. Eine Anfrage laeuft nie doppelt.
-export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehler, dokument = globalThis.document } = {}) {
+const ABSTAND_MAX_MS = 30000;
+// Fehler beim Holen der Sitzung: keine Sitzung oder Erneuern vom Server abgelehnt (4xx) heisst abgemeldet; ein
+// Netzfehler beim Erneuern (ohne Status) ist nur offline.
+function istAnmeldeFehler(e) {
+  return e?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET || (Number.isInteger(e?.status) && e.status >= 400 && e.status < 500);
+}
+export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehler, bisEnde = true, dokument = globalThis.document } = {}) {
   let aktiv = true;
   let timer = null;
   let stand = seit || null;
   let unterwegs = false;
   let letzterFehler = null;
+  let fehlerFolge = 0;     // Fehler hintereinander: der Abstand waechst (2 s, 4 s, 8 s ... hoechstens 30 s)
+  let erneuert = false;    // nach einem 401 genau einmal erneuern
+  let sofort = false;      // nach erfolgreichem Erneuern gleich noch einmal fragen
+  let endGrund = null;
   const versteckt = () => !!dokument?.hidden;
-  const melde = (fn, wert) => { try { fn?.(wert); } catch (e) { try { console.error('Online-Beobachter:', e); } catch (x) { /* egal */ } } };
+  const melde = (fn, wert) => { if (!aktiv) return; try { fn?.(wert); } catch (e) { try { console.error('Online-Beobachter:', e); } catch (x) { /* egal */ } } };
+  const beiSichtbarkeit = () => { if (aktiv && !versteckt()) tick(); };
+  function anhalten(grund) {
+    if (!aktiv) return;
+    aktiv = false; endGrund = grund; clearTimeout(timer); timer = null;
+    try { dokument?.removeEventListener?.('visibilitychange', beiSichtbarkeit); } catch (e) { /* egal */ }
+  }
+  function abmelden(e) {
+    const f = new Error(e?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET ? FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET : TEXT_ABGELAUFEN);
+    f.abgemeldet = true; f.status = e?.status; f.detail = e?.detail || e?.message || '';
+    melde(beiFehler, f);
+    anhalten('abgemeldet');
+  }
+  const abstand = () => (fehlerFolge ? Math.min(alle * 2 ** fehlerFolge, Math.max(alle, ABSTAND_MAX_MS)) : alle);
   async function tick() {
     if (!aktiv || unterwegs) return;
     clearTimeout(timer); timer = null;
     if (versteckt()) return; // pausiert; der Sichtbarkeits-Hoerer stoesst wieder an
     unterwegs = true;
+    sofort = false;
     try {
-      const s = await aktiveSitzung();
+      let s;
+      try { s = await aktiveSitzung(); } catch (e) { if (istAnmeldeFehler(e)) { abmelden(e); return; } throw e; }
+      if (!aktiv) return;
       const filter = stand ? `&aktualisiert_am=gt.${encodeURIComponent(stand)}` : '';
       const d = await anfrage(zeilenPfad(id, filter), { token: s.access_token });
+      if (!aktiv) return; // stop() waehrend der Anfrage: kein Hoerer mehr
       const p = Array.isArray(d) ? d[0] : null;
-      letzterFehler = null;
-      if (p && p.aktualisiert_am !== stand) { stand = p.aktualisiert_am; melde(beiAenderung, p); }
-      else if (!p && !stand) { const e = new Error(FEHLER_TEXTE.ONLINE_PARTIE_UNBEKANNT); letzterFehler = e.message; melde(beiFehler, e); }
+      fehlerFolge = 0; erneuert = false;
+      if (p && p.aktualisiert_am !== stand) {
+        letzterFehler = null;
+        stand = p.aktualisiert_am;
+        melde(beiAenderung, p);
+        if (bisEnde && p.status === 'beendet') anhalten('beendet');
+      } else if (!p && !stand) {
+        // gibt es nicht oder gehoert Fremden: taucht nicht von selbst auf, also einmal melden und aufhoeren
+        melde(beiFehler, new Error(FEHLER_TEXTE.ONLINE_PARTIE_UNBEKANNT));
+        anhalten('unbekannt');
+      } else {
+        letzterFehler = null;
+      }
     } catch (e) {
+      if (!aktiv) return;
+      if (e?.status === 401) {
+        // Server lehnt das Token ab, obwohl es lokal noch gilt: genau einmal erneuern, dann sofort neu fragen
+        if (erneuert) { abmelden(e); return; }
+        erneuert = true;
+        try { await erneuereSitzung(); sofort = true; return; } catch (x) {
+          if (!aktiv) return;
+          if (istAnmeldeFehler(x)) { abmelden(x); return; }
+          erneuert = false; // nur das Netz fehlte: beim naechsten 401 wieder erneuern
+          e = x; // Netzfehler beim Erneuern: wie offline weiter
+        }
+      }
+      fehlerFolge++;
       if (e?.message !== letzterFehler) { letzterFehler = e?.message; melde(beiFehler, e); }
     } finally {
       unterwegs = false;
-      if (aktiv && !versteckt()) timer = setTimeout(tick, alle);
+      if (aktiv && !versteckt()) timer = setTimeout(tick, sofort ? 0 : abstand());
     }
   }
-  const beiSichtbarkeit = () => { if (aktiv && !versteckt()) tick(); };
   try { dokument?.addEventListener?.('visibilitychange', beiSichtbarkeit); } catch (e) { /* ohne Pause weiter */ }
   tick();
   return {
-    stop() {
-      if (!aktiv) return;
-      aktiv = false; clearTimeout(timer); timer = null;
-      try { dokument?.removeEventListener?.('visibilitychange', beiSichtbarkeit); } catch (e) { /* egal */ }
-    },
+    stop() { anhalten(endGrund || 'stop'); },
     laeuft: () => aktiv,
     stand: () => stand,
+    grund: () => endGrund,
   };
 }
 

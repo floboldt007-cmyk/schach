@@ -1363,14 +1363,18 @@ Partie-Datensatz von `storage.js`), `am_zug` `'w' | 'b'`, `ergebnis` `'1-0' | '0
 `uhr_weiss_ms`, `uhr_schwarz_ms`, `letzter_zug_am`, `erstellt_am`, `aktualisiert_am` (Trigger; Grundlage der Abfrage).
 Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
 
-**Server-Funktionen (nur `authenticated`, `security definer`; direktes `update` und `delete` sind gesperrt, direktes
-`insert` nur fuer eine eigene offene Einladung, der Trigger setzt dann Code und Anfangszustand):**
+**Server-Funktionen (nur `authenticated`, `security definer`; direktes `insert`, `update` und `delete` sind gesperrt,
+`authenticated` darf nur lesen; der Trigger `online_vor_anlegen` setzt Code, Grundstellung und Anfangszustand):**
 `online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
 `offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug), `online_zug(partie, zug,
 fen_danach, am_zug_danach, ergebnis, grund)` (prueft Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel),
-`online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`), `online_biete_remis(partie)`
-(liegt das Angebot des Gegners schon vor: Annahme), `online_nimm_remis_an(partie)`, `online_meine()` (offen und
-laufend, zuletzt geaendert zuerst, laeuft unter RLS). Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
+`online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`; in einer laufenden Partie
+nur fuer die beiden Spieler), `online_biete_remis(partie)` (liegt das Angebot des Gegners schon vor: Annahme),
+`online_nimm_remis_an(partie)`, `online_pruefe_zeit(partie)` (Zeit reklamieren, fuer beide Spieler; liefert immer die
+aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst,
+laeuft unter RLS). Interne Helfer ohne Recht fuer `authenticated`: `online_hole_laufende`, `online_uhr_pruefen`.
+`online_tritt_bei` lehnt Einladungen ab, die aelter als 24 Stunden sind (`ONLINE_CODE_ABGELAUFEN`) oder in denen der
+Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
 in der SQL-Datei); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`), `tests/online.test.mjs` prueft, dass
 keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
 
@@ -1379,20 +1383,28 @@ Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden
 `online_zug` `clock_timestamp() - letzter_zug_am` von der Uhr des Ziehenden ab und addiert `inkrement_s`; bei <= 0
 endet die Partie durch `'zeit'`, der Zug wird nicht verbucht und der Verlierer bleibt mit leerer Uhr `am_zug`. Der
 Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerechnet an; massgeblich ist der Server.
+Durchsetzbar ist die Uhr ueber `online_uhr_pruefen` (intern): Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
+laufende Uhr der Seite am Zug und beenden die Partie bei <= 0 mit `'zeit'` (Rueckgabe der beendeten Zeile statt
+`raise`, damit die Beendigung nicht zurueckgerollt wird). Steht die heruntergerechnete Gegneruhr bei 0, ruft die
+Oberflaeche `pruefeZeit(id)`. Ob der Gewinner ueberhaupt noch matt setzen koennte, prueft der Server nicht.
 Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck).
 
 **Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
 `tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
 `sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
-`nimmRemisAn(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler }) -> { stop(),
-laeuft(), stand() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`, pausiert bei `document.hidden` und fragt
-beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, Fehler gehen an `beiFehler`, derselbe Text nur einmal
-hintereinander, nichts wirft), `einladungsLink(code, basis?)` -> `https://floboldt007-cmyk.github.io/schach/#online/CODE`
+`nimmRemisAn(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
+bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`,
+pausiert bei `document.hidden` und fragt beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, nach `stop()`
+kein Hoerer-Aufruf mehr, Fehler gehen an `beiFehler`, derselbe Text nur einmal hintereinander, Abstand bei Fehlern
+wachsend bis 30 s; haelt von selbst an mit `grund()` `'beendet'`, `'unbekannt'` (einmal gemeldet) oder `'abgemeldet'`
+(keine Sitzung oder Erneuern abgelehnt, `fehler.abgemeldet`); ein 401 bei lokal gueltiger Sitzung erneuert genau
+einmal und fragt sofort neu; nichts wirft), `einladungsLink(code, basis?)` -> `https://floboldt007-cmyk.github.io/schach/#online/CODE`
 (Basis aus `location`, sonst die Live-Adresse), `codeAusLink(text)`, `uebernimmEinladungsLink()`,
 `gemerkteEinladung()`, `vergissEinladung()` (Merker `schach-arena:online:einladung`), `meineFarbe(partie)`,
 `binAmZug(partie)`, `zuegeListe(partie)`, `normalisiereCode(text)`, `setzeOnlineFetch(fn)` (Tests). Alle Aufrufe
 brauchen die Sitzung aus `konto.js` (`sitzung()`, kurz vor Ablauf `erneuereSitzung()`); ohne Sitzung ein lesbarer
-Fehler ohne Anfrage, offline „Keine Verbindung …“, 401 „neu anmelden“, 404 „noch nicht eingerichtet“. Jede Anfrage
+Fehler ohne Anfrage, offline „Keine Verbindung …“, 401 „neu anmelden“, 404 „noch nicht eingerichtet“, sonst ein
+deutscher Satz je Art (403, 429, 5xx, Datenfehler); der rohe Servertext steht nur in `fehler.detail`. Jede Anfrage
 traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Funktionen laufen als
 `POST /rest/v1/rpc/<name>`, Lesen als `GET /rest/v1/partien_online?id=eq.<id>&select=*`.
 

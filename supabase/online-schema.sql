@@ -14,6 +14,15 @@
 -- werden, auch Stunden spaeter). Ab dem dritten Halbzug zieht der Server `clock_timestamp() - letzter_zug_am`
 -- von der Uhr des Ziehenden ab und addiert danach `inkrement_s`. Ist die Uhr dabei auf 0 oder darunter, ist die
 -- Partie durch Zeitueberschreitung beendet und der Zug wird nicht mehr verbucht.
+-- Die Uhr wird nicht nur beim eigenen Zug geprueft: Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
+-- laufende Uhr der Seite am Zug (online_uhr_pruefen), und mit online_pruefe_zeit kann jeder der beiden Spieler
+-- die Zeit reklamieren, wenn der Gegner einfach nicht mehr zieht. Wer ueber der Zeit ist, verliert also auch,
+-- wenn er gar nichts mehr tut, und kann kein Remis mehr annehmen. (Ob der Gegner ueberhaupt noch matt setzen
+-- koennte, prueft der Server nicht: Regeln rechnen die Clients.)
+--
+-- Einladungen gelten 24 Stunden (online_tritt_bei lehnt aeltere ab, online_meine zeigt sie nicht mehr). Der Code
+-- kommt aus gen_random_uuid() (kryptografischer Zufall), nicht aus random(). Neue Partien entstehen nur ueber
+-- online_erstelle: Ein direktes insert ist fuer authenticated nicht erlaubt.
 --
 -- Fehler melden die Funktionen als kurze Kennungen (z. B. ONLINE_NICHT_DEIN_ZUG); js/online.js uebersetzt sie
 -- in ganze Saetze. Die Kennungen sind ein Vertrag: wer eine aendert, aendert auch js/online.js.
@@ -81,7 +90,7 @@ for each row execute function public.setze_aktualisiert_am();
 
 -- Beim Anlegen entscheidet der Server, nicht der Client: Der Code wird immer hier erzeugt (6 Zeichen ohne
 -- 0/O/1/I, damit man ihn am Telefon vorlesen kann), und eine neue Partie ist immer eine leere, offene
--- Einladung mit vollen Uhren. Das gilt fuer online_erstelle genauso wie fuer ein direktes insert.
+-- Einladung mit vollen Uhren aus der Grundstellung. Angelegt wird nur ueber online_erstelle (kein direktes insert).
 create or replace function public.online_vor_anlegen()
 returns trigger
 language plpgsql
@@ -90,10 +99,12 @@ as $$
 declare
   zeichen constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   neu text := '';
+  zufall bytea := pg_catalog.uuid_send(pg_catalog.gen_random_uuid());
   i integer;
 begin
-  for i in 1..6 loop
-    neu := neu || substr(zeichen, 1 + floor(random() * 32)::integer, 1);
+  -- die ersten 6 Bytes einer v4-UUID sind voller Zufall; 256 ist durch 32 teilbar, also gleichverteilt
+  for i in 0..5 loop
+    neu := neu || substr(zeichen, 1 + (get_byte(zufall, i) % 32), 1);
   end loop;
   new.code := neu;
   new.status := 'offen';
@@ -112,6 +123,7 @@ begin
     new.uhr_weiss_ms := new.bedenkzeit_s * 1000;
     new.uhr_schwarz_ms := new.bedenkzeit_s * 1000;
   end if;
+  new.fen := 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   new.erstellt_am := now();
   new.aktualisiert_am := now();
   return new;
@@ -205,6 +217,12 @@ begin
   if not found or p.status <> 'offen' then
     raise exception 'ONLINE_CODE_UNGUELTIG';
   end if;
+  if p.erstellt_am < now() - interval '24 hours' then
+    raise exception 'ONLINE_CODE_ABGELAUFEN';
+  end if;
+  if p.weiss is null and p.schwarz is null then
+    raise exception 'ONLINE_CODE_UNGUELTIG'; -- der Ersteller muss selbst mitspielen
+  end if;
   if p.erstellt_von = uid or p.weiss = uid or p.schwarz = uid then
     raise exception 'ONLINE_EIGENE_PARTIE';
   end if;
@@ -259,6 +277,68 @@ begin
 end;
 $$;
 
+-- Laufende Uhr der Seite am Zug pruefen (die Zeile muss schon gesperrt sein). Ist sie abgelaufen, endet die Partie
+-- hier mit grund 'zeit' und die Funktion gibt die beendete Zeile zurueck; sonst die unveraenderte. Kein raise:
+-- eine Ausnahme wuerde die Beendigung wieder zurueckrollen. Nur intern (kein Recht fuer authenticated).
+-- Wie in online_zug kostet der jeweils erste Zug von Weiss und Schwarz keine Zeit (weniger als 2 Halbzuege).
+create or replace function public.online_uhr_pruefen(p public.partien_online)
+returns public.partien_online
+language plpgsql
+set search_path = public
+as $$
+declare
+  halbzuege integer;
+  rest_ms bigint;
+begin
+  if p.status <> 'laeuft' or p.bedenkzeit_s is null or p.letzter_zug_am is null then
+    return p;
+  end if;
+  halbzuege := case when p.zuege = '' then 0 else array_length(string_to_array(p.zuege, ' '), 1) end;
+  if halbzuege < 2 then
+    return p;
+  end if;
+  rest_ms := (case when p.am_zug = 'w' then p.uhr_weiss_ms else p.uhr_schwarz_ms end)
+             - floor(extract(epoch from (clock_timestamp() - p.letzter_zug_am)) * 1000);
+  if rest_ms > 0 then
+    return p;
+  end if;
+  update public.partien_online t
+  set uhr_weiss_ms = case when p.am_zug = 'w' then 0 else t.uhr_weiss_ms end,
+      uhr_schwarz_ms = case when p.am_zug = 'b' then 0 else t.uhr_schwarz_ms end,
+      status = 'beendet',
+      ergebnis = case when p.am_zug = 'w' then '0-1' else '1-0' end,
+      grund = 'zeit',
+      remis_angebot = null
+  where t.id = p.id
+  returning * into p;
+  return p;
+end;
+$$;
+
+-- Zeit reklamieren: Jeder der beiden Spieler darf fragen, ob die Uhr der Seite am Zug abgelaufen ist. Dann ist
+-- die Partie beendet (grund 'zeit'). Antwort ist immer die aktuelle Zeile, auch wenn nichts abgelaufen ist oder
+-- die Partie schon vorbei war, damit der Client danach einfach anzeigt, was zurueckkommt.
+create or replace function public.online_pruefe_zeit(partie uuid)
+returns public.partien_online
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  p public.partien_online;
+begin
+  if uid is null then
+    raise exception 'ONLINE_NICHT_ANGEMELDET';
+  end if;
+  select * into p from public.partien_online t where t.id = partie for update;
+  if not found or (p.weiss is distinct from uid and p.schwarz is distinct from uid) then
+    raise exception 'ONLINE_PARTIE_UNBEKANNT';
+  end if;
+  return public.online_uhr_pruefen(p);
+end;
+$$;
+
 -- Einen Zug verbuchen. zug: UCI (e2e4, e7e8q). fen_danach und am_zug_danach kommen vom Client (chess.js),
 -- der Server prueft nur die Form und dass die Seite am Zug wechselt. ergebnis '1-0' | '0-1' | '1/2-1/2'
 -- beendet die Partie (grund z. B. 'matt', 'patt', 'wiederholung', 'material', '50-zuege').
@@ -281,6 +361,11 @@ declare
   uhr_ms bigint;
 begin
   p := public.online_hole_laufende(partie, uid);
+  -- zuerst die Uhr der Seite am Zug: ist sie abgelaufen, endet die Partie hier (auch wenn der Gegner ruft)
+  p := public.online_uhr_pruefen(p);
+  if p.status <> 'laeuft' then
+    return p; -- Zeit abgelaufen, bevor der Zug kam: Partie beendet, Zug verfaellt
+  end if;
   farbe := case when p.weiss = uid then 'w' else 'b' end;
   gegner := case when farbe = 'w' then 'b' else 'w' end;
   if p.am_zug <> farbe then
@@ -377,6 +462,13 @@ begin
     returning * into p;
     return p;
   end if;
+  if p.weiss is distinct from uid and p.schwarz is distinct from uid then
+    raise exception 'ONLINE_PARTIE_UNBEKANNT'; -- nur wer am Brett sitzt, kann aufgeben
+  end if;
+  p := public.online_uhr_pruefen(p);
+  if p.status <> 'laeuft' then
+    return p; -- schon vorher auf Zeit entschieden
+  end if;
   farbe := case when p.weiss = uid then 'w' else 'b' end;
   update public.partien_online t
   set status = 'beendet',
@@ -403,6 +495,10 @@ declare
   gegner text;
 begin
   p := public.online_hole_laufende(partie, uid);
+  p := public.online_uhr_pruefen(p);
+  if p.status <> 'laeuft' then
+    return p; -- Uhr abgelaufen: kein Remis mehr
+  end if;
   farbe := case when p.weiss = uid then 'w' else 'b' end;
   gegner := case when farbe = 'w' then 'b' else 'w' end;
   if p.remis_angebot = gegner then
@@ -436,6 +532,10 @@ declare
   gegner text;
 begin
   p := public.online_hole_laufende(partie, uid);
+  p := public.online_uhr_pruefen(p);
+  if p.status <> 'laeuft' then
+    return p; -- Uhr abgelaufen: das Angebot zaehlt nicht mehr
+  end if;
   gegner := case when p.weiss = uid then 'b' else 'w' end;
   if p.remis_angebot is distinct from gegner then
     raise exception 'ONLINE_KEIN_REMISANGEBOT';
@@ -459,7 +559,7 @@ as $$
   select *
   from public.partien_online
   where (select auth.uid()) in (weiss, schwarz, erstellt_von)
-    and status in ('offen', 'laeuft')
+    and (status = 'laeuft' or (status = 'offen' and erstellt_am >= now() - interval '24 hours'))
   order by aktualisiert_am desc;
 $$;
 
@@ -472,26 +572,18 @@ on public.partien_online for select
 to authenticated
 using ((select auth.uid()) in (weiss, schwarz, erstellt_von));
 
--- Direkt anlegen darf man nur eine eigene, offene Einladung (der Trigger oben setzt Code und Anfangszustand).
+-- Kein insert, update oder delete fuer authenticated (keine Policy und kein Tabellenrecht): Anlegen, Zuege,
+-- Aufgabe und Remis laufen ausschliesslich ueber die Funktionen oben, die als Besitzer der Tabelle arbeiten.
+-- (Eine fruehere Fassung erlaubte ein direktes insert; die Policy wird beim erneuten Einspielen entfernt.)
 drop policy if exists "Eigene Online-Einladung anlegen" on public.partien_online;
-create policy "Eigene Online-Einladung anlegen"
-on public.partien_online for insert
-to authenticated
-with check (
-  (select auth.uid()) = erstellt_von
-  and status = 'offen'
-  and (weiss is null or weiss = erstellt_von)
-  and (schwarz is null or schwarz = erstellt_von)
-);
-
--- Kein update und kein delete fuer authenticated (keine Policy und kein Tabellenrecht): Zuege, Aufgabe und
--- Remis laufen ausschliesslich ueber die Funktionen oben, die als Besitzer der Tabelle arbeiten.
 revoke all on table public.partien_online from anon, authenticated, public;
-grant select, insert on table public.partien_online to authenticated;
+grant select on table public.partien_online to authenticated;
 
 -- Funktionen: nur fuer angemeldete Nutzer, nie fuer anon oder public. Die Helfer bleiben intern.
 revoke all on function public.online_vor_anlegen() from anon, authenticated, public;
 revoke all on function public.online_hole_laufende(uuid, uuid) from anon, authenticated, public;
+revoke all on function public.online_uhr_pruefen(public.partien_online) from anon, authenticated, public;
+revoke all on function public.online_pruefe_zeit(uuid) from anon, public;
 revoke all on function public.online_erstelle(text, integer, integer) from anon, public;
 revoke all on function public.online_tritt_bei(text) from anon, public;
 revoke all on function public.online_zug(uuid, text, text, text, text, text) from anon, public;
@@ -506,3 +598,4 @@ grant execute on function public.online_gib_auf(uuid) to authenticated;
 grant execute on function public.online_biete_remis(uuid) to authenticated;
 grant execute on function public.online_nimm_remis_an(uuid) to authenticated;
 grant execute on function public.online_meine() to authenticated;
+grant execute on function public.online_pruefe_zeit(uuid) to authenticated;

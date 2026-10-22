@@ -44,7 +44,7 @@ weitergeben oder in ein Fehlerprotokoll kopieren.
 
 Partien gegen Freunde liegen in der Tabelle `partien_online` und werden ausschließlich über Datenbank-Funktionen
 verändert (`online_erstelle`, `online_tritt_bei`, `online_zug`, `online_gib_auf`, `online_biete_remis`,
-`online_nimm_remis_an`, `online_meine`). Die App ruft sie über die REST-Schnittstelle (`/rest/v1/rpc/...`) mit dem
+`online_nimm_remis_an`, `online_pruefe_zeit`, `online_meine`). Die App ruft sie über die REST-Schnittstelle (`/rest/v1/rpc/...`) mit dem
 publishable key und dem Sitzungs-Token auf. Es gibt keinen Websocket und keine Supabase-Bibliothek im Projekt.
 Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Server vor.
 
@@ -54,14 +54,23 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
    (`create or replace` kann das nicht).
 2. **RLS prüfen:** Den Inhalt von `supabase/online-rls-test.sql` ausführen. Die Query muss am Ende
    `Online-RLS-Test erfolgreich` ausgeben. Das Skript legt drei Testnutzer an, spielt mehrere Partien durch
-   (Beitritt, Züge, Zeitabzug, Zeitüberschreitung, Remis, Aufgabe, Dritter sieht nichts) und rollt alles zurück.
-3. **Was der Server schützt:** Lesen dürfen nur die beiden Spieler und der Ersteller. `update` und `delete` sind für
-   angemeldete Nutzer gesperrt; Züge gehen nur über `online_zug`, das prüft, wer am Zug ist, und die Uhr mit der
-   Serverzeit führt. Der Einladungscode (6 Zeichen ohne 0, O, 1 und I) entsteht immer serverseitig. Die Schachregeln
-   selbst prüft der Server **nicht**: Beide Clients prüfen mit chess.js, unter Freunden reicht das. Für Partien gegen
-   Fremde kommt später eine Edge Function, die jeden Zug nachrechnet.
+   (Beitritt, Züge, Zeitabzug, Zeitüberschreitung, Zeit reklamieren, Remis, Aufgabe, abgelaufene Einladung,
+   Dritter sieht nichts) und rollt alles zurück. Wer eine ältere Fassung schon eingespielt hat, spielt die Datei
+   einfach noch einmal ein: Sie entfernt dabei die frühere Regel, nach der man eine Einladung auch direkt anlegen
+   durfte.
+3. **Was der Server schützt:** Lesen dürfen nur die beiden Spieler und der Ersteller. Anlegen, Ändern und Löschen
+   sind für angemeldete Nutzer direkt gesperrt; neue Partien entstehen nur über `online_erstelle`, Züge nur über
+   `online_zug`, das prüft, wer am Zug ist, und die Uhr mit der Serverzeit führt. Die Uhr gilt auch, wenn jemand
+   gar nicht mehr zieht: Zug, Remis, Remis-Annahme und Aufgabe prüfen zuerst die laufende Uhr, und jeder der beiden
+   Spieler kann mit `online_pruefe_zeit` die Zeit reklamieren. Der Einladungscode (6 Zeichen ohne 0, O, 1 und I)
+   entsteht immer serverseitig aus kryptografischem Zufall, eine Einladung gilt 24 Stunden.
+   **Vertrauenssache unter Freunden:** Die Schachregeln selbst prüft der Server **nicht**, und auch das Ergebnis, das
+   der Ziehende mit seinem Zug meldet (zum Beispiel „matt“), übernimmt er ungeprüft. Beide Clients prüfen mit
+   chess.js, unter Freunden reicht das. Für Partien gegen Fremde kommt später eine Edge Function, die jeden Zug und
+   jedes Ergebnis nachrechnet.
 4. **Abfrage statt Echtzeit:** Die App fragt alle 2 Sekunden über REST nach einer neueren Zeile (`aktualisiert_am`)
-   und pausiert, solange die Seite verborgen ist. Das reicht für Partien unter Freunden und braucht keine weitere
+   und pausiert, solange die Seite verborgen ist. Bei Fehlern wird der Abstand größer (bis 30 Sekunden), nach einer
+   beendeten Partie oder einer abgelaufenen Anmeldung hört die Abfrage von selbst auf. Das reicht für Partien unter Freunden und braucht keine weitere
    Einrichtung. Supabase Realtime (Websocket) kann später dazukommen; dafür müsste die Tabelle `partien_online` im
    Dashboard unter **Database > Publications** zur Publication `supabase_realtime` hinzugefügt werden, und die App
    bräuchte einen eigenen Websocket-Client. Vorerst nichts einschalten.

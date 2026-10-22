@@ -7,7 +7,7 @@ import path from 'node:path';
 import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL } from '../js/konto.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../js/konto-config.js';
 import {
-  erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte,
+  erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
   zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL,
 } from '../js/online.js';
@@ -33,6 +33,7 @@ setzeOnlineFetch(async (url, opt = {}) => {
   calls.push({ url, methode: opt.method, headers: opt.headers || {}, body: opt.body });
   if (fetchKaputt) throw fetchKaputt;
   const x = antworten.shift() || { status: 200, body: [] };
+  if (x.warte) await new Promise((r) => setTimeout(r, x.warte));
   return { ok: x.status < 400, status: x.status, async json() { if (x.body === undefined) throw new Error('leer'); return x.body; } };
 });
 const letzter = () => calls.at(-1);
@@ -151,6 +152,12 @@ anmelden();
   antworten.push({ status: 200, body: { ...partie, status: 'beendet', ergebnis: '1/2-1/2' } });
   const a = await nimmRemisAn(ID);
   pruefe('nimmRemisAn: rpc/online_nimm_remis_an mit { partie }', letzter().url.endsWith('/rest/v1/rpc/online_nimm_remis_an') && JSON.stringify(bodyVon(letzter())) === JSON.stringify({ partie: ID }) && a.ergebnis === '1/2-1/2');
+  antworten.push({ status: 200, body: { ...partie, status: 'beendet', ergebnis: '1-0', grund: 'zeit' } });
+  const z = await pruefeZeit(ID);
+  pruefe('pruefeZeit: rpc/online_pruefe_zeit mit { partie }, liefert die Partie', letzter().url.endsWith('/rest/v1/rpc/online_pruefe_zeit') && letzter().methode === 'POST' && JSON.stringify(bodyVon(letzter())) === JSON.stringify({ partie: ID }) && z.grund === 'zeit');
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_CODE_ABGELAUFEN' } });
+  const ea = await fehlerVon(() => tritteBei('ABC234'));
+  pruefe('tritteBei: abgelaufene Einladung freundlich (24 Stunden)', ea?.message === FEHLER_TEXTE.ONLINE_CODE_ABGELAUFEN && /24 Stunden/.test(ea.message) && ea.kennung === 'ONLINE_CODE_ABGELAUFEN');
   antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_KEIN_REMISANGEBOT' } });
   const e = await fehlerVon(() => nimmRemisAn(ID));
   pruefe('nimmRemisAn: ohne Angebot freundlich', e?.message === FEHLER_TEXTE.ONLINE_KEIN_REMISANGEBOT);
@@ -182,7 +189,15 @@ anmelden();
   const e4 = await fehlerVon(() => meinePartien());
   antworten.push({ status: 409, body: { code: '23505', message: 'duplicate key' } });
   const e5 = await fehlerVon(() => meinePartien());
-  pruefe('Serverfehler: 401 abgelaufen, 404 nicht eingerichtet, leer mit Status, sonst Servertext', /neu anmelden/.test(e2?.message || '') && /noch nicht eingerichtet/.test(e3?.message || '') && e4?.message === 'Serverfehler (500)' && e5?.message === 'duplicate key' && e5.code === '23505');
+  antworten.push({ status: 400, body: { code: '23514', message: 'new row for relation "partien_online" violates check constraint "partien_online_zuege_groesse"' } });
+  const e6 = await fehlerVon(() => meinePartien());
+  antworten.push({ status: 403, body: { code: '42501', message: 'permission denied for table partien_online' } });
+  const e7 = await fehlerVon(() => meinePartien());
+  pruefe('Serverfehler: 401 abgelaufen, 404 nicht eingerichtet, 500 mit Status und "noch einmal", sonst deutscher Satz mit Originaltext in detail',
+    /neu anmelden/.test(e2?.message || '') && /noch nicht eingerichtet/.test(e3?.message || '') && /\(500\)/.test(e4?.message || '') && /noch einmal/.test(e4?.message || '')
+    && e5?.message === 'Das gibt es auf dem Server schon.' && e5.detail === 'duplicate key' && e5.code === '23505' && e5.status === 409
+    && /abgelehnt/.test(e6?.message || '') && /check constraint/.test(e6?.detail || '') && /Berechtigung/.test(e7?.message || '') && e7.status === 403);
+  pruefe('Serverfehler: nie roher englischer Text in der Meldung', [e2, e3, e4, e5, e6, e7].every((x) => x && !/duplicate|violates|constraint|permission|denied|Could not find|JWT/i.test(x.message)), [e2, e3, e4, e5, e6, e7].map((x) => x?.message).join(' | '));
 }
 
 // ---------- beobachte (Abfrage) ----------
@@ -210,19 +225,83 @@ anmelden();
   await warte(5);
   pruefe('beobachte: nach dem Sichtbarwerden sofort wieder eine Abfrage', calls.length === nVerborgen + 1);
   const nVorOffline = calls.length;
+  const zeitenOffline = []; const zaehle = () => zeitenOffline.push(Date.now());
   fetchKaputt = new Error('offline');
-  await warte(50);
+  const kaputtAb = Date.now();
+  const beobachter = setInterval(() => { if (calls.length - nVorOffline > zeitenOffline.length) zaehle(); }, 1);
+  await warte(160);
+  clearInterval(beobachter);
   pruefe('beobachte: offline meldet einmal freundlich und fragt weiter', fehler.length === 1 && /Keine Verbindung/.test(fehler[0]) && calls.length >= nVorOffline + 3 && b.laeuft());
+  const abstaende = zeitenOffline.slice(1).map((t, i) => t - zeitenOffline[i]);
+  pruefe('beobachte: bei Fehlern waechst der Abstand (nicht alle 10 ms weiter)', calls.length - nVorOffline <= 5 && abstaende.length >= 2 && abstaende[1] > abstaende[0], `${calls.length - nVorOffline} Abfragen in 160 ms, Abstaende ${abstaende.join(',')} ab ${kaputtAb}`);
   fetchKaputt = null;
+  await warte(250); // der letzte Fehler-Abstand kann bis 160 ms dauern
+  const nWieder = calls.length; await warte(35);
+  pruefe('beobachte: nach dem Fehler wieder im normalen Takt', calls.length >= nWieder + 2 && b.laeuft());
+  // 401, obwohl die Sitzung lokal noch gilt: genau einmal erneuern, sofort neu fragen, keine Meldung
+  const kontoAufrufe = [];
+  setzeKontoFetch(async (url, opt) => { kontoAufrufe.push(url); return { ok: true, status: 200, async json() { return { access_token: tokenFuer('u1').replace(/^a\./, 'frisch.'), refresh_token: 'r3', expires_at: 9999999999, user: { id: 'u1', email: 'a@b.de' } }; } }; });
   antworten.push({ status: 401, body: { message: 'JWT expired' } });
-  await warte(30);
-  pruefe('beobachte: ein anderer Fehler wird gemeldet, danach laeuft es normal weiter', fehler.length === 2 && /neu anmelden/.test(fehler[1]) && aenderungen.length === 2);
+  await warte(40);
+  pruefe('beobachte: 401 erneuert die Sitzung genau einmal und fragt sofort mit dem neuen Token, ohne Meldung', kontoAufrufe.length === 1 && /grant_type=refresh_token/.test(kontoAufrufe[0]) && fehler.length === 1 && b.laeuft() && letzter().headers.Authorization === `Bearer ${tokenFuer('u1').replace(/^a\./, 'frisch.')}` && aenderungen.length === 2);
+  setzeKontoFetch(null);
   b.stop();
   const nStop = calls.length;
   await warte(50);
   pruefe('beobachte: stop beendet die Abfrage und meldet den Sichtbarkeits-Hoerer ab', calls.length === nStop && !b.laeuft() && (hoerer.visibilitychange || []).length === 0);
   b.stop();
   pruefe('beobachte: stop ist mehrfach erlaubt', !b.laeuft());
+
+  // stop() waehrend einer laufenden Anfrage: die Antwort erreicht keinen Hoerer mehr
+  const aenderungen7 = []; const fehler7 = [];
+  antworten.push({ status: 200, body: [partie], warte: 30 });
+  const b7 = beobachte(ID, { alle: 10, beiAenderung: (p) => aenderungen7.push(p), beiFehler: (e) => fehler7.push(e) });
+  await warte(5);
+  b7.stop();
+  await warte(60);
+  pruefe('beobachte: nach stop() kommt auch aus einer laufenden Anfrage kein beiAenderung mehr', aenderungen7.length === 0 && fehler7.length === 0 && !b7.laeuft() && b7.grund() === 'stop');
+
+  // 401 und das Erneuern scheitert (totes Refresh-Token): einmal "neu anmelden", dann Schluss
+  anmelden();
+  const kontoAufrufe8 = [];
+  setzeKontoFetch(async (url) => { kontoAufrufe8.push(url); return { ok: false, status: 400, async json() { return { error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' }; } }; });
+  const fehler8 = [];
+  antworten.push({ status: 401, body: { message: 'JWT expired' } });
+  const n8 = calls.length;
+  const b8 = beobachte(ID, { alle: 10, beiFehler: (e) => fehler8.push(e) });
+  await warte(80);
+  pruefe('beobachte: totes Refresh-Token: ein Erneuerungsversuch, eine deutsche Meldung, Abfrage endet', kontoAufrufe8.length === 1 && fehler8.length === 1 && /neu anmelden/.test(fehler8[0].message) && fehler8[0].abgemeldet === true && !/Invalid|Refresh Token/.test(fehler8[0].message) && !b8.laeuft() && b8.grund() === 'abgemeldet' && calls.length === n8 + 1);
+  // abgelaufene Sitzung und das Erneuern scheitert: keine Abfrage, ein Versuch, Ende
+  anmelden({ expiresAt: 1 });
+  kontoAufrufe8.length = 0;
+  const fehler9 = []; const n9 = calls.length;
+  const b9 = beobachte(ID, { alle: 10, beiFehler: (e) => fehler9.push(e) });
+  await warte(60);
+  pruefe('beobachte: abgelaufene Sitzung, Erneuern abgelehnt: keine Partie-Abfrage, kein Dauer-Erneuern', kontoAufrufe8.length === 1 && calls.length === n9 && fehler9.length === 1 && fehler9[0].abgemeldet === true && !b9.laeuft());
+  // 401 und das Erneuern scheitert nur am Netz: wie offline weiter (keine Abmeldung), naechster 401 erneuert wieder
+  let kontoNetz = 0;
+  setzeKontoFetch(async () => { kontoNetz++; throw new Error('netz weg'); });
+  anmelden();
+  const fehler12 = [];
+  antworten.push({ status: 401, body: { message: 'JWT expired' } }, { status: 401, body: { message: 'JWT expired' } }, { status: 200, body: [partie] });
+  const b12 = beobachte(ID, { alle: 10, beiFehler: (e) => fehler12.push(e) });
+  await warte(120);
+  pruefe('beobachte: Erneuern ohne Netz meldet "Keine Verbindung", meldet nicht ab und versucht beim naechsten 401 wieder', kontoNetz === 2 && b12.laeuft() && fehler12.length >= 1 && fehler12.every((e) => !e.abgemeldet) && /Keine Verbindung/.test(fehler12[0].message));
+  b12.stop();
+  setzeKontoFetch(null);
+  anmelden();
+
+  // beendete Partie: einmal melden, dann haelt die Abfrage an (mit bisEnde: false laeuft sie weiter)
+  const aenderungen10 = [];
+  antworten.push({ status: 200, body: [{ ...partie2, status: 'beendet', ergebnis: '1-0', grund: 'matt' }] });
+  const b10 = beobachte(ID, { alle: 10, beiAenderung: (p) => aenderungen10.push(p) });
+  await warte(15); const n10 = calls.length; await warte(40);
+  pruefe('beobachte: beendete Partie wird gemeldet, danach keine Abfrage mehr', aenderungen10.length === 1 && aenderungen10[0].status === 'beendet' && !b10.laeuft() && b10.grund() === 'beendet' && calls.length === n10);
+  antworten.push({ status: 200, body: [{ ...partie2, status: 'beendet', ergebnis: '1-0', grund: 'matt' }] });
+  const b11 = beobachte(ID, { alle: 10, bisEnde: false });
+  await warte(40);
+  pruefe('beobachte: mit bisEnde: false laeuft sie weiter', b11.laeuft() && b11.grund() === null);
+  b11.stop();
 
   const b2 = beobachte(ID, { alle: 10, seit: partie2.aktualisiert_am });
   await warte(5);
@@ -235,6 +314,8 @@ anmelden();
   const b3 = beobachte(ID, { alle: 10, beiFehler: (e) => fehler3.push(e.message) });
   await warte(5);
   pruefe('beobachte: unbekannte Partie wird gemeldet', fehler3.length === 1 && fehler3[0] === FEHLER_TEXTE.ONLINE_PARTIE_UNBEKANNT && calls.length === n3 + 1);
+  await warte(40);
+  pruefe('beobachte: unbekannte Partie nur einmal gemeldet, danach keine Abfrage mehr', fehler3.length === 1 && calls.length === n3 + 1 && !b3.laeuft() && b3.grund() === 'unbekannt');
   b3.stop();
 
   abmelden();
@@ -242,6 +323,7 @@ anmelden();
   const b4 = beobachte(ID, { alle: 10, beiFehler: (e) => fehler4.push(e.message) });
   await warte(25);
   pruefe('beobachte: ohne Anmeldung einmal freundlich, keine Anfrage, kein Absturz', fehler4.length === 1 && fehler4[0] === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET && calls.length === n4);
+  pruefe('beobachte: ohne Anmeldung haelt die Abfrage an (abgemeldet)', !b4.laeuft() && b4.grund() === 'abgemeldet');
   b4.stop();
   anmelden();
   const alterError = console.error; let gemeldet = 0; console.error = () => { gemeldet++; };
@@ -293,9 +375,11 @@ anmelden();
   const sql = quelle('supabase/online-schema.sql');
   const kennungen = [...new Set([...sql.matchAll(/raise exception '(ONLINE_[A-Z_]+)'/g)].map((x) => x[1]))];
   pruefe('online-schema.sql: jede Fehlerkennung des Servers ist in FEHLER_TEXTE uebersetzt', kennungen.length >= 12 && kennungen.every((k) => typeof FEHLER_TEXTE[k] === 'string' && FEHLER_TEXTE[k].length > 10), kennungen.filter((k) => !FEHLER_TEXTE[k]).join(', '));
-  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_zug', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine'];
+  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_zug', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine', 'online_pruefe_zeit'];
   pruefe('online-schema.sql: alle Funktionen, die online.js aufruft, sind definiert und nur fuer authenticated freigegeben', funktionen.every((n) => new RegExp(`create or replace function public\\.${n}\\(`).test(sql) && new RegExp(`grant execute on function public\\.${n}\\([^)]*\\) to authenticated;`).test(sql) && new RegExp(`revoke all on function public\\.${n}\\([^)]*\\) from anon, public;`).test(sql)));
-  pruefe('online-schema.sql: kein update und kein delete fuer authenticated, RLS an', /revoke all on table public\.partien_online from anon, authenticated, public;/.test(sql) && /grant select, insert on table public\.partien_online to authenticated;/.test(sql) && !/grant[^;]*\b(update|delete)\b[^;]*partien_online/.test(sql) && /alter table public\.partien_online enable row level security;/.test(sql));
+  pruefe('online-schema.sql: kein insert, update und delete fuer authenticated (nur lesen), RLS an', /revoke all on table public\.partien_online from anon, authenticated, public;/.test(sql) && /grant select on table public\.partien_online to authenticated;/.test(sql) && !/grant[^;]*\b(insert|update|delete)\b[^;]*partien_online/.test(sql) && !/create policy[^;]*for insert/.test(sql) && /alter table public\.partien_online enable row level security;/.test(sql));
+  pruefe('online-schema.sql: Uhr-Pruefung in Zug, Remis, Remis-Annahme und Aufgabe; Helfer intern', (sql.match(/p := public\.online_uhr_pruefen\(p\);/g) || []).length >= 4 && /revoke all on function public\.online_uhr_pruefen\(public\.partien_online\) from anon, authenticated, public;/.test(sql) && !/grant execute on function public\.online_uhr_pruefen/.test(sql));
+  pruefe('online-schema.sql: Code aus gen_random_uuid (nicht random()), Einladungen 24 Stunden', /gen_random_uuid/.test(sql.slice(sql.indexOf('online_vor_anlegen'), sql.indexOf('online_erstelle('))) && !/random\(\) \* 32/.test(sql) && /interval '24 hours'/.test(sql));
   pruefe('online-schema.sql: Zugregel (UCI) und Code-Alphabet wie in online.js', sql.includes("'^[a-h][1-8][a-h][1-8][qrbn]?$'") && sql.includes('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'));
   const rls = quelle('supabase/online-rls-test.sql');
   pruefe('online-rls-test.sql: drei Nutzer, Erfolgsmeldung, rollback am Ende', (rls.match(/@example\.invalid/g) || []).length === 3 && /Online-RLS-Test erfolgreich/.test(rls) && /rollback;\s*$/.test(rls));

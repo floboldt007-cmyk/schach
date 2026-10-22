@@ -91,18 +91,33 @@ begin
 end
 $$;
 
--- Ein direktes insert fuer sich selbst ist erlaubt und bekommt Code und Anfangszustand vom Server.
+-- Auch fuer sich selbst ist ein direktes insert verboten (kein Tabellenrecht, keine Policy): Partien entstehen
+-- nur ueber online_erstelle. Sonst liesse sich eine Partie ohne Spieler oder mit eigener Stellung anlegen.
 do $$
 declare
   p public.partien_online;
 begin
-  insert into public.partien_online (erstellt_von, schwarz, status, fen, bedenkzeit_s, zuege, am_zug, code)
-  values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'offen',
-          'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 60, 'e2e4 e7e5', 'b', 'XXXXXX')
-  returning * into p;
-  if p.code = 'XXXXXX' or p.code !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$' or p.zuege <> '' or p.am_zug <> 'w'
+  begin
+    insert into public.partien_online (erstellt_von, schwarz, status, fen, bedenkzeit_s, zuege, am_zug, code)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'offen',
+            'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 60, 'e2e4 e7e5', 'b', 'XXXXXX');
+    raise exception 'FEHLER: direktes insert fuer sich selbst war erlaubt';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.partien_online (erstellt_von, status, fen)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'offen', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+    raise exception 'FEHLER: direktes insert ohne Spieler war erlaubt';
+  exception
+    when insufficient_privilege then null;
+  end;
+  -- dieselbe Einladung ueber die Funktion (Schwarz, 1 Minute ohne Zuschlag)
+  p := public.online_erstelle('b', 60, null);
+  if p.code !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$' or p.zuege <> '' or p.am_zug <> 'w'
+     or p.schwarz <> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' or p.weiss is not null
      or p.uhr_weiss_ms <> 60000 or p.uhr_schwarz_ms <> 60000 or p.inkrement_s <> 0 then
-    raise exception 'FEHLER: direktes insert uebernimmt Werte des Clients, die der Server setzen muss';
+    raise exception 'FEHLER: online_erstelle (Schwarz, 1 Minute) legt falsch an';
   end if;
   -- gleich wieder zurueckziehen, damit der Rest des Tests nur mit Partie 1 arbeitet
   p := public.online_gib_auf(p.id);
@@ -483,6 +498,218 @@ begin
   end if;
 end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 11. Die Uhr ist durchsetzbar: Wer ueber der Zeit ist, verliert auch, wenn er nichts mehr tut.
+--     A (Weiss) gegen B (Schwarz), 1 Minute. Nach 1. e4 e5 2. Sf3 ist Schwarz am Zug und zieht nicht mehr.
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_erstelle('w', 60, 0);
+  perform set_config('online_test.code5', p.code, true);
+  perform set_config('online_test.partie5', p.id::text, true);
+end
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$ begin perform public.online_tritt_bei(current_setting('online_test.code5')); end $$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$ begin perform public.online_zug(current_setting('online_test.partie5')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$ begin perform public.online_zug(current_setting('online_test.partie5')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+  id5 uuid := current_setting('online_test.partie5')::uuid;
+begin
+  p := public.online_zug(id5, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b');
+  -- A bietet gleich Remis an (B koennte es spaeter annehmen wollen)
+  p := public.online_biete_remis(id5);
+  -- solange die Uhr laeuft, aendert das Reklamieren nichts
+  p := public.online_pruefe_zeit(id5);
+  if p.status <> 'laeuft' or p.ergebnis is not null or p.remis_angebot <> 'w' then
+    raise exception 'FEHLER: online_pruefe_zeit beendet eine Partie mit Restzeit (status %, grund %)', p.status, p.grund;
+  end if;
+  -- nicht am Zug: ziehen geht weiterhin nicht
+  begin
+    perform public.online_zug(id5, 'b1c3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 2 2', 'b');
+    raise exception 'FEHLER: A konnte ziehen, obwohl Schwarz am Zug ist';
+  exception
+    when others then if sqlerrm <> 'ONLINE_NICHT_DEIN_ZUG' then raise; end if;
+  end;
+end
+$$;
+
+-- C kann keine fremde Zeit reklamieren
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  perform public.online_pruefe_zeit(current_setting('online_test.partie5')::uuid);
+  raise exception 'FEHLER: Dritter konnte online_pruefe_zeit aufrufen';
+exception
+  when others then if sqlerrm <> 'ONLINE_PARTIE_UNBEKANNT' then raise; end if;
+end
+$$;
+
+-- B ist 29 Minuten ueber der Zeit und will jetzt noch das Remis annehmen: die Partie ist auf Zeit verloren.
+reset role;
+update public.partien_online
+set letzter_zug_am = clock_timestamp() - interval '30 minutes'
+where id = current_setting('online_test.partie5')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_nimm_remis_an(current_setting('online_test.partie5')::uuid);
+  if p.status <> 'beendet' or p.ergebnis <> '1-0' or p.grund <> 'zeit' or p.uhr_schwarz_ms <> 0 or p.remis_angebot is not null then
+    raise exception 'FEHLER: Remis-Annahme nach abgelaufener Uhr (status %, ergebnis %, grund %)', p.status, p.ergebnis, p.grund;
+  end if;
+end
+$$;
+
+-- Dasselbe ohne jedes Zutun von B: A reklamiert die Zeit (eigene Partie 6, sonst gleich).
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_erstelle('w', 60, 0);
+  perform set_config('online_test.code6', p.code, true);
+  perform set_config('online_test.partie6', p.id::text, true);
+end
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$ begin perform public.online_tritt_bei(current_setting('online_test.code6')); end $$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b'); end $$;
+reset role;
+update public.partien_online
+set letzter_zug_am = clock_timestamp() - interval '10 minutes'
+where id = current_setting('online_test.partie6')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+  id6 uuid := current_setting('online_test.partie6')::uuid;
+begin
+  if (select count(*) from public.online_meine() m where m.id = id6) <> 1 then
+    raise exception 'FEHLER: Partie 6 fehlt vor dem Reklamieren in online_meine';
+  end if;
+  p := public.online_pruefe_zeit(id6);
+  if p.status <> 'beendet' or p.ergebnis <> '1-0' or p.grund <> 'zeit' or p.uhr_schwarz_ms <> 0 or p.zuege <> 'e2e4 e7e5 g1f3' then
+    raise exception 'FEHLER: Zeit-Reklamation nicht erkannt (status %, ergebnis %, grund %)', p.status, p.ergebnis, p.grund;
+  end if;
+  if (select count(*) from public.online_meine() m where m.id = id6) <> 0 then
+    raise exception 'FEHLER: auf Zeit beendete Partie steht noch in online_meine';
+  end if;
+  -- noch einmal reklamieren: liefert die beendete Zeile, aendert nichts
+  p := public.online_pruefe_zeit(id6);
+  if p.status <> 'beendet' or p.ergebnis <> '1-0' then
+    raise exception 'FEHLER: zweite Reklamation aendert das Ergebnis';
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 12. Einladungen laufen nach 24 Stunden ab; eine Partie ohne Spieler (nur mit Besitzerrechten anlegbar) kann
+--     niemand starten, und wer nicht am Brett sitzt, kann eine laufende Partie nicht aufgeben.
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_erstelle('zufall', null, null);
+  perform set_config('online_test.code7', p.code, true);
+  perform set_config('online_test.partie7', p.id::text, true);
+end
+$$;
+reset role;
+update public.partien_online set erstellt_am = now() - interval '25 hours'
+where id = current_setting('online_test.partie7')::uuid;
+-- Partie 8: ohne Spieler (weiss und schwarz leer), so nur am Recht vorbei denkbar
+insert into public.partien_online (erstellt_von, status, fen)
+values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'offen', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+select set_config('online_test.code8', (select code from public.partien_online where weiss is null and schwarz is null and status = 'offen' limit 1), true);
+set local role authenticated;
+do $$
+begin
+  if (select count(*) from public.online_meine() m where m.id = current_setting('online_test.partie7')::uuid) <> 0 then
+    raise exception 'FEHLER: abgelaufene Einladung steht noch in online_meine';
+  end if;
+end
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform public.online_tritt_bei(current_setting('online_test.code7'));
+    raise exception 'FEHLER: abgelaufene Einladung angenommen';
+  exception
+    when others then if sqlerrm <> 'ONLINE_CODE_ABGELAUFEN' then raise; end if;
+  end;
+  begin
+    perform public.online_tritt_bei(current_setting('online_test.code8'));
+    raise exception 'FEHLER: Partie ohne Spieler gestartet';
+  exception
+    when others then if sqlerrm <> 'ONLINE_CODE_UNGUELTIG' then raise; end if;
+  end;
+end
+$$;
+-- C legt eine Einladung als Weiss an, B tritt bei; danach wird (nur mit Besitzerrechten) Weiss an A uebergeben.
+-- C ist dann Ersteller, aber kein Spieler und darf weder aufgeben noch die Zeit reklamieren.
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_erstelle('w', null, null);
+  perform set_config('online_test.code9', p.code, true);
+  perform set_config('online_test.partie9', p.id::text, true);
+end
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$ begin perform public.online_tritt_bei(current_setting('online_test.code9')); end $$;
+reset role;
+update public.partien_online set weiss = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+where id = current_setting('online_test.partie9')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  begin
+    perform public.online_gib_auf(current_setting('online_test.partie9')::uuid);
+    raise exception 'FEHLER: Ersteller ohne Platz am Brett konnte eine laufende Partie aufgeben';
+  exception
+    when others then if sqlerrm <> 'ONLINE_PARTIE_UNBEKANNT' then raise; end if;
+  end;
+  begin
+    perform public.online_pruefe_zeit(current_setting('online_test.partie9')::uuid);
+    raise exception 'FEHLER: Ersteller ohne Platz am Brett konnte die Zeit reklamieren';
+  exception
+    when others then if sqlerrm <> 'ONLINE_PARTIE_UNBEKANNT' then raise; end if;
+  end;
+end
+$$;
+reset role;
+do $$
+begin
+  if (select status from public.partien_online where id = current_setting('online_test.partie9')::uuid) <> 'laeuft' then
+    raise exception 'FEHLER: Partie 9 wurde durch einen Unbeteiligten veraendert';
+  end if;
+end
+$$;
+set local role authenticated;
 
 select 'Online-RLS-Test erfolgreich' as ergebnis;
 rollback;
