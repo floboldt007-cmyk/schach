@@ -21,7 +21,8 @@
 //     ids: [partieId ...]               verarbeitete partie:beendet (Ringpuffer, hoechstens IDS_MAX)
 //     lernen: { ueb: { 'pid:ply': n }, mom: { pid: n }, lek: { id: 'asg' }, karten: { tag, n }, siegel: ['boss:stufe'],
 //               rekord: [pid], raetsel: [id] }
-//     lauf: null | { id, fa, fn, ab, start, hilfe, ref, z: { ply: [klasse, gv, gn, flags, gvv, matt] } } }
+//     lauf: null | { id, fa, fn, ab, start, hilfe, ref, z: { ply: [klasse, gv, gn, flags, gvv, matt] } },
+//     lage: null | { wert, t } }   Arena-Wertung aus liga:geaendert (Paket Wertung), sonst rechnet funken die Lage selbst
 //         die laufende Partie (Live-Bewertungen fuer die Rechnung am Ende; flags: 1 trivial, 2 nach Hilfe)
 //
 // API:
@@ -35,6 +36,7 @@
 //   lern*(st, d, ctx) -> buchungen              Tabelle B (Uebung, Schluesselmoment, Karte, Lektion, Raetsel)
 //   siegel(st, d), rekord(st, d, partieId) -> buchungen   Tabelle C
 //   schliesseLevel(st, vorher, jetzt) -> null | { vorher, nachher, neu, titel }
+//   setzeLage(st, d, jetzt) -> boolean, lageVon(st) -> Zahl | null   Arena-Wertung (liga:geaendert)
 import { ladeModul, speichereModul, MODUL_BUDGET } from '../../storage.js';
 import { tagSchluessel, wochenSchluessel, tageZwischen, addiereTage, istSchluessel } from '../../tag.js';
 import { spielplanWoche } from '../../inhalte.js';
@@ -67,7 +69,7 @@ export function leer(jetzt = new Date()) {
     stand: STAND, gesamt: 0, level: 1, heute: leererTag(tag), verlauf: [],
     freigeschaltet: L.belohnungen(1).map((s) => s.id),
     rw: { karten: 0, woche: null, aktiv: 0, start: null, letzterTag: null, willkommen: null, gespielt: [], aufgehoben: [], neu: null },
-    aufstiege: [], gruss: false, ids: [],
+    aufstiege: [], gruss: false, ids: [], lage: null,
     lernen: { ueb: {}, mom: {}, lek: {}, karten: { tag: null, n: 0 }, siegel: [], rekord: [], raetsel: [] },
     lauf: null,
   };
@@ -101,6 +103,8 @@ export function normalisiere(roh, jetzt = new Date()) {
   };
   st.aufstiege = liste(r.aufstiege).filter((a) => a && Number.isInteger(a.level) && Number.isFinite(a.t)).slice(0, AUFSTIEGE_MAX);
   st.gruss = r.gruss === true;
+  const lg = objekt(r.lage);
+  st.lage = Number.isFinite(lg.wert) ? { wert: Math.round(lg.wert), t: zahl(lg.t, 0) } : null;
   st.ids = liste(r.ids).filter((x) => typeof x === 'string').slice(-IDS_MAX);
   const le = objekt(r.lernen);
   const kar = objekt(le.karten);
@@ -469,6 +473,19 @@ export function rekord(st, d, partieId) {
   if (st.lernen.rekord.includes(k)) return [];
   st.lernen.rekord = [...st.lernen.rekord, k].slice(-40);
   return [{ quelle: 'meilenstein', menge: gutschrift(st, R.MEILENSTEIN.rekord, 'meilenstein') }];
+}
+
+// Arena-Wertung aus dem Paket Wertung/Liga (Ereignis liga:geaendert, sobald es das gibt): wertung als Zahl oder
+// { wert }. Sie ersetzt fuer den Herausforderungs-Faktor den Leistungswert aus den Partien.
+export function setzeLage(st, d, jetzt = new Date()) {
+  const w = d && (typeof d.wertung === 'number' ? d.wertung : d.wertung && typeof d.wertung === 'object' ? d.wertung.wert : null);
+  if (!Number.isFinite(w) || w < 0 || w > 4000) return false;
+  st.lage = { wert: Math.round(w), t: ms(jetzt) };
+  return true;
+}
+
+export function lageVon(st) {
+  return st && st.lage && Number.isFinite(st.lage.wert) ? st.lage.wert : null;
 }
 
 // Nach den Buchungen: Level nachziehen (sinkt nie), Stuecke freischalten, Aufstieg merken

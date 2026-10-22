@@ -470,6 +470,18 @@ gruppe = 'Lernen buchen';
   pruefe('Lern-Funken stehen unter „lernen“, Meilensteine unter „meilenstein“', st.heute.quellen.lernen > 0 && st.heute.quellen.meilenstein === 200);
 }
 
+gruppe = 'Arena-Wertung';
+{
+  setzeSpeicher(fakeSpeicher());
+  const st = S.lade(ort(2026, 10, 22, 20));
+  pruefe('Ohne Paket Wertung: keine Lage gespeichert (funken rechnet den Leistungswert)', S.lageVon(st) === null);
+  pruefe('liga:geaendert mit Wertung (Zahl oder { wert }) wird zur Lage, Unsinn nicht', S.setzeLage(st, { wertung: 1183.6 }) && S.lageVon(st) === 1184
+    && S.setzeLage(st, { wertung: { wert: 1096, n: 14 } }) && S.lageVon(st) === 1096 && !S.setzeLage(st, { wertung: 'viel' }) && !S.setzeLage(st, { wertung: -5 })
+    && S.lageVon(st) === 1096);
+  S.speichere(st);
+  pruefe('Lage bleibt gespeichert (normalisiert)', S.lageVon(S.lade(ort(2026, 10, 22, 21))) === 1096);
+}
+
 gruppe = 'Speicher-Budget';
 {
   setzeSpeicher(fakeSpeicher());

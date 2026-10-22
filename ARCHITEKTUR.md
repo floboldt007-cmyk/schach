@@ -1357,8 +1357,10 @@ Zug ueber Par (Mattdistanz + 3 beim ersten Erreichen von 90 %, sonst 30), ohne j
 Niederlage, hoechstens 2, je 10): laenger als je zuvor gegen diesen Bot, Genauigkeit +5 gegen die letzte Partie (erst nach der
 Analyse, als Nachtrag), Bot-Fehler sofort bestraft. Faktor nach 3.3 (x1,5 ab +300 ... x0,25 ab -500, erste 10 wertende
 Partien x1), Abstand = Bot-Elo minus **Lage**: bis es die Arena-Wertung gibt, der Leistungswert der letzten 20 wertenden
-Partien (mittlere Bot-Elo + 400 x (Siege - Niederlagen) / Partien). Der Faktor wird bei `partie:gestartet` festgelegt und
-steht vorher im Panel. Tagesbogen: bis 800 Funken (gemessen vor Rueckenwind) voll, darueber halb, ab 4:00 neu. Rueckenwind:
+Partien (mittlere Bot-Elo + 400 x (Siege - Niederlagen) / Partien). Sobald das Paket Wertung/Liga das Ereignis
+`liga:geaendert` in `EREIGNISSE` eintraegt, abonniert funken es und nimmt `wertung` (Zahl oder `{ wert }`) als Lage
+(gespeichert als `lage: { wert, t }`); vorher wird es nicht abonniert. Der Faktor wird bei `partie:gestartet` festgelegt
+und steht vorher im Panel. Tagesbogen: bis 800 Funken (gemessen vor Rueckenwind) voll, darueber halb, ab 4:00 neu. Rueckenwind:
 Karte (Montag 4:00, hoechstens 3; Extra-Karten "Willkommen zurück" einmal je Kalendermonat nach mindestens 2 Tagen ohne
 Aktivitaet und "für dich aufgehoben" nach einem verpassten Funken-Wochenende, dann hoechstens 4), "Zünden": 3 Einheiten
 (Partie, "Ab hier nochmal", Lektion) x2; Funken-Wochenende (Spielplan) x2 ohne Kartenverbrauch; nie mehr als x2.

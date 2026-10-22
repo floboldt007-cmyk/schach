@@ -10,7 +10,8 @@
 //          VOR den Feier-Zeilen des Ergebnisses), partie:analysiert (Nachtrag: Stern 2, Genauigkeits-Lichtblick),
 //          uebung:ergebnis, analyse:gesehen, training:geloest, lektion:beendet, raetsel:geloest (Lern-Funken),
 //          boss:siegel, rekord:neu, bestmarke:neu (Meilensteine), tag:gezaehlt (nur Aktivitaet, nie Funken),
-//          app:bereit, app:screen, app:sichtbar, speicher:zurueckgesetzt.
+//          app:bereit, app:screen, app:sichtbar, speicher:zurueckgesetzt; liga:geaendert (Arena-Wertung als Lage fuer den
+//          Faktor), sobald das Paket Wertung das Ereignis eintraegt (vorher wird es nicht abonniert).
 // Sendet:  funken:gebucht { quelle, menge, gesamt, level } je Buchung, funken:geaendert { funken, level, delta,
 //          aufstieg } einmal je Ereignis mit Buchungen, level:aufstieg { level, titel, neu } beim Aufstieg.
 // Orte:    ergebnis:abrechnung 20 (Zeile FUNKEN), arena:kopf 5 (Chip Level), arena:heute 50 (Rueckenwind),
@@ -20,7 +21,7 @@
 // Feier:   level (Zeile 55) bei jedem Aufstieg, level-titel (gross 75) bei jedem neuen Titel, Klang "level".
 // Register: Icon "funke", Saetze "funken-level" fuer die 10 Leiter-Bots.
 // Testmodus (?test): window.__funken = { stand(), speichere(st), plan(), setzePlan(p), S, R, L }.
-import { hoere, sende } from '../../ereignisse.js';
+import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
 import { registriereSaetze, botNachId, alleBots, staerkeFuerElo } from '../../bots.js';
@@ -84,7 +85,8 @@ function zuegeVon(p) {
 // bis es die Arena-Wertung gibt), in den ersten 10 wertenden Partien x1
 function faktorFuer({ botId, boss = null, ohne = null } = {}) {
   const partien = ladePartien().filter((p) => p && p.id !== ohne && wertet(p));
-  const lage = R.lageAusPartien(partien, eloVon);
+  // die Arena-Wertung des Pakets Wertung (liga:geaendert) geht vor, sonst der Leistungswert
+  const lage = S.lageVon(ladeStand()) ?? R.lageAusPartien(partien, eloVon);
   const bot = typeof botId === 'string' ? botNachId(botId) : null;
   let elo = bot && Number.isFinite(bot.elo) ? bot.elo : null;
   if (boss && Number.isFinite(boss.staerke)) {
@@ -411,6 +413,13 @@ function registriere() {
   hoere('boss:siegel', (d) => sicher(() => lernEreignis((st) => S.siegel(st, d), d), 'boss:siegel'));
   hoere('rekord:neu', (d) => sicher(() => lernEreignis((st) => S.rekord(st, d, letztePartieId), d, { partieId: letztePartieId }), 'rekord:neu'));
   hoere('bestmarke:neu', (d) => sicher(() => lernEreignis((st) => S.rekord(st, d, d && d.partieId), d, { partieId: d && d.partieId }), 'bestmarke:neu'));
+  // Arena-Wertung (Paket Wertung/Liga, P4): sobald es das Ereignis gibt, ersetzt sie den Leistungswert als Lage
+  if (EREIGNISSE.includes('liga:geaendert')) {
+    hoere('liga:geaendert', (d) => sicher(() => {
+      const st = ladeStand();
+      if (S.setzeLage(st, d)) S.speichere(st);
+    }, 'liga:geaendert'));
+  }
   // Tageswerk zaehlt als Aktivitaet ("Willkommen zurück"), bringt aber nie Funken (Fairness 5.3)
   hoere('tag:gezaehlt', (d) => sicher(() => {
     if (!d || !istSchluessel(d.tag)) return;
