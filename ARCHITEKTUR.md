@@ -1338,3 +1338,16 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# App-Store-Huelle (Capacitor, nur Geruest)
+
+**Ordner `native/`:** eigenes `package.json` mit `@capacitor/core`, `cli`, `ios` und `android` in einer festen Version
+(alle gleich, kein `^`), `capacitor.config.json` (`appId` Platzhalter `de.crownmate.app`, vor dem ersten Upload
+festlegen; `appName` Crownmate; `webDir` `www`), `kopiere-web.mjs` und eine Anleitung fuer Flo (`native/README.md`).
+`kopiere-web.mjs` kopiert die App-Ordner (`css`, `js`, `assets`, `vendor`, `daten`) und jede Datei aus `DATEIEN` in
+`sw.js` nach `native/www` und bricht ab, wenn danach eine Datei der Liste fehlt; es weigert sich, das Repo selbst oder
+einen Ordner darueber zu leeren. `native/www` und `native/node_modules` stehen in `.gitignore`. Die Web-App selbst
+aendert sich nicht: Unter iOS (`capacitor://localhost`) gibt es keinen Service Worker und `registriereSW` faellt still
+aus, unter Android (`https://localhost`) laeuft er. Offen bis zur Veroeffentlichung: Plattform-Projekte `ios/` und
+`android/` (entstehen mit `npx cap add`), Symbole und Startbild, In-App-Kauf statt Stripe in der iOS-App,
+Push-Mitteilungen. Test: `node tests/native.test.mjs` (reines Node, Suite `native` in `tests/alle.mjs`).
