@@ -1338,3 +1338,62 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# Welle B1: Abo „Crownmate Trainer“ (Stripe, Supabase, Paket abo)
+
+Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (SPIELKONZEPT 2b.5 und 5). B1 baut nur das Gerüst:
+wer Premium hat, wie man abschließt und kündigt. Was Premium freischaltet, entscheiden die jeweiligen Pakete (z. B. B2
+„Frag den Coach“) über `istPremium()` bzw. auf dem Server über `ist_premium_von(uid)`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Abo mit Stripe“.
+
+**Datenfluss:** App `kaufen()` öffnet Flos Stripe-Zahlungslink mit `client_reference_id=<Supabase-Nutzer-ID>` →
+Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur und ruft mit dem Service-Schlüssel
+`rpc/abo_stripe_ereignis` → Tabelle `abos`. Die App fragt `rpc/ist_premium` und die eigene `abos`-Zeile.
+
+**Server** (`supabase/abo-schema.sql`, Test `supabase/abo-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `produkte` (`id`, `name`, `beschreibung`, `preis_text`, `kauf_link`, `portal_link`, `aktiv`): anon und angemeldete lesen
+  nur aktive Zeilen, Links nur `https://` (Check), schreiben nur Service-Rolle und Dashboard. Die App nutzt die Zeile
+  `trainer`. Preise stehen nur hier, nie im Repo.
+- `abos` (eine Zeile je Nutzer: `status` 'aktiv' | 'gekuendigt' | 'abgelaufen', `plan`, `gueltig_bis`, `quelle`
+  'stripe' | 'manuell', `kunde_id` cus_…, `abo_id` sub_…, `stand_zeit`): Nutzer lesen nur die eigene, schreiben nie.
+- `stripe_ereignisse`: jedes Ereignis genau einmal (Primärschlüssel evt_…), wartende Ereignisse ohne Zuordnung,
+  nach 90 Tagen gelöscht; nur Service-Rolle.
+- `ist_premium()` (Aufrufer) und `ist_premium_von(uid)` (nur Service-Rolle): Status aktiv oder gekündigt UND
+  `gueltig_bis > now()`.
+- `abo_stripe_ereignis(ereignis_id, typ, erstellt, kunde_id, abo_id, nutzer, status, gueltig_bis, plan)` (nur
+  Service-Rolle) → 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer', Fehler
+  `ABO_EREIGNIS_UNGUELTIG`. Regeln: idempotent; ein Ereignis, das älter ist als `stand_zeit`, ändert nichts; der Kauf
+  setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
+  Kunden werden dabei in ihrer Reihenfolge angewendet; `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
+  ein neuer Kauf verkürzt nie ein längeres Abo.
+
+**Edge Function** `supabase/functions/stripe-webhook/index.ts` (nur Hülle, Deploy mit `--no-verify-jwt`) und die Logik
+in `supabase/functions/_gemeinsam/stripe.js` (reines ES-Modul, WebCrypto, in Node getestet):
+`pruefeSignatur` (HMAC-SHA256 über `t.payload`, nur v1, Toleranz 300 s, zeitkonstanter Vergleich), `auswerten`
+(Ereignis → Parameter von `abo_stripe_ereignis`; liest alte und neue Stripe-API-Form: `current_period_end` am Abo oder
+an den Positionen, `invoice.subscription` oder `parent.subscription_details`), `verarbeite` (405, 413, 400 Signatur/JSON,
+200 verbucht oder ignoriert, 500 ohne Secrets oder Datenbank, damit Stripe wiederholt). Status-Abbildung: active/trialing
+→ aktiv (mit `cancel_at_period_end` oder `cancel_at` → gekuendigt bis dahin), alles ohne Zahlung (past_due, unpaid,
+incomplete, paused …) → abgelaufen ab dem Ereignis, deleted → abgelaufen. Ein bezahlter Kauf gibt vorläufig 1 Tag
+(`VORLAEUFIG_S`), bis das erste Abo-Ereignis den echten Stand bringt. Secrets: `STRIPE_WEBHOOK_SECRET` (Flo setzt es),
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (stellt Supabase). Ein neuer Secret Key (sb_secret_…) geht nur in `apikey`.
+
+**Client** `js/abo.js` (Muster `js/konto.js`, nur fetch, `setzeAboFetch`/`setzeAboUhr` für Tests):
+`istPremium({ neu })` (Abgleich höchstens alle 10 min, offline der letzte Stand bis `gueltig_bis`, nur für dieselbe
+Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufAdresse`, `kaufen()`
+(öffnet das Fenster ohne vorheriges await, merkt den Kauf), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor:
+kein Kauf und kein Portal über Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere
+Pakete: ruhige Karte `div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf dem Screen `partie` (also auch im
+Ergebnis) liefert sie `null` und zeigt nichts (Fairness 13).
+Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Export und Rückfall):
+`schach-arena:abo:stand` `{ uid, premium, status, plan, gueltigBis, quelle, geprueftAm }`,
+`schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts).
+
+**Paket** `pakete/abo/index` (in `PAKETE`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 6 direkt
+unter dem Konto, nur wenn das Konto sichtbar ist); `app:bereit` und `app:sichtbar` prüfen nach einem Kauf (höchstens 30
+min) sofort neu und sagen einmal Danke (Toast); DOM-Ereignis `abo:stand` auf `document` lässt offene Gruppen neu
+zeichnen. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen plus
+`.trainer-*`, Zustände in `data-zustand`: laedt, vorschau, abgemeldet, kaufbar, premium, store; schließt bei Escape,
+Schleier und jedem Screen-Wechsel). Optik `css/pakete/abo.css` (nur Tokens), lädt `stelleAboCssSicher()` nach.
+Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
+`page.route`, `window.open` ersetzt).

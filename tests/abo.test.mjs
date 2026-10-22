@@ -16,7 +16,7 @@ import { setzeSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.js';
 import {
   istPremium, premiumStand, ladeProdukt, kaufAdresse, kaufen, verwalten, vergiss, premiumHinweis, setzeAboFetch, setzeAboUhr,
-  kaufGestartet, pruefeProdukt, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
+  kaufGestartet, pruefeProdukt, inStoreHuelle, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
 } from '../js/abo.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
 import { PAKETE } from '../js/erweiterungen.js';
@@ -184,6 +184,13 @@ async function nodeTeil() {
   const v = await verwalten({ produkt: p, oeffne });
   pruefe('verwalten: Kundenportal mit prefilled_email', v.ok && geoeffnet[0] === 'https://billing.stripe.example/p/login/probe?prefilled_email=' + encodeURIComponent(MAIL));
   pruefe('verwalten ohne Portal-Link: kein_link', (await verwalten({ produkt: { ...p, portalLink: null }, oeffne })).grund === 'kein_link');
+  globalThis.Capacitor = { isNativePlatform: () => true };
+  geoeffnet = [];
+  pruefe('App-Store-Huelle (Capacitor): kein Kauf und kein Portal ueber Stripe', inStoreHuelle() && (await kaufen({ produkt: p, oeffne })).grund === 'store'
+    && (await verwalten({ produkt: p, oeffne })).grund === 'store' && geoeffnet.length === 0);
+  globalThis.Capacitor = { isNativePlatform: () => false };
+  pruefe('Capacitor im Browser (nicht nativ): normal', !inStoreHuelle());
+  delete globalThis.Capacitor;
   pruefe('premiumHinweis ohne DOM (Node): null', premiumHinweis(null, 'x') === null);
   pruefe('Paket steht in PAKETE (js/erweiterungen.js)', PAKETE.includes('pakete/abo/index'));
   vergiss();
@@ -443,6 +450,22 @@ async function browserTeil(browser) {
     const t2 = await b.seite.locator('.abo-gruppe .abo-stand').innerText();
     pruefe('offline mit abgelaufenem Stand: kein Abo aktiv', /Kein Abo aktiv/.test(t2), t2);
     await b.kontext.close();
+  }
+
+  // ---------- App-Store-Huelle: kein Kauf ueber Stripe ----------
+  gruppe = 'Store-Huelle';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: SITZUNG, server: { produkt: [PRODUKT] } });
+    await seite.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'store');
+    const z = await blattZustand(seite);
+    pruefe('in der Huelle: kein Kauf-Knopf, "Bald verfügbar" aus, ruhiger Text', JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen'])
+      && /In dieser App ist der Trainer noch nicht verfügbar/.test(z.stand), z);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
   }
 
   // ---------- premiumHinweis fuer andere Pakete ----------

@@ -6,6 +6,8 @@
 //   zeigeTrainer({ app }) -> { el, ende(), aktualisiere() } | null   ein offenes Blatt wird vorher geschlossen
 //   schliesseTrainer()
 //   VORTEILE, GRATIS   die beiden Listen (SPIELKONZEPT 2b.5), auch fuer Tests
+//   Zustaende (data-zustand an .trainer-karte): laedt, vorschau (kein aktives Produkt), abgemeldet, kaufbar, premium,
+//   store (App-Store-Huelle: kein Kauf ausserhalb des Stores, inStoreHuelle in js/abo.js)
 //
 // Fairness (SPIELKONZEPT 5, AGENTS.md): kein Countdown, keine Knappheit, kein "nur heute", keine Streichpreise, kein
 // Kaufhinweis in der Partie (das Blatt wird nur aus den Einstellungen oder einem ruhigen premiumHinweis geoeffnet).
@@ -13,7 +15,7 @@
 import { hoere } from '../../ereignisse.js';
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
-import { istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher } from '../../abo.js';
+import { istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle } from '../../abo.js';
 
 export const VORTEILE = Object.freeze([
   'Drei Coaches: Henrike, Mats und Yusuf, mit Mappe, Wochenplan und Sparring',
@@ -103,8 +105,10 @@ export function zeigeTrainer({ app = null } = {}) {
     const besch = ort.querySelector('.trainer-beschreibung');
     besch.hidden = !(p && p.beschreibung);
     besch.textContent = (p && p.beschreibung) || '';
+    const huelle = inStoreHuelle();
     let zustand;
     if (st.premium) zustand = 'premium';
+    else if (huelle) zustand = 'store';
     else if (produkt === undefined) zustand = 'laedt';
     else if (!p || !p.kaufLink) zustand = 'vorschau';
     else if (!st.angemeldet) zustand = 'abgemeldet';
@@ -113,18 +117,19 @@ export function zeigeTrainer({ app = null } = {}) {
     const stand = meldung || standText(st) || ({
       vorschau: 'Der Trainer ist noch in Vorbereitung. Bis dahin ist alles frei.',
       abgemeldet: 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).',
+      store: 'In dieser App ist der Trainer noch nicht verfügbar. Bis dahin ist alles frei.',
       laedt: '',
     }[zustand] || '');
     ort.querySelector('.trainer-stand').textContent = stand;
     const knoepfe = [];
     if (zustand === 'premium') {
-      if (p && p.portalLink) knoepfe.push(knopf('Abo verwalten', 'primaer', 'verwalten'));
+      if (p && p.portalLink && !huelle) knoepfe.push(knopf('Abo verwalten', 'primaer', 'verwalten'));
     } else if (zustand === 'kaufbar') {
       knoepfe.push(knopf('Trainer abschließen', 'primaer', 'kaufen'));
     } else if (zustand === 'abgemeldet') {
       if (app && typeof app.gehe === 'function') knoepfe.push(knopf('Zum Konto', 'primaer', 'konto'));
     } else {
-      knoepfe.push(knopf(zustand === 'laedt' ? 'Wird geladen' : 'Bald verfügbar', '', '', { aus: true }));
+      knoepfe.push(knopf(zustand === 'laedt' ? 'Wird geladen' : 'Bald verfügbar', '', '', { aus: true }));   // vorschau, store
     }
     knoepfe.push(knopf('Schließen', '', 'schliessen'));
     // Fokus ueberlebt das Neuzeichnen (gleiche Aktion, sonst der erste Knopf)

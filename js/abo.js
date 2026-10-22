@@ -20,11 +20,14 @@
 //       Links nur https, sonst null. null: Flo hat (noch) kein aktives Produkt eingetragen.
 //   kaufAdresse(produkt, sitzung) -> string | null   kauf_link + ?client_reference_id=<Nutzer-ID>&prefilled_email=...,
 //       nur mit Anmeldung (der Webhook ordnet den Kauf ueber client_reference_id dem Konto zu)
-//   kaufen({ produkt, oeffne } = {}) -> Promise<{ ok, url? , grund? }>   grund: 'abgemeldet' | 'kein_produkt' | 'kein_link'
+//   inStoreHuelle() -> boolean   true in der App-Store-/Play-Huelle (Capacitor, native/). Dort duerfen digitale Abos nur
+//       ueber den In-App-Kauf des Stores laufen (Apple 3.1.1, Google Play Billing): kaufen() und verwalten() tun dort nichts
+//       (grund 'store'), das Blatt zeigt keinen Kauf- und keinen Verwalten-Knopf. Der Premium-Stand gilt trotzdem.
+//   kaufen({ produkt, oeffne } = {}) -> Promise<{ ok, url? , grund? }>   grund: 'store' | 'abgemeldet' | 'kein_produkt' | 'kein_link'
 //       Mit produkt (schon geladen) laeuft alles bis zum Oeffnen ohne await: so bleibt der Klick eine Nutzergeste
 //       und Safari blockiert das neue Fenster nicht. Merkt sich den Kauf (kaufGestartet), damit das Paket nach der
 //       Rueckkehr neu fragt.
-//   verwalten({ produkt, oeffne } = {}) -> Promise<{ ok, url?, grund? }>   portal_link (+ prefilled_email)
+//   verwalten({ produkt, oeffne } = {}) -> Promise<{ ok, url?, grund? }>   portal_link (+ prefilled_email); grund 'store' in der Huelle
 //   kaufGestartet() -> ms | null, vergissKauf()
 //   oeffneTrainer({ app } = {}) -> Promise   oeffnet das Blatt "Crownmate Trainer" (laedt js/pakete/abo/trainer.js)
 //   premiumHinweis(el, was, { app } = {}) -> HTMLElement | null
@@ -197,7 +200,15 @@ export function kaufGestartet() {
 }
 export function vergissKauf() { entferne(KAUF_SCHLUESSEL); }
 
+export function inStoreHuelle() {
+  try {
+    const c = globalThis.Capacitor;
+    return !!(c && typeof c.isNativePlatform === 'function' && c.isNativePlatform());
+  } catch (e) { return false; }
+}
+
 export async function kaufen({ produkt, oeffne = oeffneAdresse } = {}) {
+  if (inStoreHuelle()) return { ok: false, grund: 'store' };
   const s = sitzung();
   if (!nutzerId(s)) return { ok: false, grund: 'abgemeldet' };
   const p = produkt === undefined ? await ladeProdukt() : produkt;
@@ -210,6 +221,7 @@ export async function kaufen({ produkt, oeffne = oeffneAdresse } = {}) {
 }
 
 export async function verwalten({ produkt, oeffne = oeffneAdresse } = {}) {
+  if (inStoreHuelle()) return { ok: false, grund: 'store' };
   const p = produkt === undefined ? await ladeProdukt() : produkt;
   if (!p) return { ok: false, grund: 'kein_produkt' };
   const url = portalAdresse(p);
