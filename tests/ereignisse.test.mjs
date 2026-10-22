@@ -39,8 +39,10 @@ const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet',
   'speicher:zurueckgesetzt',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18)
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
-  'rekord:neu', 'uhr:knapp', 'zug:abgelehnt'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt und W0+a)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+  'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
+  // Paket funken (S1-1): { funken, level, delta, aufstieg } einmal je Ereignis mit Buchungen
+  'funken:geaendert'];
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt, W0+a und funken:geaendert)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();

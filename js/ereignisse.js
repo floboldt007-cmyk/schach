@@ -37,6 +37,8 @@ export const EREIGNISSE = Object.freeze([
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18), Datenvertrag in ARCHITEKTUR.md
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet',
   'boss:treffer', 'boss:siegel', 'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
+  // Paket funken (S1-1): Summe einer Buchung fuer Serie, Liga und andere Pakete, Vertrag in ARCHITEKTUR.md
+  'funken:geaendert',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);
