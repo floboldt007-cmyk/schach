@@ -511,6 +511,15 @@ async function testeTouch(browser) {
   const breite = (await seite.locator('#brett').boundingBox()).width;
   pruefe('Brett nutzt die Breite (iPad hoch)', breite > 700, String(breite));
   pruefe('touch-action: none am Brett', (await seite.evaluate(() => getComputedStyle(document.querySelector('#brett')).touchAction)) === 'none');
+  // Koordinaten in der Ecke auch auf dem iPad innerhalb von 20 % (PLAN 2.5 Regel 4)
+  const eckeIpad = await seite.evaluate(() => {
+    const f8 = document.querySelector('.feld[data-feld="a8"]').getBoundingClientRect();
+    const f1 = document.querySelector('.feld[data-feld="a1"]').getBoundingClientRect();
+    const z = document.querySelector('.feld[data-feld="a8"] .koord.zahl').getBoundingClientRect();
+    const b = document.querySelector('.feld[data-feld="a1"] .koord.buchst').getBoundingClientRect();
+    return { zb: (z.right - f8.left) / f8.width, zh: (z.bottom - f8.top) / f8.height, bb: (f1.right - b.left) / f1.width, bh: (f1.bottom - b.top) / f1.height };
+  });
+  pruefe('Koordinaten "8" und "a" auf dem iPad innerhalb von 20 % der Feldecke', eckeIpad.zb <= 0.2 && eckeIpad.zh <= 0.2 && eckeIpad.bb <= 0.2 && eckeIpad.bh <= 0.2, JSON.stringify(eckeIpad));
 
   await tippe('e2');
   pruefe('Tippen waehlt Figur', (await h.anzahl('.lage.auswahl[data-feld="e2"]')) === 1);
@@ -965,6 +974,22 @@ async function testeOptik(browser) {
   await seite.evaluate(() => demo.brett.setzeDauer(150));
   pruefe('Tempo normal: wieder 150', (await seite.evaluate(() => demo.brett.gleitDauer())) === 150);
   pruefe('setzeDauer mit Unsinn faellt auf den Standard zurueck', (await seite.evaluate(() => { demo.brett.setzeDauer('x'); return demo.brett.dauer; })) === 150);
+  // beiZug meldet, wann die Figur landet (fuer den Zug-Klang der Partie): Tippen gleitet, Ziehen steht sofort
+  await h.setzeFen(START);
+  await h.klickFeld('e2');
+  await h.klickFeld('e4');
+  await warte(220);
+  const tippLog = (await h.log()).at(-1);
+  await h.zieheMaus('e7', 'e5');
+  await warte(220);
+  const ziehLog = (await h.log()).at(-1);
+  await seite.evaluate(() => demo.setzeTempo('aus'));
+  await h.klickFeld('g1');
+  await h.klickFeld('f3');
+  await seite.evaluate(() => demo.setzeTempo('normal'));
+  const ausLog = (await h.log()).at(-1);
+  pruefe('beiZug meldet die Landung: Tippen = gleitDauer (150), Ziehen = 0, Bewegung aus = 0', tippLog.art === 'tippen' && tippLog.landung === 150
+    && ziehLog.art === 'ziehen' && ziehLog.landung === 0 && ausLog.art === 'tippen' && ausLog.landung === 0 && ausLog.nach === 'f3', JSON.stringify({ tippLog, ziehLog, ausLog }));
 
   // Bewertungsbalken (A, css/app.css): Weiss-Anteil von unten (gedreht von oben), gleitet nur per transform
   const balken = await seite.evaluate(async () => {

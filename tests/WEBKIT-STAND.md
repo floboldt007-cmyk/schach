@@ -32,6 +32,8 @@ WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirkli
     (`right: 0` bzw. `top: 0`); Prüfungen für h8, a1 und h1 verlangen jetzt „bleibt in der Box“.
   - „`setzeStellung` ohne Animation“: `animieren: false` setzt `--brett-dauer: 0ms` und platziert ohne jede
     Animation; die Grund-Transition auf `.figur` ist weg.
+- **Bewertungsbalken** (`css/app.css`): der Weiß-Anteil ist volle Höhe und wird per `translateY(calc(100% - var(--w)))`
+  verschoben, statt `height` zu animieren (nur `transform`); `--w` setzt die Partie wie bisher.
 
 ## Nur die CI kann es zeigen
 
@@ -42,3 +44,12 @@ WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirkli
   Paket U9/U7, nicht zum Brett).
 - `:has()` in `css/app.css` (`.brett-rahmen:has(> .brett.koord-rand)` für die Rand-Koordinaten) braucht Safari ab
   15.4; Zielgerät ist iPadOS ab 16.4, das reicht.
+- Synthetische Ereignisse lösen keine Standard-Aktionen des Browsers aus (Scrollen, Zoom, Klick-Nachzügler). Ob ein
+  echter Finger auf dem iPad dabei etwas anderes tut, zeigt erst Flos Test auf dem Gerät (`touch-action: none` am
+  Brett soll genau das verhindern).
+
+## Bewusst offen (anderes Paket)
+
+- `.effekt-ort` (Welle, Ringe, Funken der Partie) liegt weiter über `calc(var(--x) * 12.5%)`, weil `js/ui/partie.js`
+  die Lage setzt (Paket U7). Für Pixel-Gleichheit in WebKit dort `left`/`top` als fertige Prozente setzen wie in
+  `board.js` (`x * 12.5 + '%'`). Bei Effekten fällt ein Bruchteil eines Pixels nicht auf, deshalb kein Blocker.

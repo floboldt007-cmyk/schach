@@ -22,6 +22,9 @@
 // Oeffentliche API (Vertrag, ARCHITEKTUR.md "Brett"):
 //   new Brett(el, { ausrichtung, figurenPfad, beiZug, koordinaten, koordLage, animation (ms, Standard 150),
 //                   fen, beiAbgelehnt, beiLeer, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
+//   beiZug(von, nach, umwandlung, { art: 'tippen' | 'ziehen', landung }) -> true | false | Promise
+//       landung: ms, bis die gezogene Figur auf dem Ziel steht (0 = steht schon dort: gezogen, Vorschau bestaetigt,
+//       Umwandlung gewaehlt, Bewegung aus). Die Partie legt den Zug-Klang darauf; das Brett spielt keinen Klang.
 //   setzeStellung, setzeAusrichtung, dreheUm, erlaubeZuege, zeigeVorzuege, zeigeAbzeichen, entferneAbzeichen,
 //   pfeile, markiere, koordinaten(an), setzeKoordLage('ecke' | 'rand'), setzeAutoDame, setzeBestaetigen(bool),
 //   setzeSteuerung('beides' | 'ziehen' | 'tippen'), setzeTurmRochade(bool), setzeDauer(ms), gleitDauer() (ms, mit
@@ -1464,9 +1467,10 @@ export class Brett {
         this._zeichneLagen();
       }
     };
+    const info = { art: art === 'ziehen' ? 'ziehen' : 'tippen', landung: sofort ? 0 : this.gleitDauer() };
     let antwort = false;
     try {
-      antwort = this.beiZug ? this.beiZug(von, nach, umwandlung) : false;
+      antwort = this.beiZug ? this.beiZug(von, nach, umwandlung, info) : false;
     } catch (err) {
       console.error(err);
       antwort = false;
@@ -1520,7 +1524,7 @@ export class Brett {
     wahl.append(...knoepfe);
     this._umwandlungEl.replaceChildren(wahl);
     this._umwandlungEl.hidden = false;
-    this._umwandlung = { von, nach, verdeckt, bauer, knopf: null, seit: Date.now() };
+    this._umwandlung = { von, nach, art, verdeckt, bauer, knopf: null, seit: Date.now() };
     this._auswahl = von;
     this._zeichneLagen();
     document.addEventListener('keydown', this._h.taste);
@@ -1550,7 +1554,7 @@ export class Brett {
   _waehleUmwandlung(figur) {
     const u = this._schliesseUmwandlung();
     if (!u) return;
-    this._fuehreAus(u.von, u.nach, figur, 'ziehen', true);
+    this._fuehreAus(u.von, u.nach, figur, u.art, true);   // der Bauer steht schon auf dem Ziel
   }
 
   _wahlRunter(e) {

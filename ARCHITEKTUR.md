@@ -165,7 +165,9 @@ export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug, koordinaten = true,
     koordLage = 'ecke', animation = 150, autoDame = false, bestaetigen = false, steuerung = 'beides',
     turmRochade = false, pfeile = true, beiAbgelehnt, beiLeer })
-  // beiZug(von, nach, umwandlung?) -> true wenn angenommen
+  // beiZug(von, nach, umwandlung?, { art: 'tippen' | 'ziehen', landung }) -> true wenn angenommen
+  //   landung: ms, bis die Figur auf dem Ziel steht (0 = steht schon: gezogen, Vorschau bestaetigt, Umwandlung gewaehlt,
+  //   Bewegung aus); die Partie legt den Zug-Klang darauf, das Brett spielt selbst keinen Klang
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt

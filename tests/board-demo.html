@@ -141,17 +141,17 @@ setzeFedern({ feder: [420, 30], weich: [210, 24], hupf: [520, 18] });
 
 const brett = new Brett($('brett'), {
   figurenPfad: '../assets/pieces/',
-  beiZug(von, nach, umwandlung) {
+  beiZug(von, nach, umwandlung, info) {
     let zug = null;
     try { zug = chess.move({ from: von, to: nach, promotion: umwandlung }); } catch (e) { zug = null; }
-    zugLog.push({ von, nach, umwandlung: umwandlung || null, ok: !!zug });
+    zugLog.push({ von, nach, umwandlung: umwandlung || null, ok: !!zug, art: info ? info.art : null, landung: info ? info.landung : null });
     if (!zug) {
       $('ereignis').textContent = `beiZug(${von}, ${nach}) abgewiesen`;
       if ($('ton').checked) klang.fehler();
       return false;
     }
     $('ereignis').textContent = `beiZug(${von}, ${nach}${umwandlung ? ', ' + umwandlung : ''}) angenommen: ${zug.san}`;
-    nachZug(zug, true);
+    nachZug(zug, info ? info.landung : brett.gleitDauer());
     return true;
   },
   beiAbgelehnt(von, nach, art) { abgelehntLog.push({ von, nach, art }); },
@@ -178,7 +178,8 @@ function freigeben() {
   brett.erlaubeZuege(chess.isGameOver() ? null : zielKarte(chess, { turmRochade }));
 }
 
-function nachZug(zug, vomBrett) {
+// landung: ms bis die Figur steht (beiZug meldet sie), null = Zug kam nicht vom Brett
+function nachZug(zug, landung = null) {
   letzterZug = zug ? [zug.from, zug.to] : null;
   brett.setzeStellung(chess.fen(), { animieren: true, letzterZug, schach: schachFeld() });
   freigeben();
@@ -189,8 +190,8 @@ function nachZug(zug, vomBrett) {
     brett.zeigeAbzeichen(zug.to, k);
     if (k === 'brillant' && $('ton').checked) setTimeout(() => klang.brillant(), 160);
   } else brett.entferneAbzeichen();
-  // der Klang sitzt auf der Landung der Figur (gleitDauer), nicht auf dem Start
-  if (vomBrett) setTimeout(() => spieleKlang(zug), brett.gleitDauer() * 0.9);
+  // der Klang sitzt auf der Landung der Figur (beiZug meldet sie), nicht auf dem Start
+  if (landung != null) setTimeout(() => spieleKlang(zug), landung * 0.9);
   zeigeStatus();
 }
 
