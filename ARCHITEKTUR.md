@@ -917,6 +917,7 @@ Nur der Steckbrief-Text darf sich aendern.
 |---|---|---|
 | `funken:gebucht` | `{ quelle, menge, gesamt, level }` (`quelle`: `'partie'` \| `'lernen'` \| `'tag'` \| `'meilenstein'` wie die Tabellen A, B, C in 3.3; `menge` ganze Zahl >= 0 nach Faktor, Rueckenwind und Tagesbogen; `gesamt` alle Funken bisher; `level` nach der Buchung) | S1-1, nach jeder Buchung |
 | `level:aufstieg` | `{ level, titel, neu }` (`titel`: Text bei jedem 5. Level, sonst `null`; `neu`: `[{ art, id, name }]` freigeschaltete Stuecke) | S1-1, nach der Buchung, die das Level hebt (nie mitten in einer Partie gezeigt) |
+| `funken:geaendert` | `{ funken, level, delta, aufstieg }` (`funken` alle Funken danach, `delta` Summe der Buchungen dieses Ereignisses, `aufstieg` boolean) | Paket `funken`, einmal je Ereignis mit Buchungen, nach den `funken:gebucht` (fuer Serie, Liga und andere Pakete; neu mit dem Paket) |
 | `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
 | `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
@@ -1338,3 +1339,65 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# Spielsysteme P1: Paket funken (Funken und Level, SPIELKONZEPT 3.2 und 3.3)
+
+Einstieg `js/pakete/funken/index.js` (laden: `PAKETE` bzw. im Test `?test&erw=pakete/funken/index`), daneben `rechnung.js`
+(rein), `level.js` (rein), `stand.js` (Modul-Speicher), `ansicht.js` (DOM), Optik `css/pakete/funken.css` (nur Tokens,
+das Paket haengt `link[data-paket="funken"]` selbst ein). Hakt sich nur ueber Ereignisse, Orte, Feier und Register ein;
+jeder Hoerer und Anbieter laeuft in try/catch. **Noch nicht in `PAKETE`** (siehe unten, Abschnitt Integration).
+
+**Formeln (Rechenstand 1, `STAND` in allen drei reinen Dateien).** Partie-Funken = (Zugwerte + Theorie + Ergebnis +
+Verwertung + Lichtblicke) x Herausforderungs-Faktor, dann Tagesbogen, dann Rueckenwind, einmal kaufmaennisch gerundet.
+Zugwerte nur fuer offene Zuege (Gewinnchance vorher 10 bis 90 %, Grenzen eingeschlossen; Genial 12, Goldrichtig 8, Praezise 5,
+Sauber 4, Solide 3, Unscharf 1, Daneben/Verschenkt/Weit daneben 0 mit Platz, hoechstens 40 Plaetze); Theorie 1, hoechstens 8,
+immer; Pflichtzug, triviale Zuege und der Zug nach Hinweis oder Zuruecknehmen 0 ohne Platz; ohne Live-Bewertung 0. Ergebnis
+40/25/10 (Niederlage erst ab 15 eigenen Zuegen, alles erst ab 10), mit Hilfe halbiert. Verwertung nur bei Sieg: 30 minus 1 je
+Zug ueber Par (Mattdistanz + 3 beim ersten Erreichen von 90 %, sonst 30), ohne jede Live-Bewertung 0. Lichtblicke (Remis,
+Niederlage, hoechstens 2, je 10): laenger als je zuvor gegen diesen Bot, Genauigkeit +5 gegen die letzte Partie (erst nach der
+Analyse, als Nachtrag), Bot-Fehler sofort bestraft. Faktor nach 3.3 (x1,5 ab +300 ... x0,25 ab -500, erste 10 wertende
+Partien x1), Abstand = Bot-Elo minus **Lage**: bis es die Arena-Wertung gibt, der Leistungswert der letzten 20 wertenden
+Partien (mittlere Bot-Elo + 400 x (Siege - Niederlagen) / Partien). Der Faktor wird bei `partie:gestartet` festgelegt und
+steht vorher im Panel. Tagesbogen: bis 800 Funken (gemessen vor Rueckenwind) voll, darueber halb, ab 4:00 neu. Rueckenwind:
+Karte (Montag 4:00, hoechstens 3; Extra-Karten "Willkommen zurück" einmal je Kalendermonat nach mindestens 2 Tagen ohne
+Aktivitaet und "für dich aufgehoben" nach einem verpassten Funken-Wochenende, dann hoechstens 4), "Zünden": 3 Einheiten
+(Partie, "Ab hier nochmal", Lektion) x2; Funken-Wochenende (Spielplan) x2 ohne Kartenverbrauch; nie mehr als x2.
+Boss-Partien: nur die ersten 3 Versuche am Tag. Lern-Funken (Tabelle B) und Meilensteine (Tabelle C, ohne Faktor, Bogen,
+Rueckenwind) nach 3.3; erster Sieg gegen den Stockfisch 1.000 statt 100.
+
+**Speicher** `modul:funken` (Budget 25.000, duennt selbst aus): `{ stand: 1, gesamt, level, heute: { tag, partien, funken,
+bogen, boss, quellen }, verlauf: [letzte 30 Partien mit Aufschluesselung, partieId als id], freigeschaltet: [ids],
+rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt, aufgehoben, neu }, aufstiege: [{ level, von, t, satz,
+herkunft }], gruss, ids: [verarbeitete Partien, hoechstens 300], lernen: {...}, lauf }`. `lauf` haelt die Live-Daten der
+laufenden Partie (je eigenem Ply Klasse, Gewinnchance vorher/nachher, trivial, nach Hilfe, Mattdistanz), damit eine
+fortgesetzte Partie richtig rechnet. Alte Spielstaende ohne Modul starten bei 0 Funken und Level 1. Level folgt immer den
+Funken (sinkt nie).
+
+**Ereignisse.** Hoert `partie:gestartet`, `zug:gespielt`, `hilfe:genutzt`, `zug:zurueckgenommen`, `zug:bewertet`,
+`stellung:analysiert`, `partie:beendet` (bucht synchron, also vor den Feier-Zeilen), `partie:analysiert` (Nachtrag: Stern 2,
+Genauigkeits-Lichtblick), `uebung:ergebnis`, `analyse:gesehen`, `training:geloest`, `lektion:beendet`, `raetsel:geloest`
+(nur mit dem Zusatzfeld `blick`, sonst bucht es nichts), `boss:siegel`, `rekord:neu` (nur `platz` 1 und `fenster` fehlt oder
+`'allzeit'`), `bestmarke:neu` (je Partie hoechstens ein Rekord), `tag:gezaehlt` (nur Aktivitaet, nie Funken),
+`speicher:zurueckgesetzt`. Sendet `funken:gebucht` je Quelle, `funken:geaendert` einmal je Ereignis, `level:aufstieg`.
+Andere Pakete lesen Funken nie aus dem Modul, sondern ueber diese Ereignisse.
+
+**Orte.** `ergebnis:abrechnung` 20 (`.fk-abr[data-zeile="funken"]`: "+Funken", Formel, Level-Balken vom alten zum neuen
+Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um, Klang `level`; `data-aufstieg`,
+`data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip` "Level n" mit Mini-Balken, oeffnet
+den Funken-Spiegel), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
+z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
+(`.fk-spieler`), `spielplan:tage` 20 (`.fk-spielplan`), `partie:begruessung?` 40 (Anlass `funken-level`, einmal nach einem
+Aufstieg). Funkenlinie `.fk-linie` in `buehne.platz('funkenlinie')`, nur mit der Anzeige "Funkenlinie" (Standard aus).
+
+**Feier.** Je Partie genau eine Level-Feier: `level` (Zeile) bzw. `level-titel` (gross, jedes 5. Level und 60/75/100) mit
+Koennen-Satz (Vergleich der Partien seit dem vorigen Aufstieg mit den 15 davor, Mindestmengen, sonst neutraler Fakt) und
+"Neu: ...". Kommt die Analyse noch, wartet die Feier auf `partie:analysiert` (sonst nennte sie ein zu niedriges Level).
+Lern-Aufstiege gehen ohne `partieId` in die Nachlese.
+
+**Spielplan.** Das Funken-Wochenende kommt aus `daten/boss/spielplan.json` (Paket boss). Ohne angemeldeten Boss fragt
+das Paket nicht danach (kein 404).
+
+**Integration.** Mit `pakete/funken/index` in `PAKETE` aendern sich zwei Annahmen in `tests/app.test.mjs`: der Test
+"Auswertung im Hintergrund" wartet auf `.erg-tipp`, das nur ohne Abrechnungszeile erscheint, und "Abrechnung: hoechstens
+vier Zeilen" bietet selbst eine Zeile `funken` an Reihenfolge 20 an. Beide brauchen bei der Integration eine Anpassung.
+Tests: `node tests/funken.test.mjs` (Node und Browser, `PORT`, `BILDER`), Fairness-Zeilen in `tests/fairness.test.mjs`.

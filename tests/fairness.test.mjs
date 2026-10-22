@@ -239,7 +239,9 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
 {
   // W0+a: dazu die reinen Logik-Dateien der neuen Pakete (SPIELKONZEPT 5.3) und tag.js, inhalte.js
   const REIN = ['serie.js', 'logik.js', 'kartei.js', 'alltag.js', 'profil.js', 'taktik.js',
-    'funken.js', 'punkte.js', 'marsch.js', 'boss.js', 'raetsel.js', 'liga.js', 'code.js'];
+    'funken.js', 'punkte.js', 'marsch.js', 'boss.js', 'raetsel.js', 'liga.js', 'code.js',
+    // Paket funken: Rechnung, Level-Kurve und Speicher
+    'rechnung.js', 'level.js', 'stand.js'];
   const dateien = ['js/feier.js', 'js/tag.js', 'js/inhalte.js', ...jsDateien(path.join('js', 'pakete')).filter((d) => REIN.includes(path.basename(d)))];
   const treffer = dateien.filter((d) => /Math\s*\.\s*random|crypto\s*\.\s*getRandomValues/.test(zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).code));
   pruefe(`Kein Math.random in feier.js und den reinen Paket-Logik-Dateien (${dateien.length} Dateien)`, treffer.length === 0, treffer);
@@ -367,6 +369,73 @@ function jsonDateien(ordner) {
   // Level ohne Spielwirkung (Regel 18): bots.js und engine.js importieren nichts aus Paketen (Funken, Level ...)
   const imp = ['js/bots.js', 'js/engine.js'].filter((d) => /from\s+['"][^'"]*pakete\//.test(readFileSync(path.join(WURZEL, d), 'utf8')));
   pruefe('bots.js und engine.js importieren nichts aus den Paketen (Level und Funken ohne Spielwirkung)', imp.length === 0, imp);
+}
+
+// =====================================================================
+// Paket funken (SPIELKONZEPT 5.2 Regel 18 und 5.3): ehrliche Erfahrung
+// =====================================================================
+{
+  const R = await import('../js/pakete/funken/rechnung.js');
+  const L = await import('../js/pakete/funken/level.js');
+  const S = await import('../js/pakete/funken/stand.js');
+  const st0 = await import('../js/storage.js');
+  const KLASSEN = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen', null];
+  const GEWINN = [0, 0.05, 0.0999, 0.1, 0.5, 0.9, 0.9001, 0.95, 1, null];
+  // Funken nie negativ: alle Ergebnisse, Zuglaengen, Hilfe, Faktoren, Zugklassen, Gewinnchancen, Bogen und Rueckenwind
+  let negativ = 0;
+  let faelle = 0;
+  const zuege = KLASSEN.flatMap((k) => GEWINN.map((g) => ({ klasse: k, gewinnVorher: g, gewinnNachher: g, gewinnVorigerZug: g, matt: g === 1 ? 2 : null })));
+  for (const ergebnis of ['sieg', 'remis', 'niederlage', 'abbruch']) {
+    for (const eigeneZuege of [0, 9, 10, 14, 15, 40, 120]) {
+      for (const hilfe of [false, true]) {
+        for (const faktor of [0.25, 0.5, 0.75, 1, 1.25, 1.5]) {
+          const p = R.partieFunken({ zuege, ergebnis, eigeneZuege, hilfe, faktor, genauigkeit: 90, gegner: { partien: 1, maxZuege: 3, letzteGenauigkeit: 10 } });
+          for (const schonHeute of [0, 799, 5000]) {
+            for (const [wochenende, kartenAktiv] of [[false, 0], [false, 3], [true, 0], [true, 3]]) {
+              faelle++;
+              const m = R.endMenge({ vor: p.vorRueckenwind, schonHeute, wochenende, kartenAktiv, einheit: true });
+              if (p.basis < 0 || m.menge < 0 || !Number.isInteger(m.menge)) negativ++;
+            }
+          }
+        }
+      }
+    }
+  }
+  pruefe(`Funken: nie negativ (${faelle} Fälle)`, negativ === 0 && R.runde(-5) === 0, negativ);
+  const aussen = KLASSEN.flatMap((k) => [0, 0.05, 0.0999, 0.9001, 0.95, 1].map((g) => R.zugwerte([{ klasse: k, gewinnVorher: g }])))
+    .filter((z) => z.zugwerte !== 0 || z.offen !== 0);
+  pruefe('Funken: Züge außerhalb 10 bis 90 % bringen 0 und belegen keinen Platz', aussen.length === 0, aussen);
+  pruefe('Funken: höchstens 40 offene Züge (100 „Genial“ = 480)', R.zugwerte(Array.from({ length: 100 }, () => ({ klasse: 'brillant', gewinnVorher: 0.5 }))).zugwerte === 480);
+  const zwei = R.endMenge({ vor: 100, wochenende: true, kartenAktiv: 3, einheit: true });
+  pruefe('Funken: Rückenwind und Funken-Wochenende zusammen höchstens × 2', zwei.menge === 200 && zwei.faktor === 2 && !zwei.verbraucht);
+  const bogen = R.endMenge({ vor: 400, schonHeute: 600, kartenAktiv: 1, einheit: true });
+  pruefe('Funken: Tagesbogen rechnet mit den Funken vor der Verdopplung (200 voll + 100 halb, dann × 2 = 600)', bogen.menge === 600, bogen);
+  const titel = L.TITEL.map(([, n]) => n).filter((n) => /meister|großmeister|grossmeister|profi|experte|elo/i.test(n));
+  pruefe('Level-Titel ohne „Meister“, „Großmeister“, „Profi“, „Experte“, „Elo“', titel.length === 0, titel);
+  // Uebung und Lernen: Funken ja, Wertung nie (Regel 7)
+  const m = new Map();
+  st0.setzeSpeicher({ getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k),
+    key: (i) => [...m.keys()][i] ?? null, get length() { return m.size; } });
+  const st = S.lade(new Date(2026, 9, 22, 20));
+  const fVor = JSON.stringify(st0.ladeFortschritt());
+  const sVor = JSON.stringify(st0.statistik());
+  const u = S.lernUebung(st, { partieId: 'p1', ply: 10, getroffen: true });
+  const uebungPartie = S.buchePartie(st, { partieId: 'pu', modus: 'uebung', wertet: false, ergebnis: 'sieg', eigeneZuege: 30, liveKlassen: [] });
+  S.speichere(st);
+  pruefe('Funken: eine Übung erhöht Funken, ändert aber nie Wertung, Sterne oder Statistik; Übungs-Partien bringen keine Partie-Funken',
+    u.length === 1 && u[0].menge === 15 && st.gesamt === 15 && uebungPartie === null && JSON.stringify(st0.ladeFortschritt()) === fVor
+    && JSON.stringify(st0.statistik()) === sVor);
+  // Level sinkt nie: Gutschriften sind nie negativ, ein Abschluss senkt nichts, geladene Staende folgen den Funken
+  const vorher = st.level;
+  S.gutschrift(st, -500, 'partie');
+  const kein = S.schliesseLevel(st, 99, new Date());
+  let monoton = true;
+  for (let f = 0, alt = 1; f < 60000; f += 53) { const l = L.levelVon(f); if (l < alt) monoton = false; alt = l; }
+  pruefe('Funken: Level sinkt nie', st.gesamt === 15 && st.level === vorher && kein === null && monoton);
+  pruefe('Funken: Tafel-Rekord-Funken nur für Allzeit-Rekorde', S.rekord(st, { tafel: 'bot:rudi', platz: 1, fenster: 'woche' }, 'pa').length === 0
+    && S.rekord(st, { tafel: 'bot:rudi', platz: 1, fenster: 'monat' }, 'pb').length === 0 && S.rekord(st, { tafel: 'bot:rudi', platz: 1, fenster: 'allzeit' }, 'pc').length === 1);
+  pruefe('Funken: Rätsel aus dem Treppenlauf buchen keine Einzel-Funken', S.lernRaetsel(st, { id: 'r9', richtig: true, versuch: 1, wertung: 2000, blick: 1000, quelle: 'treppe' }).length === 0);
+  pruefe('Funken: Level schaltet nur Schmuck und Titel frei (keine Bots, Analyse, Lektionen, Klangpakete)', L.alleStuecke().every((x) => !/bot|analyse|lektion|klang/i.test(x.art + x.id)));
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

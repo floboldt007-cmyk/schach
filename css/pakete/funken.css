@@ -74,7 +74,7 @@
 .fk-k-titel, .fk-s-titel { display: grid; gap: 2px; min-width: 0; }
 .fk-k-titel b, .fk-s-titel b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; letter-spacing: -.02em; line-height: 1.15;
   overflow-wrap: anywhere; }
-.fk-k-titel span, .fk-s-titel span { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.fk-k-titel > span, .fk-s-titel > span { font-size: 13px; font-weight: 650; color: var(--text-2); }
 .fk-k-heute { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
 .fk-partien { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .fk-partien li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 10px; padding: 5px 0;
@@ -113,11 +113,14 @@
 
 /* ---------- Handy ---------- */
 @media (max-width: 600px) {
+  /* Kopf auf dem Handy: Funke und Zahl reichen (das Wort steht im aria-label), damit der Chip nicht angeschnitten wird */
+  .screen .haupt-kopf .chip.fk-chip { gap: 4px; padding: 0 9px; }
+  .fk-chip .fk-ico { width: 15px; height: 15px; }
+  .fk-chip .fk-chip-wort, .fk-chip .fk-mini { display: none; }
   .fk-abr-knopf { gap: 10px; padding: 9px 10px; }
   .fk-emblem { width: 34px; height: 34px; }
   .fk-zahl > b { font-size: 15px; }
   .fk-wert { font-size: 21px; }
-  .fk-mini { width: 22px; }
 }
 
 /* ---------- reduzierte Bewegung ---------- */

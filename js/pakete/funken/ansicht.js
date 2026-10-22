@@ -2,7 +2,8 @@
 // index.js liest den Stand (stand.js) und reicht ihn hier herein. Bewegung nur ueber transform und opacity
 // (js/bewegung.js: anim, tempo); bei reduzierter Bewegung steht sofort das Endbild, der Klang bleibt.
 //
-//   abrechnungsZeile({ eintrag, gesamtJetzt, botName, schonGezeigt, merke }) -> { el, verlasse() }
+//   abrechnungsZeile({ eintrag, botName, schonGezeigt, merke, feierKommt }) -> { el, beende(), verlasse() }
+//       div.fk-abr[data-zeile="funken"]; data-aufstieg="n" bei einem Aufstieg, data-fertig="1", sobald das Endbild steht
 //       Zeile "FUNKEN +410" mit Formel, Level-Balken (laeuft vom alten zum neuen Stand, bei Aufstieg ueber den Rand:
 //       der Ring schliesst sich, die Zahl klappt um, Klang "level") und Aufschluesselung auf Antippen.
 //   kopfChip({ st, beiTipp }) -> HTMLElement            Chip "Level 12" mit Mini-Balken (arena:kopf)
@@ -88,7 +89,7 @@ function formelText(e) {
   return t;
 }
 
-export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt = false, merke = () => {} } = {}) {
+export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt = false, merke = () => {}, feierKommt = false } = {}) {
   const vorher = L.fortschritt(Math.max(0, e.g - e.f));
   const nachher = L.fortschritt(e.g);
   const aufstieg = nachher.level > vorher.level;
@@ -135,6 +136,8 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
   const emblem = zeile.querySelector('.fk-emblem');
   let fertig = schonGezeigt;
   let rahmen = 0;
+  // data-fertig: das Endbild steht (Wert, Balken, Level); fuer Tests und fuer Hosts, die warten wollen
+  if (schonGezeigt) zeile.dataset.fertig = '1';
 
   function endbild() {
     // laufende Animationen (fill: forwards) wuerden das Endbild ueberdecken
@@ -144,6 +147,7 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
     zeile.querySelector('.fk-level').textContent = `Level ${nachher.level}`;
     zeile.querySelector('.fk-bis').textContent = bisText(nachher);
     for (const b of emblem.querySelectorAll('b')) b.textContent = String(nachher.level);
+    zeile.dataset.fertig = '1';
   }
   // Antippen (der Zeile oder der Ergebnis-Karte) zeigt sofort alles
   function beende() {
@@ -162,7 +166,8 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
     return karte ? karte.querySelector('.erg-feier .erg-f-zeile[data-quelle="level"], .erg-feier .erg-f-zeile[data-quelle="level-titel"]') : null;
   }
   function klangSelbst(f) {
-    if (!f) return true;
+    // kommt die Level-Feier erst mit der Analyse (Nachtrag), spielt sie den Klang
+    if (!f) return !feierKommt;
     return klang.stufe === 'wichtig' && !f.classList.contains('gross');
   }
 
@@ -243,7 +248,7 @@ export function kopfChip({ st, beiTipp } = {}) {
   b.dataset.level = String(fs.level);
   b.title = `Level ${fs.level} · ${fs.titel}`;
   b.setAttribute('aria-label', `Level ${fs.level}, ${fs.titel}: ${zahlText(fs.inLevel)} von ${zahlText(fs.kostet)} Funken bis Level ${fs.level + 1}`);
-  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text">Level <b class="zahl">${fs.level}</b></span>`
+  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">Level </span><b class="zahl">${fs.level}</b></span>`
     + `<span class="fk-mini" aria-hidden="true"><i style="transform:scaleX(${fs.anteil.toFixed(4)})"></i></span>`;
   if (typeof beiTipp === 'function') b.addEventListener('click', beiTipp);
   return b;

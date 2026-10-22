@@ -289,7 +289,8 @@ function anbieterAbrechnung(k) {
   if (!id) return null;
   const e = ladeStand().verlauf.find((x) => x.id === id);
   if (!e) return null;
-  const z = A.abrechnungsZeile({ eintrag: e, botName: botNameVon(e.bot), schonGezeigt: gezeigt.has(id), merke: () => gezeigt.add(id) });
+  const z = A.abrechnungsZeile({ eintrag: e, botName: botNameVon(e.bot), schonGezeigt: gezeigt.has(id), merke: () => gezeigt.add(id),
+    feierKommt: !!e.lfOffen && !e.lf });
   // Antippen der Ergebnis-Karte zeigt sofort alles (wie die Huelle der Abrechnung)
   let karte = null;
   const tipp = () => z.beende();

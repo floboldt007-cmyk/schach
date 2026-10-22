@@ -13,7 +13,8 @@
 //       ("Kampfgeist"), Ende vor dem 10. eigenen Zug 0; mit Hilfe (Hinweis oder Zuruecknehmen) halbiert.
 //   verwertung({ ergebnis, zuege }) -> { funken, par, ueber, ab }   nur bei Sieg: ab dem ersten Zug, nach dem die eigene
 //       Gewinnchance mindestens 90 % war, Par = Mattdistanz + 3 (sonst 30 Zuege); 30 minus 1 je Zug ueber Par, nie < 0.
-//       zuege: { gewinnNachher, matt } (matt: eigene Zuege bis zum Matt nach diesem Zug oder null).
+//       zuege: { gewinnNachher, matt } (matt: eigene Zuege bis zum Matt nach diesem Zug oder null). Ohne jede
+//       Live-Bewertung (gewinnNachher ueberall unbekannt) gibt es keine Verwertung.
 //   lichtblicke({ ergebnis, eigeneZuege, genauigkeit, gegner, zuege, botName }) -> [{ art, text }]   nur Remis und
 //       Niederlage, hoechstens 2: so lange wie noch nie gegen diesen Gegner (es gab schon eine Partie), Genauigkeit
 //       mindestens 5 Punkte ueber der letzten Partie gegen ihn, Fehler des Bots sofort bestraft.
@@ -155,7 +156,10 @@ export function ergebnisFunken({ ergebnis, eigeneZuege = 0, hilfe = false } = {}
 export function verwertung({ ergebnis, zuege } = {}) {
   if (ergebnis !== 'sieg') return { funken: 0, par: null, ueber: 0, ab: null };
   const l = Array.isArray(zuege) ? zuege : [];
+  // ohne jede Live-Bewertung laesst sich nichts belegen: keine Verwertung (lieber zu wenig als zu viel)
+  if (!l.some((z) => z && zahl(z.gewinnNachher) != null)) return { funken: 0, par: null, ueber: 0, ab: null };
   const ab = l.findIndex((z) => z && zahl(z.gewinnNachher) != null && z.gewinnNachher >= VERWERTUNG_AB - 1e-9);
+  // nie ueber 90 % (z. B. ein Matt aus offener Stellung): nichts verschleppt, volle Verwertung
   if (ab < 0) return { funken: VERWERTUNG_MAX, par: null, ueber: 0, ab: null };
   const matt = zahl(l[ab].matt);
   const par = matt != null && matt > 0 ? matt + PAR_MATT_PLUS : PAR_OHNE_MATT;
