@@ -25,7 +25,8 @@
 --   abo_wende_an(...)             intern (kein Recht fuer irgendwen ausser dem Besitzer)
 --
 -- Reihenfolge der Ereignisse: Jede Zeile in abos merkt sich in stand_zeit den Zeitpunkt (Stripe event.created) des
--- Ereignisses, das ihren Stand gesetzt hat. Ein aelteres Ereignis aendert nichts mehr ('veraltet'). Ein Kauf
+-- Ereignisses, das ihren Stand gesetzt hat. Ein aelteres Ereignis aendert nichts mehr ('veraltet'), bei gleicher
+-- Sekunde nimmt nur customer.subscription.deleted ein laufendes Premium weg. Ein Kauf
 -- (checkout.session.completed) setzt nur die Zuordnung Nutzer <-> Stripe-Kunde und einen vorlaeufigen Stand
 -- (stand_zeit null), den das naechste Abo-Ereignis immer ueberschreibt.
 --
@@ -171,6 +172,13 @@ begin
     return 'fremdes_abo';
   end if;
   if a.stand_zeit is not null and zeit < a.stand_zeit then
+    return 'veraltet';
+  end if;
+  -- Gleiche Sekunde: Stripe schickt beim Abschluss mehrere Ereignisse mit demselben created (z. B. subscription.created
+  -- noch "incomplete" und subscription.updated schon "active"), die Zustellreihenfolge ist zufaellig. Bei Gleichstand
+  -- nimmt deshalb nur das Ende des Abos (deleted) ein laufendes Premium weg.
+  if a.stand_zeit is not null and zeit = a.stand_zeit and art <> 'customer.subscription.deleted'
+    and neu_status = 'abgelaufen' and a.status in ('aktiv', 'gekuendigt') then
     return 'veraltet';
   end if;
   if art = 'invoice.paid' then

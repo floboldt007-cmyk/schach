@@ -259,6 +259,25 @@ begin
     raise exception 'FEHLER: wartendes Ereignis beim Kauf nicht angewendet (%, %)', r, row_to_json(a);
   end if;
 
+  -- 10b. Gleiche Sekunde (Stripe schickt beim Abschluss mehrere Ereignisse mit demselben created): ein spaet
+  -- zugestelltes "incomplete" nimmt nichts weg, die bezahlte Rechnung verlaengert, nur "deleted" beendet
+  r := public.abo_stripe_ereignis('evt_c3', 'customer.subscription.created', t0 + interval '3 seconds', 'cus_C1', 'sub_C1',
+    null, 'abgelaufen', t0 + interval '3 seconds', null);
+  if r <> 'veraltet' or not public.ist_premium_von('c3333333-3333-4333-8333-333333333333') then
+    raise exception 'FEHLER: Ereignis gleicher Sekunde hat Premium weggenommen (%)', r;
+  end if;
+  r := public.abo_stripe_ereignis('evt_c4', 'invoice.paid', t0 + interval '3 seconds', 'cus_C1', 'sub_C1',
+    null, 'aktiv', t0 + interval '400 days', null);
+  select * into a from public.abos where user_id = 'c3333333-3333-4333-8333-333333333333';
+  if r <> 'neu' or a.gueltig_bis <> t0 + interval '400 days' or a.status <> 'aktiv' then
+    raise exception 'FEHLER: Rechnung gleicher Sekunde nicht verbucht (%, %)', r, row_to_json(a);
+  end if;
+  r := public.abo_stripe_ereignis('evt_c5', 'customer.subscription.deleted', t0 + interval '3 seconds', 'cus_C1', 'sub_C1',
+    null, 'abgelaufen', t0 + interval '3 seconds', null);
+  if r <> 'neu' or public.ist_premium_von('c3333333-3333-4333-8333-333333333333') then
+    raise exception 'FEHLER: Ende des Abos in derselben Sekunde nicht verbucht (%)', r;
+  end if;
+
   -- 11. Kauf mit unbekannter Nutzer-ID: verbucht, aber keine Zeile
   r := public.abo_stripe_ereignis('evt_x1', 'checkout.session.completed', t0, 'cus_X1', 'sub_X1',
     'deadbeef-0000-4000-8000-000000000000', 'aktiv', t0 + interval '1 day', null);

@@ -1362,7 +1362,9 @@ Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur u
   `gueltig_bis > now()`.
 - `abo_stripe_ereignis(ereignis_id, typ, erstellt, kunde_id, abo_id, nutzer, status, gueltig_bis, plan)` (nur
   Service-Rolle) → 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer', Fehler
-  `ABO_EREIGNIS_UNGUELTIG`. Regeln: idempotent; ein Ereignis, das älter ist als `stand_zeit`, ändert nichts; der Kauf
+  `ABO_EREIGNIS_UNGUELTIG`. Regeln: idempotent; ein Ereignis, das älter ist als `stand_zeit`, ändert nichts, bei
+gleicher Sekunde nimmt nur `customer.subscription.deleted` ein laufendes Premium weg (Stripe schickt beim Abschluss
+mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
   Kunden werden dabei in ihrer Reihenfolge angewendet; `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
   ein neuer Kauf verkürzt nie ein längeres Abo.
