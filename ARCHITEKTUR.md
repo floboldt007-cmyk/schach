@@ -1363,10 +1363,14 @@ exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `u
 - Warteschlange `schach-arena:daten:warteschlange` (höchstens 100, älteste fallen weg), jede Zeile mit `id` (uuid aus dem
   Browser) und `user_id`. Versand je Tabelle als ein POST (`/rest/v1/partien_archiv`, `/rest/v1/nutzung`, höchstens 25
   Zeilen), `Prefer: return=minimal`, höchstens alle 20 s und bei `visibilitychange` (hidden) und `pagehide` (`keepalive`
-  bis 60 000 Zeichen). Offline, 5xx, 401, 408, 429: Zeilen bleiben; andere 4xx (auch 409 bei doppelter `id`): Zeilen fallen
-  weg. Zeilen eines anderen Kontos werden nie gesendet. Ausschalten verwirft die Warteschlange.
-- `meineDaten()` = `rpc/meine_daten` + `lokalerStand()` + Warteschlange + Zustimmung, `dateiFuerAuskunft()` ->
-  `crownmate-meine-daten-JJJJ-MM-TT.json`, `speichereAuskunft()` teilt oder lädt herunter (wie `js/sicherung.js`).
+  bis 60 000 Zeichen). Offline, 5xx, 401, 408, 429: Zeilen bleiben; andere 4xx (409 bei doppelter `id`, 400 ungültig oder
+  `DATEN_MENGE`): das Bündel wird einzeln nachgesendet, nur die abgelehnten Zeilen fallen weg. Zeilen eines anderen Kontos
+  werden nie gesendet. Ausschalten verwirft die Warteschlange und widerruft auf dem Server (`rpc/freigabe_widerrufen`);
+  offline bleibt der Widerruf in `schach-arena:daten:widerruf` (`{ konto, datum }`) offen und geht beim Start, beim
+  Ereignis `online` und vor jedem neuen Senden raus. Scheitert er, wird nichts Neues gesendet (er würde es mitlöschen).
+  Ein offener Widerruf eines anderen Kontos wartet, bis dieses Konto wieder angemeldet ist.
+- `meineDaten()` = `rpc/meine_daten` + `lokalerStand()` + Warteschlange + Zustimmung + offener Widerruf,
+  `dateiFuerAuskunft()` -> `crownmate-meine-daten-JJJJ-MM-TT.json` (Tag aus `tag.js`, Grenze 4:00), `speichereAuskunft()` teilt oder lädt herunter (wie `js/sicherung.js`).
 - `loescheKonto(app)` = `rpc/konto_loeschen`, dann `abmelden()`, Warteschlange und Zustimmung weg, Freigabe aus;
   `loescheKontoDialog(app)` fragt zweistufig (Sheet). Der Spielstand auf dem Gerät bleibt.
 - Gruppe „Daten“ am Ort `einstellungen:gruppen` (Reihenfolge 6, direkt nach Konto, nur wenn das Konto freigeschaltet ist):
@@ -1376,9 +1380,14 @@ exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `u
 
 **Server** (`supabase/daten-schema.sql`): `partien_archiv` (insert/select/delete nur eigene, kein update, Größen- und
 Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
-dann genau vergeben (Supabase gäbe sonst auch update und truncate). `konto_loeschen()` und `meine_daten()` sind
-`security definer` mit `search_path = public, auth`, nur für `authenticated`. Neue Tabellen mit Konto-Bezug brauchen
-`on delete cascade` und gehören in beide Funktionen.
+dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
+Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
+insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). `konto_loeschen()`, `meine_daten()` und
+`freigabe_widerrufen()` sind `security definer`, nur für `authenticated`. `konto_loeschen()` löscht auch
+`auth.audit_log_entries` des Aufrufers (Ausnahme bei fehlender Tabelle oder fehlendem Recht abgefangen); `meine_daten()`
+liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn die Tabelle existiert) und
+`anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
+`meine_daten()`. `konto.js` speichert als `geraet` des Cloud-Spielstands nur noch `geraetKurz()` (Familie und System).
 
 **Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
 (`css/tokens.css`, `css/themes/modern.css`, hell und dunkel wie die App), im Offline-Cache. Beide sind Entwürfe mit

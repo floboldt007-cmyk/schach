@@ -39,7 +39,8 @@ const daten = await import('../js/daten.js');
 const { SUPABASE_URL, SUPABASE_KEY } = await import('../js/konto-config.js');
 const { darfTeilen, setzeFreigabe, merkeNutzung, warteschlange, leereWarteschlange, sendeJetzt, archivDatensatz, geraetKurz,
   loescheKonto, meineDaten, dateiFuerAuskunft, fehlerEreignis, setzeDatenFetch, konfiguriere,
-  WARTESCHLANGE_SCHLUESSEL, WARTESCHLANGE_MAX, ZUSTIMMUNG_SCHLUESSEL, BUENDEL_MS, JE_ANFRAGE_MAX, FEHLER_MAX, FEHLER_JE_SITZUNG } = daten;
+  WARTESCHLANGE_SCHLUESSEL, WARTESCHLANGE_MAX, ZUSTIMMUNG_SCHLUESSEL, BUENDEL_MS, JE_ANFRAGE_MAX, FEHLER_MAX, FEHLER_JE_SITZUNG,
+  WIDERRUF_SCHLUESSEL, widerrufeJetzt } = daten;
 
 const anfragen = [];
 const antworten = [];
@@ -194,6 +195,22 @@ const nurRest = () => anfragen.filter((a) => a.url.includes('/rest/v1/'));
   pruefe('401: Einträge bleiben (Sitzung wird erneuert)', (await sendeJetzt()) === false && warteschlange().length === 1);
   antworten.push({ status: 409, body: { code: '23505' } });
   pruefe('409 (schon angelegt) und andere 4xx: Einträge fallen weg statt ewig zu wiederholen', (await sendeJetzt()) === true && warteschlange().length === 0);
+  // Buendel mit einer schon angelegten Zeile (Antwort ging verloren) und zwei neuen: nur die doppelte faellt weg
+  merkeNutzung('screen', { name: 'doppelt' }); merkeNutzung('screen', { name: 'neu1' }); merkeNutzung('screen', { name: 'neu2' });
+  anfragen.length = 0;
+  antworten.push({ status: 409, body: { code: '23505' } }, { status: 409, body: { code: '23505' } }, { status: 201 }, { status: 201 });
+  const r409 = await sendeJetzt();
+  const rest409 = nurRest();
+  pruefe('409 im Bündel: einzeln nachgesendet, nur die abgelehnte Zeile fällt weg, die neuen kommen an', r409 === true && rest409.length === 4
+    && rest409[0].daten.length === 3 && rest409.slice(1).every((x) => x.daten.length === 1)
+    && rest409.slice(1).map((x) => x.daten[0].daten.name).join(',') === 'doppelt,neu1,neu2' && warteschlange().length === 0, rest409.map((x) => x.daten.length));
+  // beim Nachsenden reisst das Netz ab: Rest bleibt fuer spaeter
+  merkeNutzung('screen', { name: 'p1' }); merkeNutzung('screen', { name: 'p2' });
+  anfragen.length = 0;
+  antworten.push({ status: 400, body: { message: 'DATEN_MENGE' } }, { status: 201 }, { status: 503 });
+  pruefe('400 im Bündel, dann 5xx beim Nachsenden: Gesendetes weg, Rest bleibt', (await sendeJetzt()) === false && warteschlange().length === 1
+    && warteschlange()[0].daten.daten.name === 'p2');
+  leereWarteschlange();
   m.set(WARTESCHLANGE_SCHLUESSEL, '{kaputt');
   pruefe('kaputte Warteschlange: leer statt Fehler', warteschlange().length === 0 && merkeNutzung('screen', { name: 'b' }) === true && warteschlange().length === 1);
   m.set(WARTESCHLANGE_SCHLUESSEL, JSON.stringify([...warteschlange(), { art: 'nutzung', daten: { id: 'x', user_id: 'fremd', ereignis: 'screen' } }]));
@@ -220,10 +237,50 @@ const nurRest = () => anfragen.filter((a) => a.url.includes('/rest/v1/'));
 // --- Freigabe ausschalten: verwirft noch nicht Gesendetes, danach nichts mehr
 {
   merkeNutzung('screen', { name: 'x' });
+  anfragen.length = 0;
+  antworten.push({ status: 200, body: { widerrufen_am: '2026-10-22T20:00:00Z', geloescht_partien: 3, geloescht_nutzung: 7 } });
   pruefe('Ausschalten: Warteschlange verworfen, Einstellung aus, Zustimmung entfernt', setzeFreigabe(false) === false && warteschlange().length === 0
     && storage.ladeEinstellungen().datenfreigabe === 'aus' && !m.has(ZUSTIMMUNG_SCHLUESSEL));
+  await warte(20);
+  const wr = anfragen.filter((a) => a.url === SUPABASE_URL + '/rest/v1/rpc/freigabe_widerrufen');
+  pruefe('Ausschalten: Widerruf geht an den Server (rpc/freigabe_widerrufen, POST, Token), danach nichts offen', wr.length === 1 && wr[0].method === 'POST'
+    && wr[0].headers.Authorization === 'Bearer ' + token('u1', 'u1@b.de') && !m.has(WIDERRUF_SCHLUESSEL), anfragen.map((x) => x.url));
   sende('app:screen', { name: 'arena', params: {} });
   pruefe('Ausschalten: danach wird nichts mehr gemerkt', warteschlange().length === 0);
+  anfragen.length = 0;
+  setzeFreigabe(false);
+  await warte(20);
+  pruefe('Ausschalten ohne frühere Zustimmung: kein Widerruf nötig, keine Anfrage', anfragen.length === 0 && !m.has(WIDERRUF_SCHLUESSEL));
+}
+
+// --- Widerruf offline: bleibt offen, geht vor jedem neuen Senden raus, scheitert er, wird nichts Neues gesendet
+{
+  setzeFreigabe(true); leereWarteschlange();
+  netzAus = true;
+  setzeFreigabe(false);
+  await warte(20);
+  let offen = null; try { offen = JSON.parse(m.get(WIDERRUF_SCHLUESSEL)); } catch (e) { offen = null; }
+  pruefe('Widerruf offline: bleibt mit Konto und Datum offen', offen?.konto === 'u1' && !!offen?.datum);
+  netzAus = false;
+  setzeFreigabe(true);
+  merkeNutzung('screen', { name: 'nach-widerruf' });
+  anfragen.length = 0;
+  antworten.push({ status: 503, body: { message: 'kurz weg' } });
+  pruefe('Widerruf scheitert (5xx): keine neuen Daten, Widerruf bleibt offen', (await sendeJetzt()) === false && nurRest().filter((a) => !a.url.includes('/rpc/')).length === 0
+    && warteschlange().length === 2 && m.has(WIDERRUF_SCHLUESSEL));
+  anfragen.length = 0;
+  antworten.push({ status: 200, body: { widerrufen_am: '2026-10-22T20:00:00Z', geloescht_partien: 0, geloescht_nutzung: 1 } });
+  pruefe('Widerruf vor neuem Senden: erst rpc/freigabe_widerrufen, dann die neuen Daten', (await sendeJetzt()) === true
+    && anfragen.map((a) => a.url.replace(SUPABASE_URL, '')).join(' ') === '/rest/v1/rpc/freigabe_widerrufen /rest/v1/nutzung'
+    && !m.has(WIDERRUF_SCHLUESSEL) && warteschlange().length === 0, anfragen.map((a) => a.url));
+  // ein anderes Konto ist angemeldet: der Widerruf von u1 wartet (nie unter fremdem Konto)
+  m.set(WIDERRUF_SCHLUESSEL, JSON.stringify({ konto: 'u1', datum: '2026-10-22T20:00:00Z' }));
+  meldeAn('u2'); anfragen.length = 0;
+  pruefe('Widerruf eines anderen Kontos: nicht unter dem angemeldeten Konto gesendet', (await widerrufeJetzt()) === false && anfragen.length === 0 && m.has(WIDERRUF_SCHLUESSEL));
+  meldeAn('u1');
+  pruefe('Widerruf: mit dem richtigen Konto wieder angemeldet, geht er raus', (await widerrufeJetzt()) === true && !m.has(WIDERRUF_SCHLUESSEL));
+  setzeFreigabe(true); leereWarteschlange();
+  anfragen.length = 0;
 }
 
 // --- Datenauskunft (Art. 15/20)
@@ -243,16 +300,21 @@ const nurRest = () => anfragen.filter((a) => a.url.includes('/rest/v1/'));
   pruefe('Auskunft: JSON-Datei crownmate-meine-daten-JJJJ-MM-TT.json', /^crownmate-meine-daten-\d{4}-\d{2}-\d{2}\.json$/.test(f.name) && f.type === 'application/json'
     && inhalt.server.partien_archiv[0].zuege === 'e2e4', f.name);
   antworten.push({ status: 401, body: { message: 'JWT expired' } });
-  let fehler = ''; try { await meineDaten(); } catch (e) { fehler = e.message; }
-  pruefe('Auskunft: Serverfehler kommt als lesbare Meldung', /JWT expired/.test(fehler), fehler);
+  let fehler = ''; let detail = ''; try { await meineDaten(); } catch (e) { fehler = e.message; detail = e.detail; }
+  pruefe('Auskunft: Serverfehler kommt als lesbare deutsche Meldung, Original nur in detail', /neu anmelden/.test(fehler) && !/JWT/.test(fehler) && detail === 'JWT expired', fehler);
+  pruefe('Auskunft: Auskunft nennt einen offenen Widerruf (null, wenn keiner offen ist)', 'widerruf_offen' in d && d.widerruf_offen === null);
+  // Dateiname nach tag.js: vor 4 Uhr zaehlt noch der Vortag
+  const frueh = dateiFuerAuskunft({ erstellt: new Date(2026, 9, 23, 2, 30).toISOString() });
+  const spaet = dateiFuerAuskunft({ erstellt: new Date(2026, 9, 23, 5, 0).toISOString() });
+  pruefe('Auskunft: Dateiname mit dem Tag aus tag.js (Tagesgrenze 4:00)', frueh.name === 'crownmate-meine-daten-2026-10-22.json' && spaet.name === 'crownmate-meine-daten-2026-10-23.json', [frueh.name, spaet.name]);
 }
 
 // --- Konto loeschen (Art. 17)
 {
   anfragen.length = 0;
   antworten.push({ status: 500, body: { message: 'Datenbank nicht erreichbar' } });
-  let fehler = ''; try { await loescheKonto(); } catch (e) { fehler = e.message; }
-  pruefe('Löschen scheitert am Server: Meldung, Sitzung und Freigabe bleiben (nichts halb gelöscht)', /Datenbank/.test(fehler) && konto.sitzung() && darfTeilen() === true, fehler);
+  let fehler = ''; let detail = ''; try { await loescheKonto(); } catch (e) { fehler = e.message; detail = e.detail; }
+  pruefe('Löschen scheitert am Server: Meldung, Sitzung und Freigabe bleiben (nichts halb gelöscht)', /antwortet gerade nicht \(500\)/.test(fehler) && detail === 'Datenbank nicht erreichbar' && konto.sitzung() && darfTeilen() === true, fehler);
   anfragen.length = 0;
   antworten.push({ status: 204, body: null }, { status: 204, body: null });
   await loescheKonto();
@@ -365,7 +427,7 @@ async function browserAblauf(browser) {
   pruefe('Browser: ohne Anmeldung "Zum Teilen erst anmelden", Schalter aus und gesperrt, keine Knöpfe', /Zum Teilen erst anmelden/.test(vorKonto.text) && vorKonto.an === 'false'
     && vorKonto.gesperrt && vorKonto.knoepfe === 0, vorKonto);
   pruefe('Browser: Erklärtext nennt was, wozu, wo, wer, Widerruf und Eltern unter 16', ['Partien', 'Bots', 'Coach', 'Trainingspläne', 'Frankfurt', 'Betreiber', 'Dritte',
-    'Werbung', 'Ausschalten', 'Unter 16', 'Eltern'].every((w) => vorKonto.text.includes(w)));
+    'Werbung', 'Ausschalten', 'Unter 16', 'Eltern', 'Supabase', 'im Auftrag', 'ohne Name und E-Mail', 'nur du siehst', 'auf dem Server gelöscht'].every((w) => vorKonto.text.includes(w)));
   pruefe('Browser: Konto-Gruppe bietet "Mit Google anmelden" (nur Text), der Platzhalter "per E-Mail" ist weg', vorKonto.google === 'Mit Google anmelden' && !vorKonto.loeschenAlt);
   await seite.click('.daten-gruppe .daten-zeile .es-text');
   pruefe('Browser: gesperrter Schalter bleibt aus (auch per Tipp auf den Text)', (await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').datenfreigabe)) !== 'an');

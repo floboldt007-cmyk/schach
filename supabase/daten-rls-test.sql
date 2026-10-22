@@ -14,6 +14,17 @@ update auth.users set raw_user_meta_data = '{"name":"Test A"}' where id = '11111
 insert into public.profile (user_id, benutzername) values ('11111111-1111-4111-8111-111111111111', 'rls_test_a');
 insert into public.spielstaende (user_id, stand, format_version, geraet)
 values ('11111111-1111-4111-8111-111111111111', '{"besitzer":"A"}', 1, 'RLS-Test');
+-- Anmeldeprotokoll wie bei Supabase (nur wenn die Tabelle da und fuer den SQL Editor beschreibbar ist)
+do $$
+begin
+  insert into auth.audit_log_entries (id, payload, ip_address)
+  values (gen_random_uuid(), '{"action":"login","actor_id":"11111111-1111-4111-8111-111111111111","actor_username":"rls-a@example.invalid"}', '192.0.2.1'),
+         (gen_random_uuid(), '{"action":"login","actor_id":"22222222-2222-4222-8222-222222222222","actor_username":"rls-b@example.invalid"}', '192.0.2.2');
+  perform set_config('daten_test.protokoll', 'ja', true);
+exception
+  when undefined_table or insufficient_privilege then perform set_config('daten_test.protokoll', 'nein', true);
+end
+$$;
 
 set local role authenticated;
 
@@ -149,6 +160,15 @@ begin
   if (d -> 'nutzung' -> 0 ->> 'ereignis') is distinct from 'screen' then
     raise exception 'FEHLER: meine_daten liefert die Nutzung nicht: %', d;
   end if;
+  -- Online-Partien immer als Liste (leer, wenn online-schema.sql fehlt), Widerruf und Anmeldeprotokoll als Schluessel
+  if not (d ? 'partien_online') or jsonb_typeof(d -> 'partien_online') <> 'array' or not (d ? 'freigabe_widerruf')
+     or not (d ? 'anmeldeprotokoll') then
+    raise exception 'FEHLER: meine_daten ohne partien_online, freigabe_widerruf oder anmeldeprotokoll: %', d;
+  end if;
+  if current_setting('daten_test.protokoll', true) = 'ja'
+     and (jsonb_array_length(d -> 'anmeldeprotokoll') <> 1 or (d -> 'anmeldeprotokoll' -> 0 ->> 'ip') <> '192.0.2.1') then
+    raise exception 'FEHLER: meine_daten liefert das eigene Anmeldeprotokoll nicht (genau eine Zeile): %', d -> 'anmeldeprotokoll';
+  end if;
 end
 $$;
 
@@ -201,6 +221,102 @@ begin
 end
 $$;
 
+-- Mengenbremse und Widerruf (mit B): hoechstens 300 Partien und 2000 Nutzungsereignisse je 24 Stunden; danach
+-- loescht der Widerruf alles Geteilte von B, A bleibt unberuehrt.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+insert into public.partien_archiv (user_id, zuege)
+select '22222222-2222-4222-8222-222222222222', 'e2e4' from generate_series(1, 299);
+insert into public.nutzung (user_id, ereignis)
+select '22222222-2222-4222-8222-222222222222', 'screen' from generate_series(1, 2000);
+do $$
+begin
+  begin
+    insert into public.partien_archiv (user_id, zuege) values ('22222222-2222-4222-8222-222222222222', 'e2e4');
+    raise exception 'FEHLER: Mengenbremse liess die 301. Partie in 24 Stunden zu';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+  begin
+    insert into public.nutzung (user_id, ereignis) values ('22222222-2222-4222-8222-222222222222', 'screen');
+    raise exception 'FEHLER: Mengenbremse liess das 2001. Nutzungsereignis in 24 Stunden zu';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+  -- auch innerhalb einer einzigen Anfrage zaehlt jede Zeile (B hat schon 2000)
+  begin
+    insert into public.nutzung (user_id, ereignis)
+    select '22222222-2222-4222-8222-222222222222', 'screen' from generate_series(1, 5);
+    raise exception 'FEHLER: Mengenbremse umgangen mit einer Sammel-Anfrage';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+  -- B kann den Widerrufs-Vermerk weder lesen noch selbst schreiben
+  begin
+    perform 1 from public.freigabe_widerrufe;
+    raise exception 'FEHLER: freigabe_widerrufe direkt lesbar';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.freigabe_widerrufe (user_id) values ('22222222-2222-4222-8222-222222222222');
+    raise exception 'FEHLER: freigabe_widerrufe direkt beschreibbar';
+  exception
+    when insufficient_privilege then null;
+  end;
+end
+$$;
+
+do $$
+declare
+  r jsonb;
+  d jsonb;
+begin
+  r := public.freigabe_widerrufen();
+  if (r ->> 'geloescht_partien')::integer <> 300 or (r ->> 'geloescht_nutzung')::integer <> 2000 then
+    raise exception 'FEHLER: Widerruf loescht nicht alles Geteilte von B: %', r;
+  end if;
+  if exists (select 1 from public.partien_archiv where user_id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: nach dem Widerruf liegt noch Archiv von B';
+  end if;
+  d := public.meine_daten();
+  if jsonb_array_length(d -> 'partien_archiv') <> 0 or jsonb_array_length(d -> 'nutzung') <> 0
+     or (d -> 'freigabe_widerruf' ->> 'widerrufen_am') is null
+     or (d -> 'freigabe_widerruf' ->> 'geloescht_nutzung')::integer <> 2000 then
+    raise exception 'FEHLER: Auskunft nach dem Widerruf falsch: %', d;
+  end if;
+  -- ein zweiter Widerruf ist harmlos und haelt die Summen
+  r := public.freigabe_widerrufen();
+  if (r ->> 'geloescht_partien')::integer <> 0 then
+    raise exception 'FEHLER: zweiter Widerruf: %', r;
+  end if;
+end
+$$;
+
+-- Nach dem Widerruf darf B (mit neuer Zustimmung) wieder teilen: die Bremse zaehlt nur vorhandene Zeilen.
+insert into public.partien_archiv (user_id, bot_id, farbe, ergebnis, zuege)
+values ('22222222-2222-4222-8222-222222222222', 'hilde', 'b', 'niederlage', 'd2d4 d7d5');
+
+reset role;
+do $$
+begin
+  if (select count(*) from public.partien_archiv where user_id = '11111111-1111-4111-8111-111111111111') <> 1
+     or (select count(*) from public.nutzung where user_id = '11111111-1111-4111-8111-111111111111') <> 1 then
+    raise exception 'FEHLER: Widerruf von B hat Daten von A angefasst';
+  end if;
+end
+$$;
+
+set local role anon;
+do $$
+begin
+  perform public.freigabe_widerrufen();
+  raise exception 'FEHLER: anon darf freigabe_widerrufen() aufrufen';
+exception
+  when insufficient_privilege then null;
+end
+$$;
+
 -- Nutzer A loescht sein Konto: alles weg, auch der Auth-Nutzer; B bleibt unberuehrt.
 set local role authenticated;
 select set_config(
@@ -243,6 +359,14 @@ begin
   end if;
   if (select count(*) from public.partien_archiv where user_id = '22222222-2222-4222-8222-222222222222') <> 1 then
     raise exception 'FEHLER: konto_loeschen hat fremdes Archiv angefasst';
+  end if;
+  if current_setting('daten_test.protokoll', true) = 'ja' then
+    if exists (select 1 from auth.audit_log_entries e where e.payload ->> 'actor_id' = '11111111-1111-4111-8111-111111111111') then
+      raise exception 'FEHLER: konto_loeschen hat das Anmeldeprotokoll von A nicht geloescht';
+    end if;
+    if not exists (select 1 from auth.audit_log_entries e where e.payload ->> 'actor_id' = '22222222-2222-4222-8222-222222222222') then
+      raise exception 'FEHLER: konto_loeschen hat das Anmeldeprotokoll von B geloescht';
+    end if;
   end if;
 end
 $$;

@@ -76,6 +76,24 @@ export async function abmelden() {
   try { lager().removeItem(SITZUNG_SCHLUESSEL); } catch (e) { /* egal */ }
 }
 
+// ---------- Geraet: nur Familie und System, nie der User-Agent-String ----------
+export function geraetKurz(ua = globalThis.navigator?.userAgent, nav = globalThis.navigator) {
+  const s = String(ua || '');
+  if (!s) return 'Unbekannt';
+  let os = 'Desktop';
+  if (/iPhone|iPod/.test(s)) os = 'iOS';
+  else if (/iPad/.test(s) || (/Macintosh/.test(s) && Number(nav?.maxTouchPoints) > 1)) os = 'iPadOS';
+  else if (/Android/.test(s)) os = 'Android';
+  let browser = 'Browser';
+  if (/Edg(?:e|A|iOS)?\//.test(s)) browser = 'Edge';
+  else if (/OPR\/|Opera/.test(s)) browser = 'Opera';
+  else if (/SamsungBrowser/.test(s)) browser = 'Samsung';
+  else if (/Firefox\/|FxiOS/.test(s)) browser = 'Firefox';
+  else if (/CriOS|Chrome\/|Chromium\//.test(s)) browser = 'Chrome';
+  else if (/Safari\//.test(s)) browser = 'Safari';
+  return `${os} ${browser}`.slice(0, 120);
+}
+
 export function lokalerStand() {
   const roh = rohSpeicher(); const stand = {};
   for (const k of roh.schluessel()) stand[k] = roh.lies(k);
@@ -92,7 +110,8 @@ export async function ladeProfil() {
 }
 export async function speichereCloudStand() {
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error('Die Sitzung enthält keine Benutzer-ID.');
-  const daten = { user_id: id, stand: lokalerStand(), format_version: SPEICHER_VERSION, geraet: globalThis.navigator?.userAgent || 'Browser' };
+  // nur Familie und System ("iPadOS Safari"), nie der volle User-Agent-String (Datensparsamkeit)
+  const daten = { user_id: id, stand: lokalerStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
   await anfrage('/rest/v1/spielstaende', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
   return new Date();
 }

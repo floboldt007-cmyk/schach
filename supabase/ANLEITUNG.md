@@ -57,16 +57,25 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
    - Tabelle `nutzung`: kleine Nutzungsereignisse (welcher Bereich, Start und Ende von Partien, Fehler der App, Einschalten
      der Freigabe). Spieler dürfen nur anlegen, nicht lesen; lesen kann sie nur der Besitzer im Dashboard (Table Editor
      oder SQL Editor) und der Spieler selbst über die Datenauskunft.
-   - Funktion `konto_loeschen()`: löscht für den angemeldeten Aufrufer Nutzung, Archiv, Spielstand, Profil und zuletzt
-     den Auth-Nutzer selbst (auch die Google-Verknüpfung). Nur für angemeldete Nutzer aufrufbar.
+   - Funktion `konto_loeschen()`: löscht für den angemeldeten Aufrufer Nutzung, Archiv, Spielstand, Profil, sein
+     Anmeldeprotokoll (`auth.audit_log_entries`, soweit die Rechte reichen) und zuletzt den Auth-Nutzer selbst (auch die
+     Google-Verknüpfung, Online-Partien und den Widerrufs-Vermerk per Kaskade). Nur für angemeldete Nutzer aufrufbar.
+     Server-Logs und Sicherungen von Supabase erreicht die Funktion nicht; ihre Fristen stehen in der Datenschutzerklärung
+     (Platzhalter füllen). Prüfen nach einer Probe-Löschung: `select count(*) from auth.audit_log_entries where
+     payload->>'actor_id' = '<id>'` muss 0 ergeben.
    - Funktion `meine_daten()`: liefert alles, was der Server über den Aufrufer hat (Konto, Profil, Spielstand-Metadaten,
-     Archiv, Nutzung), als JSON. Daraus baut die App die Datei „Meine Daten herunterladen“.
+     Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
+     Datei „Meine Daten herunterladen“.
+   - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
+     Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
+   - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
+     Kennung `DATEN_MENGE`).
 4. **Auswerten nur zusammengefasst:** Für die Eichung der Bots und den Coach die Daten nur im SQL Editor zusammenfassen
    (zum Beispiel Ergebnisse je Bot und Spielstärke), nie einzelne Spieler herausgreifen und nichts exportieren, das ein
    Konto erkennen lässt. Eine Löschfrist für alte Zeilen ist noch nicht eingerichtet (siehe `design/runde4/DATEN.md`).
 5. **Neue Tabellen mit Bezug auf ein Konto** (zum Beispiel Online-Partien) brauchen `references auth.users (id) on delete
    cascade`, sonst scheitert `konto_loeschen()` am Fremdschlüssel. Am besten die Tabelle zusätzlich in
-   `konto_loeschen()` und `meine_daten()` aufnehmen.
+   `meine_daten()` aufnehmen (die Online-Partien sind dort schon drin, sobald `online-schema.sql` eingespielt ist).
 
 ## Google-Anmeldung einrichten
 

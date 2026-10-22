@@ -101,7 +101,10 @@
     <li>bei Anmeldung mit Google: E-Mail-Adresse, Name und Profilbild-Adresse laut deinem Google-Profil sowie eine Google-Nutzerkennung,</li>
     <li>ein selbst gewählter Benutzername,</li>
     <li>dein Spielstand (Einstellungen, Fortschritt, Partien, Analysen, so wie die App sie speichert),</li>
-    <li>die Browser-Kennung des Geräts, von dem aus zuletzt gesichert wurde.</li>
+    <li>Browser-Familie und Betriebssystem des Geräts, von dem aus zuletzt gesichert wurde (zum Beispiel „iPadOS Safari“),
+    nicht die vollständige Browser-Kennung,</li>
+    <li>die IP-Adresse deines Geräts: Supabase speichert sie bei jeder Anfrage in technischen Protokollen (Server-Logs) und
+    bei jeder Anmeldung zusammen mit Zeitpunkt und Art der Anmeldung im Anmeldeprotokoll, zum Schutz deines Kontos.</li>
   </ul>
   <h3>Wo und durch wen</h3>
   <p>Die Daten liegen bei Supabase, Inc., <span class="platz">[Anschrift laut Auftragsverarbeitungsvertrag]</span>, auf Servern
@@ -119,9 +122,12 @@
   Die Verknüpfung endet, wenn du dein Konto löschst; in deinem Google-Konto kannst du den Zugriff zusätzlich entfernen.</p>
   <h3>Rechtsgrundlage und Dauer</h3>
   <p>Die Verarbeitung ist zur Bereitstellung des Kontos erforderlich (Art. 6 Abs. 1 lit. b DSGVO). Die Daten bleiben
-  gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“;
-  dabei werden alle Daten deines Kontos auf dem Server endgültig gelöscht, auch die Anmeldedaten. Der Spielstand auf
-  deinem Gerät bleibt davon unberührt.</p>
+  gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
+  Dabei löschen wir sofort alles, was in unserer Datenbank zu deinem Konto gehört: Konto und Anmeldedaten (auch die
+  Verknüpfung mit Google), Benutzername, Cloud-Spielstand, geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll.
+  Nicht sofort erreichbar sind die technischen Protokolle (Server-Logs) und die Datensicherungen von Supabase: Sie werden
+  nach deren Fristen automatisch gelöscht <span class="platz">[Fristen laut Supabase prüfen: Server-Logs, Datensicherungen]</span>
+  und bis dahin nicht weiter verwendet. Der Spielstand auf deinem Gerät bleibt davon unberührt.</p>
 
   <h2>6. Teilen von Partien und Nutzungsdaten (freiwillig, Einwilligung)</h2>
   <p>Mit einem Konto kannst du in den Einstellungen unter „Daten“ den Schalter „Partien und Nutzung teilen“ einschalten.
@@ -134,17 +140,19 @@
     Browser-Familie samt Betriebssystem (zum Beispiel „iOS Safari“), nicht die vollständige Browser-Kennung.</li>
   </ul>
   <p><b>Zweck:</b> die Spielstärke der Bots an echten Partien eichen, die Zugerklärungen des Coachs verbessern und
-  persönliche Trainingspläne anbieten; außerdem erkennen, an welchen Stellen die App Spieler verliert. Die Auswertung
-  erfolgt nur zusammengefasst, nicht um einzelne Personen zu bewerten. Es gibt keine automatisierten Entscheidungen mit
-  rechtlicher Wirkung (Art. 22 DSGVO).</p>
+  persönliche Trainingspläne anbieten; außerdem erkennen, an welchen Stellen die App Spieler verliert. Für Bots, Coach und
+  App werten wir die Daten nur zusammengefasst über alle Spieler aus. Einzeln genutzt werden deine Daten nur für deine
+  eigenen Trainingspläne, die nur du siehst; wir bewerten dich damit nicht gegenüber anderen. Es gibt keine automatisierten
+  Entscheidungen mit rechtlicher Wirkung (Art. 22 DSGVO).</p>
   <p>Die Daten sind deinem Konto zugeordnet (pseudonym: Die Ereignisse enthalten weder deinen Namen noch deine E-Mail-Adresse),
   damit du sie herunterladen und mit dem Konto löschen kannst. Sie sind deshalb nicht anonym.</p>
   <p><b>Rechtsgrundlage</b> ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Wann du eingewilligt hast, speichern wir als
   Nachweis (Art. 7 Abs. 1 DSGVO). Du kannst die Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen, indem du den
-  Schalter ausschaltest; danach sendet die App nichts mehr, und noch nicht gesendete Daten werden verworfen. Die Rechtmäßigkeit
-  der bis dahin erfolgten Verarbeitung bleibt unberührt (Art. 7 Abs. 3 DSGVO). Die Löschung der bereits geteilten Daten kannst
-  du jederzeit verlangen (per E-Mail oder mit „Konto löschen“) <span class="platz">[prüfen: bereits geteilte Daten nach
-  einem Widerruf automatisch löschen?]</span>.</p>
+  Schalter ausschaltest; danach sendet die App nichts mehr, noch nicht gesendete Daten werden verworfen, und alle bereits
+  geteilten Partien und Nutzungsdaten deines Kontos werden auf dem Server gelöscht (Art. 17 Abs. 1 lit. b DSGVO). Bist du
+  dabei offline, holt die App das nach, sobald wieder eine Verbindung besteht, und zwar bevor sie je wieder etwas sendet.
+  Den Zeitpunkt des Widerrufs speichern wir als Nachweis. Die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung bleibt
+  unberührt (Art. 7 Abs. 3 DSGVO).</p>
   <p><b>Dauer:</b> Die Daten sind an dein Konto gebunden und werden mit dem Konto gelöscht. Unabhängig davon werden
   geteilte Partien und Nutzungsdaten spätestens nach <span class="platz">[z. B. 24 Monaten]</span> gelöscht oder so
   zusammengefasst, dass kein Bezug zu einem Konto mehr besteht.</p>
@@ -169,10 +177,12 @@
   <ul>
     <li><b>Auskunft</b> (Art. 15) und <b>Datenübertragbarkeit</b> (Art. 20): in der App unter Einstellungen → Daten →
     „Meine Daten herunterladen“ erhältst du alle Daten deines Kontos als Datei.</li>
-    <li><b>Löschung</b> (Art. 17): in der App unter „Konto löschen“, sofort und endgültig.</li>
+    <li><b>Löschung</b> (Art. 17): in der App unter „Konto löschen“, sofort für alles in unserer Datenbank; Server-Logs und
+    Datensicherungen von Supabase laufen nach deren Fristen ab (siehe Abschnitt 5).</li>
     <li><b>Berichtigung</b> (Art. 16): Benutzername in der App ändern; alles Weitere per E-Mail.</li>
     <li><b>Einschränkung</b> (Art. 18) und <b>Widerspruch</b> (Art. 21): per E-Mail an die oben genannte Adresse.</li>
-    <li><b>Widerruf der Einwilligung</b> (Art. 7 Abs. 3): Schalter „Partien und Nutzung teilen“ ausschalten.</li>
+    <li><b>Widerruf der Einwilligung</b> (Art. 7 Abs. 3): Schalter „Partien und Nutzung teilen“ ausschalten; bereits
+    Geteiltes wird dabei auf dem Server gelöscht.</li>
     <li><b>Beschwerde</b> (Art. 77): bei einer Datenschutz-Aufsichtsbehörde, zum Beispiel
     <span class="platz">[zuständige Aufsichtsbehörde des Bundeslands, Anschrift]</span>.</li>
   </ul>

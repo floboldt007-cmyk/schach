@@ -1,5 +1,5 @@
 // Daten-Fundament (DSGVO, Entscheidung des Besitzers vom 22.10.2026): Partien-Archiv und Nutzungsereignisse ohne
-// persoenliche Angaben (pseudonym: am Konto, damit Auskunft und Loeschung gehen),
+// Name und E-Mail (pseudonym: am Konto, damit Auskunft, Widerruf und Loeschung gehen),
 // nur fuer angemeldete Spieler und nur mit ausdruecklicher Freigabe (Einstellung datenfreigabe, Standard aus),
 // dazu Konto loeschen (Art. 17) und Datenauskunft (Art. 15/20). Nur fetch (Muster konto.js), die Sitzung kommt
 // aus konto.js. Nichts hier darf die App je blockieren oder einen Fehler nach aussen geben. Server-Seite:
@@ -9,8 +9,12 @@
 //                                       (ZUSTIMMUNG_SCHLUESSEL { konto, datum, fassung }; meldet sich auf dem Geraet
 //                                       ein anderes Konto an, ist die Freigabe fuer es aus, bis es selbst zustimmt)
 //   setzeFreigabe(an, app)              Schalter: an nur angemeldet (Zustimmung mit Datum merken, Ereignis "freigabe"),
-//                                       aus verwirft die Warteschlange; Einstellung ueber app.setzeEinstellungen
-//   geraetKurz(ua, nav)                 nur Familie/OS: "iOS Safari", "Android Chrome", "Desktop Firefox"
+//                                       aus verwirft die Warteschlange und widerruft auf dem Server (rpc/
+//                                       freigabe_widerrufen loescht alles bisher Geteilte); offline bleibt der Widerruf
+//                                       in WIDERRUF_SCHLUESSEL offen und geht beim naechsten Start bzw. vor jedem neuen
+//                                       Senden raus (nie neue Daten vor einem offenen Widerruf)
+//   widerrufeJetzt()                    offenen Widerruf senden; Promise<boolean> (true: nichts mehr offen)
+//   geraetKurz(ua, nav)                 nur Familie/OS: "iOS Safari", "Android Chrome", "Desktop Firefox" (aus konto.js)
 //   archivDatensatz(d, p)               Zeile fuer partien_archiv aus partie:beendet (d) und dem gespeicherten
 //                                       Partie-Datensatz (p, storage.ladePartie); null ohne Zuege oder bei einer
 //                                       Partie aus eigener Stellung (ohne FEN-Spalte waeren die Zuege wertlos)
@@ -21,9 +25,10 @@
 //                                       WARTESCHLANGE_MAX Eintraege, die aeltesten fallen weg)
 //   leereWarteschlange()
 //   sendeJetzt({ keepalive })           Warteschlange gebuendelt senden (POST je Tabelle, Prefer: return=minimal),
-//                                       Promise<boolean>; offline still (Eintraege bleiben), 4xx ausser 401/408/429
-//                                       verwirft die Eintraege (sie wuerden nie angenommen). Sonst hoechstens alle
-//                                       BUENDEL_MS und beim Verlassen (visibilitychange hidden, pagehide).
+//                                       Promise<boolean>; offline still (Eintraege bleiben), 4xx ausser 401/408/429:
+//                                       ein Buendel wird einzeln nachgesendet, nur die abgelehnten Zeilen fallen weg
+//                                       (409 = schon da, 400 = ungueltig oder Mengenbremse DATEN_MENGE). Sonst
+//                                       hoechstens alle BUENDEL_MS und beim Verlassen (visibilitychange hidden, pagehide).
 //   loescheKonto(app)                   rpc/konto_loeschen, dann abmelden(), Warteschlange und Zustimmung weg, datenfreigabe aus
 //   loescheKontoDialog(app)             zweistufige Rueckfrage (sheet aus bauteile.js) + loescheKonto(); Promise<boolean>
 //   meineDaten()                        rpc/meine_daten + lokaler Stand + noch nicht Gesendetes -> Objekt;
@@ -39,7 +44,8 @@
 // .schalter[data-schalter="datenfreigabe"], Knoepfe [data-daten="auskunft"|"loeschen"] (Stil css/daten.css).
 // Geladen wird die Datei als Paket (js/erweiterungen.js PAKETE 'daten'), damit ein Fehler hier nie den Start stoppt.
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
-import { sitzung, aktiveSitzung, userId, abmelden, lokalerStand, kontoFreigeschaltet } from './konto.js';
+import { sitzung, aktiveSitzung, userId, abmelden, lokalerStand, kontoFreigeschaltet, geraetKurz } from './konto.js';
+import { tagSchluessel } from './tag.js';
 import { ladeEinstellungen, speichereEinstellungen, ladePartie } from './storage.js';
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
@@ -47,6 +53,8 @@ import { schalter, sheet } from './ui/bauteile.js';
 
 export const WARTESCHLANGE_SCHLUESSEL = 'schach-arena:daten:warteschlange';
 export const ZUSTIMMUNG_SCHLUESSEL = 'schach-arena:daten:zustimmung';
+export const WIDERRUF_SCHLUESSEL = 'schach-arena:daten:widerruf';
+export { geraetKurz };
 export const FREIGABE_FASSUNG = 1;   // Fassung des Erklaertexts, dem zugestimmt wurde (bei inhaltlicher Aenderung hochzaehlen)
 export const FEHLER_JE_SITZUNG = 10;
 export const WARTESCHLANGE_MAX = 100;
@@ -92,6 +100,26 @@ function einstellen(teil, app) {
     else speichereEinstellungen(teil);
   } catch (e) { /* egal */ }
 }
+// ---------- Widerruf: alles bisher Geteilte auf dem Server loeschen (Art. 7 Abs. 3, Art. 17 Abs. 1 lit. b) ----------
+function offenerWiderruf() {
+  try { const w = JSON.parse(lager().getItem(WIDERRUF_SCHLUESSEL)); return w && typeof w.konto === 'string' ? w : null; } catch (e) { return null; }
+}
+let widerrufLaeuft = null;
+export function widerrufeJetzt() {
+  if (widerrufLaeuft) return widerrufLaeuft;
+  widerrufLaeuft = (async () => {
+    const w = offenerWiderruf();
+    if (!w) return true;
+    let s;
+    try { s = await aktiveSitzung(); } catch (e) { return false; }
+    if (userId(s) !== w.konto) return false;   // anderes Konto angemeldet: warten, bis das richtige zurueck ist
+    try { await rpc('freigabe_widerrufen', s.access_token); } catch (e) { return false; }
+    try { lager().removeItem(WIDERRUF_SCHLUESSEL); } catch (e) { /* egal */ }
+    return true;
+  })().catch(() => false).finally(() => { widerrufLaeuft = null; });
+  return widerrufLaeuft;
+}
+
 export function setzeFreigabe(an, app = null) {
   let uid = null;
   try { uid = userId(sitzung()); } catch (e) { uid = null; }
@@ -100,29 +128,17 @@ export function setzeFreigabe(an, app = null) {
     einstellen({ datenfreigabe: 'an' }, app);
     merkeNutzung('freigabe', { an: true, fassung: FREIGABE_FASSUNG });
   } else {
+    const konto = zustimmungKonto();
     try { lager().removeItem(ZUSTIMMUNG_SCHLUESSEL); } catch (e) { /* egal */ }
     einstellen({ datenfreigabe: 'aus' }, app);
     leereWarteschlange();
+    // Wer je zugestimmt hat, widerruft auch auf dem Server; offline bleibt es offen und wird nachgeholt
+    if (konto) {
+      try { lager().setItem(WIDERRUF_SCHLUESSEL, JSON.stringify({ konto, datum: new Date().toISOString() })); } catch (e) { /* egal */ }
+      widerrufeJetzt().catch(() => {});
+    }
   }
   return darfTeilen();
-}
-
-// ---------- Geraet: nur Familie und System, nie der User-Agent-String ----------
-export function geraetKurz(ua = globalThis.navigator?.userAgent, nav = globalThis.navigator) {
-  const s = String(ua || '');
-  if (!s) return 'Unbekannt';
-  let os = 'Desktop';
-  if (/iPhone|iPod/.test(s)) os = 'iOS';
-  else if (/iPad/.test(s) || (/Macintosh/.test(s) && Number(nav?.maxTouchPoints) > 1)) os = 'iPadOS';
-  else if (/Android/.test(s)) os = 'Android';
-  let browser = 'Browser';
-  if (/Edg(?:e|A|iOS)?\//.test(s)) browser = 'Edge';
-  else if (/OPR\/|Opera/.test(s)) browser = 'Opera';
-  else if (/SamsungBrowser/.test(s)) browser = 'Samsung';
-  else if (/Firefox\/|FxiOS/.test(s)) browser = 'Firefox';
-  else if (/CriOS|Chrome\/|Chromium\//.test(s)) browser = 'Chrome';
-  else if (/Safari\//.test(s)) browser = 'Safari';
-  return `${os} ${browser}`.slice(0, 120);
 }
 
 // ---------- Warteschlange (localStorage) ----------
@@ -250,6 +266,20 @@ async function post(pfadRest, daten, token, keepalive) {
   if (r.status >= 400 && r.status < 500 && ![401, 408, 429].includes(r.status)) return 'verwerfen';
   return 'spaeter';
 }
+// Ein abgelehntes Buendel (409: eine Zeile ist schon da, 400: eine Zeile ist ungueltig oder ueber der Mengenbremse)
+// wird einzeln nachgesendet: Nur die Zeilen, die der Server selbst ablehnt, fallen weg, neue gehen nicht verloren.
+async function sendeTeil(pfadRest, teil, token, keepalive) {
+  const r = await post(pfadRest, teil.map((e) => e.daten), token, keepalive);
+  if (r !== 'verwerfen' || teil.length === 1) return { erledigt: r === 'ok' || r === 'verwerfen' ? teil : [], alles: r !== 'offline' && r !== 'spaeter' };
+  const erledigt = [];
+  let alles = true;
+  for (const e of teil) {
+    const einzeln = await post(pfadRest, [e.daten], token, keepalive);
+    if (einzeln === 'ok' || einzeln === 'verwerfen') erledigt.push(e);
+    else { alles = false; break; }
+  }
+  return { erledigt, alles };
+}
 
 export function sendeJetzt({ keepalive = false } = {}) {
   if (laeuft) return laeuft;
@@ -259,6 +289,8 @@ export function sendeJetzt({ keepalive = false } = {}) {
     if (!darfTeilen()) return false;
     let liste = liesWarteschlange();
     if (!liste.length) return false;
+    // nie neue Daten, solange ein frueherer Widerruf noch nicht beim Server ist (er wuerde sie sonst mitloeschen)
+    if (offenerWiderruf() && !(await widerrufeJetzt())) return false;
     let s;
     try { s = await aktiveSitzung(); } catch (e) { return false; }
     const uid = userId(s);
@@ -269,9 +301,9 @@ export function sendeJetzt({ keepalive = false } = {}) {
     for (const art of ['partie', 'nutzung']) {
       const teil = liste.filter((e) => e.art === art).slice(0, JE_ANFRAGE_MAX);
       if (!teil.length) continue;
-      const r = await post(art === 'partie' ? '/rest/v1/partien_archiv' : '/rest/v1/nutzung', teil.map((e) => e.daten), s.access_token, keepalive);
-      if (r === 'ok' || r === 'verwerfen') liste = liste.filter((e) => !teil.includes(e));
-      else alles = false;
+      const r = await sendeTeil(art === 'partie' ? '/rest/v1/partien_archiv' : '/rest/v1/nutzung', teil, s.access_token, keepalive);
+      liste = liste.filter((e) => !r.erledigt.includes(e));
+      if (!r.alles) alles = false;
     }
     schreibWarteschlange(liste);
     if (liste.length && alles) planeSenden();   // mehr als JE_ANFRAGE_MAX je Art: naechste Runde
@@ -290,11 +322,20 @@ async function rpc(name, token) {
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leere Antwort */ } }
   if (!r.ok) {
-    const f = new Error(d?.message || d?.msg || d?.hint || `Serverfehler (${r.status})`);
-    f.status = r.status;
+    // nie rohe (englische) Servertexte an den Nutzer; das Original steht in detail
+    const f = new Error(rpcFehlerText(r.status, d?.code));
+    f.status = r.status; f.code = d?.code; f.detail = d?.message || d?.msg || d?.hint || '';
     throw f;
   }
   return d;
+}
+function rpcFehlerText(status, code) {
+  if (status === 401 || code === 'PGRST301' || code === 'PGRST303') return 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.';
+  if (status === 403 || code === '42501') return 'Bitte zuerst anmelden.';
+  if (status === 404) return 'Diese Funktion ist auf dem Server noch nicht eingerichtet.';
+  if (status === 429) return 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.';
+  if (status >= 500) return `Der Server antwortet gerade nicht (${status}). Bitte später noch einmal versuchen.`;
+  return `Das hat auf dem Server nicht geklappt (${status}). Bitte später noch einmal versuchen.`;
 }
 
 // ---------- Konto loeschen (Art. 17) und Auskunft (Art. 15/20) ----------
@@ -303,7 +344,7 @@ export async function loescheKonto(app = null) {
   await rpc('konto_loeschen', s.access_token);
   await abmelden();
   leereWarteschlange();
-  try { lager().removeItem(ZUSTIMMUNG_SCHLUESSEL); } catch (e) { /* egal */ }
+  try { lager().removeItem(ZUSTIMMUNG_SCHLUESSEL); lager().removeItem(WIDERRUF_SCHLUESSEL); } catch (e) { /* egal */ }
   einstellen({ datenfreigabe: 'aus' }, app);
   return true;
 }
@@ -315,14 +356,18 @@ export async function meineDaten() {
   try { zustimmung = JSON.parse(lager().getItem(ZUSTIMMUNG_SCHLUESSEL)); } catch (e) { zustimmung = null; }
   return {
     format: AUSKUNFT_FORMAT, version: 1, erstellt: new Date().toISOString(), konto: s.email || null,
-    hinweis: 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat. geraet: der Spielstand in diesem Browser. '
-      + 'noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. zustimmung: wann du das Teilen eingeschaltet hast.',
+    hinweis: 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat (mit Online-Partien, Widerruf und '
+      + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
+      + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
+      + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
     server, geraet: lokalerStand(), noch_nicht_gesendet: liesWarteschlange().map((e) => ({ art: e.art, ...e.daten })), zustimmung,
+    widerruf_offen: offenerWiderruf(),
   };
 }
 
 export function dateiFuerAuskunft(daten) {
-  const tag = String(daten?.erstellt || new Date().toISOString()).slice(0, 10);
+  const zeit = new Date(daten?.erstellt || Date.now());
+  const tag = tagSchluessel(Number.isNaN(zeit.getTime()) ? new Date() : zeit);   // Tage immer aus tag.js (AGENTS.md)
   return new File([JSON.stringify(daten, null, 2)], `crownmate-meine-daten-${tag}.json`, { type: 'application/json' });
 }
 
@@ -408,10 +453,10 @@ export function datenGruppe({ app } = {}) {
         <span class="daten-schalter-platz"></span>
       </div>
       <div class="daten-text">
-        <p><b>Was:</b> deine fertigen Partien (Züge, Bewertung deiner Züge, Ergebnis, Bot) und Nutzungsdaten ohne persönliche Angaben (welche Bereiche du öffnest, Start und Ende von Partien, Fehler der App).</p>
-        <p><b>Wozu:</b> die Bots an echten Partien eichen, den Coach verbessern, persönliche Trainingspläne.</p>
-        <p><b>Wo und wer:</b> auf dem Server des Betreibers in Frankfurt, nur für den Betreiber. Nie an Dritte, keine Werbung, kein Verkauf.</p>
-        <p><b>Jederzeit:</b> Ausschalten stoppt das Teilen sofort, noch nicht Gesendetes wird verworfen.</p>
+        <p><b>Was:</b> deine fertigen Partien (Züge, Bewertung deiner Züge, Ergebnis, Bot) und Nutzungsdaten ohne Name und E-Mail (welche Bereiche du öffnest, Start und Ende von Partien, Fehler der App). Sie hängen an deinem Konto, damit du sie abrufen und löschen kannst.</p>
+        <p><b>Wozu:</b> zusammengefasst über alle Spieler die Bots an echten Partien eichen und den Coach verbessern. Einzeln nur für deine eigenen Trainingspläne, die nur du siehst.</p>
+        <p><b>Wo und wer:</b> bei Supabase, dem Dienstleister des Betreibers, in Frankfurt, im Auftrag und nur für den Betreiber. Nie an Dritte, keine Werbung, kein Verkauf.</p>
+        <p><b>Jederzeit:</b> Ausschalten stoppt das Teilen sofort, noch nicht Gesendetes wird verworfen und bereits Geteiltes auf dem Server gelöscht.</p>
         <p><b>Unter 16?</b> Dann entscheiden deine Eltern, ob du das Teilen einschaltest.</p>
       </div>
       ${angemeldet ? `<div class="es-knoepfe"><button class="knopf" type="button" data-daten="auskunft">Meine Daten herunterladen</button><button class="knopf es-rot-rand" type="button" data-daten="loeschen">Konto löschen</button></div>` : ''}
@@ -423,7 +468,7 @@ export function datenGruppe({ app } = {}) {
         const jetzt = setzeFreigabe(neu, app);
         sch.setze(jetzt);
         if (jetzt) melden('Danke! Fertige Partien und Nutzungsdaten werden ab jetzt geteilt.');
-        else melden(neu ? 'Zum Teilen erst anmelden.' : 'Teilen ist aus. Es wird nichts mehr gesendet.', neu);
+        else melden(neu ? 'Zum Teilen erst anmelden.' : 'Teilen ist aus. Es wird nichts mehr gesendet, bereits Geteiltes wird auf dem Server gelöscht.', neu);
       },
     });
     sch.el.setAttribute('aria-labelledby', 'daten-l');
@@ -488,5 +533,9 @@ try {
   }
   anbieten('einstellungen:gruppen', datenGruppe, { reihenfolge: 6, paket: 'daten' });
   holeAppVersion();
+  if (offenerWiderruf()) widerrufeJetzt().catch(() => {});
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('online', () => { if (offenerWiderruf()) widerrufeJetzt().catch(() => {}); });
+  }
   if (darfTeilen() && liesWarteschlange().length) planeSenden();
 } catch (e) { /* App laeuft ohne Datenfreigabe weiter */ }
