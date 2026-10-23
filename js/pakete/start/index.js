@@ -158,12 +158,13 @@ function registriere() {
   anbieten('arena:heute', (k) => sicher(() => neuZeile(k), 'Heute'), { reihenfolge: 70, paket: L.PAKET });
   anbieten('einstellungen:gruppen', (k) => sicher(() => (k && k.app ? gruppe(k.app) : null), 'Einstellungen'), { reihenfolge: 90, paket: L.PAKET });
 
-  // Fahrplan beginnt beim ersten Start mit dem Paket (ausserhalb des Hoerers: die Partienliste kann gross sein)
+  // Fahrplan beginnt beim ersten Start mit dem Paket (ausserhalb des Hoerers: die Partienliste kann gross sein). Erfahren
+  // ist, wer schon ERFAHREN_AB Partien hat: in der Partienliste oder (wertend) im Fortschritt, das Groessere zaehlt
   hoere('app:bereit', () => {
     setTimeout(() => sicher(() => {
       const m = D.stand();
       if (m.fahrplan.start) return;
-      D.sichere(L.fahrplanStart(m, { tag: D.heute(), partien: ladePartien().length }));
+      D.sichere(L.fahrplanStart(m, { tag: D.heute(), partien: Math.max(ladePartien().length, partienAus(null)) }));
     }, 'Fahrplan'), 0);
   });
   hoere('app:screen', (d) => sicher(() => {

@@ -242,6 +242,8 @@ async function nodeTeil() {
   pruefe('Begruendung alles im ersten Versuch: "alle im ersten Versuch"', L.begruendung(alle).saetze[0] === 'Du hast 8 von 8 Aufgaben gelöst, alle im ersten Versuch.');
   pruefe('jeder empfohlene Bot hat einen eigenen Grund', ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm'].every((id) => typeof L.BOT_GRUND[id] === 'string' && L.BOT_GRUND[id].length > 20));
   const texte = [...Object.values(L.BOT_GRUND), L.SCHAETZUNG, ...b1.saetze, ...L.ENTDECKUNGEN.map((e) => e.titel + ' ' + e.text)].join(' ');
+  pruefe('Saetze der Entdeckungen kurz (hoechstens 34 Zeichen: eine Zeile in der Heute-Karte, Spielen-Knopf bleibt im Bild)',
+    L.ENTDECKUNGEN.every((e) => e.text.length <= 34 && e.titel.length <= 18), L.ENTDECKUNGEN.filter((e) => e.text.length > 34 || e.titel.length > 18).map((e) => e.id));
   pruefe('Texte ohne Druck und ohne Elo-Versprechen (keine Zahl als Spielstaerke)', !/noch offen|verfällt|läuft ab|nur noch|letzte Chance|beeil|nur heute|Elo|\d{3,4}/i.test(texte));
 
   // ---------- Entdeckungs-Fahrplan ----------
@@ -735,7 +737,7 @@ async function browserTeil(browser) {
   await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#arena');
   let zl = await zeile(n.seite);
   pruefe('nach der ersten Partie: "Neu für dich: Die Spielanalyse" in der Heute-Karte (Kopf in einer Zeile)', zl && zl.id === 'analyse' && zl.karte
-    && zl.text === 'Neu für dich: Die Spielanalyse Sieh dir an, wo deine letzte Partie kippte.' && zl.zeilen === 1, JSON.stringify(zl));
+    && zl.text === 'Neu für dich: Die Spielanalyse Wo deine letzte Partie kippte.' && zl.zeilen === 1, JSON.stringify(zl));
   await bild(n.seite, 'heute-neu-ipad');
   await n.seite.locator('.st-neu .st-neu-los').click();
   await n.seite.waitForSelector('.screen.vl-screen', { timeout: 15000 });
@@ -805,6 +807,31 @@ async function browserTeil(browser) {
   pruefe('keine Konsolenfehler (Heute-Karte, Einstellungen, Feier)', n.fehler.length === 0, n.fehler.join(' | '));
   await n.kontext.close();
 
+  // kleines iPad quer (1024 x 768): neuer Spieler nach der ersten Partie, die Heute-Karte zeigt "Neu für dich", der
+  // Spielen-Knopf bleibt ganz im Bild (eine zweizeilige Zeile schob ihn frueher 6 px unter den Rand)
+  gruppe = 'iPad 1024 x 768';
+  const k = await neueSeite(browser, { w: 1024, h: 768 });
+  await k.seite.goto(BASIS + '#arena');
+  await k.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
+  const tk = await heuteImBrowser(k.seite);
+  await bereite(k.seite, {
+    modul: { v: 1, gesehen: tk, regeln: null, einstufung: null, ersterSieg: '', letzte: 'p1', fahrplan: { start: tk, erfahren: false, heute: null, erledigt: [], benutzt: [] } },
+    partien: [{ id: 'p1', botId: 'benno', spielerFarbe: 'w', datum: new Date().toISOString(), zuege: ['e2e4'], ergebnis: 'niederlage', modus: 'normal' }],
+    fortschritt: { bots: { benno: { sterne: [false, false, false], partien: 1, siege: 0, remis: 0, niederlagen: 1 } }, brillanteZuege: [] },
+  }, '#arena');
+  await warte(900);
+  const kl = await k.seite.evaluate(() => {
+    const b = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
+    const z = document.querySelector('.heute-karte .st-neu');
+    const sm = z && z.querySelector('small');
+    return { zeile: z ? z.dataset.entdeckung : null, unten: Math.round(b.bottom), hoehe: Math.round(b.height), innerHeight, satzGanz: !!sm && sm.scrollWidth <= sm.clientWidth + 1 };
+  });
+  pruefe('Hinweis "Die Spielanalyse" in der Heute-Karte, Satz ganz, Spielen-Knopf ganz im Bild und mindestens 44 px hoch', kl.zeile === 'analyse' && kl.satzGanz
+    && kl.unten <= kl.innerHeight && kl.hoehe >= 44, JSON.stringify(kl));
+  await bild(k.seite, 'heute-neu-ipad-1024');
+  pruefe('keine Konsolenfehler (iPad 1024 x 768)', k.fehler.length === 0, k.fehler.join(' | '));
+  await k.kontext.close();
+
   // ---------- Handy und dunkel ----------
   for (const [name, w, h, handy, dunkel] of [['handy-hell', 390, 844, true, false], ['handy-dunkel', 390, 844, true, true], ['ipad-dunkel', 1180, 820, false, true],
     ['handy-klein', 375, 667, true, false]]) {
@@ -859,10 +886,10 @@ async function browserTeil(browser) {
         const zeilen = Math.round(kopf.getBoundingClientRect().height / parseFloat(getComputedStyle(kopf).lineHeight));
         return { quer: document.documentElement.scrollWidth <= innerWidth + 1 && r.right <= innerWidth + 1 && r.left >= 0,
           knoepfe: [...z.querySelectorAll('button')].map((b) => Math.round(Math.min(b.getBoundingClientRect().height, b.getBoundingClientRect().width))),
-          zeilen, text: kopf.textContent.replace(/\s+/g, ' ').trim() };
+          zeilen, text: kopf.textContent.replace(/\s+/g, ' ').trim(), satzGanz: z.querySelector('small').scrollWidth <= z.querySelector('small').clientWidth + 1 };
       });
-      pruefe('Heute-Karte: "Neu für dich: Die Spielanalyse" in einer Zeile, nichts ragt heraus, Knoepfe mindestens 44 px', hz.quer && hz.zeilen === 1
-        && hz.text === 'Neu für dich: Die Spielanalyse' && hz.knoepfe.length === 2 && hz.knoepfe.every((h) => h >= 44), JSON.stringify(hz));
+      pruefe('Heute-Karte: "Neu für dich: Die Spielanalyse" in einer Zeile, Satz nicht abgeschnitten, nichts ragt heraus, Knoepfe mindestens 44 px',
+        hz.quer && hz.zeilen === 1 && hz.satzGanz && hz.text === 'Neu für dich: Die Spielanalyse' && hz.knoepfe.length === 2 && hz.knoepfe.every((h) => h >= 44), JSON.stringify(hz));
       await bild(hs.seite, `heute-neu-${name}`);
     }
     pruefe('keine Konsolenfehler', hs.fehler.length === 0, hs.fehler.join(' | '));

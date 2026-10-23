@@ -72,12 +72,14 @@ export const SCHAETZUNG = 'Die Einstufung ist eine grobe Schätzung aus 8 Aufgab
 // Entdeckungen in ihrer Reihenfolge. neu: auch fuer erfahrene Spieler (eine neue Funktion, keine Grundlage).
 // screen: wer diesen Screen besucht, braucht den Hinweis nicht mehr. abTag: fruehestens am wievielten Tag nach dem ersten
 // Start (0 = erster Tag; am ersten Tag nur die Analyse nach der ersten Partie, die Einstufung bot schon das Willkommen an).
+// text: ein kurzer Satz, der in der Heute-Karte in eine Zeile passt (hoechstens 34 Zeichen; laengere schneidet das CSS ab).
+// Eine zweizeilige Heute-Zeile schob auf dem iPad 1024 x 768 den Spielen-Knopf unter den Rand.
 export const ENTDECKUNGEN = Object.freeze([
-  Object.freeze({ id: 'analyse', screen: 'analyse', neu: false, abTag: 0, titel: 'Die Spielanalyse', text: 'Sieh dir an, wo deine letzte Partie kippte.' }),
-  Object.freeze({ id: 'einstufung', screen: null, neu: true, abTag: 1, titel: 'Die Einstufung', text: '8 kurze Aufgaben, danach ein passender Gegner.' }),
-  Object.freeze({ id: 'training', screen: 'training', neu: true, abTag: 2, titel: 'Das Training', text: 'Deine eigenen Fehler kommen als Rätsel wieder.' }),
-  Object.freeze({ id: 'einstellungen', screen: 'einstellungen', neu: false, abTag: 2, titel: 'Brett und Klang', text: 'Brettfarben, Klangpakete, Hell und Dunkel.' }),
-  Object.freeze({ id: 'verlauf', screen: 'verlauf', neu: false, abTag: 3, titel: 'Dein Verlauf', text: 'Alle Partien und deine Bilanz auf einen Blick.' }),
+  Object.freeze({ id: 'analyse', screen: 'analyse', neu: false, abTag: 0, titel: 'Die Spielanalyse', text: 'Wo deine letzte Partie kippte.' }),
+  Object.freeze({ id: 'einstufung', screen: null, neu: true, abTag: 1, titel: 'Die Einstufung', text: 'Finde den passenden Gegner.' }),
+  Object.freeze({ id: 'training', screen: 'training', neu: true, abTag: 2, titel: 'Das Training', text: 'Deine Fehler als Rätsel.' }),
+  Object.freeze({ id: 'einstellungen', screen: 'einstellungen', neu: false, abTag: 2, titel: 'Brett und Klang', text: 'Brettfarben, Klang, Hell, Dunkel.' }),
+  Object.freeze({ id: 'verlauf', screen: 'verlauf', neu: false, abTag: 3, titel: 'Dein Verlauf', text: 'Alle Partien und deine Bilanz.' }),
 ]);
 const BEDINGUNG = Object.freeze({
   analyse: (k) => k.partien >= 1,

@@ -107,10 +107,11 @@
   color: var(--akzent-text); box-shadow: var(--kante); }
 .st-neu-siegel .ico { width: 19px; height: 19px; }
 .st-neu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 650; color: var(--text); }
-/* eine Zeile "Neu fuer dich: <Titel>" (SPIELKONZEPT 3.16), darunter der kurze Satz, der lieber umbricht als abreisst */
+/* eine Zeile "Neu fuer dich: <Titel>" (SPIELKONZEPT 3.16), darunter ein kurzer Satz in einer Zeile (logik.ENTDECKUNGEN):
+   die Heute-Karte bleibt so niedrig wie die anderen Zeilen, der Spielen-Knopf bleibt auf dem iPad 1024 x 768 im Bild */
 .st-neu-kopf { min-width: 0; line-height: 1.3; }
 .st-neu-text b { font-weight: 800; color: var(--text); }
-.st-neu-text small { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--text-2); overflow-wrap: break-word; }
+.st-neu-text small { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 44 px Tippflaeche; ragt etwas in den Rand der Heute-Karte, damit der Text Platz hat */
 .st-neu .st-neu-weg { flex: none; width: 44px; height: 44px; margin-right: -8px; border: 0; box-shadow: none; background: transparent; color: var(--text-2); }
 .st-neu .st-neu-weg .ico { width: 18px; height: 18px; }

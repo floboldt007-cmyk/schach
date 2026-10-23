@@ -1603,5 +1603,10 @@ Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus 
   `js/ui/start.js` und der Raetsel-Bildschirm (`js/ui/raetsel.js`, `css/pakete/raetsel.css`, falls die Kartei sie nicht schon
   eingetragen hat). `SCREEN_PAKET.start` in `tests/sw.test.mjs` heisst noch `einstieg` (BAUPLAN 2D), deshalb erzwingt der
   sw-Test den Screen nicht; `tests/start.test.mjs` prueft alle acht Dateien, sobald das Paket in `PAKETE` steht. Mit dem Paket
-  zeigt jeder frische Start ohne Hash das Willkommen: Suiten, die so starten, setzen vorher `modul:start` mit `gesehen` oder
-  oeffnen `#arena`.
+  zeigt jeder frische Start ohne Hash das Willkommen (die Suiten oeffnen `#arena` oder haben Partien), und der erste
+  wertende Sieg eines frischen Speichers feiert „Dein erster Sieg“. Probe mit dem Paket in `PAKETE` (Patch ausserhalb des
+  Repos): angepasst werden muessen `app.test.mjs` (Router-Rueckfall mit `PAKETE` ohne start per Route, danach `unroute`;
+  zusaetzlich der Hunk „?erw ohne ?test“ aus dem Paket teilen, weil der Service Worker alle `DATEIEN` vorlaedt; Feier-Budget
+  und stilles Nachholen mit `modul:start.ersterSieg` vorab), `e2e.test.mjs` (Feier genau aus den eingetragenen Paketen),
+  `gedaechtnis.test.mjs` (Erzfeind-Sieg mit einem frueheren Sieg, sonst gewinnt `erster-sieg` mit Prio 95 den grossen Platz)
+  und `kartei.test.mjs` (zwei Anbieter an `arena:heute`).
