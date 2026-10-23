@@ -784,6 +784,7 @@ export class Brett {
     el.style.setProperty('--y', y);
     el.dataset.feld = feld;
     el.style.width = g.toFixed(3) + '%';
+    el.style.height = g.toFixed(3) + '%';
     if (x >= 7) { el.style.left = 'auto'; el.style.right = '0'; } else { el.style.right = 'auto'; el.style.left = ((x + 1) * 12.5 + v - g).toFixed(3) + '%'; }
     el.style.top = Math.max(0, y * 12.5 - v).toFixed(3) + '%';
   }
@@ -842,7 +843,15 @@ export class Brett {
     const a = anim(el, [{ transform: start }, { transform: 'none' }], { d: dauer, k: kurve });
     el._gleit = a;
     // nur die eigene Animation beendet den Zustand (eine abgebrochene darf eine neuere nicht stoeren)
-    const fertig = () => { if (el._gleit === a) { el._gleit = null; el.classList.remove('gleitet'); } };
+    const fertig = () => {
+      if (el._gleit !== a) return;
+      el._gleit = null;
+      clearTimeout(el._gleitZeit);
+      // Auch der Zeitwaechter beendet die Animation selbst. Sonst kann WebKit den ersten Transform behalten,
+      // obwohl .gleitet schon weg ist (z. B. nach einem ausgelassenen Render-Schritt).
+      a.cancel();
+      el.classList.remove('gleitet');
+    };
     if (a && a.finished) a.finished.then(fertig, fertig);
     el._gleitZeit = setTimeout(fertig, ms + 60);
   }
@@ -1011,6 +1020,10 @@ export class Brett {
     el.setAttribute('aria-label', KLASSEN_TITEL[klasse] || klasse);
     el.innerHTML = symbolSvg(klasse);
     this._platziereAbzeichen(el, feld);
+    // Die CSS-Feder sofort an die Dokument-Zeit haengen: WebKit startet sie sonst erst beim naechsten Layout
+    // und kann bis dahin den unsichtbaren Anfang (scale(0)) halten.
+    const jetzt = document.timeline?.currentTime;
+    if (jetzt != null) for (const a of el.getAnimations()) if (a.startTime == null) a.startTime = jetzt;
   }
 
   _blendeAbzeichenAus(ms) {
