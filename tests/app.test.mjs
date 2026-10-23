@@ -161,8 +161,8 @@ function hilfen(seite, { touch = true } = {}) {
       else await seite.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
       await warte(120);
     },
-    // U7: "Zug bestaetigen" ist Standard (ohneUhr, PLAN 4): steht nach dem Tipp aufs Ziel die Vorschau, macht ein zweiter
-    // Tipp aufs Ziel den Zug fest. Ohne Vorschau (Einstellung aus, Partie mit Uhr, Vorzug, abgelehnter Zug) bleibt es bei zwei.
+    // U7: "Zug bestaetigen" (Einstellung, seit 23.10. Standard aus): steht nach dem Tipp aufs Ziel die Vorschau, macht ein
+    // zweiter Tipp aufs Ziel den Zug fest. Ohne Vorschau (Einstellung aus, Partie mit Uhr, Vorzug, abgelehnter Zug) bleibt es bei zwei.
     vorschau: () => seite.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau')),
     async zugTippen(uci) {
       await h.tippeFeld(uci.slice(0, 2));
@@ -3182,6 +3182,106 @@ async function testeU7(browser) {
     await kontext.close();
   }
 
+  // Kleines Querfenster (Flos Befund 23.10.: Vorschau-Fenster einer App auf dem iPad, 590 x 580): vorher bekam das Brett
+  // neben der festen 300-px-Spalte nur 184 px. Die Spalte darf schmal werden, alles bleibt ganz lesbar und im Bild.
+  for (const schema of ['light', 'dark']) {
+    gruppe = `U7 kleines Querfenster 590x580 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 590, h: 580, schema });
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'greta', farbe: 'w', tempo: { grund: 300, zuschlag: 2 } });
+    await warte(500);
+    const m = await u7Masse(seite);
+    const k = await seite.evaluate(() => {
+      const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
+      const seiteEl = document.querySelector('.partie .seite');
+      const teile = ['.spieler.gegner', '.coach', '.zugbox', '.spieler.ich', '.spielknoepfe'].map((s) => ({ s, ...r(document.querySelector('.partie ' + s)) }));
+      const uhren = [...document.querySelectorAll('.partie .uhr')].map((u) => ({ an: !u.hidden && u.getBoundingClientRect().width > 0, ...r(u) }));
+      const info = r(document.querySelector('.partie .spieler.gegner > .info'));
+      const woerter = [...document.querySelectorAll('.partie .spielknoepfe .knopf > span:last-child')].filter((e) => e.getBoundingClientRect().width > 0)
+        .map((e) => ({ t: e.textContent.trim(), ganz: e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= e.parentNode.getBoundingClientRect().right + 0.5 }));
+      const h2 = document.querySelector('.partie .kopf h2');
+      return { spalte: Math.round(seiteEl.getBoundingClientRect().width), teile, uhren, info, woerter, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1 };
+    });
+    pruefe('Brett mindestens 44 % der kleineren Seite (vorher 184 px)', m.brett.w >= Math.min(m.iw, m.ih) * 0.44, JSON.stringify(m.brett));
+    pruefe('Spalte rechts vom Brett, schmal (248 bis 299 px), alle Karten und Knöpfe ganz im Bild',
+      k.spalte >= 248 && k.spalte < 300 && k.teile.every((t) => t.l >= m.rahmen.r - 0.5 && t.r <= m.iw + 0.5 && t.b <= m.ih + 0.5 && t.t >= 0), JSON.stringify([k.spalte, k.teile, m.rahmen.r]));
+    const wort = await seite.evaluate(() => getComputedStyle(document.querySelector('.partie .spieler.gegner .name')).overflowWrap);
+    // Pruefer-Befund 23.10.: mit overflow-wrap break-word stand dort "Großmeisteri / n Greta"; ohne Wortbruch nimmt passeNamen() den Rufnamen
+    pruefe('Name des Gegners ohne Ellipse und nie mitten im Wort getrennt (sonst Rufname), höchstens zwei Zeilen, voller Name im aria-label',
+      m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && wort === 'normal' && ['Großmeisterin Greta', 'Greta'].includes(m.name.text)
+      && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Großmeisterin Greta', JSON.stringify([m.name, wort]));
+    pruefe('Beide Uhren sichtbar, die Uhr des Gegners überdeckt den Namen nicht', k.uhren.length === 2 && k.uhren.every((u) => u.an) && k.info.r <= k.uhren[0].l + 0.5,
+      JSON.stringify([k.uhren, k.info]));
+    pruefe('Aktionen: Wörter ganz lesbar, Tippflächen >= 44 px', k.woerter.length === 4 && k.woerter.every((w) => w.ganz) && m.tipp >= 44, JSON.stringify([k.woerter, m.tipp]));
+    pruefe('Kopf: Titel „Großmeisterin Greta“ ganz, kein waagrechter Überlauf', k.titel === 'Großmeisterin Greta' && k.titelGanz && m.ueber.seite <= 0 && m.ueber.screen <= 0
+      && m.ueber.inhalt <= 0, JSON.stringify([k.titel, k.titelGanz, m.ueber]));
+    const bl = await u7Blase(seite, U7_LANGER_SATZ);
+    // quer steht die Blase als Zeile in der Karte rechts vom Brett (die Hoch-Pruefung ueberFiguren misst nur senkrecht)
+    pruefe('Sprechblase in der Karte ganz lesbar, rechts vom Brett', bl.da && bl.l >= m.rahmen.r - 0.5 && bl.ganz && !bl.ellipse && bl.clamp === 'none'
+      && bl.r <= bl.karteR + 0.5 && bl.t >= bl.karteT - 0.5, JSON.stringify([bl, m.rahmen.r]));
+    await bild(seite, `u7-fenster-590x580-${schema === 'dark' ? 'dunkel' : 'hell'}`);
+    if (schema === 'light') {
+      // zwei Knoepfe der Pakete (Ort partie:aktionen, hier nachgebaut): zwei Reihen zu drei, alle im Bild, ganz lesbar
+      const pk = await seite.evaluate(() => {
+        const sk = document.querySelector('.partie .spielknoepfe');
+        const ort = sk.querySelector('.ort-aktionen');
+        sk.dataset.aktionen = '2';
+        if (ort) ort.hidden = false;
+        for (const t of ['Teilen', 'Kartei']) { const b = document.createElement('button'); b.className = 'knopf test-paket'; b.type = 'button'; b.innerHTML = `<span>${t}</span>`; (ort || sk).append(b); }
+        const r = [...sk.querySelectorAll('.knopf')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => {
+          const q = b.getBoundingClientRect(); const s = b.querySelector('span:last-child');
+          return { w: q.width, h: q.height, b: q.bottom, ganz: !s || s.scrollWidth <= s.clientWidth + 1 };
+        });
+        const raus = { ih: innerHeight, n: r.length, ok: r.every((x) => x.w >= 44 && x.h >= 44 && x.b <= innerHeight + 0.5 && x.ganz) };
+        sk.querySelectorAll('.test-paket').forEach((b) => b.remove());
+        delete sk.dataset.aktionen;
+        return raus;
+      });
+      pruefe('Sechs Knöpfe (zwei der Pakete): zwei Reihen, alle im Bild, mindestens 44 px, Wörter ganz', pk.n === 6 && pk.ok, JSON.stringify(pk));
+      // niedriges Querfenster: Begruessung, Uhr und Aktionen passen in 800 x 560
+      await seite.setViewportSize({ width: 800, height: 560 });
+      await warte(400);
+      const nied = await u7Masse(seite);
+      pruefe('800 x 560: Aktionen ganz im Bild', nied.knoepfe.b <= nied.ih + 0.5, JSON.stringify([nied.knoepfe, nied.ih]));
+      // waechst die Spalte ueber das Fenster (Coach mit Knoepfen, lange Saetze), scrollt sie, die Aktionen bleiben im Bild
+      await seite.setViewportSize({ width: 590, height: 580 });
+      await warte(400);
+      await seite.evaluate(() => { const d = document.createElement('div'); d.className = 'test-hoch'; d.style.height = '220px'; document.querySelector('.partie .coach').append(d); });
+      await warte(400);
+      const voll = await seite.evaluate(() => ({ scrollt: document.querySelector('.screen.partie').classList.contains('seite-scrollt'),
+        ueber: getComputedStyle(document.querySelector('.partie .seite')).overflowY, unten: document.querySelector('.partie .spielknoepfe').getBoundingClientRect().bottom, ih: innerHeight }));
+      await seite.evaluate(() => document.querySelector('.partie .coach .test-hoch').remove());
+      await warte(400);
+      const wieder = await seite.evaluate(() => document.querySelector('.screen.partie').classList.contains('seite-scrollt'));
+      pruefe('Zu volle Spalte: sie scrollt, die Aktionen bleiben im Bild; passt sie wieder, ist das vorbei', voll.scrollt && voll.ueber === 'auto' && voll.unten <= voll.ih + 0.5 && !wieder,
+        JSON.stringify([voll, wieder]));
+      // Handy quer mit Bedenkzeit: Flos eigene Uhr bleibt sichtbar (vorher fiel Flos Karte samt Uhr weg)
+      await seite.setViewportSize({ width: 844, height: 390 });
+      await warte(500);
+      const quer = await seite.evaluate(() => ({ uhren: [...document.querySelectorAll('.partie .uhr')].map((u) => { const r = u.getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight + 0.5; }),
+        knoepfe: document.querySelector('.partie .spielknoepfe').getBoundingClientRect().bottom, ih: innerHeight }));
+      pruefe('Handy quer mit Uhr (844 x 390): beide Uhren im Bild, Aktionen im Bild', quer.uhren.length === 2 && quer.uhren.every(Boolean) && quer.knoepfe <= quer.ih + 0.5, JSON.stringify(quer));
+      // Systemwechsel hell -> dunkel bei offener App: der Seitengrund geht mit (vorher blieb er hell, der Titel war unsichtbar)
+      await seite.setViewportSize({ width: 590, height: 580 });
+      await seite.emulateMedia({ colorScheme: 'dark' });
+      await warte(400);
+      const grund = await seite.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      await seite.emulateMedia({ colorScheme: 'light' });
+      await warte(300);
+      const grundHell = await seite.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      pruefe('System hell -> dunkel -> hell: der Seitengrund folgt (dunkel #15171B, hell #F4F1EC)', grund === 'rgb(21, 23, 27)' && grundHell === 'rgb(244, 241, 236)', JSON.stringify([grund, grundHell]));
+      // iPad quer bleibt wie vorher: Spalte 31vw zwischen 300 und 420 px, Brett nach Hoehe oder Breite wie gehabt
+      for (const g of [{ w: 1180, h: 820 }, { w: 1024, h: 768 }]) {
+        await seite.setViewportSize({ width: g.w, height: g.h });
+        await warte(400);
+        const ip = await seite.evaluate(() => ({ spalte: document.querySelector('.partie .seite').getBoundingClientRect().width, iw: innerWidth }));
+        pruefe(`iPad quer ${g.w}x${g.h}: Spalte unverändert (31vw, 300 bis 420 px)`, Math.abs(ip.spalte - Math.min(420, Math.max(300, ip.iw * 0.31))) <= 1, JSON.stringify(ip));
+      }
+    }
+    pruefe('Kleines Querfenster: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // --- Spielerkarten, Uhr, Kopf (iPad quer) ---
   gruppe = 'U7 Spielerkarten';
   {
@@ -3251,16 +3351,41 @@ async function testeU7(browser) {
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
     await h.starte({ botId: 'benno', farbe: 'w' });
     await h.warteFlo();
-    // Zug bestaetigen, Standard ohneUhr (ohne Bedenkzeit an): Vorschau, zweiter Tipp aufs Ziel macht fest
+    // Zug bestaetigen ist seit 23.10. Standard aus (Flo: die Vorschau ohne Erklaerung wirkte wie ein kaputtes Spiel)
     await h.tippeFeld('e2');
     await h.tippeFeld('e4');
-    const vor = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.length, an: window.__partie.brett.bestaetigen }));
+    const std = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.slice(),
+      an: window.__partie.brett.bestaetigen, einst: window.__app.einstellungen().zugBestaetigen }));
+    pruefe('Zug bestätigen: Standard aus, der Tipp aufs Ziel zieht sofort', !std.vorschau && JSON.stringify(std.zuege) === '["e2e4"]' && std.an === false && std.einst === 'aus',
+      JSON.stringify(std));
+    // ohneUhr (ohne Bedenkzeit an): Vorschau mit Hinweis auf den zweiten Tipp, der zweite Tipp aufs Ziel macht fest
+    await seite.evaluate(() => {
+      localStorage.removeItem('schach-arena:v1:laufend'); localStorage.removeItem('schach-arena:v1:hinweis-bestaetigen');
+      window.__app.setzeEinstellungen({ zugBestaetigen: 'ohneUhr' });
+    });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await h.tippeFeld('e2');
     await h.tippeFeld('e4');
-    const nach = await seite.evaluate(() => window.__partie.z.zuege.slice());
-    pruefe('Zug bestätigen (Standard ohneUhr, ohne Bedenkzeit): Vorschau, erst der zweite Tipp aufs Ziel zieht', vor.vorschau && vor.zuege === 0 && vor.an === true
-      && JSON.stringify(nach) === '["e2e4"]', JSON.stringify([vor, nach]));
+    const vor = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.length, an: window.__partie.brett.bestaetigen,
+      hinweis: (document.querySelector('.toast-ort .toast:not(.weg)') || {}).textContent || '', merker: localStorage.getItem('schach-arena:v1:hinweis-bestaetigen') }));
+    await h.tippeFeld('e4');
+    const nach = await seite.evaluate(() => ({ zuege: window.__partie.z.zuege.slice(), hinweis: !!document.querySelector('.toast-ort .toast') }));
+    pruefe('Zug bestätigen (ohneUhr, ohne Bedenkzeit): Vorschau mit Hinweis auf den zweiten Tipp, erst der zweite Tipp aufs Ziel zieht, der Hinweis geht mit',
+      vor.vorschau && vor.zuege === 0 && vor.an === true && vor.hinweis === 'Tippe zum Bestätigen auf e4. Ein Tipp daneben nimmt den Zug zurück.' && vor.merker === '1'
+      && JSON.stringify(nach.zuege) === '["e2e4"]' && !nach.hinweis, JSON.stringify([vor, nach]));
     const botPhase = await seite.evaluate(() => ({ phase: window.__partie.phase(), an: window.__partie.brett.bestaetigen }));
     pruefe('Während der Bot denkt (Vorzüge): ohne Bestätigen', botPhase.phase === 'bot' && botPhase.an === false, JSON.stringify(botPhase));
+    // nach drei Hinweisen schweigt er (die Einstellungen erklaeren den zweiten Tipp dauerhaft)
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); localStorage.setItem('schach-arena:v1:hinweis-bestaetigen', '3'); });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await seite.evaluate(() => { const o = document.querySelector('.toast-ort'); if (o) o.replaceChildren(); });
+    await h.tippeFeld('d2');
+    await h.tippeFeld('d4');
+    const still = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), toast: !!document.querySelector('.toast-ort .toast'),
+      merker: localStorage.getItem('schach-arena:v1:hinweis-bestaetigen') }));
+    pruefe('Hinweis zum zweiten Tipp höchstens dreimal je Gerät', still.vorschau && !still.toast && still.merker === '3', JSON.stringify(still));
     // aus: sofort; immer: auch mit Bedenkzeit; ohneUhr mit Bedenkzeit: aus
     const faelle = [];
     for (const [wert, tempo] of [['aus', null], ['immer', { grund: 300, zuschlag: 0 }], ['ohneUhr', { grund: 300, zuschlag: 0 }]]) {

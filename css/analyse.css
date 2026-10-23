@@ -37,8 +37,11 @@
 .an-screen {
   --an-balken: 26px;  /* Balken 18 px + Abstand 8 px */
   --an-sicher: calc(env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
-  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+  /* Mindestbreite der rechten Spalte: 420 px ab 1313 px Fensterbreite, in kleinen Querfenstern bis 280 px (sonst blieben
+     dem Brett bei 590 x 580 nur 80 px). Jedes iPad quer ist nach der Hoehe begrenzt, dort aendert sich nichts. */
+  --an-rechts-min: clamp(280px, 32vw, 420px);
+  --an-brett: min(calc(100vh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+  --an-brett: min(calc(100dvh - 318px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
 }
 .an-screen.ohne-balken { --an-balken: 0px; }
 .an-screen.ohne-balken .an-evalbalken { display: none; }
@@ -348,9 +351,67 @@
 .an-c-zuege span { white-space: nowrap; }
 @media (orientation: landscape) and (min-height: 561px) {
   .an-screen {
-    --an-brett: min(calc(100vh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
-    --an-brett: min(calc(100dvh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - 420px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+    --an-brett: min(calc(100vh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
+    --an-brett: min(calc(100dvh - 336px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 700px);
   }
   .an-navi .knopf { min-height: 48px; }
   .an-coach { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; }
+}
+
+/* ============================================================
+   Kleine Querfenster (Vorschau-Fenster anderer Apps, Stage Manager, Handy quer): Die rechte Spalte kann bis 280 px
+   schmal werden (--an-rechts-min), die linke so schmal wie das Brett. Die Karten nehmen dann die Handy-Fassung aus
+   dem Hochformat (bis 520 px), die Klassen stehen einspaltig. Gemessen wird die Spalte selbst (Container).
+   ============================================================ */
+@media (orientation: landscape) {
+  .an-rechts { container: an-rechts / inline-size; }
+  .an-links { container: an-links / inline-size; }
+}
+@container an-rechts (max-width: 400px) {
+  .an-banner { padding: 10px 12px; gap: 10px; }
+  .an-banner .an-avatar { --g: 44px; }
+  .an-ft-titel { font-size: 10px; letter-spacing: .08em; }
+  .an-ft-name { font-size: 15px; }
+  .an-ft-sterne span { display: none; }
+  .an-ft-sterne b { font-size: 20px; margin: 0; }
+  .an-genau { padding: 12px; gap: 8px 6px; }
+  .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
+  .an-seite { gap: 8px; }
+  .an-g-wert { font-size: 27px; }
+  .an-g-label { font-size: 11px; }
+  .an-vs { min-width: 52px; }
+  .an-vs b { font-size: 18px; }
+  .an-vs-wort { font-size: 10px; letter-spacing: .1em; }
+  .an-vs-grund { font-size: 11px; max-width: 84px; }
+  .an-kurve-wrap { height: 92px; }
+  .an-k-legende { display: none; }
+  .an-g-zusatz { display: none; }
+  .an-klassen { padding: 6px 12px; }
+  .an-kl-raster { display: flex; flex-direction: column; }
+  .an-kl-kopf2, .an-kl-platz { display: none; }
+}
+/* unter 330 px traegt die Zeile die Portraets nicht mehr, die Beschriftung nennt die Seiten */
+@container an-rechts (max-width: 330px) {
+  .an-genau .an-avatar { display: none; }
+  .an-g-wert { font-size: 25px; }
+  .an-g-label > .an-g-zusatz { display: inline; }
+}
+/* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen (bis 520 px: auch bei 800 x 600 passte
+   "Deine Genauigkeit" nicht in eine Zeile) */
+@container an-rechts (max-width: 520px) {
+  .an-g-label, .an-k-titel { white-space: normal; overflow: visible; text-overflow: clip; }
+}
+/* Kopf im Querfenster unter iPad-Breite (bis 1000 px): die Unterzeile darf umbrechen, sie nennt den kurzen Namen, und
+   der Grund (Matt, Aufgabe ...) entfaellt dort, sonst wurde er bis 960 px mit "..." gekuerzt; die Genauigkeits-Karte
+   nennt ihn unter dem Ergebnis */
+.an-unter-kurz { display: none; }
+@media (orientation: landscape) and (max-width: 1000px) {
+  .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
+  .an-unter-grund, .an-unter-voll { display: none; }
+  .an-unter-kurz { display: inline; }
+}
+/* Navigation unter einem kleinen Brett: vier Knoepfe ueber die volle Breite, der Zugstand entfaellt (wie am Handy) */
+@container an-links (max-width: 291px) {
+  .an-stand { display: none; }
+  .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
