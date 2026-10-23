@@ -1,0 +1,72 @@
+/* ============================================================
+   Paket abo (Welle B1): Gruppe "Crownmate Trainer" in den Einstellungen, Blatt "Crownmate Trainer"
+   (js/pakete/abo/trainer.js) und der ruhige Premium-Hinweis (premiumHinweis in js/abo.js).
+   Nur Tokens aus css/tokens.css und css/themes/modern.css, hell und dunkel; kein Neon, kein Leuchten,
+   keine Verlaeufe. Das Blatt baut auf .sheet-ort / .sheet-karte aus css/bauteile.css auf.
+   ============================================================ */
+
+/* ---------- Gruppe in den Einstellungen ---------- */
+.abo-stand { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: var(--text); }
+
+/* ---------- Blatt ---------- */
+.trainer-karte { width: min(640px, calc(100% - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px));
+  overflow-y: auto; overscroll-behavior: contain; text-align: left; }
+.trainer-kopf { display: flex; align-items: center; gap: 14px; }
+.trainer-kopf-text { min-width: 0; }
+.trainer-marke { flex: none; width: 52px; height: 52px; display: grid; place-items: center; border-radius: var(--r-l);
+  background: var(--gold-weich); color: var(--gold); }
+.trainer-marke svg { width: 28px; height: 28px; }
+.trainer-karte .trainer-unter { margin-top: 4px; font-size: 15px; }
+.trainer-karte .trainer-beschreibung { margin-top: 12px; font-size: 15px; }
+.trainer-preis { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-top: 16px;
+  padding: 12px 16px; border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
+.trainer-preis-text { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; letter-spacing: -.02em; color: var(--text); }
+.trainer-kuendbar { font-size: 14px; font-weight: 700; color: var(--text-2); }
+.trainer-karte .trainer-stand { margin-top: 12px; font-size: 15px; font-weight: 700; color: var(--text); }
+.trainer-karte .trainer-stand:empty { display: none; }
+.trainer-listen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; align-items: start; }
+.trainer-liste { padding: 12px 14px; border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
+.trainer-liste h4 { margin: 0 0 8px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
+  text-transform: uppercase; color: var(--text-2); }
+.trainer-liste ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.trainer-liste li { position: relative; padding-left: 20px; font-size: 14px; line-height: 1.35; color: var(--text); }
+.trainer-liste li::before { content: ""; position: absolute; left: 3px; top: .42em; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
+.trainer-gratis li::before { background: var(--gut); }
+/* In Arbeit: noch nicht enthalten, deshalb leerer Ring statt Punkt und gedaempfte Schrift */
+.trainer-geplant li { color: var(--text-2); }
+.trainer-geplant li::before { background: transparent; border: 2px solid var(--linie-2); width: 6px; height: 6px; }
+.trainer-geplant-hinweis { margin: 10px 0 0; font-size: 13px; color: var(--text-2); }
+.trainer-liste[hidden] { display: none; }
+/* Reihenfolge immer: "Im Trainer", "Immer gratis", "In Arbeit"; bei drei Listen "In Arbeit" ueber die ganze Breite */
+.trainer-gratis { order: 2; }
+.trainer-geplant { order: 3; }
+.trainer-listen[data-anzahl="3"] .trainer-geplant { grid-column: 1 / -1; }
+.trainer-zusagen { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.trainer-karte .trainer-alter { margin-top: 4px; font-size: 13px; font-weight: inherit; color: var(--text-2); }
+.trainer-karte .trainer-test { margin-top: 4px; font-size: 13px; color: var(--text-2); }
+.trainer-knoepfe { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.trainer-knoepfe[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
+.trainer-knoepfe[data-anzahl="3"] .knopf:last-child { grid-column: 1 / -1; }
+.trainer-knoepfe .knopf { width: 100%; white-space: normal; text-align: center; }
+
+@media (max-width: 560px) {
+  .trainer-listen { grid-template-columns: minmax(0, 1fr); }
+  .trainer-listen[data-anzahl="3"] .trainer-geplant { grid-column: auto; }
+  .trainer-knoepfe { grid-template-columns: minmax(0, 1fr); }
+  .trainer-knoepfe .knopf.primaer { order: -1; }
+  .trainer-karte { padding: 10px 16px 18px; }
+}
+
+/* ---------- Ruhiger Hinweis an gesperrten Premium-Funktionen ---------- */
+.premium-hinweis { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-l);
+  background: var(--flaeche-2); border: 1px solid var(--linie); color: var(--text); text-align: left; }
+.ph-zeichen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-m);
+  background: var(--gold-weich); color: var(--gold); }
+.ph-zeichen svg { width: 20px; height: 20px; }
+.ph-text { flex: 1; min-width: 0; margin: 0; font-size: 14px; color: var(--text-2); }
+.ph-text b { display: block; font-size: 15px; color: var(--text); }
+.premium-hinweis .ph-mehr.knopf { flex: none; padding: 0 14px; font-size: 14px; }
+@media (max-width: 420px) {
+  .premium-hinweis { flex-wrap: wrap; }
+  .premium-hinweis .ph-mehr.knopf { width: 100%; }
+}

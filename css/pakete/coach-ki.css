@@ -1,0 +1,45 @@
+/* ============================================================
+   Paket coach-ki (Welle B2): Knopf "Frag den Coach" in der Coach-Karte der Spielanalyse und die Karte mit der
+   Antwort (js/pakete/coach-ki/index.js). Nur Tokens aus css/tokens.css und css/themes/modern.css, hell und dunkel;
+   kein Neon, kein Leuchten, keine Verlaeufe, keine Schatten. Bewegung nur ueber opacity und transform, Dauer aus den
+   Tokens (--d-*, skaliert mit --tempo); "Bewegung aus" regelt tokens.css fuer alle Animationen.
+   ============================================================ */
+
+/* Platz in der Knopfzeile (Host: .an-c-fuss in js/ui/analyse.js, Optik css/analyse.css). Nur wenn der Knopf da ist (:has),
+   ohne Paket aendert sich kein Pixel: Die Hauptvariante bekommt eine eigene Zeile, damit sie neben zwei Knoepfen nicht zu
+   einer schmalen Spalte wird, und die Knopfzeile darf umbrechen statt aus der Karte zu ragen. */
+.an-c-fuss:has(.ck-knopf) { flex-wrap: wrap; }
+.an-c-fuss:has(.ck-knopf) .an-c-linie { flex-basis: 100%; }
+.an-c-knoepfe:has(.ck-knopf) { flex-wrap: wrap; max-width: 100%; }
+
+/* Die Karte steht unten in der Coach-Karte (.an-coach ist ein Raster) ueber die ganze Breite */
+.ck-karte { grid-column: 1 / -1; margin-top: 8px; padding: 12px 14px; border-radius: var(--r-m); background: var(--flaeche-2);
+  border: 1px solid var(--linie); color: var(--text); text-align: left; animation: ck-ein var(--d-m) var(--gleiten) both; }
+.ck-karte[hidden] { display: none; }
+.ck-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+/* "KI" deutlich sichtbar (KI-Verordnung Art. 50): eigene Marke, nicht nur Kleingedrucktes */
+.ck-marke { flex: none; padding: 1px 8px; border-radius: var(--r-pille); background: var(--flaeche-3); border: 1px solid var(--linie-2);
+  color: var(--text); font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); }
+.ck-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.ck-text { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text); }
+.ck-ki-hinweis { margin: 8px 0 0; font-size: var(--fs-klein); font-weight: var(--gw-stark); color: var(--text-2); }
+.ck-rest { margin: 2px 0 0; font-size: var(--fs-klein); color: var(--text-2); }
+.ck-meldung { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-2); }
+.ck-karte[data-zustand="laedt"] .ck-meldung { animation: ck-atmen calc(var(--d-m) * 5) ease-in-out infinite; }
+.ck-konto.knopf { margin-top: 10px; min-height: 44px; }
+/* Im Zustand "premium" bringt der Hinweis aus B1 seinen eigenen Rahmen mit */
+.ck-karte[data-zustand="premium"] { padding: 0; border: 0; background: none; }
+
+@keyframes ck-ein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes ck-atmen { 50% { opacity: .55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ck-karte, .ck-karte * { animation: none; }
+}
+
+@media (orientation: portrait) and (max-width: 520px) {
+  /* Handy: die Knopfzeile ueber die ganze Breite der Karte (auch unter dem Symbol), dann passen beide Knoepfe nebeneinander */
+  .an-coach .an-c-fuss:has(.ck-knopf) { grid-column: 1 / -1; }
+  .ck-karte { padding: 10px 12px; }
+  .ck-text { font-size: 14px; }
+}

@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 59;
-const STAND = 'b208a5210d39';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 61;
+const STAND = 'b75b426b59ed';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -43,6 +43,9 @@ const DATEIEN = [
   'css/sicherung.css',
   'css/daten.css',
   'css/screens.css',
+  'css/pakete/abo.css',
+  'css/pakete/coach-ki.css',
+  'css/pakete/schule.css',
   'js/app.js',
   'js/bewegung.js',
   'js/board.js',
@@ -54,6 +57,13 @@ const DATEIEN = [
   'js/inhalte.js',
   'js/konto-config.js',
   'js/konto.js',
+  'js/abo.js',
+  'js/pakete/abo/index.js',
+  'js/pakete/abo/trainer.js',
+  'js/coach-ki.js',
+  'js/pakete/coach-ki/index.js',
+  'js/schule.js',
+  'js/pakete/schule/index.js',
   'js/nachholen.js',
   'js/online.js',
   'js/openings.js',
@@ -76,6 +86,7 @@ const DATEIEN = [
   'js/ui/icons.js',
   'js/ui/partie.js',
   'js/ui/seite.js',
+  'js/ui/schule.js',
   'js/ui/training.js',
   'js/ui/online.js',
   'js/pakete/online/index.js',

@@ -479,10 +479,10 @@ export function zuruecksetzen()                  // nur Tests
 | `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
 | `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
-| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
+| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
-| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
+| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | B3 Klasse 7 · 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
 
 **Hosts im Detail (Welle 0b).** Jeder DOM-Ort hat einen eigenen Behaelter; leer ist er versteckt (`hidden`
@@ -974,7 +974,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 ```
 | Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
 |---|---|---|---|---|
-| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
+| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Klassen-Aufgabe 35 (B3) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
 | `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch` als eigene Zeile ueber Avatar und Namen, hoechstens 16 px hoch (w0plus-a-fix: vorher in `.info`, das auf dem Handy mit der Sprechblase verschwand); wandert beim Drehen mit, `data-lage`; ohne Anbieter `hidden`, mit Anbieter `.partie.mit-gegner-leiste` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
 | `partie:spieler-leiste` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-spieler-leiste` an Flos Namen, quer in `.spieler-quer` nach dem Namensblock, hoch in `.spieler-hoch` nach `.name` (wandert mit, `data-lage`); eine Zeile, nicht hoeher als der Name; ohne Anbieter `hidden` | wie `partie:gegner-leiste` | Flamme des Siegeslaufs (Paket `siegeslauf`) · Level-Emblem (S1-1) |
 | `partie:aktionen` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-aktionen` (`display: contents`) in `.spielknoepfe` vor „Aufgeben“; hoechstens 2 Knoepfe (weitere: console.warn, entfernt), die Reihe bekommt je Knopf eine Spalte (`data-aktionen`, engere Beschriftung); Klicks binden die Pakete selbst (auch ein `data-aktion` im Paket loest nie eine Aktion des Hosts aus); ohne Anbieter `hidden`, Reihe unveraendert | `{ app, buehne, bot, farbe, modus, boss }` | Emote-Rad und Schnell-Chat (Paket `ausdruck`) |
@@ -1808,6 +1808,7 @@ traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Fu
 zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
 `beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
 und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 
 Strategie und Grenzen: `design/runde4/DATEN.md`. Server: `supabase/schema.sql` (Konto light) und
@@ -1866,6 +1867,7 @@ Platzhaltern in eckigen Klammern.
 abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
 in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
 (`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
+
 # Premium-Umbau U5: Arena als Weltkarte, Duell-Intro, Portraets
 
 Flo 18.10. („Variante 1“): die Arena ist die bunte Weltkarte aus Entwurf C, alles Bedienbare im Look A.
@@ -1942,6 +1944,7 @@ Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle z
 Ziel-Lagen, Freischalten mit und ohne Bewegung, Duell `immer`/`besondere`/`aus`/ohne Bewegung, Ueberspringen, Tipp zur
 Partie, Portraetflug auf eingesetzte Ziele, Zeitplan mit Schein-Partie bei normal/langsam/schnell und spaeter Partie,
 harte Grenze).
+
 # App-Store-Huelle (Capacitor, nur Geruest)
 
 **Ordner `native/`:** eigenes `package.json` mit `@capacitor/core`, `cli`, `ios` und `android` in einer festen Version
@@ -1954,3 +1957,279 @@ aendert sich nicht: Unter iOS (`capacitor://localhost`) gibt es keinen Service W
 aus, unter Android (`https://localhost`) laeuft er. Offen bis zur Veroeffentlichung: Plattform-Projekte `ios/` und
 `android/` (entstehen mit `npx cap add`), Symbole und Startbild, In-App-Kauf statt Stripe in der iOS-App,
 Push-Mitteilungen. Test: `node tests/native.test.mjs` (reines Node, Suite `native` in `tests/alle.mjs`).
+
+# Welle B1: Abo „Crownmate Trainer“ (Stripe, Supabase, Paket abo)
+
+Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (SPIELKONZEPT 2b.5 und 5). B1 baut nur das Gerüst:
+wer Premium hat, wie man abschließt und kündigt. Was Premium freischaltet, entscheiden die jeweiligen Pakete (z. B. B2
+„Frag den Coach“) über `istPremium()` bzw. auf dem Server über `ist_premium_von(uid)`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Abo mit Stripe“.
+
+**Datenfluss:** App `kaufen()` öffnet Flos Stripe-Zahlungslink mit `client_reference_id=<Supabase-Nutzer-ID>` →
+Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur und ruft mit dem Service-Schlüssel
+`rpc/abo_stripe_ereignis` → Tabelle `abos`. Die App fragt `rpc/ist_premium` und die eigene `abos`-Zeile.
+
+**Server** (`supabase/abo-schema.sql`, Test `supabase/abo-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `produkte` (`id`, `name`, `beschreibung`, `preis_text`, `kauf_link`, `portal_link`, `aktiv`): anon und angemeldete lesen
+  nur aktive Zeilen, Links nur `https://` (Check), schreiben nur Service-Rolle und Dashboard. Die App nutzt die Zeile
+  `trainer`. Preise stehen nur hier, nie im Repo.
+- `abos` (eine Zeile je Nutzer: `status` 'aktiv' | 'gekuendigt' | 'abgelaufen', `plan`, `gueltig_bis`, `quelle`
+  'stripe' | 'manuell', `kunde_id` cus_…, `abo_id` sub_…, `stand_zeit`): Nutzer lesen nur die eigene, schreiben nie.
+- `stripe_ereignisse`: jedes Ereignis genau einmal (Primärschlüssel evt_…), wartende Ereignisse ohne Zuordnung,
+  nach 90 Tagen gelöscht; nur Service-Rolle.
+- `ist_premium()` (Aufrufer) und `ist_premium_von(uid)` (nur Service-Rolle): Status aktiv oder gekündigt UND
+  `gueltig_bis > now()`.
+- `abo_stripe_ereignis(ereignis_id, typ, erstellt, kunde_id, abo_id, nutzer, status, gueltig_bis, plan)` (nur
+  Service-Rolle) → 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer', Fehler
+  `ABO_EREIGNIS_UNGUELTIG`. Regeln: idempotent; ein Ereignis, das älter ist als `stand_zeit`, ändert nichts, bei
+gleicher Sekunde nimmt nur `customer.subscription.deleted` ein laufendes Premium weg (Stripe schickt beim Abschluss
+mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
+  setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
+  Kunden werden dabei in ihrer Reihenfolge angewendet (bei einem zweiten Abo desselben Kunden auch dessen schon als
+  `fremdes_abo` abgelegte Ereignisse); `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
+  ein neuer Kauf verkürzt nie ein längeres Abo. **Gleichzeitigkeit:** vor dem ersten Lesen oder Schreiben nimmt die
+  Funktion `pg_advisory_xact_lock(hashtextextended('abo:' || kunde_id, 0))`, alle Ereignisse eines Kunden laufen also
+  nacheinander (sonst blieb ein Abo-Ereignis, das parallel zum Kauf ankam, für immer auf 'wartet'; nachgestellt mit zwei
+  psql-Sitzungen gegen Postgres 16).
+- `abo_hole_nach(kunde, abo)` (nur Besitzer: der Kauf ruft es, Flo im SQL Editor nach einer Handzeile für einen Kauf
+  `ohne_nutzer`) wendet wartende Ereignisse des Kunden an und liefert ihre Anzahl; Fehler `ABO_KUNDE_UNBEKANNT`, wenn
+  keine Zeile in `abos` diese `kunde_id` trägt.
+
+**Edge Function** `supabase/functions/stripe-webhook/index.ts` (nur Hülle, Deploy mit `--no-verify-jwt`) und die Logik
+in `supabase/functions/_gemeinsam/stripe.js` (reines ES-Modul, WebCrypto, in Node getestet):
+`pruefeSignatur` (HMAC-SHA256 über `t.payload`, nur v1, Toleranz 300 s, zeitkonstanter Vergleich), `auswerten`
+(Ereignis → Parameter von `abo_stripe_ereignis`; liest alte und neue Stripe-API-Form: `current_period_end` am Abo oder
+an den Positionen, `invoice.subscription` oder `parent.subscription_details`), `verarbeite` (405, 413, 400 Signatur/JSON,
+200 verbucht oder ignoriert, 500 ohne Secrets oder Datenbank, damit Stripe wiederholt). Status-Abbildung: active/trialing
+→ aktiv (mit `cancel_at_period_end` oder `cancel_at` → gekuendigt bis dahin), alles ohne Zahlung (past_due, unpaid,
+incomplete, paused …) → abgelaufen ab dem Ereignis, deleted → abgelaufen. Ein bezahlter Kauf gibt vorläufig 1 Tag
+(`VORLAEUFIG_S`), bis das erste Abo-Ereignis den echten Stand bringt. Secrets: `STRIPE_WEBHOOK_SECRET` (Flo setzt es),
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (stellt Supabase). Ein neuer Secret Key (sb_secret_…) geht nur in `apikey`.
+
+**Client** `js/abo.js` (Muster `js/konto.js`, nur fetch, `setzeAboFetch`/`setzeAboUhr` für Tests):
+`istPremium({ neu })` (Abgleich höchstens alle 10 min, offline der letzte Stand bis `gueltig_bis`, nur für dieselbe
+Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufAdresse`, `kaufen()`
+(öffnet das Fenster ohne vorheriges await, merkt den Kauf; Grund `'alter'`, solange die Altersfrage nicht mit „18 oder
+älter“ beantwortet ist), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor: kein Kauf und kein Portal über
+Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere Pakete: ruhige Karte
+`div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf den Screens `OHNE_HINWEIS_SCREENS` (`partie`, also auch
+im Ergebnis, und `lektion`) liefert sie `null` und zeigt nichts (SPIELKONZEPT 2b Regel 9, Fairness 13). **Vertrag:** Ein
+Paket zeigt den Hinweis nur als Antwort auf einen Tipp auf eine Premium-Funktion (B2: Knopf „Frag den Coach“ in der
+Analyse), nie von selbst beim Öffnen eines Screens und nie ungefragt nach einer Niederlage.
+- **Gebaute Vorteile:** `registriereVorteil(id)` meldet einen Vorteil aus `VORTEILE` (`js/pakete/abo/trainer.js`, Ids
+  `coaches`, `coach-erklaerungen`, `frag-den-coach`, `lernpfad-5-10`, `raetsel-auswahl`, `formspiegel`, `liga-archiv`,
+  `foerderer-nadel`) als fertig; das Paket, das ihn baut, ruft es beim Laden (B2: `registriereVorteil('frag-den-coach')`). Das Blatt
+  zeigt nur gemeldete Vorteile unter „Im Trainer“, den Rest unter „In Arbeit“ („Noch nicht enthalten“), und bietet den
+  Kauf erst mit mindestens einem gemeldeten Vorteil an. Ausnahme: ein Zahlungslink aus dem Stripe-Testmodus
+  (`istTestLink`, `https://buy.stripe.com/test_…`) für Flos Probekauf, mit dem Satz „kein echtes Geld“.
+- **Nach dem Kauf:** `bestaetigeKauf()` fragt als Serie (sofort, dann nach `NACHFRAGEN_MS` 3, 10 und 30 s), solange der
+  Kauf-Start höchstens `NACH_KAUF_MS` (30 min) alt ist; `kaufStand()` → `'prueft'` | `'offen'` | `null`. Anfang und Ende
+  melden `abo:stand` mit `detail { prueft, premium, bestaetigt }`. Grund: Stripe leitet sofort zurück, der Webhook kommt
+  oft Sekunden später; vorher bot das Blatt dann wieder „Trainer abschließen“ an (Gefahr eines zweiten Abos).
+- **Alter:** `alterAngabe()` / `setzeAlterAngabe(ab18)`: einmal je Konto „18 oder älter?“ (SPIELKONZEPT 2b.8 Regel 22:
+  Abo für Minderjährige nur über die Familienfreigabe der Stores, die gibt es im Web nicht). Gespeichert wird nur ja/nein.
+- `produktOffline()` (letzter Abruf scheiterte ohne Zwischenspeicher), `aufraeumen()` (ohne Anmeldung Stand,
+  Altersangabe und Kauf-Merker vom Gerät), `aboHinweisZumLoeschen()` (Satz für den Dialog „Konto löschen“, solange ein
+  Stripe-Abo läuft: Löschen kündigt nicht; **die Integration hängt ihn in `loescheKontoDialog` aus `js/daten.js` an**).
+Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Export und Rückfall):
+`schach-arena:abo:stand` `{ uid, premium, status, plan, gueltigBis, quelle, geprueftAm }`,
+`schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts),
+`schach-arena:abo:alter` `{ uid, ab18 }`.
+
+**Paket** `pakete/abo/index` (noch nicht in `PAKETE`: das trägt die Integration ein, die Dateien stehen schon in `sw.js`; der
+Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 7 unter
+Konto (5) und Daten (6), nur wenn das Konto sichtbar ist; zeichnet neu bei `abo:stand` und wenn sich die Anmeldung ändert:
+`MutationObserver` vergleicht die Nutzer-ID, solange die Einstellungen offen sind, dazu `storage` für andere Tabs, weil
+`js/konto.js` beim Ab- und Anmelden nichts meldet; nach dem Abmelden `aufraeumen()`); `app:bereit` (vorher
+`aufraeumen()`) und `app:sichtbar` starten nach einem Kauf `bestaetigeKauf()`; bei `abo:stand` mit `bestaetigt` genau
+ein Toast „Danke“. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen
+plus `.trainer-*`, Zustände in `data-zustand`: laedt, vorschau (auch ohne gebauten Vorteil und ohne freigeschaltetes
+Konto, damit „Zum Konto“ nie ins Leere führt), offline, abgemeldet, kaufbar, alter, unter18, bestaetigen, wartet
+(„Zahlung prüfen“, „Neu abschließen“), premium, store; schließt bei Escape, Schleier und jedem Screen-Wechsel;
+`.trainer-alter` mit `ALTER_HINWEIS` „Web ab 18, Crownmate ab 16“). Optik `css/pakete/abo.css` (nur Tokens, geprüft in
+`tests/abo.test.mjs`, weil `tests/thema.test.mjs` `css/pakete/` nicht liest), lädt `stelleAboCssSicher()` nach.
+Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
+`page.route`, `window.open` ersetzt).
+
+# Welle B2: „Frag den Coach“ (KI-Erklärungen, Edge Function coach, Paket coach-ki)
+
+Teil des Abos „Crownmate Trainer“ (Vorteil `frag-den-coach`, SPIELKONZEPT 2b.5 „Coaches“, Punkt 5; bewusst nicht
+`coach-erklaerungen`: das sind die Erklärungen der Coaches aus Engine-Fakten und Textbausteinen, ohne KI. Der Eintrag im
+Trainer-Blatt nennt die KI und die Tagesgrenze, Prüfer-Befund B2, § 5 UWG): In der Spielanalyse erklärt ein
+Modell von Anthropic einen Zug in ganzen Sätzen. Grundlage bleiben die Engine-Fakten der gespeicherten Analyse; das
+Modell bekommt nur diese Fakten, nie einen freien Text. Einrichtung für Flo: `supabase/ANLEITUNG.md`, Abschnitt
+„Frag den Coach“. Modell, Parameter und SDK-Aufrufe nach dem Skill `claude-api`.
+
+**Datenfluss:** Tipp auf „Frag den Coach“ → `istPremium()` (B1, Zwischenspeicher; nur ein bekannter Stand ohne
+Trainer zeigt sofort den Hinweis, ein nie geprüfter Stand fragt den Server) → `frageCoach(eingabe)` POST
+`/functions/v1/coach` mit dem Token der Anmeldung → Function: `/auth/v1/user` (wer?) → `rpc/ist_premium_von` →
+`rpc/coach_nimm_frage` (Tageslimit) → `client.beta.messages.create` → `{ text, modell, rest }` → Karte in der Analyse.
+Antwortet die KI nicht, ruft die Function `rpc/coach_gib_zurueck`: Die Frage zählt dann nicht.
+
+**Server** (`supabase/coach-schema.sql`, Test `supabase/coach-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `coach_nutzung (user_id, tag, anzahl)`: eine Zeile je Nutzer und Coach-Tag, nur der Zähler (nie Frage oder Antwort),
+  `on delete cascade` mit dem Konto, Tage älter als 7 räumt jede neue Frage auf. Nutzer lesen nur die eigenen Zeilen
+  und schreiben nie.
+- `coach_tag()`: Europe/Berlin mit Tagesgrenze 4:00 (wie `js/tag.js`; die 4 Stunden gehen von der Wanduhr ab).
+- `coach_nimm_frage(nutzer, grenze)` → freie Fragen danach (0 … grenze−1) oder −1 an der Grenze (dann nichts gezählt),
+  atomar über `insert … on conflict do update … where n.anzahl < grenze`. Fehler `COACH_GRENZE_UNGUELTIG`,
+  `COACH_NUTZER_FEHLT`. `coach_gib_zurueck(nutzer)` → neue Anzahl, nie unter 0, −1 ohne Zeile.
+- Alle drei Funktionen nur für die Service-Rolle (ein Nutzer, der zurückgeben könnte, hätte kein Limit).
+
+**Edge Function** `supabase/functions/coach/index.ts` (nur Hülle, Deploy MIT JWT-Prüfung; einzige Datei mit dem
+Anthropic-SDK, `npm:@anthropic-ai/sdk@0.133.0`; ordnet die typisierten SDK-Fehler ein: NotFound/Authentication/
+PermissionDenied → `konfig`, BadRequest → `anfrage`, RateLimit und übrige APIError → `ueberlastet`, APIConnectionError
+→ `netz`; Client mit 45 s Wartezeit und einem zweiten Versuch). Die Logik steht in
+`supabase/functions/_gemeinsam/coach.js` (reines ES-Modul, in Node getestet, nutzt `dienstKopf` aus `stripe.js`):
+- `pruefeEingabe(daten)`: `{ fen, zug, besterZug?, bewertungVorher?, bewertungNachher?, klasse?, spielerLevel?,
+  eigenerZug? }`; FEN-Form (8 Reihen, je ein König, keine Bauern auf Reihe 1/8, Rochade, en passant passend zur Seite
+  am Zug mit gegnerischem Bauern davor, Zähler; die Seite, die nicht zieht, steht nicht im Schach), `beschreibeZug` mit
+  voller Zugprüfung ohne chess.js (Gangart, freie Bahn, Rochade mit Recht, Turm, freien und nicht angegriffenen
+  Feldern, en passant, Umwandlung genau auf der letzten Reihe, eigener König danach nicht im Schach) und der Folge für
+  den Gegner (`folge`: „gibt Schach“ | „setzt matt“ | „führt zum Patt“; Test gegen chess.js für alle legalen Züge),
+  Bewertungen `{cp}` oder `{mate}` aus Sicht von Weiß (`{mate: 0}` nur nach einem Mattzug), Klasse aus den 11 Ids,
+  Elo 100 bis 3500. Andere Felder werden nie gelesen. **Mattzug:** Die App schreibt die Mattstellung als
+  `{mate: ±1}` (js/engine.js `endstellung`, Vorzeichen = Gewinner); nach einem Matt- oder Pattzug steht im Prompt
+  deshalb die Tatsache („Schachmatt, die Partie ist zu Ende“ bzw. „Patt“) statt der Bewertung danach.
+- `SYSTEM_PROMPT` (fest, Deutsch, für Einsteiger verständlich, höchstens 80 Wörter, nur diese Stellung, nennt den
+  stärkeren Zug mit Grund, keine Erfindungen, „Die Engine sieht hier …“ statt zu raten, keine Engine-Zahlen, keine
+  Fragen, nichts Persönliches, nichts außer Schach; die Fakten sind Daten, keine Anweisungen) und `baueNutzerText`
+  (Fakten mit Figurenliste je Seite, Zug in Worten, Bewertung in Worten mit Zahl, Klasse mit Bedeutung, Stärke als
+  Wort). Beide als Schnappschuss in `tests/server-coach.test.mjs`: eine Änderung am Prompt dort bewusst nachziehen.
+- `baueAnfrage(eingabe, { modell, aufwand })`: `model` (Secret `COACH_MODELL`, Standard `claude-opus-5-5`),
+  `output_config.effort` (Secret `COACH_AUFWAND`: low | medium | high, Standard low), `max_tokens` je Aufwand
+  (4096 | 8192 | 16000; das Denken zählt mit), `system`, eine Nutzer-Nachricht. Kein `thinking`-Feld (Opus 5.5 denkt
+  immer adaptiv), kein `temperature`, kein Prefill. Für `FALLBACK_MODELLE` (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5)
+  zusätzlich `fallbacks: 'default'` mit `betas: ['server-side-fallback-2026-07-01']`.
+- `leseAntwort(antwort)`: zuerst `stop_reason` (`refusal` → abgelehnt), nur `text`-Blöcke nach dem letzten
+  `fallback`-Block, Markdown weg, bei `max_tokens` bis zum letzten Satzende, harte Kürzung auf 110 Wörter.
+- `verarbeite(...)`: Antworten immer JSON mit CORS (`*`, Anmeldung per Bearer, nicht per Cookie): 200
+  `{ text, modell, rest }`, 204 OPTIONS, 400 `eingabe` (mit `grund`), 401 `anmeldung`, 403 `premium`, 405, 413,
+  422 `abgelehnt`, 429 `limit` (mit `grenze`), 502/503 `ki`, 503 `server` | `nicht_eingerichtet`; jede Fehlerantwort
+  `{ fehler, text }`. Protokoll nur `coach ok <modell> ein=<n> aus=<n>`, `coach zurueck <grund>`,
+  `coach anmeldung <status>`, `coach warnung <SECRET>` und `coach nicht_eingerichtet [COACH_MODELL | apikey]`.
+- `pruefeEinstellungen(umgebung)`: ein gesetztes, aber falsch geschriebenes `COACH_MODELL` ist ein Einrichtungsfehler
+  (503 `nicht_eingerichtet`, kein Zähler, keine KI), nie ein stiller Wechsel aufs Standardmodell (das teuerste);
+  falscher Aufwand oder falsche Grenze fallen auf `low` bzw. 30 zurück, mit Warnung im Protokoll. Antwortet
+  `/auth/v1/user` mit 401 „Invalid API key“ (Projekt-Schlüssel der Function), ist das ebenfalls `nicht_eingerichtet`,
+  nicht „Melde dich an“.
+
+**Client** `js/coach-ki.js` (Muster `js/abo.js`, nur fetch, `setzeCoachFetch` für Tests): `eingabeAusZug(zug,
+{ partie, du })` (aus dem Review-Eintrag: `fenVorher`, `uci`, `besterZug`, `evalVorher`, `evalNachher`, `klasse`;
+`partie.spielstaerke` als `spielerLevel`), `frageCoach(eingabe)` → `{ ok, text, modell, rest, gemerkt }` oder
+`{ ok: false, grund }` (abgemeldet, offline, premium, limit, eingabe, abgelehnt, nicht_eingerichtet, ki; nach
+`WARTE_MS` = 100 s ohne Antwort bricht die App ab: `ki`). Antworten
+gemerkt je Nutzer, Stellung und Zug für die Sitzung (nur Arbeitsspeicher, höchstens 40): derselbe Zug zählt nicht
+zweimal. Sagt der Server „kein Trainer“, holt die App den Abo-Stand neu. `KI_HINWEIS`, `TEXTE`, `restText(rest)`
+(erst ab 5 oder weniger), `vergissAntworten()`.
+
+**Paket** `pakete/coach-ki/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die drei Dateien stehen schon
+in `sw.js`; der Test lädt es über `?test&erw=pakete/coach-ki/index`): Ort `analyse:coach` mit Reihenfolge 30, Knopf
+`.ck-knopf[data-paket="coach-ki"]` nur mit sichtbarem Konto (`kontoFreigeschaltet`); erst ein Tipp fragt. Karte
+`.ck-karte[data-zustand]` (laedt, antwort, abgemeldet, premium, offline, limit, abgelehnt, eingabe, nicht_eingerichtet,
+ki) als letztes Kind von `.an-coach` (über die ganze Breite), `role="status"`, beim Zeigen ins Bild gerollt; `verlasse()`
+nimmt sie heraus. Ein zweiter Tipp klappt eine Antwort zu und wieder auf (aus dem Merker); nach einem Fehler fragt er
+neu. Ohne Trainer `premiumHinweis(karte, 'Frag den Coach', { app })` aus B1, ohne Anmeldung „Zum Konto“.
+`registriereVorteil('frag-den-coach')` beim Laden, `registriereIcon('coach-frage')`. Optik `css/pakete/coach-ki.css`
+(nur Tokens, geprüft in `tests/coach-ki.test.mjs`): Wenn der Knopf da ist (`:has(.ck-knopf)`), bekommt die
+Hauptvariante eine eigene Zeile und die Knopfzeile darf umbrechen, auf dem Handy reicht die Knopfzeile über die ganze
+Kartenbreite; ohne Paket ändert sich nichts. Tests: `tests/server-coach.test.mjs` (Node, auch die Hülle mit
+Deno-Attrappe und gefälschtem SDK über `module.registerHooks`) und `tests/coach-ki.test.mjs` (Node und Browser mit
+echter Analyse und gefälschtem Supabase über `page.route`). Die echte API wird in keinem Test aufgerufen.
+
+# Welle B3: Schulmodus (Klassen für Lehrkräfte und Vereine, Paket schule)
+
+Eine Lehrkraft legt eine Klasse an, schreibt den 6-stelligen Code an die Tafel, Mitglieder treten mit Code und
+Anzeigename bei; die App meldet nach jeder Partie gebündelt Kennzahlen, die Lehrkraft sieht sie sortierbar und stellt
+Aufgaben. Idee, Rollen und Datenschutz (AV-Vertrag als Stichpunkte): `design/runde4/SCHULE.md`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Schulmodus“. Zielgruppe Oberstufe und Vereine, Crownmate bleibt ab 16.
+
+**Datenfluss:** nur Datenbank-Funktionen (RPC über PostgREST, keine Edge Function, kein Secret). App → `rpc/schule_*`
+mit dem Token der Anmeldung → security-definer-Funktion prüft `auth.uid()` und die Rolle → Tabellen. Gelesen wird über
+`schule_meine_klassen` (beide Rollen) und `schule_klassen_uebersicht` (Leitung); RLS sichert zusätzlich den direkten
+Tabellenzugriff ab.
+
+**Server** (`supabase/schule-schema.sql`, Test `supabase/schule-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `klassen` (`id`, `name` 2–40 ohne @, `code` 6 Zeichen aus `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` wie im Online-Fundament,
+  aus `gen_random_uuid()`, `leitung`, `erstellt_am`, `aktiv`, `geschlossen_am`): lesen nur die Leitung.
+- `klassen_mitglieder` (`id` eigene Kennung, `klasse`, `user_id`, `anzeigename` 2–24, Buchstaben mit Akzent, Ziffern,
+  Leerzeichen, `.`, `-`, `'`, mindestens ein Buchstabe, nie @; in der Klasse eindeutig ohne Groß/Klein,
+  `beigetreten_am`): lesen Leitung und das Mitglied selbst; **Spaltenrechte ohne `user_id`** (die Leitung sieht nie die
+  Konto-ID, Policy liest sie trotzdem).
+- `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0–10, `sterne` 0–30, `partien`, `genauigkeit_schnitt`
+  numeric(4,1), `haeufigste_fehler` jsonb `{ zuege, arten: [{ art, anzahl }] }` höchstens 300 Zeichen und 4 Arten aus
+  `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am` **date** (Europe/Berlin,
+  keine Uhrzeit: die Meldung kommt nach jeder Partie, ein Zeitstempel verriete, wann jemand spielt; eine ältere Fassung
+  mit Zeitstempel kürzt das Schema beim erneuten Einspielen)): lesen Leitung und das Mitglied selbst.
+- `klassen_aufgaben` (`klasse`, `titel` 2–80, `art` 'bot' | 'raetsel' | 'partien', `ziel` jsonb `{ bot, sterne 1–3 }` bzw.
+  `{ anzahl 1–100 }`, `faellig` date gestern bis +366 Tage, `erstellt_am`): lesen Leitung und Mitglieder.
+- `schule_versuche` (Fehlversuche beim Beitreten je Nutzer und Tag): nur Service-Rolle.
+- Funktionen (security definer, `search_path = ''`, nur `authenticated`): `schule_erstelle_klasse(name)`,
+  `schule_tritt_bei(code, anzeigename)` (ein falscher Code liefert `{ fehler: 'SCHULE_CODE_UNGUELTIG' }` **ohne raise**,
+  damit der Fehlversuch gezählt bleibt; 10 je Tag, dann `SCHULE_ZU_VIELE_VERSUCHE`; zweiter Beitritt ändert nur den
+  Namen; sperrt die Klasse mit `for update` und die Fehlversuche je Nutzer mit `pg_advisory_xact_lock`, damit parallele
+  Anfragen eines Kontos die Grenze nicht überholen), `schule_verlasse(klasse)`, `schule_melde_fortschritt(bots_besiegt, sterne,
+  partien, genauigkeit_schnitt, haeufigste_fehler, erledigt)` (schreibt die eigene Zeile in **allen aktiven** Klassen,
+  `erledigt` je Klasse auf ihre Aufgaben gefiltert; → Zahl der Klassen), `schule_meine_klassen()` (→ `{ leitung: [...],
+  mitglied: [...] }`, Mitglieder ohne Code und ohne Leitung), `schule_klassen_uebersicht(klasse)`,
+  `schule_aufgabe_anlegen(klasse, titel, art, ziel, faellig)`, `schule_aufgabe_loeschen(aufgabe)` (nimmt sie auch aus
+  `erledigt`), `schule_entferne_mitglied(mitglied)`, `schule_schliesse_klasse(klasse)`, `schule_loesche_klasse(klasse)`;
+  Hilfen für die Policies `schule_leitet`, `schule_mitglied_in`, `schule_ist_mein_mitglied`. Fehler-Kennungen
+  `SCHULE_*` (Vertrag mit `TEXTE` in `js/schule.js`). Grenzen: 20 Klassen je Leitung, 60 Mitglieder, 10
+  Mitgliedschaften, 30 Aufgaben. Geschlossene Klassen räumt `schule_erstelle_klasse` nach 90 Tagen weg; Konto löschen
+  kaskadiert überall.
+
+**Client** `js/schule.js` (Muster `js/abo.js`, nur fetch, `setzeSchuleFetch`/`setzeSchuleUhr`/`setzeSchuleWartezeit` für
+Tests): jede Anfrage hat eine Zeitgrenze `WARTE_MS` (15 s, Muster `js/coach-ki.js`: AbortController plus Rennen gegen
+einen Zeitgeber), danach gilt sie als `offline`. `meineKlassen({ neu })` (Zwischenspeicher 10 min, ohne Klasse 12 h,
+offline der letzte Stand); eine laufende Anfrage wird nur mitbenutzt, wenn sie nach der letzten Änderung begann
+(Zähler je Änderung), eine ältere Antwort wird nicht gespeichert, sondern neu geholt. Kommt auf eine Änderung keine
+Antwort, gilt der Zwischenspeicher als `veraltet` (der Server kann sie gebucht haben). `erstelleKlasse`,
+`trittBei` (prüft Code und Anzeigename vorher, ein sichtbar falscher Code geht nicht zum Server; meldet danach sofort),
+`verlasse`, `uebersicht`, `aufgabeAnlegen`, `aufgabeLoeschen`, `entferneMitglied`, `schliesseKlasse`, `loescheKlasse`
+(alle → `{ ok, … }` oder `{ ok: false, grund }`, danach „Meine Klassen“ neu), `fortschrittJetzt()` (aus
+`ladeFortschritt`, `statistik`, `ladePartien`; `haeufigsteFehler` zählt nur eigene Züge der letzten 20 wertenden
+Partien aus `liveKlassen`), `aufgabeStand` (Bot: Sterne aus dem Fortschritt; Partien: gespielte Partien seit der Aufgabe,
+ohne Übungen; Rätsel: auf dem Gerät gezählte, je Rätsel einmal), `offeneAufgabe` (Termine zuerst, sonst die neueste,
+länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung({ sofort, nachholen })` (vormerken, nach einer Partie
+frühestens nach 4 s; `nachholen` ohne die 4 s; beides höchstens eine Meldung je Minute; `sofort` nur nach dem Beitritt;
+dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`, `faelligText` („bis Fr
+30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT` (sagt auch, dass der Stand nach jeder Partie kommt und nur der Tag
+gespeichert wird), `RAETSEL_AUFGABEN` (false, bis ein Paket `raetsel:geloest` sendet; `tests/schule.test.mjs` prüft, dass
+der Schalter zum Code passt), Icon `tafel`.
+Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in Sicherung, Export oder Cloud-Spielstand):
+`schach-arena:schule:stand` `{ uid, daten, geholtAm, veraltet? }`, `schach-arena:schule:offen` `{ uid, seit }`,
+`schach-arena:schule:gemeldet` `{ uid, inhalt, am }`, `schach-arena:schule:raetsel` `{ uid, geloest: { aufgabeId: [id] } }`.
+
+**Paket** `pakete/schule/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die vier Dateien stehen schon in
+`sw.js`; der Test lädt es über `?test&erw=pakete/schule/index`):
+- Ort `einstellungen:gruppen` (Reihenfolge 8, unter Konto 5, Daten 6 und Trainer 7), nur mit sichtbarem Konto: Gruppe
+  `.schule-gruppe[data-angemeldet]` mit den eigenen Mitgliedschaften (`.sm-mitgliedschaft[data-klasse]`, Aufgaben mit
+  Stand, „Austreten“ mit Rückfrage), „Klasse beitreten“ (`.sm-code-eingabe`, `.sm-name-eingabe`, Satz `.sm-sieht`) und
+  „Klassen leiten“ (`app.gehe('schule')`). Zeichnet neu, wenn sich die Anmeldung ändert (MutationObserver und
+  `storage` wie das Abo-Paket).
+- Ort `arena:heute` (Reihenfolge 35): `.sm-heute[data-aufgabe][data-art]`, Titel, darunter Ziel · Stand · Termin · Klasse
+  (zweite Zeile bricht um, der Termin bleibt neben dem Knopf sichtbar), nur aus dem Zwischenspeicher. Bot-Aufgabe: Knopf „Zu <Bot>“ (`app.gehe('arena', { waehle })`), nur wenn der Bot frei und
+  nicht schon gewählt ist; Rätsel: „Üben“ (Training).
+- Ereignisse: `partie:beendet` und `speicher:zurueckgesetzt` → `planeMeldung()`; `raetsel:geloest` → `merkeRaetsel` und
+  melden; `app:bereit` → ohne Anmeldung `aufraeumen()`, sonst „Meine Klassen“ auffrischen und eine offene Meldung
+  nachholen; `app:sichtbar` und `online` → offene Meldung nachholen (`planeMeldung({ nachholen: true })`, auch hier
+  höchstens eine je Minute).
+
+**Screen** `schule` (`js/ui/schule.js`; `app.js` führt ihn in `SCREENS`, `PAKET_SCREENS` und `TITEL` „Schulmodus“,
+`tests/sw.test.mjs` ordnet ihn dem Paket `schule` zu): `.schule-screen` mit Hauptkopf und `.sm-inhalt[data-ansicht]`
+(`nicht-frei` ohne sichtbares Konto, führt zur Arena; `abgemeldet`, `laedt`, `fehler`, `liste`, `klasse`). Liste:
+`.sm-klasse-karte[data-klasse]`, Formular `.sm-neu`. Klasse: `.sm-code-karte` (`.sm-code` sechs Felder, „Groß zeigen“
+öffnet `.sm-tafel[role=dialog]` mit Fokusfalle, Escape oder Tipp schließt), `.sm-mitglieder-karte` (`table.sm-tabelle`, `th[aria-sort] > button.sm-sort[data-spalte]`,
+`tr[data-mitglied]`, `.sm-entfernen`, Spalte Stand als Tag „TT.MM.“), `.sm-aufgaben-karte` (`li[data-aufgabe]`, Formular
+`.sm-aufgabe-neu`, Art „Rätsel lösen“ nur mit `RAETSEL_AUFGABEN`), `.sm-ende`
+(schließen, danach löschen). Lädt die Übersicht alle 20 s neu, solange eine Klasse offen und die Seite sichtbar ist.
+Zurück im Kopf führt aus einer Klasse zur Liste. Optik `css/pakete/schule.css` (nur Tokens, Karten aus
+`css/training.css`, geprüft in `tests/schule.test.mjs`).
+
+**Tests:** `tests/server-schule.test.mjs` (Node: Vertrag Schema ↔ Client, Rechte, RLS, Grenzen, Bot-Liste, Zeichen,
+Kennungen, keine Geheimnisse/Preise/E-Mails) und `tests/schule.test.mjs` (Node mit gefälschtem fetch; Browser gegen die
+echte App mit einem gefälschten Supabase über `page.route`: Lehrkraft-Ablauf, Beitreten und Austreten, Heute-Karte,
+Melden auch offline, Handy und iPad, hell und dunkel; dazu Wettlauf Änderung gegen laufende Anfrage, Zeitgrenze,
+Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer
+(auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).
