@@ -234,7 +234,8 @@ export function fuegeHinzu(modul, partie, review, heute, { tagVon = null } = {})
     ergebnis.neu.push(e.id);
   }
   m.verarbeitet = [...m.verarbeitet, partie.id].slice(-MAX_VERARBEITET);
-  ergebnis.modul = duenneAus(m);
+  // in Form bringen (gleiche Felder und Reihenfolge wie beim Laden), dann ausduennen
+  ergebnis.modul = duenneAus(normalisiereModul(m));
   return ergebnis;
 }
 

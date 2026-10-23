@@ -21,7 +21,8 @@
 //     loesung: Flos Zuege und dazwischen die Antworten des Gegners (gerade Stellen Flo, ungerade der Gegner, der
 //     automatisch zieht). pruefeAufgabe() prueft jede Aufgabe mit chess.js; ungueltige fallen still weg.
 //   pruefeAufgabe(aufgabe) -> Aufgabe | null
-//   zustand() -> { offen, quelle, index, gesamt, schritt, fehlversuche, phase, aufgabe, ergebnisse }   (Tests)
+//   zustand() -> { offen, quelle, index, gesamt, schritt, fehlversuche, phase, aufgabe, ergebnisse }   (Tests; mit ?test auch
+//     als window.__raetsel.zustand())
 //
 // Ablauf je Aufgabe: Flo zieht. Richtig: der Gegner antwortet (mehrzuegig), am Ende Feder-Haken am Zielfeld, Klang
 // "raetsel-richtig", Rueckmeldung der Quelle, Knopf "Weiter". Falsch: die Figur steht kurz auf dem Feld und schnappt
@@ -62,6 +63,8 @@ export function registriereRaetselQuelle(name, quelle) {
 export function zustand() {
   return aktiv ? aktiv() : { offen: false };
 }
+// Testmodus (?test): Zustand auch synchron fuer Playwright (waitForFunction wartet nicht auf Promises)
+if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '')) window.__raetsel = { zustand };
 
 const kurz = (t, max) => (typeof t === 'string' ? t.slice(0, max) : '');
 
@@ -243,8 +246,8 @@ export function zeige(root, params, app) {
     meldungEl.dataset.art = art;
     const sym = symbol || (art === 'richtig' ? 'haken' : art === 'loesung' ? 'auge' : art === 'hinweis' ? 'hinweis' : 'kreuz');
     meldungEl.innerHTML = `<span class="rs-symbol">${icon(sym)}</span><div><b></b><span></span></div>`;
-    meldungEl.querySelector('b').textContent = kopfText;
-    const sp = meldungEl.querySelector('div > span');
+    meldungEl.querySelector(':scope > div > b').textContent = kopfText;
+    const sp = meldungEl.querySelector(':scope > div > span');
     sp.textContent = text || '';
     sp.hidden = !text;
     anim(meldungEl, [{ opacity: 0, transform: 'translateY(10px) scale(.97)' }, { opacity: 1, transform: 'none' }], { d: 520, k: 'weich' });
@@ -374,7 +377,9 @@ export function zeige(root, params, app) {
     erlaube();
     const rueck = melde({ richtig: true, versuch: st.fehl + 1, fehlversuche: st.fehl, loesungGezeigt: false });
     if (st.striche) st.striche.entferne();
-    st.striche = brett.striche([{ art: 'haken', von: m.to, nach: m.to, farbe: 'bester', breite: 0.09 }], { animieren: tempo() > 0 });
+    // Feder-Haken am Zielfeld: das Feld in der Farbe "Praezise", darueber der Haken (federt ueber board.css ein)
+    brett.markiere([m.to], 'k-bester');
+    st.striche = brett.striche([{ art: 'haken', von: m.to, nach: m.to, farbe: 'bester', breite: 0.11 }], { animieren: tempo() > 0 });
     spielKlang(typeof rueck.klang === 'string' ? rueck.klang : 'raetsel-richtig');
     meldung('richtig', rueck.titel || (st.fehl ? 'Gelöst!' : 'Richtig!'), rueck.text || (aufgaben[st.i].erklaerung || ''), { feder: true });
     fertigKnoepfe();
@@ -463,7 +468,7 @@ export function zeige(root, params, app) {
         <span class="rs-ende-symbol" data-art="${esc(art)}">${icon(art === 'ende' ? 'haken' : 'ziel')}</span>
         ${art === 'ende' ? '<div class="ueberzeile">Fertig für jetzt</div>' : ''}
         <h2 class="disp">${esc(t)}</h2>
-        ${zahl ? `<div class="rs-ende-zahl zahl"><b>${zahl.geloest}</b><small>von ${zahl.gesamt} gelöst</small></div>` : ''}
+        ${zahl ? `<div class="rs-ende-zahl zahl"><b>${zahl.geloest}</b> <small>von ${zahl.gesamt} gelöst</small></div>` : ''}
         ${punkte}
         ${text ? `<p>${esc(text)}</p>` : ''}
         <div class="rs-ende-knoepfe">
