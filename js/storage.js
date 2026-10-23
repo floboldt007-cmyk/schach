@@ -96,13 +96,13 @@ export const GENAUIGKEIT_STERN = 80;
 export const BESTWERT_MIN_ZUEGE = 10;
 
 // Spielmodi (W0+a: boss, frei, spiel; weitere nur mit einer neuen Fundament-Runde)
-export const MODI = Object.freeze(['normal', 'uebung', 'boss', 'frei', 'spiel']);
+export const MODI = Object.freeze(['normal', 'uebung', 'boss', 'frei', 'spiel', 'zuzweit']);
 // Zeichen fuer partie.extra (alle Pakete zusammen)
 export const EXTRA_MAX = 400;
 // Budget je Paket-Modul in Zeichen
 export const MODUL_BUDGET = Object.freeze({
   kartei: 160000, profil: 60000, alltag: 40000, uebung: 20000, bots: 20000,
-  taktik: 8000, start: 6000, feier: 6000, serie: 4000,
+  taktik: 8000, start: 6000, feier: 6000, serie: 4000, zuzweit: 2000,
   // W0+a (SPIELKONZEPT 6.6): zusammen 182.000
   funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000,
   // w0plus-a-fix: Matt-Finisher (S1-7: Matt-Atlas, Mattbilder) und Schub 2b, zusammen 30.000
@@ -470,6 +470,12 @@ export function pruefeTempo(t) {
   if (!Number.isInteger(t.zuschlag) || t.zuschlag < 0 || t.zuschlag > 600) return null;
   return { grund: t.grund, zuschlag: t.zuschlag };
 }
+// Namen bleiben auf dem Geraet. Steuerzeichen entfernen, hoechstens 20 Unicode-Zeichen je Person.
+export function pruefeZuzweit(z) {
+  const name = (wert, standard) => typeof wert === 'string'
+    ? [...wert.replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, 20).join('') || standard : standard;
+  return { weiss: name(z?.weiss, 'Weiß'), schwarz: name(z?.schwarz, 'Schwarz'), drehen: z?.drehen === true };
+}
 // verbrauchte Bedenkzeit je Halbzug in Zehntelsekunden (kompakt: ganze Zahlen)
 export function pruefeZeiten(z, maxLaenge = 2000) {
   if (!Array.isArray(z) || z.length > maxLaenge) return null;
@@ -495,6 +501,7 @@ function setzeOderWeg(p, feld, wert) {
   else p[feld] = wert;
 }
 function normalisiereSpiel(p) {
+  setzeOderWeg(p, 'zuzweit', p.modus === 'zuzweit' ? pruefeZuzweit(p.zuzweit) : null);
   setzeOderWeg(p, 'seed', pruefeSeed(p.seed));
   setzeOderWeg(p, 'tempo', pruefeTempo(p.tempo));
   setzeOderWeg(p, 'zeiten', pruefeZeiten(p.zeiten, Array.isArray(p.zuege) ? p.zuege.length : 2000));
@@ -819,7 +826,7 @@ export function speichereLaufendePartie(stand) {
 
 export function ladeLaufendePartie() {
   const s = lies(K.laufend, null);
-  if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || !botNachId(s.botId)) return null;
+  if (!s || typeof s !== 'object' || !Array.isArray(s.zuege) || (s.modus !== 'zuzweit' && !botNachId(s.botId))) return null;
   if (s.startFen != null && typeof s.startFen !== 'string') return null;
   // von Hand veraenderte Daten: nur bekannte Klassen und gueltige Zuege uebernehmen
   const zuege = s.zuege.filter((u) => typeof u === 'string' && UCI_RE.test(u));

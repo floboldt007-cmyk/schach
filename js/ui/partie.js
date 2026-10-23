@@ -139,6 +139,7 @@ import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
 import { botFarbe as themaBotFarbe, avatarVon, floAvatar } from '../thema.js';
 import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
+import { zeige as zeigeZuzweit } from './zuzweit.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -242,6 +243,9 @@ function evalText(ev, farbe) {
 }
 
 export function zeige(root, params, app) {
+  if (params?.modus === 'zuzweit' || (params?.fortsetzen && ladeLaufendePartie()?.modus === 'zuzweit')) {
+    return zeigeZuzweit(root, params, app);
+  }
   // U7: reduziert = Systemwunsch ODER Einstellung "Bewegung: aus" (PLAN 2.0, Buehne); live gelesen, damit ein Wechsel
   // mitten in der Partie (Einstellungen, Systemwunsch) sofort gilt, auch fuer buehne.reduziert
   const reduziertMq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;

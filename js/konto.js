@@ -99,6 +99,22 @@ export function lokalerStand() {
   for (const k of roh.schluessel()) stand[k] = roh.lies(k);
   return stand;
 }
+// Lokale Spielernamen gehoeren nicht in die automatische Cloud-Sicherung. Lokale Sicherungsdateien und
+// die Rueckfall-Sicherung behalten den vollstaendigen Stand; nur die Kopie fuer den Upload wird bereinigt.
+export function cloudStand() {
+  const stand = lokalerStand();
+  delete stand['schach-arena:v1:einstellungen:zuzweit'];
+  for (const schluessel of ['schach-arena:v1:partien', 'schach-arena:v1:laufend']) {
+    if (!(schluessel in stand)) continue;
+    try {
+      const daten = JSON.parse(stand[schluessel]);
+      const anonym = (p) => p?.modus === 'zuzweit'
+        ? { ...p, zuzweit: { weiss: 'Weiß', schwarz: 'Schwarz', drehen: p.zuzweit?.drehen === true } } : p;
+      stand[schluessel] = JSON.stringify(Array.isArray(daten) ? daten.map(anonym) : anonym(daten));
+    } catch (e) { delete stand[schluessel]; }
+  }
+  return stand;
+}
 export async function ladeCloudStand() {
   const s = await aktiveSitzung();
   const d = await anfrage('/rest/v1/spielstaende?select=*', { token: s.access_token });
@@ -111,7 +127,7 @@ export async function ladeProfil() {
 export async function speichereCloudStand() {
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error('Die Sitzung enthält keine Benutzer-ID.');
   // nur Familie und System ("iPadOS Safari"), nie der volle User-Agent-String (Datensparsamkeit)
-  const daten = { user_id: id, stand: lokalerStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
+  const daten = { user_id: id, stand: cloudStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
   await anfrage('/rest/v1/spielstaende', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
   return new Date();
 }

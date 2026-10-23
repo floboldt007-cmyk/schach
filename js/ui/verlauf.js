@@ -16,16 +16,17 @@
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
-import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
+import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { botFarbe } from '../thema.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
-const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast' };
+const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast', zuzweit: 'Zu zweit' };
 const ART_TEXT = {
   uebung: ['Übung', 'Übungen'], boss: ['Boss-Partie', 'Boss-Partien'], frei: ['freie Partie', 'freie Partien'],
   spiel: ['Spielhallen-Partie', 'Spielhallen-Partien'], gast: ['Gast-Partie', 'Gast-Partien'],
+  zuzweit: ['Partie zu zweit', 'Partien zu zweit'],
 };
 const LEITER = new Set(BOTS.map((b) => b.id));
 // Art einer nicht wertenden Partie: Modus boss, frei, spiel; Modus normal gegen einen angemeldeten Bot: gast; sonst
@@ -185,8 +186,9 @@ export function zeige(root, params = {}, app) {
 
   function zeileHtml(p) {
     const bot = botNachId(p.botId);
-    const name = bot ? bot.name : 'Unbekannter Gegner';
-    const erg = ERGEBNIS[p.ergebnis] || 'Remis';
+    const zuZweit = p.modus === 'zuzweit', namen = pruefeZuzweit(p.zuzweit);
+    const name = zuZweit ? `Zu zweit: ${namen.weiss} gegen ${namen.schwarz}` : bot ? bot.name : 'Unbekannter Gegner';
+    const erg = zuZweit && p.ergebnis !== 'remis' ? `${p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz} gewinnt` : ERGEBNIS[p.ergebnis] || 'Remis';
     const art = ERGEBNIS[p.ergebnis] ? p.ergebnis : 'remis';
     const grund = GRUND[p.grund] || '';
     const zuege = Math.ceil((p.zuege || []).length / 2);
@@ -195,7 +197,7 @@ export function zeige(root, params = {}, app) {
     const ohneZuege = !(p.zuege || []).length;
     const genau = Number.isFinite(p.genauigkeit) ? `${komma1(p.genauigkeit)} %` : (ohneZuege ? 'keine Züge' : 'Analyse offen');
     const datum = datumText(p.datum);
-    const label = `${erg} gegen ${name}, ${datum}. Analyse öffnen`;
+    const label = `${erg}${zuZweit ? ' · ' : ' gegen '}${name}, ${datum}. Analyse öffnen`;
     return `
       <div class="vl-zeile" role="listitem" data-id="${esc(p.id)}">
         <button class="vl-hinten" type="button" data-aktion="loeschen" tabindex="-1" aria-hidden="true">${icon('muell')}<span>Löschen</span></button>
@@ -203,9 +205,9 @@ export function zeige(root, params = {}, app) {
           <button class="vl-oeffnen" type="button" data-aktion="oeffnen" aria-label="${esc(label)}">
             ${avatarHtml(bot)}
             <span class="vl-info">
-              <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${art}">${erg}${grund ? ` · ${esc(grund)}` : ''}</span></span>
+              <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${art}">${esc(erg)}${grund ? ` · ${esc(grund)}` : ''}</span></span>
               <span class="vl-z2">${ohneZuege ? 'Ohne Zug beendet' : `${zuege === 1 ? '1 Zug' : `${zuege} Züge`} · ${esc(eroeffnungsName(p))}`}</span>
-              <span class="vl-z3">${esc(datum)}${p.spielerFarbe === 'b' ? ' · mit Schwarz' : ' · mit Weiß'}</span>
+              <span class="vl-z3">${esc(datum)}${zuZweit ? '' : p.spielerFarbe === 'b' ? ' · mit Schwarz' : ' · mit Weiß'}</span>
             </span>
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
@@ -321,7 +323,7 @@ export function zeige(root, params = {}, app) {
     hg.innerHTML = `
       <div class="vl-dialog flaeche" role="alertdialog" aria-modal="true" aria-labelledby="vl-dialog-titel" aria-describedby="vl-dialog-text">
         <h3 id="vl-dialog-titel">Partie löschen?</h3>
-        <p id="vl-dialog-text">Die Partie gegen ${esc(bot ? bot.name : 'den Bot')} vom ${esc(datumKurz(p.datum))} und ihre Analyse werden gelöscht. Deine Sterne bleiben.</p>
+        <p id="vl-dialog-text">${p.modus === 'zuzweit' ? `Die Partie zu zweit vom ${esc(datumKurz(p.datum))} und ihre Analyse werden gelöscht.` : `Die Partie gegen ${esc(bot ? bot.name : 'den Bot')} vom ${esc(datumKurz(p.datum))} und ihre Analyse werden gelöscht. Deine Sterne bleiben.`}</p>
         <div class="vl-dialog-knoepfe">
           <button class="knopf" type="button" data-aktion="dialog-ab">Abbrechen</button>
           <button class="knopf vl-rot" type="button" data-aktion="dialog-ok">${icon('muell')} Löschen</button>
