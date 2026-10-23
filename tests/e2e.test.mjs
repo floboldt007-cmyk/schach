@@ -371,7 +371,6 @@ async function testeSieg(seite, h, fehler) {
   const kern = ereignisse.filter((n) => /^(app:bereit|partie:|zug:gespielt|zug:bewertet)/.test(n));
   pruefe('Ereignisse: app:bereit, partie:gestartet, Züge, partie:beendet (ohne Pakete)', kern[0] === 'app:bereit' && kern.includes('partie:gestartet')
     && kern.filter((n) => n === 'zug:gespielt').length === 7 && kern.indexOf('partie:beendet') > kern.lastIndexOf('zug:gespielt'), kern.join(' '));
-  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
   pruefe('html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
 
   gruppe = 'Analyse';
@@ -718,6 +717,24 @@ async function bilder(browser, id) {
   }
 }
 
+// ---------- Kern ohne Spielpakete (?test&kern): die Pakete aus PAKETE aendern das Ergebnis, der Kern allein nicht ----------
+async function testeOhnePakete(browser) {
+  gruppe = 'Kern';
+  const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+  const h = hilfen(seite);
+  const paketAbrufe = [];
+  seite.on('request', (r) => { if (/\/pakete\//.test(r.url())) paketAbrufe.push(r.url()); });
+  await seite.goto(START + '?test&kern#arena');
+  await h.screen('arena');
+  await schaefermatt(seite, h);
+  await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+  await warte(2600);
+  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
+  pruefe('Ohne Pakete: keine Paket-Datei geladen', paketAbrufe.length === 0, paketAbrufe.join(' | '));
+  pruefe('Ohne Pakete: keine Konsolenfehler, keine fehlgeschlagenen Anfragen', fehler.length === 0 && fehlgeschlagen.length === 0, [...fehler, ...fehlgeschlagen].join(' | '));
+  await kontext.close();
+}
+
 // ---------- Ablauf ----------
 let browser;
 let code = 1;
@@ -734,6 +751,7 @@ try {
   await testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id);
   await testeAufgabe(seite, h, fehler);
   await testeUpdate(seite, h, fehler);
+  await testeOhnePakete(browser);
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));

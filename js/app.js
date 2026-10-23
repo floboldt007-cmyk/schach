@@ -15,7 +15,9 @@
 //     zusaetzlich ?erw=pfad1,pfad2 (relativ zu js/, ohne .js, nur [a-z0-9/-], z. B.
 //     ?test&erw=pakete/kartei/index), und zwar bevor app:bereit kommt und der erste Screen erscheint. Ein
 //     Paket, das nicht laedt, landet als console.error in der Konsole; die App startet trotzdem (nach
-//     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird)
+//     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird). Nur mit ?test&kern laedt die App die
+//     Spielpakete aus PAKETE (Pfade unter pakete/) nicht: so pruefen e2e (Block Kern) und die Kern-Gruppen von
+//     tests/app.test.mjs, dass der Kern ohne Pakete unveraendert bleibt
 //   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena (seit U2 ist 'training'
 //     Kern-Screen, siehe unten)
 //   - sendet app:bereit (einmal vor dem ersten Screen), app:screen (nach zeige() eines Screens) und
@@ -875,7 +877,8 @@ export function erwPfade(suche) {
 
 // Jedes Paket einzeln per import(): ein Fehler in einem Paket stoppt weder die anderen noch die App
 function ladePakete() {
-  const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p)) : [];
+  const kern = TEST && new URLSearchParams(location.search).has('kern');
+  const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p) && !(kern && p.startsWith('pakete/'))) : [];
   const pfade = [...new Set([...liste, ...(TEST ? erwPfade(location.search) : [])])];
   if (!pfade.length) return null;
   const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {

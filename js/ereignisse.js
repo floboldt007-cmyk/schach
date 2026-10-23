@@ -34,6 +34,7 @@ export const EREIGNISSE = Object.freeze([
   'training:geloest', 'training:stand',
   'uebung:ergebnis',
   'bestmarke:neu',
+  'liga:geaendert',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18), Datenvertrag in ARCHITEKTUR.md
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet',
   'boss:treffer', 'boss:siegel', 'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
