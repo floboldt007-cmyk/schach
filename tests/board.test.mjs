@@ -60,6 +60,15 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 // Lage eines Elements oder null (statt 30 s Warten und Abbruch der ganzen Suite, wenn es fehlt: die Pruefung
 // danach scheitert dann mit Beleg, und die Gruppen danach laufen noch)
 const boxOderNull = (loc) => loc.boundingBox({ timeout: 3000 }).catch(() => null);
+// Warten auf der Uhr der Seite: ein setTimeout der Seite feuert nach allen frueher geplanten Timern der Seite (z. B. dem
+// 400-ms-Halte-Timer des Bretts). Eine Wartezeit im Testprozess kann unter Last (WebKit-CI) davor enden.
+const warteSeite = (seite, ms) => seite.evaluate((m) => new Promise((r) => setTimeout(r, m)), ms);
+// Bis die Animationen eines Elements durch sind (hoechstens 1,5 s): gemessen wird dann die Endlage, nicht ein Zwischenbild
+const animationenFertig = (seite, sel) => seite.evaluate(async (s) => {
+  const el = document.querySelector(s);
+  if (!el || !el.getAnimations) return;
+  await Promise.race([Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))), new Promise((r) => setTimeout(r, 1500))]);
+}, sel);
 
 // ---------- Hilfen fuer eine Seite ----------
 
@@ -369,6 +378,7 @@ async function testeDesktop(browser) {
 
   await seite.evaluate(() => demo.brett.zeigeAbzeichen('e4', 'brillant'));
   await warte(650);
+  await animationenFertig(seite, '#brett > .abzeichen-ort');
   const abz = await seite.evaluate(() => {
     const el = document.querySelector('#brett > .abzeichen-ort');
     const r = el.getBoundingClientRect();
@@ -395,6 +405,7 @@ async function testeDesktop(browser) {
   const randBox = async (feld) => {
     await seite.evaluate((f) => demo.brett.zeigeAbzeichen(f, 'bester'), feld);
     await warte(600);
+    await animationenFertig(seite, '#brett > .abzeichen-ort');
     return seite.evaluate(() => {
       const b = document.querySelector('#brett').getBoundingClientRect();
       const r = document.querySelector('#brett > .abzeichen-ort').getBoundingClientRect();
@@ -1673,7 +1684,7 @@ async function testePfeile(browser) {
   // halten ohne ziehen = Marke (leeres Feld)
   a = await ht.mitte('d5');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   await finger.hoch(a.x, a.y);
   nt = await nutzer(s);
   pruefe('Finger: halten ohne Ziehen markiert das Feld', nt.marken.join() === 'd5' && nt.pfeile.join() === 'e7e5', JSON.stringify(nt));
@@ -1690,7 +1701,7 @@ async function testePfeile(browser) {
   // eine eigene Figur ohne Zug (Ta1 in der Grundstellung) laesst sich markieren wie ein leeres Feld
   a = await ht.mitte('a1');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   await finger.hoch(a.x, a.y);
   nt = await nutzer(s);
   pruefe('Finger: eigene Figur ohne Zug (Ta1) halten markiert das Feld, kein Zug', nt.marken.join() === 'a1' && nt.liste.length === 1 && (await ht.fen()) === START
@@ -1706,7 +1717,7 @@ async function testePfeile(browser) {
   await finger.runter(a.x, a.y);
   await warte(150);
   const eigenVor = await eigenZustand('e2');
-  await warte(400);
+  await warteSeite(s, 400);
   const eigenNach = await eigenZustand('e2');
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   const eigenMalt = await eigenZustand('e2');
@@ -1722,7 +1733,7 @@ async function testePfeile(browser) {
   // lange halten und ohne Ziehen loslassen ist ein Tipp: Auswahl mit Zielpunkten, keine Marke; der Tipp aufs Ziel zieht dann
   a = await ht.mitte('g1');
   await finger.runter(a.x, a.y);
-  await warte(550);
+  await warteSeite(s, 550);
   await finger.hoch(a.x, a.y);
   await warte(80);
   const langerTipp = await eigenZustand('g1');
@@ -1738,7 +1749,7 @@ async function testePfeile(browser) {
   a = await ht.mitte('d2');
   b = await ht.mitte('d4');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   for (let i = 1; i <= 4; i++) await finger.bewege(a.x + (b.x - a.x) * i / 4, a.y + (b.y - a.y) * i / 4);
   for (let i = 3; i >= 0; i--) await finger.bewege(a.x + (b.x - a.x) * i / 4, a.y + (b.y - a.y) * i / 4);
   const zurueckVorschau = await eigenZustand('d2');
@@ -1751,7 +1762,7 @@ async function testePfeile(browser) {
   a = await ht.mitte('g1');
   b = await ht.mitte('f3');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   const tippLaeuft = await eigenZustand('g1');
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
@@ -1791,7 +1802,7 @@ async function testePfeile(browser) {
   a = await ht.mitte('e2');
   b = await ht.mitte('e4');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
   const pbF = await boxOderNull(s.locator('svg.brett-nutzer g.pfeil'));
@@ -1809,7 +1820,7 @@ async function testePfeile(browser) {
   a = await ht.mitte('a4');
   b = await ht.mitte('h4');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y);
   await finger.hoch(b.x, b.y);
   const fingerWeg = await s.evaluate(() => window.__blase.join());
@@ -1820,7 +1831,7 @@ async function testePfeile(browser) {
   await s.evaluate(() => demo.brett.setzePfeileErlaubt(false));
   a = await ht.mitte('d4');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   await finger.hoch(a.x, a.y);
   pruefe('Finger, Pfeile aus: Halten markiert nichts', (await nutzer(s)).liste.length === 0 && !(await s.evaluate(() => document.querySelector('#brett').classList.contains('malt'))));
   await s.evaluate(() => demo.brett.setzePfeileErlaubt(true));
@@ -1857,7 +1868,7 @@ async function testePfeile(browser) {
   a = await ht.mitte('d2');
   b = await ht.mitte('d4');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
   await warte(150);
@@ -1867,7 +1878,7 @@ async function testePfeile(browser) {
     && planVz.vorzuege === 'g1f3' && planVz.leer === 0 && planVz.marken === 2 && (await ht.figurSitzt('d2')), JSON.stringify(planVz));
   a = await ht.mitte('h5');
   await finger.runter(a.x, a.y);
-  await warte(520);
+  await warteSeite(s, 520);
   await finger.hoch(a.x, a.y);
   const nachMarke = await s.evaluate(() => ({ vorzuege: window.__vorzuege.join(), leer: window.__leer.length,
     marken: document.querySelectorAll('.lage.mark-vorzug-start, .lage.mark-vorzug-ziel').length }));
