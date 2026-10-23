@@ -1,7 +1,7 @@
 // Online gegen Freunde (Stufe 2, Fundament): Einladung per Code oder Link, Zuege ueber die Funktionen aus
 // supabase/online-schema.sql, Stand der Partie per Abfrage alle 2 s. Nur fetch (keine Bibliothek, kein
 // Websocket; Realtime kann spaeter dazukommen), Sitzung aus konto.js (sitzung, erneuereSitzung).
-// Keine Oberflaeche: js/app.js importiert diese Datei noch nicht, sie aendert nichts an partie.js oder arena.js.
+// Die Oberflaeche liegt in js/ui/online.js; Bot-Partie und Arena bleiben unabhaengig.
 //
 // API (alles ausser den reinen Helfern braucht eine Anmeldung ueber konto.js):
 //   erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 }) -> Partie
@@ -14,7 +14,7 @@
 //   pruefeZeit(id) -> Partie             Zeit reklamieren: ist die Uhr der Seite am Zug abgelaufen, endet die
 //       Partie auf dem Server (grund 'zeit'); sonst kommt die unveraenderte Partie zurueck. Die Oberflaeche ruft das,
 //       wenn die heruntergerechnete Uhr des Gegners bei 0 steht.
-//   meinePartien() -> [Partie]           offen und laufend, zuletzt geaenderte zuerst
+//   meinePartien({ beendete = false } = {}) -> [Partie], optional mit den letzten 100 beendeten Partien
 //   beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler, bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }
 //       fragt alle `alle` ms nach einer neueren Zeile (aktualisiert_am) und ruft beiAenderung(partie) nur bei
 //       einer Aenderung; pausiert, solange document.hidden, und fragt beim Sichtbarwerden sofort wieder;
@@ -170,9 +170,15 @@ export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', 
 export async function bieteRemis(id) { return partieAus(await rpc('online_biete_remis', { partie: id })); }
 export async function nimmRemisAn(id) { return partieAus(await rpc('online_nimm_remis_an', { partie: id })); }
 export async function pruefeZeit(id) { return partieAus(await rpc('online_pruefe_zeit', { partie: id })); }
-export async function meinePartien() {
+export async function meinePartien({ beendete = false } = {}) {
   const d = await rpc('online_meine', {});
-  return Array.isArray(d) ? d : [];
+  const laufend = Array.isArray(d) ? d : [];
+  if (!beendete) return laufend;
+  // online_meine liefert nur offene/laufende Zeilen. Fertige Partien sind unter derselben RLS lesbar.
+  const s = await aktiveSitzung();
+  const fertig = await anfrage('/rest/v1/partien_online?status=eq.beendet&select=*&order=aktualisiert_am.desc&limit=100', { token: s.access_token });
+  return [...new Map([...laufend, ...(Array.isArray(fertig) ? fertig : [])].map(p => [p.id, p])).values()]
+    .sort((a, b) => String(b.aktualisiert_am).localeCompare(String(a.aktualisiert_am)));
 }
 
 // Abfrage statt Websocket: alle 2 s eine kleine Anfrage, die nur dann eine Zeile liefert, wenn sich seit dem

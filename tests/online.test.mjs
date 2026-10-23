@@ -166,6 +166,12 @@ anmelden();
   pruefe('meinePartien: POST auf rpc/online_meine mit leerem Objekt, liefert die Liste', letzter().url.endsWith('/rest/v1/rpc/online_meine') && letzter().methode === 'POST' && letzter().body === '{}' && liste.length === 2 && liste[1].id === 'zwei');
   antworten.push({ status: 200, body: null });
   pruefe('meinePartien: keine Liste vom Server ergibt eine leere Liste', (await meinePartien()).length === 0);
+  antworten.push({ status: 200, body: [partie] }, { status: 200, body: [{ ...partie, id: 'fertig', status: 'beendet', aktualisiert_am: '2026-10-23T12:00:00Z' }] });
+  const mitArchiv = await meinePartien({ beendete: true });
+  pruefe('meinePartien mit Archiv: authentifizierter Lesezugriff auf beendete Partien, neueste zuerst',
+    letzter().url.endsWith('/rest/v1/partien_online?status=eq.beendet&select=*&order=aktualisiert_am.desc&limit=100')
+    && letzter().methode === 'GET' && letzter().headers.Authorization.startsWith('Bearer ')
+    && mitArchiv.length === 2 && mitArchiv[0].id === 'fertig' && mitArchiv[1].id === ID);
 }
 
 // ---------- Sitzung erneuern, offline, Serverfehler ----------
@@ -382,7 +388,10 @@ anmelden();
   pruefe('online-schema.sql: Zugregel (UCI) und Code-Alphabet wie in online.js', sql.includes("'^[a-h][1-8][a-h][1-8][qrbn]?$'") && sql.includes('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'));
   const rls = quelle('supabase/online-rls-test.sql');
   pruefe('online-rls-test.sql: drei Nutzer, Erfolgsmeldung, rollback am Ende', (rls.match(/@example\.invalid/g) || []).length === 3 && /Online-RLS-Test erfolgreich/.test(rls) && /rollback;\s*$/.test(rls));
-  pruefe('app.js importiert online.js noch nicht (es gibt noch keine Oberflaeche)', !/online\.js/.test(quelle('js/app.js')));
+  pruefe('app.js uebernimmt Einladungen vor dem Routing und registriert den Online-Screen',
+    /import \{ uebernimmEinladungsLink \} from '\.\/online\.js'/.test(quelle('js/app.js'))
+    && /const einladung = uebernimmEinladungsLink\(\);\s*const ziel = einladung/.test(quelle('js/app.js'))
+    && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Gegen Freunde'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
   pruefe('online.js importiert nur konto-config.js und konto.js, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js');
   pruefe('online.js: kein setInterval, keine Supabase-Bibliothek, kein geheimer Schluessel', !/setInterval|@supabase|service_role|eyJ[A-Za-z0-9_-]{20,}/.test(eigene));

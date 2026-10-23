@@ -16,7 +16,7 @@
 // Modul-Speicher (js/storage.js) und die Register (Klang, Saetze, Icons) ein.
 // Anfangs leer: ohne Pakete verhaelt sich die App wie vorher.
 // daten: Daten-Fundament (DSGVO, js/daten.js): Datenfreigabe, Datenauskunft, Konto loeschen
-export const PAKETE = Object.freeze(['sicherung', 'daten']);
+export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/online/index']);
 
 // W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
 // 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration

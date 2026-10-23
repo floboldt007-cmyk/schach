@@ -309,7 +309,7 @@ function main() {
   const kernScreens = screens.filter((s) => !paketScreens.includes(s));
   const screenFehlt = kernScreens.map((s) => `js/ui/${s}.js`).filter((d) => !menge.has(d));
   // Kern: arena, partie, analyse, verlauf, einstellungen und (seit U2) training
-  pruefe('Alle Screen-Module im Cache', kernScreens.length === 6 && kernScreens.includes('training') && screenFehlt.length === 0, screenFehlt.join(', '));
+  pruefe('Alle Screen-Module im Cache', kernScreens.length === 7 && kernScreens.includes('training') && kernScreens.includes('online') && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
   pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
