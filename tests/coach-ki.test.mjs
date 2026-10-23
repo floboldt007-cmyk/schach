@@ -276,6 +276,10 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', handy =
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await seite.addInitScript(({ konto, sitzung }) => {
+    // Konsolenfehler fuer die Diagnose in tippe()
+    window.__konsolenFehler = [];
+    const ce = console.error.bind(console);
+    console.error = (...a) => { try { window.__konsolenFehler.push(a.map((x) => (x && x.stack) || String(x)).join(' ').slice(0, 400)); } catch (e) { /* egal */ } ce(...a); };
     try {
       if (konto) localStorage.setItem('schach-arena:konto:sichtbar', '1');
       if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
@@ -316,13 +320,24 @@ async function rechnePartie(browser) {
 }
 async function zurAnalyse(seite, ply = PLY_LXF7) {
   await seite.goto(BASIS + '#arena');
-  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function', null, { timeout: 30000 });
+  // Erst wenn der erste Screen (Arena) steht, hat die App alle Pakete geladen (ersterStart). Wer vorher zur Analyse
+  // springt, bekommt sie ohne den Knopf (der Ort ist dann noch leer) und die App zeichnet sie nicht neu (gleicher Hash).
+  // Achtung: waitForFunction mit einem Promise endet, sobald es erfuellt ist, auch mit false (ausprobiert); deshalb dort
+  // nur Synchrones und den Ort in einer eigenen Schleife abfragen.
+  await seite.waitForFunction(() => window.__app && document.documentElement.dataset.screen === 'arena', null, { timeout: 30000 });
+  let angeboten = 0;
+  for (let i = 0; i < 100 && angeboten < 1; i++) {
+    angeboten = await seite.evaluate(async () => (await import('./js/orte.js')).angeboten('analyse:coach'));
+    if (angeboten < 1) await warte(100);
+  }
+  if (angeboten < 1) throw new Error('Paket coach-ki nicht am Ort analyse:coach angemeldet');
   await seite.evaluate(async ({ partie, review }) => {
     const sp = await import('./js/storage.js');
     sp.speicherePartie(partie, review);
   }, PARTIE);
   await seite.evaluate(({ id, ply }) => window.__app.gehe('analyse', { partieId: id, ply }), { id: PARTIE.partie.id, ply });
-  await seite.waitForSelector('.an-coach .an-c-klasse', { timeout: 20000 });
+  // data-klasse setzt die Analyse nur fuer einen Zug (in der Startstellung gibt es .an-c-klasse auch, aber keinen Ort)
+  await seite.waitForSelector('.an-coach[data-klasse]', { timeout: 30000 });
   await warte(350);
 }
 const karte = (seite) => seite.evaluate(() => {
@@ -335,9 +350,32 @@ const karte = (seite) => seite.evaluate(() => {
       rest: k.querySelector('.ck-rest')?.textContent || '', hinweis: !!k.querySelector('.premium-hinweis[data-premium="Frag den Coach"]'),
       konto: !!k.querySelector('.ck-konto') } : null,
     versteckt: !!k && k.hidden,
+    // Diagnose: welcher Zug, Konto sichtbar, Paket-CSS
+    lage: { klasse: document.querySelector('.an-coach')?.dataset.klasse || null, zug: document.querySelector('.an-coach .an-c-zug')?.textContent || null,
+      konto: localStorage.getItem('schach-arena:konto:sichtbar'), css: document.querySelectorAll('link[data-paket-css="coach-ki"]').length },
   };
 });
-const tippe = async (seite, sel) => { await seite.locator(sel).first().click(); };
+// Fehlt das Element, sagt der Fehler, wo die Seite gerade steht (Screen, Hash, Zug, Konto-Schalter, Anbieter am Ort)
+const tippe = async (seite, sel) => {
+  try {
+    await seite.locator(sel).first().waitFor({ state: 'attached', timeout: 20000 });
+  } catch (e) {
+    const lage = await seite.evaluate(async () => {
+      const sp = await import('./js/storage.js');
+      const paket = await import('./js/pakete/coach-ki/index.js');
+      const konto = await import('./js/konto.js');
+      const r = sp.ladeReview('pcoachprobe1');
+      let direkt = null;
+      try { const x = paket.coachKnopf({ zug: r && r.zuege[6], partie: sp.ladePartie('pcoachprobe1'), du: true }); direkt = x ? 'knopf' : 'null'; if (x) x.verlasse(); } catch (e) { direkt = 'wirft: ' + e.message; }
+      return { screen: document.documentElement.dataset.screen, hash: location.hash,
+        klasse: document.querySelector('.an-coach')?.dataset.klasse || null, zug: document.querySelector('.an-c-zug')?.textContent || null,
+        konto: localStorage.getItem('schach-arena:konto:sichtbar'), freigeschaltet: konto.kontoFreigeschaltet(), paketOrt: document.querySelectorAll('.an-c-paket').length,
+        anbieter: await import('./js/orte.js').then((m) => m.angeboten('analyse:coach')), direkt, fehler: (window.__konsolenFehler || []).slice(0, 5) };
+    }).catch((x) => String(x));
+    throw new Error(`${sel} fehlt: ${JSON.stringify(lage)}`);
+  }
+  await seite.locator(sel).first().click();
+};
 // Lage: nichts ragt aus dem Bildschirm oder aus der Coach-Karte
 const lage = (seite) => seite.evaluate(() => {
   const c = document.querySelector('.an-coach').getBoundingClientRect();

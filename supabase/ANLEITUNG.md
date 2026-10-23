@@ -210,6 +210,9 @@ erreichbar“, und die Frage zählt nicht.
    freischalten“), eine Partie spielen, in der Analyse einen Zug wählen und **Frag den Coach** tippen. In Supabase unter
    **Edge Functions > coach > Logs** steht dann `coach ok …`, unter **Table Editor > coach_nutzung** deine Zeile von
    heute. Ohne Trainer muss der Knopf den Hinweis „Teil von Crownmate Trainer“ zeigen und die Zeile darf nicht wachsen.
+   **Reihenfolge beachten:** Sobald das Paket eingetragen ist, meldet es „Coach-Erklärungen“ als fertig, und das
+   Trainer-Blatt bietet den Kauf an, wenn in `produkte` `aktiv` = `true` steht. Deshalb `aktiv` erst dann auf `true`
+   setzen, wenn dieser Test mit der echten Function geklappt hat: Verkauft wird nur, was wirklich läuft.
 7. **Vor dem Start klären (keine Rechtsberatung, mit einer Fachperson):** In die Datenschutzerklärung gehört, dass
    Stellungen zur Erklärung an Anthropic (USA) gehen, ohne Namen oder Konto-Daten, und auf welcher Grundlage
    (Auftragsverarbeitung, Drittland-Übermittlung; Anthropic bietet dafür Vertragsbedingungen an). Prüfen, ob die
