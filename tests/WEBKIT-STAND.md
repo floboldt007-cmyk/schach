@@ -4,6 +4,13 @@ Stand: 23. Oktober 2026, PR #25 (`codex/webkit-brett`).
 
 ## Geprüfter Stand
 
+Nach den beiden erfolgreichen Läufen meldete der [Folgelauf](https://github.com/floboldt007-cmyk/schach/actions/runs/39950451782)
+auf `018c606` erneut ein unsichtbares Abzeichen auf h8: **827/828 Prüfungen** in WebKit, die übrigen drei Suiten grün.
+Die Feder erhält deshalb zusätzlich einen Zeitwächter: Nach der aus CSS gelesenen Dauer wird die tatsächliche Animation
+mit `finish()` beendet. Das Endbild und die Animationsnamen bleiben erhalten. Beim Ersetzen, Ausblenden oder Zerstören
+des Bretts wird der Wächter entfernt. Ein neuer Test hält die Animation absichtlich bei `scale(0)` an und verlangt
+danach volle Größe und Deckkraft. Die abschließenden Ergebnisse werden nach dem Lauf ergänzt.
+
 Der Anwendungscode in `3f10852762b9b8eb0030168eec309f809ca758e8` besteht die unveränderten Prüfungen in beiden
 Browsern. [Vollständiger PR-Lauf](https://github.com/floboldt007-cmyk/schach/actions/runs/39926458127):
 

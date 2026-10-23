@@ -403,6 +403,17 @@ async function testeDesktop(browser) {
     });
   };
   const randH8 = await randBox('h8');
+  // Ein pausierter Renderer darf das Abzeichen nicht dauerhaft bei scale(0) festhalten.
+  await seite.evaluate(() => {
+    demo.brett.zeigeAbzeichen('h8', 'bester');
+    for (const a of document.querySelector('#brett > .abzeichen-ort').getAnimations()) { a.pause(); a.currentTime = 0; }
+  });
+  await warte(600);
+  const nachStillstand = await seite.evaluate(() => {
+    const el = document.querySelector('#brett > .abzeichen-ort');
+    return { breite: el.getBoundingClientRect().width, deckkraft: getComputedStyle(el).opacity };
+  });
+  pruefe('Abzeichen erreicht auch nach Animationsstillstand seine volle Groesse', Math.abs(nachStillstand.breite - 0.48 * s) < 1.5 && nachStillstand.deckkraft === '1', JSON.stringify(nachStillstand));
   pruefe('Abzeichen auf h8 bleibt in der Brett-Box (volle Groesse, in die Ecke geschoben)', randH8.ueberRechts <= 0.5 && randH8.ueberOben <= 0.5
     && randH8.ueberRechts >= -1.5 && randH8.ueberOben >= -1.5 && Math.abs(randH8.breite - 0.48 * s) < 1.5, JSON.stringify(randH8));
   const randA1 = await randBox('a1');

@@ -450,6 +450,7 @@ export class Brett {
   }
 
   entferneAbzeichen() {
+    clearTimeout(this._abzeichenTimer);
     this._abzeichen = null;
     if (this._abzeichenEl) this._abzeichenEl.remove();
     this._abzeichenEl = null;
@@ -627,6 +628,7 @@ export class Brett {
   }
 
   zerstoere() {
+    clearTimeout(this._abzeichenTimer);
     alleBretter.delete(this);
     this._loescheHalten();
     this._loescheHalteMal();
@@ -1004,6 +1006,7 @@ export class Brett {
   }
 
   _zeichneAbzeichen(plopp) {
+    clearTimeout(this._abzeichenTimer);
     if (!this._abzeichen) return;
     const { feld, klasse } = this._abzeichen;
     let el = this._abzeichenEl;
@@ -1024,9 +1027,21 @@ export class Brett {
     // und kann bis dahin den unsichtbaren Anfang (scale(0)) halten.
     const jetzt = document.timeline?.currentTime;
     if (jetzt != null) for (const a of el.getAnimations()) if (a.startTime == null) a.startTime = jetzt;
+    if (plopp) {
+      // Auch eine vom Renderer nie gestartete Feder muss nach ihrer CSS-Dauer fertig sein.
+      // finish() behaelt Animation und Endbild; eine alte Feder darf kein neueres Abzeichen treffen.
+      const dauer = parseFloat(getComputedStyle(el).animationDuration) * 1000;
+      this._abzeichenTimer = setTimeout(() => {
+        if (this._abzeichenEl !== el || !el.classList.contains('plopp')) return;
+        for (const a of el.getAnimations()) {
+          try { a.finish(); } catch (e) { /* eine inzwischen entfernte Animation braucht kein Endbild */ }
+        }
+      }, (Number.isFinite(dauer) ? dauer : 0) + 40);
+    }
   }
 
   _blendeAbzeichenAus(ms) {
+    clearTimeout(this._abzeichenTimer);
     const el = this._abzeichenEl;
     this._abzeichen = null;
     this._abzeichenEl = null;
