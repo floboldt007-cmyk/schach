@@ -491,7 +491,7 @@ async function nodeTeil() {
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js)', ['js/schule.js', 'js/pakete/schule/index.js', 'js/ui/schule.js', 'css/pakete/schule.css']
     .every((d) => sw.includes(`'${d}'`)));
   const erw = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
-  pruefe('Paket steht in PAKETE (Stufe 2)', /PAKETE = Object\.freeze\(\[[^\]]*schule/.test(erw));
+  pruefe('Paket noch nicht in PAKETE (kommt mit Stufe 2, Schritt 2, wenn der Server eingerichtet ist)', !/PAKETE = Object\.freeze\(\[[^\]]*schule/.test(erw));
   const app = readFileSync(path.join(WURZEL, 'js/app.js'), 'utf8');
   pruefe("app.js: schule in SCREENS, PAKET_SCREENS und TITEL ('Schulmodus')", /const SCREENS = \[[^\]]*'schule'\]/.test(app)
     && /const PAKET_SCREENS = new Set\(\[[^\]]*'schule'\]\)/.test(app) && /schule: 'Schulmodus'/.test(app));

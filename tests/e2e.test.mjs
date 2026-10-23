@@ -735,6 +735,41 @@ async function testeOhnePakete(browser) {
   await kontext.close();
 }
 
+// ---------- Kopf mit den echten Paketen: Zahlenruhe (Flo 23.10.: Sterne, Level, Serie) ----------
+// Mit Level (funken) und Serie im Kopf tritt "Besiegt" zurueck; jeder sichtbare Chip steht ganz in der Chip-Reihe, auf dem
+// iPad (quer 1180 und 1024, hoch 820) und am Handy (390, dort ohne die Marke und ohne die Flamme der Serie).
+async function testeKopfZahlenruhe(browser) {
+  gruppe = 'Kopf';
+  for (const [name, w, h, mobil] of [['iPad quer', 1180, 820, false], ['iPad 1024', 1024, 768, false], ['iPad hoch', 820, 1180, false], ['Handy', 390, 844, true]]) {
+    const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: mobil });
+    const seite = await kontext.newPage();
+    await seite.goto(START + '?test#arena');
+    await seite.waitForFunction(() => !!window.__serie, null, { timeout: 20000 });
+    await seite.evaluate(async () => {
+      const tg = await import('./js/tag.js');
+      const S = window.__serie;
+      const st = S.T.leer();
+      for (let i = 11; i >= 1; i--) S.T.zaehleTag(st, tg.addiereTage(S.heute(), -i), { quelle: 'partie' });
+      Object.assign(st, { lauf: { n: 4, best: 4, ms: [3] } });
+      S.speichere(st);
+    });
+    await seite.goto(START + '?test#arena');
+    await seite.waitForSelector('.screen.arena .kopf-chips .se-chip', { timeout: 20000 });
+    await warte(800);
+    const k = await seite.evaluate(() => {
+      const box = document.querySelector('.kopf-chips').getBoundingClientRect();
+      const chips = [...document.querySelectorAll('.kopf-chips > *')].filter((c) => c.getClientRects().length);
+      return { sichtbar: chips.map((c) => (c.classList.contains('chip-sterne') ? 'sterne' : c.classList.contains('fk-chip') ? 'level'
+        : c.classList.contains('se-chip') ? 'serie' : c.classList.contains('chip-pokal') ? 'besiegt' : c.className)),
+        ganz: chips.every((c) => { const r = c.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; }),
+        quer: document.documentElement.scrollWidth <= innerWidth + 1, titel: document.querySelector('.haupt-kopf h1, .haupt-kopf .marke-titel')?.textContent.trim() };
+    });
+    pruefe(`${name}: im Kopf genau Sterne, Level, Serie, alle ganz im Bild, die Marke bleibt im Dokument`, k.sichtbar.join(',') === 'sterne,level,serie'
+      && k.ganz && k.quer && k.titel === 'Crownmate', JSON.stringify(k));
+    await kontext.close();
+  }
+}
+
 // ---------- Ablauf ----------
 let browser;
 let code = 1;
@@ -752,6 +787,7 @@ try {
   await testeAufgabe(seite, h, fehler);
   await testeUpdate(seite, h, fehler);
   await testeOhnePakete(browser);
+  await testeKopfZahlenruhe(browser);
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));

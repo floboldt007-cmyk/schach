@@ -227,7 +227,7 @@ async function nodeTeil() {
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
     ['js/coach-ki.js', 'js/pakete/coach-ki/index.js', 'css/pakete/coach-ki.css'].every((d) => sw.includes(`'${d}'`)));
   const erw = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
-  pruefe('Paket steht in PAKETE (Stufe 2)', /PAKETE = Object\.freeze\(\[[^\]]*coach-ki/.test(erw));
+  pruefe('Paket noch nicht in PAKETE (kommt mit Stufe 2, Schritt 2, wenn der Server eingerichtet ist)', !/PAKETE = Object\.freeze\(\[[^\]]*coach-ki/.test(erw));
 
   // ---------- Optik des Pakets: nur Tokens (tests/thema.test.mjs liest css/pakete/ nicht) ----------
   const css = readFileSync(path.join(WURZEL, 'css/pakete/coach-ki.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');

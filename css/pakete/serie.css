@@ -31,6 +31,8 @@
 .screen .haupt-kopf .chip.se-chip { padding: 0 12px; }
 .chip.se-chip[data-ruht="1"] { color: var(--text-3); background: var(--flaeche-2); }
 .se-chip-ruht { font-weight: var(--gw-stark); }
+/* Handy: im Kopf nur die Tagzahl; die Flamme steht dort an Flos Namen in der Partie und in der Heute-Karte */
+@media (max-width: 440px) { .screen .haupt-kopf .chip.se-chip .se-chip-flamme { display: none; } }
 .se-chip-flamme { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; padding-left: 7px; border-left: 1px solid var(--linie); }
 .se-chip-flamme .se-ico, .se-spieler-flamme .se-ico, .se-abr-lauf[data-flamme] .se-ico, .se-b-lauf .se-ico { color: var(--akzent); }
 .screen .haupt-kopf .chip .se-chip-flamme .ico { width: 16px; height: 16px; }
