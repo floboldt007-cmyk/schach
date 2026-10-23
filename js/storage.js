@@ -65,6 +65,9 @@
 //   steuerung, bewegung (Animationstempo), thema, modus, koordLage, pfeile, duellIntro ('besondere', D3), figuren,
 //   coachStil, sprueche. speichereEinstellungen({ klanggruppen: { uhr: false } }) aendert nur diese Gruppe.
 //   Alte Speicherstaende brauchen nichts: fehlende Schluessel bekommen ihren Standard.
+//
+// Daten-Fundament (DSGVO, 22.10.2026): datenfreigabe 'aus' | 'an' (Standard aus): angemeldete Spieler teilen fertige
+//   Partien und anonyme Nutzung nur mit dieser ausdruecklichen Freigabe (js/daten.js). Falscher Wert -> 'aus'.
 import { BOTS, botNachId } from './bots.js';
 import { sende } from './ereignisse.js';
 import { kompaktReview, ergaenzeReviewFelder } from './review.js';
@@ -162,6 +165,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   // Coach
   coachStil: 'ausfuehrlich', // 'ausfuehrlich' | 'knapp'
   sprueche: 'an',        // 'an' | 'wenig' | 'aus'
+  // Daten (DSGVO): Partien und anonyme Nutzung mit dem Betreiber teilen, nur angemeldet und nur ausdruecklich
+  datenfreigabe: 'aus',  // 'aus' | 'an' (Opt-in, Standard aus)
 });
 
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
@@ -178,6 +183,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   figuren: Object.freeze(['cburnett']),
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
+  datenfreigabe: Object.freeze(['aus', 'an']),
 });
 // Theme-IDs wie in js/thema.js (registriereThema); welche es gibt, weiss erst thema.js
 const THEMA_ID = /^[a-z][a-z0-9-]{1,31}$/;

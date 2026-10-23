@@ -1412,3 +1412,61 @@ traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Fu
 zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
 `beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
 und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+# Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
+
+Strategie und Grenzen: `design/runde4/DATEN.md`. Server: `supabase/schema.sql` (Konto light) und
+`supabase/daten-schema.sql`, Einrichtung in `supabase/ANLEITUNG.md`. Supabase wird nur über `fetch` angesprochen, ohne
+Bibliothek; im Browser steht nur der öffentliche Schlüssel (`js/konto-config.js`).
+
+**Konto** (`js/konto.js`, statisch aus `app.js` geladen, Registrierung defensiv): E-Mail mit 6-stelligem Code oder
+„Mit Google anmelden“ (`googleAnmeldeUrl(basis)` -> `SUPABASE_URL/auth/v1/authorize?provider=google&redirect_to=<basis>#konto`,
+`meldeMitGoogleAn(ort)` ruft `ort.assign`). Die Rückkehr `#konto#access_token=...&refresh_token=...` (Supabase hängt die
+Antwort mit einem zweiten `#` an) wie auch `#access_token=...` vom Anmelde-Link übernimmt `uebernimmLinkSitzung()`, entfernt
+die Tokens (auch `provider_token`) per `replaceState` und springt zu `#einstellungen`. Die Konto-Gruppe am Ort
+`einstellungen:gruppen` (Reihenfolge 5) erscheint erst nach einmal `#konto` (`kontoFreigeschaltet`). Für `daten.js`
+exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `userId`, `abmelden`, `lokalerStand`.
+
+**Datenfreigabe** (`js/daten.js`, Paket `daten` in `PAKETE`, Stil `css/daten.css`):
+- Einstellung `datenfreigabe` `'aus' | 'an'` (Standard aus, `EINSTELLUNG_WERTE`). Wirksam nur, wenn angemeldet und die
+  Zustimmung (`schach-arena:daten:zustimmung` = `{ konto, datum, fassung }`) von genau diesem Konto stammt
+  (`darfTeilen()`); ein anderes Konto auf demselben Gerät muss selbst zustimmen. `setzeFreigabe(an, app)` schaltet.
+- Hört `app:screen` (`screen` mit `{ name }`), `partie:gestartet` (`partie_start`), `partie:beendet` (nach `setTimeout 0`:
+  Archiv-Zeile aus dem gespeicherten Partie-Datensatz, `archivDatensatz(d, p)`, und `partie_ende`), `window` `error` und
+  `unhandledrejection` (`fehler`: Typ + Meldung <= 200 Zeichen ohne Adressen, höchstens 10 je Sitzung).
+- Warteschlange `schach-arena:daten:warteschlange` (höchstens 100, älteste fallen weg), jede Zeile mit `id` (uuid aus dem
+  Browser) und `user_id`. Versand je Tabelle als ein POST (`/rest/v1/partien_archiv`, `/rest/v1/nutzung`, höchstens 25
+  Zeilen), `Prefer: return=minimal`, höchstens alle 20 s und bei `visibilitychange` (hidden) und `pagehide` (`keepalive`
+  bis 60 000 Zeichen). Offline, 5xx, 401, 408, 429: Zeilen bleiben; andere 4xx (409 bei doppelter `id`, 400 ungültig oder
+  `DATEN_MENGE`): das Bündel wird einzeln nachgesendet, nur die abgelehnten Zeilen fallen weg. Zeilen eines anderen Kontos
+  werden nie gesendet. Ausschalten verwirft die Warteschlange und widerruft auf dem Server (`rpc/freigabe_widerrufen`);
+  offline bleibt der Widerruf in `schach-arena:daten:widerruf` (`{ konto, datum }`) offen und geht beim Start, beim
+  Ereignis `online` und vor jedem neuen Senden raus. Scheitert er, wird nichts Neues gesendet (er würde es mitlöschen).
+  Ein offener Widerruf eines anderen Kontos wartet, bis dieses Konto wieder angemeldet ist.
+- `meineDaten()` = `rpc/meine_daten` + `lokalerStand()` + Warteschlange + Zustimmung + offener Widerruf,
+  `dateiFuerAuskunft()` -> `crownmate-meine-daten-JJJJ-MM-TT.json` (Tag aus `tag.js`, Grenze 4:00), `speichereAuskunft()` teilt oder lädt herunter (wie `js/sicherung.js`).
+- `loescheKonto(app)` = `rpc/konto_loeschen`, dann `abmelden()`, Warteschlange und Zustimmung weg, Freigabe aus;
+  `loescheKontoDialog(app)` fragt zweistufig (Sheet). Der Spielstand auf dem Gerät bleibt.
+- Gruppe „Daten“ am Ort `einstellungen:gruppen` (Reihenfolge 6, direkt nach Konto, nur wenn das Konto freigeschaltet ist):
+  `.daten-gruppe`, Schalter `.schalter[data-schalter="datenfreigabe"]` (ohne Anmeldung gesperrt mit „Zum Teilen erst
+  anmelden“), Erklärtext `.daten-text`, Knöpfe `[data-daten="auskunft"]` und `[data-daten="loeschen"]`, `.daten-status`,
+  Links auf `datenschutz.html` und `impressum.html` (auch unter Info und Lizenzen).
+
+**Server** (`supabase/daten-schema.sql`): `partien_archiv` (insert/select/delete nur eigene, kein update, Größen- und
+Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
+dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
+Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
+insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). `konto_loeschen()`, `meine_daten()` und
+`freigabe_widerrufen()` sind `security definer`, nur für `authenticated`. `konto_loeschen()` löscht auch
+`auth.audit_log_entries` des Aufrufers (Ausnahme bei fehlender Tabelle oder fehlendem Recht abgefangen); `meine_daten()`
+liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn die Tabelle existiert) und
+`anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
+`meine_daten()`. `konto.js` speichert als `geraet` des Cloud-Spielstands nur noch `geraetKurz()` (Familie und System).
+
+**Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
+(`css/tokens.css`, `css/themes/modern.css`, hell und dunkel wie die App), im Offline-Cache. Beide sind Entwürfe mit
+Platzhaltern in eckigen Klammern.
+
+**Tests:** `node tests/daten.test.mjs` (Node: falsches `fetch` und der echte Ereignis-Bus; Browser: die echte App mit
+abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
+in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
+(`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
