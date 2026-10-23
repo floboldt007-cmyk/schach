@@ -14,19 +14,22 @@
 //         nt Nachtrag (Lichtblick nach der Analyse), lbg Genauigkeits-Lichtblick schon geprueft, lg Genauigkeit der
 //         letzten Partie gegen diesen Bot vor dieser, ms Meilenstein-Arten)
 //     freigeschaltet: [id ...]   Stuecke aus level.js (nur Schmuck und Titel)
-//     rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt: [woche], aufgehoben: [woche], neu }
-//         Rueckenwind: karten im Fach, aktiv = Einheiten, die noch doppelt zaehlen (nach "Zünden" 3)
+//     rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt: [woche], aufgehoben: [woche], neu, planBis }
+//         Rueckenwind: karten im Fach, aktiv = Einheiten, die noch doppelt zaehlen (nach "Zuenden" 3); start erster Tag,
+//         woche: Woche der letzten Wochenkarte (null bis zur ersten Karte an Tag 4); neu: 'erste' | 'willkommen' |
+//         'aufgehoben' (Text der Heute-Zeile); planBis: letzte Woche, deren Funken-Wochenende schon geprueft ist
 //     aufstiege: [{ level, von, t }]   letzte Aufstiege (fuer "Seit Level n" im Koennen-Satz)
 //     gruss: boolean                    der naechste Partiestart gruesst das neue Level
 //     ids: [partieId ...]               verarbeitete partie:beendet (Ringpuffer, hoechstens IDS_MAX)
 //     lernen: { ueb: { 'pid:ply': n }, mom: { pid: n }, lek: { id: 'asg' }, karten: { tag, n }, siegel: ['boss:stufe'],
-//               rekord: [pid], raetsel: [id] }
+//               rekord: [pid], raetsel: [id], sitzung: null | { id, rw } }   sitzung: laufende Stapel-Sitzung im Training
+//               (rw: die Sitzung zaehlt doppelt, sie hat eine Rueckenwind-Einheit verbraucht)
 //     lauf: null | { id, fa, fn, ab, start, hilfe, ref, z: { ply: [klasse, gv, gn, flags, gvv, matt] } },
 //     lage: null | { wert, t } }   Arena-Wertung aus liga:geaendert (Paket Wertung), sonst rechnet funken die Lage selbst
 //         die laufende Partie (Live-Bewertungen fuer die Rechnung am Ende; flags: 1 trivial, 2 nach Hilfe)
 //
 // API:
-//   lade(jetzt, { plan }) -> Stand (normalisiert, Tageswechsel, Wochenkarte, "Willkommen zurück", "für dich aufgehoben")
+//   lade(jetzt, { plan }) -> Stand (normalisiert, Tageswechsel, Wochenkarte, "Willkommen zurueck", "fuer dich aufgehoben")
 //   speichere(st) -> { ok, zeichen, grund? }   duennt selbst aus, damit das Budget nie reisst
 //   zuenden(st) -> boolean                     eine Karte zuenden (3 Einheiten doppelt), nie zwei zugleich
 //   bucheEinheit(st, { quelle, vor, einheit, wochenende, woche }) -> { menge, faktor, quelle, verbraucht, halb }
@@ -34,11 +37,12 @@
 //   buchePartie(st, d, { lauf, jetzt, wochenende, botName, gegner }) -> { eintrag, buchungen } | null
 //   nachtragPartie(st, d, { jetzt }) -> { eintrag, buchungen } | null
 //   lern*(st, d, ctx) -> buchungen              Tabelle B (Uebung, Schluesselmoment, Karte, Lektion, Raetsel)
+//   pruefeKarten(st, jetzt, { plan }) -> boolean   Rueckenwind-Karten (erste an Tag 4, Montag, Extra-Karten)
 //   siegel(st, d), rekord(st, d, partieId) -> buchungen   Tabelle C
 //   schliesseLevel(st, vorher, jetzt) -> null | { vorher, nachher, neu, titel }
 //   setzeLage(st, d, jetzt) -> boolean, lageVon(st) -> Zahl | null   Arena-Wertung (liga:geaendert)
 import { ladeModul, speichereModul, MODUL_BUDGET } from '../../storage.js';
-import { tagSchluessel, wochenSchluessel, tageZwischen, addiereTage, istSchluessel } from '../../tag.js';
+import { tagSchluessel, wochenSchluessel, tageZwischen, addiereTage, istSchluessel, wochentag } from '../../tag.js';
 import { spielplanWoche } from '../../inhalte.js';
 import * as L from './level.js';
 import * as R from './rechnung.js';
@@ -68,9 +72,10 @@ export function leer(jetzt = new Date()) {
   return {
     stand: STAND, gesamt: 0, level: 1, heute: leererTag(tag), verlauf: [],
     freigeschaltet: L.belohnungen(1).map((s) => s.id),
-    rw: { karten: 0, woche: null, aktiv: 0, start: null, letzterTag: null, willkommen: null, gespielt: [], aufgehoben: [], neu: null },
+    rw: { karten: 0, woche: null, aktiv: 0, start: null, letzterTag: null, willkommen: null, gespielt: [], aufgehoben: [], neu: null,
+      planBis: null },
     aufstiege: [], gruss: false, ids: [], lage: null,
-    lernen: { ueb: {}, mom: {}, lek: {}, karten: { tag: null, n: 0 }, siegel: [], rekord: [], raetsel: [] },
+    lernen: { ueb: {}, mom: {}, lek: {}, karten: { tag: null, n: 0 }, siegel: [], rekord: [], raetsel: [], sitzung: null },
     lauf: null,
   };
 }
@@ -99,7 +104,7 @@ export function normalisiere(roh, jetzt = new Date()) {
     aktiv: Math.min(R.RUECKENWIND_EINHEITEN, ganz(w.aktiv)), start: istSchluessel(w.start) ? w.start : null,
     letzterTag: istSchluessel(w.letzterTag) ? w.letzterTag : null, willkommen: /^\d{4}-\d{2}$/.test(w.willkommen || '') ? w.willkommen : null,
     gespielt: liste(w.gespielt).filter(istSchluessel).slice(-8), aufgehoben: liste(w.aufgehoben).filter(istSchluessel).slice(-8),
-    neu: ['willkommen', 'aufgehoben'].includes(w.neu) ? w.neu : null,
+    neu: ['erste', 'willkommen', 'aufgehoben'].includes(w.neu) ? w.neu : null, planBis: istSchluessel(w.planBis) ? w.planBis : null,
   };
   st.aufstiege = liste(r.aufstiege).filter((a) => a && Number.isInteger(a.level) && Number.isFinite(a.t)).slice(0, AUFSTIEGE_MAX);
   st.gruss = r.gruss === true;
@@ -113,6 +118,7 @@ export function normalisiere(roh, jetzt = new Date()) {
     karten: { tag: istSchluessel(kar.tag) ? kar.tag : null, n: ganz(kar.n) },
     siegel: liste(le.siegel).filter((x) => typeof x === 'string'), rekord: liste(le.rekord).filter((x) => typeof x === 'string').slice(-40),
     raetsel: liste(le.raetsel).filter((x) => typeof x === 'string').slice(-400),
+    sitzung: typeof objekt(le.sitzung).id === 'string' ? { id: le.sitzung.id.slice(0, 40), rw: le.sitzung.rw === true } : null,
   };
   const lauf = objekt(r.lauf);
   st.lauf = typeof lauf.id === 'string' ? { ...lauf, z: objekt(lauf.z) } : null;
@@ -128,20 +134,28 @@ export function tagWechsel(st, jetzt = new Date()) {
   return true;
 }
 
-// Rueckenwind-Karten: jeden Montag 4:00 eine (hoechstens 3 im Fach); "Willkommen zurück" nach mindestens 2 Tagen ohne
-// Tageswerk (hoechstens einmal je Kalendermonat); "für dich aufgehoben" fuer ein verpasstes Funken-Wochenende.
-// Karten im Fach bleiben liegen, bis Flo sie zuendet.
+// Rueckenwind-Karten (SPIELKONZEPT 3.3 "Rueckenwind", 3.16 Entdeckungs-Fahrplan): die erste Karte kommt an Tag 4 (3 Tage
+// nach dem ersten Start), danach jeden Montag 4:00 eine (hoechstens 3 im Fach); "Willkommen zurueck" nach mindestens
+// 2 Tagen ohne Tageswerk (hoechstens einmal je Kalendermonat); "fuer dich aufgehoben" fuer jedes verpasste
+// Funken-Wochenende seit dem ersten Start, auch wenn die App erst Wochen spaeter wieder aufgeht (jede Woche wird genau
+// einmal geprueft, planBis). Karten im Fach bleiben liegen, bis Flo sie zuendet.
+export const ERSTE_KARTE_TAG = 4;
+// so weit schaut "fuer dich aufgehoben" hoechstens zurueck (zwei Jahre; mehr als 4 Karten passen ohnehin nicht ins Fach)
+const AUFGEHOBEN_WOCHEN = 104;
 export function pruefeKarten(st, jetzt = new Date(), { plan = null } = {}) {
   const t = ms(jetzt);
   const tag = tagSchluessel(t);
   const woche = wochenSchluessel(t);
   const rw = st.rw;
   let geaendert = false;
+  if (!rw.start) { rw.start = tag; geaendert = true; }
   if (!rw.woche) {
-    rw.woche = woche;
-    rw.start = rw.start || tag;
-    rw.karten = Math.max(rw.karten, 1);
-    geaendert = true;
+    if (tageZwischen(rw.start, tag) >= ERSTE_KARTE_TAG - 1) {
+      rw.karten = Math.max(rw.karten, Math.min(R.KARTEN_MAX, rw.karten + 1));
+      rw.woche = woche;
+      rw.neu = 'erste';
+      geaendert = true;
+    }
   } else {
     const d = tageZwischen(rw.woche, woche);
     if (d >= 7) {
@@ -158,16 +172,24 @@ export function pruefeKarten(st, jetzt = new Date(), { plan = null } = {}) {
     geaendert = true;
   }
   if (plan) {
+    // alle abgeschlossenen Wochen seit der zuletzt geprueften (ohne planBis: seit der Woche des ersten Starts); die
+    // laufende Woche erst, wenn ihr Wochenende vorbei ist (Montag 4:00)
     const vorige = addiereTage(woche, -7);
-    const w = spielplanWoche(plan, vorige);
-    const freitag = addiereTage(vorige, 4);
-    if (w && w.funkenWochenende === true && rw.start && tageZwischen(rw.start, freitag) >= 0
-      && !rw.gespielt.includes(vorige) && !rw.aufgehoben.includes(vorige)) {
-      rw.karten = Math.min(R.KARTEN_MAX_EXTRA, rw.karten + 1);
-      rw.aufgehoben = [...rw.aufgehoben, vorige].slice(-8);
-      rw.neu = 'aufgehoben';
-      geaendert = true;
+    const startWoche = addiereTage(rw.start, -wochentag(rw.start));
+    let w = rw.planBis ? addiereTage(rw.planBis, 7) : startWoche;
+    if (tageZwischen(w, vorige) > AUFGEHOBEN_WOCHEN * 7) w = addiereTage(vorige, -AUFGEHOBEN_WOCHEN * 7);
+    for (; tageZwischen(w, vorige) >= 0; w = addiereTage(w, 7)) {
+      const pw = spielplanWoche(plan, w);
+      const freitag = addiereTage(w, 4);
+      if (pw && pw.funkenWochenende === true && tageZwischen(rw.start, freitag) >= 0
+        && !rw.gespielt.includes(w) && !rw.aufgehoben.includes(w)) {
+        rw.karten = Math.min(R.KARTEN_MAX_EXTRA, rw.karten + 1);
+        rw.aufgehoben = [...rw.aufgehoben, w].slice(-8);
+        rw.neu = 'aufgehoben';
+        geaendert = true;
+      }
     }
+    if (rw.planBis !== vorige && tageZwischen(rw.planBis || startWoche, vorige) >= 0) { rw.planBis = vorige; geaendert = true; }
   }
   return geaendert;
 }
@@ -220,12 +242,14 @@ function aktiv(st) {
   st.rw.letzterTag = st.heute.tag;
 }
 
-// Partie- oder Lern-Einheit: Tagesbogen (vor Rueckenwind), dann Rueckenwind (Karte oder Funken-Wochenende, nie x4)
-export function bucheEinheit(st, { quelle = 'partie', vor = 0, einheit = false, wochenende = false, woche = null } = {}) {
+// Partie- oder Lern-Einheit: Tagesbogen (vor Rueckenwind), dann Rueckenwind (Karte oder Funken-Wochenende, nie x4).
+// weiter: Teil einer Einheit, die schon eine Karte verbraucht hat (weitere Karten einer Stapel-Sitzung): doppelt, ohne
+// eine weitere Einheit zu verbrauchen
+export function bucheEinheit(st, { quelle = 'partie', vor = 0, einheit = false, wochenende = false, woche = null, weiter = false } = {}) {
   const v = Math.max(0, zahl(vor));
-  const r = R.endMenge({ vor: v, schonHeute: st.heute.bogen, wochenende, kartenAktiv: st.rw.aktiv, einheit });
+  const r = R.endMenge({ vor: v, schonHeute: st.heute.bogen, wochenende, kartenAktiv: weiter ? 1 : st.rw.aktiv, einheit: einheit || weiter });
   st.heute.bogen += v;
-  if (r.verbraucht) st.rw.aktiv = Math.max(0, st.rw.aktiv - 1);
+  if (r.verbraucht && !weiter) st.rw.aktiv = Math.max(0, st.rw.aktiv - 1);
   if (wochenende && woche && v > 0 && !st.rw.gespielt.includes(woche)) st.rw.gespielt = [...st.rw.gespielt, woche].slice(-8);
   gutschrift(st, r.menge, quelle);
   return r;
@@ -395,10 +419,10 @@ export function nachtragPartie(st, d, { jetzt = new Date() } = {}) {
 }
 
 // ---------- Tabelle B: Lern-Funken (ohne Faktor, mal Rueckenwind; Einheiten verbrauchen eine Karte) ----------
-function lernBuchung(st, vor, { einheit, wochenende, woche }) {
+function lernBuchung(st, vor, { einheit, wochenende, woche, weiter = false }) {
   if (vor <= 0) return [];
   aktiv(st);
-  const r = bucheEinheit(st, { quelle: 'lernen', vor, einheit, wochenende, woche });
+  const r = bucheEinheit(st, { quelle: 'lernen', vor, einheit, wochenende, woche, weiter });
   return r.menge ? [{ quelle: 'lernen', menge: r.menge, rw: r.quelle }] : [];
 }
 
@@ -422,15 +446,25 @@ export function lernMoment(st, d, ctx = {}) {
   return lernBuchung(st, R.LERN.moment, { ...ctx, einheit: false });
 }
 
-// Faellige Karteikarte richtig (training:geloest): 10 im 1., 4 im 2. Versuch, hoechstens 8 am Tag
+// Faellige Karteikarte richtig (training:geloest): 10 im 1., 4 im 2. Versuch, hoechstens 8 am Tag. Zwei Felder im
+// Ereignis sind freiwillig (das Kartei-Paket gibt es noch nicht, Vertrag in ARCHITEKTUR.md): faellig === false bringt
+// nichts (nur faellige Karten zaehlen), sitzung (ID der Stapel-Sitzung) macht die Sitzung zu EINER Einheit: die erste
+// Karte mit Funken verbraucht eine Rueckenwind-Einheit, alle weiteren Karten derselben Sitzung zaehlen dann auch doppelt.
+// Ohne sitzung zaehlt jede Karte einfach und verbraucht nichts.
 export function lernKarte(st, d, ctx = {}) {
-  if (!d || d.richtig !== true) return [];
+  if (!d || d.richtig !== true || d.faellig === false) return [];
   const f = R.kartenFunken({ richtig: true, versuch: d.versuch });
   if (!f) return [];
   if (st.lernen.karten.tag !== st.heute.tag) st.lernen.karten = { tag: st.heute.tag, n: 0 };
   if (st.lernen.karten.n >= R.LERN.kartenTag) return [];
   st.lernen.karten.n++;
-  return lernBuchung(st, f, { ...ctx, einheit: false });
+  const sid = typeof d.sitzung === 'string' && d.sitzung ? d.sitzung.slice(0, 40) : null;
+  if (!sid) return lernBuchung(st, f, { ...ctx, einheit: false });
+  const s = st.lernen.sitzung;
+  if (s && s.id === sid) return lernBuchung(st, f, { ...ctx, einheit: false, weiter: s.rw });
+  const b = lernBuchung(st, f, { ...ctx, einheit: true });
+  st.lernen.sitzung = { id: sid, rw: b.length > 0 && b[0].rw === 'karte' };
+  return b;
 }
 
 // Lektion (lektion:beendet): 40 beim ersten Abschluss, Ring "Sicher" +20, "Gemeistert" +40, je einmal; eine Einheit
@@ -443,14 +477,17 @@ export function lernLektion(st, d, ctx = {}) {
   return lernBuchung(st, r.funken, { ...ctx, einheit: true });
 }
 
-// Raetsel (raetsel:geloest): nur mit Raetsel-Blick im Ereignis (blick), sonst rechnet das Raetsel-Paket nicht mit;
-// je Raetsel einmal (das erste Ergebnis zaehlt); Treppenlauf-Raetsel buchen nie einzeln
+// Raetsel (raetsel:geloest { id, richtig, versuch, quelle, wertung, blick? }): je Raetsel einmal (das erste Ergebnis
+// zaehlt); Treppenlauf-Raetsel buchen nie einzeln. Die Stufe haengt am Abstand Raetselwertung minus Raetsel-Blick; das
+// Feld blick ist freiwillig: ohne blick (oder ohne wertung) zaehlt das Raetsel wie auf Augenhoehe (Abstand 0: 8 Funken
+// im 1. Versuch), damit ein Raetsel-Paket, das sich an die Tabelle in ARCHITEKTUR.md haelt, nie leer ausgeht
 export function lernRaetsel(st, d, ctx = {}) {
-  if (!d || typeof d.id !== 'string' || d.quelle === 'treppe' || !Number.isFinite(d.blick)) return [];
+  if (!d || typeof d.id !== 'string' || !d.id || d.quelle === 'treppe') return [];
   const id = String(d.id).slice(0, 40);
   if (st.lernen.raetsel.includes(id)) return [];
   st.lernen.raetsel = [...st.lernen.raetsel, id].slice(-400);
-  const f = R.raetselFunken({ richtig: d.richtig === true, versuch: ganz(d.versuch, 1), wertung: d.wertung, blick: d.blick });
+  const f = R.raetselFunken({ richtig: d.richtig === true, versuch: ganz(d.versuch, 1), wertung: d.wertung,
+    blick: Number.isFinite(d.blick) ? d.blick : null });
   return lernBuchung(st, f, { ...ctx, einheit: false });
 }
 

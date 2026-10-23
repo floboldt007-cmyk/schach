@@ -10,8 +10,9 @@
 //          VOR den Feier-Zeilen des Ergebnisses), partie:analysiert (Nachtrag: Stern 2, Genauigkeits-Lichtblick),
 //          uebung:ergebnis, analyse:gesehen, training:geloest, lektion:beendet, raetsel:geloest (Lern-Funken),
 //          boss:siegel, rekord:neu, bestmarke:neu (Meilensteine), tag:gezaehlt (nur Aktivitaet, nie Funken),
-//          app:bereit, app:screen, app:sichtbar, speicher:zurueckgesetzt; liga:geaendert (Arena-Wertung als Lage fuer den
-//          Faktor), sobald das Paket Wertung das Ereignis eintraegt (vorher wird es nicht abonniert).
+//          app:bereit, app:screen, app:sichtbar, speicher:zurueckgesetzt, spielplan:geladen (das Boss-Paket hat den
+//          Spielplan geladen: erst dann liest funken ihn); liga:geaendert (Arena-Wertung als Lage fuer den Faktor), sobald
+//          das Paket Wertung das Ereignis eintraegt (vorher wird es nicht abonniert).
 // Sendet:  funken:gebucht { quelle, menge, gesamt, level } je Buchung, funken:geaendert { funken, level, delta,
 //          aufstieg } einmal je Ereignis mit Buchungen, level:aufstieg { level, titel, neu } beim Aufstieg.
 // Orte:    ergebnis:abrechnung 20 (Zeile FUNKEN), arena:kopf 5 (Chip Level), arena:heute 50 (Rueckenwind),
@@ -24,7 +25,7 @@
 import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
-import { registriereSaetze, botNachId, alleBots, staerkeFuerElo } from '../../bots.js';
+import { registriereSaetze, botNachId, staerkeFuerElo } from '../../bots.js';
 import { registriereIcon } from '../../ui/icons.js';
 import { ladePartien, wertet, eigeneZuege as eigeneZuegeVon } from '../../storage.js';
 import { ladeSpielplan, funkenWochenendeAktiv, spielplanWoche } from '../../inhalte.js';
@@ -47,17 +48,17 @@ function sicher(fn, wo) {
 }
 
 // ---------- Spielplan (Funken-Wochenende) ----------
-// Der Spielplan gehoert zum Boss-Paket (daten/boss/spielplan.json). Ohne angemeldeten Boss gibt es ihn nicht: dann
-// fragt funken gar nicht erst (sonst 404 in der Konsole), und es gibt kein Funken-Wochenende.
+// Der Spielplan gehoert zum Boss-Paket (S1-6, daten/boss/spielplan.json). funken fragt erst danach, wenn das Boss-Paket
+// meldet, dass es ihn geladen hat (spielplan:geladen); ladeSpielplan() liefert ihn dann aus dem Zwischenspeicher von
+// inhalte.js, ohne zweite Anfrage. Ein angemeldeter Boss allein reicht nicht: ein Boss ohne Spielplan-Datei (wie das
+// Test-Paket in tests/app.test.mjs) ergaebe sonst einen 404 in der Konsole. Ohne Spielplan kein Funken-Wochenende.
+// Kommt das Signal wieder (neuer Plan), liest funken ihn neu.
 let plan = null;
-let planVersucht = false;
-function bossDa() {
-  try { return alleBots().some((b) => b && b.art === 'boss'); } catch (e) { return false; }
-}
+let planLaeuft = false;
 function planLaden() {
-  if (plan || planVersucht || !bossDa()) return;
-  planVersucht = true;
-  ladeSpielplan().then((r) => { if (r && r.ok) plan = r.daten; }).catch(() => {});
+  if (planLaeuft) return;
+  planLaeuft = true;
+  ladeSpielplan().then((r) => { if (r && r.ok) plan = r.daten; }).catch(() => {}).then(() => { planLaeuft = false; });
 }
 function wochenende(t = jetzt()) {
   try { return !!plan && funkenWochenendeAktiv(plan, t); } catch (e) { return false; }
@@ -298,18 +299,28 @@ function anbieterAbrechnung(k) {
   if (!e) return null;
   const z = A.abrechnungsZeile({ eintrag: e, botName: botNameVon(e.bot), schonGezeigt: gezeigt.has(id), merke: () => gezeigt.add(id),
     feierKommt: !!e.lfOffen && !e.lf });
-  // Antippen der Ergebnis-Karte zeigt sofort alles (wie die Huelle der Abrechnung)
+  // Antippen der Ergebnis-Karte zeigt sofort alles (wie die Huelle der Abrechnung); erst nach dem Einhaengen, und nie
+  // mehr, wenn der Host die Zeile vorher schon wieder abgeraeumt hat
   let karte = null;
+  let weg = false;
   const tipp = () => z.beende();
-  setTimeout(() => {
+  const uhr = setTimeout(() => {
+    if (weg) return;
     karte = z.el.closest('.ergebnis-karte');
     if (karte) karte.addEventListener('click', tipp);
   }, 0);
-  return { el: z.el, verlasse() { z.verlasse(); if (karte) karte.removeEventListener('click', tipp); } };
+  return {
+    el: z.el,
+    verlasse() {
+      weg = true;
+      clearTimeout(uhr);
+      z.verlasse();
+      if (karte) karte.removeEventListener('click', tipp);
+    },
+  };
 }
 
 function anbieterHeute() {
-  planLaden();
   const st = ladeStand();
   const we = wochenende();
   const zuenden = (zeile) => sicher(() => {
@@ -366,12 +377,13 @@ function registriere() {
   registriereIcon('funke', '<path d="M12 3.2c.7 4.3 2.2 5.9 6.6 6.6-4.4.7-5.9 2.3-6.6 6.6-.7-4.3-2.2-5.9-6.6-6.6 4.4-.7 5.9-2.3 6.6-6.6z"/><path d="M18.6 15.6v4M16.6 17.6h4"/>');
   registriereSaetze('funken-level', GRUSS);
 
-  hoere('app:bereit', () => sicher(() => { planLaden(); S.speichere(ladeStand()); }, 'app:bereit'));
+  hoere('app:bereit', () => sicher(() => S.speichere(ladeStand()), 'app:bereit'));
+  hoere('spielplan:geladen', () => sicher(planLaden, 'spielplan:geladen'));
   hoere('app:screen', () => sicher(() => A.schliesseSpiegel(), 'app:screen'));
   hoere('app:sichtbar', (d) => sicher(() => { if (d && d.sichtbar === false && speichernUhr) speichereLauf(); }, 'app:sichtbar'));
   hoere('speicher:zurueckgesetzt', () => sicher(() => { lauf = null; linie = null; gezeigt.clear(); letztePartieId = null; }, 'zurueckgesetzt'));
 
-  hoere('partie:gestartet', (d) => { planLaden(); setTimeout(() => sicher(() => starteLauf(d), 'partie:gestartet'), 0); });
+  hoere('partie:gestartet', (d) => { setTimeout(() => sicher(() => starteLauf(d), 'partie:gestartet'), 0); });
   hoere('zug:gespielt', (d) => sicher(() => {
     if (!passt(d) || d.wer !== 'flo' || !lauf.hilfe) return;
     S.merkeHilfe(lauf, d.ply);
@@ -420,7 +432,7 @@ function registriere() {
       if (S.setzeLage(st, d)) S.speichere(st);
     }, 'liga:geaendert'));
   }
-  // Tageswerk zaehlt als Aktivitaet ("Willkommen zurück"), bringt aber nie Funken (Fairness 5.3)
+  // Tageswerk zaehlt als Aktivitaet ("Willkommen zurueck"), bringt aber nie Funken (Fairness 5.3)
   hoere('tag:gezaehlt', (d) => sicher(() => {
     if (!d || !istSchluessel(d.tag)) return;
     const st = ladeStand();
@@ -448,7 +460,7 @@ function registriere() {
   if (TEST && typeof window !== 'undefined') {
     window.__funken = {
       stand: () => ladeStand(), speichere: (st) => S.speichere(st), plan: () => plan,
-      setzePlan: (p) => { plan = p; planVersucht = true; }, S, R, L,
+      setzePlan: (p) => { plan = p; }, S, R, L,
     };
   }
 }

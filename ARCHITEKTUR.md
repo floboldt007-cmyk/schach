@@ -423,7 +423,7 @@ export function zuruecksetzen()          // nur Tests
 | `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
 | `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
 | `speicher:zurueckgesetzt` | `{ mitEinstellungen }` | `storage.js` `setzeZurueck()` („Fortschritt zurücksetzen“), nach dem Loeschen; Pakete leeren ihren Zustand im Arbeitsspeicher (w0-fix) |
-| `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }` | Paket 1C |
+| `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }`, freiwillig dazu (P1-Nachbesserung, fuer Funken nach 3.3): `faellig` (`false`: keine Funken, nur faellige Karten zaehlen) und `sitzung` (ID der Stapel-Sitzung: die Sitzung ist eine Rueckenwind-Einheit, alle ihre Karten zaehlen dann doppelt; ohne `sitzung` zaehlt jede Karte einfach) | Paket 1C |
 | `training:stand` | `{ faellig, gesamt, gemeistert }` | Paket 1C |
 | `uebung:ergebnis` | `{ partieId, ply, getroffen }` | Paket 1B |
 | `bestmarke:neu` | `{ kategorie, wert, vorher, text, partieId }` | Pakete 1A und 2A |
@@ -885,7 +885,10 @@ Funken-Wochenende, sonst aendert sich nichts. Der Browser meldet den 404 dann be
 nicht abschalten), und die App-Tests werten ihn als Konsolenfehler: **S1-1 (Schub 1) liefert den Spielplan in seinen
 Browser-Tests per `page.route('**/daten/boss/spielplan.json', ...)` aus** (z. B. mit dem Inhalt von
 `daten/beispiel/spielplan.json`) oder filtert genau diesen 404, solange S1-6 fehlt. Nach der Integration (beide Pakete in
-`PAKETE`) gibt es ihn nicht mehr (w0plus-a-fix, Befund des Pruefers).
+`PAKETE`) gibt es ihn nicht mehr (w0plus-a-fix, Befund des Pruefers). **P1-Nachbesserung:** S1-1 (`funken`) fragt erst
+nach dem Spielplan, wenn S1-6 das Ereignis `spielplan:geladen` sendet (nach seinem eigenen erfolgreichen
+`ladeSpielplan()`); ein angemeldeter Boss allein reicht nicht mehr. **S1-6 muss dieses Ereignis senden**, sonst gibt es
+kein Funken-Wochenende.
 
 **Spielplan** (`art: 'spielplan'`, `format: 1`, eine Datei je Quartal oder Saison; Beispiel `daten/beispiel/spielplan.json`):
 ```json
@@ -918,8 +921,9 @@ Nur der Steckbrief-Text darf sich aendern.
 | `funken:gebucht` | `{ quelle, menge, gesamt, level }` (`quelle`: `'partie'` \| `'lernen'` \| `'tag'` \| `'meilenstein'` wie die Tabellen A, B, C in 3.3; `menge` ganze Zahl >= 0 nach Faktor, Rueckenwind und Tagesbogen; `gesamt` alle Funken bisher; `level` nach der Buchung) | S1-1, nach jeder Buchung |
 | `level:aufstieg` | `{ level, titel, neu }` (`titel`: Text bei jedem 5. Level, sonst `null`; `neu`: `[{ art, id, name }]` freigeschaltete Stuecke) | S1-1, nach der Buchung, die das Level hebt (nie mitten in einer Partie gezeigt) |
 | `funken:geaendert` | `{ funken, level, delta, aufstieg }` (`funken` alle Funken danach, `delta` Summe der Buchungen dieses Ereignisses, `aufstieg` boolean) | Paket `funken`, einmal je Ereignis mit Buchungen, nach den `funken:gebucht` (fuer Serie, Liga und andere Pakete; neu mit dem Paket) |
+| `spielplan:geladen` | `{}` (keine Daten; der Spielplan selbst kommt aus `ladeSpielplan()`, also aus dem Zwischenspeicher von `inhalte.js`) | S1-6 `boss`, nach `app:bereit` (die Pakete laden parallel; vorher koennte ein Hoerer noch fehlen) einmal nach dem ersten erfolgreichen `ladeSpielplan()` (`r.ok`), und nach jedem neu geladenen Plan wieder. Erst danach liest `funken` den Spielplan (Funken-Wochenende): so fragt nie ein Paket nach `daten/boss/spielplan.json`, solange es die Datei nicht gibt (kein 404, auch nicht mit dem Test-Boss in `tests/app.test.mjs`). Neu mit der P1-Nachbesserung |
 | `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
-| `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
+| `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung, blick? }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`; `blick` freiwillig (P1-Nachbesserung): Raetsel-Blick vor dem Versuch, dann rechnet funken die Stufe nach 3.3 aus `wertung - blick` (12/8/4/1), ohne `blick` wie auf Augenhoehe (8)) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
 | `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1, also der Stand der Lebensleiste: `vorher` nach Flos vorigem Zug, d. h. vor dem letzten Boss-Zug, = `1 - (gewinnVorigerZug ?? gewinnVorher)` aus `zug:bewertet`; `nachher` nach Flos Zug = `1 - gewinnNachher`; Treffer ab `vorher - nachher >= 0,03`). So zaehlt ein sofort bestrafter Boss-Fehler als Treffer (3.8); ein guter Zug in ruhiger Stellung haelt die Leiste nur. w0plus-a-fix: vorher stand hier „vor Flos Zug“, mit `gewinnVorher` gab es praktisch nie einen Treffer, auch nicht beim Matt | S1-6, nach `zug:bewertet` in Boss-Partien |
 | `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
@@ -1361,44 +1365,65 @@ Partien (mittlere Bot-Elo + 400 x (Siege - Niederlagen) / Partien). Sobald das P
 `liga:geaendert` in `EREIGNISSE` eintraegt, abonniert funken es und nimmt `wertung` (Zahl oder `{ wert }`) als Lage
 (gespeichert als `lage: { wert, t }`); vorher wird es nicht abonniert. Der Faktor wird bei `partie:gestartet` festgelegt
 und steht vorher im Panel. Tagesbogen: bis 800 Funken (gemessen vor Rueckenwind) voll, darueber halb, ab 4:00 neu. Rueckenwind:
-Karte (Montag 4:00, hoechstens 3; Extra-Karten "Willkommen zurück" einmal je Kalendermonat nach mindestens 2 Tagen ohne
-Aktivitaet und "für dich aufgehoben" nach einem verpassten Funken-Wochenende, dann hoechstens 4), "Zünden": 3 Einheiten
-(Partie, "Ab hier nochmal", Lektion) x2; Funken-Wochenende (Spielplan) x2 ohne Kartenverbrauch; nie mehr als x2.
-Boss-Partien: nur die ersten 3 Versuche am Tag. Lern-Funken (Tabelle B) und Meilensteine (Tabelle C, ohne Faktor, Bogen,
-Rueckenwind) nach 3.3; erster Sieg gegen den Stockfisch 1.000 statt 100.
+die erste Karte an Tag 4 (3 Tage nach dem ersten Start, Entdeckungs-Fahrplan 3.16; die Heute-Zeile sagt dann "Neu für
+dich: eine Rückenwind-Karte"), danach Montag 4:00 eine, hoechstens 3; Extra-Karten "Willkommen zurück" einmal je
+Kalendermonat nach mindestens 2 Tagen ohne Aktivitaet und "für dich aufgehoben" fuer jedes verpasste Funken-Wochenende seit
+dem ersten Start (auch wenn die App erst Wochen spaeter wieder aufgeht; jede Woche wird genau einmal geprueft, `rw.planBis`),
+dann hoechstens 4. "Zünden": 3 Einheiten x2 (Partie, "Ab hier nochmal", Lektion, Stapel-Sitzung im Training: alle Karten
+einer `sitzung` zaehlen doppelt und verbrauchen zusammen eine Einheit); Funken-Wochenende (Spielplan) x2 ohne
+Kartenverbrauch; nie mehr als x2. Boss-Partien: nur die ersten 3 Versuche am Tag. Lern-Funken (Tabelle B) und
+Meilensteine (Tabelle C, ohne Faktor, Bogen, Rueckenwind) nach 3.3; erster Sieg gegen den Stockfisch 1.000 statt 100;
+Raetsel ohne `blick` wie auf Augenhoehe (8); Karteikarten mit `faellig: false` 0.
 
 **Speicher** `modul:funken` (Budget 25.000, duennt selbst aus): `{ stand: 1, gesamt, level, heute: { tag, partien, funken,
 bogen, boss, quellen }, verlauf: [letzte 30 Partien mit Aufschluesselung, partieId als id], freigeschaltet: [ids],
-rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt, aufgehoben, neu }, aufstiege: [{ level, von, t, satz,
-herkunft }], gruss, ids: [verarbeitete Partien, hoechstens 300], lernen: {...}, lauf }`. `lauf` haelt die Live-Daten der
+rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt, aufgehoben, neu, planBis }, aufstiege: [{ level, von, t,
+satz, herkunft }], gruss, ids: [verarbeitete Partien, hoechstens 300], lernen: { ..., sitzung }, lauf, lage }` (`rw.woche`
+bleibt `null` bis zur ersten Karte an Tag 4; `rw.neu`: `'erste'` \| `'willkommen'` \| `'aufgehoben'`; `lernen.sitzung`:
+laufende Stapel-Sitzung `{ id, rw }`; neue Felder sind freiwillig, Rechenstand bleibt 1, aeltere Staende laden). `lauf` haelt die Live-Daten der
 laufenden Partie (je eigenem Ply Klasse, Gewinnchance vorher/nachher, trivial, nach Hilfe, Mattdistanz), damit eine
 fortgesetzte Partie richtig rechnet. Alte Spielstaende ohne Modul starten bei 0 Funken und Level 1. Level folgt immer den
 Funken (sinkt nie).
 
 **Ereignisse.** Hoert `partie:gestartet`, `zug:gespielt`, `hilfe:genutzt`, `zug:zurueckgenommen`, `zug:bewertet`,
 `stellung:analysiert`, `partie:beendet` (bucht synchron, also vor den Feier-Zeilen), `partie:analysiert` (Nachtrag: Stern 2,
-Genauigkeits-Lichtblick), `uebung:ergebnis`, `analyse:gesehen`, `training:geloest`, `lektion:beendet`, `raetsel:geloest`
-(nur mit dem Zusatzfeld `blick`, sonst bucht es nichts), `boss:siegel`, `rekord:neu` (nur `platz` 1 und `fenster` fehlt oder
+Genauigkeits-Lichtblick), `uebung:ergebnis`, `analyse:gesehen`, `training:geloest` (freiwillig `faellig` und `sitzung`, siehe
+Tabelle), `lektion:beendet`, `raetsel:geloest` (Vertrag wie in der Tabelle; das freiwillige Feld `blick` macht die Stufe genau,
+ohne `blick` zaehlt ein Raetsel wie auf Augenhoehe), `boss:siegel`, `rekord:neu` (nur `platz` 1 und `fenster` fehlt oder
 `'allzeit'`), `bestmarke:neu` (je Partie hoechstens ein Rekord), `tag:gezaehlt` (nur Aktivitaet, nie Funken),
-`speicher:zurueckgesetzt`. Sendet `funken:gebucht` je Quelle, `funken:geaendert` einmal je Ereignis, `level:aufstieg`.
+`speicher:zurueckgesetzt`, `spielplan:geladen` (erst dann liest es den Spielplan). Sendet `funken:gebucht` je Quelle, `funken:geaendert` einmal je Ereignis, `level:aufstieg`.
 Andere Pakete lesen Funken nie aus dem Modul, sondern ueber diese Ereignisse.
 
 **Orte.** `ergebnis:abrechnung` 20 (`.fk-abr[data-zeile="funken"]`: "+Funken", Formel, Level-Balken vom alten zum neuen
 Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um, Klang `level`; `data-aufstieg`,
 `data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip[role=button]` "Level n" mit
 Mini-Balken, oeffnet per Antippen, Enter oder Leertaste den Funken-Spiegel; so hoch wie die Chips Sterne und Pokal, die
-Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; auf dem Handy nur die Zahl im Emblem), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
+Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; **Form nach Platz**: ganz, solange die
+Chip-Reihe ihn ohne Ueberlauf fasst, sonst und auf dem Handy bis 600 px nur die Zahl im Emblem, `.fk-schmal`; gemessen nach
+dem Einhaengen und per ResizeObserver am Kopf, die Form wechselt im naechsten Bild; so ist er im iPad-Hochformat 744 bis
+834 px ganz sichtbar), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
 z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
 (`.fk-spieler`), `spielplan:tage` 20 (`.fk-spielplan`), `partie:begruessung?` 40 (Anlass `funken-level`, einmal nach einem
 Aufstieg). Funkenlinie `.fk-linie` in `buehne.platz('funkenlinie')`, nur mit der Anzeige "Funkenlinie" (Standard aus).
 
-**Feier.** Je Partie genau eine Level-Feier: `level` (Zeile) bzw. `level-titel` (gross, jedes 5. Level und 60/75/100) mit
-Koennen-Satz (Vergleich der Partien seit dem vorigen Aufstieg mit den 15 davor, Mindestmengen, sonst neutraler Fakt) und
-"Neu: ...". Kommt die Analyse noch, wartet die Feier auf `partie:analysiert` (sonst nennte sie ein zu niedriges Level).
+**Feier.** Je Partie hoechstens ein Level-Moment: bei einem normalen Level eine Zeile `level` ("Level n · Neu: ..." mit
+Koennen-Satz: Vergleich der Partien seit dem vorigen Aufstieg mit den 15 davor, Mindestmengen, sonst neutraler Fakt); bei
+einem neuen Titel (jedes 5. Level und 60/75/100) der grosse Moment `level-titel` mit Koennen-Satz und, wenn dabei Stuecke frei
+werden (Level 10, 15, 20, ... 50), dazu eine Zeile `level` "Neu: ..." (belegt also 1 von 3 Zeilen-Plaetzen). Kommt die Analyse noch, wartet die Feier auf `partie:analysiert` (sonst nennte sie ein zu niedriges Level).
 Lern-Aufstiege gehen ohne `partieId` in die Nachlese.
 
-**Spielplan.** Das Funken-Wochenende kommt aus `daten/boss/spielplan.json` (Paket boss). Ohne angemeldeten Boss fragt
-das Paket nicht danach (kein 404).
+**Spielplan.** Das Funken-Wochenende kommt aus `daten/boss/spielplan.json` (Paket boss, S1-6). `funken` liest ihn erst,
+wenn S1-6 `spielplan:geladen` sendet (dann aus dem Zwischenspeicher von `inhalte.js`, ohne zweite Anfrage). Ein Boss ohne
+dieses Signal (z. B. `wpboss` in `tests/app.test.mjs`) loest keine Anfrage aus, also auch keinen 404. Vertrag fuer S1-6 in
+der Ereignis-Tabelle.
+
+**Noch nicht verdrahtet (es fehlt das Ereignis oder ein Feld darin).** Aus Tabelle B: Karteikarte "für immer gelöst" +30
+(`training:geloest` braucht ein Feld wie `fuerImmer`), Tagesraetsel "Ein Wort" +5 (Feld in `raetsel:geloest`), Pruefung
+beim Lehrmeister 40/+60 (`lektion:beendet` kennt nur Ringe), Endspiel-Fall, Heimbringer, Mission je Stufe 30 und
+Treppenlauf-Bestleistung 25 (kein Ereignis). Aus Tabelle C: Tagesaufgabe 20 und "Tageskrone" +30 (kein Ereignis; die
+Quelle `'tag'` steht in `funken:gebucht` schon bereit), Liga-Saison beendet 100 (P4), Erste Schritte je 50 (kein
+Ereignis). Wer eines dieser Ereignisse einfuehrt, ergaenzt in `js/pakete/funken/index.js` einen Hoerer und in `stand.js`
+die Buchung (Werte stehen in `rechnung.js` bzw. sind in 3.3 festgelegt).
 
 **Integration.** Das Paket steht bewusst noch nicht in `PAKETE` (Kopfkommentar von `js/erweiterungen.js` und
 `tests/sw.test.mjs`: das macht die Integration). Probelauf am 22.10. mit `pakete/funken/index` in `PAKETE` und den fuenf

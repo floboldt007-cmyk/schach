@@ -302,7 +302,28 @@ gruppe = 'Speicher';
   let st = S.lade(ort(2026, 10, 22, 20));
   pruefe('Alter Spielstand ohne Modul startet bei 0 Funken, Level 1, mit den Stücken von Level 1', st.gesamt === 0 && st.level === 1 && st.stand === 1
     && st.freigeschaltet.join() === 'titel-funke,namensschild,finisher-tinte,emotes-grund' && st.verlauf.length === 0, st);
-  pruefe('Erste Rückenwind-Karte liegt beim ersten Start im Fach', st.rw.karten === 1 && st.rw.woche === '2026-10-19' && st.rw.start === '2026-10-22');
+  // Entdeckungs-Fahrplan 3.16: die erste Karte kommt an Tag 4 (Start Donnerstag 22.10.: Tag 4 = Sonntag 25.10. ab 4:00)
+  pruefe('Erster Start: Tag gemerkt, noch keine Rückenwind-Karte', st.rw.karten === 0 && st.rw.woche === null && st.rw.start === '2026-10-22', st.rw);
+  {
+    const k = (x, t) => { S.pruefeKarten(x, t); return x.rw.karten; };
+    const a = S.lade(ort(2026, 10, 22, 20));
+    const tag3 = k(a, ort(2026, 10, 24, 12));
+    const vorVier = k(a, ort(2026, 10, 25, 3, 59));
+    const tag4 = k(a, ort(2026, 10, 25, 4, 0));
+    const neu = a.rw.neu;
+    const montag = k(a, ort(2026, 10, 26, 4, 0));
+    // Start Samstag 24.10.: Montag 26.10. ist erst Tag 3, die Montagskarte kommt nicht vor der ersten Karte (Tag 4 = Dienstag)
+    sp.removeItem('schach-arena:v1:modul:funken');
+    const b = S.lade(ort(2026, 10, 24, 10));
+    const bMontag = k(b, ort(2026, 10, 26, 12));
+    const bTag4 = k(b, ort(2026, 10, 27, 12));
+    const bWoche = b.rw.woche;
+    const bNaechster = k(b, ort(2026, 11, 2, 12));
+    pruefe('Rückenwind: erste Karte an Tag 4 („Neu für dich“, Tagesgrenze 4:00), danach jeden Montag; nie eine Montagskarte vor der ersten',
+      tag3 === 0 && vorVier === 0 && tag4 === 1 && neu === 'erste' && a.rw.woche === '2026-10-26' && montag === 2
+      && bMontag === 0 && bTag4 === 1 && bWoche === '2026-10-26' && bNaechster === 2 && b.rw.woche === '2026-11-02',
+    { tag3, vorVier, tag4, neu, montag, bMontag, bTag4, bWoche, bNaechster });
+  }
   sp.setItem('schach-arena:v1:modul:funken', JSON.stringify({ gesamt: 'viel', verlauf: 'x', rw: { karten: 99, aktiv: -3 }, ids: [1, 'a'], lauf: 5 }));
   st = S.lade(ort(2026, 10, 22, 20));
   pruefe('Kaputte Daten werden still ersetzt (Zahlen, Listen, Karten höchstens 4)', st.gesamt === 0 && Array.isArray(st.verlauf) && st.rw.karten === 4
@@ -326,9 +347,10 @@ gruppe = 'Speicher';
   S.tagWechsel(st, ort(2026, 10, 21, 12));
   pruefe('Uhr zurückgestellt: der Tag zählt weiter, nichts beginnt neu', st.heute.tag === '2026-10-23' && st.heute.bogen === 300);
 
-  // Wochenkarte: Montag 4:00
+  // Wochenkarte: Montag 4:00 (die erste Karte kam schon: Woche gesetzt)
   st = S.lade(ort(2026, 10, 22, 12));
   st.rw.karten = 0;
+  st.rw.woche = '2026-10-19';
   S.pruefeKarten(st, ort(2026, 10, 26, 3, 59));
   const vorMontag = st.rw.karten;
   S.pruefeKarten(st, ort(2026, 10, 26, 4, 0));
@@ -379,6 +401,20 @@ gruppe = 'Speicher';
   const c = fach('2026-12-06');
   pruefe('„Für dich aufgehoben“: Montag eine Karte, wer am Funken-Wochenende nicht gespielt hat (nicht, wer gespielt hat oder später kam)',
     a.karten === 1 && a.neu === 'aufgehoben' && a.aufgehoben.includes('2026-11-30') && b.karten === 0 && c.karten === 0, [a, b.karten, c.karten]);
+  // die Karte verfaellt nie: wer erst Wochen spaeter wieder oeffnet, bekommt sie trotzdem, genau einmal
+  const spaet = (tage) => {
+    sp.removeItem('schach-arena:v1:modul:funken');
+    const x = S.lade(ort(2026, 11, 20, 12), { plan });
+    Object.assign(x.rw, { karten: 0, woche: '2026-11-16' });
+    S.speichere(x);
+    const kartenNach = tage.map((t) => { const y = S.lade(t, { plan }); S.speichere(y); return [y.rw.karten, y.rw.aufgehoben.join(), y.rw.planBis]; });
+    return kartenNach;
+  };
+  const zweiWochen = spaet([ort(2026, 12, 15, 12), ort(2026, 12, 16, 12), ort(2026, 12, 22, 12)]);
+  const direkt = spaet([ort(2026, 12, 8, 12), ort(2026, 12, 15, 12)]);
+  pruefe('„Für dich aufgehoben“ auch nach zwei Wochen ohne Öffnen (verfällt nie), jede Woche nur einmal geprüft',
+    zweiWochen[0][0] === 4 && zweiWochen[0][1] === '2026-11-30' && zweiWochen[0][2] === '2026-12-07' && zweiWochen[1][0] === 4
+    && zweiWochen[2][1] === '2026-11-30' && direkt[0][1] === '2026-11-30' && direkt[1][1] === '2026-11-30', { zweiWochen, direkt });
 }
 
 gruppe = 'Partie buchen';
@@ -455,10 +491,33 @@ gruppe = 'Lernen buchen';
     && S.lernMoment(st, { partieId: 'p8', ply: 3, moment: false }).length === 0);
   const ka = Array.from({ length: 10 }, (_, i) => S.lernKarte(st, { karteId: 'k' + i, richtig: true, versuch: 1 }));
   pruefe('Karteikarte: höchstens 8 am Tag', ka.filter((x) => x.length).length === 8 && ka[0][0].menge === 10);
+  {
+    // Stapel-Sitzung als eine Einheit (3.3 Rueckenwind), nur faellige Karten (freiwillige Felder sitzung und faellig)
+    setzeSpeicher(fakeSpeicher());
+    const s2 = S.lade(ort(2026, 10, 22, 20));
+    s2.rw.karten = 1;
+    const nichtFaellig = S.lernKarte(s2, { karteId: 'k0', richtig: true, versuch: 1, quelle: 'kartei', faellig: false });
+    const einzeln = S.lernKarte(s2, { karteId: 'k1', richtig: true, versuch: 1, quelle: 'kartei' });
+    S.zuenden(s2);
+    const ohneSitzung = S.lernKarte(s2, { karteId: 'k2', richtig: true, versuch: 1, quelle: 'kartei' });
+    const aktivVor = s2.rw.aktiv;
+    const s1 = [1, 1, 2].map((v, i) => S.lernKarte(s2, { karteId: 'a' + i, richtig: true, versuch: v, quelle: 'kartei', faellig: true, sitzung: 'sitzung-a' }));
+    const aktivNachA = s2.rw.aktiv;
+    const sB = S.lernKarte(s2, { karteId: 'b0', richtig: true, versuch: 1, quelle: 'kartei', sitzung: 'sitzung-b' });
+    pruefe('Karteikarte: nur fällige zählen; eine Stapel-Sitzung ist EINE Einheit (Rückenwind: alle Karten doppelt, eine Einheit verbraucht), einzelne Karten ohne Sitzung einfach',
+      nichtFaellig.length === 0 && einzeln[0].menge === 10 && ohneSitzung[0].menge === 10 && aktivVor === 3
+      && s1.map((x) => x[0].menge).join() === '20,20,8' && s1.every((x) => x[0].rw === 'karte') && aktivNachA === 2
+      && sB[0].menge === 20 && s2.rw.aktiv === 1 && s2.lernen.sitzung.id === 'sitzung-b', { s1, aktivVor, aktivNachA, sB, aktiv: s2.rw.aktiv });
+  }
   const le = [S.lernLektion(st, { id: 'rudi-1', ringe: { gelernt: true } }), S.lernLektion(st, { id: 'rudi-1', ringe: { gelernt: true } }),
     S.lernLektion(st, { id: 'rudi-1', ringe: { sicher: true } })];
   pruefe('Lektion: 40 beim ersten Abschluss, Ring „Sicher“ einmal +20', le.map((x) => (x[0] ? x[0].menge : 0)).join() === '40,0,20');
-  pruefe('Rätsel nur mit Rätsel-Blick im Ereignis, je Rätsel einmal, Treppenlauf nie einzeln', S.lernRaetsel(st, { id: 'r1', richtig: true, versuch: 1, wertung: 1500 }).length === 0
+  const ohneBlick = S.lernRaetsel(st, { id: 'r1', richtig: true, versuch: 1, quelle: 'tag', wertung: 1500 });
+  pruefe('Rätsel nach dem Vertrag in ARCHITEKTUR.md ({ id, richtig, versuch, quelle, wertung }, ohne blick): wie auf Augenhöhe 8 Funken',
+    ohneBlick.length === 1 && ohneBlick[0].menge === 8 && ohneBlick[0].quelle === 'lernen'
+    && S.lernRaetsel(st, { id: 'r4', richtig: true, versuch: 1, quelle: 'archiv', wertung: null })[0].menge === 8
+    && S.lernRaetsel(st, { id: 'r5', richtig: false, versuch: 1, quelle: 'pool', wertung: 1500 })[0].menge === 1, ohneBlick);
+  pruefe('Rätsel mit Rätsel-Blick nach Abstand, je Rätsel einmal, Treppenlauf nie einzeln', S.lernRaetsel(st, { id: 'r1', richtig: true, versuch: 1, wertung: 1500 }).length === 0
     && S.lernRaetsel(st, { id: 'r2', richtig: true, versuch: 1, wertung: 1500, blick: 1200 })[0].menge === 12
     && S.lernRaetsel(st, { id: 'r2', richtig: true, versuch: 1, wertung: 1500, blick: 1200 }).length === 0
     && S.lernRaetsel(st, { id: 'r3', richtig: true, versuch: 1, wertung: 1500, blick: 1200, quelle: 'treppe' }).length === 0);
@@ -631,10 +690,20 @@ const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
 const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const MODUL = 'schach-arena:v1:modul:funken';
 const zahlText = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE');
-// kleines Test-Paket: meldet einen Boss an (der Spielplan gehoert zum Boss-Paket; ohne Boss fragt funken nicht nach ihm)
+// kleines Test-Paket wie das Boss-Paket (S1-6): meldet einen Boss an, laedt den Spielplan und meldet spielplan:geladen
+// (erst dann liest funken den Spielplan)
 const TEST_BOSS = `
 import { registriereBot, botNachId } from '../../bots.js';
+import { ladeSpielplan } from '../../inhalte.js';
+import { hoere, sende } from '../../ereignisse.js';
 registriereBot({ id: 'fk-testboss', art: 'boss', archiv: true, name: 'Testboss', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('rudi').staerke } });
+// nach app:bereit (dann sind alle Pakete angemeldet, sie laden parallel)
+hoere('app:bereit', () => ladeSpielplan().then((r) => { if (r.ok) sende('spielplan:geladen', {}); }));
+`;
+// Boss ohne Spielplan-Datei und ohne Signal (wie das Test-Paket in tests/app.test.mjs mit wpboss)
+const TEST_BOSS_OHNE_PLAN = `
+import { registriereBot, botNachId } from '../../bots.js';
+registriereBot({ id: 'fk-ohneplan', art: 'boss', archiv: true, name: 'Testboss', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('rudi').staerke } });
 `;
 
 async function neueSeite(browser, { w = 1180, h = 820, handy = false, farbe = 'light', reduziert = false, lokal = null } = {}) {
@@ -824,8 +893,21 @@ async function testeBrowser(browser) {
   const kopf = await seite.evaluate(() => [...document.querySelector('.kopf-chips').children].map((c) => c.className));
   pruefe('arena:kopf: Chip „Level 1“ mit Mini-Balken nach den Chips Sterne und Pokal', /Level\s*1/.test(await seite.locator('.fk-chip').innerText())
     && await seite.locator('.fk-chip .fk-mini > i').count() === 1 && kopf.findIndex((k) => /fk-chip/.test(k)) > kopf.findIndex((k) => /chip-pokal/.test(k)), kopf);
-  pruefe('arena:heute: Rückenwind-Zeile mit „Zünden“ (erste Karte liegt im Fach)', /1 Karte im Fach/.test(await seite.locator('.heute-karte:not([hidden]) .fk-heute').innerText())
-    && await seite.locator('.fk-heute .fk-zuenden').count() === 1);
+  pruefe('arena:heute: am ersten Tag noch keine Rückenwind-Zeile (die erste Karte kommt an Tag 4, SPIELKONZEPT 3.16)',
+    await seite.locator('.fk-heute').count() === 0 && (await h.stand()).rw.karten === 0);
+  // vier Tage spaeter (Start 3 Tage zurueck): die erste Karte stellt sich vor
+  await seite.evaluate(async () => {
+    const t = await import('./js/tag.js');
+    const st = window.__funken.stand();
+    st.rw.start = t.addiereTage(t.tagSchluessel(), -3);
+    st.rw.woche = null;
+    window.__funken.speichere(st);
+  });
+  await h.arena();
+  const tag4 = await h.stand();
+  pruefe('arena:heute an Tag 4: „Neu für dich: eine Rückenwind-Karte“ mit „Zünden“ (erste Karte liegt im Fach)',
+    /^Neu für dich: eine Rückenwind-Karte\. Zünden: Die nächsten 3 Einheiten zählen doppelt\.$/.test((await seite.locator('.heute-karte:not([hidden]) .fk-heute .fk-h-text').innerText()).trim())
+    && await seite.locator('.fk-heute .fk-zuenden').count() === 1 && tag4.rw.karten === 1 && tag4.rw.neu === 'erste', tag4.rw);
   const kopfMass = await seite.evaluate(kopfChipMass);
   pruefe('arena:kopf: Level-Chip antippbar (role=button, Tastatur) mit Tippfläche mindestens 44 x 44, sichtbar so hoch wie der Sterne-Chip, '
     + 'eine Oberkante in der Chip-Reihe, Kopf-Knöpfe weiter mindestens 44 x 44', kopfMass.rolle && kopfMass.tipp.w >= 44 && kopfMass.tipp.h >= 44
@@ -850,6 +932,18 @@ async function testeBrowser(browser) {
   await seite.locator('.fk-chip').focus();
   await seite.keyboard.press('Enter');
   const perTaste = await seite.waitForSelector('.fk-spiegel-ort .fk-spiegel', { timeout: 3000 }).then(() => true).catch(() => false);
+  await warte(300);
+  // modal: Tab und Umschalt+Tab bleiben im Blatt (wie bauteile.sheet)
+  const imBlatt = [];
+  for (let i = 0; i < 6; i++) {
+    await seite.keyboard.press('Tab');
+    imBlatt.push(await seite.evaluate(() => !!document.activeElement && !!document.activeElement.closest('.fk-spiegel')));
+  }
+  for (let i = 0; i < 3; i++) {
+    await seite.keyboard.press('Shift+Tab');
+    imBlatt.push(await seite.evaluate(() => !!document.activeElement && !!document.activeElement.closest('.fk-spiegel')));
+  }
+  pruefe('Funken-Spiegel ist modal: Tab und Umschalt+Tab bleiben im Blatt', perTaste && imBlatt.every(Boolean), imBlatt);
   await seite.keyboard.press('Escape');
   await seite.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
   pruefe('Tastatur: Enter auf dem Level-Chip öffnet den Spiegel, Escape schließt ihn, Fokus zurück auf dem Chip', perTaste
@@ -886,6 +980,8 @@ async function testeBrowser(browser) {
   pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, Verwertung, × 2 Rückenwind-Karte, Meilensteine)', await seite.locator('.fk-details:not([hidden])').count() === 1
     && await seite.locator('.fk-abr-knopf[aria-expanded="true"]').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det) && /Verwertung/.test(det)
     && /× 2 Rückenwind-Karte/.test(det) && /Meilensteine: neue Sterne, erster Sieg gegen Bauer Benno/.test(det), det);
+  pruefe('Kurzer Sieg (Schäfermatt, 4 Züge): die Aufschlüsselung sagt, warum der Ergebnis-Bonus fehlt', e1.e === 0 && e1.erg === 'sieg' && e1.p > 0
+    && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det), { e: e1.e, p: e1.p, det });
   await bild(seite, 'ergebnis-aufstieg');
   await seite.locator('.ergebnis-overlay .erg-zu').click();
 
@@ -983,6 +1079,12 @@ async function testeBrowser(browser) {
     await s.waitForSelector('.screen.arena .fk-chip');
     await warte(500);
     pruefe('Alter Spielstand (12 Partien, kein Modul): Level 1, 0 Funken', /Level\s*1/.test(await s.locator('.fk-chip').innerText()) && (await hh.stand()).gesamt === 0);
+    await hh.tippe('.fk-chip');
+    await s.waitForSelector('.fk-spiegel-ort .fk-spiegel');
+    pruefe('Funken-Spiegel vor der ersten Karte: „Die erste Rückenwind-Karte kommt an deinem 4. Tag, danach jeden Montag eine.“',
+      /Die erste Rückenwind-Karte kommt an deinem 4\. Tag, danach jeden Montag eine\./.test(await s.locator('.fk-spiegel .fk-s-rw').innerText()));
+    await s.locator('.fk-spiegel .fk-schliessen').click();
+    await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
     pruefe('Benno nach 12 Siegen: „Training · Funken × 0,5“ (Lage 650, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
@@ -1049,7 +1151,9 @@ async function testeBrowser(browser) {
   // ---------- 8. Funken-Wochenende (Spielplan des Boss-Pakets) ----------
   gruppe = 'Funken-Wochenende';
   {
-    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
+    // eine Karte im Fach und 2 aktive Einheiten: am Funken-Wochenende wird nichts davon verbraucht (nie x 4)
+    const lokal = { [MODUL]: { rw: { karten: 1, aktiv: 2, woche: '2026-11-30', start: '2026-11-20' } } };
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { lokal });
     const hh = hilfen(s);
     const plan = readFileSync(path.join(WURZEL, 'daten/beispiel/spielplan.json'), 'utf8');
     await s.route('**/daten/boss/spielplan.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: plan }));
@@ -1063,9 +1167,10 @@ async function testeBrowser(browser) {
     pruefe('Heute-Karte: „Funken-Wochenende: Partien und Lernen zählen doppelt.“', /Funken-Wochenende: Partien und Lernen zählen doppelt\./.test(await s.locator('.fk-heute').innerText()));
     await hh.schaefermatt();
     const { e } = await hh.abrFertig();
-    pruefe('Partie am Funken-Wochenende zählt doppelt (Quelle Wochenende, Karte bleibt im Fach)', e.rw === 'wochenende' && (await hh.stand()).rw.karten === 1
-      && /× 2 Funken-Wochenende/.test(await s.locator('.fk-details').innerHTML()), e);
-    pruefe('Keine Konsolenfehler (der Spielplan wird nur mit Boss geladen)', f.length === 0, f.join(' | '));
+    const rwNach = (await hh.stand()).rw;
+    pruefe('Partie am Funken-Wochenende zählt doppelt (Quelle Wochenende, Karte bleibt im Fach, aktive Einheiten bleiben)', e.rw === 'wochenende'
+      && rwNach.karten === 1 && rwNach.aktiv === 2 && /× 2 Funken-Wochenende/.test(await s.locator('.fk-details').innerHTML()), { e, rw: rwNach });
+    pruefe('Keine Konsolenfehler (der Spielplan wird erst nach spielplan:geladen gelesen)', f.length === 0, f.join(' | '));
     await k.close();
   }
   {
@@ -1077,6 +1182,22 @@ async function testeBrowser(browser) {
     await s.waitForSelector('.screen.arena .fk-chip');
     await warte(1200);
     pruefe('Ohne Boss-Paket fragt funken nie nach dem Spielplan (kein 404)', anfragen.length === 0 && f.length === 0, anfragen);
+    await k.close();
+  }
+  {
+    // Boss angemeldet, aber ohne Spielplan-Datei und ohne spielplan:geladen (wie wpboss in tests/app.test.mjs): kein Abruf
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
+    const hh = hilfen(s);
+    const anfragen = [];
+    s.on('request', (r) => { if (/spielplan\.json/.test(r.url())) anfragen.push(r.url()); });
+    await s.route('**/js/pakete/fk-ohneplan/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_BOSS_OHNE_PLAN }));
+    await s.goto(`${BASIS}&erw=pakete/fk-ohneplan/index,pakete/funken/index#arena`);
+    await s.waitForSelector('.screen.arena .fk-chip');
+    await hh.starte({ botId: 'benno', farbe: 'w' });
+    await hh.arena();
+    await warte(800);
+    pruefe('Boss ohne Spielplan und ohne spielplan:geladen: funken fragt nicht nach dem Spielplan (kein 404, keine Konsolenfehler)',
+      anfragen.length === 0 && f.length === 0 && await s.evaluate(() => window.__funken.plan() === null), { anfragen, f });
     await k.close();
   }
 
@@ -1099,7 +1220,50 @@ async function testeBrowser(browser) {
     await k.close();
   }
 
-  // ---------- 10. Handy und dunkel ----------
+  // ---------- 10. Kopf nach Platz: Level-Chip im iPad-Hochformat ganz sichtbar, die Form folgt dem Platz ----------
+  gruppe = 'Kopf nach Platz';
+  {
+    const form = (s) => s.evaluate(() => {
+      const c = document.querySelector('.haupt-kopf .fk-chip');
+      const w = c && c.querySelector('.fk-chip-wort');
+      return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none' };
+    });
+    const passt = (m) => m.rolle && m.ganz && m.tipp.w >= 44 && m.tipp.h >= 44 && m.oben === 1 && Math.abs(m.sicht.h - m.sterne.h) <= 1;
+    // frisch geladen im Hochformat des iPad mini (744 x 1133): gleich die schmale Form, ganz sichtbar
+    const { kontext: k1, seite: s1, fehler: f1 } = await neueSeite(browser, { w: 744, h: 1133 });
+    await s1.goto(MIT() + '#arena');
+    await s1.waitForSelector('.screen.arena .fk-chip');
+    await warte(500);
+    const frisch = { ...(await s1.evaluate(kopfChipMass)), ...(await form(s1)) };
+    pruefe('iPad mini hoch (744 px), frisch geladen: Level-Chip schmal und ganz sichtbar, Tippfläche mindestens 44 x 44', passt(frisch) && frisch.schmal, frisch);
+    await s1.screenshot({ path: path.join(BILDER, 'kopf-744.png'), clip: { x: 0, y: 0, width: 744, height: 90 } });
+    pruefe('744 px: keine Konsolenfehler', f1.length === 0, f1.join(' | '));
+    await k1.close();
+    // Groesse aendern: die Form folgt (ResizeObserver), auch zurueck
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
+    await s.goto(MIT() + '#arena');
+    await s.waitForSelector('.screen.arena .fk-chip');
+    await warte(500);
+    const breit = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
+    const mass = {};
+    for (const w of [744, 768, 810, 834]) {
+      await s.setViewportSize({ width: w, height: 1100 });
+      await warte(300);
+      mass[w] = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
+    }
+    await s.setViewportSize({ width: 1180, height: 820 });
+    await warte(300);
+    const zurueck = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
+    pruefe('iPad hoch (744, 768, 810, 834 px): Level-Chip ganz sichtbar, Tippfläche mindestens 44 x 44, eine Oberkante, so hoch wie Sterne',
+      Object.values(mass).every(passt), mass);
+    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 744 px schmal (nur die Zahl), zurück auf 1180 px wieder ganz',
+      passt(breit) && !breit.schmal && breit.wort && mass[744].schmal && !mass[744].wort && passt(zurueck) && !zurueck.schmal && zurueck.wort,
+    { breit, m744: mass[744], zurueck });
+    pruefe('Größenwechsel: keine Konsolenfehler (keine ResizeObserver-Schleife)', f.length === 0, f.join(' | '));
+    await k.close();
+  }
+
+  // ---------- 11. Handy und dunkel ----------
   gruppe = 'Handy und dunkel';
   for (const [name, o] of [['handy', { w: 390, h: 844, handy: true }], ['dunkel', { farbe: 'dark' }], ['handy-dunkel', { w: 390, h: 844, handy: true, farbe: 'dark' }]]) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, o);

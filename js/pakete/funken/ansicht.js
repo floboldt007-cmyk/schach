@@ -6,8 +6,9 @@
 //       div.fk-abr[data-zeile="funken"]; data-aufstieg="n" bei einem Aufstieg, data-fertig="1", sobald das Endbild steht
 //       Zeile "FUNKEN +410" mit Formel, Level-Balken (laeuft vom alten zum neuen Stand, bei Aufstieg ueber den Rand:
 //       der Ring schliesst sich, die Zahl klappt um, Klang "level") und Aufschluesselung auf Antippen.
-//   kopfChip({ st, beiTipp }) -> HTMLElement            Chip .fk-chip[role=button] "Level 12" mit Mini-Balken (arena:kopf),
-//                                                        Tippflaeche >= 44 px ueber ::before
+//   kopfChip({ st, beiTipp }) -> { el, verlasse() }      Chip .fk-chip[role=button] "Level 12" mit Mini-Balken (arena:kopf),
+//                                                        Tippflaeche >= 44 px ueber ::before; reicht der Platz in der
+//                                                        Chip-Reihe nicht (und auf dem Handy), .fk-schmal: nur die Zahl
 //   spielerEmblem({ st }) -> HTMLElement                 kleines Level-Emblem an Flos Namen (partie:spieler-leiste)
 //   verlaufKarte({ st, botName, beiMehr }) -> HTMLElement Karte "Level und Funken" (verlauf:seite)
 //   heuteZeile({ st, wochenende, beiZuenden }) -> HTMLElement | null   Rueckenwind in der Heute-Karte (arena:heute)
@@ -59,7 +60,9 @@ function postenListe(e, botName) {
     p.push([`Züge (${e.of} offen)`, e.z]);
     if (e.th) p.push(['Theorie', e.th]);
     if (e.e) p.push([`${ERGEBNIS_NAME[e.erg] || 'Ergebnis'}${e.hilfe ? ' (halbiert: Hilfe genutzt)' : ''}`, e.e]);
-    else if (e.gr === 'kurz') p.push(['Vor dem 10. eigenen Zug beendet: kein Ergebnis-Bonus', null]);
+    // ohne Ergebnis-Funken sagt die Zeile, warum (auch wenn die Zuege Funken brachten, z. B. ein Schaefermatt)
+    else if (e.gr === 'kurz' || e.erg === 'sieg' || e.erg === 'remis') p.push(['Vor dem 10. eigenen Zug beendet: kein Ergebnis-Bonus', null]);
+    else if (e.erg === 'niederlage') p.push([`Kampfgeist gibt es ab dem ${R.KAMPFGEIST_ZUEGE}. eigenen Zug`, null]);
     if (e.v) p.push(['Verwertung', e.v]);
     for (const t of e.lb || []) p.push([`Lichtblick: ${t}`, R.LICHTBLICK_FUNKEN]);
     if (e.fa !== 1) p.push([`× ${faktorText(e.fa)} ${e.fn || 'Herausforderung'}`, null]);
@@ -244,9 +247,26 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
 // Der Chip steht in einer Reihe mit den Chips Sterne und Pokal (gleiche Hoehe, gleiche Oberkante) und ist trotzdem
 // antippbar: role="button" mit Tastatur (Enter, Leertaste); die Tippflaeche reicht per ::before 3 px ueber und unter den
 // Chip (40 px Chip -> 46 px, auf dem Handy 38 px -> 44 px; --tipp), so viel Rand laesst die Chip-Reihe.
+// Form nach Platz: ganz ("Level 12" mit Mini-Balken), solange die Chip-Reihe ihn ohne Ueberlauf fasst, sonst schmal
+// (.fk-schmal: nur die Zahl im Emblem, SPIELKONZEPT 3.1); auf dem Handy (bis HANDY_BREITE) immer schmal. Gemessen nach
+// dem Einhaengen und bei jeder Groessenaenderung des Kopfs, hoechstens einmal je Bild (wie js/ui/seite.js die Chips
+// misst): so passt er auch im iPad-Hochformat (744 bis 833 px) und wenn spaeter weitere Chips dazukommen.
+const HANDY_BREITE = '(max-width: 600px)';
+function istHandy() {
+  try { return typeof matchMedia === 'function' && matchMedia(HANDY_BREITE).matches; } catch (e) { return false; }
+}
+
+function passeForm(b) {
+  const reihe = b.parentElement;
+  if (!reihe || !b.isConnected) return;
+  b.classList.remove('fk-schmal');
+  if (istHandy() || reihe.scrollWidth > reihe.clientWidth + 1) b.classList.add('fk-schmal');
+}
+
 export function kopfChip({ st, beiTipp } = {}) {
   const fs = L.fortschritt(st.gesamt);
   const b = el('span', 'chip fk-chip dr');
+  if (istHandy()) b.classList.add('fk-schmal');
   b.setAttribute('role', 'button');
   b.tabIndex = 0;
   b.dataset.paket = 'funken';
@@ -263,7 +283,42 @@ export function kopfChip({ st, beiTipp } = {}) {
       beiTipp(e);
     });
   }
-  return b;
+  // Messen erst, wenn der Host den Chip eingehaengt hat (Mikroaufgabe: vor dem ersten Bild, kein Springen); die Form
+  // wechselt im naechsten Bild, nie im Rueckruf des ResizeObserver (sonst meldet der Browser eine Schleife)
+  let aus = false;
+  let rahmen = 0;
+  let ro = null;
+  const spaeter = () => {
+    if (aus || rahmen || typeof requestAnimationFrame !== 'function') return;
+    rahmen = requestAnimationFrame(() => { rahmen = 0; if (!aus) passeForm(b); });
+  };
+  let versuche = 0;
+  const beobachte = () => {
+    if (aus) return;
+    if (!b.isConnected) {
+      // noch nicht im Dokument (Host haengt den Screen spaeter ein): im naechsten Bild noch einmal, hoechstens 10-mal
+      if (versuche++ < 10 && typeof requestAnimationFrame === 'function') requestAnimationFrame(beobachte);
+      return;
+    }
+    passeForm(b);
+    if (typeof ResizeObserver !== 'function') return;
+    ro = new ResizeObserver(spaeter);
+    const kopf = b.closest('.haupt-kopf');
+    if (kopf) ro.observe(kopf);
+    // die rechte Seite des Kopfs aendert ihre Breite auch ohne Fenster (Reiter-Pille zieht ein oder aus)
+    const seite = b.parentElement && b.parentElement.parentElement;
+    if (seite && seite !== kopf) ro.observe(seite);
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(beobachte); else Promise.resolve().then(beobachte);
+  return {
+    el: b,
+    verlasse() {
+      aus = true;
+      if (ro) ro.disconnect();
+      if (rahmen && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(rahmen);
+      rahmen = 0;
+    },
+  };
 }
 
 export function spielerEmblem({ st } = {}) {
@@ -299,6 +354,8 @@ function rueckenwindText(st, wochenende) {
   if (a > 0) return a === 1 ? 'Rückenwind an: Die nächste Einheit zählt doppelt.' : `Rückenwind an: Die nächsten ${a} Einheiten zählen doppelt.`;
   const k = st.rw.karten;
   if (k > 0) return `${k} Rückenwind-${k === 1 ? 'Karte' : 'Karten'} im Fach. Zünden in der Arena: 3 Einheiten zählen doppelt.`;
+  // vor der ersten Karte (Entdeckungs-Fahrplan 3.16: Tag 4) steht noch keine Woche fest
+  if (!st.rw.woche) return 'Die erste Rückenwind-Karte kommt an deinem 4. Tag, danach jeden Montag eine.';
   return 'Montags kommt eine neue Rückenwind-Karte ins Fach.';
 }
 
@@ -325,7 +382,8 @@ function soEntstehen() {
     Lichtblicke bei Remis und Niederlage je 10 (höchstens 2).</p>
     <p>Herausforderung: Brocken × 1,5 · Herausforderung × 1,25 · Augenhöhe × 1 · Sparring × 0,75 · Training × 0,5 · Aufwärmen × 0,25.
     In den ersten 10 gewerteten Partien gilt × 1. Der Faktor steht vor der Partie im Panel.</p>
-    <p>Rückenwind: Jeden Montag kommt eine Karte (höchstens 3 im Fach). Zünden: Die nächsten 3 Einheiten zählen doppelt.
+    <p>Rückenwind: Die erste Karte kommt an deinem 4. Tag, danach jeden Montag eine (höchstens 3 im Fach). Zünden: Die nächsten
+    3 Einheiten zählen doppelt (eine Partie, eine Lektion, eine Übung „Ab hier nochmal“ oder eine Stapel-Sitzung im Training).
     Am Funken-Wochenende zählen Partien und Lernen doppelt, Karten bleiben dann liegen. Nie mehr als × 2.</p>
     <p>Tagesbogen: bis 800 Funken am Tag zählt alles voll, darüber halb (gemessen vor dem Rückenwind), ab 4 Uhr wieder voll.</p>
     <p>Lernen: „Ab hier nochmal“ 15 (getroffen) oder 5, Schlüsselmoment angesehen 5 (höchstens 3 je Partie), Karteikarte 10 oder 4
@@ -410,6 +468,8 @@ export function heuteZeile({ st, wochenende = false, beiZuenden } = {}) {
   z.innerHTML = `<span class="fk-h-symbol" aria-hidden="true">${icon('funke', 'fk-ico')}</span>`;
   if (wochenende) text.textContent = 'Funken-Wochenende: Partien und Lernen zählen doppelt.';
   else if (rw.aktiv > 0) text.textContent = rueckenwindText(st, false);
+  // die erste Karte stellt sich selbst vor (Entdeckungs-Fahrplan 3.16, Tag 4: "Neu fuer dich")
+  else if (rw.neu === 'erste' && rw.karten === 1) text.textContent = 'Neu für dich: eine Rückenwind-Karte. Zünden: Die nächsten 3 Einheiten zählen doppelt.';
   else text.textContent = `${neu}Rückenwind: ${rw.karten} ${rw.karten === 1 ? 'Karte' : 'Karten'} im Fach.`;
   z.append(text);
   if (!wochenende && rw.aktiv < 1 && rw.karten > 0 && typeof beiZuenden === 'function') {
@@ -471,7 +531,20 @@ export function oeffneSpiegel(inhalt, { titel = 'Funken-Spiegel' } = {}) {
   const schleier = ort.querySelector('.sheet-schleier');
   const vorher = document.activeElement;
   let zu = false;
-  const taste = (e) => { if (e.key === 'Escape') { e.preventDefault(); schliesse(); } };
+  // modal wie das Blatt in js/ui/bauteile.js: Escape schliesst, Tab und Umschalt+Tab bleiben im Blatt
+  const fokussierbar = () => [...karte.querySelectorAll('button, [href], summary, input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((x) => !x.disabled && x.getClientRects().length > 0);
+  const taste = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); schliesse(); return; }
+    if (e.key !== 'Tab') return;
+    const liste = fokussierbar();
+    if (!liste.length) { e.preventDefault(); return; }
+    const erstes = liste[0];
+    const letztes = liste[liste.length - 1];
+    const aktiv = document.activeElement;
+    if (!karte.contains(aktiv)) { e.preventDefault(); (e.shiftKey ? letztes : erstes).focus(); return; }
+    if (e.shiftKey && aktiv === erstes) { e.preventDefault(); letztes.focus(); } else if (!e.shiftKey && aktiv === letztes) { e.preventDefault(); erstes.focus(); }
+  };
   function schliesse() {
     if (zu) return;
     zu = true;

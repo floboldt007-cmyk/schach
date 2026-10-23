@@ -41,8 +41,10 @@ const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet',
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
   'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
   // Paket funken (S1-1): { funken, level, delta, aufstieg } einmal je Ereignis mit Buchungen
-  'funken:geaendert'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt, W0+a und funken:geaendert)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+  'funken:geaendert',
+  // Paket boss (S1-6) nach dem Laden von daten/boss/spielplan.json; funken liest den Spielplan erst danach (P1-Nachbesserung)
+  'spielplan:geladen'];
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt, W0+a, funken:geaendert und spielplan:geladen)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();

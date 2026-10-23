@@ -39,6 +39,8 @@ export const EREIGNISSE = Object.freeze([
   'boss:treffer', 'boss:siegel', 'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
   // Paket funken (S1-1): Summe einer Buchung fuer Serie, Liga und andere Pakete, Vertrag in ARCHITEKTUR.md
   'funken:geaendert',
+  // Paket boss (S1-6) meldet, dass daten/boss/spielplan.json geladen ist; erst dann liest funken den Spielplan (kein 404)
+  'spielplan:geladen',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);

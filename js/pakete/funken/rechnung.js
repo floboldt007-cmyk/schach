@@ -88,7 +88,7 @@ export const LAGE_PARTIEN = 20;
 export const TAGESBOGEN = 800;
 export const RUECKENWIND_EINHEITEN = 3;
 export const KARTEN_MAX = 3;
-// Extra-Karten ("Willkommen zurück", "für dich aufgehoben") duerfen eine vierte Karte ins Fach legen
+// Extra-Karten ("Willkommen zurueck", "fuer dich aufgehoben") duerfen eine vierte Karte ins Fach legen
 export const KARTEN_MAX_EXTRA = 4;
 export const BOSS_VERSUCHE = 3;
 
