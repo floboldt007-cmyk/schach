@@ -57,6 +57,9 @@ function pruefe(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${gruppe ? gruppe + ': ' : ''}${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
 }
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+// Lage eines Elements oder null (statt 30 s Warten und Abbruch der ganzen Suite, wenn es fehlt: die Pruefung
+// danach scheitert dann mit Beleg, und die Gruppen danach laufen noch)
+const boxOderNull = (loc) => loc.boundingBox({ timeout: 3000 }).catch(() => null);
 
 // ---------- Hilfen fuer eine Seite ----------
 
@@ -1489,10 +1492,10 @@ async function testePfeile(browser) {
   pruefe('Rechtsklick ziehen malt einen Pfeil (Vorschau waehrend der Geste)', unterwegs.vorschau === 1 && n.pfeile.join() === 'e2e4' && n.vorschau === 0
     && JSON.stringify(n.liste) === '[{"art":"pfeil","von":"e2","nach":"e4"}]', JSON.stringify({ unterwegs, n }));
   pruefe('Pfeil malen loest keinen Zug aus', (await h.fen()) === START && (await h.anzahl('.lage.auswahl')) === 0);
-  const pfeilBox = await seite.locator('svg.brett-nutzer g.pfeil').boundingBox();
+  const pfeilBox = await boxOderNull(seite.locator('svg.brett-nutzer g.pfeil'));
   const e2 = await h.mitte('e2');
   const e4 = await h.mitte('e4');
-  pruefe('Nutzer-Pfeil liegt zwischen e2 und e4, in Pfeilfarbe (--pfeil-nutzer)', pfeilBox.y < e2.y && pfeilBox.y + pfeilBox.height > e4.y - 5 && Math.abs(pfeilBox.x + pfeilBox.width / 2 - e4.x) < 3
+  pruefe('Nutzer-Pfeil liegt zwischen e2 und e4, in Pfeilfarbe (--pfeil-nutzer)', !!pfeilBox && pfeilBox.y < e2.y && pfeilBox.y + pfeilBox.height > e4.y - 5 && Math.abs(pfeilBox.x + pfeilBox.width / 2 - e4.x) < 3
     && (await seite.evaluate(() => {
       const probe = document.createElement('div');
       probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--pfeil-nutzer');
@@ -1553,10 +1556,10 @@ async function testePfeile(browser) {
   // gedrehtes Brett: Pfeil folgt der Ausrichtung
   await seite.evaluate(() => demo.brett.setzeAusrichtung('b'));
   await rechtsZiehen('b8', 'c6');
-  const pb = await seite.locator('svg.brett-nutzer g.pfeil').boundingBox();
+  const pb = await boxOderNull(seite.locator('svg.brett-nutzer g.pfeil'));
   const c6 = await h.mitte('c6');
   const b8 = await h.mitte('b8');
-  pruefe('Gedreht: Nutzer-Pfeil b8-c6 liegt im Rechteck der beiden Felder', pb.y >= c6.b.y - 1 && pb.y + pb.height <= b8.b.y + b8.b.height + 1
+  pruefe('Gedreht: Nutzer-Pfeil b8-c6 liegt im Rechteck der beiden Felder', !!pb && pb.y >= c6.b.y - 1 && pb.y + pb.height <= b8.b.y + b8.b.height + 1
     && pb.x >= c6.b.x - 1 && pb.x + pb.width <= b8.b.x + b8.b.width + 1 && pb.height > b8.b.height, JSON.stringify({ pb, c6: c6.b, b8: b8.b }));
   await rechtsKlick('a1');
   pruefe('Gedreht: Marke sitzt auf a1 (oben rechts)', await seite.evaluate(() => {
@@ -1791,10 +1794,10 @@ async function testePfeile(browser) {
   await warte(520);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
-  const pbF = await s.locator('svg.brett-nutzer g.pfeil').boundingBox();
+  const pbF = await boxOderNull(s.locator('svg.brett-nutzer g.pfeil'));
   const e4f = await ht.mitte('e4');
   const e2f = await ht.mitte('e2');
-  pruefe('Finger, gedreht: Pfeil e2-e4 (e2 oben) liegt zwischen den Feldern', (await nutzer(s)).pfeile.join() === 'e2e4' && e2f.y < e4f.y && pbF.y >= e2f.b.y - 1
+  pruefe('Finger, gedreht: Pfeil e2-e4 (e2 oben) liegt zwischen den Feldern', (await nutzer(s)).pfeile.join() === 'e2e4' && e2f.y < e4f.y && !!pbF && pbF.y >= e2f.b.y - 1
     && pbF.y + pbF.height <= e4f.b.y + e4f.b.height + 1 && pbF.height > e4f.b.height && Math.abs(pbF.x + pbF.width / 2 - e4f.x) < 3, JSON.stringify({ pbF, e2: e2f.b, e4: e4f.b }));
   await s.evaluate(() => { demo.brett.setzeAusrichtung('w'); demo.brett.loescheNutzerPfeile(); });
   // Finger-Zeichnung: sobald gemalt wird, gehen Bewegen und Loslassen nicht mehr an die Umgebung (Wischen der Analyse)
@@ -1998,14 +2001,13 @@ const t0 = Date.now();
 try {
   await warteAufServer(URL_DEMO);
   browser = await browserTyp(ladePlaywright()).launch();
-  await testeDesktop(browser);
-  await testeTouch(browser);
-  await testeHandy(browser);
-  await testeFundament(browser);
-  await testeOptik(browser);
-  await testeKomfort(browser);
-  await testePfeile(browser);
-  await testeGalerie(browser);
+  // Jede Gruppe laeuft, auch wenn eine fruehere mit einer Ausnahme abbricht (die Ausnahme zaehlt als Fehler)
+  for (const teil of [testeDesktop, testeTouch, testeHandy, testeFundament, testeOptik, testeKomfort, testePfeile, testeGalerie]) {
+    try { await teil(browser); } catch (e) {
+      gruppe = teil.name;
+      pruefe('lief ohne Ausnahme', false, String(e && e.message || e).split('\n')[0]);
+    }
+  }
   const fehlend = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - fehlend.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of fehlend) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));
