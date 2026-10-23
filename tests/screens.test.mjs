@@ -410,6 +410,30 @@ async function testePruefrunde(browser, d) {
   pruefe('Niederlage gegen Benno (nicht der nächste Gegner): "Nächster Gegner" primär',
     knoepfeB.some((k) => k.a === 'weiter' && k.primaer && /Nächster Gegner/.test(k.text)) && knoepfeB.some((k) => k.a === 'nochmal' && !k.primaer), JSON.stringify(knoepfeB));
 
+  // Zu kurze Partie (Aufgabe nach zwei eigenen Zuegen, gespeichert mit 100 % und Spielstaerke): die Analyse zeigt
+  // weder Genauigkeit noch "spielte wie", sondern einen Hinweis (Vorschlag Nr. 1 in VORSCHLAEGE-CODEX.md)
+  const kurzId = await seite.evaluate((id) => {
+    const p0 = testseite.speicher.ladePartie(id);
+    const r = testseite.speicher.ladeReview(id);
+    const n = 4;
+    return testseite.speichere({ ...p0, id: undefined, botId: 'benno', zuege: p0.zuege.slice(0, n), san: (p0.san || []).slice(0, n),
+      ergebnis: 'niederlage', grund: 'aufgabe', genauigkeit: 100, spielstaerke: 500,
+      datum: new Date(Date.now() - 864e5 * 10).toISOString() },
+    { ...r, zuege: r.zuege.slice(0, n), kurve: null, schluesselmomente: [],
+      genauigkeit: { w: 100, b: 100 }, spielstaerke: { w: 500, b: 500 } }).partie.id;
+  }, d.oper);
+  await oeffne(seite, `screen=analyse&partieId=${kurzId}`);
+  await seite.waitForSelector('.an-genau', { timeout: 10000 });
+  await bild(seite, 'analyse-kurz');
+  const kurz =await seite.evaluate(() => ({
+    zahlen: document.querySelectorAll('.an-g-wert.zahl').length,
+    kurz: document.querySelectorAll('.an-g-wert.an-g-kurz').length,
+    text: document.querySelector('.an-genau').innerText,
+  }));
+  pruefe('Kurze Partie: keine Genauigkeit, zweimal "zu kurz"', kurz.zahlen === 0 && kurz.kurz === 2, JSON.stringify(kurz));
+  pruefe('Kurze Partie: Hinweis statt Bewertung', kurz.text.includes('Zu wenige Züge für eine verlässliche Bewertung'), kurz.text);
+  pruefe('Kurze Partie: kein "spielte wie" und keine 100 %', !/spielte wie/.test(kurz.text) && !/100/.test(kurz.text), kurz.text);
+
   // Bewertung in der Coach-Karte aus Sicht der Seite, die gezogen hat (wie im Coach-Satz)
   const fall = await seite.evaluate((id) => {
     const r = testseite.speicher.ladeReview(id);
