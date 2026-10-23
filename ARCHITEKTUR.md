@@ -646,7 +646,7 @@ buehne = {
   effekte,                                         // .brett-effekte (gleiche Lage wie die Felder)
   rahmen,                                          // .brett-rahmen
   brett,                                           // Brett-Instanz: nur lesen und Effekte, nie Zuege setzen
-  reduziert,                                       // prefers-reduced-motion
+  reduziert,                                       // prefers-reduced-motion oder Einstellung "Bewegung: aus" (U7)
   feld(feld) -> { x, y } | null,                   // 0..7 in der aktuellen Brett-Ausrichtung (wie --x/--y)
   liveAn() -> boolean,
   phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
@@ -684,6 +684,14 @@ Chip „Übung“. Die Statistik im Verlauf zaehlt nur wertende Partien; der Kop
 extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne Statistik-Kacheln).
 
 ## Ergebnis-Overlay (partie.js)
+U7 (Look A, PLAN 2.6, css/ergebnis.css): Schleier `--schleier` ohne Weichzeichner, der Screen dahinter tritt zurueck
+(`.partie.mit-ergebnis`: `.kopf` und `.inhalt` mit `scale(.975)`, „Brett ansehen“ nimmt das zurueck), die Karte federt
+auf. Kopfwort „Sieg“ mit goldenem Ausrufezeichen (`.erg-wort .ausruf`), „Partie verloren“ (ruhig, kleiner), „Remis“
+(gold-neutral). Sterne als Symbole (`.e-stern svg`), sie schlagen nacheinander ein, der Klang sitzt auf der Landung. Kein
+Konfetti. Niederlage: zuerst die **Lichtblick-Karte** `.erg-lichtblick` in `.erg-mitte` (Flos bester Zug aus den
+Live-Klassen, „Zug 14 Sf5: Präzise“, Theorie nur, wenn sonst nichts dabei war), nur wenn `ergebnis:karte` leer bleibt
+(wie `.erg-tipp`). Bot-Spruch als Karte (`.erg-bot` mit `.av` und `.sprechblase`, bei Sprueche „aus“ versteckt). Knoepfe
+„Zur Analyse“ (Zinnober) und „Nächster Gegner“/„Nochmal“, auf dem Handy untereinander, der Hauptknopf zuerst.
 `.ergebnis-karte` = Kopfwort (bei nicht wertenden Partien `.erg-kopf` mit Chip), Unterzeile, `.erg-mitte`
 (Sterne bzw. Genauigkeit und Tipp), `.erg-feier`, `.erg-karte-ort` (Ort `ergebnis:karte`), `.erg-bot`,
 `.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
@@ -1040,6 +1048,58 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 - **Ergebnis**: Kontext von `ergebnis:karte` zusaetzlich `boss`.
 - **Arena**: Die Karte „Offene Partie“ und der Dialog „Neue Partie starten?“ finden auch angemeldete Bots (`botNachId`),
   eine verlassene Boss-Partie laesst sich also wie jede andere fortsetzen (solange ihr Paket geladen ist).
+
+- **Premium-Umbau U7 (Look A, PLAN 2.4 bis 2.6, 3.7, 4):**
+  - **Spielerkarte** `.spieler` fuer beide Lagen (statt `.botbox` und `.botleiste-hoch`): Gegner `.spieler.gegner` mit den
+    alten Klassen als Zusatzklassen (`.botbox`, `.botleiste-hoch`, `.botkarte`), erstes Kind `.ort-gegner-leiste`, dann `.av`
+    (Portraet ueber `thema.avatarVon`), `.info` (`.bot-name`, Unterzeile `.bot-meta` mit Elo, `.denkt-ort`, `.geschlagen-ort`),
+    `.uhr[data-wer="bot"]` und `.blase-ort` (quer eine Zeile in der Karte, hoch haengt die Blase unter der Karte ueber dem
+    Brett). Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
+    `.name`, direkt danach `.ort-spieler-leiste`, Unterzeile, `.uhr[data-wer="flo"]`. Der Name wird nie mit „…“ gekuerzt:
+    passt er nicht in zwei Zeilen, steht der Rufname da (Benno, Hilde, Kalle, Lisa, Rudi, Prof. Turm, Delia, Kommissar,
+    Greta, Stockfisch), der volle Name im `aria-label` der Karte. `lage()` meldet weiter `'hoch'`/`'quer'`.
+  - **Uhr** (Anzeige, W0+b bringt die Logik): `export fmtUhr(ms)` („M:SS“ ab 20 s, darunter „0:SS,z“). Beide `.uhr` sind
+    versteckt ohne Bedenkzeit (`z.tempo`), mit Bedenkzeit steht die Grundzeit da. `uhr.setze(wer, ms, { laeuft })` (intern,
+    im Test `window.__partie.uhr`): laufend in Tinte, unter 20 s `.warn` rot mit Uhr-Symbol und Sekundenpuls;
+    `uhr.zeige(an)`. Auf dem Handy 66 x 36 px, 17 px Ziffern.
+  - **Kopf** `.p-kopf`: Zurueck, Bot-Name (Handy: Rufname), Unterzeile `.p-eroeffnung` · Stufe · Farbe, Brettwahl
+    (`.brettwahl`, 3 Mini-Felder, ab 861 px), Klang-Schalter (`[data-aktion="klang"]`, `aria-pressed`), `.p-zaehlwerk`
+    (Buehne), Zahnrad. Alle Knoepfe sind direkte Kinder von `.kopf`.
+  - **Lagen** (css/partie.css): quer Brett und Balken links, rechts eine Spalte (Gegner, Coach, Zugliste, Flo, Aktionen);
+    iPad hoch eine Spalte per `order` (Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen); **Handy** (hoch bis 600 px):
+    `layout()` rechnet „Brett zuerst“ (PLAN 2.5): `g = floor((Breite - 2 x 10 - Sockel) / 8) x 8`, gemessen an `.inhalt`,
+    setzt `--brett` und `--spalte`; reicht die Hoehe nicht (4 px Puffer), wird zuerst der Coach einzeilig (`.coach-eng`,
+    Rest auf Antippen), erst dann das Brett kleiner (nie unter 280 px). Unter 760 px Hoehe steht der Zugstreifen nach den
+    Knoepfen (`.streifen-unten`, die Spalte scrollt). Der Balken liegt dort waagrecht ueber dem Brett (6 px, `--anteil` per
+    `scaleX`, gedreht von rechts), die Zahl kommt nur auf Antippen (`.zeigt-zahl`). `layout()` laeuft beim Start, bei jeder
+    Groessenaenderung (ResizeObserver) und bei `koordLage`.
+  - **Coach-Karte** `.coach.coach-karte` (gemeinsames Bauteil in css/bauteile.css): `.c-symbol`, `.c-kopf` (`.c-klasse`,
+    `.c-zug`, `.c-eval`, `.combo` oben rechts), `.c-text`, `.c-zusatz`, `.coach-knoepfe`. Genial: Klassenwort als Pille,
+    Karte mit Ring, COMBO in der Klassenfarbe. Stil „knapp“: `.c-satz` + `.c-rest` (versteckt bis Antippen, `.offen`);
+    `.hat-rest` heisst „Antippen zeigt mehr“ (knapp, Handy). `.kompakt` wie bisher.
+  - **Komfort** (Einstellungen, alle sofort ueber `schach:einstellungen`): `zugBestaetigen` -> `brett.setzeBestaetigen` nur
+    waehrend Flo am Zug ist (`ohneUhr`: ohne Bedenkzeit, `immer`, `aus`; nie fuer Vorzuege), `haltenAufgeben` -> Aufgeben ist
+    `bauteile.halteKnopf` (1 s halten, Ring, frueh loslassen: Hinweis; Tastatur und Bedienhilfen, also ein Klick ohne Zeiger,
+    bekommen die Rueckfrage `app.frage` wie bei „aus“, nicht das Blatt des Bauteils), `turmRochade` ->
+    `zielKarte(chess, { turmRochade })` und `brett.setzeTurmRochade`, `autoDame`, `steuerung`, `pfeile`, `koordinaten`,
+    `koordLage` -> Setter des Bretts, `bewegung` -> Gleitdauer (`brett.setzeDauer(300)`, mal `tempo()`), `coachStil`,
+    `sprueche` (`aus`: keine Blase, `buehne.blase()` liefert `false`, auch kein Spruch im Ergebnis; `wenig`: Begruessung,
+    Ende und hoechstens ein Satz je 5 eigene Zuege), `brett` (Brettwahl), `klang` (Kopf-Schalter). Flos eigene Pfeile und
+    Marken loescht die Partie mit seinem naechsten Zug (`loescheNutzerPfeile`), ueber Bot-Zuege bleiben sie stehen.
+  - **Klang-Takt** (PLAN 3.7): `spieleKlang(m, landungMs)`: der Zugklang sitzt auf der Landung (`klang.zug({ wann })`,
+    `landung` aus `beiZug(von, nach, umwandlung, { art, landung })` bzw. `brett.gleitDauer()` fuer Bot und Vorzug), gemerkt in
+    `z.landung[ply]`. Der Bewertungsklang kommt 150 ms nach der Landung (oder mit dem Abzeichen, wenn die Bewertung
+    spaeter fertig ist) und nur einer je Moment: nach Schach oder Umwandlung bleibt Praezise/COMBO still. Protokoll (Test):
+    `{ typ: 'klang', name, ply, wann }`, `{ typ: 'bewertungsklang', ply, klasse, name, ms, still }`. Sterne im Ergebnis
+    klingen auf ihrer Landung, Abstaende mal `taktFaktor()` (nie unter 0,6).
+  - **Grosser Moment** nur bei Genial (`effekt(feld, 'brillant')` in `.brett-effekte`): Feld-Puls (`.feld-puls`), Ring
+    (`.welle`), 8 Funken (`.funken i`, 0,6 bis 0,9 Feldbreiten), Lichtstreif (`.streif-huelle > .streif`), das Brett hebt
+    sich 1,2 % (`.brett-rahmen.prisma`). Effekte stehen in fertigen Prozenten (left/top) und behalten `--x`/`--y`. Grobe
+    Fehler bleiben ruhig. `buehne.reduziert` = Systemwunsch oder Einstellung „Bewegung: aus“ (dann keine Effekte).
+  - **Duell-Vertrag (U5):** Steht beim Start `html[data-duell="laeuft"]`, zieht der Bot (und spaeter die Uhr, W0+b) erst
+    nach dem DOM-Ereignis `duell:fertig` auf `document`, hoechstens 1,4 s (`DUELL_MAX_MS`). Ohne Duell sofort. Die Ziele des
+    Portraetflugs sind `.spieler.gegner .av` und `.spieler.ich .av`. Im Test: `window.__partie.duellBereit`, Protokoll
+    `{ typ: 'duell', grund: 'ereignis' | 'zeit' | 'verlassen' }`.
 
 ## Bots (js/bots.js)
 ```js

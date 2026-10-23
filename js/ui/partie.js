@@ -722,11 +722,13 @@ export function zeige(root, params, app) {
     if (!m) return esc(t);
     return `<span class="c-satz">${esc(m[1])}</span><span class="c-rest">${esc(m[2] + m[3])}</span>`;
   }
-  // U7: hat der Coach etwas, das erst ein Antippen zeigt (Stil knapp, Handy: Text bei Platznot und die Knoepfe)?
+  // U7: hat der Coach etwas, das erst ein Antippen zeigt (Stil knapp; hoch, also iPad hoch und Handy: der Coach hat eine
+  // feste Hoehe, Text bei Platznot und die Knoepfe kommen auf Antippen)?
   function pruefeCoachRest() {
     const knapp = !!coachEl.querySelector('.c-rest');
     coachEl.classList.toggle('knapp', knapp);
-    const handyRest = s.classList.contains('handy') && !!coachEl.querySelector('.c-text, .coach-knoepfe');
+    const hoch = !!(window.matchMedia && window.matchMedia('(orientation: portrait)').matches);
+    const handyRest = hoch && !!coachEl.querySelector('.c-text, .coach-knoepfe');
     coachEl.classList.toggle('hat-rest', knapp || handyRest);
     if (!knapp && !handyRest) coachEl.classList.remove('offen');
   }
@@ -1724,8 +1726,8 @@ export function zeige(root, params, app) {
   }
 
   // U7: Lichtblick (Ergebnis Niederlage): Flos bester Zug der Partie aus den Live-Klassen, bei Gleichstand der spaetere;
-  // "Zug 14 Sf5: Präzise". Ohne bewerteten guten Zug null (dann keine Karte).
-  const LICHTBLICK_RANG = ['brillant', 'stark', 'bester', 'exzellent', 'gut'];
+  // "Zug 14 Sf5: Präzise" (Theorie nur, wenn sonst nichts Gutes dabei war). Ohne so einen Zug null (dann keine Karte).
+  const LICHTBLICK_RANG = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch'];
   function lichtblick() {
     let best = -1;
     let rang = LICHTBLICK_RANG.length;
