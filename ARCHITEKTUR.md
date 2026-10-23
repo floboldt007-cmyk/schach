@@ -470,6 +470,8 @@ export function zuruecksetzen()                  // nur Tests
 | `arena:panel-oben` | DOM | `arena.js` `zeigeDetail()`, oben in `.detail` | `{ app, bot, fortschritt }` | W0 Nachlese 5 · 1D Willkommen 10 · 1D Heute-Karte 20 · 2D Sicherungs-Tipp 90 |
 | `arena:panel-bot` | DOM | `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | 2A Bilanz 10 · 2B Geheimnis und Erzfeind 20 |
 | `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
+| `arena:karte-boss` | DOM | `arena.js` (U5), `.ort-karte-boss` am Zelt des Wochen-Boss auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | S1-6 Boss |
+| `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
 | `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
 | `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
@@ -486,8 +488,9 @@ diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete bin
 |---|---|---|---|
 | `arena:kopf` | `.kopf-chips` selbst | nach den Chips Sterne und Pokal | einmal beim Aufbau |
 | `arena:panel-oben` | `.detail > .ort-panel-oben` | erstes Kind des Panels (vor „Offene Partie“), zuerst die Nachlese | bei jedem `zeigeDetail()` (Botwahl) |
-| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (im Handy-Hochformat nur mit „Mehr“ sichtbar wie die Ziele) | bei jedem `zeigeDetail()` |
+| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (seit U5 in jeder Lage sichtbar, das Panel scrollt) | bei jedem `zeigeDetail()` |
 | `arena:start` | keiner (Aufruf) | nach dem ersten `layout()` und der Freischalt-Animation | einmal; `verlasse()` beim Screen-Wechsel |
+| `arena:karte-boss`, `arena:karte-event` | `.welt > .ort-karte-boss` bzw. `.ort-karte-event` (absolut, Mitte am Platz) | auf der Karte (Zelt bzw. Burgturm), ohne Anbieter `hidden` | einmal beim Aufbau |
 | `partie:begruessung?` | Wahl | `partie.js` vor der Begruessungs-Blase; ebenso die Sprechblase im Arena-Panel (`farbe` dort `null` bei Zufall, `modus` `'normal'`) | Start einer Partie bzw. Botwahl |
 | `ergebnis:karte` | `.erg-karte-ort` | zwischen `.erg-feier` und `.erg-bot` | bei jedem `fuelle()` des Overlays |
 | `analyse:coach` | `.an-c-knoepfe > .an-c-paket` | Knopfzeile der Coach-Karte nach „Variante zeigen“; ohne Hauptvariante bekommt die Karte eine eigene Zeile (nur wenn gefuellt) | bei jedem Zug (`zeigeCoach()`), nur fuer Zuege, nicht fuer die Startstellung |
@@ -1591,3 +1594,79 @@ Platzhaltern in eckigen Klammern.
 abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
 in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
 (`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
+# Premium-Umbau U5: Arena als Weltkarte, Duell-Intro, Portraets
+
+Flo 18.10. („Variante 1“): die Arena ist die bunte Weltkarte aus Entwurf C, alles Bedienbare im Look A.
+
+**Arena** (`js/ui/arena.js`, `css/arena.css`): `section.screen.arena` > Hauptseiten-Kopf + `.inhalt` > `.karte`
+(Scroll-Behaelter, Kontext `karte` von `arena:start`) > `.welt` (SVG `svg.welt-svg` aus `weltSvg()`: Himmel, Berge,
+Huegelbaender, Baeume, Haeuser, Zelt, Burgturm, Pfad als Bezier `pfadD()` durch die Stationen, Fortschritt
+`.w-fortschritt` in `--akzent` bis zum naechsten Gegner) + je Bot `button.stufe.knoten[data-bot]` (Zustand `besiegt` |
+`aktuell` | `gesperrt`, Endgegner `.boss`; darin `.avatar img`, `.k-nr`, `.schloss`, `.k-sterne .stern`, `.k-schild` mit
+`.k-name`/`.k-meta`, `.fahne`, `.boss-krone`) + `.flo-figur` (Flos Koenig, `thema.floAvatar`) + die Orte
+`arena:karte-boss`/`arena:karte-event`; daneben `aside.detail`. Die Lagen stehen in `LAGEN.quer`/`LAGEN.hoch` als Anteile
+(0..1); `layout()` rechnet in Pixel der Karte und zeichnet die Welt je Groesse neu:
+- **quer** (`.karte-quer`, Querformat mit mindestens 420 px Kartenhoehe): Karte links, passt ganz (`scrollTop` 0,
+  Endgegner oben), Panel rechts mit eigenem Scrollen.
+- **hoch** (`.karte-hoch`, iPad hoch, Handy, Handy quer): Karte senkrecht scrollbar (Handy 2,3 x, iPad 1,45 x so hoch
+  wie breit, schmale Karten mindestens `WELT_MIN_H` = 820 px), startet beim gewaehlten Gegner (samt Schild und Fahne im
+  Bild, auch nach einer Hoehenaenderung); senkrechte Abbildung `Y(f) = y0 + f * hy` mit Rand fuer Krone und Fahne des
+  Endgegners oben und das Schild der ersten Station unten. Hochformat: Panel darunter (iPad zweispaltig), die Seite
+  (`.inhalt`) scrollt, der Spielen-Knopf klebt (`.cta-platz`, `position: sticky`) unten ueber der Reiter-Pille.
+  **Kurzes Querformat** (`@media (orientation: landscape) and (max-height: 559px)`, Handy quer): Karte links, Panel rechts
+  mit eigenem Scrollen, der Knopf klebt unten im Panel (sonst laege er unter dem Bildrand).
+- Farben der Karte: eigene Palette `--welt-*` in `css/arena.css` (hell Sommertag, dunkel Abendstimmung); alles andere
+  nur Tokens.
+- Momente: Eintritt (Karte gleitet, Portraets fallen im 48-ms-Takt, Fortschritt zeichnet sich), Botwahl (Portraet
+  federt, Panel wechselt gestaffelt), Freischalten (`params.neuFreigeschaltet`: `.wird-frei` genau 2,7 s; Sterne der
+  bezwungenen Station fallen ein, Stern-Klang, Karte scrollt zur neuen Station, Weg waechst, Flo zieht weiter, Schloss
+  springt ab, Fahne erscheint). Bewegung aus (`reduziert()`): alles sofort.
+- **Panel** (PLAN 2.2): `.ort-panel-oben`, `section.heute-karte`, ggf. `.fortsetzen`, Kopf (Portraet 84, `.detail-ueber`
+  „Stufe n · Nächster Gegner“ in `--akzent-text`, `h2`, `.elo`, `.mini-sterne`), `.sprechblase` (Spruch-Karte),
+  `.merkmale` (3 x `.merkmal`), `.ziel-sterne` (3 x `div`, erreicht `.an`), `.ort-panel-bot`, Farbe als
+  `bauteile.segment` mit `.farbwahl [data-farbe="w|zufall|b"][aria-checked]`, `.ort-tempo` (leer, `hidden`, fuer W0+b),
+  `.cta-platz [data-aktion="spielen"]` („Spielen gegen Kalle“, besiegt „Revanche gegen …“, Text aus dem Export
+  `spielenText(bot, besiegt)`; der Rufname steht in `.sp-name` und bleibt zusammen, wird es eng, bricht der Text auf zwei
+  Zeilen um, nie abgeschnitten), `.bilanz`. Sterne und Pokal als SVG (`icons.js` `stern`), nie „★“. Farbwahl: die
+  Figuren stehen auf einem hellen Feld (`.fig-bg`, `--feld-hell`). Steckbrief und „Offene Partie“ ragen nie aus ihrer
+  Kachel (Container-Abfrage, Umbruch).
+- Die Arena laedt den Partie-Screen vorab (`import('./partie.js')` beim Vorwaermen und beim Tipp auf Spielen), damit er
+  sich waehrend des Duell-Intros schnell unter der Buehne aufbaut.
+
+**Portraets** (`assets/avatare/modern/<bot.id>.svg`, viewBox 0 0 120 120): aus `AV.svg(id)` in Entwurf A erzeugt (eigene
+Werke fuer dieses Projekt, GPL-3.0 wie die Pixel-Avatare, die als Rueckfall bleiben). `THEMEN.modern.portraets` nennt
+die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`, sonst `bot.avatar`.
+
+**Duell-Intro** (`js/ui/duell.js`, `css/duell.css`, PLAN 2.3):
+- `duellArt({ einstellung, anlass, reduziert })` -> `'voll' | 'kurz' | 'aus'`: `aus` bei Einstellung `duellIntro: 'aus'`
+  oder reduzierter Bewegung (nur Start-Klang); `voll` bei `immer` oder bei `besondere` mit Anlass `boss` | `liga` |
+  `erste` (erste Partie gegen diesen Bot); sonst `kurz` (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von
+  seiner Figur auf der Karte, beide beim Start gemessen, weil die Arena beim Flug schon weg ist).
+- `spieleDuell({ bot, farbe, anlass, von, art?, einstellung? })` -> `{ bereit, fertig, ueberspringe(), art }`.
+  Ueberlagerung `div.duell` an `document.body`: Bot-Haelfte in Bot-Farbe waechst aus der Detail-Karte (`von`), Flos
+  Haelfte (Schiefer, sein Koenig) mit schraeger Naht (Hochformat waagrecht), „gegen“ schlaegt ein, genau dann
+  `klang.spiele('start')`. **Zeitplan** (Exporte `WECHSEL_BEI`, `HALTE_BIS`, `FLUG`, `FLUG_MIN`): `bereit` erfuellt sich,
+  sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig, fruehestens 0,47 s, spaetestens 0,82 s; Kurzfassung
+  sofort), dann ruft `arena.js` `app.gehe('partie', …)` und die Partie baut sich unter der Buehne auf. Auf `app:screen` mit `name: 'partie'` fliegen die Portraets
+  (`.duell-flieger`), fruehestens am Ende der Haltephase (0,82 s), 440 ms lang auf `.screen.partie .spieler.gegner .av`
+  und `.screen.partie .spieler.ich .av` (die Ziele sind waehrenddessen `visibility: hidden`); fehlen sie, blendet die
+  Ueberlagerung nur aus. Kommt die Partie so spaet, dass kein Flug von mindestens `FLUG_MIN` (180 ms) mehr passt, fliegt
+  nichts. Hoechstens 1,4 s (`DAUER_MAX`); blockiert der Aufbau der Partie den Hauptfaden laenger, ist die Ueberlagerung
+  trotzdem zur Grenze ausgeblendet (Compositor), `fertig` kommt dann mit dem Ende des Blocks. Tempo: die Vollfassung
+  laeuft hoechstens im normalen Tempo (Bewegung „langsam“ dehnt sie nicht), „schnell“ verkuerzt sie.
+  **Tippen ueberspringt** in jeder Phase (Horcher `pointerdown` am `document`, capture): solange nur die Arena unter der
+  Buehne liegt, faengt die Buehne den Tipp ab; sobald die Partie da ist (`.duell.durch`) und in der Kurzfassung liegt die
+  Ueberlagerung mit `pointer-events: none` darueber, der Tipp beendet das Intro und kommt zusaetzlich bei der Partie an.
+- **Vertrag mit der Partie:** solange das Intro laeuft, steht `document.documentElement.dataset.duell = 'laeuft'`; beim
+  Ende (auch beim Ueberspringen) wird es entfernt und `document.dispatchEvent(new CustomEvent('duell:fertig', { detail:
+  { art, uebersprungen, bot } }))` gesendet. `aktivesDuell()` -> `{ fertig } | null`. Bei `aus` laeuft nichts (kein
+  Attribut, kein Ereignis). Die Partie startet Uhr und Bot-Zug erst nach `fertig` (U7).
+- Testmodus (`?test`): `window.__duellProtokoll` (je Lauf `{ art, anlass, bot, uebersprungen, ziele, dauer, wechsel,
+  partieAb, flugAb, flug }`, Zeiten in ms ab dem Start).
+
+**Tests:** `node tests/arena.test.mjs` (Suite `arena` in `tests/alle.mjs`): Node (Duell-Regeln, Portraet-Dateien, Orte,
+CSS-Regeln, Cache) und Browser (Karte quer/hoch/Handy hell und dunkel, Zustaende, Panel, Orte mit Test-Paket, Lage und
+Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle zehn Bots in beiden Fassungen und allen
+Ziel-Lagen, Freischalten mit und ohne Bewegung, Duell `immer`/`besondere`/`aus`/ohne Bewegung, Ueberspringen, Tipp zur
+Partie, Portraetflug auf eingesetzte Ziele, Zeitplan mit Schein-Partie bei normal/langsam/schnell und spaeter Partie,
+harte Grenze).
