@@ -322,7 +322,9 @@ async function nodeTeil() {
   for (const s of ['benno', 'hilde', 'kalle']) { f.bots[s].sterne = [true, true, true]; localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); planeMeldung(); await warte(5); }
   await warte(BUENDEL_MS / 2);
   const mitte = aufrufe.filter((x) => x.name === 'schule_melde_fortschritt').length;
-  await warte(BUENDEL_MS / 2 + 600);
+  // grosszuegig warten (Rechner unter Last); vor Ablauf von MELDE_ABSTAND_MS kaeme ohnehin keine zweite Meldung
+  for (let i = 0; i < 100 && aufrufe.filter((x) => x.name === 'schule_melde_fortschritt').length === vor; i++) await warte(100);
+  await warte(300);
   const danach = aufrufe.filter((x) => x.name === 'schule_melde_fortschritt');
   pruefe(`gebuendelt: drei Partien kurz hintereinander, eine Meldung nach ${BUENDEL_MS / 1000} s mit dem letzten Stand`, mitte === vor && danach.length === vor + 1
     && danach.at(-1).daten.sterne === JSON.parse(JSON.stringify(fortschrittJetzt({ stand: meineKlassenGespeichert() }))).sterne, { vor, mitte, danach: danach.length });
@@ -802,7 +804,7 @@ async function browserTeil(browser) {
       && m.aufgaben.some((t) => t.includes('2 Rätsel lösen · 0 von 2')) && m.status === 'Willkommen in „Q1 Schach-AG“.' && m.code === '', m);
     pruefe('Server: Code normalisiert, Name sauber', srv.mitglieder.length === 1 && srv.mitglieder[0].anzeigename === 'Anna' && srv.mitglieder[0].uid === UID_A);
     await seite.waitForFunction(() => true);
-    for (let i = 0; i < 40 && !srv.meldungen.length; i++) await warte(100);
+    for (let i = 0; i < 100 && !srv.meldungen.length; i++) await warte(100);
     const mel = srv.meldungen[0];
     pruefe('gleich nach dem Beitritt: Fortschritt gemeldet (genau die Felder der SQL-Funktion)', mel && JSON.stringify(Object.keys(mel.d)) === JSON.stringify(SQL_PARAMS.schule_melde_fortschritt)
       && mel.d.bots_besiegt === 0 && mel.d.partien === 0 && Array.isArray(mel.d.erledigt), mel && mel.d);
@@ -889,13 +891,16 @@ async function browserTeil(browser) {
         eigeneZuege: 20, liveKlassen: [], maxSerie: 3, hinweise: 0, zuruecknahmen: 0, neueSterne: [], neuFreigeschaltet: null, extra: {}, datum: new Date().toISOString(), dauerMs: 1000 });
     });
     await beendet();
-    await warte(BUENDEL_MS + 1500);
+    // der Versuch kommt fruehestens nach BUENDEL_MS (unter Last spaeter): auf ihn warten, dann noch kurz
+    for (let i = 0; i < 150 && !srv.aufrufe.some((a) => a.name === 'schule_melde_fortschritt'); i++) await warte(100);
+    await warte(300);
     const off = await seite.evaluate((k) => ({ offen: !!localStorage.getItem(k), toast: [...document.querySelectorAll('.toast')].map((t) => t.textContent) }), OFFEN_SCHLUESSEL);
     pruefe('offline nach der Partie: Meldung vorgemerkt, still (kein Hinweis)', off.offen && off.toast.length === 0 && srv.meldungen.length === 0
       && srv.aufrufe.some((a) => a.name === 'schule_melde_fortschritt'), off);
     srv.offline = false;
     await seite.evaluate(async () => { const { sende } = await import('./js/ereignisse.js'); sende('app:sichtbar', { sichtbar: true }); });
-    for (let i = 0; i < 40 && !srv.meldungen.length; i++) await warte(100);
+    for (let i = 0; i < 100 && !srv.meldungen.length; i++) await warte(100);
+    await warte(200);
     const nachher = await seite.evaluate((k) => !!localStorage.getItem(k), OFFEN_SCHLUESSEL);
     pruefe('zurueck in der App (wieder online): Meldung geht raus, nichts mehr vorgemerkt', srv.meldungen.length === 1 && !nachher
       && srv.meldungen[0].d.bots_besiegt === 4 && srv.meldungen[0].d.sterne === 4 && srv.meldungen[0].uid === UID_A, srv.meldungen.map((x) => x.d));
@@ -928,6 +933,15 @@ async function browserTeil(browser) {
     pruefe(`${name}: Seite ohne waagrechtes Scrollen, Knoepfe und Felder im Bild, die Tabelle scrollt in ihrer Huelle`, l.ueber <= 1 && l.raus === 0
       && l.huelle && l.huelle.rechts <= l.vw + 1, l);
     await bild(seite, `lehrkraft-klasse-${name}`);
+    if (name === 'handy-dunkel') {
+      // Neu laden ohne Netz: Satz an der Karte, die Klasse bleibt
+      srv.offline = true;
+      await seite.click('.sm-neu-laden');
+      await seite.waitForFunction(() => document.querySelector('.sm-mitglieder-karte .sm-status')?.dataset.fehler === 'ja', null, { timeout: 10000 });
+      pruefe('Neu laden ohne Netz: ruhiger Satz an der Karte, Tabelle bleibt', (await seite.textContent('.sm-mitglieder-karte .sm-status')) === TEXTE.offline
+        && (await seite.locator('.sm-tabelle tbody tr').count()) === 5);
+      srv.offline = false;
+    }
     await seite.click('.sm-gross');
     await seite.waitForSelector('.sm-tafel:not([hidden])');
     await warte(tempoWarte);
@@ -947,6 +961,24 @@ async function browserTeil(browser) {
     pruefe(`${name}: Code in der Karte in einer Zeile`, c.eineZeile && c.innen, c);
     await bild(seite, `lehrkraft-tafel-${name}`);
     pruefe(`${name}: keine Fehler`, fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // Klasse auf einem anderen Geraet geloescht: Neu laden fuehrt zur Liste mit einem Satz
+  gruppe = 'Klasse weg';
+  {
+    const srv = serverMitKlasse();
+    const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: L, srv });
+    await bereit(seite, '#schule');
+    await seite.waitForSelector('.sm-klasse-karte', { timeout: 20000 });
+    await seite.click('.sm-klasse-karte');
+    await seite.waitForSelector('.sm-inhalt[data-ansicht="klasse"]');
+    srv.klassen = [];
+    await seite.click('.sm-neu-laden');
+    await seite.waitForFunction(() => document.querySelector('.sm-inhalt')?.dataset.ansicht === 'liste' && document.querySelector('.sm-neu .sm-status')?.textContent, null, { timeout: 10000 });
+    pruefe('geloeschte Klasse: zurueck zur Liste mit Satz statt Fehlerseite', (await seite.textContent('.sm-neu .sm-status')) === TEXTE.SCHULE_KEINE_LEITUNG
+      && (await seite.locator('.sm-klasse-karte').count()) === 0);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
 

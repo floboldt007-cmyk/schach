@@ -99,7 +99,7 @@ export const TEXTE = Object.freeze({
   SCHULE_ZU_VIELE_KLASSEN: 'Mit einem Konto gehen höchstens 20 eigene Klassen und 10 Klassen als Mitglied.',
   SCHULE_ZU_VIELE_VERSUCHE: 'Heute waren es zu viele falsche Codes. Morgen geht es wieder.',
   SCHULE_KEIN_CODE: 'Gerade ließ sich kein Code erzeugen. Versuch es gleich noch einmal.',
-  SCHULE_KEINE_LEITUNG: 'Diese Klasse leitest du nicht.',
+  SCHULE_KEINE_LEITUNG: 'Diese Klasse gibt es nicht mehr, oder du leitest sie nicht.',
   SCHULE_AUFGABE_UNGUELTIG: 'So passt die Aufgabe nicht: Titel 2 bis 80 Zeichen, Anzahl 1 bis 100, Datum höchstens ein Jahr voraus.',
   SCHULE_ZU_VIELE_AUFGABEN: 'Eine Klasse hat höchstens 30 Aufgaben. Lösche eine alte, dann geht eine neue.',
   SCHULE_FORTSCHRITT_UNGUELTIG: 'Der Fortschritt ließ sich nicht melden.',

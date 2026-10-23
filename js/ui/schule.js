@@ -211,6 +211,7 @@ export function zeige(root, params = {}, app) {
     if (weg || offen !== id) return;
     if (!r.ok) {
       if (r.grund === 'abgemeldet') zeigeAbgemeldet();
+      else if (r.grund === 'SCHULE_KEINE_LEITUNG') klasseWeg();
       else zeigeFehler(r.grund, () => oeffneKlasse(id));
       return;
     }
@@ -218,6 +219,12 @@ export function zeige(root, params = {}, app) {
     baueKlasse();
     if (neu) zeigeTafel();
     planeAuffrischen();
+  }
+
+  // Klasse gibt es nicht mehr (z. B. auf einem anderen Geraet geloescht): zurueck zur Liste mit dem Satz dazu
+  async function klasseWeg() {
+    await zeigeListe();
+    if (!weg && ansicht === 'liste') status(inhalt.querySelector('.sm-neu'), fehlerText('SCHULE_KEINE_LEITUNG'), true);
   }
 
   function planeAuffrischen() {
@@ -230,6 +237,7 @@ export function zeige(root, params = {}, app) {
       const r = await uebersicht(id);
       if (weg || offen !== id || ansicht !== 'klasse') return;
       if (r.ok) { daten = r.daten; fuelleMitglieder(); fuelleAufgabenListe(); fuelleTafel(); }
+      if (!r.ok && r.grund === 'SCHULE_KEINE_LEITUNG') { klasseWeg(); return; }
       planeAuffrischen();
     }, AUFFRISCHEN_MS);
   }
@@ -299,6 +307,7 @@ export function zeige(root, params = {}, app) {
       const r = await uebersicht(k.id);
       if (weg || offen !== k.id) return;
       const karte = inhalt.querySelector('.sm-mitglieder-karte');
+      if (!r.ok && r.grund === 'SCHULE_KEINE_LEITUNG') { klasseWeg(); return; }
       if (!r.ok) { status(karte, fehlerText(r.grund), true); return; }
       daten = r.daten;
       fuelleMitglieder();

@@ -212,7 +212,7 @@ export function schuleGruppe({ app } = {}) {
 // ---------- Zeile in der Heute-Karte ----------
 export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) {
   if (typeof document === 'undefined' || !nutzerId()) return null;
-  const o = offeneAufgabe();
+  const o = offeneAufgabe(undefined, fortschritt ? { fortschritt } : {});
   if (!o) return null;
   stelleSchuleCssSicher();
   const { klasse, aufgabe, stand } = o;
