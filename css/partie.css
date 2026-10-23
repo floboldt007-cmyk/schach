@@ -4,13 +4,15 @@
    (css/bauteile.css), das Brett mit Sockel und Balken kommt aus U6 (css/board.css, css/app.css "Brett-Rahmen").
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
    Lagen:
-     quer             Brett im Sockel links (Balken 18 px senkrecht), rechts eine Spalte (300 bis 420 px)
+     quer             Brett im Sockel links (Balken 18 px senkrecht), rechts eine Spalte (300 bis 420 px; in kleinen
+                      Querfenstern ab 481 px Hoehe bis 248 px, unter 300 px kompakt per Container "seite")
      hoch (iPad)      eine Spalte: Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen (order)
      Handy (hoch, bis 600 px)  "Brett zuerst": js/ui/partie.js layout() setzt --brett und --spalte an .inhalt,
                       .coach-eng (Coach eine Zeile) und .streifen-unten (Zugstreifen nach den Knoepfen)
    ============================================================ */
 
-.partie { --balken: 18px; --spalt: 12px; --rahmen: var(--sockel-rand); --seite: clamp(300px, 31vw, 420px); --luecke: 12px; }
+.partie { --balken: 18px; --spalt: 12px; --rahmen: var(--sockel-rand); --seite: clamp(300px, 31vw, 420px); --luecke: 12px;
+  --quer-rand: 24px; --quer-luecke: 20px; }
 .partie.ohne-balken { --balken: 0px; --spalt: 0px; }
 .partie.ohne-balken .evalbalken { display: none; }
 .partie .inhalt { position: relative; flex: 1; min-height: 0; min-width: 0; }
@@ -154,11 +156,11 @@
    QUER (iPad quer, Desktop): Brett links, eine Spalte rechts
    ============================================================ */
 @media (orientation: landscape) {
-  .partie .inhalt { display: grid; grid-template-columns: auto var(--seite); justify-content: center; align-items: start; gap: 20px;
-    padding: 16px 24px 22px; container: partie / size; }
+  .partie .inhalt { display: grid; grid-template-columns: auto var(--seite); justify-content: center; align-items: start; gap: var(--quer-luecke);
+    padding: 16px var(--quer-rand) 22px; container: partie / size; }
   .partie .inhalt > .brettzone {
-    --brett: min(calc(100cqh - 2 * var(--rahmen)), calc(100cqw - var(--balken) - var(--spalt) - 20px - var(--seite) - 2 * var(--rahmen))); }
-  .partie .seite { display: flex; flex-direction: column; gap: var(--luecke); height: 100cqh; }
+    --brett: min(calc(100cqh - 2 * var(--rahmen)), calc(100cqw - var(--balken) - var(--spalt) - var(--quer-luecke) - var(--seite) - 2 * var(--rahmen))); }
+  .partie .seite { display: flex; flex-direction: column; gap: var(--luecke); height: 100cqh; container: seite / inline-size; }
   .partie .seite > * { flex: none; }
   .partie .zugleiste { display: none; }
   .partie .zugbox { flex: 1 1 0; }
@@ -191,6 +193,26 @@
   .partie .zugbox { min-height: 60px; }
   .partie .spielknoepfe > .knopf { min-height: 46px; font-size: 11px; }
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
+}
+/* kleine Querfenster (Vorschau-Fenster anderer Apps, Stage Manager, Desktop; nicht Handy quer): Die Spalte darf bis
+   248 px schmal werden, Rand und Luecke schrumpfen mit. Sonst blieb dem Brett bei 590 x 580 nur ein Drittel der Breite
+   (184 px). Ab 968 px Breite (jedes iPad quer) gilt wieder 31vw, dort aendert sich nichts. */
+@media (orientation: landscape) and (min-height: 481px) {
+  .partie { --seite: clamp(248px, 31vw, 420px); --quer-rand: clamp(12px, 2.5vw, 24px); --quer-luecke: clamp(12px, 2vw, 20px); }
+}
+/* schmale Spalte (unter 300 px): Karten, Uhr und Knoepfe eine Stufe kompakter, Namen duerfen zweizeilig werden */
+@container seite (max-width: 299px) {
+  .partie .spieler { --av: 38px; padding-left: 10px; padding-right: 8px; }
+  .partie .spieler > .av { margin-right: 10px; border-radius: 12px; }
+  .partie .spieler .name { font-size: 15px; }
+  .partie .uhr { min-width: 72px; height: 38px; margin-left: 8px; padding: 0 10px; border-radius: 12px; font-size: 18px; }
+  .partie .coach { padding-left: 12px; padding-right: 12px; }
+  .zugliste { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
+  .zugliste .z { gap: 5px; padding: 0 6px; font-size: 14px; }
+  .partie .spielknoepfe { gap: 6px; }
+  .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { font-size: 11.5px; letter-spacing: -.01em; }
+  /* sechs Knoepfe (zwei der Pakete) in zwei Reihen zu drei, in einer Reihe fielen sie unter 44 px */
+  .partie .spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ============================================================
