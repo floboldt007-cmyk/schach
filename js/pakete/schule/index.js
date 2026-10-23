@@ -11,12 +11,13 @@
 //                           nichts meldet); nach dem Abmelden raeumt sie den Stand weg.
 //   arena:heute             (reihenfolge 35) die naechste offene Aufgabe einer Klasse, ruhig, mit Termin statt Countdown;
 //                           nur aus dem Zwischenspeicher (kein Netz im Anbieter). Bei einer Bot-Aufgabe ein Knopf zum Bot
-//                           (nur wenn er frei und nicht schon gewaehlt ist), bei Raetseln "Üben" (Training).
+//                           (nur wenn er frei und nicht schon gewaehlt ist), bei Raetseln "Ueben" (Training).
 //   partie:beendet          Fortschritt melden, gebuendelt (planeMeldung in js/schule.js), offline still
 //   raetsel:geloest         richtig geloeste Raetsel fuer Raetsel-Aufgaben zaehlen (merkeRaetsel), dann melden
-//   speicher:zurueckgesetzt neuer Stand nach "Fortschritt zurücksetzen" (die Lehrkraft sieht keinen alten)
-//   app:bereit              ohne Anmeldung aufraeumen; sonst "Meine Klassen" auffrischen und eine offene Meldung senden
-//   app:sichtbar, online    eine offene Meldung senden (sie wartet, solange das Netz fehlt)
+//   speicher:zurueckgesetzt neuer Stand nach "Fortschritt zuruecksetzen" (die Lehrkraft sieht keinen alten)
+//   app:bereit              ohne Anmeldung aufraeumen; sonst "Meine Klassen" auffrischen und eine offene Meldung nachholen
+//   app:sichtbar, online    eine offene Meldung nachholen (sie wartet, solange das Netz fehlt); auch dabei hoechstens
+//                           eine Meldung je Minute (planeMeldung({ nachholen: true }))
 // Defensiv: Ein Fehler hier haelt die App nie an.
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
@@ -24,7 +25,7 @@ import { kontoFreigeschaltet } from '../../konto.js';
 import { icon } from '../../ui/icons.js';
 import {
   nutzerId, meineKlassen, meineKlassenGespeichert, trittBei, verlasse, offeneAufgabe, aufgabeStand, zielText, faelligText,
-  planeMeldung, meldeJetzt, meldungOffen, merkeRaetsel, aufraeumen, fehlerText, normalisiereCode, pruefeAnzeigename,
+  planeMeldung, meldungOffen, merkeRaetsel, aufraeumen, fehlerText, normalisiereCode, pruefeAnzeigename,
   stelleSchuleCssSicher, WAS_DIE_LEITUNG_SIEHT, ICON,
 } from '../../schule.js';
 import { BOTS } from '../../bots.js';
@@ -220,16 +221,18 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
   el.className = 'sm-heute';
   el.dataset.aufgabe = aufgabe.id;
   el.dataset.art = aufgabe.art;
+  // zwei Zeilen: der Titel (zur Not gekuerzt), darunter Ziel, Stand, Termin und Klasse (bricht um, damit der Termin auch
+  // auf dem iPad neben "Zu Rudi" sichtbar bleibt; ein title hilft auf Touch-Geraeten nicht). Der Trenner zwischen den
+  // Zeilen steht nur im Text (Vorlesen, textContent), sichtbar ist er nicht.
   el.innerHTML = `<span class="sm-heute-symbol" aria-hidden="true">${icon(ICON)}</span>
-    <span class="sm-heute-text"><b></b><span class="sm-heute-ziel"></span></span>`;
+    <span class="sm-heute-text"><b></b><span class="sm-heute-trenn"> · </span><span class="sm-heute-ziel"></span></span>`;
   el.querySelector('b').textContent = aufgabe.titel;
-  // Ziel und Termin vor dem Namen der Klasse: wird die Zeile zu lang, faellt zuerst die Klasse weg (steht im Titel-Tipp)
   const teile = [zielText(aufgabe)];
   if (aufgabe.art !== 'bot') teile.push(`${stand.stand} von ${stand.ziel}`);
   const f = faelligText(aufgabe.faellig);
   if (f) teile.push(f);
   teile.push(klasse.name);
-  el.querySelector('.sm-heute-ziel').textContent = ' · ' + teile.join(' · ');
+  el.querySelector('.sm-heute-ziel').textContent = teile.join(' · ');
   el.querySelector('.sm-heute-text').title = `${aufgabe.titel} · ${teile.join(' · ')}`;
   const ziel = aufgabe.ziel || {};
   let knopf = null;
@@ -258,8 +261,9 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
 
 // ---------- Einhaengen ----------
 const sicher = (fn) => { try { return fn(); } catch (e) { console.error('Paket schule', e); return null; } };
+// eine vorgemerkte Meldung nachholen: ohne Buendel-Wartezeit, aber hoechstens eine je Minute (wie nach einer Partie)
 function sendeOffene() {
-  if (meldungOffen()) meldeJetzt().catch(() => {});
+  if (meldungOffen()) planeMeldung({ nachholen: true });
 }
 
 try {

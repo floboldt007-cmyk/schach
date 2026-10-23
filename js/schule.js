@@ -6,11 +6,14 @@
 //
 // Was die Leitung sieht (und was die App einem Mitglied vor dem Beitritt sagt, WAS_DIE_LEITUNG_SIEHT): den selbst
 // gewaehlten Anzeigenamen, besiegte Bots, Sterne, Zahl der wertenden Partien, die durchschnittliche Genauigkeit, die
-// haeufigsten Fehlerarten (aus den letzten FEHLER_FENSTER Partien) und welche Aufgaben erledigt sind. Nie die E-Mail,
-// nie die Partien, Zuege oder Uhrzeiten.
+// haeufigsten Fehlerarten (aus den letzten FEHLER_FENSTER Partien) und welche Aufgaben erledigt sind. Vom Stand nur den
+// Tag (aktualisiert_am ist auf dem Server ein Datum). Nie die E-Mail, nie die Partien, Zuege oder Uhrzeiten. Weil die
+// Meldung nach jeder Partie kommt, sagt der Satz das auch (eine offene Lehrkraft-Ansicht sieht neue Staende kommen).
 //
 // API:
-//   setzeSchuleFetch(fn), setzeSchuleUhr(fn)    nur fuer Tests
+//   setzeSchuleFetch(fn), setzeSchuleUhr(fn), setzeSchuleWartezeit(ms)   nur fuer Tests (null: Standard)
+//   WARTE_MS   Zeitgrenze je Anfrage: antwortet der Server nicht (Funkloch, Anmeldeseite im Schul-WLAN), gilt sie als
+//              'offline'; sonst hielte eine haengende Anfrage alle danach fest (laufende Anfragen werden gebuendelt)
 //   normalisiereCode(text) -> 'ABC234' | null   Leerzeichen und Bindestriche weg, gross; nur die 32 Zeichen ohne 0/O/1/I
 //   pruefeAnzeigename(text) -> { ok, name, grund? }   2 bis 24 Zeichen, Buchstaben (auch mit Akzent), Ziffern, Leerzeichen,
 //       Punkt, Bindestrich, Apostroph, mindestens ein Buchstabe, nie eine E-Mail (wie die Pruefung auf dem Server)
@@ -20,28 +23,35 @@
 //       daten = { leitung: [{ id, name, code, aktiv, erstellt_am, geschlossen_am, mitglieder }],
 //                 mitglied: [{ klasse, name, aktiv, mitglied, anzeigename, beigetreten_am, erledigt, aufgaben }] }
 //       Zwischenspeicher hoechstens STAND_MS (ohne Klasse LEER_MS), offline der letzte Stand (offline: true).
+//       Eine laufende Anfrage wird nur mitbenutzt, wenn sie nach der letzten Aenderung begann; eine Antwort, die vor
+//       einer Aenderung (Beitritt, Austritt, ...) losging, wird nicht gespeichert, sondern neu geholt.
 //   meineKlassenGespeichert() -> daten | null   synchron, nur fuer das angemeldete Konto
 //   erstelleKlasse(name), trittBei(code, anzeigename), verlasse(klasseId), uebersicht(klasseId),
 //   aufgabeAnlegen(klasseId, { titel, art, ziel, faellig }), aufgabeLoeschen(aufgabeId), entferneMitglied(mitgliedId),
 //   schliesseKlasse(klasseId), loescheKlasse(klasseId)
 //       -> Promise<{ ok: true, ... } | { ok: false, grund }>   grund: 'abgemeldet' | 'offline' | 'server' |
-//       'nicht_eingerichtet' | eine Kennung SCHULE_* aus dem Schema. Nach jeder Aenderung ist "Meine Klassen" neu geholt.
+//       'nicht_eingerichtet' | eine Kennung SCHULE_* aus dem Schema. Nach jeder Aenderung ist "Meine Klassen" neu geholt;
+//       kam keine Antwort (offline, Server), gilt der Zwischenspeicher als veraltet (die Aenderung kann gebucht sein).
 //   Fortschritt (Mitglied):
 //   fortschrittJetzt({ stand, partien, fortschritt, statistikWerte, geloest } = {}) -> Parameter fuer
 //       schule_melde_fortschritt: { bots_besiegt, sterne, partien, genauigkeit_schnitt, haeufigste_fehler, erledigt }
 //   haeufigsteFehler(partien) -> { zuege, arten: [{ art, anzahl }] }   letzte FEHLER_FENSTER wertende Partien, nur eigene Zuege
 //   aufgabeStand(aufgabe, { fortschritt, partien, geloest }) -> { erledigt, stand, ziel }   stand/ziel bei Partien und Raetseln
-//   zielText(aufgabe) -> 'Ritter Rudi besiegen' | '5 Partien spielen' | '10 Rätsel lösen' (mit Sternen: '... mit 2 Sternen')
+//   zielText(aufgabe) -> 'Ritter Rudi besiegen' | '5 Partien spielen' | '10 Raetsel loesen' (mit Sternen: '... mit 2 Sternen')
+//   RAETSEL_AUFGABEN   false, solange kein Paket raetsel:geloest sendet (Tagesraetsel S1-5): Dann bietet die
+//       Lehrkraft-Ansicht die Art 'raetsel' nicht an (niemand koennte sie erfuellen). Wer den Sender einbaut, stellt hier
+//       auf true; tests/schule.test.mjs prueft, dass der Schalter zum Code passt.
 //   faelligText(faellig) -> 'bis Fr 30.10.' | ''   (ein Termin, nie ein Countdown)
 //   offeneAufgabe(stand = meineKlassenGespeichert(), { heute, ... }) -> { klasse, aufgabe, stand } | null
 //       die naechste nicht erledigte Aufgabe einer aktiven Klasse (Heute-Karte), Faellige zuerst; laenger als
 //       ALT_TAGE ueberfaellige nicht mehr
 //   merkeRaetsel({ id, richtig })   raetsel:geloest: zaehlt ein richtig geloestes Raetsel fuer offene Raetsel-Aufgaben
 //       (jedes Raetsel einmal je Aufgabe, nur Aufgaben, die vor dem Loesen gestellt waren)
-//   planeMeldung({ sofort = false } = {})   nach einer Partie: Meldung vormerken (OFFEN_SCHLUESSEL) und gebuendelt
-//       senden (fruehestens BUENDEL_MS spaeter, hoechstens alle MELDE_ABSTAND_MS). Nur mit Anmeldung und einer
-//       aktiven Klasse. Offline bleibt sie vorgemerkt (still, ohne Meldung) und geht beim naechsten Start oder
-//       Zurueckkommen in die App.
+//   planeMeldung({ sofort = false, nachholen = false } = {})   nach einer Partie: Meldung vormerken (OFFEN_SCHLUESSEL)
+//       und gebuendelt senden (fruehestens BUENDEL_MS spaeter, hoechstens alle MELDE_ABSTAND_MS). nachholen (eine
+//       vorgemerkte Meldung beim Start, Zurueckkommen in die App, wieder online): ohne BUENDEL_MS, aber ebenfalls
+//       hoechstens eine je MELDE_ABSTAND_MS. sofort (nach dem Beitritt): gleich. Nur mit Anmeldung und einer aktiven
+//       Klasse (ein veralteter Zwischenspeicher zaehlt nicht als bekannt). Offline bleibt sie vorgemerkt (still).
 //   meldeJetzt() -> Promise<{ ok, gesendet?, klassen?, grund? }>   grund 'keine_klasse' | 'gleich' (schon so gemeldet) | ...
 //   meldungOffen() -> boolean
 //   aufraeumen() -> boolean   ohne Anmeldung: alles vom Geraet nehmen, was zum Konto gehoert (nach dem Abmelden)
@@ -52,7 +62,7 @@
 //
 // Speicher (bewusst AUSSERHALB von schach-arena:v1:, wie beim Abo: gehoert zum Konto, nicht zum Spielstand; nicht in
 // Cloud-Sicherung oder Export):
-//   schach-arena:schule:stand     { uid, daten, geholtAm }
+//   schach-arena:schule:stand     { uid, daten, geholtAm, veraltet? }   veraltet: nach einer Aenderung ohne Antwort
 //   schach-arena:schule:offen     { uid, seit }   eine Meldung steht aus
 //   schach-arena:schule:gemeldet  { uid, inhalt, am }   zuletzt gemeldet (gleiche Meldung geht nicht zweimal)
 //   schach-arena:schule:raetsel   { uid, geloest: { <aufgabeId>: [raetselId, ...] } }
@@ -76,12 +86,16 @@ export const FEHLER_FENSTER = 20;
 export const FEHLER_ARTEN = Object.freeze(['patzer', 'fehler', 'verpasst', 'ungenau']);
 export const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const ALT_TAGE = 14;
+export const WARTE_MS = 15000;
 export const ARTEN = Object.freeze(['bot', 'raetsel', 'partien']);
+// Raetsel-Aufgaben erst anbieten, wenn ein Paket raetsel:geloest sendet (Tagesraetsel S1-5); siehe Kopf
+export const RAETSEL_AUFGABEN = false;
 export const GRENZEN = Object.freeze({ mitglieder: 60, klassen: 20, mitgliedschaften: 10, aufgaben: 30, anzahl: 100 });
 
 export const WAS_DIE_LEITUNG_SIEHT = 'Deine Lehrkraft oder Trainerin sieht deinen Anzeigenamen, wie viele Bots du besiegt hast, '
   + 'deine Sterne, die Zahl deiner Partien, deine durchschnittliche Genauigkeit, deine häufigsten Fehlerarten und welche '
-  + 'Aufgaben erledigt sind. Nicht: deine E-Mail-Adresse, deine Partien, Züge oder Spielzeiten. Austreten geht jederzeit.';
+  + 'Aufgaben erledigt sind. Dein Stand wird nach jeder Partie aktualisiert, gespeichert wird dazu nur der Tag, keine Uhrzeit. '
+  + 'Nicht: deine E-Mail-Adresse, deine Partien oder Züge. Austreten geht jederzeit.';
 
 export const TEXTE = Object.freeze({
   abgemeldet: 'Melde dich zuerst mit deinem Konto an.',
@@ -112,11 +126,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 let fetchFn = (...a) => fetch(...a);
 let uhr = () => Date.now();
-let laufendStand = null;
+let wartezeit = WARTE_MS;
+let laufendStand = null;      // { uid, gen, p }: die laufende Anfrage nach "Meine Klassen"
+let generation = 0;           // zaehlt Aenderungen: ein Stand, der vorher geholt wurde, kennt sie vielleicht nicht
 let laufendMeldung = null;
 let meldeTimer = null;
 export function setzeSchuleFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 export function setzeSchuleUhr(fn) { uhr = typeof fn === 'function' ? fn : () => Date.now(); }
+export function setzeSchuleWartezeit(ms) { wartezeit = Number.isFinite(ms) && ms > 0 ? ms : WARTE_MS; }
 
 function lager() { return globalThis.localStorage; }
 function jsonLies(k) { try { return JSON.parse(lager().getItem(k)); } catch (e) { return null; } }
@@ -141,18 +158,40 @@ async function gueltigeSitzung() {
 }
 
 // RPC an die Datenbank. Fehler tragen grund: 'offline' | 'abgemeldet' | 'server' | 'nicht_eingerichtet' | SCHULE_*
+// Zeitgrenze wie in js/coach-ki.js: AbortController bricht fetch und das Lesen des Koerpers ab, das Rennen gegen den
+// Zeitgeber faengt auch ein fetch ohne signal (Tests, alte Browser) und eine haengende Erneuerung der Sitzung.
 async function rpc(name, daten = {}) {
-  const s = await gueltigeSitzung();
+  const abbruch = typeof AbortController === 'function' ? new AbortController() : null;
+  let zeitgeber = null;
+  const zuSpaet = new Promise((_, nein) => {
+    zeitgeber = setTimeout(() => {
+      nein(Object.assign(new Error('Keine Antwort.'), { grund: 'offline', zeit: true }));
+      try { if (abbruch) abbruch.abort(); } catch (e) { /* egal */ }
+    }, wartezeit);
+  });
+  zuSpaet.catch(() => {});
+  const abgelaufen = (e) => !!(e && e.zeit) || !!(abbruch && abbruch.signal.aborted);
+  const offline = () => { const f = new Error('Keine Verbindung.'); f.grund = 'offline'; return f; };
+  try {
+    return await rpcMitFrist(name, daten, { zuSpaet, abbruch, abgelaufen, offline });
+  } finally {
+    clearTimeout(zeitgeber);
+  }
+}
+async function rpcMitFrist(name, daten, { zuSpaet, abbruch, abgelaufen, offline }) {
+  const s = await Promise.race([gueltigeSitzung(), zuSpaet]);
   let r;
   try {
-    r = await fetchFn(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST',
+    r = await Promise.race([fetchFn(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST',
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(daten) });
+      body: JSON.stringify(daten), ...(abbruch ? { signal: abbruch.signal } : {}) }), zuSpaet]);
   } catch (e) {
-    const f = new Error('Keine Verbindung.'); f.grund = 'offline'; throw f;
+    throw offline();
   }
   let d = null;
-  if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leer */ } }
+  if (r.status !== 204) {
+    try { d = await Promise.race([r.json(), zuSpaet]); } catch (e) { if (abgelaufen(e)) throw offline(); }
+  }
   if (!r.ok) {
     const text = String((d && (d.message || d.msg)) || '');
     const f = new Error(text || `Serverfehler (${r.status})`);
@@ -218,34 +257,51 @@ export function meineKlassen({ neu = false } = {}) {
   const uid = nutzerId();
   if (!uid) return Promise.resolve({ ok: false, grund: 'abgemeldet' });
   const c = gecacht(uid);
-  if (!neu && c && Number.isFinite(c.geholtAm) && uhr() >= c.geholtAm
+  if (!neu && c && !c.veraltet && Number.isFinite(c.geholtAm) && uhr() >= c.geholtAm
     && uhr() - c.geholtAm < (hatKlassen(pruefeStand(c.daten)) ? STAND_MS : LEER_MS)) {
     return Promise.resolve({ ok: true, daten: pruefeStand(c.daten) });
   }
-  if (laufendStand && laufendStand.uid === uid) return laufendStand.p;
-  const p = (async () => {
+  // eine laufende Anfrage nur mitbenutzen, wenn sie nach der letzten Aenderung begann (sonst fehlt die Aenderung darin)
+  if (laufendStand && laufendStand.uid === uid && laufendStand.gen === generation) return laufendStand.p;
+  const eintrag = { uid, gen: generation, p: null };
+  eintrag.p = (async () => {
     try {
       const daten = pruefeStand(await rpc('schule_meine_klassen'));
+      // waehrenddessen geaendert (Beitritt, Austritt, ...): diese Antwort ist vielleicht alt, nicht speichern, neu holen
+      if (eintrag.gen !== generation) return meineKlassen({ neu: true });
       jsonSchreib(STAND_SCHLUESSEL, { uid, daten, geholtAm: uhr() });
       return { ok: true, daten };
     } catch (e) {
-      if (c && (e.grund === 'offline' || e.grund === 'server')) return { ok: true, daten: pruefeStand(c.daten), offline: true };
+      const alt = gecacht(uid);
+      if (alt && (e.grund === 'offline' || e.grund === 'server')) return { ok: true, daten: pruefeStand(alt.daten), offline: true };
       return fehlschlag(e);
     } finally {
-      laufendStand = null;
+      if (laufendStand === eintrag) laufendStand = null;
     }
   })();
-  laufendStand = { uid, p };
-  return p;
+  laufendStand = eintrag;
+  return eintrag.p;
 }
 
-// Aenderung, danach "Meine Klassen" neu holen (Fehler beim Nachholen aendern das Ergebnis nicht)
+// Nach einer Aenderung: Antworten, die vorher losgingen, gelten nicht mehr, der Zwischenspeicher wird beim naechsten Mal
+// neu geholt (und zaehlt bis dahin nicht als "bekannt ohne Klasse")
+function veraltet() {
+  generation++;
+  const uid = nutzerId();
+  const c = uid ? gecacht(uid) : null;
+  if (c && !c.veraltet) jsonSchreib(STAND_SCHLUESSEL, { ...c, veraltet: true });
+}
+
+// Aenderung, danach "Meine Klassen" neu holen (Fehler beim Nachholen aendern das Ergebnis nicht). Ohne Antwort
+// (offline, Server) ist offen, ob der Server die Aenderung gebucht hat: dann ebenfalls veraltet.
 async function aendere(name, daten, aus = (d) => d) {
   try {
     const d = await rpc(name, daten);
+    veraltet();
     await meineKlassen({ neu: true }).catch(() => null);
     return { ok: true, ...aus(d) };
   } catch (e) {
+    if (e && (e.grund === 'offline' || e.grund === 'server')) veraltet();
     return fehlschlag(e);
   }
 }
@@ -429,16 +485,17 @@ export function meldungOffen() {
 }
 const aktiveKlassen = (d) => ((d && d.mitglied) || []).filter((k) => k.aktiv);
 
-export function planeMeldung({ sofort = false } = {}) {
+export function planeMeldung({ sofort = false, nachholen = false } = {}) {
   const uid = nutzerId();
   if (!uid) return false;
-  const stand = meineKlassenGespeichert();
-  // bekannt ohne aktive Klasse: nichts vormerken (kein Netz fuer Leute ohne Klasse)
-  if (stand && !aktiveKlassen(stand).length) return false;
+  const c = gecacht(uid);
+  // bekannt ohne aktive Klasse: nichts vormerken (kein Netz fuer Leute ohne Klasse); ein veralteter Stand ist unbekannt
+  if (c && !c.veraltet && !aktiveKlassen(pruefeStand(c.daten)).length) return false;
   if (!meldungOffen()) jsonSchreib(OFFEN_SCHLUESSEL, { uid, seit: uhr() });
   const g = jsonLies(GEMELDET_SCHLUESSEL);
   const seit = g && g.uid === uid && Number.isFinite(g.am) ? uhr() - g.am : Infinity;
-  const warte = sofort ? 0 : Math.max(BUENDEL_MS, seit >= 0 ? MELDE_ABSTAND_MS - seit : 0);
+  // hoechstens eine Meldung je MELDE_ABSTAND_MS, auch beim Nachholen; nur der Beitritt (sofort) wartet nicht
+  const warte = sofort ? 0 : Math.max(nachholen ? 0 : BUENDEL_MS, seit >= 0 ? MELDE_ABSTAND_MS - seit : 0);
   clearTimeout(meldeTimer);
   meldeTimer = setTimeout(() => { meldeTimer = null; meldeJetzt().catch(() => {}); }, warte);
   return true;

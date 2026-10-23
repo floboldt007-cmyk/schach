@@ -311,6 +311,11 @@ begin
     or (select erledigt from public.klassen_fortschritt) <> array[current_setting('schule.aufgabe1')::uuid] then
     raise exception 'FEHLER: eigener Fortschritt falsch gespeichert (fremde Aufgaben-ID muss wegfallen)';
   end if;
+  -- nur der Tag der Meldung, keine Uhrzeit (sonst liesse sich mitschreiben, wann jemand spielt)
+  if (select pg_typeof(aktualisiert_am)::text from public.klassen_fortschritt) <> 'date'
+    or (select aktualisiert_am from public.klassen_fortschritt) <> public.schule_heute() then
+    raise exception 'FEHLER: aktualisiert_am ist kein Tag (Europe/Berlin)';
+  end if;
   -- noch einmal: dieselbe Zeile, neue Werte
   perform public.schule_melde_fortschritt(4, 8, 13, null, '{}'::jsonb, '[]'::jsonb);
   if (select count(*) from public.klassen_fortschritt) <> 1 or (select bots_besiegt from public.klassen_fortschritt) <> 4
@@ -567,6 +572,11 @@ begin
     or jsonb_typeof(u -> 'mitglieder' -> 1 -> 'fortschritt') <> 'null'
     or jsonb_array_length(u -> 'aufgaben') <> 3 or u -> 'klasse' ->> 'code' <> current_setting('schule.code') then
     raise exception 'FEHLER: Uebersicht falsch: %', u;
+  end if;
+  -- die Leitung bekommt vom Stand nur den Tag, auch beim direkten Lesen der Tabelle
+  if (u -> 'mitglieder' -> 0 -> 'fortschritt' ->> 'aktualisiert_am') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    or (select pg_typeof(f.aktualisiert_am)::text from public.klassen_fortschritt f) <> 'date' then
+    raise exception 'FEHLER: Leitung sieht eine Uhrzeit: %', u -> 'mitglieder' -> 0 -> 'fortschritt' ->> 'aktualisiert_am';
   end if;
   select x into a1 from jsonb_array_elements(u -> 'aufgaben') x where x ->> 'id' = current_setting('schule.aufgabe1');
   if (a1 ->> 'erledigt')::integer <> 1 then

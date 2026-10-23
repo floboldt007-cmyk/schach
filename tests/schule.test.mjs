@@ -13,7 +13,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { setzeSpeicher, ladeFortschritt, rohSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.js';
@@ -22,7 +22,7 @@ import {
   erstelleKlasse, trittBei, verlasse, uebersicht, aufgabeAnlegen, aufgabeLoeschen, entferneMitglied, schliesseKlasse, loescheKlasse,
   fortschrittJetzt, haeufigsteFehler, aufgabeStand, zielText, faelligText, offeneAufgabe, merkeRaetsel, planeMeldung, meldeJetzt, meldungOffen,
   aufraeumen, sortiereMitglieder, TEXTE, WAS_DIE_LEITUNG_SIEHT, STAND_SCHLUESSEL, OFFEN_SCHLUESSEL, GEMELDET_SCHLUESSEL, RAETSEL_SCHLUESSEL,
-  STAND_MS, BUENDEL_MS, FEHLER_FENSTER, ALT_TAGE,
+  STAND_MS, BUENDEL_MS, FEHLER_FENSTER, ALT_TAGE, MELDE_ABSTAND_MS, WARTE_MS, RAETSEL_AUFGABEN, setzeSchuleWartezeit,
 } from '../js/schule.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
 import { tagSchluessel, addiereTage } from '../js/tag.js';
@@ -179,6 +179,15 @@ async function nodeTeil() {
   pruefe('Hinweis vor dem Beitritt: was die Lehrkraft sieht und was nicht (E-Mail, Partien), Austreten jederzeit',
     /Anzeigenamen/.test(WAS_DIE_LEITUNG_SIEHT) && /Genauigkeit/.test(WAS_DIE_LEITUNG_SIEHT) && /Nicht: deine E-Mail-Adresse, deine Partien/.test(WAS_DIE_LEITUNG_SIEHT)
     && /Austreten geht jederzeit/.test(WAS_DIE_LEITUNG_SIEHT));
+  pruefe('Hinweis vor dem Beitritt ehrlich: Stand nach jeder Partie, gespeichert nur der Tag (keine Uhrzeit), kein Versprechen "Spielzeiten"',
+    /nach jeder Partie aktualisiert/.test(WAS_DIE_LEITUNG_SIEHT) && /nur der Tag, keine Uhrzeit/.test(WAS_DIE_LEITUNG_SIEHT) && !/Spielzeit/.test(WAS_DIE_LEITUNG_SIEHT));
+  // Raetsel-Aufgaben nur, wenn sie jemand erfuellen kann: der Schalter passt zum Code (sendet ein Paket raetsel:geloest?)
+  const jsDateien = (dir) => readdirSync(dir, { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? jsDateien(path.join(dir, e.name)) : e.name.endsWith('.js') ? [path.join(dir, e.name)] : []));
+  const raetselSender = jsDateien(path.join(WURZEL, 'js')).filter((d) => /sende\(\s*['"`]raetsel:geloest['"`]/.test(readFileSync(d, 'utf8')))
+    .map((d) => path.relative(WURZEL, d));
+  pruefe('RAETSEL_AUFGABEN genau dann, wenn ein Paket raetsel:geloest sendet (heute keins: keine Raetsel-Aufgaben stellen)',
+    RAETSEL_AUFGABEN === (raetselSender.length > 0), { RAETSEL_AUFGABEN, raetselSender });
 
   // ---------- Vertrag: jeder Aufruf schickt genau die Parameter der SQL-Funktion ----------
   srv.antworten = {
@@ -339,6 +348,17 @@ async function nodeTeil() {
   const g4 = await meldeJetzt();
   pruefe('abgelehnte Meldung (400): nicht mehr vorgemerkt', g4.grund === 'SCHULE_FORTSCHRITT_UNGUELTIG' && !meldungOffen());
   srv.fehler = null;
+  // nachholen (Paket: app:bereit, app:sichtbar, online): ohne Buendel-Wartezeit, aber ebenfalls hoechstens eine je Minute
+  const meldungen = () => aufrufe.filter((x) => x.name === 'schule_melde_fortschritt').length;
+  const vorN = meldungen();
+  pruefe('nachholen kurz nach einer Meldung: merkt vor, sendet aber nicht', planeMeldung({ nachholen: true }) === true && meldungOffen());
+  await warte(400);
+  pruefe('nachholen kurz nach einer Meldung: wartet ebenfalls (hoechstens eine je Minute)', meldungen() === vorN && meldungOffen(), meldungen() - vorN);
+  jetzt += MELDE_ABSTAND_MS;
+  planeMeldung({ nachholen: true });
+  for (let i = 0; i < 100 && meldungen() === vorN; i++) await warte(10);
+  await warte(30);
+  pruefe(`nachholen eine Minute spaeter: geht ohne Buendel-Wartezeit (${BUENDEL_MS / 1000} s) raus`, meldungen() === vorN + 1 && !meldungOffen(), meldungen() - vorN);
   // nur geschlossene Klassen: keine Meldung, kein Netz
   srv.stand = { leitung: [], mitglied: [{ ...srv.stand.mitglied[0], aktiv: false, aufgaben: [] }] };
   await meineKlassen({ neu: true });
@@ -358,6 +378,93 @@ async function nodeTeil() {
   pruefe('Speicher des Schulmodus nicht im Cloud-Spielstand und nicht in der Sicherung', !Object.keys(lokalerStand()).some((k) => k.includes(':schule:'))
     && !rohSpeicher().schluessel().some((k) => k.includes(':schule:')));
   m.delete(STAND_SCHLUESSEL);
+
+  // ---------- Wettlauf: Aenderung waehrend "Meine Klassen" laeuft; Zeitgrenze fuer haengende Anfragen ----------
+  {
+    localStorage.setItem(SITZUNG_SCHLUESSEL, JSON.stringify(sitzungVon(UID_A, MAIL_A)));
+    const KL = uuid(70);
+    const net = { drin: false, langsam: 300, haengt: new Set(), koerperHaengt: false, log: [] };
+    const antwort = (body) => ({ ok: true, status: 200, async json() { return body; } });
+    setzeSchuleFetch(async (url) => {
+      const name = String(url).replace(`${SUPA}/rest/v1/rpc/`, '');
+      net.log.push(name);
+      if (net.haengt.has(name)) {
+        if (name === 'schule_tritt_bei') net.drin = true; // gebucht, aber die Antwort kommt nie an
+        return new Promise(() => {});
+      }
+      if (name === 'schule_meine_klassen') {
+        const drin = net.drin; // was der Server beim Eingang der Anfrage weiss
+        await warte(net.langsam);
+        if (net.koerperHaengt) return { ok: true, status: 200, json: () => new Promise(() => {}) };
+        return antwort({ leitung: [], mitglied: drin ? [{ klasse: KL, name: 'Q2', aktiv: true, mitglied: uuid(71), anzeigename: 'Anna', aufgaben: [] }] : [] });
+      }
+      if (name === 'schule_tritt_bei') { net.drin = true; return antwort({ klasse: { id: KL, name: 'Q2' }, mitglied: { id: uuid(71), anzeigename: 'Anna' } }); }
+      if (name === 'schule_verlasse') { net.drin = false; return antwort(true); }
+      return antwort(1);
+    });
+    const zahl = (n) => net.log.filter((x) => x === n).length;
+    const klassenImSpeicher = () => (meineKlassenGespeichert() || { mitglied: [] }).mitglied.length;
+    // Einstellungen offen (holt neu, langsames Netz), waehrenddessen Beitritt
+    const vorher = meineKlassen({ neu: true });
+    const rb = await trittBei('K7Q2MX', 'Anna');
+    pruefe('Beitritt waehrend "Meine Klassen" laeuft: danach neu geholt, die Klasse steht im Zwischenspeicher', rb.ok && zahl('schule_meine_klassen') >= 2
+      && klassenImSpeicher() === 1, { log: net.log, im: klassenImSpeicher() });
+    const rv0 = await vorher;
+    pruefe('... die alte Antwort ueberschreibt ihn nicht, wer auf sie wartete, bekommt den neuen Stand', rv0.ok && rv0.daten.mitglied.length === 1
+      && klassenImSpeicher() === 1 && !JSON.parse(m.get(STAND_SCHLUESSEL)).veraltet, rv0);
+    pruefe('nach dem Beitritt: eine Partie wird gemeldet (Stand mit Klasse bekannt)', planeMeldung({ sofort: true }) === true);
+    await warte(100);
+    // Austritt, waehrend eine Anfrage laeuft
+    const vorher2 = meineKlassen({ neu: true });
+    const rv = await verlasse(KL);
+    const r2 = await vorher2;
+    pruefe('Austritt waehrend "Meine Klassen" laeuft: die Mitgliedschaft ist danach weg, auch fuer den Wartenden', rv.ok && klassenImSpeicher() === 0
+      && r2.ok && r2.daten.mitglied.length === 0, { im: klassenImSpeicher(), r2 });
+    net.langsam = 0;
+    await warte(50);
+    // Zeitgrenze: Standard und Testwert
+    pruefe('Zeitgrenze je Anfrage: 15 s', WARTE_MS === 15000);
+    setzeSchuleWartezeit(250);
+    net.drin = true;
+    net.haengt.add('schule_meine_klassen');
+    let t = Date.now();
+    const rh = await meineKlassen({ neu: true });
+    pruefe('haengt "Meine Klassen": nach der Wartezeit offline mit dem letzten Stand (kein Festhaengen)', rh.ok && rh.offline === true && Date.now() - t < 5000, rh);
+    net.haengt.clear();
+    const rn = await meineKlassen({ neu: true });
+    pruefe('danach geht es wieder (keine haengende Anfrage wird mitbenutzt)', rn.ok && !rn.offline && rn.daten.mitglied.length === 1, rn);
+    net.koerperHaengt = true;
+    t = Date.now();
+    const rk = await meineKlassen({ neu: true });
+    pruefe('haengt der Koerper der Antwort: ebenfalls offline mit dem letzten Stand, nie "ok ohne Daten"', rk.ok && rk.offline === true
+      && rk.daten.mitglied.length === 1 && klassenImSpeicher() === 1 && Date.now() - t < 5000, rk);
+    net.koerperHaengt = false;
+    // haengender Beitritt (gebucht, Antwort verloren): Knopf wird wieder frei, der Stand gilt als veraltet
+    await verlasse(KL);
+    net.haengt.add('schule_tritt_bei');
+    t = Date.now();
+    const rt = await trittBei('K7Q2MX', 'Anna');
+    pruefe('haengt der Beitritt: trittBei kommt mit "offline" zurueck', rt.ok === false && rt.grund === 'offline' && Date.now() - t < 5000, rt);
+    net.haengt.clear();
+    const n0 = zahl('schule_meine_klassen');
+    const rs = await meineKlassen();
+    pruefe('... danach fragt "Meine Klassen" den Server (der Beitritt kann gebucht sein), statt 12 h dem leeren Stand zu glauben',
+      zahl('schule_meine_klassen') === n0 + 1 && rs.ok && rs.daten.mitglied.length === 1 && klassenImSpeicher() === 1, { rs, n: zahl('schule_meine_klassen') - n0 });
+    // haengende Meldung: meldeJetzt kommt zurueck, die Meldung bleibt vorgemerkt
+    net.haengt.add('schule_melde_fortschritt');
+    m.delete(GEMELDET_SCHLUESSEL);
+    m.set(OFFEN_SCHLUESSEL, JSON.stringify({ uid: UID_A, seit: jetzt }));
+    t = Date.now();
+    const rm = await meldeJetzt();
+    pruefe('haengt die Meldung: meldeJetzt kommt mit "offline" zurueck, die Meldung bleibt vorgemerkt', rm.ok === false && rm.grund === 'offline'
+      && meldungOffen() && Date.now() - t < 5000, rm);
+    net.haengt.clear();
+    const rm2 = await meldeJetzt();
+    pruefe('... und geht beim naechsten Versuch raus', rm2.ok && rm2.gesendet === true && !meldungOffen(), rm2);
+    setzeSchuleWartezeit(null);
+    localStorage.removeItem(SITZUNG_SCHLUESSEL);
+    aufraeumen();
+  }
 
   // ---------- Sortieren ----------
   const mit = (name, f2) => ({ id: name, anzeigename: name, fortschritt: f2 });
@@ -434,6 +541,8 @@ function neuerServer() {
   return { klassen: [], mitglieder: [], fortschritt: new Map(), aufgaben: [], aufrufe: [], meldungen: [], offline: false, n: 500, codes: 0 };
 }
 const fehler400 = (k) => ({ status: 400, body: { code: 'P0001', message: k } });
+// aktualisiert_am ist auf dem Server ein Tag ohne Uhrzeit (date): der gefaelschte Server liefert es genauso
+const tagIso = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const uidAus = (kopf) => {
   try { return JSON.parse(Buffer.from(String(kopf.authorization || '').replace(/^Bearer a\./, '').split('.')[0], 'base64url').toString()).sub; } catch (e) { return null; }
 };
@@ -479,7 +588,7 @@ function rpcAntwort(s, name, uid, d) {
       for (const m of s.mitglieder.filter((x) => x.uid === uid && klasse(x.klasse).aktiv)) {
         const ids = aufgabenVon(m.klasse).map((a) => a.id);
         s.fortschritt.set(m.id, { bots_besiegt: d.bots_besiegt, sterne: d.sterne, partien: d.partien, genauigkeit_schnitt: d.genauigkeit_schnitt,
-          haeufigste_fehler: d.haeufigste_fehler, erledigt: (d.erledigt || []).filter((x) => ids.includes(x)), aktualisiert_am: new Date().toISOString() });
+          haeufigste_fehler: d.haeufigste_fehler, erledigt: (d.erledigt || []).filter((x) => ids.includes(x)), aktualisiert_am: tagIso() });
         n++;
       }
       return { status: 200, body: n };
@@ -659,8 +768,21 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.sm-tafel:not([hidden])');
     await seite.click('.sm-tafel', { position: { x: 5, y: 5 } });
     pruefe('"Groß zeigen" oeffnet die Tafel, Tipp schliesst sie', await seite.evaluate(() => document.querySelector('.sm-tafel').hidden));
+    // mit der Tastatur: Tab und Shift+Tab bleiben in der offenen Tafel, Escape bringt den Fokus zurueck
+    await seite.focus('.sm-gross');
+    await seite.keyboard.press('Enter');
+    await seite.waitForSelector('.sm-tafel:not([hidden])');
+    for (const taste of ['Tab', 'Tab', 'Shift+Tab', 'Tab']) await seite.keyboard.press(taste);
+    const falle = await seite.evaluate(() => ({ drin: !!document.activeElement?.closest('.sm-tafel'), cls: document.activeElement?.className || '' }));
+    pruefe('Tafel offen: Tab und Shift+Tab bleiben in der Tafel (Fokusfalle)', falle.drin && /sm-tafel-zu/.test(falle.cls), falle);
+    await seite.keyboard.press('Escape');
+    pruefe('... Escape schliesst sie, der Fokus steht wieder auf "Groß zeigen"', await seite.evaluate(() => document.querySelector('.sm-tafel').hidden
+      && document.activeElement?.classList.contains('sm-gross')));
 
     // Aufgaben
+    const arten = await seite.evaluate(() => [...document.querySelectorAll('.sm-aufgabe-neu input[name="sm-art"]')].map((x) => x.value));
+    pruefe('Arten im Formular: Raetsel nur, wenn ein Paket Raetsel zaehlt (RAETSEL_AUFGABEN, heute aus)', JSON.stringify(arten)
+      === JSON.stringify(RAETSEL_AUFGABEN ? ['bot', 'raetsel', 'partien'] : ['bot', 'partien']), arten);
     await seite.fill('.sm-a-titel', 'Gabeln mit Rudi');
     await seite.selectOption('.sm-a-bot', 'rudi');
     await seite.fill('.sm-a-faellig', IN_7);
@@ -684,10 +806,10 @@ async function browserTeil(browser) {
 
     // Mitglieder kommen dazu (wie aus der Klasse heraus beigetreten)
     const mitglied = (id, name, f) => { srv.mitglieder.push({ id, klasse: k.id, uid: 'x-' + id, anzeigename: name, beigetreten_am: new Date().toISOString() }); if (f) srv.fortschritt.set(id, f); };
-    mitglied(uuid(31), 'Anna', { bots_besiegt: 3, sterne: 7, partien: 12, genauigkeit_schnitt: 81.5, erledigt: [srv.aufgaben[0].id], aktualisiert_am: new Date().toISOString(),
+    mitglied(uuid(31), 'Anna', { bots_besiegt: 3, sterne: 7, partien: 12, genauigkeit_schnitt: 81.5, erledigt: [srv.aufgaben[0].id], aktualisiert_am: tagIso(),
       haeufigste_fehler: { zuege: 240, arten: [{ art: 'fehler', anzahl: 9 }, { art: 'ungenau', anzahl: 7 }] } });
     mitglied(uuid(32), 'Ben', null);
-    mitglied(uuid(33), 'Cem', { bots_besiegt: 4, sterne: 12, partien: 3, genauigkeit_schnitt: null, erledigt: [], aktualisiert_am: new Date().toISOString(),
+    mitglied(uuid(33), 'Cem', { bots_besiegt: 4, sterne: 12, partien: 3, genauigkeit_schnitt: null, erledigt: [], aktualisiert_am: tagIso(),
       haeufigste_fehler: { zuege: 40, arten: [{ art: 'patzer', anzahl: 2 }] } });
     await seite.click('.sm-neu-laden');
     await seite.waitForFunction(() => document.querySelectorAll('.sm-tabelle tbody tr').length === 3);
@@ -695,6 +817,9 @@ async function browserTeil(browser) {
     pruefe('Mitglieder: Name, Bots, Sterne, Partien, Genauigkeit, häufigste Fehler (Klartext-Namen), Aufgaben, Stand', z1.length === 3 && z1[0][0] === 'Anna'
       && z1[0][1] === '3 / 10' && z1[0][2] === '7 / 30' && z1[0][3] === '12' && z1[0][4] === '81,5 %' && z1[0][5] === 'Daneben 9 · Unscharf 7' && z1[0][6] === '1 / 2'
       && z1[1][0] === 'Ben' && z1[1][7] === 'noch nichts' && z1[2][4] === '–' && z1[2][5] === 'Weit daneben 2', z1);
+    const [jj, mm, tt] = tagIso().split('-');
+    pruefe('Stand: nur der Tag der letzten Meldung ("TT.MM.", ohne Uhrzeit), Hilfe sagt es so', z1[0][7] === `${tt}.${mm}.` && jj.length === 4
+      && /an welchem Tag zuletzt ein Fortschritt kam/.test(await seite.textContent('.sm-mitglieder-karte .sm-hilfe')), z1[0][7]);
     const titel = await seite.textContent('#sm-m-titel');
     const aufg = await seite.evaluate(() => document.querySelector('.sm-aufgaben li').innerText);
     pruefe('Kopf zaehlt die Mitglieder, Aufgabe zaehlt die Erledigten', titel === 'Mitglieder (3)' && /1 von 3 erledigt/.test(aufg), { titel, aufg });
@@ -766,6 +891,16 @@ async function browserTeil(browser) {
     await warte(300);
     pruefe('Konto nicht freigeschaltet: keine Gruppe "Klasse"', (await zwei.seite.locator('.schule-gruppe').count()) === 0);
     await zwei.kontext.close();
+    const drei = await neueSeite(browser, { sitzung: null, konto: false });
+    await bereit(drei.seite, '#schule');
+    await drei.seite.waitForSelector('.sm-inhalt[data-ansicht="nicht-frei"]', { timeout: 20000 });
+    const nf = await drei.seite.evaluate(() => ({ text: document.querySelector('.sm-inhalt').innerText, einstellungen: !!document.querySelector('[data-sm="einstellungen"]') }));
+    await drei.seite.click('[data-sm="arena"]');
+    await drei.seite.waitForFunction(() => document.documentElement.dataset.screen === 'arena', null, { timeout: 10000 });
+    pruefe('Konten nicht sichtbar: #schule sagt "noch nicht freigeschaltet" und fuehrt zur Arena (keine Sackgasse in den Einstellungen)',
+      /noch nicht freigeschaltet/.test(nf.text) && !nf.einstellungen && fair(nf.text), nf);
+    pruefe('keine Fehler (nicht freigeschaltet)', drei.fehler.length === 0, drei.fehler);
+    await drei.kontext.close();
   }
 
   // ---------- Schuelerin: beitreten und austreten in den Einstellungen ----------
@@ -850,13 +985,23 @@ async function browserTeil(browser) {
       .every((k) => !k.hasAttribute('aria-label') || k.getAttribute('aria-label').includes(k.textContent.trim()))));
     pruefe('Heute-Karte: naechste Aufgabe mit Ziel, Termin, Klasse (zuletzt) und Knopf zum Bot', z.titel === 'Gabeln mit Rudi'
       && z.text.includes('Gabeln mit Rudi · Ritter Rudi besiegen · bis ') && z.text.endsWith('· Q1 Schach-AG') && z.knopf === 'Zu Rudi' && z.art === 'bot' && fair(z.text), z);
+    const sicht = await seite.evaluate(() => {
+      const z = document.querySelector('.sm-heute .sm-heute-ziel');
+      const t = document.querySelector('.sm-heute .sm-heute-text').getBoundingClientRect();
+      const r = document.createRange();
+      r.selectNodeContents(z);
+      const teile = [...r.getClientRects()];
+      return { text: z.innerText.replace(/\s+/g, ' '), innen: teile.length > 0 && teile.every((x) => x.left >= t.left - 1 && x.right <= t.right + 1 && x.bottom <= t.bottom + 1) };
+    });
+    pruefe('iPad neben "Zu Rudi": Ziel, Termin und Klasse ganz zu sehen (zweite Zeile, nichts abgeschnitten)', sicht.innen && /bis \S+ \d\d\.\d\d\./.test(sicht.text)
+      && sicht.text.endsWith('Q1 Schach-AG'), sicht);
     await bild(seite, 'heute-aufgabe-ipad-hell');
     await seite.click('.sm-heute-los');
     await seite.waitForFunction(() => /Rudi/.test(document.querySelector('.arena .detail .detail-name')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     const gewaehlt = await seite.evaluate(() => document.querySelector('.arena .detail .detail-name')?.textContent || '');
     pruefe('"Zu Rudi" waehlt Ritter Rudi in der Arena (dann ohne eigenen Knopf)', /Ritter Rudi/.test(gewaehlt)
       && (await seite.locator('.sm-heute .sm-heute-los').count()) === 0, gewaehlt);
-    // Rudi besiegt: die Raetsel-Aufgabe ist dran, Knopf "Üben" fuehrt ins Training
+    // Rudi besiegt: die Raetsel-Aufgabe ist dran, Knopf "Ueben" fuehrt ins Training
     await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('arena', {}, { ersetzen: true }); }, fortschrittBisLisa(true));
     await seite.waitForFunction(() => document.querySelector('.sm-heute')?.dataset.art === 'raetsel', null, { timeout: 10000 });
     const r = await seite.evaluate(() => ({ text: document.querySelector('.sm-heute').innerText.replace(/\s+/g, ' '), knopf: document.querySelector('.sm-heute-los')?.textContent }));
@@ -912,6 +1057,15 @@ async function browserTeil(browser) {
     await beendet();
     await warte(BUENDEL_MS + 1500);
     pruefe('zwei weitere Partien kurz danach: keine zweite Meldung in derselben Minute', srv.meldungen.length === 1);
+    // neuer Stand (Rudi besiegt), dann zurueck in die App und wieder online, alles in derselben Minute: auch das
+    // Nachholen wartet die Minute ab (die gleich-Sperre greift hier nicht, der Stand ist ein anderer)
+    await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), fortschrittBisLisa(true));
+    await beendet();
+    await seite.evaluate(async () => { const { sende } = await import('./js/ereignisse.js'); sende('app:sichtbar', { sichtbar: true }); window.dispatchEvent(new Event('online')); });
+    await warte(BUENDEL_MS + 1500);
+    const nochOffen = await seite.evaluate((k) => !!localStorage.getItem(k), OFFEN_SCHLUESSEL);
+    pruefe('neuer Stand, zurueck in der App und wieder online in derselben Minute: keine zweite Meldung, sie bleibt vorgemerkt',
+      srv.meldungen.length === 1 && nochOffen, { meldungen: srv.meldungen.length, nochOffen });
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
@@ -923,7 +1077,7 @@ async function browserTeil(browser) {
     for (const [i, n] of ['Anna-Lena Großmann', 'Ben', 'Cem', 'Dörte', 'Emil'].entries()) {
       srv.mitglieder.push({ id: uuid(60 + i), klasse: uuid(1), uid: 'x' + i, anzeigename: n, beigetreten_am: new Date().toISOString() });
       if (i !== 1) srv.fortschritt.set(uuid(60 + i), { bots_besiegt: i + 2, sterne: 3 * i + 1, partien: 10 * i + 4, genauigkeit_schnitt: 70 + i, erledigt: i % 2 ? [uuid(11)] : [],
-        aktualisiert_am: new Date().toISOString(), haeufigste_fehler: { zuege: 300, arten: [{ art: 'verpasst', anzahl: 12 }, { art: 'patzer', anzahl: 4 }] } });
+        aktualisiert_am: tagIso(), haeufigste_fehler: { zuege: 300, arten: [{ art: 'verpasst', anzahl: 12 }, { art: 'patzer', anzahl: 4 }] } });
     }
     const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: L, srv, w, h, schema, handy: w < 500 });
     await bereit(seite, '#schule');

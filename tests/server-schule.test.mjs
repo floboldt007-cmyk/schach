@@ -120,6 +120,14 @@ pruefe('Fehlversuche beim Beitreten: ohne raise gezaehlt (sonst rollte der Zaehl
   /return jsonb_build_object\('fehler', 'SCHULE_CODE_UNGUELTIG'\);/.test(fn('schule_tritt_bei').rumpf)
   && /v\.tag = v_tag\), 0\) >= 10 then\s+raise exception 'SCHULE_ZU_VIELE_VERSUCHE';/.test(fn('schule_tritt_bei').rumpf));
 pruefe('Beitritt sperrt die Klasse (Mitglieder zaehlen nacheinander)', /where t\.code = v_code for update;/.test(fn('schule_tritt_bei').rumpf));
+pruefe('Fehlversuche: Beitritte eines Kontos laufen nacheinander (Sperre je Nutzer vor dem Lesen des Zaehlers)',
+  /perform pg_advisory_xact_lock\(hashtextextended\('schule_versuche:' \|\| uid::text, 0\)\);\s+if coalesce\(\(select v\.anzahl from public\.schule_versuche/
+    .test(fn('schule_tritt_bei').rumpf));
+pruefe('Fortschritt: vom Stand nur der Tag (aktualisiert_am date, Europe/Berlin), keine Uhrzeit, auch nicht beim direkten Lesen',
+  /aktualisiert_am date not null default \(\(now\(\) at time zone 'Europe\/Berlin'\)::date\),/.test(ohne) && !/aktualisiert_am timestamptz/.test(ohne)
+  && /public\.schule_heute\(\)\)\s+on conflict \(mitglied\) do update/.test(fn('schule_melde_fortschritt').rumpf)
+  && !/now\(\)/.test(fn('schule_melde_fortschritt').rumpf)
+  && /alter column aktualisiert_am type date\s+using \(\(aktualisiert_am at time zone 'Europe\/Berlin'\)::date\);/.test(ohne));
 pruefe('Uebersicht und Meine Klassen geben weder user_id noch leitung heraus',
   !/'user_id'|'leitung', k\.leitung|'email'/.test(fn('schule_klassen_uebersicht').rumpf + fn('schule_meine_klassen').rumpf)
   && /'leitung', coalesce/.test(fn('schule_meine_klassen').rumpf));

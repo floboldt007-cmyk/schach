@@ -12,8 +12,10 @@
 -- Grundsatz Datensparsamkeit: gespeichert wird nur, was die Leitung fuer den Unterricht braucht. Je Mitglied ein
 -- selbst gewaehlter Anzeigename (Vorname oder Spitzname, 2 bis 24 Zeichen, nie eine E-Mail) und eine Zeile mit
 -- Kennzahlen (besiegte Bots, Sterne, Partien, durchschnittliche Genauigkeit, die haeufigsten Fehlerarten, erledigte
--- Aufgaben). Nie Partien, Zuege, Uhrzeiten einzelner Partien oder Geraetedaten. Mit dem Konto verschwindet alles
--- (on delete cascade), mit dem Verlassen der Klasse die Zeile, mit dem Loeschen der Klasse die ganze Klasse.
+-- Aufgaben) mit dem TAG der letzten Meldung (aktualisiert_am ist ein Datum ohne Uhrzeit: die Meldung kommt nach jeder
+-- Partie, ein Zeitstempel verriete, wann jemand spielt). Nie Partien, Zuege, Uhrzeiten einzelner Partien oder
+-- Geraetedaten. Mit dem Konto verschwindet alles (on delete cascade), mit dem Verlassen der Klasse die Zeile, mit dem
+-- Loeschen der Klasse die ganze Klasse.
 -- Geschlossene Klassen raeumt der Server nach 90 Tagen selbst weg (bei jeder neuen Klasse, fuer alle).
 --
 -- Tabellen (Nutzer lesen nur ueber RLS, schreiben nie direkt; alles Schreiben ueber die Funktionen unten):
@@ -24,12 +26,13 @@
 --                        beigetreten_am. Lesen: Leitung alle ihrer Klassen, Mitglied die eigene Zeile. Die Spalte
 --                        user_id ist fuer angemeldete Nutzer gar nicht lesbar (Spaltenrechte).
 --   klassen_fortschritt  eine Zeile je Mitglied: bots_besiegt, sterne, partien, genauigkeit_schnitt, haeufigste_fehler
---                        (jsonb, klein), erledigt (Aufgaben-IDs), aktualisiert_am. Lesen: Leitung und das Mitglied
+--                        (jsonb, klein), erledigt (Aufgaben-IDs), aktualisiert_am (date, Europe/Berlin). Lesen: Leitung und das Mitglied
 --                        selbst. Schreiben nur ueber schule_melde_fortschritt (das Mitglied seine eigene Zeile).
 --   klassen_aufgaben     klasse, titel, art ('bot' | 'raetsel' | 'partien'), ziel (jsonb), faellig, erstellt_am. Lesen:
 --                        Leitung und Mitglieder der Klasse.
 --   schule_versuche      Fehlversuche beim Beitreten je Nutzer und Tag (gegen das Durchprobieren von Codes). Nur
---                        Service-Rolle.
+--                        Service-Rolle. Gleichzeitige Beitritte eines Kontos laufen nacheinander (Sperre je Nutzer bis
+--                        zum Ende der Transaktion), sonst saehen parallele Anfragen alle einen Zaehler unter 10.
 --
 -- Funktionen (alle security definer mit leerem search_path, nur fuer angemeldete Nutzer; js/schule.js ruft sie):
 --   schule_erstelle_klasse(name)                    -> { id, name, code, aktiv, erstellt_am }
@@ -114,7 +117,8 @@ create table if not exists public.klassen_fortschritt (
   genauigkeit_schnitt numeric(4, 1),
   haeufigste_fehler jsonb not null default '{}'::jsonb,
   erledigt uuid[] not null default '{}',
-  aktualisiert_am timestamptz not null default now(),
+  -- nur der Tag der letzten Meldung, keine Uhrzeit (siehe Kopf)
+  aktualisiert_am date not null default ((now() at time zone 'Europe/Berlin')::date),
   constraint klassen_fortschritt_bots check (bots_besiegt between 0 and 10),
   constraint klassen_fortschritt_sterne check (sterne between 0 and 30),
   constraint klassen_fortschritt_partien check (partien between 0 and 100000),
@@ -123,6 +127,18 @@ create table if not exists public.klassen_fortschritt (
   constraint klassen_fortschritt_erledigt check (cardinality(erledigt) <= 30)
 );
 create index if not exists klassen_fortschritt_klasse on public.klassen_fortschritt (klasse);
+-- Erste Fassung (vor der Pruefung): aktualisiert_am war ein Zeitstempel. Beim erneuten Einspielen auf den Tag kuerzen.
+do $$
+begin
+  if exists (select 1 from information_schema.columns c where c.table_schema = 'public' and c.table_name = 'klassen_fortschritt'
+             and c.column_name = 'aktualisiert_am' and c.data_type <> 'date') then
+    alter table public.klassen_fortschritt alter column aktualisiert_am drop default;
+    alter table public.klassen_fortschritt alter column aktualisiert_am type date
+      using ((aktualisiert_am at time zone 'Europe/Berlin')::date);
+    alter table public.klassen_fortschritt alter column aktualisiert_am set default ((now() at time zone 'Europe/Berlin')::date);
+  end if;
+end
+$$;
 
 create table if not exists public.klassen_aufgaben (
   id uuid primary key default gen_random_uuid(),
@@ -272,6 +288,9 @@ begin
     or v_name !~ '[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]' then
     raise exception 'SCHULE_NAME_UNGUELTIG';
   end if;
+  -- Fehlversuche eines Kontos nacheinander zaehlen (Sperre je Nutzer bis zum Ende der Transaktion): parallele Anfragen
+  -- saehen sonst alle einen Zaehler unter 10
+  perform pg_advisory_xact_lock(hashtextextended('schule_versuche:' || uid::text, 0));
   if coalesce((select v.anzahl from public.schule_versuche v where v.user_id = uid and v.tag = v_tag), 0) >= 10 then
     raise exception 'SCHULE_ZU_VIELE_VERSUCHE';
   end if;
@@ -399,7 +418,8 @@ begin
     insert into public.klassen_fortschritt as f (mitglied, klasse, bots_besiegt, sterne, partien, genauigkeit_schnitt,
       haeufigste_fehler, erledigt, aktualisiert_am)
     values (m.id, m.klasse, v_bots, v_sterne, v_partien, round(v_gen, 1), v_fehler,
-      coalesce((select array_agg(a.id) from public.klassen_aufgaben a where a.klasse = m.klasse and a.id = any (v_ids)), '{}'), now())
+      coalesce((select array_agg(a.id) from public.klassen_aufgaben a where a.klasse = m.klasse and a.id = any (v_ids)), '{}'),
+      public.schule_heute())
     on conflict (mitglied) do update set
       bots_besiegt = excluded.bots_besiegt, sterne = excluded.sterne, partien = excluded.partien,
       genauigkeit_schnitt = excluded.genauigkeit_schnitt, haeufigste_fehler = excluded.haeufigste_fehler,

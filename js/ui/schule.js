@@ -6,11 +6,15 @@
 //   params: { klasse?: id }   oeffnet gleich diese Klasse (sonst die Liste)
 //
 // Aufbau: header.kopf.haupt-kopf (js/ui/seite.js), darunter .schule-rumpf (scrollt) mit .seiten-kopf und .sm-inhalt
-// [data-ansicht="abgemeldet" | "laedt" | "fehler" | "liste" | "klasse"].
+// [data-ansicht="nicht-frei" | "abgemeldet" | "laedt" | "fehler" | "liste" | "klasse"]. nicht-frei: Konten sind auf
+// diesem Geraet nicht sichtbar (kontoFreigeschaltet), die Adresse #schule fuehrt dann zur Arena statt zu einer Anmeldung,
+// die es in den Einstellungen nicht gibt.
 //   liste:  .sm-klassen (button.t-karte.sm-klasse-karte[data-klasse] je eigene Klasse), form.sm-neu ("Klasse anlegen")
-//   klasse: .sm-code-karte (.sm-code mit 6 Zeichen, "Groß zeigen" oeffnet .sm-tafel ueber dem Screen), .sm-mitglieder-karte
+//   klasse: .sm-code-karte (.sm-code mit 6 Zeichen, "Gross zeigen" oeffnet .sm-tafel ueber dem Screen; Fokus bleibt in der
+//           Tafel, bis sie zu ist), .sm-mitglieder-karte
 //           (table.sm-tabelle mit th[aria-sort] > button.sm-sort[data-spalte], tr[data-mitglied], Entfernen),
-//           .sm-aufgaben-karte (li[data-aufgabe], form.sm-aufgabe-neu), .sm-ende (Schliessen, danach Loeschen)
+//           .sm-aufgaben-karte (li[data-aufgabe], form.sm-aufgabe-neu; die Art 'raetsel' nur mit RAETSEL_AUFGABEN),
+//           .sm-ende (Schliessen, danach Loeschen)
 // Solange eine Klasse offen ist, holt der Screen alle AUFFRISCHEN_MS die Uebersicht neu (nur sichtbar), damit neue
 // Mitglieder waehrend der Stunde auftauchen. Rueckfragen ueber app.frage. Zurueck: aus einer Klasse zur Liste.
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
@@ -22,7 +26,7 @@ import { tagSchluessel, addiereTage } from '../tag.js';
 import {
   nutzerId, meineKlassen, meineKlassenGespeichert, erstelleKlasse, uebersicht, aufgabeAnlegen, aufgabeLoeschen,
   entferneMitglied, schliesseKlasse, loescheKlasse, sortiereMitglieder, zielText, faelligText, fehlerText, fehlerArtName,
-  pruefeKlassenname, stelleSchuleCssSicher, GRENZEN, ICON,
+  pruefeKlassenname, stelleSchuleCssSicher, GRENZEN, ICON, RAETSEL_AUFGABEN,
 } from '../schule.js';
 
 export const AUFFRISCHEN_MS = 20000;
@@ -36,13 +40,17 @@ const SPALTEN = [
   { id: 'aufgaben', text: 'Aufgaben' },
   { id: 'aktualisiert', text: 'Stand' },
 ];
+// Raetsel-Aufgaben erst, wenn ein Paket raetsel:geloest sendet (sonst koennte niemand sie erfuellen)
 const ARTEN = [
   { id: 'bot', text: 'Bot besiegen' },
   { id: 'raetsel', text: 'Rätsel lösen' },
   { id: 'partien', text: 'Partien spielen' },
-];
+].filter((a) => a.id !== 'raetsel' || RAETSEL_AUFGABEN);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Tag als "23.10.": ein Datum ohne Uhrzeit (aktualisiert_am) direkt, ohne Umweg ueber die Zeitzone des Geraets
 const datum = (iso) => {
+  const tag = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
+  if (tag) return `${tag[3]}.${tag[2]}.`;
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '–';
   const d = new Date(t);
@@ -103,6 +111,20 @@ export function zeige(root, params = {}, app) {
   };
   const stoppeTimer = () => { clearTimeout(timer); timer = null; };
 
+  // ---------- Konten auf diesem Geraet nicht sichtbar (nur ueber die Adresse #schule erreichbar) ----------
+  function zeigeNichtFrei() {
+    stoppeTimer();
+    setze('nicht-frei', `<div class="t-karte sm-hinweis-karte">
+        <span class="sm-symbol" aria-hidden="true">${icon(ICON)}</span>
+        <div><h2>Der Schulmodus ist noch nicht freigeschaltet</h2>
+          <p>Er braucht ein Konto, und Konten gibt es in Crownmate noch nicht für alle. Sobald es so weit ist, steht er in den
+            Einstellungen unter „Klasse“.</p></div>
+        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="arena">Zur Arena ${icon('vor')}</button></div>
+      </div>`);
+    inhalt.querySelector('[data-sm="arena"]').addEventListener('click', () => app.gehe('arena'));
+    eintritt();
+  }
+
   // ---------- ohne Konto ----------
   function zeigeAbgemeldet() {
     stoppeTimer();
@@ -132,7 +154,8 @@ export function zeige(root, params = {}, app) {
     stoppeTimer();
     offen = null;
     daten = null;
-    if (!kontoFreigeschaltet() || !nutzerId()) { zeigeAbgemeldet(); return; }
+    if (!kontoFreigeschaltet()) { zeigeNichtFrei(); return; }
+    if (!nutzerId()) { zeigeAbgemeldet(); return; }
     const gespeichert = meineKlassenGespeichert();
     if (gespeichert) baueListe(gespeichert.leitung);
     else setze('laedt', '<p class="sm-laedt">Klassen werden geladen …</p>');
@@ -269,8 +292,8 @@ export function zeige(root, params = {}, app) {
             <tbody></tbody>
           </table>
         </div>
-        <p class="sm-hilfe">Stand: wann das Mitglied zuletzt gespielt hat und der Fortschritt kam. Genauigkeit und Fehler aus den
-          letzten 20 Partien gegen die Bots.</p>
+        <p class="sm-hilfe">Stand: an welchem Tag zuletzt ein Fortschritt kam (er kommt nach jeder Partie, gespeichert wird nur der
+          Tag). Genauigkeit: Durchschnitt aller gespeicherten Partien gegen die Bots; Fehler: die eigenen Züge der letzten 20 davon.</p>
         <p class="sm-status" aria-live="polite"></p>
       </section>
       <section class="t-karte sm-aufgaben-karte" aria-labelledby="sm-a-titel">
@@ -559,8 +582,16 @@ export function zeige(root, params = {}, app) {
     if (vorherFokus && vorherFokus.isConnected) { try { vorherFokus.focus({ preventScroll: true }); } catch (e) { /* egal */ } }
   }
   tafel.addEventListener('click', schliesseTafel);
-  const taste = (e) => { if (e.key === 'Escape' && !tafel.hidden) { e.preventDefault(); schliesseTafel(); } };
+  // Fokusfalle: Solange die Tafel offen ist, bleibt der Fokus darin (einziges Ziel: "Schliessen"), Tab laeuft nicht dahinter
+  const zu = tafel.querySelector('.sm-tafel-zu');
+  const taste = (e) => {
+    if (tafel.hidden) return;
+    if (e.key === 'Escape') { e.preventDefault(); schliesseTafel(); return; }
+    if (e.key === 'Tab') { e.preventDefault(); zu.focus({ preventScroll: true }); }
+  };
+  const fokusRein = (e) => { if (!tafel.hidden && !tafel.contains(e.target)) zu.focus({ preventScroll: true }); };
   document.addEventListener('keydown', taste);
+  document.addEventListener('focusin', fokusRein);
 
   if (params && typeof params.klasse === 'string' && kontoFreigeschaltet() && nutzerId()) oeffneKlasse(params.klasse);
   else zeigeListe();
@@ -570,6 +601,7 @@ export function zeige(root, params = {}, app) {
       weg = true;
       stoppeTimer();
       document.removeEventListener('keydown', taste);
+      document.removeEventListener('focusin', fokusRein);
       kopf.verlasse();
     },
   };

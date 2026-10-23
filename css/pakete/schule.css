@@ -160,7 +160,9 @@ th[aria-sort="ascending"] .sm-sort, th[aria-sort="descending"] .sm-sort { color:
 .sm-heute-symbol { flex: none; width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--flaeche);
   color: var(--text-2); }
 .sm-heute-symbol .ico { width: 18px; height: 18px; }
-.sm-heute-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; font-weight: 650;
-  color: var(--text-2); }
-.sm-heute-text b { font-weight: 800; color: var(--text); }
+/* zwei Zeilen: Titel (gekuerzt), darunter Ziel, Stand, Termin, Klasse (darf umbrechen, damit der Termin sichtbar bleibt) */
+.sm-heute-text { flex: 1; min-width: 0; display: grid; gap: 1px; font-size: 14.5px; font-weight: 650; color: var(--text-2); }
+.sm-heute-text b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; color: var(--text); }
+.sm-heute-trenn { display: none; }
+.sm-heute-ziel { font-size: 13.5px; line-height: 1.3; overflow-wrap: anywhere; }
 .sm-heute-los.knopf { flex: none; min-height: 44px; padding: 0 14px; font-size: 14.5px; }
