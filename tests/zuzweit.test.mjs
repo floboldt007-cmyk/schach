@@ -41,9 +41,13 @@ try {
   seite.setDefaultTimeout(15000);
   seite.on('pageerror', e => fehler.push(e.message));
   seite.on('console', m => { if (m.type() === 'error') fehler.push(m.text()); });
-  const wartePartie = () => seite.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit');
+  // Eine neue Partie hat ein neues z. Vor dem Ausloesen merken (merke), sonst gilt die alte Partie noch als "da",
+  // solange der naechste Screen laedt (Revanche lief in der CI so in die alte Partie)
+  const merke = () => seite.evaluate(() => { window.__altesZ = window.__partie?.z || null; });
+  const wartePartie = () => seite.waitForFunction(() => window.__partie?.z?.modus === 'zuzweit' && window.__partie.z !== window.__altesZ);
   const knopf = name => seite.locator(`[data-zz="${name}"]`);
   async function start(tempo = 'ohne', drehen = false) {
+    await merke();
     await seite.evaluate(() => window.__app.gehe('training'));
     await seite.getByRole('button', { name: 'Zu zweit spielen', exact: true }).click();
     await seite.locator('[name="weiss"]').fill('Anna');
@@ -90,7 +94,7 @@ try {
   await knopf('remis').click(); await seite.getByRole('button', { name: 'Annehmen', exact: true }).click();
   pruefe('Remis angenommen, Ergebnis ohne Sterne', (await seite.locator('.zz-ergebnis').innerText()).startsWith('Remis') && !(await seite.locator('.zz-ergebnis').innerText()).includes('Stern'));
   pruefe('Keine Wertung oder Freischaltung', await seite.evaluate(v => localStorage.getItem('schach-arena:v1:fortschritt') === v, fortschritt));
-  await knopf('revanche').click(); await wartePartie();
+  await merke(); await knopf('revanche').click(); await wartePartie();
   pruefe('Revanche tauscht Namen und startet leeres Brett', await seite.evaluate(() => window.__partie.z.zuzweit.weiss === 'Ben' && window.__partie.z.zuzweit.schwarz === 'Anna' && !window.__partie.z.zuege.length));
   await aufgeben();
   pruefe('Aufgabe der Seite am Zug: benannter Sieger', (await seite.locator('.zz-ergebnis h3').innerText()) === 'Anna gewinnt');
