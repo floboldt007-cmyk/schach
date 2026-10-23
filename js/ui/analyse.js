@@ -429,9 +429,15 @@ export function zeige(root, params = {}, app) {
     const zaehlt = (p) => eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
     const alle = ladePartien().filter(zaehlt).map((p) => p.genauigkeit).filter(Number.isFinite);
     const rekord = zaehlt(st.partie) && Number.isFinite(eigen) && alle.length >= 2 && eigen >= Math.max(...alle) - 1e-9;
-    const wert = (g, ich) => (Number.isFinite(g)
-      ? `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`
-      : '<div class="an-g-wert an-g-leer">keine Züge</div>');
+    // Zu kurze Partie (z. B. Aufgabe im zweiten Zug): keine Genauigkeit und keine Spielstaerke zeigen, Werte aus
+    // so wenigen Zuegen sind nicht verlaesslich (Vorschlag Nr. 1 in design/runde4/VORSCHLAEGE-CODEX.md).
+    // Gilt nur fuer die Anzeige, gespeicherte Werte und Sterne bleiben unveraendert.
+    const zuKurz = !zaehlt(st.partie);
+    const wert = (g, ich) => {
+      if (!Number.isFinite(g)) return '<div class="an-g-wert an-g-leer">keine Züge</div>';
+      if (zuKurz) return '<div class="an-g-wert an-g-leer an-g-kurz">zu kurz</div>';
+      return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`;
+    };
     const eroeffnung = r.eroeffnung || st.partie.eroeffnung;
     return `
       <div class="an-genau flaeche">
@@ -442,10 +448,11 @@ export function zeige(root, params = {}, app) {
         <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>
         <div class="an-seite an-re">
           ${avatarHtml(st.bot)}
-          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div>${Number.isFinite(staerkeBot) ? `<div class="an-g-label an-g-zusatz an-g-zweit">spielte wie ≈ ${staerkeBot}</div>` : ''}</div>
+          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div>${!zuKurz && Number.isFinite(staerkeBot) ? `<div class="an-g-label an-g-zusatz an-g-zweit">spielte wie ≈ ${staerkeBot}</div>` : ''}</div>
         </div>
         <div class="an-g-chips">
-          ${Number.isFinite(staerke) ? `<span class="chip an-chip-staerke">spielte wie ≈ <b class="zahl">${staerke}</b></span>` : ''}
+          ${zuKurz ? '<span class="an-g-hinweis">Zu wenige Züge für eine verlässliche Bewertung</span>' : ''}
+          ${!zuKurz && Number.isFinite(staerke) ? `<span class="chip an-chip-staerke">spielte wie ≈ <b class="zahl">${staerke}</b></span>` : ''}
           ${rekord ? `<span class="chip an-chip-rekord">${icon('pokal')} Bestwert</span>` : ''}
           ${eroeffnung ? `<span class="an-eroeffnung">${icon('buch')}<span>${esc(eroeffnung)}</span></span>` : ''}
         </div>

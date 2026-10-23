@@ -185,6 +185,7 @@
 .an-chip-staerke { color: var(--text-2); background: var(--flaeche-2); }
 .an-chip-staerke b { font-weight: 800; color: var(--text); }
 .an-chip-rekord { color: var(--text); border-color: var(--gold); background: var(--gold-weich); }
+.an-g-hinweis { flex: 1 1 100%; font-size: 13px; color: var(--text-2); }
 .an-eroeffnung { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--text-2); }
 .an-eroeffnung svg { width: 18px; height: 18px; flex: none; color: var(--k-buch); }
 
