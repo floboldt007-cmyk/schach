@@ -56,8 +56,10 @@ function ladeCss() {
   } catch (e) { /* ohne eigenes CSS bleibt alles bedienbar */ }
 }
 
+// Zusatz (klein) mit Leerzeichen davor: der Name des Knopfs liest sich dann "... Laeufer wertet nicht" (Screenreader);
+// im Flex-Knopf zeichnet das Leerzeichen nichts
 const knopf = (st, text, { art = '', klein = '' } = {}) =>
-  `<button class="knopf dr${art ? ' ' + art : ''}" type="button" data-st="${st}"><span>${esc(text)}</span>${klein ? `<small>${esc(klein)}</small>` : ''}</button>`;
+  `<button class="knopf dr${art ? ' ' + art : ''}" type="button" data-st="${st}"><span>${esc(text)}</span>${klein ? ` <small>${esc(klein)}</small>` : ''}</button>`;
 // Bot-Farbe und Toenung aus dem Theme (Rueckfall: Farbe aus bots.js bzw. Flaeche)
 const farben = (b) => `--bf:${botFarbe(b)};--bt:var(--bot-${/^[a-z0-9-]+$/.test(b.id) ? b.id : 'x'}-tint, var(--flaeche-2))`;
 const portraet = (b) => `<div class="st-portraet" style="${farben(b)}"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></div>

@@ -72,7 +72,7 @@ function neuZeile(k) {
   el.dataset.paket = L.PAKET;
   el.dataset.entdeckung = e.id;
   el.innerHTML = `<span class="st-neu-siegel" aria-hidden="true">${icon('neu-siegel')}</span>
-    <span class="st-neu-text"><b>Neu für dich:</b> <span class="st-neu-titel"></span><small></small></span>
+    <span class="st-neu-text"><b>Neu für dich:</b> <span class="st-neu-titel"></span> <small></small></span>
     <button class="knopf dr st-neu-los" type="button">Ansehen</button>
     <button class="icon-knopf dr st-neu-weg" type="button" aria-label="Hinweis ausblenden">${icon('kreuz')}</button>`;
   el.querySelector('.st-neu-titel').textContent = e.titel;
