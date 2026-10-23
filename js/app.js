@@ -69,6 +69,7 @@ import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
 import './konto.js';
+import { uebernimmEinladungsLink } from './online.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -78,11 +79,11 @@ export { icon };
 const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start',
+const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
   'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
-  training: 'Training', start: 'Willkommen',
+  training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt',
 };
@@ -583,6 +584,7 @@ let ladeNr = 0;
 let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem aktuellen
 
 function hashFuer(name, params) {
+  if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
   return '#' + name;
 }
@@ -590,6 +592,7 @@ function hashFuer(name, params) {
 function ausHash(hash) {
   const h = String(hash || '').replace(/^#\/?/, '');
   const [name, rest] = h.split('/');
+  if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (SCREENS.includes(name)) return { name, params: {} };
   return { name: 'arena', params: {} };
@@ -661,9 +664,10 @@ function ersterScreen() {
 }
 
 function beiVerlauf() {
-  const ziel = ersterScreen() || ausVerlauf();
+  const einladung = uebernimmEinladungsLink();
+  const ziel = einladung ? { name: 'online', params: {} } : ersterScreen() || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
-  if (aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  if (!einladung && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }
