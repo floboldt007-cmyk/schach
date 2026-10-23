@@ -39,3 +39,112 @@ heißen.
 
 Nach Änderungen an Auth oder SMTP zuerst mit einer eigenen Adresse testen. Den empfangenen Code niemals
 weitergeben oder in ein Fehlerprotokoll kopieren.
+
+## Online gegen Freunde (Stufe 2, Fundament)
+
+Partien gegen Freunde liegen in der Tabelle `partien_online` und werden ausschließlich über Datenbank-Funktionen
+verändert (`online_erstelle`, `online_tritt_bei`, `online_zug`, `online_gib_auf`, `online_biete_remis`,
+`online_nimm_remis_an`, `online_pruefe_zeit`, `online_meine`). Die App ruft sie über die REST-Schnittstelle (`/rest/v1/rpc/...`) mit dem
+publishable key und dem Sitzungs-Token auf. Es gibt keinen Websocket und keine Supabase-Bibliothek im Projekt.
+Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Server vor.
+
+1. **Schema einspielen:** Erst `supabase/schema.sql` (falls noch nicht geschehen), dann im **SQL Editor** den
+   vollständigen Inhalt von `supabase/online-schema.sql` ausführen. Ein erneuter Lauf ist erlaubt. Wer später
+   Parameternamen oder den Rückgabetyp einer Funktion ändert, entfernt sie vorher mit `drop function`
+   (`create or replace` kann das nicht).
+2. **RLS prüfen:** Den Inhalt von `supabase/online-rls-test.sql` ausführen. Die Query muss am Ende
+   `Online-RLS-Test erfolgreich` ausgeben. Das Skript legt drei Testnutzer an, spielt mehrere Partien durch
+   (Beitritt, Züge, Zeitabzug, Zeitüberschreitung, Zeit reklamieren, Remis, Aufgabe, abgelaufene Einladung,
+   Dritter sieht nichts) und rollt alles zurück. Wer eine ältere Fassung schon eingespielt hat, spielt die Datei
+   einfach noch einmal ein: Sie entfernt dabei die frühere Regel, nach der man eine Einladung auch direkt anlegen
+   durfte.
+3. **Was der Server schützt:** Lesen dürfen nur die beiden Spieler und der Ersteller. Anlegen, Ändern und Löschen
+   sind für angemeldete Nutzer direkt gesperrt; neue Partien entstehen nur über `online_erstelle`, Züge nur über
+   `online_zug`, das prüft, wer am Zug ist, und die Uhr mit der Serverzeit führt. Die Uhr gilt auch, wenn jemand
+   gar nicht mehr zieht: Zug, Remis, Remis-Annahme und Aufgabe prüfen zuerst die laufende Uhr, und jeder der beiden
+   Spieler kann mit `online_pruefe_zeit` die Zeit reklamieren. Der Einladungscode (6 Zeichen ohne 0, O, 1 und I)
+   entsteht immer serverseitig aus kryptografischem Zufall, eine Einladung gilt 24 Stunden.
+   **Vertrauenssache unter Freunden:** Die Schachregeln selbst prüft der Server **nicht**, und auch das Ergebnis, das
+   der Ziehende mit seinem Zug meldet (zum Beispiel „matt“), übernimmt er ungeprüft. Beide Clients prüfen mit
+   chess.js, unter Freunden reicht das. Für Partien gegen Fremde kommt später eine Edge Function, die jeden Zug und
+   jedes Ergebnis nachrechnet.
+4. **Abfrage statt Echtzeit:** Die App fragt alle 2 Sekunden über REST nach einer neueren Zeile (`aktualisiert_am`)
+   und pausiert, solange die Seite verborgen ist. Bei Fehlern wird der Abstand größer (bis 30 Sekunden), nach einer
+   beendeten Partie oder einer abgelaufenen Anmeldung hört die Abfrage von selbst auf. Das reicht für Partien unter Freunden und braucht keine weitere
+   Einrichtung. Supabase Realtime (Websocket) kann später dazukommen; dafür müsste die Tabelle `partien_online` im
+   Dashboard unter **Database > Publications** zur Publication `supabase_realtime` hinzugefügt werden, und die App
+   bräuchte einen eigenen Websocket-Client. Vorerst nichts einschalten.
+5. **Anfragen im Blick behalten:** Zwei Spieler mit offener Partie erzeugen zusammen etwa 60 kleine Anfragen pro
+   Minute. Bei vielen gleichzeitigen Partien die Grenzen unter **Settings > API** prüfen oder den Abstand in
+   `js/online.js` (`beobachte`, `alle`) vergrößern.
+## Daten-Schema einspielen (Partien-Archiv, Nutzung, Konto löschen, Datenauskunft)
+
+Voraussetzung: `supabase/schema.sql` ist eingespielt (Schritt 2 oben). Das Daten-Schema gehört zur Datenfreigabe in der
+App (Einstellungen > Daten): Spieler mit Konto können freiwillig fertige Partien und Nutzungsdaten teilen (Standard aus),
+ihre Daten herunterladen und ihr Konto selbst löschen.
+
+1. **SQL Editor** öffnen, **New query**, den vollständigen Inhalt von `supabase/daten-schema.sql` einfügen und **Run**
+   drücken. Ein erneuter Lauf ist erlaubt (Tabellen und Regeln werden nur ergänzt oder gezielt ersetzt).
+2. **Prüfen:** In einer neuen Query den Inhalt von `supabase/daten-rls-test.sql` ausführen. Am Ende muss
+   `Daten-RLS-Test erfolgreich` stehen. Der Test legt zwei Testnutzer an, prüft Fremdzugriff, die Größen-Checks, die
+   Auskunft und das Löschen und rollt am Ende alles zurück.
+3. **Was angelegt wird:**
+   - Tabelle `partien_archiv`: eine fertige Partie je Zeile. Spieler dürfen nur eigene Zeilen anlegen, lesen und löschen,
+     nichts ändern.
+   - Tabelle `nutzung`: kleine Nutzungsereignisse (welcher Bereich, Start und Ende von Partien, Fehler der App, Einschalten
+     der Freigabe). Spieler dürfen nur anlegen, nicht lesen; lesen kann sie nur der Besitzer im Dashboard (Table Editor
+     oder SQL Editor) und der Spieler selbst über die Datenauskunft.
+   - Funktion `konto_loeschen()`: löscht für den angemeldeten Aufrufer Nutzung, Archiv, Spielstand, Profil, sein
+     Anmeldeprotokoll (`auth.audit_log_entries`, soweit die Rechte reichen) und zuletzt den Auth-Nutzer selbst (auch die
+     Google-Verknüpfung, Online-Partien und den Widerrufs-Vermerk per Kaskade). Nur für angemeldete Nutzer aufrufbar.
+     Server-Logs und Sicherungen von Supabase erreicht die Funktion nicht; ihre Fristen stehen in der Datenschutzerklärung
+     (Platzhalter füllen). Prüfen nach einer Probe-Löschung: `select count(*) from auth.audit_log_entries where
+     payload->>'actor_id' = '<id>'` muss 0 ergeben.
+   - Funktion `meine_daten()`: liefert alles, was der Server über den Aufrufer hat (Konto, Profil, Spielstand-Metadaten,
+     Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
+     Datei „Meine Daten herunterladen“.
+   - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
+     Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
+   - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
+     Kennung `DATEN_MENGE`).
+4. **Auswerten nur zusammengefasst:** Für die Eichung der Bots und den Coach die Daten nur im SQL Editor zusammenfassen
+   (zum Beispiel Ergebnisse je Bot und Spielstärke), nie einzelne Spieler herausgreifen und nichts exportieren, das ein
+   Konto erkennen lässt. Eine Löschfrist für alte Zeilen ist noch nicht eingerichtet (siehe `design/runde4/DATEN.md`).
+5. **Neue Tabellen mit Bezug auf ein Konto** (zum Beispiel Online-Partien) brauchen `references auth.users (id) on delete
+   cascade`, sonst scheitert `konto_loeschen()` am Fremdschlüssel. Am besten die Tabelle zusätzlich in
+   `meine_daten()` aufnehmen (die Online-Partien sind dort schon drin, sobald `online-schema.sql` eingespielt ist).
+
+## Google-Anmeldung einrichten
+
+Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
+(`/auth/v1/authorize?provider=google`), Supabase zu Google und danach mit der Sitzung zurück zur App (`#konto`). Damit
+das funktioniert, braucht Supabase einen eigenen OAuth-Client bei Google. Client-ID und Client-Secret trägt nur der
+Besitzer im Supabase-Dashboard ein, **nie** in App-Dateien, Git, Screenshots oder Nachrichten.
+
+1. **Google Cloud Console** (console.cloud.google.com) öffnen, ein Projekt anlegen oder wählen.
+2. **OAuth-Zustimmungsbildschirm** (Google Auth Platform > Branding/Zielgruppe) einrichten: App-Name `Crownmate`,
+   Support-E-Mail, Link zur Datenschutzerklärung (`https://floboldt007-cmyk.github.io/schach/datenschutz.html`, erst wenn
+   sie fertig geprüft ist) und zum Impressum. Nur die Standard-Bereiche `openid`, `email` und `profile` verwenden, keine
+   weiteren. Zum Ausprobieren reicht der Testmodus mit eingetragenen Testnutzern; für alle Nutzer die App veröffentlichen.
+3. **Anmeldedaten > Anmeldedaten erstellen > OAuth-Client-ID**, Anwendungstyp **Webanwendung**.
+   - **Autorisierte JavaScript-Quellen:** `https://floboldt007-cmyk.github.io`
+   - **Autorisierte Weiterleitungs-URIs:** genau `https://usaamcqypmvgqmsbfecb.supabase.co/auth/v1/callback`
+   Erstellen. Google zeigt Client-ID und Client-Secret.
+4. **Supabase-Dashboard > Authentication > Sign In / Providers > Google:** einschalten, Client-ID und Client-Secret dort
+   einfügen, speichern. Diese beiden Werte gehören nirgendwo sonst hin. Ein versehentlich veröffentlichtes Secret sofort
+   in der Google Cloud Console ersetzen und in Supabase neu eintragen.
+5. **Rückkehr-Adresse:** Unter **Authentication > URL Configuration** muss die Site URL
+   `https://floboldt007-cmyk.github.io/schach/` sein (Schritt 5 oben). Die App schickt als Rückkehr-Adresse dieselbe
+   Adresse mit `#konto`. Sicherheitshalber genau `https://floboldt007-cmyk.github.io/schach/#konto` zusätzlich unter
+   **Redirect URLs** eintragen (keine Wildcard). Lehnt Supabase die Rückkehr-Adresse ab, landet man auf der Site URL; die
+   App übernimmt die Anmeldung auch dort. Zum lokalen Testen die Testadresse (zum Beispiel `http://localhost:8000/`)
+   vorübergehend unter **Redirect URLs** eintragen und danach wieder entfernen.
+6. **Testen:** In der App Einstellungen > Konto > „Mit Google anmelden“. Nach der Bestätigung bei Google muss die App
+   wieder die Einstellungen zeigen, angemeldet mit der Google-Adresse. Die Adresszeile darf danach keine Tokens mehr
+   enthalten. In Supabase unter **Authentication > Users** steht der Nutzer mit dem Anbieter `google`.
+7. **Was Supabase von Google speichert:** E-Mail-Adresse, Name, Profilbild-Adresse und die Google-Kennung (sie stehen
+   auch in der Datenauskunft unter `konto.angaben_anbieter`). Die Datenschutzerklärung nennt Google als Anmeldeanbieter.
+
+**Hinweis für eine spätere App im Apple App Store:** Wer dort eine Anmeldung über einen fremden Anbieter wie Google
+anbietet, muss nach Apples Regeln zusätzlich „Sign in with Apple“ anbieten (oder eine gleichwertige datensparsame
+Anmeldung). Das betrifft nur eine native App im App Store, nicht die Web-App.

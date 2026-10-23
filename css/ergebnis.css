@@ -1,5 +1,132 @@
 /* ============================================================
-   Schach-Arena · Ergebnis (Premium-Umbau, Look A)
+   Crownmate · Ergebnis (Premium-Umbau, Look A)
    Angelegt von U1 (leer), gefuellt von Paket U7 (PLAN 2.6).
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Schleier ohne Weichzeichner, der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf,
+   "Sieg" mit goldenem Ausrufezeichen, drei Sterne nacheinander (der Klang sitzt auf der Landung, js/ui/partie.js),
+   kein Konfetti. Niederlage ruhig (kleinerer Titel, Lichtblick-Karte), Remis gold-neutral. Feier-Zeilen, Chip "Übung"
+   und die Abrechnung stehen weiter in css/app.css (Erweiterungspunkte).
    ============================================================ */
+
+/* ---------- Schleier und zuruecktretender Screen ---------- */
+.ergebnis-overlay { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--schleier); animation: overlay-ein calc(420ms * var(--tempo)) var(--sanft) both; }
+.ergebnis-overlay[hidden] { display: none; }
+.partie > .kopf, .partie > .inhalt { transform-origin: 50% 40%; transition: transform var(--d-l) var(--gleiten); }
+.partie.mit-ergebnis > .kopf, .partie.mit-ergebnis > .inhalt { transform: scale(.975); }
+
+/* ---------- Karte ---------- */
+.ergebnis-karte { position: relative; width: min(100%, 540px); max-height: 100%; overflow-y: auto; scrollbar-width: none;
+  display: grid; gap: 14px; padding: 22px 28px 26px; border-radius: 32px; text-align: center;
+  background-color: var(--flaeche); background-image: var(--textur-flaeche, none); color: var(--text); box-shadow: var(--s3), var(--kante);
+  animation: erg-karte calc(680ms * var(--tempo)) var(--feder-weich) both; }
+.ergebnis-karte::-webkit-scrollbar { display: none; }
+.ergebnis-karte:focus { outline: none; }
+.remis .ergebnis-karte { box-shadow: 0 0 0 1.5px var(--gold), var(--s3); }
+.erg-zu { position: absolute; z-index: 3; top: 12px; right: 12px; width: 44px; height: 44px; }
+@keyframes erg-karte { from { opacity: 0; transform: translateY(40px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* Titel sofort (Display-Schrift); Sieg mit goldenem Ausrufezeichen, Niederlage ruhig und kleiner, Remis gold-neutral */
+.erg-wort { margin: 0; padding: 0 48px; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(46px, 9vmin, 72px);
+  letter-spacing: var(--lw-titel); line-height: 1; color: var(--text);
+  animation: erg-titel calc(700ms * var(--tempo)) var(--feder-hupf) calc(140ms * var(--tempo)) both; }
+.erg-wort .ausruf { color: var(--gold); }
+.niederlage .erg-wort { font-size: clamp(30px, 5vmin, 38px); font-weight: 750; letter-spacing: -.025em; animation-name: overlay-ein; }
+.remis .erg-wort { font-size: clamp(36px, 6.5vmin, 52px); }
+.remis .erg-wort::after { content: ""; display: block; width: 44px; height: 4px; margin: 10px auto 0; border-radius: var(--r-pille); background: var(--gold); }
+.erg-unter { margin: -4px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2);
+  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(240ms * var(--tempo)) both; }
+@keyframes erg-titel { from { opacity: 0; transform: translateY(18px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes erg-zeile { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Mitte: Sterne (Symbole, schlagen nacheinander ein), Genauigkeit, Lichtblick, Tipp ---------- */
+.erg-mitte { min-height: 80px; display: grid; align-content: center; gap: 12px; }
+.erg-rechnet { display: grid; justify-items: center; gap: 8px; color: var(--text-2); }
+.erg-rechnet .c-klasse { font-weight: 800; color: var(--text); }
+.erg-balken { width: min(260px, 80%); height: 6px; border-radius: var(--r-pille); background: var(--flaeche-3); overflow: hidden; }
+.erg-balken i { display: block; height: 100%; width: 5%; background: var(--tinte); transition: width .3s ease; }
+.erg-sterne { display: flex; justify-content: center; align-items: flex-start; gap: clamp(8px, 4vw, 28px); margin-top: 6px; }
+.erg-stern { position: relative; flex: 0 1 120px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 13px; line-height: 1.25; color: var(--text-2); }
+.e-stern { position: relative; display: block; width: 62px; height: 62px; color: var(--linie-2); }
+.erg-stern:nth-child(2) .e-stern { width: 76px; height: 76px; margin-top: -8px; }
+.e-stern .ico { width: 100%; height: 100%; display: block; }
+.e-stern::after { content: ""; position: absolute; left: 24%; right: 24%; bottom: -4px; height: 6px; border-radius: 50%; background: var(--gold-weich); }
+.erg-stern.an .e-stern { color: var(--gold);
+  animation: erg-stern calc(720ms * var(--tempo)) var(--feder-hupf) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
+.erg-stern.aus .e-stern { animation: overlay-ein calc(400ms * var(--tempo)) var(--sanft) calc((360ms + var(--i) * 250ms) * var(--tempo)) both; }
+.erg-stern.wartet .e-stern { opacity: .5; }
+.erg-stern b { font-size: 14px; font-weight: 800; color: var(--text); }
+.erg-stern small { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.erg-stern.aus b { color: var(--text-2); }
+.erg-stern > b, .erg-stern > small { animation: erg-zeile calc(420ms * var(--tempo)) var(--feder-weich) calc((540ms + var(--i) * 250ms) * var(--tempo)) both; }
+.e-neu { position: absolute; top: -4px; left: calc(50% + 18px); padding: 2px 6px; border-radius: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  color: var(--auf-akzent); background: var(--akzent);
+  animation: combo calc(400ms * var(--tempo)) var(--feder-hupf) calc((700ms + var(--i) * 250ms) * var(--tempo)) both; }
+@keyframes erg-stern { from { opacity: 0; transform: translateY(46px) scale(.2) rotate(-60deg); } to { opacity: 1; transform: none; } }
+.erg-genau { font-size: 15px; font-weight: 650; color: var(--text-2); }
+.erg-genau b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.erg-genau.gross b { display: block; margin: 2px 0; font-size: 34px; }
+.erg-genau.gross span { display: block; font-size: 14px; }
+.erg-tipp { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-2); }
+/* Lichtblick (Niederlage): Flos bester Zug der Partie, ruhig auf Gold */
+.erg-lichtblick { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 20px; text-align: left; background: var(--gold-weich);
+  animation: erg-zeile calc(600ms * var(--tempo)) var(--feder-weich) calc(160ms * var(--tempo)) both; }
+.erg-lichtblick .lb-sym { flex: none; width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; color: var(--gold);
+  background: var(--flaeche); box-shadow: var(--s1); }
+.erg-lichtblick .lb-sym .ico { width: 22px; height: 22px; }
+.erg-lichtblick .lb-text { min-width: 0; }
+.erg-lichtblick b { display: block; font-size: 15px; font-weight: 800; color: var(--text); }
+.erg-lichtblick span { display: block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+/* ---------- Bot-Spruch als Karte, neu freigeschaltet, Knoepfe ---------- */
+.erg-bot { display: flex; align-items: center; gap: 12px; text-align: left;
+  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(900ms * var(--tempo)) both; }
+.erg-bot[hidden] { display: none; }
+.erg-bot .av { flex: none; width: 48px; height: 48px; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
+  background: var(--flaeche-2); }
+.erg-bot .av img { width: 88%; height: 88%; pointer-events: none; -webkit-user-drag: none; }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .erg-bot .av { background: color-mix(in srgb, var(--bf, var(--flaeche-3)) 24%, var(--flaeche)); }
+}
+.erg-bot .sprechblase { flex: 1; min-width: 0; font-size: 14.5px; animation: none; }
+.erg-bot .sprechblase:empty { display: none; }
+.erg-frei { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px 14px; border-radius: 18px; text-align: left;
+  border: 1.5px dashed var(--linie-2); background: var(--flaeche-2);
+  animation: coach-ein calc(500ms * var(--tempo)) var(--feder-weich) calc(1200ms * var(--tempo)) both; }
+.erg-frei .avatar { --g: 54px; }
+.erg-frei .schloss { position: absolute; right: -8px; bottom: -8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--gut); color: var(--auf-akzent); }
+.erg-frei .schloss .ico { width: 13px; height: 13px; }
+.ef-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); color: var(--akzent-text); }
+.ef-name { font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
+.ef-elo { margin-left: 4px; padding: 2px 7px; border-radius: 7px; vertical-align: 3px; font-size: 12px; font-weight: 800; color: var(--text); background: var(--flaeche-3); }
+.erg-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  animation: erg-zeile calc(520ms * var(--tempo)) var(--feder-weich) calc(990ms * var(--tempo)) both; }
+.erg-knoepfe:empty { display: none; }
+.erg-knoepfe .knopf { min-height: 56px; font-size: 17px; padding: 0 12px; }
+
+/* ---------- Handy: Knoepfe untereinander, Hauptknopf zuerst ---------- */
+@media (max-width: 600px) {
+  .ergebnis-karte { gap: 12px; padding: 20px 16px 18px; border-radius: 26px; }
+  .erg-wort { padding: 0 44px; font-size: 46px; }
+  .niederlage .erg-wort { font-size: 30px; }
+  .remis .erg-wort { font-size: 38px; }
+  .erg-zu { top: 8px; right: 8px; }
+  .e-stern { width: 50px; height: 50px; }
+  .erg-stern:nth-child(2) .e-stern { width: 60px; height: 60px; margin-top: -6px; }
+  .erg-stern b { font-size: 13px; }
+  .erg-stern small { font-size: 11.5px; }
+  .erg-knoepfe { grid-template-columns: 1fr; }
+  .erg-knoepfe .knopf { min-height: 52px; font-size: 16px; }
+  .erg-bot .av { width: 42px; height: 42px; border-radius: 14px; }
+  .erg-lichtblick { padding: 12px 14px; gap: 12px; }
+}
+@media (max-height: 700px) {
+  .ergebnis-karte { gap: 10px; padding-top: 18px; }
+  .erg-wort { font-size: 44px; }
+  .niederlage .erg-wort { font-size: 30px; }
+  .e-stern { width: 46px; height: 46px; }
+  .erg-stern:nth-child(2) .e-stern { width: 56px; height: 56px; }
+}

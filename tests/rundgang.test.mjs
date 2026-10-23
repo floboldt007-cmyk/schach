@@ -74,12 +74,15 @@ async function screen(page, browserName, groesse, name, selector = '#app > .scre
 }
 
 async function tippeZug(page, uci) {
-  for (const feld of [uci.slice(0, 2), uci.slice(2, 4)]) {
+  const tippe = async (feld) => {
     const box = await page.locator(`.brett-felder .feld[data-feld="${feld}"]`).boundingBox();
     if (!box) throw new Error(`Feld ${feld} nicht sichtbar`);
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
     await warten(120);
-  }
+  };
+  for (const feld of [uci.slice(0, 2), uci.slice(2, 4)]) await tippe(feld);
+  // U7: "Zug bestaetigen" ist Standard (ohneUhr): steht die Vorschau, macht ein zweiter Tipp aufs Ziel den Zug fest
+  if (await page.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau'))) await tippe(uci.slice(2, 4));
 }
 
 async function rundgang(browser, browserName, groesse) {
@@ -113,7 +116,13 @@ async function rundgang(browser, browserName, groesse) {
   await page.waitForFunction(() => window.__partie.phase() === 'flo' && window.__partie.z.zuege.length === 4, null, { timeout: 10000 });
   bilder.push(await screen(page, browserName, groesse, '02-partie', '.screen.partie'));
 
-  await page.locator('[data-aktion="aufgeben"]').click();
+  // U7: Aufgeben ist ein Halte-Knopf (haltenAufgeben, Standard an); Tastatur und Bedienhilfen bekommen die Rueckfrage
+  const aufgeben = page.locator('.spielknoepfe > [data-aktion="aufgeben"]');
+  if (await aufgeben.evaluate((el) => el.classList.contains('halte-knopf'))) {
+    await aufgeben.focus();
+    await page.keyboard.press('Enter');
+  } else await aufgeben.click();
+  await page.locator('.dialog-ort .dialog').waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('button', { name: 'Aufgeben', exact: true }).last().click();
   await page.locator('.ergebnis-overlay').waitFor({ state: 'visible', timeout: 10000 });
   bilder.push(await screen(page, browserName, groesse, '03-ergebnis', '.ergebnis-overlay'));

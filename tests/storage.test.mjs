@@ -128,6 +128,22 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   s.m.clear();
 }
 
+// ---------- Daten-Fundament (DSGVO): datenfreigabe, Opt-in mit Standard aus ----------
+{
+  s.m.clear();
+  pruefe('Daten: datenfreigabe Standard aus, erlaubt nur aus und an', STANDARD_EINSTELLUNGEN.datenfreigabe === 'aus' && ladeEinstellungen().datenfreigabe === 'aus'
+    && JSON.stringify(EINSTELLUNG_WERTE.datenfreigabe) === '["aus","an"]' && Object.isFrozen(EINSTELLUNG_WERTE.datenfreigabe));
+  speichereEinstellungen({ datenfreigabe: 'an' });
+  pruefe('Daten: Freigabe an bleibt gespeichert, andere Einstellungen unberuehrt', ladeEinstellungen().datenfreigabe === 'an' && ladeEinstellungen().klang === true);
+  for (const falsch of ['ja', true, 1, 'AN', '', null]) {
+    s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ datenfreigabe: falsch }));
+    pruefe(`Daten: falscher Wert ${JSON.stringify(falsch)} -> aus`, ladeEinstellungen().datenfreigabe === 'aus');
+  }
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, brett: 'holz' }));
+  pruefe('Daten: alter Speicherstand ohne datenfreigabe -> aus, alte Werte bleiben', ladeEinstellungen().datenfreigabe === 'aus' && ladeEinstellungen().brett === 'holz');
+  s.m.clear();
+}
+
 // ---------- Fortschritt / Freischaltung ----------
 s = fakeSpeicher();
 setzeSpeicher(s);

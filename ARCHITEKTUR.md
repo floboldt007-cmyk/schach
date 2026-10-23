@@ -162,24 +162,38 @@ Review = { zuege: [{ ply, farbe, san, uci, fenVorher, fenNachher, evalVorher, ev
 ## js/board.js
 ```js
 export class Brett {
-  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug })
-  // beiZug(von, nach, umwandlung?) -> true wenn angenommen
+  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug, koordinaten = true,
+    koordLage = 'ecke', animation = 150, autoDame = false, bestaetigen = false, steuerung = 'beides',
+    turmRochade = false, pfeile = true, beiAbgelehnt, beiLeer })
+  // beiZug(von, nach, umwandlung?, { art: 'tippen' | 'ziehen', landung }) -> true wenn angenommen
+  //   landung: ms, bis die Figur auf dem Ziel steht (0 = steht schon: gezogen, Vorschau bestaetigt, Umwandlung gewaehlt,
+  //   Bewegung aus); die Partie legt den Zug-Klang darauf, das Brett spielt selbst keinen Klang
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
   zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
-  setzeAutoDame(boolean)          // Umwandlung bei der Eingabe sofort als Dame ausfuehren
+  setzeAutoDame(boolean)          // Umwandlung ohne Auswahl als Dame; 450 ms auf dem Zielfeld halten zeigt D T L S
+  setzeBestaetigen(boolean)       // Zug bestaetigen: Vorschau, zweiter Tipp aufs Ziel macht fest, Tipp anderswo nimmt zurueck
+  setzeSteuerung('beides' | 'ziehen' | 'tippen')
+  setzeTurmRochade(boolean)       // Koenig auf den eigenen Turm = Rochade (zielKarte(chess, { turmRochade }))
+  setzeDauer(ms), gleitDauer()    // Gleitdauer; gleitDauer() mit Tempo (0 = das Brett setzt sofort), fuer den Klang bei der Landung
+  setzeKoordLage('ecke' | 'rand') // Koordinaten klein in der Feldecke oder aussen im Sockel (.brett.koord-rand)
+  setzePfeileErlaubt(boolean), nutzerPfeile(), loescheNutzerPfeile()   // Flos Pfeile und Marken (svg.brett-nutzer)
   zeigeAbzeichen(feld, klasse)    // Klassen-Symbol oben rechts am Feld (siehe Design)
   entferneAbzeichen()
-  pfeile([{ von, nach, farbe }])  // SVG-Pfeile ueber dem Brett
+  pfeile([{ von, nach, farbe }])  // Coach-Pfeile (svg.brett-pfeile), getrennt von Flos Zeichnungen
   markiere(felder, art)           // z. B. Hinweis, Fehlerfeld
-  koordinaten(an)                 // a-h / 1-8 am Rand
+  koordinaten(an)                 // a-h / 1-8 an oder aus
 }
 ```
-- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ring), Tippen auf Ziel zieht.
-  Ziehen mit dem Finger (Pointer Events), Figur folgt dem Finger, Abwurf auf Feld.
+- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ringecken), Tippen auf Ziel zieht.
+  Ziehen mit dem Finger (Pointer Events, Schwelle 8 px, Maus 4 px), Figur folgt dem Finger, Abwurf auf Feld.
+  Ein zweiter Zeiger bricht jede Geste ab, zwei Finger ergeben nie einen Zug: ein Finger-Tipp aufs Ziel zieht deshalb
+  erst beim Loslassen (die Maus beim Druecken).
 - Umwandlung: kleine Auswahl D T L S direkt am Feld.
-- Animation 150 ms, Rochade bewegt beide Figuren, en passant entfernt den Bauern.
+- Gleiten 150 ms (Standard; die Partie setzt `setzeDauer(300)` aus `--d-zug`) mal Tempo aus `js/bewegung.js`,
+  Rochade bewegt beide Figuren, en passant entfernt den Bauern. Lage von Figuren, Feldern und Lagen als fertige
+  Prozentwerte (`left`/`top`), animiert werden nur `transform` und `opacity` (keine Browser-Rundung, WebKit).
 - Groesse: quadratisch, fuellt den verfuegbaren Platz (CSS `aspect-ratio`), scharf auf Retina.
 
 ## js/sounds.js
@@ -456,6 +470,8 @@ export function zuruecksetzen()                  // nur Tests
 | `arena:panel-oben` | DOM | `arena.js` `zeigeDetail()`, oben in `.detail` | `{ app, bot, fortschritt }` | W0 Nachlese 5 · 1D Willkommen 10 · 1D Heute-Karte 20 · 2D Sicherungs-Tipp 90 |
 | `arena:panel-bot` | DOM | `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | 2A Bilanz 10 · 2B Geheimnis und Erzfeind 20 |
 | `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
+| `arena:karte-boss` | DOM | `arena.js` (U5), `.ort-karte-boss` am Zelt des Wochen-Boss auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | S1-6 Boss |
+| `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
 | `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
 | `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
@@ -472,8 +488,9 @@ diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete bin
 |---|---|---|---|
 | `arena:kopf` | `.kopf-chips` selbst | nach den Chips Sterne und Pokal | einmal beim Aufbau |
 | `arena:panel-oben` | `.detail > .ort-panel-oben` | erstes Kind des Panels (vor „Offene Partie“), zuerst die Nachlese | bei jedem `zeigeDetail()` (Botwahl) |
-| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (im Handy-Hochformat nur mit „Mehr“ sichtbar wie die Ziele) | bei jedem `zeigeDetail()` |
+| `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (seit U5 in jeder Lage sichtbar, das Panel scrollt) | bei jedem `zeigeDetail()` |
 | `arena:start` | keiner (Aufruf) | nach dem ersten `layout()` und der Freischalt-Animation | einmal; `verlasse()` beim Screen-Wechsel |
+| `arena:karte-boss`, `arena:karte-event` | `.welt > .ort-karte-boss` bzw. `.ort-karte-event` (absolut, Mitte am Platz) | auf der Karte (Zelt bzw. Burgturm), ohne Anbieter `hidden` | einmal beim Aufbau |
 | `partie:begruessung?` | Wahl | `partie.js` vor der Begruessungs-Blase; ebenso die Sprechblase im Arena-Panel (`farbe` dort `null` bei Zufall, `modus` `'normal'`) | Start einer Partie bzw. Botwahl |
 | `ergebnis:karte` | `.erg-karte-ort` | zwischen `.erg-feier` und `.erg-bot` | bei jedem `fuelle()` des Overlays |
 | `analyse:coach` | `.an-c-knoepfe > .an-c-paket` | Knopfzeile der Coach-Karte nach „Variante zeigen“; ohne Hauptvariante bekommt die Karte eine eigene Zeile (nur wenn gefuellt) | bei jedem Zug (`zeigeCoach()`), nur fuer Zuege, nicht fuer die Startstellung |
@@ -632,7 +649,7 @@ buehne = {
   effekte,                                         // .brett-effekte (gleiche Lage wie die Felder)
   rahmen,                                          // .brett-rahmen
   brett,                                           // Brett-Instanz: nur lesen und Effekte, nie Zuege setzen
-  reduziert,                                       // prefers-reduced-motion
+  reduziert,                                       // prefers-reduced-motion oder Einstellung "Bewegung: aus" (U7)
   feld(feld) -> { x, y } | null,                   // 0..7 in der aktuellen Brett-Ausrichtung (wie --x/--y)
   liveAn() -> boolean,
   phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
@@ -670,6 +687,14 @@ Chip „Übung“. Die Statistik im Verlauf zaehlt nur wertende Partien; der Kop
 extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne Statistik-Kacheln).
 
 ## Ergebnis-Overlay (partie.js)
+U7 (Look A, PLAN 2.6, css/ergebnis.css): Schleier `--schleier` ohne Weichzeichner, der Screen dahinter tritt zurueck
+(`.partie.mit-ergebnis`: `.kopf` und `.inhalt` mit `scale(.975)`, „Brett ansehen“ nimmt das zurueck), die Karte federt
+auf. Kopfwort „Sieg“ mit goldenem Ausrufezeichen (`.erg-wort .ausruf`), „Partie verloren“ (ruhig, kleiner), „Remis“
+(gold-neutral). Sterne als Symbole (`.e-stern svg`), sie schlagen nacheinander ein, der Klang sitzt auf der Landung. Kein
+Konfetti. Niederlage: zuerst die **Lichtblick-Karte** `.erg-lichtblick` in `.erg-mitte` (Flos bester Zug aus den
+Live-Klassen, „Zug 14 Sf5: Präzise“, Theorie nur, wenn sonst nichts dabei war), nur wenn `ergebnis:karte` leer bleibt
+(wie `.erg-tipp`). Bot-Spruch als Karte (`.erg-bot` mit `.av` und `.sprechblase`, bei Sprueche „aus“ versteckt). Knoepfe
+„Zur Analyse“ (Zinnober) und „Nächster Gegner“/„Nochmal“, auf dem Handy untereinander, der Hauptknopf zuerst.
 `.ergebnis-karte` = Kopfwort (bei nicht wertenden Partien `.erg-kopf` mit Chip), Unterzeile, `.erg-mitte`
 (Sterne bzw. Genauigkeit und Tipp), `.erg-feier`, `.erg-karte-ort` (Ort `ergebnis:karte`), `.erg-bot`,
 `.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
@@ -1027,6 +1052,63 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 - **Arena**: Die Karte „Offene Partie“ und der Dialog „Neue Partie starten?“ finden auch angemeldete Bots (`botNachId`),
   eine verlassene Boss-Partie laesst sich also wie jede andere fortsetzen (solange ihr Paket geladen ist).
 
+- **Premium-Umbau U7 (Look A, PLAN 2.4 bis 2.6, 3.7, 4):**
+  - **Spielerkarte** `.spieler` fuer beide Lagen (statt `.botbox` und `.botleiste-hoch`): Gegner `.spieler.gegner` mit den
+    alten Klassen als Zusatzklassen (`.botbox`, `.botleiste-hoch`, `.botkarte`), erstes Kind `.ort-gegner-leiste`, dann `.av`
+    (Portraet ueber `thema.avatarVon`), `.info` (`.bot-name`, Unterzeile `.bot-meta` mit Elo, `.denkt-ort`, `.geschlagen-ort`),
+    `.uhr[data-wer="bot"]` und `.blase-ort` (quer eine Zeile in der Karte; hoch legt sich die Blase neben dem Portraet ueber
+    `.info`, also Name und Unterzeile, die Uhr bleibt frei; lange Saetze wachsen nach unten hoechstens bis an den Sockel,
+    nie ueber die Figuren; kein Kuerzen; die Begruessung steht hoch wie jeder Satz 3,5 s, quer 6 s). Karten haben
+    `role="group"`. Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
+    `.name`, direkt danach `.ort-spieler-leiste`, Unterzeile, `.uhr[data-wer="flo"]`. Der Name wird nie mit „…“ gekuerzt:
+    passt er nicht in zwei Zeilen, steht der Rufname da (Benno, Hilde, Kalle, Lisa, Rudi, Prof. Turm, Delia, Kommissar,
+    Greta, Stockfisch), der volle Name im `aria-label` der Karte. `lage()` meldet weiter `'hoch'`/`'quer'`.
+  - **Uhr** (Anzeige, W0+b bringt die Logik): `export fmtUhr(ms)` („M:SS“ ab 20 s, darunter „0:SS,z“). Beide `.uhr` sind
+    versteckt ohne Bedenkzeit (`z.tempo`), mit Bedenkzeit steht die Grundzeit da. `uhr.setze(wer, ms, { laeuft })` (intern,
+    im Test `window.__partie.uhr`): laufend in Tinte, unter 20 s `.warn` rot mit Uhr-Symbol und Sekundenpuls;
+    `uhr.zeige(an)`. Auf dem Handy 66 x 36 px, 17 px Ziffern.
+  - **Kopf** `.p-kopf`: Zurueck, Bot-Name (Handy: Rufname), Unterzeile `.p-eroeffnung` · Stufe · Farbe, Brettwahl
+    (`.brettwahl`, 3 Mini-Felder, nur auf dem iPad: versteckt bis 600 px Breite und bis 500 px Hoehe), Klang-Schalter (`[data-aktion="klang"]`, `aria-pressed`), `.p-zaehlwerk`
+    (Buehne), Zahnrad. Alle Knoepfe sind direkte Kinder von `.kopf`.
+  - **Lagen** (css/partie.css): quer Brett und Balken links, rechts eine Spalte (Gegner, Coach, Zugliste, Flo, Aktionen);
+    iPad hoch eine Spalte per `order` (Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen); **Handy** (hoch bis 600 px):
+    `layout()` rechnet „Brett zuerst“ (PLAN 2.5): `g = floor((Breite - 2 x 10 - Sockel) / 8) x 8`, gemessen an `.inhalt`,
+    setzt `--brett` und `--spalte`; reicht die Hoehe nicht (4 px Puffer), wird zuerst der Coach einzeilig (`.coach-eng`,
+    Rest auf Antippen), erst dann das Brett kleiner (nie unter 280 px). Unter 760 px Hoehe steht der Zugstreifen nach den
+    Knoepfen (`.streifen-unten`, die Spalte scrollt). Der Balken liegt dort waagrecht ueber dem Brett (6 px, `--anteil` per
+    `scaleX`, gedreht von rechts), die Zahl kommt nur auf Antippen (`.zeigt-zahl`). `layout()` laeuft beim Start, bei jeder
+    Groessenaenderung (ResizeObserver) und bei `koordLage`. Es misst ohne `transform` (`offsetTop`/`offsetHeight` bis
+    `.inhalt`), weil das Ergebnis `.inhalt` auf `scale(.975)` setzt; sonst waere das Brett nach Drehen oder Safari-Leiste
+    mit stehendem Ergebnis zu gross.
+  - **Coach-Karte** `.coach.coach-karte` (gemeinsames Bauteil in css/bauteile.css): `.c-symbol`, `.c-kopf` (`.c-klasse`,
+    `.c-zug`, `.c-eval`, `.combo` oben rechts), `.c-text`, `.c-zusatz`, `.coach-knoepfe`. Genial: Klassenwort als Pille,
+    Karte mit Ring, COMBO in der Klassenfarbe. Stil „knapp“: `.c-satz` + `.c-rest` (versteckt bis Antippen, `.offen`);
+    `.hat-rest` heisst „Antippen zeigt mehr“ (knapp, Handy). `.kompakt` wie bisher.
+  - **Komfort** (Einstellungen, alle sofort ueber `schach:einstellungen`): `zugBestaetigen` -> `brett.setzeBestaetigen` nur
+    waehrend Flo am Zug ist (`ohneUhr`: ohne Bedenkzeit, `immer`, `aus`; nie fuer Vorzuege), `haltenAufgeben` -> Aufgeben ist
+    `bauteile.halteKnopf` (1 s halten, Ring, frueh loslassen: Hinweis; Tastatur und Bedienhilfen, also ein Klick ohne Zeiger,
+    bekommen die Rueckfrage `app.frage` wie bei „aus“, nicht das Blatt des Bauteils), `turmRochade` ->
+    `zielKarte(chess, { turmRochade })` und `brett.setzeTurmRochade`, `autoDame`, `steuerung`, `pfeile`, `koordinaten`,
+    `koordLage` -> Setter des Bretts, `bewegung` -> Gleitdauer (`brett.setzeDauer(300)`, mal `tempo()`), `coachStil`,
+    `sprueche` (`aus`: keine Blase, `buehne.blase()` liefert `false`, auch kein Spruch im Ergebnis; `wenig`: Begruessung,
+    Ende und hoechstens ein Satz je 5 eigene Zuege), `brett` (Brettwahl), `klang` (Kopf-Schalter). Flos eigene Pfeile und
+    Marken loescht die Partie mit seinem naechsten Zug (`loescheNutzerPfeile`), ueber Bot-Zuege bleiben sie stehen.
+  - **Klang-Takt** (PLAN 3.7): `spieleKlang(m, landungMs)`: der Zugklang sitzt auf der Landung (`klang.zug({ wann })`,
+    `landung` aus `beiZug(von, nach, umwandlung, { art, landung })` bzw. `brett.gleitDauer()` fuer Bot und Vorzug), gemerkt in
+    `z.landung[ply]`. Der Bewertungsklang kommt 150 ms nach der Landung (oder mit dem Abzeichen, wenn die Bewertung
+    spaeter fertig ist) und nur einer je Moment: nach Schach oder Umwandlung bleibt Praezise/COMBO still. Protokoll (Test):
+    `{ typ: 'klang', name, ply, wann }`, `{ typ: 'bewertungsklang', ply, klasse, name, ms, still }`. Sterne im Ergebnis
+    klingen auf ihrer Landung, Abstaende mal `taktFaktor()` (nie unter 0,6).
+  - **Grosser Moment** nur bei Genial (`effekt(feld, 'brillant')` in `.brett-effekte`): Feld-Puls (`.feld-puls`), Ring
+    (`.welle`), 8 Funken (`.funken i`, 0,6 bis 0,9 Feldbreiten), Lichtstreif (`.streif-huelle > .streif`), das Brett hebt
+    sich 1,2 % (`.brett-rahmen.prisma`). Effekte stehen in fertigen Prozenten (left/top) und behalten `--x`/`--y`. Grobe
+    Fehler bleiben ruhig. `buehne.reduziert` = Systemwunsch oder Einstellung „Bewegung: aus“ (dann keine Effekte), als
+    Getter live gelesen (ein Wechsel mitten in der Partie gilt sofort).
+  - **Duell-Vertrag (U5):** Steht beim Start `html[data-duell="laeuft"]`, zieht der Bot (und spaeter die Uhr, W0+b) erst
+    nach dem DOM-Ereignis `duell:fertig` auf `document`, hoechstens 1,4 s (`DUELL_MAX_MS`). Ohne Duell sofort. Die Ziele des
+    Portraetflugs sind `.spieler.gegner .av` und `.spieler.ich .av`. Im Test: `window.__partie.duellBereit`, Protokoll
+    `{ typ: 'duell', grund: 'ereignis' | 'zeit' | 'verlassen', ms }` (`ms`: so lange hat die Partie gewartet).
+
 ## Bots (js/bots.js)
 ```js
 registriereBot(profil) -> abmelden()     // { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo,
@@ -1074,6 +1156,48 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
   `opacity`, reduzierte Bewegung zeigt das fertige Bild.
 - `kippeKoenig(feld, { langsam = false }) -> boolean` (`.figur.kippt`, langsam 1,4 s), `richteAuf()`; `setzeStellung`
   stellt gekippte Koenige wieder auf.
+- **Premium-Umbau U6 (Look A):** `.brett-rahmen` ist der Sockel (`--sockel`, `--s-brett`, `--r-sockel`, Haarlinie
+  `--kante`, Rand `--sockel-abstand` = `--rahmen` der Partie, sonst `--sockel-rand`); `.brett-effekte` liegt mit
+  demselben Abstand exakt ueber den 8x8 Feldern. Bei `koordLage: 'rand'` traegt das Brett `.brett.koord-rand`, der
+  Sockel bekommt links und unten 12 px, die Koordinaten stehen in `.brett-koord-rand`. Markierungen: `.lage.zuletzt`
+  (`--zuletzt`), `.lage.auswahl` (Abdunklung `--auswahl` mit heller Innenkante, Figur `.figur.angehoben`),
+  `.lage.ziel` (Scheibe), `.lage.ziel.schlag` (Ringecken), `.lage.ziel.rochade` (Turm-auf-Koenig), `.lage.schach`
+  (roter Hof), `.lage.vorschau` (Zug bestaetigen, Figur `.figur.vorschau` halb durchsichtig). Alle `.lage` und Flos
+  Marken liegen in `.brett-felder` (eigener Stapelkontext, `z-index: 0`) und damit UNTER den Figuren. Abzeichen federn mit
+  `--feder-hupf` ein (`.abzeichen-ort.plopp`), bleiben in der Brett-Box und verschwinden (`.weg`), sobald ihre Figur
+  das Feld verlaesst oder geschlagen wird. Schatten der Figuren und Abzeichen kommen aus festen Tokens in
+  `css/tokens.css` (`--schatten-figur`, `-hoch`, `-zieh`, `--schatten-abzeichen`). Der Buchstabe im Feld unten rechts
+  (`.koord.buchst.ecke`) rueckt nur nach oben ins abgerundete Brett-Eck, nicht nach links hinter den Fuss der Figur.
+- Komfort (Einstellungen aus PLAN 4, die Partie verdrahtet sie): `setzeBestaetigen(bool)` (Vorschau: erster
+  Tipp/Abwurf stellt die Figur halb durchsichtig aufs Ziel, zweiter Tipp aufs Ziel macht fest, erst dann `beiZug`;
+  Tipp anderswo nimmt zurueck und tut sonst nichts, ausser er trifft eine eigene ziehbare Figur, die er waehlt; kein
+  `beiLeer`), `setzeStellung` und `erlaubeZuege` raeumen eine Vorschau weg; was die Vorschau schlagen wuerde (auch en
+  passant), ist solange `.figur.verdeckt`, ein Abzeichen auf dem verlassenen oder geschlagenen Feld `.verdeckt`
+  (visibility)), `setzeAutoDame(bool)`
+  (450 ms auf dem Zielfeld halten, auch beim Ziehen, zeigt D T L S; verrutscht der Finger ueber 8 px, zaehlt das
+  Loslassen auf dem Zielfeld als Tipp = Dame), `setzeSteuerung('beides' | 'ziehen' | 'tippen')`,
+  `setzeTurmRochade(bool)` zusammen mit `zielKarte(chess, { turmRochade })`, `setzeDauer(ms)` und `gleitDauer()`
+  (Dauer mal Tempo; der Zug-Klang gehoert auf die Landung), `setzeKoordLage('ecke' | 'rand')`.
+- Flos Pfeile und Marken (`pfeile`-Einstellung, `setzePfeileErlaubt(bool)`): Maus Rechtsklick ziehen = Pfeil,
+  Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett ohne Auswahl loescht alles; Finger 400 ms
+  halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht. Das gilt auch auf der eigenen Figur, die
+  gerade ziehen darf (auch als Vorzug, waehrend der Bot zieht), damit Flo seinen Plan einzeichnen kann: liegt der Finger
+  dort 400 ms still, gehen Zielpunkte und Anheben aus (malbereit), Ziehen malt den Pfeil und die Figur bleibt stehen;
+  Loslassen ohne Ziehen bleibt ein Tipp (Auswahl, keine Marke). Wer sofort zieht (8 px vor Ablauf der 400 ms), zieht
+  die Figur. Nie aus einer laufenden Zug-Geste: Finger zieht schon, eine andere Figur ist gewaehlt (Tipp-Tipp) oder eine
+  Vorschau wurde eben zurueckgenommen. Ein zweiter Finger bricht ab.
+  Pfeile in `svg.brett-nutzer` ueber den Figuren (`g.pfeil[data-von][data-nach]`), Marken in
+  `svg.brett-nutzer.brett-marken` unter den Figuren (`rect.marke[data-feld]`), Farben `--pfeil-nutzer`/`--marke-nutzer`,
+  getrennt von den Coach-Pfeilen: `pfeile([])` der Partie loescht Flos
+  Zeichnungen nicht. `nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }]`, `loescheNutzerPfeile()`.
+  Flos Zeichnungen bleiben ueber `setzeStellung` stehen; ob sie nach einem Zug oder beim Blaettern in der Analyse
+  verschwinden, entscheidet die Partie bzw. Analyse (dann `loescheNutzerPfeile()` rufen).
+  `contextmenu` am Brett ist unterdrueckt. Ausserhalb des Bretts losgelassen bricht eine Zeichnung ab. Die
+  Zeiger-Ereignisse einer Zeichen-Geste (Rechtsklick-Druck, Bewegen, Loslassen) gehen nicht an die Umgebung
+  (`stopPropagation`, sonst sprang das Wischen der Analyse beim waagrechten Pfeil); Capture-Lauscher sehen sie.
+- `beiLeer(feld)` (Tipp ohne Zug, die Partie bricht damit Vorzuege ab): Maus beim Druecken, Finger erst beim Loslassen
+  und nur, wenn kein Halten (Marke) daraus wurde. `setzeTurmRochade(true)` ergaenzt auch eine einfache `zielKarte(chess)`
+  um den Turm und wirkt sofort.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)
@@ -1338,3 +1462,223 @@ Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekue
 mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
+
+# Online gegen Freunde: Fundament (Stufe 2, ohne Oberflaeche)
+
+**Was es ist:** Partien gegen Freunde per Einladungscode oder -link, kein Chat, keine Fremden, kein Matchmaking.
+Der Server (Supabase, Frankfurt) ist Schiedsrichter fuer Reihenfolge und Uhr, nicht fuer die Schachregeln (beide
+Clients pruefen mit chess.js; fuer Fremde spaeter eine Edge Function). Verbindung weg: Die Partie steht in der
+Datenbank und geht beim naechsten Oeffnen weiter. Echtzeit vorerst per Abfrage alle 2 s ueber REST (kein Websocket,
+keine Bibliothek); Realtime kann spaeter dazukommen.
+
+**Dateien:** `supabase/online-schema.sql` (Tabelle `partien_online`, Trigger, Funktionen, RLS, Rechte; mehrfach
+ausfuehrbar), `supabase/online-rls-test.sql` (Pruefung mit drei Nutzern, rollt alles zurueck), `js/online.js`
+(Modul, nur fetch, Sitzung aus `konto.js`), `tests/online.test.mjs` (gefaelschtes fetch, Suite `online` in
+`tests/alle.mjs` nach `konto`), Anleitung in `supabase/ANLEITUNG.md`. **Noch nicht:** Oberflaeche, Einbindung in
+`app.js` (die Datei wird nirgends importiert, liegt aber schon im Offline-Cache), Aenderungen an `partie.js` oder
+`arena.js`.
+
+**Datensatz (Zeile `partien_online`, Feldnamen wie in der Datenbank):** `id` (uuid), `code` (6 Zeichen aus
+`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, immer vom Server), `weiss`, `schwarz`, `erstellt_von` (Nutzer-IDs), `status`
+`'offen' | 'laeuft' | 'beendet'`, `fen` (aktuelle Stellung), `zuege` (UCI durch Leerzeichen, wie `zuege: [uci]` im
+Partie-Datensatz von `storage.js`), `am_zug` `'w' | 'b'`, `ergebnis` `'1-0' | '0-1' | '1/2-1/2' | null`, `grund`
+(vom Client z. B. `'matt'`, `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'`; vom Server `'zeit'`, `'aufgabe'`,
+`'remis'`, `'abgebrochen'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
+`uhr_weiss_ms`, `uhr_schwarz_ms`, `letzter_zug_am`, `erstellt_am`, `aktualisiert_am` (Trigger; Grundlage der Abfrage).
+Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
+
+**Server-Funktionen (nur `authenticated`, `security definer`; direktes `insert`, `update` und `delete` sind gesperrt,
+`authenticated` darf nur lesen; der Trigger `online_vor_anlegen` setzt Code, Grundstellung und Anfangszustand):**
+`online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
+`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug), `online_zug(partie, zug,
+fen_danach, am_zug_danach, ergebnis, grund)` (prueft Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel),
+`online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`; in einer laufenden Partie
+nur fuer die beiden Spieler), `online_biete_remis(partie)` (liegt das Angebot des Gegners schon vor: Annahme),
+`online_nimm_remis_an(partie)`, `online_pruefe_zeit(partie)` (Zeit reklamieren, fuer beide Spieler; liefert immer die
+aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst,
+laeuft unter RLS). Interne Helfer ohne Recht fuer `authenticated`: `online_hole_laufende`, `online_uhr_pruefen`.
+`online_tritt_bei` lehnt Einladungen ab, die aelter als 24 Stunden sind (`ONLINE_CODE_ABGELAUFEN`) oder in denen der
+Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
+in der SQL-Datei); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`), `tests/online.test.mjs` prueft, dass
+keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
+
+**Uhr-Regeln:** Beide starten beim Beitritt mit `bedenkzeit_s * 1000` ms. Der jeweils erste Zug von Weiss und von
+Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden). Ab dem dritten Halbzug zieht
+`online_zug` `clock_timestamp() - letzter_zug_am` von der Uhr des Ziehenden ab und addiert `inkrement_s`; bei <= 0
+endet die Partie durch `'zeit'`, der Zug wird nicht verbucht und der Verlierer bleibt mit leerer Uhr `am_zug`. Der
+Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerechnet an; massgeblich ist der Server.
+Durchsetzbar ist die Uhr ueber `online_uhr_pruefen` (intern): Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
+laufende Uhr der Seite am Zug und beenden die Partie bei <= 0 mit `'zeit'` (Rueckgabe der beendeten Zeile statt
+`raise`, damit die Beendigung nicht zurueckgerollt wird). Steht die heruntergerechnete Gegneruhr bei 0, ruft die
+Oberflaeche `pruefeZeit(id)`. Ob der Gewinner ueberhaupt noch matt setzen koennte, prueft der Server nicht.
+Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck).
+
+**Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
+`tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
+`sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
+`nimmRemisAn(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
+bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`,
+pausiert bei `document.hidden` und fragt beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, nach `stop()`
+kein Hoerer-Aufruf mehr, Fehler gehen an `beiFehler`, derselbe Text nur einmal hintereinander, Abstand bei Fehlern
+wachsend bis 30 s; haelt von selbst an mit `grund()` `'beendet'`, `'unbekannt'` (einmal gemeldet) oder `'abgemeldet'`
+(keine Sitzung oder Erneuern abgelehnt, `fehler.abgemeldet`); ein 401 bei lokal gueltiger Sitzung erneuert genau
+einmal und fragt sofort neu; nichts wirft), `einladungsLink(code, basis?)` -> `https://floboldt007-cmyk.github.io/schach/#online/CODE`
+(Basis aus `location`, sonst die Live-Adresse), `codeAusLink(text)`, `uebernimmEinladungsLink()`,
+`gemerkteEinladung()`, `vergissEinladung()` (Merker `schach-arena:online:einladung`), `meineFarbe(partie)`,
+`binAmZug(partie)`, `zuegeListe(partie)`, `normalisiereCode(text)`, `setzeOnlineFetch(fn)` (Tests). Alle Aufrufe
+brauchen die Sitzung aus `konto.js` (`sitzung()`, kurz vor Ablauf `erneuereSitzung()`); ohne Sitzung ein lesbarer
+Fehler ohne Anfrage, offline „Keine Verbindung …“, 401 „neu anmelden“, 404 „noch nicht eingerichtet“, sonst ein
+deutscher Satz je Art (403, 429, 5xx, Datenfehler); der rohe Servertext steht nur in `fehler.detail`. Jede Anfrage
+traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Funktionen laufen als
+`POST /rest/v1/rpc/<name>`, Lesen als `GET /rest/v1/partien_online?id=eq.<id>&select=*`.
+
+**Fuer die Oberflaeche (naechster Schritt):** `app.js` kennt `#online/CODE` nicht: `ausHash` faellt auf die Arena
+zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
+`beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
+und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+# Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
+
+Strategie und Grenzen: `design/runde4/DATEN.md`. Server: `supabase/schema.sql` (Konto light) und
+`supabase/daten-schema.sql`, Einrichtung in `supabase/ANLEITUNG.md`. Supabase wird nur über `fetch` angesprochen, ohne
+Bibliothek; im Browser steht nur der öffentliche Schlüssel (`js/konto-config.js`).
+
+**Konto** (`js/konto.js`, statisch aus `app.js` geladen, Registrierung defensiv): E-Mail mit 6-stelligem Code oder
+„Mit Google anmelden“ (`googleAnmeldeUrl(basis)` -> `SUPABASE_URL/auth/v1/authorize?provider=google&redirect_to=<basis>#konto`,
+`meldeMitGoogleAn(ort)` ruft `ort.assign`). Die Rückkehr `#konto#access_token=...&refresh_token=...` (Supabase hängt die
+Antwort mit einem zweiten `#` an) wie auch `#access_token=...` vom Anmelde-Link übernimmt `uebernimmLinkSitzung()`, entfernt
+die Tokens (auch `provider_token`) per `replaceState` und springt zu `#einstellungen`. Die Konto-Gruppe am Ort
+`einstellungen:gruppen` (Reihenfolge 5) erscheint erst nach einmal `#konto` (`kontoFreigeschaltet`). Für `daten.js`
+exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `userId`, `abmelden`, `lokalerStand`.
+
+**Datenfreigabe** (`js/daten.js`, Paket `daten` in `PAKETE`, Stil `css/daten.css`):
+- Einstellung `datenfreigabe` `'aus' | 'an'` (Standard aus, `EINSTELLUNG_WERTE`). Wirksam nur, wenn angemeldet und die
+  Zustimmung (`schach-arena:daten:zustimmung` = `{ konto, datum, fassung }`) von genau diesem Konto stammt
+  (`darfTeilen()`); ein anderes Konto auf demselben Gerät muss selbst zustimmen. `setzeFreigabe(an, app)` schaltet.
+- Hört `app:screen` (`screen` mit `{ name }`), `partie:gestartet` (`partie_start`), `partie:beendet` (nach `setTimeout 0`:
+  Archiv-Zeile aus dem gespeicherten Partie-Datensatz, `archivDatensatz(d, p)`, und `partie_ende`), `window` `error` und
+  `unhandledrejection` (`fehler`: Typ + Meldung <= 200 Zeichen ohne Adressen, höchstens 10 je Sitzung).
+- Warteschlange `schach-arena:daten:warteschlange` (höchstens 100, älteste fallen weg), jede Zeile mit `id` (uuid aus dem
+  Browser) und `user_id`. Versand je Tabelle als ein POST (`/rest/v1/partien_archiv`, `/rest/v1/nutzung`, höchstens 25
+  Zeilen), `Prefer: return=minimal`, höchstens alle 20 s und bei `visibilitychange` (hidden) und `pagehide` (`keepalive`
+  bis 60 000 Zeichen). Offline, 5xx, 401, 408, 429: Zeilen bleiben; andere 4xx (409 bei doppelter `id`, 400 ungültig oder
+  `DATEN_MENGE`): das Bündel wird einzeln nachgesendet, nur die abgelehnten Zeilen fallen weg. Zeilen eines anderen Kontos
+  werden nie gesendet. Ausschalten verwirft die Warteschlange und widerruft auf dem Server (`rpc/freigabe_widerrufen`);
+  offline bleibt der Widerruf in `schach-arena:daten:widerruf` (`{ konto, datum }`) offen und geht beim Start, beim
+  Ereignis `online` und vor jedem neuen Senden raus. Scheitert er, wird nichts Neues gesendet (er würde es mitlöschen).
+  Ein offener Widerruf eines anderen Kontos wartet, bis dieses Konto wieder angemeldet ist.
+- `meineDaten()` = `rpc/meine_daten` + `lokalerStand()` + Warteschlange + Zustimmung + offener Widerruf,
+  `dateiFuerAuskunft()` -> `crownmate-meine-daten-JJJJ-MM-TT.json` (Tag aus `tag.js`, Grenze 4:00), `speichereAuskunft()` teilt oder lädt herunter (wie `js/sicherung.js`).
+- `loescheKonto(app)` = `rpc/konto_loeschen`, dann `abmelden()`, Warteschlange und Zustimmung weg, Freigabe aus;
+  `loescheKontoDialog(app)` fragt zweistufig (Sheet). Der Spielstand auf dem Gerät bleibt.
+- Gruppe „Daten“ am Ort `einstellungen:gruppen` (Reihenfolge 6, direkt nach Konto, nur wenn das Konto freigeschaltet ist):
+  `.daten-gruppe`, Schalter `.schalter[data-schalter="datenfreigabe"]` (ohne Anmeldung gesperrt mit „Zum Teilen erst
+  anmelden“), Erklärtext `.daten-text`, Knöpfe `[data-daten="auskunft"]` und `[data-daten="loeschen"]`, `.daten-status`,
+  Links auf `datenschutz.html` und `impressum.html` (auch unter Info und Lizenzen).
+
+**Server** (`supabase/daten-schema.sql`): `partien_archiv` (insert/select/delete nur eigene, kein update, Größen- und
+Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
+dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
+Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
+insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). `konto_loeschen()`, `meine_daten()` und
+`freigabe_widerrufen()` sind `security definer`, nur für `authenticated`. `konto_loeschen()` löscht auch
+`auth.audit_log_entries` des Aufrufers (Ausnahme bei fehlender Tabelle oder fehlendem Recht abgefangen); `meine_daten()`
+liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn die Tabelle existiert) und
+`anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
+`meine_daten()`. `konto.js` speichert als `geraet` des Cloud-Spielstands nur noch `geraetKurz()` (Familie und System).
+
+**Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
+(`css/tokens.css`, `css/themes/modern.css`, hell und dunkel wie die App), im Offline-Cache. Beide sind Entwürfe mit
+Platzhaltern in eckigen Klammern.
+
+**Tests:** `node tests/daten.test.mjs` (Node: falsches `fetch` und der echte Ereignis-Bus; Browser: die echte App mit
+abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
+in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
+(`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
+# Premium-Umbau U5: Arena als Weltkarte, Duell-Intro, Portraets
+
+Flo 18.10. („Variante 1“): die Arena ist die bunte Weltkarte aus Entwurf C, alles Bedienbare im Look A.
+
+**Arena** (`js/ui/arena.js`, `css/arena.css`): `section.screen.arena` > Hauptseiten-Kopf + `.inhalt` > `.karte`
+(Scroll-Behaelter, Kontext `karte` von `arena:start`) > `.welt` (SVG `svg.welt-svg` aus `weltSvg()`: Himmel, Berge,
+Huegelbaender, Baeume, Haeuser, Zelt, Burgturm, Pfad als Bezier `pfadD()` durch die Stationen, Fortschritt
+`.w-fortschritt` in `--akzent` bis zum naechsten Gegner) + je Bot `button.stufe.knoten[data-bot]` (Zustand `besiegt` |
+`aktuell` | `gesperrt`, Endgegner `.boss`; darin `.avatar img`, `.k-nr`, `.schloss`, `.k-sterne .stern`, `.k-schild` mit
+`.k-name`/`.k-meta`, `.fahne`, `.boss-krone`) + `.flo-figur` (Flos Koenig, `thema.floAvatar`) + die Orte
+`arena:karte-boss`/`arena:karte-event`; daneben `aside.detail`. Die Lagen stehen in `LAGEN.quer`/`LAGEN.hoch` als Anteile
+(0..1); `layout()` rechnet in Pixel der Karte und zeichnet die Welt je Groesse neu:
+- **quer** (`.karte-quer`, Querformat mit mindestens 420 px Kartenhoehe): Karte links, passt ganz (`scrollTop` 0,
+  Endgegner oben), Panel rechts mit eigenem Scrollen.
+- **hoch** (`.karte-hoch`, iPad hoch, Handy, Handy quer): Karte senkrecht scrollbar (Handy 2,3 x, iPad 1,45 x so hoch
+  wie breit, schmale Karten mindestens `WELT_MIN_H` = 820 px), startet beim gewaehlten Gegner (samt Schild und Fahne im
+  Bild, auch nach einer Hoehenaenderung); senkrechte Abbildung `Y(f) = y0 + f * hy` mit Rand fuer Krone und Fahne des
+  Endgegners oben und das Schild der ersten Station unten. Hochformat: Panel darunter (iPad zweispaltig), die Seite
+  (`.inhalt`) scrollt, der Spielen-Knopf klebt (`.cta-platz`, `position: sticky`) unten ueber der Reiter-Pille.
+  **Kurzes Querformat** (`@media (orientation: landscape) and (max-height: 559px)`, Handy quer): Karte links, Panel rechts
+  mit eigenem Scrollen, der Knopf klebt unten im Panel (sonst laege er unter dem Bildrand).
+- Farben der Karte: eigene Palette `--welt-*` in `css/arena.css` (hell Sommertag, dunkel Abendstimmung); alles andere
+  nur Tokens.
+- Momente: Eintritt (Karte gleitet, Portraets fallen im 48-ms-Takt, Fortschritt zeichnet sich), Botwahl (Portraet
+  federt, Panel wechselt gestaffelt), Freischalten (`params.neuFreigeschaltet`: `.wird-frei` genau 2,7 s; Sterne der
+  bezwungenen Station fallen ein, Stern-Klang, Karte scrollt zur neuen Station, Weg waechst, Flo zieht weiter, Schloss
+  springt ab, Fahne erscheint). Bewegung aus (`reduziert()`): alles sofort.
+- **Panel** (PLAN 2.2): `.ort-panel-oben`, `section.heute-karte`, ggf. `.fortsetzen`, Kopf (Portraet 84, `.detail-ueber`
+  „Stufe n · Nächster Gegner“ in `--akzent-text`, `h2`, `.elo`, `.mini-sterne`), `.sprechblase` (Spruch-Karte),
+  `.merkmale` (3 x `.merkmal`), `.ziel-sterne` (3 x `div`, erreicht `.an`), `.ort-panel-bot`, Farbe als
+  `bauteile.segment` mit `.farbwahl [data-farbe="w|zufall|b"][aria-checked]`, `.ort-tempo` (leer, `hidden`, fuer W0+b),
+  `.cta-platz [data-aktion="spielen"]` („Spielen gegen Kalle“, besiegt „Revanche gegen …“, Text aus dem Export
+  `spielenText(bot, besiegt)`; der Rufname steht in `.sp-name` und bleibt zusammen, wird es eng, bricht der Text auf zwei
+  Zeilen um, nie abgeschnitten), `.bilanz`. Sterne und Pokal als SVG (`icons.js` `stern`), nie „★“. Farbwahl: die
+  Figuren stehen auf einem hellen Feld (`.fig-bg`, `--feld-hell`). Steckbrief und „Offene Partie“ ragen nie aus ihrer
+  Kachel (Container-Abfrage, Umbruch).
+- Die Arena laedt den Partie-Screen vorab (`import('./partie.js')` beim Vorwaermen und beim Tipp auf Spielen), damit er
+  sich waehrend des Duell-Intros schnell unter der Buehne aufbaut.
+
+**Portraets** (`assets/avatare/modern/<bot.id>.svg`, viewBox 0 0 120 120): aus `AV.svg(id)` in Entwurf A erzeugt (eigene
+Werke fuer dieses Projekt, GPL-3.0 wie die Pixel-Avatare, die als Rueckfall bleiben). `THEMEN.modern.portraets` nennt
+die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`, sonst `bot.avatar`.
+
+**Duell-Intro** (`js/ui/duell.js`, `css/duell.css`, PLAN 2.3):
+- `duellArt({ einstellung, anlass, reduziert })` -> `'voll' | 'kurz' | 'aus'`: `aus` bei Einstellung `duellIntro: 'aus'`
+  oder reduzierter Bewegung (nur Start-Klang); `voll` bei `immer` oder bei `besondere` mit Anlass `boss` | `liga` |
+  `erste` (erste Partie gegen diesen Bot); sonst `kurz` (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von
+  seiner Figur auf der Karte, beide beim Start gemessen, weil die Arena beim Flug schon weg ist).
+- `spieleDuell({ bot, farbe, anlass, von, art?, einstellung? })` -> `{ bereit, fertig, ueberspringe(), art }`.
+  Ueberlagerung `div.duell` an `document.body`: Bot-Haelfte in Bot-Farbe waechst aus der Detail-Karte (`von`), Flos
+  Haelfte (Schiefer, sein Koenig) mit schraeger Naht (Hochformat waagrecht), „gegen“ schlaegt ein, genau dann
+  `klang.spiele('start')`. **Zeitplan** (Exporte `WECHSEL_BEI`, `HALTE_BIS`, `FLUG`, `FLUG_MIN`): `bereit` erfuellt sich,
+  sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig, fruehestens 0,47 s, spaetestens 0,82 s; Kurzfassung
+  sofort), dann ruft `arena.js` `app.gehe('partie', …)` und die Partie baut sich unter der Buehne auf. Auf `app:screen` mit `name: 'partie'` fliegen die Portraets
+  (`.duell-flieger`), fruehestens am Ende der Haltephase (0,82 s), 440 ms lang auf `.screen.partie .spieler.gegner .av`
+  und `.screen.partie .spieler.ich .av` (die Ziele sind waehrenddessen `visibility: hidden`); fehlen sie, blendet die
+  Ueberlagerung nur aus. Kommt die Partie so spaet, dass kein Flug von mindestens `FLUG_MIN` (180 ms) mehr passt, fliegt
+  nichts. Hoechstens 1,4 s (`DAUER_MAX`); blockiert der Aufbau der Partie den Hauptfaden laenger, ist die Ueberlagerung
+  trotzdem zur Grenze ausgeblendet (Compositor), `fertig` kommt dann mit dem Ende des Blocks. Tempo: die Vollfassung
+  laeuft hoechstens im normalen Tempo (Bewegung „langsam“ dehnt sie nicht), „schnell“ verkuerzt sie.
+  **Tippen ueberspringt** in jeder Phase (Horcher `pointerdown` am `document`, capture): solange nur die Arena unter der
+  Buehne liegt, faengt die Buehne den Tipp ab; sobald die Partie da ist (`.duell.durch`) und in der Kurzfassung liegt die
+  Ueberlagerung mit `pointer-events: none` darueber, der Tipp beendet das Intro und kommt zusaetzlich bei der Partie an.
+- **Vertrag mit der Partie:** solange das Intro laeuft, steht `document.documentElement.dataset.duell = 'laeuft'`; beim
+  Ende (auch beim Ueberspringen) wird es entfernt und `document.dispatchEvent(new CustomEvent('duell:fertig', { detail:
+  { art, uebersprungen, bot } }))` gesendet. `aktivesDuell()` -> `{ fertig } | null`. Bei `aus` laeuft nichts (kein
+  Attribut, kein Ereignis). Die Partie startet Uhr und Bot-Zug erst nach `fertig` (U7).
+- Testmodus (`?test`): `window.__duellProtokoll` (je Lauf `{ art, anlass, bot, uebersprungen, ziele, dauer, wechsel,
+  partieAb, flugAb, flug }`, Zeiten in ms ab dem Start).
+
+**Tests:** `node tests/arena.test.mjs` (Suite `arena` in `tests/alle.mjs`): Node (Duell-Regeln, Portraet-Dateien, Orte,
+CSS-Regeln, Cache) und Browser (Karte quer/hoch/Handy hell und dunkel, Zustaende, Panel, Orte mit Test-Paket, Lage und
+Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle zehn Bots in beiden Fassungen und allen
+Ziel-Lagen, Freischalten mit und ohne Bewegung, Duell `immer`/`besondere`/`aus`/ohne Bewegung, Ueberspringen, Tipp zur
+Partie, Portraetflug auf eingesetzte Ziele, Zeitplan mit Schein-Partie bei normal/langsam/schnell und spaeter Partie,
+harte Grenze).
+# App-Store-Huelle (Capacitor, nur Geruest)
+
+**Ordner `native/`:** eigenes `package.json` mit `@capacitor/core`, `cli`, `ios` und `android` in einer festen Version
+(alle gleich, kein `^`), `capacitor.config.json` (`appId` Platzhalter `de.crownmate.app`, vor dem ersten Upload
+festlegen; `appName` Crownmate; `webDir` `www`), `kopiere-web.mjs` und eine Anleitung fuer Flo (`native/README.md`).
+`kopiere-web.mjs` kopiert die App-Ordner (`css`, `js`, `assets`, `vendor`, `daten`) und jede Datei aus `DATEIEN` in
+`sw.js` nach `native/www` und bricht ab, wenn danach eine Datei der Liste fehlt; es weigert sich, das Repo selbst oder
+einen Ordner darueber zu leeren. `native/www` und `native/node_modules` stehen in `.gitignore`. Die Web-App selbst
+aendert sich nicht: Unter iOS (`capacitor://localhost`) gibt es keinen Service Worker und `registriereSW` faellt still
+aus, unter Android (`https://localhost`) laeuft er. Offen bis zur Veroeffentlichung: Plattform-Projekte `ios/` und
+`android/` (entstehen mit `npx cap add`), Symbole und Startbild, In-App-Kauf statt Stripe in der iOS-App,
+Push-Mitteilungen. Test: `node tests/native.test.mjs` (reines Node, Suite `native` in `tests/alle.mjs`).

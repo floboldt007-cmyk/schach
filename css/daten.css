@@ -1,0 +1,15 @@
+/* Daten-Fundament (DSGVO): Gruppe "Daten" in den Einstellungen (js/daten.js). Nur Tokens, keine festen Farben.
+   Baut auf .es-gruppe, .es-zeile, .es-text, .es-knoepfe, .es-hilfe (css/einstellungen.css) und .schalter (css/bauteile.css). */
+.daten-gruppe .daten-zeile { border-bottom: 0; padding-bottom: 0; min-height: 56px; }
+.daten-gruppe .schalter:disabled { opacity: .38; cursor: default; }
+.daten-text { margin: 4px 0 12px; padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche-2); border: 1px solid var(--linie); }
+.daten-text p { margin: 0 0 6px; font-size: 14px; color: var(--text-2); }
+.daten-text p:last-child { margin-bottom: 0; }
+.daten-text b { color: var(--text); }
+.daten-status { margin: 10px 0 0; min-height: 1.3em; font-size: 14px; color: var(--text-2); }
+.daten-status[data-fehler="ja"] { color: var(--warn); }
+.daten-links { margin: 10px 0 0; }
+.daten-links a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; }
+/* Konto-Gruppe (js/konto.js): "oder" und "Mit Google anmelden" (nur Text, kein fremdes Logo) */
+.konto-gruppe .konto-oder { margin: 12px 0 8px; }
+.konto-gruppe .konto-google { width: 100%; max-width: 320px; }

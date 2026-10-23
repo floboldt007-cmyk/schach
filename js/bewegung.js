@@ -53,7 +53,9 @@ function systemReduziert() {
       if (mq.addEventListener) mq.addEventListener('change', neu);
       else if (mq.addListener) mq.addListener(neu);
     }
-    return !!(mq && mq.matches);
+    // Eine neue Abfrage liest den aktuellen Systemwunsch auch dann, wenn WebKit das change-Ereignis der
+    // gespeicherten MediaQueryList erst im naechsten Render-Schritt zustellt.
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch (e) {
     return false;
   }
@@ -165,6 +167,9 @@ export function anim(el, frames, o = {}) {
     iterations: o.it || 1,
     direction: o.dir || 'normal',
   });
+  // Der Start darf nicht von einem weiteren Render-Schritt abhaengen (WebKit, insbesondere bei Touch).
+  const jetzt = typeof document !== 'undefined' ? document.timeline?.currentTime : null;
+  if (a && a.startTime == null && jetzt != null) a.startTime = jetzt;
   if (a && a.finished) a.finished.catch(() => {});
   return a;
 }

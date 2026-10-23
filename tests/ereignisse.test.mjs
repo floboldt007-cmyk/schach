@@ -184,6 +184,8 @@ const ORT_TABELLE = {
   'bestenliste:reiter': 'dom', 'training:karten': 'dom', 'ich:vitrine': 'dom', 'spielplan:tage': 'dom',
   // w0plus-a-fix: Schub 2b (Flamme an Flos Namen, Emote-Rad und Schnell-Chat in der Knopfreihe)
   'partie:spieler-leiste': 'dom', 'partie:aktionen': 'dom',
+  // Premium-Umbau U5: Plaetze auf der Weltkarte (Zelt des Wochen-Boss, Event-Fahne), Host arena.js
+  'arena:karte-boss': 'dom', 'arena:karte-event': 'dom',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));
@@ -597,7 +599,7 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   // Test-Huelle der Screen-Orte (die Hosts kommen mit den Screens der Pakete): Reihenfolge und Abraeumen
   const falsch = [];
   for (const ort of ['bestenliste:reiter', 'training:karten', 'ich:vitrine', 'spielplan:tage', 'arena:heute', 'partie:gegner-leiste',
-    'partie:spieler-leiste', 'partie:aktionen']) {
+    'partie:spieler-leiste', 'partie:aktionen', 'arena:karte-boss', 'arena:karte-event']) {
     const h = el('host');
     const ab1 = anbieten(ort, () => el('zweiter'), { reihenfolge: 20, paket: 'b' });
     const ab2 = anbieten(ort, (k) => (k.leer ? null : el('erster')), { reihenfolge: 10, paket: 'a' });

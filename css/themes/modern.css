@@ -32,6 +32,7 @@
   --tinte: #1C1B19; --auf-tinte: #F4F1EC;
   --akzent: #CC4820; --akzent-text: #B83E1A; --akzent-weich: rgba(204, 72, 32, .11); --akzent-tief: #B53D18; --auf-akzent: #FFFFFF;
   --vorzug-start: rgba(70, 87, 120, .34); --vorzug-ziel: rgba(204, 72, 32, .36);
+  --pfeil-nutzer: rgba(230, 126, 34, .82); --marke-nutzer: rgba(230, 126, 34, .45);
   --gold: #E0A22B; --gold-weich: rgba(224, 162, 43, .16);
   --gut: #2E9E63;
   --warn: #D2453A; --warn-weich: rgba(210, 69, 58, .12);
@@ -118,6 +119,7 @@
   --tinte: #F3F1EC; --auf-tinte: #15171B;
   --akzent: #C8441E; --akzent-text: #FF825F; --akzent-weich: rgba(255, 106, 66, .15); --akzent-tief: #B03A18; --auf-akzent: #FFFFFF;
   --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
+  --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
   --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
   --gut: #4CC488;
   --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);
@@ -169,6 +171,7 @@
     --tinte: #F3F1EC; --auf-tinte: #15171B;
     --akzent: #C8441E; --akzent-text: #FF825F; --akzent-weich: rgba(255, 106, 66, .15); --akzent-tief: #B03A18; --auf-akzent: #FFFFFF;
     --vorzug-start: rgba(166, 177, 202, .30); --vorzug-ziel: rgba(255, 106, 66, .34);
+    --pfeil-nutzer: rgba(255, 150, 60, .82); --marke-nutzer: rgba(255, 150, 60, .45);
     --gold: #F2BE4A; --gold-weich: rgba(242, 190, 74, .14);
     --gut: #4CC488;
     --warn: #FF6B5E; --warn-weich: rgba(255, 107, 94, .14);

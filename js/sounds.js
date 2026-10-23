@@ -359,6 +359,9 @@ function entsperre() {
 }
 
 if (typeof document !== 'undefined' && document.addEventListener) {
+  // Den Kontext beim Aufsetzen vorbereiten; die Freigabe bleibt auf Loslassen/Klick. Gerade Safari braucht
+  // fuer den ersten Live-Kontext Zeit, die sonst erst nach der vollstaendigen Beruehrung beginnt.
+  document.addEventListener('pointerdown', () => { if (!klang.aus) erzeuge(); }, { capture: true, passive: true });
   // Bleibt angemeldet: iOS unterbricht den Kontext nach App-Wechsel oder Anruf ('interrupted', 'suspended').
   // pointerdown zaehlt in WebKit nicht sicher als Geste, deshalb nicht in der Liste.
   for (const typ of ['touchend', 'click', 'keydown', 'pointerup']) {

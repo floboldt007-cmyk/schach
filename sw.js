@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 30;
-const STAND = 'df18c0d644f9';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 49;
+const STAND = 'f18b7ba4997c';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -16,6 +16,8 @@ const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
   'index.html',
+  'datenschutz.html',
+  'impressum.html',
   'manifest.webmanifest',
   'LICENSE',
   'css/tokens.css',
@@ -33,6 +35,7 @@ const DATEIEN = [
   'css/einstellungen.css',
   'css/training.css',
   'css/sicherung.css',
+  'css/daten.css',
   'css/screens.css',
   'js/app.js',
   'js/bewegung.js',
@@ -46,6 +49,7 @@ const DATEIEN = [
   'js/konto-config.js',
   'js/konto.js',
   'js/nachholen.js',
+  'js/online.js',
   'js/openings.js',
   'js/orte.js',
   'js/review.js',
@@ -55,11 +59,13 @@ const DATEIEN = [
   'js/zugklassen.js',
   'js/tag.js',
   'js/sicherung.js',
+  'js/daten.js',
   'js/thema.js',
   'js/ui/abrechnung.js',
   'js/ui/analyse.js',
   'js/ui/arena.js',
   'js/ui/bauteile.js',
+  'js/ui/duell.js',
   'js/ui/einstellungen.js',
   'js/ui/icons.js',
   'js/ui/partie.js',
@@ -91,6 +97,17 @@ const DATEIEN = [
   'assets/avatare/08-kommissar-koenig.svg',
   'assets/avatare/09-grossmeisterin-greta.svg',
   'assets/avatare/10-der-stockfisch.svg',
+  // Modern-Portraets (Premium-Umbau U5, thema.js avatarVon)
+  'assets/avatare/modern/benno.svg',
+  'assets/avatare/modern/hilde.svg',
+  'assets/avatare/modern/kalle.svg',
+  'assets/avatare/modern/lisa.svg',
+  'assets/avatare/modern/rudi.svg',
+  'assets/avatare/modern/turm.svg',
+  'assets/avatare/modern/delia.svg',
+  'assets/avatare/modern/koenig.svg',
+  'assets/avatare/modern/greta.svg',
+  'assets/avatare/modern/stockfisch.svg',
   'assets/schriften/manrope.woff2',
   'assets/schriften/bricolage-grotesque.woff2',
   'assets/schriften/OFL-Manrope.txt',
