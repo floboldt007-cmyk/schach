@@ -5,7 +5,8 @@
    und aside.detail). Lagen (Klasse am Screen, js/ui/arena.js layout()):
      .karte-quer  iPad quer: Karte links, passt ganz (kein Scrollen), Panel rechts (scrollt selbst)
      .karte-hoch  iPad hoch und Handy: Karte oben, senkrecht scrollbar, Panel darunter, die Seite (.inhalt) scrollt,
-                  der Spielen-Knopf klebt unten (position: sticky) ueber der Reiter-Pille
+                  der Spielen-Knopf klebt unten (position: sticky) ueber der Reiter-Pille; kurzes Querformat (Handy
+                  quer): Karte links (scrollt senkrecht), Panel rechts mit eigenem Scrollen, Knopf klebt unten im Panel
    Bedienung (Stationen, Schilder, Sterne, Schloss, Fahne, Panel) nur mit Tokens aus css/tokens.css und
    css/themes/<id>.css. Die Karte selbst ist ein Bild und hat ihre eigene Palette --welt-* (hell: Sommertag,
    dunkel: Abendstimmung, gedaempft). Nur hier duerfen feste Farben stehen.
