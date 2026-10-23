@@ -303,6 +303,7 @@ function eigeneAus(uci, startFen, farbe) {
 export function reiterFreunde({ app, jetzt = new Date() } = {}) {
   const s = huelle('freunde', 'Freunde');
   s.hidden = false;
+  s.dataset.ohneFenster = '1';
   let st = S.lade();
   const meine = Object.values(st.tafeln).filter((t) => t.eintraege.length).map((t) => ({ id: t.id, e: T.eigene(t, 'allzeit', jetzt)[0] }));
   const teilen = el('article', 'bl-karte bl-teilen');

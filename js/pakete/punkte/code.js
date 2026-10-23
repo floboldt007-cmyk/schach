@@ -96,9 +96,10 @@ export function crc16(bytes) {
 }
 
 export function normalisiere(text) {
-  let t = String(text || '').toUpperCase().replace(/[\s‐-―−-]+/g, '');
+  // erst die Verwechsler ersetzen (auch im Praefix: "SAl-" ist "SA1-"), dann das Praefix weg. Eindeutig, weil der Inhalt
+  // nie mit S beginnt: das erste Byte ist die Version (1), also beginnt der Code immer mit 0.
+  let t = String(text || '').toUpperCase().replace(/[\s\u2010-\u2015\u2212-]+/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
   if (t.startsWith(PRAEFIX)) t = t.slice(PRAEFIX.length);
-  t = t.replace(/O/g, '0').replace(/[IL]/g, '1');
   return /^[0-9A-HJKMNP-TV-Z]*$/.test(t) && t.length ? t : null;
 }
 

@@ -55,7 +55,7 @@
 .bl-steuer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px var(--rand) 4px; }
 .bl-steuer-reiter { flex: 1 1 320px; max-width: 460px; min-width: 0; }
 .bl-steuer-fenster { flex: 0 1 300px; min-width: 0; }
-.bl-steuer-reiter:empty { display: none; }
+.bl-steuer-reiter:empty, .bl-steuer-fenster[hidden] { display: none; }
 .bl-ort { padding: 12px var(--rand) 0; }
 .bl-ort[hidden] { display: none; }
 .bl-leer-screen { margin: 16px var(--rand) 0; max-width: 640px; flex-direction: row; align-items: flex-start; gap: 16px; }

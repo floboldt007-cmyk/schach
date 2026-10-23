@@ -11,7 +11,8 @@
 // Aufbau: header.kopf.haupt-kopf (js/ui/seite.js), darunter .bl-rumpf (scrollt) mit .seiten-kopf, der Steuerzeile
 // .bl-steuer (Segment der Reiter aus den Anbietern, Segment der Fenster Woche · Monat · Allzeit, Standard Woche) und dem
 // Behaelter .bl-ort des Orts bestenliste:reiter (Kontext { app, reiter, fenster }). Jeder Anbieter liefert ein
-// section.bl-reiter[data-reiter][data-name] (Reihenfolge: Ich 10 · Bots 20 · Liga 30 · Raetsel 40 · Freunde 50); ist sein
+// section.bl-reiter[data-reiter][data-name] (Reihenfolge: Ich 10 · Bots 20 · Liga 30 · Raetsel 40 · Freunde 50; mit
+// data-ohne-fenster blendet der Host das Fenster-Segment aus, solange dieser Reiter gewaehlt ist); ist sein
 // Reiter nicht gewaehlt, eine leere Huelle (hidden), aus der die Reiterzeile entsteht. Wechsel von Reiter oder Fenster
 // fuellt den Ort neu. Ohne Anbieter: eine ruhige Karte .bl-leer-screen. Gemerkt je Geraet (Modul-Einstellungen punkte).
 import { fuelle } from '../orte.js';
@@ -91,6 +92,8 @@ function zeigeBestenliste(root, params = {}, app) {
     s.querySelector('.bl-leer-screen').hidden = gefuellt.anzahl > 0;
     ort.hidden = gefuellt.anzahl === 0;
     const sichtbar = alle.find((x) => !x.hidden);
+    // ein Reiter ohne Zeitraum (z. B. Freunde) blendet das Fenster-Segment aus
+    s.querySelector('.bl-steuer-fenster').hidden = !!(sichtbar && sichtbar.hasAttribute('data-ohne-fenster'));
     if (!erst && sichtbar && tempo() > 0) staffel(sichtbar.children, { d: 480, abstand: 50, von: 'translateY(14px)' });
   }
   fuelleOrt({ erst: true });
