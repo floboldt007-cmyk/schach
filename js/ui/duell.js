@@ -12,7 +12,8 @@
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
-//       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (WECHSEL_BEI, 0,47 s; arena.js ruft
+//       duellArt(). bereit erfuellt sich, sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig,
+//       fruehestens WECHSEL_BEI, 0,47 s; arena.js ruft
 //       dann app.gehe('partie'), die Partie baut sich unter der Buehne auf), bei 'kurz' und 'aus' sofort. Die Portraets
 //       fliegen, sobald die Partie da ist, fruehestens am Ende der Haltephase (HALTE_BIS, 0,82 s), so bleibt dem Flug
 //       seine volle Dauer. fertig erfuellt sich am Ende (auch beim Ueberspringen), hoechstens DAUER_MAX ms nach dem Start.
@@ -40,7 +41,8 @@ export const BESONDERE = Object.freeze(['boss', 'liga', 'erste']);
 export const DAUER_MAX = 1400;          // haerteste Grenze fuer das ganze Intro (ms, unabhaengig vom Tempo)
 const KURZ_DAUER = 400;                  // Kurzfassung: nur der Portraetflug
 // Zeitplan der Vollfassung (ms bei normalem Tempo, mal Zeitfaktor zf = min(tempo(), 1)):
-// Die Buehne waechst in 460 ms auf den ganzen Schirm. Danach (WECHSEL_BEI) erfuellt sich `bereit` und die Arena wechselt
+// Die Buehne waechst in 460 ms auf den ganzen Schirm. Ist ihre Animation fertig (fruehestens WECHSEL_BEI, spaetestens
+// HALTE_BIS), erfuellt sich `bereit` und die Arena wechselt
 // zur Partie, die sich unter der deckenden Buehne aufbaut, waehrend "gegen" einschlaegt und die Haltephase laeuft. Die
 // Portraets fliegen, sobald die Partie da ist, fruehestens bei HALTE_BIS; so hat der Flug (FLUG) seine volle Dauer und
 // das Intro endet vor der harten Grenze, auch wenn der Aufbau der Partie dauert (Pruefer-Befund U5: mit dem Wechsel
@@ -361,7 +363,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const bw = Math.max(1, Math.min(W, dr.right) - bx);
   const bh = Math.max(1, Math.min(H, dr.bottom) - by);
   buehne.style.transformOrigin = '0 0';
-  A(buehne, [{ transform: `translate(${bx.toFixed(1)}px, ${by.toFixed(1)}px) scale(${(bw / W).toFixed(4)}, ${(bh / H).toFixed(4)})`, opacity: 0 }, { opacity: 1, offset: 0.12 }, { transform: 'none', opacity: 1 }], { d: 460, k: 'gleiten' });
+  const buehneLauf = A(buehne, [{ transform: `translate(${bx.toFixed(1)}px, ${by.toFixed(1)}px) scale(${(bw / W).toFixed(4)}, ${(bh / H).toFixed(4)})`, opacity: 0 }, { opacity: 1, offset: 0.12 }, { transform: 'none', opacity: 1 }], { d: 460, k: 'gleiten' });
   A(ueber.querySelector('.duell-flo'), [{ transform: hoch() ? 'translateY(64%)' : 'translateX(64%)' }, { transform: 'none' }], { d: 480, v: 40, k: 'gleiten' });
   // beide Portraets fliegen von ihrer Quelle zur Mitte (Bot aus der Karte, Flo aus dem Pfeil des Spielen-Knopfs)
   const qBot = imBild(rect(von)) ? rect(von) : null;
@@ -381,8 +383,16 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   A(seiteBot, [{ transform: 'none' }, { transform: zu(11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
   A(ueber.querySelector('.duell-seite.flo'), [{ transform: 'none' }, { transform: zu(-11) }], { d: 900, v: 460, k: 'sanft', fill: 'forwards' });
   // Die Buehne deckt den Schirm: die Arena darf zur Partie wechseln, die sich darunter aufbaut (die Buehne bleibt davor,
-  // bis die Portraets geflogen sind); kommt die Partie nicht, stoesst die harte Grenze oben an
-  spaeter(meldeBereit, WECHSEL_BEI * zf);
+  // bis die Portraets geflogen sind); kommt die Partie nicht, stoesst die harte Grenze oben an. Gewechselt wird erst, wenn
+  // die Animation der Buehne wirklich fertig ist (unter Last startet sie ein, zwei Bilder spaeter als ein Timer, die
+  // Partie stuende dann kurz neben der noch wachsenden Buehne), und fruehestens bei WECHSEL_BEI. Sicherheitsnetz, falls
+  // Animationen stehen (z. B. im Hintergrund): spaetestens am Ende der Haltephase.
+  let gedeckt = false;
+  let zeitDa = false;
+  const wechsle = () => { if (gedeckt && zeitDa) meldeBereit(); };
+  Promise.resolve(buehneLauf && buehneLauf.finished).catch(() => {}).then(() => { gedeckt = true; wechsle(); });
+  spaeter(() => { zeitDa = true; wechsle(); }, WECHSEL_BEI * zf);
+  spaeter(meldeBereit, HALTE_BIS * zf);
 
   return { bereit, fertig, ueberspringe, art: gewaehlteArt };
 }

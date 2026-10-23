@@ -1394,8 +1394,8 @@ die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`,
   Ueberlagerung `div.duell` an `document.body`: Bot-Haelfte in Bot-Farbe waechst aus der Detail-Karte (`von`), Flos
   Haelfte (Schiefer, sein Koenig) mit schraeger Naht (Hochformat waagrecht), „gegen“ schlaegt ein, genau dann
   `klang.spiele('start')`. **Zeitplan** (Exporte `WECHSEL_BEI`, `HALTE_BIS`, `FLUG`, `FLUG_MIN`): `bereit` erfuellt sich,
-  sobald die Buehne den ganzen Schirm deckt (0,47 s; Kurzfassung sofort), dann ruft `arena.js` `app.gehe('partie', …)`
-  und die Partie baut sich unter der Buehne auf. Auf `app:screen` mit `name: 'partie'` fliegen die Portraets
+  sobald die Buehne den ganzen Schirm deckt (ihre Animation ist fertig, fruehestens 0,47 s, spaetestens 0,82 s; Kurzfassung
+  sofort), dann ruft `arena.js` `app.gehe('partie', …)` und die Partie baut sich unter der Buehne auf. Auf `app:screen` mit `name: 'partie'` fliegen die Portraets
   (`.duell-flieger`), fruehestens am Ende der Haltephase (0,82 s), 440 ms lang auf `.screen.partie .spieler.gegner .av`
   und `.screen.partie .spieler.ich .av` (die Ziele sind waehrenddessen `visibility: hidden`); fehlen sie, blendet die
   Ueberlagerung nur aus. Kommt die Partie so spaet, dass kein Flug von mindestens `FLUG_MIN` (180 ms) mehr passt, fliegt

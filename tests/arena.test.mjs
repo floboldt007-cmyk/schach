@@ -727,8 +727,15 @@ async function testeFreischalten(browser) {
     await seite.waitForSelector('.screen.arena .knoten');
     await warte(600);
     await seite.evaluate(() => {
-      const t = { an: null, aus: null };
+      const t = { an: null, aus: null, setzen: null, entfernen: null };
       window.__frei = t;
+      // genaue Zeitpunkte beim Setzen und Entfernen der Klasse (der MutationObserver unten meldet erst nach der laufenden
+      // Aufgabe: baut die Arena nach dem Setzen noch lange auf, z. B. auf einem kalten Rechner, wirkte die Choreografie
+      // um diese Zeit zu kurz). .wird-frei gibt es nur an der neuen Station (js/ui/arena.js freischalten)
+      const add = DOMTokenList.prototype.add;
+      const remove = DOMTokenList.prototype.remove;
+      DOMTokenList.prototype.add = function (...k) { if (k.includes('wird-frei') && t.setzen == null) t.setzen = performance.now(); return add.apply(this, k); };
+      DOMTokenList.prototype.remove = function (...k) { if (k.includes('wird-frei') && t.setzen != null && t.entfernen == null && this.contains('wird-frei')) t.entfernen = performance.now(); return remove.apply(this, k); };
       const mo = new MutationObserver(() => {
         const k = document.querySelector('.knoten[data-bot="hilde"]');
         if (!k) return;
@@ -745,7 +752,8 @@ async function testeFreischalten(browser) {
     pruefe('Beginn: .wird-frei auf Hilde, Schloss noch da, Gesicht noch grau, Hilde im Panel', anfang.schloss === 1 && anfang.aktuell && anfang.panel === 'Oma Hilde' && anfang.fahneDa && anfang.grau, JSON.stringify(anfang));
     await seite.waitForFunction(() => window.__frei.aus != null, null, { timeout: 15000 });
     const frei = await seite.evaluate(() => window.__frei);
-    pruefe('Choreografie endet nach 2,7 s (nicht frueher, hoechstens 1 s spaeter)', frei.aus - frei.an >= 2650 && frei.aus - frei.an <= 3700, Math.round(frei.aus - frei.an) + ' ms');
+    pruefe('Choreografie endet nach 2,7 s (nicht frueher, hoechstens 1 s spaeter)', frei.setzen != null && frei.entfernen != null && frei.an != null && frei.aus != null
+      && frei.entfernen - frei.setzen >= 2650 && frei.entfernen - frei.setzen <= 3700, Math.round(frei.entfernen - frei.setzen) + ' ms (Beobachter: ' + Math.round(frei.aus - frei.an) + ' ms)');
     const ende = await seite.evaluate(async () => {
       const { klang } = await import('./js/sounds.js');
       const k = document.querySelector('.karte').getBoundingClientRect();
@@ -791,8 +799,30 @@ async function testeDuell(browser) {
     await seite.waitForSelector('.screen.arena .knoten');
     await warte(800);
     await duellHorcher(seite);
+    // FLIP-Start (Pruefer-Befund U5, klein): das Bot-Portraet der Buehne startet genau auf dem Portraet der Detail-Karte,
+    // Flos Koenig auf dem Pfeil des Spielen-Knopfs (erstes Bild der Animation angehalten und gemessen)
+    await seite.evaluate(() => {
+      const m = (el) => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), w: Math.round(r.width) }; };
+      window.__flipQuelle = { bot: m(document.querySelector('.detail-kopf .av')), flo: m(document.querySelector('.detail .spielen .pf')) };
+      new MutationObserver((l, mo) => {
+        if (!document.querySelector('.duell.voll [data-rolle="bot"]')) return;
+        mo.disconnect();
+        window.__flipStart = {};
+        for (const rolle of ['bot', 'flo']) {
+          const el = document.querySelector(`.duell.voll [data-rolle="${rolle}"]`);
+          const a = el.getAnimations()[0];
+          if (a) { a.pause(); a.currentTime = 0; }
+          window.__flipStart[rolle] = m(el);
+          if (a) a.play();
+        }
+      }).observe(document.body, { childList: true });
+    });
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForSelector('.duell.voll', { timeout: 5000 });
+    const flipLage = await seite.evaluate(() => ({ quelle: window.__flipQuelle, start: window.__flipStart }));
+    const gleich = (a, b) => !!a && !!b && Math.abs(a.l - b.l) <= 2 && Math.abs(a.t - b.t) <= 2 && Math.abs(a.w - b.w) <= 2;
+    pruefe('Buehnen-Portraets starten genau auf ihrer Quelle (Bot: Portraet der Detail-Karte, Flo: Pfeil des Spielen-Knopfs)',
+      gleich(flipLage.start && flipLage.start.bot, flipLage.quelle.bot) && gleich(flipLage.start && flipLage.start.flo, flipLage.quelle.flo), JSON.stringify(flipLage));
     const mitte = await seite.evaluate(() => {
       const d = document.querySelector('.duell');
       const bf = getComputedStyle(document.documentElement).getPropertyValue('--bot-rudi').trim();
@@ -908,20 +938,48 @@ async function testeDuell(browser) {
   // Tippen ueberspringt
   gruppe = 'Duell ueberspringen';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'immer', klang: false } });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(600);
-    await duellHorcher(seite);
-    await tippe(seite, '.detail [data-aktion="spielen"]');
-    await seite.waitForSelector('.duell.voll', { timeout: 5000 });
-    await seite.evaluate(() => { window.__arenaTipp = 0; const a = document.querySelector('.screen.arena'); if (a) a.addEventListener('pointerdown', () => { window.__arenaTipp++; }); });
-    await warte(150);
-    await seite.touchscreen.tap(600, 400);
-    await warte(80);
-    const u = await seite.evaluate(() => ({ duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig, prot: window.__duellProtokoll, arenaTipp: window.__arenaTipp }));
-    pruefe('Tippen: Ueberlagerung sofort weg, Attribut weg, duell:fertig mit uebersprungen', u.duell === 0 && u.attr === null && u.fertig.length === 1 && u.fertig[0].uebersprungen === true && u.prot[0].uebersprungen === true && u.prot[0].dauer < 1000, JSON.stringify(u));
-    pruefe('solange die Arena unter der Buehne liegt, faengt die Buehne den Tipp ab (die Arena bekommt ihn nicht)', u.arenaTipp === 0, JSON.stringify(u));
+    // Gepruefte Lage: der Tipp kommt, solange nur die Arena unter der Buehne liegt. Unter Last (geteilter Testrechner)
+    // kann der Tipp so spaet ankommen, dass die Partie schon darunter steht: dann ist es nicht die gepruefte Lage, der
+    // Ablauf wird in einer frischen Seite neu aufgesetzt (hoechstens dreimal; Konsolenfehler zaehlen aus allen Anlaeufen).
+    // Die Lage wird im Moment des Tipps festgehalten (Horcher am window, capture: laeuft vor dem Horcher des Duells).
+    let u = null;
+    let lauf = null;
+    const fehler = [];
+    for (let versuch = 1; versuch <= 3; versuch++) {
+      if (lauf) { fehler.push(...lauf.fehler); await lauf.kontext.close(); }
+      if (versuch > 1) console.log(`  (Duell ueberspringen: Tipp kam erst nach dem Wechsel zur Partie an, Versuch ${versuch})`);
+      lauf = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'immer', klang: false } });
+      const seite = lauf.seite;
+      await seite.goto(BASIS + '#arena');
+      await seite.waitForSelector('.screen.arena .knoten');
+      await warte(600);
+      await duellHorcher(seite);
+      await seite.evaluate(() => {
+        window.__arenaTipp = 0;
+        // nur Tipps waehrend des Intros zaehlen (der Tipp auf "Spielen" davor gehoert der Arena)
+        document.querySelector('.screen.arena').addEventListener('pointerdown', () => { if (document.querySelector('.duell')) window.__arenaTipp++; });
+        window.__tippLage = null;
+        window.addEventListener('pointerdown', () => {
+          if (window.__tippLage || !document.querySelector('.duell')) return;
+          window.__tippLage = { t: Math.round(performance.now()), laeuft: document.documentElement.dataset.duell === 'laeuft',
+            arenaDrunter: !!document.querySelector('.screen.arena') && !document.querySelector('.duell.durch') };
+        }, { capture: true });
+      });
+      const sp = await box(seite, '.detail [data-aktion="spielen"]');
+      await seite.touchscreen.tap(sp.l + sp.w / 2, sp.t + sp.h / 2);
+      await seite.waitForSelector('.duell.voll', { timeout: 5000 });
+      await seite.touchscreen.tap(600, 400);
+      await warte(80);
+      u = await seite.evaluate(() => ({ duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig, prot: window.__duellProtokoll,
+        arenaTipp: window.__arenaTipp, lage: window.__tippLage, block: Math.round(window.__block) }));
+      if (u.lage && u.lage.laeuft && u.lage.arenaDrunter) break;
+    }
+    const { kontext, seite } = lauf;
+    fehler.push(...lauf.fehler);
+    const lageOk = !!u.lage && u.lage.laeuft && u.lage.arenaDrunter;
+    pruefe('Tippen: Ueberlagerung sofort weg (hoechstens 50 ms nach dem Tipp), Attribut weg, duell:fertig mit uebersprungen', lageOk && u.duell === 0 && u.attr === null && u.fertig.length === 1
+      && u.fertig[0].uebersprungen === true && u.prot[0].uebersprungen === true && u.prot[0].dauer < 1000 && u.fertig[0].t - u.lage.t <= 50, JSON.stringify(u));
+    pruefe('solange die Arena unter der Buehne liegt, faengt die Buehne den Tipp ab (die Arena bekommt ihn nicht)', lageOk && u.arenaTipp === 0, JSON.stringify(u));
     await seite.waitForFunction(() => document.documentElement.dataset.screen === 'partie' && window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     pruefe('die Partie startet trotzdem', true);
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -930,20 +988,37 @@ async function testeDuell(browser) {
   // Portraetflug auf Ziele in der Partie (hier in den Test-DOM eingesetzt; U7 baut sie)
   gruppe = 'Duell Portraetflug';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'immer', klang: false } });
-    await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena .knoten');
-    await warte(600);
-    await duellHorcher(seite);
-    await zieleEinsetzen(seite);
-    await tippe(seite, '.detail [data-aktion="spielen"]');
-    await seite.waitForFunction(() => !!window.__flugBlick || window.__fertig.length > 0, null, { timeout: 6000 }).catch(() => {});
-    const flug = await seite.evaluate(() => window.__flugBlick || { flieger: window.__fliegerMax });
-    pruefe('waehrend des Flugs: zwei Flieger (Bot-Portraet, Flos Koenig), die Ziele sind verborgen, Attribut steht', flug.flieger === 2 && flug.inhalt === 'img,svg' && flug.versteckt === 'hidden,hidden' && flug.attr === 'laeuft', JSON.stringify(flug));
-    await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
-    await warte(60);
-    const nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(), prot: window.__duellProtokoll,
-      deckt: window.__ziele.deckt, block: Math.round(window.__block) }));
+    // Gepruefte Lage: die echte Partie ist rechtzeitig fuer einen Flug da (spaetestens 1,0 s nach dem Start; danach passt
+    // kein Flug von FLUG_MIN mehr vor die harte Grenze, und es fliegt mit Absicht nichts, siehe Zeitplan unten). Baut sie
+    // unter Last (geteilter Testrechner) laenger, ist es nicht diese Lage: neuer Anlauf in einer frischen Seite
+    // (hoechstens dreimal; Konsolenfehler zaehlen aus allen Anlaeufen)
+    let flug = null;
+    let nach = null;
+    let lauf = null;
+    const fehler = [];
+    for (let versuch = 1; versuch <= 3; versuch++) {
+      if (lauf) { fehler.push(...lauf.fehler); await lauf.kontext.close(); }
+      if (versuch > 1) console.log(`  (Duell Portraetflug: Partie kam erst nach ${nach.prot[0] ? nach.prot[0].partieAb : '?'} ms, Versuch ${versuch})`);
+      lauf = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'immer', klang: false } });
+      const seite = lauf.seite;
+      await seite.goto(BASIS + '#arena');
+      await seite.waitForSelector('.screen.arena .knoten');
+      await warte(600);
+      await duellHorcher(seite);
+      await zieleEinsetzen(seite);
+      await tippe(seite, '.detail [data-aktion="spielen"]');
+      await seite.waitForFunction(() => !!window.__flugBlick || window.__fertig.length > 0, null, { timeout: 6000 }).catch(() => {});
+      flug = await seite.evaluate(() => window.__flugBlick || { flieger: window.__fliegerMax });
+      await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
+      await warte(60);
+      nach = await seite.evaluate(() => ({ flieger: document.querySelectorAll('.duell-flieger').length, sichtbar: [...document.querySelectorAll('.screen.partie .spieler .av')].map((z) => z.style.visibility || 'sichtbar').join(), prot: window.__duellProtokoll,
+        deckt: window.__ziele.deckt, block: Math.round(window.__block) }));
+      const pa = nach.prot && nach.prot[0] ? nach.prot[0].partieAb : null;
+      if (pa != null && pa <= 1000) break;
+    }
+    const { kontext } = lauf;
+    fehler.push(...lauf.fehler);
+    pruefe('waehrend des Flugs: zwei Flieger (Bot-Portraet, Flos Koenig), die Ziele sind verborgen, Attribut steht', flug.flieger === 2 && flug.inhalt === 'img,svg' && flug.versteckt === 'hidden,hidden' && flug.attr === 'laeuft', JSON.stringify(flug) + ' ' + JSON.stringify(nach.prot));
     pruefe('danach: Flieger weg, Ziele wieder sichtbar, Protokoll meldet 2 Ziele', nach.flieger === 0 && nach.sichtbar === 'sichtbar,sichtbar' && nach.prot[0].ziele === 2, JSON.stringify(nach));
     // Pruefer-Befund U5 (wichtig): die Arena wechselte erst am Ende der Haltephase, der Flug schrumpfte auf 160 bis 215 ms.
     // Jetzt wechselt sie, sobald die Buehne deckt; war die Partie vor dem Ende der Haltephase da, fliegt das Portraet
@@ -1050,28 +1125,46 @@ async function testeDuell(browser) {
     await seite.waitForSelector('.screen.arena .knoten');
     await warte(600);
     await duellHorcher(seite);
-    await seite.evaluate(async () => {
-      const { spieleDuell } = await import('./js/ui/duell.js');
-      const { sende } = await import('./js/ereignisse.js');
-      const { BOTS } = await import('./js/bots.js');
-      window.__tipps = 0;
-      const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
-      d.bereit.then(() => {
-        const p = document.createElement('section');
-        p.className = 'screen partie schein-partie';
-        p.style.cssText = 'position:fixed;inset:0;z-index:1';
-        p.addEventListener('pointerdown', () => { window.__tipps++; });
-        document.body.append(p);
-        sende('app:screen', { name: 'partie', params: {} });
-      });
+    // Lage im Moment des Tipps festhalten (Horcher am window, capture). Kommt der Tipp unter Last erst nach dem Ende des
+    // Intros an, ist es nicht die gepruefte Lage: neuer Anlauf (hoechstens dreimal)
+    await seite.evaluate(() => {
+      window.addEventListener('pointerdown', () => {
+        if (window.__vorher) return;
+        window.__vorher = { laeuft: document.documentElement.dataset.duell || null, buehne: !!document.querySelector('.duell-buehne'), durch: !!document.querySelector('.duell.voll.durch'),
+          ziel: (document.elementFromPoint(300, 400) || {}).className || null };
+      }, { capture: true });
     });
-    await seite.waitForSelector('.duell.voll.durch', { timeout: 5000 });
-    const vorher = await seite.evaluate(() => ({ laeuft: document.documentElement.dataset.duell, buehne: !!document.querySelector('.duell-buehne') }));
-    await seite.touchscreen.tap(300, 400);
-    await warte(100);
-    const r = await seite.evaluate(() => ({ tipps: window.__tipps, duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig }));
-    pruefe('Partie unter der Buehne: der Tipp kommt bei der Partie an und beendet das Intro (uebersprungen)', vorher.laeuft === 'laeuft' && vorher.buehne && r.tipps === 1 && r.duell === 0 && r.attr === null
-      && r.fertig.length === 1 && r.fertig[0].uebersprungen === true, JSON.stringify({ vorher, r }));
+    let vorher = null;
+    let r = null;
+    for (let versuch = 1; versuch <= 3; versuch++) {
+      if (versuch > 1) console.log(`  (Duell Tipp zur Partie: Tipp kam erst nach dem Ende des Intros an, Versuch ${versuch})`);
+      await seite.evaluate(async () => {
+        const { spieleDuell } = await import('./js/ui/duell.js');
+        const { sende } = await import('./js/ereignisse.js');
+        const { BOTS } = await import('./js/bots.js');
+        for (const p of document.querySelectorAll('.schein-partie')) p.remove();
+        window.__tipps = 0;
+        window.__vorher = null;
+        window.__fertig = [];
+        const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
+        d.bereit.then(() => {
+          const p = document.createElement('section');
+          p.className = 'screen partie schein-partie';
+          p.style.cssText = 'position:fixed;inset:0;z-index:1';
+          p.addEventListener('pointerdown', () => { window.__tipps++; });
+          document.body.append(p);
+          sende('app:screen', { name: 'partie', params: {} });
+        });
+      });
+      await seite.waitForSelector('.duell.voll.durch', { timeout: 5000 });
+      await seite.touchscreen.tap(300, 400);
+      await warte(100);
+      ({ vorher, r } = await seite.evaluate(() => ({ vorher: window.__vorher, r: { tipps: window.__tipps, duell: document.querySelectorAll('.duell').length, attr: document.documentElement.dataset.duell || null, fertig: window.__fertig } })));
+      if (vorher && vorher.laeuft === 'laeuft') break;
+      await seite.waitForFunction(() => !document.querySelector('.duell'), null, { timeout: 5000 });
+    }
+    pruefe('Partie unter der Buehne: der Tipp kommt bei der Partie an und beendet das Intro (uebersprungen)', !!vorher && vorher.laeuft === 'laeuft' && vorher.buehne && vorher.durch && /schein-partie/.test(vorher.ziel || '')
+      && r.tipps === 1 && r.duell === 0 && r.attr === null && r.fertig.length === 1 && r.fertig[0].uebersprungen === true, JSON.stringify({ vorher, r }));
     await seite.evaluate(() => { for (const p of document.querySelectorAll('.schein-partie')) p.remove(); });
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -1105,6 +1198,7 @@ async function testeDuell(browser) {
       const sofortWeg = !document.querySelector('.duell') && document.documentElement.dataset.duell == null;
       const t2 = performance.now();
       await d2.fertig;
+      const warteZeit = Math.round(performance.now() - t2);
       // 3. zweites Intro beendet das erste
       const d3 = spieleDuell({ bot, farbe: 'w', anlass: 'erste', art: 'voll' });
       const d4 = spieleDuell({ bot: BOTS[0], farbe: 'w', anlass: 'erste', art: 'voll' });
@@ -1112,7 +1206,7 @@ async function testeDuell(browser) {
       const nurEins = document.querySelectorAll('.duell').length === 1 && document.querySelector('.duell').dataset.bot === 'benno';
       const drittesFertig = await Promise.race([d3.fertig.then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
       d4.ueberspringe();
-      return { bereitSofort, aktiv1, huelle, t1: Math.round(t1), block: Math.round(window.__block), aktiv2, lief, sofortWeg, warteZeit: Math.round(performance.now() - t2), nurEins, drittesFertig, fertig: window.__fertig.map((f) => f.art + (f.uebersprungen ? '!' : '')).join(), prot: window.__duellProtokoll.map((p) => p.art + ':' + p.ziele).join() };
+      return { bereitSofort, aktiv1, huelle, t1: Math.round(t1), block: Math.round(window.__block), aktiv2, lief, sofortWeg, warteZeit, nurEins, drittesFertig, fertig: window.__fertig.map((f) => f.art + (f.uebersprungen ? '!' : '')).join(), prot: window.__duellProtokoll.map((p) => p.art + ':' + p.ziele).join() };
     });
     pruefe('Kurzfassung ohne Partie: bereit sofort, aktivesDuell() gesetzt, nur eine unsichtbare Huelle, Ende an der harten Grenze (1,4 s), danach null',
       r.bereitSofort && r.aktiv1 && r.huelle && r.t1 >= 1380 && r.t1 <= 1700 + r.block && r.aktiv2 === null, JSON.stringify(r));
