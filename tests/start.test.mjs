@@ -884,6 +884,9 @@ async function browserTeil(browser) {
   // ---------- ohne Paket: nur die Screen-Datei liegt da (vor der Integration, Router-Test in app.test.mjs) ----------
   gruppe = 'Ohne Paket';
   const op = await neueSeite(browser);
+  // PAKETE ohne start (so wie vor der Integration; nach ihr steht das Paket dort und wird hier herausgenommen)
+  await op.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
+    body: "export const PAKETE = Object.freeze(['sicherung']);\nexport const REITER = Object.freeze([]);\n" }));
   await op.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
   await op.seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Crownmate' && !!document.querySelector('.screen.arena'), null, { timeout: 20000 });
   const ohne = await op.seite.evaluate(() => ({ st: !!document.querySelector('.st-screen'), platzhalter: !!document.querySelector('.screen.platzhalter'),
