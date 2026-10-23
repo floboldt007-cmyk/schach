@@ -1539,3 +1539,69 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
 - **sw-Test:** `js/ui/raetsel.js` gehoert laut `SCREEN_PAKET` dem Paket `raetsel`, `css/pakete/raetsel.css` ebenfalls (nach
   dem Dateinamen). Mit der Kartei in `PAKETE` muessen beide trotzdem in `DATEIEN` (die Integration setzt
   `SCREEN_PAKET.raetsel` auf `kartei` oder traegt sie von Hand ein), sonst fehlt der Bildschirm offline.
+
+## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
+
+Dateien: `js/pakete/start/index.js` (Orte, Ereignisse, Feier), `dienst.js` (Speicher, Raetsel-Quellen, Spielstart; gemeinsam
+fuer Einstieg und Screen), `logik.js` (rein, Node-testbar, kein `Math.random`, keine Uhr), `aufgaben.js` (Regel-Hilfe und
+Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus `PAKET_SCREENS`, `app.js` unveraendert) und
+`css/pakete/start.css` (nur Tokens, `link[data-paket="start"]`). Test: `tests/start.test.mjs`. SPIELKONZEPT 3.16 und 3.12.
+
+- **Willkommen (Wahl-Ort `app:erster-screen?`, Reihenfolge 80):** nur beim allerersten Start, also ohne Hash und ohne
+  Verlaufseintrag (`app.js`), ohne gespeicherte und ohne laufende Partie und wenn das Modul noch kein `gesehen` hat
+  (`logik.ersterScreenWahl`). Ein Paket mit eigener Wahl unter 80 geht vor. Das Willkommen gilt als gesehen, sobald der
+  Screen einmal da war. Nach „Fortschritt zuruecksetzen“ ist das Modul weg, der naechste frische Start zeigt es wieder.
+- **Screen `start`** (`zeige(root, { seite }, app)`): Seiten `w1` (Was ist Crownmate), `w2` (deine Gegner: die Leiter aus
+  `BOTS`, Zahl und Namen daraus), `w3` (wie du lernst), dann `frage` „Kennst du die Schachregeln?“ (Ja: `einstufung`,
+  Nein: Regel-Hilfe), `einstufung` (Angebot), `empfehlung`, `nach-regeln`. „Weiter“, „Überspringen“ (zur Frage),
+  Seiten-Punkte und Pfeiltasten auf w1 bis w3; „Ich kenne mich aus“ steht auf jeder Seite im Kopf und fuehrt zur Arena.
+  Die aktuelle Seite steht in `params.seite` des eigenen Verlaufseintrags (`history.replaceState`, Hash bleibt `#start`):
+  Neuladen bleibt auf ihr. Aus dem Raetsel-Bildschirm zurueck (Zurueck oder „Fertig“) gilt die Seite, die `dienst.setzeRueck`
+  gemerkt hat (nach der Einstufung `empfehlung`, nach der Regel-Hilfe `nach-regeln`), sonst die aus dem Verlauf. Ohne
+  geladenen Paket-Einstieg (`dienst.paketGeladen()`, z. B. `#start` von Hand ohne Paket) geht der Screen still zur Arena
+  wie ein fehlender Paket-Screen (Router-Test in `app.test.mjs`). DOM: `section.screen.st-screen[data-seite]`,
+  `.st-buehne[data-seite]`, Knoepfe mit `data-st` (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter,
+  spielen, benno, einstufung-seite, wiederholen, arena, raus). Test-Schnittstelle `zustand()` -> `{ offen, seite }`, mit
+  `?test` auch `window.__start.zustand()`.
+- **Regel-Hilfe und Einstufung** laufen im Raetsel-Bildschirm aus A3 (Quellen `start-regeln` und `start-einstufung`, angemeldet
+  erst von `dienst.starte()` aus `index.js`). Regel-Hilfe: 7 Aufgaben (Turm, Laeufer, Dame, Springer, Koenig, Bauer, dann das
+  Matt), je Figur genau ein Zug, der das Ziel erreicht, mit dieser Figur; Antippen zeigt die Zielpunkte. Einstufung: 8 selbst
+  erstellte Stellungen mit steigender Schwierigkeit (Matt in 1, Material, Matt in 1 mit Schwarz, Gabel, Spiess, Fesselung,
+  Matt in 2 mit erzwungener Antwort, Bauernendspiel mit Quadratregel). `tests/start.test.mjs` prueft jede Loesung mit chess.js
+  und einer Suche mit Material und Matt: jeder eigene Zug ist der einzige beste (Tiefe 4, Endspiel 7), Antworten sind
+  erzwungen. Quelle: selbst erstellt (Kopf von `aufgaben.js`).
+- **Empfehlung (RECHENSTAND 1):** Punkte je Aufgabe 1 (erster Versuch), 0,5 (spaeter geloest), 0 (Loesung gezeigt);
+  `EMPFEHLUNG`: bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, darueber hoechstens Professor Turm (8
+  Aufgaben sagen ueber die oberen Stufen zu wenig). Begruendung aus den Ergebnissen (geloest, Staerken = die zwei schwersten
+  im ersten Versuch, naechster Schritt = die leichteste nicht geloeste, ein Satz zum Bot), keine Elo-Zahl. **Leiter bleibt:**
+  Steht der Bot ueber der hoechsten freigeschalteten Stufe, gibt es ihn nur als „Probepartie“ (`app.gehe('partie', { botId,
+  farbe: 'w', modus: 'frei' })`, `wertet()` ist false: keine Sterne, keine Freischaltung), daneben „Leiter: <naechster
+  Gegner>“. Sonst eine normale Partie. Ist eine Partie offen, fragt `dienst.starteSpiel` wie die Arena („Neue Partie
+  starten?“). Fehlt ein Bot der Tabelle in `BOTS`, nimmt `botFuerPunkte` den naechstschwaecheren.
+- **Entdeckungs-Fahrplan:** beginnt bei `app:bereit` (einmal, `fahrplan.start`; ab 5 Partien beim ersten Start „erfahren“:
+  nur neue Funktionen). In den ersten 28 Tagen hoechstens ein Hinweis je Tag im Ort `arena:heute` (Reihenfolge 70):
+  `.st-neu[data-entdeckung]`, die ganze Zeile `button.st-neu-los` „Neu für dich: <Titel>“ mit Satz fuehrt hin, `.st-neu-weg`
+  blendet aus; beides erledigt den Hinweis, heute kommt kein zweiter. Reihenfolge `ENTDECKUNGEN`: Spielanalyse (nach der
+  ersten Partie), Einstufung (ab Tag 1, solange nicht gemacht), Training (ab Tag 2, nur wenn ein Paket `training:karten`
+  anbietet), Brett und Klang (ab 2 Partien), Verlauf (ab 3 Partien). Wer einen Screen schon besucht hat (`app:screen`), bekommt
+  dafuer keinen Hinweis mehr. Abschaltbar in der Gruppe „Erste Schritte“ (Paket-Einstellung `start.hinweise`).
+- **Orte:** `app:erster-screen?` (80), `arena:heute` (70), `einstellungen:gruppen` (90: Gruppe „Erste Schritte“ mit Schalter
+  „Neu für dich“, Stand der Einstufung mit „Zur Empfehlung“ oder „Einstufung machen“, „Willkommen ansehen“, „Regel-Hilfe“).
+- **Feier:** Beim ersten wertenden Sieg ueberhaupt (der Fortschritt kennt genau einen Sieg) synchron im Hoerer von
+  `partie:beendet` `melde({ quelle: 'erster-sieg', titel: 'Dein erster Sieg', text: 'Gegen <Bot>, in <n> Zügen', symbol:
+  'pokal', klang: 'rekord' })` (gross, Prio 95 laut `feier.QUELLEN`), nur einmal (`ersterSieg` im Modul).
+- **Ereignisse:** hoert `app:bereit` (Fahrplan, per `setTimeout`), `app:screen` (besuchte Screens; Rueckweg vergessen) und
+  `partie:beendet` (letzte Partie fuer den Hinweis zur Analyse, erster Sieg). Sendet nichts. **Register:** Icon
+  `neu-siegel`, Raetsel-Quellen `start-regeln` und `start-einstufung`.
+- **Speicher:** Modul `start` (vorhanden, Budget 6.000) `{ v: RECHENSTAND (1), gesehen: '' | Tag, regeln: null | { tag,
+  geloest, gesamt }, einstufung: null | { tag, rechenstand, punkte, geloest, ersterVersuch, gesamt, je: [[id, punkte]], botId },
+  ersterSieg: '' | partieId, letzte: '' | partieId, fahrplan: { start: '' | Tag, erfahren, heute: null | { tag, id },
+  erledigt: [id], benutzt: [screen] } }` (voll unter 1.500 Zeichen). Tage aus `tag.js` (Grenze 4:00). Bei jedem Zugriff
+  frisch gelesen, Falsches faellt still weg; ein Modul einer neueren App (`v` hoeher) wird gelesen, nie ueberschrieben.
+  Paket-Einstellungen `start` `{ hinweise: true }`.
+- **Integration:** `PAKETE += 'pakete/start/index'`; in `DATEIEN` (sw.js) die vier Paket-Dateien, `css/pakete/start.css`,
+  `js/ui/start.js` und der Raetsel-Bildschirm (`js/ui/raetsel.js`, `css/pakete/raetsel.css`, falls die Kartei sie nicht schon
+  eingetragen hat). `SCREEN_PAKET.start` in `tests/sw.test.mjs` heisst noch `einstieg` (BAUPLAN 2D), deshalb erzwingt der
+  sw-Test den Screen nicht; `tests/start.test.mjs` prueft alle acht Dateien, sobald das Paket in `PAKETE` steht. Mit dem Paket
+  zeigt jeder frische Start ohne Hash das Willkommen: Suiten, die so starten, setzen vorher `modul:start` mit `gesehen` oder
+  oeffnen `#arena`.
