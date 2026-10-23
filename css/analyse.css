@@ -396,18 +396,21 @@
   .an-g-wert { font-size: 25px; }
   .an-g-label > .an-g-zusatz { display: inline; }
 }
-/* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen */
-@container an-rechts (max-width: 400px) {
+/* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen (bis 520 px: auch bei 800 x 600 passte
+   "Deine Genauigkeit" nicht in eine Zeile) */
+@container an-rechts (max-width: 520px) {
   .an-g-label, .an-k-titel { white-space: normal; overflow: visible; text-overflow: clip; }
 }
-/* Kopf im schmalen Querfenster: die Unterzeile darf umbrechen, der Grund (Matt, Aufgabe ...) entfaellt dort,
-   die Genauigkeits-Karte nennt ihn unter dem Ergebnis */
+/* Kopf im schmalen Querfenster: die Unterzeile darf umbrechen, sie nennt den kurzen Namen, und der Grund (Matt,
+   Aufgabe ...) entfaellt dort; die Genauigkeits-Karte nennt ihn unter dem Ergebnis */
+.an-unter-kurz { display: none; }
 @media (orientation: landscape) and (max-width: 760px) {
   .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
-  .an-unter-grund { display: none; }
+  .an-unter-grund, .an-unter-voll { display: none; }
+  .an-unter-kurz { display: inline; }
 }
 /* Navigation unter einem kleinen Brett: vier Knoepfe ueber die volle Breite, der Zugstand entfaellt (wie am Handy) */
-@container an-links (max-width: 307px) {
+@container an-links (max-width: 291px) {
   .an-stand { display: none; }
   .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

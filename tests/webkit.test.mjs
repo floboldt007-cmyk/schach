@@ -165,7 +165,8 @@ async function durchlauf(browser, vp) {
     const vorher = await seite.evaluate(() => window.__partie.z.zuege.length);
     await tippeFeld(seite, zug.slice(0, 2));
     await tippeFeld(seite, zug.slice(2, 4));
-    // U7: "Zug bestaetigen" ist Standard (ohneUhr): steht die Vorschau, macht ein zweiter Tipp aufs Ziel den Zug fest
+    // U7: "Zug bestaetigen" (seit 23.10. Standard aus; die Vorschau prueft board.test auch in WebKit): steht sie, macht ein
+    // zweiter Tipp aufs Ziel den Zug fest
     if (await seite.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau'))) await tippeFeld(seite, zug.slice(2, 4));
     await seite.waitForFunction((n) => window.__partie.z.zuege.length > n, vorher, { timeout: 5000 });
   }

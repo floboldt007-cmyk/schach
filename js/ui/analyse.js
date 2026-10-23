@@ -224,9 +224,13 @@ export function zeige(root, params = {}, app) {
     })();
     const info = ergebnisInfo(p, nummer);
     const name = st.bot ? st.bot.name : 'Bot';
-    // Der Grund steht in einem eigenen Span: im kleinen Querfenster entfaellt er im Kopf (die Genauigkeits-Karte nennt ihn)
+    // Name und Grund stehen in eigenen Spans: im kleinen Querfenster zeigt der Kopf den kurzen Namen, und der Grund
+    // entfaellt dort (die Genauigkeits-Karte nennt ihn); sichtbar ist immer nur eine Fassung des Namens
     const unter = sec.querySelector('.an-unter');
-    unter.textContent = [`Du gegen ${name}`, info.stand].filter(Boolean).join(' · ');
+    const namensSpan = (klasse, text) => { const e = document.createElement('span'); e.className = klasse; e.textContent = text; return e; };
+    unter.textContent = 'Du gegen ';
+    unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? (KURZ[st.bot.id] || name) : name));
+    if (info.stand) unter.append(' · ' + info.stand);
     if (info.grund) {
       const grund = document.createElement('span');
       grund.className = 'an-unter-grund';

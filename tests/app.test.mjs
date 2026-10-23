@@ -3205,8 +3205,11 @@ async function testeU7(browser) {
     pruefe('Brett mindestens 44 % der kleineren Seite (vorher 184 px)', m.brett.w >= Math.min(m.iw, m.ih) * 0.44, JSON.stringify(m.brett));
     pruefe('Spalte rechts vom Brett, schmal (248 bis 299 px), alle Karten und Knöpfe ganz im Bild',
       k.spalte >= 248 && k.spalte < 300 && k.teile.every((t) => t.l >= m.rahmen.r - 0.5 && t.r <= m.iw + 0.5 && t.b <= m.ih + 0.5 && t.t >= 0), JSON.stringify([k.spalte, k.teile, m.rahmen.r]));
-    pruefe('Name des Gegners ohne Ellipse, höchstens zwei Zeilen, voller Name im aria-label', m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis'
-      && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Großmeisterin Greta', JSON.stringify(m.name));
+    const wort = await seite.evaluate(() => getComputedStyle(document.querySelector('.partie .spieler.gegner .name')).overflowWrap);
+    // Pruefer-Befund 23.10.: mit overflow-wrap break-word stand dort "Großmeisteri / n Greta"; ohne Wortbruch nimmt passeNamen() den Rufnamen
+    pruefe('Name des Gegners ohne Ellipse und nie mitten im Wort getrennt (sonst Rufname), höchstens zwei Zeilen, voller Name im aria-label',
+      m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && wort === 'normal' && ['Großmeisterin Greta', 'Greta'].includes(m.name.text)
+      && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Großmeisterin Greta', JSON.stringify([m.name, wort]));
     pruefe('Beide Uhren sichtbar, die Uhr des Gegners überdeckt den Namen nicht', k.uhren.length === 2 && k.uhren.every((u) => u.an) && k.info.r <= k.uhren[0].l + 0.5,
       JSON.stringify([k.uhren, k.info]));
     pruefe('Aktionen: Wörter ganz lesbar, Tippflächen >= 44 px', k.woerter.length === 4 && k.woerter.every((w) => w.ganz) && m.tipp >= 44, JSON.stringify([k.woerter, m.tipp]));
@@ -3218,6 +3221,28 @@ async function testeU7(browser) {
       && bl.r <= bl.karteR + 0.5 && bl.t >= bl.karteT - 0.5, JSON.stringify([bl, m.rahmen.r]));
     await bild(seite, `u7-fenster-590x580-${schema === 'dark' ? 'dunkel' : 'hell'}`);
     if (schema === 'light') {
+      // zwei Knoepfe der Pakete (Ort partie:aktionen, hier nachgebaut): zwei Reihen zu drei, alle im Bild, ganz lesbar
+      const pk = await seite.evaluate(() => {
+        const sk = document.querySelector('.partie .spielknoepfe');
+        const ort = sk.querySelector('.ort-aktionen');
+        sk.dataset.aktionen = '2';
+        if (ort) ort.hidden = false;
+        for (const t of ['Teilen', 'Kartei']) { const b = document.createElement('button'); b.className = 'knopf test-paket'; b.type = 'button'; b.innerHTML = `<span>${t}</span>`; (ort || sk).append(b); }
+        const r = [...sk.querySelectorAll('.knopf')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => {
+          const q = b.getBoundingClientRect(); const s = b.querySelector('span:last-child');
+          return { w: q.width, h: q.height, b: q.bottom, ganz: !s || s.scrollWidth <= s.clientWidth + 1 };
+        });
+        const raus = { ih: innerHeight, n: r.length, ok: r.every((x) => x.w >= 44 && x.h >= 44 && x.b <= innerHeight + 0.5 && x.ganz) };
+        sk.querySelectorAll('.test-paket').forEach((b) => b.remove());
+        delete sk.dataset.aktionen;
+        return raus;
+      });
+      pruefe('Sechs Knöpfe (zwei der Pakete): zwei Reihen, alle im Bild, mindestens 44 px, Wörter ganz', pk.n === 6 && pk.ok, JSON.stringify(pk));
+      // niedriges Querfenster: Begruessung, Uhr und Aktionen passen in 800 x 560
+      await seite.setViewportSize({ width: 800, height: 560 });
+      await warte(400);
+      const nied = await u7Masse(seite);
+      pruefe('800 x 560: Aktionen ganz im Bild', nied.knoepfe.b <= nied.ih + 0.5, JSON.stringify([nied.knoepfe, nied.ih]));
       // iPad quer bleibt wie vorher: Spalte 31vw zwischen 300 und 420 px, Brett nach Hoehe oder Breite wie gehabt
       for (const g of [{ w: 1180, h: 820 }, { w: 1024, h: 768 }]) {
         await seite.setViewportSize({ width: g.w, height: g.h });
@@ -3318,10 +3343,10 @@ async function testeU7(browser) {
     const vor = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.length, an: window.__partie.brett.bestaetigen,
       hinweis: (document.querySelector('.toast-ort .toast:not(.weg)') || {}).textContent || '', merker: localStorage.getItem('schach-arena:v1:hinweis-bestaetigen') }));
     await h.tippeFeld('e4');
-    const nach = await seite.evaluate(() => window.__partie.z.zuege.slice());
-    pruefe('Zug bestätigen (ohneUhr, ohne Bedenkzeit): Vorschau mit Hinweis auf den zweiten Tipp, erst der zweite Tipp aufs Ziel zieht', vor.vorschau && vor.zuege === 0
-      && vor.an === true && vor.hinweis === 'Tippe noch einmal auf e4, um den Zug zu spielen. Ein Tipp daneben nimmt ihn zurück.' && vor.merker === '1'
-      && JSON.stringify(nach) === '["e2e4"]', JSON.stringify([vor, nach]));
+    const nach = await seite.evaluate(() => ({ zuege: window.__partie.z.zuege.slice(), hinweis: !!document.querySelector('.toast-ort .toast') }));
+    pruefe('Zug bestätigen (ohneUhr, ohne Bedenkzeit): Vorschau mit Hinweis auf den zweiten Tipp, erst der zweite Tipp aufs Ziel zieht, der Hinweis geht mit',
+      vor.vorschau && vor.zuege === 0 && vor.an === true && vor.hinweis === 'Tippe zum Bestätigen auf e4. Ein Tipp daneben nimmt den Zug zurück.' && vor.merker === '1'
+      && JSON.stringify(nach.zuege) === '["e2e4"]' && !nach.hinweis, JSON.stringify([vor, nach]));
     const botPhase = await seite.evaluate(() => ({ phase: window.__partie.phase(), an: window.__partie.brett.bestaetigen }));
     pruefe('Während der Bot denkt (Vorzüge): ohne Bestätigen', botPhase.phase === 'bot' && botPhase.an === false, JSON.stringify(botPhase));
     // nach drei Hinweisen schweigt er (die Einstellungen erklaeren den zweiten Tipp dauerhaft)

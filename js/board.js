@@ -24,7 +24,8 @@
 // Oeffentliche API (Vertrag, ARCHITEKTUR.md "Brett"):
 //   new Brett(el, { ausrichtung, figurenPfad, beiZug, koordinaten, koordLage, animation (ms, Standard 150),
 //                   fen, beiAbgelehnt, beiLeer, beiVorschau, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
-//   beiVorschau(von, nach): Zug bestaetigen hat die Vorschau gezeigt (die Partie erklaert den zweiten Tipp)
+//   beiVorschau(von, nach): Zug bestaetigen hat die Vorschau gezeigt (die Partie erklaert den zweiten Tipp);
+//       beiVorschau(null, null): die Vorschau ist vorbei (bestaetigt oder zurueckgenommen)
 //   beiZug(von, nach, umwandlung, { art: 'tippen' | 'ziehen', landung }) -> true | false | Promise
 //       landung: ms, bis die gezogene Figur auf dem Ziel steht (0 = steht schon dort: gezogen, Vorschau bestaetigt,
 //       Umwandlung gewaehlt, Bewegung aus). Die Partie legt den Zug-Klang darauf; das Brett spielt keinen Klang.
@@ -1541,6 +1542,11 @@ export class Brett {
     const v = this._vorschau;
     this._vorschau = null;
     if (v) v.el.classList.remove('vorschau');
+    if (v) this._meldeVorschauEnde();
+  }
+
+  _meldeVorschauEnde() {
+    if (this.beiVorschau) { try { this.beiVorschau(null, null); } catch (e) { /* egal */ } }
   }
 
   _brichVorschauAb(animieren) {
@@ -1558,6 +1564,7 @@ export class Brett {
     this._platziere(v.el, v.von);
     if (animieren) this._gleiteVon(v.el, v.nach);
     this._zeichneLagen();
+    this._meldeVorschauEnde();
   }
 
   // Zug sofort zeigen (inkl. Rochade/en passant), dann die App fragen; bei Nein zuruecknehmen.

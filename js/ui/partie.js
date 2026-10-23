@@ -126,7 +126,7 @@ import {
 import { eroeffnung, stellungsSchluessel } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
-import { halteKnopf } from './bauteile.js';
+import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
   ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
@@ -189,6 +189,7 @@ const BLASE_MS = 3500;
 // Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
 const BESTAETIGEN_HINWEISE = 3;
 const BESTAETIGEN_MERKER = 'schach-arena:v1:hinweis-bestaetigen';
+let bestaetigenHinweiseGezeigt = 0;   // Zaehler dieser Sitzung (falls der Speicher gesperrt ist)
 const BEGRUESSUNG_MS = 6000;
 // U7: Sprueche "wenig": hoechstens ein Satz je 5 eigene Zuege (10 Halbzuege)
 const WENIG_ABSTAND = 10;
@@ -1144,16 +1145,24 @@ export function zeige(root, params, app) {
     aktualisiereBestaetigen();
   }
   // Zug bestaetigen: die ersten drei Vorschauen erklaeren den zweiten Tipp (Flo, 23.10.: ohne Hinweis sah es aus, als
-  // reagiere das Spiel nicht). Gezaehlt wird je Geraet; die Einstellungen erklaeren es dauerhaft.
+  // reagiere das Spiel nicht). Gezaehlt wird je Geraet (ohne Speicher je Sitzung); die Einstellungen erklaeren es
+  // dauerhaft. Ist die Vorschau vorbei (bestaetigt oder zurueckgenommen), verschwindet der Hinweis mit ihr.
+  let hinweisText = '';
   function beiVorschau(von, nach) {
+    if (!von) {
+      const t = document.querySelector('.toast-ort .toast');
+      if (hinweisText && t && t.textContent === hinweisText) toastLeeren();
+      hinweisText = '';
+      return;
+    }
     if (weg || z.phase !== 'flo') return;
-    let n = 0;
-    try {
-      n = Number(localStorage.getItem(BESTAETIGEN_MERKER)) || 0;
-      if (n >= BESTAETIGEN_HINWEISE) return;
-      localStorage.setItem(BESTAETIGEN_MERKER, String(n + 1));
-    } catch (e) { if (n >= BESTAETIGEN_HINWEISE) return; }
-    app.meldung(`Tippe noch einmal auf ${nach}, um den Zug zu spielen. Ein Tipp daneben nimmt ihn zurück.`, { dauer: 4500 });
+    let n = bestaetigenHinweiseGezeigt;
+    try { n = Math.max(n, Number(localStorage.getItem(BESTAETIGEN_MERKER)) || 0); } catch (e) { /* nur die Sitzung zaehlt */ }
+    if (n >= BESTAETIGEN_HINWEISE) return;
+    bestaetigenHinweiseGezeigt = n + 1;
+    try { localStorage.setItem(BESTAETIGEN_MERKER, String(n + 1)); } catch (e) { /* nur die Sitzung zaehlt */ }
+    hinweisText = `Tippe zum Bestätigen auf ${nach}. Ein Tipp daneben nimmt den Zug zurück.`;
+    app.meldung(hinweisText, { dauer: 4500 });
   }
   // Zug bestaetigen (PLAN 4): 'ohneUhr' nur ohne Bedenkzeit, 'immer', 'aus'; nur fuer echte Zuege (nie fuer Vorzuege)
   const bestaetigenAn = () => {
