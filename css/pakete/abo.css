@@ -24,7 +24,7 @@
 .trainer-kuendbar { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .trainer-karte .trainer-stand { margin-top: 12px; font-size: 15px; font-weight: 700; color: var(--text); }
 .trainer-karte .trainer-stand:empty { display: none; }
-.trainer-listen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.trainer-listen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; align-items: start; }
 .trainer-liste { padding: 12px 14px; border-radius: var(--r-l); background: var(--flaeche-2); border: 1px solid var(--linie); }
 .trainer-liste h4 { margin: 0 0 8px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber);
   text-transform: uppercase; color: var(--text-2); }
@@ -32,14 +32,26 @@
 .trainer-liste li { position: relative; padding-left: 20px; font-size: 14px; line-height: 1.35; color: var(--text); }
 .trainer-liste li::before { content: ""; position: absolute; left: 3px; top: .42em; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
 .trainer-gratis li::before { background: var(--gut); }
+/* In Arbeit: noch nicht enthalten, deshalb leerer Ring statt Punkt und gedaempfte Schrift */
+.trainer-geplant li { color: var(--text-2); }
+.trainer-geplant li::before { background: transparent; border: 2px solid var(--linie-2); width: 6px; height: 6px; }
+.trainer-geplant-hinweis { margin: 10px 0 0; font-size: 13px; color: var(--text-2); }
+.trainer-liste[hidden] { display: none; }
+/* Reihenfolge immer: "Im Trainer", "Immer gratis", "In Arbeit"; bei drei Listen "In Arbeit" ueber die ganze Breite */
+.trainer-gratis { order: 2; }
+.trainer-geplant { order: 3; }
+.trainer-listen[data-anzahl="3"] .trainer-geplant { grid-column: 1 / -1; }
 .trainer-zusagen { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
 .trainer-karte .trainer-alter { margin-top: 4px; font-size: 13px; font-weight: inherit; color: var(--text-2); }
+.trainer-karte .trainer-test { margin-top: 4px; font-size: 13px; color: var(--text-2); }
 .trainer-knoepfe { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .trainer-knoepfe[data-anzahl="1"] { grid-template-columns: minmax(0, 1fr); }
+.trainer-knoepfe[data-anzahl="3"] .knopf:last-child { grid-column: 1 / -1; }
 .trainer-knoepfe .knopf { width: 100%; white-space: normal; text-align: center; }
 
 @media (max-width: 560px) {
   .trainer-listen { grid-template-columns: minmax(0, 1fr); }
+  .trainer-listen[data-anzahl="3"] .trainer-geplant { grid-column: auto; }
   .trainer-knoepfe { grid-template-columns: minmax(0, 1fr); }
   .trainer-knoepfe .knopf.primaer { order: -1; }
   .trainer-karte { padding: 10px 16px 18px; }

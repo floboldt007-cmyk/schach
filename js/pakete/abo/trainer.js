@@ -5,28 +5,49 @@
 //
 //   zeigeTrainer({ app }) -> { el, ende(), aktualisiere() } | null   ein offenes Blatt wird vorher geschlossen
 //   schliesseTrainer()
-//   VORTEILE, GRATIS   die beiden Listen (SPIELKONZEPT 2b.5), auch fuer Tests
-//   ALTER_HINWEIS      Satz zum Alter (ab 16, unter 18 nur mit den Eltern), .trainer-alter, ausser bei premium und store
-//   Zustaende (data-zustand an .trainer-karte): laedt, vorschau (kein aktives Produkt), abgemeldet, kaufbar, premium,
-//   store (App-Store-Huelle: kein Kauf ausserhalb des Stores, inStoreHuelle in js/abo.js)
+//   VORTEILE   [{ id, text }] was der Trainer bringen soll (SPIELKONZEPT 2b.5). Unter "Im Trainer" steht nur, was ein
+//              Paket mit registriereVorteil(id) (js/abo.js) als gebaut gemeldet hat; der Rest steht unter "In Arbeit"
+//              mit dem Satz "Noch nicht enthalten". Verkauft wird nur, was es gibt (Paragraf 5 UWG).
+//   GRATIS     was immer gratis bleibt
+//   bereiteVorteile(), verkaufbar(produkt)   Kauf nur mit mindestens einem gebauten Vorteil (oder Stripe-Testmodus)
+//   ALTER_HINWEIS, ALTER_FRAGE, UNTER_18   Texte zum Alter: Crownmate ist ab 16, das Abo im Web ab 18 (SPIELKONZEPT 2b.8
+//              Regel 22: Abo fuer Minderjaehrige nur ueber die Familienfreigabe der Stores, die gibt es im Web nicht).
+//              Vor dem ersten Kauf fragt das Blatt einmal "18 oder aelter?" (alterAngabe in js/abo.js).
+//   Zustaende (data-zustand an .trainer-karte):
+//     laedt        Produkt kommt noch
+//     vorschau     kein aktives Produkt, kein gebauter Vorteil, oder ohne Konto-Freischaltung (keine Anmeldung moeglich)
+//     offline      kein Netz und nichts zwischengespeichert
+//     abgemeldet   Produkt kaufbar, aber nicht angemeldet ("Zum Konto")
+//     kaufbar      "Trainer abschließen"
+//     alter        Altersfrage vor dem ersten Kauf ("Ja, 18 oder älter" oeffnet Stripe im selben Klick)
+//     unter18      Antwort "jünger": kein Kauf im Web ("Angabe ändern" fuer einen Fehlklick)
+//     bestaetigen  nach der Rueckkehr von Stripe: die Nachfrage-Serie laeuft, kein Kauf-Knopf (kein zweites Abo)
+//     wartet       Kauf offen, Serie ohne Bestaetigung vorbei: "Zahlung prüfen", daneben "Neu abschließen"
+//     premium      "Abo verwalten"
+//     store        App-Store-Huelle: kein Kauf ausserhalb des Stores (inStoreHuelle in js/abo.js)
 //
 // Fairness (SPIELKONZEPT 5, AGENTS.md): kein Countdown, keine Knappheit, kein "nur heute", keine Streichpreise, kein
 // Kaufhinweis in der Partie (das Blatt wird nur aus den Einstellungen oder einem ruhigen premiumHinweis geoeffnet).
 // Schliessen: Knopf, Escape, Tipp auf den Schleier, jeder Screen-Wechsel (app:screen). Das DOM-Ereignis "abo:stand"
-// (nach einem Kauf) zeichnet ein offenes Blatt neu.
+// (Stand oder Kauf-Pruefung geaendert, js/abo.js) zeichnet ein offenes Blatt neu.
 import { hoere } from '../../ereignisse.js';
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
-import { istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle } from '../../abo.js';
+import { kontoFreigeschaltet } from '../../konto.js';
+import {
+  istPremium, premiumStand, ladeProdukt, kaufen, verwalten, stelleAboCssSicher, inStoreHuelle, kaufStand, bestaetigeKauf,
+  alterAngabe, setzeAlterAngabe, vorteilBereit, produktOffline, istTestLink,
+} from '../../abo.js';
 
+const vorteil = (id, text) => Object.freeze({ id, text });
 export const VORTEILE = Object.freeze([
-  'Drei Coaches: Henrike, Mats und Yusuf, mit Mappe, Wochenplan und Sparring',
-  'Coach-Erklärungen in ganzen Sätzen in der Spielanalyse',
-  'Lernpfad: Einheiten 5 bis 10',
-  'Rätsel mit Themen-Wahl, Rätsel-Pakete und Spezial-Training',
-  'Ausführlicher Formspiegel',
-  'Ältere Liga-Saisons zum Nachspielen',
-  'Förderer-Nadel am Namen, wächst mit der Dauer (abschaltbar)',
+  vorteil('coaches', 'Drei Coaches: Henrike, Mats und Yusuf, mit Mappe, Wochenplan und Sparring'),
+  vorteil('coach-erklaerungen', 'Coach-Erklärungen in ganzen Sätzen in der Spielanalyse'),
+  vorteil('lernpfad-5-10', 'Lernpfad: Einheiten 5 bis 10'),
+  vorteil('raetsel-auswahl', 'Rätsel mit Themen-Wahl, Rätsel-Pakete und Spezial-Training'),
+  vorteil('formspiegel', 'Ausführlicher Formspiegel'),
+  vorteil('liga-archiv', 'Ältere Liga-Saisons zum Nachspielen'),
+  vorteil('foerderer-nadel', 'Förderer-Nadel am Namen, wächst mit der Dauer (abschaltbar)'),
 ]);
 export const GRATIS = Object.freeze([
   'Alle 10 Bots der Leiter, Schachuhr und Wochen-Boss',
@@ -40,10 +61,28 @@ const ZUSAGEN = Object.freeze([
   'Das Abo bringt nie mehr Funken, Punkte oder Wertung.',
   'Bezahlt wird über Stripe. Die App sieht keine Kartendaten.',
 ]);
-// Crownmate ist ab 16 (ENTSCHEIDUNGEN 17.10., SPIELKONZEPT Regel 22). Ein Abo ist ein Vertrag mit laufenden Kosten:
-// 16- und 17-Jaehrige brauchen dafuer die Zustimmung der Eltern. Ruhiger Satz ueberall, wo man abschliessen koennte
-// (nicht bei aktivem Abo und nicht in der Store-Huelle, dort laeuft das spaeter ueber die Familienfreigabe).
-export const ALTER_HINWEIS = 'Crownmate ist ab 16. Unter 18 schließt du das Abo bitte nur mit dem Einverständnis deiner Eltern ab.';
+export const GEPLANT_HINWEIS = 'Noch nicht enthalten. Es kommt erst in den Trainer, wenn es fertig ist.';
+// Crownmate ist ab 16 (ENTSCHEIDUNGEN 17.10.). Ein Abo ist ein Vertrag mit laufenden Kosten; 16- und 17-Jaehrige
+// schliessen es nach Regel 22 nur ueber die Familienfreigabe der Stores ab. Im Web gibt es die nicht, also dort ab 18.
+// Ob es spaeter einen Weg mit Zustimmung der Eltern gibt, entscheidet Flo mit der Fachperson (ANLEITUNG, Abschnitt Abo).
+export const ALTER_HINWEIS = 'Den Trainer gibt es im Web ab 18. Spielen und Lernen in Crownmate bleiben ab 16 frei.';
+export const ALTER_FRAGE = 'Eine Frage vorab: Bist du 18 oder älter? Ein Abo ist ein Vertrag mit laufenden Kosten, deshalb gibt es den Trainer im Web erst ab 18.';
+export const UNTER_18 = 'Den Trainer gibt es im Web erst ab 18. Alles andere in Crownmate bleibt für dich frei.';
+const TEST_HINWEIS = 'Stripe-Testmodus: Es fließt kein echtes Geld.';
+const TEXTE = Object.freeze({
+  laedt: '',
+  vorschau: 'Der Trainer ist noch in Vorbereitung. Bis dahin ist alles frei.',
+  offline: 'Gerade keine Verbindung. Öffne den Trainer später noch einmal.',
+  abgemeldet: 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).',
+  store: 'In dieser App ist der Trainer noch nicht verfügbar. Bis dahin ist alles frei.',
+  bestaetigen: 'Stripe bestätigt deine Zahlung. Das dauert meist nur ein paar Sekunden.',
+  wartet: 'Noch keine Bestätigung von Stripe. Hast du bezahlt, kommt sie meist in ein paar Minuten. Sonst kannst du neu abschließen.',
+  alter: ALTER_FRAGE,
+  unter18: UNTER_18,
+});
+
+export function bereiteVorteile() { return VORTEILE.filter((v) => vorteilBereit(v.id)); }
+export function verkaufbar(p) { return !!(p && p.kaufLink) && (bereiteVorteile().length > 0 || istTestLink(p)); }
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const datum = (ms) => new Date(ms).toLocaleDateString('de-DE');
@@ -65,6 +104,8 @@ export function zeigeTrainer({ app = null } = {}) {
   schliesseTrainer();
   stelleAboCssSicher();
   const li = (t) => `<li>${esc(t)}</li>`;
+  const drin = bereiteVorteile();
+  const geplant = VORTEILE.filter((v) => !drin.includes(v));
   const ort = document.createElement('div');
   ort.className = 'sheet-ort trainer-ort';
   ort.innerHTML = `<div class="sheet-schleier"></div>
@@ -78,12 +119,16 @@ export function zeigeTrainer({ app = null } = {}) {
       <p class="trainer-beschreibung" hidden></p>
       <div class="trainer-preis"><b class="trainer-preis-text">Preis folgt</b><span class="trainer-kuendbar">Jederzeit kündbar</span></div>
       <p class="trainer-stand" aria-live="polite"></p>
-      <div class="trainer-listen">
-        <section class="trainer-liste trainer-im-abo" aria-labelledby="trainer-l1"><h4 id="trainer-l1">Im Trainer</h4><ul>${VORTEILE.map(li).join('')}</ul></section>
+      <div class="trainer-listen" data-anzahl="${(drin.length ? 1 : 0) + (geplant.length ? 1 : 0) + 1}">
+        <section class="trainer-liste trainer-im-abo" aria-labelledby="trainer-l1"${drin.length ? '' : ' hidden'}><h4 id="trainer-l1">Im Trainer</h4>
+          <ul>${drin.map((v) => li(v.text)).join('')}</ul></section>
+        <section class="trainer-liste trainer-geplant" aria-labelledby="trainer-l3"${geplant.length ? '' : ' hidden'}><h4 id="trainer-l3">In Arbeit</h4>
+          <ul>${geplant.map((v) => li(v.text)).join('')}</ul><p class="trainer-geplant-hinweis">${esc(GEPLANT_HINWEIS)}</p></section>
         <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">Immer gratis</h4><ul>${GRATIS.map(li).join('')}</ul></section>
       </div>
       <ul class="trainer-zusagen">${ZUSAGEN.map(li).join('')}</ul>
       <p class="trainer-alter">${esc(ALTER_HINWEIS)}</p>
+      <p class="trainer-test" hidden>${esc(TEST_HINWEIS)}</p>
       <div class="trainer-knoepfe"></div>
     </div>`;
   const karte = ort.querySelector('.trainer-karte');
@@ -92,6 +137,7 @@ export function zeigeTrainer({ app = null } = {}) {
   const vorherFokus = document.activeElement;
   let produkt;           // undefined: noch nicht geladen, null: kein aktives Produkt
   let meldung = '';
+  let frage = false;     // Altersfrage gerade offen (nach "Trainer abschließen" ohne Angabe)
   let fertig = false;
 
   function knopf(textInhalt, art, aktion, { aus = false } = {}) {
@@ -104,6 +150,21 @@ export function zeigeTrainer({ app = null } = {}) {
     return b;
   }
 
+  function zustandVon(st, p, huelle) {
+    if (st.premium) return 'premium';
+    if (huelle) return 'store';
+    if (produkt === undefined) return 'laedt';
+    if (!p) return produktOffline() ? 'offline' : 'vorschau';
+    if (!verkaufbar(p)) return 'vorschau';
+    // ohne freigeschaltetes Konto kann man sich nicht anmelden: "Zum Konto" waere eine Sackgasse
+    if (!st.angemeldet) return kontoFreigeschaltet() ? 'abgemeldet' : 'vorschau';
+    const ks = kaufStand();
+    if (ks === 'prueft') return 'bestaetigen';
+    if (ks === 'offen') return 'wartet';
+    if (alterAngabe() === false) return 'unter18';
+    return frage ? 'alter' : 'kaufbar';
+  }
+
   function aktualisiere() {
     if (fertig) return;
     const st = premiumStand();
@@ -113,30 +174,29 @@ export function zeigeTrainer({ app = null } = {}) {
     besch.hidden = !(p && p.beschreibung);
     besch.textContent = (p && p.beschreibung) || '';
     const huelle = inStoreHuelle();
-    let zustand;
-    if (st.premium) zustand = 'premium';
-    else if (huelle) zustand = 'store';
-    else if (produkt === undefined) zustand = 'laedt';
-    else if (!p || !p.kaufLink) zustand = 'vorschau';
-    else if (!st.angemeldet) zustand = 'abgemeldet';
-    else zustand = 'kaufbar';
+    const zustand = zustandVon(st, p, huelle);
     karte.dataset.zustand = zustand;
-    ort.querySelector('.trainer-alter').hidden = zustand === 'premium' || zustand === 'store';
-    const stand = meldung || standText(st) || ({
-      vorschau: 'Der Trainer ist noch in Vorbereitung. Bis dahin ist alles frei.',
-      abgemeldet: 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).',
-      store: 'In dieser App ist der Trainer noch nicht verfügbar. Bis dahin ist alles frei.',
-      laedt: '',
-    }[zustand] || '');
+    ort.querySelector('.trainer-alter').hidden = ['premium', 'store', 'alter', 'unter18'].includes(zustand);
+    ort.querySelector('.trainer-test').hidden = !(istTestLink(p) && ['kaufbar', 'alter', 'wartet', 'bestaetigen'].includes(zustand));
+    // Zustandstexte, die eine Antwort brauchen, gehen vor; sonst Meldung zum letzten Klick, eigener Stand, Zustand
+    const stand = ['bestaetigen', 'alter', 'unter18', 'offline'].includes(zustand) ? TEXTE[zustand] : (meldung || standText(st) || TEXTE[zustand] || '');
     ort.querySelector('.trainer-stand').textContent = stand;
     const knoepfe = [];
     if (zustand === 'premium') {
       if (p && p.portalLink && !huelle) knoepfe.push(knopf('Abo verwalten', 'primaer', 'verwalten'));
     } else if (zustand === 'kaufbar') {
       knoepfe.push(knopf('Trainer abschließen', 'primaer', 'kaufen'));
+    } else if (zustand === 'alter') {
+      knoepfe.push(knopf('Ja, 18 oder älter', 'primaer', 'alter-ja'), knopf('Nein, jünger', '', 'alter-nein'));
+    } else if (zustand === 'unter18') {
+      knoepfe.push(knopf('Angabe ändern', '', 'alter-aendern'));
+    } else if (zustand === 'wartet') {
+      knoepfe.push(knopf('Zahlung prüfen', 'primaer', 'pruefen'), knopf('Neu abschließen', '', 'kaufen'));
+    } else if (zustand === 'bestaetigen') {
+      knoepfe.push(knopf('Wird bestätigt', '', '', { aus: true }));
     } else if (zustand === 'abgemeldet') {
       if (app && typeof app.gehe === 'function') knoepfe.push(knopf('Zum Konto', 'primaer', 'konto'));
-    } else {
+    } else if (zustand !== 'offline') {
       knoepfe.push(knopf(zustand === 'laedt' ? 'Wird geladen' : 'Bald verfügbar', '', '', { aus: true }));   // vorschau, store
     }
     knoepfe.push(knopf('Schließen', '', 'schliessen'));
@@ -148,6 +208,17 @@ export function zeigeTrainer({ app = null } = {}) {
       const ziel = knoepfe.find((b) => !b.disabled && (b.dataset.trainer || '') === hatteFokus) || knoepfe.find((b) => !b.disabled);
       if (ziel) ziel.focus({ preventScroll: true });
     }
+  }
+
+  // Kauf: ohne await bis zum Oeffnen (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
+  function kaufe() {
+    kaufen({ produkt: produkt || null }).then((r) => {
+      meldung = r.ok ? 'Die Bezahlseite von Stripe ist offen. Nach der Zahlung prüft die App hier von selbst.'
+        : r.grund === 'abgemeldet' ? TEXTE.abgemeldet
+          : r.grund === 'alter' ? ''
+            : 'Der Kauf ist gerade nicht möglich. Versuch es später noch einmal.';
+      aktualisiere();
+    });
   }
 
   leiste.addEventListener('click', (e) => {
@@ -165,13 +236,18 @@ export function zeigeTrainer({ app = null } = {}) {
       return;
     }
     if (a === 'kaufen') {
-      // ohne await bis zum Oeffnen (Nutzergeste)
-      kaufen({ produkt: produkt || null }).then((r) => {
-        meldung = r.ok ? 'Die Bezahlseite von Stripe ist offen. Danach ist der Trainer hier gleich aktiv.'
-          : r.grund === 'abgemeldet' ? 'Zum Abschließen brauchst du ein Konto (Einstellungen, Konto).'
-            : 'Der Kauf ist gerade nicht möglich. Versuch es später noch einmal.';
-        aktualisiere();
-      });
+      meldung = '';
+      if (alterAngabe() !== true) { frage = true; aktualisiere(); return; }
+      kaufe();
+      return;
+    }
+    if (a === 'alter-ja') { setzeAlterAngabe(true); frage = false; kaufe(); return; }
+    if (a === 'alter-nein') { setzeAlterAngabe(false); frage = false; aktualisiere(); return; }
+    if (a === 'alter-aendern') { setzeAlterAngabe(null); frage = true; aktualisiere(); return; }
+    if (a === 'pruefen') {
+      meldung = '';
+      bestaetigeKauf().then(() => aktualisiere()).catch(() => {});
+      aktualisiere();
       return;
     }
     if (a === 'verwalten') {
@@ -193,8 +269,8 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   };
   let abScreen = null;
-  // Neuer Stand (z. B. nach der Rueckkehr von Stripe, js/pakete/abo/index.js): Meldung zum Kauf weg, neu zeichnen
-  const beiStand = () => { if (premiumStand().premium) meldung = ''; aktualisiere(); };
+  // Neuer Stand oder Kauf-Pruefung (js/abo.js, z. B. nach der Rueckkehr von Stripe): Meldung zum Klick weg, neu zeichnen
+  const beiStand = () => { meldung = ''; aktualisiere(); };
   function ende() {
     if (fertig) return;
     fertig = true;

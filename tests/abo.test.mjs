@@ -18,6 +18,8 @@ import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.j
 import {
   istPremium, premiumStand, ladeProdukt, kaufAdresse, kaufen, verwalten, vergiss, premiumHinweis, setzeAboFetch, setzeAboUhr,
   kaufGestartet, pruefeProdukt, inStoreHuelle, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
+  ALTER_SCHLUESSEL, alterAngabe, setzeAlterAngabe, kaufOffen, kaufStand, bestaetigeKauf, setzeNachfragen, NACH_KAUF_MS, NACHFRAGEN_MS,
+  registriereVorteil, vorteilBereit, produktOffline, istTestLink, aufraeumen, aboHinweisZumLoeschen, OHNE_HINWEIS_SCREENS,
 } from '../js/abo.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
 import { browserTyp } from './browser.mjs';
@@ -70,6 +72,8 @@ async function nodeTeil() {
   setzeAboFetch(async (url, opt) => {
     aufrufe.push({ url, ...opt });
     if (server.offline) throw new Error('offline');
+    // beiRpc: Haken fuer die Serie nach dem Kauf, laeuft vor der Antwort (der Webhook kommt "zwischen" zwei Nachfragen)
+    if (url.includes('/rpc/ist_premium') && typeof server.beiRpc === 'function') server.beiRpc();
     await warte(1);
     const body = url.includes('/rpc/ist_premium') ? server.premium : url.includes('/abos?') ? server.abo : url.includes('/produkte?') ? server.produkt : null;
     return { ok: server.status < 400, status: server.status, async json() { return server.status < 400 ? body : { message: 'kaputt' }; } };
@@ -153,13 +157,24 @@ async function nodeTeil() {
   pruefe('Produkt: Zwischenspeicher (PRODUKT_MS 1 h)', (await ladeProdukt()).kaufLink === PRODUKT.kauf_link && aufrufe.length === 0 && PRODUKT_MS === 3600000
     && !!localStorage.getItem(PRODUKT_SCHLUESSEL));
   server.offline = true;
-  pruefe('Produkt offline: letzter Stand', (await ladeProdukt({ neu: true })).preisText === PRODUKT.preis_text);
+  pruefe('Produkt offline: letzter Stand (und kein "offline ohne Produkt")', (await ladeProdukt({ neu: true })).preisText === PRODUKT.preis_text
+    && produktOffline() === false);
+  const zwischen = localStorage.getItem(PRODUKT_SCHLUESSEL);
+  localStorage.removeItem(PRODUKT_SCHLUESSEL);
+  pruefe('Produkt offline ohne Zwischenspeicher: null und produktOffline() (Blatt sagt "keine Verbindung", nicht "in Vorbereitung")',
+    (await ladeProdukt({ neu: true })) === null && produktOffline() === true);
+  localStorage.setItem(PRODUKT_SCHLUESSEL, zwischen);
   server.offline = false;
   pruefe('Produkt: nur https-Links (javascript:, http:, Leerzeichen -> null)', pruefeProdukt({ ...PRODUKT, kauf_link: 'javascript:alert(1)' }).kaufLink === null
     && pruefeProdukt({ ...PRODUKT, kauf_link: 'http://buy.example/x' }).kaufLink === null && pruefeProdukt({ ...PRODUKT, portal_link: 'https://a b' }).portalLink === null
     && pruefeProdukt({ ...PRODUKT, kauf_link: 'https://x.example/"onmouseover' }).kaufLink === null && pruefeProdukt(null) === null);
   server.produkt = [];
-  pruefe('kein aktives Produkt: null (Blatt zeigt "Preis folgt")', (await ladeProdukt({ neu: true })) === null);
+  pruefe('kein aktives Produkt: null (Blatt zeigt "Preis folgt"), aber nicht offline', (await ladeProdukt({ neu: true })) === null && produktOffline() === false);
+  pruefe('Stripe-Testmodus am Link erkannt (buy.stripe.com/test_...)', istTestLink({ kaufLink: 'https://buy.stripe.com/test_abc' })
+    && !istTestLink({ kaufLink: 'https://buy.stripe.com/abc' }) && !istTestLink({ kaufLink: 'https://buy.stripe.com.example/test_x' }) && !istTestLink(null));
+  pruefe('Vorteile: nur gemeldete sind bereit, falsche Ids werden ignoriert', !vorteilBereit('coach-erklaerungen')
+    && (registriereVorteil('Böse Id'), registriereVorteil(''), registriereVorteil(null), !vorteilBereit('Böse Id'))
+    && (registriereVorteil('probe-vorteil'), vorteilBereit('probe-vorteil')));
   server.produkt = [PRODUKT];
   await ladeProdukt({ neu: true });
 
@@ -174,6 +189,14 @@ async function nodeTeil() {
   localStorage.removeItem(SITZUNG_SCHLUESSEL);
   pruefe('kaufen ohne Anmeldung: nichts geoeffnet', (await kaufen({ produkt: p, oeffne })).grund === 'abgemeldet' && geoeffnet.length === 0 && kaufGestartet() === null);
   localStorage.setItem(SITZUNG_SCHLUESSEL, JSON.stringify(SITZUNG));
+  pruefe('kaufen ohne Altersangabe: grund alter, nichts geoeffnet, kein Merker (Regel 22: im Web ab 18)', alterAngabe() === null
+    && (await kaufen({ produkt: p, oeffne })).grund === 'alter' && geoeffnet.length === 0 && kaufGestartet() === null);
+  setzeAlterAngabe(false);
+  pruefe('Altersangabe "jünger": kein Kauf', alterAngabe() === false && (await kaufen({ produkt: p, oeffne })).grund === 'alter' && geoeffnet.length === 0);
+  localStorage.setItem(ALTER_SCHLUESSEL, JSON.stringify({ uid: 'anders', ab18: true }));
+  pruefe('Altersangabe einer anderen Person gilt nicht', alterAngabe() === null && (await kaufen({ produkt: p, oeffne })).grund === 'alter');
+  pruefe('Altersangabe: nur ja/nein mit Nutzer-ID gespeichert, ausserhalb von schach-arena:v1:', setzeAlterAngabe(true) && alterAngabe() === true
+    && JSON.stringify(JSON.parse(localStorage.getItem(ALTER_SCHLUESSEL))) === JSON.stringify({ uid: UID, ab18: true }) && !ALTER_SCHLUESSEL.startsWith('schach-arena:v1:'));
   const versprechen = kaufen({ produkt: p, oeffne });
   const sofort = geoeffnet.length;
   const k = await versprechen;
@@ -185,6 +208,55 @@ async function nodeTeil() {
   const v = await verwalten({ produkt: p, oeffne });
   pruefe('verwalten: Kundenportal mit prefilled_email', v.ok && geoeffnet[0] === 'https://billing.stripe.example/p/login/probe?prefilled_email=' + encodeURIComponent(MAIL));
   pruefe('verwalten ohne Portal-Link: kein_link', (await verwalten({ produkt: { ...p, portalLink: null }, oeffne })).grund === 'kein_link');
+
+  // ---------- Nach dem Kauf: Serie von Nachfragen (Pruefer-Befund: Webhook kommt nach der Rueckkehr) ----------
+  pruefe('Serie: Standard sofort, dann nach 3, 10 und 30 s; Kauf offen hoechstens 30 min', JSON.stringify(NACHFRAGEN_MS) === '[3000,10000,30000]'
+    && Object.isFrozen(NACHFRAGEN_MS) && NACH_KAUF_MS === 1800000);
+  setzeNachfragen([5, 5, 5]);
+  server.premium = false;
+  server.abo = [];
+  pruefe('Kauf offen (Merker von eben), Stand "offen"', kaufOffen() && kaufStand() === 'offen');
+  aufrufe.length = 0;
+  // Der Webhook ist waehrend der ersten Pause verbucht: die erste Nachfrage (sofort) sagt nein, ab der zweiten ja.
+  // Fest an die Zahl der Nachfragen gebunden statt an eine Zeit, damit der Test unter Last nicht kippt.
+  let rpcNr = 0;
+  server.beiRpc = () => {
+    rpcNr += 1;
+    if (rpcNr === 2) {
+      server.premium = true;
+      server.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(jetzt + 30 * 86400000).toISOString(), quelle: 'stripe' }];
+    }
+  };
+  const serie = bestaetigeKauf();
+  const imLauf = kaufStand();
+  pruefe('gleichzeitiger zweiter Aufruf bekommt dieselbe Serie', bestaetigeKauf() === serie && imLauf === 'prueft');
+  const bestaetigt = await serie;
+  server.beiRpc = null;
+  const abfragen = aufrufe.filter((x) => x.url.includes('/rpc/ist_premium')).length;
+  pruefe('Webhook spaet: die Serie fragt nach der Pause genau einmal neu und findet das Abo, Merker weg', bestaetigt === true && abfragen === 2
+    && kaufGestartet() === null && kaufStand() === null && premiumStand().premium, { abfragen, rpcNr });
+  server.premium = false;
+  server.abo = [];
+  await istPremium({ neu: true });
+  localStorage.setItem(KAUF_SCHLUESSEL, String(jetzt));
+  aufrufe.length = 0;
+  const ohne = await bestaetigeKauf();
+  pruefe('Webhook bleibt aus: sofort plus 3 Nachfragen, Merker bleibt, Stand "offen" (Blatt bietet "Zahlung prüfen")', ohne === false
+    && aufrufe.filter((x) => x.url.includes('/rpc/ist_premium')).length === 4 && kaufStand() === 'offen');
+  jetzt += NACH_KAUF_MS + 1000;
+  aufrufe.length = 0;
+  pruefe('nach 30 min: Kauf nicht mehr offen, Merker weg, keine Serie', (await bestaetigeKauf()) === false && aufrufe.length === 0
+    && kaufGestartet() === null && kaufStand() === null);
+  jetzt -= NACH_KAUF_MS + 1000;
+  setzeNachfragen(null);
+  pruefe('setzeNachfragen(null) stellt den Standard wieder her', true);
+
+  // ---------- Konto loeschen kuendigt nicht: Satz fuer den Loesch-Dialog ----------
+  const st0 = { premium: true, status: 'aktiv', quelle: 'stripe' };
+  pruefe('aboHinweisZumLoeschen: nur bei laufendem Stripe-Abo ein Satz (mit Weg zum Kuendigen)', /läuft bei Stripe weiter/.test(aboHinweisZumLoeschen(st0))
+    && /Abo verwalten/.test(aboHinweisZumLoeschen(st0)) && aboHinweisZumLoeschen({ ...st0, status: 'gekuendigt' }) === ''
+    && aboHinweisZumLoeschen({ ...st0, quelle: 'manuell' }) === '' && aboHinweisZumLoeschen({ ...st0, premium: false }) === '');
+  pruefe('kein Kaufhinweis in Partie und Lektion (Regel 9)', OHNE_HINWEIS_SCREENS.includes('partie') && OHNE_HINWEIS_SCREENS.includes('lektion'));
   globalThis.Capacitor = { isNativePlatform: () => true };
   geoeffnet = [];
   pruefe('App-Store-Huelle (Capacitor): kein Kauf und kein Portal ueber Stripe', inStoreHuelle() && (await kaufen({ produkt: p, oeffne })).grund === 'store'
@@ -196,8 +268,26 @@ async function nodeTeil() {
   const sw = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
     ['js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css'].every((d) => sw.includes(`'${d}'`)));
+  await istPremium({ neu: true });
+  localStorage.setItem(KAUF_SCHLUESSEL, String(jetzt));
+  pruefe('aufraeumen angemeldet: nichts', aufraeumen() === false && !!localStorage.getItem(STAND_SCHLUESSEL));
+  localStorage.removeItem(SITZUNG_SCHLUESSEL);
+  pruefe('aufraeumen nach dem Abmelden: Stand, Altersangabe und Kauf-Merker weg, oeffentliches Produkt bleibt', aufraeumen() === true
+    && !localStorage.getItem(STAND_SCHLUESSEL) && !localStorage.getItem(ALTER_SCHLUESSEL) && kaufGestartet() === null && !!localStorage.getItem(PRODUKT_SCHLUESSEL));
+  localStorage.setItem(SITZUNG_SCHLUESSEL, JSON.stringify(SITZUNG));
+  setzeAlterAngabe(true);
   vergiss();
-  pruefe('vergiss: Stand, Produkt und Kauf-Merker weg', !localStorage.getItem(STAND_SCHLUESSEL) && !localStorage.getItem(PRODUKT_SCHLUESSEL) && kaufGestartet() === null);
+  pruefe('vergiss: Stand, Produkt, Altersangabe und Kauf-Merker weg', !localStorage.getItem(STAND_SCHLUESSEL) && !localStorage.getItem(PRODUKT_SCHLUESSEL)
+    && !localStorage.getItem(ALTER_SCHLUESSEL) && kaufGestartet() === null);
+
+  // ---------- Optik des Pakets: nur Tokens (tests/thema.test.mjs liest css/pakete/ nicht) ----------
+  const css = readFileSync(path.join(WURZEL, 'css/pakete/abo.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const definiert = new Set([...readFileSync(path.join(WURZEL, 'css/tokens.css'), 'utf8').matchAll(/(--[a-z0-9-]+)\s*:/g),
+    ...readFileSync(path.join(WURZEL, 'css/themes/modern.css'), 'utf8').matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const benutzt = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]))];
+  pruefe('abo.css: keine festen Farben, kein Schatten, kein Leuchten, kein Verlauf, kein Neon', !/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|shadow|gradient|glow|--neon-/i.test(css));
+  pruefe('abo.css: jede benutzte Variable ist ein Token aus tokens.css oder themes/modern.css', benutzt.length > 5 && benutzt.every((v) => definiert.has(v)),
+    benutzt.filter((v) => !definiert.has(v)));
   setzeAboFetch(null);
   setzeAboUhr(null);
 }
@@ -280,12 +370,25 @@ const blattZustand = (seite) => seite.evaluate(() => {
   return {
     zustand: k.dataset.zustand, preis: k.querySelector('.trainer-preis-text').textContent, stand: k.querySelector('.trainer-stand').textContent,
     knoepfe: [...k.querySelectorAll('.trainer-knoepfe button')].map((b) => b.textContent + (b.disabled ? ' (aus)' : '')),
-    vorteile: k.querySelectorAll('.trainer-im-abo li').length, gratis: k.querySelectorAll('.trainer-gratis li').length,
+    vorteile: k.querySelector('.trainer-im-abo').hidden ? 0 : k.querySelectorAll('.trainer-im-abo li').length,
+    imAbo: [...k.querySelectorAll('.trainer-im-abo li')].map((l) => l.textContent),
+    geplant: k.querySelector('.trainer-geplant').hidden ? 0 : k.querySelectorAll('.trainer-geplant li').length,
+    geplantHinweis: k.querySelector('.trainer-geplant-hinweis')?.textContent || '', gratis: k.querySelectorAll('.trainer-gratis li').length,
+    test: (() => { const a = k.querySelector('.trainer-test'); return a && !a.hidden && a.getClientRects().length ? a.textContent : ''; })(),
     alter: (() => { const a = k.querySelector('.trainer-alter'); return a && !a.hidden && a.getClientRects().length ? a.textContent : ''; })(),
     fokusDrin: k.contains(document.activeElement), links: r.left, rechts: r.right, breite: innerWidth, ueber: document.scrollingElement.scrollWidth - innerWidth,
     dialog: k.getAttribute('role') === 'dialog' && k.getAttribute('aria-modal') === 'true',
   };
 });
+
+// Ein Paket meldet einen gebauten Vorteil (wie spaeter B2 mit 'coach-erklaerungen'); dasselbe Modul wie die App
+const meldeVorteil = (seite, id = 'coach-erklaerungen') => seite.evaluate((id) => import('./js/abo.js').then((m) => m.registriereVorteil(id)), id);
+const kurzeNachfragen = (seite, liste) => seite.evaluate((l) => import('./js/abo.js').then((m) => m.setzeNachfragen(l)), liste);
+const zurueck = (seite) => seite.evaluate(() => {
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  document.dispatchEvent(new Event('visibilitychange'));
+});
+const ALTER_JA = { 'schach-arena:abo:alter': JSON.stringify({ uid: UID, ab18: true }) };
 
 async function browserTeil(browser) {
   // ---------- Konto verborgen: auch keine Abo-Gruppe ----------
@@ -320,8 +423,9 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: Dialog, Preis folgt, "Bald verfügbar" aus, Schließen', z.dialog && z.zustand === 'vorschau' && z.preis === 'Preis folgt'
       && JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen']) && /in Vorbereitung/.test(z.stand), z);
-    pruefe('Blatt: 7 Vorteile im Trainer, 5 immer gratis, jederzeit kündbar', z.vorteile === 7 && z.gratis === 5
-      && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()));
+    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 7 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
+      z.vorteile === 0 && z.geplant === 7 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
+      && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()), z);
     pruefe('Blatt: Fokus im Blatt', z.fokusDrin);
     const t = await fairPruefung(seite);
     pruefe('Fairness: kein Druck, kein Countdown, kein Prozent, kein Streichpreis', fair(t), t.text.slice(0, 200));
@@ -341,6 +445,7 @@ async function browserTeil(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { server: { produkt: [PRODUKT] } });
     await zuEinstellungen(seite);
     await seite.waitForSelector('.abo-gruppe');
+    await meldeVorteil(seite);
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
     await seite.waitForFunction(() => ['abgemeldet', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
     const z = await blattZustand(seite);
@@ -371,28 +476,48 @@ async function browserTeil(browser) {
     pruefe('Gruppe: kein Abo aktiv, Spiel bleibt gratis', true);
     const rpc = anfragen.find((a) => a.url.endsWith('/rest/v1/rpc/ist_premium'));
     pruefe('Abgleich mit Bearer der Sitzung', rpc && rpc.methode === 'POST' && rpc.kopf.authorization === 'Bearer ' + SITZUNG.access_token);
+    // Produkt aktiv, aber noch kein Vorteil gebaut: kein Kauf (Pruefer-Befund, verkauft wird nur, was es gibt)
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => ['vorschau', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
+    const ohneVorteil = await blattZustand(seite);
+    pruefe('aktives Produkt ohne gebauten Vorteil: "Bald verfügbar" statt Kauf, alle Vorteile "In Arbeit"', ohneVorteil.zustand === 'vorschau'
+      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 7
+      && ohneVorteil.vorteile === 0, ohneVorteil);
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
+    await meldeVorteil(seite);
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     const z = await blattZustand(seite);
     pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
-    pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (ab 16, unter 18 nur mit den Eltern)', /ab 16/.test(z.alter) && /Unter 18/.test(z.alter)
-      && /Eltern/.test(z.alter), z.alter);
+    pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 6 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
+      && z.geplant === 6, z);
+    pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, Crownmate ab 16), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && /ab 16/.test(z.alter)
+      && z.test === '', z.alter);
     await warte(600);
     await bild(seite, 'abo-kaufbar-hell');
     await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'alter');
+    const fr = await blattZustand(seite);
+    pruefe('erster Kauf: erst die Altersfrage (einmal), noch nichts geoeffnet', /18 oder älter/.test(fr.stand)
+      && JSON.stringify(fr.knoepfe) === JSON.stringify(['Ja, 18 oder älter', 'Nein, jünger', 'Schließen']) && fr.alter === ''
+      && (await seite.evaluate(() => window.__geoeffnet.length)) === 0, fr);
+    await bild(seite, 'abo-altersfrage-hell');
+    await seite.click('.trainer-knoepfe [data-trainer="alter-ja"]');
     await seite.waitForFunction(() => window.__geoeffnet.length === 1);
     const u = new URL(await seite.evaluate(() => window.__geoeffnet[0]));
     pruefe('Kauf oeffnet Stripe mit client_reference_id und prefilled_email', u.origin + u.pathname === 'https://buy.stripe.example/probe-link'
       && u.searchParams.get('client_reference_id') === UID && u.searchParams.get('prefilled_email') === MAIL, u.toString());
     await seite.waitForFunction(() => /Bezahlseite/.test(document.querySelector('.trainer-stand').textContent));
-    pruefe('Kauf gemerkt (fuer die Rueckkehr)', !!(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf'))));
+    pruefe('Kauf gemerkt (fuer die Rueckkehr), Antwort "18 oder älter" gemerkt', !!(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf')))
+      && JSON.parse(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:alter'))).ab18 === true);
+    const nachKauf = await blattZustand(seite);
+    pruefe('nach dem Kauf-Start kein zweites "Trainer abschließen": "Zahlung prüfen" zuerst, "Neu abschließen" daneben',
+      nachKauf.zustand === 'wartet' && JSON.stringify(nachKauf.knoepfe) === JSON.stringify(['Zahlung prüfen', 'Neu abschließen', 'Schließen']), nachKauf);
     // Zahlung fertig: der Webhook hat das Abo eingetragen; Flo kommt in die App zurueck
     srv.premium = true;
     srv.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(Date.now() + 30 * 86400000).toISOString(), quelle: 'stripe' }];
-    await seite.evaluate(() => {
-      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-      document.dispatchEvent(new Event('visibilitychange'));
-    });
+    await zurueck(seite);
     await seite.waitForSelector('.toast', { timeout: 5000 });
     const toast = await seite.locator('.toast').innerText();
     pruefe('Rueckkehr: neu gefragt, einmal Danke', /Crownmate Trainer ist aktiv/.test(toast) && /Danke/.test(toast), toast);
@@ -417,6 +542,142 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     pruefe('Fokus bleibt beim Neuzeichnen auf dem Knopf und kommt aus dem Blatt zurueck',
       await seite.evaluate(() => document.activeElement && document.activeElement.dataset.abo === 'zeigen' && document.activeElement.isConnected));
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Webhook kommt erst nach der Rueckkehr (Pruefer-Befund): Serie mit Pausen, kein Kauf-Knopf dazwischen ----------
+  gruppe = 'Webhook spaet';
+  {
+    const { kontext, seite, fehler, srv, anfragen } = await neueSeite(browser, { sitzung: SITZUNG, server: { produkt: [PRODUKT] }, vorher: ALTER_JA });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await meldeVorteil(seite);
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
+    await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
+    await seite.waitForFunction(() => window.__geoeffnet.length === 1);
+    pruefe('mit gemerkter Altersangabe oeffnet "Trainer abschließen" Stripe direkt', true);
+    const rpcZahl = () => anfragen.filter((a) => a.url.endsWith('/rest/v1/rpc/ist_premium')).length;
+    await zurueck(seite);   // Rueckkehr, der Webhook ist noch nicht verbucht
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'bestaetigen', null, { timeout: 3000 }).catch(() => {});
+    const z = await blattZustand(seite);
+    const gruppenText = await seite.locator('.abo-gruppe .abo-stand').innerText();
+    pruefe('waehrend der Nachfragen: "Wird bestätigt" (aus) statt Kauf-Knopf, ruhiger Text', z.zustand === 'bestaetigen'
+      && JSON.stringify(z.knoepfe) === JSON.stringify(['Wird bestätigt (aus)', 'Schließen']) && /bestätigt deine Zahlung/.test(z.stand), z);
+    pruefe('Gruppe zeigt die Bestaetigung, nicht "Kein Abo aktiv"', /bestätigt deine Zahlung/.test(gruppenText) && !/Kein Abo/.test(gruppenText), gruppenText);
+    await bild(seite, 'abo-bestaetigen-hell');
+    // Jetzt ist der Webhook verbucht (die Serie steht in einer Pause). Ohne feste Zeit, damit der Test unter Last nicht
+    // kippt: die naechste Nachfrage der Serie (nach 3 s, unter Last spaetestens nach weiteren 10 s) muss es finden.
+    const vorFlip = rpcZahl();
+    srv.premium = true;
+    srv.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(Date.now() + 30 * 86400000).toISOString(), quelle: 'stripe' }];
+    await seite.waitForSelector('.toast', { timeout: 16000 }).catch(() => {});
+    const toast = await seite.locator('.toast').allInnerTexts();
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium', null, { timeout: 3000 }).catch(() => {});
+    const danach = await blattZustand(seite);
+    pruefe('naechste Nachfrage der Serie findet das Abo (ohne neuen Tab-Wechsel): einmal Danke, Blatt aktiv', vorFlip >= 1 && rpcZahl() > vorFlip
+      && toast.length === 1 && /Danke/.test(toast[0]) && danach.zustand === 'premium' && danach.knoepfe[0] === 'Abo verwalten', { vorFlip, nachher: rpcZahl(), toast, danach });
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Webhook bleibt aus: nach der Serie "Zahlung prüfen", neu abschliessen bleibt moeglich ----------
+  gruppe = 'Webhook bleibt aus';
+  {
+    const { kontext, seite, fehler, srv } = await neueSeite(browser, { sitzung: SITZUNG, server: { produkt: [PRODUKT] }, vorher: ALTER_JA });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await meldeVorteil(seite);
+    await kurzeNachfragen(seite, [150, 150]);
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
+    await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
+    await seite.waitForFunction(() => window.__geoeffnet.length === 1);
+    await zurueck(seite);
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'wartet' && document.querySelector('.abo-gruppe').dataset.premium === 'nein'
+      && /Noch keine Bestätigung/.test(document.querySelector('.abo-gruppe .abo-stand').textContent), null, { timeout: 4000 }).catch(() => {});
+    const z = await blattZustand(seite);
+    pruefe('Serie ohne Bestaetigung: "Zahlung prüfen" zuerst, Hinweis auf Stripe, kein Toast', z.zustand === 'wartet' && /Noch keine Bestätigung/.test(z.stand)
+      && JSON.stringify(z.knoepfe) === JSON.stringify(['Zahlung prüfen', 'Neu abschließen', 'Schließen']) && (await seite.locator('.toast').count()) === 0, z);
+    pruefe('Gruppe: "Noch keine Bestätigung von Stripe"', /Noch keine Bestätigung von Stripe/.test(await seite.locator('.abo-gruppe .abo-stand').innerText()));
+    await bild(seite, 'abo-wartet-hell');
+    srv.premium = true;
+    srv.abo = [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(Date.now() + 30 * 86400000).toISOString(), quelle: 'stripe' }];
+    await seite.click('.trainer-knoepfe [data-trainer="pruefen"]');
+    await seite.waitForSelector('.toast', { timeout: 5000 }).catch(() => {});
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium', null, { timeout: 3000 }).catch(() => {});
+    pruefe('"Zahlung prüfen" fragt neu: Danke und aktiv', /Danke/.test(await seite.locator('.toast').first().innerText().catch(() => ''))
+      && (await blattZustand(seite)).zustand === 'premium');
+    pruefe('nur ein Fenster geoeffnet (kein zweiter Kauf)', (await seite.evaluate(() => window.__geoeffnet.length)) === 1);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Altersfrage "jünger": kein Kauf im Web ----------
+  gruppe = 'Unter 18';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: SITZUNG, server: { produkt: [PRODUKT] } });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await meldeVorteil(seite);
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
+    await seite.click('.trainer-knoepfe [data-trainer="kaufen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'alter');
+    await seite.click('.trainer-knoepfe [data-trainer="alter-nein"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'unter18');
+    const z = await blattZustand(seite);
+    pruefe('"jünger": kein Kauf, ruhiger Satz, nur "Angabe ändern" und "Schließen", nichts geoeffnet', /im Web erst ab 18/.test(z.stand)
+      && JSON.stringify(z.knoepfe) === JSON.stringify(['Angabe ändern', 'Schließen']) && (await seite.evaluate(() => window.__geoeffnet.length)) === 0, z);
+    const t = await fairPruefung(seite);
+    pruefe('Fairness (unter 18): kein Druck', fair(t), t.text.slice(0, 200));
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'unter18');
+    pruefe('die Antwort gilt (einmal gefragt)', true);
+    await seite.click('.trainer-knoepfe [data-trainer="alter-aendern"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'alter');
+    pruefe('"Angabe ändern" stellt die Frage neu (Fehlklick)', true);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Stripe-Testmodus: Probekauf ohne gebauten Vorteil (kein echtes Geld), mit Hinweis ----------
+  gruppe = 'Testmodus';
+  {
+    const testProdukt = { ...PRODUKT, kauf_link: 'https://buy.stripe.com/test_probe' };
+    const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: SITZUNG, server: { produkt: [testProdukt] }, vorher: ALTER_JA });
+    await zuEinstellungen(seite);
+    await seite.waitForSelector('.abo-gruppe');
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar', null, { timeout: 5000 }).catch(() => {});
+    const z = await blattZustand(seite);
+    pruefe('Testmodus-Link: kaufbar fuer den Probekauf (ANLEITUNG Schritt 10), Satz "kein echtes Geld"', z.zustand === 'kaufbar' && /kein echtes Geld/.test(z.test)
+      && z.vorteile === 0 && z.geplant === 7, z);
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Abmelden in der Gruppe Konto: Abo-Gruppe zeichnet neu, Stand weg ----------
+  gruppe = 'Abmelden';
+  {
+    const bis = Date.now() + 20 * 86400000;
+    const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: SITZUNG,
+      server: { produkt: [PRODUKT], premium: true, abo: [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(bis).toISOString(), quelle: 'stripe' }] } });
+    await zuEinstellungen(seite);
+    await seite.waitForFunction(() => /aktiv bis/.test(document.querySelector('.abo-gruppe .abo-stand')?.textContent || ''));
+    await seite.click('.konto-gruppe [data-konto="abmelden"]');
+    await seite.waitForFunction(() => /brauchst du ein Konto/.test(document.querySelector('.abo-gruppe .abo-stand').textContent), null, { timeout: 3000 }).catch(() => {});
+    const r = await seite.evaluate(() => ({ text: document.querySelector('.abo-gruppe .abo-stand').textContent, premium: document.querySelector('.abo-gruppe').dataset.premium,
+      knopf: document.querySelector('.abo-gruppe [data-abo="zeigen"]').textContent, stand: localStorage.getItem('schach-arena:abo:stand') }));
+    pruefe('nach dem Abmelden: Gruppe sagt "Konto nötig", kein "aktiv" mehr, Stand vom Geraet weg', /brauchst du ein Konto/.test(r.text) && r.premium === 'nein'
+      && r.knopf === 'Mehr zum Trainer' && r.stand === null, r);
+    // Anmeldung in einem anderen Tab (storage-Ereignis): Gruppe fragt neu und zeigt das Abo
+    await seite.evaluate((s) => { localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(s)); window.dispatchEvent(new StorageEvent('storage', { key: 'schach-arena:konto:sitzung' })); }, SITZUNG);
+    await seite.waitForFunction(() => /aktiv bis/.test(document.querySelector('.abo-gruppe .abo-stand').textContent), null, { timeout: 3000 }).catch(() => {});
+    pruefe('Anmeldung in einem anderen Tab: Gruppe zeigt wieder den Stand', /aktiv bis/.test(await seite.locator('.abo-gruppe .abo-stand').innerText()));
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
@@ -478,6 +739,12 @@ async function browserTeil(browser) {
     await warte(800);
     const t2 = await b.seite.locator('.abo-gruppe .abo-stand').innerText();
     pruefe('offline mit abgelaufenem Stand: kein Abo aktiv', /Kein Abo aktiv/.test(t2), t2);
+    await b.seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await b.seite.waitForFunction(() => !['laedt', undefined].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
+    const zb = await blattZustand(b.seite);
+    pruefe('offline ohne zwischengespeichertes Produkt: "keine Verbindung" statt "in Vorbereitung", nur Schließen', zb.zustand === 'offline'
+      && /keine Verbindung/.test(zb.stand) && !/Vorbereitung/.test(zb.stand) && JSON.stringify(zb.knoepfe) === '["Schließen"]', zb);
+    pruefe('keine Fehler', b.fehler.length === 0, b.fehler);
     await b.kontext.close();
   }
 
@@ -519,9 +786,14 @@ async function browserTeil(browser) {
       && r.anzeige === 'flex' && r.knopf, r);
     await seite.locator('#ph-box').scrollIntoViewIfNeeded();
     await bild(seite, 'abo-hinweis-hell');
+    await meldeVorteil(seite);
     await seite.click('#ph-box .ph-mehr');
     await seite.waitForSelector('.trainer-karte');
     pruefe('Knopf "Mehr zum Trainer" oeffnet das Blatt', (await seite.locator('.trainer-karte h3').innerText()) === 'Crownmate Trainer');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand !== 'laedt');
+    const ohneKonto = await blattZustand(seite);
+    pruefe('Konto noch nicht freigeschaltet: kein "Zum Konto" (dort gibt es keine Gruppe Konto), sondern "in Vorbereitung"', ohneKonto.zustand === 'vorschau'
+      && !ohneKonto.knoepfe.includes('Zum Konto') && (await seite.locator('.konto-gruppe').count()) === 0, ohneKonto);
     const t = await fairPruefung(seite);
     pruefe('Fairness (Hinweis): kein Druck, kein Countdown', fair(t), t.text.slice(0, 200));
     await seite.keyboard.press('Escape');
@@ -535,6 +807,16 @@ async function browserTeil(browser) {
       return { r, kinder: box.children.length };
     });
     pruefe('in der Partie (und im Ergebnis) zeigt der Hinweis nichts (Fairness 13)', inPartie.r === null && inPartie.kinder === 0);
+    const inLektion = await seite.evaluate(async () => {
+      const m = await import('./js/abo.js');
+      const alt = document.documentElement.dataset.screen;
+      document.documentElement.dataset.screen = 'lektion';
+      const box = document.createElement('div');
+      const r = m.premiumHinweis(box, 'Einheit 5');
+      document.documentElement.dataset.screen = alt;
+      return { r, kinder: box.children.length };
+    });
+    pruefe('in einer Lektion zeigt der Hinweis nichts (Regel 9)', inLektion.r === null && inLektion.kinder === 0);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
