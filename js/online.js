@@ -41,7 +41,7 @@
 //   uhr_*_ms und letzter_zug_am selbst herunter.
 // Fehlerkennungen des Servers (ONLINE_...) werden hier in ganze Saetze uebersetzt (FEHLER_TEXTE).
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
-import { sitzung, erneuereSitzung } from './konto.js';
+import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId } from './konto.js';
 
 export const EINLADUNG_SCHLUESSEL = 'schach-arena:online:einladung';
 export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
@@ -112,15 +112,10 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   return d;
 }
 
-// Sitzung aus konto.js; kurz vor dem Ablauf wird sie dort erneuert.
+// Sitzung aus konto.js (dort wird sie kurz vor dem Ablauf erneuert); ohne Anmeldung der Online-Text.
 async function aktiveSitzung() {
-  const s = sitzung();
-  if (!s?.access_token) throw new Error(FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET);
-  return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
-}
-function userId(s) {
-  if (s?.user?.id) return s.user.id;
-  try { return JSON.parse(atob(String(s.access_token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch (e) { return null; }
+  if (!sitzung()?.access_token) throw new Error(FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET);
+  return kontoSitzung();
 }
 async function rpc(name, daten) {
   const s = await aktiveSitzung();

@@ -117,7 +117,8 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
     seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
-      if (/ERR_ABORTED/.test(grund)) return;   // beim Neuladen abgebrochen: kein Fehler
+      // beim Neuladen abgebrochen: kein Fehler (Chromium ERR_ABORTED, WebKit: Load request cancelled, Firefox NS_BINDING_ABORTED)
+      if (/ERR_ABORTED|Load request cancelled|NS_BINDING_ABORTED/.test(grund)) return;
       fehlgeschlagen.push(`${grund} ${r.url()}`);
     });
     seite.on('response', (r) => { if (r.status() >= 400) fehlgeschlagen.push(`${r.status()} ${r.url()}`); });
