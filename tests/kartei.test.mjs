@@ -370,7 +370,9 @@ async function bereite(seite, { modul = null, partien = null, einstellungen = nu
   }, { modul, partien, einstellungen });
   await seite.goto(BASIS + hash);
   await seite.reload();
-  await seite.waitForFunction(() => !!window.__app && !!document.querySelector('link[data-paket="kartei"]') && !!document.querySelector('.screen'), null, { timeout: 20000 });
+  // auf den Ziel-Screen warten, nicht auf den Lade-Bildschirm (die Arena holt beim Aufbau die Nachlese ab)
+  const ziel = { '#arena': '.screen.arena', '#training': '.screen.training-screen' }[hash] || '#app > .screen:not(.lade-screen)';
+  await seite.waitForFunction((sel) => !!window.__app && !!document.querySelector('link[data-paket="kartei"]') && !!document.querySelector(sel), ziel, { timeout: 20000 });
 }
 
 const rz = (seite) => seite.evaluate(async () => (await import('/js/ui/raetsel.js')).zustand());
