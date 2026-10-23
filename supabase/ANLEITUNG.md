@@ -200,7 +200,11 @@ erreichbar“, und die Frage zählt nicht.
    schickt das Token der Anmeldung mit, Supabase prüft es zusätzlich zur Function). Adresse:
    `https://usaamcqypmvgqmsbfecb.supabase.co/functions/v1/coach`. Die Function lädt beim Hochladen das Anthropic-SDK in
    der festen Version aus `supabase/functions/coach/index.ts`. `SUPABASE_URL`, `SUPABASE_ANON_KEY` und
-   `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase selbst bereit.
+   `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase selbst bereit. Zeigt die App danach auch angemeldet nur „Melde dich an“
+   und steht unter **Edge Functions > coach > Logs** gar keine Zeile `coach …`, weist schon das Supabase-Gateway das
+   Token ab (das kann bei Projekten mit den neuen JWT-Signaturschlüsseln passieren). Dann mit
+   `npx supabase functions deploy coach --no-verify-jwt` neu hochladen: Die Function prüft die Anmeldung ohnehin
+   selbst über `/auth/v1/user`, bevor sie irgendetwas tut.
 6. **Testen:** Das Paket `pakete/coach-ki/index` muss in der App eingetragen sein (`js/erweiterungen.js`, macht die
    Integration). In der App anmelden (Adresse mit `#konto`), dir den Trainer von Hand geben (oben: „Von Hand
    freischalten“), eine Partie spielen, in der Analyse einen Zug wählen und **Frag den Coach** tippen. In Supabase unter
