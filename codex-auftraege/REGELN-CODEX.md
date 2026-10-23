@@ -5,16 +5,17 @@ Claude prüft danach den Pull Request und führt ihn zusammen.
 
 ## Rahmen
 
-- **Basis:** `claude/integration`. Das ist `main` plus Weltkarte (U5), Brett (U6), Partie und Handy (U7), Online, Daten
-  und App-Hülle.
-- **Arbeitszweig:** der `codex/...`-Zweig, auf dem dieser Auftrag liegt.
+- **Basis:** `claude/integration`. Das ist `main` plus alles aus Stufe 2: Weltkarte, Brett und Partie, Liga, Funken,
+  Punkte, Serie, Teilen, Gedächtnis, Kartei, Willkommen, Zu zweit, Online, Abo, Coach und Schule.
+- **Arbeitszweig:** der im Auftrag genannte `codex/...`-Zweig. Zweig ihn von `claude/integration` ab, falls es ihn noch
+  nicht gibt.
 - **Pull Request:** gegen `claude/integration`. Nie auf `main` oder `claude/*` pushen (`AGENTS.md`).
-- **Parallel** bauen Claude-Agenten auf anderen Zweigen:
-  - Pakete Funken, Punkte, Serie
-  - Teilen, Gedächtnis, Kartei, Willkommen
-  - Abo, Coach-KI, Schulmodus
+- **Parallel** arbeitet Claude am Sammelzweig:
+  - Livegang von Stufe 2: `js/erweiterungen.js` (PAKETE, REITER), `sw.js`, Kopfzeile in `css/navigation.css`
+  - danach die Welten mit 30 Bots
 
-  Codex baut die Liga. Fasse deren Dateien unter `js/pakete/` nicht an.
+  Diese Stellen änderst du nur, wenn dein Auftrag es ausdrücklich sagt. `sw.js` stempelst du mit
+  `node tests/sw.test.mjs --aktualisieren`, Konflikte dort löst Claude beim Zusammenführen.
 - **Sprache:** Deutsch in Oberfläche, Kommentaren und Commits. In Code-Kommentaren und Commit-Nachrichten stehen
   Umlaute als ae/oe/ue/ss, in Oberflächentexten echte Umlaute.
 
