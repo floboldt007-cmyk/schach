@@ -249,16 +249,18 @@ Mit dem Schulmodus legt eine Lehrkraft (oder eine Trainerin im Verein) in der Ap
 6-stelligen Code an die Tafel, und die Schülerinnen und Schüler treten in den Einstellungen unter **Klasse** mit Code
 und einem selbst gewählten **Anzeigenamen** bei. Danach meldet die App nach jeder Partie gebündelt den Fortschritt:
 besiegte Bots, Sterne, Zahl der Partien, durchschnittliche Genauigkeit, häufigste Fehlerarten, erledigte Aufgaben. Die
-Lehrkraft sieht das in ihrer Ansicht (Einstellungen, Klasse, „Klassen leiten“), stellt Aufgaben (Bot besiegen, Rätsel
-lösen, Partien spielen), die bei allen in der Heute-Karte der Arena stehen, und schließt die Klasse am Ende. Idee,
+Lehrkraft sieht das in ihrer Ansicht (Einstellungen, Klasse, „Klassen leiten“), stellt Aufgaben (Bot besiegen, Partien
+spielen; „Rätsel lösen“ kommt, sobald das Tagesrätsel gelöste Rätsel meldet), die bei allen in der Heute-Karte der
+Arena stehen, und schließt die Klasse am Ende. Idee,
 Rollen und Datenschutz (mit Stichpunkten für einen AV-Vertrag): `design/runde4/SCHULE.md`.
 
-**Was die Lehrkraft sieht und was nicht:** Anzeigename und die Kennzahlen oben. **Nie** die E-Mail-Adresse, die
-Konto-ID, Partien, Züge oder Spielzeiten. Das steht so auch in der App, bevor jemand beitritt. Der Schulmodus braucht
+**Was die Lehrkraft sieht und was nicht:** Anzeigename und die Kennzahlen oben, dazu den **Tag** der letzten Meldung
+(die Datenbank speichert keine Uhrzeit). **Nie** die E-Mail-Adresse, die Konto-ID, Partien oder Züge. Das steht so auch
+in der App, bevor jemand beitritt, zusammen mit dem Hinweis, dass der Stand nach jeder Partie kommt. Der Schulmodus braucht
 keine Edge Function und kein Secret: Alles läuft über Datenbank-Funktionen mit Zeilen-Sicherheit.
 
 1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/schule-schema.sql` ausführen (nach
-   `schema.sql`; ein erneuter Lauf ist erlaubt). Danach `supabase/schule-rls-test.sql` ausführen: Am Ende muss
+   `schema.sql`; ein erneuter Lauf ist erlaubt und bringt auch eine ältere Fassung auf den Stand). Danach `supabase/schule-rls-test.sql` ausführen: Am Ende muss
    `Schule-RLS-Test erfolgreich` stehen; der Test rollt alles zurück (keine Testnutzer, keine Klassen bleiben). Die
    Warnung „destructive operation“ (wegen `drop policy if exists`, das nur die eigene Regel ersetzt) bei genau diesen
    zwei Dateien bestätigen.
@@ -276,11 +278,21 @@ keine Edge Function und kein Secret: Alles läuft über Datenbank-Funktionen mit
 5. **Grenzen (stehen im Schema):** 20 Klassen je Lehrkraft, 60 Mitglieder je Klasse, 10 Klassen je Mitglied, 30 Aufgaben
    je Klasse. Wer an einem Tag 10 falsche Codes eingibt, kann erst am nächsten Tag wieder beitreten (gegen das
    Durchprobieren von Codes). Geschlossene Klassen löscht der Server 90 Tage nach dem Schließen selbst.
-6. **Auskunft und Löschen (für Anfragen von Schulen oder Eltern):** Im SQL Editor zeigt
-   `select k.name, m.anzeigename, f.* from public.klassen_mitglieder m join public.klassen k on k.id = m.klasse left join public.klassen_fortschritt f on f.mitglied = m.id where m.user_id = '<Nutzer-ID>';`
-   alles, was zu einer Person im Schulmodus gespeichert ist (die Nutzer-ID steht unter **Authentication > Users**).
-   Löschen: `delete from public.klassen_mitglieder where user_id = '<Nutzer-ID>';` (der Fortschritt geht mit). Wird ein
-   Konto gelöscht, verschwinden Mitgliedschaften, Fortschritt und die eigenen Klassen von selbst.
+6. **Auskunft und Löschen (für Anfragen von Schulen oder Eltern):** Die Nutzer-ID steht unter **Authentication >
+   Users**. Alles, was zu einer Person im Schulmodus gespeichert ist, zeigen im SQL Editor diese vier Abfragen:
+   - als Mitglied (Klasse, Anzeigename, Beitritt, Kennzahlen):
+     `select k.name, m.anzeigename, m.beigetreten_am, f.* from public.klassen_mitglieder m join public.klassen k on k.id = m.klasse left join public.klassen_fortschritt f on f.mitglied = m.id where m.user_id = '<Nutzer-ID>';`
+   - als Leitung (eigene Klassen mit Code und Zahl der Mitglieder; die Namen der Mitglieder sind deren Daten):
+     `select k.*, (select count(*) from public.klassen_mitglieder t where t.klasse = k.id) as mitglieder from public.klassen k where k.leitung = '<Nutzer-ID>';`
+   - die Aufgaben dieser Klassen:
+     `select a.* from public.klassen_aufgaben a join public.klassen k on k.id = a.klasse where k.leitung = '<Nutzer-ID>';`
+   - Fehlversuche beim Beitreten (je Tag):
+     `select * from public.schule_versuche where user_id = '<Nutzer-ID>';`
+
+   Löschen: `delete from public.klassen_mitglieder where user_id = '<Nutzer-ID>';` (der Fortschritt geht mit),
+   `delete from public.klassen where leitung = '<Nutzer-ID>';` (eigene Klassen mit Mitgliedern, Ständen und Aufgaben)
+   und `delete from public.schule_versuche where user_id = '<Nutzer-ID>';`. Wird ein Konto gelöscht, verschwindet all
+   das von selbst.
 7. **Vor dem Einsatz an einer Schule klären (keine Rechtsberatung, mit einer Fachperson):** Die Schule ist für die
    Daten ihrer Klasse verantwortlich, du bist Auftragsverarbeiter: Dafür braucht es einen **AV-Vertrag** (Stichpunkte
    in `design/runde4/SCHULE.md`), einen Abschnitt in der Datenschutzerklärung und die Klärung, wie die Schule

@@ -1539,15 +1539,17 @@ Tabellenzugriff ab.
   Konto-ID, Policy liest sie trotzdem).
 - `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0–10, `sterne` 0–30, `partien`, `genauigkeit_schnitt`
   numeric(4,1), `haeufigste_fehler` jsonb `{ zuege, arten: [{ art, anzahl }] }` höchstens 300 Zeichen und 4 Arten aus
-  `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am`): lesen Leitung und das
-  Mitglied selbst.
+  `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am` **date** (Europe/Berlin,
+  keine Uhrzeit: die Meldung kommt nach jeder Partie, ein Zeitstempel verriete, wann jemand spielt; eine ältere Fassung
+  mit Zeitstempel kürzt das Schema beim erneuten Einspielen)): lesen Leitung und das Mitglied selbst.
 - `klassen_aufgaben` (`klasse`, `titel` 2–80, `art` 'bot' | 'raetsel' | 'partien', `ziel` jsonb `{ bot, sterne 1–3 }` bzw.
   `{ anzahl 1–100 }`, `faellig` date gestern bis +366 Tage, `erstellt_am`): lesen Leitung und Mitglieder.
 - `schule_versuche` (Fehlversuche beim Beitreten je Nutzer und Tag): nur Service-Rolle.
 - Funktionen (security definer, `search_path = ''`, nur `authenticated`): `schule_erstelle_klasse(name)`,
   `schule_tritt_bei(code, anzeigename)` (ein falscher Code liefert `{ fehler: 'SCHULE_CODE_UNGUELTIG' }` **ohne raise**,
   damit der Fehlversuch gezählt bleibt; 10 je Tag, dann `SCHULE_ZU_VIELE_VERSUCHE`; zweiter Beitritt ändert nur den
-  Namen; sperrt die Klasse mit `for update`), `schule_verlasse(klasse)`, `schule_melde_fortschritt(bots_besiegt, sterne,
+  Namen; sperrt die Klasse mit `for update` und die Fehlversuche je Nutzer mit `pg_advisory_xact_lock`, damit parallele
+  Anfragen eines Kontos die Grenze nicht überholen), `schule_verlasse(klasse)`, `schule_melde_fortschritt(bots_besiegt, sterne,
   partien, genauigkeit_schnitt, haeufigste_fehler, erledigt)` (schreibt die eigene Zeile in **allen aktiven** Klassen,
   `erledigt` je Klasse auf ihre Aufgaben gefiltert; → Zahl der Klassen), `schule_meine_klassen()` (→ `{ leitung: [...],
   mitglied: [...] }`, Mitglieder ohne Code und ohne Leitung), `schule_klassen_uebersicht(klasse)`,
@@ -1558,19 +1560,26 @@ Tabellenzugriff ab.
   Mitgliedschaften, 30 Aufgaben. Geschlossene Klassen räumt `schule_erstelle_klasse` nach 90 Tagen weg; Konto löschen
   kaskadiert überall.
 
-**Client** `js/schule.js` (Muster `js/abo.js`, nur fetch, `setzeSchuleFetch`/`setzeSchuleUhr` für Tests):
-`meineKlassen({ neu })` (Zwischenspeicher 10 min, ohne Klasse 12 h, offline der letzte Stand), `erstelleKlasse`,
+**Client** `js/schule.js` (Muster `js/abo.js`, nur fetch, `setzeSchuleFetch`/`setzeSchuleUhr`/`setzeSchuleWartezeit` für
+Tests): jede Anfrage hat eine Zeitgrenze `WARTE_MS` (15 s, Muster `js/coach-ki.js`: AbortController plus Rennen gegen
+einen Zeitgeber), danach gilt sie als `offline`. `meineKlassen({ neu })` (Zwischenspeicher 10 min, ohne Klasse 12 h,
+offline der letzte Stand); eine laufende Anfrage wird nur mitbenutzt, wenn sie nach der letzten Änderung begann
+(Zähler je Änderung), eine ältere Antwort wird nicht gespeichert, sondern neu geholt. Kommt auf eine Änderung keine
+Antwort, gilt der Zwischenspeicher als `veraltet` (der Server kann sie gebucht haben). `erstelleKlasse`,
 `trittBei` (prüft Code und Anzeigename vorher, ein sichtbar falscher Code geht nicht zum Server; meldet danach sofort),
 `verlasse`, `uebersicht`, `aufgabeAnlegen`, `aufgabeLoeschen`, `entferneMitglied`, `schliesseKlasse`, `loescheKlasse`
 (alle → `{ ok, … }` oder `{ ok: false, grund }`, danach „Meine Klassen“ neu), `fortschrittJetzt()` (aus
 `ladeFortschritt`, `statistik`, `ladePartien`; `haeufigsteFehler` zählt nur eigene Züge der letzten 20 wertenden
 Partien aus `liveKlassen`), `aufgabeStand` (Bot: Sterne aus dem Fortschritt; Partien: gespielte Partien seit der Aufgabe,
 ohne Übungen; Rätsel: auf dem Gerät gezählte, je Rätsel einmal), `offeneAufgabe` (Termine zuerst, sonst die neueste,
-länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung` (vormerken, frühestens nach 4 s, höchstens eine
-Meldung je Minute, dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`,
-`faelligText` („bis Fr 30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT`, Icon `tafel`.
+länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung({ sofort, nachholen })` (vormerken, nach einer Partie
+frühestens nach 4 s; `nachholen` ohne die 4 s; beides höchstens eine Meldung je Minute; `sofort` nur nach dem Beitritt;
+dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`, `faelligText` („bis Fr
+30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT` (sagt auch, dass der Stand nach jeder Partie kommt und nur der Tag
+gespeichert wird), `RAETSEL_AUFGABEN` (false, bis ein Paket `raetsel:geloest` sendet; `tests/schule.test.mjs` prüft, dass
+der Schalter zum Code passt), Icon `tafel`.
 Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in Sicherung, Export oder Cloud-Spielstand):
-`schach-arena:schule:stand` `{ uid, daten, geholtAm }`, `schach-arena:schule:offen` `{ uid, seit }`,
+`schach-arena:schule:stand` `{ uid, daten, geholtAm, veraltet? }`, `schach-arena:schule:offen` `{ uid, seit }`,
 `schach-arena:schule:gemeldet` `{ uid, inhalt, am }`, `schach-arena:schule:raetsel` `{ uid, geloest: { aufgabeId: [id] } }`.
 
 **Paket** `pakete/schule/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die vier Dateien stehen schon in
@@ -1580,19 +1589,21 @@ Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in 
   Stand, „Austreten“ mit Rückfrage), „Klasse beitreten“ (`.sm-code-eingabe`, `.sm-name-eingabe`, Satz `.sm-sieht`) und
   „Klassen leiten“ (`app.gehe('schule')`). Zeichnet neu, wenn sich die Anmeldung ändert (MutationObserver und
   `storage` wie das Abo-Paket).
-- Ort `arena:heute` (Reihenfolge 35): `.sm-heute[data-aufgabe][data-art]`, Titel · Ziel · Stand · Termin · Klasse, nur
-  aus dem Zwischenspeicher. Bot-Aufgabe: Knopf „Zu <Bot>“ (`app.gehe('arena', { waehle })`), nur wenn der Bot frei und
+- Ort `arena:heute` (Reihenfolge 35): `.sm-heute[data-aufgabe][data-art]`, Titel, darunter Ziel · Stand · Termin · Klasse
+  (zweite Zeile bricht um, der Termin bleibt neben dem Knopf sichtbar), nur aus dem Zwischenspeicher. Bot-Aufgabe: Knopf „Zu <Bot>“ (`app.gehe('arena', { waehle })`), nur wenn der Bot frei und
   nicht schon gewählt ist; Rätsel: „Üben“ (Training).
 - Ereignisse: `partie:beendet` und `speicher:zurueckgesetzt` → `planeMeldung()`; `raetsel:geloest` → `merkeRaetsel` und
   melden; `app:bereit` → ohne Anmeldung `aufraeumen()`, sonst „Meine Klassen“ auffrischen und eine offene Meldung
-  senden; `app:sichtbar` und `online` → offene Meldung senden.
+  nachholen; `app:sichtbar` und `online` → offene Meldung nachholen (`planeMeldung({ nachholen: true })`, auch hier
+  höchstens eine je Minute).
 
 **Screen** `schule` (`js/ui/schule.js`; `app.js` führt ihn in `SCREENS`, `PAKET_SCREENS` und `TITEL` „Schulmodus“,
 `tests/sw.test.mjs` ordnet ihn dem Paket `schule` zu): `.schule-screen` mit Hauptkopf und `.sm-inhalt[data-ansicht]`
-(`abgemeldet`, `laedt`, `fehler`, `liste`, `klasse`). Liste: `.sm-klasse-karte[data-klasse]`, Formular `.sm-neu`.
-Klasse: `.sm-code-karte` (`.sm-code` sechs Felder, „Groß zeigen“ öffnet `.sm-tafel[role=dialog]`, Escape oder Tipp
-schließt), `.sm-mitglieder-karte` (`table.sm-tabelle`, `th[aria-sort] > button.sm-sort[data-spalte]`,
-`tr[data-mitglied]`, `.sm-entfernen`), `.sm-aufgaben-karte` (`li[data-aufgabe]`, Formular `.sm-aufgabe-neu`), `.sm-ende`
+(`nicht-frei` ohne sichtbares Konto, führt zur Arena; `abgemeldet`, `laedt`, `fehler`, `liste`, `klasse`). Liste:
+`.sm-klasse-karte[data-klasse]`, Formular `.sm-neu`. Klasse: `.sm-code-karte` (`.sm-code` sechs Felder, „Groß zeigen“
+öffnet `.sm-tafel[role=dialog]` mit Fokusfalle, Escape oder Tipp schließt), `.sm-mitglieder-karte` (`table.sm-tabelle`, `th[aria-sort] > button.sm-sort[data-spalte]`,
+`tr[data-mitglied]`, `.sm-entfernen`, Spalte Stand als Tag „TT.MM.“), `.sm-aufgaben-karte` (`li[data-aufgabe]`, Formular
+`.sm-aufgabe-neu`, Art „Rätsel lösen“ nur mit `RAETSEL_AUFGABEN`), `.sm-ende`
 (schließen, danach löschen). Lädt die Übersicht alle 20 s neu, solange eine Klasse offen und die Seite sichtbar ist.
 Zurück im Kopf führt aus einer Klasse zur Liste. Optik `css/pakete/schule.css` (nur Tokens, Karten aus
 `css/training.css`, geprüft in `tests/schule.test.mjs`).
@@ -1600,4 +1611,6 @@ Zurück im Kopf führt aus einer Klasse zur Liste. Optik `css/pakete/schule.css`
 **Tests:** `tests/server-schule.test.mjs` (Node: Vertrag Schema ↔ Client, Rechte, RLS, Grenzen, Bot-Liste, Zeichen,
 Kennungen, keine Geheimnisse/Preise/E-Mails) und `tests/schule.test.mjs` (Node mit gefälschtem fetch; Browser gegen die
 echte App mit einem gefälschten Supabase über `page.route`: Lehrkraft-Ablauf, Beitreten und Austreten, Heute-Karte,
-Melden auch offline, Handy und iPad, hell und dunkel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer.
+Melden auch offline, Handy und iPad, hell und dunkel; dazu Wettlauf Änderung gegen laufende Anfrage, Zeitgrenze,
+Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer
+(auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).

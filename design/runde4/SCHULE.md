@@ -16,12 +16,14 @@ darüber:
   von der Tafel abschreiben und am Telefon vorlesen kann). „Groß zeigen“ füllt den Bildschirm für den Beamer.
 - Schülerinnen und Schüler geben in der App unter **Einstellungen, Klasse** den Code und einen **Anzeigenamen** ein
   (Vorname oder Spitzname). Vorher steht dort in einem Satz, was die Lehrkraft sieht und was nicht.
-- Nach jeder Partie meldet die App gebündelt ein paar **Kennzahlen** (höchstens einmal pro Minute; ohne Netz wartet
-  die Meldung still, bis es wieder Netz gibt).
+- Nach jeder Partie meldet die App gebündelt ein paar **Kennzahlen** (höchstens einmal pro Minute, auch wenn eine
+  vorgemerkte Meldung beim Zurückkommen in die App nachgeholt wird; ohne Netz wartet die Meldung still, bis es wieder
+  Netz gibt).
 - Die Lehrkraft sieht eine **sortierbare Liste**: besiegte Bots, Sterne, Partien, durchschnittliche Genauigkeit, die
   häufigsten Fehlerarten (z. B. „Daneben 9 · Unscharf 7“) und wie viele Aufgaben erledigt sind.
-- Sie stellt **Aufgaben**: einen Bot besiegen (auch „mit 2 Sternen“), eine Zahl Rätsel lösen oder eine Zahl Partien
-  spielen, wahlweise mit Termin. Die nächste offene Aufgabe steht bei allen in der Heute-Karte der Arena, ruhig, mit
+- Sie stellt **Aufgaben**: einen Bot besiegen (auch „mit 2 Sternen“) oder eine Zahl Partien spielen, wahlweise mit
+  Termin. „Eine Zahl Rätsel lösen“ ist vorbereitet (Server, Zählen auf dem Gerät), die Lehrkraft-Ansicht bietet es
+  aber erst an, wenn das Tagesrätsel da ist und gelöste Rätsel meldet; vorher könnte niemand so eine Aufgabe erfüllen. Die nächste offene Aufgabe steht bei allen in der Heute-Karte der Arena, ruhig, mit
   „bis Fr 30.10.“ statt Countdown.
 - Am Ende des Schuljahrs oder der Saison **schließt** sie die Klasse (niemand tritt mehr bei, keine neuen Stände) und
   **löscht** sie. Spätestens 90 Tage nach dem Schließen löscht der Server sie selbst.
@@ -59,13 +61,16 @@ Je Mitglied und Klasse genau das:
 | Anzeigename (2 bis 24 Zeichen, Vorname oder Spitzname, nie eine E-Mail) | selbst eingegeben | damit die Lehrkraft weiß, wer wer ist |
 | Beitrittszeitpunkt | Server | Übersicht |
 | besiegte Bots (0 bis 10), Sterne (0 bis 30), Zahl der wertenden Partien | Spielstand auf dem Gerät | Fortschritt |
-| durchschnittliche Genauigkeit | Spielstand auf dem Gerät | Fortschritt |
+| durchschnittliche Genauigkeit (aller gespeicherten Partien gegen die Bots) | Spielstand auf dem Gerät | Fortschritt |
 | häufigste Fehlerarten: Zahl der eigenen Züge der letzten 20 Partien und wie viele davon „Unscharf“, „Daneben“, „Verschenkt“, „Weit daneben“ waren | Spielstand auf dem Gerät | wo es hakt |
 | erledigte Aufgaben (Kennungen) | von der App aus dem Spielstand berechnet | Aufgaben |
-| Zeitpunkt der letzten Meldung | Server | ob die Daten aktuell sind |
+| Tag der letzten Meldung (ein Datum, keine Uhrzeit) | Server | ob die Daten aktuell sind |
 
-Nicht gespeichert: Partien, Züge, Stellungen, Uhrzeiten einzelner Partien, Gerät, IP-Adresse (Supabase führt eigene,
-kurzlebige Zugriffsprotokolle; die gehören in den AV-Vertrag, Punkt 6). Die Rätsel, die für eine Rätsel-Aufgabe zählen,
+Nicht gespeichert: Partien, Züge, Stellungen, Uhrzeiten (auch nicht die der letzten Meldung: Weil sie nach jeder Partie
+kommt, verriete ein Zeitstempel, wann jemand spielt), Gerät, IP-Adresse (Supabase führt eigene, kurzlebige
+Zugriffsprotokolle; die gehören in den AV-Vertrag, Punkt 6). Wer die Lehrkraft-Ansicht offen hat, sieht neue Stände
+trotzdem kommen (sie lädt alle 20 Sekunden neu). Deshalb sagt der Satz vor dem Beitritt, dass der Stand nach jeder
+Partie kommt, statt zu versprechen, die Lehrkraft sehe keine Spielzeiten. Die Rätsel, die für eine Rätsel-Aufgabe zählen,
 merkt sich nur das Gerät. Der Server steht in Frankfurt (Supabase, Region eu-central-1).
 
 **Löschen:** Austreten löscht die eigene Zeile samt Kennzahlen sofort. Die Leitung kann ein Mitglied entfernen.
@@ -92,15 +97,16 @@ sein Konto löscht, verliert alle Mitgliedschaften und Klassen gleich mit.
   weil er kein Konto anlegen will.
 - Der Satz in der App vor dem Beitritt: „Deine Lehrkraft oder Trainerin sieht deinen Anzeigenamen, wie viele Bots du
   besiegt hast, deine Sterne, die Zahl deiner Partien, deine durchschnittliche Genauigkeit, deine häufigsten
-  Fehlerarten und welche Aufgaben erledigt sind. Nicht: deine E-Mail-Adresse, deine Partien, Züge oder Spielzeiten.
-  Austreten geht jederzeit.“
+  Fehlerarten und welche Aufgaben erledigt sind. Dein Stand wird nach jeder Partie aktualisiert, gespeichert wird dazu
+  nur der Tag, keine Uhrzeit. Nicht: deine E-Mail-Adresse, deine Partien oder Züge. Austreten geht jederzeit.“
 
 **Vorlage für einen AV-Vertrag (Stichpunkte nach Art. 28 Abs. 3 DSGVO, von einer Fachperson auszuformulieren):**
 1. Gegenstand und Dauer: Bereitstellung des Schulmodus von Crownmate für die Klassen der Schule, für die Dauer der
    Nutzung; endet mit dem Löschen der letzten Klasse oder der Kündigung.
 2. Art und Zweck: Speichern von Mitgliedschaften, Kennzahlen und Aufgaben, damit die Lehrkraft den Lernfortschritt
    sieht. Keine Auswertung für andere Zwecke, keine Werbung, kein Verkauf, kein Training von KI-Modellen.
-3. Art der Daten: Anzeigename, Kennzahlen aus dem Spiel (Abschnitt 4), Aufgaben-Titel der Lehrkraft, Zeitpunkte.
+3. Art der Daten: Anzeigename, Kennzahlen aus dem Spiel (Abschnitt 4), Aufgaben-Titel der Lehrkraft, Zeitpunkt des
+   Beitritts, Tag der letzten Meldung.
    Für das Konto: E-Mail-Adresse (sieht die Schule nicht).
 4. Betroffene: Schülerinnen und Schüler (ab 16), Lehrkräfte, im Verein Mitglieder und Trainer.
 5. Weisungen: nur nach dokumentierter Weisung der Schule; die Funktionen der App (anlegen, entfernen, schließen,
@@ -150,6 +156,8 @@ stehen als „bis Fr 30.10.“ da), Niederlagen nie laut. Zusätzlich:
 6. **Datenauskunft und „Konto löschen“** in der App (Daten-Fundament): die Klassen-Daten in die Auskunft aufnehmen und im
    Lösch-Dialog erwähnen, dass Mitgliedschaften und eigene Klassen mit verschwinden.
 7. **Store-App:** prüfen, ob der Schulmodus in den Store-Beschreibungen erwähnt werden muss (Bildung, Altersfreigabe).
-8. **Abo und Schule:** Kein Schüler soll im Unterricht auf einen Kauf stoßen. Vor dem Start klären, ob Mitglieder einer
+8. **Rätsel-Aufgaben einschalten**, sobald das Tagesrätsel (S1-5) gelöste Rätsel meldet: `RAETSEL_AUFGABEN` in
+   `js/schule.js` auf `true` (ein Test in `tests/schule.test.mjs` schlägt an, wenn der Schalter nicht zum Code passt).
+9. **Abo und Schule:** Kein Schüler soll im Unterricht auf einen Kauf stoßen. Vor dem Start klären, ob Mitglieder einer
    aktiven Klasse die Trainer-Gruppe in den Einstellungen sehen sollen und ob Schulen den Trainer für die Klasse
    bekommen (eine Lizenz, keine Einzelkäufe).
