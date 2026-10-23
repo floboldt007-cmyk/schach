@@ -381,7 +381,8 @@ export function alsAufgabe(karte, { botName = '', heute = '' } = {}) {
     titel: 'Finde den besseren Zug',
     text: satz,
     hinweis: akk ? `Schau dir ${akk} auf ${von} an.` : `Schau dir die Figur auf ${von} an.`,
-    erklaerung: k.coach || (k.loesungSan ? `Besser war ${k.loesungSan}.` : ''),
+    // nach der Loesung steht das Brett auf dem besten Zug: der Coach-Satz sagt deshalb, um welchen alten Zug es ging
+    erklaerung: k.coach ? (zug ? `${zug}: ${k.coach}` : k.coach) : (k.loesungSan ? `Besser war ${k.loesungSan}.` : ''),
     marke: KLASSEN_NAME[k.klasse] || '',
     klasse: k.klasse,
   };

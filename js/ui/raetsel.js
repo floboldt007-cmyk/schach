@@ -172,7 +172,6 @@ export function zeige(root, params, app) {
     timer.add(t);
     return t;
   };
-  const pause = (ms) => new Promise((r) => spaeter(r, ms));
   const taktPause = (ms) => takt(ms).then(() => { if (weg) throw new Error('weg'); });
 
   const st = {

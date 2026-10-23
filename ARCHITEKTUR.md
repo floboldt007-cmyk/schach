@@ -1450,3 +1450,78 @@ ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `test
 - **RECHENSTAND 2** (2: Sperre auch bei `wenig`, Plaetze vorn und hinten, Erzfeind nach Stufe, Komma bei Greta) steckt im
   Seed und im Modul (`v`): Wer Vorrang, Schwellen oder Satz-Tabelle aendert, zaehlt ihn hoch, sonst wechseln die Saetze
   unbemerkt mitten am Tag. Alte Module (`v: 1`) bleiben gueltig, `normalisiereModul` uebernimmt Memo und Erzfeind.
+
+## Paket kartei (A3): Deine Fehler werden dein Training, dazu der Raetsel-Bildschirm
+
+Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.js` (rein, Node-testbar, kein
+`Math.random`, keine Uhr), `css/pakete/kartei.css` (nur Tokens, `link[data-paket="kartei"]`), der generische Screen
+`js/ui/raetsel.js` mit `css/pakete/raetsel.css` (haengt sich selbst als `link[data-screen="raetsel"]` ein). Test:
+`tests/kartei.test.mjs`.
+
+- **Karten entstehen** bei `partie:analysiert` (Partie-Ende, Analyse-Screen, Nachholen; Uebungen nie, auch Partien aus
+  einer eigenen Stellung, Bosse, freie Partien): eigene Zuege der Klassen `patzer` („Weit daneben“), `verpasst`
+  („Verschenkt“) und `fehler` („Daneben“) aus `review.zuege` mit **eindeutiger Loesung**: `gewinnVorher >= 0,25` und
+  `gewinnVorher - gewinnZweiter >= 0,15` (MultiPV 2 der Analyse; ohne zweite Linie keine Karte). Hoechstens 3 je Partie,
+  die mit dem groessten `verlust` zuerst (gleich: Patzer, Verschenkt, Fehler, dann der fruehere Zug). Idempotent ueber die
+  verarbeiteten Partie-IDs (hoechstens 300). Dieselbe Stellung (`stellungsSchluessel`) schon in der Kartei: keine neue
+  Karte, sondern `rueckfaelle + 1`, wieder Stufe 0 und heute faellig, mit dem Bild der neuen Partie (auch eine fuer immer
+  geloeste kommt so zurueck; der Zaehler „fuer immer gelöst“ sinkt nie). Beim Start (2,5 s nach `app:bereit`, einmal je
+  Sitzung) traegt das Paket gespeicherte Analysen nach, die noch nicht verarbeitet sind (Partien, die vor dem Paket
+  analysiert wurden), still und ohne Feier.
+- **Wiederholung** (`logik.js`): Stufe 0 neu (am Tag der Partie faellig), 1 bis 5 mit den Abstaenden 1, 3, 7, 14, 30 Tagen
+  (`addiereTage` auf dem Tagesschluessel aus `tag.js`, Grenze 4:00, Sommerzeit egal), danach Stufe 6 „für immer gelöst“.
+  Nur der erste Versuch zaehlt als richtig (Stufe + 1); im zweiten Versuch geloest oder Loesung gezeigt: zurueck auf
+  Stufe 1, wieder morgen. **Stapel des Tages:** faellige Karten, die aeltesten zuerst, hoechstens 10 je Tag (A3 und
+  SPIELKONZEPT 2.2; heute schon geuebte zaehlen mit, `heute: { tag, ids }`). Der Ueberhang bleibt still faellig und kommt
+  an den Folgetagen dran: nichts verfaellt, keine rote Zahl. SPIELKONZEPT 3.6 sieht spaeter einen gemeinsamen
+  Trainingsstapel mit Deckel 10 vor, davon hoechstens 8 Karteikarten: kommt ein zweiter Lieferant dazu, wird
+  `TAGES_MAX` (oder ein gemeinsamer Stapel) angepasst und `RECHENSTAND` hochgezaehlt.
+- **Orte:** `training:karten` (Reihenfolge 10): `section.t-karte.kt-karte[data-faellig]` mit drei Zustaenden: faellig
+  („Fehler wiederholen · 5 fällig“, Stapel aus bis zu 4 Mini-Brettern, „12 im Training · 2 für immer gelöst“, Knopf
+  `.kt-los` „Üben“), alles geuebt („Stapel leer. Gut gemacht.“ mit dem naechsten Tag) und keine Karten („Noch keine
+  Karten“, ohne Knopf). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“, nur wenn Karten
+  faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`.
+- **Feier:** Neue Karten (und Rueckfaelle) einer Partie melden synchron im Hoerer von `partie:analysiert`
+  `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', symbol: 'kartei' })` (Zeile, Prio 30 laut
+  `feier.QUELLEN`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
+  Analyse-Screen landet sie in der Nachlese. Geschrieben wird per `setTimeout(0)` nach frischem Lesen.
+- **Ereignisse:** sendet `training:geloest { karteId, richtig, versuch, quelle: 'kartei' }` je beantworteter Karte
+  (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche)
+  und `training:stand { faellig, gesamt, gemeistert }` (faellig = heute noch im Stapel, gesamt = Karten im Training ohne die
+  geloesten, gemeistert = fuer immer geloest, nie weniger) bei `app:bereit`, nach jeder Antwort, nach neuen Karten und nach
+  `speicher:zurueckgesetzt`. Hoert `partie:analysiert`, `app:bereit`, `speicher:zurueckgesetzt`. **Register:** Icon
+  `kartei`, Raetsel-Quelle `kartei`. **Test-Schnittstelle:** `zustand()` (modul, stand, letzte).
+- **Speicher:** Modul `kartei` (vorhanden, Budget 160.000) `{ v: RECHENSTAND (1), karten: [Karte], verarbeitet: [partieId],
+  heute: { tag, ids }, zaehler: { erstellt, gemeistert, richtig, falsch } }`, Karte `{ id: 'partieId:ply', fen, besterZug,
+  gespielt, klasse, partieId, ply, botId, farbe, vor, san, loesungSan, nummer, coach (Kern, hoechstens 160), datum (Tag der
+  Partie), gewinn, verlust, stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle }` (ca. 400
+  Zeichen). Ueber 380 Karten oder dem Budget fallen zuerst die aeltesten fuer immer geloesten, dann die aeltesten der
+  Stufe 5, dann die aeltesten ueberhaupt. Bei jedem Zugriff frisch gelesen; kaputte Karten fallen beim Lesen weg; ein Modul
+  mit hoeherem `v` (neuere App) wird gelesen, aber nie ueberschrieben. Keine Paket-Einstellungen.
+
+**Raetsel-Bildschirm** `js/ui/raetsel.js` (Paket-Screen `raetsel` aus `PAKET_SCREENS`, `app.js` unveraendert):
+- `zeige(root, { quelle } | { liste, titel, unter }, app)`. Ohne Quelle und ohne Liste (z. B. `#raetsel` von Hand) oder mit
+  einer nicht angemeldeten Quelle geht es still zur Arena, genau wie bei einem fehlenden Paket-Screen (der Router-Test
+  in `app.test.mjs` bleibt so gueltig). Die Parameter liegen im Browser-Verlauf: Neuladen fragt die Quelle neu.
+- `registriereRaetselQuelle(name, { titel, unter, liste(params), ergebnis(aufgabe, erg) -> { titel, text, klang },
+  ende(zusammenfassung) -> { titel, text, klang, knoepfe: [{ text, art, beiKlick(app) }] }, leer() -> { titel, text } })`
+  -> `abmelden()`. So benutzen spaeter Tagesraetsel, Lernpfad und der Einstufungstest (A4) denselben Bildschirm.
+- **Aufgabe** `{ id, fen, loesung: [uci, ...], titel, text, hinweis, erklaerung, vorZug, marke, klasse }`: in `loesung`
+  wechseln sich Flos Zuege und die Antworten des Gegners ab (der Gegner zieht von selbst nach `takt(520)`).
+  `pruefeAufgabe()` spielt jede Loesung mit chess.js durch; ungueltige fallen still weg.
+- Ablauf: Brett (`Brett` mit `beiZug`, `zielKarte`, gedreht, wenn Schwarz am Zug ist; Koordinaten und „automatisch Dame“
+  aus den Einstellungen), Fortschritt oben („3 von 7“ und je Aufgabe ein Punkt: gut, grau, nie rot), Status (wer zieht,
+  Klasse des alten Zugs, Titel, Satz). Richtig: Feld `mark-k-bester`, Haken ueber `brett.striche` (art `haken`), Symbol
+  federt (`hupf`), Klang `raetsel-richtig` (oder der der Quelle, z. B. `stern` bei „für immer gelöst“), Knopf „Weiter“
+  (nie ein Autostart). Falsch: die Figur steht 380 ms auf dem Feld und schnappt zurueck (`beiZug` liefert ein
+  Promise auf `false`), Klang `raetsel-falsch`, der zweite Versuch markiert die Figur, mit der es losgeht
+  (`markiere(..., 'hinweis')`); nach dem zweiten Fehlversuch ruht das Brett und „Lösung zeigen“ wird die Hauptaktion.
+  „Lösung zeigen“ (jederzeit) zeichnet jeden Zug als Pfeil (`brett.pfeile`) und spielt ihn vor. Ende: Zusammenfassung
+  („4 von 5 gelöst“, Text der Quelle), „Fertig“ = `app.zurueck()`.
+- Layout: Container-Einheiten (`container: rs / size`) bestimmen die Brettgroesse; ab 861 px Breite zwei Spalten (Brett,
+  rechts Status, Meldung, Knoepfe), darunter eine Spalte (iPad hoch, Handy). Tippflaechen mindestens 44 px.
+- **Test-Schnittstelle:** `zustand()` (offen, quelle, index, gesamt, schritt, fehlversuche, phase, aufgabe, ergebnisse),
+  mit `?test` auch `window.__raetsel.zustand()`.
+- **sw-Test:** `js/ui/raetsel.js` gehoert laut `SCREEN_PAKET` dem Paket `raetsel`, `css/pakete/raetsel.css` ebenfalls (nach
+  dem Dateinamen). Mit der Kartei in `PAKETE` muessen beide trotzdem in `DATEIEN` (die Integration setzt
+  `SCREEN_PAKET.raetsel` auf `kartei` oder traegt sie von Hand ein), sonst fehlt der Bildschirm offline.

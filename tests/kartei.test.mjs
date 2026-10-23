@@ -265,7 +265,7 @@ async function nodeTeil() {
   const a2 = L.alsAufgabe({ ...r1.modul.karten[0], farbe: 'b', datum: '2026-10-12' }, { botName: '', heute: '2026-10-21' });
   pruefe('Schwarz und ohne Bot: "Am 12. Okt. hast du hier 2. … Dh5 gespielt."', a2.text === 'Am 12. Okt. hast du hier 2. … Dh5 gespielt.', a2.text);
   pruefe('heute: "Heute gegen …"', L.alsAufgabe({ ...r1.modul.karten[0], datum: '2026-10-21' }, { botName: 'Bauer Benno', heute: '2026-10-21' }).text.startsWith('Heute gegen Bauer Benno'));
-  pruefe('Erklaerung aus dem Coach-Satz', a.erklaerung === 'Verliert die Dame. Besser war Sf3.');
+  pruefe('Erklaerung aus dem Coach-Satz, mit dem alten Zug davor', a.erklaerung === '2.\u00a0Dh5: Verliert die Dame. Besser war Sf3.', a.erklaerung);
   pruefe('Loesung jeder Aufgabe aus der Kartei ist mit chess.js spielbar', r1.modul.karten.every((k) => {
     const c = new Chess(k.fen);
     try { return !!c.move({ from: k.besterZug.slice(0, 2), to: k.besterZug.slice(2, 4), promotion: k.besterZug[4] }); } catch (e) { return false; }
