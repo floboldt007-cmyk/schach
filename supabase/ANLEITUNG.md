@@ -242,3 +242,47 @@ Ausgabengrenze in der Anthropic-Konsole. Eingaben prüft die Function streng (FE
 am Zug, der Zug ist in der Stellung erlaubt, Längen), rechnet Schach, Matt und Patt selbst aus und baut den Text für
 das Modell selbst; was die App sonst mitschickt, liest sie nicht. Der Schlüssel liegt nur in den Secrets der Function,
 nie in der App. Antwortet die Function nicht binnen 100 Sekunden, zeigt die App „nicht erreichbar“.
+
+## Schulmodus (Klassen für Lehrkräfte und Vereine)
+
+Mit dem Schulmodus legt eine Lehrkraft (oder eine Trainerin im Verein) in der App eine **Klasse** an, schreibt den
+6-stelligen Code an die Tafel, und die Schülerinnen und Schüler treten in den Einstellungen unter **Klasse** mit Code
+und einem selbst gewählten **Anzeigenamen** bei. Danach meldet die App nach jeder Partie gebündelt den Fortschritt:
+besiegte Bots, Sterne, Zahl der Partien, durchschnittliche Genauigkeit, häufigste Fehlerarten, erledigte Aufgaben. Die
+Lehrkraft sieht das in ihrer Ansicht (Einstellungen, Klasse, „Klassen leiten“), stellt Aufgaben (Bot besiegen, Rätsel
+lösen, Partien spielen), die bei allen in der Heute-Karte der Arena stehen, und schließt die Klasse am Ende. Idee,
+Rollen und Datenschutz (mit Stichpunkten für einen AV-Vertrag): `design/runde4/SCHULE.md`.
+
+**Was die Lehrkraft sieht und was nicht:** Anzeigename und die Kennzahlen oben. **Nie** die E-Mail-Adresse, die
+Konto-ID, Partien, Züge oder Spielzeiten. Das steht so auch in der App, bevor jemand beitritt. Der Schulmodus braucht
+keine Edge Function und kein Secret: Alles läuft über Datenbank-Funktionen mit Zeilen-Sicherheit.
+
+1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/schule-schema.sql` ausführen (nach
+   `schema.sql`; ein erneuter Lauf ist erlaubt). Danach `supabase/schule-rls-test.sql` ausführen: Am Ende muss
+   `Schule-RLS-Test erfolgreich` stehen; der Test rollt alles zurück (keine Testnutzer, keine Klassen bleiben). Die
+   Warnung „destructive operation“ (wegen `drop policy if exists`, das nur die eigene Regel ersetzt) bei genau diesen
+   zwei Dateien bestätigen.
+2. **Prüfen, dass alles da ist:** Unter **Database > Tables** stehen `klassen`, `klassen_mitglieder`,
+   `klassen_fortschritt`, `klassen_aufgaben` und `schule_versuche`, alle mit „RLS enabled“. Unter **Database >
+   Functions** stehen die Funktionen `schule_…`.
+3. **In der App einschalten:** Das Paket `pakete/schule/index` trägt die Integration in `js/erweiterungen.js`
+   (`PAKETE`) ein; die Dateien stehen schon im Offline-Cache. Bis dahin lässt es sich im Test über
+   `index.html?test&erw=pakete/schule/index` ausprobieren. Die Gruppe „Klasse“ erscheint nur, wenn das Konto sichtbar
+   ist (wie beim Abo).
+4. **Selbst ausprobieren:** Mit einem Konto unter Einstellungen, Klasse, „Klassen leiten“ eine Klasse anlegen. In einem
+   zweiten Browser (oder privaten Fenster) mit einer **zweiten E-Mail-Adresse** anmelden, unter Einstellungen, Klasse
+   den Code und einen Anzeigenamen eingeben, eine Partie spielen. Nach spätestens einer Minute steht der Stand in der
+   Lehrkraft-Ansicht (sie lädt alle 20 Sekunden neu, solange sie offen ist).
+5. **Grenzen (stehen im Schema):** 20 Klassen je Lehrkraft, 60 Mitglieder je Klasse, 10 Klassen je Mitglied, 30 Aufgaben
+   je Klasse. Wer an einem Tag 10 falsche Codes eingibt, kann erst am nächsten Tag wieder beitreten (gegen das
+   Durchprobieren von Codes). Geschlossene Klassen löscht der Server 90 Tage nach dem Schließen selbst.
+6. **Auskunft und Löschen (für Anfragen von Schulen oder Eltern):** Im SQL Editor zeigt
+   `select k.name, m.anzeigename, f.* from public.klassen_mitglieder m join public.klassen k on k.id = m.klasse left join public.klassen_fortschritt f on f.mitglied = m.id where m.user_id = '<Nutzer-ID>';`
+   alles, was zu einer Person im Schulmodus gespeichert ist (die Nutzer-ID steht unter **Authentication > Users**).
+   Löschen: `delete from public.klassen_mitglieder where user_id = '<Nutzer-ID>';` (der Fortschritt geht mit). Wird ein
+   Konto gelöscht, verschwinden Mitgliedschaften, Fortschritt und die eigenen Klassen von selbst.
+7. **Vor dem Einsatz an einer Schule klären (keine Rechtsberatung, mit einer Fachperson):** Die Schule ist für die
+   Daten ihrer Klasse verantwortlich, du bist Auftragsverarbeiter: Dafür braucht es einen **AV-Vertrag** (Stichpunkte
+   in `design/runde4/SCHULE.md`), einen Abschnitt in der Datenschutzerklärung und die Klärung, wie die Schule
+   Schülerinnen, Schüler und bei Minderjährigen die Eltern informiert bzw. ihre Einwilligung einholt. Crownmate ist ab
+   16; für jüngere Kinder (etwa im Verein) ist der Schulmodus nicht gedacht.

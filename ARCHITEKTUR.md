@@ -461,7 +461,7 @@ export function zuruecksetzen()                  // nur Tests
 | `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
-| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
+| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | B3 Klasse 7 · 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
 
 **Hosts im Detail (Welle 0b).** Jeder DOM-Ort hat einen eigenen Behaelter; leer ist er versteckt (`hidden`
@@ -938,7 +938,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 ```
 | Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
 |---|---|---|---|---|
-| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
+| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Klassen-Aufgabe 35 (B3) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
 | `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch` als eigene Zeile ueber Avatar und Namen, hoechstens 16 px hoch (w0plus-a-fix: vorher in `.info`, das auf dem Handy mit der Sprechblase verschwand); wandert beim Drehen mit, `data-lage`; ohne Anbieter `hidden`, mit Anbieter `.partie.mit-gegner-leiste` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
 | `partie:spieler-leiste` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-spieler-leiste` an Flos Namen, quer in `.spieler-quer` nach dem Namensblock, hoch in `.spieler-hoch` nach `.name` (wandert mit, `data-lage`); eine Zeile, nicht hoeher als der Name; ohne Anbieter `hidden` | wie `partie:gegner-leiste` | Flamme des Siegeslaufs (Paket `siegeslauf`) · Level-Emblem (S1-1) |
 | `partie:aktionen` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-aktionen` (`display: contents`) in `.spielknoepfe` vor „Aufgeben“; hoechstens 2 Knoepfe (weitere: console.warn, entfernt), die Reihe bekommt je Knopf eine Spalte (`data-aktionen`, engere Beschriftung); Klicks binden die Pakete selbst (auch ein `data-aktion` im Paket loest nie eine Aktion des Hosts aus); ohne Anbieter `hidden`, Reihe unveraendert | `{ app, buehne, bot, farbe, modus, boss }` | Emote-Rad und Schnell-Chat (Paket `ausdruck`) |
@@ -1517,3 +1517,87 @@ Hauptvariante eine eigene Zeile und die Knopfzeile darf umbrechen, auf dem Handy
 Kartenbreite; ohne Paket ändert sich nichts. Tests: `tests/server-coach.test.mjs` (Node, auch die Hülle mit
 Deno-Attrappe und gefälschtem SDK über `module.registerHooks`) und `tests/coach-ki.test.mjs` (Node und Browser mit
 echter Analyse und gefälschtem Supabase über `page.route`). Die echte API wird in keinem Test aufgerufen.
+
+# Welle B3: Schulmodus (Klassen für Lehrkräfte und Vereine, Paket schule)
+
+Eine Lehrkraft legt eine Klasse an, schreibt den 6-stelligen Code an die Tafel, Mitglieder treten mit Code und
+Anzeigename bei; die App meldet nach jeder Partie gebündelt Kennzahlen, die Lehrkraft sieht sie sortierbar und stellt
+Aufgaben. Idee, Rollen und Datenschutz (AV-Vertrag als Stichpunkte): `design/runde4/SCHULE.md`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Schulmodus“. Zielgruppe Oberstufe und Vereine, Crownmate bleibt ab 16.
+
+**Datenfluss:** nur Datenbank-Funktionen (RPC über PostgREST, keine Edge Function, kein Secret). App → `rpc/schule_*`
+mit dem Token der Anmeldung → security-definer-Funktion prüft `auth.uid()` und die Rolle → Tabellen. Gelesen wird über
+`schule_meine_klassen` (beide Rollen) und `schule_klassen_uebersicht` (Leitung); RLS sichert zusätzlich den direkten
+Tabellenzugriff ab.
+
+**Server** (`supabase/schule-schema.sql`, Test `supabase/schule-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `klassen` (`id`, `name` 2–40 ohne @, `code` 6 Zeichen aus `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` wie im Online-Fundament,
+  aus `gen_random_uuid()`, `leitung`, `erstellt_am`, `aktiv`, `geschlossen_am`): lesen nur die Leitung.
+- `klassen_mitglieder` (`id` eigene Kennung, `klasse`, `user_id`, `anzeigename` 2–24, Buchstaben mit Akzent, Ziffern,
+  Leerzeichen, `.`, `-`, `'`, mindestens ein Buchstabe, nie @; in der Klasse eindeutig ohne Groß/Klein,
+  `beigetreten_am`): lesen Leitung und das Mitglied selbst; **Spaltenrechte ohne `user_id`** (die Leitung sieht nie die
+  Konto-ID, Policy liest sie trotzdem).
+- `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0–10, `sterne` 0–30, `partien`, `genauigkeit_schnitt`
+  numeric(4,1), `haeufigste_fehler` jsonb `{ zuege, arten: [{ art, anzahl }] }` höchstens 300 Zeichen und 4 Arten aus
+  `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am`): lesen Leitung und das
+  Mitglied selbst.
+- `klassen_aufgaben` (`klasse`, `titel` 2–80, `art` 'bot' | 'raetsel' | 'partien', `ziel` jsonb `{ bot, sterne 1–3 }` bzw.
+  `{ anzahl 1–100 }`, `faellig` date gestern bis +366 Tage, `erstellt_am`): lesen Leitung und Mitglieder.
+- `schule_versuche` (Fehlversuche beim Beitreten je Nutzer und Tag): nur Service-Rolle.
+- Funktionen (security definer, `search_path = ''`, nur `authenticated`): `schule_erstelle_klasse(name)`,
+  `schule_tritt_bei(code, anzeigename)` (ein falscher Code liefert `{ fehler: 'SCHULE_CODE_UNGUELTIG' }` **ohne raise**,
+  damit der Fehlversuch gezählt bleibt; 10 je Tag, dann `SCHULE_ZU_VIELE_VERSUCHE`; zweiter Beitritt ändert nur den
+  Namen; sperrt die Klasse mit `for update`), `schule_verlasse(klasse)`, `schule_melde_fortschritt(bots_besiegt, sterne,
+  partien, genauigkeit_schnitt, haeufigste_fehler, erledigt)` (schreibt die eigene Zeile in **allen aktiven** Klassen,
+  `erledigt` je Klasse auf ihre Aufgaben gefiltert; → Zahl der Klassen), `schule_meine_klassen()` (→ `{ leitung: [...],
+  mitglied: [...] }`, Mitglieder ohne Code und ohne Leitung), `schule_klassen_uebersicht(klasse)`,
+  `schule_aufgabe_anlegen(klasse, titel, art, ziel, faellig)`, `schule_aufgabe_loeschen(aufgabe)` (nimmt sie auch aus
+  `erledigt`), `schule_entferne_mitglied(mitglied)`, `schule_schliesse_klasse(klasse)`, `schule_loesche_klasse(klasse)`;
+  Hilfen für die Policies `schule_leitet`, `schule_mitglied_in`, `schule_ist_mein_mitglied`. Fehler-Kennungen
+  `SCHULE_*` (Vertrag mit `TEXTE` in `js/schule.js`). Grenzen: 20 Klassen je Leitung, 60 Mitglieder, 10
+  Mitgliedschaften, 30 Aufgaben. Geschlossene Klassen räumt `schule_erstelle_klasse` nach 90 Tagen weg; Konto löschen
+  kaskadiert überall.
+
+**Client** `js/schule.js` (Muster `js/abo.js`, nur fetch, `setzeSchuleFetch`/`setzeSchuleUhr` für Tests):
+`meineKlassen({ neu })` (Zwischenspeicher 10 min, ohne Klasse 12 h, offline der letzte Stand), `erstelleKlasse`,
+`trittBei` (prüft Code und Anzeigename vorher, ein sichtbar falscher Code geht nicht zum Server; meldet danach sofort),
+`verlasse`, `uebersicht`, `aufgabeAnlegen`, `aufgabeLoeschen`, `entferneMitglied`, `schliesseKlasse`, `loescheKlasse`
+(alle → `{ ok, … }` oder `{ ok: false, grund }`, danach „Meine Klassen“ neu), `fortschrittJetzt()` (aus
+`ladeFortschritt`, `statistik`, `ladePartien`; `haeufigsteFehler` zählt nur eigene Züge der letzten 20 wertenden
+Partien aus `liveKlassen`), `aufgabeStand` (Bot: Sterne aus dem Fortschritt; Partien: gespielte Partien seit der Aufgabe,
+ohne Übungen; Rätsel: auf dem Gerät gezählte, je Rätsel einmal), `offeneAufgabe` (Termine zuerst, sonst die neueste,
+länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung` (vormerken, frühestens nach 4 s, höchstens eine
+Meldung je Minute, dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`,
+`faelligText` („bis Fr 30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT`, Icon `tafel`.
+Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in Sicherung, Export oder Cloud-Spielstand):
+`schach-arena:schule:stand` `{ uid, daten, geholtAm }`, `schach-arena:schule:offen` `{ uid, seit }`,
+`schach-arena:schule:gemeldet` `{ uid, inhalt, am }`, `schach-arena:schule:raetsel` `{ uid, geloest: { aufgabeId: [id] } }`.
+
+**Paket** `pakete/schule/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die vier Dateien stehen schon in
+`sw.js`; der Test lädt es über `?test&erw=pakete/schule/index`):
+- Ort `einstellungen:gruppen` (Reihenfolge 7, unter Konto 5 und Trainer 6), nur mit sichtbarem Konto: Gruppe
+  `.schule-gruppe[data-angemeldet]` mit den eigenen Mitgliedschaften (`.sm-mitgliedschaft[data-klasse]`, Aufgaben mit
+  Stand, „Austreten“ mit Rückfrage), „Klasse beitreten“ (`.sm-code-eingabe`, `.sm-name-eingabe`, Satz `.sm-sieht`) und
+  „Klassen leiten“ (`app.gehe('schule')`). Zeichnet neu, wenn sich die Anmeldung ändert (MutationObserver und
+  `storage` wie das Abo-Paket).
+- Ort `arena:heute` (Reihenfolge 35): `.sm-heute[data-aufgabe][data-art]`, Titel · Ziel · Stand · Termin · Klasse, nur
+  aus dem Zwischenspeicher. Bot-Aufgabe: Knopf „Zu <Bot>“ (`app.gehe('arena', { waehle })`), nur wenn der Bot frei und
+  nicht schon gewählt ist; Rätsel: „Üben“ (Training).
+- Ereignisse: `partie:beendet` und `speicher:zurueckgesetzt` → `planeMeldung()`; `raetsel:geloest` → `merkeRaetsel` und
+  melden; `app:bereit` → ohne Anmeldung `aufraeumen()`, sonst „Meine Klassen“ auffrischen und eine offene Meldung
+  senden; `app:sichtbar` und `online` → offene Meldung senden.
+
+**Screen** `schule` (`js/ui/schule.js`; `app.js` führt ihn in `SCREENS`, `PAKET_SCREENS` und `TITEL` „Schulmodus“,
+`tests/sw.test.mjs` ordnet ihn dem Paket `schule` zu): `.schule-screen` mit Hauptkopf und `.sm-inhalt[data-ansicht]`
+(`abgemeldet`, `laedt`, `fehler`, `liste`, `klasse`). Liste: `.sm-klasse-karte[data-klasse]`, Formular `.sm-neu`.
+Klasse: `.sm-code-karte` (`.sm-code` sechs Felder, „Groß zeigen“ öffnet `.sm-tafel[role=dialog]`, Escape oder Tipp
+schließt), `.sm-mitglieder-karte` (`table.sm-tabelle`, `th[aria-sort] > button.sm-sort[data-spalte]`,
+`tr[data-mitglied]`, `.sm-entfernen`), `.sm-aufgaben-karte` (`li[data-aufgabe]`, Formular `.sm-aufgabe-neu`), `.sm-ende`
+(schließen, danach löschen). Lädt die Übersicht alle 20 s neu, solange eine Klasse offen und die Seite sichtbar ist.
+Zurück im Kopf führt aus einer Klasse zur Liste. Optik `css/pakete/schule.css` (nur Tokens, Karten aus
+`css/training.css`, geprüft in `tests/schule.test.mjs`).
+
+**Tests:** `tests/server-schule.test.mjs` (Node: Vertrag Schema ↔ Client, Rechte, RLS, Grenzen, Bot-Liste, Zeichen,
+Kennungen, keine Geheimnisse/Preise/E-Mails) und `tests/schule.test.mjs` (Node mit gefälschtem fetch; Browser gegen die
+echte App mit einem gefälschten Supabase über `page.route`: Lehrkraft-Ablauf, Beitreten und Austreten, Heute-Karte,
+Melden auch offline, Handy und iPad, hell und dunkel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer.

@@ -43,8 +43,11 @@
 .sm-neu .t-fuss { justify-content: flex-start; }
 .sm-datenschutz { margin: 0; max-width: 640px; font-size: 13.5px; color: var(--text-2); }
 
-/* ---------- Eine Klasse ---------- */
-.sm-inhalt[data-ansicht="klasse"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+/* ---------- Eine Klasse ----------
+   Breit: Code und Aufgaben nebeneinander, die Mitglieder ueber die ganze Breite darunter (dense fuellt die Luecke neben
+   dem Code mit den Aufgaben); schmal (iPad hoch, Handy) alles untereinander in der Reihenfolge des Dokuments. */
+.sm-inhalt[data-ansicht="klasse"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-auto-flow: row dense; align-items: start; }
+.sm-inhalt[data-ansicht="klasse"]:not(:has(.sm-code-karte)) .sm-aufgaben-karte { grid-column: 1 / -1; }
 .sm-klasse-kopf { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
 .sm-klasse-name { margin: 0; min-width: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 30px; letter-spacing: -.02em;
   overflow-wrap: anywhere; color: var(--text); }
@@ -58,10 +61,10 @@
 .sm-hilfe { font-size: 13px; }
 .sm-leer[hidden], .sm-keine-aufgabe[hidden], .sm-tabelle-huelle[hidden] { display: none; }
 
-/* Code fuer die Tafel */
-.sm-code { display: flex; flex-wrap: wrap; gap: 8px; }
-.sm-code span { display: grid; place-items: center; width: 52px; height: 64px; border-radius: var(--r-m); background: var(--flaeche-2);
-  border: 1px solid var(--linie); font-family: var(--display); font-weight: var(--gw-titel); font-size: 36px; color: var(--text); }
+/* Code fuer die Tafel (bricht nie um) */
+.sm-code { display: flex; flex-wrap: nowrap; gap: 8px; }
+.sm-code span { flex: none; display: grid; place-items: center; width: 50px; height: 62px; border-radius: var(--r-m); background: var(--flaeche-2);
+  border: 1px solid var(--linie); font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; color: var(--text); }
 .sm-code-karte .t-fuss { justify-content: flex-start; }
 
 /* Tabelle der Mitglieder: scrollt auf dem Handy waagrecht in ihrer Huelle, die erste Spalte bleibt stehen */
@@ -107,18 +110,24 @@ th[aria-sort="ascending"] .sm-sort, th[aria-sort="descending"] .sm-sort { color:
 /* Code gross (Beamer, Tafel): ueber dem ganzen Screen, Tipp oder Escape schliesst */
 .sm-tafel { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: var(--schleier); }
 .sm-tafel[hidden] { display: none; }
-.sm-tafel-karte { width: min(960px, 100%); display: grid; justify-items: center; gap: 18px; padding: clamp(20px, 4vw, 40px); border-radius: var(--r-xl);
+.sm-tafel-karte { width: min(960px, 100%); display: grid; justify-items: center; gap: 18px; padding: 28px 32px; border-radius: var(--r-xl);
   background: var(--flaeche); color: var(--text); text-align: center; }
 .sm-tafel-name { margin: 0; font-size: 22px; font-weight: 800; overflow-wrap: anywhere; }
-.sm-tafel-code { display: flex; gap: clamp(4px, 1.4vw, 14px); max-width: 100%; }
-.sm-tafel-code span { display: grid; place-items: center; min-width: 1.05em; padding: .08em .1em; border-radius: var(--r-l); border: 2px solid var(--linie);
-  background: var(--flaeche-2); font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(40px, 12.5vw, 150px); line-height: 1.05; }
+/* Groesse aus der Breite der Karte: innen min(960px, Bildschirm - 40px) - 64px, sechs Felder zu 1,1em plus fuenf Luecken zu
+   0,15em und die Raender passen dann immer hinein; hoechstens 130px */
+.sm-tafel-code { display: flex; flex-wrap: nowrap; gap: .15em; max-width: 100%; font-family: var(--display); font-weight: var(--gw-titel);
+  font-size: min(130px, calc((min(960px, 100vw - 40px) - 64px) / 8.6)); line-height: 1; }
+.sm-tafel-code span { flex: none; display: grid; place-items: center; width: 1.1em; height: 1.35em; border-radius: var(--r-l); border: 2px solid var(--linie);
+  background: var(--flaeche-2); }
 .sm-tafel-satz { margin: 0; font-size: 16px; font-weight: 650; color: var(--text-2); }
 
+@media (max-width: 1000px) {
+  .sm-inhalt[data-ansicht="klasse"] { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; }
+}
 @media (max-width: 760px) {
-  .sm-inhalt[data-ansicht="klasse"] { grid-template-columns: minmax(0, 1fr); }
   .sm-klasse-name { font-size: 26px; }
-  .sm-code span { width: 44px; height: 56px; font-size: 30px; }
+  .sm-code { gap: 6px; }
+  .sm-code span { width: 42px; height: 54px; font-size: 29px; }
   .sm-aufgaben li { flex-wrap: wrap; }
   .sm-a-text { flex-basis: calc(100% - 52px); }
   .sm-a-erledigt { order: 3; flex-basis: 100%; }
@@ -126,6 +135,9 @@ th[aria-sort="ascending"] .sm-sort, th[aria-sort="descending"] .sm-sort { color:
 
 /* ---------- Gruppe "Klasse" in den Einstellungen ---------- */
 .schule-gruppe h4 { margin: 14px 0 8px; font-size: 15px; }
+.schule-gruppe .sm-status { margin: 10px 0 0; }
+.schule-gruppe .sm-leiten { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linie); }
+.schule-gruppe .sm-leiten[hidden], .schule-gruppe .sm-beitreten[hidden], .schule-gruppe .sm-abgemeldet[hidden] { display: none; }
 .schule-gruppe .sm-felder { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
 .schule-gruppe label { display: grid; gap: 6px; min-width: 0; font-size: 14px; font-weight: 700; }
 .schule-gruppe .sm-code-eingabe { font-family: var(--display); letter-spacing: .14em; text-transform: uppercase; }

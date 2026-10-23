@@ -10,7 +10,8 @@
 //                           die Anmeldung aendert (MutationObserver und storage, wie das Abo-Paket, weil js/konto.js
 //                           nichts meldet); nach dem Abmelden raeumt sie den Stand weg.
 //   arena:heute             (reihenfolge 35) die naechste offene Aufgabe einer Klasse, ruhig, mit Termin statt Countdown;
-//                           nur aus dem Zwischenspeicher (kein Netz im Anbieter). Bei einer Bot-Aufgabe ein Knopf zum Bot.
+//                           nur aus dem Zwischenspeicher (kein Netz im Anbieter). Bei einer Bot-Aufgabe ein Knopf zum Bot
+//                           (nur wenn er frei und nicht schon gewaehlt ist), bei Raetseln "Üben" (Training).
 //   partie:beendet          Fortschritt melden, gebuendelt (planeMeldung in js/schule.js), offline still
 //   raetsel:geloest         richtig geloeste Raetsel fuer Raetsel-Aufgaben zaehlen (merkeRaetsel), dann melden
 //   speicher:zurueckgesetzt neuer Stand nach "Fortschritt zurücksetzen" (die Lehrkraft sieht keinen alten)
@@ -27,6 +28,7 @@ import {
   stelleSchuleCssSicher, WAS_DIE_LEITUNG_SIEHT, ICON,
 } from '../../schule.js';
 import { BOTS } from '../../bots.js';
+import { istFreigeschaltet, ladeFortschritt } from '../../storage.js';
 
 export { ICON };
 const botName = (id) => (BOTS.find((b) => b.id === id) || {}).name || id;
@@ -208,7 +210,7 @@ export function schuleGruppe({ app } = {}) {
 }
 
 // ---------- Zeile in der Heute-Karte ----------
-export function heuteZeile({ app = null, bot = null } = {}) {
+export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) {
   if (typeof document === 'undefined' || !nutzerId()) return null;
   const o = offeneAufgabe();
   if (!o) return null;
@@ -221,15 +223,21 @@ export function heuteZeile({ app = null, bot = null } = {}) {
   el.innerHTML = `<span class="sm-heute-symbol" aria-hidden="true">${icon(ICON)}</span>
     <span class="sm-heute-text"><b></b><span class="sm-heute-ziel"></span></span>`;
   el.querySelector('b').textContent = aufgabe.titel;
-  const teile = [klasse.name, zielText(aufgabe)];
+  // Ziel und Termin vor dem Namen der Klasse: wird die Zeile zu lang, faellt zuerst die Klasse weg (steht im Titel-Tipp)
+  const teile = [zielText(aufgabe)];
   if (aufgabe.art !== 'bot') teile.push(`${stand.stand} von ${stand.ziel}`);
   const f = faelligText(aufgabe.faellig);
   if (f) teile.push(f);
+  teile.push(klasse.name);
   el.querySelector('.sm-heute-ziel').textContent = ' · ' + teile.join(' · ');
-  el.setAttribute('aria-label', `Aufgabe: ${aufgabe.titel}. ${teile.join(', ')}`);
+  el.querySelector('.sm-heute-text').title = `${aufgabe.titel} · ${teile.join(' · ')}`;
   const ziel = aufgabe.ziel || {};
   let knopf = null;
-  if (aufgabe.art === 'bot' && ziel.bot && !(bot && bot.id === ziel.bot) && app && typeof app.gehe === 'function') {
+  // Knopf zum Bot nur, wenn er schon frei ist (sonst waehlte die Arena still den naechsten Gegner) und nicht schon gewaehlt
+  const zielBot = BOTS.find((b) => b.id === ziel.bot);
+  let frei = false;
+  try { frei = !!zielBot && istFreigeschaltet(zielBot.stufe, fortschritt || ladeFortschritt()); } catch (e) { frei = false; }
+  if (aufgabe.art === 'bot' && frei && !(bot && bot.id === ziel.bot) && app && typeof app.gehe === 'function') {
     knopf = document.createElement('button');
     knopf.type = 'button';
     knopf.className = 'knopf dr sm-heute-los';
