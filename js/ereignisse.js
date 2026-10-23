@@ -41,6 +41,8 @@ export const EREIGNISSE = Object.freeze([
   'funken:geaendert',
   // Paket boss (S1-6) meldet, dass daten/boss/spielplan.json geladen ist; erst dann liest funken den Spielplan (kein 404)
   'spielplan:geladen',
+  // Paket punkte (S1-3): { punkte, platz, tafel, rekord } je bewerteter Partie, Vertrag in ARCHITEKTUR.md
+  'punkte:geaendert',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);
