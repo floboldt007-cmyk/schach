@@ -1426,14 +1426,27 @@ Ereignis). Wer eines dieser Ereignisse einfuehrt, ergaenzt in `js/pakete/funken/
 die Buchung (Werte stehen in `rechnung.js` bzw. sind in 3.3 festgelegt).
 
 **Integration.** Das Paket steht bewusst noch nicht in `PAKETE` (Kopfkommentar von `js/erweiterungen.js` und
-`tests/sw.test.mjs`: das macht die Integration). Probelauf am 22.10. mit `pakete/funken/index` in `PAKETE` und den fuenf
-Dateien in `DATEIEN` von `sw.js`: sw, navigation, screens, thema, klang, funken gruen; rot sind nur Pruefungen, die den
-Kern ausdruecklich ohne Pakete pruefen: `tests/e2e.test.mjs` "Ohne Pakete: keine Feier, kein Ort im Ergebnis" und
-`tests/app.test.mjs` (bricht bei "Auswertung im Hintergrund" ab, weil `.erg-tipp` nur ohne Abrechnungszeile erscheint;
-dahinter dieselbe Annahme in "Kopf: genau 3 Chips", "Heute-Karte ohne Paket: versteckt" und `wpabr`, das selbst eine
-Zeile `funken` an Reihenfolge 20 anbietet). Vorschlag: diese Kern-Pruefungen laden `js/erweiterungen.js` per
-`page.route` mit `PAKETE = ['sicherung']`, damit sie weiter den Kern ohne Spiel-Pakete pruefen. Kopf auf schmalen
-Handys: neben dem Sterne-Chip passt der Level-Chip ab 390 px ganz, bei 375 px fehlen 12 px, bei 360 px 27 px, und
-zwischen 441 und etwa 510 px (Pokal-Chip wieder sichtbar) ist er angeschnitten oder liegt ganz im waagrechten
-Scrollbereich; das entscheidet die Integration mit der Auswahl der Kopf-Chips (Zahlenruhe 3.1).
+`tests/sw.test.mjs`: das macht die Integration). Probelauf am 23.10. (P1-Nachbesserung) mit `pakete/funken/index` in
+`PAKETE` und den fuenf Dateien in `DATEIEN` von `sw.js` (danach `node tests/sw.test.mjs --aktualisieren`):
+`tests/e2e.test.mjs` 124/125, rot nur "Ohne Pakete: keine Feier, kein Ort im Ergebnis"; `tests/app.test.mjs` bricht bei
+"Auswertung im Hintergrund" ab (wartet auf `.erg-tipp`, das es nur ohne Abrechnungszeile gibt). Mit diesem Warten in einer
+Kopie nachsichtig: 515 gruen, 8 rot, alle pruefen ausdruecklich den Kern ohne Pakete: "?erw ohne ?test wird ignoriert"
+(die Paket-Dateien werden geladen), "Ort arena:kopf: nach den zwei Chips", "Feier im Ergebnis: hoechstens 3 ..." und
+"Nachlese ..." (die Level-Zeile belegt einen Platz), dreimal `wpabr` ("Zeilen Punkte vor Funken", "Nachtrag baut die
+Huelle neu", "hoechstens vier Zeilen": das Test-Paket bietet selbst eine Zeile `funken` an) und "Ohne Paket:
+Spieler-Leiste und Aktionen versteckt" (funken bietet `partie:spieler-leiste` an). Nicht mehr rot: "Heute-Karte ohne
+Paket: versteckt" (die erste Rueckenwind-Karte kommt erst an Tag 4) und die Konsolenfehler-Pruefungen mit `wpboss` (kein
+Abruf des Spielplans ohne `spielplan:geladen`). **Rezept, im Probelauf geprueft (app 523/523, e2e 125/125 mit funken in
+`PAKETE`):** die Kern-Pruefungen laden `js/erweiterungen.js` ohne Spiel-Pakete, in `tests/app.test.mjs` in `neueSeite`
+und im Kontext "Sternklang", in `tests/e2e.test.mjs` in `neuerKontext`:
+```js
+const echt = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
+const body = echt.replace(/^export const PAKETE = Object\.freeze\(\[[^\]]*\]\);/m, "export const PAKETE = Object.freeze(['sicherung']);");
+await kontext.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body }));
+```
+(`/m` und `^` sind noetig: ohne sie trifft die Regex das Beispiel im Kopfkommentar, und das Paket laedt trotzdem.)
+Kopf: Der Level-Chip waehlt seine Form nach Platz (siehe Orte); im iPad-Hochformat ist er damit ganz sichtbar. Reicht der
+Platz auch fuer die schmale Form nicht (neben dem Sterne-Chip fehlen bei 375 px 12 px, bei 360 px 27 px; zwischen 441 und
+etwa 510 px, wenn der Pokal-Chip wieder sichtbar ist), liegt er teils im waagrechten Scrollbereich der Chip-Reihe. Das
+entscheidet die Integration mit der Auswahl der Kopf-Chips (Zahlenruhe 3.1; die Serie aus P3 kommt dazu).
 Tests: `node tests/funken.test.mjs` (Node und Browser, `PORT`, `BILDER`), Fairness-Zeilen in `tests/fairness.test.mjs`.
