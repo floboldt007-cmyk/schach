@@ -1114,6 +1114,12 @@ async function testeBrowser(browser) {
   const ohnePanel = await seite.locator('.ort-panel-bot .pk-panel').count();
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
   await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
+  // Seit U5 gleitet das Detail-Panel beim Wechsel des Bots herein (transform): erst messen, wenn es steht
+  // (nur endliche Animationen im Panel, die Weltkarte hat Dauer-Animationen)
+  await seite.evaluate(() => Promise.all(document.getAnimations().filter((a) => {
+    const t = a.effect && a.effect.target;
+    return t && t.closest && t.closest('.detail') && a.effect.getComputedTiming().endTime !== Infinity;
+  }).map((a) => a.finished.catch(() => null))));
   const panel = await seite.evaluate(() => {
     const k = document.querySelector('.ort-panel-bot .pk-panel');
     return k && { text: k.textContent.trim(), h: Math.round(k.getBoundingClientRect().height), tag: k.tagName };
