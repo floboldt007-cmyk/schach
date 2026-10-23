@@ -1,66 +1,72 @@
 # WebKit-Stand
 
-Stand: 22. Oktober 2026 (Premium-Umbau U6, Brett). Aufruf lokal mit dem von Playwright installierten WebKit:
+Stand: 23. Oktober 2026, PR #25 (`codex/webkit-brett`).
+
+## Geprüfter Stand
+
+Der Anwendungscode in `3f10852762b9b8eb0030168eec309f809ca758e8` besteht die unveränderten Prüfungen in beiden
+Browsern. [Vollständiger PR-Lauf](https://github.com/floboldt007-cmyk/schach/actions/runs/39926458127):
+
+- Chromium: **20/20 Suiten bestanden, 2952/2952 Prüfungen**.
+- WebKit: **4/4 Suiten bestanden, 828/828 Prüfungen**: storage 218/218, board 280/280, screens 205/205,
+  e2e 125/125.
+- Auch der unabhängige [Push-Lauf](https://github.com/floboldt007-cmyk/schach/actions/runs/39926450380) besteht die
+  vier WebKit-Suiten mit **828/828 Prüfungen**.
+
+Aufrufe:
 
 ```sh
-BROWSER=webkit node tests/board.test.mjs
-BROWSER=webkit node tests/screens.test.mjs --ohne-bilder
+node tests/alle.mjs
+BROWSER=webkit node tests/alle.mjs --nur=storage,board,screens,e2e
 ```
 
-Die CI (`.github/workflows`, Job `webkit`) lässt `storage`, `board`, `screens` und `e2e` mit WebKit laufen und
-bewahrt Ausgabe und Screenshots bei einem Fehlschlag als Artefakt auf. Hier ist die Entwicklungsumgebung ohne
-WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirklich grün sind.
+WebKit konnte in der Entwicklungsumgebung nicht installiert werden: Der Browser-Download wurde mit HTTP 403
+gesperrt. Die WebKit-Ergebnisse stammen deshalb aus der CI. Lokal wurde System-Chromium über `PLAYWRIGHT_PFAD`
+verwendet. Der Bretttest bestand dort mit 279/279 Prüfungen; die zusätzliche CI-Prüfung kontrolliert die
+Screenshot-Galerie bei gesetztem `BILDER`.
 
-## Erledigt mit U6 (im Code, in Chromium geprüft)
+Der lokale Gesamtlauf hatte zunächst 19/20 Suiten und 2947/2951 Prüfungen: Vier Konsolenprüfungen in `screens`
+meldeten eine fehlende `/favicon.ico`. Die Testseite bindet nun das vorhandene SVG-Favicon der App ausdrücklich ein.
+Fehlermeldungen werden weiterhin gesammelt und geprüft; keine Prüfung wurde entfernt oder abgeschwächt.
+Der erneute lokale Lauf von `node tests/screens.test.mjs` besteht mit **205/205 Prüfungen**.
 
-- **Kein CDP mehr in den Touch-Teilen.** `tests/board.test.mjs` (Teil „iPad“, Finger-Teil in „W0+a“, neue Teile
-  „Pfeile (Finger)“, „Zwei Finger“, „Schwelle“) und `tests/screens.test.mjs` (Teil „Touch (iPad)“, Wischen in der
-  Analyse) nutzen `fingerTreiber(seite)` aus `tests/browser.mjs`: synthetische `PointerEvent`s mit
-  `pointerType: 'touch'` per `page.evaluate`, pointermove/pointerup gehen an das Element des pointerdown (wie beim
-  echten Zeiger-Fang). `page.touchscreen.tap` bleibt für einfache Tipps (gibt es in WebKit). Die Prüfungen sind
-  inhaltlich unverändert streng. Damit bricht der iPad-Teil nicht mehr bei `browserContext.newCDPSession()` ab.
-- **Keine browserabhängige Rundung mehr bei der Figuren-Lage.** `js/board.js` setzt für Felder, Figuren,
-  Überlagerungen, Abzeichen, Umwandlungs-Auswahl und Rand-Koordinaten `left`/`top` als fertig berechnete
-  Prozentwerte (`prozent()`), nicht mehr `calc(var(--x) * 12.5%)`. Animiert werden nur `transform` und `opacity`
-  (Web Animations API über `js/bewegung.js`). Die fünf Abweichungen vom 17. Oktober sind damit im Code beseitigt:
-  - „Bauer steht auf e4“ und „Zug e7–e5 bei gedrehtem Brett“: Lage aus festen Prozenten, Gleiten per `transform`,
-    nach dem Ende steht die Figur ohne Transform exakt auf dem Feld.
-  - „Zurückschnappen nach einem illegalen Zug“: `_schnappeZurueck` gleitet aus dem Zieh-Transform (px-Text)
-    zurück auf `none`; es gibt keine CSS-Transition mehr auf der Figur, die dazwischenfunken könnte (nur noch im
-    Zustand `.angehoben`).
-  - „Überstand des Abzeichens auf h8“: `_platziereAbzeichen` schiebt das Abzeichen am Rand in die Brett-Box
-    (`right: 0` bzw. `top: 0`); Prüfungen für h8, a1 und h1 verlangen jetzt „bleibt in der Box“.
-  - „`setzeStellung` ohne Animation“: `animieren: false` setzt `--brett-dauer: 0ms` und platziert ohne jede
-    Animation; die Grund-Transition auf `.figur` ist weg.
-- **Schichten ohne Browser-Zufall.** `.brett-felder` ist ausdrücklich ein eigener Stapelkontext (`z-index: 0`), die
-  Überlagerungen (Auswahl, Schach-Hof, letzter Zug, Flos Marken) liegen darin und damit unter den Figuren. Vorher hing
-  das daran, ob `container-type` einen Stapelkontext bildet (Chromium tut es nicht, für WebKit ist das nicht
-  gesichert): in Chromium lagen Auswahl und Schach-Hof über der Figur. Prüfung per Pixelvergleich
-  (Teil „Optik“).
-- **Finger-Tipp aufs Ziel zieht beim Loslassen** (vorher beim Aufsetzen), damit ein zweiter Finger oder ein
-  `pointercancel` von iPadOS (Systemgeste) den Zug noch zurücknehmen kann. `page.touchscreen.tap` und der
-  `fingerTreiber` liefern beide `pointerup`, die Tests laufen in beiden Engines gleich.
-- **Bewertungsbalken** (`css/app.css`): der Weiß-Anteil ist volle Höhe und wird per `translateY(calc(100% - var(--w)))`
-  verschoben, statt `height` zu animieren (nur `transform`); `--w` setzt die Partie wie bisher.
+## Änderungen an der App
 
-## Nur die CI kann es zeigen
+- **Abzeichen:** `js/board.js` setzt Breite und Höhe als Prozentwerte. `css/board.css` hält auch die Mindestgröße
+  quadratisch. Die CSS-Feder wird beim Einsetzen an die Dokument-Zeit gebunden, sodass ein später Render-Schritt
+  den unsichtbaren Anfang `scale(0)` nicht festhält. Sichtbarkeit, Lage und Brettgrenzen werden weiterhin geprüft.
+- **Figuren und Zurückschnappen:** `js/bewegung.js` bindet neue Web-Animations an die aktuelle Dokument-Zeit.
+  Der Zeitwächter in `_gleiteVon` beendet außerdem die tatsächliche Animation, bevor er `.gleitet` entfernt.
+  Dadurch bleibt auch bei einem verspäteten Animationsende kein alter Zieh-Transform auf der Figur liegen.
+- **Weniger Bewegung:** `systemReduziert()` liest die aktuelle Media-Abfrage direkt. Die Antwort hängt nicht davon
+  ab, ob WebKit das `change`-Ereignis der gespeicherten MediaQueryList bereits zugestellt hat. Der bestehende
+  Listener aktualisiert weiterhin die CSS-Tokens. `gleitDauer()` ist bei reduzierter Bewegung sofort 0.
+- **Erster Klang:** `js/sounds.js` bereitet den Audio-Kontext beim Aufsetzen vor. Die Freigabe bleibt an
+  `touchend`, `pointerup`, Klick oder Taste gebunden; `zustand()` meldet weiterhin den tatsächlichen Zustand.
+  Die bestehenden Regeln für stummgeschalteten Klang und unterbrochene Audio-Kontexte bleiben erhalten.
 
-- Ob WebKit die synthetischen Pointer-Ereignisse im `page.evaluate` genau wie Chromium an das Brett liefert
-  (`setPointerCapture` wirft dort bei unbekannter pointerId, das fängt `board.js` ab).
-- Ob die Prozent-Lage in WebKit wirklich auf den Pixel mit Chromium übereinstimmt (`figurSitzt` erlaubt 1,5 px).
-- `screens`: Beim kleinen Handy-Viewport hat der Analyse-Screen 8 px waagrechten Überlauf (unverändert, gehört zu
-  Paket U9/U7, nicht zum Brett).
-- `:has()` in `css/app.css` (`.brett-rahmen:has(> .brett.koord-rand)` für die Rand-Koordinaten) braucht Safari ab
-  15.4; Zielgerät ist iPadOS ab 16.4, das reicht.
-- Ob ein echter Finger auf dem iPad beim Malen (Halten 400 ms, dann ziehen) dieselben Ereignisse liefert wie der
-  Treiber; die Zeichen-Geste stoppt `pointermove`/`pointerup` an der Brett-Grenze (`stopPropagation`), das Aufsetzen
-  geht noch an die Umgebung (Wischen der Analyse setzt dort nur seinen Startpunkt).
-- Synthetische Ereignisse lösen keine Standard-Aktionen des Browsers aus (Scrollen, Zoom, Klick-Nachzügler). Ob ein
-  echter Finger auf dem iPad dabei etwas anderes tut, zeigt erst Flos Test auf dem Gerät (`touch-action: none` am
-  Brett soll genau das verhindern).
+## Korrektur am Finger-Treiber
 
-## Bewusst offen (anderes Paket)
+`fingerTreiber` in `tests/browser.mjs` bringt die Seite vor dem Aufsetzen nach vorn und lässt danach einen
+Render-Schritt durchlaufen. Synthetische `PointerEvent`s aus `evaluate()` aktivieren die Browser-Seite nicht wie
+native Eingaben. Die zusätzliche Synchronisation verhindert, dass Halte-Timer und Animationen in einer noch
+inaktiven Seite starten. Die Halteschwelle bleibt bei 400 ms; alle Gesten, Prüfungen und Zeitgrenzen bleiben bestehen.
 
-- `.effekt-ort` (Welle, Ringe, Funken der Partie) liegt weiter über `calc(var(--x) * 12.5%)`, weil `js/ui/partie.js`
-  die Lage setzt (Paket U7). Für Pixel-Gleichheit in WebKit dort `left`/`top` als fertige Prozente setzen wie in
-  `board.js` (`x * 12.5 + '%'`). Bei Effekten fällt ein Bruchteil eines Pixels nicht auf, deshalb kein Blocker.
+Der Treiber sendet weiterhin ohne CDP an das Element des Aufsetzens, entsprechend dem Zeiger-Fang. Zwei Finger,
+Abbruch, Pfeile auf eigenen und leeren Feldern sowie ein gedrehtes Brett sind Teil der bestandenen Bretttests.
+
+## Noch auf einem echten iPad prüfen
+
+Die CI verwendet Playwright-WebKit unter Linux. Sie ersetzt diese Geräteprüfungen nicht:
+
+- Tippen, Ziehen und 400 ms Halten mit einem echten Finger, einschließlich zweitem Finger und `pointercancel`.
+- Scrollen, Zoom, Systemgesten und nachgelieferte Klicks rund um das Brett. Synthetische Pointer-Ereignisse lösen
+  diese Browser-Standardaktionen nicht aus.
+- Erster Klang nach Laden, Stummschalten sowie Audio nach App-Wechsel, Unterbrechung und Rückkehr aus dem Hintergrund.
+- „Bewegung reduzieren“ in iPadOS während einer geöffneten Partie ändern.
+- Safari und installierte PWA, Hoch- und Querformat. Ziel bleibt iPadOS ab 16.4; `:has()` benötigt Safari ab 15.4.
+
+## Andere Pakete
+
+`.effekt-ort` der Partie wird weiterhin in `js/ui/partie.js` über `calc(var(--x) * 12.5%)` positioniert. Dieser PR
+ändert weder die Partie-Effekte noch die Weltkarte oder Pakete anderer Zweige.
