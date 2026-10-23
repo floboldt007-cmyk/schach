@@ -1003,7 +1003,9 @@ async function testeDuell(browser) {
       const seite = lauf.seite;
       await seite.goto(BASIS + '#arena');
       await seite.waitForSelector('.screen.arena .knoten');
-      await warte(600);
+      // wie Flo: erst einen Moment auf die Karte schauen, dann spielen (die Arena waermt nach 0,9 s Engines und
+      // Partie-Screen vor; mitten im Intro kostet das auf dem geteilten Testrechner mehrere 100 ms Hauptfaden)
+      await warte(1500);
       await duellHorcher(seite);
       await zieleEinsetzen(seite);
       await tippe(seite, '.detail [data-aktion="spielen"]');
