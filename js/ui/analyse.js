@@ -429,10 +429,11 @@ export function zeige(root, params = {}, app) {
     const zaehlt = (p) => eigeneZuege(p) >= BESTWERT_MIN_ZUEGE;
     const alle = ladePartien().filter(zaehlt).map((p) => p.genauigkeit).filter(Number.isFinite);
     const rekord = zaehlt(st.partie) && Number.isFinite(eigen) && alle.length >= 2 && eigen >= Math.max(...alle) - 1e-9;
-    // Zu kurze Partie (z. B. Aufgabe im zweiten Zug): keine Genauigkeit und keine Spielstaerke zeigen, Werte aus
-    // so wenigen Zuegen sind nicht verlaesslich (Vorschlag Nr. 1 in design/runde4/VORSCHLAEGE-CODEX.md).
+    // Zu kurze Partie ohne Sieg (z. B. Aufgabe im zweiten Zug): keine Genauigkeit und keine Spielstaerke zeigen,
+    // Werte aus so wenigen Zuegen sind nicht verlaesslich (Vorschlag Nr. 1 in design/runde4/VORSCHLAEGE-CODEX.md).
+    // Ein kurzer Sieg (z. B. Schaefermatt) zeigt seinen Wert weiter, denn auf ihm beruht Stern 2.
     // Gilt nur fuer die Anzeige, gespeicherte Werte und Sterne bleiben unveraendert.
-    const zuKurz = !zaehlt(st.partie);
+    const zuKurz = !zaehlt(st.partie) && st.partie.ergebnis !== 'sieg';
     const wert = (g, ich) => {
       if (!Number.isFinite(g)) return '<div class="an-g-wert an-g-leer">keine Züge</div>';
       if (zuKurz) return '<div class="an-g-wert an-g-leer an-g-kurz">zu kurz</div>';
