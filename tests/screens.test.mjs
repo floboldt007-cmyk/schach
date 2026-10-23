@@ -12,14 +12,13 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8832);
 const BASIS = `http://127.0.0.1:${PORT}/tests/screens.html`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design/app-shots'));
+const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design/app-shots'));
 if (BILDER) mkdirSync(BILDER, { recursive: true });
 
 const VIEWPORTS = [
@@ -115,24 +114,6 @@ const kleineKnoepfe = (seite) => seite.evaluate(() => [...document.querySelector
   return r.height < 43.5 || r.width < 43.5;
 }).map((b) => `${b.className || b.tagName} ${Math.round(b.getBoundingClientRect().width)}x${Math.round(b.getBoundingClientRect().height)}`));
 
-// Premium-Umbau Schub 1: Text-Links brauchen ebenfalls >= 44 px Tippflaeche
-const kleineLinks = (seite) => seite.evaluate(() => [...document.querySelectorAll('.screen a[href]')].filter((a) => {
-  const r = a.getBoundingClientRect();
-  if (!r.width || !r.height || getComputedStyle(a).visibility === 'hidden') return false;
-  return r.height < 43.5 || r.width < 43.5;
-}).map((a) => `"${a.textContent.trim().slice(0, 24)}" ${Math.round(a.getBoundingClientRect().width)}x${Math.round(a.getBoundingClientRect().height)}`));
-
-// Premium-Umbau Schub 1 (Flos iPhone-Befund): kein Text wird abgeschnitten, weder per Ellipse noch still per
-// overflow hidden. Nur Elemente mit eigenem Text; .sr (nur fuer Screenreader) ist absichtlich 1 px gross.
-const gekuerzt = (seite) => seite.evaluate(() => [...document.querySelectorAll('.screen *')].filter((el) => {
-  if (el.closest('.sr, svg, [hidden]')) return false;
-  if (![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) return false;
-  const cs = getComputedStyle(el);
-  if (cs.visibility === 'hidden' || !el.getBoundingClientRect().width) return false;
-  if (cs.textOverflow !== 'ellipsis' && !/(hidden|clip)/.test(cs.overflowX)) return false;
-  return el.scrollWidth > el.clientWidth + 1;
-}).slice(0, 4).map((el) => `${String(el.className.baseVal ?? el.className) || el.tagName} "${el.textContent.trim().slice(0, 30)}"`));
-
 // ---------------------------------------------------------------------------
 // Testdaten einmal anlegen (Opernpartie mit Review, Bot-Partie ohne Review)
 // ---------------------------------------------------------------------------
@@ -154,7 +135,7 @@ async function testeDaten(browser) {
   const t0 = Date.now();
   const d = await legeDatenAn(seite);
   pruefe('Opernpartie (mit Review) und Bot-Partie (ohne) angelegt', d.oper && d.bot && d.botAnzahl > 4, JSON.stringify(d));
-  pruefe('Opernpartie hat einen Genial-Zug für die Schatzkiste', d.brillant >= 1, String(d.brillant));
+  pruefe('Opernpartie hat einen Brillant-Zug für die Schatzkiste', d.brillant >= 1, String(d.brillant));
   console.log(`     (Testdaten in ${((Date.now() - t0) / 1000).toFixed(1)} s)`);
   SPEICHER = await kontext.storageState();
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -271,7 +252,7 @@ async function testeAnalyse(browser, d) {
   const besterPlies = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege
     .filter((z) => z.farbe === 'w' && z.klasse === 'bester').map((z) => z.ply), d.oper);
   await seite.click('.an-kl[data-klasse="bester"]');
-  pruefe('Klasse "Stärkster Zug": erster eigener', (await aktuellerPly(seite)) === besterPlies[0], `${await aktuellerPly(seite)} vs ${besterPlies[0]}`);
+  pruefe('Klasse "Bester Zug": erster eigener', (await aktuellerPly(seite)) === besterPlies[0], `${await aktuellerPly(seite)} vs ${besterPlies[0]}`);
   await seite.click('.an-kl[data-klasse="bester"]');
   pruefe('Nochmal antippen: der nächste', (await aktuellerPly(seite)) === besterPlies[1], `${await aktuellerPly(seite)} vs ${besterPlies[1]}`);
   const kl = await seite.locator('.an-coach').getAttribute('data-klasse');
@@ -296,7 +277,7 @@ async function testeAnalyse(browser, d) {
   const pfeil = await seite.evaluate(() => [...document.querySelectorAll('.an-brett .pfeil')].map((g) => g.dataset.von + g.dataset.nach));
   pruefe('Pfeil des besten Zugs', pfeil.includes(mitAnderemBesten.von + mitAnderemBesten.nach), pfeil.join(','));
   const linie = await seite.locator('.an-c-linie').textContent();
-  pruefe('Zeile "Stärkster Zug +x,y · Züge"', /Stärkster Zug\s+[+−]\d+,\d/.test(linie) && /[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
+  pruefe('Zeile "Bester Zug +x,y · Züge"', /Bester Zug\s+[+−]\d+,\d/.test(linie) && /[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
   const evalChip = await seite.locator('.an-c-eval').textContent();
   pruefe('Bewertungs-Chip', /[+−]?\d+,\d|M\d/.test(evalChip), evalChip);
   await bild(seite, 'analyse-bester-zug');
@@ -425,22 +406,12 @@ async function testePruefrunde(browser, d) {
   pruefe('Rochade: kein O-O in gespeicherten Coach-Texten', await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege
     .every((x) => !/O-O/.test(x.coach) && !/O-O/.test(x.besterZugSanDe || '') && !(x.besteLinieSan || []).some((t) => /O-O/.test(t))), d.oper));
 
-  // Genial-Karte: deckende Flaeche unter der Toenung (Kontrast des Klassenworts)
+  // Brillant-Karte: deckende Flaeche unter der Toenung (Kontrast des Klassenworts)
   const brillant = await seite.evaluate((id) => testseite.speicher.ladeReview(id).zuege.find((x) => x.klasse === 'brillant'), d.oper);
   if (brillant) {
     await oeffne(seite, `screen=analyse&partieId=${d.oper}&ply=${brillant.ply}`);
-    // Premium-Umbau U1: die deckende Flaeche ist die Kartenfarbe des Themes (--flaeche), nicht mehr das Neon-Blau
-    const bg = await seite.evaluate(() => {
-      const el = document.querySelector('.an-coach.brillant');
-      const probe = document.createElement('i');
-      probe.style.color = 'var(--flaeche)';
-      el.appendChild(probe);
-      const flaeche = getComputedStyle(probe).color;
-      probe.remove();
-      return { bild: getComputedStyle(el).backgroundImage, flaeche };
-    });
-    pruefe('Genial-Karte: deckende Fläche unter dem Verlauf', /^rgb\(/.test(bg.flaeche) && bg.bild.includes(`linear-gradient(${bg.flaeche}, ${bg.flaeche})`),
-      JSON.stringify(bg).slice(0, 200));
+    const bg = await seite.evaluate(() => getComputedStyle(document.querySelector('.an-coach.brillant')).backgroundImage);
+    pruefe('Brillant-Karte: deckende Fläche unter dem Verlauf', /linear-gradient\(rgb\(16, 20, 42\), rgb\(16, 20, 42\)\)/.test(bg), bg.slice(0, 160));
   }
 
   // Engine stuerzt ab (leere Analyse mit Fehler): Fehlerkarte statt endlosem Warten, danach klappt es
@@ -479,8 +450,8 @@ async function testeTouch(browser, d) {
   await seite.touchscreen.tap(kl.x + kl.width / 2, kl.y + kl.height / 2);
   await warte(500);
   const z = await seite.locator('.an-coach').getAttribute('data-klasse');
-  pruefe('Klassen-Zeile mit dem Finger: Genial', z === 'brillant', z);
-  pruefe('Genial-Coach mit Verlaufsrahmen, Wort vollfarbig', await seite.evaluate(() => {
+  pruefe('Klassen-Zeile mit dem Finger: Brillant', z === 'brillant', z);
+  pruefe('Brillant-Coach mit Verlaufsrahmen, Wort vollfarbig', await seite.evaluate(() => {
     const c = document.querySelector('.an-coach.brillant .an-c-klasse');
     const st = c && getComputedStyle(c);
     return !!st && st.color !== 'rgba(0, 0, 0, 0)' && !/text/.test(st.backgroundClip || st.webkitBackgroundClip || '');
@@ -516,7 +487,7 @@ async function testeVerlauf(browser, d) {
   pruefe('Statistik oben', stat.includes('Partien') && stat.includes('Siege') && stat.includes('Genauigkeit'), stat.replace(/\s+/g, ' '));
   const juwelen = await seite.locator('.vl-juwel').count();
   const brillant = await seite.evaluate(() => testseite.speicher.ladeFortschritt().brillanteZuege.length);
-  pruefe('Schatzkiste mit allen Genial-Zügen', juwelen === brillant, `${juwelen} vs ${brillant}`);
+  pruefe('Schatzkiste mit allen Brillant-Zügen', juwelen === brillant, `${juwelen} vs ${brillant}`);
   await bild(seite, 'verlauf-ipad-quer');
 
   // Antippen -> Analyse
@@ -536,7 +507,7 @@ async function testeVerlauf(browser, d) {
     await seite.locator('.vl-juwel').first().click();
     await seite.waitForSelector('.an-coach');
     g = (await protokoll(seite)).filter((x) => x.art === 'gehe').pop();
-    pruefe('Genial-Zug antippen: Analyse an diesem Zug', g.params.ply === ply && (await aktuellerPly(seite)) === ply
+    pruefe('Brillant-Zug antippen: Analyse an diesem Zug', g.params.ply === ply && (await aktuellerPly(seite)) === ply
       && (await seite.locator('.an-coach').getAttribute('data-klasse')) === 'brillant', JSON.stringify(g));
     await seite.click('.kopf [data-aktion="zurueck"]');
     await seite.waitForSelector('.vl-liste');
@@ -676,10 +647,6 @@ async function testeViewports(browser, d) {
       pruefe(`${name} ${screen}: kein waagrechter Überlauf`, u.doc <= 0 && u.scr <= 0 && !u.raus.length, JSON.stringify(u));
       const klein = await kleineKnoepfe(seite);
       pruefe(`${name} ${screen}: Tippflächen ≥ 44 px`, !klein.length, klein.slice(0, 4).join(', '));
-      const links = await kleineLinks(seite);
-      pruefe(`${name} ${screen}: Text-Links mit Tippfläche ≥ 44 px`, !links.length, links.slice(0, 4).join(', '));
-      const kurz = await gekuerzt(seite);
-      pruefe(`${name} ${screen}: keine abgeschnittenen Namen oder Titel`, !kurz.length, kurz.join(', '));
       if (screen === 'analyse') {
         const brett = await seite.locator('.an-brett').boundingBox();
         const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * 0.5;
@@ -722,7 +689,8 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  browser = await browserTyp(ladePlaywright()).launch();
+  const { chromium } = ladePlaywright();
+  browser = await chromium.launch();
   const d = await testeDaten(browser);
   await testeViewports(browser, d);
   await testeAnalyse(browser, d);

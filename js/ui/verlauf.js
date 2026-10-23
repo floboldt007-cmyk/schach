@@ -1,11 +1,9 @@
-// Screen "Verlauf": Statistik, Schatzkiste (alle eigenen geniale Züge) und die Liste aller
+// Screen "Verlauf": Statistik, Schatzkiste (alle eigenen Brillant-Zuege) und die Liste aller
 // gespeicherten Partien. Antippen oeffnet die Analyse, Loeschen per Wischen oder Knopf (mit Rueckfrage).
 //
 //   zeige(root, {}, app) -> { verlasse() }
 //
 // Klassen mit Praefix vl- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
-// Premium-Umbau U2: Kopf aus js/ui/seite.js (Titel "Verlauf", Unterzeile mit der Anzahl, Zurueck nur ohne Reiter Verlauf,
-// dazu Chips, Hell/Dunkel, Klang, Zahnrad); als Zwischenreiter (Flo D2) traegt der Kopf die Reiter-Pille.
 // Runde 4: Anzeige-Ort verlauf:seite (in .vl-seite zwischen Statistik und Schatzkiste); Partien, die
 // nicht werten (Uebung, eigene Stellung), zeigen statt der Sterne den Chip "Übung". Die Statistik zaehlt nur
 // wertende Partien; die Kopfzeile nennt deshalb die Uebungen extra ("12 Partien, davon 2 Übungen").
@@ -18,8 +16,6 @@ import { SYMBOLE } from '../symbole.js';
 import { eroeffnung } from '../openings.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet } from '../storage.js';
 import { fuelle } from '../orte.js';
-import { botFarbe } from '../thema.js';
-import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
 const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast' };
@@ -88,7 +84,7 @@ function eroeffnungsName(p) {
 
 function avatarHtml(bot, klein = false) {
   if (!bot) return `<span class="an-avatar${klein ? ' vl-klein' : ''}" aria-hidden="true"></span>`;
-  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(botFarbe(bot))}" aria-hidden="true"><img src="${esc(pfad(bot.avatar))}" alt=""></span>`;
+  return `<span class="an-avatar${klein ? ' vl-klein' : ''}" style="--bf:${esc(bot.farbe)}" aria-hidden="true"><img src="${esc(pfad(bot.avatar))}" alt=""></span>`;
 }
 
 export function zeige(root, params = {}, app) {
@@ -110,7 +106,10 @@ export function zeige(root, params = {}, app) {
     const partien = ladePartien();
     const n = partien.length;
     sec.innerHTML = `
-      ${hauptKopf({ titel: 'Verlauf', unter: anzahlText(partien), marke: false, zurueck: true })}
+      <header class="kopf">
+        <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
+        <div class="titel"><h2>Verlauf</h2><div class="unter">${anzahlText(partien)}</div></div>
+      </header>
       <div class="vl-inhalt">
         <aside class="vl-seite">
           ${statistikHtml()}
@@ -170,15 +169,15 @@ export function zeige(root, params = {}, app) {
         const nr = Math.floor((b.ply || 0) / 2) + 1;
         const zug = `${nr}${(b.ply || 0) % 2 ? '…' : '.'} ${sanDe(b.san)}!!`;
         return `<button class="vl-juwel" type="button" role="listitem" data-aktion="juwel" data-id="${esc(b.partieId)}" data-ply="${Number(b.ply) || 0}"
-          ${da ? '' : 'disabled'} aria-label="Genialer Zug ${esc(zug)} gegen ${esc(bot ? bot.name : 'Bot')}${da ? '' : ', Partie gelöscht'}">
+          ${da ? '' : 'disabled'} aria-label="Brillant ${esc(zug)} gegen ${esc(bot ? bot.name : 'Bot')}${da ? '' : ', Partie gelöscht'}">
           <span class="vl-juwel-symbol">${SYMBOLE.brillant}</span>
           <span class="vl-juwel-text"><b class="zahl">${esc(zug)}</b><span>${da ? `gegen ${esc(bot ? bot.name : 'Bot')} · ${esc(datumKurz(b.datum))}` : 'Partie gelöscht'}</span></span>
         </button>`;
       }).join('')}</div>`
-      : '<p class="vl-schatz-leer">Noch kein genialer Zug. Opfere eine Figur, wenn die Rechnung aufgeht, dann landet er hier.</p>';
+      : '<p class="vl-schatz-leer">Noch kein Brillant-Zug. Opfere eine Figur, wenn die Rechnung aufgeht, dann landet er hier.</p>';
     return `
       <section class="vl-schatz flaeche" aria-label="Schatzkiste">
-        <div class="vl-schatz-kopf">${icon('kiste')}<h3>Schatzkiste</h3><span class="chip zahl">${liste.length} ${liste.length === 1 ? 'genialer Zug' : 'Geniale Züge'}</span></div>
+        <div class="vl-schatz-kopf">${icon('kiste')}<h3>Schatzkiste</h3><span class="chip zahl">${liste.length} ${liste.length === 1 ? 'Brillant-Zug' : 'Brillant-Züge'}</span></div>
         ${inhalt}
       </section>`;
   }
@@ -222,7 +221,7 @@ export function zeige(root, params = {}, app) {
     const g = naechsterGegner();
     return `
       <div class="vl-leer flaeche">
-        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
+        ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(g.farbe)}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
         <h3>Noch keine Partien.</h3>
         <p>Fordere ${esc(g ? g.name : 'Bauer Benno')} heraus!</p>
         <button class="knopf primaer" type="button" data-aktion="arena">Zur Arena ${icon('pfeil')}</button>
@@ -237,7 +236,6 @@ export function zeige(root, params = {}, app) {
     if (zeile && zeile._gewischt) { zeile._gewischt = false; return; }
     switch (k.dataset.aktion) {
       case 'zurueck': app.zurueck(); break;
-      case 'einstellungen': app.gehe('einstellungen'); break;
       case 'arena': app.gehe('arena'); break;
       case 'oeffnen':
         if (offen) { schliesse(offen); return; }
@@ -356,9 +354,6 @@ export function zeige(root, params = {}, app) {
   }
 
   baue();
-  // Premium-Umbau U2: Klang-Schalter und Hell/Dunkel im Hauptseiten-Kopf (Delegation, ueberlebt baue())
-  const kopf = verbindeKopf(sec, app);
-  aufraeumen.push(() => kopf.verlasse());
 
   return {
     verlasse() {

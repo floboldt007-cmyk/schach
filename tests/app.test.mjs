@@ -18,14 +18,13 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8831);
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
+const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
 const NUR_PRUEFRUNDE = process.argv.includes('--pruefrunde');
 const NUR_ERWEITERUNGEN = process.argv.includes('--erweiterungen');
@@ -283,7 +282,7 @@ async function testePartie(seite, h, fehler) {
   pruefe('Abzeichen am Brett auf e4', await seite.locator('.screen.partie .brett > .abzeichen-ort[data-feld="e4"]').count() === 1);
   pruefe('Zielfeld in Klassenfarbe lasiert', await seite.locator(`.screen.partie .lage.mark-k-${k0}`).count() === 1);
   const coach0 = await seite.locator('.screen.partie .coach .c-klasse').innerText();
-  pruefe('Coach zeigt die Klasse', /Theorie/.test(coach0), coach0);
+  pruefe('Coach zeigt die Klasse', /Buchzug/.test(coach0), coach0);
   pruefe('Coach mit role=status und aria-live', (await seite.locator('.coach[role="status"][aria-live="polite"]').count()) === 1);
   pruefe('Zugliste: Symbol an Flos Zug', await seite.locator('.zugliste .z.du .z-sym').count() >= 1);
 
@@ -1314,16 +1313,11 @@ async function testeErweiterungen(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const anfragen = [];
     seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
-    // Premium-Umbau U2 (PLAN 2.10): training ist Kern-Screen (Training-Huelle); der Rueckfall gilt weiter fuer start
-    await seite.goto(BASIS + '#start');
-    await seite.waitForSelector('.screen.arena');
-    pruefe('#start ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
     await seite.goto(BASIS + '#training');
-    await seite.waitForSelector('.screen.training-screen');
-    pruefe('#training (Kern-Screen seit U2): Training-Huelle, kein Platzhalter', (await seite.evaluate(() => location.hash)) === '#training'
-      && await seite.locator('.screen.platzhalter').count() === 0);
+    await seite.waitForSelector('.screen.arena');
+    pruefe('#training ohne Paket-Screen: still zur Arena', (await seite.evaluate(() => location.hash)) === '#arena' && await seite.locator('.screen.platzhalter').count() === 0);
     await seite.evaluate(() => window.__app.gehe('start'));
-    await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Crownmate');
+    await seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Schach-Arena');
     pruefe('gehe("start") ohne Paket-Screen: Arena, kein Platzhalter', await seite.locator('.screen.arena').count() === 1 && await seite.locator('.screen.platzhalter').count() === 0);
     pruefe('Zurück nach dem Rückfall bleibt in der App', await seite.evaluate(() => history.state && history.state.schach === true && history.state.name === 'arena'));
     // 404 der fehlenden Paket-Screens gehoert zum Test
@@ -1867,8 +1861,8 @@ async function testeErweiterungenFix(browser) {
     await kontext.close();
   }
 
-  // Sternklang: ein registrierter Klang (Paket 1A) und seit dem Premium-Umbau (U3, PLAN 3.6) auch die Dateien stern,
-  // stern-2, stern-3 klingen auch bei reduzierter Bewegung (Klang ist keine Bewegung; die Ausnahme von Runde 4 entfaellt)
+  // Sternklang ohne registrierten Klang 'stern': bei reduzierter Bewegung still wie vor Runde 4, sonst zug();
+  // ein registrierter Klang (Paket 1A) klingt auch bei reduzierter Bewegung (Klang ist keine Bewegung)
   gruppe = 'Erweiterungen: Sternklang';
   for (const fall of [{ reduziert: false, register: false }, { reduziert: true, register: false }, { reduziert: true, register: true }]) {
     const kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true, userAgent: IPAD_UA,
@@ -1904,7 +1898,7 @@ async function testeErweiterungenFix(browser) {
     const name = `${fall.reduziert ? 'reduzierte Bewegung' : 'normal'}${fall.register ? ', registrierter Klang' : ''}`;
     const laeuft = st.sterne.length === 3 && st.sterne.every((x) => x.laeuft === 'bereit');
     if (!fall.reduziert) pruefe(`${name}: drei Sterne klingen (zug)`, laeuft && st.sterne.every((x) => x.toene > 0 && !x.reduziert), JSON.stringify(st));
-    else if (!fall.register) pruefe(`${name}: drei Sterne klingen trotzdem (PLAN 3.6)`, laeuft && st.sterne.every((x) => x.toene > 0 && x.reduziert), JSON.stringify(st));
+    else if (!fall.register) pruefe(`${name}: drei Sterne still wie vor Runde 4`, laeuft && st.sterne.every((x) => x.toene === 0 && x.reduziert), JSON.stringify(st));
     else pruefe(`${name}: der registrierte Klang spielt dreimal`, laeuft && st.register === 3, JSON.stringify(st));
     await kontext.close();
   }
@@ -2068,39 +2062,25 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,bestenliste,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
       return n && { hidden: n.hidden, reiter: [...n.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join(),
-        html: document.documentElement.dataset.reiter, imKopf: !!n.closest('.haupt-kopf'), oben: Math.round(n.getBoundingClientRect().top) };
+        html: document.documentElement.dataset.reiter, unten: Math.round(innerHeight - n.getBoundingClientRect().bottom) };
     });
-    // Premium-Umbau U2 (Flo D5): im Querformat ab 1021 px sitzt die Leiste oben in der Kopfzeile (vorher unten, html "an")
-    pruefe('Leiste (Testmodus ?reiter=training,bestenliste,ich): Arena, Training, Bestenliste, Ich, Arena aktiv, quer oben im Kopf', !!l1 && !l1.hidden
-      && l1.reiter === 'arena*,training,bestenliste,ich' && l1.html === 'oben' && l1.imKopf && l1.oben < 82, JSON.stringify(l1));
+    pruefe('Leiste (Testmodus ?reiter=training,ich): Arena, Training, Ich, Arena aktiv, unten', !!l1 && !l1.hidden && l1.reiter === 'arena*,training,ich' && l1.html === 'an' && l1.unten === 0, JSON.stringify(l1));
     await seite.locator('.reiter-leiste [data-reiter="ich"]').click();
     await seite.waitForSelector('.screen.ich-test');
     pruefe('Leiste: Reiter Ich öffnet den Ich-Screen und ist aktiv', (await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter)) === 'ich'
-      && (await seite.evaluate(() => document.title)) === 'Ich · Crownmate' && (await seite.evaluate(() => location.hash)) === '#ich');
-    await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
-    await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
-    pruefe('Leiste: Bestenliste ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
-      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
-    // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle), der Reiter oeffnet ihn
+      && (await seite.evaluate(() => document.title)) === 'Ich · Schach-Arena' && (await seite.evaluate(() => location.hash)) === '#ich');
     await seite.locator('.reiter-leiste [data-reiter="training"]').click();
-    await seite.waitForSelector('.screen.training-screen');
-    pruefe('Leiste: Reiter Training oeffnet die Training-Huelle und ist aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
-      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'training' && location.hash === '#training'));
-    // Premium-Umbau U2 (Flo D2): mit Ich gehoert der Verlauf zum Reiter Ich; versteckt ist die Leiste auf Screens ohne Reiter
-    // (Einstellungen), dort faehrt sie weg und ist danach hidden
+    await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
+    pruefe('Leiste: Training ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
     await seite.evaluate(() => window.__app.gehe('verlauf'));
     await seite.waitForSelector('.screen.vl-screen');
-    pruefe('Leiste: Verlauf gehoert zu Ich (Reiter Ich aktiv)', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
-      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'ich'));
-    await seite.evaluate(() => window.__app.gehe('einstellungen'));
-    await seite.waitForSelector('.screen.es-screen');
-    await seite.waitForFunction(() => document.querySelector('.reiter-leiste').hidden, null, { timeout: 2000 }).catch(() => {});
-    pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
+    pruefe('Leiste: auf Screens ohne Reiter (Verlauf) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste') || document.querySelector('.reiter-leiste').hidden));
@@ -2340,7 +2320,7 @@ async function testeSpielFundament(browser) {
     pruefe('Matt-Hook: ein Tipp vor dem Start des Finishers gilt auch (signal schon abgebrochen, Ergebnis ohne Warten)',
       r3.m.t > tippT && r3.m.schonAbgebrochen === true && r3.ende.abgebrochen === true && r3.overlayT - r3.m.t < 700, JSON.stringify({ ...r3, tippT }));
     pruefe('Matt-Hook: keine Konsolenfehler (drei Partien)', fehler.length === 0, fehler.join(' | '));
-    // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Stärkster Zug") kommt doch
+    // Anbieter, der null liefert (Finisher aus): kein Warten, der Klassen-Effekt des Mattzugs ("Bester Zug") kommt doch
     await seite.goto(MIT_W0PLUS('wpmattnull') + '#arena');
     await seite.waitForSelector('.screen.arena');
     await schaeferBisMatt(seite, h);
@@ -2489,8 +2469,6 @@ async function testeSpielFundament(browser) {
         const verdeckt = [];
         let geprueft = 0;
         for (const el of document.querySelectorAll('#app > .screen button, #app > .screen a[href], #app > .screen [role="button"]')) {
-          // Premium-Umbau U2: quer liegen die Reiter selbst im Kopf (#app); sie verdecken sich nicht selbst
-          if (el.closest('.reiter-leiste')) continue;
           el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
           const b = el.getBoundingClientRect();
           if (!b.width || !b.height || getComputedStyle(el).visibility === 'hidden') continue;
@@ -2505,18 +2483,13 @@ async function testeSpielFundament(browser) {
         sp.scrollIntoView({ block: 'nearest' });
         const sb = sp.getBoundingClientRect();
         const spTreffer = document.elementFromPoint(sb.left + sb.width / 2, sb.top + sb.height / 2);
-        return { lage: document.documentElement.dataset.reiter, leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt,
-          spielen: !!spTreffer && sp.contains(spTreffer) };
+        return { leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt, spielen: !!spTreffer && sp.contains(spTreffer) };
       });
-      // Premium-Umbau U2 (Flo D5): quer (1180) oben in der Kopfzeile, hoch und Handy unten; unten endet der Screen ueber ihr
-      const lageSoll = vp.name === 'quer' ? 'oben' : 'unten';
-      if (r.lage !== lageSoll || (r.lage === 'unten' && r.screenUnten > r.leisteOben) || r.verdeckt.length || r.geprueft < 5 || !r.spielen) {
-        falsch.push(`${vp.name} ${JSON.stringify(r)}`);
-      }
+      if (r.screenUnten > r.leisteOben || r.verdeckt.length || r.geprueft < 5 || !r.spielen) falsch.push(`${vp.name} ${JSON.stringify(r)}`);
       if (fehler.length) falsch.push(`${vp.name} Konsole: ${fehler.join(' | ')}`);
       await kontext.close();
     }
-    pruefe('Leiste (quer oben im Kopf, hoch und Handy unten): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
+    pruefe('Untere Leiste (quer, hoch, Handy): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
       falsch.length === 0, falsch.join(' || '));
   }
   // Schub 2b (Entscheidung 17.10.): Screen werkstatt (Paket werkstatt), gehoert zum Reiter Ich
@@ -2535,7 +2508,7 @@ async function testeSpielFundament(browser) {
       const aktiv = document.querySelector('.reiter-leiste [aria-current="page"]');
       return { titel: document.title, hash: location.hash, aktiv: aktiv ? aktiv.dataset.reiter : null, leiste: !document.querySelector('.reiter-leiste').hidden };
     });
-    pruefe('Screen werkstatt mit Datei (Paket werkstatt): wird gezeigt und gehört zum Reiter Ich', r.titel === 'Werkstatt · Crownmate' && r.hash === '#werkstatt'
+    pruefe('Screen werkstatt mit Datei (Paket werkstatt): wird gezeigt und gehört zum Reiter Ich', r.titel === 'Werkstatt · Schach-Arena' && r.hash === '#werkstatt'
       && r.aktiv === 'ich' && r.leiste, JSON.stringify(r));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/werkstatt\.js/.test(f));
     pruefe('Werkstatt: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
@@ -2888,14 +2861,14 @@ async function testeViewport(browser, vp) {
   await bild(seite, `partie-${vp.name}`);
   await h.botAnhalten(false);
 
-  // Genial-Moment
+  // Brillant-Moment
   await h.starte({ botId: 'benno', farbe: 'w', startFen: BRILLANT });
   await h.botAnhalten(true);
   await h.warteFlo();
   await h.zugTippen('d5f6');
   const kb = await h.warteAbzeichen(0);
   await warte(330);
-  pruefe('Genial erkannt (Sf6+!!)', kb === 'brillant', kb);
+  pruefe('Brillant erkannt (Sf6+!!)', kb === 'brillant', kb);
   pruefe('Prisma-Rahmen, Welle, Funken', await seite.locator('.screen.partie .brett-rahmen.prisma').count() === 1
     && await seite.locator('.screen.partie .effekt-ort .welle').count() === 1 && await seite.locator('.screen.partie .effekt-ort .funken i').count() === 12);
   const wort = await seite.evaluate(() => {
@@ -2903,7 +2876,7 @@ async function testeViewport(browser, vp) {
     const st = getComputedStyle(el);
     return { text: el.textContent, farbe: st.color, clip: st.webkitBackgroundClip || st.backgroundClip };
   });
-  pruefe('Klassenwort vollfarbig (keine Verlaufsschrift)', wort.text === 'Genial!' && wort.clip !== 'text' && wort.farbe !== 'rgba(0, 0, 0, 0)', JSON.stringify(wort));
+  pruefe('Klassenwort vollfarbig (keine Verlaufsschrift)', wort.text === 'Brillant!' && wort.clip !== 'text' && wort.farbe !== 'rgba(0, 0, 0, 0)', JSON.stringify(wort));
   await bild(seite, `brillant-${vp.name}`);
   await h.botAnhalten(false);
 
@@ -2947,7 +2920,8 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(BASIS);
-  browser = await browserTyp(ladePlaywright()).launch();
+  const { chromium } = ladePlaywright();
+  browser = await chromium.launch();
   const NUR = NUR_PRUEFRUNDE || NUR_ERWEITERUNGEN || NUR_NACHPRUEFUNG || NUR_SPIEL;
   if (!NUR) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });

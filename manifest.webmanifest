@@ -1,6 +1,6 @@
 {
-  "name": "Crownmate",
-  "short_name": "Crownmate",
+  "name": "Schach-Arena",
+  "short_name": "Schach",
   "description": "Schach gegen zehn Bots mit Live-Bewertung jedes Zugs und Spielanalyse.",
   "lang": "de",
   "dir": "ltr",
@@ -9,8 +9,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#F4F1EC",
-  "theme_color": "#F4F1EC",
+  "background_color": "#070914",
+  "theme_color": "#070914",
   "categories": ["games", "education"],
   "icons": [
     { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

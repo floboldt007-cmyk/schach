@@ -1,0 +1,470 @@
+{
+ "partien": 108,
+ "wiederholungen": 1000,
+ "maia": {
+  "600": {
+   "seiten": 24,
+   "genauigkeit": 72.8625,
+   "schaetzung": 1160.4166666666667,
+   "schaetzungMedian": 1050,
+   "abw": 560.4166666666666,
+   "abwMedian": 450,
+   "ergebnis": 0.7291666666666666,
+   "ki": {
+    "abw": [
+     333.3333333333333,
+     804.1666666666666
+    ],
+    "genauigkeit": [
+     65.95364583333334,
+     79.70020833333332
+    ]
+   },
+   "gegnerStufen": [
+    1,
+    2
+   ]
+  },
+  "800": {
+   "seiten": 12,
+   "genauigkeit": 76.39999999999999,
+   "schaetzung": 1187.5,
+   "schaetzungMedian": 1175,
+   "abw": 387.5,
+   "abwMedian": 375,
+   "ergebnis": 0.7083333333333334,
+   "ki": {
+    "abw": [
+     208.33333333333334,
+     558.3333333333334
+    ],
+    "genauigkeit": [
+     70.67625,
+     81.666875
+    ]
+   },
+   "gegnerStufen": [
+    3
+   ]
+  },
+  "1000": {
+   "seiten": 12,
+   "genauigkeit": 74.05,
+   "schaetzung": 1150,
+   "schaetzungMedian": 1200,
+   "abw": 150,
+   "abwMedian": 200,
+   "ergebnis": 0.5,
+   "ki": {
+    "abw": [
+     0,
+     270.8333333333333
+    ],
+    "genauigkeit": [
+     66.855625,
+     79.20895833333333
+    ]
+   },
+   "gegnerStufen": [
+    4
+   ]
+  },
+  "1200": {
+   "seiten": 12,
+   "genauigkeit": 84.85833333333333,
+   "schaetzung": 1675,
+   "schaetzungMedian": 1575,
+   "abw": 475,
+   "abwMedian": 375,
+   "ergebnis": 0.625,
+   "ki": {
+    "abw": [
+     233.33333333333334,
+     691.7708333333333
+    ],
+    "genauigkeit": [
+     78.38041666666668,
+     89.68375
+    ]
+   },
+   "gegnerStufen": [
+    5
+   ]
+  },
+  "1400": {
+   "seiten": 12,
+   "genauigkeit": 76.27499999999999,
+   "schaetzung": 1345.8333333333333,
+   "schaetzungMedian": 1375,
+   "abw": -54.166666666666664,
+   "abwMedian": -25,
+   "ergebnis": 0.20833333333333334,
+   "ki": {
+    "abw": [
+     -320.8333333333333,
+     170.93749999999991
+    ],
+    "genauigkeit": [
+     67.50750000000001,
+     83.24208333333333
+    ]
+   },
+   "gegnerStufen": [
+    6
+   ]
+  },
+  "1600": {
+   "seiten": 12,
+   "genauigkeit": 81.96666666666665,
+   "schaetzung": 1562.5,
+   "schaetzungMedian": 1550,
+   "abw": -37.5,
+   "abwMedian": -50,
+   "ergebnis": 0.2916666666666667,
+   "ki": {
+    "abw": [
+     -266.6666666666667,
+     212.5
+    ],
+    "genauigkeit": [
+     76.458125,
+     86.90083333333332
+    ]
+   },
+   "gegnerStufen": [
+    7
+   ]
+  },
+  "1800": {
+   "seiten": 12,
+   "genauigkeit": 79.35000000000001,
+   "schaetzung": 1458.3333333333333,
+   "schaetzungMedian": 1475,
+   "abw": -341.6666666666667,
+   "abwMedian": -325,
+   "ergebnis": 0.08333333333333333,
+   "ki": {
+    "abw": [
+     -504.27083333333326,
+     -183.22916666666677
+    ],
+    "genauigkeit": [
+     74.71604166666667,
+     83.53354166666668
+    ]
+   },
+   "gegnerStufen": [
+    8
+   ]
+  },
+  "2100": {
+   "seiten": 12,
+   "genauigkeit": 80.8,
+   "schaetzung": 1583.3333333333333,
+   "schaetzungMedian": 1725,
+   "abw": -516.6666666666666,
+   "abwMedian": -375,
+   "ergebnis": 0.16666666666666666,
+   "ki": {
+    "abw": [
+     -762.6041666666665,
+     -300
+    ],
+    "genauigkeit": [
+     73.07375,
+     86.98375000000001
+    ]
+   },
+   "gegnerStufen": [
+    9
+   ]
+  }
+ },
+ "paare": {
+  "maia-1-600": {
+   "stufe": 1,
+   "label": 250,
+   "maiaR": 600,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 75.70833333333334,
+    "schaetzung": 1250,
+    "schaetzungMedian": 1200,
+    "abw": 650,
+    "abwMedian": 600,
+    "ergebnis": 0.9166666666666666
+   },
+   "bot": {
+    "genauigkeit": 62.474999999999994,
+    "appBotTabelleMedian": 250,
+    "kennzahlen": {
+     "verlust": 6.597585227272727,
+     "patzer": 8.522727272727273
+    }
+   }
+  },
+  "maia-2-600": {
+   "stufe": 2,
+   "label": 500,
+   "maiaR": 600,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 70.01666666666665,
+    "schaetzung": 1070.8333333333333,
+    "schaetzungMedian": 925,
+    "abw": 470.8333333333333,
+    "abwMedian": 325,
+    "ergebnis": 0.5416666666666666
+   },
+   "bot": {
+    "genauigkeit": 71.50833333333333,
+    "appBotTabelleMedian": 400,
+    "kennzahlen": {
+     "verlust": 4.912615384615386,
+     "patzer": 5.961538461538462
+    }
+   }
+  },
+  "maia-3-800": {
+   "stufe": 3,
+   "label": 800,
+   "maiaR": 800,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 76.39999999999999,
+    "schaetzung": 1187.5,
+    "schaetzungMedian": 1175,
+    "abw": 387.5,
+    "abwMedian": 375,
+    "ergebnis": 0.7083333333333334
+   },
+   "bot": {
+    "genauigkeit": 67.41666666666667,
+    "appBotTabelleMedian": 700,
+    "kennzahlen": {
+     "verlust": 4.451088825214901,
+     "patzer": 4.011461318051576
+    }
+   }
+  },
+  "maia-4-1000": {
+   "stufe": 4,
+   "label": 1000,
+   "maiaR": 1000,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 74.05,
+    "schaetzung": 1150,
+    "schaetzungMedian": 1200,
+    "abw": 150,
+    "abwMedian": 200,
+    "ergebnis": 0.5
+   },
+   "bot": {
+    "genauigkeit": 70.29166666666666,
+    "appBotTabelleMedian": 675,
+    "kennzahlen": {
+     "verlust": 4.598720173535793,
+     "patzer": 4.772234273318872
+    }
+   }
+  },
+  "maia-5-1200": {
+   "stufe": 5,
+   "label": 1200,
+   "maiaR": 1200,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 84.85833333333333,
+    "schaetzung": 1675,
+    "schaetzungMedian": 1575,
+    "abw": 475,
+    "abwMedian": 375,
+    "ergebnis": 0.625
+   },
+   "bot": {
+    "genauigkeit": 78.45833333333334,
+    "appBotTabelleMedian": 1125,
+    "kennzahlen": {
+     "verlust": 3.393813559322033,
+     "patzer": 2.7542372881355934
+    }
+   }
+  },
+  "maia-6-1400": {
+   "stufe": 6,
+   "label": 1400,
+   "maiaR": 1400,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 76.27499999999999,
+    "schaetzung": 1345.8333333333333,
+    "schaetzungMedian": 1375,
+    "abw": -54.166666666666664,
+    "abwMedian": -25,
+    "ergebnis": 0.20833333333333334
+   },
+   "bot": {
+    "genauigkeit": 81.825,
+    "appBotTabelleMedian": 1375,
+    "kennzahlen": {
+     "verlust": 3.307612293144209,
+     "patzer": 2.600472813238771
+    }
+   }
+  },
+  "maia-7-1600": {
+   "stufe": 7,
+   "label": 1600,
+   "maiaR": 1600,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 81.96666666666665,
+    "schaetzung": 1562.5,
+    "schaetzungMedian": 1550,
+    "abw": -37.5,
+    "abwMedian": -50,
+    "ergebnis": 0.2916666666666667
+   },
+   "bot": {
+    "genauigkeit": 82.86666666666666,
+    "appBotTabelleMedian": 1600,
+    "kennzahlen": {
+     "verlust": 3.1701761252446197,
+     "patzer": 2.544031311154599
+    }
+   }
+  },
+  "maia-8-1800": {
+   "stufe": 8,
+   "label": 1800,
+   "maiaR": 1800,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 79.35000000000001,
+    "schaetzung": 1458.3333333333333,
+    "schaetzungMedian": 1475,
+    "abw": -341.6666666666667,
+    "abwMedian": -325,
+    "ergebnis": 0.08333333333333333
+   },
+   "bot": {
+    "genauigkeit": 87.95833333333333,
+    "appBotTabelleMedian": 1875,
+    "kennzahlen": {
+     "verlust": 2.5702747252747256,
+     "patzer": 2.4725274725274726
+    }
+   }
+  },
+  "maia-9-2100": {
+   "stufe": 9,
+   "label": 2100,
+   "maiaR": 2100,
+   "partien": 12,
+   "maia": {
+    "seiten": 12,
+    "genauigkeit": 80.8,
+    "schaetzung": 1583.3333333333333,
+    "schaetzungMedian": 1725,
+    "abw": -516.6666666666666,
+    "abwMedian": -375,
+    "ergebnis": 0.16666666666666666
+   },
+   "bot": {
+    "genauigkeit": 82.85833333333333,
+    "appBotTabelleMedian": 2050,
+    "kennzahlen": {
+     "verlust": 2.478752293577981,
+     "patzer": 1.4678899082568808
+    }
+   }
+  }
+ },
+ "selbst": {
+  "600": {
+   "seiten": 16,
+   "genauigkeit": 68.2625,
+   "schaetzung": 1028.125,
+   "schaetzungMedian": 900,
+   "abw": 428.125,
+   "abwMedian": 300,
+   "ergebnis": 0.5,
+   "ki": {
+    "abw": [
+     128.04687500000006,
+     740.7031249999999
+    ],
+    "genauigkeit": [
+     57.1609375,
+     79.0009375
+    ]
+   }
+  },
+  "1100": {
+   "seiten": 16,
+   "genauigkeit": 66.47499999999998,
+   "schaetzung": 1071.875,
+   "schaetzungMedian": 1125,
+   "abw": -28.125,
+   "abwMedian": 25,
+   "ergebnis": 0.5,
+   "ki": {
+    "abw": [
+     -218.75,
+     171.875
+    ],
+    "genauigkeit": [
+     53.638124999999995,
+     76.42640624999999
+    ]
+   }
+  },
+  "1500": {
+   "seiten": 16,
+   "genauigkeit": 71.10624999999999,
+   "schaetzung": 1296.875,
+   "schaetzungMedian": 1275,
+   "abw": -203.125,
+   "abwMedian": -225,
+   "ergebnis": 0.5,
+   "ki": {
+    "abw": [
+     -550.0781249999999,
+     150
+    ],
+    "genauigkeit": [
+     58.18734375,
+     82.77546875
+    ]
+   }
+  },
+  "1900": {
+   "seiten": 16,
+   "genauigkeit": 80.29999999999998,
+   "schaetzung": 1556.25,
+   "schaetzungMedian": 1625,
+   "abw": -343.75,
+   "abwMedian": -275,
+   "ergebnis": 0.5,
+   "ki": {
+    "abw": [
+     -621.9531249999999,
+     -74.84375000000014
+    ],
+    "genauigkeit": [
+     73.17421875,
+     86.63140624999998
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,792 @@
+diff --git a/js/bots.js b/js/bots.js
+index 0f77789..56b044e 100644
+--- a/js/bots.js
++++ b/js/bots.js
+@@ -1,10 +1,11 @@
+ // Bot-Leiter: zehn Gegner mit Charakter, Saetzen und einem Staerke-Modell.
+-// Zugwahl (Stufe 1 bis 9): Die Engine bewertet viele Zuege (MultiPV) in der Rechentiefe des
+-// Bots. Der Bot betrachtet nur einige Kandidaten: die besten n laut Engine ("Intuition") plus
+-// ein paar "naheliegende" Zuege (Schlagen, Schach, Entwicklung). Jeder Kandidat bekommt die
+-// Engine-Bewertung + Charakter-Bonus + Rauschen, der hoechste gewinnt. Dazu kommen
+-// Spontanzuege (Patzer) und manchmal zu flaches Rechnen (uebersehene Taktik).
+-// Stufe 10 spielt mit voller Staerke.
++// Zugwahl (Stufe 1 bis 9, geeicht Oktober 2026): Die Engine bewertet die Zuege (MultiPV) in der Rechentiefe
++// des Bots. Gewaehlt wird wie bei Menschen derselben Wertung (menschenWahl): unter den besten Zuegen der
++// eigenen Suche und den naheliegenden forcierenden Zuegen (Schlagen, Schach, bedrohte Figur wegziehen), mit
++// Wahrscheinlichkeiten aus einem an echten Lichess-Partien gefitteten Modell (Verlust an Gewinnchance plus
++// "wie naheliegend"). Fehler entstehen durch zu flaches Rechnen, Aussetzer (kurzTiefe) und geringe Sorgfalt,
++// nicht durch Zufallszuege. Stufe 10 spielt mit voller Staerke.
++// Profile ohne staerke.mensch (z. B. aeltere Gaeste) nutzen weiter das alte Modell (Rauschen, Spontanzuege).
+ //
+ // Saetze (Runde 4): botSatz(bot, anlass, zufall = Math.random, werte = null) -> Satz | null
+ // sucht zuerst bot.saetze[anlass], dann das Register; registriereSaetze(anlass, { [botId]: [Satz] })
+@@ -22,16 +23,17 @@
+ //     zaehlen nie zur Leiter (keine Sterne, keine Freischaltung). Falsches Profil: Fehler.
+ //   botNachId(id) findet auch angemeldete Bots; alleBots() -> [...BOTS, ...angemeldete].
+ //   staerkeFuerElo(elo) -> { staerke, botId, elo } | null   Staerke fuer eine offen angesagte Zahl (Boss-Stufe
+-//     "≈ deine Wertung"): vor der Eichung das Profil des Leiter-Bots mit der naechstliegenden Elo; die Eichung ersetzt
+-//     nur diese Funktion. elo ist die Staerke, mit der der Bot WIRKLICH spielt (die Elo dieses Profils, vor der Eichung
+-//     z. B. 1000 fuer die Anfrage 1080): Kopf, Bot-Zeile und Spielanalyse zeigen diese Zahl, nie die Anfrage
+-//     (Fairness 12, ehrliche Zahlen).
++//     "≈ deine Wertung"), geeicht (Oktober 2026): zwischen 500 und 2100 das Profil des naeheren Leiter-Bots mit
++//     verschobener sorgfalt, ausserhalb das Profil des Leiter-Bots mit der naechstliegenden Elo. elo ist die Staerke,
++//     mit der der Bot WIRKLICH spielt (geeicht: die Anfrage auf 50 gerundet, z. B. 1100 fuer 1080; ausserhalb die Elo
++//     des Leiter-Bots): Kopf, Bot-Zeile und Spielanalyse zeigen diese Zahl (Fairness 12, ehrliche Zahlen).
+ //   eloDerPartie(partie) -> Zahl | null   mit welcher Elo der Bot dieser Partie gespielt hat (Boss mit boss.staerke:
+ //     staerkeFuerElo(boss.staerke).elo, sonst die Elo des Bots); fuer Spielanalyse und Nachholen
+ //   botZug(..., { zufall, nodes, vorliebe }):
+ //     zufall    Zufallsquelle (Standard Math.random; pruefbare Partien: tag.js zufallAus(seed))
+ //     nodes     feste Knotenzahl statt Zeitlimit fuer jede Suche (gleicher Seed, gleiche Knoten, ein Thread:
+-//               derselbe Zug auf jedem Geraet; mit der Eichung abstimmen, geprueft in S3-0)
++//               derselbe Zug auf jedem Geraet). Die Rechentiefe bleibt die Obergrenze. Die Eichung setzt voraus,
++//               dass die Suche ihre Tiefe erreicht: zu wenige Knoten machen den Bot schwaecher (neu messen, S3-0).
+ //     vorliebe  Stil eines Bots: Funktion (zug, { fen, farbe, vollzug, punkte, bestePunkte }) -> Zahl oder
+ //               Gewichte { schlagen, schach, rochade, rochadeKurz, rochadeLang, bauer, springer, laeufer, turm,
+ //               dame, koenig, vorwaerts, tausch }. Gewaehlt wird nur unter Zuegen, die hoechstens
+@@ -42,6 +44,7 @@
+ //               je Zug schwaecher, also heimlich schwaecher). Den verbleibenden Effekt misst die Eichung (S3-0).
+ //               Der hoechste Wert ueber 0 gewinnt (bei Gleichstand der bessere Zug). Rueckgabe dann zusaetzlich
+ //               vorliebe: true.
++//               Bei der menschlichen Zugwahl (staerke.mensch) gilt dasselbe Fenster nach der Wahl.
+ //   Ohne diese drei Angaben spielt jeder Bot genau wie vorher.
+ import { Chess } from '../vendor/chess/chess.js';
+ 
+@@ -49,18 +52,14 @@ const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+ export const ANLAESSE = ['begruessung', 'schlagen', 'spielerFehler', 'spielerGut', 'schach', 'verliert', 'gewinnt', 'remis'];
+ 
+ // Staerke-Felder:
+-//  tiefe, kurzTiefe, kurzChance  Rechentiefe; manchmal nur flach gerechnet (Uebersehen)
+-//  breite      so viele Zuege bewertet die Engine (MultiPV)
+-//  intuition   die besten n Engine-Zuege sind immer Kandidaten
+-//  blick       zusaetzlich so viele naheliegende Zuege (gewichtet gezogen)
+-//  rauschen    Bewertungsrauschen in Centipawn (Standardabweichung)
+-//  patzer      Chance auf einen spontanen Zug ohne Nachdenken
++//  tiefe, kurzTiefe, kurzChance  Rechentiefe; manchmal nur flach gerechnet (Aussetzer, uebersehene Taktik)
++//  breite      so viele Zuege bewertet die Engine (MultiPV; 256 = alle)
++//  mensch      menschliche Zugwahl: { elo, sorgfalt, biss, kandidaten, phasen, eloJeLn } (siehe menschenWahl)
+ //  mattInEins  Chance, ein Matt in 1 zu sehen (ab Stufe 4 immer)
+-//  gier        Chance, bei einem Spontanzug trotzdem freies Material zu nehmen
+-//  vorlieben   Charakter-Boni in Centipawn
+-//  endspiel    { rauschenFaktor, tiefePlus } fuer Endspiel-Spezialisten
++//  vorlieben   Charakter-Boni in Centipawn (bei mensch: nur unter Zuegen, die hoechstens STIL_FENSTER_PP kosten)
+ //  zeit        [min, max] menschliche Denkzeit in ms; maxZeit = Deckel fuer die Engine
+ //  voll        Engine-Zug direkt (movetime; optional elo/skill fuer Stockfishs eigene Bremse)
++//  Altes Modell (ohne mensch): intuition, blick, rauschen, patzer, gier, endspiel { rauschenFaktor, tiefePlus }
+ export const BOTS = [
+   {
+     id: 'benno', stufe: 1, name: 'Bauer Benno', elo: 250, titel: 'Der Gutmütige',
+@@ -68,8 +67,9 @@ export const BOTS = [
+     kurz: 'Kennt die Zugregeln, meistens. Freut sich über jede Figur.',
+     bio: 'Benno hat Schach im Winter gelernt, als auf dem Hof nichts zu tun war. Er zieht, was gerade in der Nähe steht, und schnappt sich jede Figur, die er erwischen kann. Ob sie gedeckt war, merkt er meistens erst hinterher.',
+     staerke: {
+-      tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 0, blick: 3,
+-      rauschen: 350, patzer: 0.5, mattInEins: 0.35, gier: 0.5,
++      tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 256, mattInEins: 0.35,
++      mensch: { elo: 250, sorgfalt: 0.109, biss: 0.25, kandidaten: 0,
++        phasen: { eroeffnung: 1.452, mittelspiel: 1, endspiel: 5.366 } },
+       vorlieben: { schlagen: 90 }, zeit: [400, 900],
+     },
+     saetze: {
+@@ -128,8 +128,9 @@ export const BOTS = [
+     kurz: 'Gemütlich, nimmt alles, was ungedeckt steht.',
+     bio: 'Hilde spielt seit über fünfzig Jahren, am liebsten mit Tee und Keksen. Sie hat keinen Plan und braucht auch keinen: Was ungedeckt herumsteht, räumt sie freundlich ab. Ihre eigenen Figuren vergisst sie dabei gern mal.',
+     staerke: {
+-      tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3,
+-      rauschen: 270, patzer: 0.38, mattInEins: 0.6, gier: 0.95,
++      tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 256, mattInEins: 0.6,
++      mensch: { elo: 500, sorgfalt: 0.0145, biss: 1, kandidaten: 8, eloJeLn: 466,
++        phasen: { eroeffnung: 1.243, mittelspiel: 1, endspiel: 2.172 } },
+       vorlieben: { schlagen: 60 }, zeit: [500, 1100],
+     },
+     saetze: {
+@@ -189,8 +190,9 @@ export const BOTS = [
+     kurz: 'Greift sofort an, übersieht dabei viel.',
+     bio: 'Kalle ist der Schachkönig seiner Stammkneipe, behauptet er jedenfalls. Er kennt nur eine Richtung: nach vorne. Schach geben findet er großartig, auf seine eigene Deckung achtet er dagegen eher selten.',
+     staerke: {
+-      tiefe: 2, kurzTiefe: 1, kurzChance: 0.45, breite: 60, intuition: 1, blick: 4,
+-      rauschen: 190, patzer: 0.22, mattInEins: 0.85, gier: 0.6,
++      tiefe: 2, kurzTiefe: 1, kurzChance: 0.3, breite: 256, mattInEins: 0.85,
++      mensch: { elo: 800, sorgfalt: 0.0165, biss: 1, kandidaten: 8, eloJeLn: 430,
++        phasen: { eroeffnung: 1.196, mittelspiel: 1, endspiel: 1.46 } },
+       vorlieben: { schach: 80, vorwaerts: 30, dame: 20, schlagen: 25 }, zeit: [400, 1000],
+     },
+     saetze: {
+@@ -250,8 +252,9 @@ export const BOTS = [
+     kurz: 'Schnelle Schülerin, liebt ihre Läufer.',
+     bio: 'Lisa ist in der Schach-AG ihrer Schule und läuft nebenbei im Verein. Sie zieht flott, sieht kurze Taktiken sofort und hat eine Schwäche für lange Diagonalen. Ein Matt in eins lässt sie sich nie entgehen.',
+     staerke: {
+-      tiefe: 2, kurzTiefe: 1, kurzChance: 0.4, breite: 60, intuition: 2, blick: 4,
+-      rauschen: 160, patzer: 0.15, mattInEins: 1, gier: 0.9,
++      tiefe: 3, kurzTiefe: 1, kurzChance: 0.25, breite: 256, mattInEins: 1,
++      mensch: { elo: 1000, sorgfalt: 0.1515, biss: 0.6, kandidaten: 5, eloJeLn: 702,
++        phasen: { eroeffnung: 1.182, mittelspiel: 1, endspiel: 1.256 } },
+       vorlieben: { laeufer: 60 }, zeit: [400, 1000],
+     },
+     saetze: {
+@@ -310,8 +313,9 @@ export const BOTS = [
+     kurz: 'Springer-Fan, sucht Gabeln.',
+     bio: 'Rudi trägt seine Rüstung auch beim Frühstück. Seine Springer sind ihm heilig, und nichts macht ihn glücklicher als eine Gabel auf König und Dame. Er rechnet schon ein paar Züge voraus, verliert aber manchmal den Überblick.',
+     staerke: {
+-      tiefe: 3, kurzTiefe: 1, kurzChance: 0.35, breite: 60, intuition: 2, blick: 4,
+-      rauschen: 120, patzer: 0.09, mattInEins: 1, gier: 0.95,
++      tiefe: 4, kurzTiefe: 2, kurzChance: 0.25, breite: 256, mattInEins: 1,
++      mensch: { elo: 1200, sorgfalt: 0.4574, biss: 0.4, kandidaten: 5, eloJeLn: 781,
++        phasen: { eroeffnung: 1.174, mittelspiel: 1, endspiel: 1.129 } },
+       vorlieben: { springer: 55, gabel: 80 }, zeit: [600, 1300],
+     },
+     saetze: {
+@@ -370,8 +374,9 @@ export const BOTS = [
+     kurz: 'Solide, positionell, geduldig.',
+     bio: 'Der Professor lehrt seit Jahrzehnten Positionsspiel und hat noch nie einen Zug überstürzt. Er rochiert früh, stellt seine Türme auf offene Linien und wartet geduldig, bis du einen Fehler machst.',
+     staerke: {
+-      tiefe: 4, kurzTiefe: 1, kurzChance: 0.33, breite: 40, intuition: 2, blick: 3,
+-      rauschen: 100, patzer: 0.065, mattInEins: 1, gier: 1,
++      tiefe: 5, kurzTiefe: 2, kurzChance: 0.1, breite: 256, mattInEins: 1,
++      mensch: { elo: 1400, sorgfalt: 1.3065, biss: 0.25, kandidaten: 5, eloJeLn: 868,
++        phasen: { eroeffnung: 1.168, mittelspiel: 1, endspiel: 1.041 } },
+       vorlieben: { rochade: 50, turm: 15, ruhig: 10 }, zeit: [800, 1500],
+     },
+     saetze: {
+@@ -430,8 +435,9 @@ export const BOTS = [
+     kurz: 'Angriffslustig, opfert gern.',
+     bio: 'Delia spielt Schach wie eine Opernaufführung: laut, leidenschaftlich und mit großem Finale. Sie gibt gern Schach und opfert auch mal eine Figur, wenn der Angriff dafür rollt. Langweilige Remis-Partien sind ihr ein Graus.',
+     staerke: {
+-      tiefe: 5, kurzTiefe: 2, kurzChance: 0.3, breite: 30, intuition: 3, blick: 3,
+-      rauschen: 80, patzer: 0.04, mattInEins: 1, gier: 1,
++      tiefe: 6, kurzTiefe: 3, kurzChance: 0.1, breite: 20, mattInEins: 1,
++      mensch: { elo: 1600, sorgfalt: 0.7312, biss: 0.25, kandidaten: 3, eloJeLn: 389,
++        phasen: { eroeffnung: 1.164, mittelspiel: 1, endspiel: 0.977 } },
+       vorlieben: { schach: 45, opfer: 40 }, zeit: [700, 1400],
+     },
+     saetze: {
+@@ -491,9 +497,9 @@ export const BOTS = [
+     kurz: 'Endspiel-Spezialist, gibt nie auf.',
+     bio: 'Kommissar König hat schon jeden Fall gelöst, meistens im Endspiel. Er tauscht gern ab, sammelt Indizien in Form von kleinen Vorteilen und spielt jede Stellung bis zum letzten Bauern aus. Aufgeben steht nicht in seiner Dienstvorschrift.',
+     staerke: {
+-      tiefe: 6, kurzTiefe: 2, kurzChance: 0.25, breite: 20, intuition: 3, blick: 2,
+-      rauschen: 65, patzer: 0.025, mattInEins: 1, gier: 1,
+-      endspiel: { rauschenFaktor: 0.5, tiefePlus: 3 },
++      tiefe: 7, kurzTiefe: 3, kurzChance: 0.08, breite: 16, mattInEins: 1,
++      mensch: { elo: 1800, sorgfalt: 0.4789, biss: 0.4, kandidaten: 3, eloJeLn: 434,
++        phasen: { eroeffnung: 1.161, mittelspiel: 1, endspiel: 0.928 } },
+       vorlieben: { koenigEndspiel: 15 }, zeit: [800, 1500],
+     },
+     saetze: {
+@@ -552,8 +558,9 @@ export const BOTS = [
+     kurz: 'Kaum Fehler, bestraft jeden.',
+     bio: 'Greta redet nicht viel, sie rechnet. Sie macht kaum Fehler und findet jede Lücke, die du ihr lässt. Wer sie schlagen will, muss eine ganze Partie lang konzentriert bleiben.',
+     staerke: {
+-      tiefe: 7, kurzTiefe: 3, kurzChance: 0.15, breite: 12, intuition: 3, blick: 2,
+-      rauschen: 45, patzer: 0.01, mattInEins: 1, gier: 1,
++      tiefe: 8, kurzTiefe: 4, kurzChance: 0.05, breite: 12, mattInEins: 1,
++      mensch: { elo: 2100, sorgfalt: 0.0718, biss: 1, kandidaten: 3, eloJeLn: 315,
++        phasen: { eroeffnung: 1.157, mittelspiel: 1, endspiel: 0.874 } },
+       vorlieben: {}, zeit: [800, 1500], maxZeit: 2500,
+     },
+     saetze: {
+@@ -727,19 +734,39 @@ export function registriereBot(profil) {
+   };
+ }
+ 
+-export function botNachStufe(stufe) {
+-  return BOTS.find((b) => b.stufe === stufe) || null;
+-}
+-
+-// W0+a: Staerke fuer eine offen angesagte Zahl (z. B. ein Wochen-Boss "spielt mit ungefaehr deiner Wertung",
+-// SPIELKONZEPT 3.8). Bis die Eichung geeichte Profile liefert: das Staerke-Profil des Leiter-Bots mit der
+-// naechstliegenden Elo (bei Gleichstand der schwaechere). Die Eichung ersetzt nur diese Funktion.
+-// -> { staerke (tiefe Kopie), botId (woher), elo (mit dieser Elo spielt der Bot wirklich) } oder null
++// Staerke fuer eine beliebige Arena-Elo (z. B. ein Boss "etwa deine Wertung"), geeicht: das Profil des naeheren
++// Leiter-Bots (Stufe 2 bis 9, mit Charakter-Vorlieben und Natur-Gewichten wie geeicht), nur sorgfalt entlang seiner
++// lokalen Eichkurve verschoben (mensch.eloJeLn: so viele Elo bringt ein Faktor e auf sorgfalt, gemessen mit
++// skripte/gitter.mjs fuer die Faktoren 0,7 bis 1,4). Ohne Vorlieben oder mit Natur-Gewichten der Ziel-Elo spielte
++// der Bot messbar schwaecher (bei 900 etwa 330 Punkte), deshalb bleibt das Profil sonst unveraendert.
++// Ausserhalb 500 bis 2100 (und genau auf einer Leiter-Elo): das Profil des Leiter-Bots mit der naechstliegenden Elo
++// (bei Gleichstand der schwaechere), elo = dessen Elo. Rueckgabe { staerke, botId, elo } oder null. elo ist die
++// Staerke, mit der der Bot spielt: innerhalb die Anfrage auf 50 gerundet (die Eichung ist auf etwa 100 genau).
+ export function staerkeFuerElo(elo) {
+   if (!Number.isFinite(elo)) return null;
+-  let bester = BOTS[0];
+-  for (const b of BOTS) if (Math.abs(b.elo - elo) < Math.abs(bester.elo - elo)) bester = b;
+-  return { staerke: JSON.parse(JSON.stringify(bester.staerke)), botId: bester.id, elo: bester.elo };
++  const leiter = BOTS.filter((b) => b.stufe >= 2 && b.staerke && b.staerke.mensch);
++  const kopie = (b) => ({ staerke: JSON.parse(JSON.stringify(b.staerke)), botId: b.id, elo: b.elo });
++  if (elo < leiter[0].elo || elo > leiter[leiter.length - 1].elo) {
++    // ausserhalb der geeichten Spanne: Leiter-Bot mit der naechstliegenden Elo (bei Gleichstand der schwaechere)
++    let bester = BOTS[0];
++    for (const x of BOTS) if (Math.abs(x.elo - elo) < Math.abs(bester.elo - elo)) bester = x;
++    return kopie(bester);
++  }
++  let i = 0;
++  while (i < leiter.length - 2 && leiter[i + 1].elo <= elo) i++;
++  const a = leiter[i];
++  const b = leiter[i + 1];
++  const t = (elo - a.elo) / (b.elo - a.elo);
++  if (t <= 0 || t >= 1) return kopie(t <= 0 ? a : b);
++  const nah = t <= 0.5 ? a : b;
++  const m = nah.staerke.mensch;
++  const staerke = JSON.parse(JSON.stringify(nah.staerke));
++  staerke.mensch.sorgfalt = m.sorgfalt * Math.exp((elo - nah.elo) / m.eloJeLn);
++  return { staerke, botId: nah.id, elo: Math.round(elo / 50) * 50 };
++}
++
++export function botNachStufe(stufe) {
++  return BOTS.find((b) => b.stufe === stufe) || null;
+ }
+ 
+ // w0plus-a-fix: Elo, mit der der Bot einer gespeicherten Partie gespielt hat (Spielanalyse, Nachholen). Ein Boss mit
+@@ -855,6 +882,7 @@ async function suche(engine, fen, opts, signal) {
+ }
+ 
+ // Zug des Bots. Wartet selbst eine menschliche Denkzeit ab (ausser ohnePause).
++// vorigerZug (optional, UCI des letzten Gegnerzugs): fuer das Zurueckschlagen in der menschlichen Zugwahl.
+ // Rueckgabe { uci, san, denkzeitMs, art } oder null (keine legalen Zuege / abgebrochen).
+ // art: 'erzwungen' | 'matt' | 'engine' | 'patzer' | 'kurz' | 'normal'
+ // So viel schlechter als der beste Zug darf ein Zug der Vorliebe hoechstens sein (0,3 Bauern)
+@@ -864,7 +892,7 @@ export const VORLIEBE_FENSTER_CP = 30;
+ export const VORLIEBE_NAEHE_CP = 10;
+ 
+ export async function botZug(engine, fen, bot, {
+-  zugNummer, ohnePause = false, zufall = Math.random, signal = null, nodes = null, vorliebe = null,
++  zugNummer, ohnePause = false, zufall = Math.random, signal = null, nodes = null, vorliebe = null, vorigerZug = null,
+ } = {}) {
+   const start = jetzt();
+   const knoten = Number.isInteger(nodes) && nodes > 0 ? nodes : null;
+@@ -902,7 +930,23 @@ export async function botZug(engine, fen, bot, {
+   } else {
+     // Matt in 1 nicht gesehen: dann auch nicht "zufaellig" ueber die Bewertung finden
+     const verboten = new Set(siehtMatt ? [] : mattZuege.map((z) => z.lan));
+-    if (zufall() < (s.patzer || 0)) {
++    if (s.mensch) {
++      // Menschliche Zugwahl (siehe menschenWahl): eine Suche, dann Wahl nach Verlust und Natuerlichkeit.
++      // Aussetzer: manchmal nur mit kurzTiefe gerechnet (uebersehene Taktik).
++      const kurz = zufall() < (s.kurzChance || 0);
++      const a = await suche(engine, fen, {
++        depth: Math.max(1, (kurz ? s.kurzTiefe : s.tiefe) || 1),
++        multipv: Math.min(s.breite || zuege.length, zuege.length),
++        ...(knoten ? { nodes: knoten } : { movetime: s.maxZeit || 4000 }),
++      }, signal);
++      if (signal && signal.aborted) return null;
++      zug = menschenWahl(chess, zuege, a, bot, { farbe, vollzug, zufall, verboten, fen, vorigerZug });
++      art = kurz ? 'kurz' : 'normal';
++      if (stil && zug) {
++        const v = waehleMitVorliebe(zuege, a, zug, stil, { farbe, vollzug, fen, verboten });
++        if (v !== zug) { zug = v; mitVorliebe = true; }
++      }
++    } else if (zufall() < (s.patzer || 0)) {
+       // Spontanzug; frei herumstehendes Material wird je nach Gier trotzdem mitgenommen
+       const beute = freieBeute(chess, zuege, verboten);
+       zug = beute && zufall() < (s.gier || 0) ? beute : menschlicherZug(chess, zuege, bot, vollzug, zufall, verboten);
+@@ -1012,6 +1056,263 @@ function waehleMitVorliebe(zuege, analyse, gewaehlt, vorliebe, ctx) {
+   return siegerWert > 0 ? sieger : gewaehlt;
+ }
+ 
++// ---------- Menschliche Zugwahl (Eichung Oktober 2026) ----------
++// Ein Bot mit staerke.mensch waehlt so, wie Menschen seiner Wertung waehlen, statt mit Rauschen und
++// Spontanzuegen. Jeder legale Zug bekommt einen Reiz
++//   u = -sorgfalt * phasenFaktor * ((verlust + 1)^biss - 1) + natur(zug, elo) + stil
++// verlust  Verlust an Gewinnchance in Prozentpunkten laut der eigenen Suche des Bots (0 = bester Zug;
++//          Lichess-Formel wie in review.js). Zuege ausserhalb der MultiPV-Liste sind keine Kandidaten.
++// natur    wie naheliegend der Zug fuer Menschen dieser Wertung ist (Schlagen, Schach, Entwicklung,
++//          bedrohte Figur wegziehen, ...). Gewichte NATUR: bedingtes Logit-Modell, gefittet an echten
++//          Zuegen aus Lichess-Schnellschach-Partien (CC0, Januar 2024, Baender 400 bis 2400).
++// stil     Vorlieben des Charakters (vorlieben in Centipawn / STIL_TEILER), nur fuer Zuege, die hoechstens
++//          STIL_FENSTER_PP Prozentpunkte kosten: der Charakter faerbt die Wahl, macht den Bot aber nicht
++//          schwaecher.
++// Gezogen wird mit Wahrscheinlichkeit proportional zu exp(u) (Gumbel-Trick mit der Zufallsquelle des Bots).
++// Fehler entstehen wie bei Menschen: naheliegende Zuege, deren Folgen der Bot nicht erfasst (zu flache
++// Suche, Aussetzer mit kurzTiefe, geringe Sorgfalt); keine ziellosen Zufallszuege.
++// staerke.mensch = { elo (Wertung fuer die Natur-Gewichte), sorgfalt, biss (0..1, kleiner = mehr grobe
++//                    Patzer im Verhaeltnis), phasen: { eroeffnung, mittelspiel, endspiel } (Faktor auf sorgfalt),
++//                    kandidaten (so viele beste Zuege der eigenen Suche plus forcierende Zuege; sonst alle),
++//                    eloJeLn (Elo je Faktor e auf sorgfalt, lokale Steigung der Eichung; fuer staerkeFuerElo) }
++
++const K_LICHESS = 0.00368208;
++const UNGELISTET_PP = 5;
++export const STIL_FENSTER_PP = 3;
++// Vorlieben in Centipawn / STIL_TEILER = Zuschlag auf den Reiz (60 cp: Faktor 3,3 unter gleichwertigen Zuegen)
++export const STIL_TEILER = 50;
++
++// Merkmale "wie naheliegend" (Reihenfolge = Gewichte in NATUR)
++export const NATUR_MERKMALE = ['schlag', 'schlagWert', 'schach', 'flucht', 'entwicklung', 'rochade', 'zentrumBauer',
++  'koenig', 'dameFrueh', 'randBauer', 'rueckzug', 'bauernAngriff', 'haengt', 'haengtWert', 'gewinnSchlag', 'umwandlung',
++  'endspielBauer', 'vorwaerts', 'droht', 'rueckSchlag', 'zentrum', 'doppelschritt'];
++
++// Gewichte je Merkmal bei Wertung 1500 (basis) und Aenderung je 1000 Wertungspunkte (steigung).
++// Aus skripte/fit_zugwahl.py (Eichung), nicht von Hand.
++export const NATUR = {
++  basis: Object.freeze({
++    schlag: 1.170, schlagWert: -0.597, schach: 0.944, flucht: 0.694, entwicklung: 0.839, rochade: 1.914,
++    zentrumBauer: 0.724, koenig: -0.617, dameFrueh: -0.298, randBauer: -0.142, rueckzug: -0.267,
++    bauernAngriff: -0.582, haengt: -1.269, haengtWert: -0.354, gewinnSchlag: 1.501, umwandlung: 3.941,
++    endspielBauer: 0.168, vorwaerts: 0.286, droht: 0.296, rueckSchlag: 1.104, zentrum: 0.135,
++    doppelschritt: -0.196,
++  }),
++  steigung: Object.freeze({
++    schlag: -0.491, schlagWert: 0.265, schach: -0.155, flucht: -0.250, entwicklung: -0.026, rochade: -0.081,
++    zentrumBauer: -0.343, koenig: -0.266, dameFrueh: -0.149, randBauer: 0.237, rueckzug: -0.188,
++    bauernAngriff: 0.750, haengt: 0.581, haengtWert: -0.361, gewinnSchlag: 0.841, umwandlung: 3.737,
++    endspielBauer: -0.114, vorwaerts: -0.162, droht: -0.029, rueckSchlag: -0.161, zentrum: 0.141,
++    doppelschritt: -0.015,
++  }),
++};
++
++// Wertungsbereich der Daten (Bandmittel 543 bis 2473): ausserhalb nicht weiter extrapolieren
++export const NATUR_BEREICH = [550, 2470];
++const naturCache = new Map();
++function naturGewichte(elo) {
++  const e = Number.isFinite(elo) ? Math.round(elo) : 1500;
++  if (!naturCache.has(e)) {
++    const z = (Math.max(NATUR_BEREICH[0], Math.min(NATUR_BEREICH[1], e)) - 1500) / 1000;
++    naturCache.set(e, NATUR_MERKMALE.map((k) => (NATUR.basis[k] || 0) + (NATUR.steigung[k] || 0) * z));
++  }
++  return naturCache.get(e);
++}
++
++// Spielphase einer Stellung wie spielphasen() in review.js (ohne Buch): Endspiel ab hoechstens 6 Leicht- und
++// Schwerfiguren, Eroeffnung solange mehr als 10 Figuren, beide Grundreihen fast voll und vor Halbzug 30.
++export function phaseVon(fen) {
++  const teile = String(fen).split(' ');
++  const reihen = teile[0].split('/');
++  const figuren = (teile[0].match(/[nbrqNBRQ]/g) || []).length;
++  if (figuren <= 6) return 'endspiel';
++  const ply = 2 * ((Number(teile[5]) || 1) - 1) + (teile[1] === 'b' ? 1 : 0);
++  const weissHinten = (reihen[7].match(/[A-Z]/g) || []).length;
++  const schwarzHinten = (reihen[0].match(/[a-z]/g) || []).length;
++  if (figuren > 10 && weissHinten >= 4 && schwarzHinten >= 4 && ply < 30) return 'eroeffnung';
++  return 'mittelspiel';
++}
++
++// Gewinnchance (0..1) aus Sicht von farbe, Lichess-Formel (wie gewinnChance in review.js)
++function gewinn(ev, farbe) {
++  let p = 0.5;
++  if (ev && ev.mate != null) p = ev.mate > 0 ? 1 : ev.mate < 0 ? 0 : 0.5;
++  else if (ev && Number.isFinite(ev.cp)) p = 1 / (1 + Math.exp(-K_LICHESS * ev.cp));
++  return farbe === 'b' ? 1 - p : p;
++}
++
++// Merkmale eines Zugs (Zahlen, Reihenfolge NATUR_MERKMALE). chess = Stellung VOR dem Zug (wird nur
++// kurz veraendert und wiederhergestellt). ctx: { farbe, vollzug, phase, vorigerZug (UCI des Gegners, optional) }
++export function naturMerkmale(chess, z, ctx) {
++  const eigen = z.color;
++  const gegner = eigen === 'w' ? 'b' : 'w';
++  const rochade = z.flags.includes('k') || z.flags.includes('q');
++  const grund = eigen === 'w' ? '1' : '8';
++  const vor = (a, b) => (eigen === 'w' ? b > a : b < a);
++  const vonReihe = Number(z.from[1]);
++  const nachReihe = Number(z.to[1]);
++  const figur = z.piece;
++  const leicht = figur === 'n' || figur === 'b';
++  const schwer = figur === 'r' || figur === 'q';
++  let flucht = 0;
++  if (!rochade && figur !== 'p' && figur !== 'k' && chess.isAttacked(z.from, gegner)) flucht = 1;
++  // Zielfeld nach dem Zug: von Bauern angegriffen? haengt die Figur (angegriffen und ungedeckt oder von
++  // einer billigeren Figur angegriffen)?
++  let bauernAngriff = 0;
++  let haengt = 0;
++  let haengtWert = 0;
++  let gewinnSchlag = 0;
++  let droht = 0;
++  if (!rochade) {
++    chess.move({ from: z.from, to: z.to, promotion: z.promotion });
++    // Droht der Zug etwas? Die gezogene Figur greift eine gegnerische Figur an, die ungedeckt oder
++    // wertvoller ist (Menschen lieben Angriffszuege, gerade schwache Spieler)
++    if (figur !== 'k') {
++      const eigenWert = WERT[z.promotion || figur];
++      for (const reihe of chess.board()) {
++        for (const f of reihe) {
++          if (!f || f.color !== gegner || f.type === 'k' || f.type === 'p') continue;
++          if (WERT[f.type] <= droht * 3) continue;
++          if (!chess.attackers(f.square, eigen).includes(z.to)) continue;
++          if (WERT[f.type] > eigenWert || !chess.isAttacked(f.square, gegner)) droht = WERT[f.type] / 3;
++        }
++      }
++    }
++    const angreifer = figur === 'k' ? [] : chess.attackers(z.to, gegner);
++    const wert = WERT[z.promotion || figur];
++    // Schlagen, das Material gewinnt: Figur ungedeckt oder wertvoller als die schlagende (Menschen sehen das)
++    if (z.captured && (!angreifer.length || WERT[z.captured] > wert)) gewinnSchlag = WERT[z.captured] / 3;
++    // Schlagen gleich- oder hoeherwertiger Figuren ist ein Tausch, kein Haengenlassen
++    if (angreifer.length && !(z.captured && WERT[z.captured] >= wert)) {
++      const typen = angreifer.map((f) => (chess.get(f) || {}).type);
++      if (figur !== 'p' && typen.includes('p')) bauernAngriff = 1;
++      const billiger = typen.some((t) => t && t !== 'k' && WERT[t] < wert);
++      if (billiger || !chess.isAttacked(z.to, eigen)) {
++        haengt = 1;
++        haengtWert = wert / 3;
++      }
++    }
++    chess.undo();
++  }
++  const endspiel = ctx.phase === 'endspiel';
++  return [
++    z.captured ? 1 : 0,
++    z.captured ? WERT[z.captured] / 3 : 0,
++    /[+#]/.test(z.san) ? 1 : 0,
++    flucht,
++    leicht && z.from[1] === grund && ctx.vollzug <= 15 ? 1 : 0,
++    rochade ? 1 : 0,
++    figur === 'p' && (z.from[0] === 'd' || z.from[0] === 'e') && ctx.vollzug <= 10 ? 1 : 0,
++    figur === 'k' && !rochade && !endspiel ? 1 : 0,
++    figur === 'q' && ctx.vollzug <= 10 ? 1 : 0,
++    figur === 'p' && (z.from[0] === 'a' || z.from[0] === 'h') && !endspiel ? 1 : 0,
++    (leicht || schwer) && vor(nachReihe, vonReihe) ? 1 : 0,
++    bauernAngriff,
++    haengt,
++    haengtWert,
++    gewinnSchlag,
++    z.promotion === 'q' ? 1 : 0,
++    figur === 'p' && endspiel ? 1 : 0,
++    (leicht || schwer) && (eigen === 'w' ? nachReihe >= 5 : nachReihe <= 4) ? 1 : 0,
++    droht,
++    z.captured && ctx.vorigerZug && z.to === String(ctx.vorigerZug).slice(2, 4) ? 1 : 0,
++    (z.to === 'd4' || z.to === 'e4' || z.to === 'd5' || z.to === 'e5') ? 1 : 0,
++    z.flags.includes('b') ? 1 : 0,
++  ];
++}
++
++// Verlust je Zug in Prozentpunkten aus der Analyse (Sicht des Ziehenden); Map lan -> Verlust
++export function verlusteAusAnalyse(zuege, analyse, farbe) {
++  const nachLan = new Map(zuege.map((z) => [z.lan, z]));
++  const w = new Map();
++  for (const l of analyse.lines || []) {
++    const z = nachLan.get(l.pv && l.pv[0]);
++    if (z && !w.has(z.lan)) w.set(z.lan, gewinn(l.eval, farbe));
++  }
++  const aus = new Map();
++  if (!w.size) return aus;
++  const beste = Math.max(...w.values());
++  let schlechtester = 0;
++  for (const [lan, p] of w) {
++    const v = Math.max(0, (beste - p) * 100);
++    aus.set(lan, v);
++    if (v > schlechtester) schlechtester = v;
++  }
++  for (const z of zuege) if (!aus.has(z.lan)) aus.set(z.lan, Math.min(100, schlechtester + UNGELISTET_PP));
++  return aus;
++}
++
++// Strafe fuer einen Verlust von v Prozentpunkten: (v + 1)^biss - 1 (biss = 0: ln(1 + v)). Kleines biss =
++// flacher Verlauf: grobe Patzer werden kaum staerker bestraft als kleine Fehler (wie bei schwachen Spielern).
++function strafe(v, biss) {
++  return biss > 0 ? Math.pow(v + 1, biss) - 1 : Math.log1p(v);
++}
++
++// Reiz (logit) jedes erlaubten Zugs; ohne Zufall (fuer Tests und die Eichung)
++export function menschenReize(chess, zuege, analyse, bot, ctx) {
++  const s = bot.staerke || {};
++  const m = s.mensch || {};
++  const verluste = verlusteAusAnalyse(zuege, analyse, ctx.farbe);
++  if (!verluste.size) return [];
++  const phase = phaseVon(ctx.fen || chess.fen());
++  const faktor = (m.phasen && Number.isFinite(m.phasen[phase]) ? m.phasen[phase] : 1);
++  const sorgfalt = Math.max(0, (Number.isFinite(m.sorgfalt) ? m.sorgfalt : 1) * faktor);
++  const biss = Number.isFinite(m.biss) ? m.biss : 0.25;
++  const gew = naturGewichte(m.elo ?? bot.elo);
++  const stilCtx = { farbe: ctx.farbe, vollzug: ctx.vollzug, endspiel: phase === 'endspiel' };
++  const merkmalCtx = { farbe: ctx.farbe, vollzug: ctx.vollzug, phase, vorigerZug: ctx.vorigerZug || null };
++  // Kandidaten wie bei Menschen: die besten m.kandidaten Zuege der eigenen Suche plus naheliegende
++  // forcierende Zuege (Schlagen, Schach, bedrohte Figur wegziehen, Zurueckschlagen). Ohne m.kandidaten: alle.
++  let oben = null;
++  if (Number.isFinite(m.kandidaten) && m.kandidaten > 0) {
++    oben = new Set([...verluste.entries()].sort((a, b) => a[1] - b[1]).slice(0, m.kandidaten).map(([lan]) => lan));
++  }
++  const gegner = ctx.farbe === 'w' ? 'b' : 'w';
++  // Zuege ausserhalb der MultiPV-Liste (begrenzte breite) hat der Bot nicht bewertet: Sie sind keine Kandidaten
++  // (vorher galten sie als "schlechtester + 5" und wurden als Schlag- oder Schachzug oft gewaehlt, obwohl sie
++  // Material einstellten: die meisten groben Patzer von Delia, Koenig und Greta).
++  const gelistet = new Set();
++  for (const l of analyse.lines || []) if (l.pv && l.pv[0]) gelistet.add(l.pv[0]);
++  const begrenzt = gelistet.size > 0 && gelistet.size < zuege.length;
++  const aus = [];
++  const ungelistet = [];
++  for (const z of zuege) {
++    if (ctx.verboten && ctx.verboten.has(z.lan)) continue;
++    const ziel = begrenzt && !gelistet.has(z.lan) ? ungelistet : aus;
++    if (oben && !oben.has(z.lan)) {
++      // forcierend oder naheliegend: Schlagen (auch Zurueckschlagen), Schach, bedrohte Figur wegziehen
++      const rochade = z.flags.includes('k') || z.flags.includes('q');
++      const flucht = !rochade && z.piece !== 'p' && z.piece !== 'k' && chess.isAttacked(z.from, gegner);
++      if (!z.captured && !/[+#]/.test(z.san) && !flucht) continue;
++    }
++    const v = verluste.get(z.lan);
++    const f = naturMerkmale(chess, z, merkmalCtx);
++    let natur = 0;
++    for (let i = 0; i < f.length; i++) natur += gew[i] * f[i];
++    const stil = v <= STIL_FENSTER_PP ? charakterBonus(chess, z, bot, stilCtx) / STIL_TEILER : 0;
++    ziel.push({ zug: z, verlust: v, reiz: -sorgfalt * strafe(v, biss) + natur + stil });
++  }
++  return aus.length ? aus : ungelistet;
++}
++
++function menschenWahl(chess, zuege, analyse, bot, ctx) {
++  const reize = menschenReize(chess, zuege, analyse, bot, ctx);
++  if (!reize.length) {
++    const z = zuege.find((x) => x.lan === analyse.bestmove);
++    return z && !(ctx.verboten && ctx.verboten.has(z.lan)) ? z : null;
++  }
++  let bester = null;
++  let besterWert = -Infinity;
++  for (const r of reize) {
++    const u = Math.min(1 - 1e-12, Math.max(1e-12, ctx.zufall()));
++    const wert = r.reiz - Math.log(-Math.log(u));
++    if (wert > besterWert) {
++      besterWert = wert;
++      bester = r.zug;
++    }
++  }
++  return bester;
++}
++
+ // ---------- Zugwahl ----------
+ 
+ function waehleKandidat(chess, zuege, analyse, bot, ctx) {
+diff --git a/js/review.js b/js/review.js
+index 35d3618..2f8baab 100644
+--- a/js/review.js
++++ b/js/review.js
+@@ -185,6 +185,192 @@ export function schaetzeSpielstaerke(genauigkeit, gegnerElo, anzahlZuege, { eige
+   return Math.max(100, Math.min(3200, Math.round(elo / 50) * 50));
+ }
+ 
++// ---------------------------------------------------------------------------
++// Spielstaerke, geeicht (Oktober 2026). Ersetzt schaetzeSpielstaerke in analysierePartie; die alte
++// Funktion bleibt fuer gespeicherte Daten und Tests erhalten.
++// Skala: Lichess-Schnellschach-Wertung (Glicko-2, Januar 2024) = "Arena-Elo". Nicht FIDE, nicht chess.com.
++// Beleg einer Partie: mittlere Zuggenauigkeit in OFFENEN Stellungen (Gewinnchance vor dem Zug zwischen
++// 10 und 90 %, ohne Buch- und erzwungene Zuege) und die Zahl dieser Zuege. Entschiedene Stellungen zaehlen
++// nicht: wer gegen einen schwachen Gegner laengst gewonnen hat, sammelt dort keine geschenkte Genauigkeit.
++// Bei Menschen der Wertung R liegt dieser Wert im Mittel bei mu(R) (Stuetzpunkte), Streuung
++//   var(R, n) = exp(c0 + c1 * (R - 1500) / 1000) / n + s2.
++// Gefittet an 5594 Spielerseiten aus 2833 Lichess-Schnellschach-Partien (CC0, Baender 400 bis 2400),
++// geprueft per 5-facher Kreuzvalidierung und an 330 Partien, die mit genau der App-Engine bewertet wurden.
++// Eine Partie gibt eine Likelihood ueber R (Gitter); mehrere Partien werden multipliziert (Bayes-Regel).
++// Partien gegen deutlich schwaechere Gegner zaehlen weniger (wie bei Elo: ein Sieg gegen einen viel
++// Schwaecheren sagt wenig). Ergebnis: Wert, 80-%-Spanne und "vorlaeufig", solange die Spanne breit ist.
++// ---------------------------------------------------------------------------
++export const STAERKE_MODELL = Object.freeze({
++  skala: 'Lichess-Schnellschach (Glicko-2, Januar 2024)',
++  fenster: [0.10, 0.90],
++  knoten: [[543, 70.4], [718, 75.0], [913, 77.7], [1107, 80.9], [1303, 82.9], [1501, 84.3],
++    [1698, 85.7], [1895, 86.5], [2084, 88.1], [2292, 89.6], [2473, 90.9]],
++  c0: 6.5, c1: -0.9, s2: 6,
++  gitter: [0, 3200, 10],
++  prior: [1300, 1000],          // Spielstaerke: sehr schwaches Vorwissen
++  priorNeu: [1300, 700],        // "Spielte wie" ohne fruehere Partien
++  tagesform: 350,               // "Spielte wie" mit Vorwissen: so weit darf eine Partie vom Schnitt abweichen
++  systematisch: 130,            // Modell- und Skalenunsicherheit, quadratisch auf die Streuung
++  schwacherGegner: [300, 900, 0.25], // ab 300 Punkte unter der eigenen Staerke weniger Gewicht, ab 900 nur noch 0,25
++  vorlaeufigSd: 250,            // vorlaeufig, solange die Streuung (ohne Unsicherheit des Bot-Aufschlags) groesser ist
++  mindestPartien: 5,
++  // Gegen App-Bots spielt man in offenen Stellungen genauer als gegen Menschen gleicher Staerke (gemessen mit
++  // Maia-3 als Stellvertreter, Messung E3): um so viele Punkte wird der Beleg einer Bot-Partie gesenkt
++  botAufschlag: 5.4,
++  botAufschlagSd: 1.6,          // dessen Standardfehler (Punkte): verbreitert die Spanne der Spielstaerke gegen Bots
++});
++
++// Beleg einer Seite aus den Zug-Eintraegen von analysierePartie (oder kompatiblen Objekten mit klasse,
++// buch, gewinnVorher, genauigkeit, farbe). Rueckgabe { genauigkeit, zuege } oder null (keine offenen Zuege).
++export function staerkeBeleg(eintraege, farbe, modell = STAERKE_MODELL) {
++  const [lo, hi] = modell.fenster;
++  let summe = 0;
++  let n = 0;
++  for (const z of eintraege || []) {
++    if (!z || z.farbe !== farbe || z.buch || z.klasse === 'buch' || z.klasse === 'erzwungen') continue;
++    const wv = z.gewinnVorher;
++    if (!Number.isFinite(wv) || wv < lo - EPS || wv > hi + EPS || !Number.isFinite(z.genauigkeit)) continue;
++    summe += z.genauigkeit;
++    n++;
++  }
++  return n ? { genauigkeit: runde(summe / n, 2), zuege: n } : null;
++}
++
++function staerkeGitter(modell) {
++  const [von, bis, schritt] = modell.gitter;
++  const g = [];
++  for (let r = von; r <= bis + EPS; r += schritt) g.push(r);
++  return g;
++}
++
++// mittlere offene Genauigkeit bei Wertung R (Stuetzpunkte linear, aussen linear fortgesetzt, hoechstens 99,5)
++export function staerkeMittel(R, modell = STAERKE_MODELL) {
++  const k = modell.knoten;
++  let i = 1;
++  while (i < k.length - 1 && R > k[i][0]) i++;
++  const [r0, a0] = k[i - 1];
++  const [r1, a1] = k[i];
++  return Math.min(99.5, a0 + ((R - r0) / (r1 - r0)) * (a1 - a0));
++}
++
++// Streuung der offenen Genauigkeit einer Partie mit n offenen Zuegen bei Wertung R
++export function staerkeStreuung(R, n, modell = STAERKE_MODELL) {
++  return Math.sqrt(Math.exp(modell.c0 + (modell.c1 * (R - 1500)) / 1000) / Math.max(1, n) + modell.s2);
++}
++
++// Log-Likelihood eines Belegs ueber dem Gitter. Die Streuung wird bei der Bezugswertung bezugR ausgewertet
++// (fest, iteriert von den Aufrufern): sonst bevorzugt die mit R sinkende Streuung allein schon hoehere
++// Wertungen, sobald viele Partien zusammenkommen. gegenBot: Partie gegen einen App-Bot (Beleg um
++// modell.botAufschlag gesenkt, siehe dort).
++export function staerkeLikelihood(beleg, modell = STAERKE_MODELL, bezugR = 1500, gegenBot = false) {
++  const g = staerkeGitter(modell);
++  if (!beleg || !Number.isFinite(beleg.genauigkeit) || !(beleg.zuege > 0)) return g.map(() => 0);
++  const s = staerkeStreuung(bezugR, beleg.zuege, modell);
++  const a = beleg.genauigkeit - (gegenBot ? (modell.botAufschlag || 0) : 0);
++  return g.map((R) => {
++    const d = (a - staerkeMittel(R, modell)) / s;
++    return -0.5 * d * d;
++  });
++}
++
++// Gewicht einer Partie gegen einen Gegner der Wertung gegnerElo, wenn man selbst etwa staerke hat
++export function gegnerGewicht(gegnerElo, staerke, modell = STAERKE_MODELL) {
++  if (!Number.isFinite(gegnerElo) || !Number.isFinite(staerke)) return 1;
++  const [ab, bis, min] = modell.schwacherGegner;
++  const abstand = staerke - gegnerElo;
++  if (abstand <= ab) return 1;
++  if (abstand >= bis) return min;
++  return 1 - ((abstand - ab) / (bis - ab)) * (1 - min);
++}
++
++// Verteilung aus Log-Likelihood und Normal-Prior [mitte, sd]: Median, Streuung, 80-%-Spanne
++function staerkeVerteilung(ll, prior, modell, extraSd = 0) {
++  const g = staerkeGitter(modell);
++  const lp = ll.map((x, i) => x - 0.5 * ((g[i] - prior[0]) / prior[1]) ** 2);
++  const max = Math.max(...lp);
++  const roh = lp.map((x) => Math.exp(x - max));
++  const summe = roh.reduce((a, b) => a + b, 0);
++  const p = roh.map((x) => x / summe);
++  const kum = [];
++  p.reduce((a, x, i) => (kum[i] = a + x), 0);
++  // Quantil: lineare Interpolation der Verteilungsfunktion an den Gitterpunkten
++  const q = (anteil) => {
++    let i = 0;
++    while (i < kum.length - 1 && kum[i] < anteil) i++;
++    if (i === 0) return g[0];
++    return g[i - 1] + ((anteil - kum[i - 1]) / Math.max(1e-300, kum[i] - kum[i - 1])) * (g[i] - g[i - 1]);
++  };
++  const mittel = p.reduce((a, x, i) => a + x * g[i], 0);
++  const varianz = p.reduce((a, x, i) => a + x * (g[i] - mittel) ** 2, 0);
++  const median = q(0.5);
++  const sd = Math.sqrt(varianz + extraSd * extraSd);
++  const breit = Math.sqrt(1 + (extraSd * extraSd) / Math.max(1, varianz));
++  const lo = median - (median - q(0.1)) * breit;
++  const hi = median + (q(0.9) - median) * breit;
++  return { median, sd, lo, hi, ll };
++}
++
++const auf50 = (x) => Math.max(100, Math.min(3200, Math.round(x / 50) * 50));
++
++// "Spielte wie": Staerke in EINER Partie. vorwissen = { elo, sd } (bisherige Spielstaerke): dann zeigt die
++// Zahl, wie diese Partie im Vergleich zum eigenen Schnitt war (eine Partie streut stark und verschiebt nur
++// etwas). Ohne Vorwissen: breites Vorwissen um 1300, Ergebnis "vorlaeufig". gegnerElo: Partien gegen deutlich
++// Schwaechere zaehlen weniger. gegenBot: Partie gegen einen App-Bot (Beleg um modell.botAufschlag gesenkt).
++// Rueckgabe { elo, spanne: [lo, hi], sd, tendenz, vorlaeufig } oder null.
++export function spielteWie(beleg, { vorwissen = null, gegnerElo = null, gegenBot = false, modell = STAERKE_MODELL } = {}) {
++  if (!beleg || !(beleg.zuege > 0)) return null;
++  const mitVorwissen = vorwissen && Number.isFinite(vorwissen.elo) && Number.isFinite(vorwissen.sd);
++  const prior = mitVorwissen ? [vorwissen.elo, Math.hypot(vorwissen.sd, modell.tagesform)] : modell.priorNeu;
++  const w = gegnerGewicht(gegnerElo, mitVorwissen ? vorwissen.elo : null, modell);
++  let bezug = prior[0];
++  let v = null;
++  for (let i = 0; i < 2; i++) {
++    v = staerkeVerteilung(staerkeLikelihood(beleg, modell, bezug, gegenBot).map((x) => w * x), prior, modell);
++    bezug = v.median;
++  }
++  // Tendenz: lag die Partie ueber oder unter dem, was bei der bisherigen Staerke zu erwarten war?
++  let tendenz = null;
++  if (mitVorwissen) {
++    const R = vorwissen.elo;
++    const a = beleg.genauigkeit - (gegenBot ? (modell.botAufschlag || 0) : 0);
++    const z = (a - staerkeMittel(R, modell)) / staerkeStreuung(R, beleg.zuege, modell);
++    tendenz = z > 0.8 ? 'besser' : z < -0.8 ? 'schwaecher' : 'wie immer';
++  }
++  return { elo: auf50(v.median), spanne: [auf50(v.lo), auf50(v.hi)], sd: Math.round(v.sd), tendenz, vorlaeufig: !mitVorwissen, gewicht: runde(w, 2) };
++}
++
++// Spielstaerke aus mehreren Partien. liste: [{ beleg, gegnerElo, gegenBot, hilfe }] (neueste zuerst, z. B. die
++// letzten 20). Partien mit Hilfe (Zuruecknahme, Hinweis) zaehlen nicht. gegnerElo: Gewicht gegen deutlich
++// Schwaechere; gegenBot: Partie gegen einen App-Bot (Beleg um modell.botAufschlag gesenkt).
++// Rueckgabe { elo, spanne, sd, partien, vorlaeufig } oder null (keine zaehlende Partie).
++export function spielstaerkeAusPartien(liste, { modell = STAERKE_MODELL } = {}) {
++  const gueltig = (liste || []).filter((x) => x && !x.hilfe && x.beleg && x.beleg.zuege > 0 && Number.isFinite(x.beleg.genauigkeit));
++  if (!gueltig.length) return null;
++  // dreimal: Streuung und Gegner-Gewichte bei der zuletzt geschaetzten Staerke (erst ohne Gewichte)
++  let v = null;
++  let bezug = modell.prior[0];
++  for (let durchgang = 0; durchgang < 3; durchgang++) {
++    const gewichte = gueltig.map((x) => (durchgang === 0 ? 1 : gegnerGewicht(x.gegnerElo, bezug, modell)));
++    const lls = gueltig.map((x) => staerkeLikelihood(x.beleg, modell, bezug, !!x.gegenBot));
++    const summe = lls[0].map((_, i) => lls.reduce((a, l, k) => a + gewichte[k] * l[i], 0));
++    v = staerkeVerteilung(summe, modell.prior, modell, modell.systematisch);
++    bezug = v.median;
++  }
++  // Unsicherheit des Bot-Aufschlags (in Genauigkeitspunkten) als Elo bei der geschaetzten Staerke: verbreitert die
++  // Spanne, macht die Zahl aber nicht dauerhaft "vorlaeufig" (das haengt nur an Partien und Streuung)
++  const anteilBot = gueltig.filter((x) => x.gegenBot).length / gueltig.length;
++  const steigung = Math.max(0.002, (staerkeMittel(bezug + 50, modell) - staerkeMittel(bezug - 50, modell)) / 100);
++  const botSdElo = anteilBot * (modell.botAufschlagSd || 0) / steigung;
++  const breit = botSdElo > 0
++    ? staerkeVerteilung(v.ll, modell.prior, modell, Math.hypot(modell.systematisch, botSdElo))
++    : v;
++  const sd = Math.round(v.sd);
++  return {
++    elo: auf50(v.median), spanne: [auf50(breit.lo), auf50(breit.hi)], sd: Math.round(breit.sd), partien: gueltig.length,
++    vorlaeufig: gueltig.length < modell.mindestPartien || sd > modell.vorlaeufigSd,
++  };
++}
++
+ // SAN auf Deutsch: K D T L S statt K Q R B N, Rochade mit Nullen (0-0, 0-0-0)
+ export function sanDeutsch(san) {
+   if (san == null) return '';
+@@ -964,7 +1150,8 @@ const STUECK_ZUEGE = 10;
+ //         vorab (Map stellungsSchluessel -> Analyse, z. B. aus der Live-Bewertung), vorabMinTiefe = 1,
+ //         vorabMerken (true: neu gerechnete Analysen auch in vorab ablegen, fuer einen Abbruch mit Neustart),
+ //         stueckeln (true: beim Nachspielen und Einordnen der Zuege den Hauptthread regelmaessig per
+-//         setTimeout freigeben, fuer das stille Nachholen; das Ergebnis ist dasselbe) }
++//         setTimeout freigeben, fuer das stille Nachholen; das Ergebnis ist dasselbe),
++//         vorwissen ({ elo, sd }: bisherige Spielstaerke des Spielers, fuer "Spielte wie") }
+ // Abbruch: signal.abort() oder engine.stop() -> Promise wird mit Fehler (fehler.abgebrochen) abgelehnt.
+ export async function analysierePartie(engine, zuege, opts = {}) {
+   const tiefe = opts.tiefe ?? 16;
+@@ -1058,17 +1245,23 @@ export async function analysierePartie(engine, zuege, opts = {}) {
+   }
+   for (const z of eintraege) anzahl[z.farbe][z.klasse]++;
+ 
+-  // Bekannte eigene Elo (Bot-Seite): Bot-Tabelle und Zug zur eigenen Elo
++  // Spielstaerke je Seite (geeicht, siehe spielteWie). Bot-Seite (eigene Elo bekannt, nicht der Spieler):
++  // Vorwissen = eigene Elo. Spieler-Seite: opts.vorwissen = { elo, sd } (bisherige Spielstaerke aus
++  // spielstaerkeAusPartien), sonst vorlaeufig. Gegner-Elo nur fuer das Gewicht gegen deutlich Schwaechere.
+   const elo = opts.elo || {};
+-  const zahl = (f) => eintraege.filter((z) => z.farbe === f).length;
+-  const staerke = (f) => {
++  const belege = { w: staerkeBeleg(eintraege, 'w'), b: staerkeBeleg(eintraege, 'b') };
++  const staerke = { w: null, b: null };
++  const spielstaerke = { w: null, b: null };
++  for (const f of ['w', 'b']) {
+     const eigene = elo[f];
+-    if (typeof eigene === 'number' && isFinite(eigene) && opts.spielerFarbe !== f) {
+-      return schaetzeSpielstaerke(genauigkeit[f], undefined, zahl(f), { eigeneElo: eigene });
+-    }
+-    return schaetzeSpielstaerke(genauigkeit[f], elo[gegnerVon(f)], zahl(f));
+-  };
+-  const spielstaerke = { w: staerke('w'), b: staerke('b') };
++    const istBot = typeof eigene === 'number' && isFinite(eigene) && opts.spielerFarbe !== f;
++    const vorwissen = istBot ? { elo: eigene, sd: 100 }
++      : (opts.vorwissen && (!opts.spielerFarbe || opts.spielerFarbe === f) ? opts.vorwissen : null);
++    // Spieler gegen einen App-Bot (dessen Elo bekannt ist): Bot-Aufschlag
++    const gegenBot = !istBot && Number.isFinite(elo[gegnerVon(f)]);
++    staerke[f] = spielteWie(belege[f], { vorwissen, gegnerElo: elo[gegnerVon(f)], gegenBot });
++    spielstaerke[f] = staerke[f] ? staerke[f].elo : (istBot ? auf50(eigene) : null);
++  }
+ 
+   return {
+     zuege: eintraege,
+@@ -1076,6 +1269,8 @@ export async function analysierePartie(engine, zuege, opts = {}) {
+     anzahl,
+     eroeffnung: er.name || (ausStart && eintraege.length ? 'Unbekannte Eröffnung' : null),
+     spielstaerke,
++    staerke,            // je Seite { elo, spanne, sd, tendenz, vorlaeufig, gewicht } oder null
++    belege,             // je Seite { genauigkeit, zuege } (offene Stellungen) fuer spielstaerkeAusPartien
+     schluesselmomente: schluesselmomente(eintraege),
+     // Zusatzfelder
+     kurve,

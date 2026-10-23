@@ -30,12 +30,11 @@ js/bots.js                 Bot-Leiter + Zugwahl mit Schwaechen
 js/review.js               Bewertung: Zug-Klassen, Genauigkeit, Coach-Texte (rein, ohne DOM)
 js/openings.js             Eroeffnungs-Tabelle (Buchzuege + Namen)
 js/board.js                Brett-Komponente (DOM, Touch, Pfeile, Abzeichen)
-js/sounds.js               Klaenge per WebAudio: Klangpakete (MP3), Synth als Rueckfall
+js/sounds.js               Klaenge per WebAudio (keine Audiodateien)
 js/storage.js              localStorage: Fortschritt, Partien, Einstellungen
 vendor/chess/chess.js      chess.js 1.4.0 (ESM): import { Chess } from '../vendor/chess/chess.js'
 vendor/stockfish/          stockfish-19-lite-single.js + .wasm (Worker, UCI)
 assets/pieces/{w,b}{K,Q,R,B,N,P}.svg   Figuren (cburnett)
-assets/klang/{holz,arcade}/*.mp3        Klangpakete (je 40 Dateien, eigene Werke, assets/klang/LIZENZEN.md)
 tests/*.test.mjs           Node-Tests (node tests/x.test.mjs), ohne Browser
 ```
 
@@ -167,8 +166,6 @@ export class Brett {
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
-  zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
-  setzeAutoDame(boolean)          // Umwandlung bei der Eingabe sofort als Dame ausfuehren
   zeigeAbzeichen(feld, klasse)    // Klassen-Symbol oben rechts am Feld (siehe Design)
   entferneAbzeichen()
   pfeile([{ von, nach, farbe }])  // SVG-Pfeile ueber dem Brett
@@ -184,9 +181,8 @@ export class Brett {
 
 ## js/sounds.js
 `export const klang = { zug(), schlagen(), schach(), rochade(), umwandlung(), ende(gewonnen),
-fehler(), brillant(), aus: false }` per WebAudio, erst nach erster Beruehrung aktiv (iOS). Seit dem
-Premium-Umbau spielen die gemasterten Dateien der Klangpakete, die eingebauten Synth-Klaenge sind der
-Rueckfall (Vertrag im Abschnitt "Premium-Umbau", Absatz "Klang").
+fehler(), brillant(), aus: false }` per WebAudio, kurze angenehme Toene, erst nach erster
+Beruehrung aktiv (iOS).
 
 ## CSS-Variablen (Design fuellt sie, Module benutzen nur diese)
 `--feld-hell, --feld-dunkel, --zuletzt, --auswahl, --hinweis, --schach, --punkt,
@@ -580,17 +576,13 @@ export function speichereModulEinstellungen(name, daten)      // -> { ok, zeiche
 export { ton, klick, tock, huelle, rauschen, NOTEN }  // Bausteine fuer eigene Synthese (NOTEN eingefroren)
 export function registriereKlang(name, fn, { wichtig = true } = {})  // fn(ac, ziel, t, ...args) -> abmelden()
 klang.spiele(name, ...args)   // registrierter (geht vor) oder eingebauter Klang
-klang.klasse(k, ...args)      // ohne Register 'klasse' seit U3 nach PLAN 3.6 (brillant, bester/combo, ungenau,
-                              // fehler auch fuer verpasst, patzer; exzellent, gut, buch, erzwungen still)
-klang.stern(i, neu, { reduziert })   // ohne Register 'stern' seit U3 die Dateien stern, stern-2, stern-3, auch bei
-                              // reduzierter Bewegung; ein registrierter 'stern' bekommt (i, neu)
-klang.stufe = 'alle'          // 'alle' | 'wichtig' | 'aus'; 'wichtig': registrierte Klaenge nach ihrem wichtig,
-                              // alle anderen nach der Spalte im KATALOG
+klang.klasse(k, ...args)      // ohne Register 'klasse' wie bisher: brillant -> brillant(), fehler/patzer -> fehler(), sonst still
+klang.stern(i, neu, { reduziert })   // ohne Register 'stern' wie bisher: zug(), bei reduzierter Bewegung still
+                              // (wie vor Runde 4); ein registrierter 'stern' klingt immer
+klang.stufe = 'alle'          // 'wichtig': spielt nur Klaenge mit wichtig: true (eingebaute gelten als wichtig)
 ```
 `wichtig` darf auch eine Funktion `(...args) -> boolean` sein (z. B. fuer `klasse`: nur Brillant,
-Grossartig, Fehler, Patzer). `klangProbe(name, ...)` funktioniert auch fuer registrierte Klaenge und (seit U3)
-fuer Dateiklaenge. Ein registrierter Klang geht immer vor die Datei gleichen Namens und bekommt die Argumente
-unveraendert.
+Grossartig, Fehler, Patzer). `klangProbe(name, ...)` funktioniert auch fuer registrierte Klaenge.
 
 **`js/bots.js`:**
 ```js
@@ -659,8 +651,8 @@ Ungenau, Fehler, Chance verpasst oder Patzer bricht die Serie wie jeder andere. 
 `data-stufe` (`''` bei 3 bis 4, `heiss` 5 bis 7, `ueberladen` 8 bis 11, `unaufhaltsam` ab 12), der Screen
 `data-serie` (laufende Serie; 0 bei Live-Bewertung aus) und `data-serie-stufe`. `maxSerie` landet in der
 laufenden Partie, im Datensatz und in `partie:beendet`. Klang zur Klasse ueber `klang.klasse(k, { serie,
-serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu, { reduziert })` (klingt seit U3 auch
-bei reduzierter Bewegung, registriert oder nicht: Klang ist keine Bewegung).
+serieVorher, trivial, ply })`, je Stern im Ergebnis `klang.stern(i, neu, { reduziert })` (ein registrierter
+Klang `stern` auch bei reduzierter Bewegung, der eingebaute dann nicht, wie vor Runde 4).
 
 **Uebung und eigene Stellung.** `app.gehe('partie', { botId, farbe, startFen, modus: 'uebung', ziel })` startet
 eine Uebung (Kopf „Übung ab Zug n“, n = Zugnummer der Startstellung). Partien, die nicht werten
@@ -675,7 +667,7 @@ extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne 
 `.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
 - `.erg-feier` zeigt `feier.fuerOverlay(partieId)`: neue Zeilen gleiten im Abstand von 200 ms ein (`--t`),
   die erste ab 1,5 s (Sieg mit Sternen) bzw. 0,7 s, schon gezeigte stehen ruhig. Jede neue Zeile spielt ihren
-  `klang` (sonst `'feier'`: die Datei mit steigender Tonhoehe, ohne Datei der eingebaute Tick); bei `klang.stufe === 'wichtig'` nur
+  `klang` (sonst den eingebauten Tick `'feier'` mit steigender Tonhoehe); bei `klang.stufe === 'wichtig'` nur
   grosse. Antippen der Karte zeigt sofort alles. `symbol`: Icon-Name aus `ui/icons.js` oder kurzer Text.
   Handy (bis 600 px): die Zeilen werden zu einer Summenzeile (nur Titel), grosse bleiben eigene Zeilen.
 - `ergebnis:karte` wird neu gefuellt; `.erg-tipp` („Kopf hoch! …“) erscheint nur, wenn der Ort leer bleibt.
@@ -945,7 +937,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 | `partie:matt` | Aufruf | `partie.js` `ende()` bei Matt: nach `speicherePartie`, nach `partie:beendet` (darauf wartet der Hook hoechstens 300 ms, w0plus-a-fix), vor dem Ergebnis (Ablauf unten) | `{ app, buehne, laufId, partieId, ergebnis, gewinner, koenigFeld, letzterZug { von, nach, san, figur }, fen, reduziert, signal, dauerMs, kurzMs }` | Finisher (S1-7) |
 | `ergebnis:abrechnung` | DOM | `js/ui/abrechnung.js`: Huelle `div.abrechnung[role=list]`, die selbst an `ergebnis:karte` (Reihenfolge 3) haengt | wie `ergebnis:karte` (mit `boss`) | Punkte 10 (S1-3) · Funken 20 (S1-1) · Wertung 30 (S1-2) · Serie 40 (S1-4) |
 | `bestenliste:reiter` | DOM | Screen `bestenliste` (S1-3 `punkte`), Reiterzeile der Bestenliste; bis dahin nur die Node-Pruefung in `tests/ereignisse.test.mjs` | `{ app, reiter, fenster }` (`reiter`: gewaehlter Reiter, `fenster`: `'woche'` \| `'monat'` \| `'allzeit'`) | Ich 10 · Bots 20 (S1-3) · Liga 30 (S3-2) · Raetsel 40 (S2-2) · Freunde 50 (S3-3) |
-| `training:karten` | DOM | Screen `training` (seit U2 Kern-Screen, `js/ui/training.js`): `.training-gitter`, Karten des Trainings; ohne Anbieter eine ruhige Karte | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
+| `training:karten` | DOM | Screen `training` (S2-1 `kartei`), Karten des Trainings | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
 | `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
 | `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeSpielplan()`, also `daten/boss/spielplan.json`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
 Die vier Screen-Orte haben noch keinen Host in der App: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau
@@ -967,7 +959,7 @@ Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
 | `partie:spieler-leiste`, `partie:aktionen` | `js/ui/partie.js` (w0plus-a-fix) | bleibt |
 | `ergebnis:abrechnung` | `js/ui/abrechnung.js` an `ergebnis:karte` (W0+a) | bleibt |
 | `bestenliste:reiter` | `tests/orte-huelle.html` | Screen `bestenliste` (`js/ui/bestenliste.js`, S1-3 `punkte`) |
-| `training:karten` | `js/ui/training.js` (Premium-Umbau U2, Training-Huelle); `tests/orte-huelle.html` bleibt | bleibt |
+| `training:karten` | `tests/orte-huelle.html` | Screen `training` (`js/ui/training.js`, S2-1 `kartei`) |
 | `ich:vitrine` | `tests/orte-huelle.html` | Screen `ich` (`js/ui/ich.js`, Paket `ich` mit der Integration S1) |
 | `spielplan:tage` | `tests/orte-huelle.html` | Screen `spielplan` (`js/ui/spielplan.js`, S1-6 `boss`) |
 
@@ -1130,10 +1122,10 @@ dem Ergebnis laeuft und nicht ins Budget zaehlt.
   `bestenliste`; `ich`, `werkstatt`). Dann `html[data-reiter="an"]`: die Screens werden um die Hoehe der Leiste kuerzer
   (`--reiter-h`, w0plus-a-fix: vorher bekam `#app` Platz unten, die Screens sind aber selbst `100dvh` hoch, und die Leiste lag
   im Querformat und auf dem Handy ueber dem SPIELEN-Knopf), `aria-current="page"` am aktiven Reiter,
-  Wechsel ersetzt den Verlaufseintrag. `app.js` liest `PAKETE` und `REITER` ueber den Namensraum
-  (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Seit dem Premium-Umbau U2 ist sie
-  eine schwebende Glas-Pille mit Lage nach Flo D5 (`html[data-reiter="oben"|"unten"]` statt `"an"`), dazu der
-  Zwischenreiter Verlauf (D2) und `training` als Kern-Screen: Abschnitt „Premium-Umbau U2“ am Ende.
+  Wechsel ersetzt den Verlaufseintrag. Die Optik kommt mit dem Premium-Umbau. `app.js` liest `PAKETE` und `REITER` ueber
+  den Namensraum (`import * as erweiterungen`), damit eine Datei ohne `REITER` die App nicht lahmlegt. Flos Entscheidung
+  D5 (17.10.: auf dem iPad quer in der Kopfzeile, sonst unten schwebend) setzt der Premium-Umbau nur mit CSS um; Aufbau,
+  Reiter und `aria-current` bleiben.
 - Start: `dauerhaftAnfragen()` vor dem Laden der Pakete, `duenneAnalysenAus()` per `setTimeout(0)` nach dem ersten Screen.
 
 ## Tests (W0+a)
@@ -1178,163 +1170,3 @@ uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket 
 | Werkstatt: jedes Stueck `nurOptik: true` und `immerErhaeltlich: true`, kein Feld `verfuegbarBis`; keine Preise im Repo; Kaufknopf nur „bald verfügbar“; kein Kaufhinweis nach einer Niederlage, in der Partie oder im Ergebnis; in jeder Kategorie erspielbare Stuecke; kein Countdown (schon im Fundament fuer Dateien mit `werkstatt` im Namen) | Schub 2b `werkstatt` |
 | hoechstens eine Bot-Stichelei je Partie, keine nach 3 Niederlagen in Folge | S3-5 (Bots mit Gedaechtnis) |
 | kein Raetsel-Tageslimit in der Gratis-Konfiguration | S1-5 `raetsel` (Abo-Schalter: S4-1) |
-
-# Premium-Umbau U1: Theme-Fundament (Look A „Modern und klar“, verbindlich)
-
-Alle Farben, Schriften, Radien, Schatten und Kurven sind Tokens. Kein Modul und kein Screen-CSS schreibt mehr feste
-Farben fuer Flaechen und Text; Screen-Pakete benutzen nur die Tokens (Liste: Kopf von `css/themes/modern.css`,
-Bedeutung: PLAN 1.2 im Umbau-Plan). Ladereihenfolge in `index.html` (und in `tests/screens.html`, `tests/orte-huelle.html`):
-`css/tokens.css` -> `css/themes/modern.css` -> `css/board.css` -> `css/app.css` -> `css/bauteile.css`, `navigation`,
-`arena`, `duell`, `partie`, `ergebnis`, `analyse`, `verlauf`, `einstellungen`, `training` (je Screen-Paket, von U1 leer
-angelegt) -> `css/screens.css` (Rest, verschwindet mit U8/U9).
-
-- **`css/tokens.css` (fest):** Abstaende `--a1..--a7`, `--rand`, `--rand-brett-handy`, `--tipp`, `--reiter-hoehe`,
-  `--kopf-hoehe(-partie)`, `--tempo`; Feldfarben und Markierungen je `html[data-brett]` (`--feld-hell`, `--feld-dunkel`,
-  `--zuletzt`, `--auswahl`, `--punkt`, dazu `--hinweis`, `--schach`); `color-scheme` je `data-modus`; die **Bruecke**
-  der alten Namen (`--ui-bg` -> `--grund`, `--ui-text` -> `--text`, `--stern` -> `--gold`, `--schlecht` -> `--warn`,
-  `--neon-*` ruhig gestellt). Die Bruecke entfernt U10, sobald grep keine Nutzung mehr findet.
-- **`css/themes/<id>.css` (Theme):** nur Custom Properties und `@font-face` (dazu Zierde in `::before/::after` mit
-  `background-image`, `border-image`, `mask-image`, `opacity`), jeder Token fuer hell und dunkel, dunkel zweimal
-  (`[data-modus="dunkel"]` und `[data-modus="system"]` in `prefers-color-scheme: dark`), keine festen Tokens, keine
-  Feldfarben, Textkontraste >= 4,5:1. `tests/thema.test.mjs` prueft das fuer jede Datei im Ordner.
-- **Bot-Farben:** `--bf` immer ueber `botFarbe(bot)` aus `js/thema.js` setzen (`var(--bot-<id>, <bot.farbe>)`), damit
-  registrierte Bosse ohne Theme-Eintrag funktionieren. Toenung hinter dem Portraet: `--bot-<id>-tint`.
-- **Zugklassen-Farben:** `--k-<id>` (Fuellung, hell und dunkel gleich), `--kg-<id>` (Zeichen auf der Fuellung),
-  `--kt-<id>` (Text, >= 4,5:1). Namen kommen mit U4 aus `js/zugklassen.js`.
-
-**`js/thema.js`** (rein bis auf `wendeThemaAn`): `THEMEN` (eingefroren, `modern`), `MODI` (`system`, `hell`, `dunkel`),
-`registriereThema(def) -> abmelden()` (prueft id, name, `css` genau `'css/themes/<id>.css'`, modi hell+dunkel, metaFarbe,
-klang.standard), `themaListe()`, `themaVon(id)`, `wendeThemaAn({ thema, modus }) -> Promise` (laedt ein
-nachgeladenes Theme-CSS zuerst, setzt `html[data-thema|data-modus]`, Federn, `<meta name="theme-color">`; Unbekanntes
--> modern/system; der spaetere Aufruf gewinnt), `aufgeloesterModus()`, `aktuellesThema()`, `standardKlangpaket(id)`
-(modern: arcade, Flo D6), `avatarVon(bot)` (Portraet des Themes nur fuer Bots in `portraets`, sonst `bot.avatar`), `botFarbe(bot)`,
-`floAvatar(farbe)`. Ereignis `window 'schach:thema'` `{ thema, modus, aufgeloest }` nach jedem Wechsel und bei
-Systemwechsel im Modus `system`. Gegen Aufblitzen setzt ein kleines Inline-Skript in `index.html` den gespeicherten
-Modus `hell`/`dunkel` vor dem ersten Bild; `system` braucht kein JS.
-
-**`js/bewegung.js`:** `TEMPI` (langsam 1,5, normal 1, schnell 0,6, aus 0), `setzeBewegung(stufe)` (setzt `--tempo` und
-`html[data-bewegung]`; `prefers-reduced-motion` wirkt wie `aus`; bei `aus` kuerzt `css/tokens.css` auch alle festen
-CSS-Animationen und Uebergaenge auf 0,01 ms und einen Durchlauf, `animationend`/`transitionend` kommen weiter), `tempo()`, `reduziert()`, `bewegungStufe()`,
-`taktFaktor()`/`takt(ms)` (Pausen zum Mitlesen, nie unter 0,6), `warte(ms)`, `federKurve(k, d)` (rein),
-`setzeFedern({ feder, weich, hupf })` (`linear()` wo moeglich, sonst die cubic-bezier-Werte des Themes), `KURVEN`,
-`anim(el, frames, { d, v, k, fill, it, dir })` (Web-Animation mit Tempo, bei Tempo 0 sofort am Ende),
-`staffel(els, o)`, `starteDruck()` (jedes `.dr` bekommt beim Druecken `.gedrueckt`). Dauern im CSS immer ueber
-`--d-xs .. --d-xl`, `--d-zug` (skalieren mit `--tempo`), Kurven `--feder`, `--feder-weich`, `--feder-hupf`, `--gleiten`,
-`--sanft`, `--raus`.
-
-**Einstellungen (`js/storage.js`, PLAN 4):** alle Schluessel des Umbaus stehen in `STANDARD_EINSTELLUNGEN`, die
-erlaubten Werte in `EINSTELLUNG_WERTE`; `ladeEinstellungen()` faellt bei Falschem still auf den Standard (auch
-`lautstaerke` 0..1 in 0,05, `klanggruppen` je Teilschluessel), `speichereEinstellungen({ klanggruppen: { uhr: false } })`
-aendert nur die genannte Gruppe. Standards: `klangpaket ''`, `lautstaerke 0.8`, `klangstufe 'alle'` (Flo, D4),
-`klanggruppen` alle an, `zugBestaetigen 'ohneUhr'`, `haltenAufgeben true`, `turmRochade false`, `autoDame true`,
-`steuerung 'beides'`, `bewegung 'normal'` (heisst nicht `tempo`, das ist die Bedenkzeit), `thema 'modern'`,
-`modus 'system'`, `koordLage 'ecke'`, `pfeile true`, `duellIntro 'besondere'` (Flo, D3), `figuren 'cburnett'`,
-`coachStil 'ausfuehrlich'`, `sprueche 'an'`. `app.js wendeEinstellungenAn(e)` ruft `setzeBewegung`, `wendeThemaAn` und
-`klang.einstellen(e)` (U3); Hell/Dunkel wechselt ueber `app.setzeEinstellungen({ modus })` ohne Neuladen.
-Nach dem Laden der Pakete wendet `app.js` das gespeicherte Theme noch einmal an (ein Paket-Theme kennt
-`thema.js` erst dann), ohne den Start darauf warten zu lassen.
-
-**Klang (`js/sounds.js`, PLAN 3, U3):** Klangpakete `holz` und `arcade` unter `assets/klang/<paket>/` (je 40 MP3,
-44,1 kHz, 128 kbit/s, gemastert: die Lautstaerke-Rangfolge steckt in den Dateien), Lizenz: eigene Werke von Flo, alle
-Rechte vorbehalten, Nutzung nur in der Schach-Arena (`assets/klang/LIZENZEN.md`, `assets/LIZENZ-KUNST.md`).
-- `KATALOG` (eingefroren, 33 Namen): `name -> { gruppe, vorrang 0..3, wichtig, varianten, wechselnd, tonhoehe }`.
-  Gruppen `brett`, `bewertung`, `feier`, `uhr`, `boss`, `finisher`, `bedienung` (Einstellung `klanggruppen`, je
-  ein Schalter) und `moment` (start, sieg, niederlage, remis, stern: ohne Schalter). Varianten: `zug` (3) und
-  `schlagen` (2) wechseln ab, `stern` (nach Index) und `combo` (nach Serie) waehlt die Option `stufe`.
-  `PAKETE_KLANG`, `KLANGGRUPPEN`, `KLANGSTUFEN`, `klassenKlang(k, info)` (rein).
-- Abspielen: (1) registrierter Klang, (2) dekodierte Datei des aktiven Pakets, (3) Synth (`zug`, `schlagen`,
-  `rochade`, `schach`, `umwandlung`, `fehler`, `brillant`, `feier`, `ende`) bzw. der Ersatz wie vor dem Umbau
-  (`stern` -> `zug`, `patzer` -> `fehler`, `sieg`/`niederlage`/`remis` -> `ende`), sonst still. Optionen als letztes
-  Argument (nur diese Schluessel): `{ wann, gain, genau, stufe, paket }`; `wann` plant per WebAudio genau (Landung).
-- Filter: `klang.aus` (Schalter, Lautstaerke bleibt), `klang.stufe` (`alle` | `wichtig` | `aus`), Gruppen. Master =
-  `lautstaerke` hoch 2 (`setzeLautstaerke`, 15 ms). Hoechstens 4 Stimmen: Vorrang 3 wird nie abgebrochen, sonst
-  das aelteste mit dem niedrigsten Vorrang; ist nichts zu opfern, wird der neue Klang verworfen (Vorrang 3 darf
-  ueberziehen). Begrenzer -6 dB, Ratio 4.
-- `klang.einstellen(e)` (aus `wendeEinstellungenAn`): `klang`, `klangpaket` (`''` = `standardKlangpaket(thema)`,
-  modern: arcade), `lautstaerke`, `klangstufe`, `klanggruppen`, `thema`; 1 s spaeter `vorladen()`: `fetch` (4
-  voraus, Reihenfolge Brett, start, brillant, stern, Ergebnis, Rest), Dekodieren der Reihe nach mit
-  `setTimeout(0)` dazwischen, vor der ersten Beruehrung ueber einen `OfflineAudioContext` (keine Warnung, der erste
-  Zug klingt schon aus der Datei). Nur das aktive Paket bleibt dekodiert; `setzePaket(id)` gibt die alten Puffer frei.
-- iOS: ein `AudioContext`, entsperrt auf `touchend`, `click`, `keydown`, `pointerup` (Hoerer bleiben angemeldet),
-  fortgesetzt bei `visibilitychange` und beim naechsten Klang; `navigator.audioSession.type = 'ambient'`, wo es
-  das gibt. `zustand()`: `aus`, `nicht-verfuegbar`, `gesperrt`, `laedt`, `bereit`.
-- Weiteres: `probe(id)` (Zug, Schlagen, Bester Zug, Stern im Paket id, auch wenn es nicht aktiv ist), `stille()`,
-  `vorrat()` (Paket, dekodiert, fehlt, laedt, Stimmen, Master), `protokoll()` (nur `?test`: letzte 50 mit laufender
-  `nr`, `aktion` `spielt`/`opfert`/`verworfen`/`still`, `quelle`, `datei`, `grund`, `start`).
-- Takt in der Partie (Landung mit `wann`, ein fuehrender Klang pro Moment) verdrahtet U7; die Bedien-Klaenge die
-  Bauteile. Tests: `tests/klang.test.mjs` (Node: Katalog gegen Dateien, Format, Laenge, Messwerte an sha256
-  gebunden, Logik mit Fake-Kontext; Browser: Vorladen, jeder Name in beiden Paketen, Wechsel, Probe, Stufe,
-  Gruppen, Stumm, Stimmen, Rueckfall, Register, Abbildung, klangProbe, wann, Fortsetzen, Spitze jeder Datei).
-
-**Schriften:** `assets/schriften/manrope.woff2` und `bricolage-grotesque.woff2` (SIL OFL 1.1, Lizenztexte daneben,
-Quelle im Kopf von `modern.css`), vorgeladen in `index.html`, im Service-Worker-Cache. Es fehlen `≈ ▲ ★ ♙ ♔ ✓ →`
-(Systemschrift springt ein); Sterne und Bauer deshalb als SVG-Icon.
-
-**Tests:** `tests/thema.test.mjs` (Node: Token-Vollstaendigkeit, Theme-Regeln, Kontraste, Schriften, thema.js,
-bewegung.js; Browser: hell/dunkel nach System, Wechsel ohne Neuladen, kein Aufblitzen, Schriften lokal, Probe-Theme
-aendert kein Layout, Lesbarkeit aller Hauptscreens mindestens 3:1 in hell und dunkel, keine externen Anfragen).
-
-# Premium-Umbau U2: Navigation, Kopf, Bauteile, Training-Huelle
-
-**Reiter-Leiste** (`js/app.js`, Optik `css/navigation.css`): schwebende Glas-Pille (`--glas`, `--glas-filter`, `--s2`)
-mit `button.reiter[data-reiter]` (Symbol und Wort) und einer gleitenden `.reiter-pille` unter dem aktiven Reiter
-(`aria-current="page"`); gemessen ueber `offsetLeft/offsetWidth`, ein `ResizeObserver` (Leiste und Fenster) misst neu,
-die Pille gleitet per Web-Animation (`--feder-weich`), auch wenn die Leiste dabei in einen neuen Kopf umzieht.
-- **Wann:** nur wenn `REITER` (oder im Testmodus `?reiter=`) Reiter nennt und der Screen einem Reiter gehoert
-  (`reiterVon(screen)`), sonst keine Leiste und kein Abstand. Erlaubt in `REITER`: `training`, `verlauf`, `bestenliste`, `ich`.
-- **Zwischenreiter Verlauf (Flo D2):** `REITER = ['verlauf']` ergibt „Arena · Verlauf“. Steht `ich` in `REITER`,
-  verschwindet er; der Verlauf gehoert dann zum Reiter Ich (Leiste sichtbar, Ich aktiv, Zurueck bleibt).
-- **Lage (Flo D5):** Querformat ab 1021 px (`(min-width: 1021px) and (orientation: landscape)`) oben in der Kopfzeile,
-  und zwar in `.kopf-reiter-platz` des Hauptseiten-Kopfs (DOM-Umzug; zeichnet ein Screen seinen Kopf neu, holt ein
-  `MutationObserver` sie zurueck). Passt sie dort nicht, wird sie schmaler (`.eng`), dann ohne Symbole (`.enger`), dann
-  steht sie nicht mehr genau mittig (`.reiter-frei`), sonst unten. Ein Screen ohne `.kopf-reiter-platz` (z. B. ein
-  Paket-Screen ohne `hauptKopf`) bekommt sie unten. Unten schwebt sie 14 px ueber dem Rand (oder der sicheren Zone),
-  zu breit fuer eine Zeile (Handy mit vier Reitern) wird sie `.gestapelt` (volle Breite, Symbol ueber dem Wort,
-  `html[data-reiter-form="gestapelt"]`).
-- **Attribute:** `html[data-reiter="oben"|"unten"]` (nur unten werden die Screens um `--reiter-h` kuerzer),
-  `html[data-reiter-wurzel="ja"]` auf dem Screen des Reiters selbst (der Kopf blendet dort seinen Zurueck-Knopf aus),
-  `html[data-reiter-liste]` (die Reiter, durch Leerzeichen getrennt; ein Reiter Verlauf blendet den Verlauf-Knopf im
-  Kopf aus).
-- **Wegfahren:** auf Screens ohne Reiter (Partie, Analyse, Einstellungen) ist der Platz sofort frei (`data-reiter`
-  weg), die Leiste faehrt unten weg (`.weg`, dann `hidden`); zurueck faehrt sie wieder ein. Tempo 0 (Einstellung oder
-  „weniger Bewegung“): sofort.
-
-**Hauptseiten-Kopf** (`js/ui/seite.js`, importiert `app.js` nicht): `hauptKopf({ titel = 'Schach-Arena', unter, marke,
-zurueck, chips, knoepfe, modus, klang, einstellungen })` -> `header.kopf.haupt-kopf` mit Marke (Bauer auf Tinte),
-`h1.marke-titel.logo` und `.unter.logo-unter`, `.kopf-reiter-platz`, rechts `.kopf-chips` (Standard `standardChips()`:
-Sterne und besiegte Bots; Ort `arena:kopf` haengt dort an), eigene `.icon-knopf[data-aktion]`, Mond/Sonne
-(`data-aktion="modus"`), Klang-Schalter (`.knopf-klang[data-aktion="klang"][aria-pressed]`), Zahnrad. Der Titel wird nie
-gekuerzt (kein Auslassungszeichen, kein Umbruch): eng werden zuerst die Unterzeile, auf dem Handy der Mond, dann das
-Zeichen und der zweite Chip; viele Chips scrollen waagrecht, passt nicht einmal der erste, blendet der Kopf sie aus
-(`.ohne-chips`). `verbindeKopf(wurzel, app, { beiZurueck, beiEinstellungen })` bindet Klang (`app.setzeEinstellungen({
-klang })`, Meldung) und Hell/Dunkel (`app.setzeEinstellungen({ modus })`, Kreis-Aufdecken ueber View Transitions, wo es
-sie gibt) als Delegation an den Screen. `seitenKopf({ ueber, titel, text })` -> `.seiten-kopf` (grosser Seitentitel).
-Benutzer: Arena, Verlauf (Titel „Verlauf“, Unterzeile mit der Anzahl, Zurueck), Training; Pakete mit eigenen
-Hauptseiten sollen ihn benutzen, damit die Leiste im Querformat oben sitzt.
-
-**Bauteile** (`js/ui/bauteile.js`, Optik `css/bauteile.css`): `segment({ name, optionen, wert, beiWahl })` (Radiogruppe,
-gleitende `.seg-pille`, Pfeiltasten, Pos1/Ende), `schalter({ an, beiWechsel })` (`role="switch"`), `regler({ wert, min,
-max, schritt, beiAenderung, format })` (`role="slider"`, Ziehen und Tasten), `sheet({ titel, text, knoepfe, abbrechen })
--> Promise` und `schliesseSheet()` (Blatt von unten, Fokus bleibt drin; ein Screen-Wechsel schliesst es),
-`halteKnopf({ text, icon, dauer = 1000, beiAusloesen, frage, hinweis })` (Ring fuellt sich, frueher loslassen bricht ab,
-Klick ohne Zeiger, also Tastatur oder Bedienhilfe, oeffnet die Rueckfrage als Blatt; die Haltezeit haengt nicht am
-Tempo), `toast(text, { art, dauer })`/`toastLeeren()` (dahinter steht `app.meldung`), `miniBrett(fen, { zuletzt })`.
-Dazu die Klasse `.coach-karte` (Coach-Karte aus A fuer U7 und U9) und `.ico { stroke-width: var(--ic-strich) }`.
-Testseite: `tests/bauteile.html`.
-
-**Training-Huelle** (`js/ui/training.js`, `css/training.css`): Kern-Screen (nicht mehr in `PAKET_SCREENS`, im sw-Test
-nicht mehr in `SCREEN_PAKET`), Hauptseiten-Kopf, Seitentitel „Üben ohne Druck / Training“, `.training-gitter` als
-Behaelter von `training:karten` (Kontext `{ app }`, `data-anzahl`; ab drei Karten steht die Karte mit `.t-held`, sonst
-die erste, gross links ueber zwei Zeilen, Handy eine Spalte), ohne Anbieter `.training-leer` („Training kommt mit der nächsten Welle“, Knopf zur Arena).
-Bausteine fuer die Karten der Pakete: `.t-karte`, `.t-held`, `.t-marke`, `.t-zahl`, `.t-fuss`, `.kartei-stapel`, `.mini`.
-Der Reiter Training erscheint erst, wenn die Integration `training` in `REITER` eintraegt.
-
-**Icons** (`js/ui/icons.js`): die Strich-Icons aus Entwurf A unter den bisherigen Namen, neu `mond`, `sonne`, `laut`,
-`leise`, `klang` (mit `.klang-welle` und `.klang-strich`), `regler`, `haken`, `bauer` (gefuellt), `podest`, `person`.
-
-**Tests:** `node tests/navigation.test.mjs` (Node: Icons, Router-Quelltext, CSS ohne feste Farben und Neon; Browser:
-Leiste mit und ohne `REITER`, oben/unten bei 1180 x 820, 1024 x 768, 820 x 1180, 390 x 844, 375 x 667, Drehen, Pille,
-Wegfahren mit und ohne Bewegung, Kopf mit Klang und Hell/Dunkel, Titel nie gekuerzt, Chips scrollen, Training leer und
-mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflaechen >= 44 px, keine externe Anfrage).
-
-**Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.

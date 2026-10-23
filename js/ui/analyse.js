@@ -14,8 +14,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
 import { botNachId, eloDerPartie } from '../bots.js';
 import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp, spielphasen, coachKern } from '../review.js';
-import { SYMBOLE } from '../symbole.js';
-import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
+import { SYMBOLE, KLASSEN_NAME } from '../symbole.js';
 import { klang } from '../sounds.js';
 import {
   ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
@@ -23,7 +22,6 @@ import {
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
-import { botFarbe } from '../thema.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
 const WURZEL = new URL('../../', import.meta.url);
@@ -46,7 +44,10 @@ const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const symbol = (k) => SYMBOLE[k] || '';
 
 // Klassenwort in der Coach-Karte und Satzzeichen an den Schluesselmomenten
-const WORT = KLASSEN_WORT;
+const WORT = {
+  brillant: 'Brillant!', stark: 'Großartig!', bester: 'Bester Zug', exzellent: 'Exzellent', gut: 'Gut',
+  buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler', verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
+};
 const ZEICHEN = { brillant: '!!', stark: '!', ungenau: '?!', fehler: '?', patzer: '??' };
 const PUNKT_KLASSEN = new Set(['brillant', 'stark', 'fehler', 'patzer', 'verpasst']);
 const VERLUST_KLASSEN = new Set(['ungenau', 'fehler', 'patzer', 'verpasst']);
@@ -282,7 +283,7 @@ export function zeige(root, params = {}, app) {
       });
       if (beendet) return;
       // Review speichern und Partie-Datensatz nachtragen (Genauigkeit, Spielstaerke, Stern 2,
-      // geniale Züge): die Partie wurde am Ende ohne fertige Analyse gesichert
+      // Brillant-Zuege): die Partie wurde am Ende ohne fertige Analyse gesichert
       const nach = ergaenzeAnalyse(p.id, review);
       if (nach) {
         st.partie = nach.partie;
@@ -319,7 +320,7 @@ export function zeige(root, params = {}, app) {
 
   function avatarHtml(bot, extra = '') {
     if (!bot) return `<div class="an-avatar ${extra}" aria-hidden="true"></div>`;
-    return `<div class="an-avatar ${extra}" style="--bf:${esc(botFarbe(bot))}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
+    return `<div class="an-avatar ${extra}" style="--bf:${esc(bot.farbe)}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
   }
 
   // ---------- Aufbau der Analyse ----------
@@ -406,7 +407,7 @@ export function zeige(root, params = {}, app) {
     const name = neuBot ? `Stufe ${neuBot.stufe} · ${neuBot.name}` : (st.bot ? st.bot.name : '');
     const b = neuBot || st.bot;
     return `
-      <div class="an-banner" style="--bf:${esc(b ? botFarbe(b) : 'var(--linie-2)')}" role="status">
+      <div class="an-banner" style="--bf:${esc(b ? b.farbe : '#8fa8ff')}" role="status">
         ${avatarHtml(b)}
         <div class="an-banner-text"><div class="an-ft-titel">${esc(titel)}</div><div class="an-ft-name">${esc(name)}</div></div>
         <div class="an-ft-sterne"><b aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</b><span>${esc(grund)}</span></div>
@@ -721,7 +722,7 @@ export function zeige(root, params = {}, app) {
     const linieHtml = linie.length ? `
       <div class="an-c-fuss">
         <div class="an-c-linie">
-          <span class="an-c-linie-titel">${andererZug ? 'Stärkster Zug' : 'Hauptvariante'} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
+          <span class="an-c-linie-titel">${andererZug ? 'Bester Zug' : 'Hauptvariante'} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
           <span class="an-c-zuege">${linie.map((s, i) => `<span data-i="${i}">${esc(sanDe(s))}</span>`).join(' ')}${linie.length >= 8 ? ' …' : ''}</span>
         </div>
         <div class="an-c-knoepfe">

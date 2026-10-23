@@ -1,4 +1,4 @@
-// Crownmate: App-Rahmen. Routing per location.hash, Screens als Module (js/ui/<name>.js),
+// Schach-Arena: App-Rahmen. Routing per location.hash, Screens als Module (js/ui/<name>.js),
 // gemeinsame Dienste fuer alle Screens (Engines, Einstellungen, Meldungen, Rueckfragen).
 //
 // Vertrag (ARCHITEKTUR.md "Runde 2"): jedes Screen-Modul exportiert
@@ -16,8 +16,7 @@
 //     ?test&erw=pakete/kartei/index), und zwar bevor app:bereit kommt und der erste Screen erscheint. Ein
 //     Paket, das nicht laedt, landet als console.error in der Konsole; die App startet trotzdem (nach
 //     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird)
-//   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena (seit U2 ist 'training'
-//     Kern-Screen, siehe unten)
+//   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena
 //   - sendet app:bereit (einmal vor dem ersten Screen), app:screen (nach zeige() eines Screens) und
 //     app:sichtbar (bei visibilitychange; setzt html[data-sichtbar="ja"|"nein"])
 //   - Wahl-Ort app:erster-screen? (nur ohne Hash und ohne Verlaufseintrag), kontext { partienZahl }
@@ -34,24 +33,6 @@
 //     Screen, storage.duenneAnalysenAus() (MAX_REVIEWS 12; aeltere Speicherstaende hatten bis zu 20)
 //   - w0plus-a-fix: Screen werkstatt (Werkstatt-Vorschau aus Schub 2b, Paket werkstatt), gehoert zum Reiter Ich.
 //     dauerhaftAnfragen fragt nur dort an, wo kein Dialog droht (Firefox ausserhalb der installierten App nicht).
-//
-// Premium-Umbau U1 (Theme-Fundament): wendeEinstellungenAn(e) ruft zusaetzlich setzeBewegung(e.bewegung) (bewegung.js),
-//   wendeThemaAn({ thema, modus }) (thema.js) und, sobald es sie gibt, klang.einstellen(e) (sounds.js, U3). Start:
-//   starteDruck() (Druck-Rueckmeldung fuer .dr). Hell/Dunkel wechselt ueber app.setzeEinstellungen({ modus }) ohne Neuladen.
-//   Nach ladePakete() gilt die gespeicherte Ansicht noch einmal (Themes aus Paketen kennt thema.js erst dann).
-//
-// Premium-Umbau U2 (Navigation, PLAN 2.1, 2.10, Flo D2/D5):
-//   - Reiter-Leiste als schwebende Glas-Pille mit gleitender .reiter-pille unter dem aktiven Reiter (gemessen; ein
-//     ResizeObserver misst bei jeder Groessenaenderung neu). Lage nach D5: Querformat ab 1021 px oben in der Kopfzeile
-//     (in .kopf-reiter-platz des Hauptseiten-Kopfs aus js/ui/seite.js; passt sie dort nicht, zuerst enger, sonst
-//     unten), sonst unten schwebend. html[data-reiter="oben"|"unten"] (vorher "an"); nur "unten" kuerzt die Screens um
-//     --reiter-h. Auf Screens ohne Reiter (Partie, Analyse, Einstellungen) faehrt sie unten weg (bei Tempo 0 sofort).
-//     html[data-reiter-wurzel="ja"] auf dem Screen eines Reiters selbst (dort blendet der Kopf seinen Zurueck-Knopf
-//     aus), html[data-reiter-liste] nennt die Reiter (ein Reiter Verlauf ersetzt den Verlauf-Knopf im Kopf).
-//   - Zwischenreiter Verlauf (D2): REITER darf 'verlauf' nennen (Arena · Verlauf); steht 'ich' in REITER, verschwindet
-//     er, und der Verlauf gehoert zum Reiter Ich (reiterVon()).
-//   - 'training' ist Kern-Screen (js/ui/training.js, Huelle fuer training:karten), nicht mehr in PAKET_SCREENS.
-//   - app.meldung() benutzt toast() aus js/ui/bauteile.js; ein Screen-Wechsel schliesst auch ein offenes Blatt (sheet).
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -63,10 +44,6 @@ import {
 import { icon } from './ui/icons.js';
 import { hoere, sende } from './ereignisse.js';
 import { waehle } from './orte.js';
-import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
-import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
-import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
-import './konto.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -84,9 +61,8 @@ const TITEL = {
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt',
 };
-// Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
-// Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
-const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
+// Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena
+const PAKET_SCREENS = new Set(['training', 'start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
   'werkstatt']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 
@@ -94,31 +70,12 @@ const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.searc
 
 function wendeEinstellungenAn(e) {
   klang.aus = !e.klang;
-  // Premium-Umbau: Klang-Einstellungen (Paket, Lautstaerke, Stufe, Gruppen), sobald sounds.js sie kennt (U3)
-  if (typeof klang.einstellen === 'function') {
-    try { klang.einstellen(e); } catch (f) { console.error(f); }
-  }
-  // Theme (Ansicht, Hell/Dunkel) und Animationstempo; ein Fehler darf die App nie anhalten
-  setzeBewegung(e.bewegung);
-  wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
   const html = document.documentElement;
   html.dataset.brett = e.brett;
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
   html.dataset.balken = e.balken ? 'an' : 'aus';
   html.dataset.live = e.liveBewertung ? 'an' : 'aus';
   window.dispatchEvent(new CustomEvent('schach:einstellungen', { detail: e }));
-}
-
-// Themes aus Paketen (registriereThema) kennt thema.js erst nach ladePakete(): die gespeicherte Ansicht dann noch
-// einmal anwenden. Nicht abwarten (bremst den Start nicht); wendeThemaAn schaltet erst um, wenn das CSS da ist.
-function themaNachPaketen() {
-  const e = ladeEinstellungen();
-  if (e.thema === aktuellesThema().thema || !themaVon(e.thema)) return;
-  wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
-  // Codex-Befund (PR #4): ohne gewaehltes Klangpaket bestimmt das Theme den Standard, der gilt erst jetzt
-  if (typeof klang.einstellen === 'function') {
-    try { klang.einstellen(e); } catch (f) { console.error(f); }
-  }
 }
 
 // ---------- Engines (zwei Instanzen, lazy, einmal init) ----------
@@ -265,9 +222,25 @@ function engine(name) {
 
 // ---------- Meldungen (Toast) ----------
 
-// Premium-Umbau U2: die Meldung ist das Bauteil toast() (js/ui/bauteile.js), gleiche Elemente wie vorher
-function meldung(text, opt = {}) {
-  toast(text, opt);
+let toastOrt = null;
+let toastUhr = 0;
+function meldung(text, { art = 'info', dauer = 3200 } = {}) {
+  if (!toastOrt) {
+    toastOrt = document.createElement('div');
+    toastOrt.className = 'toast-ort';
+    toastOrt.setAttribute('role', 'status');
+    toastOrt.setAttribute('aria-live', 'polite');
+    document.body.append(toastOrt);
+  }
+  const t = document.createElement('div');
+  t.className = 'toast ' + (art === 'fehler' ? 'fehler' : 'info');
+  t.textContent = String(text);
+  toastOrt.replaceChildren(t);
+  clearTimeout(toastUhr);
+  toastUhr = setTimeout(() => {
+    t.classList.add('weg');
+    toastUhr = setTimeout(() => t.remove(), 320);
+  }, dauer);
 }
 
 // Speicher voll (storage.js sendet speicher:fehler): einmal je Sitzung Bescheid sagen
@@ -342,17 +315,13 @@ function schliesseDialog() {
   offenerDialog = null;
 }
 
-// ---------- Reiter-Leiste (W0+a vorbereitet; Premium-Umbau U2: Glas-Pille aus Entwurf A, Lage nach Flo D5) ----------
-// Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt. 'verlauf' ist der
-// Zwischenreiter bis S1 (Flo D2: "Arena · Verlauf"); steht 'ich' dabei, verschwindet er (der Verlauf gehoert dann zu Ich).
-const REITER_ALLE = [['arena', 'Arena', 'pokal'], ['training', 'Training', 'ziel'], ['verlauf', 'Verlauf', 'verlauf'],
-  ['bestenliste', 'Bestenliste', 'podest'], ['ich', 'Ich', 'person']];
-// Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
+// ---------- Untere Leiste (W0+a, nur vorbereitet) ----------
+// Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt.
+const REITER_ALLE = [['arena', 'Arena', 'play'], ['training', 'Training', 'ziel'], ['bestenliste', 'Bestenliste', 'pokal'], ['ich', 'Ich', 'stern']];
+// Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt)
 const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich',
   werkstatt: 'ich' };
-// Querformat ab 1021 px (iPad quer): die Leiste sitzt oben in der Kopfzeile, sonst schwebt sie unten (D5)
-const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
-
+let reiterLeiste = null;
 export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
   const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));
   const aus = new Set((Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
@@ -361,216 +330,37 @@ export function reiterListe(suche = typeof location !== 'undefined' ? location.s
     try { test = new URLSearchParams(suche || '').get('reiter'); } catch (e) { test = null; }
     if (test) for (const n of test.split(',')) if (erlaubt.has(n.trim())) aus.add(n.trim());
   }
-  if (aus.has('ich')) aus.delete('verlauf');
   return aus.size ? REITER_ALLE.filter(([n]) => n === 'arena' || aus.has(n)).map(([n]) => n) : [];
 }
-
-// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg)
-export function reiterVon(screen, liste = reiterListe()) {
-  if (screen === 'verlauf') return liste.includes('verlauf') ? 'verlauf' : liste.includes('ich') ? 'ich' : null;
-  return Object.prototype.hasOwnProperty.call(REITER_VON, screen) ? REITER_VON[screen] : null;
-}
-
-const leiste = { el: null, pille: null, lage: null, sichtbar: false, gezeigt: false, wegAnim: null, pilleX: null, pilleB: null,
-  ro: null, mo: null, rahmen: 0, fokusFolgt: false };
-
-function baueReiter(liste) {
-  if (leiste.el) return;
-  const nav = document.createElement('nav');
-  nav.className = 'reiter-leiste';
-  nav.setAttribute('aria-label', 'Bereiche');
-  nav.hidden = true;
-  nav.innerHTML = '<span class="reiter-pille" aria-hidden="true"></span>' + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, t, ic]) =>
-    `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t}</span></button>`).join('');
-  nav.addEventListener('click', (e) => {
-    const k = e.target.closest('[data-reiter]');
-    if (!k) return;
-    const ziel = k.dataset.reiter;
-    if (aktuell && aktuell.name === ziel && reiterVon(aktuell.name) === ziel) return;
-    try { klang.spiele('wechsel'); } catch (f) { /* still */ }
-    // Tastatur (Klick ohne Zeiger): der Fokus folgt auf den neuen Reiter (oben zieht die Leiste in einen neuen Kopf um)
-    leiste.fokusFolgt = e.detail === 0;
-    gehe(ziel, {}, { ersetzen: true });
-  });
-  leiste.el = nav;
-  leiste.pille = nav.querySelector('.reiter-pille');
-  document.body.append(nav);
-  // Neu messen, sobald sich die Leiste (Schrift geladen, enger) oder das Fenster (Drehen) aendert; im naechsten Bild,
-  // damit die Messung selbst keine Schleife ausloest
-  const spaeter = () => {
-    if (leiste.rahmen) return;
-    leiste.rahmen = requestAnimationFrame(() => { leiste.rahmen = 0; if (leiste.sichtbar) platziereReiter(); });
-  };
-  if (typeof ResizeObserver === 'function') {
-    leiste.ro = new ResizeObserver(spaeter);
-    leiste.ro.observe(nav);
-    leiste.ro.observe(document.documentElement);
-  } else {
-    window.addEventListener('resize', spaeter);
-  }
-  try {
-    const mq = matchMedia(OBEN_MQ);
-    if (mq.addEventListener) mq.addEventListener('change', spaeter);
-    else if (mq.addListener) mq.addListener(spaeter);
-  } catch (e) { /* egal */ }
-  // Oben: zeichnet ein Screen seinen Kopf neu (z. B. der Verlauf nach dem Loeschen), kommt die Leiste wieder hinein
-  if (typeof MutationObserver === 'function') {
-    leiste.mo = new MutationObserver(() => {
-      if (leiste.sichtbar && leiste.lage === 'oben' && !nav.isConnected) platziereReiter();
-    });
-  }
-}
-
-// Laeuft der Kopf ueber (Leiste und rechte Seite passen nicht) oder werden die Chips gequetscht?
-// Gequetscht heisst: die ersten zwei Chips (Sterne, besiegte Bots) passen nicht ganz; weitere Chips der Pakete duerfen
-// waagrecht scrollen. Gemessen mit sichtbaren Chips (.ohne-chips setzt js/ui/seite.js danach selbst neu).
-function kopfZuEng(kopf) {
-  if (!kopf) return true;
-  const ohne = kopf.classList.contains('ohne-chips');
-  if (ohne) kopf.classList.remove('ohne-chips');
-  let eng = kopf.scrollWidth > kopf.clientWidth + 1;
-  const chips = kopf.querySelector('.kopf-chips');
-  if (!eng && chips) {
-    const kinder = [...chips.children].filter((c) => c.offsetWidth > 0).slice(0, 2);
-    const bedarf = kinder.length ? kinder[kinder.length - 1].offsetLeft + kinder[kinder.length - 1].offsetWidth - kinder[0].offsetLeft : 0;
-    eng = chips.clientWidth + 1 < bedarf;
-  }
-  if (ohne) kopf.classList.add('ohne-chips');
-  return eng;
-}
-
-function platziereReiter() {
-  const nav = leiste.el;
-  if (!nav) return;
-  const screenEl = document.querySelector('#app > .screen');
-  const platz = screenEl ? screenEl.querySelector('.kopf-reiter-platz') : null;
-  let oben = false;
-  try { oben = !!platz && matchMedia(OBEN_MQ).matches; } catch (e) { oben = false; }
-  nav.classList.remove('eng', 'enger');
-  for (const k of document.querySelectorAll('.haupt-kopf.mit-reiter')) {
-    if (!platz || k !== platz.closest('.haupt-kopf')) k.classList.remove('mit-reiter', 'reiter-frei');
-  }
-  if (oben) {
-    const kopf = platz.closest('.kopf');
-    if (nav.parentNode !== platz) platz.append(nav);
-    nav.dataset.lage = 'oben';
-    if (kopf) { kopf.classList.add('mit-reiter'); kopf.classList.remove('reiter-frei'); }
-    // passt sie nicht: erst engere Reiter, dann ohne Symbole, dann nicht mehr genau mittig, sonst unten
-    const stufen = [() => nav.classList.add('eng'), () => nav.classList.add('enger'), () => kopf && kopf.classList.add('reiter-frei')];
-    let i = 0;
-    while (kopfZuEng(kopf) && i < stufen.length) stufen[i++]();
-    if (kopfZuEng(kopf)) oben = false;
-    if (!oben) {
-      nav.classList.remove('eng', 'enger');
-      if (kopf) kopf.classList.remove('mit-reiter', 'reiter-frei');
-    }
-  }
-  let gestapelt = false;
-  if (!oben) {
-    if (nav.parentNode !== document.body) document.body.append(nav);
-    nav.dataset.lage = 'unten';
-    nav.classList.remove('gestapelt');
-    // zu breit fuer eine Zeile (Handy mit vielen Reitern): volle Breite, Symbol ueber dem Wort
-    if (nav.scrollWidth > nav.clientWidth + 1) { nav.classList.add('gestapelt'); gestapelt = true; }
-  } else {
-    nav.classList.remove('gestapelt');
-  }
-  leiste.lage = oben ? 'oben' : 'unten';
-  const html = document.documentElement;
-  html.dataset.reiter = leiste.lage;
-  if (gestapelt) html.dataset.reiterForm = 'gestapelt';
-  else delete html.dataset.reiterForm;
-  if (leiste.mo) {
-    leiste.mo.disconnect();
-    const app0 = document.getElementById('app');
-    if (oben && app0) leiste.mo.observe(app0, { childList: true, subtree: true });
-  }
-  setzePille();
-}
-
-// Pille unter den aktiven Reiter; gleitet mit der weichen Feder vom alten Platz (auch nach einem Screen-Wechsel, bei dem
-// die Leiste in einen neuen Kopf umzieht und CSS-Uebergaenge nicht greifen)
-function setzePille() {
-  const nav = leiste.el;
-  const p = leiste.pille;
-  if (!nav || !p || !nav.isConnected || nav.hidden) return;
-  const k = nav.querySelector('[aria-current="page"]');
-  if (!k || !k.offsetWidth) { p.style.opacity = '0'; return; }
-  const x = k.offsetLeft;
-  const b = k.offsetWidth;
-  p.style.opacity = '';
-  if (leiste.pilleX != null && (leiste.pilleX !== x || leiste.pilleB !== b) && tempo() > 0) {
-    anim(p, [{ transform: `translateX(${leiste.pilleX}px)`, width: `${leiste.pilleB}px` }, { transform: `translateX(${x}px)`, width: `${b}px` }],
-      { d: 520, k: 'weich' });
-  }
-  p.style.transform = `translateX(${x}px)`;
-  p.style.width = `${b}px`;
-  leiste.pilleX = x;
-  leiste.pilleB = b;
-}
-
-function versteckeReiter() {
-  const html = document.documentElement;
-  delete html.dataset.reiter;
-  delete html.dataset.reiterWurzel;
-  delete html.dataset.reiterListe;
-  delete html.dataset.reiterForm;
-  if (leiste.mo) leiste.mo.disconnect();
-  const nav = leiste.el;
-  if (!nav) return;
-  const war = leiste.sichtbar;
-  leiste.sichtbar = false;
-  for (const k of document.querySelectorAll('.haupt-kopf.mit-reiter')) k.classList.remove('mit-reiter', 'reiter-frei');
-  // oben ging die Leiste mit dem alten Kopf; unten faehrt sie weg (Partie, Analyse, Einstellungen)
-  if (war && leiste.lage === 'unten' && nav.isConnected && !nav.hidden && tempo() > 0) {
-    nav.classList.add('weg');
-    const a = anim(nav, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(160%)', opacity: 0 }], { d: 420, k: 'gleiten', fill: 'forwards' });
-    leiste.wegAnim = a;
-    Promise.resolve(a.finished).catch(() => {}).then(() => {
-      if (leiste.wegAnim !== a) return;
-      leiste.wegAnim = null;
-      nav.hidden = true;
-      nav.classList.remove('weg');
-      try { a.cancel(); } catch (e) { /* egal */ }
-    });
-  } else {
-    nav.hidden = true;
-    nav.classList.remove('weg');
-  }
-  if (nav.parentNode !== document.body) document.body.append(nav);
-}
-
 function zeigeReiter(screen) {
   const liste = reiterListe();
-  const aktiv = screen ? reiterVon(screen, liste) : null;
-  if (!liste.length || !aktiv) {
-    versteckeReiter();
+  const aktiv = REITER_VON[screen] || null;
+  const sichtbar = liste.length > 0 && !!aktiv;
+  if (!sichtbar) {
+    if (reiterLeiste) reiterLeiste.hidden = true;
+    delete document.documentElement.dataset.reiter;
     return;
   }
-  baueReiter(liste);
-  const nav = leiste.el;
-  const html = document.documentElement;
-  for (const k of nav.querySelectorAll('[data-reiter]')) {
+  if (!reiterLeiste) {
+    reiterLeiste = document.createElement('nav');
+    reiterLeiste.className = 'reiter-leiste';
+    reiterLeiste.setAttribute('aria-label', 'Bereiche');
+    reiterLeiste.innerHTML = REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, t, ic]) =>
+      `<button type="button" class="reiter" data-reiter="${n}">${icon(ic)}<span>${t}</span></button>`).join('');
+    reiterLeiste.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-reiter]');
+      if (!k) return;
+      const ziel = k.dataset.reiter;
+      if (aktuell && REITER_VON[aktuell.name] === ziel && aktuell.name === ziel) return;
+      gehe(ziel, {}, { ersetzen: true });
+    });
+    document.body.append(reiterLeiste);
+  }
+  reiterLeiste.hidden = false;
+  document.documentElement.dataset.reiter = 'an';
+  for (const k of reiterLeiste.querySelectorAll('[data-reiter]')) {
     if (k.dataset.reiter === aktiv) k.setAttribute('aria-current', 'page');
     else k.removeAttribute('aria-current');
-  }
-  html.dataset.reiterWurzel = aktiv === screen ? 'ja' : 'nein';
-  html.dataset.reiterListe = liste.join(' ');
-  const warWeg = leiste.gezeigt && (!leiste.sichtbar || !!leiste.wegAnim);
-  if (leiste.wegAnim) { try { leiste.wegAnim.cancel(); } catch (e) { /* egal */ } leiste.wegAnim = null; }
-  nav.classList.remove('weg');
-  nav.hidden = false;
-  leiste.sichtbar = true;
-  platziereReiter();
-  // zurueck aus Partie, Analyse oder Einstellungen: unten wieder einfahren
-  if (warWeg && leiste.lage === 'unten') {
-    anim(nav, [{ transform: 'translateY(160%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { d: 520, k: 'gleiten' });
-  }
-  leiste.gezeigt = true;
-  if (leiste.fokusFolgt) {
-    leiste.fokusFolgt = false;
-    const a = nav.querySelector('[aria-current="page"]');
-    if (a) { try { a.focus({ preventScroll: true }); } catch (e) { /* egal */ } }
   }
 }
 
@@ -684,14 +474,13 @@ async function zeigeScreen(name, params, hash) {
   if (aktuell && aktuell.handle) {
     try { aktuell.handle.verlasse(); } catch (e) { console.error(e); }
   }
-  // Meldungen und ein offenes Blatt gehoeren zum alten Screen ("Zug zurückgenommen" nicht in der naechsten Partie)
-  toastLeeren();
-  schliesseSheet();
+  // Meldungen gehoeren zum alten Screen ("Zug zurückgenommen" nicht in der naechsten Partie)
+  if (toastOrt) { clearTimeout(toastUhr); toastOrt.replaceChildren(); }
   const root = document.getElementById('app');
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
   document.documentElement.dataset.screen = name;
-  document.title = name === 'arena' ? 'Crownmate' : `${TITEL[name]} · Crownmate`;
+  document.title = name === 'arena' ? 'Schach-Arena' : `${TITEL[name]} · Schach-Arena`;
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
@@ -900,7 +689,6 @@ function setzeSichtbar() {
 function starte() {
   setzeSymbole(SYMBOLE);
   wendeEinstellungenAn(ladeEinstellungen());
-  starteDruck();
   setzeSichtbar();
   document.addEventListener('visibilitychange', () => sende('app:sichtbar', { sichtbar: setzeSichtbar() }));
   // Klang: der AudioContext darf auf iOS erst nach der ersten Beruehrung starten
@@ -916,7 +704,7 @@ function starte() {
   dauerhaftAnfragen();
   // Pakete zuerst laden (PAKETE, im Testmodus dazu ?erw), dann app:bereit und der erste Screen
   const pakete = ladePakete();
-  if (pakete) pakete.then(() => { themaNachPaketen(); ersterStart(); });
+  if (pakete) pakete.then(ersterStart);
   else ersterStart();
 }
 

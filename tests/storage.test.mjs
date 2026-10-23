@@ -1,6 +1,6 @@
 // Tests fuer js/storage.js (Node, ohne Browser): node tests/storage.test.mjs
 import {
-  setzeSpeicher, ladeEinstellungen, speichereEinstellungen, STANDARD_EINSTELLUNGEN, EINSTELLUNG_WERTE,
+  setzeSpeicher, ladeEinstellungen, speichereEinstellungen, STANDARD_EINSTELLUNGEN,
   ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne,
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
@@ -55,78 +55,13 @@ function partie(teil) {
 let s = fakeSpeicher();
 setzeSpeicher(s);
 pruefe('Einstellungen: Standard', JSON.stringify(ladeEinstellungen()) === JSON.stringify(STANDARD_EINSTELLUNGEN));
-pruefe('Vorzüge: bei alten Speicherständen standardmäßig an', ladeEinstellungen().vorzuege === true);
 speichereEinstellungen({ klang: false, brett: 'holz' });
 pruefe('Einstellungen: speichern + mischen', ladeEinstellungen().klang === false && ladeEinstellungen().brett === 'holz' && ladeEinstellungen().balken === true);
-speichereEinstellungen({ vorzuege: false });
-pruefe('Vorzüge: erlaubter boolescher Wert bleibt gespeichert', ladeEinstellungen().vorzuege === false);
 s.setItem('schach-arena:v1:einstellungen', '{kaputt');
 pruefe('Einstellungen: kaputtes JSON -> Standard', ladeEinstellungen().klang === true);
 s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'lila', klang: 'ja', tiefe: 99 }));
 const e = ladeEinstellungen();
 pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett === 'nacht' && e.klang === true && e.tiefe === 20);
-
-// ---------- Premium-Umbau U1: neue Einstellungen (PLAN 4) ----------
-{
-  s.m.clear();
-  const std = ladeEinstellungen();
-  const erwartet = {
-    klangpaket: '', lautstaerke: 0.8, klangstufe: 'alle', zugBestaetigen: 'ohneUhr', haltenAufgeben: true, turmRochade: false,
-    autoDame: true, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
-    duellIntro: 'besondere', figuren: 'cburnett', coachStil: 'ausfuehrlich', sprueche: 'an',
-  };
-  pruefe('U1: Standards der neuen Einstellungen (Klangstufe alle nach D4, Duell-Intro besondere nach D3)',
-    Object.entries(erwartet).every(([k, v]) => std[k] === v && STANDARD_EINSTELLUNGEN[k] === v), std);
-  pruefe('U1: Klanggruppen, alle an', JSON.stringify(std.klanggruppen) === '{"brett":true,"bewertung":true,"feier":true,"uhr":true,"boss":true,"finisher":true,"bedienung":true}');
-  pruefe('U1: alte Einstellungen bleiben (klang, balken, liveBewertung, brett, koordinaten, tiefe, zaehlwerk, funkenlinie, lebensleiste)',
-    std.klang === true && std.balken === true && std.liveBewertung === true && std.brett === 'nacht' && std.koordinaten === true && std.tiefe === 14
-    && std.zaehlwerk === false && std.funkenlinie === false && std.lebensleiste === true);
-  pruefe('U1: STANDARD_EINSTELLUNGEN eingefroren (auch die Klanggruppen)', Object.isFrozen(STANDARD_EINSTELLUNGEN) && Object.isFrozen(STANDARD_EINSTELLUNGEN.klanggruppen));
-  std.klanggruppen.uhr = false;
-  pruefe('U1: ladeEinstellungen liefert eine eigene Kopie der Klanggruppen', ladeEinstellungen().klanggruppen.uhr === true && STANDARD_EINSTELLUNGEN.klanggruppen.uhr === true);
-
-  // alter Speicherstand ohne die neuen Schluessel: Standards, alte Werte bleiben
-  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, balken: true, liveBewertung: false, brett: 'holz', koordinaten: false, tiefe: 16 }));
-  const alt = ladeEinstellungen();
-  pruefe('U1: alter Speicherstand ohne neue Schluessel laedt (Standards ergaenzt, alte Werte bleiben)', alt.klang === false && alt.liveBewertung === false
-    && alt.brett === 'holz' && alt.koordinaten === false && alt.tiefe === 16 && alt.klangstufe === 'alle' && alt.modus === 'system' && alt.klanggruppen.brett === true, alt);
-
-  // falsche Werte fallen still auf den Standard
-  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({
-    klangpaket: 'neon', lautstaerke: 3, klangstufe: 'laut', zugBestaetigen: true, haltenAufgeben: 'ja', turmRochade: 1, autoDame: null,
-    steuerung: 'wischen', bewegung: 'turbo', thema: 'Neon Arena!', modus: 'grau', koordLage: 'mitte', pfeile: 'an', duellIntro: 'manchmal',
-    figuren: 'staunton', coachStil: 'laut', sprueche: 'viele', klanggruppen: { brett: false, uhr: 'aus', fremd: false },
-  }));
-  const f = ladeEinstellungen();
-  pruefe('U1: falsche Aufzaehlungen und Typen -> Standard', Object.entries(erwartet).filter(([k]) => k !== 'lautstaerke').every(([k, v]) => f[k] === v), f);
-  pruefe('U1: Lautstaerke begrenzt auf 0..1', f.lautstaerke === 1);
-  pruefe('U1: Klanggruppen einzeln geprueft (brett aus bleibt, falscher Typ -> an, fremde Gruppe weg)',
-    f.klanggruppen.brett === false && f.klanggruppen.uhr === true && !('fremd' in f.klanggruppen) && Object.keys(f.klanggruppen).length === 7, f.klanggruppen);
-  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ lautstaerke: 0.333, klanggruppen: [false, false] }));
-  const g = ladeEinstellungen();
-  pruefe('U1: Lautstaerke auf 0,05 gerundet, Klanggruppen als Liste ignoriert', g.lautstaerke === 0.35 && Object.values(g.klanggruppen).every((x) => x === true), g);
-  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ lautstaerke: -2 }));
-  pruefe('U1: negative Lautstaerke -> 0', ladeEinstellungen().lautstaerke === 0);
-  s.setItem('schach-arena:v1:einstellungen', JSON.stringify(['kaputt']));
-  pruefe('U1: Einstellungen als Liste -> Standard', JSON.stringify(ladeEinstellungen()) === JSON.stringify(STANDARD_EINSTELLUNGEN));
-
-  // erlaubte Werte werden uebernommen
-  s.m.clear();
-  speichereEinstellungen({ klangpaket: 'arcade', lautstaerke: 0.45, klangstufe: 'wichtig', zugBestaetigen: 'immer', haltenAufgeben: false,
-    turmRochade: true, autoDame: false, steuerung: 'tippen', bewegung: 'aus', thema: 'edel', modus: 'dunkel', koordLage: 'rand', pfeile: false,
-    duellIntro: 'aus', coachStil: 'knapp', sprueche: 'wenig' });
-  const h = ladeEinstellungen();
-  pruefe('U1: erlaubte Werte bleiben gespeichert', h.klangpaket === 'arcade' && h.lautstaerke === 0.45 && h.klangstufe === 'wichtig' && h.zugBestaetigen === 'immer'
-    && h.haltenAufgeben === false && h.turmRochade === true && h.autoDame === false && h.steuerung === 'tippen' && h.bewegung === 'aus' && h.thema === 'edel'
-    && h.modus === 'dunkel' && h.koordLage === 'rand' && h.pfeile === false && h.duellIntro === 'aus' && h.coachStil === 'knapp' && h.sprueche === 'wenig', h);
-  speichereEinstellungen({ klanggruppen: { uhr: false } });
-  speichereEinstellungen({ klanggruppen: { bedienung: false } });
-  const kg = ladeEinstellungen().klanggruppen;
-  pruefe('U1: speichereEinstellungen({ klanggruppen: { … } }) aendert nur die genannten Gruppen', kg.uhr === false && kg.bedienung === false
-    && kg.brett === true && kg.feier === true && ladeEinstellungen().klangpaket === 'arcade', kg);
-  pruefe('U1: EINSTELLUNG_WERTE nennt jede Aufzaehlung mit ihrem Standard', Object.entries(EINSTELLUNG_WERTE).every(([k, w]) => w.includes(STANDARD_EINSTELLUNGEN[k])));
-  s.m.clear();
-}
 
 // ---------- Fortschritt / Freischaltung ----------
 s = fakeSpeicher();

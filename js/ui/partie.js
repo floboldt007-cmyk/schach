@@ -28,7 +28,7 @@
 //         Pakete zusammen hoechstens EXTRA_MAX Zeichen als JSON; null loescht den Eintrag)
 //     spaeter(fn, ms) -> Timer, den verlasse() abraeumt }
 //   Nach partie:verlassen tut die Buehne nichts mehr.
-// COMBO: Serie aus Präzise, Goldrichtig und Genial; neutral sind Buch, Pflichtzug und triviale Zuege
+// COMBO: Serie aus Bester Zug, Großartig, Brillant; neutral sind Buch, Erzwungen und triviale Zuege
 // (Zurueckschlagen, erzwungene Schachabwehr), solange sie nichts verschenken. Der Chip traegt
 // data-stufe ('' bei 3 bis 4, 'heiss' 5 bis 7, 'ueberladen' 8 bis 11, 'unaufhaltsam' ab 12), der Screen
 // data-serie (laufende Serie) und data-serie-stufe.
@@ -98,10 +98,11 @@ import { fuerOverlay, BRETT_FEIER } from '../feier.js';
 import './abrechnung.js';
 import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
-import { botFarbe as themaBotFarbe } from '../thema.js';
-import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
 
-
+const KLASSEN_WORT = {
+  brillant: 'Brillant!', stark: 'Großartig!', bester: 'Bester Zug', exzellent: 'Exzellent', gut: 'Gut',
+  buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler', verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
+};
 const SERIE = new Set(['bester', 'stark', 'brillant']);
 const NEUTRAL = new Set(['buch', 'erzwungen']);
 const MIT_VERLUST = new Set(['ungenau', 'fehler', 'verpasst', 'patzer']);
@@ -216,7 +217,6 @@ export function zeige(root, params, app) {
     zeiten: pruefeZeiten(laufend && laufend.zeiten),
     finisher: false,
     effektGemerkt: null,
-    vorzuege: [],
   };
   z.fens.push(z.chess.fen());
   // W0+a: Boss mit offen angesagter Staerke (boss.staerke, z. B. 1080): gespielt wird mit staerkeFuerElo (vor der
@@ -302,7 +302,7 @@ export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen partie';
   s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
-  s.style.setProperty('--bf', themaBotFarbe(bot));
+  s.style.setProperty('--bf', bot.farbe);
   const knopf = (aktion, ico, text, extra = '') =>
     `<button class="knopf ${extra}" type="button" data-aktion="${aktion}">${icon(ico)}<span>${text}</span></button>`;
   s.innerHTML = `
@@ -354,7 +354,6 @@ export function zeige(root, params, app) {
 
   const brett = new Brett($('.brett'), {
     ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
-    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, autoDame: einst.autoDame,
   });
   // W0+a: nicht erlaubter Zugversuch (den Grund rechnet ein Paket mit chess.js aus, SPIELKONZEPT 3.18)
   function beiAbgelehnt(von, nach, art) {
@@ -379,9 +378,6 @@ export function zeige(root, params, app) {
     else if (a === 'idee') zeigeIdee(Number(k.dataset.ply));
     else if (a === 'besser') zeigeBesser(Number(k.dataset.ply));
     else if (a === 'ergebnis') zeigeOverlayWieder();
-  });
-  s.addEventListener('pointerdown', (e) => {
-    if (z.phase === 'bot' && z.vorzuege.length && !e.target.closest('.brett')) loescheVorzuege();
   });
   coachEl.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
@@ -597,7 +593,7 @@ export function zeige(root, params, app) {
       <div class="c-kopf"><span class="c-klasse">Coach rechnet …</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
       <p class="c-text">Gleich weißt du, wie gut dein Zug war.</p>`, 'wartet', ply);
   }
-  // COMBO: Präzise, Goldrichtig und Genial zaehlen; Buch, Pflichtzug und triviale Zuege
+  // COMBO: Bester Zug, Großartig und Brillant zaehlen; Buch, Erzwungen und triviale Zuege
   // (Zurueckschlagen, Schachabwehr) sind neutral, solange sie nichts verschenken
   const neutral = (i) => NEUTRAL.has(z.liveKlassen[i]) || (z.liveTrivial[i] === true && !MIT_VERLUST.has(z.liveKlassen[i]));
   function serieBis(ply) {
@@ -639,7 +635,7 @@ export function zeige(root, params, app) {
     const serie = SERIE.has(k) && !neutral(ply) ? serieBis(ply) : 0;
     const combo = serie >= 3 ? `<span class="combo" data-stufe="${serienStufe(serie)}">${icon('blitz')}COMBO ×${serie}</span>` : '';
     if (k === 'buch') {
-      coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_NAME.buch)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>
+      coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">Buchzug</span><span class="c-zug">${esc(zugLabel(ply))}</span>
         <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
         <p class="c-text">Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
@@ -703,8 +699,7 @@ export function zeige(root, params, app) {
     ort.style.setProperty('--x', x);
     ort.style.setProperty('--y', y);
     if (klasse === 'brillant') {
-      // Premium-Umbau U1: Funken in den Theme-Farben (Amethyst, Gold, Weiss, Kobalt), kein Neon
-      const farben = ['var(--k-brillant)', 'var(--gold)', '#FFFFFF', 'var(--k-stark)', 'var(--kt-brillant)', 'var(--gold)'];
+      const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#ffffff'];
       ort.innerHTML = '<i class="welle"></i><span class="funken">' + Array.from({ length: 12 }, (_, i) =>
         `<i style="--a:${i * 30 + 8}deg;--r:${i % 2 ? 1.25 : 1.75};--c:${farben[i % farben.length]};animation-delay:${(i % 3) * 40}ms"></i>`).join('') + '</span>';
       rahmen.classList.remove('prisma');
@@ -716,7 +711,7 @@ export function zeige(root, params, app) {
     } else if (klasse === 'bester') {
       ort.innerHTML = '<i class="ring-ping"></i>';
     }
-    // Unscharf/Fehler bleiben ruhig, grober Fehlzug wackelt nur am Symbol (CSS)
+    // Ungenau/Fehler bleiben ruhig, Patzer wackelt nur am Symbol (CSS)
     if (ort.innerHTML) {
       effekteEl.append(ort);
       spaeter(() => ort.remove(), 1700);
@@ -806,7 +801,7 @@ export function zeige(root, params, app) {
       const e = await bewertungsEngine();
       const aV = await analysiere(fenVorher);
       if (veraltet()) return;
-      // Gegnerzug davor einordnen (fuer "Verschenkt")
+      // Gegnerzug davor einordnen (fuer "Chance verpasst")
       let gegnerKlasse = null;
       let vorigerZug = null;
       let vorigerSchlag = false;
@@ -878,7 +873,7 @@ export function zeige(root, params, app) {
         brett.markiere([nach], 'k-' + k);
         brett.zeigeAbzeichen(nach, k);
         effekt(nach, k);
-        // Standard wie bisher: Genial, Fehler und grober Fehlzug klingen, sonst still (Pakete: registriereKlang('klasse'))
+        // Standard wie bisher: Brillant, Fehler und Patzer klingen, sonst still (Pakete: registriereKlang('klasse'))
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
         spaeter(() => klang.klasse(k, info), 120);
         melde({ typ: 'abzeichen', ply, klasse: k });
@@ -902,94 +897,16 @@ export function zeige(root, params, app) {
   }
 
   // ---------- Eigener Zug ----------
-  function vorzugZiele() {
-    const karte = {};
-    const code = (f) => brett.figurAuf(f);
-    const feld = (x, y) => x >= 0 && x < 8 && y >= 1 && y <= 8 ? String.fromCharCode(97 + x) + y : null;
-    const fuege = (liste, x, y) => { const f = feld(x, y); if (f && (!code(f) || code(f)[0] !== farbe)) liste.push(f); return f; };
-    for (let y = 1; y <= 8; y++) for (let x = 0; x < 8; x++) {
-      const von = feld(x, y); const fig = code(von);
-      if (!fig || fig[0] !== farbe) continue;
-      const liste = [];
-      if (fig[1] === 'P') {
-        const dy = farbe === 'w' ? 1 : -1;
-        const eins = feld(x, y + dy);
-        if (eins && !code(eins)) {
-          liste.push(eins);
-          const zwei = feld(x, y + 2 * dy);
-          if (y === (farbe === 'w' ? 2 : 7) && zwei && !code(zwei)) liste.push(zwei);
-        }
-        fuege(liste, x - 1, y + dy); fuege(liste, x + 1, y + dy);
-      } else if (fig[1] === 'N') {
-        for (const [dx, dy] of [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]]) fuege(liste, x + dx, y + dy);
-      } else if (fig[1] === 'K') {
-        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) fuege(liste, x + dx, y + dy);
-      } else {
-        const gerade = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        const diagonal = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-        const richtungen = fig[1] === 'B' ? diagonal : fig[1] === 'R' ? gerade : gerade.concat(diagonal);
-        for (const [dx, dy] of richtungen) for (let n = 1; n < 8; n++) {
-          const ziel = feld(x + dx * n, y + dy * n); if (!ziel) break;
-          const dort = code(ziel);
-          if (!dort || dort[0] !== farbe) liste.push(ziel);
-          if (dort) break;
-        }
-      }
-      if (liste.length) karte[von] = [...new Set(liste)];
-    }
-    return karte;
-  }
-
-  function zeichneVorzuege() {
-    brett.markiere(z.vorzuege.map((v) => v.von), 'vorzug-start');
-    brett.markiere(z.vorzuege.map((v) => v.nach), 'vorzug-ziel');
-  }
-
-  function loescheVorzuege() {
-    const hatte = z.vorzuege.length > 0;
-    z.vorzuege.length = 0;
-    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
-    if (!hatte) return;
-    brett.setzeStellung(z.chess.fen(), { animieren: false, letzterZug: letzterZugFelder(), schach: z.chess.inCheck() ? true : null });
-    if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) brett.erlaubeZuege(vorzugZiele());
-  }
-
-  function merkeVorzug(von, nach, umwandlung) {
-    if (z.vorzuege.length >= 5) return false;
-    z.vorzuege.push({ von, nach, umwandlung: umwandlung || 'q' });
-    zeichneVorzuege();
-    klang.spiele('klick');
-    brett.erlaubeZuege(z.vorzuege.length < 5 ? vorzugZiele() : null);
-    return true;
-  }
-
   function beiZug(von, nach, umwandlung) {
-    if (weg) return false;
-    if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) return merkeVorzug(von, nach, umwandlung);
-    if (z.phase !== 'flo') return false;
+    if (z.phase !== 'flo' || weg) return false;
     let m = null;
     try { m = z.chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
-    spieleEigenenZug(m);
-    return true;
-  }
-
-  function spieleEigenenZug(m) {
     const ply = z.zuege.length;
     merkeZug(m);
     neuerLiveEintrag(ply);
     z.phase = 'gezogen';
     queueMicrotask(() => nachEigenemZug(ply, m));
-  }
-
-  function fuehreVorzugAus() {
-    if (!z.vorzuege.length || weg || z.phase === 'ende') return false;
-    const v = z.vorzuege.shift();
-    let m = null;
-    try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
-    if (!m) { loescheVorzuege(); return false; }
-    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
-    spieleEigenenZug(m);
     return true;
   }
 
@@ -1055,8 +972,7 @@ export function zeige(root, params, app) {
   async function botAmZug() {
     if (weg || z.phase === 'ende') return;
     z.phase = 'bot';
-    if (z.vorzuege.length) { brett.zeigeVorzuege(z.vorzuege); zeichneVorzuege(); }
-    brett.erlaubeZuege(app.einstellungen().vorzuege === false ? null : vorzugZiele());
+    brett.erlaubeZuege(null);
     setzeDenkt(true);
     zeichneKnoepfe();
     const ctrl = new AbortController();
@@ -1134,7 +1050,6 @@ export function zeige(root, params, app) {
     speichereLaufend();
     if (pruefeEnde()) return;
     z.phase = 'flo';
-    if (fuehreVorzugAus()) return;
     brett.erlaubeZuege(zielKarte(z.chess));
     zeichneKnoepfe();
     balkenAktualisieren();
@@ -1148,7 +1063,6 @@ export function zeige(root, params, app) {
 
   // ---------- Hinweis, Zuruecknehmen, Drehen ----------
   async function hinweis() {
-    loescheVorzuege();
     if (z.phase !== 'flo' || z.hinweisRechnet) return;   // zweites Tippen waehrend der Rechnung
     const fen = z.chess.fen();
     if (z.hinweisFen !== fen) { z.hinweisFen = fen; z.hinweisStufe = 0; }
@@ -1181,7 +1095,6 @@ export function zeige(root, params, app) {
   }
 
   function zuruecknehmen() {
-    loescheVorzuege();
     if (z.phase === 'ende' || z.phase === 'start') return;
     const fp = letzterFloPly();
     if (fp < 0) { app.meldung('Es gibt noch keinen eigenen Zug zum Zurücknehmen.'); return; }
@@ -1224,14 +1137,12 @@ export function zeige(root, params, app) {
   }
 
   function drehen() {
-    loescheVorzuege();
     brett.dreheUm();
     balkenAusrichtung();
     melde({ typ: 'drehen', ausrichtung: brett.ausrichtung });
   }
 
   async function aufgebenFragen() {
-    loescheVorzuege();
     if (z.phase === 'ende') return;
     const ok = await app.frage({
       titel: 'Wirklich aufgeben?',
@@ -1331,7 +1242,6 @@ export function zeige(root, params, app) {
   let aktuellErg = null;
   async function ende(ergebnis, grund) {
     if (z.phase === 'ende') return;
-    loescheVorzuege();
     z.phase = 'ende';
     if (app.schliesseDialog) app.schliesseDialog();   // z. B. "Wirklich aufgeben?", wenn der Bot mattsetzt
     abbrechenBot();
@@ -1528,8 +1438,7 @@ export function zeige(root, params, app) {
     else unter = `${GRUND_TEXT[grund] || 'Remis'} gegen ${bot.name}`;
     const konfetti = ergebnis === 'sieg' && !reduziert
       ? '<div class="konfetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, i) => {
-        // Premium-Umbau U1: Konfetti in den Theme-Farben statt Neon
-        const farben = ['var(--akzent)', 'var(--gold)', 'var(--gut)', 'var(--k-stark)', 'var(--k-brillant)', 'var(--tinte)', 'var(--k-ungenau)'];
+        const farben = ['#19f6e8', '#a06bff', '#ff2d78', '#ff8a1e', '#ffd23f', '#3ef08a', '#ffffff'];
         return `<i style="--l:${(i * 37) % 100}%;--d:${(i % 7) * 0.18}s;--t:${2.6 + (i % 5) * 0.35}s;--c:${farben[i % farben.length]};--r:${(i * 47) % 360}deg"></i>`;
       }).join('') + '</div>'
       : '';
@@ -1695,7 +1604,7 @@ export function zeige(root, params, app) {
         }
         const neu = wertet ? erg.neuFreigeschaltet : null;
         if (neu && !nachtrag) {
-          o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${themaBotFarbe(neu)}">
+          o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${neu.farbe}">
             <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
             <div><div class="ef-titel">NEU FREIGESCHALTET · STUFE ${neu.stufe}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
         }
@@ -1957,8 +1866,6 @@ export function zeige(root, params, app) {
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
     brett.koordinaten(!!d.koordinaten);
-    brett.setzeAutoDame(d.autoDame !== false);
-    if (d.vorzuege === false) { loescheVorzuege(); if (z.phase === 'bot') brett.erlaubeZuege(null); }
     s.classList.toggle('ohne-balken', ohneBalken(d));
     for (const [name, el] of plaetze) el.hidden = d[name] !== true;
   };

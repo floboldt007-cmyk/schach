@@ -1,0 +1,315 @@
+{
+ "name": "tiefe18-bots",
+ "aufGemeinsameLaengeGekuerzt": 7,
+ "partien": 9,
+ "seiten": 18,
+ "zuege": 714,
+ "genauigkeitAbstand": {
+  "mittel": -0.8500000000000002,
+  "median": -0.8000000000000007,
+  "sd": 1.027418237765966,
+  "se": 0.24216480101301574,
+  "p10": -2.0300000000000025,
+  "p90": 0.26000000000000384
+ },
+ "genauigkeitA": 75.51666666666667,
+ "genauigkeitB": 74.66666666666666,
+ "patzerJe100": {
+  "A": 5.042016806722689,
+  "B": 5.182072829131653
+ },
+ "fehlerUndPatzerJe100": {
+  "A": 10.784313725490197,
+  "B": 10.92436974789916
+ },
+ "klasseGleich": 71.70868347338936,
+ "eloAbstand": null,
+ "haeufigsteWechsel": [
+  [
+   "exzellent>gut",
+   43
+  ],
+  [
+   "bester>exzellent",
+   34
+  ],
+  [
+   "gut>exzellent",
+   33
+  ],
+  [
+   "gut>ungenau",
+   21
+  ],
+  [
+   "exzellent>bester",
+   18
+  ],
+  [
+   "ungenau>gut",
+   17
+  ],
+  [
+   "bester>gut",
+   14
+  ],
+  [
+   "ungenau>fehler",
+   5
+  ]
+ ],
+ "paare": [
+  {
+   "id": "selbst-1-0",
+   "band": null,
+   "stufe": 1,
+   "gA": 49.3,
+   "gB": 49.7,
+   "patzerA": 7,
+   "patzerB": 6,
+   "fehlerA": 14,
+   "fehlerB": 12,
+   "zuege": 59,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-1-0",
+   "band": null,
+   "stufe": 1,
+   "gA": 57.3,
+   "gB": 56.7,
+   "patzerA": 12,
+   "patzerB": 12,
+   "fehlerA": 15,
+   "fehlerB": 16,
+   "zuege": 59,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-2-0",
+   "band": null,
+   "stufe": 2,
+   "gA": 57.6,
+   "gB": 56.3,
+   "patzerA": 3,
+   "patzerB": 3,
+   "fehlerA": 6,
+   "fehlerB": 6,
+   "zuege": 40,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-2-0",
+   "band": null,
+   "stufe": 2,
+   "gA": 60.3,
+   "gB": 59.6,
+   "patzerA": 5,
+   "patzerB": 5,
+   "fehlerA": 9,
+   "fehlerB": 10,
+   "zuege": 39,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-3-0",
+   "band": null,
+   "stufe": 3,
+   "gA": 77,
+   "gB": 77.2,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 3,
+   "fehlerB": 2,
+   "zuege": 30,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-3-0",
+   "band": null,
+   "stufe": 3,
+   "gA": 58.6,
+   "gB": 58.1,
+   "patzerA": 1,
+   "patzerB": 2,
+   "fehlerA": 3,
+   "fehlerB": 3,
+   "zuege": 29,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-4-0",
+   "band": null,
+   "stufe": 4,
+   "gA": 66.4,
+   "gB": 63.1,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 4,
+   "fehlerB": 4,
+   "zuege": 29,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-4-0",
+   "band": null,
+   "stufe": 4,
+   "gA": 73.7,
+   "gB": 72.8,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 2,
+   "fehlerB": 2,
+   "zuege": 29,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-5-0",
+   "band": null,
+   "stufe": 5,
+   "gA": 72.6,
+   "gB": 73.5,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 2,
+   "fehlerB": 2,
+   "zuege": 18,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-5-0",
+   "band": null,
+   "stufe": 5,
+   "gA": 94.1,
+   "gB": 94.3,
+   "patzerA": 0,
+   "patzerB": 0,
+   "fehlerA": 0,
+   "fehlerB": 0,
+   "zuege": 18,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-6-0",
+   "band": null,
+   "stufe": 6,
+   "gA": 81.2,
+   "gB": 79.1,
+   "patzerA": 1,
+   "patzerB": 2,
+   "fehlerA": 6,
+   "fehlerB": 6,
+   "zuege": 42,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-6-0",
+   "band": null,
+   "stufe": 6,
+   "gA": 85.5,
+   "gB": 85.4,
+   "patzerA": 0,
+   "patzerB": 0,
+   "fehlerA": 3,
+   "fehlerB": 4,
+   "zuege": 41,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-7-0",
+   "band": null,
+   "stufe": 7,
+   "gA": 86.8,
+   "gB": 85.8,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 2,
+   "fehlerB": 2,
+   "zuege": 51,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-7-0",
+   "band": null,
+   "stufe": 7,
+   "gA": 92.9,
+   "gB": 92.3,
+   "patzerA": 0,
+   "patzerB": 0,
+   "fehlerA": 0,
+   "fehlerB": 0,
+   "zuege": 51,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-8-0",
+   "band": null,
+   "stufe": 8,
+   "gA": 93.2,
+   "gB": 92.1,
+   "patzerA": 0,
+   "patzerB": 0,
+   "fehlerA": 1,
+   "fehlerB": 1,
+   "zuege": 56,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-8-0",
+   "band": null,
+   "stufe": 8,
+   "gA": 89.7,
+   "gB": 87.7,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 2,
+   "fehlerB": 2,
+   "zuege": 55,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-9-0",
+   "band": null,
+   "stufe": 9,
+   "gA": 75.1,
+   "gB": 73.2,
+   "patzerA": 1,
+   "patzerB": 1,
+   "fehlerA": 3,
+   "fehlerB": 4,
+   "zuege": 34,
+   "eloA": null,
+   "eloB": null
+  },
+  {
+   "id": "selbst-9-0",
+   "band": null,
+   "stufe": 9,
+   "gA": 88,
+   "gB": 87.1,
+   "patzerA": 0,
+   "patzerB": 0,
+   "fehlerA": 2,
+   "fehlerB": 2,
+   "zuege": 34,
+   "eloA": null,
+   "eloB": null
+  }
+ ]
+}

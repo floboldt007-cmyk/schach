@@ -1,0 +1,304 @@
+{
+ "aufschlagGemessen": 5.121837181924832,
+ "ki95": [
+  1.8952289377289162,
+  7.986506307867231
+ ],
+ "aufschlagVerwendet": 5.4,
+ "selbst": {
+  "seiten": 24,
+  "beleg": 82.00494780793318
+ },
+ "gegner": {
+  "benno": {
+   "label": 250,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 84.16898305084746,
+   "alt": 1425,
+   "ohne": {
+    "elo": 1550,
+    "spanne": [
+     850,
+     2450
+    ],
+    "sd": 605,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1250,
+    "spanne": [
+     600,
+     2150
+    ],
+    "sd": 596,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "hilde": {
+   "label": 500,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 89.03991596638656,
+   "alt": 1841.6666666666667,
+   "ohne": {
+    "elo": 2000,
+    "spanne": [
+     1300,
+     2700
+    ],
+    "sd": 529,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1550,
+    "spanne": [
+     900,
+     2300
+    ],
+    "sd": 544,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "kalle": {
+   "label": 800,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 87.37063636363636,
+   "alt": 1875,
+   "ohne": {
+    "elo": 1850,
+    "spanne": [
+     1050,
+     2750
+    ],
+    "sd": 648,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1400,
+    "spanne": [
+     900,
+     2050
+    ],
+    "sd": 453,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "lisa": {
+   "label": 1000,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 88.97155844155844,
+   "alt": 1766.6666666666667,
+   "ohne": {
+    "elo": 2000,
+    "spanne": [
+     1350,
+     2650
+    ],
+    "sd": 505,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1450,
+    "spanne": [
+     1000,
+     2050
+    ],
+    "sd": 398,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "rudi": {
+   "label": 1200,
+   "partien": 6,
+   "punkte": 6,
+   "beleg": 85.24758620689656,
+   "alt": 1633.3333333333333,
+   "ohne": {
+    "elo": 1650,
+    "spanne": [
+     1050,
+     2300
+    ],
+    "sd": 475,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1200,
+    "spanne": [
+     750,
+     1850
+    ],
+    "sd": 418,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "turm": {
+   "label": 1400,
+   "partien": 6,
+   "punkte": 3,
+   "beleg": 84.96571428571428,
+   "alt": 1466.6666666666667,
+   "ohne": {
+    "elo": 1600,
+    "spanne": [
+     1150,
+     2150
+    ],
+    "sd": 390,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1100,
+    "spanne": [
+     750,
+     1550
+    ],
+    "sd": 313,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "delia": {
+   "label": 1600,
+   "partien": 6,
+   "punkte": 3,
+   "beleg": 88.22723404255319,
+   "alt": 1625,
+   "ohne": {
+    "elo": 2000,
+    "spanne": [
+     1500,
+     2450
+    ],
+    "sd": 379,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1350,
+    "spanne": [
+     950,
+     1950
+    ],
+    "sd": 383,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "koenig": {
+   "label": 1800,
+   "partien": 6,
+   "punkte": 3,
+   "beleg": 87.00329268292681,
+   "alt": 1966.6666666666667,
+   "ohne": {
+    "elo": 1850,
+    "spanne": [
+     1150,
+     2550
+    ],
+    "sd": 537,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1300,
+    "spanne": [
+     850,
+     1900
+    ],
+    "sd": 400,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "greta": {
+   "label": 2100,
+   "partien": 6,
+   "punkte": 1.5,
+   "beleg": 86.25992307692309,
+   "alt": 1375,
+   "ohne": {
+    "elo": 1750,
+    "spanne": [
+     1100,
+     2400
+    ],
+    "sd": 495,
+    "partien": 6,
+    "vorlaeufig": true
+   },
+   "mit": {
+    "elo": 1200,
+    "spanne": [
+     850,
+     1700
+    ],
+    "sd": 343,
+    "partien": 6,
+    "vorlaeufig": true
+   }
+  },
+  "selbst": {
+   "label": null,
+   "partien": 24,
+   "punkte": 11,
+   "beleg": 82.00494780793318,
+   "alt": 1206.25,
+   "ohne": {
+    "elo": 1250,
+    "spanne": [
+     1050,
+     1550
+    ],
+    "sd": 202,
+    "partien": 24,
+    "vorlaeufig": false
+   },
+   "mit": {
+    "elo": 1250,
+    "spanne": [
+     1050,
+     1550
+    ],
+    "sd": 202,
+    "partien": 24,
+    "vorlaeufig": false
+   }
+  }
+ },
+ "alleBotsohne": {
+  "elo": 1850,
+  "spanne": [
+   1350,
+   2350
+  ],
+  "sd": 379,
+  "partien": 54,
+  "vorlaeufig": false
+ },
+ "alleBotsmit": {
+  "elo": 1200,
+  "spanne": [
+   950,
+   1550
+  ],
+  "sd": 231,
+  "partien": 54,
+  "vorlaeufig": false
+ }
+}

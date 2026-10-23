@@ -20,7 +20,6 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { leseSw } from './sw.test.mjs';
-import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +28,7 @@ const PRAEFIX = '/schach/';
 const START = `http://127.0.0.1:${PORT}${PRAEFIX}`;
 const APP = START + '?test&sw';
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
-const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
+const BILDER = bilderArg ? bilderArg.slice(9) : path.join(WURZEL, 'design', 'app-shots');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 mkdirSync(BILDER, { recursive: true });
 
@@ -274,7 +273,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   await seite.goto(APP + '#arena');
   await h.screen('arena');
   pruefe('Arena unter /schach/ geladen', await seite.locator('.screen.arena .knoten').count() === 10);
-  pruefe('Seitentitel', (await seite.title()) === 'Crownmate');
+  pruefe('Seitentitel', (await seite.title()) === 'Schach-Arena');
   const links = await seite.evaluate(() => ({
     manifest: document.querySelector('link[rel="manifest"]')?.href,
     apple: document.querySelector('link[rel="apple-touch-icon"]')?.href,
@@ -300,7 +299,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
     return { typ: r.headers.get('content-type'), name: j.name, kurz: j.short_name, start: new URL(j.start_url, r.url).href, scope: new URL(j.scope, r.url).href, display: j.display, icons };
   });
   pruefe('Manifest: Typ application/manifest+json', /manifest\+json/.test(man.typ), man.typ);
-  pruefe('Manifest: Name und Kurzname', man.name === 'Crownmate' && man.kurz === 'Crownmate');
+  pruefe('Manifest: Name und Kurzname', man.name === 'Schach-Arena' && man.kurz === 'Schach');
   pruefe('Manifest: start_url und scope = /schach/', man.start === START && man.scope === START, `${man.start} ${man.scope}`);
   pruefe('Manifest: standalone', man.display === 'standalone');
   pruefe('Manifest: alle Icons laden', man.icons.length >= 3 && man.icons.every((i) => i.status === 200), JSON.stringify(man.icons.filter((i) => i.status !== 200)));
@@ -711,7 +710,8 @@ let code = 1;
 const t0 = Date.now();
 try {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); });
-  browser = await browserTyp(ladePlaywright()).launch();
+  const { chromium } = ladePlaywright();
+  browser = await chromium.launch();
   const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
   const h = hilfen(seite);
   await testeStart(seite, h, fehler, fehlgeschlagen);

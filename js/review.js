@@ -15,7 +15,6 @@
 //   analysierePartie(..., { stueckeln: true }) gibt beim Einordnen der Zuege den Hauptthread frei (Nachholen)
 import { Chess } from '../vendor/chess/chess.js';
 import { eroeffnung, stellungsSchluessel } from './openings.js';
-import { KLASSEN_NAME, KLASSEN_WORT, ALTE_WOERTER } from './zugklassen.js';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -23,7 +22,11 @@ export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0
 export const KLASSEN = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch',
   'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
 
-export const KLASSEN_NAMEN = KLASSEN_NAME;
+export const KLASSEN_NAMEN = {
+  brillant: 'Brillant', stark: 'Großartig', bester: 'Bester Zug', exzellent: 'Exzellent',
+  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler',
+  verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
+};
 
 // Grenzen fuer den Erwartungsverlust (Gewinnchance 0..1, Sicht des Ziehenden)
 export const GRENZEN = { exzellent: 0.02, gut: 0.05, ungenau: 0.10, fehler: 0.20 };
@@ -144,7 +147,7 @@ export function seitenGenauigkeit(eintraege, farbe, plies = (eintraege || []).le
 const ELO_TABELLE = [[0, 100], [20, 200], [40, 400], [50, 550], [60, 750], [70, 1000], [75, 1150],
   [80, 1350], [85, 1600], [90, 1900], [94, 2250], [97, 2600], [100, 3000]];
 
-// Bots spielen anders als Menschen (seltene grobe Fehlzuege, sonst fast Engine-Zuege) und erreichen
+// Bots spielen anders als Menschen (seltene grobe Patzer, sonst fast Engine-Zuege) und erreichen
 // deshalb bei gleicher Staerke eine viel hoehere Genauigkeit. Tabelle aus den Medianen von
 // 80 Bot-gegen-Bot-Partien (Tiefe 14, MultiPV 2), monoton angepasst.
 const ELO_TABELLE_BOT = [[0, 100], [50, 150], [60, 200], [66, 250], [72, 350], [76, 500], [78, 750], [80, 1000],
@@ -402,7 +405,7 @@ function istRueckschlag(d, zug) {
   return !!(zug && zug.captured && d.vorigerSchlag && d.vorigerZug && zug.to === String(d.vorigerZug).slice(2, 4));
 }
 
-// Selbstverstaendlicher Zug (Eintrag "trivial", fuer die COMBO neutral wie ein Theoriezug): wie in
+// Selbstverstaendlicher Zug (Eintrag "trivial", fuer die COMBO neutral wie ein Buchzug): wie in
 // selbstverstaendlich() das Schlagen auf dem Feld, auf das der Gegner gerade gezogen hat, oder die
 // Schachabwehr mit hoechstens drei erlaubten Zuegen; ausserdem jedes echte Zurueckschlagen.
 function trivialerZug(d) {
@@ -526,7 +529,7 @@ export function klassifiziere(eingabe) {
   // 1. einziger legaler Zug
   if (d.anzahl === 1) return ergebnis('erzwungen', 0, 'einziger legaler Zug');
 
-  // 2. Theoriezug (nur, wenn die Engine ihn nicht als grober Fehlzug sieht)
+  // 2. Buchzug (nur, wenn die Engine ihn nicht als Patzer sieht)
   const basis = nachSchwelle(roh);
   if (d.buch && basis !== 'patzer') return ergebnis('buch', roh, d.eroeffnung || 'Eröffnungstheorie');
 
@@ -552,7 +555,7 @@ export function klassifiziere(eingabe) {
   }
 
   // Matt in hoechstens 3 ausgelassen und danach kein Matt mehr ("Miss" bei chess.com):
-  // mindestens "Verschenkt", auch wenn die Stellung gewonnen bleibt
+  // mindestens "Chance verpasst", auch wenn die Stellung gewonnen bleibt
   const mattVerpasst = !d.istBester && !d.matt && d.mattVorher != null && d.mattVorher > 0 && d.mattVorher <= 3
     && !(d.mattNachher != null && d.mattNachher > 0);
   const mattNotiz = mattVerpasst ? `Matt in ${d.mattVorher} verpasst` : '';
@@ -573,8 +576,8 @@ export function klassifiziere(eingabe) {
     return ergebnis('bester', 0, 'so gut wie der Engine-Zug');
   }
 
-  // 6. Verschenkt: Gegner hatte gerade gepatzt, Vorteil >= 0.70 verspielt (< 0.55).
-  // Bleibt die Stellung danach offen (>= 0.30, kein Matt gegen sich), ist es kein schwerer Fehlzug.
+  // 6. Chance verpasst: Gegner hatte gerade gepatzt, Vorteil >= 0.70 verspielt (< 0.55).
+  // Bleibt die Stellung danach offen (>= 0.30, kein Matt gegen sich), ist es kein Patzer.
   let klasse = basis;
   let notiz = `Gewinnchance −${Math.round(roh * 100)} %`;
   const offenDanach = d.wn >= 0.30 && !(d.mattNachher != null && d.mattNachher < 0);
@@ -745,56 +748,56 @@ export function coachText(eingabe, ergebnis) {
 
   switch (e.klasse) {
     case 'erzwungen':
-      return `${KLASSEN_WORT.erzwungen} Das war der einzige legale Zug.`;
+      return 'Erzwungen: Das war der einzige legale Zug.';
 
     case 'buch': {
       const satz = auswahl(d, ['Genau so steht es in der Eröffnungstheorie.', 'Ein bewährter Theoriezug.',
         'So spielen es auch die Profis.']);
-      return d.eroeffnung ? `${KLASSEN_WORT.buch}: ${d.eroeffnung}. ${satz}` : `${KLASSEN_WORT.buch}. ${satz}`;
+      return d.eroeffnung ? `Buchzug: ${d.eroeffnung}. ${satz}` : `Buchzug. ${satz}`;
     }
 
     case 'brillant': {
       const o = d.opfer || findeOpfer(d.fenVorher, d.uci, d.pvNachher, d.farbe);
-      if (!o) return `${KLASSEN_WORT.brillant} ${sanDe} ist ein mutiger und starker Zug.`;
+      if (!o) return `Brillant! ${sanDe} ist ein mutiger und starker Zug.`;
       const wer = d.du ? 'Du opferst' : `${farbName(d.farbe)} opfert`;
       const feld = o.feld ? ` auf ${o.feld}` : '';
       if (o.art === 'haengt') {
         const gegner = d.du ? 'deinen Gegner' : 'den Gegner';
-        return `${KLASSEN_WORT.brillant} ${gross(NOM[o.figur])}${feld} steht bewusst im Schlag, Nehmen wäre für ${gegner} ein Fehler.`;
+        return `Brillant! ${gross(NOM[o.figur])}${feld} steht bewusst im Schlag, Nehmen wäre für ${gegner} ein Fehler.`;
       }
       if (d.mattNachher != null && d.mattNachher > 0) {
         const n = d.mattNachher;
         const linie = n <= 2 ? variante(d.fenNachher, d.pvNachher, 2 * n) : '';
-        return `${KLASSEN_WORT.brillant} ${wer} ${AKK[o.figur]}${feld} und setzt danach in ${n} ${zuegeWort(n)} matt${linie ? ` (${linie})` : ''}.`;
+        return `Brillant! ${wer} ${AKK[o.figur]}${feld} und setzt danach in ${n} ${zuegeWort(n)} matt${linie ? ` (${linie})` : ''}.`;
       }
-      return `${KLASSEN_WORT.brillant} ${wer} ${AKK[o.figur]}${feld}, und die Rechnung geht auf.`;
+      return `Brillant! ${wer} ${AKK[o.figur]}${feld}, und die Rechnung geht auf.`;
     }
 
     case 'stark': {
       const haelt = d.wv >= 0.7 ? 'den Vorteil hält' : d.wv >= 0.4 ? 'die Stellung hält' : 'den Schaden begrenzt';
-      return `${KLASSEN_WORT.stark} ${sanDe} ist der einzige Zug, der ${haelt}. Alles andere wäre deutlich schlechter gewesen.`;
+      return `Großartig! ${sanDe} ist der einzige Zug, der ${haelt}. Alles andere wäre deutlich schlechter gewesen.`;
     }
 
     case 'bester': {
       if (d.matt) return `Schachmatt! ${sanDe} beendet die Partie.`;
       if (d.patt) return d.wv < 0.4 ? 'Patt! Damit ist das Remis gerettet.' : 'Patt – die Partie endet remis.';
       if (d.mattNachher != null && d.mattNachher > 0) {
-        return `${KLASSEN_WORT.bester} Matt in ${d.mattNachher} ist jetzt nicht mehr aufzuhalten.`;
+        return `Bester Zug! Matt in ${d.mattNachher} ist jetzt nicht mehr aufzuhalten.`;
       }
-      if (istRueckschlag(d, d.zug)) return `${KLASSEN_WORT.bester} Richtig zurückgeschlagen.`;
+      if (istRueckschlag(d, d.zug)) return 'Bester Zug! Richtig zurückgeschlagen.';
       if (d.fenVorher && d.uci && d.pvNachher.length) {
         const folge = materialFolge(d.fenVorher, [d.uci, ...d.pvNachher], d.farbe, { min: 4 });
         const mt = materialText(folge, 'gewinn', 'akk');
-        if (mt) return `${KLASSEN_WORT.bester} Das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}.`;
+        if (mt) return `Bester Zug! Das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}.`;
       }
       // "Genau das hätte auch die Engine gespielt" nur fuer den Engine-Zug selbst
       return auswahl(d, d.istBester ? [
-        `${KLASSEN_WORT.bester} Genau das hätte auch die Engine gespielt.`,
-        `${KLASSEN_WORT.bester} Genau gespielt.`,
-        `${KLASSEN_WORT.bester} Stärker geht es in dieser Stellung nicht.`,
+        'Bester Zug! Genau das hätte auch die Engine gespielt.',
+        'Bester Zug! Präzise gespielt.',
+        'Bester Zug! Stärker geht es in dieser Stellung nicht.',
       ] : [
-        `${KLASSEN_WORT.bester} Genau gespielt.`,
-        `${KLASSEN_WORT.bester} Genauso stark wie der Engine-Zug.`,
+        'Bester Zug! Präzise gespielt.',
+        'Bester Zug! Genauso stark wie der Engine-Zug.',
       ]);
     }
 
@@ -802,19 +805,19 @@ export function coachText(eingabe, ergebnis) {
     case 'gut': {
       // ausgelassenes Matt immer nennen
       if (d.mattVorher != null && d.mattVorher > 0 && !(d.mattNachher != null && d.mattNachher > 0) && besserB && !d.istBester) {
-        return `${KLASSEN_WORT[e.klasse]} Hier war aber Matt in ${d.mattVorher} mit ${besserB} möglich.`;
+        return `${e.klasse === 'gut' ? 'Guter Zug.' : 'Exzellent!'} Hier war aber Matt in ${d.mattVorher} mit ${besserB} möglich.`;
       }
       if (e.klasse === 'gut') {
-        return besserB && !d.istBester ? `${KLASSEN_WORT.gut} Noch etwas genauer war ${besserB}.` : KLASSEN_WORT.gut;
+        return besserB && !d.istBester ? `Guter Zug. Noch etwas genauer war ${besserB}.` : 'Guter Zug.';
       }
       return besserB && !d.istBester
-        ? `${KLASSEN_WORT.exzellent} Fast so stark wie ${besserB}.`
-        : `${KLASSEN_WORT.exzellent} Ein sehr starker Zug.`;
+        ? `Exzellent! Fast so stark wie ${besserB}.`
+        : 'Exzellent! Ein sehr starker Zug.';
     }
 
     default: {
       // ungenau, fehler, patzer, verpasst
-      const kopf = KLASSEN_WORT[e.klasse] || '';
+      const kopf = { ungenau: 'Ungenau.', fehler: 'Ein Fehler.', patzer: 'Patzer!', verpasst: 'Chance verpasst!' }[e.klasse] || '';
       let grund = null;
       let besser = besserText(d);
       if (d.patt && d.wv >= 0.6) {
@@ -1094,7 +1097,7 @@ export function warKnapp(kurve, farbe) {
   return false;
 }
 
-// Wichtigste Momente: Brillanz, starke Zuege, Fehler, schwere Fehlzuege, verpasste Chancen (max. 8)
+// Wichtigste Momente: Brillanz, starke Zuege, Fehler, Patzer, verpasste Chancen (max. 8)
 function schluesselmomente(eintraege) {
   const gewicht = { brillant: 2, stark: 1.2, verpasst: 1.5, patzer: 1, fehler: 0.6 };
   return eintraege
@@ -1140,12 +1143,7 @@ export function spielphasen(fens, buchEnde) {
 // schon gross ueber dem Satz). Die einzige Stelle, die die Klassenwoerter der Coach-Texte kennt.
 // Keine langen Gedankenstriche in UI-Texten (werden zu ": "), Rochade wie in der Zugliste (0-0).
 // ---------------------------------------------------------------------------
-const regexSicher = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const KLASSENWOERTER = [...Object.values(KLASSEN_WORT), ...ALTE_WOERTER]
-  .filter((wort) => wort !== KLASSEN_WORT.buch)
-  .map(regexSicher);
-KLASSENWOERTER.push(`${regexSicher(KLASSEN_WORT.buch)}[.:]`);
-const KLASSENWORT_AM_ANFANG = new RegExp(`^(?:${KLASSENWOERTER.join('|')})\\s+`);
+const KLASSENWORT_AM_ANFANG = /^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/;
 
 export function coachKern(t) {
   const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');

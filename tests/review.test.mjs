@@ -9,7 +9,6 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
 import { Chess } from '../vendor/chess/chess.js';
 import {
   gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
@@ -164,7 +163,7 @@ function nodeTests() {
 
   // Buch
   const rbuch = klassifiziere(basis(0.03, { buch: true, eroeffnung: 'Testeröffnung' }));
-  pruefe('buch: Theorie', rbuch.klasse === 'buch', rbuch.klasse);
+  pruefe('buch: Buchzug', rbuch.klasse === 'buch', rbuch.klasse);
   const rbuchP = klassifiziere(basis(0.3, { buch: true }));
   pruefe('buch: Patzer laut Engine bleibt patzer', rbuchP.klasse === 'patzer', rbuchP.klasse);
 
@@ -199,7 +198,7 @@ function nodeTests() {
   const rmiss = klassifiziere(miss);
   const tmiss = coachText(miss, rmiss);
   pruefe('Matt in 1 ausgelassen (Lh8-d4 statt Dg8#) -> verpasst', rmiss.klasse === 'verpasst', rmiss.klasse);
-  pruefe('Coach: "Hier war Matt in 1 mit Dg8# möglich"', /^Verschenkt! Hier war Matt in 1 mit Dg8# möglich/.test(tmiss), tmiss);
+  pruefe('Coach: "Hier war Matt in 1 mit Dg8# möglich"', /^Chance verpasst! Hier war Matt in 1 mit Dg8# möglich/.test(tmiss), tmiss);
   pruefe('Matt in 2 statt Matt in 1 bleibt gut (Matt-Saettigung)', klassifiziere({ ...miss, evalNachher: matt(2) }).klasse !== 'verpasst');
   const rmatt = klassifiziere(basis(0, { evalVorher: matt(2), evalNachher: matt(5) }));
   pruefe('Matt-Saettigung: Matt in 2 -> Matt in 5 = exzellent', rmatt.klasse === 'exzellent', rmatt.klasse);
@@ -261,7 +260,7 @@ function nodeTests() {
   const tumwB = coachText({ fenVorher: UMW_G, uci: 'c3d3', besterZug: 'c3b2', pvVorher: ['c3b2'], evalVorher: ev(0), evalNachher: ev(-900), pvNachher: ['b2b1q', 'd3e3'], du: false });
   pruefe('Coach Umwandlung (Bot-Sicht): "wandelt Schwarz in eine Dame um"', /wandelt Schwarz in eine Dame um/.test(tumwB), tumwB);
 
-  // kein Genial, wenn nach dem Annehmen des Opfers totes Remis bleibt
+  // kein Brillant, wenn nach dem Annehmen des Opfers totes Remis bleibt
   const TOT = '5B2/8/7K/3k4/2b5/8/8/8 w - - 6 76';
   const tot = klassifiziere({ fenVorher: TOT, uci: 'f8c5', besterZug: 'f8c5', evalVorher: ev(7), evalNachher: ev(0), evalZweiter: ev(0), pvNachher: ['d5c5'] });
   pruefe('kein brillant: Laeufer einstellen ins tote Remis', tot.klasse !== 'brillant', tot.klasse);
@@ -366,12 +365,12 @@ function nodeTests() {
   const gut = coachText(basis(0.03));
   pruefe('Coach gut: "Noch etwas genauer war dxc5"', /genauer war dxc5/.test(gut), gut);
   pruefe('Coach exzellent: "Fast so stark wie dxc5"', /Fast so stark wie dxc5/.test(coachText(basis(0.01))));
-  pruefe('Coach buch: nennt Eroeffnung', /Theorie: Testeröffnung/.test(coachText(basis(0.01, { buch: true, eroeffnung: 'Testeröffnung' }))));
+  pruefe('Coach buch: nennt Eroeffnung', /Buchzug: Testeröffnung/.test(coachText(basis(0.01, { buch: true, eroeffnung: 'Testeröffnung' }))));
   const MATTZUG = fenNach(['f3', 'e5', 'g4']);
   pruefe('Coach Matt: "Schachmatt! Dh4#"', /Schachmatt! Dh4#/.test(coachText({ fenVorher: MATTZUG, uci: 'd8h4', besterZug: 'd8h4', evalVorher: matt(-1), evalNachher: matt(-1) })));
-  pruefe('Coach stark: "Großartig"', /^Goldrichtig! Sf3 ist der einzige Zug/.test(coachText({ fenVorher: STARK, uci: 'g1f3', besterZug: 'g1f3', evalVorher: ev(30), evalNachher: ev(30), evalZweiter: ev(-200) })));
+  pruefe('Coach stark: "Großartig"', /^Großartig! Sf3 ist der einzige Zug/.test(coachText({ fenVorher: STARK, uci: 'g1f3', besterZug: 'g1f3', evalVorher: ev(30), evalNachher: ev(30), evalZweiter: ev(-200) })));
   const verpT = coachText(basis(0, { fenVorher: FIGUR, uci: 'g1f1', besterZug: 'd3e4', pvVorher: ['d3e4', 'g8f8'], evalVorher: evFuer(0.72), evalNachher: evFuer(0.54), gegnerKlasse: 'patzer', pvNachher: ['e4d2'] }));
-  pruefe('Coach verpasst: "Verschenkt! ... Lxe4 ... gewinnt den Springer"', /^Verschenkt!/.test(verpT) && /Lxe4/.test(verpT) && /Springer/.test(verpT), verpT);
+  pruefe('Coach verpasst: "Chance verpasst! ... Lxe4 ... gewinnt den Springer"', /^Chance verpasst!/.test(verpT) && /Lxe4/.test(verpT) && /Springer/.test(verpT), verpT);
   // Alle Klassen haben einen nicht-leeren Text
   for (const [name, e] of [['patzer', narr], ['brillant', opferMatt], ['erzwungen', { fenVorher: EINZIG, uci: 'e1e2', evalVorher: ev(0), evalNachher: ev(0) }], ['ungenau', basis(0.07)], ['fehler', basis(0.15)]]) {
     const t = coachText(e);
@@ -544,7 +543,7 @@ function altePhasen(fens, buchEnde) {
 }
 function alterCoachSatz(t) {
   const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
-  const rest = text.replace(/^(Genial!|Goldrichtig!|Präzise!|Sauber!|Solide\.|Unscharf\.|Daneben\.|Weit daneben!|Verschenkt!|Theorie[.:]|Pflichtzug:)\s+/, '');
+  const rest = text.replace(/^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug[.:]|Erzwungen:)\s+/, '');
   if (!rest.trim()) return text;
   return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);
 }
@@ -617,35 +616,33 @@ async function runde4Tests() {
 
   // coachKern: Klassenwort am Anfang weg, Gedankenstriche zu Doppelpunkt, O-O zu 0-0
   const BEISPIELE = [
-    ['Genial! Du opferst den Springer auf f7, und die Rechnung geht auf.', 'Du opferst den Springer auf f7, und die Rechnung geht auf.'],
-    ['Goldrichtig! e5 ist der einzige Zug, der den Vorteil hält.', 'e5 ist der einzige Zug, der den Vorteil hält.'],
-    ['Goldrichtig! Sf3 ist der einzige Zug, der die Stellung hält.', 'Sf3 ist der einzige Zug, der die Stellung hält.'],
-    ['Präzise! Genau das hätte auch die Engine gespielt.', 'Genau das hätte auch die Engine gespielt.'],
-    ['Sauber! Fast so stark wie Sf3.', 'Fast so stark wie Sf3.'],
-    ['Solide. Noch etwas genauer war d4.', 'Noch etwas genauer war d4.'],
-    ['Unscharf. Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.', 'Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.'],
-    ['Daneben. Nach Sxf7 verlierst du den Turm auf h8.', 'Nach Sxf7 verlierst du den Turm auf h8.'],
-    ['Weit daneben! Das erlaubt Matt in 1: Dh4#. Besser war Sf3.', 'Das erlaubt Matt in 1: Dh4#. Besser war Sf3.'],
-    ['Verschenkt! Nach dem Fehler deines Gegners war Dxd5 stark.', 'Nach dem Fehler deines Gegners war Dxd5 stark.'],
-    ['Theorie: Spanische Partie. Ein bewährter Theoriezug.', 'Spanische Partie. Ein bewährter Theoriezug.'],
-    ['Theorie. So spielen es auch die Profis.', 'So spielen es auch die Profis.'],
-    ['Pflichtzug: Das war der einzige legale Zug.', 'Das war der einzige legale Zug.'],
-    ['Präzise! exd5 gewinnt einen Bauern.', 'exd5 gewinnt einen Bauern.'],
-    ['Sauber! fast perfekt.', 'Fast perfekt.'],
+    ['Brillant! Du opferst den Springer auf f7, und die Rechnung geht auf.', 'Du opferst den Springer auf f7, und die Rechnung geht auf.'],
+    ['Großartig! e5 ist der einzige Zug, der den Vorteil hält.', 'e5 ist der einzige Zug, der den Vorteil hält.'],
+    ['Großartig! Sf3 ist der einzige Zug, der die Stellung hält.', 'Sf3 ist der einzige Zug, der die Stellung hält.'],
+    ['Bester Zug! Genau das hätte auch die Engine gespielt.', 'Genau das hätte auch die Engine gespielt.'],
+    ['Exzellent! Fast so stark wie Sf3.', 'Fast so stark wie Sf3.'],
+    ['Guter Zug. Noch etwas genauer war d4.', 'Noch etwas genauer war d4.'],
+    ['Ungenau. Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.', 'Die Bewertung aus deiner Sicht sinkt von +0,4 auf −0,1. Besser war Sf3.'],
+    ['Ein Fehler. Nach Sxf7 verlierst du den Turm auf h8.', 'Nach Sxf7 verlierst du den Turm auf h8.'],
+    ['Patzer! Das erlaubt Matt in 1: Dh4#. Besser war Sf3.', 'Das erlaubt Matt in 1: Dh4#. Besser war Sf3.'],
+    ['Chance verpasst! Nach dem Fehler deines Gegners war Dxd5 stark.', 'Nach dem Fehler deines Gegners war Dxd5 stark.'],
+    ['Buchzug: Spanische Partie. Ein bewährter Theoriezug.', 'Spanische Partie. Ein bewährter Theoriezug.'],
+    ['Buchzug. So spielen es auch die Profis.', 'So spielen es auch die Profis.'],
+    ['Erzwungen: Das war der einzige legale Zug.', 'Das war der einzige legale Zug.'],
+    ['Bester Zug! exd5 gewinnt einen Bauern.', 'exd5 gewinnt einen Bauern.'],
+    ['Exzellent! fast perfekt.', 'Fast perfekt.'],
     ['Patt – die Partie endet remis.', 'Patt: die Partie endet remis.'],
-    ['Weit daneben! Patt — damit ist der Sieg weg.', 'Patt: damit ist der Sieg weg.'],
-    ['Präzise! O-O-O bringt den König in Sicherheit, O-O ging nicht.', '0-0-0 bringt den König in Sicherheit, 0-0 ging nicht.'],
+    ['Patzer! Patt — damit ist der Sieg weg.', 'Patt: damit ist der Sieg weg.'],
+    ['Bester Zug! O-O-O bringt den König in Sicherheit, O-O ging nicht.', '0-0-0 bringt den König in Sicherheit, 0-0 ging nicht.'],
     ['Schachmatt! Dxf7# beendet die Partie.', 'Schachmatt! Dxf7# beendet die Partie.'],
-    ['Solide.', 'Solide.'],
-    ['Brillant! Alter gespeicherter Text.', 'Alter gespeicherter Text.'],
-    ['Buchzug: Alte Eröffnung.', 'Alte Eröffnung.'],
+    ['Guter Zug.', 'Guter Zug.'],
     ['', ''],
   ];
   for (const [ein, aus] of BEISPIELE) pruefe('coachKern: ' + (ein.slice(0, 22) || '(leer)'), coachKern(ein) === aus, coachKern(ein));
   pruefe('coachKern: null und undefined -> leer', coachKern(null) === '' && coachKern(undefined) === '');
   // Alle Klassen: echte Coach-Texte beginnen nach coachKern nie mit einem Klassenwort, und coachKern
   // liefert dasselbe wie das alte coachSatz() aus partie.js
-  const KOPF = /^(Genial!|Goldrichtig!|Präzise!|Sauber!|Solide\.|Unscharf\.|Daneben\.|Weit daneben!|Verschenkt!|Theorie|Pflichtzug)/;
+  const KOPF = /^(Brillant!|Großartig!|Bester Zug!|Exzellent!|Guter Zug\.|Ungenau\.|Ein Fehler\.|Patzer!|Chance verpasst!|Buchzug|Erzwungen)/;
   const eingaben = [
     { fenVorher: START_FEN, uci: 'e2e4', evalVorher: ev(30), evalNachher: ev(25), besterZug: 'd2d4', pvVorher: ['d2d4'], pvNachher: ['e7e5'], eroeffnung: 'Königsbauernspiel' },
     { fenVorher: fenNach(['e4', 'e5', 'Nf3']), uci: 'd8g5', evalVorher: ev(40), evalNachher: ev(900), besterZug: 'b8c6', pvVorher: ['b8c6'], pvNachher: ['f3g5'] },
@@ -746,7 +743,7 @@ async function browserTests() {
   let browser;
   try {
     await warteAufServer(`http://127.0.0.1:${PORT}/js/review.js`);
-    browser = await browserTyp(pw).launch();
+    browser = await pw.chromium.launch();
     const seite = await browser.newPage();
     seite.on('pageerror', (e) => console.log('Seitenfehler: ' + e.message));
     await seite.goto(`http://127.0.0.1:${PORT}/`);

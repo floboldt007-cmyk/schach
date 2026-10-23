@@ -1,0 +1,173 @@
+[
+ {
+  "name": "benno",
+  "bot": "benno",
+  "elo": 250,
+  "tiefe": 1,
+  "breite": 256,
+  "kurzChance": 0,
+  "kurzTiefe": 1,
+  "mattInEins": 0.35,
+  "vorlieben": {
+   "schlagen": 90
+  },
+  "zeit": [
+   400,
+   900
+  ],
+  "kandidaten": 0,
+  "k": 0.5
+ },
+ {
+  "name": "hilde",
+  "bot": "hilde",
+  "elo": 500,
+  "tiefe": 1,
+  "breite": 256,
+  "kurzChance": 0,
+  "kurzTiefe": 1,
+  "mattInEins": 0.6,
+  "vorlieben": {
+   "schlagen": 60
+  },
+  "zeit": [
+   500,
+   1100
+  ],
+  "kandidaten": 3,
+  "k": 0.55
+ },
+ {
+  "name": "kalle",
+  "bot": "kalle",
+  "elo": 800,
+  "tiefe": 2,
+  "breite": 256,
+  "kurzChance": 0.3,
+  "kurzTiefe": 1,
+  "mattInEins": 0.85,
+  "vorlieben": {
+   "schach": 80,
+   "vorwaerts": 30,
+   "dame": 20,
+   "schlagen": 25
+  },
+  "zeit": [
+   400,
+   1000
+  ],
+  "kandidaten": 3,
+  "k": 0.47
+ },
+ {
+  "name": "lisa",
+  "bot": "lisa",
+  "elo": 1000,
+  "tiefe": 3,
+  "breite": 256,
+  "kurzChance": 0.25,
+  "kurzTiefe": 1,
+  "vorlieben": {
+   "laeufer": 60
+  },
+  "zeit": [
+   400,
+   1000
+  ],
+  "kandidaten": 3,
+  "k": 0.56
+ },
+ {
+  "name": "rudi",
+  "bot": "rudi",
+  "elo": 1200,
+  "tiefe": 4,
+  "breite": 256,
+  "kurzChance": 0.25,
+  "kurzTiefe": 2,
+  "vorlieben": {
+   "springer": 55,
+   "gabel": 80
+  },
+  "zeit": [
+   600,
+   1300
+  ],
+  "kandidaten": 3,
+  "k": 0.56
+ },
+ {
+  "name": "turm",
+  "bot": "turm",
+  "elo": 1400,
+  "tiefe": 5,
+  "breite": 256,
+  "kurzChance": 0.1,
+  "kurzTiefe": 2,
+  "vorlieben": {
+   "rochade": 50,
+   "turm": 15,
+   "ruhig": 10
+  },
+  "zeit": [
+   800,
+   1500
+  ],
+  "kandidaten": 3,
+  "k": 0.55
+ },
+ {
+  "name": "delia",
+  "bot": "delia",
+  "elo": 1600,
+  "tiefe": 6,
+  "breite": 20,
+  "kurzChance": 0.1,
+  "kurzTiefe": 3,
+  "vorlieben": {
+   "schach": 45,
+   "opfer": 40
+  },
+  "zeit": [
+   700,
+   1400
+  ],
+  "kandidaten": 3,
+  "k": 0.62
+ },
+ {
+  "name": "koenig",
+  "bot": "koenig",
+  "elo": 1800,
+  "tiefe": 7,
+  "breite": 16,
+  "kurzChance": 0.08,
+  "kurzTiefe": 3,
+  "vorlieben": {
+   "koenigEndspiel": 15
+  },
+  "zeit": [
+   800,
+   1500
+  ],
+  "kandidaten": 3,
+  "k": 0.78
+ },
+ {
+  "name": "greta",
+  "bot": "greta",
+  "elo": 2100,
+  "tiefe": 8,
+  "breite": 12,
+  "kurzChance": 0.05,
+  "kurzTiefe": 4,
+  "vorlieben": {},
+  "zeit": [
+   800,
+   1500
+  ],
+  "maxZeit": 2500,
+  "kandidaten": 3,
+  "k": 0.83
+ }
+]

@@ -11,7 +11,6 @@ import { BUDGET, BRETT_FEIER } from '../js/feier.js';
 import { wertet, sterneFuerPartie, MODI } from '../js/storage.js';
 import { pruefeInhalt, pruefeSpielplan, texteVon, COUNTDOWN_RE } from '../js/inhalte.js';
 import { registriereBot, botNachId } from '../js/bots.js';
-import { ZUGKLASSEN } from '../js/zugklassen.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -20,11 +19,6 @@ let fehler = 0;
 function pruefe(name, bedingung, info) {
   if (bedingung) { ok++; console.log('OK     ' + name); } else { fehler++; console.log('FEHLER ' + name + (info !== undefined ? '  -> ' + JSON.stringify(info) : '')); }
 }
-
-const CHESS_COM_NAMEN = new Set(['Brillant', 'Großartig', 'Bester Zug', 'Exzellent', 'Gut', 'Buch', 'Ungenauigkeit', 'Fehler', 'Verpasst', 'Patzer']);
-const VERBOTENE_KLASSENNAMEN = new Set(['Treffer', 'Klasse', 'Serie', 'Funken']);
-pruefe('Zugklassen: 11 verschiedene Klartext-Namen', ZUGKLASSEN.length === 11 && new Set(ZUGKLASSEN.map((k) => k.name)).size === 11);
-pruefe('Zugklassen: keine Namen der Vergleichs-App oder Verbotsliste', ZUGKLASSEN.every((k) => !CHESS_COM_NAMEN.has(k.name) && !VERBOTENE_KLASSENNAMEN.has(k.name)));
 
 // ---------------------------------------------------------------------------
 // Quelltext zerlegen: Zeichenketten (auch Template-Texte) und Code ohne Kommentare.

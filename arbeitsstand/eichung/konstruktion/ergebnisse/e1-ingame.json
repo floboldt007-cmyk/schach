@@ -1,0 +1,200 @@
+{
+ "benno": {
+  "partien": 12,
+  "punkte": 4,
+  "zuegeOffen": 254,
+  "verlust": 6.745039370078739,
+  "patzer100": 9.84251968503937,
+  "grob100": 2.3622047244094486,
+  "grob100Alle": 1.6778523489932886,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "maia-gegen-benno": {
+  "partien": 12,
+  "punkte": 8,
+  "zuegeOffen": 267,
+  "verlust": 6.001385767790268,
+  "patzer100": 8.239700374531836,
+  "grob100": 2.247191011235955,
+  "grob100Alle": 1.6339869281045751,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "hilde": {
+  "partien": 12,
+  "punkte": 6.5,
+  "zuegeOffen": 319,
+  "verlust": 6.320156739811911,
+  "patzer100": 10.344827586206897,
+  "grob100": 3.761755485893417,
+  "grob100Alle": 2.096177558569667,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "maia-gegen-hilde": {
+  "partien": 12,
+  "punkte": 5.5,
+  "zuegeOffen": 367,
+  "verlust": 6.824904632152586,
+  "patzer100": 9.264305177111716,
+  "grob100": 2.4523160762942777,
+  "grob100Alle": 1.3664596273291925,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "kalle": {
+  "partien": 12,
+  "punkte": 5,
+  "zuegeOffen": 432,
+  "verlust": 4.044375000000003,
+  "patzer100": 5.787037037037037,
+  "grob100": 2.314814814814815,
+  "grob100Alle": 1.9841269841269842,
+  "kurzAnteil": 0.28703703703703703,
+  "grobKurz100": 2.4193548387096775
+ },
+ "maia-gegen-kalle": {
+  "partien": 12,
+  "punkte": 7,
+  "zuegeOffen": 499,
+  "verlust": 5.017735470941882,
+  "patzer100": 6.613226452905812,
+  "grob100": 1.2024048096192386,
+  "grob100Alle": 0.9271523178807947,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "lisa": {
+  "partien": 12,
+  "punkte": 4.5,
+  "zuegeOffen": 328,
+  "verlust": 5.023079268292686,
+  "patzer100": 7.926829268292683,
+  "grob100": 1.524390243902439,
+  "grob100Alle": 1.5384615384615385,
+  "kurzAnteil": 0.25,
+  "grobKurz100": 2.4390243902439024
+ },
+ "maia-gegen-lisa": {
+  "partien": 12,
+  "punkte": 7.5,
+  "zuegeOffen": 323,
+  "verlust": 4.787182662538699,
+  "patzer100": 5.882352941176471,
+  "grob100": 1.8575851393188854,
+  "grob100Alle": 1.4760147601476015,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "rudi": {
+  "partien": 12,
+  "punkte": 4,
+  "zuegeOffen": 284,
+  "verlust": 5.400387323943663,
+  "patzer100": 7.394366197183099,
+  "grob100": 2.816901408450704,
+  "grob100Alle": 1.680672268907563,
+  "kurzAnteil": 0.2640845070422535,
+  "grobKurz100": 2.6666666666666665
+ },
+ "maia-gegen-rudi": {
+  "partien": 12,
+  "punkte": 8,
+  "zuegeOffen": 289,
+  "verlust": 4.390103806228374,
+  "patzer100": 4.1522491349480966,
+  "grob100": 1.3840830449826989,
+  "grob100Alle": 1.0101010101010102,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "turm": {
+  "partien": 12,
+  "punkte": 3.5,
+  "zuegeOffen": 402,
+  "verlust": 3.711840796019898,
+  "patzer100": 3.9800995024875623,
+  "grob100": 0.746268656716418,
+  "grob100Alle": 0.7704160246533128,
+  "kurzAnteil": 0.11691542288557213,
+  "grobKurz100": 0
+ },
+ "maia-gegen-turm": {
+  "partien": 12,
+  "punkte": 8.5,
+  "zuegeOffen": 426,
+  "verlust": 3.6279577464788715,
+  "patzer100": 2.112676056338028,
+  "grob100": 0.704225352112676,
+  "grob100Alle": 0.7485029940119761,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "delia": {
+  "partien": 12,
+  "punkte": 2,
+  "zuegeOffen": 353,
+  "verlust": 4.545184135977338,
+  "patzer100": 5.09915014164306,
+  "grob100": 2.8328611898016995,
+  "grob100Alle": 2.2540983606557377,
+  "kurzAnteil": 0.10198300283286119,
+  "grobKurz100": 2.7777777777777777
+ },
+ "maia-gegen-delia": {
+  "partien": 12,
+  "punkte": 10,
+  "zuegeOffen": 347,
+  "verlust": 3.8598270893371773,
+  "patzer100": 4.899135446685879,
+  "grob100": 0.5763688760806917,
+  "grob100Alle": 0.8016032064128257,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "koenig": {
+  "partien": 12,
+  "punkte": 3,
+  "zuegeOffen": 314,
+  "verlust": 4.115828025477708,
+  "patzer100": 4.777070063694268,
+  "grob100": 1.2738853503184713,
+  "grob100Alle": 1.1538461538461537,
+  "kurzAnteil": 0.08280254777070063,
+  "grobKurz100": 3.8461538461538463
+ },
+ "maia-gegen-koenig": {
+  "partien": 12,
+  "punkte": 9,
+  "zuegeOffen": 313,
+  "verlust": 3.8943769968051143,
+  "patzer100": 3.8338658146964857,
+  "grob100": 0.3194888178913738,
+  "grob100Alle": 0.18691588785046728,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ },
+ "greta": {
+  "partien": 12,
+  "punkte": 7,
+  "zuegeOffen": 346,
+  "verlust": 2.684306358381503,
+  "patzer100": 2.8901734104046244,
+  "grob100": 0.8670520231213873,
+  "grob100Alle": 0.7109004739336493,
+  "kurzAnteil": 0.057803468208092484,
+  "grobKurz100": 5
+ },
+ "maia-gegen-greta": {
+  "partien": 12,
+  "punkte": 5,
+  "zuegeOffen": 352,
+  "verlust": 3.0384090909090884,
+  "patzer100": 2.272727272727273,
+  "grob100": 0.2840909090909091,
+  "grob100Alle": 0.23255813953488372,
+  "kurzAnteil": 0,
+  "grobKurz100": null
+ }
+}

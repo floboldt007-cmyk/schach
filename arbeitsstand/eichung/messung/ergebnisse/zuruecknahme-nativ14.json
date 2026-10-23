@@ -1,0 +1,112 @@
+{
+ "400": {
+  "seiten": 53,
+  "genauigkeitPlusA": 18.384186265109896,
+  "genauigkeitPlusB": 26.76689863211106,
+  "schaetzungPlusA": 557.5471698113207,
+  "schaetzungPlusB": 1036.7924528301887,
+  "abwVorher": 461.92452830188677,
+  "abwA": 1019.4716981132076,
+  "abwB": 1498.7169811320755
+ },
+ "600": {
+  "seiten": 60,
+  "genauigkeitPlusA": 18.905193555048733,
+  "genauigkeitPlusB": 25.292312506869102,
+  "schaetzungPlusA": 607.5,
+  "schaetzungPlusB": 1016.6666666666666,
+  "abwVorher": 310.8,
+  "abwA": 918.3,
+  "abwB": 1327.4666666666667
+ },
+ "800": {
+  "seiten": 60,
+  "genauigkeitPlusA": 14.720068755874447,
+  "genauigkeitPlusB": 22.340729911581544,
+  "schaetzungPlusA": 455.8333333333333,
+  "schaetzungPlusB": 909.1666666666666,
+  "abwVorher": 153.15,
+  "abwA": 608.9833333333333,
+  "abwB": 1062.3166666666666
+ },
+ "1000": {
+  "seiten": 60,
+  "genauigkeitPlusA": 10.54148801146936,
+  "genauigkeitPlusB": 16.72502345913757,
+  "schaetzungPlusA": 364.1666666666667,
+  "schaetzungPlusB": 735,
+  "abwVorher": 150.95,
+  "abwA": 515.1166666666667,
+  "abwB": 885.95
+ },
+ "1200": {
+  "seiten": 60,
+  "genauigkeitPlusA": 9.830914701593764,
+  "genauigkeitPlusB": 14.738190234130391,
+  "schaetzungPlusA": 355,
+  "schaetzungPlusB": 660,
+  "abwVorher": 6.1,
+  "abwA": 361.1,
+  "abwB": 666.1
+ },
+ "1400": {
+  "seiten": 60,
+  "genauigkeitPlusA": 8.405965833734362,
+  "genauigkeitPlusB": 14.49020347048573,
+  "schaetzungPlusA": 295.8333333333333,
+  "schaetzungPlusB": 660.8333333333334,
+  "abwVorher": -62.6,
+  "abwA": 233.23333333333332,
+  "abwB": 598.2333333333333
+ },
+ "1600": {
+  "seiten": 60,
+  "genauigkeitPlusA": 6.04250377244893,
+  "genauigkeitPlusB": 10.757770027605353,
+  "schaetzungPlusA": 243.33333333333334,
+  "schaetzungPlusB": 515,
+  "abwVorher": -184.35,
+  "abwA": 58.983333333333334,
+  "abwB": 330.65
+ },
+ "1800": {
+  "seiten": 60,
+  "genauigkeitPlusA": 5.792402034652436,
+  "genauigkeitPlusB": 11.219427814519102,
+  "schaetzungPlusA": 236.66666666666666,
+  "schaetzungPlusB": 537.5,
+  "abwVorher": -371.23333333333335,
+  "abwA": -134.56666666666666,
+  "abwB": 166.26666666666668
+ },
+ "2000": {
+  "seiten": 60,
+  "genauigkeitPlusA": 5.978247329928355,
+  "genauigkeitPlusB": 9.605608958761254,
+  "schaetzungPlusA": 288.3333333333333,
+  "schaetzungPlusB": 508.3333333333333,
+  "abwVorher": -411.8833333333333,
+  "abwA": -123.55,
+  "abwB": 96.45
+ },
+ "2200": {
+  "seiten": 60,
+  "genauigkeitPlusA": 4.105469355557575,
+  "genauigkeitPlusB": 8.119384725991562,
+  "schaetzungPlusA": 224.16666666666666,
+  "schaetzungPlusB": 496.6666666666667,
+  "abwVorher": -505.6666666666667,
+  "abwA": -281.5,
+  "abwB": -9
+ },
+ "2400": {
+  "seiten": 60,
+  "genauigkeitPlusA": 4.567411835673734,
+  "genauigkeitPlusB": 7.811117911973252,
+  "schaetzungPlusA": 252.5,
+  "schaetzungPlusB": 481.6666666666667,
+  "abwVorher": -626.0333333333333,
+  "abwA": -373.53333333333336,
+  "abwB": -144.36666666666667
+ }
+}

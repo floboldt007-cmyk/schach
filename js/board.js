@@ -36,15 +36,17 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const FIGUR_NAMEN = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
 const UMWANDLUNG_REIHE = ['q', 'r', 'b', 'n']; // Vertrag: D T L S
 
-import { KLASSEN_NAME } from './zugklassen.js';
-
-export const KLASSEN_TITEL = KLASSEN_NAME;
+export const KLASSEN_TITEL = {
+  brillant: 'Brillant', stark: 'Großartig', bester: 'Bester Zug', exzellent: 'Exzellent',
+  gut: 'Gut', buch: 'Buchzug', ungenau: 'Ungenau', fehler: 'Fehler',
+  verpasst: 'Chance verpasst', patzer: 'Patzer', erzwungen: 'Erzwungen',
+};
 
 // Ersatzfarben, falls die Design-Variablen --k-* fehlen
 const KLASSEN_ERSATZ = {
-  brillant: '#7A4FD6', stark: '#2F67D8', bester: '#14936A', exzellent: '#5E9C4E', gut: '#7F928A',
-  buch: '#A07A52', ungenau: '#D6A21C', fehler: '#DD7A2A', verpasst: '#B4468F', patzer: '#BC2A4C',
-  erzwungen: '#878E9E',
+  brillant: '#14b8c8', stark: '#4f7bf7', bester: '#2db45d', exzellent: '#7cc242', gut: '#97ad7b',
+  buch: '#c38d5e', ungenau: '#e9b21b', fehler: '#ff8b2c', verpasst: '#b266ea', patzer: '#f0474b',
+  erzwungen: '#8a93a8',
 };
 
 // Farbnamen fuer Pfeile, die auf Vertrags-Variablen zeigen
@@ -194,15 +196,12 @@ function svgEl(name, attr) {
 
 export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
-    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null, beiLeer = null,
-    autoDame = false } = {}) {
+    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
     this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
     this.beiZug = beiZug;
     this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
-    this.beiLeer = typeof beiLeer === 'function' ? beiLeer : null;
-    this.autoDame = !!autoDame;
     this._stumm = null;          // Geste auf einer eigenen Figur ohne erlaubten Zug (nur fuer beiAbgelehnt)
     this._striche = new Set();   // gezeichnete Striche (W0+a)
     this._gekippt = new Set();   // gekippte Koenige (img)
@@ -289,18 +288,6 @@ export class Brett {
     this._zeichneLagen();
   }
 
-  // Zeigt eine Folge vorgemerkter Zuege, ohne beiZug aufzurufen. Die echte Stellung
-  // bleibt Aufgabe der App und wird mit dem naechsten setzeStellung wiederhergestellt.
-  zeigeVorzuege(liste) {
-    let figuren = this._stellungKarte();
-    for (const z of liste || []) {
-      if (!z || !gueltigesFeld(z.von) || !gueltigesFeld(z.nach)) continue;
-      figuren = wendeZugAn(figuren, z.von, z.nach, z.umwandlung || 'q');
-    }
-    this._zeigeFiguren(figuren, false);
-    this._zeichneLagen();
-  }
-
   zeigeAbzeichen(feld, klasse) {
     if (!gueltigesFeld(feld) || !klasse) { this.entferneAbzeichen(); return; }
     this._abzeichen = { feld, klasse };
@@ -337,8 +324,6 @@ export class Brett {
     this.el.classList.toggle('ohne-koordinaten', !this._koord);
     this._beschrifte();
   }
-
-  setzeAutoDame(an = true) { this.autoDame = !!an; }
 
   // ----- W0+a: Striche und Koenigsfall -----
 
@@ -786,9 +771,6 @@ export class Brett {
       this._auswahl = null;
       this._zeichneLagen();
     }
-    if (this.beiLeer) {
-      try { this.beiLeer(feld); } catch (err) { console.error(err); }
-    }
   }
 
   // Figur der Seite am Zug (Farbe aus der Zielkarte), die selbst keinen erlaubten Zug hat
@@ -827,16 +809,11 @@ export class Brett {
     e.preventDefault();
     const r = this._felderEl.getBoundingClientRect();
     const s = r.width / 8;
-    const f = this._feldAusPunkt(e.clientX, e.clientY);
-    const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
-    // Touchmove-Ereignisse koennen auf iPadOS bei schneller Bewegung einen Frame hinterherhinken.
-    // Ueber einem gueltigen Ziel bleibt die Vorschau deshalb mittig unter diesem Feld statt sichtbar nachzulaufen.
-    const [spalte, zeile] = ueber && g.typ !== 'mouse' ? this._spalteZeile(ueber) : [null, null];
-    const x = spalte == null ? e.clientX : r.left + (spalte + 0.5) * s;
-    const y = zeile == null ? e.clientY : r.top + (zeile + 0.5) * s;
     // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
     const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
-    g.el.style.transform = `translate(${(x - r.left - s / 2).toFixed(1)}px, ${(y - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
+    g.el.style.transform = `translate(${(e.clientX - r.left - s / 2).toFixed(1)}px, ${(e.clientY - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
+    const f = this._feldAusPunkt(e.clientX, e.clientY);
+    const ueber = f && f !== g.von && this._zieleVon(g.von).has(f) ? f : null;
     if (ueber !== this._ueber) {
       this._ueber = ueber;
       this._zeichneLagen();
@@ -858,8 +835,6 @@ export class Brett {
     this.el.classList.remove('zieht');
     if (g.zieht) {
       g.el.classList.remove('gezogen', 'beruehrung');
-      g.el.style.left = '';
-      g.el.style.top = '';
       const ziel = this._feldAusPunkt(e.clientX, e.clientY);
       if (ziel && ziel !== g.von && this._zieleVon(g.von).has(ziel)) {
         this._versucheZug(g.von, ziel, 'ziehen');
@@ -889,8 +864,6 @@ export class Brett {
     try { this.el.releasePointerCapture(g.id); } catch (err) { /* egal */ }
     if (g.zieht && g.el) {
       g.el.classList.remove('gezogen', 'beruehrung');
-      g.el.style.left = '';
-      g.el.style.top = '';
       if (animieren) this._schnappeZurueck(g.el, g.von);
       else { g.el.style.transform = ''; this._platziere(g.el, g.von); }
     }
@@ -912,7 +885,6 @@ export class Brett {
   _versucheZug(von, nach, art) {
     const fig = this.figurAuf(von);
     if (fig && fig[1] === 'P' && ((fig[0] === 'w' && nach[1] === '8') || (fig[0] === 'b' && nach[1] === '1'))) {
-      if (this.autoDame) { this._fuehreAus(von, nach, 'q', art); return; }
       this._oeffneUmwandlung(von, nach, art);
       return;
     }

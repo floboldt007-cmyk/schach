@@ -2,8 +2,6 @@
 // Gegner-Panel (Avatar, Begruessung, Bio, Merkmale, Stern-Ziele, Farbwahl, Spielen, Bilanz).
 // Params: { neuFreigeschaltet?: botId } spielt die Freischalt-Animation,
 //         { waehle?: botId } (Zusatz) waehlt einen freien Bot im Panel vor.
-// Premium-Umbau U2: Kopf aus js/ui/seite.js (hauptKopf: Marke, Platz fuer die Reiter-Pille, Chips, Verlauf, Hell/Dunkel,
-// Klang, Zahnrad); .logo, .logo-unter, .kopf-chips und die data-aktion-Knoepfe bleiben.
 // Runde 4 (Anzeige-Orte, js/orte.js): arena:kopf (in .kopf-chips nach den zwei Chips),
 // arena:panel-oben (ganz oben im Panel, davor die Nachlese aus feier.nachlese() "Seit deiner letzten
 // Partie"), arena:panel-bot (nach den Stern-Zielen), arena:start (einmal nach dem ersten Layout).
@@ -27,8 +25,6 @@ import { fuelle, waehle } from '../orte.js';
 import { nachlese } from '../feier.js';
 import { starteNachholen } from '../nachholen.js';
 import { icon } from '../app.js';
-import { botFarbe } from '../thema.js';
-import { hauptKopf, standardChips, verbindeKopf } from './seite.js';
 
 // Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
 const MERKMALE = {
@@ -94,11 +90,16 @@ export function zeige(root, params, app) {
   s.className = 'screen arena';
   s.setAttribute('aria-label', 'Bot-Leiter');
   s.innerHTML = `
-    ${hauptKopf({
-    unter: alleBesiegt ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne` : 'Besiege alle 10 Bots',
-    chips: standardChips(fortschritt),
-    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: 'Verlauf' }],
-  })}
+    <header class="kopf">
+      <div class="titel"><div class="logo">SCHACH·ARENA</div><div class="logo-unter">${alleBesiegt
+        ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30\u00a0Sterne` : 'Besiege alle 10 Bots'}</div></div>
+      <div class="kopf-chips">
+        <span class="chip zahl" title="Gesammelte Sterne"><span class="stern" aria-hidden="true">★</span><span class="sr">Sterne:</span> ${gesamtSterne(fortschritt)}<span class="von"> / 30</span></span>
+        <span class="chip zahl" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegteBots(fortschritt)}<span class="von"> / 10</span></span>
+      </div>
+      <button class="icon-knopf" type="button" data-aktion="verlauf" aria-label="Verlauf">${icon('verlauf')}</button>
+      <button class="icon-knopf" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
+    </header>
     <div class="inhalt">
       <div class="karte" tabindex="-1">
         <div class="karte-innen">
@@ -123,8 +124,6 @@ export function zeige(root, params, app) {
 
   s.querySelector('[data-aktion="verlauf"]').addEventListener('click', () => app.gehe('verlauf'));
   s.querySelector('[data-aktion="einstellungen"]').addEventListener('click', () => app.gehe('einstellungen'));
-  // Premium-Umbau U2: Hauptseiten-Kopf (Klang-Schalter, Hell/Dunkel), js/ui/seite.js
-  const kopfHandle = verbindeKopf(s, app);
   orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
 
   // ---------- Knoten ----------
@@ -134,7 +133,7 @@ export function zeige(root, params, app) {
     el.type = 'button';
     el.className = `knoten ${z}${b.stufe === 10 ? ' boss' : ''}`;
     el.dataset.bot = b.id;
-    el.style.setProperty('--bf', botFarbe(b));
+    el.style.setProperty('--bf', b.farbe);
     const sterne = fortschritt.bots[b.id].sterne;
     el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
@@ -307,7 +306,7 @@ export function zeige(root, params, app) {
     const status = z === 'besiegt' ? 'BESIEGT' : 'NÄCHSTER GEGNER';
     const satz = begruessung(b);
     const farben = [['w', 'Weiß', ['wK']], ['z', 'Zufall', ['wK', 'bK']], ['b', 'Schwarz', ['bK']]];
-    detail.style.setProperty('--bf', botFarbe(b));
+    detail.style.setProperty('--bf', b.farbe);
     if (orte.oben) orte.oben.verlasse();
     if (orte.heute) orte.heute.verlasse();
     if (orte.bot) orte.bot.verlasse();
@@ -315,7 +314,7 @@ export function zeige(root, params, app) {
       <div class="ort-panel-oben" hidden></div>
       <section class="heute-karte" aria-label="Heute" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
-      <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
+      <div class="fortsetzen" style="--bf:${laufBot.farbe}">
         <span class="avatar"><img src="${esc(laufBot.avatar)}" alt=""></span>
         <div class="ft-text"><b>Offene Partie</b><span>gegen ${esc(laufBot.name)}</span><span>bei Zug ${Math.floor(laufend.zuege.length / 2) + 1}</span></div>
         <button class="knopf primaer" type="button" data-aktion="fortsetzen">${icon('play')} Fortsetzen</button>
@@ -511,23 +510,14 @@ export function zeige(root, params, app) {
     app, s, karte, scrolleZu: (id, sanft) => scrolleZu(id, !!sanft), neuId,
   });
   if (typeof ResizeObserver === 'function') {
-    // Groesse schon jetzt merken: kommt die Reiter-Leiste erst nach dem ersten Layout, ist schon die erste Meldung
-    // eine Aenderung (frueher wurde sie uebersprungen, die Karte wurde niedriger und der Gegner rutschte aus dem Bild)
-    let letzteB = karte.clientWidth;
-    let letzteH = karte.clientHeight;
+    let letzte = '';
     beobachter = new ResizeObserver(() => {
-      const kb = karte.clientWidth;
-      const kh = karte.clientHeight;
-      if (kb === letzteB && kh === letzteH) return;
-      const diff = letzteH - kh;
-      const warHoch = modus === 'hoch' && letzteH > 0;
-      letzteB = kb;
-      letzteH = kh;
+      const g = karte.clientWidth + 'x' + karte.clientHeight;
+      if (g === letzte) return;
+      const ersterLauf = letzte === '';
+      letzte = g;
+      if (ersterLauf) return;
       layout();
-      // Hochformat: unten verankert (die Leiter waechst von unten), so bleibt der naechste Gegner im Bild
-      if (warHoch && modus === 'hoch' && diff && kh) {
-        karte.scrollTop = Math.max(0, Math.min(karte.scrollHeight - kh, karte.scrollTop + diff));
-      }
     });
     beobachter.observe(karte);
   }
@@ -549,7 +539,6 @@ export function zeige(root, params, app) {
       if (beobachter) beobachter.disconnect();
       window.removeEventListener('orientationchange', beiGroesse);
       for (const o of Object.values(orte)) if (o) o.verlasse();
-      kopfHandle.verlasse();
     },
   };
 }

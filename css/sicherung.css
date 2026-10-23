@@ -1,4 +1,0 @@
-.si-gruppe .si-stand { margin-bottom: var(--a2); }
-.si-belegung { margin: 0 0 var(--a4); color: var(--text-2); font-size: var(--fs-klein); }
-.si-knoepfe { display: flex; flex-wrap: wrap; gap: var(--a2); }
-.si-knoepfe .knopf { flex: 1 1 180px; }

@@ -11,7 +11,6 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -350,7 +349,7 @@ async function testeDesktop(browser) {
       svg: !!el.querySelector('svg'), pe: getComputedStyle(el).pointerEvents };
   });
   const s = e4.b.width;
-  pruefe('Abzeichen sichtbar mit Symbol', abz.klasse === 'brillant' && abz.svg && abz.r.w > 10 && abz.label === 'Genial');
+  pruefe('Abzeichen sichtbar mit Symbol', abz.klasse === 'brillant' && abz.svg && abz.r.w > 10 && abz.label === 'Brillant');
   pruefe('Abzeichen oben rechts am Feld (48 %, 17 % Versatz)',
     Math.abs(abz.r.w - 0.48 * s) < 1.5 && Math.abs(abz.r.x + abz.r.w - (e4.b.x + s + 0.17 * s)) < 1.5 &&
     Math.abs(abz.r.y - (e4.b.y - 0.17 * s)) < 1.5, JSON.stringify({ abz: abz.r, feld: e4.b }));
@@ -776,7 +775,8 @@ let code = 1;
 const t0 = Date.now();
 try {
   await warteAufServer(URL_DEMO);
-  browser = await browserTyp(ladePlaywright()).launch();
+  const { chromium } = ladePlaywright();
+  browser = await chromium.launch();
   await testeDesktop(browser);
   await testeTouch(browser);
   await testeHandy(browser);
