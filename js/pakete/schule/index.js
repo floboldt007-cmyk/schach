@@ -99,7 +99,7 @@ export function schuleGruppe({ app } = {}) {
       raus.className = 'knopf sm-austreten';
       raus.dataset.schule = 'verlassen';
       raus.textContent = 'Austreten';
-      raus.setAttribute('aria-label', `Klasse „${k.name}“ verlassen`);
+      raus.setAttribute('aria-label', `Austreten aus „${k.name}“`);
       kopf.append(titel, raus);
       karte.append(kopf);
       const aufgaben = Array.isArray(k.aufgaben) ? k.aufgaben : [];
@@ -242,14 +242,14 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
     knopf.type = 'button';
     knopf.className = 'knopf dr sm-heute-los';
     knopf.textContent = `Zu ${botName(ziel.bot).split(' ').slice(-1)[0]}`;
-    knopf.setAttribute('aria-label', `Zu ${botName(ziel.bot)}`);
+    knopf.title = `Zu ${botName(ziel.bot)}`;
     knopf.addEventListener('click', () => app.gehe('arena', { waehle: ziel.bot }, { ersetzen: true }));
   } else if (aufgabe.art === 'raetsel' && app && typeof app.gehe === 'function') {
     knopf = document.createElement('button');
     knopf.type = 'button';
     knopf.className = 'knopf dr sm-heute-los';
     knopf.textContent = 'Üben';
-    knopf.setAttribute('aria-label', 'Zum Training');
+    knopf.title = 'Zum Training';
     knopf.addEventListener('click', () => app.gehe('training'));
   }
   if (knopf) el.append(knopf);

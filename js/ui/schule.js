@@ -59,7 +59,7 @@ export function zeige(root, params = {}, app) {
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '' })}
     <div class="schule-rumpf">
       ${seitenKopf({ ueber: 'Für Lehrkräfte und Vereine', titel: 'Schulmodus', text: 'Klasse anlegen, den Code an die Tafel schreiben und sehen, wie alle vorankommen. Für die Oberstufe und den Verein, Crownmate ist ab 16.' })}
-      <div class="sm-inhalt" data-ansicht="laedt" aria-live="polite"></div>
+      <div class="sm-inhalt" data-ansicht="laedt"></div>
     </div>
     <div class="sm-tafel" role="dialog" aria-modal="true" aria-label="Code für die Tafel" hidden>
       <div class="sm-tafel-karte"><p class="sm-tafel-name"></p><div class="sm-tafel-code" aria-hidden="true"></div>

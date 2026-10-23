@@ -799,6 +799,7 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.sm-mitgliedschaft', { timeout: 10000 });
     const m = await seite.evaluate(() => ({ titel: document.querySelector('.sm-m-titel').textContent, aufgaben: [...document.querySelectorAll('.sm-m-aufgaben li')].map((li) => li.innerText.replace(/\s+/g, ' ')),
       status: document.querySelector('.schule-gruppe .sm-status').textContent, code: document.querySelector('.sm-code-eingabe').value }));
+    pruefe('Austreten: sichtbarer Text steht im zugaenglichen Namen', (await seite.getAttribute('.sm-austreten', 'aria-label')) === 'Austreten aus „Q1 Schach-AG“');
     pruefe('beigetreten: Klasse mit Anzeigename und Aufgaben (Ziel, Stand, Termin), Felder leer', m.titel === 'Q1 Schach-AG als „Anna“' && m.aufgaben.length === 2
       && m.aufgaben.some((t) => t.includes('Gabeln mit Rudi') && t.includes('Ritter Rudi besiegen') && t.includes('bis '))
       && m.aufgaben.some((t) => t.includes('2 Rätsel lösen · 0 von 2')) && m.status === 'Willkommen in „Q1 Schach-AG“.' && m.code === '', m);
@@ -845,6 +846,8 @@ async function browserTeil(browser) {
       return { titel: el.querySelector('b').textContent, text: el.querySelector('.sm-heute-text').textContent.replace(/\s+/g, ' '), knopf: el.querySelector('.sm-heute-los')?.textContent || null,
         breit: el.scrollWidth <= el.clientWidth + 1, art: el.dataset.art };
     });
+    pruefe('Knoepfe: der sichtbare Text steht im zugaenglichen Namen (WCAG 2.5.3)', await seite.evaluate(() => [...document.querySelectorAll('.sm-heute button')]
+      .every((k) => !k.hasAttribute('aria-label') || k.getAttribute('aria-label').includes(k.textContent.trim()))));
     pruefe('Heute-Karte: naechste Aufgabe mit Ziel, Termin, Klasse (zuletzt) und Knopf zum Bot', z.titel === 'Gabeln mit Rudi'
       && z.text.includes('Gabeln mit Rudi · Ritter Rudi besiegen · bis ') && z.text.endsWith('· Q1 Schach-AG') && z.knopf === 'Zu Rudi' && z.art === 'bot' && fair(z.text), z);
     await bild(seite, 'heute-aufgabe-ipad-hell');
