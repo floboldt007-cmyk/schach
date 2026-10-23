@@ -41,7 +41,9 @@ create table if not exists public.coach_nutzung (
 -- Fuer das Aufraeumen alter Tage (delete ... where tag < ...)
 create index if not exists coach_nutzung_tag on public.coach_nutzung (tag);
 
--- Der Coach-Tag: Europe/Berlin, Tagesgrenze 4:00 Uhr (die App rechnet ihre Tage genauso, js/tag.js)
+-- Der Coach-Tag: Europe/Berlin, Tagesgrenze 4:00 Uhr (die App rechnet ihre Tage genauso, js/tag.js). Die 4 Stunden
+-- gehen von der Wanduhr ab (`now() at time zone` liefert die Ortszeit ohne Zone), nicht von einem Zeitstempel: Auch am
+-- Tag der Zeitumstellung gehoert 3:59 Ortszeit zum Vortag und 4:00 zum neuen Tag.
 create or replace function public.coach_tag()
 returns date
 language sql
