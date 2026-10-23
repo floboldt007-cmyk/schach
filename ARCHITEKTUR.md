@@ -1385,3 +1385,51 @@ Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/
   nach dem Oeffnen kam) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
   sendet nichts. **Register:** Icon `teilen`. **Test-Schnittstelle:** `zustand()` (offen, modus, bereit, texte, datei,
   weg, name) und `oeffneBlatt({ partie | partieId, bot })`.
+
+## Paket gedaechtnis (A2): Bots erinnern sich, Revanche, Erzfeind
+
+Dateien: `js/pakete/gedaechtnis/index.js` (Orte, Ereignisse, Register), `logik.js` (rein, Node-testbar, kein
+`Math.random`), `saetze.js` (eigene Texte: 10 Anlaesse x 10 Leiter-Bots x 3 Varianten, je Bot im Ton seiner Bio, hoechstens
+110 Zeichen), `css/pakete/gedaechtnis.css` (nur Tokens; das Paket haengt sein CSS selbst als `link[data-paket="gedaechtnis"]`
+ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `tests/fairness.test.mjs` (SPIELKONZEPT 5.3).
+
+- **Begruessung (Wahl-Ort `partie:begruessung?`, Reihenfolge 10, also auch die Sprechblase im Arena-Panel):** nur
+  Leiter-Bots im Modus `normal`. Quelle sind die wertenden Partien gegen diesen Bot (`partienGegenBot`, gefiltert mit
+  `storage.wertet`), das Modul-Memo aus der Spielanalyse und `fortschritt.bots[bot].partien`. Vorrang (der erste Treffer
+  gewinnt): `kennenlernen` (keine Partie; kennt der Fortschritt Partien, die aus der Liste der 300 gefallen sind:
+  `wiedersehen` ohne Zahl) > `ersterSieg` (letzte Partie Sieg nach mindestens 3 Niederlagen in Folge) > `wiedersehen`
+  (letzte Partie mindestens 7 Tage her, `{tage}` ueber `tag.js` mit der Grenze 4:00) > `mutmachen` (3 Niederlagen in
+  Folge gegen ihn oder insgesamt) > `genial` (Flos genialer Zug in der letzten Partie, aus der Spielanalyse, sonst aus
+  `liveKlassen`) > `botPatzer` (Zug „Weit daneben“ des Bots, nur aus der Spielanalyse) > `serieGegen` (mindestens 3 Siege
+  in Folge) > `rueckkampf` (letzte gewonnen, `{zuege}`) > `revanche` (letzte verloren) > `remisZuletzt`.
+  **Sparsam:** `kennenlernen`, `ersterSieg`, `wiedersehen`, `mutmachen`, `genial` kommen immer, die anderen nur, wenn der
+  Wurf unter 0,5 liegt (sonst `null`, dann begruesst der Host wie bisher). **Bestimmt:** Wurf und Variante kommen aus
+  `zufallAus(seedAus('gedaechtnis|<RECHENSTAND>|<Tagesschluessel>|<botId>|<Zahl der Partien>'))`: Panel und Partie sagen
+  dasselbe, die naechste Partie wuerfelt neu. Weil der Host mit `Math.random` waehlt (`botSatz`), meldet das Paket jede
+  Variante als eigenen Anlass `gedaechtnis.<anlass>.<i>` mit genau einem Satz je Bot an und gibt diesen zurueck; unter den
+  schlichten Namen (`kennenlernen`, `wiedersehen`, `revanche`, `rueckkampf`, `mutmachen` ...) stehen alle Varianten fuer
+  andere Pakete (z. B. „Willkommen zurück“: `botSatz(bot, 'wiedersehen', zufall, { tage })`). Die Einstellung der App
+  „Bot-Sprüche“ (`sprueche`) gilt: `aus` keine Wahl, `wenig` nur `kennenlernen`, `ersterSieg`, `mutmachen`.
+- **Fairness (Bot-Ton, SPIELKONZEPT 3.12):** Die einzige Stichelei ist `revanche`, und sie ist die Begruessung, also
+  hoechstens eine je Partie (das Paket spricht sonst nie, keine Blase, kein Coach-Zusatz). Nach 3 Niederlagen in Folge
+  (gegen diesen Bot aus `partienGegenBot`, insgesamt aus `ladePartien()`, gemerkt bis zum naechsten Screen oder Spielende)
+  kommt immer `mutmachen`, nie Schweigen (sonst spraeche die eingebaute Begruessung, die auch sticheln kann).
+- **Revanche (Ort `ergebnis:karte`, Reihenfolge 50):** `.gd-revanche-zeile[data-ort="ergebnis"] > button.knopf.gd-revanche`
+  („Revanche · Du spielst Schwarz“, `data-farbe`), nur nach Niederlage oder Remis einer Partie im Modus `normal` aus der
+  Grundstellung (auch gegen Gaeste, nie Uebung, Boss, frei, Spielhalle). Klick: `app.gehe('partie', { botId, farbe:
+  getauscht, tempo })` wie „Nochmal“ im Host, aber mit getauschten Farben (die Arena startet mit denselben Parametern),
+  ohne `liga`. **Host-Regel:** Ist `ergebnis:karte` gefuellt, entfaellt der Tipp „Kopf hoch! …“ (PLAN 2.6, wie bei jeder
+  Karte an diesem Ort).
+- **Erzfeind (Ort `arena:panel-bot`, Reihenfolge 20):** `.gd-erzfeind` „Dein Erzfeind · 1 Sieg · 4 Niederlagen“ beim
+  Leiter-Bot mit den meisten Niederlagen von Flo laut Fortschritt (wertende Partien, fuer immer gezaehlt), mindestens 3
+  und mehr Niederlagen als Siege; Gleichstand: groessere Differenz, dann die hoehere Stufe. **Feier:** Bei `partie:beendet`
+  (synchron, also vor den Feier-Zeilen des Overlays) bringt ein wertender Sieg gegen den Bot, der vor dieser Partie
+  Erzfeind war, `melde({ quelle: 'erzfeind', titel: 'Erzfeind bezwungen', text: 'Gegen <Bot>, nach <n> Niederlagen',
+  symbol: 'erzfeind', klang: 'siegel' })` (laut `feier.QUELLEN` gross, Prio 85), einmal je neuer Niederlage.
+- **Speicher:** Modul `bots` (vorhanden, Budget 20.000) `{ v: RECHENSTAND, memo: [[partieId, genialeZuege, patzerDesBots]]
+  (hoechstens 60), erzfeind: { [botId]: Niederlagen beim letzten Feiern } }`; keine eigenen Paket-Einstellungen.
+- **Ereignisse:** hoert `partie:beendet` (Erzfeind-Feier), `partie:analysiert` (Memo, per `setTimeout(0)`, ersetzt den Eintrag
+  derselben Partie), `app:screen` und `speicher:zurueckgesetzt` (Zwischenspeicher leeren); sendet nichts. **Register:**
+  Saetze, Icons `revanche` und `erzfeind`. **Test-Schnittstelle:** `zustand()` (letzteWahl, modul, folge).
+- **RECHENSTAND 1** steckt im Seed: Wer Vorrang, Schwellen oder Satz-Tabelle aendert, zaehlt ihn hoch, sonst wechseln die
+  Saetze unbemerkt mitten am Tag.
