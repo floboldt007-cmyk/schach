@@ -324,7 +324,8 @@ const duellHorcher = (seite) => seite.evaluate(() => {
   });
   mo.observe(document.body, { childList: true, subtree: true });
 });
-// Ziele fuer den Portraetflug in den (heutigen) Partie-Screen einsetzen, sobald er kommt (U7 baut sie spaeter selbst)
+// Ziele fuer den Portraetflug: Seit U7 baut der Partie-Screen sie selbst (.spieler.gegner .av, .spieler.ich .av); dann
+// pruefen die Tests den Flug auf die echten Ziele. Nur ein Partie-Screen ohne diese Ziele bekommt Ersatz-Ziele.
 const zieleEinsetzen = (seite) => seite.evaluate(async () => {
   const { hoere } = await import('./js/ereignisse.js');
   window.__ziele = { sichtbarWaehrendFlug: null, deckt: null };
@@ -335,6 +336,8 @@ const zieleEinsetzen = (seite) => seite.evaluate(async () => {
     // deckt die Buehne den ganzen Schirm, wenn die Partie darunter erscheint?
     const b = document.querySelector('.duell-buehne');
     if (b) { const r = b.getBoundingClientRect(); window.__ziele.deckt = r.left <= 0.5 && r.top <= 0.5 && r.right >= innerWidth - 0.5 && r.bottom >= innerHeight - 0.5; }
+    window.__ziele.echt = !!(p.querySelector('.spieler.gegner .av') && p.querySelector('.spieler.ich .av'));
+    if (window.__ziele.echt) return;
     for (const [rolle, top] of [['gegner', 90], ['ich', 520]]) {
       const sp = document.createElement('div');
       sp.className = 'spieler ' + rolle;
