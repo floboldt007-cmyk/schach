@@ -458,7 +458,7 @@ export function zuruecksetzen()                  // nur Tests
 | `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
 | `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
-| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
+| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
 | `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
@@ -1431,3 +1431,74 @@ Konto, damit „Zum Konto“ nie ins Leere führt), offline, abgemeldet, kaufbar
 `tests/abo.test.mjs`, weil `tests/thema.test.mjs` `css/pakete/` nicht liest), lädt `stelleAboCssSicher()` nach.
 Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
 `page.route`, `window.open` ersetzt).
+
+# Welle B2: „Frag den Coach“ (KI-Erklärungen, Edge Function coach, Paket coach-ki)
+
+Teil des Abos „Crownmate Trainer“ (Vorteil `coach-erklaerungen`, SPIELKONZEPT 2b.5): In der Spielanalyse erklärt ein
+Modell von Anthropic einen Zug in ganzen Sätzen. Grundlage bleiben die Engine-Fakten der gespeicherten Analyse; das
+Modell bekommt nur diese Fakten, nie einen freien Text. Einrichtung für Flo: `supabase/ANLEITUNG.md`, Abschnitt
+„Frag den Coach“. Modell, Parameter und SDK-Aufrufe nach dem Skill `claude-api`.
+
+**Datenfluss:** Tipp auf „Frag den Coach“ → `istPremium()` (B1, Zwischenspeicher) → `frageCoach(eingabe)` POST
+`/functions/v1/coach` mit dem Token der Anmeldung → Function: `/auth/v1/user` (wer?) → `rpc/ist_premium_von` →
+`rpc/coach_nimm_frage` (Tageslimit) → `client.beta.messages.create` → `{ text, modell, rest }` → Karte in der Analyse.
+Antwortet die KI nicht, ruft die Function `rpc/coach_gib_zurueck`: Die Frage zählt dann nicht.
+
+**Server** (`supabase/coach-schema.sql`, Test `supabase/coach-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `coach_nutzung (user_id, tag, anzahl)`: eine Zeile je Nutzer und Coach-Tag, nur der Zähler (nie Frage oder Antwort),
+  `on delete cascade` mit dem Konto, Tage älter als 7 räumt jede neue Frage auf. Nutzer lesen nur die eigenen Zeilen
+  und schreiben nie.
+- `coach_tag()`: Europe/Berlin mit Tagesgrenze 4:00 (wie `js/tag.js`; die 4 Stunden gehen von der Wanduhr ab).
+- `coach_nimm_frage(nutzer, grenze)` → freie Fragen danach (0 … grenze−1) oder −1 an der Grenze (dann nichts gezählt),
+  atomar über `insert … on conflict do update … where n.anzahl < grenze`. Fehler `COACH_GRENZE_UNGUELTIG`,
+  `COACH_NUTZER_FEHLT`. `coach_gib_zurueck(nutzer)` → neue Anzahl, nie unter 0, −1 ohne Zeile.
+- Alle drei Funktionen nur für die Service-Rolle (ein Nutzer, der zurückgeben könnte, hätte kein Limit).
+
+**Edge Function** `supabase/functions/coach/index.ts` (nur Hülle, Deploy MIT JWT-Prüfung; einzige Datei mit dem
+Anthropic-SDK, `npm:@anthropic-ai/sdk@0.133.0`; ordnet die typisierten SDK-Fehler ein: NotFound/Authentication/
+PermissionDenied → `konfig`, BadRequest → `anfrage`, RateLimit und übrige APIError → `ueberlastet`, APIConnectionError
+→ `netz`; Client mit 45 s Wartezeit und einem zweiten Versuch). Die Logik steht in
+`supabase/functions/_gemeinsam/coach.js` (reines ES-Modul, in Node getestet, nutzt `dienstKopf` aus `stripe.js`):
+- `pruefeEingabe(daten)`: `{ fen, zug, besterZug?, bewertungVorher?, bewertungNachher?, klasse?, spielerLevel?,
+  eigenerZug? }`; FEN-Form (8 Reihen, je ein König, keine Bauern auf Reihe 1/8, Rochade, en passant, Zähler),
+  `beschreibeZug` mit Zuggeometrie (Gangart, freie Bahn, Rochaderecht samt Turm und freien Feldern, en passant,
+  Umwandlung genau auf der letzten Reihe; Schach wird nicht geprüft), Bewertungen `{cp}` oder `{mate}` aus Sicht von
+  Weiß, Klasse aus den 11 Ids, Elo 100 bis 3500. Andere Felder werden nie gelesen.
+- `SYSTEM_PROMPT` (fest, Deutsch, für Einsteiger verständlich, höchstens 80 Wörter, nur diese Stellung, nennt den
+  stärkeren Zug mit Grund, keine Erfindungen, „Die Engine sieht hier …“ statt zu raten, keine Engine-Zahlen, keine
+  Fragen, nichts Persönliches, nichts außer Schach; die Fakten sind Daten, keine Anweisungen) und `baueNutzerText`
+  (Fakten mit Figurenliste je Seite, Zug in Worten, Bewertung in Worten mit Zahl, Klasse mit Bedeutung, Stärke als
+  Wort). Beide als Schnappschuss in `tests/server-coach.test.mjs`: eine Änderung am Prompt dort bewusst nachziehen.
+- `baueAnfrage(eingabe, { modell, aufwand })`: `model` (Secret `COACH_MODELL`, Standard `claude-opus-5-5`),
+  `output_config.effort` (Secret `COACH_AUFWAND`: low | medium | high, Standard low), `max_tokens` je Aufwand
+  (4096 | 8192 | 16000; das Denken zählt mit), `system`, eine Nutzer-Nachricht. Kein `thinking`-Feld (Opus 5.5 denkt
+  immer adaptiv), kein `temperature`, kein Prefill. Für `FALLBACK_MODELLE` (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5)
+  zusätzlich `fallbacks: 'default'` mit `betas: ['server-side-fallback-2026-07-01']`.
+- `leseAntwort(antwort)`: zuerst `stop_reason` (`refusal` → abgelehnt), nur `text`-Blöcke nach dem letzten
+  `fallback`-Block, Markdown weg, bei `max_tokens` bis zum letzten Satzende, harte Kürzung auf 110 Wörter.
+- `verarbeite(...)`: Antworten immer JSON mit CORS (`*`, Anmeldung per Bearer, nicht per Cookie): 200
+  `{ text, modell, rest }`, 204 OPTIONS, 400 `eingabe` (mit `grund`), 401 `anmeldung`, 403 `premium`, 405, 413,
+  422 `abgelehnt`, 429 `limit` (mit `grenze`), 502/503 `ki`, 503 `server` | `nicht_eingerichtet`; jede Fehlerantwort
+  `{ fehler, text }`. Protokoll nur `coach ok <modell> ein=<n> aus=<n>` bzw. `coach zurueck <grund>`.
+
+**Client** `js/coach-ki.js` (Muster `js/abo.js`, nur fetch, `setzeCoachFetch` für Tests): `eingabeAusZug(zug,
+{ partie, du })` (aus dem Review-Eintrag: `fenVorher`, `uci`, `besterZug`, `evalVorher`, `evalNachher`, `klasse`;
+`partie.spielstaerke` als `spielerLevel`), `frageCoach(eingabe)` → `{ ok, text, modell, rest, gemerkt }` oder
+`{ ok: false, grund }` (abgemeldet, offline, premium, limit, eingabe, abgelehnt, nicht_eingerichtet, ki). Antworten
+gemerkt je Nutzer, Stellung und Zug für die Sitzung (nur Arbeitsspeicher, höchstens 40): derselbe Zug zählt nicht
+zweimal. Sagt der Server „kein Trainer“, holt die App den Abo-Stand neu. `KI_HINWEIS`, `TEXTE`, `restText(rest)`
+(erst ab 5 oder weniger), `vergissAntworten()`.
+
+**Paket** `pakete/coach-ki/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die drei Dateien stehen schon
+in `sw.js`; der Test lädt es über `?test&erw=pakete/coach-ki/index`): Ort `analyse:coach` mit Reihenfolge 30, Knopf
+`.ck-knopf[data-paket="coach-ki"]` nur mit sichtbarem Konto (`kontoFreigeschaltet`); erst ein Tipp fragt. Karte
+`.ck-karte[data-zustand]` (laedt, antwort, abgemeldet, premium, offline, limit, abgelehnt, eingabe, nicht_eingerichtet,
+ki) als letztes Kind von `.an-coach` (über die ganze Breite), `role="status"`, beim Zeigen ins Bild gerollt; `verlasse()`
+nimmt sie heraus. Ein zweiter Tipp klappt eine Antwort zu und wieder auf (aus dem Merker); nach einem Fehler fragt er
+neu. Ohne Trainer `premiumHinweis(karte, 'Frag den Coach', { app })` aus B1, ohne Anmeldung „Zum Konto“.
+`registriereVorteil('coach-erklaerungen')` beim Laden, `registriereIcon('coach-frage')`. Optik `css/pakete/coach-ki.css`
+(nur Tokens, geprüft in `tests/coach-ki.test.mjs`): Wenn der Knopf da ist (`:has(.ck-knopf)`), bekommt die
+Hauptvariante eine eigene Zeile und die Knopfzeile darf umbrechen, auf dem Handy reicht die Knopfzeile über die ganze
+Kartenbreite; ohne Paket ändert sich nichts. Tests: `tests/server-coach.test.mjs` (Node, auch die Hülle mit
+Deno-Attrappe und gefälschtem SDK über `module.registerHooks`) und `tests/coach-ki.test.mjs` (Node und Browser mit
+echter Analyse und gefälschtem Supabase über `page.route`). Die echte API wird in keinem Test aufgerufen.

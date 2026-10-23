@@ -147,3 +147,72 @@ Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wi
 Store-Hülle (Capacitor) braucht das Abo deshalb später einen eigenen Weg (z. B. ein Dienst wie RevenueCat, der beide
 Stores und das Web zusammenführt); bis dahin dort den Kauf-Knopf nicht anbieten. Die Regeln ändern sich: vor dem
 Store-Start aktuell prüfen.
+
+## „Frag den Coach“ (KI-Erklärungen im Trainer)
+
+In der Spielanalyse steht bei jedem Zug der Knopf **„Frag den Coach“**. Wer Crownmate Trainer hat, bekommt dort eine
+kurze Erklärung in ganzen Sätzen (höchstens etwa 80 Wörter, einfache Sprache): was der Zug bewirkt und warum der
+stärkere Zug besser ist. Die Erklärung schreibt ein Modell von Anthropic (Claude) über die Edge Function `coach`; die
+Fakten (Bewertungen, stärkster Zug) kommen weiter von Stockfish. Die Karte trägt sichtbar „KI“ und den Satz
+„Erklärung von einer KI, kann sich irren.“ (Transparenzpflicht der KI-Verordnung, Art. 50). Ohne Trainer zeigt der
+Knopf nur den ruhigen Hinweis aufs Abo, ohne Anmeldung den Weg zum Konto. Voraussetzung: der Abschnitt „Abo mit
+Stripe“ oben (mindestens Schritt 1, `abo-schema.sql`), denn die Function fragt `ist_premium_von`.
+
+**Was an Anthropic geht und was gespeichert wird:** Die App schickt nur Fakten aus der gespeicherten Analyse: die
+Stellung vor dem Zug (FEN), den gespielten und den stärksten Zug, die Engine-Bewertungen, die Zugklasse, eine grobe
+Spielstärke als Wort und ob du oder der Gegner gezogen hat. Die Function baut daraus selbst den Text für das Modell;
+**keine Nutzer-ID, kein Name, keine E-Mail und nie ein freier Text** gehen an Anthropic. Gespeichert wird nur, **wie
+viele** Fragen jemand an einem Tag gestellt hat (Tabelle `coach_nutzung`, nach 7 Tagen gelöscht, mit dem Konto sofort
+weg), nie Frage oder Antwort. Ins Protokoll der Function kommen nur Kennungen, das Modell und die Token-Zahlen.
+
+**Kosten (vorher selbst rechnen, Preise nachsehen):** Jede Frage kostet bei Anthropic Geld, abgerechnet nach Token.
+Geschätzt hat eine Frage etwa 700 bis 900 Token Eingabe (fester Text plus Stellung) und einige hundert Token Ausgabe
+(Antwort plus das Nachdenken des Modells), höchstens 4096. Die echten Zahlen stehen nach jeder Frage im Protokoll der
+Function (Zeile `coach ok claude-opus-5-5 ein=… aus=…`) und in der Anthropic-Konsole (`platform.claude.com`) unter
+**Usage**. Die aktuellen Preise je Million Token stehen auf der Preisseite von Anthropic; mal das mit der Zahl der
+Nutzer und dem Tageslimit.
+Ein **günstigeres Modell** wählst du mit dem Secret `COACH_MODELL` (unten), weniger Nachdenken mit `COACH_AUFWAND`.
+Lege in der Anthropic-Konsole für den Workspace eine monatliche **Ausgabengrenze** (Spend limit, bei den Limits in den
+Einstellungen; Menünamen können sich ändern) fest: Ist sie erreicht, antwortet die App „Der Coach ist gerade nicht
+erreichbar“, und die Frage zählt nicht.
+
+1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/coach-schema.sql` ausführen (nach `schema.sql`
+   und `abo-schema.sql`; ein erneuter Lauf ist erlaubt). Danach `supabase/coach-rls-test.sql` ausführen: Am Ende muss
+   `Coach-RLS-Test erfolgreich` stehen; der Test rollt alles zurück. Die Warnung „destructive operation“ (wegen
+   `drop policy if exists`, das nur die eigene Regel ersetzt) bei genau diesen zwei Dateien bestätigen.
+2. **Anthropic-Konto und Schlüssel:** Auf `platform.claude.com` (früher `console.anthropic.com`) ein Konto anlegen
+   (Zahlungsmittel hinterlegen), unter **API Keys** einen Schlüssel mit einem Namen wie `crownmate-coach` erzeugen und
+   **einmal** kopieren (er beginnt mit `sk-ant-`). Gleich danach die Ausgabengrenze setzen (siehe Kosten).
+3. **Schlüssel als Geheimnis setzen:** Im Terminal `npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...` (dein
+   Wert). Der Schlüssel gehört nur dorthin: nie in Dateien, Git, Screenshots oder Chats. Ist er doch einmal irgendwo
+   gelandet, in der Konsole sofort löschen und einen neuen setzen.
+4. **Einstellungen (freiwillig, ebenfalls mit `npx supabase secrets set NAME=wert`):**
+   - `COACH_MODELL`: Standard `claude-opus-5-5` (beste Erklärungen). Günstiger: `claude-sonnet-5-5`, am günstigsten
+     `claude-haiku-5-5` (einfachere Erklärungen; dort springt bei einer Ablehnung durch die Sicherheitsfilter kein
+     Ersatzmodell ein, die Karte sagt dann „keine Erklärung“). Ein falscher Name zeigt in der App „Der Coach ist noch
+     nicht eingerichtet“ und im Protokoll `coach zurueck ki_konfig`.
+   - `COACH_AUFWAND`: `low` (Standard: schnell, günstig), `medium` oder `high` (gründlicher, aber langsamer und teurer).
+     Wirken die Erklärungen zu oberflächlich, zuerst `medium` probieren.
+   - `COACH_TAGESLIMIT`: Fragen je Person und Tag, Standard `30` (erlaubt 1 bis 1000). Der Tag beginnt um 4 Uhr
+     (Europe/Berlin), wie überall in der App. Eine Frage, auf die die KI nicht antwortet, zählt nicht.
+   Neue Werte gelten ab der nächsten Frage, ohne neues Hochladen.
+5. **Edge Function hochladen:** `npx supabase functions deploy coach` (diesmal **ohne** `--no-verify-jwt`: Die App
+   schickt das Token der Anmeldung mit, Supabase prüft es zusätzlich zur Function). Adresse:
+   `https://usaamcqypmvgqmsbfecb.supabase.co/functions/v1/coach`. Die Function lädt beim Hochladen das Anthropic-SDK in
+   der festen Version aus `supabase/functions/coach/index.ts`. `SUPABASE_URL`, `SUPABASE_ANON_KEY` und
+   `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase selbst bereit.
+6. **Testen:** Das Paket `pakete/coach-ki/index` muss in der App eingetragen sein (`js/erweiterungen.js`, macht die
+   Integration). In der App anmelden (Adresse mit `#konto`), dir den Trainer von Hand geben (oben: „Von Hand
+   freischalten“), eine Partie spielen, in der Analyse einen Zug wählen und **Frag den Coach** tippen. In Supabase unter
+   **Edge Functions > coach > Logs** steht dann `coach ok …`, unter **Table Editor > coach_nutzung** deine Zeile von
+   heute. Ohne Trainer muss der Knopf den Hinweis „Teil von Crownmate Trainer“ zeigen und die Zeile darf nicht wachsen.
+7. **Vor dem Start klären (keine Rechtsberatung, mit einer Fachperson):** In die Datenschutzerklärung gehört, dass
+   Stellungen zur Erklärung an Anthropic (USA) gehen, ohne Namen oder Konto-Daten, und auf welcher Grundlage
+   (Auftragsverarbeitung, Drittland-Übermittlung; Anthropic bietet dafür Vertragsbedingungen an). Prüfen, ob die
+   Hinweise in der App zur KI-Verordnung reichen, und dass der Trainer die KI-Erklärungen als solche beschreibt.
+
+**Was der Server schützt:** Ohne gültige Anmeldung (`/auth/v1/user`) und ohne Trainer (`ist_premium_von`) fragt die
+Function das Modell nie. Das Tageslimit zählt atomar in der Datenbank, auch bei gleichzeitigen Fragen; zurückgeben
+kann eine Frage nur die Function selbst (wenn die KI nicht antwortet), nie ein Nutzer. Eingaben prüft die Function
+streng (FEN-Form, Zug passt zur Stellung, Längen) und baut den Text für das Modell selbst; was die App sonst mitschickt,
+liest sie nicht. Der Schlüssel liegt nur in den Secrets der Function, nie in der App.
