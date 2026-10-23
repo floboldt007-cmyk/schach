@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 62;
-const STAND = 'a063e6344f3b';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 63;
+const STAND = '61a2a94de63e';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -19,6 +19,48 @@ const DATEIEN = [
   'js/pakete/liga/ansicht.js',
   'js/pakete/liga/index.js',
   'js/pakete/liga/wertung.js',
+  // Stufe 2: Spielsysteme (P1 bis P3) und Welle A
+  'css/pakete/funken.css',
+  'js/pakete/funken/ansicht.js',
+  'js/pakete/funken/index.js',
+  'js/pakete/funken/level.js',
+  'js/pakete/funken/rechnung.js',
+  'js/pakete/funken/stand.js',
+  'css/pakete/punkte.css',
+  'js/pakete/punkte/ansicht.js',
+  'js/pakete/punkte/code.js',
+  'js/pakete/punkte/formel.js',
+  'js/pakete/punkte/index.js',
+  'js/pakete/punkte/liste.js',
+  'js/pakete/punkte/stand.js',
+  'js/pakete/punkte/tafel.js',
+  'css/pakete/serie.css',
+  'js/pakete/serie/ansicht.js',
+  'js/pakete/serie/index.js',
+  'js/pakete/serie/lauf.js',
+  'js/pakete/serie/stand.js',
+  'js/pakete/serie/tag.js',
+  'css/pakete/teilen.css',
+  'js/pakete/teilen/bild.js',
+  'js/pakete/teilen/index.js',
+  'js/pakete/teilen/logik.js',
+  'css/pakete/gedaechtnis.css',
+  'js/pakete/gedaechtnis/index.js',
+  'js/pakete/gedaechtnis/logik.js',
+  'js/pakete/gedaechtnis/saetze.js',
+  'css/pakete/kartei.css',
+  'js/pakete/kartei/index.js',
+  'js/pakete/kartei/logik.js',
+  'css/pakete/start.css',
+  'js/pakete/start/aufgaben.js',
+  'js/pakete/start/dienst.js',
+  'js/pakete/start/index.js',
+  'js/pakete/start/logik.js',
+  'css/pakete/raetsel.css',
+  'daten/punkte/bot-laeufe.json',
+  'js/ui/bestenliste.js',
+  'js/ui/raetsel.js',
+  'js/ui/start.js',
   'index.html',
   'datenschutz.html',
   'impressum.html',

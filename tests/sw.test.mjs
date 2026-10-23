@@ -78,8 +78,8 @@ export function lesePakete(text) {
 // aendert die Integration die Zuordnung hier.
 export const SCREEN_PAKET = Object.freeze({
   // Premium-Umbau U2 (PLAN 2.10): training ist Kern-Screen (Training-Huelle), kein Paket-Screen mehr
-  start: 'einstieg',
-  bestenliste: 'punkte', raetsel: 'raetsel', lernen: 'lernen', lektion: 'lernen', ich: 'ich', spielplan: 'boss', spielhalle: 'spielhalle',
+  start: 'start',
+  bestenliste: 'punkte', raetsel: 'kartei', lernen: 'lernen', lektion: 'lernen', ich: 'ich', spielplan: 'boss', spielhalle: 'spielhalle',
   // w0plus-a-fix: Werkstatt-Vorschau (Schub 2b)
   werkstatt: 'werkstatt',
   // Welle B3: Lehrkraft-Ansicht des Schulmodus (Paket schule)
@@ -94,7 +94,8 @@ export function paketDateien(dateien, pakete) {
     let m = d.match(/^js\/pakete\/([^/]+)\//);
     if (m) return m[1];
     m = d.match(/^css\/pakete\/([^/.]+)(?:\.css$|\/)/);
-    if (m) return m[1];
+    // Stufe 2: die Optik eines Paket-Screens (css/pakete/raetsel.css zum Screen raetsel) gehoert dessen Paket
+    if (m) return SCREEN_PAKET[m[1]] || m[1];
     m = d.match(/^js\/ui\/([^/]+)\.js$/);
     if (m && SCREEN_PAKET[m[1]]) return SCREEN_PAKET[m[1]];
     // W0+a: Inhalte eines Pakets unter daten/<paket>/ (daten/beispiel/ gehoert keinem Paket und wird nie ausgeliefert)
@@ -210,14 +211,14 @@ function main() {
   // seit U2 ist js/ui/training.js Kern-Screen und gehoert keinem Paket)
   {
     const probe = ['js/ui/training.js', 'js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css',
-      'js/pakete/klang-serie/index.js', 'css/pakete/klang-serie.css', 'js/ui/start.js', 'js/pakete/einstieg/sub/x.js'];
+      'js/pakete/klang-serie/index.js', 'css/pakete/klang-serie.css', 'js/ui/start.js', 'js/pakete/start/sub/x.js'];
     const vor = paketDateien(probe, []);
     const nach = paketDateien(probe, ['pakete/kartei/index']);
     pruefe('Paket-Regel: vor der Integration ist keine Paket-Datei Pflicht', vor.pflicht.length === 0 && vor.wartend.length === probe.length - 1
       && !vor.erlaubt.includes('js/ui/training.js'));
     pruefe('Paket-Regel: nach der Integration sind genau die Dateien des Pakets Pflicht (auch der Screen, auch tiefer)',
       JSON.stringify(nach.pflicht) === JSON.stringify(['js/pakete/kartei/index.js', 'js/pakete/kartei/kartei.js', 'css/pakete/kartei.css'])
-      && JSON.stringify(paketDateien(probe, ['pakete/einstieg/index']).pflicht) === JSON.stringify(['js/ui/start.js', 'js/pakete/einstieg/sub/x.js']),
+      && JSON.stringify(paketDateien(probe, ['pakete/start/index']).pflicht) === JSON.stringify(['js/ui/start.js', 'js/pakete/start/sub/x.js']),
       JSON.stringify(nach.pflicht));
     // W0+a: Inhalte unter daten/<paket>/ gehoeren zum Paket; direkt unter daten/ und daten/beispiel/ zu keinem
     const daten = ['daten/spielplan.json', 'daten/beispiel/spielplan.json', 'daten/raetsel/jahr-2027.json', 'daten/boss/saison/1.json'];
