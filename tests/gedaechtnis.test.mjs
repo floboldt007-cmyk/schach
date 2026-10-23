@@ -541,6 +541,27 @@ async function browserTeil(browser) {
   pruefe('10 Tage Pause: wiedersehen, Platzhalter gefuellt (kein "{tage}" im Text)', soll2 && soll2.grund === 'wiedersehen' && soll2.werte.tage === 10
     && panel2 === `„${soll2.text}“` && !/\{/.test(panel2), JSON.stringify({ panel2, soll2, dbg2 }));
 
+  // ---------- Spielanalyse: genialer Zug (partie:analysiert -> Modul-Memo -> Begruessung genial) ----------
+  await bereite(seite, { partien: [partie('lisa', 'remis', 1, { id: 'ptgenial1' })], fortschritt: fortschritt(4, { lisa: { partien: 1, remis: 1 } }) });
+  const memo = await seite.evaluate(async () => {
+    const E = await import('/js/ereignisse.js');
+    const review = { zuege: [{ farbe: 'w', klasse: 'brillant' }, { farbe: 'b', klasse: 'gut' }] };
+    E.sende('partie:analysiert', { partieId: 'ptgenial1', botId: 'lisa', modus: 'normal', wertet: true, partie: { id: 'ptgenial1', spielerFarbe: 'w' }, review, quelle: 'analyse' });
+    // zweimal (darf je Partie zweimal kommen): ersetzt den Eintrag
+    E.sende('partie:analysiert', { partieId: 'ptgenial1', botId: 'lisa', modus: 'normal', wertet: true, partie: { id: 'ptgenial1', spielerFarbe: 'w' }, review, quelle: 'nachholen' });
+    E.sende('partie:analysiert', { partieId: 'ptuebung', botId: 'lisa', modus: 'uebung', wertet: false, partie: { id: 'ptuebung', spielerFarbe: 'w' }, review });
+    await new Promise((r) => setTimeout(r, 50));
+    return JSON.parse(localStorage.getItem('schach-arena:v1:modul:bots') || 'null');
+  });
+  pruefe('partie:analysiert: genialer Zug im Modul "bots" gemerkt (einmal je Partie, Uebungen nicht)', memo && memo.v === 1
+    && JSON.stringify(memo.memo) === '[["ptgenial1",1,0]]', JSON.stringify(memo));
+  await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'lisa' }));
+  await seite.waitForFunction(() => /Lisa/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+  const sollG = await erwartet(seite, 'lisa');
+  const panelG = await seite.evaluate(() => (document.querySelector('.detail .sprechblase') || {}).textContent || '');
+  pruefe('danach spricht Lisa vom genialen Zug der letzten Partie (Remis, sonst nur jede zweite Partie)', sollG && sollG.grund === 'genial'
+    && panelG === `„${sollG.text}“`, JSON.stringify({ panelG, sollG }));
+
   // ---------- Bot-Sprueche aus ----------
   await bereite(seite, { partien: [], fortschritt: fortschritt(5), einstellungen: { sprueche: 'aus' } });
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'rudi' }));
@@ -597,6 +618,13 @@ async function browserTeil(browser) {
     && knopf.farbe === 'b' && knopf.label === 'Revanche, du spielst Schwarz' && knopf.icon, JSON.stringify(knopf));
   pruefe('Tippflaeche mindestens 44 px', knopf.hoehe >= 44, knopf.hoehe);
   pruefe('Host-Regel: Mit gefülltem Ort ergebnis:karte entfaellt der Tipp "Kopf hoch!" (PLAN 2.6)', knopf.tipp === 0, knopf.tipp);
+  const echt = await seite.waitForFunction(() => {
+    const id = (JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]')[0] || {}).id;
+    const m = JSON.parse(localStorage.getItem('schach-arena:v1:modul:bots') || 'null');
+    const e = m && m.memo.find((x) => x[0] === id);
+    return e ? { id, e } : null;
+  }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  pruefe('echte Spielanalyse (partie:analysiert) landet im Memo: kein genialer Zug von Flo, kein Patzer des Bots', echt && echt.e[1] === 0 && echt.e[2] === 0, JSON.stringify(echt));
   await warte(1200);
   await seite.screenshot({ path: path.join(BILDER, 'ergebnis-revanche-ipad.png') });
   const vorher = await seite.evaluate(() => window.__partie.laufId);
