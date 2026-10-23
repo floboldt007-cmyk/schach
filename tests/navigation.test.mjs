@@ -402,6 +402,8 @@ async function testeTraining(browser) {
   gruppe = 'Training leer';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820 });
+    // Dieser Vertrag prueft die Huelle ohne Anbieter, unabhaengig von installierten Paketen.
+    await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.goto(BASIS + '#training');
     await seite.waitForSelector('.screen.training-screen');
     const r = await seite.evaluate(() => ({ hash: location.hash, titel: document.title, platzhalter: !!document.querySelector('.screen.platzhalter'),
@@ -421,6 +423,8 @@ async function testeTraining(browser) {
   for (const vp of [{ name: 'quer', w: 1180, h: 820 }, { name: 'Handy', w: 390, h: 844, handy: true }]) {
     gruppe = `Training mit Anbieter (${vp.name})`;
     const { kontext, seite, fehler } = await neueSeite(browser, vp);
+    // Genau die drei Test-Anbieter liefern die Karten dieses Layout-Vertrags.
+    await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.route('**/js/pakete/nav-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_TRAINING }));
     await seite.goto(`${BASIS}&erw=pakete/nav-test/index&reiter=training#training`);
     await seite.waitForSelector('.training-gitter [data-karte="2"]');

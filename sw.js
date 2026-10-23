@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 56;
-const STAND = '26866080f4a6';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 57;
+const STAND = '4e3ce566ed2b';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -38,6 +38,7 @@ const DATEIEN = [
   'css/verlauf.css',
   'css/einstellungen.css',
   'css/training.css',
+  'css/pakete/zuzweit.css',
   'css/sicherung.css',
   'css/daten.css',
   'css/screens.css',
@@ -75,6 +76,8 @@ const DATEIEN = [
   'js/ui/partie.js',
   'js/ui/seite.js',
   'js/ui/training.js',
+  'js/ui/zuzweit.js',
+  'js/pakete/zuzweit/index.js',
   'js/ui/verlauf.js',
   'vendor/chess/chess.js',
   'vendor/stockfish/stockfish-19-lite-single.js',
