@@ -632,7 +632,9 @@ async function warteAufServer(url, ms = 10000) {
   throw new Error('Server startet nicht: ' + url);
 }
 
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: nur dieses Paket (?erw), keine fest eingetragenen PAKETE. Sonst bringen andere Pakete Trainings-Karten
+// oder Panel-Karten mit, und die Pruefungen haengen davon ab, was gerade in PAKETE steht.
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const MIT = (extra = '') => `${BASIS}&erw=pakete/serie/index${extra}`;
 // 10 eigene Zuege bis zum Matt (Bot nach Plan): 1.e4 Sa6 2.Lc4 Sb8 3.Dh5 ... 10.Dxf7#
 const LANG_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'g1f3', 'b1c3', 'd2d3', 'a2a3', 'b2b3', 'h2h3', 'h5f7'];
