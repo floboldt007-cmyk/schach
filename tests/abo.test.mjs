@@ -697,6 +697,9 @@ async function browserTeil(browser) {
     pruefe('Gruppe: gekündigt, gilt bis Datum (ohne Countdown)', text === `Gekündigt, dein Trainer gilt bis ${new Date(bis).toLocaleDateString('de-DE')}.`, text);
     await seite.click('.abo-gruppe [data-abo="zeigen"]');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium');
+    // Das Blatt zeichnet neu, sobald das Produkt (mit dem Link zum Kundenportal) geladen ist; vorher steht "Preis folgt"
+    await seite.waitForFunction(() => [...document.querySelectorAll('.trainer-knoepfe button')].some((b) => b.textContent.trim() === 'Abo verwalten'),
+      null, { timeout: 5000 }).catch(() => {});
     const z = await blattZustand(seite);
     pruefe('Blatt: "Abo verwalten" statt Kauf', z.knoepfe[0] === 'Abo verwalten' && !z.knoepfe.includes('Trainer abschließen'), z);
     pruefe('Premium: kein Satz zum Alter (nichts mehr abzuschließen)', z.alter === '', z.alter);
