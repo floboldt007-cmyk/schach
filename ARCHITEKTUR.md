@@ -1053,8 +1053,10 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
   - **Spielerkarte** `.spieler` fuer beide Lagen (statt `.botbox` und `.botleiste-hoch`): Gegner `.spieler.gegner` mit den
     alten Klassen als Zusatzklassen (`.botbox`, `.botleiste-hoch`, `.botkarte`), erstes Kind `.ort-gegner-leiste`, dann `.av`
     (Portraet ueber `thema.avatarVon`), `.info` (`.bot-name`, Unterzeile `.bot-meta` mit Elo, `.denkt-ort`, `.geschlagen-ort`),
-    `.uhr[data-wer="bot"]` und `.blase-ort` (quer eine Zeile in der Karte, hoch haengt die Blase unter der Karte ueber dem
-    Brett). Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
+    `.uhr[data-wer="bot"]` und `.blase-ort` (quer eine Zeile in der Karte; hoch legt sich die Blase neben dem Portraet ueber
+    `.info`, also Name und Unterzeile, die Uhr bleibt frei; lange Saetze wachsen nach unten hoechstens bis an den Sockel,
+    nie ueber die Figuren; kein Kuerzen; die Begruessung steht hoch wie jeder Satz 3,5 s, quer 6 s). Karten haben
+    `role="group"`. Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
     `.name`, direkt danach `.ort-spieler-leiste`, Unterzeile, `.uhr[data-wer="flo"]`. Der Name wird nie mit „…“ gekuerzt:
     passt er nicht in zwei Zeilen, steht der Rufname da (Benno, Hilde, Kalle, Lisa, Rudi, Prof. Turm, Delia, Kommissar,
     Greta, Stockfisch), der volle Name im `aria-label` der Karte. `lage()` meldet weiter `'hoch'`/`'quer'`.
@@ -1063,7 +1065,7 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
     im Test `window.__partie.uhr`): laufend in Tinte, unter 20 s `.warn` rot mit Uhr-Symbol und Sekundenpuls;
     `uhr.zeige(an)`. Auf dem Handy 66 x 36 px, 17 px Ziffern.
   - **Kopf** `.p-kopf`: Zurueck, Bot-Name (Handy: Rufname), Unterzeile `.p-eroeffnung` · Stufe · Farbe, Brettwahl
-    (`.brettwahl`, 3 Mini-Felder, ab 861 px), Klang-Schalter (`[data-aktion="klang"]`, `aria-pressed`), `.p-zaehlwerk`
+    (`.brettwahl`, 3 Mini-Felder, nur auf dem iPad: versteckt bis 600 px Breite und bis 500 px Hoehe), Klang-Schalter (`[data-aktion="klang"]`, `aria-pressed`), `.p-zaehlwerk`
     (Buehne), Zahnrad. Alle Knoepfe sind direkte Kinder von `.kopf`.
   - **Lagen** (css/partie.css): quer Brett und Balken links, rechts eine Spalte (Gegner, Coach, Zugliste, Flo, Aktionen);
     iPad hoch eine Spalte per `order` (Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen); **Handy** (hoch bis 600 px):
@@ -1072,7 +1074,9 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
     Rest auf Antippen), erst dann das Brett kleiner (nie unter 280 px). Unter 760 px Hoehe steht der Zugstreifen nach den
     Knoepfen (`.streifen-unten`, die Spalte scrollt). Der Balken liegt dort waagrecht ueber dem Brett (6 px, `--anteil` per
     `scaleX`, gedreht von rechts), die Zahl kommt nur auf Antippen (`.zeigt-zahl`). `layout()` laeuft beim Start, bei jeder
-    Groessenaenderung (ResizeObserver) und bei `koordLage`.
+    Groessenaenderung (ResizeObserver) und bei `koordLage`. Es misst ohne `transform` (`offsetTop`/`offsetHeight` bis
+    `.inhalt`), weil das Ergebnis `.inhalt` auf `scale(.975)` setzt; sonst waere das Brett nach Drehen oder Safari-Leiste
+    mit stehendem Ergebnis zu gross.
   - **Coach-Karte** `.coach.coach-karte` (gemeinsames Bauteil in css/bauteile.css): `.c-symbol`, `.c-kopf` (`.c-klasse`,
     `.c-zug`, `.c-eval`, `.combo` oben rechts), `.c-text`, `.c-zusatz`, `.coach-knoepfe`. Genial: Klassenwort als Pille,
     Karte mit Ring, COMBO in der Klassenfarbe. Stil „knapp“: `.c-satz` + `.c-rest` (versteckt bis Antippen, `.offen`);
@@ -1095,11 +1099,12 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
   - **Grosser Moment** nur bei Genial (`effekt(feld, 'brillant')` in `.brett-effekte`): Feld-Puls (`.feld-puls`), Ring
     (`.welle`), 8 Funken (`.funken i`, 0,6 bis 0,9 Feldbreiten), Lichtstreif (`.streif-huelle > .streif`), das Brett hebt
     sich 1,2 % (`.brett-rahmen.prisma`). Effekte stehen in fertigen Prozenten (left/top) und behalten `--x`/`--y`. Grobe
-    Fehler bleiben ruhig. `buehne.reduziert` = Systemwunsch oder Einstellung „Bewegung: aus“ (dann keine Effekte).
+    Fehler bleiben ruhig. `buehne.reduziert` = Systemwunsch oder Einstellung „Bewegung: aus“ (dann keine Effekte), als
+    Getter live gelesen (ein Wechsel mitten in der Partie gilt sofort).
   - **Duell-Vertrag (U5):** Steht beim Start `html[data-duell="laeuft"]`, zieht der Bot (und spaeter die Uhr, W0+b) erst
     nach dem DOM-Ereignis `duell:fertig` auf `document`, hoechstens 1,4 s (`DUELL_MAX_MS`). Ohne Duell sofort. Die Ziele des
     Portraetflugs sind `.spieler.gegner .av` und `.spieler.ich .av`. Im Test: `window.__partie.duellBereit`, Protokoll
-    `{ typ: 'duell', grund: 'ereignis' | 'zeit' | 'verlassen' }`.
+    `{ typ: 'duell', grund: 'ereignis' | 'zeit' | 'verlassen', ms }` (`ms`: so lange hat die Partie gewartet).
 
 ## Bots (js/bots.js)
 ```js

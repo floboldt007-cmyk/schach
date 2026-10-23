@@ -38,7 +38,8 @@
 .brettwahl button[aria-checked="true"] { background: var(--flaeche-3); }
 .brettwahl button[aria-checked="true"] i { transform: scale(1.12); box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 3.5px var(--text); }
 .brettwahl button:focus-visible { outline: var(--fokus); outline-offset: -2px; }
-@media (max-width: 860px) { .partie .brettwahl { display: none; } }
+/* nur auf dem iPad (quer und hoch, PLAN 2.4); auf dem Handy hoch und quer liegt sie in den Einstellungen (2.5 Regel 5) */
+@media (max-width: 600px), (max-height: 500px) { .partie .brettwahl { display: none; } }
 
 /* ---------- Spielerkarten (.spieler.gegner, .spieler.ich) ---------- */
 .partie .spieler { --av: 46px; position: relative; display: grid; align-items: center; min-width: 0; min-height: 66px;
@@ -57,7 +58,7 @@
   .partie .spieler.gegner > .av { background: color-mix(in srgb, var(--bf, var(--flaeche-3)) 24%, var(--flaeche)); }
 }
 .partie .spieler.gegner > .info { grid-area: info; min-width: 0; }
-.partie .spieler .name { font-weight: 800; font-size: 16px; line-height: 1.15; color: var(--text); min-width: 0;
+.partie .spieler .name { font-weight: 800; font-size: 16px; line-height: 1.25; color: var(--text); min-width: 0;
   white-space: normal; overflow-wrap: break-word; text-overflow: clip; }
 .partie .spieler.ich > .name { grid-area: name; }
 .partie .spieler .unter { display: flex; align-items: center; gap: 6px; height: 18px; margin-top: 1px; min-width: 0; overflow: hidden;
@@ -133,6 +134,8 @@
 /* Ring ragt ueber die Symbolhoehe hinaus, die Beschriftung bleibt auf einer Linie mit den Nachbarn */
 .partie .spielknoepfe .halte-symbol { width: 32px; height: 32px; margin: -4px 0; }
 .partie .spielknoepfe .halte-symbol > .ico { width: 20px; height: 20px; }
+/* Halten zum Aufgeben: der Knopf faerbt sich wie im Bauteil (die Knopf-Regel oben ist sonst spezifischer) */
+.partie .spielknoepfe > .knopf.halte-knopf.haelt { background: var(--warn-weich); }
 .partie .spielknoepfe .hinweis-k.stufe-2 { box-shadow: inset 0 0 0 1.5px var(--text), var(--s1); }
 .partie .spielknoepfe .hinweis-k.rechnet .ico { animation: lade-puls .8s ease-in-out infinite; }
 .partie .spielknoepfe .knopf:disabled { opacity: .45; }
@@ -214,14 +217,18 @@
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
   .partie .spieler { min-height: 58px; padding: 6px 8px 6px 10px; }
   .partie .spieler { --av: 44px; }
-  /* die Blase haengt unter der Gegner-Karte ueber dem Brett (gedreht: ueber der Karte) */
-  .partie .spieler > .blase-ort { position: absolute; z-index: 20; top: calc(100% + 8px); left: 10px; right: 10px; margin: 0; min-height: 0;
-    pointer-events: none; }
-  .partie .spieler > .blase-ort:empty { display: none; }
-  .partie.vertauscht .spieler > .blase-ort { top: auto; bottom: calc(100% + 8px); }
-  .partie .p-blase { box-shadow: var(--s2), var(--kante); background: var(--flaeche); }
-  .partie .p-blase::before { background: var(--flaeche); }
-  .partie.vertauscht .p-blase::before { top: auto; bottom: -6px; transform: rotate(225deg); }
+}
+
+/* ---------- Sprechblase hoch (iPad hoch und Handy): der Bot spricht aus seiner Karte ----------
+   Die Blase legt sich neben dem Portraet ueber Name und Unterzeile (Feld "info", die Uhr bleibt frei) und blendet nach
+   3,5 s aus. Sie steht nie ueber den Figuren: lange Saetze wachsen nach unten hoechstens ueber Luecke und Balken bis an
+   den Sockel (Handy: Zelle 40 + 4 + 20 px, drei Zeilen passen), gedreht ueber den Coach. Kein Kuerzen mit "...". */
+@media (orientation: portrait) {
+  .partie .spieler.gegner > .blase-ort { position: absolute; z-index: 20; grid-area: info; inset: 0; margin: 0; min-height: 0; pointer-events: none; }
+  .partie .spieler.gegner > .blase-ort:empty { display: none; }
+  .partie .p-blase { min-height: 100%; display: flex; align-items: center; padding: 8px 12px; font-size: 14px; line-height: 1.3;
+    box-shadow: var(--s1), var(--kante); transform-origin: 0 calc(var(--av) / 2); }
+  .partie .p-blase::before { left: -5px; top: calc(var(--av) / 2 - 4px); transform: rotate(-45deg); }
 }
 
 /* ============================================================
@@ -254,14 +261,8 @@
   .partie .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; gap: 4px; }
   .partie .uhr .uhr-ic { width: 14px; height: 14px; }
   .partie .spieler > .ort-gegner-leiste { margin-bottom: 4px; }
-  /* Blase haengt ueber dem Brett */
-  .partie .spieler > .blase-ort { position: absolute; z-index: 20; top: calc(100% + 6px); left: 8px; right: 8px; margin: 0; min-height: 0;
-    pointer-events: none; }
-  .partie .spieler > .blase-ort:empty { display: none; }
-  .partie.vertauscht .spieler > .blase-ort { top: auto; bottom: calc(100% + 6px); }
-  .partie .p-blase { font-size: 13.5px; padding: 7px 11px; box-shadow: var(--s2), var(--kante); background: var(--flaeche);
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .partie .p-blase::before { display: none; }
+  /* Blase in der Karte (Abschnitt "Sprechblase hoch" oben), etwas kleiner */
+  .partie .p-blase { padding: 6px 10px; font-size: 13px; }
   /* Bewertungsbalken waagrecht ueber dem Brett (6 px, volle Breite, Weiss von links, gedreht von rechts), Zahl auf Antippen */
   .partie .evalbalken { width: 100%; height: 6px; border-radius: var(--r-pille); overflow: visible; cursor: pointer;
     box-shadow: 0 0 0 1px var(--linie-2); }

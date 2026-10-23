@@ -93,7 +93,8 @@
 //   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
 //   Zuschlag, Zeitueberschreitung) bringt W0+b; bis dahin steht die Grundzeit still da.
 //   Sprechblase: .blase-ort ist das letzte Kind der Gegner-Karte (quer eine Zeile in der Karte unter dem Namen, hoch
-//   haengt die kleine Blase unter der Karte ueber dem Brett) und blendet nach BLASE_MS (3,5 s) aus. Einstellung
+//   legt sie sich neben dem Portraet ueber Name und Unterzeile, nie ueber die Figuren) und blendet nach BLASE_MS
+//   (3,5 s) aus; nur quer bleibt die Begruessung BEGRUESSUNG_MS stehen. Einstellung
 //   sprueche: 'aus' zeigt keine Blase (buehne.blase() liefert false), 'wenig' nur Begruessung, Ende und hoechstens
 //   einen Satz je 5 eigene Zuege.
 //   Handy (hoch, bis 600 px): layout() rechnet "Brett zuerst" (PLAN 2.5): g = floor((Breite - 2 x 10 - Sockel) / 8) x 8,
@@ -183,7 +184,7 @@ const RUFNAME = Object.freeze({
 const rufnameVon = (b) => RUFNAME[b && b.id] || (b && b.name) || '';
 // U7: Brettwahl im Kopf (Feldfarben wie tokens.css, fest wie die Brettfarben selbst)
 const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
-// U7: Sprechblase blendet nach 3,5 s aus (Begruessung etwas laenger, sie kommt vor dem ersten Zug)
+// U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
 const BEGRUESSUNG_MS = 6000;
 // U7: Sprueche "wenig": hoechstens ein Satz je 5 eigene Zuege (10 Halbzuege)
@@ -237,8 +238,10 @@ function evalText(ev, farbe) {
 }
 
 export function zeige(root, params, app) {
-  // U7: reduziert = Systemwunsch ODER Einstellung "Bewegung: aus" (PLAN 2.0, Buehne)
-  const reduziert = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || tempo() === 0;
+  // U7: reduziert = Systemwunsch ODER Einstellung "Bewegung: aus" (PLAN 2.0, Buehne); live gelesen, damit ein Wechsel
+  // mitten in der Partie (Einstellungen, Systemwunsch) sofort gilt, auch fuer buehne.reduziert
+  const reduziertMq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  const reduziert = () => !!(reduziertMq && reduziertMq.matches) || tempo() === 0;
   const einst = app.einstellungen();
 
   // ---------- Partie bestimmen ----------
@@ -404,7 +407,7 @@ export function zeige(root, params, app) {
           <button class="knopf primaer ergebnis-zeigen" type="button" data-aktion="ergebnis" hidden>${icon('pokal')} Ergebnis</button></div>
       </div>
       <div class="seite">
-        <div class="spieler gegner botbox botleiste-hoch botkarte" aria-label="${esc(bot.name)}">
+        <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
             <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="denkt-ort"></span><span class="geschlagen-ort" data-wer="bot"></span></div></div>
@@ -414,7 +417,7 @@ export function zeige(root, params, app) {
         <div class="coach coach-karte leer" role="status" aria-live="polite"></div>
         <div class="zugbox"><div class="zugliste" aria-label="Züge"></div></div>
         <div class="zugleiste" aria-label="Züge"></div>
-        <div class="spieler ich spielerleiste spieler-quer spieler-hoch" aria-label="Flo">
+        <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="Flo">
           <span class="av">${floAvatar(farbe)}</span>
           <div class="name">Flo</div>
           <div class="unter bot-meta"><span class="p-meta">${FARBE_NAME[farbe]}</span><span class="geschlagen-ort" data-wer="flo"></span></div>
@@ -867,7 +870,7 @@ export function zeige(root, params, app) {
     return brett.ausrichtung === 'w' ? [d, 7 - r] : [7 - d, r];
   }
   function effekt(feld, klasse) {
-    if (reduziert || tempo() === 0) return;
+    if (reduziert()) return;
     // W0+a: ein Finisher ersetzt jeden Brett-Effekt. Bis feststeht, ob einer laeuft (ein Anbieter darf null liefern,
     // z. B. "Finisher aus"), wird der Effekt gemerkt; laeuft keiner, holt der Matt-Hook ihn nach
     if (z.finisher) { z.effektGemerkt = [feld, klasse]; return; }
@@ -1655,7 +1658,7 @@ export function zeige(root, params, app) {
       for (const reihe of z.chess.board()) for (const f of reihe) if (f && f.type === 'k' && f.color === matt) koenigFeld = f.square;
       mattOrt = fuelle('partie:matt', null, {
         app, buehne, laufId, partieId: z.gespeichert ? z.gespeichert.partie.id : null, ergebnis,
-        gewinner: ergebnis === 'sieg' ? 'flo' : 'bot', koenigFeld, fen: z.chess.fen(), reduziert: !!reduziert,
+        gewinner: ergebnis === 'sieg' ? 'flo' : 'bot', koenigFeld, fen: z.chess.fen(), reduziert: reduziert(),
         letzterZug: m ? Object.freeze({ von: m.from, nach: m.to, san: m.san, figur: m.color + m.piece.toUpperCase() }) : null,
         signal: ctrl.signal, dauerMs: BRETT_FEIER.dauerMs, kurzMs: BRETT_FEIER.kurzMs,
       });
@@ -1974,7 +1977,7 @@ export function zeige(root, params, app) {
         const zahl = o.querySelector('.erg-genau b');
         const ziel = Number(zahl && zahl.dataset.ziel);
         if (zahl && Number.isFinite(ziel) && zahl.dataset.ziel !== '') {
-          if (reduziert) zahl.textContent = komma(ziel) + ' %';
+          if (reduziert()) zahl.textContent = komma(ziel) + ' %';
           else {
             const t0 = jetzt();
             const schritt = () => {
@@ -1991,7 +1994,7 @@ export function zeige(root, params, app) {
         // U7, Takt (PLAN 3.7): der Klang sitzt auf der Landung jedes Sterns (360 ms + i x 250 ms, Landung nach 220 ms),
         // Abstaende mit dem Tempo, aber nie unter 0,6 (takt); bei reduzierter Bewegung erklingen alle drei
         if (ergebnis === 'sieg' && wertet) {
-          const opt = { reduziert: !!reduziert };
+          const opt = { reduziert: reduziert() };
           const f = taktFaktor();
           if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i], opt), Math.round((580 + i * 250) * f)); });
           else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true, opt), Math.round(800 * f));
@@ -2016,8 +2019,11 @@ export function zeige(root, params, app) {
       });
     } catch (e) { wahl = null; }
     const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
-    if (anlass && anlass !== 'begruessung' && zeigeBlase(anlass, 'start', { dauer: BEGRUESSUNG_MS, prio: 60, werte: wahl.werte || null })) return;
-    zeigeBlase('begruessung', 'start', { dauer: BEGRUESSUNG_MS, prio: 60, werte: (anlass === 'begruessung' && wahl.werte) || null });
+    // U7: hoch liegt die Blase ueber Name und Unterzeile der Gegner-Karte, dort gilt BLASE_MS (3,5 s) wie fuer jeden
+    // Satz; quer hat sie eine eigene Zeile in der Karte und verdeckt nichts, dort bleibt die Begruessung laenger stehen
+    const dauer = lage() === 'hoch' ? BLASE_MS : BEGRUESSUNG_MS;
+    if (anlass && anlass !== 'begruessung' && zeigeBlase(anlass, 'start', { dauer, prio: 60, werte: wahl.werte || null })) return;
+    zeigeBlase('begruessung', 'start', { dauer, prio: 60, werte: (anlass === 'begruessung' && wahl.werte) || null });
   }
 
   // ---------- Buehne fuer die Pakete (kommt mit partie:gestartet) ----------
@@ -2041,7 +2047,7 @@ export function zeige(root, params, app) {
     laufId, bot, farbe, modus: z.modus, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
     boss: z.boss ? Object.freeze({ ...z.boss }) : null, seed: z.seed,
     zeigt, platz,
-    el: s, effekte: effekteEl, rahmen, brett, reduziert: !!reduziert,
+    el: s, effekte: effekteEl, rahmen, brett, get reduziert() { return reduziert(); },
     feld(f) {
       if (typeof f !== 'string' || !/^[a-h][1-8]$/.test(f)) return null;
       const [x, y] = spalteZeile(f);
@@ -2173,17 +2179,27 @@ export function zeige(root, params, app) {
       inhaltEl.style.setProperty('--brett', g + 'px');
       inhaltEl.style.setProperty('--spalte', (g + sockelX) + 'px');
     };
-    // Hoehe: alles ausser dem Brett messen (bei der vollen Breite), 4 px Puffer bis zur Unterkante
+    // Hoehe: alles ausser dem Brett messen (bei der vollen Breite), 4 px Puffer bis zur Unterkante.
+    // Gemessen wird ohne transform (offsetTop/offsetHeight bis .inhalt): mit dem Ergebnis steht .inhalt auf scale(.975),
+    // Rects waeren dann 2,5 % zu klein, und nach "Brett ansehen" ragten die Aktionen unten aus dem Bild.
+    const knoepfe = $('.spielknoepfe');
+    const untenVon = (el) => {
+      let y = el.offsetHeight;
+      let e = el;
+      while (e && e !== inhaltEl) { y += e.offsetTop; e = e.offsetParent; }
+      if (e === inhaltEl) return y;
+      // Rueckfall (kein offsetParent-Weg bis .inhalt): Rects, auf den Massstab von .inhalt zurueckgerechnet
+      const ri = inhaltEl.getBoundingClientRect();
+      const k = inhaltEl.offsetHeight ? ri.height / inhaltEl.offsetHeight : 1;
+      return (el.getBoundingClientRect().bottom - ri.top) / (k || 1) + inhaltEl.scrollTop;
+    };
     const passt = (g) => {
       setze(g);
-      const oben = inhaltEl.getBoundingClientRect().top - inhaltEl.scrollTop;
-      const unten = $('.spielknoepfe').getBoundingClientRect().bottom - oben + 4;
-      return unten <= inhaltEl.clientHeight + 0.5;
+      return untenVon(knoepfe) + 4 <= inhaltEl.clientHeight + 0.5;
     };
     const hoehe = (g) => {
       setze(g);
-      const oben = inhaltEl.getBoundingClientRect().top - inhaltEl.scrollTop;
-      const rest = $('.spielknoepfe').getBoundingClientRect().bottom - oben + 4 - rahmen.offsetHeight;
+      const rest = untenVon(knoepfe) + 4 - rahmen.offsetHeight;
       return Math.floor((inhaltEl.clientHeight - rest - sockelY) / 8) * 8;
     };
     s.classList.remove('coach-eng');
@@ -2218,12 +2234,13 @@ export function zeige(root, params, app) {
   let duellAus = null;
   const duellBereit = document.documentElement.dataset.duell === 'laeuft'
     ? new Promise((resolve) => {
+      const seit = jetzt();
       const u = setTimeout(() => fertig('zeit'), DUELL_MAX_MS);
       function fertig(grund) {
         clearTimeout(u);
         document.removeEventListener('duell:fertig', ereignis);
         duellAus = null;
-        melde({ typ: 'duell', grund });
+        melde({ typ: 'duell', grund, ms: Math.round(jetzt() - seit) });
         resolve();
       }
       const ereignis = () => fertig('ereignis');

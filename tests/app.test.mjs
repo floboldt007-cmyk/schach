@@ -3009,6 +3009,27 @@ const u7Masse = (seite) => seite.evaluate(() => {
     brettwahl: sichtbar('.partie .brettwahl'), scrollt: inh.scrollHeight - inh.clientHeight,
   };
 });
+// Sprechblase des Bots (hoch: in der Gegner-Karte neben dem Portraet); text ersetzt den Satz (Laengentest)
+const U7_LANGER_SATZ = 'Ich hab mein Strickzeug weggelegt. Jetzt hast du meine volle Aufmerksamkeit!';
+const u7Blase = (seite, text = null) => seite.evaluate((t) => {
+  const b = document.querySelector('.partie .blase-ort .sprechblase:not(.weg)');
+  if (!b) return { da: false };
+  if (t) b.textContent = t;
+  const r = b.getBoundingClientRect();
+  const felder = [...document.querySelectorAll('.partie .brett-felder .feld')].map((f) => f.getBoundingClientRect());
+  const fo = Math.min(...felder.map((f) => f.top));
+  const fu = Math.max(...felder.map((f) => f.bottom));
+  const karte = document.querySelector('.partie .spieler.gegner').getBoundingClientRect();
+  const av = document.querySelector('.partie .spieler.gegner > .av').getBoundingClientRect();
+  const uhr = document.querySelector('.partie .spieler.gegner .uhr');
+  const cs = getComputedStyle(b);
+  return { da: true, t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), avR: Math.round(av.right),
+    karteT: Math.round(karte.top), karteR: Math.round(karte.right), uhrL: uhr.hidden ? null : Math.round(uhr.getBoundingClientRect().left),
+    ueberFiguren: r.bottom > fo + 0.5 && r.top < fu - 0.5, ganz: b.scrollHeight <= b.clientHeight + 1 && b.scrollWidth <= b.clientWidth + 1,
+    clamp: cs.webkitLineClamp, ellipse: cs.textOverflow === 'ellipsis' };
+}, text);
+const u7BlaseOk = (bl) => bl.da && !bl.ueberFiguren && bl.l >= bl.avR && bl.r <= bl.karteR + 0.5 && bl.t >= bl.karteT - 0.5
+  && (bl.uhrL == null || bl.r <= bl.uhrL + 0.5) && bl.ganz && bl.clamp === 'none' && !bl.ellipse;
 
 async function testeU7(browser) {
   // --- Handy-Pflicht (PLAN 2.5) als harte Pruefung: 390 x 844, 375 x 667, 390 x 664, hell und dunkel ---
@@ -3018,6 +3039,13 @@ async function testeU7(browser) {
       const { kontext, seite, fehler, h } = await u7Seite(browser, { ...g, schema, handy: true });
       await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
       await h.starte({ botId: 'kalle', farbe: 'w' });
+      // wann verschwindet die Begruessung (Beobachter direkt nach dem Start)
+      await seite.evaluate(() => {
+        window.__blaseWeg = null;
+        const sc = document.querySelector('.screen.partie');
+        new MutationObserver(() => { if (window.__blaseWeg == null && !sc.classList.contains('hat-blase')) window.__blaseWeg = performance.now(); })
+          .observe(sc, { attributes: true, attributeFilter: ['class'] });
+      });
       await warte(500);
       const m = await u7Masse(seite);
       pruefe('Brett zuerst: Brettbreite >= Breite - 2 x 12 - 8 (und ein Vielfaches von 8)', m.brett.w >= m.iw - 2 * 12 - 8 && Math.round(m.brett.w) % 8 === 0, JSON.stringify(m.brett));
@@ -3039,6 +3067,19 @@ async function testeU7(browser) {
       }
       pruefe('Kopf: Rufname „Kalle“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Kalle' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
       pruefe('Genug Höhe: Coach in voller Höhe, Brett in voller Breite', !m.eng && Math.round(m.brett.w) === Math.floor((m.iw - 2 * 10 - 8) / 8) * 8, JSON.stringify([m.eng, m.brett.w]));
+      // Sprechblase hoch (Nachbesserung): in der Karte neben dem Portraet, nie ueber den Figuren, nie gekuerzt
+      const bl = await u7Blase(seite);
+      const blLang = await u7Blase(seite, U7_LANGER_SATZ);
+      pruefe('Sprechblase: in der Gegner-Karte neben dem Porträt, nie über den Figuren, ganz lesbar (auch der längste Satz)', u7BlaseOk(bl) && u7BlaseOk(blLang),
+        JSON.stringify([bl, blLang]));
+      if (schema === 'light' && g.h === 844) {
+        await seite.waitForFunction(() => window.__blaseWeg != null, null, { timeout: 10000 }).catch(() => {});
+        const dauer = await seite.evaluate(() => {
+          const e = window.__partie.protokoll.filter((x) => x.typ === 'blase').pop();
+          return { anlass: e && e.anlass, ms: e && window.__blaseWeg != null ? Math.round(window.__blaseWeg - e.t) : null };
+        });
+        pruefe('Hoch: auch die Begrüßung blendet nach 3,5 s aus (quer bleibt sie länger)', dauer.anlass === 'begruessung' && dauer.ms >= 3400 && dauer.ms <= 4500, JSON.stringify(dauer));
+      }
       // Zahl des Balkens nur auf Antippen
       const zahl = await seite.evaluate(() => getComputedStyle(document.querySelector('.partie .evalbalken .wert')).display);
       await h.tippe('.partie .evalbalken');
@@ -3056,6 +3097,8 @@ async function testeU7(browser) {
       const m2 = await u7Masse(seite);
       pruefe('Mit Uhr: kompakte Uhr (mindestens 66 x 36, 17 px), Name ganz', u.sichtbar && u.w >= 66 && u.h === 36 && u.fs === '17px' && u.text === '5:00'
         && m2.name.scroll <= m2.name.client + 1 && m2.name.hoehe <= m2.name.lh * 2 + 2 && m2.unten <= m2.ih + 0.5, JSON.stringify([u, m2.name, m2.unten]));
+      const blUhr = await u7Blase(seite, U7_LANGER_SATZ);
+      pruefe('Mit Uhr: der längste Satz lässt die Uhr frei, steht nie über den Figuren und bleibt ganz', u7BlaseOk(blUhr) && blUhr.uhrL != null, JSON.stringify(blUhr));
       pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
       await kontext.close();
     }
@@ -3104,6 +3147,41 @@ async function testeU7(browser) {
     await kontext.close();
   }
 
+  // iPad hoch (PLAN 2.4): Brettwahl im Kopf (nur auf dem Handy nicht), Titel ganz, die Blase steht nie ueber den Figuren
+  for (const g of [{ w: 820, h: 1180 }, { w: 768, h: 1024 }]) {
+    gruppe = `U7 iPad hoch ${g.w}x${g.h}`;
+    const { kontext, seite, fehler, h } = await u7Seite(browser, g);
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'greta', farbe: 'w', tempo: { grund: 300, zuschlag: 2 } });
+    await warte(400);
+    const k = await seite.evaluate(() => {
+      const kopf = document.querySelector('.partie .kopf');
+      const h2 = kopf.querySelector('h2');
+      const bw = document.querySelector('.partie .brettwahl');
+      const knoepfe = [...bw.querySelectorAll('button')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); });
+      return { brettwahl: getComputedStyle(bw).display !== 'none' && bw.getBoundingClientRect().width > 0, knoepfe, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1,
+        kopf: kopf.scrollWidth - kopf.clientWidth, seite: document.documentElement.scrollWidth - innerWidth, lage: window.__partie.gegnerLeiste.dataset.lage };
+    });
+    pruefe('iPad hoch: Brettwahl im Kopf (3 Mini-Felder, je mindestens 44 px), Titel „Großmeisterin Greta“ ganz, kein Überlauf', k.brettwahl && k.knoepfe.length === 3
+      && k.knoepfe.every((x) => x >= 44) && k.titel === 'Großmeisterin Greta' && k.titelGanz && k.kopf <= 0 && k.seite <= 0 && k.lage === 'hoch', JSON.stringify(k));
+    const bl = await u7Blase(seite, U7_LANGER_SATZ);
+    pruefe('iPad hoch: die Blase in der Gegner-Karte, nie über den Figuren, Uhr frei, ganz lesbar', u7BlaseOk(bl), JSON.stringify(bl));
+    await bild(seite, `u7-ipad-hoch-${g.w}x${g.h}`);
+    pruefe('iPad hoch: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'U7 Handy quer';
+  {
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 844, h: 390, handy: true });
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'kalle', farbe: 'w' });
+    const q = await seite.evaluate(() => ({ brettwahl: getComputedStyle(document.querySelector('.partie .brettwahl')).display, seite: document.documentElement.scrollWidth - innerWidth,
+      knoepfe: Math.round(document.querySelector('.partie .spielknoepfe').getBoundingClientRect().bottom), ih: innerHeight }));
+    pruefe('Handy quer: keine Brettwahl im Kopf (sie liegt in den Einstellungen), Aktionen im Bild', q.brettwahl === 'none' && q.seite <= 0 && q.knoepfe <= q.ih, JSON.stringify(q));
+    pruefe('Handy quer: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // --- Spielerkarten, Uhr, Kopf (iPad quer) ---
   gruppe = 'U7 Spielerkarten';
   {
@@ -3120,8 +3198,11 @@ async function testeU7(browser) {
         ich: ['spielerleiste', 'spieler-quer', 'spieler-hoch'].every((c) => ich.classList.contains(c)), kopf: document.querySelector('.partie .kopf h2').textContent,
         unter: document.querySelector('.partie .kopf .unter').textContent, brettwahl: document.querySelectorAll('.partie .brettwahl button').length,
         klang: document.querySelector('.partie .kopf [data-aktion="klang"]').getAttribute('aria-pressed'), lage: window.__partie.gegnerLeiste.dataset.lage,
+        rollen: [g.getAttribute('role'), ich.getAttribute('role')], label: g.getAttribute('aria-label'),
       };
     });
+    pruefe('Spielerkarten mit role="group", der volle Name im aria-label (Bedienhilfen lesen ihn verlässlich)', JSON.stringify(k.rollen) === '["group","group"]' && k.label === 'Kalle vom Stammtisch',
+      JSON.stringify([k.rollen, k.label]));
     pruefe('Gegner-Karte .spieler.gegner mit den alten Klassen (.botbox, .botleiste-hoch, .botkarte), Gegner-Leiste als erstes Kind', k.klassen && k.erstes, JSON.stringify(k));
     pruefe('Portraets als Flugziele des Duells (.spieler.gegner .av, .spieler.ich .av), Spieler-Leiste nach Flos Namen, Flos Zusatzklassen', k.av && k.leisteNachName && k.ich, JSON.stringify(k));
     pruefe('Ohne Bedenkzeit: beide Uhren versteckt; Kopf „Kalle vom Stammtisch“, Unterzeile mit Stufe und Farbe, Brettwahl (3), Klang-Schalter an', k.uhren.every(Boolean)
@@ -3207,6 +3288,21 @@ async function testeU7(browser) {
       Object.assign(r, { zurueck: b.bestaetigen, normal: b.gleitDauer(), lage2: b.koordLage(), steuerung2: b.steuerung, pfeile2: b.pfeileErlaubt, dame2: b.autoDame });
       return r;
     });
+    // Buehne: reduziert gilt sofort (Bewegung aus mitten in der Partie), auch fuer den grossen Moment
+    const red = await seite.evaluate(() => {
+      const P = window.__partie;
+      const r = { vorher: P.buehne.reduziert };
+      window.__app.setzeEinstellungen({ bewegung: 'aus' });
+      const n = document.querySelectorAll('.partie .effekt-ort').length;
+      P.effekt('e4', 'brillant');
+      r.aus = P.buehne.reduziert;
+      r.effekte = document.querySelectorAll('.partie .effekt-ort').length - n;
+      window.__app.setzeEinstellungen({ bewegung: 'normal' });
+      r.wieder = P.buehne.reduziert;
+      return r;
+    });
+    pruefe('Bühne: reduziert folgt „Bewegung“ sofort (aus: true und kein Brett-Effekt, normal: wieder false)', red.vorher === false && red.aus === true && red.effekte === 0 && red.wieder === false,
+      JSON.stringify(red));
     pruefe('Einstellungen wirken sofort am Brett: Bestätigen, Turm-Rochade, Auto-Dame, Steuerung, Pfeile, Koordinaten am Rand, Gleitdauer (Tempo)',
       live.vorher === true && live.aus === false && live.turm === true && live.dame === false && live.steuerung === 'tippen' && live.pfeile === false && live.lage === 'rand' && live.rand
       && live.gleiten === 0 && live.langsam === 450 && live.zurueck === true && live.normal === 300 && live.lage2 === 'ecke' && live.steuerung2 === 'beides' && live.pfeile2 && live.dame2,
@@ -3291,6 +3387,15 @@ async function testeU7(browser) {
     await seite.mouse.down();
     await warte(450);
     const haelt = await seite.evaluate(() => document.querySelector('.spielknoepfe > [data-aktion="aufgeben"]').classList.contains('haelt'));
+    const haltFarbe = await seite.evaluate(() => {
+      const probe = document.createElement('i');
+      probe.style.background = 'var(--warn-weich)';
+      document.body.append(probe);
+      const soll = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { ist: getComputedStyle(document.querySelector('.spielknoepfe > [data-aktion="aufgeben"]')).backgroundColor, soll };
+    });
+    pruefe('Während des Haltens färbt sich der Aufgeben-Knopf (--warn-weich)', haelt && haltFarbe.ist === haltFarbe.soll, JSON.stringify(haltFarbe));
     await bild(seite, 'u7-aufgeben-halten');
     await warte(800);
     await seite.mouse.up();
@@ -3379,6 +3484,7 @@ async function testeU7(browser) {
       await seite.waitForFunction(() => window.__partie && window.__partie.z.zuege.length === 1, null, { timeout: 8000 }).catch(() => {});
       const dauer = Date.now() - t0;
       const r = await seite.evaluate(() => ({ zuege: window.__partie.z.zuege.length, duell: (window.__partie.protokoll.find((e) => e.typ === 'duell') || {}).grund,
+        ms: (window.__partie.protokoll.find((e) => e.typ === 'duell') || {}).ms,
         ziele: !!document.querySelector('.spieler.gegner .av') && !!document.querySelector('.spieler.ich .av') }));
       await seite.evaluate(() => { delete document.documentElement.dataset.duell; });
       return { frueh, dauer, ...r };
@@ -3387,6 +3493,8 @@ async function testeU7(browser) {
     pruefe('Duell läuft: Bot zieht erst nach duell:fertig (vorher keiner), Porträt-Ziele da', a.frueh === 0 && a.zuege === 1 && a.duell === 'ereignis' && a.ziele, JSON.stringify(a));
     const b = await lauf(false);
     pruefe('Duell ohne Ereignis: der Bot wartet höchstens 1,4 s', b.frueh === 0 && b.zuege === 1 && b.duell === 'zeit' && b.dauer < 4000, JSON.stringify(b));
+    pruefe('Duell-Vertrag streng: ohne Ereignis wartet die Partie 1,4 s (gemessen in der Seite), mit Ereignis endet das Warten mit dem Ereignis',
+      b.ms >= 1390 && b.ms <= 1900 && a.ms >= 600 && a.ms < 1390, JSON.stringify([a.ms, b.ms]));
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
     await seite.waitForSelector('.screen.arena');
     await seite.evaluate(() => { window.__test = { botPause: 0, botZug: () => 'e2e4' }; window.__app.gehe('partie', { botId: 'benno', farbe: 'b' }); });
@@ -3453,7 +3561,44 @@ async function testeU7(browser) {
     const goldRgb = await seite.evaluate((gh) => { const d = document.createElement('i'); d.style.color = gh; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; }, rm.gold);
     pruefe('Remis gold-neutral: „Remis“, goldener Rand, keine Lichtblick-Karte', rm.wort === 'Remis' && rm.schatten.includes(goldRgb) && rm.lb === 0, JSON.stringify([rm, goldRgb]));
     await bild(seite, `u7-ergebnis-remis-${g.w}x${g.h}`);
+    // Patt ist auch Remis (der Bot ist am Zug und hat keinen Zug mehr)
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'kalle', farbe: 'w', startFen: 'k7/8/1K6/8/8/8/2Q5/8 w - - 0 1' });
+    await h.warteFlo();
+    await h.zugTippen('c2c7');
+    await seite.waitForSelector('.ergebnis-overlay.remis.gefuellt', { timeout: 30000 });
+    const patt = await seite.evaluate(() => ({ wort: document.querySelector('.erg-wort').textContent, unter: document.querySelector('.erg-unter').textContent,
+      grund: (window.__partie.protokoll.find((e) => e.typ === 'ende') || {}).grund }));
+    pruefe('Patt: „Remis“ mit „Patt gegen …“', patt.wort === 'Remis' && /^Patt gegen /.test(patt.unter) && patt.grund === 'patt', JSON.stringify(patt));
     pruefe('Ergebnis: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // --- Handy: Groesse aendert sich, waehrend das Ergebnis steht (Drehen, Safari-Leiste). layout() misst ohne den
+  //     Massstab des zuruecktretenden Screens (scale .975); nach "Brett ansehen" ist alles im Bild ---
+  gruppe = 'U7 Ergebnis Groesse';
+  {
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 390, h: 700, handy: true });
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.setzeEinstellungen({ zugBestaetigen: 'aus' }); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'benno', farbe: 'w', startFen: MATT_IN_1 });
+    await h.warteFlo();
+    await h.zugTippen('a1a8');
+    await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 30000 });
+    await warte(900);
+    const brettVar = () => seite.evaluate(() => document.querySelector('.partie .inhalt').style.getPropertyValue('--brett'));
+    await seite.setViewportSize({ width: 390, height: 640 });
+    await warte(900);
+    const waehrend = { brett: await brettVar(), zurueck: await seite.evaluate(() => document.querySelector('.screen.partie').classList.contains('mit-ergebnis')) };
+    await h.tippe('.ergebnis-overlay .erg-zu');
+    await warte(900);
+    const danach = await u7Masse(seite);
+    // frische Rechnung ohne Ergebnis bei derselben Groesse
+    await seite.evaluate(() => window.__partie.layout());
+    const frisch = await brettVar();
+    pruefe('Ergebnis steht, die Höhe ändert sich: dasselbe Brett wie frisch gerechnet; nach „Brett ansehen“ Kopf bis Aktionen im Bild', waehrend.zurueck
+      && waehrend.brett === frisch && Math.round(danach.brett.w) + 'px' === frisch && danach.unten <= danach.ih + 0.5, JSON.stringify({ waehrend, frisch, brett: danach.brett.w, unten: danach.unten, ih: danach.ih }));
+    await seite.evaluate(() => window.__app.setzeEinstellungen({ zugBestaetigen: 'ohneUhr' }));
+    pruefe('Ergebnis Größe: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
 
