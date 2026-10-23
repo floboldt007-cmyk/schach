@@ -49,18 +49,27 @@ die Stripe über jede Änderung informiert. Preise stehen nie im Code (öffentli
 „Bald verfügbar“.
 
 **Vorher klären (keine Rechtsberatung):** Echte Zahlungen erst mit Gewerbe, Impressum, Datenschutzerklärung (Stripe
-nennen), AGB mit Widerrufsbelehrung für digitale Inhalte und geklärter Umsatzsteuer. Bis dahin alles im **Testmodus**
-von Stripe ausprobieren: Dort fließt kein Geld.
+nennen), AGB mit Widerrufsbelehrung für digitale Inhalte und geklärter Umsatzsteuer. Dazu der **Kündigungsbutton nach
+§ 312k BGB**: Wer Abos über eine Website verkauft, braucht dort eine gut sichtbare Schaltfläche „Verträge hier kündigen“
+mit einer Bestätigungsseite; Gerichte haben eine vorgeschaltete Anmeldung als unzulässig angesehen. Die App hat bisher
+nur „Abo verwalten“ (angemeldet, Kundenportal von Stripe mit E-Mail-Login). Mit der Fachperson klären, was davon reicht;
+eine eigene Kündigungsseite bräuchte eine Edge Function mit einem Stripe-API-Schlüssel (eingeschränkt auf Abos). Bis
+dahin alles im **Testmodus** von Stripe ausprobieren: Dort fließt kein Geld.
 
-**Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; 16-
-und 17-Jährige brauchen dafür die Zustimmung der Eltern (§§ 107, 108 BGB, das „Taschengeld“ nach § 110 BGB deckt ein
-laufendes Abo in der Regel nicht). Das Blatt „Crownmate Trainer“ sagt das ruhig neben dem Kauf-Knopf. In die AGB
-gehört dieselbe Regel; in den Store-Apps läuft das später über die Familienfreigabe von Apple und Google
-(`design/runde4/SPIELKONZEPT.md`, Regel 22). Vor dem Start mit der Fachperson klären, die die AGB prüft.
+**Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; ohne
+Zustimmung der Eltern ist er bei 16- und 17-Jährigen schwebend unwirksam (§§ 107, 108 BGB, das „Taschengeld“ nach § 110
+BGB deckt ein laufendes Abo in der Regel nicht), Rückforderungen trägt der Verkäufer. Nach `design/runde4/SPIELKONZEPT.md`
+Regel 22 schließen Minderjährige ein Abo nur über die **Familienfreigabe** von Apple und Google ab; die gibt es im Web
+nicht. Deshalb gilt in der App: **das Web-Abo erst ab 18.** Vor dem ersten Kauf fragt das Blatt einmal „Bist du 18 oder
+älter?“ (gespeichert wird nur ja oder nein, auf dem Gerät); wer „jünger“ antwortet, bekommt keinen Kauf-Knopf, alles
+andere bleibt frei. In die AGB gehört dieselbe Regel. **Deine Entscheidung:** Soll es später einen Weg mit Zustimmung
+der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage in `js/pakete/abo/trainer.js` ändern.
 
 1. **Schema einspielen:** Im **SQL Editor** den Inhalt von `supabase/abo-schema.sql` ausführen (nach `schema.sql`; ein
    erneuter Lauf ist erlaubt). Danach `supabase/abo-rls-test.sql` ausführen: Am Ende muss
-   `Abo-RLS-Test erfolgreich` stehen. Der Test rollt alles zurück und hinterlässt nichts.
+   `Abo-RLS-Test erfolgreich` stehen. Der Test rollt alles zurück und hinterlässt nichts. Der SQL Editor warnt bei
+   beiden Dateien vor einer „destructive operation“ (wegen `drop policy if exists` und `drop trigger if exists`, die
+   nur die eigenen Regeln ersetzen): bei genau diesen zwei Dateien bestätigen.
 2. **Stripe-Konto:** Auf stripe.com ein Konto anlegen und oben rechts den **Testmodus** (Sandbox) einschalten. Alle
    folgenden Stripe-Schritte zuerst im Testmodus machen.
 3. **Produkt und Preis:** **Produktkatalog > Produkt hinzufügen**: Name `Crownmate Trainer`, ein **wiederkehrender**
@@ -82,7 +91,8 @@ gehört dieselbe Regel; in den Store-Apps läuft das später über die Familienf
    `npx supabase functions deploy stripe-webhook --no-verify-jwt`.
    `--no-verify-jwt` ist nötig, weil Stripe kein Supabase-Login mitschickt; geschützt ist die Function durch die
    Stripe-Signatur. Ihre Adresse: `https://usaamcqypmvgqmsbfecb.supabase.co/functions/v1/stripe-webhook`.
-7. **Webhook in Stripe:** **Entwickler > Webhooks > Endpunkt hinzufügen**, die Adresse aus Schritt 6 eintragen und genau
+7. **Webhook in Stripe:** **Entwickler > Webhooks > Endpunkt hinzufügen** (in der neueren Ansicht **Workbench >
+   Webhooks > Ziel hinzufügen**, Nutzlast **Snapshot**, nicht „Thin“), die Adresse aus Schritt 6 eintragen und genau
    diese Ereignisse wählen: `checkout.session.completed`, `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`. Danach beim Endpunkt das
    **Signaturgeheimnis** (`whsec_...`) aufdecken.
@@ -92,13 +102,18 @@ gehört dieselbe Regel; in den Store-Apps läuft das später über die Familienf
    gebraucht.
 9. **Tabelle `produkte` füllen:** **Table Editor > produkte > Insert row**: `id` = `trainer`, `name` =
    `Crownmate Trainer`, `preis_text` = der Preis so, wie er in der App stehen soll (mit „inkl. MwSt.“ und Zeitraum),
-   `kauf_link` = Link aus Schritt 4, `portal_link` = Link aus Schritt 5, `beschreibung` optional, `aktiv` = `true`.
-   Es werden nur `https://`-Links angenommen. **Vor dem Freischalten** prüfen, dass alles aus der Liste „Im Trainer“
-   (`js/pakete/abo/trainer.js`, `VORTEILE`) schon gebaut ist, sonst die Liste kürzen: Verkauft wird nur, was es gibt.
-10. **Testen (Testmodus):** In der App anmelden (Adresse mit `#konto` öffnen), **Einstellungen > Crownmate Trainer >
-    Mehr zum Trainer > Trainer abschließen**, mit der Stripe-Testkarte `4242 4242 4242 4242` (beliebiges künftiges
-    Datum, beliebige Prüfziffer) bezahlen und zurückkehren: Die App fragt sofort neu und zeigt „Dein Trainer ist
-    aktiv“. In Stripe unter **Webhooks > Endpunkt** müssen die Zustellungen mit 200 stehen, in Supabase unter
+   `kauf_link` = Link aus Schritt 4, `portal_link` = Link aus Schritt 5, `beschreibung` optional, `aktiv` = `false`
+   (erst zum Probekauf in Schritt 10 und zum Start auf `true`). Es werden nur `https://`-Links angenommen. **Verkauft wird nur, was es gibt:** Unter „Im Trainer“ zeigt das Blatt
+   nur Vorteile, deren Paket sich als fertig meldet (`registriereVorteil` in `js/abo.js`); alles andere steht unter
+   „In Arbeit, noch nicht enthalten“. Solange kein Vorteil fertig ist, gibt es **keinen Kauf-Knopf**, auch mit
+   `aktiv` = `true` (Ausnahme: ein Link aus dem Testmodus, `https://buy.stripe.com/test_...`, für den Probekauf).
+10. **Testen (Testmodus):** Dafür in `produkte` kurz `aktiv` = `true` setzen (mit dem Testmodus-Link aus Schritt 4;
+    das Paket `abo` muss in der App eingetragen sein, `js/erweiterungen.js`) und nach dem Test wieder `false`. In der App anmelden (Adresse mit `#konto` öffnen),
+    **Einstellungen > Crownmate Trainer > Mehr zum Trainer > Trainer abschließen**, die Altersfrage beantworten, mit
+    der Stripe-Testkarte `4242 4242 4242 4242` (beliebiges künftiges Datum, beliebige Prüfziffer) bezahlen und
+    zurückkehren: Die App zeigt „Stripe bestätigt deine Zahlung“, fragt einige Male neu (sofort, nach 3, 10 und
+    30 Sekunden) und zeigt dann „Dein Trainer ist aktiv“. Kommt nichts, steht dort „Zahlung prüfen“. In Stripe unter
+    **Webhooks > Endpunkt** müssen die Zustellungen mit 200 stehen, in Supabase unter
     **Table Editor > abos** die Zeile. Danach über „Abo verwalten“ kündigen: Status „gekündigt“, gilt bis zum Ende
     der bezahlten Zeit.
 11. **Live gehen:** In Stripe den Testmodus verlassen und Produkt, Preis, Zahlungslink, Kundenportal und Webhook

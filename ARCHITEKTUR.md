@@ -1368,7 +1368,13 @@ mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
   setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
   Kunden werden dabei in ihrer Reihenfolge angewendet (bei einem zweiten Abo desselben Kunden auch dessen schon als
   `fremdes_abo` abgelegte Ereignisse); `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
-  ein neuer Kauf verkürzt nie ein längeres Abo.
+  ein neuer Kauf verkürzt nie ein längeres Abo. **Gleichzeitigkeit:** vor dem ersten Lesen oder Schreiben nimmt die
+  Funktion `pg_advisory_xact_lock(hashtextextended('abo:' || kunde_id, 0))`, alle Ereignisse eines Kunden laufen also
+  nacheinander (sonst blieb ein Abo-Ereignis, das parallel zum Kauf ankam, für immer auf 'wartet'; nachgestellt mit zwei
+  psql-Sitzungen gegen Postgres 16).
+- `abo_hole_nach(kunde, abo)` (nur Besitzer: der Kauf ruft es, Flo im SQL Editor nach einer Handzeile für einen Kauf
+  `ohne_nutzer`) wendet wartende Ereignisse des Kunden an und liefert ihre Anzahl; Fehler `ABO_KUNDE_UNBEKANNT`, wenn
+  keine Zeile in `abos` diese `kunde_id` trägt.
 
 **Edge Function** `supabase/functions/stripe-webhook/index.ts` (nur Hülle, Deploy mit `--no-verify-jwt`) und die Logik
 in `supabase/functions/_gemeinsam/stripe.js` (reines ES-Modul, WebCrypto, in Node getestet):
@@ -1384,21 +1390,44 @@ incomplete, paused …) → abgelaufen ab dem Ereignis, deleted → abgelaufen. 
 **Client** `js/abo.js` (Muster `js/konto.js`, nur fetch, `setzeAboFetch`/`setzeAboUhr` für Tests):
 `istPremium({ neu })` (Abgleich höchstens alle 10 min, offline der letzte Stand bis `gueltig_bis`, nur für dieselbe
 Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufAdresse`, `kaufen()`
-(öffnet das Fenster ohne vorheriges await, merkt den Kauf), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor:
-kein Kauf und kein Portal über Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere
-Pakete: ruhige Karte `div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf dem Screen `partie` (also auch im
-Ergebnis) liefert sie `null` und zeigt nichts (Fairness 13).
+(öffnet das Fenster ohne vorheriges await, merkt den Kauf; Grund `'alter'`, solange die Altersfrage nicht mit „18 oder
+älter“ beantwortet ist), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor: kein Kauf und kein Portal über
+Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere Pakete: ruhige Karte
+`div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf den Screens `OHNE_HINWEIS_SCREENS` (`partie`, also auch
+im Ergebnis, und `lektion`) liefert sie `null` und zeigt nichts (SPIELKONZEPT 2b Regel 9, Fairness 13). **Vertrag:** Ein
+Paket zeigt den Hinweis nur als Antwort auf einen Tipp auf eine Premium-Funktion (B2: Knopf „Frag den Coach“ in der
+Analyse), nie von selbst beim Öffnen eines Screens und nie ungefragt nach einer Niederlage.
+- **Gebaute Vorteile:** `registriereVorteil(id)` meldet einen Vorteil aus `VORTEILE` (`js/pakete/abo/trainer.js`, Ids
+  `coaches`, `coach-erklaerungen`, `lernpfad-5-10`, `raetsel-auswahl`, `formspiegel`, `liga-archiv`, `foerderer-nadel`)
+  als fertig; das Paket, das ihn baut, ruft es beim Laden (B2: `registriereVorteil('coach-erklaerungen')`). Das Blatt
+  zeigt nur gemeldete Vorteile unter „Im Trainer“, den Rest unter „In Arbeit“ („Noch nicht enthalten“), und bietet den
+  Kauf erst mit mindestens einem gemeldeten Vorteil an. Ausnahme: ein Zahlungslink aus dem Stripe-Testmodus
+  (`istTestLink`, `https://buy.stripe.com/test_…`) für Flos Probekauf, mit dem Satz „kein echtes Geld“.
+- **Nach dem Kauf:** `bestaetigeKauf()` fragt als Serie (sofort, dann nach `NACHFRAGEN_MS` 3, 10 und 30 s), solange der
+  Kauf-Start höchstens `NACH_KAUF_MS` (30 min) alt ist; `kaufStand()` → `'prueft'` | `'offen'` | `null`. Anfang und Ende
+  melden `abo:stand` mit `detail { prueft, premium, bestaetigt }`. Grund: Stripe leitet sofort zurück, der Webhook kommt
+  oft Sekunden später; vorher bot das Blatt dann wieder „Trainer abschließen“ an (Gefahr eines zweiten Abos).
+- **Alter:** `alterAngabe()` / `setzeAlterAngabe(ab18)`: einmal je Konto „18 oder älter?“ (SPIELKONZEPT 2b.8 Regel 22:
+  Abo für Minderjährige nur über die Familienfreigabe der Stores, die gibt es im Web nicht). Gespeichert wird nur ja/nein.
+- `produktOffline()` (letzter Abruf scheiterte ohne Zwischenspeicher), `aufraeumen()` (ohne Anmeldung Stand,
+  Altersangabe und Kauf-Merker vom Gerät), `aboHinweisZumLoeschen()` (Satz für den Dialog „Konto löschen“, solange ein
+  Stripe-Abo läuft: Löschen kündigt nicht; **die Integration hängt ihn in `loescheKontoDialog` aus `js/daten.js` an**).
 Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Export und Rückfall):
 `schach-arena:abo:stand` `{ uid, premium, status, plan, gueltigBis, quelle, geprueftAm }`,
-`schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts).
+`schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts),
+`schach-arena:abo:alter` `{ uid, ab18 }`.
 
 **Paket** `pakete/abo/index` (noch nicht in `PAKETE`: das trägt die Integration ein, die Dateien stehen schon in `sw.js`; der
 Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 6 direkt
-unter dem Konto, nur wenn das Konto sichtbar ist); `app:bereit` und `app:sichtbar` prüfen nach einem Kauf (höchstens 30
-min) sofort neu und sagen einmal Danke (Toast); DOM-Ereignis `abo:stand` auf `document` lässt offene Gruppen neu
-zeichnen. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen plus
-`.trainer-*`, Zustände in `data-zustand`: laedt, vorschau, abgemeldet, kaufbar, premium, store; schließt bei Escape,
-Schleier und jedem Screen-Wechsel; `.trainer-alter` mit `ALTER_HINWEIS` „ab 16, unter 18 nur mit den Eltern“, außer bei
-premium und store). Optik `css/pakete/abo.css` (nur Tokens), lädt `stelleAboCssSicher()` nach.
+unter dem Konto, nur wenn das Konto sichtbar ist; zeichnet neu bei `abo:stand` und wenn sich die Anmeldung ändert:
+`MutationObserver` vergleicht die Nutzer-ID, solange die Einstellungen offen sind, dazu `storage` für andere Tabs, weil
+`js/konto.js` beim Ab- und Anmelden nichts meldet; nach dem Abmelden `aufraeumen()`); `app:bereit` (vorher
+`aufraeumen()`) und `app:sichtbar` starten nach einem Kauf `bestaetigeKauf()`; bei `abo:stand` mit `bestaetigt` genau
+ein Toast „Danke“. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen
+plus `.trainer-*`, Zustände in `data-zustand`: laedt, vorschau (auch ohne gebauten Vorteil und ohne freigeschaltetes
+Konto, damit „Zum Konto“ nie ins Leere führt), offline, abgemeldet, kaufbar, alter, unter18, bestaetigen, wartet
+(„Zahlung prüfen“, „Neu abschließen“), premium, store; schließt bei Escape, Schleier und jedem Screen-Wechsel;
+`.trainer-alter` mit `ALTER_HINWEIS` „Web ab 18, Crownmate ab 16“). Optik `css/pakete/abo.css` (nur Tokens, geprüft in
+`tests/abo.test.mjs`, weil `tests/thema.test.mjs` `css/pakete/` nicht liest), lädt `stelleAboCssSicher()` nach.
 Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
 `page.route`, `window.open` ersetzt).
