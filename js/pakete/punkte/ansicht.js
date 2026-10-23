@@ -3,14 +3,16 @@
 // (js/bewegung.js: anim, tempo); bei reduzierter Bewegung oder Tempo 0 steht sofort das Endbild, der Klang bleibt.
 //
 //   zahlText(n) -> '21.300'
-//   tafelName(tafelId, botNachId) -> 'Rudis Tafel' | 'Boss-Tafel Baron von Gambit · Meister' | 'Tafel'
+//   tafelName(tafelId, botNachId) -> 'Rudis Tafel' | 'Boss-Tafel Baron von Gambit / Meister' | 'Tafel'
 //   unterText(ergebnis, name) -> Satz der Abrechnungszeile ("Platz 3 auf Rudis Tafel", "Rekord auf ...", ...)
-//   abrechnungsZeile({ ergebnis, tafelName, schonGezeigt, merke, mini, beiListe }) -> { el, beende(), verlasse() }
-//       div.pk-abr[data-zeile="punkte"]: "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ▲ 2"; bei einem Rekord bleibt
-//       der alte Wert durchgestrichen stehen (.pk-alt), der neue zaehlt hoch. Bei ueberholten Zeilen (▲) eine Mini-Tafel mit
+//   abrechnungsZeile({ ergebnis, tafelName, schonGezeigt, merke, mini, beiListe, post }) -> { el, beende(), verlasse() }
+//       div.pk-abr[data-zeile="punkte"]: "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ^ 2"; bei einem Rekord bleibt
+//       der alte Wert durchgestrichen stehen (.pk-alt), der neue zaehlt hoch. Bei ueberholten Zeilen (^) eine Mini-Tafel mit
 //       drei Zeilen (ueber dir, du, unter dir): deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken (Klang
 //       "klick"). Antippen zeigt die Aufschluesselung und "Zur Bestenliste". data-fertig="1", sobald das Endbild steht.
-//   wartezeile({ fehlt }) -> HTMLElement   "Punkte werden gezählt …" (Analyse rechnet noch, ruhiger Schimmer, endlich)
+//       post: { name, text() -> Text } (Ueberhol-Post, 3.13): in der Aufschluesselung einmal still "Ueberhol-Post an Jule";
+//       Antippen zeigt den Text mit Code als Vorschau, verschickt wird nur von Hand (Kopieren oder Teilen-Blatt).
+//   wartezeile({ fehlt }) -> HTMLElement   "Punkte werden gezaehlt ..." (Analyse rechnet noch, ruhiger Schimmer, endlich)
 //       bzw. mit fehlt: "Punkte folgen mit der Analyse" (die Arena holt sie nach)
 import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
@@ -52,6 +54,8 @@ export function unterText(e, name = 'Tafel') {
   if (!e) return '';
   if (!e.tafel) return GRUND[e.grund] || GRUND.gast;
   if (e.erster) return `Erster Eintrag auf ${name}`;
+  // Platz gewonnen: "Platz 3 auf Rudis Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
+  if (e.rekord && e.aufstieg > 0 && e.platz != null) return `Platz ${e.platz} auf ${name}`;
   if (e.rekord) return `Rekord auf ${name} · +${zahlText(e.w - (e.vorher || 0))}`;
   if (e.platz != null) return `Platz ${e.platz} auf ${name}`;
   if (e.wochenPlatz != null) return `Diese Woche: Platz ${e.wochenPlatz} auf ${name}`;
@@ -96,8 +100,46 @@ function miniHtml(mini) {
     + `<span class="pk-m-wert zahl">${zahlText(r.w)}</span></li>`).join('');
 }
 
+// Ueberhol-Post (3.13): Vorschau des Texts mit Code, Kopieren oder Teilen-Blatt; nichts geht automatisch raus
+async function kopiere(text, feld) {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { /* weiter mit der Auswahl */ }
+  try {
+    feld.focus();
+    feld.select();
+    return document.execCommand('copy');
+  } catch (e) { return false; }
+}
+
+function zeigePost(box, post) {
+  if (!box || !post) return;
+  if (!box.hidden) { box.hidden = true; return; }
+  let text = '';
+  try { text = String(post.text() || ''); } catch (e) { text = ''; }
+  box.hidden = false;
+  box.innerHTML = `<p class="pk-klein">Vorschau. Der Code enthält deine Züge, Datum, Seed und deinen Namen, falls du einen eingetragen hast.</p>
+    <textarea class="pk-post-text" rows="3" readonly></textarea>
+    <div class="pk-d-knoepfe"><button class="knopf primaer pk-post-kopieren dr" type="button">Kopieren</button>
+    ${typeof navigator !== 'undefined' && navigator.share ? '<button class="knopf pk-post-teilen dr" type="button">Teilen …</button>' : ''}</div>
+    <p class="pk-klein pk-post-meldung" role="status" aria-live="polite"></p>`;
+  const feld = box.querySelector('.pk-post-text');
+  feld.value = text;
+  box.querySelector('.pk-post-kopieren').addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    const ok = await kopiere(text, feld);
+    box.querySelector('.pk-post-meldung').textContent = ok ? 'Kopiert. Füge den Text in eine Nachricht ein.' : 'Kopieren ging nicht. Markiere den Text und kopiere ihn von Hand.';
+  });
+  const teilen = box.querySelector('.pk-post-teilen');
+  if (teilen) teilen.addEventListener('click', (ev) => { ev.stopPropagation(); navigator.share({ text }).catch(() => {}); });
+  if (tempo() > 0) anim(box, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { d: 320, k: 'gleiten' });
+}
+
 export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schonGezeigt = false, merke = () => {}, mini = null,
-  beiListe = null } = {}) {
+  beiListe = null, post = null } = {}) {
   const z = el('div', 'pk-abr');
   z.dataset.zeile = 'punkte';
   z.dataset.paket = 'punkte';
@@ -116,7 +158,9 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schon
     ${zeigeMini ? `<ol class="pk-mini" aria-label="Ausschnitt der Tafel">${miniHtml(mini)}</ol>` : ''}
     <div class="pk-details" id="${id}" hidden><ul></ul><p class="pk-d-summe">Zusammen <b class="zahl">${zahlText(e.w)}</b> Punkte`
       + `${e.tafel && e.bestwert != null ? ` · dein Bestwert auf ${esc(name)}: <span class="zahl">${zahlText(e.bestwert)}</span>` : ''}</p>`
-      + `${e.tafel && typeof beiListe === 'function' ? '<button class="knopf pk-zur-liste" type="button">Zur Bestenliste</button>' : ''}</div>`;
+      + `<div class="pk-d-knoepfe">${e.tafel && typeof beiListe === 'function' ? '<button class="knopf pk-zur-liste dr" type="button">Zur Bestenliste</button>' : ''}`
+      + `${post && post.name && typeof post.text === 'function' ? `<button class="knopf pk-post dr" type="button">Überhol-Post an ${esc(post.name)}</button>` : ''}</div>`
+      + '<div class="pk-post-box" hidden></div></div>';
   z.querySelector('.pk-satz').textContent = unterText(e, name);
   const ul = z.querySelector('.pk-details ul');
   for (const [text, wert] of posten(e)) {
@@ -135,6 +179,8 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schon
   });
   const liste = z.querySelector('.pk-zur-liste');
   if (liste) liste.addEventListener('click', (ev) => { ev.stopPropagation(); beiListe(); });
+  const postKnopf = z.querySelector('.pk-post');
+  if (postKnopf) postKnopf.addEventListener('click', (ev) => { ev.stopPropagation(); zeigePost(z.querySelector('.pk-post-box'), post); });
 
   const uhren = new Set();
   const spaeter = (fn, t) => { const u = setTimeout(() => { uhren.delete(u); fn(); }, Math.max(0, t)); uhren.add(u); return u; };

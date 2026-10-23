@@ -9,6 +9,7 @@
 //   reiterFreunde({ app, jetzt }) -> { el, verlasse() }            Code teilen (Vorschau mit allem, was im Code steht),
 //       Code einlesen (pruefen, nachrechnen, eintragen), Freunde (hoechstens 12, ein Tipp loescht)
 //   huelle(id, name) -> section (leer, hidden)
+//   codeFuer(eintrag, tafelId, name) -> erzeugeCode-Ergebnis (auch fuer die Ueberhol-Post der Abrechnung)
 // Einstellungen (Komfort je Geraet, speichereModulEinstellungen('punkte')): { reiter, fenster, tafel, name }.
 import { anim, staffel, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
@@ -242,7 +243,8 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
 }
 
 // ---------- Reiter Freunde: Codes teilen und einlesen ----------
-function codeFuer(e, tafelId, name) {
+// SA1-Code eines eigenen Tafel-Eintrags: aus dem gespeicherten Nachweis (der Name kommt neu hinein) oder aus der Partie
+export function codeFuer(e, tafelId, name) {
   const z = T.zerlegeId(tafelId);
   if (!z) return { ok: false, grund: 'tafel' };
   if (e.n) {
@@ -378,7 +380,15 @@ export function reiterFreunde({ app, jetzt = new Date() } = {}) {
   // --- Einlesen: pruefen, Vorschau, nachrechnen (Spielanalyse wie nach jeder Partie), als Gast eintragen ---
   let abbruch = null;
   const ergebnisBox = lesen.querySelector('.bl-lesen-ergebnis');
+  // das Ergebnis steht unter dem Knopf: ins Bild holen (der Rumpf scrollt, auf dem Handy liegt es sonst unter dem Rand)
+  const insBild = () => {
+    try { ergebnisBox.scrollIntoView({ block: 'nearest', behavior: tempo() > 0 ? 'smooth' : 'auto' }); } catch (e) { /* egal */ }
+  };
   lesen.querySelector('.bl-pruefen').addEventListener('click', () => {
+    pruefeCode();
+    insBild();
+  });
+  function pruefeCode() {
     if (abbruch) abbruch.abort();
     abbruch = null;
     const text = lesen.querySelector('.bl-code-ein').value;
@@ -453,7 +463,7 @@ export function reiterFreunde({ app, jetzt = new Date() } = {}) {
       merkeEinstellung({ tafel });
       zeichneFreunde();
     });
-  });
+  }
   return { el: s, verlasse() { if (abbruch) abbruch.abort(); } };
 }
 

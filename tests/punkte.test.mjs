@@ -9,6 +9,7 @@
 //
 //   node tests/punkte.test.mjs              alles
 //   node tests/punkte.test.mjs --nur-node   ohne Browser
+//   node tests/punkte.test.mjs --schnell    Bilder und Layout nur in 2 statt 5 Fenstern (1180 hell, 390 dunkel; alle --schnell)
 //   PORT=9600 BILDER=/pfad node tests/punkte.test.mjs
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
@@ -33,6 +34,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8868);
 const NUR_NODE = process.argv.includes('--nur-node');
+const SCHNELL = process.argv.includes('--schnell');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(os.tmpdir(), 'crownmate-punkte-bilder');
 
@@ -487,6 +489,8 @@ gruppe = 'Abrechnung: Sätze';
     && A.unterText({ ...basis, wochenPlatz: 2 }, n) === 'Diese Woche: Platz 2 auf Rudis Tafel'
     && A.unterText({ ...basis, fast: { prozent: 97 } }, n) === 'So nah wie noch nie: 97 % deines Rekords auf Rudis Tafel'
     && A.unterText({ ...basis, bestwert: 23100 }, n) === 'Rudis Tafel: dein Bestwert 23.100');
+  pruefe('Satz bei Rekord mit Überholen: „Platz 3 auf Rudis Tafel“ (der Pfeil ▲ 2 und die alte Zahl stehen daneben)',
+    A.unterText({ ...basis, rekord: true, vorher: 19480, aufstieg: 2, platz: 3 }, n) === 'Platz 3 auf Rudis Tafel');
   pruefe('Ohne Tafel: ehrlicher Grund', /Hinweis oder Zurücknehmen/.test(A.unterText({ w: 1, tafel: null, grund: 'hilfe' }))
     && /Freie Partie/.test(A.unterText({ w: 1, tafel: null, grund: 'frei' })) && /Eigene Stellung/.test(A.unterText({ w: 1, tafel: null, grund: 'stellung' })));
 }
@@ -574,6 +578,41 @@ gruppe = 'Ereignisse';
   const nl = n && C.leseCode(n);
   pruefe('Nachweis: der Eintrag trägt seinen SA1-Code (Rechenstand, Bot, Seed, Züge, Datum)', nl && nl.ok && nl.daten.botId === 'benno' && nl.daten.seed === 99
     && C.zuegeAusIndizes(nl.daten.indizes).uci.join() === SCHAEFER.join() && nl.daten.stand === 1, nl);
+
+  // Ueberholen mit Freunden als Gaesten: Platz gewonnen (▲), grosser Moment mit Platz, als Zeile wenn das Budget vergeben ist
+  const freunde = (st) => {
+    st.freunde = [{ id: 'f1', name: 'Jule', eintraege: [{ tafel: 'bot:kalle', w: 30000, t: 0, tag: '2026-10-01', f: 'w', z: 20, e: 's', pruef: 'nachgerechnet', n: '' }] },
+      { id: 'f2', name: 'Kim', eintraege: [{ tafel: 'bot:kalle', w: 12000, t: 0, tag: '2026-10-01', f: 'w', z: 20, e: 's', pruef: 'nachgerechnet', n: '' }] },
+      { id: 'f3', name: 'Mo', eintraege: [{ tafel: 'bot:kalle', w: 11000, t: 0, tag: '2026-10-01', f: 'w', z: 20, e: 's', pruef: 'nachgerechnet', n: '' }] }];
+  };
+  const s0 = S.lade();
+  freunde(s0);
+  S.speichere(s0);
+  sende('partie:analysiert', analysiert(bauePartie('ka', { botId: 'kalle', zuege: 12 }), z('ungenau', 12)));   // 1.200 + 7.000 = 8.200: Platz 4
+  sende('partie:analysiert', analysiert(bauePartie('kb', { botId: 'kalle', zuege: 12 }), z('gut', 12)));       // 10.600: Platz 4, kein Ueberholen
+  sende('partie:analysiert', analysiert(bauePartie('kc', { botId: 'kalle', zuege: 12 }), z('exzellent', 12))); // 11.800: Platz 3 ▲ 1 (vor Mo)
+  await warte(0);
+  const kc = S.lade().letzte[0];
+  const fk = fuerOverlay('kc');
+  pruefe('Rekord mit Überholen: Platz 3 ▲ 1 vor Mo, großer Moment „NEUER REKORD“ mit „Platz 3 ▲ 1“, Überhol-Post für Mo', kc.id === 'kc' && kc.rekord
+    && kc.platz === 3 && kc.aufstieg === 1 && kc.ueberholt.join() === 'Mo' && fk.length === 1 && fk[0].quelle === 'tafel-rekord'
+    && fk[0].text === 'Platz 3 ▲ 1 · 11.800 Punkte, vorher 10.600 (+1.200)' && JSON.stringify(kc.post) === '{"name":"Mo","w":11000}', { kc, fk });
+  const weg2 = hoere('partie:analysiert', (d) => { if (d.partieId === 'kd') melde({ partieId: 'kd', quelle: 'boss-siegel', titel: 'BOSS BESIEGT' }); });
+  sende('partie:analysiert', analysiert(bauePartie('kd', { botId: 'kalle', zuege: 12 }), z('stark', 12, { trivial: false }).map((x, i) => ({ ...x, klasse: i % 2 ? 'stark' : 'gut' }))));
+  weg2();
+  await warte(0);
+  const kd = S.lade().letzte[0];
+  const fd = fuerOverlay('kd');
+  pruefe('Großes Budget vergeben: Platz gewonnen als Zeile „Platz 2 auf Kalles Tafel ▲ 1“ (vorher Platz 3), Überhol-Post für die beste Überholte',
+    kd.platz === 2 && kd.aufstieg === 1 && fd.length === 2 && fd[1].quelle === 'rekord' && fd[1].art === 'zeile' && fd[1].titel === 'Platz 2 auf Kalles Tafel ▲ 1'
+    && fd[1].text === 'vorher Platz 3' && kd.post.name === 'Kim', { kd, fd });
+  sende('partie:analysiert', analysiert(bauePartie('ke', { botId: 'kalle', zuege: 12 }), z('brillant', 12)));
+  await warte(0);
+  const ke = S.lade().letzte[0];
+  const fe = fuerOverlay('ke');
+  pruefe('Platz 1 vor allen Freunden: „PLATZ 1 AUF KALLES TAFEL“ (bot-rekord, groß 78) mit den Überholten', ke.platz1 && ke.platz === 1 && ke.ueberholt.join() === 'Jule'
+    && fe.length === 1 && fe[0].quelle === 'bot-rekord' && fe[0].art === 'gross' && fe[0].titel === 'PLATZ 1 AUF KALLES TAFEL' && /vor Jule/.test(fe[0].text)
+    && ke.post.name === 'Jule' && ke.post.w === 30000, { ke, fe });
 }
 
 // =====================================================================
@@ -605,11 +644,25 @@ const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
 const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };
 const zahlText = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE');
 
+// Diese Suite prueft das Paket punkte fuer sich: js/erweiterungen.js kommt immer mit PAKETE = ['sicherung'] und REITER = [],
+// das Paket selbst per ?erw und der Reiter per ?reiter. So bleibt die Suite gleich, wenn die Integration Pakete und Reiter
+// eintraegt (sonst laege z. B. eine Level-Feier von funken auf dem grossen Platz, und "ohne Paket" waere nie mehr ohne).
+async function nurDiesesPaket(kontext) {
+  const echt = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
+  const body = echt.replace(/^export const PAKETE = Object\.freeze\(\[[^\]]*\]\);/m, "export const PAKETE = Object.freeze(['sicherung']);")
+    .replace(/^export const REITER = Object\.freeze\(\[[^\]]*\]\);/m, 'export const REITER = Object.freeze([]);');
+  if (!/^export const PAKETE = Object\.freeze\(\['sicherung'\]\);/m.test(body) || !/^export const REITER = Object\.freeze\(\[\]\);/m.test(body)) {
+    throw new Error('PAKETE oder REITER in js/erweiterungen.js nicht gefunden');
+  }
+  await kontext.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body }));
+}
+
 async function neueSeite(browser, { w = 1180, h = 820, handy = false, farbe = 'light', reduziert = false } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: handy, colorScheme: farbe,
     reducedMotion: reduziert ? 'reduce' : 'no-preference',
   });
+  await nurDiesesPaket(kontext);
   const seite = await kontext.newPage();
   const fehler = [];
   seite.on('console', (m) => {
@@ -636,6 +689,8 @@ function hilfen(seite) {
     async tippe(sel) {
       const loc = seite.locator(sel).first();
       await loc.waitFor({ state: 'visible', timeout: 10000 });
+      // der Rumpf der Bestenliste scrollt selbst: erst ins Bild holen, sonst tippt der Finger neben das Fenster
+      await loc.scrollIntoViewIfNeeded();
       const b = await loc.boundingBox();
       await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
       await warte(150);
@@ -846,13 +901,23 @@ async function testeBrowser(browser) {
     && zeile.hoehe >= 56, zeile);
   pruefe('Punkt „neu“ an der neuen Zeile, nach dem Ansehen weg', zeile && zeile.neu === '1' && (await h.stand()).neu.length === 0);
   await h.fenster('allzeit');
-  pruefe('Fenster Allzeit: dieselbe Zeile', await seite.locator('.bl-tafel .bl-zeile.ich').count() === 1 && /Allzeit/.test(await seite.locator('.bl-tafel .ueberzeile').innerText()));
+  pruefe('Fenster Allzeit: dieselbe Zeile', await seite.locator('.bl-tafel .bl-zeile.ich').count() === 1
+    && (await seite.locator('.bl-tafel .bl-k-kopf .ueberzeile').textContent()).trim() === 'Allzeit');
   await h.fenster('woche');
   await bild(seite, 'bestenliste-bots-1180');
+  // die Zeile springt an den Moment mit dem groessten Ausschlag (Ply im Eintrag), die Analyse meldet ihn mit analyse:gesehen
+  const mPly = (await h.stand()).tafeln['bot:benno'].eintraege.find((x) => x.id === e1.id).m;
+  await seite.evaluate(async () => {
+    const e = await import('./js/ereignisse.js');
+    window.__gesehen = [];
+    e.hoere('analyse:gesehen', (d) => window.__gesehen.push(d.ply));
+  });
   await h.tippe('.bl-tafel .bl-zeile.ich .bl-z-innen');
-  await seite.waitForSelector('.screen.analyse', { timeout: 30000 }).catch(() => {});
-  const an = await seite.evaluate(() => ({ hash: location.hash, da: !!document.querySelector('.screen.analyse') }));
-  pruefe('Zeile antippen springt in die Analyse dieser Partie', an.da && an.hash === '#analyse/' + encodeURIComponent(e1.id), an);
+  await seite.waitForSelector('.screen.an-screen', { timeout: 30000 }).catch(() => {});
+  await warte(600);
+  const an = await seite.evaluate(() => ({ hash: location.hash, da: !!document.querySelector('.screen.an-screen'), gesehen: window.__gesehen }));
+  pruefe('Zeile antippen springt in die Analyse dieser Partie, an den Moment mit dem größten Ausschlag', an.da && an.hash === '#analyse/' + encodeURIComponent(e1.id)
+    && Number.isInteger(mPly) && an.gesehen[0] === mPly, { an, mPly });
   await h.bestenliste({ reiter: 'ich' });
   const ich = await seite.locator('.bl-reiter[data-reiter="ich"]').innerText();
   pruefe('Reiter Ich: Spielerkarte (Rekorde, Platz 1, Tafeln, beste Partie) und „Deine besten Partien“ über alle Tafeln', /Rekorde\s*0/.test(ich) && /Tafeln\s*1/.test(ich)
@@ -894,7 +959,20 @@ async function testeBrowser(browser) {
   await warte(600);
   const k3 = await h.klaenge();
   pruefe('je überholter Zeile ein Klacken (klick) und der Rekord-Klang', k3.filter((n) => n === 'klick').length >= 1 && k3.includes('rekord'), k3);
+  pruefe('Abrechnung: „Platz 1 auf Bennos Tafel ▲ 1“', (await seite.locator('.pk-satz').innerText()).trim() === 'Platz 1 auf Bennos Tafel'
+    && (await seite.locator('.pk-pfeil').innerText()).trim() === '▲ 1');
   await bild(seite, 'ergebnis-platz1');
+  // Ueberhol-Post (3.13): einmal still in der Aufschluesselung angeboten, Vorschau mit Text und Code, nichts geht automatisch raus
+  await h.tippe('.pk-abr-knopf');
+  pruefe('Überhol-Post: in der Aufschlüsselung „Überhol-Post an Jule“', (await seite.locator('.pk-post').innerText()).trim() === 'Überhol-Post an Jule');
+  await h.tippe('.pk-post');
+  const post = await seite.locator('.pk-post-text').inputValue();
+  const postCode = (post.match(/SA1-[0-9A-Z-]+/) || [''])[0];
+  pruefe('Überhol-Post: Vorschau „Ich hab deine 2.000 auf Bennos Tafel geknackt, jetzt …“ mit gültigem Code der Partie, Kopieren-Knopf',
+    new RegExp(`^Ich hab deine 2\\.000 auf Bennos Tafel geknackt, jetzt ${zahlText(e3.w).replace('.', '\\.')}\\. Code: SA1-`).test(post)
+    && C.leseCode(postCode).ok && C.zuegeAusIndizes(C.leseCode(postCode).daten.indizes).uci.join() === SCHAEFER.join()
+    && await seite.locator('.pk-post-kopieren').count() === 1, post);
+  await bild(seite, 'ergebnis-ueberhol-post');
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'bots' });
   const gast = await seite.evaluate(() => [...document.querySelectorAll('.bl-tafel .bl-zeile')].map((z) => z.dataset.platz + ':' + z.querySelector('.bl-z-name').textContent.trim()));
@@ -947,7 +1025,7 @@ async function testeBrowser(browser) {
   const stF = await h.stand();
   pruefe('Nachrechnen: die App spielt die Partie nach und rechnet die Punkte selbst („Nachgerechnet ✓: … Punkte auf Bennos Tafel“)', /^Nachgerechnet ✓: [\d.]+ Punkte auf Bennos Tafel/.test(nachText)
     && stF.freunde.length === 1 && stF.freunde[0].name === 'Mia' && stF.freunde[0].eintraege[0].pruef === 'nachgerechnet' && stF.freunde[0].eintraege[0].w > 0, { nachText, f: stF.freunde });
-  pruefe('„Deine Freunde“ zeigt Mia mit ihrer Tafel', /Mia/.test(await seite.locator('.bl-freunde').innerText()) && /1 von 12/.test(await seite.locator('.bl-freunde').innerText()));
+  pruefe('„Deine Freunde“ zeigt Mia mit ihrer Tafel', /Mia/.test(await seite.locator('.bl-freunde').innerText()) && /1 von 12/.test(await seite.locator('.bl-freunde').textContent()));
   await bild(seite, 'freunde-eingelesen');
   await h.reiter('bots');
   pruefe('Mia steht als Gast-Zeile auf Bennos Tafel', /Mia/.test(await seite.locator('.bl-tafel').innerText()));
@@ -958,20 +1036,30 @@ async function testeBrowser(browser) {
 
   // ---------- 10. Umzug: vorhandene Analysen werden einmal die ersten Eintraege ----------
   gruppe = 'Umzug';
-  await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:modul:punkte'));
-  await seite.goto(MIT() + '#arena');
+  // goto mit anderem Hash laedt die Seite nicht neu (nur ein Sprung im Dokument): deshalb reload
+  await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:modul:punkte'); location.hash = '#arena'; });
+  await seite.reload();
   await seite.waitForSelector('.screen.arena');
   await seite.waitForFunction(() => window.__punkte && window.__punkte.stand().umzug === true, null, { timeout: 8000 }).catch(() => {});
   const um = await h.stand();
-  pruefe('Erster Start mit Paket: gespeicherte Analysen eingetragen (still, ohne „neu“), danach nie wieder', um.umzug === true && um.tafeln['bot:benno']
-    && um.tafeln['bot:benno'].eintraege.length >= 1 && um.neu.length === 0, { umzug: um.umzug, t: Object.keys(um.tafeln) });
+  const analysen = await seite.evaluate(async () => { const st = await import('./js/storage.js'); return st.ladePartien().filter((p) => st.hatReview(p.id)).length; });
+  pruefe('Erster Start mit Paket: gespeicherte Analysen eingetragen (still: ohne „neu“, ohne Feier)', um.umzug === true && um.tafeln['bot:benno']
+    && um.tafeln['bot:benno'].eintraege.length >= 1 && um.ids.length === Math.min(12, analysen) && um.neu.length === 0 && um.letzte.length >= 1,
+  { umzug: um.umzug, t: Object.keys(um.tafeln), ids: um.ids.length, analysen });
+  await h.aendereStand('st.tafeln = {}; st.ids = []; st.letzte = [];', null);
+  await seite.reload();
+  await seite.waitForSelector('.screen.arena');
+  await warte(2500);
+  const um2 = await h.stand();
+  pruefe('Umzug nur einmal: beim nächsten Start nicht wieder', um2.umzug === true && Object.keys(um2.tafeln).length === 0 && um2.ids.length === 0, um2.ids);
   pruefe('Umzug: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 
   // ---------- 11. Bilder und Layout: 1180 x 820 und 390 x 844, hell und dunkel ----------
   gruppe = 'Bilder';
-  for (const [name, w, hh, handy, farbe] of [['1180-hell', 1180, 820, false, 'light'], ['1180-dunkel', 1180, 820, false, 'dark'], ['390-hell', 390, 844, true, 'light'],
-    ['390-dunkel', 390, 844, true, 'dark'], ['820-hoch', 820, 1180, false, 'light']]) {
+  const FENSTER_BILDER = [['1180-hell', 1180, 820, false, 'light'], ['1180-dunkel', 1180, 820, false, 'dark'], ['390-hell', 390, 844, true, 'light'],
+    ['390-dunkel', 390, 844, true, 'dark'], ['820-hoch', 820, 1180, false, 'light']];
+  for (const [name, w, hh, handy, farbe] of FENSTER_BILDER.filter(([n]) => !SCHNELL || n === '1180-hell' || n === '390-dunkel')) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { w, h: hh, handy, farbe });
     const hs = hilfen(s);
     await s.goto(MIT() + '#arena');
@@ -1003,14 +1091,31 @@ async function testeBrowser(browser) {
     await k.close();
   }
 
-  // ---------- 12. Test-Huelle des Orts (ohne App) ----------
+  // ---------- 12. Zusammen mit funken (P1): eine Abrechnung, Punkte vor Funken ----------
+  gruppe = 'Mit funken';
+  {
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
+    const hs = hilfen(s);
+    await s.goto(`${BASIS}&erw=pakete/funken/index,pakete/punkte/index&reiter=bestenliste#arena`);
+    await s.waitForSelector('.screen.arena');
+    await hs.schaefermatt();
+    await s.waitForSelector('.ergebnis-overlay .abrechnung > [data-zeile="funken"]', { timeout: 15000 }).catch(() => {});
+    const zeilen = await s.evaluate(() => [...document.querySelectorAll('.ergebnis-overlay .abrechnung > [data-zeile]')].map((x) => x.dataset.zeile).join());
+    pruefe('Eine Abrechnung mit beiden Paketen: Zeile Punkte (10) vor Funken (20)', zeilen === 'punkte,funken', zeilen);
+    pruefe('Mit funken: keine Konsolenfehler', f.length === 0, f.join(' | '));
+    await k.close();
+  }
+
+  // ---------- 13. Test-Huelle des Orts (ohne App) ----------
   gruppe = 'Test-Hülle';
   {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
     await s.goto(`http://127.0.0.1:${PORT}/tests/orte-huelle.html?ort=bestenliste:reiter&erw=pakete/punkte/index&reiter=bots&fenster=allzeit`);
-    await s.waitForFunction(() => window.__huelle && window.__huelle.anzahl != null, null, { timeout: 15000 });
-    const r = await s.evaluate(() => ({ anzahl: window.__huelle.anzahl, reiter: [...document.querySelectorAll('.huelle-ort > .bl-reiter')].map((x) => x.dataset.reiter + (x.hidden ? '' : '*')).join() }));
-    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'ich,bots*,freunde', r);
+    await s.waitForFunction(() => window.__huelle && window.__huelle.bereit === true, null, { timeout: 15000 });
+    const r = await s.evaluate(() => ({ anzahl: window.__huelle.anzahl, fehler: window.__huelle.fehler,
+      reiter: [...document.querySelectorAll('.huelle-ort > .bl-reiter')].map((x) => x.dataset.reiter + (x.hidden ? '' : '*')).join() }));
+    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'ich,bots*,freunde'
+      && r.fehler.length === 0, r);
     pruefe('Test-Hülle: keine Konsolenfehler', f.length === 0, f.join(' | '));
     await k.close();
   }

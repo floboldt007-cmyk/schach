@@ -241,7 +241,9 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
   const REIN = ['serie.js', 'logik.js', 'kartei.js', 'alltag.js', 'profil.js', 'taktik.js',
     'funken.js', 'punkte.js', 'marsch.js', 'boss.js', 'raetsel.js', 'liga.js', 'code.js',
     // Paket funken: Rechnung, Level-Kurve und Speicher
-    'rechnung.js', 'level.js', 'stand.js'];
+    'rechnung.js', 'level.js', 'stand.js',
+    // Paket punkte: Formel und Tafeln (code.js und stand.js stehen oben)
+    'formel.js', 'tafel.js'];
   const dateien = ['js/feier.js', 'js/tag.js', 'js/inhalte.js', ...jsDateien(path.join('js', 'pakete')).filter((d) => REIN.includes(path.basename(d)))];
   const treffer = dateien.filter((d) => /Math\s*\.\s*random|crypto\s*\.\s*getRandomValues/.test(zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).code));
   pruefe(`Kein Math.random in feier.js und den reinen Paket-Logik-Dateien (${dateien.length} Dateien)`, treffer.length === 0, treffer);
@@ -436,6 +438,65 @@ function jsonDateien(ordner) {
     && S.rekord(st, { tafel: 'bot:rudi', platz: 1, fenster: 'monat' }, 'pb').length === 0 && S.rekord(st, { tafel: 'bot:rudi', platz: 1, fenster: 'allzeit' }, 'pc').length === 1);
   pruefe('Funken: Rätsel aus dem Treppenlauf buchen keine Einzel-Funken', S.lernRaetsel(st, { id: 'r9', richtig: true, versuch: 1, wertung: 2000, blick: 1000, quelle: 'treppe' }).length === 0);
   pruefe('Funken: Level schaltet nur Schmuck und Titel frei (keine Bots, Analyse, Lektionen, Klangpakete)', L.alleStuecke().every((x) => !/bot|analyse|lektion|klang/i.test(x.art + x.id)));
+}
+
+// =====================================================================
+// Paket punkte (SPIELKONZEPT 3.13 und 5.3): Punkte nie negativ, Schleppen lohnt nie, Hilfe ohne Tafel
+// =====================================================================
+{
+  const P = await import('../js/pakete/punkte/formel.js');
+  const PS = await import('../js/pakete/punkte/stand.js');
+  const st0 = await import('../js/storage.js');
+  const KLASSEN = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen', null, 'quatsch'];
+  const GEWINN = [-1, 0, 0.05, 0.0999, 0.1, 0.5, 0.9, 0.9001, 0.95, 1, 2, null];
+  // Punkte nie negativ: alle Ergebnisse, Zuglaengen, Hilfe, Uhr-Anteile, Zugklassen, Gewinnchancen, Matt-Angaben, Reihenfolgen
+  const zuege = KLASSEN.flatMap((k) => GEWINN.map((g, i) => ({ klasse: k, gewinnVorher: g, gewinnNachher: GEWINN[(i + 3) % GEWINN.length],
+    trivial: i % 4 === 0, nachHilfe: i % 5 === 0, matt: i % 3 === 0 ? -2 : i })));
+  let negativ = 0;
+  let faelle = 0;
+  for (const ergebnis of ['sieg', 'remis', 'niederlage', 'abbruch', undefined]) {
+    for (const eigeneZuege of [0, 9, 10, 14, 15, 40, 120, -3, null]) {
+      for (const hilfe of [false, true]) {
+        for (const uhrAnteil of [null, -1, 0, 0.5, 1, 7]) {
+          for (const teil of [zuege, zuege.slice().reverse(), zuege.slice(0, 7), []]) {
+            faelle++;
+            const r = P.tafelwert({ zuege: teil, ergebnis, eigeneZuege, hilfe, uhrAnteil });
+            const posten = [r.wert, r.zugpunkte, r.theorie, r.ergebnis, r.verwertung, r.combo, r.weste, r.uhr, r.kuer];
+            if (posten.some((x) => !Number.isInteger(x) || x < 0)) negativ++;
+          }
+        }
+      }
+    }
+  }
+  pruefe(`Punkte: nie negativ und immer ganze Zahlen (${faelle} Fälle)`, negativ === 0 && P.runde(-5) === 0 && P.leistungspunkte(-100, 1200) === 0, negativ);
+  // 120 Zuege Schieben gegen Benno bleibt unter der zuegig verwerteten Fassung; je laenger geschoben, desto weniger (nie mehr)
+  const z = (klasse, n, g = 0.5) => Array.from({ length: n }, () => ({ klasse, gewinnVorher: g, gewinnNachher: g }));
+  const anfang = [...z('buch', 3), ...z('exzellent', 3), ...z('gut', 2), { klasse: 'gut', gewinnVorher: 0.6, gewinnNachher: 0.95 }];
+  const lauf = (n) => P.tafelwert({ zuege: [...anfang, ...z('bester', n, 0.97)], ergebnis: 'sieg', eigeneZuege: anfang.length + n }).wert;
+  // ab dem 10. eigenen Zug (vorher gibt es noch keinen Ergebnis-Bonus)
+  let monoton = true;
+  for (let n = 2; n <= 160; n++) if (lauf(n) > lauf(n - 1)) monoton = false;
+  pruefe('Punkte: „120 Züge Schieben gegen Benno“ bleibt unter der zügig verwerteten Fassung (und Schieben bringt nie mehr)',
+    lauf(120 - anfang.length) < lauf(25) && lauf(120 - anfang.length) === 6400 && lauf(25) === 9400 && monoton, [lauf(111), lauf(25)]);
+  // Tafeleintrag nur ohne Hilfe-Flag (Hinweis oder Zuruecknehmen), Uebung, freie Partien, Spielhalle und eigene Stellung nie
+  const m = new Map();
+  st0.setzeSpeicher({ getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k),
+    key: (i) => [...m.keys()][i] ?? null, get length() { return m.size; } });
+  const st = PS.lade();
+  const review = { zuege: Array.from({ length: 24 }, (_, i) => ({ ply: i, farbe: i % 2 ? 'b' : 'w', klasse: 'bester', gewinnVorher: 0.5, gewinnNachher: 0.5 })) };
+  const partie = (id, extra = {}) => ({ id, botId: 'benno', spielerFarbe: 'w', ergebnis: 'sieg', modus: 'normal', hinweise: 0, zuruecknahmen: 0,
+    datum: '2026-10-22T18:00:00.000Z', zuege: Array.from({ length: 24 }, () => 'e2e4'), ...extra });
+  const bewerte = (p) => PS.bewerte(st, { partieId: p.id, botId: p.botId, modus: p.modus, partie: p, review }, { jetzt: new Date(2026, 9, 22, 20) });
+  const mitHinweis = bewerte(partie('h1', { hinweise: 1 }));
+  const mitZurueck = bewerte(partie('h2', { zuruecknahmen: 1 }));
+  const nie = ['uebung', 'frei', 'spiel'].map((modus) => bewerte(partie('m-' + modus, { modus })));
+  const stellung = bewerte(partie('s1', { startFen: '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1' }));
+  const ohne = bewerte(partie('o1'));
+  const eintraege = Object.values(st.tafeln).flatMap((t) => t.eintraege.map((e) => e.id));
+  pruefe('Punkte: mit Hilfe-Flag (Hinweis oder Zurücknehmen) kein Tafeleintrag, Übung, freie Partie, Spielhalle und eigene Stellung nie; ohne Hilfe ja',
+    P.tafelwert({ zuege: [], ergebnis: 'sieg', hilfe: true }).tafel === false && mitHinweis.tafel === null && mitZurueck.tafel === null
+    && nie[0] === null && nie[1].tafel === null && nie[2].tafel === null && stellung.tafel === null && ohne.tafel === 'bot:benno' && eintraege.join() === 'o1',
+    { eintraege, h: mitHinweis && mitHinweis.grund });
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);

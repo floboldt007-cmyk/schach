@@ -17,7 +17,8 @@
 // Ergebnis einer Partie (Abrechnung, Ereignis punkte:geaendert):
 //   { id, t, w, posten: { zugpunkte, theorie, ergebnis, verwertung, combo, weste, offen, entschieden, par, maxSerie },
 //     tafel (Id oder null), grund (ohne Tafel: 'hilfe' | 'frei' | 'spiel' | 'gast' | 'stellung'), platz, platzVorher,
-//     aufstieg, vorher, rekord, erster, platz1, ueberholt: [Name], wochenPlatz, sichtbar, bestwert, fast: { prozent } | null }
+//     aufstieg, vorher, rekord, erster, platz1, ueberholt: [Name], wochenPlatz, sichtbar, bestwert, fast: { prozent } | null,
+//     post: { name, w } | null }   post: die beste ueberholte Freundin (fuer die Ueberhol-Post, 3.13; nie automatisch)
 //
 // API:
 //   STAND, MODUL, lade() -> Stand, speichere(st) -> { ok, ... } (duennt selbst aus), standard()
@@ -228,7 +229,7 @@ export function bewerte(st, d, { jetzt = new Date(), nachHilfe = null, bossElo =
       offen: r.offen, entschieden: r.entschieden, par: r.par, maxSerie: r.maxSerie, eigeneZuege: n, kurz: n < F.MIN_ZUEGE },
     erg: p.ergebnis || null, bot: p.botId || null, tafel: tafelId, grund: grund || (tafelId ? null : 'gast'),
     platz: null, platzVorher: null, aufstieg: 0, vorher: null, rekord: false, erster: false, platz1: false, ueberholt: [],
-    wochenPlatz: null, sichtbar: false, bestwert: null, fast: null,
+    wochenPlatz: null, sichtbar: false, bestwert: null, fast: null, post: null,
   };
   if (tafelId) {
     const tafel = st.tafeln[tafelId] || T.neueTafel(tafelId);
@@ -246,6 +247,8 @@ export function bewerte(st, d, { jetzt = new Date(), nachHilfe = null, bossElo =
         platz1: res.platz1, ueberholt: res.ueberholt.map((x) => x.name).slice(0, 3), wochenPlatz: res.wochenPlatz, sichtbar: res.sichtbar,
         bestwert: res.bestwert,
       });
+      const freund = res.ueberholt.filter((x) => x.art === 'freund').sort(T.vergleiche)[0];
+      if (freund) ergebnis.post = { name: String(freund.name || 'Freund').slice(0, 24), w: Math.round(freund.w) };
       const eNeu = neu.tafel.eintraege.find((x) => x.id === d.partieId);
       if (!res.rekord && !res.erster) ergebnis.fast = T.fast(neu.tafel, eNeu, { vorher: res.vorher, jetzt: t });
       st.tafeln[tafelId] = T.duenneAus(neu.tafel, t);

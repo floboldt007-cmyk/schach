@@ -927,7 +927,8 @@ Nur der Steckbrief-Text darf sich aendern.
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
 | `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1, also der Stand der Lebensleiste: `vorher` nach Flos vorigem Zug, d. h. vor dem letzten Boss-Zug, = `1 - (gewinnVorigerZug ?? gewinnVorher)` aus `zug:bewertet`; `nachher` nach Flos Zug = `1 - gewinnNachher`; Treffer ab `vorher - nachher >= 0,03`). So zaehlt ein sofort bestrafter Boss-Fehler als Treffer (3.8); ein guter Zug in ruhiger Stellung haelt die Leiste nur. w0plus-a-fix: vorher stand hier „vor Flos Zug“, mit `gewinnVorher` gab es praktisch nie einen Treffer, auch nicht beim Matt | S1-6, nach `zug:bewertet` in Boss-Partien |
 | `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
-| `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`) | S1-3 (spaeter S2-2), nach dem Eintrag |
+| `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`); P2 (`punkte`) gibt zusaetzlich `fenster: 'allzeit'` und `partieId` mit | S1-3 (spaeter S2-2), nach dem Eintrag. `punkte` sendet es nur fuer einen neuen **eigenen Allzeit-Rekord** (ein Wert ueber dem alten Bestwert der Tafel, also immer mit `vorher`), nicht fuer den ersten Eintrag einer Tafel und nie fuer Wochen- oder Monatsbeste |
+| `punkte:geaendert` | `{ punkte, platz, tafel, rekord }` (`punkte` Tafelwert der Partie, auch ohne Tafel; `platz` Platz auf der Tafel 1.. oder `null` (ohne Tafel oder nicht unter den drei eigenen Besten); `tafel` Tafel-ID oder `null` (Hilfe, Uebung, freie Partie, Spielhalle, Gast, eigene Stellung); `rekord` boolean wie bei `rekord:neu`) | P2 `punkte`, einmal je bewerteter Partie nach `partie:analysiert` (auch beim Nachholen in der Arena), vor `rekord:neu`; nie beim einmaligen Umzug |
 | `uhr:knapp` | `{ laufId, rest }` (`rest` Restzeit von Flo in ms) | W0+b, einmal je Partie, wenn Flos Uhr unter 30 s faellt |
 | `zug:abgelehnt` | `{ laufId, von, nach, art, figur, fen }` (`nach`: Feld oder `null`, wenn nur eine Figur ohne erlaubten Zug angetippt wurde; `art`: `'ziehen'` \| `'tippen'`; `figur` z. B. `'wN'`; `fen` die Stellung) | `partie.js` aus `board.js` `beiAbgelehnt`, nur wenn Flo am Zug ist (3.18; den Grund rechnet S2-8 mit chess.js) |
 `partie:gestartet` traegt zusaetzlich `boss` (Kopie oder `null`) und `seed`, `partie:beendet` ebenso `boss` und `seed`.
@@ -1450,3 +1451,108 @@ Platz auch fuer die schmale Form nicht (neben dem Sterne-Chip fehlen bei 375 px 
 etwa 510 px, wenn der Pokal-Chip wieder sichtbar ist), liegt er teils im waagrechten Scrollbereich der Chip-Reihe. Das
 entscheidet die Integration mit der Auswahl der Kopf-Chips (Zahlenruhe 3.1; die Serie aus P3 kommt dazu).
 Tests: `node tests/funken.test.mjs` (Node und Browser, `PORT`, `BILDER`), Fairness-Zeilen in `tests/fairness.test.mjs`.
+
+# Spielsysteme P2: Paket punkte (Punkte, Abrechnung und Bestenliste, SPIELKONZEPT 3.2, 3.10, 3.13, 3.17)
+
+Einstieg `js/pakete/punkte/index.js` (laden: `PAKETE` bzw. im Test `?test&erw=pakete/punkte/index`), daneben `formel.js`,
+`tafel.js` und `code.js` (rein, in Node testbar, kein `Math.random`), `stand.js` (Modul-Speicher), `ansicht.js` (Zeile der
+Abrechnung), `liste.js` (Reiter der Bestenliste), Paket-Screen `js/ui/bestenliste.js`, Optik `css/pakete/punkte.css` (nur
+Tokens; das Paket haengt `link[data-paket="punkte"]` selbst ein). Hakt sich nur ueber Ereignisse, Orte, Feier, Register und
+den Modul-Speicher ein, jeder Hoerer und Anbieter laeuft in try/catch. **Noch nicht in `PAKETE` und `REITER`** (siehe
+Integration unten). Funken liest es nie: das Level der Spielerkarte kommt aus `funken:geaendert`.
+
+**Formel (Rechenstand 1, `STAND` in formel.js, tafel.js und stand.js).** Tafelwert = Zugpunkte der offenen Zuege (Gewinnchance
+vorher 10 bis 90 %, Grenzen eingeschlossen; Genial 1.200, Goldrichtig 800, Praezise 500, Sauber 400, Solide 300, Unscharf 100,
+Daneben/Verschenkt/Weit daneben 0 mit Platz, hoechstens 40 Plaetze) + Theorie (je 100, hoechstens 8, immer) + Ergebnis (Sieg
+4.000, Remis 2.500, Niederlage ab 15 eigenen Zuegen 1.000; Ende vor dem 10. eigenen Zug 0) + Verwertung (nur Sieg: ab dem ersten
+eigenen Zug mit mindestens 90 % Par = Mattdistanz + 3, sonst 30; 3.000 minus 100 je Zug ueber Par, nie unter 0; nie ueber 90 %:
+volle 3.000; ohne jede Bewertung 0, wie bei den Funken) + Kuer (COMBO-Zuschlag wie in der Partie: Praezise, Goldrichtig, Genial
+zaehlen, Theorie, Pflichtzug und triviale Zuege ohne Verlust sind neutral, offene Zuege in laufender Serie +50 % ab x3, +100 %
+ab x5, +150 % ab x8, +200 % ab x12 ihrer Zugpunkte; Weisse Weste +2.000 bei Sieg ohne Daneben, Verschenkt, Weit daneben ab 20
+offenen Zuegen). Pflichtzuege, triviale Zuege und der erste eigene Zug nach einem Hinweis oder Zuruecknehmen: 0, kein Platz.
+Uhr-Bonus (`uhrBonus`, 1.000 x Rest der eigenen Bedenkzeit) und Leistungspunkte (`leistungspunkte`, Phase 2) sind vorbereitet,
+aber noch nicht verdrahtet. Gerechnet wird nur aus der **Spielanalyse** (`partie:analysiert`, Review mit fester Tiefe), nie aus
+der Live-Bewertung: so rechnet jedes Geraet mit derselben App denselben Wert nach (Codes). Die Beispiele aus 3.2 und 3.13 (10.400,
+18.000, 6.400/9.400, 14.900, 20.100) sind Pruefwerte in `tests/punkte.test.mjs`.
+
+**Tafeln (`tafel.js`).** Je Leiter-Bot `bot:<id>` ("Rudis Tafel") und je Boss und Stufe `boss:<id>:standard|meister`.
+Eingetragen wird eine wertende Partie gegen einen Leiter-Bot oder eine Boss-Partie, beide nur ohne Hinweis und ohne
+Zuruecknehmen (sonst Punkte in der Abrechnung, aber `grund: 'hilfe'`); Uebungen (gar keine Rechnung), freie Partien,
+Spielhalle, Gaeste und eigene Stellungen nie (`grund`). Regeln aus 3.13: 10 Zeilen, davon hoechstens 3 eigene; dein Bestwert steht
+immer da, auch unter Platz 10; Gleichstand: der fruehere Eintrag vorn (gleich gut ist kein Rekord); Fenster Woche (Montag 4:00),
+Monat (Tagesgrenze 4:00) und Allzeit (Standard Woche); Gaeste sind an kein Fenster gebunden. Platz und Aufstieg zaehlen unter
+Gaesten und den drei eigenen Besten. Chronik: je Tafel die Bestwerte der letzten 12 Wochen und 12 Monate (Saeulen). "So nah wie noch
+nie": hoechstens einmal je Tafel und Woche, ab 90 % des eigenen Rekords und naeher als je zuvor, nie "knapp verpasst".
+Ausduennen: behalten werden die 3 Allzeit-Besten und je 3 Beste der laufenden Woche und des Monats; Nachweise nur an den 3
+Allzeit-Besten. **Gaeste in S1 sind nur Freunde aus Codes**; die vorlaeufigen Bot-Laeufe der Nachbar-Bots fehlen noch (offen).
+
+**Speicher** `modul:punkte` (Budget 40.000, duennt selbst aus: erst alte Abrechnungen, dann Rekordbuch, Nachweise, IDs, Chronik,
+Freunde, zuletzt die schwaechsten Eintraege, nie der Bestwert einer Tafel): `{ stand: 1, tafeln: { [id]: { id, eintraege: [{ id
+(partieId), w, t, tag, wo, mo, f, z, e, g, st, m, n? }], chronik: { w, m }, nah, fast } }, rekorde: [{ tafel, w, vorher, t, id,
+stand, n? }] (Rekordbuch, hoechstens 30), freunde: [{ id, name, eintraege: [{ tafel, w, t, tag, f, z, e, pruef, n }] }]
+(hoechstens 12 Freunde, 24 Eintraege), letzte: [Ergebnis] (Abrechnung der letzten 12 Partien), ids (verarbeitete Partien,
+hoechstens 300), neu (Punkt "neu" an Zeilen), offen (beendet, Analyse steht aus), lauf ({ id, hilfe, nachHilfe: [ply] }), level,
+umzug }`. `m` ist der Ply mit dem groessten Ausschlag (dorthin springt eine Zeile in der Analyse), `n` der Nachweis (SA1-Code ohne
+Striche, Rechenstand, Bot, Seed, Zuege, Datum; nach der Partie per `setTimeout` gebaut, nie im Hoerer). Kaputte oder fremde Teile
+fallen beim Laden still weg, ein Spielstand ohne Modul startet leer. **Umzug** (6.3): einmal beim ersten Start mit dem Paket
+werden die gespeicherten Analysen (bis zu 12) bewertet und die ersten eigenen Eintraege, still (keine Feier, keine Ereignisse,
+kein "neu"). Einstellungen je Geraet (`speichereModulEinstellungen('punkte')`): `{ reiter, fenster, tafel, name }`.
+
+**Ereignisse.** Hoert `partie:gestartet`, `hilfe:genutzt`, `zug:gespielt`, `zug:zurueckgenommen` (der erste eigene Zug nach Hilfe
+zaehlt 0, die Liste haengt an der laufenden Partie), `partie:beendet` (merkt die Partie bis zur Analyse), `partie:analysiert`
+(Rechnung, Eintrag, synchron vor dem Nachtrag des Ergebnisses; zweimal je Partie ist harmlos), `funken:geaendert` (Level),
+`app:bereit` (Umzug nach 1,2 s), `speicher:zurueckgesetzt`. Sendet `punkte:geaendert { punkte, platz, tafel, rekord }` je
+bewerteter Partie und danach bei einem neuen eigenen Allzeit-Rekord `rekord:neu { tafel, wert, vorher, platz, fenster:
+'allzeit', partieId }` (Tabelle "Ereignisse" oben; funken bucht dafuer seine 25 Funken nur bei `platz` 1).
+
+**Orte.** `ergebnis:abrechnung` 10: `div.pk-abr[data-zeile="punkte"]` "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ▲ 2",
+"Rekord auf Rudis Tafel · +1.820", "Erster Eintrag auf ...", "Diese Woche: Platz 2 ...", "So nah wie noch nie: 97 % ..." oder
+ohne Tafel der ehrliche Grund; bei einem Rekord bleibt die alte Zahl durchgestrichen stehen (`.pk-alt`), die neue zaehlt hoch;
+beim Ueberholen eine Mini-Tafel (ueber dir, du, unter dir), deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken
+(`klick`), Klang `rekord` nur mit Rekord, Platz 1 oder Aufstieg (Niederlagen ohne Rekord bleiben still); hoechstens 1,2 s,
+Antippen der Karte zeigt sofort das Endbild, Tempo 0 und reduzierte Bewegung nur das Endbild (`data-fertig`). Antippen der Zeile
+zeigt die Aufschluesselung, "Zur Bestenliste" und nach dem Ueberholen einer Freundin einmal still "Überhol-Post an Jule"
+(Vorschau des Texts "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..." mit Kopieren oder Teilen-Blatt,
+nichts geht automatisch raus). Rechnet die Analyse noch: "Punkte werden gezählt …" mit endlichem Schimmer (nur opacity), danach
+der Nachtrag; ohne Analyse "Punkte folgen mit der Analyse" (die Arena holt sie nach). Uebungen: keine Zeile.
+`bestenliste:reiter` Ich 10 (Spielerkarte, "Deine besten Partien" ueber alle Tafeln im Fenster, Rekordbuch mit Rechenstand),
+Bots 20 (Tafel-Wahl der 10 Leiter-Bots und der Boss-Tafeln mit Eintraegen, die Tafel mit Platz, Name, Datum, Farbe, Ergebnis,
+Zuegen, Genauigkeit, Punkten, eigene Zeile mit Akzentlinie, Freunde als Gast-Zeilen mit Initiale und Pruefstufe, Chronik,
+"Rekord angreifen: Rudi, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
+nachspielen, mit `app.engine('bewertung')` neu analysieren und mit derselben Formel rechnen, "Nachgerechnet ✓"; Freunde-Liste,
+ein Tipp entfernt). Jeder Anbieter liefert `section.bl-reiter[data-reiter][data-name]`, nicht gewaehlt eine leere Huelle (daraus
+baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment aus (Freunde).
+
+**Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL". Neuer eigener
+Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie "Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL"
+mit altem Wert und, beim Ueberholen, "Platz 3 ▲ 1". Ist der grosse Platz der Partie schon mit gleicher oder hoeherer Prioritaet
+vergeben (z. B. ein Level-Titel 75), kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Rudis Tafel ▲ 2" (vorher Platz 6) bzw.
+"Rekord auf Rudis Tafel: 23.100". Dafuer liest `index.js` die Feier-Warteschlange (`ladeModul('feier')`, nur lesen) in einer
+Mikroaufgabe nach dem Ereignis, also nach den Meldungen der anderen Hoerer. Erster Eintrag, Wochen- und Monatsbeste und "so nah"
+feiern nicht. Klang `rekord` (Datei aus dem Klangpaket).
+
+**Codes (`code.js`).** `SA1-` plus Crockford-Base32 in Vierergruppen (Eingabe ohne Gross- und Kleinschreibung, Striche und
+Leerzeichen egal, O wird 0, I und L werden 1, auch im Praefix). Bytes (Version 1): Version, Rechenstand, Art (1 Partie, 2 Boss),
+Merker (Farbe, Boss-Stufe, Ergebnis), Seed (4), Datum (Tage seit 2020-01-01), Analysetiefe, Bot-ID, Boss-Staerke, Name (UTF-8,
+hoechstens 12 Zeichen), Zahl der Halbzuege und je Halbzug der Index in den nach UCI sortierten erlaubten Zuegen, CRC-16/CCITT.
+80 Halbzuege ergeben rund 170 Code-Zeichen (3.13 schaetzte 130; mit einem Byte je Halbzug geht das nicht). Pruefstufen: die
+Pruefsumme schuetzt nur gegen Tippfehler (jeder Fehler in einem Zeichen faellt auf), "Nachgerechnet ✓" heisst: die App hat die
+Partie nachgespielt und selbst bewertet; "Bot-geprüft ✓✓" braucht Bots mit fester Knotenzahl (S3-0), noch nicht. Eine neuere
+Version wird ehrlich abgelehnt ("Bitte die App aktualisieren"). Die Startstellung steht nicht im Code: sie kommt vom Bot
+(Leiter-Bot Grundstellung, Boss `startFen` aus `registriereBot`).
+
+**Screen `bestenliste`** (`js/ui/bestenliste.js`, `PAKET_SCREENS`, Reiter Bestenliste): `hauptKopf` (die Reiter-Leiste sitzt im
+Querformat oben), Seitenkopf, Steuerzeile mit Segment der Reiter (aus den Anbietern) und Segment Woche · Monat · Allzeit,
+Behaelter `.bl-ort` des Orts `bestenliste:reiter` (Kontext `{ app, reiter, fenster }`), ohne Anbieter eine ruhige Karte. Params
+`{ reiter, fenster }`, gemerkt je Geraet. `zeige()` gibt es erst, wenn das Paket geladen ist (`freischalten()`, Live-Binding):
+ohne Paket geht der Router still zur Arena wie ohne Datei (die Pruefung "Bestenliste ohne Screen geht still zur Arena" in
+`tests/app.test.mjs` bleibt so gruen). Handy einspaltig, Tafel-Wahl waagrecht wischbar, Tippflaechen mindestens 44 px.
+
+**Fairness** (5.3, in `tests/fairness.test.mjs`): Punkte nie negativ und ganzzahlig (2.160 Faelle), "120 Zuege Schieben gegen
+Benno" 6.400 unter der zuegig verwerteten Fassung 9.400 und Schieben bringt nie mehr, Tafeleintrag nur ohne Hilfe-Flag (Uebung,
+freie Partie, Spielhalle, eigene Stellung nie); `formel.js` und `tafel.js` stehen in der Liste ohne `Math.random`.
+
+Tests: `node tests/punkte.test.mjs` (Node und Browser, `PORT`, `BILDER`, `--nur-node`, `--schnell`: Bilder nur 1180 hell und
+390 dunkel). Der Browser-Teil laedt `js/erweiterungen.js` immer mit `PAKETE = ['sicherung']` und `REITER = []` (per
+`page.route`) und das Paket per `?erw`, den Reiter per `?reiter`: so bleibt die Suite gleich, wenn die Integration Pakete und
+Reiter eintraegt.

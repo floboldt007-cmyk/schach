@@ -3,12 +3,12 @@
 //
 // Eine Code-Familie fuer alles, was man teilt: "SA1-" plus Crockford-Base32 (ohne I, L, O, U; Eingabe ohne Gross- und
 // Kleinschreibung, O wird 0, I und L werden 1) in Vierergruppen. Inhalt (Bytes, Version 1, alle Zahlen big-endian):
-//   0 Version (1) · 1 Rechenstand · 2 Art (1 Partie gegen einen Leiter-Bot, 2 Boss) · 3 Merker (Bit 0 Farbe Schwarz,
-//   Bit 1-2 Boss-Stufe 0 keine/1 Standard/2 Meister, Bit 3-4 Ergebnis 0 Sieg/1 Remis/2 Niederlage) · 4-7 Seed ·
-//   8-9 Datum (Tage seit 2020-01-01) · 10 Analysetiefe (0 unbekannt) · 11 Laenge L der Bot-ID, dann L Zeichen ·
-//   2 Byte Boss-Staerke (0 keine) · 1 Byte Laenge N des Namens (UTF-8, hoechstens 12 Zeichen), dann N Bytes ·
+//   0 Version (1) / 1 Rechenstand / 2 Art (1 Partie gegen einen Leiter-Bot, 2 Boss) / 3 Merker (Bit 0 Farbe Schwarz,
+//   Bit 1-2 Boss-Stufe 0 keine/1 Standard/2 Meister, Bit 3-4 Ergebnis 0 Sieg/1 Remis/2 Niederlage) / 4-7 Seed /
+//   8-9 Datum (Tage seit 2020-01-01) / 10 Analysetiefe (0 unbekannt) / 11 Laenge L der Bot-ID, dann L Zeichen /
+//   2 Byte Boss-Staerke (0 keine) / 1 Byte Laenge N des Namens (UTF-8, hoechstens 12 Zeichen), dann N Bytes /
 //   2 Byte Zahl H der Halbzuege, dann H Bytes: je Halbzug der Index in der Liste der erlaubten Zuege (sortiert nach
-//   UCI, 1 Byte je Halbzug) · 2 Byte Pruefsumme (CRC-16/CCITT ueber alles davor).
+//   UCI, 1 Byte je Halbzug) / 2 Byte Pruefsumme (CRC-16/CCITT ueber alles davor).
 // Eine Partie mit 80 Halbzuegen ergibt so rund 170 Zeichen.
 //
 // Drei ehrliche Pruefstufen (3.13): Die Pruefsumme schuetzt nur gegen Tippfehler (der Code der App ist offen);

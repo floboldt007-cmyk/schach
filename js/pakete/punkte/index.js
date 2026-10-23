@@ -14,8 +14,10 @@
 //          fenster: 'allzeit', partieId } bei einem neuen eigenen Allzeit-Rekord auf einer Tafel.
 // Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Ich 10, Bots 20, Freunde 50.
 // Feier:   bot-rekord (gross 78) "Platz 1 auf ... Tafel", wenn dabei Gaeste hinter dir landen; tafel-rekord (gross 70, eigene
-//          Quelle wie "Eigener Allzeit-Rekord" in 3.13) bei einem neuen Rekord, ist das grosse Budget dieser Partie schon
-//          vergeben, als Zeile rekord (58); rekord (Zeile 58) "Platz 4 auf Rudis Tafel ▲ 2" beim Ueberholen. Klang "rekord".
+//          Quelle wie "Eigener Allzeit-Rekord" in 3.13) bei einem neuen Rekord. Ist das grosse Budget dieser Partie schon
+//          vergeben (gleiche oder hoehere Prioritaet), kommt der Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf
+//          Rudis Tafel ^ 2" (vorher Platz 6), sonst "Rekord auf Rudis Tafel: 23.100". Klang "rekord". Erster Eintrag, Wochen-
+//          und Monatsbeste und "so nah wie noch nie": keine Feier (nur die Abrechnungszeile).
 // Register: Icon "code".
 // Testmodus (?test): window.__punkte = { stand(), speichere(st), S, T, C, F }.
 import { hoere, sende } from '../../ereignisse.js';
@@ -102,26 +104,29 @@ function feiern(e) {
   if (!e || !e.tafel) return;
   const name = A.tafelName(e.tafel, botNachId);
   const gross = name.toLocaleUpperCase('de-DE');
+  const pfeil = e.aufstieg > 0 ? ` ▲ ${e.aufstieg}` : '';
+  // Platz 1 einer Tafel (nur mit Gaesten dahinter): grosser Moment 78; ist der schon vergeben, eine Zeile
   if (e.platz1) {
     if (grossFrei(e.id, 78)) {
       melde({ partieId: e.id, quelle: 'bot-rekord', titel: `PLATZ 1 AUF ${gross}`,
         text: `${A.zahlText(e.w)} Punkte, vor ${e.ueberholt.join(', ') || 'allen Gästen'}`, symbol: 'podest', klang: 'rekord' });
     } else {
-      melde({ partieId: e.id, quelle: 'rekord', titel: `Platz 1 auf ${name}${e.aufstieg ? ` ▲ ${e.aufstieg}` : ''}`, symbol: 'podest' });
+      melde({ partieId: e.id, quelle: 'rekord', titel: `Platz 1 auf ${name}${pfeil}`, text: e.platzVorher ? `vorher Platz ${e.platzVorher}` : null, symbol: 'podest' });
     }
     return;
   }
+  // eigener Allzeit-Rekord: grosser Moment 70 (alte Zahl daneben); ist der schon vergeben, eine Zeile: mit Ueberholen
+  // "Platz 4 auf Rudis Tafel ^ 2" (Platz gewonnen, 58), sonst "Rekord auf Rudis Tafel: 23.100"
   if (e.rekord) {
-    const text = `${A.zahlText(e.w)} Punkte, vorher ${A.zahlText(e.vorher)} (+${A.zahlText(e.w - e.vorher)})`;
+    const plus = `${A.zahlText(e.w)} Punkte, vorher ${A.zahlText(e.vorher)} (+${A.zahlText(e.w - e.vorher)})`;
     if (grossFrei(e.id, 70)) {
-      melde({ partieId: e.id, quelle: 'tafel-rekord', art: 'gross', prio: 70, titel: `NEUER REKORD AUF ${gross}`, text, symbol: 'podest', klang: 'rekord' });
+      melde({ partieId: e.id, quelle: 'tafel-rekord', art: 'gross', prio: 70, titel: `NEUER REKORD AUF ${gross}`,
+        text: e.aufstieg > 0 && e.platz != null ? `Platz ${e.platz}${pfeil} · ${plus}` : plus, symbol: 'podest', klang: 'rekord' });
+    } else if (e.aufstieg > 0 && e.platz != null) {
+      melde({ partieId: e.id, quelle: 'rekord', titel: `Platz ${e.platz} auf ${name}${pfeil}`, text: `vorher Platz ${e.platzVorher}`, symbol: 'podest' });
     } else {
       melde({ partieId: e.id, quelle: 'rekord', titel: `Rekord auf ${name}: ${A.zahlText(e.w)}`, text: `vorher ${A.zahlText(e.vorher)}`, symbol: 'podest' });
     }
-    return;
-  }
-  if (e.aufstieg > 0 && e.platz != null) {
-    melde({ partieId: e.id, quelle: 'rekord', titel: `Platz ${e.platz} auf ${name} ▲ ${e.aufstieg}`, text: `vorher Platz ${e.platzVorher}`, symbol: 'podest' });
   }
 }
 
@@ -185,6 +190,16 @@ function miniTafel(e) {
   return aus;
 }
 
+// Ueberhol-Post (3.13): "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..."; erst beim Antippen
+function postText(e) {
+  const name = A.tafelName(e.tafel, botNachId);
+  const st = S.lade();
+  const t = st.tafeln[e.tafel];
+  const eintrag = t && t.eintraege.find((x) => x.id === e.id);
+  const code = eintrag ? sicher(() => B.codeFuer(eintrag, e.tafel, String(B.einstellungen().name || '').slice(0, C.NAME_MAX)), 'Code') : null;
+  return `Ich hab deine ${A.zahlText(e.post.w)} auf ${name} geknackt, jetzt ${A.zahlText(e.w)}.${code && code.ok ? ` Code: ${code.code}` : ''}`;
+}
+
 function anbieterAbrechnung(k) {
   const p = k && k.erg && k.erg.partie ? k.erg.partie : null;
   if (!p || typeof p.id !== 'string') return null;
@@ -199,6 +214,7 @@ function anbieterAbrechnung(k) {
     ergebnis: e, tafelName: e.tafel ? A.tafelName(e.tafel, botNachId) : 'Tafel', schonGezeigt: gezeigt.has(p.id), merke: () => gezeigt.add(p.id),
     mini: sicher(() => miniTafel(e), 'Mini-Tafel'),
     beiListe: e.tafel && k.app && typeof k.app.gehe === 'function' ? () => { B.merkeEinstellung({ tafel: e.tafel, reiter: 'bots' }); k.app.gehe('bestenliste', { reiter: 'bots' }); } : null,
+    post: e.post && e.tafel ? { name: e.post.name, text: () => postText(e) } : null,
   });
   // Antippen der Ergebnis-Karte zeigt sofort alles (wie die Huelle der Abrechnung), erst nach dem Einhaengen
   let karte = null;
