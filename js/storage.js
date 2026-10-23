@@ -146,8 +146,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
   klangstufe: 'alle',    // 'alle' | 'wichtig' | 'aus' (Flo, D4: Standard alle)
   klanggruppen: Object.freeze({ brett: true, bewertung: true, feier: true, uhr: true, boss: true, finisher: true, bedienung: true }),
-  // Spiel (Fingerschutz)
-  zugBestaetigen: 'ohneUhr', // 'aus' | 'ohneUhr' | 'immer'
+  // Spiel (Fingerschutz). Zug bestaetigen ist seit 23.10. Standard aus (Flo: ohne Hinweis wirkte das Spiel kaputt)
+  zugBestaetigen: 'aus', // 'aus' | 'ohneUhr' | 'immer'
   vorzuege: true,        // eigene Zuege vormerken, waehrend der Gegner denkt
   haltenAufgeben: true,  // Aufgeben und Remis anbieten nur durch Halten
   turmRochade: false,    // Turm auf Koenig tippen rochiert
@@ -167,6 +167,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   sprueche: 'an',        // 'an' | 'wenig' | 'aus'
   // Daten (DSGVO): Partien und anonyme Nutzung mit dem Betreiber teilen, nur angemeldet und nur ausdruecklich
   datenfreigabe: 'aus',  // 'aus' | 'an' (Opt-in, Standard aus)
+  // Fassung des gespeicherten Stands (fuer einmalige Umstellungen in ladeEinstellungen)
+  fassung: 2,
 });
 
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
@@ -289,6 +291,10 @@ export function ladeEinstellungen() {
   for (const [k, werte] of Object.entries(EINSTELLUNG_WERTE)) {
     if (!werte.includes(e[k])) e[k] = STANDARD_EINSTELLUNGEN[k];
   }
+  // Fassung 2 (23.10.): Bis dahin stand der alte Standard 'ohneUhr' von "Zug bestaetigen" in jedem gespeicherten Stand,
+  // ob gewaehlt oder nicht. Einmal auf den neuen Standard 'aus'; wer danach 'ohneUhr' waehlt, behaelt es.
+  if (roh && typeof roh === 'object' && !(Number(roh.fassung) >= 2) && e.zugBestaetigen === 'ohneUhr') e.zugBestaetigen = 'aus';
+  e.fassung = STANDARD_EINSTELLUNGEN.fassung;
   if (!THEMA_ID.test(e.thema)) e.thema = STANDARD_EINSTELLUNGEN.thema;
   e.tiefe = Number.isFinite(e.tiefe) ? Math.max(8, Math.min(20, Math.round(e.tiefe))) : STANDARD_EINSTELLUNGEN.tiefe;
   e.lautstaerke = Number.isFinite(e.lautstaerke)

@@ -186,6 +186,9 @@ const rufnameVon = (b) => RUFNAME[b && b.id] || (b && b.name) || '';
 const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
+// Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
+const BESTAETIGEN_HINWEISE = 3;
+const BESTAETIGEN_MERKER = 'schach-arena:v1:hinweis-bestaetigen';
 const BEGRUESSUNG_MS = 6000;
 // U7: Sprueche "wenig": hoechstens ein Satz je 5 eigene Zuege (10 Halbzuege)
 const WENIG_ABSTAND = 10;
@@ -445,7 +448,7 @@ export function zeige(root, params, app) {
 
   const brett = new Brett($('.brett'), {
     ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
-    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, autoDame: einst.autoDame,
+    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, beiVorschau, autoDame: einst.autoDame,
     koordLage: einst.koordLage, steuerung: einst.steuerung, turmRochade: einst.turmRochade === true, pfeile: einst.pfeile !== false,
   });
   brett.setzeDauer(ZUG_MS);
@@ -1139,6 +1142,18 @@ export function zeige(root, params, app) {
     brett.setzeTurmRochade(tr);
     brett.erlaubeZuege(zielKarte(z.chess, { turmRochade: tr }));
     aktualisiereBestaetigen();
+  }
+  // Zug bestaetigen: die ersten drei Vorschauen erklaeren den zweiten Tipp (Flo, 23.10.: ohne Hinweis sah es aus, als
+  // reagiere das Spiel nicht). Gezaehlt wird je Geraet; die Einstellungen erklaeren es dauerhaft.
+  function beiVorschau(von, nach) {
+    if (weg || z.phase !== 'flo') return;
+    let n = 0;
+    try {
+      n = Number(localStorage.getItem(BESTAETIGEN_MERKER)) || 0;
+      if (n >= BESTAETIGEN_HINWEISE) return;
+      localStorage.setItem(BESTAETIGEN_MERKER, String(n + 1));
+    } catch (e) { if (n >= BESTAETIGEN_HINWEISE) return; }
+    app.meldung(`Tippe noch einmal auf ${nach}, um den Zug zu spielen. Ein Tipp daneben nimmt ihn zurück.`, { dauer: 4500 });
   }
   // Zug bestaetigen (PLAN 4): 'ohneUhr' nur ohne Bedenkzeit, 'immer', 'aus'; nur fuer echte Zuege (nie fuer Vorzuege)
   const bestaetigenAn = () => {

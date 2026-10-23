@@ -161,8 +161,8 @@ function hilfen(seite, { touch = true } = {}) {
       else await seite.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
       await warte(120);
     },
-    // U7: "Zug bestaetigen" ist Standard (ohneUhr, PLAN 4): steht nach dem Tipp aufs Ziel die Vorschau, macht ein zweiter
-    // Tipp aufs Ziel den Zug fest. Ohne Vorschau (Einstellung aus, Partie mit Uhr, Vorzug, abgelehnter Zug) bleibt es bei zwei.
+    // U7: "Zug bestaetigen" (Einstellung, seit 23.10. Standard aus): steht nach dem Tipp aufs Ziel die Vorschau, macht ein
+    // zweiter Tipp aufs Ziel den Zug fest. Ohne Vorschau (Einstellung aus, Partie mit Uhr, Vorzug, abgelehnter Zug) bleibt es bei zwei.
     vorschau: () => seite.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau')),
     async zugTippen(uci) {
       await h.tippeFeld(uci.slice(0, 2));
@@ -3299,16 +3299,41 @@ async function testeU7(browser) {
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
     await h.starte({ botId: 'benno', farbe: 'w' });
     await h.warteFlo();
-    // Zug bestaetigen, Standard ohneUhr (ohne Bedenkzeit an): Vorschau, zweiter Tipp aufs Ziel macht fest
+    // Zug bestaetigen ist seit 23.10. Standard aus (Flo: die Vorschau ohne Erklaerung wirkte wie ein kaputtes Spiel)
     await h.tippeFeld('e2');
     await h.tippeFeld('e4');
-    const vor = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.length, an: window.__partie.brett.bestaetigen }));
+    const std = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.slice(),
+      an: window.__partie.brett.bestaetigen, einst: window.__app.einstellungen().zugBestaetigen }));
+    pruefe('Zug bestätigen: Standard aus, der Tipp aufs Ziel zieht sofort', !std.vorschau && JSON.stringify(std.zuege) === '["e2e4"]' && std.an === false && std.einst === 'aus',
+      JSON.stringify(std));
+    // ohneUhr (ohne Bedenkzeit an): Vorschau mit Hinweis auf den zweiten Tipp, der zweite Tipp aufs Ziel macht fest
+    await seite.evaluate(() => {
+      localStorage.removeItem('schach-arena:v1:laufend'); localStorage.removeItem('schach-arena:v1:hinweis-bestaetigen');
+      window.__app.setzeEinstellungen({ zugBestaetigen: 'ohneUhr' });
+    });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await h.tippeFeld('e2');
+    await h.tippeFeld('e4');
+    const vor = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), zuege: window.__partie.z.zuege.length, an: window.__partie.brett.bestaetigen,
+      hinweis: (document.querySelector('.toast-ort .toast:not(.weg)') || {}).textContent || '', merker: localStorage.getItem('schach-arena:v1:hinweis-bestaetigen') }));
     await h.tippeFeld('e4');
     const nach = await seite.evaluate(() => window.__partie.z.zuege.slice());
-    pruefe('Zug bestätigen (Standard ohneUhr, ohne Bedenkzeit): Vorschau, erst der zweite Tipp aufs Ziel zieht', vor.vorschau && vor.zuege === 0 && vor.an === true
+    pruefe('Zug bestätigen (ohneUhr, ohne Bedenkzeit): Vorschau mit Hinweis auf den zweiten Tipp, erst der zweite Tipp aufs Ziel zieht', vor.vorschau && vor.zuege === 0
+      && vor.an === true && vor.hinweis === 'Tippe noch einmal auf e4, um den Zug zu spielen. Ein Tipp daneben nimmt ihn zurück.' && vor.merker === '1'
       && JSON.stringify(nach) === '["e2e4"]', JSON.stringify([vor, nach]));
     const botPhase = await seite.evaluate(() => ({ phase: window.__partie.phase(), an: window.__partie.brett.bestaetigen }));
     pruefe('Während der Bot denkt (Vorzüge): ohne Bestätigen', botPhase.phase === 'bot' && botPhase.an === false, JSON.stringify(botPhase));
+    // nach drei Hinweisen schweigt er (die Einstellungen erklaeren den zweiten Tipp dauerhaft)
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); localStorage.setItem('schach-arena:v1:hinweis-bestaetigen', '3'); });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await seite.evaluate(() => { const o = document.querySelector('.toast-ort'); if (o) o.replaceChildren(); });
+    await h.tippeFeld('d2');
+    await h.tippeFeld('d4');
+    const still = await seite.evaluate(() => ({ vorschau: !!document.querySelector('.partie .lage.vorschau'), toast: !!document.querySelector('.toast-ort .toast'),
+      merker: localStorage.getItem('schach-arena:v1:hinweis-bestaetigen') }));
+    pruefe('Hinweis zum zweiten Tipp höchstens dreimal je Gerät', still.vorschau && !still.toast && still.merker === '3', JSON.stringify(still));
     // aus: sofort; immer: auch mit Bedenkzeit; ohneUhr mit Bedenkzeit: aus
     const faelle = [];
     for (const [wert, tempo] of [['aus', null], ['immer', { grund: 300, zuschlag: 0 }], ['ohneUhr', { grund: 300, zuschlag: 0 }]]) {

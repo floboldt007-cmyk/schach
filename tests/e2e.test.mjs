@@ -167,8 +167,8 @@ function hilfen(seite) {
       await seite.touchscreen.tap(p.x, p.y);
       await warte(90);
     },
-    // U7: "Zug bestaetigen" ist Standard (ohneUhr, PLAN 4): steht nach dem Tipp aufs Ziel die Vorschau, macht ein zweiter
-    // Tipp aufs Ziel den Zug fest
+    // U7: "Zug bestaetigen" (Einstellung, seit 23.10. Standard aus): steht nach dem Tipp aufs Ziel die Vorschau, macht ein
+    // zweiter Tipp aufs Ziel den Zug fest
     async zugTippen(uci) {
       await h.tippeFeld(uci.slice(0, 2));
       await h.tippeFeld(uci.slice(2, 4));
