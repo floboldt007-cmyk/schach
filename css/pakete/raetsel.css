@@ -1,0 +1,109 @@
+/* ============================================================
+   Crownmate · Raetsel-Bildschirm (Welle A, A3; js/ui/raetsel.js)
+   Look A (Entwurf A, Raetsel-Seite): links das Brett im Sockel, rechts Fortschritt, Status, Rueckmeldung, Knoepfe;
+   iPad hoch und Handy eine Spalte. Nur Tokens (css/tokens.css, css/themes/<id>.css), hell und dunkel, keine festen
+   Farben. Der Screen haengt diese Datei selbst ein (link[data-screen="raetsel"]).
+   Groesse des Bretts aus der Flaeche unter dem Kopf (Container-Einheiten, Safari ab 16).
+   ============================================================ */
+.rs-screen .rs-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; container: rs / size; }
+
+.rs-inhalt { --rs-seite: 360px; --rs-luft: 28px;
+  --rs-b: min(calc(100cqh - 88px), calc(100cqw - 2 * var(--rand) - var(--rs-seite) - var(--rs-luft)), 700px);
+  display: grid; grid-template-columns: var(--rs-b) var(--rs-seite); grid-template-rows: auto auto; column-gap: var(--rs-luft); row-gap: 14px;
+  justify-content: center; align-content: center; min-height: 100%; padding: 8px var(--rand) 20px; }
+.rs-inhalt[hidden], .rs-ende[hidden], .rs-meldung[hidden], .rs-marke[hidden], .rs-screen .knopf[hidden] { display: none; }
+
+/* Fortschritt oben: "3 von 7" und je Aufgabe ein Punkt (nie rot: daneben ist neutral grau) */
+.rs-fortschritt { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+.rs-zaehler { font-size: 15px; font-weight: var(--gw-stark); color: var(--text-2); }
+.rs-zaehler b { color: var(--text); font-weight: 800; }
+.rs-punkte { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
+.rs-punkte > i { width: 10px; height: 10px; border-radius: var(--r-pille); background: var(--linie-2);
+  transition: transform var(--d-m) var(--feder), background-color var(--d-s) var(--sanft); }
+.rs-punkte > i.jetzt { background: var(--text); transform: scale(1.3); }
+.rs-punkte > i.gut { background: var(--k-bester); }
+.rs-punkte > i.durch { background: var(--text-3); }
+.rs-balken { display: block; width: 140px; height: 6px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
+.rs-balken > i { display: block; height: 100%; background: var(--text); transform-origin: 0 50%; transform: scaleX(0);
+  transition: transform var(--d-l) var(--gleiten); }
+
+.rs-brettzone { grid-column: 1; grid-row: 2; min-width: 0; }
+.rs-rahmen { width: var(--rs-b); }
+.rs-screen .brett > .figur { filter: drop-shadow(0 2px 1.5px var(--linie-2)); }
+
+.rs-seite { grid-column: 2; grid-row: 2; align-self: center; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* Status: wer zieht, Klasse des alten Zugs, Aufgabe */
+.rs-status { display: flex; flex-direction: column; gap: 8px; padding: 18px; border-radius: var(--r-l); background-color: var(--flaeche);
+  background-image: var(--textur-flaeche, none); box-shadow: var(--s2), var(--kante); }
+.rs-statuszeile { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rs-amzug { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: var(--gw-stark); }
+.rs-amzug i { width: 16px; height: 16px; border-radius: var(--r-pille); background: var(--balken-weiss); box-shadow: inset 0 0 0 1.5px var(--linie-2); }
+.rs-amzug i[data-farbe="b"] { background: var(--balken-schwarz); }
+.rs-marke { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--r-pille);
+  background: var(--flaeche-2); box-shadow: var(--kante); font-size: 12.5px; font-weight: 750; color: var(--text-2); }
+.rs-marke i { width: 8px; height: 8px; border-radius: var(--r-pille); background: var(--text-3); }
+.rs-marke[data-klasse="fehler"] i { background: var(--k-fehler); }
+.rs-marke[data-klasse="verpasst"] i { background: var(--k-verpasst); }
+.rs-marke[data-klasse="patzer"] i { background: var(--k-patzer); }
+.rs-status h2 { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 26px; letter-spacing: -.025em; line-height: 1.08; }
+.rs-status p { margin: 0; color: var(--text-2); font-weight: 600; font-size: 15px; }
+.rs-status p[hidden] { display: none; }
+
+/* Rueckmeldung: richtig (Haken auf Zugklassen-Gruen), Hinweis, falsch und Loesung ruhig */
+.rs-meldung { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-l); background: var(--flaeche-2);
+  box-shadow: var(--kante); }
+.rs-meldung > div { min-width: 0; }
+.rs-meldung b { display: block; font-weight: 800; font-size: 16px; }
+.rs-meldung div > span { display: block; margin-top: 2px; color: var(--text-2); font-weight: 600; font-size: 14px; }
+.rs-meldung div > span[hidden] { display: none; }
+.rs-symbol { flex: none; width: 44px; height: 44px; border-radius: var(--r-pille); display: grid; place-items: center;
+  background: var(--flaeche-3); color: var(--text-2); }
+.rs-symbol .ico { width: 24px; height: 24px; }
+.rs-meldung[data-art="richtig"] { background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+.rs-meldung[data-art="richtig"] b { color: var(--kt-bester); }
+.rs-meldung[data-art="richtig"] .rs-symbol { background: var(--k-bester); color: var(--kg-bester); }
+.rs-meldung[data-art="richtig"] .rs-symbol .ico { stroke-width: 3; }
+.rs-meldung[data-art="loesung"] .rs-symbol { background: var(--tinte); color: var(--auf-tinte); }
+
+.rs-aktionen { display: flex; flex-wrap: wrap; gap: 10px; }
+.rs-aktionen .knopf { flex: 1 1 160px; min-height: 52px; }
+
+/* Abschluss und leerer Stapel */
+.rs-ende { min-height: 100%; display: grid; place-items: center; padding: 16px var(--rand) 28px; }
+.rs-ende-karte { width: min(100%, 520px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 26px 26px;
+  text-align: center; border-radius: var(--r-xl); background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
+  box-shadow: var(--s3), var(--kante); }
+.rs-ende-symbol { width: 64px; height: 64px; border-radius: var(--r-pille); display: grid; place-items: center; background: var(--k-bester);
+  color: var(--kg-bester); }
+.rs-ende-symbol .ico { width: 34px; height: 34px; stroke-width: 3; }
+.rs-ende-symbol[data-art="leer"] { background: var(--flaeche-3); color: var(--text-2); }
+.rs-ende-karte h2 { margin: 0; font-size: 34px; }
+.rs-ende-zahl { display: flex; align-items: baseline; gap: 8px; }
+.rs-ende-zahl b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 54px; letter-spacing: -.04em; line-height: 1; }
+.rs-ende-zahl small { font-size: 15px; font-weight: 700; color: var(--text-2); }
+.rs-ende-punkte { justify-content: center; }
+.rs-ende-karte p { margin: 0; color: var(--text-2); font-weight: 600; font-size: 15px; }
+.rs-ende-knoepfe { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; width: 100%; }
+.rs-ende-knoepfe .knopf { flex: 1 1 180px; min-height: 52px; }
+
+/* iPad hoch und Handy: eine Spalte, Brett oben, darunter Status, Rueckmeldung und Knoepfe */
+@container rs (max-width: 860px) {
+  .rs-inhalt { --rs-b: min(calc(100cqw - 2 * var(--rand)), max(calc(100cqh - 270px), 300px), 620px);
+    grid-template-columns: var(--rs-b); grid-template-rows: auto auto auto; align-content: start; row-gap: 12px; padding-top: 4px; }
+  .rs-fortschritt { grid-column: 1; }
+  .rs-brettzone { grid-column: 1; grid-row: 2; }
+  .rs-seite { grid-column: 1; grid-row: 3; align-self: start; gap: 12px; }
+  .rs-status { padding: 14px 16px; }
+  .rs-status h2 { font-size: 22px; }
+}
+@container rs (max-width: 520px) {
+  .rs-rahmen { padding: 3px; border-radius: 14px; }
+  .rs-rahmen::after { inset: 2px; border-radius: 12px; }
+  .rs-rahmen > .brett { --brett-radius: 11px; }
+  .rs-meldung { padding: 12px 14px; gap: 12px; }
+  .rs-symbol { width: 38px; height: 38px; }
+  .rs-ende-karte { padding: 24px 18px 20px; }
+  .rs-ende-karte h2 { font-size: 28px; }
+}
