@@ -204,7 +204,7 @@ export function abrechnungsZeile({ e, schonGezeigt = false, merke = () => {}, st
   let unter = '';
   if (mitTag) {
     kopf = `<span class="se-label">Serie</span><b class="se-abr-wert">Tag ${zahl(e.t)} · Bauernmarsch</b>`;
-    if (umw) unter = 'Umwandlung! Die Figur wählst du in der Arena.';
+    if (umw) unter = 'Umwandlung! Figur in der Arena wählen.';
     else unter = (e.d ? 'Willkommen zurück. Doppelschritt. ' : '') + bisText(T.FELDER - (e.f % T.FELDER));
   } else {
     kopf = `<span class="se-label">Siegeslauf</span><b class="se-abr-wert">${mitLauf ? esc(laufText(e.l)) : 'beendet'}</b>`;

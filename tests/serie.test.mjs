@@ -684,6 +684,17 @@ function hilfen(seite) {
     async tippe(sel) {
       const loc = seite.locator(sel).first();
       await loc.waitFor({ state: 'visible', timeout: 10000 });
+      // wie in arena.test.mjs: verdeckt (fester Spielen-Knopf) oder ausserhalb des Fensters -> erst in die Mitte scrollen.
+      // Zweimal kurz hintereinander frei = stabil (am Handy legt sich der Spielen-Knopf erst nach dem Aufbau des Panels darueber)
+      const verdeckt = () => loc.evaluate((e) => {
+        const r = e.getBoundingClientRect(), oben = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return !oben || !(oben === e || e.contains(oben));
+      });
+      for (let versuch = 0; versuch < 4; versuch++) {
+        if (await verdeckt()) { await loc.evaluate((e) => e.scrollIntoView({ block: 'center' })); await warte(150); continue; }
+        await warte(120);
+        if (!(await verdeckt())) break;
+      }
       const b = await loc.boundingBox();
       await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
       await warte(150);
