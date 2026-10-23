@@ -52,6 +52,36 @@ begin
 end
 $$;
 
+-- ---------- angemeldet ohne Nutzer-ID (kaputtes Token): jede Funktion lehnt ab ----------
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+do $$
+declare
+  aufruf text;
+begin
+  foreach aufruf in array array[
+    'select public.schule_erstelle_klasse(''Probe'')',
+    'select public.schule_tritt_bei(''ABCDEF'', ''Anna'')',
+    'select public.schule_verlasse(gen_random_uuid())',
+    'select public.schule_melde_fortschritt(1, 1, 1)',
+    'select public.schule_meine_klassen()',
+    'select public.schule_klassen_uebersicht(gen_random_uuid())',
+    'select public.schule_aufgabe_anlegen(gen_random_uuid(), ''Titel'', ''partien'', ''{"anzahl":1}'')',
+    'select public.schule_aufgabe_loeschen(gen_random_uuid())',
+    'select public.schule_entferne_mitglied(gen_random_uuid())',
+    'select public.schule_schliesse_klasse(gen_random_uuid())',
+    'select public.schule_loesche_klasse(gen_random_uuid())'] loop
+    begin
+      execute aufruf;
+      raise exception 'FEHLER: ohne Nutzer-ID angenommen: %', aufruf;
+    exception when raise_exception then
+      if sqlerrm <> 'SCHULE_NICHT_ANGEMELDET' then raise; end if;
+    end;
+  end loop;
+end
+$$;
+
 -- ---------- L legt eine Klasse an und stellt Aufgaben ----------
 reset role;
 set local role authenticated;
@@ -653,6 +683,9 @@ select ('e0000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid, 'voll' || i
 insert into public.klassen_mitglieder (klasse, user_id, anzeigename)
 select current_setting('schule.klasse_m')::uuid, ('e0000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid, 'Kind ' || i
 from generate_series(1, 60) i;
+-- 30 Aufgaben in der Klasse von M, dann geht keine mehr
+insert into public.klassen_aufgaben (klasse, titel, art, ziel)
+select current_setting('schule.klasse_m')::uuid, 'Aufgabe ' || i, 'partien', '{"anzahl":1}' from generate_series(1, 30) i;
 -- 19 weitere Klassen fuer M (zusammen 20), eine davon seit 91 Tagen geschlossen
 insert into public.klassen (name, code, leitung, aktiv, geschlossen_am)
 select 'Gruppe ' || i, 'QQQQQ' || substr('ABCDEFGHJKLMNPQRSTUVWXYZ', i, 1), 'd4444444-4444-4444-8444-444444444444',
@@ -676,6 +709,12 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"d4444444-4444-4444-8444-444444444444","role":"authenticated"}', true);
 do $$
 begin
+  begin
+    perform public.schule_aufgabe_anlegen(current_setting('schule.klasse_m')::uuid, 'Einunddreissig', 'partien', '{"anzahl":1}');
+    raise exception 'FEHLER: 31. Aufgabe angenommen';
+  exception when raise_exception then
+    if sqlerrm <> 'SCHULE_ZU_VIELE_AUFGABEN' then raise; end if;
+  end;
   -- 20 Klassen, davon eine seit 91 Tagen geschlossen: die raeumt der Server beim Anlegen weg, dann passt eine neue
   perform public.schule_erstelle_klasse('Gruppe 20');
   if (select count(*) from public.klassen) <> 20 or exists (select 1 from public.klassen where name = 'Gruppe 1') then
