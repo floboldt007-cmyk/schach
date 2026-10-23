@@ -1768,8 +1768,8 @@ Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Ex
 `schach-arena:abo:alter` `{ uid, ab18 }`.
 
 **Paket** `pakete/abo/index` (noch nicht in `PAKETE`: das trägt die Integration ein, die Dateien stehen schon in `sw.js`; der
-Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 6 direkt
-unter dem Konto, nur wenn das Konto sichtbar ist; zeichnet neu bei `abo:stand` und wenn sich die Anmeldung ändert:
+Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 7 unter
+Konto (5) und Daten (6), nur wenn das Konto sichtbar ist; zeichnet neu bei `abo:stand` und wenn sich die Anmeldung ändert:
 `MutationObserver` vergleicht die Nutzer-ID, solange die Einstellungen offen sind, dazu `storage` für andere Tabs, weil
 `js/konto.js` beim Ab- und Anmelden nichts meldet; nach dem Abmelden `aufraeumen()`); `app:bereit` (vorher
 `aufraeumen()`) und `app:sichtbar` starten nach einem Kauf `bestaetigeKauf()`; bei `abo:stand` mit `bestaetigt` genau
@@ -1934,7 +1934,7 @@ Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in 
 
 **Paket** `pakete/schule/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die vier Dateien stehen schon in
 `sw.js`; der Test lädt es über `?test&erw=pakete/schule/index`):
-- Ort `einstellungen:gruppen` (Reihenfolge 7, unter Konto 5 und Trainer 6), nur mit sichtbarem Konto: Gruppe
+- Ort `einstellungen:gruppen` (Reihenfolge 8, unter Konto 5, Daten 6 und Trainer 7), nur mit sichtbarem Konto: Gruppe
   `.schule-gruppe[data-angemeldet]` mit den eigenen Mitgliedschaften (`.sm-mitgliedschaft[data-klasse]`, Aufgaben mit
   Stand, „Austreten“ mit Rückfrage), „Klasse beitreten“ (`.sm-code-eingabe`, `.sm-name-eingabe`, Satz `.sm-sieht`) und
   „Klassen leiten“ (`app.gehe('schule')`). Zeichnet neu, wenn sich die Anmeldung ändert (MutationObserver und

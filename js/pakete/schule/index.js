@@ -3,7 +3,7 @@
 // Server in supabase/schule-schema.sql. Idee und Datenschutz: design/runde4/SCHULE.md.
 //
 // Orte und Ereignisse:
-//   einstellungen:gruppen   Gruppe "Klasse" (reihenfolge 7, unter Konto 5 und Trainer 6), nur wenn das Konto sichtbar ist
+//   einstellungen:gruppen   Gruppe "Klasse" (reihenfolge 8, unter Konto 5, Daten 6 und Trainer 7), nur mit sichtbarem Konto
 //                           (kontoFreigeschaltet, zuerst nur fuer Flo): ohne Konto kein Beitritt. Angemeldet: die eigenen
 //                           Klassen mit ihren Aufgaben (Austreten), "Klasse beitreten" (Code und Anzeigename, mit dem
 //                           Satz, was die Lehrkraft sieht) und "Klassen leiten" (Screen schule). Zeichnet neu, wenn sich
@@ -267,7 +267,7 @@ function sendeOffene() {
 }
 
 try {
-  anbieten('einstellungen:gruppen', schuleGruppe, { reihenfolge: 7, paket: 'schule' });
+  anbieten('einstellungen:gruppen', schuleGruppe, { reihenfolge: 8, paket: 'schule' });
   anbieten('arena:heute', heuteZeile, { reihenfolge: 35, paket: 'schule' });
   hoere('partie:beendet', () => { sicher(() => planeMeldung()); });
   hoere('raetsel:geloest', (d) => { sicher(() => { if (merkeRaetsel(d)) planeMeldung(); }); });

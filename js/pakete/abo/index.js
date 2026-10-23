@@ -2,7 +2,7 @@
 // in js/abo.js, das Blatt in ./trainer.js, die Optik in css/pakete/abo.css.
 //
 // Orte und Ereignisse:
-//   einstellungen:gruppen   Gruppe "Crownmate Trainer" direkt unter dem Konto (reihenfolge 6, das Konto hat 5). Sie
+//   einstellungen:gruppen   Gruppe "Crownmate Trainer" unter Konto (5) und Daten (6), reihenfolge 7. Sie
 //                           erscheint nur, wenn auch das Konto sichtbar ist (kontoFreigeschaltet, zuerst nur fuer
 //                           Flo), weil man ohne Konto nichts abschliessen kann. Knopf oeffnet das Blatt. Sie zeichnet
 //                           neu bei "abo:stand" und wenn sich die Anmeldung aendert (Abmelden in der Gruppe Konto,
@@ -89,7 +89,7 @@ export function pruefeNachKauf() {
 }
 
 try {
-  anbieten('einstellungen:gruppen', aboGruppe, { reihenfolge: 6, paket: 'abo' });
+  anbieten('einstellungen:gruppen', aboGruppe, { reihenfolge: 7, paket: 'abo' });
   if (typeof document !== 'undefined') document.addEventListener('abo:stand', (e) => { if (e.detail && e.detail.bestaetigt) toast(DANKE); });
   hoere('app:bereit', () => { aufraeumen(); pruefeNachKauf(); });
   hoere('app:sichtbar', (d) => { if (d && d.sichtbar) pruefeNachKauf(); });

@@ -411,10 +411,12 @@ async function browserTeil(browser) {
     await seite.waitForSelector('.abo-gruppe');
     const lage = await seite.evaluate(() => {
       const g = document.querySelector('.abo-gruppe');
-      return { nachKonto: g.previousElementSibling && g.previousElementSibling.classList.contains('konto-gruppe'), text: g.innerText,
+      // Reihenfolge: Konto (5), Daten (6, nur mit freigeschaltetem Konto), Trainer (7)
+      const vor = g.previousElementSibling;
+      return { nachKonto: !!vor && (vor.classList.contains('daten-gruppe') || vor.classList.contains('konto-gruppe')), text: g.innerText,
         css: [...document.querySelectorAll('link[data-paket-css="abo"]')].length, primaer: g.querySelectorAll('.primaer').length };
     });
-    pruefe('Gruppe direkt unter dem Konto, Hinweis aufs Konto, Paket-CSS einmal geladen, kein zweiter Zinnober-Knopf', lage.nachKonto
+    pruefe('Gruppe direkt unter Konto und Daten, Hinweis aufs Konto, Paket-CSS einmal geladen, kein zweiter Zinnober-Knopf', lage.nachKonto
       && /brauchst du ein Konto/.test(lage.text) && /bleiben gratis/.test(lage.text) && lage.css === 1 && lage.primaer === 0, lage);
     pruefe('ohne Anmeldung keine Abo-Abfrage', !anfragen.some((a) => /rpc\/ist_premium|\/abos\?/.test(a.url)));
     await seite.click('.abo-gruppe [data-abo="zeigen"]');

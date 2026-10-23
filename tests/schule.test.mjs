@@ -913,11 +913,13 @@ async function browserTeil(browser) {
     await cssDa(seite);
     const g = await seite.evaluate(() => {
       const gr = [...document.querySelectorAll('.es-gruppe')];
-      return { nachKonto: gr.indexOf(document.querySelector('.schule-gruppe')) === gr.indexOf(document.querySelector('.konto-gruppe')) + 1,
+      return { // Reihenfolge: Konto (5), Daten (6), Trainer (7, nur mit Paket abo), Klasse (8): direkt nach dem letzten davon
+      nachKonto: gr.indexOf(document.querySelector('.schule-gruppe')) === Math.max(...['.konto-gruppe', '.daten-gruppe', '.abo-gruppe']
+        .map((k) => gr.indexOf(document.querySelector(k)))) + 1,
         sieht: document.querySelector('.schule-gruppe .sm-sieht').textContent, mitglied: document.querySelectorAll('.sm-mitgliedschaft').length,
         leiten: !document.querySelector('.sm-leiten').hidden };
     });
-    pruefe('Gruppe "Klasse" direkt unter dem Konto, mit dem Satz, was die Lehrkraft sieht, und "Klassen leiten"', g.nachKonto && g.sieht === WAS_DIE_LEITUNG_SIEHT
+    pruefe('Gruppe "Klasse" direkt unter Konto, Daten und Trainer, mit dem Satz, was die Lehrkraft sieht, und "Klassen leiten"', g.nachKonto && g.sieht === WAS_DIE_LEITUNG_SIEHT
       && g.mitglied === 0 && g.leiten, g);
     await seite.fill('.sm-code-eingabe', 'ABCDEF');
     await seite.fill('.sm-name-eingabe', 'Anna');

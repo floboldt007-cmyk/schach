@@ -161,7 +161,7 @@ pruefe('schule-rls-test.sql: jede Kennung des Schemas kommt im Test vor (ausser 
     if (MAIL_RE.test(ohneBeispiele)) funde.push(d + ': E-Mail ' + ohneBeispiele.match(MAIL_RE)[0]);
   }
   pruefe(`keine Schluessel, Preise oder echten E-Mail-Adressen in ${dateien.length} Dateien des Schulmodus`, funde.length === 0, funde);
-  pruefe('Muster fangen Beispiele', GEHEIM_RE.test('sb_secret_' + 'abcdefghijkl') && PREIS_RE.test('4,99 €') && MAIL_RE.test('flo' + '@gmail.com')
+  pruefe('Muster fangen Beispiele', GEHEIM_RE.test('sb_secret_' + 'abcdefghijkl') && PREIS_RE.test('4,99 €') && MAIL_RE.test('jemand' + '@beispiel-post.de')
     && !MAIL_RE.test('schule-a@example.invalid'));
 }
 
