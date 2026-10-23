@@ -1,0 +1,23 @@
+{
+  "name": "crownmate-native",
+  "private": true,
+  "version": "0.1.0",
+  "description": "App-Store-Huelle (Capacitor) fuer die Web-App Crownmate: iOS und Android",
+  "license": "GPL-3.0",
+  "type": "module",
+  "scripts": {
+    "web": "node kopiere-web.mjs",
+    "sync": "node kopiere-web.mjs && npx cap sync",
+    "ios": "node kopiere-web.mjs && npx cap sync ios && npx cap open ios",
+    "android": "node kopiere-web.mjs && npx cap sync android && npx cap open android",
+    "doctor": "npx cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
