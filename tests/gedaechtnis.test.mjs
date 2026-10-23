@@ -1,6 +1,6 @@
 // Tests fuer das Paket "gedaechtnis" (Welle A, A2: Bots erinnern sich, Revanche, Erzfeind). Node-Teil ohne Browser
 // (Satz-Tabelle: alle Bots, alle Anlaesse, Ton, Laenge, Platzhalter; Register; Vorrang mit festen Testpartien;
-// Tagesgrenze 4:00; Satzwahl deterministisch aus tag.js; Sparsamkeit; Einstellung "Bot-Sprüche"; keine Stichelei nach
+// Tagesgrenze 4:00; Satzwahl deterministisch aus tag.js; Sparsamkeit; Einstellung "Bot-Sprueche"; keine Stichelei nach
 // 3 Niederlagen in Folge; Revanche-Parameter; Erzfeind-Regel und Feier einmal je neuer Niederlage; Modul-Speicher;
 // CSS nur mit Tokens), danach Browser-Teil (Playwright, Chromium) gegen die echte App mit dem Paket ueber
 // ?test&erw=pakete/gedaechtnis/index: Gedaechtnis-Satz im Arena-Panel und als Begruessungsblase nach vorbereiteten
@@ -263,6 +263,16 @@ async function nodeTeil() {
     && L.begruessung({ botId: 'kalle', partien: [], heute: HEUTE, sprueche: 'wenig' }).grund === 'kennenlernen'
     && L.begruessung({ botId: 'kalle', partien: [P('niederlage', 1), P('niederlage', 2), P('niederlage', 3)], heute: HEUTE, sprueche: 'wenig' }).grund === 'mutmachen'
     && L.begruessung({ botId: 'kalle', partien: [P('remis', 10)], heute: HEUTE, sprueche: 'wenig' }) === null);
+  // Pruefer-Befund: Unter der Fairness-Sperre schwieg das Paket bei "wenig", wenn vorher wiedersehen gewann (lange Pause oder
+  // Partien aus der Liste gefallen); dann begruesste der Host mit seinen eingebauten Saetzen, die auch sticheln
+  const wenigPause = L.begruessung({ botId: 'kalle', partien: [P('niederlage', 9), P('niederlage', 10), P('niederlage', 11)], heute: HEUTE, sprueche: 'wenig' });
+  const wenigAlt = L.begruessung({ botId: 'kalle', partien: [], heute: HEUTE, bekannt: 5, folgeGesamt: () => 3, sprueche: 'wenig' });
+  const wenigGesamt = L.begruessung({ botId: 'kalle', partien: [P('remis', 12)], heute: HEUTE, folgeGesamt: () => 3, sprueche: 'wenig' });
+  pruefe('"wenig" unter der Sperre (3 Niederlagen in Folge): Mut statt Schweigen, auch nach 9 Tagen Pause und bei aus der Liste gefallenen Partien',
+    [wenigPause, wenigAlt, wenigGesamt].every((w) => w && w.grund === 'mutmachen' && w.stark && w.gesperrt && w.vorn
+      && w.satz === SAETZE.mutmachen.kalle[Number(w.anlass.split('.').pop())]), [wenigPause, wenigAlt, wenigGesamt]);
+  pruefe('"wenig" ohne Sperre nach langer Pause: weiter Schweigen (wiedersehen gehoert nicht zu "wenig")',
+    L.begruessung({ botId: 'kalle', partien: [], heute: HEUTE, bekannt: 5, folgeGesamt: () => 2, sprueche: 'wenig' }) === null);
 
   gruppe = 'Fairness';
   let stichelei = 0;
@@ -281,10 +291,66 @@ async function nodeTeil() {
     }
   }
   pruefe('nach 3 Niederlagen in Folge (gegen ihn oder insgesamt) nie eine Stichelei, sondern immer Mut (auch kein Schweigen)', stichelei === 0 && mut === BOTS.length * 60 * 3, { stichelei, mut });
+  // dieselbe Sperre mit langer Pause (wiedersehen gewinnt den Vorrang), mit aus der Liste gefallenen Partien und mit "wenig":
+  // nie Schweigen, nie eine Stichelei, bei "wenig" nur WENIG, und die Wahl steht vorn am Wahl-Ort (vor anderen Paketen)
+  const sperrFehler = [];
+  let sperrFaelle = 0;
+  for (const b of BOTS) {
+    for (let i = 0; i < 30; i++) {
+      const h = tag.addiereTage(HEUTE, i);
+      const dat = (k) => new Date(Date.parse(vor(k)) + i * 864e5).toISOString();
+      const pause = [9, 10, 11].map((k) => ({ ...P('niederlage', k), botId: b.id, datum: dat(k) }));
+      const gemischt = [{ ...P('remis', 8), botId: b.id, datum: dat(8) }];
+      for (const sprueche of ['an', 'wenig']) {
+        for (const [liste, gesamt, bekannt] of [[pause, 0, 3], [gemischt, 3, 1], [[], 3, 6]]) {
+          sperrFaelle++;
+          const w = L.begruessung({ botId: b.id, partien: liste, heute: h, folgeGesamt: () => gesamt, bekannt, sprueche });
+          if (!w || L.STICHELEI.includes(w.grund) || !w.vorn || !w.gesperrt || !w.stark || (sprueche === 'wenig' && !L.WENIG.includes(w.grund))) {
+            sperrFehler.push(`${b.id} ${sprueche} ${gesamt} ${bekannt}: ${w ? w.grund + (w.vorn ? '' : ' hinten') : 'null'}`);
+          }
+        }
+      }
+    }
+  }
+  pruefe(`Sperre auch nach langer Pause, bei alten Partien und bei "wenig": immer ein Satz, nie Stichelei, immer vorn (${sperrFaelle} Faelle)`,
+    sperrFehler.length === 0 && sperrFaelle === BOTS.length * 30 * 6, sperrFehler.slice(0, 5));
   pruefe('die einzige Stichelei ist die Begruessung revanche (hoechstens eine je Partie: ein Wahl-Ort, eine Wahl)', JSON.stringify(L.STICHELEI) === '["revanche"]'
     && !/\.blase\(|zeigeBlase|coachZusatz/.test(lies('js/pakete/gedaechtnis/index.js').replace(/\/\/.*$/gm, '')));
   pruefe('kein Math.random in logik.js und saetze.js', !/Math\s*\.\s*random/.test(lies('js/pakete/gedaechtnis/logik.js').replace(/\/\/.*$/gm, ''))
     && !/Math\s*\.\s*random/.test(lies('js/pakete/gedaechtnis/saetze.js')));
+
+  // ---------- Platz am Wahl-Ort: vorn nur, was vorn stehen muss ----------
+  // Pruefer-Befund: Mit Reihenfolge 10 fuer alles verdraengte das Paket den einmaligen Level-Gruss von Funken (Reihenfolge
+  // 40, Zweig claude/spielsysteme), der bei partie:gestartet verbraucht wird. Jetzt: vorn (10) nur die Fairness-Sperre und
+  // die einmaligen Momente, alles andere hinten (60). Unter der Sperre steht die Wahl vorn, weil der Level-Gruss selbst
+  // eine Stichelei ist.
+  gruppe = 'Wahl-Ort';
+  pruefe('Plaetze: vorn vor 40 (Level-Gruss von Funken), hinten danach', L.REIHENFOLGE.vorn < 40 && L.REIHENFOLGE.hinten > 40
+    && JSON.stringify(L.VORN) === '["kennenlernen","ersterSieg","mutmachen"]');
+  const platz2 = (partien, opt = {}) => {
+    for (let i = 0; i < 40; i++) {
+      const h = tag.addiereTage(HEUTE, i);
+      const w = L.begruessung({ botId: 'kalle', partien: verschoben(partien, i), heute: h, folgeGesamt: () => opt.gesamt || 0, bekannt: opt.bekannt || 0 });
+      if (w) return `${w.grund}:${w.vorn ? 'vorn' : 'hinten'}`;
+    }
+    return 'nichts';
+  };
+  const plaetze = {
+    kennenlernen: platz2([]),
+    ersterSieg: platz2([P('sieg', 1), P('niederlage', 2), P('niederlage', 3), P('niederlage', 4)]),
+    mutmachen: platz2([P('niederlage', 1), P('niederlage', 2), P('niederlage', 3)]),
+    wiedersehen: platz2([P('remis', 9)]),
+    wiedersehenGesperrt: platz2([P('niederlage', 9), P('niederlage', 10), P('niederlage', 11)]),
+    genial: platz2([P('remis', 1, { liveKlassen: ['brillant'] })]),
+    serieGegen: platz2([P('sieg', 1), P('sieg', 2), P('sieg', 3)]),
+    rueckkampf: platz2([P('sieg', 1)]),
+    revanche: platz2([P('niederlage', 1), P('sieg', 2)]),
+    remisZuletzt: platz2([P('remis', 1)]),
+  };
+  pruefe('vorn: kennenlernen, ersterSieg, mutmachen und alles unter der Sperre; hinten: wiedersehen, genial, Serie, Rueckkampf, revanche, Remis',
+    JSON.stringify(plaetze) === JSON.stringify({ kennenlernen: 'kennenlernen:vorn', ersterSieg: 'ersterSieg:vorn', mutmachen: 'mutmachen:vorn',
+      wiedersehen: 'wiedersehen:hinten', wiedersehenGesperrt: 'wiedersehen:vorn', genial: 'genial:hinten', serieGegen: 'serieGegen:hinten',
+      rueckkampf: 'rueckkampf:hinten', revanche: 'revanche:hinten', remisZuletzt: 'remisZuletzt:hinten' }), plaetze);
 
   // ---------- Revanche ----------
   gruppe = 'Revanche';
@@ -299,6 +365,8 @@ async function nodeTeil() {
   pruefe('Bedenkzeit bleibt (wie "Nochmal"), Liga nicht', JSON.stringify(L.revanche(k({ erg: { partie: { tempo: { grund: 300, zuschlag: 2 }, liga: { saison: 's', runde: 1 } } } })))
     === '{"botId":"rudi","farbe":"b","tempo":{"grund":300,"zuschlag":2}}');
   pruefe('ohne Bot oder ohne Partie: nichts', L.revanche(k({ bot: null })) === null && L.revanche(k({ erg: null })) === null && L.revanche(null) === null);
+  pruefe('angemeldete Gaeste (stufe null, eigene Ablaeufe): kein Knopf', L.revanche(k({ bot: { id: 'gast-x', stufe: null, name: 'Gast' } })) === null
+    && L.revanche(k({ bot: { id: 'gast-y', name: 'Gast' } })) === null);
   const arena = lies('js/ui/arena.js');
   pruefe("die Arena startet mit app.gehe('partie', { botId, farbe }) (gleiche Parameter)", /app\.gehe\('partie', \{ botId: b\.id, farbe \}\)/.test(arena));
 
@@ -315,6 +383,12 @@ async function nodeTeil() {
     === '{"botId":"rudi","siege":4,"niederlagen":5}');
   pruefe('Gleichstand: die deutlichere Bilanz, dann die hoehere Stufe', L.erzfeind(fs({ kalle: { niederlagen: 4, siege: 0 }, rudi: { niederlagen: 4, siege: 1 } })).botId === 'kalle'
     && L.erzfeind(fs({ kalle: { niederlagen: 4, siege: 1 }, rudi: { niederlagen: 4, siege: 1 } })).botId === 'rudi');
+  pruefe('Gleichstand nach Stufe, nicht nach der Reihenfolge der Schluessel im Fortschritt (Cloud, Test, spaetere Normalisierung)',
+    L.erzfeind({ bots: { rudi: { niederlagen: 4, siege: 1 }, kalle: { niederlagen: 4, siege: 1 } } }).botId === 'rudi'
+    && L.erzfeind({ bots: { kalle: { niederlagen: 4, siege: 1 }, rudi: { niederlagen: 4, siege: 1 } } }).botId === 'rudi'
+    && L.erzfeind({ bots: { stockfisch: { niederlagen: 6, siege: 2 }, benno: { niederlagen: 6, siege: 2 } } }).botId === 'stockfisch');
+  pruefe('Schluessel, die kein Leiter-Bot sind, zaehlen nicht', L.erzfeind({ bots: { 'boss-x': { niederlagen: 9 }, kalle: { niederlagen: 3 } } }).botId === 'kalle'
+    && L.erzfeind({ bots: { 'gast-y': { niederlagen: 9 } } }) === null);
   pruefe('Zeile "Dein Erzfeind · 1 Sieg · 4 Niederlagen" (Einzahl und Mehrzahl)', L.erzfeindZeile({ siege: 1, niederlagen: 4 }) === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen'
     && L.erzfeindZeile({ siege: 0, niederlagen: 3 }) === 'Dein Erzfeind · 0 Siege · 3 Niederlagen' && L.erzfeindZeile({ siege: 2, niederlagen: 1 }) === 'Dein Erzfeind · 2 Siege · 1 Niederlage');
   pruefe('kaputter Fortschritt: nichts', L.erzfeind(null) === null && L.erzfeind({ bots: { kalle: 'x' } }) === null);
@@ -352,7 +426,13 @@ async function nodeTeil() {
   pruefe(`Modul "bots" (Budget ${storage.MODUL_BUDGET.bots}) passt voll belegt (${voll} Zeichen) und laesst sich speichern`, storage.MODUL_BUDGET.bots === 20000 && voll < 4000
     && storage.speichereModul('bots', m).ok === true);
   const kaputt = L.normalisiereModul({ v: 9, memo: [['x y', 1, 1], 'quatsch', ['ok1', -3, 'a']], erzfeind: { 'Böse': 3, kalle: 'drei', rudi: 4 } });
-  pruefe('kaputte Daten werden still bereinigt', JSON.stringify(kaputt) === '{"v":1,"memo":[["ok1",0,0]],"erzfeind":{"rudi":4}}', kaputt);
+  pruefe('kaputte Daten werden still bereinigt (v ist der aktuelle Rechenstand)', JSON.stringify(kaputt) === `{"v":${L.RECHENSTAND},"memo":[["ok1",0,0]],"erzfeind":{"rudi":4}}`
+    && L.RECHENSTAND === 2, kaputt);
+  // ein Modul aus Rechenstand 1 (vor der Nachbesserung gespeichert) bleibt gueltig: Memo und Erzfeind-Merker bleiben
+  const alt1 = L.normalisiereModul({ v: 1, memo: [['p1', 1, 0], ['p2', 0, 2]], erzfeind: { kalle: 3 } });
+  pruefe('Modul aus Rechenstand 1 bleibt gueltig (Memo und Erzfeind-Merker uebernommen)', JSON.stringify(alt1)
+    === `{"v":${L.RECHENSTAND},"memo":[["p1",1,0],["p2",0,2]],"erzfeind":{"kalle":3}}`
+    && L.erzfeindBezwungen({ fortschritt: { bots: { kalle: { niederlagen: 3, siege: 1 } } }, botId: 'kalle', ergebnis: 'sieg', wertet: true, gefeiert: alt1.erzfeind }) === null, alt1);
 
   // ---------- CSS nur mit Tokens ----------
   gruppe = 'CSS';
@@ -486,6 +566,7 @@ async function spiele(seite, plan, { botId = 'benno', farbe = 'w', handy = false
 async function browserTeil(browser) {
   mkdirSync(BILDER, { recursive: true });
   tagMod = await import('../js/tag.js');
+  const { RECHENSTAND } = await import('../js/pakete/gedaechtnis/logik.js');
   const { kontext, seite, fehler } = await neueSeite(browser);
   await seite.goto(BASIS + '#arena');
   await seite.waitForSelector('.screen.arena', { timeout: 20000 });
@@ -499,8 +580,8 @@ async function browserTeil(browser) {
       icons: i.iconNamen().includes('revanche') && i.iconNamen().includes('erzfeind'), css: !!document.querySelector('link[data-paket="gedaechtnis"]'),
       satz: b.botSatz(b.botNachId('rudi'), 'wiedersehen', () => 0, { tage: 8 }) };
   });
-  pruefe('ueber ?erw geladen: Anbieter an Begruessung, Bot-Panel und Ergebnis, Icons, eigenes CSS, Saetze im Register',
-    geladen.gruss === 1 && geladen.panel === 1 && geladen.erg === 1 && geladen.icons && geladen.css && /8 Tagen|Burg|Recke/.test(geladen.satz || ''), JSON.stringify(geladen));
+  pruefe('ueber ?erw geladen: zwei Anbieter an der Begruessung (vorn und hinten), Bot-Panel und Ergebnis, Icons, eigenes CSS, Saetze im Register',
+    geladen.gruss === 2 && geladen.panel === 1 && geladen.erg === 1 && geladen.icons && geladen.css && /8 Tagen|Burg|Recke/.test(geladen.satz || ''), JSON.stringify(geladen));
 
   // ---------- Gedaechtnis: erster Sieg nach drei Niederlagen (besonderer Anlass, kommt immer) ----------
   gruppe = 'Gedächtnis';
@@ -553,7 +634,7 @@ async function browserTeil(browser) {
     await new Promise((r) => setTimeout(r, 50));
     return JSON.parse(localStorage.getItem('schach-arena:v1:modul:bots') || 'null');
   });
-  pruefe('partie:analysiert: genialer Zug im Modul "bots" gemerkt (einmal je Partie, Uebungen nicht)', memo && memo.v === 1
+  pruefe('partie:analysiert: genialer Zug im Modul "bots" gemerkt (einmal je Partie, Uebungen nicht)', memo && memo.v === RECHENSTAND
     && JSON.stringify(memo.memo) === '[["ptgenial1",1,0]]', JSON.stringify(memo));
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'lisa' }));
   await seite.waitForFunction(() => /Lisa/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
@@ -573,6 +654,50 @@ async function browserTeil(browser) {
     return { t, eingebaut: b.botNachId('rudi').saetze.begruessung.some((s) => t === `„${s}“`) };
   });
   pruefe('Einstellung "Bot-Sprüche: Aus": das Paket schweigt (eingebaute Begruessung des Hosts)', aus.letzteWahl === null && panelAus.eingebaut, JSON.stringify({ aus, panelAus }));
+
+  // ---------- Wahl-Ort mit einem anderen Paket (wie der einmalige Level-Gruss von Funken auf Reihenfolge 40) ----------
+  // Pruefer-Befund: Mit Reihenfolge 10 fuer alles ging der Level-Gruss meist still verloren. Vorn (10) steht nur noch die
+  // Fairness-Sperre und die einmaligen Momente, alles andere hinten (60). waehle() ist genau der Aufruf von partie.js und
+  // arena.js (erster Wert ungleich null gewinnt).
+  gruppe = 'Wahl-Ort';
+  await bereite(seite, {
+    partien: [partie('lisa', 'remis', 1, { liveKlassen: ['brillant', null, null, null] }),
+      partie('kalle', 'niederlage', 2), partie('kalle', 'niederlage', 3), partie('kalle', 'niederlage', 4),
+      partie('rudi', 'niederlage', 9), partie('rudi', 'niederlage', 10), partie('rudi', 'niederlage', 11), partie('turm', 'remis', 10)],
+    fortschritt: fortschritt(10, { lisa: { partien: 1, remis: 1 }, kalle: { partien: 3, niederlagen: 3 }, rudi: { partien: 3, niederlagen: 3 },
+      turm: { partien: 1, remis: 1 } }),
+  });
+  const nachbar = await seite.evaluate(async () => {
+    const o = await import('/js/orte.js');
+    const b = await import('/js/bots.js');
+    const S = await import('/js/storage.js');
+    const aus = {};
+    for (const id of ['lisa', 'kalle', 'rudi', 'turm', 'benno']) {
+      const kontext = () => ({ bot: b.botNachId(id), farbe: 'w', modus: 'normal', partienGegenBot: S.ladePartien().filter((p) => p.botId === id) });
+      let gefragt = 0;
+      const ab = o.anbieten('partie:begruessung?', () => { gefragt++; return { anlass: 'nachbar-level' }; }, { reihenfolge: 40, paket: 'nachbar' });
+      const mit = o.waehle('partie:begruessung?', kontext());
+      ab();
+      const ohne = o.waehle('partie:begruessung?', kontext());
+      aus[id] = { mit: mit && mit.anlass, gefragt, ohne: ohne && ohne.anlass, angeboten: o.angeboten('partie:begruessung?') };
+    }
+    return aus;
+  });
+  const sollN = {};
+  for (const id of Object.keys(nachbar)) sollN[id] = await erwartet(seite, id);
+  const SOLL_PLATZ = { lisa: ['genial', false], kalle: ['mutmachen', true], rudi: ['wiedersehen', true], turm: ['wiedersehen', false], benno: ['kennenlernen', true] };
+  const platzFehler = [];
+  for (const [id, [grund, vorn]] of Object.entries(SOLL_PLATZ)) {
+    const n = nachbar[id];
+    const w = sollN[id];
+    const ok = w && w.grund === grund && w.vorn === vorn && n.ohne === w.anlass && n.angeboten === 2
+      && (vorn ? n.mit === w.anlass && n.gefragt === 0 : n.mit === 'nachbar-level' && n.gefragt === 1);
+    if (!ok) platzFehler.push(`${id}: ${JSON.stringify({ n, grund: w && w.grund, vorn: w && w.vorn })}`);
+  }
+  pruefe('Nachbar-Paket auf 40: genial und wiedersehen (ohne Sperre) lassen ihm den Vortritt, ohne ihn kommen sie von hinten (60)',
+    !platzFehler.some((f) => /^(lisa|turm):/.test(f)), platzFehler);
+  pruefe('vor dem Nachbar-Paket (10): mutmachen, wiedersehen unter der Sperre (3 Niederlagen gegen Rudi) und kennenlernen; der Nachbar wird gar nicht gefragt',
+    !platzFehler.some((f) => /^(kalle|rudi|benno):/.test(f)), platzFehler);
 
   // ---------- Erzfeind im Bot-Panel ----------
   gruppe = 'Erzfeind';
@@ -612,12 +737,20 @@ async function browserTeil(browser) {
     // Hoehe ohne die Feder der Karte (getBoundingClientRect folgt dem transform)
     return { sichtbar: !o.hidden && r.width > 0, text: k.textContent.replace(/\s+/g, ' ').trim(), farbe: k.dataset.farbe, label: k.getAttribute('aria-label'),
       hoehe: k.offsetHeight, icon: !!k.querySelector('svg.ico path'), erg: document.querySelector('.ergebnis-overlay').classList.contains('niederlage'),
-      tipp: document.querySelectorAll('.erg-tipp').length };
+      tipp: document.querySelectorAll('.erg-tipp').length, art: k.parentElement.dataset.art || '' };
   });
   pruefe('Niederlage (Narrenmatt mit Weiß): Knopf "Revanche · Du spielst Schwarz" im Ort ergebnis:karte', knopf.sichtbar && knopf.erg && knopf.text === 'Revanche Du spielst Schwarz'
     && knopf.farbe === 'b' && knopf.label === 'Revanche, du spielst Schwarz' && knopf.icon, JSON.stringify(knopf));
   pruefe('Tippflaeche mindestens 44 px', knopf.hoehe >= 44, knopf.hoehe);
-  pruefe('Host-Regel: Mit gefülltem Ort ergebnis:karte entfaellt der Tipp "Kopf hoch!" (PLAN 2.6)', knopf.tipp === 0, knopf.tipp);
+  // Pruefer-Befund: Die Revanche verdraengte nach jeder Niederlage den Tipp "Kopf hoch!" (und spaeter die Lichtblick-Karte von
+  // U7), weil der Host beides nur bei leerem Ort zeigt. Die Zeile ist deshalb als reine Knopf-Zeile markiert; der Host
+  // zaehlt sie mit der Knopf-Regel (Integrations-Patch fuer partie.js, ARCHITEKTUR.md) nicht als Inhalt. Bis dahin gilt
+  // PLAN 2.6 (Tipp nur bei leerem Ort), danach muss der Tipp neben der Revanche stehen.
+  const knopfRegel = /\[data-art="knopf"\]/.test(lies('js/ui/partie.js'));
+  pruefe('reine Knopf-Zeile: .gd-revanche-zeile[data-art="knopf"] (kein Inhalt wie Lernpunkt oder Lichtblick)', knopf.art === 'knopf', knopf.art);
+  pruefe(knopfRegel ? 'Host mit Knopf-Regel: der Tipp "Kopf hoch!" bleibt neben der Revanche stehen'
+    : 'Host ohne Knopf-Regel (vor der Integration): mit gefuelltem Ort ergebnis:karte entfaellt der Tipp "Kopf hoch!" (PLAN 2.6)',
+  knopf.tipp === (knopfRegel ? 1 : 0), JSON.stringify({ knopfRegel, tipp: knopf.tipp }));
   const echt = await seite.waitForFunction(() => {
     const id = (JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]')[0] || {}).id;
     const m = JSON.parse(localStorage.getItem('schach-arena:v1:modul:bots') || 'null');
@@ -717,6 +850,30 @@ async function browserTeil(browser) {
     });
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Knopf ganz im Bild, mindestens 44 px hoch, keine waagrechte Rolle`, m.links >= 0 && m.rechts <= m.breite && m.hoehe >= 44 && m.scroll, JSON.stringify(m));
     await h.seite.screenshot({ path: path.join(BILDER, `ergebnis-revanche-handy-${dunkel ? 'dunkel' : 'hell'}.png`) });
+    // Erzfeind-Zeile und Gedaechtnis-Satz im Bot-Panel (Kalle: 1 Sieg, 4 Niederlagen, die letzten 3 in Folge: Mut)
+    await h.seite.evaluate(() => window.__app.gehe('arena'));
+    await h.seite.waitForSelector('.screen.arena');
+    await bereite(h.seite, { partien: [partie('kalle', 'niederlage', 1), partie('kalle', 'niederlage', 2), partie('kalle', 'niederlage', 3),
+      partie('kalle', 'sieg', 4), partie('kalle', 'niederlage', 5)], fortschritt: fortschritt(4, { kalle: { partien: 5, siege: 1, niederlagen: 4 } }),
+    einstellungen: { modus: dunkel ? 'dunkel' : 'hell' } });
+    await h.seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
+    await h.seite.waitForFunction(() => /Kalle/.test((document.querySelector('.detail h2') || {}).textContent || '') && !!document.querySelector('.detail .gd-erzfeind'),
+      null, { timeout: 10000 });
+    await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').scrollIntoView({ block: 'center' }));
+    await warte(600);
+    const ezH = await h.seite.evaluate(() => {
+      const e = document.querySelector('.detail .gd-erzfeind');
+      const r = e.getBoundingClientRect();
+      const cs = getComputedStyle(e);
+      return { links: r.left, rechts: r.right, breite: innerWidth, hoehe: r.height, text: e.textContent.trim(), farbe: cs.color, hg: cs.backgroundColor,
+        scroll: document.documentElement.scrollWidth <= innerWidth + 1, blase: (document.querySelector('.detail .sprechblase') || {}).textContent || '' };
+    });
+    const sollH = await erwartet(h.seite, 'kalle');
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`, ezH.links >= 0 && ezH.rechts <= ezH.breite
+      && ezH.hoehe <= 60 && ezH.scroll && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify(ezH));
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante`,
+      sollH && sollH.grund === 'mutmachen' && ezH.blase === `„${sollH.text}“`, JSON.stringify({ blase: ezH.blase, soll: sollH }));
+    await h.seite.screenshot({ path: path.join(BILDER, `panel-erzfeind-handy-${dunkel ? 'dunkel' : 'hell'}.png`) });
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Konsole ohne Fehler`, h.fehler.length === 0, h.fehler.join(' | '));
     await h.kontext.close();
   }
@@ -735,7 +892,7 @@ async function browserTeil(browser) {
       blase: (document.querySelector('.detail .sprechblase') || {}).textContent || '' };
   });
   const sollP = await erwartet(pr.seite, 'benno');
-  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Benno begruesst zum Kennenlernen', prod.gruss === 1 && prod.erg === 1 && prod.css
+  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Benno begruesst zum Kennenlernen', prod.gruss === 2 && prod.erg === 1 && prod.css
     && sollP && sollP.grund === 'kennenlernen' && prod.blase === `„${sollP.text}“`, JSON.stringify({ prod, sollP }));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();

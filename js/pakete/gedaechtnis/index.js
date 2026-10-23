@@ -10,15 +10,20 @@
 //   Bot-Panel eine ruhige Zeile "Dein Erzfeind · 1 Sieg · 4 Niederlagen"; der naechste Sieg gegen ihn bringt die
 //   Feier "Erzfeind bezwungen" (Quelle erzfeind, gross, Prio 85 laut feier.QUELLEN), einmal je neuer Niederlage.
 //
-// Orte:       partie:begruessung? (Reihenfolge 10; Wahl -> { anlass, werte }, auch die Sprechblase im Arena-Panel),
-//             arena:panel-bot (20, Erzfeind-Zeile .gd-erzfeind), ergebnis:karte (50, .gd-revanche-zeile mit Knopf)
+// Orte:       partie:begruessung? (Wahl -> { anlass, werte }, auch die Sprechblase im Arena-Panel) mit zwei Anbietern:
+//             Reihenfolge 10 (vorn) nur fuer die Fairness-Sperre und die einmaligen Momente (logik.js VORN), alles
+//             andere auf 60 (hinten), also hinter den Begruessungen anderer Pakete (Funken: Level-Gruss auf 40). Beide
+//             rechnen dieselbe Wahl (einmal je Kontext) und liefern sie nie beide.
+//             arena:panel-bot (20, Erzfeind-Zeile .gd-erzfeind), ergebnis:karte (50, .gd-revanche-zeile mit Knopf,
+//             data-art="knopf": eine reine Knopf-Zeile, kein Inhalt; Vorschlag fuer den Host in ARCHITEKTUR.md)
 // Ereignisse: partie:beendet (synchron: Erzfeind-Feier vor den Feier-Zeilen des Overlays), partie:analysiert (genialer
-//             Zug und Patzer des Bots aus der Spielanalyse merken), app:screen und speicher:zurueckgesetzt (Zwischen-
-//             speicher leeren). Sendet nichts.
+//             Zug und Patzer des Bots aus der Spielanalyse merken), app:screen und speicher:zurueckgesetzt (gemerkte
+//             Niederlagen in Folge vergessen). Sendet nichts.
 // Register:   Saetze (registriereSaetze: je Anlass alle Varianten unter dem schlichten Namen, z. B. 'wiedersehen', dazu
 //             je Variante 'gedaechtnis.<anlass>.<i>'), Icons 'revanche' und 'erzfeind'.
-// Speicher:   Modul "bots" (logik.js STANDARD_MODUL: { v, memo, erzfeind }); Einstellung "Bot-Sprüche" der App
-//             (sprueche: an | wenig | aus) wird beachtet.
+// Speicher:   Modul "bots" (logik.js STANDARD_MODUL: { v, memo, erzfeind }), bei jedem Zugriff frisch gelesen (ein
+//             zweiter Tab oder eine Cloud-Uebernahme schreibt sonst gegen einen alten Stand); Einstellung
+//             "Bot-Sprueche" der App (sprueche: an | wenig | aus) wird beachtet.
 // Test:       zustand() -> { letzteWahl, modul, folge }
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
 import { anbieten } from '../../orte.js';
@@ -39,20 +44,18 @@ function sicher(fn, wo) {
   }
 }
 
-// ---------- Modul-Speicher (im Arbeitsspeicher zwischengespeichert) ----------
-let modul = null;
+// ---------- Modul-Speicher (bei jedem Zugriff frisch gelesen, klein: hoechstens etwa 1.500 Zeichen) ----------
 function stand() {
-  if (!modul) modul = L.normalisiereModul(ladeModul(L.MODUL, L.STANDARD_MODUL));
-  return modul;
+  return L.normalisiereModul(ladeModul(L.MODUL, L.STANDARD_MODUL));
 }
 function sichere(m) {
-  modul = L.normalisiereModul(m);
-  const r = speichereModul(L.MODUL, modul);
+  const r = speichereModul(L.MODUL, L.normalisiereModul(m));
   if (!r || !r.ok) console.warn('gedaechtnis: Modul nicht gespeichert', r && r.grund);
 }
 
 // ---------- Niederlagen in Folge ueber alle Partien (fuer die Stichelei-Sperre) ----------
-// Nur bei Bedarf gelesen und bis zum naechsten Screen-Wechsel oder Spielende gemerkt (die Arena fragt bei jeder Botwahl).
+// Hoechstens einmal je Screen gelesen und bis zum naechsten Screen-Wechsel oder Spielende gemerkt (die Arena fragt bei
+// jeder Botwahl).
 let folge = null;
 function folgeGesamt() {
   if (folge == null) {
@@ -95,6 +98,8 @@ function revancheZeile(app, params) {
   const el = document.createElement('div');
   el.className = 'gd-revanche-zeile';
   el.dataset.ort = 'ergebnis';
+  // reine Knopf-Zeile (kein Inhalt wie Lernpunkt oder Lichtblick): der Host darf seinen Tipp daneben stehen lassen
+  el.dataset.art = 'knopf';
   const farbe = params.farbe === 'b' ? 'Schwarz' : 'Weiß';
   el.innerHTML = `<button class="knopf gd-revanche dr" type="button" data-farbe="${params.farbe}">${icon('revanche')}`
     + `<span class="gd-r-text"><b>Revanche</b> <small>Du spielst ${farbe}</small></span></button>`;
@@ -130,17 +135,31 @@ function registriere() {
   // zwei gekreuzte Klingen (Erzfeind)
   registriereIcon('erzfeind', '<path d="M4.5 4.5 16 16M13.5 18.5l5-5M16.5 16.5l3 3"/><path d="M19.5 4.5 8 16M5.5 13.5l5 5M7.5 16.5l-3 3"/>');
 
-  anbieten('partie:begruessung?', (k) => sicher(() => {
-    if (!k || !k.bot || k.bot.stufe == null) return null;
-    if (k.modus && k.modus !== 'normal') return null;
-    const f = sicher(() => ladeFortschritt().bots[k.bot.id], 'Fortschritt');
-    const w = L.begruessung({
-      botId: k.bot.id, partien: k.partienGegenBot, heute: tagSchluessel(), memo: stand().memo, folgeGesamt,
-      bekannt: f && Number.isFinite(f.partien) ? f.partien : 0, sprueche: sprueche(),
-    });
-    letzteWahl = w ? { botId: k.bot.id, anlass: w.anlass, grund: w.grund, werte: w.werte, satz: w.satz } : null;
-    return w ? { anlass: w.anlass, werte: w.werte } : null;
-  }, 'Begruessung'), { reihenfolge: 10, paket: L.PAKET });
+  // Begruessung: eine Wahl je Kontext (waehle reicht allen Anbietern dasselbe eingefrorene Objekt), angeboten vorn
+  // oder hinten (logik.js begruessung().vorn), nie an beiden Plaetzen
+  const wahlen = new WeakMap();
+  function wahl(k) {
+    if (!k || typeof k !== 'object') return null;
+    if (wahlen.has(k)) return wahlen.get(k);
+    let w = null;
+    if (k.bot && k.bot.stufe != null && (!k.modus || k.modus === 'normal')) {
+      const f = sicher(() => ladeFortschritt().bots[k.bot.id], 'Fortschritt');
+      w = L.begruessung({
+        botId: k.bot.id, partien: k.partienGegenBot, heute: tagSchluessel(), memo: stand().memo, folgeGesamt,
+        bekannt: f && Number.isFinite(f.partien) ? f.partien : 0, sprueche: sprueche(),
+      });
+    }
+    letzteWahl = w ? { botId: k.bot.id, anlass: w.anlass, grund: w.grund, werte: w.werte, satz: w.satz, vorn: w.vorn } : null;
+    wahlen.set(k, w);
+    return w;
+  }
+  const GRUSS_ORT = 'partie:begruessung?';
+  for (const [platz, vorn] of [['vorn', true], ['hinten', false]]) {
+    anbieten(GRUSS_ORT, (k) => sicher(() => {
+      const w = wahl(k);
+      return w && w.vorn === vorn ? { anlass: w.anlass, werte: w.werte } : null;
+    }, 'Begruessung ' + platz), { reihenfolge: L.REIHENFOLGE[platz], paket: L.PAKET });
+  }
 
   anbieten('arena:panel-bot', (k) => sicher(() => {
     if (!k || !k.bot || k.bot.stufe == null) return null;
@@ -175,7 +194,7 @@ function registriere() {
     }, 'partie:analysiert'), 0);
   });
   hoere('app:screen', () => { folge = null; });
-  hoere('speicher:zurueckgesetzt', () => { modul = null; folge = null; letzteWahl = null; });
+  hoere('speicher:zurueckgesetzt', () => { folge = null; letzteWahl = null; });
 }
 
 sicher(registriere, 'Laden');

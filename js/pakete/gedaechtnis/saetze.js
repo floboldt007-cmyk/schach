@@ -61,7 +61,7 @@ export const SAETZE = Object.freeze({
     greta: [
       'Hallo. Wir haben noch nie gespielt. Ich bin gespannt.',
       'Erste Partie gegen dich. Ich rechne gern mit Unbekannten.',
-      'Willkommen. Zeig mir, wie du spielst. Danach weiß ich mehr über dich als du denkst.',
+      'Willkommen. Zeig mir, wie du spielst. Danach weiß ich mehr über dich, als du denkst.',
     ],
     stockfisch: [
       'Blubb. Neuer Mensch erkannt. Profil wird angelegt.',

@@ -9,20 +9,29 @@
 //   anlassFuer(lage, { folgeGesamt }) -> { anlass, werte } | null   Vorrang wie ANLAESSE (erster Treffer gewinnt):
 //     kennenlernen > ersterSieg > wiedersehen > mutmachen > genial > botPatzer > serieGegen > rueckkampf > revanche
 //     > remisZuletzt. folgeGesamt() -> Niederlagen in Folge ueber alle Partien (nur bei Bedarf gerufen).
-//   begruessung({ botId, partien, heute, memo, bekannt, folgeGesamt, sprueche, saetze }) -> { anlass, werte, grund, stark }
-//     | null. Sparsam: Die STARKEN Anlaesse kommen immer, die anderen nur, wenn der Tageszufall es will (ANTEIL,
-//     also etwa jede zweite Partie). Zufall nur aus tag.js: zufallAus(seedAus('gedaechtnis|RECHENSTAND|Tag|Bot|n')),
-//     n = Zahl der gemeinsamen Partien: gleicher Tag, gleiche Geschichte, gleicher Satz (Panel und Partie sagen
-//     dasselbe). anlass ist der Schluessel EINER Variante (variante(anlass, i)), damit botSatz() im Host, der mit
-//     Math.random waehlt, genau diesen Satz nimmt. sprueche: 'aus' -> null, 'wenig' -> nur WENIG.
+//   gesperrt(lage, folgeGesamt) -> boolean   Fairness-Sperre: FOLGE_NIEDERLAGEN Niederlagen in Folge gegen diesen
+//     Bot oder insgesamt
+//   begruessung({ botId, partien, heute, memo, bekannt, folgeGesamt, sprueche, saetze })
+//     -> { anlass, werte, grund, stark, satz, gesperrt, vorn } | null. Sparsam: Die STARKEN Anlaesse kommen immer, die
+//     anderen nur, wenn der Tageszufall es will (ANTEIL, also etwa jede zweite Partie). Zufall nur aus tag.js:
+//     zufallAus(seedAus('gedaechtnis|RECHENSTAND|Tag|Bot|n')), n = Zahl der gemeinsamen Partien: gleicher Tag, gleiche
+//     Geschichte, gleicher Satz (Panel und Partie sagen dasselbe). anlass ist der Schluessel EINER Variante
+//     (variante(anlass, i)), damit botSatz() im Host, der mit Math.random waehlt, genau diesen Satz nimmt.
+//     sprueche: 'aus' -> null, 'wenig' -> nur WENIG (unter der Fairness-Sperre statt Schweigen mutmachen).
+//     vorn: die Wahl gehoert an den Wahl-Ort VOR die Begruessungen anderer Pakete (REIHENFOLGE.vorn), sonst dahinter
+//     (REIHENFOLGE.hinten). Vorn steht nur, was vorn stehen muss: jede Wahl unter der Fairness-Sperre (sonst kaeme z. B.
+//     der Level-Gruss von Funken, der selbst eine Stichelei ist) und die einmaligen Momente aus VORN.
 //   Fairness (SPIELKONZEPT 3.12, 5.3): hoechstens eine Stichelei je Partie (nur die Begruessung, revanche) und keine
-//   nach 3 Niederlagen in Folge (gegen diesen Bot oder insgesamt): dann mutmachen, und zwar immer (stark), damit auch
-//   keine Stichelei aus den eingebauten Begruessungen kommt.
-// Revanche (Ort ergebnis:karte): revanche(kontext) -> { botId, farbe, tempo? } | null, nur nach Niederlage oder Remis
-//   einer normalen Partie aus der Grundstellung; Farben getauscht, Bedenkzeit wie gehabt (wie "Nochmal" im Host).
+//   nach 3 Niederlagen in Folge (gegen diesen Bot oder insgesamt): dann spricht das Paket immer (kennenlernen,
+//   ersterSieg, wiedersehen oder mutmachen, auch bei "Bot-Sprueche: Wenig"), und zwar vorn, damit weder eine
+//   eingebaute Begruessung noch der Gruss eines anderen Pakets sticheln kann.
+// Revanche (Ort ergebnis:karte): revanche(kontext) -> { botId, farbe, tempo? } | null, nur fuer Leiter-Bots nach
+//   Niederlage oder Remis einer normalen Partie aus der Grundstellung; Farben getauscht, Bedenkzeit wie gehabt (wie
+//   "Nochmal" im Host), ohne Liga (wie "Nochmal": eine Liga-Runde plant die Liga selbst).
 // Erzfeind: erzfeind(fortschritt) -> { botId, siege, niederlagen } | null   der Leiter-Bot mit den meisten
 //   Niederlagen von Flo (mindestens ERZFEIND_MIN und mehr Niederlagen als Siege; Gleichstand: groessere Differenz,
-//   dann die hoehere Stufe). Quelle: Fortschritt (wertende Partien, storage.bucheFortschritt).
+//   dann die hoehere Stufe aus BOTS, unabhaengig von der Reihenfolge im Fortschritt). Quelle: Fortschritt (wertende
+//   Partien, storage.bucheFortschritt); Schluessel, die kein Leiter-Bot sind, zaehlen nicht.
 //   erzfeindZeile(e) -> 'Dein Erzfeind · 1 Sieg · 4 Niederlagen'
 //   erzfeindBezwungen({ fortschritt, botId, ergebnis, wertet, gefeiert }) -> { botId, niederlagen } | null
 //     Sieg einer wertenden Partie gegen den Bot, der VOR dieser Partie Erzfeind war; einmal je neuer Niederlage
@@ -31,9 +40,11 @@
 //   erzfeind: { [botId]: Niederlagen beim letzten Feiern } }
 import { seedAus, zufallAus, tagSchluessel, tageZwischen, istSchluessel } from '../../tag.js';
 import { wertet } from '../../storage.js';
+import { BOTS } from '../../bots.js';
 import { SAETZE } from './saetze.js';
 
-export const RECHENSTAND = 1;
+// 2: Fairness-Sperre auch bei "Wenig", Plaetze vorn und hinten am Wahl-Ort, Erzfeind nach Stufe, Komma bei Greta
+export const RECHENSTAND = 2;
 export const MODUL = 'bots';
 export const PAKET = 'gedaechtnis';
 // Vorrang: der erste passende Anlass gewinnt
@@ -41,8 +52,12 @@ export const ANLAESSE = Object.freeze(['kennenlernen', 'ersterSieg', 'wiedersehe
   'serieGegen', 'rueckkampf', 'revanche', 'remisZuletzt']);
 // Kommen immer (ein besonderer Moment oder Fairness), die anderen nur etwa jede zweite Partie
 export const STARK = Object.freeze(['kennenlernen', 'ersterSieg', 'wiedersehen', 'mutmachen', 'genial']);
-// Einstellung "Bot-Sprüche: Wenig"
+// Einstellung "Bot-Sprueche: Wenig"
 export const WENIG = Object.freeze(['kennenlernen', 'ersterSieg', 'mutmachen']);
+// Einmalige Momente, die vor den Begruessungen anderer Pakete stehen (dazu jede Wahl unter der Fairness-Sperre)
+export const VORN = Object.freeze(['kennenlernen', 'ersterSieg', 'mutmachen']);
+// Plaetze am Wahl-Ort partie:begruessung? (Funken steht mit dem einmaligen Level-Gruss auf 40)
+export const REIHENFOLGE = Object.freeze({ vorn: 10, hinten: 60 });
 // leichte Sticheleien (hoechstens eine je Partie, nie nach FOLGE_NIEDERLAGEN Niederlagen in Folge)
 export const STICHELEI = Object.freeze(['revanche']);
 export const ANTEIL = 0.5;
@@ -155,15 +170,21 @@ export function lage({ partien, botId, heute, memo = null, bekannt = 0 } = {}) {
   };
 }
 
+// Fairness-Sperre: FOLGE_NIEDERLAGEN Niederlagen in Folge gegen diesen Bot (aus der Lage) oder insgesamt (folgeGesamt)
+export function gesperrt(l, folgeGesamt = () => 0) {
+  if (l && Number.isFinite(l.niederlageFolge) && l.niederlageFolge >= FOLGE_NIEDERLAGEN) return true;
+  let gesamt = 0;
+  try { gesamt = Number(folgeGesamt()) || 0; } catch (e) { gesamt = 0; }
+  return gesamt >= FOLGE_NIEDERLAGEN;
+}
+
 // Anlass ohne Sparsamkeit und Einstellung (Vorrang wie ANLAESSE)
 export function anlassFuer(l, { folgeGesamt = () => 0 } = {}) {
   if (!l || !Number.isInteger(l.n)) return null;
   if (l.n === 0) return { anlass: l.bekannt > 0 ? 'wiedersehen' : 'kennenlernen', werte: null };
   if (l.letzte === 'sieg' && l.davorNiederlagen >= ERSTER_SIEG_NACH) return { anlass: 'ersterSieg', werte: null };
   if (Number.isFinite(l.tage) && l.tage >= PAUSE_TAGE) return { anlass: 'wiedersehen', werte: { tage: l.tage } };
-  let gesamt = 0;
-  try { gesamt = Number(folgeGesamt()) || 0; } catch (e) { gesamt = 0; }
-  if (l.niederlageFolge >= FOLGE_NIEDERLAGEN || gesamt >= FOLGE_NIEDERLAGEN) return { anlass: 'mutmachen', werte: null };
+  if (gesperrt(l, folgeGesamt)) return { anlass: 'mutmachen', werte: null };
   if (l.genial) return { anlass: 'genial', werte: null };
   if (l.botPatzer) return { anlass: 'botPatzer', werte: null };
   if (l.siegFolge >= SERIE_MIN) return { anlass: 'serieGegen', werte: null };
@@ -188,22 +209,44 @@ export function zufallFuer(heute, botId, n) {
   return zufallAus(seedAus(`gedaechtnis|${RECHENSTAND}|${heute}|${botId}|${n}`));
 }
 
+const MUT = Object.freeze({ anlass: 'mutmachen', werte: null });
+
 export function begruessung({ botId, partien, heute, memo = null, bekannt = 0, folgeGesamt = () => 0, sprueche = 'an', saetze = SAETZE } = {}) {
   if (!botId || sprueche === 'aus' || !istSchluessel(heute)) return null;
   const l = lage({ partien, botId, heute, memo, bekannt });
-  const a = anlassFuer(l, { folgeGesamt });
+  // Niederlagen in Folge insgesamt: hoechstens einmal gelesen
+  let gesamt = null;
+  const folge = () => {
+    if (gesamt === null) {
+      try { gesamt = Number(folgeGesamt()) || 0; } catch (e) { gesamt = 0; }
+    }
+    return gesamt;
+  };
+  let a = anlassFuer(l, { folgeGesamt: folge });
   if (!a) return null;
-  const stark = STARK.includes(a.anlass);
-  if (sprueche === 'wenig' && !WENIG.includes(a.anlass)) return null;
-  const liste = saetze[a.anlass] && saetze[a.anlass][botId];
+  // Unter der Fairness-Sperre spricht das Paket immer (nie Schweigen, sonst begruesst der Host oder ein anderes
+  // Paket, und das kann sticheln): bei "Wenig" statt eines Anlasses ausserhalb von WENIG der Mut-Satz
+  const sperre = gesperrt(l, folge);
+  if (sprueche === 'wenig' && !WENIG.includes(a.anlass)) {
+    if (!sperre) return null;
+    a = MUT;
+  }
+  const stark = sperre || STARK.includes(a.anlass);
+  let liste = saetze[a.anlass] && saetze[a.anlass][botId];
   if (!Array.isArray(liste) || !liste.length) return null;
   const z = zufallFuer(heute, botId, l.n);
   const wurf = z();
   if (!stark && wurf >= ANTEIL) return null;
-  const frei = nutzbar(liste, a.werte);
+  let frei = nutzbar(liste, a.werte);
+  if (!frei.length && sperre && a.anlass !== MUT.anlass) {
+    a = MUT;
+    liste = (saetze[a.anlass] && saetze[a.anlass][botId]) || [];
+    frei = nutzbar(liste, a.werte);
+  }
   if (!frei.length) return null;
   const i = frei[Math.min(frei.length - 1, Math.floor(z() * frei.length))];
-  return { anlass: variante(a.anlass, i), werte: a.werte, grund: a.anlass, stark, satz: liste[i] };
+  return { anlass: variante(a.anlass, i), werte: a.werte, grund: a.anlass, stark, satz: liste[i], gesperrt: sperre,
+    vorn: sperre || VORN.includes(a.anlass) };
 }
 
 // ---------- Revanche ----------
@@ -212,7 +255,8 @@ function eigeneStellung(fen) {
   return String(fen).trim().split(/\s+/).slice(0, 4).join(' ') !== GRUNDSTELLUNG;
 }
 export function revanche(k) {
-  if (!k || !k.bot || typeof k.bot.id !== 'string') return null;
+  // nur Leiter-Bots (angemeldete Gaeste, Bosse und Sparring haben stufe null und eigene Ablaeufe)
+  if (!k || !k.bot || typeof k.bot.id !== 'string' || !Number.isInteger(k.bot.stufe)) return null;
   if (k.ergebnis !== 'niederlage' && k.ergebnis !== 'remis') return null;
   if ((k.modus || 'normal') !== 'normal') return null;
   const p = k.erg && k.erg.partie;
@@ -226,13 +270,16 @@ export function revanche(k) {
 
 // ---------- Erzfeind ----------
 const ganz = (x) => (Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
+// Stufe der Leiter-Bots (Gleichstand beim Erzfeind: die hoehere Stufe, egal in welcher Reihenfolge der Fortschritt kommt)
+const STUFE = new Map(BOTS.filter((b) => Number.isInteger(b.stufe)).map((b) => [b.id, b.stufe]));
 export function erzfeind(fortschritt) {
   const bots = fortschritt && fortschritt.bots && typeof fortschritt.bots === 'object' ? fortschritt.bots : null;
   if (!bots) return null;
   let best = null;
-  Object.keys(bots).forEach((botId, rang) => {
+  Object.keys(bots).forEach((botId) => {
     const b = bots[botId];
-    if (!b || typeof b !== 'object') return;
+    const rang = STUFE.get(botId);
+    if (!b || typeof b !== 'object' || rang === undefined) return;
     const n = ganz(b.niederlagen);
     const s = ganz(b.siege);
     if (n < ERZFEIND_MIN || n <= s) return;
