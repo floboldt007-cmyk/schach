@@ -745,6 +745,10 @@ async function testeKopfZahlenruhe(browser) {
     const seite = await kontext.newPage();
     await seite.goto(START + '?test#arena');
     await seite.waitForFunction(() => !!window.__serie, null, { timeout: 20000 });
+    await seite.waitForSelector('.screen.arena .kopf-chips .fk-chip', { timeout: 20000 });
+    const neu = await seite.evaluate(() => [...document.querySelectorAll('.kopf-chips > *')].filter((c) => c.getClientRects().length)
+      .map((c) => (c.classList.contains('chip-sterne') ? 'sterne' : c.classList.contains('fk-chip') ? 'level' : c.classList.contains('chip-pokal') ? 'besiegt' : c.className)).join(','));
+    pruefe(`${name}: neuer Spieler (noch keine Serie): Sterne und Level, kein Besiegt`, neu === 'sterne,level', neu);
     await seite.evaluate(async () => {
       const tg = await import('./js/tag.js');
       const S = window.__serie;
@@ -753,7 +757,8 @@ async function testeKopfZahlenruhe(browser) {
       Object.assign(st, { lauf: { n: 4, best: 4, ms: [3] } });
       S.speichere(st);
     });
-    await seite.goto(START + '?test#arena');
+    // neu zeichnen statt neu laden (beim Verlassen der Seite koennte ein Paket seinen alten Stand zurueckschreiben)
+    await seite.evaluate(() => window.__app.gehe('arena'));
     await seite.waitForSelector('.screen.arena .kopf-chips .se-chip', { timeout: 20000 });
     await warte(800);
     const k = await seite.evaluate(() => {

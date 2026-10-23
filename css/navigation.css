@@ -43,9 +43,9 @@
 .screen .haupt-kopf.ohne-chips .kopf-chips { display: none; }
 .haupt-kopf.ohne-chips .rechts > .kopf-knopf:first-of-type { margin-left: auto; }
 .screen .haupt-kopf .kopf-chips > * { flex: none; }
-/* Zahlenruhe (SPIELKONZEPT 3.1, Flo 23.10.): hoechstens drei Zahlen im Kopf. Bringen Pakete zwei eigene Chips (Level, Serie),
-   tritt "Besiegt" zurueck; es steht auf der Weltkarte und im Panel */
-.screen .haupt-kopf .kopf-chips:has(> :nth-child(4)) > .chip-pokal { display: none; }
+/* Zahlenruhe (SPIELKONZEPT 3.1, Flo 23.10.: "Sterne, Level, Serie"): bringt ein Paket einen eigenen Chip (Level, Serie),
+   tritt "Besiegt" zurueck; es steht auf der Weltkarte und in der Liga-Karte. Ohne Pakete bleiben Sterne und Besiegt */
+.screen .haupt-kopf .kopf-chips:has(> :nth-child(3)) > .chip-pokal { display: none; }
 .screen .haupt-kopf .chip { height: 40px; padding: 0 14px; gap: 7px; font-size: 14.5px; font-weight: var(--gw-stark); border: 0;
   box-shadow: var(--s1), var(--kante); }
 .screen .haupt-kopf .chip .ico { width: 18px; height: 18px; }

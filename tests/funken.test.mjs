@@ -1230,13 +1230,14 @@ async function testeBrowser(browser) {
       return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none' };
     });
     const passt = (m) => m.rolle && m.ganz && m.tipp.w >= 44 && m.tipp.h >= 44 && m.oben === 1 && Math.abs(m.sicht.h - m.sterne.h) <= 1;
-    // frisch geladen im Hochformat des iPad mini (744 x 1133): gleich die schmale Form, ganz sichtbar
+    // frisch geladen im Hochformat des iPad mini (744 x 1133): ganz sichtbar. Seit der Zahlenruhe (Flo 23.10.) tritt
+    // "Besiegt" zurueck, sobald ein Paket-Chip im Kopf steht; dann passt hier auch die volle Form
     const { kontext: k1, seite: s1, fehler: f1 } = await neueSeite(browser, { w: 744, h: 1133 });
     await s1.goto(MIT() + '#arena');
     await s1.waitForSelector('.screen.arena .fk-chip');
     await warte(500);
     const frisch = { ...(await s1.evaluate(kopfChipMass)), ...(await form(s1)) };
-    pruefe('iPad mini hoch (744 px), frisch geladen: Level-Chip schmal und ganz sichtbar, Tippfläche mindestens 44 x 44', passt(frisch) && frisch.schmal, frisch);
+    pruefe('iPad mini hoch (744 px), frisch geladen: Level-Chip ganz sichtbar, Tippfläche mindestens 44 x 44', passt(frisch), frisch);
     await s1.screenshot({ path: path.join(BILDER, 'kopf-744.png'), clip: { x: 0, y: 0, width: 744, height: 90 } });
     pruefe('744 px: keine Konsolenfehler', f1.length === 0, f1.join(' | '));
     await k1.close();
@@ -1252,14 +1253,18 @@ async function testeBrowser(browser) {
       await warte(300);
       mass[w] = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
     }
+    // eng (600 px): nur noch die schmale Form passt
+    await s.setViewportSize({ width: 600, height: 1000 });
+    await warte(300);
+    mass[600] = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
     await s.setViewportSize({ width: 1180, height: 820 });
     await warte(300);
     const zurueck = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
     pruefe('iPad hoch (744, 768, 810, 834 px): Level-Chip ganz sichtbar, Tippfläche mindestens 44 x 44, eine Oberkante, so hoch wie Sterne',
-      Object.values(mass).every(passt), mass);
-    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 744 px schmal (nur die Zahl), zurück auf 1180 px wieder ganz',
-      passt(breit) && !breit.schmal && breit.wort && mass[744].schmal && !mass[744].wort && passt(zurueck) && !zurueck.schmal && zurueck.wort,
-    { breit, m744: mass[744], zurueck });
+      [744, 768, 810, 834].every((w) => passt(mass[w])), mass);
+    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 600 px schmal (nur die Zahl, ganz sichtbar), zurück auf 1180 px wieder ganz',
+      passt(breit) && !breit.schmal && breit.wort && mass[600].schmal && !mass[600].wort && passt(mass[600]) && passt(zurueck) && !zurueck.schmal && zurueck.wort,
+    { breit, m600: mass[600], zurueck });
     pruefe('Größenwechsel: keine Konsolenfehler (keine ResizeObserver-Schleife)', f.length === 0, f.join(' | '));
     await k.close();
   }
