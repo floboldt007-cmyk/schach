@@ -17,10 +17,10 @@ import { setzeSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL } from '../js/konto.js';
 import { setzeAboFetch, setzeAboUhr, STAND_SCHLUESSEL, vorteilBereit } from '../js/abo.js';
 import {
-  COACH_PFAD, MERKER_MAX, KI_HINWEIS, TEXTE, eingabeAusZug, frageCoach, restText, vergissAntworten, setzeCoachFetch,
+  COACH_PFAD, MERKER_MAX, WARTE_MS, KI_HINWEIS, TEXTE, eingabeAusZug, frageCoach, restText, vergissAntworten, setzeCoachFetch, setzeCoachWartezeit,
 } from '../js/coach-ki.js';
 import { COUNTDOWN_RE } from '../js/inhalte.js';
-import { pruefeEingabe } from '../supabase/functions/_gemeinsam/coach.js';
+import { pruefeEingabe, baueNutzerText } from '../supabase/functions/_gemeinsam/coach.js';
 import { browserTyp } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
@@ -80,6 +80,12 @@ async function nodeTeil() {
     && ohne.bewertungNachher === null && ohne.klasse === null && !('spielerLevel' in ohne) && !('eigenerZug' in ohne) && pruefeEingabe(ohne).ok);
   pruefe('eingabeAusZug: ohne Stellung oder Zug null', eingabeAusZug(null) === null && eingabeAusZug({ uci: 'e2e4' }) === null
     && eingabeAusZug({ fenVorher: 'x', uci: 'Lxf7' }) === null);
+  // Pruefer-Befund B2: der Mattzug selbst. Der Review-Eintrag traegt danach die Mattstellung als { cp: null, mate: +-1 }
+  // (js/engine.js endstellung); beim Modell muss "Schachmatt" ankommen, nicht "setzt in 1 Zug matt"
+  const matt = eingabeAusZug({ ...ZUG, uci: 'h5f7', san: 'Qxf7#', klasse: 'bester', evalNachher: { cp: null, mate: 1 } }, { du: true });
+  const mattText = pruefeEingabe(matt).ok ? baueNutzerText(pruefeEingabe(matt).eingabe) : '';
+  pruefe('Mattzug aus der Analyse: der Server macht "Schachmatt, die Partie ist zu Ende" daraus', /Dame von h5 nach f7, schlägt den Bauern auf f7, setzt matt/.test(mattText)
+    && mattText.includes('Nach dem Zug: Schachmatt, die Partie ist zu Ende. Weiß hat gewonnen.') && !mattText.includes('Bewertung nach dem gespielten Zug'), mattText);
 
   // ---------- Anfrage ----------
   const server = { status: 200, body: { text: ANTWORT, modell: 'claude-opus-5-5', rest: 12 }, offline: false, warte: 0 };
@@ -145,13 +151,15 @@ async function nodeTeil() {
     ['200 ohne Text', 200, { text: '  ' }, 'ki'],
     ['unbekannte Kennung', 503, { fehler: '<script>' }, 'ki'],
   ];
+  const vorFehler = aufrufe.length;
   for (const [name, status, body2, grund] of faelle) {
     server.status = status;
     server.body = body2;
     const r = await frageCoach({ ...e, zug: 'h5f7' });
     pruefe(`Fehler ${name} -> ${grund}, nicht gemerkt`, !r.ok && r.grund === grund && r.status === status, r);
   }
-  pruefe('Fehler werden nie gemerkt (der naechste Tipp fragt neu)', true);
+  pruefe('Fehler werden nie gemerkt: jeder der Faelle oben hat neu gefragt (derselbe Zug)', aufrufe.length === vorFehler + faelle.length,
+    { vorher: vorFehler, nachher: aufrufe.length, faelle: faelle.length });
   const aboVorher = aboAufrufe.length;
   server.status = 403;
   server.body = { fehler: 'premium' };
@@ -164,6 +172,18 @@ async function nodeTeil() {
   server.offline = true;
   pruefe('kein Netz: offline', (await frageCoach({ ...e, zug: 'h5f7' })).grund === 'offline');
   server.offline = false;
+  // Klein-Befund B2: ohne Zeitgrenze bliebe die Karte bei "schaut sich die Stellung an", bis der Browser aufgibt
+  setzeCoachWartezeit(60);
+  server.warte = 400;
+  const t0 = Date.now();
+  const lang = await frageCoach({ ...e, zug: 'h5f7' });
+  const dauer = Date.now() - t0;
+  server.warte = 0;
+  const danach = await frageCoach({ ...e, zug: 'h5f7' });
+  setzeCoachWartezeit(null);
+  pruefe(`Zeitgrenze (Standard ${WARTE_MS / 1000} s): Server antwortet nicht rechtzeitig -> ki (nicht erreichbar), nicht gemerkt, danach neu gefragt`,
+    WARTE_MS === 100000 && !lang.ok && lang.grund === 'ki' && lang.status === null && dauer < 350 && danach.ok && danach.gemerkt === false, { lang, dauer, danach });
+  vergissAntworten();
 
   // abgelaufene Sitzung: erst erneuern (js/konto.js), dann fragen; Erneuern ohne Netz: offline, abgelehnt: abgemeldet
   const kontoAufrufe = [];
@@ -199,8 +219,9 @@ async function nodeTeil() {
   // ---------- Paket ----------
   const paket = await import('../js/pakete/coach-ki/index.js');
   const orte = await import('../js/orte.js');
-  pruefe('Paket meldet den Vorteil coach-erklaerungen beim Abo (B1) und bietet am Ort analyse:coach an', vorteilBereit('coach-erklaerungen')
-    && paket.VORTEIL === 'coach-erklaerungen' && orte.angeboten('analyse:coach') === 1);
+  // Pruefer-Befund B2: eigener Vorteil "frag-den-coach" (KI, Tagesgrenze), nicht die Coach-Erklaerungen aus Textbausteinen
+  pruefe('Paket meldet den Vorteil frag-den-coach beim Abo (B1), nicht coach-erklaerungen, und bietet am Ort analyse:coach an', vorteilBereit('frag-den-coach')
+    && !vorteilBereit('coach-erklaerungen') && paket.VORTEIL === 'frag-den-coach' && orte.angeboten('analyse:coach') === 1);
   pruefe('ohne DOM: kein Knopf (defensiv)', paket.coachKnopf({ zug: ZUG }) === null);
   const sw = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
@@ -252,7 +273,7 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', handy =
   const fehler = [];
   const coach = [];
   const anfragen = [];
-  const srv = { premium: true, coach: { status: 200, body: { text: ANTWORT, modell: 'claude-opus-5-5', rest: 3 }, warte: 0, offline: false }, ...server };
+  const srv = { premium: true, aboOffline: false, coach: { status: 200, body: { text: ANTWORT, modell: 'claude-opus-5-5', rest: 3 }, warte: 0, offline: false }, ...server };
   seite.on('pageerror', (e) => fehler.push('pageerror: ' + e.message));
   seite.on('console', (m) => { if (m.type() === 'error' && !/404|Failed to fetch dynamically imported module|ERR_FAILED|net::|status of 4\d\d|status of 5\d\d/.test(m.text())) fehler.push('console: ' + m.text()); });
   seite.on('request', (r) => {
@@ -268,8 +289,11 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', handy =
       const c = srv.coach;
       if (c.offline) return r.abort('internetdisconnected');
       if (c.warte) await warte(c.warte);
-      return r.fulfill({ status: c.status, contentType: 'application/json', body: JSON.stringify(c.body) });
+      // nach der Zeitgrenze hat die App die Anfrage schon abgebrochen
+      return r.fulfill({ status: c.status, contentType: 'application/json', body: JSON.stringify(c.body) }).catch(() => {});
     }
+    // Abo-Stand nicht pruefbar (neues Geraet ohne Netz): ist_premium und abos scheitern
+    if (srv.aboOffline && (u.includes('/rpc/ist_premium') || u.includes('/rest/v1/abos?'))) return r.abort('internetdisconnected');
     const body = u.includes('/rpc/ist_premium') ? srv.premium
       : u.includes('/rest/v1/abos?') ? (srv.premium ? [{ status: 'aktiv', plan: 'monat', gueltig_bis: new Date(Date.now() + 30 * 86400000).toISOString(), quelle: 'manuell' }] : [])
         : u.includes('/rest/v1/produkte?') ? [] : {};
@@ -448,8 +472,11 @@ async function browserTeil(browser) {
     await tippe(seite, '.ck-karte .ph-mehr');
     await seite.waitForSelector('.trainer-karte', { timeout: 10000 });
     const imAbo = await seite.evaluate(() => [...document.querySelectorAll('.trainer-karte .trainer-im-abo li')].map((l) => l.textContent));
-    pruefe('"Mehr zum Trainer" oeffnet das Blatt; dort steht die Coach-Erklaerung unter "Im Trainer" (Vorteil gemeldet)',
-      imAbo.some((t) => /Coach-Erklärungen/.test(t)), imAbo);
+    const geplant = await seite.evaluate(() => [...document.querySelectorAll('.trainer-karte .trainer-geplant li')].map((l) => l.textContent));
+    pruefe('"Mehr zum Trainer" oeffnet das Blatt; unter "Im Trainer" steht "Frag den Coach" ehrlich (KI, bis zu 30 Fragen am Tag)',
+      imAbo.some((t) => /^Frag den Coach: Eine KI erklärt/.test(t) && /bis zu 30 Fragen am Tag/.test(t)), imAbo);
+    pruefe('die Coach-Erklaerungen aus Textbausteinen (SPIELKONZEPT 2b.5) bleiben "In Arbeit" (nicht als gebaut verkauft)',
+      !imAbo.some((t) => /Coach-Erklärungen/.test(t)) && geplant.some((t) => /Coach-Erklärungen/.test(t)), { imAbo, geplant });
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
@@ -570,6 +597,16 @@ async function browserTeil(browser) {
     await tippe(seite, '.ck-knopf');
     await seite.waitForSelector('.ck-karte[data-zustand="abgelehnt"]', { timeout: 10000 });
     pruefe('Ablehnung der KI: "keine Erklärung", die Bewertung gilt weiter', (await karte(seite)).karte.text.includes(TEXTE.abgelehnt));
+    // Klein-Befund B2: Zeitgrenze im Browser (kurz gestellt): Karte "nicht erreichbar", Knopf wieder frei
+    await seite.evaluate(() => import('./js/coach-ki.js').then((m) => m.setzeCoachWartezeit(800)));
+    srv.coach = { status: 200, body: { text: ANTWORT, rest: 9 }, warte: 4000 };
+    await tippe(seite, '.ck-knopf');
+    await seite.waitForSelector('.ck-karte[data-zustand="laedt"]', { timeout: 5000 });
+    await seite.waitForSelector('.ck-karte[data-zustand="ki"]', { timeout: 5000 });
+    const zk = await karte(seite);
+    pruefe('Server antwortet nicht rechtzeitig: "nicht erreichbar", Knopf wieder frei, nicht mehr beschaeftigt', zk.karte.text.includes(TEXTE.ki)
+      && zk.knopf.aus === false && zk.karte.busy === 'false', zk);
+    await seite.evaluate(() => import('./js/coach-ki.js').then((m) => m.setzeCoachWartezeit(null)));
     // Der Server sagt "kein Trainer", obwohl der Zwischenspeicher "ja" sagte: Hinweis und neuer Abgleich
     const vorher = anfragen.filter((u) => u.includes('/rpc/ist_premium')).length;
     srv.premium = false;
@@ -580,6 +617,32 @@ async function browserTeil(browser) {
     pruefe('Server sagt "kein Trainer": premiumHinweis und neuer Abgleich des Abo-Stands', (await karte(seite)).karte.hinweis
       && anfragen.filter((u) => u.includes('/rpc/ist_premium')).length > vorher);
     pruefe('Texte fair', fair(await fairText(seite)), await fairText(seite));
+    pruefe('keine Fehler', fehler.length === 0, fehler);
+    await kontext.close();
+  }
+
+  // ---------- Abo-Stand unbekannt (Klein-Befund B2) ----------
+  gruppe = 'Abo-Stand unbekannt';
+  {
+    const { kontext, seite, fehler, coach, srv } = await neueSeite(browser, { server: { aboOffline: true } });
+    await zurAnalyse(seite);
+    srv.coach = { offline: true };
+    await tippe(seite, '.ck-knopf');
+    await seite.waitForSelector('.ck-karte[data-zustand="offline"], .ck-karte[data-zustand="premium"]', { timeout: 10000 });
+    const k = await karte(seite);
+    pruefe('nie geprueft und kein Netz: "Gerade keine Verbindung", kein Kaufhinweis (auch zahlende Nutzer auf einem neuen Geraet)',
+      k.karte.zustand === 'offline' && k.karte.text.includes(TEXTE.offline) && !k.karte.hinweis && (await seite.locator('.premium-hinweis').count()) === 0, k);
+    srv.coach = { status: 200, body: { text: ANTWORT, rest: 20 } };
+    await tippe(seite, '.ck-knopf');
+    await seite.waitForSelector('.ck-karte[data-zustand="antwort"]', { timeout: 10000 });
+    pruefe('Stand unbekannt, Server erreichbar: der Server prueft den Trainer selbst, Antwort mit KI-Hinweis', (await karte(seite)).karte.kiText === KI_HINWEIS
+      && coach.length === 2);
+    srv.coach = { status: 403, body: { fehler: 'premium', text: 'x' } };
+    await seite.evaluate(() => import('./js/coach-ki.js').then((m) => m.vergissAntworten()));
+    await tippe(seite, '.ck-knopf');
+    await tippe(seite, '.ck-knopf');
+    await seite.waitForSelector('.ck-karte[data-zustand="premium"]', { timeout: 10000 });
+    pruefe('Stand unbekannt, Server sagt "kein Trainer": dann der ruhige Hinweis', (await karte(seite)).karte.hinweis);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

@@ -381,7 +381,7 @@ const blattZustand = (seite) => seite.evaluate(() => {
   };
 });
 
-// Ein Paket meldet einen gebauten Vorteil (wie spaeter B2 mit 'coach-erklaerungen'); dasselbe Modul wie die App
+// Ein Paket meldet einen gebauten Vorteil (wie B2 mit 'frag-den-coach'); dasselbe Modul wie die App
 const meldeVorteil = (seite, id = 'coach-erklaerungen') => seite.evaluate((id) => import('./js/abo.js').then((m) => m.registriereVorteil(id)), id);
 const kurzeNachfragen = (seite, liste) => seite.evaluate((l) => import('./js/abo.js').then((m) => m.setzeNachfragen(l)), liste);
 const zurueck = (seite) => seite.evaluate(() => {
@@ -423,8 +423,8 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: Dialog, Preis folgt, "Bald verfügbar" aus, Schließen', z.dialog && z.zustand === 'vorschau' && z.preis === 'Preis folgt'
       && JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen']) && /in Vorbereitung/.test(z.stand), z);
-    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 7 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
-      z.vorteile === 0 && z.geplant === 7 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
+    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 8 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
+      z.vorteile === 0 && z.geplant === 8 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
       && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()), z);
     pruefe('Blatt: Fokus im Blatt', z.fokusDrin);
     const t = await fairPruefung(seite);
@@ -481,7 +481,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => ['vorschau', 'kaufbar'].includes(document.querySelector('.trainer-karte')?.dataset.zustand));
     const ohneVorteil = await blattZustand(seite);
     pruefe('aktives Produkt ohne gebauten Vorteil: "Bald verfügbar" statt Kauf, alle Vorteile "In Arbeit"', ohneVorteil.zustand === 'vorschau'
-      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 7
+      && !ohneVorteil.knoepfe.includes('Trainer abschließen') && ohneVorteil.knoepfe[0] === 'Bald verfügbar (aus)' && ohneVorteil.geplant === 8
       && ohneVorteil.vorteile === 0, ohneVorteil);
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
@@ -490,8 +490,8 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar');
     const z = await blattZustand(seite);
     pruefe('kaufbar: "Trainer abschließen" zuerst, Preis aus der Tabelle', z.knoepfe[0] === 'Trainer abschließen' && z.preis === PRODUKT.preis_text, z);
-    pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 6 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
-      && z.geplant === 6, z);
+    pruefe('kaufbar: nur der gemeldete Vorteil unter "Im Trainer", die anderen 7 "In Arbeit"', z.vorteile === 1 && /Coach-Erklärungen/.test(z.imAbo[0])
+      && z.geplant === 7, z);
     pruefe('kaufbar: ruhiger Satz zum Alter sichtbar (Web ab 18, Crownmate ab 16), kein Testmodus-Satz', /Web ab 18/.test(z.alter) && /ab 16/.test(z.alter)
       && z.test === '', z.alter);
     await warte(600);
@@ -655,7 +655,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'kaufbar', null, { timeout: 5000 }).catch(() => {});
     const z = await blattZustand(seite);
     pruefe('Testmodus-Link: kaufbar fuer den Probekauf (ANLEITUNG Schritt 10), Satz "kein echtes Geld"', z.zustand === 'kaufbar' && /kein echtes Geld/.test(z.test)
-      && z.vorteile === 0 && z.geplant === 7, z);
+      && z.vorteile === 0 && z.geplant === 8, z);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

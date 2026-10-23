@@ -43,6 +43,10 @@ const vorteil = (id, text) => Object.freeze({ id, text });
 export const VORTEILE = Object.freeze([
   vorteil('coaches', 'Drei Coaches: Henrike, Mats und Yusuf, mit Mappe, Wochenplan und Sparring'),
   vorteil('coach-erklaerungen', 'Coach-Erklärungen in ganzen Sätzen in der Spielanalyse'),
+  // Welle B2 (Pruefer-Befund): eigener Eintrag, ehrlich beschrieben (eine KI schreibt, mit Tagesgrenze; Paragraf 5 UWG,
+  // KI-VO Art. 50). Die Zahl ist der Standard von COACH_TAGESLIMIT (supabase/functions/_gemeinsam/coach.js); wer das
+  // Secret aendert, passt sie hier an (tests/server-coach.test.mjs vergleicht mit dem Standard).
+  vorteil('frag-den-coach', 'Frag den Coach: Eine KI erklärt dir einzelne Züge in der Spielanalyse, bis zu 30 Fragen am Tag'),
   vorteil('lernpfad-5-10', 'Lernpfad: Einheiten 5 bis 10'),
   vorteil('raetsel-auswahl', 'Rätsel mit Themen-Wahl, Rätsel-Pakete und Spezial-Training'),
   vorteil('formspiegel', 'Ausführlicher Formspiegel'),

@@ -26,23 +26,34 @@
 //                                         selbst ein Ersatzmodell nimmt (fallbacks: 'default'); andere Modelle ohne
 //   KLASSEN                              Zugklasse -> Text fuer den Prompt (Namen wie js/zugklassen.js, der Test vergleicht)
 //   SYSTEM_PROMPT                        der feste Systemprompt (Deutsch; aendert sich nie je Anfrage, gut fuer den Cache)
-//   leseFen(fen) -> { felder, amZug, rochade, ep } | null      Form-Pruefung und Brett (felder: 'e4' -> { farbe, typ })
-//   beschreibeZug(stellung, uci) -> { text, figur, schlaegt, rochade, umwandlung, enPassant } | null
-//       null, wenn der Zug in dieser Stellung nicht passt (keine eigene Figur auf dem Startfeld, eigene Figur auf dem
-//       Zielfeld, Umwandlung ohne Bauern auf der vorletzten Reihe, Bauer schraeg auf ein leeres Feld ohne en passant ...).
-//       Keine volle Zugpruefung (dafuer braeuchte der Server chess.js), aber genug, damit nur Stimmiges in den Prompt kommt.
+//   leseFen(fen) -> { felder, amZug, rochade, ep } | null      Form-Pruefung und Brett (felder: 'e4' -> { farbe, typ });
+//       null auch, wenn das en-passant-Feld nicht zur Seite am Zug passt oder die Seite, die nicht zieht, im Schach steht
+//   beschreibeZug(stellung, uci) -> { text, folge, figur, schlaegt, rochade, umwandlung, enPassant, schach, matt, patt } | null
+//       Volle Zugpruefung ohne chess.js (Gangart, freie Bahn, Rochade nur mit Recht, Turm, freien und nicht angegriffenen
+//       Feldern, en passant, Umwandlung, eigener Koenig danach nicht im Schach): null, wenn der Zug nicht erlaubt ist.
+//       text: der Zug in Worten; folge: 'gibt Schach' | 'setzt matt' | 'führt zum Patt' | null (was er fuer den Gegner
+//       bedeutet). tests/server-coach.test.mjs vergleicht alles mit chess.js.
 //   pruefeEingabe(daten) -> { ok: true, eingabe } | { ok: false, grund }
 //       daten: { fen, zug, besterZug?, bewertungVorher?, bewertungNachher?, klasse?, spielerLevel?, eigenerZug? }
 //       Bewertungen { cp } oder { mate } aus Sicht von Weiss (wie js/review.js), spielerLevel eine Elo-Schaetzung
 //       (100 bis 3500). Andere Felder werden nie gelesen. grund: 'form' | 'fen' | 'zug' | 'bester_zug' | 'bewertung' |
-//       'klasse' | 'level' | 'eigener_zug'
+//       'klasse' | 'level' | 'eigener_zug'. { mate: 0 } ("Matt auf dem Brett") gilt nur nach einem Zug, der wirklich matt
+//       setzt. Setzt der Zug matt (oder patt), ersetzt der Server die Bewertung danach durch genau diese Tatsache: Die App
+//       schreibt eine Mattstellung als { mate: +1 } bzw. { mate: -1 } (js/engine.js endstellung), das hiesse sonst
+//       "setzt in 1 Zug matt".
 //   bewertungText(ev) -> 'Weiß steht klar besser (+1,8)' usw.
 //   staerkeWort(elo) -> 'Einsteiger' | ...
-//   baueNutzerText(eingabe) -> Text der Nutzer-Nachricht (nur Fakten, aus gepruefter Form gebaut)
+//   baueNutzerText(eingabe) -> Text der Nutzer-Nachricht (nur Fakten, aus gepruefter Form gebaut; Schach, Matt und Patt
+//       rechnet der Server selbst aus der Stellung aus)
 //   baueAnfrage(eingabe, { modell, aufwand }) -> Parameter fuer client.beta.messages.create (SDK, Huelle)
 //   leseAntwort(antwort) -> { ok: true, text, modell, nutzung } | { ok: false, grund: 'abgelehnt' | 'leer' | 'abgeschnitten' }
 //   saeubere(text), kuerze(text, maxWoerter)
 //   modellAus(wert), aufwandAus(wert), grenzeAus(wert)   Secrets lesen, bei Unsinn der Standard
+//   pruefeEinstellungen(umgebung) -> { fehler: ['COACH_MODELL'] | [], warnungen: ['COACH_AUFWAND', 'COACH_TAGESLIMIT'] }
+//       gesetzte, aber ungueltige Secrets. Ein falsches COACH_MODELL ist ein Einrichtungsfehler (503 nicht_eingerichtet,
+//       Zeile "coach nicht_eingerichtet COACH_MODELL" im Protokoll): Still auf das Standardmodell auszuweichen hiesse,
+//       wer zum Sparen "claude-haiku-5.5" (mit Punkt) eintraegt, zahlt unbemerkt das teuerste Modell. Falsche Werte fuer
+//       Aufwand und Grenze fallen auf den guenstigen bzw. sicheren Standard zurueck, mit "coach warnung <NAME>".
 //   FEHLER_TEXTE                         Kennung -> freundlicher Satz (die App hat eigene Texte, das hier ist der Rueckfall)
 //   verarbeite({ methode, koerper, autorisierung }, umgebung, { fetch, frageModell, ordneFehler, protokoll })
 //       -> Promise<{ status, kopf, koerper }>
@@ -125,6 +136,40 @@ const REIHENFOLGE = ['k', 'q', 'r', 'b', 'n', 'p'];
 // ---------------------------------------------------------------------------
 // Stellung und Zuege
 // ---------------------------------------------------------------------------
+const feldName = (x, y) => String.fromCharCode(97 + x) + String(y + 1);
+const SPRINGER = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
+const KOENIG = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+const GERADE = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const SCHRAEG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+// Greift eine Figur von farbe das Feld (x, y) an? (felder wie in leseFen)
+function angegriffen(felder, farbe, x, y) {
+  const auf = (fx, fy) => (fx >= 0 && fx < 8 && fy >= 0 && fy < 8 ? felder.get(feldName(fx, fy)) : null);
+  const ist = (f, typen) => !!f && f.farbe === farbe && typen.includes(f.typ);
+  // ein weisser Bauer greift schraeg nach oben an, steht also eine Reihe tiefer
+  const unten = farbe === 'w' ? -1 : 1;
+  if (ist(auf(x - 1, y + unten), 'p') || ist(auf(x + 1, y + unten), 'p')) return true;
+  if (SPRINGER.some(([dx, dy]) => ist(auf(x + dx, y + dy), 'n'))) return true;
+  if (KOENIG.some(([dx, dy]) => ist(auf(x + dx, y + dy), 'k'))) return true;
+  const strahl = (richtungen, typen) => richtungen.some(([dx, dy]) => {
+    for (let fx = x + dx, fy = y + dy; fx >= 0 && fx < 8 && fy >= 0 && fy < 8; fx += dx, fy += dy) {
+      const f = felder.get(feldName(fx, fy));
+      if (f) return ist(f, typen);
+    }
+    return false;
+  });
+  return strahl(GERADE, 'rq') || strahl(SCHRAEG, 'bq');
+}
+
+function koenigXY(felder, farbe) {
+  for (const [feld, f] of felder) if (f.typ === 'k' && f.farbe === farbe) return [feld.charCodeAt(0) - 97, Number(feld[1]) - 1];
+  return null;
+}
+const imSchach = (felder, farbe) => {
+  const k = koenigXY(felder, farbe);
+  return !!k && angegriffen(felder, farbe === 'w' ? 'b' : 'w', k[0], k[1]);
+};
+
 export function leseFen(fen) {
   if (typeof fen !== 'string' || fen.length > 100) return null;
   const teile = fen.trim().split(/ +/);
@@ -132,7 +177,8 @@ export function leseFen(fen) {
   const [brett, amZug, rochade, ep, halb, voll] = teile;
   if (amZug !== 'w' && amZug !== 'b') return null;
   if (!/^(-|K?Q?k?q?)$/.test(rochade) || !rochade) return null;
-  if (!/^(-|[a-h][36])$/.test(ep)) return null;
+  // en passant gibt es nur direkt nach einem Doppelschritt des Gegners: Weiss am Zug -> Feld auf Reihe 6, Schwarz -> 3
+  if (ep !== '-' && !(/^[a-h][36]$/.test(ep) && ep[1] === (amZug === 'w' ? '6' : '3'))) return null;
   if (!/^\d{1,3}$/.test(halb) || !/^\d{1,4}$/.test(voll) || Number(voll) < 1) return null;
   const reihen = brett.split('/');
   if (reihen.length !== 8) return null;
@@ -154,10 +200,21 @@ export function leseFen(fen) {
     if (spalte !== 8) return null;
   }
   if (koenige.w !== 1 || koenige.b !== 1) return null;
+  if (ep !== '-') {
+    // das en-passant-Feld und das Startfeld des Doppelschritts sind leer, der gegnerische Bauer steht davor
+    const vor = amZug === 'w' ? -1 : 1;
+    const bauer = felder.get(ep[0] + String(Number(ep[1]) + vor));
+    if (felder.has(ep) || felder.has(ep[0] + String(Number(ep[1]) - vor)) || !bauer || bauer.typ !== 'p' || bauer.farbe === amZug) return null;
+  }
+  // Wer nicht am Zug ist, steht nie im Schach (sonst koennte der Koenig geschlagen werden)
+  if (imSchach(felder, amZug === 'w' ? 'b' : 'w')) return null;
   return { felder, amZug, rochade, ep };
 }
 
-export function beschreibeZug(stellung, uci) {
+// Volle Zugpruefung ohne Text: null, wenn der Zug in dieser Stellung nicht erlaubt ist (Gangart, freie Bahn, Rochade
+// samt Recht, Turm, freien und nicht angegriffenen Feldern, en passant, Umwandlung, eigener Koenig danach nicht im
+// Schach). Sonst die Stellung danach (mit Rochaderechten und en-passant-Feld fuer die Gegenseite).
+function zugDaten(stellung, uci) {
   if (!stellung || typeof uci !== 'string' || !UCI.test(uci)) return null;
   const von = uci.slice(0, 2);
   const nach = uci.slice(2, 4);
@@ -175,8 +232,7 @@ export function beschreibeZug(stellung, uci) {
   const dy = ty - fy;
   const adx = Math.abs(dx);
   const ady = Math.abs(dy);
-  const feld = (x, y) => String.fromCharCode(97 + x) + String(y + 1);
-  const leer = (x, y) => !stellung.felder.has(feld(x, y));
+  const leer = (x, y) => !stellung.felder.has(feldName(x, y));
   // Felder zwischen Start und Ziel frei (Laeufer, Turm, Dame)
   const bahnFrei = () => {
     const sx = Math.sign(dx);
@@ -184,6 +240,7 @@ export function beschreibeZug(stellung, uci) {
     for (let x = fx + sx, y = fy + sy; x !== tx || y !== ty; x += sx, y += sy) if (!leer(x, y)) return false;
     return true;
   };
+  const gegner = figur.farbe === 'w' ? 'b' : 'w';
   const vor = figur.farbe === 'w' ? 1 : -1;
   let rochade = null;
   let enPassant = false;
@@ -203,13 +260,15 @@ export function beschreibeZug(stellung, uci) {
       break;
     case 'k':
       if (adx === 2 && dy === 0) {
-        // Rochade: Koenig auf e1/e8, Recht laut FEN, eigener Turm in der Ecke, Felder dazwischen frei
+        // Rochade: Koenig auf e1/e8, Recht laut FEN, eigener Turm in der Ecke, Felder dazwischen frei, der Koenig
+        // steht nicht im Schach und zieht nicht durch ein angegriffenes Feld (das Zielfeld prueft der Test unten)
         const reihe = figur.farbe === 'w' ? 0 : 7;
         const kurz = dx > 0;
         const recht = figur.farbe === 'w' ? (kurz ? 'K' : 'Q') : (kurz ? 'k' : 'q');
-        const turm = stellung.felder.get(feld(kurz ? 7 : 0, reihe));
+        const turm = stellung.felder.get(feldName(kurz ? 7 : 0, reihe));
         if (fx !== 4 || fy !== reihe || ziel || !stellung.rochade.includes(recht) || !turm || turm.typ !== 'r' || turm.farbe !== figur.farbe) return null;
         if ((kurz ? [5, 6] : [1, 2, 3]).some((x) => !leer(x, reihe))) return null;
+        if (angegriffen(stellung.felder, gegner, 4, reihe) || angegriffen(stellung.felder, gegner, kurz ? 5 : 3, reihe)) return null;
         rochade = kurz ? 'kurz' : 'lang';
       } else if (adx > 1 || ady > 1) {
         return null;
@@ -235,13 +294,55 @@ export function beschreibeZug(stellung, uci) {
     default:
       return null;
   }
+  // Stellung danach
+  const felder = new Map(stellung.felder);
+  felder.delete(von);
+  // en passant: der geschlagene Bauer steht neben dem Startfeld, nicht auf dem Zielfeld
+  if (enPassant) felder.delete(feldName(tx, fy));
+  felder.set(nach, { farbe: figur.farbe, typ: umw || figur.typ });
+  if (rochade) {
+    felder.delete(feldName(rochade === 'kurz' ? 7 : 0, fy));
+    felder.set(feldName(rochade === 'kurz' ? 5 : 3, fy), { farbe: figur.farbe, typ: 'r' });
+  }
+  // der eigene Koenig steht danach nie im Schach
+  if (imSchach(felder, figur.farbe)) return null;
+  let rechte = stellung.rochade === '-' ? '' : stellung.rochade;
+  if (figur.typ === 'k') rechte = rechte.replace(figur.farbe === 'w' ? /[KQ]/g : /[kq]/g, '');
+  for (const [ecke, recht] of [['h1', 'K'], ['a1', 'Q'], ['h8', 'k'], ['a8', 'q']]) if (von === ecke || nach === ecke) rechte = rechte.replace(recht, '');
+  const danach = { felder, amZug: gegner, rochade: rechte || '-', ep: figur.typ === 'p' && ady === 2 ? feldName(fx, fy + vor) : '-' };
+  return { von, nach, figur, ziel, umw, rochade, enPassant, danach };
+}
+
+// Hat die Seite am Zug irgendeinen erlaubten Zug? (fuer Matt und Patt; bricht beim ersten ab)
+function hatZug(stellung) {
+  for (const [von, f] of stellung.felder) {
+    if (f.farbe !== stellung.amZug) continue;
+    for (let i = 0; i < 64; i++) {
+      const nach = feldName(i % 8, Math.floor(i / 8));
+      const umw = f.typ === 'p' && (nach[1] === '8' || nach[1] === '1') ? 'q' : '';
+      if (zugDaten(stellung, von + nach + umw)) return true;
+    }
+  }
+  return false;
+}
+
+export function beschreibeZug(stellung, uci) {
+  const z = zugDaten(stellung, uci);
+  if (!z) return null;
+  const { von, nach, figur, ziel, umw, rochade, enPassant, danach } = z;
   const teile = [];
   if (rochade) teile.push(`${rochade === 'kurz' ? 'kurze' : 'lange'} Rochade (König von ${von} nach ${nach})`);
   else teile.push(`${FIGUR_NOM[figur.typ]} von ${von} nach ${nach}`);
   if (ziel) teile.push(`schlägt ${FIGUR_AKK[ziel.typ]} auf ${nach}`);
   if (enPassant) teile.push('schlägt en passant');
   if (umw) teile.push(`wandelt sich in ${UMWANDLUNG[umw]} um`);
-  return { text: teile.join(', '), figur: figur.typ, schlaegt: ziel ? ziel.typ : (enPassant ? 'p' : null), rochade, umwandlung: umw, enPassant };
+  // Was der Zug fuer den Gegner bedeutet: Schach, Matt (Schach und kein Zug mehr) oder Patt (kein Schach, kein Zug)
+  const schach = imSchach(danach.felder, danach.amZug);
+  const zugDa = hatZug(danach);
+  const matt = schach && !zugDa;
+  const patt = !schach && !zugDa;
+  return { text: teile.join(', '), folge: matt ? 'setzt matt' : patt ? 'führt zum Patt' : schach ? 'gibt Schach' : null,
+    figur: figur.typ, schlaegt: ziel ? ziel.typ : (enPassant ? 'p' : null), rochade, umwandlung: umw, enPassant, schach, matt, patt };
 }
 
 function figurenListe(stellung, farbe) {
@@ -272,12 +373,15 @@ export function pruefeEingabe(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d)) return { ok: false, grund: 'form' };
   const stellung = leseFen(d.fen);
   if (!stellung) return { ok: false, grund: 'fen' };
-  if (!beschreibeZug(stellung, d.zug)) return { ok: false, grund: 'zug' };
+  const gespielt = beschreibeZug(stellung, d.zug);
+  if (!gespielt) return { ok: false, grund: 'zug' };
   const besterZug = d.besterZug === undefined || d.besterZug === null ? null : d.besterZug;
   if (besterZug !== null && !beschreibeZug(stellung, besterZug)) return { ok: false, grund: 'bester_zug' };
   const vorher = bewertungAus(d.bewertungVorher);
   const nachher = bewertungAus(d.bewertungNachher);
   if (!vorher.ok || !nachher.ok) return { ok: false, grund: 'bewertung' };
+  // "Matt auf dem Brett" vor einem Zug gibt es nicht (dann gaebe es keinen Zug), danach nur, wenn der Zug matt setzt
+  if ((vorher.wert && vorher.wert.mate === 0) || (nachher.wert && nachher.wert.mate === 0 && !gespielt.matt)) return { ok: false, grund: 'bewertung' };
   const klasse = d.klasse === undefined || d.klasse === null ? null : d.klasse;
   if (klasse !== null && !Object.prototype.hasOwnProperty.call(KLASSEN, klasse)) return { ok: false, grund: 'klasse' };
   const level = d.spielerLevel === undefined || d.spielerLevel === null ? null : d.spielerLevel;
@@ -331,13 +435,18 @@ export function baueNutzerText(e) {
     `- Schwarze Figuren: ${figurenListe(st, 'b')}`,
   ];
   if (e.eigenerZug !== null) zeilen.push(`- Gezogen hat: ${e.eigenerZug ? 'der Spieler selbst' : 'sein Gegner'}`);
-  zeilen.push(`- Gespielter Zug: ${gespielt.text}`);
+  const zugText = (b) => (b.folge ? `${b.text}, ${b.folge}` : b.text);
+  zeilen.push(`- Gespielter Zug: ${zugText(gespielt)}`);
   if (e.klasse) zeilen.push(`- Einordnung der App: ${KLASSEN[e.klasse]}`);
   const vorher = bewertungText(e.bewertungVorher);
   const nachher = bewertungText(e.bewertungNachher);
   if (vorher) zeilen.push(`- Bewertung vor dem Zug (bei bestem Spiel): ${vorher}`);
-  if (nachher) zeilen.push(`- Bewertung nach dem gespielten Zug: ${nachher}`);
-  if (e.besterZug && e.besterZug !== e.zug) zeilen.push(`- Stärkster Zug laut Engine: ${beschreibeZug(st, e.besterZug).text}`);
+  // Nach einem Matt- oder Pattzug zaehlt die Tatsache auf dem Brett, nicht die Bewertung der App (dort hiesse Matt
+  // "mate +1/-1", also "setzt in 1 Zug matt")
+  if (gespielt.matt) zeilen.push(`- Nach dem Zug: Schachmatt, die Partie ist zu Ende. ${FARBE[st.amZug]} hat gewonnen.`);
+  else if (gespielt.patt) zeilen.push('- Nach dem Zug: Patt, die Partie endet unentschieden.');
+  else if (nachher) zeilen.push(`- Bewertung nach dem gespielten Zug: ${nachher}`);
+  if (e.besterZug && e.besterZug !== e.zug) zeilen.push(`- Stärkster Zug laut Engine: ${zugText(beschreibeZug(st, e.besterZug))}`);
   else if (e.besterZug) zeilen.push('- Der gespielte Zug ist auch der stärkste Zug laut Engine.');
   const staerke = staerkeWort(e.spielerLevel);
   if (staerke) zeilen.push(`- Spielstärke des Spielers: ${staerke}`);
@@ -356,6 +465,16 @@ export function aufwandAus(wert) {
 export function grenzeAus(wert) {
   const n = typeof wert === 'string' && /^\d{1,4}$/.test(wert.trim()) ? Number(wert.trim()) : (Number.isInteger(wert) ? wert : NaN);
   return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : STANDARD_GRENZE;
+}
+// Gesetzt heisst: ein Text, der nach dem Abschneiden der Leerzeichen nicht leer ist (Deno.env.get liefert sonst '')
+const gesetzt = (w) => (typeof w === 'string' && w.trim() !== '') || (w !== undefined && w !== null && typeof w !== 'string');
+export function pruefeEinstellungen(u = {}) {
+  const fehler = [];
+  const warnungen = [];
+  if (gesetzt(u.COACH_MODELL) && !(typeof u.COACH_MODELL === 'string' && MODELL.test(u.COACH_MODELL.trim()))) fehler.push('COACH_MODELL');
+  if (gesetzt(u.COACH_AUFWAND) && !(typeof u.COACH_AUFWAND === 'string' && AUFWAENDE.includes(u.COACH_AUFWAND.trim().toLowerCase()))) warnungen.push('COACH_AUFWAND');
+  if (gesetzt(u.COACH_TAGESLIMIT) && grenzeAus(u.COACH_TAGESLIMIT) !== (typeof u.COACH_TAGESLIMIT === 'string' ? Number(u.COACH_TAGESLIMIT.trim()) : u.COACH_TAGESLIMIT)) warnungen.push('COACH_TAGESLIMIT');
+  return { fehler, warnungen };
 }
 
 // Parameter fuer client.beta.messages.create (Huelle). Kein thinking-Feld: Claude Opus 5.5 denkt immer adaptiv, der
@@ -486,6 +605,12 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
     log('coach nicht_eingerichtet');
     return fehler(503, 'nicht_eingerichtet');
   }
+  const einst = pruefeEinstellungen(umgebung);
+  if (einst.fehler.length) {
+    log('coach nicht_eingerichtet ' + einst.fehler.join(' '));
+    return fehler(503, 'nicht_eingerichtet');
+  }
+  for (const w of einst.warnungen) log('coach warnung ' + w);
   const jwt = bearer(autorisierung);
   if (!jwt) return fehler(401, 'anmeldung');
   if (typeof koerper !== 'string' || !koerper) return fehler(400, 'eingabe', { grund: 'form' });
@@ -500,7 +625,19 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
   let uid = null;
   try {
     const r = await f(`${basis}/auth/v1/user`, { method: 'GET', headers: { apikey: oeffentlich, Authorization: `Bearer ${jwt}` } });
-    if (r && (r.status === 401 || r.status === 403)) return fehler(401, 'anmeldung');
+    if (r && (r.status === 401 || r.status === 403)) {
+      // Ein falscher oder abgeschalteter Projekt-Schluessel (apikey) sieht sonst aus wie eine abgelaufene Anmeldung:
+      // Das Gateway antwortet dann mit 401 und "Invalid API key" (bzw. "No API key found"), die Anmeldung mit bad_jwt
+      let d = null;
+      try { d = await r.json(); } catch (e) { /* ohne Koerper */ }
+      const meldung = d && typeof d === 'object' ? String(d.message || d.msg || '') : '';
+      if (r.status === 401 && /api ?key/i.test(meldung)) {
+        log('coach nicht_eingerichtet apikey');
+        return fehler(503, 'nicht_eingerichtet');
+      }
+      log('coach anmeldung ' + r.status);
+      return fehler(401, 'anmeldung');
+    }
     if (!r || !r.ok) return fehler(503, 'server');
     const u = await r.json();
     uid = u && typeof u.id === 'string' && UUID.test(u.id) ? u.id : null;

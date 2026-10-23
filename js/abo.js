@@ -26,7 +26,7 @@
 //
 //   Vorteile, die schon gebaut sind (Verkauft wird nur, was es gibt; Pruefer-Befund B1, Paragraf 5 UWG):
 //   registriereVorteil(id)   das Paket, das einen Vorteil des Trainers umsetzt, meldet ihn beim Laden an, z. B. B2 mit
-//       registriereVorteil('coach-erklaerungen'). Die Ids stehen in VORTEILE (js/pakete/abo/trainer.js). Das Blatt zeigt
+//       registriereVorteil('frag-den-coach'). Die Ids stehen in VORTEILE (js/pakete/abo/trainer.js). Das Blatt zeigt
 //       nur angemeldete Vorteile unter "Im Trainer", die uebrigen unter "In Arbeit" (nicht enthalten), und bietet den
 //       Kauf erst an, wenn mindestens einer angemeldet ist (oder der Link aus dem Stripe-Testmodus stammt).
 //   vorteilBereit(id) -> boolean

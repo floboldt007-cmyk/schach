@@ -9,22 +9,27 @@
 //                   Fehler (offline, nicht erreichbar, Limit) fragt er erneut.
 //                   Nur, wenn das Konto sichtbar ist (kontoFreigeschaltet, zuerst nur fuer Flo): ohne Konto kann niemand
 //                   den Trainer haben, der Knopf waere eine Sackgasse.
-//   registriereVorteil('coach-erklaerungen')   meldet den Vorteil beim Abo (B1) als gebaut: Das Blatt "Crownmate
-//                   Trainer" fuehrt ihn dann unter "Im Trainer" und bietet den Kauf an.
+//   registriereVorteil('frag-den-coach')   meldet den Vorteil beim Abo (B1) als gebaut: Das Blatt "Crownmate Trainer"
+//                   fuehrt ihn dann unter "Im Trainer" (Text in js/pakete/abo/trainer.js: eine KI erklaert, mit Tagesgrenze)
+//                   und bietet den Kauf an. Bewusst NICHT 'coach-erklaerungen': Das sind laut SPIELKONZEPT 2b.5 die
+//                   Erklaerungen der Coaches aus Engine-Fakten und Textbausteinen, ohne KI (Pruefer-Befund B2, Paragraf 5 UWG).
 //   registriereIcon('coach-frage')              Sprechblase mit Fragezeichen fuer den Knopf
 //
 // Zustaende der Karte (data-zustand): laedt | antwort | abgemeldet | premium | offline | limit | abgelehnt | eingabe |
 //   nicht_eingerichtet | ki. Die Antwort traegt immer sichtbar den Hinweis KI_HINWEIS (KI-Verordnung Art. 50).
-//   premium zeigt premiumHinweis aus js/abo.js (ruhig, "Mehr zum Trainer"), und nur als Antwort auf den Tipp.
+//   premium zeigt premiumHinweis aus js/abo.js (ruhig, "Mehr zum Trainer"), und nur als Antwort auf den Tipp. Nur ein
+//   bekannter Abo-Stand ohne Trainer zeigt ihn sofort; ist der Stand unbekannt (nie geprueft, z. B. neues Geraet ohne
+//   Netz), fragt die App den Server, der den Trainer selbst prueft: So sieht kein zahlender Nutzer einen Kaufhinweis,
+//   nur weil gerade das Netz fehlt (dann "offline").
 // Defensiv: Ein Fehler hier stoert nie die Analyse.
 import { anbieten } from '../../orte.js';
 import { kontoFreigeschaltet } from '../../konto.js';
-import { registriereVorteil, premiumHinweis, istPremium, nutzerId } from '../../abo.js';
+import { registriereVorteil, premiumHinweis, istPremium, premiumStand, nutzerId } from '../../abo.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { tempo } from '../../bewegung.js';
 import { frageCoach, eingabeAusZug, restText, TEXTE, KI_HINWEIS } from '../../coach-ki.js';
 
-export const VORTEIL = 'coach-erklaerungen';
+export const VORTEIL = 'frag-den-coach';
 export const KNOPF_TEXT = 'Frag den Coach';
 export const LAEDT_TEXT = 'Der Coach schaut sich die Stellung an …';
 // Zustaende, in denen ein zweiter Tipp die Karte zuklappt; sonst (Fehler, offline, Limit) fragt er erneut
@@ -139,10 +144,11 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
     laeuft = true;
     knopf.disabled = true;
     try {
-      // Erst der Zwischenspeicher des Abos (ohne Netz, wenn frisch): ohne Trainer kein Aufruf der KI
+      // Erst der Zwischenspeicher des Abos (ohne Netz, wenn frisch): ohne Trainer kein Aufruf der KI. Ein unbekannter
+      // Stand (nie erfolgreich geprueft) ist kein "ohne Trainer": dann entscheidet der Server (403 -> Hinweis)
       const premium = await istPremium();
       if (weg) return;
-      if (!premium) { zeigeGrund('premium'); return; }
+      if (!premium && premiumStand().geprueftAm) { zeigeGrund('premium'); return; }
       const k = zeigeKarte('laedt');
       kopf(k);
       absatz(k, 'ck-meldung', LAEDT_TEXT);

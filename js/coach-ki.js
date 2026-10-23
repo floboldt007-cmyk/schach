@@ -14,18 +14,22 @@
 //       Ohne Anmeldung keine Anfrage ('abgemeldet'), ohne Netz 'offline'. Eine Antwort merkt sich die App fuer diese
 //       Sitzung (nur im Arbeitsspeicher, hoechstens MERKER_MAX): derselbe Zug kostet keine zweite Frage. Sagt der Server
 //       "kein Premium", fragt die App den Abo-Stand neu (der Zwischenspeicher von js/abo.js war dann veraltet).
-//       Gleichzeitige Fragen zum selben Zug laufen zusammen.
+//       Gleichzeitige Fragen zum selben Zug laufen zusammen. Antwortet der Server nicht binnen WARTE_MS, bricht die App
+//       ab ('ki': "nicht erreichbar"), statt die Karte unbegrenzt bei "schaut sich die Stellung an" zu lassen.
 //   TEXTE                     grund -> ruhiger Satz fuer die Karte (premium zeigt stattdessen premiumHinweis aus js/abo.js)
 //   KI_HINWEIS                "Erklärung von einer KI, kann sich irren." (KI-Verordnung Art. 50: Transparenz)
 //   restText(rest) -> string  "Heute noch 3 Fragen." erst ab 5 oder weniger, sonst ''
-//   vergissAntworten()        Merker leeren (nach dem Abmelden, in Tests)
-//   setzeCoachFetch(fn)       nur fuer Tests
+//   WARTE_MS = 100000         laengste Wartezeit auf die Function (sie selbst wartet hoechstens 2 x 45 s auf die KI)
+//   vergissAntworten()        Merker leeren (fuer Tests; nach dem Abmelden ist es nicht noetig, der Merker schluesselt
+//                             je Nutzer-ID und lebt nur im Arbeitsspeicher)
+//   setzeCoachFetch(fn), setzeCoachWartezeit(ms)   nur fuer Tests (null: Standard)
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { sitzung, erneuereSitzung } from './konto.js';
 import { istPremium, nutzerId } from './abo.js';
 
 export const COACH_PFAD = '/functions/v1/coach';
 export const MERKER_MAX = 40;
+export const WARTE_MS = 100000;
 export const KI_HINWEIS = 'Erklärung von einer KI, kann sich irren.';
 export const TEXTE = Object.freeze({
   eingabe: 'Zu diesem Zug kann der Coach nichts sagen.',
@@ -41,7 +45,9 @@ const GRUENDE = new Set(Object.keys(TEXTE));
 const UCI = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
 let fetchFn = (...a) => fetch(...a);
+let wartezeit = WARTE_MS;
 export function setzeCoachFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
+export function setzeCoachWartezeit(ms) { wartezeit = Number.isFinite(ms) && ms > 0 ? ms : WARTE_MS; }
 
 const merker = new Map();       // "uid fen zug" -> Antwort
 const laufend = new Map();      // "uid fen zug" -> Promise
@@ -91,18 +97,37 @@ async function token() {
 async function frage(eingabe, schluessel) {
   const t = await token();
   if (!t.token) return { ok: false, grund: t.grund };
+  // Zeitgrenze: AbortController bricht fetch und das Lesen des Koerpers ab; das Rennen gegen den Zeitgeber faengt auch
+  // ein fetch ohne signal (Tests, alte Browser)
+  const abbruch = typeof AbortController === 'function' ? new AbortController() : null;
+  let zeitgeber = null;
+  const zuSpaet = new Promise((_, nein) => {
+    zeitgeber = setTimeout(() => {
+      nein(Object.assign(new Error('Zeit'), { zeit: true }));
+      try { if (abbruch) abbruch.abort(); } catch (e) { /* egal */ }
+    }, wartezeit);
+  });
+  zuSpaet.catch(() => {});
+  const abgelaufen = (e) => !!(e && e.zeit) || !!(abbruch && abbruch.signal.aborted);
   let r;
-  try {
-    r = await fetchFn(SUPABASE_URL + COACH_PFAD, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(eingabe),
-    });
-  } catch (e) {
-    return { ok: false, grund: 'offline' };
-  }
   let d = null;
-  try { d = await r.json(); } catch (e) { /* leer */ }
+  try {
+    try {
+      r = await Promise.race([fetchFn(SUPABASE_URL + COACH_PFAD, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(eingabe),
+        ...(abbruch ? { signal: abbruch.signal } : {}),
+      }), zuSpaet]);
+    } catch (e) {
+      return abgelaufen(e) ? { ok: false, grund: 'ki', status: null } : { ok: false, grund: 'offline' };
+    }
+    try { d = await Promise.race([r.json(), zuSpaet]); } catch (e) {
+      if (abgelaufen(e)) return { ok: false, grund: 'ki', status: null };
+    }
+  } finally {
+    clearTimeout(zeitgeber);
+  }
   if (r.ok && d && typeof d.text === 'string' && d.text.trim()) {
     const a = { ok: true, text: d.text.trim().slice(0, 1200), modell: typeof d.modell === 'string' ? d.modell : null,
       rest: Number.isInteger(d.rest) ? d.rest : null, gemerkt: false };
