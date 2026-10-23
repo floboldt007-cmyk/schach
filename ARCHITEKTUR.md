@@ -2233,3 +2233,291 @@ echte App mit einem gefälschten Supabase über `page.route`: Lehrkraft-Ablauf, 
 Melden auch offline, Handy und iPad, hell und dunkel; dazu Wettlauf Änderung gegen laufende Anfrage, Zeitgrenze,
 Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer
 (auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).
+---
+
+# Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
+
+Jedes Paket haengt sich nur ueber Orte, Ereignisse, Register, Modul-Speicher und eigene Paket-Screens ein. Bis die
+Integration es in `PAKETE` (`js/erweiterungen.js`) eintraegt, laedt es nur im Test (`?test&erw=pakete/<name>/index`).
+
+## Paket teilen (A1): Siegesbild
+
+Dateien: `js/pakete/teilen/index.js` (Orte, Blatt, Teilen), `logik.js` (rein, Node-testbar, kein `Math.random`),
+`bild.js` (Zeichnen auf Canvas 2D, Lader fuer Farben, Bilder, Schriften), `css/pakete/teilen.css` (nur Tokens; das
+Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/teilen.test.mjs`.
+
+- **Orte:** `ergebnis:karte` (Reihenfolge 60, nach der Abrechnungs-Huelle 3) und `analyse:oben` (60) zeigen
+  `.tl-knopf-zeile[data-ort] > button.knopf.tl-teilen` („Siegesbild teilen“ bzw. „Als Bild teilen“), nur wenn
+  `teilbar(p)`: Sieg oder Remis mit mindestens einem Zug, keine Uebung, keine Partie aus einer eigenen Stellung
+  (Bosse, freie Partien und Spielhalle ja, dann ohne Sterne). Niederlagen bekommen keinen Knopf (Fairness 10), dort
+  bleibt der Tipp „Kopf hoch!“. Der Verlauf hat keinen Ort je Zeile: jede Partie ist ueber Verlauf -> Analyse teilbar.
+- **Blatt:** `.sheet-ort.tl-blatt` (Grundform der Bauteile) mit Vorschau-Canvas, Wahl Hell/Dunkel (`segment`), Schalter
+  „Benutzername zeigen“ (nur mit Konto-Sitzung und Benutzernamen im Profil, Standard aus; der Name wird je Konto der
+  Sitzung gemerkt, ein Kontowechsel ohne Neuladen fragt neu, ohne Namen wird beim naechsten Blatt neu gefragt), Hinweis,
+  was im Bild steht, „Teilen“ (`navigator.share({ files, title, text })`, wenn `canShare` die Datei nimmt) sonst
+  „Bild speichern“ (Download `crownmate-<sieg|remis>-<Tag>.png`). Die PNG-Datei liegt schon bereit, bevor der Knopf
+  aktiv wird, damit `share()` direkt im Klick laeuft (Safari). Abbruch im Teilen-Blatt (`AbortError`) laesst das Blatt
+  offen; lehnt das Geraet ab (jeder andere Fehler, z. B. `NotAllowedError`), wird die Datei gespeichert („Teilen ging
+  hier nicht, das Bild ist gespeichert.“, Weg `datei`). Scheitert das Bild, steht „Das Bild konnte nicht entstehen.“
+  da, jeder neue Versuch zeigt wieder „Bild entsteht …“. Tab bleibt im Blatt und laeuft wie bei den Bauteilen nur ueber
+  die gewaehlte Segment-Option. `app:screen` und Escape schliessen es. `data-bereit="ja"` und `data-modus` am Blatt,
+  sobald das Bild steht (die Karte kann dann noch eingleiten: Lage erst nach `getAnimations()` messen).
+- **Bild (RECHENSTAND 1):** 1080 x 1350, `logik.layout()`; Marke (Bauer auf Tinte) und „Crownmate“, Datum (Kalendertag
+  lokal wie im Verlauf, `kalenderTag()`; bewusst nicht die Tagesgrenze 4:00 aus `tag.js`, die gilt fuer Schluessel),
+  Ueberzeile (z. B. „Schachmatt im 23. Zug“, Boss mit „Boss · …“), „Sieg“ mit goldenem „!“ bzw. „Remis“,
+  „gegen <Bot>“, optional „Gespielt von <Benutzername>“, Portraet (`thema.avatarVon`) auf der Bot-Toenung, Endstellung im
+  Sockel (Feldfarben und `--zuletzt` aus Flos Brettfarbe, Figuren aus dem Figuren-Pfad des Themes, Brett gedreht bei
+  Schwarz, Koordinaten ueber den Figuren), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt),
+  Zuege; Fuss „crownmate“ und die Adresse der App (`appAdresse(location.href)`: `MARKEN_ADRESSE` in `logik.js`, solange
+  leer die Adresse der Seite; in einer App-Huelle wie `capacitor://localhost`, `https://localhost` oder `file:` keine).
+  Sperrt ein Browser die Leinwand wegen der SVG-Bilder (`toBlob` wirft), entsteht das Bild neu ohne Figurenbilder
+  (Kreis mit Buchstabe); in WebKitGTK 2.52 und Chromium sperrt nichts. Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
+  dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
+- **Speicher:** Modul `teilen` (Budget 2.000) `{ v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] }`
+  (hoechstens 20, je Partie eine Zeile); Modul-Einstellungen `teilen` `{ bild: '' | 'hell' | 'dunkel', name: false }`.
+- **Ereignisse:** hoert `app:screen` (Blatt zu), `partie:analysiert` (offenes Bild bekommt die Genauigkeit, die erst
+  nach dem Oeffnen kam) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
+  sendet nichts. **Register:** Icon `teilen`. **Test-Schnittstelle:** `zustand()` (offen, modus, bereit, texte, datei,
+  weg, name) und `oeffneBlatt({ partie | partieId, bot })`.
+
+## Paket gedaechtnis (A2): Bots erinnern sich, Revanche, Erzfeind
+
+Dateien: `js/pakete/gedaechtnis/index.js` (Orte, Ereignisse, Register), `logik.js` (rein, Node-testbar, kein
+`Math.random`), `saetze.js` (eigene Texte: 10 Anlaesse x 10 Leiter-Bots x 3 Varianten, je Bot im Ton seiner Bio, hoechstens
+110 Zeichen), `css/pakete/gedaechtnis.css` (nur Tokens; das Paket haengt sein CSS selbst als `link[data-paket="gedaechtnis"]`
+ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `tests/fairness.test.mjs` (SPIELKONZEPT 5.3).
+
+- **Begruessung (Wahl-Ort `partie:begruessung?`, also auch die Sprechblase im Arena-Panel):** nur Leiter-Bots im Modus
+  `normal`. Zwei Anbieter rechnen dieselbe Wahl (einmal je `waehle`-Aufruf, gemerkt am eingefrorenen Kontext) und liefern
+  sie an genau einem Platz: **vorn (Reihenfolge 10)** nur `kennenlernen`, `ersterSieg`, `mutmachen` (`logik.js VORN`) und
+  jede Wahl unter der Fairness-Sperre, **hinten (60)** alles andere, also hinter den Begruessungen anderer Pakete (Funken:
+  einmaliger Level-Gruss auf 40, der sonst meist still verloren ginge, weil Funken ihn bei `partie:gestartet` verbraucht). Quelle sind die wertenden Partien gegen diesen Bot (`partienGegenBot`, gefiltert mit
+  `storage.wertet`), das Modul-Memo aus der Spielanalyse und `fortschritt.bots[bot].partien`. Vorrang (der erste Treffer
+  gewinnt): `kennenlernen` (keine Partie; kennt der Fortschritt Partien, die aus der Liste der 300 gefallen sind:
+  `wiedersehen` ohne Zahl) > `ersterSieg` (letzte Partie Sieg nach mindestens 3 Niederlagen in Folge) > `wiedersehen`
+  (letzte Partie mindestens 7 Tage her, `{tage}` ueber `tag.js` mit der Grenze 4:00) > `mutmachen` (3 Niederlagen in
+  Folge gegen ihn oder insgesamt) > `genial` (Flos genialer Zug in der letzten Partie, aus der Spielanalyse, sonst aus
+  `liveKlassen`) > `botPatzer` (Zug „Weit daneben“ des Bots, nur aus der Spielanalyse) > `serieGegen` (mindestens 3 Siege
+  in Folge) > `rueckkampf` (letzte gewonnen, `{zuege}`) > `revanche` (letzte verloren) > `remisZuletzt`.
+  **Sparsam:** `kennenlernen`, `ersterSieg`, `wiedersehen`, `mutmachen`, `genial` kommen immer, die anderen nur, wenn der
+  Wurf unter 0,5 liegt (sonst `null`, dann begruesst der Host wie bisher). **Bestimmt:** Wurf und Variante kommen aus
+  `zufallAus(seedAus('gedaechtnis|<RECHENSTAND>|<Tagesschluessel>|<botId>|<Zahl der Partien>'))`: Panel und Partie sagen
+  dasselbe, die naechste Partie wuerfelt neu. Weil der Host mit `Math.random` waehlt (`botSatz`), meldet das Paket jede
+  Variante als eigenen Anlass `gedaechtnis.<anlass>.<i>` mit genau einem Satz je Bot an und gibt diesen zurueck; unter den
+  schlichten Namen (`kennenlernen`, `wiedersehen`, `revanche`, `rueckkampf`, `mutmachen` ...) stehen alle Varianten fuer
+  andere Pakete (z. B. „Willkommen zurück“: `botSatz(bot, 'wiedersehen', zufall, { tage })`). Die Einstellung der App
+  „Bot-Sprüche“ (`sprueche`) gilt: `aus` keine Wahl, `wenig` nur `kennenlernen`, `ersterSieg`, `mutmachen` (unter der
+  Fairness-Sperre statt Schweigen `mutmachen`).
+- **Fairness (Bot-Ton, SPIELKONZEPT 3.12):** Die einzige Stichelei ist `revanche`, und sie ist die Begruessung, also
+  hoechstens eine je Partie (das Paket spricht sonst nie, keine Blase, kein Coach-Zusatz). Nach 3 Niederlagen in Folge
+  (gegen diesen Bot aus `partienGegenBot`, insgesamt aus `ladePartien()`, gemerkt bis zum naechsten Screen oder Spielende)
+  spricht das Paket immer, nie Schweigen, auch bei `wenig` und nach langer Pause (`kennenlernen`, `ersterSieg`,
+  `wiedersehen` oder `mutmachen`, bei `wenig` nur deren Teilmenge), und zwar **vorn**: sonst spraeche die eingebaute
+  Begruessung des Hosts oder der Level-Gruss von Funken, die beide sticheln koennen (`logik.js gesperrt()`).
+- **Revanche (Ort `ergebnis:karte`, Reihenfolge 50):**
+  `.gd-revanche-zeile[data-ort="ergebnis"][data-art="knopf"] > button.knopf.gd-revanche` („Revanche · Du spielst Schwarz“,
+  `data-farbe`), nur gegen Leiter-Bots nach Niederlage oder Remis einer Partie im Modus `normal` aus der Grundstellung (nie
+  Uebung, Boss, frei, Spielhalle, angemeldete Gaeste). Klick: `app.gehe('partie', { botId, farbe: getauscht, tempo })` wie
+  „Nochmal“ im Host, aber mit getauschten Farben (die Arena startet mit denselben Parametern), ohne `liga` (wie „Nochmal“:
+  eine Liga-Runde plant die Liga selbst).
+- **Knopf-Regel fuer den Host (Vorschlag, braucht `js/ui/partie.js`, also die Integration):** Heute entfallen der Tipp
+  „Kopf hoch! …“ (PLAN 2.6) und die Lichtblick-Karte von U7, sobald `ergebnis:karte` irgendetwas zeigt; die Revanche
+  verdraengte sie damit nach jeder Niederlage, genau dort, wofuer sie gedacht sind. Eine Zeile mit `data-art="knopf"` ist
+  deshalb eine reine Knopf-Zeile (kein Inhalt). `fuelleKarte` zaehlt sie nicht mit:
+  `return karteOrt.anzahl - karteOrtEl.querySelectorAll(':scope > [data-art="knopf"]').length;` (fertige Patches fuer den
+  heutigen Stand und fuer U7 liegen beim Integrations-Patch). Inhalt (Lernpunkt, Abrechnung) verdraengt den Tipp weiter.
+  `tests/gedaechtnis.test.mjs` prueft beide Staende: ohne Regel kein Tipp neben der Revanche, mit Regel genau einer.
+- **Erzfeind (Ort `arena:panel-bot`, Reihenfolge 20):** `.gd-erzfeind` „Dein Erzfeind · 1 Sieg · 4 Niederlagen“ beim
+  Leiter-Bot mit den meisten Niederlagen von Flo laut Fortschritt (wertende Partien, fuer immer gezaehlt), mindestens 3
+  und mehr Niederlagen als Siege; Gleichstand: groessere Differenz, dann die hoehere Stufe aus `BOTS` (nicht die
+  Reihenfolge der Schluessel im Fortschritt); Schluessel, die kein Leiter-Bot sind, zaehlen nicht. **Feier:** Bei `partie:beendet`
+  (synchron, also vor den Feier-Zeilen des Overlays) bringt ein wertender Sieg gegen den Bot, der vor dieser Partie
+  Erzfeind war, `melde({ quelle: 'erzfeind', titel: 'Erzfeind bezwungen', text: 'Gegen <Bot>, nach <n> Niederlagen',
+  symbol: 'erzfeind', klang: 'siegel' })` (laut `feier.QUELLEN` gross, Prio 85), einmal je neuer Niederlage.
+- **Speicher:** Modul `bots` (vorhanden, Budget 20.000) `{ v: RECHENSTAND, memo: [[partieId, genialeZuege, patzerDesBots]]
+  (hoechstens 60), erzfeind: { [botId]: Niederlagen beim letzten Feiern } }`, bei jedem Zugriff frisch gelesen (kein
+  Zwischenspeicher, damit ein zweiter Tab oder eine Cloud-Uebernahme nicht mit einem alten Stand ueberschrieben wird);
+  keine eigenen Paket-Einstellungen.
+- **Ereignisse:** hoert `partie:beendet` (Erzfeind-Feier), `partie:analysiert` (Memo, per `setTimeout(0)`, ersetzt den Eintrag
+  derselben Partie), `app:screen` und `speicher:zurueckgesetzt` (gemerkte Niederlagen in Folge vergessen); sendet nichts. **Register:**
+  Saetze, Icons `revanche` und `erzfeind`. **Test-Schnittstelle:** `zustand()` (letzteWahl, modul, folge).
+- **RECHENSTAND 2** (2: Sperre auch bei `wenig`, Plaetze vorn und hinten, Erzfeind nach Stufe, Komma bei Greta) steckt im
+  Seed und im Modul (`v`): Wer Vorrang, Schwellen oder Satz-Tabelle aendert, zaehlt ihn hoch, sonst wechseln die Saetze
+  unbemerkt mitten am Tag. Alte Module (`v: 1`) bleiben gueltig, `normalisiereModul` uebernimmt Memo und Erzfeind.
+
+## Paket kartei (A3): Deine Fehler werden dein Training, dazu der Raetsel-Bildschirm
+
+Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.js` (rein, Node-testbar, kein
+`Math.random`, keine Uhr), `css/pakete/kartei.css` (nur Tokens, `link[data-paket="kartei"]`), der generische Screen
+`js/ui/raetsel.js` mit `css/pakete/raetsel.css` (haengt sich selbst als `link[data-screen="raetsel"]` ein). Test:
+`tests/kartei.test.mjs`.
+
+- **Karten entstehen** bei `partie:analysiert` (Partie-Ende, Analyse-Screen, Nachholen; Uebungen nie, auch Partien aus
+  einer eigenen Stellung, Bosse, freie Partien): eigene Zuege der Klassen `patzer` („Weit daneben“), `verpasst`
+  („Verschenkt“) und `fehler` („Daneben“) aus `review.zuege` mit **eindeutiger Loesung**: `gewinnVorher >= 0,25` und
+  `gewinnVorher - gewinnZweiter >= 0,15` (MultiPV 2 der Analyse; ohne zweite Linie keine Karte). Hoechstens 3 je Partie,
+  die mit dem groessten `verlust` zuerst (gleich: Patzer, Verschenkt, Fehler, dann der fruehere Zug). Dieselbe Stellung
+  kommt je Partie nur einmal vor (Zugwiederholung: der schwerste Eintrag), sonst verdraengte derselbe Fehler die anderen.
+  Idempotent ueber die verarbeiteten Partie-IDs (hoechstens 300). Dieselbe Stellung (`stellungsSchluessel`) schon in der
+  Kartei: keine neue Karte, sondern `rueckfaelle + 1`, wieder Stufe 0 und heute faellig (auch wenn sie heute schon geuebt
+  war: sie verlaesst dafuer `heute.ids` und steht wieder im Stapel von heute), mit dem Bild der neuen Partie. Jede Karte
+  zaehlt je Partie hoechstens einmal (neu oder Rueckfall). Auch eine fuer immer geloeste kommt so zurueck; der Zaehler
+  `gemeistert` sinkt nie und zaehlt jede Karte nur beim ersten Mal (Feld `gemeistert` der Karte). Beim Start (2,5 s nach
+  `app:bereit`, einmal je Sitzung) traegt das Paket gespeicherte Analysen nach, die noch nicht verarbeitet sind (Partien,
+  die vor dem Paket analysiert wurden), still und ohne Feier.
+- **Wiederholung** (`logik.js`): Stufe 0 neu (am Tag der Partie faellig), 1 bis 5 mit den Abstaenden 1, 3, 7, 14, 30 Tagen
+  (`addiereTage` auf dem Tagesschluessel aus `tag.js`, Grenze 4:00, Sommerzeit egal), danach Stufe 6 „für immer gelöst“.
+  Nur der erste Versuch zaehlt als richtig (Stufe + 1); im zweiten Versuch geloest oder Loesung gezeigt: zurueck auf
+  Stufe 1, wieder morgen. **Stapel des Tages:** faellige Karten, die aeltesten zuerst, hoechstens 10 je Tag (A3 und
+  SPIELKONZEPT 2.2; heute schon geuebte zaehlen mit, `heute: { tag, ids }`). Der Ueberhang bleibt still faellig und kommt
+  an den Folgetagen dran: nichts verfaellt, keine rote Zahl. SPIELKONZEPT 3.6 sieht spaeter einen gemeinsamen
+  Trainingsstapel mit Deckel 10 vor, davon hoechstens 8 Karteikarten: kommt ein zweiter Lieferant dazu, wird
+  `TAGES_MAX` (oder ein gemeinsamer Stapel) angepasst und `RECHENSTAND` hochgezaehlt.
+- **Orte:** `training:karten` (Reihenfolge 10): `section.t-karte.kt-karte[data-faellig]` mit drei Zustaenden: faellig
+  („Fehler wiederholen · 5 fällig“, Stapel aus bis zu 4 Mini-Brettern, „12 im Training · 2 für immer gelöst“, Knopf
+  `.kt-los` „Üben“), alles geuebt („Stapel leer. Gut gemacht.“ mit dem naechsten Tag) und keine Karten („Noch keine
+  Karten“, ohne Knopf). Die Mini-Bretter zeigen jede Karte aus Flos Sicht (mit Schwarz gedreht, `logik.drehe`, weil
+  `miniBrett` keine Ausrichtung kennt). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“,
+  nur wenn Karten faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`. **Einstieg:** Die Karte im
+  Training ist erst erreichbar, wenn `REITER` (js/erweiterungen.js) `'training'` nennt; das entscheidet die Integration
+  bzw. Flo. Bis dahin fuehrt nur die Zeile in der Heute-Karte (sobald etwas faellig ist) in die Kartei.
+- **Feier:** Neue Karten einer Partie melden synchron im Hoerer von `partie:analysiert`
+  `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', text: '1 Karte ist wieder dabei.', symbol:
+  'kartei' })` (Zeile, Prio 30 laut `feier.QUELLEN`; nur Rueckfaelle: „1 Karte wieder in deinem Stapel“,
+  `logik.kartenFeier`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
+  Analyse-Screen landet sie in der Nachlese. Synchron rechnet der Hoerer nur `logik.vorschau` (Modul einmal lesen und in
+  Form bringen, Kandidaten, Abgleich nach ID und Stellung; rund 2 ms bei 380 Karten), geschrieben wird per
+  `setTimeout(0)` nach frischem Lesen (`fuegeHinzu`, Ausduennen). Ein Modul einer neueren App (`v` hoeher): keine Karten
+  und keine Zeile. Bleibt nur der seltene Fall, dass `localStorage` beim Schreiben voll ist: dann stand die Zeile schon
+  da (die App meldet den vollen Speicher selbst einmal je Sitzung).
+- **Ereignisse:** sendet `training:geloest { karteId, richtig, versuch, quelle: 'kartei' }` je beantworteter Karte
+  (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche
+  davor, **0 = Loesung ohne eigenen Zug**; wer „geuebte Karten“ zaehlt, etwa S1-4 fuer den Tag, nimmt nur `versuch >= 1`)
+  und `training:stand { faellig, gesamt, gemeistert }` (faellig = heute noch im Stapel, gesamt = Karten im Training ohne die
+  geloesten, gemeistert = fuer immer geloest, nie weniger) bei `app:bereit`, nach jeder Antwort, nach neuen Karten und nach
+  `speicher:zurueckgesetzt`. Hoert `partie:analysiert`, `app:bereit`, `speicher:zurueckgesetzt`. **Register:** Icon
+  `kartei`, Raetsel-Quelle `kartei`. **Test-Schnittstelle:** `zustand()` (modul, stand, letzte).
+- **Speicher:** Modul `kartei` (vorhanden, Budget 160.000) `{ v: RECHENSTAND (1), karten: [Karte], verarbeitet: [partieId],
+  heute: { tag, ids }, zaehler: { erstellt, gemeistert, richtig, falsch } }`, Karte `{ id: 'partieId:ply', fen, besterZug,
+  gespielt, klasse, partieId, ply, botId, farbe, vor, san, loesungSan, nummer, coach (Kern, hoechstens 160), datum (Tag der
+  Partie), gewinn, verlust, stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle, gemeistert }` (ca. 400
+  Zeichen). Ueber 380 Karten oder dem Budget fallen zuerst die aeltesten fuer immer geloesten, dann die aeltesten der
+  Stufe 5, dann die aeltesten ueberhaupt. Bei jedem Zugriff frisch gelesen; kaputte Karten fallen beim Lesen weg; ein Modul
+  mit hoeherem `v` (neuere App) wird gelesen, aber nie ueberschrieben. Keine Paket-Einstellungen.
+
+**Raetsel-Bildschirm** `js/ui/raetsel.js` (Paket-Screen `raetsel` aus `PAKET_SCREENS`, `app.js` unveraendert):
+- `zeige(root, { quelle } | { liste, titel, unter }, app)`. Ohne Quelle und ohne Liste (z. B. `#raetsel` von Hand) oder mit
+  einer nicht angemeldeten Quelle geht es still zur Arena, genau wie bei einem fehlenden Paket-Screen (der Router-Test
+  in `app.test.mjs` bleibt so gueltig). Die Parameter liegen im Browser-Verlauf: Neuladen fragt die Quelle neu.
+- `registriereRaetselQuelle(name, { titel, unter, liste(params), ergebnis(aufgabe, erg) -> { titel, text, klang },
+  ende(zusammenfassung) -> { titel, text, klang, knoepfe: [{ text, art, beiKlick(app) }] }, leer() -> { titel, text } })`
+  -> `abmelden()`. So benutzen spaeter Tagesraetsel, Lernpfad und der Einstufungstest (A4) denselben Bildschirm.
+- **Aufgabe** `{ id, fen, loesung: [uci, ...], titel, text, hinweis, erklaerung, vorZug, marke, klasse }`: in `loesung`
+  wechseln sich Flos Zuege und die Antworten des Gegners ab (der Gegner zieht von selbst nach `takt(520)`).
+  `pruefeAufgabe()` spielt jede Loesung mit chess.js durch; ungueltige fallen still weg.
+- Ablauf: Brett (`Brett` mit `beiZug`, `zielKarte`, gedreht, wenn Schwarz am Zug ist; Koordinaten und „automatisch Dame“
+  aus den Einstellungen), Fortschritt oben („3 von 7“ und je Aufgabe ein Punkt: gut, grau, nie rot), Status (wer zieht,
+  Klasse des alten Zugs, Titel, Satz). Richtig: Feld `mark-k-bester`, Haken ueber `brett.striche` (art `haken`), Symbol
+  federt (`hupf`), Klang `raetsel-richtig` (oder der der Quelle, z. B. `stern` bei „für immer gelöst“), Knopf „Weiter“
+  (nie ein Autostart). Falsch: die Figur steht 380 ms auf dem Feld und schnappt zurueck (`beiZug` liefert ein
+  Promise auf `false`), Klang `raetsel-falsch`, der zweite Versuch markiert die Figur, mit der es losgeht
+  (`markiere(..., 'hinweis')`); nach dem zweiten Fehlversuch ruht das Brett und „Lösung zeigen“ wird die Hauptaktion.
+  „Lösung zeigen“ (jederzeit) zeichnet jeden Zug als Pfeil (`brett.pfeile`) und spielt ihn vor. Nach dem Loesen (oder der
+  gezeigten Loesung) wird „Weiß am Zug“ unsichtbar (Platz bleibt). „Weiter“, „Lösung zeigen“ und „Fertig“ bekommen den
+  Fokus; den Rahmen zeigt nur die Tastatur (`section[data-eingabe="zeiger"|"tastatur"]`). Ende: Zusammenfassung
+  („4 von 5 gelöst“, Text der Quelle), „Fertig“ = `app.zurueck()`.
+- Layout: Container-Einheiten (`container: rs / size`) bestimmen die Brettgroesse; ab 861 px Breite zwei Spalten (Brett,
+  rechts Status, Meldung, Knoepfe), darunter eine Spalte (iPad hoch, Handy). Tippflaechen mindestens 44 px.
+- **Test-Schnittstelle:** `zustand()` (offen, quelle, index, gesamt, schritt, fehlversuche, phase, aufgabe, ergebnisse),
+  mit `?test` auch `window.__raetsel.zustand()`.
+- **sw-Test:** `js/ui/raetsel.js` gehoert laut `SCREEN_PAKET` dem Paket `raetsel`, `css/pakete/raetsel.css` ebenfalls (nach
+  dem Dateinamen). Mit der Kartei in `PAKETE` muessen beide trotzdem in `DATEIEN` (die Integration setzt
+  `SCREEN_PAKET.raetsel` auf `kartei` oder traegt sie von Hand ein), sonst fehlt der Bildschirm offline.
+
+## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
+
+Dateien: `js/pakete/start/index.js` (Orte, Ereignisse, Feier), `dienst.js` (Speicher, Raetsel-Quellen, Spielstart; gemeinsam
+fuer Einstieg und Screen), `logik.js` (rein, Node-testbar, kein `Math.random`, keine Uhr), `aufgaben.js` (Regel-Hilfe und
+Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus `PAKET_SCREENS`, `app.js` unveraendert) und
+`css/pakete/start.css` (nur Tokens, `link[data-paket="start"]`). Test: `tests/start.test.mjs`. SPIELKONZEPT 3.16 und 3.12.
+
+- **Willkommen (Wahl-Ort `app:erster-screen?`, Reihenfolge 80):** nur beim allerersten Start, also ohne Hash und ohne
+  Verlaufseintrag (`app.js`), ohne gespeicherte und ohne laufende Partie (Partien aus der Partienliste oder, wertend, aus dem
+  Fortschritt, das Groessere zaehlt) und wenn das Modul noch kein `gesehen` hat (`logik.ersterScreenWahl`). Ein Paket mit eigener Wahl unter 80 geht vor. Das Willkommen gilt als gesehen, sobald der
+  Screen einmal da war. Nach „Fortschritt zuruecksetzen“ ist das Modul weg, der naechste frische Start zeigt es wieder.
+- **Screen `start`** (`zeige(root, { seite }, app)`): Seiten `w1` (Was ist Crownmate), `w2` (deine Gegner: die Leiter aus
+  `BOTS`, Zahl und Namen daraus), `w3` (wie du lernst), dann `frage` „Kennst du die Schachregeln?“ (Ja: `einstufung`,
+  Nein: Regel-Hilfe), `einstufung` (Angebot), `empfehlung`, `nach-regeln`. „Weiter“, „Überspringen“ (zur Frage),
+  Seiten-Punkte und Pfeiltasten auf w1 bis w3; „Ich kenne mich aus“ steht auf jeder Seite im Kopf und fuehrt zur Arena.
+  Liegt ein eigener Verlaufseintrag davor (`history.state.tiefe > 0`: aus den Einstellungen oder vom Hinweis in der
+  Heute-Karte geoeffnet), hat der Kopf zusaetzlich Zurueck (`app.zurueck()`); auf dem Handy tritt dann die Marke im Kopf
+  zurueck, damit Zurueck, „Ich kenne mich aus“ und Klang nebeneinander passen. `nach-regeln` bietet den ersten Bot der
+  Leiter an (`dienst.ersterGegner()` = `BOTS[0]`, kein fester Name).
+  Die aktuelle Seite steht in `params.seite` des eigenen Verlaufseintrags (`history.replaceState`, Hash bleibt `#start`):
+  Neuladen bleibt auf ihr. Aus dem Raetsel-Bildschirm zurueck (Zurueck oder „Fertig“) gilt die Seite, die `dienst.setzeRueck`
+  gemerkt hat (nach der Einstufung `empfehlung`, nach der Regel-Hilfe `nach-regeln`), sonst die aus dem Verlauf. Ohne
+  geladenen Paket-Einstieg (`dienst.paketGeladen()`, z. B. `#start` von Hand ohne Paket) geht der Screen still zur Arena
+  wie ein fehlender Paket-Screen (Router-Test in `app.test.mjs`). DOM: `section.screen.st-screen[data-seite]`,
+  `.st-buehne[data-seite]`, Knoepfe mit `data-st` (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter,
+  spielen, benno, einstufung-seite, wiederholen, arena, raus). Stapel auf `einstufung`: `.st-stapel-ort` traegt Lage und
+  Drehung, die `.st-stapel-karte` darin gleitet ein (der Eintritt animiert `transform` der Karte und ueberschreibt so nie
+  die Schraeglage). Test-Schnittstelle `zustand()` -> `{ offen, seite }`, mit
+  `?test` auch `window.__start.zustand()`.
+- **Regel-Hilfe und Einstufung** laufen im Raetsel-Bildschirm aus A3 (Quellen `start-regeln` und `start-einstufung`, angemeldet
+  erst von `dienst.starte()` aus `index.js`). Regel-Hilfe: 7 Aufgaben (Turm, Laeufer, Dame, Springer, Koenig, Bauer, dann das
+  Matt), je Figur genau ein Zug, der das Ziel erreicht, mit dieser Figur; Antippen zeigt die Zielpunkte. Einstufung: 8 selbst
+  erstellte Stellungen mit steigender Schwierigkeit (Matt in 1, Material, Matt in 1 mit Schwarz, Gabel, Spiess, Fesselung,
+  Matt in 2 mit erzwungener Antwort, Bauernendspiel mit Quadratregel). `tests/start.test.mjs` prueft jede Loesung mit chess.js
+  und einer Suche mit Material und Matt: jeder eigene Zug ist der einzige beste (Tiefe 4, Endspiel 7), Antworten sind
+  erzwungen. Quelle: selbst erstellt (Kopf von `aufgaben.js`).
+- **Empfehlung (RECHENSTAND 1):** Punkte je Aufgabe 1 (erster Versuch), 0,5 (spaeter geloest), 0 (Loesung gezeigt);
+  `EMPFEHLUNG`: bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, darueber hoechstens Professor Turm (8
+  Aufgaben sagen ueber die oberen Stufen zu wenig). Begruendung aus den Ergebnissen (geloest, Staerken = die zwei schwersten
+  im ersten Versuch, naechster Schritt = die leichteste nicht geloeste, ein Satz zum Bot), keine Elo-Zahl. **Leiter bleibt:**
+  Steht der Bot ueber der hoechsten freigeschalteten Stufe, gibt es ihn nur als „Probepartie“ (`app.gehe('partie', { botId,
+  farbe: 'w', modus: 'frei' })`, `wertet()` ist false: keine Sterne, keine Freischaltung), daneben „Leiter: <naechster
+  Gegner>“. Sonst eine normale Partie. Ob es eine Probepartie wird, entscheidet die Leiter beim Antippen, nicht beim
+  Zeichnen (wurde der Fortschritt inzwischen zurueckgesetzt oder ein anderer Stand eingespielt, wird auch „Gegen <Bot>
+  spielen“ zur Probepartie). Ist eine Partie offen, fragt `dienst.starteSpiel` wie die Arena („Neue Partie
+  starten?“). Fehlt ein Bot der Tabelle in `BOTS`, nimmt `botFuerPunkte` den naechstschwaecheren.
+- **Entdeckungs-Fahrplan:** beginnt bei `app:bereit` (einmal, `fahrplan.start`; ab 5 Partien beim ersten Start „erfahren“:
+  nur neue Funktionen). In den ersten 28 Tagen hoechstens ein Hinweis je Tag im Ort `arena:heute` (Reihenfolge 70):
+  `.st-neu[data-entdeckung]`, die ganze Zeile `button.st-neu-los` „Neu für dich: <Titel>“ mit Satz fuehrt hin, `.st-neu-weg`
+  blendet aus; beides erledigt den Hinweis, heute kommt kein zweiter. Reihenfolge `ENTDECKUNGEN`: Spielanalyse (nach der
+  ersten Partie), Einstufung (ab Tag 1, solange nicht gemacht), Training (ab Tag 2, nur wenn ein Paket `training:karten`
+  anbietet UND `training:stand` Karten meldet, `gesamt > 0`; nie fuer einen leeren Stapel), Brett und Klang (ab 2 Partien),
+  Verlauf (ab 3 Partien). Wer einen Screen schon besucht hat (`app:screen`), bekommt dafuer keinen Hinweis mehr. Abschaltbar
+  in der Gruppe „Erste Schritte“ (Paket-Einstellung `start.hinweise`). **Eine Zeile:** „Neu für dich“ ist die leiseste
+  Zeile der Heute-Karte. Steht dort eine Zeile eines anderen Pakets (z. B. faellige Karten der Kartei), tritt sie zurueck
+  (`css/pakete/start.css`: `.heute-karte .st-neu:not(:only-child) { display: none }`) und erscheint wieder, sobald sie allein
+  ist; der Hinweis bleibt der des Tages und gilt nicht als erledigt. Grund: Mit zwei Zeilen lag der Spielen-Knopf auf dem
+  iPad quer 1024 x 768 21 px unter dem Rand. Folge fuer die Integration: Ein Paket mit einer Zeile an jedem Tag (z. B. die
+  Serie auf `claude/spielsysteme`) laesst „Neu für dich“ nie zu Wort kommen. Haelt die Arena den Spielen-Knopf selbst im
+  Bild (U5/U7, z. B. sticky im Panel), kann die eine CSS-Regel fallen. Der Kopf „Neu für dich: <Titel>“ bricht nie um
+  (Ellipse als Notbremse; geprueft: alle fuenf Titel ganz bei 1024 und 375).
+- **Orte:** `app:erster-screen?` (80), `arena:heute` (70), `einstellungen:gruppen` (90: Gruppe „Erste Schritte“ mit Schalter
+  „Neu für dich“, Stand der Einstufung mit „Zur Empfehlung“ oder „Einstufung machen“, „Willkommen ansehen“, „Regel-Hilfe“).
+- **Feier:** Beim ersten wertenden Sieg ueberhaupt (der Fortschritt kennt genau einen Sieg) synchron im Hoerer von
+  `partie:beendet` `melde({ quelle: 'erster-sieg', titel: 'Dein erster Sieg', text: 'Gegen <Bot>, in <n> Zügen', symbol:
+  'pokal', klang: 'rekord' })` (gross, Prio 95 laut `feier.QUELLEN`), nur einmal (`ersterSieg` im Modul).
+- **Ereignisse:** hoert `app:bereit` (Fahrplan, per `setTimeout`), `app:screen` (besuchte Screens; Rueckweg vergessen),
+  `partie:beendet` (letzte Partie fuer den Hinweis zur Analyse, erster Sieg) und `training:stand` (Karten im Training, fuer
+  den Hinweis „Das Training“; die Kartei sendet es bei `app:bereit`, also vor dem ersten Screen). Sendet nichts. **Register:** Icon
+  `neu-siegel`, Raetsel-Quellen `start-regeln` und `start-einstufung`.
+- **Speicher:** Modul `start` (vorhanden, Budget 6.000) `{ v: RECHENSTAND (1), gesehen: '' | Tag, regeln: null | { tag,
+  geloest, gesamt }, einstufung: null | { tag, rechenstand, punkte, geloest, ersterVersuch, gesamt, je: [[id, punkte]], botId },
+  ersterSieg: '' | partieId, letzte: '' | partieId, fahrplan: { start: '' | Tag, erfahren, heute: null | { tag, id },
+  erledigt: [id], benutzt: [screen] } }` (voll unter 1.500 Zeichen). Tage aus `tag.js` (Grenze 4:00). Bei jedem Zugriff
+  frisch gelesen, Falsches faellt still weg; ein Modul einer neueren App (`v` hoeher) wird gelesen, nie ueberschrieben.
+  Paket-Einstellungen `start` `{ hinweise: true }`.
+- **Integration:** `PAKETE += 'pakete/start/index'`; in `DATEIEN` (sw.js) die vier Paket-Dateien, `css/pakete/start.css`,
+  `js/ui/start.js` und der Raetsel-Bildschirm (`js/ui/raetsel.js`, `css/pakete/raetsel.css`, falls die Kartei sie nicht schon
+  eingetragen hat). `SCREEN_PAKET.start` in `tests/sw.test.mjs` heisst noch `einstieg` (BAUPLAN 2D), deshalb erzwingt der
+  sw-Test den Screen nicht; `tests/start.test.mjs` prueft alle acht Dateien, sobald das Paket in `PAKETE` steht. Mit dem Paket
+  zeigt jeder frische Start ohne Hash das Willkommen (die Suiten oeffnen `#arena` oder haben Partien), und der erste
+  wertende Sieg eines frischen Speichers feiert „Dein erster Sieg“. Probe mit dem Paket in `PAKETE` (Patch ausserhalb des
+  Repos): angepasst werden muessen `app.test.mjs` (Router-Rueckfall mit `PAKETE` ohne start per Route, danach `unroute`;
+  zusaetzlich der Hunk „?erw ohne ?test“ aus dem Paket teilen, weil der Service Worker alle `DATEIEN` vorlaedt; Feier-Budget
+  und stilles Nachholen mit `modul:start.ersterSieg` vorab), `e2e.test.mjs` (Feier genau aus den eingetragenen Paketen),
+  `gedaechtnis.test.mjs` (Erzfeind-Sieg mit einem frueheren Sieg, sonst gewinnt `erster-sieg` mit Prio 95 den grossen Platz)
+  und `kartei.test.mjs` (zwei Anbieter an `arena:heute`).

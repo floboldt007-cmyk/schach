@@ -568,9 +568,13 @@ setzeSpeicher(s);
     Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(NEU).reduce((a, k) => a + MODUL_BUDGET[k], 0) === 182000);
   // w0plus-a-fix: S1-7 (Matt-Atlas) und Schub 2b bekommen eigene Module (vorher hatte finisher keins: "unbekanntes Modul")
   const FIX = { finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000 };
-  pruefe('MODUL_BUDGET mit zuzweit: bisherige Module plus 2.000, alles 22 Module, 538.000',
-    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && MODUL_BUDGET.zuzweit === 2000 && Object.keys(MODUL_BUDGET).length === 22
-    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 538000, MODUL_BUDGET);
+  // Zu den 21 Modulen von w0plus-a-fix (536.000) kommen zuzweit (#26) und Welle A (A1 teilen); alle anderen Zahlen bleiben fest
+  const DAZU = { zuzweit: 2000, teilen: 2000 };
+  const summeNeu = Object.values(DAZU).reduce((a, b) => a + b, 0);
+  pruefe('MODUL_BUDGET: 21 Module (536.000) plus zuzweit und teilen, zusammen 23 Module, 540.000',
+    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21 + Object.keys(DAZU).length
+    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000 + summeNeu, MODUL_BUDGET);
+  pruefe('MODUL_BUDGET neu: zuzweit 2.000 (Zu zweit), teilen 2.000 (A1 Siegesbild)', Object.entries(DAZU).every(([k, v]) => MODUL_BUDGET[k] === v));
   const neuePakete = Object.keys(FIX).map((name) => {
     const m = speichereModul(name, { probe: name });
     const e = speichereModulEinstellungen(name, { stil: 'voll' });

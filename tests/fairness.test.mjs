@@ -370,6 +370,57 @@ function jsonDateien(ordner) {
   pruefe(`Schnell-Chat ohne "Wow", "Hoppla", "Knapp", "Glück gehabt", "Endlich" (${chatJs.length + chatJson.length} Dateien)`, probe && treffer.length === 0, treffer);
 }
 {
+  // Bot-Ton (SPIELKONZEPT 3.12 und 5.3, Paket gedaechtnis, Welle A2): hoechstens eine Bot-Stichelei je Partie (nur die
+  // Begruessung, ein Wahl-Ort, keine Blase in der Partie) und keine nach 3 Niederlagen in Folge, weder gegen diesen Bot
+  // noch insgesamt; dann kommt immer ein Mut-Satz (auch kein Schweigen, sonst spraeche die eingebaute Begruessung).
+  const datei = path.join(WURZEL, 'js/pakete/gedaechtnis/logik.js');
+  if (existsSync(datei)) {
+    const G = await import('../js/pakete/gedaechtnis/logik.js');
+    const T = await import('../js/tag.js');
+    const indexTeile = zerlege(readFileSync(path.join(WURZEL, 'js/pakete/gedaechtnis/index.js'), 'utf8'));
+    const index = indexTeile.code;
+    const leiter = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
+    let falsch = 0;
+    let gesehen = 0;
+    for (const botId of leiter) {
+      for (let i = 0; i < 30; i++) {
+        const heute = T.addiereTage('2026-11-02', i);
+        const am = (k) => new Date(Date.parse(T.beginnVon(T.addiereTage(heute, -k))) + 14 * 3600e3).toISOString();
+        const p = (ergebnis, k) => ({ id: `f${botId}${i}${k}`, botId, ergebnis, datum: am(k), modus: 'normal', zuege: ['e2e4'] });
+        for (const [partien, gesamt] of [[[p('niederlage', 1), p('niederlage', 2), p('niederlage', 3)], 0], [[p('niederlage', 1), p('sieg', 2)], 3]]) {
+          const w = G.begruessung({ botId, partien, heute, folgeGesamt: () => gesamt });
+          gesehen++;
+          if (!w || G.STICHELEI.includes(w.grund) || w.grund !== 'mutmachen') falsch++;
+        }
+      }
+    }
+    pruefe(`Bot-Ton: nach 3 Niederlagen in Folge keine Stichelei, sondern Mut (${gesehen} Faelle, alle Leiter-Bots)`, falsch === 0 && gesehen === 600, falsch);
+    // dieselbe Sperre nach 9 Tagen Pause (wiedersehen gewinnt den Vorrang) und mit Partien, die aus der Liste gefallen sind,
+    // bei "Bot-Sprueche: Normal" und "Wenig": nie Schweigen (sonst spraeche die eingebaute Begruessung, die sticheln kann),
+    // bei "Wenig" nur dessen Anlaesse, und die Wahl steht vorn am Wahl-Ort (vor dem Level-Gruss anderer Pakete)
+    let sperrFalsch = 0;
+    let sperrFaelle = 0;
+    for (const botId of leiter) {
+      for (let i = 0; i < 30; i++) {
+        const heute = T.addiereTage('2026-11-02', i);
+        const am = (k) => new Date(Date.parse(T.beginnVon(T.addiereTage(heute, -k))) + 14 * 3600e3).toISOString();
+        const p = (ergebnis, k) => ({ id: `s${botId}${i}${k}`, botId, ergebnis, datum: am(k), modus: 'normal', zuege: ['e2e4'] });
+        for (const sprueche of ['an', 'wenig']) {
+          for (const [partien, gesamt, bekannt] of [[[p('niederlage', 9), p('niederlage', 10), p('niederlage', 11)], 0, 3], [[], 3, 5]]) {
+            const w = G.begruessung({ botId, partien, heute, folgeGesamt: () => gesamt, bekannt, sprueche });
+            sperrFaelle++;
+            if (!w || G.STICHELEI.includes(w.grund) || w.vorn !== true || (sprueche === 'wenig' && !G.WENIG.includes(w.grund))) sperrFalsch++;
+          }
+        }
+      }
+    }
+    pruefe(`Bot-Ton: Sperre auch nach langer Pause und bei "Wenig", nie Schweigen, immer vorn (${sperrFaelle} Faelle)`, sperrFalsch === 0 && sperrFaelle === 1200, sperrFalsch);
+    pruefe('Bot-Ton: hoechstens eine Stichelei je Partie (nur die Begruessung "revanche", keine Blase, kein Coach-Zusatz)',
+      JSON.stringify(G.STICHELEI) === '["revanche"]' && !/\.blase\(|coachZusatz\(/.test(index)
+      && indexTeile.texte.filter((t) => t === 'partie:begruessung?').length === 1);
+  }
+}
+{
   // Level ohne Spielwirkung (Regel 18): bots.js und engine.js importieren nichts aus Paketen (Funken, Level ...)
   const imp = ['js/bots.js', 'js/engine.js'].filter((d) => /from\s+['"][^'"]*pakete\//.test(readFileSync(path.join(WURZEL, d), 'utf8')));
   pruefe('bots.js und engine.js importieren nichts aus den Paketen (Level und Funken ohne Spielwirkung)', imp.length === 0, imp);

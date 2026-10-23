@@ -107,6 +107,8 @@ export const MODUL_BUDGET = Object.freeze({
   funken: 25000, punkte: 40000, boss: 12000, raetsel: 30000, lernen: 30000, liga: 10000, sammeln: 20000, freunde: 15000,
   // w0plus-a-fix: Matt-Finisher (S1-7: Matt-Atlas, Mattbilder) und Schub 2b, zusammen 30.000
   finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000,
+  // Welle A: Siegesbild (A1, Paket teilen: Wahl hell/dunkel und Benutzername, gemerkte geteilte Partien)
+  teilen: 2000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;
