@@ -873,22 +873,29 @@ async function testeOptik(browser) {
   pruefe('Koordinaten in der Gegenfeldfarbe', ecke.zahlFarbe === ecke.dunkel && ecke.buchstFarbe === ecke.hell, JSON.stringify(ecke));
   // Feld unten rechts (h1, gedreht a8): das Brett-Eck ist abgerundet; der Buchstabe (unteres Viertel seiner Box, wo der Fuss
   // des Zeichens steht) liegt ganz innerhalb des Rundes (Pruefer U6: das "h" wurde angeschnitten), beide Ausrichtungen
-  const imRund = (feld) => seite.evaluate((f) => {
-    const fe = document.querySelector(`.feld[data-feld="${f}"]`);
-    const b = fe.querySelector('.koord.buchst').getBoundingClientRect();
-    const q = fe.getBoundingClientRect();
+  // Dazu der Vergleich mit dem Nachbarfeld (g1, gedreht b8): rechts gleich weit vom Feldrand, sonst stuende der Buchstabe
+  // hinter dem Fuss der Figur (Turm auf h1, auf dem Handy unsichtbar), und hoechstens 3 px hoeher als die Nachbarn
+  const imRund = ([f, nachbar]) => seite.evaluate(([f, nachbar]) => {
+    const lage = (feld) => {
+      const fe = document.querySelector(`.feld[data-feld="${feld}"]`);
+      const b = fe.querySelector('.koord.buchst').getBoundingClientRect();
+      const q = fe.getBoundingClientRect();
+      return { dx: q.right - b.right, dy: q.bottom - (b.top + b.height * 0.75), ecke: fe.querySelector('.koord.buchst').classList.contains('ecke') };
+    };
     const r = parseFloat(getComputedStyle(document.querySelector('#brett > .brett-felder')).borderBottomRightRadius);
-    const dx = q.right - b.right;
-    const dy = q.bottom - (b.top + b.height * 0.75);
+    const { dx, dy, ecke } = lage(f);
+    const n = lage(nachbar);
     const drin = dx >= r || dy >= r || Math.hypot(r - dx, r - dy) <= r;
-    return { drin, dx: +dx.toFixed(2), dy: +dy.toFixed(2), r, ecke: fe.querySelector('.koord.buchst').classList.contains('ecke') };
-  }, feld);
-  const rundW = await imRund('h1');
+    return { drin, dx: +dx.toFixed(2), dy: +dy.toFixed(2), r, ecke, nachbarDx: +n.dx.toFixed(2), nachbarDy: +n.dy.toFixed(2), nachbarEcke: n.ecke };
+  }, [f, nachbar]);
+  const rundW = await imRund(['h1', 'g1']);
   await seite.evaluate(() => demo.brett.setzeAusrichtung('b'));
-  const rundB = await imRund('a8');
+  const rundB = await imRund(['a8', 'b8']);
   await seite.evaluate(() => demo.brett.setzeAusrichtung('w'));
   pruefe('Koordinate im Feld unten rechts bleibt im abgerundeten Brett-Eck (h1, gedreht a8)', rundW.drin && rundB.drin && rundW.ecke && rundB.ecke && rundW.r > 0,
     JSON.stringify({ rundW, rundB }));
+  pruefe('Koordinate im Feld unten rechts rueckt nur nach oben, nicht hinter den Fuss der Figur (rechts wie g1/b8, hoechstens 3 px hoeher)',
+    [rundW, rundB].every((x) => Math.abs(x.dx - x.nachbarDx) <= 0.5 && x.dy - x.nachbarDy <= 3 && !x.nachbarEcke), JSON.stringify({ rundW, rundB }));
 
   // Koordinaten am Rand: ausserhalb der Felder im Sockel, Sockel links und unten 12 px, Effekt-Ebene bleibt deckungsgleich
   await seite.evaluate(() => demo.brett.setzeKoordLage('rand'));

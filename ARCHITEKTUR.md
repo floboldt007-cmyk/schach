@@ -1097,7 +1097,9 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
   (roter Hof), `.lage.vorschau` (Zug bestaetigen, Figur `.figur.vorschau` halb durchsichtig). Alle `.lage` und Flos
   Marken liegen in `.brett-felder` (eigener Stapelkontext, `z-index: 0`) und damit UNTER den Figuren. Abzeichen federn mit
   `--feder-hupf` ein (`.abzeichen-ort.plopp`), bleiben in der Brett-Box und verschwinden (`.weg`), sobald ihre Figur
-  das Feld verlaesst oder geschlagen wird.
+  das Feld verlaesst oder geschlagen wird. Schatten der Figuren und Abzeichen kommen aus festen Tokens in
+  `css/tokens.css` (`--schatten-figur`, `-hoch`, `-zieh`, `--schatten-abzeichen`). Der Buchstabe im Feld unten rechts
+  (`.koord.buchst.ecke`) rueckt nur nach oben ins abgerundete Brett-Eck, nicht nach links hinter den Fuss der Figur.
 - Komfort (Einstellungen aus PLAN 4, die Partie verdrahtet sie): `setzeBestaetigen(bool)` (Vorschau: erster
   Tipp/Abwurf stellt die Figur halb durchsichtig aufs Ziel, zweiter Tipp aufs Ziel macht fest, erst dann `beiZug`;
   Tipp anderswo nimmt zurueck und tut sonst nichts, ausser er trifft eine eigene ziehbare Figur, die er waehlt; kein

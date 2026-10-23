@@ -137,9 +137,9 @@ button, a, [role="radio"] { touch-action: manipulation; }
 .brett-rahmen > .brett { width: var(--brett, 100%); --brett-radius: var(--r-brett); }
 .brett-rahmen:has(> .brett.koord-rand) { padding-left: 12px; padding-bottom: 12px; }
 html[data-koordinaten="aus"] .brett .koord { display: none; }
-.brett > .figur { filter: drop-shadow(0 2px 1.5px rgba(10, 12, 30, .28)); }
-.brett > .figur.angehoben { filter: drop-shadow(0 6px 5px rgba(10, 12, 30, .26)); }
-.brett > .figur.gezogen { filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .3)); }
+.brett > .figur { filter: drop-shadow(var(--schatten-figur)); }
+.brett > .figur.angehoben { filter: drop-shadow(var(--schatten-figur-hoch)); }
+.brett > .figur.gezogen { filter: drop-shadow(var(--schatten-figur-zieh)); }
 .brett .lage.mark-hinweis { box-shadow: inset 0 0 0 max(3px, .5cqw) var(--k-stark); }
 
 /* Klassen-Farbe fuer Effekte (Welle, Ringe, Funken) je Abzeichen- bzw. Effekt-Klasse */

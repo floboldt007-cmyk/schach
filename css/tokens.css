@@ -58,6 +58,11 @@ html[data-brett="holz"] {
   --vorzug-start: rgba(70, 87, 120, .34);
   --vorzug-ziel: rgba(204, 72, 32, .36);
   --schach: rgba(226, 60, 60, .85);
+  /* Schatten der Figuren und Abzeichen auf dem Brett (fest wie die Brettfarben): ruhend, angehoben, gezogen */
+  --schatten-figur: 0 2px 1.5px rgba(10, 12, 30, .28);
+  --schatten-figur-hoch: 0 6px 5px rgba(10, 12, 30, .26);
+  --schatten-figur-zieh: 0 8px 10px rgba(0, 0, 0, .3);
+  --schatten-abzeichen: 0 2px 3px rgba(0, 0, 0, .3);
 }
 
 /* ---------- Bruecke: alte Variablen auf die neuen Tokens ----------
