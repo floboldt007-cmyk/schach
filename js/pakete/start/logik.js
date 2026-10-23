@@ -21,7 +21,8 @@
 //     neue Funktionen, keine Grundlagen wie Analyse oder Verlauf)
 //   hinweisHeute(modul, { tag, an, partien, training, einstufungFertig }) -> { id | null, modul }   der Hinweis des Tages;
 //     ein neu gewaehlter steht danach in modul.fahrplan.heute (der Aufrufer speichert), ein erledigter kommt heute nicht
-//     wieder und kein anderer an seiner Stelle
+//     wieder und kein anderer an seiner Stelle. training: das Training hat etwas zu ueben (index.js: ein Paket bietet
+//     training:karten an UND training:stand meldet Karten; ein leerer Stapel ist keine Entdeckung)
 //   erledige(modul, id) -> modul   angetippt oder ausgeblendet
 //   merkeBenutzt(modul, screen) -> { modul, neu }   ein Screen einer Entdeckung wurde besucht (dann kein Hinweis mehr)
 // Erster Sieg (SPIELKONZEPT 3.16 "schneller erster Sieg", Feier-Quelle erster-sieg):

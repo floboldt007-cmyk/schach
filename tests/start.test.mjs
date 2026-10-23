@@ -8,8 +8,10 @@
 // Willkommen, zweiter nicht, nicht mit gespeicherter Partie; Seiten, Ueberspringen, Pfeiltasten, "Ich kenne mich aus";
 // Regel-Hilfe (Punkte am Brett, falscher Zug, alle Figuren, Ende, Rueckweg); Einstufung mit festen Antworten -> Lisa Laeufer
 // als Probepartie (Modus frei), Leiter-Knopf, freigeschaltet ohne Probe; Heute-Karte "Neu fuer dich" (nach der ersten
-// Partie, einer je Tag, Ausblenden, naechster Tag, abschaltbar); Gruppe "Erste Schritte"; erster Sieg als Feier-Zeile;
-// Laden ueber PAKETE ohne ?test; Bilder 1180 x 820 und 390 x 844, hell und dunkel.
+// Partie, einer je Tag, Ausblenden, naechster Tag, abschaltbar); Gruppe "Erste Schritte" (mit Zurueck); erster Sieg als
+// Feier-Zeile; zusammen mit der Kartei (?erw=pakete/start/index,pakete/kartei/index): "Neu fuer dich" tritt hinter die
+// Kartei-Zeile zurueck (Spielen-Knopf auf dem iPad 1024 x 768 im Bild), "Das Training" nur mit Karten im Stapel, jeder
+// Kopf einzeilig bei 1024 und 375; Laden ueber PAKETE ohne ?test; Bilder 1180 x 820 und 390 x 844, hell und dunkel.
 //
 //   node tests/start.test.mjs                 alles
 //   node tests/start.test.mjs --nur-node      ohne Browser
@@ -160,6 +162,9 @@ async function nodeTeil() {
     [...R, ...A.EINSTUFUNG].every(textOk) && new Set([...R, ...A.EINSTUFUNG].map((a) => a.id)).size === R.length + A.EINSTUFUNG.length,
     [...R, ...A.EINSTUFUNG].filter((a) => !textOk(a)).map((a) => a.id));
   pruefe('Quelle dokumentiert: selbst erstellt', /Quelle aller Stellungen: selbst erstellt/.test(lies('js/pakete/start/aufgaben.js')));
+  const bauer = R.find((a) => a.id === 'regel-bauer');
+  pruefe('Bauer: die Umwandlung ist sachlich richtig (eine neue Figur nach Wahl, meist die Dame, nicht immer die Dame)',
+    bauer && /neuen Figur/.test(bauer.erklaerung) && /meist zur Dame/.test(bauer.erklaerung) && !/wird er zu einer Dame/.test(bauer.erklaerung), bauer && bauer.erklaerung);
 
   // ---------- Einstufung: 8 Aufgaben, eindeutige Loesungen ----------
   gruppe = 'Einstufung';
@@ -320,6 +325,14 @@ async function nodeTeil() {
   pruefe('kein toISOString in den Paket-Dateien (Tage aus tag.js)', alleJs.every((d) => !/toISOString/.test(lies(d).replace(/\/\/.*$/gm, ''))));
   pruefe('Kommentare in ASCII (Umlaute nur in Oberflaechentexten)', alleJs.every((d) => lies(d).split('\n').every((z) => !/^\s*\/\/.*[^\x00-\x7F]/.test(z))),
     alleJs.flatMap((d) => lies(d).split('\n').filter((z) => /^\s*\/\/.*[^\x00-\x7F]/.test(z)).map((z) => d + ': ' + z.trim().slice(0, 50))));
+  const ohneKommentar = (d) => lies(d).replace(/\/\/.*$/gm, '');
+  pruefe('kein fester Bot im Dienst und im Screen: der Gegner nach der Regel-Hilfe ist der erste Bot der Leiter (BOTS[0])',
+    ['js/pakete/start/dienst.js', 'js/ui/start.js'].every((d) => !/botNachId\('benno'\)|botId: 'benno'|Bauer Benno/.test(ohneKommentar(d)))
+    && /export const ersterGegner = \(\) => BOTS\[0\]/.test(lies('js/pakete/start/dienst.js')));
+  const cssRoh = lies('css/pakete/start.css');
+  pruefe('Kommentare in ASCII auch im CSS und in dieser Testdatei', [...cssRoh.matchAll(/\/\*[\s\S]*?\*\//g)].every((x) => !/[^\x00-\x7F]/.test(x[0]))
+    && lies('tests/start.test.mjs').split('\n').every((z) => !/^\s*\/\/.*[^\x00-\x7F]/.test(z)),
+    lies('tests/start.test.mjs').split('\n').filter((z) => /^\s*\/\/.*[^\x00-\x7F]/.test(z)).map((z) => z.trim().slice(0, 50)));
   pruefe('nur ueber Orte, Ereignisse, Register und Modul-Speicher: keine Datei eines anderen Pakets oder Host-Screens importiert',
     alleJs.every((d) => !/from '[^']*(pakete\/(?!start)|ui\/(partie|arena|analyse|verlauf|einstellungen)\.js)/.test(lies(d))));
   const tokens = new Set([...lies('css/tokens.css').matchAll(/(--[a-z0-9-]+)\s*:/g), ...lies('css/themes/modern.css').matchAll(/(--[a-z0-9-]+)\s*:/g)].map((x) => x[1]));
@@ -462,6 +475,8 @@ async function browserTeil(browser) {
     css: !!document.querySelector('link[data-paket="start"]') }));
   pruefe('frischer Start ohne Partien: Willkommen (#start, Seite 1 von 3, "Ich kenne mich aus" im Kopf, eigenes CSS)', erst.hash === '#start' && erst.titel === 'Willkommen · Crownmate'
     && erst.h1 === 'Schach, das mit dir wächst.' && erst.raus && erst.punkte === 3 && erst.aktuell === 'w1' && erst.css, JSON.stringify(erst));
+  pruefe('beim allerersten Start kein Zurueck im Kopf (es gibt keinen Weg zurueck), nur "Ich kenne mich aus"',
+    await seite.evaluate(() => !document.querySelector('.st-screen .kopf-zurueck') && !!document.querySelector('.st-screen .st-raus')));
   pruefe('Willkommen gilt als gesehen (Modul start, Tag mit Grenze 4:00)', (await modulImBrowser(seite)).gesehen === heute);
   pruefe('Fahrplan beginnt beim ersten Start (neuer Spieler)', await seite.waitForFunction((P) => {
     const m = JSON.parse(localStorage.getItem(P + 'modul:start') || 'null');
@@ -521,6 +536,16 @@ async function browserTeil(browser) {
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
   await warte(300);
   pruefe('mit gespeicherter Partie (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen') && location.hash === '#arena'));
+  // nur Fortschritt, keine Partienliste (z. B. nur teilweise wiederhergestellt): auch kein allererster Start
+  await seite.evaluate((P) => {
+    localStorage.clear();
+    localStorage.setItem(P + 'fortschritt', JSON.stringify({ bots: { benno: { sterne: [false, false, false], partien: 5, siege: 0, remis: 0, niederlagen: 5 } }, brillanteZuege: [] }));
+  }, P);
+  await seite.goto(BASIS);
+  await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
+  await warte(300);
+  pruefe('nur Fortschritt mit 5 Partien, keine Partienliste (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen')
+    && location.hash === '#arena'));
   // Ueberspringen auf Seite 1
   await seite.evaluate(() => localStorage.clear());
   await seite.goto(BASIS);
@@ -603,6 +628,27 @@ async function browserTeil(browser) {
   await warteSeite(seite, 'frage');
   await seite.locator('[data-st="ja"]').click();
   await warteSeite(seite, 'einstufung');
+  // Stapel: die Schraeglage haengt am Platz, die Karte darin gleitet ein. Waehrend des Eintritts und am Ende dieselbe
+  // Drehung (frueher kippten die Karten nach etwa 600 ms schlagartig um bis zu 8 Grad, weil der Eintritt transform ueberschrieb)
+  const winkel = () => seite.evaluate(() => {
+    const grad = (t) => {
+      if (!t || t === 'none') return 0;
+      const m = t.match(/matrix\(([^)]+)\)/);
+      if (!m) return NaN;
+      const [a, b] = m[1].split(',').map(Number);
+      return Math.round(Math.atan2(b, a) * 180 / Math.PI);
+    };
+    const karten = [...document.querySelectorAll('.st-stapel-karte')];
+    return { ort: [...document.querySelectorAll('.st-stapel-ort')].map((o) => grad(getComputedStyle(o).transform)),
+      karte: karten.map((k) => grad(getComputedStyle(k).transform)),
+      dreht: karten.some((k) => k.getAnimations().some((a) => /rotate/.test(JSON.stringify(a.effect.getKeyframes())))) };
+  });
+  const sw0 = await winkel();
+  await warte(1100);
+  const sw1 = await winkel();
+  pruefe('Stapel: Drehung am Platz (-8, -1, 7 Grad) schon im Eintritt und am Ende gleich, die einfliegende Karte dreht nie',
+    JSON.stringify(sw0.ort) === '[-8,-1,7]' && JSON.stringify(sw1.ort) === '[-8,-1,7]' && sw0.karte.every((x) => x === 0) && sw1.karte.every((x) => x === 0)
+    && !sw0.dreht, JSON.stringify({ sw0, sw1 }));
   const ang = await seite.evaluate(() => ({ chips: [...document.querySelectorAll('.st-chips span')].map((c) => c.textContent),
     knoepfe: [...document.querySelectorAll('.st-knoepfe .knopf')].map((k) => k.textContent.trim()), stapel: document.querySelectorAll('.st-stapel .mini').length }));
   pruefe('Ja: Angebot der Einstufung ("8 Aufgaben", "etwa 5 Minuten", "wertet nichts"), starten oder gleich spielen', ang.chips.join('|') === '8 Aufgaben|etwa 5 Minuten|wertet nichts'
@@ -711,6 +757,18 @@ async function browserTeil(browser) {
   await seite.locator('[data-st="spielen"]').click();
   await seite.waitForFunction(() => !!window.__partie && window.__partie.z.bot.id === 'lisa', null, { timeout: 15000 });
   pruefe('...und die startet normal (wertet)', await seite.evaluate(() => window.__partie.z.modus) === 'normal');
+  // die Leiter beim Antippen entscheidet, nicht die beim Zeichnen: Seite mit "Gegen Lisa Laeufer spielen" offen, dann setzt
+  // ein zweiter Tab (oder eine eingespielte Sicherung) den Fortschritt zurueck. Antippen startet nur eine Probepartie
+  await seite.evaluate(() => window.__app.gehe('start', { seite: 'empfehlung' }));
+  await warteSeite(seite, 'empfehlung');
+  const vorher = await seite.evaluate(() => { const b = document.querySelector('[data-st="spielen"]'); return b ? b.textContent.trim() : null; });
+  await seite.evaluate((P) => { window.__altePartie = window.__partie; localStorage.removeItem(P + 'fortschritt'); localStorage.removeItem(P + 'laufend'); }, P);
+  if (vorher) await seite.locator('[data-st="spielen"]').click();
+  const neuGestartet = await seite.waitForFunction(() => !!window.__partie && window.__partie !== window.__altePartie && !!document.querySelector('.screen.partie'),
+    null, { timeout: 15000 }).then(() => true, () => false);
+  const nach = neuGestartet ? await seite.evaluate(() => ({ bot: window.__partie.z.bot.id, modus: window.__partie.z.modus })) : null;
+  pruefe('Leiter inzwischen zurueckgesetzt: "Gegen Lisa Läufer spielen" startet nur eine Probepartie gegen Lisa (Modus frei, wertet nie)',
+    vorher === 'Gegen Lisa Läufer spielen' && nach && nach.bot === 'lisa' && nach.modus === 'frei', JSON.stringify({ vorher, nach }));
   pruefe('keine Konsolenfehler (Willkommen, Regel-Hilfe, Einstufung)', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 
@@ -788,6 +846,11 @@ async function browserTeil(browser) {
   await n.seite.locator('.st-gruppe .st-g-willkommen').click();
   await warteSeite(n.seite, 'w1');
   pruefe('"Willkommen ansehen": Seite 1 des Willkommens', (await sz(n.seite)).seite === 'w1');
+  const zk = await n.seite.evaluate(() => ({ zurueck: !!document.querySelector('.st-screen .haupt-kopf .kopf-zurueck'), raus: !!document.querySelector('.st-screen .st-raus') }));
+  if (zk.zurueck) await n.seite.locator('.st-screen .kopf-zurueck').click();
+  const zuruckDa = zk.zurueck && await n.seite.waitForSelector('.es-screen .st-gruppe', { timeout: 15000 }).then(() => true, () => false);
+  pruefe('aus den Einstellungen geoeffnet: Zurueck im Kopf (neben "Ich kenne mich aus") fuehrt wieder in die Einstellungen', zk.zurueck && zk.raus && zuruckDa
+    && await n.seite.evaluate(() => location.hash) === '#einstellungen', JSON.stringify(zk));
   // erster Sieg (Ereignis wie aus partie.js, Fortschritt mit genau einem Sieg)
   gruppe = 'Erster Sieg';
   await bereite(n.seite, { modul: modulMit({}), fortschritt: { bots: { benno: { sterne: [true, false, false], partien: 2, siege: 1, niederlagen: 1 } } } }, '#arena');
@@ -807,7 +870,7 @@ async function browserTeil(browser) {
   pruefe('keine Konsolenfehler (Heute-Karte, Einstellungen, Feier)', n.fehler.length === 0, n.fehler.join(' | '));
   await n.kontext.close();
 
-  // kleines iPad quer (1024 x 768): neuer Spieler nach der ersten Partie, die Heute-Karte zeigt "Neu für dich", der
+  // kleines iPad quer (1024 x 768): neuer Spieler nach der ersten Partie, die Heute-Karte zeigt "Neu fuer dich", der
   // Spielen-Knopf bleibt ganz im Bild (eine zweizeilige Zeile schob ihn frueher 6 px unter den Rand)
   gruppe = 'iPad 1024 x 768';
   const k = await neueSeite(browser, { w: 1024, h: 768 });
@@ -831,6 +894,109 @@ async function browserTeil(browser) {
   await bild(k.seite, 'heute-neu-ipad-1024');
   pruefe('keine Konsolenfehler (iPad 1024 x 768)', k.fehler.length === 0, k.fehler.join(' | '));
   await k.kontext.close();
+
+  // ---------- zusammen mit der Kartei (A3): eine Zeile in der Heute-Karte, Training nur mit Karten, Kopf einzeilig ----------
+  gruppe = 'Mit Kartei';
+  const URL_K = `http://127.0.0.1:${PORT}/index.html?test&erw=${ERW},pakete/kartei/index`;
+  const mk = await neueSeite(browser, { w: 1024, h: 768 });
+  await mk.seite.goto(URL_K + '#arena');
+  await mk.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
+  const tm = await heuteImBrowser(mk.seite);
+  const tagK = (n) => mk.seite.evaluate(async (x) => (await import('/js/tag.js')).addiereTage(x.t, x.n), { t: tm, n });
+  const [vorgesternK, gesternK, morgenK, vor5K] = [await tagK(-2), await tagK(-1), await tagK(1), await tagK(-5)];
+  // eine Karte der Kartei (Form aus js/pakete/kartei/logik.js), faellig am Tag "faellig"
+  const karteiModul = (faellig) => ({ v: 1, karten: [{ id: 'pk1:4', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', besterZug: 'b8c6',
+    gespielt: 'f7f6', klasse: 'fehler', partieId: 'pk1', ply: 3, botId: 'benno', farbe: 'b', stufe: 0, faellig, erstellt: tm, datum: tm }],
+  verarbeitet: ['pk1'], heute: { tag: tm, ids: [] }, zaehler: {} });
+  const fortK = (partien) => ({ bots: { benno: { sterne: [false, false, false], partien, siege: 0, remis: 0, niederlagen: partien } }, brillanteZuege: [] });
+  async function bereiteK(s, { modul, kartei = null, partien = 1 }) {
+    await s.evaluate(({ modul, kartei, fort, P }) => {
+      localStorage.clear();
+      localStorage.setItem(P + 'modul:start', JSON.stringify(modul));
+      if (kartei) localStorage.setItem(P + 'modul:kartei', JSON.stringify(kartei));
+      localStorage.setItem(P + 'fortschritt', JSON.stringify(fort));
+      localStorage.setItem(P + 'partien', JSON.stringify([{ id: 'pk1', botId: 'benno', spielerFarbe: 'w', datum: new Date().toISOString(), zuege: ['e2e4'], ergebnis: 'niederlage', modus: 'normal' }]));
+    }, { modul, kartei, fort: fortK(partien), P });
+    await s.reload();
+    await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen.arena .knoten') && !!document.querySelector('link[data-paket="start"]'), null, { timeout: 20000 });
+    await warte(600);
+  }
+  const messeK = (s) => s.evaluate(async () => {
+    const sicht = (el) => !!el && el.getClientRects().length > 0;
+    const b = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
+    const neu = document.querySelector('.heute-karte .st-neu');
+    const { zustand } = await import('/js/pakete/start/index.js');
+    const z = zustand();
+    return { unten: Math.round(b.bottom), innerHeight, karte: !document.querySelector('.heute-karte').hidden, kartei: sicht(document.querySelector('.heute-karte .kt-heute')),
+      neu: neu ? neu.dataset.entdeckung : null, neuSichtbar: sicht(neu), hinweis: z.hinweis, training: z.training, erledigt: z.modul.fahrplan.erledigt,
+      heute: z.modul.fahrplan.heute && z.modul.fahrplan.heute.id };
+  });
+  const startK = (fp, extra = {}) => ({ v: 1, gesehen: vor5K, regeln: null, einstufung: null, ersterSieg: '', letzte: 'pk1',
+    fahrplan: { start: gesternK, erfahren: false, heute: null, erledigt: ['analyse'], benutzt: [], ...fp }, ...extra });
+  // Fall des Pruefers: Tag 1 nach dem ersten Start, die Einstufung waere dran, und die Kartei meldet eine faellige Karte
+  await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(tm) });
+  let mK = await messeK(mk.seite);
+  pruefe('Kartei-Zeile und "Neu für dich" zugleich: die Kartei-Zeile steht, "Die Einstufung" tritt zurueck (unsichtbar, nicht erledigt, bleibt der Hinweis des Tages)',
+    mK.karte && mK.kartei && mK.neu === 'einstufung' && !mK.neuSichtbar && mK.hinweis === 'einstufung' && mK.heute === 'einstufung' && !mK.erledigt.includes('einstufung'), JSON.stringify(mK));
+  pruefe('...und der Spielen-Knopf bleibt auf dem iPad quer 1024 x 768 ganz im Bild', mK.unten <= mK.innerHeight, JSON.stringify({ unten: mK.unten, innerHeight: mK.innerHeight }));
+  await bild(mk.seite, 'heute-kartei-ipad-1024');
+  // dieselbe Lage, die Karte ist erst morgen faellig: keine Kartei-Zeile, "Neu fuer dich" steht wieder allein
+  await bereiteK(mk.seite, { modul: startK({}), kartei: karteiModul(morgenK) });
+  mK = await messeK(mk.seite);
+  pruefe('ohne faellige Karte: "Neu für dich: Die Einstufung" steht allein in der Heute-Karte, Spielen-Knopf im Bild', mK.karte && !mK.kartei && mK.neu === 'einstufung'
+    && mK.neuSichtbar && mK.unten <= mK.innerHeight, JSON.stringify(mK));
+  // Training: Tag 2, Analyse und Einstufung erledigt, eine Partie (Brett und Klang erst ab 2). Mit Karte im Stapel (morgen
+  // faellig): "Das Training"; mit leerem Stapel kein Hinweis (frueher fuehrte er zu "Noch keine Karten")
+  await bereiteK(mk.seite, { modul: startK({ start: vorgesternK, erledigt: ['analyse', 'einstufung'] }), kartei: karteiModul(morgenK) });
+  mK = await messeK(mk.seite);
+  pruefe('Karten im Stapel (training:stand meldet gesamt 1): "Neu für dich: Das Training"', mK.neu === 'training' && mK.neuSichtbar && mK.training && mK.training.gesamt === 1,
+    JSON.stringify(mK));
+  await bereiteK(mk.seite, { modul: startK({ start: vorgesternK, erledigt: ['analyse', 'einstufung'] }) });
+  mK = await messeK(mk.seite);
+  pruefe('leerer Stapel (training:stand meldet gesamt 0): kein Hinweis auf das Training, heute gar keiner', mK.neu === null && mK.hinweis === null && mK.training
+    && mK.training.gesamt === 0, JSON.stringify(mK));
+  // jeder Kopf "Neu fuer dich: <Titel>" in einer Zeile und ganz (nicht gekuerzt), jeder Satz ganz: iPad quer und kleines Handy
+  const kopfK = async (s, wo) => {
+    const aus = [];
+    const alle = ['analyse', 'einstufung', 'training', 'einstellungen', 'verlauf'];
+    for (const e of alle) {
+      await bereiteK(s, { modul: startK({ start: vor5K, heute: { tag: tm, id: e }, erledigt: alle.filter((x) => x !== e) }), kartei: karteiModul(morgenK), partien: 3 });
+      aus.push(await s.evaluate((id) => {
+        const z = document.querySelector('.heute-karte .st-neu');
+        if (!z || z.dataset.entdeckung !== id || !z.getClientRects().length) return { id, fehlt: true };
+        const kopf = z.querySelector('.st-neu-kopf');
+        const sm = z.querySelector('small');
+        return { id, zeilen: Math.round(kopf.getBoundingClientRect().height / parseFloat(getComputedStyle(kopf).lineHeight)),
+          kopfGanz: kopf.scrollWidth <= kopf.clientWidth + 1, satzGanz: sm.scrollWidth <= sm.clientWidth + 1 };
+      }, e));
+    }
+    pruefe(`${wo}: jeder Kopf "Neu für dich: <Titel>" in einer Zeile und nicht gekuerzt, jeder Satz ganz`, aus.every((x) => !x.fehlt && x.zeilen === 1 && x.kopfGanz && x.satzGanz),
+      JSON.stringify(aus.filter((x) => x.fehlt || x.zeilen !== 1 || !x.kopfGanz || !x.satzGanz)));
+  };
+  await kopfK(mk.seite, 'iPad quer 1024 x 768');
+  pruefe('keine Konsolenfehler (mit Kartei, iPad 1024 x 768)', mk.fehler.length === 0, mk.fehler.join(' | '));
+  await mk.kontext.close();
+  const mh = await neueSeite(browser, { w: 375, h: 667, handy: true });
+  await mh.seite.goto(URL_K + '#arena');
+  await mh.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
+  await kopfK(mh.seite, 'kleines Handy 375 x 667');
+  // Willkommen aus den Einstellungen auf dem kleinen Handy: Zurueck, "Ich kenne mich aus" und Klang passen in den Kopf
+  await mh.seite.evaluate(() => window.__app.gehe('einstellungen'));
+  await mh.seite.waitForSelector('.es-screen .st-gruppe', { timeout: 15000 });
+  await mh.seite.locator('.st-gruppe .st-g-willkommen').click();
+  await warteSeite(mh.seite, 'w1');
+  await warte(500);
+  const kh = await mh.seite.evaluate(() => {
+    const knoepfe = [...document.querySelectorAll('.st-screen .haupt-kopf button')].filter((b) => b.getClientRects().length);
+    return { zurueck: !!document.querySelector('.st-screen .kopf-zurueck'), anzahl: knoepfe.length,
+      drin: knoepfe.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1 && r.height >= 44; }) };
+  });
+  const lk = await layout(mh.seite);
+  pruefe('kleines Handy, aus den Einstellungen geoeffnet: Zurueck, "Ich kenne mich aus" und Klang ganz im Kopf (die Marke tritt zurueck), nichts ragt heraus',
+    kh.zurueck && kh.anzahl === 3 && kh.drin && lk.quer && lk.raus && lk.titel && !lk.klein.length, JSON.stringify({ kh, lk }));
+  await bild(mh.seite, 'w1-zurueck-handy-klein');
+  pruefe('keine Konsolenfehler (mit Kartei, Handy 375 x 667)', mh.fehler.length === 0, mh.fehler.join(' | '));
+  await mh.kontext.close();
 
   // ---------- Handy und dunkel ----------
   for (const [name, w, h, handy, dunkel] of [['handy-hell', 390, 844, true, false], ['handy-dunkel', 390, 844, true, true], ['ipad-dunkel', 1180, 820, false, true],
@@ -874,7 +1040,7 @@ async function browserTeil(browser) {
       const l = await layout(hs.seite);
       pruefe('Empfehlung: nichts ragt heraus, Knoepfe mindestens 44 px', l.quer && l.raus && l.titel && !l.klein.length, JSON.stringify(l));
       await bild(hs.seite, `empfehlung-${name}`);
-      // Heute-Karte mit "Neu für dich" auf dem Handy: eine Kopfzeile, nichts ragt heraus, Knoepfe mindestens 44 px
+      // Heute-Karte mit "Neu fuer dich" auf dem Handy: eine Kopfzeile, nichts ragt heraus, Knoepfe mindestens 44 px
       const th = await heuteImBrowser(hs.seite);
       await bereite(hs.seite, { modul: { v: 1, gesehen: th, regeln: null, einstufung: null, ersterSieg: '', letzte: 'pprobe1',
         fahrplan: { start: th, erfahren: false, heute: null, erledigt: [], benutzt: [] } } }, '#arena');

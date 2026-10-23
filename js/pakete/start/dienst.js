@@ -18,11 +18,13 @@
 //     Partie offen, fragt es wie die Arena, ob sie verworfen werden soll
 //   aktuelleEmpfehlung() -> { e, bot, leiter, probe, begruendung } | null   letzte Einstufung mit dem heutigen Stand der
 //     Leiter (probe: der Bot ist noch nicht freigeschaltet)
+//   ersterGegner() -> Bot   der erste Bot der Leiter (BOTS[0], heute Bauer Benno; immer frei): Gegner nach der
+//     Regel-Hilfe. Aus BOTS statt mit festem Namen, damit es nach einem Umbau der Leiter (Welten) weiter stimmt
 import {
   ladeModul, speichereModul, ladeModulEinstellungen, speichereModulEinstellungen, ladeFortschritt, hoechsteFreieStufe,
   naechsterGegner, ladeLaufendePartie, loescheLaufendePartie,
 } from '../../storage.js';
-import { botNachId } from '../../bots.js';
+import { BOTS, botNachId } from '../../bots.js';
 import { tagSchluessel } from '../../tag.js';
 import { hoere } from '../../ereignisse.js';
 import { registriereRaetselQuelle } from '../../ui/raetsel.js';
@@ -78,6 +80,8 @@ export function einstellungen() {
 export function setzeEinstellungen(teil) {
   return speichereModulEinstellungen(L.MODUL, { ...einstellungen(), ...teil });
 }
+
+export const ersterGegner = () => BOTS[0];
 
 export function markiereGesehen() {
   return aendere((m) => (m.gesehen ? null : { ...m, gesehen: heute() }));
@@ -139,11 +143,12 @@ function regelQuelle() {
     ende(z) {
       sicher(() => aendere((m) => ({ ...m, regeln: { tag: heute(), geloest: z.geloest, gesamt: z.gesamt } })), 'Regeln speichern');
       setzeRueck('nach-regeln');
+      const erster = ersterGegner();
       return {
         titel: z.geloest === z.gesamt ? 'Du kennst alle Figuren' : 'Alle Figuren gesehen',
         text: 'Dazu kommen ein paar Sonderzüge wie die Rochade. Im Spiel zeigen dir die Punkte jeden erlaubten Zug: Tippe einfach eine Figur an.',
         klang: 'stern',
-        knoepfe: [{ text: 'Gegen Bauer Benno spielen', art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: 'benno' }); } }],
+        knoepfe: [{ text: `Gegen ${erster.name} spielen`, art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: erster.id }); } }],
       };
     },
   };

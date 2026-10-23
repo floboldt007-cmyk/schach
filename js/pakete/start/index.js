@@ -13,10 +13,14 @@
 //             Willkommen, Regel-Hilfe)
 // Ereignisse: hoert app:bereit (Fahrplan beginnt, per setTimeout), app:screen (besuchte Screens: kein Hinweis mehr dafuer),
 //             partie:beendet (letzte Partie fuer den Hinweis zur Analyse; erster Sieg synchron vor den Feier-Zeilen des
-//             Overlays). Sendet nichts.
+//             Overlays), training:stand (Stand des Trainings, z. B. der Kartei: der Hinweis "Das Training" kommt erst, wenn
+//             dort Karten liegen, nie fuer einen leeren Stapel). Sendet nichts.
+// Heute-Karte: die Zeile "Neu fuer dich" tritt zurueck, solange dort eine Zeile eines anderen Pakets steht
+//             (css/pakete/start.css, .heute-karte .st-neu:not(:only-child)): Spielen-Knopf auf dem iPad quer im Bild.
 // Register:   Raetsel-Quellen start-regeln und start-einstufung (dienst.js), Icon "neu-siegel".
 // Speicher:   Modul "start" (Budget 6.000, logik.js), Paket-Einstellungen "start" { hinweise: true }.
-// Test:       zustand() -> { modul, einstellungen, hinweis }
+// Test:       zustand() -> { modul, einstellungen, hinweis, training }   hinweis: der Hinweis des Tages (auch wenn die Zeile
+//             gerade zuruecktritt), training: letzter training:stand
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
 import { anbieten, angeboten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
@@ -31,9 +35,12 @@ import * as L from './logik.js';
 
 const sicher = D.sicher;
 let letzterHinweis = null;
+// letzter Stand des Trainings (Ereignis training:stand { faellig, gesamt, gemeistert }), null: niemand hat gemeldet
+let trainingStand = null;
+const trainingHatKarten = () => !!(trainingStand && Number(trainingStand.gesamt) > 0);
 
 export function zustand() {
-  return { modul: D.stand(), einstellungen: D.einstellungen(), hinweis: letzterHinweis };
+  return { modul: D.stand(), einstellungen: D.einstellungen(), hinweis: letzterHinweis, training: trainingStand ? { ...trainingStand } : null };
 }
 
 const partienAus = (fortschritt) => {
@@ -62,7 +69,7 @@ function neuZeile(k) {
   const partien = Math.max(partienAus(k.fortschritt), m.letzte ? 1 : 0);
   const r = L.hinweisHeute(m, {
     tag: typeof k.tag === 'string' ? k.tag : D.heute(), an: true, partien,
-    training: angeboten('training:karten') > 0, einstufungFertig: !!m.einstufung,
+    training: angeboten('training:karten') > 0 && trainingHatKarten(), einstufungFertig: !!m.einstufung,
   });
   if (JSON.stringify(r.modul.fahrplan.heute) !== JSON.stringify(m.fahrplan.heute)) D.sichere(r.modul);
   letzterHinweis = r.id;
@@ -152,8 +159,10 @@ function registriere() {
   // kleines Papier-Siegel (gezackter Rand mit Haken) fuer "Neu fuer dich"
   registriereIcon('neu-siegel', '<path d="M12 2.8l2.1 1.5 2.5-.2.9 2.4 2.4.9-.2 2.5 1.5 2.1-1.5 2.1.2 2.5-2.4.9-.9 2.4-2.5-.2L12 21.2l-2.1-1.5-2.5.2-.9-2.4-2.4-.9.2-2.5L2.8 12l1.5-2.1-.2-2.5 2.4-.9.9-2.4 2.5.2z"/><path d="M8.8 12.3l2.2 2.1 4.2-4.6"/>');
 
+  // Partien wie beim Fahrplan: Partienliste (aus app.js) oder wertend im Fortschritt, das Groessere zaehlt (ein Spielstand
+  // mit Fortschritt, aber ohne Partienliste, z. B. nur teilweise wiederhergestellt, ist kein allererster Start)
   anbieten('app:erster-screen?', (k) => sicher(() => L.ersterScreenWahl(D.stand(), {
-    partienZahl: k && Number.isFinite(k.partienZahl) ? k.partienZahl : 1, laufend: !!ladeLaufendePartie(),
+    partienZahl: Math.max(k && Number.isFinite(k.partienZahl) ? k.partienZahl : 1, partienAus(null)), laufend: !!ladeLaufendePartie(),
   }), 'Erster Screen'), { reihenfolge: L.WAHL_REIHENFOLGE, paket: L.PAKET });
   anbieten('arena:heute', (k) => sicher(() => neuZeile(k), 'Heute'), { reihenfolge: 70, paket: L.PAKET });
   anbieten('einstellungen:gruppen', (k) => sicher(() => (k && k.app ? gruppe(k.app) : null), 'Einstellungen'), { reihenfolge: 90, paket: L.PAKET });
@@ -167,6 +176,9 @@ function registriere() {
       D.sichere(L.fahrplanStart(m, { tag: D.heute(), partien: Math.max(ladePartien().length, partienAus(null)) }));
     }, 'Fahrplan'), 0);
   });
+  hoere('training:stand', (d) => sicher(() => {
+    trainingStand = d && typeof d === 'object' ? { faellig: Number(d.faellig) || 0, gesamt: Number(d.gesamt) || 0 } : null;
+  }, 'training:stand'));
   hoere('app:screen', (d) => sicher(() => {
     if (!d || typeof d.name !== 'string') return;
     const m = D.stand();

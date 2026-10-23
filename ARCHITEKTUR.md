@@ -1548,20 +1548,26 @@ Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus 
 `css/pakete/start.css` (nur Tokens, `link[data-paket="start"]`). Test: `tests/start.test.mjs`. SPIELKONZEPT 3.16 und 3.12.
 
 - **Willkommen (Wahl-Ort `app:erster-screen?`, Reihenfolge 80):** nur beim allerersten Start, also ohne Hash und ohne
-  Verlaufseintrag (`app.js`), ohne gespeicherte und ohne laufende Partie und wenn das Modul noch kein `gesehen` hat
-  (`logik.ersterScreenWahl`). Ein Paket mit eigener Wahl unter 80 geht vor. Das Willkommen gilt als gesehen, sobald der
+  Verlaufseintrag (`app.js`), ohne gespeicherte und ohne laufende Partie (Partien aus der Partienliste oder, wertend, aus dem
+  Fortschritt, das Groessere zaehlt) und wenn das Modul noch kein `gesehen` hat (`logik.ersterScreenWahl`). Ein Paket mit eigener Wahl unter 80 geht vor. Das Willkommen gilt als gesehen, sobald der
   Screen einmal da war. Nach „Fortschritt zuruecksetzen“ ist das Modul weg, der naechste frische Start zeigt es wieder.
 - **Screen `start`** (`zeige(root, { seite }, app)`): Seiten `w1` (Was ist Crownmate), `w2` (deine Gegner: die Leiter aus
   `BOTS`, Zahl und Namen daraus), `w3` (wie du lernst), dann `frage` „Kennst du die Schachregeln?“ (Ja: `einstufung`,
   Nein: Regel-Hilfe), `einstufung` (Angebot), `empfehlung`, `nach-regeln`. „Weiter“, „Überspringen“ (zur Frage),
   Seiten-Punkte und Pfeiltasten auf w1 bis w3; „Ich kenne mich aus“ steht auf jeder Seite im Kopf und fuehrt zur Arena.
+  Liegt ein eigener Verlaufseintrag davor (`history.state.tiefe > 0`: aus den Einstellungen oder vom Hinweis in der
+  Heute-Karte geoeffnet), hat der Kopf zusaetzlich Zurueck (`app.zurueck()`); auf dem Handy tritt dann die Marke im Kopf
+  zurueck, damit Zurueck, „Ich kenne mich aus“ und Klang nebeneinander passen. `nach-regeln` bietet den ersten Bot der
+  Leiter an (`dienst.ersterGegner()` = `BOTS[0]`, kein fester Name).
   Die aktuelle Seite steht in `params.seite` des eigenen Verlaufseintrags (`history.replaceState`, Hash bleibt `#start`):
   Neuladen bleibt auf ihr. Aus dem Raetsel-Bildschirm zurueck (Zurueck oder „Fertig“) gilt die Seite, die `dienst.setzeRueck`
   gemerkt hat (nach der Einstufung `empfehlung`, nach der Regel-Hilfe `nach-regeln`), sonst die aus dem Verlauf. Ohne
   geladenen Paket-Einstieg (`dienst.paketGeladen()`, z. B. `#start` von Hand ohne Paket) geht der Screen still zur Arena
   wie ein fehlender Paket-Screen (Router-Test in `app.test.mjs`). DOM: `section.screen.st-screen[data-seite]`,
   `.st-buehne[data-seite]`, Knoepfe mit `data-st` (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter,
-  spielen, benno, einstufung-seite, wiederholen, arena, raus). Test-Schnittstelle `zustand()` -> `{ offen, seite }`, mit
+  spielen, benno, einstufung-seite, wiederholen, arena, raus). Stapel auf `einstufung`: `.st-stapel-ort` traegt Lage und
+  Drehung, die `.st-stapel-karte` darin gleitet ein (der Eintritt animiert `transform` der Karte und ueberschreibt so nie
+  die Schraeglage). Test-Schnittstelle `zustand()` -> `{ offen, seite }`, mit
   `?test` auch `window.__start.zustand()`.
 - **Regel-Hilfe und Einstufung** laufen im Raetsel-Bildschirm aus A3 (Quellen `start-regeln` und `start-einstufung`, angemeldet
   erst von `dienst.starte()` aus `index.js`). Regel-Hilfe: 7 Aufgaben (Turm, Laeufer, Dame, Springer, Koenig, Bauer, dann das
@@ -1576,22 +1582,33 @@ Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus 
   im ersten Versuch, naechster Schritt = die leichteste nicht geloeste, ein Satz zum Bot), keine Elo-Zahl. **Leiter bleibt:**
   Steht der Bot ueber der hoechsten freigeschalteten Stufe, gibt es ihn nur als „Probepartie“ (`app.gehe('partie', { botId,
   farbe: 'w', modus: 'frei' })`, `wertet()` ist false: keine Sterne, keine Freischaltung), daneben „Leiter: <naechster
-  Gegner>“. Sonst eine normale Partie. Ist eine Partie offen, fragt `dienst.starteSpiel` wie die Arena („Neue Partie
+  Gegner>“. Sonst eine normale Partie. Ob es eine Probepartie wird, entscheidet die Leiter beim Antippen, nicht beim
+  Zeichnen (wurde der Fortschritt inzwischen zurueckgesetzt oder ein anderer Stand eingespielt, wird auch „Gegen <Bot>
+  spielen“ zur Probepartie). Ist eine Partie offen, fragt `dienst.starteSpiel` wie die Arena („Neue Partie
   starten?“). Fehlt ein Bot der Tabelle in `BOTS`, nimmt `botFuerPunkte` den naechstschwaecheren.
 - **Entdeckungs-Fahrplan:** beginnt bei `app:bereit` (einmal, `fahrplan.start`; ab 5 Partien beim ersten Start „erfahren“:
   nur neue Funktionen). In den ersten 28 Tagen hoechstens ein Hinweis je Tag im Ort `arena:heute` (Reihenfolge 70):
   `.st-neu[data-entdeckung]`, die ganze Zeile `button.st-neu-los` „Neu für dich: <Titel>“ mit Satz fuehrt hin, `.st-neu-weg`
   blendet aus; beides erledigt den Hinweis, heute kommt kein zweiter. Reihenfolge `ENTDECKUNGEN`: Spielanalyse (nach der
   ersten Partie), Einstufung (ab Tag 1, solange nicht gemacht), Training (ab Tag 2, nur wenn ein Paket `training:karten`
-  anbietet), Brett und Klang (ab 2 Partien), Verlauf (ab 3 Partien). Wer einen Screen schon besucht hat (`app:screen`), bekommt
-  dafuer keinen Hinweis mehr. Abschaltbar in der Gruppe „Erste Schritte“ (Paket-Einstellung `start.hinweise`).
+  anbietet UND `training:stand` Karten meldet, `gesamt > 0`; nie fuer einen leeren Stapel), Brett und Klang (ab 2 Partien),
+  Verlauf (ab 3 Partien). Wer einen Screen schon besucht hat (`app:screen`), bekommt dafuer keinen Hinweis mehr. Abschaltbar
+  in der Gruppe „Erste Schritte“ (Paket-Einstellung `start.hinweise`). **Eine Zeile:** „Neu für dich“ ist die leiseste
+  Zeile der Heute-Karte. Steht dort eine Zeile eines anderen Pakets (z. B. faellige Karten der Kartei), tritt sie zurueck
+  (`css/pakete/start.css`: `.heute-karte .st-neu:not(:only-child) { display: none }`) und erscheint wieder, sobald sie allein
+  ist; der Hinweis bleibt der des Tages und gilt nicht als erledigt. Grund: Mit zwei Zeilen lag der Spielen-Knopf auf dem
+  iPad quer 1024 x 768 21 px unter dem Rand. Folge fuer die Integration: Ein Paket mit einer Zeile an jedem Tag (z. B. die
+  Serie auf `claude/spielsysteme`) laesst „Neu für dich“ nie zu Wort kommen. Haelt die Arena den Spielen-Knopf selbst im
+  Bild (U5/U7, z. B. sticky im Panel), kann die eine CSS-Regel fallen. Der Kopf „Neu für dich: <Titel>“ bricht nie um
+  (Ellipse als Notbremse; geprueft: alle fuenf Titel ganz bei 1024 und 375).
 - **Orte:** `app:erster-screen?` (80), `arena:heute` (70), `einstellungen:gruppen` (90: Gruppe „Erste Schritte“ mit Schalter
   „Neu für dich“, Stand der Einstufung mit „Zur Empfehlung“ oder „Einstufung machen“, „Willkommen ansehen“, „Regel-Hilfe“).
 - **Feier:** Beim ersten wertenden Sieg ueberhaupt (der Fortschritt kennt genau einen Sieg) synchron im Hoerer von
   `partie:beendet` `melde({ quelle: 'erster-sieg', titel: 'Dein erster Sieg', text: 'Gegen <Bot>, in <n> Zügen', symbol:
   'pokal', klang: 'rekord' })` (gross, Prio 95 laut `feier.QUELLEN`), nur einmal (`ersterSieg` im Modul).
-- **Ereignisse:** hoert `app:bereit` (Fahrplan, per `setTimeout`), `app:screen` (besuchte Screens; Rueckweg vergessen) und
-  `partie:beendet` (letzte Partie fuer den Hinweis zur Analyse, erster Sieg). Sendet nichts. **Register:** Icon
+- **Ereignisse:** hoert `app:bereit` (Fahrplan, per `setTimeout`), `app:screen` (besuchte Screens; Rueckweg vergessen),
+  `partie:beendet` (letzte Partie fuer den Hinweis zur Analyse, erster Sieg) und `training:stand` (Karten im Training, fuer
+  den Hinweis „Das Training“; die Kartei sendet es bei `app:bereit`, also vor dem ersten Screen). Sendet nichts. **Register:** Icon
   `neu-siegel`, Raetsel-Quellen `start-regeln` und `start-einstufung`.
 - **Speicher:** Modul `start` (vorhanden, Budget 6.000) `{ v: RECHENSTAND (1), gesehen: '' | Tag, regeln: null | { tag,
   geloest, gesamt }, einstufung: null | { tag, rechenstand, punkte, geloest, ersterVersuch, gesamt, je: [[id, punkte]], botId },

@@ -1,5 +1,5 @@
 /* ============================================================
-   Crownmate · Paket start (Welle A, A4): Willkommens-Screen (js/ui/start.js), Zeile "Neu fuer dich" in der Heute-Karte
+   Crownmate - Paket start (Welle A, A4): Willkommens-Screen (js/ui/start.js), Zeile "Neu fuer dich" in der Heute-Karte
    (Ort arena:heute) und die Gruppe "Erste Schritte" in den Einstellungen (Ort einstellungen:gruppen).
    Look A: eine Buehnen-Karte, links das Bild (Brett im Sockel, Leiter der Gegner, Kacheln, Portraet), rechts Text und
    Knoepfe; iPad hoch und Handy eine Spalte. Nur Tokens, hell und dunkel; Zinnober nur fuer die eine Hauptaktion.
@@ -82,12 +82,15 @@
 .st-kachel b { font-size: 16px; font-weight: 800; }
 .st-kachel span { font-size: 14px; font-weight: 600; color: var(--text-2); }
 
+/* Lage und Drehung haengen am Platz (.st-stapel-ort), die Karte darin gleitet ein (staffel in js/ui/start.js animiert
+   transform der Karte): so ueberschreibt der Eintritt die Schraeglage nie, und am Ende springt nichts */
 .st-stapel { position: relative; width: min(100%, 360px); aspect-ratio: 1.2; }
-.st-stapel-karte { position: absolute; top: 12%; width: 52%; padding: 8px; border-radius: 18px; background: var(--flaeche); box-shadow: var(--s2), var(--kante); }
+.st-stapel-ort { position: absolute; top: 12%; width: 52%; }
+.st-stapel-ort:nth-child(1) { left: 0; transform: rotate(-8deg); }
+.st-stapel-ort:nth-child(2) { left: 24%; top: 4%; transform: rotate(-1deg); z-index: 1; }
+.st-stapel-ort:nth-child(3) { left: 48%; transform: rotate(7deg); }
+.st-stapel-karte { padding: 8px; border-radius: 18px; background: var(--flaeche); box-shadow: var(--s2), var(--kante); }
 .st-stapel-karte .mini { width: 100%; }
-.st-stapel-karte:nth-child(1) { left: 0; transform: rotate(-8deg); }
-.st-stapel-karte:nth-child(2) { left: 24%; top: 4%; transform: rotate(-1deg); z-index: 1; }
-.st-stapel-karte:nth-child(3) { left: 48%; transform: rotate(7deg); }
 
 .st-portraet { width: min(70%, 220px); aspect-ratio: 1; border-radius: var(--r-xl); background: var(--bt, var(--flaeche-2)); box-shadow: var(--s2), inset 0 0 0 3px var(--bf);
   display: grid; place-items: center; }
@@ -98,7 +101,12 @@
 
 /* ---------- Heute-Karte: "Neu fuer dich" (Ort arena:heute) ---------- */
 .st-neu { display: flex; align-items: center; gap: 0; min-width: 0; min-height: 44px; }
-.st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 2px 4px 0;
+/* "Neu fuer dich" ist die leiseste Zeile der Heute-Karte: steht dort schon eine Zeile eines anderen Pakets (z. B. faellige
+   Karten der Kartei), tritt sie zurueck und kommt wieder, sobald sie allein ist (der Hinweis bleibt der des Tages, er
+   gilt nicht als erledigt). Zwei Zeilen schoben auf dem iPad quer 1024 x 768 den Spielen-Knopf 21 px unter den Rand.
+   Haelt die Arena den Spielen-Knopf einmal selbst im Bild (U5/U7), kann diese Regel fallen. */
+.heute-karte .st-neu:not(:only-child) { display: none; }
+.st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 2px 4px 0;
   border: 0; border-radius: var(--r-m); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .st-neu-los:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .st-neu-pfeil { flex: none; display: grid; place-items: center; color: var(--text-2); }
@@ -108,8 +116,10 @@
 .st-neu-siegel .ico { width: 19px; height: 19px; }
 .st-neu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 650; color: var(--text); }
 /* eine Zeile "Neu fuer dich: <Titel>" (SPIELKONZEPT 3.16), darunter ein kurzer Satz in einer Zeile (logik.ENTDECKUNGEN):
-   die Heute-Karte bleibt so niedrig wie die anderen Zeilen, der Spielen-Knopf bleibt auf dem iPad 1024 x 768 im Bild */
-.st-neu-kopf { min-width: 0; line-height: 1.3; }
+   die Heute-Karte bleibt so niedrig wie die anderen Zeilen, der Spielen-Knopf bleibt auf dem iPad 1024 x 768 im Bild.
+   Der Kopf bricht nie um (der laengste Titel passt ab 375 px ganz, tests/start.test.mjs misst 375, 390, 1024 und 1180);
+   wird es doch einmal enger, kuerzt die Ellipse den Titel statt eine zweite Zeile anzufangen */
+.st-neu-kopf { min-width: 0; font-size: 13.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-neu-text b { font-weight: 800; color: var(--text); }
 .st-neu-text small { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 44 px Tippflaeche; ragt etwas in den Rand der Heute-Karte, damit der Text Platz hat */
@@ -151,6 +161,9 @@
   .st-portraet-name b { font-size: 19px; }
   .screen .haupt-kopf .st-raus { padding: 0 12px; font-size: 13.5px; }
   .st-screen .haupt-kopf .unter { display: none; }
+  /* mit Zurueck (aus Einstellungen oder Heute-Karte geoeffnet) passen Marke, "Ich kenne mich aus" und Klang nicht mehr
+     nebeneinander: die Marke tritt zurueck, die Seite hat ihren eigenen Titel */
+  .st-screen .haupt-kopf.mit-zurueck .marke { display: none; }
   .st-gruppe .st-g-zeile { flex-wrap: wrap; }
 }
 @media (max-width: 380px) {

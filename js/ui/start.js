@@ -7,14 +7,17 @@
 //          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Regel-Hilfe (Raetsel-Bildschirm)
 //          'einstufung'         Angebot des Einstufungstests (8 Aufgaben im Raetsel-Bildschirm)
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
-//          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen Bauer Benno
+//          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen den ersten Bot der Leiter (BOTS[0], Bauer Benno)
 //   Ohne geladenen Paket-Einstieg (dienst.paketGeladen) geht es still zur Arena, wie bei einem fehlenden Paket-Screen.
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
 //   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags
 //   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
+//   Liegt ein eigener Verlaufseintrag davor (history.state.tiefe > 0, z. B. aus den Einstellungen oder vom Hinweis in
+//   der Heute-Karte geoeffnet), hat der Kopf zusaetzlich "Zurueck" (app.zurueck); beim allerersten Start nicht.
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
-// DOM: section.screen.st-screen[data-seite] > header.haupt-kopf (mit button.st-raus), .st-rumpf > .st-buehne
-//   (.st-bild, .st-text mit .ueberzeile, h1.st-titel, p, .st-chips, .st-wahl, .st-knoepfe), nav.st-punkte (w1 bis w3).
+// DOM: section.screen.st-screen[data-seite] > header.haupt-kopf (mit button.st-raus, ggf. .kopf-zurueck), .st-rumpf >
+//   .st-buehne (.st-bild, .st-text mit .ueberzeile, h1.st-titel, p, .st-chips, .st-wahl, .st-knoepfe), nav.st-punkte (w1
+//   bis w3). Stapel der Seite einstufung: .st-stapel > .st-stapel-ort (Lage, Drehung) > .st-stapel-karte (gleitet ein).
 //   Knoepfe tragen data-st (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter, spielen, benno,
 //   einstufung-seite, wiederholen, arena, raus).
 // Optik: css/pakete/start.css (link[data-paket="start"], vom Paket oder hier eingehaengt). Nur Tokens.
@@ -24,7 +27,7 @@ import { icon } from './icons.js';
 import { miniBrett } from './bauteile.js';
 import { klang } from '../sounds.js';
 import { anim, staffel, tempo } from '../bewegung.js';
-import { BOTS, botNachId } from '../bots.js';
+import { BOTS } from '../bots.js';
 import { avatarVon, botFarbe } from '../thema.js';
 import { angeboten } from '../orte.js';
 import { KLASSEN_NAME } from '../zugklassen.js';
@@ -135,7 +138,7 @@ function seite(name) {
   if (name === 'einstufung') {
     const stapel = [EINSTUFUNG[0], EINSTUFUNG[3], EINSTUFUNG[6]];
     return {
-      bild: `<div class="st-stapel">${stapel.map((a) => `<div class="st-stapel-karte">${miniBrett(a.fen)}</div>`).join('')}</div>`,
+      bild: `<div class="st-stapel">${stapel.map((a) => `<div class="st-stapel-ort"><div class="st-stapel-karte">${miniBrett(a.fen)}</div></div>`).join('')}</div>`,
       text: `<div class="ueberzeile">Einstufung</div>
         <h1 class="disp st-titel" tabindex="-1">Wie stark bist du schon?</h1>
         <p>8 kurze Aufgaben, von leicht bis knifflig. Danach schlagen wir dir einen Gegner vor, der zu dir passt. Du kannst jederzeit aufhören.</p>
@@ -164,15 +167,15 @@ function seite(name) {
         <div class="st-knoepfe st-leise">${knopf('wiederholen', 'Einstufung wiederholen', { art: 'leise' })}${knopf('arena', 'Zur Arena', { art: 'leise' })}</div>`,
     };
   }
-  // nach der Regel-Hilfe
-  const benno = botNachId('benno');
+  // nach der Regel-Hilfe: der erste Bot der Leiter (aus BOTS wie Seite 2, kein fester Name; data-st="benno" bleibt als Haken)
+  const erster = D.ersterGegner();
   const r = D.stand().regeln;
   return {
-    bild: portraet(benno),
+    bild: portraet(erster),
     text: `<div class="ueberzeile">${r && r.geloest === r.gesamt ? 'Regel-Hilfe geschafft' : 'Regel-Hilfe'}</div>
       <h1 class="disp st-titel" tabindex="-1">Bereit für deine erste Partie?</h1>
-      <p>Du kennst jetzt die Figuren. Am meisten lernst du im Spiel, und Bauer Benno ist ein freundlicher erster Gegner. Nach jedem Zug sagt dir der Coach, wie er war.</p>
-      <div class="st-knoepfe">${knopf('benno', `Gegen ${benno.name} spielen`, { art: 'primaer' })}${knopf('einstufung-seite', 'Einstufung machen')}</div>
+      <p>Du kennst jetzt die Figuren. Am meisten lernst du im Spiel, und ${esc(erster.name)} ist ein freundlicher erster Gegner. Nach jedem Zug sagt dir der Coach, wie er war.</p>
+      <div class="st-knoepfe">${knopf('benno', `Gegen ${erster.name} spielen`, { art: 'primaer' })}${knopf('einstufung-seite', 'Einstufung machen')}</div>
       <div class="st-knoepfe st-leise">${knopf('arena', 'Zur Arena', { art: 'leise' })}</div>`,
   };
 }
@@ -202,10 +205,14 @@ export function zeige(root, params, app) {
   if (jetzt === 'empfehlung' && !D.aktuelleEmpfehlung()) jetzt = 'einstufung';
   merkeSeite(jetzt);
 
+  // Zurueck nur mit eigenem Verlaufseintrag davor (aus Einstellungen oder Heute-Karte); beim ersten Start fuehrt nur
+  // "Ich kenne mich aus" hinaus
+  let zurueck = false;
+  try { zurueck = !!(history.state && history.state.schach && Number(history.state.tiefe) > 0); } catch (e) { zurueck = false; }
   const s = document.createElement('section');
   s.className = 'screen st-screen';
   s.setAttribute('aria-label', 'Willkommen');
-  s.innerHTML = `${hauptKopf({ titel: 'Crownmate', unter: 'Willkommen', chips: '', modus: false, einstellungen: false })}
+  s.innerHTML = `${hauptKopf({ titel: 'Crownmate', unter: 'Willkommen', zurueck, chips: '', modus: false, einstellungen: false })}
     <div class="st-rumpf">
       <div class="st-buehne"></div>
       <nav class="st-punkte" aria-label="Seiten">${INTRO.map((n, i) =>
@@ -223,7 +230,7 @@ export function zeige(root, params, app) {
   else rechts.append(raus);
   root.append(s);
 
-  const kopf = verbindeKopf(s, app);
+  const kopf = verbindeKopf(s, app, zurueck ? { beiZurueck: () => app.zurueck() } : {});
   const buehne = s.querySelector('.st-buehne');
   const punkte = s.querySelector('.st-punkte');
   let weg = false;
@@ -288,11 +295,13 @@ export function zeige(root, params, app) {
     else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('raetsel', { quelle: D.QUELLE_REGELN }); }
     else if (was === 'einstufung-start') { D.setzeRueck('einstufung'); app.gehe('raetsel', { quelle: D.QUELLE_EINSTUFUNG }); }
     else if (was === 'raus' || was === 'arena') app.gehe('arena', {}, { ersetzen: true });
-    else if (was === 'benno') spiele('benno');
+    else if (was === 'benno') spiele(D.ersterGegner().id);
     else if (was === 'leiter') spiele(naechsterGegner(ladeFortschritt()).id);
     else if (was === 'probe' || was === 'spielen') {
+      // die Leiter von jetzt entscheidet, nicht der Knopf von vorhin: wurde sie inzwischen zurueckgesetzt oder ein
+      // anderer Stand eingespielt (zweiter Tab, Sicherung, Cloud), wird auch "spielen" zur Probepartie, die nie wertet
       const em = D.aktuelleEmpfehlung();
-      if (em) spiele(em.bot.id, was === 'probe' && em.probe);
+      if (em) spiele(em.bot.id, em.probe);
     }
   });
   // Pfeiltasten blaettern durch die drei ersten Seiten

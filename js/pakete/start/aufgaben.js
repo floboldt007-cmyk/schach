@@ -63,7 +63,7 @@ export const REGEL_AUFGABEN = Object.freeze([
     titel: 'Der Bauer',
     text: 'Der Bauer zieht geradeaus, beim ersten Zug auch zwei Felder. Schlagen kann er nur schräg nach vorn. Schlage mit dem Bauern.',
     hinweis: 'Geradeaus ist der Weg versperrt. Schau schräg nach vorn.',
-    erklaerung: 'Genau. Kommt ein Bauer auf der letzten Reihe an, wird er zu einer Dame.',
+    erklaerung: 'Genau. Kommt ein Bauer auf der letzten Reihe an, wird er zu einer neuen Figur, meist zur Dame.',
   }),
   Object.freeze({
     id: 'regel-matt', figur: 'r', ziel: 'matt',
