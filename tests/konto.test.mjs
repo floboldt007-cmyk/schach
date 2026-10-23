@@ -22,6 +22,20 @@ localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, 
 pruefe('Sitzung erneuern', sitzung().refresh_token === 'r2' && calls.at(-1).url.includes('grant_type=refresh_token'));
 localStorage.setItem('schach-arena:v1:partien', '[]'); antworten.push({ status: 201, body: null }); await speichereCloudStand();
 pruefe('Hochladen mit Auth und Prefer', calls.at(-1).headers.Authorization.startsWith('Bearer ') && calls.at(-1).headers.Prefer === 'resolution=merge-duplicates');
+{
+  const lokal = { modus: 'zuzweit', zuzweit: { weiss: 'Anna privat', schwarz: 'Ben privat', drehen: true }, zuege: ['e2e4'] };
+  localStorage.setItem('schach-arena:v1:partien', JSON.stringify([lokal]));
+  localStorage.setItem('schach-arena:v1:laufend', JSON.stringify(lokal));
+  localStorage.setItem('schach-arena:v1:einstellungen:zuzweit', JSON.stringify(lokal.zuzweit));
+  antworten.push({ status: 201, body: null }); await speichereCloudStand();
+  const stand = JSON.parse(calls.at(-1).body).stand;
+  pruefe('Lokale Namen fehlen im Cloud-Spielstand und in den Einstellungen', !JSON.stringify(stand).includes('privat')
+    && !('schach-arena:v1:einstellungen:zuzweit' in stand)
+    && JSON.parse(stand['schach-arena:v1:partien'])[0].zuzweit.weiss === 'Weiß'
+    && JSON.parse(stand['schach-arena:v1:laufend']).zuzweit.schwarz === 'Schwarz');
+  pruefe('Cloud-Sicherung aendert die Namen auf dem Geraet nicht', localStorage.getItem('schach-arena:v1:laufend').includes('Anna privat')
+    && localStorage.getItem('schach-arena:v1:einstellungen:zuzweit').includes('Ben privat'));
+}
 antworten.push({ status: 200, body: [{ stand: {}, format_version: 1 }] }); const cloud = await ladeCloudStand(); pruefe('Cloud laden', cloud.format_version === 1);
 antworten.push({ status: 409, body: { code: '23505' } }); let nameFehler = ''; try { await speichereBenutzername('Flo_1'); } catch(e) { nameFehler=e.message; } pruefe('belegter Benutzername freundlich', /vergeben/.test(nameFehler));
 let offline = ''; setzeKontoFetch(async () => { throw new Error('offline'); }); try { await fordereCodeAn('a@b.de'); } catch(e) { offline=e.message; } pruefe('Offline-Fehler freundlich', /offline/.test(offline));
