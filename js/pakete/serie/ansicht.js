@@ -4,7 +4,7 @@
 // Texte: nie "0" fuer eine ruhende Serie, nie "am Stueck", keine Warnung vorher (SPIELKONZEPT 3.14 Regeln 4, 8, 9).
 //
 //   streifenHtml({ feld, heute, umwandlung, klein }) -> HTML      Bauernmarsch als Reihe: Startfeld, 5 Felder, Umwandlungsfeld
-//   kopfChip({ lage, lauf, ring, leise, beiTipp }) -> { el, verlasse() }   .se-chip[role=button] "♙ 12", ruhend "♙ ruht" (grau),
+//   kopfChip({ lage, lauf, ring, leise, beiTipp }) -> { el, verlasse() }   .se-chip[role=button] "Bauer 12", ruhend "Bauer ruht" (grau),
 //       leise (nach Tag 66, auf Wunsch): Wochen-Ring; Flamme mit Zahl ab 3 Siegen in Folge
 //   heuteZeile({ lage, st, einst, ring, training, beiTraining, beiWahl, beiBlatt, beiLeise, texte }) -> HTMLElement
 //   abrechnungsZeile({ e, schonGezeigt, merke, stumm }) -> { el, beende(), verlasse() } | null   div.se-abr[data-zeile="serie"];
@@ -204,7 +204,7 @@ export function abrechnungsZeile({ e, schonGezeigt = false, merke = () => {}, st
   let unter = '';
   if (mitTag) {
     kopf = `<span class="se-label">Serie</span><b class="se-abr-wert">Tag ${zahl(e.t)} · Bauernmarsch</b>`;
-    if (umw) unter = 'Umwandlung! Deine Figur wählst du in der Arena.';
+    if (umw) unter = 'Umwandlung! Die Figur wählst du in der Arena.';
     else unter = (e.d ? 'Willkommen zurück. Doppelschritt. ' : '') + bisText(T.FELDER - (e.f % T.FELDER));
   } else {
     kopf = `<span class="se-label">Siegeslauf</span><b class="se-abr-wert">${mitLauf ? esc(laufText(e.l)) : 'beendet'}</b>`;
@@ -370,14 +370,14 @@ function ruhetagWahl({ einst, beiRuhetag }) {
   return box;
 }
 
-function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest }) {
+function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb = 'heute' }) {
   const box = el('div', 'se-pause');
   const kommend = st.pausen.filter((k) => k >= heute);
   const info = el('p', 'se-p-info');
   if (kommend.length) {
     info.textContent = `Pause angesagt: ${datumKurz(kommend[0])} bis ${datumKurz(kommend[kommend.length - 1])} (${kommend.length} ${kommend.length === 1 ? 'Tag' : 'Tage'}). Die Serie ist dann eingefroren.`;
   } else {
-    info.textContent = `Urlaub oder krank? Sag eine Pause an, dann ist die Serie eingefroren. Dieses Jahr sind noch ${pauseRest} von ${T.PAUSE_JAHR_MAX} Pausentagen frei.`;
+    info.textContent = `Urlaub oder krank? Sag eine Pause ab ${pauseAb} an, dann ist die Serie eingefroren. Dieses Jahr sind noch ${pauseRest} von ${T.PAUSE_JAHR_MAX} Pausentagen frei.`;
   }
   box.append(info);
   const reihe = el('div', 'se-p-knoepfe');
@@ -391,7 +391,7 @@ function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest }) {
       const k = el('button', 'knopf se-p-tage dr', `${n} ${n === 1 ? 'Tag' : 'Tage'}`);
       k.type = 'button';
       k.dataset.tage = String(n);
-      k.setAttribute('aria-label', `Pause ab heute für ${n} ${n === 1 ? 'Tag' : 'Tage'} ansagen`);
+      k.setAttribute('aria-label', `Pause ab ${pauseAb} für ${n} ${n === 1 ? 'Tag' : 'Tage'} ansagen`);
       k.addEventListener('click', () => beiPause(n));
       reihe.append(k);
     }
@@ -415,7 +415,7 @@ function regeln() {
   return d;
 }
 
-export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, beiPause, beiPauseEnde, beiWahl, pauseRest = T.PAUSE_JAHR_MAX } = {}) {
+export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, beiPause, beiPauseEnde, beiWahl, pauseRest = T.PAUSE_JAHR_MAX, pauseAb = 'heute' } = {}) {
   const box = el('div', 'se-blatt-inhalt');
   const kopf = el('div', 'se-b-kopf');
   let titel;
@@ -423,7 +423,9 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
   else if (lage.art === 'ruht') titel = `Ruht · Rekord ${zahl(lage.best)} · Kapitel ${lage.kapitel}`;
   else titel = `${schachtage(lage.aktuell)} · Rekord ${zahl(lage.best)} · Kapitel ${lage.kapitel}`;
   const unter = [];
-  if (lage.art === 'laeuft' && lage.seit) unter.push(`seit ${datumKurz(lage.seit)}, ${lage.bruecken} ${lage.bruecken === 1 ? 'Brücke' : 'Brücken'}`);
+  if (lage.art === 'laeuft' && lage.seit) {
+    unter.push(`seit ${datumKurz(lage.seit)}, ${lage.bruecken ? `${lage.bruecken} ${lage.bruecken === 1 ? 'Brücke' : 'Brücken'}` : 'ohne Brücke'}`);
+  }
   if (lage.art === 'ruht') unter.push(`Das nächste Tageswerk beginnt Kapitel ${lage.naechstesKapitel}.`);
   unter.push(bisText(lage.bisUmwandlung));
   kopf.innerHTML = `<span class="se-b-symbol" aria-hidden="true">${icon('se-bauer', 'se-ico')}</span><div><b class="se-b-titel"></b><span class="se-b-unter"></span></div>`;
@@ -478,7 +480,7 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
   ein.innerHTML = '<h4 class="se-b-ueber">Ruhetag</h4><p class="se-b-text">Dein Ruhetag zählt nie als freier Tag.</p>';
   ein.append(ruhetagWahl({ einst, beiRuhetag }));
   const pz = el('h4', 'se-b-ueber', 'Pause ansagen');
-  ein.append(pz, pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest }));
+  ein.append(pz, pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb }));
   box.append(ein);
   box.append(regeln());
   return box;

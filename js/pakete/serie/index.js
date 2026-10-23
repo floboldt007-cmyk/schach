@@ -13,8 +13,8 @@
 // Sendet:  tag:gezaehlt { tag, quelle, serie, kapitel } einmal je Tag beim ersten Tageswerk (bringt nie Funken),
 //          serie:geaendert { tag, lauf, meilenstein, ruht, kapitel, rekord, gesamt, heute } nach jedem gezaehlten Tag, jeder
 //          Aenderung am Siegeslauf und einmal nach app:bereit (tag = Schachtage in Serie wie "Tag 12", heute = Tagesschluessel).
-// Orte:    arena:heute 10 (Bauernmarsch als Bild, was heute zaehlt, Umwandlung waehlen), arena:kopf 20 (Chip "♙ 12", Flamme ab 3),
-//          ergebnis:abrechnung 40 (Zeile "Tag 12 · Bauernmarsch" nur am ersten Werk des Tages, Siegeslauf), partie:spieler-leiste 30
+// Orte:    arena:heute 10 (Bauernmarsch als Bild, was heute zaehlt, Umwandlung waehlen), arena:kopf 20 (Chip "Bauer 12", Flamme ab 3),
+//          ergebnis:abrechnung 40 (Zeile "Tag 12 - Bauernmarsch" nur am ersten Werk des Tages, Siegeslauf), partie:spieler-leiste 30
 //          (Flamme an Flos Namen ab 3 Siegen), einstellungen:gruppen 20 (Gruppe Bauernmarsch: anzeigen, streng, leise, Ruhetag).
 // Feier:   umwandlung (gross 66, Klang umwandlung), meilenstein (gross 72, Plakette mit Zeitraum und Beweis, Klang siegel),
 //          marsch (Zeile 50, nur fuer ein Tageswerk ausserhalb einer Partie: dort ist die Abrechnungszeile der Zaehl-Moment),
@@ -27,7 +27,7 @@ import { melde } from '../../feier.js';
 import { botNachId } from '../../bots.js';
 import { registriereIcon } from '../../ui/icons.js';
 import { ladeFortschritt, hoechsteFreieStufe, ladePartien, eigeneZuege } from '../../storage.js';
-import { tagSchluessel, istSchluessel } from '../../tag.js';
+import { tagSchluessel, addiereTage } from '../../tag.js';
 import { klang } from '../../sounds.js';
 import * as T from './tag.js';
 import * as LA from './lauf.js';
@@ -259,12 +259,14 @@ function zeigeBlatt() {
     const h = heute();
     return A.blattInhalt({
       st, lage: T.lage(st, h, einst), einst, heute: h, wochen: T.kalender(st, h, einst, 6), ring: T.ringStand(st, h, einst),
-      pauseRest: T.pauseRest(st, h.slice(0, 4)),
+      pauseRest: T.pauseRest(st, h.slice(0, 4)), pauseAb: st.letzter === h ? 'morgen' : 'heute',
       beiRuhetag: (w) => sicher(() => { S.speichereEinstellungen({ ruhetag: w }); neu(); }, 'Ruhetag'),
       beiPause: (n) => sicher(() => {
         const s2 = S.lade();
         if (S.nurLesen(s2)) return;
-        const r = T.pauseAnsagen(s2, heute(), { ab: heute(), tage: n });
+        // ist heute schon gezaehlt, beginnt die Pause morgen (sonst waere ein Tag der Pause verschenkt)
+        const h2 = heute();
+        const r = T.pauseAnsagen(s2, h2, { ab: s2.letzter === h2 ? addiereTage(h2, 1) : h2, tage: n });
         if (r.ok) S.speichere(s2);
         neu();
       }, 'Pause'),

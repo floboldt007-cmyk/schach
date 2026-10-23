@@ -44,7 +44,6 @@ export function normalisiere(roh) {
   st.reise = schluesselListe(r.reise);
   st.letzter = schluessel(r.letzter) || (st.tage.length ? st.tage[st.tage.length - 1] : null);
   st.aktuell = ganz(r.aktuell);
-  st.best = Math.max(ganz(r.best), st.aktuell);
   st.gesamt = Math.max(ganz(r.gesamt), st.tage.length);
   const k = objekt(r.kapitel);
   if (k && Number.isInteger(k.nr) && k.nr >= 1 && istSchluessel(k.von)) {
@@ -55,6 +54,7 @@ export function normalisiere(roh) {
     st.kapitel = { nr: 1, von: st.tage[0] || st.letzter, br: 0, z: {} };
   }
   if (st.letzter && st.aktuell < 1) st.aktuell = 1;
+  st.best = Math.max(ganz(r.best), st.aktuell);
   st.kapitelListe = (Array.isArray(r.kapitelListe) ? r.kapitelListe : [])
     .filter((x) => objekt(x) && Number.isInteger(x.nr) && istSchluessel(x.von) && istSchluessel(x.bis) && Number.isInteger(x.tage))
     .map((x) => ({ nr: x.nr, von: x.von, bis: x.bis, tage: Math.max(1, x.tage) }));

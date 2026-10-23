@@ -243,7 +243,9 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
     // Paket funken: Rechnung, Level-Kurve und Speicher
     'rechnung.js', 'level.js', 'stand.js',
     // Paket punkte: Formel und Tafeln (code.js und stand.js stehen oben)
-    'formel.js', 'tafel.js'];
+    'formel.js', 'tafel.js',
+    // Paket serie: Tageslogik und Siegeslauf (stand.js steht oben)
+    'tag.js', 'lauf.js'];
   const dateien = ['js/feier.js', 'js/tag.js', 'js/inhalte.js', ...jsDateien(path.join('js', 'pakete')).filter((d) => REIN.includes(path.basename(d)))];
   const treffer = dateien.filter((d) => /Math\s*\.\s*random|crypto\s*\.\s*getRandomValues/.test(zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).code));
   pruefe(`Kein Math.random in feier.js und den reinen Paket-Logik-Dateien (${dateien.length} Dateien)`, treffer.length === 0, treffer);
@@ -497,6 +499,56 @@ function jsonDateien(ordner) {
     P.tafelwert({ zuege: [], ergebnis: 'sieg', hilfe: true }).tafel === false && mitHinweis.tafel === null && mitZurueck.tafel === null
     && nie[0] === null && nie[1].tafel === null && nie[2].tafel === null && stellung.tafel === null && ohne.tafel === 'bot:benno' && eintraege.join() === 'o1',
     { eintraege, h: mitHinweis && mitHinweis.grund });
+}
+
+// =====================================================================
+// Paket serie (SPIELKONZEPT 3.14, 3.15 und 5.3): Serie ohne Verlustangst, Siegeslauf ohne Bonus
+// =====================================================================
+{
+  const T = await import('../js/pakete/serie/tag.js');
+  const LA = await import('../js/pakete/serie/lauf.js');
+  const add = (k, n) => {
+    const d = new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, Number(k.slice(8, 10)) + n, 12);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  // Serie zeigt nach einer Pause oder Luecke nie "0": 300 Tage mit Pausen und Luecken, jede Lage danach
+  const st = T.leer();
+  let null0 = 0;
+  for (let i = 0; i < 300; i++) {
+    const tag = add('2026-01-01', i);
+    if (i % 40 === 10) T.pauseAnsagen(st, tag, { ab: tag, tage: 5 });
+    if (i % 17 !== 3 && i % 23 > 2 && !st.pausen.includes(tag)) T.zaehleTag(st, tag, { quelle: 'partie' });
+    const lg = T.lage(st, add(tag, 1), {});
+    if (st.letzter && (lg.aktuell < 1 || lg.best < 1)) null0++;
+  }
+  pruefe('Serie: zeigt nach Pause oder Lücke nie „0“ (ruht mit Rekord, 300 Tage)', null0 === 0 && st.kapitel.nr > 1, null0);
+  const p = T.leer();
+  pruefe('Serie: Pause nur für heute oder künftige Tage, höchstens 30 im Jahr', !T.pauseAnsagen(p, '2026-05-10', { ab: '2026-05-09', tage: 2 }).ok
+    && T.pauseAnsagen(p, '2026-05-10', { ab: '2026-05-10', tage: 40 }).tage.length === 30 && T.PAUSE_JAHR_MAX === 30);
+  const r = T.leer();
+  T.zaehleTag(r, '2026-03-01', { quelle: 'partie', tz: -60 });
+  pruefe('Serie: Reise-Regel (ein übersprungener Tag bei Zeitzonenwechsel zählt)', T.zaehleTag(r, '2026-03-03', { quelle: 'partie', tz: 300 }).reise === '2026-03-02'
+    && r.aktuell === 3);
+  const w = T.leer();
+  const doppel = [];
+  for (const tag of ['2026-04-01', '2026-04-05', '2026-04-09', '2026-04-20', '2026-05-02', '2026-05-09']) doppel.push(T.zaehleTag(w, tag, { quelle: 'partie' }).doppelschritt);
+  pruefe('Serie: „Willkommen zurück“ (Doppelschritt) höchstens einmal je Kalendermonat', doppel.join() === 'false,true,false,false,true,false', doppel);
+  // keine Funken fuer die Serie: das Paket importiert nichts aus funken und sendet keine Funken-Ereignisse
+  const quellen = ['tag.js', 'lauf.js', 'stand.js', 'ansicht.js', 'index.js'].map((d) => readFileSync(path.join(WURZEL, 'js/pakete/serie', d), 'utf8'));
+  pruefe('Serie und Siegeslauf: keine Funken (kein Import aus funken, kein funken:-Ereignis), nichts kaufbar',
+    quellen.every((q) => !/from\s+['"][^'"]*funken|sende\(\s*['"]funken:|kaufen|Kauf/.test(zerlege(q).code + zerlege(q).texte.join(' '))));
+  // Siegeslauf: nur gegen gleich starke oder staerkere, Pausen brechen nicht, Remis/Niederlage enden still, Flamme ab 3
+  const sieg = (x = {}) => ({ modus: 'normal', wertet: true, ergebnis: 'sieg', hinweise: 0, zuruecknahmen: 0, botStufe: 4, ...x });
+  const lauf = { n: 0, best: 0, ms: [] };
+  for (let i = 0; i < 4; i++) LA.buche(lauf, sieg(), { hoechsteStufe: 5 });
+  const pausen = [sieg({ hinweise: 1 }), sieg({ botStufe: 2 }), sieg({ modus: 'uebung', wertet: false }), sieg({ modus: 'frei', wertet: false }),
+    sieg({ modus: 'boss', wertet: false }), sieg({ ergebnis: 'niederlage', botStufe: 1 })].map((d) => LA.buche(lauf, d, { hoechsteStufe: 5 }).wirkung);
+  const ende = LA.buche(lauf, sieg({ ergebnis: 'remis' }), { hoechsteStufe: 5 });
+  pruefe('Siegeslauf: nur gegen ungefähr gleich starke (Wertung minus 150, vorher höchster Bot minus eine Stufe); Hilfe, Schwächere, Übung, frei, Boss pausieren; Remis beendet still',
+    pausen.every((x) => x === 'pause') && ende.wirkung === 'ende' && ende.endeBei === 4 && lauf.best === 4 && LA.ABSTAND === 150
+    && LA.gleichStark({ botElo: 1050, wertung: 1200, wertungPartien: 10 }) && !LA.gleichStark({ botStufe: 3, hoechsteStufe: 5 }), pausen);
+  pruefe('Siegeslauf: Flamme erst ab 3 Siegen, Ergebnis ohne Funken- oder Wertungs-Bonus', LA.FLAMME_AB === 3
+    && Object.keys(LA.buche({ n: 0, best: 0, ms: [] }, sieg(), { hoechsteStufe: 1 })).every((k) => !/funken|wertung|bonus|liga/i.test(k)));
 }
 
 console.log(`\n${ok}/${ok + fehler} bestanden`);
