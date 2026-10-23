@@ -9,10 +9,12 @@
 //     bei einem fehlenden Paket-Screen. Die Parameter liegen im Browser-Verlauf: Neuladen fragt die Quelle neu.
 //   registriereRaetselQuelle(name, quelle) -> abmelden()   name [a-z][a-z0-9-]*
 //     quelle = {
-//       titel, unter,                     Kopf des Bildschirms (Standard "Rätsel")
+//       titel, unter,                     Kopf des Bildschirms (Standard "Raetsel")
 //       liste(params) -> [Aufgabe],       beim Oeffnen (und Neuladen) frisch
 //       ergebnis(aufgabe, erg) -> { titel?, text?, klang? } | null   nach jeder Aufgabe; erg = { richtig, versuch,
-//                                         fehlversuche, loesungGezeigt }  (versuch: 1 = im ersten Versuch geloest)
+//                                         fehlversuche, loesungGezeigt }  (versuch: 1 = im ersten Versuch geloest;
+//                                         Loesung gezeigt: richtig false, versuch = Fehlversuche davor, 0 = ohne
+//                                         eigenen Zug. Wer "geuebte" Aufgaben zaehlt, nimmt nur versuch >= 1.)
 //       ende(zusammenfassung) -> { titel?, text?, klang?, knoepfe?: [{ text, art, beiKlick(app) }] } | null
 //                                         zusammenfassung = { gesamt, geloest, ergebnisse: [{ id, ...erg, rueck }] }
 //       leer() -> { titel, text } | null  keine Aufgabe (z. B. Stapel leer)
@@ -27,9 +29,11 @@
 // Ablauf je Aufgabe: Flo zieht. Richtig: der Gegner antwortet (mehrzuegig), am Ende Feder-Haken am Zielfeld, Klang
 // "raetsel-richtig", Rueckmeldung der Quelle, Knopf "Weiter". Falsch: die Figur steht kurz auf dem Feld und schnappt
 // zurueck (Klang "raetsel-falsch"), der zweite Versuch zeigt die Figur, mit der es losgeht (markiere 'hinweis'), nach
-// dem zweiten Fehlversuch ist das Brett still und "Lösung zeigen" wird die Hauptaktion. "Lösung zeigen" (jederzeit)
+// dem zweiten Fehlversuch ist das Brett still und "Loesung zeigen" wird die Hauptaktion. "Loesung zeigen" (jederzeit)
 // zeichnet den Zug als Pfeil (brett.pfeile) und spielt die Loesung vor. Oben der Fortschritt "3 von 7", am Ende eine
-// Zusammenfassung. Brett gedreht, wenn Schwarz am Zug ist. Handy und iPad hoch: eine Spalte.
+// Zusammenfassung. Brett gedreht, wenn Schwarz am Zug ist. Handy und iPad hoch: eine Spalte. Nach dem Loesen (oder der
+// gezeigten Loesung) verschwindet "Weiss am Zug" aus der Statuszeile. "Weiter", "Loesung zeigen" und "Fertig" bekommen
+// den Fokus (Tastatur); den Rahmen zeigt nur die Tastatur (section[data-eingabe="zeiger"|"tastatur"]).
 // DOM: section.screen.rs-screen > header.haupt-kopf, .rs-rumpf > .rs-inhalt (.rs-fortschritt, .rs-brettzone mit
 // .brett-rahmen.rs-rahmen > .brett, .rs-seite mit .rs-status, .rs-meldung[data-art], .rs-aktionen) bzw. .rs-ende.
 // Optik: css/pakete/raetsel.css (haengt sich selbst als link[data-screen="raetsel"] ein, nur Tokens).
@@ -183,6 +187,11 @@ export function zeige(root, params, app) {
     ergebnisse: st.ergebnisse.map((e) => ({ ...e })),
   });
 
+  // Fokus-Rahmen nur fuer die Tastatur: Chromium zeigt ihn sonst auch nach einem Mausklick, wenn der Fokus per Skript
+  // auf "Weiter" wandert (focus({ focusVisible }) kennt Chromium nicht); css/pakete/raetsel.css liest data-eingabe
+  s.addEventListener('pointerdown', () => { s.dataset.eingabe = 'zeiger'; }, true);
+  s.addEventListener('keydown', () => { s.dataset.eingabe = 'tastatur'; }, true);
+
   let brett = null;
   s.addEventListener('click', (e) => {
     const b = e.target.closest('[data-r]');
@@ -228,6 +237,7 @@ export function zeige(root, params, app) {
   function setzeStatus(a) {
     const amZug = st.chess.turn();
     const zug = $('.rs-amzug');
+    zug.hidden = false;
     zug.querySelector('i').dataset.farbe = amZug;
     zug.querySelector('span').textContent = amZug === 'w' ? 'Weiß am Zug' : 'Schwarz am Zug';
     const marke = $('.rs-marke');
@@ -238,6 +248,11 @@ export function zeige(root, params, app) {
     const pEl = $('.rs-status p');
     pEl.textContent = a.text || '';
     pEl.hidden = !a.text;
+  }
+
+  // nach dem Loesungszug (und nach einem Matt) stimmt "Weiss am Zug" nicht mehr: die Zeile ruht bis zur naechsten Aufgabe
+  function statusFertig() {
+    $('.rs-amzug').hidden = true;
   }
 
   function meldung(art, kopfText, text, { symbol = null, feder = false } = {}) {
@@ -374,6 +389,7 @@ export function zeige(root, params, app) {
   function geloest(m) {
     st.phase = 'geloest';
     erlaube();
+    statusFertig();
     const rueck = melde({ richtig: true, versuch: st.fehl + 1, fehlversuche: st.fehl, loesungGezeigt: false });
     if (st.striche) st.striche.entferne();
     // Feder-Haken am Zielfeld: das Feld in der Farbe "Praezise", darueber der Haken (federt ueber board.css ein)
@@ -412,6 +428,7 @@ export function zeige(root, params, app) {
     // der Pfeil bleibt als Beleg stehen (Flos letzter Zug der Loesung)
     if (letzter) brett.pfeile([{ von: letzter.slice(0, 2), nach: letzter.slice(2, 4), farbe: 'bester' }]);
     st.phase = 'gezeigt';
+    statusFertig();
     const rueck = melde({ richtig: false, versuch: st.fehl, fehlversuche: st.fehl, loesungGezeigt: true });
     meldung('loesung', rueck.titel || 'So geht es', [a.erklaerung, rueck.text].filter(Boolean).join(' '));
     fertigKnoepfe();

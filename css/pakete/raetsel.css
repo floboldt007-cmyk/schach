@@ -13,6 +13,8 @@
   display: grid; grid-template-columns: var(--rs-b) var(--rs-seite); grid-template-rows: auto auto; column-gap: var(--rs-luft); row-gap: 14px;
   justify-content: center; align-content: center; min-height: 100%; padding: 8px var(--rand) 20px; }
 .rs-inhalt[hidden], .rs-ende[hidden], .rs-meldung[hidden], .rs-marke[hidden], .rs-screen .knopf[hidden] { display: none; }
+/* Der Fokus wandert per Skript auf "Weiter", "Loesung zeigen" und "Fertig"; den Rahmen braucht nur die Tastatur */
+.rs-screen[data-eingabe="zeiger"] .knopf:focus-visible { outline: none; }
 
 /* Fortschritt oben: "3 von 7" und je Aufgabe ein Punkt (nie rot: daneben ist neutral grau) */
 .rs-fortschritt { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
@@ -41,6 +43,8 @@
 .rs-amzug { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: var(--gw-stark); }
 .rs-amzug i { width: 16px; height: 16px; border-radius: var(--r-pille); background: var(--balken-weiss); box-shadow: inset 0 0 0 1.5px var(--linie-2); }
 .rs-amzug i[data-farbe="b"] { background: var(--balken-schwarz); }
+/* nach dem Loesen stimmt "am Zug" nicht mehr: unsichtbar, der Platz bleibt (kein Sprung im Status) */
+.rs-amzug[hidden] { visibility: hidden; }
 .rs-marke { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--r-pille);
   background: var(--flaeche-2); box-shadow: var(--kante); font-size: 12.5px; font-weight: 750; color: var(--text-2); }
 .rs-marke i { width: 8px; height: 8px; border-radius: var(--r-pille); background: var(--text-3); }

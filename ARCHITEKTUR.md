@@ -1462,12 +1462,15 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
   einer eigenen Stellung, Bosse, freie Partien): eigene Zuege der Klassen `patzer` („Weit daneben“), `verpasst`
   („Verschenkt“) und `fehler` („Daneben“) aus `review.zuege` mit **eindeutiger Loesung**: `gewinnVorher >= 0,25` und
   `gewinnVorher - gewinnZweiter >= 0,15` (MultiPV 2 der Analyse; ohne zweite Linie keine Karte). Hoechstens 3 je Partie,
-  die mit dem groessten `verlust` zuerst (gleich: Patzer, Verschenkt, Fehler, dann der fruehere Zug). Idempotent ueber die
-  verarbeiteten Partie-IDs (hoechstens 300). Dieselbe Stellung (`stellungsSchluessel`) schon in der Kartei: keine neue
-  Karte, sondern `rueckfaelle + 1`, wieder Stufe 0 und heute faellig, mit dem Bild der neuen Partie (auch eine fuer immer
-  geloeste kommt so zurueck; der Zaehler „fuer immer gelöst“ sinkt nie). Beim Start (2,5 s nach `app:bereit`, einmal je
-  Sitzung) traegt das Paket gespeicherte Analysen nach, die noch nicht verarbeitet sind (Partien, die vor dem Paket
-  analysiert wurden), still und ohne Feier.
+  die mit dem groessten `verlust` zuerst (gleich: Patzer, Verschenkt, Fehler, dann der fruehere Zug). Dieselbe Stellung
+  kommt je Partie nur einmal vor (Zugwiederholung: der schwerste Eintrag), sonst verdraengte derselbe Fehler die anderen.
+  Idempotent ueber die verarbeiteten Partie-IDs (hoechstens 300). Dieselbe Stellung (`stellungsSchluessel`) schon in der
+  Kartei: keine neue Karte, sondern `rueckfaelle + 1`, wieder Stufe 0 und heute faellig (auch wenn sie heute schon geuebt
+  war: sie verlaesst dafuer `heute.ids` und steht wieder im Stapel von heute), mit dem Bild der neuen Partie. Jede Karte
+  zaehlt je Partie hoechstens einmal (neu oder Rueckfall). Auch eine fuer immer geloeste kommt so zurueck; der Zaehler
+  `gemeistert` sinkt nie und zaehlt jede Karte nur beim ersten Mal (Feld `gemeistert` der Karte). Beim Start (2,5 s nach
+  `app:bereit`, einmal je Sitzung) traegt das Paket gespeicherte Analysen nach, die noch nicht verarbeitet sind (Partien,
+  die vor dem Paket analysiert wurden), still und ohne Feier.
 - **Wiederholung** (`logik.js`): Stufe 0 neu (am Tag der Partie faellig), 1 bis 5 mit den Abstaenden 1, 3, 7, 14, 30 Tagen
   (`addiereTage` auf dem Tagesschluessel aus `tag.js`, Grenze 4:00, Sommerzeit egal), danach Stufe 6 „für immer gelöst“.
   Nur der erste Versuch zaehlt als richtig (Stufe + 1); im zweiten Versuch geloest oder Loesung gezeigt: zurueck auf
@@ -1479,15 +1482,23 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
 - **Orte:** `training:karten` (Reihenfolge 10): `section.t-karte.kt-karte[data-faellig]` mit drei Zustaenden: faellig
   („Fehler wiederholen · 5 fällig“, Stapel aus bis zu 4 Mini-Brettern, „12 im Training · 2 für immer gelöst“, Knopf
   `.kt-los` „Üben“), alles geuebt („Stapel leer. Gut gemacht.“ mit dem naechsten Tag) und keine Karten („Noch keine
-  Karten“, ohne Knopf). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“, nur wenn Karten
-  faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`.
+  Karten“, ohne Knopf). Die Mini-Bretter zeigen jede Karte aus Flos Sicht (mit Schwarz gedreht, `logik.drehe`, weil
+  `miniBrett` keine Ausrichtung kennt). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“,
+  nur wenn Karten faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`. **Einstieg:** Die Karte im
+  Training ist erst erreichbar, wenn `REITER` (js/erweiterungen.js) `'training'` nennt; das entscheidet die Integration
+  bzw. Flo. Bis dahin fuehrt nur die Zeile in der Heute-Karte (sobald etwas faellig ist) in die Kartei.
 - **Feier:** Neue Karten einer Partie melden synchron im Hoerer von `partie:analysiert`
   `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', text: '1 Karte ist wieder dabei.', symbol:
   'kartei' })` (Zeile, Prio 30 laut `feier.QUELLEN`; nur Rueckfaelle: „1 Karte wieder in deinem Stapel“,
   `logik.kartenFeier`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
-  Analyse-Screen landet sie in der Nachlese. Geschrieben wird per `setTimeout(0)` nach frischem Lesen.
+  Analyse-Screen landet sie in der Nachlese. Synchron rechnet der Hoerer nur `logik.vorschau` (Modul einmal lesen und in
+  Form bringen, Kandidaten, Abgleich nach ID und Stellung; rund 2 ms bei 380 Karten), geschrieben wird per
+  `setTimeout(0)` nach frischem Lesen (`fuegeHinzu`, Ausduennen). Ein Modul einer neueren App (`v` hoeher): keine Karten
+  und keine Zeile. Bleibt nur der seltene Fall, dass `localStorage` beim Schreiben voll ist: dann stand die Zeile schon
+  da (die App meldet den vollen Speicher selbst einmal je Sitzung).
 - **Ereignisse:** sendet `training:geloest { karteId, richtig, versuch, quelle: 'kartei' }` je beantworteter Karte
-  (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche)
+  (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche
+  davor, **0 = Loesung ohne eigenen Zug**; wer „geuebte Karten“ zaehlt, etwa S1-4 fuer den Tag, nimmt nur `versuch >= 1`)
   und `training:stand { faellig, gesamt, gemeistert }` (faellig = heute noch im Stapel, gesamt = Karten im Training ohne die
   geloesten, gemeistert = fuer immer geloest, nie weniger) bei `app:bereit`, nach jeder Antwort, nach neuen Karten und nach
   `speicher:zurueckgesetzt`. Hoert `partie:analysiert`, `app:bereit`, `speicher:zurueckgesetzt`. **Register:** Icon
@@ -1495,7 +1506,7 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
 - **Speicher:** Modul `kartei` (vorhanden, Budget 160.000) `{ v: RECHENSTAND (1), karten: [Karte], verarbeitet: [partieId],
   heute: { tag, ids }, zaehler: { erstellt, gemeistert, richtig, falsch } }`, Karte `{ id: 'partieId:ply', fen, besterZug,
   gespielt, klasse, partieId, ply, botId, farbe, vor, san, loesungSan, nummer, coach (Kern, hoechstens 160), datum (Tag der
-  Partie), gewinn, verlust, stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle }` (ca. 400
+  Partie), gewinn, verlust, stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle, gemeistert }` (ca. 400
   Zeichen). Ueber 380 Karten oder dem Budget fallen zuerst die aeltesten fuer immer geloesten, dann die aeltesten der
   Stufe 5, dann die aeltesten ueberhaupt. Bei jedem Zugriff frisch gelesen; kaputte Karten fallen beim Lesen weg; ein Modul
   mit hoeherem `v` (neuere App) wird gelesen, aber nie ueberschrieben. Keine Paket-Einstellungen.
@@ -1517,7 +1528,9 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
   (nie ein Autostart). Falsch: die Figur steht 380 ms auf dem Feld und schnappt zurueck (`beiZug` liefert ein
   Promise auf `false`), Klang `raetsel-falsch`, der zweite Versuch markiert die Figur, mit der es losgeht
   (`markiere(..., 'hinweis')`); nach dem zweiten Fehlversuch ruht das Brett und „Lösung zeigen“ wird die Hauptaktion.
-  „Lösung zeigen“ (jederzeit) zeichnet jeden Zug als Pfeil (`brett.pfeile`) und spielt ihn vor. Ende: Zusammenfassung
+  „Lösung zeigen“ (jederzeit) zeichnet jeden Zug als Pfeil (`brett.pfeile`) und spielt ihn vor. Nach dem Loesen (oder der
+  gezeigten Loesung) wird „Weiß am Zug“ unsichtbar (Platz bleibt). „Weiter“, „Lösung zeigen“ und „Fertig“ bekommen den
+  Fokus; den Rahmen zeigt nur die Tastatur (`section[data-eingabe="zeiger"|"tastatur"]`). Ende: Zusammenfassung
   („4 von 5 gelöst“, Text der Quelle), „Fertig“ = `app.zurueck()`.
 - Layout: Container-Einheiten (`container: rs / size`) bestimmen die Brettgroesse; ab 861 px Breite zwei Spalten (Brett,
   rechts Status, Meldung, Knoepfe), darunter eine Spalte (iPad hoch, Handy). Tippflaechen mindestens 44 px.

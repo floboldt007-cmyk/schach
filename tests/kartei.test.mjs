@@ -7,6 +7,10 @@
 // Pfeil, mehrzuegig mit Antwort des Gegners, gedrehtes Brett, Zusammenfassung, ohne Aufgaben zur Arena), Kartei im
 // Training und in der Heute-Karte, Antworten im Modul und als Ereignisse, Leer-Zustaende, eine echte Partie mit Fehler
 // (Feier-Zeile im Ergebnis, Karte, Loesen), Nachtrag gespeicherter Analysen, Handy hell und dunkel, Laden ueber PAKETE.
+// Nachbesserung (Pruefer-Befunde): Zugwiederholung (dieselbe Stellung nur einmal je Partie), Rueckfall am selben Tag,
+// "fuer immer geloest" zaehlt jede Karte einmal, Vorschau statt voller Rechnung im Hoerer (Zeit), Modul einer neueren App
+// (keine Feier-Zeile), versuch 0 bei sofort gezeigter Loesung, Mini-Bretter gedreht, Statuszeile nach dem Loesen,
+// Fokus-Rahmen nur fuer die Tastatur, Einstieg ueber den Reiter Training (mit REITER per Route).
 //
 //   node tests/kartei.test.mjs                 alles
 //   node tests/kartei.test.mjs --nur-node      ohne Browser
@@ -160,6 +164,55 @@ async function nodeTeil() {
   for (let i = 0; i < 320; i++) mv = L.fuegeHinzu(mv, { ...partie, id: 'pv' + i }, { zuege: [] }, heute, { tagVon }).modul;
   pruefe('verarbeitete Partien: hoechstens 300 (die neuesten)', mv.verarbeitet.length === 300 && mv.verarbeitet[0] === 'pv20' && mv.verarbeitet[299] === 'pv319');
 
+  // Zugwiederholung (Pruefer-Befund): dieselbe Stellung mit demselben Fehler dreimal in EINER Partie, dazu ein anderer Fehler
+  const FEN_W = '6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 30';
+  const zugW = (ply, fen, verlust) => ({ ply, farbe: 'w', nummer: 30 + ply, san: 'Kf1', sanDe: 'Kf1', uci: 'g1f1', fenVorher: fen.replace(' 30', ' ' + (30 + ply)),
+    besterZug: 'a1a8', besterZugSanDe: 'Ta8#', klasse: 'verpasst', verlust, gewinnVorher: 1, gewinnZweiter: 0.6, coach: 'Verschenkt.' });
+  const reviewW = { zuege: [zugW(0, FEN_W, 0.4), { ply: 1, farbe: 'b' }, zugW(2, FEN_W, 0.45), { ply: 3, farbe: 'b' }, zugW(4, FEN_W, 0.4), { ply: 5, farbe: 'b' },
+    zugW(6, 'r5k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 30', 0.3), { ply: 7, farbe: 'b' }, { ...zugW(8, FENS[2], 0.2), besterZug: 'g1f3', uci: 'd1h5', klasse: 'fehler' }] };
+  const partieW = { ...partie, id: 'pwdh' };
+  const kandW = L.kandidaten(reviewW, partieW);
+  pruefe('Zugwiederholung: dieselbe Stellung nur einmal (der schwerste Eintrag, Ply 2), die anderen Fehler bekommen ihre Plaetze',
+    kandW.map((k) => k.id).join() === 'pwdh:2,pwdh:6,pwdh:8', kandW.map((k) => k.id));
+  const rW = L.fuegeHinzu(null, partieW, reviewW, heute, { tagVon });
+  pruefe('Zugwiederholung: 3 neue Karten, kein Rueckfall, rueckfaelle 0, Feier ohne "wieder dabei"', rW.neu.length === 3 && rW.rueckfall.length === 0
+    && rW.modul.karten.every((k) => k.rueckfaelle === 0) && JSON.stringify(L.kartenFeier(rW.neu.length, rW.rueckfall.length)) === '{"titel":"3 neue Karten in deinem Stapel","text":""}',
+  { neu: rW.neu, rueckfall: rW.rueckfall });
+  const rW2 = L.fuegeHinzu(rW.modul, { ...partieW, id: 'pwdh2' }, reviewW, '2026-10-22', { tagVon });
+  pruefe('Zugwiederholung in einer spaeteren Partie: jede Karte genau ein Rueckfall (rueckfaelle 1), keine neue', rW2.neu.length === 0
+    && rW2.rueckfall.length === 3 && new Set(rW2.rueckfall).size === 3 && rW2.modul.karten.every((k) => k.rueckfaelle === 1), { neu: rW2.neu, rueckfall: rW2.rueckfall });
+  // Altbestand mit zwei Karten derselben Stellung (vor dieser Regel moeglich): ein Treffer zaehlt nur einmal
+  const doppelAlt = L.normalisiereModul({ v: 1, karten: [
+    { ...rW.modul.karten[0], id: 'pa1:2' }, { ...rW.modul.karten[0], id: 'pa2:2' }] });
+  const rW3 = L.fuegeHinzu(doppelAlt, { ...partieW, id: 'pwdh3' }, reviewW, '2026-10-22', { tagVon });
+  pruefe('jede Karte zaehlt je Aufruf hoechstens einmal (neu oder Rueckfall)', new Set([...rW3.neu, ...rW3.rueckfall]).size === rW3.neu.length + rW3.rueckfall.length
+    && rW3.rueckfall.filter((x) => x === 'pa1:2').length === 1 && rW3.modul.karten.find((k) => k.id === 'pa1:2').rueckfaelle === 1, rW3.rueckfall);
+
+  // Vorschau fuer die Feier-Zeile: dasselbe Ergebnis wie fuegeHinzu, Eingabe unveraendert
+  const vorEingabe = JSON.stringify(r1.modul);
+  const vs = L.vorschau(r1.modul, partie2, z2, '2026-10-22', { tagVon });
+  const vf = L.fuegeHinzu(r1.modul, partie2, z2, '2026-10-22', { tagVon });
+  pruefe('vorschau: gleiche neu/rueckfall/doppelt wie fuegeHinzu, Modul der Eingabe bleibt unveraendert', JSON.stringify([vs.neu, vs.rueckfall, vs.doppelt])
+    === JSON.stringify([vf.neu, vf.rueckfall, vf.doppelt]) && vs.rueckfall.length === 3 && JSON.stringify(r1.modul) === vorEingabe && !('modul' in vs)
+    && L.vorschau(r1.modul, partie, beispielReview(), heute, { tagVon }).doppelt === true);
+  // Rechenzeit im Hoerer (Pruefer-Befund: vorher 14 bis 33 ms bei 380 Karten): die Vorschau bleibt klein, auch wenn die
+  // Kartei voll ist (Median aus 9 Laeufen, grosszuegige Grenze fuer einen ausgelasteten Rechner)
+  const gross = L.leeresModul();
+  for (let i = 0; i < 380; i++) {
+    gross.karten.push({ ...kand[0], id: `pz${i}abc:${i}`, partieId: `pz${i}abc`, fen: FENS[i % 16].replace(/ \d+$/, ' ' + (10 + i)), coach: 'x'.repeat(60),
+      stufe: 1 + (i % 5), faellig: `2026-10-${String(10 + (i % 20)).padStart(2, '0')}`, erstellt: '2026-10-01', geuebt: i % 3 ? '' : '2026-10-02', datum: '2026-10-01',
+      richtig: 0, falsch: 0, rueckfaelle: 0 });
+  }
+  const grossRoh = JSON.stringify(gross);
+  const zeiten = [];
+  for (let i = 0; i < 9; i++) {
+    const t = performance.now();
+    L.vorschau(JSON.parse(grossRoh), { ...partie, id: 'pzeit' + i }, beispielReview(), '2026-10-22', { tagVon });
+    zeiten.push(performance.now() - t);
+  }
+  zeiten.sort((a, b) => a - b);
+  pruefe('vorschau mit 380 Karten (Lesen inklusive): Median unter 10 ms (ohne Ausduennen)', zeiten[4] < 10, zeiten.map((x) => x.toFixed(1)).join(' '));
+
   // ---------- Wiederholung ueber Tagesgrenzen ----------
   gruppe = 'Wiederholung';
   const tag = (j, mo, t, h, mi = 0) => T.tagSchluessel(new Date(j, mo - 1, t, h, mi));
@@ -203,6 +256,37 @@ async function nodeTeil() {
     b2.info.stufe === 1 && b2.info.faellig === '2026-11-03' && b2.karte.richtig === 4 && b2.info.richtig && !b2.info.ersterVersuch);
   pruefe('unbekannte Karte oder kein Tag: null', L.beantworte(mf, 'gibtsnicht:1', { richtig: true, heute: '2026-11-01' }) === null
     && L.beantworte(mf, 'pf1:2', { richtig: true, heute: 'gestern' }) === null);
+
+  // Rueckfall am selben Tag (Pruefer-Befund): heute schon geuebt, dann dieselbe Stellung in einer neuen Partie
+  const nurEine = { zuege: [beispielReview().zuege[2]] };
+  let mh = L.fuegeHinzu(null, { ...partie, id: 'ph1' }, nurEine, '2026-10-21', { tagVon }).modul;
+  mh = L.beantworte(mh, 'ph1:2', { richtig: true, versuch: 1, heute: '2026-10-21' }).modul;
+  const vorRf = L.faellige(mh, '2026-10-21').length;
+  const rh = L.fuegeHinzu(mh, { ...partie, id: 'ph2' }, nurEine, '2026-10-21', { tagVon });
+  const kh = rh.modul.karten[0];
+  pruefe('Rueckfall einer heute geuebten Karte: wieder Stufe 0 und noch heute im Stapel (die Feier-Zeile stimmt)', vorRf === 0 && rh.rueckfall.join() === 'ph1:2'
+    && kh.stufe === 0 && kh.faellig === '2026-10-21' && L.faellige(rh.modul, '2026-10-21').map((k) => k.id).join() === 'ph1:2'
+    && L.geuebtHeute(rh.modul, '2026-10-21') === 0 && L.kartenFeier(0, 1).titel === '1 Karte wieder in deinem Stapel', { kh, ids: rh.modul.heute.ids });
+  const rhAnders = L.fuegeHinzu(mh, { ...partie, id: 'ph3' }, nurEine, '2026-10-22', { tagVon });
+  pruefe('Rueckfall an einem anderen Tag laesst den Stapel von gestern in Ruhe', rhAnders.modul.heute.tag === '2026-10-21' && rhAnders.modul.heute.ids.join() === 'ph1:2'
+    && L.faellige(rhAnders.modul, '2026-10-22').length === 1);
+
+  // "fuer immer geloest" zaehlt jede Karte nur einmal (Pruefer-Befund): gemeistert, Rueckfall, wieder gemeistert
+  let mg = L.fuegeHinzu(null, { ...partie, id: 'pg1' }, nurEine, '2026-10-21', { tagVon }).modul;
+  for (const t of ['2026-10-21', '2026-10-22', '2026-10-25', '2026-11-01', '2026-11-15', '2026-12-15']) mg = L.beantworte(mg, 'pg1:2', { richtig: true, versuch: 1, heute: t }).modul;
+  const gm1 = mg.zaehler.gemeistert;
+  mg = L.fuegeHinzu(mg, { ...partie, id: 'pg2' }, nurEine, '2027-01-10', { tagVon }).modul;
+  let letzteInfo = null;
+  for (const t of ['2027-01-10', '2027-01-11', '2027-01-14', '2027-01-21', '2027-02-04', '2027-03-06']) {
+    const b = L.beantworte(mg, 'pg1:2', { richtig: true, versuch: 1, heute: t });
+    mg = b.modul;
+    letzteInfo = b.info;
+  }
+  pruefe('nach Rueckfall wieder fuer immer geloest: Moment und Klang ja, Zaehler gemeistert bleibt 1 (eine Stellung)', gm1 === 1 && mg.zaehler.gemeistert === 1
+    && letzteInfo.gemeistert && mg.karten.length === 1 && mg.karten[0].stufe === 6 && mg.karten[0].gemeistert === true && L.stand(mg, '2027-03-06').gemeistert === 1,
+  { z: mg.zaehler, k: mg.karten[0].gemeistert });
+  pruefe('aeltere Karte ohne Feld gemeistert: fuer immer geloest gilt als gemeistert, sonst nicht', L.normalisiereModul({ v: 1, karten: [
+    { ...mg.karten[0], gemeistert: undefined }, { ...mg.karten[0], id: 'pg9:2', stufe: 3, faellig: '2027-03-09', gemeistert: undefined }] }).karten.map((k) => k.gemeistert).join() === 'true,false');
 
   // ---------- Tagesdeckel ----------
   gruppe = 'Tagesdeckel';
@@ -251,6 +335,8 @@ async function nodeTeil() {
     { ...kand[0], id: 'pk:4', stufe: 0, faellig: '2026-10-21' }, { ...kand[0], id: 'pk:4', stufe: 3, faellig: '2026-10-21' }], verarbeitet: 'x', heute: 7, zaehler: { gemeistert: -1 } });
   pruefe('kaputte Karten fallen weg (FEN, Zug, Klasse, doppelte ID), Rest bleibt, Zaehler nie negativ', kaputt.karten.length === 1 && kaputt.karten[0].id === 'pk:4'
     && kaputt.karten[0].stufe === 0 && kaputt.verarbeitet.length === 0 && kaputt.heute.tag === '' && kaputt.zaehler.gemeistert === 0, kaputt);
+  const klein = L.normalisiereModul(r1.modul);
+  pruefe('unter 380 Karten und dem Budget: Ausduennen laesst das Modul unberuehrt (derselbe Gegenstand)', L.duenneAus(klein) === klein && klein.karten.length === 3);
   pruefe('Muell statt Modul: leeres Modul', JSON.stringify(L.normalisiereModul([1, 2])) === JSON.stringify(L.leeresModul())
     && JSON.stringify(L.normalisiereModul('x')) === JSON.stringify(L.leeresModul()) && L.normalisiereModul(null).karten.length === 0);
   storage.speichereModul('kartei', r1.modul);
@@ -295,6 +381,9 @@ async function nodeTeil() {
   pruefe('Damen-Stellung: Sxh4 legal, a3 laesst Dxf2# zu', (() => { const c = new Chess(FEN_DAME); c.move('a3'); c.move('Qxf2#'); return c.isCheckmate(); })()
     && (() => { const c = new Chess(FEN_DAME); return !!c.move('Nxh4'); })());
   pruefe('Schwarz am Zug wird gedreht gezeigt', new Chess(R_SCHWARZ.fen).turn() === 'b');
+  pruefe('Mini-Brett aus Sicht von Schwarz: drehe() und dreheFeld() drehen um 180 Grad, zweimal ergibt das Original',
+    L.drehe(R_SCHWARZ.fen) === '1K6/PPP5/8/8/8/8/ppp5/1k5r b - - 0 1' && L.drehe(L.drehe(FEN_DAME)) === FEN_DAME
+    && L.dreheFeld('a8') === 'h1' && L.dreheFeld('e2') === 'd7' && L.dreheFeld('h1') === 'a8' && L.drehe('kaputt') === 'kaputt', L.drehe(R_SCHWARZ.fen));
   pruefe('Stellungsschluessel ohne Zugzaehler (Rueckfall auch bei anderer Zugnummer)', stellungsSchluessel(FEN_DAME) === stellungsSchluessel(FEN_DAME.replace('4 4', '9 12')));
 
   // ---------- Dateien ----------
@@ -449,9 +538,13 @@ async function browserTeil(browser) {
   z = await rz(seite);
   pruefe('richtig: Feder-Haken am Zielfeld (brett.striche, Feld markiert), Meldung "Richtig!", Knopf Weiter, Punkt gut', r1.haken && r1.feld && r1.meldung === 'richtig' && r1.titel === 'Richtig!'
     && r1.weiter && r1.zeigen && r1.punkt === 'gut' && z.ergebnisse[0].richtig && z.ergebnisse[0].versuch === 1, JSON.stringify({ r1, e: z.ergebnisse }));
+  const st1 = await seite.evaluate(() => { const a = document.querySelector('.rs-amzug'); return { hidden: a.hidden, sicht: getComputedStyle(a).visibility, hoehe: a.getBoundingClientRect().height }; });
+  pruefe('nach dem Loesen (Matt): "Weiß am Zug" unsichtbar, der Platz bleibt (kein Sprung im Status)', st1.hidden && st1.sicht === 'hidden' && st1.hoehe > 0, JSON.stringify(st1));
   await bild(seite, 'raetsel-richtig-ipad');
   await seite.locator('.rs-weiter').click();
   await warteZustand(seite, 'z.index === 1 && z.phase === "flo"');
+  pruefe('naechste Aufgabe: "Weiß am Zug" wieder sichtbar', await seite.evaluate(() => { const a = document.querySelector('.rs-amzug');
+    return !a.hidden && getComputedStyle(a).visibility === 'visible' && a.textContent.trim() === 'Weiß am Zug'; }));
   // 2) falsch: Figur schnappt zurueck, Hinweis markiert die Figur, dann richtig im zweiten Versuch
   const vorMarke = await seite.evaluate(() => ({ marke: document.querySelector('.rs-marke').hidden ? '' : document.querySelector('.rs-marke').textContent.trim(),
     text: document.querySelector('.rs-status p').textContent, zuletzt: [...document.querySelectorAll('.rs-screen .lage.zuletzt')].map((l) => l.dataset.feld).sort().join() }));
@@ -481,6 +574,13 @@ async function browserTeil(browser) {
   const r3 = await seite.evaluate(() => ({ primaer: document.querySelector('.rs-zeigen').classList.contains('primaer'), fokus: document.activeElement === document.querySelector('.rs-zeigen'),
     meldung: document.querySelector('.rs-meldung').dataset.art, ziele: document.querySelectorAll('.rs-screen .lage.ziel').length }));
   pruefe('zweimal falsch: Brett ruht, "Lösung zeigen" wird die Hauptaktion (Fokus)', r3.primaer && r3.fokus && r3.meldung === 'falsch', JSON.stringify(r3));
+  const ring = () => seite.evaluate(() => { const k = document.querySelector('.rs-zeigen');
+    return { eingabe: document.querySelector('.rs-screen').dataset.eingabe, fv: k.matches(':focus-visible'), outline: getComputedStyle(k).outlineStyle }; });
+  const ring1 = await ring();
+  await seite.keyboard.press('Shift');
+  const ring2 = await ring();
+  pruefe('Fokus-Rahmen nur fuer die Tastatur: nach Mausklicks keiner an "Lösung zeigen", nach einer Taste wieder da', ring1.eingabe === 'zeiger'
+    && ring1.outline === 'none' && ring2.eingabe === 'tastatur' && ring2.fv && ring2.outline !== 'none', JSON.stringify({ ring1, ring2 }));
   await seite.locator('.rs-zeigen').click();
   await seite.waitForSelector('.rs-screen .brett-pfeile .pfeil[data-von="a1"][data-nach="a8"]', { timeout: 5000 });
   await bild(seite, 'raetsel-loesung-pfeil-ipad');
@@ -569,6 +669,12 @@ async function browserTeil(browser) {
     zahlen: document.querySelector('.kt-zahlen').textContent, faellig: document.querySelector('.kt-karte').dataset.faellig }));
   pruefe('Training: Karte "Fehler wiederholen · 10 fällig", Stapel mit 4 Mini-Brettern, "12 im Training"', tk.h2 === 'Fehler wiederholen · 10 fällig' && tk.stapel === 4
     && tk.zahlen === '12 im Training' && tk.faellig === '10', JSON.stringify(tk));
+  const minis = await seite.evaluate(() => {
+    const zelle = (sel, n) => { const i = document.querySelector(sel + ' .mini').children[n]; const img = i && i.querySelector('img'); return img ? img.getAttribute('src').split('/').pop() : ''; };
+    return { schwarz0: zelle('.kt-karte .kk[data-farbe="b"]', 0), schwarz1: zelle('.kt-karte .kk[data-farbe="b"]', 1), weiss0: zelle('.kt-karte .kk[data-farbe="w"]', 0) };
+  });
+  pruefe('Mini-Bretter aus Flos Sicht: Karte mit Schwarz gedreht (oben links h1, daneben der weisse Koenig von g1), mit Weiss oben links a8',
+    minis.schwarz0 === '' && minis.schwarz1 === 'wK.svg' && minis.weiss0 === 'bR.svg', JSON.stringify(minis));
   await warte(800);
   await bild(seite, 'training-kartei-ipad');
   await seite.evaluate(async () => {
@@ -615,6 +721,19 @@ async function browserTeil(browser) {
   await seite.locator('.rs-screen .kopf-zurueck').click();
   await seite.waitForSelector('.training-gitter .kt-karte');
   pruefe('zurueck ins Training: "· 8 fällig" (2 geuebt, Deckel 10)', await seite.locator('.kt-karte h2').textContent() === 'Fehler wiederholen · 8 fällig');
+  // sofort "Loesung zeigen", ohne eigenen Zug: versuch 0 (Vertrag in ARCHITEKTUR: zaehlt nicht als geuebt)
+  await seite.locator('.kt-karte .kt-los').click();
+  await seite.waitForSelector('.rs-screen .rs-brett .figur');
+  await warteZustand(seite, 'z.index === 0 && z.phase === "flo"');
+  const evVor = await seite.evaluate(() => window.__ev.length);
+  await seite.locator('.rs-zeigen').click();
+  await warteZustand(seite, 'z.phase === "gezeigt"');
+  const ev0 = await seite.evaluate((n) => window.__ev.slice(n), evVor);
+  pruefe('sofort "Lösung zeigen": training:geloest mit richtig false und versuch 0', ev0.length >= 1 && ev0[0][0] === 'geloest' && ev0[0][1].richtig === false
+    && ev0[0][1].versuch === 0 && ev0[0][1].quelle === 'kartei', JSON.stringify(ev0));
+  await seite.locator('.rs-screen .kopf-zurueck').click();
+  await seite.waitForSelector('.training-gitter .kt-karte');
+  pruefe('danach "· 7 fällig" (die gezeigte Karte kommt morgen wieder)', await seite.locator('.kt-karte h2').textContent() === 'Fehler wiederholen · 7 fällig');
 
   // Stapel leer: alles fuer heute geuebt
   const zwei = [karte(20, heute), karte(21, heute, { fen: R_GRUND.fen, besterZug: 'a1a8', san: 'Kh1' })];
@@ -661,6 +780,20 @@ async function browserTeil(browser) {
   pruefe('partie:analysiert: eine Karte aus der normalen Partie, keine aus der Uebung, zweimal ergibt nichts doppelt', an.modul && an.modul.karten.length === 1
     && an.modul.karten[0].id === 'pan1:0' && JSON.stringify(an.modul.verarbeitet) === '["pan1"]', JSON.stringify(an.modul));
   pruefe('Feier-Zeile (Nachlese, weil kein Ergebnis offen): "1 neue Karte in deinem Stapel", genau einmal', JSON.stringify(an.feier) === '["1 neue Karte in deinem Stapel"]', an.feier);
+  // Modul einer neueren App (Pruefer-Befund): keine Karte und keine Zeile, die eine Karte verspricht
+  await bereite(seite, { modul: { v: 2, karten: [], neuesFeld: 1 } });
+  const neuer = await seite.evaluate(async ({ fen }) => {
+    const E = await import('/js/ereignisse.js');
+    const F = await import('/js/feier.js');
+    const zug = { ply: 0, farbe: 'w', nummer: 4, san: 'a3', sanDe: 'a3', uci: 'a2a3', fenVorher: fen, besterZug: 'f3h4', besterZugSanDe: 'Sxh4', klasse: 'patzer',
+      verlust: 0.93, gewinnVorher: 0.93, gewinnZweiter: 0.6, coach: 'Weit daneben!' };
+    E.sende('partie:analysiert', { partieId: 'pnv1', botId: 'lisa', modus: 'normal', wertet: true, review: { zuege: [zug] }, quelle: 'nachholen',
+      partie: { id: 'pnv1', spielerFarbe: 'w', botId: 'lisa', modus: 'normal', datum: new Date().toISOString() } });
+    await new Promise((r) => setTimeout(r, 80));
+    return { roh: JSON.parse(localStorage.getItem('schach-arena:v1:modul:kartei') || 'null'), feier: F.nachlese().map((f) => f.titel) };
+  }, { fen: FEN_DAME });
+  pruefe('Modul einer neueren App (v 2): keine Karte, keine Feier-Zeile, Modul unveraendert', neuer.roh && neuer.roh.v === 2 && neuer.roh.neuesFeld === 1
+    && neuer.roh.karten.length === 0 && neuer.feier.length === 0, JSON.stringify(neuer));
   pruefe('Kartei: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 
@@ -686,6 +819,12 @@ async function browserTeil(browser) {
     const kp = (await kz(s2)).modul.karten[0];
     pruefe('Karte aus der echten Analyse: Stellung vor a3, bester Zug Sxh4 (f3h4), gespielt a2a3, Weit daneben, Benno', kp.fen.startsWith(FEN_DAME.split(' ').slice(0, 2).join(' '))
       && kp.besterZug === 'f3h4' && kp.gespielt === 'a2a3' && kp.klasse === 'patzer' && kp.botId === 'benno' && kp.stufe === 0, JSON.stringify(kp));
+    // Bild erst, wenn die Zeile fertig eingeblendet ist (bei einer Niederlage 700 ms Verzoegerung plus 400 ms Einblenden)
+    const voll = await s2.waitForFunction(() => {
+      const z = [...document.querySelectorAll('.erg-feier .erg-f-zeile')].find((e) => /neue Karte/.test(e.textContent));
+      return !!z && z.getAnimations().every((a) => a.playState === 'finished') && getComputedStyle(z).opacity === '1';
+    }, null, { timeout: 8000 }).then(() => true, () => false);
+    pruefe('Feier-Zeile im Ergebnis fertig eingeblendet (Deckkraft 1)', voll);
     await bild(s2, 'ergebnis-feier-ipad');
     await s2.evaluate(() => window.__app.gehe('training'));
     await s2.waitForSelector('.kt-karte .kt-los');
@@ -787,6 +926,12 @@ async function browserTeil(browser) {
     return { training: o.angeboten('training:karten'), css: !!document.querySelector('link[data-paket="kartei"]'), h2: document.querySelector('.kt-karte h2').textContent };
   });
   pruefe('ohne ?test aus PAKETE geladen: Karte im Training ("Noch keine Karten"), eigenes CSS', prod.training === 1 && prod.css && prod.h2 === 'Noch keine Karten', JSON.stringify(prod));
+  // Einstieg ueber die Leiste: erst mit 'training' in REITER (Entscheidung der Integration, hier per Route gesetzt)
+  await pr.seite.evaluate(() => { location.hash = '#arena'; });
+  await pr.seite.waitForSelector('.screen.arena', { timeout: 20000 });
+  await pr.seite.locator('.reiter-leiste:not([hidden]) [data-reiter="training"]').click({ timeout: 10000 });
+  const ueberLeiste = await pr.seite.waitForSelector('.training-gitter .kt-karte', { timeout: 10000 }).then(() => true, () => false);
+  pruefe('mit REITER ["training"]: Arena, Reiter Training, dort die Karte der Kartei', ueberLeiste && await pr.seite.evaluate(() => location.hash === '#training'));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();
 }

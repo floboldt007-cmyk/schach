@@ -3,15 +3,17 @@
 //   Analyse-Screen; Uebungen nie): eigene Zuege "Weit daneben", "Verschenkt" und "Daneben" mit eindeutiger Loesung,
 //   hoechstens 3 je Partie, die schwersten zuerst (Regeln in logik.js). Beim Start werden gespeicherte Analysen
 //   einmal je Sitzung nachgetragen (Partien, die vor dem Paket analysiert wurden).
-// - Wiederholung nach 1, 3, 7, 14, 30 Tagen (Tagesschluessel aus tag.js, Grenze 4:00), dann "für immer gelöst";
+// - Wiederholung nach 1, 3, 7, 14, 30 Tagen (Tagesschluessel aus tag.js, Grenze 4:00), dann "fuer immer geloest";
 //   hoechstens 10 Karten am Tag, der Rest bleibt still faellig.
 // - Ueben im Raetsel-Bildschirm (js/ui/raetsel.js, Quelle "kartei"): app.gehe('raetsel', { quelle: 'kartei' }).
 //
-// Orte:       training:karten (10, Karte "Fehler wiederholen · 5 fällig" mit Stapel, sonst "Stapel leer" bzw. ein
+// Orte:       training:karten (10, Karte "Fehler wiederholen - 5 faellig" mit Stapel, sonst "Stapel leer" bzw. ein
 //             freundlicher Leer-Zustand), arena:heute (25, Zeile nur wenn Karten faellig sind)
 // Ereignisse: hoert partie:analysiert (Karten, Feier-Zeile "2 neue Karten in deinem Stapel", Quelle karten, Zeile
-//             Prio 30), app:bereit (training:stand, Nachtrag), speicher:zurueckgesetzt (training:stand);
-//             sendet training:geloest { karteId, richtig, versuch, quelle: 'kartei' } je Karte und training:stand
+//             Prio 30; synchron nur logik.vorschau, geschrieben wird per setTimeout), app:bereit (training:stand,
+//             Nachtrag), speicher:zurueckgesetzt (training:stand);
+//             sendet training:geloest { karteId, richtig, versuch, quelle: 'kartei' } je Karte (Loesung gezeigt:
+//             richtig false, versuch = Fehlversuche davor, 0 = ohne eigenen Zug) und training:stand
 //             { faellig, gesamt, gemeistert } beim Start und nach jeder Aenderung.
 // Register:   Raetsel-Quelle "kartei" (js/ui/raetsel.js), Icon "kartei".
 // Speicher:   Modul "kartei" (Budget 160.000, logik.js), bei jedem Zugriff frisch gelesen; ein Modul aus einer
@@ -51,12 +53,17 @@ function stand() {
   return L.normalisiereModul(roh());
 }
 // Neuere App (hoeherer Rechenstand): lesen ja, schreiben nie (sonst gingen ihre Felder verloren)
-function schreibbar() {
-  const r = roh();
+function schreibbar(r = roh()) {
   return !(r && Number.isInteger(r.v) && r.v > L.RECHENSTAND);
 }
+let gewarnt = false;
+function warneNeuer() {
+  if (gewarnt) return;
+  gewarnt = true;
+  console.warn('kartei: Modul aus einer neueren App (Rechenstand hoeher als ' + L.RECHENSTAND + '), es bleibt unveraendert');
+}
 function sichere(m) {
-  if (!schreibbar()) return false;
+  if (!schreibbar()) { warneNeuer(); return false; }
   let r = speichereModul(L.MODUL, { ...m, v: L.RECHENSTAND });
   if (r && r.grund === 'budget') r = speichereModul(L.MODUL, { ...L.duenneAus(m, Math.floor(L.BUDGET * 0.9)), v: L.RECHENSTAND });
   if (!r || !r.ok) { console.warn('kartei: Modul nicht gespeichert', r && r.grund); return false; }
@@ -70,16 +77,19 @@ export function zustand() {
   return { modul: JSON.parse(JSON.stringify(m)), stand: L.stand(m, heute()), letzte: letzte ? { ...letzte } : null };
 }
 
-function sendeStand(m = stand()) {
+function sendeStand(m = roh()) {
   sicher(() => sende('training:stand', L.stand(m, heute())), 'training:stand');
 }
 
 // ---------- Karten aus der Spielanalyse ----------
+const tagVon = (ms) => tagSchluessel(ms);
 function verarbeite(partie, review, { feier = true } = {}) {
   if (!partie || !review || (partie.modus || 'normal') === 'uebung') return null;
-  const tag = heute();
-  const m = stand();
-  const r = L.fuegeHinzu(m, partie, review, tag, { tagVon: (ms) => tagSchluessel(ms) });
+  const r0 = roh();
+  // Modul einer neueren App: keine Karten, also auch keine Zeile, die Karten verspricht
+  if (!schreibbar(r0)) { warneNeuer(); return null; }
+  // synchron nur der leichte Teil (Hoerer hoechstens 2 ms, js/ereignisse.js): welche Karten neu sind oder wiederkommen
+  const r = L.vorschau(r0, partie, review, heute(), { tagVon });
   if (r.doppelt) return r;
   letzte = { partieId: partie.id, neu: r.neu.slice(), rueckfall: r.rueckfall.slice() };
   // Feier-Zeile synchron, damit sie noch im Ergebnis erscheint (partie.js fuellt das Overlay gleich danach)
@@ -89,7 +99,7 @@ function verarbeite(partie, review, { feier = true } = {}) {
   }
   // Schreiben in einer eigenen Aufgabe (Hoerer bleiben kurz); vorher frisch lesen, falls inzwischen geuebt wurde
   setTimeout(() => sicher(() => {
-    const neu = L.fuegeHinzu(stand(), partie, review, heute(), { tagVon: (ms) => tagSchluessel(ms) });
+    const neu = L.fuegeHinzu(roh(), partie, review, heute(), { tagVon });
     if (!neu.doppelt) sichere(neu.modul);
     sendeStand();
   }, 'Speichern'), 0);
@@ -111,7 +121,7 @@ function nachtragen() {
     sicher(() => {
       const review = ladeReview(p.id);
       if (!review) return;
-      const neu = L.fuegeHinzu(stand(), p, review, heute(), { tagVon: (ms) => tagSchluessel(ms) });
+      const neu = L.fuegeHinzu(roh(), p, review, heute(), { tagVon });
       if (!neu.doppelt && sichere(neu.modul)) sendeStand(neu.modul);
     }, 'Nachtrag');
     setTimeout(schritt, 0);
@@ -134,13 +144,13 @@ function quelle() {
     liste() {
       sitzung = [];
       const tag = heute();
-      return L.faellige(stand(), tag).map((k) => L.alsAufgabe(k, { botName: botName(k.botId), heute: tag })).filter(Boolean);
+      return L.faellige(roh(), tag).map((k) => L.alsAufgabe(k, { botName: botName(k.botId), heute: tag })).filter(Boolean);
     },
     ergebnis(aufgabe, erg) {
       const tag = heute();
       const richtig = !!erg.richtig;
       const versuch = Number.isInteger(erg.versuch) ? erg.versuch : 0;
-      const r = L.beantworte(stand(), aufgabe.id, { richtig, versuch, heute: tag });
+      const r = L.beantworte(roh(), aufgabe.id, { richtig, versuch, heute: tag });
       if (!r) return null;
       sichere(r.modul);
       sitzung.push({ id: aufgabe.id, info: r.info });
@@ -154,18 +164,16 @@ function quelle() {
       return { titel: t.titel, text: t.text };
     },
     leer() {
-      const m = stand();
-      const st = L.stand(m, heute());
-      return st.gesamt
-        ? { titel: 'Stapel leer. Gut gemacht.', text: naechsteText(m) }
+      const u = L.uebersicht(roh(), heute());
+      return u.stand.gesamt
+        ? { titel: 'Stapel leer. Gut gemacht.', text: naechsteText(u.naechster) }
         : { titel: 'Noch keine Karten', text: 'Nach jeder analysierten Partie werden bis zu drei deiner Fehler hier zu Karten.' };
     },
   };
 }
 
-function naechsteText(m) {
+function naechsteText(n) {
   const tag = heute();
-  const n = L.naechsterTag(m, tag);
   if (!n || n === tag) return '';
   const tage = tageZwischen(tag, n);
   if (tage === 1) return 'Die nächste Karte kommt morgen.';
@@ -179,23 +187,26 @@ function oeffne(app, ev) {
   sicher(() => app.gehe('raetsel', { quelle: L.PAKET }), 'Öffnen');
 }
 
+// Mini-Brett aus Flos Sicht: Karten mit Schwarz gedreht (miniBrett kennt keine Ausrichtung)
+function mini(k) {
+  const schwarz = k.farbe === 'b';
+  const vor = k.vor ? [k.vor.slice(0, 2), k.vor.slice(2, 4)] : [];
+  return miniBrett(schwarz ? L.drehe(k.fen) : k.fen, { zuletzt: schwarz ? vor.map(L.dreheFeld) : vor });
+}
+
 function trainingKarte(app) {
-  const m = stand();
   const tag = heute();
-  const st = L.stand(m, tag);
+  const { stand: st, faellige: faellig, naechster } = L.uebersicht(roh(), tag);
   const el = document.createElement('section');
   el.className = 't-karte kt-karte';
   el.dataset.paket = L.PAKET;
   el.dataset.faellig = String(st.faellig);
   el.setAttribute('aria-label', 'Fehler-Kartei');
-  const faellig = L.faellige(m, tag);
   if (st.faellig > 0) {
     const zeigen = faellig.slice(0, 4);
     el.innerHTML = `<span class="ueberzeile">Fehler-Kartei</span>
-      <div class="kartei-stapel kt-stapel" data-anzahl="${zeigen.length}">${zeigen.map((k) => {
-        const vor = k.vor ? [k.vor.slice(0, 2), k.vor.slice(2, 4)] : [];
-        return `<div class="kk">${miniBrett(k.fen, { zuletzt: vor })}${k.san ? `<em>${esc(k.san)}</em>` : ''}</div>`;
-      }).join('')}</div>
+      <div class="kartei-stapel kt-stapel" data-anzahl="${zeigen.length}">${zeigen.map((k) =>
+        `<div class="kk" data-farbe="${k.farbe}">${mini(k)}${k.san ? `<em>${esc(k.san)}</em>` : ''}</div>`).join('')}</div>
       <h2>Fehler wiederholen · ${st.faellig} fällig</h2>
       <p>Deine eigenen Fehler als Karten. Jede kommt wieder, bis sie sitzt.</p>
       <div class="t-fuss"><span class="kt-zahlen">${zahlenText(st)}</span>
@@ -206,7 +217,7 @@ function trainingKarte(app) {
     el.innerHTML = `<span class="ueberzeile">Fehler-Kartei</span>
       <span class="kt-symbol" aria-hidden="true">${icon('haken')}</span>
       <h2>Stapel leer. Gut gemacht.</h2>
-      <p>${esc(naechsteText(m) || 'Für heute ist alles geübt.')}</p>
+      <p>${esc(naechsteText(naechster) || 'Für heute ist alles geübt.')}</p>
       <div class="t-fuss"><span class="kt-zahlen">${zahlenText(st)}</span></div>`;
   } else {
     el.classList.add('kt-ruhig', 'kt-leer');
@@ -225,7 +236,7 @@ function zahlenText(st) {
 }
 
 function heuteZeile(app, tag) {
-  const st = L.stand(stand(), tag);
+  const st = L.stand(roh(), tag);
   if (!st.faellig) return null;
   const el = document.createElement('div');
   el.className = 'kt-heute';
