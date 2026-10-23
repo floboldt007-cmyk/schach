@@ -25,7 +25,7 @@ import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
 import { botNachId, staerkeFuerElo } from '../../bots.js';
 import { registriereIcon } from '../../ui/icons.js';
-import { ladeModul, ladePartie, ladePartien, ladeReview, hatReview, ladeEinstellungen } from '../../storage.js';
+import { ladeModul, ladePartie, ladePartien, ladeReview, hatReview, ladeEinstellungen, eigeneZuege } from '../../storage.js';
 import { tagSchluessel } from '../../tag.js';
 import { freischalten } from '../../ui/bestenliste.js';
 import * as S from './stand.js';
@@ -204,6 +204,8 @@ function anbieterAbrechnung(k) {
   const p = k && k.erg && k.erg.partie ? k.erg.partie : null;
   if (!p || typeof p.id !== 'string') return null;
   if ((k.modus || p.modus) === 'uebung') return null;
+  // ohne eigenen Zug (z. B. sofort aufgegeben) gibt es keine Spielanalyse und also keine Punkte: keine Zeile
+  if (!(eigeneZuege(p) > 0)) return null;
   const e = S.ergebnisVon(S.lade(), p.id);
   if (!e) {
     // die Analyse rechnet noch: ruhiger Schimmer; ohne Analyse (fehlgeschlagen): die Arena holt sie nach
@@ -262,17 +264,22 @@ function registriere() {
   hoere('speicher:zurueckgesetzt', () => sicher(() => { gezeigt.clear(); }, 'zurueckgesetzt'));
   // der Modul-Speicher wird nur bei Hilfe gelesen: der naechste eigene Zug nach einem Hinweis oder Zuruecknehmen
   // (hilfeOffen merkt sich die laufId, damit nicht jeder Zug den Speicher liest)
-  hoere('partie:gestartet', (d) => sicher(() => {
+  // partie:gestartet liest und schreibt den Modul-Speicher: ausserhalb des Hoerers (Hoerer hoechstens 2 ms), lange vor
+  // dem ersten eigenen Zug
+  hoere('partie:gestartet', (d) => {
     if (!d || !d.laufId) return;
-    lauf((st) => {
-      S.merkeLauf(st, d.laufId, { fortgesetzt: !!d.fortgesetzt });
-      hilfeOffen = st.lauf && st.lauf.hilfe ? d.laufId : null;
-    });
-  }, 'partie:gestartet'));
+    const laufId = d.laufId;
+    const fortgesetzt = !!d.fortgesetzt;
+    setTimeout(() => sicher(() => lauf((st) => {
+      S.merkeLauf(st, laufId, { fortgesetzt });
+      hilfeOffen = st.lauf && st.lauf.hilfe ? laufId : null;
+    }), 'partie:gestartet'), 0);
+  });
   hoere('hilfe:genutzt', (d) => sicher(() => {
     if (!d || !d.laufId) return;
     hilfeOffen = d.laufId;
-    lauf((st) => S.merkeHilfe(st, d.laufId));
+    // der Lauf entsteht notfalls hier (partie:gestartet merkt ihn erst nach dem Hoerer)
+    lauf((st) => { S.merkeLauf(st, d.laufId, { fortgesetzt: true }); S.merkeHilfe(st, d.laufId); });
   }, 'hilfe:genutzt'));
   hoere('zug:gespielt', (d) => sicher(() => {
     if (!d || d.wer !== 'flo' || hilfeOffen !== d.laufId) return;
@@ -282,7 +289,7 @@ function registriere() {
   hoere('zug:zurueckgenommen', (d) => sicher(() => {
     if (!d || !d.laufId) return;
     hilfeOffen = d.laufId;
-    lauf((st) => S.vergissAb(st, d.laufId, d.bisPly));
+    lauf((st) => { S.merkeLauf(st, d.laufId, { fortgesetzt: true }); S.vergissAb(st, d.laufId, d.bisPly); });
   }, 'zug:zurueckgenommen'));
   hoere('partie:beendet', (d) => sicher(() => { if (d && d.partieId) lauf((st) => S.beende(st, d.laufId, d.partieId)); }, 'partie:beendet'));
   hoere('partie:analysiert', (d) => sicher(() => partieAnalysiert(d), 'partie:analysiert'));

@@ -855,16 +855,19 @@ async function testeBrowser(browser) {
   const wartend = await seite.evaluate(async () => {
     const o = await import('./js/orte.js');
     const d = document.createElement('div');
-    const a = o.fuelle('ergebnis:abrechnung', d, { rechnet: true, erg: { partie: { id: 'gibt-es-nicht' } }, modus: 'normal' });
-    const b = o.fuelle('ergebnis:abrechnung', d, { rechnet: false, erg: { partie: { id: 'gibt-es-nicht' } }, modus: 'normal' });
-    const u = o.fuelle('ergebnis:abrechnung', document.createElement('div'), { rechnet: true, erg: { partie: { id: 'x', modus: 'uebung' } }, modus: 'uebung' });
+    const partie = { id: 'gibt-es-nicht', spielerFarbe: 'w', zuege: ['e2e4', 'e7e5', 'g1f3'] };
+    const a = o.fuelle('ergebnis:abrechnung', d, { rechnet: true, erg: { partie }, modus: 'normal' });
+    const b = o.fuelle('ergebnis:abrechnung', d, { rechnet: false, erg: { partie }, modus: 'normal' });
+    const u = o.fuelle('ergebnis:abrechnung', document.createElement('div'), { rechnet: true, erg: { partie: { ...partie, id: 'x', modus: 'uebung' } }, modus: 'uebung' });
+    // sofort aufgegeben (kein eigener Zug): keine Spielanalyse, also auch keine Punkte-Zeile
+    const n = o.fuelle('ergebnis:abrechnung', document.createElement('div'), { rechnet: true, erg: { partie: { ...partie, id: 'y', zuege: [] } }, modus: 'normal' });
     const t = [...d.querySelectorAll('.pk-abr')].map((x) => x.className + '|' + x.textContent.replace(/\s+/g, ' ').trim());
-    a.verlasse(); b.verlasse(); u.verlasse();
-    return { t, u: u.anzahl };
+    a.verlasse(); b.verlasse(); u.verlasse(); n.verlasse();
+    return { t, u: u.anzahl, n: n.anzahl };
   });
-  pruefe('Rechnet die Analyse noch: „Punkte werden gezählt …“ mit ruhigem Schimmer; ohne Analyse: „Punkte folgen mit der Analyse“; Übung: keine Zeile',
+  pruefe('Rechnet die Analyse noch: „Punkte werden gezählt …“ mit ruhigem Schimmer; ohne Analyse: „Punkte folgen mit der Analyse“; Übung und ohne eigenen Zug: keine Zeile',
     wartend.t.length === 2 && /pk-schimmer/.test(wartend.t[0]) && /Punkte werden gezählt …/.test(wartend.t[0]) && !/pk-schimmer/.test(wartend.t[1])
-    && /Punkte folgen mit der Analyse/.test(wartend.t[1]) && wartend.u === 0, wartend);
+    && /Punkte folgen mit der Analyse/.test(wartend.t[1]) && wartend.u === 0 && wartend.n === 0, wartend);
 
   // ---------- 4. Erste Partie: Abrechnung "Erster Eintrag" ----------
   await h.klangSpion();
