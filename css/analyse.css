@@ -396,6 +396,16 @@
   .an-g-wert { font-size: 25px; }
   .an-g-label > .an-g-zusatz { display: inline; }
 }
+/* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen */
+@container an-rechts (max-width: 400px) {
+  .an-g-label, .an-k-titel { white-space: normal; overflow: visible; text-overflow: clip; }
+}
+/* Kopf im schmalen Querfenster: die Unterzeile darf umbrechen, der Grund (Matt, Aufgabe ...) entfaellt dort,
+   die Genauigkeits-Karte nennt ihn unter dem Ergebnis */
+@media (orientation: landscape) and (max-width: 760px) {
+  .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
+  .an-unter-grund { display: none; }
+}
 /* Navigation unter einem kleinen Brett: vier Knoepfe ueber die volle Breite, der Zugstand entfaellt (wie am Handy) */
 @container an-links (max-width: 307px) {
   .an-stand { display: none; }

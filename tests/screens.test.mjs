@@ -25,6 +25,8 @@ if (BILDER) mkdirSync(BILDER, { recursive: true });
 const VIEWPORTS = [
   ['ipad-quer', 1180, 820], ['ipad-hoch', 820, 1180], ['ipad-klein', 1024, 768],
   ['ipad-pro', 1366, 1024], ['handy', 390, 844], ['handy-se', 375, 667],
+  // kleines Querfenster (Flos Befund 23.10.: Vorschau-Fenster einer App auf dem iPad, Brett vorher 80 px)
+  ['fenster-klein', 590, 580],
 ];
 
 function ladePlaywright() {
@@ -680,7 +682,9 @@ async function testeViewports(browser, d) {
       pruefe(`${name} ${screen}: keine abgeschnittenen Namen oder Titel`, !kurz.length, kurz.join(', '));
       if (screen === 'analyse') {
         const brett = await seite.locator('.an-brett').boundingBox();
-        const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * 0.5;
+        // im kleinen Querfenster teilen sich Brett, Navigation und Coach (ohne Scrollen sichtbar) die Hoehe: mindestens 37 %
+        const anteil = name === 'fenster-klein' ? 0.37 : 0.5;
+        const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * anteil;
         pruefe(`${name} analyse: Brett ganz sichtbar und groß`, ok, JSON.stringify(brett));
         if (breite > hoehe) {
           const unten = await seite.evaluate(() => {

@@ -224,7 +224,15 @@ export function zeige(root, params = {}, app) {
     })();
     const info = ergebnisInfo(p, nummer);
     const name = st.bot ? st.bot.name : 'Bot';
-    sec.querySelector('.an-unter').textContent = [`Du gegen ${name}`, info.stand, info.grund].filter(Boolean).join(' · ');
+    // Der Grund steht in einem eigenen Span: im kleinen Querfenster entfaellt er im Kopf (die Genauigkeits-Karte nennt ihn)
+    const unter = sec.querySelector('.an-unter');
+    unter.textContent = [`Du gegen ${name}`, info.stand].filter(Boolean).join(' · ');
+    if (info.grund) {
+      const grund = document.createElement('span');
+      grund.className = 'an-unter-grund';
+      grund.textContent = ' · ' + info.grund;
+      unter.append(grund);
+    }
     const ng = naechsterGegner();
     // Ist der naechste Gegner derselbe Bot (noch nicht besiegt), gibt es keinen "Nächsten Gegner":
     // dann ist "Nochmal" der Hauptknopf und "Arena" der zweite

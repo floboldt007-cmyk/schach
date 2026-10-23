@@ -3182,6 +3182,54 @@ async function testeU7(browser) {
     await kontext.close();
   }
 
+  // Kleines Querfenster (Flos Befund 23.10.: Vorschau-Fenster einer App auf dem iPad, 590 x 580): vorher bekam das Brett
+  // neben der festen 300-px-Spalte nur 184 px. Die Spalte darf schmal werden, alles bleibt ganz lesbar und im Bild.
+  for (const schema of ['light', 'dark']) {
+    gruppe = `U7 kleines Querfenster 590x580 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 590, h: 580, schema });
+    await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__test = { botAnhalten: true }; });
+    await h.starte({ botId: 'greta', farbe: 'w', tempo: { grund: 300, zuschlag: 2 } });
+    await warte(500);
+    const m = await u7Masse(seite);
+    const k = await seite.evaluate(() => {
+      const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
+      const seiteEl = document.querySelector('.partie .seite');
+      const teile = ['.spieler.gegner', '.coach', '.zugbox', '.spieler.ich', '.spielknoepfe'].map((s) => ({ s, ...r(document.querySelector('.partie ' + s)) }));
+      const uhren = [...document.querySelectorAll('.partie .uhr')].map((u) => ({ an: !u.hidden && u.getBoundingClientRect().width > 0, ...r(u) }));
+      const info = r(document.querySelector('.partie .spieler.gegner > .info'));
+      const woerter = [...document.querySelectorAll('.partie .spielknoepfe .knopf > span:last-child')].filter((e) => e.getBoundingClientRect().width > 0)
+        .map((e) => ({ t: e.textContent.trim(), ganz: e.scrollWidth <= e.clientWidth + 1 && e.getBoundingClientRect().right <= e.parentNode.getBoundingClientRect().right + 0.5 }));
+      const h2 = document.querySelector('.partie .kopf h2');
+      return { spalte: Math.round(seiteEl.getBoundingClientRect().width), teile, uhren, info, woerter, titel: h2.textContent, titelGanz: h2.scrollWidth <= h2.clientWidth + 1 };
+    });
+    pruefe('Brett mindestens 44 % der kleineren Seite (vorher 184 px)', m.brett.w >= Math.min(m.iw, m.ih) * 0.44, JSON.stringify(m.brett));
+    pruefe('Spalte rechts vom Brett, schmal (248 bis 299 px), alle Karten und Knöpfe ganz im Bild',
+      k.spalte >= 248 && k.spalte < 300 && k.teile.every((t) => t.l >= m.rahmen.r - 0.5 && t.r <= m.iw + 0.5 && t.b <= m.ih + 0.5 && t.t >= 0), JSON.stringify([k.spalte, k.teile, m.rahmen.r]));
+    pruefe('Name des Gegners ohne Ellipse, höchstens zwei Zeilen, voller Name im aria-label', m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis'
+      && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Großmeisterin Greta', JSON.stringify(m.name));
+    pruefe('Beide Uhren sichtbar, die Uhr des Gegners überdeckt den Namen nicht', k.uhren.length === 2 && k.uhren.every((u) => u.an) && k.info.r <= k.uhren[0].l + 0.5,
+      JSON.stringify([k.uhren, k.info]));
+    pruefe('Aktionen: Wörter ganz lesbar, Tippflächen >= 44 px', k.woerter.length === 4 && k.woerter.every((w) => w.ganz) && m.tipp >= 44, JSON.stringify([k.woerter, m.tipp]));
+    pruefe('Kopf: Titel „Großmeisterin Greta“ ganz, kein waagrechter Überlauf', k.titel === 'Großmeisterin Greta' && k.titelGanz && m.ueber.seite <= 0 && m.ueber.screen <= 0
+      && m.ueber.inhalt <= 0, JSON.stringify([k.titel, k.titelGanz, m.ueber]));
+    const bl = await u7Blase(seite, U7_LANGER_SATZ);
+    // quer steht die Blase als Zeile in der Karte rechts vom Brett (die Hoch-Pruefung ueberFiguren misst nur senkrecht)
+    pruefe('Sprechblase in der Karte ganz lesbar, rechts vom Brett', bl.da && bl.l >= m.rahmen.r - 0.5 && bl.ganz && !bl.ellipse && bl.clamp === 'none'
+      && bl.r <= bl.karteR + 0.5 && bl.t >= bl.karteT - 0.5, JSON.stringify([bl, m.rahmen.r]));
+    await bild(seite, `u7-fenster-590x580-${schema === 'dark' ? 'dunkel' : 'hell'}`);
+    if (schema === 'light') {
+      // iPad quer bleibt wie vorher: Spalte 31vw zwischen 300 und 420 px, Brett nach Hoehe oder Breite wie gehabt
+      for (const g of [{ w: 1180, h: 820 }, { w: 1024, h: 768 }]) {
+        await seite.setViewportSize({ width: g.w, height: g.h });
+        await warte(400);
+        const ip = await seite.evaluate(() => ({ spalte: document.querySelector('.partie .seite').getBoundingClientRect().width, iw: innerWidth }));
+        pruefe(`iPad quer ${g.w}x${g.h}: Spalte unverändert (31vw, 300 bis 420 px)`, Math.abs(ip.spalte - Math.min(420, Math.max(300, ip.iw * 0.31))) <= 1, JSON.stringify(ip));
+      }
+    }
+    pruefe('Kleines Querfenster: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // --- Spielerkarten, Uhr, Kopf (iPad quer) ---
   gruppe = 'U7 Spielerkarten';
   {
