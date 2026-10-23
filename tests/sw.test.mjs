@@ -122,7 +122,16 @@ function relativ(von, ziel) {
 
 function main() {
   const aktualisieren = process.argv.includes('--aktualisieren');
-  const text = readFileSync(SW, 'utf8');
+  let text = readFileSync(SW, 'utf8');
+  // Neue Dateien angemeldeter Pakete gehoeren beim Aktualisieren automatisch in den Cache.
+  // Alle anschliessenden Pruefungen bleiben auch im Schreibmodus unveraendert aktiv.
+  if (aktualisieren) {
+    const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8')) || [];
+    const kandidaten = [...alleDateienTief('js/pakete', /\.(js|json|svg|png)$/), ...alleDateienTief('css/pakete', /\.(css|svg|png)$/)];
+    const vorhanden = new Set(leseSw(text).DATEIEN);
+    const neu = paketDateien(kandidaten, pakete).pflicht.filter((d) => !vorhanden.has(d));
+    if (neu.length) text = text.replace('const DATEIEN = [', 'const DATEIEN = [\n' + neu.sort().map((d) => `  '${d}',`).join('\n'));
+  }
   const sw = leseSw(text);
   const liste = sw.DATEIEN;
   const menge = new Set(liste);

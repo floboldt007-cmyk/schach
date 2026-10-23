@@ -81,7 +81,7 @@ async function tippeZug(page, uci) {
     await warten(120);
   };
   for (const feld of [uci.slice(0, 2), uci.slice(2, 4)]) await tippe(feld);
-  // U7: "Zug bestaetigen" ist Standard (ohneUhr): steht die Vorschau, macht ein zweiter Tipp aufs Ziel den Zug fest
+  // U7: "Zug bestaetigen" (Einstellung, seit 23.10. Standard aus): steht die Vorschau, macht ein zweiter Tipp aufs Ziel den Zug fest
   if (await page.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau'))) await tippe(uci.slice(2, 4));
 }
 

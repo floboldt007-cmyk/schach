@@ -110,7 +110,7 @@ export function zeige(root, params = {}, app) {
         </section>
 
         <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">Spiel</h3>
-          ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']])}
+          ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']],'Der erste Tipp zeigt den Zug, ein zweiter Tipp aufs Zielfeld spielt ihn.')}
           ${schalter('haltenAufgeben','Aufgeben und Remis halten','Schützt vor versehentlichem Antippen.')}
           ${schalter('turmRochade','Turm auf König rochiert','Erlaubt die kurze Eingabe der Rochade.')}
           ${schalter('autoDame','Automatisch Dame','Halten am Zielfeld zeigt andere Figuren.')}

@@ -16,22 +16,28 @@ export function browserTyp(playwright) {
 //   await finger.runter(x, y); await finger.bewege(x2, y2); await finger.hoch(x2, y2);
 //   await finger.ziehe([[x, y], [x2, y2]], { schritte: 8, mitte: async () => {...} });
 export function fingerTreiber(seite) {
-  const sende = (typ, x, y, id) => seite.evaluate(({ typ, x, y, id }) => {
-    const finger = (window.__finger = window.__finger || {});
-    let ziel;
-    if (typ === 'pointerdown') {
-      ziel = document.elementFromPoint(x, y) || document.body;
-      finger[id] = ziel;
-    } else ziel = finger[id] || document.elementFromPoint(x, y) || document.body;
-    const ende = typ === 'pointerup' || typ === 'pointercancel';
-    const ev = new PointerEvent(typ, {
-      pointerType: 'touch', pointerId: id, isPrimary: id === 1, clientX: x, clientY: y, screenX: x, screenY: y,
-      bubbles: true, cancelable: true, composed: true, button: typ === 'pointermove' ? -1 : 0, buttons: ende ? 0 : 1,
-      width: 16, height: 16, pressure: ende ? 0 : 0.5,
-    });
-    ziel.dispatchEvent(ev);
-    if (ende) delete finger[id];
-  }, { typ, x, y, id });
+  const sende = async (typ, x, y, id) => {
+    // Echte Eingaben aktivieren die Seite und durchlaufen einen Render-Schritt. evaluate() allein tut das in
+    // WebKit nicht: Halte-Timer und CSS-Federn duerfen dadurch nicht wie in einer Hintergrundseite warten.
+    if (typ === 'pointerdown') await seite.bringToFront();
+    await seite.evaluate(({ typ, x, y, id }) => {
+      const finger = (window.__finger = window.__finger || {});
+      let ziel;
+      if (typ === 'pointerdown') {
+        ziel = document.elementFromPoint(x, y) || document.body;
+        finger[id] = ziel;
+      } else ziel = finger[id] || document.elementFromPoint(x, y) || document.body;
+      const ende = typ === 'pointerup' || typ === 'pointercancel';
+      const ev = new PointerEvent(typ, {
+        pointerType: 'touch', pointerId: id, isPrimary: id === 1, clientX: x, clientY: y, screenX: x, screenY: y,
+        bubbles: true, cancelable: true, composed: true, button: typ === 'pointermove' ? -1 : 0, buttons: ende ? 0 : 1,
+        width: 16, height: 16, pressure: ende ? 0 : 0.5,
+      });
+      ziel.dispatchEvent(ev);
+      if (ende) delete finger[id];
+    }, { typ, x, y, id });
+    if (typ === 'pointerdown') await seite.evaluate(() => new Promise((fertig) => requestAnimationFrame(fertig)));
+  };
   const t = {
     runter: (x, y, id = 1) => sende('pointerdown', x, y, id),
     bewege: (x, y, id = 1) => sende('pointermove', x, y, id),

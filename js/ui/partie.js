@@ -126,7 +126,7 @@ import {
 import { eroeffnung, stellungsSchluessel } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
-import { halteKnopf } from './bauteile.js';
+import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
   ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
@@ -186,6 +186,10 @@ const rufnameVon = (b) => RUFNAME[b && b.id] || (b && b.name) || '';
 const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
+// Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
+const BESTAETIGEN_HINWEISE = 3;
+const BESTAETIGEN_MERKER = 'schach-arena:v1:hinweis-bestaetigen';
+let bestaetigenHinweiseGezeigt = 0;   // Zaehler dieser Sitzung (falls der Speicher gesperrt ist)
 const BEGRUESSUNG_MS = 6000;
 // U7: Sprueche "wenig": hoechstens ein Satz je 5 eigene Zuege (10 Halbzuege)
 const WENIG_ABSTAND = 10;
@@ -445,7 +449,7 @@ export function zeige(root, params, app) {
 
   const brett = new Brett($('.brett'), {
     ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
-    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, autoDame: einst.autoDame,
+    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, beiVorschau, autoDame: einst.autoDame,
     koordLage: einst.koordLage, steuerung: einst.steuerung, turmRochade: einst.turmRochade === true, pfeile: einst.pfeile !== false,
   });
   brett.setzeDauer(ZUG_MS);
@@ -1139,6 +1143,26 @@ export function zeige(root, params, app) {
     brett.setzeTurmRochade(tr);
     brett.erlaubeZuege(zielKarte(z.chess, { turmRochade: tr }));
     aktualisiereBestaetigen();
+  }
+  // Zug bestaetigen: die ersten drei Vorschauen erklaeren den zweiten Tipp (Flo, 23.10.: ohne Hinweis sah es aus, als
+  // reagiere das Spiel nicht). Gezaehlt wird je Geraet (ohne Speicher je Sitzung); die Einstellungen erklaeren es
+  // dauerhaft. Ist die Vorschau vorbei (bestaetigt oder zurueckgenommen), verschwindet der Hinweis mit ihr.
+  let hinweisText = '';
+  function beiVorschau(von, nach) {
+    if (!von) {
+      const t = document.querySelector('.toast-ort .toast');
+      if (hinweisText && t && t.textContent === hinweisText) toastLeeren();
+      hinweisText = '';
+      return;
+    }
+    if (weg || z.phase !== 'flo') return;
+    let n = bestaetigenHinweiseGezeigt;
+    try { n = Math.max(n, Number(localStorage.getItem(BESTAETIGEN_MERKER)) || 0); } catch (e) { /* nur die Sitzung zaehlt */ }
+    if (n >= BESTAETIGEN_HINWEISE) return;
+    bestaetigenHinweiseGezeigt = n + 1;
+    try { localStorage.setItem(BESTAETIGEN_MERKER, String(n + 1)); } catch (e) { /* nur die Sitzung zaehlt */ }
+    hinweisText = `Tippe zum Bestätigen auf ${nach}. Ein Tipp daneben nimmt den Zug zurück.`;
+    app.meldung(hinweisText, { dauer: 4500 });
   }
   // Zug bestaetigen (PLAN 4): 'ohneUhr' nur ohne Bedenkzeit, 'immer', 'aus'; nur fuer echte Zuege (nie fuer Vorzuege)
   const bestaetigenAn = () => {
@@ -2166,6 +2190,7 @@ export function zeige(root, params, app) {
       s.classList.remove('coach-eng', 'streifen-unten');
       passeNamen();
       pruefeCoachRest();
+      pruefeSeite();
       return;
     }
     // Brett zuerst: volle Breite minus Rand (2 x 10) und Sockel, ein Vielfaches von 8
@@ -2213,13 +2238,25 @@ export function zeige(root, params, app) {
     passeNamen();
     pruefeCoachRest();
   }
+  // Quer: passt die Spalte nicht ins Fenster (kleines Fenster, Coach mit Knoepfen, Begruessung), scrollt sie, und die
+  // Aktionen bleiben unten stehen (Pruefer-Befund 23.10.: sonst lagen Hinweis und Aufgeben unerreichbar unter dem Rand)
+  const seiteEl = $('.seite');
+  function pruefeSeite() {
+    if (!seiteEl) return;
+    const zuViel = lage() === 'quer' && !istHandy() && seiteEl.scrollHeight > seiteEl.clientHeight + 1;
+    s.classList.toggle('seite-scrollt', zuViel);
+  }
   let layoutBild = 0;
   const layoutSpaeter = () => {
     if (layoutBild || weg) return;
     layoutBild = requestAnimationFrame(() => { layoutBild = 0; layout(); });
   };
   const layoutRo = typeof ResizeObserver === 'function' ? new ResizeObserver(layoutSpaeter) : null;
-  if (layoutRo) layoutRo.observe(s);
+  if (layoutRo) {
+    layoutRo.observe(s);
+    // die Karten der Spalte wachsen mit ihrem Inhalt (Coach, Blase): dann neu pruefen, ob die Spalte passt
+    if (seiteEl) for (const k of seiteEl.children) layoutRo.observe(k);
+  }
   // Handy: Zahl des waagrechten Balkens nur auf Antippen
   balken.addEventListener('click', () => {
     if (!istHandy()) return;
