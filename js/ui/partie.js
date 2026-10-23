@@ -93,8 +93,9 @@
 //   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
 //   Zuschlag, Zeitueberschreitung) bringt W0+b; bis dahin steht die Grundzeit still da.
 //   Sprechblase: .blase-ort ist das letzte Kind der Gegner-Karte (quer eine Zeile in der Karte unter dem Namen, hoch
-//   haengt die kleine Blase unter der Karte ueber dem Brett) und blendet nach BLASE_MS (3,5 s) aus. Einstellung sprueche: 'aus' zeigt keine Blase (buehne.blase() liefert false), 'wenig' nur
-//   Begruessung, Ende und hoechstens einen Satz je 5 eigene Zuege.
+//   haengt die kleine Blase unter der Karte ueber dem Brett) und blendet nach BLASE_MS (3,5 s) aus. Einstellung
+//   sprueche: 'aus' zeigt keine Blase (buehne.blase() liefert false), 'wenig' nur Begruessung, Ende und hoechstens
+//   einen Satz je 5 eigene Zuege.
 //   Handy (hoch, bis 600 px): layout() rechnet "Brett zuerst" (PLAN 2.5): g = floor((Breite - 2 x 10 - Sockel) / 8) x 8,
 //   der Coach schrumpft bei Platznot auf eine Zeile (.coach-eng, Rest auf Antippen), das Brett erst danach (nie unter
 //   280 px); der Zugstreifen steht ab 760 px Hoehe zwischen Coach und Knoepfen, darunter nach den Knoepfen (die Spalte
