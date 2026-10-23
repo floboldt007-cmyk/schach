@@ -55,6 +55,10 @@ export const ORTE = Object.freeze({
   // w0plus-a-fix: Schub 2b (Emote-Rad, Schnell-Chat, Flamme des Siegeslaufs an Flos Namen), Host partie.js
   'partie:spieler-leiste': 'dom',
   'partie:aktionen': 'dom',
+  // Premium-Umbau U5 (Weltkarte): zwei Plaetze auf der Karte, Host arena.js (.ort-karte-boss am Zelt des Wochen-Boss,
+  // .ort-karte-event an der Fahne); ohne Anbieter unsichtbar. Kontext { app, fortschritt, karte, scrolleZu }
+  'arena:karte-boss': 'dom',
+  'arena:karte-event': 'dom',
 });
 
 let anbieterListe = new Map();   // ort -> [{ fn, reihenfolge, paket, nr }]

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="de" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>Impressum · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Schlichte Textseite mit den Tokens der App (hell und dunkel ueber css/themes/modern.css), keine festen Farben. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: var(--a5) 0 var(--a1); font-size: var(--fs-text); font-weight: var(--gw-stark); }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
+  .entwurf p { margin: 0; }
+  .entwurf b { display: block; margin-bottom: var(--a1); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
+  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+  dl { margin: 0; display: grid; grid-template-columns: minmax(0, 12em) minmax(0, 1fr); gap: var(--a2) var(--a4); }
+  dt { color: var(--text-2); }
+  dd { margin: 0; }
+  @media (max-width: 520px) { dl { grid-template-columns: minmax(0, 1fr); gap: 0; } dd { margin-bottom: var(--a3); } }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Zurück zu Crownmate</a></p>
+  <h1>Impressum</h1>
+  <p class="stand">Angaben nach § 5 DDG, Entwurf, Stand <span class="platz">[Datum]</span></p>
+
+  <div class="entwurf" role="note">
+    <p><b>Entwurf. Vor der Veröffentlichung von einer fachkundigen Person prüfen lassen.</b>
+    Alle Felder in eckigen Klammern sind Platzhalter und müssen ersetzt werden. Nicht zutreffende Zeilen werden gestrichen.</p>
+  </div>
+
+  <h2>Anbieter</h2>
+  <div class="kasten">
+    <dl>
+      <dt>Name</dt><dd><span class="platz">[Vor- und Nachname]</span></dd>
+      <dt>Anschrift</dt><dd><span class="platz">[Straße und Hausnummer]</span><br><span class="platz">[Postleitzahl und Ort]</span><br>Deutschland</dd>
+      <dt>E-Mail</dt><dd><span class="platz">[E-Mail-Adresse]</span></dd>
+      <dt>Weiterer schneller Kontakt</dt><dd><span class="platz">[Telefonnummer oder Kontaktformular]</span></dd>
+      <dt>Umsatzsteuer-ID</dt><dd><span class="platz">[USt-IdNr. nach § 27a UStG, falls vorhanden]</span></dd>
+      <dt>Wirtschafts-ID</dt><dd><span class="platz">[W-IdNr., falls vorhanden]</span></dd>
+      <dt>Register</dt><dd><span class="platz">[Registergericht und Registernummer, falls eingetragen]</span></dd>
+    </dl>
+  </div>
+
+  <h2>Verantwortlich für den Inhalt</h2>
+  <p>Verantwortlich nach § 18 Abs. 2 MStV: <span class="platz">[Vor- und Nachname, Anschrift wie oben]</span></p>
+
+  <h2>Verbraucherstreitbeilegung</h2>
+  <p><span class="platz">[Angabe nach § 36 VSBG prüfen, z. B.: Wir sind nicht bereit und nicht verpflichtet, an
+  Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.]</span></p>
+
+  <h2>Software</h2>
+  <p>Crownmate ist freie Software unter der GNU General Public License 3.0. Die Lizenzen der verwendeten Bausteine stehen in
+  der App unter Einstellungen → Info und Lizenzen.</p>
+
+  <p class="fuss"><a href="datenschutz.html">Datenschutzerklärung</a> <a href="./#einstellungen">Zurück zu Crownmate</a></p>
+</main>
+</body>
+</html>

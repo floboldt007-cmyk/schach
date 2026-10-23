@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { browserTyp } from './browser.mjs';
+import { browserTyp, fingerTreiber } from './browser.mjs';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +25,8 @@ if (BILDER) mkdirSync(BILDER, { recursive: true });
 const VIEWPORTS = [
   ['ipad-quer', 1180, 820], ['ipad-hoch', 820, 1180], ['ipad-klein', 1024, 768],
   ['ipad-pro', 1366, 1024], ['handy', 390, 844], ['handy-se', 375, 667],
+  // kleines Querfenster (Flos Befund 23.10.: Vorschau-Fenster einer App auf dem iPad, Brett vorher 80 px)
+  ['fenster-klein', 590, 580],
 ];
 
 function ladePlaywright() {
@@ -485,16 +487,14 @@ async function testeTouch(browser, d) {
     const st = c && getComputedStyle(c);
     return !!st && st.color !== 'rgba(0, 0, 0, 0)' && !/text/.test(st.backgroundClip || st.webkitBackgroundClip || '');
   }));
-  // Wischen mit echten Touch-Ereignissen (CDP)
-  const cdp = await kontext.newCDPSession(seite);
+  // Wischen mit Finger-Ereignissen ohne CDP (synthetische Pointer-Ereignisse, pointerType touch; laeuft auch in WebKit)
+  const finger = fingerTreiber(seite);
   await seite.locator('.an-brett').scrollIntoViewIfNeeded();
   const br = await seite.locator('.an-brett').boundingBox();
   const vor = await aktuellerPly(seite);
   const y = br.y + br.height / 2;
-  const punkte = [0.8, 0.65, 0.5, 0.35, 0.2].map((f) => ({ x: br.x + br.width * f, y }));
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [punkte[0]] });
-  for (const pt of punkte.slice(1)) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [pt] });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const punkte = [0.8, 0.65, 0.5, 0.35, 0.2].map((f) => [br.x + br.width * f, y]);
+  await finger.ziehe(punkte, { schritte: 2 });
   await warte(200);
   pruefe('Wischen mit dem Finger: Zug vor', (await aktuellerPly(seite)) === vor + 1, `${vor} -> ${await aktuellerPly(seite)}`);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -681,8 +681,16 @@ async function testeViewports(browser, d) {
       const kurz = await gekuerzt(seite);
       pruefe(`${name} ${screen}: keine abgeschnittenen Namen oder Titel`, !kurz.length, kurz.join(', '));
       if (screen === 'analyse') {
+        const kopf = await seite.evaluate(() => {
+          const k = document.querySelector('.an-screen .kopf').getBoundingClientRect();
+          const t = document.querySelector('.an-screen .kopf .titel').getBoundingClientRect();
+          return { kt: k.top, kb: k.bottom, tt: t.top, tb: t.bottom };
+        });
+        pruefe(`${name} analyse: Titel und Unterzeile ganz im Kopf`, kopf.tt >= kopf.kt - 0.5 && kopf.tb <= kopf.kb + 0.5, JSON.stringify(kopf));
         const brett = await seite.locator('.an-brett').boundingBox();
-        const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * 0.5;
+        // im kleinen Querfenster begrenzt die rechte Spalte (mindestens 280 px) die Breite: 590 - 90 - 280 = 220 px, also 37 %
+        const anteil = name === 'fenster-klein' ? 0.37 : 0.5;
+        const ok = brett.x >= 0 && brett.x + brett.width <= breite + 0.5 && brett.width >= Math.min(breite, hoehe) * anteil;
         pruefe(`${name} analyse: Brett ganz sichtbar und groß`, ok, JSON.stringify(brett));
         if (breite > hoehe) {
           const unten = await seite.evaluate(() => {

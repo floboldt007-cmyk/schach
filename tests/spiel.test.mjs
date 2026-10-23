@@ -158,7 +158,8 @@ pruefe('Beispiel-Spielplan (daten/beispiel/spielplan.json) ist gueltig', pruefeI
     'daten/falsch.json': JSON.stringify({ ...BEISPIEL, wochen: [{ montag: '2026-11-17', boss: 'x', funkenWochenende: false }] }),
   };
   setzeHoler(async (url) => {
-    const rel = url.slice(url.indexOf('daten/'));
+    // Pfad ab dem letzten "daten/": der Ordner der Arbeitskopie kann selbst "daten/" enthalten
+    const rel = url.slice(url.lastIndexOf('daten/'));
     anfragen.push(rel);
     if (rel === 'daten/netzfehler.json') throw new Error('offline');
     return dateien[rel] ? { ok: true, status: 200, text: async () => dateien[rel] } : { ok: false, status: 404, text: async () => '' };

@@ -1,3 +1,7 @@
 node_modules/
 .DS_Store
 design/**/*.png
+
+# App-Store-Huelle (Capacitor): kopierte Web-App und installierte Pakete
+native/www/
+native/node_modules/

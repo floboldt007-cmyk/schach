@@ -36,8 +36,10 @@ const MODERN = Object.freeze({
     Object.freeze({ familie: 'Bricolage', datei: 'assets/schriften/bricolage-grotesque.woff2', lizenz: 'assets/schriften/OFL-Bricolage-Grotesque.txt' }),
   ]),
   klang: Object.freeze({ standard: 'arcade' }), // Flo, D6: "Arcade ist besser"; Holz bleibt waehlbar
-  avatare: 'assets/avatare/modern/',       // <bot.id>.svg; nur fuer die Bots in portraets (U5 fuellt die Liste)
-  portraets: Object.freeze([]),
+  avatare: 'assets/avatare/modern/',       // <bot.id>.svg; nur fuer die Bots in portraets (U5: die zehn Leiter-Bots)
+  // Premium-Umbau U5: Modern-Portraets aus Entwurf A (eigene Werke fuer dieses Projekt, GPL-3.0 wie die Pixel-Avatare,
+  // die als Rueckfall bleiben). Arena, Duell-Intro und Partie holen den Pfad ueber avatarVon(bot).
+  portraets: Object.freeze(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch']),
   figuren: 'assets/pieces/',               // bleibt cburnett
   federn: Object.freeze({ feder: Object.freeze([420, 30]), weich: Object.freeze([210, 24]), hupf: Object.freeze([520, 18]) }),
   frei: true,                              // spaeter: erspielt oder Werkstatt
@@ -188,6 +190,9 @@ function beobachteSystem() {
   systemHoert = true;
   const neu = () => {
     if (aktuell.modus !== 'system') return;
+    // den beim Anwenden fest gesetzten Seitengrund mitziehen, sonst bliebe er hell, waehrend die Texte schon hell werden
+    const t = themaVon(aktuell.thema) || MODERN;
+    if (typeof document !== 'undefined' && document.body) document.body.style.backgroundColor = t.metaFarbe[aufgeloesterModus()];
     schreibeMeta();
     melde();
   };

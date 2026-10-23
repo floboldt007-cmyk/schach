@@ -117,7 +117,8 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
     seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
-      if (/ERR_ABORTED/.test(grund)) return;   // beim Neuladen abgebrochen: kein Fehler
+      // beim Neuladen abgebrochen: kein Fehler (Chromium ERR_ABORTED, WebKit: Load request cancelled, Firefox NS_BINDING_ABORTED)
+      if (/ERR_ABORTED|Load request cancelled|NS_BINDING_ABORTED/.test(grund)) return;
       fehlgeschlagen.push(`${grund} ${r.url()}`);
     });
     seite.on('response', (r) => { if (r.status() >= 400) fehlgeschlagen.push(`${r.status()} ${r.url()}`); });
@@ -166,9 +167,21 @@ function hilfen(seite) {
       await seite.touchscreen.tap(p.x, p.y);
       await warte(90);
     },
+    // U7: "Zug bestaetigen" (Einstellung, seit 23.10. Standard aus): steht nach dem Tipp aufs Ziel die Vorschau, macht ein
+    // zweiter Tipp aufs Ziel den Zug fest
     async zugTippen(uci) {
       await h.tippeFeld(uci.slice(0, 2));
       await h.tippeFeld(uci.slice(2, 4));
+      if (await seite.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau'))) await h.tippeFeld(uci.slice(2, 4));
+    },
+    // U7: Aufgeben mit Rueckfrage: mit "Halten zum Aufgeben" (Standard) ueber die Tastatur (Rueckfrage app.frage)
+    async aufgebenFragen() {
+      const k = seite.locator('.spielknoepfe > [data-aktion="aufgeben"]');
+      if (await k.evaluate((el) => el.classList.contains('halte-knopf'))) {
+        await k.focus();
+        await seite.keyboard.press('Enter');
+        await warte(140);
+      } else await h.tippe('.spielknoepfe > [data-aktion="aufgeben"]');
     },
     // tippt das erste sichtbare Element (Finger)
     async tippe(sel) {
@@ -346,7 +359,7 @@ async function testeSieg(seite, h, fehler) {
   await schaefermatt(seite, h, { pruefeHash: true });
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
   await warte(2600);
-  pruefe('Overlay "SIEG!"', /SIEG!/.test(await seite.locator('.erg-wort').innerText()));
+  pruefe('Overlay "Sieg!"', /^Sieg!$/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Drei Sterne', await seite.locator('.erg-stern.an').count() === 3);
   pruefe('Kachel: Oma Hilde freigeschaltet', /Oma Hilde/.test(await seite.locator('.erg-frei').innerText()));
   const partien = await h.partien();
@@ -358,7 +371,6 @@ async function testeSieg(seite, h, fehler) {
   const kern = ereignisse.filter((n) => /^(app:bereit|partie:|zug:gespielt|zug:bewertet)/.test(n));
   pruefe('Ereignisse: app:bereit, partie:gestartet, Züge, partie:beendet (ohne Pakete)', kern[0] === 'app:bereit' && kern.includes('partie:gestartet')
     && kern.filter((n) => n === 'zug:gespielt').length === 7 && kern.indexOf('partie:beendet') > kern.lastIndexOf('zug:gespielt'), kern.join(' '));
-  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
   pruefe('html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
 
   gruppe = 'Analyse';
@@ -570,11 +582,11 @@ async function testeAufgabe(seite, h, fehler) {
   await h.warteBereit();
   const n = (await h.zuege()).length;
   pruefe('Fortsetzen aus der Arena', n >= 8, String(n));
-  await h.tippe('.spielknoepfe [data-aktion="aufgeben"]');
+  await h.aufgebenFragen();
   await seite.waitForSelector('.dialog-ort .dialog');
   await h.tippe('.dialog-knoepfe .knopf.gefahr');
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
-  pruefe('Overlay: Niederlage mit Genauigkeit', /VERLOREN/.test(await seite.locator('.erg-wort').innerText())
+  pruefe('Overlay: Niederlage mit Genauigkeit', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
     && /\d/.test(await seite.locator('.erg-genau b').innerText()));
   const p = (await h.partien()).find((x) => x.botId === 'hilde');
   pruefe('Partie mit Analyse gespeichert', p && p.zuege.length === n && Number.isFinite(p.genauigkeit)
@@ -705,6 +717,24 @@ async function bilder(browser, id) {
   }
 }
 
+// ---------- Kern ohne Spielpakete (?test&kern): die Pakete aus PAKETE aendern das Ergebnis, der Kern allein nicht ----------
+async function testeOhnePakete(browser) {
+  gruppe = 'Kern';
+  const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+  const h = hilfen(seite);
+  const paketAbrufe = [];
+  seite.on('request', (r) => { if (/\/pakete\//.test(r.url())) paketAbrufe.push(r.url()); });
+  await seite.goto(START + '?test&kern#arena');
+  await h.screen('arena');
+  await schaefermatt(seite, h);
+  await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+  await warte(2600);
+  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
+  pruefe('Ohne Pakete: keine Paket-Datei geladen', paketAbrufe.length === 0, paketAbrufe.join(' | '));
+  pruefe('Ohne Pakete: keine Konsolenfehler, keine fehlgeschlagenen Anfragen', fehler.length === 0 && fehlgeschlagen.length === 0, [...fehler, ...fehlgeschlagen].join(' | '));
+  await kontext.close();
+}
+
 // ---------- Ablauf ----------
 let browser;
 let code = 1;
@@ -721,6 +751,7 @@ try {
   await testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id);
   await testeAufgabe(seite, h, fehler);
   await testeUpdate(seite, h, fehler);
+  await testeOhnePakete(browser);
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));

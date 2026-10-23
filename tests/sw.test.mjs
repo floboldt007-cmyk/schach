@@ -122,7 +122,16 @@ function relativ(von, ziel) {
 
 function main() {
   const aktualisieren = process.argv.includes('--aktualisieren');
-  const text = readFileSync(SW, 'utf8');
+  let text = readFileSync(SW, 'utf8');
+  // Neue Dateien angemeldeter Pakete gehoeren beim Aktualisieren automatisch in den Cache.
+  // Alle anschliessenden Pruefungen bleiben auch im Schreibmodus unveraendert aktiv.
+  if (aktualisieren) {
+    const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8')) || [];
+    const kandidaten = [...alleDateienTief('js/pakete', /\.(js|json|svg|png)$/), ...alleDateienTief('css/pakete', /\.(css|svg|png)$/)];
+    const vorhanden = new Set(leseSw(text).DATEIEN);
+    const neu = paketDateien(kandidaten, pakete).pflicht.filter((d) => !vorhanden.has(d));
+    if (neu.length) text = text.replace('const DATEIEN = [', 'const DATEIEN = [\n' + neu.sort().map((d) => `  '${d}',`).join('\n'));
+  }
   const sw = leseSw(text);
   const liste = sw.DATEIEN;
   const menge = new Set(liste);
@@ -149,6 +158,8 @@ function main() {
   // Alles, was zur App gehoert, muss im Cache stehen
   const soll = [
     'index.html', 'manifest.webmanifest', 'LICENSE',
+    // Daten-Fundament: Datenschutzerklaerung und Impressum muessen auch offline erreichbar sein
+    'datenschutz.html', 'impressum.html',
     ...alleDateien('css', /\.css$/),
     // Premium-Umbau (PLAN 3.8): Themes, Schriften mit Lizenztext, Klangpakete, Portraets des Themes
     ...alleDateien('css/themes', /\.css$/),
@@ -224,6 +235,15 @@ function main() {
   pruefe('index.html: alle Verweise im Cache', ausHtml.length >= 7 && htmlFehlt.length === 0, htmlFehlt.join(', ') || String(ausHtml.length));
   for (const n of ['manifest.webmanifest', 'assets/icons/apple-touch-icon.png', 'assets/icons/favicon.svg']) {
     pruefe(`index.html verlinkt ${n}`, ausHtml.includes(n));
+  }
+  // Daten-Fundament: Datenschutzerklaerung und Impressum vorhanden, ihre Verweise (Tokens, Theme, Icon) im Cache
+  for (const seite of ['datenschutz.html', 'impressum.html']) {
+    const t = existsSync(path.join(WURZEL, seite)) ? readFileSync(path.join(WURZEL, seite), 'utf8') : '';
+    // "./" (zurueck zur App) ist index.html
+    const verweise = [...t.matchAll(/(?:href|src)="([^"]+)"/g)].map((m) => relativ(seite, m[1])).filter(Boolean).map((d) => (d === './' ? 'index.html' : d));
+    const weg = verweise.filter((d) => !menge.has(d));
+    pruefe(`${seite}: im Cache, Verweise im Cache, Tokens und Theme der App`, menge.has(seite) && weg.length === 0
+      && verweise.includes('css/tokens.css') && verweise.includes('css/themes/modern.css'), weg.join(', ') || String(verweise.length));
   }
   // Premium-Umbau U1: Tokens und Theme vor allen anderen Stylesheets, jede CSS-Datei verlinkt, Schriften vorgeladen
   const css = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);

@@ -294,7 +294,11 @@ function nodeTeil() {
   ab2();
   pruefe('abmelden() entfernt das Theme', themaListe().length === 1 && themaVon('edel') === null && themaVon('modern') === THEMEN.modern);
   const benno = BOTS[0];
-  pruefe('avatarVon: ohne Portraet im Theme der Pixel-Avatar aus bots.js', avatarVon(benno) === benno.avatar && avatarVon(null) === '');
+  // Premium-Umbau U5: die zehn Leiter-Bots haben Modern-Portraets; der Rueckfall gilt weiter fuer jeden Bot ohne
+  // Portraet im Theme (z. B. einen angemeldeten Boss) und fuer unsaubere IDs
+  const ohnePortraet = { id: 'test-boss', avatar: benno.avatar };
+  pruefe('avatarVon: ohne Portraet im Theme der Pixel-Avatar aus bots.js (Leiter-Bots: Modern-Portraet)', avatarVon(ohnePortraet) === benno.avatar
+    && avatarVon({ id: '../benno', avatar: benno.avatar }) === benno.avatar && avatarVon(benno) === 'assets/avatare/modern/benno.svg' && avatarVon(null) === '');
   const ab3 = registriereThema({ ...gut, portraets: ['benno'], avatare: 'assets/avatare/edel/' });
   return { ab3, benno, gut };
 }

@@ -34,24 +34,35 @@
 }
 
 /* ---------- Brettfarben (Flos Einstellung, unabhaengig vom Theme) ----------
-   Feldfarben bleiben exakt wie bisher; dazu die Markierungen aus Entwurf A je Brett. */
+   Feldfarben bleiben exakt wie bisher; dazu die Markierungen aus Entwurf A je Brett (--auswahl-kante: die helle
+   Innenkante von Auswahl, Vorschau und Zielfeld unter dem Finger, A "Runde 2"). */
 :root, html[data-brett="nacht"] {
   --feld-hell: #e4e8f6; --feld-dunkel: #7c87b6;
   --zuletzt: rgba(118, 206, 255, .5); --auswahl: rgba(28, 34, 92, .26); --punkt: rgba(28, 30, 60, .2);
+  --auswahl-kante: rgba(255, 255, 255, .82);
 }
 html[data-brett="gruen"] {
   --feld-hell: #eeeed2; --feld-dunkel: #769656;
   --zuletzt: rgba(255, 236, 80, .5); --auswahl: rgba(24, 58, 12, .24); --punkt: rgba(20, 30, 10, .2);
+  --auswahl-kante: rgba(255, 255, 255, .82);
 }
 html[data-brett="holz"] {
   --feld-hell: #f0d9b5; --feld-dunkel: #b58863;
   --zuletzt: rgba(214, 220, 92, .52); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
+  --auswahl-kante: rgba(255, 255, 255, .82);
 }
 :root {
   --hinweis: rgba(76, 110, 245, .34);
+  /* Flos eigene Pfeile und Marken: das Theme setzt --pfeil-nutzer/--marke-nutzer hell und dunkel, hier der Rueckfall */
+  --pfeil-nutzer: rgba(230, 126, 34, .82); --marke-nutzer: rgba(230, 126, 34, .45);
   --vorzug-start: rgba(70, 87, 120, .34);
   --vorzug-ziel: rgba(204, 72, 32, .36);
   --schach: rgba(226, 60, 60, .85);
+  /* Schatten der Figuren und Abzeichen auf dem Brett (fest wie die Brettfarben): ruhend, angehoben, gezogen */
+  --schatten-figur: 0 2px 1.5px rgba(10, 12, 30, .28);
+  --schatten-figur-hoch: 0 6px 5px rgba(10, 12, 30, .26);
+  --schatten-figur-zieh: 0 8px 10px rgba(0, 0, 0, .3);
+  --schatten-abzeichen: 0 2px 3px rgba(0, 0, 0, .3);
 }
 
 /* ---------- Bruecke: alte Variablen auf die neuen Tokens ----------

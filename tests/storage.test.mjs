@@ -71,7 +71,7 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   s.m.clear();
   const std = ladeEinstellungen();
   const erwartet = {
-    klangpaket: '', lautstaerke: 0.8, klangstufe: 'alle', zugBestaetigen: 'ohneUhr', haltenAufgeben: true, turmRochade: false,
+    klangpaket: '', lautstaerke: 0.8, klangstufe: 'alle', zugBestaetigen: 'aus', haltenAufgeben: true, turmRochade: false,
     autoDame: true, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
     duellIntro: 'besondere', figuren: 'cburnett', coachStil: 'ausfuehrlich', sprueche: 'an',
   };
@@ -102,6 +102,22 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   pruefe('U1: Lautstaerke begrenzt auf 0..1', f.lautstaerke === 1);
   pruefe('U1: Klanggruppen einzeln geprueft (brett aus bleibt, falscher Typ -> an, fremde Gruppe weg)',
     f.klanggruppen.brett === false && f.klanggruppen.uhr === true && !('fremd' in f.klanggruppen) && Object.keys(f.klanggruppen).length === 7, f.klanggruppen);
+  // Fassung 2 (23.10.): "Zug bestaetigen" Standard aus. Alte Staende trugen den alten Standard 'ohneUhr' mit, ob gewaehlt
+  // oder nicht: einmal auf 'aus'. 'immer' bleibt, und wer nach der Umstellung 'ohneUhr' waehlt, behaelt es.
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'holz', zugBestaetigen: 'ohneUhr' }));
+  const m1 = ladeEinstellungen();
+  pruefe('Fassung 2: alter Stand mit ohneUhr -> aus, andere Werte bleiben, Fassung 2', m1.zugBestaetigen === 'aus' && m1.brett === 'holz' && m1.fassung === 2, m1);
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'immer' }));
+  pruefe('Fassung 2: alter Stand mit immer bleibt immer', ladeEinstellungen().zugBestaetigen === 'immer');
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 2 }));
+  pruefe('Fassung 2: neuer Stand mit ohneUhr bleibt ohneUhr', ladeEinstellungen().zugBestaetigen === 'ohneUhr');
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'gruen', zugBestaetigen: 'ohneUhr' }));
+  const m2 = speichereEinstellungen({ zugBestaetigen: 'ohneUhr' });
+  const m2roh = JSON.parse(s.getItem('schach-arena:v1:einstellungen'));
+  pruefe('Fassung 2: nach der Umstellung gewaehltes ohneUhr wird mit Fassung 2 gespeichert und bleibt', m2.zugBestaetigen === 'ohneUhr' && m2roh.fassung === 2
+    && ladeEinstellungen().zugBestaetigen === 'ohneUhr' && ladeEinstellungen().brett === 'gruen', m2roh);
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 'zwei' }));
+  pruefe('Fassung 2: kaputte Fassung zaehlt als alt', ladeEinstellungen().zugBestaetigen === 'aus');
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ lautstaerke: 0.333, klanggruppen: [false, false] }));
   const g = ladeEinstellungen();
   pruefe('U1: Lautstaerke auf 0,05 gerundet, Klanggruppen als Liste ignoriert', g.lautstaerke === 0.35 && Object.values(g.klanggruppen).every((x) => x === true), g);
@@ -125,6 +141,22 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   pruefe('U1: speichereEinstellungen({ klanggruppen: { … } }) aendert nur die genannten Gruppen', kg.uhr === false && kg.bedienung === false
     && kg.brett === true && kg.feier === true && ladeEinstellungen().klangpaket === 'arcade', kg);
   pruefe('U1: EINSTELLUNG_WERTE nennt jede Aufzaehlung mit ihrem Standard', Object.entries(EINSTELLUNG_WERTE).every(([k, w]) => w.includes(STANDARD_EINSTELLUNGEN[k])));
+  s.m.clear();
+}
+
+// ---------- Daten-Fundament (DSGVO): datenfreigabe, Opt-in mit Standard aus ----------
+{
+  s.m.clear();
+  pruefe('Daten: datenfreigabe Standard aus, erlaubt nur aus und an', STANDARD_EINSTELLUNGEN.datenfreigabe === 'aus' && ladeEinstellungen().datenfreigabe === 'aus'
+    && JSON.stringify(EINSTELLUNG_WERTE.datenfreigabe) === '["aus","an"]' && Object.isFrozen(EINSTELLUNG_WERTE.datenfreigabe));
+  speichereEinstellungen({ datenfreigabe: 'an' });
+  pruefe('Daten: Freigabe an bleibt gespeichert, andere Einstellungen unberuehrt', ladeEinstellungen().datenfreigabe === 'an' && ladeEinstellungen().klang === true);
+  for (const falsch of ['ja', true, 1, 'AN', '', null]) {
+    s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ datenfreigabe: falsch }));
+    pruefe(`Daten: falscher Wert ${JSON.stringify(falsch)} -> aus`, ladeEinstellungen().datenfreigabe === 'aus');
+  }
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, brett: 'holz' }));
+  pruefe('Daten: alter Speicherstand ohne datenfreigabe -> aus, alte Werte bleiben', ladeEinstellungen().datenfreigabe === 'aus' && ladeEinstellungen().brett === 'holz');
   s.m.clear();
 }
 
