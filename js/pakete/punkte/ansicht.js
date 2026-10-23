@@ -12,6 +12,8 @@
 //       "klick"). Antippen zeigt die Aufschluesselung und "Zur Bestenliste". data-fertig="1", sobald das Endbild steht.
 //       post: { name, text() -> Text } (Ueberhol-Post, 3.13): in der Aufschluesselung einmal still "Ueberhol-Post an Jule";
 //       Antippen zeigt den Text mit Code als Vorschau, verschickt wird nur von Hand (Kopieren oder Teilen-Blatt).
+//   panelZeile({ name, best, platz, beiTipp }) -> HTMLElement   Ort arena:panel-bot (3.17 "Rudis Tafel: Platz 4"):
+//       button.pk-panel "Rudis Tafel / Bestwert 12.300" (mit Gaesten dazu "/ Platz 2"), Antippen oeffnet die Tafel
 //   wartezeile({ fehlt }) -> HTMLElement   "Punkte werden gezaehlt ..." (Analyse rechnet noch, ruhiger Schimmer, endlich)
 //       bzw. mit fehlt: "Punkte folgen mit der Analyse" (die Arena holt sie nach)
 import { anim, tempo } from '../../bewegung.js';
@@ -80,6 +82,17 @@ function posten(e) {
   if (p.weste) aus.push(['Weiße Weste: Sieg ohne Daneben', p.weste]);
   if (e.erg === 'niederlage' && !p.kurz && !p.ergebnis) aus.push(['Kampfgeist gibt es ab dem 15. eigenen Zug', null]);
   return aus;
+}
+
+export function panelZeile({ name = 'Tafel', best = 0, platz = null, beiTipp = null } = {}) {
+  const k = el('button', 'pk-panel dr');
+  k.type = 'button';
+  k.dataset.paket = 'punkte';
+  k.innerHTML = `<span class="pk-panel-symbol" aria-hidden="true">${icon('podest')}</span><span class="pk-panel-text"></span>`;
+  k.querySelector('.pk-panel-text').textContent = `${name} · Bestwert ${zahlText(best)}${platz != null ? ` · Platz ${platz}` : ''}`;
+  k.setAttribute('aria-label', `${name} öffnen: dein Bestwert ${zahlText(best)} Punkte${platz != null ? `, Platz ${platz}` : ''}`);
+  if (typeof beiTipp === 'function') k.addEventListener('click', (ev) => { ev.stopPropagation(); beiTipp(); });
+  return k;
 }
 
 export function wartezeile({ fehlt = false } = {}) {

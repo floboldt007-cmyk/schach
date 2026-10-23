@@ -926,6 +926,24 @@ async function testeBrowser(browser) {
   pruefe('Reiter Ich: Spielerkarte (Rekorde, Platz 1, Tafeln, beste Partie) und „Deine besten Partien“ über alle Tafeln', /Rekorde\s*0/.test(ich) && /Tafeln\s*1/.test(ich)
     && new RegExp(zahlText(e1.w)).test(ich) && /Bennos Tafel ·/.test(await seite.locator('.bl-gesamt .bl-z-info').first().innerText()), ich.slice(0, 300));
 
+  // Bot-Panel der Arena (3.17 "Rudis Tafel: Platz 4"): Tafel des gewaehlten Bots mit Bestwert, Antippen oeffnet sie
+  await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'hilde' }));
+  await seite.waitForSelector('.screen.arena .detail');
+  await warte(500);
+  const ohnePanel = await seite.locator('.ort-panel-bot .pk-panel').count();
+  await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
+  const panel = await seite.evaluate(() => {
+    const k = document.querySelector('.ort-panel-bot .pk-panel');
+    return k && { text: k.textContent.trim(), h: Math.round(k.getBoundingClientRect().height), tag: k.tagName };
+  });
+  pruefe('Bot-Panel (arena:panel-bot): „Bennos Tafel · Bestwert …“ als Knopf, mindestens 44 px hoch; ohne eigenen Eintrag (Hilde) keine Zeile', ohnePanel === 0
+    && panel && panel.tag === 'BUTTON' && panel.text === `Bennos Tafel · Bestwert ${zahlText(e1.w)}` && panel.h >= 44, { ohnePanel, panel });
+  await h.tippe('.ort-panel-bot .pk-panel');
+  await seite.waitForSelector('.bl-reiter[data-reiter="bots"]:not([hidden])', { timeout: 10000 }).catch(() => {});
+  await warte(500);
+  pruefe('Bot-Panel antippen öffnet Bennos Tafel in der Bestenliste', await seite.locator('.bl-wahl[aria-pressed="true"]').getAttribute('data-tafel') === 'bot:benno');
+
   // ---------- 6. Rekord: grosser Moment, alte Zahl durchgestrichen ----------
   gruppe = 'Rekord';
   await h.aendereStand("st.tafeln['bot:benno'].eintraege[0].w = 1000; st.ids = [];", null);
@@ -979,6 +997,10 @@ async function testeBrowser(browser) {
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'bots' });
   const gast = await seite.evaluate(() => [...document.querySelectorAll('.bl-tafel .bl-zeile')].map((z) => z.dataset.platz + ':' + z.querySelector('.bl-z-name').textContent.trim()));
+  await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
+  pruefe('Bot-Panel mit Gast auf der Tafel: dazu „· Platz 1“', /^Bennos Tafel · Bestwert [\d.]+ · Platz 1$/.test((await seite.locator('.ort-panel-bot .pk-panel').textContent()).trim()));
+  await h.bestenliste({ reiter: 'bots' });
   pruefe('Freunde stehen als Gast-Zeilen auf der Tafel (Initiale, „Nachgerechnet ✓“)', gast.some((g) => /^2:J\s*Jule\s*Nachgerechnet ✓/.test(g)) && /^1:Du/.test(gast[0]), gast);
 
   // ---------- 8. So nah wie noch nie, und Hilfe ohne Tafel ----------

@@ -57,6 +57,16 @@
 .pk-schimmer .pk-text, .pk-schimmer .pk-wert { animation: pk-schimmer 1.6s var(--sanft) 6 alternate both; }
 @keyframes pk-schimmer { from { opacity: 1; } to { opacity: .45; } }
 
+/* ---------- Bot-Panel der Arena (Ort arena:panel-bot) ---------- */
+.pk-panel { display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--tipp); margin: 0; padding: 6px 12px 6px 6px; border: 0;
+  border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit; font-size: 13.5px;
+  font-weight: 650; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pk-panel:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.pk-panel-symbol { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--r-pille); background: var(--flaeche);
+  color: var(--text); box-shadow: var(--kante); }
+.pk-panel-symbol .ico { width: 16px; height: 16px; }
+.pk-panel-text { min-width: 0; overflow-wrap: anywhere; }
+
 /* ---------- Screen Bestenliste ---------- */
 .bl-screen .bl-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   padding-bottom: var(--a6); }

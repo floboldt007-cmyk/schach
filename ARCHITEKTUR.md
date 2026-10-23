@@ -1521,7 +1521,9 @@ Zuegen, Genauigkeit, Punkten, eigene Zeile mit Akzentlinie, Freunde als Gast-Zei
 "Rekord angreifen: Rudi, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
 nachspielen, mit `app.engine('bewertung')` neu analysieren und mit derselben Formel rechnen, "Nachgerechnet ✓"; Freunde-Liste,
 ein Tipp entfernt). Jeder Anbieter liefert `section.bl-reiter[data-reiter][data-name]`, nicht gewaehlt eine leere Huelle (daraus
-baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment aus (Freunde).
+baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment aus (Freunde). `arena:panel-bot` 40 (3.17
+"Rudis Tafel: Platz 4"): `button.pk-panel` "Rudis Tafel · Bestwert 12.300", mit Gaesten auf der Tafel dazu "· Platz 2", nur fuer
+Leiter-Bots mit eigenem Eintrag; Antippen oeffnet die Tafel in der Bestenliste.
 
 **Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL". Neuer eigener
 Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie "Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL"
@@ -1556,3 +1558,22 @@ Tests: `node tests/punkte.test.mjs` (Node und Browser, `PORT`, `BILDER`, `--nur-
 390 dunkel). Der Browser-Teil laedt `js/erweiterungen.js` immer mit `PAKETE = ['sicherung']` und `REITER = []` (per
 `page.route`) und das Paket per `?erw`, den Reiter per `?reiter`: so bleibt die Suite gleich, wenn die Integration Pakete und
 Reiter eintraegt.
+
+**Integration (Probelauf 23.10. in einer Kopie, Port 9602).** Eingetragen: `PAKETE = ['sicherung', 'pakete/funken/index',
+'pakete/punkte/index']`, `REITER = ['bestenliste']`, in `DATEIEN` von `sw.js` die Dateien beider Pakete und
+`js/ui/bestenliste.js`, danach `node tests/sw.test.mjs --aktualisieren`. Ohne weiteres Rezept (alle `--schnell`): 16/18
+Suiten, rot nur Pruefungen, die ausdruecklich den Kern ohne Reiter und ohne Pakete pruefen: `navigation` 6 ("Leiste ohne
+REITER" zweimal, "Reiter Arena (aktiv) und Verlauf" und "Reiter Verlauf ... oben im Kopf" (die Leiste hat dann drei Reiter),
+"?reiter ohne ?test bleibt wirkungslos", "Training leer: ohne Reiter ein Zurueck-Knopf") und `funken` 3 (im iPad-Querformat
+sitzt die Leiste im Kopf, der Level-Chip nimmt die schmale Form, danach bricht der Browser-Teil ab). `app`, `screens`, `e2e`
+waren schon mit dem Rezept aus P1 gruen, `punkte` bringt sein Rezept selbst mit. **Rezept, geprueft (alle 18 Suiten gruen):** das
+P1-Rezept setzt zusaetzlich `REITER = []` (`tests/app.test.mjs`, `tests/e2e.test.mjs`), dasselbe in `neueSeite` von
+`tests/navigation.test.mjs` und `tests/funken.test.mjs`:
+```js
+const body = echt.replace(/^export const PAKETE = Object\.freeze\(\[[^\]]*\]\);/m, "export const PAKETE = Object.freeze(['sicherung']);")
+  .replace(/^export const REITER = Object\.freeze\(\[[^\]]*\]\);/m, 'export const REITER = Object.freeze([]);');
+```
+Beobachtet in der Kopie (echte App ohne `?test`): Reiter-Leiste "Arena · Bestenliste" im Kopf (1180 x 820) bzw. unten (390 x
+844, 820 x 1180), keine Konsolenfehler. Im iPad-Querformat verdraengt die Leiste im Kopf den Level-Chip von funken in den
+waagrechten Scrollbereich der Chip-Reihe: das gehoert zur Auswahl der Kopf-Chips der Integration (Zahlenruhe 3.1). Ob der
+Zwischenreiter Verlauf dabeibleibt (`REITER = ['verlauf', 'bestenliste']`), entscheidet ebenfalls die Integration.

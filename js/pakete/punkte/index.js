@@ -12,7 +12,8 @@
 //          fuer die Spielerkarte), app:bereit (einmaliger Umzug der gespeicherten Analysen), speicher:zurueckgesetzt.
 // Sendet:  punkte:geaendert { punkte, platz, tafel, rekord } je bewerteter Partie; rekord:neu { tafel, wert, vorher, platz,
 //          fenster: 'allzeit', partieId } bei einem neuen eigenen Allzeit-Rekord auf einer Tafel.
-// Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Ich 10, Bots 20, Freunde 50.
+// Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Ich 10, Bots 20, Freunde 50, arena:panel-bot 40
+//          (Tafel des gewaehlten Bots mit Bestwert, Antippen oeffnet sie).
 // Feier:   bot-rekord (gross 78) "Platz 1 auf ... Tafel", wenn dabei Gaeste hinter dir landen; tafel-rekord (gross 70, eigene
 //          Quelle wie "Eigener Allzeit-Rekord" in 3.13) bei einem neuen Rekord. Ist das grosse Budget dieser Partie schon
 //          vergeben (gleiche oder hoehere Prioritaet), kommt der Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf
@@ -238,6 +239,22 @@ function anbieterAbrechnung(k) {
   };
 }
 
+// Bot-Panel der Arena (3.17 "Rudis Tafel: Platz 4"): nur Leiter-Bots mit eigenem Eintrag, Platz nur mit Gaesten
+function anbieterPanel(k) {
+  const bot = k && k.bot;
+  if (!bot || bot.stufe == null) return null;
+  const id = T.tafelId({ botId: bot.id });
+  const st = S.lade();
+  const t = id && st.tafeln[id];
+  if (!t || !t.eintraege.length) return null;
+  const gaeste = S.gaeste(st, id);
+  const ich = gaeste.length ? T.zeilen(t, { fenster: 'allzeit', gaeste }).find((r) => r.eigen) : null;
+  return A.panelZeile({
+    name: A.tafelName(id, botNachId), best: T.eigene(t, 'allzeit')[0].w, platz: ich ? ich.platz : null,
+    beiTipp: k.app && typeof k.app.gehe === 'function' ? () => { B.merkeEinstellung({ tafel: id, reiter: 'bots' }); k.app.gehe('bestenliste', { reiter: 'bots' }); } : null,
+  });
+}
+
 function anbieterReiter(id, name, baue) {
   return (k) => sicher(() => {
     if (!k || k.reiter !== id) return B.huelle(id, name);
@@ -299,6 +316,7 @@ function registriere() {
   }, 'funken:geaendert'));
 
   anbieten('ergebnis:abrechnung', (k) => sicher(() => anbieterAbrechnung(k), 'Abrechnung'), { reihenfolge: 10, paket: PAKET });
+  anbieten('arena:panel-bot', (k) => sicher(() => anbieterPanel(k), 'Panel'), { reihenfolge: 40, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('ich', 'Ich', B.reiterIch), { reihenfolge: 10, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('bots', 'Bots', B.reiterBots), { reihenfolge: 20, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('freunde', 'Freunde', B.reiterFreunde), { reihenfolge: 50, paket: PAKET });
