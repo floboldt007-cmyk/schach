@@ -859,20 +859,30 @@ async function browserTeil(browser) {
     await h.seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
     await h.seite.waitForFunction(() => /Kalle/.test((document.querySelector('.detail h2') || {}).textContent || '') && !!document.querySelector('.detail .gd-erzfeind'),
       null, { timeout: 10000 });
+    // auf dem Handy stehen Sprechblase und Ort arena:panel-bot hinter "Mehr" (.detail.offen, css/app.css): aufklappen wie Flo,
+    // sonst waeren beide display:none und jede Pruefung der Masse leer
+    const zu = await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height === 0);
+    await h.seite.locator('.detail .mehr-knopf').click();
+    await h.seite.waitForFunction(() => document.querySelector('.detail').classList.contains('offen')
+      && document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height > 0, null, { timeout: 5000 });
     await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').scrollIntoView({ block: 'center' }));
     await warte(600);
     const ezH = await h.seite.evaluate(() => {
       const e = document.querySelector('.detail .gd-erzfeind');
       const r = e.getBoundingClientRect();
       const cs = getComputedStyle(e);
-      return { links: r.left, rechts: r.right, breite: innerWidth, hoehe: r.height, text: e.textContent.trim(), farbe: cs.color, hg: cs.backgroundColor,
-        scroll: document.documentElement.scrollWidth <= innerWidth + 1, blase: (document.querySelector('.detail .sprechblase') || {}).textContent || '' };
+      const bl = document.querySelector('.detail .sprechblase');
+      const rb = bl ? bl.getBoundingClientRect() : { height: 0 };
+      return { links: r.left, rechts: r.right, oben: r.top, unten: r.bottom, breite: innerWidth, hoch: innerHeight, hoehe: r.height, text: e.textContent.trim(),
+        farbe: cs.color, hg: cs.backgroundColor, scroll: document.documentElement.scrollWidth <= innerWidth + 1,
+        blase: bl ? bl.textContent : '', blaseHoehe: rb.height };
     });
     const sollH = await erwartet(h.seite, 'kalle');
-    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`, ezH.links >= 0 && ezH.rechts <= ezH.breite
-      && ezH.hoehe <= 60 && ezH.scroll && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify(ezH));
-    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante`,
-      sollH && sollH.grund === 'mutmachen' && ezH.blase === `„${sollH.text}“`, JSON.stringify({ blase: ezH.blase, soll: sollH }));
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile hinter "Mehr" (zu: versteckt, auf: sichtbar), ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
+      zu && ezH.hoehe >= 20 && ezH.hoehe <= 60 && ezH.links >= 0 && ezH.rechts <= ezH.breite && ezH.oben >= 0 && ezH.unten <= ezH.hoch && ezH.scroll
+      && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify({ zu, ...ezH }));
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante, sichtbar`,
+      sollH && sollH.grund === 'mutmachen' && ezH.blase === `„${sollH.text}“` && ezH.blaseHoehe > 0, JSON.stringify({ blase: ezH.blase, hoehe: ezH.blaseHoehe, soll: sollH }));
     await h.seite.screenshot({ path: path.join(BILDER, `panel-erzfeind-handy-${dunkel ? 'dunkel' : 'hell'}.png`) });
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Konsole ohne Fehler`, h.fehler.length === 0, h.fehler.join(' | '));
     await h.kontext.close();
