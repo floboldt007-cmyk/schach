@@ -189,13 +189,21 @@ erreichbar“, und die Frage zählt nicht.
 4. **Einstellungen (freiwillig, ebenfalls mit `npx supabase secrets set NAME=wert`):**
    - `COACH_MODELL`: Standard `claude-opus-5-5` (beste Erklärungen). Günstiger: `claude-sonnet-5-5`, am günstigsten
      `claude-haiku-5-5` (einfachere Erklärungen; dort springt bei einer Ablehnung durch die Sicherheitsfilter kein
-     Ersatzmodell ein, die Karte sagt dann „keine Erklärung“). Ein falscher Name zeigt in der App „Der Coach ist noch
-     nicht eingerichtet“ und im Protokoll `coach zurueck ki_konfig`.
+     Ersatzmodell ein, die Karte sagt dann „keine Erklärung“). Den Namen genau so schreiben: nur Kleinbuchstaben,
+     Ziffern und Bindestriche, Anfang `claude-` (also `claude-haiku-5-5`, nicht `claude-haiku-5.5` oder `Haiku`). Ein
+     falsch geschriebener Name zeigt in der App „Der Coach ist noch nicht eingerichtet“ und im Protokoll
+     `coach nicht_eingerichtet COACH_MODELL`; ein richtig geschriebener, den Anthropic nicht kennt, ebenfalls „noch nicht
+     eingerichtet“ mit `coach zurueck ki_konfig`. Die Function nimmt nie still ein anderes Modell (sonst zahlst du beim
+     Sparversuch unbemerkt das teuerste).
    - `COACH_AUFWAND`: `low` (Standard: schnell, günstig), `medium` oder `high` (gründlicher, aber langsamer und teurer).
      Wirken die Erklärungen zu oberflächlich, zuerst `medium` probieren.
    - `COACH_TAGESLIMIT`: Fragen je Person und Tag, Standard `30` (erlaubt 1 bis 1000). Der Tag beginnt um 4 Uhr
-     (Europe/Berlin), wie überall in der App. Eine Frage, auf die die KI nicht antwortet, zählt nicht.
-   Neue Werte gelten ab der nächsten Frage, ohne neues Hochladen.
+     (Europe/Berlin), wie überall in der App. Eine Frage, auf die die KI nicht antwortet, zählt nicht. **Änderst du die
+     Grenze, pass auch den Text im Trainer-Blatt an** (`js/pakete/abo/trainer.js`, Eintrag `frag-den-coach`: „bis zu 30
+     Fragen am Tag“), sonst verspricht der Verkaufstext eine andere Zahl.
+   Ein ungültiger Wert bei Aufwand oder Grenze gilt als Standard (`low` bzw. `30`), im Protokoll steht dann
+   `coach warnung COACH_AUFWAND` bzw. `coach warnung COACH_TAGESLIMIT`. Neue Werte gelten ab der nächsten Frage, ohne
+   neues Hochladen.
 5. **Edge Function hochladen:** `npx supabase functions deploy coach` (diesmal **ohne** `--no-verify-jwt`: Die App
    schickt das Token der Anmeldung mit, Supabase prüft es zusätzlich zur Function). Adresse:
    `https://usaamcqypmvgqmsbfecb.supabase.co/functions/v1/coach`. Die Function lädt beim Hochladen das Anthropic-SDK in
@@ -204,22 +212,33 @@ erreichbar“, und die Frage zählt nicht.
    und steht unter **Edge Functions > coach > Logs** gar keine Zeile `coach …`, weist schon das Supabase-Gateway das
    Token ab (das kann bei Projekten mit den neuen JWT-Signaturschlüsseln passieren). Dann mit
    `npx supabase functions deploy coach --no-verify-jwt` neu hochladen: Die Function prüft die Anmeldung ohnehin
-   selbst über `/auth/v1/user`, bevor sie irgendetwas tut.
+   selbst über `/auth/v1/user`, bevor sie irgendetwas tut. Steht im Protokoll `coach nicht_eingerichtet apikey`, lehnt
+   Supabase den Projekt-Schlüssel ab, mit dem die Function nachfragt (`SUPABASE_ANON_KEY`, sonst
+   `SUPABASE_SERVICE_ROLE_KEY`; z. B. wenn die alten Schlüssel im Projekt abgeschaltet sind); die App zeigt dann „noch
+   nicht eingerichtet“ statt „Melde dich an“. `coach anmeldung 401` bzw. `403` heißt dagegen: Die Anmeldung der
+   Person ist abgelaufen oder ungültig.
 6. **Testen:** Das Paket `pakete/coach-ki/index` muss in der App eingetragen sein (`js/erweiterungen.js`, macht die
    Integration). In der App anmelden (Adresse mit `#konto`), dir den Trainer von Hand geben (oben: „Von Hand
    freischalten“), eine Partie spielen, in der Analyse einen Zug wählen und **Frag den Coach** tippen. In Supabase unter
    **Edge Functions > coach > Logs** steht dann `coach ok …`, unter **Table Editor > coach_nutzung** deine Zeile von
    heute. Ohne Trainer muss der Knopf den Hinweis „Teil von Crownmate Trainer“ zeigen und die Zeile darf nicht wachsen.
-   **Reihenfolge beachten:** Sobald das Paket eingetragen ist, meldet es „Coach-Erklärungen“ als fertig, und das
-   Trainer-Blatt bietet den Kauf an, wenn in `produkte` `aktiv` = `true` steht. Deshalb `aktiv` erst dann auf `true`
+   **Reihenfolge beachten:** Sobald das Paket eingetragen ist, meldet es „Frag den Coach“ als fertig (im Blatt unter
+   „Im Trainer“: „Frag den Coach: Eine KI erklärt dir einzelne Züge in der Spielanalyse, bis zu 30 Fragen am Tag“; die
+   „Coach-Erklärungen in ganzen Sätzen“ der Coaches bleiben „In Arbeit“), und das Trainer-Blatt bietet den Kauf an,
+   wenn in `produkte` `aktiv` = `true` steht. Deshalb `aktiv` erst dann auf `true`
    setzen, wenn dieser Test mit der echten Function geklappt hat: Verkauft wird nur, was wirklich läuft.
 7. **Vor dem Start klären (keine Rechtsberatung, mit einer Fachperson):** In die Datenschutzerklärung gehört, dass
    Stellungen zur Erklärung an Anthropic (USA) gehen, ohne Namen oder Konto-Daten, und auf welcher Grundlage
    (Auftragsverarbeitung, Drittland-Übermittlung; Anthropic bietet dafür Vertragsbedingungen an). Prüfen, ob die
-   Hinweise in der App zur KI-Verordnung reichen, und dass der Trainer die KI-Erklärungen als solche beschreibt.
+   Hinweise in der App zur KI-Verordnung reichen (Karte: „KI“ und „Erklärung von einer KI, kann sich irren.“;
+   Trainer-Blatt: „Eine KI erklärt dir …, bis zu 30 Fragen am Tag“).
 
 **Was der Server schützt:** Ohne gültige Anmeldung (`/auth/v1/user`) und ohne Trainer (`ist_premium_von`) fragt die
 Function das Modell nie. Das Tageslimit zählt atomar in der Datenbank, auch bei gleichzeitigen Fragen; zurückgeben
-kann eine Frage nur die Function selbst (wenn die KI nicht antwortet), nie ein Nutzer. Eingaben prüft die Function
-streng (FEN-Form, Zug passt zur Stellung, Längen) und baut den Text für das Modell selbst; was die App sonst mitschickt,
-liest sie nicht. Der Schlüssel liegt nur in den Secrets der Function, nie in der App.
+kann eine Frage nur die Function selbst (wenn die KI nicht antwortet), nie ein Nutzer. Bewusst entschieden: Auch eine
+abgeschnittene oder leere Antwort und eine Zeitüberschreitung gehen zurück, obwohl Anthropic sie berechnet. Gezielt
+auslösen lässt sich das kaum (die App schickt nur Fakten, keinen freien Text), und gegen Ausreißer schützt die
+Ausgabengrenze in der Anthropic-Konsole. Eingaben prüft die Function streng (FEN-Form, en-passant-Feld passt zur Seite
+am Zug, der Zug ist in der Stellung erlaubt, Längen), rechnet Schach, Matt und Patt selbst aus und baut den Text für
+das Modell selbst; was die App sonst mitschickt, liest sie nicht. Der Schlüssel liegt nur in den Secrets der Function,
+nie in der App. Antwortet die Function nicht binnen 100 Sekunden, zeigt die App „nicht erreichbar“.

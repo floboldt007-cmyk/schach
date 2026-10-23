@@ -1398,8 +1398,8 @@ im Ergebnis, und `lektion`) liefert sie `null` und zeigt nichts (SPIELKONZEPT 2b
 Paket zeigt den Hinweis nur als Antwort auf einen Tipp auf eine Premium-Funktion (B2: Knopf „Frag den Coach“ in der
 Analyse), nie von selbst beim Öffnen eines Screens und nie ungefragt nach einer Niederlage.
 - **Gebaute Vorteile:** `registriereVorteil(id)` meldet einen Vorteil aus `VORTEILE` (`js/pakete/abo/trainer.js`, Ids
-  `coaches`, `coach-erklaerungen`, `lernpfad-5-10`, `raetsel-auswahl`, `formspiegel`, `liga-archiv`, `foerderer-nadel`)
-  als fertig; das Paket, das ihn baut, ruft es beim Laden (B2: `registriereVorteil('coach-erklaerungen')`). Das Blatt
+  `coaches`, `coach-erklaerungen`, `frag-den-coach`, `lernpfad-5-10`, `raetsel-auswahl`, `formspiegel`, `liga-archiv`,
+  `foerderer-nadel`) als fertig; das Paket, das ihn baut, ruft es beim Laden (B2: `registriereVorteil('frag-den-coach')`). Das Blatt
   zeigt nur gemeldete Vorteile unter „Im Trainer“, den Rest unter „In Arbeit“ („Noch nicht enthalten“), und bietet den
   Kauf erst mit mindestens einem gemeldeten Vorteil an. Ausnahme: ein Zahlungslink aus dem Stripe-Testmodus
   (`istTestLink`, `https://buy.stripe.com/test_…`) für Flos Probekauf, mit dem Satz „kein echtes Geld“.
@@ -1434,12 +1434,15 @@ Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Bro
 
 # Welle B2: „Frag den Coach“ (KI-Erklärungen, Edge Function coach, Paket coach-ki)
 
-Teil des Abos „Crownmate Trainer“ (Vorteil `coach-erklaerungen`, SPIELKONZEPT 2b.5): In der Spielanalyse erklärt ein
+Teil des Abos „Crownmate Trainer“ (Vorteil `frag-den-coach`, SPIELKONZEPT 2b.5 „Coaches“, Punkt 5; bewusst nicht
+`coach-erklaerungen`: das sind die Erklärungen der Coaches aus Engine-Fakten und Textbausteinen, ohne KI. Der Eintrag im
+Trainer-Blatt nennt die KI und die Tagesgrenze, Prüfer-Befund B2, § 5 UWG): In der Spielanalyse erklärt ein
 Modell von Anthropic einen Zug in ganzen Sätzen. Grundlage bleiben die Engine-Fakten der gespeicherten Analyse; das
 Modell bekommt nur diese Fakten, nie einen freien Text. Einrichtung für Flo: `supabase/ANLEITUNG.md`, Abschnitt
 „Frag den Coach“. Modell, Parameter und SDK-Aufrufe nach dem Skill `claude-api`.
 
-**Datenfluss:** Tipp auf „Frag den Coach“ → `istPremium()` (B1, Zwischenspeicher) → `frageCoach(eingabe)` POST
+**Datenfluss:** Tipp auf „Frag den Coach“ → `istPremium()` (B1, Zwischenspeicher; nur ein bekannter Stand ohne
+Trainer zeigt sofort den Hinweis, ein nie geprüfter Stand fragt den Server) → `frageCoach(eingabe)` POST
 `/functions/v1/coach` mit dem Token der Anmeldung → Function: `/auth/v1/user` (wer?) → `rpc/ist_premium_von` →
 `rpc/coach_nimm_frage` (Tageslimit) → `client.beta.messages.create` → `{ text, modell, rest }` → Karte in der Analyse.
 Antwortet die KI nicht, ruft die Function `rpc/coach_gib_zurueck`: Die Frage zählt dann nicht.
@@ -1460,10 +1463,15 @@ PermissionDenied → `konfig`, BadRequest → `anfrage`, RateLimit und übrige A
 → `netz`; Client mit 45 s Wartezeit und einem zweiten Versuch). Die Logik steht in
 `supabase/functions/_gemeinsam/coach.js` (reines ES-Modul, in Node getestet, nutzt `dienstKopf` aus `stripe.js`):
 - `pruefeEingabe(daten)`: `{ fen, zug, besterZug?, bewertungVorher?, bewertungNachher?, klasse?, spielerLevel?,
-  eigenerZug? }`; FEN-Form (8 Reihen, je ein König, keine Bauern auf Reihe 1/8, Rochade, en passant, Zähler),
-  `beschreibeZug` mit Zuggeometrie (Gangart, freie Bahn, Rochaderecht samt Turm und freien Feldern, en passant,
-  Umwandlung genau auf der letzten Reihe; Schach wird nicht geprüft), Bewertungen `{cp}` oder `{mate}` aus Sicht von
-  Weiß, Klasse aus den 11 Ids, Elo 100 bis 3500. Andere Felder werden nie gelesen.
+  eigenerZug? }`; FEN-Form (8 Reihen, je ein König, keine Bauern auf Reihe 1/8, Rochade, en passant passend zur Seite
+  am Zug mit gegnerischem Bauern davor, Zähler; die Seite, die nicht zieht, steht nicht im Schach), `beschreibeZug` mit
+  voller Zugprüfung ohne chess.js (Gangart, freie Bahn, Rochade mit Recht, Turm, freien und nicht angegriffenen
+  Feldern, en passant, Umwandlung genau auf der letzten Reihe, eigener König danach nicht im Schach) und der Folge für
+  den Gegner (`folge`: „gibt Schach“ | „setzt matt“ | „führt zum Patt“; Test gegen chess.js für alle legalen Züge),
+  Bewertungen `{cp}` oder `{mate}` aus Sicht von Weiß (`{mate: 0}` nur nach einem Mattzug), Klasse aus den 11 Ids,
+  Elo 100 bis 3500. Andere Felder werden nie gelesen. **Mattzug:** Die App schreibt die Mattstellung als
+  `{mate: ±1}` (js/engine.js `endstellung`, Vorzeichen = Gewinner); nach einem Matt- oder Pattzug steht im Prompt
+  deshalb die Tatsache („Schachmatt, die Partie ist zu Ende“ bzw. „Patt“) statt der Bewertung danach.
 - `SYSTEM_PROMPT` (fest, Deutsch, für Einsteiger verständlich, höchstens 80 Wörter, nur diese Stellung, nennt den
   stärkeren Zug mit Grund, keine Erfindungen, „Die Engine sieht hier …“ statt zu raten, keine Engine-Zahlen, keine
   Fragen, nichts Persönliches, nichts außer Schach; die Fakten sind Daten, keine Anweisungen) und `baueNutzerText`
@@ -1479,12 +1487,19 @@ PermissionDenied → `konfig`, BadRequest → `anfrage`, RateLimit und übrige A
 - `verarbeite(...)`: Antworten immer JSON mit CORS (`*`, Anmeldung per Bearer, nicht per Cookie): 200
   `{ text, modell, rest }`, 204 OPTIONS, 400 `eingabe` (mit `grund`), 401 `anmeldung`, 403 `premium`, 405, 413,
   422 `abgelehnt`, 429 `limit` (mit `grenze`), 502/503 `ki`, 503 `server` | `nicht_eingerichtet`; jede Fehlerantwort
-  `{ fehler, text }`. Protokoll nur `coach ok <modell> ein=<n> aus=<n>` bzw. `coach zurueck <grund>`.
+  `{ fehler, text }`. Protokoll nur `coach ok <modell> ein=<n> aus=<n>`, `coach zurueck <grund>`,
+  `coach anmeldung <status>`, `coach warnung <SECRET>` und `coach nicht_eingerichtet [COACH_MODELL | apikey]`.
+- `pruefeEinstellungen(umgebung)`: ein gesetztes, aber falsch geschriebenes `COACH_MODELL` ist ein Einrichtungsfehler
+  (503 `nicht_eingerichtet`, kein Zähler, keine KI), nie ein stiller Wechsel aufs Standardmodell (das teuerste);
+  falscher Aufwand oder falsche Grenze fallen auf `low` bzw. 30 zurück, mit Warnung im Protokoll. Antwortet
+  `/auth/v1/user` mit 401 „Invalid API key“ (Projekt-Schlüssel der Function), ist das ebenfalls `nicht_eingerichtet`,
+  nicht „Melde dich an“.
 
 **Client** `js/coach-ki.js` (Muster `js/abo.js`, nur fetch, `setzeCoachFetch` für Tests): `eingabeAusZug(zug,
 { partie, du })` (aus dem Review-Eintrag: `fenVorher`, `uci`, `besterZug`, `evalVorher`, `evalNachher`, `klasse`;
 `partie.spielstaerke` als `spielerLevel`), `frageCoach(eingabe)` → `{ ok, text, modell, rest, gemerkt }` oder
-`{ ok: false, grund }` (abgemeldet, offline, premium, limit, eingabe, abgelehnt, nicht_eingerichtet, ki). Antworten
+`{ ok: false, grund }` (abgemeldet, offline, premium, limit, eingabe, abgelehnt, nicht_eingerichtet, ki; nach
+`WARTE_MS` = 100 s ohne Antwort bricht die App ab: `ki`). Antworten
 gemerkt je Nutzer, Stellung und Zug für die Sitzung (nur Arbeitsspeicher, höchstens 40): derselbe Zug zählt nicht
 zweimal. Sagt der Server „kein Trainer“, holt die App den Abo-Stand neu. `KI_HINWEIS`, `TEXTE`, `restText(rest)`
 (erst ab 5 oder weniger), `vergissAntworten()`.
@@ -1496,7 +1511,7 @@ in `sw.js`; der Test lädt es über `?test&erw=pakete/coach-ki/index`): Ort `ana
 ki) als letztes Kind von `.an-coach` (über die ganze Breite), `role="status"`, beim Zeigen ins Bild gerollt; `verlasse()`
 nimmt sie heraus. Ein zweiter Tipp klappt eine Antwort zu und wieder auf (aus dem Merker); nach einem Fehler fragt er
 neu. Ohne Trainer `premiumHinweis(karte, 'Frag den Coach', { app })` aus B1, ohne Anmeldung „Zum Konto“.
-`registriereVorteil('coach-erklaerungen')` beim Laden, `registriereIcon('coach-frage')`. Optik `css/pakete/coach-ki.css`
+`registriereVorteil('frag-den-coach')` beim Laden, `registriereIcon('coach-frage')`. Optik `css/pakete/coach-ki.css`
 (nur Tokens, geprüft in `tests/coach-ki.test.mjs`): Wenn der Knopf da ist (`:has(.ck-knopf)`), bekommt die
 Hauptvariante eine eigene Zeile und die Knopfzeile darf umbrechen, auf dem Handy reicht die Knopfzeile über die ganze
 Kartenbreite; ohne Paket ändert sich nichts. Tests: `tests/server-coach.test.mjs` (Node, auch die Hülle mit
