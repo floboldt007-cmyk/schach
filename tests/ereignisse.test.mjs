@@ -35,12 +35,14 @@ function stillMit(fn) {
 const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet', 'partie:verlassen', 'zug:gespielt',
   'stellung:analysiert', 'zug:bewertet', 'zug:zurueckgenommen', 'hilfe:genutzt', 'partie:beendet', 'partie:analysiert',
   'analyse:gesehen', 'speicher:fehler', 'training:geloest', 'training:stand', 'uebung:ergebnis', 'bestmarke:neu',
+  // P4 Liga (ARCHITEKTUR.md, Tabelle der Ereignisse)
+  'liga:geaendert',
   // w0-fix: "Fortschritt zuruecksetzen" meldet sich (Pakete leeren ihren Zustand im Arbeitsspeicher)
   'speicher:zurueckgesetzt',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18)
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
   'rekord:neu', 'uhr:knapp', 'zug:abgelehnt'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt und W0+a)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt, W0+a und P4)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();

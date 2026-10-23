@@ -235,7 +235,22 @@ export function zeige(root, params = {}, app) {
     })();
     const info = ergebnisInfo(p, nummer);
     const name = st.bot ? st.bot.name : 'Bot';
-    sec.querySelector('.an-unter').textContent = [zuzweit() ? `${personenName('w')} gegen ${personenName('b')}` : `Du gegen ${name}`, info.stand, info.grund].filter(Boolean).join(' · ');
+    // Name und Grund stehen in eigenen Spans: im kleinen Querfenster zeigt der Kopf den kurzen Namen, und der Grund
+    // entfaellt dort (die Genauigkeits-Karte nennt ihn); sichtbar ist immer nur eine Fassung des Namens
+    const unter = sec.querySelector('.an-unter');
+    const namensSpan = (klasse, text) => { const e = document.createElement('span'); e.className = klasse; e.textContent = text; return e; };
+    if (zuzweit()) unter.textContent = `${personenName('w')} gegen ${personenName('b')}`;
+    else {
+      unter.textContent = 'Du gegen ';
+      unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? (KURZ[st.bot.id] || name) : name));
+    }
+    if (info.stand) unter.append(' · ' + info.stand);
+    if (info.grund) {
+      const grund = document.createElement('span');
+      grund.className = 'an-unter-grund';
+      grund.textContent = ' · ' + info.grund;
+      unter.append(grund);
+    }
     const ng = naechsterGegner();
     // Ist der naechste Gegner derselbe Bot (noch nicht besiegt), gibt es keinen "Nächsten Gegner":
     // dann ist "Nochmal" der Hauptknopf und "Arena" der zweite

@@ -200,6 +200,13 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
 async function tippe(seite, sel) {
   const el = seite.locator(sel).first();
   await el.waitFor({ state: 'visible', timeout: 10000 });
+  // Wie ein Finger: liegt etwas ueber dem Ziel (z. B. der feste Spielen-Knopf ueber einem laengeren Panel),
+  // scrollt Flo es erst in die Mitte. Bleibt es verdeckt, geht der Tipp daneben und die Pruefung scheitert.
+  const verdeckt = await el.evaluate((e) => {
+    const r = e.getBoundingClientRect(), oben = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !oben || !(oben === e || e.contains(oben));
+  });
+  if (verdeckt) { await el.evaluate((e) => e.scrollIntoView({ block: 'center' })); await warte(150); }
   const b = await el.boundingBox();
   if (!b) throw new Error('nicht sichtbar: ' + sel);
   await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);

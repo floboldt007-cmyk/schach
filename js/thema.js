@@ -190,6 +190,9 @@ function beobachteSystem() {
   systemHoert = true;
   const neu = () => {
     if (aktuell.modus !== 'system') return;
+    // den beim Anwenden fest gesetzten Seitengrund mitziehen, sonst bliebe er hell, waehrend die Texte schon hell werden
+    const t = themaVon(aktuell.thema) || MODERN;
+    if (typeof document !== 'undefined' && document.body) document.body.style.backgroundColor = t.metaFarbe[aufgeloesterModus()];
     schreibeMeta();
     melde();
   };

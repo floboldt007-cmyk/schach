@@ -1,0 +1,48 @@
+/* P4, Look A: nur Theme-Tokens, keine eigene Bewegung oder Brett-Effekte. */
+.liga-karte {
+  min-width: 0; margin-block: var(--a3); padding: var(--a4);
+  border: 1px solid var(--linie); border-radius: var(--r-m);
+  background: var(--flaeche); color: var(--text); box-shadow: var(--s1);
+  font-family: var(--schrift); overflow-wrap: anywhere;
+}
+.liga-karte h3, .liga-karte h4 { margin: var(--a3) 0 var(--a2); font-family: var(--display); }
+.liga-karte h3 { font-size: var(--fs-h2); }
+.liga-karte h4 { font-size: var(--fs-text); }
+.liga-summary {
+  display: flex; align-items: center; gap: var(--a3); min-height: var(--tipp);
+  cursor: pointer; list-style: none; border-radius: var(--r-s);
+}
+.liga-summary::-webkit-details-marker { display: none; }
+.liga-summary:focus-visible, .liga-knopf:focus-visible { outline: var(--fokus); outline-offset: var(--a1); }
+.liga-wappen { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 40px; color: var(--akzent-text); background: var(--akzent-weich); border-radius: var(--r-s); }
+.liga-wappen .ico { width: 26px; height: 26px; }
+.liga-kurz { display: grid; gap: var(--a1); min-width: 0; }
+.liga-titel { font-family: var(--display); font-size: var(--fs-text); }
+.liga-unter, .liga-hilfe, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }
+.liga-hilfe { margin: var(--a2) 0; }
+.liga-mehr { margin-left: auto; color: var(--text-2); }
+.liga-mehr .ico { width: 18px; height: 18px; }
+.liga-aufklappen[open] .liga-mehr { transform: rotate(90deg); }
+.liga-balken { display: block; width: 100%; height: var(--a2); margin-top: var(--a3); border: 0; border-radius: var(--r-pille); background: var(--flaeche-3); color: var(--akzent); accent-color: var(--akzent); }
+.liga-balken::-webkit-progress-bar { background: var(--flaeche-3); border-radius: var(--r-pille); }
+.liga-balken::-webkit-progress-value { background: var(--akzent); border-radius: var(--r-pille); }
+.liga-balken::-moz-progress-bar { background: var(--akzent); border-radius: var(--r-pille); }
+.liga-wertung { font-size: var(--fs-klein); font-weight: var(--gw-stark); line-height: 1.55; margin: var(--a2) 0; }
+.liga-club, .liga-weg { margin-bottom: 0; }
+.liga-details { border-top: 1px solid var(--linie); padding-top: var(--a2); margin-top: var(--a3); }
+.liga-tabelle { width: 100%; border-collapse: collapse; font-size: var(--fs-klein); line-height: 1.5; }
+.liga-tabelle caption { font-family: var(--display); font-weight: var(--gw-stark); padding-block: var(--a2); text-align: left; }
+.liga-tabelle th, .liga-tabelle td { padding: var(--a2) var(--a1); text-align: left; border-bottom: 1px solid var(--linie); }
+.liga-tabelle th { font-weight: var(--gw-stark); }
+.liga-tabelle td:last-child, .liga-tabelle thead th:last-child { text-align: right; }
+.liga-wechsel { padding: var(--a3); margin-top: var(--a3); border-radius: var(--r-s); background: var(--akzent-weich); }
+.liga-wechsel[hidden] { display: none; }
+.liga-knopf { min-height: var(--tipp); padding: var(--a2) var(--a3); font: inherit; color: var(--text); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); cursor: pointer; }
+.liga-bilanz { margin: var(--a2) 0; }
+.liga-abrechnung { font-size: var(--fs-klein); color: var(--text); line-height: 1.55; padding-block: var(--a1); }
+.liga-kurve svg { display: block; width: 100%; max-height: 110px; color: var(--akzent-text); }
+.liga-kurve polyline { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.liga-archiv { list-style: none; padding: 0; margin: 0; }
+.liga-abzeichen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--a2); padding-block: var(--a2); border-bottom: 1px solid var(--linie); }
+.liga-abzeichen .ico { width: 20px; height: 20px; color: var(--akzent-text); }
+.liga-abzeichen small { color: var(--text-2); font-size: var(--fs-klein); }

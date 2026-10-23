@@ -248,6 +248,7 @@
   z-index: 6;
   pointer-events: none;
   min-width: 20px;
+  min-height: 20px;
   aspect-ratio: 1 / 1;
   filter: drop-shadow(var(--schatten-abzeichen, 0 2px 3px rgba(0, 0, 0, .3)));
 }
