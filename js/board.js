@@ -3,17 +3,62 @@
 // Kennt keine Schachregeln: welche Zuege gehen, sagt die App ueber erlaubeZuege().
 //
 // DOM (Klassennamen fuer css/app.css, Grundstil in css/board.css):
-//   .brett[data-ausrichtung="w"|"b"]                    das uebergebene Element (ohne padding/border)
-//     .brett-felder                                      8x8-Raster, abgerundet, schneidet ab
-//       .feld.h | .feld.d [data-feld]                    Felder, darin .koord.zahl / .koord.buchst
-//       .brett-lagen > .lage.<art>[data-feld]            Ueberlagerungen: zuletzt, auswahl, schach,
-//                                                        ziel (Punkt), ziel.schlag (Ring), ueber, mark-<art>
-//     img.figur[data-feld][data-figur="wN"]              Figuren; Zustaende .gleitet .gezogen .geht .kommt
-//     svg.brett-pfeile > g.pfeil[data-von][data-nach]    Pfeile (viewBox 0 0 8 8)
-//     .abzeichen-ort.k-<klasse>[data-feld][data-klasse]  Klassen-Symbol oben rechts am Feld
+//   .brett[data-ausrichtung="w"|"b"][.koord-rand]        das uebergebene Element (ohne padding/border)
+//     .brett-felder                                      8x8 Felder (absolut, je 12,5 %), abgerundet, schneidet ab
+//       .feld.h | .feld.d [data-feld]                    Felder, darin .koord.zahl / .koord.buchst (Lage "ecke")
+//       .brett-lagen > .lage.<art>[data-feld]            Ueberlagerungen: zuletzt, auswahl, vorschau, schach,
+//                                                        ziel (Punkt), ziel.schlag (Ringecken), ziel.rochade, ueber, mark-<art>
+//       svg.brett-nutzer.brett-marken > rect.marke[data-feld]   Flos Marken (faerben das Feld, nicht die Figur)
+//     (.brett-felder ist ein eigener Stapelkontext: alles darin liegt UNTER den Figuren, wie in Entwurf A)
+//     .brett-koord-rand > .koord.zahl / .koord.buchst    Koordinaten bei Lage "rand" (ausserhalb, im Sockel)
+//     img.figur[data-feld][data-figur="wN"]              Figuren; Zustaende .angehoben .gleitet .gezogen .geht .kommt .vorschau
+//     svg.brett-pfeile > g.pfeil[data-von][data-nach]    Coach-Pfeile (viewBox 0 0 8 8), pfeile(liste)
+//     svg.brett-nutzer > g.pfeil[data-von][data-nach]    Flos eigene Pfeile ueber den Figuren (getrennt von den Coach-Pfeilen)
+//     .abzeichen-ort.k-<klasse>[data-feld][data-klasse]  Klassen-Symbol oben rechts am Feld (bleibt in der Brett-Box)
 //     .brett-umwandlung > .umwandlung-wahl > button.umwandlung-figur[data-figur="q"]
 //     svg.brett-striche > g.strich[data-art][data-von][data-nach]   W0+a: Striche (im Brett oder in einer Effekt-Ebene)
-// Alles, was auf einem Feld sitzt, traegt --x/--y (Spalte/Zeile am Bildschirm, 0..7).
+// Alles, was auf einem Feld sitzt, traegt --x/--y (Spalte/Zeile am Bildschirm, 0..7) UND fertig berechnete
+// Prozentwerte (left/top), damit kein Browser die Lage ueber calc(var(--x) * 12,5 %) selbst runden muss
+// (WebKit rundete anders als Chromium). Animiert werden nur transform und opacity.
+//
+// Oeffentliche API (Vertrag, ARCHITEKTUR.md "Brett"):
+//   new Brett(el, { ausrichtung, figurenPfad, beiZug, koordinaten, koordLage, animation (ms, Standard 150),
+//                   fen, beiAbgelehnt, beiLeer, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
+//   beiZug(von, nach, umwandlung, { art: 'tippen' | 'ziehen', landung }) -> true | false | Promise
+//       landung: ms, bis die gezogene Figur auf dem Ziel steht (0 = steht schon dort: gezogen, Vorschau bestaetigt,
+//       Umwandlung gewaehlt, Bewegung aus). Die Partie legt den Zug-Klang darauf; das Brett spielt keinen Klang.
+//   setzeStellung, setzeAusrichtung, dreheUm, erlaubeZuege, zeigeVorzuege, zeigeAbzeichen, entferneAbzeichen,
+//   pfeile, markiere, koordinaten(an), setzeKoordLage('ecke' | 'rand'), setzeAutoDame, setzeBestaetigen(bool),
+//   setzeSteuerung('beides' | 'ziehen' | 'tippen'), setzeTurmRochade(bool), setzeDauer(ms), gleitDauer() (ms, mit
+//   Tempo; 0 = sofort), setzePfeileErlaubt(bool), nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }],
+//   loescheNutzerPfeile(), striche, kippeKoenig, richteAuf, figurAuf, zerstoere
+//   zielKarte(chess, { turmRochade }) erlaubt mit turmRochade Koenig -> eigener Turm als Rochade.
+//
+// Komfort (Premium-Umbau U6, PLAN Abschnitt 4):
+//   bestaetigen: Zug bestaetigen. Erster Tipp/Abwurf zeigt die Figur halb durchsichtig auf dem Ziel (Vorschau),
+//       zweiter Tipp aufs Ziel macht fest (erst dann beiZug), Tipp anderswo nimmt zurueck. Ist das eine eigene ziehbare
+//       Figur, wird sie gewaehlt; sonst tut der Tipp nichts weiter (kein beiLeer, Flos Zeichnungen bleiben).
+//   autoDame: Umwandlung ohne Auswahl; Finger/Maus 450 ms auf dem Zielfeld halten zeigt D T L S. Verrutscht der Finger
+//       dabei (8 px), gilt das Loslassen auf dem Zielfeld als Tipp (Dame), daneben passiert nichts (Auswahl bleibt).
+//   steuerung: 'beides' | 'ziehen' (kein Tipp-Zug) | 'tippen' (kein Ziehen). Ein zweiter Zeiger bricht jede Geste ab,
+//       zwei Finger ergeben nie einen Zug: deshalb zieht ein Finger-Tipp aufs Ziel erst beim Loslassen (die Maus beim
+//       Druecken), ein zweiter Finger oder pointercancel bis dahin nimmt ihn zurueck. Zieh-Schwelle 8 px (Maus 4 px).
+//   turmRochade: ein Zug Koenig -> eigener Turm (aus der Zielkarte) wird als Rochade ausgefuehrt. Mit setzeTurmRochade(true)
+//       ergaenzt das Brett jede Zielkarte selbst um den Turm (auch zielKarte(chess) ohne Option); bei Zug bestaetigen
+//       macht der zweite Tipp auf das Ziel (g1/c1) oder auf den Turm fest.
+//   pfeile: Maus Rechtsklick ziehen = Pfeil, Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett
+//       ohne Auswahl loescht alles. Finger: 400 ms halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht.
+//       Auf allen Feldern, auch auf der eigenen Figur, die gerade ziehen darf (auch als Vorzug), damit Flo seinen Plan
+//       (z. B. Sg1-f3) einzeichnen kann: liegt der Finger dort 400 ms still, gehen Zielpunkte und Anheben aus, Ziehen malt
+//       dann den Pfeil (die Figur bleibt stehen), Loslassen ohne Ziehen bleibt ein Tipp (Auswahl, keine Marke). Wer sofort
+//       zieht (8 px vor Ablauf der 400 ms), zieht die Figur wie immer. Nie aus einer laufenden Zug-Geste: Finger zieht schon,
+//       eine andere Figur ist gewaehlt (Tipp-Tipp, auch ein Vorzug) oder eine Vorschau wurde eben zurueckgenommen.
+//       Die Partie loescht Coach-Pfeile mit pfeile([]), Flos Zeichnungen bleiben davon unberuehrt (auch ueber
+//       setzeStellung hinweg). Rechtsklick ziehen und ausserhalb des Bretts loslassen bricht ab. Die Zeiger-Ereignisse einer Zeichen-Geste (Rechtsklick-Druck, Bewegen, Loslassen)
+//       gibt das Brett nicht an die Umgebung weiter (stopPropagation), damit z. B. das Wischen der Analyse beim Malen
+//       nicht springt; Lauscher in der Capture-Phase (Klang entsperren) bekommen sie weiter.
+//   beiLeer(feld): Maus sofort beim Druecken; Finger (bei erlaubten Pfeilen) erst beim Loslassen und nur, wenn daraus
+//       keine Marke wurde, damit Halten zum Markieren die Vorzuege der Partie stehen laesst.
 //
 // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2, 3.9, 3.18):
 //   new Brett(el, { ..., beiAbgelehnt(von, nach, art) })   meldet einen Zugversuch, den die Zielkarte nicht
@@ -29,6 +74,9 @@
 //   kippeKoenig(feld, { langsam = false }) -> boolean   der Koenig auf feld kippt (Matt, Finisher); setzeStellung
 //       und richteAuf() stellen ihn wieder auf. false, wenn dort kein Koenig steht.
 
+import { KLASSEN_NAME } from './zugklassen.js';
+import { anim, tempo } from './bewegung.js';
+
 const DATEIEN = 'abcdefgh';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -36,7 +84,14 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const FIGUR_NAMEN = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
 const UMWANDLUNG_REIHE = ['q', 'r', 'b', 'n']; // Vertrag: D T L S
 
-import { KLASSEN_NAME } from './zugklassen.js';
+const SCHWELLE_FINGER = 8;     // px, ab hier zieht der Finger (PLAN 4: 8 statt 7)
+const SCHWELLE_MAUS = 4;
+const HALTEN_UMWANDLUNG = 450; // ms auf dem Zielfeld: Auswahl D T L S trotz autoDame
+const HALTEN_MALEN = 400;      // ms Finger auf einem Feld: Pfeil oder Marke statt Zug
+const STANDARD_DAUER = 150;    // ms Gleiten wie bisher (mal Tempo); die Partie setzt per setzeDauer() die 300 ms aus --d-zug
+const ABZEICHEN = { groesse: 0.48, versatz: 0.17 }; // Anteil der Feldbreite; am Brettrand wird es hineingeschoben
+const STEUERUNGEN = ['beides', 'ziehen', 'tippen'];
+const KOORD_LAGEN = ['ecke', 'rand'];
 
 export const KLASSEN_TITEL = KLASSEN_NAME;
 
@@ -96,11 +151,17 @@ export function symbolSvg(klasse) {
 }
 
 // Zielkarte fuer erlaubeZuege() aus einer chess.js-Instanz: { e2: ['e3','e4'], ... }
-export function zielKarte(chess) {
+// turmRochade: zusaetzlich Koenig -> eigener Turm (h1/a1 bzw. h8/a8) fuer jede erlaubte Rochade; das Brett
+// fuehrt daraus den Rochadezug (Koenig nach g/c) aus.
+export function zielKarte(chess, { turmRochade = false } = {}) {
   const karte = {};
   for (const z of chess.moves({ verbose: true })) {
     const liste = karte[z.from] || (karte[z.from] = []);
     if (!liste.includes(z.to)) liste.push(z.to);
+    if (turmRochade && z.piece === 'k' && /[kq]/.test(z.flags || '')) {
+      const turm = (z.flags.includes('k') ? 'h' : 'a') + z.from[1];
+      if (!liste.includes(turm)) liste.push(turm);
+    }
   }
   return karte;
 }
@@ -190,12 +251,52 @@ function svgEl(name, attr) {
   return el;
 }
 
+const prozent = (n) => Number((n * 12.5).toFixed(3)) + '%';
+
+// Pfeil von Feldmitte zu Feldmitte im 8x8-Raster (Springer als L); von === nach zeichnet einen Kreis.
+function pfeilElement(von, nach, [x1, y1], [x2, y2], breite) {
+  const g = svgEl('g', { class: 'pfeil', 'data-von': von, 'data-nach': nach });
+  const r = (n) => n.toFixed(3);
+  if (nach === von) {
+    g.append(svgEl('circle', {
+      cx: x1, cy: y1, r: 0.44, fill: 'none', stroke: 'currentColor', 'stroke-width': Math.max(0.07, breite * 0.45),
+    }));
+    return g;
+  }
+  const punkte = [[x1, y1]];
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  if ((dx === 1 && dy === 2) || (dx === 2 && dy === 1)) {
+    punkte.push(dx === 2 ? [x2, y1] : [x1, y2]); // Springer als L, langer Schenkel zuerst
+  }
+  const [ax, ay] = punkte[punkte.length - 1];
+  const laenge = Math.hypot(x2 - ax, y2 - ay);
+  const ux = (x2 - ax) / laenge;
+  const uy = (y2 - ay) / laenge;
+  const kopfL = breite * 2.2;
+  const kopfB = breite * 1.4;
+  const sx = x2 - ux * 0.08;
+  const sy = y2 - uy * 0.08;
+  const bx = sx - ux * kopfL;
+  const by = sy - uy * kopfL;
+  const d = 'M ' + punkte.map(([x, y]) => r(x) + ' ' + r(y)).join(' L ') + ` L ${r(bx + ux * 0.02)} ${r(by + uy * 0.02)}`;
+  g.append(svgEl('path', {
+    d, fill: 'none', stroke: 'currentColor', 'stroke-width': breite,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'pfeil-linie',
+  }));
+  g.append(svgEl('polygon', {
+    points: `${r(sx)},${r(sy)} ${r(bx - uy * kopfB)},${r(by + ux * kopfB)} ${r(bx + uy * kopfB)},${r(by - ux * kopfB)}`,
+    fill: 'currentColor', class: 'pfeil-kopf',
+  }));
+  return g;
+}
+
 // ---------- Brett ----------
 
 export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
-    koordinaten = true, animation = 150, fen = null, beiAbgelehnt = null, beiLeer = null,
-    autoDame = false } = {}) {
+    koordinaten = true, koordLage = 'ecke', animation = STANDARD_DAUER, fen = null, beiAbgelehnt = null, beiLeer = null,
+    autoDame = false, bestaetigen = false, steuerung = 'beides', turmRochade = false, pfeile = true } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
     this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
@@ -203,14 +304,20 @@ export class Brett {
     this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
     this.beiLeer = typeof beiLeer === 'function' ? beiLeer : null;
     this.autoDame = !!autoDame;
+    this.bestaetigen = !!bestaetigen;
+    this.steuerung = STEUERUNGEN.includes(steuerung) ? steuerung : 'beides';
+    this.turmRochade = !!turmRochade;
+    this.pfeileErlaubt = pfeile !== false;
     this._stumm = null;          // Geste auf einer eigenen Figur ohne erlaubten Zug (nur fuer beiAbgelehnt)
     this._striche = new Set();   // gezeichnete Striche (W0+a)
     this._gekippt = new Set();   // gekippte Koenige (img)
     this.ausrichtung = ausrichtung === 'b' ? 'b' : 'w';
-    this.dauer = animation;
+    this.dauer = Number(animation) >= 0 ? Number(animation) : STANDARD_DAUER;
 
     this._figuren = new Map();   // feld -> img
     this._erlaubt = null;        // Map feld -> Set(ziele) oder null
+    this._karte = null;          // Zielkarte, wie die App sie uebergeben hat (fuer setzeTurmRochade)
+    this._leerOffen = null;      // Finger auf einem Feld ohne Zug: beiLeer erst beim Loslassen { id, feld }
     this._erlaubtVersion = 0;
     this._stellungVersion = 0;
     this._letzter = null;
@@ -220,12 +327,18 @@ export class Brett {
     this._marken = new Map();    // art -> Set(felder)
     this._lagen = new Map();     // schluessel -> element
     this._pfeile = [];
+    this._nutzer = { pfeile: [], marken: [] };   // Flos eigene Pfeile und Marken
     this._abzeichen = null;
     this._abzeichenEl = null;
-    this._geste = null;
+    this._geste = null;          // laufende Tipp-/Zieh-Geste { id, von, x0, y0, typ, zieht, warSchon, el, ueberSeit, malZeit, malBereit }
+    this._halten = null;         // Tipp aufs Ziel bis zum Loslassen (Finger; Umwandlung mit autoDame auch Maus) { id, von, nach, x0, y0, timer, bewegt }
+    this._halteMal = null;       // Finger liegt auf einem Feld (400 ms -> malen) { id, feld, x0, y0, timer, geste }
+    this._malen = null;          // laufende Zeichen-Geste { id, von, nach, ohneMarke }
+    this._vorschau = null;       // Zug bestaetigen: { von, nach, art, el }
     this._umwandlung = null;
     this._wartet = false;
     this._koord = !!koordinaten;
+    this._koordLage = KOORD_LAGEN.includes(koordLage) ? koordLage : 'ecke';
     this._cursorFeld = null;
 
     this._baue();
@@ -240,7 +353,9 @@ export class Brett {
     this._stellungVersion++;
     if (this._gekippt.size) this.richteAuf();
     if (this._umwandlung) this._brichUmwandlungAb(false);
+    if (this._vorschau) this._brichVorschauAb(false);
     if (this._geste) this._brichGesteAb(false);
+    this._loescheHalten();
     this._auswahl = null;
     this._ueber = null;
     this._letzter = this._normiereLetzten(letzterZug);
@@ -255,14 +370,17 @@ export class Brett {
     const neu = farbe === 'b' ? 'b' : 'w';
     if (neu === this.ausrichtung) return;
     if (this._umwandlung) this._brichUmwandlungAb(false);
+    if (this._vorschau) this._brichVorschauAb(false);
     if (this._geste) this._brichGesteAb(false);
+    this._loescheHalten();
     this.ausrichtung = neu;
     this.el.dataset.ausrichtung = neu;
     this._beschrifte();
-    for (const [feld, el] of this._figuren) { el.classList.remove('gleitet'); this._platziere(el, feld); }
+    for (const [feld, el] of this._figuren) { this._stoppeGleiten(el); this._platziere(el, feld); }
     for (const el of this._lagen.values()) this._platziere(el, el.dataset.feld);
-    if (this._abzeichenEl) this._platziere(this._abzeichenEl, this._abzeichen.feld);
+    if (this._abzeichenEl) this._platziereAbzeichen(this._abzeichenEl, this._abzeichen.feld);
     this._zeichnePfeile();
+    this._zeichneNutzer();
     for (const h of this._striche) this._zeichneStriche(h);
   }
 
@@ -273,25 +391,49 @@ export class Brett {
 
   erlaubeZuege(karte) {
     this._erlaubtVersion++;
-    if (!karte) this._erlaubt = null;
-    else {
-      this._erlaubt = new Map();
-      const eintraege = karte instanceof Map ? [...karte] : Object.entries(karte);
-      for (const [von, ziele] of eintraege) {
-        const s = new Set([...(ziele || [])].map((z) => String(z).slice(0, 2)).filter(gueltigesFeld));
-        if (gueltigesFeld(von) && s.size) this._erlaubt.set(von, s);
-      }
-    }
+    this._karte = karte || null;
+    this._baueErlaubt();
     if (this._geste && !this._kannZiehen(this._geste.von)) this._brichGesteAb(true);
     const u = this._umwandlung;
     if (u && !this._zieleVon(u.von).has(u.nach)) this._brichUmwandlungAb(true);
+    const v = this._vorschau;
+    if (v && !this._zieleVon(v.von).has(v.eingabe)) this._brichVorschauAb(true);
+    const h = this._halten;
+    if (h && !this._zieleVon(h.von).has(h.nach)) this._loescheHalten();
     if (this._auswahl && !this._kannZiehen(this._auswahl)) this._auswahl = null;
     this._zeichneLagen();
+  }
+
+  // Zielkarte -> Map feld -> Set(ziele). Mit turmRochade kommt zu jeder erlaubten Rochade (Koenig zwei Felder seitwaerts)
+  // der eigene Turm als Ziel dazu, auch wenn die App eine einfache zielKarte(chess) liefert.
+  _baueErlaubt() {
+    const karte = this._karte;
+    if (!karte) { this._erlaubt = null; return; }
+    this._erlaubt = new Map();
+    const eintraege = karte instanceof Map ? [...karte] : Object.entries(karte);
+    for (const [von, ziele] of eintraege) {
+      const s = new Set([...(ziele || [])].map((z) => String(z).slice(0, 2)).filter(gueltigesFeld));
+      if (!gueltigesFeld(von) || !s.size) continue;
+      if (this.turmRochade) this._ergaenzeTurmRochade(von, s);
+      this._erlaubt.set(von, s);
+    }
+  }
+
+  _ergaenzeTurmRochade(von, ziele) {
+    const fig = this.figurAuf(von);
+    if (!fig || fig[1] !== 'K') return;
+    for (const z of [...ziele]) {
+      const dd = z.charCodeAt(0) - von.charCodeAt(0);
+      if (z[1] !== von[1] || Math.abs(dd) !== 2) continue;
+      const turm = (dd > 0 ? 'h' : 'a') + von[1];
+      if (this.figurAuf(turm) === fig[0] + 'R') ziele.add(turm);
+    }
   }
 
   // Zeigt eine Folge vorgemerkter Zuege, ohne beiZug aufzurufen. Die echte Stellung
   // bleibt Aufgabe der App und wird mit dem naechsten setzeStellung wiederhergestellt.
   zeigeVorzuege(liste) {
+    if (this._vorschau) this._brichVorschauAb(false);
     let figuren = this._stellungKarte();
     for (const z of liste || []) {
       if (!z || !gueltigesFeld(z.von) || !gueltigesFeld(z.nach)) continue;
@@ -338,7 +480,74 @@ export class Brett {
     this._beschrifte();
   }
 
+  // Lage der Koordinaten: 'ecke' (klein in der Feldecke) oder 'rand' (aussen im Sockel; der Sockel bekommt links und
+  // unten 12 px ueber .brett.koord-rand, siehe css/app.css)
+  setzeKoordLage(lage) {
+    this._koordLage = KOORD_LAGEN.includes(lage) ? lage : 'ecke';
+    this._beschrifte();
+  }
+
+  koordLage() { return this._koordLage; }
+
   setzeAutoDame(an = true) { this.autoDame = !!an; }
+
+  setzeBestaetigen(an = true) {
+    this.bestaetigen = !!an;
+    if (!this.bestaetigen && this._vorschau) this._brichVorschauAb(true);
+  }
+
+  setzeSteuerung(art) {
+    this.steuerung = STEUERUNGEN.includes(art) ? art : 'beides';
+    if (this.steuerung === 'tippen' && this._geste && this._geste.zieht) this._brichGesteAb(true);
+  }
+
+  // Koenig auf den eigenen Turm = Rochade; wirkt sofort auf die aktuelle Zielkarte (ohne neue Freigabe der App)
+  setzeTurmRochade(an = true) {
+    this.turmRochade = !!an;
+    if (!this._erlaubt) return;
+    this._baueErlaubt();
+    if (this._auswahl && !this._kannZiehen(this._auswahl)) this._auswahl = null;
+    this._zeichneLagen();
+  }
+
+  // Gleitdauer in ms (ohne Tempo); gleitDauer() liefert die wirksame Dauer mit Tempo (0 = das Brett setzt sofort)
+  setzeDauer(ms) {
+    const d = Number(ms);
+    this.dauer = Number.isFinite(d) && d >= 0 ? d : STANDARD_DAUER;
+  }
+
+  gleitDauer() {
+    return Math.round(this.dauer * tempo());
+  }
+
+  // ----- Flos eigene Pfeile und Marken -----
+
+  setzePfeileErlaubt(an = true) {
+    this.pfeileErlaubt = !!an;
+    if (!this.pfeileErlaubt) {
+      this._loescheHalteMal();
+      this._malen = null;
+      const g = this._geste;
+      if (g) {
+        clearTimeout(g.malZeit);
+        g.malZeit = null;
+        if (g.malBereit) { g.malBereit = false; this._zeichneLagen(); }
+      }
+      this.loescheNutzerPfeile();
+    }
+  }
+
+  nutzerPfeile() {
+    return [
+      ...this._nutzer.pfeile.map((p) => ({ art: 'pfeil', von: p.von, nach: p.nach })),
+      ...this._nutzer.marken.map((f) => ({ art: 'marke', feld: f })),
+    ];
+  }
+
+  loescheNutzerPfeile() {
+    this._nutzer = { pfeile: [], marken: [] };
+    this._zeichneNutzer();
+  }
 
   // ----- W0+a: Striche und Koenigsfall -----
 
@@ -398,6 +607,7 @@ export class Brett {
   kippeKoenig(feld, { langsam = false } = {}) {
     const el = gueltigesFeld(feld) ? this._figuren.get(feld) : null;
     if (!el || !/K$/.test(el.dataset.figur || '')) return false;
+    this._stoppeGleiten(el);
     el.classList.add('kippt');
     el.classList.toggle('langsam', !!langsam);
     this._gekippt.add(el);
@@ -418,6 +628,9 @@ export class Brett {
 
   zerstoere() {
     alleBretter.delete(this);
+    this._loescheHalten();
+    this._loescheHalteMal();
+    if (this._geste) clearTimeout(this._geste.malZeit);
     for (const h of this._striche) h.el.remove();
     this._striche.clear();
     const el = this.el;
@@ -430,7 +643,8 @@ export class Brett {
     el.removeEventListener('pointerleave', this._h.verlassen);
     document.removeEventListener('keydown', this._h.taste);
     el.innerHTML = '';
-    el.classList.remove('brett', 'zieht', 'ohne-koordinaten');
+    el.style.removeProperty('--brett-dauer');
+    el.classList.remove('brett', 'zieht', 'greifbar', 'ohne-koordinaten', 'koord-rand', 'malt');
   }
 
   // ----- Aufbau -----
@@ -440,7 +654,7 @@ export class Brett {
     el.classList.add('brett');
     el.innerHTML = '';
     el.dataset.ausrichtung = this.ausrichtung;
-    el.style.setProperty('--brett-dauer', this.dauer + 'ms');
+    el.style.setProperty('--brett-dauer', this.gleitDauer() + 'ms');
     if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', 'Schachbrett');
 
     this._felderEl = document.createElement('div');
@@ -451,14 +665,24 @@ export class Brett {
       const zeile = Math.floor(i / 8);
       const spalte = i % 8;
       f.className = 'feld ' + ((zeile + spalte) % 2 === 0 ? 'h' : 'd');
+      // Lage am Bildschirm fest in Prozent (keine Raster-Rundung des Browsers)
+      f.style.left = prozent(spalte);
+      f.style.top = prozent(zeile);
       this._feldEls.push(f);
       this._felderEl.append(f);
     }
     this._lagenEl = document.createElement('div');
     this._lagenEl.className = 'brett-lagen';
-    this._felderEl.append(this._lagenEl);
+    // Flos Marken liegen wie die Ueberlagerungen unter den Figuren (Pfeile darueber, siehe _nutzerEl)
+    this._markenEl = svgEl('svg', { class: 'brett-nutzer brett-marken', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
+    this._felderEl.append(this._lagenEl, this._markenEl);
+
+    this._koordRandEl = document.createElement('div');
+    this._koordRandEl.className = 'brett-koord-rand';
+    this._koordRandEl.setAttribute('aria-hidden', 'true');
 
     this._pfeileEl = svgEl('svg', { class: 'brett-pfeile', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
+    this._nutzerEl = svgEl('svg', { class: 'brett-nutzer', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
 
     this._umwandlungEl = document.createElement('div');
     this._umwandlungEl.className = 'brett-umwandlung';
@@ -466,7 +690,7 @@ export class Brett {
     this._umwandlungEl.setAttribute('role', 'dialog');
     this._umwandlungEl.setAttribute('aria-label', 'Umwandlung wählen');
 
-    el.append(this._felderEl, this._pfeileEl, this._umwandlungEl);
+    el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._umwandlungEl);
     el.classList.toggle('ohne-koordinaten', !this._koord);
     this._beschrifte();
 
@@ -494,8 +718,11 @@ export class Brett {
     this._umwandlungEl.addEventListener('click', this._h.wahlKlick);
   }
 
-  // Feldnamen und Koordinaten je nach Ausrichtung
+  // Feldnamen und Koordinaten je nach Ausrichtung und Lage
   _beschrifte() {
+    const rand = this._koord && this._koordLage === 'rand';
+    this.el.classList.toggle('koord-rand', rand);
+    this._koordRandEl.replaceChildren();
     this._feldEls.forEach((f, i) => {
       const zeile = Math.floor(i / 8);
       const spalte = i % 8;
@@ -507,13 +734,14 @@ export class Brett {
         const s = document.createElement('span');
         s.className = 'koord zahl';
         s.textContent = feld[1];
-        f.append(s);
+        if (rand) { s.style.top = prozent(zeile); this._koordRandEl.append(s); } else f.append(s);
       }
       if (zeile === 7) {
         const s = document.createElement('span');
-        s.className = 'koord buchst';
+        // .ecke: der Buchstabe im Feld unten rechts ruckt vom abgerundeten Brett-Eck weg (css/board.css)
+        s.className = 'koord buchst' + (spalte === 7 ? ' ecke' : '');
         s.textContent = feld[0];
-        f.append(s);
+        if (rand) { s.style.left = prozent(spalte); this._koordRandEl.append(s); } else f.append(s);
       }
     });
   }
@@ -537,11 +765,27 @@ export class Brett {
     return this._feldAus(Math.floor((x - r.left) / r.width * 8), Math.floor((y - r.top) / r.height * 8));
   }
 
+  // Lage eines Feld-Elements (Figur, Ueberlagerung): --x/--y fuer Effekte, left/top fertig in Prozent
   _platziere(el, feld) {
     const [x, y] = this._spalteZeile(feld);
     el.style.setProperty('--x', x);
     el.style.setProperty('--y', y);
+    el.style.left = prozent(x);
+    el.style.top = prozent(y);
     el.dataset.feld = feld;
+  }
+
+  // Abzeichen oben rechts am Feld, ragt 17 % ins Nachbarfeld, am Brettrand wird es hineingeschoben
+  _platziereAbzeichen(el, feld) {
+    const [x, y] = this._spalteZeile(feld);
+    const g = ABZEICHEN.groesse * 12.5;
+    const v = ABZEICHEN.versatz * 12.5;
+    el.style.setProperty('--x', x);
+    el.style.setProperty('--y', y);
+    el.dataset.feld = feld;
+    el.style.width = g.toFixed(3) + '%';
+    if (x >= 7) { el.style.left = 'auto'; el.style.right = '0'; } else { el.style.right = 'auto'; el.style.left = ((x + 1) * 12.5 + v - g).toFixed(3) + '%'; }
+    el.style.top = Math.max(0, y * 12.5 - v).toFixed(3) + '%';
   }
 
   _normiereLetzten(z) {
@@ -575,17 +819,39 @@ export class Brett {
     return k;
   }
 
-  _gleite(el, an) {
+  _stoppeGleiten(el) {
     clearTimeout(el._gleitZeit);
-    if (an) {
-      el.classList.add('gleitet');
-      el._gleitZeit = setTimeout(() => el.classList.remove('gleitet'), this.dauer + 60);
-    } else el.classList.remove('gleitet');
+    el.classList.remove('gleitet');
+    if (el._gleit) { el._gleit.cancel(); el._gleit = null; }
+  }
+
+  // Figur gleitet von ihrer alten Lage (Feld oder transform-Text in px) in die neue (schon per _platziere gesetzt).
+  // Nur transform wird animiert; bei Tempo 0 steht sie sofort.
+  _gleiteVon(el, von, { kurve = 'gleiten', dauer = this.dauer } = {}) {
+    this._stoppeGleiten(el);
+    const ms = Math.round(dauer * tempo());
+    let start;
+    if (typeof von === 'string' && gueltigesFeld(von)) {
+      const [x0, y0] = this._spalteZeile(von);
+      const [x1, y1] = this._spalteZeile(el.dataset.feld);
+      if (x0 === x1 && y0 === y1) return;
+      start = `translate(${((x0 - x1) * 100).toFixed(2)}%, ${((y0 - y1) * 100).toFixed(2)}%)`;
+    } else start = von;
+    if (!ms || !start) return;
+    el.classList.add('gleitet');
+    const a = anim(el, [{ transform: start }, { transform: 'none' }], { d: dauer, k: kurve });
+    el._gleit = a;
+    // nur die eigene Animation beendet den Zustand (eine abgebrochene darf eine neuere nicht stoeren)
+    const fertig = () => { if (el._gleit === a) { el._gleit = null; el.classList.remove('gleitet'); } };
+    if (a && a.finished) a.finished.then(fertig, fertig);
+    el._gleitZeit = setTimeout(fertig, ms + 60);
   }
 
   // Neue Stellung zeigen: gleiche Figuren gleiten (kuerzester Weg), geschlagene blenden aus.
   // sofortFeld: die Figur, die dort landet, springt ohne Gleiten (nach dem Ziehen mit dem Finger).
   _zeigeFiguren(neu, animieren, sofortFeld = null) {
+    const ms = animieren ? this.gleitDauer() : 0;
+    this.el.style.setProperty('--brett-dauer', ms + 'ms');
     const bleiben = new Map();
     const weg = [];
     const dazu = [];
@@ -615,28 +881,37 @@ export class Brett {
       }
     }
 
+    // Abzeichen verschwindet, sobald sein Feld geschlagen oder verlassen wird
+    const abz = this._abzeichen;
+    if (abz && this._abzeichenEl) {
+      const vorher = this._figuren.get(abz.feld);
+      const nachher = neu.get(abz.feld);
+      if (!vorher || vorher.dataset.figur !== nachher) this._blendeAbzeichenAus(ms);
+    }
+
     const karte = new Map(bleiben);
     for (const [w, d] of paare) {
       const el = w.el;
       if (el.dataset.figur !== d.code) { el.dataset.figur = d.code; el.src = this._bild(d.code); }
-      el.classList.remove('verdeckt', 'geht');
+      el.classList.remove('verdeckt', 'geht', 'vorschau');
       el.style.transform = '';
-      this._gleite(el, animieren && d.feld !== sofortFeld);
+      this._stoppeGleiten(el);
       this._platziere(el, d.feld);
+      if (ms && d.feld !== sofortFeld) this._gleiteVon(el, w.feld);
       karte.set(d.feld, el);
     }
     for (const i of wegFrei) {
       const el = weg[i].el;
-      clearTimeout(el._gleitZeit);
-      if (animieren) {
+      this._stoppeGleiten(el);
+      if (ms) {
         el.classList.add('geht');
         el.dataset.feld = '';
-        setTimeout(() => el.remove(), this.dauer + 60);
+        setTimeout(() => el.remove(), ms + 60);
       } else el.remove();
     }
     for (const j of dazuFrei) {
       const el = this._neueFigur(dazu[j].code, dazu[j].feld);
-      if (animieren) el.classList.add('kommt');
+      if (ms) el.classList.add('kommt');
       karte.set(dazu[j].feld, el);
     }
     this._figuren = karte;
@@ -652,27 +927,60 @@ export class Brett {
     return (this._erlaubt && this._erlaubt.get(feld)) || new Set();
   }
 
+  _istUmwandlung(von, nach) {
+    const fig = this.figurAuf(von);
+    return !!fig && fig[1] === 'P' && ((fig[0] === 'w' && nach[1] === '8') || (fig[0] === 'b' && nach[1] === '1'));
+  }
+
+  // turmRochade: Koenig auf den eigenen Turm getippt -> das echte Rochadeziel (g/c)
+  _echtesZiel(von, nach) {
+    const fig = this.figurAuf(von);
+    const dort = this.figurAuf(nach);
+    if (fig && dort && fig[1] === 'K' && dort[1] === 'R' && fig[0] === dort[0] && von[1] === nach[1] && (nach[0] === 'h' || nach[0] === 'a')) {
+      return (nach[0] === 'h' ? 'g' : 'c') + von[1];
+    }
+    return nach;
+  }
+
   _zeichneLagen() {
     const soll = [];
     if (this._letzter) for (const f of this._letzter) soll.push(['zuletzt', f]);
     for (const [art, felder] of this._marken) for (const f of felder) soll.push(['mark-' + art, f]);
     if (this._schach) soll.push(['schach', this._schach]);
-    if (this._auswahl) {
+    const v = this._vorschau;
+    // Finger haelt die eigene Figur lange (malbereit): Auswahl bleibt, Zielpunkte und Anheben gehen aus (Ziehen malt jetzt)
+    const malBereit = !!(this._geste && this._geste.malBereit);
+    if (v) {
+      soll.push(['auswahl', v.von]);
+      soll.push(['vorschau', v.nach]);
+    } else if (this._auswahl) {
       soll.push(['auswahl', this._auswahl]);
-      if (!this._umwandlung) {
-        for (const z of this._zieleVon(this._auswahl)) soll.push([this._figuren.has(z) ? 'ziel schlag' : 'ziel', z]);
+      if (!this._umwandlung && !malBereit) {
+        const eigene = this.figurAuf(this._auswahl);
+        const [x0, y0] = this._spalteZeile(this._auswahl);
+        const ziele = [...this._zieleVon(this._auswahl)].sort((a, b) => {
+          const pa = this._spalteZeile(a);
+          const pb = this._spalteZeile(b);
+          return Math.hypot(pa[0] - x0, pa[1] - y0) - Math.hypot(pb[0] - x0, pb[1] - y0);
+        });
+        ziele.forEach((z, n) => {
+          const dort = this.figurAuf(z);
+          const art = !dort ? 'ziel' : eigene && dort[0] === eigene[0] ? 'ziel rochade' : 'ziel schlag';
+          soll.push([art, z, n]);
+        });
       }
     }
     if (this._ueber) soll.push(['ueber', this._ueber]);
 
     const neu = new Map();
-    for (const [art, feld] of soll) {
+    for (const [art, feld, n] of soll) {
       const schluessel = art + '@' + feld;
       if (neu.has(schluessel)) continue;
       let el = this._lagen.get(schluessel);
       if (!el) {
         el = document.createElement('div');
         el.className = 'lage ' + art;
+        if (n != null) el.style.setProperty('--v', Math.round(n * 22 * tempo()) + 'ms');
         this._platziere(el, feld);
         this._lagenEl.append(el);
       }
@@ -680,6 +988,10 @@ export class Brett {
     }
     for (const [schluessel, el] of this._lagen) if (!neu.has(schluessel)) el.remove();
     this._lagen = neu;
+
+    // gewaehlte Figur steht leicht angehoben (nicht waehrend sie gezogen wird)
+    const heben = !v && !malBereit && this._auswahl && !(this._geste && this._geste.zieht) ? this._figuren.get(this._auswahl) : null;
+    for (const el of this._figuren.values()) el.classList.toggle('angehoben', el === heben);
   }
 
   _zeichneAbzeichen(plopp) {
@@ -693,11 +1005,27 @@ export class Brett {
       this._abzeichenEl = el;
     }
     el.className = 'abzeichen-ort k-' + klasse + (plopp ? ' plopp' : '');
+    this._zeigeAbzeichenInVorschau();
     el.dataset.klasse = klasse;
     el.setAttribute('role', 'img');
     el.setAttribute('aria-label', KLASSEN_TITEL[klasse] || klasse);
     el.innerHTML = symbolSvg(klasse);
-    this._platziere(el, feld);
+    this._platziereAbzeichen(el, feld);
+  }
+
+  _blendeAbzeichenAus(ms) {
+    const el = this._abzeichenEl;
+    this._abzeichen = null;
+    this._abzeichenEl = null;
+    if (!el) return;
+    if (!ms) { el.remove(); return; }
+    el.classList.remove('plopp');
+    el.classList.add('weg');
+    // anim() rechnet das Tempo selbst ein, ms ist schon gleitDauer() (mit Tempo): deshalb die Grunddauer
+    const a = anim(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6)' }], { d: Math.min(180, this.dauer), k: 'sanft', fill: 'forwards' });
+    const raus = () => el.remove();
+    if (a && a.finished) a.finished.then(raus, raus);
+    setTimeout(raus, ms + 60);
   }
 
   _zeichnePfeile() {
@@ -709,72 +1037,115 @@ export class Brett {
     };
     for (const p of this._pfeile) {
       const nach = p.nach || p.von;
-      const g = svgEl('g', { class: 'pfeil', 'data-von': p.von, 'data-nach': nach });
+      const breite = Number(p.breite) > 0 ? Number(p.breite) : 0.2;
+      const g = pfeilElement(p.von, nach, mitte(p.von), mitte(nach), breite);
       g.style.color = farbeAus(p.farbe);
       if (p.deckkraft != null) g.style.opacity = String(p.deckkraft);
-      const breite = Number(p.breite) > 0 ? Number(p.breite) : 0.2;
-      const [x1, y1] = mitte(p.von);
-      if (nach === p.von) {
-        g.append(svgEl('circle', {
-          cx: x1, cy: y1, r: 0.44, fill: 'none', stroke: 'currentColor', 'stroke-width': Math.max(0.07, breite * 0.45),
-        }));
-        svg.append(g);
-        continue;
-      }
-      const [x2, y2] = mitte(nach);
-      const punkte = [[x1, y1]];
-      const dx = Math.abs(x2 - x1);
-      const dy = Math.abs(y2 - y1);
-      if ((dx === 1 && dy === 2) || (dx === 2 && dy === 1)) {
-        punkte.push(dx === 2 ? [x2, y1] : [x1, y2]); // Springer als L, langer Schenkel zuerst
-      }
-      const [ax, ay] = punkte[punkte.length - 1];
-      const laenge = Math.hypot(x2 - ax, y2 - ay);
-      const ux = (x2 - ax) / laenge;
-      const uy = (y2 - ay) / laenge;
-      const kopfL = breite * 2.2;
-      const kopfB = breite * 1.4;
-      const sx = x2 - ux * 0.08;
-      const sy = y2 - uy * 0.08;
-      const bx = sx - ux * kopfL;
-      const by = sy - uy * kopfL;
-      const r = (n) => n.toFixed(3);
-      const d = 'M ' + punkte.map(([x, y]) => r(x) + ' ' + r(y)).join(' L ') + ` L ${r(bx + ux * 0.02)} ${r(by + uy * 0.02)}`;
-      g.append(svgEl('path', {
-        d, fill: 'none', stroke: 'currentColor', 'stroke-width': breite,
-        'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'pfeil-linie',
-      }));
-      g.append(svgEl('polygon', {
-        points: `${r(sx)},${r(sy)} ${r(bx - uy * kopfB)},${r(by + ux * kopfB)} ${r(bx + uy * kopfB)},${r(by - ux * kopfB)}`,
-        fill: 'currentColor', class: 'pfeil-kopf',
-      }));
       svg.append(g);
     }
+  }
+
+  // Flos Pfeile und Marken (plus die Vorschau der laufenden Zeichen-Geste)
+  _zeichneNutzer() {
+    const svg = this._nutzerEl;
+    svg.replaceChildren();
+    this._markenEl.replaceChildren();
+    const mitte = (feld) => {
+      const [x, y] = this._spalteZeile(feld);
+      return [x + 0.5, y + 0.5];
+    };
+    const marke = (feld, vorschau) => {
+      const [x, y] = this._spalteZeile(feld);
+      const r = svgEl('rect', { class: 'marke' + (vorschau ? ' vorschau' : ''), 'data-feld': feld, x, y, width: 1, height: 1 });
+      this._markenEl.append(r);
+    };
+    const pfeil = (von, nach, vorschau) => {
+      const g = pfeilElement(von, nach, mitte(von), mitte(nach), 0.2);
+      if (vorschau) g.classList.add('vorschau');
+      svg.append(g);
+    };
+    for (const f of this._nutzer.marken) marke(f, false);
+    for (const p of this._nutzer.pfeile) pfeil(p.von, p.nach, false);
+    const m = this._malen;
+    if (m) {
+      if (!m.nach || m.nach === m.von) { if (!m.ohneMarke) marke(m.von, true); } else pfeil(m.von, m.nach, true);
+    }
+    this.el.classList.toggle('malt', !!m);
+  }
+
+  _schaltePfeil(von, nach) {
+    const p = this._nutzer.pfeile;
+    const i = p.findIndex((x) => x.von === von && x.nach === nach);
+    if (i >= 0) p.splice(i, 1);
+    else p.push({ von, nach });
+  }
+
+  _schalteMarke(feld) {
+    const m = this._nutzer.marken;
+    const i = m.indexOf(feld);
+    if (i >= 0) m.splice(i, 1);
+    else m.push(feld);
   }
 
   // ----- Bedienung -----
 
   _runter(e) {
-    if (this._geste || this._umwandlung) return;
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (this._umwandlung) return;
+    const maus = e.pointerType === 'mouse';
+    const aktiv = this._geste || this._halten || this._halteMal || this._malen;
+    if (aktiv) {
+      // zweiter Zeiger (zweiter Finger, zweite Maustaste): jede laufende Geste bricht ab, es entsteht nie ein Zug
+      if (e.pointerId !== aktiv.id) this._zweiterZeiger();
+      return;
+    }
+    if (maus && e.button === 2) {
+      // Rechtsklick: Pfeil malen oder Feld markieren
+      const feld = this._feldAusPunkt(e.clientX, e.clientY);
+      if (!feld || !this.pfeileErlaubt) return;
+      e.preventDefault();
+      e.stopPropagation();   // Zeichen-Geste: die Umgebung (Wischen der Analyse) bekommt sie nicht
+      this._starteMalen(e.pointerId, feld);
+      return;
+    }
+    if (maus && e.button !== 0) return;
     this._stumm = null;
     const feld = this._feldAusPunkt(e.clientX, e.clientY);
     if (!feld) return;
     e.preventDefault();
     if (this._wartet) return;
+    const v = this._vorschau;
+    if (v) {
+      if (feld === v.nach || feld === v.eingabe) { this._tippAufZiel(v.von, v.nach, e); return; }
+      // Tipp anderswo nimmt zurueck. Auf einer eigenen ziehbaren Figur wirkt er danach normal (waehlt sie), sonst tut er
+      // nichts weiter: kein beiLeer (die Partie bricht damit Vorzuege ab), Flos Zeichnungen bleiben stehen
+      this._brichVorschauAb(true);
+      if (!this._kannZiehen(feld)) return;
+    }
     if (this._auswahl && this._auswahl !== feld && this._zieleVon(this._auswahl).has(feld)) {
-      this._versucheZug(this._auswahl, feld, 'tippen');
+      if (this.steuerung === 'ziehen') {
+        // nur Ziehen: ein Tipp aufs Ziel zieht nicht, er hebt die Auswahl auf
+        this._auswahl = null;
+        this._zeichneLagen();
+        return;
+      }
+      this._tippAufZiel(this._auswahl, feld, e);
       return;
     }
     if (this._kannZiehen(feld)) {
       const warSchon = this._auswahl === feld;
+      // laufende Tipp-Geste (eine andere Figur war gewaehlt) oder eben zurueckgenommene Vorschau: hier nie malen
+      const frei = !v && (!this._auswahl || warSchon);
       this._auswahl = feld;
       this._zeichneLagen();
-      this._geste = {
+      const g = {
         id: e.pointerId, von: feld, x0: e.clientX, y0: e.clientY, typ: e.pointerType,
-        zieht: false, warSchon, el: this._figuren.get(feld),
+        zieht: false, warSchon, el: this._figuren.get(feld), ueberSeit: 0, malZeit: null, malBereit: false,
       };
+      this._geste = g;
       try { this.el.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+      // Finger liegt 400 ms still auf der eigenen Figur: danach wird Ziehen zum Pfeil (Flos Plan, z. B. Sg1-f3), Loslassen
+      // bleibt ein Tipp (Auswahl, keine Marke). Wer sofort zieht, zieht wie immer die Figur.
+      if (!maus && frei && this.pfeileErlaubt) g.malZeit = setTimeout(() => this._malBereit(g), HALTEN_MALEN);
       return;
     }
     // W0+a: nicht erlaubter Zugversuch (am Bild aendert sich nichts)
@@ -782,12 +1153,128 @@ export class Brett {
       if (this._eigeneFigur(feld)) this._stumm = { id: e.pointerId, von: feld };
       else if (this._auswahl) this._meldeAbgelehnt(this._auswahl, feld, 'tippen');
     }
+    const hatteAuswahl = !!this._auswahl;
     if (this._auswahl) {
       this._auswahl = null;
       this._zeichneLagen();
     }
-    if (this.beiLeer) {
-      try { this.beiLeer(feld); } catch (err) { console.error(err); }
+    // Tipp ins Brett ohne Auswahl loescht Flos Pfeile und Marken (Maus sofort, Finger beim Loslassen ohne Halten)
+    let spaeter = false;
+    if (!hatteAuswahl) {
+      if (maus) this.loescheNutzerPfeile();
+      else {
+        this._starteHalteMal(e, feld, { loeschtBeimTipp: true });
+        // Ob der Finger tippt (beiLeer, z. B. Vorzuege abbrechen) oder haelt (Marke malen), zeigt erst das Loslassen:
+        // eine Marke laesst die Vorzuege stehen
+        spaeter = this.pfeileErlaubt;
+      }
+    }
+    if (spaeter) this._leerOffen = { id: e.pointerId, feld };
+    else this._meldeLeer(feld);
+  }
+
+  _meldeLeer(feld) {
+    if (!this.beiLeer) return;
+    try { this.beiLeer(feld); } catch (err) { console.error(err); }
+  }
+
+  // Tipp auf ein Zielfeld: bei Umwandlung mit autoDame erst 450 ms warten (Halten zeigt D T L S). Ein Finger zieht erst
+  // beim Loslassen (ein zweiter Finger bis dahin bricht ab: zwei Finger ergeben nie einen Zug), die Maus sofort.
+  _tippAufZiel(von, nach, e) {
+    const fuehrtAus = !this.bestaetigen || (this._vorschau && this._vorschau.von === von && this._vorschau.nach === nach);
+    const umwandlung = fuehrtAus && this.autoDame && this._istUmwandlung(von, this._echtesZiel(von, nach));
+    if (umwandlung || e.pointerType !== 'mouse') {
+      const timer = umwandlung ? setTimeout(() => {
+        this._halten = null;
+        this._eingabe(von, nach, 'tippen', { gehalten: true });
+      }, HALTEN_UMWANDLUNG) : null;
+      this._halten = { id: e.pointerId, von, nach, x0: e.clientX, y0: e.clientY, timer };
+      try { this.el.setPointerCapture(e.pointerId); } catch (err) { /* egal */ }
+      return;
+    }
+    this._eingabe(von, nach, 'tippen');
+  }
+
+  _loescheHalten() {
+    if (this._halten) clearTimeout(this._halten.timer);
+    this._halten = null;
+  }
+
+  // Finger liegt 400 ms still auf einer eigenen ziehbaren Figur (ohne laufende Tipp-Geste): die Zielpunkte gehen aus, die
+  // Figur setzt sich, ab jetzt malt Ziehen einen Pfeil. Loslassen ohne Ziehen bleibt ein Tipp.
+  _malBereit(g) {
+    g.malZeit = null;
+    if (this._geste !== g || g.zieht || !this.pfeileErlaubt || this._malen) return;
+    g.malBereit = true;
+    this._zeichneLagen();
+  }
+
+  // Finger liegt auf einem Feld ohne eigene Zug-Geste: nach 400 ms wird daraus Malen (Pfeil oder Marke), sonst war es ein Tipp
+  _starteHalteMal(e, feld, { loeschtBeimTipp = false } = {}) {
+    this._loescheHalteMal();
+    if (!this.pfeileErlaubt && !loeschtBeimTipp) return;
+    const id = e.pointerId;
+    const timer = this.pfeileErlaubt ? setTimeout(() => {
+      const h = this._halteMal;
+      this._halteMal = null;
+      if (!h || this._malen || this._halten) return;
+      if (this._geste) return;                   // laufende Zug-Geste: nie malen
+      if (this._stumm && this._stumm.id === id) this._stumm = null;
+      if (this._leerOffen && this._leerOffen.id === id) this._leerOffen = null;
+      // Hat die App die Figur waehrend des Haltens zum Ziehen freigegeben (Bot hat gezogen), gilt dieselbe Regel wie auf einer
+      // ziehbaren Figur: Ziehen malt den Pfeil, Loslassen ohne Ziehen setzt keine Marke
+      this._starteMalen(id, feld, { ohneMarke: this._kannZiehen(feld) });
+    }, HALTEN_MALEN) : null;
+    this._halteMal = { id, feld, x0: e.clientX, y0: e.clientY, timer, loeschtBeimTipp };
+    try { this.el.setPointerCapture(id); } catch (err) { /* egal */ }
+  }
+
+  _loescheHalteMal() {
+    if (this._halteMal && this._halteMal.timer) clearTimeout(this._halteMal.timer);
+    this._halteMal = null;
+  }
+
+  // ohneMarke: die Geste begann auf einer ziehbaren Figur, sie malt nur Pfeile (zurueck aufs Startfeld = nichts)
+  _starteMalen(id, feld, { ohneMarke = false, nach = feld } = {}) {
+    this._malen = { id, von: feld, nach, ohneMarke };
+    try { this.el.setPointerCapture(id); } catch (err) { /* egal */ }
+    this._zeichneNutzer();
+  }
+
+  _beendeMalen(e) {
+    const m = this._malen;
+    this._malen = null;
+    if (!m) return;
+    try { this.el.releasePointerCapture(m.id); } catch (err) { /* egal */ }
+    // ausserhalb des Bretts losgelassen: nichts (so bricht man eine Zeichnung ab)
+    const nach = e ? this._feldAusPunkt(e.clientX, e.clientY) : null;
+    if (nach && nach !== m.von) this._schaltePfeil(m.von, nach);
+    else if (nach && !m.ohneMarke) this._schalteMarke(m.von);
+    this._zeichneNutzer();
+  }
+
+  // Die Zug-Geste auf einer eigenen Figur wird zur Zeichen-Geste: Auswahl weg, Pfeil vom Startfeld zum Finger
+  _geste2Malen(g, e) {
+    clearTimeout(g.malZeit);
+    this._geste = null;
+    this._ueber = null;
+    this._auswahl = null;
+    this._zeichneLagen();
+    e.preventDefault();
+    e.stopPropagation();   // ab hier Zeichen-Geste: die Umgebung (Wischen der Analyse) bekommt nichts mehr
+    this._starteMalen(g.id, g.von, { ohneMarke: true, nach: this._feldAusPunkt(e.clientX, e.clientY) });
+  }
+
+  _zweiterZeiger() {
+    this._loescheHalten();
+    this._loescheHalteMal();
+    this._stumm = null;
+    this._leerOffen = null;
+    if (this._malen) { this._malen = null; this._zeichneNutzer(); }
+    if (this._geste) this._brichGesteAb(true);
+    if (this._auswahl) {
+      this._auswahl = null;
+      this._zeichneLagen();
     }
   }
 
@@ -808,6 +1295,23 @@ export class Brett {
   }
 
   _bewege(e) {
+    const m = this._malen;
+    if (m) {
+      if (e.pointerId !== m.id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const nach = this._feldAusPunkt(e.clientX, e.clientY);
+      if (nach !== m.nach) { m.nach = nach; this._zeichneNutzer(); }
+      return;
+    }
+    const hm = this._halteMal;
+    if (hm && e.pointerId === hm.id && Math.hypot(e.clientX - hm.x0, e.clientY - hm.y0) >= SCHWELLE_FINGER) this._loescheHalteMal();
+    const h = this._halten;
+    if (h && e.pointerId === h.id && !h.bewegt && Math.hypot(e.clientX - h.x0, e.clientY - h.y0) >= SCHWELLE_FINGER) {
+      // verrutscht: kein Halten mehr (keine Auswahl D T L S), das Loslassen auf dem Zielfeld bleibt ein Tipp
+      clearTimeout(h.timer);
+      h.bewegt = true;
+    }
     const g = this._geste;
     if (!g) {
       if (e.pointerType === 'mouse') this._setzeCursor(this._feldAusPunkt(e.clientX, e.clientY));
@@ -815,14 +1319,28 @@ export class Brett {
     }
     if (e.pointerId !== g.id) return;
     if (!g.zieht) {
-      const schwelle = g.typ === 'mouse' ? 4 : 7;
-      if (Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < schwelle || !g.el) return;
+      const weg = Math.hypot(e.clientX - g.x0, e.clientY - g.y0);
+      if (g.malBereit) {
+        // nach 400 ms Halten: Ziehen malt den Pfeil, die Figur bleibt stehen (kein Zug)
+        if (weg >= SCHWELLE_FINGER) this._geste2Malen(g, e);
+        return;
+      }
+      // vor Ablauf der 400 ms bewegt: kein Halten mehr (wie auf einem leeren Feld)
+      if (g.malZeit && weg >= SCHWELLE_FINGER) { clearTimeout(g.malZeit); g.malZeit = null; }
+      if (this.steuerung === 'tippen') return;
+      const schwelle = g.typ === 'mouse' ? SCHWELLE_MAUS : SCHWELLE_FINGER;
+      if (weg < schwelle || !g.el) return;
       g.zieht = true;
-      clearTimeout(g.el._gleitZeit);
-      g.el.classList.remove('gleitet');
+      this._loescheHalteMal();
+      this._stoppeGleiten(g.el);
+      g.el.classList.remove('angehoben');
       g.el.classList.add('gezogen');
       g.el.classList.toggle('beruehrung', g.typ !== 'mouse');
       this.el.classList.add('zieht');
+      g.ursprung = this._spalteZeile(g.von);
+      // Vergroesserung als Zahl (ein var() im transform liesse sich beim Zurueckfedern nicht animieren)
+      const wunsch = parseFloat(getComputedStyle(this.el).getPropertyValue(g.typ === 'mouse' ? '--brett-zieh-maus' : '--brett-zieh-finger'));
+      g.skala = Number.isFinite(wunsch) && wunsch > 0 ? wunsch : (g.typ === 'mouse' ? 1 : 1.35);
     }
     e.preventDefault();
     const r = this._felderEl.getBoundingClientRect();
@@ -834,16 +1352,45 @@ export class Brett {
     const [spalte, zeile] = ueber && g.typ !== 'mouse' ? this._spalteZeile(ueber) : [null, null];
     const x = spalte == null ? e.clientX : r.left + (spalte + 0.5) * s;
     const y = zeile == null ? e.clientY : r.top + (zeile + 0.5) * s;
-    // Vergroesserung im selben transform (die CSS-Eigenschaft scale wuerde den Versatz mitskalieren)
-    const skala = g.typ === 'mouse' ? 'var(--brett-zieh-maus, 1)' : 'var(--brett-zieh-finger, 1.35)';
-    g.el.style.transform = `translate(${(x - r.left - s / 2).toFixed(1)}px, ${(y - r.top - s / 2).toFixed(1)}px) scale(${skala})`;
+    // Versatz zur Ruhelage der Figur (ihr Startfeld); Vergroesserung im selben transform (die CSS-Eigenschaft
+    // scale wuerde den Versatz mitskalieren)
+    const tx = x - r.left - s / 2 - g.ursprung[0] * s;
+    const ty = y - r.top - s / 2 - g.ursprung[1] * s;
+    g.el.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${g.skala})`;
     if (ueber !== this._ueber) {
       this._ueber = ueber;
+      g.ueberSeit = ueber ? Date.now() : 0;
       this._zeichneLagen();
     }
   }
 
   _hoch(e) {
+    if (this._malen) {
+      if (e.pointerId === this._malen.id) {
+        e.stopPropagation();   // Ende einer Zeichen-Geste: kein Wischen in der Umgebung
+        this._beendeMalen(e);
+      }
+      return;
+    }
+    const hm = this._halteMal;
+    if (hm && e.pointerId === hm.id) {
+      this._loescheHalteMal();
+      // kurzer Tipp (kein Halten) ohne Auswahl: Flos Pfeile und Marken weg
+      if (hm.loeschtBeimTipp && !this._geste) this.loescheNutzerPfeile();
+    }
+    const leer = this._leerOffen;
+    if (leer && e.pointerId === leer.id) {
+      this._leerOffen = null;
+      this._meldeLeer(leer.feld);
+    }
+    const h = this._halten;
+    if (h && e.pointerId === h.id) {
+      this._loescheHalten();
+      // Finger-Tipp aufs Ziel losgelassen (bei Umwandlung vor 450 ms: Dame). Ist der Finger verrutscht, zaehlt das nur auf
+      // dem Zielfeld (sonst bleibt die Auswahl, kein Zug)
+      if (!h.bewegt || this._feldAusPunkt(e.clientX, e.clientY) === h.nach) this._eingabe(h.von, h.nach, 'tippen');
+      return;
+    }
     const st = this._stumm;
     if (st && e.pointerId === st.id) {
       this._stumm = null;
@@ -853,16 +1400,15 @@ export class Brett {
     }
     const g = this._geste;
     if (!g || e.pointerId !== g.id) return;
+    clearTimeout(g.malZeit);
     this._geste = null;
     this._ueber = null;
     this.el.classList.remove('zieht');
     if (g.zieht) {
       g.el.classList.remove('gezogen', 'beruehrung');
-      g.el.style.left = '';
-      g.el.style.top = '';
       const ziel = this._feldAusPunkt(e.clientX, e.clientY);
       if (ziel && ziel !== g.von && this._zieleVon(g.von).has(ziel)) {
-        this._versucheZug(g.von, ziel, 'ziehen');
+        this._eingabe(g.von, ziel, 'ziehen', { gehalten: g.ueberSeit > 0 && Date.now() - g.ueberSeit >= HALTEN_UMWANDLUNG });
       } else {
         this._schnappeZurueck(g.el, g.von);
         this._zeichneLagen();
@@ -871,10 +1417,16 @@ export class Brett {
     } else if (g.warSchon) {
       this._auswahl = null; // zweites Tippen auf dieselbe Figur hebt die Auswahl auf
       this._zeichneLagen();
+    } else if (g.malBereit) {
+      this._zeichneLagen(); // lange gehalten, nicht gezogen: ein Tipp, die Figur bleibt gewaehlt (Zielpunkte wieder da)
     }
   }
 
   _abbruch(e) {
+    if (this._malen && e.pointerId === this._malen.id) { this._malen = null; this._zeichneNutzer(); }
+    if (this._halteMal && e.pointerId === this._halteMal.id) this._loescheHalteMal();
+    if (this._leerOffen && e.pointerId === this._leerOffen.id) this._leerOffen = null;
+    if (this._halten && e.pointerId === this._halten.id) this._loescheHalten();
     const g = this._geste;
     if (!g || e.pointerId !== g.id) return;
     this._brichGesteAb(true);
@@ -886,21 +1438,22 @@ export class Brett {
     this._ueber = null;
     this.el.classList.remove('zieht');
     if (!g) return;
+    clearTimeout(g.malZeit);
     try { this.el.releasePointerCapture(g.id); } catch (err) { /* egal */ }
     if (g.zieht && g.el) {
       g.el.classList.remove('gezogen', 'beruehrung');
-      g.el.style.left = '';
-      g.el.style.top = '';
       if (animieren) this._schnappeZurueck(g.el, g.von);
-      else { g.el.style.transform = ''; this._platziere(g.el, g.von); }
+      else { this._stoppeGleiten(g.el); g.el.style.transform = ''; this._platziere(g.el, g.von); }
     }
     this._zeichneLagen();
   }
 
+  // Figur federt aus der Zieh-Lage auf ihr Feld zurueck
   _schnappeZurueck(el, feld) {
-    this._gleite(el, true);
+    const alt = el.style.transform;
     el.style.transform = '';
     this._platziere(el, feld);
+    this._gleiteVon(el, alt || null, { kurve: 'feder', dauer: Math.min(this.dauer, 260) });
   }
 
   _setzeCursor(feld) {
@@ -909,25 +1462,98 @@ export class Brett {
     this.el.classList.toggle('greifbar', !!feld && this._kannZiehen(feld));
   }
 
-  _versucheZug(von, nach, art) {
-    const fig = this.figurAuf(von);
-    if (fig && fig[1] === 'P' && ((fig[0] === 'w' && nach[1] === '8') || (fig[0] === 'b' && nach[1] === '1'))) {
-      if (this.autoDame) { this._fuehreAus(von, nach, 'q', art); return; }
-      this._oeffneUmwandlung(von, nach, art);
+  // Ein eingegebener Zug (Tipp aufs Ziel oder Abwurf): Vorschau (bestaetigen), Umwandlung oder sofort ausfuehren
+  _eingabe(von, nach, art, { gehalten = false } = {}) {
+    const ziel = this._echtesZiel(von, nach);
+    const v = this._vorschau;
+    if (this.bestaetigen && !(v && v.von === von && v.nach === ziel)) {
+      this._zeigeVorschau(von, ziel, nach, art);
       return;
     }
-    this._fuehreAus(von, nach, undefined, art);
+    const sofort = !!v || art === 'ziehen';   // die Figur steht schon dort
+    if (v) this._loeseVorschau();
+    if (this._istUmwandlung(von, ziel)) {
+      if (this.autoDame && !gehalten) this._fuehreAus(von, ziel, 'q', art, sofort);
+      else this._oeffneUmwandlung(von, ziel, art, sofort);
+      return;
+    }
+    this._fuehreAus(von, ziel, undefined, art, sofort);
+  }
+
+  // ----- Zug bestaetigen: Vorschau -----
+
+  _zeigeVorschau(von, nach, eingabe, art) {
+    const el = this._figuren.get(von);
+    if (!el) return;
+    this._auswahl = null;
+    this._ueber = null;
+    // Was der Zug schlagen wuerde (auch en passant), verschwindet waehrend der Vorschau; sonst laege die halb durchsichtige
+    // Figur ueber der geschlagenen und man saehe einen grauen Mischklumpen. Zuruecknehmen zeigt sie wieder.
+    const vorher = this._stellungKarte();
+    const nachher = wendeZugAn(vorher, von, nach);
+    const farbe = el.dataset.figur[0];
+    const geschlagen = [];
+    for (const [feld, code] of vorher) {
+      if (feld === von || code[0] === farbe || nachher.get(feld) === code) continue;
+      const opfer = this._figuren.get(feld);
+      if (opfer) { opfer.classList.add('verdeckt'); geschlagen.push(feld); }
+    }
+    this._stoppeGleiten(el);
+    el.style.transform = '';
+    el.classList.remove('angehoben');
+    el.classList.add('vorschau');
+    this._platziere(el, nach);
+    if (art === 'tippen') this._gleiteVon(el, von);
+    this._vorschau = { von, nach, eingabe, art, el, geschlagen };
+    this._zeigeAbzeichenInVorschau();
+    this._zeichneLagen();
+  }
+
+  // Das Abzeichen haengt an seinem Feld: verlaesst die Vorschau es oder schlaegt sie die Figur dort, ist es solange weg
+  // (visibility, damit die Einblende-Animation es nicht zurueckholt); ohne Vorschau ist es wieder da
+  _zeigeAbzeichenInVorschau() {
+    const el = this._abzeichenEl;
+    if (!el || !this._abzeichen) return;
+    const v = this._vorschau;
+    const feld = this._abzeichen.feld;
+    el.classList.toggle('verdeckt', !!v && (v.von === feld || v.geschlagen.includes(feld)));
+  }
+
+  // Vorschau fest machen: die Figur bleibt auf dem Ziel, der Zug laeuft weiter wie ein normaler (geschlagene Figuren und
+  // das Abzeichen bleiben verdeckt, bis der Zug sie ausblendet; eine abgebrochene Umwandlung zeigt sie wieder)
+  _loeseVorschau() {
+    const v = this._vorschau;
+    this._vorschau = null;
+    if (v) v.el.classList.remove('vorschau');
+  }
+
+  _brichVorschauAb(animieren) {
+    const v = this._vorschau;
+    this._vorschau = null;
+    if (!v) return;
+    for (const feld of v.geschlagen) {
+      const opfer = this._figuren.get(feld);
+      if (opfer) opfer.classList.remove('verdeckt');
+    }
+    this._zeigeAbzeichenInVorschau();
+    v.el.classList.remove('vorschau');
+    this._stoppeGleiten(v.el);
+    v.el.style.transform = '';
+    this._platziere(v.el, v.von);
+    if (animieren) this._gleiteVon(v.el, v.nach);
+    this._zeichneLagen();
   }
 
   // Zug sofort zeigen (inkl. Rochade/en passant), dann die App fragen; bei Nein zuruecknehmen.
-  _fuehreAus(von, nach, umwandlung, art) {
+  // sofort: die Figur steht schon auf dem Ziel (gezogen oder Vorschau), sie gleitet nicht noch einmal.
+  _fuehreAus(von, nach, umwandlung, art, sofort = art === 'ziehen') {
     const vorher = { figuren: this._stellungKarte(), letzter: this._letzter, schach: this._schach };
     const neu = wendeZugAn(vorher.figuren, von, nach, umwandlung);
     this._auswahl = null;
     this._ueber = null;
     this._letzter = [von, nach];
     this._schach = null;
-    this._zeigeFiguren(neu, true, art === 'tippen' ? null : nach);
+    this._zeigeFiguren(neu, true, sofort ? nach : null);
     this._zeichneLagen();
 
     const stellungVersion = ++this._stellungVersion;
@@ -942,12 +1568,14 @@ export class Brett {
         }
       } else if (this._erlaubtVersion === erlaubtVersion) {
         this._erlaubt = null; // alte Zielkarte gilt nicht mehr; die App gibt die naechste frei
+        this._karte = null;
         this._zeichneLagen();
       }
     };
+    const info = { art: art === 'ziehen' ? 'ziehen' : 'tippen', landung: sofort ? 0 : this.gleitDauer() };
     let antwort = false;
     try {
-      antwort = this.beiZug ? this.beiZug(von, nach, umwandlung) : false;
+      antwort = this.beiZug ? this.beiZug(von, nach, umwandlung, info) : false;
     } catch (err) {
       console.error(err);
       antwort = false;
@@ -963,15 +1591,17 @@ export class Brett {
 
   // ----- Umwandlung -----
 
-  _oeffneUmwandlung(von, nach, art) {
+  _oeffneUmwandlung(von, nach, art, sofort = art === 'ziehen') {
     const bauer = this._figuren.get(von);
     const farbe = bauer.dataset.figur[0];
     const verdeckt = this._figuren.get(nach) || null;
     if (verdeckt) verdeckt.classList.add('verdeckt');
     bauer.classList.add('wartet');
-    this._gleite(bauer, art === 'tippen');
+    bauer.classList.remove('angehoben');
+    this._stoppeGleiten(bauer);
     bauer.style.transform = '';
     this._platziere(bauer, nach);
+    if (!sofort) this._gleiteVon(bauer, von);
 
     const [spalte, zeile] = this._spalteZeile(nach);
     const nachUnten = zeile < 4;
@@ -979,6 +1609,8 @@ export class Brett {
     wahl.className = 'umwandlung-wahl ' + (nachUnten ? 'nach-unten' : 'nach-oben');
     wahl.style.setProperty('--x', spalte);
     wahl.style.setProperty('--y', nachUnten ? zeile : zeile - 3);
+    wahl.style.left = prozent(spalte);
+    wahl.style.top = prozent(nachUnten ? zeile : zeile - 3);
     const knoepfe = UMWANDLUNG_REIHE.map((f) => {
       const k = document.createElement('button');
       k.type = 'button';
@@ -997,7 +1629,7 @@ export class Brett {
     wahl.append(...knoepfe);
     this._umwandlungEl.replaceChildren(wahl);
     this._umwandlungEl.hidden = false;
-    this._umwandlung = { von, nach, verdeckt, bauer, knopf: null, seit: Date.now() };
+    this._umwandlung = { von, nach, art, verdeckt, bauer, knopf: null, seit: Date.now() };
     this._auswahl = von;
     this._zeichneLagen();
     document.addEventListener('keydown', this._h.taste);
@@ -1017,8 +1649,10 @@ export class Brett {
     const u = this._schliesseUmwandlung();
     if (!u) return;
     if (u.verdeckt) u.verdeckt.classList.remove('verdeckt');
-    this._gleite(u.bauer, animieren);
+    if (this._abzeichenEl) this._abzeichenEl.classList.remove('verdeckt');   // nach einer bestaetigten Vorschau
+    this._stoppeGleiten(u.bauer);
     this._platziere(u.bauer, u.von);
+    if (animieren) this._gleiteVon(u.bauer, u.nach);
     this._auswahl = null;
     this._zeichneLagen();
   }
@@ -1026,7 +1660,7 @@ export class Brett {
   _waehleUmwandlung(figur) {
     const u = this._schliesseUmwandlung();
     if (!u) return;
-    this._fuehreAus(u.von, u.nach, figur, 'ziehen');
+    this._fuehreAus(u.von, u.nach, figur, u.art, true);   // der Bauer steht schon auf dem Ziel
   }
 
   _wahlRunter(e) {

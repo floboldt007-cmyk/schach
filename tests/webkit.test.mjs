@@ -165,12 +165,15 @@ async function durchlauf(browser, vp) {
     const vorher = await seite.evaluate(() => window.__partie.z.zuege.length);
     await tippeFeld(seite, zug.slice(0, 2));
     await tippeFeld(seite, zug.slice(2, 4));
+    // U7: "Zug bestaetigen" ist Standard (ohneUhr): steht die Vorschau, macht ein zweiter Tipp aufs Ziel den Zug fest
+    if (await seite.evaluate(() => !!document.querySelector('.screen.partie .brett .lage.vorschau'))) await tippeFeld(seite, zug.slice(2, 4));
     await seite.waitForFunction((n) => window.__partie.z.zuege.length > n, vorher, { timeout: 5000 });
   }
   await seite.evaluate(() => { window.__test = {}; });
   await seite.waitForSelector('.ergebnis-overlay.gefuellt', { timeout: 40000 });
   await warte(2600);
-  pruefe('Ergebnis', vp.name, 'ganze Partie per Tippen beendet', /SIEG!/.test(await seite.locator('.erg-wort').innerText()), await seite.locator('.erg-wort').innerText());
+  // U7 (PLAN 2.6): Kopfwort "Sieg!" mit goldenem Ausrufezeichen statt "SIEG!"
+  pruefe('Ergebnis', vp.name, 'ganze Partie per Tippen beendet', /^Sieg!$/.test((await seite.locator('.erg-wort').innerText()).trim()), await seite.locator('.erg-wort').innerText());
   await bild(seite, 'ergebnis', vp.name);
 
   await tippe(seite, '.erg-knoepfe [data-ziel="analyse"]');

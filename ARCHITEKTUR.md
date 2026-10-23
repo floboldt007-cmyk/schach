@@ -162,24 +162,38 @@ Review = { zuege: [{ ply, farbe, san, uci, fenVorher, fenNachher, evalVorher, ev
 ## js/board.js
 ```js
 export class Brett {
-  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug })
-  // beiZug(von, nach, umwandlung?) -> true wenn angenommen
+  constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug, koordinaten = true,
+    koordLage = 'ecke', animation = 150, autoDame = false, bestaetigen = false, steuerung = 'beides',
+    turmRochade = false, pfeile = true, beiAbgelehnt, beiLeer })
+  // beiZug(von, nach, umwandlung?, { art: 'tippen' | 'ziehen', landung }) -> true wenn angenommen
+  //   landung: ms, bis die Figur auf dem Ziel steht (0 = steht schon: gezogen, Vorschau bestaetigt, Umwandlung gewaehlt,
+  //   Bewegung aus); die Partie legt den Zug-Klang darauf, das Brett spielt selbst keinen Klang
   setzeStellung(fen, { animieren = true, letzterZug = [von, nach] | null, schach = feld | null })
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
   zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
-  setzeAutoDame(boolean)          // Umwandlung bei der Eingabe sofort als Dame ausfuehren
+  setzeAutoDame(boolean)          // Umwandlung ohne Auswahl als Dame; 450 ms auf dem Zielfeld halten zeigt D T L S
+  setzeBestaetigen(boolean)       // Zug bestaetigen: Vorschau, zweiter Tipp aufs Ziel macht fest, Tipp anderswo nimmt zurueck
+  setzeSteuerung('beides' | 'ziehen' | 'tippen')
+  setzeTurmRochade(boolean)       // Koenig auf den eigenen Turm = Rochade (zielKarte(chess, { turmRochade }))
+  setzeDauer(ms), gleitDauer()    // Gleitdauer; gleitDauer() mit Tempo (0 = das Brett setzt sofort), fuer den Klang bei der Landung
+  setzeKoordLage('ecke' | 'rand') // Koordinaten klein in der Feldecke oder aussen im Sockel (.brett.koord-rand)
+  setzePfeileErlaubt(boolean), nutzerPfeile(), loescheNutzerPfeile()   // Flos Pfeile und Marken (svg.brett-nutzer)
   zeigeAbzeichen(feld, klasse)    // Klassen-Symbol oben rechts am Feld (siehe Design)
   entferneAbzeichen()
-  pfeile([{ von, nach, farbe }])  // SVG-Pfeile ueber dem Brett
+  pfeile([{ von, nach, farbe }])  // Coach-Pfeile (svg.brett-pfeile), getrennt von Flos Zeichnungen
   markiere(felder, art)           // z. B. Hinweis, Fehlerfeld
-  koordinaten(an)                 // a-h / 1-8 am Rand
+  koordinaten(an)                 // a-h / 1-8 an oder aus
 }
 ```
-- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ring), Tippen auf Ziel zieht.
-  Ziehen mit dem Finger (Pointer Events), Figur folgt dem Finger, Abwurf auf Feld.
+- Tippen auf eigene Figur zeigt Ziel-Punkte (Schlagziele als Ringecken), Tippen auf Ziel zieht.
+  Ziehen mit dem Finger (Pointer Events, Schwelle 8 px, Maus 4 px), Figur folgt dem Finger, Abwurf auf Feld.
+  Ein zweiter Zeiger bricht jede Geste ab, zwei Finger ergeben nie einen Zug: ein Finger-Tipp aufs Ziel zieht deshalb
+  erst beim Loslassen (die Maus beim Druecken).
 - Umwandlung: kleine Auswahl D T L S direkt am Feld.
-- Animation 150 ms, Rochade bewegt beide Figuren, en passant entfernt den Bauern.
+- Gleiten 150 ms (Standard; die Partie setzt `setzeDauer(300)` aus `--d-zug`) mal Tempo aus `js/bewegung.js`,
+  Rochade bewegt beide Figuren, en passant entfernt den Bauern. Lage von Figuren, Feldern und Lagen als fertige
+  Prozentwerte (`left`/`top`), animiert werden nur `transform` und `opacity` (keine Browser-Rundung, WebKit).
 - Groesse: quadratisch, fuellt den verfuegbaren Platz (CSS `aspect-ratio`), scharf auf Retina.
 
 ## js/sounds.js
@@ -632,7 +646,7 @@ buehne = {
   effekte,                                         // .brett-effekte (gleiche Lage wie die Felder)
   rahmen,                                          // .brett-rahmen
   brett,                                           // Brett-Instanz: nur lesen und Effekte, nie Zuege setzen
-  reduziert,                                       // prefers-reduced-motion
+  reduziert,                                       // prefers-reduced-motion oder Einstellung "Bewegung: aus" (U7)
   feld(feld) -> { x, y } | null,                   // 0..7 in der aktuellen Brett-Ausrichtung (wie --x/--y)
   liveAn() -> boolean,
   phase() -> 'start' | 'flo' | 'gezogen' | 'bot' | 'ende',
@@ -670,6 +684,14 @@ Chip „Übung“. Die Statistik im Verlauf zaehlt nur wertende Partien; der Kop
 extra („12 Partien, davon 2 Übungen“, nur Uebungen: „2 Übungen“, ohne Statistik-Kacheln).
 
 ## Ergebnis-Overlay (partie.js)
+U7 (Look A, PLAN 2.6, css/ergebnis.css): Schleier `--schleier` ohne Weichzeichner, der Screen dahinter tritt zurueck
+(`.partie.mit-ergebnis`: `.kopf` und `.inhalt` mit `scale(.975)`, „Brett ansehen“ nimmt das zurueck), die Karte federt
+auf. Kopfwort „Sieg“ mit goldenem Ausrufezeichen (`.erg-wort .ausruf`), „Partie verloren“ (ruhig, kleiner), „Remis“
+(gold-neutral). Sterne als Symbole (`.e-stern svg`), sie schlagen nacheinander ein, der Klang sitzt auf der Landung. Kein
+Konfetti. Niederlage: zuerst die **Lichtblick-Karte** `.erg-lichtblick` in `.erg-mitte` (Flos bester Zug aus den
+Live-Klassen, „Zug 14 Sf5: Präzise“, Theorie nur, wenn sonst nichts dabei war), nur wenn `ergebnis:karte` leer bleibt
+(wie `.erg-tipp`). Bot-Spruch als Karte (`.erg-bot` mit `.av` und `.sprechblase`, bei Sprueche „aus“ versteckt). Knoepfe
+„Zur Analyse“ (Zinnober) und „Nächster Gegner“/„Nochmal“, auf dem Handy untereinander, der Hauptknopf zuerst.
 `.ergebnis-karte` = Kopfwort (bei nicht wertenden Partien `.erg-kopf` mit Chip), Unterzeile, `.erg-mitte`
 (Sterne bzw. Genauigkeit und Tipp), `.erg-feier`, `.erg-karte-ort` (Ort `ergebnis:karte`), `.erg-bot`,
 `.erg-frei-ort`, `.erg-knoepfe`. Bei jedem `fuelle()` (vorlaeufig, fertig, Nachtrag):
@@ -1027,6 +1049,63 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
 - **Arena**: Die Karte „Offene Partie“ und der Dialog „Neue Partie starten?“ finden auch angemeldete Bots (`botNachId`),
   eine verlassene Boss-Partie laesst sich also wie jede andere fortsetzen (solange ihr Paket geladen ist).
 
+- **Premium-Umbau U7 (Look A, PLAN 2.4 bis 2.6, 3.7, 4):**
+  - **Spielerkarte** `.spieler` fuer beide Lagen (statt `.botbox` und `.botleiste-hoch`): Gegner `.spieler.gegner` mit den
+    alten Klassen als Zusatzklassen (`.botbox`, `.botleiste-hoch`, `.botkarte`), erstes Kind `.ort-gegner-leiste`, dann `.av`
+    (Portraet ueber `thema.avatarVon`), `.info` (`.bot-name`, Unterzeile `.bot-meta` mit Elo, `.denkt-ort`, `.geschlagen-ort`),
+    `.uhr[data-wer="bot"]` und `.blase-ort` (quer eine Zeile in der Karte; hoch legt sich die Blase neben dem Portraet ueber
+    `.info`, also Name und Unterzeile, die Uhr bleibt frei; lange Saetze wachsen nach unten hoechstens bis an den Sockel,
+    nie ueber die Figuren; kein Kuerzen; die Begruessung steht hoch wie jeder Satz 3,5 s, quer 6 s). Karten haben
+    `role="group"`. Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
+    `.name`, direkt danach `.ort-spieler-leiste`, Unterzeile, `.uhr[data-wer="flo"]`. Der Name wird nie mit „…“ gekuerzt:
+    passt er nicht in zwei Zeilen, steht der Rufname da (Benno, Hilde, Kalle, Lisa, Rudi, Prof. Turm, Delia, Kommissar,
+    Greta, Stockfisch), der volle Name im `aria-label` der Karte. `lage()` meldet weiter `'hoch'`/`'quer'`.
+  - **Uhr** (Anzeige, W0+b bringt die Logik): `export fmtUhr(ms)` („M:SS“ ab 20 s, darunter „0:SS,z“). Beide `.uhr` sind
+    versteckt ohne Bedenkzeit (`z.tempo`), mit Bedenkzeit steht die Grundzeit da. `uhr.setze(wer, ms, { laeuft })` (intern,
+    im Test `window.__partie.uhr`): laufend in Tinte, unter 20 s `.warn` rot mit Uhr-Symbol und Sekundenpuls;
+    `uhr.zeige(an)`. Auf dem Handy 66 x 36 px, 17 px Ziffern.
+  - **Kopf** `.p-kopf`: Zurueck, Bot-Name (Handy: Rufname), Unterzeile `.p-eroeffnung` · Stufe · Farbe, Brettwahl
+    (`.brettwahl`, 3 Mini-Felder, nur auf dem iPad: versteckt bis 600 px Breite und bis 500 px Hoehe), Klang-Schalter (`[data-aktion="klang"]`, `aria-pressed`), `.p-zaehlwerk`
+    (Buehne), Zahnrad. Alle Knoepfe sind direkte Kinder von `.kopf`.
+  - **Lagen** (css/partie.css): quer Brett und Balken links, rechts eine Spalte (Gegner, Coach, Zugliste, Flo, Aktionen);
+    iPad hoch eine Spalte per `order` (Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen); **Handy** (hoch bis 600 px):
+    `layout()` rechnet „Brett zuerst“ (PLAN 2.5): `g = floor((Breite - 2 x 10 - Sockel) / 8) x 8`, gemessen an `.inhalt`,
+    setzt `--brett` und `--spalte`; reicht die Hoehe nicht (4 px Puffer), wird zuerst der Coach einzeilig (`.coach-eng`,
+    Rest auf Antippen), erst dann das Brett kleiner (nie unter 280 px). Unter 760 px Hoehe steht der Zugstreifen nach den
+    Knoepfen (`.streifen-unten`, die Spalte scrollt). Der Balken liegt dort waagrecht ueber dem Brett (6 px, `--anteil` per
+    `scaleX`, gedreht von rechts), die Zahl kommt nur auf Antippen (`.zeigt-zahl`). `layout()` laeuft beim Start, bei jeder
+    Groessenaenderung (ResizeObserver) und bei `koordLage`. Es misst ohne `transform` (`offsetTop`/`offsetHeight` bis
+    `.inhalt`), weil das Ergebnis `.inhalt` auf `scale(.975)` setzt; sonst waere das Brett nach Drehen oder Safari-Leiste
+    mit stehendem Ergebnis zu gross.
+  - **Coach-Karte** `.coach.coach-karte` (gemeinsames Bauteil in css/bauteile.css): `.c-symbol`, `.c-kopf` (`.c-klasse`,
+    `.c-zug`, `.c-eval`, `.combo` oben rechts), `.c-text`, `.c-zusatz`, `.coach-knoepfe`. Genial: Klassenwort als Pille,
+    Karte mit Ring, COMBO in der Klassenfarbe. Stil „knapp“: `.c-satz` + `.c-rest` (versteckt bis Antippen, `.offen`);
+    `.hat-rest` heisst „Antippen zeigt mehr“ (knapp, Handy). `.kompakt` wie bisher.
+  - **Komfort** (Einstellungen, alle sofort ueber `schach:einstellungen`): `zugBestaetigen` -> `brett.setzeBestaetigen` nur
+    waehrend Flo am Zug ist (`ohneUhr`: ohne Bedenkzeit, `immer`, `aus`; nie fuer Vorzuege), `haltenAufgeben` -> Aufgeben ist
+    `bauteile.halteKnopf` (1 s halten, Ring, frueh loslassen: Hinweis; Tastatur und Bedienhilfen, also ein Klick ohne Zeiger,
+    bekommen die Rueckfrage `app.frage` wie bei „aus“, nicht das Blatt des Bauteils), `turmRochade` ->
+    `zielKarte(chess, { turmRochade })` und `brett.setzeTurmRochade`, `autoDame`, `steuerung`, `pfeile`, `koordinaten`,
+    `koordLage` -> Setter des Bretts, `bewegung` -> Gleitdauer (`brett.setzeDauer(300)`, mal `tempo()`), `coachStil`,
+    `sprueche` (`aus`: keine Blase, `buehne.blase()` liefert `false`, auch kein Spruch im Ergebnis; `wenig`: Begruessung,
+    Ende und hoechstens ein Satz je 5 eigene Zuege), `brett` (Brettwahl), `klang` (Kopf-Schalter). Flos eigene Pfeile und
+    Marken loescht die Partie mit seinem naechsten Zug (`loescheNutzerPfeile`), ueber Bot-Zuege bleiben sie stehen.
+  - **Klang-Takt** (PLAN 3.7): `spieleKlang(m, landungMs)`: der Zugklang sitzt auf der Landung (`klang.zug({ wann })`,
+    `landung` aus `beiZug(von, nach, umwandlung, { art, landung })` bzw. `brett.gleitDauer()` fuer Bot und Vorzug), gemerkt in
+    `z.landung[ply]`. Der Bewertungsklang kommt 150 ms nach der Landung (oder mit dem Abzeichen, wenn die Bewertung
+    spaeter fertig ist) und nur einer je Moment: nach Schach oder Umwandlung bleibt Praezise/COMBO still. Protokoll (Test):
+    `{ typ: 'klang', name, ply, wann }`, `{ typ: 'bewertungsklang', ply, klasse, name, ms, still }`. Sterne im Ergebnis
+    klingen auf ihrer Landung, Abstaende mal `taktFaktor()` (nie unter 0,6).
+  - **Grosser Moment** nur bei Genial (`effekt(feld, 'brillant')` in `.brett-effekte`): Feld-Puls (`.feld-puls`), Ring
+    (`.welle`), 8 Funken (`.funken i`, 0,6 bis 0,9 Feldbreiten), Lichtstreif (`.streif-huelle > .streif`), das Brett hebt
+    sich 1,2 % (`.brett-rahmen.prisma`). Effekte stehen in fertigen Prozenten (left/top) und behalten `--x`/`--y`. Grobe
+    Fehler bleiben ruhig. `buehne.reduziert` = Systemwunsch oder Einstellung „Bewegung: aus“ (dann keine Effekte), als
+    Getter live gelesen (ein Wechsel mitten in der Partie gilt sofort).
+  - **Duell-Vertrag (U5):** Steht beim Start `html[data-duell="laeuft"]`, zieht der Bot (und spaeter die Uhr, W0+b) erst
+    nach dem DOM-Ereignis `duell:fertig` auf `document`, hoechstens 1,4 s (`DUELL_MAX_MS`). Ohne Duell sofort. Die Ziele des
+    Portraetflugs sind `.spieler.gegner .av` und `.spieler.ich .av`. Im Test: `window.__partie.duellBereit`, Protokoll
+    `{ typ: 'duell', grund: 'ereignis' | 'zeit' | 'verlassen', ms }` (`ms`: so lange hat die Partie gewartet).
+
 ## Bots (js/bots.js)
 ```js
 registriereBot(profil) -> abmelden()     // { id, name, avatar, staerke, art = 'gast', farbe, titel, kurz, bio, elo,
@@ -1074,6 +1153,48 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
   `opacity`, reduzierte Bewegung zeigt das fertige Bild.
 - `kippeKoenig(feld, { langsam = false }) -> boolean` (`.figur.kippt`, langsam 1,4 s), `richteAuf()`; `setzeStellung`
   stellt gekippte Koenige wieder auf.
+- **Premium-Umbau U6 (Look A):** `.brett-rahmen` ist der Sockel (`--sockel`, `--s-brett`, `--r-sockel`, Haarlinie
+  `--kante`, Rand `--sockel-abstand` = `--rahmen` der Partie, sonst `--sockel-rand`); `.brett-effekte` liegt mit
+  demselben Abstand exakt ueber den 8x8 Feldern. Bei `koordLage: 'rand'` traegt das Brett `.brett.koord-rand`, der
+  Sockel bekommt links und unten 12 px, die Koordinaten stehen in `.brett-koord-rand`. Markierungen: `.lage.zuletzt`
+  (`--zuletzt`), `.lage.auswahl` (Abdunklung `--auswahl` mit heller Innenkante, Figur `.figur.angehoben`),
+  `.lage.ziel` (Scheibe), `.lage.ziel.schlag` (Ringecken), `.lage.ziel.rochade` (Turm-auf-Koenig), `.lage.schach`
+  (roter Hof), `.lage.vorschau` (Zug bestaetigen, Figur `.figur.vorschau` halb durchsichtig). Alle `.lage` und Flos
+  Marken liegen in `.brett-felder` (eigener Stapelkontext, `z-index: 0`) und damit UNTER den Figuren. Abzeichen federn mit
+  `--feder-hupf` ein (`.abzeichen-ort.plopp`), bleiben in der Brett-Box und verschwinden (`.weg`), sobald ihre Figur
+  das Feld verlaesst oder geschlagen wird. Schatten der Figuren und Abzeichen kommen aus festen Tokens in
+  `css/tokens.css` (`--schatten-figur`, `-hoch`, `-zieh`, `--schatten-abzeichen`). Der Buchstabe im Feld unten rechts
+  (`.koord.buchst.ecke`) rueckt nur nach oben ins abgerundete Brett-Eck, nicht nach links hinter den Fuss der Figur.
+- Komfort (Einstellungen aus PLAN 4, die Partie verdrahtet sie): `setzeBestaetigen(bool)` (Vorschau: erster
+  Tipp/Abwurf stellt die Figur halb durchsichtig aufs Ziel, zweiter Tipp aufs Ziel macht fest, erst dann `beiZug`;
+  Tipp anderswo nimmt zurueck und tut sonst nichts, ausser er trifft eine eigene ziehbare Figur, die er waehlt; kein
+  `beiLeer`), `setzeStellung` und `erlaubeZuege` raeumen eine Vorschau weg; was die Vorschau schlagen wuerde (auch en
+  passant), ist solange `.figur.verdeckt`, ein Abzeichen auf dem verlassenen oder geschlagenen Feld `.verdeckt`
+  (visibility)), `setzeAutoDame(bool)`
+  (450 ms auf dem Zielfeld halten, auch beim Ziehen, zeigt D T L S; verrutscht der Finger ueber 8 px, zaehlt das
+  Loslassen auf dem Zielfeld als Tipp = Dame), `setzeSteuerung('beides' | 'ziehen' | 'tippen')`,
+  `setzeTurmRochade(bool)` zusammen mit `zielKarte(chess, { turmRochade })`, `setzeDauer(ms)` und `gleitDauer()`
+  (Dauer mal Tempo; der Zug-Klang gehoert auf die Landung), `setzeKoordLage('ecke' | 'rand')`.
+- Flos Pfeile und Marken (`pfeile`-Einstellung, `setzePfeileErlaubt(bool)`): Maus Rechtsklick ziehen = Pfeil,
+  Rechtsklick auf ein Feld = Marke (erneut = weg), Linksklick ins Brett ohne Auswahl loescht alles; Finger 400 ms
+  halten und ziehen = Pfeil, halten = Marke, Tipp ohne Auswahl loescht. Das gilt auch auf der eigenen Figur, die
+  gerade ziehen darf (auch als Vorzug, waehrend der Bot zieht), damit Flo seinen Plan einzeichnen kann: liegt der Finger
+  dort 400 ms still, gehen Zielpunkte und Anheben aus (malbereit), Ziehen malt den Pfeil und die Figur bleibt stehen;
+  Loslassen ohne Ziehen bleibt ein Tipp (Auswahl, keine Marke). Wer sofort zieht (8 px vor Ablauf der 400 ms), zieht
+  die Figur. Nie aus einer laufenden Zug-Geste: Finger zieht schon, eine andere Figur ist gewaehlt (Tipp-Tipp) oder eine
+  Vorschau wurde eben zurueckgenommen. Ein zweiter Finger bricht ab.
+  Pfeile in `svg.brett-nutzer` ueber den Figuren (`g.pfeil[data-von][data-nach]`), Marken in
+  `svg.brett-nutzer.brett-marken` unter den Figuren (`rect.marke[data-feld]`), Farben `--pfeil-nutzer`/`--marke-nutzer`,
+  getrennt von den Coach-Pfeilen: `pfeile([])` der Partie loescht Flos
+  Zeichnungen nicht. `nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }]`, `loescheNutzerPfeile()`.
+  Flos Zeichnungen bleiben ueber `setzeStellung` stehen; ob sie nach einem Zug oder beim Blaettern in der Analyse
+  verschwinden, entscheidet die Partie bzw. Analyse (dann `loescheNutzerPfeile()` rufen).
+  `contextmenu` am Brett ist unterdrueckt. Ausserhalb des Bretts losgelassen bricht eine Zeichnung ab. Die
+  Zeiger-Ereignisse einer Zeichen-Geste (Rechtsklick-Druck, Bewegen, Loslassen) gehen nicht an die Umgebung
+  (`stopPropagation`, sonst sprang das Wischen der Analyse beim waagrechten Pfeil); Capture-Lauscher sehen sie.
+- `beiLeer(feld)` (Tipp ohne Zug, die Partie bricht damit Vorzuege ab): Maus beim Druecken, Finger erst beim Loslassen
+  und nur, wenn kein Halten (Marke) daraus wurde. `setzeTurmRochade(true)` ergaenzt auch eine einfache `zielKarte(chess)`
+  um den Turm und wirkt sofort.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)
