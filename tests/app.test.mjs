@@ -1376,8 +1376,8 @@ async function testeErweiterungen(browser) {
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?erw=pakete/w0-test/index#arena`);
     await seite.waitForSelector('.screen.arena');
     await warte(400);
-    pruefe('?erw ohne ?test wird ignoriert, registrierte Liga bleibt aktiv', !anfragen.some((a) => a.includes('/pakete/w0-test/'))
-      && await seite.evaluate(() => !window.__w0 && !!document.querySelector('.liga-karte')));
+    // PAKETE ist hier leer (Route oben): dann laedt die App ohne ?test gar kein Paket, auch nicht ueber ?erw
+    pruefe('?erw ohne ?test wird ignoriert', !anfragen.some((a) => a.includes('/pakete/')) && await seite.evaluate(() => !window.__w0));
     await kontext.close();
   }
 
