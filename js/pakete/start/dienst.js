@@ -1,7 +1,11 @@
 // Paket "start" (Welle A, A4): Speicher, Raetsel-Quellen und Spielstart, gemeinsam fuer den Paket-Einstieg (index.js)
-// und den Willkommens-Screen (js/ui/start.js). Beim Laden meldet diese Datei nur die zwei Raetsel-Quellen an und hoert
-// app:screen (Rueckweg vergessen); Orte, Feier und Fahrplan haengt erst index.js ein.
+// und den Willkommens-Screen (js/ui/start.js). Beim Laden tut diese Datei nichts; erst starte() (aus index.js) meldet
+// die zwei Raetsel-Quellen an und hoert app:screen (Rueckweg vergessen). Orte, Feier und Fahrplan haengt index.js ein.
 //
+//   starte()                             einmal aus index.js; danach gilt paketGeladen() (ohne den Einstieg, z. B. #start
+//                                        von Hand ohne Paket, geht der Screen still zur Arena wie ein fehlender
+//                                        Paket-Screen; so bleibt der Router-Test in app.test.mjs gueltig)
+//   paketGeladen() -> boolean
 //   QUELLE_REGELN 'start-regeln'         Regel-Hilfe: je Figur eine Mini-Aufgabe (aufgaben.js REGEL_AUFGABEN)
 //   QUELLE_EINSTUFUNG 'start-einstufung' Einstufungstest: 8 Aufgaben (aufgaben.js EINSTUFUNG), am Ende die Empfehlung
 //   stand() -> Modul "start" (logik.normalisiereModul, bei jedem Zugriff frisch gelesen)
@@ -83,7 +87,6 @@ export function markiereGesehen() {
 let rueck = null;
 export function setzeRueck(seite) { rueck = typeof seite === 'string' ? seite : null; }
 export function nimmRueck() { const r = rueck; rueck = null; return r; }
-hoere('app:screen', (d) => { if (!d || (d.name !== 'raetsel' && d.name !== 'start')) rueck = null; });
 
 // ---------- Spiel starten ----------
 export async function starteSpiel(app, { botId, probe = false } = {}) {
@@ -182,7 +185,15 @@ function einstufungQuelle() {
   };
 }
 
-sicher(() => {
-  registriereRaetselQuelle(QUELLE_REGELN, regelQuelle());
-  registriereRaetselQuelle(QUELLE_EINSTUFUNG, einstufungQuelle());
-}, 'Raetsel-Quellen');
+// ---------- Start (aus index.js) ----------
+let geladen = false;
+export const paketGeladen = () => geladen;
+export function starte() {
+  if (geladen) return;
+  geladen = true;
+  sicher(() => {
+    registriereRaetselQuelle(QUELLE_REGELN, regelQuelle());
+    registriereRaetselQuelle(QUELLE_EINSTUFUNG, einstufungQuelle());
+  }, 'Raetsel-Quellen');
+  sicher(() => hoere('app:screen', (d) => { if (!d || (d.name !== 'raetsel' && d.name !== 'start')) rueck = null; }), 'app:screen');
+}

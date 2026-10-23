@@ -8,6 +8,7 @@
 //          'einstufung'         Angebot des Einstufungstests (8 Aufgaben im Raetsel-Bildschirm)
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
 //          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen Bauer Benno
+//   Ohne geladenen Paket-Einstieg (dienst.paketGeladen) geht es still zur Arena, wie bei einem fehlenden Paket-Screen.
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
 //   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags
 //   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
@@ -188,6 +189,11 @@ function merkeSeite(name) {
 }
 
 export function zeige(root, params, app) {
+  // ohne den Paket-Einstieg (z. B. #start von Hand, Paket nicht in PAKETE): still zur Arena wie ein fehlender Paket-Screen
+  if (!D.paketGeladen()) {
+    setTimeout(() => { try { app.gehe('arena', {}, { ersetzen: true }); } catch (e) { /* egal */ } }, 0);
+    return { verlasse() {} };
+  }
   ladeCss();
   D.markiereGesehen();
   const p = params && typeof params === 'object' ? params : {};

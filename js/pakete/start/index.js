@@ -146,6 +146,8 @@ function ladeCss() {
 }
 
 function registriere() {
+  // zuerst: Raetsel-Quellen und Rueckweg (dienst.js); ab hier gehoert der Screen "start" einem geladenen Paket
+  D.starte();
   ladeCss();
   // kleines Papier-Siegel (gezackter Rand mit Haken) fuer "Neu fuer dich"
   registriereIcon('neu-siegel', '<path d="M12 2.8l2.1 1.5 2.5-.2.9 2.4 2.4.9-.2 2.5 1.5 2.1-1.5 2.1.2 2.5-2.4.9-.9 2.4-2.5-.2L12 21.2l-2.1-1.5-2.5.2-.9-2.4-2.4-.9.2-2.5L2.8 12l1.5-2.1-.2-2.5 2.4-.9.9-2.4 2.5.2z"/><path d="M8.8 12.3l2.2 2.1 4.2-4.6"/>');

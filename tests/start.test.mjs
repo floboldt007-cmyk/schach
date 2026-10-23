@@ -880,6 +880,20 @@ async function browserTeil(browser) {
   pruefe('ohne ?test aus PAKETE geladen: erster Start zeigt das Willkommen, eigenes CSS, keine Test-Schnittstelle', prod.hash === '#start' && prod.css && !prod.test, JSON.stringify(prod));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();
+
+  // ---------- ohne Paket: nur die Screen-Datei liegt da (vor der Integration, Router-Test in app.test.mjs) ----------
+  gruppe = 'Ohne Paket';
+  const op = await neueSeite(browser);
+  await op.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
+  await op.seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Crownmate' && !!document.querySelector('.screen.arena'), null, { timeout: 20000 });
+  const ohne = await op.seite.evaluate(() => ({ st: !!document.querySelector('.st-screen'), platzhalter: !!document.querySelector('.screen.platzhalter'),
+    css: !!document.querySelector('link[data-paket="start"]'), zustand: history.state && history.state.name }));
+  await op.seite.evaluate(() => window.__app.gehe('raetsel', { quelle: 'start-einstufung' }));
+  await op.seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena') && !document.querySelector('.rs-screen'), null, { timeout: 15000 });
+  pruefe('#start ohne Paket-Einstieg: still zur Arena (kein Willkommen, kein Platzhalter, Verlauf in der App), Raetsel-Quellen nicht angemeldet',
+    !ohne.st && !ohne.platzhalter && !ohne.css && ohne.zustand === 'arena' && await op.seite.evaluate(() => !document.querySelector('.rs-screen')), JSON.stringify(ohne));
+  pruefe('keine Konsolenfehler (ohne Paket)', op.fehler.length === 0, op.fehler.join(' | '));
+  await op.kontext.close();
 }
 
 // =====================================================================
