@@ -24,7 +24,8 @@ import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8838);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots'));

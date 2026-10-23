@@ -358,7 +358,10 @@ const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
 
 export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
   const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));
-  const aus = new Set((Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
+  // ?test&kern: nur der Kern, also auch ohne die fest eingetragenen REITER (wie ohne PAKETE); ?reiter gilt weiter
+  let kern = false;
+  try { kern = TEST && new URLSearchParams(suche || '').has('kern'); } catch (e) { kern = false; }
+  const aus = new Set((!kern && Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
   if (TEST) {
     let test = null;
     try { test = new URLSearchParams(suche || '').get('reiter'); } catch (e) { test = null; }

@@ -928,7 +928,8 @@ hoere('partie:beendet', (d) => {
   melde({ partieId: d.partieId, quelle: 'w0-c', prio: 50, titel: 'Zeile C', text: 'doppelt' });
 });
 `;
-const MIT_PAKET = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0-test/index`;
+// &kern mit der echten Liga: diese Gruppen pruefen das Zusammenspiel mit genau ihr (Panel, Abrechnung), nicht mit allen PAKETE
+const MIT_PAKET = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/w0-test/index,pakete/liga/index`;
 const namen = (log) => log.map((e) => e.name);
 
 // ---------- Nachpruefung w0c ----------
@@ -2065,7 +2066,7 @@ if (q.has('wpboss')) {
   });
 }
 `;
-const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0plus-test/index${flags ? '&' + flags : ''}`;
+const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/w0plus-test/index,pakete/liga/index${flags ? '&' + flags : ''}`;
 const FAKE_ICH = `export function zeige(root) { const s = document.createElement('section'); s.className = 'screen ich-test'; s.textContent = 'Ich'; root.append(s); return { verlasse() {} }; }`;
 const BOSS_START = 'r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 5';
 
@@ -2100,7 +2101,7 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,bestenliste,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=training,bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
@@ -2135,7 +2136,8 @@ async function testeSpielFundament(browser) {
     pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
     await seite.waitForSelector('.screen.arena');
-    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste') || document.querySelector('.reiter-leiste').hidden));
+    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Ich)
+    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="ich"]')));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/training\.js/.test(f));
     pruefe('Leiste: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
     await kontext.close();
@@ -2561,7 +2563,7 @@ async function testeSpielFundament(browser) {
     pruefe('Screen werkstatt ohne Datei: still zur Arena, kein Platzhalter', ohne.hash === '#arena' && !ohne.platzhalter, JSON.stringify(ohne));
     const FAKE_WERKSTATT = FAKE_ICH.replace('ich-test', 'werkstatt-test').replace("'Ich'", "'Werkstatt'");
     await seite.route('**/js/ui/werkstatt.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_WERKSTATT }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=ich#werkstatt`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=ich#werkstatt`);
     await seite.waitForSelector('.screen.werkstatt-test');
     const r = await seite.evaluate(() => {
       const aktiv = document.querySelector('.reiter-leiste [aria-current="page"]');

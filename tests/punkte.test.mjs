@@ -794,7 +794,8 @@ async function warteAufServer(url, ms = 10000) {
   throw new Error('Server startet nicht: ' + url);
 }
 
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const MIT = (extra = '') => `${BASIS}&erw=pakete/punkte/index&reiter=bestenliste${extra}`;
 const SCHAEFER_ZUEGE = ['e2e4', 'f1c4', 'd1h5', 'h5f7'];
 const SCHAEFER_PLAN = { e2e4: 'e7e5', f1c4: 'b8c6', d1h5: 'g8f6' };

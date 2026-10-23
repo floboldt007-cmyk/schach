@@ -32,7 +32,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8876);
 // Das Paket steht noch nicht in PAKETE (das macht die Integration, js/erweiterungen.js): im Test ueber ?erw laden.
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/schule/index`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/schule/index`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'schule') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
@@ -491,7 +491,7 @@ async function nodeTeil() {
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js)', ['js/schule.js', 'js/pakete/schule/index.js', 'js/ui/schule.js', 'css/pakete/schule.css']
     .every((d) => sw.includes(`'${d}'`)));
   const erw = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
-  pruefe('Paket noch nicht in PAKETE (das traegt die Integration ein, wie beim Abo)', !/PAKETE = Object\.freeze\(\[[^\]]*schule/.test(erw));
+  pruefe('Paket steht in PAKETE (Stufe 2)', /PAKETE = Object\.freeze\(\[[^\]]*schule/.test(erw));
   const app = readFileSync(path.join(WURZEL, 'js/app.js'), 'utf8');
   pruefe("app.js: schule in SCREENS, PAKET_SCREENS und TITEL ('Schulmodus')", /const SCREENS = \[[^\]]*'schule'\]/.test(app)
     && /const PAKET_SCREENS = new Set\(\[[^\]]*'schule'\]\)/.test(app) && /schule: 'Schulmodus'/.test(app));

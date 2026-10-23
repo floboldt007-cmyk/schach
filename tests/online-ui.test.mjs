@@ -95,7 +95,7 @@ try {
   });
   const seite = await kontext.newPage(); seite.setDefaultTimeout(15000);
   seite.on('pageerror', e => fehler.push(e.message));
-  const start = 'http://127.0.0.1:8887/?test';
+  const start = 'http://127.0.0.1:8887/?test&kern&erw=pakete/online/index';
   const knopf = a => seite.locator(`[data-online="${a}"]`);
   const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy());
   async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }

@@ -18,7 +18,8 @@ import { icon, iconNamen } from '../js/ui/icons.js';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8837);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -314,7 +315,8 @@ async function testeLeiste(browser) {
     const { kontext, seite } = await neueSeite(browser, { w: 820, h: 1180 });
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => { const n = document.querySelector('.reiter-leiste'); return (!n || n.hidden) && !document.documentElement.dataset.reiter; }));
+    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Verlauf)
+    pruefe('?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="verlauf"]')));
     await kontext.close();
   }
 }

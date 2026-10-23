@@ -28,7 +28,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8873);
 // Das Paket steht noch nicht in PAKETE (das macht die Integration, js/erweiterungen.js): im Test ueber ?erw laden
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/abo/index`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/abo/index`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'abo') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });

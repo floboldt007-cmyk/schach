@@ -28,7 +28,7 @@ const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8874);
 // Das Paket steht noch nicht in PAKETE (das macht die Integration, js/erweiterungen.js): im Test ueber ?erw laden.
 // Das Abo-Paket dazu, damit "Mehr zum Trainer" das Blatt wie in der App oeffnet.
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/coach-ki/index,pakete/abo/index`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/coach-ki/index,pakete/abo/index`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.BILDER ? path.join(process.env.BILDER, 'coach-ki') : '';
 if (BILDER) mkdirSync(BILDER, { recursive: true });
@@ -227,7 +227,7 @@ async function nodeTeil() {
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
     ['js/coach-ki.js', 'js/pakete/coach-ki/index.js', 'css/pakete/coach-ki.css'].every((d) => sw.includes(`'${d}'`)));
   const erw = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
-  pruefe('Paket noch nicht in PAKETE (das traegt die Integration ein, wie beim Abo)', !/PAKETE = Object\.freeze\(\[[^\]]*coach-ki/.test(erw));
+  pruefe('Paket steht in PAKETE (Stufe 2)', /PAKETE = Object\.freeze\(\[[^\]]*coach-ki/.test(erw));
 
   // ---------- Optik des Pakets: nur Tokens (tests/thema.test.mjs liest css/pakete/ nicht) ----------
   const css = readFileSync(path.join(WURZEL, 'css/pakete/coach-ki.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
