@@ -79,6 +79,41 @@
 //   zug:bewertet zusaetzlich gewinnVorigerZug: Flos Gewinnchance nach seinem vorigen eigenen Zug (also vor dem
 //   letzten Bot-Zug), null beim ersten eigenen Zug oder ohne Bewertung. Damit rechnet S1-6 boss:treffer.
 //   Antippen der Ergebnis-Karte zeigt auch die Abrechnung sofort ganz (.alles an Karte und Huelle).
+//
+// Premium-Umbau U7 (Look A, PLAN 2.4 bis 2.6, 3.7, 4; Optik in css/partie.css, css/ergebnis.css, Coach-Karte in
+// css/bauteile.css):
+//   Spielerkarten: eine Komponente .spieler fuer beide Lagen. Gegner: .spieler.gegner (Zusatzklassen .botbox,
+//   .botleiste-hoch, .botkarte fuer Tests und Pakete), erstes Kind .ort-gegner-leiste, dann .av (Portraet ueber
+//   thema.avatarVon), .info (.bot-name + Unterzeile .bot-meta mit Elo, .denkt-ort, .geschlagen-ort) und .uhr. Flo:
+//   .spieler.ich (Zusatzklassen .spielerleiste, .spieler-quer, .spieler-hoch): .av (thema.floAvatar), .name, danach
+//   .ort-spieler-leiste, Unterzeile, .uhr. Der Name wird nie mit "..." gekuerzt: passt er nicht in zwei Zeilen, steht
+//   der Rufname da (RUFNAME), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
+//   im Duell-Intro (U5). lage() meldet weiter 'hoch' | 'quer'.
+//   Uhr: .uhr in beiden Karten, versteckt ohne Bedenkzeit (z.tempo). fmtUhr(ms) (exportiert) formatiert, uhr.setze(wer,
+//   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
+//   Zuschlag, Zeitueberschreitung) bringt W0+b; bis dahin steht die Grundzeit still da.
+//   Sprechblase: .blase-ort ist das letzte Kind der Gegner-Karte (quer eine Zeile in der Karte unter dem Namen, hoch
+//   haengt die kleine Blase unter der Karte ueber dem Brett) und blendet nach BLASE_MS (3,5 s) aus. Einstellung sprueche: 'aus' zeigt keine Blase (buehne.blase() liefert false), 'wenig' nur
+//   Begruessung, Ende und hoechstens einen Satz je 5 eigene Zuege.
+//   Handy (hoch, bis 600 px): layout() rechnet "Brett zuerst" (PLAN 2.5): g = floor((Breite - 2 x 10 - Sockel) / 8) x 8,
+//   der Coach schrumpft bei Platznot auf eine Zeile (.coach-eng, Rest auf Antippen), das Brett erst danach (nie unter
+//   280 px); der Zugstreifen steht ab 760 px Hoehe zwischen Coach und Knoepfen, darunter nach den Knoepfen (die Spalte
+//   scrollt). Der Bewertungsbalken liegt dort waagrecht ueber dem Brett (Zahl nur auf Antippen).
+//   Komfort (Einstellungen, wirken sofort ueber schach:einstellungen): zugBestaetigen ('ohneUhr': nur ohne Bedenkzeit,
+//   'immer', 'aus'; nur fuer echte Zuege, nie fuer Vorzuege), haltenAufgeben (Aufgeben ueber bauteile.halteKnopf: 1 s
+//   halten; Tastatur und Bedienhilfen bekommen die Rueckfrage app.frage wie bei "aus"), turmRochade, autoDame,
+//   steuerung, pfeile, koordinaten, koordLage, brett (Brettwahl im Kopf, nur iPad), klang (Kopf-Schalter), coachStil
+//   ('knapp': erster Satz, Rest auf Antippen), sprueche, bewegung (Gleitdauer ueber tempo()).
+//   Klang-Takt (PLAN 3.7): der Zugklang sitzt auf der Landung (klang.zug({ wann })), der Bewertungsklang 150 ms danach,
+//   nur einer je Moment (Schach und Umwandlung gehen vor Praezise/COMBO). Grosser Moment nur bei Genial: Feld-Puls,
+//   Ring, 8 Funken, Lichtstreif, Brett hebt sich 1,2 % (.brett-rahmen.prisma), Klassenwort als Pille, COMBO in der
+//   Klassenfarbe (alles in .brett-effekte, nur transform und opacity). Grobe Fehler bleiben ruhig.
+//   Duell-Vertrag (U5): steht beim Start html[data-duell="laeuft"], ziehen Bot (und spaeter die Uhr) erst nach dem
+//   DOM-Ereignis duell:fertig auf document, hoechstens DUELL_MAX_MS (1,4 s).
+//   Ergebnis (2.6): Schleier ohne Weichzeichner, der Screen dahinter tritt zurueck (.mit-ergebnis), "Sieg!" mit
+//   goldenem Ausrufezeichen, Sterne als Symbole nacheinander (klang.stern), kein Konfetti, Niederlage ruhig mit
+//   Lichtblick-Karte (.erg-lichtblick: Flos bester Zug aus den Live-Klassen, nur wenn ergebnis:karte leer bleibt),
+//   Remis gold-neutral.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
@@ -87,7 +122,9 @@ import {
   bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
 } from '../review.js';
 import { eroeffnung, stellungsSchluessel } from '../openings.js';
-import { klang } from '../sounds.js';
+import { klang, klassenKlang } from '../sounds.js';
+import { anim, tempo, taktFaktor } from '../bewegung.js';
+import { halteKnopf } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
   ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
@@ -98,7 +135,7 @@ import { fuerOverlay, BRETT_FEIER } from '../feier.js';
 import './abrechnung.js';
 import { iconNamen } from './icons.js';
 import { icon } from '../app.js';
-import { botFarbe as themaBotFarbe } from '../thema.js';
+import { botFarbe as themaBotFarbe, avatarVon, floAvatar } from '../thema.js';
 import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
 
 
@@ -137,6 +174,44 @@ const PAKET_NAME = /^[a-z][a-z0-9-]{0,30}$/;
 const MATT_HOOK_WARTEN_MS = 300;
 // w0plus-a-fix: hoechstens so viele Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen)
 const AKTIONEN_MAX = 2;
+// U7: Rufnamen fuer sehr lange Namen (Spielerkarte, Kopf auf dem Handy); der volle Name steht im aria-label
+const RUFNAME = Object.freeze({
+  benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm', delia: 'Delia',
+  koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch',
+});
+const rufnameVon = (b) => RUFNAME[b && b.id] || (b && b.name) || '';
+// U7: Brettwahl im Kopf (Feldfarben wie tokens.css, fest wie die Brettfarben selbst)
+const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
+// U7: Sprechblase blendet nach 3,5 s aus (Begruessung etwas laenger, sie kommt vor dem ersten Zug)
+const BLASE_MS = 3500;
+const BEGRUESSUNG_MS = 6000;
+// U7: Sprueche "wenig": hoechstens ein Satz je 5 eigene Zuege (10 Halbzuege)
+const WENIG_ABSTAND = 10;
+// U7: Duell-Intro (U5): so lange wartet die Partie hoechstens auf duell:fertig
+const DUELL_MAX_MS = 1400;
+// U7: Uhr wird unter 20 s rot (PLAN 2.4)
+const UHR_WARN_MS = 20000;
+// U7: Bewertungsklang so lange nach der Landung der Figur (PLAN 3.7)
+const BEWERTUNG_NACH_MS = 150;
+// U7: Gleitdauer der Figuren (--d-zug, mal Tempo ueber brett.gleitDauer())
+const ZUG_MS = 300;
+// U7: Handy-Layout (PLAN 2.5): Seitenrand neben dem Brett, kleinstes Brett, Hoehe fuer den Zugstreifen
+const HANDY_RAND = 10;
+const BRETT_MIN = 280;
+const STREIFEN_AB = 760;
+const UHR_SYMBOL = '<svg class="ico uhr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>';
+
+// U7: Bedenkzeit als Text: ab 20 s "M:SS" (aufgerundet), darunter "0:SS,z" (Zehntel), nie negativ
+export function fmtUhr(ms) {
+  const t = Math.max(0, Number(ms) || 0);
+  if (t < UHR_WARN_MS) {
+    const s = Math.floor(t / 1000);
+    return `0:${String(s).padStart(2, '0')},${Math.floor((t % 1000) / 100)}`;
+  }
+  const s = Math.ceil(t / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 // Stufe der COMBO (Chip data-stufe): leer bei 3 bis 4, dann heiss, ueberladen, unaufhaltsam
 function serienStufe(n) {
@@ -161,7 +236,8 @@ function evalText(ev, farbe) {
 }
 
 export function zeige(root, params, app) {
-  const reduziert = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // U7: reduziert = Systemwunsch ODER Einstellung "Bewegung: aus" (PLAN 2.0, Buehne)
+  const reduziert = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || tempo() === 0;
   const einst = app.einstellungen();
 
   // ---------- Partie bestimmen ----------
@@ -217,6 +293,7 @@ export function zeige(root, params, app) {
     finisher: false,
     effektGemerkt: null,
     vorzuege: [],
+    landung: [],       // U7: je Ply { name (Zugklang), um (Landung, performance.now) } fuer den Klang-Takt
   };
   z.fens.push(z.chess.fen());
   // W0+a: Boss mit offen angesagter Staerke (boss.staerke, z. B. 1080): gespielt wird mit staerkeFuerElo (vor der
@@ -290,10 +367,12 @@ export function zeige(root, params, app) {
       if (!z.boss) return bot.name;
       return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${bossStaerke.elo}` : ''}`;
     }
-    return bot.stufe ? `${bot.name} · Stufe ${bot.stufe}` : bot.name;
+    return bot.name;
   }
+  // U7: auf dem Handy der Rufname im Kopf (PLAN 2.5 Regel 5), nur fuer Bots mit Rufname und nicht im Boss-Kopf
+  const kopfKurz = () => (z.modus !== 'boss' && RUFNAME[bot.id] ? RUFNAME[bot.id] : kopfTitel());
   function botMeta() {
-    if (bot.stufe) return `Stufe ${bot.stufe} · Elo ${bot.elo}`;
+    if (bot.stufe) return `Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
     if (bossStaerke) teile.push(`≈ ${bossStaerke.elo}`);
     else if (Number.isFinite(bot.elo)) teile.push(`Elo ${bot.elo}`);
@@ -303,41 +382,45 @@ export function zeige(root, params, app) {
   s.className = 'screen partie';
   s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
   s.style.setProperty('--bf', themaBotFarbe(bot));
-  const knopf = (aktion, ico, text, extra = '') =>
-    `<button class="knopf ${extra}" type="button" data-aktion="${aktion}">${icon(ico)}<span>${text}</span></button>`;
+  const knopf = (aktion, ico, text, extra = '', label = '') =>
+    `<button class="knopf aktion dr ${extra}" type="button" data-aktion="${aktion}"${label ? ` aria-label="${esc(label)}"` : ''}>${icon(ico)}<span>${text}</span></button>`;
+  const brettwahl = BRETTER.map(([id, name, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="Brett ${name}" `
+    + `aria-checked="${einst.brett === id}"><i style="--h:${h};--d:${d}"><b></b><b></b><b></b><b></b></i></button>`).join('');
+  const uhrHtml = (wer) => `<div class="uhr zahl" data-wer="${wer}" hidden>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
   s.innerHTML = `
-    <header class="kopf">
-      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück zur Arena">${icon('zurueck')}</button>
-      <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span> · Du spielst ${FARBE_NAME[farbe]}</div></div>
-      <button class="icon-knopf" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
+    <header class="kopf p-kopf">
+      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="Zurück zur Arena">${icon('zurueck')}</button>
+      <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
+    ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">Stufe ${bot.stufe}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">Du spielst </span>${FARBE_NAME[farbe]}</span></div></div>
+      <div class="brettwahl" role="radiogroup" aria-label="Brettfarbe">${brettwahl}</div>
+      <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="Klang">${icon('klang')}</button>
+      <button class="icon-knopf dr" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
     </header>
     <div class="inhalt">
-      <div class="botleiste-hoch">
-        <span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span>
-        <div class="info"><div class="bot-name">${esc(bot.name)}</div>
-          <div class="zeile"><span class="geschlagen-ort" data-wer="bot"></span><span class="bot-meta denkt-ort"></span></div></div>
-        <div class="blase-ort" data-spitze="links" data-leer="${esc(bot.kurz)}"></div>
-      </div>
       <div class="brettzone">
         <div class="evalbalken" role="img" aria-label="Bewertung"><div class="mitte"></div><div class="weiss"></div><span class="wert zahl"></span></div>
         <div class="brett-rahmen"><div class="brett"></div><div class="brett-effekte" aria-hidden="true"></div>
           <button class="knopf primaer ergebnis-zeigen" type="button" data-aktion="ergebnis" hidden>${icon('pokal')} Ergebnis</button></div>
       </div>
       <div class="seite">
-        <div class="botbox flaeche">
-          <div class="botkarte"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span>
-            <div class="info"><div class="bot-name">${esc(bot.name)}</div>
-              <div class="bot-meta">${esc(botMeta())}<span class="denkt-ort"></span></div>
-              <span class="geschlagen-ort" data-wer="bot"></span></div></div>
-          <div class="blase-ort" data-spitze="oben" data-leer="${esc(bot.kurz)}"></div>
+        <div class="spieler gegner botbox botleiste-hoch botkarte" aria-label="${esc(bot.name)}">
+          <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
+          <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
+            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="denkt-ort"></span><span class="geschlagen-ort" data-wer="bot"></span></div></div>
+          ${uhrHtml('bot')}
+          <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
-        <div class="spielerleiste spieler-hoch"><span class="avatar ich">F</span><div class="name">Flo</div><span class="geschlagen-ort" data-wer="flo"></span></div>
-        <div class="coach leer" role="status" aria-live="polite"></div>
-        <div class="zugbox flaeche"><div class="zugliste" aria-label="Züge"></div></div>
+        <div class="coach coach-karte leer" role="status" aria-live="polite"></div>
+        <div class="zugbox"><div class="zugliste" aria-label="Züge"></div></div>
         <div class="zugleiste" aria-label="Züge"></div>
-        <div class="spielerleiste spieler-quer"><span class="avatar ich">F</span><div><div class="name">Flo</div><div class="bot-meta">${FARBE_NAME[farbe]}</div></div><span class="geschlagen-ort" data-wer="flo"></span></div>
-        <div class="spielknoepfe">
-          ${knopf('hinweis', 'hinweis', 'Hinweis', 'hinweis-k')}${knopf('zuruecknehmen', 'undo', 'Zurück&shy;nehmen')}
+        <div class="spieler ich spielerleiste spieler-quer spieler-hoch" aria-label="Flo">
+          <span class="av">${floAvatar(farbe)}</span>
+          <div class="name">Flo</div>
+          <div class="unter bot-meta"><span class="p-meta">${FARBE_NAME[farbe]}</span><span class="geschlagen-ort" data-wer="flo"></span></div>
+          ${uhrHtml('flo')}
+        </div>
+        <div class="spielknoepfe aktionen">
+          ${knopf('hinweis', 'hinweis', 'Hinweis', 'hinweis-k')}${knopf('zuruecknehmen', 'undo', 'Zurück', '', 'Zug zurücknehmen')}
           ${knopf('drehen', 'drehen', 'Drehen')}${knopf('aufgeben', 'flagge', 'Aufgeben', 'aufgeben')}
         </div>
       </div>
@@ -350,12 +433,18 @@ export function zeige(root, params, app) {
   const effekteEl = $('.brett-effekte');
   const balken = $('.evalbalken');
   const coachEl = $('.coach');
+  const gegnerKarte = $('.spieler.gegner');
+  const floKarte = $('.spieler.ich');
   s.classList.toggle('ohne-balken', !einst.balken);
+  s.classList.toggle('mit-uhr', !!z.tempo);
+  if (bot.stufe) s.classList.add('mit-stufe');
 
   const brett = new Brett($('.brett'), {
     ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
     beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, autoDame: einst.autoDame,
+    koordLage: einst.koordLage, steuerung: einst.steuerung, turmRochade: einst.turmRochade === true, pfeile: einst.pfeile !== false,
   });
+  brett.setzeDauer(ZUG_MS);
   // W0+a: nicht erlaubter Zugversuch (den Grund rechnet ein Paket mit chess.js aus, SPIELKONZEPT 3.18)
   function beiAbgelehnt(von, nach, art) {
     if (weg || z.phase !== 'flo') return;
@@ -372,28 +461,84 @@ export function zeige(root, params, app) {
     const a = k.dataset.aktion;
     if (a === 'zurueck') zurueckGedrueckt();
     else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
+    else if (a === 'klang') klangUmschalten(k);
     else if (a === 'hinweis') hinweis();
     else if (a === 'zuruecknehmen') zuruecknehmen();
     else if (a === 'drehen') drehen();
-    else if (a === 'aufgeben') aufgebenFragen();
+    // U7: mit "Halten zum Aufgeben" entscheidet der Halte-Knopf (Tastatur: Rueckfrage, siehe unten)
+    else if (a === 'aufgeben') { if (!halte) aufgebenFragen(); }
     else if (a === 'idee') zeigeIdee(Number(k.dataset.ply));
     else if (a === 'besser') zeigeBesser(Number(k.dataset.ply));
     else if (a === 'ergebnis') zeigeOverlayWieder();
   });
+  // U7: Tastatur und Bedienhilfen (Klick ohne Zeiger) bekommen beim Halte-Knopf dieselbe Rueckfrage wie ohne Halten
+  // (app.frage), nicht das Blatt des Bauteils: eine Rueckfrage fuer alle Wege
+  s.addEventListener('click', (e) => {
+    if (!halte || e.detail !== 0 || !e.target || !e.target.closest) return;
+    if (e.target.closest('.spielknoepfe > [data-aktion="aufgeben"]') !== halte.el) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (!halte.el.disabled) aufgebenFragen();
+  }, true);
+  // U7: Brettwahl im Kopf (wie in den Einstellungen, wirkt sofort)
+  $('.brettwahl').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-brett]');
+    if (!b) return;
+    app.setzeEinstellungen({ brett: b.dataset.brett });
+    try { klang.spiele('klick'); } catch (f) { /* still */ }
+  });
   s.addEventListener('pointerdown', (e) => {
     if (z.phase === 'bot' && z.vorzuege.length && !e.target.closest('.brett')) loescheVorzuege();
   });
+  // Coach antippen: zeigt den Rest (Stil "knapp", Handy), sonst klappt er auf oder ein
   coachEl.addEventListener('click', (e) => {
     if (e.target.closest('button')) return;
-    const p = Number(coachEl.dataset.ply);
-    if (!Number.isFinite(p) || !z.live[p] || z.live[p].status !== 'fertig') return;
-    if (window.matchMedia('(max-width: 600px) and (orientation: portrait)').matches) {
-      const erster = coachEl.querySelector('.coach-knoepfe button');
-      if (erster) erster.click();
+    if (coachEl.classList.contains('hat-rest')) {
+      const offen = !coachEl.classList.contains('offen');
+      coachEl.classList.toggle('offen', offen);
+      if (offen) { coachEl.classList.remove('kompakt'); clearTimeout(z.kompaktUhr); }
       return;
     }
+    const p = Number(coachEl.dataset.ply);
+    if (!Number.isFinite(p) || !z.live[p] || z.live[p].status !== 'fertig') return;
     coachEl.classList.toggle('kompakt');
   });
+
+  // U7: Klang-Schalter im Kopf (stumm, die Lautstaerke bleibt; wie der Kopf der Hauptseiten)
+  function klangUmschalten(k) {
+    const an = app.einstellungen().klang === false;
+    app.setzeEinstellungen({ klang: an });
+    k.setAttribute('aria-pressed', an ? 'true' : 'false');
+    const svg = k.querySelector('svg');
+    if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
+    if (an) { try { klang.spiele('schalter'); } catch (f) { /* still */ } }
+    app.meldung(an ? 'Klang an' : 'Klang aus', { dauer: 1600 });
+  }
+
+  // U7: Aufgeben ueber den Halte-Knopf (Einstellung haltenAufgeben, Standard an) oder wie bisher mit Rueckfrage
+  let halte = null;
+  function setzeAufgeben(halten) {
+    const alt = $('.spielknoepfe > [data-aktion="aufgeben"]');
+    if (!alt || !!halte === !!halten) return;
+    if (halte) { halte.verlasse(); halte = null; }
+    let neu;
+    if (halten) {
+      halte = halteKnopf({
+        text: 'Aufgeben', icon: icon('flagge'), dauer: 1000, klasse: 'aktion dr aufgeben', label: 'Aufgeben (gedrückt halten)',
+        hinweis: 'Zum Aufgeben gedrückt halten',
+        beiAusloesen: () => { if (!weg && z.phase !== 'ende') { melde({ typ: 'aufgeben', weg: 'halten' }); ende('niederlage', 'aufgabe'); } },
+      });
+      neu = halte.el;
+    } else {
+      const huelle = document.createElement('div');
+      huelle.innerHTML = knopf('aufgeben', 'flagge', 'Aufgeben', 'aufgeben');
+      neu = huelle.firstElementChild;
+    }
+    neu.dataset.aktion = 'aufgeben';
+    neu.disabled = alt.disabled;
+    alt.replaceWith(neu);
+  }
+  setzeAufgeben(einst.haltenAufgeben !== false);
 
   // ---------- Darstellung ----------
   function letzterZugFelder() {
@@ -500,6 +645,7 @@ export function zeige(root, params, app) {
     else if (ev.mate != null) { text = 'M' + Math.abs(ev.mate); fuehrt = ev.mate > 0 ? 'w' : 'b'; }
     else { text = komma(Math.abs(ev.cp) / 100); fuehrt = ev.cp >= 0 ? 'w' : 'b'; }
     balken.style.setProperty('--w', (w * 100).toFixed(1) + '%');
+    balken.style.setProperty('--anteil', w.toFixed(3));   // U7: waagrechter Balken auf dem Handy (scaleX)
     balken.dataset.fuehrt = fuehrt;
     $('.evalbalken .wert').textContent = text;
     balken.setAttribute('aria-label', `Bewertung ${evalText(ev, 'w') || text} aus Sicht von Weiß`);
@@ -523,16 +669,26 @@ export function zeige(root, params, app) {
   }
   // Hoechstens eine Blase je Zugpaar; eine hoehere prio ersetzt eine niedrigere (BAUPLAN 3.5:
   // spielerFehler/spielerGut 70, Begruessung 60, schlagen/schach des Bots 50)
-  function zeigeBlase(anlass, paar, { dauer = 4500, immer = false, prio = 50, werte = null } = {}) {
+  // U7: Einstellung sprueche: 'aus' keine Blase, 'wenig' nur Begruessung ('start'), Ende ('ende') und hoechstens eine
+  // weitere je WENIG_ABSTAND Halbzuege. Die Blase blendet nach BLASE_MS aus.
+  function blaseErlaubt(paar) {
+    const art = app.einstellungen().sprueche;
+    if (art === 'aus') return false;
+    if (art !== 'wenig' || paar === 'start' || paar === 'ende') return true;
+    if (paar !== undefined && paar === z.blasePaar) return true;   // hoehere prio im selben Moment ersetzt
+    return z.blaseWenigPly == null || z.zuege.length - z.blaseWenigPly >= WENIG_ABSTAND;
+  }
+  function zeigeBlase(anlass, paar, { dauer = BLASE_MS, immer = false, prio = 50, werte = null } = {}) {
     const p = Number.isFinite(prio) ? prio : 50;
     if (!immer && paar !== undefined && z.blasePaar === paar && p <= z.blasePrio) return false;
+    if (!blaseErlaubt(paar)) return false;
     const text = satzFuer(anlass, werte);
     if (!text) return false;
+    if (paar !== 'start' && paar !== 'ende' && paar !== z.blasePaar) z.blaseWenigPly = z.zuege.length;
     z.blasePaar = paar;
     z.blasePrio = p;
-    for (const ort of $$('.blase-ort')) {
-      ort.innerHTML = `<div class="sprechblase ${ort.dataset.spitze}">${esc(text)}</div>`;
-    }
+    const ort = $('.blase-ort');
+    ort.innerHTML = `<div class="sprechblase p-blase${tempo() ? '' : ' still'}">${esc(text)}</div>`;
     s.classList.add('hat-blase');
     melde({ typ: 'blase', anlass, text });
     clearTimeout(z.blaseUhr);
@@ -552,11 +708,27 @@ export function zeige(root, params, app) {
   let zusaetze = [];   // Coach-Zusaetze der Pakete: { el, prio, nr }
   let zusatzNr = 0;
   function coachZeige(html, klassen, ply = null) {
-    coachEl.className = 'coach ' + klassen;
+    coachEl.className = 'coach coach-karte ' + klassen;
     coachEl.innerHTML = html;
     zusaetze = [];
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
+    pruefeCoachRest();
+  }
+  // U7: Coach-Stil "knapp": nur der erste Satz, der Rest auf Antippen (.c-rest)
+  function coachText(text) {
+    const t = String(text || '');
+    const m = app.einstellungen().coachStil === 'knapp' ? t.match(/^(.+?[.!?…])(\s+)(\S[\s\S]*)$/) : null;
+    if (!m) return esc(t);
+    return `<span class="c-satz">${esc(m[1])}</span><span class="c-rest">${esc(m[2] + m[3])}</span>`;
+  }
+  // U7: hat der Coach etwas, das erst ein Antippen zeigt (Stil knapp, Handy: Text bei Platznot und die Knoepfe)?
+  function pruefeCoachRest() {
+    const knapp = !!coachEl.querySelector('.c-rest');
+    coachEl.classList.toggle('knapp', knapp);
+    const handyRest = s.classList.contains('handy') && !!coachEl.querySelector('.c-text, .coach-knoepfe');
+    coachEl.classList.toggle('hat-rest', knapp || handyRest);
+    if (!knapp && !handyRest) coachEl.classList.remove('offen');
   }
   // Zeile unter dem Coach-Satz (Buehne): hoechstens ZUSATZ_MAX, die hoehere prio gewinnt. bleibt: der Coach
   // klappt nicht von selbst ein, solange die Zeile da ist (ein schon eingeklappter klappt wieder auf), z. B.
@@ -641,7 +813,7 @@ export function zeige(root, params, app) {
     if (k === 'buch') {
       coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_NAME.buch)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>
         <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
-        <p class="c-text">Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.</p>`,
+        <p class="c-text">${coachText('Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.')}</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
       coachEl.style.setProperty('--kf', `var(--k-${k})`);
       return;
@@ -658,9 +830,8 @@ export function zeige(root, params, app) {
       knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="Kostet den 3. Stern">${icon('undo')} Zurücknehmen</button>`);
     }
     coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
-      <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>${combo}</div>
-      <span class="c-eval zahl">${esc(evalT)}</span>
-      <p class="c-text">${esc(coachKern(erg.coach))}</p>
+      <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span><span class="c-eval zahl">${esc(evalT)}</span>${combo}</div>
+      <p class="c-text">${coachText(coachKern(erg.coach))}</p>
       ${knoepfe.length ? `<div class="coach-knoepfe">${knoepfe.join('')}</div>` : ''}`,
     `k-${k}${neu ? ' neu' : ''}`, ply);
     coachEl.style.setProperty('--kf', `var(--k-${k})`);
@@ -693,7 +864,7 @@ export function zeige(root, params, app) {
     return brett.ausrichtung === 'w' ? [d, 7 - r] : [7 - d, r];
   }
   function effekt(feld, klasse) {
-    if (reduziert) return;
+    if (reduziert || tempo() === 0) return;
     // W0+a: ein Finisher ersetzt jeden Brett-Effekt. Bis feststeht, ob einer laeuft (ein Anbieter darf null liefern,
     // z. B. "Finisher aus"), wird der Effekt gemerkt; laeuft keiner, holt der Matt-Hook ihn nach
     if (z.finisher) { z.effektGemerkt = [feld, klasse]; return; }
@@ -702,11 +873,20 @@ export function zeige(root, params, app) {
     ort.className = 'effekt-ort k-' + klasse;
     ort.style.setProperty('--x', x);
     ort.style.setProperty('--y', y);
+    // U7 (Befund U6): fertige Prozente statt calc(var(--x) * 12.5%), wie die Lagen des Bretts
+    ort.style.left = (x * 12.5) + '%';
+    ort.style.top = (y * 12.5) + '%';
     if (klasse === 'brillant') {
-      // Premium-Umbau U1: Funken in den Theme-Farben (Amethyst, Gold, Weiss, Kobalt), kein Neon
-      const farben = ['var(--k-brillant)', 'var(--gold)', '#FFFFFF', 'var(--k-stark)', 'var(--kt-brillant)', 'var(--gold)'];
-      ort.innerHTML = '<i class="welle"></i><span class="funken">' + Array.from({ length: 12 }, (_, i) =>
-        `<i style="--a:${i * 30 + 8}deg;--r:${i % 2 ? 1.25 : 1.75};--c:${farben[i % farben.length]};animation-delay:${(i % 3) * 40}ms"></i>`).join('') + '</span>';
+      // Der eine grosse Moment (PLAN 2.4, Entwurf A): Feld-Puls, Ring, 8 Funken (0,6 bis 0,9 Feldbreiten) in der
+      // Klassenfarbe, ein Lichtstreif ueber das ganze Brett, das Brett hebt sich 1,2 % (.prisma am Sockel)
+      ort.style.setProperty('--feld', ((effekteEl.clientWidth || 480) / 8).toFixed(1) + 'px');
+      ort.innerHTML = '<i class="feld-puls"></i><i class="welle"></i><span class="funken">' + Array.from({ length: 8 }, (_, i) =>
+        `<i style="--a:${i * 45 + 22}deg;--r:${(0.6 + (i % 3) * 0.15).toFixed(2)};animation-delay:${60 + (i % 2) * 30}ms"></i>`).join('') + '</span>';
+      const streif = document.createElement('div');
+      streif.className = 'streif-huelle';
+      streif.innerHTML = '<i class="streif"></i>';
+      effekteEl.append(streif);
+      spaeter(() => streif.remove(), 1500);
       rahmen.classList.remove('prisma');
       void rahmen.offsetWidth;
       rahmen.classList.add('prisma');
@@ -716,7 +896,7 @@ export function zeige(root, params, app) {
     } else if (klasse === 'bester') {
       ort.innerHTML = '<i class="ring-ping"></i>';
     }
-    // Unscharf/Fehler bleiben ruhig, grober Fehlzug wackelt nur am Symbol (CSS)
+    // Unscharf, Daneben und Weit daneben bleiben ruhig (nur das Abzeichen, kein Wackeln)
     if (ort.innerHTML) {
       effekteEl.append(ort);
       spaeter(() => ort.remove(), 1700);
@@ -878,9 +1058,16 @@ export function zeige(root, params, app) {
         brett.markiere([nach], 'k-' + k);
         brett.zeigeAbzeichen(nach, k);
         effekt(nach, k);
-        // Standard wie bisher: Genial, Fehler und grober Fehlzug klingen, sonst still (Pakete: registriereKlang('klasse'))
+        // Klang zur Klasse (PLAN 3.6, Pakete: registriereKlang('klasse')). U7, Takt (3.7): 150 ms nach der Landung der
+        // Figur (kommt die Bewertung spaeter, sofort mit dem Abzeichen) und nur einer je Moment: hat die Landung schon
+        // Schach oder Umwandlung gemeldet, bleibt ein Praezise/COMBO-Klang still
         const info = Object.freeze({ serie: serieBis(ply), serieVorher: serieBis(ply - 1), trivial: z.liveTrivial[ply] === true, ply });
-        spaeter(() => klang.klasse(k, info), 120);
+        const w = klassenKlang(k, info);
+        const lande = z.landung[ply] || null;
+        const verdraengt = !!(w && (w.name === 'bester' || w.name === 'combo') && lande && (lande.name === 'schach' || lande.name === 'umwandlung'));
+        const ms = Math.max(0, Math.round((lande ? lande.um : 0) + BEWERTUNG_NACH_MS - jetzt()));
+        if (!verdraengt) spaeter(() => klang.klasse(k, info), ms);
+        melde({ typ: 'bewertungsklang', ply, klasse: k, name: w ? w.name : null, ms, still: verdraengt });
         melde({ typ: 'abzeichen', ply, klasse: k });
       }
     }
@@ -940,6 +1127,22 @@ export function zeige(root, params, app) {
     return karte;
   }
 
+  // U7: Flo ist am Zug: Zielkarte (mit Turm-auf-Koenig-Rochade nach Einstellung) und Zug bestaetigen
+  function erlaubeFlo() {
+    const tr = app.einstellungen().turmRochade === true;
+    brett.setzeTurmRochade(tr);
+    brett.erlaubeZuege(zielKarte(z.chess, { turmRochade: tr }));
+    aktualisiereBestaetigen();
+  }
+  // Zug bestaetigen (PLAN 4): 'ohneUhr' nur ohne Bedenkzeit, 'immer', 'aus'; nur fuer echte Zuege (nie fuer Vorzuege)
+  const bestaetigenAn = () => {
+    const w = app.einstellungen().zugBestaetigen;
+    return w === 'immer' || (w !== 'aus' && !z.tempo);
+  };
+  function aktualisiereBestaetigen() {
+    brett.setzeBestaetigen(bestaetigenAn() && z.phase === 'flo');
+  }
+
   function zeichneVorzuege() {
     brett.markiere(z.vorzuege.map((v) => v.von), 'vorzug-start');
     brett.markiere(z.vorzuege.map((v) => v.nach), 'vorzug-ziel');
@@ -963,23 +1166,25 @@ export function zeige(root, params, app) {
     return true;
   }
 
-  function beiZug(von, nach, umwandlung) {
+  // info (board.js): { art, landung } - landung: ms, bis die Figur auf dem Ziel steht (0: steht schon dort)
+  function beiZug(von, nach, umwandlung, info = null) {
     if (weg) return false;
     if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) return merkeVorzug(von, nach, umwandlung);
     if (z.phase !== 'flo') return false;
     let m = null;
     try { m = z.chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
-    spieleEigenenZug(m);
+    spieleEigenenZug(m, info && Number.isFinite(info.landung) ? info.landung : brett.gleitDauer());
     return true;
   }
 
-  function spieleEigenenZug(m) {
+  function spieleEigenenZug(m, landungMs = 0) {
     const ply = z.zuege.length;
     merkeZug(m);
     neuerLiveEintrag(ply);
     z.phase = 'gezogen';
-    queueMicrotask(() => nachEigenemZug(ply, m));
+    aktualisiereBestaetigen();
+    queueMicrotask(() => nachEigenemZug(ply, m, landungMs));
   }
 
   function fuehreVorzugAus() {
@@ -989,7 +1194,7 @@ export function zeige(root, params, app) {
     try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
     if (!m) { loescheVorzuege(); return false; }
     brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
-    spieleEigenenZug(m);
+    spieleEigenenZug(m, brett.gleitDauer());
     return true;
   }
 
@@ -999,19 +1204,21 @@ export function zeige(root, params, app) {
     z.live[ply] = { marke: {}, status: 'rechnet', erg: null, fertig, erledigt, gezeigtUm: 0 };
   }
 
-  function nachEigenemZug(ply, m) {
+  function nachEigenemZug(ply, m, landungMs = 0) {
     if (weg) return;
     const an = liveAn();
     brett.entferneAbzeichen();
     brett.markiere(null);
     brett.pfeile([]);
+    // U7: Flos eigene Pfeile und Marken gelten bis zu seinem naechsten Zug (ueber Bot-Zuege hinweg bleiben sie)
+    brett.loescheNutzerPfeile();
     z.ideeAn = null;
     brett.setzeStellung(z.chess.fen(), {
       animieren: true, letzterZug: an ? [m.from, m.from] : [m.from, m.to], schach: z.chess.inCheck() ? true : null,
     });
     if (an) brett.markiere([m.to], 'bewertung');
     sendeZug(ply, m, 'flo');
-    spieleKlang(m);
+    spieleKlang(m, landungMs, ply);
     versteckeBlase();
     z.hinweisFen = null;
     z.hinweisStufe = 0;
@@ -1034,13 +1241,22 @@ export function zeige(root, params, app) {
     });
   }
 
-  function spieleKlang(m) {
-    if (z.chess.isGameOver()) return;  // Ende-Klang kommt mit dem Ergebnis
-    if (z.chess.inCheck()) klang.schach();
-    else if (m.promotion) klang.umwandlung();
-    else if (m.isKingsideCastle() || m.isQueensideCastle()) klang.rochade();
-    else if (m.captured) klang.schlagen();
-    else klang.zug();
+  // U7, Klang-Takt (PLAN 3.7): der Zugklang sitzt auf der Landung der Figur (landungMs: Gleitdauer des Bretts, 0 =
+  // steht schon, z. B. gezogen oder Bewegung aus), WebAudio plant ihn genau (wann). Gemerkt fuer den Bewertungsklang.
+  function spieleKlang(m, landungMs = 0, ply = z.zuege.length - 1) {
+    const ms = Math.max(0, Number(landungMs) || 0);
+    let name = null;
+    if (!z.chess.isGameOver()) {  // Ende-Klang kommt mit dem Ergebnis
+      if (z.chess.inCheck()) name = 'schach';
+      else if (m.promotion) name = 'umwandlung';
+      else if (m.isKingsideCastle() || m.isQueensideCastle()) name = 'rochade';
+      else if (m.captured) name = 'schlagen';
+      else name = 'zug';
+    }
+    z.landung[ply] = { name, um: jetzt() + ms };
+    if (!name) return;
+    klang[name]({ wann: ms / 1000 });
+    melde({ typ: 'klang', name, ply, wann: ms });
   }
 
   // ---------- Bot ----------
@@ -1055,6 +1271,7 @@ export function zeige(root, params, app) {
   async function botAmZug() {
     if (weg || z.phase === 'ende') return;
     z.phase = 'bot';
+    aktualisiereBestaetigen();
     if (z.vorzuege.length) { brett.zeigeVorzuege(z.vorzuege); zeichneVorzuege(); }
     brett.erlaubeZuege(app.einstellungen().vorzuege === false ? null : vorzugZiele());
     setzeDenkt(true);
@@ -1121,7 +1338,7 @@ export function zeige(root, params, app) {
     z.ideeAn = null;
     brett.setzeStellung(z.chess.fen(), { animieren: true, letzterZug: [m.from, m.to], schach: z.chess.inCheck() ? true : null });
     sendeZug(ply, m, 'bot');
-    spieleKlang(m);
+    spieleKlang(m, brett.gleitDauer(), ply);
     melde({ typ: 'zug', wer: 'bot', uci: m.lan, ply });
     const paar = ply - 1;
     if (m.captured) zeigeBlase('schlagen', paar, { prio: 50 });
@@ -1135,7 +1352,7 @@ export function zeige(root, params, app) {
     if (pruefeEnde()) return;
     z.phase = 'flo';
     if (fuehreVorzugAus()) return;
-    brett.erlaubeZuege(zielKarte(z.chess));
+    erlaubeFlo();
     zeichneKnoepfe();
     balkenAktualisieren();
   }
@@ -1215,7 +1432,7 @@ export function zeige(root, params, app) {
     speichereLaufend();
     if (z.chess.turn() === farbe) {
       z.phase = 'flo';
-      brett.erlaubeZuege(zielKarte(z.chess));
+      erlaubeFlo();
       zeichneKnoepfe();
       balkenAktualisieren();
     } else {
@@ -1506,6 +1723,22 @@ export function zeige(root, params, app) {
     return { partie: nach.partie, review, neueSterne, neuFreigeschaltet: g.neuFreigeschaltet, wertet: nach.wertet !== false };
   }
 
+  // U7: Lichtblick (Ergebnis Niederlage): Flos bester Zug der Partie aus den Live-Klassen, bei Gleichstand der spaetere;
+  // "Zug 14 Sf5: Präzise". Ohne bewerteten guten Zug null (dann keine Karte).
+  const LICHTBLICK_RANG = ['brillant', 'stark', 'bester', 'exzellent', 'gut'];
+  function lichtblick() {
+    let best = -1;
+    let rang = LICHTBLICK_RANG.length;
+    for (let i = 0; i < z.zuege.length; i++) {
+      if (!istFlo(i)) continue;
+      const r = LICHTBLICK_RANG.indexOf(z.liveKlassen[i]);
+      if (r >= 0 && r <= rang) { rang = r; best = i; }
+    }
+    if (best < 0) return null;
+    const k = z.liveKlassen[best];
+    return { ply: best, klasse: k, text: `Zug ${nummerVon(best)} ${sanDeutsch(z.san[best])}: ${KLASSEN_NAME[k] || k}` };
+  }
+
   // Chip nicht wertender Partien: je Modus, gegen angemeldete Bots im Modus normal "GAST" (w0plus-a-fix)
   function chipText() {
     if (MODUS_CHIP[z.modus] && z.modus !== 'uebung') return MODUS_CHIP[z.modus];
@@ -1520,23 +1753,17 @@ export function zeige(root, params, app) {
     o.setAttribute('role', 'dialog');
     o.setAttribute('aria-modal', 'true');
     o.setAttribute('aria-labelledby', 'erg-wort');
-    const wort = { sieg: 'SIEG!', niederlage: 'VERLOREN', remis: 'REMIS' }[ergebnis];
+    // U7 (PLAN 2.6): "Sieg" mit goldenem Ausrufezeichen, Niederlage ruhig und kleiner, Remis gold-neutral
+    const wort = { sieg: 'Sieg<span class="ausruf">!</span>', niederlage: 'Partie verloren', remis: 'Remis' }[ergebnis];
     const nr = nummerVon(Math.max(0, z.zuege.length - 1));
     let unter;
     if (grund === 'matt') unter = ergebnis === 'sieg' ? `Schachmatt im ${nr}. Zug gegen ${bot.name}` : `${bot.name} setzt dich im ${nr}. Zug matt`;
     else if (grund === 'aufgabe') unter = `Aufgegeben gegen ${bot.name}. Nächstes Mal klappt’s!`;
     else unter = `${GRUND_TEXT[grund] || 'Remis'} gegen ${bot.name}`;
-    const konfetti = ergebnis === 'sieg' && !reduziert
-      ? '<div class="konfetti" aria-hidden="true">' + Array.from({ length: 42 }, (_, i) => {
-        // Premium-Umbau U1: Konfetti in den Theme-Farben statt Neon
-        const farben = ['var(--akzent)', 'var(--gold)', 'var(--gut)', 'var(--k-stark)', 'var(--k-brillant)', 'var(--tinte)', 'var(--k-ungenau)'];
-        return `<i style="--l:${(i * 37) % 100}%;--d:${(i % 7) * 0.18}s;--t:${2.6 + (i % 5) * 0.35}s;--c:${farben[i % farben.length]};--r:${(i * 47) % 360}deg"></i>`;
-      }).join('') + '</div>'
-      : '';
-    // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne
+    // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne. Kein Konfetti mehr.
     const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
-    const kopfWort = `<h2 class="erg-wort" id="erg-wort">${wort}</h2>`;
-    o.innerHTML = `${konfetti}
+    const kopfWort = `<h2 class="erg-wort disp" id="erg-wort">${wort}</h2>`;
+    o.innerHTML = `
       <div class="ergebnis-karte">
         <button class="icon-knopf erg-zu" type="button" aria-label="Brett ansehen">${icon('auge')}</button>
         ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${chipText()}</span></div>`}
@@ -1546,16 +1773,21 @@ export function zeige(root, params, app) {
             <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>
         </div>
         <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
-        <div class="erg-bot"><span class="avatar"><img src="${esc(bot.avatar)}" alt=""></span><div class="sprechblase links"></div></div>
+        <div class="erg-bot"><span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
         <div class="erg-knoepfe"></div>
       </div>`;
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
+    // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
+    o.querySelector('.erg-bot').hidden = app.einstellungen().sprueche === 'aus';
     o.querySelector('.erg-zu').addEventListener('click', () => {
       o.hidden = true;
+      s.classList.remove('mit-ergebnis');
       $('.ergebnis-zeigen').hidden = false;
     });
     s.append(o);
+    // U7: der Screen dahinter tritt zurueck (scale .975, nur transform), die Karte federt auf
+    s.classList.add('mit-ergebnis');
     const karte = o.querySelector('.ergebnis-karte');
     karte.setAttribute('tabindex', '-1');
     karte.focus({ preventScroll: true });
@@ -1660,7 +1892,7 @@ export function zeige(root, params, app) {
           const [t, u] = ziele[i];
           const an = sterne[i] && !(rechnet && i === 1);
           return `<div class="erg-stern${an ? ' an' : ' aus'}${an && neueSterne[i] ? ' neu' : ''}${rechnet && i === 1 ? ' wartet' : ''}" style="--i:${i}" data-i="${i}">
-              <span class="e-stern" aria-hidden="true">★</span><b>${esc(t)}</b><small>${esc(u)}</small>
+              <span class="e-stern" aria-hidden="true">${icon('stern')}</span><b>${esc(t)}</b><small>${esc(u)}</small>
               ${an && neueSterne[i] ? '<span class="e-neu">NEU</span>' : ''}<span class="sr">${rechnet && i === 1 ? 'wird berechnet' : an ? 'erreicht' : 'nicht erreicht'}</span></div>`;
         };
         const rechnetHtml = `<div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
@@ -1689,8 +1921,13 @@ export function zeige(root, params, app) {
               ? `${knapp ? 'Knapp!' : 'Kopf hoch!'} Schau dir ${anzahl === 1 ? 'den Schlüsselmoment' : `die ${anzahl} Schlüsselmomente`} in der Analyse an.`
               : (knapp ? 'Knapp! In der Analyse siehst du, wo mehr drin war.' : 'Kopf hoch! In der Analyse siehst du, wo die Partie gekippt ist.'))
             : ergebnis === 'remis' ? 'Ein halber Punkt! In der Analyse siehst du, wo mehr drin war.' : '';
+          // U7: Niederlage ruhig mit Lichtblick-Karte zuerst (Flos bester Zug aus den Live-Klassen); wie der Tipp nur,
+          // wenn kein Paket am Ort ergebnis:karte etwas zeigt
+          const lb = ergebnis === 'niederlage' && !karten ? lichtblick() : null;
+          const lbHtml = lb ? `<div class="erg-lichtblick k-${esc(lb.klasse)}"><span class="lb-sym">${icon('sonne')}</span>
+            <div class="lb-text"><b>Lichtblick</b><span>${esc(lb.text)}</span></div></div>` : '';
           // der Tipp nur, wenn kein Paket am Ort ergebnis:karte etwas zeigt
-          mitte.innerHTML = `${rechnet ? rechnetHtml : genauHtml(true)}
+          mitte.innerHTML = `${lbHtml}${rechnet ? rechnetHtml : genauHtml(true)}
             ${rechnet || !tipp || karten ? '' : `<p class="erg-tipp">${esc(tipp)}</p>`}`;
         }
         const neu = wertet ? erg.neuFreigeschaltet : null;
@@ -1748,10 +1985,13 @@ export function zeige(root, params, app) {
         }
         // Klang je Stern (Pakete: registriereKlang('stern'), der klingt auch bei reduzierter Bewegung; ohne
         // Register wie vor Runde 4: zug, bei reduzierter Bewegung still)
+        // U7, Takt (PLAN 3.7): der Klang sitzt auf der Landung jedes Sterns (360 ms + i x 250 ms, Landung nach 220 ms),
+        // Abstaende mit dem Tempo, aber nie unter 0,6 (takt); bei reduzierter Bewegung erklingen alle drei
         if (ergebnis === 'sieg' && wertet) {
           const opt = { reduziert: !!reduziert };
-          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i], opt), 450 + i * 350); });
-          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true, opt), 800);
+          const f = taktFaktor();
+          if (!nachtrag) sterne.forEach((an, i) => { if (an && !(rechnet && i === 1)) spaeter(() => klang.stern(i, !!neueSterne[i], opt), Math.round((580 + i * 250) * f)); });
+          else if (sterne[1] && neueSterne[1]) spaeter(() => klang.stern(1, true, opt), Math.round(800 * f));
         }
         melde({ typ: 'overlay', ergebnis, sterne, neu: neu ? neu.id : null, rechnet, nachtrag, wertet, feier: feierBox.children.length, karten });
       },
@@ -1760,6 +2000,7 @@ export function zeige(root, params, app) {
   function zeigeOverlayWieder() {
     if (!overlay) return;
     overlay.el.hidden = false;
+    s.classList.add('mit-ergebnis');
     $('.ergebnis-zeigen').hidden = true;
   }
 
@@ -1772,8 +2013,8 @@ export function zeige(root, params, app) {
       });
     } catch (e) { wahl = null; }
     const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
-    if (anlass && anlass !== 'begruessung' && zeigeBlase(anlass, 'start', { dauer: 6000, prio: 60, werte: wahl.werte || null })) return;
-    zeigeBlase('begruessung', 'start', { dauer: 6000, prio: 60, werte: (anlass === 'begruessung' && wahl.werte) || null });
+    if (anlass && anlass !== 'begruessung' && zeigeBlase(anlass, 'start', { dauer: BEGRUESSUNG_MS, prio: 60, werte: wahl.werte || null })) return;
+    zeigeBlase('begruessung', 'start', { dauer: BEGRUESSUNG_MS, prio: 60, werte: (anlass === 'begruessung' && wahl.werte) || null });
   }
 
   // ---------- Buehne fuer die Pakete (kommt mit partie:gestartet) ----------
@@ -1842,30 +2083,160 @@ export function zeige(root, params, app) {
   });
 
   // ---------- W0+a: Ort partie:gegner-leiste (ueber dem Gegner, z. B. die Lebensleiste eines Bosses) ----------
-  // Ein Behaelter, der beim Drehen des Geraets zwischen Bot-Karte (quer) und Bot-Leiste (hoch) wandert.
-  // w0plus-a-fix: im Hochformat erstes eigenes Kind von .botleiste-hoch (eigene Zeile, .mit-gegner-leiste), nicht mehr
-  // in .info: Das verschwindet auf dem Handy, solange der Bot spricht, und mit ihm die Lebensleiste.
+  // U7: eine Spielerkarte fuer beide Lagen: der Behaelter ist immer das erste Kind von .spieler.gegner (die Karte traegt
+  // dafuer auch .botbox und .botleiste-hoch); data-lage folgt der Lage des Geraets.
+  // w0plus-a-fix: Ort partie:spieler-leiste an Flos Namen (U7: immer direkt nach .spieler.ich > .name)
   const gegnerLeiste = document.createElement('div');
   gegnerLeiste.className = 'ort-gegner-leiste';
   gegnerLeiste.hidden = true;
-  // w0plus-a-fix: Ort partie:spieler-leiste an Flos Namen (quer in .spieler-quer, hoch in .spieler-hoch)
   const spielerLeiste = document.createElement('div');
   spielerLeiste.className = 'ort-spieler-leiste';
   spielerLeiste.hidden = true;
   const hochMq = window.matchMedia ? window.matchMedia('(orientation: portrait)') : null;
   const lage = () => (hochMq && hochMq.matches ? 'hoch' : 'quer');
   function setzeGegnerLeiste() {
-    const hoch = lage() === 'hoch';
-    const anker = hoch ? $('.botleiste-hoch') : $('.botbox');
-    if (anker && gegnerLeiste.parentNode !== anker) anker.insertBefore(gegnerLeiste, anker.firstChild);
+    if (gegnerLeiste.parentNode !== gegnerKarte || gegnerKarte.firstElementChild !== gegnerLeiste) gegnerKarte.insertBefore(gegnerLeiste, gegnerKarte.firstChild);
     gegnerLeiste.dataset.lage = lage();
-    // nach dem Namen (hoch) bzw. nach dem Namensblock (quer), vor den geschlagenen Figuren
-    const nach = hoch ? $('.spieler-hoch > .name') : $('.spieler-quer > div');
-    if (nach && spielerLeiste.previousSibling !== nach) nach.after(spielerLeiste);
+    const nach = floKarte.querySelector(':scope > .name');
+    if (nach && spielerLeiste.previousElementSibling !== nach) nach.after(spielerLeiste);
     spielerLeiste.dataset.lage = lage();
+    layout();
   }
+
+  // ---------- U7: Uhr (Anzeige; die Logik bringt W0+b) ----------
+  const uhrEl = { bot: gegnerKarte.querySelector('.uhr'), flo: floKarte.querySelector('.uhr') };
+  const uhr = Object.freeze({
+    // zeigt oder versteckt beide Uhren (ohne Uhr bekommt der Name den Platz)
+    zeige(an) {
+      for (const el of Object.values(uhrEl)) el.hidden = !an;
+      s.classList.toggle('mit-uhr', !!an);
+      layout();
+    },
+    // wer: 'bot' | 'flo'; laufend in Tinte, unter 20 s rot mit Uhr-Symbol und Sekundenpuls
+    setze(wer, ms, { laeuft = false } = {}) {
+      const el = uhrEl[wer];
+      if (!el) return;
+      const t = Math.max(0, Number(ms) || 0);
+      el.querySelector('.uhr-zeit').textContent = fmtUhr(t);
+      const warn = t < UHR_WARN_MS;
+      el.classList.toggle('laeuft', !!laeuft);
+      el.classList.toggle('warn', warn);
+      el.setAttribute('aria-label', `${wer === 'flo' ? 'Deine' : 'Gegnerische'} Bedenkzeit ${fmtUhr(t)}`);
+      const sek = Math.floor(t / 1000);
+      if (warn && laeuft && el.dataset.sek !== String(sek)) {
+        el.dataset.sek = String(sek);
+        anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
+      }
+    },
+  });
+
+  // ---------- U7: Groesse und Lage (Handy: "Brett zuerst", PLAN 2.5) ----------
+  const handyMq = window.matchMedia ? window.matchMedia('(orientation: portrait) and (max-width: 600px)') : null;
+  const inhaltEl = $('.inhalt');
+  const istHandy = () => !!(handyMq && handyMq.matches);
+  // Name nie mit "..." kuerzen: passt er nicht in zwei Zeilen (oder ist ein Wort breiter als die Spalte), der Rufname
+  function passeNamen() {
+    const el = gegnerKarte.querySelector('.name');
+    if (!el) return;
+    if (el.textContent !== bot.name) el.textContent = bot.name;
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 18;
+    const zuGross = el.scrollHeight > lh * 2 + 2 || el.scrollWidth > el.clientWidth + 1;
+    if (zuGross && rufnameVon(bot) !== bot.name) el.textContent = rufnameVon(bot);
+    el.classList.toggle('ruf', el.textContent !== bot.name);
+  }
+  function layout() {
+    if (weg || !inhaltEl || !s.isConnected) return;
+    const handy = istHandy();
+    s.classList.toggle('handy', handy);
+    const h2 = $('.kopf h2');
+    const titel = handy ? kopfKurz() : kopfTitel();
+    if (h2 && h2.textContent !== titel) h2.textContent = titel;
+    if (!handy) {
+      inhaltEl.style.removeProperty('--brett');
+      inhaltEl.style.removeProperty('--spalte');
+      s.classList.remove('coach-eng', 'streifen-unten');
+      passeNamen();
+      pruefeCoachRest();
+      return;
+    }
+    // Brett zuerst: volle Breite minus Rand (2 x 10) und Sockel, ein Vielfaches von 8
+    const rs = getComputedStyle(rahmen);
+    const sockelX = (parseFloat(rs.paddingLeft) || 0) + (parseFloat(rs.paddingRight) || 0);
+    const sockelY = (parseFloat(rs.paddingTop) || 0) + (parseFloat(rs.paddingBottom) || 0);
+    const breit = Math.floor((inhaltEl.clientWidth - 2 * HANDY_RAND - sockelX) / 8) * 8;
+    // Zugstreifen zwischen Coach und Knoepfen erst ab 760 px Hoehe, darunter nach den Knoepfen (die Spalte scrollt)
+    s.classList.toggle('streifen-unten', s.clientHeight < STREIFEN_AB);
+    const setze = (g) => {
+      inhaltEl.style.setProperty('--brett', g + 'px');
+      inhaltEl.style.setProperty('--spalte', (g + sockelX) + 'px');
+    };
+    // Hoehe: alles ausser dem Brett messen (bei der vollen Breite), 4 px Puffer bis zur Unterkante
+    const passt = (g) => {
+      setze(g);
+      const oben = inhaltEl.getBoundingClientRect().top - inhaltEl.scrollTop;
+      const unten = $('.spielknoepfe').getBoundingClientRect().bottom - oben + 4;
+      return unten <= inhaltEl.clientHeight + 0.5;
+    };
+    const hoehe = (g) => {
+      setze(g);
+      const oben = inhaltEl.getBoundingClientRect().top - inhaltEl.scrollTop;
+      const rest = $('.spielknoepfe').getBoundingClientRect().bottom - oben + 4 - rahmen.offsetHeight;
+      return Math.floor((inhaltEl.clientHeight - rest - sockelY) / 8) * 8;
+    };
+    s.classList.remove('coach-eng');
+    let g = breit;
+    if (!passt(g)) {
+      // vorher schrumpft der Coach auf eine Zeile (Rest auf Antippen), erst dann das Brett (nie unter 280 px)
+      s.classList.add('coach-eng');
+      if (!passt(g)) g = Math.max(BRETT_MIN, Math.min(breit, hoehe(g)));
+    }
+    setze(Math.max(BRETT_MIN, g));
+    passeNamen();
+    pruefeCoachRest();
+  }
+  let layoutBild = 0;
+  const layoutSpaeter = () => {
+    if (layoutBild || weg) return;
+    layoutBild = requestAnimationFrame(() => { layoutBild = 0; layout(); });
+  };
+  const layoutRo = typeof ResizeObserver === 'function' ? new ResizeObserver(layoutSpaeter) : null;
+  if (layoutRo) layoutRo.observe(s);
+  // Handy: Zahl des waagrechten Balkens nur auf Antippen
+  balken.addEventListener('click', () => {
+    if (!istHandy()) return;
+    balken.classList.add('zeigt-zahl');
+    clearTimeout(z.balkenUhr);
+    z.balkenUhr = spaeter(() => balken.classList.remove('zeigt-zahl'), 2200);
+  });
+
+  // ---------- U7: Duell-Vertrag (U5 baut das Intro) ----------
+  // Laeuft beim Start ein Duell-Intro (html[data-duell="laeuft"]), ziehen Bot (und die Uhr, W0+b) erst nach duell:fertig
+  // (auf document), hoechstens DUELL_MAX_MS. Ohne Duell sofort.
+  let duellAus = null;
+  const duellBereit = document.documentElement.dataset.duell === 'laeuft'
+    ? new Promise((resolve) => {
+      const u = setTimeout(() => fertig('zeit'), DUELL_MAX_MS);
+      function fertig(grund) {
+        clearTimeout(u);
+        document.removeEventListener('duell:fertig', ereignis);
+        duellAus = null;
+        melde({ typ: 'duell', grund });
+        resolve();
+      }
+      const ereignis = () => fertig('ereignis');
+      document.addEventListener('duell:fertig', ereignis);
+      duellAus = () => fertig('verlassen');
+    })
+    : Promise.resolve();
+
   setzeGegnerLeiste();
   if (hochMq && hochMq.addEventListener) hochMq.addEventListener('change', setzeGegnerLeiste);
+  if (handyMq && handyMq.addEventListener) handyMq.addEventListener('change', layout);
+  if (z.tempo) {
+    uhr.zeige(true);
+    uhr.setze('bot', z.tempo.grund * 1000);
+    uhr.setze('flo', z.tempo.grund * 1000);
+  }
   const gegnerOrt = fuelle('partie:gegner-leiste', gegnerLeiste, {
     app, buehne, bot, farbe, modus: z.modus, boss: buehne.boss, lage,
   });
@@ -1940,9 +2311,12 @@ export function zeige(root, params, app) {
     if (pruefeEnde()) return;
     if (z.chess.turn() === farbe) {
       z.phase = 'flo';
-      brett.erlaubeZuege(zielKarte(z.chess));
+      erlaubeFlo();
       zeichneKnoepfe();
     } else {
+      // U7: der erste Bot-Zug wartet auf das Duell-Intro (hoechstens 1,4 s)
+      await duellBereit;
+      if (weg || z.phase !== 'start') return;
       botAmZug();
     }
   })();
@@ -1950,17 +2324,40 @@ export function zeige(root, params, app) {
   // Flo darf schon ziehen, waehrend die Engines noch laden (sie reihen sich ein)
   if (z.chess.turn() === farbe && !z.chess.isGameOver()) {
     z.phase = 'flo';
-    brett.erlaubeZuege(zielKarte(z.chess));
+    erlaubeFlo();
     zeichneKnoepfe();
   }
 
+  layout();
+
+  // Einstellungen wirken sofort (U7: alle Komfort-Schalter aus PLAN 4, ohne Neuladen)
   const beiEinstellungen = (e) => {
     const d = e.detail || {};
     brett.koordinaten(!!d.koordinaten);
+    const lageVorher = brett.koordLage();
+    brett.setzeKoordLage(d.koordLage);
     brett.setzeAutoDame(d.autoDame !== false);
+    brett.setzeSteuerung(d.steuerung);
+    brett.setzePfeileErlaubt(d.pfeile !== false);
     if (d.vorzuege === false) { loescheVorzuege(); if (z.phase === 'bot') brett.erlaubeZuege(null); }
+    if (z.phase === 'flo') erlaubeFlo(); else aktualisiereBestaetigen();
+    setzeAufgeben(d.haltenAufgeben !== false);
+    zeichneKnoepfe();
     s.classList.toggle('ohne-balken', ohneBalken(d));
     for (const [name, el] of plaetze) el.hidden = d[name] !== true;
+    const k = $('.kopf [data-aktion="klang"]');
+    if (k) k.setAttribute('aria-pressed', d.klang !== false ? 'true' : 'false');
+    for (const b of $$('.brettwahl button')) b.setAttribute('aria-checked', String(b.dataset.brett === d.brett));
+    if (d.sprueche === 'aus') versteckeBlase();
+    // Coach-Stil: den gezeigten Coach neu schreiben (ohne neue Animation)
+    const p = Number(coachEl.dataset.ply);
+    if (Number.isFinite(p) && z.live[p] && z.live[p].status === 'fertig' && liveAn()) {
+      const kompakt = coachEl.classList.contains('kompakt');
+      coachErgebnis(p, { neu: false });
+      if (kompakt) coachEl.classList.add('kompakt');
+    }
+    if (lageVorher !== brett.koordLage()) layout();
+    else pruefeCoachRest();
   };
   window.addEventListener('schach:einstellungen', beiEinstellungen);
 
@@ -1971,6 +2368,8 @@ export function zeige(root, params, app) {
       phase: () => z.phase,
       effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
+      // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
+      uhr, fmtUhr, layout, duellBereit, halte: () => halte,
     };
   }
 
@@ -2009,6 +2408,11 @@ export function zeige(root, params, app) {
       aktionenOrt.verlasse();
       if (mattOrt) mattOrt.verlasse();
       if (hochMq && hochMq.removeEventListener) hochMq.removeEventListener('change', setzeGegnerLeiste);
+      if (handyMq && handyMq.removeEventListener) handyMq.removeEventListener('change', layout);
+      if (layoutRo) layoutRo.disconnect();
+      if (layoutBild) cancelAnimationFrame(layoutBild);
+      if (duellAus) duellAus();
+      if (halte) halte.verlasse();
       plaetze.clear();
       window.removeEventListener('schach:einstellungen', beiEinstellungen);
       brett.zerstoere();

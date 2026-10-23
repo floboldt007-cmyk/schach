@@ -1,5 +1,306 @@
 /* ============================================================
-   Schach-Arena · Partie: Layout, Spielerkarten, Coach, Zugliste, Aktionen, Handy (Premium-Umbau, Look A)
-   Angelegt von U1 (leer), gefuellt von Paket U7 (PLAN 2.4, 2.5).
+   Crownmate · Partie: Layout, Spielerkarten, Uhr, Sprechblase, Zugliste, Aktionen, Handy (Premium-Umbau, Look A)
+   Angelegt von U1 (leer), gefuellt von Paket U7 (PLAN 2.4, 2.5). Die Coach-Karte ist ein gemeinsames Bauteil
+   (css/bauteile.css), das Brett mit Sockel und Balken kommt aus U6 (css/board.css, css/app.css "Brett-Rahmen").
    Nur Tokens benutzen (css/tokens.css, css/themes/<id>.css), keine festen Farben.
+   Lagen:
+     quer             Brett im Sockel links (Balken 18 px senkrecht), rechts eine Spalte (300 bis 420 px)
+     hoch (iPad)      eine Spalte: Gegner, Brett, Flo, Coach, Zugstreifen, Aktionen (order)
+     Handy (hoch, bis 600 px)  "Brett zuerst": js/ui/partie.js layout() setzt --brett und --spalte an .inhalt,
+                      .coach-eng (Coach eine Zeile) und .streifen-unten (Zugstreifen nach den Knoepfen)
    ============================================================ */
+
+.partie { --balken: 18px; --spalt: 12px; --rahmen: var(--sockel-rand); --seite: clamp(300px, 31vw, 420px); --luecke: 12px; }
+.partie.ohne-balken { --balken: 0px; --spalt: 0px; }
+.partie.ohne-balken .evalbalken { display: none; }
+.partie .inhalt { position: relative; flex: 1; min-height: 0; min-width: 0; }
+.partie .seite { min-height: 0; min-width: 0; }
+.partie .brettzone { position: relative; display: flex; gap: var(--spalt); align-items: stretch; flex: none; }
+.partie .brett-rahmen { padding: var(--rahmen); }
+.partie.ist-ende .brett-rahmen > .brett { filter: saturate(.85); }
+.ergebnis-zeigen { position: absolute; left: 50%; bottom: 16px; z-index: 12; transform: translateX(-50%); }
+/* .knopf:active (scale) darf die Zentrierung nicht ersetzen, sonst springt der Knopf unter dem Finger weg */
+.ergebnis-zeigen:active { transform: translateX(-50%) scale(.97); }
+.ergebnis-zeigen[hidden] { display: none; }
+
+/* ---------- Kopf: Zurueck, Bot-Name und Unterzeile, Brettwahl (iPad), Klang, Zaehlwerk, Zahnrad ---------- */
+.partie .p-kopf { height: var(--kopf-hoehe-partie); padding: 0 24px; gap: 10px; }
+.partie .p-kopf .titel { margin-right: auto; }
+.partie .p-kopf h2 { font-size: 22px; letter-spacing: -.025em; }
+.partie .p-kopf .unter { margin-top: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
+.brettwahl { flex: none; display: flex; gap: 4px; padding: 4px; border-radius: 15px; background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+.brettwahl button { width: var(--tipp); height: var(--tipp); margin: 0; padding: 0; border: 0; border-radius: 12px; background: none;
+  display: grid; place-items: center; cursor: pointer; }
+.brettwahl i { width: 22px; height: 22px; border-radius: 7px; display: grid; grid-template: 1fr 1fr / 1fr 1fr; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--linie-2); transition: transform var(--d-m) var(--feder); }
+.brettwahl i b:nth-child(1), .brettwahl i b:nth-child(4) { background: var(--h); }
+.brettwahl i b:nth-child(2), .brettwahl i b:nth-child(3) { background: var(--d); }
+.brettwahl button[aria-checked="true"] { background: var(--flaeche-3); }
+.brettwahl button[aria-checked="true"] i { transform: scale(1.12); box-shadow: 0 0 0 2px var(--flaeche), 0 0 0 3.5px var(--text); }
+.brettwahl button:focus-visible { outline: var(--fokus); outline-offset: -2px; }
+@media (max-width: 860px) { .partie .brettwahl { display: none; } }
+
+/* ---------- Spielerkarten (.spieler.gegner, .spieler.ich) ---------- */
+.partie .spieler { --av: 46px; position: relative; display: grid; align-items: center; min-width: 0; min-height: 66px;
+  padding: 10px 10px 10px 12px; border-radius: 20px; background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
+  box-shadow: var(--s1), var(--kante); }
+.partie .spieler.gegner { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto; row-gap: 0;
+  grid-template-areas: "leiste leiste leiste" "av info uhr" "blase blase blase"; }
+.partie .spieler.ich { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 0;
+  grid-template-areas: "av name leiste uhr" "av unter unter uhr"; }
+.partie .spieler > .av { grid-area: av; width: var(--av); height: var(--av); margin-right: 12px; border-radius: 15px; overflow: hidden;
+  display: grid; place-items: center; background: var(--flaeche-2); }
+.partie .spieler > .av img { width: 88%; height: 88%; -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.partie .spieler > .av svg { display: block; width: 100%; height: 100%; }
+.partie .spieler.ich > .av { background: var(--flo-grund); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .partie .spieler.gegner > .av { background: color-mix(in srgb, var(--bf, var(--flaeche-3)) 24%, var(--flaeche)); }
+}
+.partie .spieler.gegner > .info { grid-area: info; min-width: 0; }
+.partie .spieler .name { font-weight: 800; font-size: 16px; line-height: 1.15; color: var(--text); min-width: 0;
+  white-space: normal; overflow-wrap: break-word; text-overflow: clip; }
+.partie .spieler.ich > .name { grid-area: name; }
+.partie .spieler .unter { display: flex; align-items: center; gap: 6px; height: 18px; margin-top: 1px; min-width: 0; overflow: hidden;
+  white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
+.partie .spieler.ich > .unter { grid-area: unter; }
+.partie .spieler .p-meta { flex: none; }
+.partie .spieler .denkt-ort { display: inline-flex; align-items: center; flex: none; }
+.partie .spieler .denkt { margin-left: 2px; }
+.partie .spieler > .ort-gegner-leiste { grid-area: leiste; margin-bottom: 8px; min-width: 0; }
+.partie .spieler > .ort-spieler-leiste { grid-area: leiste; margin-left: 8px; align-self: center; }
+/* geschlagene Figuren klein in der Unterzeile (ueberlappend), Vorsprung als Zahl */
+.partie .geschlagen-ort { display: inline-flex; min-width: 0; overflow: hidden; }
+.partie .geschlagen { display: inline-flex; align-items: center; min-width: 0; height: 18px; }
+.partie .geschlagen.leer { display: none; }
+.partie .geschlagen img { width: 18px; height: 18px; margin-right: -7px; flex: none; -webkit-user-drag: none; pointer-events: none; }
+.partie .geschlagen img:last-of-type { margin-right: 0; }
+.partie .geschlagen img.neu-gruppe { margin-left: 9px; }
+.partie .geschlagen .plus { margin-left: 6px; font-size: 12.5px; font-weight: 800; color: var(--text); }
+
+/* ---------- Uhr (66 x 36 auf dem Handy; die Logik bringt W0+b) ---------- */
+.partie .uhr { grid-area: uhr; margin-left: 10px; min-width: 96px; height: 46px; padding: 0 14px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+  font-family: var(--schrift); font-weight: 800; font-size: 22px; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+  background: var(--flaeche-3); color: var(--text-2);
+  transition: background-color var(--d-m) var(--sanft), color var(--d-m) var(--sanft); }
+.partie .uhr[hidden] { display: none; }
+.partie .uhr .uhr-ic { display: none; width: 17px; height: 17px; flex: none; }
+.partie .uhr.laeuft { background: var(--tinte); color: var(--auf-tinte); }
+.partie .uhr.warn .uhr-ic { display: block; }
+.partie .uhr.warn { background: var(--warn-weich); color: var(--warn); box-shadow: inset 0 0 0 1.5px var(--warn); }
+.partie .uhr.warn.laeuft { background: var(--warn); color: var(--grund); box-shadow: none; }
+
+/* ---------- Sprechblase des Bots: quer eine ruhige Zeile in der Karte, hoch haengt sie ueber dem Brett ---------- */
+.partie .spieler > .blase-ort { grid-area: blase; min-width: 0; margin-top: 10px; min-height: 44px; }
+.partie .blase-ort:empty::before { content: attr(data-leer); display: block; padding: 3px 2px; font-size: 14px; font-weight: 600;
+  line-height: 1.35; color: var(--text-2); font-style: italic; }
+.partie .p-blase { font-size: 14px; padding: 9px 13px; }
+.partie .p-blase::before { left: 18px; top: -6px; }
+
+/* ---------- Zugliste (Gitter mit Symbolen) und Zugstreifen ---------- */
+.partie .zugbox { display: flex; flex-direction: column; min-height: 96px; padding: 10px; border-radius: 22px;
+  background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); }
+.zugliste { flex: 1; min-height: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr); align-content: start; gap: 4px 6px;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.zugliste .nr { height: 34px; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px;
+  font-size: 13px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.zugliste .z, .zugleiste .z { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border-radius: 10px;
+  font-weight: 750; font-size: 14.5px; color: var(--text); white-space: nowrap; }
+.zugliste .z.aktuell, .zugleiste .z.aktuell { background: var(--flaeche-3); }
+.zugliste .z.leer { color: var(--text-2); }
+.z-sym { display: inline-flex; flex: none; }
+.z-sym svg { width: 18px; height: 18px; display: block; }
+.z-wartet { flex: none; width: 9px; height: 9px; margin: 0 4px; border-radius: 50%; background: var(--text-2); animation: denkt 1.1s infinite; }
+.zugliste-leer { grid-column: 1 / -1; padding: 8px; font-size: 14px; font-weight: 600; color: var(--text-2); }
+.zugleiste { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 2px; overflow-x: auto; overflow-y: hidden;
+  white-space: nowrap; scrollbar-width: none; overscroll-behavior: contain; }
+.zugleiste::-webkit-scrollbar { display: none; }
+.zugleiste .nr { flex: none; padding-left: 4px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.zugleiste .z { flex: none; gap: 5px; font-size: 13.5px; background: var(--flaeche); box-shadow: var(--kante); }
+.zugleiste .z-sym svg { width: 16px; height: 16px; }
+.zugleiste .zugliste-leer { padding: 8px 6px; }
+
+/* ---------- Aktionen: Hinweis, Zurueck, Drehen, Aufgeben (Woerter unter den Symbolen) ---------- */
+.partie .spielknoepfe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; flex: none; }
+.partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { flex-direction: column; gap: 3px; min-width: 0; min-height: 60px; padding: 6px 2px;
+  border: 0; border-radius: 17px; background: var(--flaeche); box-shadow: var(--s1), var(--kante);
+  font-size: 12.5px; font-weight: 750; color: var(--text-2); }
+.partie .spielknoepfe .knopf .ico { width: 24px; height: 24px; color: var(--text); }
+.partie .spielknoepfe .knopf > span:last-child { max-width: 100%; line-height: 1.12; text-align: center; white-space: normal; }
+.partie .spielknoepfe .halte-symbol { width: 32px; height: 32px; }
+.partie .spielknoepfe .halte-symbol > .ico { width: 20px; height: 20px; }
+.partie .spielknoepfe .hinweis-k.stufe-2 { box-shadow: inset 0 0 0 1.5px var(--text), var(--s1); }
+.partie .spielknoepfe .hinweis-k.rechnet .ico { animation: lade-puls .8s ease-in-out infinite; }
+.partie .spielknoepfe .knopf:disabled { opacity: .45; }
+
+/* ---------- Grosser Moment (Genial): Feld-Puls und Lichtstreif; Ring und Funken kommen aus css/app.css ---------- */
+.partie .effekt-ort .feld-puls { position: absolute; inset: 0; background: var(--kf); opacity: 0;
+  animation: feld-puls calc(1300ms * var(--tempo)) var(--sanft) both; }
+.partie .brett-effekte > .streif-huelle { position: absolute; inset: 0; overflow: hidden; border-radius: var(--r-brett); pointer-events: none; }
+.partie .streif-huelle > .streif { position: absolute; top: -20%; bottom: -20%; left: 0; width: 34%; opacity: .55; color: var(--balken-weiss);
+  background: linear-gradient(90deg, transparent, currentColor 50%, transparent);
+  animation: streif calc(950ms * var(--tempo)) var(--sanft) calc(40ms * var(--tempo)) both; }
+@keyframes feld-puls { 0% { opacity: 0; transform: scale(.7); } 25% { opacity: .5; transform: none; } 100% { opacity: 0; transform: none; } }
+@keyframes streif { from { transform: translateX(-135%) skewX(-16deg); } to { transform: translateX(330%) skewX(-16deg); } }
+
+/* ============================================================
+   QUER (iPad quer, Desktop): Brett links, eine Spalte rechts
+   ============================================================ */
+@media (orientation: landscape) {
+  .partie .inhalt { display: grid; grid-template-columns: auto var(--seite); justify-content: center; align-items: start; gap: 20px;
+    padding: 16px 24px 22px; container: partie / size; }
+  .partie .inhalt > .brettzone {
+    --brett: min(calc(100cqh - 2 * var(--rahmen)), calc(100cqw - var(--balken) - var(--spalt) - 20px - var(--seite) - 2 * var(--rahmen))); }
+  .partie .seite { display: flex; flex-direction: column; gap: var(--luecke); height: 100cqh; }
+  .partie .seite > * { flex: none; }
+  .partie .zugleiste { display: none; }
+  .partie .zugbox { flex: 1 1 0; }
+  .partie .spieler.gegner { order: 1; } .partie .coach { order: 2; } .partie .zugbox { order: 3; }
+  .partie .spieler.ich { order: 4; } .partie .spielknoepfe { order: 5; }
+  .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 4; }
+  .partie .coach { min-height: 112px; align-content: start; }
+}
+/* hohe Querformate (iPad Pro): alles eine Spur groesser */
+@container partie (orientation: landscape) and (min-height: 860px) {
+  .partie .spieler { --av: 52px; min-height: 72px; }
+  .partie .spieler .name { font-size: 17px; }
+  .partie .coach .c-klasse { font-size: 22px; }
+  .partie .coach > .c-text { font-size: 15.5px; }
+  .partie .spielknoepfe > .knopf { min-height: 70px; font-size: 13.5px; }
+}
+/* kurze Querformate (iPad 1024 x 768, 1133 x 744): Karten straffen, die Zugliste behaelt ihre Hoehe */
+@container partie (orientation: landscape) and (max-height: 700px) {
+  .partie .seite { gap: 10px; }
+  .partie .spieler { --av: 40px; min-height: 58px; padding-top: 7px; padding-bottom: 7px; }
+  .partie .spieler > .blase-ort { margin-top: 7px; min-height: 40px; }
+  .partie .coach { min-height: 0; padding: 12px 14px; }
+  .partie .coach > .c-text { font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .partie .spielknoepfe > .knopf { min-height: 54px; }
+  .partie .uhr { height: 40px; min-width: 84px; font-size: 19px; }
+}
+@container partie (orientation: landscape) and (max-height: 440px) {
+  .partie .spieler > .blase-ort, .partie .coach > .c-text, .partie .coach > .coach-knoepfe { display: none; }
+  .partie .spieler.ich { display: none; }
+  .partie .zugbox { min-height: 60px; }
+  .partie .spielknoepfe > .knopf { min-height: 46px; font-size: 11px; }
+  .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
+}
+
+/* ============================================================
+   HOCH (iPad hoch): eine Spalte, Brett zuerst nach dem Gegner, Balken senkrecht links
+   ============================================================ */
+@media (orientation: portrait) and (min-width: 601px) {
+  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 16px 16px; container: partie / size; }
+  .partie .seite { display: contents; }
+  .partie .inhalt > *, .partie .seite > * {
+    --reserve: calc(66px + 66px + 116px + 40px + 62px + 5 * 10px + 2 * var(--rahmen));
+    --brett: min(calc(100cqw - var(--balken) - var(--spalt) - 2 * var(--rahmen)), calc(100cqh - var(--reserve)));
+    width: calc(var(--brett) + var(--balken) + var(--spalt) + 2 * var(--rahmen)); max-width: 100%; flex: none; }
+  .partie .zugbox { display: none; }
+  .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
+  .partie .coach { order: 3; height: 116px; align-content: start; overflow: hidden; }
+  .partie .coach > .c-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .partie .coach.offen { height: auto; }
+  .partie .coach.offen > .c-text { display: block; }
+  .partie .zugleiste { order: 4; height: 40px; }
+  .partie .spielknoepfe { order: 5; }
+  .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
+  .partie .spieler { min-height: 58px; padding: 6px 8px 6px 10px; }
+  .partie .spieler { --av: 44px; }
+  /* die Blase haengt unter der Gegner-Karte ueber dem Brett (gedreht: ueber der Karte) */
+  .partie .spieler > .blase-ort { position: absolute; z-index: 20; top: calc(100% + 8px); left: 10px; right: 10px; margin: 0; min-height: 0;
+    pointer-events: none; }
+  .partie .spieler > .blase-ort:empty { display: none; }
+  .partie.vertauscht .spieler > .blase-ort { top: auto; bottom: calc(100% + 8px); }
+  .partie .p-blase { box-shadow: var(--s2), var(--kante); background: var(--flaeche); }
+  .partie .p-blase::before { background: var(--flaeche); }
+  .partie.vertauscht .p-blase::before { top: auto; bottom: -6px; transform: rotate(225deg); }
+}
+
+/* ============================================================
+   HANDY (hoch, bis 600 px; PLAN 2.5, Pflicht): Brett zuerst, Balken waagrecht ueber dem Brett, eine Spalte gleicher
+   Breite (Brett plus Sockel), Aktionen 4 x 48 px. --brett und --spalte rechnet layout() in js/ui/partie.js.
+   ============================================================ */
+@media (orientation: portrait) and (max-width: 600px) {
+  .partie { --balken: 6px; --spalt: 4px; }
+  .partie .p-kopf { padding: 0 10px; gap: 8px; }
+  .partie .p-kopf h2 { font-size: 19px; }
+  .partie .p-kopf .unter { margin-top: 2px; font-size: 12.5px; }
+  .partie .p-kopf .p-eroeffnung, .partie .p-kopf .p-eroeffnung + .p-sep, .partie .p-kopf .p-lang { display: none; }
+  .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .partie .seite { display: contents; }
+  .partie .inhalt > *, .partie .seite > * { width: var(--spalte, calc(100% - 2 * var(--rand-brett-handy))); max-width: 100%; flex: none; }
+  .partie .inhalt > .brettzone { flex-direction: column; gap: 4px; }
+  .partie .zugbox { display: none; }
+  .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
+  .partie .coach { order: 3; } .partie .zugleiste { order: 4; } .partie .spielknoepfe { order: 5; }
+  .partie.streifen-unten .zugleiste { order: 6; }
+  .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
+  /* Spielerkarten: Avatar 36, Name 15 px fett (zweizeilig erlaubt, nie gekuerzt), kompakte Uhr */
+  .partie .spieler { --av: 36px; min-height: 48px; padding: 4px 6px 4px 8px; border-radius: 16px; }
+  .partie .spieler > .av { margin-right: 10px; border-radius: 12px; }
+  .partie .spieler .name { font-size: 15px; }
+  .partie .spieler .unter { height: 16px; font-size: 12px; margin-top: 0; }
+  .partie .geschlagen, .partie .geschlagen img { height: 16px; }
+  .partie .geschlagen img { width: 16px; }
+  .partie .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; gap: 4px; }
+  .partie .uhr .uhr-ic { width: 14px; height: 14px; }
+  .partie .spieler > .ort-gegner-leiste { margin-bottom: 4px; }
+  /* Blase haengt ueber dem Brett */
+  .partie .spieler > .blase-ort { position: absolute; z-index: 20; top: calc(100% + 6px); left: 8px; right: 8px; margin: 0; min-height: 0;
+    pointer-events: none; }
+  .partie .spieler > .blase-ort:empty { display: none; }
+  .partie.vertauscht .spieler > .blase-ort { top: auto; bottom: calc(100% + 6px); }
+  .partie .p-blase { font-size: 13.5px; padding: 7px 11px; box-shadow: var(--s2), var(--kante); background: var(--flaeche);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .partie .p-blase::before { display: none; }
+  /* Bewertungsbalken waagrecht ueber dem Brett (6 px, volle Breite, Weiss von links, gedreht von rechts), Zahl auf Antippen */
+  .partie .evalbalken { width: 100%; height: 6px; border-radius: var(--r-pille); overflow: visible; cursor: pointer;
+    box-shadow: 0 0 0 1px var(--linie-2); }
+  .partie .evalbalken::after { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -4px; }
+  .partie .evalbalken .weiss { border-radius: var(--r-pille) 0 0 var(--r-pille); transform-origin: 0 50%;
+    transform: scaleX(var(--anteil, .5)); }
+  .partie .evalbalken.gedreht .weiss { border-radius: 0 var(--r-pille) var(--r-pille) 0; transform-origin: 100% 50%; transform: scaleX(var(--anteil, .5)); }
+  .partie .evalbalken .weiss::before { display: none; }
+  .partie .evalbalken .mitte { left: 50%; right: auto; top: 0; bottom: 0; width: 1px; height: auto; }
+  .partie .evalbalken .wert, .partie .evalbalken[data-fuehrt] .wert, .partie .evalbalken.gedreht[data-fuehrt] .wert { display: none; top: auto; bottom: calc(100% + 6px);
+    left: 50%; right: auto; transform: translateX(-50%); writing-mode: horizontal-tb; padding: 3px 8px; border-radius: var(--r-pille);
+    font-size: 12px; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s2); z-index: 25; }
+  .partie .evalbalken.zeigt-zahl .wert { display: block; }
+  /* Coach: eine feste Hoehe (das Brett springt nie), Text eine Zeile, ab 760 px Hoehe zwei; bei Platznot nur die
+     Kopfzeile (.coach-eng); Antippen zeigt den Rest (.offen, die Spalte scrollt dann) */
+  .partie .coach { height: 58px; padding: 8px 12px; border-radius: 16px; align-content: start; overflow: hidden; column-gap: 8px; }
+  .partie .coach > .c-symbol { width: 26px; height: 26px; }
+  .partie .coach .c-klasse, .partie .coach.leer .c-klasse, .partie .coach.wartet .c-klasse, .partie .coach.kompakt .c-klasse { font-size: 16px; }
+  .partie .coach.k-brillant .c-klasse { font-size: 16px; padding: 1px 10px 2px; }
+  .partie .coach .c-zug { font-size: 13.5px; }
+  .partie .coach .c-eval { font-size: 12px; }
+  .partie .coach .c-buch { font-size: 12.5px; }
+  .partie .coach .combo { height: 22px; padding: 0 8px; font-size: 10.5px; top: 8px; right: 8px; }
+  .partie .coach:has(.combo) > .c-kopf { padding-right: 84px; }
+  .partie .coach > .c-text { margin-top: 3px; font-size: 13.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .partie .coach.kompakt { padding-top: 8px; padding-bottom: 8px; }
+  .partie .coach.kompakt > .c-symbol { width: 26px; height: 26px; }
+  .partie .coach > .coach-knoepfe { display: none; }
+  .partie .coach.mit-zusatz:not(.offen) > .c-text { display: none; }
+  .partie .coach > .c-zusatz { margin-top: 3px; font-size: 13px; }
+  .partie:not(.streifen-unten) .coach { height: 76px; }
+  .partie:not(.streifen-unten) .coach > .c-text { -webkit-line-clamp: 2; }
+  .partie.coach-eng .coach { height: 44px; }
+  .partie.coach-eng .coach > .c-text, .partie.coach-eng .coach > .c-zusatz { display: none; }
+  .partie .coach.offen { height: auto; }
+  .partie .coach.offen > .c-text { display: block; -webkit-line-clamp: unset; }
+  .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }
+  .partie .coach.offen > .c-zusatz { display: block; }
+  /* Zugstreifen und Aktionen */
+  .partie .zugleiste { height: 34px; min-height: 34px; padding: 0; }
+  .partie .zugleiste .z { height: 30px; }
+  .partie .spielknoepfe { gap: 6px; }
+  .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { min-height: 48px; height: 48px; padding: 3px 2px; gap: 1px;
+    border-radius: 14px; font-size: 11.5px; letter-spacing: -.01em; }
+  .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
+  .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; }
+  .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
+}
