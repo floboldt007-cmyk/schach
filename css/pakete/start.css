@@ -106,12 +106,12 @@
    gilt nicht als erledigt). Zwei Zeilen schoben auf dem iPad quer 1024 x 768 den Spielen-Knopf 21 px unter den Rand.
    Haelt die Arena den Spielen-Knopf einmal selbst im Bild (U5/U7), kann diese Regel fallen. */
 .heute-karte .st-neu:not(:only-child) { display: none; }
-.st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 2px 4px 0;
+.st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 5px; margin: 0; padding: 4px 2px 4px 0;
   border: 0; border-radius: var(--r-m); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .st-neu-los:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .st-neu-pfeil { flex: none; display: grid; place-items: center; color: var(--text-2); }
 .st-neu-pfeil .ico { width: 14px; height: 14px; }
-.st-neu-siegel { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--flaeche);
+.st-neu-siegel { flex: none; width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center; background: var(--flaeche);
   color: var(--akzent-text); box-shadow: var(--kante); }
 .st-neu-siegel .ico { width: 19px; height: 19px; }
 .st-neu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 650; color: var(--text); }
@@ -119,11 +119,11 @@
    die Heute-Karte bleibt so niedrig wie die anderen Zeilen, der Spielen-Knopf bleibt auf dem iPad 1024 x 768 im Bild.
    Der Kopf bricht nie um (der laengste Titel passt ab 375 px ganz, tests/start.test.mjs misst 375, 390, 1024 und 1180);
    wird es doch einmal enger, kuerzt die Ellipse den Titel statt eine zweite Zeile anzufangen */
-.st-neu-kopf { min-width: 0; font-size: 13.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-neu-kopf { min-width: 0; font-size: 13.25px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .st-neu-text b { font-weight: 800; color: var(--text); }
 .st-neu-text small { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 44 px Tippflaeche; ragt etwas in den Rand der Heute-Karte, damit der Text Platz hat */
-.st-neu .st-neu-weg { flex: none; width: 44px; height: 44px; margin-right: -8px; border: 0; box-shadow: none; background: transparent; color: var(--text-2); }
+.st-neu .st-neu-weg { flex: none; width: 44px; height: 44px; margin-right: -12px; border: 0; box-shadow: none; background: transparent; color: var(--text-2); }
 .st-neu .st-neu-weg .ico { width: 18px; height: 18px; }
 
 /* ---------- Einstellungen: "Erste Schritte" ---------- */

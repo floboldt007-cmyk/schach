@@ -26,7 +26,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8862);
 const ERW = 'pakete/gedaechtnis/index';
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=${ERW}`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const BILDER = process.env.BILDER || path.join(WURZEL, 'design', 'app-shots', 'gedaechtnis');
 const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
@@ -861,10 +861,13 @@ async function browserTeil(browser) {
       null, { timeout: 10000 });
     // auf dem Handy stehen Sprechblase und Ort arena:panel-bot hinter "Mehr" (.detail.offen, css/app.css): aufklappen wie Flo,
     // sonst waeren beide display:none und jede Pruefung der Masse leer
-    const zu = await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height === 0);
-    await h.seite.locator('.detail .mehr-knopf').click();
-    await h.seite.waitForFunction(() => document.querySelector('.detail').classList.contains('offen')
-      && document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height > 0, null, { timeout: 5000 });
+    // Seit der Weltkarte (U5) gibt es am Handy kein "Mehr" mehr: das Panel zeigt alles und rollt. Den alten Weg gibt es nur
+    // noch, wenn der Knopf da ist.
+    const mehrDa = await h.seite.locator('.detail .mehr-knopf').count() > 0;
+    const zu = mehrDa ? await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height === 0) : true;
+    if (mehrDa) await h.seite.locator('.detail .mehr-knopf').click();
+    await h.seite.waitForFunction((m) => (!m || document.querySelector('.detail').classList.contains('offen'))
+      && document.querySelector('.detail .gd-erzfeind').getBoundingClientRect().height > 0, mehrDa, { timeout: 5000 });
     await h.seite.evaluate(() => document.querySelector('.detail .gd-erzfeind').scrollIntoView({ block: 'center' }));
     await warte(600);
     const ezH = await h.seite.evaluate(() => {
@@ -878,7 +881,7 @@ async function browserTeil(browser) {
         blase: bl ? bl.textContent : '', blaseHoehe: rb.height };
     });
     const sollH = await erwartet(h.seite, 'kalle');
-    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile hinter "Mehr" (zu: versteckt, auf: sichtbar), ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
+    pruefe(`${dunkel ? 'dunkel' : 'hell'}: Erzfeind-Zeile sichtbar (mit "Mehr": erst zu, dann auf), ganz im Bild (390 px), eine ruhige Zeile, keine waagrechte Rolle`,
       zu && ezH.hoehe >= 20 && ezH.hoehe <= 60 && ezH.links >= 0 && ezH.rechts <= ezH.breite && ezH.oben >= 0 && ezH.unten <= ezH.hoch && ezH.scroll
       && ezH.text === 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' && ezH.farbe !== ezH.hg, JSON.stringify({ zu, ...ezH }));
     pruefe(`${dunkel ? 'dunkel' : 'hell'}: Panel-Begruessung nach 3 Niederlagen in Folge: Mut-Satz, genau die bestimmte Variante, sichtbar`,

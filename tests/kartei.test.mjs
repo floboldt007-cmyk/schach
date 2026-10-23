@@ -32,7 +32,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8863);
 const ERW = 'pakete/kartei/index';
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=${ERW}`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 // Bilder nie ins Repo (REGELN): Standard ist ein Ordner unter dem Temp-Verzeichnis

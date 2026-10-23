@@ -33,7 +33,7 @@ const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8867);
 const ERW = 'pakete/start/index';
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&erw=${ERW}`;
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 // Bilder nie ins Repo (REGELN): Standard ist ein Ordner unter dem Temp-Verzeichnis
@@ -897,7 +897,7 @@ async function browserTeil(browser) {
 
   // ---------- zusammen mit der Kartei (A3): eine Zeile in der Heute-Karte, Training nur mit Karten, Kopf einzeilig ----------
   gruppe = 'Mit Kartei';
-  const URL_K = `http://127.0.0.1:${PORT}/index.html?test&erw=${ERW},pakete/kartei/index`;
+  const URL_K = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW},pakete/kartei/index`;
   const mk = await neueSeite(browser, { w: 1024, h: 768 });
   await mk.seite.goto(URL_K + '#arena');
   await mk.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
@@ -1045,6 +1045,11 @@ async function browserTeil(browser) {
       await bereite(hs.seite, { modul: { v: 1, gesehen: th, regeln: null, einstufung: null, ersterSieg: '', letzte: 'pprobe1',
         fahrplan: { start: th, erfahren: false, heute: null, erledigt: [], benutzt: [] } } }, '#arena');
       await hs.seite.locator('.heute-karte .st-neu').scrollIntoViewIfNeeded();
+      // Das Detail-Panel der Weltkarte (U5) federt mit scale(.985) ein: erst messen, wenn es steht
+      await hs.seite.evaluate(() => Promise.all(document.getAnimations().filter((a) => {
+        const t = a.effect && a.effect.target;
+        return t && t.closest && t.closest('.detail') && a.effect.getComputedTiming().endTime !== Infinity;
+      }).map((a) => a.finished.catch(() => null))));
       const hz = await hs.seite.evaluate(() => {
         const z = document.querySelector('.heute-karte .st-neu');
         const r = z.getBoundingClientRect();
@@ -1080,7 +1085,7 @@ async function browserTeil(browser) {
   // PAKETE ohne start (so wie vor der Integration; nach ihr steht das Paket dort und wird hier herausgenommen)
   await op.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
     body: "export const PAKETE = Object.freeze(['sicherung']);\nexport const REITER = Object.freeze([]);\n" }));
-  await op.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#start`);
+  await op.seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern#start`);
   await op.seite.waitForFunction(() => location.hash === '#arena' && document.title === 'Crownmate' && !!document.querySelector('.screen.arena'), null, { timeout: 20000 });
   const ohne = await op.seite.evaluate(() => ({ st: !!document.querySelector('.st-screen'), platzhalter: !!document.querySelector('.screen.platzhalter'),
     css: !!document.querySelector('link[data-paket="start"]'), zustand: history.state && history.state.name }));
