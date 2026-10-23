@@ -5,11 +5,12 @@
 //   zahlText(n) -> '21.300'
 //   tafelName(tafelId, botNachId) -> 'Rudis Tafel' | 'Boss-Tafel Baron von Gambit / Meister' | 'Tafel'
 //   unterText(ergebnis, name) -> Satz der Abrechnungszeile ("Platz 3 auf Rudis Tafel", "Rekord auf ...", ...)
-//   abrechnungsZeile({ ergebnis, tafelName, schonGezeigt, merke, mini, beiListe, post }) -> { el, beende(), verlasse() }
+//   abrechnungsZeile({ ergebnis, tafelName, schonGezeigt, merke, mini, beiListe, post, stumm }) -> { el, beende(), verlasse() }
 //       div.pk-abr[data-zeile="punkte"]: "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ^ 2"; bei einem Rekord bleibt
 //       der alte Wert durchgestrichen stehen (.pk-alt), der neue zaehlt hoch. Bei ueberholten Zeilen (^) eine Mini-Tafel mit
 //       drei Zeilen (ueber dir, du, unter dir): deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken (Klang
 //       "klick"). Antippen zeigt die Aufschluesselung und "Zur Bestenliste". data-fertig="1", sobald das Endbild steht.
+//       stumm: true, wenn das Ergebnis den grossen Moment schon mit Klang "rekord" zeigt (dann nur das Klacken, kein Echo).
 //       post: { name, text() -> Text } (Ueberhol-Post, 3.13): in der Aufschluesselung einmal still "Ueberhol-Post an Jule";
 //       Antippen zeigt den Text mit Code als Vorschau, verschickt wird nur von Hand (Kopieren oder Teilen-Blatt).
 //   panelZeile({ name, best, platz, beiTipp }) -> HTMLElement   Ort arena:panel-bot (3.17 "Rudis Tafel: Platz 4"):
@@ -59,9 +60,11 @@ export function unterText(e, name = 'Tafel') {
   // Platz gewonnen: "Platz 3 auf Rudis Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
   if (e.rekord && e.aufstieg > 0 && e.platz != null) return `Platz ${e.platz} auf ${name}`;
   if (e.rekord) return `Rekord auf ${name} · +${zahlText(e.w - (e.vorher || 0))}`;
+  // "So nah" vor dem Platz: eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten, und der leise
+  // Moment (hoechstens einmal je Tafel und Woche) waere sonst nie zu sehen
+  if (e.fast) return `So nah wie noch nie: ${e.fast.prozent} % deines Rekords auf ${name}`;
   if (e.platz != null) return `Platz ${e.platz} auf ${name}`;
   if (e.wochenPlatz != null) return `Diese Woche: Platz ${e.wochenPlatz} auf ${name}`;
-  if (e.fast) return `So nah wie noch nie: ${e.fast.prozent} % deines Rekords auf ${name}`;
   return `${name}: dein Bestwert ${zahlText(e.bestwert)}`;
 }
 
@@ -152,7 +155,7 @@ function zeigePost(box, post) {
 }
 
 export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schonGezeigt = false, merke = () => {}, mini = null,
-  beiListe = null, post = null } = {}) {
+  beiListe = null, post = null, stumm = false } = {}) {
   const z = el('div', 'pk-abr');
   z.dataset.zeile = 'punkte';
   z.dataset.paket = 'punkte';
@@ -221,8 +224,9 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schon
     spaeter(() => {
       const t0 = parseInt(z.style.getPropertyValue('--t'), 10) || 300;
       const f = tempo();
-      // Klang: ein Rekord klingt (Datei "rekord"), Niederlagen ohne Rekord bleiben still (3.13)
-      const klingt = e.rekord || e.platz1 || e.aufstieg > 0;
+      // Klang: ein Rekord klingt (Datei "rekord"), Niederlagen ohne Rekord bleiben still (3.13); zeigt das Ergebnis den
+      // grossen Moment, klingt er dort (stumm), hier nur das Klacken der ueberholten Zeilen
+      const klingt = !stumm && (e.rekord || e.platz1 || e.aufstieg > 0);
       if (f === 0) {
         endbild();
         fertig = true;

@@ -9,22 +9,29 @@
 // Hoert:   partie:gestartet, hilfe:genutzt, zug:gespielt, zug:zurueckgenommen (Zuege nach Hilfe zaehlen 0 und belegen keinen
 //          Platz), partie:beendet (merkt sie bis zur Analyse), partie:analysiert (Tafelwert aus der Spielanalyse, Eintrag auf
 //          der Tafel, synchron vor dem Nachtrag des Ergebnisses; zweimal je Partie ist harmlos), funken:geaendert (Level
-//          fuer die Spielerkarte), app:bereit (einmaliger Umzug der gespeicherten Analysen), speicher:zurueckgesetzt.
+//          fuer die Spielerkarte), app:bereit (vorlaeufige Bot-Laeufe laden, einmaliger Umzug der gespeicherten Analysen),
+//          speicher:zurueckgesetzt.
 // Sendet:  punkte:geaendert { punkte, platz, tafel, rekord } je bewerteter Partie; rekord:neu { tafel, wert, vorher, platz,
 //          fenster: 'allzeit', partieId } bei einem neuen eigenen Allzeit-Rekord auf einer Tafel.
 // Orte:    ergebnis:abrechnung 10 (Zeile PUNKTE), bestenliste:reiter Ich 10, Bots 20, Freunde 50, arena:panel-bot 40
 //          (Tafel des gewaehlten Bots mit Bestwert, Antippen oeffnet sie).
-// Feier:   bot-rekord (gross 78) "Platz 1 auf ... Tafel", wenn dabei Gaeste hinter dir landen; tafel-rekord (gross 70, eigene
-//          Quelle wie "Eigener Allzeit-Rekord" in 3.13) bei einem neuen Rekord. Ist das grosse Budget dieser Partie schon
-//          vergeben (gleiche oder hoehere Prioritaet), kommt der Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf
-//          Rudis Tafel ^ 2" (vorher Platz 6), sonst "Rekord auf Rudis Tafel: 23.100". Klang "rekord". Erster Eintrag, Wochen-
-//          und Monatsbeste und "so nah wie noch nie": keine Feier (nur die Abrechnungszeile).
-// Register: Icon "code".
-// Testmodus (?test): window.__punkte = { stand(), speichere(st), S, T, C, F }.
+// Feier:   bot-rekord (gross 78) "Platz 1 auf ... Tafel", wenn dabei Gaeste hinter dir landen (stand vorher ein Bot-Lauf
+//          vorn, sagt dieser Bot einen Satz, 3.13); tafel-rekord (gross 70, eigene Quelle wie "Eigener Allzeit-Rekord" in
+//          3.13) bei einem neuen Rekord. Ist der grosse Platz dieser Partie schon belegt (ein grosser Moment, den das
+//          Ergebnis schon zeigt, egal mit welcher Prioritaet, oder ein wartender mit gleicher oder hoeherer), kommt der
+//          Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf Rudis Tafel ^ 2" (vorher Platz 6), sonst "Rekord auf
+//          Rudis Tafel: 23.100". Klang "rekord" genau einmal: zeigt das Ergebnis den grossen Moment (der klingt dort), bleibt
+//          die Abrechnungszeile still. Erster Eintrag, Wochen- und Monatsbeste und "so nah wie noch nie": keine Feier.
+// Inhalte: daten/punkte/bot-laeufe.json (art 'bot-laeufe', format 1; werkzeuge/nachbar-laeufe.mjs): vorlaeufige Bot-
+//          Laeufe der Nachbar-Bots als Gaeste auf den Tafeln (3.13 "Schon in S1 nicht leer"), nur mit dem Rechenstand der
+//          Formel. Fehlt die Datei, stehen nur Freunde auf den Tafeln.
+// Register: Icon "code", Saetze "tafel-platz1" (der Bot, den du von Platz 1 verdraengt hast).
+// Testmodus (?test): window.__punkte = { stand(), speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F }.
 import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
-import { botNachId, staerkeFuerElo } from '../../bots.js';
+import { botNachId, staerkeFuerElo, registriereSaetze, botSatz } from '../../bots.js';
+import { registriereInhaltsart, ladeInhalt } from '../../inhalte.js';
 import { registriereIcon } from '../../ui/icons.js';
 import { ladeModul, ladePartie, ladePartien, ladeReview, hatReview, ladeEinstellungen, eigeneZuege } from '../../storage.js';
 import { tagSchluessel } from '../../tag.js';
@@ -93,12 +100,45 @@ function nachweisSpaeter(partieId, tafelId) {
   }, 'Nachweis'), 0);
 }
 
-// Ist der eine grosse Moment dieser Partie schon vergeben (gleiche oder hoehere Prioritaet)? Liest nur die
-// Feier-Warteschlange (js/feier.js speichert sie im Modul feier), schreibt nie hinein.
-function grossFrei(partieId, prio) {
+// Feier-Warteschlange dieser Partie, nur lesend (js/feier.js speichert sie im Modul feier; punkte schreibt nie hinein)
+function feierEintraege(partieId) {
   const f = ladeModul('feier', { eintraege: [] });
   const l = f && Array.isArray(f.eintraege) ? f.eintraege : [];
-  return !l.some((x) => x && x.partieId === partieId && x.art === 'gross' && x.status !== 'nachlese' && Number(x.prio) >= prio);
+  return l.filter((x) => x && typeof x === 'object' && x.partieId === partieId);
+}
+
+// Ist der eine grosse Platz dieser Partie noch frei? Belegt ist er, wenn das Ergebnis schon einen grossen Moment zeigt
+// (status 'overlay', egal mit welcher Prioritaet: feier.fuerOverlay vergibt den Platz kein zweites Mal), oder wenn ein
+// wartender grosser Moment mindestens so wichtig ist (der verdraengt uns ohnehin). Ein wartender kleinerer weicht uns.
+function grossFrei(partieId, prio) {
+  return !feierEintraege(partieId).some((x) => x.art === 'gross'
+    && (x.status === 'overlay' || (x.status !== 'nachlese' && Number(x.prio) >= prio)));
+}
+
+// Zeigt das Ergebnis den grossen Moment von punkte (mit Klang)? Dann klingt "rekord" dort, die Abrechnungszeile schweigt.
+const EIGENE_GROSSE = ['tafel-rekord', 'bot-rekord'];
+function feierKlingt(partieId) {
+  return feierEintraege(partieId).some((x) => EIGENE_GROSSE.includes(x.quelle) && x.art === 'gross' && x.klang && x.status === 'overlay');
+}
+
+// Satz des Bots, der vorher Platz 1 war (3.13: "dazu ein Satz des ueberholten Bots"); fest gewaehlt, kein Zufall
+const PLATZ1_SAETZE = {
+  benno: ['Donnerwetter, an mir vorbei! Das erzähl ich heute Abend im Stall.'],
+  hilde: ['Na sowas, an mir vorbei! Dafür gibt es ein extra Stück Kuchen.'],
+  kalle: ['Alle Achtung! Am Stammtisch geht die nächste Runde auf dich.'],
+  lisa: ['Schneller als ich! Die Partie schau ich mir gleich noch mal an.'],
+  rudi: ['Bei meiner Ehre, das war ritterlich gespielt. Respekt!'],
+  turm: ['Bemerkenswert. Diese Partie nehme ich in meine Vorlesung auf.'],
+  delia: ['Hut ab! Mutig gespielt, ganz nach meinem Geschmack.'],
+  koenig: ['Fall gelöst: Du warst es. Und zwar richtig gut.'],
+  greta: ['Respekt. Diese Partie lege ich mir heute Abend noch einmal auf.'],
+  stockfisch: ['Notiert. Diese Partie rechne ich heute Nacht noch einmal durch.'],
+};
+function platz1Satz(botId) {
+  const b = botId ? botNachId(botId) : null;
+  if (!b) return null;
+  const t = botSatz(b, 'tafel-platz1', () => 0);
+  return t ? `${b.name}: „${t}“` : null;
 }
 
 function feiern(e) {
@@ -109,8 +149,9 @@ function feiern(e) {
   // Platz 1 einer Tafel (nur mit Gaesten dahinter): grosser Moment 78; ist der schon vergeben, eine Zeile
   if (e.platz1) {
     if (grossFrei(e.id, 78)) {
+      const satz = sicher(() => platz1Satz(e.satzBot), 'Bot-Satz');
       melde({ partieId: e.id, quelle: 'bot-rekord', titel: `PLATZ 1 AUF ${gross}`,
-        text: `${A.zahlText(e.w)} Punkte, vor ${e.ueberholt.join(', ') || 'allen Gästen'}`, symbol: 'podest', klang: 'rekord' });
+        text: `${A.zahlText(e.w)} Punkte, vor ${e.ueberholt.join(', ') || 'allen Gästen'}${satz ? `. ${satz}` : ''}`, symbol: 'podest', klang: 'rekord' });
     } else {
       melde({ partieId: e.id, quelle: 'rekord', titel: `Platz 1 auf ${name}${pfeil}`, text: e.platzVorher ? `vorher Platz ${e.platzVorher}` : null, symbol: 'podest' });
     }
@@ -148,6 +189,15 @@ function partieAnalysiert(d) {
   // nach den anderen Hoerern dieses Ereignisses (Funken meldet seine Level-Feier synchron), aber vor dem Nachtrag des
   // Ergebnisses (der kommt erst nach dem Ende des Ereignisses ueber ein await): so sieht grossFrei() deren grosse Momente
   queueMicrotask(() => sicher(() => feiern(e), 'Feier'));
+}
+
+// Vorlaeufige Bot-Laeufe (3.13 "Schon in S1 nicht leer"): nur mit dem Rechenstand der Formel, sonst keine (alte und
+// neue Regeln mischen sich nie). Fehlt die Datei (grund 'netz'), bleiben die Tafeln bei Freunden und eigenen Zeilen.
+const BOT_LAEUFE = 'punkte/bot-laeufe';
+async function ladeBotLaeufe() {
+  const r = await ladeInhalt(BOT_LAEUFE, { art: 'bot-laeufe' });
+  if (!r.ok || r.veraltet || !r.kopf || r.kopf.rechenstand !== S.STAND) { S.setzeBotLaeufe(null); return 0; }
+  return S.setzeBotLaeufe(r.daten);
 }
 
 // Umzug bestehender Spielstaende (SPIELKONZEPT 6.3): einmal beim ersten Start die gespeicherten Analysen (bis zu 12)
@@ -201,22 +251,51 @@ function postText(e) {
   return `Ich hab deine ${A.zahlText(e.post.w)} auf ${name} geknackt, jetzt ${A.zahlText(e.w)}.${code && code.ok ? ` Code: ${code.code}` : ''}`;
 }
 
+// "So nah wie noch nie" gilt erst, wenn die Zeile ihn zeigt: beim ersten Zeigen festschreiben; ist der Moment der Woche
+// inzwischen vergeben (eine andere Partie hat ihn gezeigt), steht stattdessen der naechste Satz da. Entschieden wird
+// einmal je Partie (fastEntschieden), damit ein Neuaufbau der Zeile (Nachtrag) denselben Satz zeigt.
+const fastEntschieden = new Map();   // partieId -> true (Satz gezeigt) | false (Moment schon vergeben)
+function fastZeigen(e) {
+  if (!e.fast) return e;
+  if (!fastEntschieden.has(e.id)) {
+    const ok = !!sicher(() => {
+      const st = S.lade();
+      const r = S.merkeFast(st, e);
+      if (r) S.speichere(st);
+      return r;
+    }, 'So nah');
+    fastEntschieden.set(e.id, ok);
+    if (fastEntschieden.size > 40) fastEntschieden.delete(fastEntschieden.keys().next().value);
+  }
+  return fastEntschieden.get(e.id) ? e : { ...e, fast: null };
+}
+
+// Fenster der Bestenliste passend zum Satz: "Diese Woche: Platz 2" oeffnet die Woche, sonst Allzeit (Platz, Rekord, so nah)
+const fensterFuer = (e) => (e.platz == null && !e.rekord && !e.fast && e.wochenPlatz != null ? 'woche' : 'allzeit');
+
 function anbieterAbrechnung(k) {
   const p = k && k.erg && k.erg.partie ? k.erg.partie : null;
   if (!p || typeof p.id !== 'string') return null;
   if ((k.modus || p.modus) === 'uebung') return null;
   // ohne eigenen Zug (z. B. sofort aufgegeben) gibt es keine Spielanalyse und also keine Punkte: keine Zeile
   if (!(eigeneZuege(p) > 0)) return null;
-  const e = S.ergebnisVon(S.lade(), p.id);
-  if (!e) {
+  const roh = S.ergebnisVon(S.lade(), p.id);
+  if (!roh) {
     // die Analyse rechnet noch: ruhiger Schimmer; ohne Analyse (fehlgeschlagen): die Arena holt sie nach
     if (k.rechnet) return A.wartezeile();
     return A.wartezeile({ fehlt: true });
   }
+  const schon = gezeigt.has(p.id);
+  const e = fastZeigen(roh);
   const z = A.abrechnungsZeile({
-    ergebnis: e, tafelName: e.tafel ? A.tafelName(e.tafel, botNachId) : 'Tafel', schonGezeigt: gezeigt.has(p.id), merke: () => gezeigt.add(p.id),
+    ergebnis: e, tafelName: e.tafel ? A.tafelName(e.tafel, botNachId) : 'Tafel', schonGezeigt: schon, merke: () => gezeigt.add(p.id),
     mini: sicher(() => miniTafel(e), 'Mini-Tafel'),
-    beiListe: e.tafel && k.app && typeof k.app.gehe === 'function' ? () => { B.merkeEinstellung({ tafel: e.tafel, reiter: 'bots' }); k.app.gehe('bestenliste', { reiter: 'bots' }); } : null,
+    // der grosse Moment im Ergebnis klingt schon "rekord": die Zeile schweigt (kein Echo)
+    stumm: !!sicher(() => feierKlingt(p.id), 'Klang'),
+    beiListe: e.tafel && k.app && typeof k.app.gehe === 'function' ? () => {
+      B.merkeEinstellung({ tafel: e.tafel, reiter: 'bots' });
+      k.app.gehe('bestenliste', { reiter: 'bots', fenster: fensterFuer(e) });
+    } : null,
     post: e.post && e.tafel ? { name: e.post.name, text: () => postText(e) } : null,
   });
   // Antippen der Ergebnis-Karte zeigt sofort alles (wie die Huelle der Abrechnung), erst nach dem Einhaengen
@@ -251,7 +330,10 @@ function anbieterPanel(k) {
   const ich = gaeste.length ? T.zeilen(t, { fenster: 'allzeit', gaeste }).find((r) => r.eigen) : null;
   return A.panelZeile({
     name: A.tafelName(id, botNachId), best: T.eigene(t, 'allzeit')[0].w, platz: ich ? ich.platz : null,
-    beiTipp: k.app && typeof k.app.gehe === 'function' ? () => { B.merkeEinstellung({ tafel: id, reiter: 'bots' }); k.app.gehe('bestenliste', { reiter: 'bots' }); } : null,
+    beiTipp: k.app && typeof k.app.gehe === 'function' ? () => {
+      B.merkeEinstellung({ tafel: id, reiter: 'bots' });
+      k.app.gehe('bestenliste', { reiter: 'bots', fenster: 'allzeit' });
+    } : null,
   });
 }
 
@@ -276,9 +358,16 @@ function registriere() {
   cssLaden();
   freischalten();
   registriereIcon('code', '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5.5l-3 13"/>');
+  // je fuer sich: ein Fehler hier (z. B. Art schon angemeldet) haelt die Hoerer und Orte darunter nicht auf
+  sicher(() => registriereSaetze('tafel-platz1', PLATZ1_SAETZE), 'Saetze');
+  sicher(() => registriereInhaltsart('bot-laeufe', { formate: [1], pruefe: (json) => S.pruefeBotLaeufe(json) }), 'Inhaltsart');
+  S.setzeBotNamen((id) => { const b = botNachId(id); return b && b.name ? b.name : id; });
 
-  hoere('app:bereit', () => { setTimeout(() => sicher(umzug, 'Umzug'), 1200); });
-  hoere('speicher:zurueckgesetzt', () => sicher(() => { gezeigt.clear(); }, 'zurueckgesetzt'));
+  hoere('app:bereit', () => {
+    ladeBotLaeufe().catch((e) => sicher(() => { throw e; }, 'Bot-Laeufe'));
+    setTimeout(() => sicher(umzug, 'Umzug'), 1200);
+  });
+  hoere('speicher:zurueckgesetzt', () => sicher(() => { gezeigt.clear(); fastEntschieden.clear(); }, 'zurueckgesetzt'));
   // der Modul-Speicher wird nur bei Hilfe gelesen: der naechste eigene Zug nach einem Hinweis oder Zuruecknehmen
   // (hilfeOffen merkt sich die laufId, damit nicht jeder Zug den Speicher liest)
   // partie:gestartet liest und schreibt den Modul-Speicher: ausserhalb des Hoerers (Hoerer hoechstens 2 ms), lange vor
@@ -322,7 +411,7 @@ function registriere() {
   anbieten('bestenliste:reiter', anbieterReiter('freunde', 'Freunde', B.reiterFreunde), { reihenfolge: 50, paket: PAKET });
 
   if (TEST && typeof window !== 'undefined') {
-    window.__punkte = { stand: () => S.lade(), speichere: (st) => S.speichere(st), umzug, S, T, C, F };
+    window.__punkte = { stand: () => S.lade(), speichere: (st) => S.speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F };
   }
 }
 

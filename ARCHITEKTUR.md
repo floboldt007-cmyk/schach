@@ -1472,7 +1472,9 @@ ab x5, +150 % ab x8, +200 % ab x12 ihrer Zugpunkte; Weisse Weste +2.000 bei Sieg
 offenen Zuegen). Pflichtzuege, triviale Zuege und der erste eigene Zug nach einem Hinweis oder Zuruecknehmen: 0, kein Platz.
 Uhr-Bonus (`uhrBonus`, 1.000 x Rest der eigenen Bedenkzeit) und Leistungspunkte (`leistungspunkte`, Phase 2) sind vorbereitet,
 aber noch nicht verdrahtet. Gerechnet wird nur aus der **Spielanalyse** (`partie:analysiert`, Review mit fester Tiefe), nie aus
-der Live-Bewertung: so rechnet jedes Geraet mit derselben App denselben Wert nach (Codes). Die Beispiele aus 3.2 und 3.13 (10.400,
+der Live-Bewertung (feste Tiefe statt Zeitdeckel). Ganz gleich ist der nachgerechnete Wert eines Codes trotzdem nicht garantiert:
+die eigene Spielanalyse nutzt schon gerechnete Live-Suchen gleicher Tiefe wieder (`vorab`), das Nachrechnen analysiert frisch;
+kleine Abweichungen sind moeglich. Die Beispiele aus 3.2 und 3.13 (10.400,
 18.000, 6.400/9.400, 14.900, 20.100) sind Pruefwerte in `tests/punkte.test.mjs`.
 
 **Tafeln (`tafel.js`).** Je Leiter-Bot `bot:<id>` ("Rudis Tafel") und je Boss und Stufe `boss:<id>:standard|meister`.
@@ -1482,15 +1484,34 @@ Spielhalle, Gaeste und eigene Stellungen nie (`grund`). Regeln aus 3.13: 10 Zeil
 immer da, auch unter Platz 10; Gleichstand: der fruehere Eintrag vorn (gleich gut ist kein Rekord); Fenster Woche (Montag 4:00),
 Monat (Tagesgrenze 4:00) und Allzeit (Standard Woche); Gaeste sind an kein Fenster gebunden. Platz und Aufstieg zaehlen unter
 Gaesten und den drei eigenen Besten. Chronik: je Tafel die Bestwerte der letzten 12 Wochen und 12 Monate (Saeulen). "So nah wie noch
-nie": hoechstens einmal je Tafel und Woche, ab 90 % des eigenen Rekords und naeher als je zuvor, nie "knapp verpasst".
+nie": hoechstens einmal je Tafel und Woche, ab 90 % des eigenen Rekords und naeher als je zuvor, nie "knapp verpasst". `bewerte`
+merkt nur den Kandidaten (`fastPruefen`, `ergebnis.fast = { prozent, anteil, wo }`); festgeschrieben (`tafel.fast = { wo, id }`,
+`tafel.nah`) wird er erst, wenn die Abrechnung den Satz zeigt (`merkeFast`, einmal je Partie entschieden: ein Neuaufbau der Zeile im
+Nachtrag zeigt denselben Satz). So verbrauchen Umzug und Nachholen in der Arena den Moment nicht, und der Satz steht in der Zeile **vor** "Platz N" (eine Partie mit 90 % des Rekords steht fast immer unter den drei
+eigenen Besten; Pruefer-Befund P2).
 Ausduennen: behalten werden die 3 Allzeit-Besten und je 3 Beste der laufenden Woche und des Monats; Nachweise nur an den 3
-Allzeit-Besten. **Gaeste in S1 sind nur Freunde aus Codes**; die vorlaeufigen Bot-Laeufe der Nachbar-Bots fehlen noch (offen).
+Allzeit-Besten. **Gaeste** sind Freunde aus Codes und die **vorlaeufigen Bot-Laeufe** (3.13 "Schon in S1 nicht leer", unten).
+
+**Vorlaeufige Bot-Laeufe.** `daten/punkte/bot-laeufe.json` (art `bot-laeufe`, format 1, rechenstand 1, ca. 4 KB): je Leiter-Tafel
+der beste und der mittlere Lauf jedes Nachbar-Bots (Stufe k-1 und k+1; Bennos und Gretas Tafel je einen Nachbarn, die
+Stockfisch-Tafel keinen), Lauf `{ bot, lauf: 'best'|'mittel', w, f, e, z, g, partie, von }`. Erzeugt mit
+`werkzeuge/nachbar-laeufe.mjs` aus den 320 Nachbar-Partien der Eichung (`eichung/messung/roh/botpartien.jsonl`, nicht im Repo;
+Partien mit Zuglimit zaehlen nicht): Analyse mit der App-Engine (Stockfish 19 lite unter Node) und der unveraenderten
+`analysierePartie` (Tiefe 14, MultiPV 2), dann `formel.tafelwert` fuer beide Seiten. Das Werkzeug ist fortsetzbar und teilbar
+(`--teil=k/n`, Cache je Prozess), `--auswerten` rechnet ohne Engine aus dem Cache neu (nach einer Formel-Aenderung mit hoeherem
+STAND). `index.js` meldet die Inhaltsart an (`registriereInhaltsart('bot-laeufe', { pruefe: S.pruefeBotLaeufe })`), laedt die
+Datei nach `app:bereit` (`ladeInhalt('punkte/bot-laeufe')`) und reicht sie nur mit `kopf.rechenstand === STAND` an
+`S.setzeBotLaeufe` (alte und neue Regeln mischen sich nie). Die Laeufe stehen nie im Modul-Speicher, nur als Gaeste
+(`art: 'bot'`, `vorlaeufig: true`, Name ueber `botNachId`) in `S.gaeste()`; auf der Tafel mit Avatar und "Bester Bot-Lauf ·
+vorläufig · Schwarz · Sieg · 31 Züge". Fehlt die Datei, stehen nur Freunde auf den Tafeln. Nach der Eichung ersetzt S3-1 sie durch
+geeichte Laeufe (Rechenstand 2). Die Partien der Laeufe sind noch nicht ansehbar (nur die ID in `partie`). Kommt die Datei
+mit der Integration in `PAKETE`, gehoert sie in `DATEIEN` von `sw.js` (Paket-Regel `daten/<paket>/`).
 
 **Speicher** `modul:punkte` (Budget 40.000, duennt selbst aus: erst alte Abrechnungen, dann Rekordbuch, Nachweise, IDs, Chronik,
 Freunde, zuletzt die schwaechsten Eintraege, nie der Bestwert einer Tafel): `{ stand: 1, tafeln: { [id]: { id, eintraege: [{ id
 (partieId), w, t, tag, wo, mo, f, z, e, g, st, m, n? }], chronik: { w, m }, nah, fast } }, rekorde: [{ tafel, w, vorher, t, id,
 stand, n? }] (Rekordbuch, hoechstens 30), freunde: [{ id, name, eintraege: [{ tafel, w, t, tag, f, z, e, pruef, n }] }]
-(hoechstens 12 Freunde, 24 Eintraege), letzte: [Ergebnis] (Abrechnung der letzten 12 Partien), ids (verarbeitete Partien,
+(hoechstens 12 Freunde, 24 Eintraege; ein besserer Code ersetzt den alten Eintrag auch bei vollem Speicher), letzte: [Ergebnis] (Abrechnung der letzten 12 Partien), ids (verarbeitete Partien,
 hoechstens 300), neu (Punkt "neu" an Zeilen), offen (beendet, Analyse steht aus), lauf ({ id, hilfe, nachHilfe: [ply] }), level,
 umzug }`. `m` ist der Ply mit dem groessten Ausschlag (dorthin springt eine Zeile in der Analyse), `n` der Nachweis (SA1-Code ohne
 Striche, Rechenstand, Bot, Seed, Zuege, Datum; nach der Partie per `setTimeout` gebaut, nie im Hoerer). Kaputte oder fremde Teile
@@ -1511,7 +1532,8 @@ ohne Tafel der ehrliche Grund; bei einem Rekord bleibt die alte Zahl durchgestri
 beim Ueberholen eine Mini-Tafel (ueber dir, du, unter dir), deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken
 (`klick`), Klang `rekord` nur mit Rekord, Platz 1 oder Aufstieg (Niederlagen ohne Rekord bleiben still); hoechstens 1,2 s,
 Antippen der Karte zeigt sofort das Endbild, Tempo 0 und reduzierte Bewegung nur das Endbild (`data-fertig`). Antippen der Zeile
-zeigt die Aufschluesselung, "Zur Bestenliste" und nach dem Ueberholen einer Freundin einmal still "Überhol-Post an Jule"
+zeigt die Aufschluesselung, "Zur Bestenliste" (oeffnet die Tafel im Fenster des Satzes: "Diese Woche: Platz 2" die Woche, sonst
+Allzeit, ohne das gemerkte Fenster zu aendern) und nach dem Ueberholen einer Freundin einmal still "Überhol-Post an Jule"
 (Vorschau des Texts "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..." mit Kopieren oder Teilen-Blatt,
 nichts geht automatisch raus). Rechnet die Analyse noch: "Punkte werden gezählt …" mit endlichem Schimmer (nur opacity), danach
 der Nachtrag; ohne Analyse "Punkte folgen mit der Analyse" (die Arena holt sie nach). Uebungen: keine Zeile.
@@ -1525,13 +1547,18 @@ baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment 
 "Rudis Tafel: Platz 4"): `button.pk-panel` "Rudis Tafel · Bestwert 12.300", mit Gaesten auf der Tafel dazu "· Platz 2", nur fuer
 Leiter-Bots mit eigenem Eintrag; Antippen oeffnet die Tafel in der Bestenliste.
 
-**Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL". Neuer eigener
-Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie "Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL"
-mit altem Wert und, beim Ueberholen, "Platz 3 ▲ 1". Ist der grosse Platz der Partie schon mit gleicher oder hoeherer Prioritaet
-vergeben (z. B. ein Level-Titel 75), kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Rudis Tafel ▲ 2" (vorher Platz 6) bzw.
-"Rekord auf Rudis Tafel: 23.100". Dafuer liest `index.js` die Feier-Warteschlange (`ladeModul('feier')`, nur lesen) in einer
-Mikroaufgabe nach dem Ereignis, also nach den Meldungen der anderen Hoerer. Erster Eintrag, Wochen- und Monatsbeste und "so nah"
-feiern nicht. Klang `rekord` (Datei aus dem Klangpaket).
+**Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL"; stand vorher ein
+Bot-Lauf vorn, sagt dieser Bot dazu seinen Satz (Register `registriereSaetze('tafel-platz1')`, fest gewaehlt, kein Zufall:
+"Oma Hilde: „Na sowas, an mir vorbei! ...“"). Neuer eigener Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie
+"Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL" mit altem Wert und, beim Ueberholen, "Platz 3 ▲ 1". Ist der
+grosse Platz der Partie schon belegt, kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Rudis Tafel ▲ 2" (vorher Platz 6) bzw.
+"Rekord auf Rudis Tafel: 23.100". Belegt heisst: ein grosser Moment, den das Ergebnis schon zeigt (Status `overlay`, egal mit
+welcher Prioritaet, z. B. eine Umwandlung 66 vom Partie-Ende: `fuerOverlay` vergibt den Platz kein zweites Mal), oder ein
+wartender mit gleicher oder hoeherer Prioritaet (z. B. ein Level-Titel 75); ein wartender kleinerer weicht (Pruefer-Befund P2).
+Dafuer liest `index.js` die Feier-Warteschlange (`ladeModul('feier')`, nur lesen) in einer Mikroaufgabe nach dem Ereignis, also
+nach den Meldungen der anderen Hoerer. Erster Eintrag, Wochen- und Monatsbeste und "so nah" feiern nicht. Klang `rekord` genau
+einmal: zeigt das Ergebnis den grossen Moment von punkte (der klingt dort), bleibt die Abrechnungszeile still (`stumm`, nur das
+Klacken der ueberholten Zeilen); sonst klingt die Zeile.
 
 **Codes (`code.js`).** `SA1-` plus Crockford-Base32 in Vierergruppen (Eingabe ohne Gross- und Kleinschreibung, Striche und
 Leerzeichen egal, O wird 0, I und L werden 1, auch im Praefix). Bytes (Version 1): Version, Rechenstand, Art (1 Partie, 2 Boss),
@@ -1539,7 +1566,9 @@ Merker (Farbe, Boss-Stufe, Ergebnis), Seed (4), Datum (Tage seit 2020-01-01), An
 hoechstens 12 Zeichen), Zahl der Halbzuege und je Halbzug der Index in den nach UCI sortierten erlaubten Zuegen, CRC-16/CCITT.
 80 Halbzuege ergeben rund 170 Code-Zeichen (3.13 schaetzte 130; mit einem Byte je Halbzug geht das nicht). Pruefstufen: die
 Pruefsumme schuetzt nur gegen Tippfehler (jeder Fehler in einem Zeichen faellt auf), "Nachgerechnet ✓" heisst: die App hat die
-Partie nachgespielt und selbst bewertet; "Bot-geprüft ✓✓" braucht Bots mit fester Knotenzahl (S3-0), noch nicht. Eine neuere
+Partie nachgespielt und selbst bewertet, und das Ergebnis im Code passt zur Schlussstellung (`pruefeErgebnis`: Sieg nur mit Matt
+des Bots, Remis nur bei Patt, Wiederholung, 50 Zuegen oder zu wenig Material, Niederlage nur nach Matt gegen dich oder in offener
+Stellung, also Aufgeben; sonst ehrlich abgelehnt; Uhr-Tafeln (S2) brauchen hier eine Erweiterung); "Bot-geprüft ✓✓" braucht Bots mit fester Knotenzahl (S3-0), noch nicht. Eine neuere
 Version wird ehrlich abgelehnt ("Bitte die App aktualisieren"). Die Startstellung steht nicht im Code: sie kommt vom Bot
 (Leiter-Bot Grundstellung, Boss `startFen` aus `registriereBot`).
 
@@ -1560,8 +1589,8 @@ Tests: `node tests/punkte.test.mjs` (Node und Browser, `PORT`, `BILDER`, `--nur-
 Reiter eintraegt.
 
 **Integration (Probelauf 23.10. in einer Kopie, Port 9602).** Eingetragen: `PAKETE = ['sicherung', 'pakete/funken/index',
-'pakete/punkte/index']`, `REITER = ['bestenliste']`, in `DATEIEN` von `sw.js` die Dateien beider Pakete und
-`js/ui/bestenliste.js`, danach `node tests/sw.test.mjs --aktualisieren`. Ohne weiteres Rezept (alle `--schnell`): 16/18
+'pakete/punkte/index']`, `REITER = ['bestenliste']`, in `DATEIEN` von `sw.js` die Dateien beider Pakete,
+`js/ui/bestenliste.js` und (seit der Nachbesserung) `daten/punkte/bot-laeufe.json`, danach `node tests/sw.test.mjs --aktualisieren`. Ohne weiteres Rezept (alle `--schnell`): 16/18
 Suiten, rot nur Pruefungen, die ausdruecklich den Kern ohne Reiter und ohne Pakete pruefen: `navigation` 6 ("Leiste ohne
 REITER" zweimal, "Reiter Arena (aktiv) und Verlauf" und "Reiter Verlauf ... oben im Kopf" (die Leiste hat dann drei Reiter),
 "?reiter ohne ?test bleibt wirkungslos", "Training leer: ohne Reiter ein Zurueck-Knopf") und `funken` 3 (im iPad-Querformat

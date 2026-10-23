@@ -17,16 +17,27 @@
 // Ergebnis einer Partie (Abrechnung, Ereignis punkte:geaendert):
 //   { id, t, w, posten: { zugpunkte, theorie, ergebnis, verwertung, combo, weste, offen, entschieden, par, maxSerie },
 //     tafel (Id oder null), grund (ohne Tafel: 'hilfe' | 'frei' | 'spiel' | 'gast' | 'stellung'), platz, platzVorher,
-//     aufstieg, vorher, rekord, erster, platz1, ueberholt: [Name], wochenPlatz, sichtbar, bestwert, fast: { prozent } | null,
-//     post: { name, w } | null }   post: die beste ueberholte Freundin (fuer die Ueberhol-Post, 3.13; nie automatisch)
+//     aufstieg, vorher, rekord, erster, platz1, ueberholt: [Name], wochenPlatz, sichtbar, bestwert,
+//     fast: { prozent, anteil, wo } | null, post: { name, w } | null, satzBot: botId | null }
+//   fast: Kandidat fuer "So nah wie noch nie"; festgeschrieben wird er erst, wenn die Abrechnung ihn zeigt (merkeFast).
+//   post: die beste ueberholte Freundin (fuer die Ueberhol-Post, 3.13; nie automatisch). satzBot: der Bot, dessen Lauf
+//   vorher Platz 1 war (Platz 1 einer Tafel: sein Satz in der Feier, 3.13).
+//
+// Vorlaeufige Bot-Laeufe (3.13 "Schon in S1 nicht leer"): daten/punkte/bot-laeufe.json (werkzeuge/nachbar-laeufe.mjs),
+// index.js laedt die Datei nach app:bereit und reicht sie mit setzeBotLaeufe herein. Sie stehen als Gaeste (art 'bot')
+// auf den Tafeln, nie im Modul-Speicher; nur mit demselben Rechenstand wie die Formel (sonst mischen sich Regeln).
 //
 // API:
 //   STAND, MODUL, lade() -> Stand, speichere(st) -> { ok, ... } (duennt selbst aus), standard()
 //   bewerte(st, d, { jetzt, nachHilfe, bossElo, tiefe, nachweis }) -> Ergebnis | null   aus partie:analysiert
 //       ({ partieId, botId, modus, wertet, partie, review }); idempotent (zweites Mal: das gespeicherte Ergebnis)
 //   ergebnisVon(st, partieId) -> Ergebnis | null
-//   gaeste(st, tafelId) -> [Gast]   Freunde-Eintraege dieser Tafel (Gast-Zeilen, tafel.js)
-//   fuegeFreundHinzu(st, { name, tafel, w, t, tag, f, z, e, pruef, n }) -> { ok, grund }   hoechstens 12 Freunde
+//   gaeste(st, tafelId) -> [Gast]   Freunde-Eintraege und Bot-Laeufe dieser Tafel (Gast-Zeilen, tafel.js)
+//   merkeFast(st, ergebnis) -> boolean   "So nah wie noch nie" festschreiben (erst beim Zeigen; false: schon vergeben)
+//   pruefeBotLaeufe(json) -> [Fehlertext]   Inhalt der Datei (art 'bot-laeufe', format 1)
+//   setzeBotLaeufe(json | null) -> Anzahl   Laeufe uebernehmen (null: keine); botLaeufe(tafelId) -> [Gast]
+//   fuegeFreundHinzu(st, { name, tafel, w, t, tag, f, z, e, pruef, n }) -> { ok, grund }   hoechstens 12 Freunde und
+//       24 Eintraege (grund 'voll' bzw. 'eintraege'); ein besserer Code ersetzt den alten Eintrag auch bei vollem Speicher
 //   entferneFreund(st, id)
 //   merkeLauf / merkeHilfe / vergissAb / beende: Zuege nach Hilfe der laufenden Partie
 //   tafelStatistik(st) -> { rekorde, platz1, tafeln, beste, partien }
@@ -42,6 +53,7 @@ export const LETZTE_MAX = 12;
 export const REKORDE_MAX = 30;
 export const FREUNDE_MAX = 12;
 export const FREUND_EINTRAEGE_MAX = 24;
+export const BOT_LAEUFE_MAX = 4;   // je Tafel und Nachbar hoechstens: bester und mittlerer Lauf (Reserve fuer S3)
 const NEU_MAX = 40;
 const OFFEN_MAX = 6;
 const PLY_MAX = 600;
@@ -166,6 +178,52 @@ export function ergebnisVon(st, partieId) {
   return st.letzte.find((e) => e.id === partieId) || null;
 }
 
+// ---------- Vorlaeufige Bot-Laeufe (Gaeste aus daten/punkte/bot-laeufe.json) ----------
+let laeufe = new Map();   // tafelId -> [Gast]
+const BOT_RE = /^[a-z][a-z0-9-]{0,31}$/;
+const LAUF_ARTEN = ['best', 'mittel'];
+
+export function pruefeBotLaeufe(json) {
+  const fehler = [];
+  const t = json && json.tafeln;
+  if (!t || typeof t !== 'object' || Array.isArray(t)) return ['tafeln fehlt'];
+  for (const [id, l] of Object.entries(t)) {
+    if (!T.istTafelId(id)) { fehler.push('Tafel ' + id + ': ungueltige ID'); continue; }
+    if (!Array.isArray(l) || l.length > 2 * BOT_LAEUFE_MAX) { fehler.push('Tafel ' + id + ': keine Liste'); continue; }
+    l.forEach((x, i) => {
+      if (!x || typeof x !== 'object' || !BOT_RE.test(String(x.bot)) || !LAUF_ARTEN.includes(x.lauf) || zahl(x.w) == null || x.w < 0
+        || 'bot:' + x.bot === id) {
+        fehler.push(`Tafel ${id}, Lauf ${i}: ungueltig`);
+      }
+    });
+  }
+  return fehler;
+}
+
+export function setzeBotLaeufe(json) {
+  laeufe = new Map();
+  if (!json || pruefeBotLaeufe(json).length) return 0;
+  let n = 0;
+  for (const [id, l] of Object.entries(json.tafeln)) {
+    laeufe.set(id, l.map((x) => ({
+      id: `b:${x.bot}:${x.lauf}`, art: 'bot', bot: x.bot, lauf: x.lauf, w: Math.round(x.w), t: 0, pruef: null, vorlaeufig: true,
+      f: x.f === 'b' ? 'b' : 'w', e: ['s', 'r', 'n'].includes(x.e) ? x.e : null, z: Number.isInteger(x.z) ? x.z : null, g: zahl(x.g),
+    })));
+    n += l.length;
+  }
+  return n;
+}
+
+export function botLaeufe(tafelId) {
+  return (laeufe.get(tafelId) || []).map((x) => ({ ...x }));
+}
+
+// name: wie der Gast heisst (Freunde aus dem Code, Bots ueber botName, standardmaessig die ID)
+let botName = (id) => id;
+export function setzeBotNamen(fn) {
+  botName = typeof fn === 'function' ? fn : (id) => id;
+}
+
 export function gaeste(st, tafelId) {
   const aus = [];
   for (const f of st.freunde) {
@@ -173,7 +231,15 @@ export function gaeste(st, tafelId) {
       if (e.tafel === tafelId) aus.push({ id: `f:${f.id}:${i}`, name: f.name || 'Freund', art: 'freund', w: e.w, t: e.t, pruef: e.pruef, freund: f.id });
     });
   }
+  for (const b of botLaeufe(tafelId)) aus.push({ ...b, name: String(botName(b.bot) || b.bot) });
   return aus;
+}
+
+// "So nah wie noch nie" erst festschreiben, wenn die Abrechnung den Satz zeigt (sonst verbraucht ein ungesehener
+// Satz, z. B. beim Umzug oder beim Nachholen in der Arena, den Moment der Woche)
+export function merkeFast(st, e) {
+  if (!e || !e.fast || !e.tafel || !st.tafeln[e.tafel]) return false;
+  return T.merkeFast(st.tafeln[e.tafel], e.fast, { id: e.id });
 }
 
 // ohne Tafel: warum (Abrechnung sagt es ehrlich)
@@ -229,7 +295,7 @@ export function bewerte(st, d, { jetzt = new Date(), nachHilfe = null, bossElo =
       offen: r.offen, entschieden: r.entschieden, par: r.par, maxSerie: r.maxSerie, eigeneZuege: n, kurz: n < F.MIN_ZUEGE },
     erg: p.ergebnis || null, bot: p.botId || null, tafel: tafelId, grund: grund || (tafelId ? null : 'gast'),
     platz: null, platzVorher: null, aufstieg: 0, vorher: null, rekord: false, erster: false, platz1: false, ueberholt: [],
-    wochenPlatz: null, sichtbar: false, bestwert: null, fast: null, post: null,
+    wochenPlatz: null, sichtbar: false, bestwert: null, fast: null, post: null, satzBot: null,
   };
   if (tafelId) {
     const tafel = st.tafeln[tafelId] || T.neueTafel(tafelId);
@@ -239,18 +305,23 @@ export function bewerte(st, d, { jetzt = new Date(), nachHilfe = null, bossElo =
       st: zahl(bossElo), m: groessterAusschlag(review),
     };
     if (typeof nachweis === 'string' && nachweis) e.n = nachweis;
-    const neu = T.eintragen(tafel, e, { jetzt: t, gaeste: gaeste(st, tafelId) });
+    const gs = gaeste(st, tafelId);
+    const neu = T.eintragen(tafel, e, { jetzt: t, gaeste: gs });
     if (neu) {
       const res = neu.ergebnis;
       Object.assign(ergebnis, {
         platz: res.platz, platzVorher: res.platzVorher, aufstieg: res.aufstieg, vorher: res.vorher, rekord: res.rekord, erster: res.erster,
-        platz1: res.platz1, ueberholt: res.ueberholt.map((x) => x.name).slice(0, 3), wochenPlatz: res.wochenPlatz, sichtbar: res.sichtbar,
-        bestwert: res.bestwert,
+        platz1: res.platz1, ueberholt: [...new Set(res.ueberholt.sort(T.vergleiche).map((x) => String(x.name || 'Gast')))].slice(0, 3),
+        wochenPlatz: res.wochenPlatz, sichtbar: res.sichtbar, bestwert: res.bestwert,
       });
       const freund = res.ueberholt.filter((x) => x.art === 'freund').sort(T.vergleiche)[0];
       if (freund) ergebnis.post = { name: String(freund.name || 'Freund').slice(0, 24), w: Math.round(freund.w) };
+      // Platz 1: der Bot, der vorher vorn stand, sagt etwas (3.13); beim ersten Eintrag ist das der beste Gast
+      const vorn = !res.platz1 ? null : (res.erster ? gs.slice().sort(T.vergleiche)[0] : res.ueberholt.slice().sort(T.vergleiche)[0]);
+      if (vorn && vorn.art === 'bot' && BOT_RE.test(String(vorn.bot))) ergebnis.satzBot = vorn.bot;
       const eNeu = neu.tafel.eintraege.find((x) => x.id === d.partieId);
-      if (!res.rekord && !res.erster) ergebnis.fast = T.fast(neu.tafel, eNeu, { vorher: res.vorher, jetzt: t });
+      // nur ein Kandidat: festgeschrieben wird "So nah" erst, wenn die Abrechnung ihn zeigt (merkeFast)
+      if (!res.rekord && !res.erster) ergebnis.fast = T.fastPruefen(neu.tafel, eNeu, { vorher: res.vorher, jetzt: t });
       st.tafeln[tafelId] = T.duenneAus(neu.tafel, t);
       if (res.rekord) {
         st.rekorde = [{ tafel: tafelId, w: r.wert, vorher: res.vorher, t: eintragT, id: d.partieId, stand: STAND, ...(e.n ? { n: e.n } : {}) },
@@ -269,19 +340,21 @@ export function bewerte(st, d, { jetzt = new Date(), nachHilfe = null, bossElo =
 export function fuegeFreundHinzu(st, { name = '', tafel, w, t = 0, tag = '', f = 'w', z = 0, e = 'n', pruef = 'nachgerechnet', n = '' } = {}) {
   if (!T.istTafelId(tafel) || zahl(w) == null || w < 0) return { ok: false, grund: 'daten' };
   const nm = String(name || '').trim().slice(0, 24) || 'Freund';
+  const gesamt = st.freunde.reduce((s, x) => s + x.eintraege.length, 0);
   let freund = st.freunde.find((x) => x.name.toLowerCase() === nm.toLowerCase());
   if (!freund) {
     if (st.freunde.length >= FREUNDE_MAX) return { ok: false, grund: 'voll' };
+    if (gesamt >= FREUND_EINTRAEGE_MAX) return { ok: false, grund: 'eintraege' };
     let nr = st.freunde.length + 1;
     while (st.freunde.some((x) => x.id === 'f' + nr)) nr++;
     freund = { id: 'f' + nr, name: nm, eintraege: [] };
     st.freunde.push(freund);
   }
   if (freund.eintraege.some((x) => x.n && x.n === n)) return { ok: false, grund: 'doppelt', freund: freund.id };
-  const gesamt = st.freunde.reduce((s, x) => s + x.eintraege.length, 0);
-  if (gesamt >= FREUND_EINTRAEGE_MAX) return { ok: false, grund: 'voll' };
-  // je Tafel zaehlt der beste Code eines Freundes (Gaeste-Zeilen bleiben uebersichtlich)
+  // je Tafel zaehlt der beste Code eines Freundes (Gaeste-Zeilen bleiben uebersichtlich); ein besserer Code ersetzt den
+  // alten Eintrag, braucht also keinen neuen Platz
   const alt = freund.eintraege.find((x) => x.tafel === tafel);
+  if (!alt && gesamt >= FREUND_EINTRAEGE_MAX) return { ok: false, grund: 'eintraege' };
   const neu = { tafel, w: Math.round(w), t: zahl(t) ?? 0, tag: String(tag || '').slice(0, 10), f: f === 'b' ? 'b' : 'w', z: Number.isInteger(z) ? z : 0,
     e: ['s', 'r', 'n'].includes(e) ? e : 'n', pruef, n: String(n || '').slice(0, 1400) };
   if (alt && alt.w >= neu.w) return { ok: true, freund: freund.id, besser: false };

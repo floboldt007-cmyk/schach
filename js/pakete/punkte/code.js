@@ -22,6 +22,8 @@
 //   gruppiert(roh) -> 'SA1-XXXX-XXXX-...'
 //   zugIndizes(uciListe, startFen) -> { ok, indizes, grund }   Index je Halbzug in den erlaubten Zuegen (nach UCI sortiert)
 //   zuegeAusIndizes(indizes, startFen) -> { ok, uci, san, fen, matt, remis, grund }   spielt die Partie nach
+//   pruefeErgebnis({ ergebnis, farbe }, nachgespielt) -> { ok, grund, text }   passt das Ergebnis im Code zur nachgespielten
+//       Schlussstellung? (3.13 "Erfundene Zahlen fallen auf"; ein Sieg bringt 4.000 Punkte und die Verwertung)
 //   erzeugeCode({ art, botId, farbe, stufe, ergebnis, seed, tag, tiefe, staerke, name, zuege, startFen, stand })
 //       -> { ok: true, code, roh, zeichen } | { ok: false, grund }
 //   leseCode(text) -> { ok: true, daten: { version, stand, art, botId, farbe, stufe, ergebnis, seed, tag, tiefe, staerke,
@@ -145,6 +147,27 @@ export function zuegeAusIndizes(indizes, startFen = GRUNDSTELLUNG) {
     san.push(m.san);
   }
   return { ok: true, uci, san, fen: c.fen(), matt: c.isCheckmate(), remis: c.isDraw() || c.isStalemate() };
+}
+
+// In der App endet eine Partie nur so (js/ui/partie.js): Sieg nur durch Matt des Bots; Remis nur durch Patt,
+// zu wenig Material, dreifache Wiederholung oder 50 Zuege (chess.js, die App beendet die Partie sofort); Niederlage durch
+// Matt oder Aufgeben. Uhr-Tafeln (S2: Zeit abgelaufen) brauchen hier eine Erweiterung.
+const ERGEBNIS_FALSCH = {
+  sieg: 'Im Code steht ein Sieg, aber die nachgespielte Partie endet nicht mit Matt. Diesen Code trägt die App nicht ein.',
+  remis: 'Im Code steht ein Remis, aber die nachgespielte Schlussstellung ist kein Remis. Diesen Code trägt die App nicht ein.',
+  niederlage: 'Im Code steht eine Niederlage, aber die nachgespielte Partie endet anders. Diesen Code trägt die App nicht ein.',
+  zuege: 'Die Züge im Code lassen sich nicht nachspielen.',
+};
+export function pruefeErgebnis({ ergebnis, farbe } = {}, nach = null) {
+  const nein = (grund) => ({ ok: false, grund, text: ERGEBNIS_FALSCH[grund] || ERGEBNIS_FALSCH.zuege });
+  if (!nach || !nach.ok || typeof nach.fen !== 'string') return nein('zuege');
+  const amZug = nach.fen.split(' ')[1] === 'b' ? 'b' : 'w';
+  const ich = farbe === 'b' ? 'b' : 'w';
+  const ichSetzeMatt = !!nach.matt && amZug !== ich;
+  if (ergebnis === 'sieg') return ichSetzeMatt ? { ok: true } : nein('sieg');
+  if (ergebnis === 'remis') return nach.remis && !nach.matt ? { ok: true } : nein('remis');
+  if (ergebnis === 'niederlage') return ichSetzeMatt || nach.remis ? nein('niederlage') : { ok: true };
+  return nein('zuege');
 }
 
 export function erzeugeCode({ art = 'partie', botId, farbe = 'w', stufe = null, ergebnis = 'sieg', seed = 0, tag, tiefe = 0,

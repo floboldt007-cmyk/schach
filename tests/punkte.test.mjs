@@ -24,6 +24,8 @@ import { setzeSpeicher, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/s
 import { hoere, sende, EREIGNISSE } from '../js/ereignisse.js';
 import { fuerOverlay, melde } from '../js/feier.js';
 import { addiereTage, wochenSchluessel } from '../js/tag.js';
+import { pruefeInhalt, RECHENSTAND } from '../js/inhalte.js';
+import { BOTS, botNachId } from '../js/bots.js';
 import * as F from '../js/pakete/punkte/formel.js';
 import * as T from '../js/pakete/punkte/tafel.js';
 import * as C from '../js/pakete/punkte/code.js';
@@ -293,6 +295,21 @@ gruppe = 'Tafel: so nah wie noch nie';
     && kaputt.chronik.w.length === 1 && kaputt.chronik.m.length === 0 && kaputt.nah === null, kaputt);
 }
 
+gruppe = 'Tafel: so nah erst beim Zeigen';
+{
+  // Pruefer-Befund: der Moment wurde in bewerte() verbraucht, auch wenn die Abrechnung "Platz 2" zeigte; jetzt pruefen
+  // und festschreiben getrennt (festgeschrieben wird beim Zeigen)
+  const t = T.neueTafel('bot:rudi');
+  const k = T.fastPruefen(t, { w: 22000 }, { vorher: 23000, jetzt });
+  pruefe('fastPruefen: Kandidat mit Prozent, Anteil und Woche, die Tafel bleibt unverändert', k && k.prozent === 95 && k.wo === wochenSchluessel(jetzt)
+    && Math.abs(k.anteil - 22000 / 23000) < 1e-9 && t.nah === null && t.fast === null, { k, t });
+  pruefe('merkeFast: schreibt den Moment fest (Anteil, Woche, Partie)', T.merkeFast(t, k, { id: 'p1' }) && t.fast.wo === k.wo && t.fast.id === 'p1' && t.nah === k.anteil, t);
+  pruefe('merkeFast: dieselbe Partie noch einmal ja (der Nachtrag baut die Zeile neu), eine andere in derselben Woche nein',
+    T.merkeFast(t, k, { id: 'p1' }) && !T.merkeFast(t, { ...k }, { id: 'p2' }) && T.fastPruefen(t, { w: 22900 }, { vorher: 23000, jetzt }) === null);
+  const geladen = T.pruefeTafel(JSON.parse(JSON.stringify(t)), 'bot:rudi');
+  pruefe('pruefeTafel: Woche und Partie des Moments bleiben gespeichert', geladen.fast.id === 'p1' && geladen.fast.wo === k.wo && geladen.nah === t.nah);
+}
+
 // =====================================================================
 // SA1-Codes (code.js)
 // =====================================================================
@@ -354,6 +371,30 @@ gruppe = 'SA1-Code';
     && rl.zeichen === 4 + rl.roh.length + Math.ceil(rl.roh.length / 4) - 1
     && C.zuegeAusIndizes(C.leseCode(rl.code).daten.indizes).uci.join() === lang.join(), rl.zeichen);
   pruefe('Nachspielen lehnt einen Index außerhalb der erlaubten Züge ab', C.zuegeAusIndizes([11, 200]).ok === false);
+}
+
+gruppe = 'SA1-Code: Ergebnis gegen die Schlussstellung';
+{
+  // Pruefer-Befund: "Nachgerechnet" glaubte dem Ergebnis im Code (ein Sieg bringt 4.000 Punkte und die Verwertung)
+  const nach = (uci) => C.zuegeAusIndizes(C.zugIndizes(uci).indizes);
+  const matt = nach(SCHAEFER);                                          // Weiss setzt matt
+  const narr = nach(['f2f3', 'e7e5', 'g2g4', 'd8h4']);                  // Schwarz setzt matt
+  const patt = nach(['e2e3', 'a7a5', 'd1h5', 'a8a6', 'h5a5', 'h7h5', 'h2h4', 'a6h6', 'a5c7', 'f7f6', 'c7d7', 'e8f7', 'd7b7', 'd8d3', 'b7b8',
+    'd3h7', 'b8c8', 'f7g6', 'c8e6']);                                    // Patt in 10 Zuegen
+  const wdh = nach(['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1', 'f6g8']);   // dreifache Wiederholung
+  const offen = nach(['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6']);
+  const p = (ergebnis, farbe, n) => C.pruefeErgebnis({ ergebnis, farbe }, n).ok;
+  pruefe('Sieg nur, wenn die nachgespielte Partie mit deinem Matt endet', p('sieg', 'w', matt) && p('sieg', 'b', narr) && !p('sieg', 'b', matt)
+    && !p('sieg', 'w', narr) && !p('sieg', 'w', offen) && !p('sieg', 'w', patt));
+  pruefe('Remis nur bei Patt, Wiederholung, 50 Zügen oder zu wenig Material (so beendet die App eine Partie)', patt.remis && wdh.remis
+    && p('remis', 'w', patt) && p('remis', 'b', wdh) && !p('remis', 'w', offen) && !p('remis', 'w', matt));
+  pruefe('Niederlage: Matt gegen dich oder Aufgeben (offene Stellung), nie nach deinem eigenen Matt oder einem Remis',
+    p('niederlage', 'w', narr) && p('niederlage', 'b', matt) && p('niederlage', 'w', offen) && !p('niederlage', 'w', matt) && !p('niederlage', 'w', patt));
+  const falsch = C.leseCode(C.erzeugeCode({ botId: 'rudi', farbe: 'w', ergebnis: 'sieg', seed: 1, tag: '2026-10-20', tiefe: 14,
+    zuege: ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6'] }).code);
+  const r = C.pruefeErgebnis(falsch.daten, C.zuegeAusIndizes(falsch.daten.indizes));
+  pruefe('Code mit erfundenem Sieg (offene Partie): Prüfzeichen stimmt, aber ehrlich abgelehnt', falsch.ok && !r.ok && r.grund === 'sieg'
+    && /endet nicht mit Matt/.test(r.text) && !C.pruefeErgebnis({ ergebnis: 'sieg', farbe: 'w' }, { ok: false }).ok, r);
 }
 
 // =====================================================================
@@ -478,6 +519,87 @@ gruppe = 'Speicher-Budget';
   pruefe('Ein Tipp löscht einen Freund', S.entferneFreund(s2, s2.freunde[0].id) && s2.freunde.length === 0);
 }
 
+gruppe = 'So nah: erst beim Zeigen verbraucht';
+{
+  // Nachstellung des Pruefer-Befunds: 9.000 Rekord, dann 8.600 (95 %) als zweitbeste eigene Partie
+  setzeSpeicher(fakeSpeicher());
+  const st = S.lade();
+  const nl = (id, eigene) => S.bewerte(st, analysiert(bauePartie(id, { ergebnis: 'niederlage', zuege: 20 }), eigene), { jetzt });
+  nl('na', z('exzellent', 20));                                   // 8.000 + Kampfgeist 1.000 = 9.000
+  const c = nl('nc', [...z('exzellent', 19), ...z('fehler')]);      // 7.600 + 1.000 = 8.600
+  pruefe('95 % des Rekords auf Platz 2: der Satz ist „So nah wie noch nie: 95 %“, nicht „Platz 2“', c.platz === 2 && c.fast && c.fast.prozent === 95
+    && A.unterText(c, 'Rudis Tafel') === 'So nah wie noch nie: 95 % deines Rekords auf Rudis Tafel', c);
+  pruefe('Ungezeigt verbraucht nichts (Umzug, Nachholen in der Arena): die Tafel merkt sich den Moment erst beim Zeigen',
+    st.tafeln['bot:rudi'].fast === null && st.tafeln['bot:rudi'].nah === null);
+  const gezeigt = S.merkeFast(st, c);
+  const e = nl('ne', [...z('exzellent', 19), ...z('fehler')]);
+  pruefe('Gezeigt (merkeFast), dann in derselben Woche keine zweite „So nah“-Zeile', gezeigt && st.tafeln['bot:rudi'].fast.id === 'nc'
+    && e.fast === null && A.unterText(e, 'Rudis Tafel') === 'Platz 3 auf Rudis Tafel' && !S.merkeFast(st, { ...e, fast: c.fast }), e);
+}
+
+gruppe = 'Freunde: Grenzen';
+{
+  setzeSpeicher(fakeSpeicher());
+  const st = S.lade();
+  for (let f = 0; f < 6; f++) for (const b of ['benno', 'hilde', 'kalle', 'lisa']) S.fuegeFreundHinzu(st, { name: 'F' + f, tafel: 'bot:' + b, w: 100, n: `N${f}${b}` });
+  const voll = st.freunde.reduce((n, x) => n + x.eintraege.length, 0);
+  const ersetzt = S.fuegeFreundHinzu(st, { name: 'F0', tafel: 'bot:benno', w: 500, n: 'NEU1' });
+  const neueTafel = S.fuegeFreundHinzu(st, { name: 'F0', tafel: 'bot:rudi', w: 500, n: 'NEU2' });
+  const neuerFreund = S.fuegeFreundHinzu(st, { name: 'F9', tafel: 'bot:rudi', w: 500, n: 'NEU3' });
+  pruefe('24 Freundes-Einträge voll: ein besserer Code ersetzt den alten (kein neuer Platz nötig), eine neue Tafel oder ein neuer Freund: „eintraege“',
+    voll === 24 && ersetzt.ok && ersetzt.besser && st.freunde[0].eintraege.find((x) => x.tafel === 'bot:benno').w === 500
+    && neueTafel.grund === 'eintraege' && neuerFreund.grund === 'eintraege' && st.freunde.length === 6, { voll, ersetzt, neueTafel, neuerFreund });
+}
+
+gruppe = 'Bot-Läufe (vorläufig, 3.13 „Schon in S1 nicht leer“)';
+{
+  const roh = readFileSync(path.join(WURZEL, 'daten/punkte/bot-laeufe.json'), 'utf8');
+  const datei = JSON.parse(roh);
+  const kopfOk = pruefeInhalt(datei, { art: 'bot-laeufe' });
+  pruefe('daten/punkte/bot-laeufe.json: Kopf art „bot-laeufe“, Format 1, Rechenstand der Formel und der App, Inhalt gültig, klein (unter 8 KB)',
+    kopfOk.ok && datei.kopf.format === 1 && datei.kopf.rechenstand === F.STAND && datei.kopf.rechenstand === RECHENSTAND && S.pruefeBotLaeufe(datei).length === 0
+    && roh.length < 8000 && datei.quelle && datei.quelle.vorlaeufig === true && datei.quelle.tiefe === 14, { kopf: datei.kopf, fehler: S.pruefeBotLaeufe(datei), laenge: roh.length });
+  // Nachbarn: Stufe k spielt gegen k - 1 und k + 1 (Benno nur gegen Hilde, Greta nur gegen Koenig, Stockfisch gegen niemanden)
+  const leiter = BOTS.filter((b) => b.stufe >= 1 && b.stufe <= 9);
+  const erwartet = Object.fromEntries(leiter.map((b) => [`bot:${b.id}`, leiter.filter((x) => Math.abs(x.stufe - b.stufe) === 1).map((x) => x.id).sort().join()]));
+  const ist = Object.fromEntries(Object.entries(datei.tafeln).map(([t, l]) => [t, [...new Set(l.map((x) => x.bot))].sort().join()]));
+  pruefe('Jede Leiter-Tafel hat ihre Nachbar-Bots als Gäste (Benno und Greta je einen), die Stockfisch-Tafel noch keinen',
+    JSON.stringify(ist) === JSON.stringify(Object.fromEntries(Object.keys(ist).map((k) => [k, erwartet[k]]))) && Object.keys(ist).length === 9
+    && !ist['bot:stockfisch'], { ist, erwartet });
+  const paare = Object.values(datei.tafeln).flatMap((l) => [...new Set(l.map((x) => x.bot))].map((b) => [l.find((x) => x.bot === b && x.lauf === 'best'), l.find((x) => x.bot === b && x.lauf === 'mittel')]));
+  pruefe('Je Nachbar ein bester und ein mittlerer Lauf (bester ≥ mittlerer), ganze Punkte, Farbe, Ergebnis und Züge dabei',
+    paare.every(([b, m]) => b && Number.isInteger(b.w) && b.w >= 0 && (!m || (Number.isInteger(m.w) && m.w <= b.w))) && paare.filter(([, m]) => m).length >= 14
+    && Object.values(datei.tafeln).flat().every((x) => ['w', 'b'].includes(x.f) && ['s', 'r', 'n'].includes(x.e) && Number.isInteger(x.z) && x.z > 0), paare.length);
+  pruefe('pruefeBotLaeufe lehnt Unsinn ab (fremde Tafel-ID, Bot auf seiner eigenen Tafel, negativer Wert, unbekannte Laufart)',
+    S.pruefeBotLaeufe({ tafeln: { 'bot:Rudi': [] } }).length > 0 && S.pruefeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'rudi', lauf: 'best', w: 1 }] } }).length > 0
+    && S.pruefeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'lisa', lauf: 'best', w: -1 }] } }).length > 0
+    && S.pruefeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'lisa', lauf: 'schnell', w: 1 }] } }).length > 0 && S.pruefeBotLaeufe(null).length > 0);
+
+  // Mischen: Laeufe als Gaeste auf der Tafel, Platz, Ueberholen, Platz 1 mit dem Satz des Bots, der vorn stand
+  setzeSpeicher(fakeSpeicher());
+  S.setzeBotNamen((id) => (botNachId(id) || {}).name || id);
+  const n = S.setzeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'turm', lauf: 'best', w: 20000, f: 'w', e: 's', z: 40 }, { bot: 'turm', lauf: 'mittel', w: 15000 },
+    { bot: 'lisa', lauf: 'best', w: 9000, f: 'b', e: 'n', z: 38 }, { bot: 'lisa', lauf: 'mittel', w: 6000 }] } });
+  const st = S.lade();
+  const g = S.gaeste(st, 'bot:rudi');
+  pruefe('Bot-Läufe stehen als Gäste (art bot, vorläufig, Name des Bots) auf ihrer Tafel, nie im Modul-Speicher', n === 4 && g.length === 4
+    && g.every((x) => x.art === 'bot' && x.vorlaeufig === true) && g[0].name === 'Professor Turm' && S.gaeste(st, 'bot:lisa').length === 0
+    && !/turm/.test(JSON.stringify(st)), g);
+  const e1 = S.bewerte(st, analysiert(bauePartie('b1', { zuege: 12 }), z('ungenau', 12)), { jetzt });   // 1.200 + 7.000 = 8.200
+  pruefe('Erste Partie mitten zwischen den Bot-Läufen: Platz 4 (hinter Turm und Turm und Lisa), kein Platz-1-Moment', e1.erster && e1.platz === 4 && !e1.platz1, e1);
+  const e2 = S.bewerte(st, analysiert(bauePartie('b2', { zuege: 12 }), z('brillant', 12)), { jetzt });   // 14.400 + COMBO 14.400 + 7.000
+  pruefe('Rekord vor allen Läufen: Platz 1 ▲ 3 (vorher Platz 4), überholt Professor Turm und Lisa Läufer (jeder Name einmal), Satz von Turm',
+    e2.rekord && e2.platz1 && e2.platz === 1 && e2.platzVorher === 4 && e2.aufstieg === 3 && e2.ueberholt.join() === 'Professor Turm,Lisa Läufer'
+    && e2.satzBot === 'turm' && e2.post === null, e2);
+  const zeilen = T.zeilen(st.tafeln['bot:rudi'], { fenster: 'allzeit', jetzt, gaeste: S.gaeste(st, 'bot:rudi') });
+  pruefe('Tafel mit Bot-Läufen: Du, Turm (bester, mittlerer), Lisa (bester), Du, Lisa (mittlerer)', zeilen.map((r) => (r.eigen ? 'Du' : `${r.bot}/${r.lauf}`)).join()
+    === 'Du,turm/best,turm/mittel,lisa/best,Du,lisa/mittel', zeilen.map((r) => r.id).join());
+  const nb = S.bewerte(st, analysiert(bauePartie('b3', { botId: 'greta', zuege: 12 }), z('gut', 12)), { jetzt });
+  pruefe('Ohne Läufe auf der Tafel (Greta im Test): wie vorher nur eigene Einträge', nb.erster && nb.platz === 1 && !nb.platz1);
+  pruefe('setzeBotLaeufe(null) nimmt alle Läufe weg; eine ungültige Datei auch', S.setzeBotLaeufe(null) === 0 && S.gaeste(st, 'bot:rudi').length === 0
+    && S.setzeBotLaeufe({ tafeln: { 'bot:rudi': [{ bot: 'rudi', lauf: 'best', w: 1 }] } }) === 0);
+}
+
 gruppe = 'Abrechnung: Sätze';
 {
   const n = 'Rudis Tafel';
@@ -489,6 +611,9 @@ gruppe = 'Abrechnung: Sätze';
     && A.unterText({ ...basis, wochenPlatz: 2 }, n) === 'Diese Woche: Platz 2 auf Rudis Tafel'
     && A.unterText({ ...basis, fast: { prozent: 97 } }, n) === 'So nah wie noch nie: 97 % deines Rekords auf Rudis Tafel'
     && A.unterText({ ...basis, bestwert: 23100 }, n) === 'Rudis Tafel: dein Bestwert 23.100');
+  pruefe('„So nah“ steht vor dem Platz (eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten)',
+    A.unterText({ ...basis, platz: 2, fast: { prozent: 95 } }, n) === 'So nah wie noch nie: 95 % deines Rekords auf Rudis Tafel'
+    && A.unterText({ ...basis, platz: 2, wochenPlatz: 1, fast: null }, n) === 'Platz 2 auf Rudis Tafel');
   pruefe('Satz bei Rekord mit Überholen: „Platz 3 auf Rudis Tafel“ (der Pfeil ▲ 2 und die alte Zahl stehen daneben)',
     A.unterText({ ...basis, rekord: true, vorher: 19480, aufstieg: 2, platz: 3 }, n) === 'Platz 3 auf Rudis Tafel');
   pruefe('Ohne Tafel: ehrlicher Grund', /Hinweis oder Zurücknehmen/.test(A.unterText({ w: 1, tafel: null, grund: 'hilfe' }))
@@ -579,7 +704,7 @@ gruppe = 'Ereignisse';
   pruefe('Nachweis: der Eintrag trägt seinen SA1-Code (Rechenstand, Bot, Seed, Züge, Datum)', nl && nl.ok && nl.daten.botId === 'benno' && nl.daten.seed === 99
     && C.zuegeAusIndizes(nl.daten.indizes).uci.join() === SCHAEFER.join() && nl.daten.stand === 1, nl);
 
-  // Ueberholen mit Freunden als Gaesten: Platz gewonnen (▲), grosser Moment mit Platz, als Zeile wenn das Budget vergeben ist
+  // Ueberholen mit Freunden als Gaesten: Platz gewonnen (Pfeil hoch), grosser Moment mit Platz, als Zeile wenn das Budget vergeben ist
   const freunde = (st) => {
     st.freunde = [{ id: 'f1', name: 'Jule', eintraege: [{ tafel: 'bot:kalle', w: 30000, t: 0, tag: '2026-10-01', f: 'w', z: 20, e: 's', pruef: 'nachgerechnet', n: '' }] },
       { id: 'f2', name: 'Kim', eintraege: [{ tafel: 'bot:kalle', w: 12000, t: 0, tag: '2026-10-01', f: 'w', z: 20, e: 's', pruef: 'nachgerechnet', n: '' }] },
@@ -613,6 +738,37 @@ gruppe = 'Ereignisse';
   pruefe('Platz 1 vor allen Freunden: „PLATZ 1 AUF KALLES TAFEL“ (bot-rekord, groß 78) mit den Überholten', ke.platz1 && ke.platz === 1 && ke.ueberholt.join() === 'Jule'
     && fe.length === 1 && fe[0].quelle === 'bot-rekord' && fe[0].art === 'gross' && fe[0].titel === 'PLATZ 1 AUF KALLES TAFEL' && /vor Jule/.test(fe[0].text)
     && ke.post.name === 'Jule' && ke.post.w === 30000, { ke, fe });
+
+  // Pruefer-Befund (grossFrei): ein grosser Moment mit KLEINERER Prioritaet, den das Ergebnis schon zeigt (Umwandlung 66 beim
+  // Partie-Ende, vor der Analyse), belegt den grossen Platz; der Rekord kommt dann als Zeile statt still in die Nachlese
+  sende('partie:analysiert', analysiert(bauePartie('ua', { botId: 'lisa', zuege: 12 }), z('gut', 12)));
+  melde({ partieId: 'ub', quelle: 'umwandlung', titel: 'Umwandlung! Deine 3. Figur zieht in die Ehrenreihe.' });
+  const vorUb = fuerOverlay('ub');
+  sende('partie:analysiert', analysiert(bauePartie('ub', { botId: 'lisa', zuege: 12 }), z('exzellent', 12)));
+  await warte(0);
+  const fu = fuerOverlay('ub');
+  const liegenGeblieben = ladeModul('feier', { eintraege: [] }).eintraege.filter((x) => x.partieId === 'ub' && x.status === 'neu');
+  pruefe('Großer Platz schon gezeigt (Umwandlung 66): der Rekord kommt als Zeile „Rekord auf Lisas Tafel: 11.800“, nichts bleibt für die Nachlese',
+    vorUb.length === 1 && fu.length === 2 && fu[0].quelle === 'umwandlung' && fu[1].quelle === 'rekord' && fu[1].art === 'zeile'
+    && fu[1].titel === 'Rekord auf Lisas Tafel: 11.800' && liegenGeblieben.length === 0, { fu, liegenGeblieben });
+  // ein WARTENDER kleinerer grosser Moment (noch nicht gezeigt) weicht dem Rekord: das Ergebnis zeigt den Rekord gross
+  melde({ partieId: 'uc', quelle: 'umwandlung', titel: 'Umwandlung! Die Dame ist zurück.' });
+  sende('partie:analysiert', analysiert(bauePartie('uc', { botId: 'lisa', zuege: 12 }), z('stark', 12)));
+  await warte(0);
+  const fc = fuerOverlay('uc');
+  pruefe('Wartender kleinerer Moment (Umwandlung, noch nicht gezeigt): der Rekord bekommt den großen Platz (tafel-rekord 70)',
+    fc.length === 1 && fc[0].quelle === 'tafel-rekord' && fc[0].art === 'gross', fc);
+
+  // Platz 1 vor vorlaeufigen Bot-Laeufen: der Bot, der vorn stand, sagt seinen Satz (3.13)
+  S.setzeBotLaeufe({ tafeln: { 'bot:delia': [{ bot: 'koenig', lauf: 'best', w: 9000, f: 'w', e: 's', z: 30 }, { bot: 'turm', lauf: 'best', w: 6000, f: 'b', e: 'n', z: 41 }] } });
+  sende('partie:analysiert', analysiert(bauePartie('da', { botId: 'delia', zuege: 12 }), z('exzellent', 12)));   // 11.800, erster Eintrag vor beiden
+  await warte(0);
+  const da = S.lade().letzte[0];
+  const fda = fuerOverlay('da');
+  pruefe('Erster Eintrag vor allen Bot-Läufen: „PLATZ 1 AUF DELIAS TAFEL“ (bot-rekord 78) mit dem Satz von Kommissar König',
+    da.id === 'da' && da.platz1 && da.erster && da.satzBot === 'koenig' && fda.length === 1 && fda[0].quelle === 'bot-rekord'
+    && fda[0].titel === 'PLATZ 1 AUF DELIAS TAFEL' && /^11\.800 Punkte, vor allen Gästen\. Kommissar König: „Fall gelöst/.test(fda[0].text) && fda[0].klang === 'rekord', { da, fda });
+  S.setzeBotLaeufe(null);
 }
 
 // =====================================================================
@@ -657,12 +813,24 @@ async function nurDiesesPaket(kontext) {
   await kontext.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body }));
 }
 
-async function neueSeite(browser, { w = 1180, h = 820, handy = false, farbe = 'light', reduziert = false } = {}) {
+// Vorlaeufige Bot-Laeufe (daten/punkte/bot-laeufe.json): die Gruppen pruefen ihre Tafeln ohne Bot-Gaeste (eine leere Datei
+// mit gueltigem Kopf, sonst haengen ihre Plaetze an den Werten der Eichung); die Gruppe "Bot-Laeufe" nimmt die echte Datei
+// ('echt') und eigene Laeufe
+const LEERE_LAEUFE = { kopf: { art: 'bot-laeufe', format: 1, rechenstand: 1, stand: '2026-10-23' }, tafeln: {} };
+async function botLaeufeRoute(kontext, daten) {
+  await kontext.unroute('**/daten/punkte/bot-laeufe.json').catch(() => {});
+  if (daten === 'echt') return;
+  await kontext.route('**/daten/punkte/bot-laeufe.json', (r) => r.fulfill({ status: 200, contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify(daten) }));
+}
+
+async function neueSeite(browser, { w = 1180, h = 820, handy = false, farbe = 'light', reduziert = false, botLaeufe = LEERE_LAEUFE } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: handy, colorScheme: farbe,
     reducedMotion: reduziert ? 'reduce' : 'no-preference',
   });
   await nurDiesesPaket(kontext);
+  await botLaeufeRoute(kontext, botLaeufe);
   const seite = await kontext.newPage();
   const fehler = [];
   seite.on('console', (m) => {
@@ -741,6 +909,11 @@ function hilfen(seite) {
       });
     },
     klaenge: () => seite.evaluate(() => (window.__klaenge || []).slice()),
+    // wartet, bis der Klang einmal kam, und dann so lange, dass ein Echo (zweites Mal) auch noch kaeme
+    async warteKlang(name, nachher = 1800) {
+      await seite.waitForFunction((n) => (window.__klaenge || []).includes(n), name, { timeout: 6000 }).catch(() => {});
+      await warte(nachher);
+    },
     async schliesseErgebnis() {
       await seite.locator('.ergebnis-overlay .erg-zu').click();
       await warte(300);
@@ -886,11 +1059,19 @@ async function testeBrowser(browser) {
     await seite.locator('.pk-details:not([hidden])').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det)
     && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1, det);
   await bild(seite, 'ergebnis-erster-eintrag');
+  const fensterGemerkt = () => seite.evaluate(() => (JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:punkte') || '{}') || {}).fenster ?? null);
+  const fensterVorher = await fensterGemerkt();
   await h.tippe('.pk-zur-liste');
   await seite.waitForSelector('.bl-reiter[data-reiter="bots"]:not([hidden])');
   await warte(600);
   pruefe('„Zur Bestenliste“ öffnet den Reiter Bots mit Bennos Tafel', /Bennos Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
     && await seite.locator('.bl-wahl[aria-pressed="true"]').getAttribute('data-tafel') === 'bot:benno');
+  // Pruefer-Befund (klein): der Platz der Abrechnung gilt Allzeit, also oeffnet "Zur Bestenliste" die Tafel in Allzeit
+  // (nicht im gemerkten Fenster, Standard Woche); gemerkt wird dabei kein Fenster
+  pruefe('„Zur Bestenliste“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
+    await seite.locator('.bl-screen').getAttribute('data-fenster') === 'allzeit'
+    && await seite.locator('.bl-steuer-fenster .seg[aria-checked="true"]').getAttribute('data-wert') === 'allzeit'
+    && fensterVorher !== 'allzeit' && await fensterGemerkt() === fensterVorher, { fensterVorher, jetzt: await fensterGemerkt() });
 
   // ---------- 5. Bestenliste mit Daten ----------
   gruppe = 'Bestenliste';
@@ -958,7 +1139,10 @@ async function testeBrowser(browser) {
     && (await seite.locator('.pk-abr .pk-wert').innerText()).trim() === zahlText(e2.w) && /^Rekord auf Bennos Tafel · \+/.test((await seite.locator('.pk-satz').innerText()).trim())
     && await seite.locator('.pk-abr[data-rekord="1"]').count() === 1);
   await warte(500);
+  await h.warteKlang('rekord');
   pruefe('Klang „rekord“ beim Rekord', (await h.klaenge()).includes('rekord'), await h.klaenge());
+  pruefe('Klang „rekord“ genau einmal: der große Moment klingt, die Abrechnungszeile schweigt (kein Echo)',
+    (await h.klaenge()).filter((n) => n === 'rekord').length === 1, await h.klaenge());
   await bild(seite, 'ergebnis-rekord');
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'ich' });
@@ -978,8 +1162,10 @@ async function testeBrowser(browser) {
   pruefe('Platz 1 als großer Moment „PLATZ 1 AUF BENNOS TAFEL“ (bot-rekord, 78)', await seite.locator('.erg-feier .erg-f-zeile.gross[data-quelle="bot-rekord"]').count() === 1
     && /PLATZ 1 AUF BENNOS TAFEL/.test(await seite.locator('.erg-feier [data-quelle="bot-rekord"]').innerText()));
   await warte(600);
+  await h.warteKlang('rekord');
   const k3 = await h.klaenge();
   pruefe('je überholter Zeile ein Klacken (klick) und der Rekord-Klang', k3.filter((n) => n === 'klick').length >= 1 && k3.includes('rekord'), k3);
+  pruefe('Platz 1: „rekord“ genau einmal (nur der große Moment), das Klacken bleibt', k3.filter((n) => n === 'rekord').length === 1, k3);
   pruefe('Abrechnung: „Platz 1 auf Bennos Tafel ▲ 1“', (await seite.locator('.pk-satz').innerText()).trim() === 'Platz 1 auf Bennos Tafel'
     && (await seite.locator('.pk-pfeil').innerText()).trim() === '▲ 1');
   await bild(seite, 'ergebnis-platz1');
@@ -1012,6 +1198,41 @@ async function testeBrowser(browser) {
   pruefe('97 % des Rekords: „So nah wie noch nie: 97 % deines Rekords auf Bennos Tafel“, keine Feier', e4.fast && e4.fast.prozent >= 96
     && /^So nah wie noch nie: \d+ % deines Rekords auf Bennos Tafel$/.test((await seite.locator('.pk-satz').innerText()).trim())
     && await seite.locator('.erg-feier [data-quelle="tafel-rekord"], .erg-feier [data-quelle="rekord"], .erg-feier [data-quelle="bot-rekord"]').count() === 0, e4);
+  pruefe('Gezeigt heißt festgeschrieben: die Tafel merkt sich Woche und Partie des Moments', (await h.stand()).tafeln['bot:benno'].fast.id === e4.id);
+  await h.schliesseErgebnis();
+  // Pruefer-Befund: dieselbe Naehe auf Platz 2 (unter deinen drei Besten) zeigte "Platz 2" und verbrauchte den Moment still
+  await h.aendereStand(`st.ids = []; const t = st.tafeln['bot:benno']; t.eintraege = t.eintraege.slice(0, 2); t.eintraege[0].w = a; t.eintraege[1].w = 10;
+    t.nah = null; t.fast = null;`, Math.round(e3.w / 0.97));
+  await h.schaefermatt();
+  const e4b = (await h.stand()).letzte[0];
+  const satz4b = (await seite.locator('.pk-satz').innerText()).trim();
+  pruefe('97 % auf Platz 2: „So nah wie noch nie …“ statt „Platz 2“, beim Zeigen festgeschrieben', e4b.platz === 2 && e4b.fast
+    && /^So nah wie noch nie: \d+ % deines Rekords auf Bennos Tafel$/.test(satz4b) && (await h.stand()).tafeln['bot:benno'].fast.id === e4b.id, { e4b, satz4b });
+  await h.schliesseErgebnis();
+  await h.schaefermatt();
+  const e4c = (await h.stand()).letzte[0];
+  const satz4c = (await seite.locator('.pk-satz').innerText()).trim();
+  pruefe('Dieselbe Woche noch einmal so nah: nur der Platz (höchstens einmal je Tafel und Woche)', e4c.id !== e4b.id && !e4c.fast
+    && /^Platz \d auf Bennos Tafel$/.test(satz4c), { e4c, satz4c });
+  // Neuaufbau der Zeile (Nachtrag): entschieden wird einmal je Partie, der Satz bleibt derselbe
+  const neuaufbau = await seite.evaluate(() => {
+    const P = window.__punkte;
+    const alt = P.stand().tafeln['bot:benno'];
+    const merk = { fast: alt.fast, nah: alt.nah };
+    const kandidat = (id) => ({ id, tafel: 'bot:benno', w: 1, fast: { prozent: 99, anteil: 0.99, wo: merk.fast.wo } });
+    const setze = (fast, nah) => { const st = P.stand(); st.tafeln['bot:benno'].fast = fast; st.tafeln['bot:benno'].nah = nah; P.speichere(st); };
+    const a1 = P.fastZeigen(kandidat('fz-a'));   // Moment der Woche schon vergeben
+    const a2 = P.fastZeigen(kandidat('fz-a'));   // Neuaufbau derselben Zeile
+    setze(null, null);
+    const b1 = P.fastZeigen(kandidat('fz-b'));   // jetzt frei: gezeigt und festgeschrieben
+    const fest = P.stand().tafeln['bot:benno'].fast;
+    setze({ wo: merk.fast.wo, id: 'jemand-anders' }, 0.995);
+    const b2 = P.fastZeigen(kandidat('fz-b'));   // Neuaufbau: bleibt bei "So nah"
+    setze(merk.fast, merk.nah);
+    return { a1: a1.fast, a2: a2.fast, b1: !!b1.fast, b2: !!b2.fast, fest };
+  });
+  pruefe('Neuaufbau der Zeile: derselbe Satz wie beim ersten Zeigen (vergeben bleibt vergeben, gezeigt bleibt gezeigt)',
+    neuaufbau.a1 === null && neuaufbau.a2 === null && neuaufbau.b1 && neuaufbau.b2 && neuaufbau.fest && neuaufbau.fest.id === 'fz-b', neuaufbau);
   await h.schliesseErgebnis();
   await h.schaefermatt({ hinweis: true });
   const e5 = (await h.stand()).letzte[0];
@@ -1038,6 +1259,13 @@ async function testeBrowser(browser) {
   await seite.locator('.bl-code-ein').fill(code.slice(0, 12) + (code[12] === 'A' ? 'B' : 'A') + code.slice(13));
   await h.tippe('.bl-pruefen');
   pruefe('Tippfehler im Code: ehrlicher Hinweis auf das Prüfzeichen', /Prüfzeichen passt nicht/.test(await seite.locator('.bl-lesen-ergebnis').innerText()));
+  // Pruefer-Befund: ein Code, der fuer eine offene Partie einen Sieg behauptet, wird ehrlich abgelehnt (kein "Nachgerechnet")
+  const gefaelscht = C.erzeugeCode({ botId: 'benno', farbe: 'w', ergebnis: 'sieg', seed: 4711, tag: '2026-10-20', tiefe: 10, zuege: SCHAEFER.slice(0, 4), name: 'Max' }).code;
+  await seite.locator('.bl-code-ein').fill(gefaelscht);
+  await h.tippe('.bl-pruefen');
+  pruefe('Code mit erfundenem Sieg (Partie ohne Matt): ehrlich abgelehnt, kein „Nachrechnen und eintragen“',
+    /Im Code steht ein Sieg, aber die nachgespielte Partie endet nicht mit Matt/.test(await seite.locator('.bl-lesen-ergebnis').innerText())
+    && await seite.locator('.bl-nachrechnen').count() === 0 && (await h.stand()).freunde.length === 0);
   const freundCode = C.erzeugeCode({ botId: 'benno', farbe: 'w', ergebnis: 'sieg', seed: 4711, tag: '2026-10-20', tiefe: 10, zuege: SCHAEFER, name: '' }).code;
   await seite.locator('.bl-code-ein').fill(freundCode);
   await h.tippe('.bl-pruefen');
@@ -1079,6 +1307,111 @@ async function testeBrowser(browser) {
   pruefe('Umzug nur einmal: beim nächsten Start nicht wieder', um2.umzug === true && Object.keys(um2.tafeln).length === 0 && um2.ids.length === 0, um2.ids);
   pruefe('Umzug: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+
+  // ---------- 10b. Vorlaeufige Bot-Laeufe (3.13 "Schon in S1 nicht leer"): echte Datei, dann eigene Laeufe ----------
+  gruppe = 'Bot-Läufe';
+  {
+    const echt = JSON.parse(readFileSync(path.join(WURZEL, 'daten/punkte/bot-laeufe.json'), 'utf8'));
+    const hilde = echt.tafeln['bot:benno'] || [];
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { botLaeufe: 'echt' });
+    const hs = hilfen(s);
+    await s.goto(MIT() + '#arena');
+    await s.waitForSelector('.screen.arena');
+    await s.waitForFunction(() => window.__punkte && window.__punkte.S.botLaeufe('bot:benno').length > 0, null, { timeout: 10000 }).catch(() => {});
+    await hs.bestenliste({ reiter: 'bots' });
+    const tafelZeilen = () => s.evaluate(() => [...document.querySelectorAll('.bl-tafel .bl-zeile')].map((z) => ({
+      platz: z.dataset.platz, ich: z.classList.contains('ich'), name: z.querySelector('.bl-z-name').textContent.trim(),
+      info: z.querySelector('.bl-z-info').textContent.trim(), punkte: z.querySelector('.bl-punkte').textContent.trim(),
+      bild: !!z.querySelector('.bl-gast-bot img[src*="avatare"]') })));
+    const z0 = await tafelZeilen();
+    pruefe('Bennos Tafel ohne eigene Partie ist nicht leer: Hildes Läufe aus daten/punkte/bot-laeufe.json (Avatar, „Bester Bot-Lauf · vorläufig“, Punkte)',
+      hilde.length >= 1 && z0.length === hilde.length && z0.every((x) => /^Oma Hilde/.test(x.name) && x.bild && !x.ich)
+      && /^Bester Bot-Lauf · vorläufig · (Weiß|Schwarz) · (Sieg|Remis|Niederlage) · \d+ Züge$/.test(z0[0].info) && z0[0].punkte === zahlText(hilde[0].w)
+      && /Erste Partie: Benno, Weiß/.test(await s.locator('.bl-tafel').innerText()), { z0, hilde });
+    await bild(s, 'bestenliste-bot-laeufe-leer');
+    // erste eigene Partie: Platz zwischen den Laeufen (Gaeste sind aelter: bei Gleichstand stehen sie vorn)
+    await hs.schaefermatt();
+    const e = (await hs.stand()).letzte[0];
+    const vor = hilde.filter((x) => x.w >= e.w).length;
+    pruefe('Erste Partie mit echten Läufen: Platz gleich 1 + Zahl der Läufe mit mindestens gleich vielen Punkten', e.erster && e.platz === vor + 1
+      && e.platz1 === (vor === 0), { e, vor });
+    pruefe('Echte Datei: keine Konsolenfehler (die Datei ist da)', f.length === 0, f.join(' | '));
+
+    // eigene Laeufe relativ zur Partie: Hilde 70 % und 50 %, dein alter Bestwert 30 %; die naechste Partie ueberholt beide
+    const eigene = { kopf: LEERE_LAEUFE.kopf, tafeln: { 'bot:benno': [
+      { bot: 'hilde', lauf: 'best', w: Math.round(e.w * 0.7), f: 'b', e: 's', z: 31, g: 81.2 },
+      { bot: 'hilde', lauf: 'mittel', w: Math.round(e.w * 0.5), f: 'w', e: 'n', z: 22, g: 64.5 }] } };
+    await botLaeufeRoute(k, eigene);
+    await hs.aendereStand("st.tafeln['bot:benno'].eintraege.forEach((x) => { x.w = a; });", Math.round(e.w * 0.3));
+    await s.evaluate(() => { location.hash = '#arena'; });
+    await s.reload();
+    await s.waitForSelector('.screen.arena');
+    await s.waitForFunction((w) => window.__punkte && window.__punkte.S.botLaeufe('bot:benno').some((x) => x.w === w), Math.round(e.w * 0.7), { timeout: 10000 }).catch(() => {});
+    await hs.klangSpion();
+    await hs.schaefermatt();
+    const e2 = (await hs.stand()).letzte[0];
+    const gross = await s.locator('.erg-feier .erg-f-zeile.gross[data-quelle="bot-rekord"]').allInnerTexts();
+    const mini = await s.evaluate(() => [...document.querySelectorAll('.pk-mini .pk-m-zeile')].map((x) => x.dataset.rolle + ':' + x.querySelector('.pk-m-name').textContent));
+    pruefe('Rekord vor beiden Läufen: Platz 1 ▲ 2 (vorher Platz 3), überholt „Oma Hilde“ (ein Name), Mini-Tafel du / Oma Hilde', e2.rekord && e2.platz1
+      && e2.platz === 1 && e2.platzVorher === 3 && e2.aufstieg === 2 && e2.ueberholt.join() === 'Oma Hilde' && mini.join() === 'ich:Du,unter:Oma Hilde'
+      && (await s.locator('.pk-satz').innerText()).trim() === 'Platz 1 auf Bennos Tafel' && (await s.locator('.pk-pfeil').innerText()).trim() === '▲ 2', { e2, mini });
+    pruefe('Großer Moment „PLATZ 1 AUF BENNOS TAFEL“ mit dem Satz des überholten Bots (Oma Hilde, 3.13)', gross.length === 1 && /PLATZ 1 AUF BENNOS TAFEL/.test(gross[0])
+      && /vor Oma Hilde\. Oma Hilde: „Na sowas, an mir vorbei!/.test(gross[0]) && e2.satzBot === 'hilde', gross);
+    await hs.warteKlang('rekord');
+    const kl = await hs.klaenge();
+    pruefe('Bot überholt: zwei Klacken (je überholte Zeile), „rekord“ genau einmal', kl.filter((n) => n === 'klick').length === 2
+      && kl.filter((n) => n === 'rekord').length === 1, kl);
+    await bild(s, 'ergebnis-platz1-bot');
+    await hs.schliesseErgebnis();
+    await hs.bestenliste({ reiter: 'bots' });
+    const z2 = await tafelZeilen();
+    pruefe('Tafel danach: Du vorn, dann Hildes bester und mittlerer Lauf, dann dein alter Wert', z2.map((x) => (x.ich ? 'Du' : x.name.replace(/\s+/g, ' '))).join()
+      === 'Du,Oma Hilde,Oma Hilde,Du' && /^Mittlerer Bot-Lauf · vorläufig · Weiß · Niederlage · 22 Züge$/.test(z2[2].info), z2);
+    await bild(s, 'bestenliste-bot-laeufe');
+    pruefe('keine Konsolenfehler', f.length === 0, f.join(' | '));
+    await k.close();
+  }
+
+  // ---------- 10c. Reduzierte Bewegung: sofort das fertige Bild, ein Klang ----------
+  gruppe = 'Reduzierte Bewegung';
+  {
+    const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { reduziert: true });
+    const hs = hilfen(s);
+    await s.goto(MIT() + '#arena');
+    await s.waitForSelector('.screen.arena');
+    await hs.schaefermatt();
+    await hs.schliesseErgebnis();
+    await hs.aendereStand("st.tafeln['bot:benno'].eintraege.forEach((x) => { x.w = 1000; });", null);
+    await hs.klangSpion();
+    // Zeitpunkte: wann kommt die Zeile (nicht die Wartezeile), wann steht ihr Endbild (data-fertig)
+    await s.evaluate(() => {
+      window.__abr = [];
+      new MutationObserver((ml) => {
+        for (const m of ml) {
+          for (const n of m.addedNodes || []) {
+            if (n.nodeType !== 1) continue;
+            for (const z of [n, ...n.querySelectorAll('.pk-abr')]) if (z.matches('.pk-abr:not(.pk-wartet)')) window.__abr.push({ was: 'neu', t: performance.now() });
+          }
+          if (m.type === 'attributes' && m.target.matches('.pk-abr:not(.pk-wartet)')) window.__abr.push({ was: 'fertig', t: performance.now() });
+        }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-fertig'] });
+    });
+    await hs.schaefermatt();
+    const e = (await hs.stand()).letzte[0];
+    const r = await s.evaluate(() => {
+      const z = document.querySelector('.pk-abr:not(.pk-wartet)');
+      const neu = window.__abr.find((x) => x.was === 'neu');
+      const fertig = window.__abr.find((x) => x.was === 'fertig');
+      return { abstand: neu && fertig ? fertig.t - neu.t : null, wert: z.querySelector('.pk-wert').textContent, anim: z.getAnimations({ subtree: true }).length,
+        alt: (z.querySelector('.pk-alt') || {}).textContent || '' };
+    });
+    pruefe('Die Zeile steht sofort fertig da (data-fertig in unter 300 ms, kein Hochzählen, keine Animation), alte Zahl daneben',
+      e.rekord && r.abstand != null && r.abstand < 300 && r.wert === zahlText(e.w) && r.anim === 0 && r.alt === '1.000', r);
+    await hs.warteKlang('rekord');
+    pruefe('„rekord“ genau einmal', (await hs.klaenge()).filter((n) => n === 'rekord').length === 1, await hs.klaenge());
+    pruefe('keine Konsolenfehler', f.length === 0, f.join(' | '));
+    await k.close();
+  }
 
   // ---------- 11. Bilder und Layout: 1180 x 820 und 390 x 844, hell und dunkel ----------
   gruppe = 'Bilder';

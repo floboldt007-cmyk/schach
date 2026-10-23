@@ -74,12 +74,29 @@ function infoText(e, { mitTafel = false } = {}) {
   return teile.join(' · ');
 }
 
+// Gast-Bot (vorlaeufiger Bot-Lauf, 3.13): Avatar, "Bester Bot-Lauf / vorlaeufig" mit Farbe, Ergebnis und Zuegen
+function botInfo(r) {
+  const teile = [`${r.lauf === 'mittel' ? 'Mittlerer' : 'Bester'} Bot-Lauf${r.vorlaeufig ? ' · vorläufig' : ''}`];
+  if (r.f) teile.push(FARBE[r.f]);
+  if (r.e) teile.push(ERG[r.e]);
+  if (Number.isInteger(r.z) && r.z > 0) teile.push(`${r.z} Züge`);
+  return teile.join(' · ');
+}
+function gastMarke(r, name) {
+  if (r.art === 'bot') {
+    const b = botNachId(r.bot);
+    if (b && b.avatar) return `<span class="bl-gast bl-gast-bot" aria-hidden="true"><img src="${esc(b.avatar)}" alt="" draggable="false"></span>`;
+    return `<span class="bl-gast" aria-hidden="true">${icon('podest')}</span>`;
+  }
+  return `<span class="bl-gast" title="${esc(PRUEF_TEXT[r.pruef] || '')}">${r.art === 'freund' ? esc((name[0] || '?').toUpperCase()) : icon('podest')}</span>`;
+}
+
 // eine Tafel-Zeile; eigene Zeilen springen in die Analyse (Moment mit dem groessten Ausschlag), solange die Partie da ist
 function zeileHtml(r, { neu = false, mitTafel = false } = {}) {
   const name = r.eigen ? 'Du' : r.name || 'Gast';
-  const marke = r.eigen ? '' : `<span class="bl-gast" title="${esc(PRUEF_TEXT[r.pruef] || '')}">${r.art === 'freund' ? esc((name[0] || '?').toUpperCase()) : icon('podest')}</span>`;
+  const marke = r.eigen ? '' : gastMarke(r, name);
   const pruef = !r.eigen && r.pruef ? `<span class="bl-pruef">${esc(PRUEF_TEXT[r.pruef] || '')}</span>` : '';
-  const info = r.eigen ? infoText(r, { mitTafel }) : (r.art === 'freund' ? `Freund · ${datumText(r.t)}` : 'Bot-Lauf');
+  const info = r.eigen ? infoText(r, { mitTafel }) : (r.art === 'freund' ? `Freund · ${datumText(r.t)}` : botInfo(r));
   const tag = r.eigen && ladePartie(r.id) ? 'button' : 'div';
   return `<li class="bl-zeile${r.eigen ? ' ich' : ''}" data-platz="${r.platz}"${r.eigen ? ` data-id="${esc(r.id)}"` : ''}${neu ? ' data-neu="1"' : ''}>`
     + `<${tag} class="bl-z-innen"${tag === 'button' ? ` type="button" data-aktion="analyse" data-id="${esc(r.id)}"${Number.isInteger(r.m) ? ` data-ply="${r.m}"` : ''}` : ''}>`
@@ -147,7 +164,7 @@ export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
       + `<span class="bl-b-werte">${r.vorher != null ? `<s class="zahl">${zahlText(r.vorher)}</s>` : ''}<b class="zahl">${zahlText(r.w)}</b></span>`
       + `<span class="bl-b-info">${datumText(r.t)} · Rechenstand ${r.stand}${r.n ? ' · Nachweis' : ''}</span></li>`).join('')}</ol>`
     : '<p class="bl-leer">Hier landet jeder neue Rekord auf einer Tafel, mit dem alten Wert daneben. Nichts wird überschrieben.</p>'}
-    <p class="bl-klein">Ändert ein Update die Punkte-Formel, rechnet die App mit dem neuen Rechenstand nach und zeigt beide Werte.</p>`;
+    <p class="bl-klein">Jeder Rekord merkt sich seinen Rechenstand und seinen Nachweis (die Züge). So mischen sich alte und neue Regeln nie, und der alte Wert bleibt hier stehen.</p>`;
   s.append(spielerkarte(st), liste, buch);
   bindeAnalyse(s, app);
   merkeGesehen(beste.filter((r) => neu.has(r.id)).map((r) => r.id));
@@ -411,8 +428,15 @@ export function reiterFreunde({ app, jetzt = new Date() } = {}) {
       ergebnisBox.innerHTML = '<p class="bl-fehler">Die Züge im Code passen nicht zu dieser Partie. Der Code ist beschädigt.</p>';
       return;
     }
+    // Ergebnis gegen die Schlussstellung: ein Code, der einen Sieg ohne Matt behauptet, kommt nicht auf die Tafel
+    const passt = C.pruefeErgebnis(d, nach);
+    if (!passt.ok) {
+      ergebnisBox.innerHTML = `<p class="bl-fehler"></p>${vorschauListe(d)}`;
+      ergebnisBox.firstChild.textContent = passt.text;
+      return;
+    }
     const tafel = d.art === 'boss' ? `boss:${d.botId}:${d.stufe}` : `bot:${d.botId}`;
-    ergebnisBox.innerHTML = `<p class="bl-ok">Prüfzeichen stimmt. Die Züge lassen sich nachspielen.</p>${vorschauListe(d)}
+    ergebnisBox.innerHTML = `<p class="bl-ok">Prüfzeichen stimmt. Die Züge lassen sich nachspielen, das Ergebnis passt zur Schlussstellung.</p>${vorschauListe(d)}
       ${d.name ? '' : '<label class="bl-feld"><span>Wie heißt dein Freund?</span><input class="bl-f-name-ein" type="text" maxlength="12" autocomplete="off"></label>'}
       <div class="bl-knoepfe"><button class="knopf primaer bl-nachrechnen dr" type="button">Nachrechnen und eintragen</button></div>
       <p class="bl-fortschritt" role="status" aria-live="polite"></p>`;
@@ -450,7 +474,8 @@ export function reiterFreunde({ app, jetzt = new Date() } = {}) {
       });
       if (!erg.ok) {
         zeile.textContent = erg.grund === 'voll' ? `Höchstens ${S.FREUNDE_MAX} Freunde. Entferne erst jemanden.`
-          : erg.grund === 'doppelt' ? 'Diesen Code hast du schon eingetragen.' : 'Eintragen ging nicht.';
+          : erg.grund === 'eintraege' ? `Höchstens ${S.FREUND_EINTRAEGE_MAX} Freundes-Einträge auf allen Tafeln. Entferne erst jemanden.`
+            : erg.grund === 'doppelt' ? 'Diesen Code hast du schon eingetragen.' : 'Eintragen ging nicht.';
         knopf.disabled = false;
         return;
       }

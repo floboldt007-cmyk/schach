@@ -29,8 +29,11 @@
 //   eintragen(tafel, e, { jetzt, gaeste }) -> { tafel, ergebnis } | null (schon da)
 //       ergebnis: { platz, platzVorher, aufstieg, vorher, rekord, erster, bestwert, ueberholt: [Gast], platz1,
 //       wochenPlatz, wochenBest, monatsBest, sichtbar }
-//   fast(tafel, e, { vorher, jetzt }) -> { prozent } | null   "So nah wie noch nie": hoechstens einmal je Tafel und Woche,
-//       nur unter dem eigenen Rekord und naeher als je zuvor (ab FAST_AB); setzt tafel.nah und tafel.fast
+//   fastPruefen(tafel, e, { vorher, jetzt }) -> { prozent, anteil, wo } | null   "So nah wie noch nie": hoechstens einmal
+//       je Tafel und Woche, nur unter dem eigenen Rekord und naeher als je zuvor (ab FAST_AB); aendert nichts
+//   merkeFast(tafel, kandidat, { id }) -> boolean   schreibt den Moment fest (tafel.nah, tafel.fast = { wo, id }), erst
+//       wenn der Satz wirklich gezeigt wird; true auch, wenn dieselbe Partie ihn schon festgeschrieben hat
+//   fast(tafel, e, { vorher, jetzt }) -> { prozent } | null   beides zusammen (pruefen und gleich festschreiben)
 //   duenneAus(tafel, jetzt) -> tafel   behaelt die Allzeit-Besten und die Besten der laufenden Woche und des laufenden
 //       Monats (je 3); Nachweise nur an den Allzeit-Besten
 import { tagSchluessel, wochenSchluessel, istSchluessel } from '../../tag.js';
@@ -97,7 +100,8 @@ export function pruefeTafel(roh, id) {
   const c = roh.chronik && typeof roh.chronik === 'object' ? roh.chronik : {};
   t.chronik = { w: pruefeSaeulen(c.w, /^\d{4}-\d{2}-\d{2}$/), m: pruefeSaeulen(c.m, /^\d{4}-\d{2}$/) };
   t.nah = zahl(roh.nah) != null && roh.nah > 0 && roh.nah < 1 ? roh.nah : null;
-  t.fast = roh.fast && istSchluessel(roh.fast.wo) ? { wo: roh.fast.wo } : null;
+  t.fast = roh.fast && istSchluessel(roh.fast.wo)
+    ? { wo: roh.fast.wo, ...(typeof roh.fast.id === 'string' && roh.fast.id && roh.fast.id.length <= 40 ? { id: roh.fast.id } : {}) } : null;
   return t;
 }
 
@@ -183,16 +187,31 @@ export function eintragen(tafel, roh, { jetzt = new Date(), gaeste = [] } = {}) 
   return { tafel: neu, ergebnis };
 }
 
-export function fast(tafel, e, { vorher = null, jetzt = new Date() } = {}) {
+export function fastPruefen(tafel, e, { vorher = null, jetzt = new Date() } = {}) {
   if (!tafel || !e || zahl(vorher) == null || vorher <= 0 || zahl(e.w) == null || e.w >= vorher) return null;
   const anteil = e.w / vorher;
   if (anteil < FAST_AB) return null;
   const wo = wochenSchluessel(jetzt);
   if (tafel.fast && tafel.fast.wo === wo) return null;
   if (tafel.nah != null && anteil <= tafel.nah + 1e-9) return null;
-  tafel.nah = anteil;
-  tafel.fast = { wo };
-  return { prozent: Math.floor(anteil * 100) };
+  return { prozent: Math.floor(anteil * 100), anteil, wo };
+}
+
+// Festschreiben erst beim Zeigen: ein Satz, den niemand gesehen hat, verbraucht den Moment der Woche nicht
+export function merkeFast(tafel, k, { id = null } = {}) {
+  if (!tafel || !k || zahl(k.anteil) == null || !istSchluessel(k.wo)) return false;
+  if (id && tafel.fast && tafel.fast.id === id) return true;
+  if (tafel.fast && tafel.fast.wo === k.wo) return false;
+  if (tafel.nah != null && k.anteil <= tafel.nah + 1e-9) return false;
+  tafel.nah = k.anteil;
+  tafel.fast = id ? { wo: k.wo, id } : { wo: k.wo };
+  return true;
+}
+
+export function fast(tafel, e, { vorher = null, jetzt = new Date() } = {}) {
+  const k = fastPruefen(tafel, e, { vorher, jetzt });
+  if (!k || !merkeFast(tafel, k)) return null;
+  return { prozent: k.prozent };
 }
 
 export function duenneAus(tafel, jetzt = new Date()) {

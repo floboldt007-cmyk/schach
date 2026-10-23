@@ -1,0 +1,56 @@
+{
+ "kopf": {"art":"bot-laeufe","format":1,"rechenstand":1,"stand":"2026-10-23","titel":"Vorlaeufige Bot-Laeufe aus den Nachbar-Partien der Eichung"},
+ "quelle": {"partien":311,"tiefe":14,"multipv":2,"engine":"Stockfish 19 lite (wie die App)","vorlaeufig":true},
+ "tafeln": {
+  "bot:benno": [
+   {"bot":"hilde","lauf":"best","w":13600,"f":"w","e":"r","z":69,"g":51.5,"partie":"nachbar-1-2-35","von":39},
+   {"bot":"hilde","lauf":"mittel","w":7700,"f":"b","e":"s","z":12,"g":89.7,"partie":"nachbar-1-2-26","von":39}
+  ],
+  "bot:delia": [
+   {"bot":"koenig","lauf":"best","w":25400,"f":"w","e":"s","z":81,"g":89.2,"partie":"nachbar-7-8-37","von":39},
+   {"bot":"koenig","lauf":"mittel","w":13200,"f":"b","e":"s","z":35,"g":89.8,"partie":"nachbar-7-8-14","von":39},
+   {"bot":"turm","lauf":"best","w":18050,"f":"b","e":"s","z":60,"g":84.2,"partie":"nachbar-6-7-11","von":39},
+   {"bot":"turm","lauf":"mittel","w":9950,"f":"b","e":"s","z":32,"g":96.9,"partie":"nachbar-6-7-7","von":39}
+  ],
+  "bot:greta": [
+   {"bot":"koenig","lauf":"best","w":25900,"f":"w","e":"s","z":71,"g":91.5,"partie":"nachbar-8-9-28","von":39},
+   {"bot":"koenig","lauf":"mittel","w":13000,"f":"b","e":"n","z":37,"g":89.7,"partie":"nachbar-8-9-19","von":39}
+  ],
+  "bot:hilde": [
+   {"bot":"benno","lauf":"best","w":12100,"f":"b","e":"r","z":100,"g":77.6,"partie":"nachbar-1-2-3","von":39},
+   {"bot":"benno","lauf":"mittel","w":3500,"f":"w","e":"r","z":119,"g":89.6,"partie":"nachbar-1-2-36","von":39},
+   {"bot":"kalle","lauf":"best","w":14650,"f":"w","e":"r","z":57,"g":56.5,"partie":"nachbar-2-3-21","von":38},
+   {"bot":"kalle","lauf":"mittel","w":9300,"f":"b","e":"s","z":21,"g":85.1,"partie":"nachbar-2-3-30","von":38}
+  ],
+  "bot:kalle": [
+   {"bot":"hilde","lauf":"best","w":14000,"f":"b","e":"r","z":57,"g":57,"partie":"nachbar-2-3-21","von":38},
+   {"bot":"hilde","lauf":"mittel","w":4700,"f":"w","e":"r","z":91,"g":84.4,"partie":"nachbar-2-3-0","von":38},
+   {"bot":"lisa","lauf":"best","w":14850,"f":"b","e":"r","z":84,"g":87.9,"partie":"nachbar-3-4-34","von":38},
+   {"bot":"lisa","lauf":"mittel","w":9800,"f":"w","e":"s","z":25,"g":92.2,"partie":"nachbar-3-4-9","von":38}
+  ],
+  "bot:koenig": [
+   {"bot":"delia","lauf":"best","w":22250,"f":"b","e":"r","z":44,"g":81.3,"partie":"nachbar-7-8-11","von":39},
+   {"bot":"delia","lauf":"mittel","w":10700,"f":"b","e":"s","z":85,"g":96.2,"partie":"nachbar-7-8-31","von":39},
+   {"bot":"greta","lauf":"best","w":27150,"f":"w","e":"s","z":50,"g":93.9,"partie":"nachbar-8-9-7","von":39},
+   {"bot":"greta","lauf":"mittel","w":15150,"f":"b","e":"n","z":75,"g":72.2,"partie":"nachbar-8-9-36","von":39}
+  ],
+  "bot:lisa": [
+   {"bot":"kalle","lauf":"best","w":14550,"f":"w","e":"r","z":84,"g":86.3,"partie":"nachbar-3-4-34","von":38},
+   {"bot":"kalle","lauf":"mittel","w":4300,"f":"w","e":"n","z":42,"g":66.5,"partie":"nachbar-3-4-18","von":38},
+   {"bot":"rudi","lauf":"best","w":17400,"f":"w","e":"s","z":116,"g":83.7,"partie":"nachbar-4-5-3","von":39},
+   {"bot":"rudi","lauf":"mittel","w":9900,"f":"b","e":"s","z":32,"g":90.6,"partie":"nachbar-4-5-4","von":39}
+  ],
+  "bot:rudi": [
+   {"bot":"lisa","lauf":"best","w":13600,"f":"b","e":"s","z":37,"g":72.2,"partie":"nachbar-4-5-17","von":39},
+   {"bot":"lisa","lauf":"mittel","w":6200,"f":"b","e":"n","z":31,"g":50.1,"partie":"nachbar-4-5-13","von":39},
+   {"bot":"turm","lauf":"best","w":20500,"f":"b","e":"s","z":71,"g":84.3,"partie":"nachbar-5-6-24","von":40},
+   {"bot":"turm","lauf":"mittel","w":11900,"f":"w","e":"s","z":39,"g":85.5,"partie":"nachbar-5-6-17","von":40}
+  ],
+  "bot:turm": [
+   {"bot":"delia","lauf":"best","w":20800,"f":"w","e":"s","z":107,"g":83.9,"partie":"nachbar-6-7-15","von":39},
+   {"bot":"delia","lauf":"mittel","w":12700,"f":"w","e":"s","z":53,"g":78.7,"partie":"nachbar-6-7-3","von":39},
+   {"bot":"rudi","lauf":"best","w":16050,"f":"w","e":"s","z":70,"g":90.6,"partie":"nachbar-5-6-36","von":40},
+   {"bot":"rudi","lauf":"mittel","w":7550,"f":"w","e":"n","z":33,"g":73.9,"partie":"nachbar-5-6-8","von":40}
+  ]
+ }
+}

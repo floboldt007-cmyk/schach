@@ -115,6 +115,9 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-gast { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: var(--r-pille); background: var(--flaeche-3);
   color: var(--text); font-size: 12px; font-weight: 800; }
 .bl-gast .ico { width: 14px; height: 14px; }
+/* vorlaeufiger Bot-Lauf: Avatar des Bots im Kreis */
+.bl-gast-bot { overflow: hidden; }
+.bl-gast-bot img { width: 100%; height: 100%; object-fit: cover; }
 .bl-pruef { flex: none; font-size: 11.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
 .bl-neu { flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-pille); background: var(--akzent-weich); color: var(--akzent-text);
   font-size: 11px; font-weight: 800; line-height: 20px; }
