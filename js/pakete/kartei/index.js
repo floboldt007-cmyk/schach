@@ -82,10 +82,10 @@ function verarbeite(partie, review, { feier = true } = {}) {
   const r = L.fuegeHinzu(m, partie, review, tag, { tagVon: (ms) => tagSchluessel(ms) });
   if (r.doppelt) return r;
   letzte = { partieId: partie.id, neu: r.neu.slice(), rueckfall: r.rueckfall.slice() };
-  const anzahl = r.neu.length + r.rueckfall.length;
   // Feier-Zeile synchron, damit sie noch im Ergebnis erscheint (partie.js fuellt das Overlay gleich danach)
-  if (feier && anzahl) {
-    sicher(() => melde({ partieId: partie.id, quelle: 'karten', titel: L.neueKartenText(anzahl), symbol: 'kartei' }), 'Feier');
+  const f = L.kartenFeier(r.neu.length, r.rueckfall.length);
+  if (feier && f) {
+    sicher(() => melde({ partieId: partie.id, quelle: 'karten', titel: f.titel, text: f.text || undefined, symbol: 'kartei' }), 'Feier');
   }
   // Schreiben in einer eigenen Aufgabe (Hoerer bleiben kurz); vorher frisch lesen, falls inzwischen geuebt wurde
   setTimeout(() => sicher(() => {

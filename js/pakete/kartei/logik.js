@@ -26,7 +26,7 @@
 //       fuer immer geloesten (ihr Zaehler bleibt), dann die aeltesten der Stufe 5, dann die aeltesten ueberhaupt
 //   normalisiereModul(m) -> Modul      kaputte oder fremde Daten -> leeres Modul, falsche Karten fallen weg
 //   alsAufgabe(karte, { botName, heute }) -> Aufgabe fuer den Raetsel-Bildschirm (js/ui/raetsel.js)
-//   rueckmeldung(info), endeText(ergebnisse), neueKartenText(n), stapelText(...)   Texte
+//   rueckmeldung(info), endeText(ergebnisse), neueKartenText(n), kartenFeier(neu, rueckfall), stapelText(...)   Texte
 //
 // Modul (Speicher "kartei", Budget 160.000 Zeichen): { v: RECHENSTAND, karten: [Karte], verarbeitet: [partieId],
 //   heute: { tag, ids }, zaehler: { erstellt, gemeistert, richtig, falsch } }
@@ -418,6 +418,18 @@ export function endeText(ergebnisse) {
 
 export function neueKartenText(n) {
   return n === 1 ? '1 neue Karte in deinem Stapel' : `${n} neue Karten in deinem Stapel`;
+}
+
+// Feier-Zeile nach einer Partie (Quelle karten): neue Karten, sonst Karten, die wieder dabei sind (Rueckfall) -> null
+export function kartenFeier(neu, rueckfall) {
+  if (neu > 0) {
+    return { titel: neueKartenText(neu), text: rueckfall ? `${rueckfall === 1 ? '1 Karte ist' : rueckfall + ' Karten sind'} wieder dabei.` : '' };
+  }
+  if (rueckfall > 0) {
+    return { titel: rueckfall === 1 ? '1 Karte wieder in deinem Stapel' : `${rueckfall} Karten wieder in deinem Stapel`,
+      text: 'Die Stellung kam wieder vor, die Karte beginnt neu.' };
+  }
+  return null;
 }
 
 // Zeile fuer die Karte im Training und die Heute-Karte

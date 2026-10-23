@@ -276,6 +276,10 @@ async function nodeTeil() {
   const ende = L.endeText([{ info: { ersterVersuch: true } }, { info: { ersterVersuch: true, gemeistert: true } }, { info: { ersterVersuch: false } }]);
   pruefe('Zusammenfassung: "2 Karten weiter, 1 für immer gelöst, 1 Karte kommt morgen wieder."', ende.text === '2 Karten weiter, 1 für immer gelöst, 1 Karte kommt morgen wieder.', ende);
   pruefe('Feier-Text: 1 neue Karte / 2 neue Karten in deinem Stapel', L.neueKartenText(1) === '1 neue Karte in deinem Stapel' && L.neueKartenText(2) === '2 neue Karten in deinem Stapel');
+  pruefe('Feier nach einer Partie: neue Karten zuerst (Rueckfaelle im Text), sonst "wieder in deinem Stapel", ohne beides keine Zeile',
+    JSON.stringify(L.kartenFeier(2, 1)) === '{"titel":"2 neue Karten in deinem Stapel","text":"1 Karte ist wieder dabei."}'
+    && L.kartenFeier(0, 2).titel === '2 Karten wieder in deinem Stapel' && L.kartenFeier(0, 1).titel === '1 Karte wieder in deinem Stapel'
+    && L.kartenFeier(1, 0).text === '' && L.kartenFeier(0, 0) === null);
   const texte = [a.text, a.hinweis, ...['ersterVersuch', 'gemeistert', 'richtig'].map((x) => JSON.stringify(L.rueckmeldung({ [x]: true, tage: 3 }))), JSON.stringify(ende),
     lies('js/pakete/kartei/index.js'), lies('js/ui/raetsel.js')].join(' ');
   pruefe('kein Druck in den Texten (nichts "offen", nichts verfaellt, keine Restzeit)', !/noch offen|verfällt|läuft ab|nur noch|letzte Chance|beeil/i.test(texte));

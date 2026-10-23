@@ -1481,9 +1481,10 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
   `.kt-los` „Üben“), alles geuebt („Stapel leer. Gut gemacht.“ mit dem naechsten Tag) und keine Karten („Noch keine
   Karten“, ohne Knopf). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“, nur wenn Karten
   faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`.
-- **Feier:** Neue Karten (und Rueckfaelle) einer Partie melden synchron im Hoerer von `partie:analysiert`
-  `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', symbol: 'kartei' })` (Zeile, Prio 30 laut
-  `feier.QUELLEN`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
+- **Feier:** Neue Karten einer Partie melden synchron im Hoerer von `partie:analysiert`
+  `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', text: '1 Karte ist wieder dabei.', symbol:
+  'kartei' })` (Zeile, Prio 30 laut `feier.QUELLEN`; nur Rueckfaelle: „1 Karte wieder in deinem Stapel“,
+  `logik.kartenFeier`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
   Analyse-Screen landet sie in der Nachlese. Geschrieben wird per `setTimeout(0)` nach frischem Lesen.
 - **Ereignisse:** sendet `training:geloest { karteId, richtig, versuch, quelle: 'kartei' }` je beantworteter Karte
   (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche)
