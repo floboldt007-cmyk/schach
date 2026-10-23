@@ -8,8 +8,9 @@
 // - Erster Sieg: die Feier-Zeile "Dein erster Sieg" (Quelle erster-sieg, gross) beim ersten wertenden Sieg ueberhaupt.
 //
 // Orte:       app:erster-screen? (Reihenfolge 80, logik.WAHL_REIHENFOLGE: andere Pakete mit eigener Wahl gehen vor),
-//             arena:heute (70, Zeile .st-neu "Neu fuer dich: ..." mit Knopf und Ausblenden), einstellungen:gruppen (90,
-//             Gruppe "Erste Schritte": Schalter fuer die Hinweise, Stand der Einstufung, Willkommen, Regel-Hilfe)
+//             arena:heute (70, Zeile .st-neu: Knopf .st-neu-los "Neu fuer dich: ..." fuehrt hin, .st-neu-weg blendet aus),
+//             einstellungen:gruppen (90, Gruppe "Erste Schritte": Schalter fuer die Hinweise, Stand der Einstufung,
+//             Willkommen, Regel-Hilfe)
 // Ereignisse: hoert app:bereit (Fahrplan beginnt, per setTimeout), app:screen (besuchte Screens: kein Hinweis mehr dafuer),
 //             partie:beendet (letzte Partie fuer den Hinweis zur Analyse; erster Sieg synchron vor den Feier-Zeilen des
 //             Overlays). Sendet nichts.
@@ -71,9 +72,10 @@ function neuZeile(k) {
   el.className = 'st-neu';
   el.dataset.paket = L.PAKET;
   el.dataset.entdeckung = e.id;
-  el.innerHTML = `<span class="st-neu-siegel" aria-hidden="true">${icon('neu-siegel')}</span>
-    <span class="st-neu-text"><b>Neu für dich:</b> <span class="st-neu-titel"></span> <small></small></span>
-    <button class="knopf dr st-neu-los" type="button">Ansehen</button>
+  // die ganze Zeile fuehrt hin (SPIELKONZEPT 3.16 "Antippen fuehrt hin"), daneben nur das Kreuz zum Ausblenden
+  el.innerHTML = `<button class="st-neu-los dr" type="button"><span class="st-neu-siegel" aria-hidden="true">${icon('neu-siegel')}</span>
+    <span class="st-neu-text"><span class="st-neu-kopf"><b>Neu für dich:</b> <span class="st-neu-titel"></span></span> <small></small></span>
+    <span class="st-neu-pfeil" aria-hidden="true">${icon('vor')}</span></button>
     <button class="icon-knopf dr st-neu-weg" type="button" aria-label="Hinweis ausblenden">${icon('kreuz')}</button>`;
   el.querySelector('.st-neu-titel').textContent = e.titel;
   el.querySelector('small').textContent = e.text;

@@ -723,7 +723,10 @@ async function browserTeil(browser) {
     fahrplan: { start: t, erfahren: false, heute: null, erledigt: [], benutzt: [], ...fp }, ...extra });
   const zeile = (s) => s.evaluate(() => {
     const z = document.querySelector('.heute-karte .st-neu');
-    return z ? { id: z.dataset.entdeckung, text: z.querySelector('.st-neu-text').textContent.replace(/\s+/g, ' ').trim(), karte: !z.closest('.heute-karte').hidden } : null;
+    if (!z) return null;
+    const kopf = z.querySelector('.st-neu-kopf');
+    return { id: z.dataset.entdeckung, text: z.querySelector('.st-neu-text').textContent.replace(/\s+/g, ' ').trim(), karte: !z.closest('.heute-karte').hidden,
+      zeilen: Math.round(kopf.getBoundingClientRect().height / parseFloat(getComputedStyle(kopf).lineHeight)) };
   });
   // erster Tag ohne Partie: nichts
   await bereite(n.seite, { modul: modulMit({}) }, '#arena');
@@ -731,8 +734,8 @@ async function browserTeil(browser) {
   // nach der ersten Partie (hier eine Probepartie: letzte gesetzt)
   await bereite(n.seite, { modul: modulMit({}, { letzte: 'pprobe1' }) }, '#arena');
   let zl = await zeile(n.seite);
-  pruefe('nach der ersten Partie: "Neu für dich: Die Spielanalyse" in der Heute-Karte', zl && zl.id === 'analyse' && zl.karte
-    && zl.text === 'Neu für dich: Die Spielanalyse Sieh dir an, wo deine letzte Partie kippte.', JSON.stringify(zl));
+  pruefe('nach der ersten Partie: "Neu für dich: Die Spielanalyse" in der Heute-Karte (Kopf in einer Zeile)', zl && zl.id === 'analyse' && zl.karte
+    && zl.text === 'Neu für dich: Die Spielanalyse Sieh dir an, wo deine letzte Partie kippte.' && zl.zeilen === 1, JSON.stringify(zl));
   await bild(n.seite, 'heute-neu-ipad');
   await n.seite.locator('.st-neu .st-neu-los').click();
   await n.seite.waitForSelector('.screen.vl-screen', { timeout: 15000 });
@@ -844,6 +847,23 @@ async function browserTeil(browser) {
       const l = await layout(hs.seite);
       pruefe('Empfehlung: nichts ragt heraus, Knoepfe mindestens 44 px', l.quer && l.raus && l.titel && !l.klein.length, JSON.stringify(l));
       await bild(hs.seite, `empfehlung-${name}`);
+      // Heute-Karte mit "Neu für dich" auf dem Handy: eine Kopfzeile, nichts ragt heraus, Knoepfe mindestens 44 px
+      const th = await heuteImBrowser(hs.seite);
+      await bereite(hs.seite, { modul: { v: 1, gesehen: th, regeln: null, einstufung: null, ersterSieg: '', letzte: 'pprobe1',
+        fahrplan: { start: th, erfahren: false, heute: null, erledigt: [], benutzt: [] } } }, '#arena');
+      await hs.seite.locator('.heute-karte .st-neu').scrollIntoViewIfNeeded();
+      const hz = await hs.seite.evaluate(() => {
+        const z = document.querySelector('.heute-karte .st-neu');
+        const r = z.getBoundingClientRect();
+        const kopf = z.querySelector('.st-neu-kopf');
+        const zeilen = Math.round(kopf.getBoundingClientRect().height / parseFloat(getComputedStyle(kopf).lineHeight));
+        return { quer: document.documentElement.scrollWidth <= innerWidth + 1 && r.right <= innerWidth + 1 && r.left >= 0,
+          knoepfe: [...z.querySelectorAll('button')].map((b) => Math.round(Math.min(b.getBoundingClientRect().height, b.getBoundingClientRect().width))),
+          zeilen, text: kopf.textContent.replace(/\s+/g, ' ').trim() };
+      });
+      pruefe('Heute-Karte: "Neu für dich: Die Spielanalyse" in einer Zeile, nichts ragt heraus, Knoepfe mindestens 44 px', hz.quer && hz.zeilen === 1
+        && hz.text === 'Neu für dich: Die Spielanalyse' && hz.knoepfe.length === 2 && hz.knoepfe.every((h) => h >= 44), JSON.stringify(hz));
+      await bild(hs.seite, `heute-neu-${name}`);
     }
     pruefe('keine Konsolenfehler', hs.fehler.length === 0, hs.fehler.join(' | '));
     await hs.kontext.close();
