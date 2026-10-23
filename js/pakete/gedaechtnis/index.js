@@ -97,7 +97,7 @@ function revancheZeile(app, params) {
   el.dataset.ort = 'ergebnis';
   const farbe = params.farbe === 'b' ? 'Schwarz' : 'Weiß';
   el.innerHTML = `<button class="knopf gd-revanche dr" type="button" data-farbe="${params.farbe}">${icon('revanche')}`
-    + `<span class="gd-r-text"><b>Revanche</b><small>Du spielst ${farbe}</small></span></button>`;
+    + `<span class="gd-r-text"><b>Revanche</b> <small>Du spielst ${farbe}</small></span></button>`;
   const knopf = el.querySelector('button');
   knopf.setAttribute('aria-label', `Revanche, du spielst ${farbe}`);
   knopf.addEventListener('click', (ev) => {
@@ -133,9 +133,10 @@ function registriere() {
   anbieten('partie:begruessung?', (k) => sicher(() => {
     if (!k || !k.bot || k.bot.stufe == null) return null;
     if (k.modus && k.modus !== 'normal') return null;
+    const f = sicher(() => ladeFortschritt().bots[k.bot.id], 'Fortschritt');
     const w = L.begruessung({
       botId: k.bot.id, partien: k.partienGegenBot, heute: tagSchluessel(), memo: stand().memo, folgeGesamt,
-      sprueche: sprueche(),
+      bekannt: f && Number.isFinite(f.partien) ? f.partien : 0, sprueche: sprueche(),
     });
     letzteWahl = w ? { botId: k.bot.id, anlass: w.anlass, grund: w.grund, werte: w.werte, satz: w.satz } : null;
     return w ? { anlass: w.anlass, werte: w.werte } : null;

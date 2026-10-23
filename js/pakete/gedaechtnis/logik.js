@@ -9,7 +9,7 @@
 //   anlassFuer(lage, { folgeGesamt }) -> { anlass, werte } | null   Vorrang wie ANLAESSE (erster Treffer gewinnt):
 //     kennenlernen > ersterSieg > wiedersehen > mutmachen > genial > botPatzer > serieGegen > rueckkampf > revanche
 //     > remisZuletzt. folgeGesamt() -> Niederlagen in Folge ueber alle Partien (nur bei Bedarf gerufen).
-//   begruessung({ botId, partien, heute, memo, folgeGesamt, sprueche, saetze }) -> { anlass, werte, grund, stark }
+//   begruessung({ botId, partien, heute, memo, bekannt, folgeGesamt, sprueche, saetze }) -> { anlass, werte, grund, stark }
 //     | null. Sparsam: Die STARKEN Anlaesse kommen immer, die anderen nur, wenn der Tageszufall es will (ANTEIL,
 //     also etwa jede zweite Partie). Zufall nur aus tag.js: zufallAus(seedAus('gedaechtnis|RECHENSTAND|Tag|Bot|n')),
 //     n = Zahl der gemeinsamen Partien: gleicher Tag, gleiche Geschichte, gleicher Satz (Panel und Partie sagen
@@ -127,9 +127,11 @@ function memoVon(memo, id) {
   return null;
 }
 
-export function lage({ partien, botId, heute, memo = null } = {}) {
+// bekannt: wertende Partien gegen diesen Bot laut Fortschritt (zaehlt fuer immer, die Partienliste nur die letzten
+// MAX_PARTIEN): ohne Partie in der Liste, aber mit Fortschritt ist es kein erstes Treffen, sondern ein Wiedersehen.
+export function lage({ partien, botId, heute, memo = null, bekannt = 0 } = {}) {
   const g = geschichte(partien, botId);
-  if (!g.length) return { n: 0 };
+  if (!g.length) return Number.isFinite(bekannt) && bekannt > 0 ? { n: 0, bekannt: Math.floor(bekannt) } : { n: 0 };
   const letzte = g[0];
   let tage = null;
   try {
@@ -156,7 +158,7 @@ export function lage({ partien, botId, heute, memo = null } = {}) {
 // Anlass ohne Sparsamkeit und Einstellung (Vorrang wie ANLAESSE)
 export function anlassFuer(l, { folgeGesamt = () => 0 } = {}) {
   if (!l || !Number.isInteger(l.n)) return null;
-  if (l.n === 0) return { anlass: 'kennenlernen', werte: null };
+  if (l.n === 0) return { anlass: l.bekannt > 0 ? 'wiedersehen' : 'kennenlernen', werte: null };
   if (l.letzte === 'sieg' && l.davorNiederlagen >= ERSTER_SIEG_NACH) return { anlass: 'ersterSieg', werte: null };
   if (Number.isFinite(l.tage) && l.tage >= PAUSE_TAGE) return { anlass: 'wiedersehen', werte: { tage: l.tage } };
   let gesamt = 0;
@@ -186,9 +188,9 @@ export function zufallFuer(heute, botId, n) {
   return zufallAus(seedAus(`gedaechtnis|${RECHENSTAND}|${heute}|${botId}|${n}`));
 }
 
-export function begruessung({ botId, partien, heute, memo = null, folgeGesamt = () => 0, sprueche = 'an', saetze = SAETZE } = {}) {
+export function begruessung({ botId, partien, heute, memo = null, bekannt = 0, folgeGesamt = () => 0, sprueche = 'an', saetze = SAETZE } = {}) {
   if (!botId || sprueche === 'aus' || !istSchluessel(heute)) return null;
-  const l = lage({ partien, botId, heute, memo });
+  const l = lage({ partien, botId, heute, memo, bekannt });
   const a = anlassFuer(l, { folgeGesamt });
   if (!a) return null;
   const stark = STARK.includes(a.anlass);
