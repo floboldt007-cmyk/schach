@@ -43,6 +43,8 @@ export const EREIGNISSE = Object.freeze([
   'spielplan:geladen',
   // Paket punkte (S1-3): { punkte, platz, tafel, rekord } je bewerteter Partie, Vertrag in ARCHITEKTUR.md
   'punkte:geaendert',
+  // Paket serie (P3): { tag, lauf, meilenstein, ... } nach jedem gezaehlten Tag und jeder Aenderung am Siegeslauf
+  'serie:geaendert',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);

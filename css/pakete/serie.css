@@ -1,0 +1,168 @@
+/* ============================================================
+   Paket serie (Bauernmarsch und Siegeslauf, SPIELKONZEPT 3.14 und 3.15), Look A "Modern und klar".
+   Laedt js/pakete/serie/index.js selbst (link[data-paket="serie"]). Nur Tokens aus css/tokens.css und
+   css/themes/<thema>.css, damit hell und dunkel (und spaetere Ansichten) ohne eigene Regeln stimmen. Die Felder des
+   Bauernmarschs tragen Flos Brettfarben (--feld-hell, --feld-dunkel). Ruhend ist grau, nie rot; die Flamme ist der eine
+   Zinnober-Akzent. Kein Neon, kein Glow. Bewegt werden nur transform und opacity (js/bewegung.js).
+   ============================================================ */
+
+.se-ico { width: 18px; height: 18px; flex: none; }
+
+/* ---------- Bauernmarsch-Streifen: Startfeld, 5 Felder, Umwandlungsfeld ---------- */
+.se-streifen { --zelle: 22px; --feld: 0; position: relative; display: inline-grid; grid-template-columns: repeat(7, var(--zelle));
+  grid-auto-rows: var(--zelle); flex: none; border-radius: var(--r-s); overflow: hidden; box-shadow: var(--kante); }
+.se-streifen.klein { --zelle: 18px; }
+.se-feld { position: relative; display: block; }
+.se-feld.h { background: var(--feld-hell); }
+.se-feld.d { background: var(--feld-dunkel); }
+.se-krone { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); opacity: .32; pointer-events: none; }
+.se-feld.ziel { box-shadow: inset 0 0 0 2px var(--gold); }
+.se-feld.heute { box-shadow: inset 0 0 0 2px var(--akzent); }
+.se-feld.naechstes::before { content: ''; position: absolute; inset: 2px; border: 1.5px dashed var(--tinte); border-radius: 3px; opacity: .6; }
+.se-bauer { position: absolute; top: 0; left: calc(var(--zelle) * var(--feld)); width: var(--zelle); height: var(--zelle); padding: 1px;
+  box-sizing: border-box; pointer-events: none; user-select: none; }
+
+/* ---------- Kopf-Chip (arena:kopf) und Flamme an Flos Namen (partie:spieler-leiste) ---------- */
+/* Antippbar wie der Level-Chip (role=button): die Tippflaeche reicht per ::before 3 px ueber und unter den Chip */
+.chip.se-chip { position: relative; gap: 6px; cursor: pointer; color: var(--text); background: var(--flaeche); -webkit-tap-highlight-color: transparent; }
+.chip.se-chip::before { content: ''; position: absolute; inset: -3px -2px; border-radius: var(--r-pille); }
+.chip.se-chip:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.chip.se-chip b { font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; }
+.screen .haupt-kopf .chip.se-chip { padding: 0 12px; }
+.chip.se-chip[data-ruht="1"] { color: var(--text-3); background: var(--flaeche-2); }
+.se-chip-ruht { font-weight: var(--gw-stark); }
+.se-chip-flamme { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; padding-left: 7px; border-left: 1px solid var(--linie); }
+.se-chip-flamme .se-ico, .se-spieler-flamme .se-ico, .se-abr-lauf[data-flamme] .se-ico, .se-b-lauf .se-ico { color: var(--akzent); }
+.screen .haupt-kopf .chip .se-chip-flamme .ico { width: 16px; height: 16px; }
+.se-spieler-flamme { display: inline-flex; align-items: center; gap: 2px; flex: none; height: 18px; padding: 0 6px 0 3px; border-radius: var(--r-pille);
+  background: var(--akzent-weich); color: var(--akzent-text); }
+.se-spieler-flamme .se-ico { width: 13px; height: 13px; }
+.se-spieler-flamme b { font-size: 11px; font-weight: 800; line-height: 1; }
+
+/* ---------- Heute-Karte (arena:heute) ---------- */
+.se-heute { display: grid; gap: 4px; min-width: 0; }
+.se-h-zeile { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.se-h-titel { display: inline-flex; align-items: center; gap: 8px; min-height: var(--tipp); min-width: 0; margin: 0; padding: 0; border: 0;
+  background: none; color: var(--text); font: inherit; font-size: 15px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.se-h-titel:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-s); }
+.se-h-titel b { font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; }
+.se-h-symbol { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--r-pille); background: var(--grund-2); }
+.se-heute[data-art="ruht"] .se-h-titel, .se-heute[data-art="ruht"] .se-h-symbol { color: var(--text-2); }
+.se-h-status { margin: 0; font-size: 14px; font-weight: 650; color: var(--text); }
+.se-h-detail { margin: 0; font-size: 13px; font-weight: 550; color: var(--text-2); }
+.se-h-hinweis { margin: 4px 0 0; padding: 8px 10px; border-radius: var(--r-m); background: var(--flaeche-2); font-size: 13.5px; font-weight: 550;
+  color: var(--text); box-shadow: var(--kante); }
+.knopf.se-h-training, .knopf.se-h-leise { justify-self: start; min-height: var(--tipp); padding: 0 14px; font-size: 14px; }
+
+/* Umwandlung waehlen: vier Figuren, je mindestens 44 x 44 */
+.se-wahl { display: grid; gap: 6px; margin-top: 4px; padding: 10px; border-radius: var(--r-m); background: var(--gold-weich); }
+.se-wahl-text { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text); }
+.se-wahl-knoepfe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.se-wahl-knopf { display: grid; justify-items: center; gap: 2px; min-height: 56px; min-width: 44px; padding: 6px 2px; border: 0; border-radius: var(--r-m);
+  background: var(--flaeche); color: var(--text); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; box-shadow: var(--s1), var(--kante); }
+.se-wahl-knopf img { width: 30px; height: 30px; }
+.se-wahl-knopf:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+
+/* ---------- Abrechnung (ergebnis:abrechnung) ---------- */
+.se-abr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; min-height: var(--tipp);
+  padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.se-abr-symbol { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--r-pille); background: var(--tinte);
+  color: var(--auf-tinte); box-shadow: var(--s1); }
+.se-abr-mitte { display: grid; gap: 3px; min-width: 0; }
+.se-abr-kopf { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.se-label { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.se-abr-wert { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 15px; font-weight: var(--gw-titel); color: var(--text); font-variant-numeric: tabular-nums; }
+.se-abr-unter, .se-abr-ende { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.se-abr-lauf { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 700; color: var(--text); }
+.se-abr-lauf .se-ico { width: 15px; height: 15px; }
+
+/* ---------- Serien-Blatt ---------- */
+.sheet-karte.se-blatt { text-align: left; max-height: min(86vh, 760px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.se-blatt h3 { text-align: center; }
+.se-blatt-inhalt { display: grid; gap: 14px; margin-top: 14px; }
+.se-b-kopf { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.se-b-kopf > div { display: grid; gap: 2px; min-width: 0; }
+.se-b-symbol { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); }
+.se-b-symbol .se-ico { width: 24px; height: 24px; }
+.se-b-titel { font-family: var(--display); font-weight: var(--gw-titel); font-size: 18px; letter-spacing: -.01em; line-height: 1.2; overflow-wrap: anywhere; }
+.se-b-unter { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.se-b-teil { display: grid; gap: 8px; min-width: 0; }
+.se-b-ueber { margin: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.se-b-text { margin: 0; font-size: 13.5px; font-weight: 550; color: var(--text-2); }
+.se-b-teil .se-streifen { --zelle: 30px; justify-self: start; }
+
+.se-ehren { display: grid; gap: 4px; justify-content: start; }
+.se-ehren-reihe { display: grid; grid-template-columns: repeat(8, 30px); grid-auto-rows: 30px; border-radius: var(--r-s); overflow: hidden; box-shadow: var(--kante); }
+.se-ehre { position: relative; display: grid; place-items: center; }
+.se-ehre.h { background: var(--feld-hell); }
+.se-ehre.d { background: var(--feld-dunkel); }
+.se-ehre img { width: 90%; height: 90%; }
+.se-ehre.offen { box-shadow: inset 0 0 0 2px var(--gold); }
+.se-ehre.offen b { font-size: 15px; font-weight: 800; color: var(--tinte); }
+
+.se-kalender { display: grid; gap: 4px; justify-content: start; }
+.se-k-zeile { display: grid; grid-template-columns: 52px repeat(7, 34px); gap: 4px; align-items: center; }
+.se-k-kopf span { font-size: 11.5px; font-weight: var(--gw-stark); color: var(--text-2); text-align: center; }
+.se-k-kw { font-size: 12px; font-weight: 650; color: var(--text-2); }
+.se-k-tag { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-s); background: var(--grund-2); color: var(--text-2); }
+.se-k-tag .se-ico { width: 18px; height: 18px; }
+.se-k-tag.gezaehlt, .se-k-tag.reise { background: var(--tinte); color: var(--auf-tinte); }
+.se-k-tag.reise { box-shadow: inset 0 0 0 2px var(--gold); }
+.se-k-tag.bruecke::before, .se-l-bruecke { content: ''; display: block; width: 14px; height: 14px; border-radius: var(--r-pille); border: 2px solid var(--text-3); box-sizing: border-box; }
+.se-k-tag.zukunft { background: transparent; box-shadow: inset 0 0 0 1px var(--linie); }
+.se-k-tag.vorher { background: transparent; }
+.se-k-tag.pause { background: var(--flaeche-2); }
+.se-k-tag.heute { box-shadow: inset 0 0 0 2px var(--akzent); }
+.se-legende { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.se-legende > span { display: inline-flex; align-items: center; gap: 5px; }
+.se-legende .se-ico { width: 15px; height: 15px; }
+
+.se-b-zahlen { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
+.se-b-zahlen dt { font-weight: var(--gw-stark); color: var(--text-2); }
+.se-b-zahlen dd { display: flex; align-items: center; gap: 4px; margin: 0; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.se-b-lauf .se-ico { width: 16px; height: 16px; }
+
+.se-kapitel { display: grid; gap: 6px; }
+.se-kap { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.se-kap-balken { position: relative; display: block; height: 10px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
+.se-kap-balken > i { position: absolute; inset: 0; border-radius: inherit; background: var(--tinte); transform-origin: left center; }
+.se-kap-zahl { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.se-ruhetag { display: flex; flex-wrap: wrap; gap: 6px; }
+.se-rt { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1.5px solid var(--linie); border-radius: var(--r-pille); background: var(--flaeche-2);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+.se-rt[aria-checked="true"] { border-color: var(--text); background: var(--flaeche); box-shadow: inset 0 0 0 1px var(--text); }
+.se-rt:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.se-pause { display: grid; gap: 8px; }
+.se-p-info { margin: 0; font-size: 13.5px; font-weight: 550; color: var(--text-2); }
+.se-p-knoepfe { display: flex; flex-wrap: wrap; gap: 6px; }
+.se-p-knoepfe .knopf { min-height: var(--tipp); padding: 0 14px; font-size: 14px; }
+
+.se-regeln { border-top: 1px solid var(--linie); padding-top: 10px; }
+.se-regeln summary { min-height: var(--tipp); display: flex; align-items: center; font-weight: var(--gw-stark); cursor: pointer; }
+.se-regeln p { margin: 0 0 8px; font-size: 13.5px; font-weight: 550; line-height: 1.45; color: var(--text-2); }
+.se-blatt-knoepfe { display: grid; margin-top: 16px; }
+.se-blatt-knoepfe .knopf { width: 100%; }
+
+/* ---------- Einstellungen (einstellungen:gruppen) ---------- */
+.se-es-ruhetag { display: grid; gap: 6px; padding: 10px 0 4px; }
+.se-es-ruhetag > b { font-size: 16px; font-weight: 750; }
+.se-es-ruhetag > span { font-size: 13px; color: var(--text-2); }
+
+/* ---------- Handy ---------- */
+@media (max-width: 600px) {
+  .se-abr { gap: 10px; padding: 9px 10px; }
+  .se-abr-symbol { width: 34px; height: 34px; }
+  .se-streifen.klein { --zelle: 15px; }
+  .se-k-zeile { grid-template-columns: 44px repeat(7, minmax(30px, 34px)); gap: 3px; }
+  .se-k-tag { width: 100%; }
+}
+@media (max-width: 440px) {
+  .se-abr-symbol { display: none; }
+  .se-abr { grid-template-columns: minmax(0, 1fr) auto; }
+  .se-b-zahlen { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .se-b-zahlen dd { margin-bottom: 6px; }
+  .se-b-teil .se-streifen { --zelle: 26px; }
+  .se-ehren-reihe { grid-template-columns: repeat(8, 28px); grid-auto-rows: 28px; }
+}
