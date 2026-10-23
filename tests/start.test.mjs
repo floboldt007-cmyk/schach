@@ -217,6 +217,8 @@ async function nodeTeil() {
   for (let p = 0; p <= 8; p += 0.5) if (stufe(L.botFuerPunkte(p + 0.5)) < stufe(L.botFuerPunkte(p))) monoton = false;
   pruefe('mehr Punkte nie ein schwaecherer Bot; hoechstens Professor Turm (Stufe 6): 8 Aufgaben sagen ueber die oberen Stufen zu wenig',
     monoton && Math.max(...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((p) => stufe(L.botFuerPunkte(p)))) === 6);
+  pruefe('jeder Bot der Tabelle steht auf der Leiter (sonst nimmt botFuerPunkte den naechstschwaecheren)', L.EMPFEHLUNG.every((x) => BOTS.some((b) => b.id === x.botId)),
+    L.EMPFEHLUNG.filter((x) => !BOTS.some((b) => b.id === x.botId)).map((x) => x.botId));
   const fest = [...['stufe-1', 'stufe-2', 'stufe-3', 'stufe-4'].map((id) => ({ id, richtig: true, versuch: 1 })), { id: 'stufe-5', richtig: true, versuch: 2 },
     { id: 'stufe-6', richtig: false, versuch: 0, loesungGezeigt: true }, { id: 'stufe-7', richtig: true, versuch: 1 }, { id: 'stufe-8', richtig: false, versuch: 1, loesungGezeigt: true }];
   const e1 = L.empfehlung({ ergebnisse: fest, hoechsteFrei: 1 });
@@ -471,9 +473,12 @@ async function browserTeil(browser) {
   await warteSeite(seite, 'w2');
   const w2 = await seite.evaluate(() => ({ bots: document.querySelectorAll('.st-leiter .st-bot').length, erster: document.querySelectorAll('.st-bot.st-erster').length,
     bilder: [...document.querySelectorAll('.st-leiter img')].every((i) => i.complete && i.naturalWidth > 0), aktuell: document.querySelector('.st-punkte [aria-current]').dataset.ziel,
-    fokus: document.activeElement && document.activeElement.classList.contains('st-titel') }));
+    fokus: document.activeElement && document.activeElement.classList.contains('st-titel'), h1: document.querySelector('.st-titel').textContent,
+    p: document.querySelector('.st-text p').textContent }));
   pruefe('Seite 2 "deine Gegner": alle 10 Bots als Leiter, Benno als Start, Bilder geladen, Fokus auf dem Titel', w2.bots === 10 && w2.erster === 1 && w2.bilder && w2.aktuell === 'w2' && w2.fokus,
     JSON.stringify(w2));
+  pruefe('Seite 2: Zahl und Namen aus der Leiter ("Zehn Gegner, eine Leiter.", "Von Bauer Benno bis zum Stockfisch: ...")', w2.h1 === 'Zehn Gegner, eine Leiter.'
+    && w2.p.startsWith('Von Bauer Benno bis zum Stockfisch: Jeder Sieg schaltet den nächsten frei'), JSON.stringify({ h1: w2.h1, p: w2.p }));
   await bild(seite, 'w2-ipad');
   await seite.keyboard.press('ArrowRight');
   await warteSeite(seite, 'w3');
@@ -491,6 +496,11 @@ async function browserTeil(browser) {
   pruefe('danach die Frage "Kennst du die Schachregeln?" mit Ja und Nein; keine Seiten-Punkte mehr, "Ich kenne mich aus" bleibt', fr.h1 === 'Kennst du die Schachregeln?'
     && fr.wahl.join('|') === 'Ja, ich kenne sie|Nein, zeig sie mir' && fr.punkte && fr.raus, JSON.stringify(fr));
   await bild(seite, 'frage-ipad');
+  // Neuladen bleibt auf der Seite (params.seite im eigenen Verlaufseintrag), nicht Seite 1
+  await seite.reload();
+  await warteSeite(seite, 'frage', 20000);
+  pruefe('Neuladen auf der Frage: wieder die Frage (Seite im Verlaufseintrag), Hash #start', (await sz(seite)).seite === 'frage'
+    && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
   // "Ich kenne mich aus" -> Arena; der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
   await seite.waitForSelector('.screen.arena .knoten', { timeout: 15000 });
@@ -530,6 +540,14 @@ async function browserTeil(browser) {
   await seite.locator('.rs-screen .kopf-zurueck').click();
   await warteSeite(seite, 'frage');
   pruefe('Zurueck aus der Regel-Hilfe: wieder die Frage (nicht Seite 1)', (await sz(seite)).seite === 'frage');
+  // auch nach einem Neuladen im Raetsel-Bildschirm (der gemerkte Rueckweg ist dann weg, die Seite steht im Verlauf)
+  await seite.locator('[data-st="nein"]').click();
+  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo"');
+  await seite.reload();
+  await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo" && z.index === 0', null, 20000);
+  await seite.locator('.rs-screen .kopf-zurueck').click();
+  await warteSeite(seite, 'frage');
+  pruefe('Neuladen in der Regel-Hilfe, dann Zurueck: wieder die Frage', (await sz(seite)).seite === 'frage');
   await seite.locator('[data-st="nein"]').click();
   await warteRaetsel(seite, 'z.offen && z.quelle === "start-regeln" && z.phase === "flo" && z.index === 0');
   await bild(seite, 'regel-turm-ipad');
@@ -649,6 +667,10 @@ async function browserTeil(browser) {
     && /Bauer Benno dein nächster Gegner/.test(em.notiz), JSON.stringify(em));
   pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zur Arena', em.knoepfe.join('|')
     === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Bauer Benno|Einstufung wiederholen|Zur Arena', em.knoepfe.join('|'));
+  await seite.reload();
+  await warteSeite(seite, 'empfehlung', 20000);
+  pruefe('Neuladen auf der Empfehlung: wieder die Empfehlung (nicht Seite 1)', (await sz(seite)).seite === 'empfehlung'
+    && await seite.evaluate(() => document.querySelector('.st-titel').textContent) === 'Starte gegen Lisa Läufer');
   lay = await layout(seite);
   pruefe('Empfehlung iPad: nichts ragt heraus, Knoepfe mindestens 44 px', lay.quer && lay.raus && !lay.klein.length, JSON.stringify(lay));
   await bild(seite, 'empfehlung-ipad');

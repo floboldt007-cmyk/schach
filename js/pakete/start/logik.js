@@ -168,8 +168,10 @@ export function auswerten(ergebnisse) {
 
 export function botFuerPunkte(punkte) {
   const p = Number.isFinite(punkte) ? punkte : 0;
-  const t = EMPFEHLUNG.find((x) => p <= x.bis) || EMPFEHLUNG[EMPFEHLUNG.length - 1];
-  return t.botId;
+  const i = EMPFEHLUNG.findIndex((x) => p <= x.bis);
+  // fehlt ein Bot der Tabelle in der Leiter (z. B. nach einem Umbau der Leiter), der naechstschwaechere, zuletzt Stufe 1
+  for (let j = i < 0 ? EMPFEHLUNG.length - 1 : i; j >= 0; j--) if (LEITER.has(EMPFEHLUNG[j].botId)) return EMPFEHLUNG[j].botId;
+  return BOTS[0].id;
 }
 
 export function empfehlung({ ergebnisse = [], hoechsteFrei = 1 } = {}) {

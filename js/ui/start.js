@@ -9,7 +9,8 @@
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
 //          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen Bauer Benno
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
-//   dafuer gemerkt hat (dienst.nimmRueck). "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
+//   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags
+//   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
 // DOM: section.screen.st-screen[data-seite] > header.haupt-kopf (mit button.st-raus), .st-rumpf > .st-buehne
 //   (.st-bild, .st-text mit .ueberzeile, h1.st-titel, p, .st-chips, .st-wahl, .st-knoepfe), nav.st-punkte (w1 bis w3).
@@ -64,6 +65,16 @@ const knopf = (st, text, { art = '', klein = '' } = {}) =>
 const farben = (b) => `--bf:${botFarbe(b)};--bt:var(--bot-${/^[a-z0-9-]+$/.test(b.id) ? b.id : 'x'}-tint, var(--flaeche-2))`;
 const portraet = (b) => `<div class="st-portraet" style="${farben(b)}"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></div>
   <div class="st-portraet-name"><b>${esc(b.name)}</b><span>Stufe ${b.stufe} · ${esc(b.titel)}</span></div>`;
+// Seite 2: "Zehn Gegner", "bis zum Stockfisch" (Artikel im Namen: Der/Die -> zum/zur)
+const ZAHLWORT = ['', 'Ein', 'Zwei', 'Drei', 'Vier', 'Fünf', 'Sechs', 'Sieben', 'Acht', 'Neun', 'Zehn', 'Elf', 'Zwölf'];
+const zahlWort = (n) => ZAHLWORT[n] || String(n);
+function bisZu(name) {
+  const t = String(name || '');
+  if (/^Der /.test(t)) return 'bis zum ' + t.slice(4);
+  if (/^Die /.test(t)) return 'bis zur ' + t.slice(4);
+  if (/^Das /.test(t)) return 'bis zum ' + t.slice(4);
+  return 'bis ' + t;
+}
 
 // ---------- Inhalte der Seiten ----------
 function seite(name) {
@@ -78,13 +89,16 @@ function seite(name) {
     };
   }
   if (name === 'w2') {
+    // Zahl und Namen aus der Leiter (BOTS), damit die Seite stimmt, wenn die Leiter waechst
+    const erster = BOTS[0];
+    const letzter = BOTS[BOTS.length - 1];
     return {
-      bild: `<div class="st-leiter">${BOTS.map((b) => `<span class="st-bot${b.stufe === 1 ? ' st-erster' : ''}" style="${farben(b)}">
+      bild: `<div class="st-leiter">${BOTS.map((b) => `<span class="st-bot${b === erster ? ' st-erster' : ''}" style="${farben(b)}">
           <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${b.stufe}</b></span>`).join('')}</div>
-        <div class="st-leiter-fuss"><span>Start: ${esc(BOTS[0].name)}</span><span>Ziel: ${esc(BOTS[BOTS.length - 1].name)}</span></div>`,
+        <div class="st-leiter-fuss"><span>Start: ${esc(erster.name)}</span><span>Ziel: ${esc(letzter.name)}</span></div>`,
       text: `<div class="ueberzeile">Deine Gegner</div>
-        <h1 class="disp st-titel" tabindex="-1">Zehn Gegner, eine Leiter.</h1>
-        <p>Von Bauer Benno bis zum Stockfisch: Jeder Sieg schaltet den nächsten frei, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.</p>
+        <h1 class="disp st-titel" tabindex="-1">${esc(zahlWort(BOTS.length))} Gegner, eine Leiter.</h1>
+        <p>Von ${esc(erster.name)} ${esc(bisZu(letzter.name))}: Jeder Sieg schaltet den nächsten frei, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.</p>
         <div class="st-knoepfe">${knopf('weiter', 'Weiter', { art: 'primaer' })}${knopf('ueberspringen', 'Überspringen', { art: 'leise' })}</div>`,
     };
   }
@@ -162,6 +176,17 @@ function seite(name) {
   };
 }
 
+// Die Seite steht in params.seite des eigenen Verlaufseintrags (app.js liest beim Neuladen und bei Zurueck die params
+// aus history.state): Neuladen bleibt auf der Seite, und Zurueck aus dem Raetsel-Bildschirm findet sie auch dann, wenn
+// der gemerkte Rueckweg (dienst.nimmRueck) mit dem Neuladen verloren ging. Nur der eigene Eintrag, Hash unveraendert.
+function merkeSeite(name) {
+  try {
+    const st = history.state;
+    if (!st || !st.schach || st.name !== 'start' || (st.params && st.params.seite === name)) return;
+    history.replaceState({ ...st, params: { ...(st.params || {}), seite: name } }, '', location.hash);
+  } catch (e) { /* z. B. file:// */ }
+}
+
 export function zeige(root, params, app) {
   ladeCss();
   D.markiereGesehen();
@@ -169,6 +194,7 @@ export function zeige(root, params, app) {
   const rueck = D.nimmRueck();
   let jetzt = SEITEN.includes(rueck) ? rueck : (SEITEN.includes(p.seite) ? p.seite : 'w1');
   if (jetzt === 'empfehlung' && !D.aktuelleEmpfehlung()) jetzt = 'einstufung';
+  merkeSeite(jetzt);
 
   const s = document.createElement('section');
   s.className = 'screen st-screen';
@@ -227,6 +253,7 @@ export function zeige(root, params, app) {
   function geheZu(name, richtung = 1) {
     if (weg || wechselt || !SEITEN.includes(name) || name === jetzt) return;
     jetzt = name;
+    merkeSeite(name);
     spielKlang('wechsel');
     s.querySelector('.st-rumpf').scrollTop = 0;
     if (tempo() === 0) { baue(name); return; }
