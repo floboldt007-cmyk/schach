@@ -2190,6 +2190,7 @@ export function zeige(root, params, app) {
       s.classList.remove('coach-eng', 'streifen-unten');
       passeNamen();
       pruefeCoachRest();
+      pruefeSeite();
       return;
     }
     // Brett zuerst: volle Breite minus Rand (2 x 10) und Sockel, ein Vielfaches von 8
@@ -2237,13 +2238,25 @@ export function zeige(root, params, app) {
     passeNamen();
     pruefeCoachRest();
   }
+  // Quer: passt die Spalte nicht ins Fenster (kleines Fenster, Coach mit Knoepfen, Begruessung), scrollt sie, und die
+  // Aktionen bleiben unten stehen (Pruefer-Befund 23.10.: sonst lagen Hinweis und Aufgeben unerreichbar unter dem Rand)
+  const seiteEl = $('.seite');
+  function pruefeSeite() {
+    if (!seiteEl) return;
+    const zuViel = lage() === 'quer' && !istHandy() && seiteEl.scrollHeight > seiteEl.clientHeight + 1;
+    s.classList.toggle('seite-scrollt', zuViel);
+  }
   let layoutBild = 0;
   const layoutSpaeter = () => {
     if (layoutBild || weg) return;
     layoutBild = requestAnimationFrame(() => { layoutBild = 0; layout(); });
   };
   const layoutRo = typeof ResizeObserver === 'function' ? new ResizeObserver(layoutSpaeter) : null;
-  if (layoutRo) layoutRo.observe(s);
+  if (layoutRo) {
+    layoutRo.observe(s);
+    // die Karten der Spalte wachsen mit ihrem Inhalt (Coach, Blase): dann neu pruefen, ob die Spalte passt
+    if (seiteEl) for (const k of seiteEl.children) layoutRo.observe(k);
+  }
   // Handy: Zahl des waagrechten Balkens nur auf Antippen
   balken.addEventListener('click', () => {
     if (!istHandy()) return;

@@ -3243,6 +3243,33 @@ async function testeU7(browser) {
       await warte(400);
       const nied = await u7Masse(seite);
       pruefe('800 x 560: Aktionen ganz im Bild', nied.knoepfe.b <= nied.ih + 0.5, JSON.stringify([nied.knoepfe, nied.ih]));
+      // waechst die Spalte ueber das Fenster (Coach mit Knoepfen, lange Saetze), scrollt sie, die Aktionen bleiben im Bild
+      await seite.setViewportSize({ width: 590, height: 580 });
+      await warte(400);
+      await seite.evaluate(() => { const d = document.createElement('div'); d.className = 'test-hoch'; d.style.height = '220px'; document.querySelector('.partie .coach').append(d); });
+      await warte(400);
+      const voll = await seite.evaluate(() => ({ scrollt: document.querySelector('.screen.partie').classList.contains('seite-scrollt'),
+        ueber: getComputedStyle(document.querySelector('.partie .seite')).overflowY, unten: document.querySelector('.partie .spielknoepfe').getBoundingClientRect().bottom, ih: innerHeight }));
+      await seite.evaluate(() => document.querySelector('.partie .coach .test-hoch').remove());
+      await warte(400);
+      const wieder = await seite.evaluate(() => document.querySelector('.screen.partie').classList.contains('seite-scrollt'));
+      pruefe('Zu volle Spalte: sie scrollt, die Aktionen bleiben im Bild; passt sie wieder, ist das vorbei', voll.scrollt && voll.ueber === 'auto' && voll.unten <= voll.ih + 0.5 && !wieder,
+        JSON.stringify([voll, wieder]));
+      // Handy quer mit Bedenkzeit: Flos eigene Uhr bleibt sichtbar (vorher fiel Flos Karte samt Uhr weg)
+      await seite.setViewportSize({ width: 844, height: 390 });
+      await warte(500);
+      const quer = await seite.evaluate(() => ({ uhren: [...document.querySelectorAll('.partie .uhr')].map((u) => { const r = u.getBoundingClientRect(); return r.width > 0 && r.top >= 0 && r.bottom <= innerHeight + 0.5; }),
+        knoepfe: document.querySelector('.partie .spielknoepfe').getBoundingClientRect().bottom, ih: innerHeight }));
+      pruefe('Handy quer mit Uhr (844 x 390): beide Uhren im Bild, Aktionen im Bild', quer.uhren.length === 2 && quer.uhren.every(Boolean) && quer.knoepfe <= quer.ih + 0.5, JSON.stringify(quer));
+      // Systemwechsel hell -> dunkel bei offener App: der Seitengrund geht mit (vorher blieb er hell, der Titel war unsichtbar)
+      await seite.setViewportSize({ width: 590, height: 580 });
+      await seite.emulateMedia({ colorScheme: 'dark' });
+      await warte(400);
+      const grund = await seite.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      await seite.emulateMedia({ colorScheme: 'light' });
+      await warte(300);
+      const grundHell = await seite.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      pruefe('System hell -> dunkel -> hell: der Seitengrund folgt (dunkel #15171B, hell #F4F1EC)', grund === 'rgb(21, 23, 27)' && grundHell === 'rgb(244, 241, 236)', JSON.stringify([grund, grundHell]));
       // iPad quer bleibt wie vorher: Spalte 31vw zwischen 300 und 420 px, Brett nach Hoehe oder Breite wie gehabt
       for (const g of [{ w: 1180, h: 820 }, { w: 1024, h: 768 }]) {
         await seite.setViewportSize({ width: g.w, height: g.h });

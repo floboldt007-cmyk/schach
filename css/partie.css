@@ -189,7 +189,13 @@
 }
 @container partie (orientation: landscape) and (max-height: 440px) {
   .partie .spieler > .blase-ort, .partie .coach > .c-text, .partie .coach > .coach-knoepfe { display: none; }
-  .partie .spieler.ich { display: none; }
+  /* Flos Karte entfaellt nur ohne Bedenkzeit. Mit Uhr bleibt sie knapp stehen (sonst saehe Flo seine Restzeit nicht),
+     dafuer weicht die Zugliste */
+  .partie:not(.mit-uhr) .spieler.ich { display: none; }
+  .partie.mit-uhr .spieler.ich { --av: 30px; min-height: 0; padding-top: 4px; padding-bottom: 4px; }
+  .partie.mit-uhr .spieler.ich { grid-template-rows: auto; grid-template-areas: "av name leiste uhr"; }
+  .partie.mit-uhr .spieler.ich > .unter { display: none; }
+  .partie.mit-uhr .zugbox { display: none; }
   .partie .zugbox { min-height: 60px; }
   .partie .spielknoepfe > .knopf { min-height: 46px; font-size: 11px; }
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
@@ -206,6 +212,10 @@
   .partie .spieler > .av { margin-right: 10px; border-radius: 12px; }
   /* nie mitten im Wort trennen: passt ein Wort nicht, ragt es heraus, und passeNamen() nimmt den Rufnamen */
   .partie .spieler .name { font-size: 15px; overflow-wrap: normal; }
+  /* geschlagene Figuren und Vorsprung ("+4") brechen in eine zweite Zeile um, statt still abgeschnitten zu werden */
+  .partie .spieler .unter { height: auto; min-height: 18px; flex-wrap: wrap; row-gap: 2px; overflow: visible; }
+  .partie .geschlagen-ort { overflow: visible; }
+  .partie .geschlagen { flex-wrap: wrap; height: auto; row-gap: 2px; }
   .partie .uhr { min-width: 72px; height: 38px; margin-left: 8px; padding: 0 10px; border-radius: 12px; font-size: 18px; }
   .partie .coach { padding-left: 12px; padding-right: 12px; }
   .zugliste { grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
@@ -216,6 +226,13 @@
      drei; den Platz dafuer gibt die Zugliste ab (der Coach nennt den letzten Zug weiter) */
   .partie .spielknoepfe[data-aktionen] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .partie .seite:has(> .spielknoepfe[data-aktionen]) > .zugbox { display: none; }
+}
+/* Quer: passt die Spalte nicht ins Fenster, scrollt sie (partie.js pruefeSeite), die Aktionen bleiben unten stehen.
+   Rand und Gegenrand halten die Schatten der Karten frei; ohne Ueberlauf aendert sich nichts. */
+@media (orientation: landscape) {
+  .partie.seite-scrollt .seite { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; margin: 0 -6px; padding: 0 6px; }
+  .partie.seite-scrollt .seite::-webkit-scrollbar { display: none; }
+  .partie.seite-scrollt .spielknoepfe { position: sticky; bottom: 0; z-index: 2; padding-top: 8px; background: var(--grund); }
 }
 /* niedrige Querfenster (Inhalt 441 bis 520 px hoch, z. B. 800 x 560): Zugliste, Coach und Luecken eine Spur knapper,
    sonst ragten die Aktionen mit Begruessung und Uhr unten aus dem Bild. Handys quer (darunter) bleiben wie sie sind */

@@ -401,10 +401,11 @@
 @container an-rechts (max-width: 520px) {
   .an-g-label, .an-k-titel { white-space: normal; overflow: visible; text-overflow: clip; }
 }
-/* Kopf im schmalen Querfenster: die Unterzeile darf umbrechen, sie nennt den kurzen Namen, und der Grund (Matt,
-   Aufgabe ...) entfaellt dort; die Genauigkeits-Karte nennt ihn unter dem Ergebnis */
+/* Kopf im Querfenster unter iPad-Breite (bis 1000 px): die Unterzeile darf umbrechen, sie nennt den kurzen Namen, und
+   der Grund (Matt, Aufgabe ...) entfaellt dort, sonst wurde er bis 960 px mit "..." gekuerzt; die Genauigkeits-Karte
+   nennt ihn unter dem Ergebnis */
 .an-unter-kurz { display: none; }
-@media (orientation: landscape) and (max-width: 760px) {
+@media (orientation: landscape) and (max-width: 1000px) {
   .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
   .an-unter-grund, .an-unter-voll { display: none; }
   .an-unter-kurz { display: inline; }
