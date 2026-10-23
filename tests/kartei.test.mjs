@@ -310,7 +310,14 @@ async function nodeTeil() {
   }
   const app = lies('js/app.js');
   pruefe('app.js unveraendert: raetsel ist ein Paket-Screen (fehlt die Datei, geht es zur Arena)', /PAKET_SCREENS = new Set\(\[[^\]]*'raetsel'/.test(app));
-  pruefe('Paket nicht in PAKETE (traegt die Integration ein)', !/kartei/.test(lies('js/erweiterungen.js').replace(/\/\/.*$/gm, '')));
+  // vor der Integration nur ein Hinweis; steht das Paket in PAKETE, muessen Raetsel-Bildschirm und Paket-Dateien offline
+  // da sein (sw.test.mjs erzwingt css/pakete/raetsel.css nicht: die Datei gehoert dem Namen nach dem Paket "raetsel")
+  const eingetragen = /['"]pakete\/kartei\/index['"]/.test(lies('js/erweiterungen.js').replace(/\/\/.*$/gm, ''));
+  const swText = lies('sw.js');
+  const noetig = ['js/ui/raetsel.js', 'css/pakete/raetsel.css', 'css/pakete/kartei.css', 'js/pakete/kartei/index.js', 'js/pakete/kartei/logik.js'];
+  pruefe(eingetragen ? 'in PAKETE: Raetsel-Bildschirm, sein CSS und alle Paket-Dateien im Offline-Cache (sw.js DATEIEN)'
+    : 'noch nicht in PAKETE (traegt die Integration ein, dann mit Raetsel-Bildschirm und CSS in sw.js DATEIEN)',
+  !eingetragen || noetig.every((d) => swText.includes(`'${d}'`)), noetig.filter((d) => !swText.includes(`'${d}'`)));
   const logikCode = lies('js/pakete/kartei/logik.js').replace(/\/\/.*$/gm, '');
   pruefe('logik.js: kein Math.random, kein toISOString, keine Uhr (Date.now/new Date)', !/Math\.random|toISOString|Date\.now|new Date/.test(logikCode));
 }
