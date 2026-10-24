@@ -1,0 +1,138 @@
+/* ============================================================
+   Paket funken (Funken und Level, SPIELKONZEPT 3.3), Look A "Modern und klar".
+   Laedt js/pakete/funken/index.js selbst (link[data-paket="funken"]). Nur Tokens aus css/tokens.css und
+   css/themes/<thema>.css, damit hell und dunkel (und spaetere Ansichten) ohne eigene Regeln stimmen.
+   Balken und Emblem in Tinte (ruhig), Gold nur als kleiner Funken-Akzent wie bei den Sternen. Kein Neon, kein Glow.
+   Bewegt werden nur transform und opacity (js/bewegung.js); --tempo 0 und reduzierte Bewegung zeigen das Endbild.
+   ============================================================ */
+
+/* ---------- Bausteine: Emblem, Balken, Icon ---------- */
+.fk-ico { width: 18px; height: 18px; flex: none; color: var(--gold); }
+.fk-emblem { position: relative; display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px;
+  border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s1); perspective: 240px; }
+.fk-emblem.gross { width: 52px; height: 52px; }
+.fk-zahl { display: grid; }
+.fk-zahl > b { grid-area: 1 / 1; font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em; backface-visibility: hidden; }
+.fk-emblem.gross .fk-zahl > b { font-size: 22px; }
+.fk-z-neu { opacity: 0; }
+.fk-ring { position: absolute; inset: -5px; border-radius: var(--r-pille); border: 2px solid var(--gold); opacity: 0; pointer-events: none; }
+.fk-balken { position: relative; display: block; height: 8px; min-width: 0; border-radius: var(--r-pille); background: var(--grund-2);
+  overflow: hidden; box-shadow: var(--kante); }
+.fk-balken > i { position: absolute; inset: 0; border-radius: inherit; background: var(--tinte); transform-origin: left center; }
+
+/* ---------- Abrechnung (Ort ergebnis:abrechnung) ---------- */
+.fk-abr { min-width: 0; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.fk-abr-knopf { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%;
+  min-height: var(--tipp); margin: 0; padding: 10px 12px; border: 0; border-radius: inherit; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; }
+.fk-abr-knopf:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.fk-abr-mitte { display: grid; gap: 5px; min-width: 0; }
+.fk-abr-kopf { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.fk-label { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.fk-formel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; color: var(--text-2);
+  font-variant-numeric: tabular-nums; }
+.fk-unter { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.fk-level { color: var(--text); font-weight: var(--gw-stark); }
+.fk-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.02em; line-height: 1; color: var(--text);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fk-hinweis { margin: -4px 12px 10px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.fk-details { padding: 0 12px 12px; }
+.fk-details[hidden] { display: none; }
+.fk-details ul { display: grid; gap: 4px; margin: 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--linie); }
+.fk-details li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.fk-details li b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fk-d-summe { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.fk-d-summe b { color: var(--text); }
+.fk-abr.aufgestiegen .fk-level { color: var(--text); }
+
+/* ---------- Kopf-Chip (arena:kopf) und Spieler-Leiste (partie:spieler-leiste) ---------- */
+/* Antippbarer Chip (role="button"): sichtbar so hoch wie Sterne und Pokal, die Tippflaeche (::before) reicht 3 px darueber
+   und darunter, genau so weit wie der Rand der Chip-Reihe (navigation.css: padding 3px); 40 + 6 = 46, Handy 38 + 6 = 44 */
+.chip.fk-chip { position: relative; gap: 7px; cursor: pointer; color: var(--text); background: var(--flaeche); -webkit-tap-highlight-color: transparent; }
+.chip.fk-chip::before { content: ''; position: absolute; inset: -3px -2px; border-radius: var(--r-pille); }
+.chip.fk-chip:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.fk-chip-text { white-space: nowrap; }
+.fk-chip-text b { font-weight: var(--gw-titel); }
+.fk-mini { position: relative; display: block; width: 30px; height: 5px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; flex: none; }
+.fk-mini > i { position: absolute; inset: 0; background: var(--tinte); transform-origin: left center; }
+/* Schmale Form (.fk-schmal, setzt ansicht.js nach Platz in der Chip-Reihe, auf dem Handy immer): nur die Level-Zahl im
+   Emblem (SPIELKONZEPT 3.1 "kleine Zahl im Emblem", wie in Abrechnung, Verlauf und Spieler-Leiste; Wort und Titel stehen
+   im aria-label). Die Tippflaeche bleibt ueber ::before mindestens 44 px breit. */
+.screen .haupt-kopf .chip.fk-chip.fk-schmal { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
+.fk-chip.fk-schmal .fk-ico, .fk-chip.fk-schmal .fk-chip-wort, .fk-chip.fk-schmal .fk-mini { display: none; }
+.fk-chip.fk-schmal .fk-chip-text b { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px;
+  padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); font-size: 14px; line-height: 1; }
+.fk-spieler { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-pille);
+  background: var(--tinte); color: var(--auf-tinte); }
+.fk-spieler b { font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* ---------- Faktor vor der Partie (arena:panel-bot) ---------- */
+.chip.fk-faktor { align-self: flex-start; max-width: 100%; height: 30px; gap: 6px; padding: 0 12px; font-size: 13px; font-weight: 700; color: var(--text);
+  background: var(--flaeche-2); border-color: var(--linie); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.fk-faktor .fk-ico { width: 15px; height: 15px; }
+
+/* ---------- Heute-Karte: Rueckenwind (arena:heute) ---------- */
+.fk-heute { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.fk-h-symbol { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: var(--r-pille); background: var(--gold-weich); }
+.fk-h-text { flex: 1; min-width: 0; }
+.knopf.fk-zuenden { flex: none; min-height: var(--tipp); padding: 0 14px; font-size: 14px; }
+
+/* ---------- Verlauf: Karte "Level und Funken" (verlauf:seite) ---------- */
+.fk-karte { display: grid; gap: 10px; padding: 14px; border-radius: var(--r-l); border: 1px solid var(--linie); box-shadow: var(--s1); min-width: 0; }
+.fk-k-ueber { margin: 0; }
+.fk-k-kopf, .fk-s-kopf { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fk-k-titel, .fk-s-titel { display: grid; gap: 2px; min-width: 0; }
+.fk-k-titel b, .fk-s-titel b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; letter-spacing: -.02em; line-height: 1.15;
+  overflow-wrap: anywhere; }
+.fk-k-titel > span, .fk-s-titel > span { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.fk-k-heute { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text-2); }
+.fk-partien { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.fk-partien li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 10px; padding: 5px 0;
+  border-top: 1px solid var(--linie); font-size: 13.5px; font-weight: 600; }
+.fk-p-name { min-width: 0; overflow-wrap: anywhere; }
+.fk-p-erg { color: var(--text-2); }
+.fk-partien b { font-variant-numeric: tabular-nums; }
+.knopf.fk-k-mehr { justify-self: start; min-height: 44px; font-size: 14px; }
+
+/* ---------- Funken-Spiegel (Blatt) ---------- */
+.sheet-karte.fk-spiegel { text-align: left; max-height: min(86vh, 760px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.fk-spiegel h3 { text-align: center; }
+.fk-spiegel-inhalt { display: grid; gap: 12px; margin-top: 14px; }
+.fk-s-liste { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: 14px; }
+.fk-s-liste dt { font-weight: var(--gw-stark); color: var(--text-2); }
+.fk-s-liste dd { margin: 0; font-weight: 600; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.fk-s-herkunft { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
+.fk-s-zwischen { margin: 4px 0 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase;
+  color: var(--text-2); }
+.fk-regeln { border-top: 1px solid var(--linie); padding-top: 10px; }
+.fk-regeln summary { min-height: var(--tipp); display: flex; align-items: center; font-weight: var(--gw-stark); cursor: pointer; }
+.fk-regeln p { margin: 0 0 8px; font-size: 13.5px; font-weight: 550; line-height: 1.45; color: var(--text-2); }
+.fk-spiegel-knoepfe { display: grid; margin-top: 16px; }
+.fk-spiegel-knoepfe .knopf { width: 100%; }
+@media (max-width: 440px) {
+  .fk-s-liste { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .fk-s-liste dd { margin-bottom: 6px; }
+}
+
+/* ---------- Spielplan (spielplan:tage) ---------- */
+.fk-spielplan { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+
+/* ---------- Funkenlinie am Brett (buehne.platz('funkenlinie'), nur mit Anzeige an) ---------- */
+.fk-linie { position: absolute; inset: 0; border-radius: var(--r-pille); background: var(--gold); transform-origin: left center;
+  transform: scaleX(0); transition: transform var(--d-l) var(--gleiten); }
+
+/* ---------- Handy ---------- */
+@media (max-width: 600px) {
+  /* Kopf-Chip: schmale Form oben (.fk-schmal, auf dem Handy setzt ansicht.js sie immer) */
+  .fk-abr-knopf { gap: 10px; padding: 9px 10px; }
+  .fk-emblem { width: 34px; height: 34px; }
+  .fk-zahl > b { font-size: 15px; }
+  .fk-wert { font-size: 21px; }
+}
+
+/* ---------- reduzierte Bewegung ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .fk-linie { transition: none; }
+}
+:root[data-bewegung="aus"] .fk-linie { transition: none; }

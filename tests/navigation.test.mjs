@@ -18,7 +18,8 @@ import { icon, iconNamen } from '../js/ui/icons.js';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8837);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -314,7 +315,8 @@ async function testeLeiste(browser) {
     const { kontext, seite } = await neueSeite(browser, { w: 820, h: 1180 });
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => { const n = document.querySelector('.reiter-leiste'); return (!n || n.hidden) && !document.documentElement.dataset.reiter; }));
+    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Verlauf)
+    pruefe('?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="verlauf"]')));
     await kontext.close();
   }
 }
@@ -402,6 +404,8 @@ async function testeTraining(browser) {
   gruppe = 'Training leer';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820 });
+    // Dieser Vertrag prueft die Huelle ohne Anbieter, unabhaengig von installierten Paketen.
+    await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.goto(BASIS + '#training');
     await seite.waitForSelector('.screen.training-screen');
     const r = await seite.evaluate(() => ({ hash: location.hash, titel: document.title, platzhalter: !!document.querySelector('.screen.platzhalter'),
@@ -421,6 +425,8 @@ async function testeTraining(browser) {
   for (const vp of [{ name: 'quer', w: 1180, h: 820 }, { name: 'Handy', w: 390, h: 844, handy: true }]) {
     gruppe = `Training mit Anbieter (${vp.name})`;
     const { kontext, seite, fehler } = await neueSeite(browser, vp);
+    // Genau die drei Test-Anbieter liefern die Karten dieses Layout-Vertrags.
+    await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.route('**/js/pakete/nav-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_TRAINING }));
     await seite.goto(`${BASIS}&erw=pakete/nav-test/index&reiter=training#training`);
     await seite.waitForSelector('.training-gitter [data-karte="2"]');

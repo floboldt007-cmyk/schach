@@ -7,7 +7,7 @@ import {
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
-  duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog,
+  duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog, pruefeZuzweit,
 } from '../js/storage.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 import { hoere, zuruecksetzen as busZuruecksetzen } from '../js/ereignisse.js';
@@ -426,7 +426,22 @@ const UEBUNG_FEN = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQk
 const ZIEL = { partieId: 'pquelle1', ply: 6, besterZug: 'h5f7', alterZug: 'h5f3', alterSanDe: 'Df3', gewinnVorher: 0.99 };
 
 // ---------- wertet / MODI ----------
-pruefe('MODI = normal, uebung, boss, frei, spiel (W0+a, eingefroren)', JSON.stringify(MODI) === '["normal","uebung","boss","frei","spiel"]' && Object.isFrozen(MODI));
+pruefe('MODI mit zuzweit, eingefroren', JSON.stringify(MODI) === '["normal","uebung","boss","frei","spiel","zuzweit"]' && Object.isFrozen(MODI));
+pruefe('Zu zweit: nie gewertet, auch bei Sieg mit hoher Genauigkeit', !wertet(partie({ modus: 'zuzweit' })));
+pruefe('Zu zweit: Namen begrenzt, Steuerzeichen entfernt, fehlende Namen ersetzt',
+  JSON.stringify(pruefeZuzweit({ weiss: '  Anna\u0000  ', schwarz: 'x'.repeat(40), drehen: true })) === JSON.stringify({ weiss: 'Anna', schwarz: 'x'.repeat(20), drehen: true })
+  && JSON.stringify(pruefeZuzweit(null)) === JSON.stringify({ weiss: 'Weiß', schwarz: 'Schwarz', drehen: false }));
+{
+  setzeSpeicher(fakeSpeicher());
+  const vor = JSON.stringify(ladeFortschritt());
+  const p = speicherePartie(partie({ modus: 'zuzweit', botId: null, zuzweit: { weiss: 'Anna', schwarz: 'Ben' } }));
+  pruefe('Zu zweit: Namen im Verlauf, keine Sterne und unveraenderter Fortschritt', p.wertet === false
+    && ladePartie(p.partie.id).zuzweit.weiss === 'Anna' && !p.neueSterne.some(Boolean) && JSON.stringify(ladeFortschritt()) === vor);
+  speichereLaufendePartie({ modus: 'zuzweit', zuzweit: { weiss: 'Anna', schwarz: 'Ben' }, zuege: ['e2e4'] });
+  pruefe('Zu zweit: laufende Partie ohne Bot ladbar', ladeLaufendePartie()?.modus === 'zuzweit' && ladeLaufendePartie().zuege[0] === 'e2e4');
+  speichereLaufendePartie({ botId: 'benno', zuege: ['d2d4'] });
+  pruefe('Alter Stand: Bot-Partie ohne Modus weiter gueltig, keine lokalen Namen', ladeLaufendePartie()?.modus === 'normal' && !('zuzweit' in ladeLaufendePartie()));
+}
 pruefe('wertet: normale Partie ja, ohne modus ja', wertet({ modus: 'normal' }) && wertet({}));
 pruefe('wertet: Uebung, eigene Stellung, unbekannter Modus nein', !wertet({ modus: 'uebung', startFen: UEBUNG_FEN }) && !wertet({ startFen: UEBUNG_FEN })
   && !wertet({ modus: 'uebung' }) && !wertet({ modus: 'boss' }) && !wertet(null));
@@ -553,9 +568,13 @@ setzeSpeicher(s);
     Object.entries(NEU).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(NEU).reduce((a, k) => a + MODUL_BUDGET[k], 0) === 182000);
   // w0plus-a-fix: S1-7 (Matt-Atlas) und Schub 2b bekommen eigene Module (vorher hatte finisher keins: "unbekanntes Modul")
   const FIX = { finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000 };
-  pruefe('MODUL_BUDGET w0plus-a-fix: finisher, ausdruck, siegeslauf, werkstatt (zusammen 30.000), alles 21 Module, 536.000',
-    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21
-    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000, MODUL_BUDGET);
+  // Zu den 21 Modulen von w0plus-a-fix (536.000) kommen zuzweit (#26) und Welle A (A1 teilen); alle anderen Zahlen bleiben fest
+  const DAZU = { zuzweit: 2000, teilen: 2000 };
+  const summeNeu = Object.values(DAZU).reduce((a, b) => a + b, 0);
+  pruefe('MODUL_BUDGET: 21 Module (536.000) plus zuzweit und teilen, zusammen 23 Module, 540.000',
+    Object.entries(FIX).every(([k, v]) => MODUL_BUDGET[k] === v) && Object.keys(MODUL_BUDGET).length === 21 + Object.keys(DAZU).length
+    && Object.values(MODUL_BUDGET).reduce((a, b) => a + b, 0) === 536000 + summeNeu, MODUL_BUDGET);
+  pruefe('MODUL_BUDGET neu: zuzweit 2.000 (Zu zweit), teilen 2.000 (A1 Siegesbild)', Object.entries(DAZU).every(([k, v]) => MODUL_BUDGET[k] === v));
   const neuePakete = Object.keys(FIX).map((name) => {
     const m = speichereModul(name, { probe: name });
     const e = speichereModulEinstellungen(name, { stil: 'voll' });

@@ -1,0 +1,171 @@
+/* ============================================================
+   Crownmate - Paket start (Welle A, A4): Willkommens-Screen (js/ui/start.js), Zeile "Neu fuer dich" in der Heute-Karte
+   (Ort arena:heute) und die Gruppe "Erste Schritte" in den Einstellungen (Ort einstellungen:gruppen).
+   Look A: eine Buehnen-Karte, links das Bild (Brett im Sockel, Leiter der Gegner, Kacheln, Portraet), rechts Text und
+   Knoepfe; iPad hoch und Handy eine Spalte. Nur Tokens, hell und dunkel; Zinnober nur fuer die eine Hauptaktion.
+   Das Paket (und der Screen selbst) haengt diese Datei ein (link[data-paket="start"]).
+   ============================================================ */
+
+/* ---------- Kopf: "Ich kenne mich aus" ---------- */
+.screen .haupt-kopf .st-raus { flex: none; min-height: 46px; padding: 0 16px; border: 0; border-radius: var(--r-m); font-size: 14.5px;
+  box-shadow: var(--s1), var(--kante); }
+
+/* ---------- Rumpf und Buehne ---------- */
+.st-screen .st-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px var(--rand) 18px; }
+.st-buehne { margin-block: auto; width: min(100%, 1040px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 44px;
+  align-items: center; padding: 36px; border-radius: var(--r-xl); background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
+  box-shadow: var(--s3), var(--kante); }
+.st-bild { min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.st-text { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.st-text .ueberzeile { margin: 0; }
+.st-titel { margin: 0; font-size: 46px; color: var(--text); outline: none; overflow-wrap: break-word; hyphens: manual; }
+.st-text p { margin: 0; max-width: 54ch; color: var(--text-2); font-weight: 600; font-size: 16px; line-height: 1.5; }
+.st-grund { display: flex; flex-direction: column; gap: 6px; }
+.st-grund p:last-child { color: var(--text); }
+.st-text p.st-notiz { padding: 12px 14px; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text);
+  font-size: 14.5px; }
+.st-text p.st-klein { font-size: 13px; }
+
+/* Knoepfe: die Hauptaktion in Zinnober, leise Knoepfe ohne Flaeche */
+.st-knoepfe { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; margin-top: 6px; }
+.st-knoepfe.st-leise { margin-top: -4px; }
+.st-knoepfe .knopf { flex: 1 1 180px; min-height: 52px; }
+.st-screen .knopf.leise { background: transparent; border-color: transparent; box-shadow: none; color: var(--text-2); }
+.st-screen .knopf.st-probe { flex-direction: column; gap: 1px; line-height: 1.15; padding-top: 6px; padding-bottom: 6px; }
+.st-screen .knopf small { font-size: 12px; font-weight: 700; opacity: .86; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.st-chips span { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: var(--r-pille); background: var(--flaeche-2);
+  box-shadow: var(--kante); font-size: 13px; font-weight: 750; color: var(--text-2); }
+
+/* Frage: zwei gleichwertige Antworten */
+.st-wahl { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 6px; }
+.st-wahl-knopf { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; min-height: 64px;
+  padding: 14px 52px 14px 18px; border: 0; border-radius: var(--r-l); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text);
+  font: inherit; text-align: left; cursor: pointer; }
+.st-wahl-knopf b { font-size: 17px; font-weight: 800; }
+.st-wahl-knopf span { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.st-wahl-knopf .ico { position: absolute; right: 18px; top: 50%; width: 20px; height: 20px; margin-top: -10px; color: var(--text-2); }
+.st-wahl-knopf:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+
+/* Seiten-Punkte (w1 bis w3): der aktuelle wird breit (nur transform) */
+.st-punkte { display: flex; justify-content: center; gap: 2px; }
+.st-punkte[hidden] { display: none; }
+.st-punkte button { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.st-punkte i { width: 8px; height: 8px; border-radius: var(--r-pille); background: var(--linie-2);
+  transition: transform var(--d-m) var(--feder), background-color var(--d-s) var(--sanft); }
+.st-punkte [aria-current] i { background: var(--text); transform: scaleX(2.6); }
+.st-punkte button:focus-visible { outline: var(--fokus); outline-offset: -6px; border-radius: var(--r-s); }
+
+/* ---------- Bilder der Seiten ---------- */
+.st-sockel { position: relative; width: min(100%, 380px); padding: var(--sockel-rand); border-radius: var(--r-sockel);
+  background-color: var(--sockel); background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); }
+.st-sockel .mini { width: 100%; border-radius: var(--r-brett); box-shadow: none; }
+.st-klasse { position: absolute; right: -14px; top: 20%; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
+  border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2), var(--kante); font-size: 14.5px; font-weight: 800; color: var(--kt-bester); }
+.st-klasse i { width: 12px; height: 12px; border-radius: var(--r-pille); background: var(--k-bester); }
+
+.st-leiter { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: min(100%, 430px); }
+.st-bot { position: relative; aspect-ratio: 1; border-radius: var(--r-m); background: var(--bt, var(--flaeche-2)); box-shadow: var(--s1), var(--kante); }
+.st-bot img { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.st-bot b { position: absolute; left: -6px; bottom: -6px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: var(--r-pille); display: grid;
+  place-items: center; background: var(--flaeche); box-shadow: var(--s1), var(--kante); font-size: 11.5px; font-weight: 800; color: var(--text-2); }
+.st-bot.st-erster { box-shadow: var(--s2), inset 0 0 0 2.5px var(--bf); }
+.st-bot.st-erster b { background: var(--akzent); color: var(--auf-akzent); }
+.st-leiter-fuss { display: flex; justify-content: space-between; gap: 12px; width: min(100%, 430px); font-size: 13px; font-weight: 700; color: var(--text-2); }
+
+.st-kacheln { display: flex; flex-direction: column; gap: 12px; width: min(100%, 400px); }
+.st-kachel { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-l); background: var(--flaeche-2); box-shadow: var(--kante); }
+.st-kachel-symbol { flex: none; width: 46px; height: 46px; border-radius: 15px; display: grid; place-items: center; background: var(--tinte); color: var(--auf-tinte); }
+.st-kachel-symbol .ico { width: 24px; height: 24px; }
+.st-kachel div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.st-kachel b { font-size: 16px; font-weight: 800; }
+.st-kachel span { font-size: 14px; font-weight: 600; color: var(--text-2); }
+
+/* Lage und Drehung haengen am Platz (.st-stapel-ort), die Karte darin gleitet ein (staffel in js/ui/start.js animiert
+   transform der Karte): so ueberschreibt der Eintritt die Schraeglage nie, und am Ende springt nichts */
+.st-stapel { position: relative; width: min(100%, 360px); aspect-ratio: 1.2; }
+.st-stapel-ort { position: absolute; top: 12%; width: 52%; }
+.st-stapel-ort:nth-child(1) { left: 0; transform: rotate(-8deg); }
+.st-stapel-ort:nth-child(2) { left: 24%; top: 4%; transform: rotate(-1deg); z-index: 1; }
+.st-stapel-ort:nth-child(3) { left: 48%; transform: rotate(7deg); }
+.st-stapel-karte { padding: 8px; border-radius: 18px; background: var(--flaeche); box-shadow: var(--s2), var(--kante); }
+.st-stapel-karte .mini { width: 100%; }
+
+.st-portraet { width: min(70%, 220px); aspect-ratio: 1; border-radius: var(--r-xl); background: var(--bt, var(--flaeche-2)); box-shadow: var(--s2), inset 0 0 0 3px var(--bf);
+  display: grid; place-items: center; }
+.st-portraet img { width: 82%; height: 82%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.st-portraet-name { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.st-portraet-name b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; letter-spacing: var(--lw-titel); }
+.st-portraet-name span { font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+
+/* ---------- Heute-Karte: "Neu fuer dich" (Ort arena:heute) ---------- */
+.st-neu { display: flex; align-items: center; gap: 0; min-width: 0; min-height: 44px; }
+/* "Neu fuer dich" ist die leiseste Zeile der Heute-Karte: steht dort schon eine Zeile eines anderen Pakets (z. B. faellige
+   Karten der Kartei), tritt sie zurueck und kommt wieder, sobald sie allein ist (der Hinweis bleibt der des Tages, er
+   gilt nicht als erledigt). Zwei Zeilen schoben auf dem iPad quer 1024 x 768 den Spielen-Knopf 21 px unter den Rand.
+   Haelt die Arena den Spielen-Knopf einmal selbst im Bild (U5/U7), kann diese Regel fallen. */
+.heute-karte .st-neu:not(:only-child) { display: none; }
+.st-neu-los { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 5px; margin: 0; padding: 4px 2px 4px 0;
+  border: 0; border-radius: var(--r-m); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.st-neu-los:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.st-neu-pfeil { flex: none; display: grid; place-items: center; color: var(--text-2); }
+.st-neu-pfeil .ico { width: 14px; height: 14px; }
+.st-neu-siegel { flex: none; width: 28px; height: 28px; border-radius: 10px; display: grid; place-items: center; background: var(--flaeche);
+  color: var(--akzent-text); box-shadow: var(--kante); }
+.st-neu-siegel .ico { width: 19px; height: 19px; }
+.st-neu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 14px; font-weight: 650; color: var(--text); }
+/* eine Zeile "Neu fuer dich: <Titel>" (SPIELKONZEPT 3.16), darunter ein kurzer Satz in einer Zeile (logik.ENTDECKUNGEN):
+   die Heute-Karte bleibt so niedrig wie die anderen Zeilen, der Spielen-Knopf bleibt auf dem iPad 1024 x 768 im Bild.
+   Der Kopf bricht nie um (der laengste Titel passt ab 375 px ganz, tests/start.test.mjs misst 375, 390, 1024 und 1180);
+   wird es doch einmal enger, kuerzt die Ellipse den Titel statt eine zweite Zeile anzufangen */
+.st-neu-kopf { min-width: 0; font-size: 13.25px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-neu-text b { font-weight: 800; color: var(--text); }
+.st-neu-text small { font-size: 12.5px; font-weight: 600; line-height: 1.35; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 44 px Tippflaeche; ragt etwas in den Rand der Heute-Karte, damit der Text Platz hat */
+.st-neu .st-neu-weg { flex: none; width: 44px; height: 44px; margin-right: -12px; border: 0; box-shadow: none; background: transparent; color: var(--text-2); }
+.st-neu .st-neu-weg .ico { width: 18px; height: 18px; }
+
+/* ---------- Einstellungen: "Erste Schritte" ---------- */
+.st-gruppe .st-g-zeile { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; }
+.st-gruppe .st-g-zeile + .st-g-zeile { border-top: 1px solid var(--linie); }
+.st-gruppe .st-g-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.st-gruppe .st-g-text b { font-size: 15.5px; font-weight: 800; }
+.st-gruppe .st-g-text span { font-size: 13.5px; font-weight: 600; color: var(--text-2); }
+.st-gruppe .st-g-zeile > .knopf { flex: none; min-height: 44px; font-size: 14.5px; }
+.st-gruppe .st-g-knoepfe { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 10px; border-top: 1px solid var(--linie); }
+.st-gruppe .st-g-knoepfe .knopf { flex: 1 1 160px; min-height: 44px; font-size: 14.5px; }
+
+/* ---------- iPad hoch: eine Spalte ---------- */
+@media (max-width: 900px) {
+  .st-buehne { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 28px; width: min(100%, 640px); }
+  .st-bild { order: 0; }
+  .st-sockel { width: min(100%, 300px); }
+  .st-titel { font-size: 38px; }
+}
+/* ---------- Handy ---------- */
+@media (max-width: 600px) {
+  .st-screen .st-rumpf { padding: 6px var(--rand) 12px; }
+  .st-buehne { gap: 18px; padding: 20px 18px; border-radius: var(--r-l); }
+  .st-titel { font-size: 31px; }
+  .st-text { gap: 12px; }
+  .st-text p { font-size: 15px; }
+  .st-sockel { width: min(100%, 220px); }
+  .st-klasse { right: -8px; height: 32px; padding: 0 12px; font-size: 13px; }
+  .st-leiter { gap: 8px; }
+  .st-kacheln { gap: 8px; }
+  .st-kachel { padding: 10px 12px; }
+  .st-kachel-symbol { width: 40px; height: 40px; border-radius: 13px; }
+  .st-stapel { width: min(100%, 250px); }
+  .st-portraet { width: min(46%, 150px); }
+  .st-portraet-name b { font-size: 19px; }
+  .screen .haupt-kopf .st-raus { padding: 0 12px; font-size: 13.5px; }
+  .st-screen .haupt-kopf .unter { display: none; }
+  /* mit Zurueck (aus Einstellungen oder Heute-Karte geoeffnet) passen Marke, "Ich kenne mich aus" und Klang nicht mehr
+     nebeneinander: die Marke tritt zurueck, die Seite hat ihren eigenen Titel */
+  .st-screen .haupt-kopf.mit-zurueck .marke { display: none; }
+  .st-gruppe .st-g-zeile { flex-wrap: wrap; }
+}
+@media (max-width: 380px) {
+  .st-screen .haupt-kopf .marke-zeichen { display: none; }
+}

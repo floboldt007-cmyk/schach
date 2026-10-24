@@ -16,10 +16,15 @@
 // Modul-Speicher (js/storage.js) und die Register (Klang, Saetze, Icons) ein.
 // Anfangs leer: ohne Pakete verhaelt sich die App wie vorher.
 // daten: Daten-Fundament (DSGVO, js/daten.js): Datenfreigabe, Datenauskunft, Konto loeschen
-export const PAKETE = Object.freeze(['sicherung', 'daten']);
+// Stufe 2, Schritt 1 (Flo 23.10.2026: zwei Schritte): alles, was ohne Server laeuft. Reihenfolge = Ladereihenfolge; die
+// Orte ordnen ueber ihre eigene reihenfolge. Schritt 2 (wenn Supabase und Stripe eingerichtet sind): 'pakete/online/index',
+// 'pakete/abo/index', 'pakete/coach-ki/index', 'pakete/schule/index'.
+export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 'pakete/funken/index', 'pakete/punkte/index',
+  'pakete/serie/index', 'pakete/teilen/index', 'pakete/gedaechtnis/index', 'pakete/kartei/index', 'pakete/start/index',
+  'pakete/zuzweit/index']);
 
 // W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
 // 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
 // traegt hier etwas ein, sobald der Screen des Reiters da ist, z. B.
 //   export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
-export const REITER = Object.freeze([]);
+export const REITER = Object.freeze(['training', 'bestenliste']);

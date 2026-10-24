@@ -1,0 +1,29 @@
+/* Online-Partien nutzen dieselben Theme-Tokens wie das lokale Brett. */
+.online-screen { display: flex; flex-direction: column; min-height: 0; }
+.online-screen > .kopf { flex-shrink: 0; gap: var(--a3); }
+.online-screen h2 { margin: 0; font-size: var(--fs-h2); }
+.on-rumpf { flex: 1; overflow: auto; min-height: 0; padding: var(--a4); }
+.on-inhalt, .on-meldung { max-width: 960px; margin: 0 auto; }
+.on-meldung { padding: var(--a4); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
+.on-start { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--a4); }
+.on-karte { display: grid; gap: var(--a4); padding: var(--a5); margin-bottom: var(--a4); }
+.on-karte h3, .on-karte p { margin: 0; }
+.on-karte label { display: grid; gap: var(--a2); font-weight: var(--gw-stark); }
+.on-karte input, .on-karte select { width: 100%; min-height: var(--tipp); padding: var(--a3); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); color: var(--text); font: inherit; }
+.on-liste { display: grid; gap: var(--a3); }
+.on-listeneintrag { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--a3); text-align: left; }
+.on-einladung { max-width: 600px; margin-inline: auto; text-align: center; }
+.on-code { font-size: var(--fs-h1); letter-spacing: .15em; font-weight: var(--gw-titel); }
+.on-spiel { display: grid; gap: var(--a3); width: min(100%, 680px, calc(100dvh - 300px)); min-width: min(100%, 280px); margin: auto; }
+.on-spieler { display: flex; align-items: center; gap: var(--a3); padding: var(--a2) var(--a3); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
+.on-spieler img { width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--r-s); background: var(--feld-hell); }
+.on-spieler > div { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.on-spieler > div > span, .on-uhr-hinweis, .on-zuege { color: var(--text-2); font-size: var(--fs-klein); }
+.on-spieler .uhr { flex-shrink: 0; }
+.on-spieler .uhr[hidden], .on-ergebnis[hidden] { display: none; }
+.on-brett { width: 100%; aspect-ratio: 1; }
+.on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
+.on-zug, .on-uhr-hinweis, .on-zuege { margin: 0; text-align: center; }
+.on-uhr-hinweis:empty { display: none; }
+.on-zuege { max-height: 4em; overflow: auto; }
+.on-ergebnis { text-align: center; }

@@ -15,7 +15,9 @@
 //     zusaetzlich ?erw=pfad1,pfad2 (relativ zu js/, ohne .js, nur [a-z0-9/-], z. B.
 //     ?test&erw=pakete/kartei/index), und zwar bevor app:bereit kommt und der erste Screen erscheint. Ein
 //     Paket, das nicht laedt, landet als console.error in der Konsole; die App startet trotzdem (nach
-//     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird)
+//     hoechstens PAKETE_WARTEN_MS auch dann, wenn ein Paket nie fertig wird). Nur mit ?test&kern laedt die App die
+//     Spielpakete aus PAKETE (Pfade unter pakete/) nicht: so pruefen e2e (Block Kern) und die Kern-Gruppen von
+//     tests/app.test.mjs, dass der Kern ohne Pakete unveraendert bleibt
 //   - Screens 'training' und 'start' gehoeren Paketen: fehlt ihre Datei, geht es still zur Arena (seit U2 ist 'training'
 //     Kern-Screen, siehe unten)
 //   - sendet app:bereit (einmal vor dem ersten Screen), app:screen (nach zeige() eines Screens) und
@@ -67,6 +69,7 @@ import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
 import './konto.js';
+import { uebernimmEinladungsLink } from './online.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -76,18 +79,18 @@ export { icon };
 const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt'];
+const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'schule'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
-  training: 'Training', start: 'Willkommen',
+  training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
-  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt',
+  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', schule: 'Schulmodus',
 };
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt']);
+  'werkstatt', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 
 // ---------- Einstellungen ----------
@@ -355,7 +358,10 @@ const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
 
 export function reiterListe(suche = typeof location !== 'undefined' ? location.search : '') {
   const erlaubt = new Set(REITER_ALLE.map(([n]) => n).filter((n) => n !== 'arena'));
-  const aus = new Set((Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
+  // ?test&kern: nur der Kern, also auch ohne die fest eingetragenen REITER (wie ohne PAKETE); ?reiter gilt weiter
+  let kern = false;
+  try { kern = TEST && new URLSearchParams(suche || '').has('kern'); } catch (e) { kern = false; }
+  const aus = new Set((!kern && Array.isArray(REITER) ? REITER : []).filter((n) => erlaubt.has(n)));
   if (TEST) {
     let test = null;
     try { test = new URLSearchParams(suche || '').get('reiter'); } catch (e) { test = null; }
@@ -581,6 +587,7 @@ let ladeNr = 0;
 let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem aktuellen
 
 function hashFuer(name, params) {
+  if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
   return '#' + name;
 }
@@ -588,6 +595,7 @@ function hashFuer(name, params) {
 function ausHash(hash) {
   const h = String(hash || '').replace(/^#\/?/, '');
   const [name, rest] = h.split('/');
+  if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (SCREENS.includes(name)) return { name, params: {} };
   return { name: 'arena', params: {} };
@@ -659,9 +667,10 @@ function ersterScreen() {
 }
 
 function beiVerlauf() {
-  const ziel = ersterScreen() || ausVerlauf();
+  const einladung = uebernimmEinladungsLink();
+  const ziel = einladung ? { name: 'online', params: {} } : ersterScreen() || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
-  if (aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  if (!einladung && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }
@@ -875,7 +884,8 @@ export function erwPfade(suche) {
 
 // Jedes Paket einzeln per import(): ein Fehler in einem Paket stoppt weder die anderen noch die App
 function ladePakete() {
-  const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p)) : [];
+  const kern = TEST && new URLSearchParams(location.search).has('kern');
+  const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p) && !(kern && p.startsWith('pakete/'))) : [];
   const pfade = [...new Set([...liste, ...(TEST ? erwPfade(location.search) : [])])];
   if (!pfade.length) return null;
   const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {

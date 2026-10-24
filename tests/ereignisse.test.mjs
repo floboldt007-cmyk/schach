@@ -35,12 +35,22 @@ function stillMit(fn) {
 const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet', 'partie:verlassen', 'zug:gespielt',
   'stellung:analysiert', 'zug:bewertet', 'zug:zurueckgenommen', 'hilfe:genutzt', 'partie:beendet', 'partie:analysiert',
   'analyse:gesehen', 'speicher:fehler', 'training:geloest', 'training:stand', 'uebung:ergebnis', 'bestmarke:neu',
+  // P4 Liga (ARCHITEKTUR.md, Tabelle der Ereignisse)
+  'liga:geaendert',
   // w0-fix: "Fortschritt zuruecksetzen" meldet sich (Pakete leeren ihren Zustand im Arbeitsspeicher)
   'speicher:zurueckgesetzt',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18)
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
-  'rekord:neu', 'uhr:knapp', 'zug:abgelehnt'];
-pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt und W0+a)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
+  'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
+  // Paket funken (S1-1): { funken, level, delta, aufstieg } einmal je Ereignis mit Buchungen
+  'funken:geaendert',
+  // Paket boss (S1-6) nach dem Laden von daten/boss/spielplan.json; funken liest den Spielplan erst danach (P1-Nachbesserung)
+  'spielplan:geladen',
+  // Paket punkte (S1-3): { punkte, platz, tafel, rekord } je bewerteter Partie
+  'punkte:geaendert',
+  // Paket serie (P3): { tag, lauf, meilenstein, ... } nach jedem gezaehlten Tag und jeder Aenderung am Siegeslauf
+  'serie:geaendert'];
+pruefe('EREIGNISSE: genau die Namen aus der Tabelle (BAUPLAN 3.3, dazu speicher:zurueckgesetzt, W0+a, liga:geaendert (P4), funken:geaendert, spielplan:geladen, punkte:geaendert und serie:geaendert)',EREIGNISSE.length === TABELLE.length && TABELLE.every((n) => EREIGNISSE.includes(n)), EREIGNISSE);
 pruefe('EREIGNISSE: eingefroren', Object.isFrozen(EREIGNISSE));
 
 zuruecksetzen();

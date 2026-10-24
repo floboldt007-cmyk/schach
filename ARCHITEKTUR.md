@@ -383,6 +383,10 @@ Bau B:
 
 # Runde 4: Erweiterungspunkte (Welle 0, verbindlich)
 
+P4 Liga (`js/pakete/liga/index.js`, reine Formeln in `wertung.js`, eigene Ansichten in `ansicht.js`, Tokens in `css/pakete/liga.css`) nutzt ausschliesslich `arena:panel-oben` (30), `arena:panel-bot` (15), `ergebnis:abrechnung` (30), `verlauf:seite` (20), Ereignisse, Icon-Register und Feier-Budget. `liga:geaendert` liefert `{ wertung, klasse, saison, stufe, aufstieg }` (Stufenname und Aufstiegs-Boolean). Modul `liga`, Rechenstand 1, Budget 10.000 Zeichen: normale/Blitz-Wertung getrennt, dauerhafte Haupt-Spielklasse, 84-Tage-Saison ab 19.10.2026 (4:00 lokal), Archiv-Abzeichen, beste Ergebnisse gegen die zehn Bots, letzte 40 normale Wertungen und hoechstens 100 Buchungsbelege. Negative rohe Elo-Schritte werden gemaess dem ausdruecklichen P4-Verlustschutz mit 0 uebernommen; die Oberflaeche benennt das und die ausstehende Eichung. Analysen ergaenzen ausschliesslich die Genauigkeit eines bekannten Belegs; die Liga rechnet die nachfolgenden Belege derselben Saison in Reihenfolge nach, damit Stufengrenzen unabhaengig vom Analysezeitpunkt bleiben. Kommt die Analyse einer Partie der zuletzt archivierten Saison erst nach dem Wechsel (Partie 3:59, Analyse 4:01), zieht die Liga Archiv und Startstufe der laufenden Saison so nach, als waere sie vorher gekommen, ohne Feier; aeltere Analysen aendern nichts mehr. Saisonwechsel archivieren den letzten Stand und setzen einmal um eine Stufe zurueck, auch nach mehreren ausgelassenen Saisons; eine laufende Partie wird nie unterbrochen. Der erste Start zaehlt keine alten Partien nach. Alte Partie-Felder und `pruefeLiga()` bleiben unveraendert. Das Modul kuerzt bei Bedarf nur alte Belege und Kurvenpunkte, nie Abzeichen. Die neue Suite ist `node tests/liga.test.mjs` (Node und Browser; `--nur-node` fuer Formeln).
+
+P3 Serie (`js/pakete/serie/index.js`, reine Logik in `tag.js` (Tageswerk, Serie, Bruecken, Kapitel, Bauernmarsch, Meilensteine, Kalender, Wochen-Ring, Pause) und `lauf.js` (Siegeslauf), Speicher in `stand.js`, Ansichten in `ansicht.js`, Tokens in `css/pakete/serie.css`) nutzt ausschliesslich `arena:heute` (10), `arena:kopf` (20, Chip mit Tagzahl, Flamme ab 3 Siegen in Folge), `ergebnis:abrechnung` (40, Zeile nur beim ersten Tageswerk des Tages), `partie:spieler-leiste` (30) und `einstellungen:gruppen` (20), dazu Ereignisse, Icon-Register (`se-bauer`, `se-flamme`, `se-ring`, `se-mond`, `se-liege`) und das Feier-Budget (`umwandlung` gross 66, `meilenstein` gross 72, `marsch` Zeile 50 nur ausserhalb einer Partie, `siegeslauf` Zeile 44). Es sendet `tag:gezaehlt` einmal je Tag und `serie:geaendert` `{ tag, lauf, meilenstein, ruht, kapitel, rekord, gesamt, heute }`; `liga:geaendert` liefert die Wertung fuer die Siegeslauf-Grenze. Modul `serie`, Rechenstand 1, Budget 4.000 Zeichen (hoechstens 49 Tage in der Liste, Abrechnungs-Belege je Partie); Einstellungen `{ anzeigen, ruhetag, strenge, leise }` ueberstehen "Fortschritt zuruecksetzen". Der Tag wechselt um 4:00 (`js/tag.js`), eine Partie um 3:59 zaehlt zum Vortag. Die Serie zerbricht nie mit einem Vorwurf: ein freier Tag wird zur Bruecke, danach ruht sie ("ruht", nie "0"). Ein Stand aus einer neueren App wird gelesen, aber nie ueberschrieben. Die Suite ist `node tests/serie.test.mjs` (Node und Browser; `--nur-node` fuer die Logik).
+
 Bauplan: `design/runde4/BAUPLAN.md` (Abschnitt 3). Pakete (`js/pakete/<paket>/`) schreiben nur neue
 Dateien und klinken sich **ausschliesslich** ueber diese API ein: Ereignisse, Anzeige-Orte,
 Feier-Warteschlange, Modul-Speicher, Klang-, Satz- und Icon-Register und die Partie-Buehne.
@@ -437,10 +441,11 @@ export function zuruecksetzen()          // nur Tests
 | `analyse:gesehen` | `{ partieId, ply, moment, letzter }` | `analyse.js` `springe()`, wenn sich `ply` aendert |
 | `speicher:fehler` | `{ schluessel, grund: 'voll'/'fehler' }` | `storage.js`, wenn ein Schreiben trotz geopferter Analysen scheitert |
 | `speicher:zurueckgesetzt` | `{ mitEinstellungen }` | `storage.js` `setzeZurueck()` („Fortschritt zurücksetzen“), nach dem Loeschen; Pakete leeren ihren Zustand im Arbeitsspeicher (w0-fix) |
-| `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }` | Paket 1C |
+| `training:geloest` | `{ karteId, richtig, versuch, quelle: 'kartei' }`, freiwillig dazu (P1-Nachbesserung, fuer Funken nach 3.3): `faellig` (`false`: keine Funken, nur faellige Karten zaehlen) und `sitzung` (ID der Stapel-Sitzung: die Sitzung ist eine Rueckenwind-Einheit, alle ihre Karten zaehlen dann doppelt; ohne `sitzung` zaehlt jede Karte einfach) | Paket 1C |
 | `training:stand` | `{ faellig, gesamt, gemeistert }` | Paket 1C |
 | `uebung:ergebnis` | `{ partieId, ply, getroffen }` | Paket 1B |
 | `bestmarke:neu` | `{ kategorie, wert, vorher, text, partieId }` | Pakete 1A und 2A |
+| `liga:geaendert` | `{ wertung, klasse, saison, stufe, aufstieg }` (`stufe` Name der Liga-Stufe, `aufstieg` true bei einem neuen Aufstiegsmoment) | Paket P4 Liga, nach jeder gespeicherten Buchung, Genauigkeit oder Saisonwechsel |
 
 `hilfe:genutzt` kommt bei beiden Hinweis-Stufen. `zug:bewertet` traegt `serie` (laufende COMBO nach diesem Zug) und
 `serieVorher` (vor diesem Zug); ein trivialer Zug laesst beide gleich.
@@ -474,10 +479,10 @@ export function zuruecksetzen()                  // nur Tests
 | `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
 | `partie:begruessung?` | Wahl | `partie.js` Start, vor der Begruessungs-Blase | `{ bot, farbe, modus, partienGegenBot }` -> `{ anlass, werte }` | 2B 10 |
 | `ergebnis:karte` | DOM | `partie.js` Overlay `fuelle()`, zwischen `.erg-feier` und `.erg-bot` | `{ app, bot, farbe, ergebnis, grund, erg, review, rechnet, nachtrag, wertet, modus, ziel }` | 2A 5 · 1B 10 · 2B 20 |
-| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 |
+| `analyse:coach` | DOM | `analyse.js` `zeigeCoach()`, Knopfzeile der Coach-Karte | `{ app, partie, review, zug, ply, du }` | 1B 10 · 2C 20 · B2 Frag den Coach 30 |
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
-| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
+| `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | B3 Klasse 7 · 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
 
 **Hosts im Detail (Welle 0b).** Jeder DOM-Ort hat einen eigenen Behaelter; leer ist er versteckt (`hidden`
@@ -910,7 +915,10 @@ Funken-Wochenende, sonst aendert sich nichts. Der Browser meldet den 404 dann be
 nicht abschalten), und die App-Tests werten ihn als Konsolenfehler: **S1-1 (Schub 1) liefert den Spielplan in seinen
 Browser-Tests per `page.route('**/daten/boss/spielplan.json', ...)` aus** (z. B. mit dem Inhalt von
 `daten/beispiel/spielplan.json`) oder filtert genau diesen 404, solange S1-6 fehlt. Nach der Integration (beide Pakete in
-`PAKETE`) gibt es ihn nicht mehr (w0plus-a-fix, Befund des Pruefers).
+`PAKETE`) gibt es ihn nicht mehr (w0plus-a-fix, Befund des Pruefers). **P1-Nachbesserung:** S1-1 (`funken`) fragt erst
+nach dem Spielplan, wenn S1-6 das Ereignis `spielplan:geladen` sendet (nach seinem eigenen erfolgreichen
+`ladeSpielplan()`); ein angemeldeter Boss allein reicht nicht mehr. **S1-6 muss dieses Ereignis senden**, sonst gibt es
+kein Funken-Wochenende.
 
 **Spielplan** (`art: 'spielplan'`, `format: 1`, eine Datei je Quartal oder Saison; Beispiel `daten/beispiel/spielplan.json`):
 ```json
@@ -942,12 +950,15 @@ Nur der Steckbrief-Text darf sich aendern.
 |---|---|---|
 | `funken:gebucht` | `{ quelle, menge, gesamt, level }` (`quelle`: `'partie'` \| `'lernen'` \| `'tag'` \| `'meilenstein'` wie die Tabellen A, B, C in 3.3; `menge` ganze Zahl >= 0 nach Faktor, Rueckenwind und Tagesbogen; `gesamt` alle Funken bisher; `level` nach der Buchung) | S1-1, nach jeder Buchung |
 | `level:aufstieg` | `{ level, titel, neu }` (`titel`: Text bei jedem 5. Level, sonst `null`; `neu`: `[{ art, id, name }]` freigeschaltete Stuecke) | S1-1, nach der Buchung, die das Level hebt (nie mitten in einer Partie gezeigt) |
+| `funken:geaendert` | `{ funken, level, delta, aufstieg }` (`funken` alle Funken danach, `delta` Summe der Buchungen dieses Ereignisses, `aufstieg` boolean) | Paket `funken`, einmal je Ereignis mit Buchungen, nach den `funken:gebucht` (fuer Serie, Liga und andere Pakete; neu mit dem Paket) |
+| `spielplan:geladen` | `{}` (keine Daten; der Spielplan selbst kommt aus `ladeSpielplan()`, also aus dem Zwischenspeicher von `inhalte.js`) | S1-6 `boss`, nach `app:bereit` (die Pakete laden parallel; vorher koennte ein Hoerer noch fehlen) einmal nach dem ersten erfolgreichen `ladeSpielplan()` (`r.ok`), und nach jedem neu geladenen Plan wieder. Erst danach liest `funken` den Spielplan (Funken-Wochenende): so fragt nie ein Paket nach `daten/boss/spielplan.json`, solange es die Datei nicht gibt (kein 404, auch nicht mit dem Test-Boss in `tests/app.test.mjs`). Neu mit der P1-Nachbesserung |
 | `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
-| `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
+| `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung, blick? }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`; `blick` freiwillig (P1-Nachbesserung): Raetsel-Blick vor dem Versuch, dann rechnet funken die Stufe nach 3.3 aus `wertung - blick` (12/8/4/1), ohne `blick` wie auf Augenhoehe (8)) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
 | `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1, also der Stand der Lebensleiste: `vorher` nach Flos vorigem Zug, d. h. vor dem letzten Boss-Zug, = `1 - (gewinnVorigerZug ?? gewinnVorher)` aus `zug:bewertet`; `nachher` nach Flos Zug = `1 - gewinnNachher`; Treffer ab `vorher - nachher >= 0,03`). So zaehlt ein sofort bestrafter Boss-Fehler als Treffer (3.8); ein guter Zug in ruhiger Stellung haelt die Leiste nur. w0plus-a-fix: vorher stand hier „vor Flos Zug“, mit `gewinnVorher` gab es praktisch nie einen Treffer, auch nicht beim Matt | S1-6, nach `zug:bewertet` in Boss-Partien |
 | `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
-| `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`) | S1-3 (spaeter S2-2), nach dem Eintrag |
+| `rekord:neu` | `{ tafel, wert, vorher, platz }` (`tafel` z. B. `'bot:rudi'`, `'boss:bergwirt:meister'`; `vorher` alter Bestwert oder `null`; `platz` 1..10 oder `null`); P2 (`punkte`) gibt zusaetzlich `fenster: 'allzeit'` und `partieId` mit | S1-3 (spaeter S2-2), nach dem Eintrag. `punkte` sendet es nur fuer einen neuen **eigenen Allzeit-Rekord** (ein Wert ueber dem alten Bestwert der Tafel, also immer mit `vorher`), nicht fuer den ersten Eintrag einer Tafel und nie fuer Wochen- oder Monatsbeste |
+| `punkte:geaendert` | `{ punkte, platz, tafel, rekord }` (`punkte` Tafelwert der Partie, auch ohne Tafel; `platz` Platz auf der Tafel 1.. oder `null` (ohne Tafel oder nicht unter den drei eigenen Besten); `tafel` Tafel-ID oder `null` (Hilfe, Uebung, freie Partie, Spielhalle, Gast, eigene Stellung); `rekord` boolean wie bei `rekord:neu`) | P2 `punkte`, einmal je bewerteter Partie nach `partie:analysiert` (auch beim Nachholen in der Arena), vor `rekord:neu`; nie beim einmaligen Umzug |
 | `uhr:knapp` | `{ laufId, rest }` (`rest` Restzeit von Flo in ms) | W0+b, einmal je Partie, wenn Flos Uhr unter 30 s faellt |
 | `zug:abgelehnt` | `{ laufId, von, nach, art, figur, fen }` (`nach`: Feld oder `null`, wenn nur eine Figur ohne erlaubten Zug angetippt wurde; `art`: `'ziehen'` \| `'tippen'`; `figur` z. B. `'wN'`; `fen` die Stellung) | `partie.js` aus `board.js` `beiAbgelehnt`, nur wenn Flo am Zug ist (3.18; den Grund rechnet S2-8 mit chess.js) |
 `partie:gestartet` traegt zusaetzlich `boss` (Kopie oder `null`) und `seed`, `partie:beendet` ebenso `boss` und `seed`.
@@ -963,7 +974,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 ```
 | Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
 |---|---|---|---|---|
-| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
+| `arena:heute` | DOM | `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Klassen-Aufgabe 35 (B3) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
 | `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch` als eigene Zeile ueber Avatar und Namen, hoechstens 16 px hoch (w0plus-a-fix: vorher in `.info`, das auf dem Handy mit der Sprechblase verschwand); wandert beim Drehen mit, `data-lage`; ohne Anbieter `hidden`, mit Anbieter `.partie.mit-gegner-leiste` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
 | `partie:spieler-leiste` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-spieler-leiste` an Flos Namen, quer in `.spieler-quer` nach dem Namensblock, hoch in `.spieler-hoch` nach `.name` (wandert mit, `data-lage`); eine Zeile, nicht hoeher als der Name; ohne Anbieter `hidden` | wie `partie:gegner-leiste` | Flamme des Siegeslaufs (Paket `siegeslauf`) · Level-Emblem (S1-1) |
 | `partie:aktionen` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-aktionen` (`display: contents`) in `.spielknoepfe` vor „Aufgeben“; hoechstens 2 Knoepfe (weitere: console.warn, entfernt), die Reihe bekommt je Knopf eine Spalte (`data-aktionen`, engere Beschriftung); Klicks binden die Pakete selbst (auch ein `data-aktion` im Paket loest nie eine Aktion des Hosts aus); ohne Anbieter `hidden`, Reihe unveraendert | `{ app, buehne, bot, farbe, modus, boss }` | Emote-Rad und Schnell-Chat (Paket `ausdruck`) |
@@ -1463,6 +1474,267 @@ mit Test-Anbieter, alle Bauteile mit Maus, Finger und Tastatur, dunkel, Tippflae
 
 **Zugklassen-Anzeigenamen.** `js/zugklassen.js` ist die einzige Quelle für Namen, Coach-Klassenwörter, Formen und Zeichen. Die stabilen IDs bleiben Teil des Speicherformats; `coachKern()` erkennt auch die früher gespeicherten Klassenwörter.
 
+# Spielsysteme P1: Paket funken (Funken und Level, SPIELKONZEPT 3.2 und 3.3)
+
+Einstieg `js/pakete/funken/index.js` (laden: `PAKETE` bzw. im Test `?test&erw=pakete/funken/index`), daneben `rechnung.js`
+(rein), `level.js` (rein), `stand.js` (Modul-Speicher), `ansicht.js` (DOM), Optik `css/pakete/funken.css` (nur Tokens,
+das Paket haengt `link[data-paket="funken"]` selbst ein). Hakt sich nur ueber Ereignisse, Orte, Feier und Register ein;
+jeder Hoerer und Anbieter laeuft in try/catch. **Noch nicht in `PAKETE`** (siehe unten, Abschnitt Integration).
+
+**Formeln (Rechenstand 1, `STAND` in allen drei reinen Dateien).** Partie-Funken = (Zugwerte + Theorie + Ergebnis +
+Verwertung + Lichtblicke) x Herausforderungs-Faktor, dann Tagesbogen, dann Rueckenwind, einmal kaufmaennisch gerundet.
+Zugwerte nur fuer offene Zuege (Gewinnchance vorher 10 bis 90 %, Grenzen eingeschlossen; Genial 12, Goldrichtig 8, Praezise 5,
+Sauber 4, Solide 3, Unscharf 1, Daneben/Verschenkt/Weit daneben 0 mit Platz, hoechstens 40 Plaetze); Theorie 1, hoechstens 8,
+immer; Pflichtzug, triviale Zuege und der Zug nach Hinweis oder Zuruecknehmen 0 ohne Platz; ohne Live-Bewertung 0. Ergebnis
+40/25/10 (Niederlage erst ab 15 eigenen Zuegen, alles erst ab 10), mit Hilfe halbiert. Verwertung nur bei Sieg: 30 minus 1 je
+Zug ueber Par (Mattdistanz + 3 beim ersten Erreichen von 90 %, sonst 30), ohne jede Live-Bewertung 0. Lichtblicke (Remis,
+Niederlage, hoechstens 2, je 10): laenger als je zuvor gegen diesen Bot, Genauigkeit +5 gegen die letzte Partie (erst nach der
+Analyse, als Nachtrag), Bot-Fehler sofort bestraft. Faktor nach 3.3 (x1,5 ab +300 ... x0,25 ab -500, erste 10 wertende
+Partien x1), Abstand = Bot-Elo minus **Lage**: bis es die Arena-Wertung gibt, der Leistungswert der letzten 20 wertenden
+Partien (mittlere Bot-Elo + 400 x (Siege - Niederlagen) / Partien). Sobald das Paket Wertung/Liga das Ereignis
+`liga:geaendert` in `EREIGNISSE` eintraegt, abonniert funken es und nimmt `wertung` (Zahl oder `{ wert }`) als Lage
+(gespeichert als `lage: { wert, t }`); vorher wird es nicht abonniert. Der Faktor wird bei `partie:gestartet` festgelegt
+und steht vorher im Panel. Tagesbogen: bis 800 Funken (gemessen vor Rueckenwind) voll, darueber halb, ab 4:00 neu. Rueckenwind:
+die erste Karte an Tag 4 (3 Tage nach dem ersten Start, Entdeckungs-Fahrplan 3.16; die Heute-Zeile sagt dann "Neu für
+dich: eine Rückenwind-Karte"), danach Montag 4:00 eine, hoechstens 3; Extra-Karten "Willkommen zurück" einmal je
+Kalendermonat nach mindestens 2 Tagen ohne Aktivitaet und "für dich aufgehoben" fuer jedes verpasste Funken-Wochenende seit
+dem ersten Start (auch wenn die App erst Wochen spaeter wieder aufgeht; jede Woche wird genau einmal geprueft, `rw.planBis`),
+dann hoechstens 4. "Zünden": 3 Einheiten x2 (Partie, "Ab hier nochmal", Lektion, Stapel-Sitzung im Training: alle Karten
+einer `sitzung` zaehlen doppelt und verbrauchen zusammen eine Einheit); Funken-Wochenende (Spielplan) x2 ohne
+Kartenverbrauch; nie mehr als x2. Boss-Partien: nur die ersten 3 Versuche am Tag. Lern-Funken (Tabelle B) und
+Meilensteine (Tabelle C, ohne Faktor, Bogen, Rueckenwind) nach 3.3; erster Sieg gegen den Stockfisch 1.000 statt 100;
+Raetsel ohne `blick` wie auf Augenhoehe (8); Karteikarten mit `faellig: false` 0.
+
+**Speicher** `modul:funken` (Budget 25.000, duennt selbst aus): `{ stand: 1, gesamt, level, heute: { tag, partien, funken,
+bogen, boss, quellen }, verlauf: [letzte 30 Partien mit Aufschluesselung, partieId als id], freigeschaltet: [ids],
+rw: { karten, woche, aktiv, start, letzterTag, willkommen, gespielt, aufgehoben, neu, planBis }, aufstiege: [{ level, von, t,
+satz, herkunft }], gruss, ids: [verarbeitete Partien, hoechstens 300], lernen: { ..., sitzung }, lauf, lage }` (`rw.woche`
+bleibt `null` bis zur ersten Karte an Tag 4; `rw.neu`: `'erste'` \| `'willkommen'` \| `'aufgehoben'`; `lernen.sitzung`:
+laufende Stapel-Sitzung `{ id, rw }`; neue Felder sind freiwillig, Rechenstand bleibt 1, aeltere Staende laden). `lauf` haelt die Live-Daten der
+laufenden Partie (je eigenem Ply Klasse, Gewinnchance vorher/nachher, trivial, nach Hilfe, Mattdistanz), damit eine
+fortgesetzte Partie richtig rechnet. Alte Spielstaende ohne Modul starten bei 0 Funken und Level 1. Level folgt immer den
+Funken (sinkt nie).
+
+**Ereignisse.** Hoert `partie:gestartet`, `zug:gespielt`, `hilfe:genutzt`, `zug:zurueckgenommen`, `zug:bewertet`,
+`stellung:analysiert`, `partie:beendet` (bucht synchron, also vor den Feier-Zeilen), `partie:analysiert` (Nachtrag: Stern 2,
+Genauigkeits-Lichtblick), `uebung:ergebnis`, `analyse:gesehen`, `training:geloest` (freiwillig `faellig` und `sitzung`, siehe
+Tabelle), `lektion:beendet`, `raetsel:geloest` (Vertrag wie in der Tabelle; das freiwillige Feld `blick` macht die Stufe genau,
+ohne `blick` zaehlt ein Raetsel wie auf Augenhoehe), `boss:siegel`, `rekord:neu` (nur `platz` 1 und `fenster` fehlt oder
+`'allzeit'`), `bestmarke:neu` (je Partie hoechstens ein Rekord), `tag:gezaehlt` (nur Aktivitaet, nie Funken),
+`speicher:zurueckgesetzt`, `spielplan:geladen` (erst dann liest es den Spielplan). Sendet `funken:gebucht` je Quelle, `funken:geaendert` einmal je Ereignis, `level:aufstieg`.
+Andere Pakete lesen Funken nie aus dem Modul, sondern ueber diese Ereignisse.
+
+**Orte.** `ergebnis:abrechnung` 20 (`.fk-abr[data-zeile="funken"]`: "+Funken", Formel, Level-Balken vom alten zum neuen
+Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um, Klang `level`; `data-aufstieg`,
+`data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip[role=button]` "Level n" mit
+Mini-Balken, oeffnet per Antippen, Enter oder Leertaste den Funken-Spiegel; so hoch wie die Chips Sterne und Pokal, die
+Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; **Form nach Platz**: ganz, solange die
+Chip-Reihe ihn ohne Ueberlauf fasst, sonst und auf dem Handy bis 600 px nur die Zahl im Emblem, `.fk-schmal`; gemessen nach
+dem Einhaengen und per ResizeObserver am Kopf, die Form wechselt im naechsten Bild; so ist er im iPad-Hochformat 744 bis
+834 px ganz sichtbar), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
+z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
+(`.fk-spieler`), `spielplan:tage` 20 (`.fk-spielplan`), `partie:begruessung?` 40 (Anlass `funken-level`, einmal nach einem
+Aufstieg). Funkenlinie `.fk-linie` in `buehne.platz('funkenlinie')`, nur mit der Anzeige "Funkenlinie" (Standard aus).
+
+**Feier.** Je Partie hoechstens ein Level-Moment: bei einem normalen Level eine Zeile `level` ("Level n · Neu: ..." mit
+Koennen-Satz: Vergleich der Partien seit dem vorigen Aufstieg mit den 15 davor, Mindestmengen, sonst neutraler Fakt); bei
+einem neuen Titel (jedes 5. Level und 60/75/100) der grosse Moment `level-titel` mit Koennen-Satz und, wenn dabei Stuecke frei
+werden (Level 10, 15, 20, ... 50), dazu eine Zeile `level` "Neu: ..." (belegt also 1 von 3 Zeilen-Plaetzen). Kommt die Analyse noch, wartet die Feier auf `partie:analysiert` (sonst nennte sie ein zu niedriges Level).
+Lern-Aufstiege gehen ohne `partieId` in die Nachlese.
+
+**Spielplan.** Das Funken-Wochenende kommt aus `daten/boss/spielplan.json` (Paket boss, S1-6). `funken` liest ihn erst,
+wenn S1-6 `spielplan:geladen` sendet (dann aus dem Zwischenspeicher von `inhalte.js`, ohne zweite Anfrage). Ein Boss ohne
+dieses Signal (z. B. `wpboss` in `tests/app.test.mjs`) loest keine Anfrage aus, also auch keinen 404. Vertrag fuer S1-6 in
+der Ereignis-Tabelle.
+
+**Noch nicht verdrahtet (es fehlt das Ereignis oder ein Feld darin).** Aus Tabelle B: Karteikarte "für immer gelöst" +30
+(`training:geloest` braucht ein Feld wie `fuerImmer`), Tagesraetsel "Ein Wort" +5 (Feld in `raetsel:geloest`), Pruefung
+beim Lehrmeister 40/+60 (`lektion:beendet` kennt nur Ringe), Endspiel-Fall, Heimbringer, Mission je Stufe 30 und
+Treppenlauf-Bestleistung 25 (kein Ereignis). Aus Tabelle C: Tagesaufgabe 20 und "Tageskrone" +30 (kein Ereignis; die
+Quelle `'tag'` steht in `funken:gebucht` schon bereit), Liga-Saison beendet 100 (P4), Erste Schritte je 50 (kein
+Ereignis). Wer eines dieser Ereignisse einfuehrt, ergaenzt in `js/pakete/funken/index.js` einen Hoerer und in `stand.js`
+die Buchung (Werte stehen in `rechnung.js` bzw. sind in 3.3 festgelegt).
+
+**Integration.** Das Paket steht bewusst noch nicht in `PAKETE` (Kopfkommentar von `js/erweiterungen.js` und
+`tests/sw.test.mjs`: das macht die Integration). Probelauf am 23.10. (P1-Nachbesserung) mit `pakete/funken/index` in
+`PAKETE` und den fuenf Dateien in `DATEIEN` von `sw.js` (danach `node tests/sw.test.mjs --aktualisieren`):
+`tests/e2e.test.mjs` 124/125, rot nur "Ohne Pakete: keine Feier, kein Ort im Ergebnis"; `tests/app.test.mjs` bricht bei
+"Auswertung im Hintergrund" ab (wartet auf `.erg-tipp`, das es nur ohne Abrechnungszeile gibt). Mit diesem Warten in einer
+Kopie nachsichtig: 515 gruen, 8 rot, alle pruefen ausdruecklich den Kern ohne Pakete: "?erw ohne ?test wird ignoriert"
+(die Paket-Dateien werden geladen), "Ort arena:kopf: nach den zwei Chips", "Feier im Ergebnis: hoechstens 3 ..." und
+"Nachlese ..." (die Level-Zeile belegt einen Platz), dreimal `wpabr` ("Zeilen Punkte vor Funken", "Nachtrag baut die
+Huelle neu", "hoechstens vier Zeilen": das Test-Paket bietet selbst eine Zeile `funken` an) und "Ohne Paket:
+Spieler-Leiste und Aktionen versteckt" (funken bietet `partie:spieler-leiste` an). Nicht mehr rot: "Heute-Karte ohne
+Paket: versteckt" (die erste Rueckenwind-Karte kommt erst an Tag 4) und die Konsolenfehler-Pruefungen mit `wpboss` (kein
+Abruf des Spielplans ohne `spielplan:geladen`). **Rezept, im Probelauf geprueft (app 523/523, e2e 125/125 mit funken in
+`PAKETE`):** die Kern-Pruefungen laden `js/erweiterungen.js` ohne Spiel-Pakete, in `tests/app.test.mjs` in `neueSeite`
+und im Kontext "Sternklang", in `tests/e2e.test.mjs` in `neuerKontext`:
+```js
+const echt = readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8');
+const body = echt.replace(/^export const PAKETE = Object\.freeze\(\[[^\]]*\]\);/m, "export const PAKETE = Object.freeze(['sicherung']);");
+await kontext.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body }));
+```
+(`/m` und `^` sind noetig: ohne sie trifft die Regex das Beispiel im Kopfkommentar, und das Paket laedt trotzdem.)
+Kopf: Der Level-Chip waehlt seine Form nach Platz (siehe Orte); im iPad-Hochformat ist er damit ganz sichtbar. Reicht der
+Platz auch fuer die schmale Form nicht (neben dem Sterne-Chip fehlen bei 375 px 12 px, bei 360 px 27 px; zwischen 441 und
+etwa 510 px, wenn der Pokal-Chip wieder sichtbar ist), liegt er teils im waagrechten Scrollbereich der Chip-Reihe. Das
+entscheidet die Integration mit der Auswahl der Kopf-Chips (Zahlenruhe 3.1; die Serie aus P3 kommt dazu).
+Tests: `node tests/funken.test.mjs` (Node und Browser, `PORT`, `BILDER`), Fairness-Zeilen in `tests/fairness.test.mjs`.
+
+# Spielsysteme P2: Paket punkte (Punkte, Abrechnung und Bestenliste, SPIELKONZEPT 3.2, 3.10, 3.13, 3.17)
+
+Einstieg `js/pakete/punkte/index.js` (laden: `PAKETE` bzw. im Test `?test&erw=pakete/punkte/index`), daneben `formel.js`,
+`tafel.js` und `code.js` (rein, in Node testbar, kein `Math.random`), `stand.js` (Modul-Speicher), `ansicht.js` (Zeile der
+Abrechnung), `liste.js` (Reiter der Bestenliste), Paket-Screen `js/ui/bestenliste.js`, Optik `css/pakete/punkte.css` (nur
+Tokens; das Paket haengt `link[data-paket="punkte"]` selbst ein). Hakt sich nur ueber Ereignisse, Orte, Feier, Register und
+den Modul-Speicher ein, jeder Hoerer und Anbieter laeuft in try/catch. **Noch nicht in `PAKETE` und `REITER`** (siehe
+Integration unten). Funken liest es nie: das Level der Spielerkarte kommt aus `funken:geaendert`.
+
+**Formel (Rechenstand 1, `STAND` in formel.js, tafel.js und stand.js).** Tafelwert = Zugpunkte der offenen Zuege (Gewinnchance
+vorher 10 bis 90 %, Grenzen eingeschlossen; Genial 1.200, Goldrichtig 800, Praezise 500, Sauber 400, Solide 300, Unscharf 100,
+Daneben/Verschenkt/Weit daneben 0 mit Platz, hoechstens 40 Plaetze) + Theorie (je 100, hoechstens 8, immer) + Ergebnis (Sieg
+4.000, Remis 2.500, Niederlage ab 15 eigenen Zuegen 1.000; Ende vor dem 10. eigenen Zug 0) + Verwertung (nur Sieg: ab dem ersten
+eigenen Zug mit mindestens 90 % Par = Mattdistanz + 3, sonst 30; 3.000 minus 100 je Zug ueber Par, nie unter 0; nie ueber 90 %:
+volle 3.000; ohne jede Bewertung 0, wie bei den Funken) + Kuer (COMBO-Zuschlag wie in der Partie: Praezise, Goldrichtig, Genial
+zaehlen, Theorie, Pflichtzug und triviale Zuege ohne Verlust sind neutral, offene Zuege in laufender Serie +50 % ab x3, +100 %
+ab x5, +150 % ab x8, +200 % ab x12 ihrer Zugpunkte; Weisse Weste +2.000 bei Sieg ohne Daneben, Verschenkt, Weit daneben ab 20
+offenen Zuegen). Pflichtzuege, triviale Zuege und der erste eigene Zug nach einem Hinweis oder Zuruecknehmen: 0, kein Platz.
+Uhr-Bonus (`uhrBonus`, 1.000 x Rest der eigenen Bedenkzeit) und Leistungspunkte (`leistungspunkte`, Phase 2) sind vorbereitet,
+aber noch nicht verdrahtet. Gerechnet wird nur aus der **Spielanalyse** (`partie:analysiert`, Review mit fester Tiefe), nie aus
+der Live-Bewertung (feste Tiefe statt Zeitdeckel). Ganz gleich ist der nachgerechnete Wert eines Codes trotzdem nicht garantiert:
+die eigene Spielanalyse nutzt schon gerechnete Live-Suchen gleicher Tiefe wieder (`vorab`), das Nachrechnen analysiert frisch;
+kleine Abweichungen sind moeglich. Die Beispiele aus 3.2 und 3.13 (10.400,
+18.000, 6.400/9.400, 14.900, 20.100) sind Pruefwerte in `tests/punkte.test.mjs`.
+
+**Tafeln (`tafel.js`).** Je Leiter-Bot `bot:<id>` ("Rudis Tafel") und je Boss und Stufe `boss:<id>:standard|meister`.
+Eingetragen wird eine wertende Partie gegen einen Leiter-Bot oder eine Boss-Partie, beide nur ohne Hinweis und ohne
+Zuruecknehmen (sonst Punkte in der Abrechnung, aber `grund: 'hilfe'`); Uebungen (gar keine Rechnung), freie Partien,
+Spielhalle, Gaeste und eigene Stellungen nie (`grund`). Regeln aus 3.13: 10 Zeilen, davon hoechstens 3 eigene; dein Bestwert steht
+immer da, auch unter Platz 10; Gleichstand: der fruehere Eintrag vorn (gleich gut ist kein Rekord); Fenster Woche (Montag 4:00),
+Monat (Tagesgrenze 4:00) und Allzeit (Standard Woche); Gaeste sind an kein Fenster gebunden. Platz und Aufstieg zaehlen unter
+Gaesten und den drei eigenen Besten. Chronik: je Tafel die Bestwerte der letzten 12 Wochen und 12 Monate (Saeulen). "So nah wie noch
+nie": hoechstens einmal je Tafel und Woche, ab 90 % des eigenen Rekords und naeher als je zuvor, nie "knapp verpasst". `bewerte`
+merkt nur den Kandidaten (`fastPruefen`, `ergebnis.fast = { prozent, anteil, wo }`); festgeschrieben (`tafel.fast = { wo, id }`,
+`tafel.nah`) wird er erst, wenn die Abrechnung den Satz zeigt (`merkeFast`, einmal je Partie entschieden: ein Neuaufbau der Zeile im
+Nachtrag zeigt denselben Satz). So verbrauchen Umzug und Nachholen in der Arena den Moment nicht, und der Satz steht in der Zeile **vor** "Platz N" (eine Partie mit 90 % des Rekords steht fast immer unter den drei
+eigenen Besten; Pruefer-Befund P2).
+Ausduennen: behalten werden die 3 Allzeit-Besten und je 3 Beste der laufenden Woche und des Monats; Nachweise nur an den 3
+Allzeit-Besten. **Gaeste** sind Freunde aus Codes und die **vorlaeufigen Bot-Laeufe** (3.13 "Schon in S1 nicht leer", unten).
+
+**Vorlaeufige Bot-Laeufe.** `daten/punkte/bot-laeufe.json` (art `bot-laeufe`, format 1, rechenstand 1, ca. 4 KB): je Leiter-Tafel
+der beste und der mittlere Lauf jedes Nachbar-Bots (Stufe k-1 und k+1; Bennos und Gretas Tafel je einen Nachbarn, die
+Stockfisch-Tafel keinen), Lauf `{ bot, lauf: 'best'|'mittel', w, f, e, z, g, partie, von }`. Erzeugt mit
+`werkzeuge/nachbar-laeufe.mjs` aus den 320 Nachbar-Partien der Eichung (`eichung/messung/roh/botpartien.jsonl`, nicht im Repo;
+Partien mit Zuglimit zaehlen nicht): Analyse mit der App-Engine (Stockfish 19 lite unter Node) und der unveraenderten
+`analysierePartie` (Tiefe 14, MultiPV 2), dann `formel.tafelwert` fuer beide Seiten. Das Werkzeug ist fortsetzbar und teilbar
+(`--teil=k/n`, Cache je Prozess), `--auswerten` rechnet ohne Engine aus dem Cache neu (nach einer Formel-Aenderung mit hoeherem
+STAND). `index.js` meldet die Inhaltsart an (`registriereInhaltsart('bot-laeufe', { pruefe: S.pruefeBotLaeufe })`), laedt die
+Datei nach `app:bereit` (`ladeInhalt('punkte/bot-laeufe')`) und reicht sie nur mit `kopf.rechenstand === STAND` an
+`S.setzeBotLaeufe` (alte und neue Regeln mischen sich nie). Die Laeufe stehen nie im Modul-Speicher, nur als Gaeste
+(`art: 'bot'`, `vorlaeufig: true`, Name ueber `botNachId`) in `S.gaeste()`; auf der Tafel mit Avatar und "Bester Bot-Lauf ·
+vorläufig · Schwarz · Sieg · 31 Züge". Fehlt die Datei, stehen nur Freunde auf den Tafeln. Nach der Eichung ersetzt S3-1 sie durch
+geeichte Laeufe (Rechenstand 2). Die Partien der Laeufe sind noch nicht ansehbar (nur die ID in `partie`). Kommt die Datei
+mit der Integration in `PAKETE`, gehoert sie in `DATEIEN` von `sw.js` (Paket-Regel `daten/<paket>/`).
+
+**Speicher** `modul:punkte` (Budget 40.000, duennt selbst aus: erst alte Abrechnungen, dann Rekordbuch, Nachweise, IDs, Chronik,
+Freunde, zuletzt die schwaechsten Eintraege, nie der Bestwert einer Tafel): `{ stand: 1, tafeln: { [id]: { id, eintraege: [{ id
+(partieId), w, t, tag, wo, mo, f, z, e, g, st, m, n? }], chronik: { w, m }, nah, fast } }, rekorde: [{ tafel, w, vorher, t, id,
+stand, n? }] (Rekordbuch, hoechstens 30), freunde: [{ id, name, eintraege: [{ tafel, w, t, tag, f, z, e, pruef, n }] }]
+(hoechstens 12 Freunde, 24 Eintraege; ein besserer Code ersetzt den alten Eintrag auch bei vollem Speicher), letzte: [Ergebnis] (Abrechnung der letzten 12 Partien), ids (verarbeitete Partien,
+hoechstens 300), neu (Punkt "neu" an Zeilen), offen (beendet, Analyse steht aus), lauf ({ id, hilfe, nachHilfe: [ply] }), level,
+umzug }`. `m` ist der Ply mit dem groessten Ausschlag (dorthin springt eine Zeile in der Analyse), `n` der Nachweis (SA1-Code ohne
+Striche, Rechenstand, Bot, Seed, Zuege, Datum; nach der Partie per `setTimeout` gebaut, nie im Hoerer). Kaputte oder fremde Teile
+fallen beim Laden still weg, ein Spielstand ohne Modul startet leer. **Umzug** (6.3): einmal beim ersten Start mit dem Paket
+werden die gespeicherten Analysen (bis zu 12) bewertet und die ersten eigenen Eintraege, still (keine Feier, keine Ereignisse,
+kein "neu"). Einstellungen je Geraet (`speichereModulEinstellungen('punkte')`): `{ reiter, fenster, tafel, name }`.
+
+**Ereignisse.** Hoert `partie:gestartet`, `hilfe:genutzt`, `zug:gespielt`, `zug:zurueckgenommen` (der erste eigene Zug nach Hilfe
+zaehlt 0, die Liste haengt an der laufenden Partie), `partie:beendet` (merkt die Partie bis zur Analyse), `partie:analysiert`
+(Rechnung, Eintrag, synchron vor dem Nachtrag des Ergebnisses; zweimal je Partie ist harmlos), `funken:geaendert` (Level),
+`app:bereit` (Umzug nach 1,2 s), `speicher:zurueckgesetzt`. Sendet `punkte:geaendert { punkte, platz, tafel, rekord }` je
+bewerteter Partie und danach bei einem neuen eigenen Allzeit-Rekord `rekord:neu { tafel, wert, vorher, platz, fenster:
+'allzeit', partieId }` (Tabelle "Ereignisse" oben; funken bucht dafuer seine 25 Funken nur bei `platz` 1).
+
+**Orte.** `ergebnis:abrechnung` 10: `div.pk-abr[data-zeile="punkte"]` "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ▲ 2",
+"Rekord auf Rudis Tafel · +1.820", "Erster Eintrag auf ...", "Diese Woche: Platz 2 ...", "So nah wie noch nie: 97 % ..." oder
+ohne Tafel der ehrliche Grund; bei einem Rekord bleibt die alte Zahl durchgestrichen stehen (`.pk-alt`), die neue zaehlt hoch;
+beim Ueberholen eine Mini-Tafel (ueber dir, du, unter dir), deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken
+(`klick`), Klang `rekord` nur mit Rekord, Platz 1 oder Aufstieg (Niederlagen ohne Rekord bleiben still); hoechstens 1,2 s,
+Antippen der Karte zeigt sofort das Endbild, Tempo 0 und reduzierte Bewegung nur das Endbild (`data-fertig`). Antippen der Zeile
+zeigt die Aufschluesselung, "Zur Bestenliste" (oeffnet die Tafel im Fenster des Satzes: "Diese Woche: Platz 2" die Woche, sonst
+Allzeit, ohne das gemerkte Fenster zu aendern) und nach dem Ueberholen einer Freundin einmal still "Überhol-Post an Jule"
+(Vorschau des Texts "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..." mit Kopieren oder Teilen-Blatt,
+nichts geht automatisch raus). Rechnet die Analyse noch: "Punkte werden gezählt …" mit endlichem Schimmer (nur opacity), danach
+der Nachtrag; ohne Analyse "Punkte folgen mit der Analyse" (die Arena holt sie nach). Uebungen: keine Zeile.
+`bestenliste:reiter` Ich 10 (Spielerkarte, "Deine besten Partien" ueber alle Tafeln im Fenster, Rekordbuch mit Rechenstand),
+Bots 20 (Tafel-Wahl der 10 Leiter-Bots und der Boss-Tafeln mit Eintraegen, die Tafel mit Platz, Name, Datum, Farbe, Ergebnis,
+Zuegen, Genauigkeit, Punkten, eigene Zeile mit Akzentlinie, Freunde als Gast-Zeilen mit Initiale und Pruefstufe, Chronik,
+"Rekord angreifen: Rudi, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
+nachspielen, mit `app.engine('bewertung')` neu analysieren und mit derselben Formel rechnen, "Nachgerechnet ✓"; Freunde-Liste,
+ein Tipp entfernt). Jeder Anbieter liefert `section.bl-reiter[data-reiter][data-name]`, nicht gewaehlt eine leere Huelle (daraus
+baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment aus (Freunde). `arena:panel-bot` 40 (3.17
+"Rudis Tafel: Platz 4"): `button.pk-panel` "Rudis Tafel · Bestwert 12.300", mit Gaesten auf der Tafel dazu "· Platz 2", nur fuer
+Leiter-Bots mit eigenem Eintrag; Antippen oeffnet die Tafel in der Bestenliste.
+
+**Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL"; stand vorher ein
+Bot-Lauf vorn, sagt dieser Bot dazu seinen Satz (Register `registriereSaetze('tafel-platz1')`, fest gewaehlt, kein Zufall:
+"Oma Hilde: „Na sowas, an mir vorbei! ...“"). Neuer eigener Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie
+"Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL" mit altem Wert und, beim Ueberholen, "Platz 3 ▲ 1". Ist der
+grosse Platz der Partie schon belegt, kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Rudis Tafel ▲ 2" (vorher Platz 6) bzw.
+"Rekord auf Rudis Tafel: 23.100". Belegt heisst: ein grosser Moment, den das Ergebnis schon zeigt (Status `overlay`, egal mit
+welcher Prioritaet, z. B. eine Umwandlung 66 vom Partie-Ende: `fuerOverlay` vergibt den Platz kein zweites Mal), oder ein
+wartender mit gleicher oder hoeherer Prioritaet (z. B. ein Level-Titel 75); ein wartender kleinerer weicht (Pruefer-Befund P2).
+Dafuer liest `index.js` die Feier-Warteschlange (`ladeModul('feier')`, nur lesen) in einer Mikroaufgabe nach dem Ereignis, also
+nach den Meldungen der anderen Hoerer. Erster Eintrag, Wochen- und Monatsbeste und "so nah" feiern nicht. Klang `rekord` genau
+einmal: zeigt das Ergebnis den grossen Moment von punkte (der klingt dort), bleibt die Abrechnungszeile still (`stumm`, nur das
+Klacken der ueberholten Zeilen); sonst klingt die Zeile.
+
+**Codes (`code.js`).** `SA1-` plus Crockford-Base32 in Vierergruppen (Eingabe ohne Gross- und Kleinschreibung, Striche und
+Leerzeichen egal, O wird 0, I und L werden 1, auch im Praefix). Bytes (Version 1): Version, Rechenstand, Art (1 Partie, 2 Boss),
+Merker (Farbe, Boss-Stufe, Ergebnis), Seed (4), Datum (Tage seit 2020-01-01), Analysetiefe, Bot-ID, Boss-Staerke, Name (UTF-8,
+hoechstens 12 Zeichen), Zahl der Halbzuege und je Halbzug der Index in den nach UCI sortierten erlaubten Zuegen, CRC-16/CCITT.
+80 Halbzuege ergeben rund 170 Code-Zeichen (3.13 schaetzte 130; mit einem Byte je Halbzug geht das nicht). Pruefstufen: die
+Pruefsumme schuetzt nur gegen Tippfehler (jeder Fehler in einem Zeichen faellt auf), "Nachgerechnet ✓" heisst: die App hat die
+Partie nachgespielt und selbst bewertet, und das Ergebnis im Code passt zur Schlussstellung (`pruefeErgebnis`: Sieg nur mit Matt
+des Bots, Remis nur bei Patt, Wiederholung, 50 Zuegen oder zu wenig Material, Niederlage nur nach Matt gegen dich oder in offener
+Stellung, also Aufgeben; sonst ehrlich abgelehnt; Uhr-Tafeln (S2) brauchen hier eine Erweiterung); "Bot-geprüft ✓✓" braucht Bots mit fester Knotenzahl (S3-0), noch nicht. Eine neuere
+Version wird ehrlich abgelehnt ("Bitte die App aktualisieren"). Die Startstellung steht nicht im Code: sie kommt vom Bot
+(Leiter-Bot Grundstellung, Boss `startFen` aus `registriereBot`).
+
+**Screen `bestenliste`** (`js/ui/bestenliste.js`, `PAKET_SCREENS`, Reiter Bestenliste): `hauptKopf` (die Reiter-Leiste sitzt im
+Querformat oben), Seitenkopf, Steuerzeile mit Segment der Reiter (aus den Anbietern) und Segment Woche · Monat · Allzeit,
+Behaelter `.bl-ort` des Orts `bestenliste:reiter` (Kontext `{ app, reiter, fenster }`), ohne Anbieter eine ruhige Karte. Params
+`{ reiter, fenster }`, gemerkt je Geraet. `zeige()` gibt es erst, wenn das Paket geladen ist (`freischalten()`, Live-Binding):
+ohne Paket geht der Router still zur Arena wie ohne Datei (die Pruefung "Bestenliste ohne Screen geht still zur Arena" in
+`tests/app.test.mjs` bleibt so gruen). Handy einspaltig, Tafel-Wahl waagrecht wischbar, Tippflaechen mindestens 44 px.
+
+**Fairness** (5.3, in `tests/fairness.test.mjs`): Punkte nie negativ und ganzzahlig (2.160 Faelle), "120 Zuege Schieben gegen
+Benno" 6.400 unter der zuegig verwerteten Fassung 9.400 und Schieben bringt nie mehr, Tafeleintrag nur ohne Hilfe-Flag (Uebung,
+freie Partie, Spielhalle, eigene Stellung nie); `formel.js` und `tafel.js` stehen in der Liste ohne `Math.random`.
+
+Tests: `node tests/punkte.test.mjs` (Node und Browser, `PORT`, `BILDER`, `--nur-node`, `--schnell`: Bilder nur 1180 hell und
+390 dunkel). Der Browser-Teil laedt `js/erweiterungen.js` immer mit `PAKETE = ['sicherung']` und `REITER = []` (per
+`page.route`) und das Paket per `?erw`, den Reiter per `?reiter`: so bleibt die Suite gleich, wenn die Integration Pakete und
+Reiter eintraegt.
+
+**Integration (Probelauf 23.10. in einer Kopie, Port 9602).** Eingetragen: `PAKETE = ['sicherung', 'pakete/funken/index',
+'pakete/punkte/index']`, `REITER = ['bestenliste']`, in `DATEIEN` von `sw.js` die Dateien beider Pakete,
+`js/ui/bestenliste.js` und (seit der Nachbesserung) `daten/punkte/bot-laeufe.json`, danach `node tests/sw.test.mjs --aktualisieren`. Ohne weiteres Rezept (alle `--schnell`): 16/18
+Suiten, rot nur Pruefungen, die ausdruecklich den Kern ohne Reiter und ohne Pakete pruefen: `navigation` 6 ("Leiste ohne
+REITER" zweimal, "Reiter Arena (aktiv) und Verlauf" und "Reiter Verlauf ... oben im Kopf" (die Leiste hat dann drei Reiter),
+"?reiter ohne ?test bleibt wirkungslos", "Training leer: ohne Reiter ein Zurueck-Knopf") und `funken` 3 (im iPad-Querformat
+sitzt die Leiste im Kopf, der Level-Chip nimmt die schmale Form, danach bricht der Browser-Teil ab). `app`, `screens`, `e2e`
+waren schon mit dem Rezept aus P1 gruen, `punkte` bringt sein Rezept selbst mit. **Rezept, geprueft (alle 18 Suiten gruen):** das
+P1-Rezept setzt zusaetzlich `REITER = []` (`tests/app.test.mjs`, `tests/e2e.test.mjs`), dasselbe in `neueSeite` von
+`tests/navigation.test.mjs` und `tests/funken.test.mjs`:
+```js
+const body = echt.replace(/^export const PAKETE = Object\.freeze\(\[[^\]]*\]\);/m, "export const PAKETE = Object.freeze(['sicherung']);")
+  .replace(/^export const REITER = Object\.freeze\(\[[^\]]*\]\);/m, 'export const REITER = Object.freeze([]);');
+```
+Beobachtet in der Kopie (echte App ohne `?test`): Reiter-Leiste "Arena · Bestenliste" im Kopf (1180 x 820) bzw. unten (390 x
+844, 820 x 1180), keine Konsolenfehler. Im iPad-Querformat verdraengt die Leiste im Kopf den Level-Chip von funken in den
+waagrechten Scrollbereich der Chip-Reihe: das gehoert zur Auswahl der Kopf-Chips der Integration (Zahlenruhe 3.1). Ob der
+Zwischenreiter Verlauf dabeibleibt (`REITER = ['verlauf', 'bestenliste']`), entscheidet ebenfalls die Integration.
 # Online gegen Freunde: Fundament (Stufe 2, ohne Oberflaeche)
 
 **Was es ist:** Partien gegen Freunde per Einladungscode oder -link, kein Chat, keine Fremden, kein Matchmaking.
@@ -1536,6 +1808,7 @@ traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Fu
 zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
 `beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
 und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 
 Strategie und Grenzen: `design/runde4/DATEN.md`. Server: `supabase/schema.sql` (Konto light) und
@@ -1594,6 +1867,7 @@ Platzhaltern in eckigen Klammern.
 abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
 in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`
 (`datenfreigabe`). SQL: `supabase/daten-rls-test.sql` im Supabase SQL Editor (`Daten-RLS-Test erfolgreich`).
+
 # Premium-Umbau U5: Arena als Weltkarte, Duell-Intro, Portraets
 
 Flo 18.10. („Variante 1“): die Arena ist die bunte Weltkarte aus Entwurf C, alles Bedienbare im Look A.
@@ -1670,6 +1944,7 @@ Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle z
 Ziel-Lagen, Freischalten mit und ohne Bewegung, Duell `immer`/`besondere`/`aus`/ohne Bewegung, Ueberspringen, Tipp zur
 Partie, Portraetflug auf eingesetzte Ziele, Zeitplan mit Schein-Partie bei normal/langsam/schnell und spaeter Partie,
 harte Grenze).
+
 # App-Store-Huelle (Capacitor, nur Geruest)
 
 **Ordner `native/`:** eigenes `package.json` mit `@capacitor/core`, `cli`, `ios` und `android` in einer festen Version
@@ -1682,3 +1957,567 @@ aendert sich nicht: Unter iOS (`capacitor://localhost`) gibt es keinen Service W
 aus, unter Android (`https://localhost`) laeuft er. Offen bis zur Veroeffentlichung: Plattform-Projekte `ios/` und
 `android/` (entstehen mit `npx cap add`), Symbole und Startbild, In-App-Kauf statt Stripe in der iOS-App,
 Push-Mitteilungen. Test: `node tests/native.test.mjs` (reines Node, Suite `native` in `tests/alle.mjs`).
+
+# Welle B1: Abo „Crownmate Trainer“ (Stripe, Supabase, Paket abo)
+
+Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (SPIELKONZEPT 2b.5 und 5). B1 baut nur das Gerüst:
+wer Premium hat, wie man abschließt und kündigt. Was Premium freischaltet, entscheiden die jeweiligen Pakete (z. B. B2
+„Frag den Coach“) über `istPremium()` bzw. auf dem Server über `ist_premium_von(uid)`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Abo mit Stripe“.
+
+**Datenfluss:** App `kaufen()` öffnet Flos Stripe-Zahlungslink mit `client_reference_id=<Supabase-Nutzer-ID>` →
+Stripe ruft die Edge Function `stripe-webhook` auf → sie prüft die Signatur und ruft mit dem Service-Schlüssel
+`rpc/abo_stripe_ereignis` → Tabelle `abos`. Die App fragt `rpc/ist_premium` und die eigene `abos`-Zeile.
+
+**Server** (`supabase/abo-schema.sql`, Test `supabase/abo-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `produkte` (`id`, `name`, `beschreibung`, `preis_text`, `kauf_link`, `portal_link`, `aktiv`): anon und angemeldete lesen
+  nur aktive Zeilen, Links nur `https://` (Check), schreiben nur Service-Rolle und Dashboard. Die App nutzt die Zeile
+  `trainer`. Preise stehen nur hier, nie im Repo.
+- `abos` (eine Zeile je Nutzer: `status` 'aktiv' | 'gekuendigt' | 'abgelaufen', `plan`, `gueltig_bis`, `quelle`
+  'stripe' | 'manuell', `kunde_id` cus_…, `abo_id` sub_…, `stand_zeit`): Nutzer lesen nur die eigene, schreiben nie.
+- `stripe_ereignisse`: jedes Ereignis genau einmal (Primärschlüssel evt_…), wartende Ereignisse ohne Zuordnung,
+  nach 90 Tagen gelöscht; nur Service-Rolle.
+- `ist_premium()` (Aufrufer) und `ist_premium_von(uid)` (nur Service-Rolle): Status aktiv oder gekündigt UND
+  `gueltig_bis > now()`.
+- `abo_stripe_ereignis(ereignis_id, typ, erstellt, kunde_id, abo_id, nutzer, status, gueltig_bis, plan)` (nur
+  Service-Rolle) → 'neu' | 'doppelt' | 'wartet' | 'veraltet' | 'fremdes_abo' | 'zugeordnet' | 'ohne_nutzer', Fehler
+  `ABO_EREIGNIS_UNGUELTIG`. Regeln: idempotent; ein Ereignis, das älter ist als `stand_zeit`, ändert nichts, bei
+gleicher Sekunde nimmt nur `customer.subscription.deleted` ein laufendes Premium weg (Stripe schickt beim Abschluss
+mehrere Ereignisse mit demselben `created` in zufälliger Reihenfolge); der Kauf
+  setzt nur die Zuordnung Nutzer ↔ Kunde und einen vorläufigen Stand (`stand_zeit` null), wartende Ereignisse dieses
+  Kunden werden dabei in ihrer Reihenfolge angewendet (bei einem zweiten Abo desselben Kunden auch dessen schon als
+  `fremdes_abo` abgelegte Ereignisse); `invoice.paid` verlängert nur und lässt eine Kündigung stehen;
+  ein neuer Kauf verkürzt nie ein längeres Abo. **Gleichzeitigkeit:** vor dem ersten Lesen oder Schreiben nimmt die
+  Funktion `pg_advisory_xact_lock(hashtextextended('abo:' || kunde_id, 0))`, alle Ereignisse eines Kunden laufen also
+  nacheinander (sonst blieb ein Abo-Ereignis, das parallel zum Kauf ankam, für immer auf 'wartet'; nachgestellt mit zwei
+  psql-Sitzungen gegen Postgres 16).
+- `abo_hole_nach(kunde, abo)` (nur Besitzer: der Kauf ruft es, Flo im SQL Editor nach einer Handzeile für einen Kauf
+  `ohne_nutzer`) wendet wartende Ereignisse des Kunden an und liefert ihre Anzahl; Fehler `ABO_KUNDE_UNBEKANNT`, wenn
+  keine Zeile in `abos` diese `kunde_id` trägt.
+
+**Edge Function** `supabase/functions/stripe-webhook/index.ts` (nur Hülle, Deploy mit `--no-verify-jwt`) und die Logik
+in `supabase/functions/_gemeinsam/stripe.js` (reines ES-Modul, WebCrypto, in Node getestet):
+`pruefeSignatur` (HMAC-SHA256 über `t.payload`, nur v1, Toleranz 300 s, zeitkonstanter Vergleich), `auswerten`
+(Ereignis → Parameter von `abo_stripe_ereignis`; liest alte und neue Stripe-API-Form: `current_period_end` am Abo oder
+an den Positionen, `invoice.subscription` oder `parent.subscription_details`), `verarbeite` (405, 413, 400 Signatur/JSON,
+200 verbucht oder ignoriert, 500 ohne Secrets oder Datenbank, damit Stripe wiederholt). Status-Abbildung: active/trialing
+→ aktiv (mit `cancel_at_period_end` oder `cancel_at` → gekuendigt bis dahin), alles ohne Zahlung (past_due, unpaid,
+incomplete, paused …) → abgelaufen ab dem Ereignis, deleted → abgelaufen. Ein bezahlter Kauf gibt vorläufig 1 Tag
+(`VORLAEUFIG_S`), bis das erste Abo-Ereignis den echten Stand bringt. Secrets: `STRIPE_WEBHOOK_SECRET` (Flo setzt es),
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (stellt Supabase). Ein neuer Secret Key (sb_secret_…) geht nur in `apikey`.
+
+**Client** `js/abo.js` (Muster `js/konto.js`, nur fetch, `setzeAboFetch`/`setzeAboUhr` für Tests):
+`istPremium({ neu })` (Abgleich höchstens alle 10 min, offline der letzte Stand bis `gueltig_bis`, nur für dieselbe
+Nutzer-ID), `premiumStand()` (synchron), `ladeProdukt()` (öffentlich, 1 h Zwischenspeicher), `kaufAdresse`, `kaufen()`
+(öffnet das Fenster ohne vorheriges await, merkt den Kauf; Grund `'alter'`, solange die Altersfrage nicht mit „18 oder
+älter“ beantwortet ist), `verwalten()` (Kundenportal), `inStoreHuelle()` (Capacitor: kein Kauf und kein Portal über
+Stripe, Apple 3.1.1), `oeffneTrainer()`, **`premiumHinweis(el, was, { app })`** für andere Pakete: ruhige Karte
+`div.premium-hinweis[data-premium]` mit „Mehr zum Trainer“; auf den Screens `OHNE_HINWEIS_SCREENS` (`partie`, also auch
+im Ergebnis, und `lektion`) liefert sie `null` und zeigt nichts (SPIELKONZEPT 2b Regel 9, Fairness 13). **Vertrag:** Ein
+Paket zeigt den Hinweis nur als Antwort auf einen Tipp auf eine Premium-Funktion (B2: Knopf „Frag den Coach“ in der
+Analyse), nie von selbst beim Öffnen eines Screens und nie ungefragt nach einer Niederlage.
+- **Gebaute Vorteile:** `registriereVorteil(id)` meldet einen Vorteil aus `VORTEILE` (`js/pakete/abo/trainer.js`, Ids
+  `coaches`, `coach-erklaerungen`, `frag-den-coach`, `lernpfad-5-10`, `raetsel-auswahl`, `formspiegel`, `liga-archiv`,
+  `foerderer-nadel`) als fertig; das Paket, das ihn baut, ruft es beim Laden (B2: `registriereVorteil('frag-den-coach')`). Das Blatt
+  zeigt nur gemeldete Vorteile unter „Im Trainer“, den Rest unter „In Arbeit“ („Noch nicht enthalten“), und bietet den
+  Kauf erst mit mindestens einem gemeldeten Vorteil an. Ausnahme: ein Zahlungslink aus dem Stripe-Testmodus
+  (`istTestLink`, `https://buy.stripe.com/test_…`) für Flos Probekauf, mit dem Satz „kein echtes Geld“.
+- **Nach dem Kauf:** `bestaetigeKauf()` fragt als Serie (sofort, dann nach `NACHFRAGEN_MS` 3, 10 und 30 s), solange der
+  Kauf-Start höchstens `NACH_KAUF_MS` (30 min) alt ist; `kaufStand()` → `'prueft'` | `'offen'` | `null`. Anfang und Ende
+  melden `abo:stand` mit `detail { prueft, premium, bestaetigt }`. Grund: Stripe leitet sofort zurück, der Webhook kommt
+  oft Sekunden später; vorher bot das Blatt dann wieder „Trainer abschließen“ an (Gefahr eines zweiten Abos).
+- **Alter:** `alterAngabe()` / `setzeAlterAngabe(ab18)`: einmal je Konto „18 oder älter?“ (SPIELKONZEPT 2b.8 Regel 22:
+  Abo für Minderjährige nur über die Familienfreigabe der Stores, die gibt es im Web nicht). Gespeichert wird nur ja/nein.
+- `produktOffline()` (letzter Abruf scheiterte ohne Zwischenspeicher), `aufraeumen()` (ohne Anmeldung Stand,
+  Altersangabe und Kauf-Merker vom Gerät), `aboHinweisZumLoeschen()` (Satz für den Dialog „Konto löschen“, solange ein
+  Stripe-Abo läuft: Löschen kündigt nicht; **die Integration hängt ihn in `loescheKontoDialog` aus `js/daten.js` an**).
+Speicher bewusst außerhalb von `schach-arena:v1:` (nicht in Cloud-Sicherung, Export und Rückfall):
+`schach-arena:abo:stand` `{ uid, premium, status, plan, gueltigBis, quelle, geprueftAm }`,
+`schach-arena:abo:produkt` `{ id, produkt, geholtAm }`, `schach-arena:abo:kauf` (Zeit des letzten Kauf-Starts),
+`schach-arena:abo:alter` `{ uid, ab18 }`.
+
+**Paket** `pakete/abo/index` (noch nicht in `PAKETE`: das trägt die Integration ein, die Dateien stehen schon in `sw.js`; der
+Test lädt es über `?test&erw=pakete/abo/index`): Ort `einstellungen:gruppen` (Gruppe `.abo-gruppe` mit Reihenfolge 7 unter
+Konto (5) und Daten (6), nur wenn das Konto sichtbar ist; zeichnet neu bei `abo:stand` und wenn sich die Anmeldung ändert:
+`MutationObserver` vergleicht die Nutzer-ID, solange die Einstellungen offen sind, dazu `storage` für andere Tabs, weil
+`js/konto.js` beim Ab- und Anmelden nichts meldet; nach dem Abmelden `aufraeumen()`); `app:bereit` (vorher
+`aufraeumen()`) und `app:sichtbar` starten nach einem Kauf `bestaetigeKauf()`; bei `abo:stand` mit `bestaetigt` genau
+ein Toast „Danke“. Blatt `js/pakete/abo/trainer.js` (`zeigeTrainer`, Klassen `sheet-ort`/`sheet-karte` aus den Bauteilen
+plus `.trainer-*`, Zustände in `data-zustand`: laedt, vorschau (auch ohne gebauten Vorteil und ohne freigeschaltetes
+Konto, damit „Zum Konto“ nie ins Leere führt), offline, abgemeldet, kaufbar, alter, unter18, bestaetigen, wartet
+(„Zahlung prüfen“, „Neu abschließen“), premium, store; schließt bei Escape, Schleier und jedem Screen-Wechsel;
+`.trainer-alter` mit `ALTER_HINWEIS` „Web ab 18, Crownmate ab 16“). Optik `css/pakete/abo.css` (nur Tokens, geprüft in
+`tests/abo.test.mjs`, weil `tests/thema.test.mjs` `css/pakete/` nicht liest), lädt `stelleAboCssSicher()` nach.
+Tests: `tests/server-abo.test.mjs` (Node) und `tests/abo.test.mjs` (Node und Browser mit gefälschtem Supabase über
+`page.route`, `window.open` ersetzt).
+
+# Welle B2: „Frag den Coach“ (KI-Erklärungen, Edge Function coach, Paket coach-ki)
+
+Teil des Abos „Crownmate Trainer“ (Vorteil `frag-den-coach`, SPIELKONZEPT 2b.5 „Coaches“, Punkt 5; bewusst nicht
+`coach-erklaerungen`: das sind die Erklärungen der Coaches aus Engine-Fakten und Textbausteinen, ohne KI. Der Eintrag im
+Trainer-Blatt nennt die KI und die Tagesgrenze, Prüfer-Befund B2, § 5 UWG): In der Spielanalyse erklärt ein
+Modell von Anthropic einen Zug in ganzen Sätzen. Grundlage bleiben die Engine-Fakten der gespeicherten Analyse; das
+Modell bekommt nur diese Fakten, nie einen freien Text. Einrichtung für Flo: `supabase/ANLEITUNG.md`, Abschnitt
+„Frag den Coach“. Modell, Parameter und SDK-Aufrufe nach dem Skill `claude-api`.
+
+**Datenfluss:** Tipp auf „Frag den Coach“ → `istPremium()` (B1, Zwischenspeicher; nur ein bekannter Stand ohne
+Trainer zeigt sofort den Hinweis, ein nie geprüfter Stand fragt den Server) → `frageCoach(eingabe)` POST
+`/functions/v1/coach` mit dem Token der Anmeldung → Function: `/auth/v1/user` (wer?) → `rpc/ist_premium_von` →
+`rpc/coach_nimm_frage` (Tageslimit) → `client.beta.messages.create` → `{ text, modell, rest }` → Karte in der Analyse.
+Antwortet die KI nicht, ruft die Function `rpc/coach_gib_zurueck`: Die Frage zählt dann nicht.
+
+**Server** (`supabase/coach-schema.sql`, Test `supabase/coach-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `coach_nutzung (user_id, tag, anzahl)`: eine Zeile je Nutzer und Coach-Tag, nur der Zähler (nie Frage oder Antwort),
+  `on delete cascade` mit dem Konto, Tage älter als 7 räumt jede neue Frage auf. Nutzer lesen nur die eigenen Zeilen
+  und schreiben nie.
+- `coach_tag()`: Europe/Berlin mit Tagesgrenze 4:00 (wie `js/tag.js`; die 4 Stunden gehen von der Wanduhr ab).
+- `coach_nimm_frage(nutzer, grenze)` → freie Fragen danach (0 … grenze−1) oder −1 an der Grenze (dann nichts gezählt),
+  atomar über `insert … on conflict do update … where n.anzahl < grenze`. Fehler `COACH_GRENZE_UNGUELTIG`,
+  `COACH_NUTZER_FEHLT`. `coach_gib_zurueck(nutzer)` → neue Anzahl, nie unter 0, −1 ohne Zeile.
+- Alle drei Funktionen nur für die Service-Rolle (ein Nutzer, der zurückgeben könnte, hätte kein Limit).
+
+**Edge Function** `supabase/functions/coach/index.ts` (nur Hülle, Deploy MIT JWT-Prüfung; einzige Datei mit dem
+Anthropic-SDK, `npm:@anthropic-ai/sdk@0.133.0`; ordnet die typisierten SDK-Fehler ein: NotFound/Authentication/
+PermissionDenied → `konfig`, BadRequest → `anfrage`, RateLimit und übrige APIError → `ueberlastet`, APIConnectionError
+→ `netz`; Client mit 45 s Wartezeit und einem zweiten Versuch). Die Logik steht in
+`supabase/functions/_gemeinsam/coach.js` (reines ES-Modul, in Node getestet, nutzt `dienstKopf` aus `stripe.js`):
+- `pruefeEingabe(daten)`: `{ fen, zug, besterZug?, bewertungVorher?, bewertungNachher?, klasse?, spielerLevel?,
+  eigenerZug? }`; FEN-Form (8 Reihen, je ein König, keine Bauern auf Reihe 1/8, Rochade, en passant passend zur Seite
+  am Zug mit gegnerischem Bauern davor, Zähler; die Seite, die nicht zieht, steht nicht im Schach), `beschreibeZug` mit
+  voller Zugprüfung ohne chess.js (Gangart, freie Bahn, Rochade mit Recht, Turm, freien und nicht angegriffenen
+  Feldern, en passant, Umwandlung genau auf der letzten Reihe, eigener König danach nicht im Schach) und der Folge für
+  den Gegner (`folge`: „gibt Schach“ | „setzt matt“ | „führt zum Patt“; Test gegen chess.js für alle legalen Züge),
+  Bewertungen `{cp}` oder `{mate}` aus Sicht von Weiß (`{mate: 0}` nur nach einem Mattzug), Klasse aus den 11 Ids,
+  Elo 100 bis 3500. Andere Felder werden nie gelesen. **Mattzug:** Die App schreibt die Mattstellung als
+  `{mate: ±1}` (js/engine.js `endstellung`, Vorzeichen = Gewinner); nach einem Matt- oder Pattzug steht im Prompt
+  deshalb die Tatsache („Schachmatt, die Partie ist zu Ende“ bzw. „Patt“) statt der Bewertung danach.
+- `SYSTEM_PROMPT` (fest, Deutsch, für Einsteiger verständlich, höchstens 80 Wörter, nur diese Stellung, nennt den
+  stärkeren Zug mit Grund, keine Erfindungen, „Die Engine sieht hier …“ statt zu raten, keine Engine-Zahlen, keine
+  Fragen, nichts Persönliches, nichts außer Schach; die Fakten sind Daten, keine Anweisungen) und `baueNutzerText`
+  (Fakten mit Figurenliste je Seite, Zug in Worten, Bewertung in Worten mit Zahl, Klasse mit Bedeutung, Stärke als
+  Wort). Beide als Schnappschuss in `tests/server-coach.test.mjs`: eine Änderung am Prompt dort bewusst nachziehen.
+- `baueAnfrage(eingabe, { modell, aufwand })`: `model` (Secret `COACH_MODELL`, Standard `claude-opus-5-5`),
+  `output_config.effort` (Secret `COACH_AUFWAND`: low | medium | high, Standard low), `max_tokens` je Aufwand
+  (4096 | 8192 | 16000; das Denken zählt mit), `system`, eine Nutzer-Nachricht. Kein `thinking`-Feld (Opus 5.5 denkt
+  immer adaptiv), kein `temperature`, kein Prefill. Für `FALLBACK_MODELLE` (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5)
+  zusätzlich `fallbacks: 'default'` mit `betas: ['server-side-fallback-2026-07-01']`.
+- `leseAntwort(antwort)`: zuerst `stop_reason` (`refusal` → abgelehnt), nur `text`-Blöcke nach dem letzten
+  `fallback`-Block, Markdown weg, bei `max_tokens` bis zum letzten Satzende, harte Kürzung auf 110 Wörter.
+- `verarbeite(...)`: Antworten immer JSON mit CORS (`*`, Anmeldung per Bearer, nicht per Cookie): 200
+  `{ text, modell, rest }`, 204 OPTIONS, 400 `eingabe` (mit `grund`), 401 `anmeldung`, 403 `premium`, 405, 413,
+  422 `abgelehnt`, 429 `limit` (mit `grenze`), 502/503 `ki`, 503 `server` | `nicht_eingerichtet`; jede Fehlerantwort
+  `{ fehler, text }`. Protokoll nur `coach ok <modell> ein=<n> aus=<n>`, `coach zurueck <grund>`,
+  `coach anmeldung <status>`, `coach warnung <SECRET>` und `coach nicht_eingerichtet [COACH_MODELL | apikey]`.
+- `pruefeEinstellungen(umgebung)`: ein gesetztes, aber falsch geschriebenes `COACH_MODELL` ist ein Einrichtungsfehler
+  (503 `nicht_eingerichtet`, kein Zähler, keine KI), nie ein stiller Wechsel aufs Standardmodell (das teuerste);
+  falscher Aufwand oder falsche Grenze fallen auf `low` bzw. 30 zurück, mit Warnung im Protokoll. Antwortet
+  `/auth/v1/user` mit 401 „Invalid API key“ (Projekt-Schlüssel der Function), ist das ebenfalls `nicht_eingerichtet`,
+  nicht „Melde dich an“.
+
+**Client** `js/coach-ki.js` (Muster `js/abo.js`, nur fetch, `setzeCoachFetch` für Tests): `eingabeAusZug(zug,
+{ partie, du })` (aus dem Review-Eintrag: `fenVorher`, `uci`, `besterZug`, `evalVorher`, `evalNachher`, `klasse`;
+`partie.spielstaerke` als `spielerLevel`), `frageCoach(eingabe)` → `{ ok, text, modell, rest, gemerkt }` oder
+`{ ok: false, grund }` (abgemeldet, offline, premium, limit, eingabe, abgelehnt, nicht_eingerichtet, ki; nach
+`WARTE_MS` = 100 s ohne Antwort bricht die App ab: `ki`). Antworten
+gemerkt je Nutzer, Stellung und Zug für die Sitzung (nur Arbeitsspeicher, höchstens 40): derselbe Zug zählt nicht
+zweimal. Sagt der Server „kein Trainer“, holt die App den Abo-Stand neu. `KI_HINWEIS`, `TEXTE`, `restText(rest)`
+(erst ab 5 oder weniger), `vergissAntworten()`.
+
+**Paket** `pakete/coach-ki/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die drei Dateien stehen schon
+in `sw.js`; der Test lädt es über `?test&erw=pakete/coach-ki/index`): Ort `analyse:coach` mit Reihenfolge 30, Knopf
+`.ck-knopf[data-paket="coach-ki"]` nur mit sichtbarem Konto (`kontoFreigeschaltet`); erst ein Tipp fragt. Karte
+`.ck-karte[data-zustand]` (laedt, antwort, abgemeldet, premium, offline, limit, abgelehnt, eingabe, nicht_eingerichtet,
+ki) als letztes Kind von `.an-coach` (über die ganze Breite), `role="status"`, beim Zeigen ins Bild gerollt; `verlasse()`
+nimmt sie heraus. Ein zweiter Tipp klappt eine Antwort zu und wieder auf (aus dem Merker); nach einem Fehler fragt er
+neu. Ohne Trainer `premiumHinweis(karte, 'Frag den Coach', { app })` aus B1, ohne Anmeldung „Zum Konto“.
+`registriereVorteil('frag-den-coach')` beim Laden, `registriereIcon('coach-frage')`. Optik `css/pakete/coach-ki.css`
+(nur Tokens, geprüft in `tests/coach-ki.test.mjs`): Wenn der Knopf da ist (`:has(.ck-knopf)`), bekommt die
+Hauptvariante eine eigene Zeile und die Knopfzeile darf umbrechen, auf dem Handy reicht die Knopfzeile über die ganze
+Kartenbreite; ohne Paket ändert sich nichts. Tests: `tests/server-coach.test.mjs` (Node, auch die Hülle mit
+Deno-Attrappe und gefälschtem SDK über `module.registerHooks`) und `tests/coach-ki.test.mjs` (Node und Browser mit
+echter Analyse und gefälschtem Supabase über `page.route`). Die echte API wird in keinem Test aufgerufen.
+
+# Welle B3: Schulmodus (Klassen für Lehrkräfte und Vereine, Paket schule)
+
+Eine Lehrkraft legt eine Klasse an, schreibt den 6-stelligen Code an die Tafel, Mitglieder treten mit Code und
+Anzeigename bei; die App meldet nach jeder Partie gebündelt Kennzahlen, die Lehrkraft sieht sie sortierbar und stellt
+Aufgaben. Idee, Rollen und Datenschutz (AV-Vertrag als Stichpunkte): `design/runde4/SCHULE.md`. Einrichtung für Flo:
+`supabase/ANLEITUNG.md`, Abschnitt „Schulmodus“. Zielgruppe Oberstufe und Vereine, Crownmate bleibt ab 16.
+
+**Datenfluss:** nur Datenbank-Funktionen (RPC über PostgREST, keine Edge Function, kein Secret). App → `rpc/schule_*`
+mit dem Token der Anmeldung → security-definer-Funktion prüft `auth.uid()` und die Rolle → Tabellen. Gelesen wird über
+`schule_meine_klassen` (beide Rollen) und `schule_klassen_uebersicht` (Leitung); RLS sichert zusätzlich den direkten
+Tabellenzugriff ab.
+
+**Server** (`supabase/schule-schema.sql`, Test `supabase/schule-rls-test.sql`, beide im PGlite-Prüfer und im SQL Editor):
+- `klassen` (`id`, `name` 2–40 ohne @, `code` 6 Zeichen aus `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` wie im Online-Fundament,
+  aus `gen_random_uuid()`, `leitung`, `erstellt_am`, `aktiv`, `geschlossen_am`): lesen nur die Leitung.
+- `klassen_mitglieder` (`id` eigene Kennung, `klasse`, `user_id`, `anzeigename` 2–24, Buchstaben mit Akzent, Ziffern,
+  Leerzeichen, `.`, `-`, `'`, mindestens ein Buchstabe, nie @; in der Klasse eindeutig ohne Groß/Klein,
+  `beigetreten_am`): lesen Leitung und das Mitglied selbst; **Spaltenrechte ohne `user_id`** (die Leitung sieht nie die
+  Konto-ID, Policy liest sie trotzdem).
+- `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0–10, `sterne` 0–30, `partien`, `genauigkeit_schnitt`
+  numeric(4,1), `haeufigste_fehler` jsonb `{ zuege, arten: [{ art, anzahl }] }` höchstens 300 Zeichen und 4 Arten aus
+  `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am` **date** (Europe/Berlin,
+  keine Uhrzeit: die Meldung kommt nach jeder Partie, ein Zeitstempel verriete, wann jemand spielt; eine ältere Fassung
+  mit Zeitstempel kürzt das Schema beim erneuten Einspielen)): lesen Leitung und das Mitglied selbst.
+- `klassen_aufgaben` (`klasse`, `titel` 2–80, `art` 'bot' | 'raetsel' | 'partien', `ziel` jsonb `{ bot, sterne 1–3 }` bzw.
+  `{ anzahl 1–100 }`, `faellig` date gestern bis +366 Tage, `erstellt_am`): lesen Leitung und Mitglieder.
+- `schule_versuche` (Fehlversuche beim Beitreten je Nutzer und Tag): nur Service-Rolle.
+- Funktionen (security definer, `search_path = ''`, nur `authenticated`): `schule_erstelle_klasse(name)`,
+  `schule_tritt_bei(code, anzeigename)` (ein falscher Code liefert `{ fehler: 'SCHULE_CODE_UNGUELTIG' }` **ohne raise**,
+  damit der Fehlversuch gezählt bleibt; 10 je Tag, dann `SCHULE_ZU_VIELE_VERSUCHE`; zweiter Beitritt ändert nur den
+  Namen; sperrt die Klasse mit `for update` und die Fehlversuche je Nutzer mit `pg_advisory_xact_lock`, damit parallele
+  Anfragen eines Kontos die Grenze nicht überholen), `schule_verlasse(klasse)`, `schule_melde_fortschritt(bots_besiegt, sterne,
+  partien, genauigkeit_schnitt, haeufigste_fehler, erledigt)` (schreibt die eigene Zeile in **allen aktiven** Klassen,
+  `erledigt` je Klasse auf ihre Aufgaben gefiltert; → Zahl der Klassen), `schule_meine_klassen()` (→ `{ leitung: [...],
+  mitglied: [...] }`, Mitglieder ohne Code und ohne Leitung), `schule_klassen_uebersicht(klasse)`,
+  `schule_aufgabe_anlegen(klasse, titel, art, ziel, faellig)`, `schule_aufgabe_loeschen(aufgabe)` (nimmt sie auch aus
+  `erledigt`), `schule_entferne_mitglied(mitglied)`, `schule_schliesse_klasse(klasse)`, `schule_loesche_klasse(klasse)`;
+  Hilfen für die Policies `schule_leitet`, `schule_mitglied_in`, `schule_ist_mein_mitglied`. Fehler-Kennungen
+  `SCHULE_*` (Vertrag mit `TEXTE` in `js/schule.js`). Grenzen: 20 Klassen je Leitung, 60 Mitglieder, 10
+  Mitgliedschaften, 30 Aufgaben. Geschlossene Klassen räumt `schule_erstelle_klasse` nach 90 Tagen weg; Konto löschen
+  kaskadiert überall.
+
+**Client** `js/schule.js` (Muster `js/abo.js`, nur fetch, `setzeSchuleFetch`/`setzeSchuleUhr`/`setzeSchuleWartezeit` für
+Tests): jede Anfrage hat eine Zeitgrenze `WARTE_MS` (15 s, Muster `js/coach-ki.js`: AbortController plus Rennen gegen
+einen Zeitgeber), danach gilt sie als `offline`. `meineKlassen({ neu })` (Zwischenspeicher 10 min, ohne Klasse 12 h,
+offline der letzte Stand); eine laufende Anfrage wird nur mitbenutzt, wenn sie nach der letzten Änderung begann
+(Zähler je Änderung), eine ältere Antwort wird nicht gespeichert, sondern neu geholt. Kommt auf eine Änderung keine
+Antwort, gilt der Zwischenspeicher als `veraltet` (der Server kann sie gebucht haben). `erstelleKlasse`,
+`trittBei` (prüft Code und Anzeigename vorher, ein sichtbar falscher Code geht nicht zum Server; meldet danach sofort),
+`verlasse`, `uebersicht`, `aufgabeAnlegen`, `aufgabeLoeschen`, `entferneMitglied`, `schliesseKlasse`, `loescheKlasse`
+(alle → `{ ok, … }` oder `{ ok: false, grund }`, danach „Meine Klassen“ neu), `fortschrittJetzt()` (aus
+`ladeFortschritt`, `statistik`, `ladePartien`; `haeufigsteFehler` zählt nur eigene Züge der letzten 20 wertenden
+Partien aus `liveKlassen`), `aufgabeStand` (Bot: Sterne aus dem Fortschritt; Partien: gespielte Partien seit der Aufgabe,
+ohne Übungen; Rätsel: auf dem Gerät gezählte, je Rätsel einmal), `offeneAufgabe` (Termine zuerst, sonst die neueste,
+länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung({ sofort, nachholen })` (vormerken, nach einer Partie
+frühestens nach 4 s; `nachholen` ohne die 4 s; beides höchstens eine Meldung je Minute; `sofort` nur nach dem Beitritt;
+dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`, `faelligText` („bis Fr
+30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT` (sagt auch, dass der Stand nach jeder Partie kommt und nur der Tag
+gespeichert wird), `RAETSEL_AUFGABEN` (false, bis ein Paket `raetsel:geloest` sendet; `tests/schule.test.mjs` prüft, dass
+der Schalter zum Code passt), Icon `tafel`.
+Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in Sicherung, Export oder Cloud-Spielstand):
+`schach-arena:schule:stand` `{ uid, daten, geholtAm, veraltet? }`, `schach-arena:schule:offen` `{ uid, seit }`,
+`schach-arena:schule:gemeldet` `{ uid, inhalt, am }`, `schach-arena:schule:raetsel` `{ uid, geloest: { aufgabeId: [id] } }`.
+
+**Paket** `pakete/schule/index` (noch nicht in `PAKETE`: das trägt die Integration ein; die vier Dateien stehen schon in
+`sw.js`; der Test lädt es über `?test&erw=pakete/schule/index`):
+- Ort `einstellungen:gruppen` (Reihenfolge 8, unter Konto 5, Daten 6 und Trainer 7), nur mit sichtbarem Konto: Gruppe
+  `.schule-gruppe[data-angemeldet]` mit den eigenen Mitgliedschaften (`.sm-mitgliedschaft[data-klasse]`, Aufgaben mit
+  Stand, „Austreten“ mit Rückfrage), „Klasse beitreten“ (`.sm-code-eingabe`, `.sm-name-eingabe`, Satz `.sm-sieht`) und
+  „Klassen leiten“ (`app.gehe('schule')`). Zeichnet neu, wenn sich die Anmeldung ändert (MutationObserver und
+  `storage` wie das Abo-Paket).
+- Ort `arena:heute` (Reihenfolge 35): `.sm-heute[data-aufgabe][data-art]`, Titel, darunter Ziel · Stand · Termin · Klasse
+  (zweite Zeile bricht um, der Termin bleibt neben dem Knopf sichtbar), nur aus dem Zwischenspeicher. Bot-Aufgabe: Knopf „Zu <Bot>“ (`app.gehe('arena', { waehle })`), nur wenn der Bot frei und
+  nicht schon gewählt ist; Rätsel: „Üben“ (Training).
+- Ereignisse: `partie:beendet` und `speicher:zurueckgesetzt` → `planeMeldung()`; `raetsel:geloest` → `merkeRaetsel` und
+  melden; `app:bereit` → ohne Anmeldung `aufraeumen()`, sonst „Meine Klassen“ auffrischen und eine offene Meldung
+  nachholen; `app:sichtbar` und `online` → offene Meldung nachholen (`planeMeldung({ nachholen: true })`, auch hier
+  höchstens eine je Minute).
+
+**Screen** `schule` (`js/ui/schule.js`; `app.js` führt ihn in `SCREENS`, `PAKET_SCREENS` und `TITEL` „Schulmodus“,
+`tests/sw.test.mjs` ordnet ihn dem Paket `schule` zu): `.schule-screen` mit Hauptkopf und `.sm-inhalt[data-ansicht]`
+(`nicht-frei` ohne sichtbares Konto, führt zur Arena; `abgemeldet`, `laedt`, `fehler`, `liste`, `klasse`). Liste:
+`.sm-klasse-karte[data-klasse]`, Formular `.sm-neu`. Klasse: `.sm-code-karte` (`.sm-code` sechs Felder, „Groß zeigen“
+öffnet `.sm-tafel[role=dialog]` mit Fokusfalle, Escape oder Tipp schließt), `.sm-mitglieder-karte` (`table.sm-tabelle`, `th[aria-sort] > button.sm-sort[data-spalte]`,
+`tr[data-mitglied]`, `.sm-entfernen`, Spalte Stand als Tag „TT.MM.“), `.sm-aufgaben-karte` (`li[data-aufgabe]`, Formular
+`.sm-aufgabe-neu`, Art „Rätsel lösen“ nur mit `RAETSEL_AUFGABEN`), `.sm-ende`
+(schließen, danach löschen). Lädt die Übersicht alle 20 s neu, solange eine Klasse offen und die Seite sichtbar ist.
+Zurück im Kopf führt aus einer Klasse zur Liste. Optik `css/pakete/schule.css` (nur Tokens, Karten aus
+`css/training.css`, geprüft in `tests/schule.test.mjs`).
+
+**Tests:** `tests/server-schule.test.mjs` (Node: Vertrag Schema ↔ Client, Rechte, RLS, Grenzen, Bot-Liste, Zeichen,
+Kennungen, keine Geheimnisse/Preise/E-Mails) und `tests/schule.test.mjs` (Node mit gefälschtem fetch; Browser gegen die
+echte App mit einem gefälschten Supabase über `page.route`: Lehrkraft-Ablauf, Beitreten und Austreten, Heute-Karte,
+Melden auch offline, Handy und iPad, hell und dunkel; dazu Wettlauf Änderung gegen laufende Anfrage, Zeitgrenze,
+Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer
+(auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).
+---
+
+# Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
+
+Jedes Paket haengt sich nur ueber Orte, Ereignisse, Register, Modul-Speicher und eigene Paket-Screens ein. Bis die
+Integration es in `PAKETE` (`js/erweiterungen.js`) eintraegt, laedt es nur im Test (`?test&erw=pakete/<name>/index`).
+
+## Paket teilen (A1): Siegesbild
+
+Dateien: `js/pakete/teilen/index.js` (Orte, Blatt, Teilen), `logik.js` (rein, Node-testbar, kein `Math.random`),
+`bild.js` (Zeichnen auf Canvas 2D, Lader fuer Farben, Bilder, Schriften), `css/pakete/teilen.css` (nur Tokens; das
+Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/teilen.test.mjs`.
+
+- **Orte:** `ergebnis:karte` (Reihenfolge 60, nach der Abrechnungs-Huelle 3) und `analyse:oben` (60) zeigen
+  `.tl-knopf-zeile[data-ort] > button.knopf.tl-teilen` („Siegesbild teilen“ bzw. „Als Bild teilen“), nur wenn
+  `teilbar(p)`: Sieg oder Remis mit mindestens einem Zug, keine Uebung, keine Partie aus einer eigenen Stellung
+  (Bosse, freie Partien und Spielhalle ja, dann ohne Sterne). Niederlagen bekommen keinen Knopf (Fairness 10), dort
+  bleibt der Tipp „Kopf hoch!“. Der Verlauf hat keinen Ort je Zeile: jede Partie ist ueber Verlauf -> Analyse teilbar.
+- **Blatt:** `.sheet-ort.tl-blatt` (Grundform der Bauteile) mit Vorschau-Canvas, Wahl Hell/Dunkel (`segment`), Schalter
+  „Benutzername zeigen“ (nur mit Konto-Sitzung und Benutzernamen im Profil, Standard aus; der Name wird je Konto der
+  Sitzung gemerkt, ein Kontowechsel ohne Neuladen fragt neu, ohne Namen wird beim naechsten Blatt neu gefragt), Hinweis,
+  was im Bild steht, „Teilen“ (`navigator.share({ files, title, text })`, wenn `canShare` die Datei nimmt) sonst
+  „Bild speichern“ (Download `crownmate-<sieg|remis>-<Tag>.png`). Die PNG-Datei liegt schon bereit, bevor der Knopf
+  aktiv wird, damit `share()` direkt im Klick laeuft (Safari). Abbruch im Teilen-Blatt (`AbortError`) laesst das Blatt
+  offen; lehnt das Geraet ab (jeder andere Fehler, z. B. `NotAllowedError`), wird die Datei gespeichert („Teilen ging
+  hier nicht, das Bild ist gespeichert.“, Weg `datei`). Scheitert das Bild, steht „Das Bild konnte nicht entstehen.“
+  da, jeder neue Versuch zeigt wieder „Bild entsteht …“. Tab bleibt im Blatt und laeuft wie bei den Bauteilen nur ueber
+  die gewaehlte Segment-Option. `app:screen` und Escape schliessen es. `data-bereit="ja"` und `data-modus` am Blatt,
+  sobald das Bild steht (die Karte kann dann noch eingleiten: Lage erst nach `getAnimations()` messen).
+- **Bild (RECHENSTAND 1):** 1080 x 1350, `logik.layout()`; Marke (Bauer auf Tinte) und „Crownmate“, Datum (Kalendertag
+  lokal wie im Verlauf, `kalenderTag()`; bewusst nicht die Tagesgrenze 4:00 aus `tag.js`, die gilt fuer Schluessel),
+  Ueberzeile (z. B. „Schachmatt im 23. Zug“, Boss mit „Boss · …“), „Sieg“ mit goldenem „!“ bzw. „Remis“,
+  „gegen <Bot>“, optional „Gespielt von <Benutzername>“, Portraet (`thema.avatarVon`) auf der Bot-Toenung, Endstellung im
+  Sockel (Feldfarben und `--zuletzt` aus Flos Brettfarbe, Figuren aus dem Figuren-Pfad des Themes, Brett gedreht bei
+  Schwarz, Koordinaten ueber den Figuren), Werte rechts: Sterne (nur wertender Sieg), Genauigkeit (nur wenn bekannt),
+  Zuege; Fuss „crownmate“ und die Adresse der App (`appAdresse(location.href)`: `MARKEN_ADRESSE` in `logik.js`, solange
+  leer die Adresse der Seite; in einer App-Huelle wie `capacitor://localhost`, `https://localhost` oder `file:` keine).
+  Sperrt ein Browser die Leinwand wegen der SVG-Bilder (`toBlob` wirft), entsteht das Bild neu ohne Figurenbilder
+  (Kreis mit Buchstabe); in WebKitGTK 2.52 und Chromium sperrt nichts. Farben: `themaTokens()` liest die Theme-Regeln des gewuenschten Modus aus
+  dem CSSOM, ohne den Modus der App umzuschalten. Im Bild steht nur, was `bildDaten()` liefert (`FELDER`).
+- **Speicher:** Modul `teilen` (Budget 2.000) `{ v: RECHENSTAND, geteilt: [{ id, tag, weg: 'teilen' | 'datei' }] }`
+  (hoechstens 20, je Partie eine Zeile); Modul-Einstellungen `teilen` `{ bild: '' | 'hell' | 'dunkel', name: false }`.
+- **Ereignisse:** hoert `app:screen` (Blatt zu), `partie:analysiert` (offenes Bild bekommt die Genauigkeit, die erst
+  nach dem Oeffnen kam) und `speicher:zurueckgesetzt` (gemerkten Benutzernamen vergessen);
+  sendet nichts. **Register:** Icon `teilen`. **Test-Schnittstelle:** `zustand()` (offen, modus, bereit, texte, datei,
+  weg, name) und `oeffneBlatt({ partie | partieId, bot })`.
+
+## Paket gedaechtnis (A2): Bots erinnern sich, Revanche, Erzfeind
+
+Dateien: `js/pakete/gedaechtnis/index.js` (Orte, Ereignisse, Register), `logik.js` (rein, Node-testbar, kein
+`Math.random`), `saetze.js` (eigene Texte: 10 Anlaesse x 10 Leiter-Bots x 3 Varianten, je Bot im Ton seiner Bio, hoechstens
+110 Zeichen), `css/pakete/gedaechtnis.css` (nur Tokens; das Paket haengt sein CSS selbst als `link[data-paket="gedaechtnis"]`
+ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `tests/fairness.test.mjs` (SPIELKONZEPT 5.3).
+
+- **Begruessung (Wahl-Ort `partie:begruessung?`, also auch die Sprechblase im Arena-Panel):** nur Leiter-Bots im Modus
+  `normal`. Zwei Anbieter rechnen dieselbe Wahl (einmal je `waehle`-Aufruf, gemerkt am eingefrorenen Kontext) und liefern
+  sie an genau einem Platz: **vorn (Reihenfolge 10)** nur `kennenlernen`, `ersterSieg`, `mutmachen` (`logik.js VORN`) und
+  jede Wahl unter der Fairness-Sperre, **hinten (60)** alles andere, also hinter den Begruessungen anderer Pakete (Funken:
+  einmaliger Level-Gruss auf 40, der sonst meist still verloren ginge, weil Funken ihn bei `partie:gestartet` verbraucht). Quelle sind die wertenden Partien gegen diesen Bot (`partienGegenBot`, gefiltert mit
+  `storage.wertet`), das Modul-Memo aus der Spielanalyse und `fortschritt.bots[bot].partien`. Vorrang (der erste Treffer
+  gewinnt): `kennenlernen` (keine Partie; kennt der Fortschritt Partien, die aus der Liste der 300 gefallen sind:
+  `wiedersehen` ohne Zahl) > `ersterSieg` (letzte Partie Sieg nach mindestens 3 Niederlagen in Folge) > `wiedersehen`
+  (letzte Partie mindestens 7 Tage her, `{tage}` ueber `tag.js` mit der Grenze 4:00) > `mutmachen` (3 Niederlagen in
+  Folge gegen ihn oder insgesamt) > `genial` (Flos genialer Zug in der letzten Partie, aus der Spielanalyse, sonst aus
+  `liveKlassen`) > `botPatzer` (Zug „Weit daneben“ des Bots, nur aus der Spielanalyse) > `serieGegen` (mindestens 3 Siege
+  in Folge) > `rueckkampf` (letzte gewonnen, `{zuege}`) > `revanche` (letzte verloren) > `remisZuletzt`.
+  **Sparsam:** `kennenlernen`, `ersterSieg`, `wiedersehen`, `mutmachen`, `genial` kommen immer, die anderen nur, wenn der
+  Wurf unter 0,5 liegt (sonst `null`, dann begruesst der Host wie bisher). **Bestimmt:** Wurf und Variante kommen aus
+  `zufallAus(seedAus('gedaechtnis|<RECHENSTAND>|<Tagesschluessel>|<botId>|<Zahl der Partien>'))`: Panel und Partie sagen
+  dasselbe, die naechste Partie wuerfelt neu. Weil der Host mit `Math.random` waehlt (`botSatz`), meldet das Paket jede
+  Variante als eigenen Anlass `gedaechtnis.<anlass>.<i>` mit genau einem Satz je Bot an und gibt diesen zurueck; unter den
+  schlichten Namen (`kennenlernen`, `wiedersehen`, `revanche`, `rueckkampf`, `mutmachen` ...) stehen alle Varianten fuer
+  andere Pakete (z. B. „Willkommen zurück“: `botSatz(bot, 'wiedersehen', zufall, { tage })`). Die Einstellung der App
+  „Bot-Sprüche“ (`sprueche`) gilt: `aus` keine Wahl, `wenig` nur `kennenlernen`, `ersterSieg`, `mutmachen` (unter der
+  Fairness-Sperre statt Schweigen `mutmachen`).
+- **Fairness (Bot-Ton, SPIELKONZEPT 3.12):** Die einzige Stichelei ist `revanche`, und sie ist die Begruessung, also
+  hoechstens eine je Partie (das Paket spricht sonst nie, keine Blase, kein Coach-Zusatz). Nach 3 Niederlagen in Folge
+  (gegen diesen Bot aus `partienGegenBot`, insgesamt aus `ladePartien()`, gemerkt bis zum naechsten Screen oder Spielende)
+  spricht das Paket immer, nie Schweigen, auch bei `wenig` und nach langer Pause (`kennenlernen`, `ersterSieg`,
+  `wiedersehen` oder `mutmachen`, bei `wenig` nur deren Teilmenge), und zwar **vorn**: sonst spraeche die eingebaute
+  Begruessung des Hosts oder der Level-Gruss von Funken, die beide sticheln koennen (`logik.js gesperrt()`).
+- **Revanche (Ort `ergebnis:karte`, Reihenfolge 50):**
+  `.gd-revanche-zeile[data-ort="ergebnis"][data-art="knopf"] > button.knopf.gd-revanche` („Revanche · Du spielst Schwarz“,
+  `data-farbe`), nur gegen Leiter-Bots nach Niederlage oder Remis einer Partie im Modus `normal` aus der Grundstellung (nie
+  Uebung, Boss, frei, Spielhalle, angemeldete Gaeste). Klick: `app.gehe('partie', { botId, farbe: getauscht, tempo })` wie
+  „Nochmal“ im Host, aber mit getauschten Farben (die Arena startet mit denselben Parametern), ohne `liga` (wie „Nochmal“:
+  eine Liga-Runde plant die Liga selbst).
+- **Knopf-Regel fuer den Host (Vorschlag, braucht `js/ui/partie.js`, also die Integration):** Heute entfallen der Tipp
+  „Kopf hoch! …“ (PLAN 2.6) und die Lichtblick-Karte von U7, sobald `ergebnis:karte` irgendetwas zeigt; die Revanche
+  verdraengte sie damit nach jeder Niederlage, genau dort, wofuer sie gedacht sind. Eine Zeile mit `data-art="knopf"` ist
+  deshalb eine reine Knopf-Zeile (kein Inhalt). `fuelleKarte` zaehlt sie nicht mit:
+  `return karteOrt.anzahl - karteOrtEl.querySelectorAll(':scope > [data-art="knopf"]').length;` (fertige Patches fuer den
+  heutigen Stand und fuer U7 liegen beim Integrations-Patch). Inhalt (Lernpunkt, Abrechnung) verdraengt den Tipp weiter.
+  `tests/gedaechtnis.test.mjs` prueft beide Staende: ohne Regel kein Tipp neben der Revanche, mit Regel genau einer.
+- **Erzfeind (Ort `arena:panel-bot`, Reihenfolge 20):** `.gd-erzfeind` „Dein Erzfeind · 1 Sieg · 4 Niederlagen“ beim
+  Leiter-Bot mit den meisten Niederlagen von Flo laut Fortschritt (wertende Partien, fuer immer gezaehlt), mindestens 3
+  und mehr Niederlagen als Siege; Gleichstand: groessere Differenz, dann die hoehere Stufe aus `BOTS` (nicht die
+  Reihenfolge der Schluessel im Fortschritt); Schluessel, die kein Leiter-Bot sind, zaehlen nicht. **Feier:** Bei `partie:beendet`
+  (synchron, also vor den Feier-Zeilen des Overlays) bringt ein wertender Sieg gegen den Bot, der vor dieser Partie
+  Erzfeind war, `melde({ quelle: 'erzfeind', titel: 'Erzfeind bezwungen', text: 'Gegen <Bot>, nach <n> Niederlagen',
+  symbol: 'erzfeind', klang: 'siegel' })` (laut `feier.QUELLEN` gross, Prio 85), einmal je neuer Niederlage.
+- **Speicher:** Modul `bots` (vorhanden, Budget 20.000) `{ v: RECHENSTAND, memo: [[partieId, genialeZuege, patzerDesBots]]
+  (hoechstens 60), erzfeind: { [botId]: Niederlagen beim letzten Feiern } }`, bei jedem Zugriff frisch gelesen (kein
+  Zwischenspeicher, damit ein zweiter Tab oder eine Cloud-Uebernahme nicht mit einem alten Stand ueberschrieben wird);
+  keine eigenen Paket-Einstellungen.
+- **Ereignisse:** hoert `partie:beendet` (Erzfeind-Feier), `partie:analysiert` (Memo, per `setTimeout(0)`, ersetzt den Eintrag
+  derselben Partie), `app:screen` und `speicher:zurueckgesetzt` (gemerkte Niederlagen in Folge vergessen); sendet nichts. **Register:**
+  Saetze, Icons `revanche` und `erzfeind`. **Test-Schnittstelle:** `zustand()` (letzteWahl, modul, folge).
+- **RECHENSTAND 2** (2: Sperre auch bei `wenig`, Plaetze vorn und hinten, Erzfeind nach Stufe, Komma bei Greta) steckt im
+  Seed und im Modul (`v`): Wer Vorrang, Schwellen oder Satz-Tabelle aendert, zaehlt ihn hoch, sonst wechseln die Saetze
+  unbemerkt mitten am Tag. Alte Module (`v: 1`) bleiben gueltig, `normalisiereModul` uebernimmt Memo und Erzfeind.
+
+## Paket kartei (A3): Deine Fehler werden dein Training, dazu der Raetsel-Bildschirm
+
+Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.js` (rein, Node-testbar, kein
+`Math.random`, keine Uhr), `css/pakete/kartei.css` (nur Tokens, `link[data-paket="kartei"]`), der generische Screen
+`js/ui/raetsel.js` mit `css/pakete/raetsel.css` (haengt sich selbst als `link[data-screen="raetsel"]` ein). Test:
+`tests/kartei.test.mjs`.
+
+- **Karten entstehen** bei `partie:analysiert` (Partie-Ende, Analyse-Screen, Nachholen; Uebungen nie, auch Partien aus
+  einer eigenen Stellung, Bosse, freie Partien): eigene Zuege der Klassen `patzer` („Weit daneben“), `verpasst`
+  („Verschenkt“) und `fehler` („Daneben“) aus `review.zuege` mit **eindeutiger Loesung**: `gewinnVorher >= 0,25` und
+  `gewinnVorher - gewinnZweiter >= 0,15` (MultiPV 2 der Analyse; ohne zweite Linie keine Karte). Hoechstens 3 je Partie,
+  die mit dem groessten `verlust` zuerst (gleich: Patzer, Verschenkt, Fehler, dann der fruehere Zug). Dieselbe Stellung
+  kommt je Partie nur einmal vor (Zugwiederholung: der schwerste Eintrag), sonst verdraengte derselbe Fehler die anderen.
+  Idempotent ueber die verarbeiteten Partie-IDs (hoechstens 300). Dieselbe Stellung (`stellungsSchluessel`) schon in der
+  Kartei: keine neue Karte, sondern `rueckfaelle + 1`, wieder Stufe 0 und heute faellig (auch wenn sie heute schon geuebt
+  war: sie verlaesst dafuer `heute.ids` und steht wieder im Stapel von heute), mit dem Bild der neuen Partie. Jede Karte
+  zaehlt je Partie hoechstens einmal (neu oder Rueckfall). Auch eine fuer immer geloeste kommt so zurueck; der Zaehler
+  `gemeistert` sinkt nie und zaehlt jede Karte nur beim ersten Mal (Feld `gemeistert` der Karte). Beim Start (2,5 s nach
+  `app:bereit`, einmal je Sitzung) traegt das Paket gespeicherte Analysen nach, die noch nicht verarbeitet sind (Partien,
+  die vor dem Paket analysiert wurden), still und ohne Feier.
+- **Wiederholung** (`logik.js`): Stufe 0 neu (am Tag der Partie faellig), 1 bis 5 mit den Abstaenden 1, 3, 7, 14, 30 Tagen
+  (`addiereTage` auf dem Tagesschluessel aus `tag.js`, Grenze 4:00, Sommerzeit egal), danach Stufe 6 „für immer gelöst“.
+  Nur der erste Versuch zaehlt als richtig (Stufe + 1); im zweiten Versuch geloest oder Loesung gezeigt: zurueck auf
+  Stufe 1, wieder morgen. **Stapel des Tages:** faellige Karten, die aeltesten zuerst, hoechstens 10 je Tag (A3 und
+  SPIELKONZEPT 2.2; heute schon geuebte zaehlen mit, `heute: { tag, ids }`). Der Ueberhang bleibt still faellig und kommt
+  an den Folgetagen dran: nichts verfaellt, keine rote Zahl. SPIELKONZEPT 3.6 sieht spaeter einen gemeinsamen
+  Trainingsstapel mit Deckel 10 vor, davon hoechstens 8 Karteikarten: kommt ein zweiter Lieferant dazu, wird
+  `TAGES_MAX` (oder ein gemeinsamer Stapel) angepasst und `RECHENSTAND` hochgezaehlt.
+- **Orte:** `training:karten` (Reihenfolge 10): `section.t-karte.kt-karte[data-faellig]` mit drei Zustaenden: faellig
+  („Fehler wiederholen · 5 fällig“, Stapel aus bis zu 4 Mini-Brettern, „12 im Training · 2 für immer gelöst“, Knopf
+  `.kt-los` „Üben“), alles geuebt („Stapel leer. Gut gemacht.“ mit dem naechsten Tag) und keine Karten („Noch keine
+  Karten“, ohne Knopf). Die Mini-Bretter zeigen jede Karte aus Flos Sicht (mit Schwarz gedreht, `logik.drehe`, weil
+  `miniBrett` keine Ausrichtung kennt). `arena:heute` (25): `.kt-heute` „Fehler wiederholen · 3 fällig“ mit Knopf „Üben“,
+  nur wenn Karten faellig sind. Beide Knoepfe: `app.gehe('raetsel', { quelle: 'kartei' })`. **Einstieg:** Die Karte im
+  Training ist erst erreichbar, wenn `REITER` (js/erweiterungen.js) `'training'` nennt; das entscheidet die Integration
+  bzw. Flo. Bis dahin fuehrt nur die Zeile in der Heute-Karte (sobald etwas faellig ist) in die Kartei.
+- **Feier:** Neue Karten einer Partie melden synchron im Hoerer von `partie:analysiert`
+  `melde({ partieId, quelle: 'karten', titel: '2 neue Karten in deinem Stapel', text: '1 Karte ist wieder dabei.', symbol:
+  'kartei' })` (Zeile, Prio 30 laut `feier.QUELLEN`; nur Rueckfaelle: „1 Karte wieder in deinem Stapel“,
+  `logik.kartenFeier`): so steht die Zeile noch im Ergebnis, das `partie.js` direkt danach fuellt; beim Nachholen und im
+  Analyse-Screen landet sie in der Nachlese. Synchron rechnet der Hoerer nur `logik.vorschau` (Modul einmal lesen und in
+  Form bringen, Kandidaten, Abgleich nach ID und Stellung; rund 2 ms bei 380 Karten), geschrieben wird per
+  `setTimeout(0)` nach frischem Lesen (`fuegeHinzu`, Ausduennen). Ein Modul einer neueren App (`v` hoeher): keine Karten
+  und keine Zeile. Bleibt nur der seltene Fall, dass `localStorage` beim Schreiben voll ist: dann stand die Zeile schon
+  da (die App meldet den vollen Speicher selbst einmal je Sitzung).
+- **Ereignisse:** sendet `training:geloest { karteId, richtig, versuch, quelle: 'kartei' }` je beantworteter Karte
+  (`richtig` true auch im zweiten Versuch, `versuch` 1, 2, ...; Loesung gezeigt: `richtig: false`, `versuch` = Fehlversuche
+  davor, **0 = Loesung ohne eigenen Zug**; wer „geuebte Karten“ zaehlt, etwa S1-4 fuer den Tag, nimmt nur `versuch >= 1`)
+  und `training:stand { faellig, gesamt, gemeistert }` (faellig = heute noch im Stapel, gesamt = Karten im Training ohne die
+  geloesten, gemeistert = fuer immer geloest, nie weniger) bei `app:bereit`, nach jeder Antwort, nach neuen Karten und nach
+  `speicher:zurueckgesetzt`. Hoert `partie:analysiert`, `app:bereit`, `speicher:zurueckgesetzt`. **Register:** Icon
+  `kartei`, Raetsel-Quelle `kartei`. **Test-Schnittstelle:** `zustand()` (modul, stand, letzte).
+- **Speicher:** Modul `kartei` (vorhanden, Budget 160.000) `{ v: RECHENSTAND (1), karten: [Karte], verarbeitet: [partieId],
+  heute: { tag, ids }, zaehler: { erstellt, gemeistert, richtig, falsch } }`, Karte `{ id: 'partieId:ply', fen, besterZug,
+  gespielt, klasse, partieId, ply, botId, farbe, vor, san, loesungSan, nummer, coach (Kern, hoechstens 160), datum (Tag der
+  Partie), gewinn, verlust, stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle, gemeistert }` (ca. 400
+  Zeichen). Ueber 380 Karten oder dem Budget fallen zuerst die aeltesten fuer immer geloesten, dann die aeltesten der
+  Stufe 5, dann die aeltesten ueberhaupt. Bei jedem Zugriff frisch gelesen; kaputte Karten fallen beim Lesen weg; ein Modul
+  mit hoeherem `v` (neuere App) wird gelesen, aber nie ueberschrieben. Keine Paket-Einstellungen.
+
+**Raetsel-Bildschirm** `js/ui/raetsel.js` (Paket-Screen `raetsel` aus `PAKET_SCREENS`, `app.js` unveraendert):
+- `zeige(root, { quelle } | { liste, titel, unter }, app)`. Ohne Quelle und ohne Liste (z. B. `#raetsel` von Hand) oder mit
+  einer nicht angemeldeten Quelle geht es still zur Arena, genau wie bei einem fehlenden Paket-Screen (der Router-Test
+  in `app.test.mjs` bleibt so gueltig). Die Parameter liegen im Browser-Verlauf: Neuladen fragt die Quelle neu.
+- `registriereRaetselQuelle(name, { titel, unter, liste(params), ergebnis(aufgabe, erg) -> { titel, text, klang },
+  ende(zusammenfassung) -> { titel, text, klang, knoepfe: [{ text, art, beiKlick(app) }] }, leer() -> { titel, text } })`
+  -> `abmelden()`. So benutzen spaeter Tagesraetsel, Lernpfad und der Einstufungstest (A4) denselben Bildschirm.
+- **Aufgabe** `{ id, fen, loesung: [uci, ...], titel, text, hinweis, erklaerung, vorZug, marke, klasse }`: in `loesung`
+  wechseln sich Flos Zuege und die Antworten des Gegners ab (der Gegner zieht von selbst nach `takt(520)`).
+  `pruefeAufgabe()` spielt jede Loesung mit chess.js durch; ungueltige fallen still weg.
+- Ablauf: Brett (`Brett` mit `beiZug`, `zielKarte`, gedreht, wenn Schwarz am Zug ist; Koordinaten und „automatisch Dame“
+  aus den Einstellungen), Fortschritt oben („3 von 7“ und je Aufgabe ein Punkt: gut, grau, nie rot), Status (wer zieht,
+  Klasse des alten Zugs, Titel, Satz). Richtig: Feld `mark-k-bester`, Haken ueber `brett.striche` (art `haken`), Symbol
+  federt (`hupf`), Klang `raetsel-richtig` (oder der der Quelle, z. B. `stern` bei „für immer gelöst“), Knopf „Weiter“
+  (nie ein Autostart). Falsch: die Figur steht 380 ms auf dem Feld und schnappt zurueck (`beiZug` liefert ein
+  Promise auf `false`), Klang `raetsel-falsch`, der zweite Versuch markiert die Figur, mit der es losgeht
+  (`markiere(..., 'hinweis')`); nach dem zweiten Fehlversuch ruht das Brett und „Lösung zeigen“ wird die Hauptaktion.
+  „Lösung zeigen“ (jederzeit) zeichnet jeden Zug als Pfeil (`brett.pfeile`) und spielt ihn vor. Nach dem Loesen (oder der
+  gezeigten Loesung) wird „Weiß am Zug“ unsichtbar (Platz bleibt). „Weiter“, „Lösung zeigen“ und „Fertig“ bekommen den
+  Fokus; den Rahmen zeigt nur die Tastatur (`section[data-eingabe="zeiger"|"tastatur"]`). Ende: Zusammenfassung
+  („4 von 5 gelöst“, Text der Quelle), „Fertig“ = `app.zurueck()`.
+- Layout: Container-Einheiten (`container: rs / size`) bestimmen die Brettgroesse; ab 861 px Breite zwei Spalten (Brett,
+  rechts Status, Meldung, Knoepfe), darunter eine Spalte (iPad hoch, Handy). Tippflaechen mindestens 44 px.
+- **Test-Schnittstelle:** `zustand()` (offen, quelle, index, gesamt, schritt, fehlversuche, phase, aufgabe, ergebnisse),
+  mit `?test` auch `window.__raetsel.zustand()`.
+- **sw-Test:** `js/ui/raetsel.js` gehoert laut `SCREEN_PAKET` dem Paket `raetsel`, `css/pakete/raetsel.css` ebenfalls (nach
+  dem Dateinamen). Mit der Kartei in `PAKETE` muessen beide trotzdem in `DATEIEN` (die Integration setzt
+  `SCREEN_PAKET.raetsel` auf `kartei` oder traegt sie von Hand ein), sonst fehlt der Bildschirm offline.
+
+## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
+
+Dateien: `js/pakete/start/index.js` (Orte, Ereignisse, Feier), `dienst.js` (Speicher, Raetsel-Quellen, Spielstart; gemeinsam
+fuer Einstieg und Screen), `logik.js` (rein, Node-testbar, kein `Math.random`, keine Uhr), `aufgaben.js` (Regel-Hilfe und
+Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus `PAKET_SCREENS`, `app.js` unveraendert) und
+`css/pakete/start.css` (nur Tokens, `link[data-paket="start"]`). Test: `tests/start.test.mjs`. SPIELKONZEPT 3.16 und 3.12.
+
+- **Willkommen (Wahl-Ort `app:erster-screen?`, Reihenfolge 80):** nur beim allerersten Start, also ohne Hash und ohne
+  Verlaufseintrag (`app.js`), ohne gespeicherte und ohne laufende Partie (Partien aus der Partienliste oder, wertend, aus dem
+  Fortschritt, das Groessere zaehlt) und wenn das Modul noch kein `gesehen` hat (`logik.ersterScreenWahl`). Ein Paket mit eigener Wahl unter 80 geht vor. Das Willkommen gilt als gesehen, sobald der
+  Screen einmal da war. Nach „Fortschritt zuruecksetzen“ ist das Modul weg, der naechste frische Start zeigt es wieder.
+- **Screen `start`** (`zeige(root, { seite }, app)`): Seiten `w1` (Was ist Crownmate), `w2` (deine Gegner: die Leiter aus
+  `BOTS`, Zahl und Namen daraus), `w3` (wie du lernst), dann `frage` „Kennst du die Schachregeln?“ (Ja: `einstufung`,
+  Nein: Regel-Hilfe), `einstufung` (Angebot), `empfehlung`, `nach-regeln`. „Weiter“, „Überspringen“ (zur Frage),
+  Seiten-Punkte und Pfeiltasten auf w1 bis w3; „Ich kenne mich aus“ steht auf jeder Seite im Kopf und fuehrt zur Arena.
+  Liegt ein eigener Verlaufseintrag davor (`history.state.tiefe > 0`: aus den Einstellungen oder vom Hinweis in der
+  Heute-Karte geoeffnet), hat der Kopf zusaetzlich Zurueck (`app.zurueck()`); auf dem Handy tritt dann die Marke im Kopf
+  zurueck, damit Zurueck, „Ich kenne mich aus“ und Klang nebeneinander passen. `nach-regeln` bietet den ersten Bot der
+  Leiter an (`dienst.ersterGegner()` = `BOTS[0]`, kein fester Name).
+  Die aktuelle Seite steht in `params.seite` des eigenen Verlaufseintrags (`history.replaceState`, Hash bleibt `#start`):
+  Neuladen bleibt auf ihr. Aus dem Raetsel-Bildschirm zurueck (Zurueck oder „Fertig“) gilt die Seite, die `dienst.setzeRueck`
+  gemerkt hat (nach der Einstufung `empfehlung`, nach der Regel-Hilfe `nach-regeln`), sonst die aus dem Verlauf. Ohne
+  geladenen Paket-Einstieg (`dienst.paketGeladen()`, z. B. `#start` von Hand ohne Paket) geht der Screen still zur Arena
+  wie ein fehlender Paket-Screen (Router-Test in `app.test.mjs`). DOM: `section.screen.st-screen[data-seite]`,
+  `.st-buehne[data-seite]`, Knoepfe mit `data-st` (weiter, ueberspringen, punkt, ja, nein, einstufung-start, probe, leiter,
+  spielen, benno, einstufung-seite, wiederholen, arena, raus). Stapel auf `einstufung`: `.st-stapel-ort` traegt Lage und
+  Drehung, die `.st-stapel-karte` darin gleitet ein (der Eintritt animiert `transform` der Karte und ueberschreibt so nie
+  die Schraeglage). Test-Schnittstelle `zustand()` -> `{ offen, seite }`, mit
+  `?test` auch `window.__start.zustand()`.
+- **Regel-Hilfe und Einstufung** laufen im Raetsel-Bildschirm aus A3 (Quellen `start-regeln` und `start-einstufung`, angemeldet
+  erst von `dienst.starte()` aus `index.js`). Regel-Hilfe: 7 Aufgaben (Turm, Laeufer, Dame, Springer, Koenig, Bauer, dann das
+  Matt), je Figur genau ein Zug, der das Ziel erreicht, mit dieser Figur; Antippen zeigt die Zielpunkte. Einstufung: 8 selbst
+  erstellte Stellungen mit steigender Schwierigkeit (Matt in 1, Material, Matt in 1 mit Schwarz, Gabel, Spiess, Fesselung,
+  Matt in 2 mit erzwungener Antwort, Bauernendspiel mit Quadratregel). `tests/start.test.mjs` prueft jede Loesung mit chess.js
+  und einer Suche mit Material und Matt: jeder eigene Zug ist der einzige beste (Tiefe 4, Endspiel 7), Antworten sind
+  erzwungen. Quelle: selbst erstellt (Kopf von `aufgaben.js`).
+- **Empfehlung (RECHENSTAND 1):** Punkte je Aufgabe 1 (erster Versuch), 0,5 (spaeter geloest), 0 (Loesung gezeigt);
+  `EMPFEHLUNG`: bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, darueber hoechstens Professor Turm (8
+  Aufgaben sagen ueber die oberen Stufen zu wenig). Begruendung aus den Ergebnissen (geloest, Staerken = die zwei schwersten
+  im ersten Versuch, naechster Schritt = die leichteste nicht geloeste, ein Satz zum Bot), keine Elo-Zahl. **Leiter bleibt:**
+  Steht der Bot ueber der hoechsten freigeschalteten Stufe, gibt es ihn nur als „Probepartie“ (`app.gehe('partie', { botId,
+  farbe: 'w', modus: 'frei' })`, `wertet()` ist false: keine Sterne, keine Freischaltung), daneben „Leiter: <naechster
+  Gegner>“. Sonst eine normale Partie. Ob es eine Probepartie wird, entscheidet die Leiter beim Antippen, nicht beim
+  Zeichnen (wurde der Fortschritt inzwischen zurueckgesetzt oder ein anderer Stand eingespielt, wird auch „Gegen <Bot>
+  spielen“ zur Probepartie). Ist eine Partie offen, fragt `dienst.starteSpiel` wie die Arena („Neue Partie
+  starten?“). Fehlt ein Bot der Tabelle in `BOTS`, nimmt `botFuerPunkte` den naechstschwaecheren.
+- **Entdeckungs-Fahrplan:** beginnt bei `app:bereit` (einmal, `fahrplan.start`; ab 5 Partien beim ersten Start „erfahren“:
+  nur neue Funktionen). In den ersten 28 Tagen hoechstens ein Hinweis je Tag im Ort `arena:heute` (Reihenfolge 70):
+  `.st-neu[data-entdeckung]`, die ganze Zeile `button.st-neu-los` „Neu für dich: <Titel>“ mit Satz fuehrt hin, `.st-neu-weg`
+  blendet aus; beides erledigt den Hinweis, heute kommt kein zweiter. Reihenfolge `ENTDECKUNGEN`: Spielanalyse (nach der
+  ersten Partie), Einstufung (ab Tag 1, solange nicht gemacht), Training (ab Tag 2, nur wenn ein Paket `training:karten`
+  anbietet UND `training:stand` Karten meldet, `gesamt > 0`; nie fuer einen leeren Stapel), Brett und Klang (ab 2 Partien),
+  Verlauf (ab 3 Partien). Wer einen Screen schon besucht hat (`app:screen`), bekommt dafuer keinen Hinweis mehr. Abschaltbar
+  in der Gruppe „Erste Schritte“ (Paket-Einstellung `start.hinweise`). **Eine Zeile:** „Neu für dich“ ist die leiseste
+  Zeile der Heute-Karte. Steht dort eine Zeile eines anderen Pakets (z. B. faellige Karten der Kartei), tritt sie zurueck
+  (`css/pakete/start.css`: `.heute-karte .st-neu:not(:only-child) { display: none }`) und erscheint wieder, sobald sie allein
+  ist; der Hinweis bleibt der des Tages und gilt nicht als erledigt. Grund: Mit zwei Zeilen lag der Spielen-Knopf auf dem
+  iPad quer 1024 x 768 21 px unter dem Rand. Folge fuer die Integration: Ein Paket mit einer Zeile an jedem Tag (z. B. die
+  Serie auf `claude/spielsysteme`) laesst „Neu für dich“ nie zu Wort kommen. Haelt die Arena den Spielen-Knopf selbst im
+  Bild (U5/U7, z. B. sticky im Panel), kann die eine CSS-Regel fallen. Der Kopf „Neu für dich: <Titel>“ bricht nie um
+  (Ellipse als Notbremse; geprueft: alle fuenf Titel ganz bei 1024 und 375).
+- **Orte:** `app:erster-screen?` (80), `arena:heute` (70), `einstellungen:gruppen` (90: Gruppe „Erste Schritte“ mit Schalter
+  „Neu für dich“, Stand der Einstufung mit „Zur Empfehlung“ oder „Einstufung machen“, „Willkommen ansehen“, „Regel-Hilfe“).
+- **Feier:** Beim ersten wertenden Sieg ueberhaupt (der Fortschritt kennt genau einen Sieg) synchron im Hoerer von
+  `partie:beendet` `melde({ quelle: 'erster-sieg', titel: 'Dein erster Sieg', text: 'Gegen <Bot>, in <n> Zügen', symbol:
+  'pokal', klang: 'rekord' })` (gross, Prio 95 laut `feier.QUELLEN`), nur einmal (`ersterSieg` im Modul).
+- **Ereignisse:** hoert `app:bereit` (Fahrplan, per `setTimeout`), `app:screen` (besuchte Screens; Rueckweg vergessen),
+  `partie:beendet` (letzte Partie fuer den Hinweis zur Analyse, erster Sieg) und `training:stand` (Karten im Training, fuer
+  den Hinweis „Das Training“; die Kartei sendet es bei `app:bereit`, also vor dem ersten Screen). Sendet nichts. **Register:** Icon
+  `neu-siegel`, Raetsel-Quellen `start-regeln` und `start-einstufung`.
+- **Speicher:** Modul `start` (vorhanden, Budget 6.000) `{ v: RECHENSTAND (1), gesehen: '' | Tag, regeln: null | { tag,
+  geloest, gesamt }, einstufung: null | { tag, rechenstand, punkte, geloest, ersterVersuch, gesamt, je: [[id, punkte]], botId },
+  ersterSieg: '' | partieId, letzte: '' | partieId, fahrplan: { start: '' | Tag, erfahren, heute: null | { tag, id },
+  erledigt: [id], benutzt: [screen] } }` (voll unter 1.500 Zeichen). Tage aus `tag.js` (Grenze 4:00). Bei jedem Zugriff
+  frisch gelesen, Falsches faellt still weg; ein Modul einer neueren App (`v` hoeher) wird gelesen, nie ueberschrieben.
+  Paket-Einstellungen `start` `{ hinweise: true }`.
+- **Integration:** `PAKETE += 'pakete/start/index'`; in `DATEIEN` (sw.js) die vier Paket-Dateien, `css/pakete/start.css`,
+  `js/ui/start.js` und der Raetsel-Bildschirm (`js/ui/raetsel.js`, `css/pakete/raetsel.css`, falls die Kartei sie nicht schon
+  eingetragen hat). `SCREEN_PAKET.start` in `tests/sw.test.mjs` heisst noch `einstieg` (BAUPLAN 2D), deshalb erzwingt der
+  sw-Test den Screen nicht; `tests/start.test.mjs` prueft alle acht Dateien, sobald das Paket in `PAKETE` steht. Mit dem Paket
+  zeigt jeder frische Start ohne Hash das Willkommen (die Suiten oeffnen `#arena` oder haben Partien), und der erste
+  wertende Sieg eines frischen Speichers feiert „Dein erster Sieg“. Probe mit dem Paket in `PAKETE` (Patch ausserhalb des
+  Repos): angepasst werden muessen `app.test.mjs` (Router-Rueckfall mit `PAKETE` ohne start per Route, danach `unroute`;
+  zusaetzlich der Hunk „?erw ohne ?test“ aus dem Paket teilen, weil der Service Worker alle `DATEIEN` vorlaedt; Feier-Budget
+  und stilles Nachholen mit `modul:start.ersterSieg` vorab), `e2e.test.mjs` (Feier genau aus den eingetragenen Paketen),
+  `gedaechtnis.test.mjs` (Erzfeind-Sieg mit einem frueheren Sieg, sonst gewinnt `erster-sieg` mit Prio 95 den grossen Platz)
+  und `kartei.test.mjs` (zwei Anbieter an `arena:heute`).

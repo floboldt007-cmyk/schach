@@ -24,7 +24,8 @@ import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8838);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// &kern: ohne die fest eingetragenen PAKETE und REITER (die pruefen die Integration und e2e)
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = process.argv.includes('--ohne-bilder') ? '' : (bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots'));
@@ -200,6 +201,13 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
 async function tippe(seite, sel) {
   const el = seite.locator(sel).first();
   await el.waitFor({ state: 'visible', timeout: 10000 });
+  // Wie ein Finger: liegt etwas ueber dem Ziel (z. B. der feste Spielen-Knopf ueber einem laengeren Panel),
+  // scrollt Flo es erst in die Mitte. Bleibt es verdeckt, geht der Tipp daneben und die Pruefung scheitert.
+  const verdeckt = await el.evaluate((e) => {
+    const r = e.getBoundingClientRect(), oben = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return !oben || !(oben === e || e.contains(oben));
+  });
+  if (verdeckt) { await el.evaluate((e) => e.scrollIntoView({ block: 'center' })); await warte(150); }
   const b = await el.boundingBox();
   if (!b) throw new Error('nicht sichtbar: ' + sel);
   await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);

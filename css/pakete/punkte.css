@@ -1,0 +1,223 @@
+/* ============================================================
+   Paket punkte (Punkte, Abrechnung und Bestenliste, SPIELKONZEPT 3.13), Look A "Modern und klar".
+   Laedt js/pakete/punkte/index.js selbst (link[data-paket="punkte"]). Nur Tokens aus css/tokens.css und
+   css/themes/<thema>.css, damit hell und dunkel (und spaetere Ansichten) ohne eigene Regeln stimmen.
+   Klare Liste mit einer Akzentlinie an der eigenen Zeile, Tabellenziffern, Zeilen 56 px, kein Leuchten, kein Neon.
+   Bewegt werden nur transform und opacity (js/bewegung.js); --tempo 0 und reduzierte Bewegung zeigen das Endbild.
+   ============================================================ */
+
+/* ---------- Abrechnung (Ort ergebnis:abrechnung) ---------- */
+.pk-abr { min-width: 0; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); }
+.pk-abr-knopf { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%;
+  min-height: var(--tipp); margin: 0; padding: 10px 12px; border: 0; border-radius: inherit; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; }
+.pk-abr-knopf.pk-statisch { cursor: default; }
+.pk-abr-knopf:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.pk-symbol { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--r-pille); background: var(--flaeche);
+  color: var(--text); box-shadow: var(--s1), var(--kante); }
+.pk-symbol .ico { width: 20px; height: 20px; }
+.pk-abr-mitte { display: grid; gap: 4px; min-width: 0; }
+.pk-label { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.pk-text { min-width: 0; font-size: 13.5px; font-weight: 650; line-height: 1.3; color: var(--text); overflow-wrap: anywhere; }
+.pk-pfeil { white-space: nowrap; font-weight: var(--gw-titel); color: var(--text); font-variant-numeric: tabular-nums; }
+.pk-werte { display: grid; justify-items: end; gap: 2px; }
+.pk-wert { font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.02em; line-height: 1; color: var(--text);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pk-alt { font-size: 13px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; text-decoration-thickness: 1.5px; }
+.pk-abr[data-rekord] .pk-symbol { background: var(--gold-weich); }
+.pk-abr[data-rekord] .pk-symbol .ico { color: var(--text); }
+
+/* Mini-Tafel: ueber dir, du, unter dir (deine Zeile gleitet nach oben) */
+.pk-mini { display: grid; gap: 2px; margin: 0 12px 10px; padding: 0; list-style: none; overflow: hidden; border-radius: var(--r-s); }
+.pk-m-zeile { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 30px; padding: 0 10px;
+  border-radius: var(--r-s); background: var(--flaeche); font-size: 13px; font-weight: 650; color: var(--text-2); }
+.pk-m-zeile.ich { color: var(--text); box-shadow: inset 3px 0 0 var(--akzent); position: relative; z-index: 1; }
+.pk-m-platz, .pk-m-wert { font-variant-numeric: tabular-nums; }
+.pk-m-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pk-details { padding: 0 12px 12px; }
+.pk-details[hidden] { display: none; }
+.pk-details ul { display: grid; gap: 4px; margin: 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--linie); }
+.pk-details li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.pk-details li b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pk-d-summe { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.pk-d-summe b { color: var(--text); }
+.pk-d-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pk-d-knoepfe:empty { display: none; }
+.pk-d-knoepfe .knopf { min-height: var(--tipp); font-size: 14px; }
+.pk-post-box { display: grid; gap: 8px; margin-top: 10px; padding: 10px; border-radius: var(--r-m); background: var(--flaeche); }
+.pk-post-box[hidden] { display: none; }
+.pk-post-text { width: 100%; min-height: var(--tipp); box-sizing: border-box; padding: 10px 12px; border-radius: var(--r-m); border: 1px solid var(--linie-2);
+  background: var(--flaeche-2); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; resize: vertical; word-break: break-word; }
+.pk-post-text:focus-visible { outline: var(--fokus); outline-offset: 1px; }
+.pk-klein { margin: 0; font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+
+/* Analyse rechnet noch: ruhiger Schimmer (endlich, nur opacity) */
+.pk-wartet .pk-wert { color: var(--text-2); }
+.pk-schimmer .pk-text, .pk-schimmer .pk-wert { animation: pk-schimmer 1.6s var(--sanft) 6 alternate both; }
+@keyframes pk-schimmer { from { opacity: 1; } to { opacity: .45; } }
+
+/* ---------- Bot-Panel der Arena (Ort arena:panel-bot) ---------- */
+.pk-panel { display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--tipp); margin: 0; padding: 6px 12px 6px 6px; border: 0;
+  border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text); font: inherit; font-size: 13.5px;
+  font-weight: 650; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pk-panel:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.pk-panel-symbol { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--r-pille); background: var(--flaeche);
+  color: var(--text); box-shadow: var(--kante); }
+.pk-panel-symbol .ico { width: 16px; height: 16px; }
+.pk-panel-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Screen Bestenliste ---------- */
+.bl-screen .bl-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  padding-bottom: var(--a6); }
+.bl-steuer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px var(--rand) 4px; }
+.bl-steuer-reiter { flex: 1 1 320px; max-width: 460px; min-width: 0; }
+.bl-steuer-fenster { flex: 0 1 300px; min-width: 0; }
+.bl-steuer-reiter:empty, .bl-steuer-fenster[hidden] { display: none; }
+.bl-ort { padding: 12px var(--rand) 0; }
+.bl-ort[hidden] { display: none; }
+.bl-leer-screen { margin: 16px var(--rand) 0; max-width: 640px; flex-direction: row; align-items: flex-start; gap: 16px; }
+.bl-leer-screen[hidden] { display: none; }
+.bl-leer-screen h2 { font-size: 22px; }
+.bl-leer-screen .t-symbol { width: 52px; height: 52px; flex: none; border-radius: 17px; display: grid; place-items: center; background: var(--flaeche-3); color: var(--text-2); }
+
+.bl-reiter { display: grid; gap: 18px; min-width: 0; }
+.bl-reiter[hidden] { display: none; }
+.bl-reiter[data-reiter="ich"] { grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); align-items: start; }
+.bl-reiter[data-reiter="ich"] > .bl-spieler { grid-row: span 2; }
+.bl-reiter[data-reiter="freunde"] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.bl-reiter[data-reiter="freunde"] > .bl-freunde { grid-column: 1 / -1; }
+
+.bl-karte { display: grid; gap: 12px; min-width: 0; padding: 20px; border-radius: var(--r-xl); background-color: var(--flaeche);
+  background-image: var(--textur-flaeche, none); box-shadow: var(--s2), var(--kante); color: var(--text); }
+.bl-k-kopf { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.bl-k-kopf h2 { margin: 2px 0 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.025em; line-height: 1.1; }
+.bl-k-hinweis { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.bl-leer { margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text-2); max-width: 60ch; }
+.bl-klein { margin: 0; font-size: 12.5px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+
+/* Zeilen: 56 px, Tabellenziffern, eigene Zeile mit einer Akzentlinie */
+.bl-zeilen { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.bl-zeile { min-width: 0; border-radius: var(--r-m); background: var(--flaeche-2); }
+.bl-zeile.ich { background: var(--flaeche); box-shadow: inset 4px 0 0 var(--akzent), var(--kante); }
+.bl-z-innen { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin: 0;
+  padding: 6px 14px 6px 12px; border: 0; border-radius: inherit; background: none; color: inherit; font: inherit; text-align: left; }
+button.bl-z-innen { cursor: pointer; }
+button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.bl-platz { font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; text-align: center; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.bl-zeile.ich .bl-platz { color: var(--text); }
+.bl-z-mitte { display: grid; gap: 2px; min-width: 0; }
+.bl-z-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: var(--gw-stark); font-size: 15px; }
+.bl-z-name > span:not([class]) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-z-info { min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
+.bl-punkte { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums;
+  white-space: nowrap; }
+.bl-gast { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: var(--r-pille); background: var(--flaeche-3);
+  color: var(--text); font-size: 12px; font-weight: 800; }
+.bl-gast .ico { width: 14px; height: 14px; }
+/* vorlaeufiger Bot-Lauf: Avatar des Bots im Kreis */
+.bl-gast-bot { overflow: hidden; }
+.bl-gast-bot img { width: 100%; height: 100%; object-fit: cover; }
+.bl-pruef { flex: none; font-size: 11.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.bl-neu { flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-pille); background: var(--akzent-weich); color: var(--akzent-text);
+  font-size: 11px; font-weight: 800; line-height: 20px; }
+
+/* Tafel-Wahl: Chips, auf dem Handy waagrecht wischbar */
+.bl-tafelwahl { display: flex; gap: 8px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px 2px 6px; }
+.bl-tafelwahl::-webkit-scrollbar { display: none; }
+.chip.bl-wahl { flex: none; position: relative; height: var(--tipp); padding: 0 16px; gap: 6px; font-size: 14px; font-weight: var(--gw-stark); cursor: pointer;
+  background: var(--flaeche); color: var(--text-2); border: 0; box-shadow: var(--s1), var(--kante); }
+.chip.bl-wahl[aria-pressed="true"] { background: var(--tinte); color: var(--auf-tinte); }
+.chip.bl-wahl:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.bl-punkt { display: block; width: 6px; height: 6px; border-radius: var(--r-pille); background: currentColor; opacity: .55; }
+.bl-fuss { display: flex; flex-wrap: wrap; gap: 10px; }
+.knopf.bl-angriff { min-height: var(--tipp); }
+
+/* Chronik: 12 Saeulen, Hoehe ueber transform (scaleY), kein Layout */
+.bl-chronik { display: grid; gap: 6px; }
+.bl-chronik ol { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: 4px; height: 44px; margin: 0; padding: 0;
+  list-style: none; }
+.bl-chronik li { position: relative; height: 100%; }
+.bl-chronik i { position: absolute; inset: 0; border-radius: 4px 4px 2px 2px; background: var(--flaeche-3); transform-origin: bottom center;
+  transform: scaleY(var(--h, .1)); }
+.bl-chronik li:last-child i { background: var(--tinte); }
+
+/* Spielerkarte */
+.bl-spieler { gap: 16px; }
+.bl-s-kopf { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.bl-s-avatar { display: grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); }
+.bl-s-avatar .ico { width: 26px; height: 26px; }
+.bl-s-name { display: grid; gap: 2px; min-width: 0; }
+.bl-s-name b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.02em; line-height: 1.05; }
+.bl-s-name span { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.bl-s-zahlen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.bl-s-zahlen div { display: grid; gap: 2px; padding: 10px; border-radius: var(--r-m); background: var(--flaeche-2); min-width: 0; }
+.bl-s-zahlen dt { font-size: 11.5px; font-weight: 700; color: var(--text-2); }
+.bl-s-zahlen dd { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; font-variant-numeric: tabular-nums; }
+.bl-s-beste { display: grid; gap: 2px; }
+.bl-s-beste b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 30px; letter-spacing: -.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.bl-s-beste span:not(.ueberzeile) { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.bl-s-satz { margin: 0; padding-top: 10px; border-top: 1px solid var(--linie); font-size: 12.5px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
+
+/* Rekordbuch */
+.bl-buch { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.bl-buch li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche-2); }
+.bl-b-name { min-width: 0; font-weight: var(--gw-stark); font-size: 14.5px; overflow-wrap: anywhere; }
+.bl-b-werte { display: flex; align-items: baseline; gap: 8px; font-variant-numeric: tabular-nums; }
+.bl-b-werte s { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.bl-b-werte b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 18px; }
+.bl-b-info { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--text-2); }
+
+/* Freunde: Code teilen und einlesen */
+.bl-feld { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.bl-feld select, .bl-feld input, .bl-feld textarea, .bl-code-aus { width: 100%; min-height: var(--tipp); box-sizing: border-box; padding: 10px 12px;
+  border-radius: var(--r-m); border: 1px solid var(--linie-2); background: var(--flaeche-2); color: var(--text); font: inherit; font-size: 15px; font-weight: 600; }
+.bl-feld textarea, .bl-code-aus { resize: vertical; font-variant-numeric: tabular-nums; letter-spacing: .02em; word-break: break-all; }
+.bl-feld select:focus-visible, .bl-feld input:focus-visible, .bl-feld textarea:focus-visible, .bl-code-aus:focus-visible { outline: var(--fokus); outline-offset: 1px; }
+.knopf.bl-zeigen, .knopf.bl-pruefen { justify-self: start; min-height: var(--tipp); }
+.bl-teilen-vorschau, .bl-lesen-ergebnis { display: grid; gap: 10px; min-width: 0; }
+.bl-teilen-vorschau[hidden] { display: none; }
+.bl-vorschau { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; margin: 0; padding: 12px; border-radius: var(--r-m); background: var(--flaeche-2); }
+.bl-vorschau div { display: grid; gap: 1px; min-width: 0; }
+.bl-vorschau dt { font-size: 11.5px; font-weight: 700; color: var(--text-2); }
+.bl-vorschau dd { margin: 0; font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+.bl-knoepfe { display: flex; flex-wrap: wrap; gap: 10px; }
+.bl-knoepfe .knopf { min-height: var(--tipp); }
+.bl-meldung, .bl-fortschritt { margin: 0; font-size: 13.5px; font-weight: 650; color: var(--text); }
+.bl-fehler { margin: 0; padding: 10px 12px; border-radius: var(--r-m); background: var(--warn-weich); color: var(--text); font-size: 14px; font-weight: 650; }
+.bl-ok { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+.bl-f-liste { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.bl-f-liste li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; border-radius: var(--r-m);
+  background: var(--flaeche-2); }
+.bl-f-name { display: grid; gap: 2px; min-width: 0; }
+.bl-f-name b { font-size: 15px; }
+.bl-f-name span { font-size: 12.5px; font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
+.knopf.bl-f-weg { min-height: var(--tipp); font-size: 13.5px; }
+
+/* ---------- iPad hoch und schmaler: eine Spalte ---------- */
+@media (max-width: 900px) {
+  .bl-reiter[data-reiter="ich"], .bl-reiter[data-reiter="freunde"] { grid-template-columns: minmax(0, 1fr); }
+  .bl-reiter[data-reiter="ich"] > .bl-spieler { grid-row: auto; }
+}
+
+/* ---------- Handy ---------- */
+@media (max-width: 600px) {
+  .pk-abr-knopf { gap: 10px; padding: 9px 10px; }
+  .pk-symbol { width: 34px; height: 34px; }
+  .pk-wert { font-size: 21px; }
+  .bl-steuer { padding-top: 4px; }
+  .bl-steuer-reiter, .bl-steuer-fenster { flex: 1 1 100%; max-width: none; }
+  .bl-karte { padding: 16px; border-radius: var(--r-l); }
+  .bl-k-kopf h2 { font-size: 21px; }
+  .bl-z-innen { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; padding: 6px 12px 6px 8px; }
+  .bl-punkte { font-size: 18px; }
+  .bl-vorschau { grid-template-columns: minmax(0, 1fr); }
+  .bl-f-liste li { grid-template-columns: auto minmax(0, 1fr); }
+  .bl-f-liste .bl-f-weg { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* ---------- reduzierte Bewegung ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .pk-schimmer .pk-text, .pk-schimmer .pk-wert { animation: none; }
+}
+:root[data-bewegung="aus"] .pk-schimmer .pk-text, :root[data-bewegung="aus"] .pk-schimmer .pk-wert { animation: none; }

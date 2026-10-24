@@ -1,0 +1,29 @@
+/* Zu zweit: Namen und Uhr am gemeinsamen Brett; Farben und Abstaende aus dem Theme. */
+.partie.zz-screen { display: flex; flex-direction: column; min-height: 0; }
+.zz-screen > .kopf { gap: var(--a3); flex-shrink: 0; }
+.zz-screen > .kopf h2 { margin: 0; font-size: var(--fs-h2); }
+.zz-rumpf { flex: 1; min-height: 0; overflow: auto; padding: var(--a4); }
+.zz-start { display: grid; gap: var(--a4); max-width: 520px; margin: auto; padding: var(--a5); }
+.zz-start h3, .zz-start p { margin: 0; }
+.zz-start label { display: grid; gap: var(--a2); font-weight: var(--gw-stark); }
+.zz-start input:not([type="checkbox"]), .zz-start select { width: 100%; min-height: var(--tipp); padding: var(--a3); border: 1px solid var(--linie-2); border-radius: var(--r-s); background: var(--flaeche); color: var(--text); font: inherit; }
+.zz-start .zz-schalter { display: flex; align-items: center; min-height: var(--tipp); gap: var(--a3); }
+.zz-schalter input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--akzent); }
+.zz-hinweis { color: var(--text-2); font-size: var(--fs-klein); }
+.zz-spielbereich { display: grid; gap: var(--a3); width: min(100%, 680px, calc(100dvh - 300px)); min-width: min(100%, 280px); margin: auto; }
+.zz-spieler { display: flex; align-items: center; gap: var(--a3); padding: var(--a2) var(--a3); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
+.zz-spieler > img { width: 44px; height: 44px; flex-shrink: 0; background: var(--feld-hell); border-radius: var(--r-s); }
+.zz-name { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.zz-name span { color: var(--text-2); font-size: var(--fs-klein); }
+.zz-gegenueber { transform: rotate(180deg); }
+.zz-spieler .uhr { flex-shrink: 0; }
+.zz-spieler .uhr[hidden] { display: none; }
+.partie .zz-rahmen { width: 100%; }
+.zz-brett { width: 100%; aspect-ratio: 1; }
+.zz-status { margin: 0; text-align: center; min-height: 1.5em; }
+.zz-aktionen { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--a3); }
+.zz-aktionen .knopf { min-height: var(--tipp); }
+.zz-zuege { max-height: 4em; overflow: auto; color: var(--text-2); font-size: var(--fs-klein); }
+.zz-ergebnis { padding: var(--a4); text-align: center; }
+.zz-ergebnis h3 { overflow-wrap: anywhere; }
+.zz-ergebnis[hidden] { display: none; }

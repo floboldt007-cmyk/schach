@@ -1,0 +1,31 @@
+/* ============================================================
+   Crownmate · Paket kartei (Welle A, A3): Karte im Training (Ort training:karten) und Zeile in der Heute-Karte
+   (Ort arena:heute). Bausteine der Training-Huelle (.t-karte, .t-fuss, .kartei-stapel, .mini) kommen aus
+   css/training.css und css/bauteile.css. Nur Tokens, hell und dunkel; keine rote Zahl (Fairness).
+   Das Paket haengt diese Datei selbst ein (link[data-paket="kartei"]).
+   ============================================================ */
+.kt-karte h2 { font-size: 26px; }
+.kt-stapel { height: 132px; }
+.kt-stapel .kk { overflow: hidden; }
+.kt-stapel .kk em { position: absolute; left: 9px; bottom: 6px; padding: 1px 6px; border-radius: var(--r-pille); background: var(--flaeche);
+  font-style: normal; font-size: 11px; font-weight: 800; color: var(--text-2); box-shadow: var(--kante); }
+.kt-zahlen { color: var(--text-2); font-size: 13.5px; font-weight: 700; }
+.kt-symbol { width: 52px; height: 52px; border-radius: 17px; display: grid; place-items: center; background: var(--flaeche-3); color: var(--text-2); }
+.kt-symbol .ico { width: 28px; height: 28px; }
+.kt-ruhig:not(.kt-leer) .kt-symbol { background: var(--k-bester); color: var(--kg-bester); }
+.kt-ruhig:not(.kt-leer) .kt-symbol .ico { stroke-width: 3; }
+.kt-los .ico { width: 18px; height: 18px; }
+
+/* Zeile in der Heute-Karte der Arena */
+.kt-heute { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; }
+.kt-heute-symbol { flex: none; width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--flaeche);
+  color: var(--text-2); box-shadow: var(--kante); }
+.kt-heute-symbol .ico { width: 18px; height: 18px; }
+.kt-heute-text { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 650; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kt-heute-text b { color: var(--text); font-weight: 800; }
+.kt-heute-los { flex: none; min-height: 44px; padding: 0 14px; font-size: 14.5px; }
+
+@media (max-width: 700px) {
+  .kt-karte h2 { font-size: 23px; }
+  .kt-stapel { height: 124px; }
+}

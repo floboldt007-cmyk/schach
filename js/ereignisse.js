@@ -34,9 +34,18 @@ export const EREIGNISSE = Object.freeze([
   'training:geloest', 'training:stand',
   'uebung:ergebnis',
   'bestmarke:neu',
+  'liga:geaendert',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18), Datenvertrag in ARCHITEKTUR.md
   'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet',
   'boss:treffer', 'boss:siegel', 'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
+  // Paket funken (S1-1): Summe einer Buchung fuer Serie, Liga und andere Pakete, Vertrag in ARCHITEKTUR.md
+  'funken:geaendert',
+  // Paket boss (S1-6) meldet, dass daten/boss/spielplan.json geladen ist; erst dann liest funken den Spielplan (kein 404)
+  'spielplan:geladen',
+  // Paket punkte (S1-3): { punkte, platz, tafel, rekord } je bewerteter Partie, Vertrag in ARCHITEKTUR.md
+  'punkte:geaendert',
+  // Paket serie (P3): { tag, lauf, meilenstein, ... } nach jedem gezaehlten Tag und jeder Aenderung am Siegeslauf
+  'serie:geaendert',
 ]);
 
 const BEKANNT = new Set(EREIGNISSE);

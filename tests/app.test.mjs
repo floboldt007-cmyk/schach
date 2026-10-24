@@ -23,7 +23,10 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8831);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+// Kern-Gruppen laufen mit ?test&kern: ohne die Spielpakete aus PAKETE (js/erweiterungen.js), damit sie den Kern
+// pruefen und nicht mit jedem neuen Paket umgeschrieben werden muessen. Die echte Paketliste pruefen die
+// Erweiterungs-Gruppen hier (MIT_PAKET, MIT_W0PLUS) sowie e2e, arena, navigation und screens.
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const bilderArg = process.argv.find((a) => a.startsWith('--bilder='));
 const BILDER = bilderArg ? bilderArg.slice(9) : process.env.BILDER || path.join(WURZEL, 'design', 'app-shots');
 const SCHNELL = process.argv.includes('--schnell');
@@ -155,6 +158,13 @@ function hilfen(seite, { touch = true } = {}) {
     },
     async tippe(sel) {
       await stehtStill(seite.locator(sel).first());
+      // Wie ein Finger: liegt etwas ueber dem Ziel (z. B. der feste Spielen-Knopf ueber einem laengeren Arena-Panel),
+      // scrollt Flo es erst in die Mitte. Bleibt es verdeckt, geht der Tipp daneben und die Pruefung scheitert.
+      const verdeckt = await seite.locator(sel).first().evaluate((e) => {
+        const r = e.getBoundingClientRect(), oben = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return !oben || !(oben === e || e.contains(oben));
+      });
+      if (verdeckt) { await seite.locator(sel).first().evaluate((e) => e.scrollIntoView({ block: 'center' })); await warte(150); }
       const b = await seite.locator(sel).first().boundingBox();
       if (!b) throw new Error('nicht sichtbar: ' + sel);
       if (touch) await seite.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
@@ -918,7 +928,8 @@ hoere('partie:beendet', (d) => {
   melde({ partieId: d.partieId, quelle: 'w0-c', prio: 50, titel: 'Zeile C', text: 'doppelt' });
 });
 `;
-const MIT_PAKET = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0-test/index`;
+// &kern mit der echten Liga: diese Gruppen pruefen das Zusammenspiel mit genau ihr (Panel, Abrechnung), nicht mit allen PAKETE
+const MIT_PAKET = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/w0-test/index,pakete/liga/index`;
 const namen = (log) => log.map((e) => e.name);
 
 // ---------- Nachpruefung w0c ----------
@@ -1361,9 +1372,12 @@ async function testeErweiterungen(browser) {
     const anfragen = [];
     seite.on('request', (r) => anfragen.push(new URL(r.url()).pathname));
     await seite.route('**/js/pakete/w0-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET }));
+    // Ohne fest installierte Pakete bleibt die Aussage ueber ?erw unabhaengig von PAKETE.
+    await seite.route('**/js/erweiterungen.js', r => r.fulfill({ contentType: 'text/javascript', body: 'export const PAKETE = []; export const REITER = [];' }));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?erw=pakete/w0-test/index#arena`);
     await seite.waitForSelector('.screen.arena');
     await warte(400);
+    // PAKETE ist hier leer (Route oben): dann laedt die App ohne ?test gar kein Paket, auch nicht ueber ?erw
     pruefe('?erw ohne ?test wird ignoriert', !anfragen.some((a) => a.includes('/pakete/')) && await seite.evaluate(() => !window.__w0));
     await kontext.close();
   }
@@ -1557,7 +1571,8 @@ async function testeErweiterungen(browser) {
   await seite.waitForSelector('.screen.arena .detail');
   const nl = await seite.evaluate(() => {
     const n = document.querySelector('.detail .ort-panel-oben .nachlese');
-    return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent), vorDemOrt: n.nextElementSibling && n.nextElementSibling.matches('.w0-test') } : null;
+    return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent),
+      vorDemOrt: n.parentElement.firstElementChild === n && !!n.parentElement.querySelector('.w0-test') && !!n.parentElement.querySelector('.liga-karte') } : null;
   });
   pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, vor den Paketen', nl && /Seit deiner letzten Partie/.test(nl.titel)
     && JSON.stringify(nl.zeilen) === '["GROSS B","Zeile E"]' && nl.vorDemOrt, JSON.stringify(nl));
@@ -2008,7 +2023,8 @@ if (q.has('wpabr')) {
   anbieten('ergebnis:abrechnung', zeile('FUNKEN', 'funken'), { reihenfolge: 20, paket: 'funken' });
   anbieten('ergebnis:abrechnung', zeile('PUNKTE', 'punkte'), { reihenfolge: 10, paket: 'punkte' });
   if (q.has('wpabr5')) {
-    anbieten('ergebnis:abrechnung', zeile('WERTUNG', 'wertung'), { reihenfolge: 30, paket: 'wertung' });
+    // Echte Liga auf 30, Test-Zeile dazwischen: keine Abhaengigkeit von gleichzeitigen Modul-Imports.
+    anbieten('ergebnis:abrechnung', zeile('WERTUNG', 'wertung'), { reihenfolge: 35, paket: 'wertung' });
     anbieten('ergebnis:abrechnung', zeile('SERIE', 'serie'), { reihenfolge: 40, paket: 'alltag' });
     anbieten('ergebnis:abrechnung', zeile('FUENFTE', 'fuenfte'), { reihenfolge: 50, paket: 'x' });
   }
@@ -2050,7 +2066,7 @@ if (q.has('wpboss')) {
   });
 }
 `;
-const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/w0plus-test/index${flags ? '&' + flags : ''}`;
+const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/w0plus-test/index,pakete/liga/index${flags ? '&' + flags : ''}`;
 const FAKE_ICH = `export function zeige(root) { const s = document.createElement('section'); s.className = 'screen ich-test'; s.textContent = 'Ich'; root.append(s); return { verlasse() {} }; }`;
 const BOSS_START = 'r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 5';
 
@@ -2085,7 +2101,7 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=training,bestenliste,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=training,bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
@@ -2120,7 +2136,8 @@ async function testeSpielFundament(browser) {
     pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
     await seite.waitForSelector('.screen.arena');
-    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste') || document.querySelector('.reiter-leiste').hidden));
+    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Ich)
+    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="ich"]')));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/training\.js/.test(f));
     pruefe('Leiste: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
     await kontext.close();
@@ -2254,8 +2271,8 @@ async function testeSpielFundament(browser) {
         rollen: z.map((x) => x.getAttribute('role')).join(), erstes: a.parentNode.firstElementChild === a, kontext: window.__wp.kontexte['ergebnis:abrechnung'],
         tipp: !!document.querySelector('.ergebnis-overlay .erg-tipp'), hook: window.__partie.protokoll.some((e) => e.typ === 'matt-hook') };
     });
-    pruefe('Abrechnung: Hülle an ergebnis:karte, Zeilen Punkte vor Funken, rollen im Abstand von 200 ms ein', abr.zeilen === 'punkte,funken' && abr.t === '300ms,500ms'
-      && abr.rollt && abr.rollen === 'listitem,listitem' && abr.erstes && !abr.tipp, JSON.stringify(abr));
+    pruefe('Abrechnung: Hülle an ergebnis:karte, Punkte vor Funken vor Liga, rollen im Abstand von 200 ms ein', abr.zeilen === 'punkte,funken,liga' && abr.t === '300ms,500ms,700ms'
+      && abr.rollt && abr.rollen === 'listitem,listitem,listitem' && abr.erstes && !abr.tipp, JSON.stringify(abr));
     pruefe('Abrechnung: Kontext der Zeilen wie ergebnis:karte (mit boss)', JSON.stringify(abr.kontext) === JSON.stringify(['app', 'boss', 'bot', 'erg', 'ergebnis', 'farbe', 'grund', 'modus', 'nachtrag', 'rechnet', 'review', 'wertet', 'ziel']), JSON.stringify(abr.kontext));
     pruefe('Matt ohne Finisher-Anbieter: kein Matt-Hook, Ablauf wie vorher', abr.hook === false);
     await seite.evaluate(() => { window.__abrVorher = document.querySelector('.ergebnis-overlay .abrechnung'); });
@@ -2265,7 +2282,7 @@ async function testeSpielFundament(browser) {
       return { neu: a !== window.__abrVorher, zeilen: [...a.children].map((x) => x.dataset.zeile).join(), rollt: [...a.children].some((x) => x.classList.contains('abr-rollt')),
         rechnet: [...a.children].some((x) => x.textContent.includes('…')) };
     });
-    pruefe('Abrechnung: Nachtrag baut die Hülle neu, dieselben Zeilen stehen still (ohne erneutes Einrollen)', nach.neu && nach.zeilen === 'punkte,funken' && !nach.rollt && !nach.rechnet, JSON.stringify(nach));
+    pruefe('Abrechnung: Nachtrag baut die Hülle neu, dieselben Zeilen stehen still (ohne erneutes Einrollen)', nach.neu && nach.zeilen === 'punkte,funken,liga' && !nach.rollt && !nach.rechnet, JSON.stringify(nach));
     await seite.locator('.ergebnis-overlay .abrechnung').click();
     pruefe('Abrechnung: Antippen zeigt sofort alles', await seite.evaluate(() => document.querySelector('.ergebnis-overlay .abrechnung').classList.contains('alles')));
     const datensatz = (await h.gespeichert())[0];
@@ -2275,13 +2292,13 @@ async function testeSpielFundament(browser) {
     await seite.evaluate(() => window.__app.gehe('arena'));
     await seite.waitForSelector('.screen.arena');
     pruefe('partie:gegner-leiste: verlasse() beim Verlassen der Partie', (await seite.evaluate(() => window.__wp.leisteWeg)) >= 1);
-    // fuenf Zeilen: hoechstens vier
+    // Fuenf Test-Zeilen plus die echte Liga: weiterhin hoechstens vier, in Anbieter-Reihenfolge.
     await seite.goto(MIT_W0PLUS('wpabr&wpabr5') + '#arena');
     await seite.waitForSelector('.screen.arena');
     await h.schaefermatt();
     await seite.waitForSelector('.ergebnis-overlay .erg-karte-ort .abrechnung', { timeout: 20000 });
-    pruefe('Abrechnung: höchstens vier Zeilen (Punkte, Funken, Wertung, Serie)', (await seite.evaluate(() => [...document.querySelector('.ergebnis-overlay .abrechnung').children]
-      .map((x) => x.dataset.zeile).join())) === 'punkte,funken,wertung,serie');
+    const vierZeilen = await seite.evaluate(() => [...document.querySelector('.ergebnis-overlay .abrechnung').children].map((x) => x.dataset.zeile).join());
+    pruefe('Abrechnung: höchstens vier von sechs Zeilen (Punkte, Funken, Liga, Wertung)', vierZeilen === 'punkte,funken,liga,wertung', vierZeilen);
     pruefe('Orte: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -2546,7 +2563,7 @@ async function testeSpielFundament(browser) {
     pruefe('Screen werkstatt ohne Datei: still zur Arena, kein Platzhalter', ohne.hash === '#arena' && !ohne.platzhalter, JSON.stringify(ohne));
     const FAKE_WERKSTATT = FAKE_ICH.replace('ich-test', 'werkstatt-test').replace("'Ich'", "'Werkstatt'");
     await seite.route('**/js/ui/werkstatt.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_WERKSTATT }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&reiter=ich#werkstatt`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=ich#werkstatt`);
     await seite.waitForSelector('.screen.werkstatt-test');
     const r = await seite.evaluate(() => {
       const aktiv = document.querySelector('.reiter-leiste [aria-current="page"]');

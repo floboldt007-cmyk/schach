@@ -371,7 +371,6 @@ async function testeSieg(seite, h, fehler) {
   const kern = ereignisse.filter((n) => /^(app:bereit|partie:|zug:gespielt|zug:bewertet)/.test(n));
   pruefe('Ereignisse: app:bereit, partie:gestartet, Züge, partie:beendet (ohne Pakete)', kern[0] === 'app:bereit' && kern.includes('partie:gestartet')
     && kern.filter((n) => n === 'zug:gespielt').length === 7 && kern.indexOf('partie:beendet') > kern.lastIndexOf('zug:gespielt'), kern.join(' '));
-  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
   pruefe('html[data-sichtbar="ja"]', (await seite.evaluate(() => document.documentElement.dataset.sichtbar)) === 'ja');
 
   gruppe = 'Analyse';
@@ -718,6 +717,64 @@ async function bilder(browser, id) {
   }
 }
 
+// ---------- Kern ohne Spielpakete (?test&kern): die Pakete aus PAKETE aendern das Ergebnis, der Kern allein nicht ----------
+async function testeOhnePakete(browser) {
+  gruppe = 'Kern';
+  const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+  const h = hilfen(seite);
+  const paketAbrufe = [];
+  seite.on('request', (r) => { if (/\/pakete\//.test(r.url())) paketAbrufe.push(r.url()); });
+  await seite.goto(START + '?test&kern#arena');
+  await h.screen('arena');
+  await schaefermatt(seite, h);
+  await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+  await warte(2600);
+  pruefe('Ohne Pakete: keine Feier, kein Ort im Ergebnis', await seite.locator('.erg-feier').isHidden() && await seite.locator('.erg-karte-ort').isHidden());
+  pruefe('Ohne Pakete: keine Paket-Datei geladen', paketAbrufe.length === 0, paketAbrufe.join(' | '));
+  pruefe('Ohne Pakete: keine Konsolenfehler, keine fehlgeschlagenen Anfragen', fehler.length === 0 && fehlgeschlagen.length === 0, [...fehler, ...fehlgeschlagen].join(' | '));
+  await kontext.close();
+}
+
+// ---------- Kopf mit den echten Paketen: Zahlenruhe (Flo 23.10.: Sterne, Level, Serie) ----------
+// Mit Level (funken) und Serie im Kopf tritt "Besiegt" zurueck; jeder sichtbare Chip steht ganz in der Chip-Reihe, auf dem
+// iPad (quer 1180 und 1024, hoch 820) und am Handy (390, dort ohne die Marke und ohne die Flamme der Serie).
+async function testeKopfZahlenruhe(browser) {
+  gruppe = 'Kopf';
+  for (const [name, w, h, mobil] of [['iPad quer', 1180, 820, false], ['iPad 1024', 1024, 768, false], ['iPad hoch', 820, 1180, false], ['Handy', 390, 844, true]]) {
+    const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: mobil });
+    const seite = await kontext.newPage();
+    await seite.goto(START + '?test#arena');
+    await seite.waitForFunction(() => !!window.__serie, null, { timeout: 20000 });
+    await seite.waitForSelector('.screen.arena .kopf-chips .fk-chip', { timeout: 20000 });
+    const neu = await seite.evaluate(() => [...document.querySelectorAll('.kopf-chips > *')].filter((c) => c.getClientRects().length)
+      .map((c) => (c.classList.contains('chip-sterne') ? 'sterne' : c.classList.contains('fk-chip') ? 'level' : c.classList.contains('chip-pokal') ? 'besiegt' : c.className)).join(','));
+    pruefe(`${name}: neuer Spieler (noch keine Serie): Sterne und Level, kein Besiegt`, neu === 'sterne,level', neu);
+    await seite.evaluate(async () => {
+      const tg = await import('./js/tag.js');
+      const S = window.__serie;
+      const st = S.T.leer();
+      for (let i = 11; i >= 1; i--) S.T.zaehleTag(st, tg.addiereTage(S.heute(), -i), { quelle: 'partie' });
+      Object.assign(st, { lauf: { n: 4, best: 4, ms: [3] } });
+      S.speichere(st);
+    });
+    // neu zeichnen statt neu laden (beim Verlassen der Seite koennte ein Paket seinen alten Stand zurueckschreiben)
+    await seite.evaluate(() => window.__app.gehe('arena'));
+    await seite.waitForSelector('.screen.arena .kopf-chips .se-chip', { timeout: 20000 });
+    await warte(800);
+    const k = await seite.evaluate(() => {
+      const box = document.querySelector('.kopf-chips').getBoundingClientRect();
+      const chips = [...document.querySelectorAll('.kopf-chips > *')].filter((c) => c.getClientRects().length);
+      return { sichtbar: chips.map((c) => (c.classList.contains('chip-sterne') ? 'sterne' : c.classList.contains('fk-chip') ? 'level'
+        : c.classList.contains('se-chip') ? 'serie' : c.classList.contains('chip-pokal') ? 'besiegt' : c.className)),
+        ganz: chips.every((c) => { const r = c.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; }),
+        quer: document.documentElement.scrollWidth <= innerWidth + 1, titel: document.querySelector('.haupt-kopf h1, .haupt-kopf .marke-titel')?.textContent.trim() };
+    });
+    pruefe(`${name}: im Kopf genau Sterne, Level, Serie, alle ganz im Bild, die Marke bleibt im Dokument`, k.sichtbar.join(',') === 'sterne,level,serie'
+      && k.ganz && k.quer && k.titel === 'Crownmate', JSON.stringify(k));
+    await kontext.close();
+  }
+}
+
 // ---------- Ablauf ----------
 let browser;
 let code = 1;
@@ -734,6 +791,8 @@ try {
   await testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id);
   await testeAufgabe(seite, h, fehler);
   await testeUpdate(seite, h, fehler);
+  await testeOhnePakete(browser);
+  await testeKopfZahlenruhe(browser);
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
