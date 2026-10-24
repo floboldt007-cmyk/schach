@@ -20,56 +20,58 @@
 import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { icon } from '../../ui/icons.js';
+import { t, zahl } from '../../sprache.js';
+import '../../sprachen/allgemein.js';
+import './texte.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const zahlText = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE');
+// Zahlen in der eingestellten Sprache ('21.300' | '21,300')
+export const zahlText = (n) => zahl(Math.round(Number(n) || 0));
 
-// Besitzform der Leiter-Bots ("Rudis Tafel"); andere Gegner heissen "Tafel: <Name>"
-const BESITZ = {
-  benno: 'Bennos', hilde: 'Hildes', kalle: 'Kalles', lisa: 'Lisas', rudi: 'Rudis', turm: 'Professor Turms', delia: 'Delias',
-  koenig: 'Kommissar Königs', greta: 'Gretas', stockfisch: 'Stockfischs',
+// Besitzform der Leiter-Bots ("Rudis Tafel", Woerterbuch besitz.<id>); andere Gegner heissen "Tafel: <Name>"
+const BESITZ = new Set(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch',
   // Welten (24.10.): die neuen Bots
-  fridolin: 'Fridolins', paula: 'Paulas', gustav: 'Gustavs', janine: 'Janines', bodo: 'Bodos', leo: 'Leos', edda: 'Eddas',
-  luke: 'Lukes', moritz: 'Moritz’', ottilie: 'Ottilies', lasse: 'Lasses', wiebke: 'Wiebkes', henning: 'Hennings', ilka: 'Ilkas',
-  johann: 'Johanns', keetan: 'Keetans', ragna: 'Ragnas', silas: 'Silas’', merle: 'Merles', alva: 'Alvas',
-};
-const STUFE_NAME = { standard: 'Standard', meister: 'Meister' };
+  'fridolin', 'paula', 'gustav', 'janine', 'bodo', 'leo', 'edda', 'luke', 'moritz', 'ottilie', 'lasse', 'wiebke', 'henning', 'ilka',
+  'johann', 'keetan', 'ragna', 'silas', 'merle', 'alva']);
+const STUFEN = ['standard', 'meister'];
 
 export function tafelName(tafelId, botNachId = () => null) {
-  const t = typeof tafelId === 'string' ? tafelId.split(':') : [];
-  if (t[0] === 'bot') {
-    if (BESITZ[t[1]]) return `${BESITZ[t[1]]} Tafel`;
-    const b = botNachId(t[1]);
-    return b && b.name ? `Tafel: ${b.name}` : 'Tafel';
+  const teile = typeof tafelId === 'string' ? tafelId.split(':') : [];
+  if (teile[0] === 'bot') {
+    if (BESITZ.has(teile[1])) return t('p-punkte.tafel.besitz', { wer: t('p-punkte.besitz.' + teile[1]) });
+    const b = botNachId(teile[1]);
+    return b && b.name ? t('p-punkte.tafel.von', { name: b.name }) : t('p-punkte.tafel.allein');
   }
-  if (t[0] === 'boss') {
-    const b = botNachId(t[1]);
-    return `Boss-Tafel ${b && b.name ? b.name : 'Wochen-Boss'} · ${STUFE_NAME[t[2]] || ''}`.trim();
+  if (teile[0] === 'boss') {
+    const b = botNachId(teile[1]);
+    return t('p-punkte.tafel.boss', { name: b && b.name ? b.name : t('p-punkte.tafel.wochenBoss'),
+      stufe: STUFEN.includes(teile[2]) ? t('p-punkte.stufe.' + teile[2]) : '' }).trim();
   }
-  return 'Tafel';
+  return t('p-punkte.tafel.allein');
 }
 
-const GRUND = {
-  hilfe: 'Ohne Tafel-Eintrag: Hinweis oder Zurücknehmen genutzt',
-  frei: 'Freie Partie: zählt für keine Tafel',
-  spiel: 'Spielhalle: eigene Tafeln kommen später',
-  gast: 'Gast-Partie: zählt für keine Tafel',
-  stellung: 'Eigene Stellung: zählt für keine Tafel',
-};
+const GRUENDE = ['hilfe', 'frei', 'spiel', 'gast', 'stellung'];
 
-export function unterText(e, name = 'Tafel') {
+export function unterText(e, name = t('p-punkte.tafel.allein')) {
   if (!e) return '';
-  if (!e.tafel) return GRUND[e.grund] || GRUND.gast;
-  if (e.erster) return `Erster Eintrag auf ${name}`;
+  if (!e.tafel) return t('p-punkte.grund.' + (GRUENDE.includes(e.grund) ? e.grund : 'gast'));
+  if (e.erster) return t('p-punkte.erster', { name });
   // Platz gewonnen: "Platz 3 auf Rudis Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
-  if (e.rekord && e.aufstieg > 0 && e.platz != null) return `Platz ${e.platz} auf ${name}`;
-  if (e.rekord) return `Rekord auf ${name} · +${zahlText(e.w - (e.vorher || 0))}`;
+  if (e.rekord && e.aufstieg > 0 && e.platz != null) return t('p-punkte.platzAuf', { platz: e.platz, name });
+  if (e.rekord) return t('p-punkte.rekordPlus', { name, plus: zahlText(e.w - (e.vorher || 0)) });
   // "So nah" vor dem Platz: eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten, und der leise
   // Moment (hoechstens einmal je Tafel und Woche) waere sonst nie zu sehen
-  if (e.fast) return `So nah wie noch nie: ${e.fast.prozent} % deines Rekords auf ${name}`;
-  if (e.platz != null) return `Platz ${e.platz} auf ${name}`;
-  if (e.wochenPlatz != null) return `Diese Woche: Platz ${e.wochenPlatz} auf ${name}`;
-  return `${name}: dein Bestwert ${zahlText(e.bestwert)}`;
+  if (e.fast) return t('p-punkte.fast', { prozent: e.fast.prozent, name });
+  if (e.platz != null) return t('p-punkte.platzAuf', { platz: e.platz, name });
+  if (e.wochenPlatz != null) return t('p-punkte.wochePlatz', { platz: e.wochenPlatz, name });
+  return t('p-punkte.bestwert', { name, wert: zahlText(e.bestwert) });
+}
+
+// Text mit Markup an Platzhaltern: der Text wird maskiert, {name} aus html bleibt Markup (Texte ohne HTML im Woerterbuch)
+function mitHtml(schluessel, werte, html) {
+  let s = esc(t(schluessel, werte));
+  for (const [k, v] of Object.entries(html)) s = s.split('{' + k + '}').join(v);
+  return s;
 }
 
 function el(tag, klasse, html) {
@@ -81,23 +83,27 @@ function el(tag, klasse, html) {
 
 function posten(e) {
   const p = e.posten || {};
-  const aus = [[`Züge (${p.offen || 0} offen)`, p.zugpunkte], ['Theorie', p.theorie]];
-  if (p.kurz) aus.push(['Vor dem 10. eigenen Zug beendet: kein Ergebnis-Bonus', null]);
-  else aus.push([{ sieg: 'Sieg', remis: 'Remis', niederlage: 'Kampfgeist' }[e.erg] || 'Ergebnis', p.ergebnis]);
-  if (e.erg === 'sieg') aus.push([p.par ? `Verwertung (Par ${p.par})` : 'Verwertung', p.verwertung]);
-  if (p.combo) aus.push([`COMBO-Zuschlag (längste Serie × ${p.maxSerie || 0})`, p.combo]);
-  if (p.weste) aus.push(['Weiße Weste: Sieg ohne Daneben', p.weste]);
-  if (e.erg === 'niederlage' && !p.kurz && !p.ergebnis) aus.push(['Kampfgeist gibt es ab dem 15. eigenen Zug', null]);
+  const aus = [[t('p-punkte.posten.zuege', { offen: p.offen || 0 }), p.zugpunkte], [t('p-punkte.posten.theorie'), p.theorie]];
+  if (p.kurz) aus.push([t('p-punkte.posten.kurz'), null]);
+  else {
+    const erg = { sieg: 'allgemein.sieg', remis: 'allgemein.remis', niederlage: 'p-punkte.posten.kampfgeist' }[e.erg];
+    aus.push([t(erg || 'p-punkte.posten.ergebnis'), p.ergebnis]);
+  }
+  if (e.erg === 'sieg') aus.push([p.par ? t('p-punkte.posten.verwertungPar', { par: p.par }) : t('p-punkte.posten.verwertung'), p.verwertung]);
+  if (p.combo) aus.push([t('p-punkte.posten.combo', { n: p.maxSerie || 0 }), p.combo]);
+  if (p.weste) aus.push([t('p-punkte.posten.weste'), p.weste]);
+  if (e.erg === 'niederlage' && !p.kurz && !p.ergebnis) aus.push([t('p-punkte.posten.kampfgeistAb'), null]);
   return aus;
 }
 
-export function panelZeile({ name = 'Tafel', best = 0, platz = null, beiTipp = null } = {}) {
+export function panelZeile({ name = t('p-punkte.tafel.allein'), best = 0, platz = null, beiTipp = null } = {}) {
   const k = el('button', 'pk-panel dr');
   k.type = 'button';
   k.dataset.paket = 'punkte';
   k.innerHTML = `<span class="pk-panel-symbol" aria-hidden="true">${icon('podest')}</span><span class="pk-panel-text"></span>`;
-  k.querySelector('.pk-panel-text').textContent = `${name} · Bestwert ${zahlText(best)}${platz != null ? ` · Platz ${platz}` : ''}`;
-  k.setAttribute('aria-label', `${name} öffnen: dein Bestwert ${zahlText(best)} Punkte${platz != null ? `, Platz ${platz}` : ''}`);
+  const werte = { name, wert: zahlText(best), platz };
+  k.querySelector('.pk-panel-text').textContent = t(platz != null ? 'p-punkte.panel.textPlatz' : 'p-punkte.panel.text', werte);
+  k.setAttribute('aria-label', t(platz != null ? 'p-punkte.panel.labelPlatz' : 'p-punkte.panel.label', werte));
   if (typeof beiTipp === 'function') k.addEventListener('click', (ev) => { ev.stopPropagation(); beiTipp(); });
   return k;
 }
@@ -107,9 +113,9 @@ export function wartezeile({ fehlt = false } = {}) {
   z.dataset.zeile = 'punkte';
   z.dataset.paket = 'punkte';
   z.innerHTML = `<div class="pk-abr-knopf pk-statisch"><span class="pk-symbol" aria-hidden="true">${icon('podest')}</span>
-    <span class="pk-abr-mitte"><span class="pk-label">Punkte</span><span class="pk-text"></span></span>
+    <span class="pk-abr-mitte"><span class="pk-label">${esc(t('p-punkte.label'))}</span><span class="pk-text"></span></span>
     <span class="pk-werte"><span class="pk-wert zahl">…</span></span></div>`;
-  z.querySelector('.pk-text').textContent = fehlt ? 'Punkte folgen mit der Analyse (die Arena rechnet sie nach).' : 'Punkte werden gezählt …';
+  z.querySelector('.pk-text').textContent = t(fehlt ? 'p-punkte.warte.fehlt' : 'p-punkte.warte.rechnet');
   return z;
 }
 
@@ -141,24 +147,24 @@ function zeigePost(box, post) {
   let text = '';
   try { text = String(post.text() || ''); } catch (e) { text = ''; }
   box.hidden = false;
-  box.innerHTML = `<p class="pk-klein">Vorschau. Der Code enthält deine Züge, Datum, Seed und deinen Namen, falls du einen eingetragen hast.</p>
+  box.innerHTML = `<p class="pk-klein">${esc(t('p-punkte.post.vorschau'))}</p>
     <textarea class="pk-post-text" rows="3" readonly></textarea>
-    <div class="pk-d-knoepfe"><button class="knopf primaer pk-post-kopieren dr" type="button">Kopieren</button>
-    ${typeof navigator !== 'undefined' && navigator.share ? '<button class="knopf pk-post-teilen dr" type="button">Teilen …</button>' : ''}</div>
+    <div class="pk-d-knoepfe"><button class="knopf primaer pk-post-kopieren dr" type="button">${esc(t('p-punkte.kopieren'))}</button>
+    ${typeof navigator !== 'undefined' && navigator.share ? `<button class="knopf pk-post-teilen dr" type="button">${esc(t('p-punkte.teilen'))}</button>` : ''}</div>
     <p class="pk-klein pk-post-meldung" role="status" aria-live="polite"></p>`;
   const feld = box.querySelector('.pk-post-text');
   feld.value = text;
   box.querySelector('.pk-post-kopieren').addEventListener('click', async (ev) => {
     ev.stopPropagation();
     const ok = await kopiere(text, feld);
-    box.querySelector('.pk-post-meldung').textContent = ok ? 'Kopiert. Füge den Text in eine Nachricht ein.' : 'Kopieren ging nicht. Markiere den Text und kopiere ihn von Hand.';
+    box.querySelector('.pk-post-meldung').textContent = t(ok ? 'p-punkte.post.kopiert' : 'p-punkte.post.kopierenNicht');
   });
   const teilen = box.querySelector('.pk-post-teilen');
   if (teilen) teilen.addEventListener('click', (ev) => { ev.stopPropagation(); navigator.share({ text }).catch(() => {}); });
   if (tempo() > 0) anim(box, [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { d: 320, k: 'gleiten' });
 }
 
-export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schonGezeigt = false, merke = () => {}, mini = null,
+export function abrechnungsZeile({ ergebnis: e, tafelName: name = t('p-punkte.tafel.allein'), schonGezeigt = false, merke = () => {}, mini = null,
   beiListe = null, post = null, stumm = false } = {}) {
   const z = el('div', 'pk-abr');
   z.dataset.zeile = 'punkte';
@@ -171,15 +177,16 @@ export function abrechnungsZeile({ ergebnis: e, tafelName: name = 'Tafel', schon
   z.innerHTML = `
     <button class="pk-abr-knopf" type="button" aria-expanded="false" aria-controls="${id}">
       <span class="pk-symbol" aria-hidden="true">${icon('podest')}</span>
-      <span class="pk-abr-mitte"><span class="pk-label">Punkte</span><span class="pk-text"><span class="pk-satz"></span>${pfeil}</span></span>
-      <span class="pk-werte">${e.rekord && e.vorher != null ? `<s class="pk-alt zahl" aria-label="vorher ${zahlText(e.vorher)}">${zahlText(e.vorher)}</s>` : ''}`
+      <span class="pk-abr-mitte"><span class="pk-label">${esc(t('p-punkte.label'))}</span><span class="pk-text"><span class="pk-satz"></span>${pfeil}</span></span>
+      <span class="pk-werte">${e.rekord && e.vorher != null ? `<s class="pk-alt zahl" aria-label="${esc(t('p-punkte.vorher', { wert: zahlText(e.vorher) }))}">${zahlText(e.vorher)}</s>` : ''}`
       + `<span class="pk-wert zahl" data-wert="${e.w}">${schonGezeigt ? zahlText(e.w) : '0'}</span></span>
     </button>
-    ${zeigeMini ? `<ol class="pk-mini" aria-label="Ausschnitt der Tafel">${miniHtml(mini)}</ol>` : ''}
-    <div class="pk-details" id="${id}" hidden><ul></ul><p class="pk-d-summe">Zusammen <b class="zahl">${zahlText(e.w)}</b> Punkte`
-      + `${e.tafel && e.bestwert != null ? ` · dein Bestwert auf ${esc(name)}: <span class="zahl">${zahlText(e.bestwert)}</span>` : ''}</p>`
-      + `<div class="pk-d-knoepfe">${e.tafel && typeof beiListe === 'function' ? '<button class="knopf pk-zur-liste dr" type="button">Zur Bestenliste</button>' : ''}`
-      + `${post && post.name && typeof post.text === 'function' ? `<button class="knopf pk-post dr" type="button">Überhol-Post an ${esc(post.name)}</button>` : ''}</div>`
+    ${zeigeMini ? `<ol class="pk-mini" aria-label="${esc(t('p-punkte.abr.mini'))}">${miniHtml(mini)}</ol>` : ''}
+    <div class="pk-details" id="${id}" hidden><ul></ul><p class="pk-d-summe">`
+      + `${mitHtml(e.tafel && e.bestwert != null ? 'p-punkte.abr.summeBest' : 'p-punkte.abr.summe', { name },
+        { wert: `<b class="zahl">${zahlText(e.w)}</b>`, best: `<span class="zahl">${zahlText(e.bestwert)}</span>` })}</p>`
+      + `<div class="pk-d-knoepfe">${e.tafel && typeof beiListe === 'function' ? `<button class="knopf pk-zur-liste dr" type="button">${esc(t('p-punkte.abr.zurListe'))}</button>` : ''}`
+      + `${post && post.name && typeof post.text === 'function' ? `<button class="knopf pk-post dr" type="button">${esc(t('p-punkte.abr.post', { name: post.name }))}</button>` : ''}</div>`
       + '<div class="pk-post-box" hidden></div></div>';
   z.querySelector('.pk-satz').textContent = unterText(e, name);
   const ul = z.querySelector('.pk-details ul');

@@ -36,6 +36,8 @@ import { registriereIcon } from '../../ui/icons.js';
 import { ladeModul, ladePartie, ladePartien, ladeReview, hatReview, ladeEinstellungen, eigeneZuege } from '../../storage.js';
 import { tagSchluessel } from '../../tag.js';
 import { freischalten } from '../../ui/bestenliste.js';
+import { t, locale, texte } from '../../sprache.js';
+import './texte.js';
 import * as S from './stand.js';
 import * as T from './tafel.js';
 import * as C from './code.js';
@@ -88,8 +90,8 @@ function nachweisFuer(p, tafelId) {
 function nachweisSpaeter(partieId, tafelId) {
   setTimeout(() => sicher(() => {
     const st = S.lade();
-    const t = st.tafeln[tafelId];
-    const e = t && t.eintraege.slice(0, T.EIGENE_SICHTBAR).find((x) => x.id === partieId);
+    const tf = st.tafeln[tafelId];
+    const e = tf && tf.eintraege.slice(0, T.EIGENE_SICHTBAR).find((x) => x.id === partieId);
     if (!e || e.n) return;
     const n = nachweisFuer(ladePartie(partieId), tafelId);
     if (!n) return;
@@ -121,53 +123,56 @@ function feierKlingt(partieId) {
   return feierEintraege(partieId).some((x) => EIGENE_GROSSE.includes(x.quelle) && x.art === 'gross' && x.klang && x.status === 'overlay');
 }
 
-// Satz des Bots, der vorher Platz 1 war (3.13: "dazu ein Satz des ueberholten Bots"); fest gewaehlt, kein Zufall
-const PLATZ1_SAETZE = {
-  benno: ['Donnerwetter, an mir vorbei! Das erzähl ich heute Abend im Stall.'],
-  hilde: ['Na sowas, an mir vorbei! Dafür gibt es ein extra Stück Kuchen.'],
-  kalle: ['Alle Achtung! Am Stammtisch geht die nächste Runde auf dich.'],
-  lisa: ['Schneller als ich! Die Partie schau ich mir gleich noch mal an.'],
-  rudi: ['Bei meiner Ehre, das war ritterlich gespielt. Respekt!'],
-  turm: ['Bemerkenswert. Diese Partie nehme ich in meine Vorlesung auf.'],
-  delia: ['Hut ab! Mutig gespielt, ganz nach meinem Geschmack.'],
-  koenig: ['Fall gelöst: Du warst es. Und zwar richtig gut.'],
-  greta: ['Respekt. Diese Partie lege ich mir heute Abend noch einmal auf.'],
-  stockfisch: ['Notiert. Diese Partie rechne ich heute Nacht noch einmal durch.'],
-};
+// Satz des Bots, der vorher Platz 1 war (3.13: "dazu ein Satz des ueberholten Bots"); fest gewaehlt, kein Zufall.
+// Die Saetze stehen im Woerterbuch p-punkte (platz1.<botId>). Das Satz-Register bekommt die deutschen (Quelle, wie alle
+// Saetze im Register); angezeigt wird der eigene Satz in der eingestellten Sprache, ein fremder Satz aus dem Register so,
+// wie er angemeldet ist.
+const PLATZ1_BOTS = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
+function platz1Saetze() {
+  const de = texte('de');
+  return Object.fromEntries(PLATZ1_BOTS.map((id) => [id, [de['p-punkte.platz1.' + id]]]));
+}
 function platz1Satz(botId) {
   const b = botId ? botNachId(botId) : null;
   if (!b) return null;
-  const t = botSatz(b, 'tafel-platz1', () => 0);
-  return t ? `${b.name}: „${t}“` : null;
+  const satz = botSatz(b, 'tafel-platz1', () => 0);
+  if (!satz) return null;
+  const eigen = PLATZ1_BOTS.includes(b.id) && satz === texte('de')['p-punkte.platz1.' + b.id];
+  return t('p-punkte.feier.satz', { name: b.name, satz: eigen ? t('p-punkte.platz1.' + b.id) : satz });
 }
 
 function feiern(e) {
   if (!e || !e.tafel) return;
+  // Texte in der eingestellten Sprache; die Feier merkt sie sich fertig (ein spaeterer Sprachwechsel zeigt sie wie gemeldet)
   const name = A.tafelName(e.tafel, botNachId);
-  const gross = name.toLocaleUpperCase('de-DE');
+  const gross = (text) => text.toLocaleUpperCase(locale());
   const pfeil = e.aufstieg > 0 ? ` ▲ ${e.aufstieg}` : '';
   // Platz 1 einer Tafel (nur mit Gaesten dahinter): grosser Moment 78; ist der schon vergeben, eine Zeile
   if (e.platz1) {
     if (grossFrei(e.id, 78)) {
       const satz = sicher(() => platz1Satz(e.satzBot), 'Bot-Satz');
-      melde({ partieId: e.id, quelle: 'bot-rekord', titel: `PLATZ 1 AUF ${gross}`,
-        text: `${A.zahlText(e.w)} Punkte, vor ${e.ueberholt.join(', ') || 'allen Gästen'}${satz ? `. ${satz}` : ''}`, symbol: 'podest', klang: 'rekord' });
+      const text = t('p-punkte.feier.text', { wert: A.zahlText(e.w), wer: e.ueberholt.join(', ') || t('p-punkte.feier.allenGaesten') });
+      melde({ partieId: e.id, quelle: 'bot-rekord', titel: gross(t('p-punkte.platzAuf', { platz: 1, name })),
+        text: satz ? t('p-punkte.feier.mitSatz', { text, satz }) : text, symbol: 'podest', klang: 'rekord' });
     } else {
-      melde({ partieId: e.id, quelle: 'rekord', titel: `Platz 1 auf ${name}${pfeil}`, text: e.platzVorher ? `vorher Platz ${e.platzVorher}` : null, symbol: 'podest' });
+      melde({ partieId: e.id, quelle: 'rekord', titel: t('p-punkte.platzAuf', { platz: 1, name }) + pfeil,
+        text: e.platzVorher ? t('p-punkte.feier.vorherPlatz', { platz: e.platzVorher }) : null, symbol: 'podest' });
     }
     return;
   }
   // eigener Allzeit-Rekord: grosser Moment 70 (alte Zahl daneben); ist der schon vergeben, eine Zeile: mit Ueberholen
   // "Platz 4 auf Rudis Tafel ^ 2" (Platz gewonnen, 58), sonst "Rekord auf Rudis Tafel: 23.100"
   if (e.rekord) {
-    const plus = `${A.zahlText(e.w)} Punkte, vorher ${A.zahlText(e.vorher)} (+${A.zahlText(e.w - e.vorher)})`;
+    const plus = t('p-punkte.feier.plus', { wert: A.zahlText(e.w), vorher: A.zahlText(e.vorher), diff: A.zahlText(e.w - e.vorher) });
     if (grossFrei(e.id, 70)) {
-      melde({ partieId: e.id, quelle: 'tafel-rekord', art: 'gross', prio: 70, titel: `NEUER REKORD AUF ${gross}`,
-        text: e.aufstieg > 0 && e.platz != null ? `Platz ${e.platz}${pfeil} · ${plus}` : plus, symbol: 'podest', klang: 'rekord' });
+      melde({ partieId: e.id, quelle: 'tafel-rekord', art: 'gross', prio: 70, titel: gross(t('p-punkte.feier.neuerRekord', { name })),
+        text: e.aufstieg > 0 && e.platz != null ? t('p-punkte.feier.platzPlus', { platz: e.platz, pfeil, plus }) : plus, symbol: 'podest', klang: 'rekord' });
     } else if (e.aufstieg > 0 && e.platz != null) {
-      melde({ partieId: e.id, quelle: 'rekord', titel: `Platz ${e.platz} auf ${name}${pfeil}`, text: `vorher Platz ${e.platzVorher}`, symbol: 'podest' });
+      melde({ partieId: e.id, quelle: 'rekord', titel: t('p-punkte.platzAuf', { platz: e.platz, name }) + pfeil,
+        text: t('p-punkte.feier.vorherPlatz', { platz: e.platzVorher }), symbol: 'podest' });
     } else {
-      melde({ partieId: e.id, quelle: 'rekord', titel: `Rekord auf ${name}: ${A.zahlText(e.w)}`, text: `vorher ${A.zahlText(e.vorher)}`, symbol: 'podest' });
+      melde({ partieId: e.id, quelle: 'rekord', titel: t('p-punkte.feier.rekordAuf', { name, wert: A.zahlText(e.w) }),
+        text: t('p-punkte.vorher', { wert: A.zahlText(e.vorher) }), symbol: 'podest' });
     }
   }
 }
@@ -218,8 +223,8 @@ function umzug() {
   st.neu = [];
   S.speichere(st);
   for (const id of tafeln) {
-    const t = st.tafeln[id];
-    if (t) for (const e of t.eintraege.slice(0, T.EIGENE_SICHTBAR)) nachweisSpaeter(e.id, id);
+    const tf = st.tafeln[id];
+    if (tf) for (const e of tf.eintraege.slice(0, T.EIGENE_SICHTBAR)) nachweisSpaeter(e.id, id);
   }
 }
 
@@ -229,15 +234,16 @@ const gezeigt = new Set();   // Partien, deren Abrechnungszeile schon gelaufen i
 function miniTafel(e) {
   if (!e.tafel || !(e.aufstieg > 0)) return null;
   const st = S.lade();
-  const t = st.tafeln[e.tafel];
-  if (!t) return null;
-  const zeilen = T.zeilen(t, { fenster: 'allzeit', gaeste: S.gaeste(st, e.tafel) });
+  const tf = st.tafeln[e.tafel];
+  if (!tf) return null;
+  const zeilen = T.zeilen(tf, { fenster: 'allzeit', gaeste: S.gaeste(st, e.tafel) });
   const i = zeilen.findIndex((r) => r.eigen && r.id === e.id);
   if (i < 0) return null;
   const aus = [];
-  if (zeilen[i - 1]) aus.push({ ...zeilen[i - 1], rolle: 'ueber', name: zeilen[i - 1].eigen ? 'Du' : zeilen[i - 1].name });
-  aus.push({ ...zeilen[i], rolle: 'ich', name: 'Du', eigen: true });
-  if (zeilen[i + 1]) aus.push({ ...zeilen[i + 1], rolle: 'unter', name: zeilen[i + 1].eigen ? 'Du' : zeilen[i + 1].name, eigen: false });
+  const du = t('p-punkte.du');
+  if (zeilen[i - 1]) aus.push({ ...zeilen[i - 1], rolle: 'ueber', name: zeilen[i - 1].eigen ? du : zeilen[i - 1].name });
+  aus.push({ ...zeilen[i], rolle: 'ich', name: du, eigen: true });
+  if (zeilen[i + 1]) aus.push({ ...zeilen[i + 1], rolle: 'unter', name: zeilen[i + 1].eigen ? du : zeilen[i + 1].name, eigen: false });
   return aus;
 }
 
@@ -245,10 +251,11 @@ function miniTafel(e) {
 function postText(e) {
   const name = A.tafelName(e.tafel, botNachId);
   const st = S.lade();
-  const t = st.tafeln[e.tafel];
-  const eintrag = t && t.eintraege.find((x) => x.id === e.id);
+  const tf = st.tafeln[e.tafel];
+  const eintrag = tf && tf.eintraege.find((x) => x.id === e.id);
   const code = eintrag ? sicher(() => B.codeFuer(eintrag, e.tafel, String(B.einstellungen().name || '').slice(0, C.NAME_MAX)), 'Code') : null;
-  return `Ich hab deine ${A.zahlText(e.post.w)} auf ${name} geknackt, jetzt ${A.zahlText(e.w)}.${code && code.ok ? ` Code: ${code.code}` : ''}`;
+  const werte = { alt: A.zahlText(e.post.w), name, neu: A.zahlText(e.w), code: code && code.ok ? code.code : '' };
+  return t(code && code.ok ? 'p-punkte.post.textCode' : 'p-punkte.post.text', werte);
 }
 
 // "So nah wie noch nie" gilt erst, wenn die Zeile ihn zeigt: beim ersten Zeigen festschreiben; ist der Moment der Woche
@@ -288,7 +295,7 @@ function anbieterAbrechnung(k) {
   const schon = gezeigt.has(p.id);
   const e = fastZeigen(roh);
   const z = A.abrechnungsZeile({
-    ergebnis: e, tafelName: e.tafel ? A.tafelName(e.tafel, botNachId) : 'Tafel', schonGezeigt: schon, merke: () => gezeigt.add(p.id),
+    ergebnis: e, tafelName: e.tafel ? A.tafelName(e.tafel, botNachId) : t('p-punkte.tafel.allein'), schonGezeigt: schon, merke: () => gezeigt.add(p.id),
     mini: sicher(() => miniTafel(e), 'Mini-Tafel'),
     // der grosse Moment im Ergebnis klingt schon "rekord": die Zeile schweigt (kein Echo)
     stumm: !!sicher(() => feierKlingt(p.id), 'Klang'),
@@ -324,12 +331,12 @@ function anbieterPanel(k) {
   if (!bot || bot.stufe == null) return null;
   const id = T.tafelId({ botId: bot.id });
   const st = S.lade();
-  const t = id && st.tafeln[id];
-  if (!t || !t.eintraege.length) return null;
+  const tf = id && st.tafeln[id];
+  if (!tf || !tf.eintraege.length) return null;
   const gaeste = S.gaeste(st, id);
-  const ich = gaeste.length ? T.zeilen(t, { fenster: 'allzeit', gaeste }).find((r) => r.eigen) : null;
+  const ich = gaeste.length ? T.zeilen(tf, { fenster: 'allzeit', gaeste }).find((r) => r.eigen) : null;
   return A.panelZeile({
-    name: A.tafelName(id, botNachId), best: T.eigene(t, 'allzeit')[0].w, platz: ich ? ich.platz : null,
+    name: A.tafelName(id, botNachId), best: T.eigene(tf, 'allzeit')[0].w, platz: ich ? ich.platz : null,
     beiTipp: k.app && typeof k.app.gehe === 'function' ? () => {
       B.merkeEinstellung({ tafel: id, reiter: 'bots' });
       k.app.gehe('bestenliste', { reiter: 'bots', fenster: 'allzeit' });
@@ -337,9 +344,10 @@ function anbieterPanel(k) {
   });
 }
 
-function anbieterReiter(id, name, baue) {
+// name erst beim Fuellen (Woerterbuch p-punkte, reiter.<id>)
+function anbieterReiter(id, baue) {
   return (k) => sicher(() => {
-    if (!k || k.reiter !== id) return B.huelle(id, name);
+    if (!k || k.reiter !== id) return B.huelle(id, t('p-punkte.reiter.' + id));
     return baue({ app: k.app, fenster: k.fenster || 'woche', jetzt: new Date() });
   }, 'Reiter ' + id);
 }
@@ -359,7 +367,7 @@ function registriere() {
   freischalten();
   registriereIcon('code', '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5.5l-3 13"/>');
   // je fuer sich: ein Fehler hier (z. B. Art schon angemeldet) haelt die Hoerer und Orte darunter nicht auf
-  sicher(() => registriereSaetze('tafel-platz1', PLATZ1_SAETZE), 'Saetze');
+  sicher(() => registriereSaetze('tafel-platz1', platz1Saetze()), 'Saetze');
   sicher(() => registriereInhaltsart('bot-laeufe', { formate: [1], pruefe: (json) => S.pruefeBotLaeufe(json) }), 'Inhaltsart');
   S.setzeBotNamen((id) => { const b = botNachId(id); return b && b.name ? b.name : id; });
 
@@ -406,9 +414,9 @@ function registriere() {
 
   anbieten('ergebnis:abrechnung', (k) => sicher(() => anbieterAbrechnung(k), 'Abrechnung'), { reihenfolge: 10, paket: PAKET });
   anbieten('arena:panel-bot', (k) => sicher(() => anbieterPanel(k), 'Panel'), { reihenfolge: 40, paket: PAKET });
-  anbieten('bestenliste:reiter', anbieterReiter('ich', 'Ich', B.reiterIch), { reihenfolge: 10, paket: PAKET });
-  anbieten('bestenliste:reiter', anbieterReiter('bots', 'Bots', B.reiterBots), { reihenfolge: 20, paket: PAKET });
-  anbieten('bestenliste:reiter', anbieterReiter('freunde', 'Freunde', B.reiterFreunde), { reihenfolge: 50, paket: PAKET });
+  anbieten('bestenliste:reiter', anbieterReiter('ich', B.reiterIch), { reihenfolge: 10, paket: PAKET });
+  anbieten('bestenliste:reiter', anbieterReiter('bots', B.reiterBots), { reihenfolge: 20, paket: PAKET });
+  anbieten('bestenliste:reiter', anbieterReiter('freunde', B.reiterFreunde), { reihenfolge: 50, paket: PAKET });
 
   if (TEST && typeof window !== 'undefined') {
     window.__punkte = { stand: () => S.lade(), speichere: (st) => S.speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F };
