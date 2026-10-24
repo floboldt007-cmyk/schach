@@ -104,7 +104,7 @@
    Karofelder = die Grundpalette oben. Hell und dunkel getrennt, dunkel gilt fuer data-modus="dunkel" und System. */
 .arena .welt[data-welt="springerforst"] {
   --welt-himmel: #CFE6EE; --welt-berg: #8FA5B8; --welt-berg-2: #7E95AA;
-  --welt-strand: #B9D59A; --welt-gras: #86BE6E; --welt-gras-2: #91C577; --welt-gras-3: #9CCB81; --welt-gras-4: #A7D18B;
+  --welt-strand: #A6C98A; --welt-gras: #74AE5E; --welt-gras-2: #7FB667; --welt-gras-3: #8ABD71; --welt-gras-4: #95C47B;
   --welt-laub: #3F8F4F; --welt-laub-2: #4C9A58; --welt-laub-3: #58A462; --welt-tanne: #2C7A50; --welt-tanne-2: #36885B;
   --welt-weg-rand: #B8946A; --welt-weg: #E9D3AA; --welt-weg-strich: #CDAF80;
 }
