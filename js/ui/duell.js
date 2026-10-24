@@ -36,6 +36,9 @@ import { klang } from '../sounds.js';
 import { hoere } from '../ereignisse.js';
 import { anim, tempo } from '../bewegung.js';
 import { botFarbe, avatarVon, floAvatar } from '../thema.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/arena.js';
 
 export const BESONDERE = Object.freeze(['boss', 'liga', 'erste']);
 export const DAUER_MAX = 1400;          // haerteste Grenze fuer das ganze Intro (ms, unabhaengig vom Tempo)
@@ -55,8 +58,9 @@ export const FLUG_MIN = 180;             // kuerzer lohnt kein Flug: dann blende
 const PUFFER = 60;                       // Abstand zur harten Grenze: der Flug endet spaetestens DAUER_MAX - PUFFER ms
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * zf)
-const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
-const ANLASS_TEXT = { boss: 'Endgegner', liga: 'Liga', erste: 'Erste Partie' };
+// Texte als Schluessel (Woerterbuecher allgemein und arena), gelesen beim Zeichnen
+const FARBE_NAME = { w: 'allgemein.weiss', b: 'allgemein.schwarz' };
+const ANLASS_TEXT = { boss: 'arena.duell.boss', liga: 'arena.duell.liga', erste: 'arena.duell.erste' };
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '');
@@ -189,9 +193,9 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   ueber.style.setProperty('--bf', bf);
   ueber.setAttribute('role', voll ? 'dialog' : 'presentation');
   ueber.tabIndex = -1;
-  if (voll) ueber.setAttribute('aria-label', `Duell gegen ${bot.name}`);
-  const stufeText = bot.stufe ? `Stufe ${bot.stufe}` : '';
-  const anlassText = ANLASS_TEXT[anlass] || '';
+  if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
+  const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
+  const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
   if (voll) {
     ueber.innerHTML = `
       <div class="duell-buehne"></div>
@@ -201,18 +205,18 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-seite bot">
             <div class="duell-av" data-rolle="bot"><img src="${esc(avatarVon(bot))}" alt="" draggable="false"></div>
             <div class="duell-name">${esc(bot.name)}</div>
-            <div class="duell-unter">Elo ${esc(bot.elo)} · ${FARBE_NAME[f === 'w' ? 'b' : 'w']}</div>
+            <div class="duell-unter">Elo ${esc(bot.elo)} · ${esc(t(FARBE_NAME[f === 'w' ? 'b' : 'w']))}</div>
           </div>
-          <div class="duell-gegen">gegen</div>
+          <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
             <div class="duell-av" data-rolle="flo">${floAvatar(f)}</div>
             <div class="duell-name">Flo</div>
-            <div class="duell-unter">${FARBE_NAME[f]}</div>
+            <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>
           </div>
         </div>
       </div>
       ${stufeText || anlassText ? `<div class="duell-oben"><span class="duell-chip">${esc([stufeText, anlassText].filter(Boolean).join(' · '))}</span></div>` : ''}
-      <div class="duell-tipp">Tippen zum Überspringen</div>`;
+      <div class="duell-tipp">${esc(t('arena.duell.tipp'))}</div>`;
   } else {
     // Kurzfassung: nur eine unsichtbare Huelle (Tipps gehen durch und beenden das Intro); die Portraets fliegen aus der Arena
     ueber.innerHTML = '';
