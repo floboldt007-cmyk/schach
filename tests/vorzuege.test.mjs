@@ -58,7 +58,7 @@ try {
     } };
   });
   const seite = await kontext.newPage();
-  seite.setDefaultTimeout(20000);
+  seite.setDefaultTimeout(45000);   // unter Last (CI, volle Suite) braucht der Partie-Start mit Engine laenger
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
   await seite.goto(START);
@@ -187,9 +187,14 @@ try {
   pruefe('Pfeil-Tipp: in der zweiten Partie eine ruhige Zeile mit "Verstanden"', t2.sichtbar && t2.knopf >= 44
     && ['Tipp: Finger auf ein Feld halten und ziehen zeichnet einen Pfeil.', 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.'].includes(t2.text), t2);
   // Rechtsklick ziehen zeichnet einen Pfeil: die Zeile geht und kommt nicht wieder
+  // langsam zeichnen (CI: zu schnelle Zeiger-Ereignisse kamen nicht als Malen an) und auf den Pfeil warten
+  await seite.waitForFunction(() => window.__partie.phase() === 'flo');
   const a = await feld('e2'), b = await feld('e4');
-  await seite.mouse.move(a.x, a.y); await seite.mouse.down({ button: 'right' });
-  await seite.mouse.move(b.x, b.y, { steps: 6 }); await seite.mouse.up({ button: 'right' });
+  await seite.mouse.move(a.x, a.y); await warte(80);
+  await seite.mouse.down({ button: 'right' }); await warte(80);
+  for (let i = 1; i <= 10; i++) { await seite.mouse.move(a.x + (b.x - a.x) * i / 10, a.y + (b.y - a.y) * i / 10); await warte(20); }
+  await seite.mouse.up({ button: 'right' });
+  await seite.waitForFunction(() => window.__partie.brett.nutzerPfeile().some((x) => x.art === 'pfeil'), null, { timeout: 8000 }).catch(() => {});
   await warte(150);
   const t3 = await seite.evaluate((m) => ({ pfeile: window.__partie.brett.nutzerPfeile().filter((x) => x.art === 'pfeil').length,
     sichtbar: !document.querySelector('.screen.partie .pfeil-tipp').hidden, merker: JSON.parse(localStorage.getItem(m)) }), MERKER);
