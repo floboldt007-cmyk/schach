@@ -20,13 +20,13 @@
 //   zahl(n, opt) / datum(d, opt)   Intl mit der Sprache ('de-DE' | 'en-US')
 //   locale() -> 'de-DE' | 'en-US'
 //   texte(sprache) -> { 'bereich.schluessel': Text }   (Tests: alle angemeldeten Texte einer Sprache)
-//   SPRACHWAHL   false, bis alle Screens und Pakete uebersetzt sind: dann zeigen die Einstellungen die Wahl. Vorher
-//       schaltet nur die Adresse um (?sprache=en, wird gemerkt) oder die gespeicherte Einstellung.
+//   SPRACHWAHL   true seit Teil 2 (alle Screens und Pakete uebersetzt): die Einstellungen zeigen die Wahl. Dazu schaltet
+//       weiter die Adresse um (?sprache=en, wird gemerkt) und die gespeicherte Einstellung gilt.
 //
 // Regeln fuer Woerterbuecher: t() erst beim Zeichnen aufrufen, nie beim Laden eines Moduls (sonst bliebe der Text in
 // der Sprache von vor dem Start stehen). Texte ohne HTML; Markup bleibt im Code.
 export const SPRACHEN = Object.freeze(['de', 'en']);
-export const SPRACHWAHL = false;
+export const SPRACHWAHL = true;
 const LOCALE = { de: 'de-DE', en: 'en-US' };
 const BEREICH_RE = /^[a-z][a-z0-9-]*$/;
 

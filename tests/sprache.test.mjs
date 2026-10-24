@@ -74,13 +74,19 @@ async function nodeTeil() {
   let warf = false;
   try { S.registriereTexte('Gross', {}); } catch (e) { warf = true; }
   pruefe('Bereichsname wird geprueft', warf);
-  pruefe('Sprachwahl noch nicht sichtbar (Teil 1)', S.SPRACHWAHL === false);
+  pruefe('Sprachwahl sichtbar (Teil 2: alles uebersetzt)', S.SPRACHWAHL === true);
 
   gruppe = 'Woerterbuecher';
   const ordner = path.join(WURZEL, 'js/sprachen');
   const dateien = existsSync(ordner) ? readdirSync(ordner).filter((d) => d.endsWith('.js')).sort() : [];
   pruefe('Woerterbuecher vorhanden', dateien.length >= 1, dateien);
   for (const d of dateien) await import(pathToFileURL(path.join(ordner, d)).href);
+  // Teil 2: jedes Paket hat sein Woerterbuch in js/pakete/<paket>/texte.js (Bereich 'p-<paket>')
+  const paketOrdner = path.join(WURZEL, 'js/pakete');
+  const paketTexte = readdirSync(paketOrdner).filter((p) => existsSync(path.join(paketOrdner, p, 'texte.js'))).sort();
+  for (const p of paketTexte) await import(pathToFileURL(path.join(paketOrdner, p, 'texte.js')).href);
+  pruefe('Woerterbuecher der live geschalteten Pakete vorhanden', ['funken', 'gedaechtnis', 'kartei', 'liga', 'punkte', 'serie', 'start',
+    'tagesraetsel', 'teilen', 'zuzweit'].every((p) => paketTexte.includes(p)), paketTexte);
   const de = S.texte('de');
   const en = S.texte('en');
   const eigene = (o) => Object.keys(o).filter((k) => !k.startsWith('probe.'));
@@ -104,13 +110,17 @@ async function nodeTeil() {
   // t() auf Modulebene haelt die Sprache von vor dem Start fest: nur innerhalb von Funktionen erlaubt (grobe Pruefung:
   // keine Zeile ohne Einrueckung, die t( aufruft, ausser in Funktionskoepfen)
   const kandidaten = [...readdirSync(path.join(WURZEL, 'js')).filter((d) => d.endsWith('.js')).map((d) => 'js/' + d),
-    ...readdirSync(path.join(WURZEL, 'js/ui')).filter((d) => d.endsWith('.js')).map((d) => 'js/ui/' + d)];
+    ...readdirSync(path.join(WURZEL, 'js/ui')).filter((d) => d.endsWith('.js')).map((d) => 'js/ui/' + d),
+    ...readdirSync(path.join(WURZEL, 'js/pakete')).flatMap((p) => (existsSync(path.join(WURZEL, 'js/pakete', p)) && !p.includes('.')
+      ? readdirSync(path.join(WURZEL, 'js/pakete', p)).filter((d) => d.endsWith('.js')).map((d) => `js/pakete/${p}/${d}`) : []))];
   const modulEbene = [];
   for (const d of kandidaten) {
     const text = lies(d);
-    if (!/from '\.{1,2}\/(\.\.\/)?sprache\.js'/.test(text)) continue;
+    if (!/from '(\.{1,2}\/)+sprache\.js'/.test(text)) continue;
     text.split('\n').forEach((z, i) => {
-      if (/^(export )?(const|let|var) [^=]+= .*\bt\(['`]/.test(z)) modulEbene.push(`${d}:${i + 1}`);
+      const m = /^(export )?(const|let|var) [^=]+= (.*?)\bt\(['`]/.exec(z);
+      // Funktionen (Pfeil, function, Getter, toString) rufen t() erst beim Aufruf: erlaubt
+      if (m && !/=>|\bfunction\b|\bget\(\)/.test(m[3])) modulEbene.push(`${d}:${i + 1}`);
     });
   }
   pruefe('kein t() auf Modulebene (Texte erst beim Zeichnen)', modulEbene.length === 0, modulEbene);
