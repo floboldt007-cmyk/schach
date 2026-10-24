@@ -107,6 +107,9 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
     fehler.push('console: ' + m.text());
   });
   seite.on('request', (r) => { if (!r.url().startsWith(`http://127.0.0.1:${PORT}/`) && !/^(data|blob):/.test(r.url())) fremd.push(r.url()); });
+  // Die 404-Ausnahme oben gilt nur fuer fehlende Paket-Screens: eine fehlende Datei unter assets/ (z. B. das Modern-Portraet eines
+  // Bots) ist ein Fehler
+  seite.on('response', (r) => { if (r.status() === 404 && /\/assets\//.test(r.url())) fehler.push('404: ' + r.url()); });
   return { kontext, seite, fehler };
 }
 
@@ -167,17 +170,26 @@ async function testeLeiste(browser) {
     pruefe('Kopf passt (kein Ueberlauf), Seite ohne waagrechten Ueberlauf', m.kopfUeber <= 0 && m.doc <= 0, JSON.stringify({ k: m.kopfUeber, d: m.doc }));
     pruefe('Reiter mindestens 44 x 44', m.reiterKlein === 0);
     pruefe('Verlauf ist Reiter: kein Verlauf-Knopf im Kopf', !(await seite.locator('.haupt-kopf [data-aktion="verlauf"]').isVisible()));
-    // Wechsel: die Pille gleitet zum neuen Reiter
+    // Wechsel: die Pille gleitet zum neuen Reiter. Die Lage unterwegs wird im Bild selbst abgetastet (jedes Bild von der
+    // Berührung bis zum Ende), nicht nur einmal von aussen gemessen: auf einem ausgelasteten Rechner kommt die Messung von
+    // aussen oft erst nach den 520 ms des Gleitens an
     const vorher = m.pille.l;
+    await seite.evaluate(() => {
+      const s = window.__pilleAbtast = { links: [], an: true };
+      const f = () => { const p = document.querySelector('.reiter-leiste .reiter-pille'); if (p) s.links.push(p.getBoundingClientRect().left); if (s.an) requestAnimationFrame(f); };
+      f();
+    });
     await seite.locator('.reiter-leiste [data-reiter="verlauf"]').click();
     await seite.waitForSelector('.screen.vl-screen');
     const mitten = await lageMessen(seite);
     await warte(800);
     m = await lageMessen(seite);
+    const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.links; });
     pruefe('Reiter Verlauf: #verlauf, aktiv, Leiste wieder oben im Kopf des Verlaufs', m.reiter === 'arena,verlauf*' && m.html === 'oben' && m.imKopf
       && await seite.evaluate(() => location.hash) === '#verlauf', JSON.stringify({ r: m.reiter, h: m.html }));
+    const zwischen = (l) => l > vorher + 1 && l < m.pille.l - 1;
     pruefe('Pille gleitet (unterwegs zwischen alt und neu, am Ende unter Verlauf)', pilleUnterAktivem(m) && m.pille.l > vorher
-      && mitten.pille.l < m.pille.l - 1, JSON.stringify({ vorher, mitten: mitten.pille && mitten.pille.l, ende: m.pille.l }));
+      && (zwischen(mitten.pille.l) || abtast.some(zwischen)), JSON.stringify({ vorher, mitten: mitten.pille && mitten.pille.l, ende: m.pille.l, bilder: abtast.length }));
     pruefe('auf dem Screen des Reiters: kein Zurueck-Knopf (html[data-reiter-wurzel="ja"])', m.wurzel === 'ja'
       && !(await seite.locator('.vl-screen .kopf-zurueck').isVisible()));
     // Drehen: hochkant faehrt die Leiste nach unten
@@ -277,10 +289,18 @@ async function testeLeiste(browser) {
       await seite.evaluate(() => window.__app.gehe('arena', {}, { ersetzen: true }));
       await seite.waitForSelector('.screen.arena .knoten');
       await seite.waitForFunction(() => { const n = document.querySelector('.reiter-leiste'); return n && !n.hidden && !n.classList.contains('weg'); });
-      const params = { partie: { botId: 'benno', farbe: 'w' }, analyse: { partieId: 'gibt-es-nicht' } }[ziel] || {};
-      await seite.evaluate(([z, p]) => window.__app.gehe(z, p), [ziel, params]);
+      const params = { partie: { botId: 'fridolin', farbe: 'w' }, analyse: { partieId: 'gibt-es-nicht' } }[ziel] || {};
+      // der Zustand wird in dem Augenblick festgehalten, in dem die Leiste wegzufahren beginnt (.weg): bis die Partie gebaut
+      // ist, kann das Wegfahren (420 ms) auf einem ausgelasteten Rechner schon vorbei sein
+      await seite.evaluate(([z, p]) => {
+        const nav = document.querySelector('.reiter-leiste');
+        window.__weg = null;
+        const lies = () => ({ html: document.documentElement.dataset.reiter || null, h: document.querySelector('#app > .screen').getBoundingClientRect().height, ih: innerHeight, weg: nav.classList.contains('weg') });
+        new MutationObserver((l, mo) => { if (nav.classList.contains('weg')) { window.__weg = lies(); mo.disconnect(); } }).observe(nav, { attributes: true, attributeFilter: ['class'] });
+        window.__app.gehe(z, p);
+      }, [ziel, params]);
       await seite.waitForSelector(sel);
-      const sofort = await seite.evaluate(() => ({ html: document.documentElement.dataset.reiter || null, h: document.querySelector('#app > .screen').getBoundingClientRect().height,
+      const sofort = await seite.evaluate(() => window.__weg || ({ html: document.documentElement.dataset.reiter || null, h: document.querySelector('#app > .screen').getBoundingClientRect().height,
         ih: innerHeight, weg: document.querySelector('.reiter-leiste').classList.contains('weg') }));
       pruefe(`${ziel}: Platz sofort frei (kein data-reiter, Screen volle Hoehe), Leiste faehrt weg`, !sofort.html && sofort.h === sofort.ih && sofort.weg, JSON.stringify(sofort));
       const versteckt = await seite.waitForFunction(() => document.querySelector('.reiter-leiste').hidden, null, { timeout: 1500 }).then(() => true, () => false);
