@@ -1680,7 +1680,7 @@ const EN = {
         'Our first game? Then I’ll cast my net very carefully.',
       ],
       wiebke: [
-        'Hello. I’m Wiebke, the harbor master. We haven’t met, so please sign in.',
+        'Hello. I’m Wiebke, the harbor master. We haven’t met, so please check in.',
         'A new ship in my harbor! Welcome, I’ll assign you a berth right away.',
         'Our first game? Then I’ll enter you in the harbor log, with date and berth.',
       ],
@@ -1906,7 +1906,7 @@ const EN = {
         'Welcome back to my castle! Let the fanfares ring out.',
       ],
       turm: [
-        'Welcome back. A {tage}-day semester break, so we are both well rested.',
+        'Welcome back. {tage} days of semester break, so we are both well rested.',
         'Good to see you again. In the meantime I patiently drank tea.',
         'Ah, my student has returned! Then let us continue the lecture.',
       ],
@@ -2119,7 +2119,7 @@ const EN = {
         'No worries. A little ember grows into a whole fire again, with patience.',
       ],
       luke: [
-        'Chin up! I lose a few games here every afternoon. It’s part of it.',
+        'Chin up! I lose a few games here every afternoon. It’s all part of the game.',
         'Rough run? Today we keep it easy, no gambit and no pressure.',
         'At the market we say: tomorrow brings fresh goods. And fresh games. It’ll turn around!',
       ],
@@ -2247,7 +2247,7 @@ const EN = {
         'I often think of your amazing move. It arrived faster than any express delivery.',
       ],
       gustav: [
-        'Your ingenious move from last time! I dropped my veil.',
+        'Your ingenious move from last time! I dropped my bee veil.',
         'Last time you had such a smart idea. Busier than a whole bee colony.',
         'I often think of your amazing move. It was sweet as fresh honey.',
       ],
@@ -2346,7 +2346,7 @@ const EN = {
       ],
       hilde: [
         'Last time I really misread the board. My glasses must have fogged up.',
-        'My slip from last time, oh my. That’s what happens when you knit on the side.',
+        'My slip from last time, oh my. That’s what happens when you knit while you play.',
         'Did you see what I got up to last time? Today I’ll concentrate, I promise.',
       ],
       kalle: [
@@ -2447,7 +2447,7 @@ const EN = {
       wiebke: [
         'Last time I forgot a line. That should never happen to a harbor master.',
         'My slip last time? I misjudged your course. It won’t happen again.',
-        'Did you see what happened to me last time? A ship without a sign-in. Mine.',
+        'Did you see what happened to me last time? A ship that never checked in. Mine.',
       ],
       henning: [
         'Last time I miscalculated the tides. That never happens to me.',
@@ -2671,7 +2671,7 @@ const EN = {
         'Last time I fell off my horse. Today I sit firmer in the saddle, I swear it!',
       ],
       turm: [
-        'You beat me in {zuege} moves last time. It is now in my minutes.',
+        'You beat me in {zuege} moves last time. It is now in my records.',
         'You passed the last exam. Today I shall ask slightly harder questions.',
         'Ah, my top student from last time. I have revised my notes.',
       ],
@@ -2731,7 +2731,7 @@ const EN = {
         'Ah, my winner from last time! Today the embers are hotter.',
       ],
       luke: [
-        'Last time you wrapped me up in {zuege} moves. That was faster than me.',
+        'Last time you wrapped me up in {zuege} moves. Even faster than me.',
         'You won last time. Today I brought a new gambit.',
         'Ah, my winner from last time! Come on, the market wants to see a rematch.',
       ],
@@ -2747,7 +2747,7 @@ const EN = {
       ],
       lasse: [
         'Last time you beat me in {zuege} moves. Not a good day for my boat.',
-        'You won last time. Since then I’ve retied every mesh.',
+        'You won last time. Since then I’ve retied every knot in my net.',
         'Ah, my winner from last time! Today I’ll cast my net wider.',
       ],
       wiebke: [
@@ -2936,7 +2936,7 @@ const EN = {
       silas: [
         'Remember? Half a pawn was enough for me last time. Today too?',
         'Last time the treasure was mine. Let’s see who raises it today.',
-        'I won last time. Very finely, at the very end.',
+        'I won last time. By a fine margin, right at the end.',
       ],
       merle: [
         'Remember? My hypothesis held up last time. Today we test it again.',
@@ -2979,7 +2979,7 @@ const EN = {
       turm: [
         'A draw last time. Balanced, but today we go deeper into the topic.',
         'A draw last time. We shall continue that discussion at the board today.',
-        'A draw last time, very proper. Today we seek a decision.',
+        'A draw last time, very respectable. Today we seek a decision.',
       ],
       delia: [
         'A draw last time? How unromantic! Today I want a finale.',
@@ -2987,7 +2987,7 @@ const EN = {
         'A draw, last time. Today I’ll sacrifice more, I promise.',
       ],
       koenig: [
-        'A draw last time. The case has been on follow-up ever since.',
+        'A draw last time. The case has been pending ever since.',
         'A draw, last time. Today I’m looking for the decisive clue.',
         'A draw. No culprit, no victim. Today we settle it.',
       ],
