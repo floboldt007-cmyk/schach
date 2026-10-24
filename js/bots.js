@@ -64,7 +64,7 @@ export const ANLAESSE = ['begruessung', 'schlagen', 'spielerFehler', 'spielerGut
 export const BOTS = [
   {
     id: 'fridolin', stufe: 1, welt: 1, name: 'Vogelscheuche Fridolin', rufname: 'Fridolin', elo: 100, titel: 'Der Windige',
-    avatar: 'assets/avatare/modern/fridolin.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/fridolin.svg', farbe: '#8A93A8',
     kurz: 'Zieht, wohin der Wind weht. Aber immer nach den Regeln.',
     bio: 'Fridolin steht seit Jahren auf dem ersten Acker und hat vom Zuschauen gelernt, wie die Figuren ziehen. Er zieht, wohin der Wind ihn gerade schiebt, aber immer regelgerecht. Über jeden guten Zug von dir freut er sich mit.',
     merkmale: { figur: 'P', lieblings: 'Bauer', tempo: 'Windig', schwaeche: 'Zieht fast zufällig' },
@@ -174,7 +174,7 @@ export const BOTS = [
   },
   {
     id: 'paula', stufe: 3, welt: 1, name: 'Postbotin Paula', rufname: 'Paula', elo: 300, titel: 'Die Eilige',
-    avatar: 'assets/avatare/modern/paula.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/paula.svg', farbe: '#8A93A8',
     kurz: 'Hat nie Zeit. Holt die Dame früh raus, gibt jedes Schach.',
     bio: 'Paula radelt jeden Morgen über die Feldwege und hat dabei nie Zeit. Ihre Dame schickt sie so früh los wie die erste Post, und jedes Schach wird zugestellt. Ob die Dame unterwegs in Gefahr gerät, merkt sie oft erst später.',
     merkmale: { figur: 'Q', lieblings: 'Dame', tempo: 'Eilig', schwaeche: 'Holt die Dame zu früh' },
@@ -224,7 +224,7 @@ export const BOTS = [
   },
   {
     id: 'gustav', stufe: 4, welt: 1, name: 'Imker Gustav', rufname: 'Gustav', elo: 400, titel: 'Der Vorsichtige',
-    avatar: 'assets/avatare/modern/gustav.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/gustav.svg', farbe: '#8A93A8',
     kurz: 'Rochiert früh, deckt alles, sticht nur, wenn’s sicher ist.',
     bio: 'Gustav hält dreißig Bienenvölker hinter der Mühle und hat Respekt vor jedem Stich. Genauso spielt er: Er rochiert früh, deckt jede Figur und baut sich eine Stellung wie einen Bienenstock. Losgehen mag er erst, wenn alles summt.',
     merkmale: { figur: 'K', lieblings: 'Rochade', tempo: 'Bedächtig', schwaeche: 'Greift selten an' },
@@ -335,7 +335,7 @@ export const BOTS = [
   },
   {
     id: 'janine', stufe: 6, welt: 1, endgegner: true, name: 'Janine vom Scheunenclub', rufname: 'Janine', elo: 600, titel: 'Die Clubchefin',
-    avatar: 'assets/avatare/modern/janine.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/janine.svg', farbe: '#8A93A8',
     kurz: 'Clubchefin der Karofelder. Kann alles, patzt kaum.',
     bio: 'Janine hat in der großen Scheune am Ende der Karofelder einen Schachclub gegründet, mit Strohballen als Stühlen und einer Kreidetafel als Demobrett. Sie spielt von allem ein bisschen und lässt kaum noch etwas stehen.',
     merkmale: { figur: 'N', lieblings: 'Alle', tempo: 'Überlegt', schwaeche: 'Lange Rechnungen' },
@@ -385,7 +385,7 @@ export const BOTS = [
   },
   {
     id: 'bodo', stufe: 7, welt: 2, name: 'Holzfäller Bodo', rufname: 'Bodo', elo: 700, titel: 'Der Kahlschläger',
-    avatar: 'assets/avatare/modern/bodo.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/bodo.svg', farbe: '#8A93A8',
     kurz: 'Tauscht ab, was geht. Hauptsache, das Brett wird leer.',
     bio: 'Bodo fällt Bäume, seit er eine Axt halten kann, und genauso spielt er Schach. Er tauscht ab, wo er nur kann, bis auf dem Brett eine Lichtung entsteht. Da sieht man wenigstens, wo der König wohnt, sagt er.',
     merkmale: { figur: 'R', lieblings: 'Turm', tempo: 'Kräftig', schwaeche: 'Tauscht auch Gutes ab' },
@@ -496,7 +496,7 @@ export const BOTS = [
   },
   {
     id: 'leo', stufe: 9, welt: 2, name: 'Waldläufer Leo', rufname: 'Leo', elo: 900, titel: 'Der Fallensteller',
-    avatar: 'assets/avatare/modern/leo.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/leo.svg', farbe: '#8A93A8',
     kurz: 'Kennt jeden Schleichweg und legt überall kleine Fallen.',
     bio: 'Leo kennt jeden Schleichweg im Springerforst und legt überall kleine Fallen aus, nur aus Spaß. Auf dem Brett sieht vieles harmlos aus, bis es plötzlich zuschnappt. Wer genau hinschaut, entdeckt seine Stolperdrähte rechtzeitig.',
     merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Leise', schwaeche: 'Vergisst die eigene Deckung' },
@@ -606,7 +606,7 @@ export const BOTS = [
   },
   {
     id: 'edda', stufe: 11, welt: 2, name: 'Köhlerin Edda', rufname: 'Edda', elo: 1100, titel: 'Die Glutwächterin',
-    avatar: 'assets/avatare/modern/edda.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/edda.svg', farbe: '#8A93A8',
     kurz: 'Baut langsam Druck auf offenen Linien auf.',
     bio: 'Edda hütet ihren Kohlenmeiler tagelang, denn gute Glut braucht Zeit. Auf dem Brett öffnet sie Linien, stellt ihre Türme dahinter und lässt den Druck langsam steigen. Wenn es knistert, hat sie längst angeheizt.',
     merkmale: { figur: 'R', lieblings: 'Turm', tempo: 'Geduldig', schwaeche: 'Schnelle Konter' },
@@ -716,7 +716,7 @@ export const BOTS = [
   },
   {
     id: 'luke', stufe: 13, welt: 3, name: 'Luke vom Marktplatz', rufname: 'Luke', elo: 1300, titel: 'Der Blitzer',
-    avatar: 'assets/avatare/modern/luke.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/luke.svg', farbe: '#8A93A8',
     kurz: 'Straßenschach unter der Rathausuhr. Liebt Gambits.',
     bio: 'Luke spielt jeden Nachmittag Straßenschach unter der Rathausuhr, zehn Partien in der Stunde. Einen Bauern opfert er für schnelles Spiel ohne zu zögern, und ein lockerer Spruch ist immer dabei. Mit ihm wird es nie langweilig.',
     merkmale: { figur: 'P', lieblings: 'Gambit', tempo: 'Blitzschnell', schwaeche: 'Opfert zu leicht' },
@@ -826,7 +826,7 @@ export const BOTS = [
   },
   {
     id: 'moritz', stufe: 15, welt: 3, name: 'Zauberer Moritz', rufname: 'Moritz', elo: 1500, titel: 'Der Trickkünstler',
-    avatar: 'assets/avatare/modern/moritz.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/moritz.svg', farbe: '#8A93A8',
     kurz: 'Zwischenzüge, Abzugsschach und lauter Überraschungen.',
     bio: 'Moritz zaubert auf der alten Brücke und verblüfft am liebsten mit Dingen, die eben noch nicht da waren. Auf dem Brett liebt er Zwischenzüge und Abzugsschach: Eine Figur zieht weg, und plötzlich steht eine ganz andere im Rampenlicht.',
     merkmale: { figur: 'B', lieblings: 'Läufer', tempo: 'Verblüffend', schwaeche: 'Ruhige Stellungen' },
@@ -937,7 +937,7 @@ export const BOTS = [
   },
   {
     id: 'ottilie', stufe: 17, welt: 3, name: 'Bibliothekarin Ottilie', rufname: 'Ottilie', elo: 1700, titel: 'Die Belesene',
-    avatar: 'assets/avatare/modern/ottilie.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/ottilie.svg', farbe: '#8A93A8',
     kurz: 'Kennt jede Eröffnung aus viertausend Büchern.',
     bio: 'Ottilie verwaltet die Turmbibliothek mit viertausend Schachbüchern und hat jedes davon gelesen. Ihre Eröffnungen spielt sie wie aus dem Lehrbuch. Spannend wird es erst, wenn die Buchseiten aufhören.',
     merkmale: { figur: 'B', lieblings: 'Läuferpaar', tempo: 'Belesen', schwaeche: 'Unbekannte Wege' },
@@ -1048,7 +1048,7 @@ export const BOTS = [
   },
   {
     id: 'lasse', stufe: 19, welt: 4, name: 'Fischer Lasse', rufname: 'Lasse', elo: 1900, titel: 'Der Netzwerfer',
-    avatar: 'assets/avatare/modern/lasse.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/lasse.svg', farbe: '#8A93A8',
     kurz: 'Wirft sein Netz direkt um deinen König.',
     bio: 'Lasse fährt vor Sonnenaufgang mit dem Kutter raus und kommt nie mit leerem Netz zurück. Auf dem Brett zieht er alle Figuren Richtung König und wirft dann aus. Wenn er die Ärmel hochkrempelt, schau lieber nach deiner Rochade.',
     merkmale: { figur: 'Q', lieblings: 'Dame', tempo: 'Zupackend', schwaeche: 'Lässt hinten Lücken' },
@@ -1098,7 +1098,7 @@ export const BOTS = [
   },
   {
     id: 'wiebke', stufe: 20, welt: 4, name: 'Hafenmeisterin Wiebke', rufname: 'Wiebke', elo: 2000, titel: 'Die Vorausschauende',
-    avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#8A93A8',
     kurz: 'Spielt vorausschauend und nimmt dir die guten Felder.',
     bio: 'Wiebke ist Hafenmeisterin: Jedes Schiff hat seinen Liegeplatz, jede Leine sitzt. Auf dem Brett denkt sie an deine Pläne, bevor du sie hast, und belegt die besten Felder zuerst. Ohne Anmeldung legt bei ihr niemand an.',
     merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Vorausschauend', schwaeche: 'Scharfe Opfer' },
@@ -1208,7 +1208,7 @@ export const BOTS = [
   },
   {
     id: 'henning', stufe: 22, welt: 4, name: 'Wattführer Henning', rufname: 'Henning', elo: 2200, titel: 'Der Gezeitenkenner',
-    avatar: 'assets/avatare/modern/henning.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/henning.svg', farbe: '#8A93A8',
     kurz: 'Kennt den richtigen Moment. Dann kommt die Flut.',
     bio: 'Henning führt Wanderer bei Ebbe übers Watt und weiß auf die Minute, wann das Wasser kommt. Genauso spielt er: ruhig, geduldig und mit dem Blick auf die Uhr der Gezeiten. Wenn die Stellung reif ist, schlägt er genau im richtigen Moment zu.',
     merkmale: { figur: 'P', lieblings: 'Bauernhebel', tempo: 'Abwartend', schwaeche: 'Kaum eine' },
@@ -1258,7 +1258,7 @@ export const BOTS = [
   },
   {
     id: 'ilka', stufe: 23, welt: 4, name: 'Seenotretterin Ilka', rufname: 'Ilka', elo: 2300, titel: 'Die Unsinkbare',
-    avatar: 'assets/avatare/modern/ilka.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/ilka.svg', farbe: '#8A93A8',
     kurz: 'Verteidigt zäh und findet Rettung, wo keiner sie sieht.',
     bio: 'Ilka fährt als Seenotretterin bei jedem Wetter raus und hat noch nie jemanden aufgegeben, sich selbst auch nicht. Auf dem Brett verteidigt sie zäh und findet einen Ausweg, wo andere längst die Segel streichen.',
     merkmale: { figur: 'K', lieblings: 'König', tempo: 'Zäh', schwaeche: 'Kaum eine' },
@@ -1308,7 +1308,7 @@ export const BOTS = [
   },
   {
     id: 'johann', stufe: 24, welt: 4, endgegner: true, name: 'Johann vom Leuchtturm', rufname: 'Johann', elo: 2400, titel: 'Der Weitblickende',
-    avatar: 'assets/avatare/modern/johann.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/johann.svg', farbe: '#8A93A8',
     kurz: 'Hütet die Küste. Kann alles und sieht weit voraus.',
     bio: 'Johann hält seit vierzig Jahren den Leuchtturm am Ende der Küste. In jeder langen Nacht hat er eine Partie aus alten Büchern nachgespielt, deshalb beherrscht er Angriff, Verteidigung und Endspiel gleichermaßen.',
     merkmale: { figur: 'R', lieblings: 'Alle', tempo: 'Weitblickend', schwaeche: 'Kaum eine' },
@@ -1358,7 +1358,7 @@ export const BOTS = [
   },
   {
     id: 'keetan', stufe: 25, welt: 5, name: 'Taucher Keetan', rufname: 'Keetan', elo: 2500, titel: 'Der Furchtlose',
-    avatar: 'assets/avatare/modern/keetan.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/keetan.svg', farbe: '#8A93A8',
     kurz: 'Opfert ohne Zögern, Hauptsache, er bestimmt das Tempo.',
     bio: 'Keetan ist als Erster ohne Zögern in die Tiefe gesprungen. Jetzt zeigt er allen, die es über die Küste hinaus geschafft haben, den Weg nach unten. Auf dem Brett opfert er gern Material, solange er dafür das Tempo bestimmt.',
     merkmale: { figur: 'N', lieblings: 'Initiative', tempo: 'Furchtlos', schwaeche: 'Kaum eine' },
@@ -1408,7 +1408,7 @@ export const BOTS = [
   },
   {
     id: 'ragna', stufe: 26, welt: 5, name: 'Lotsin Ragna', rufname: 'Ragna', elo: 2600, titel: 'Die Lautlose',
-    avatar: 'assets/avatare/modern/ragna.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/ragna.svg', farbe: '#8A93A8',
     kurz: 'Nimmt dir leise den Raum, Zug um Zug.',
     bio: 'Ragna steuert ihr kleines Tauchboot durch die dunkelsten Gräben, ohne je anzustoßen. Auf dem Brett gewinnt sie Raum, ganz leise und mit viel Geduld. Irgendwann merkst du, dass deine Figuren kaum Platz zum Atmen haben.',
     merkmale: { figur: 'P', lieblings: 'Raum', tempo: 'Lautlos', schwaeche: 'Keine bekannt' },
@@ -1458,7 +1458,7 @@ export const BOTS = [
   },
   {
     id: 'silas', stufe: 27, welt: 5, name: 'Schatzsucher Silas', rufname: 'Silas', elo: 2700, titel: 'Der Feinsinnige',
-    avatar: 'assets/avatare/modern/silas.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/silas.svg', farbe: '#8A93A8',
     kurz: 'Endspiel-Feinschmecker. Findet jeden kleinen Vorteil.',
     bio: 'Silas wohnt in einem alten Schiffswrack am Grund und sammelt, was andere übersehen. Im Endspiel ist er zu Hause: Ein halber Bauer mehr ist für ihn ein ganzer Schatz. Er tauscht gern ab, bis die Kostbarkeiten übrig bleiben.',
     merkmale: { figur: 'K', lieblings: 'Endspiel', tempo: 'Feinsinnig', schwaeche: 'Keine bekannt' },
@@ -1508,7 +1508,7 @@ export const BOTS = [
   },
   {
     id: 'merle', stufe: 28, welt: 5, name: 'Forscherin Merle', rufname: 'Merle', elo: 2800, titel: 'Die Gründliche',
-    avatar: 'assets/avatare/modern/merle.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/merle.svg', farbe: '#8A93A8',
     kurz: 'Gründlich in jeder Phase. Notiert sich alles.',
     bio: 'Merle erforscht die Tiefsee aus einer gläsernen Tauchkugel und notiert alles, was sie sieht. So spielt sie auch: Eröffnung, Mittelspiel und Endspiel mit derselben Sorgfalt. Lücken in ihren Notizen findet man selten.',
     merkmale: { figur: 'B', lieblings: 'Alle', tempo: 'Gründlich', schwaeche: 'Keine bekannt' },
@@ -1558,7 +1558,7 @@ export const BOTS = [
   },
   {
     id: 'alva', stufe: 29, welt: 5, name: 'Hüterin Alva', rufname: 'Alva', elo: 2900, titel: 'Die Torwächterin',
-    avatar: 'assets/avatare/modern/alva.svg', farbe: '#8a93a8',
+    avatar: 'assets/avatare/modern/alva.svg', farbe: '#8A93A8',
     kurz: 'Bewacht den letzten Durchgang. Macht fast keine Fehler.',
     bio: 'Alva bewacht den letzten Durchgang zum Grund, dort, wo der Stockfisch wohnt. Seit Ewigkeiten lässt sie niemanden vorbei, der nicht ganz bei der Sache ist. Fehler macht sie fast nie.',
     merkmale: { figur: 'Q', lieblings: 'Alle', tempo: 'Präzise', schwaeche: 'Keine bekannt' },

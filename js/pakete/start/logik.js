@@ -49,8 +49,10 @@ export const FAHRPLAN_TAGE = 28;
 export const ERFAHREN_AB = 5;
 const ERLEDIGT_MAX = 20;
 
-// Punkte -> Bot (bis einschliesslich). 8 Aufgaben: hoechstens Professor Turm (Stufe 6)
+// Punkte -> Bot (bis einschliesslich). 8 Aufgaben: hoechstens Professor Turm (Elo 1400). Welten (24.10.): ohne
+// geloeste Aufgabe die Vogelscheuche Fridolin (Stufe 1, immer frei), sonst dieselben Bots wie vorher
 export const EMPFEHLUNG = Object.freeze([
+  Object.freeze({ bis: 0.5, botId: 'fridolin' }),
   Object.freeze({ bis: 1.5, botId: 'benno' }),
   Object.freeze({ bis: 3, botId: 'hilde' }),
   Object.freeze({ bis: 4.5, botId: 'kalle' }),
@@ -61,6 +63,7 @@ export const EMPFEHLUNG = Object.freeze([
 
 // Warum dieser Gegner (aus Bio und Eigenschaften der Bots in js/bots.js, eigene Saetze)
 export const BOT_GRUND = Object.freeze({
+  fridolin: 'Vogelscheuche Fridolin zieht fast zufällig, aber immer nach den Regeln. Der sanfteste Einstieg in die erste Welt.',
   benno: 'Bauer Benno kennt die Zugregeln und freut sich über jede Figur. Gut für einen ersten Sieg.',
   hilde: 'Oma Hilde nimmt alles, was ungedeckt steht. Wer seine Figuren deckt, hat gegen sie gute Chancen.',
   kalle: 'Kalle greift sofort an und übersieht dabei viel. Wer Gabeln und Matt in 1 sieht, kommt gegen ihn weit.',

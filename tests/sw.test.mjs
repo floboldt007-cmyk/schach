@@ -313,7 +313,7 @@ function main() {
   pruefe('Alle statischen Imports im Cache', importFehlt.length === 0, importFehlt.join(', '));
   const bots = readFileSync(path.join(WURZEL, 'js/bots.js'), 'utf8');
   const avatare = [...bots.matchAll(/avatar:\s*'([^']+)'/g)].map((m) => m[1]);
-  pruefe('Alle Bot-Avatare im Cache', avatare.length === 10 && avatare.every((a) => menge.has(a)), avatare.filter((a) => !menge.has(a)).join(', '));
+  pruefe('Alle Bot-Avatare im Cache (Welten: 30)', avatare.length === 30 && avatare.every((a) => menge.has(a)), avatare.filter((a) => !menge.has(a)).join(', '));
   const app = readFileSync(path.join(WURZEL, 'js/app.js'), 'utf8');
   const screens = ((app.match(/const SCREENS = \[([^\]]+)\]/) || [, ''])[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
   // Screens der Pakete (Runde 4: training, start): ihre Datei kommt erst mit dem Paket; ist sie da, muss sie in den Cache

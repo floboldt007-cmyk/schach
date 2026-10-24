@@ -332,6 +332,22 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
 8. Waehrend der Partie nach jedem Zug `speichereLaufendePartie(stand)`.
 
 ## Sterne und Freischaltung (storage.js)
+
+**Welten (Flo 23.10., gebaut 24.10.):** 30 Bots in fuenf Welten (`WELTEN` in `js/bots.js`: Karofelder, Springerforst,
+Turmstadt, Gezeitenkueste, Stockfisch-Tiefe), je sechs, Elo 100 bis 3000 in 100er-Schritten (`stufe` 1..30 = Elo/100,
+`welt` 1..5, `endgegner: true` am sechsten jeder Welt, `rufname` fuer Schilder und Knoepfe, `merkmale` fuer das Panel).
+Die zehn bisherigen Bots behalten id, Bild und Sterne; Benno spielt jetzt mit Elo 200, Fridolin (100) ist der erste.
+Ab Elo 2200 spielt Stockfish selbst (`staerke.voll` mit `elo`, UCI_Elo), der Stockfisch ohne Bremse.
+Freischaltung (`storage.js`): frei ist jede Stufe bis `hoechsterSieg() + 1` (alte Spielstaende behalten alles unter
+ihrem besten Sieg, neu eingezogene Bots darunter sind offen und tragen das Schild NEU), dazu der Endgegner jeder Welt,
+deren erste Stufe frei ist (direkt herausfordern; sein Sieg oeffnet die ganze Welt und die naechste).
+`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Fridolin). `hoechsteFreieStufe()` zaehlt
+die Endgegner-Ausnahme nicht mit (Massstab fuer Empfehlungen). `istWeltFrei(nr)`, `hatWeltsiegel(nr)` (alle 18 Sterne).
+Oeffnet ein Sieg mehrere Stufen, meldet `neuFreigeschaltet` den neuen naechsten Gegner.
+Arena (`js/ui/arena.js`): die Karte zeigt eine Welt (`params.welt`, sonst die des gewaehlten Bots) mit sechs Stationen,
+Weltwahl mit Pfeilen oben auf der Karte (`.weltwahl`, wechselt ohne Neuaufbau), Landschaft aus `SZENEN[welt.id]` und
+den Farben `.welt[data-welt]` in `css/arena.css`; gesperrte Welten als ruhige Silhouette mit `.welt-sperre`.
+Zustaende der Stationen: besiegt | aktuell (naechster Gegner) | offen | gesperrt.
 Drei **einzelne** Sterne je Bot, jeder fuer immer verdient: (1) Sieg, (2) Sieg mit
 Genauigkeit >= 80 %, (3) Sieg ohne Hinweis und ohne Zuruecknahme. Stufe n ist frei, sobald
 Stufe n-1 besiegt ist. Brillante Zuege werden gesammelt (`fortschritt.brillanteZuege`).

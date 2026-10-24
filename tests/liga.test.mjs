@@ -209,14 +209,15 @@ function nodeTeil() {
     assert.equal(a.gebucht, true); assert.deepEqual(a.stand.archiv, st.archiv); assert.deepEqual(a.stand.saison, st.saison);
     assert.equal(W.belegFuer(a.stand, 'alt')[5], 1);
   });
-  pruefe('Kreuztabelle: zehn Bots, nur bestes Ergebnis, maximal 30 Punkte', () => {
+  pruefe('Kreuztabelle: alle Bots der Leiter (Welten: 30), nur bestes Ergebnis, maximal 3 Punkte je Bot', () => {
     let st = neu();
     for (const bot of BOTS) for (const [i, ergebnis] of ['niederlage', 'remis', 'sieg', 'niederlage'].entries()) st = buche(st, partie(bot.id + i, { botId: bot.id, ergebnis }), bot.elo).stand;
-    const k = W.kreuztabelle(st.meisterschaft, BOTS); assert.equal(k.zeilen.length, 10); assert.equal(k.punkte, 30); assert.equal(k.siege, 10);
+    const k = W.kreuztabelle(st.meisterschaft, BOTS); assert.equal(k.zeilen.length, BOTS.length); assert.equal(k.punkte, BOTS.length * 3); assert.equal(k.siege, BOTS.length);
   });
   pruefe('Kreuztabelle unterscheidet offen, gespielt und Remis', () => {
     const t = W.kreuztabelle({ benno: 0, hilde: 1, fremderBot: 3 }, BOTS);
-    assert.equal(t.zeilen[0].gespielt, true); assert.equal(t.zeilen[1].punkte, 1); assert.equal(t.zeilen[2].gespielt, false); assert.equal(t.punkte, 1);
+    const zeile = (id) => t.zeilen[BOTS.findIndex((b) => b.id === id)];
+    assert.equal(zeile('benno').gespielt, true); assert.equal(zeile('hilde').punkte, 1); assert.equal(zeile('kalle').gespielt, false); assert.equal(t.punkte, 1);
   });
   pruefe('Alte Spielstaende ohne Modul und unbekannter Rechenstand', () => {
     assert.deepEqual(W.normalisiereStand(null, DATUM), neu()); assert.equal(W.normalisiereStand({ stand: 2 }, DATUM), null);
@@ -345,7 +346,7 @@ async function browserTeil(browser, start) {
       });
       await page.locator('.liga-summary').tap();
       await browserPruefe(name + ': Details mit Kreuztabelle und ehrlichem Verlustschutz', async () => {
-        assert.equal(await page.locator('.liga-tabelle tbody tr').count(), 10);
+        assert.equal(await page.locator('.liga-tabelle tbody tr').count(), 30);
         assert.match(await page.locator('.liga-details').innerText(), /Verlustschutz/);
         assert.equal(await page.locator('html').getAttribute('data-modus'), modus);
         assert.equal(await page.locator('html').getAttribute('data-bewegung'), 'aus');
@@ -393,12 +394,13 @@ async function browserTeil(browser, start) {
           return JSON.stringify(t.speicher.ladeModul('liga')) === vorher;
         }));
       });
-      await page.evaluate(() => window.__app.gehe('arena'));
+      // Welten: nach dem Sieg ueber Rudi (Endgegner Welt 2) zeigt die Arena die Turmstadt; Rudi steht in Welt 2
+      await page.evaluate(() => window.__app.gehe('arena', { welt: 2 }));
       await page.waitForSelector('.liga-bilanz');
       await page.locator('.knoten[data-bot="rudi"]').tap();
       await browserPruefe(name + ': Bot-Bilanz und Vereinsmeisterschaft zeigen den echten Sieg', async () => {
         assert.match(await page.locator('.liga-bilanz').innerText(), /Rudi: 1 Sieg/);
-        assert.match(await page.locator('.liga-club').innerText(), /1 von 10 Bots geschlagen/);
+        assert.match(await page.locator('.liga-club').innerText(), /1 von 30 Bots geschlagen/);
       });
       await page.evaluate(() => window.__app.gehe('verlauf'));
       await page.waitForSelector('.liga-verlauf');

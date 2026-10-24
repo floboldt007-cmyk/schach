@@ -549,9 +549,10 @@ begin
     raise exception 'SCHULE_AUFGABE_UNGUELTIG';
   end if;
   if v_art = 'bot' then
-    -- die zehn Bots der Leiter (js/bots.js, tests/server-schule.test.mjs vergleicht die Liste)
-    if (v_ziel ->> 'bot') is null or (v_ziel ->> 'bot') not in ('benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia',
-      'koenig', 'greta', 'stockfisch') then
+    -- die Bots der Leiter, Welten: dreissig (js/bots.js, tests/server-schule.test.mjs vergleicht die Liste)
+    if (v_ziel ->> 'bot') is null or (v_ziel ->> 'bot') not in ('fridolin', 'benno', 'paula', 'gustav', 'hilde', 'janine', 'bodo', 'kalle', 'leo', 'lisa', 'edda',
+      'rudi', 'luke', 'turm', 'moritz', 'delia', 'ottilie', 'koenig', 'lasse', 'wiebke', 'greta',
+      'henning', 'ilka', 'johann', 'keetan', 'ragna', 'silas', 'merle', 'alva', 'stockfisch') then
       raise exception 'SCHULE_AUFGABE_UNGUELTIG';
     end if;
     if v_ziel ? 'sterne' and (jsonb_typeof(v_ziel -> 'sterne') <> 'number' or (v_ziel ->> 'sterne') !~ '^[123]$') then

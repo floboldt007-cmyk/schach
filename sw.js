@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 68;
-const STAND = '95d3f2f893f2';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 69;
+const STAND = '1c9a924529b3';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -171,6 +171,26 @@ const DATEIEN = [
   'assets/avatare/modern/koenig.svg',
   'assets/avatare/modern/greta.svg',
   'assets/avatare/modern/stockfisch.svg',
+  'assets/avatare/modern/fridolin.svg',
+  'assets/avatare/modern/paula.svg',
+  'assets/avatare/modern/gustav.svg',
+  'assets/avatare/modern/janine.svg',
+  'assets/avatare/modern/bodo.svg',
+  'assets/avatare/modern/leo.svg',
+  'assets/avatare/modern/edda.svg',
+  'assets/avatare/modern/luke.svg',
+  'assets/avatare/modern/moritz.svg',
+  'assets/avatare/modern/ottilie.svg',
+  'assets/avatare/modern/lasse.svg',
+  'assets/avatare/modern/wiebke.svg',
+  'assets/avatare/modern/henning.svg',
+  'assets/avatare/modern/ilka.svg',
+  'assets/avatare/modern/johann.svg',
+  'assets/avatare/modern/keetan.svg',
+  'assets/avatare/modern/ragna.svg',
+  'assets/avatare/modern/silas.svg',
+  'assets/avatare/modern/merle.svg',
+  'assets/avatare/modern/alva.svg',
   'assets/schriften/manrope.woff2',
   'assets/schriften/bricolage-grotesque.woff2',
   'assets/schriften/OFL-Manrope.txt',
