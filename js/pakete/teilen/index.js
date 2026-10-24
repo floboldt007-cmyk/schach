@@ -28,11 +28,14 @@ import { sitzung, ladeProfil } from '../../konto.js';
 import { tagSchluessel } from '../../tag.js';
 import { teilbar, bildDaten, appAdresse, gueltigerName, RECHENSTAND } from './logik.js';
 import { rendere, alsDatei } from './bild.js';
+import { t } from '../../sprache.js';
+import '../../sprachen/allgemein.js';
+import './texte.js';
 
 const MODUL = 'teilen';
 const PROFIL_WARTEN_MS = 3000;
 
-const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Einstellungen und Modul-Speicher ----------
 function einstellungen() {
@@ -140,8 +143,8 @@ function botFuer(partie, bot) {
 
 function figurenPfad() {
   try {
-    const t = themaVon(aktuellesThema().thema);
-    return (t && t.figuren) || 'assets/pieces/';
+    const th = themaVon(aktuellesThema().thema);
+    return (th && th.figuren) || 'assets/pieces/';
   } catch (e) {
     return 'assets/pieces/';
   }
@@ -149,7 +152,7 @@ function figurenPfad() {
 
 // Was im Bild steht, ehrlich und vollstaendig (wie die Felder in logik.js)
 function hinweisText(mitName) {
-  return `Im Bild stehen nur Ergebnis, Gegner, Endstellung, Sterne, Genauigkeit, Züge, Datum${mitName ? ', dein Benutzername' : ''} und die Adresse der App.`;
+  return t(mitName ? 'p-teilen.hinweisName' : 'p-teilen.hinweis');
 }
 
 export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = null } = {}) {
@@ -174,13 +177,13 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   ort.innerHTML = `<div class="sheet-schleier"></div>
     <div class="sheet-karte tl-karte" role="dialog" aria-modal="true" aria-labelledby="${id}-t">
       <div class="sheet-griff" aria-hidden="true"></div>
-      <h3 id="${id}-t">${sieg ? 'Siegesbild teilen' : 'Partie als Bild teilen'}</h3>
-      <div class="tl-vorschau"><canvas class="tl-leinwand" role="img"></canvas><span class="tl-laden" role="status">Bild entsteht …</span></div>
+      <h3 id="${id}-t">${esc(t(sieg ? 'p-teilen.blatt.sieg' : 'p-teilen.blatt.remis'))}</h3>
+      <div class="tl-vorschau"><canvas class="tl-leinwand" role="img"></canvas><span class="tl-laden" role="status">${esc(t('p-teilen.entsteht'))}</span></div>
       <div class="tl-optionen"></div>
       <p class="tl-hinweis">${esc(hinweisText(false))}</p>
       <div class="sheet-knoepfe">
-        <button class="knopf gross dr" type="button" data-tl="abbrechen">Abbrechen</button>
-        <button class="knopf gross primaer dr tl-los" type="button" data-tl="los" disabled>${icon('teilen')} ${teilenGeht ? 'Teilen' : 'Bild speichern'}</button>
+        <button class="knopf gross dr" type="button" data-tl="abbrechen">${esc(t('allgemein.abbrechen'))}</button>
+        <button class="knopf gross primaer dr tl-los" type="button" data-tl="los" disabled>${icon('teilen')} ${esc(teilenGeht ? t('allgemein.teilen') : t('p-teilen.speichern'))}</button>
       </div>
     </div>`;
   const karte = ort.querySelector('.tl-karte');
@@ -192,23 +195,23 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
   const hinweis = ort.querySelector('.tl-hinweis');
 
   const wahl = segment({
-    name: 'tl-modus', label: 'Bild hell oder dunkel',
-    optionen: [{ id: 'hell', text: 'Hell' }, { id: 'dunkel', text: 'Dunkel' }],
+    name: 'tl-modus', label: t('p-teilen.modus.label'),
+    optionen: [{ id: 'hell', text: t('p-teilen.modus.hell') }, { id: 'dunkel', text: t('p-teilen.modus.dunkel') }],
     wert: modus,
     beiWahl: (w) => { modus = w; speichereEinstellung({ bild: w }); neu(); },
   });
   const modusZeile = document.createElement('div');
   modusZeile.className = 'tl-zeile-option';
-  modusZeile.innerHTML = '<span class="tl-label">Bild</span>';
+  modusZeile.innerHTML = `<span class="tl-label">${esc(t('p-teilen.modus.zeile'))}</span>`;
   modusZeile.append(wahl.el);
   optionen.append(modusZeile);
 
   const nameZeile = document.createElement('div');
   nameZeile.className = 'tl-zeile-option tl-name';
   nameZeile.hidden = true;
-  nameZeile.innerHTML = '<span class="tl-label">Benutzername zeigen<small class="tl-name-wert"></small></span>';
+  nameZeile.innerHTML = `<span class="tl-label">${esc(t('p-teilen.name.zeile'))}<small class="tl-name-wert"></small></span>`;
   const nameSchalter = schalter({
-    name: 'tl-name', an: nameAn, label: 'Benutzername im Bild zeigen',
+    name: 'tl-name', an: nameAn, label: t('p-teilen.name.label'),
     beiWechsel: (an) => { nameAn = an; speichereEinstellung({ name: an }); neu(); },
   });
   nameZeile.append(nameSchalter.el);
@@ -231,7 +234,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     los.disabled = true;
     ort.dataset.bereit = 'nein';
     ort.dataset.modus = modus;
-    laden.textContent = 'Bild entsteht …';
+    laden.textContent = t('p-teilen.entsteht');
     laden.hidden = false;
     try {
       daten = bildDaten(p, { bot: gegner, name: nameAn ? name : null, adresse });
@@ -274,7 +277,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     } catch (f) {
       if (nr !== lauf) return;
       console.error('teilen: Bild', f);
-      laden.textContent = 'Das Bild konnte nicht entstehen.';
+      laden.textContent = t('p-teilen.fehler');
     }
   }
 
@@ -326,7 +329,7 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
     let laeuft;
     try { laeuft = teileDatei(datei, daten ? daten.titel : 'Crownmate'); } catch (f) { laeuft = Promise.reject(f); }
     // zwei Zweige statt then().catch(): nur ein Fehler von share() selbst fuehrt zum Speichern
-    laeuft.then((weg) => erledigt(weg, weg === 'teilen' ? 'Bild geteilt.' : 'Bild gespeichert.'), (f) => {
+    laeuft.then((weg) => erledigt(weg, t(weg === 'teilen' ? 'p-teilen.geteilt' : 'p-teilen.gespeichert')), (f) => {
       if (f && f.name === 'AbortError') return;   // im Teilen-Blatt abgebrochen: unser Blatt bleibt offen
       // das Geraet lehnt das Teilen ab (z. B. NotAllowedError, Dateityp): die Datei liegt bereit, also speichern
       try { console.warn('teilen: Teilen abgelehnt, Bild wird gespeichert', (f && f.name) || f); } catch (x) { /* egal */ }
@@ -334,10 +337,10 @@ export function oeffneBlatt({ app = null, partieId = null, partie = null, bot = 
         speichereDatei(datei);
       } catch (g) {
         console.error('teilen', g);
-        toast('Teilen hat nicht geklappt. Versuch es noch einmal.', { art: 'fehler' });
+        toast(t('p-teilen.nichtGeklappt'), { art: 'fehler' });
         return;
       }
-      erledigt('datei', 'Teilen ging hier nicht, das Bild ist gespeichert.');
+      erledigt('datei', t('p-teilen.gespeichertStatt'));
     }).catch((f) => console.error('teilen', f));
   });
   document.addEventListener('keydown', taste, true);
@@ -383,7 +386,7 @@ function knopf({ app, partie, bot, ort }) {
   el.className = 'tl-knopf-zeile';
   el.dataset.ort = ort;
   const sieg = partie.ergebnis === 'sieg';
-  const text = ort === 'analyse' ? 'Als Bild teilen' : sieg ? 'Siegesbild teilen' : 'Als Bild teilen';
+  const text = t(ort === 'analyse' ? 'p-teilen.knopf.bild' : sieg ? 'p-teilen.knopf.sieg' : 'p-teilen.knopf.bild');
   el.innerHTML = `<button class="knopf tl-teilen dr" type="button" data-partie="${esc(partie.id)}">${icon('teilen')}<span>${esc(text)}</span></button>`;
   el.querySelector('button').addEventListener('click', (ev) => {
     ev.stopPropagation();

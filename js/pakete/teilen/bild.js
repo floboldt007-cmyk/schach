@@ -16,12 +16,17 @@
 //   rendere(canvas, daten, modus, { ohneBilder }) -> Promise<{ texte, modus }>
 //   alsDatei(canvas, name) -> Promise<File>          PNG
 import { BREITE, HOEHE, TOKENS_THEMA, TOKENS_BRETT, layout, feldRechteck, themaTokens } from './logik.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 
 // Formen im 24er Raster (wie js/ui/icons.js 'stern' und 'bauer', die Schriften kennen ★ und ♙ nicht)
 const STERN = 'M12 2.6l2.85 5.95 6.5.82-4.78 4.5 1.2 6.46L12 17.2l-5.77 3.13 1.2-6.46-4.78-4.5 6.5-.82z';
 const BAUER = 'M12 3.4a2.55 2.55 0 0 1 1.58 4.57c1.42.9 2.25 2.25 2.25 3.83 0 1.12-.45 2.1-1.2 2.85l.9 3.07H8.47l.9-3.07'
   + 'a3.98 3.98 0 0 1-1.2-2.85c0-1.58.83-2.93 2.25-3.83A2.55 2.55 0 0 1 12 3.4z';
-const FIGUR_BUCHSTABE = { K: 'K', Q: 'D', R: 'T', B: 'L', N: 'S', P: 'B' };
+// Ersatz-Buchstabe einer Figur in der eingestellten Sprache (Woerterbuch p-teilen, figur.<K|Q|R|B|N|P>: K D T L S B)
+function figurBuchstabe(typ) {
+  return t('p-teilen.figur.' + typ);
+}
 const RUECKFALL_SCHRIFT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
 function pfad(d) {
@@ -72,26 +77,26 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
     // eine Familienliste, die der Kontext nicht versteht, ersetzt er nicht: dann die Systemschrift
     if (typeof ctx.font === 'string' && !ctx.font.includes(`${gr}px`)) ctx.font = `${gewicht} ${gr}px ${RUECKFALL_SCHRIFT}`;
   };
-  const breite = (t) => {
-    try { return ctx.measureText(t).width || 0; } catch (e) { return 0; }
+  const breite = (x) => {
+    try { return ctx.measureText(x).width || 0; } catch (e) { return 0; }
   };
   // Text so gross wie moeglich bis max (hoechstens 40 % kleiner), sonst gekuerzt
-  const passend = (t, gewicht, gr, familie, max) => {
+  const passend = (roh, gewicht, gr, familie, max) => {
     let g = gr;
     font(gewicht, g, familie);
-    while (max && breite(t) > max && g > gr * 0.6) { g -= 2; font(gewicht, g, familie); }
-    let s = t;
+    while (max && breite(roh) > max && g > gr * 0.6) { g -= 2; font(gewicht, g, familie); }
+    let s = roh;
     while (max && s.length > 1 && breite(s) > max) s = s.slice(0, -2) + '…';
     return s;
   };
-  const text = (t, x, y, { farbe, ausrichtung = 'left', grundlinie = 'alphabetic' } = {}) => {
-    if (!t) return 0;
+  const text = (inhalt, x, y, { farbe, ausrichtung = 'left', grundlinie = 'alphabetic' } = {}) => {
+    if (!inhalt) return 0;
     ctx.fillStyle = farbe;
     ctx.textAlign = ausrichtung;
     ctx.textBaseline = grundlinie;
-    ctx.fillText(t, x, y);
-    texte.push(t);
-    return breite(t);
+    ctx.fillText(inhalt, x, y);
+    texte.push(inhalt);
+    return breite(inhalt);
   };
 
   // 1. Grund und Karte
@@ -144,7 +149,7 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
   const gegner = passend(daten.gegner, 750, l.gegner.gr, display, Math.min(l.gegner.max, textMax));
   text(gegner, l.gegner.x, l.gegner.y, { farbe: f('--text', '#000') });
   if (daten.name) {
-    const name = passend(`Gespielt von ${daten.name}`, 650, l.name.gr, schrift, Math.min(l.name.max, textMax));
+    const name = passend(t('p-teilen.gespieltVon', { name: daten.name }), 650, l.name.gr, schrift, Math.min(l.name.max, textMax));
     text(name, l.name.x, l.name.y, { farbe: f('--text-2', '#555') });
   }
 
@@ -210,7 +215,7 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
     ctx.strokeStyle = fig.farbe === 'w' ? schwarz : weiss;
     ctx.stroke();
     font(800, 30, schrift);
-    text(FIGUR_BUCHSTABE[fig.typ], q.x + q.s / 2, q.y + q.s / 2 + 1, { farbe: fig.farbe === 'w' ? schwarz : weiss, ausrichtung: 'center', grundlinie: 'middle' });
+    text(figurBuchstabe(fig.typ), q.x + q.s / 2, q.y + q.s / 2 + 1, { farbe: fig.farbe === 'w' ? schwarz : weiss, ausrichtung: 'center', grundlinie: 'middle' });
   }
   // Koordinaten nach den Figuren (die Figurenbilder fuellen das ganze Feld und wuerden sie sonst verdecken): Reihen
   // links oben in der linken Spalte, Linien rechts unten in der unteren Reihe
@@ -230,9 +235,9 @@ export function zeichne(ctx, daten, farben = {}, bilder = {}) {
   // 6. Werte rechts neben dem Brett: Sterne (nur wertender Sieg), Genauigkeit (wenn bekannt), Zuege
   const w = l.werte;
   const bloecke = [];
-  if (Array.isArray(daten.sterne)) bloecke.push({ art: 'sterne', label: 'Sterne' });
-  if (daten.genauigkeit) bloecke.push({ wert: daten.genauigkeit, label: 'Genauigkeit' });
-  if (daten.zuege) bloecke.push({ wert: String(daten.zuege), label: daten.zuege === 1 ? 'Zug' : 'Züge' });
+  if (Array.isArray(daten.sterne)) bloecke.push({ art: 'sterne', label: t('p-teilen.bild.sterne') });
+  if (daten.genauigkeit) bloecke.push({ wert: daten.genauigkeit, label: t('p-teilen.bild.genauigkeit') });
+  if (daten.zuege) bloecke.push({ wert: String(daten.zuege), label: t('p-teilen.bild.zuege', { n: daten.zuege }) });
   const stern = pfad(STERN);
   bloecke.forEach((bl, i) => {
     const y = w.y + i * w.abstand;

@@ -1,5 +1,6 @@
 // Freunde-Code SA1 (Paket punkte, SPIELKONZEPT 3.13 "Freunde-Vergleich ohne Server"). Rein: ohne DOM, ohne Speicher,
-// ohne Uhr, ohne Zufall; braucht nur chess.js (erlaubte Zuege). In Node testbar.
+// ohne Uhr, ohne Zufall; braucht nur chess.js (erlaubte Zuege) und fuer die Fehlertexte js/sprache.js (Woerterbuch
+// p-punkte, ohne Wahl Deutsch). In Node testbar.
 //
 // Eine Code-Familie fuer alles, was man teilt: "SA1-" plus Crockford-Base32 (ohne I, L, O, U; Eingabe ohne Gross- und
 // Kleinschreibung, O wird 0, I und L werden 1) in Vierergruppen. Inhalt (Bytes, Version 1, alle Zahlen big-endian):
@@ -31,6 +32,8 @@
 // Kein Math.random in dieser Datei (Fairness-Regel 1).
 import { Chess } from '../../../vendor/chess/chess.js';
 import { addiereTage, tageZwischen, istSchluessel } from '../../tag.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 
 export const PRAEFIX = 'SA1';
 export const VERSION = 1;
@@ -152,14 +155,10 @@ export function zuegeAusIndizes(indizes, startFen = GRUNDSTELLUNG) {
 // In der App endet eine Partie nur so (js/ui/partie.js): Sieg nur durch Matt des Bots; Remis nur durch Patt,
 // zu wenig Material, dreifache Wiederholung oder 50 Zuege (chess.js, die App beendet die Partie sofort); Niederlage durch
 // Matt oder Aufgeben. Uhr-Tafeln (S2: Zeit abgelaufen) brauchen hier eine Erweiterung.
-const ERGEBNIS_FALSCH = {
-  sieg: 'Im Code steht ein Sieg, aber die nachgespielte Partie endet nicht mit Matt. Diesen Code trägt die App nicht ein.',
-  remis: 'Im Code steht ein Remis, aber die nachgespielte Schlussstellung ist kein Remis. Diesen Code trägt die App nicht ein.',
-  niederlage: 'Im Code steht eine Niederlage, aber die nachgespielte Partie endet anders. Diesen Code trägt die App nicht ein.',
-  zuege: 'Die Züge im Code lassen sich nicht nachspielen.',
-};
+// Texte erst beim Pruefen (Woerterbuch p-punkte, code.<grund>)
+const ERGEBNIS_FALSCH = ['sieg', 'remis', 'niederlage', 'zuege'];
 export function pruefeErgebnis({ ergebnis, farbe } = {}, nach = null) {
-  const nein = (grund) => ({ ok: false, grund, text: ERGEBNIS_FALSCH[grund] || ERGEBNIS_FALSCH.zuege });
+  const nein = (grund) => ({ ok: false, grund, text: t('p-punkte.code.' + (ERGEBNIS_FALSCH.includes(grund) ? grund : 'zuege')) });
   if (!nach || !nach.ok || typeof nach.fen !== 'string') return nein('zuege');
   const amZug = nach.fen.split(' ')[1] === 'b' ? 'b' : 'w';
   const ich = farbe === 'b' ? 'b' : 'w';
@@ -208,24 +207,21 @@ function fehler(grund, text) {
   return { ok: false, grund, text };
 }
 
-const FEHLERTEXT = {
-  leer: 'Kein Code eingefügt.',
-  zeichen: 'Der Code enthält Zeichen, die es in SA1-Codes nicht gibt.',
-  pruefsumme: 'Das Prüfzeichen passt nicht: Vermutlich hat sich ein Tippfehler eingeschlichen.',
-  version: 'Dieser Code stammt aus einer neueren App. Bitte die App aktualisieren.',
-  format: 'Der Code ist unvollständig oder beschädigt.',
-};
+// Texte erst beim Lesen (Woerterbuch p-punkte, code.<grund>)
+function fehlerText(grund) {
+  return t('p-punkte.code.' + grund);
+}
 
 export function leseCode(text) {
   const roh = String(text || '').trim();
-  if (!roh) return fehler('leer', FEHLERTEXT.leer);
+  if (!roh) return fehler('leer', fehlerText('leer'));
   const n = normalisiere(roh);
-  if (!n) return fehler('zeichen', FEHLERTEXT.zeichen);
+  if (!n) return fehler('zeichen', fehlerText('zeichen'));
   const b = ausBase32(n);
-  if (!b || b.length < 18) return fehler('format', FEHLERTEXT.format);
+  if (!b || b.length < 18) return fehler('format', fehlerText('format'));
   const inhalt = b.subarray(0, b.length - 2);
-  if (crc16(inhalt) !== ((b[b.length - 2] << 8) | b[b.length - 1])) return fehler('pruefsumme', FEHLERTEXT.pruefsumme);
-  if (b[0] !== VERSION) return fehler('version', FEHLERTEXT.version);
+  if (crc16(inhalt) !== ((b[b.length - 2] << 8) | b[b.length - 1])) return fehler('pruefsumme', fehlerText('pruefsumme'));
+  if (b[0] !== VERSION) return fehler('version', fehlerText('version'));
   let i = 0;
   const lies = (n2) => {
     if (i + n2 > inhalt.length) throw new Error('kurz');
@@ -249,13 +245,13 @@ export function leseCode(text) {
     const hb = lies(2);
     const h = (hb[0] << 8) | hb[1];
     const indizes = [...lies(h)];
-    if (i !== inhalt.length) return fehler('format', FEHLERTEXT.format);
+    if (i !== inhalt.length) return fehler('format', fehlerText('format'));
     const art = ZAHL_ART[artZahl];
     const stufe = ZAHL_STUFE[(merker >> 1) & 3] || null;
     const ergebnis = ZAHL_ERG[(merker >> 3) & 3];
     if (!art || !BOT_RE.test(botId) || !ergebnis || (art === 'boss') !== !!stufe || [...name].length > NAME_MAX || h > ZUEGE_MAX
       || (merker >> 5) !== 0) {
-      return fehler('format', FEHLERTEXT.format);
+      return fehler('format', fehlerText('format'));
     }
     return {
       ok: true,
@@ -263,6 +259,6 @@ export function leseCode(text) {
         staerke: staerke || null, name, indizes },
     };
   } catch (e) {
-    return fehler('format', FEHLERTEXT.format);
+    return fehler('format', fehlerText('format'));
   }
 }
