@@ -13,26 +13,31 @@
 // ihren Namen ueber botNachId, solange das Paket geladen ist.
 // w0plus-a-fix: Partien gegen angemeldete Bots im Modus normal heissen "Gast" (sie werten nie). Die Kopfzeile zaehlt die
 // nicht wertenden Partien je Art ("3 Partien, davon 1 Übung und 1 Boss-Partie"); vorher hiess jede davon "Übung".
+// Englische Version (Teil 1): Texte aus js/sprachen/analyse.js (vl.*, ergebnis.*), Datum und Uhrzeit mit der Sprache,
+// Eroeffnung ueber openings.eroeffnungsAnzeige (gespeichert bleibt der deutsche Name).
 import { BOTS, botNachId } from '../bots.js';
 import { SYMBOLE } from '../symbole.js';
-import { eroeffnung } from '../openings.js';
+import { eroeffnung, eroeffnungsAnzeige } from '../openings.js';
+import { t, sprache, locale } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/analyse.js';
 import { ladePartien, ladePartie, loeschePartie, ladeFortschritt, statistik, gesamtSterne, naechsterGegner, wertet, pruefeZuzweit } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { botFarbe } from '../thema.js';
 import { hauptKopf, verbindeKopf } from './seite.js';
 
 // W0+a: Chip nicht wertender Partien je Art (w0plus-a-fix: dazu Gast), Einzahl und Mehrzahl fuer die Kopfzeile
-const CHIP_TEXT = { boss: 'Boss', frei: 'Frei', spiel: 'Spielhalle', gast: 'Gast', zuzweit: 'Zu zweit' };
-const ART_TEXT = {
-  uebung: ['Übung', 'Übungen'], boss: ['Boss-Partie', 'Boss-Partien'], frei: ['freie Partie', 'freie Partien'],
-  spiel: ['Spielhallen-Partie', 'Spielhallen-Partien'], gast: ['Gast-Partie', 'Gast-Partien'],
-  zuzweit: ['Partie zu zweit', 'Partien zu zweit'],
-};
+// (Texte: analyse.vl.chip.<art>, analyse.vl.art.<art>.eins/.mehr; ART_REIHE ist die Reihenfolge in der Kopfzeile)
+const CHIP_ARTEN = new Set(['boss', 'frei', 'spiel', 'gast', 'zuzweit']);
+const ART_REIHE = ['uebung', 'boss', 'frei', 'spiel', 'gast', 'zuzweit'];
+function chipText(art) {
+  return t(`analyse.vl.chip.${CHIP_ARTEN.has(art) ? art : 'uebung'}`);
+}
 const LEITER = new Set(BOTS.map((b) => b.id));
 // Art einer nicht wertenden Partie: Modus boss, frei, spiel; Modus normal gegen einen angemeldeten Bot: gast; sonst
 // (Uebung, eigene Stellung) uebung
 function artVon(p) {
-  if (CHIP_TEXT[p.modus]) return p.modus;
+  if (CHIP_ARTEN.has(p.modus)) return p.modus;
   if ((p.modus || 'normal') === 'normal' && p.botId != null && !LEITER.has(p.botId)) return 'gast';
   return 'uebung';
 }
@@ -49,42 +54,52 @@ const ICON = {
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
-const GRUND = { matt: 'Matt', aufgabe: 'Aufgabe', patt: 'Patt', wiederholung: 'Wiederholung', '50-zuege': '50-Züge-Regel', material: 'Zu wenig Material' };
-const ERGEBNIS = { sieg: 'Sieg', niederlage: 'Niederlage', remis: 'Remis' };
+// Spielende: Grund (analyse.ergebnis.*) und Ergebnis (allgemein.sieg/niederlage/remis)
+const GRUND = new Set(['matt', 'aufgabe', 'patt', 'wiederholung', '50-zuege', 'material']);
+const ERGEBNIS = new Set(['sieg', 'niederlage', 'remis']);
+function grundText(grund) {
+  return GRUND.has(grund) ? t(`analyse.ergebnis.${grund}`) : '';
+}
 
 function esc(t) {
   return String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-const komma1 = (x) => x.toFixed(1).replace('.', ',');
-const sanDe = (san) => String(san || '').replace(/[QRBN]/g, (c) => ({ Q: 'D', R: 'T', B: 'L', N: 'S' }[c]))
+// Dezimalzeichen nach Sprache (Deutsch Komma)
+const komma1 = (x) => (sprache() === 'de' ? x.toFixed(1).replace('.', ',') : x.toFixed(1));
+function prozent(x) {
+  return t('analyse.vl.prozent', { wert: komma1(x) });
+}
+// SAN der Schatzkiste: Deutsch D T L S (K bleibt), Englisch K Q R B N; Rochade mit Nullen
+const sanDe = (san) => (sprache() === 'de' ? String(san || '').replace(/[QRBN]/g, (c) => ({ Q: 'D', R: 'T', B: 'L', N: 'S' }[c])) : String(san || ''))
   .replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 
-// "Heute, 14:05" / "Gestern, 09:12" / "16. Okt. 2026, 14:05"
+// "Heute, 14:05" / "Gestern, 09:12" / "16. Okt. 2026, 14:05" (Englisch: "Today, 2:05 PM" / "Oct 16, 2026, 2:05 PM")
 function datumText(iso, jetzt = new Date()) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const uhr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  // Englisch ohne fuehrende Null in der Stunde ("2:05 PM" statt "02:05 PM"), Deutsch wie bisher ("09:12")
+  const uhr = d.toLocaleTimeString(locale(), { hour: sprache() === 'de' ? '2-digit' : 'numeric', minute: '2-digit' });
   const tag = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((tag(jetzt) - tag(d)) / 86400000);
-  if (diff === 0) return `Heute, ${uhr}`;
-  if (diff === 1) return `Gestern, ${uhr}`;
-  const datum = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (diff === 0) return t('analyse.vl.heute', { uhr });
+  if (diff === 1) return t('analyse.vl.gestern', { uhr });
+  const datum = d.toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' });
   return `${datum}, ${uhr}`;
 }
 const datumKurz = (iso) => {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
 };
 
-// Eroeffnung: gespeichert oder aus den Zuegen nachgeschlagen (Partien ohne Analyse)
+// Eroeffnung: gespeichert oder aus den Zuegen nachgeschlagen (Partien ohne Analyse), in der eingestellten Sprache
 function eroeffnungsName(p) {
-  if (p.eroeffnung) return p.eroeffnung;
-  if (p.startFen && !String(p.startFen).startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w')) return 'Eigene Stellung';
+  if (p.eroeffnung) return eroeffnungsAnzeige(p.eroeffnung);
+  if (p.startFen && !String(p.startFen).startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w')) return t('analyse.vl.eigeneStellung');
   try {
     const n = Array.isArray(p.san) && p.san.length ? eroeffnung(p.san).name : null;
-    if (n) return n;
+    if (n) return eroeffnungsAnzeige(n);
   } catch (e) { /* egal */ }
-  return 'Eröffnung unbekannt';
+  return t('analyse.vl.eroeffnungUnbekannt');
 }
 
 function avatarHtml(bot, klein = false) {
@@ -104,14 +119,14 @@ export function zeige(root, params = {}, app) {
 
   const sec = document.createElement('section');
   sec.className = 'screen scrollt vl-screen';
-  sec.setAttribute('aria-label', 'Verlauf');
+  sec.setAttribute('aria-label', t('allgemein.verlauf'));
   root.append(sec);
 
   function baue() {
     const partien = ladePartien();
     const n = partien.length;
     sec.innerHTML = `
-      ${hauptKopf({ titel: 'Verlauf', unter: anzahlText(partien), marke: false, zurueck: true })}
+      ${hauptKopf({ titel: t('allgemein.verlauf'), unter: anzahlText(partien), marke: false, zurueck: true })}
       <div class="vl-inhalt">
         <aside class="vl-seite">
           ${statistikHtml()}
@@ -119,7 +134,7 @@ export function zeige(root, params = {}, app) {
           ${schatzHtml()}
         </aside>
         <div class="vl-haupt">
-          ${n ? `<h3 class="vl-titel">Deine Partien</h3><div class="vl-liste" role="list">${partien.map(zeileHtml).join('')}</div>` : leerHtml()}
+          ${n ? `<h3 class="vl-titel">${esc(t('analyse.vl.titel'))}</h3><div class="vl-liste" role="list">${partien.map(zeileHtml).join('')}</div>` : leerHtml()}
         </div>
       </div>`;
     for (const z of sec.querySelectorAll('.vl-zeile')) verbindeWischen(z);
@@ -137,11 +152,12 @@ export function zeige(root, params = {}, app) {
     const zaehl = new Map();
     for (const p of partien) if (!wertet(p)) { const a = artVon(p); zaehl.set(a, (zaehl.get(a) || 0) + 1); }
     const u = [...zaehl.values()].reduce((a, b) => a + b, 0);
-    const teile = Object.keys(ART_TEXT).filter((a) => zaehl.has(a)).map((a) => `${zaehl.get(a)} ${ART_TEXT[a][zaehl.get(a) === 1 ? 0 : 1]}`);
-    const liste = teile.length > 1 ? `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}` : teile[0];
+    // Mehrzahl ueber n: analyse.vl.art.<art>.eins / .mehr
+    const teile = ART_REIHE.filter((a) => zaehl.has(a)).map((a) => t(`analyse.vl.art.${a}`, { n: zaehl.get(a) }));
+    const liste = teile.length > 1 ? t('analyse.vl.liste', { anfang: teile.slice(0, -1).join(', '), ende: teile[teile.length - 1] }) : teile[0];
     if (u && u === n) return liste;
-    const alle = n === 1 ? '1 Partie' : `${n} Partien`;
-    return u ? `${alle}, davon ${liste}` : alle;
+    const alle = t('analyse.vl.partien', { n });
+    return u ? t('analyse.vl.davon', { alle, liste }) : alle;
   }
 
   function statistikHtml() {
@@ -150,15 +166,15 @@ export function zeige(root, params = {}, app) {
     const sterne = gesamtSterne();
     const kachel = (wert, label, extra = '') => `<div class="vl-kachel${extra}"><b class="zahl">${wert}</b><span>${label}</span></div>`;
     return `
-      <section class="vl-statistik flaeche" aria-label="Statistik">
-        ${kachel(s.partien, 'Partien')}
-        ${kachel(s.siege, 'Siege', ' sieg')}
-        ${kachel(s.remis, 'Remis', ' remis')}
-        ${kachel(s.niederlagen, 'Niederlagen', ' niederlage')}
-        ${kachel(s.schnittGenauigkeit != null ? komma1(s.schnittGenauigkeit) + ' %' : '?', 'Ø Genauigkeit')}
-        ${kachel(s.besteGenauigkeit != null ? komma1(s.besteGenauigkeit) + ' %' : '?', 'Bestwert')}
-        ${kachel(s.spielstaerke != null ? '≈ ' + s.spielstaerke : '?', 'Spielstärke')}
-        ${kachel(`<span class="stern">★</span> ${sterne}`, `von ${BOTS.length * 3} Sternen`)}
+      <section class="vl-statistik flaeche" aria-label="${esc(t('analyse.vl.statistik'))}">
+        ${kachel(s.partien, esc(t('analyse.vl.stat.partien')))}
+        ${kachel(s.siege, esc(t('analyse.vl.stat.siege')), ' sieg')}
+        ${kachel(s.remis, esc(t('analyse.vl.stat.remis')), ' remis')}
+        ${kachel(s.niederlagen, esc(t('analyse.vl.stat.niederlagen')), ' niederlage')}
+        ${kachel(s.schnittGenauigkeit != null ? prozent(s.schnittGenauigkeit) : '?', esc(t('analyse.vl.stat.schnitt')))}
+        ${kachel(s.besteGenauigkeit != null ? prozent(s.besteGenauigkeit) : '?', esc(t('analyse.vl.stat.bestwert')))}
+        ${kachel(s.spielstaerke != null ? '≈ ' + s.spielstaerke : '?', esc(t('analyse.vl.stat.staerke')))}
+        ${kachel(`<span class="stern">★</span> ${sterne}`, esc(t('analyse.vl.stat.sterne', { n: BOTS.length * 3 })))}
       </section>`;
   }
 
@@ -171,15 +187,16 @@ export function zeige(root, params = {}, app) {
         const nr = Math.floor((b.ply || 0) / 2) + 1;
         const zug = `${nr}${(b.ply || 0) % 2 ? '…' : '.'} ${sanDe(b.san)}!!`;
         return `<button class="vl-juwel" type="button" role="listitem" data-aktion="juwel" data-id="${esc(b.partieId)}" data-ply="${Number(b.ply) || 0}"
-          ${da ? '' : 'disabled'} aria-label="Genialer Zug ${esc(zug)} gegen ${esc(bot ? bot.name : 'Bot')}${da ? '' : ', Partie gelöscht'}">
+          ${da ? '' : 'disabled'} aria-label="${esc(t('analyse.vl.schatz.aria', { zug, name: bot ? bot.name : 'Bot' }))}${da ? '' : ', ' + esc(t('analyse.vl.schatz.geloescht'))}">
           <span class="vl-juwel-symbol">${SYMBOLE.brillant}</span>
-          <span class="vl-juwel-text"><b class="zahl">${esc(zug)}</b><span>${da ? `gegen ${esc(bot ? bot.name : 'Bot')} · ${esc(datumKurz(b.datum))}` : 'Partie gelöscht'}</span></span>
+          <span class="vl-juwel-text"><b class="zahl">${esc(zug)}</b><span>${da ? esc(t('analyse.vl.schatz.gegen', { name: bot ? bot.name : 'Bot', datum: datumKurz(b.datum) })) : esc(t('analyse.vl.schatz.geloescht'))}</span></span>
         </button>`;
       }).join('')}</div>`
-      : '<p class="vl-schatz-leer">Noch kein genialer Zug. Opfere eine Figur, wenn die Rechnung aufgeht, dann landet er hier.</p>';
+      : `<p class="vl-schatz-leer">${esc(t('analyse.vl.schatz.leer'))}</p>`;
+    const titel = esc(t('analyse.vl.schatz.titel'));
     return `
-      <section class="vl-schatz flaeche" aria-label="Schatzkiste">
-        <div class="vl-schatz-kopf">${icon('kiste')}<h3>Schatzkiste</h3><span class="chip zahl">${liste.length} ${liste.length === 1 ? 'genialer Zug' : 'Geniale Züge'}</span></div>
+      <section class="vl-schatz flaeche" aria-label="${titel}">
+        <div class="vl-schatz-kopf">${icon('kiste')}<h3>${titel}</h3><span class="chip zahl">${esc(t('analyse.vl.schatz.anzahl', { n: liste.length }))}</span></div>
         ${inhalt}
       </section>`;
   }
@@ -187,35 +204,35 @@ export function zeige(root, params = {}, app) {
   function zeileHtml(p) {
     const bot = botNachId(p.botId);
     const zuZweit = p.modus === 'zuzweit', namen = pruefeZuzweit(p.zuzweit);
-    const name = zuZweit ? `Zu zweit: ${namen.weiss} gegen ${namen.schwarz}` : bot ? bot.name : 'Unbekannter Gegner';
-    const erg = zuZweit && p.ergebnis !== 'remis' ? `${p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz} gewinnt` : ERGEBNIS[p.ergebnis] || 'Remis';
-    const art = ERGEBNIS[p.ergebnis] ? p.ergebnis : 'remis';
-    const grund = GRUND[p.grund] || '';
+    const name = zuZweit ? t('analyse.vl.zeile.zuzweit', { weiss: namen.weiss, schwarz: namen.schwarz }) : bot ? bot.name : t('analyse.vl.zeile.unbekannt');
+    const art = ERGEBNIS.has(p.ergebnis) ? p.ergebnis : 'remis';
+    const erg = zuZweit && p.ergebnis !== 'remis' ? t('analyse.ergebnis.gewinnt', { name: p.ergebnis === 'sieg' ? namen.weiss : namen.schwarz }) : t(`allgemein.${art}`);
+    const grund = grundText(p.grund);
     const zuege = Math.ceil((p.zuege || []).length / 2);
     const sterne = Array.isArray(p.sterne) ? p.sterne : [false, false, false];
     const sterneHtml = sterne.map((s) => `<span class="${s ? 'an' : 'aus'}">★</span>`).join('');
     const ohneZuege = !(p.zuege || []).length;
-    const genau = Number.isFinite(p.genauigkeit) ? `${komma1(p.genauigkeit)} %` : (ohneZuege ? 'keine Züge' : 'Analyse offen');
+    const genau = Number.isFinite(p.genauigkeit) ? prozent(p.genauigkeit) : t(ohneZuege ? 'analyse.vl.zeile.keineZuege' : 'analyse.vl.zeile.analyseOffen');
     const datum = datumText(p.datum);
-    const label = `${erg}${zuZweit ? ' · ' : ' gegen '}${name}, ${datum}. Analyse öffnen`;
+    const label = t(zuZweit ? 'analyse.vl.zeile.labelZuzweit' : 'analyse.vl.zeile.label', { erg, name, datum });
     return `
       <div class="vl-zeile" role="listitem" data-id="${esc(p.id)}">
-        <button class="vl-hinten" type="button" data-aktion="loeschen" tabindex="-1" aria-hidden="true">${icon('muell')}<span>Löschen</span></button>
+        <button class="vl-hinten" type="button" data-aktion="loeschen" tabindex="-1" aria-hidden="true">${icon('muell')}<span>${esc(t('allgemein.loeschen'))}</span></button>
         <div class="vl-vorne">
           <button class="vl-oeffnen" type="button" data-aktion="oeffnen" aria-label="${esc(label)}">
             ${avatarHtml(bot)}
             <span class="vl-info">
               <span class="vl-z1"><b class="vl-name">${esc(name)}</b><span class="vl-ergebnis ${art}">${esc(erg)}${grund ? ` · ${esc(grund)}` : ''}</span></span>
-              <span class="vl-z2">${ohneZuege ? 'Ohne Zug beendet' : `${zuege === 1 ? '1 Zug' : `${zuege} Züge`} · ${esc(eroeffnungsName(p))}`}</span>
-              <span class="vl-z3">${esc(datum)}${zuZweit ? '' : p.spielerFarbe === 'b' ? ' · mit Schwarz' : ' · mit Weiß'}</span>
+              <span class="vl-z2">${ohneZuege ? esc(t('analyse.vl.zeile.ohneZug')) : `${esc(t('analyse.vl.zeile.zuege', { n: zuege }))} · ${esc(eroeffnungsName(p))}`}</span>
+              <span class="vl-z3">${esc(datum)}${zuZweit ? '' : ' · ' + esc(t('analyse.vl.zeile.mitFarbe', { farbe: t(p.spielerFarbe === 'b' ? 'allgemein.schwarz' : 'allgemein.weiss') }))}</span>
             </span>
             <span class="vl-werte">
               <b class="vl-genau zahl${Number.isFinite(p.genauigkeit) ? '' : ' offen'}">${genau}</b>
-              ${wertet(p) ? `<span class="vl-sterne" aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</span>`
-                : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="Zählt nicht für Sterne und Statistik">${CHIP_TEXT[artVon(p)] || 'Übung'}</span>`}
+              ${wertet(p) ? `<span class="vl-sterne" aria-label="${esc(t('analyse.sterne', { n: sterne.filter(Boolean).length }))}">${sterneHtml}</span>`
+                : `<span class="chip uebung vl-uebung" data-modus="${esc(p.modus || 'normal')}" title="${esc(t('analyse.vl.zeile.zaehltNicht'))}">${esc(chipText(artVon(p)))}</span>`}
             </span>
           </button>
-          <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="Partie gegen ${esc(name)} löschen">${icon('muell')}</button>
+          <button class="icon-knopf vl-muell" type="button" data-aktion="loeschen" aria-label="${esc(t('analyse.vl.zeile.loeschen', { name }))}">${icon('muell')}</button>
         </div>
       </div>`;
   }
@@ -225,9 +242,9 @@ export function zeige(root, params = {}, app) {
     return `
       <div class="vl-leer flaeche">
         ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
-        <h3>Noch keine Partien.</h3>
-        <p>Fordere ${esc(g ? g.name : 'Bauer Benno')} heraus!</p>
-        <button class="knopf primaer" type="button" data-aktion="arena">Zur Arena ${icon('pfeil')}</button>
+        <h3>${esc(t('analyse.vl.leer.titel'))}</h3>
+        <p>${esc(t('analyse.vl.leer.text', { name: g ? g.name : (botNachId('benno')?.name || 'Bauer Benno') }))}</p>
+        <button class="knopf primaer" type="button" data-aktion="arena">${esc(t('analyse.vl.leer.arena'))} ${icon('pfeil')}</button>
       </div>`;
   }
 
@@ -322,11 +339,11 @@ export function zeige(root, params = {}, app) {
     hg.className = 'vl-dialog-hg';
     hg.innerHTML = `
       <div class="vl-dialog flaeche" role="alertdialog" aria-modal="true" aria-labelledby="vl-dialog-titel" aria-describedby="vl-dialog-text">
-        <h3 id="vl-dialog-titel">Partie löschen?</h3>
-        <p id="vl-dialog-text">${p.modus === 'zuzweit' ? `Die Partie zu zweit vom ${esc(datumKurz(p.datum))} und ihre Analyse werden gelöscht.` : `Die Partie gegen ${esc(bot ? bot.name : 'den Bot')} vom ${esc(datumKurz(p.datum))} und ihre Analyse werden gelöscht. Deine Sterne bleiben.`}</p>
+        <h3 id="vl-dialog-titel">${esc(t('analyse.vl.dialog.titel'))}</h3>
+        <p id="vl-dialog-text">${p.modus === 'zuzweit' ? esc(t('analyse.vl.dialog.zuzweit', { datum: datumKurz(p.datum) })) : esc(t('analyse.vl.dialog.text', { name: bot ? bot.name : t('analyse.vl.dialog.denBot'), datum: datumKurz(p.datum) }))}</p>
         <div class="vl-dialog-knoepfe">
-          <button class="knopf" type="button" data-aktion="dialog-ab">Abbrechen</button>
-          <button class="knopf vl-rot" type="button" data-aktion="dialog-ok">${icon('muell')} Löschen</button>
+          <button class="knopf" type="button" data-aktion="dialog-ab">${esc(t('allgemein.abbrechen'))}</button>
+          <button class="knopf vl-rot" type="button" data-aktion="dialog-ok">${icon('muell')} ${esc(t('allgemein.loeschen'))}</button>
         </div>
       </div>`;
     hg.addEventListener('click', (e) => { if (e.target === hg) schliesseDialog(); });
@@ -349,7 +366,7 @@ export function zeige(root, params = {}, app) {
     loeschePartie(id);
     if (offen === zeile) offen = null;
     zeile.classList.add('weg');
-    try { app.meldung('Partie gelöscht'); } catch (e) { /* egal */ }
+    try { app.meldung(t('analyse.vl.geloescht')); } catch (e) { /* egal */ }
     nach(matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260, () => {
       const y = sec.scrollTop;
       baue();

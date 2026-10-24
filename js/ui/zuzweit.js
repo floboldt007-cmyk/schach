@@ -3,19 +3,37 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { anim } from '../bewegung.js';
 import { klang } from '../sounds.js';
-import { sanDeutsch } from '../review.js';
+import { sanAnzeige } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
   pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
   ladeLaufendePartie, speichereLaufendePartie, loescheLaufendePartie, speicherePartie,
 } from '../storage.js';
+import { t, sprache } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/einstellungen.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TEMPI = { ohne: null, '5': { grund: 300, zuschlag: 0 }, '10': { grund: 600, zuschlag: 0 }, '15': { grund: 900, zuschlag: 10 } };
-const GRUENDE = { matt: 'Schachmatt', patt: 'Patt', material: 'Zu wenig Material', wiederholung: 'Dreifache Wiederholung', '50-zuege': '50-Züge-Regel', aufgabe: 'Aufgabe', zeit: 'Zeit abgelaufen', vereinbart: 'Remis vereinbart' };
+// Texte beim Zeichnen (js/sprachen/einstellungen.js, Schluessel zz.*)
+const GRUENDE = ['matt', 'patt', 'material', 'wiederholung', '50-zuege', 'aufgabe', 'zeit', 'vereinbart'];
+function Z(k, w) { return t('einstellungen.zz.' + k, w); }
+function grundText(grund) {
+  return GRUENDE.includes(grund) ? Z('grund.' + grund) : '';
+}
 const andere = (farbe) => farbe === 'w' ? 'b' : 'w';
-const farbwort = (farbe) => farbe === 'w' ? 'Weiß' : 'Schwarz';
+function farbwort(farbe) {
+  return farbe === 'w' ? t('allgemein.weiss') : t('allgemein.schwarz');
+}
+// Die Standardnamen aus storage.pruefeZuzweit ('Weiß', 'Schwarz') zeigt die Oberflaeche in der gewaehlten Sprache;
+// gespeichert bleibt der Name, wie er ist
+function anzeigeName(n) {
+  return n === 'Weiß' ? t('allgemein.weiss') : n === 'Schwarz' ? t('allgemein.schwarz') : n;
+}
+// Zugliste: in der eingestellten Sprache wie in Partie und Analyse (review.sanAnzeige: Deutsch K D T L S, Englisch
+// K Q R B N, Rochade mit Nullen)
+const sanText = (san) => sanAnzeige(san);
 
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;
@@ -36,15 +54,15 @@ function startblatt(root, app) {
   const namen = pruefeZuzweit(alt);
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen';
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">Zurück</button><h2>Zu zweit</h2></header>
+  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.zurueck')}</button><h2>${Z('titel')}</h2></header>
     <div class="zz-rumpf"><form class="zz-start flaeche">
-      <h3>Zu zweit am Brett</h3><p>Zwei Menschen spielen an diesem Gerät. Die Analyse kommt nach der Partie.</p>
-      <label>Name für Weiß<input name="weiss" maxlength="20" value="${esc(namen.weiss)}" autocomplete="off"></label>
-      <label>Name für Schwarz<input name="schwarz" maxlength="20" value="${esc(namen.schwarz)}" autocomplete="off"></label>
-      <label>Bedenkzeit<select name="bedenkzeit"><option value="ohne">Ohne Uhr</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
-      <label class="zz-schalter"><input name="drehen" type="checkbox"${namen.drehen ? ' checked' : ''}>Brett nach jedem Zug drehen</label>
-      <p class="zz-hinweis">Die Namen bleiben auf diesem Gerät. Mit Uhr läuft die Zeit auch im Hintergrund weiter.</p>
-      <button class="knopf primaer" type="submit">Los</button>
+      <h3>${Z('amBrett')}</h3><p>${Z('einleitung')}</p>
+      <label>${Z('nameWeiss')}<input name="weiss" maxlength="20" value="${esc(anzeigeName(namen.weiss))}" autocomplete="off"></label>
+      <label>${Z('nameSchwarz')}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
+      <label>${Z('bedenkzeit')}<select name="bedenkzeit"><option value="ohne">${Z('ohneUhr')}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
+      <label class="zz-schalter"><input name="drehen" type="checkbox"${namen.drehen ? ' checked' : ''}>${Z('drehen')}</label>
+      <p class="zz-hinweis">${Z('hinweis')}</p>
+      <button class="knopf primaer" type="submit">${Z('los')}</button>
     </form></div>`;
   root.append(s);
   let weg = false, startet = false;
@@ -56,8 +74,8 @@ function startblatt(root, app) {
     if (startet) return;
     startet = true;
     if (ladeLaufendePartie()) {
-      const ok = await app.frage({ titel: 'Neue Partie starten?', text: 'Die noch offene Partie wird verworfen.',
-        knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Neue Partie', wert: true, art: 'primaer' }], abbrechen: false });
+      const ok = await app.frage({ titel: Z('neuTitel'), text: Z('neuText'),
+        knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: Z('neuKnopf'), wert: true, art: 'primaer' }], abbrechen: false });
       if (!ok || weg) { startet = false; return; }
     }
     const zuzweit = pruefeZuzweit({ weiss: form.elements.weiss.value, schwarz: form.elements.schwarz.value, drehen: form.elements.drehen.checked });
@@ -82,13 +100,13 @@ function partie(root, quelle, app, fortgesetzt) {
       }
       z.zeiten = Array.isArray(quelle.zeiten) ? quelle.zeiten.slice(0, z.zuege.length) : [];
     } catch (e) {
-      app.meldung('Die gespeicherte Partie konnte nicht fortgesetzt werden.', { art: 'fehler' });
+      app.meldung(Z('fortsetzenFehler'), { art: 'fehler' });
       return startblatt(root, app);
     }
   }
   const gestartet = fortgesetzt && typeof quelle.gestartet === 'string' ? quelle.gestartet : new Date().toISOString();
   const laufId = 'zz' + gestartet;
-  const name = (f) => namen[f === 'w' ? 'weiss' : 'schwarz'];
+  const name = (f) => anzeigeName(namen[f === 'w' ? 'weiss' : 'schwarz']);
   const grund = (tempo?.grund || 0) * 1000;
   const gespeichertUhr = fortgesetzt && quelle.uhr;
   const rest = { w: grund, b: grund };
@@ -100,16 +118,16 @@ function partie(root, quelle, app, fortgesetzt) {
   let uhrTimer;
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
-  s.setAttribute('aria-label', 'Zu zweit am Brett');
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">Training</button><h2>Zu zweit</h2></header>
+  s.setAttribute('aria-label', Z('amBrett'));
+  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h2>${Z('titel')}</h2></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
       <div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div>
       <div class="zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
-      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="remis">Remis anbieten</button><button class="knopf" type="button" data-zz="aufgeben">Aufgeben</button></div>
-      <div class="zz-zuege" aria-label="Züge"></div>
-      <section class="zz-ergebnis flaeche" aria-label="Ergebnis" hidden></section>
+      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
+      <div class="zz-zuege" aria-label="${Z('zuege')}"></div>
+      <section class="zz-ergebnis flaeche" aria-label="${Z('ergebnis')}" hidden></section>
     </div></div>`;
   root.append(s);
   const brettEl = s.querySelector('.brett');
@@ -160,8 +178,8 @@ function partie(root, quelle, app, fortgesetzt) {
       drehenAnimation = anim(brettEl, [{ opacity: .65 }, { opacity: 1 }], { d: 240, k: 'sanft' });
     }
     karten(); tick();
-    s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? `${name(chess.turn())} ist am Zug${chess.inCheck() ? ' · Schach' : ''}` : 'Partie beendet';
-    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanDeutsch(san)}`).join(' ');
+    s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? Z(chess.inCheck() ? 'amZugSchach' : 'amZug', { name: name(chess.turn()) }) : Z('beendet');
+    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanText(san)}`).join(' ');
   }
   function beiZug(von, nach, umwandlung) {
     if (weg || fragt || z.phase !== 'spiel') return false;
@@ -207,10 +225,10 @@ function partie(root, quelle, app, fortgesetzt) {
     for (const el of s.querySelectorAll('.uhr')) {
       el.classList.remove('laeuft'); el.querySelector('.uhr-zeit').textContent = uhrText(rest[el.dataset.farbe]);
     }
-    s.querySelector('.zz-status').textContent = 'Partie beendet';
+    s.querySelector('.zz-status').textContent = Z('beendet');
     const el = s.querySelector('.zz-ergebnis');
-    el.innerHTML = `<h3>${gewinner ? esc(name(gewinner)) + ' gewinnt' : 'Remis'}</h3><p>${GRUENDE[grund] || ''}</p>
-      <div class="zz-aktionen"><button class="knopf primaer" data-zz="analyse">Analyse</button><button class="knopf" data-zz="revanche">Revanche</button><button class="knopf" data-zz="fertig">Fertig</button></div>`;
+    el.innerHTML = `<h3>${gewinner ? Z('gewinnt', { name: esc(name(gewinner)) }) : t('allgemein.remis')}</h3><p>${grundText(grund)}</p>
+      <div class="zz-aktionen"><button class="knopf primaer" data-zz="analyse">${t('allgemein.analyse')}</button><button class="knopf" data-zz="revanche">${Z('revanche')}</button><button class="knopf" data-zz="fertig">${t('allgemein.fertig')}</button></div>`;
     el.hidden = false; el.scrollIntoView({ block: 'nearest' });
   }
   s.addEventListener('click', async (e) => {
@@ -226,8 +244,8 @@ function partie(root, quelle, app, fortgesetzt) {
     fragt = true; brett.erlaubeZuege(null);
     const amZug = chess.turn();
     const ok = await app.frage(aktion === 'remis'
-      ? { titel: `${name(amZug)} bietet Remis`, text: `${name(andere(amZug))} entscheidet.`, knoepfe: [{ text: 'Weiterspielen', wert: false }, { text: 'Annehmen', wert: true, art: 'primaer' }], abbrechen: false }
-      : { titel: `${name(amZug)} gibt auf?`, text: `${name(andere(amZug))} gewinnt dann die Partie.`, knoepfe: [{ text: 'Weiterspielen', wert: false }, { text: 'Aufgeben', wert: true, art: 'gefahr' }], abbrechen: false });
+      ? { titel: Z('bietetRemis', { name: name(amZug) }), text: Z('entscheidet', { name: name(andere(amZug)) }), knoepfe: [{ text: Z('weiterspielen'), wert: false }, { text: Z('annehmen'), wert: true, art: 'primaer' }], abbrechen: false }
+      : { titel: Z('gibtAuf', { name: name(amZug) }), text: Z('gewinntDann', { name: name(andere(amZug)) }), knoepfe: [{ text: Z('weiterspielen'), wert: false }, { text: Z('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
     fragt = false;
     if (weg || z.phase !== 'spiel') return;
     tick(); if (z.phase !== 'spiel') return;

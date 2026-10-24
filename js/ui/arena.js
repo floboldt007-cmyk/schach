@@ -47,31 +47,36 @@ import { anim, staffel, tempo, reduziert } from '../bewegung.js';
 import { segment } from './bauteile.js';
 import { hauptKopf, standardChips, verbindeKopf, kopfEintritt } from './seite.js';
 import { spieleDuell, duellArt } from './duell.js';
+import { t, zahl } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/arena.js';
 
-// Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche
+// Merkmal-Kacheln (aus der Bot-Bio abgeleitet): Lieblingsfigur, Tempo, Schwaeche. Hier nur die Figur; die Texte stehen
+// im Woerterbuch (arena.merkmal.<id>.lieblings | .tempo | .schwaeche) und werden beim Zeichnen gelesen (merkmaleVon)
 const MERKMALE = {
-  benno: { figur: 'P', lieblings: 'Bauer', tempo: 'Flott', schwaeche: 'Lässt Figuren hängen' },
-  hilde: { figur: 'Q', lieblings: 'Dame', tempo: 'Gemütlich', schwaeche: 'Vergisst eigene Figuren' },
-  kalle: { figur: 'Q', lieblings: 'Dame', tempo: 'Hastig', schwaeche: 'Achtet kaum auf Deckung' },
-  lisa: { figur: 'B', lieblings: 'Läufer', tempo: 'Flott', schwaeche: 'Lange Pläne' },
-  rudi: { figur: 'N', lieblings: 'Springer', tempo: 'Überlegt', schwaeche: 'Verliert den Überblick' },
-  turm: { figur: 'R', lieblings: 'Turm', tempo: 'Bedächtig', schwaeche: 'Spielt lieber sicher' },
-  delia: { figur: 'Q', lieblings: 'Dame', tempo: 'Stürmisch', schwaeche: 'Opfert zu gern' },
-  koenig: { figur: 'K', lieblings: 'König', tempo: 'Bedächtig', schwaeche: 'Scharfe Taktik' },
-  greta: { figur: 'B', lieblings: 'Läuferpaar', tempo: 'Präzise', schwaeche: 'Kaum eine' },
-  stockfisch: { figur: 'Q', lieblings: 'Alle', tempo: 'Blitzschnell', schwaeche: 'Keine bekannt' },
+  benno: 'P', hilde: 'Q', kalle: 'Q', lisa: 'B', rudi: 'N', turm: 'R', delia: 'Q', koenig: 'K', greta: 'B', stockfisch: 'Q',
 };
-// Kurze Namen fuer die Schilder auf der Karte (nie abgeschnitten) und den Spielen-Knopf ("Spielen gegen Kalle")
-const KURZ = {
-  benno: 'Benno', hilde: 'Oma Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Ritter Rudi', turm: 'Prof. Turm',
-  delia: 'Delia', koenig: 'König', greta: 'Greta', stockfisch: 'Stockfisch',
-};
-const RUF = { ...KURZ, turm: 'den Professor', koenig: 'den Kommissar', stockfisch: 'den Stockfisch' };
+function merkmaleVon(id) {
+  const k = MERKMALE[id] ? id : 'benno';
+  return {
+    figur: MERKMALE[k],
+    lieblings: t(`arena.merkmal.${k}.lieblings`),
+    tempo: t(`arena.merkmal.${k}.tempo`),
+    schwaeche: t(`arena.merkmal.${k}.schwaeche`),
+  };
+}
+// Kurze Namen fuer die Schilder auf der Karte (nie abgeschnitten) und den Spielen-Knopf ("Spielen gegen Kalle"): der
+// Rufname aus js/bots.js; drei Bots haben im Spielen-Knopf eine eigene Form (arena.ruf.<id>: "den Professor")
+const RUF = ['turm', 'koenig', 'stockfisch'];
+function rufForm(b) {
+  return RUF.includes(b.id) ? t(`arena.ruf.${b.id}`) : rufname(b);
+}
 // Text des Spielen-Knopfs ("Spielen gegen Kalle", besiegt "Revanche gegen ..."). Der Rufname steht in .sp-name und
 // bricht nie in sich um; wird es eng (schmales Panel, langer Rufname), bricht der Knopf vor dem Namen auf zwei Zeilen
 // um, statt etwas abzuschneiden (css/arena.css .spielen .sp-text, tests/arena.test.mjs prueft alle Bots)
 export function spielenText(b, besiegt) {
-  return `${besiegt ? 'Revanche' : 'Spielen'} gegen <span class="sp-name">${esc((b && (RUF[b.id] || rufname(b))) || '')}</span>`;
+  const name = `<span class="sp-name">${esc((b && rufForm(b)) || '')}</span>`;
+  return esc(t(besiegt ? 'arena.spielen.revanche' : 'arena.spielen.gegen')).replace('{name}', () => name);
 }
 
 // Lagen der Karte: Stationen und Szenerie in Anteilen der Kartengroesse (0..1). quer = fast quadratische Karte
@@ -140,21 +145,33 @@ function ladePartieScreen() {
   return partieVorab;
 }
 
-const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+// Wochentage (Montag = 0, tag.js wochentag): Schluessel im Woerterbuch arena.wochentag.<kurz>
+const WOCHENTAGE = ['mo', 'di', 'mi', 'do', 'fr', 'sa', 'so'];
 
 let letzteFarbe = 'w';   // Farbwahl bleibt waehrend der Sitzung erhalten ('w' | 'zufall' | 'b')
 // Fehlende Analysen erst nachrechnen, wenn die Arena steht (nach der Freischalt-Animation)
 const ARENA_NACHHOLEN_MS = 2500;
-const ZIELE = [['Sieg', 'Sieg'], ['80 % genau', 'Sieg mit mindestens 80 % Genauigkeit'], ['Ohne Hilfe', 'Ohne Hinweis und ohne Zurücknehmen']];
+// Die drei Stern-Ziele (Woerterbuch arena.ziel.<id>.kurz | .lang)
+const ZIELE = ['sieg', 'genau', 'hilfe'];
 // Mindesthoehe der hohen Welt auf schmalen Karten (px): Stationen mit Sternen, Fahne und Schild ueberdecken sich nicht
 const WELT_MIN_H = 820;
 // Dauer der Freischalt-Choreografie (tests/app.test.mjs misst 2,7 s zwischen Beginn und Ende von .wird-frei)
 const FREI_DAUER_MS = 2700;
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const prozent = (x) => (Number.isFinite(x) ? String(Math.round(x * 10) / 10).replace('.', ',') + ' %' : '-');
+// Prozent mit einer Nachkommastelle in der Schreibweise der Sprache ("85,3 %" | "85.3%")
+function prozent(x) {
+  if (!Number.isFinite(x)) return '-';
+  return t('arena.prozent', { wert: zahl(Math.round(x * 10) / 10, { maximumFractionDigits: 1, useGrouping: false }) });
+}
 const kSterneHtml = (sterne) => sterne.map((x) => icon('stern', x ? 'stern' : 'aus')).join('');
-const zielSterneHtml = (sterne) => ZIELE.map(([kurz, lang], i) => `<div class="${sterne[i] ? 'an' : ''}" title="${esc(lang)}"><b aria-hidden="true">${icon('stern')}</b>${kurz}<span class="sr"> (${esc(lang)}${sterne[i] ? ', erreicht' : ''})</span></div>`).join('');
+function zielSterneHtml(sterne) {
+  return ZIELE.map((id, i) => {
+    const kurz = t(`arena.ziel.${id}.kurz`);
+    const lang = t(`arena.ziel.${id}.lang`);
+    return `<div class="${sterne[i] ? 'an' : ''}" title="${esc(lang)}"><b aria-hidden="true">${icon('stern')}</b>${esc(kurz)}<span class="sr"> (${esc(sterne[i] ? t('arena.ziel.erreicht', { ziel: lang }) : lang)})</span></div>`;
+  }).join('');
+}
 const r1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, '');
 
 // ---------- Welt-Zeichnung (Pixelmass) ----------
@@ -309,27 +326,27 @@ export function zeige(root, params, app) {
     if (istFreigeschaltet(b.stufe, fortschritt)) return 'offen';
     return 'gesperrt';
   };
-  const kurzName = (b) => KURZ[b.id] || rufname(b);
+  const kurzName = (b) => rufname(b);
 
   // ---------- Aufbau ----------
   const s = document.createElement('section');
   s.className = 'screen arena';
-  s.setAttribute('aria-label', 'Bot-Leiter');
+  s.setAttribute('aria-label', t('arena.aria.leiter'));
   // Lage schon vor dem ersten Bild setzen (kein Umspringen): quer nur im Querformat mit genug Hoehe
   const querVorab = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && window.innerHeight - 140 >= 420;
   s.classList.add(querVorab ? 'karte-quer' : 'karte-hoch');
   s.innerHTML = `
     ${hauptKopf({
-    unter: alleBesiegt ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/${BOTS.length * 3} Sterne` : `Fünf Welten, ${BOTS.length} Bots`,
+    unter: alleBesiegt ? t('arena.kopf.bezwungen', { sterne: gesamtSterne(fortschritt), max: BOTS.length * 3 }) : t('arena.kopf.titel', { bots: BOTS.length }),
     chips: standardChips(fortschritt),
-    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: 'Verlauf' }],
+    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
   })}
     <div class="inhalt">
-      <div class="karte" tabindex="-1" aria-label="Weltkarte">
-        <div class="weltwahl" role="group" aria-label="Welt wählen">
-          <button class="ww-pfeil dr" type="button" data-richtung="-1" aria-label="Vorige Welt">${icon('zurueck')}</button>
+      <div class="karte" tabindex="-1" aria-label="${esc(t('arena.aria.karte'))}">
+        <div class="weltwahl" role="group" aria-label="${esc(t('arena.aria.weltwahl'))}">
+          <button class="ww-pfeil dr" type="button" data-richtung="-1" aria-label="${esc(t('arena.aria.vorige'))}">${icon('zurueck')}</button>
           <div class="ww-mitte" aria-live="polite"><b class="ww-name"></b><span class="ww-unter"></span></div>
-          <button class="ww-pfeil dr" type="button" data-richtung="1" aria-label="Nächste Welt">${icon('vor')}</button>
+          <button class="ww-pfeil dr" type="button" data-richtung="1" aria-label="${esc(t('arena.aria.naechste'))}">${icon('vor')}</button>
         </div>
         <div class="welt">
           <div class="welt-bild" aria-hidden="true"></div>
@@ -339,7 +356,7 @@ export function zeige(root, params, app) {
           <div class="welt-sperre" hidden></div>
         </div>
       </div>
-      <aside class="detail" aria-label="Gegner"></aside>
+      <aside class="detail" aria-label="${esc(t('arena.aria.gegner'))}"></aside>
     </div>`;
   root.append(s);
 
@@ -372,13 +389,13 @@ export function zeige(root, params, app) {
     const sterne = fortschritt.bots[b.id].sterne;
     el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
-      ${b.endgegner ? '<span class="boss-krone">ENDGEGNER</span>' : ''}
-      ${z === 'aktuell' && b.id === aktuellId ? '<span class="fahne">NÄCHSTER GEGNER</span>' : ''}
+      ${b.endgegner ? `<span class="boss-krone">${esc(t('arena.schild.endgegner'))}</span>` : ''}
+      ${z === 'aktuell' && b.id === aktuellId ? `<span class="fahne">${esc(t('arena.schild.naechster'))}</span>` : ''}
       ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${kSterneHtml(sterne)}</span>` : ''}
       <span class="avatar"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></span>
       <span class="k-nr zahl" aria-hidden="true">${b.stufe}</span>
       ${z === 'gesperrt' || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}
-      ${z === 'offen' && neuEingezogen(b) ? '<span class="k-neu">NEU</span>' : ''}
+      ${z === 'offen' && neuEingezogen(b) ? `<span class="k-neu">${esc(t('arena.schild.neu'))}</span>` : ''}
       <span class="k-schild"><span class="k-name">${esc(kurzName(b))}</span><span class="k-meta zahl">${b.elo}</span></span>`;
     el.addEventListener('click', () => tippeKnoten(b, el));
     weltEl.insertBefore(el, weltSperre);
@@ -387,9 +404,10 @@ export function zeige(root, params, app) {
   baueKnoten();
 
   function knotenLabel(b, z) {
-    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', offen: neuEingezogen(b) ? 'neu eingezogen' : b.endgegner ? 'Endgegner, direkt herausfordern' : 'offen', gesperrt: 'gesperrt' }[z];
+    const zustand = { besiegt: 'besiegt', aktuell: 'aktuell', offen: neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
-    return `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`;
+    const werte = { stufe: b.stufe, name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
+    return z === 'besiegt' ? t('arena.knoten.labelSterne', { ...werte, sterne: sterne.filter(Boolean).length }) : t('arena.knoten.label', werte);
   }
 
   function tippeKnoten(b, el) {
@@ -397,9 +415,9 @@ export function zeige(root, params, app) {
       // den Bot nennen, den Flo jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
       const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
       const tor = weltFrei ? null : endgegnerDerWelt(weltNr - 1);
-      app.meldung(tor ? `Diese Welt öffnet sich mit einem Sieg gegen ${tor.name}.`
-        : vorher && vorher.id === naechster.id ? `Besiege erst ${vorher.name}.`
-          : `Gesperrt. Besiege zuerst ${naechster.name}, dann geht es Stufe für Stufe weiter.`);
+      app.meldung(tor ? t('arena.gesperrt.welt', { name: tor.name })
+        : vorher && vorher.id === naechster.id ? t('arena.gesperrt.erst', { name: vorher.name })
+          : t('arena.gesperrt.zuerst', { name: naechster.name }));
       el.classList.remove('ruettel');
       void el.offsetWidth;
       el.classList.add('ruettel');
@@ -541,14 +559,14 @@ export function zeige(root, params, app) {
     const lauf = ++panelLauf;
     const b = BOTS.find((x) => x.id === gewaehlt);
     const f = fortschritt.bots[b.id];
-    const mm = b.merkmale || MERKMALE[b.id] || MERKMALE.benno;
+    const mm = b.merkmale || merkmaleVon(b.id);
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
     const st = statistik();
     const laufend = ladeLaufendePartie();
     // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
     const laufBot = laufend ? botNachId(laufend.botId) : null;
-    const status = z === 'besiegt' ? 'Besiegt' : z === 'aktuell' ? 'Nächster Gegner'
-      : neuEingezogen(b) ? 'Neu eingezogen' : b.endgegner ? 'Endgegner · direkt herausfordern' : 'Offen';
+    const status = t('arena.status.' + (z === 'besiegt' ? 'besiegt' : z === 'aktuell' ? 'aktuell'
+      : neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen'));
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
     if (orte.oben) orte.oben.verlasse();
@@ -558,37 +576,37 @@ export function zeige(root, params, app) {
       if (lauf !== panelLauf || weg) return;
       detail.innerHTML = `
       <div class="ort-panel-oben" hidden></div>
-      <section class="heute-karte" aria-label="Heute" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
+      <section class="heute-karte" aria-label="${esc(t('arena.heute.aria'))}" hidden><div class="hk-kopf"></div><div class="ort-heute"></div></section>
       ${laufend && laufBot ? `
       <div class="fortsetzen" style="--bf:${botFarbe(laufBot)}">
         <span class="avatar"><img src="${esc(avatarVon(laufBot))}" alt=""></span>
-        <div class="ft-text"><b>Offene Partie</b><span>gegen ${esc(laufBot.name)}</span><span>bei Zug ${Math.floor(laufend.zuege.length / 2) + 1}</span></div>
-        <button class="knopf primaer dr" type="button" data-aktion="fortsetzen">${icon('play')} Fortsetzen</button>
+        <div class="ft-text"><b>${esc(t('arena.offen.titel'))}</b><span>${esc(t('arena.offen.gegen', { name: laufBot.name }))}</span><span>${esc(t('arena.offen.zug', { zug: Math.floor(laufend.zuege.length / 2) + 1 }))}</span></div>
+        <button class="knopf primaer dr" type="button" data-aktion="fortsetzen">${icon('play')} ${esc(t('arena.offen.fortsetzen'))}</button>
       </div>` : ''}
       <div class="detail-links">
         <div class="detail-kopf">
           <div class="av"><img src="${esc(avatarVon(b))}" alt=""></div>
           <div class="detail-name">
-            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">Stufe ${b.stufe} · ${status}</div>
-            <div class="detail-welt">Welt ${b.welt} · ${esc((WELTEN.find((w) => w.nr === b.welt) || {}).name || '')}</div>
+            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { stufe: b.stufe, status }))}</div>
+            <div class="detail-welt">${esc(t('arena.detail.welt', { nr: b.welt, name: (WELTEN.find((w) => w.nr === b.welt) || {}).name || '' }))}</div>
             <h2 class="disp">${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>
-            <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${kSterneHtml(f.sterne)}</div>
+            <div class="mini-sterne" aria-label="${esc(t('arena.sterne.von', { anzahl: f.sterne.filter(Boolean).length }))}">${kSterneHtml(f.sterne)}</div>
           </div>
         </div>
-        <div class="sprechblase spruch${neueBlase ? '' : ' still'}">„${esc(satz)}“</div>
+        <div class="sprechblase spruch${neueBlase ? '' : ' still'}">${esc(t('arena.zitat', { satz }))}</div>
         <div class="merkmale">
-          <div class="merkmal"><span class="m-label">Lieblingsfigur</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
-          <div class="merkmal"><span class="m-label">Tempo</span><span class="m-wert">${esc(mm.tempo)}</span></div>
-          <div class="merkmal"><span class="m-label">Schwäche</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
+          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
+          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
+          <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.schwaeche'))}</span><span class="m-wert">${esc(mm.schwaeche)}</span></div>
         </div>
       </div>
       <div class="detail-rechts">
-        <div class="ziel-sterne" aria-label="Bedingungen für die drei Sterne">
+        <div class="ziel-sterne" aria-label="${esc(t('arena.ziele.aria'))}">
           ${zielSterneHtml(f.sterne)}
         </div>
         <div class="ort-panel-bot" hidden></div>
-        <div class="wahl wahl-farbe"><div class="wahl-titel">Deine Farbe</div><div class="farbwahl-ort"></div></div>
+        <div class="wahl wahl-farbe"><div class="wahl-titel">${esc(t('arena.farbe.titel'))}</div><div class="farbwahl-ort"></div></div>
         <div class="ort-tempo" hidden></div>
         <div class="cta-platz"><button class="knopf primaer gross spielen dr" type="button" data-aktion="spielen"><span class="sp-text">${spielenText(b, z === 'besiegt')}</span><span class="pf">${icon('pfeil')}</span></button></div>
         <div class="bilanz">${bilanzHtml(st)}</div>
@@ -597,11 +615,11 @@ export function zeige(root, params, app) {
       // Farbe als Segment (A): Hooks .farbwahl [data-farbe="w|zufall|b"][aria-checked]
       const fig = (x) => `<img class="fig" src="assets/pieces/${x}.svg" alt="">`;
       const seg = segment({
-        name: 'farbe', label: 'Deine Farbe', wert: letzteFarbe,
+        name: 'farbe', label: t('arena.farbe.titel'), wert: letzteFarbe,
         optionen: [
-          { id: 'w', zeile: true, label: 'Weiß', html: `<span class="fig-bg">${fig('wK')}</span>Weiß` },
-          { id: 'zufall', zeile: true, label: 'Zufall', html: `<span class="fig-bg fig-paar">${fig('wK')}${fig('bK')}</span>Zufall` },
-          { id: 'b', zeile: true, label: 'Schwarz', html: `<span class="fig-bg">${fig('bK')}</span>Schwarz` },
+          { id: 'w', zeile: true, label: t('allgemein.weiss'), html: `<span class="fig-bg">${fig('wK')}</span>${esc(t('allgemein.weiss'))}` },
+          { id: 'zufall', zeile: true, label: t('arena.farbe.zufall'), html: `<span class="fig-bg fig-paar">${fig('wK')}${fig('bK')}</span>${esc(t('arena.farbe.zufall'))}` },
+          { id: 'b', zeile: true, label: t('allgemein.schwarz'), html: `<span class="fig-bg">${fig('bK')}</span>${esc(t('allgemein.schwarz'))}` },
         ],
         beiWahl: (id) => { letzteFarbe = id; floFigur.innerHTML = floAvatar(id === 'b' ? 'b' : 'w'); },
       });
@@ -623,7 +641,7 @@ export function zeige(root, params, app) {
       // W0+a: Heute-Karte (Ort arena:heute), nur mit Zeilen sichtbar
       const heute = detail.querySelector('.heute-karte');
       const tag = tagSchluessel();
-      heute.querySelector('.hk-kopf').textContent = `Heute · ${WOCHENTAGE[wochentag(tag)]}`;
+      heute.querySelector('.hk-kopf').textContent = t('arena.heute.kopf', { tag: t('arena.wochentag.' + WOCHENTAGE[wochentag(tag)]) });
       orte.heute = fuelle('arena:heute', heute.querySelector('.ort-heute'), { app, bot: b, fortschritt, tag, woche: wochenSchluessel() });
       heute.hidden = orte.heute.anzahl === 0;
       const botOrt = detail.querySelector('.ort-panel-bot');
@@ -642,10 +660,10 @@ export function zeige(root, params, app) {
 
   function bilanzHtml(st) {
     return `
-          <div><b>${st.partien}</b><span>Partien</span></div>
-          <div><b>${st.siege}</b><span>Siege</span></div>
-          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>Ø Genauigkeit</span></div>
-          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>Spielstärke</span></div>
+          <div><b>${st.partien}</b><span>${esc(t('arena.bilanz.partien'))}</span></div>
+          <div><b>${st.siege}</b><span>${esc(t('arena.bilanz.siege'))}</span></div>
+          <div><b>${prozent(st.schnittGenauigkeit)}</b><span>${esc(t('arena.bilanz.genauigkeit'))}</span></div>
+          <div><b>${st.spielstaerke ? '≈ ' + st.spielstaerke : '-'}</b><span>${esc(t('arena.bilanz.staerke'))}</span></div>
         `;
   }
 
@@ -657,7 +675,7 @@ export function zeige(root, params, app) {
     for (const b of BOTS) fortschritt.bots[b.id] = neu.bots[b.id];
     const zahl = s.querySelector('.kopf-chips .chip .sr');
     if (zahl && zahl.nextSibling && zahl.nextSibling.nodeType === 3) zahl.nextSibling.textContent = ' ' + gesamtSterne(fortschritt);
-    if (alleBesiegt) s.querySelector('.logo-unter').textContent = `Arena bezwungen! ${gesamtSterne(fortschritt)}/${BOTS.length * 3} Sterne`;
+    if (alleBesiegt) s.querySelector('.logo-unter').textContent = t('arena.kopf.bezwungen', { sterne: gesamtSterne(fortschritt), max: BOTS.length * 3 });
     LBOTS.forEach((b, i) => {
       const el = knoten[i];
       const z = b.id === neuId ? 'aktuell' : zustandVon(b);
@@ -669,7 +687,7 @@ export function zeige(root, params, app) {
     const mini = detail.querySelector('.mini-sterne');
     if (f && mini) {
       mini.innerHTML = kSterneHtml(f.sterne);
-      mini.setAttribute('aria-label', `${f.sterne.filter(Boolean).length} von 3 Sternen`);
+      mini.setAttribute('aria-label', t('arena.sterne.von', { anzahl: f.sterne.filter(Boolean).length }));
     }
     const ziele = detail.querySelector('.ziel-sterne');
     if (f && ziele) ziele.innerHTML = `\n          ${zielSterneHtml(f.sterne)}\n        `;
@@ -696,7 +714,7 @@ export function zeige(root, params, app) {
     const k = document.createElement('div');
     k.className = 'nachlese';
     k.setAttribute('role', 'status');
-    k.innerHTML = '<div class="nl-titel">Seit deiner letzten Partie</div>';
+    k.innerHTML = `<div class="nl-titel">${esc(t('arena.nachlese.titel'))}</div>`;
     for (const f of feierRest) {
       const z = document.createElement('div');
       z.className = 'nl-zeile' + (f.art === 'gross' ? ' gross' : '');
@@ -719,9 +737,9 @@ export function zeige(root, params, app) {
     if (laufend) {
       const lb = botNachId(laufend.botId);
       const ok = await app.frage({
-        titel: 'Neue Partie starten?',
-        text: `Du hast noch eine offene Partie gegen ${lb ? lb.name : 'einen Bot'}. Sie wird verworfen.`,
-        knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Neue Partie', wert: true, art: 'primaer' }],
+        titel: t('arena.neu.titel'),
+        text: t('arena.neu.text', { name: lb ? lb.name : t('arena.neu.einBot') }),
+        knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: t('arena.neu.knopf'), wert: true, art: 'primaer' }],
         abbrechen: false,
       });
       if (!ok || weg) return;
@@ -854,7 +872,7 @@ export function zeige(root, params, app) {
       s.classList.remove('freischaltung');
       const fahne = el.querySelector('.fahne');
       if (fahne) fahne.getAnimations().forEach((a) => a.cancel());
-      app.meldung(i === 0 && weltNr > 1 ? `Neue Welt offen: ${welt.name}!` : `Neu freigeschaltet: ${LBOTS[i].name}!`);
+      app.meldung(i === 0 && weltNr > 1 ? t('arena.meldung.welt', { name: welt.name }) : t('arena.meldung.bot', { name: LBOTS[i].name }));
     }, FREI_DAUER_MS);
   }
 
@@ -863,8 +881,9 @@ export function zeige(root, params, app) {
     const ww = s.querySelector('.weltwahl');
     ww.querySelector('.ww-name').textContent = welt.name;
     const sterne = LBOTS.reduce((n, b) => n + fortschritt.bots[b.id].sterne.filter(Boolean).length, 0);
-    ww.querySelector('.ww-unter').textContent = !weltFrei ? `Welt ${weltNr} von ${WELTEN.length} · gesperrt`
-      : `Welt ${weltNr} von ${WELTEN.length} · ${sterne}/${LBOTS.length * 3} Sterne${hatWeltsiegel(weltNr, fortschritt) ? ' · Weltsiegel' : ''}`;
+    const ww0 = { nr: weltNr, anzahl: WELTEN.length, sterne, max: LBOTS.length * 3 };
+    ww.querySelector('.ww-unter').textContent = !weltFrei ? t('arena.weltwahl.gesperrt', ww0)
+      : t(hatWeltsiegel(weltNr, fortschritt) ? 'arena.weltwahl.siegel' : 'arena.weltwahl.sterne', ww0);
     ww.classList.toggle('mit-siegel', hatWeltsiegel(weltNr, fortschritt));
     ww.classList.toggle('gesperrt', !weltFrei);
     for (const k of ww.querySelectorAll('.ww-pfeil')) {
@@ -875,7 +894,7 @@ export function zeige(root, params, app) {
     const tor = endgegnerDerWelt(weltNr - 1);
     weltSperre.hidden = weltFrei;
     weltSperre.innerHTML = weltFrei ? '' : `<div class="ws-karte">${icon('schloss')}<b>${esc(welt.name)}</b>`
-      + `<span>${esc(welt.text)} Ein Sieg gegen ${esc(tor ? tor.name : 'den Endgegner davor')} öffnet sie.</span></div>`;
+      + `<span>${esc(welt.text)} ${esc(t('arena.sperre.text', { name: tor ? tor.name : t('arena.sperre.davor') }))}</span></div>`;
   }
   function wechsleWelt(nr) {
     if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;

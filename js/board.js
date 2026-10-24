@@ -81,12 +81,17 @@
 
 import { KLASSEN_NAME } from './zugklassen.js';
 import { anim, tempo } from './bewegung.js';
+import { t } from './sprache.js';
+import './sprachen/rahmen.js';
 
 const DATEIEN = 'abcdefgh';
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-const FIGUR_NAMEN = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
+// Namen der Figuren in der Umwandlungs-Wahl (aria-label, title): t('rahmen.brett.figur.<q|r|b|n>') beim Zeichnen
+function figurName(f) {
+  return t('rahmen.brett.figur.' + f);
+}
 const UMWANDLUNG_REIHE = ['q', 'r', 'b', 'n']; // Vertrag: D T L S
 
 const SCHWELLE_FINGER = 8;     // px, ab hier zieht der Finger (PLAN 4: 8 statt 7)
@@ -671,7 +676,7 @@ export class Brett {
     el.innerHTML = '';
     el.dataset.ausrichtung = this.ausrichtung;
     el.style.setProperty('--brett-dauer', this.gleitDauer() + 'ms');
-    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', 'Schachbrett');
+    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', t('rahmen.brett.label'));
 
     this._felderEl = document.createElement('div');
     this._felderEl.className = 'brett-felder';
@@ -708,7 +713,7 @@ export class Brett {
     this._umwandlungEl.className = 'brett-umwandlung';
     this._umwandlungEl.hidden = true;
     this._umwandlungEl.setAttribute('role', 'dialog');
-    this._umwandlungEl.setAttribute('aria-label', 'Umwandlung wählen');
+    this._umwandlungEl.setAttribute('aria-label', t('rahmen.brett.umwandlung'));
 
     el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._nummernEl, this._umwandlungEl);
     el.classList.toggle('ohne-koordinaten', !this._koord);
@@ -1672,8 +1677,8 @@ export class Brett {
       k.type = 'button';
       k.className = 'umwandlung-figur';
       k.dataset.figur = f;
-      k.setAttribute('aria-label', FIGUR_NAMEN[f]);
-      k.title = FIGUR_NAMEN[f];
+      k.setAttribute('aria-label', figurName(f));
+      k.title = figurName(f);
       const img = document.createElement('img');
       img.alt = '';
       img.draggable = false;

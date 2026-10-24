@@ -13,9 +13,15 @@
 //   seitenGenauigkeit(eintraege, farbe, plies) -> Genauigkeit einer Seite aus Zug-Eintraegen (Live-Bewertung)
 //     nach demselben Verfahren wie analysierePartie (volatilitaetsgewichtet)
 //   analysierePartie(..., { stueckeln: true }) gibt beim Einordnen der Zuege den Hauptthread frei (Nachholen)
+// Englische Version (Teil 1): Coach-Saetze als ganze Saetze mit Platzhaltern aus js/sprachen/analyse.js (coach.*),
+//   in der Sprache beim Erzeugen. sanAnzeige(san): SAN in der eingestellten Sprache (Deutsch = sanDeutsch). Gespeicherte
+//   Daten bleiben wie bisher: notiz, spielphasen-Namen, eroeffnung, sanDe/besterZugSanDe/besteLinieSan (deutsch).
 import { Chess } from '../vendor/chess/chess.js';
-import { eroeffnung, stellungsSchluessel } from './openings.js';
-import { KLASSEN_NAME, KLASSEN_WORT, ALTE_WOERTER } from './zugklassen.js';
+import { eroeffnung, stellungsSchluessel, eroeffnungsAnzeige } from './openings.js';
+import { KLASSEN_NAME, KLASSEN_WORT, ALTE_WOERTER, klassenWoerterAllerSprachen } from './zugklassen.js';
+import { t, sprache } from './sprache.js';
+import './sprachen/allgemein.js';
+import './sprachen/analyse.js';
 
 export const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -32,12 +38,8 @@ const EPS = 1e-9;
 const K_LICHESS = 0.00368208;
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const ANGREIFER_WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+// Figur im Nominativ fuer die (gespeicherte) Notiz eines genialen Zugs; Coach-Saetze nehmen figurText()
 const NOM = { p: 'der Bauer', n: 'der Springer', b: 'der Läufer', r: 'der Turm', q: 'die Dame', k: 'der König' };
-const AKK = { p: 'den Bauern', n: 'den Springer', b: 'den Läufer', r: 'den Turm', q: 'die Dame', k: 'den König' };
-const EIN_AKK = { p: 'einen Bauern', n: 'einen Springer', b: 'einen Läufer', r: 'einen Turm', q: 'eine Dame' };
-const NEU_AKK = { n: 'einen neuen Springer', b: 'einen neuen Läufer', r: 'einen neuen Turm', q: 'eine neue Dame' };
-const NEU_NOM = { n: 'ein neuer Springer', b: 'ein neuer Läufer', r: 'ein neuer Turm', q: 'eine neue Dame' };
-const ZAHLWORT = ['null', 'ein', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht'];
 const FEHLERKLASSEN = ['fehler', 'patzer', 'verpasst'];
 
 // ---------------------------------------------------------------------------
@@ -186,6 +188,15 @@ export function schaetzeSpielstaerke(genauigkeit, gegnerElo, anzahlZuege, { eige
 export function sanDeutsch(san) {
   if (san == null) return '';
   return String(san).replace(/[KQRBN]/g, (c) => ({ K: 'K', Q: 'D', R: 'T', B: 'L', N: 'S' }[c]))
+    .replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
+}
+
+// SAN fuer die Anzeige in der eingestellten Sprache. Deutsch: genau sanDeutsch. Englisch: K Q R B N (auch aus
+// deutscher SAN, z. B. gespeicherter besteLinieSan), Rochade wie im Deutschen mit Nullen (0-0, 0-0-0).
+export function sanAnzeige(san) {
+  if (sprache() === 'de') return sanDeutsch(san);
+  if (san == null) return '';
+  return String(san).replace(/[DTLS]/g, (c) => ({ D: 'Q', T: 'R', L: 'B', S: 'N' }[c]))
     .replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 }
 
@@ -617,27 +628,30 @@ function gleichGut(d) {
 // ---------------------------------------------------------------------------
 
 function farbName(farbe) {
-  return farbe === 'w' ? 'Weiß' : 'Schwarz';
+  return t(farbe === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz');
 }
 
 function gross(text) {
   return text ? text[0].toUpperCase() + text.slice(1) : text;
 }
 
-function zuegeWort(n) {
-  return n === 1 ? 'Zug' : 'Zügen';
+// Figur im Coach-Satz; art: nom | akk | einAkk | neuAkk | neuNom (Woerterbuch analyse.figur.*)
+function figurText(art, figur) {
+  return t(`analyse.figur.${art}.${figur}`);
 }
 
 function bauernText(n, kasus) {
-  if (n === 1) return kasus === 'nom' ? 'ein Bauer' : 'einen Bauern';
-  return `${ZAHLWORT[n] || n} Bauern`;
+  if (n === 1) return t(kasus === 'nom' ? 'analyse.bauern.nom.eins' : 'analyse.bauern.akk.eins');
+  return t('analyse.bauern.mehr', { anzahl: n >= 2 && n <= 8 ? t(`analyse.zahlwort.${n}`) : n });
 }
 
-// Betrag runden, damit -1,25 und +1,25 gleich lang werden (wie die Anzeige in Partie und Analyse)
+// Betrag runden, damit -1,25 und +1,25 gleich lang werden (wie die Anzeige in Partie und Analyse);
+// Dezimalzeichen nach Sprache (Deutsch Komma)
 function cpText(cp) {
   const w = Math.round(Math.abs(cp) / 10) / 10;
-  if (w === 0) return '0,0';
-  return (cp > 0 ? '+' : '−') + w.toFixed(1).replace('.', ',');
+  const dezimal = (x) => (sprache() === 'de' ? x.replace('.', ',') : x);
+  if (w === 0) return dezimal('0.0');
+  return (cp > 0 ? '+' : '−') + dezimal(w.toFixed(1));
 }
 
 // Materialtext aus einer materialFolge: 'gewinn' oder 'verlust' aus Sicht der Folge-Farbe
@@ -651,17 +665,17 @@ function materialText(folge, art, kasus = 'akk') {
   // Gewinn durch eine Umwandlung (eigene bei 'gewinn', gegnerische bei 'verlust')
   const umw = (folge.umwandlungen || []).find((u) => u.eigener === (art === 'gewinn'));
   if (umw && (!figur || WERT[umw.figur] - 1 > WERT[figur.figur])) {
-    return { text: `${(kasus === 'nom' ? NEU_NOM : NEU_AKK)[umw.figur]} (${sanDeutsch(umw.san)})`, mehrzahl: false, umwandlung: umw };
+    return { text: `${figurText(kasus === 'nom' ? 'neuNom' : 'neuAkk', umw.figur)} (${sanAnzeige(umw.san)})`, mehrzahl: false, umwandlung: umw };
   }
   if (figur) {
     if (figur.figur === 'r' && netto < 3 && gegen.some((x) => x.figur === 'n' || x.figur === 'b')) {
-      return { text: 'die Qualität', mehrzahl: false };
+      return { text: t('analyse.figur.qualitaet'), mehrzahl: false };
     }
-    let text = `${(kasus === 'nom' ? NOM : AKK)[figur.figur]} auf ${figur.feld}`;
+    let text = t('analyse.figur.auf', { figur: figurText(kasus === 'nom' ? 'nom' : 'akk', figur.figur), feld: figur.feld });
     const komp = gegen.filter((x) => x.figur !== 'k').sort((a, b) => WERT[b.figur] - WERT[a.figur]);
     if (komp.length) {
       const bauern = komp.filter((x) => x.figur === 'p').length;
-      text += komp[0].figur !== 'p' ? ` gegen ${EIN_AKK[komp[0].figur]}` : ` gegen ${bauernText(bauern, 'akk')}`;
+      text = t('analyse.figur.gegen', { material: text, gegen: komp[0].figur !== 'p' ? figurText('einAkk', komp[0].figur) : bauernText(bauern, 'akk') });
     }
     return { text, mehrzahl: false };
   }
@@ -670,16 +684,16 @@ function materialText(folge, art, kasus = 'akk') {
 }
 
 function variante(fen, pv, max) {
-  return pvAlsSan(fen, pv, max).map(sanDeutsch).join(' ');
+  return pvAlsSan(fen, pv, max).map(sanAnzeige).join(' ');
 }
 
 // Was hat der Gegner nach dem gespielten Zug? (Matt, Materialgewinn)
 function folgenText(d) {
   if (d.mattNachher != null && d.mattNachher < 0 && d.pvNachher.length) {
     const n = -d.mattNachher;
-    const erster = sanDeutsch(pvAlsSan(d.fenNachher, d.pvNachher, 1)[0] || '');
-    if (!erster) return `Das erlaubt Matt in ${n}.`;
-    return n === 1 ? `Das erlaubt Matt in 1: ${erster}.` : `Das erlaubt Matt in ${n}, zum Beispiel mit ${erster}.`;
+    const erster = sanAnzeige(pvAlsSan(d.fenNachher, d.pvNachher, 1)[0] || '');
+    if (!erster) return t('analyse.coach.folge.matt', { n });
+    return n === 1 ? t('analyse.coach.folge.mattEins', { zug: erster }) : t('analyse.coach.folge.mattBeispiel', { n, zug: erster });
   }
   if (!d.fenVorher || !d.uci || !d.pvNachher.length) return null;
   const folge = materialFolge(d.fenVorher, [d.uci, ...d.pvNachher], d.farbe, { min: 5, max: 9 });
@@ -691,19 +705,25 @@ function folgenText(d) {
     if (besteFolge.saldo < 0 || besteFolge.saldo - folge.saldo < 1) return null;
   }
   if (mt.umwandlung) {
-    const wer = d.du ? 'dein Gegner' : farbName(gegnerVon(d.farbe));
-    return `Danach wandelt ${wer} in ${EIN_AKK[mt.umwandlung.figur]} um (${sanDeutsch(mt.umwandlung.san)}).`;
+    const figur = figurText('einAkk', mt.umwandlung.figur);
+    const zug = sanAnzeige(mt.umwandlung.san);
+    return d.du ? t('analyse.coach.folge.umwandlung.du', { figur, zug })
+      : t('analyse.coach.folge.umwandlung.farbe', { farbe: farbName(gegnerVon(d.farbe)), figur, zug });
   }
-  const erster = sanDeutsch(pvAlsSan(d.fenNachher, d.pvNachher, 1)[0] || '');
-  if (d.du) return erster ? `Nach ${erster} verlierst du ${mt.text}.` : `Damit verlierst du ${mt.text}.`;
-  const verb = mt.mehrzahl ? 'gehen' : 'geht';
-  return erster ? `Nach ${erster} ${verb} ${mt.text} verloren.` : `Damit ${verb} ${mt.text} verloren.`;
+  const erster = sanAnzeige(pvAlsSan(d.fenNachher, d.pvNachher, 1)[0] || '');
+  if (d.du) {
+    return erster ? t('analyse.coach.folge.verlierstNach', { zug: erster, material: mt.text })
+      : t('analyse.coach.folge.verlierstDamit', { material: mt.text });
+  }
+  if (erster) return t(mt.mehrzahl ? 'analyse.coach.folge.gehenNach' : 'analyse.coach.folge.gehtNach', { zug: erster, material: mt.text });
+  return t(mt.mehrzahl ? 'analyse.coach.folge.gehenDamit' : 'analyse.coach.folge.gehtDamit', { material: mt.text });
 }
 
 // Warum war der beste Zug besser? (Matt, Materialgewinn, Zurueckschlagen)
+// 'zurückschlagen' ist ein Merker (kein Anzeigetext), die Saetze dazu baut besserText
 function grundBester(d) {
   if (d.mattVorher != null && d.mattVorher > 0) {
-    return d.mattVorher === 1 ? 'das setzt sofort matt' : `das setzt in ${d.mattVorher} Zügen matt`;
+    return d.mattVorher === 1 ? t('analyse.coach.grund.mattSofort') : t('analyse.coach.grund.mattIn', { n: d.mattVorher });
   }
   if (!d.fenVorher || !d.pvVorher.length) return null;
   const c = neuesBrett(d.fenVorher);
@@ -711,23 +731,23 @@ function grundBester(d) {
   if (istRueckschlag(d, b)) return 'zurückschlagen';
   const folge = materialFolge(d.fenVorher, d.pvVorher, d.farbe, { min: 4 });
   const mt = materialText(folge, 'gewinn', 'akk');
-  return mt ? `das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}` : null;
+  return mt ? t(mt.umwandlung ? 'analyse.coach.grund.bringt' : 'analyse.coach.grund.gewinnt', { material: mt.text }) : null;
 }
 
 function besserText(d) {
   if (!d.besterSan || d.istBester) return null;
-  const b = sanDeutsch(d.besterSan);
+  const b = sanAnzeige(d.besterSan);
   const grund = grundBester(d);
-  if (grund === 'zurückschlagen') return `Besser war das Zurückschlagen mit ${b}.`;
-  return grund ? `Besser war ${b}, ${grund}.` : `Besser war ${b}.`;
+  if (grund === 'zurückschlagen') return t('analyse.coach.besser.zurueck', { zug: b });
+  return grund ? t('analyse.coach.besser.grund', { zug: b, grund }) : t('analyse.coach.besser.zug', { zug: b });
 }
 
 function bewertungsText(d) {
   const v = cpFuer(d.evalVorher, d.farbe);
   const n = cpFuer(d.evalNachher, d.farbe);
   if (v == null || n == null) return null;
-  const sicht = d.du ? 'aus deiner Sicht' : `aus Sicht von ${farbName(d.farbe)}`;
-  return `Die Bewertung ${sicht} sinkt von ${cpText(v)} auf ${cpText(n)}.`;
+  const werte = { vorher: cpText(v), nachher: cpText(n) };
+  return d.du ? t('analyse.coach.bewertung.du', werte) : t('analyse.coach.bewertung.farbe', { ...werte, farbe: farbName(d.farbe) });
 }
 
 function auswahl(d, texte) {
@@ -740,101 +760,100 @@ function auswahl(d, texte) {
 export function coachText(eingabe, ergebnis) {
   const e = ergebnis && ergebnis.klasse ? ergebnis : klassifiziere(eingabe);
   const d = e.details || vorbereiten(eingabe);
-  const sanDe = sanDeutsch(d.san || '');
-  const besserB = d.besterSan ? sanDeutsch(d.besterSan) : '';
+  const sanDe = sanAnzeige(d.san || '');
+  const besserB = d.besterSan ? sanAnzeige(d.besterSan) : '';
+  const W = KLASSEN_WORT;
 
   switch (e.klasse) {
     case 'erzwungen':
-      return `${KLASSEN_WORT.erzwungen} Das war der einzige legale Zug.`;
+      return t('analyse.coach.erzwungen', { wort: W.erzwungen });
 
     case 'buch': {
-      const satz = auswahl(d, ['Genau so steht es in der Eröffnungstheorie.', 'Ein bewährter Theoriezug.',
-        'So spielen es auch die Profis.']);
-      return d.eroeffnung ? `${KLASSEN_WORT.buch}: ${d.eroeffnung}. ${satz}` : `${KLASSEN_WORT.buch}. ${satz}`;
+      const satz = auswahl(d, [t('analyse.coach.buch.satz1'), t('analyse.coach.buch.satz2'), t('analyse.coach.buch.satz3')]);
+      return d.eroeffnung ? t('analyse.coach.buch.name', { wort: W.buch, eroeffnung: eroeffnungsAnzeige(d.eroeffnung), satz })
+        : t('analyse.coach.buch.ohne', { wort: W.buch, satz });
     }
 
     case 'brillant': {
       const o = d.opfer || findeOpfer(d.fenVorher, d.uci, d.pvNachher, d.farbe);
-      if (!o) return `${KLASSEN_WORT.brillant} ${sanDe} ist ein mutiger und starker Zug.`;
-      const wer = d.du ? 'Du opferst' : `${farbName(d.farbe)} opfert`;
-      const feld = o.feld ? ` auf ${o.feld}` : '';
+      if (!o) return t('analyse.coach.brillant.zug', { wort: W.brillant, zug: sanDe });
+      const mitFeld = (text) => (o.feld ? t('analyse.figur.auf', { figur: text, feld: o.feld }) : text);
       if (o.art === 'haengt') {
-        const gegner = d.du ? 'deinen Gegner' : 'den Gegner';
-        return `${KLASSEN_WORT.brillant} ${gross(NOM[o.figur])}${feld} steht bewusst im Schlag, Nehmen wäre für ${gegner} ein Fehler.`;
+        return t(d.du ? 'analyse.coach.brillant.haengt.du' : 'analyse.coach.brillant.haengt.gegner',
+          { wort: W.brillant, figur: gross(mitFeld(figurText('nom', o.figur))) });
       }
+      const figur = mitFeld(figurText('akk', o.figur));
+      const farbe = farbName(d.farbe);
       if (d.mattNachher != null && d.mattNachher > 0) {
         const n = d.mattNachher;
         const linie = n <= 2 ? variante(d.fenNachher, d.pvNachher, 2 * n) : '';
-        return `${KLASSEN_WORT.brillant} ${wer} ${AKK[o.figur]}${feld} und setzt danach in ${n} ${zuegeWort(n)} matt${linie ? ` (${linie})` : ''}.`;
+        // Mehrzahl ueber n: ...matt.eins (in 1 Zug) / ...matt.mehr (in n Zuegen)
+        return t(d.du ? 'analyse.coach.brillant.mattDu' : 'analyse.coach.brillant.matt',
+          { wort: W.brillant, farbe, figur, n, linie: linie ? ` (${linie})` : '' });
       }
-      return `${KLASSEN_WORT.brillant} ${wer} ${AKK[o.figur]}${feld}, und die Rechnung geht auf.`;
+      return t(d.du ? 'analyse.coach.brillant.rechnung.du' : 'analyse.coach.brillant.rechnung.gegner', { wort: W.brillant, farbe, figur });
     }
 
     case 'stark': {
-      const haelt = d.wv >= 0.7 ? 'den Vorteil hält' : d.wv >= 0.4 ? 'die Stellung hält' : 'den Schaden begrenzt';
-      return `${KLASSEN_WORT.stark} ${sanDe} ist der einzige Zug, der ${haelt}. Alles andere wäre deutlich schlechter gewesen.`;
+      const haelt = d.wv >= 0.7 ? 'vorteil' : d.wv >= 0.4 ? 'stellung' : 'schaden';
+      return t(`analyse.coach.stark.${haelt}`, { wort: W.stark, zug: sanDe });
     }
 
     case 'bester': {
-      if (d.matt) return `Schachmatt! ${sanDe} beendet die Partie.`;
-      if (d.patt) return d.wv < 0.4 ? 'Patt! Damit ist das Remis gerettet.' : 'Patt – die Partie endet remis.';
+      if (d.matt) return t('analyse.coach.schachmatt', { zug: sanDe });
+      if (d.patt) return d.wv < 0.4 ? t('analyse.coach.patt.gerettet') : t('analyse.coach.patt.remis');
       if (d.mattNachher != null && d.mattNachher > 0) {
-        return `${KLASSEN_WORT.bester} Matt in ${d.mattNachher} ist jetzt nicht mehr aufzuhalten.`;
+        return t('analyse.coach.bester.mattKommt', { wort: W.bester, n: d.mattNachher });
       }
-      if (istRueckschlag(d, d.zug)) return `${KLASSEN_WORT.bester} Richtig zurückgeschlagen.`;
+      if (istRueckschlag(d, d.zug)) return t('analyse.coach.bester.zurueck', { wort: W.bester });
       if (d.fenVorher && d.uci && d.pvNachher.length) {
         const folge = materialFolge(d.fenVorher, [d.uci, ...d.pvNachher], d.farbe, { min: 4 });
         const mt = materialText(folge, 'gewinn', 'akk');
-        if (mt) return `${KLASSEN_WORT.bester} Das ${mt.umwandlung ? 'bringt' : 'gewinnt'} ${mt.text}.`;
+        if (mt) return t(mt.umwandlung ? 'analyse.coach.bester.bringt' : 'analyse.coach.bester.gewinnt', { wort: W.bester, material: mt.text });
       }
       // "Genau das hätte auch die Engine gespielt" nur fuer den Engine-Zug selbst
-      return auswahl(d, d.istBester ? [
-        `${KLASSEN_WORT.bester} Genau das hätte auch die Engine gespielt.`,
-        `${KLASSEN_WORT.bester} Genau gespielt.`,
-        `${KLASSEN_WORT.bester} Stärker geht es in dieser Stellung nicht.`,
-      ] : [
-        `${KLASSEN_WORT.bester} Genau gespielt.`,
-        `${KLASSEN_WORT.bester} Genauso stark wie der Engine-Zug.`,
-      ]);
+      const satz = (k) => t(`analyse.coach.bester.${k}`, { wort: W.bester });
+      return auswahl(d, d.istBester ? [satz('engine'), satz('genau'), satz('staerker')] : [satz('genau'), satz('wieEngine')]);
     }
 
     case 'exzellent':
     case 'gut': {
       // ausgelassenes Matt immer nennen
       if (d.mattVorher != null && d.mattVorher > 0 && !(d.mattNachher != null && d.mattNachher > 0) && besserB && !d.istBester) {
-        return `${KLASSEN_WORT[e.klasse]} Hier war aber Matt in ${d.mattVorher} mit ${besserB} möglich.`;
+        return t('analyse.coach.gut.mattAber', { wort: W[e.klasse], n: d.mattVorher, zug: besserB });
       }
       if (e.klasse === 'gut') {
-        return besserB && !d.istBester ? `${KLASSEN_WORT.gut} Noch etwas genauer war ${besserB}.` : KLASSEN_WORT.gut;
+        return besserB && !d.istBester ? t('analyse.coach.gut.genauer', { wort: W.gut, zug: besserB }) : W.gut;
       }
       return besserB && !d.istBester
-        ? `${KLASSEN_WORT.exzellent} Fast so stark wie ${besserB}.`
-        : `${KLASSEN_WORT.exzellent} Ein sehr starker Zug.`;
+        ? t('analyse.coach.exzellent.fast', { wort: W.exzellent, zug: besserB })
+        : t('analyse.coach.exzellent.stark', { wort: W.exzellent });
     }
 
     default: {
       // ungenau, fehler, patzer, verpasst
-      const kopf = KLASSEN_WORT[e.klasse] || '';
+      const kopf = W[e.klasse] || '';
       let grund = null;
       let besser = besserText(d);
       if (d.patt && d.wv >= 0.6) {
-        grund = 'Patt – damit ist der Sieg weg.';
+        grund = t('analyse.coach.patt.siegWeg');
       } else if (d.mattNachher != null && d.mattNachher < 0) {
         grund = folgenText(d);
       } else if (d.mattVorher != null && d.mattVorher > 0 && !(d.mattNachher != null && d.mattNachher > 0) && besserB) {
-        grund = `Hier war Matt in ${d.mattVorher} mit ${besserB} möglich.`;
+        grund = t('analyse.coach.mattMoeglich', { n: d.mattVorher, zug: besserB });
         besser = null;
       } else if (e.klasse !== 'ungenau') {
         grund = folgenText(d);
       }
       if (e.klasse === 'verpasst') {
-        const nach = d.du ? 'Nach dem Fehler deines Gegners' : 'Nach dem Fehler des Gegners';
+        // nach dem Fehler deines Gegners (du) bzw. des Gegners
+        const wer = d.du ? 'du' : 'gegner';
         const gb = grundBester(d);
         if (besserB && grund == null) {
-          if (gb && gb !== 'zurückschlagen') return `${kopf} ${nach} war ${besserB} stark, ${gb}.`;
-          return `${kopf} ${nach} war ${besserB} stark.`;
+          if (gb && gb !== 'zurückschlagen') return t(`analyse.coach.verpasst.grund.${wer}`, { wort: kopf, zug: besserB, grund: gb });
+          return t(`analyse.coach.verpasst.stark.${wer}`, { wort: kopf, zug: besserB });
         }
-        if (!grund) grund = `${nach} war mehr drin.`;
+        if (!grund) grund = t(`analyse.coach.verpasst.mehr.${wer}`);
       }
       if (!grund) grund = bewertungsText(d);
       return [kopf, grund, besser].filter(Boolean).join(' ');
@@ -1141,15 +1160,21 @@ export function spielphasen(fens, buchEnde) {
 // Keine langen Gedankenstriche in UI-Texten (werden zu ": "), Rochade wie in der Zugliste (0-0).
 // ---------------------------------------------------------------------------
 const regexSicher = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const KLASSENWOERTER = [...Object.values(KLASSEN_WORT), ...ALTE_WOERTER]
-  .filter((wort) => wort !== KLASSEN_WORT.buch)
-  .map(regexSicher);
-KLASSENWOERTER.push(`${regexSicher(KLASSEN_WORT.buch)}[.:]`);
-const KLASSENWORT_AM_ANFANG = new RegExp(`^(?:${KLASSENWOERTER.join('|')})\\s+`);
+// Klassenwoerter aller Sprachen (Englische Version: auch ein gespeicherter Satz der anderen Sprache) und die alten
+// deutschen; "Theorie"/"Theory" nur mit Punkt oder Doppelpunkt. Einmal beim ersten Aufruf gebaut.
+let klassenwortAmAnfang = null;
+function klassenwortRegex() {
+  if (klassenwortAmAnfang) return klassenwortAmAnfang;
+  const woerter = klassenWoerterAllerSprachen();
+  const liste = [...woerter.filter((w) => w.id !== 'buch').map((w) => w.wort), ...ALTE_WOERTER].map(regexSicher);
+  for (const w of woerter) if (w.id === 'buch') liste.push(`${regexSicher(w.wort)}[.:]`);
+  klassenwortAmAnfang = new RegExp(`^(?:${liste.join('|')})\\s+`);
+  return klassenwortAmAnfang;
+}
 
 export function coachKern(t) {
   const text = String(t || '').replace(/\s*[–—]\s*/g, ': ').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
-  const rest = text.replace(KLASSENWORT_AM_ANFANG, '');
+  const rest = text.replace(klassenwortRegex(), '');
   if (!rest.trim()) return text;
   // Bauernzug am Satzanfang bleibt klein ("exd5", nicht "Exd5" wie ein Damenzug)
   return /^[a-h][1-8x]/.test(rest) ? rest : rest.charAt(0).toUpperCase() + rest.slice(1);

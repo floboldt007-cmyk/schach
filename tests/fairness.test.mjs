@@ -221,7 +221,10 @@ pruefe('feier.BUDGET = { gross: 1, zeilen: 3, nachlese: 3 }', JSON.stringify(BUD
 const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verpasst du', 'verlierst deine', 'Wir vermissen dich', 'Nein, ich will',
   // W0+a: Zusaetze aus SPIELKONZEPT 5.3 (dazu aus dem Lektorat: die Serie zeigt nie "am Stück")
   'Serie in Gefahr', 'rette deine', 'wartet auf dich', 'hat dich überholt', 'Abstieg', 'endet in', 'läuft ab', 'verfällt', 'knapp verpasst',
-  'nur heute', 'limitiert', 'Leben verloren', 'Game Over', 'Funken verfallen', 'Boost kaufen', 'am Stück'];
+  'nur heute', 'limitiert', 'Leben verloren', 'Game Over', 'Funken verfallen', 'Boost kaufen', 'am Stück',
+  // Englische Version (js/sprachen/*.js): dieselben Regeln auf Englisch
+  'last chance', 'streak in danger', 'streak at risk', 'save your streak', 'we miss you', 'only today', 'limited time',
+  'you lose your', 'you will lose', 'overtook you', 'is waiting for you', 'lives lost', 'buy a boost', 'gone forever'];
 {
   const dateien = jsDateien('js');
   const treffer = [];

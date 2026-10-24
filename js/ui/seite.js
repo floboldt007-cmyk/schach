@@ -27,6 +27,9 @@ import { ladeFortschritt, gesamtSterne, besiegteBots, ladeEinstellungen } from '
 import { aufgeloesterModus } from '../thema.js';
 import { klang as klangDienst } from '../sounds.js';
 import { anim, staffel, tempo, KURVEN } from '../bewegung.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/rahmen.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -35,8 +38,8 @@ export function standardChips(fortschritt = null) {
   if (!f) { try { f = ladeFortschritt(); } catch (e) { f = null; } }
   const sterne = f ? gesamtSterne(f) : 0;
   const besiegt = f ? besiegteBots(f) : 0;
-  return `<span class="chip zahl chip-sterne" title="Gesammelte Sterne">${icon('stern', 'stern')}<span class="sr">Sterne:</span> ${sterne}<span class="von"> / ${BOTS.length * 3}</span></span>` +
-    `<span class="chip zahl chip-pokal" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegt}<span class="von"> / ${BOTS.length}</span></span>`;
+  return `<span class="chip zahl chip-sterne" title="${esc(t('rahmen.kopf.sterneTitel'))}">${icon('stern', 'stern')}<span class="sr">${esc(t('rahmen.kopf.sterne'))}</span> ${sterne}<span class="von"> / ${BOTS.length * 3}</span></span>` +
+    `<span class="chip zahl chip-pokal" title="${esc(t('rahmen.kopf.besiegtTitel'))}">${icon('pokal')}<span class="sr">${esc(t('rahmen.kopf.besiegt'))}</span> ${besiegt}<span class="von"> / ${BOTS.length}</span></span>`;
 }
 
 export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
@@ -57,7 +60,7 @@ export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurue
   const klangAn = (() => { try { return ladeEinstellungen().klang !== false; } catch (e) { return true; } })();
   return `<header class="${klassen.join(' ')}">
       <div class="kopf-links">
-        ${zurueck ? knopf('zurueck', 'zurueck', 'Zurück', 'kopf-zurueck') : ''}
+        ${zurueck ? knopf('zurueck', 'zurueck', t('allgemein.zurueck'), 'kopf-zurueck') : ''}
         <div class="marke">
           ${marke ? `<span class="marke-zeichen" aria-hidden="true">${icon('bauer')}</span>` : ''}
           <div class="marke-text"><${tt} class="marke-titel logo">${esc(titel)}</${tt}>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}</div>
@@ -67,9 +70,9 @@ export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurue
       <div class="rechts">
         <div class="kopf-chips">${chips == null ? standardChips() : chips}</div>
         ${eigene.map((k) => knopf(k.aktion, k.icon || k.aktion, k.label || k.aktion)).join('')}
-        ${modus ? knopf('modus', dunkel ? 'sonne' : 'mond', 'Hell oder dunkel', 'knopf-thema') : ''}
-        ${klang ? `<button class="icon-knopf kopf-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${klangAn ? 'true' : 'false'}" aria-label="Klang">${icon('klang')}</button>` : ''}
-        ${einstellungen ? knopf('einstellungen', 'einst', 'Einstellungen') : ''}
+        ${modus ? knopf('modus', dunkel ? 'sonne' : 'mond', t('rahmen.kopf.modus'), 'knopf-thema') : ''}
+        ${klang ? `<button class="icon-knopf kopf-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${klangAn ? 'true' : 'false'}" aria-label="${esc(t('rahmen.kopf.klang'))}">${icon('klang')}</button>` : ''}
+        ${einstellungen ? knopf('einstellungen', 'einst', t('allgemein.einstellungen')) : ''}
       </div>
     </header>`;
 }
@@ -92,7 +95,7 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
     const name = dunkel ? 'sonne' : 'mond';
     for (const k of wurzel.querySelectorAll('.haupt-kopf [data-aktion="modus"]')) {
       if (k.dataset.icon !== name) { k.innerHTML = icon(name); k.dataset.icon = name; }
-      k.setAttribute('aria-label', dunkel ? 'Hell' : 'Dunkel');
+      k.setAttribute('aria-label', dunkel ? t('rahmen.kopf.hell') : t('rahmen.kopf.dunkel'));
     }
   };
   const klick = (e) => {
@@ -106,7 +109,7 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
       const svg = k.querySelector('svg');
       if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
       if (an) { try { klangDienst.spiele('schalter'); } catch (f) { /* still */ } }
-      if (app && typeof app.meldung === 'function') app.meldung(an ? 'Klang an' : 'Klang aus', { dauer: 1600 });
+      if (app && typeof app.meldung === 'function') app.meldung(an ? t('rahmen.kopf.klangAn') : t('rahmen.kopf.klangAus'), { dauer: 1600 });
     } else if (a === 'modus') {
       wechsleModus(k, app);
     } else if (a === 'zurueck' && typeof beiZurueck === 'function') {

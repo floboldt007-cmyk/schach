@@ -87,7 +87,7 @@
 //   thema.avatarVon), .info (.bot-name + Unterzeile .bot-meta mit Elo, .denkt-ort, .geschlagen-ort) und .uhr. Flo:
 //   .spieler.ich (Zusatzklassen .spielerleiste, .spieler-quer, .spieler-hoch): .av (thema.floAvatar), .name, danach
 //   .ort-spieler-leiste, Unterzeile, .uhr. Der Name wird nie mit "..." gekuerzt: passt er nicht in zwei Zeilen, steht
-//   der Rufname da (RUFNAME), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
+//   der Rufname da (rufnameVon), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
 //   im Duell-Intro (U5). lage() meldet weiter 'hoch' | 'quer'.
 //   Uhr: .uhr in beiden Karten, versteckt ohne Bedenkzeit (z.tempo). fmtUhr(ms) (exportiert) formatiert, uhr.setze(wer,
 //   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
@@ -121,9 +121,9 @@ import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
-  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
+  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
 } from '../review.js';
-import { eroeffnung, stellungsSchluessel } from '../openings.js';
+import { eroeffnung, stellungsSchluessel, eroeffnungsAnzeige } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
@@ -140,6 +140,9 @@ import { icon } from '../app.js';
 import { botFarbe as themaBotFarbe, avatarVon, floAvatar } from '../thema.js';
 import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
 import { zeige as zeigeZuzweit } from './zuzweit.js';
+import { t, sprache } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/partie.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -147,11 +150,16 @@ const NEUTRAL = new Set(['buch', 'erzwungen']);
 const MIT_VERLUST = new Set(['ungenau', 'fehler', 'verpasst', 'patzer']);
 const SCHLECHT = new Set(['fehler', 'verpasst', 'patzer']);
 const WERT = { q: 9, r: 5, b: 3, n: 3, p: 1 };
-const GRUND_TEXT = {
-  matt: 'Schachmatt', aufgabe: 'Aufgabe', patt: 'Patt', wiederholung: 'Dreifache Stellungswiederholung',
-  '50-zuege': '50-Züge-Regel', material: 'Zu wenig Material zum Mattsetzen',
+// Grund des Spielendes -> Schluessel im Woerterbuch partie (Text erst beim Zeichnen)
+const GRUND_SCHLUESSEL = {
+  matt: 'matt', aufgabe: 'aufgabe', patt: 'patt', wiederholung: 'wiederholung', '50-zuege': 'fuenfzig', material: 'material',
 };
-const FARBE_NAME = { w: 'Weiß', b: 'Schwarz' };
+function grundText(grund) {
+  return Object.hasOwn(GRUND_SCHLUESSEL, grund) ? t('partie.grund.' + GRUND_SCHLUESSEL[grund]) : null;
+}
+function farbeName(f) {
+  return t(f === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz');
+}
 // Live-Bewertung: hoechstens so lange je Stellung; warten schon zwei Stellungen (Flo zieht
 // zuegig), nur noch kurz rechnen, damit sich nichts staut (die Analyse rechnet genauso)
 const LIVE_MAX_MS = 5000;
@@ -161,13 +169,20 @@ const AUSWERTUNG_WARTEN_MS = 2500;
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-const komma = (x, n = 1) => x.toFixed(n).replace('.', ',');
+// Dezimalkomma (Englisch: Punkt)
+const komma = (x, n = 1) => (sprache() === 'en' ? x.toFixed(n) : x.toFixed(n).replace('.', ','));
+// Prozent wie "87,5 %" (Englisch "87.5%")
+function prozent(x) {
+  return t('partie.prozent', { wert: komma(x) });
+}
 // tiefe Kopie einfacher Daten (Params, extra), sonst null
 const kopie = (x) => { try { return x == null ? null : JSON.parse(JSON.stringify(x)); } catch (e) { return null; } };
 const ZUSATZ_ARTEN = ['info', 'gut', 'leise', 'gross'];
 // W0+a: Chip im Ergebnis nicht wertender Partien je Modus, Name der Boss-Stufe, Anzeigen der Buehne
-const MODUS_CHIP = { uebung: 'ÜBUNG', boss: 'BOSS', frei: 'FREI', spiel: 'SPIELHALLE' };
-const STUFE_NAME = { standard: 'Standard', meister: 'Meister' };
+const MODUS_CHIP = new Set(['uebung', 'boss', 'frei', 'spiel']);
+function stufeName(stufe) {
+  return stufe === 'standard' || stufe === 'meister' ? t('partie.boss.' + stufe) : undefined;
+}
 const ANZEIGEN = ['zaehlwerk', 'funkenlinie', 'lebensleiste', 'balken'];
 // neuer Seed fuer die Bot-Zuege einer Partie (32 Bit)
 const neuerSeed = () => Math.floor(Math.random() * 4294967296) >>> 0;
@@ -177,16 +192,23 @@ const PAKET_NAME = /^[a-z][a-z0-9-]{0,30}$/;
 const MATT_HOOK_WARTEN_MS = 300;
 // w0plus-a-fix: hoechstens so viele Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen)
 const AKTIONEN_MAX = 2;
-// U7: Rufnamen fuer sehr lange Namen (Spielerkarte, Kopf auf dem Handy); der volle Name steht im aria-label
-const RUFNAME = Object.freeze({
-  benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm', delia: 'Delia',
-  koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch',
-});
-const rufnameVon = (b) => RUFNAME[b && b.id] || (b && (b.rufname || b.name)) || '';
+// U7: Rufnamen fuer sehr lange Namen (Spielerkarte, Kopf auf dem Handy); der volle Name steht im aria-label.
+// Diese Bots haben eine Kurzform: der Rufname aus js/bots.js, drei eine eigene (Woerterbuch partie, rufname.<id>)
+const RUFNAME_BOTS = new Set(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch']);
+const RUFNAME_EIGEN = new Set(['hilde', 'rudi', 'koenig']);
+function kurzform(b) {
+  if (!b || !RUFNAME_BOTS.has(b.id)) return '';
+  return RUFNAME_EIGEN.has(b.id) ? t('partie.rufname.' + b.id) : (b.rufname || b.name || '');
+}
+const rufnameVon = (b) => kurzform(b) || (b && (b.rufname || b.name)) || '';
 // U7: Brettwahl im Kopf (Feldfarben wie tokens.css, fest wie die Brettfarben selbst)
-const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
+const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
+// Bot-Saetze, die nicht zur Lage passen, je Sprache: Matt-Saetze nach einer Aufgabe, "ich fang an", wenn Flo anfaengt
+// (englisch nicht /matt/: das traefe "matter")
+const SATZ_MATT = Object.freeze({ de: /matt/i, en: /checkmat|\bmated?\b/i });
+const SATZ_ICH_FANG = Object.freeze({ de: /ich fang/i, en: /\bI[’']ll (just )?(start|begin|go first)\b/i });
 // Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
 // Pfeile leichter finden (Flo, 23.10.): einmal je Geraet, ab der zweiten neu begonnenen Partie gegen einen Bot, eine ruhige
 // Zeile unter dem Brett. Weg mit dem ersten gezeichneten Pfeil, mit "Verstanden" oder am Ende der Partie, in der sie stand.
@@ -218,7 +240,7 @@ export function fmtUhr(ms) {
   const t = Math.max(0, Number(ms) || 0);
   if (t < UHR_WARN_MS) {
     const s = Math.floor(t / 1000);
-    return `0:${String(s).padStart(2, '0')},${Math.floor((t % 1000) / 100)}`;
+    return `0:${String(s).padStart(2, '0')}${sprache() === 'en' ? '.' : ','}${Math.floor((t % 1000) / 100)}`;
   }
   const s = Math.ceil(t / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -242,7 +264,7 @@ function evalText(ev, farbe) {
   // wie in der Analyse und im Coach-Text gerundet (Betrag auf eine Nachkommastelle)
   const cp = farbe === 'b' ? -ev.cp : ev.cp;
   const w = Math.round(Math.abs(cp) / 10) / 10;
-  if (w === 0) return '0,0';
+  if (w === 0) return komma(0);
   return (cp > 0 ? '+' : '−') + komma(w);
 }
 
@@ -347,7 +369,7 @@ export function zeige(root, params, app) {
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
   const istFlo = (i) => farbeVon(i) === farbe;
   const nummerVon = (i) => startNummer + Math.floor((i + (startFarbe === 'b' ? 1 : 0)) / 2);
-  const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanDeutsch(z.san[i])}`;
+  const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanAnzeige(z.san[i])}`;
   const letzterFloPly = () => { for (let i = z.zuege.length - 1; i >= 0; i--) if (istFlo(i)) return i; return -1; };
   // w0plus-a-fix: Flos Gewinnchance nach seinem vorigen eigenen Zug (vor dem letzten Bot-Zug), null ohne Bewertung
   const gewinnNachVorigemZug = (ply) => {
@@ -381,12 +403,12 @@ export function zeige(root, params, app) {
   function kopfTitel() {
     if (z.modus === 'boss') {
       if (!z.boss) return bot.name;
-      return `${bot.name} · ${STUFE_NAME[z.boss.stufe]}${bossStaerke ? ` ≈ ${bossStaerke.elo}` : ''}`;
+      return `${bot.name} · ${stufeName(z.boss.stufe)}${bossStaerke ? ` ≈ ${bossStaerke.elo}` : ''}`;
     }
     return bot.name;
   }
   // U7: auf dem Handy der Rufname im Kopf (PLAN 2.5 Regel 5), nur fuer Bots mit Rufname und nicht im Boss-Kopf
-  const kopfKurz = () => (z.modus !== 'boss' && (RUFNAME[bot.id] || (bot.stufe != null && bot.rufname)) ? RUFNAME[bot.id] || bot.rufname : kopfTitel());
+  const kopfKurz = () => (z.modus !== 'boss' && (kurzform(bot) || (bot.stufe != null && bot.rufname)) ? kurzform(bot) || bot.rufname : kopfTitel());
   function botMeta() {
     if (bot.stufe) return `Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
@@ -396,27 +418,27 @@ export function zeige(root, params, app) {
   }
   const s = document.createElement('section');
   s.className = 'screen partie';
-  s.setAttribute('aria-label', `Partie gegen ${bot.name}`);
+  s.setAttribute('aria-label', t('partie.screen.label', { name: bot.name }));
   s.style.setProperty('--bf', themaBotFarbe(bot));
   const knopf = (aktion, ico, text, extra = '', label = '') =>
-    `<button class="knopf aktion dr ${extra}" type="button" data-aktion="${aktion}"${label ? ` aria-label="${esc(label)}"` : ''}>${icon(ico)}<span>${text}</span></button>`;
-  const brettwahl = BRETTER.map(([id, name, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="Brett ${name}" `
+    `<button class="knopf aktion dr ${extra}" type="button" data-aktion="${aktion}"${label ? ` aria-label="${esc(label)}"` : ''}>${icon(ico)}<span>${esc(text)}</span></button>`;
+  const brettwahl = BRETTER.map(([id, h, d]) => `<button class="dr" type="button" role="radio" data-brett="${id}" aria-label="${esc(t('partie.kopf.brett', { name: t('partie.brett.' + id) }))}" `
     + `aria-checked="${einst.brett === id}"><i style="--h:${h};--d:${d}"><b></b><b></b><b></b><b></b></i></button>`).join('');
   const uhrHtml = (wer) => `<div class="uhr zahl" data-wer="${wer}" hidden>${UHR_SYMBOL}<span class="uhr-zeit"></span></div>`;
   s.innerHTML = `
     <header class="kopf p-kopf">
-      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="Zurück zur Arena">${icon('zurueck')}</button>
+      <button class="icon-knopf dr" type="button" data-aktion="zurueck" aria-label="${esc(t('partie.kopf.zurueck'))}">${icon('zurueck')}</button>
       <div class="titel"><h2>${esc(kopfTitel())}</h2><div class="unter"><span class="p-eroeffnung"></span>${bot.stufe
-    ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">Stufe ${bot.stufe}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">Du spielst </span>${FARBE_NAME[farbe]}</span></div></div>
-      <div class="brettwahl" role="radiogroup" aria-label="Brettfarbe">${brettwahl}</div>
-      <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="Klang">${icon('klang')}</button>
-      <button class="icon-knopf dr" type="button" data-aktion="einstellungen" aria-label="Einstellungen">${icon('einst')}</button>
+    ? `<span class="p-sep" aria-hidden="true"> · </span><span class="p-stufe">${esc(t('partie.kopf.stufe', { stufe: bot.stufe }))}</span>` : ''}<span class="p-sep" aria-hidden="true"> · </span><span class="p-farbe"><span class="p-lang">${esc(t('partie.kopf.duSpielst'))}</span>${esc(farbeName(farbe))}</span></div></div>
+      <div class="brettwahl" role="radiogroup" aria-label="${esc(t('partie.kopf.brettfarbe'))}">${brettwahl}</div>
+      <button class="icon-knopf knopf-klang dr" type="button" data-aktion="klang" aria-pressed="${einst.klang !== false}" aria-label="${esc(t('partie.kopf.klang'))}">${icon('klang')}</button>
+      <button class="icon-knopf dr" type="button" data-aktion="einstellungen" aria-label="${esc(t('allgemein.einstellungen'))}">${icon('einst')}</button>
     </header>
     <div class="inhalt">
       <div class="brettzone">
-        <div class="evalbalken" role="img" aria-label="Bewertung"><div class="mitte"></div><div class="weiss"></div><span class="wert zahl"></span></div>
+        <div class="evalbalken" role="img" aria-label="${esc(t('partie.balken.label'))}"><div class="mitte"></div><div class="weiss"></div><span class="wert zahl"></span></div>
         <div class="brett-rahmen"><div class="brett"></div><div class="brett-effekte" aria-hidden="true"></div>
-          <button class="knopf primaer ergebnis-zeigen" type="button" data-aktion="ergebnis" hidden>${icon('pokal')} Ergebnis</button></div>
+          <button class="knopf primaer ergebnis-zeigen" type="button" data-aktion="ergebnis" hidden>${icon('pokal')} ${esc(t('partie.knopf.ergebnis'))}</button></div>
       </div>
       <div class="seite">
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
@@ -427,18 +449,18 @@ export function zeige(root, params, app) {
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
         <div class="coach coach-karte leer" role="status" aria-live="polite"></div>
-        <div class="zugbox"><div class="zugliste" aria-label="Züge"></div></div>
-        <div class="zugleiste" aria-label="Züge"></div>
-        <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">Verstanden</button></div>
+        <div class="zugbox"><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
+        <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
+        <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
         <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="Flo">
           <span class="av">${floAvatar(farbe)}</span>
           <div class="name">Flo</div>
-          <div class="unter bot-meta"><span class="p-meta">${FARBE_NAME[farbe]}</span><span class="geschlagen-ort" data-wer="flo"></span></div>
+          <div class="unter bot-meta"><span class="p-meta">${esc(farbeName(farbe))}</span><span class="geschlagen-ort" data-wer="flo"></span></div>
           ${uhrHtml('flo')}
         </div>
         <div class="spielknoepfe aktionen">
-          ${knopf('hinweis', 'hinweis', 'Hinweis', 'hinweis-k')}${knopf('zuruecknehmen', 'undo', 'Zurück', '', 'Zug zurücknehmen')}
-          ${knopf('drehen', 'drehen', 'Drehen')}${knopf('aufgeben', 'flagge', 'Aufgeben', 'aufgeben')}
+          ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}${knopf('zuruecknehmen', 'undo', t('partie.knopf.zurueck'), '', t('partie.knopf.zurueckLabel'))}
+          ${knopf('drehen', 'drehen', t('partie.knopf.drehen'))}${knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben')}
         </div>
       </div>
     </div>`;
@@ -530,7 +552,7 @@ export function zeige(root, params, app) {
     const svg = k.querySelector('svg');
     if (svg) anim(svg, [{ transform: 'scale(.7)' }, { transform: 'none' }], { d: 520, k: 'hupf' });
     if (an) { try { klang.spiele('schalter'); } catch (f) { /* still */ } }
-    app.meldung(an ? 'Klang an' : 'Klang aus', { dauer: 1600 });
+    app.meldung(t(an ? 'partie.meldung.klangAn' : 'partie.meldung.klangAus'), { dauer: 1600 });
   }
 
   // U7: Aufgeben ueber den Halte-Knopf (Einstellung haltenAufgeben, Standard an) oder wie bisher mit Rueckfrage
@@ -542,14 +564,14 @@ export function zeige(root, params, app) {
     let neu;
     if (halten) {
       halte = halteKnopf({
-        text: 'Aufgeben', icon: icon('flagge'), dauer: 1000, klasse: 'aktion dr aufgeben', label: 'Aufgeben (gedrückt halten)',
-        hinweis: 'Zum Aufgeben gedrückt halten',
+        text: t('partie.knopf.aufgeben'), icon: icon('flagge'), dauer: 1000, klasse: 'aktion dr aufgeben', label: t('partie.knopf.aufgebenHalten'),
+        hinweis: t('partie.knopf.aufgebenHinweis'),
         beiAusloesen: () => { if (!weg && z.phase !== 'ende') { melde({ typ: 'aufgeben', weg: 'halten' }); ende('niederlage', 'aufgabe'); } },
       });
       neu = halte.el;
     } else {
       const huelle = document.createElement('div');
-      huelle.innerHTML = knopf('aufgeben', 'flagge', 'Aufgeben', 'aufgeben');
+      huelle.innerHTML = knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben');
       neu = huelle.firstElementChild;
     }
     neu.dataset.aktion = 'aufgeben';
@@ -565,12 +587,12 @@ export function zeige(root, params, app) {
   }
 
   function zeichneKopf() {
-    let name = 'Eigene Stellung';
-    if (z.modus === 'boss') name = bot.regel ? `Regel: ${bot.regel}` : 'Boss-Partie';
-    else if (z.modus === 'uebung') name = `Übung ab Zug ${startNummer}`;
+    let name = t('partie.kopf.eigeneStellung');
+    if (z.modus === 'boss') name = bot.regel ? t('partie.kopf.regel', { regel: bot.regel }) : t('partie.kopf.bossPartie');
+    else if (z.modus === 'uebung') name = t('partie.kopf.uebungAb', { nr: startNummer });
     else if (!startFen) {
       const er = eroeffnung(z.san);
-      name = er.name || (z.san.length ? 'Eröffnung' : 'Grundstellung');
+      name = eroeffnungsAnzeige(er.name) || t(z.san.length ? 'partie.kopf.eroeffnung' : 'partie.kopf.grundstellung');
     }
     $('.p-eroeffnung').textContent = name;
   }
@@ -607,7 +629,7 @@ export function zeige(root, params, app) {
         if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
-      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanDeutsch(z.san[i]))}</span>`;
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
     };
     const zeilen = new Map();
     for (let i = 0; i < z.zuege.length; i++) {
@@ -619,7 +641,7 @@ export function zeige(root, params, app) {
     for (const [n, r] of zeilen) {
       liste += `<span class="nr">${n}.</span>${r.w == null && r.b != null ? '<span class="z leer">…</span>' : zelle(r.w)}${zelle(r.b)}`;
     }
-    if (!z.zuege.length) liste = '<span class="zugliste-leer">Noch keine Züge</span>';
+    if (!z.zuege.length) liste = `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
     const listeEl = $('.zugliste');
     listeEl.innerHTML = liste;
     listeEl.scrollTop = listeEl.scrollHeight;
@@ -630,7 +652,7 @@ export function zeige(root, params, app) {
       leiste += zelle(i);
     }
     const leisteEl = $('.zugleiste');
-    leisteEl.innerHTML = leiste || '<span class="zugliste-leer">Noch keine Züge</span>';
+    leisteEl.innerHTML = leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
     leisteEl.scrollLeft = leisteEl.scrollWidth;
   }
 
@@ -646,7 +668,7 @@ export function zeige(root, params, app) {
 
   function setzeDenkt(an) {
     for (const ort of $$('.denkt-ort')) {
-      ort.innerHTML = an ? '<span class="denkt-text"><span class="denkt-punkt"> · </span>denkt</span><span class="denkt"><i></i><i></i><i></i></span>' : '';
+      ort.innerHTML = an ? `<span class="denkt-text"><span class="denkt-punkt"> · </span>${esc(t('partie.bot.denkt'))}</span><span class="denkt"><i></i><i></i><i></i></span>` : '';
     }
     s.classList.toggle('bot-denkt', !!an);
   }
@@ -666,7 +688,7 @@ export function zeige(root, params, app) {
     balken.style.setProperty('--anteil', w.toFixed(3));   // U7: waagrechter Balken auf dem Handy (scaleX)
     balken.dataset.fuehrt = fuehrt;
     $('.evalbalken .wert').textContent = text;
-    balken.setAttribute('aria-label', `Bewertung ${evalText(ev, 'w') || text} aus Sicht von Weiß`);
+    balken.setAttribute('aria-label', t('partie.balken.wert', { wert: evalText(ev, 'w') || text }));
   }
   function balkenAusrichtung() {
     balken.classList.toggle('gedreht', brett.ausrichtung === 'b');
@@ -679,8 +701,9 @@ export function zeige(root, params, app) {
   function satzFuer(anlass, werte = null) {
     const liste = (bot.saetze && bot.saetze[anlass]) || [];
     let passt = null;
-    if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !/matt/i.test(t);
-    if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !/ich fang/i.test(t);
+    const sp = sprache();
+    if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !(SATZ_MATT[sp] || SATZ_MATT.de).test(t);
+    if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !(SATZ_ICH_FANG[sp] || SATZ_ICH_FANG.de).test(t);
     const auswahl = passt ? liste.filter(passt) : liste;
     if (passt && auswahl.length && auswahl.length < liste.length) return auswahl[Math.floor(Math.random() * auswahl.length)];
     return botSatz(bot, anlass, Math.random, werte);
@@ -776,18 +799,18 @@ export function zeige(root, params, app) {
   const zusatzBleibt = () => zusaetze.some((x) => x.bleibt && x.el.isConnected);
   function coachLeer() {
     if (!liveAn()) {
-      coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Live-Bewertung aus</span></div>
-        <p class="c-text">Die Bewertung jedes Zugs siehst du nach der Partie in der Analyse.</p>`, 'leer');
+      coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.liveAus'))}</span></div>
+        <p class="c-text">${esc(t('partie.coach.liveAusText'))}</p>`, 'leer');
       return;
     }
-    coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Dein Coach</span></div>
-      <p class="c-text">${z.zuege.length ? 'Weiter geht’s! Ich bewerte jeden deiner Züge.' : 'Ich bewerte jeden deiner Züge, sobald du ziehst.'}</p>`, 'leer');
+    coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.dein'))}</span></div>
+      <p class="c-text">${esc(t(z.zuege.length ? 'partie.coach.weiterText' : 'partie.coach.startText'))}</p>`, 'leer');
   }
   function coachRechnet(ply) {
     if (!liveAn()) return;
     coachZeige(`<span class="c-symbol c-warte"><span class="denkt grau"><i></i><i></i><i></i></span></span>
-      <div class="c-kopf"><span class="c-klasse">Coach rechnet …</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
-      <p class="c-text">Gleich weißt du, wie gut dein Zug war.</p>`, 'wartet', ply);
+      <div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.rechnet'))}</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
+      <p class="c-text">${esc(t('partie.coach.rechnetText'))}</p>`, 'wartet', ply);
   }
   // COMBO: Präzise, Goldrichtig und Genial zaehlen; Buch, Pflichtzug und triviale Zuege
   // (Zurueckschlagen, Schachabwehr) sind neutral, solange sie nichts verschenken
@@ -826,14 +849,14 @@ export function zeige(root, params, app) {
     const erg = e.erg;
     const k = erg.klasse;
     const ende = erg.analyseNachher && erg.analyseNachher.ende;
-    let evalT = ende === 'matt' ? 'Matt' : ende === 'patt' ? 'Patt' : evalText(erg.evalNachher, farbe);
+    let evalT = ende === 'matt' ? t('partie.coach.matt') : ende === 'patt' ? t('partie.coach.patt') : evalText(erg.evalNachher, farbe);
     if (MIT_VERLUST.has(k) && !ende) evalT = `${evalText(erg.evalVorher, farbe)} → ${evalText(erg.evalNachher, farbe)}`;
     const serie = SERIE.has(k) && !neutral(ply) ? serieBis(ply) : 0;
     const combo = serie >= 3 ? `<span class="combo" data-stufe="${serienStufe(serie)}">${icon('blitz')}COMBO ×${serie}</span>` : '';
     if (k === 'buch') {
       coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_NAME.buch)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>
-        <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || 'Eröffnungstheorie'))}</span></div>
-        <p class="c-text">${coachText('Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.')}</p>`,
+        <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' && erg.notiz !== t('partie.coach.theorie') ? eroeffnungsAnzeige(erg.notiz) : (eroeffnungsAnzeige(eroeffnung(z.san.slice(0, ply + 1)).name) || t('partie.coach.theorie')))}</span></div>
+        <p class="c-text">${coachText(t('partie.coach.buchText'))}</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
       coachEl.style.setProperty('--kf', `var(--k-${k})`);
       return;
@@ -841,13 +864,13 @@ export function zeige(root, params, app) {
     const knoepfe = [];
     const anders = erg.besterZug && erg.besterZug !== erg.uci;
     if ((k === 'brillant' || k === 'stark' || k === 'bester') && erg.analyseNachher && erg.analyseNachher.lines && erg.analyseNachher.lines[0] && erg.analyseNachher.lines[0].pv.length) {
-      knoepfe.push(`<button class="knopf" type="button" data-aktion="idee" data-ply="${ply}">${icon('pfeil')} Idee zeigen</button>`);
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="idee" data-ply="${ply}">${icon('pfeil')} ${esc(t('partie.coach.idee'))}</button>`);
     }
     if (anders && !['brillant', 'stark', 'bester', 'erzwungen', 'buch'].includes(k)) {
-      knoepfe.push(`<button class="knopf" type="button" data-aktion="besser" data-ply="${ply}">${icon('ziel')} Besser?</button>`);
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="besser" data-ply="${ply}">${icon('ziel')} ${esc(t('partie.coach.besser'))}</button>`);
     }
     if (SCHLECHT.has(k) && ply === letzterFloPly() && z.phase !== 'ende') {
-      knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="Kostet den 3. Stern">${icon('undo')} Zurücknehmen</button>`);
+      knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="${esc(t('partie.coach.zurueckTitel'))}">${icon('undo')} ${esc(t('partie.coach.zurueck'))}</button>`);
     }
     coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
       <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span><span class="c-eval zahl">${esc(evalT)}</span>${combo}</div>
@@ -874,7 +897,7 @@ export function zeige(root, params, app) {
     const b = e.erg.besterZug;
     brett.pfeile([{ von: b.slice(0, 2), nach: b.slice(2, 4), farbe: 'bester' }]);
     z.ideeAn = 'besser' + ply;
-    if (e.erg.besterZugSanDe) app.meldung(`Besser war ${e.erg.besterZugSanDe}.`);
+    if (e.erg.besterZugSanDe) app.meldung(t('partie.meldung.besserWar', { zug: e.erg.besterZugSanDe }));
   }
 
   // ---------- Effekte am Brett ----------
@@ -1053,8 +1076,8 @@ export function zeige(root, params, app) {
       eintrag.status = 'fehler';
       if (!err || !err.abgebrochen) console.warn('Live-Bewertung fehlgeschlagen', err);
       if (ply === letzterFloPly() && liveAn()) {
-        coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">Coach</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
-          <p class="c-text">Diesen Zug konnte ich gerade nicht bewerten. In der Analyse siehst du ihn trotzdem.</p>`, 'leer', ply);
+        coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.titel'))}</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
+          <p class="c-text">${esc(t('partie.coach.fehlerText'))}</p>`, 'leer', ply);
         brett.markiere(null, 'bewertung');
       }
       zeichneZugliste();
@@ -1160,8 +1183,8 @@ export function zeige(root, params, app) {
   let hinweisText = '';
   function beiVorschau(von, nach) {
     if (!von) {
-      const t = document.querySelector('.toast-ort .toast');
-      if (hinweisText && t && t.textContent === hinweisText) toastLeeren();
+      const toastEl = document.querySelector('.toast-ort .toast');
+      if (hinweisText && toastEl && toastEl.textContent === hinweisText) toastLeeren();
       hinweisText = '';
       return;
     }
@@ -1171,7 +1194,7 @@ export function zeige(root, params, app) {
     if (n >= BESTAETIGEN_HINWEISE) return;
     bestaetigenHinweiseGezeigt = n + 1;
     try { localStorage.setItem(BESTAETIGEN_MERKER, String(n + 1)); } catch (e) { /* nur die Sitzung zaehlt */ }
-    hinweisText = `Tippe zum Bestätigen auf ${nach}. Ein Tipp daneben nimmt den Zug zurück.`;
+    hinweisText = t('partie.meldung.bestaetigen', { feld: nach });
     app.meldung(hinweisText, { dauer: 4500 });
   }
   // Zug bestaetigen (PLAN 4): 'ohneUhr' nur ohne Bedenkzeit, 'immer', 'aus'; nur fuer echte Zuege (nie fuer Vorzuege)
@@ -1356,7 +1379,7 @@ export function zeige(root, params, app) {
     } catch (err) {
       if (ctrl.signal.aborted || weg) return;
       console.warn('Bot-Zug fehlgeschlagen, Ersatzzug', err);
-      if (!z.engineGemeldet) app.meldung('Die Engine hakt gerade. Der Bot zieht aus dem Bauch heraus.', { art: 'fehler' });
+      if (!z.engineGemeldet) app.meldung(t('partie.meldung.engineHakt'), { art: 'fehler' });
       z.engineGemeldet = true;
       zug = null;
     }
@@ -1434,12 +1457,12 @@ export function zeige(root, params, app) {
     k.classList.remove('rechnet');
     if (weg || z.chess.fen() !== fen || z.phase !== 'flo') return;
     const best = a && a.lines && a.lines[0] && (a.lines[0].pv[0] || a.bestmove);
-    if (!best) { app.meldung('Gerade kein Hinweis möglich.'); return; }
+    if (!best) { app.meldung(t('partie.meldung.keinHinweis')); return; }
     if (z.hinweisStufe === 0) {
       z.hinweisStufe = 1;
       z.hinweise++;
       brett.markiere([best.slice(0, 2)], 'hinweis');
-      if (z.hinweise === 1) app.meldung('Hinweis: diese Figur. Nochmal tippen zeigt den Zug. Der 3. Stern ist für diese Partie weg.');
+      if (z.hinweise === 1) app.meldung(t('partie.meldung.hinweis'));
       melde({ typ: 'hinweis', stufe: 1, feld: best.slice(0, 2) });
     } else {
       z.hinweisStufe = 2;
@@ -1457,7 +1480,7 @@ export function zeige(root, params, app) {
     loescheVorzuege();
     if (z.phase === 'ende' || z.phase === 'start') return;
     const fp = letzterFloPly();
-    if (fp < 0) { app.meldung('Es gibt noch keinen eigenen Zug zum Zurücknehmen.'); return; }
+    if (fp < 0) { app.meldung(t('partie.meldung.nichtsZurueck')); return; }
     abbrechenBot();
     const anzahl = z.zuege.length - fp;
     for (let i = 0; i < anzahl; i++) {
@@ -1469,7 +1492,7 @@ export function zeige(root, params, app) {
     z.zuruecknahmen++;
     merkeSerie();
     sende('zug:zurueckgenommen', { laufId, bisPly: fp, plies: anzahl });
-    if (z.zuruecknahmen === 1) app.meldung('Zug zurückgenommen. Der 3. Stern ist für diese Partie weg.');
+    if (z.zuruecknahmen === 1) app.meldung(t('partie.meldung.zurueckgenommen'));
     brett.entferneAbzeichen();
     brett.markiere(null);
     brett.pfeile([]);
@@ -1507,9 +1530,9 @@ export function zeige(root, params, app) {
     loescheVorzuege();
     if (z.phase === 'ende') return;
     const ok = await app.frage({
-      titel: 'Wirklich aufgeben?',
-      text: `Die Partie gegen ${bot.name} zählt dann als Niederlage.`,
-      knoepfe: [{ text: 'Weiterspielen', wert: false }, { text: 'Aufgeben', wert: true, art: 'gefahr' }],
+      titel: t('partie.aufgeben.titel'),
+      text: t('partie.aufgeben.text', { name: bot.name }),
+      knoepfe: [{ text: t('partie.aufgeben.weiter'), wert: false }, { text: t('partie.aufgeben.ja'), wert: true, art: 'gefahr' }],
       abbrechen: false,
     });
     if (ok && !weg) ende('niederlage', 'aufgabe');
@@ -1521,9 +1544,9 @@ export function zeige(root, params, app) {
     for (let i = 0; i < z.zuege.length; i++) if (istFlo(i)) floZuege++;
     if (floZuege === 0) { z.verworfen = true; loescheLaufendePartie(); app.gehe('arena'); return; }
     const w = await app.frage({
-      titel: 'Partie unterbrechen?',
-      text: 'Pausieren: Die Partie bleibt gespeichert und du setzt sie später in der Arena fort.',
-      knoepfe: [{ text: 'Weiterspielen', wert: null }, { text: 'Aufgeben', wert: 'aufgeben', art: 'gefahr' }, { text: 'Pausieren', wert: 'pause', art: 'primaer' }],
+      titel: t('partie.pause.titel'),
+      text: t('partie.pause.text'),
+      knoepfe: [{ text: t('partie.pause.weiter'), wert: null }, { text: t('partie.pause.aufgeben'), wert: 'aufgeben', art: 'gefahr' }, { text: t('partie.pause.ja'), wert: 'pause', art: 'primaer' }],
       abbrechen: null,
     });
     if (weg) return;
@@ -1793,14 +1816,14 @@ export function zeige(root, params, app) {
     }
     if (best < 0) return null;
     const k = z.liveKlassen[best];
-    return { ply: best, klasse: k, text: `Zug ${nummerVon(best)} ${sanDeutsch(z.san[best])}: ${KLASSEN_NAME[k] || k}` };
+    return { ply: best, klasse: k, text: t('partie.erg.lichtblickZug', { nr: nummerVon(best), zug: sanAnzeige(z.san[best]), klasse: KLASSEN_NAME[k] || k }) };
   }
 
   // Chip nicht wertender Partien: je Modus, gegen angemeldete Bots im Modus normal "GAST" (w0plus-a-fix)
   function chipText() {
-    if (MODUS_CHIP[z.modus] && z.modus !== 'uebung') return MODUS_CHIP[z.modus];
-    if (z.modus === 'normal' && bot.stufe == null && !startFen) return 'GAST';
-    return 'ÜBUNG';
+    if (MODUS_CHIP.has(z.modus) && z.modus !== 'uebung') return t('partie.chip.' + z.modus);
+    if (z.modus === 'normal' && bot.stufe == null && !startFen) return t('partie.chip.gast');
+    return t('partie.chip.uebung');
   }
 
   // ---------- Ergebnis-Overlay ----------
@@ -1811,22 +1834,24 @@ export function zeige(root, params, app) {
     o.setAttribute('aria-modal', 'true');
     o.setAttribute('aria-labelledby', 'erg-wort');
     // U7 (PLAN 2.6): "Sieg" mit goldenem Ausrufezeichen, Niederlage ruhig und kleiner, Remis gold-neutral
-    const wort = { sieg: 'Sieg<span class="ausruf">!</span>', niederlage: 'Partie verloren', remis: 'Remis' }[ergebnis];
+    const wort = {
+      sieg: `${esc(t('partie.erg.sieg'))}<span class="ausruf">!</span>`, niederlage: esc(t('partie.erg.niederlage')), remis: esc(t('partie.erg.remis')),
+    }[ergebnis];
     const nr = nummerVon(Math.max(0, z.zuege.length - 1));
     let unter;
-    if (grund === 'matt') unter = ergebnis === 'sieg' ? `Schachmatt im ${nr}. Zug gegen ${bot.name}` : `${bot.name} setzt dich im ${nr}. Zug matt`;
-    else if (grund === 'aufgabe') unter = `Aufgegeben gegen ${bot.name}. Nächstes Mal klappt’s!`;
-    else unter = `${GRUND_TEXT[grund] || 'Remis'} gegen ${bot.name}`;
+    if (grund === 'matt') unter = t(ergebnis === 'sieg' ? 'partie.erg.mattSieg' : 'partie.erg.mattNiederlage', { nr, name: bot.name });
+    else if (grund === 'aufgabe') unter = t('partie.erg.aufgabe', { name: bot.name });
+    else unter = t('partie.erg.grund', { grund: grundText(grund) || t('partie.grund.remis'), name: bot.name });
     // Nicht wertende Partie (Uebung, eigene Stellung): Chip "ÜBUNG" neben dem Kopfwort, keine Sterne. Kein Konfetti mehr.
     const wertend = z.gespeichert ? z.gespeichert.wertet !== false : wertetJetzt();
     const kopfWort = `<h2 class="erg-wort disp" id="erg-wort">${wort}</h2>`;
     o.innerHTML = `
       <div class="ergebnis-karte">
-        <button class="icon-knopf erg-zu" type="button" aria-label="Brett ansehen">${icon('auge')}</button>
-        ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${chipText()}</span></div>`}
+        <button class="icon-knopf erg-zu" type="button" aria-label="${esc(t('partie.erg.brettAnsehen'))}">${icon('auge')}</button>
+        ${wertend ? kopfWort : `<div class="erg-kopf">${kopfWort}<span class="chip uebung" data-modus="${esc(z.modus)}">${esc(chipText())}</span></div>`}
         <p class="erg-unter">${esc(unter)}</p>
         <div class="erg-mitte">
-          <div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
+          <div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">${esc(t('partie.erg.wertetAus'))}</span>
             <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>
         </div>
         <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
@@ -1935,28 +1960,31 @@ export function zeige(root, params, app) {
         const sterne = p.sterne || [false, false, false];
         const neueSterne = erg.neueSterne || [false, false, false];
         const gen = p.genauigkeit;
-        const genText = Number.isFinite(gen) ? komma(gen) + ' %' : '-';
+        const genText = Number.isFinite(gen) ? prozent(gen) : '-';
         const hilfe = [];
-        if (p.hinweise > 0) hilfe.push(p.hinweise === 1 ? '1 Hinweis' : `${p.hinweise} Hinweise`);
-        if (p.zuruecknahmen > 0) hilfe.push(p.zuruecknahmen === 1 ? '1 Zurücknahme' : `${p.zuruecknahmen} Zurücknahmen`);
+        if (p.hinweise > 0) hilfe.push(t('partie.erg.hinweise', { n: p.hinweise }));
+        if (p.zuruecknahmen > 0) hilfe.push(t('partie.erg.zuruecknahmen', { n: p.zuruecknahmen }));
         const ziele = [
-          ['Gewonnen', `${bot.name.split(' ').pop()} besiegt`],
-          rechnet ? ['Genauigkeit', 'wird berechnet …']
-            : [Number.isFinite(gen) ? `${genText} genau` : 'Genauigkeit', sterne[1] ? `mindestens ${GENAUIGKEIT_STERN} %` : `${GENAUIGKEIT_STERN} % nötig`],
-          ['Ohne Hilfe', hilfe.length ? hilfe.join(', ') : 'kein Hinweis, nichts zurückgenommen'],
+          // Deutsch wie bisher das letzte Wort des Namens; Englisch die Kurzform ("Kalle from the Pub" -> "Kalle", nicht "Pub")
+          [t('partie.erg.gewonnen'), t('partie.erg.besiegt', { name: sprache() === 'de' ? bot.name.split(' ').pop() : rufnameVon(bot) })],
+          rechnet ? [t('partie.erg.genauigkeit'), t('partie.erg.wirdBerechnet')]
+            : [Number.isFinite(gen) ? t('partie.erg.genau', { wert: genText }) : t('partie.erg.genauigkeit'),
+              t(sterne[1] ? 'partie.erg.mindestens' : 'partie.erg.noetig', { n: GENAUIGKEIT_STERN })],
+          [t('partie.erg.ohneHilfe'), hilfe.length ? hilfe.join(', ') : t('partie.erg.keineHilfe')],
         ];
         const sternHtml = (i) => {
-          const [t, u] = ziele[i];
+          const [kopf, u] = ziele[i];
           const an = sterne[i] && !(rechnet && i === 1);
+          const sr = rechnet && i === 1 ? t('partie.erg.srRechnet') : an ? t('partie.erg.srErreicht') : t('partie.erg.srNicht');
           return `<div class="erg-stern${an ? ' an' : ' aus'}${an && neueSterne[i] ? ' neu' : ''}${rechnet && i === 1 ? ' wartet' : ''}" style="--i:${i}" data-i="${i}">
-              <span class="e-stern" aria-hidden="true">${icon('stern')}</span><b>${esc(t)}</b><small>${esc(u)}</small>
-              ${an && neueSterne[i] ? '<span class="e-neu">NEU</span>' : ''}<span class="sr">${rechnet && i === 1 ? 'wird berechnet' : an ? 'erreicht' : 'nicht erreicht'}</span></div>`;
+              <span class="e-stern" aria-hidden="true">${icon('stern')}</span><b>${esc(kopf)}</b><small>${esc(u)}</small>
+              ${an && neueSterne[i] ? `<span class="e-neu">${esc(t('partie.erg.neu'))}</span>` : ''}<span class="sr">${esc(sr)}</span></div>`;
         };
-        const rechnetHtml = `<div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">Coach wertet die Partie aus</span>
+        const rechnetHtml = `<div class="erg-rechnet" role="status" aria-live="polite"><span class="c-klasse">${esc(t('partie.erg.wertetAus'))}</span>
             <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>`;
         const mitte = o.querySelector('.erg-mitte');
-        const staerke = p.spielstaerke ? ` · spielte wie ≈ ${p.spielstaerke}` : '';
-        const genauHtml = (gross) => `<div class="erg-genau${gross ? ' gross' : ''}">Genauigkeit <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? '0,0 %' : '-'}</b>${gross ? (p.spielstaerke ? `<span>spielte wie ≈ ${p.spielstaerke}</span>` : '') : esc(staerke)}</div>`;
+        const staerke = p.spielstaerke ? ` · ${t('partie.erg.spielteWie', { elo: p.spielstaerke })}` : '';
+        const genauHtml = (gross) => `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
         if (ergebnis === 'sieg' && wertet) {
           if (nachtrag && mitte.querySelector('.erg-sterne')) {
             // nur Stern 2 und die Genauigkeit erneuern (die anderen Sterne nicht neu animieren)
@@ -1975,14 +2003,14 @@ export function zeige(root, params, app) {
           // Sieg einer nicht wertenden Partie: ohne Tipp
           const tipp = ergebnis === 'niederlage'
             ? (momente
-              ? `${knapp ? 'Knapp!' : 'Kopf hoch!'} Schau dir ${anzahl === 1 ? 'den Schlüsselmoment' : `die ${anzahl} Schlüsselmomente`} in der Analyse an.`
-              : (knapp ? 'Knapp! In der Analyse siehst du, wo mehr drin war.' : 'Kopf hoch! In der Analyse siehst du, wo die Partie gekippt ist.'))
-            : ergebnis === 'remis' ? 'Ein halber Punkt! In der Analyse siehst du, wo mehr drin war.' : '';
+              ? t('partie.erg.momente', { n: anzahl, auftakt: t(knapp ? 'partie.erg.knapp' : 'partie.erg.kopfHoch') })
+              : t(knapp ? 'partie.erg.knappText' : 'partie.erg.kopfHochText'))
+            : ergebnis === 'remis' ? t('partie.erg.remisText') : '';
           // U7: Niederlage ruhig mit Lichtblick-Karte zuerst (Flos bester Zug aus den Live-Klassen); wie der Tipp nur,
           // wenn kein Paket am Ort ergebnis:karte etwas zeigt
           const lb = ergebnis === 'niederlage' && !karten ? lichtblick() : null;
           const lbHtml = lb ? `<div class="erg-lichtblick k-${esc(lb.klasse)}"><span class="lb-sym">${icon('sonne')}</span>
-            <div class="lb-text"><b>Lichtblick</b><span>${esc(lb.text)}</span></div></div>` : '';
+            <div class="lb-text"><b>${esc(t('partie.erg.lichtblick'))}</b><span>${esc(lb.text)}</span></div></div>` : '';
           // der Tipp nur, wenn kein Paket am Ort ergebnis:karte etwas zeigt
           mitte.innerHTML = `${lbHtml}${rechnet ? rechnetHtml : genauHtml(true)}
             ${rechnet || !tipp || karten ? '' : `<p class="erg-tipp">${esc(tipp)}</p>`}`;
@@ -1991,7 +2019,7 @@ export function zeige(root, params, app) {
         if (neu && !nachtrag) {
           o.querySelector('.erg-frei-ort').innerHTML = `<div class="erg-frei" style="--bf:${themaBotFarbe(neu)}">
             <span class="avatar"><img src="${esc(neu.avatar)}" alt=""><span class="schloss offen">${icon('offen')}</span></span>
-            <div><div class="ef-titel">NEU FREIGESCHALTET · STUFE ${neu.stufe}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
+            <div><div class="ef-titel">${esc(t('partie.erg.freigeschaltet', { stufe: neu.stufe }))}</div><div class="ef-name">${esc(neu.name)} <span class="ef-elo zahl">${neu.elo}</span></div></div></div>`;
         }
         if (!nachtrag) {
           const knoepfe = o.querySelector('.erg-knoepfe');
@@ -1999,10 +2027,10 @@ export function zeige(root, params, app) {
           const naechster = !wertet || bot.stufe == null ? null : neu || (ergebnis === 'sieg' ? BOTS.find((b) => b.stufe === bot.stufe + 1) : null);
           // nicht wertend: "Nochmal ab hier" mit denselben Params (Uebung bzw. eigene Stellung), sonst "Nochmal"
           const abHier = z.modus === 'uebung' || (z.modus === 'normal' && !!startFen);
-          knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} Zur Analyse</button>
-          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${abHier ? 'Nochmal ab hier' : 'Nochmal'}</button>`
-            : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">Nächster Gegner ${icon('pfeil')}</button>`
-              : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} Nochmal</button>`}`;
+          knoepfe.innerHTML = `<button class="knopf primaer gross" type="button" data-ziel="analyse">${icon('analyse')} ${esc(t('partie.erg.zurAnalyse'))}</button>
+          ${!wertet ? `<button class="knopf gross" type="button" data-ziel="ab-hier">${icon('nochmal')} ${esc(t(abHier ? 'partie.erg.abHier' : 'partie.erg.nochmal'))}</button>`
+            : naechster ? `<button class="knopf gross" type="button" data-ziel="weiter">${esc(t('partie.erg.naechster'))} ${icon('pfeil')}</button>`
+              : `<button class="knopf gross" type="button" data-ziel="nochmal">${icon('nochmal')} ${esc(t('partie.erg.nochmal'))}</button>`}`;
           // aktuellErg: nach dem Nachtrag zaehlt auch ein neuer Stern 2
           knoepfe.querySelector('[data-ziel="analyse"]').addEventListener('click', () => app.gehe('analyse', {
             partieId: p.id, neuFreigeschaltet: neu ? neu.id : undefined, neueSterne: aktuellErg.neueSterne,
@@ -2028,13 +2056,13 @@ export function zeige(root, params, app) {
         const zahl = o.querySelector('.erg-genau b');
         const ziel = Number(zahl && zahl.dataset.ziel);
         if (zahl && Number.isFinite(ziel) && zahl.dataset.ziel !== '') {
-          if (reduziert()) zahl.textContent = komma(ziel) + ' %';
+          if (reduziert()) zahl.textContent = prozent(ziel);
           else {
             const t0 = jetzt();
             const schritt = () => {
               if (weg) return;
               const f = Math.min(1, (jetzt() - t0) / 1200);
-              zahl.textContent = komma(ziel * (1 - Math.pow(1 - f, 3))) + ' %';
+              zahl.textContent = prozent(ziel * (1 - Math.pow(1 - f, 3)));
               if (f < 1) requestAnimationFrame(schritt);
             };
             requestAnimationFrame(schritt);
@@ -2176,13 +2204,13 @@ export function zeige(root, params, app) {
     setze(wer, ms, { laeuft = false } = {}) {
       const el = uhrEl[wer];
       if (!el) return;
-      const t = Math.max(0, Number(ms) || 0);
-      el.querySelector('.uhr-zeit').textContent = fmtUhr(t);
-      const warn = t < UHR_WARN_MS;
+      const rest = Math.max(0, Number(ms) || 0);
+      el.querySelector('.uhr-zeit').textContent = fmtUhr(rest);
+      const warn = rest < UHR_WARN_MS;
       el.classList.toggle('laeuft', !!laeuft);
       el.classList.toggle('warn', warn);
-      el.setAttribute('aria-label', `${wer === 'flo' ? 'Deine' : 'Gegnerische'} Bedenkzeit ${fmtUhr(t)}`);
-      const sek = Math.floor(t / 1000);
+      el.setAttribute('aria-label', t(wer === 'flo' ? 'partie.uhr.flo' : 'partie.uhr.bot', { zeit: fmtUhr(rest) }));
+      const sek = Math.floor(rest / 1000);
       if (warn && laeuft && el.dataset.sek !== String(sek)) {
         el.dataset.sek = String(sek);
         anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
@@ -2361,8 +2389,8 @@ export function zeige(root, params, app) {
   if (nachholen) neuerLiveEintrag(fpStart);
   if (nachholen && liveAn()) coachRechnet(fpStart);
   else if (laufend && fpStart >= 0 && z.liveKlassen[fpStart] && liveAn()) {
-    coachZeige(`<span class="c-symbol">${symbolSvg(z.liveKlassen[fpStart])}</span><div class="c-kopf"><span class="c-klasse">Weiter geht’s</span>
-      <span class="c-zug">${esc(zugLabel(fpStart))}</span></div><p class="c-text">Dein letzter Zug: ${esc(KLASSEN_WORT[z.liveKlassen[fpStart]])}.</p>`,
+    coachZeige(`<span class="c-symbol">${symbolSvg(z.liveKlassen[fpStart])}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.weiter'))}</span>
+      <span class="c-zug">${esc(zugLabel(fpStart))}</span></div><p class="c-text">${esc(t('partie.coach.letzterZug', { wort: KLASSEN_WORT[z.liveKlassen[fpStart]] }))}</p>`,
     `k-${z.liveKlassen[fpStart]} kompakt`, null);
     coachEl.style.setProperty('--kf', `var(--k-${z.liveKlassen[fpStart]})`);
   } else coachLeer();
@@ -2384,7 +2412,7 @@ export function zeige(root, params, app) {
       if (!laufend) await Promise.all([eb.newGame(), ew.newGame()]);
     } catch (err) {
       // dauerhafte Fehler (z. B. iPadOS zu alt) meldet app.js selbst mit genauem Grund
-      if (!weg && !(err && err.dauerhaft)) app.meldung('Die Schach-Engine startet nicht. Der Bot spielt ohne sie, die Bewertung fehlt.', { art: 'fehler' });
+      if (!weg && !(err && err.dauerhaft)) app.meldung(t('partie.meldung.engineStartet'), { art: 'fehler' });
       z.engineGemeldet = true;
     }
     if (weg) return;
@@ -2425,8 +2453,7 @@ export function zeige(root, params, app) {
     try { localStorage.setItem(PFEIL_TIPP_MERKER, JSON.stringify({ partien, erledigt: false })); } catch (e) { /* nur diese Partie */ }
     if (partien < 2) return;
     const maus = !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
-    el.querySelector('.pt-text').textContent = maus ? 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.'
-      : 'Tipp: Finger auf ein Feld halten und ziehen zeichnet einen Pfeil.';
+    el.querySelector('.pt-text').textContent = t(maus ? 'partie.pfeil.maus' : 'partie.pfeil.finger');
     el.hidden = false;
   }
   function pfeilTippWeg() {

@@ -173,6 +173,8 @@ function main() {
     ...alleDateien('assets/avatare/modern', /\.(svg|png)$/),
     ...alleDateien('js', /\.js$/),
     ...alleDateien('js/ui', /\.js$/).filter((d) => !pk.erlaubt.includes(d)),
+    // Englische Version: Woerterbuecher der Sprachen (js/sprache.js)
+    ...alleDateien('js/sprachen', /\.js$/),
     ...alleDateien('vendor/chess', /\.js$/),
     ...alleDateien('vendor/stockfish', /\.(js|wasm)$/),
     ...alleDateien('assets/pieces', /\.(svg|png)$/),

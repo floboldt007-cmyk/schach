@@ -24,6 +24,9 @@
 //       Figuren aus assets/pieces/ (cburnett)
 import { klang } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/rahmen.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const tonSpielen = (name) => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
@@ -116,7 +119,7 @@ export function regler({ name = '', wert = 0, min = 0, max = 1, schritt = 0.05, 
   const el = document.createElement('div');
   el.className = 'regler-zeile';
   if (name) el.dataset.regler = name;
-  const fmt = typeof format === 'function' ? format : (w) => `${Math.round(((w - min) / ((max - min) || 1)) * 100)} %`;
+  const fmt = typeof format === 'function' ? format : (w) => t('rahmen.bauteile.prozent', { wert: Math.round(((w - min) / ((max - min) || 1)) * 100) });
   el.innerHTML = `${links || ''}<div class="regler" role="slider" tabindex="0" aria-valuemin="${min}" aria-valuemax="${max}"` +
     `${label ? ` aria-label="${esc(label)}"` : ''}><span class="regler-innen"><span class="bahn"><span class="fuell"></span></span>` +
     `<span class="knauf" aria-hidden="true"></span></span></div>${rechts || ''}<output class="regler-wert zahl"></output>`;
@@ -253,7 +256,7 @@ export function halteKnopf({ text = '', icon = '', dauer = 1000, beiAusloesen = 
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'knopf halte-knopf' + (klasse ? ' ' + klasse : '');
-  el.setAttribute('aria-label', label || `${text} (gedrückt halten)`);
+  el.setAttribute('aria-label', label || t('rahmen.bauteile.halten', { text }));
   el.innerHTML = `<span class="halte-symbol"><svg class="halte-ring" viewBox="0 0 36 36" aria-hidden="true" focusable="false">` +
     `<circle class="halte-bahn" cx="18" cy="18" r="16"/><circle class="halte-fuell" cx="18" cy="18" r="16" pathLength="100"/></svg>` +
     `${icon || ''}</span><span class="halte-text">${esc(text)}</span>`;
@@ -307,7 +310,7 @@ export function halteKnopf({ text = '', icon = '', dauer = 1000, beiAusloesen = 
     const f = frage || {};
     sheet({
       titel: f.titel || text, text: f.text || '',
-      knoepfe: [{ text: f.nein || 'Abbrechen', wert: false }, { text: f.ja || text, wert: true, art: 'gefahr' }],
+      knoepfe: [{ text: f.nein || t('allgemein.abbrechen'), wert: false }, { text: f.ja || text, wert: true, art: 'gefahr' }],
       abbrechen: false,
     }).then((ja) => { if (ja) ausloesen(); });
   });

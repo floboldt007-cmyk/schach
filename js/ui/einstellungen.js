@@ -12,6 +12,13 @@
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
+import { SPRACHWAHL, sprache, t } from '../sprache.js';
+import { BOTS } from '../bots.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/einstellungen.js';
+
+// Sprachwahl erst, wenn alles uebersetzt ist (SPRACHWAHL); mit ?test schon jetzt (tests/sprache.test.mjs)
+const ZEIGE_SPRACHE = SPRACHWAHL || (typeof location !== 'undefined' && /[?&]test\b/.test(location.search || ''));
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -26,17 +33,24 @@ const ICON = {
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
-// Brettfarben wie im Design-Konzept (nur --feld-hell/--feld-dunkel)
+// Brettfarben wie im Design-Konzept (nur --feld-hell/--feld-dunkel); Namen beim Zeichnen: t('einstellungen.brett.<id>')
 const BRETTER = [
-  { id: 'nacht', name: 'Nacht', hell: '#e4e8f6', dunkel: '#7c87b6' },
-  { id: 'gruen', name: 'Grün', hell: '#eeeed2', dunkel: '#769656' },
-  { id: 'holz', name: 'Holz', hell: '#f0d9b5', dunkel: '#b58863' },
+  { id: 'nacht', hell: '#e4e8f6', dunkel: '#7c87b6' },
+  { id: 'gruen', hell: '#eeeed2', dunkel: '#769656' },
+  { id: 'holz', hell: '#f0d9b5', dunkel: '#b58863' },
 ];
+// Namen beim Zeichnen: t('einstellungen.tiefe.<name>'), Text t('einstellungen.tiefe.text')
 const TIEFEN = [
-  { wert: 12, name: 'Schnell', text: 'Tiefe 12' },
-  { wert: 14, name: 'Normal', text: 'Tiefe 14' },
-  { wert: 16, name: 'Gründlich', text: 'Tiefe 16' },
+  { wert: 12, name: 'schnell' },
+  { wert: 14, name: 'normal' },
+  { wert: 16, name: 'gruendlich' },
 ];
+function E(k, w) { return t('einstellungen.' + k, w); }
+// der Bot, bei dem die Leiter nach dem Zuruecksetzen wieder beginnt (Name aus bots.js, beim Zeichnen gelesen)
+// Erster Gegner der Leiter (seit den Welten Vogelscheuche Fridolin, vorher Bauer Benno): dort beginnt sie nach dem Zuruecksetzen
+function ersterGegner() {
+  return (BOTS[0] || {}).name || '';
+}
 // Mini-Brett: 4x4 Ausschnitt mit ein paar Figuren
 const MINI = { 1: 'bN', 6: 'bP', 9: 'wB', 14: 'wK' };
 
@@ -57,7 +71,7 @@ export function zeige(root, params = {}, app) {
 
   const sec = document.createElement('section');
   sec.className = 'screen scrollt es-screen';
-  sec.setAttribute('aria-label', 'Einstellungen');
+  sec.setAttribute('aria-label', t('allgemein.einstellungen'));
   root.append(sec);
 
   const schalter = (key, titel, text, extra = '') => `
@@ -91,83 +105,84 @@ export function zeige(root, params = {}, app) {
   function baue() {
     sec.innerHTML = `
       <header class="kopf">
-        <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
-        <div class="titel"><h2>Einstellungen</h2><div class="unter">Wirkt sofort und bleibt gespeichert</div></div>
+        <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="${t('allgemein.zurueck')}">${icon('zurueck')}</button>
+        <div class="titel"><h2>${t('allgemein.einstellungen')}</h2><div class="unter">${E('unter')}</div></div>
       </header>
       <div class="es-layout">
-       <nav class="es-nav" aria-label="Einstellungsbereiche">
-        ${[['klang','Klang'],['spiel','Spiel'],['bewegung','Bewegung'],['anzeige','Anzeige'],['coach','Coach'],['fortschritt','Fortschritt'],['info','Info']].map(([id,n], i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${n}</a>`).join('')}
+       <nav class="es-nav" aria-label="${E('nav')}">
+        ${['klang','spiel','bewegung','anzeige','coach','fortschritt','info'].map((id, i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${E('gruppe.' + id)}</a>`).join('')}
        </nav>
        <div class="es-inhalt">
         <section class="es-gruppe flaeche" aria-labelledby="es-g-klang">
-          <h3 class="es-titel" id="es-g-klang">Klang</h3>
-          ${schalter('klang', 'Klang', 'Zugklänge und Effekte',
-            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} Probe</button>`)}
-          ${segment('klangpaket', 'Klangpaket', [['','Arcade (Ansicht)'],['arcade','Arcade'],['holz','Holz']])}
-          <label class="es-regler"><span><b>Lautstärke</b><output>80 %</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
-          ${segment('klangstufe', 'Klangstufe', [['alle','Alle'],['wichtig','Wichtig'],['aus','Aus']])}
-          <div class="es-untergruppe"><h4>Klänge einzeln</h4>${[['brett','Züge'],['bewertung','Bewertung'],['feier','Feier'],['uhr','Uhr'],['boss','Boss-Treffer'],['finisher','Finisher'],['bedienung','Bedienung']].map(([k,n]) => schalter(`klanggruppe-${k}`,n,'')).join('')}</div>
+          <h3 class="es-titel" id="es-g-klang">${E('gruppe.klang')}</h3>
+          ${schalter('klang', E('klang.titel'), E('klang.text'),
+            `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} ${E('klang.probe')}</button>`)}
+          ${segment('klangpaket', E('klang.paket'), [['',E('klang.paketAnsicht')],['arcade',E('klang.paketArcade')],['holz',E('klang.paketHolz')]])}
+          <label class="es-regler"><span><b>${E('klang.lautstaerke')}</b><output>${E('prozent', { wert: 80 })}</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
+          ${segment('klangstufe', E('klang.stufe'), [['alle',E('klang.alle')],['wichtig',E('klang.wichtig')],['aus',t('allgemein.aus')]])}
+          <div class="es-untergruppe"><h4>${E('klang.einzeln')}</h4>${['brett','bewertung','feier','uhr','boss','finisher','bedienung'].map((k) => schalter(`klanggruppe-${k}`,E('klang.' + k),'')).join('')}</div>
         </section>
 
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">Spiel</h3>
-          ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']],'Der erste Tipp zeigt den Zug, ein zweiter Tipp aufs Zielfeld spielt ihn.')}
-          ${schalter('haltenAufgeben','Aufgeben und Remis halten','Schützt vor versehentlichem Antippen.')}
-          ${schalter('turmRochade','Turm auf König rochiert','Erlaubt die kurze Eingabe der Rochade.')}
-          ${schalter('autoDame','Automatisch Dame','Ohne Auswahl bei der Umwandlung. Halten am Zielfeld zeigt die anderen Figuren.')}
-          ${schalter('vorzuege','Vorzüge','Bis zu fünf Züge vormerken, während der Gegner denkt. Ein Tipp ins leere Brett löscht sie.')}
-          ${segment('steuerung','Figuren bewegen',[['beides','Beides'],['ziehen','Ziehen'],['tippen','Tippen']])}
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">${E('gruppe.spiel')}</h3>
+          ${segment('zugBestaetigen',E('spiel.bestaetigen'),[['aus',t('allgemein.aus')],['ohneUhr',E('spiel.ohneUhr')],['immer',E('spiel.immer')]],E('spiel.bestaetigenHilfe'))}
+          ${schalter('haltenAufgeben',E('spiel.halten'),E('spiel.haltenText'))}
+          ${schalter('turmRochade',E('spiel.turmRochade'),E('spiel.turmRochadeText'))}
+          ${schalter('autoDame',E('spiel.autoDame'),E('spiel.autoDameText'))}
+          ${schalter('vorzuege',E('spiel.vorzuege'),E('spiel.vorzuegeText'))}
+          ${segment('steuerung',E('spiel.steuerung'),[['beides',E('spiel.beides')],['ziehen',E('spiel.ziehen')],['tippen',E('spiel.tippen')]])}
         </section>
 
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-bewegung"><h3 class="es-titel" id="es-g-bewegung">Bewegung</h3>
-          ${segment('bewegung','Animationstempo',[['langsam','Langsam'],['normal','Normal'],['schnell','Schnell'],['aus','Aus']],'Die Systemeinstellung „weniger Bewegung“ hat Vorrang.')}
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-bewegung"><h3 class="es-titel" id="es-g-bewegung">${E('gruppe.bewegung')}</h3>
+          ${segment('bewegung',E('bewegung.tempo'),[['langsam',E('bewegung.langsam')],['normal',E('bewegung.normal')],['schnell',E('bewegung.schnell')],['aus',t('allgemein.aus')]],E('bewegung.hilfe'))}
           <div class="es-tempo-vorschau" aria-hidden="true"><span>♞</span></div>
         </section>
 
         <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
-          <h3 class="es-titel" id="es-g-anzeige">Anzeige</h3>
-          ${segment('thema','Ansicht',[['modern','Modern und klar']])}
-          ${segment('modus','Erscheinungsbild',[['system','System'],['hell','Hell'],['dunkel','Dunkel']])}
-          <h4>Brettfarbe</h4>
+          <h3 class="es-titel" id="es-g-anzeige">${E('gruppe.anzeige')}</h3>
+          ${segment('thema',E('anzeige.ansicht'),[['modern',E('anzeige.modern')]])}
+          ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
+          ${ZEIGE_SPRACHE ? segment('sprache','Sprache · Language',[['de','Deutsch'],['en','English']]) : ''}
+          <h4>${E('anzeige.brettfarbe')}</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
             ${BRETTER.map((b) => `
               <button class="es-brett" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
-                ${miniBrett(b)}<span class="es-brett-name">${b.name}</span>
+                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>
               </button>`).join('')}
           </div>
-          ${schalter('koordinaten','Koordinaten','Buchstaben und Zahlen am Brett.')}
-          ${segment('koordLage','Lage der Koordinaten',[['ecke','Ecke'],['rand','Rand']])}
-          ${schalter('balken','Bewertungsbalken','Zeigt, wer besser steht.')}${schalter('liveBewertung','Live-Bewertung','Coach nach jedem eigenen Zug.')}
-          ${schalter('pfeile','Pfeile und Marken','Feld halten und ziehen malt einen Pfeil, nur halten eine Marke. Am Rechner mit Rechtsklick. Ein Tipp ins leere Brett löscht alles.')}
-          ${segment('duellIntro','Duell-Intro',[['immer','Immer'],['besondere','Besondere'],['aus','Aus']])}
-          ${schalter('lebensleiste','Lebensleiste','Bei Boss-Partien.')}${schalter('zaehlwerk','Zählwerk','Wenn ein Spielmodus es anbietet.')}${schalter('funkenlinie','Funkenlinie','Wenn ein Spielmodus es anbietet.')}
+          ${schalter('koordinaten',E('anzeige.koordinaten'),E('anzeige.koordinatenText'))}
+          ${segment('koordLage',E('anzeige.koordLage'),[['ecke',E('anzeige.ecke')],['rand',E('anzeige.rand')]])}
+          ${schalter('balken',E('anzeige.balken'),E('anzeige.balkenText'))}${schalter('liveBewertung',E('anzeige.live'),E('anzeige.liveText'))}
+          ${schalter('pfeile',E('anzeige.pfeile'),E('anzeige.pfeileText'))}
+          ${segment('duellIntro',E('anzeige.duellIntro'),[['immer',E('spiel.immer')],['besondere',E('anzeige.besondere')],['aus',t('allgemein.aus')]])}
+          ${schalter('lebensleiste',E('anzeige.lebensleiste'),E('anzeige.lebensleisteText'))}${schalter('zaehlwerk',E('anzeige.zaehlwerk'),E('anzeige.spielmodus'))}${schalter('funkenlinie',E('anzeige.funkenlinie'),E('anzeige.spielmodus'))}
         </section>
 
-        <section class="es-gruppe flaeche" aria-labelledby="es-g-coach"><h3 class="es-titel" id="es-g-coach">Coach</h3>
-          ${segment('coachStil','Erklärungen',[['ausfuehrlich','Ausführlich'],['knapp','Knapp']])}
-          ${segment('sprueche','Bot-Sprüche',[['an','An'],['wenig','Wenig'],['aus','Aus']])}
-          ${segment('tiefe','Rechentiefe',TIEFEN.map(t => [String(t.wert),t.name,t.text]),'Gründlich ist genauer, braucht aber länger.')}
-          <div class="es-coach-vorschau"><b>Coach-Vorschau</b><p>Dieser Zug entwickelt eine Figur und bereitet die Rochade vor.</p></div>
+        <section class="es-gruppe flaeche" aria-labelledby="es-g-coach"><h3 class="es-titel" id="es-g-coach">${E('gruppe.coach')}</h3>
+          ${segment('coachStil',E('coach.stil'),[['ausfuehrlich',E('coach.ausfuehrlich')],['knapp',E('coach.knapp')]])}
+          ${segment('sprueche',E('coach.sprueche'),[['an',t('allgemein.an')],['wenig',E('coach.wenig')],['aus',t('allgemein.aus')]])}
+          ${segment('tiefe',E('coach.tiefe'),TIEFEN.map(x => [String(x.wert),E('tiefe.' + x.name),E('tiefe.text', { wert: x.wert })]),E('coach.tiefeHilfe'))}
+          <div class="es-coach-vorschau"><b>${E('coach.vorschau')}</b><p>${E('coach.vorschauText')}</p></div>
         </section>
 
         <div class="es-ort"></div>
 
         <section class="es-gruppe flaeche es-gefahr" aria-labelledby="es-g-fortschritt">
-          <h3 class="es-titel" id="es-g-fortschritt">Fortschritt</h3>
+          <h3 class="es-titel" id="es-g-fortschritt">${E('gruppe.fortschritt')}</h3>
           <div class="es-reset" aria-live="polite"></div>
         </section>
 
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
-          <h3 class="es-titel" id="es-g-info">Info und Lizenzen</h3>
-          <p><b>Crownmate</b> ist freie Software unter der <a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>. Alles läuft auf deinem Gerät, auch offline.</p>
-          <p class="es-recht"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">Datenschutzerklärung</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">Impressum</a></p>
+          <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
+          <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
+          <p class="es-recht"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <ul class="es-lizenzen">
-            <li><b>Stockfish 19</b><span>Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a></span></li>
-            <li><b>chess.js 1.4.0</b><span>Schachregeln, BSD-2-Clause</span></li>
-            <li><b>Figuren „cburnett“</b><span>von Colin M. L. Burnett, GPLv2+</span></li>
-            <li><b>Schriften Manrope und Bricolage Grotesque</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
-            <li><b>Tagesrätsel</b><span>Eigene Rätsel, mit Stockfish geprüft. Entstanden aus Partien der Engine gegen sich selbst und eigenen Lehr-Stellungen, keine Rätsel aus fremden Sammlungen.</span></li>
-            <li><b>Klänge „Holz“ und „Arcade“</b><span>Eigene Werke, alle Rechte vorbehalten, nur zur Nutzung in dieser App</span></li>
-            <li><b>Avatare, Zug-Symbole und App-Icon</b><span>Für dieses Projekt entstanden, GPL-3.0</span></li>
+            <li><b>Stockfish 19</b><span>${E('info.stockfish', { link: '<a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a>' })}</span></li>
+            <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span></li>
+            <li><b>${E('info.figuren')}</b><span>${E('info.figurenText')}</span></li>
+            <li><b>${E('info.schriften')}</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
+            <li><b>${E('info.tagesraetsel')}</b><span>${E('info.tagesraetselText')}</span></li>
+            <li><b>${E('info.klaenge')}</b><span>${E('info.klaengeText')}</span></li>
+            <li><b>${E('info.bilder')}</b><span>${E('info.bilderText')}</span></li>
           </ul>
         </section>
        </div>
@@ -191,7 +206,7 @@ export function zeige(root, params = {}, app) {
     for (const b of sec.querySelectorAll('.es-brett')) b.setAttribute('aria-checked', b.dataset.wert === (e.brett || 'nacht') ? 'true' : 'false');
     for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', String(b.dataset.wert) === String(e[b.dataset.key]) ? 'true' : 'false');
     const regler = sec.querySelector('[data-key="lautstaerke"]');
-    if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = `${Math.round(regler.value * 100)} %`; }
+    if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = E('prozent', { wert: Math.round(regler.value * 100) }); }
   }
 
   function zeigeReset() {
@@ -199,31 +214,32 @@ export function zeige(root, params = {}, app) {
     if (!box) return;
     if (resetStufe === 0) {
       const s = statistik();
+      const sterne = gesamtSterne();
       box.innerHTML = `
-        <p class="es-hilfe">Löscht alle Sterne, Freischaltungen, Partien, Analysen und die Schatzkiste. Die Einstellungen bleiben.
-          Im Moment: <b class="zahl">${s.partien}</b> ${s.partien === 1 ? 'Partie' : 'Partien'}, <b class="zahl">${gesamtSterne()}</b> Sterne.</p>
-        <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} Fortschritt zurücksetzen</button>`;
+        <p class="es-hilfe">${E('reset.hilfe')}
+          ${E('reset.stand', { partien: E('reset.partien', { n: s.partien, zahl: `<b class="zahl">${s.partien}</b>` }), sterne: E('reset.sterne', { n: sterne, zahl: `<b class="zahl">${sterne}</b>` }) })}</p>
+        <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button>`;
     } else if (resetStufe === 1) {
       box.innerHTML = `
-        <div class="es-warnung" role="alert">${icon('warnung')}<p><b>Wirklich alles zurücksetzen?</b> Alle Sterne, Partien und Analysen sind dann weg, und die Leiter beginnt wieder bei Bauer Benno.</p></div>
+        <div class="es-warnung" role="alert">${icon('warnung')}<p><b>${E('reset.frage1')}</b> ${E('reset.text1', { bot: esc(ersterGegner()) })}</p></div>
         <div class="es-knoepfe">
-          <button class="knopf" type="button" data-aktion="reset-ab">Abbrechen</button>
-          <button class="knopf es-rot-rand" type="button" data-aktion="reset-2">Ja, weiter</button>
+          <button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button>
+          <button class="knopf es-rot-rand" type="button" data-aktion="reset-2">${E('reset.weiter')}</button>
         </div>`;
       box.querySelector('[data-aktion="reset-ab"]').focus();
     } else {
       box.innerHTML = `
-        <div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>Letzte Rückfrage.</b> Das lässt sich nicht rückgängig machen.</p></div>
+        <div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E('reset.frage2')}</b> ${E('reset.text2')}</p></div>
         <div class="es-knoepfe">
-          <button class="knopf" type="button" data-aktion="reset-ab">Abbrechen</button>
-          <button class="knopf es-rot" type="button" data-aktion="reset-ok">${icon('muell')} Endgültig löschen</button>
+          <button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button>
+          <button class="knopf es-rot" type="button" data-aktion="reset-ok">${icon('muell')} ${E('reset.endgueltig')}</button>
         </div>`;
       box.querySelector('[data-aktion="reset-ab"]').focus();
     }
   }
 
   function setze(teil) {
-    try { app.setzeEinstellungen(teil); } catch (e) { try { app.meldung('Speichern hat nicht geklappt', { art: 'fehler' }); } catch (f) { /* egal */ } }
+    try { app.setzeEinstellungen(teil); } catch (e) { try { app.meldung(E('speichernFehler'), { art: 'fehler' }); } catch (f) { /* egal */ } }
     zeigeStand();
   }
 
@@ -245,7 +261,11 @@ export function zeige(root, params = {}, app) {
       case 'probe': probeton(); break;
       case 'brett': setze({ brett: k.dataset.wert }); break;
       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
-      case 'wahl': setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert }); break;
+      case 'wahl':
+        setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert });
+        // neue Sprache: alles neu zeichnen (die Screens lesen ihre Texte beim Zeichnen)
+        if (k.dataset.key === 'sprache' && k.dataset.wert !== sprache()) setTimeout(() => location.reload(), 60);
+        break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
       case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
@@ -257,7 +277,7 @@ export function zeige(root, params = {}, app) {
         if (ortGruppen) ortGruppen.verlasse();
         ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
         zeigeReset();
-        try { app.meldung('Fortschritt zurückgesetzt. Bauer Benno wartet schon!'); } catch (f) { /* egal */ }
+        try { app.meldung(E('reset.fertig', { bot: ersterGegner() })); } catch (f) { /* egal */ }
         break;
       default: break;
     }
@@ -266,7 +286,7 @@ export function zeige(root, params = {}, app) {
   lausche(sec, 'input', (e) => {
     const regler = e.target.closest('input[type="range"][data-key]');
     if (!regler) return;
-    regler.previousElementSibling.querySelector('output').value = `${Math.round(Number(regler.value) * 100)} %`;
+    regler.previousElementSibling.querySelector('output').value = E('prozent', { wert: Math.round(Number(regler.value) * 100) });
     setze({ [regler.dataset.key]: Number(regler.value) });
   });
 

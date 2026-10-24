@@ -8,6 +8,8 @@ import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
+import { t, locale } from './sprache.js';
+import './sprachen/einstellungen.js';
 
 export const SITZUNG_SCHLUESSEL = 'schach-arena:konto:sitzung';
 export const SICHTBAR_SCHLUESSEL = 'schach-arena:konto:sichtbar';
@@ -15,6 +17,7 @@ export const RUECKFALL_SCHLUESSEL = 'schach-arena:konto:rueckfall';
 const NAME = /^[A-Za-z0-9_]{3,20}$/;
 let fetchFn = (...a) => fetch(...a);
 let timer = null;
+function K(k, w) { return t('einstellungen.konto.' + k, w); }
 
 function lager() { return globalThis.localStorage; }
 function jsonLies(k) { try { return JSON.parse(lager().getItem(k)); } catch (e) { return null; } }
@@ -23,7 +26,7 @@ export function setzeKontoFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 
 function fehlerText(d, status) {
-  const e = new Error(d?.msg || d?.message || d?.error_description || `Serverfehler (${status})`);
+  const e = new Error(d?.msg || d?.message || d?.error_description || K('serverfehler', { status }));
   e.status = status; e.code = d?.code; return e;
 }
 async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
@@ -33,7 +36,7 @@ async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
   if (prefer) kopf.Prefer = prefer;
   let r;
   try { r = await fetchFn(SUPABASE_URL + pfad, { method: methode, headers: kopf, body: daten === undefined ? undefined : JSON.stringify(daten) }); }
-  catch (e) { throw new Error('Keine Verbindung. Die App funktioniert weiter offline.'); }
+  catch (e) { throw new Error(K('offline')); }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leere Antwort */ } }
   if (!r.ok) throw fehlerText(d, r.status);
@@ -42,7 +45,7 @@ async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
 
 export async function fordereCodeAn(email) {
   email = String(email || '').trim();
-  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error('Bitte eine gültige E-Mail-Adresse eingeben.');
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error(K('emailUngueltig'));
   await anfrage('/auth/v1/otp', { methode: 'POST', daten: { email, create_user: true } });
   return true;
 }
@@ -54,20 +57,20 @@ function merkeSitzung(d, email) {
   const s = { access_token: d.access_token, refresh_token: d.refresh_token,
     expires_at: Number(d.expires_at) || Math.floor(Date.now() / 1000) + Number(d.expires_in || 3600),
     user: d.user || undefined, email: d.user?.email || email };
-  if (!s.access_token || !s.refresh_token || !userId(s)) throw new Error('Die Sitzung vom Server ist unvollständig.');
+  if (!s.access_token || !s.refresh_token || !userId(s)) throw new Error(K('sitzungUnvollstaendig'));
   jsonSchreib(SITZUNG_SCHLUESSEL, s); return s;
 }
 export async function pruefeCode(email, token) {
   token = String(token || '').replace(/\D/g, '');
-  if (token.length !== 6) throw new Error('Der Code muss aus 6 Ziffern bestehen.');
+  if (token.length !== 6) throw new Error(K('codeZiffern'));
   return merkeSitzung(await anfrage('/auth/v1/verify', { methode: 'POST', daten: { type: 'email', email: String(email).trim(), token } }), email);
 }
 export async function erneuereSitzung() {
-  const s = sitzung(); if (!s?.refresh_token) throw new Error('Nicht angemeldet.');
+  const s = sitzung(); if (!s?.refresh_token) throw new Error(K('nichtAngemeldet'));
   return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
 }
 export async function aktiveSitzung() {
-  const s = sitzung(); if (!s) throw new Error('Nicht angemeldet.');
+  const s = sitzung(); if (!s) throw new Error(K('nichtAngemeldet'));
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
 export async function abmelden() {
@@ -125,7 +128,7 @@ export async function ladeProfil() {
   return Array.isArray(d) ? (d[0] || null) : d;
 }
 export async function speichereCloudStand() {
-  const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error('Die Sitzung enthält keine Benutzer-ID.');
+  const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error(K('keineId'));
   // nur Familie und System ("iPadOS Safari"), nie der volle User-Agent-String (Datensparsamkeit)
   const daten = { user_id: id, stand: cloudStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
   await anfrage('/rest/v1/spielstaende', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
@@ -133,13 +136,13 @@ export async function speichereCloudStand() {
 }
 export async function speichereBenutzername(benutzername) {
   benutzername = String(benutzername || '').trim();
-  if (!NAME.test(benutzername)) throw new Error('Der Benutzername braucht 3 bis 20 Zeichen: Buchstaben, Zahlen oder _.');
+  if (!NAME.test(benutzername)) throw new Error(K('nameRegel'));
   const s = await aktiveSitzung();
   try {
     await anfrage('/rest/v1/profile', { methode: 'POST', token: s.access_token,
       daten: { user_id: userId(s), benutzername }, prefer: 'resolution=merge-duplicates' });
   } catch (e) {
-    if (e.status === 409 || e.code === '23505') throw new Error('Dieser Benutzername ist schon vergeben.');
+    if (e.status === 409 || e.code === '23505') throw new Error(K('nameVergeben'));
     throw e;
   }
   return benutzername;
@@ -149,9 +152,9 @@ function gueltigerStand(stand) {
     && Object.entries(stand).every(([k, v]) => k.startsWith('schach-arena:v1:') && typeof v === 'string');
 }
 export function ladeStandAufGeraet(cloud) {
-  if (!cloud || cloud.format_version !== SPEICHER_VERSION || !gueltigerStand(cloud.stand)) throw new Error('Der Cloud-Spielstand hat ein unbekanntes Format.');
+  if (!cloud || cloud.format_version !== SPEICHER_VERSION || !gueltigerStand(cloud.stand)) throw new Error(K('cloudFormat'));
   const vorher = lokalerStand();
-  if (!jsonSchreib(RUECKFALL_SCHLUESSEL, { datum: new Date().toISOString(), stand: vorher })) throw new Error('Die Rückfall-Sicherung konnte nicht gespeichert werden.');
+  if (!jsonSchreib(RUECKFALL_SCHLUESSEL, { datum: new Date().toISOString(), stand: vorher })) throw new Error(K('rueckfallFehler'));
   const roh = rohSpeicher();
   try {
     for (const k of roh.schluessel()) roh.entferne(k);
@@ -159,7 +162,7 @@ export function ladeStandAufGeraet(cloud) {
   } catch (e) {
     for (const k of roh.schluessel()) roh.entferne(k);
     for (const [k, v] of Object.entries(vorher)) roh.schreib(k, v);
-    throw new Error('Cloud-Spielstand konnte nicht geladen werden. Der bisherige Stand bleibt erhalten.');
+    throw new Error(K('cloudLadenFehler'));
   }
   return true;
 }
@@ -232,24 +235,24 @@ export function kontoGruppe({ app } = {}) {
   const render = () => {
     const s = sitzung();
     gezeichnetMit = !!s;
-    el.innerHTML = `<h3 class="es-titel">Konto</h3>${s ? `<p>Angemeldet als <b>${escapeHtml(s.email || email)}</b></p>
-      <label>Benutzername <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">Jetzt sichern</button><button class="knopf" data-konto="abmelden">Abmelden</button></div>` : `<label>E-Mail <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
-      <button class="knopf primaer" data-konto="code">Code senden</button><div class="konto-code" hidden><fieldset><legend>6-stelliger Code</legend><div class="konto-ziffern">
-      ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="Ziffer ${i + 1}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">Anmelden</button></div>
-      <p class="es-hilfe konto-oder">oder</p><button class="knopf konto-google" type="button" data-konto="google">Mit Google anmelden</button>`}
-      <p class="konto-status" aria-live="polite">${zuletzt ? `Zuletzt gesichert: ${zuletzt}` : 'Noch nicht mit der Cloud abgeglichen.'}</p>
-      <p class="es-hilfe">Gespeichert werden E-Mail, Benutzername, Spielstand und der Browser-Typ des Geräts, bei Anmeldung mit Google auch Name und Profilbild-Adresse aus dem Google-Konto. Der Server steht in Frankfurt.${s ? ' Deine Daten herunterladen oder das Konto löschen kannst du unter „Daten“.' : ''}</p>`;
+    el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
+      <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
+      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
+      ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
+      <p class="es-hilfe konto-oder">${K('oder')}</p><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`}
+      <p class="konto-status" aria-live="polite">${zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
+      <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
   };
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
-      if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden('Code gesendet. Bitte E-Mail prüfen.'); }
+      if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet')); }
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }
-      if (a === 'sichern') { const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name); const d = await speichereCloudStand(); zuletzt = d.toLocaleString('de-DE'); render(); }
+      if (a === 'sichern') { const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name); const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render(); }
       if (a === 'abmelden') { await abmelden(); render(); }
-      if (a === 'google') { melden('Weiter zu Google …'); meldeMitGoogleAn(); }
-    } catch (f) { melden(f.message || 'Das hat nicht geklappt.', true); }
+      if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
+    } catch (f) { melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
   el.addEventListener('input', (e) => {
     const z = e.target.closest('.konto-ziffern input'); if (!z) return;
@@ -264,13 +267,15 @@ export function kontoGruppe({ app } = {}) {
   });
   async function konfliktDialog(k) {
     const c = k.cloud, g = k.geraet;
-    const w = await app?.frage?.({ titel: 'Welchen Spielstand behalten?', text: `Gerät: ${g.partien} Partien, Level ${g.level}. Cloud: ${c.partien} Partien, Level ${c.level}${c.datum ? ` vom ${new Date(c.datum).toLocaleString('de-DE')}` : ''}.`, knoepfe: [{ text: 'Gerät behalten und hochladen', wert: 'geraet', art: 'primaer' }, { text: 'Cloud laden', wert: 'cloud' }], abbrechen: true });
-    if (w) { await gleicheNachAnmeldung(w); melden(w === 'cloud' ? 'Cloud-Spielstand geladen.' : 'Gerätestand hochgeladen.'); }
+    const zahlen = { gp: g.partien, gl: g.level, cp: c.partien, cl: c.level };
+    const text = c.datum ? K('konfliktTextDatum', { ...zahlen, datum: new Date(c.datum).toLocaleString(locale()) }) : K('konfliktText', zahlen);
+    const w = await app?.frage?.({ titel: K('konfliktTitel'), text, knoepfe: [{ text: K('geraetBehalten'), wert: 'geraet', art: 'primaer' }, { text: K('cloudLaden'), wert: 'cloud' }], abbrechen: true });
+    if (w) { await gleicheNachAnmeldung(w); melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); }
   }
   render();
   if (abgleichOffen && sitzung()) {
     abgleichOffen = false;
-    gleicheNachAnmeldung().then((abgleich) => { render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }).catch((f) => melden(f.message || 'Das hat nicht geklappt.', true));
+    gleicheNachAnmeldung().then((abgleich) => { render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true));
   }
   // Abmelden von aussen (Konto loeschen in der Gruppe "Daten"): neu zeichnen
   const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) render(); }, 1000);
