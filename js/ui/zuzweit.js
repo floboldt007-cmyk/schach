@@ -3,7 +3,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { anim } from '../bewegung.js';
 import { klang } from '../sounds.js';
-import { sanDeutsch } from '../review.js';
+import { sanAnzeige } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
   pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
@@ -31,12 +31,9 @@ function farbwort(farbe) {
 function anzeigeName(n) {
   return n === 'Weiß' ? t('allgemein.weiss') : n === 'Schwarz' ? t('allgemein.schwarz') : n;
 }
-// Zugliste: Deutsch wie bisher (sanDeutsch: K D T L S), Englisch die SAN von chess.js (K Q R B N), Rochade mit Nullen
-// wie in der Analyse. Bereich d bringt dafuer sanAnzeige in review.js; nach dem Zusammenfuehren kann zuzweit.js die nehmen.
-function sanText(san) {
-  if (sprache() === 'de') return sanDeutsch(san);
-  return String(san ?? '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
-}
+// Zugliste: in der eingestellten Sprache wie in Partie und Analyse (review.sanAnzeige: Deutsch K D T L S, Englisch
+// K Q R B N, Rochade mit Nullen)
+const sanText = (san) => sanAnzeige(san);
 
 function stil() {
   if (document.querySelector('link[data-zuzweit]')) return;

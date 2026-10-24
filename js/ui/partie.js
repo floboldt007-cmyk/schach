@@ -121,9 +121,9 @@ import { Brett, zielKarte, symbolSvg } from '../board.js';
 import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
-  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
+  bewerteZug, analysierePartie, klassifiziere, gewinnChance, sanDeutsch, sanAnzeige, materialBilanz, seitenGenauigkeit, warKnapp, coachKern,
 } from '../review.js';
-import { eroeffnung, stellungsSchluessel } from '../openings.js';
+import { eroeffnung, stellungsSchluessel, eroeffnungsAnzeige } from '../openings.js';
 import { klang, klassenKlang } from '../sounds.js';
 import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
@@ -369,7 +369,7 @@ export function zeige(root, params, app) {
   const farbeVon = (i) => (i % 2 === 0 ? startFarbe : (startFarbe === 'w' ? 'b' : 'w'));
   const istFlo = (i) => farbeVon(i) === farbe;
   const nummerVon = (i) => startNummer + Math.floor((i + (startFarbe === 'b' ? 1 : 0)) / 2);
-  const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanDeutsch(z.san[i])}`;
+  const zugLabel = (i) => `${nummerVon(i)}${farbeVon(i) === 'w' ? '.' : '…'} ${sanAnzeige(z.san[i])}`;
   const letzterFloPly = () => { for (let i = z.zuege.length - 1; i >= 0; i--) if (istFlo(i)) return i; return -1; };
   // w0plus-a-fix: Flos Gewinnchance nach seinem vorigen eigenen Zug (vor dem letzten Bot-Zug), null ohne Bewertung
   const gewinnNachVorigemZug = (ply) => {
@@ -592,7 +592,7 @@ export function zeige(root, params, app) {
     else if (z.modus === 'uebung') name = t('partie.kopf.uebungAb', { nr: startNummer });
     else if (!startFen) {
       const er = eroeffnung(z.san);
-      name = er.name || t(z.san.length ? 'partie.kopf.eroeffnung' : 'partie.kopf.grundstellung');
+      name = eroeffnungsAnzeige(er.name) || t(z.san.length ? 'partie.kopf.eroeffnung' : 'partie.kopf.grundstellung');
     }
     $('.p-eroeffnung').textContent = name;
   }
@@ -629,7 +629,7 @@ export function zeige(root, params, app) {
         if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
-      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanDeutsch(z.san[i]))}</span>`;
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
     };
     const zeilen = new Map();
     for (let i = 0; i < z.zuege.length; i++) {
@@ -855,7 +855,7 @@ export function zeige(root, params, app) {
     const combo = serie >= 3 ? `<span class="combo" data-stufe="${serienStufe(serie)}">${icon('blitz')}COMBO ×${serie}</span>` : '';
     if (k === 'buch') {
       coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span><div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_NAME.buch)}</span><span class="c-zug">${esc(zugLabel(ply))}</span>
-        <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' && erg.notiz !== t('partie.coach.theorie') ? erg.notiz : (eroeffnung(z.san.slice(0, ply + 1)).name || t('partie.coach.theorie')))}</span></div>
+        <span class="c-buch">${esc(erg.notiz && erg.notiz !== 'Eröffnungstheorie' && erg.notiz !== t('partie.coach.theorie') ? eroeffnungsAnzeige(erg.notiz) : (eroeffnungsAnzeige(eroeffnung(z.san.slice(0, ply + 1)).name) || t('partie.coach.theorie')))}</span></div>
         <p class="c-text">${coachText(t('partie.coach.buchText'))}</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
       coachEl.style.setProperty('--kf', `var(--k-${k})`);
@@ -1816,7 +1816,7 @@ export function zeige(root, params, app) {
     }
     if (best < 0) return null;
     const k = z.liveKlassen[best];
-    return { ply: best, klasse: k, text: t('partie.erg.lichtblickZug', { nr: nummerVon(best), zug: sanDeutsch(z.san[best]), klasse: KLASSEN_NAME[k] || k }) };
+    return { ply: best, klasse: k, text: t('partie.erg.lichtblickZug', { nr: nummerVon(best), zug: sanAnzeige(z.san[best]), klasse: KLASSEN_NAME[k] || k }) };
   }
 
   // Chip nicht wertender Partien: je Modus, gegen angemeldete Bots im Modus normal "GAST" (w0plus-a-fix)

@@ -179,7 +179,10 @@ async function sichtbarerText(seite, sel = '#app') {
       for (const a of ['aria-label', 'title', 'placeholder', 'alt']) if (el.getAttribute(a)) teile.push(el.getAttribute(a));
     }
     let text = teile.join(' | ');
-    for (const n of ['Crownmate', 'Stockfish', ...namen]) text = text.split(n).join(' ');
+    // nur ganze Woerter entfernen (sonst wird aus "Königsbauernspiel" mit dem Rufnamen "König" ein harmloses "sbauernspiel")
+    for (const n of ['Crownmate', 'Stockfish', ...namen]) {
+      text = text.replace(new RegExp(`(?<![\\p{L}])${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}])`, 'gu'), ' ');
+    }
     return text;
   }, sel);
 }

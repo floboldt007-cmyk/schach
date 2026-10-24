@@ -2434,7 +2434,7 @@ const EN = {
     },
   },
   koenig: {
-    name: 'Inspector King', rufname: 'King', titel: 'The Endgame Detective',
+    name: 'Inspector King', rufname: 'Inspector', titel: 'The Endgame Detective',
     kurz: 'Endgame specialist, never gives up.',
     bio: 'Inspector King has solved every case, usually in the endgame. He likes to trade pieces, gathers evidence in the form of small advantages and plays every position down to the last pawn. Resigning is not in his rule book.',
     saetze: {
