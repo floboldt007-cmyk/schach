@@ -28,6 +28,10 @@ export const zahlText = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE'
 const BESITZ = {
   benno: 'Bennos', hilde: 'Hildes', kalle: 'Kalles', lisa: 'Lisas', rudi: 'Rudis', turm: 'Professor Turms', delia: 'Delias',
   koenig: 'Kommissar Königs', greta: 'Gretas', stockfisch: 'Stockfischs',
+  // Welten (24.10.): die neuen Bots
+  fridolin: 'Fridolins', paula: 'Paulas', gustav: 'Gustavs', janine: 'Janines', bodo: 'Bodos', leo: 'Leos', edda: 'Eddas',
+  luke: 'Lukes', moritz: 'Moritz’', ottilie: 'Ottilies', lasse: 'Lasses', wiebke: 'Wiebkes', henning: 'Hennings', ilka: 'Ilkas',
+  johann: 'Johanns', keetan: 'Keetans', ragna: 'Ragnas', silas: 'Silas’', merle: 'Merles', alva: 'Alvas',
 };
 const STUFE_NAME = { standard: 'Standard', meister: 'Meister' };
 

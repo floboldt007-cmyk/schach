@@ -182,7 +182,7 @@ const RUFNAME = Object.freeze({
   benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm', delia: 'Delia',
   koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch',
 });
-const rufnameVon = (b) => RUFNAME[b && b.id] || (b && b.name) || '';
+const rufnameVon = (b) => RUFNAME[b && b.id] || (b && (b.rufname || b.name)) || '';
 // U7: Brettwahl im Kopf (Feldfarben wie tokens.css, fest wie die Brettfarben selbst)
 const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen', 'Grün', '#eeeed2', '#769656'], ['holz', 'Holz', '#f0d9b5', '#b58863']]);
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
@@ -386,7 +386,7 @@ export function zeige(root, params, app) {
     return bot.name;
   }
   // U7: auf dem Handy der Rufname im Kopf (PLAN 2.5 Regel 5), nur fuer Bots mit Rufname und nicht im Boss-Kopf
-  const kopfKurz = () => (z.modus !== 'boss' && RUFNAME[bot.id] ? RUFNAME[bot.id] : kopfTitel());
+  const kopfKurz = () => (z.modus !== 'boss' && (RUFNAME[bot.id] || (bot.stufe != null && bot.rufname)) ? RUFNAME[bot.id] || bot.rufname : kopfTitel());
   function botMeta() {
     if (bot.stufe) return `Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];

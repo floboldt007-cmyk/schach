@@ -362,22 +362,48 @@ export function besiegteBots(f = ladeFortschritt()) {
   return BOTS.filter((b) => f.bots[b.id] && f.bots[b.id].sterne[0]).length;
 }
 
-// Stufe 1 ist immer frei, jede weitere, sobald die Stufe davor besiegt ist.
-export function istFreigeschaltet(stufe, f = ladeFortschritt()) {
-  if (stufe <= 1) return true;
-  const vorher = BOTS.find((b) => b.stufe === stufe - 1);
-  return !!(vorher && f.bots[vorher.id] && f.bots[vorher.id].sterne[0]);
-}
-
-export function hoechsteFreieStufe(f = ladeFortschritt()) {
-  let s = 1;
-  for (const b of [...BOTS].sort((a, c) => a.stufe - c.stufe)) if (istFreigeschaltet(b.stufe, f)) s = Math.max(s, b.stufe);
+// Welten (Flo, 23.10.): frei ist Stufe 1 und jede Stufe bis eine ueber dem hoechsten Sieg. Wer frueher Greta besiegt
+// hat, behaelt damit alles darunter, auch neu eingezogene Bots (niemand wird zu Fridolin zurueckgeschickt). Dazu ist
+// der Endgegner jeder Welt frei, deren erste Stufe frei ist (direkt herausfordern, freiwillig): sein Sieg oeffnet die
+// ganze Welt und die naechste. Welten schliessen sich nie wieder.
+export function hoechsterSieg(f = ladeFortschritt()) {
+  let s = 0;
+  for (const b of BOTS) if (f.bots[b.id] && f.bots[b.id].sterne[0]) s = Math.max(s, b.stufe);
   return s;
 }
 
-// Naechster Gegner: die niedrigste freie Stufe, die noch nicht besiegt ist (sonst die hoechste)
+export function istFreigeschaltet(stufe, f = ladeFortschritt()) {
+  if (stufe <= 1) return true;
+  const grenze = hoechsterSieg(f) + 1;
+  if (stufe <= grenze) return true;
+  const b = BOTS.find((x) => x.stufe === stufe);
+  if (!b || !b.endgegner) return false;
+  const erste = Math.min(...BOTS.filter((x) => x.welt === b.welt).map((x) => x.stufe));
+  return erste <= grenze;
+}
+
+// Welt frei = ihre erste Stufe frei; Weltsiegel = alle Sterne ihrer Bots
+export function istWeltFrei(nr, f = ladeFortschritt()) {
+  const stufen = BOTS.filter((x) => x.welt === nr).map((x) => x.stufe);
+  return stufen.length > 0 && istFreigeschaltet(Math.min(...stufen), f);
+}
+export function hatWeltsiegel(nr, f = ladeFortschritt()) {
+  const bots = BOTS.filter((x) => x.welt === nr);
+  return bots.length > 0 && bots.every((x) => f.bots[x.id] && f.bots[x.id].sterne.every(Boolean));
+}
+
+// Hoechste Stufe auf dem normalen Weg (ohne die direkt herausforderbaren Endgegner): Massstab fuer Empfehlungen
+export function hoechsteFreieStufe(f = ladeFortschritt()) {
+  const max = Math.max(1, ...BOTS.map((b) => b.stufe));
+  return Math.min(max, hoechsterSieg(f) + 1);
+}
+
+// Naechster Gegner: der Bot direkt ueber dem hoechsten Sieg (Welten: nie zurueck zu neu eingezogenen Bots darunter).
+// Ist der Endgegner der letzten Welt besiegt: die niedrigste noch nicht besiegte Stufe, sonst die hoechste.
 export function naechsterGegner(f = ladeFortschritt()) {
   const sortiert = [...BOTS].sort((a, c) => a.stufe - c.stufe);
+  const ueber = sortiert.find((b) => b.stufe === hoechsterSieg(f) + 1);
+  if (ueber) return ueber;
   for (const b of sortiert) if (istFreigeschaltet(b.stufe, f) && !f.bots[b.id].sterne[0]) return b;
   return sortiert[sortiert.length - 1];
 }
@@ -602,7 +628,10 @@ function bucheFortschritt(p, review, ergebnis) {
     });
     const jetztFrei = BOTS.filter((x) => istFreigeschaltet(x.stufe, f)).map((x) => x.id);
     const neuFrei = jetztFrei.filter((id) => !vorherFrei.includes(id));
-    if (neuFrei.length) ergebnis.neuFreigeschaltet = BOTS.find((x) => x.id === neuFrei[0]) || null;
+    // Welten: oeffnet ein Sieg mehrere Stufen (Endgegner direkt besiegt), zeigt die Arena den neuen naechsten Gegner
+    const naechster = naechsterGegner(f);
+    const neuId = neuFrei.includes(naechster.id) ? naechster.id : neuFrei[0];
+    if (neuFrei.length) ergebnis.neuFreigeschaltet = BOTS.find((x) => x.id === neuId) || null;
   }
   ergebnis.brillant = sammleBrillante(f, p, review);
   speichereFortschritt(f);

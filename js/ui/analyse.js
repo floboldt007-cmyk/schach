@@ -242,7 +242,7 @@ export function zeige(root, params = {}, app) {
     if (zuzweit()) unter.textContent = `${personenName('w')} gegen ${personenName('b')}`;
     else {
       unter.textContent = 'Du gegen ';
-      unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? (KURZ[st.bot.id] || name) : name));
+      unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? (KURZ[st.bot.id] || st.bot.rufname || name) : name));
     }
     if (info.stand) unter.append(' · ' + info.stand);
     if (info.grund) {
@@ -457,7 +457,7 @@ export function zeige(root, params = {}, app) {
     const staerkeBot = r.spielstaerke ? r.spielstaerke[st.bf] : null;
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
-    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
+    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
     // gezeigt wird die Genauigkeit der Partie (auf ihr beruht Stern 2; eine spaetere Neuberechnung ersetzt
     // sie nicht, storage.ergaenzeAnalyse), sonst die der Review
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
@@ -557,7 +557,7 @@ export function zeige(root, params = {}, app) {
     const r = st.review;
     const du = (r.anzahl && r.anzahl[st.sf]) || {};
     const gegner = (r.anzahl && r.anzahl[st.bf]) || {};
-    const kurz = zuzweit() ? personenName(st.bf) : st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
+    const kurz = zuzweit() ? personenName(st.bf) : st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
     const zeile = (k) => {
       const a = du[k] || 0;
       const b = gegner[k] || 0;
@@ -743,7 +743,7 @@ export function zeige(root, params = {}, app) {
       return;
     }
     const du = z.farbe === st.sf;
-    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.name) : 'Bot';
+    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
     el.dataset.klasse = z.klasse;
     el.style.setProperty('--kf', `var(--k-${z.klasse})`);
     if (z.klasse === 'brillant') el.classList.add('brillant');
