@@ -20,7 +20,8 @@
 //          partie:spieler-leiste 20 (Level-Emblem), spielplan:tage 20 (Funken-Wochenende), partie:begruessung? 40
 //          (der Bot gruesst einmal das neue Level). Funkenlinie: buehne.platz('funkenlinie'), nur mit Anzeige an.
 // Feier:   level (Zeile 55) bei jedem Aufstieg, level-titel (gross 75) bei jedem neuen Titel, Klang "level".
-// Register: Icon "funke", Saetze "funken-level" fuer die 10 Leiter-Bots.
+// Register: Icon "funke", Saetze "funken-level" fuer die 10 Leiter-Bots (angemeldet beim ersten Gruss, in der Sprache der
+//          App; Texte in texte.js).
 // Testmodus (?test): window.__funken = { stand(), speichere(st), plan(), setzePlan(p), S, R, L }.
 import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
@@ -31,12 +32,16 @@ import { ladePartien, wertet, eigeneZuege as eigeneZuegeVon } from '../../storag
 import { ladeSpielplan, funkenWochenendeAktiv, spielplanWoche } from '../../inhalte.js';
 import { wochenSchluessel, wochentag, istSchluessel } from '../../tag.js';
 import { klang } from '../../sounds.js';
+import { t, sprache } from '../../sprache.js';
+import { GRUSS_BOTS } from './texte.js';
 import * as S from './stand.js';
 import * as R from './rechnung.js';
 import * as L from './level.js';
 import * as A from './ansicht.js';
 
 const PAKET = 'funken';
+// Texte aus dem Woerterbuch (texte.js), erst beim Erzeugen eines Textes
+const tx = (k, w) => t('p-funken.' + k, w);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '');
 const jetzt = () => new Date();
 
@@ -68,12 +73,12 @@ const ladeStand = (t = jetzt()) => S.lade(t, { plan });
 // ---------- Hilfen ----------
 function botNameVon(id) {
   const b = typeof id === 'string' ? botNachId(id) : null;
-  return b && b.name ? b.name : 'den Bot';
+  return b && b.name ? b.name : tx('denBot');
 }
 // in Listen (Verlauf, Spiegel): unbekannte Gegner (z. B. ein Boss, dessen Paket fehlt) heissen neutral "Gegner"
 function listenName(id) {
   const b = typeof id === 'string' ? botNachId(id) : null;
-  return b && b.name ? b.name : 'Gegner';
+  return b && b.name ? b.name : tx('gegner');
 }
 function eloVon(p) {
   const b = p && botNachId(p.botId);
@@ -171,16 +176,19 @@ function koennen(st) {
 
 function feiern(auf, satz, partieId) {
   const stuecke = auf.neu.filter((s) => s.art !== 'titel');
+  const liste = stuecke.slice(0, 2).map(A.stueckName).join(' · ');
   const neuText = stuecke.length
-    ? 'Neu: ' + stuecke.slice(0, 2).map((s) => s.name).join(' · ') + (stuecke.length > 2 ? ` und ${stuecke.length - 2} mehr` : '')
+    ? (stuecke.length > 2 ? tx('feier.neuMehr', { liste, n: stuecke.length - 2 }) : tx('feier.neu', { liste }))
     : '';
+  // der Koennen-Satz ist deutsch gespeichert: in der Sprache der App zeigen
+  const satzText = satz ? A.satzText(satz.text) : null;
   if (auf.titel) {
-    melde({ partieId, quelle: 'level-titel', titel: `LEVEL ${auf.nachher} · ${L.titelVon(auf.nachher)}`,
-      text: satz ? satz.text : (neuText || null), symbol: 'funke', klang: 'level' });
+    melde({ partieId, quelle: 'level-titel', titel: tx('feier.levelTitel', { level: auf.nachher, titel: A.titelName(auf.nachher) }),
+      text: satzText || (neuText || null), symbol: 'funke', klang: 'level' });
     if (neuText) melde({ partieId, quelle: 'level', titel: neuText, symbol: 'funke' });
   } else {
-    melde({ partieId, quelle: 'level', titel: `Level ${auf.nachher}${neuText ? ' · ' + neuText : ''}`,
-      text: satz ? satz.text : null, symbol: 'funke', klang: 'level' });
+    melde({ partieId, quelle: 'level', titel: tx('level', { level: auf.nachher }) + (neuText ? ' · ' + neuText : ''),
+      text: satzText, symbol: 'funke', klang: 'level' });
   }
 }
 
@@ -287,7 +295,7 @@ function lernEreignis(fn, d, { partieId = null } = {}) {
 // ---------- Oberflaeche ----------
 function zeigeSpiegel() {
   const st = ladeStand();
-  A.oeffneSpiegel(A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() }), { titel: 'Funken-Spiegel' });
+  A.oeffneSpiegel(A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() }), { titel: tx('spiegel.titel') });
 }
 
 const gezeigt = new Set();   // Partien, deren Abrechnungszeile schon gelaufen ist (der Nachtrag rollt nicht neu)
@@ -345,7 +353,7 @@ function anbieterSpielplan(k) {
   const z = document.createElement('p');
   z.className = 'fk-spielplan';
   z.dataset.paket = PAKET;
-  z.textContent = 'Funken-Wochenende ab Freitag 16 Uhr: Partien und Lernen zählen doppelt. Wer nicht spielt, bekommt am Montag eine Rückenwind-Karte.';
+  z.textContent = tx('spielplan');
   return z;
 }
 
@@ -359,23 +367,20 @@ function cssLaden() {
   document.head.append(l);
 }
 
-const GRUSS = {
-  benno: ['Ein neues Level? Donnerwetter, dann zieh ich die Gummistiefel lieber wieder an.'],
-  hilde: ['Du bist ja ein Level weiter! Dafür gibt es nachher ein extra Stück Kuchen.'],
-  kalle: ['Ein Level hoch, Kollege? Dann geb ich heute noch mehr Gas!'],
-  lisa: ['Level hoch? Stark! Dann wird mein Training heute richtig anstrengend.'],
-  rudi: ['Fürwahr, Ihr seid aufgestiegen! Mein Ross scharrt schon unruhig mit den Hufen.'],
-  turm: ['Ein neues Level. Ausgezeichnet, dann heben wir das Niveau der Vorlesung an.'],
-  delia: ['Ein Level höher, Schätzchen? Dann gibt es heute das große Feuerwerk.'],
-  koenig: ['Neues Level, notiert. Der Fall wird interessanter.'],
-  greta: ['Ein neues Level. Gut. Dann wird es ja endlich spannend.'],
-  stockfisch: ['Blubb. Ein neues Level. Ich rechne trotzdem dreißig Züge voraus.'],
-};
+// Gruss zum neuen Level (Saetze 'funken-level', Texte 'gruss.<bot>' in texte.js). Angemeldet wird erst, wenn ein Gruss
+// gebraucht wird, in der Sprache, die dann gilt (nie beim Laden des Moduls); wechselt die Sprache, kommen die Saetze neu.
+let grussAbmelden = null;
+let grussSprache = null;
+function grussAnmelden() {
+  if (grussSprache === sprache()) return;
+  if (grussAbmelden) grussAbmelden();
+  grussAbmelden = registriereSaetze('funken-level', Object.fromEntries(GRUSS_BOTS.map((id) => [id, [tx('gruss.' + id)]])));
+  grussSprache = sprache();
+}
 
 function registriere() {
   cssLaden();
   registriereIcon('funke', '<path d="M12 3.2c.7 4.3 2.2 5.9 6.6 6.6-4.4.7-5.9 2.3-6.6 6.6-.7-4.3-2.2-5.9-6.6-6.6 4.4-.7 5.9-2.3 6.6-6.6z"/><path d="M18.6 15.6v4M16.6 17.6h4"/>');
-  registriereSaetze('funken-level', GRUSS);
 
   hoere('app:bereit', () => sicher(() => S.speichere(ladeStand()), 'app:bereit'));
   hoere('spielplan:geladen', () => sicher(planLaden, 'spielplan:geladen'));
@@ -453,8 +458,10 @@ function registriere() {
   anbieten('partie:spieler-leiste', () => sicher(() => A.spielerEmblem({ st: ladeStand() }), 'Spieler-Leiste'), { reihenfolge: 20, paket: PAKET });
   anbieten('spielplan:tage', (k) => sicher(() => anbieterSpielplan(k), 'Spielplan'), { reihenfolge: 20, paket: PAKET });
   anbieten('partie:begruessung?', (k) => sicher(() => {
-    if (!k || !k.bot || k.bot.stufe == null || !GRUSS[k.bot.id] || (k.modus && k.modus !== 'normal')) return null;
-    return ladeStand().gruss ? { anlass: 'funken-level' } : null;
+    if (!k || !k.bot || k.bot.stufe == null || !GRUSS_BOTS.includes(k.bot.id) || (k.modus && k.modus !== 'normal')) return null;
+    if (!ladeStand().gruss) return null;
+    grussAnmelden();
+    return { anlass: 'funken-level' };
   }, 'Begruessung'), { reihenfolge: 40, paket: PAKET });
 
   if (TEST && typeof window !== 'undefined') {

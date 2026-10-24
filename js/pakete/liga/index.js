@@ -6,8 +6,10 @@ import { melde } from '../../feier.js';
 import { BOTS, botNachId } from '../../bots.js';
 import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET } from '../../storage.js';
 import { registriereIcon } from '../../ui/icons.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 import {
-  normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, KLASSEN, STUFEN,
+  normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
 import { saisonKarte, verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
 
@@ -48,9 +50,9 @@ function feiere(r, partieId) {
     const klasse = a.art === 'klasse';
     melde({
       partieId, quelle: klasse ? 'klasse' : 'liga-saison',
-      titel: klasse ? `AUFSTIEG: ${KLASSEN[a.stufe]}` : `LIGA-AUFSTIEG: ${STUFEN[a.stufe].name}`,
-      text: klasse ? `${r.stand.wertung.n} wertende Partien · Wertung ≈ ${r.stand.wertung.wert}`
-        : `Saison ${r.stand.saison.nr} · ${r.stand.saison.punkte} Liga-Punkte`,
+      titel: klasse ? t('p-liga.feier.klasse', { klasse: t('p-liga.klasse.' + a.stufe) }) : t('p-liga.feier.liga', { stufe: t('p-liga.stufe.' + a.stufe) }),
+      text: klasse ? t('p-liga.feier.klasseText', { n: r.stand.wertung.n, wert: r.stand.wertung.wert })
+        : t('p-liga.feier.ligaText', { nr: r.stand.saison.nr, punkte: r.stand.saison.punkte }),
       symbol: klasse ? 'bauer' : 'liga-wappen', klang: 'rekord',
     });
   }
