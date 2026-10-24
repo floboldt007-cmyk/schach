@@ -50,6 +50,9 @@ import { ladeEinstellungen, speichereEinstellungen, ladePartie } from './storage
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
 import { schalter, sheet } from './ui/bauteile.js';
+import { t } from './sprache.js';
+import './sprachen/allgemein.js';
+import './sprachen/einstellungen.js';
 
 export const WARTESCHLANGE_SCHLUESSEL = 'schach-arena:daten:warteschlange';
 export const ZUSTIMMUNG_SCHLUESSEL = 'schach-arena:daten:zustimmung';
@@ -83,6 +86,7 @@ const text = (w, max) => (w == null || w === '' ? null : String(w).slice(0, max)
 const ganz = (w) => (w != null && Number.isFinite(Number(w)) ? Math.max(0, Math.round(Number(w))) : null);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pfad = (rel) => new URL(rel, WURZEL).href;
+function D(k, w) { return t('einstellungen.' + k, w); }
 
 function zustimmungKonto() {
   try { const z = JSON.parse(lager().getItem(ZUSTIMMUNG_SCHLUESSEL)); return z && typeof z.konto === 'string' ? z.konto : null; } catch (e) { return null; }
@@ -318,7 +322,7 @@ async function rpc(name, token) {
     r = await fetchFn(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
       method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}',
     });
-  } catch (e) { throw new Error('Keine Verbindung. Bitte später noch einmal versuchen.'); }
+  } catch (e) { throw new Error(D('daten.verbindung')); }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leere Antwort */ } }
   if (!r.ok) {
@@ -330,12 +334,12 @@ async function rpc(name, token) {
   return d;
 }
 function rpcFehlerText(status, code) {
-  if (status === 401 || code === 'PGRST301' || code === 'PGRST303') return 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.';
-  if (status === 403 || code === '42501') return 'Bitte zuerst anmelden.';
-  if (status === 404) return 'Diese Funktion ist auf dem Server noch nicht eingerichtet.';
-  if (status === 429) return 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.';
-  if (status >= 500) return `Der Server antwortet gerade nicht (${status}). Bitte später noch einmal versuchen.`;
-  return `Das hat auf dem Server nicht geklappt (${status}). Bitte später noch einmal versuchen.`;
+  if (status === 401 || code === 'PGRST301' || code === 'PGRST303') return D('daten.fehler.abgelaufen');
+  if (status === 403 || code === '42501') return D('daten.fehler.anmelden');
+  if (status === 404) return D('daten.fehler.fehlt');
+  if (status === 429) return D('daten.fehler.viele');
+  if (status >= 500) return D('daten.fehler.server', { status });
+  return D('daten.fehler.sonst', { status });
 }
 
 // ---------- Konto loeschen (Art. 17) und Auskunft (Art. 15/20) ----------
@@ -356,10 +360,7 @@ export async function meineDaten() {
   try { zustimmung = JSON.parse(lager().getItem(ZUSTIMMUNG_SCHLUESSEL)); } catch (e) { zustimmung = null; }
   return {
     format: AUSKUNFT_FORMAT, version: 1, erstellt: new Date().toISOString(), konto: s.email || null,
-    hinweis: 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat (mit Online-Partien, Widerruf und '
-      + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
-      + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
-      + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
+    hinweis: D('daten.auskunftHinweis'),
     server, geraet: lokalerStand(), noch_nicht_gesendet: liesWarteschlange().map((e) => ({ art: e.art, ...e.daten })), zustimmung,
     widerruf_offen: offenerWiderruf(),
   };
@@ -374,7 +375,7 @@ export function dateiFuerAuskunft(daten) {
 export async function speichereAuskunft(datei) {
   const nav = globalThis.navigator;
   if (nav?.share && nav.canShare && nav.canShare({ files: [datei] })) {
-    await nav.share({ files: [datei], title: 'Crownmate: meine Daten' });
+    await nav.share({ files: [datei], title: D('daten.teilenTitel') });
     return 'geteilt';
   }
   const url = URL.createObjectURL(datei);
@@ -416,19 +417,19 @@ export function fehlerEreignis(ev) {
 // ---------- Oberflaeche: Gruppe "Daten" in den Einstellungen ----------
 export async function loescheKontoDialog(app) {
   const weiter = await sheet({
-    titel: 'Konto löschen?',
-    text: 'Gelöscht werden auf dem Server: dein Konto mit der E-Mail-Adresse (und der Verknüpfung mit Google), der Benutzername, der Cloud-Spielstand und alle geteilten Partien und Nutzungsdaten. Der Spielstand auf diesem Gerät bleibt.',
-    knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Weiter', wert: true, art: 'gefahr' }], abbrechen: false,
+    titel: D('daten.loeschen1Titel'),
+    text: D('daten.loeschen1Text'),
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false,
   });
   if (!weiter) return false;
   const ja = await sheet({
-    titel: 'Wirklich endgültig löschen?',
-    text: 'Das lässt sich nicht rückgängig machen. Du kannst dich später mit derselben E-Mail-Adresse neu anmelden, dann aber mit leerem Cloud-Spielstand.',
-    knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Endgültig löschen', wert: true, art: 'gefahr' }], abbrechen: false,
+    titel: D('daten.loeschen2Titel'),
+    text: D('daten.loeschen2Text'),
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.endgueltig'), wert: true, art: 'gefahr' }], abbrechen: false,
   });
   if (!ja) return false;
   await loescheKonto(app);
-  try { app?.meldung?.('Konto gelöscht. Dein Spielstand auf diesem Gerät bleibt erhalten.'); } catch (e) { /* egal */ }
+  try { app?.meldung?.(D('daten.geloeschtMeldung')); } catch (e) { /* egal */ }
   return true;
 }
 
@@ -447,28 +448,28 @@ export function datenGruppe({ app } = {}) {
   function render() {
     angemeldet = !!sitzung();
     const an = darfTeilen();
-    el.innerHTML = `<h3 class="es-titel" id="daten-titel">Daten</h3>
+    el.innerHTML = `<h3 class="es-titel" id="daten-titel">${D('daten.titel')}</h3>
       <div class="es-zeile daten-zeile">
-        <div class="es-text"><b id="daten-l">Partien und Nutzung teilen</b><span id="daten-t">${angemeldet ? 'Freiwillig, Standard aus, jederzeit abschaltbar.' : 'Zum Teilen erst anmelden.'}</span></div>
+        <div class="es-text"><b id="daten-l">${D('daten.teilen')}</b><span id="daten-t">${angemeldet ? D('daten.teilenText') : D('daten.erstAnmelden')}</span></div>
         <span class="daten-schalter-platz"></span>
       </div>
       <div class="daten-text">
-        <p><b>Was:</b> deine fertigen Partien (Züge, Bewertung deiner Züge, Ergebnis, Bot) und Nutzungsdaten ohne Name und E-Mail (welche Bereiche du öffnest, Start und Ende von Partien, Fehler der App). Sie hängen an deinem Konto, damit du sie abrufen und löschen kannst.</p>
-        <p><b>Wozu:</b> zusammengefasst über alle Spieler die Bots an echten Partien eichen und den Coach verbessern. Einzeln nur für deine eigenen Trainingspläne, die nur du siehst.</p>
-        <p><b>Wo und wer:</b> bei Supabase, dem Dienstleister des Betreibers, in Frankfurt, im Auftrag und nur für den Betreiber. Nie an Dritte, keine Werbung, kein Verkauf.</p>
-        <p><b>Jederzeit:</b> Ausschalten stoppt das Teilen sofort, noch nicht Gesendetes wird verworfen und bereits Geteiltes auf dem Server gelöscht.</p>
-        <p><b>Unter 16?</b> Dann entscheiden deine Eltern, ob du das Teilen einschaltest.</p>
+        <p><b>${D('daten.wasKopf')}</b> ${D('daten.was')}</p>
+        <p><b>${D('daten.wozuKopf')}</b> ${D('daten.wozu')}</p>
+        <p><b>${D('daten.woKopf')}</b> ${D('daten.wo')}</p>
+        <p><b>${D('daten.jederzeitKopf')}</b> ${D('daten.jederzeit')}</p>
+        <p><b>${D('daten.unter16Kopf')}</b> ${D('daten.unter16')}</p>
       </div>
-      ${angemeldet ? `<div class="es-knoepfe"><button class="knopf" type="button" data-daten="auskunft">Meine Daten herunterladen</button><button class="knopf es-rot-rand" type="button" data-daten="loeschen">Konto löschen</button></div>` : ''}
+      ${angemeldet ? `<div class="es-knoepfe"><button class="knopf" type="button" data-daten="auskunft">${D('daten.herunterladen')}</button><button class="knopf es-rot-rand" type="button" data-daten="loeschen">${D('daten.kontoLoeschen')}</button></div>` : ''}
       <p class="daten-status" aria-live="polite"></p>
-      <p class="es-hilfe daten-links"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">Datenschutzerklärung</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">Impressum</a></p>`;
+      <p class="es-hilfe daten-links"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">${D('info.datenschutz')}</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">${D('info.impressum')}</a></p>`;
     sch = schalter({
       name: 'datenfreigabe', an,
       beiWechsel: (neu) => {
         const jetzt = setzeFreigabe(neu, app);
         sch.setze(jetzt);
-        if (jetzt) melden('Danke! Fertige Partien und Nutzungsdaten werden ab jetzt geteilt.');
-        else melden(neu ? 'Zum Teilen erst anmelden.' : 'Teilen ist aus. Es wird nichts mehr gesendet, bereits Geteiltes wird auf dem Server gelöscht.', neu);
+        if (jetzt) melden(D('daten.danke'));
+        else melden(neu ? D('daten.erstAnmelden') : D('daten.aus'), neu);
       },
     });
     sch.el.setAttribute('aria-labelledby', 'daten-l');
@@ -485,14 +486,14 @@ export function datenGruppe({ app } = {}) {
     try {
       knopf.disabled = true;
       if (a === 'auskunft') {
-        melden('Deine Daten werden vom Server geholt …');
+        melden(D('daten.holen'));
         const d = await meineDaten();
         await speichereAuskunft(dateiFuerAuskunft(d));
-        melden('Datei mit deinen Daten erstellt.');
+        melden(D('daten.dateiErstellt'));
       }
-      if (a === 'loeschen' && await loescheKontoDialog(app)) { render(); melden('Konto gelöscht.'); }
+      if (a === 'loeschen' && await loescheKontoDialog(app)) { render(); melden(D('daten.geloescht')); }
     } catch (f) {
-      if (f && f.name !== 'AbortError') melden(f.message || 'Das hat nicht geklappt.', true);
+      if (f && f.name !== 'AbortError') melden(f.message || D('nichtGeklappt'), true);
     } finally {
       if (knopf.isConnected) knopf.disabled = false;
     }
