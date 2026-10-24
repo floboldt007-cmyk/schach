@@ -28,7 +28,12 @@
 //   wortWahl(aufgabe, alle) -> [motiv, motiv, motiv] | null   drei Woerter, eines richtig, Reihenfolge aus der id; die
 //       falschen sind Motive, die KEINE Aufgabe des Tages hat (Sonntag: beide Teile)
 //   teilText(td, eintrag) -> Text zum Teilen, ohne Link und ohne Loesung (SPIELKONZEPT 3.6)
+// Texte: t('p-tagesraetsel.x') aus texte.js, in der Sprache der App (ohne gesetzte Sprache, z. B. in Node, deutsch).
+//   WOCHENTAG und MOTIVE bleiben deutsche Daten; angezeigt werden sie ueber wochentagName(i) und motivName(k).
+//   Die Fehlertexte von pruefeDatei sind fuer Entwickler (Konsole) und bleiben deutsch.
 import { addiereTage, tageZwischen, wochentag, istSchluessel } from '../../tag.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 
 export const PAKET = 'tagesraetsel';
 export const MODUL = 'tagesraetsel';
@@ -43,6 +48,9 @@ export const WOCHENTAG = Object.freeze(['Montag', 'Dienstag', 'Mittwoch', 'Donne
 export const MOTIVE = Object.freeze({
   gabel: 'Gabel', fesselung: 'Fesselung', spiess: 'Spieß', abzug: 'Abzug', grundreihe: 'Grundreihe', matt: 'Matt',
 });
+// Namen zum Anzeigen (Sprache der App)
+export const wochentagName = (i) => t('p-tagesraetsel.wochentag.' + i);
+export const motivName = (k) => (Object.hasOwn(MOTIVE, k) ? t('p-tagesraetsel.motiv.' + k) : '');
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 const FIGUR = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 
@@ -100,12 +108,12 @@ export function tagDaten(daten, tag) {
 }
 
 const amZug = (fen) => (String(fen).split(/\s+/)[1] === 'b' ? 'b' : 'w');
-export const amZugText = (fen) => (amZug(fen) === 'b' ? 'Schwarz am Zug' : 'Weiß am Zug');
+export const amZugText = (fen) => (amZug(fen) === 'b' ? t('allgemein.schwarzAmZug') : t('allgemein.weissAmZug'));
 
 export function zuegeText(a) {
   const n = Math.ceil(a.loesung.length / 2);
-  if (a.matt) return `Matt in ${a.matt}`;
-  return n === 1 ? 'in 1 Zug' : `in ${n} Zügen`;
+  if (a.matt) return t('p-tagesraetsel.matt', { n: a.matt });
+  return t('p-tagesraetsel.zuege', { n });
 }
 
 // Aufgaben fuer den Raetsel-Bildschirm; die id traegt den Tag, damit Archiv und heute nie durcheinander kommen
@@ -116,8 +124,9 @@ export function alsAufgaben(td, { nur = null } = {}) {
     id: `${td.tag}:${i}`,
     fen: a.fen,
     loesung: a.loesung.slice(),
-    text: `${zwei ? `Teil ${i + 1} von 2 · ` : ''}Rätsel ${td.nummer} · ${WOCHENTAG[td.wochentag]} · ${zuegeText(a)}`,
-    hinweis: a.matt ? `Es gibt ein Matt ${a.matt === 1 ? 'in einem Zug' : `in ${a.matt} Zügen`}.` : 'Such nach dem Zug, der etwas erzwingt.',
+    text: t(zwei ? 'p-tagesraetsel.aufgabe.textTeil' : 'p-tagesraetsel.aufgabe.text',
+      { teil: i + 1, nummer: td.nummer, tag: wochentagName(td.wochentag), zuege: zuegeText(a) }),
+    hinweis: a.matt ? t('p-tagesraetsel.hinweis.matt', { n: a.matt }) : t('p-tagesraetsel.hinweis.zwang'),
   }));
 }
 
@@ -292,23 +301,23 @@ export function teilText(td, eintrag = null) {
   const kaesten = td.aufgaben.map((_, i) => kaestchen(ergebnisse[i])).filter(Boolean).join(' ');
   const m = motivAufgabe(td);
   const teile = [`${fig ? fig + ' ' : ''}${zuegeText(a)}`];
-  if (td.aufgaben.length > 1) teile[0] += ' · zwei Teile';
+  if (td.aufgaben.length > 1) teile[0] += ' · ' + t('p-tagesraetsel.teilen.zweiTeile');
   if (kaesten) teile.push(kaesten);
-  if (m && eintrag && eintrag.wort === 1) teile.push(`Motiv: ${MOTIVE[m.motiv]}`);
-  return `Crownmate · Rätsel ${td.nummer} · ${WOCHENTAG[td.wochentag]} ${punkte(stufe)}\n${teile.join(' · ')}`;
+  if (m && eintrag && eintrag.wort === 1) teile.push(t('p-tagesraetsel.teilen.motiv', { motiv: motivName(m.motiv) }));
+  const kopf = t('p-tagesraetsel.teilen.kopf', { nummer: td.nummer, tag: wochentagName(td.wochentag), punkte: punkte(stufe) });
+  return `${kopf}\n${teile.join(' · ')}`;
 }
 
 // ---------- Texte ----------
 export function rueckmeldung({ richtig, fehlversuche }) {
-  if (!richtig) return { titel: 'Jetzt weißt du, wie es geht.', text: 'Fehlversuche kosten hier nichts.' };
-  if (!fehlversuche) return { titel: 'Gelöst, im ersten Versuch.', text: '' };
-  return { titel: 'Gelöst.', text: 'Fehlversuche kosten hier nichts.' };
+  if (!richtig) return { titel: t('p-tagesraetsel.rueck.gezeigt'), text: t('p-tagesraetsel.rueck.kostenlos') };
+  if (!fehlversuche) return { titel: t('p-tagesraetsel.rueck.ersterVersuch'), text: '' };
+  return { titel: t('p-tagesraetsel.rueck.geloest'), text: t('p-tagesraetsel.rueck.kostenlos') };
 }
 
 export function endeText({ archiv = false, anzahl = 0, td = null } = {}) {
   if (archiv) {
-    return { titel: anzahl === 1 ? 'Ein Rätsel aus dem Archiv' : `${anzahl} Rätsel aus dem Archiv`,
-      text: 'Archiv-Rätsel zählen für Funken und die Serie, nicht als Tagesrätsel.' };
+    return { titel: t('p-tagesraetsel.ende.archiv', { n: anzahl }), text: t('p-tagesraetsel.ende.archivText') };
   }
-  return { titel: td ? `Rätsel ${td.nummer} geschafft` : 'Geschafft', text: 'Morgen kommt das nächste. Für alle dasselbe.' };
+  return { titel: td ? t('p-tagesraetsel.ende.titel', { nummer: td.nummer }) : t('p-tagesraetsel.ende.geschafft'), text: t('p-tagesraetsel.ende.text') };
 }
