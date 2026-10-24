@@ -500,7 +500,7 @@ registriereTexte('einstellungen', {
     'zz.ergebnis': 'Result',
     'zz.amZug': '{name} to move',
     'zz.amZugSchach': '{name} to move · check',
-    'zz.beendet': 'Game over',
+    'zz.beendet': 'Game finished',
     'zz.gewinnt': '{name} wins',
     'zz.revanche': 'Rematch',
     'zz.bietetRemis': '{name} offers a draw',

@@ -47,8 +47,9 @@ const TIEFEN = [
 ];
 function E(k, w) { return t('einstellungen.' + k, w); }
 // der Bot, bei dem die Leiter nach dem Zuruecksetzen wieder beginnt (Name aus bots.js, beim Zeichnen gelesen)
-function benno() {
-  return (BOTS.find((b) => b.id === 'benno') || {}).name || 'Bauer Benno';
+// Erster Gegner der Leiter (seit den Welten Vogelscheuche Fridolin, vorher Bauer Benno): dort beginnt sie nach dem Zuruecksetzen
+function ersterGegner() {
+  return (BOTS[0] || {}).name || '';
 }
 // Mini-Brett: 4x4 Ausschnitt mit ein paar Figuren
 const MINI = { 1: 'bN', 6: 'bP', 9: 'wB', 14: 'wK' };
@@ -220,7 +221,7 @@ export function zeige(root, params = {}, app) {
         <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button>`;
     } else if (resetStufe === 1) {
       box.innerHTML = `
-        <div class="es-warnung" role="alert">${icon('warnung')}<p><b>${E('reset.frage1')}</b> ${E('reset.text1', { bot: esc(benno()) })}</p></div>
+        <div class="es-warnung" role="alert">${icon('warnung')}<p><b>${E('reset.frage1')}</b> ${E('reset.text1', { bot: esc(ersterGegner()) })}</p></div>
         <div class="es-knoepfe">
           <button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button>
           <button class="knopf es-rot-rand" type="button" data-aktion="reset-2">${E('reset.weiter')}</button>
@@ -276,7 +277,7 @@ export function zeige(root, params = {}, app) {
         if (ortGruppen) ortGruppen.verlasse();
         ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
         zeigeReset();
-        try { app.meldung(E('reset.fertig', { bot: benno() })); } catch (f) { /* egal */ }
+        try { app.meldung(E('reset.fertig', { bot: ersterGegner() })); } catch (f) { /* egal */ }
         break;
       default: break;
     }
