@@ -68,7 +68,9 @@ import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
-import { setzeSprache, SPRACHEN } from './sprache.js';
+import { setzeSprache, SPRACHEN, t } from './sprache.js';
+import './sprachen/allgemein.js';
+import './sprachen/rahmen.js';
 import './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 
@@ -88,11 +90,18 @@ const TITEL = {
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', schule: 'Schulmodus',
 };
+// Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
+// titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen
+function titelVon(name) {
+  return Object.prototype.hasOwnProperty.call(TITEL, name) ? t('rahmen.titel.' + name) : null;
+}
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
   'werkstatt', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
+// Texte aus den Woerterbuechern in HTML einsetzen
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- Einstellungen ----------
 
@@ -148,16 +157,17 @@ const WASM_DIREKT = 'schach-arena:v1:wasm-direkt';
 const WASM_DIREKT_TAGE = 30;
 // kleinstes Modul mit einem SIMD-Befehl (v128)
 const SIMD_TEST = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+// Texte der dauerhaften Engine-Fehler (Schluessel in js/sprachen/rahmen.js, t() erst beim Fehler)
 const ENGINE_TEXT = {
-  'kein-simd': 'Für die Schach-Engine braucht dein iPad iPadOS 16.4 oder neuer (Einstellungen → Allgemein → Softwareupdate). Bis dahin spielen die Bots ohne Engine und es gibt keine Bewertung.',
-  'kein-wasm': 'Dieser Browser kann die Schach-Engine nicht starten. Bitte Safari oder einen aktuellen Browser nehmen.',
-  'wasm-kaputt': 'Die Datei der Schach-Engine ist beschädigt. Lade die App bitte neu.',
+  'kein-simd': 'rahmen.engine.keinSimd',
+  'kein-wasm': 'rahmen.engine.keinWasm',
+  'wasm-kaputt': 'rahmen.engine.wasmKaputt',
 };
 let wasmPruefung = null;
 let engineGemeldet = false;
 
 function dauerhafterFehler(code) {
-  const f = new Error(ENGINE_TEXT[code] || code);
+  const f = new Error(ENGINE_TEXT[code] ? t(ENGINE_TEXT[code]) : code);
   f.code = code;
   f.dauerhaft = true;
   return f;
@@ -191,7 +201,7 @@ export function pruefeWasm({ simdTest = SIMD_TEST, pfad = WASM_PFAD } = {}) {
 function meldeEngineFehler(e) {
   if (!e || !e.dauerhaft || engineGemeldet) return;
   engineGemeldet = true;
-  frage({ titel: 'Schach-Engine startet nicht', text: e.message, knoepfe: [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen: true });
+  frage({ titel: t('rahmen.engine.titel'), text: e.message, knoepfe: [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen: true });
 }
 
 // Die Worker bekommen Skript und gepruefte Bytes als Blob-URL. Hat das nicht geklappt (der Worker
@@ -281,7 +291,7 @@ let speicherGemeldet = false;
 hoere('speicher:fehler', () => {
   if (speicherGemeldet || typeof document === 'undefined' || !document.body) return;
   speicherGemeldet = true;
-  meldung('Speichern hat nicht geklappt: Der Speicher des Geräts ist voll.', { art: 'fehler', dauer: 6000 });
+  meldung(t('rahmen.speicherVoll'), { art: 'fehler', dauer: 6000 });
 });
 
 // ---------- Rueckfrage-Dialog ----------
@@ -351,6 +361,7 @@ function schliesseDialog() {
 // ---------- Reiter-Leiste (W0+a vorbereitet; Premium-Umbau U2: Glas-Pille aus Entwurf A, Lage nach Flo D5) ----------
 // Reiter -> Screen. Arena ist immer dabei, die anderen nur, wenn REITER (erweiterungen.js) sie nennt. 'verlauf' ist der
 // Zwischenreiter bis S1 (Flo D2: "Arena · Verlauf"); steht 'ich' dabei, verschwindet er (der Verlauf gehoert dann zu Ich).
+// Der Name je Reiter ist die deutsche Quelle; gezeigt wird t('rahmen.reiter.<reiter>') beim Bauen der Leiste.
 const REITER_ALLE = [['arena', 'Arena', 'pokal'], ['training', 'Training', 'ziel'], ['verlauf', 'Verlauf', 'verlauf'],
   ['bestenliste', 'Bestenliste', 'podest'], ['ich', 'Ich', 'person']];
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
@@ -387,10 +398,10 @@ function baueReiter(liste) {
   if (leiste.el) return;
   const nav = document.createElement('nav');
   nav.className = 'reiter-leiste';
-  nav.setAttribute('aria-label', 'Bereiche');
+  nav.setAttribute('aria-label', t('rahmen.reiter.label'));
   nav.hidden = true;
-  nav.innerHTML = '<span class="reiter-pille" aria-hidden="true"></span>' + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, t, ic]) =>
-    `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t}</span></button>`).join('');
+  nav.innerHTML = '<span class="reiter-pille" aria-hidden="true"></span>' + REITER_ALLE.filter(([n]) => liste.includes(n)).map(([n, , ic]) =>
+    `<button type="button" class="reiter dr" data-reiter="${n}">${icon(ic)}<span>${t('rahmen.reiter.' + n)}</span></button>`).join('');
   nav.addEventListener('click', (e) => {
     const k = e.target.closest('[data-reiter]');
     if (!k) return;
@@ -703,7 +714,7 @@ async function zeigeScreen(name, params, hash) {
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
   document.documentElement.dataset.screen = name;
-  document.title = name === 'arena' ? 'Crownmate' : `${TITEL[name]} · Crownmate`;
+  document.title = name === 'arena' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
@@ -736,25 +747,26 @@ async function zeigeScreen(name, params, hash) {
 function zeigePlatzhalter(root, name, kaputt = false) {
   const s = document.createElement('section');
   s.className = 'screen platzhalter';
-  s.setAttribute('aria-label', TITEL[name] || 'Bereich');
+  const titel = titelVon(name);
+  s.setAttribute('aria-label', titel || t('rahmen.bereich'));
   s.innerHTML = `
     <header class="kopf">
-      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
+      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="${esc(t('allgemein.zurueck'))}">${icon('zurueck')}</button>
       <div class="titel"><h2></h2></div>
     </header>
     <div class="platzhalter-inhalt">
       <div class="platzhalter-karte flaeche">
         <div class="platzhalter-icon">${icon('ziel')}</div>
-        <div class="logo">HOPPLA</div>
+        <div class="logo">${esc(t('rahmen.platzhalter.hoppla'))}</div>
         <p></p>
-        <button class="knopf primaer gross" type="button" data-aktion="neu-laden">${icon('nochmal')} Neu laden</button>
-        <button class="knopf gross" type="button" data-aktion="arena">${icon('zurueck')} Zur Arena</button>
+        <button class="knopf primaer gross" type="button" data-aktion="neu-laden">${icon('nochmal')} ${esc(t('rahmen.neuLaden'))}</button>
+        <button class="knopf gross" type="button" data-aktion="arena">${icon('zurueck')} ${esc(t('rahmen.zurArena'))}</button>
       </div>
     </div>`;
-  s.querySelector('h2').textContent = TITEL[name] || 'Bereich';
+  s.querySelector('h2').textContent = titel || t('rahmen.bereich');
   s.querySelector('p').textContent = kaputt
-    ? 'Hier ist etwas schiefgegangen. Versuch es gleich noch einmal.'
-    : `Der Bereich „${TITEL[name] || name}“ konnte nicht geladen werden. Prüfe die Internetverbindung und lade die App neu.`;
+    ? t('rahmen.platzhalter.kaputt')
+    : t('rahmen.platzhalter.nichtGeladen', { name: titel || name });
   s.querySelector('[data-aktion="zurueck"]').addEventListener('click', () => zurueck());
   s.querySelector('[data-aktion="neu-laden"]').addEventListener('click', () => location.reload());
   s.querySelector('[data-aktion="arena"]').addEventListener('click', () => gehe('arena', {}, { ersetzen: true }));
@@ -841,9 +853,9 @@ function zeigeUpdateHinweis(neuLaden) {
   h.className = 'update-hinweis';
   h.setAttribute('role', 'status');
   h.setAttribute('aria-live', 'polite');
-  h.innerHTML = `<span class="u-text">Neue Version<span class="u-lang"> verfügbar</span></span>
-    <button class="knopf primaer" type="button" data-aktion="neu-laden">${icon('nochmal')} Neu laden</button>
-    <button class="icon-knopf" type="button" data-aktion="spaeter" aria-label="Später">${icon('kreuz')}</button>`;
+  h.innerHTML = `<span class="u-text">${esc(t('rahmen.update.neu'))}<span class="u-lang"> ${esc(t('rahmen.update.verfuegbar'))}</span></span>
+    <button class="knopf primaer" type="button" data-aktion="neu-laden">${icon('nochmal')} ${esc(t('rahmen.neuLaden'))}</button>
+    <button class="icon-knopf" type="button" data-aktion="spaeter" aria-label="${esc(t('rahmen.update.spaeter'))}">${icon('kreuz')}</button>`;
   h.querySelector('[data-aktion="neu-laden"]').addEventListener('click', () => { h.remove(); neuLaden(); });
   h.querySelector('[data-aktion="spaeter"]').addEventListener('click', () => { h.remove(); updateHinweis = null; });
   document.body.append(h);
@@ -865,9 +877,9 @@ function pruefeInstallation() {
     localStorage.setItem(HINWEIS_MERKER, '1');
   } catch (e) { return; }
   setTimeout(() => frage({
-    titel: 'Tipp: Als App speichern',
-    text: 'Tippe auf Teilen und dann auf „Zum Home-Bildschirm“. Als App bleibt dein Fortschritt dauerhaft erhalten. Was du hier im Safari-Tab spielst, wird nicht in die App übernommen.',
-    knoepfe: [{ text: 'Verstanden', wert: true, art: 'primaer' }],
+    titel: t('rahmen.installieren.titel'),
+    text: t('rahmen.installieren.text'),
+    knoepfe: [{ text: t('rahmen.installieren.ok'), wert: true, art: 'primaer' }],
     abbrechen: true,
   }), 1200);
 }
@@ -919,10 +931,20 @@ function spracheAusAdresse() {
   } catch (e) { /* egal */ }
 }
 
+// Lade-Screen aus index.html (steht, bis die Pakete geladen sind) in der gewaehlten Sprache
+function ladeScreenTexte() {
+  const lade = document.querySelector('#app > .lade-screen');
+  if (!lade) return;
+  lade.setAttribute('aria-label', t('rahmen.laden.label'));
+  const unter = lade.querySelector('.logo-unter');
+  if (unter) unter.textContent = t('rahmen.laden.unter');
+}
+
 function starte() {
   setzeSymbole(SYMBOLE);
   spracheAusAdresse();
   wendeEinstellungenAn(ladeEinstellungen());
+  ladeScreenTexte();
   starteDruck();
   setzeSichtbar();
   document.addEventListener('visibilitychange', () => sende('app:sichtbar', { sichtbar: setzeSichtbar() }));

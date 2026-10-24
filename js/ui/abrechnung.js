@@ -17,6 +17,8 @@
 // Kontext der Zeilen: der von ergebnis:karte ({ app, bot, farbe, ergebnis, grund, erg, review, rechnet,
 // nachtrag, wertet, modus, ziel, boss }); erg.partie.id ist die Partie.
 import { anbieten, fuelle } from '../orte.js';
+import { t } from '../sprache.js';
+import '../sprachen/rahmen.js';
 
 export const ABRECHNUNG_MAX = 4;
 export const ABRECHNUNG_TAKT_MS = 200;
@@ -41,7 +43,7 @@ export function anbieterAbrechnung(kontext) {
   const huelle = document.createElement('div');
   huelle.className = 'abrechnung';
   huelle.setAttribute('role', 'list');
-  huelle.setAttribute('aria-label', 'Abrechnung');
+  huelle.setAttribute('aria-label', t('rahmen.abrechnung.label'));
   const innen = fuelle('ergebnis:abrechnung', huelle, kontext);
   if (!innen.anzahl) {
     innen.verlasse();
