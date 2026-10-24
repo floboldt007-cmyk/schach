@@ -172,6 +172,7 @@ export class Brett {
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
   zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
+  nummern([{ feld, text }])       // kleine Zahl oben links am Feld ueber den Figuren (.brett-nummern), [] loescht
   setzeAutoDame(boolean)          // Umwandlung ohne Auswahl als Dame; 450 ms auf dem Zielfeld halten zeigt D T L S
   setzeBestaetigen(boolean)       // Zug bestaetigen: Vorschau, zweiter Tipp aufs Ziel macht fest, Tipp anderswo nimmt zurueck
   setzeSteuerung('beides' | 'ziehen' | 'tippen')
@@ -1209,6 +1210,19 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
 - `beiLeer(feld)` (Tipp ohne Zug, die Partie bricht damit Vorzuege ab): Maus beim Druecken, Finger erst beim Loslassen
   und nur, wenn kein Halten (Marke) daraus wurde. `setzeTurmRochade(true)` ergaenzt auch eine einfache `zielKarte(chess)`
   um den Turm und wirkt sofort.
+- `beiPfeil(von, nach)`: Flo hat einen eigenen Pfeil gezeichnet (nicht beim Wegnehmen, nicht bei Marken). Die Partie
+  schliesst damit den Pfeil-Tipp.
+- **Vorzug-Kette** (Flo 23.10., `tests/vorzuege.test.mjs`): waehrend der Bot denkt, merkt `beiZug` bis zu 5 Zuege vor
+  (`z.vorzuege`). Das Brett zieht jeden Vorzug sichtbar, die Ziele des naechsten kommen aus dieser gedachten Stellung
+  (`vorzugZiele()` liest das Brett), also geht e2-e4 und danach e4-e5 mit derselben Figur; `z.chess` bleibt echt. Jeder
+  Vorzug traegt am Ziel seine Nummer (`brett.nummern`). Je Bot-Zug wird der vorderste ausgefuehrt; ist er regelwidrig
+  geworden, fallen er und der Rest leise weg (Klang `zurueck`, Protokoll `vorzug:verworfen`). Ein sechster springt
+  zurueck, die Kette bleibt. Tipp ins Leere, Hinweis, Zuruecknehmen, Aufgeben und Partie-Ende loeschen die Kette.
+  Zu zweit und online gibt es keine Vorzuege (eigene Bildschirme), Raetsel auch nicht.
+- **Pfeil-Tipp** (`PFEIL_TIPP_MERKER` = `schach-arena:v1:hinweis-pfeile`, `{ partien, erledigt }`): einmal je Geraet ab der
+  zweiten neu begonnenen Partie eine ruhige Zeile `.pfeil-tipp` (hoch unter dem Brett, quer unter der Zugliste) mit
+  "Verstanden". Weg mit dem ersten Pfeil, mit "Verstanden" oder am Partie-Ende. Im Testmodus nur mit
+  `window.__test.pfeilTipp`, damit sie fremde Layout-Pruefungen nicht verschiebt.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)

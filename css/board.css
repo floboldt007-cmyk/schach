@@ -260,6 +260,19 @@
 .brett > .abzeichen-ort.plopp.k-ungenau, .brett > .abzeichen-ort.plopp.k-fehler,
 .brett > .abzeichen-ort.plopp.k-verpasst, .brett > .abzeichen-ort.plopp.k-patzer { animation: brett-ruhig var(--b-d-m) var(--b-sanft) both; }
 
+/* ---------- Nummern (Vorzug-Kette): kleine Zahl oben links am Feld, ueber den Figuren, ohne Leuchten ---------- */
+.brett-nummern { position: absolute; inset: 0; z-index: 5; pointer-events: none; container-type: inline-size; }
+.brett-nummern .nummer { position: absolute; width: 12.5%; height: 12.5%; }
+.brett-nummern .nummer > span {
+  position: absolute; top: 5%; left: 5%;
+  min-width: 34%; height: 34%; padding: 0 6%; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--akzent, #CC4820); color: var(--auf-akzent, #FFFFFF);
+  font: 700 max(10px, 1.9cqw)/1 var(--schrift, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Umwandlung ---------- */
 .brett-umwandlung {
   position: absolute;

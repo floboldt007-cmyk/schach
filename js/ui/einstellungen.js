@@ -113,8 +113,8 @@ export function zeige(root, params = {}, app) {
           ${segment('zugBestaetigen','Zug bestätigen',[['aus','Aus'],['ohneUhr','Ohne Uhr'],['immer','Immer']],'Der erste Tipp zeigt den Zug, ein zweiter Tipp aufs Zielfeld spielt ihn.')}
           ${schalter('haltenAufgeben','Aufgeben und Remis halten','Schützt vor versehentlichem Antippen.')}
           ${schalter('turmRochade','Turm auf König rochiert','Erlaubt die kurze Eingabe der Rochade.')}
-          ${schalter('autoDame','Automatisch Dame','Halten am Zielfeld zeigt andere Figuren.')}
-          ${schalter('vorzuege','Vorzüge','Züge vormerken, während der Gegner denkt.')}
+          ${schalter('autoDame','Automatisch Dame','Ohne Auswahl bei der Umwandlung. Halten am Zielfeld zeigt die anderen Figuren.')}
+          ${schalter('vorzuege','Vorzüge','Bis zu fünf Züge vormerken, während der Gegner denkt. Ein Tipp ins leere Brett löscht sie.')}
           ${segment('steuerung','Figuren bewegen',[['beides','Beides'],['ziehen','Ziehen'],['tippen','Tippen']])}
         </section>
 
@@ -137,7 +137,7 @@ export function zeige(root, params = {}, app) {
           ${schalter('koordinaten','Koordinaten','Buchstaben und Zahlen am Brett.')}
           ${segment('koordLage','Lage der Koordinaten',[['ecke','Ecke'],['rand','Rand']])}
           ${schalter('balken','Bewertungsbalken','Zeigt, wer besser steht.')}${schalter('liveBewertung','Live-Bewertung','Coach nach jedem eigenen Zug.')}
-          ${schalter('pfeile','Pfeile malen','Feld halten und ziehen.')}
+          ${schalter('pfeile','Pfeile und Marken','Feld halten und ziehen malt einen Pfeil, nur halten eine Marke. Am Rechner mit Rechtsklick. Ein Tipp ins leere Brett löscht alles.')}
           ${segment('duellIntro','Duell-Intro',[['immer','Immer'],['besondere','Besondere'],['aus','Aus']])}
           ${schalter('lebensleiste','Lebensleiste','Bei Boss-Partien.')}${schalter('zaehlwerk','Zählwerk','Wenn ein Spielmodus es anbietet.')}${schalter('funkenlinie','Funkenlinie','Wenn ein Spielmodus es anbietet.')}
         </section>

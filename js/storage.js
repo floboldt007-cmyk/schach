@@ -153,7 +153,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   vorzuege: true,        // eigene Zuege vormerken, waehrend der Gegner denkt
   haltenAufgeben: true,  // Aufgeben und Remis anbieten nur durch Halten
   turmRochade: false,    // Turm auf Koenig tippen rochiert
-  autoDame: true,        // Umwandlung ohne Auswahl (Halten zeigt D T L S)
+  autoDame: false,       // Umwandlung: Auswahl D T L S (Flo, 24.10.: "ich will waehlen"); an = Dame ohne Auswahl, Halten zeigt D T L S
   steuerung: 'beides',   // 'beides' | 'ziehen' | 'tippen'
   // Bewegung (heisst nicht "tempo": das ist im Partie-Datensatz die Bedenkzeit)
   bewegung: 'normal',    // 'langsam' | 'normal' | 'schnell' | 'aus'
@@ -170,7 +170,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   // Daten (DSGVO): Partien und anonyme Nutzung mit dem Betreiber teilen, nur angemeldet und nur ausdruecklich
   datenfreigabe: 'aus',  // 'aus' | 'an' (Opt-in, Standard aus)
   // Fassung des gespeicherten Stands (fuer einmalige Umstellungen in ladeEinstellungen)
-  fassung: 2,
+  fassung: 3,
 });
 
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
@@ -296,6 +296,9 @@ export function ladeEinstellungen() {
   // Fassung 2 (23.10.): Bis dahin stand der alte Standard 'ohneUhr' von "Zug bestaetigen" in jedem gespeicherten Stand,
   // ob gewaehlt oder nicht. Einmal auf den neuen Standard 'aus'; wer danach 'ohneUhr' waehlt, behaelt es.
   if (roh && typeof roh === 'object' && !(Number(roh.fassung) >= 2) && e.zugBestaetigen === 'ohneUhr') e.zugBestaetigen = 'aus';
+  // Fassung 3 (24.10.): "Automatisch Dame" war Standard an und stand so in jedem Stand; Flo will bei der Umwandlung die
+  // Figur waehlen. Einmal auf aus; wer es danach anschaltet, behaelt es.
+  if (roh && typeof roh === 'object' && !(Number(roh.fassung) >= 3) && e.autoDame === true) e.autoDame = false;
   e.fassung = STANDARD_EINSTELLUNGEN.fassung;
   if (!THEMA_ID.test(e.thema)) e.thema = STANDARD_EINSTELLUNGEN.thema;
   e.tiefe = Number.isFinite(e.tiefe) ? Math.max(8, Math.min(20, Math.round(e.tiefe))) : STANDARD_EINSTELLUNGEN.tiefe;

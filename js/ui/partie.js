@@ -188,6 +188,10 @@ const BRETTER = Object.freeze([['nacht', 'Nacht', '#e4e8f6', '#7c87b6'], ['gruen
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
 // Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
+// Pfeile leichter finden (Flo, 23.10.): einmal je Geraet, ab der zweiten neu begonnenen Partie gegen einen Bot, eine ruhige
+// Zeile unter dem Brett. Weg mit dem ersten gezeichneten Pfeil, mit "Verstanden" oder am Ende der Partie, in der sie stand.
+// Merker { partien, erledigt }. Im Testmodus nur mit window.__test.pfeilTipp (sonst aendert sie fremde Layout-Pruefungen).
+const PFEIL_TIPP_MERKER = 'schach-arena:v1:hinweis-pfeile';
 const BESTAETIGEN_HINWEISE = 3;
 const BESTAETIGEN_MERKER = 'schach-arena:v1:hinweis-bestaetigen';
 let bestaetigenHinweiseGezeigt = 0;   // Zaehler dieser Sitzung (falls der Speicher gesperrt ist)
@@ -425,6 +429,7 @@ export function zeige(root, params, app) {
         <div class="coach coach-karte leer" role="status" aria-live="polite"></div>
         <div class="zugbox"><div class="zugliste" aria-label="Züge"></div></div>
         <div class="zugleiste" aria-label="Züge"></div>
+        <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">Verstanden</button></div>
         <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="Flo">
           <span class="av">${floAvatar(farbe)}</span>
           <div class="name">Flo</div>
@@ -453,7 +458,7 @@ export function zeige(root, params, app) {
 
   const brett = new Brett($('.brett'), {
     ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
-    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, beiVorschau, autoDame: einst.autoDame,
+    beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, beiVorschau, beiPfeil: () => pfeilTippWeg(), autoDame: einst.autoDame,
     koordLage: einst.koordLage, steuerung: einst.steuerung, turmRochade: einst.turmRochade === true, pfeile: einst.pfeile !== false,
   });
   brett.setzeDauer(ZUG_MS);
@@ -482,6 +487,7 @@ export function zeige(root, params, app) {
     else if (a === 'idee') zeigeIdee(Number(k.dataset.ply));
     else if (a === 'besser') zeigeBesser(Number(k.dataset.ply));
     else if (a === 'ergebnis') zeigeOverlayWieder();
+    else if (a === 'pfeil-tipp') pfeilTippWeg();
   });
   // U7: Tastatur und Bedienhilfen (Klick ohne Zeiger) bekommen beim Halte-Knopf dieselbe Rueckfrage wie ohne Halten
   // (app.frage), nicht das Blatt des Bauteils: eine Rueckfrage fuer alle Wege
@@ -1177,26 +1183,35 @@ export function zeige(root, params, app) {
     brett.setzeBestaetigen(bestaetigenAn() && z.phase === 'flo');
   }
 
+  // Vorzug-Kette (Flo, 23.10.): das Brett zeigt die gedachte Stellung (Figur auf dem Ziel, die echte bleibt in z.chess),
+  // jeder vorgemerkte Zug traegt am Ziel seine Nummer 1 bis 5
   function zeichneVorzuege() {
     brett.markiere(z.vorzuege.map((v) => v.von), 'vorzug-start');
     brett.markiere(z.vorzuege.map((v) => v.nach), 'vorzug-ziel');
+    brett.nummern(z.vorzuege.map((v, i) => ({ feld: v.nach, text: i + 1 })));
+  }
+  function wischeVorzugMarken() {
+    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
+    brett.nummern([]);
   }
 
   function loescheVorzuege() {
     const hatte = z.vorzuege.length > 0;
     z.vorzuege.length = 0;
-    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
+    wischeVorzugMarken();
     if (!hatte) return;
     brett.setzeStellung(z.chess.fen(), { animieren: false, letzterZug: letzterZugFelder(), schach: z.chess.inCheck() ? true : null });
     if (z.phase === 'bot' && app.einstellungen().vorzuege !== false) brett.erlaubeZuege(vorzugZiele());
   }
 
+  // Hoechstens 5: ein sechster springt leise zurueck, die Kette bleibt (ohne Zielkarte waere der Tipp aufs Ziel ein Tipp
+  // ins Leere und loeschte alles)
   function merkeVorzug(von, nach, umwandlung) {
-    if (z.vorzuege.length >= 5) return false;
+    if (z.vorzuege.length >= 5) { try { klang.spiele('zurueck'); } catch (e) { /* still */ } return false; }
     z.vorzuege.push({ von, nach, umwandlung: umwandlung || 'q' });
     zeichneVorzuege();
     klang.spiele('klick');
-    brett.erlaubeZuege(z.vorzuege.length < 5 ? vorzugZiele() : null);
+    brett.erlaubeZuege(vorzugZiele());
     return true;
   }
 
@@ -1226,8 +1241,14 @@ export function zeige(root, params, app) {
     const v = z.vorzuege.shift();
     let m = null;
     try { m = z.chess.move({ from: v.von, to: v.nach, promotion: v.umwandlung || 'q' }); } catch (e) { m = null; }
-    if (!m) { loescheVorzuege(); return false; }
-    brett.markiere(null, 'vorzug-start'); brett.markiere(null, 'vorzug-ziel');
+    // Der Gegner hat etwas geaendert: dieser Vorzug und alle danach fallen leise weg (kein Fehlertext)
+    if (!m) {
+      loescheVorzuege();
+      try { klang.spiele('zurueck'); } catch (e) { /* still */ }
+      melde({ typ: 'vorzug:verworfen', uci: v.von + v.nach });
+      return false;
+    }
+    wischeVorzugMarken();
     spieleEigenenZug(m, brett.gleitDauer());
     return true;
   }
@@ -1368,6 +1389,7 @@ export function zeige(root, params, app) {
     setzeDenkt(false);
     brett.entferneAbzeichen();
     brett.markiere(null);
+    brett.nummern([]);
     brett.pfeile([]);
     z.ideeAn = null;
     brett.setzeStellung(z.chess.fen(), { animieren: true, letzterZug: [m.from, m.to], schach: z.chess.inCheck() ? true : null });
@@ -1583,6 +1605,7 @@ export function zeige(root, params, app) {
   async function ende(ergebnis, grund) {
     if (z.phase === 'ende') return;
     loescheVorzuege();
+    pfeilTippWeg();
     z.phase = 'ende';
     if (app.schliesseDialog) app.schliesseDialog();   // z. B. "Wirklich aufgeben?", wenn der Bot mattsetzt
     abbrechenBot();
@@ -2388,6 +2411,34 @@ export function zeige(root, params, app) {
     erlaubeFlo();
     zeichneKnoepfe();
   }
+
+  // Pfeile leichter finden (PFEIL_TIPP_MERKER): zaehlt neu begonnene Partien, zeigt die Zeile ab der zweiten
+  function pfeilTippPruefen() {
+    const el = $('.pfeil-tipp');
+    if (!el || einst.pfeile === false) return;
+    if (app.test && !(window.__test && window.__test.pfeilTipp)) return;
+    let m = null;
+    try { m = JSON.parse(localStorage.getItem(PFEIL_TIPP_MERKER) || 'null'); } catch (e) { m = null; }
+    if (!m || typeof m !== 'object') m = {};
+    if (m.erledigt === true) return;
+    const partien = Math.max(0, Number(m.partien) || 0) + (laufend ? 0 : 1);
+    try { localStorage.setItem(PFEIL_TIPP_MERKER, JSON.stringify({ partien, erledigt: false })); } catch (e) { /* nur diese Partie */ }
+    if (partien < 2) return;
+    const maus = !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+    el.querySelector('.pt-text').textContent = maus ? 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.'
+      : 'Tipp: Finger auf ein Feld halten und ziehen zeichnet einen Pfeil.';
+    el.hidden = false;
+  }
+  function pfeilTippWeg() {
+    const el = $('.pfeil-tipp');
+    if (!el || el.hidden) return;
+    el.hidden = true;
+    let m = null;
+    try { m = JSON.parse(localStorage.getItem(PFEIL_TIPP_MERKER) || 'null'); } catch (e) { m = null; }
+    try { localStorage.setItem(PFEIL_TIPP_MERKER, JSON.stringify({ partien: Number(m && m.partien) || 2, erledigt: true })); } catch (e) { /* egal */ }
+    layoutSpaeter();
+  }
+  pfeilTippPruefen();
 
   layout();
 

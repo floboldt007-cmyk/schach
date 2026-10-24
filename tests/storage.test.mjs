@@ -72,7 +72,7 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   const std = ladeEinstellungen();
   const erwartet = {
     klangpaket: '', lautstaerke: 0.8, klangstufe: 'alle', zugBestaetigen: 'aus', haltenAufgeben: true, turmRochade: false,
-    autoDame: true, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
+    autoDame: false, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
     duellIntro: 'besondere', figuren: 'cburnett', coachStil: 'ausfuehrlich', sprueche: 'an',
   };
   pruefe('U1: Standards der neuen Einstellungen (Klangstufe alle nach D4, Duell-Intro besondere nach D3)',
@@ -106,7 +106,7 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   // oder nicht: einmal auf 'aus'. 'immer' bleibt, und wer nach der Umstellung 'ohneUhr' waehlt, behaelt es.
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'holz', zugBestaetigen: 'ohneUhr' }));
   const m1 = ladeEinstellungen();
-  pruefe('Fassung 2: alter Stand mit ohneUhr -> aus, andere Werte bleiben, Fassung 2', m1.zugBestaetigen === 'aus' && m1.brett === 'holz' && m1.fassung === 2, m1);
+  pruefe('Fassung 2: alter Stand mit ohneUhr -> aus, andere Werte bleiben, jetzt Fassung 3', m1.zugBestaetigen === 'aus' && m1.brett === 'holz' && m1.fassung === 3, m1);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'immer' }));
   pruefe('Fassung 2: alter Stand mit immer bleibt immer', ladeEinstellungen().zugBestaetigen === 'immer');
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 2 }));
@@ -114,10 +114,18 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'gruen', zugBestaetigen: 'ohneUhr' }));
   const m2 = speichereEinstellungen({ zugBestaetigen: 'ohneUhr' });
   const m2roh = JSON.parse(s.getItem('schach-arena:v1:einstellungen'));
-  pruefe('Fassung 2: nach der Umstellung gewaehltes ohneUhr wird mit Fassung 2 gespeichert und bleibt', m2.zugBestaetigen === 'ohneUhr' && m2roh.fassung === 2
+  pruefe('Fassung 2: nach der Umstellung gewaehltes ohneUhr wird mit Fassung 2 gespeichert und bleibt', m2.zugBestaetigen === 'ohneUhr' && m2roh.fassung === 3
     && ladeEinstellungen().zugBestaetigen === 'ohneUhr' && ladeEinstellungen().brett === 'gruen', m2roh);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 'zwei' }));
   pruefe('Fassung 2: kaputte Fassung zaehlt als alt', ladeEinstellungen().zugBestaetigen === 'aus');
+  // Fassung 3 (24.10.): "Automatisch Dame" Standard aus (Flo will die Figur waehlen); alte Staende mit an -> aus, danach bleibt an
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ autoDame: true, fassung: 2, brett: 'holz' }));
+  const m3 = ladeEinstellungen();
+  pruefe('Fassung 3: alter Stand mit Automatisch Dame an -> aus, anderes bleibt', m3.autoDame === false && m3.brett === 'holz' && m3.fassung === 3, m3);
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ autoDame: true, fassung: 3 }));
+  pruefe('Fassung 3: danach gewaehltes Automatisch Dame bleibt an', ladeEinstellungen().autoDame === true);
+  s.removeItem('schach-arena:v1:einstellungen');
+  pruefe('Fassung 3: neuer Stand ohne Eintrag: Auswahl bei der Umwandlung (aus)', ladeEinstellungen().autoDame === false);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ lautstaerke: 0.333, klanggruppen: [false, false] }));
   const g = ladeEinstellungen();
   pruefe('U1: Lautstaerke auf 0,05 gerundet, Klanggruppen als Liste ignoriert', g.lautstaerke === 0.35 && Object.values(g.klanggruppen).every((x) => x === true), g);
