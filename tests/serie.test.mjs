@@ -875,10 +875,17 @@ async function testeBrowser(browser) {
   await seite.locator('.se-blatt .se-p-tage[data-tage="3"]').click();
   await warte(200);
   const pst = await h.stand();
-  pruefe('Pause für 3 Tage angesagt, ab morgen (heute ist schon gezählt); Kalender zeigt den Liegestuhl, Text nennt den Zeitraum', pst.pausen.length === 3
+  // Der Kalender reicht bis zum Sonntag der laufenden Woche: samstags ist nur ein Pausentag zu sehen, sonntags keiner
+  const sichtbar = await seite.evaluate(async (pausen) => {
+    const T = await import('./js/tag.js');
+    const heute = window.__serie.heute();
+    const sonntag = T.addiereTage(heute, 6 - T.wochentag(heute));
+    return pausen.filter((k) => k <= sonntag).length;
+  }, pst.pausen);
+  pruefe('Pause für 3 Tage angesagt, ab morgen (heute ist schon gezählt); Kalender zeigt den Liegestuhl bis Sonntag, Text nennt den Zeitraum', pst.pausen.length === 3
     && pst.pausen[0] === await seite.evaluate(async () => (await import('./js/tag.js')).addiereTage(window.__serie.heute(), 1))
     && /Pause angesagt: .* \(3 Tage\)/.test(await seite.locator('.se-blatt .se-p-info').innerText())
-    && await seite.locator('.se-blatt .se-k-tag.pause').count() >= 2, pst.pausen);
+    && await seite.locator('.se-blatt .se-k-tag.pause').count() === sichtbar, { pausen: pst.pausen, sichtbar });
   await seite.locator('.se-blatt .se-p-ende').click();
   await warte(200);
   pruefe('Pause beenden: weg, die Tage zählen wieder fürs Jahr', (await h.stand()).pausen.length === 0 && /noch 30 von 30 Pausentagen/.test(await seite.locator('.se-blatt .se-p-info').innerText()));
