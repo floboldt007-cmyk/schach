@@ -5,7 +5,7 @@
 // Tageswerk = daily goal, Bruecke = bridge (day), Ruhetag = rest day, Pause = break, Kapitel = chapter, Rekord = record,
 // Umwandlung = promotion, Ehrenreihe = honor row, Doppelschritt = double step, Wochen-Ring = week ring,
 // Siegeslauf = winning run (nicht "streak", damit er nicht mit der Serie verwechselt wird), Flamme = flame,
-// Plakette = badge, Schonungstage = grace days, KW = Wk. Datum kurz: TT.MM. | MM/TT (wie Paket punkte).
+// Plakette = badge, Schonungstage = grace days, KW = Wk, Uebung = practice game (wie Teil 1). Datum kurz: TT.MM. | MM/TT.
 // Wochentage und Kurzformen: 0 = Montag (tag.js wochentag).
 import { registriereTexte } from '../../sprache.js';
 
@@ -49,6 +49,7 @@ registriereTexte('p-serie', {
     'chip.ruht': 'Bauernmarsch ruht, Rekord {best}. Das nächste Tageswerk beginnt Kapitel {kapitel}',
     'chip.laeuft': 'Bauernmarsch: {schachtage}, Rekord {best}',
     // Heute-Karte
+    'heute.ruht': 'ruht',
     'heute.blatt': 'Serien-Blatt öffnen',
     'heute.geschafft': 'Tageswerk geschafft. Alles Weitere ist Kür.',
     'heute.pause': 'Pause: Die Serie ist eingefroren.',
@@ -210,16 +211,17 @@ registriereTexte('p-serie', {
     'chip.ring.mehr': 'Week ring: {n} full weeks in a row. Pawn March: {schachtage}',
     'chip.ruht': 'Pawn March is resting, record {best}. Your next daily goal starts chapter {kapitel}',
     'chip.laeuft': 'Pawn March: {schachtage}, record {best}',
+    'heute.ruht': 'Resting',
     'heute.blatt': 'Open your Pawn March',
     'heute.geschafft': 'Daily goal done. Anything more is a bonus.',
     'heute.pause': 'Break: your streak is frozen.',
     'heute.ruhetag': 'Today is your rest day. It never counts as a day off.',
-    'heute.offen': 'Still open today · daily goal in 5 minutes',
+    'heute.offen': 'Still open today · a 5-minute daily goal',
     'heute.neu': 'Every chess day moves your pawn one square forward. After 6 squares, it promotes.',
     'heute.ruhtDetail': 'Your next daily goal starts chapter {kapitel}. Your pieces and record stay.',
     'heute.bruecke': 'Yesterday was a bridge day. Your {schachtage} carries on.',
     'heute.training': 'Go to Training',
-    'heute.trainingLabel': 'Go to Training: daily goal in 5 minutes',
+    'heute.trainingLabel': 'Go to Training: a 5-minute daily goal',
     'heute.leise': 'Show only the week ring',
     'hinweis.gewohnheit': '66 chess days: according to one study, the median point where a habit runs on its own. Your streak can get quieter now.',
     'hinweis.doppel': 'Welcome back. Double step: your pawn moved two squares.',
@@ -270,10 +272,10 @@ registriereTexte('p-serie', {
     'pause.label.eins': 'Plan a break starting {ab} for {n} day',
     'pause.label.mehr': 'Plan a break starting {ab} for {n} days',
     'regeln.titel': 'How the Pawn March counts',
-    'regeln.tag': 'A day runs from 4 a.m. to 4 a.m. It counts with a daily goal: a game with at least 10 of your own moves (any kind), 3 cards, 2 “Retry from here” exercises, 3 puzzles, or one lesson. Games with help count too. Just opening the app never counts.',
+    'regeln.tag': 'A day runs from 4 a.m. to 4 a.m. It counts with a daily goal: a game with at least 10 of your own moves (any kind), 3 cards, 2 “Retry from here” practice games, 3 puzzles, or one lesson. Games with help count too. Just opening the app never counts.',
     'regeln.frei': 'A day off is never a problem: it becomes a bridge. Only two days off in a row let the streak rest. Your rest day and a planned break never count as a day off. When the streak rests, your next daily goal starts a new chapter; your record, pieces, and chess days stay.',
     'regeln.bauer': 'Every chess day moves your pawn one square forward, and after 6 squares it promotes. Double step: on the first day after at least two days without a daily goal, at most once a month. The pawn never moves backward.',
-    'regeln.lauf': 'Winning run: wins in a row against opponents from one level below your highest unlocked bot (later: from your rating minus 150). Games with help, against weaker opponents, exercises, free games, and boss games do not count and do not end the run. At 3 wins, a flame appears.',
+    'regeln.lauf': 'Winning run: wins in a row against opponents from one level below your highest unlocked bot (later: from your rating minus 150). Games with help, against weaker opponents, practice games, free games, and boss games do not count and do not end the run. At 3 wins, a flame appears.',
     'regeln.ohne': 'The streak brings no sparks, changes no bots, rating, or stars, and is never on a leaderboard.',
     'blatt.neu': 'No chess day yet',
     'blatt.ruht': 'Resting · Record {best} · Chapter {kapitel}',
@@ -322,6 +324,6 @@ registriereTexte('p-serie', {
     'beweis.karte.eins': '{n} card', 'beweis.karte.mehr': '{n} cards',
     'beweis.raetsel.eins': '{n} puzzle', 'beweis.raetsel.mehr': '{n} puzzles',
     'beweis.lektion.eins': '{n} lesson', 'beweis.lektion.mehr': '{n} lessons',
-    'beweis.uebung.eins': '{n} exercise', 'beweis.uebung.mehr': '{n} exercises',
+    'beweis.uebung.eins': '{n} practice game', 'beweis.uebung.mehr': '{n} practice games',
   },
 });

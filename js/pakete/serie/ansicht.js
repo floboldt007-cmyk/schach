@@ -131,7 +131,7 @@ export function heuteZeile({ lage, st, einst = {}, training = false, beiTraining
   const heuteArt = lage.heuteGezaehlt ? 'gezaehlt' : 'offen';
   let titel;
   if (lage.art === 'neu') titel = `<b>${esc(t('p-serie.name'))}</b>`;
-  else if (lage.art === 'ruht') titel = `<b>${esc(t('p-serie.ruht'))}</b> · ${esc(t('p-serie.rekord', { wert: zahl(lage.best) }))}`;
+  else if (lage.art === 'ruht') titel = `<b>${esc(t('p-serie.heute.ruht'))}</b> · ${esc(t('p-serie.rekord', { wert: zahl(lage.best) }))}`;
   else titel = `<b>${esc(t('p-serie.tag', { wert: zahl(lage.aktuell) }))}</b> · ${esc(t('p-serie.name'))}`;
   z.innerHTML = `<div class="se-h-zeile"><button class="se-h-titel" type="button" aria-label="${esc(t('p-serie.heute.blatt'))}">`
     + `<span class="se-h-symbol" aria-hidden="true">${icon('se-bauer', 'se-ico')}</span><span class="se-h-text">${titel}</span></button>`
