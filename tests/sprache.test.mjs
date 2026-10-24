@@ -71,6 +71,12 @@ async function nodeTeil() {
   pruefe('unbekannte Sprache: Deutsch', S.setzeSprache('fr') === 'de' && S.sprache() === 'de');
   pruefe('locale', S.locale() === 'de-DE' && (S.setzeSprache('en'), S.locale() === 'en-US'));
   S.setzeSprache('de');
+  // Sprache des Geraets (Flo, 24.10.): erste deutsche oder englische Geraetesprache, sonst die Region
+  const gs = S.geraeteSprache;
+  pruefe('Geraet: de-DE deutsch, en-US englisch', gs(['de-DE']) === 'de' && gs(['en-US']) === 'en' && gs(['de']) === 'de' && gs(['en_GB']) === 'en');
+  pruefe('Geraet: erste passende Sprache gewinnt', gs(['fr-FR', 'de-DE', 'en-US']) === 'de' && gs(['es-ES', 'en-GB', 'de-DE']) === 'en');
+  pruefe('Geraet: andere Sprache, Region DE/AT/LI deutsch, sonst englisch', gs(['fr-AT']) === 'de' && gs(['tr-DE']) === 'de'
+    && gs(['fr-FR']) === 'en' && gs(['ja-JP']) === 'en' && gs([]) === 'en');
   let warf = false;
   try { S.registriereTexte('Gross', {}); } catch (e) { warf = true; }
   pruefe('Bereichsname wird geprueft', warf);
@@ -129,6 +135,25 @@ async function nodeTeil() {
   const st = await import('../js/storage.js');
   pruefe('Standard sprache de, erlaubt de und en', st.STANDARD_EINSTELLUNGEN.sprache === 'de'
     && JSON.stringify(st.EINSTELLUNG_WERTE.sprache) === '["de","en"]');
+  pruefe('Standard: keine eigene Wahl (Sprache des Geraets)', st.STANDARD_EINSTELLUNGEN.spracheGewaehlt === false);
+  {
+    // alte Staende: bewusst Englisch bleibt Wahl, das alte Standard-Deutsch folgt dem Geraet
+    const speicher = new Map();
+    st.setzeSpeicher({ getItem: (k) => (speicher.has(k) ? speicher.get(k) : null), setItem: (k, v) => speicher.set(k, String(v)), removeItem: (k) => speicher.delete(k), key: (i) => [...speicher.keys()][i] ?? null, get length() { return speicher.size; } });
+    try {
+      const k = 'schach-arena:v1:einstellungen';
+      speicher.set(k, JSON.stringify({ sprache: 'en', fassung: 3 }));
+      const en = st.ladeEinstellungen();
+      speicher.set(k, JSON.stringify({ sprache: 'de', fassung: 3 }));
+      const de = st.ladeEinstellungen();
+      speicher.set(k, JSON.stringify({ sprache: 'en', spracheGewaehlt: false, fassung: 3 }));
+      const zurueck = st.ladeEinstellungen();
+      pruefe('alter Stand: Englisch bleibt gewaehlt, Deutsch folgt dem Geraet, Geraet bleibt Geraet',
+        en.sprache === 'en' && en.spracheGewaehlt === true && de.spracheGewaehlt === false && zurueck.spracheGewaehlt === false);
+    } finally {
+      st.setzeSpeicher(null);
+    }
+  }
   gruppe = '';
 }
 
@@ -151,10 +176,10 @@ async function warteAufServer(url, ms = 10000) {
   throw new Error('Server startet nicht: ' + url);
 }
 
-async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = false } = {}) {
+async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = false, locale = 'de-DE' } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: handy, isMobile: handy, colorScheme: dunkel ? 'dark' : 'light',
-    timezoneId: 'Europe/Berlin',
+    timezoneId: 'Europe/Berlin', locale,
   });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -313,10 +338,37 @@ async function browserTeil(browser) {
     await warte(400);
     pruefe('ohne Wahl: <html lang="de">, Einstellungen deutsch', await seite.evaluate(() => document.documentElement.lang) === 'de'
       && /Einstellungen/.test(await seite.locator('#app').innerText()));
-    pruefe('Sprachwahl mit ?test sichtbar (Deutsch, English)', await seite.locator('[data-einstellung="sprache"] .es-seg').count() === 2);
+    pruefe('Sprachwahl sichtbar (Geraet, Deutsch, English), Geraet gewaehlt', await seite.locator('[data-einstellung="sprache"] .es-seg').count() === 3
+      && await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').getAttribute('aria-checked') === 'true');
     await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="en"]').click();
     await seite.waitForFunction(() => document.documentElement.lang === 'en', null, { timeout: 10000 });
-    pruefe('Wahl English: Seite laedt neu und ist englisch', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).sprache) === 'en');
+    const gespeichert = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')));
+    pruefe('Wahl English: Seite laedt neu und ist englisch', gespeichert.sprache === 'en' && gespeichert.spracheGewaehlt === true);
+    await seite.waitForFunction(() => !!document.querySelector('[data-einstellung="sprache"] .es-seg[aria-checked="true"]'), null, { timeout: 10000 });
+    await seite.locator('[data-einstellung="sprache"] .es-seg[data-wert="auto"]').click();
+    await seite.waitForFunction(() => document.documentElement.lang === 'de', null, { timeout: 10000 });
+    pruefe('Wahl Geraet: zurueck auf die Sprache des Geraets (Test: deutsch)', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).spracheGewaehlt) === false);
+    await kontext.close();
+  }
+  // Sprache des Geraets ohne eigene Wahl (?autosprache: auch im Testlauf wie auf einem echten Geraet)
+  gruppe = 'Sprache des Geraets';
+  for (const [loc, erwartet] of [['en-US', 'en'], ['de-DE', 'de'], ['de-AT', 'de']]) {
+    const { kontext, seite } = await neueSeite(browser, { locale: loc });
+    await seite.goto(BASIS + '&autosprache#einstellungen');
+    await seite.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 20000 });
+    pruefe(`Geraet ${loc}: ${erwartet}`, await seite.evaluate(() => document.documentElement.lang) === erwartet);
+    await kontext.close();
+  }
+  {
+    // eigene Wahl schlaegt das Geraet; ohne ?autosprache bleibt ein Testlauf deutsch
+    const { kontext, seite } = await neueSeite(browser, { locale: 'en-US' });
+    await seite.goto(BASIS + '#einstellungen');
+    await seite.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 20000 });
+    pruefe('Testlauf ohne ?autosprache: deutsch trotz englischem Geraet', await seite.evaluate(() => document.documentElement.lang) === 'de');
+    await seite.evaluate(() => localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ sprache: 'de', spracheGewaehlt: true, fassung: 3 })));
+    await seite.goto(BASIS + '&autosprache#einstellungen');
+    await seite.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 20000 });
+    pruefe('eigene Wahl Deutsch schlaegt englisches Geraet', await seite.evaluate(() => document.documentElement.lang) === 'de');
     await kontext.close();
   }
   const ansichten = [['ipad-hell', {}], ['ipad-dunkel', { dunkel: true }], ['handy-hell', { w: 390, h: 844, handy: true }], ['handy-dunkel', { w: 390, h: 844, handy: true, dunkel: true }]];

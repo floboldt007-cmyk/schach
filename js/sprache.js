@@ -11,6 +11,10 @@
 // API:
 //   SPRACHEN = ['de', 'en']
 //   sprache() -> 'de' | 'en'
+//   geraeteSprache(sprachen = navigator.languages) -> 'de' | 'en'   Sprache des Geraets (Flo, 24.10.: deutsches Geraet
+//       deutsch, englisches englisch): die erste Geraetesprache, die Deutsch oder Englisch ist; spricht das Geraet keine
+//       von beiden, entscheidet die Region (Deutschland, Oesterreich, Liechtenstein: Deutsch), sonst Englisch.
+//       Kein Standort, keine Anfrage ans Netz: nur die Einstellungen des Geraets.
 //   setzeSprache(code) -> code   unbekannt: 'de'; setzt auch <html lang> (falls es ein document gibt)
 //   registriereTexte(bereich, { de: {...}, en: {...} })   bereich [a-z][a-z0-9-]*; Schluessel ohne den Bereich
 //   t(schluessel, werte = {}) -> Text   'bereich.schluessel'. Fehlt er im Englischen: der deutsche Text; fehlt er ganz:
@@ -20,8 +24,9 @@
 //   zahl(n, opt) / datum(d, opt)   Intl mit der Sprache ('de-DE' | 'en-US')
 //   locale() -> 'de-DE' | 'en-US'
 //   texte(sprache) -> { 'bereich.schluessel': Text }   (Tests: alle angemeldeten Texte einer Sprache)
-//   SPRACHWAHL   true seit Teil 2 (alle Screens und Pakete uebersetzt): die Einstellungen zeigen die Wahl. Dazu schaltet
-//       weiter die Adresse um (?sprache=en, wird gemerkt) und die gespeicherte Einstellung gilt.
+//   SPRACHWAHL   true seit Teil 2 (alle Screens und Pakete uebersetzt): die Einstellungen zeigen die Wahl (Geraet, Deutsch,
+//       English). Dazu schaltet weiter die Adresse um (?sprache=en, wird gemerkt). Welche Sprache beim Start gilt,
+//       entscheidet js/app.js (eigene Wahl, sonst geraeteSprache()).
 //
 // Regeln fuer Woerterbuecher: t() erst beim Zeichnen aufrufen, nie beim Laden eines Moduls (sonst bliebe der Text in
 // der Sprache von vor dem Start stehen). Texte ohne HTML; Markup bleibt im Code.
@@ -36,6 +41,22 @@ const gewarnt = new Set();
 
 export function sprache() {
   return aktuell;
+}
+
+const DEUTSCHE_REGIONEN = new Set(['DE', 'AT', 'LI']);
+export function geraeteSprache(sprachen = null) {
+  let liste = sprachen;
+  if (!Array.isArray(liste)) {
+    try {
+      liste = typeof navigator === 'undefined' ? [] : (navigator.languages && navigator.languages.length ? [...navigator.languages] : [navigator.language]);
+    } catch (e) { liste = []; }
+  }
+  const tags = liste.filter((x) => typeof x === 'string' && x).map((x) => x.replace('_', '-'));
+  for (const tag of tags) {
+    const s = tag.split('-')[0].toLowerCase();
+    if (SPRACHEN.includes(s)) return s;
+  }
+  return tags.some((tag) => DEUTSCHE_REGIONEN.has((tag.split('-')[1] || '').toUpperCase())) ? 'de' : 'en';
 }
 
 export function locale() {

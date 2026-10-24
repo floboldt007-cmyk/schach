@@ -12,7 +12,7 @@
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
-import { SPRACHWAHL, sprache, t } from '../sprache.js';
+import { SPRACHWAHL, t } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
@@ -141,7 +141,7 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-anzeige">${E('gruppe.anzeige')}</h3>
           ${segment('thema',E('anzeige.ansicht'),[['modern',E('anzeige.modern')]])}
           ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
-          ${ZEIGE_SPRACHE ? segment('sprache','Sprache · Language',[['de','Deutsch'],['en','English']]) : ''}
+          ${ZEIGE_SPRACHE ? segment('sprache','Sprache · Language',[['auto',E('anzeige.geraet')],['de','Deutsch'],['en','English']]) : ''}
           <h4>${E('anzeige.brettfarbe')}</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
             ${BRETTER.map((b) => `
@@ -204,7 +204,11 @@ export function zeige(root, params = {}, app) {
     const probe = sec.querySelector('.es-probe');
     if (probe) probe.disabled = e.klang === false;
     for (const b of sec.querySelectorAll('.es-brett')) b.setAttribute('aria-checked', b.dataset.wert === (e.brett || 'nacht') ? 'true' : 'false');
-    for (const b of sec.querySelectorAll('.es-seg')) b.setAttribute('aria-checked', String(b.dataset.wert) === String(e[b.dataset.key]) ? 'true' : 'false');
+    for (const b of sec.querySelectorAll('.es-seg')) {
+      // Sprache ohne eigene Wahl: "Geraet" (js/app.js spracheOhneWahl)
+      const wert = b.dataset.key === 'sprache' && !e.spracheGewaehlt ? 'auto' : e[b.dataset.key];
+      b.setAttribute('aria-checked', String(b.dataset.wert) === String(wert) ? 'true' : 'false');
+    }
     const regler = sec.querySelector('[data-key="lautstaerke"]');
     if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = E('prozent', { wert: Math.round(regler.value * 100) }); }
   }
@@ -262,9 +266,13 @@ export function zeige(root, params = {}, app) {
       case 'brett': setze({ brett: k.dataset.wert }); break;
       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
       case 'wahl':
+        if (k.dataset.key === 'sprache') {
+          // Geraet oder feste Sprache; danach alles neu zeichnen (die Screens lesen ihre Texte beim Zeichnen)
+          setze(k.dataset.wert === 'auto' ? { spracheGewaehlt: false } : { sprache: k.dataset.wert, spracheGewaehlt: true });
+          setTimeout(() => location.reload(), 60);
+          break;
+        }
         setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert });
-        // neue Sprache: alles neu zeichnen (die Screens lesen ihre Texte beim Zeichnen)
-        if (k.dataset.key === 'sprache' && k.dataset.wert !== sprache()) setTimeout(() => location.reload(), 60);
         break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
