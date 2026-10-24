@@ -1,6 +1,11 @@
 // Eroeffnungs-Tabelle: Buchzuege und deutsche Namen. Zuege in englischer SAN.
 // Erkennung ueber Stellungen (nicht nur Zugfolgen), damit Zugumstellungen passen.
+// Englische Version (Teil 1): die Namen der Tabelle (und damit gespeicherte Partien und Analysen) bleiben deutsch.
+// Angezeigt wird ueber eroeffnungsAnzeige(name): der Name in der eingestellten Sprache (Woerterbuch
+// js/sprachen/eroeffnungen.js); unbekannte Namen kommen unveraendert zurueck.
 import { Chess } from '../vendor/chess/chess.js';
+import { t, texte, SPRACHEN } from './sprache.js';
+import './sprachen/eroeffnungen.js';
 
 // Buchzuege zaehlen nur in den ersten Halbzuegen (laengste Tabellenzeile: 16)
 export const BUCH_GRENZE = 16;
@@ -347,4 +352,21 @@ export function eroeffnung(sanListe) {
   }
   for (let i = 0; i < namen.length; i++) if (namen[i] == null && i > 0) namen[i] = namen[i - 1];
   return { name, buch, namen };
+}
+
+// Anzeigename einer Eroeffnung in der eingestellten Sprache. name: ein Name aus der Tabelle (deutsch, wie gespeichert)
+// oder einer der Zusatznamen ("Unbekannte Eröffnung", "Eröffnungstheorie"); auch ein englischer Name wird erkannt.
+// Auf Deutsch kommt ein deutscher Name unveraendert zurueck.
+let NAMEN_SCHLUESSEL = null;   // Name (jede Sprache) -> Schluessel im Woerterbuch
+export function eroeffnungsAnzeige(name) {
+  if (typeof name !== 'string' || !name) return name;
+  if (!NAMEN_SCHLUESSEL) {
+    NAMEN_SCHLUESSEL = new Map();
+    // Deutsch zuletzt: bei gleichem Text gewinnt der deutsche Eintrag
+    for (const s of [...SPRACHEN].reverse()) {
+      for (const [k, v] of Object.entries(texte(s))) if (k.startsWith('eroeffnungen.')) NAMEN_SCHLUESSEL.set(v, k);
+    }
+  }
+  const k = NAMEN_SCHLUESSEL.get(name);
+  return k ? t(k) : name;
 }
