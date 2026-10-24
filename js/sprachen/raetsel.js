@@ -37,7 +37,7 @@ registriereTexte('raetsel', {
     falschText: 'No problem: take your time and look at the solution.',
     geloest: 'Solved!',
     richtig: 'Correct!',
-    soGehtEs: 'This is how it goes',
+    soGehtEs: 'Here is how it works',
     leerTitel: 'Nothing to solve right now',
     leerText: 'There is no puzzle here at the moment.',
     allesGeloest: 'All solved',

@@ -9,7 +9,7 @@ import {
   pruefeZuzweit, pruefeTempo, ladeModulEinstellungen, speichereModulEinstellungen,
   ladeLaufendePartie, speichereLaufendePartie, loescheLaufendePartie, speicherePartie,
 } from '../storage.js';
-import { t } from '../sprache.js';
+import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 
@@ -30,6 +30,12 @@ function farbwort(farbe) {
 // gespeichert bleibt der Name, wie er ist
 function anzeigeName(n) {
   return n === 'Weiß' ? t('allgemein.weiss') : n === 'Schwarz' ? t('allgemein.schwarz') : n;
+}
+// Zugliste: Deutsch wie bisher (sanDeutsch: K D T L S), Englisch die SAN von chess.js (K Q R B N), Rochade mit Nullen
+// wie in der Analyse. Bereich d bringt dafuer sanAnzeige in review.js; nach dem Zusammenfuehren kann zuzweit.js die nehmen.
+function sanText(san) {
+  if (sprache() === 'de') return sanDeutsch(san);
+  return String(san ?? '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 }
 
 function stil() {
@@ -176,7 +182,7 @@ function partie(root, quelle, app, fortgesetzt) {
     }
     karten(); tick();
     s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? Z(chess.inCheck() ? 'amZugSchach' : 'amZug', { name: name(chess.turn()) }) : Z('beendet');
-    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanDeutsch(san)}`).join(' ');
+    s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanText(san)}`).join(' ');
   }
   function beiZug(von, nach, umwandlung) {
     if (weg || fragt || z.phase !== 'spiel') return false;
