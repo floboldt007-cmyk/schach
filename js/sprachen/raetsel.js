@@ -1,9 +1,48 @@
 // Woerterbuch "raetsel" (Englische Version, Teil 1). Schluessel t('raetsel.x'); de = die heutigen deutschen Texte woertlich.
+// Genutzt vom Raetsel-Bildschirm (js/ui/raetsel.js). Titel und Texte der Quellen (Pakete) kommen von den Paketen selbst.
 import { registriereTexte } from '../sprache.js';
 
 registriereTexte('raetsel', {
   de: {
+    titel: 'Rätsel',
+    aufgabeTitel: 'Finde den besten Zug',
+    brett: 'Brett des Rätsels',
+    zeigen: 'Lösung zeigen',
+    fortschritt: '{jetzt} von {gesamt}',
+    zumAbschluss: 'Zum Abschluss',
+    hinweisKopf: 'Nicht ganz. Noch ein Versuch.',
+    hinweisFigur: 'Schau dir die Figur auf {feld} an.',
+    falschKopf: 'Das war es noch nicht.',
+    falschText: 'Kein Problem: Schau dir die Lösung in Ruhe an.',
+    geloest: 'Gelöst!',
+    richtig: 'Richtig!',
+    soGehtEs: 'So geht es',
+    leerTitel: 'Gerade nichts zu lösen',
+    leerText: 'Hier ist im Moment keine Aufgabe.',
+    allesGeloest: 'Alles gelöst',
+    geschafft: 'Geschafft',
+    fertigFuerJetzt: 'Fertig für jetzt',
+    vonGeloest: 'von {gesamt} gelöst',
   },
   en: {
+    titel: 'Puzzle',
+    aufgabeTitel: 'Find the strongest move',
+    brett: 'Puzzle board',
+    zeigen: 'Show solution',
+    fortschritt: '{jetzt} of {gesamt}',
+    zumAbschluss: 'See summary',
+    hinweisKopf: 'Not quite. Have another go.',
+    hinweisFigur: 'Take a look at the piece on {feld}.',
+    falschKopf: 'Not this time.',
+    falschText: 'No problem: take your time and look at the solution.',
+    geloest: 'Solved!',
+    richtig: 'Correct!',
+    soGehtEs: 'This is how it goes',
+    leerTitel: 'Nothing to solve right now',
+    leerText: 'There is no puzzle here at the moment.',
+    allesGeloest: 'All solved',
+    geschafft: 'All done',
+    fertigFuerJetzt: 'Done for now',
+    vonGeloest: 'of {gesamt} solved',
   },
 });

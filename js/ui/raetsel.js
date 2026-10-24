@@ -44,6 +44,9 @@ import { icon } from './icons.js';
 import { klang } from '../sounds.js';
 import { anim, staffel, tempo, takt } from '../bewegung.js';
 import { ladeEinstellungen } from '../storage.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/raetsel.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -87,7 +90,7 @@ export function pruefeAufgabe(a) {
     id: String(a.id ?? '').slice(0, 80),
     fen: a.fen,
     loesung: a.loesung.slice(),
-    titel: kurz(a.titel, 80) || 'Finde den besten Zug',
+    titel: kurz(a.titel, 80) || t('raetsel.aufgabeTitel'),
     text: kurz(a.text, 240),
     hinweis: kurz(a.hinweis, 200),
     erklaerung: kurz(a.erklaerung, 240),
@@ -120,7 +123,7 @@ export function zeige(root, params, app) {
 
   const s = document.createElement('section');
   s.className = 'screen rs-screen';
-  s.setAttribute('aria-label', 'Rätsel');
+  s.setAttribute('aria-label', t('raetsel.titel'));
   root.append(s);
 
   // nichts zu zeigen: still zur Arena (wie ein Paket-Screen ohne Paket)
@@ -133,7 +136,7 @@ export function zeige(root, params, app) {
   ladeCss();
   const aufgaben = (Array.isArray(roh) ? roh : []).slice(0, MAX_AUFGABEN).map(pruefeAufgabe).filter(Boolean);
   if (Array.isArray(roh) && aufgaben.length < Math.min(roh.length, MAX_AUFGABEN)) console.warn('Rätsel: ungültige Aufgaben übersprungen');
-  const titel = kurz(quelle ? quelle.titel : p.titel, 60) || 'Rätsel';
+  const titel = kurz(quelle ? quelle.titel : p.titel, 60) || t('raetsel.titel');
   const unter = kurz(quelle ? quelle.unter : p.unter, 60);
   const einst = (() => { try { return app && typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
 
@@ -144,7 +147,7 @@ export function zeige(root, params, app) {
           <span class="rs-zaehler zahl"></span>
           <span class="rs-punkte" aria-hidden="true"></span>
         </div>
-        <div class="rs-brettzone"><div class="brett-rahmen rs-rahmen"><div class="rs-brett" aria-label="Brett des Rätsels"></div></div></div>
+        <div class="rs-brettzone"><div class="brett-rahmen rs-rahmen"><div class="rs-brett" aria-label="${t('raetsel.brett')}"></div></div></div>
         <div class="rs-seite">
           <div class="rs-status">
             <div class="rs-statuszeile"><span class="rs-amzug"><i></i><span></span></span><span class="rs-marke" hidden><i></i><span></span></span></div>
@@ -153,8 +156,8 @@ export function zeige(root, params, app) {
           </div>
           <div class="rs-meldung" role="status" hidden></div>
           <div class="rs-aktionen">
-            <button class="knopf dr rs-zeigen" type="button" data-r="zeigen">${icon('auge')}Lösung zeigen</button>
-            <button class="knopf primaer dr rs-weiter" type="button" data-r="weiter" hidden>Weiter${icon('vor')}</button>
+            <button class="knopf dr rs-zeigen" type="button" data-r="zeigen">${icon('auge')}${t('raetsel.zeigen')}</button>
+            <button class="knopf primaer dr rs-weiter" type="button" data-r="weiter" hidden>${t('allgemein.weiter')}${icon('vor')}</button>
           </div>
         </div>
       </div>
@@ -207,7 +210,7 @@ export function zeige(root, params, app) {
     let l = null;
     try { l = quelle && typeof quelle.leer === 'function' ? quelle.leer() : null; } catch (e) { l = null; }
     zeigeAbschluss({
-      art: 'leer', titel: (l && l.titel) || 'Gerade nichts zu lösen', text: (l && l.text) || 'Hier ist im Moment keine Aufgabe.',
+      art: 'leer', titel: (l && l.titel) || t('raetsel.leerTitel'), text: (l && l.text) || t('raetsel.leerText'),
     });
     return handle();
   }
@@ -222,7 +225,7 @@ export function zeige(root, params, app) {
   punkteEl.innerHTML = aufgaben.length <= PUNKTE_MAX ? aufgaben.map(() => '<i></i>').join('') : '<b class="rs-balken"><i></i></b>';
 
   function zeichneFortschritt() {
-    zaehlerEl.innerHTML = `<b>${Math.min(st.i + 1, aufgaben.length)}</b> von <b>${aufgaben.length}</b>`;
+    zaehlerEl.innerHTML = t('raetsel.fortschritt', { jetzt: `<b>${Math.min(st.i + 1, aufgaben.length)}</b>`, gesamt: `<b>${aufgaben.length}</b>` });
     if (aufgaben.length <= PUNKTE_MAX) {
       [...punkteEl.children].forEach((el, n) => {
         const e = st.ergebnisse[n];
@@ -239,7 +242,7 @@ export function zeige(root, params, app) {
     const zug = $('.rs-amzug');
     zug.hidden = false;
     zug.querySelector('i').dataset.farbe = amZug;
-    zug.querySelector('span').textContent = amZug === 'w' ? 'Weiß am Zug' : 'Schwarz am Zug';
+    zug.querySelector('span').textContent = amZug === 'w' ? t('allgemein.weissAmZug') : t('allgemein.schwarzAmZug');
     const marke = $('.rs-marke');
     marke.hidden = !a.marke;
     marke.dataset.klasse = a.klasse || '';
@@ -302,7 +305,7 @@ export function zeige(root, params, app) {
     zeigenK.disabled = false;
     zeigenK.classList.remove('primaer');
     weiterK.hidden = true;
-    weiterK.innerHTML = `${i + 1 < aufgaben.length ? 'Weiter' : 'Zum Abschluss'}${icon('vor')}`;
+    weiterK.innerHTML = `${i + 1 < aufgaben.length ? t('allgemein.weiter') : t('raetsel.zumAbschluss')}${icon('vor')}`;
     st.phase = 'flo';
     erlaube();
     zeichneFortschritt();
@@ -364,7 +367,7 @@ export function zeige(root, params, app) {
     const von = a.loesung[st.schritt].slice(0, 2);
     if (st.fehl === 1) {
       brett.markiere([von], 'hinweis');
-      meldung('hinweis', 'Nicht ganz. Noch ein Versuch.', a.hinweis || `Schau dir die Figur auf ${von} an.`);
+      meldung('hinweis', t('raetsel.hinweisKopf'), a.hinweis || t('raetsel.hinweisFigur', { feld: von }));
       st.phase = 'flo';
       erlaube();
       return;
@@ -372,7 +375,7 @@ export function zeige(root, params, app) {
     // zweiter Fehlversuch: das Brett ruht, die Loesung ist die naechste Aktion
     st.phase = 'aus';
     erlaube();
-    meldung('falsch', 'Das war es noch nicht.', 'Kein Problem: Schau dir die Lösung in Ruhe an.');
+    meldung('falsch', t('raetsel.falschKopf'), t('raetsel.falschText'));
     zeigenK.classList.add('primaer');
     try { zeigenK.focus({ preventScroll: true }); } catch (e) { /* egal */ }
   }
@@ -396,7 +399,7 @@ export function zeige(root, params, app) {
     brett.markiere([m.to], 'k-bester');
     st.striche = brett.striche([{ art: 'haken', von: m.to, nach: m.to, farbe: 'bester', breite: 0.11 }], { animieren: tempo() > 0 });
     spielKlang(typeof rueck.klang === 'string' ? rueck.klang : 'raetsel-richtig');
-    meldung('richtig', rueck.titel || (st.fehl ? 'Gelöst!' : 'Richtig!'), rueck.text || (aufgaben[st.i].erklaerung || ''), { feder: true });
+    meldung('richtig', rueck.titel || (st.fehl ? t('raetsel.geloest') : t('raetsel.richtig')), rueck.text || (aufgaben[st.i].erklaerung || ''), { feder: true });
     fertigKnoepfe();
   }
 
@@ -430,7 +433,7 @@ export function zeige(root, params, app) {
     st.phase = 'gezeigt';
     statusFertig();
     const rueck = melde({ richtig: false, versuch: st.fehl, fehlversuche: st.fehl, loesungGezeigt: true });
-    meldung('loesung', rueck.titel || 'So geht es', [a.erklaerung, rueck.text].filter(Boolean).join(' '));
+    meldung('loesung', rueck.titel || t('raetsel.soGehtEs'), [a.erklaerung, rueck.text].filter(Boolean).join(' '));
     fertigKnoepfe();
   }
 
@@ -468,12 +471,12 @@ export function zeige(root, params, app) {
     e = e && typeof e === 'object' ? e : {};
     if (typeof e.klang === 'string') spielKlang(e.klang);
     zeigeAbschluss({
-      art: 'ende', titel: e.titel || (zus.geloest === zus.gesamt ? 'Alles gelöst' : 'Geschafft'),
+      art: 'ende', titel: e.titel || (zus.geloest === zus.gesamt ? t('raetsel.allesGeloest') : t('raetsel.geschafft')),
       text: e.text || '', knoepfe: Array.isArray(e.knoepfe) ? e.knoepfe : [], zahl: zus,
     });
   }
 
-  function zeigeAbschluss({ art, titel: t, text, knoepfe = [], zahl = null }) {
+  function zeigeAbschluss({ art, titel: kopfTitel, text, knoepfe = [], zahl = null }) {
     inhalt.hidden = true;
     endeEl.hidden = false;
     endeEl.dataset.art = art;
@@ -482,14 +485,14 @@ export function zeige(root, params, app) {
     const eigene = knoepfe.filter((k) => k && typeof k.text === 'string' && typeof k.beiKlick === 'function').slice(0, 2);
     endeEl.innerHTML = `<div class="rs-ende-karte">
         <span class="rs-ende-symbol" data-art="${esc(art)}">${icon(art === 'ende' ? 'haken' : 'ziel')}</span>
-        ${art === 'ende' ? '<div class="ueberzeile">Fertig für jetzt</div>' : ''}
-        <h2 class="disp">${esc(t)}</h2>
-        ${zahl ? `<div class="rs-ende-zahl zahl"><b>${zahl.geloest}</b> <small>von ${zahl.gesamt} gelöst</small></div>` : ''}
+        ${art === 'ende' ? `<div class="ueberzeile">${t('raetsel.fertigFuerJetzt')}</div>` : ''}
+        <h2 class="disp">${esc(kopfTitel)}</h2>
+        ${zahl ? `<div class="rs-ende-zahl zahl"><b>${zahl.geloest}</b> <small>${t('raetsel.vonGeloest', { gesamt: zahl.gesamt })}</small></div>` : ''}
         ${punkte}
         ${text ? `<p>${esc(text)}</p>` : ''}
         <div class="rs-ende-knoepfe">
           ${eigene.map((k, n) => `<button class="knopf dr${k.art === 'primaer' ? ' primaer' : ''}" type="button" data-eigen="${n}">${esc(k.text)}</button>`).join('')}
-          <button class="knopf dr${eigene.some((k) => k.art === 'primaer') ? '' : ' primaer'} rs-fertig" type="button" data-r="fertig">${art === 'ende' ? 'Fertig' : 'Zurück'}</button>
+          <button class="knopf dr${eigene.some((k) => k.art === 'primaer') ? '' : ' primaer'} rs-fertig" type="button" data-r="fertig">${art === 'ende' ? t('allgemein.fertig') : t('allgemein.zurueck')}</button>
         </div>
       </div>`;
     endeEl.querySelectorAll('[data-eigen]').forEach((b) => b.addEventListener('click', () => {

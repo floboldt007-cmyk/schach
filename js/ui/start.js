@@ -35,6 +35,9 @@ import { ladeFortschritt, naechsterGegner } from '../storage.js';
 import * as D from '../pakete/start/dienst.js';
 import { SCHAETZUNG } from '../pakete/start/logik.js';
 import { EINSTUFUNG } from '../pakete/start/aufgaben.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/einstellungen.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const SEITEN = Object.freeze(['w1', 'w2', 'w3', 'frage', 'einstufung', 'empfehlung', 'nach-regeln']);
@@ -43,6 +46,8 @@ const INTRO = ['w1', 'w2', 'w3'];
 const FEN_WILLKOMMEN = 'r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4';
 const FEN_GRUND = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const spielKlang = (name) => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
+// Texte beim Zeichnen (js/sprachen/einstellungen.js, Schluessel start.*)
+function T(k, w) { return t('einstellungen.start.' + k, w); }
 
 let aktiv = null;
 export function zustand() {
@@ -68,18 +73,18 @@ const knopf = (st, text, { art = '', klein = '' } = {}) =>
 // Bot-Farbe und Toenung aus dem Theme (Rueckfall: Farbe aus bots.js bzw. Flaeche)
 const farben = (b) => `--bf:${botFarbe(b)};--bt:var(--bot-${/^[a-z0-9-]+$/.test(b.id) ? b.id : 'x'}-tint, var(--flaeche-2))`;
 const portraet = (b) => `<div class="st-portraet" style="${farben(b)}"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></div>
-  <div class="st-portraet-name"><b>${esc(b.name)}</b><span>Stufe ${b.stufe} · ${esc(b.titel)}</span></div>`;
-// Seite 2: "Zehn Gegner", "bis zum Stockfisch" (Artikel im Namen: Der/Die -> zum/zur)
-const ZAHLWORT = ['', 'Ein', 'Zwei', 'Drei', 'Vier', 'Fünf', 'Sechs', 'Sieben', 'Acht', 'Neun', 'Zehn', 'Elf', 'Zwölf'];
-ZAHLWORT[20] = 'Zwanzig';
-ZAHLWORT[30] = 'Dreißig';
-const zahlWort = (n) => ZAHLWORT[n] || String(n);
+  <div class="st-portraet-name"><b>${esc(b.name)}</b><span>${T('stufe', { stufe: b.stufe, titel: esc(b.titel) })}</span></div>`;
+// Seite 2: "Zehn Gegner", "bis zum Stockfisch" (Artikel im Namen: Der/Die -> zum/zur); Zahlwoerter beim Zeichnen
+// (Schluessel start.zahl<n>)
+const ZAHLWORT = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30];
+const zahlWort = (n) => (ZAHLWORT.includes(n) ? T('zahl' + n) : String(n));
 function bisZu(name) {
-  const t = String(name || '');
-  if (/^Der /.test(t)) return 'bis zum ' + t.slice(4);
-  if (/^Die /.test(t)) return 'bis zur ' + t.slice(4);
-  if (/^Das /.test(t)) return 'bis zum ' + t.slice(4);
-  return 'bis ' + t;
+  const n = String(name || '');
+  if (/^Der /.test(n)) return T('bisZum', { name: n.slice(4) });
+  if (/^Die /.test(n)) return T('bisZur', { name: n.slice(4) });
+  if (/^Das /.test(n)) return T('bisZum', { name: n.slice(4) });
+  if (/^The /.test(n)) return T('bis', { name: 'the ' + n.slice(4) });   // englischer Name mit Artikel: "to the ..."
+  return T('bis', { name: n });
 }
 
 // ---------- Inhalte der Seiten ----------
@@ -87,11 +92,11 @@ function seite(name) {
   if (name === 'w1') {
     return {
       bild: `<div class="st-sockel">${miniBrett(FEN_WILLKOMMEN, { zuletzt: ['f8', 'c5'] })}
-          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || 'Präzise')}</span></div>`,
-      text: `<div class="ueberzeile">Willkommen bei Crownmate</div>
-        <h1 class="disp st-titel" tabindex="-1">Schach, das mit dir wächst.</h1>
-        <p>Du spielst gegen Gegner mit Charakter, siehst nach jedem Zug, wie gut er war, und lernst aus deinen eigenen Partien. Ohne Werbung, in deinem Tempo.</p>
-        <div class="st-knoepfe">${knopf('weiter', 'Weiter', { art: 'primaer' })}${knopf('ueberspringen', 'Überspringen', { art: 'leise' })}</div>`,
+          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || T('praezise'))}</span></div>`,
+      text: `<div class="ueberzeile">${T('w1.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('w1.titel')}</h1>
+        <p>${T('w1.text')}</p>
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
     };
   }
   if (name === 'w2') {
@@ -102,39 +107,39 @@ function seite(name) {
       // Welten: je Welt ihr Endgegner mit der Nummer der Welt (dreissig Portraets passten nicht in eine Reihe)
       bild: `<div class="st-leiter">${WELTEN.map((w) => { const b = endgegnerDerWelt(w.nr) || erster; return `<span class="st-bot${w.nr === 1 ? ' st-erster' : ''}" style="${farben(b)}" title="${esc(w.name)}">
           <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${w.nr}</b></span>`; }).join('')}</div>
-        <div class="st-leiter-fuss"><span>Start: ${esc(erster.name)}</span><span>Ziel: ${esc(letzter.name)}</span></div>`,
-      text: `<div class="ueberzeile">Deine Gegner</div>
-        <h1 class="disp st-titel" tabindex="-1">${esc(zahlWort(BOTS.length))} Gegner, ${esc(zahlWort(WELTEN.length).toLowerCase())} Welten.</h1>
-        <p>Von ${esc(erster.name)} ${esc(bisZu(letzter.name))}: Jeder Sieg schaltet den nächsten frei, jede Welt endet mit einem Endgegner, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.</p>
-        <div class="st-knoepfe">${knopf('weiter', 'Weiter', { art: 'primaer' })}${knopf('ueberspringen', 'Überspringen', { art: 'leise' })}</div>`,
+        <div class="st-leiter-fuss"><span>${T('w2.start', { name: esc(erster.name) })}</span><span>${T('w2.ziel', { name: esc(letzter.name) })}</span></div>`,
+      text: `<div class="ueberzeile">${T('w2.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('w2.titel', { bots: esc(zahlWort(BOTS.length)), welten: esc(zahlWort(WELTEN.length).toLowerCase()) })}</h1>
+        <p>${T('w2.text', { erster: esc(erster.name), bis: esc(bisZu(letzter.name)) })}</p>
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
     };
   }
   if (name === 'w3') {
     const kacheln = [
-      ['analyse', 'Nach jedem Zug', 'Der Coach sagt dir, wie gut er war.'],
-      ['verlauf', 'Nach der Partie', 'Die Analyse zeigt die Momente, in denen sie kippte.'],
+      ['analyse', T('w3.zugTitel'), T('w3.zugText')],
+      ['verlauf', T('w3.partieTitel'), T('w3.partieText')],
       angeboten('training:karten') > 0
-        ? ['ziel', 'Im Training', 'Deine eigenen Fehler kommen als Rätsel wieder.']
-        : ['stern', 'Drei Sterne je Gegner', 'Für den Sieg, für Genauigkeit und für einen Sieg ohne Hilfe.'],
+        ? ['ziel', T('w3.trainingTitel'), T('w3.trainingText')]
+        : ['stern', T('w3.sterneTitel'), T('w3.sterneText')],
     ];
     return {
-      bild: `<div class="st-kacheln">${kacheln.map(([ic, t, x]) => `<div class="st-kachel"><span class="st-kachel-symbol">${icon(ic)}</span>
-          <div><b>${esc(t)}</b><span>${esc(x)}</span></div></div>`).join('')}</div>`,
-      text: `<div class="ueberzeile">Wie du lernst</div>
-        <h1 class="disp st-titel" tabindex="-1">Aus jeder Partie wird Training.</h1>
-        <p>Hinweis und Zurücknehmen gibt es, wann immer du willst. Was zählt, ist, dass du nach jeder Partie ein Stück mehr siehst.</p>
-        <div class="st-knoepfe">${knopf('weiter', 'Weiter', { art: 'primaer' })}</div>`,
+      bild: `<div class="st-kacheln">${kacheln.map(([ic, kt, x]) => `<div class="st-kachel"><span class="st-kachel-symbol">${icon(ic)}</span>
+          <div><b>${esc(kt)}</b><span>${esc(x)}</span></div></div>`).join('')}</div>`,
+      text: `<div class="ueberzeile">${T('w3.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('w3.titel')}</h1>
+        <p>${T('w3.text')}</p>
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}</div>`,
     };
   }
   if (name === 'frage') {
     return {
       bild: `<div class="st-sockel">${miniBrett(FEN_GRUND)}</div>`,
-      text: `<div class="ueberzeile">Kurz gefragt</div>
-        <h1 class="disp st-titel" tabindex="-1">Kennst du die Schachregeln?</h1>
-        <p>Dann schlagen wir dir nach einer kurzen Einstufung einen passenden Gegner vor. Sonst zeigen wir dir in ein paar Minuten, wie die Figuren ziehen.</p>
+      text: `<div class="ueberzeile">${T('frage.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('frage.titel')}</h1>
+        <p>${T('frage.text')}</p>
         <div class="st-wahl">
-          <button class="st-wahl-knopf dr" type="button" data-st="ja"><b>Ja, ich kenne sie</b><span>Einstufung mit 8 Aufgaben, etwa 5 Minuten</span>${icon('vor')}</button>
-          <button class="st-wahl-knopf dr" type="button" data-st="nein"><b>Nein, zeig sie mir</b><span>Je Figur eine kleine Aufgabe am Brett</span>${icon('vor')}</button>
+          <button class="st-wahl-knopf dr" type="button" data-st="ja"><b>${T('frage.ja')}</b><span>${T('frage.jaText')}</span>${icon('vor')}</button>
+          <button class="st-wahl-knopf dr" type="button" data-st="nein"><b>${T('frage.nein')}</b><span>${T('frage.neinText')}</span>${icon('vor')}</button>
         </div>`,
     };
   }
@@ -142,32 +147,32 @@ function seite(name) {
     const stapel = [EINSTUFUNG[0], EINSTUFUNG[3], EINSTUFUNG[6]];
     return {
       bild: `<div class="st-stapel">${stapel.map((a) => `<div class="st-stapel-ort"><div class="st-stapel-karte">${miniBrett(a.fen)}</div></div>`).join('')}</div>`,
-      text: `<div class="ueberzeile">Einstufung</div>
-        <h1 class="disp st-titel" tabindex="-1">Wie stark bist du schon?</h1>
-        <p>8 kurze Aufgaben, von leicht bis knifflig. Danach schlagen wir dir einen Gegner vor, der zu dir passt. Du kannst jederzeit aufhören.</p>
-        <div class="st-chips"><span>8 Aufgaben</span><span>etwa 5 Minuten</span><span>wertet nichts</span></div>
-        <div class="st-knoepfe">${knopf('einstufung-start', 'Einstufung starten', { art: 'primaer' })}${knopf('arena', 'Lieber gleich spielen')}</div>`,
+      text: `<div class="ueberzeile">${T('einstufung.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('einstufung.titel')}</h1>
+        <p>${T('einstufung.text')}</p>
+        <div class="st-chips"><span>${T('einstufung.aufgaben')}</span><span>${T('einstufung.minuten')}</span><span>${T('einstufung.wertetNichts')}</span></div>
+        <div class="st-knoepfe">${knopf('einstufung-start', T('einstufung.starten'), { art: 'primaer' })}${knopf('arena', T('einstufung.lieberSpielen'))}</div>`,
     };
   }
   if (name === 'empfehlung') {
     const em = D.aktuelleEmpfehlung();
     if (!em) return seite('einstufung');
     const { e, bot, leiter, probe, begruendung: b } = em;
-    const chips = [`${e.geloest} von ${e.gesamt} gelöst`];
-    if (e.geloest && e.ersterVersuch !== e.geloest) chips.push(`${e.ersterVersuch} im ersten Versuch`);
+    const chips = [T('em.geloest', { geloest: e.geloest, gesamt: e.gesamt })];
+    if (e.geloest && e.ersterVersuch !== e.geloest) chips.push(T('em.ersterVersuch', { anzahl: e.ersterVersuch }));
     const knoepfe = probe
-      ? knopf('probe', `Probepartie gegen ${bot.name}`, { art: 'primaer st-probe', klein: 'wertet nicht' }) + knopf('leiter', `Leiter: ${leiter.name}`)
-      : knopf('spielen', `Gegen ${bot.name} spielen`, { art: 'primaer' });
+      ? knopf('probe', T('em.probe', { name: bot.name }), { art: 'primaer st-probe', klein: T('em.wertetNicht') }) + knopf('leiter', T('em.leiter', { name: leiter.name }))
+      : knopf('spielen', T('spielen', { name: bot.name }), { art: 'primaer' });
     return {
       bild: portraet(bot),
-      text: `<div class="ueberzeile">Deine Empfehlung</div>
-        <h1 class="disp st-titel" tabindex="-1">Starte gegen ${esc(bot.name)}</h1>
+      text: `<div class="ueberzeile">${T('em.ueber')}</div>
+        <h1 class="disp st-titel" tabindex="-1">${T('em.titel', { name: esc(bot.name) })}</h1>
         <div class="st-chips">${chips.map((c) => `<span class="zahl">${esc(c)}</span>`).join('')}</div>
         <div class="st-grund">${b.saetze.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
-        ${probe ? `<p class="st-notiz">${esc(bot.name)} ist auf der Leiter noch nicht frei. Eine Probepartie wertet nicht: keine Sterne, keine Freischaltung. Auf der Leiter ist ${esc(leiter.name)} dein nächster Gegner.</p>` : ''}
+        ${probe ? `<p class="st-notiz">${T('em.notiz', { bot: esc(bot.name), leiter: esc(leiter.name) })}</p>` : ''}
         <p class="st-klein">${esc(SCHAETZUNG)}</p>
         <div class="st-knoepfe">${knoepfe}</div>
-        <div class="st-knoepfe st-leise">${knopf('wiederholen', 'Einstufung wiederholen', { art: 'leise' })}${knopf('arena', 'Zur Arena', { art: 'leise' })}</div>`,
+        <div class="st-knoepfe st-leise">${knopf('wiederholen', T('em.wiederholen'), { art: 'leise' })}${knopf('arena', T('zurArena'), { art: 'leise' })}</div>`,
     };
   }
   // nach der Regel-Hilfe: der erste Bot der Leiter (aus BOTS wie Seite 2, kein fester Name; data-st="benno" bleibt als Haken)
@@ -175,11 +180,11 @@ function seite(name) {
   const r = D.stand().regeln;
   return {
     bild: portraet(erster),
-    text: `<div class="ueberzeile">${r && r.geloest === r.gesamt ? 'Regel-Hilfe geschafft' : 'Regel-Hilfe'}</div>
-      <h1 class="disp st-titel" tabindex="-1">Bereit für deine erste Partie?</h1>
-      <p>Du kennst jetzt die Figuren. Am meisten lernst du im Spiel, und ${esc(erster.name)} ist ein freundlicher erster Gegner. Nach jedem Zug sagt dir der Coach, wie er war.</p>
-      <div class="st-knoepfe">${knopf('benno', `Gegen ${erster.name} spielen`, { art: 'primaer' })}${knopf('einstufung-seite', 'Einstufung machen')}</div>
-      <div class="st-knoepfe st-leise">${knopf('arena', 'Zur Arena', { art: 'leise' })}</div>`,
+    text: `<div class="ueberzeile">${r && r.geloest === r.gesamt ? T('regeln.geschafft') : T('regeln.ueber')}</div>
+      <h1 class="disp st-titel" tabindex="-1">${T('regeln.titel')}</h1>
+      <p>${T('regeln.text', { name: esc(erster.name) })}</p>
+      <div class="st-knoepfe">${knopf('benno', T('spielen', { name: erster.name }), { art: 'primaer' })}${knopf('einstufung-seite', T('regeln.einstufung'))}</div>
+      <div class="st-knoepfe st-leise">${knopf('arena', T('zurArena'), { art: 'leise' })}</div>`,
   };
 }
 
@@ -214,19 +219,19 @@ export function zeige(root, params, app) {
   try { zurueck = !!(history.state && history.state.schach && Number(history.state.tiefe) > 0); } catch (e) { zurueck = false; }
   const s = document.createElement('section');
   s.className = 'screen st-screen';
-  s.setAttribute('aria-label', 'Willkommen');
-  s.innerHTML = `${hauptKopf({ titel: 'Crownmate', unter: 'Willkommen', zurueck, chips: '', modus: false, einstellungen: false })}
+  s.setAttribute('aria-label', T('willkommen'));
+  s.innerHTML = `${hauptKopf({ titel: 'Crownmate', unter: T('willkommen'), zurueck, chips: '', modus: false, einstellungen: false })}
     <div class="st-rumpf">
       <div class="st-buehne"></div>
-      <nav class="st-punkte" aria-label="Seiten">${INTRO.map((n, i) =>
-    `<button class="dr" type="button" data-st="punkt" data-ziel="${n}" aria-label="Seite ${i + 1} von ${INTRO.length}"><i></i></button>`).join('')}</nav>
+      <nav class="st-punkte" aria-label="${T('seiten')}">${INTRO.map((n, i) =>
+    `<button class="dr" type="button" data-st="punkt" data-ziel="${n}" aria-label="${T('seite', { nr: i + 1, gesamt: INTRO.length })}"><i></i></button>`).join('')}</nav>
     </div>`;
   // "Ich kenne mich aus": immer sichtbar im Kopf (SPIELKONZEPT 3.16)
   const raus = document.createElement('button');
   raus.type = 'button';
   raus.className = 'knopf dr st-raus';
   raus.dataset.st = 'raus';
-  raus.textContent = 'Ich kenne mich aus';
+  raus.textContent = T('raus');
   const rechts = s.querySelector('.haupt-kopf .rechts');
   const chips = rechts.querySelector('.kopf-chips');
   if (chips && chips.nextSibling) rechts.insertBefore(raus, chips.nextSibling);
