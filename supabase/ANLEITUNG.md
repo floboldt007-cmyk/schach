@@ -211,7 +211,9 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase jeder Function selbst bereit; ein Stripe-API-Schlüssel wird nicht
    gebraucht.
 9. **Tabelle `produkte` füllen:** **Table Editor > produkte > Insert row**: `id` = `trainer`, `name` =
-   `Crownmate Trainer`, `preis_text` = der Preis so, wie er in der App stehen soll (mit „inkl. MwSt.“ und Zeitraum),
+   `Crownmate Trainer`, `preis_text` = der Preis so, wie er in der App stehen soll (mit Zeitraum und dem Steuerhinweis, der
+   für dich gilt: „inkl. MwSt.“, bei Kleinunternehmern nach § 19 UStG stattdessen „Gemäß § 19 UStG wird keine
+   Umsatzsteuer berechnet.“; vorher von einer Fachperson bestätigen lassen),
    `kauf_link` = Link aus Schritt 4, `portal_link` = Link aus Schritt 5, `beschreibung` optional, `aktiv` = `false`
    (erst zum Probekauf in Schritt 10 und zum Start auf `true`). Es werden nur `https://`-Links angenommen. **Verkauft wird nur, was es gibt:** Unter „Im Trainer“ zeigt das Blatt
    nur Vorteile, deren Paket sich als fertig meldet (`registriereVorteil` in `js/abo.js`); alles andere steht unter
