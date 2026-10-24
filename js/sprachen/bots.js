@@ -1937,7 +1937,7 @@ const EN = {
         'Heh, I saw that! At least I think I did.',
         'Whoa whoa, somebody dozed off! I’m telling the guys at the pub.',
         'Well, buddy? Had too much apple cider?',
-        'That was nothing! Now I’m coming for you!',
+        'That was a dud! Now I’m coming for you!',
       ],
       spielerGut: [
         'Whoa! Where did that come from? Just you wait!',
@@ -2078,7 +2078,7 @@ const EN = {
     name: 'Charcoal Burner Edda', rufname: 'Edda', titel: 'The Ember Keeper',
     kurz: 'Slowly builds pressure on open files.',
     bio: 'Edda tends her charcoal kiln for days, because good embers take time. On the board she opens files, lines up her rooks behind them and lets the pressure rise slowly. By the time things crackle, she has long since stoked the fire.',
-    merkmale: { lieblings: 'Rook', tempo: 'Patient', schwaeche: 'Quick counterattacks' },
+    merkmale: { lieblings: 'Rook', tempo: 'Patient', schwaeche: 'Quick counterplay' },
     saetze: {
       begruessung: [
         'Hello! My kiln is already smoking, so we have time.',
@@ -2309,7 +2309,7 @@ const EN = {
       ],
       schach: [
         'Check! And that came out of nowhere.',
-        'Check! The trick is called a discovery. Ta-da!',
+        'Check! The trick is called a discovered check. Ta-da!',
         'Check! Please don’t watch my hands so closely.',
       ],
       verliert: [
