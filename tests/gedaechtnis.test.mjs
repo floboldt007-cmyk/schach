@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { BOTS as LEITER } from '../js/bots.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -55,6 +56,27 @@ const TON = {
   koenig: /Akte|Fall|Revier|Ermittl|Indiz|Spur|Beweis|Täter|Endspiel|überführt/,
   greta: /Präzise|analysiert|gerechnet|rechne|Daten|Fehler|Partie|Zug/,
   stockfisch: /Blubb|Mensch|Fisch|Tiefsee|Speicher|Berechnung|berechnet|Kiemen|Code|Analyse/,
+  // Welten (24.10.): die zwanzig neuen Bots
+  fridolin: /Wind|Stroh|Acker|Krähe|Spatz|Hut|Böe|Wetter|Feld|Vogelscheuche/,
+  paula: /Post|Brief|Fahrrad|radel|Klingel|Route|zustell|Zustell|Eil|Karte/,
+  gustav: /Biene|Honig|Wabe|Stock|Stich|stech|Mühle|Schleier|summ|Imker/,
+  janine: /Club|Scheune|Tafel|Kreide|Stroh|Training|Mitglied/,
+  bodo: /Axt|Holz|Baum|Lichtung|Stumpf|Säge|fäll|Eiche|Fichte|Wald|hack/,
+  leo: /Falle|Pfad|Schleich|Forst|Moos|Unterholz|Spur|Stolper|Waldläufer|Grube/,
+  edda: /Glut|Meiler|Kohle|Feuer|Funke|Rauch|qualm|heiz|Köhler|Scheit/,
+  luke: /Markt|Rathaus|Gambit|Brunnen|Runde|Händler|Stand/,
+  moritz: /Trick|Zauber|zauber|Hut|Ärmel|Kaninchen|Publikum|Vorstellung|Simsalabim|Ta-daa|Brücke|Karte/,
+  ottilie: /Buch|Bücher|Regal|Kapitel|Bibliothek|Seite|Lesezeichen|Katalog|gelesen|Klassiker/,
+  lasse: /Netz|Fang|Kutter|Fisch|See|Masche|Hafen|Möwe/,
+  wiebke: /Hafen|Liegeplatz|Leine|Schiff|Kurs|Seekarte|anleg|vertäut/,
+  henning: /Watt|Ebbe|Flut|Gezeit|Priel|Schlick|Wasser|Deich|Moment/,
+  ilka: /Boot|Rettung|Retterin|Welle|Sturm|Bord|Weste|See|Unsinkbare|Station|untergegangen|versenkt/,
+  johann: /Leuchtturm|Licht|Lampe|Nacht|Logbuch|Horizont|Weitblick|Nebel|vierzig/,
+  keetan: /Tauch|tauch|Tiefe|Sprung|spring|Mut|mutig|Flosse|Maske|Strömung/,
+  ragna: /leise|Leise|Graben|Gräben|Boot|lots|Echolot|still|Still|Raum|Geduld/,
+  silas: /Schatz|Truhe|Wrack|Fund|Münze|Lupe|Sammlung|glänz|glitzer|Endspiel/,
+  merle: /Notiz|notier|Beobacht|Kugel|Forsch|Mess|Protokoll|protokoll|Hypothese|Versuch|Daten|Befund/,
+  alva: /Tor|Durchgang|Wache|hüte|Hüterin|passier|Spalt|standgehalten|stand/,
 };
 
 // =====================================================================
@@ -96,7 +118,7 @@ async function nodeTeil() {
       }
     }
   }
-  pruefe('jeder der 10 Bots hat jeden Anlass mit mindestens 3 Varianten', fehlt.length === 0, fehlt);
+  pruefe('jeder der 30 Bots hat jeden Anlass mit mindestens 3 Varianten', fehlt.length === 0, fehlt);
   pruefe(`hoechstens 110 Zeichen (${alle.size} Saetze)`, zuLang.length === 0 && alle.size >= 300, zuLang);
   pruefe('keine langen Gedankenstriche', strich.length === 0, strich);
   pruefe('kein Satz doppelt (eigene Texte je Bot und Anlass)', doppelt.length === 0, doppelt);
@@ -500,12 +522,15 @@ async function bereite(seite, { partien = [], fortschritt = null, einstellungen 
 }
 
 // Fortschritt mit freien Bots bis Stufe "bis" und Zaehlern
+// bis zaehlt in der alten Zehnerleiter (1 Benno ... 10 Stockfisch): dieser Bot ist der naechste Gegner. Welten: besiegt
+// ist jeder Bot der neuen Leiter unterhalb seiner Stufe (auch die neu eingezogenen), damit er frei und der naechste ist.
 function fortschritt(bis = 1, zaehler = {}) {
-  const ids = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
+  const alt = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
+  const ziel = LEITER.find((b) => b.id === alt[Math.max(1, Math.min(alt.length, bis)) - 1]);
   const bots = {};
-  ids.forEach((id, i) => {
-    bots[id] = { sterne: [i + 1 < bis, false, false], partien: 0, siege: 0, remis: 0, niederlagen: 0, besteGenauigkeit: null, ...(zaehler[id] || {}) };
-  });
+  for (const b of LEITER) {
+    bots[b.id] = { sterne: [b.stufe < ziel.stufe, false, false], partien: 0, siege: 0, remis: 0, niederlagen: 0, besteGenauigkeit: null, ...(zaehler[b.id] || {}) };
+  }
   return { bots, brillanteZuege: [] };
 }
 // t Tage vor dem heutigen Tagesschluessel (Grenze 4:00, tag.js) um 18:00
@@ -904,8 +929,9 @@ async function browserTeil(browser) {
     return { gruss: o.angeboten('partie:begruessung?'), erg: o.angeboten('ergebnis:karte'), css: !!document.querySelector('link[data-paket="gedaechtnis"]'),
       blase: (document.querySelector('.detail .sprechblase') || {}).textContent || '' };
   });
-  const sollP = await erwartet(pr.seite, 'benno');
-  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Benno begruesst zum Kennenlernen', prod.gruss === 2 && prod.erg === 1 && prod.css
+  // Welten: der erste Gegner eines frischen Spielstands ist Fridolin (Stufe 1)
+  const sollP = await erwartet(pr.seite, 'fridolin');
+  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Fridolin begruesst zum Kennenlernen', prod.gruss === 2 && prod.erg === 1 && prod.css
     && sollP && sollP.grund === 'kennenlernen' && prod.blase === `„${sollP.text}“`, JSON.stringify({ prod, sollP }));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();
