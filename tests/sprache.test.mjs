@@ -191,7 +191,7 @@ async function sichtbarerText(seite, sel = '#app') {
 
 function deutschIn(text) {
   const treffer = [];
-  for (const teil of text.split(' | ')) {
+  for (const teil of text.split(/ \| |\n/)) {
     if (UMLAUT_RE.test(teil) || DEUTSCH_RE.test(teil) || SCHLUESSEL_RE.test(teil)) treffer.push(teil.slice(0, 80));
   }
   return [...new Set(treffer)];
