@@ -10,12 +10,18 @@
 // Variantenspiel) und partie:analysiert (nach dem Nachrechnen, quelle 'analyse').
 // W0+a: Boss-Partien mit boss.staerke rechnen die Spielstaerke gegen die Elo, mit der der Boss wirklich spielte
 // (w0plus-a-fix: bots.eloDerPartie, die Elo des Profils aus staerkeFuerElo, nicht die Anfrage; wie partie.js).
+// Englische Version (Teil 1): Texte aus js/sprachen/analyse.js (an.*, ergebnis.*), Zugklassen und Eroeffnung in der
+// eingestellten Sprache, SAN ueber review.sanAnzeige, Dezimalzeichen nach Sprache.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
 import { botNachId, eloDerPartie } from '../bots.js';
-import { analysierePartie, gewinnChance, KLASSEN, sanDeutsch, warKnapp, spielphasen, coachKern } from '../review.js';
+import { analysierePartie, gewinnChance, KLASSEN, sanAnzeige, warKnapp, spielphasen, coachKern } from '../review.js';
 import { SYMBOLE } from '../symbole.js';
 import { KLASSEN_NAME, KLASSEN_WORT } from '../zugklassen.js';
+import { eroeffnungsAnzeige } from '../openings.js';
+import { t, sprache } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/analyse.js';
 import { klang } from '../sounds.js';
 import {
   ladePartie, ladePartien, ladeReview, ergaenzeAnalyse, naechsterGegner,
@@ -51,11 +57,23 @@ const WORT = KLASSEN_WORT;
 const ZEICHEN = { brillant: '!!', stark: '!', ungenau: '?!', fehler: '?', patzer: '??' };
 const PUNKT_KLASSEN = new Set(['brillant', 'stark', 'fehler', 'patzer', 'verpasst']);
 const VERLUST_KLASSEN = new Set(['ungenau', 'fehler', 'patzer', 'verpasst']);
-const STERN_GRUND = ['Sieg', 'Genauigkeit ab 80\u00a0%', 'ohne Hinweis und ohne Zurücknehmen'];
+// Grund fuer Stern 1..3 (i = 0..2)
+function sternGrund(i) {
+  return t(`analyse.an.stern.${i + 1}`);
+}
+// Spielphase (review.spielphasen liefert die deutschen Namen) in der eingestellten Sprache
+const PHASE = { 'Eröffnung': 'eroeffnung', 'Mittelspiel': 'mittelspiel', 'Endspiel': 'endspiel' };
+function phasenName(name) {
+  return PHASE[name] ? t(`analyse.phase.${PHASE[name]}`) : name;
+}
 
-// Kurzname des Bots fuer Beschriftungen ("Rudi")
+// Kurzname des Bots fuer Beschriftungen ("Rudi"); Englisch: der Rufname des Bots (KURZ sind deutsche Kurzformen)
 const KURZ = { benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm',
   delia: 'Delia', koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch' };
+function kurzName(bot) {
+  if (!bot) return 'Bot';
+  return (sprache() === 'de' ? KURZ[bot.id] : null) || bot.rufname || bot.name;
+}
 
 // Kurve (SVG-Koordinaten)
 const KW = 560;
@@ -67,8 +85,10 @@ function esc(t) {
 }
 // Das Klassenwort steht schon gross in der Karte: review.js coachKern laesst es am Anfang des
 // Coach-Texts weg (keine langen Gedankenstriche, Rochade als 0-0)
-const komma1 = (x) => x.toFixed(1).replace('.', ',');
-const sanDe = (san) => sanDeutsch(san || '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
+// Dezimalzeichen nach Sprache (Deutsch Komma)
+const dezimal = (text) => (sprache() === 'de' ? text.replace('.', ',') : text);
+const komma1 = (x) => dezimal(x.toFixed(1));
+const sanDe = (san) => sanAnzeige(san || '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 const zugText = (z) => `${z.nummer}${z.farbe === 'w' ? '.' : '…'} ${sanDe(z.san)}`;
 const reduziert = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -81,8 +101,8 @@ function evalText(ev, { vorzeichen = true, sicht = 'w' } = {}) {
   if (ev.mate != null) return (ev.mate * vz < 0 && vorzeichen ? '−' : '') + 'M' + Math.abs(ev.mate);
   const cp = (ev.cp || 0) * vz;
   const w = Math.round(Math.abs(cp) / 10) / 10;
-  if (w === 0) return '0,0';
-  return (vorzeichen ? (cp > 0 ? '+' : '−') : '') + w.toFixed(1).replace('.', ',');
+  if (w === 0) return dezimal('0.0');
+  return (vorzeichen ? (cp > 0 ? '+' : '−') : '') + dezimal(w.toFixed(1));
 }
 
 function ergebnisInfo(partie, letzteNummer) {
@@ -92,19 +112,20 @@ function ergebnisInfo(partie, letzteNummer) {
   if (e === 'sieg') stand = sf === 'w' ? '1:0' : '0:1';
   else if (e === 'niederlage') stand = sf === 'w' ? '0:1' : '1:0';
   const n = letzteNummer || 1;
-  const grund = {
-    matt: `Matt im ${n}.\u00a0Zug`,
-    aufgabe: partie.modus === 'zuzweit' ? 'Aufgabe' : e === 'sieg' ? 'Gegner gibt auf' : `Aufgegeben im ${n}.\u00a0Zug`,
-    zeit: 'Zeit abgelaufen', vereinbart: 'Remis vereinbart',
-    patt: 'Patt',
-    wiederholung: 'Dreifache Wiederholung',
-    '50-zuege': '50-Züge-Regel',
-    material: 'Zu wenig Material',
-  }[partie.grund] || '';
+  const schluessel = {
+    matt: 'mattIm',
+    aufgabe: partie.modus === 'zuzweit' ? 'aufgabe' : e === 'sieg' ? 'gegnerGibtAuf' : 'aufgegebenIm',
+    zeit: 'zeit', vereinbart: 'vereinbart',
+    patt: 'patt',
+    wiederholung: 'dreifach',
+    '50-zuege': '50-zuege',
+    material: 'material',
+  }[partie.grund];
+  const grund = schluessel ? t(`analyse.ergebnis.${schluessel}`, { n }) : '';
   const namen = pruefeZuzweit(partie.zuzweit);
   const wort = partie.modus === 'zuzweit' && e !== 'remis'
-    ? `${namen[stand === '1:0' ? 'weiss' : 'schwarz']} gewinnt`
-    : e === 'sieg' ? 'Sieg' : e === 'niederlage' ? 'Niederlage' : 'Remis';
+    ? t('analyse.ergebnis.gewinnt', { name: namen[stand === '1:0' ? 'weiss' : 'schwarz'] })
+    : e === 'sieg' ? t('allgemein.sieg') : e === 'niederlage' ? t('allgemein.niederlage') : t('allgemein.remis');
   return { stand, grund, wort, art: e === 'sieg' ? 'sieg' : e === 'niederlage' ? 'niederlage' : 'remis' };
 }
 
@@ -129,11 +150,11 @@ export function zeige(root, params = {}, app) {
   // ---------- Geruest ----------
   const sec = document.createElement('section');
   sec.className = 'screen scrollt an-screen';
-  sec.setAttribute('aria-label', 'Spielanalyse');
+  sec.setAttribute('aria-label', t('analyse.an.titel'));
   sec.innerHTML = `
     <header class="kopf">
-      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="Zurück">${icon('zurueck')}</button>
-      <div class="titel"><h2>Spielanalyse</h2><div class="unter an-unter"></div></div>
+      <button class="icon-knopf" type="button" data-aktion="zurueck" aria-label="${esc(t('allgemein.zurueck'))}">${icon('zurueck')}</button>
+      <div class="titel"><h2>${esc(t('analyse.an.titel'))}</h2><div class="unter an-unter"></div></div>
       <div class="an-kopf-knoepfe"></div>
     </header>
     <div class="an-koerper"></div>`;
@@ -176,9 +197,9 @@ export function zeige(root, params = {}, app) {
     if (laufend && typeof app.frage === 'function') {
       const lb = botNachId(laufend.botId);
       const ok = await app.frage({
-        titel: 'Neue Partie starten?',
-        text: `Du hast noch eine offene Partie gegen ${lb ? lb.name : 'einen Bot'}. Sie wird verworfen.`,
-        knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Neue Partie', wert: true, art: 'primaer' }],
+        titel: t('analyse.an.frage.titel'),
+        text: t('analyse.an.frage.text', { name: lb ? lb.name : t('analyse.an.frage.einenBot') }),
+        knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: t('analyse.an.frage.neu'), wert: true, art: 'primaer' }],
         abbrechen: false,
       });
       if (!ok || beendet) return;
@@ -216,13 +237,13 @@ export function zeige(root, params = {}, app) {
   }
 
   function zeigeUnbekannt() {
-    sec.querySelector('.an-unter').textContent = 'Partie nicht gefunden';
+    sec.querySelector('.an-unter').textContent = t('analyse.an.unbekannt.unter');
     koerper.innerHTML = `
       <div class="an-meldung flaeche" role="alert">
         <div class="an-meldung-icon">${icon('ziel')}</div>
-        <h3>Diese Partie gibt es nicht mehr.</h3>
-        <p>Vielleicht wurde sie gelöscht. Im Verlauf findest du alle gespeicherten Partien.</p>
-        <button class="knopf primaer" type="button" data-aktion="zurueck">${icon('zurueck')} Zurück</button>
+        <h3>${esc(t('analyse.an.unbekannt.titel'))}</h3>
+        <p>${esc(t('analyse.an.unbekannt.text'))}</p>
+        <button class="knopf primaer" type="button" data-aktion="zurueck">${icon('zurueck')} ${esc(t('allgemein.zurueck'))}</button>
       </div>`;
   }
 
@@ -239,10 +260,10 @@ export function zeige(root, params = {}, app) {
     // entfaellt dort (die Genauigkeits-Karte nennt ihn); sichtbar ist immer nur eine Fassung des Namens
     const unter = sec.querySelector('.an-unter');
     const namensSpan = (klasse, text) => { const e = document.createElement('span'); e.className = klasse; e.textContent = text; return e; };
-    if (zuzweit()) unter.textContent = `${personenName('w')} gegen ${personenName('b')}`;
+    if (zuzweit()) unter.textContent = t('analyse.an.kopf.gegen', { weiss: personenName('w'), schwarz: personenName('b') });
     else {
-      unter.textContent = 'Du gegen ';
-      unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? (KURZ[st.bot.id] || st.bot.rufname || name) : name));
+      unter.textContent = t('analyse.an.kopf.duGegen');
+      unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? kurzName(st.bot) : name));
     }
     if (info.stand) unter.append(' · ' + info.stand);
     if (info.grund) {
@@ -255,12 +276,14 @@ export function zeige(root, params = {}, app) {
     // Ist der naechste Gegner derselbe Bot (noch nicht besiegt), gibt es keinen "Nächsten Gegner":
     // dann ist "Nochmal" der Hauptknopf und "Arena" der zweite
     const derselbe = !ng || ng.id === p.botId;
-    const knoepfe = zuzweit() ? `<button class="knopf" type="button" data-aktion="zurueck">Zurück</button>
-      <button class="knopf primaer" type="button" data-aktion="nochmal">Revanche</button>` : derselbe ? `
-      <button class="knopf" type="button" data-aktion="weiter" aria-label="Zur Arena">${icon('zurueck')} Arena</button>
-      <button class="knopf primaer" type="button" data-aktion="nochmal" aria-label="Nochmal gegen ${esc(name)}">${icon('nochmal')} Nochmal</button>` : `
-      <button class="knopf" type="button" data-aktion="nochmal" aria-label="Nochmal gegen ${esc(name)}">${icon('nochmal')} Nochmal</button>
-      <button class="knopf primaer" type="button" data-aktion="weiter" aria-label="Nächster Gegner: ${esc(ng.name)}">Nächster Gegner ${icon('pfeil')}</button>`;
+    const nochmalAria = esc(t('analyse.an.knopf.nochmalGegen', { name }));
+    const nochmalText = esc(t('analyse.an.knopf.nochmal'));
+    const knoepfe = zuzweit() ? `<button class="knopf" type="button" data-aktion="zurueck">${esc(t('allgemein.zurueck'))}</button>
+      <button class="knopf primaer" type="button" data-aktion="nochmal">${esc(t('analyse.an.knopf.revanche'))}</button>` : derselbe ? `
+      <button class="knopf" type="button" data-aktion="weiter" aria-label="${esc(t('analyse.an.knopf.zurArena'))}">${icon('zurueck')} ${esc(t('allgemein.arena'))}</button>
+      <button class="knopf primaer" type="button" data-aktion="nochmal" aria-label="${nochmalAria}">${icon('nochmal')} ${nochmalText}</button>` : `
+      <button class="knopf" type="button" data-aktion="nochmal" aria-label="${nochmalAria}">${icon('nochmal')} ${nochmalText}</button>
+      <button class="knopf primaer" type="button" data-aktion="weiter" aria-label="${esc(t('analyse.an.knopf.naechsterGegen', { name: ng.name }))}">${esc(t('analyse.an.knopf.naechster'))} ${icon('pfeil')}</button>`;
     sec.querySelector('.an-kopf-knoepfe').innerHTML = knoepfe;
     let leiste = sec.querySelector('.an-aktionsleiste');
     if (!leiste) {
@@ -279,12 +302,12 @@ export function zeige(root, params = {}, app) {
       <div class="an-laden flaeche" role="status" aria-live="polite">
         <div class="an-laden-duell">
           ${zuzweit() ? personenBild('w') : '<div class="an-avatar an-ich" aria-hidden="true">F</div>'}
-          <span class="an-laden-vs">gegen</span>
+          <span class="an-laden-vs">${esc(t('analyse.an.laden.gegen'))}</span>
           ${zuzweit() ? personenBild('b') : avatarHtml(st.bot)}
         </div>
-        <h3 class="an-laden-titel">${zuzweit() ? 'Stockfish analysiert beide Seiten' : 'Stockfish analysiert deine Partie'}</h3>
-        <div class="an-fortschritt" role="progressbar" aria-label="Fortschritt der Analyse" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
-        <p class="an-laden-text zahl">Stellung 0 von ${gesamt}</p>
+        <h3 class="an-laden-titel">${esc(t(zuzweit() ? 'analyse.an.laden.beide' : 'analyse.an.laden.deine'))}</h3>
+        <div class="an-fortschritt" role="progressbar" aria-label="${esc(t('analyse.an.laden.fortschritt'))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+        <p class="an-laden-text zahl">${esc(t('analyse.an.laden.stellung', { fertig: 0, alle: gesamt }))}</p>
       </div>`;
     const balken = koerper.querySelector('.an-fortschritt');
     const text = koerper.querySelector('.an-laden-text');
@@ -293,7 +316,7 @@ export function zeige(root, params = {}, app) {
       const pz = alle ? Math.round((fertig / alle) * 100) : 0;
       balken.style.setProperty('--wert', pz + '%');
       balken.setAttribute('aria-valuenow', String(pz));
-      text.textContent = `Stellung ${fertig} von ${alle}`;
+      text.textContent = t('analyse.an.laden.stellung', { fertig, alle });
     };
     try {
       const engine = await app.engine('bewertung');
@@ -332,14 +355,14 @@ export function zeige(root, params = {}, app) {
         return;
       }
       koerper.querySelector('.an-laden').classList.add('fehler');
-      koerper.querySelector('.an-laden-titel').textContent = 'Die Analyse hat nicht geklappt.';
-      text.textContent = 'Stockfish ist gerade nicht bereit. Versuch es gleich noch einmal.';
+      koerper.querySelector('.an-laden-titel').textContent = t('analyse.an.laden.fehlerTitel');
+      text.textContent = t('analyse.an.laden.fehlerText');
       balken.remove();
       const k = document.createElement('button');
       k.type = 'button';
       k.className = 'knopf primaer';
       k.dataset.aktion = 'nochmal-rechnen';
-      k.innerHTML = `${icon('nochmal')} Nochmal versuchen`;
+      k.innerHTML = `${icon('nochmal')} ${esc(t('analyse.an.laden.nochmal'))}`;
       koerper.querySelector('.an-laden').append(k);
     }
   }
@@ -369,14 +392,14 @@ export function zeige(root, params = {}, app) {
           <div class="an-brettzone">
             <div class="an-evalbalken" data-unten="${st.sf}" aria-hidden="true"><div class="an-eb-mitte"></div><div class="an-eb-unten"></div><span class="an-eb-wert zahl"></span></div>
             <div class="an-brett-rahmen">
-              <div class="an-brett" aria-label="Brett der Analyse"></div>
+              <div class="an-brett" aria-label="${esc(t('analyse.an.brett'))}"></div>
             </div>
           </div>
           <div class="an-navi">
-            <button class="knopf" type="button" data-aktion="anfang" aria-label="Zum Anfang">${icon('anfang')}</button>
-            <button class="knopf" type="button" data-aktion="zurueck-zug" aria-label="Zug zurück">${icon('zurueck')}</button>
-            <button class="knopf" type="button" data-aktion="vor-zug" aria-label="Zug vor">${icon('vor')}</button>
-            <button class="knopf" type="button" data-aktion="ende" aria-label="Zum Ende">${icon('ende')}</button>
+            <button class="knopf" type="button" data-aktion="anfang" aria-label="${esc(t('analyse.an.navi.anfang'))}">${icon('anfang')}</button>
+            <button class="knopf" type="button" data-aktion="zurueck-zug" aria-label="${esc(t('analyse.an.navi.zurueck'))}">${icon('zurueck')}</button>
+            <button class="knopf" type="button" data-aktion="vor-zug" aria-label="${esc(t('analyse.an.navi.vor'))}">${icon('vor')}</button>
+            <button class="knopf" type="button" data-aktion="ende" aria-label="${esc(t('analyse.an.navi.ende'))}">${icon('ende')}</button>
             <span class="an-stand zahl" aria-live="polite"></span>
           </div>
           <div class="an-coach" aria-live="polite"></div>
@@ -428,16 +451,16 @@ export function zeige(root, params = {}, app) {
     if (!neuBot && !neue.some(Boolean)) return '';
     const sterne = Array.isArray(st.partie.sterne) ? st.partie.sterne : [false, false, false];
     const fehlt = sterne.findIndex((s) => !s);
-    const grund = fehlt < 0 ? 'Alle drei Sterne!' : `${fehlt + 1}. Stern: ${STERN_GRUND[fehlt]}`;
+    const grund = fehlt < 0 ? t('analyse.an.banner.alle') : t('analyse.an.banner.stern', { nr: fehlt + 1, grund: sternGrund(fehlt) });
     const sterneHtml = sterne.map((s, i) => `<span class="${s ? 'an' : 'aus'}${neue[i] ? ' neu' : ''}" style="--i:${i}">★</span>`).join('');
-    const titel = neuBot ? 'Neuer Gegner freigeschaltet' : (neue.filter(Boolean).length > 1 ? 'Neue Sterne verdient' : 'Neuer Stern verdient');
-    const name = neuBot ? `Stufe ${neuBot.stufe} · ${neuBot.name}` : (st.bot ? st.bot.name : '');
+    const titel = t(neuBot ? 'analyse.an.banner.gegner' : (neue.filter(Boolean).length > 1 ? 'analyse.an.banner.sterne' : 'analyse.an.banner.stern1'));
+    const name = neuBot ? t('analyse.an.banner.stufe', { stufe: neuBot.stufe, name: neuBot.name }) : (st.bot ? st.bot.name : '');
     const b = neuBot || st.bot;
     return `
       <div class="an-banner" style="--bf:${esc(b ? botFarbe(b) : 'var(--linie-2)')}" role="status">
         ${avatarHtml(b)}
         <div class="an-banner-text"><div class="an-ft-titel">${esc(titel)}</div><div class="an-ft-name">${esc(name)}</div></div>
-        <div class="an-ft-sterne"><b aria-label="${sterne.filter(Boolean).length} von 3 Sternen">${sterneHtml}</b><span>${esc(grund)}</span></div>
+        <div class="an-ft-sterne"><b aria-label="${esc(t('analyse.sterne', { n: sterne.filter(Boolean).length }))}">${sterneHtml}</b><span>${esc(grund)}</span></div>
       </div>`;
   }
 
@@ -447,7 +470,7 @@ export function zeige(root, params = {}, app) {
       const info = ergebnisInfo(st.partie);
       const person = (f) => `<div class="an-seite${f === 'b' ? ' an-re' : ''}">${personenBild(f)}
         <div class="an-seite-text"><div class="an-g-wert zahl">${Number.isFinite(r.genauigkeit?.[f]) ? komma1(r.genauigkeit[f]) : '–'}</div>
-        <div class="an-g-label">${esc(personenName(f))}</div><div class="an-g-label">Genauigkeit · ${f === 'w' ? 'Weiß' : 'Schwarz'}</div></div></div>`;
+        <div class="an-g-label">${esc(personenName(f))}</div><div class="an-g-label">${esc(t('analyse.an.genau.farbe', { farbe: t(f === 'w' ? 'allgemein.weiss' : 'allgemein.schwarz') }))}</div></div></div>`;
       return `<div class="an-genau flaeche">${person('w')}<div class="an-vs"><span class="an-vs-wort">${esc(info.wort)}</span>
         <b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>${person('b')}</div>`;
     }
@@ -457,7 +480,7 @@ export function zeige(root, params = {}, app) {
     const staerkeBot = r.spielstaerke ? r.spielstaerke[st.bf] : null;
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
-    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
+    const kurz = kurzName(st.bot);
     // gezeigt wird die Genauigkeit der Partie (auf ihr beruht Stern 2; eine spaetere Neuberechnung ersetzt
     // sie nicht, storage.ergaenzeAnalyse), sonst die der Review
     const eigen = Number.isFinite(st.partie.genauigkeit) ? st.partie.genauigkeit : du;
@@ -471,26 +494,27 @@ export function zeige(root, params = {}, app) {
     // Gilt nur fuer die Anzeige, gespeicherte Werte und Sterne bleiben unveraendert.
     const zuKurz = !zaehlt(st.partie) && st.partie.ergebnis !== 'sieg';
     const wert = (g, ich) => {
-      if (!Number.isFinite(g)) return '<div class="an-g-wert an-g-leer">keine Züge</div>';
-      if (zuKurz) return '<div class="an-g-wert an-g-leer an-g-kurz">zu kurz</div>';
+      if (!Number.isFinite(g)) return `<div class="an-g-wert an-g-leer">${esc(t('analyse.an.genau.keineZuege'))}</div>`;
+      if (zuKurz) return `<div class="an-g-wert an-g-leer an-g-kurz">${esc(t('analyse.an.genau.zuKurz'))}</div>`;
       return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`;
     };
-    const eroeffnung = r.eroeffnung || st.partie.eroeffnung;
+    const eroeffnung = eroeffnungsAnzeige(r.eroeffnung || st.partie.eroeffnung);
+    const spielteWie = esc(t('analyse.an.genau.spielteWie'));
     return `
       <div class="an-genau flaeche">
         <div class="an-seite">
           <div class="an-avatar an-ich" aria-hidden="true">F</div>
-          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label"><span class="an-g-zusatz">Deine </span>Genauigkeit</div></div>
+          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label"><span class="an-g-zusatz">${esc(t('analyse.an.genau.deine'))}</span>${esc(t('analyse.an.genau.genauigkeit'))}</div></div>
         </div>
         <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>
         <div class="an-seite an-re">
           ${avatarHtml(st.bot)}
-          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div>${!zuKurz && Number.isFinite(staerkeBot) ? `<div class="an-g-label an-g-zusatz an-g-zweit">spielte wie ≈ ${staerkeBot}</div>` : ''}</div>
+          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div>${!zuKurz && Number.isFinite(staerkeBot) ? `<div class="an-g-label an-g-zusatz an-g-zweit">${spielteWie} ${staerkeBot}</div>` : ''}</div>
         </div>
         <div class="an-g-chips">
-          ${zuKurz ? '<span class="an-g-hinweis">Zu wenige Züge für eine verlässliche Bewertung</span>' : ''}
-          ${!zuKurz && Number.isFinite(staerke) ? `<span class="chip an-chip-staerke">spielte wie ≈ <b class="zahl">${staerke}</b></span>` : ''}
-          ${rekord ? `<span class="chip an-chip-rekord">${icon('pokal')} Bestwert</span>` : ''}
+          ${zuKurz ? `<span class="an-g-hinweis">${esc(t('analyse.an.genau.hinweis'))}</span>` : ''}
+          ${!zuKurz && Number.isFinite(staerke) ? `<span class="chip an-chip-staerke">${spielteWie} <b class="zahl">${staerke}</b></span>` : ''}
+          ${rekord ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}
           ${eroeffnung ? `<span class="an-eroeffnung">${icon('buch')}<span>${esc(eroeffnung)}</span></span>` : ''}
         </div>
       </div>`;
@@ -510,14 +534,14 @@ export function zeige(root, params = {}, app) {
       const l = (kx(ph.von) / KW) * 100;
       const w = ((kx(ph.bis) - kx(ph.von)) / KW) * 100;
       if (w < 13) return '';
-      return `<span style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%">${ph.name}</span>`;
+      return `<span style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%">${esc(phasenName(ph.name))}</span>`;
     }).join('');
     return `
       <div class="an-kurve-box flaeche">
-        <div class="an-kurve-kopf"><span class="an-k-titel"><b>Bewertungskurve</b> · antippen zum Springen</span><span class="an-k-legende">Weiß ▲ / Schwarz ▼</span></div>
+        <div class="an-kurve-kopf"><span class="an-k-titel"><b>${esc(t('analyse.an.kurve.titel'))}</b> · ${esc(t('analyse.an.kurve.tippen'))}</span><span class="an-k-legende">${esc(t('analyse.an.kurve.legende'))}</span></div>
         <div class="an-kurve-wrap">
           <svg class="an-kurve" viewBox="0 0 ${KW} ${KH}" preserveAspectRatio="none" role="slider" tabindex="0"
-               aria-label="Bewertungskurve, Zug wählen" aria-valuemin="0" aria-valuemax="${st.zuege.length}" aria-valuenow="0">
+               aria-label="${esc(t('analyse.an.kurve.aria'))}" aria-valuemin="0" aria-valuemax="${st.zuege.length}" aria-valuenow="0">
             <defs>
               <linearGradient id="an-kurve-weiss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef1ff" stop-opacity=".95"/><stop offset="1" stop-color="#c9d2f5" stop-opacity=".82"/></linearGradient>
               <linearGradient id="an-kurve-linie" x1="0" x2="1"><stop offset="0" stop-color="#19f6e8"/><stop offset=".6" stop-color="#a06bff"/><stop offset="1" stop-color="#ff2d78"/></linearGradient>
@@ -550,31 +574,32 @@ export function zeige(root, params = {}, app) {
   function momenteHtml() {
     const plies = (st.review.schluesselmomente || []).filter((p) => st.zuege[p]);
     if (!plies.length) {
-      return '<div class="an-momente an-momente-leer"><span>Keine besonderen Momente: eine ruhige Partie.</span></div>';
+      return `<div class="an-momente an-momente-leer"><span>${esc(t('analyse.an.momente.leer'))}</span></div>`;
     }
     const chips = plies.map((p) => {
       const z = st.zuege[p];
       const du = z.farbe === st.sf;
       return `<button class="knopf an-moment${du ? ' du' : ''}" type="button" data-aktion="moment" data-ply="${p}" style="--kf:var(--k-${esc(z.klasse)})"
-        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}${zuzweit() ? ', ' + esc(personenName(z.farbe)) : du ? '' : ', Gegner'}">${symbol(z.klasse)}<span>${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
+        aria-label="${esc(zugText(z))}, ${esc(KLASSEN_NAME[z.klasse])}${zuzweit() ? ', ' + esc(personenName(z.farbe)) : du ? '' : ', ' + esc(t('analyse.an.momente.gegner'))}">${symbol(z.klasse)}<span>${esc(zugText(z))}${ZEICHEN[z.klasse] || ''}</span></button>`;
     }).join('');
-    return `<div class="an-momente-box"><div class="an-momente-titel">Schlüsselmomente</div><div class="an-momente" role="group" aria-label="Schlüsselmomente">${chips}</div></div>`;
+    const titel = esc(t('analyse.an.momente.titel'));
+    return `<div class="an-momente-box"><div class="an-momente-titel">${titel}</div><div class="an-momente" role="group" aria-label="${titel}">${chips}</div></div>`;
   }
 
   function klassenHtml() {
     const r = st.review;
     const du = (r.anzahl && r.anzahl[st.sf]) || {};
     const gegner = (r.anzahl && r.anzahl[st.bf]) || {};
-    const kurz = zuzweit() ? personenName(st.bf) : st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
+    const kurz = zuzweit() ? personenName(st.bf) : kurzName(st.bot);
     const zeile = (k) => {
       const a = du[k] || 0;
       const b = gegner[k] || 0;
       const aktiv = a || (zuzweit() && b);
       return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k})"
-        aria-label="${esc(KLASSEN_NAME[k])}: ${zuzweit() ? esc(personenName(st.sf)) : 'du'} ${a}, ${esc(kurz)} ${b}${aktiv ? zuzweit() ? ', zum nächsten Zug springen' : ', zu deinem nächsten Zug springen' : ''}"${aktiv ? '' : ' aria-disabled="true"'}>
+        aria-label="${esc(KLASSEN_NAME[k])}: ${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.du'))} ${a}, ${esc(kurz)} ${b}${aktiv ? ', ' + esc(t(zuzweit() ? 'analyse.an.klassen.springen' : 'analyse.an.klassen.springenDu')) : ''}"${aktiv ? '' : ' aria-disabled="true"'}>
         <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-mitte">${symbol(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
     };
-    const kopf = `<div class="an-kl-kopf"><span>${zuzweit() ? esc(personenName(st.sf)) : 'Du'}</span><span>${esc(kurz)}</span></div>`;
+    const kopf = `<div class="an-kl-kopf"><span>${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.kopf'))}</span><span>${esc(kurz)}</span></div>`;
     const links = KLASSEN.slice(0, 6).map(zeile).join('');
     const rechts = KLASSEN.slice(6).map(zeile).join('');
     const summe = (o) => Object.values(o).reduce((s, x) => s + (x || 0), 0);
@@ -583,7 +608,7 @@ export function zeige(root, params = {}, app) {
         <div class="an-kl-raster">
           ${kopf}${links}
           ${kopf.replace('an-kl-kopf', 'an-kl-kopf an-kl-kopf2')}${rechts}<div class="an-kl-platz" aria-hidden="true"></div>
-          <div class="an-kl an-kl-gesamt"><span class="an-n zahl">${summe(du)}</span><span class="an-kl-mitte"><span>Züge gesamt</span></span><span class="an-n zahl">${summe(gegner)}</span></div>
+          <div class="an-kl an-kl-gesamt"><span class="an-n zahl">${summe(du)}</span><span class="an-kl-mitte"><span>${esc(t('analyse.an.klassen.gesamt'))}</span></span><span class="an-n zahl">${summe(gegner)}</span></div>
         </div>
       </div>`;
   }
@@ -661,7 +686,7 @@ export function zeige(root, params = {}, app) {
     const z = st.ply >= 0 ? st.zuege[st.ply] : null;
     const letzte = n ? st.zuege[n - 1].nummer : 0;
     const stand = koerper.querySelector('.an-stand');
-    if (stand) stand.textContent = n ? (z ? `Zug ${z.nummer} / ${letzte}` : `Start / ${letzte}`) : 'Keine Züge';
+    if (stand) stand.textContent = n ? (z ? t('analyse.an.stand.zug', { nr: z.nummer, letzte }) : t('analyse.an.stand.start', { letzte })) : t('analyse.an.stand.keine');
     const setze = (a, aus) => { const k = koerper.querySelector(`[data-aktion="${a}"]`); if (k) k.disabled = aus; };
     setze('anfang', st.ply < 0);
     setze('zurueck-zug', st.ply < 0);
@@ -698,7 +723,7 @@ export function zeige(root, params = {}, app) {
     marke.style.top = ((ky(st.kurve[i]) / KH) * 100).toFixed(2) + '%';
     svg.setAttribute('aria-valuenow', String(i));
     const z = st.ply >= 0 ? st.zuege[st.ply] : null;
-    svg.setAttribute('aria-valuetext', z ? `${zugText(z)}, ${KLASSEN_NAME[z.klasse]}` : 'Startstellung');
+    svg.setAttribute('aria-valuetext', z ? `${zugText(z)}, ${KLASSEN_NAME[z.klasse]}` : t('analyse.an.startstellung'));
   }
 
   function zeigeMomente() {
@@ -735,29 +760,29 @@ export function zeige(root, params = {}, app) {
       const anzahlMomente = (st.review.schluesselmomente || []).length;
       // "Knapp!" nur, wenn die Partie bis spaet offen war
       const knapp = warKnapp(st.kurve, st.sf);
-      const momente = anzahlMomente === 1 ? 'den Schlüsselmoment' : `die ${anzahlMomente} Schlüsselmomente`;
-      const satz = zuzweit() ? 'Die Analyse zeigt die Züge und Genauigkeit beider Seiten.' : info.art === 'sieg'
-        ? 'Stark, du hast gewonnen! Geh die Partie durch und schau, wo sie gekippt ist.'
+      // Mehrzahl ueber n: ...Momente.eins (den Schluesselmoment) / ...Momente.mehr (die n Schluesselmomente)
+      const satz = zuzweit() ? t('analyse.an.start.zuzweit') : info.art === 'sieg'
+        ? t('analyse.an.start.sieg')
         : info.art === 'niederlage'
           ? (anzahlMomente
-            ? (knapp ? `Knapp! Schau dir ${momente} an, dort lag die Partie.` : `Kopf hoch! Schau dir ${momente} an, dort ist die Partie gekippt.`)
-            : (knapp ? 'Knapp! Geh die Partie Zug für Zug durch.' : 'Kopf hoch! Geh die Partie Zug für Zug durch.'))
-          : 'Geh die Partie durch und finde die Stelle, an der mehr drin war.';
+            ? t(knapp ? 'analyse.an.start.knappMomente' : 'analyse.an.start.kopfHochMomente', { n: anzahlMomente })
+            : t(knapp ? 'analyse.an.start.knapp' : 'analyse.an.start.kopfHoch'))
+          : t('analyse.an.start.remis');
       el.innerHTML = `
         <div class="an-c-symbol an-c-start">${icon('ziel')}</div>
-        <div class="an-c-kopf"><span class="an-c-klasse">${esc(info.wort)}</span><span class="an-c-zug">Startstellung</span></div>
-        <p class="an-c-text">${esc(satz)} ${zuzweit() ? 'Pfeile, Wischgeste und Kurve wechseln den Zug.' : 'Tippe auf ▶, wische über das Brett oder tippe auf die Kurve.'}</p>`;
+        <div class="an-c-kopf"><span class="an-c-klasse">${esc(info.wort)}</span><span class="an-c-zug">${esc(t('analyse.an.startstellung'))}</span></div>
+        <p class="an-c-text">${esc(satz)} ${esc(t(zuzweit() ? 'analyse.an.start.bedienungZuzweit' : 'analyse.an.start.bedienung'))}</p>`;
       neuAnimieren(el);
       return;
     }
     const du = z.farbe === st.sf;
-    const kurz = st.bot ? (KURZ[st.bot.id] || st.bot.rufname || st.bot.name) : 'Bot';
+    const kurz = kurzName(st.bot);
     el.dataset.klasse = z.klasse;
     el.style.setProperty('--kf', `var(--k-${z.klasse})`);
     if (z.klasse === 'brillant') el.classList.add('brillant');
     // Bewertung aus Sicht der Seite, die gezogen hat (wie der Coach-Satz und die Partie)
     const sicht = z.farbe === 'b' ? 'b' : 'w';
-    const nachTxt = /#$/.test(z.san) ? 'Matt' : evalText(z.evalNachher, { sicht });
+    const nachTxt = /#$/.test(z.san) ? t('analyse.an.coach.matt') : evalText(z.evalNachher, { sicht });
     const evalHtml = VERLUST_KLASSEN.has(z.klasse) && z.evalVorher
       ? `${esc(evalText(z.evalVorher, { sicht }))} → ${esc(nachTxt)}`
       : esc(nachTxt);
@@ -766,19 +791,19 @@ export function zeige(root, params = {}, app) {
     const linieHtml = linie.length ? `
       <div class="an-c-fuss">
         <div class="an-c-linie">
-          <span class="an-c-linie-titel">${andererZug ? 'Stärkster Zug' : 'Hauptvariante'} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
+          <span class="an-c-linie-titel">${esc(t(andererZug ? 'analyse.an.coach.staerkster' : 'analyse.an.coach.hauptvariante'))} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
           <span class="an-c-zuege">${linie.map((s, i) => `<span data-i="${i}">${esc(sanDe(s))}</span>`).join(' ')}${linie.length >= 8 ? ' …' : ''}</span>
         </div>
         <div class="an-c-knoepfe">
-          <button class="knopf" type="button" data-aktion="variante" aria-label="Variante zeigen">${icon('play')}<span>Variante zeigen</span></button>
-          <button class="knopf an-zur-partie" type="button" data-aktion="zur-partie" hidden>${icon('brett')}<span>Zur Partie</span></button>
+          <button class="knopf" type="button" data-aktion="variante" aria-label="${esc(t('analyse.an.coach.varianteZeigen'))}">${icon('play')}<span>${esc(t('analyse.an.coach.varianteZeigen'))}</span></button>
+          <button class="knopf an-zur-partie" type="button" data-aktion="zur-partie" hidden>${icon('brett')}<span>${esc(t('analyse.an.coach.zurPartie'))}</span></button>
         </div>
       </div>` : '';
     el.innerHTML = `
       <div class="an-c-symbol">${symbol(z.klasse)}</div>
       <div class="an-c-kopf"><span class="an-c-klasse">${esc(WORT[z.klasse] || KLASSEN_NAME[z.klasse])}</span><span class="an-c-zug">${esc(zugText(z))}${zuzweit() ? ` (${esc(personenName(z.farbe))})` : du ? '' : ` (${esc(kurz)})`}</span></div>
       <span class="an-c-eval zahl">${evalHtml}</span>
-      <p class="an-c-text">${esc(zuzweit() ? `${personenName(z.farbe)} spielt ${sanDe(z.san)}.${andererZug && linie.length ? ' Stärker war ' + sanDe(linie[0]) + '.' : ''}` : coachKern(z.coach))}</p>
+      <p class="an-c-text">${esc(zuzweit() ? `${t('analyse.an.coach.spielt', { name: personenName(z.farbe), zug: sanDe(z.san) })}${andererZug && linie.length ? ' ' + t('analyse.an.coach.staerkerWar', { zug: sanDe(linie[0]) }) : ''}` : coachKern(z.coach))}</p>
       ${linieHtml}`;
     fuelleCoachOrt(el, z, du);
     neuAnimieren(el);
@@ -839,11 +864,11 @@ export function zeige(root, params = {}, app) {
     const vk = coach.querySelector('[data-aktion="variante"]');
     if (vk) {
       vk.innerHTML = icon('nochmal');
-      vk.setAttribute('aria-label', 'Variante nochmal abspielen');
+      vk.setAttribute('aria-label', t('analyse.an.variante.nochmal'));
       vk.classList.add('an-nur-icon');
     }
     koerper.querySelector('.an-brettzone').classList.add('variante');
-    etikett('Variante');
+    etikett(t('analyse.an.variante'));
     const takt = reduziert() ? 1300 : 1000;
     const weiter = () => {
       if (st.variante !== v) return;
@@ -857,10 +882,10 @@ export function zeige(root, params = {}, app) {
       b.pfeile(pf);
       b.markiere([s.nach], 'zuletzt');
       for (const sp of coach.querySelectorAll('.an-c-zuege [data-i]')) sp.classList.toggle('an', Number(sp.dataset.i) === v.i - 1);
-      etikett(`Variante ${v.i} / ${v.schritte.length}`);
+      etikett(t('analyse.an.variante.stand', { i: v.i, n: v.schritte.length }));
       if (s.farbe === z.farbe) spieleKlang({ san: s.san });
       if (v.i < v.schritte.length) v.timer = nach(takt, weiter);
-      else etikett(`Variante ${v.schritte.length} / ${v.schritte.length}`);
+      else etikett(t('analyse.an.variante.stand', { i: v.schritte.length, n: v.schritte.length }));
     };
     v.timer = nach(Math.round(takt * 0.7), weiter);
   }
