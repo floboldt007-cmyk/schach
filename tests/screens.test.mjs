@@ -322,7 +322,7 @@ async function testeAnalyse(browser, d) {
   // --- Banner, Kopf-Knoepfe
   await oeffne(seite, `screen=analyse&partieId=${d.oper}&neuFreigeschaltet=turm&neueSterne=1,1,0`);
   const banner = await seite.locator('.an-banner').textContent();
-  pruefe('Freischalt-Banner mit Stufe und Name', banner.includes('Stufe 6') && banner.includes('Professor Turm'), banner.replace(/\s+/g, ' '));
+  pruefe('Freischalt-Banner mit Stufe und Name', banner.includes('Stufe 14') && banner.includes('Professor Turm'), banner.replace(/\s+/g, ' '));
   pruefe('Neue Sterne leuchten auf', (await seite.locator('.an-ft-sterne .neu').count()) === 2);
   await bild(seite, 'analyse-ipad-quer');
   await seite.click('.kopf [data-aktion="nochmal"]');
@@ -386,19 +386,29 @@ async function testePruefrunde(browser, d) {
   const { kontext, seite, fehler } = await neueSeite(browser);
   await oeffne(seite);
 
-  // Niederlage gegen den noch unbesiegten Bot: "Nochmal" ist der Hauptknopf, kein "Nächster Gegner"
-  const verlorenId = await seite.evaluate((id) => {
+  // Niederlage gegen den noch unbesiegten nächsten Gegner (Welten: der Bot direkt über dem höchsten Sieg, hier nach der
+  // gewonnenen Opernpartie gegen Rudi der Bot auf Stufe 13): "Nochmal" ist der Hauptknopf, kein "Nächster Gegner"
+  const verlorenVs = (botId, tage) => seite.evaluate(({ id, botId, tage }) => {
     const p0 = testseite.speicher.ladePartie(id);
     const r = testseite.speicher.ladeReview(id);
-    return testseite.speichere({ ...p0, id: undefined, botId: 'benno', ergebnis: 'niederlage', grund: 'aufgabe',
-      datum: new Date(Date.now() - 864e5 * 9).toISOString() }, r).partie.id;
-  }, d.oper);
-  await oeffne(seite, `screen=analyse&partieId=${verlorenId}`);
-  const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.kopf .an-kopf-knoepfe .knopf')]
+    return testseite.speichere({ ...p0, id: undefined, botId, ergebnis: 'niederlage', grund: 'aufgabe',
+      datum: new Date(Date.now() - 864e5 * tage).toISOString() }, r).partie.id;
+  }, { id: d.oper, botId, tage });
+  const kopfKnoepfe = () => seite.evaluate(() => [...document.querySelectorAll('.kopf .an-kopf-knoepfe .knopf')]
     .map((k) => ({ a: k.dataset.aktion, primaer: k.classList.contains('primaer'), text: k.textContent.trim() })));
-  pruefe('Niederlage gegen Benno: "Nochmal" primär, "Arena" statt "Nächster Gegner"',
+  const naechster = await seite.evaluate(() => testseite.speicher.naechsterGegner().id);
+  const verlorenId = await verlorenVs(naechster, 9);
+  await oeffne(seite, `screen=analyse&partieId=${verlorenId}`);
+  const knoepfe = await kopfKnoepfe();
+  pruefe(`Niederlage gegen den nächsten Gegner (${naechster}): "Nochmal" primär, "Arena" statt "Nächster Gegner"`,
     knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /Arena/.test(k.text))
     && !knoepfe.some((k) => /Nächster Gegner/.test(k.text)), JSON.stringify(knoepfe));
+  // Niederlage gegen einen Bot, der nicht der nächste Gegner ist (Benno, weit unter dem höchsten Sieg): "Nächster Gegner" bleibt der Hauptknopf
+  pruefe('Benno ist hier nicht der nächste Gegner', naechster !== 'benno', naechster);
+  await oeffne(seite, `screen=analyse&partieId=${await verlorenVs('benno', 8)}`);
+  const knoepfeB = await kopfKnoepfe();
+  pruefe('Niederlage gegen Benno (nicht der nächste Gegner): "Nächster Gegner" primär',
+    knoepfeB.some((k) => k.a === 'weiter' && k.primaer && /Nächster Gegner/.test(k.text)) && knoepfeB.some((k) => k.a === 'nochmal' && !k.primaer), JSON.stringify(knoepfeB));
 
   // Bewertung in der Coach-Karte aus Sicht der Seite, die gezogen hat (wie im Coach-Satz)
   const fall = await seite.evaluate((id) => {
@@ -580,7 +590,7 @@ async function testeVerlauf(browser, d) {
   await seite.evaluate(() => testseite.leere());
   await oeffne(seite, 'screen=verlauf');
   const leer = await seite.locator('.vl-leer').textContent();
-  pruefe('Leer: "Noch keine Partien. Fordere Bauer Benno heraus!"', leer.includes('Noch keine Partien.') && leer.includes('Fordere Bauer Benno heraus!'), leer.replace(/\s+/g, ' '));
+  pruefe('Leer: "Noch keine Partien. Fordere Vogelscheuche Fridolin heraus!"', leer.includes('Noch keine Partien.') && leer.includes('Fordere Vogelscheuche Fridolin heraus!'), leer.replace(/\s+/g, ' '));
   await seite.click('[data-aktion="arena"]');
   g = (await protokoll(seite)).filter((x) => x.art === 'gehe').pop();
   pruefe('Leer: Knopf zur Arena', g && g.name === 'arena');

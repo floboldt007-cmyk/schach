@@ -106,13 +106,13 @@ function pruefe(name, ok, detail = '') {
 }
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Fortschritt wie im Mockup: vier Bots besiegt
+// Fortschritt wie im Mockup: vier Bots besiegt (Welten: die ersten vier der Karofelder, naechster Gegner ist Oma Hilde)
 const SAAT = {
   bots: {
-    benno: { sterne: [true, true, true], partien: 3, siege: 2, remis: 0, niederlagen: 1, besteGenauigkeit: 84 },
-    hilde: { sterne: [true, true, false], partien: 2, siege: 1, remis: 0, niederlagen: 1, besteGenauigkeit: 81 },
-    kalle: { sterne: [true, true, true], partien: 3, siege: 2, remis: 1, niederlagen: 0, besteGenauigkeit: 88 },
-    lisa: { sterne: [true, false, false], partien: 3, siege: 1, remis: 0, niederlagen: 2, besteGenauigkeit: 71 },
+    fridolin: { sterne: [true, true, true], partien: 3, siege: 2, remis: 0, niederlagen: 1, besteGenauigkeit: 84 },
+    benno: { sterne: [true, true, false], partien: 2, siege: 1, remis: 0, niederlagen: 1, besteGenauigkeit: 81 },
+    paula: { sterne: [true, true, true], partien: 3, siege: 2, remis: 1, niederlagen: 0, besteGenauigkeit: 88 },
+    gustav: { sterne: [true, false, false], partien: 3, siege: 1, remis: 0, niederlagen: 2, besteGenauigkeit: 71 },
   },
   brillanteZuege: [],
 };
@@ -263,32 +263,47 @@ async function testeArena(seite, h) {
   await seite.goto(BASIS + '#arena');
   await seite.waitForSelector('.screen.arena .knoten');
   pruefe('Arena sichtbar', await seite.locator('.screen.arena').isVisible());
-  pruefe('10 Knoten', (await seite.locator('.knoten').count()) === 10);
-  pruefe('9 Bots gesperrt', (await seite.locator('.knoten.gesperrt').count()) === 9);
-  pruefe('Benno ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="benno"]').count() === 1);
+  // Welten: die Karte zeigt eine Welt mit sechs Stationen, frisch die erste (Karofelder)
+  pruefe('6 Knoten (eine Welt)', (await seite.locator('.knoten').count()) === 6);
+  pruefe('Welt 1 gezeigt: Die Karofelder', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()));
+  pruefe('4 Bots gesperrt (Benno bis Hilde)', (await seite.locator('.knoten.gesperrt').count()) === 4);
+  pruefe('Fridolin ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Nur ein aktueller Gegner', await seite.locator('.knoten.aktuell').count() === 1);
   const filter = await seite.evaluate(() => getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="hilde"] .avatar img')).filter);
   pruefe('Gesperrt: Gesicht in Graustufen (keine Silhouette)', /grayscale/.test(filter) && !/brightness\(0\)/.test(filter), filter);
   pruefe('Gesperrt: Schloss', await seite.locator('.knoten.gesperrt[data-bot="hilde"] .schloss').count() === 1);
-  const bossFilter = await seite.evaluate(() => getComputedStyle(document.querySelector('.knoten.boss .avatar img')).filter);
-  pruefe('Endgegner als Glitch-Silhouette', /brightness\(0\)/.test(bossFilter), bossFilter);
-  pruefe('Kopf-Chips 0/30 und 0/10', /0\s*\/ 30/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 10/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
-  pruefe('Panel zeigt Benno', /Bauer Benno/.test(await seite.locator('.detail h2').innerText()));
+  // Endgegner der ersten Welt: direkt herausforderbar (offen, mit Gesicht), nicht gesperrt
+  pruefe('Janine: Endgegner der Welt, direkt herausforderbar (offen)', await seite.locator('.knoten.boss.offen[data-bot="janine"]').count() === 1
+    && await seite.locator('.knoten.boss').count() === 1);
+  // Weltwahl: ein Pfeil weiter zeigt Welt 2 (gesperrt), ihr Endgegner ist die Glitch-Silhouette
+  await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
+  await seite.waitForSelector('.knoten[data-bot="rudi"]');
+  pruefe('Weltwahl: Welt 2 mit sechs Stationen', /Springerforst/.test(await seite.locator('.weltwahl .ww-name').innerText()) && (await seite.locator('.knoten').count()) === 6);
+  pruefe('Welt 2: alle sechs gesperrt', (await seite.locator('.knoten.gesperrt').count()) === 6);
+  const bossFilter = await seite.evaluate(() => getComputedStyle(document.querySelector('.knoten.boss.gesperrt .avatar img')).filter);
+  pruefe('Gesperrter Endgegner als Glitch-Silhouette', /brightness\(0\)/.test(bossFilter), bossFilter);
+  await h.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
+  await seite.waitForSelector('.knoten[data-bot="fridolin"]');
+  pruefe('Weltwahl: zurück zu Welt 1, Fridolin aktuell', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()) && await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Kopf-Chips 0/90 und 0/30', /0\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 30/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
+  pruefe('Kopfzeile: "Fünf Welten, 30 Bots"', /Fünf Welten, 30 Bots/.test(await seite.locator('.kopf').innerText()));
+  pruefe('Panel zeigt Fridolin', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
   pruefe('Panel: drei Merkmal-Kacheln', await seite.locator('.detail .merkmal').count() === 3);
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
 
-  await h.tippe('.knoten[data-bot="hilde"]');
+  await h.tippe('.knoten[data-bot="benno"]');
   await seite.waitForSelector('.toast');
   const toast = await seite.locator('.toast').innerText();
-  pruefe('Gesperrter Bot: "Besiege erst Bauer Benno"', /Besiege erst Bauer Benno/.test(toast), toast);
-  pruefe('Gesperrter Bot wird nicht ausgewählt', /Bauer Benno/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Fridolin"', /Besiege erst Vogelscheuche Fridolin/.test(toast), toast);
+  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
 
   await h.tippe('.farbwahl [data-farbe="w"]');
   pruefe('Farbwahl Weiß aktiv', await seite.locator('.farbwahl [data-farbe="w"][aria-checked="true"]').count() === 1);
   await bild(seite, 'test-arena-start');
 }
 
-// ---------- 2. Partie gegen Benno ----------
+// ---------- 2. Partie gegen Fridolin (der erste Gegner, Welten) ----------
 async function testePartie(seite, h, fehler) {
   gruppe = 'Partie';
   await h.tippe('.detail [data-aktion="spielen"]');
@@ -299,7 +314,7 @@ async function testePartie(seite, h, fehler) {
   pruefe('Brett mit 32 Figuren', (await seite.locator('.screen.partie .brett > img.figur').count()) === 32);
   pruefe('Begrüßung als Sprechblase', await seite.locator('.screen.partie .blase-ort .sprechblase').count() >= 1);
   const lauf0 = await h.laufend();
-  pruefe('Laufende Partie gespeichert', lauf0 && lauf0.botId === 'benno' && lauf0.spielerFarbe === 'w');
+  pruefe('Laufende Partie gespeichert', lauf0 && lauf0.botId === 'fridolin' && lauf0.spielerFarbe === 'w');
 
   // Zug per Tippen
   await h.warteFlo();
@@ -412,7 +427,7 @@ async function testeSieg(seite, h, fehler) {
   const genGespeichert = ((await h.gespeichert())[0] || {}).genauigkeit;
   pruefe('Genauigkeit zählt hoch bis zum gespeicherten Wert (mindestens 80 %)', Number.isFinite(genGespeichert) && genGespeichert >= 80
     && genText.trim() === genGespeichert.toFixed(1).replace('.', ',') + ' %', `${genText} / ${genGespeichert}`);
-  pruefe('Kachel "Neu freigeschaltet" mit Oma Hilde', /Oma Hilde/.test(await seite.locator('.erg-frei').innerText()));
+  pruefe('Kachel "Neu freigeschaltet" mit Postbotin Paula (nach Benno ist Paula der nächste Gegner)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
   pruefe('Abschiedssatz des Bots', (await seite.locator('.erg-bot .sprechblase').innerText()).length > 5);
   const f = await h.fortschritt();
   pruefe('Fortschritt: Benno drei Sterne', JSON.stringify(f.bots && f.bots.benno && f.bots.benno.sterne) === '[true,true,true]');
@@ -423,7 +438,7 @@ async function testeSieg(seite, h, fehler) {
     const t = { an: null, aus: null };
     window.__frei = t;
     const mo = new MutationObserver(() => {
-      const k = document.querySelector('.knoten[data-bot="hilde"]');
+      const k = document.querySelector('.knoten[data-bot="paula"]');
       if (!k) return;
       if (t.an == null && k.classList.contains('wird-frei')) t.an = performance.now();
       if (t.an != null && t.aus == null && !k.classList.contains('wird-frei')) { t.aus = performance.now(); mo.disconnect(); }
@@ -433,16 +448,18 @@ async function testeSieg(seite, h, fehler) {
   await h.tippe('.erg-knoepfe [data-ziel="weiter"]');
   await seite.waitForSelector('.screen.arena');
   pruefe('Nächster Gegner führt zur Arena', (await seite.evaluate(() => location.hash)) === '#arena');
-  pruefe('Freischalt-Animation läuft', await seite.locator('.knoten.wird-frei[data-bot="hilde"]').count() === 1);
-  pruefe('Hilde im Panel', /Oma Hilde/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Freischalt-Animation läuft', await seite.locator('.knoten.wird-frei[data-bot="paula"]').count() === 1);
+  pruefe('Paula im Panel', /Postbotin Paula/.test(await seite.locator('.detail h2').innerText()));
   await seite.waitForFunction(() => window.__frei.aus != null, null, { timeout: 15000 });
   const frei = await seite.evaluate(() => window.__frei);
   pruefe('Freischalt-Animation endet nach ihren 2,7 s (nicht früher, höchstens 1 s später)', frei.aus - frei.an >= 2650 && frei.aus - frei.an <= 3700,
     Math.round(frei.aus - frei.an) + ' ms');
-  pruefe('Hilde freigeschaltet und aktuell', await seite.locator('.knoten.aktuell[data-bot="hilde"]:not(.gesperrt)').count() === 1);
-  pruefe('Schloss ist weg', await seite.locator('.knoten[data-bot="hilde"] .schloss').count() === 0);
+  pruefe('Paula freigeschaltet und aktuell', await seite.locator('.knoten.aktuell[data-bot="paula"]:not(.gesperrt)').count() === 1);
+  pruefe('Schloss ist weg', await seite.locator('.knoten[data-bot="paula"] .schloss').count() === 0);
   pruefe('Benno mit drei Sternen', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 3);
-  pruefe('Kopf: 3 / 30 Sterne', /3\s*\/ 30/.test(await seite.locator('.kopf .chip').first().innerText()));
+  pruefe('Fridolin (unter dem besten Sieg) bleibt offen, mit Schild "NEU"', await seite.locator('.knoten.offen[data-bot="fridolin"] .k-neu').count() === 1);
+  pruefe('Hilde bleibt gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
+  pruefe('Kopf: 3 / 90 Sterne', /3\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
 }
 
@@ -619,7 +636,8 @@ async function testePruefrunde(browser) {
     pruefe('Stern 1 und Freischaltung bleiben', f.bots && f.bots.benno && f.bots.benno.sterne[0] === true);
     pruefe('Keine laufende Partie mehr', (await h.laufend()) === null);
     await seite.waitForSelector('.screen.arena');
-    pruefe('Arena: Hilde frei', await seite.locator('.knoten[data-bot="hilde"]:not(.gesperrt)').count() === 1);
+    pruefe('Arena: Paula frei (nach Benno), Hilde noch gesperrt', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
+      && await seite.locator('.knoten[data-bot="hilde"].gesperrt').count() === 1);
 
     // Fortgesetzte Partie, Auswertung langsam: Overlay zeigt Knoepfe trotzdem gleich
     gruppe = 'Auswertung im Hintergrund';
@@ -768,8 +786,8 @@ async function testePruefrunde(browser) {
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
 
     // Aufgabe gegen den Stockfisch: kein "Schachmatt"-Satz
-    await seite.evaluate(() => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: Object.fromEntries(
-      ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta'].map((id) => [id, { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) })));
+    await seite.evaluate(async () => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: Object.fromEntries(
+      (await import('./js/bots.js')).BOTS.filter((b) => b.id !== 'stockfisch').map((b) => [b.id, { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) })));
     await h.starte({ botId: 'stockfisch', farbe: 'w' });
     await h.warteFlo();
     await h.zugTippen('e2e4');
@@ -806,17 +824,24 @@ async function testePruefrunde(browser) {
     const h = hilfen(seite, { touch: true });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .knoten');
-    await h.tippe('.knoten[data-bot="lisa"]');
+    await h.tippe('.knoten[data-bot="hilde"]');
     await seite.waitForSelector('.toast');
     const t = await seite.locator('.toast').innerText();
-    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Bauer Benno/.test(t), t);
-    const alle = { bots: Object.fromEntries(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch']
-      .map((id, i) => [id, { sterne: [true, i > 0, i > 2], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) };
+    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Fridolin/.test(t), t);
+    // gesperrte Welt: ihr Bot nennt den Endgegner davor, der die Welt öffnet
+    await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
+    await seite.waitForSelector('.knoten[data-bot="lisa"]');
+    await h.tippe('.knoten[data-bot="lisa"]');
+    await seite.waitForFunction(() => /öffnet sich mit einem Sieg gegen/.test(document.querySelector('.toast') ? document.querySelector('.toast').textContent : ''), null, { timeout: 5000 }).catch(() => {});
+    const t2 = await seite.locator('.toast').innerText();
+    pruefe('Gesperrte Welt: "öffnet sich mit einem Sieg gegen Janine"', /Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub/.test(t2), t2);
+    const alle = await seite.evaluate(async () => ({ bots: Object.fromEntries((await import('./js/bots.js')).BOTS
+      .map((b, i) => [b.id, { sterne: [true, i > 0, i > 2], partien: 1, siege: 1, remis: 0, niederlagen: 0 }])) }));
     await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), alle);
     await seite.reload();
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('Alle besiegt: "Arena bezwungen!"', /Arena bezwungen/.test(await seite.locator('.arena .logo-unter').textContent()));
-    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Bauer Benno/.test(await seite.locator('.detail h2').innerText()));
+    pruefe('Alle besiegt: "Arena bezwungen! 86/90 Sterne"', /Arena bezwungen!\s+86\/90\s+Sterne/.test(await seite.locator('.arena .logo-unter').textContent()), await seite.locator('.arena .logo-unter').textContent());
+    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
     await kontext.close();
   }
 
@@ -915,7 +940,7 @@ for (const ort of DOM) anbieten(ort, (k) => {
 anbieten('arena:start', (k) => { log.start = Object.keys(k).sort(); return { verlasse() { log.startVerlassen++; } }; }, { paket: 'w0-test' });
 anbieten('app:erster-screen?', (k) => { log.ersterScreen = { ...k }; return q.get('w0start') || null; }, { paket: 'w0-test' });
 anbieten('partie:begruessung?', (k) => (q.has('w0gruss') ? { anlass: 'w0gruss', werte: { name: 'Flo', zuege: k.partienGegenBot.length } } : null), { paket: 'w0-test' });
-registriereSaetze('w0gruss', { benno: ['Hallo {name}, schön dich zu sehen!'] });
+registriereSaetze('w0gruss', { benno: ['Hallo {name}, schön dich zu sehen!'], fridolin: ['Hallo {name}, schön dich zu sehen!'] });
 registriereSaetze('w0blase', { benno: ['Blase leise', 'Blase leise'], hilde: ['x'] });
 registriereSaetze('w0laut', { benno: ['Blase laut'] });
 hoere('partie:beendet', (d) => {
@@ -1491,7 +1516,7 @@ async function testeErweiterungen(browser) {
   pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
   // W0+a: dazu boss, seed, zeigt, platz
   pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
-    'liveAn', 'merke', 'modus', 'phase', 'platz', 'rahmen', 'reduziert', 'seed', 'spaeter', 'zeigt', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 1, JSON.stringify(gest));
+    'liveAn', 'merke', 'modus', 'phase', 'platz', 'rahmen', 'reduziert', 'seed', 'spaeter', 'zeigt', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 2, JSON.stringify(gest));
   pruefe('partie:gestartet: wertet, hinweise und zuruecknahmen (Stand beim Start)', gest.wertet === true && gest.hinweise === 0 && gest.zuruecknahmen === 0, JSON.stringify(gest));
   const gesp = p.filter((e) => e.name === 'zug:gespielt');
   pruefe('zug:gespielt für Flo und Bot, auch zurückgenommene', gesp.length === 9 && gesp.filter((e) => e.wer === 'bot').length === 4, gesp.map((e) => e.wer + ':' + e.uci).join(' '));
@@ -1512,7 +1537,7 @@ async function testeErweiterungen(browser) {
   pruefe('stellung:analysiert je aktueller Stellung einmal', st.length >= 6 && stSchl.every((k, i) => i === 0 || k !== stSchl[i - 1])
     && new Set(stSchl.slice(0, 4)).size === 4, JSON.stringify(st.map((e) => e.plies + ':' + e.amZug)));
   pruefe('partie:beendet: Daten', ende.wertet === true && ende.ergebnis === 'sieg' && ende.grund === 'matt' && ende.eigeneZuege === 4 && ende.hinweise === 1
-    && ende.zuruecknahmen === 1 && ende.neuFreigeschaltet === 'hilde' && ende.modus === 'normal' && Number.isInteger(ende.maxSerie)
+    && ende.zuruecknahmen === 1 && ende.neuFreigeschaltet === 'paula' && ende.modus === 'normal' && Number.isInteger(ende.maxSerie)
     && JSON.stringify(ende.neueSterne) === '[true,false,false]' && Number.isFinite(ende.dauerMs) && ende.liveKlassen.length === 7, JSON.stringify(ende));
   const an = p.find((e) => e.name === 'partie:analysiert') || {};
   pruefe('partie:analysiert (quelle partie) mit Review', an.quelle === 'partie' && an.mitReview && an.wertet === true && an.partieId === ende.partieId);
@@ -2159,7 +2184,7 @@ async function testeSpielFundament(browser) {
       const partien = [];
       for (let i = 0; i < 18; i++) {
         const id = 'pwp' + String(i).padStart(2, '0');
-        partien.push({ id, datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: 'benno', botStufe: 1, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'],
+        partien.push({ id, datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: 'benno', botStufe: 2, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'],
           san: ['e4', 'e5'], ergebnis: 'remis', grund: 'aufgabe', hinweise: 0, zuruecknahmen: 0, liveKlassen: ['buch', null], genauigkeit: 70 });
         localStorage.setItem('schach-arena:v1:review:' + id, JSON.stringify({ zuege: [{ ply: 0, farbe: 'w', klasse: 'buch' }] }));
       }
@@ -2490,16 +2515,19 @@ async function testeSpielFundament(browser) {
     await h.starte({ botId: 'test-boss', farbe: 'w', modus: 'boss', boss: { id: 'test-boss', stufe: 'standard', staerke: 1080 } });
     await h.warteFlo();
     const st = await seite.evaluate(async () => {
-      const lisa = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'lisa');
+      const edda = (await import('./js/bots.js')).BOTS.find((b) => b.id === 'edda');
       const zb = window.__partie.zugBot();
       return { h2: document.querySelector('.partie .kopf h2').textContent, meta: document.querySelector('.partie .botkarte .bot-meta').textContent,
-        wieLisa: JSON.stringify(zb.staerke) === JSON.stringify(lisa.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
+        wieEdda: JSON.stringify(zb.staerke) === JSON.stringify(edda.staerke), id: zb.id, laufend: JSON.parse(localStorage.getItem('schach-arena:v1:laufend')).boss };
     });
     await seite.evaluate(() => { window.__test = {}; });
     // w0plus-a-fix (Befund des Pruefers): Kopf und Bot-Zeile nennen die Elo des Profils, mit dem der Boss wirklich spielt
-    // (vor der Eichung Lisa, 1000), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
-    pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1000"), Anfrage gespeichert',
-      st.h2 === 'Testboss · Standard ≈ 1000' && st.meta.startsWith('Wochen-Boss · ≈ 1000') && st.wieLisa && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
+    // (vor der Eichung Köhlerin Edda, 1100, der nächste Bot in 100er-Schritten), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
+    pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1100"), Anfrage gespeichert',
+      st.h2 === 'Testboss · Standard ≈ 1100' && st.meta.startsWith('Wochen-Boss · ≈ 1100') && st.wieEdda && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
+    // Welten: Leiter in 100er-Schritten; bei Gleichstand (1050) der schwächere Bot
+    const gleich = await seite.evaluate(async () => { const m = await import('./js/bots.js'); return [m.staerkeFuerElo(1050), m.staerkeFuerElo(1080), m.staerkeFuerElo(3200)].map((x) => x && x.botId + ':' + x.elo); });
+    pruefe('staerkeFuerElo: nächster Bot in 100er-Schritten, bei Gleichstand der schwächere', JSON.stringify(gleich) === JSON.stringify(['lisa:1000', 'edda:1100', 'stockfisch:3000']), JSON.stringify(gleich));
     pruefe('Boss: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -2984,7 +3012,8 @@ async function testeViewport(browser, vp) {
 
 // ---------- U7: Partie, Ergebnis und Handy (Look A, PLAN 2.4 bis 2.6, 3.7, 4) ----------
 const U7_HANDY = [{ w: 390, h: 844 }, { w: 375, h: 667 }, { w: 390, h: 664 }];
-const LEITER = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
+// die ganze Leiter (Welten: dreissig Bots in fuenf Welten), aus js/bots.js gelesen
+let LEITER = [];
 async function u7Seite(browser, { w = 1180, h = 820, schema = 'light', handy = false, reduziert = false } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: handy, colorScheme: schema,
@@ -3120,10 +3149,12 @@ async function testeU7(browser) {
       await kontext.close();
     }
   }
-  // Alle zehn Namen der Leiter auf dem kleinsten Handy mit Uhr: nie mit "…" gekuerzt, hoechstens zwei Zeilen
+  // Alle dreissig Namen der Leiter auf dem kleinsten Handy mit Uhr: nie mit "…" gekuerzt, hoechstens zwei Zeilen
   gruppe = 'U7 Namen';
   {
     const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 375, h: 667, handy: true });
+    LEITER = await seite.evaluate(async () => (await import('./js/bots.js')).BOTS.map((b) => b.id));
+    pruefe('Leiter: dreißig Bots in fünf Welten', LEITER.length === 30 && LEITER[0] === 'fridolin' && LEITER[29] === 'stockfisch', LEITER.join(','));
     await seite.evaluate(() => { window.__test = { botAnhalten: true }; });
     const namen = [];
     for (const id of LEITER) {
@@ -3132,7 +3163,7 @@ async function testeU7(browser) {
       const m = await u7Masse(seite);
       namen.push({ id, ...m.name, ok: m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && m.name.hoehe <= m.name.lh * 2 + 2 });
     }
-    pruefe('375 x 667 mit Uhr: alle zehn Namen ganz (oder Rufname), nie „…“, voller Name im aria-label', namen.every((n) => n.ok && n.label && (n.text === n.label || n.text.length < n.label.length)),
+    pruefe('375 x 667 mit Uhr: alle dreißig Namen ganz (oder Rufname), nie „…“, voller Name im aria-label', namen.every((n) => n.ok && n.label && (n.text === n.label || n.text.length < n.label.length)),
       JSON.stringify(namen.filter((n) => !n.ok).map((n) => [n.id, n.text, n.scroll, n.client, n.hoehe])));
     pruefe('Namen: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -3323,7 +3354,7 @@ async function testeU7(browser) {
     pruefe('Gegner-Karte .spieler.gegner mit den alten Klassen (.botbox, .botleiste-hoch, .botkarte), Gegner-Leiste als erstes Kind', k.klassen && k.erstes, JSON.stringify(k));
     pruefe('Portraets als Flugziele des Duells (.spieler.gegner .av, .spieler.ich .av), Spieler-Leiste nach Flos Namen, Flos Zusatzklassen', k.av && k.leisteNachName && k.ich, JSON.stringify(k));
     pruefe('Ohne Bedenkzeit: beide Uhren versteckt; Kopf „Kalle vom Stammtisch“, Unterzeile mit Stufe und Farbe, Brettwahl (3), Klang-Schalter an', k.uhren.every(Boolean)
-      && k.kopf === 'Kalle vom Stammtisch' && /Stufe 3/.test(k.unter) && /Du spielst Weiß/.test(k.unter) && k.brettwahl === 3 && k.klang === 'true' && k.lage === 'quer', JSON.stringify(k));
+      && k.kopf === 'Kalle vom Stammtisch' && /Stufe 8/.test(k.unter) && /Du spielst Weiß/.test(k.unter) && k.brettwahl === 3 && k.klang === 'true' && k.lage === 'quer', JSON.stringify(k));
     const fmt = await seite.evaluate(() => { const f = window.__partie.fmtUhr; return [f(65000), f(20000), f(19999), f(1200), f(0), f(-5), f(600000)]; });
     pruefe('fmtUhr: M:SS ab 20 s, darunter 0:SS,z, nie negativ', JSON.stringify(fmt) === JSON.stringify(['1:05', '0:20', '0:19,9', '0:01,2', '0:00,0', '0:00,0', '10:00']), JSON.stringify(fmt));
     await h.starte({ botId: 'kalle', farbe: 'w', tempo: { grund: 180, zuschlag: 2 } });
