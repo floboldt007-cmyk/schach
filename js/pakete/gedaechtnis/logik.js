@@ -32,7 +32,7 @@
 //   Niederlagen von Flo (mindestens ERZFEIND_MIN und mehr Niederlagen als Siege; Gleichstand: groessere Differenz,
 //   dann die hoehere Stufe aus BOTS, unabhaengig von der Reihenfolge im Fortschritt). Quelle: Fortschritt (wertende
 //   Partien, storage.bucheFortschritt); Schluessel, die kein Leiter-Bot sind, zaehlen nicht.
-//   erzfeindZeile(e) -> 'Dein Erzfeind · 1 Sieg · 4 Niederlagen'
+//   erzfeindZeile(e) -> 'Dein Erzfeind · 1 Sieg · 4 Niederlagen' (Englisch: 'Your archrival · 1 win · 4 losses')
 //   erzfeindBezwungen({ fortschritt, botId, ergebnis, wertet, gefeiert }) -> { botId, niederlagen } | null
 //     Sieg einer wertenden Partie gegen den Bot, der VOR dieser Partie Erzfeind war; einmal je neuer Niederlage
 //     (gefeiert[botId] = Niederlagen beim letzten Feiern).
@@ -41,7 +41,9 @@
 import { seedAus, zufallAus, tagSchluessel, tageZwischen, istSchluessel } from '../../tag.js';
 import { wertet } from '../../storage.js';
 import { BOTS } from '../../bots.js';
+import { t } from '../../sprache.js';
 import { SAETZE } from './saetze.js';
+import './texte.js';
 
 // 2: Fairness-Sperre auch bei "Wenig", Plaetze vorn und hinten am Wahl-Ort, Erzfeind nach Stufe, Komma bei Greta
 export const RECHENSTAND = 2;
@@ -290,10 +292,11 @@ export function erzfeind(fortschritt) {
   return best ? { botId: best.botId, siege: best.siege, niederlagen: best.niederlagen } : null;
 }
 
+// Texte aus texte.js in der eingestellten Sprache (ohne Wahl Deutsch); der Trenner ' · ' bleibt, index.js teilt daran
 export function erzfeindZeile(e) {
   const s = ganz(e && e.siege);
   const n = ganz(e && e.niederlagen);
-  return `Dein Erzfeind · ${s} ${s === 1 ? 'Sieg' : 'Siege'} · ${n} ${n === 1 ? 'Niederlage' : 'Niederlagen'}`;
+  return [t('p-gedaechtnis.erzfeind.kopf'), t('p-gedaechtnis.erzfeind.siege', { n: s }), t('p-gedaechtnis.erzfeind.niederlagen', { n })].join(' · ');
 }
 
 export function erzfeindBezwungen({ fortschritt, botId, ergebnis, wertet: zaehlt, gefeiert = {} } = {}) {

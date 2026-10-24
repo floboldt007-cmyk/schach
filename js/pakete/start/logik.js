@@ -14,7 +14,11 @@
 //     luecke }   staerken: thema der zwei schwersten im ersten Versuch geloesten Aufgaben, luecke: naechstes der leichtesten
 //     nicht geloesten. probe: der Bot steht ueber der hoechsten freigeschalteten Stufe; dann gibt es ihn nur als Probepartie
 //     (Modus 'frei', wertet nie). Die Leiter bleibt: Sterne und Freischaltung nur der Reihe nach.
-//   begruendung(e, { botName }) -> { kurz, saetze }   ehrliche Saetze aus den Ergebnissen (keine Elo-Schaetzung)
+//   begruendung(e, { botName }) -> { kurz, saetze }   ehrliche Saetze aus den Ergebnissen (keine Elo-Schaetzung), in der
+//     Sprache der App (Woerterbuch texte.js, ohne gesetzte Sprache deutsch). staerken und luecke bleiben die deutschen
+//     Daten aus aufgaben.js (thema, naechstes); angezeigt werden sie ueber die Aufgabe, zu der sie gehoeren.
+// Texte (BOT_GRUND, SCHAETZUNG, Titel und Text der ENTDECKUNGEN) entstehen erst beim Lesen in der Sprache der App:
+//   Getter bzw. SCHAETZUNG als Objekt mit toString() (js/ui/start.js setzt es mit String() ein).
 // Entdeckungs-Fahrplan (SPIELKONZEPT 3.16): hoechstens ein Hinweis "Neu fuer dich" je Tag in den ersten FAHRPLAN_TAGE
 //   Tagen, nur fuer Funktionen, die es gibt (Bedingungen aus dem Kontext), nie fuer etwas, das Flo schon benutzt hat.
 //   fahrplanStart(modul, { tag, partien }) -> modul   setzt den ersten Tag (und erfahren ab ERFAHREN_AB Partien: dann nur
@@ -35,7 +39,9 @@
 //   normalisiereModul(roh) liest alles robust (Falsches faellt still weg), leeresModul() ist der Anfang.
 import { istSchluessel, tageZwischen } from '../../tag.js';
 import { BOTS } from '../../bots.js';
+import { t } from '../../sprache.js';
 import { EINSTUFUNG } from './aufgaben.js';
+import './texte.js';
 
 export const PAKET = 'start';
 export const MODUL = 'start';
@@ -61,29 +67,28 @@ export const EMPFEHLUNG = Object.freeze([
   Object.freeze({ bis: 8, botId: 'turm' }),
 ]);
 
-// Warum dieser Gegner (aus Bio und Eigenschaften der Bots in js/bots.js, eigene Saetze)
-export const BOT_GRUND = Object.freeze({
-  fridolin: 'Vogelscheuche Fridolin zieht fast zufällig, aber immer nach den Regeln. Der sanfteste Einstieg in die erste Welt.',
-  benno: 'Bauer Benno kennt die Zugregeln und freut sich über jede Figur. Gut für einen ersten Sieg.',
-  hilde: 'Oma Hilde nimmt alles, was ungedeckt steht. Wer seine Figuren deckt, hat gegen sie gute Chancen.',
-  kalle: 'Kalle greift sofort an und übersieht dabei viel. Wer Gabeln und Matt in 1 sieht, kommt gegen ihn weit.',
-  lisa: 'Lisa Läufer sieht kurze Taktiken sofort, genau wie du. Eine Gegnerin auf Augenhöhe.',
-  rudi: 'Ritter Rudi sucht Gabeln. Du findest sie auch, jetzt geht es darum, seine zu vermeiden.',
-  turm: 'Professor Turm spielt geduldig und solide. Taktik allein reicht gegen ihn nicht, gerade das macht ihn lehrreich.',
-});
-export const SCHAETZUNG = 'Die Einstufung ist eine grobe Schätzung aus 8 Aufgaben. Du kannst jederzeit einen anderen Gegner wählen.';
+// Warum dieser Gegner (aus Bio und Eigenschaften der Bots in js/bots.js, eigene Saetze; Texte in texte.js 'grund.<id>')
+const text = (schluessel) => ({ get() { return t('p-start.' + schluessel); }, enumerable: true });
+export const BOT_GRUND = Object.freeze(Object.defineProperties({}, Object.fromEntries(
+  ['fridolin', 'benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm'].map((id) => [id, text('grund.' + id)]))));
+// Hinweis unter der Empfehlung: String(SCHAETZUNG) bzw. `${SCHAETZUNG}` liefert den Text in der Sprache der App
+export const SCHAETZUNG = Object.freeze({ toString: () => t('p-start.schaetzung') });
 
 // Entdeckungen in ihrer Reihenfolge. neu: auch fuer erfahrene Spieler (eine neue Funktion, keine Grundlage).
 // screen: wer diesen Screen besucht, braucht den Hinweis nicht mehr. abTag: fruehestens am wievielten Tag nach dem ersten
 // Start (0 = erster Tag; am ersten Tag nur die Analyse nach der ersten Partie, die Einstufung bot schon das Willkommen an).
 // text: ein kurzer Satz, der in der Heute-Karte in eine Zeile passt (hoechstens 34 Zeichen; laengere schneidet das CSS ab).
 // Eine zweizeilige Heute-Zeile schob auf dem iPad 1024 x 768 den Spielen-Knopf unter den Rand.
+// titel und text sind Getter (texte.js 'entdeckung.<id>.titel' und '.text'): sie liefern die Sprache der App.
+const entdeckungMit = (e) => Object.freeze(Object.defineProperties(e, {
+  titel: text(`entdeckung.${e.id}.titel`), text: text(`entdeckung.${e.id}.text`),
+}));
 export const ENTDECKUNGEN = Object.freeze([
-  Object.freeze({ id: 'analyse', screen: 'analyse', neu: false, abTag: 0, titel: 'Die Spielanalyse', text: 'Wo deine letzte Partie kippte.' }),
-  Object.freeze({ id: 'einstufung', screen: null, neu: true, abTag: 1, titel: 'Die Einstufung', text: 'Finde den passenden Gegner.' }),
-  Object.freeze({ id: 'training', screen: 'training', neu: true, abTag: 2, titel: 'Das Training', text: 'Deine Fehler als Rätsel.' }),
-  Object.freeze({ id: 'einstellungen', screen: 'einstellungen', neu: false, abTag: 2, titel: 'Brett und Klang', text: 'Brettfarben, Klang, Hell, Dunkel.' }),
-  Object.freeze({ id: 'verlauf', screen: 'verlauf', neu: false, abTag: 3, titel: 'Dein Verlauf', text: 'Alle Partien und deine Bilanz.' }),
+  entdeckungMit({ id: 'analyse', screen: 'analyse', neu: false, abTag: 0 }),
+  entdeckungMit({ id: 'einstufung', screen: null, neu: true, abTag: 1 }),
+  entdeckungMit({ id: 'training', screen: 'training', neu: true, abTag: 2 }),
+  entdeckungMit({ id: 'einstellungen', screen: 'einstellungen', neu: false, abTag: 2 }),
+  entdeckungMit({ id: 'verlauf', screen: 'verlauf', neu: false, abTag: 3 }),
 ]);
 const BEDINGUNG = Object.freeze({
   analyse: (k) => k.partien >= 1,
@@ -192,25 +197,33 @@ export function empfehlung({ ergebnisse = [], hoechsteFrei = 1 } = {}) {
   return { ...a, botId, stufe, probe: stufe > frei, staerken, luecke: offen.length ? offen[0].naechstes : null };
 }
 
+// thema bzw. naechstes (deutsche Daten aus aufgaben.js) in der Sprache der App: ueber die Aufgabe, zu der es gehoert
+function aufgabenText(feld, wert) {
+  const a = EINSTUFUNG.find((x) => x[feld] === wert);
+  return a ? t(`p-start.aufgabe.${a.id}.${feld}`) : wert;
+}
+
 export function begruendung(e, { botName = '' } = {}) {
   const saetze = [];
   if (!e || !e.geloest) {
-    saetze.push('Diesmal ging keine Aufgabe auf. Kein Problem: Die Leiter fängt ganz unten an.');
+    saetze.push(t('p-start.begruendung.keine'));
   } else {
     const zweite = e.geloest - e.ersterVersuch;
-    const zahl = `${e.geloest} von ${e.gesamt} Aufgaben`;
-    let rest;
-    if (zweite === 0) rest = e.geloest === 1 ? ', im ersten Versuch.' : ', alle im ersten Versuch.';
-    else if (e.ersterVersuch === 0) rest = e.geloest === 1 ? ', im zweiten Versuch.' : ', alle mit einem zweiten Versuch.';
-    else rest = `, ${e.ersterVersuch} davon im ersten Versuch.`;
-    saetze.push(`Du hast ${zahl} gelöst${rest}`);
+    const werte = { geloest: e.geloest, gesamt: e.gesamt, erster: e.ersterVersuch, n: e.geloest };
+    if (zweite === 0) saetze.push(t('p-start.begruendung.erster', werte));
+    else if (e.ersterVersuch === 0) saetze.push(t('p-start.begruendung.zweiter', werte));
+    else saetze.push(t('p-start.begruendung.gemischt', werte));
   }
-  if (e && e.staerken && e.staerken.length) saetze.push(`Gut gesehen: ${e.staerken.join(' und ')}.`);
-  if (e && e.luecke && e.geloest) saetze.push(`Als Nächstes lohnt es sich, ${e.luecke}.`);
-  const grund = e && BOT_GRUND[e.botId];
+  if (e && e.staerken && e.staerken.length) {
+    const s = e.staerken.map((x) => aufgabenText('thema', x));
+    const liste = s.length === 2 ? t('p-start.begruendung.und', { a: s[0], b: s[1] }) : s.join(', ');
+    saetze.push(t('p-start.begruendung.gesehen', { liste }));
+  }
+  if (e && e.luecke && e.geloest) saetze.push(t('p-start.begruendung.naechstes', { luecke: aufgabenText('naechstes', e.luecke) }));
+  const grund = e && Object.hasOwn(BOT_GRUND, e.botId) ? BOT_GRUND[e.botId] : null;
   if (grund) saetze.push(grund);
   const kurz = [saetze[0], grund].filter(Boolean).join(' ');
-  return { kurz: kurz || (botName ? `Empfehlung: ${botName}.` : ''), saetze };
+  return { kurz: kurz || (botName ? t('p-start.begruendung.empfehlung', { name: botName }) : ''), saetze };
 }
 
 // ---------- Entdeckungs-Fahrplan ----------

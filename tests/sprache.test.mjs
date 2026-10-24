@@ -23,7 +23,9 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8881);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern`;
+// --pakete: mit allen Paketen aus PAKETE (Englisch Teil 2), sonst nur der Kern (?kern)
+const PAKETE_MODUS = process.argv.includes('--pakete');
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test${PAKETE_MODUS ? '' : '&kern'}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
 const NUR = (process.argv.find((a) => a.startsWith('--nur=')) || '').slice(6).split(',').filter(Boolean);
@@ -72,13 +74,19 @@ async function nodeTeil() {
   let warf = false;
   try { S.registriereTexte('Gross', {}); } catch (e) { warf = true; }
   pruefe('Bereichsname wird geprueft', warf);
-  pruefe('Sprachwahl noch nicht sichtbar (Teil 1)', S.SPRACHWAHL === false);
+  pruefe('Sprachwahl sichtbar (Teil 2: alles uebersetzt)', S.SPRACHWAHL === true);
 
   gruppe = 'Woerterbuecher';
   const ordner = path.join(WURZEL, 'js/sprachen');
   const dateien = existsSync(ordner) ? readdirSync(ordner).filter((d) => d.endsWith('.js')).sort() : [];
   pruefe('Woerterbuecher vorhanden', dateien.length >= 1, dateien);
   for (const d of dateien) await import(pathToFileURL(path.join(ordner, d)).href);
+  // Teil 2: jedes Paket hat sein Woerterbuch in js/pakete/<paket>/texte.js (Bereich 'p-<paket>')
+  const paketOrdner = path.join(WURZEL, 'js/pakete');
+  const paketTexte = readdirSync(paketOrdner).filter((p) => existsSync(path.join(paketOrdner, p, 'texte.js'))).sort();
+  for (const p of paketTexte) await import(pathToFileURL(path.join(paketOrdner, p, 'texte.js')).href);
+  pruefe('Woerterbuecher der live geschalteten Pakete vorhanden', ['funken', 'gedaechtnis', 'kartei', 'liga', 'punkte', 'serie', 'start',
+    'tagesraetsel', 'teilen', 'zuzweit'].every((p) => paketTexte.includes(p)), paketTexte);
   const de = S.texte('de');
   const en = S.texte('en');
   const eigene = (o) => Object.keys(o).filter((k) => !k.startsWith('probe.'));
@@ -102,13 +110,17 @@ async function nodeTeil() {
   // t() auf Modulebene haelt die Sprache von vor dem Start fest: nur innerhalb von Funktionen erlaubt (grobe Pruefung:
   // keine Zeile ohne Einrueckung, die t( aufruft, ausser in Funktionskoepfen)
   const kandidaten = [...readdirSync(path.join(WURZEL, 'js')).filter((d) => d.endsWith('.js')).map((d) => 'js/' + d),
-    ...readdirSync(path.join(WURZEL, 'js/ui')).filter((d) => d.endsWith('.js')).map((d) => 'js/ui/' + d)];
+    ...readdirSync(path.join(WURZEL, 'js/ui')).filter((d) => d.endsWith('.js')).map((d) => 'js/ui/' + d),
+    ...readdirSync(path.join(WURZEL, 'js/pakete')).flatMap((p) => (existsSync(path.join(WURZEL, 'js/pakete', p)) && !p.includes('.')
+      ? readdirSync(path.join(WURZEL, 'js/pakete', p)).filter((d) => d.endsWith('.js')).map((d) => `js/pakete/${p}/${d}`) : []))];
   const modulEbene = [];
   for (const d of kandidaten) {
     const text = lies(d);
-    if (!/from '\.{1,2}\/(\.\.\/)?sprache\.js'/.test(text)) continue;
+    if (!/from '(\.{1,2}\/)+sprache\.js'/.test(text)) continue;
     text.split('\n').forEach((z, i) => {
-      if (/^(export )?(const|let|var) [^=]+= .*\bt\(['`]/.test(z)) modulEbene.push(`${d}:${i + 1}`);
+      const m = /^(export )?(const|let|var) [^=]+= (.*?)\bt\(['`]/.exec(z);
+      // Funktionen (Pfeil, function, Getter, toString) rufen t() erst beim Aufruf: erlaubt
+      if (m && !/=>|\bfunction\b|\bget\(\)/.test(m[3])) modulEbene.push(`${d}:${i + 1}`);
     });
   }
   pruefe('kein t() auf Modulebene (Texte erst beim Zeichnen)', modulEbene.length === 0, modulEbene);
@@ -189,7 +201,7 @@ async function sichtbarerText(seite, sel = '#app') {
 
 function deutschIn(text) {
   const treffer = [];
-  for (const teil of text.split(' | ')) {
+  for (const teil of text.split(/ \| |\n/)) {
     if (UMLAUT_RE.test(teil) || DEUTSCH_RE.test(teil) || SCHLUESSEL_RE.test(teil)) treffer.push(teil.slice(0, 80));
   }
   return [...new Set(treffer)];
@@ -213,7 +225,7 @@ async function feld(seite, f) {
 }
 
 // Screens: Name, wie man hinkommt, welcher Bereich gelesen wird
-const SCREENS = [
+const SCREENS_KERN = [
   { name: 'arena', hin: async (s) => { await bereite(s, '#arena'); await s.waitForSelector('.screen.arena .knoten', { timeout: 15000 }); }, sel: '#app' },
   { name: 'training', hin: async (s) => { await bereite(s, '#training'); }, sel: '#app' },
   { name: 'bestenliste', hin: async (s) => { await bereite(s, '#bestenliste'); }, sel: '#app' },
@@ -234,7 +246,7 @@ const SCREENS = [
     await warte(800);
   }, sel: '#app' },
   { name: 'ergebnis', hin: async (s) => {
-    await SCREENS.find((x) => x.name === 'partie').hin(s);
+    await SCREENS_KERN.find((x) => x.name === 'partie').hin(s);
     const k = s.locator('.spielknoepfe > [data-aktion="aufgeben"]');
     await k.focus();
     await s.keyboard.press('Enter');
@@ -250,6 +262,45 @@ const SCREENS = [
     await warte(2500);
   }, sel: '#app' },
 ];
+// Nur mit --pakete: Screens und Blaetter der Pakete
+const SCREENS_PAKETE = [
+  { name: 'willkommen', hin: async (s) => {
+    await s.goto(BASIS + '#arena');
+    await s.evaluate(() => localStorage.clear());
+    await s.goto(BASIS + '&sprache=en');
+    await s.waitForFunction(() => !!window.__app && document.documentElement.lang === 'en' && !!document.querySelector('#app > .screen:not(.lade-screen)'), null, { timeout: 20000 });
+    await warte(800);
+  }, sel: '#app' },
+  { name: 'einstufung', hin: async (s) => { await bereite(s, '#arena'); await s.evaluate(() => window.__app.gehe('start', { seite: 'einstufung' })); await warte(800); }, sel: '#app' },
+  { name: 'tagesraetsel', hin: async (s) => {
+    await bereite(s, '#training');
+    await s.waitForSelector('.tr-karte .tr-los', { timeout: 15000 });
+    await s.locator('.tr-karte .tr-los').click();
+    await s.waitForSelector('.screen.rs-screen .brett', { timeout: 10000 });
+    await warte(800);
+  }, sel: '#app' },
+  // Blaetter hinter den Chips im Kopf der Arena (Level, Serie ...): jedes oeffnen, Text sammeln, schliessen
+  { name: 'kopf-blaetter', hin: async (s) => {
+    await bereite(s, '#arena');
+    await s.waitForSelector('.screen.arena .knoten', { timeout: 15000 });
+    // Chips der Pakete (Level, Serie ...); Sterne und Besiegt haben kein Blatt
+    const CHIP = '#app .kopf-chips > .chip:not(.chip-sterne):not(.chip-pokal)';
+    const n = await s.locator(CHIP).count();
+    if (!n) throw new Error('kein Paket-Chip im Kopf');
+    const texte = [];
+    for (let i = 0; i < n; i++) {
+      const b = s.locator(CHIP).nth(i);
+      if (!(await b.isVisible())) continue;
+      await b.click();
+      await warte(900);
+      texte.push(await s.evaluate(() => document.body.innerText));
+      await s.keyboard.press('Escape');
+      await warte(500);
+    }
+    await s.evaluate((x) => { const d = document.createElement('div'); d.id = 'gesammelt'; d.textContent = x.join(' | '); d.style.cssText = 'position:absolute;left:0;top:0;width:1px;height:1px;overflow:hidden'; document.body.append(d); }, texte);
+  }, sel: '#gesammelt' },
+];
+const SCREENS = PAKETE_MODUS ? [...SCREENS_KERN, ...SCREENS_PAKETE] : SCREENS_KERN;
 
 async function browserTeil(browser) {
   if (!OHNE_BILDER) mkdirSync(BILDER, { recursive: true });

@@ -16,7 +16,9 @@
 //   kalenderTag(iso) -> 'JJJJ-MM-TT' | null   Kalendertag lokal (wie der Verlauf), nie ueber toISOString; bewusst NICHT
 //                                    die Tagesgrenze 4:00 aus tag.js (die gilt fuer Tagesschluessel, nicht fuer ein
 //                                    angezeigtes Datum: eine Partie um 01:30 am 23.10. steht im Verlauf am 23.)
-//   datumText(iso) -> 'TT.MM.JJJJ' | null   derselbe Kalendertag fuers Bild (der Dateiname nimmt ihn auch)
+//   datumText(iso) -> 'TT.MM.JJJJ' | null   derselbe Kalendertag fuers Bild (der Dateiname nimmt ihn auch); Englisch
+//                                    'MM/TT/JJJJ'. Alle Texte des Bildes kommen aus dem Woerterbuch p-teilen (texte.js)
+//                                    in der eingestellten Sprache, ohne Wahl Deutsch (so auch in Node).
 //   MARKEN_ADRESSE                   feste Adresse fuer den Fuss des Bildes; leer: die Adresse der Seite (Flo entscheidet,
 //                                    z. B. spaeter die Crownmate-Domain statt der GitHub-Adresse)
 //   adresseAus(href) -> Text         Adresse der App ohne Protokoll, index.html, Suche und Anker; leer fuer alles, was
@@ -33,6 +35,8 @@
 // Kein Math.random (Fairness-Test: logik.js zaehlt zu den reinen Paket-Logik-Dateien).
 import { Chess } from '../../../vendor/chess/chess.js';
 import { wertet } from '../../storage.js';
+import { t, zahl } from '../../sprache.js';
+import './texte.js';
 
 export const RECHENSTAND = 1;
 export const MARKEN_ADRESSE = '';
@@ -52,11 +56,9 @@ export const TOKENS_THEMA = Object.freeze([
 export const TOKENS_BRETT = Object.freeze(['--feld-hell', '--feld-dunkel', '--zuletzt']);
 
 const GRUNDSTELLUNG = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-const GRUND = Object.freeze({
-  patt: 'Patt', wiederholung: 'Dreifache Stellungswiederholung', '50-zuege': '50-Züge-Regel',
-  material: 'Zu wenig Material zum Mattsetzen', zeit: 'Auf Zeit',
-});
-const MODUS_TEXT = Object.freeze({ boss: 'Boss', frei: 'Freie Partie', spiel: 'Spielhalle' });
+// Texte erst in bildDaten() (Woerterbuch p-teilen, grund.<id> und modus.<id>)
+const GRUND = Object.freeze(['patt', 'wiederholung', '50-zuege', 'material', 'zeit']);
+const MODUS_TEXT = Object.freeze(['boss', 'frei', 'spiel']);
 const NAME = /^[A-Za-z0-9_]{3,20}$/;
 
 function eigeneStellung(fen) {
@@ -112,8 +114,8 @@ export function kalenderTag(iso) {
 export function datumText(iso) {
   const tag = kalenderTag(iso);
   if (!tag) return null;
-  const [j, m, t] = tag.split('-');
-  return `${t}.${m}.${j}`;
+  const [j, m, d] = tag.split('-');
+  return t('p-teilen.datum', { t: d, m, j });
 }
 
 export function adresseAus(href) {
@@ -139,20 +141,21 @@ export function gueltigerName(x) {
   return NAME.test(t) ? t : null;
 }
 
-const komma1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace('.', ',');
+// eine Nachkommastelle in der eingestellten Sprache ('87,4' | '87.4')
+const komma1 = (x) => zahl(Math.round(x * 10) / 10, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false });
 
 export function bildDaten(p, { bot = null, name = null, adresse = '' } = {}) {
   const partie = p && typeof p === 'object' ? p : {};
   const ergebnis = partie.ergebnis === 'remis' ? 'remis' : 'sieg';
   const stellung = endstellung(partie.startFen, partie.zuege);
   const zuege = zugZahl(partie.startFen, stellung.plies);
-  const botName = bot && typeof bot.name === 'string' && bot.name.trim() ? bot.name.trim().slice(0, 40) : 'deinen Gegner';
-  const wort = ergebnis === 'sieg' ? 'Sieg' : 'Remis';
+  const botName = bot && typeof bot.name === 'string' && bot.name.trim() ? bot.name.trim().slice(0, 40) : t('p-teilen.deinGegner');
+  const wort = t(ergebnis === 'sieg' ? 'p-teilen.wort.sieg' : 'p-teilen.wort.remis');
   let grund = '';
-  if (partie.grund === 'matt' && ergebnis === 'sieg' && zuege) grund = `Schachmatt im ${zuege}. Zug`;
-  else if (partie.grund === 'aufgabe' && ergebnis === 'sieg') grund = 'Gegner gibt auf';
-  else if (GRUND[partie.grund]) grund = GRUND[partie.grund];
-  const modus = MODUS_TEXT[partie.modus] || '';
+  if (partie.grund === 'matt' && ergebnis === 'sieg' && zuege) grund = t('p-teilen.matt', { zug: zuege });
+  else if (partie.grund === 'aufgabe' && ergebnis === 'sieg') grund = t('p-teilen.aufgabe');
+  else if (GRUND.includes(partie.grund)) grund = t('p-teilen.grund.' + partie.grund);
+  const modus = MODUS_TEXT.includes(partie.modus) ? t('p-teilen.modus.' + partie.modus) : '';
   const ueber = [modus, grund].filter(Boolean).join(' · ');
   // Sterne nur bei einem wertenden Sieg (Remis und nicht wertende Partien zeigen keine leeren Sterne)
   const sterne = ergebnis === 'sieg' && wertet(partie) && Array.isArray(partie.sterne)
@@ -165,8 +168,8 @@ export function bildDaten(p, { bot = null, name = null, adresse = '' } = {}) {
     ergebnis,
     wort,
     ausruf: ergebnis === 'sieg' ? '!' : '',
-    gegner: `gegen ${botName}`,
-    titel: `${wort} gegen ${botName}`,
+    gegner: t('p-teilen.gegner', { name: botName }),
+    titel: t('p-teilen.titel', { wort, name: botName }),
     ueber,
     fen: stellung.fen,
     zuletzt: Object.freeze(stellung.zuletzt.slice()),
@@ -175,14 +178,14 @@ export function bildDaten(p, { bot = null, name = null, adresse = '' } = {}) {
     botName,
     avatar: bot && typeof bot.avatar === 'string' ? bot.avatar : '',
     sterne: sterne ? Object.freeze(sterne) : null,
-    genauigkeit: partie.genauigkeit != null && Number.isFinite(genau) && genau >= 0 && genau <= 100 ? komma1(genau) + ' %' : null,
+    genauigkeit: partie.genauigkeit != null && Number.isFinite(genau) && genau >= 0 && genau <= 100 ? t('p-teilen.prozent', { wert: komma1(genau) }) : null,
     zuege,
     datum,
     name: gueltigerName(name),
     marke: 'Crownmate',
     fuss: 'crownmate',
     adresse: typeof adresse === 'string' ? adresse.slice(0, 80) : '',
-    dateiname: `crownmate-${ergebnis}${/^\d{4}-\d{2}-\d{2}$/.test(tag) ? '-' + tag : ''}.png`,
+    dateiname: `crownmate-${t('p-teilen.datei.' + ergebnis)}${/^\d{4}-\d{2}-\d{2}$/.test(tag) ? '-' + tag : ''}.png`,
   };
   return Object.freeze(daten);
 }

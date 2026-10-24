@@ -20,6 +20,8 @@
 //     Leiter (probe: der Bot ist noch nicht freigeschaltet)
 //   ersterGegner() -> Bot   der erste Bot der Leiter (BOTS[0], heute Bauer Benno; immer frei): Gegner nach der
 //     Regel-Hilfe. Aus BOTS statt mit festem Namen, damit es nach einem Umbau der Leiter (Welten) weiter stimmt
+// Texte ueber t('p-start.x') (texte.js), erst beim Zeichnen: Titel und Untertitel der Quellen sind Getter, die Aufgaben
+// bekommen ihre Texte in liste() (Daten in aufgaben.js deutsch, angezeigt in der Sprache der App).
 import {
   ladeModul, speichereModul, ladeModulEinstellungen, speichereModulEinstellungen, ladeFortschritt, hoechsteFreieStufe,
   naechsterGegner, ladeLaufendePartie, loescheLaufendePartie,
@@ -28,8 +30,10 @@ import { BOTS, botNachId } from '../../bots.js';
 import { tagSchluessel } from '../../tag.js';
 import { hoere } from '../../ereignisse.js';
 import { registriereRaetselQuelle } from '../../ui/raetsel.js';
+import { t } from '../../sprache.js';
 import * as L from './logik.js';
 import { REGEL_AUFGABEN, EINSTUFUNG } from './aufgaben.js';
+import './texte.js';
 
 export const QUELLE_REGELN = 'start-regeln';
 export const QUELLE_EINSTUFUNG = 'start-einstufung';
@@ -100,9 +104,9 @@ export async function starteSpiel(app, { botId, probe = false } = {}) {
   if (laufend) {
     const lb = botNachId(laufend.botId);
     const ok = await app.frage({
-      titel: 'Neue Partie starten?',
-      text: `Du hast noch eine offene Partie gegen ${lb ? lb.name : 'einen Bot'}. Sie wird verworfen.`,
-      knoepfe: [{ text: 'Abbrechen', wert: false }, { text: 'Neue Partie', wert: true, art: 'primaer' }],
+      titel: t('p-start.neu.titel'),
+      text: t('p-start.neu.text', { name: lb ? lb.name : t('p-start.neu.einBot') }),
+      knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: t('p-start.neu.knopf'), wert: true, art: 'primaer' }],
       abbrechen: false,
     });
     if (!ok) return false;
@@ -132,12 +136,18 @@ export function aktuelleEmpfehlung() {
 }
 
 // ---------- Raetsel-Quellen ----------
-const kopie = (a) => ({ ...a, loesung: [...a.loesung] });
+// Texte der Aufgabe in der Sprache der App (texte.js 'aufgabe.<id>.<feld>', de = die Daten aus aufgaben.js)
+const TEXT_FELDER = ['titel', 'text', 'hinweis', 'erklaerung', 'marke'];
+const kopie = (a) => {
+  const k = { ...a, loesung: [...a.loesung] };
+  for (const f of TEXT_FELDER) if (typeof a[f] === 'string') k[f] = t(`p-start.aufgabe.${a.id}.${f}`);
+  return k;
+};
 
 function regelQuelle() {
   return {
-    titel: 'Die Figuren',
-    unter: 'Regel-Hilfe',
+    get titel() { return t('p-start.regeln.titel'); },
+    get unter() { return t('p-start.regeln.unter'); },
     liste() { return REGEL_AUFGABEN.map(kopie); },
     ergebnis() { return null; },
     ende(z) {
@@ -145,10 +155,10 @@ function regelQuelle() {
       setzeRueck('nach-regeln');
       const erster = ersterGegner();
       return {
-        titel: z.geloest === z.gesamt ? 'Du kennst alle Figuren' : 'Alle Figuren gesehen',
-        text: 'Dazu kommen ein paar Sonderzüge wie die Rochade. Im Spiel zeigen dir die Punkte jeden erlaubten Zug: Tippe einfach eine Figur an.',
+        titel: z.geloest === z.gesamt ? t('p-start.regeln.alle') : t('p-start.regeln.gesehen'),
+        text: t('p-start.regeln.text'),
         klang: 'stern',
-        knoepfe: [{ text: `Gegen ${erster.name} spielen`, art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: erster.id }); } }],
+        knoepfe: [{ text: t('p-start.spielen', { name: erster.name }), art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: erster.id }); } }],
       };
     },
   };
@@ -156,8 +166,8 @@ function regelQuelle() {
 
 function einstufungQuelle() {
   return {
-    titel: 'Einstufung',
-    unter: '8 Aufgaben, wertet nichts',
+    get titel() { return t('p-start.einstufung.titel'); },
+    get unter() { return t('p-start.einstufung.unter'); },
     liste() { return EINSTUFUNG.map(kopie); },
     ergebnis() { return null; },
     ende(z) {
@@ -176,13 +186,13 @@ function einstufungQuelle() {
       const b = L.begruendung(e, { botName: bot.name });
       const knoepfe = e.probe
         ? [
-          { text: `Probepartie gegen ${bot.name}`, art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: bot.id, probe: true }); } },
-          { text: `Leiter: ${leiter.name}`, beiKlick: (app) => { starteSpiel(app, { botId: leiter.id }); } },
+          { text: t('p-start.einstufung.probe', { name: bot.name }), art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: bot.id, probe: true }); } },
+          { text: t('p-start.einstufung.leiter', { name: leiter.name }), beiKlick: (app) => { starteSpiel(app, { botId: leiter.id }); } },
         ]
-        : [{ text: `Gegen ${bot.name} spielen`, art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: bot.id }); } }];
+        : [{ text: t('p-start.spielen', { name: bot.name }), art: 'primaer', beiKlick: (app) => { starteSpiel(app, { botId: bot.id }); } }];
       return {
-        titel: `Starte gegen ${bot.name}`,
-        text: b.kurz + (e.probe ? ' Die Probepartie wertet nicht: keine Sterne, keine Freischaltung.' : ''),
+        titel: t('p-start.einstufung.ende', { name: bot.name }),
+        text: b.kurz + (e.probe ? ' ' + t('p-start.einstufung.probeText') : ''),
         klang: 'stern',
         knoepfe,
       };

@@ -41,9 +41,11 @@
 //   stufe, faellig ('' wenn geloest), erstellt, geuebt, richtig, falsch, rueckfaelle, gemeistert (einmal fuer immer
 //   geloest; zaehlt im Zaehler gemeistert nur beim ersten Mal, auch nach einem Rueckfall) }
 import { stellungsSchluessel } from '../../openings.js';
-import { sanDeutsch, coachKern } from '../../review.js';
+import { sanDeutsch, sanAnzeige, coachKern } from '../../review.js';
 import { KLASSEN_NAME } from '../../zugklassen.js';
 import { istSchluessel, addiereTage, tageZwischen } from '../../tag.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 
 export const PAKET = 'kartei';
 export const MODUL = 'kartei';
@@ -65,8 +67,8 @@ export const BUDGET = 160000;
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 const FIGUREN = new Set('pnbrqkPNBRQK');
 const ID_RE = /^[A-Za-z0-9_-]{1,40}:\d{1,4}$/;
-const FIGUR_AKK = { p: 'den Bauern', n: 'den Springer', b: 'den Läufer', r: 'den Turm', q: 'die Dame', k: 'den König' };
-const MONATE = ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sept.', 'Okt.', 'Nov.', 'Dez.'];
+// Figur im Hinweis ("den Springer" | "the knight") und Monatsnamen stehen im Woerterbuch (p-kartei.figur.*, monat.1..12)
+const FIGUR_AKK = new Set(['p', 'n', 'b', 'r', 'q', 'k']);
 
 export function leeresModul() {
   return { v: RECHENSTAND, karten: [], verarbeitet: [], heute: { tag: '', ids: [] }, zaehler: { erstellt: 0, gemeistert: 0, richtig: 0, falsch: 0 } };
@@ -441,19 +443,20 @@ export function duenneAus(modul, budget = BUDGET) {
 }
 
 // ---------------------------------------------------------------------------
-// Texte (Deutsch, freundlich, ohne Druck)
+// Texte (freundlich, ohne Druck; Woerterbuch p-kartei in texte.js, Sprache beim Erzeugen)
 // ---------------------------------------------------------------------------
 export function datumText(tag, heute) {
   if (!tagOk(tag) || !tagOk(heute)) return '';
   const d = tageZwischen(tag, heute);
-  if (d === 0) return 'Heute';
-  if (d === 1) return 'Gestern';
-  const [, mo, t] = tag.split('-').map(Number);
-  return `Am ${t}. ${MONATE[mo - 1]}`;
+  if (d === 0) return t('p-kartei.datum.heute');
+  if (d === 1) return t('p-kartei.datum.gestern');
+  const [, mo, tg] = tag.split('-').map(Number);
+  return t('p-kartei.datum.am', { tag: tg, monat: t('p-kartei.monat.' + mo) });
 }
 
 export function zugText(karte) {
-  const san = karte.san || '';
+  // gespeichert ist die deutsche SAN; angezeigt in der eingestellten Sprache (Deutsch unveraendert)
+  const san = karte.san ? sanAnzeige(karte.san) : '';
   if (!san) return '';
   // geschuetzte Leerzeichen: "4. a3" bricht nie zwischen Nummer und Zug um
   return karte.farbe === 'b' ? `${karte.nummer}.\u00a0…\u00a0${san}` : `${karte.nummer}.\u00a0${san}`;
@@ -461,32 +464,33 @@ export function zugText(karte) {
 
 export function abstandText(tage) {
   if (tage == null) return '';
-  if (tage <= 1) return 'morgen';
-  return `in ${tage} Tagen`;
+  if (tage <= 1) return t('p-kartei.abstand.morgen');
+  return t('p-kartei.abstand.tage', { n: tage });
 }
 
 export function alsAufgabe(karte, { botName = '', heute = '' } = {}) {
   const k = normalisiereKarte(karte);
   if (!k) return null;
   const wann = datumText(k.datum, heute);
-  const gegen = botName ? `gegen ${botName}` : '';
+  const gegen = botName ? t('p-kartei.aufgabe.gegen', { name: botName }) : '';
   const zug = zugText(k);
   let satz = '';
-  if (zug) satz = `${[wann, gegen].filter(Boolean).join(' ')}${wann || gegen ? ' ' : ''}hast du hier ${zug} gespielt.`;
-  satz = satz ? satz.charAt(0).toUpperCase() + satz.slice(1) : 'Hier ging in deiner Partie etwas daneben.';
+  const vorne = [wann, gegen].filter(Boolean).join(' ');
+  if (zug) satz = vorne ? t('p-kartei.aufgabe.satz', { vorne, zug }) : t('p-kartei.aufgabe.satzOhne', { zug });
+  satz = satz ? satz.charAt(0).toUpperCase() + satz.slice(1) : t('p-kartei.aufgabe.daneben');
   const von = k.besterZug.slice(0, 2);
   const figur = figurAuf(k.fen, von);
-  const akk = figur ? FIGUR_AKK[figur[1].toLowerCase()] : null;
+  const akk = figur && FIGUR_AKK.has(figur[1].toLowerCase()) ? t('p-kartei.figur.' + figur[1].toLowerCase()) : null;
   return {
     id: k.id,
     fen: k.fen,
     loesung: [k.besterZug],
     vorZug: k.vor,
-    titel: 'Finde den besseren Zug',
+    titel: t('p-kartei.aufgabe.titel'),
     text: satz,
-    hinweis: akk ? `Schau dir ${akk} auf ${von} an.` : `Schau dir die Figur auf ${von} an.`,
+    hinweis: akk ? t('p-kartei.aufgabe.hinweis', { figur: akk, feld: von }) : t('p-kartei.aufgabe.hinweisFigur', { feld: von }),
     // nach der Loesung steht das Brett auf dem besten Zug: der Coach-Satz sagt deshalb, um welchen alten Zug es ging
-    erklaerung: k.coach ? (zug ? `${zug}: ${k.coach}` : k.coach) : (k.loesungSan ? `Besser war ${k.loesungSan}.` : ''),
+    erklaerung: k.coach ? (zug ? `${zug}: ${k.coach}` : k.coach) : (k.loesungSan ? t('p-kartei.aufgabe.besserWar', { zug: sanAnzeige(k.loesungSan) }) : ''),
     marke: KLASSEN_NAME[k.klasse] || '',
     klasse: k.klasse,
   };
@@ -495,14 +499,12 @@ export function alsAufgabe(karte, { botName = '', heute = '' } = {}) {
 // Rueckmeldung nach einer Antwort (info aus beantworte) -> { titel, text }
 export function rueckmeldung(info) {
   if (!info) return { titel: '', text: '' };
-  if (info.gemeistert) return { titel: 'Für immer gelöst!', text: 'Diese Stellung sitzt. Die Karte kommt nicht mehr wieder.' };
+  if (info.gemeistert) return { titel: t('p-kartei.rueck.gemeistert'), text: t('p-kartei.rueck.gemeistertText') };
   const wann = abstandText(info.tage);
-  if (info.ersterVersuch) return { titel: 'Richtig!', text: `Die Karte kommt ${wann} wieder.` };
-  if (info.richtig) return { titel: 'Gelöst im zweiten Anlauf.', text: `Die Karte kommt ${wann} wieder.` };
-  return { titel: 'So geht es', text: `Kein Problem. Die Karte kommt ${wann} wieder.` };
+  if (info.ersterVersuch) return { titel: t('p-kartei.rueck.richtig'), text: t('p-kartei.rueck.wieder', { wann }) };
+  if (info.richtig) return { titel: t('p-kartei.rueck.zweiter'), text: t('p-kartei.rueck.wieder', { wann }) };
+  return { titel: t('p-kartei.rueck.soGehtEs'), text: t('p-kartei.rueck.keinProblem', { wann }) };
 }
-
-const karten = (n) => (n === 1 ? '1 Karte' : `${n} Karten`);
 
 // Zusammenfassung einer Sitzung: ergebnisse [{ info }]
 export function endeText(ergebnisse) {
@@ -511,34 +513,33 @@ export function endeText(ergebnisse) {
   const geloest = liste.filter((i) => i.gemeistert).length;
   const zurueck = liste.length - weiter;
   const teile = [];
-  if (weiter) teile.push(`${karten(weiter)} weiter`);
-  if (geloest) teile.push(`${geloest} für immer gelöst`);
-  if (zurueck) teile.push(`${karten(zurueck)} ${zurueck === 1 ? 'kommt' : 'kommen'} morgen wieder`);
+  if (weiter) teile.push(t('p-kartei.ende.weiter', { n: weiter }));
+  if (geloest) teile.push(t('p-kartei.ende.geloest', { n: geloest }));
+  if (zurueck) teile.push(t('p-kartei.ende.zurueck', { n: zurueck }));
   return {
-    titel: liste.length && weiter === liste.length ? 'Alles richtig' : 'Gut geübt',
-    text: teile.length ? teile.join(', ') + '.' : 'Für heute ist der Stapel durch.',
+    titel: liste.length && weiter === liste.length ? t('p-kartei.ende.allesRichtig') : t('p-kartei.ende.gutGeuebt'),
+    text: teile.length ? teile.join(', ') + '.' : t('p-kartei.ende.durch'),
   };
 }
 
 export function neueKartenText(n) {
-  return n === 1 ? '1 neue Karte in deinem Stapel' : `${n} neue Karten in deinem Stapel`;
+  return t('p-kartei.neu', { n });
 }
 
 // Feier-Zeile nach einer Partie (Quelle karten): neue Karten, sonst Karten, die wieder dabei sind (Rueckfall) -> null
 export function kartenFeier(neu, rueckfall) {
   if (neu > 0) {
-    return { titel: neueKartenText(neu), text: rueckfall ? `${rueckfall === 1 ? '1 Karte ist' : rueckfall + ' Karten sind'} wieder dabei.` : '' };
+    return { titel: neueKartenText(neu), text: rueckfall ? t('p-kartei.dabei', { n: rueckfall }) : '' };
   }
   if (rueckfall > 0) {
-    return { titel: rueckfall === 1 ? '1 Karte wieder in deinem Stapel' : `${rueckfall} Karten wieder in deinem Stapel`,
-      text: 'Die Stellung kam wieder vor, die Karte beginnt neu.' };
+    return { titel: t('p-kartei.wieder', { n: rueckfall }), text: t('p-kartei.wieder.text') };
   }
   return null;
 }
 
 // Zeile fuer die Karte im Training und die Heute-Karte
 export function stapelText(st) {
-  return `Fehler wiederholen · ${st.faellig} fällig`;
+  return t('p-kartei.stapel', { n: st.faellig });
 }
 
 // Brett um 180 Grad gedreht (Sicht von Schwarz): Reihen und Felder rueckwaerts. Fuer Bauteile ohne Ausrichtung

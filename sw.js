@@ -7,14 +7,24 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 77;
-const STAND = '6008e84913bd';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 79;
+const STAND = 'd96c0b5c48a6';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'js/pakete/funken/texte.js',
+  'js/pakete/gedaechtnis/texte.js',
+  'js/pakete/kartei/texte.js',
+  'js/pakete/liga/texte.js',
+  'js/pakete/punkte/texte.js',
+  'js/pakete/serie/texte.js',
+  'js/pakete/start/texte.js',
+  'js/pakete/tagesraetsel/texte.js',
+  'js/pakete/teilen/texte.js',
+  'js/pakete/zuzweit/texte.js',
   // Englische Version (Teil 1): Sprachen und Woerterbuecher
   'js/sprache.js',
   'js/sprachen/allgemein.js',

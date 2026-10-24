@@ -2270,6 +2270,28 @@ Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenban
 Jedes Paket haengt sich nur ueber Orte, Ereignisse, Register, Modul-Speicher und eigene Paket-Screens ein. Bis die
 Integration es in `PAKETE` (`js/erweiterungen.js`) eintraegt, laedt es nur im Test (`?test&erw=pakete/<name>/index`).
 
+## Sprachen: Deutsch und Englisch (js/sprache.js)
+
+Deutsch ist die Quelle, Englisch die zweite Sprache (24.10.2026, Teil 1 Kern und Bots, Teil 2 Pakete).
+
+- **API** (`js/sprache.js`, rein): `t('bereich.schluessel', werte)` mit Platzhaltern `{name}`, Zahlen `{wert:zahl}`
+  und Mehrzahl ueber `.eins`/`.mehr` (mit `werte.n`); fehlt ein englischer Text, gilt der deutsche, fehlt er ganz, der
+  Schluessel (mit `?test` eine Warnung). `zahl()`, `datum()`, `locale()` nach Sprache (`de-DE` | `en-US`).
+- **Woerterbuecher:** Kern unter `js/sprachen/<bereich>.js` (allgemein, rahmen, arena, partie, analyse, eroeffnungen,
+  einstellungen, raetsel, bots), jedes Paket in `js/pakete/<paket>/texte.js` (Bereich `p-<paket>`). Je Schluessel `de`
+  (woertlich der fruehere Text) und `en`. Texte ohne HTML.
+- **Regel:** `t()` erst beim Zeichnen, nie beim Laden eines Moduls (Konstanten werden Funktionen oder Getter). Bots
+  (`js/bots.js`), Zugklassen (`js/zugklassen.js`) und Gedaechtnis-Saetze liefern ihre Texte ueber Getter in der
+  eingestellten Sprache; Aufrufer bleiben unveraendert. Gespeicherte Texte (Feier-Zeilen, Coach-Saetze in Analysen,
+  Namen) bleiben in der Sprache, in der sie entstanden sind.
+- **Einstellung** `sprache` (`'de'` | `'en'`, Standard `'de'`), Wahl in den Einstellungen unter "Anzeige" (`SPRACHWAHL`),
+  ein Wechsel laedt die Seite neu. `?sprache=en` schaltet ebenfalls um und merkt es sich. `<html lang>` folgt.
+- **Tests:** `tests/sprache.test.mjs` (Node: API, gleiche Schluessel und Platzhalter in beiden Sprachen, kein HTML, keine
+  langen Gedankenstriche, keine Zugklassen-Namen fremder Schachseiten, kein `t()` auf Modulebene; Browser: alle
+  Screens auf Englisch ohne deutsche Woerter, Umlaute und rohe Schluessel, ohne Ueberlauf, hell und dunkel, iPad und
+  Handy; `--pakete` mit allen Paketen). Alle anderen Suiten laufen auf Deutsch. `tests/fairness.test.mjs` prueft die
+  Verbotsliste auch englisch.
+
 ## Paket teilen (A1): Siegesbild
 
 Dateien: `js/pakete/teilen/index.js` (Orte, Blatt, Teilen), `logik.js` (rein, Node-testbar, kein `Math.random`),

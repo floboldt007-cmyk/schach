@@ -41,6 +41,9 @@
 //   beweis({ partien, von, bis, tage, z }) -> Text   Beweis-Karte eines Meilensteins (nur Verbesserungen, sonst Fakten)
 //   kuerze(st)                                   haelt Listen klein (Budget des Moduls)
 import { istSchluessel, addiereTage, tageZwischen, wochentag, tagSchluessel, kalenderwoche } from '../../tag.js';
+import { t, zahl } from '../../sprache.js';
+import { KLASSEN_NAME } from '../../zugklassen.js';
+import './texte.js';
 
 export const STAND = 1;
 // Tageswerk (3.14 Regel 2): eins davon genuegt
@@ -58,7 +61,13 @@ export const SCHONUNG_MONAT = 2;
 export const RING_TAGE = 4;
 // gezaehlte Tage im Speicher (reicht fuer 7 Wochen Kalender und den Wochen-Ring)
 export const TAGE_MAX = 49;
-export const FIGUREN = Object.freeze({ D: 'Dame', T: 'Turm', L: 'Läufer', S: 'Springer' });
+// Namen der Figuren in der eingestellten Sprache (Getter, wie KLASSEN_NAME in js/zugklassen.js): FIGUREN.D, Object.entries
+function figurenNamen() {
+  const o = {};
+  for (const f of ['D', 'T', 'L', 'S']) Object.defineProperty(o, f, { get: () => t('p-serie.figur.' + f), enumerable: true });
+  return Object.freeze(o);
+}
+export const FIGUREN = figurenNamen();
 const KAPITEL_MAX = 8;
 const PLAKETTEN_MAX = 8;
 const QUELLEN = { partie: 'partie', karte: 'kartei', uebung: 'uebung', raetsel: 'raetsel', lektion: 'lektion' };
@@ -420,14 +429,17 @@ const median = (l) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
-const komma = (x, n = 0) => (Math.round(x * 10 ** n) / 10 ** n).toFixed(n).replace('.', ',');
-const datumText = (k) => `${k.slice(8, 10)}.${k.slice(5, 7)}.`;
+// gerundet wie bisher, Komma oder Punkt nach der Sprache ("1,5" | "1.5")
+const komma = (x, n = 0) => zahl(Math.round(x * 10 ** n) / 10 ** n, { minimumFractionDigits: n, maximumFractionDigits: n });
+function datumText(k) {
+  return t('p-serie.datum.kurz', { t: k.slice(8, 10), m: k.slice(5, 7) });
+}
 export { datumText };
 
 // partien: [{ datum (ISO), genauigkeit, liveKlassen, eigeneZuege, modus }]; von/bis: Tagesschluessel des Zeitraums;
 // tage: Schachtage; z: Zaehler des Kapitels { p, k, r, l, u }
 export function beweis({ partien = [], von, bis, tage = 0, z = {} } = {}) {
-  const zeit = `${datumText(von)} bis ${datumText(bis)}`;
+  const zeit = t('p-serie.zeitraum', { von: datumText(von), bis: datumText(bis) });
   const dauer = tageZwischen(von, bis) + 1;
   const davorVon = addiereTage(von, -dauer);
   const tagVon = (p) => { try { return tagSchluessel(new Date(p.datum)); } catch (e) { return null; } };
@@ -445,7 +457,9 @@ export function beweis({ partien = [], von, bis, tage = 0, z = {} } = {}) {
   const g = (l) => l.filter((p) => Number.isFinite(p.genauigkeit)).map((p) => p.genauigkeit);
   const g1 = g(imZeitraum);
   const g0 = g(davor);
-  if (g1.length >= 3 && g0.length >= 3 && median(g1) > median(g0)) teile.push(`Genauigkeit (Median) ${komma(median(g0))} % → ${komma(median(g1))} %`);
+  if (g1.length >= 3 && g0.length >= 3 && median(g1) > median(g0)) teile.push(t('p-serie.beweis.genauigkeit', {
+    vor: t('p-serie.prozent', { wert: komma(median(g0)) }), nach: t('p-serie.prozent', { wert: komma(median(g1)) }),
+  }));
   const patzer = (l) => {
     let n = 0;
     let z2 = 0;
@@ -458,12 +472,12 @@ export function beweis({ partien = [], von, bis, tage = 0, z = {} } = {}) {
   };
   const p1 = patzer(imZeitraum);
   const p0 = patzer(davor);
-  if (p1 != null && p0 != null && p1 < p0) teile.push(`„Weit daneben“ je 10 Züge ${komma(p0, 1)} → ${komma(p1, 1)}`);
+  if (p1 != null && p0 != null && p1 < p0) teile.push(t('p-serie.beweis.patzer', { klasse: KLASSEN_NAME.patzer, vor: komma(p0, 1), nach: komma(p1, 1) }));
   if (teile.length) return `${zeit} · ${teile.join(' · ')}`;
-  const fakten = [[z.p, 'Partie', 'Partien'], [z.k, 'Karte', 'Karten'], [z.r, 'Rätsel', 'Rätsel'], [z.l, 'Lektion', 'Lektionen'], [z.u, 'Übung', 'Übungen']]
-    .filter(([n]) => n > 0).map(([n, e, m]) => `${n} ${n === 1 ? e : m}`);
+  const fakten = [[z.p, 'partie'], [z.k, 'karte'], [z.r, 'raetsel'], [z.l, 'lektion'], [z.u, 'uebung']]
+    .filter(([n]) => n > 0).map(([n, art]) => t('p-serie.beweis.' + art, { n }));
   if (!fakten.length) return zeit;
-  return `${zeit} · ${tage} Tage Schach: ${fakten.join(', ')}. Auf diesem Boden wächst die Form.`;
+  return t('p-serie.beweis.fakten', { zeit, tage, liste: fakten.join(', ') });
 }
 
 // ---------- klein halten ----------

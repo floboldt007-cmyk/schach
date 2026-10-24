@@ -20,14 +20,115 @@
 import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { icon } from '../../ui/icons.js';
+import { t, sprache, zahl } from '../../sprache.js';
+import '../../sprachen/allgemein.js';
 import * as L from './level.js';
 import * as R from './rechnung.js';
+import { DE, FAKTOR_SCHLUESSEL, FIGUREN } from './texte.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const zahlText = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE');
-const faktorText = (f) => String(f).replace('.', ',');
-const ERGEBNIS_NAME = { sieg: 'Sieg', remis: 'Remis', niederlage: 'Kampfgeist' };
-const ERGEBNIS_WORT = { sieg: 'Sieg', remis: 'Remis', niederlage: 'Niederlage' };
+// Texte aus dem Woerterbuch (texte.js), erst beim Zeichnen
+const tx = (k, w) => t('p-funken.' + k, w);
+// Zahlen in der Sprache der App (Deutsch wie bisher: 12.500, 1,25)
+export const zahlText = (n) => zahl(Math.round(Number(n) || 0));
+const faktorText = (f) => zahl(Number(f));
+const ERGEBNISSE = ['sieg', 'remis', 'niederlage'];
+const ergebnisName = (erg) => tx('abr.ergebnis.' + (ERGEBNISSE.includes(erg) ? erg : 'sonst'));
+const ergebnisWort = (erg) => (ERGEBNISSE.includes(erg) ? t('allgemein.' + erg) : '');
+// Text mit Markup an den Platzhaltern {a}, {b}: der Text selbst bleibt ohne HTML, die Teile werden maskiert
+function mitMarkup(text, teile) {
+  return String(text).split(/(\{[a-z]+\})/).map((x) => {
+    const m = /^\{([a-z]+)\}$/.exec(x);
+    return m && Object.hasOwn(teile, m[1]) ? teile[m[1]] : esc(x);
+  }).join('');
+}
+
+// ---------- Namen in der Sprache der App (gespeichert wird weiter Deutsch) ----------
+// Level-Titel: level.js liefert den deutschen Namen (titelVon), angezeigt wird der Titel ueber sein Titel-Level
+export function titelName(level) {
+  const l = Number.isInteger(level) ? level : 1;
+  let ab = L.TITEL[0][0];
+  for (const [a] of L.TITEL) if (l >= a) ab = a;
+  return tx('titel.' + ab);
+}
+// Stueck aus level.js ({ id, name }): ueber die ID; unbekannte Stuecke behalten ihren Namen
+export function stueckName(s) {
+  if (!s) return '';
+  if (/^wahl-katalog-\d+$/.test(s.id)) return tx('stueck.wahlKatalog');
+  return Object.hasOwn(DE, 'stueck.' + s.id) ? tx('stueck.' + s.id) : s.name;
+}
+// gespeicherter Faktor-Name ('Brocken' ... 'Einstieg')
+export function faktorName(name) {
+  return Object.hasOwn(FAKTOR_SCHLUESSEL, name) ? tx('faktor.name.' + FAKTOR_SCHLUESSEL[name]) : name;
+}
+
+// Gespeicherte deutsche Saetze aus rechnung.js (Lichtblicke, Koennen-Satz) zerlegen: Muster aus der deutschen Vorlage in
+// texte.js ({x} -> Gruppe x). Auf Deutsch bleibt der Text, wie er gespeichert ist; passt keine Vorlage, auch auf Englisch.
+const MUSTER = new Map();
+function zerlege(schluessel, text, anfang = false) {
+  const id = schluessel + (anfang ? '^' : '');
+  let re = MUSTER.get(id);
+  if (!re) {
+    const quelle = DE[schluessel].split(/(\{[a-zA-Z0-9_]+\})/).map((teil) => {
+      const m = /^\{([a-zA-Z0-9_]+)\}$/.exec(teil);
+      return m ? `(?<${m[1]}>.+?)` : teil.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }).join('');
+    re = new RegExp('^' + quelle + (anfang ? '' : '$'), 'u');
+    MUSTER.set(id, re);
+  }
+  const m = typeof text === 'string' ? re.exec(text) : null;
+  return m ? { ...(m.groups || {}), laenge: m[0].length } : null;
+}
+// deutsche Zahl als Text: "1,5" -> "1.5" (Dezimalpunkt), "1.234" -> 1234
+const dezimal = (x) => String(x).replace(/\./g, '').replace(',', '.');
+const ganzzahl = (x) => Number(String(x).replace(/\./g, ''));
+
+// Lichtblick aus dem Verlauf (e.lb); name: Name des Gegners in der Sprache der App (sonst der gespeicherte)
+export function lichtblickText(text, name = null) {
+  if (sprache() !== 'en' || typeof text !== 'string') return text;
+  let w = zerlege('lb.lang.mehr', text);
+  if (w && Number.isFinite(ganzzahl(w.n))) return tx('lb.lang', { name: name || w.name, n: ganzzahl(w.n) });
+  w = zerlege('lb.genau', text);
+  if (w) return tx('lb.genau', { a: dezimal(w.a), b: dezimal(w.b) });
+  w = zerlege('lb.strafe', text);
+  if (w) return tx('lb.strafe', { name: name || w.name });
+  return text;
+}
+
+// Koennen-Satz eines Aufstiegs (rechnung.koennenSatz, gespeichert in aufstiege[0].satz)
+export function satzText(text) {
+  if (sprache() !== 'en' || typeof text !== 'string') return text;
+  let seit = '';
+  let rest = text;
+  const sl = zerlege('satz.seitLevel', rest, true);
+  if (sl) {
+    seit = tx('satz.seitLevel', { level: sl.level });
+    rest = rest.slice(sl.laenge);
+  } else if (rest.startsWith(DE['satz.seitLetztem'])) {
+    seit = tx('satz.seitLetztem');
+    rest = rest.slice(DE['satz.seitLetztem'].length);
+  }
+  for (const k of ['satz.patzer', 'satz.fehler', 'satz.praezise', 'satz.genauigkeit']) {
+    const w = zerlege(k, rest);
+    if (w) return seit + tx(k, { a: dezimal(w.a), b: dezimal(w.b) });
+  }
+  if (!seit) {
+    const w = zerlege('satz.fakt.mehr', text) || zerlege('satz.fakt.eins', text);
+    const figur = w && FIGUREN.find((f) => DE['figur.' + f] === w.figur);
+    if (figur && Number.isFinite(ganzzahl(w.n))) return tx('satz.fakt', { n: ganzzahl(w.n), figur: tx('figur.' + figur) });
+  }
+  return text;
+}
+
+// Herkunft des Koennen-Satzes (aufstiege[0].herkunft)
+export function herkunftText(text) {
+  if (sprache() !== 'en' || typeof text !== 'string') return text;
+  const w = zerlege('herkunft.vergleich', text);
+  if (w) return tx('herkunft.vergleich', { a: w.a, b: w.b });
+  const f = zerlege('herkunft.fakt.mehr', text);
+  if (f && Number.isFinite(ganzzahl(f.n))) return tx('herkunft.fakt', { n: ganzzahl(f.n) });
+  return text;
+}
 
 function el(tag, klasse, html) {
   const e = document.createElement(tag);
@@ -48,38 +149,38 @@ function emblemHtml(level, { gross = false } = {}) {
 }
 
 function bisText(fs) {
-  return `${zahlText(fs.bis)} bis Level ${fs.level + 1}`;
+  return tx('bis', { wert: zahlText(fs.bis), level: fs.level + 1 });
 }
 
 // ---------- Abrechnung ----------
 function postenListe(e, botName) {
   const p = [];
   if (e.gr === 'boss') {
-    p.push(['Ab dem 4. Boss-Versuch am Tag gibt es keine Partie-Funken. Weiterspielen geht immer.', null]);
+    p.push([tx('abr.boss'), null]);
   } else {
-    p.push([`Züge (${e.of} offen)`, e.z]);
-    if (e.th) p.push(['Theorie', e.th]);
-    if (e.e) p.push([`${ERGEBNIS_NAME[e.erg] || 'Ergebnis'}${e.hilfe ? ' (halbiert: Hilfe genutzt)' : ''}`, e.e]);
+    p.push([tx('abr.zuege', { n: e.of }), e.z]);
+    if (e.th) p.push([tx('abr.theorie'), e.th]);
+    if (e.e) p.push([e.hilfe ? tx('abr.halbiert', { name: ergebnisName(e.erg) }) : ergebnisName(e.erg), e.e]);
     // ohne Ergebnis-Funken sagt die Zeile, warum (auch wenn die Zuege Funken brachten, z. B. ein Schaefermatt)
-    else if (e.gr === 'kurz' || e.erg === 'sieg' || e.erg === 'remis') p.push(['Vor dem 10. eigenen Zug beendet: kein Ergebnis-Bonus', null]);
-    else if (e.erg === 'niederlage') p.push([`Kampfgeist gibt es ab dem ${R.KAMPFGEIST_ZUEGE}. eigenen Zug`, null]);
-    if (e.v) p.push(['Verwertung', e.v]);
-    for (const t of e.lb || []) p.push([`Lichtblick: ${t}`, R.LICHTBLICK_FUNKEN]);
-    if (e.fa !== 1) p.push([`× ${faktorText(e.fa)} ${e.fn || 'Herausforderung'}`, null]);
-    if (e.rw === 'karte') p.push(['× 2 Rückenwind-Karte', null]);
-    if (e.rw === 'wochenende') p.push(['× 2 Funken-Wochenende', null]);
+    else if (e.gr === 'kurz' || e.erg === 'sieg' || e.erg === 'remis') p.push([tx('abr.kurz'), null]);
+    else if (e.erg === 'niederlage') p.push([tx('abr.kampfgeist', { n: R.KAMPFGEIST_ZUEGE }), null]);
+    if (e.v) p.push([tx('abr.verwertung'), e.v]);
+    for (const x of e.lb || []) p.push([tx('abr.lichtblick', { text: lichtblickText(x, botName) }), R.LICHTBLICK_FUNKEN]);
+    if (e.fa !== 1) p.push([tx('abr.faktor', { faktor: faktorText(e.fa), name: faktorName(e.fn || 'Herausforderung') }), null]);
+    if (e.rw === 'karte') p.push([tx('abr.karte'), null]);
+    if (e.rw === 'wochenende') p.push([tx('abr.wochenende'), null]);
   }
   const ms = e.ms || [];
   const sterne = ms.filter((m) => m === 'stern').length;
   // Stern-Posten stehen je Buchung einmal, mit der Zahl der Sterne in der Menge; hier nur die Summe zeigen
   if (e.m) {
     const teile = [];
-    if (sterne) teile.push('neue Sterne');
-    if (ms.includes('ersterSieg')) teile.push(`erster Sieg gegen ${botName}`);
-    if (ms.includes('stockfisch')) teile.push('erster Sieg gegen den Stockfisch');
-    p.push([`Meilensteine: ${teile.join(', ') || 'neu erreicht'}`, e.m]);
+    if (sterne) teile.push(tx('abr.sterne'));
+    if (ms.includes('ersterSieg')) teile.push(tx('abr.ersterSieg', { name: botName }));
+    if (ms.includes('stockfisch')) teile.push(tx('abr.stockfisch'));
+    p.push([tx('abr.meilensteine', { liste: teile.join(', ') || tx('abr.neuErreicht') }), e.m]);
   }
-  if (e.nt) p.push(['Nachtrag nach der Analyse', e.nt]);
+  if (e.nt) p.push([tx('abr.nachtrag'), e.nt]);
   return p;
 }
 
@@ -93,7 +194,7 @@ function formelText(e) {
   return t;
 }
 
-export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt = false, merke = () => {}, feierKommt = false } = {}) {
+export function abrechnungsZeile({ eintrag: e, botName = tx('denBot'), schonGezeigt = false, merke = () => {}, feierKommt = false } = {}) {
   const vorher = L.fortschritt(Math.max(0, e.g - e.f));
   const nachher = L.fortschritt(e.g);
   const aufstieg = nachher.level > vorher.level;
@@ -107,16 +208,16 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
     <button class="fk-abr-knopf" type="button" aria-expanded="false" aria-controls="${detailId}">
       ${emblemHtml(schonGezeigt || !aufstieg ? nachher.level : vorher.level)}
       <span class="fk-abr-mitte">
-        <span class="fk-abr-kopf"><span class="fk-label">Funken</span>${formel ? `<span class="fk-formel zahl">${esc(formel)}</span>` : ''}</span>
-        ${balkenHtml(schonGezeigt ? nachher.anteil : vorher.anteil, `Level ${nachher.level}: ${bisText(nachher)}`)}
-        <span class="fk-unter"><span class="fk-level">Level ${schonGezeigt || !aufstieg ? nachher.level : vorher.level}</span>`
+        <span class="fk-abr-kopf"><span class="fk-label">${esc(tx('label'))}</span>${formel ? `<span class="fk-formel zahl">${esc(formel)}</span>` : ''}</span>
+        ${balkenHtml(schonGezeigt ? nachher.anteil : vorher.anteil, tx('balken', { level: nachher.level, bis: bisText(nachher) }))}
+        <span class="fk-unter"><span class="fk-level">${esc(tx('level', { level: schonGezeigt || !aufstieg ? nachher.level : vorher.level }))}</span>`
         + ` · <span class="fk-bis zahl">${esc(bisText(schonGezeigt ? nachher : vorher))}</span></span>
       </span>
       <span class="fk-wert zahl" data-wert="${e.f}">+${schonGezeigt ? zahlText(e.f) : '0'}</span>
     </button>
-    ${e.halb ? '<p class="fk-hinweis">Starker Tag: ab hier zählt jeder Funke halb, ab 4 Uhr wieder voll.</p>' : ''}
-    <div class="fk-details" id="${detailId}" hidden><ul></ul><p class="fk-d-summe">Zusammen <b class="zahl">${zahlText(e.f)}</b> · `
-      + `insgesamt <span class="zahl">${zahlText(e.g)}</span> Funken</p></div>`;
+    ${e.halb ? `<p class="fk-hinweis">${esc(tx('abr.halb'))}</p>` : ''}
+    <div class="fk-details" id="${detailId}" hidden><ul></ul><p class="fk-d-summe">${mitMarkup(tx('abr.summe'), {
+      a: `<b class="zahl">${zahlText(e.f)}</b>`, b: `<span class="zahl">${zahlText(e.g)}</span>` })}</p></div>`;
   const ul = zeile.querySelector('.fk-details ul');
   for (const [text, wert] of postenListe(e, botName)) {
     const li = el('li');
@@ -148,7 +249,7 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
     try { for (const a of zeile.getAnimations({ subtree: true })) a.cancel(); } catch (x) { /* aeltere Browser: egal */ }
     wertEl.textContent = '+' + zahlText(e.f);
     fuell.style.transform = `scaleX(${nachher.anteil.toFixed(4)})`;
-    zeile.querySelector('.fk-level').textContent = `Level ${nachher.level}`;
+    zeile.querySelector('.fk-level').textContent = tx('level', { level: nachher.level });
     zeile.querySelector('.fk-bis').textContent = bisText(nachher);
     for (const b of emblem.querySelectorAll('b')) b.textContent = String(nachher.level);
     zeile.dataset.fertig = '1';
@@ -223,7 +324,7 @@ export function abrechnungsZeile({ eintrag: e, botName = 'den Bot', schonGezeigt
         anim(neu, [{ transform: 'rotateX(-90deg)', opacity: 0 }, { transform: 'rotateX(0deg)', opacity: 1 }], { d: 360, v: 180, k: 'hupf', fill: 'forwards' });
         anim(emblem, [{ transform: 'scale(1)' }, { transform: 'scale(1.14)' }, { transform: 'scale(1)' }], { d: 520, k: 'hupf' });
         if (selbst) { try { klang.spiele('level'); } catch (x) { /* still */ } }
-        zeile.querySelector('.fk-level').textContent = `Level ${nachher.level}`;
+        zeile.querySelector('.fk-level').textContent = tx('level', { level: nachher.level });
         zeile.querySelector('.fk-bis').textContent = bisText(nachher);
         zeile.classList.add('aufgestiegen');
         anim(fuell, [{ transform: 'scaleX(0)' }, { transform: `scaleX(${nachher.anteil.toFixed(4)})` }],
@@ -271,9 +372,10 @@ export function kopfChip({ st, beiTipp } = {}) {
   b.tabIndex = 0;
   b.dataset.paket = 'funken';
   b.dataset.level = String(fs.level);
-  b.title = `Level ${fs.level} · ${fs.titel}`;
-  b.setAttribute('aria-label', `Level ${fs.level}, ${fs.titel}: ${zahlText(fs.inLevel)} von ${zahlText(fs.kostet)} Funken bis Level ${fs.level + 1}`);
-  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">Level </span><b class="zahl">${fs.level}</b></span>`
+  const titel = titelName(fs.level);
+  b.title = tx('levelTitel', { level: fs.level, titel });
+  b.setAttribute('aria-label', tx('chip.label', { level: fs.level, titel, wert: zahlText(fs.inLevel), kostet: zahlText(fs.kostet), naechstes: fs.level + 1 }));
+  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">${esc(tx('chip.wort'))}</span><b class="zahl">${fs.level}</b></span>`
     + `<span class="fk-mini" aria-hidden="true"><i style="transform:scaleX(${fs.anteil.toFixed(4)})"></i></span>`;
   if (typeof beiTipp === 'function') {
     b.addEventListener('click', beiTipp);
@@ -325,8 +427,8 @@ export function spielerEmblem({ st } = {}) {
   const fs = L.fortschritt(st.gesamt);
   const s = el('span', 'fk-spieler', `<b class="zahl">${fs.level}</b>`);
   s.dataset.paket = 'funken';
-  s.title = `Level ${fs.level} · ${fs.titel}`;
-  s.setAttribute('aria-label', `Level ${fs.level}`);
+  s.title = tx('levelTitel', { level: fs.level, titel: titelName(fs.level) });
+  s.setAttribute('aria-label', tx('level', { level: fs.level }));
   return s;
 }
 
@@ -334,8 +436,8 @@ export function spielerEmblem({ st } = {}) {
 function naechsteFreischaltung(level) {
   for (let l = level + 1; l <= level + 60; l++) {
     const neu = L.belohnungen(l).filter((s) => s.art !== 'titel');
-    const titel = L.istTitelLevel(l) ? `Titel ${L.titelVon(l)}` : null;
-    const namen = [titel, ...neu.map((s) => s.name)].filter(Boolean);
+    const titel = L.istTitelLevel(l) ? tx('titelStueck', { name: titelName(l) }) : null;
+    const namen = [titel, ...neu.map(stueckName)].filter(Boolean);
     if (namen.length) return { level: l, text: namen.join(' · ') };
   }
   return null;
@@ -343,20 +445,21 @@ function naechsteFreischaltung(level) {
 
 function heuteText(st) {
   const q = st.heute.quellen;
-  const teile = [['Partien', q.partie], ['Lernen', q.lernen], ['Tagesaufgaben', q.tag], ['Meilensteine', q.meilenstein]]
-    .filter(([, n]) => n > 0).map(([t, n]) => `${t} ${zahlText(n)}`);
-  return `${zahlText(st.heute.funken)} Funken${teile.length ? ': ' + teile.join(', ') : ''}`;
+  const teile = [['partie', q.partie], ['lernen', q.lernen], ['tag', q.tag], ['meilenstein', q.meilenstein]]
+    .filter(([, n]) => n > 0).map(([k, n]) => `${tx('quelle.' + k)} ${zahlText(n)}`);
+  const wert = zahlText(st.heute.funken);
+  return teile.length ? tx('heute.summeListe', { wert, liste: teile.join(', ') }) : tx('heute.summe', { wert });
 }
 
 function rueckenwindText(st, wochenende) {
-  if (wochenende) return 'Funken-Wochenende: Partien und Lernen zählen doppelt.';
+  if (wochenende) return tx('rw.wochenende');
   const a = st.rw.aktiv;
-  if (a > 0) return a === 1 ? 'Rückenwind an: Die nächste Einheit zählt doppelt.' : `Rückenwind an: Die nächsten ${a} Einheiten zählen doppelt.`;
+  if (a > 0) return tx('rw.an', { n: a });
   const k = st.rw.karten;
-  if (k > 0) return `${k} Rückenwind-${k === 1 ? 'Karte' : 'Karten'} im Fach. Zünden in der Arena: 3 Einheiten zählen doppelt.`;
+  if (k > 0) return tx('rw.karten', { n: k });
   // vor der ersten Karte (Entdeckungs-Fahrplan 3.16: Tag 4) steht noch keine Woche fest
-  if (!st.rw.woche) return 'Die erste Rückenwind-Karte kommt an deinem 4. Tag, danach jeden Montag eine.';
-  return 'Montags kommt eine neue Rückenwind-Karte ins Fach.';
+  if (!st.rw.woche) return tx('rw.erste');
+  return tx('rw.montag');
 }
 
 function partienListe(st, botName, n) {
@@ -365,7 +468,7 @@ function partienListe(st, botName, n) {
     const li = el('li');
     li.innerHTML = '<span class="fk-p-name"></span><span class="fk-p-erg"></span><b class="zahl"></b>';
     li.querySelector('.fk-p-name').textContent = botName(e.bot);
-    li.querySelector('.fk-p-erg').textContent = ERGEBNIS_WORT[e.erg] || '';
+    li.querySelector('.fk-p-erg').textContent = ergebnisWort(e.erg);
     li.querySelector('b').textContent = '+' + zahlText(e.f);
     ul.append(li);
   }
@@ -374,22 +477,8 @@ function partienListe(st, botName, n) {
 
 function soEntstehen() {
   const d = el('details', 'fk-regeln');
-  d.innerHTML = `<summary>So entstehen Funken</summary>
-    <p>Gezählt wird, solange die Partie offen ist: ein eigener Zug, vor dem deine Gewinnchance zwischen 10 und 90 % lag.
-    Genial 12 · Goldrichtig 8 · Präzise 5 · Sauber 4 · Solide 3 · Unscharf 1, höchstens 40 offene Züge; Theorie je 1 (höchstens 8).
-    Pflichtzüge, selbstverständliche Züge und Züge nach Hinweis oder Zurücknehmen zählen nicht.</p>
-    <p>Sieg 40 · Remis 25 · Niederlage ab 15 eigenen Zügen 10 (vor dem 10. Zug: 0; mit Hilfe halbiert). Verwertung bis 30,
-    Lichtblicke bei Remis und Niederlage je 10 (höchstens 2).</p>
-    <p>Herausforderung: Brocken × 1,5 · Herausforderung × 1,25 · Augenhöhe × 1 · Sparring × 0,75 · Training × 0,5 · Aufwärmen × 0,25.
-    In den ersten 10 gewerteten Partien gilt × 1. Der Faktor steht vor der Partie im Panel.</p>
-    <p>Rückenwind: Die erste Karte kommt an deinem 4. Tag, danach jeden Montag eine (höchstens 3 im Fach). Zünden: Die nächsten
-    3 Einheiten zählen doppelt (eine Partie, eine Lektion, eine Übung „Ab hier nochmal“ oder eine Stapel-Sitzung im Training).
-    Am Funken-Wochenende zählen Partien und Lernen doppelt, Karten bleiben dann liegen. Nie mehr als × 2.</p>
-    <p>Tagesbogen: bis 800 Funken am Tag zählt alles voll, darüber halb (gemessen vor dem Rückenwind), ab 4 Uhr wieder voll.</p>
-    <p>Lernen: „Ab hier nochmal“ 15 (getroffen) oder 5, Schlüsselmoment angesehen 5 (höchstens 3 je Partie), Karteikarte 10 oder 4
-    (höchstens 8 am Tag), Lektion 40. Meilensteine: neuer Stern 50, Bot zum ersten Mal besiegt 100, Boss-Siegel 50 oder 100,
-    erster Sieg gegen den Stockfisch 1.000.</p>
-    <p>Level schalten nur Schmuck und Titel frei, nie Bots, Analyse oder Lektionen. Level sinkt nie.</p>`;
+  d.innerHTML = `<summary>${esc(tx('regeln.titel'))}</summary>`
+    + ['zuege', 'ergebnis', 'faktor', 'rw', 'bogen', 'lernen', 'level'].map((k) => `<p>${esc(tx('regeln.' + k))}</p>`).join('');
   return d;
 }
 
@@ -397,39 +486,40 @@ export function spiegelInhalt({ st, botName = (id) => id, wochenende = false } =
   const fs = L.fortschritt(st.gesamt);
   const box = el('div', 'fk-spiegel-inhalt');
   box.innerHTML = `<div class="fk-s-kopf">${emblemHtml(fs.level, { gross: true })}<div class="fk-s-titel">
-      <b>Level ${fs.level} · <span class="fk-titel"></span></b><span class="zahl">${zahlText(fs.inLevel)} von ${zahlText(fs.kostet)} bis Level ${fs.level + 1}</span></div></div>
-    ${balkenHtml(fs.anteil, `Level ${fs.level}: ${bisText(fs)}`)}
+      <b>${esc(tx('level', { level: fs.level }))} · <span class="fk-titel"></span></b><span class="zahl">${esc(tx('fortschritt', {
+        wert: zahlText(fs.inLevel), kostet: zahlText(fs.kostet), level: fs.level + 1 }))}</span></div></div>
+    ${balkenHtml(fs.anteil, tx('balken', { level: fs.level, bis: bisText(fs) }))}
     <dl class="fk-s-liste">
-      <dt>Heute</dt><dd class="fk-s-heute"></dd>
-      <dt>Tagesbogen</dt><dd class="fk-s-bogen"></dd>
-      <dt>Rückenwind</dt><dd class="fk-s-rw"></dd>
-      <dt>Als Nächstes</dt><dd class="fk-s-naechstes"></dd>
-      <dt>Insgesamt</dt><dd><span class="zahl">${zahlText(st.gesamt)}</span> Funken</dd>
+      <dt>${esc(tx('spiegel.heute'))}</dt><dd class="fk-s-heute"></dd>
+      <dt>${esc(tx('spiegel.bogen'))}</dt><dd class="fk-s-bogen"></dd>
+      <dt>${esc(tx('spiegel.rw'))}</dt><dd class="fk-s-rw"></dd>
+      <dt>${esc(tx('spiegel.naechstes'))}</dt><dd class="fk-s-naechstes"></dd>
+      <dt>${esc(tx('spiegel.insgesamt'))}</dt><dd>${mitMarkup(tx('spiegel.insgesamtWert'), { a: `<span class="zahl">${zahlText(st.gesamt)}</span>` })}</dd>
     </dl>`;
   const auf = st.aufstiege[0];
   if (auf && auf.satz) {
     const dl = box.querySelector('.fk-s-liste');
-    const dt = el('dt', null, 'Letzter Aufstieg');
+    const dt = el('dt', null, esc(tx('spiegel.aufstieg')));
     const dd = el('dd', 'fk-s-aufstieg');
-    dd.textContent = `Level ${auf.level}: ${auf.satz}`;
+    dd.textContent = tx('spiegel.aufstiegText', { level: auf.level, satz: satzText(auf.satz) });
     if (auf.herkunft) {
       const h = el('span', 'fk-s-herkunft');
-      h.textContent = auf.herkunft;
+      h.textContent = herkunftText(auf.herkunft);
       dd.append(h);
     }
     dl.append(dt, dd);
   }
-  box.querySelector('.fk-titel').textContent = fs.titel;
+  box.querySelector('.fk-titel').textContent = titelName(fs.level);
   box.querySelector('.fk-s-heute').textContent = heuteText(st);
   const bogenRest = Math.max(0, R.TAGESBOGEN - st.heute.bogen);
   box.querySelector('.fk-s-bogen').textContent = bogenRest > 0
-    ? `Heute zählen noch ${zahlText(bogenRest)} Funken voll, danach halb, ab 4 Uhr wieder voll.`
-    : 'Starker Tag: ab hier zählt jeder Funke halb, ab 4 Uhr wieder voll.';
+    ? tx('spiegel.bogenRest', { wert: zahlText(bogenRest) })
+    : tx('abr.halb');
   box.querySelector('.fk-s-rw').textContent = rueckenwindText(st, wochenende);
   const n = naechsteFreischaltung(fs.level);
-  box.querySelector('.fk-s-naechstes').textContent = n ? `Level ${n.level}: ${n.text}` : '';
+  box.querySelector('.fk-s-naechstes').textContent = n ? tx('spiegel.naechstesText', { level: n.level, text: n.text }) : '';
   if (st.verlauf.length) {
-    const h = el('h4', 'fk-s-zwischen', 'Letzte Partien');
+    const h = el('h4', 'fk-s-zwischen', esc(tx('spiegel.partien')));
     box.append(h, partienListe(st, botName, 8));
   }
   box.append(soEntstehen());
@@ -440,16 +530,16 @@ export function verlaufKarte({ st, botName = (id) => id, beiMehr } = {}) {
   const fs = L.fortschritt(st.gesamt);
   const k = el('section', 'fk-karte flaeche');
   k.dataset.paket = 'funken';
-  k.setAttribute('aria-label', 'Level und Funken');
-  k.innerHTML = `<h3 class="vl-titel fk-k-ueber">Level und Funken</h3>
-    <div class="fk-k-kopf">${emblemHtml(fs.level, { gross: true })}<div class="fk-k-titel"><b>Level ${fs.level} · <span class="fk-titel"></span></b>
-      <span class="zahl fk-k-bis">${zahlText(fs.inLevel)} von ${zahlText(fs.kostet)} bis Level ${fs.level + 1}</span></div></div>
-    ${balkenHtml(fs.anteil, `Level ${fs.level}: ${bisText(fs)}`)}
+  k.setAttribute('aria-label', tx('verlauf.titel'));
+  k.innerHTML = `<h3 class="vl-titel fk-k-ueber">${esc(tx('verlauf.titel'))}</h3>
+    <div class="fk-k-kopf">${emblemHtml(fs.level, { gross: true })}<div class="fk-k-titel"><b>${esc(tx('level', { level: fs.level }))} · <span class="fk-titel"></span></b>
+      <span class="zahl fk-k-bis">${esc(tx('fortschritt', { wert: zahlText(fs.inLevel), kostet: zahlText(fs.kostet), level: fs.level + 1 }))}</span></div></div>
+    ${balkenHtml(fs.anteil, tx('balken', { level: fs.level, bis: bisText(fs) }))}
     <p class="fk-k-heute"></p>`;
-  k.querySelector('.fk-titel').textContent = fs.titel;
-  k.querySelector('.fk-k-heute').textContent = `Heute ${zahlText(st.heute.funken)} Funken`;
+  k.querySelector('.fk-titel').textContent = titelName(fs.level);
+  k.querySelector('.fk-k-heute').textContent = tx('verlauf.heute', { wert: zahlText(st.heute.funken) });
   if (st.verlauf.length) k.append(partienListe(st, botName, 3));
-  const mehr = el('button', 'knopf fk-k-mehr dr', `${icon('funke', 'fk-ico')} Funken-Spiegel`);
+  const mehr = el('button', 'knopf fk-k-mehr dr', `${icon('funke', 'fk-ico')} ${esc(tx('spiegel.titel'))}`);
   mehr.type = 'button';
   if (typeof beiMehr === 'function') mehr.addEventListener('click', beiMehr);
   k.append(mehr);
@@ -463,19 +553,19 @@ export function heuteZeile({ st, wochenende = false, beiZuenden } = {}) {
   const z = el('div', 'fk-heute');
   z.dataset.paket = 'funken';
   const text = el('span', 'fk-h-text');
-  const neu = rw.neu === 'willkommen' ? 'Willkommen zurück: eine Extra-Karte liegt im Fach. '
-    : rw.neu === 'aufgehoben' ? 'Für dich aufgehoben: eine Karte vom Funken-Wochenende. ' : '';
+  const neu = rw.neu === 'willkommen' ? tx('heute.willkommen') + ' '
+    : rw.neu === 'aufgehoben' ? tx('heute.aufgehoben') + ' ' : '';
   z.innerHTML = `<span class="fk-h-symbol" aria-hidden="true">${icon('funke', 'fk-ico')}</span>`;
-  if (wochenende) text.textContent = 'Funken-Wochenende: Partien und Lernen zählen doppelt.';
+  if (wochenende) text.textContent = tx('rw.wochenende');
   else if (rw.aktiv > 0) text.textContent = rueckenwindText(st, false);
   // die erste Karte stellt sich selbst vor (Entdeckungs-Fahrplan 3.16, Tag 4: "Neu fuer dich")
-  else if (rw.neu === 'erste' && rw.karten === 1) text.textContent = 'Neu für dich: eine Rückenwind-Karte. Zünden: Die nächsten 3 Einheiten zählen doppelt.';
-  else text.textContent = `${neu}Rückenwind: ${rw.karten} ${rw.karten === 1 ? 'Karte' : 'Karten'} im Fach.`;
+  else if (rw.neu === 'erste' && rw.karten === 1) text.textContent = tx('heute.erste');
+  else text.textContent = neu + tx('heute.karten', { n: rw.karten });
   z.append(text);
   if (!wochenende && rw.aktiv < 1 && rw.karten > 0 && typeof beiZuenden === 'function') {
-    const k = el('button', 'knopf fk-zuenden dr', 'Zünden');
+    const k = el('button', 'knopf fk-zuenden dr', esc(tx('heute.zuenden')));
     k.type = 'button';
-    k.setAttribute('aria-label', 'Rückenwind-Karte zünden: Die nächsten 3 Einheiten zählen doppelt');
+    k.setAttribute('aria-label', tx('heute.zuendenLabel'));
     k.addEventListener('click', () => beiZuenden(z));
     z.append(k);
   }
@@ -493,9 +583,8 @@ export function faktorChip({ faktor = 1, name = 'Augenhöhe' } = {}) {
   c.dataset.paket = 'funken';
   c.dataset.faktor = String(faktor);
   c.innerHTML = `${icon('funke', 'fk-ico')}<span></span>`;
-  c.lastChild.textContent = name === 'Einstieg' ? 'Einstieg · Funken × 1' : `${name} · Funken × ${faktorText(faktor)}`;
-  c.title = name === 'Einstieg' ? 'In den ersten 10 gewerteten Partien zählt jede Partie × 1.'
-    : 'Der Faktor hängt am Abstand zwischen Bot und deiner Lage. Er ändert nie die Bot-Stärke, die Wertung oder die Sterne.';
+  c.lastChild.textContent = tx('faktor.chip', { name: faktorName(name), faktor: name === 'Einstieg' ? faktorText(1) : faktorText(faktor) });
+  c.title = name === 'Einstieg' ? tx('faktor.einstiegTitel') : tx('faktor.titel');
   return c;
 }
 
@@ -519,12 +608,12 @@ export function funkenlinie(platz) {
 
 // ---------- Blatt (Funken-Spiegel) ----------
 let offen = null;
-export function oeffneSpiegel(inhalt, { titel = 'Funken-Spiegel' } = {}) {
+export function oeffneSpiegel(inhalt, { titel = tx('spiegel.titel') } = {}) {
   if (offen) offen.schliesse();
   const ort = el('div', 'sheet-ort fk-spiegel-ort');
   ort.innerHTML = `<div class="sheet-schleier"></div><div class="sheet-karte fk-spiegel" role="dialog" aria-modal="true" aria-labelledby="fk-spiegel-titel">
     <div class="sheet-griff" aria-hidden="true"></div><h3 id="fk-spiegel-titel"></h3><div class="fk-spiegel-rumpf"></div>
-    <div class="fk-spiegel-knoepfe"><button class="knopf gross dr fk-schliessen" type="button">Schließen</button></div></div>`;
+    <div class="fk-spiegel-knoepfe"><button class="knopf gross dr fk-schliessen" type="button">${esc(t('allgemein.schliessen'))}</button></div></div>`;
   ort.querySelector('h3').textContent = titel;
   ort.querySelector('.fk-spiegel-rumpf').append(inhalt);
   const karte = ort.querySelector('.sheet-karte');
