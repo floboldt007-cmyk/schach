@@ -25,6 +25,11 @@
 //             zweiter Tab oder eine Cloud-Uebernahme schreibt sonst gegen einen alten Stand); Einstellung
 //             "Bot-Sprueche" der App (sprueche: an | wenig | aus) wird beachtet.
 // Test:       zustand() -> { letzteWahl, modul, folge }
+// Sprache:    Englische Version (Teil 2, 24.10.2026): Texte in ./texte.js (t('p-gedaechtnis.x'), Farben aus allgemein), beim
+//             Zeichnen geholt. Das Satz-Register (bots.js) speichert Saetze als Text: sorgeSaetze() meldet sie in der
+//             eingestellten Sprache an und meldet sie neu an, sobald sich die Sprache aendert (geprueft bei jeder Wahl und
+//             bei app:bereit/app:screen). Die Feier "Erzfeind bezwungen" speichert feier.js als Text in der Sprache des
+//             Augenblicks (Nachlese bleibt so, wie sie gemeldet wurde).
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
 import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
@@ -33,6 +38,9 @@ import { ladePartien, ladeFortschritt, ladeEinstellungen, ladeModul, speichereMo
 import { registriereSaetze, botNachId } from '../../bots.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { tagSchluessel } from '../../tag.js';
+import { t, sprache } from '../../sprache.js';
+import '../../sprachen/allgemein.js';
+import './texte.js';
 import * as L from './logik.js';
 
 function sicher(fn, wo) {
@@ -100,11 +108,13 @@ function revancheZeile(app, params) {
   el.dataset.ort = 'ergebnis';
   // reine Knopf-Zeile (kein Inhalt wie Lernpunkt oder Lichtblick): der Host darf seinen Tipp daneben stehen lassen
   el.dataset.art = 'knopf';
-  const farbe = params.farbe === 'b' ? 'Schwarz' : 'Weiß';
+  const farbe = t(params.farbe === 'b' ? 'allgemein.schwarz' : 'allgemein.weiss');
   el.innerHTML = `<button class="knopf gd-revanche dr" type="button" data-farbe="${params.farbe}">${icon('revanche')}`
-    + `<span class="gd-r-text"><b>Revanche</b> <small>Du spielst ${farbe}</small></span></button>`;
+    + '<span class="gd-r-text"><b></b> <small></small></span></button>';
+  el.querySelector('.gd-r-text > b').textContent = t('p-gedaechtnis.revanche.titel');
+  el.querySelector('.gd-r-text > small').textContent = t('p-gedaechtnis.revanche.farbe', { farbe });
   const knopf = el.querySelector('button');
-  knopf.setAttribute('aria-label', `Revanche, du spielst ${farbe}`);
+  knopf.setAttribute('aria-label', t('p-gedaechtnis.revanche.label', { farbe }));
   knopf.addEventListener('click', (ev) => {
     // die Ergebnis-Karte zeigt beim Antippen sonst alles auf einmal: hier nur der Knopf
     ev.stopPropagation();
@@ -113,6 +123,19 @@ function revancheZeile(app, params) {
     sicher(() => app.gehe('partie', { ...params, tempo: params.tempo ? { ...params.tempo } : undefined }), 'Revanche');
   });
   return el;
+}
+
+// ---------- Satz-Register in der eingestellten Sprache ----------
+// bots.js merkt sich angemeldete Saetze als Text: angemeldet wird in der Sprache, die gerade gilt, und neu angemeldet,
+// sobald sie sich aendert (die App setzt die Sprache vor dem Laden der Pakete, ein Wechsel laedt sonst die Seite neu)
+let saetzeAb = null;
+let saetzeSprache = null;
+function sorgeSaetze() {
+  const s = sprache();
+  if (saetzeAb && saetzeSprache === s) return;
+  if (saetzeAb) saetzeAb();
+  saetzeAb = L.registriereAlle(registriereSaetze);
+  saetzeSprache = s;
 }
 
 // ---------- Einhaengen (defensiv) ----------
@@ -129,7 +152,7 @@ function ladeCss() {
 
 function registriere() {
   ladeCss();
-  L.registriereAlle(registriereSaetze);
+  sorgeSaetze();
   // zwei Pfeile, die die Seiten tauschen (Revanche mit getauschten Farben)
   registriereIcon('revanche', '<path d="M4.5 8.5h13M14.5 5l3.5 3.5-3.5 3.5"/><path d="M19.5 15.5h-13M9.5 12 6 15.5 9.5 19"/>');
   // zwei gekreuzte Klingen (Erzfeind)
@@ -140,6 +163,7 @@ function registriere() {
   const wahlen = new WeakMap();
   function wahl(k) {
     if (!k || typeof k !== 'object') return null;
+    sicher(sorgeSaetze, 'Saetze');
     if (wahlen.has(k)) return wahlen.get(k);
     let w = null;
     if (k.bot && k.bot.stufe != null && (!k.modus || k.modus === 'normal')) {
@@ -181,8 +205,8 @@ function registriere() {
     const m = stand();
     const b = L.erzfeindBezwungen({ fortschritt: ladeFortschritt(), botId: d.botId, ergebnis: d.ergebnis, wertet: d.wertet, gefeiert: m.erzfeind });
     if (!b) return;
-    melde({ partieId: d.partieId || null, quelle: 'erzfeind', titel: 'Erzfeind bezwungen',
-      text: `Gegen ${bot.name}, nach ${b.niederlagen} Niederlagen`, symbol: 'erzfeind', klang: 'siegel' });
+    melde({ partieId: d.partieId || null, quelle: 'erzfeind', titel: t('p-gedaechtnis.feier.titel'),
+      text: t('p-gedaechtnis.feier.text', { name: bot.name, n: b.niederlagen }), symbol: 'erzfeind', klang: 'siegel' });
     sichere({ ...m, erzfeind: { ...m.erzfeind, [d.botId]: b.niederlagen } });
   }, 'partie:beendet'));
 
@@ -193,7 +217,8 @@ function registriere() {
       sichere(L.merkeMemo(stand(), d.partieId, L.memoAus(d.review, d.partie.spielerFarbe)));
     }, 'partie:analysiert'), 0);
   });
-  hoere('app:screen', () => { folge = null; });
+  hoere('app:screen', () => { folge = null; sicher(sorgeSaetze, 'Saetze'); });
+  hoere('app:bereit', () => sicher(sorgeSaetze, 'Saetze'));
   hoere('speicher:zurueckgesetzt', () => { folge = null; letzteWahl = null; });
 }
 
