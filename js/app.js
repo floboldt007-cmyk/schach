@@ -68,6 +68,7 @@ import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
+import { setzeSprache, SPRACHEN } from './sprache.js';
 import './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 
@@ -96,6 +97,8 @@ const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.searc
 // ---------- Einstellungen ----------
 
 function wendeEinstellungenAn(e) {
+  // Sprache zuerst (die Screens zeichnen danach mit t()); ein Wechsel zur Laufzeit laedt die Seite neu (Einstellungen)
+  setzeSprache(e.sprache);
   klang.aus = !e.klang;
   // Premium-Umbau: Klang-Einstellungen (Paket, Lautstaerke, Stufe, Gruppen), sobald sounds.js sie kennt (U3)
   if (typeof klang.einstellen === 'function') {
@@ -907,8 +910,18 @@ function setzeSichtbar() {
 
 // ---------- Start ----------
 
+// Englische Version (Teil 1): ?sprache=en schaltet um und merkt es sich (?sprache=de zurueck), solange die Wahl in den
+// Einstellungen noch nicht sichtbar ist (SPRACHWAHL in js/sprache.js)
+function spracheAusAdresse() {
+  try {
+    const s = new URLSearchParams(location.search).get('sprache');
+    if (s && SPRACHEN.includes(s) && ladeEinstellungen().sprache !== s) speichereEinstellungen({ sprache: s });
+  } catch (e) { /* egal */ }
+}
+
 function starte() {
   setzeSymbole(SYMBOLE);
+  spracheAusAdresse();
   wendeEinstellungenAn(ladeEinstellungen());
   starteDruck();
   setzeSichtbar();

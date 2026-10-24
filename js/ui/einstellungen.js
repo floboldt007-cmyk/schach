@@ -12,6 +12,10 @@
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
+import { SPRACHWAHL, sprache } from '../sprache.js';
+
+// Sprachwahl erst, wenn alles uebersetzt ist (SPRACHWAHL); mit ?test schon jetzt (tests/sprache.test.mjs)
+const ZEIGE_SPRACHE = SPRACHWAHL || (typeof location !== 'undefined' && /[?&]test\b/.test(location.search || ''));
 
 const WURZEL = new URL('../../', import.meta.url);
 const pfad = (rel) => new URL(rel, WURZEL).href;
@@ -127,6 +131,7 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-anzeige">Anzeige</h3>
           ${segment('thema','Ansicht',[['modern','Modern und klar']])}
           ${segment('modus','Erscheinungsbild',[['system','System'],['hell','Hell'],['dunkel','Dunkel']])}
+          ${ZEIGE_SPRACHE ? segment('sprache','Sprache · Language',[['de','Deutsch'],['en','English']]) : ''}
           <h4>Brettfarbe</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
             ${BRETTER.map((b) => `
@@ -245,7 +250,11 @@ export function zeige(root, params = {}, app) {
       case 'probe': probeton(); break;
       case 'brett': setze({ brett: k.dataset.wert }); break;
       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
-      case 'wahl': setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert }); break;
+      case 'wahl':
+        setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert });
+        // neue Sprache: alles neu zeichnen (die Screens lesen ihre Texte beim Zeichnen)
+        if (k.dataset.key === 'sprache' && k.dataset.wert !== sprache()) setTimeout(() => location.reload(), 60);
+        break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
       case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;

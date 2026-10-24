@@ -171,6 +171,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   sprueche: 'an',        // 'an' | 'wenig' | 'aus'
   // Daten (DSGVO): Partien und anonyme Nutzung mit dem Betreiber teilen, nur angemeldet und nur ausdruecklich
   datenfreigabe: 'aus',  // 'aus' | 'an' (Opt-in, Standard aus)
+  // Sprache der Oberflaeche (js/sprache.js); Deutsch ist die Quelle
+  sprache: 'de',         // 'de' | 'en'
   // Fassung des gespeicherten Stands (fuer einmalige Umstellungen in ladeEinstellungen)
   fassung: 3,
 });
@@ -190,6 +192,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),
+  sprache: Object.freeze(['de', 'en']),
 });
 // Theme-IDs wie in js/thema.js (registriereThema); welche es gibt, weiss erst thema.js
 const THEMA_ID = /^[a-z][a-z0-9-]{1,31}$/;
