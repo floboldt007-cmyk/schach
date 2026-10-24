@@ -1,0 +1,19 @@
+{
+ "kopf": { "art": "raetsel-eigene", "format": 1, "rechenstand": 1, "stand": "2026-10-24", "titel": "Eigene Lehr-Stellungen fuer das Tagesraetsel (selbst gebaut, keine fremden Raetsel)" },
+ "hinweis": "Eingabe fuer werkzeuge/raetsel-fabrik.mjs. Jede Stellung ist hier selbst gebaut. Die Fabrik prueft sie mit Stockfish wie die Partie-Stellungen (eindeutig, 1 bis 4 eigene Zuege, Matt oder gehaltener Gewinn) und verlangt genau diese Loesung; matt und motiv muessen zur geometrischen Pruefung passen (--probe).",
+ "stellungen": [
+  { "id": "grundreihe-weiss", "fen": "6k1/5ppp/8/8/8/8/2r2PPP/4R1K1 w - - 0 1", "loesung": ["e1e8"], "matt": 1, "motiv": "grundreihe", "idee": "Grundreihenmatt mit dem Turm: der König steht hinter den eigenen Bauern.", "quelle": "eigen" },
+  { "id": "grundreihe-schwarz", "fen": "4r1k1/2R2ppp/8/8/8/8/5PPP/6K1 b - - 0 1", "loesung": ["e8e1"], "matt": 1, "motiv": "grundreihe", "idee": "Dasselbe Bild mit Schwarz: Turm auf die erste Reihe.", "quelle": "eigen" },
+  { "id": "damenopfer-grundreihe", "fen": "2r3k1/pp3ppp/8/7q/8/3Q4/PP3PPP/3R2K1 w - - 0 1", "loesung": ["d3d8", "c8d8", "d1d8"], "matt": 2, "motiv": "grundreihe", "idee": "Damenopfer lenkt den Turm ab, dann Grundreihenmatt.", "quelle": "eigen" },
+  { "id": "grundreihe-zwei-tuerme", "fen": "3r2k1/3r1ppp/8/8/7Q/8/4RPPP/6K1 b - - 0 1", "loesung": ["d7d1", "e2e1", "d1e1"], "matt": 2, "motiv": "grundreihe", "idee": "Zwei Türme auf der offenen Linie: Schach, Dazwischenstellen, Matt.", "quelle": "eigen" },
+  { "id": "matt-dame", "fen": "r2r2k1/pb3p1p/6pQ/8/8/8/PB3PPP/6K1 w - - 0 1", "loesung": ["h6g7"], "matt": 1, "motiv": "matt", "idee": "Die Dame setzt matt, der Läufer auf der langen Diagonale deckt sie.", "quelle": "eigen" },
+  { "id": "matt-erstickt", "fen": "6rk/6pp/8/q5N1/8/8/PP3PPP/3Q2K1 w - - 0 1", "loesung": ["g5f7"], "matt": 1, "motiv": "matt", "idee": "Ersticktes Matt: der König ist von eigenen Figuren eingesperrt.", "quelle": "eigen" },
+  { "id": "gabel-springer", "fen": "2q3k1/pp3ppp/8/3N4/8/8/PP3PPP/6K1 w - - 0 1", "loesung": ["d5e7", "g8f8", "e7c8"], "matt": null, "motiv": "gabel", "idee": "Springergabel mit Schach gegen König und Dame.", "quelle": "eigen" },
+  { "id": "gabel-springer-schwarz", "fen": "r1b1kb1r/pp1p1ppp/8/8/3n4/8/PP1P1PPP/RNB1KB1R b KQkq - 0 1", "loesung": ["d4c2", "e1d1", "c2a1"], "matt": null, "motiv": "gabel", "idee": "Der Springer greift König und Turm zugleich an.", "quelle": "eigen" },
+  { "id": "gabel-dame", "fen": "r4bk1/p5pp/1p6/4p2n/8/8/PP3PPP/3Q2K1 w - - 0 1", "loesung": ["d1d5", "g8h8", "d5a8"], "matt": null, "motiv": "gabel", "idee": "Die Dame gibt Schach und greift den ungedeckten Turm an.", "quelle": "eigen" },
+  { "id": "spiess-turm", "fen": "4q3/8/8/4k3/8/8/6PP/R5K1 w - - 0 1", "loesung": ["a1e1", "e5d5", "e1e8"], "matt": null, "motiv": "spiess", "idee": "Spieß: Schach auf der Linie, hinter dem König steht die Dame.", "quelle": "eigen" },
+  { "id": "spiess-laeufer", "fen": "7R/5p2/1k4p1/8/1p1K4/7P/5PP1/4b3 b - - 0 1", "loesung": ["e1c3", "d4c4", "c3h8"], "matt": null, "motiv": "spiess", "idee": "Läufer-Spieß auf der langen Diagonale: König weicht, der Turm fällt.", "quelle": "eigen" },
+  { "id": "abzug-laeufer", "fen": "1q5k/p4p1p/6p1/8/3N4/1P6/PB3PPP/6K1 w - - 0 1", "loesung": ["d4c6", "h8g8", "c6b8"], "matt": null, "motiv": "abzug", "idee": "Abzugsschach: der Springer zieht weg, der Läufer gibt Schach, die Dame fällt.", "quelle": "eigen" },
+  { "id": "fesselung-dame", "fen": "r3kb1r/pp1q1ppp/4pn2/2p5/P7/3B1N2/1PPP1PPP/R2QK2R w KQkq - 0 1", "loesung": ["d3b5", "e8c8", "b5d7"], "matt": null, "motiv": "fesselung", "idee": "Der Läufer fesselt die Dame an den König.", "quelle": "eigen" }
+ ]
+}
