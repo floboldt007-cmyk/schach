@@ -87,7 +87,7 @@
 //   thema.avatarVon), .info (.bot-name + Unterzeile .bot-meta mit Elo, .denkt-ort, .geschlagen-ort) und .uhr. Flo:
 //   .spieler.ich (Zusatzklassen .spielerleiste, .spieler-quer, .spieler-hoch): .av (thema.floAvatar), .name, danach
 //   .ort-spieler-leiste, Unterzeile, .uhr. Der Name wird nie mit "..." gekuerzt: passt er nicht in zwei Zeilen, steht
-//   der Rufname da (RUFNAME), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
+//   der Rufname da (rufnameVon), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
 //   im Duell-Intro (U5). lage() meldet weiter 'hoch' | 'quer'.
 //   Uhr: .uhr in beiden Karten, versteckt ohne Bedenkzeit (z.tempo). fmtUhr(ms) (exportiert) formatiert, uhr.setze(wer,
 //   ms, { laeuft }) zeigt an (laufend Tinte, unter 20 s .warn rot mit Uhr-Symbol und Sekundenpuls). Die Logik (Laufen,
@@ -192,16 +192,23 @@ const PAKET_NAME = /^[a-z][a-z0-9-]{0,30}$/;
 const MATT_HOOK_WARTEN_MS = 300;
 // w0plus-a-fix: hoechstens so viele Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen)
 const AKTIONEN_MAX = 2;
-// U7: Rufnamen fuer sehr lange Namen (Spielerkarte, Kopf auf dem Handy); der volle Name steht im aria-label
-const RUFNAME = Object.freeze({
-  benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm', delia: 'Delia',
-  koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch',
-});
-const rufnameVon = (b) => RUFNAME[b && b.id] || (b && (b.rufname || b.name)) || '';
+// U7: Rufnamen fuer sehr lange Namen (Spielerkarte, Kopf auf dem Handy); der volle Name steht im aria-label.
+// Diese Bots haben eine Kurzform: der Rufname aus js/bots.js, drei eine eigene (Woerterbuch partie, rufname.<id>)
+const RUFNAME_BOTS = new Set(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch']);
+const RUFNAME_EIGEN = new Set(['hilde', 'rudi', 'koenig']);
+function kurzform(b) {
+  if (!b || !RUFNAME_BOTS.has(b.id)) return '';
+  return RUFNAME_EIGEN.has(b.id) ? t('partie.rufname.' + b.id) : (b.rufname || b.name || '');
+}
+const rufnameVon = (b) => kurzform(b) || (b && (b.rufname || b.name)) || '';
 // U7: Brettwahl im Kopf (Feldfarben wie tokens.css, fest wie die Brettfarben selbst)
 const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
 // U7: Sprechblase blendet nach 3,5 s aus (Begruessung quer etwas laenger, sie kommt vor dem ersten Zug und verdeckt dort nichts)
 const BLASE_MS = 3500;
+// Bot-Saetze, die nicht zur Lage passen, je Sprache: Matt-Saetze nach einer Aufgabe, "ich fang an", wenn Flo anfaengt
+// (englisch nicht /matt/: das traefe "matter")
+const SATZ_MATT = Object.freeze({ de: /matt/i, en: /checkmat|\bmated?\b/i });
+const SATZ_ICH_FANG = Object.freeze({ de: /ich fang/i, en: /\bI[’']ll (just )?(start|begin|go first)\b/i });
 // Zug bestaetigen: so oft erklaert der Hinweis den zweiten Tipp (Merker je Geraet)
 // Pfeile leichter finden (Flo, 23.10.): einmal je Geraet, ab der zweiten neu begonnenen Partie gegen einen Bot, eine ruhige
 // Zeile unter dem Brett. Weg mit dem ersten gezeichneten Pfeil, mit "Verstanden" oder am Ende der Partie, in der sie stand.
@@ -401,7 +408,7 @@ export function zeige(root, params, app) {
     return bot.name;
   }
   // U7: auf dem Handy der Rufname im Kopf (PLAN 2.5 Regel 5), nur fuer Bots mit Rufname und nicht im Boss-Kopf
-  const kopfKurz = () => (z.modus !== 'boss' && (RUFNAME[bot.id] || (bot.stufe != null && bot.rufname)) ? RUFNAME[bot.id] || bot.rufname : kopfTitel());
+  const kopfKurz = () => (z.modus !== 'boss' && (kurzform(bot) || (bot.stufe != null && bot.rufname)) ? kurzform(bot) || bot.rufname : kopfTitel());
   function botMeta() {
     if (bot.stufe) return `Elo ${bot.elo}`;
     const teile = [bot.titel || (z.modus === 'boss' ? 'Boss' : '')];
@@ -694,8 +701,9 @@ export function zeige(root, params, app) {
   function satzFuer(anlass, werte = null) {
     const liste = (bot.saetze && bot.saetze[anlass]) || [];
     let passt = null;
-    if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !/matt/i.test(t);
-    if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !/ich fang/i.test(t);
+    const sp = sprache();
+    if (anlass === 'gewinnt' && endeDaten && endeDaten.grund !== 'matt') passt = (t) => !(SATZ_MATT[sp] || SATZ_MATT.de).test(t);
+    if (anlass === 'begruessung' && startFarbe === farbe) passt = (t) => !(SATZ_ICH_FANG[sp] || SATZ_ICH_FANG.de).test(t);
     const auswahl = passt ? liste.filter(passt) : liste;
     if (passt && auswahl.length && auswahl.length < liste.length) return auswahl[Math.floor(Math.random() * auswahl.length)];
     return botSatz(bot, anlass, Math.random, werte);
@@ -1957,7 +1965,8 @@ export function zeige(root, params, app) {
         if (p.hinweise > 0) hilfe.push(t('partie.erg.hinweise', { n: p.hinweise }));
         if (p.zuruecknahmen > 0) hilfe.push(t('partie.erg.zuruecknahmen', { n: p.zuruecknahmen }));
         const ziele = [
-          [t('partie.erg.gewonnen'), t('partie.erg.besiegt', { name: bot.name.split(' ').pop() })],
+          // Deutsch wie bisher das letzte Wort des Namens; Englisch die Kurzform ("Kalle from the Pub" -> "Kalle", nicht "Pub")
+          [t('partie.erg.gewonnen'), t('partie.erg.besiegt', { name: sprache() === 'de' ? bot.name.split(' ').pop() : rufnameVon(bot) })],
           rechnet ? [t('partie.erg.genauigkeit'), t('partie.erg.wirdBerechnet')]
             : [Number.isFinite(gen) ? t('partie.erg.genau', { wert: genText }) : t('partie.erg.genauigkeit'),
               t(sterne[1] ? 'partie.erg.mindestens' : 'partie.erg.noetig', { n: GENAUIGKEIT_STERN })],
