@@ -591,15 +591,15 @@ gruppe = 'Ereignisse';
   // Siegeslauf: der Bot, der gerade freigeschaltet wurde, hebt die Grenze erst fuer die naechste Partie
   setzeSpeicher(fakeSpeicher());
   for (let i = 0; i < 4; i++) {
-    const b = ['benno', 'hilde', 'kalle', 'lisa'][i];
+    const b = ['fridolin', 'benno', 'paula', 'gustav'][i];
     speicherePartie({ datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: b, botStufe: i + 1, spielerFarbe: 'w', zuege: Array(30).fill('e2e4'),
       san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0, liveKlassen: [] });
   }
   index.setzeUhr(ort(2026, 11, 2, 15).getTime());
-  sende('partie:beendet', partie('h1', { botId: 'lisa', botStufe: 4, neuFreigeschaltet: 'rudi' }));
-  sende('partie:beendet', partie('h2', { botId: 'kalle', botStufe: 3 }));
+  sende('partie:beendet', partie('h1', { botId: 'gustav', botStufe: 4, neuFreigeschaltet: 'hilde' }));
+  sende('partie:beendet', partie('h2', { botId: 'paula', botStufe: 3 }));
   const lst = S.lade();
-  pruefe('Freischaltung durch diese Partie zählt erst danach (Lisa zählt, Kalle danach nicht mehr: Rudi ist frei)', lst.lauf.n === 1
+  pruefe('Freischaltung durch diese Partie zählt erst danach (Gustav zählt, Paula danach nicht mehr: Hilde ist frei)', lst.lauf.n === 1
     && lst.abr.find((a) => a.id === 'h2').l === null, lst.lauf);
   // Reset: nur Arbeitsspeicher, nie schreiben
   const sp2 = fakeSpeicher();

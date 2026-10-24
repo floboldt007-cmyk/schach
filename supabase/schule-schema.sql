@@ -119,8 +119,8 @@ create table if not exists public.klassen_fortschritt (
   erledigt uuid[] not null default '{}',
   -- nur der Tag der letzten Meldung, keine Uhrzeit (siehe Kopf)
   aktualisiert_am date not null default ((now() at time zone 'Europe/Berlin')::date),
-  constraint klassen_fortschritt_bots check (bots_besiegt between 0 and 10),
-  constraint klassen_fortschritt_sterne check (sterne between 0 and 30),
+  constraint klassen_fortschritt_bots check (bots_besiegt between 0 and 30),
+  constraint klassen_fortschritt_sterne check (sterne between 0 and 90),
   constraint klassen_fortschritt_partien check (partien between 0 and 100000),
   constraint klassen_fortschritt_genauigkeit check (genauigkeit_schnitt is null or genauigkeit_schnitt between 0 and 100),
   constraint klassen_fortschritt_fehler check (jsonb_typeof(haeufigste_fehler) = 'object' and char_length(haeufigste_fehler::text) <= 300),
@@ -378,7 +378,7 @@ begin
   if uid is null then
     raise exception 'SCHULE_NICHT_ANGEMELDET';
   end if;
-  if v_bots is null or v_bots < 0 or v_bots > 10 or v_sterne is null or v_sterne < 0 or v_sterne > 30
+  if v_bots is null or v_bots < 0 or v_bots > 30 or v_sterne is null or v_sterne < 0 or v_sterne > 90
     or v_partien is null or v_partien < 0 or v_partien > 100000 or (v_gen is not null and (v_gen < 0 or v_gen > 100)) then
     raise exception 'SCHULE_FORTSCHRITT_UNGUELTIG';
   end if;

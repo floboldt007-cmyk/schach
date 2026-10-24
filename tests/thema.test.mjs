@@ -214,7 +214,7 @@ function nodeTeil() {
   pruefe('Zugklassen: Fuellung und Zeichen in hell und dunkel gleich (Wiedererkennung)', KLASSEN.every((k) => hell[`--k-${k}`] === dunkel[`--k-${k}`]
     && hell[`--kg-${k}`] === dunkel[`--kg-${k}`]));
   pruefe('Zugklassen: Amethyst #7A4FD6 fuer Genial/brillant (D1), kein Tuerkis', hell['--k-brillant'] === '#7A4FD6' && !/17A398|19f6e8/i.test(modern));
-  pruefe('Bot-Farben: jede Leiter-ID mit Farbe und Toenung (hell und dunkel)', BOT_IDS.length === 10
+  pruefe('Bot-Farben: jede Leiter-ID mit Farbe und Toenung (hell und dunkel)', BOT_IDS.length === 30
     && BOT_IDS.every((b) => hexRgb(hell[`--bot-${b}`]) && hexRgb(hell[`--bot-${b}-tint`]) && hexRgb(dunkel[`--bot-${b}-tint`])));
   pruefe('--meta-farbe = metaFarbe aus thema.js', hell['--meta-farbe'] === THEMEN.modern.metaFarbe.hell && dunkel['--meta-farbe'] === THEMEN.modern.metaFarbe.dunkel);
   pruefe('Texturen in modern alle none', ['--textur-grund', '--textur-flaeche', '--textur-sockel', '--textur-banner'].every((k) => hell[k] === 'none'));
@@ -293,8 +293,9 @@ function nodeTeil() {
   ab();
   ab2();
   pruefe('abmelden() entfernt das Theme', themaListe().length === 1 && themaVon('edel') === null && themaVon('modern') === THEMEN.modern);
-  const benno = BOTS[0];
-  // Premium-Umbau U5: die zehn Leiter-Bots haben Modern-Portraets; der Rueckfall gilt weiter fuer jeden Bot ohne
+  // Welten: Benno ist jetzt der zweite Bot (Fridolin ist der erste), also ueber die ID nehmen
+  const benno = BOTS.find((b) => b.id === 'benno');
+  // Premium-Umbau U5 / Welten: die dreissig Leiter-Bots haben Modern-Portraets; der Rueckfall gilt weiter fuer jeden Bot ohne
   // Portraet im Theme (z. B. einen angemeldeten Boss) und fuer unsaubere IDs
   const ohnePortraet = { id: 'test-boss', avatar: benno.avatar };
   pruefe('avatarVon: ohne Portraet im Theme der Pixel-Avatar aus bots.js (Leiter-Bots: Modern-Portraet)', avatarVon(ohnePortraet) === benno.avatar
@@ -306,7 +307,8 @@ function nodeTeil() {
 async function nodeTeilAsync({ ab3, benno }) {
   gruppe = 'thema.js';
   await wendeThemaAn({ thema: 'edel', modus: 'hell' });
-  pruefe('avatarVon: Portraet des aktiven Themes, sonst Rueckfall', avatarVon(benno) === 'assets/avatare/edel/benno.svg' && avatarVon(BOTS[1]) === BOTS[1].avatar);
+  const paula = BOTS.find((b) => b.id === 'paula');
+  pruefe('avatarVon: Portraet des aktiven Themes, sonst Rueckfall', avatarVon(benno) === 'assets/avatare/edel/benno.svg' && avatarVon(paula) === paula.avatar);
   pruefe('wendeThemaAn in Node: Zustand ohne DOM', aktuellesThema().thema === 'edel' && aktuellesThema().modus === 'hell' && aufgeloesterModus() === 'hell');
   ab3();
   const r = await wendeThemaAn({ thema: 'gibtsnicht', modus: 'lila' });
@@ -582,8 +584,9 @@ async function browserTeil(browser) {
   const anders = Object.keys(vorher).filter((s) => vorher[s] !== nachher[s]);
   pruefe('Probe-Theme geladen (nachgeladenes CSS, neue Farben, theme-color)', await bisStil(seite, 'body', 'background-color', 'rgb(232, 226, 244)')
     && await seite.evaluate(() => !!document.querySelector('link[data-thema-css="probe"]')) && await metas() === '#E8E2F4,#101114');
-  pruefe('Probe-Theme: Bounding-Boxen der Hauptelemente unveraendert', Object.keys(vorher).length >= 20 && anders.length === 0,
-    anders.map((s) => `${s}: ${vorher[s]} -> ${nachher[s]}`).join(' | '));
+  // Welten: die Arena zeigt eine Welt mit sechs Stationen (frueher alle zehn Bots)
+  pruefe('Probe-Theme: Bounding-Boxen der Hauptelemente unveraendert', Object.keys(vorher).length >= SEL.length + 6 && anders.length === 0,
+    anders.map((s) => `${s}: ${vorher[s]} -> ${nachher[s]}`).join(' | ') || `${Object.keys(vorher).length} Boxen: ${Object.keys(vorher).join(', ')}`);
   await seite.evaluate(() => window.__app.setzeEinstellungen({ thema: 'gibtsnicht' }));
   await seite.waitForFunction(() => document.documentElement.dataset.thema === 'modern');
   pruefe('unbekanntes Theme in den Einstellungen -> modern', await bisStil(seite, 'body', 'background-color', 'rgb(244, 241, 236)'));
