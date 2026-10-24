@@ -125,7 +125,7 @@ registriereTexte('arena', {
     'knoten.labelSterne': 'Level {stufe}: {name}, Elo {elo}, {zustand}, {sterne} of 3 stars',
     'gesperrt.welt': 'This world opens with a win against {name}.',
     'gesperrt.erst': 'Beat {name} first.',
-    'gesperrt.zuerst': 'Locked for now. Beat {name} first, then go on level by level.',
+    'gesperrt.zuerst': 'Locked for now. Beat {name} first, then keep going level by level.',
     'weltwahl.gesperrt': 'World {nr} of {anzahl} · locked',
     'weltwahl.sterne': 'World {nr} of {anzahl} · {sterne}/{max} stars',
     'weltwahl.siegel': 'World {nr} of {anzahl} · {sterne}/{max} stars · World seal',
