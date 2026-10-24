@@ -109,6 +109,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Wir stehen beide noch, das ist doch schön.',
         'Remis! Der Wind konnte sich nicht entscheiden.',
+        'Unentschieden! Die Krähen sagen, das zählt als halber Sieg.',
       ],
     },
   },
@@ -219,6 +220,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Dann geht die Post an uns beide.',
         'Remis! Wir haben uns wohl unterwegs getroffen.',
+        'Remis! Zwei Stempel auf einem Brief, ganz amtlich.',
       ],
     },
   },
@@ -269,6 +271,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Dann teilen wir uns die Wabe.',
         'Remis. Beide Stöcke stehen noch, alle Bienen sind zufrieden.',
+        'Unentschieden. Kein Stich, kein Honig, aber auch kein Ärger.',
       ],
     },
   },
@@ -380,6 +383,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Das kommt so an die Tafel, ganz ohne Fragezeichen.',
         'Remis. Im Club würden jetzt alle klatschen.',
+        'Remis! Das tragen wir beide stolz in die Clubliste ein.',
       ],
     },
   },
@@ -430,6 +434,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Die Lichtung gehört uns beiden.',
         'Remis. Zwei Könige, kein Holz mehr, Feierabend.',
+        'Unentschieden. Da war einfach kein Baum mehr zum Fällen.',
       ],
     },
   },
@@ -541,6 +546,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Wir sind beide heil durch den Forst gekommen.',
         'Remis. Keine Falle hat geschnappt, auch mal schön.',
+        'Remis! Wir haben uns gegenseitig jede Spur verwischt.',
       ],
     },
   },
@@ -651,6 +657,7 @@ export const BOTS = [
       remis: [
         'Unentschieden. Die Glut reicht für uns beide.',
         'Remis! Wir wärmen uns am selben Feuer.',
+        'Unentschieden. Das Feuer brennt weiter, für uns beide.',
       ],
     },
   },
@@ -761,6 +768,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Handschlag, und weiter zur nächsten Runde.',
         'Remis. Der Marktplatz hat heute zwei Gewinner.',
+        'Remis! Unter der Rathausuhr gibt’s dafür trotzdem Applaus.',
       ],
     },
   },
@@ -871,6 +879,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Der Trick ist bei uns beiden aufgegangen.',
         'Remis! Wir verschwinden gleichzeitig. Großes Finale.',
+        'Unentschieden! Und ich dachte, ich hätte noch einen Hasen im Hut.',
       ],
     },
   },
@@ -982,6 +991,7 @@ export const BOTS = [
       remis: [
         'Remis. Ein Klassiker, schon oft gelesen, immer wieder schön.',
         'Unentschieden. Das wird ein Buch mit zwei Hauptfiguren.',
+        'Remis. Das kommt ins Regal für besonders ausgewogene Werke.',
       ],
     },
   },
@@ -1093,6 +1103,7 @@ export const BOTS = [
       remis: [
         'Unentschieden. Heute teilen wir uns den Fang.',
         'Remis! Beide Kutter sicher im Hafen.',
+        'Unentschieden. Das Netz blieb leer, aber das Wetter war schön.',
       ],
     },
   },
@@ -1143,6 +1154,7 @@ export const BOTS = [
       remis: [
         'Remis. Beide Schiffe liegen sicher vertäut.',
         'Unentschieden. Ordentlicher Hafenbetrieb, keine Schäden.',
+        'Remis. Ich trage es ins Hafenbuch ein: ruhige See.',
       ],
     },
   },
@@ -1253,6 +1265,7 @@ export const BOTS = [
       remis: [
         'Unentschieden. Stillwasser, keiner bewegt sich mehr.',
         'Remis. Wir sind beide trockenen Fußes heimgekommen.',
+        'Unentschieden. Die Flut kam für uns beide zur gleichen Zeit.',
       ],
     },
   },
@@ -1303,6 +1316,7 @@ export const BOTS = [
       remis: [
         'Remis! Gerettet, und zwar wir beide.',
         'Unentschieden. Alle sicher an Land, so mag ich das.',
+        'Remis! Kein Schiff verloren, das ist der schönste Ausgang.',
       ],
     },
   },
@@ -1353,6 +1367,7 @@ export const BOTS = [
       remis: [
         'Remis. Zwei Leuchtfeuer, ein Horizont.',
         'Unentschieden. Eine Partie für meine Bücher.',
+        'Remis. Das Licht hat heute für uns beide geleuchtet.',
       ],
     },
   },
@@ -1403,6 +1418,7 @@ export const BOTS = [
       remis: [
         'Unentschieden! Wir tauchen beide gleichzeitig auf.',
         'Remis. Gleich tief getaucht, gleich viel Luft.',
+        'Unentschieden! Nächstes Mal tauche ich tiefer.',
       ],
     },
   },
@@ -1453,6 +1469,7 @@ export const BOTS = [
       remis: [
         'Remis. Wir haben beide nirgends angestoßen.',
         'Unentschieden. Zwei Boote, ein stiller Graben.',
+        'Remis. Ruhiges Fahrwasser, so soll es sein.',
       ],
     },
   },
@@ -1503,6 +1520,7 @@ export const BOTS = [
       remis: [
         'Remis. Wir teilen uns die Truhe.',
         'Unentschieden. Ein ehrlicher Fund für beide.',
+        'Remis. Kein halber Bauer weit und breit, schade eigentlich.',
       ],
     },
   },
@@ -1553,6 +1571,7 @@ export const BOTS = [
       remis: [
         'Remis. Ergebnis ausgeglichen, Versuch gelungen.',
         'Unentschieden. Das notiere ich als gemeinsame Entdeckung.',
+        'Remis. Das Experiment ist wiederholbar, das gefällt mir.',
       ],
     },
   },
@@ -1603,6 +1622,7 @@ export const BOTS = [
       remis: [
         'Remis. Das Tor steht einen Spalt offen.',
         'Unentschieden. Wir halten beide stand.',
+        'Remis. Heute kommt keiner durch, auch ich nicht.',
       ],
     },
   },
