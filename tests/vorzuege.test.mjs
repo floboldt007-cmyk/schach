@@ -43,8 +43,9 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 try {
   browser = await browserTyp(pw).launch({ headless: true });
   kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
-  await kontext.route('**/*.supabase.co/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
-  await kontext.addInitScript(() => {
+  const vorbereite = async (k) => {
+  await k.route('**/*.supabase.co/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await k.addInitScript(() => {
     if (!localStorage.getItem('schach-arena:v1:einstellungen')) {
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', liveBewertung: false, tiefe: 8, vorzuege: true }));
     }
@@ -57,7 +58,9 @@ try {
       return window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0];
     } };
   });
-  const seite = await kontext.newPage();
+  };
+  await vorbereite(kontext);
+  let seite = await kontext.newPage();
   seite.setDefaultTimeout(45000);   // unter Last (CI, volle Suite) braucht der Partie-Start mit Engine laenger
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
@@ -174,6 +177,17 @@ try {
   pruefe('Aufgeben loescht Vorzuege und Nummern', k6.vorzuege === '' && !Object.keys(k6.nummern).length, k6);
 
   // ---------- 7. Pfeil-Tipp: einmal je Geraet, ab der zweiten Partie ----------
+  // Am Rechner (Maus, ohne Touch, wie die Rechtsklick-Pruefungen in tests/board.test.mjs: mit Touch kam der Rechtsklick
+  // in der CI nicht als Malen an)
+  const touchSeite = seite;
+  const desktop = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+  await vorbereite(desktop);
+  seite = await desktop.newPage();
+  seite.setDefaultTimeout(45000);
+  seite.on('pageerror', (e) => fehler.push(e.message));
+  seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
+  await seite.goto(START);
+  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function');
   await seite.evaluate((m) => { localStorage.removeItem(m); window.__test.pfeilTipp = true; }, MERKER);
   await neuePartie();
   const t1 = await seite.evaluate((m) => ({ sichtbar: !document.querySelector('.screen.partie .pfeil-tipp').hidden, merker: localStorage.getItem(m) }), MERKER);
@@ -184,8 +198,8 @@ try {
     const r = el.getBoundingClientRect();
     return { sichtbar: !el.hidden && r.height > 0, text: el.querySelector('.pt-text').textContent, knopf: el.querySelector('.pt-ok').getBoundingClientRect().height };
   });
-  pruefe('Pfeil-Tipp: in der zweiten Partie eine ruhige Zeile mit "Verstanden"', t2.sichtbar && t2.knopf >= 44
-    && ['Tipp: Finger auf ein Feld halten und ziehen zeichnet einen Pfeil.', 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.'].includes(t2.text), t2);
+  pruefe('Pfeil-Tipp: in der zweiten Partie eine ruhige Zeile mit "Verstanden", am Rechner mit Rechtsklick', t2.sichtbar && t2.knopf >= 44
+    && t2.text === 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.', t2);
   // Rechtsklick ziehen zeichnet einen Pfeil: die Zeile geht und kommt nicht wieder
   // langsam zeichnen (CI: zu schnelle Zeiger-Ereignisse kamen nicht als Malen an) und auf den Pfeil warten
   await seite.waitForFunction(() => window.__partie.phase() === 'flo');
@@ -206,6 +220,15 @@ try {
   await seite.locator('.screen.partie .pfeil-tipp .pt-ok').click();
   pruefe('Pfeil-Tipp: "Verstanden" schliesst ihn fuer immer', await seite.evaluate((m) => document.querySelector('.screen.partie .pfeil-tipp').hidden
     && JSON.parse(localStorage.getItem(m)).erledigt === true, MERKER));
+
+  await desktop.close();
+  seite = touchSeite;
+  pruefe('Pfeil-Tipp: Merker fuer das iPad zurueckgesetzt', await seite.evaluate((m) => {
+    localStorage.setItem(m, JSON.stringify({ partien: 1, erledigt: false })); window.__test.pfeilTipp = true; return true; }, MERKER));
+  await neuePartie();
+  const tTouch = await seite.evaluate(() => document.querySelector('.screen.partie .pfeil-tipp .pt-text').textContent);
+  // Ob Chromium mit Touch "hover: hover" meldet, haengt vom Geraet ab: einer der beiden Texte, nie leer
+  pruefe('Pfeil-Tipp: auch am iPad sichtbar, mit einem der beiden Texte', ['Tipp: Finger auf ein Feld halten und ziehen zeichnet einen Pfeil.', 'Tipp: Rechtsklick und ziehen zeichnet einen Pfeil.'].includes(tTouch), tTouch);
 
   // ---------- 8. Ansichten: iPad quer und Handy hoch, hell und dunkel ----------
   for (const [width, height, name] of [[1180, 820, 'ipad-quer'], [390, 844, 'handy-hoch']]) for (const modus of ['hell', 'dunkel']) {
