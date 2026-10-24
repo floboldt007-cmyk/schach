@@ -1101,7 +1101,7 @@ export const BOTS = [
     avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#2772B0',
     kurz: 'Spielt vorausschauend und nimmt dir die guten Felder.',
     bio: 'Wiebke ist Hafenmeisterin: Jedes Schiff hat seinen Liegeplatz, jede Leine sitzt. Auf dem Brett denkt sie an deine Pläne, bevor du sie hast, und belegt die besten Felder zuerst. Ohne Anmeldung legt bei ihr niemand an.',
-    merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Vorausschauend', schwaeche: 'Scharfe Opfer' },
+    merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Umsichtig', schwaeche: 'Scharfe Opfer' },
     staerke: { tiefe: 7, kurzTiefe: 3, kurzChance: 0.18, breite: 14, intuition: 3, blick: 2, rauschen: 50, patzer: 0.013, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 2500 },
     saetze: {
       begruessung: [
@@ -1311,7 +1311,7 @@ export const BOTS = [
     avatar: 'assets/avatare/modern/johann.svg', farbe: '#DE8F81',
     kurz: 'Hütet die Küste. Kann alles und sieht weit voraus.',
     bio: 'Johann hält seit vierzig Jahren den Leuchtturm am Ende der Küste. In jeder langen Nacht hat er eine Partie aus alten Büchern nachgespielt, deshalb beherrscht er Angriff, Verteidigung und Endspiel gleichermaßen.',
-    merkmale: { figur: 'R', lieblings: 'Alle', tempo: 'Weitblickend', schwaeche: 'Kaum eine' },
+    merkmale: { figur: 'R', lieblings: 'Alle', tempo: 'Gelassen', schwaeche: 'Kaum eine' },
     staerke: { voll: true, elo: 2400, movetime: 1000, mattInEins: 1, zeit: [800, 1500] },
     saetze: {
       begruessung: [

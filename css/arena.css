@@ -192,6 +192,8 @@
 /* Schild "neu eingezogen" an offenen Bots unter Flos bestem Sieg */
 .arena .knoten .k-neu { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 2px 8px 3px; border-radius: var(--r-pille);
   font-size: 10.5px; font-weight: var(--gw-titel); letter-spacing: .14em; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s1); z-index: 3; pointer-events: none; }
+/* Endgegner mit Schild NEU (unter Flos bestem Sieg neu eingezogen): das Schild steht ueber der Krone */
+.arena .knoten.boss .k-neu { bottom: calc(100% + 32px); }
 .arena .detail-welt { margin-top: 3px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 
 /* Farben der Zeichnung (Klassen im SVG, js/ui/arena.js weltSvg) */
@@ -339,7 +341,8 @@
 .arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
 .arena .m-label { display: block; font-size: 11.5px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
-.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text); }
+.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
+  hyphens: auto; overflow-wrap: break-word; }
 .arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
 .arena .m-figur img { width: 20px; height: 20px; }
 @container (max-width: 330px) {

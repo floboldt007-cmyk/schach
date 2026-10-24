@@ -387,7 +387,7 @@ export function zeige(root, params, app) {
   baueKnoten();
 
   function knotenLabel(b, z) {
-    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', offen: b.endgegner ? 'Endgegner, direkt herausfordern' : neuEingezogen(b) ? 'neu eingezogen' : 'offen', gesperrt: 'gesperrt' }[z];
+    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', offen: neuEingezogen(b) ? 'neu eingezogen' : b.endgegner ? 'Endgegner, direkt herausfordern' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
     return `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`;
   }
@@ -548,7 +548,7 @@ export function zeige(root, params, app) {
     // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
     const laufBot = laufend ? botNachId(laufend.botId) : null;
     const status = z === 'besiegt' ? 'Besiegt' : z === 'aktuell' ? 'Nächster Gegner'
-      : b.endgegner ? 'Endgegner · direkt herausfordern' : neuEingezogen(b) ? 'Neu eingezogen' : 'Offen';
+      : neuEingezogen(b) ? 'Neu eingezogen' : b.endgegner ? 'Endgegner · direkt herausfordern' : 'Offen';
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
     if (orte.oben) orte.oben.verlasse();
