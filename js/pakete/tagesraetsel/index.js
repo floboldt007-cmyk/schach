@@ -1,5 +1,5 @@
 // Paket "tagesraetsel" (Welle C, S1-5, SPIELKONZEPT 3.6): jeden Tag ein Raetsel, fuer alle dasselbe, Grenze 4:00.
-// Eigene Raetsel aus daten/raetsel/tagesraetsel.json (werkzeuge/raetsel-fabrik.mjs, mit Stockfish geprueft, keine
+// Eigene Raetsel aus daten/tagesraetsel/raetsel.json (werkzeuge/raetsel-fabrik.mjs, mit Stockfish geprueft, keine
 // fremden Raetsel). Montag leicht, jeden Tag schwerer bis Samstag, Sonntag zwei Teile. Regeln in logik.js.
 // - Loesen im Raetsel-Bildschirm (js/ui/raetsel.js, Quelle "tagesraetsel"): app.gehe('raetsel', { quelle: 'tagesraetsel' })
 //   heute, mit { archiv: 1 } die offenen Raetsel der letzten 30 Tage (zaehlen fuer Funken und Serie, nicht als

@@ -2468,11 +2468,11 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
 
 Dateien: `js/pakete/tagesraetsel/index.js` (Orte, Ereignis, Raetsel-Quelle, Inhaltsart), `logik.js` (rein, Node-testbar,
 kein `Math.random`, keine Uhr), `css/pakete/tagesraetsel.css` (nur Tokens, `link[data-paket="tagesraetsel"]`), die Raetsel
-in `daten/raetsel/tagesraetsel.json` (art `tagesraetsel`, format 1) aus `werkzeuge/raetsel-fabrik.mjs`. Tests:
+in `daten/tagesraetsel/raetsel.json` (art `tagesraetsel`, format 1) aus `werkzeuge/raetsel-fabrik.mjs`. Tests:
 `tests/tagesraetsel.test.mjs` (Paket), `tests/tagesraetsel-daten.test.mjs` (Datei und Fabrik).
 
 - **Eigene Raetsel.** Die Fabrik erzeugt Stellungen aus Partien der Engine gegen sich selbst (gebremst, fester Seed)
-  und aus eigenen Lehr-Stellungen (`daten/raetsel/eigene.json`) und prueft jede mit Stockfish (eindeutiger bester Zug,
+  und aus eigenen Lehr-Stellungen (`werkzeuge/raetsel-eigene.json`, wird nicht ausgeliefert) und prueft jede mit Stockfish (eindeutiger bester Zug,
   1 bis 4 eigene Zuege, am Ende Matt oder klarer Gewinn). Keine fremden Raetsel-Sammlungen. In den Einstellungen unter
   "Info und Lizenzen": "Eigene Rätsel, mit Stockfish geprüft".
 - **Aus dem Datum.** Tag k der Datei gehoert zu `start + k` (`start` ist ein Montag, Grenze 4:00 aus `tag.js`). Nach dem

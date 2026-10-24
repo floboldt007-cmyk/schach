@@ -221,7 +221,7 @@ async function nodeTeil() {
   pruefe('keine fremde Raetsel-Quelle im Paket', !/lichess|chess\.com/i.test(texte));
 
   gruppe = 'Echte Datei';
-  const datei = path.join(WURZEL, 'daten/raetsel/tagesraetsel.json');
+  const datei = path.join(WURZEL, 'daten/tagesraetsel/raetsel.json');
   if (existsSync(datei)) {
     const json = JSON.parse(readFileSync(datei, 'utf8'));
     const { pruefeKopf, RECHENSTAND } = await import('../js/inhalte.js');
@@ -232,7 +232,7 @@ async function nodeTeil() {
     pruefe('heute (24.10.2026) gibt es ein Raetsel', !!L.tagDaten(json, '2026-10-24'));
     pruefe('Datei unter 120 KB', statSync(datei).size < 120 * 1024, statSync(datei).size);
   } else {
-    pruefe('daten/raetsel/tagesraetsel.json fehlt noch', false);
+    pruefe('daten/tagesraetsel/raetsel.json fehlt noch', false);
   }
   gruppe = '';
 }
@@ -268,11 +268,11 @@ async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = f
     if (m.type() !== 'error') return;
     const url = (m.location() && m.location().url) || '';
     if (/favicon/.test(url)) return;
-    if (datei === 'fehlt' && /tagesraetsel\.json/.test(url + m.text())) return;
+    if (datei === 'fehlt' && /tagesraetsel\/raetsel\.json/.test(url + m.text())) return;
     fehler.push(m.text() + (url ? ' @ ' + url : ''));
   });
   seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
-  await seite.route('**/daten/raetsel/tagesraetsel.json*', (route) => (datei === 'fehlt'
+  await seite.route('**/daten/tagesraetsel/raetsel.json*', (route) => (datei === 'fehlt'
     ? route.fulfill({ status: 404, body: 'fehlt' })
     : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DATEI_BROWSER) })));
   return { kontext, seite, fehler };

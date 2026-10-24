@@ -2,7 +2,7 @@
 // Math.random und keine Uhr (Fairness-Test: Liste REIN). Tage kommen immer als Tagesschluessel aus js/tag.js (Grenze
 // 4:00 lokal), nie aus toISOString.
 //
-// Die Raetsel stehen in daten/raetsel/tagesraetsel.json (art 'tagesraetsel', format 1), gebaut von
+// Die Raetsel stehen in daten/tagesraetsel/raetsel.json (art 'tagesraetsel', format 1), gebaut von
 // werkzeuge/raetsel-fabrik.mjs: eigene Raetsel aus Partien der Engine gegen sich selbst und eigenen Lehr-Stellungen,
 // jedes mit Stockfish geprueft. Keine fremden Raetsel (keine Datenbanken anderer Seiten, keine Buecher).
 //   { kopf, quelle, start: 'JJJJ-MM-TT' (ein Montag), tage: [ { aufgaben: [Aufgabe] } ] }
@@ -29,7 +29,7 @@ import { addiereTage, tageZwischen, wochentag, istSchluessel } from '../../tag.j
 
 export const PAKET = 'tagesraetsel';
 export const MODUL = 'tagesraetsel';
-export const DATEI = 'raetsel/tagesraetsel';
+export const DATEI = 'tagesraetsel/raetsel';
 export const ART = 'tagesraetsel';
 export const RECHENSTAND = 1;
 export const BUDGET = 4000;
