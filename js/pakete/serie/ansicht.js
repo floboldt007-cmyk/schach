@@ -18,14 +18,23 @@ import { anim, tempo } from '../../bewegung.js';
 import { klang } from '../../sounds.js';
 import { icon } from '../../ui/icons.js';
 import { wochentag } from '../../tag.js';
+import { t, zahl as zahlFormat } from '../../sprache.js';
+import '../../sprachen/allgemein.js';
 import * as T from './tag.js';
 import * as LA from './lauf.js';
+import './texte.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const zahl = (n) => Math.round(Number(n) || 0).toLocaleString('de-DE');
+const zahl = (n) => zahlFormat(Math.round(Number(n) || 0));
 const figurBild = (f) => new URL(`../../../assets/pieces/w${f === 'S' ? 'N' : f === 'L' ? 'B' : f === 'T' ? 'R' : f === 'D' ? 'Q' : 'P'}.svg`, import.meta.url).href;
-const WOCHENTAGE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-const KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+// Wochentage (0 = Montag) in der eingestellten Sprache: Listen mit Gettern, gelesen erst beim Zeichnen
+function tageListe(art) {
+  const l = [];
+  for (let i = 0; i < 7; i++) Object.defineProperty(l, i, { get: () => t(`p-serie.${art}.${i}`), enumerable: true });
+  return Object.freeze(l);
+}
+const WOCHENTAGE = tageListe('wochentag');
+const KURZ = tageListe('kurz');
 
 function el(tag, klasse, html) {
   const e = document.createElement(tag);
@@ -34,10 +43,18 @@ function el(tag, klasse, html) {
   return e;
 }
 
-export const schachtage = (n) => `${zahl(n)} ${n === 1 ? 'Schachtag' : 'Schachtage'} in Serie`;
-export const bisText = (n) => `noch ${n} ${n === 1 ? 'Feld' : 'Felder'} bis zur Umwandlung`;
-export const laufText = (n) => `${n} ${n === 1 ? 'Sieg' : 'Siege'} in Folge`;
-export const endeText = (n, rekord) => `Siegeslauf beendet bei ${n}. Dein Rekord: ${rekord}.`;
+export function schachtage(n) {
+  return t('p-serie.schachtage', { n: Math.round(Number(n) || 0) });
+}
+export function bisText(n) {
+  return t('p-serie.bis', { n });
+}
+export function laufText(n) {
+  return t('p-serie.lauf', { n });
+}
+export function endeText(n, rekord) {
+  return t('p-serie.lauf.ende', { n, rekord });
+}
 
 // ---------- Bauernmarsch-Streifen ----------
 // 7 Felder: 0 = Startfeld, 1..5, 6 = Umwandlungsfeld. heute: 'gezaehlt' (Feld des Bauern hervorgehoben) oder 'offen'
@@ -53,7 +70,7 @@ export function streifenHtml({ feld = 0, heute = null, umwandlung = false, klein
     // Umwandlungsfeld: blasse Dame als Ziel
     zellen += `<i class="${klassen.join(' ')}">${i === T.FELDER ? `<img class="se-krone" src="${esc(figurBild('D'))}" alt="" draggable="false">` : ''}</i>`;
   }
-  return `<span class="se-streifen${klein ? ' klein' : ''}" role="img" aria-label="${esc(label || `Bauernmarsch: Feld ${pos} von ${T.FELDER}`)}" style="--feld:${pos}">`
+  return `<span class="se-streifen${klein ? ' klein' : ''}" role="img" aria-label="${esc(label || t('p-serie.streifen.feld', { pos, max: T.FELDER }))}" style="--feld:${pos}">`
     + `${zellen}<img class="se-bauer" src="${esc(figurBild('P'))}" alt="" draggable="false"></span>`;
 }
 
@@ -71,17 +88,17 @@ export function kopfChip({ lage, lauf = { n: 0 }, ring = null, leise = false, be
   let label;
   if (leise && ring && !ruht) {
     inhalt = `${icon('se-ring', 'se-ico')}<b class="zahl">${ring.n}</b>`;
-    label = `Wochen-Ring: ${ring.n} volle ${ring.n === 1 ? 'Woche' : 'Wochen'} in Folge. Bauernmarsch: ${schachtage(lage.aktuell)}`;
+    label = t('p-serie.chip.ring', { n: ring.n, schachtage: schachtage(lage.aktuell) });
   } else if (ruht) {
-    inhalt = `${icon('se-bauer', 'se-ico')}<span class="se-chip-ruht">ruht</span>`;
-    label = `Bauernmarsch ruht, Rekord ${lage.best}. Das nächste Tageswerk beginnt Kapitel ${lage.naechstesKapitel}`;
+    inhalt = `${icon('se-bauer', 'se-ico')}<span class="se-chip-ruht">${esc(t('p-serie.ruht'))}</span>`;
+    label = t('p-serie.chip.ruht', { best: lage.best, kapitel: lage.naechstesKapitel });
   } else {
     inhalt = `${icon('se-bauer', 'se-ico')}<b class="zahl">${lage.aktuell}</b>`;
-    label = `Bauernmarsch: ${schachtage(lage.aktuell)}, Rekord ${lage.best}`;
+    label = t('p-serie.chip.laeuft', { schachtage: schachtage(lage.aktuell), best: lage.best });
   }
   if (flamme) {
     inhalt += `<span class="se-chip-flamme">${icon('se-flamme', 'se-ico')}<b class="zahl">${lauf.n}</b></span>`;
-    label += `. Siegeslauf: ${laufText(lauf.n)}`;
+    label += '. ' + t('p-serie.lauf.label', { lauf: laufText(lauf.n) });
     b.dataset.lauf = String(lauf.n);
   }
   b.innerHTML = inhalt;
@@ -101,8 +118,8 @@ export function kopfChip({ lage, lauf = { n: 0 }, ring = null, leise = false, be
 export function flamme({ n } = {}) {
   const s = el('span', 'se-spieler-flamme', `${icon('se-flamme', 'se-ico')}<b class="zahl">${n}</b>`);
   s.dataset.paket = 'serie';
-  s.title = `Siegeslauf: ${laufText(n)}`;
-  s.setAttribute('aria-label', `Siegeslauf: ${laufText(n)}`);
+  s.title = t('p-serie.lauf.label', { lauf: laufText(n) });
+  s.setAttribute('aria-label', t('p-serie.lauf.label', { lauf: laufText(n) }));
   return s;
 }
 
@@ -113,29 +130,29 @@ export function heuteZeile({ lage, st, einst = {}, training = false, beiTraining
   z.dataset.art = lage.art;
   const heuteArt = lage.heuteGezaehlt ? 'gezaehlt' : 'offen';
   let titel;
-  if (lage.art === 'neu') titel = '<b>Bauernmarsch</b>';
-  else if (lage.art === 'ruht') titel = `<b>ruht</b> · Rekord ${zahl(lage.best)}`;
-  else titel = `<b>Tag ${zahl(lage.aktuell)}</b> · Bauernmarsch`;
-  z.innerHTML = `<div class="se-h-zeile"><button class="se-h-titel" type="button" aria-label="Serien-Blatt öffnen">`
+  if (lage.art === 'neu') titel = `<b>${esc(t('p-serie.name'))}</b>`;
+  else if (lage.art === 'ruht') titel = `<b>${esc(t('p-serie.heute.ruht'))}</b> · ${esc(t('p-serie.rekord', { wert: zahl(lage.best) }))}`;
+  else titel = `<b>${esc(t('p-serie.tag', { wert: zahl(lage.aktuell) }))}</b> · ${esc(t('p-serie.name'))}`;
+  z.innerHTML = `<div class="se-h-zeile"><button class="se-h-titel" type="button" aria-label="${esc(t('p-serie.heute.blatt'))}">`
     + `<span class="se-h-symbol" aria-hidden="true">${icon('se-bauer', 'se-ico')}</span><span class="se-h-text">${titel}</span></button>`
     + `${streifenHtml({ feld: lage.feld, heute: lage.art === 'ruht' && !lage.heuteGezaehlt ? null : heuteArt,
-      label: lage.art === 'neu' ? 'Bauernmarsch: dein Bauer steht am Start' : `Bauernmarsch: ${bisText(lage.bisUmwandlung)}` })}</div>`;
+      label: lage.art === 'neu' ? t('p-serie.streifen.start') : t('p-serie.streifen.text', { text: bisText(lage.bisUmwandlung) }) })}</div>`;
   const status = el('p', 'se-h-status');
-  if (lage.heuteGezaehlt) status.textContent = 'Tageswerk geschafft. Alles Weitere ist Kür.';
-  else if (lage.pause) status.textContent = 'Pause: Die Serie ist eingefroren.';
-  else if (lage.ruhetag) status.textContent = 'Heute ist dein Ruhetag. Er zählt nie als freier Tag.';
-  else status.textContent = 'Heute noch offen · Tageswerk in 5 Minuten';
+  if (lage.heuteGezaehlt) status.textContent = t('p-serie.heute.geschafft');
+  else if (lage.pause) status.textContent = t('p-serie.heute.pause');
+  else if (lage.ruhetag) status.textContent = t('p-serie.heute.ruhetag');
+  else status.textContent = t('p-serie.heute.offen');
   z.append(status);
   const detail = el('p', 'se-h-detail');
-  if (lage.art === 'neu') detail.textContent = 'Jeder Schachtag schiebt deinen Bauern ein Feld vor. Nach 6 Feldern wandelt er sich um.';
-  else if (lage.art === 'ruht') detail.textContent = `Dein nächstes Tageswerk beginnt Kapitel ${lage.naechstesKapitel}. Figuren und Rekord bleiben.`;
-  else if (lage.gesternBruecke && !lage.heuteGezaehlt) detail.textContent = `Gestern war ein Brückentag. Deine Serie läuft: ${schachtage(lage.aktuell)}.`;
+  if (lage.art === 'neu') detail.textContent = t('p-serie.heute.neu');
+  else if (lage.art === 'ruht') detail.textContent = t('p-serie.heute.ruhtDetail', { kapitel: lage.naechstesKapitel });
+  else if (lage.gesternBruecke && !lage.heuteGezaehlt) detail.textContent = t('p-serie.heute.bruecke', { schachtage: schachtage(lage.aktuell) });
   else detail.textContent = bisText(lage.bisUmwandlung);
   z.append(detail);
   if (!lage.heuteGezaehlt && !lage.pause && training && typeof beiTraining === 'function') {
-    const k = el('button', 'knopf se-h-training dr', 'Zum Training');
+    const k = el('button', 'knopf se-h-training dr', esc(t('p-serie.heute.training')));
     k.type = 'button';
-    k.setAttribute('aria-label', 'Zum Training: Tageswerk in 5 Minuten');
+    k.setAttribute('aria-label', t('p-serie.heute.trainingLabel'));
     k.addEventListener('click', beiTraining);
     z.append(k);
   }
@@ -146,15 +163,15 @@ export function heuteZeile({ lage, st, einst = {}, training = false, beiTraining
     p.textContent = text;
     z.append(p);
     if (art === 'gewohnheit' && typeof beiLeise === 'function' && !einst.leise) {
-      const k = el('button', 'knopf se-h-leise dr', 'Nur den Wochen-Ring zeigen');
+      const k = el('button', 'knopf se-h-leise dr', esc(t('p-serie.heute.leise')));
       k.type = 'button';
       k.addEventListener('click', () => beiLeise(k));
       z.append(k);
     }
   }
   if (lage.offeneWahl > 0 && typeof beiWahl === 'function') z.append(wahlBlock({ beiWahl, nr: offeneNr(st) }));
-  const t = z.querySelector('.se-h-titel');
-  if (typeof beiBlatt === 'function') t.addEventListener('click', beiBlatt);
+  const titelKnopf = z.querySelector('.se-h-titel');
+  if (typeof beiBlatt === 'function') titelKnopf.addEventListener('click', beiBlatt);
   return z;
 }
 
@@ -166,14 +183,14 @@ function offeneNr(st) {
 function wahlBlock({ beiWahl, nr }) {
   const w = el('div', 'se-wahl');
   w.setAttribute('role', 'group');
-  w.setAttribute('aria-label', 'Umwandlung: Figur wählen');
-  w.innerHTML = `<p class="se-wahl-text">Umwandlung! Deine ${nr ? nr + '. ' : ''}Figur zieht in die Ehrenreihe. Welche soll es sein?</p><div class="se-wahl-knoepfe"></div>`;
+  w.setAttribute('aria-label', t('p-serie.wahl.label'));
+  w.innerHTML = `<p class="se-wahl-text">${esc(nr ? t('p-serie.wahl.textNr', { nr }) : t('p-serie.wahl.text'))}</p><div class="se-wahl-knoepfe"></div>`;
   const reihe = w.querySelector('.se-wahl-knoepfe');
   for (const [f, name] of Object.entries(T.FIGUREN)) {
     const k = el('button', 'se-wahl-knopf dr', `<img src="${esc(figurBild(f))}" alt=""><span>${esc(name)}</span>`);
     k.type = 'button';
     k.dataset.figur = f;
-    k.setAttribute('aria-label', `${name} wählen`);
+    k.setAttribute('aria-label', t('p-serie.wahl.figur', { name }));
     k.addEventListener('click', () => beiWahl(f, w));
     reihe.append(k);
   }
@@ -203,20 +220,20 @@ export function abrechnungsZeile({ e, schonGezeigt = false, merke = () => {}, st
   let kopf;
   let unter = '';
   if (mitTag) {
-    kopf = `<span class="se-label">Serie</span><b class="se-abr-wert">Tag ${zahl(e.t)} · Bauernmarsch</b>`;
-    if (umw) unter = 'Umwandlung! Figur in der Arena wählen.';
-    else unter = (e.d ? 'Willkommen zurück. Doppelschritt. ' : '') + bisText(T.FELDER - (e.f % T.FELDER));
+    kopf = `<span class="se-label">${esc(t('p-serie.abr.serie'))}</span><b class="se-abr-wert">${esc(t('p-serie.tag', { wert: zahl(e.t) }))} · ${esc(t('p-serie.name'))}</b>`;
+    if (umw) unter = t('p-serie.abr.umwandlung');
+    else unter = (e.d ? t('p-serie.doppelKurz') + ' ' : '') + bisText(T.FELDER - (e.f % T.FELDER));
   } else {
-    kopf = `<span class="se-label">Siegeslauf</span><b class="se-abr-wert">${mitLauf ? esc(laufText(e.l)) : 'beendet'}</b>`;
+    kopf = `<span class="se-label">${esc(t('p-serie.lauf.name'))}</span><b class="se-abr-wert">${mitLauf ? esc(laufText(e.l)) : esc(t('p-serie.lauf.beendet'))}</b>`;
   }
   let lauf = '';
   if (mitTag && mitLauf) lauf = `<span class="se-abr-lauf"${e.l >= LA.FLAMME_AB ? ' data-flamme="1"' : ''}>${e.l >= LA.FLAMME_AB ? icon('se-flamme', 'se-ico') : ''}${esc(laufText(e.l))}</span>`;
-  else if (!mitTag && mitLauf && e.l >= LA.FLAMME_AB) kopf = `<span class="se-label">Siegeslauf</span><b class="se-abr-wert">${icon('se-flamme', 'se-ico')}${esc(laufText(e.l))}</b>`;
+  else if (!mitTag && mitLauf && e.l >= LA.FLAMME_AB) kopf = `<span class="se-label">${esc(t('p-serie.lauf.name'))}</span><b class="se-abr-wert">${icon('se-flamme', 'se-ico')}${esc(laufText(e.l))}</b>`;
   if (mitEnde) lauf += `<span class="se-abr-ende">${esc(endeText(e.e, e.b))}</span>`;
   zeile.innerHTML = `<span class="se-abr-symbol" aria-hidden="true">${icon(mitTag ? 'se-bauer' : 'se-flamme', 'se-ico')}</span>`
     + `<span class="se-abr-mitte"><span class="se-abr-kopf">${kopf}</span>${unter ? `<span class="se-abr-unter">${esc(unter)}</span>` : ''}${lauf}</span>`
     + (mitTag ? streifenHtml({ feld: schonGezeigt ? posNachher : posVorher, heute: 'gezaehlt', klein: true, umwandlung: false,
-      label: umw ? 'Bauernmarsch: Umwandlung' : `Bauernmarsch: ${bisText(T.FELDER - (e.f % T.FELDER))}` }) : '');
+      label: umw ? t('p-serie.streifen.umwandlung') : t('p-serie.streifen.text', { text: bisText(T.FELDER - (e.f % T.FELDER)) }) }) : '');
   if (!mitTag && !mitLauf && !mitEnde) return null;
   const uhren = new Set();
   const spaeter = (fn, t) => { const u = setTimeout(() => { uhren.delete(u); fn(); }, Math.max(0, t)); uhren.add(u); return u; };
@@ -278,10 +295,14 @@ export function abrechnungsZeile({ e, schonGezeigt = false, merke = () => {}, st
 }
 
 // ---------- Serien-Blatt ----------
-const ART_TEXT = {
-  gezaehlt: 'gezählt', reise: 'gezählt (Reise-Regel)', bruecke: 'Brücke', ruhetag: 'Ruhetag', pause: 'Pause', leer: 'frei', offen: 'heute', zukunft: '', vorher: '',
-};
-const datumKurz = (k) => `${k.slice(8, 10)}.${k.slice(5, 7)}.`;
+// Text zur Art eines Kalendertags (zukunft und vorher: leer)
+const ART_TEXT = new Set(['gezaehlt', 'reise', 'bruecke', 'ruhetag', 'pause', 'leer', 'offen']);
+function artText(art) {
+  return ART_TEXT.has(art) ? t('p-serie.art.' + art) : '';
+}
+function datumKurz(k) {
+  return t('p-serie.datum.kurz', { t: k.slice(8, 10), m: k.slice(5, 7) });
+}
 
 function ehrenreihen(st) {
   const box = el('div', 'se-ehren');
@@ -291,7 +312,7 @@ function ehrenreihen(st) {
     const reihe = el('div', 'se-ehren-reihe');
     reihe.setAttribute('role', 'list');
     const voll = figuren.slice(r * T.REIHE, (r + 1) * T.REIHE).length === T.REIHE;
-    reihe.setAttribute('aria-label', `${r + 1}. Ehrenreihe${voll ? ' (voll)' : ''}`);
+    reihe.setAttribute('aria-label', t(voll ? 'p-serie.ehren.reiheVoll' : 'p-serie.ehren.reihe', { nr: r + 1 }));
     for (let i = 0; i < T.REIHE; i++) {
       const f = figuren[r * T.REIHE + i];
       const zelle = el('span', `se-ehre ${(r + i) % 2 ? 'd' : 'h'}${f === '?' ? ' offen' : ''}`);
@@ -301,8 +322,8 @@ function ehrenreihen(st) {
         zelle.setAttribute('aria-label', T.FIGUREN[f]);
       } else if (f === '?') {
         zelle.innerHTML = '<b aria-hidden="true">?</b>';
-        zelle.setAttribute('aria-label', 'Umwandlung: Figur noch wählen');
-      } else zelle.setAttribute('aria-label', 'frei');
+        zelle.setAttribute('aria-label', t('p-serie.ehren.offen'));
+      } else zelle.setAttribute('aria-label', t('p-serie.ehren.frei'));
       reihe.append(zelle);
     }
     box.append(reihe);
@@ -311,14 +332,14 @@ function ehrenreihen(st) {
 }
 
 function kalenderTabelle(wochen) {
-  const t = el('div', 'se-kalender');
-  t.setAttribute('role', 'table');
-  t.setAttribute('aria-label', 'Kalender der letzten Wochen');
-  t.innerHTML = `<div class="se-k-zeile se-k-kopf" role="row"><span role="columnheader"></span>${KURZ.map((k) => `<span role="columnheader">${k}</span>`).join('')}</div>`;
+  const tab = el('div', 'se-kalender');
+  tab.setAttribute('role', 'table');
+  tab.setAttribute('aria-label', t('p-serie.kalender.label'));
+  tab.innerHTML = `<div class="se-k-zeile se-k-kopf" role="row"><span role="columnheader"></span>${KURZ.map((k) => `<span role="columnheader">${esc(k)}</span>`).join('')}</div>`;
   for (const w of wochen) {
     const z = el('div', 'se-k-zeile');
     z.setAttribute('role', 'row');
-    z.innerHTML = `<span class="se-k-kw" role="rowheader">KW ${w.kw}</span>`;
+    z.innerHTML = `<span class="se-k-kw" role="rowheader">${esc(t('p-serie.kalender.kw', { kw: w.kw }))}</span>`;
     for (const d of w.tage) {
       const c = el('span', `se-k-tag ${d.art}${d.heute ? ' heute' : ''}`);
       c.setAttribute('role', 'cell');
@@ -326,12 +347,12 @@ function kalenderTabelle(wochen) {
       c.dataset.art = d.art;
       const sym = d.art === 'gezaehlt' || d.art === 'reise' ? icon('se-bauer', 'se-ico')
         : d.art === 'ruhetag' ? icon('se-mond', 'se-ico') : d.art === 'pause' ? icon('se-liege', 'se-ico') : '';
-      c.innerHTML = `${sym}<span class="sr">${datumKurz(d.tag)} ${ART_TEXT[d.art] || ''}</span>`;
+      c.innerHTML = `${sym}<span class="sr">${esc(datumKurz(d.tag))} ${esc(artText(d.art))}</span>`;
       z.append(c);
     }
-    t.append(z);
+    tab.append(z);
   }
-  return t;
+  return tab;
 }
 
 function kapitelBalken(st, lage) {
@@ -342,8 +363,8 @@ function kapitelBalken(st, lage) {
   const box = el('div', 'se-kapitel');
   for (const k of liste.slice(-6)) {
     const z = el('div', 'se-kap');
-    z.innerHTML = `<span class="se-kap-name">Kapitel ${k.nr}</span><span class="se-kap-balken"><i style="transform:scaleX(${(k.tage / max).toFixed(3)})"></i></span>`
-      + `<span class="se-kap-zahl zahl">${zahl(k.tage)}${k.laeuft ? ' (läuft)' : ''}</span>`;
+    z.innerHTML = `<span class="se-kap-name">${esc(t('p-serie.kapitel.name', { nr: k.nr }))}</span><span class="se-kap-balken"><i style="transform:scaleX(${(k.tage / max).toFixed(3)})"></i></span>`
+      + `<span class="se-kap-zahl zahl">${esc(k.laeuft ? t('p-serie.kapitel.laeuft', { wert: zahl(k.tage) }) : zahl(k.tage))}</span>`;
     box.append(z);
   }
   return box;
@@ -352,14 +373,14 @@ function kapitelBalken(st, lage) {
 function ruhetagWahl({ einst, beiRuhetag }) {
   const box = el('div', 'se-ruhetag');
   box.setAttribute('role', 'radiogroup');
-  box.setAttribute('aria-label', 'Ruhetag');
-  const werte = [[null, 'Kein'], ...KURZ.map((k, i) => [i, k])];
+  box.setAttribute('aria-label', t('p-serie.ruhetag.name'));
+  const werte = [[null, t('p-serie.ruhetag.kein')], ...KURZ.map((k, i) => [i, k])];
   for (const [w, name] of werte) {
     const k = el('button', 'se-rt dr', esc(name));
     k.type = 'button';
     k.setAttribute('role', 'radio');
     k.setAttribute('aria-checked', String(einst.ruhetag === w));
-    k.setAttribute('aria-label', w == null ? 'Kein Ruhetag' : `Ruhetag ${WOCHENTAGE[w]}`);
+    k.setAttribute('aria-label', w == null ? t('p-serie.ruhetag.keinLabel') : t('p-serie.ruhetag.label', { tag: WOCHENTAGE[w] }));
     k.dataset.wert = w == null ? '' : String(w);
     k.addEventListener('click', () => {
       for (const x of box.children) x.setAttribute('aria-checked', String(x === k));
@@ -370,28 +391,33 @@ function ruhetagWahl({ einst, beiRuhetag }) {
   return box;
 }
 
+// pauseAb ist 'heute' oder 'morgen' (Kennung aus index.js), angezeigt in der eingestellten Sprache
+function abText(ab) {
+  return ab === 'morgen' ? t('p-serie.pause.ab.morgen') : t('p-serie.pause.ab.heute');
+}
+
 function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb = 'heute' }) {
   const box = el('div', 'se-pause');
   const kommend = st.pausen.filter((k) => k >= heute);
   const info = el('p', 'se-p-info');
   if (kommend.length) {
-    info.textContent = `Pause angesagt: ${datumKurz(kommend[0])} bis ${datumKurz(kommend[kommend.length - 1])} (${kommend.length} ${kommend.length === 1 ? 'Tag' : 'Tage'}). Die Serie ist dann eingefroren.`;
+    info.textContent = t('p-serie.pause.angesagt', { von: datumKurz(kommend[0]), bis: datumKurz(kommend[kommend.length - 1]), n: kommend.length });
   } else {
-    info.textContent = `Urlaub oder krank? Sag eine Pause ab ${pauseAb} an, dann ist die Serie eingefroren. Dieses Jahr sind noch ${pauseRest} von ${T.PAUSE_JAHR_MAX} Pausentagen frei.`;
+    info.textContent = t('p-serie.pause.info', { ab: abText(pauseAb), rest: pauseRest, max: T.PAUSE_JAHR_MAX });
   }
   box.append(info);
   const reihe = el('div', 'se-p-knoepfe');
   if (kommend.length && typeof beiPauseEnde === 'function') {
-    const k = el('button', 'knopf se-p-ende dr', 'Pause beenden');
+    const k = el('button', 'knopf se-p-ende dr', esc(t('p-serie.pause.beenden')));
     k.type = 'button';
     k.addEventListener('click', beiPauseEnde);
     reihe.append(k);
   } else if (typeof beiPause === 'function' && pauseRest > 0) {
     for (const n of [1, 3, 7, 14].filter((x) => x <= pauseRest)) {
-      const k = el('button', 'knopf se-p-tage dr', `${n} ${n === 1 ? 'Tag' : 'Tage'}`);
+      const k = el('button', 'knopf se-p-tage dr', esc(t('p-serie.pause.tage', { n })));
       k.type = 'button';
       k.dataset.tage = String(n);
-      k.setAttribute('aria-label', `Pause ab ${pauseAb} für ${n} ${n === 1 ? 'Tag' : 'Tage'} ansagen`);
+      k.setAttribute('aria-label', t('p-serie.pause.label', { ab: abText(pauseAb), n }));
       k.addEventListener('click', () => beiPause(n));
       reihe.append(k);
     }
@@ -402,16 +428,8 @@ function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb = 
 
 function regeln() {
   const d = el('details', 'se-regeln');
-  d.innerHTML = `<summary>So zählt der Bauernmarsch</summary>
-    <p>Ein Tag reicht von 4 Uhr bis 4 Uhr. Er zählt mit einem Tageswerk: eine Partie ab 10 eigenen Zügen (egal welche Art),
-    3 Karteikarten, 2 Übungen „Ab hier nochmal“, 3 Rätsel oder eine Lektion. Partien mit Hilfe zählen auch. Bloßes Öffnen zählt nie.</p>
-    <p>Ein freier Tag ist nie schlimm: Er wird zur Brücke. Erst zwei freie Tage hintereinander lassen die Serie ruhen. Dein Ruhetag und eine
-    angesagte Pause zählen nie als freier Tag. Ruht die Serie, beginnt das nächste Tageswerk ein neues Kapitel; Rekord, Figuren und Spieltage bleiben.</p>
-    <p>Jeder Schachtag schiebt deinen Bauern ein Feld vor, nach 6 Feldern wandelt er sich um. Doppelschritt: am ersten Tag nach mindestens
-    zwei Tagen ohne Tageswerk, höchstens einmal im Monat. Der Bauer läuft nie zurück.</p>
-    <p>Siegeslauf: Siege in Folge gegen Gegner ab einer Stufe unter deinem höchsten freigeschalteten Bot (später: ab deiner Wertung minus 150).
-    Partien mit Hilfe, gegen schwächere Gegner, Übungen, freie und Boss-Partien zählen nicht und beenden nichts. Ab 3 Siegen eine Flamme.</p>
-    <p>Die Serie bringt keine Funken, ändert keine Bots, Wertung oder Sterne und ist nie in einer Rangliste.</p>`;
+  d.innerHTML = `<summary>${esc(t('p-serie.regeln.titel'))}</summary>`
+    + ['tag', 'frei', 'bauer', 'lauf', 'ohne'].map((k) => `\n    <p>${esc(t('p-serie.regeln.' + k))}</p>`).join('');
   return d;
 }
 
@@ -419,14 +437,14 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
   const box = el('div', 'se-blatt-inhalt');
   const kopf = el('div', 'se-b-kopf');
   let titel;
-  if (lage.art === 'neu') titel = 'Noch kein Schachtag';
-  else if (lage.art === 'ruht') titel = `Ruht · Rekord ${zahl(lage.best)} · Kapitel ${lage.kapitel}`;
-  else titel = `${schachtage(lage.aktuell)} · Rekord ${zahl(lage.best)} · Kapitel ${lage.kapitel}`;
+  if (lage.art === 'neu') titel = t('p-serie.blatt.neu');
+  else if (lage.art === 'ruht') titel = t('p-serie.blatt.ruht', { best: zahl(lage.best), kapitel: lage.kapitel });
+  else titel = t('p-serie.blatt.laeuft', { schachtage: schachtage(lage.aktuell), best: zahl(lage.best), kapitel: lage.kapitel });
   const unter = [];
   if (lage.art === 'laeuft' && lage.seit) {
-    unter.push(`seit ${datumKurz(lage.seit)}, ${lage.bruecken ? `${lage.bruecken} ${lage.bruecken === 1 ? 'Brücke' : 'Brücken'}` : 'ohne Brücke'}`);
+    unter.push(t('p-serie.blatt.seit', { datum: datumKurz(lage.seit), bruecken: lage.bruecken ? t('p-serie.blatt.bruecken', { n: lage.bruecken }) : t('p-serie.blatt.ohneBruecke') }));
   }
-  if (lage.art === 'ruht') unter.push(`Das nächste Tageswerk beginnt Kapitel ${lage.naechstesKapitel}.`);
+  if (lage.art === 'ruht') unter.push(t('p-serie.blatt.naechstes', { kapitel: lage.naechstesKapitel }));
   unter.push(bisText(lage.bisUmwandlung));
   kopf.innerHTML = `<span class="se-b-symbol" aria-hidden="true">${icon('se-bauer', 'se-ico')}</span><div><b class="se-b-titel"></b><span class="se-b-unter"></span></div>`;
   kopf.querySelector('.se-b-titel').textContent = titel;
@@ -434,52 +452,56 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
   box.append(kopf);
 
   const marsch = el('section', 'se-b-teil');
-  marsch.innerHTML = `<h4 class="se-b-ueber">Bauernmarsch</h4>${streifenHtml({ feld: lage.feld, heute: lage.heuteGezaehlt ? 'gezaehlt' : (lage.art === 'ruht' ? null : 'offen') })}`;
+  marsch.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.name'))}</h4>${streifenHtml({ feld: lage.feld, heute: lage.heuteGezaehlt ? 'gezaehlt' : (lage.art === 'ruht' ? null : 'offen') })}`;
   const umw = st.bretter * T.BRETT + st.figuren.length;
   const info = el('p', 'se-b-text');
-  info.textContent = umw ? `${umw} ${umw === 1 ? 'Umwandlung' : 'Umwandlungen'}${st.bretter ? `, ${st.bretter} ${st.bretter === 1 ? 'volles Brett' : 'volle Bretter'}` : ''}. Jede Figur zieht mit Datum in deine Ehrenreihe.`
-    : 'Nach 6 Feldern wandelt sich dein Bauer um, und die Figur zieht in deine Ehrenreihe.';
+  info.textContent = umw ? (st.bretter
+    ? t('p-serie.blatt.umwInfoBretter', { umw: t('p-serie.blatt.umw', { n: umw }), bretter: t('p-serie.blatt.bretter', { n: st.bretter }) })
+    : t('p-serie.blatt.umwInfo', { umw: t('p-serie.blatt.umw', { n: umw }) }))
+    : t('p-serie.blatt.umwKeine');
   marsch.append(info);
   if (umw) marsch.append(ehrenreihen(st));
   if (lage.offeneWahl > 0 && typeof beiWahl === 'function') marsch.append(wahlBlock({ beiWahl, nr: offeneNr(st) }));
   box.append(marsch);
 
   const kal = el('section', 'se-b-teil');
-  kal.innerHTML = '<h4 class="se-b-ueber">Kalender</h4>';
+  kal.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.kalender'))}</h4>`;
   kal.append(kalenderTabelle(wochen));
   const leg = el('p', 'se-legende');
-  leg.innerHTML = `<span>${icon('se-bauer', 'se-ico')} Schachtag</span><span><i class="se-l-bruecke"></i> Brücke</span><span>${icon('se-mond', 'se-ico')} Ruhetag</span>`
-    + `<span>${icon('se-liege', 'se-ico')} Pause</span><span>leer: frei, nie rot</span>`;
+  const legende = (k) => esc(t('p-serie.blatt.legende.' + k));
+  leg.innerHTML = `<span>${icon('se-bauer', 'se-ico')} ${legende('schachtag')}</span><span><i class="se-l-bruecke"></i> ${legende('bruecke')}</span><span>${icon('se-mond', 'se-ico')} ${legende('ruhetag')}</span>`
+    + `<span>${icon('se-liege', 'se-ico')} ${legende('pause')}</span><span>${legende('leer')}</span>`;
   kal.append(leg);
   box.append(kal);
 
   const zahlen = el('dl', 'se-b-zahlen');
-  const ringText = ring.n > 0 ? `${ring.n} volle ${ring.n === 1 ? 'Woche' : 'Wochen'} in Folge (Rekord ${ring.best})`
-    : `diese Woche ${Math.min(ring.woche.gezaehlt, ring.woche.noetig)} von ${ring.woche.noetig} Tagen`;
+  const ringText = ring.n > 0 ? t('p-serie.blatt.ring', { n: ring.n, best: ring.best })
+    : t('p-serie.blatt.ringWoche', { gezaehlt: Math.min(ring.woche.gezaehlt, ring.woche.noetig), noetig: ring.woche.noetig });
   const lauf = st.lauf;
-  const laufInhalt = lauf.n > 0 ? `${laufText(lauf.n)} · Rekord ${lauf.best}` : lauf.best > 0 ? `Rekord ${lauf.best}` : 'noch kein Lauf';
-  zahlen.innerHTML = `<dt>Wochen-Ring</dt><dd class="se-b-ring"></dd><dt>Spieltage gesamt</dt><dd class="zahl">${zahl(st.gesamt)}</dd>`
-    + `<dt>Siegeslauf</dt><dd class="se-b-lauf"></dd>`;
+  const laufInhalt = lauf.n > 0 ? t('p-serie.blatt.laufRekord', { lauf: laufText(lauf.n), best: lauf.best })
+    : lauf.best > 0 ? t('p-serie.rekord', { wert: lauf.best }) : t('p-serie.blatt.keinLauf');
+  zahlen.innerHTML = `<dt>${esc(t('p-serie.blatt.wochenRing'))}</dt><dd class="se-b-ring"></dd><dt>${esc(t('p-serie.blatt.gesamt'))}</dt><dd class="zahl">${zahl(st.gesamt)}</dd>`
+    + `<dt>${esc(t('p-serie.lauf.name'))}</dt><dd class="se-b-lauf"></dd>`;
   zahlen.querySelector('.se-b-ring').textContent = ringText;
   zahlen.querySelector('.se-b-lauf').innerHTML = `${lauf.n >= LA.FLAMME_AB ? icon('se-flamme', 'se-ico') : ''}<span></span>`;
   zahlen.querySelector('.se-b-lauf span').textContent = laufInhalt;
   if (st.plaketten.length) {
     const p = st.plaketten[0];
-    zahlen.insertAdjacentHTML('beforeend', '<dt>Letzte Plakette</dt><dd class="se-b-plakette"></dd>');
-    zahlen.querySelector('.se-b-plakette').textContent = `${schachtage(p.n)}, ${datumKurz(p.von)} bis ${datumKurz(p.bis)}`;
+    zahlen.insertAdjacentHTML('beforeend', `<dt>${esc(t('p-serie.blatt.plakette'))}</dt><dd class="se-b-plakette"></dd>`);
+    zahlen.querySelector('.se-b-plakette').textContent = t('p-serie.blatt.plaketteText', { schachtage: schachtage(p.n), von: datumKurz(p.von), bis: datumKurz(p.bis) });
   }
   box.append(zahlen);
   const kap = kapitelBalken(st, lage);
   if (kap) {
     const teil = el('section', 'se-b-teil');
-    teil.innerHTML = '<h4 class="se-b-ueber">Kapitel</h4>';
+    teil.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.kapitel'))}</h4>`;
     teil.append(kap);
     box.append(teil);
   }
   const ein = el('section', 'se-b-teil');
-  ein.innerHTML = '<h4 class="se-b-ueber">Ruhetag</h4><p class="se-b-text">Dein Ruhetag zählt nie als freier Tag.</p>';
+  ein.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.ruhetag.name'))}</h4><p class="se-b-text">${esc(t('p-serie.blatt.ruhetagText'))}</p>`;
   ein.append(ruhetagWahl({ einst, beiRuhetag }));
-  const pz = el('h4', 'se-b-ueber', 'Pause ansagen');
+  const pz = el('h4', 'se-b-ueber', esc(t('p-serie.blatt.pause')));
   ein.append(pz, pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb }));
   box.append(ein);
   box.append(regeln());
@@ -488,12 +510,12 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
 
 // ---------- Blatt ----------
 let offen = null;
-export function oeffneBlatt(inhalt, { titel = 'Bauernmarsch' } = {}) {
+export function oeffneBlatt(inhalt, { titel = t('p-serie.name') } = {}) {
   if (offen) offen.schliesse();
   const ort = el('div', 'sheet-ort se-blatt-ort');
   ort.innerHTML = `<div class="sheet-schleier"></div><div class="sheet-karte se-blatt" role="dialog" aria-modal="true" aria-labelledby="se-blatt-titel">
     <div class="sheet-griff" aria-hidden="true"></div><h3 id="se-blatt-titel"></h3><div class="se-blatt-rumpf"></div>
-    <div class="se-blatt-knoepfe"><button class="knopf gross dr se-schliessen" type="button">Schließen</button></div></div>`;
+    <div class="se-blatt-knoepfe"><button class="knopf gross dr se-schliessen" type="button">${esc(t('allgemein.schliessen'))}</button></div></div>`;
   ort.querySelector('h3').textContent = titel;
   ort.querySelector('.se-blatt-rumpf').append(inhalt);
   const karte = ort.querySelector('.sheet-karte');
@@ -575,16 +597,16 @@ export function einstellungsGruppe({ einst, beiAenderung } = {}) {
   const g = el('section', 'es-gruppe flaeche se-es');
   g.dataset.paket = 'serie';
   g.setAttribute('aria-labelledby', 'se-es-titel');
-  g.innerHTML = '<h3 class="es-titel" id="se-es-titel">Bauernmarsch</h3>';
+  g.innerHTML = `<h3 class="es-titel" id="se-es-titel">${esc(t('p-serie.name'))}</h3>`;
   const aendere = (teil) => { if (typeof beiAenderung === 'function') beiAenderung(teil); };
-  g.append(schalterZeile({ key: 'anzeigen', titel: 'Serie anzeigen', text: 'Chip im Kopf, Heute-Karte und Abrechnung. Gezählt wird auch ausgeblendet.',
+  g.append(schalterZeile({ key: 'anzeigen', titel: t('p-serie.es.anzeigen'), text: t('p-serie.es.anzeigenText'),
     an: einst.anzeigen, beiWechsel: (an) => aendere({ anzeigen: an }) }));
-  g.append(schalterZeile({ key: 'strenge', titel: 'Strenge Serie', text: 'Statt Brücken gelten 2 Schonungstage im Monat.',
+  g.append(schalterZeile({ key: 'strenge', titel: t('p-serie.es.strenge'), text: t('p-serie.es.strengeText'),
     an: einst.strenge, beiWechsel: (an) => aendere({ strenge: an }) }));
-  g.append(schalterZeile({ key: 'leise', titel: 'Leise Serie', text: 'Im Kopf steht der Wochen-Ring statt der Tage.',
+  g.append(schalterZeile({ key: 'leise', titel: t('p-serie.es.leise'), text: t('p-serie.es.leiseText'),
     an: einst.leise, beiWechsel: (an) => aendere({ leise: an }) }));
   const rt = el('div', 'se-es-ruhetag');
-  rt.innerHTML = '<b>Ruhetag</b><span>Zählt nie als freier Tag. Standard: keiner.</span>';
+  rt.innerHTML = `<b>${esc(t('p-serie.ruhetag.name'))}</b><span>${esc(t('p-serie.es.ruhetagText'))}</span>`;
   rt.append(ruhetagWahl({ einst, beiRuhetag: (w) => aendere({ ruhetag: w }) }));
   g.append(rt);
   return g;

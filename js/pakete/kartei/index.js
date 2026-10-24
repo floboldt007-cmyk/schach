@@ -27,13 +27,18 @@ import { ladeModul, speichereModul, ladePartien, hatReview, ladeReview } from '.
 import { botNachId } from '../../bots.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { miniBrett } from '../../ui/bauteile.js';
+import { sanAnzeige } from '../../review.js';
 import { tagSchluessel, tageZwischen, wochentag } from '../../tag.js';
 import { registriereRaetselQuelle } from '../../ui/raetsel.js';
+import { t } from '../../sprache.js';
 import * as L from './logik.js';
+import './texte.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// wochentag() aus tag.js: 0 = Montag
-const WOCHENTAG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+// wochentag() aus tag.js: 0 = Montag; Name in der eingestellten Sprache (p-kartei.wochentag.0..6)
+function wochentagName(k) {
+  return t('p-kartei.wochentag.' + wochentag(k));
+}
 const NACHTRAG_MS = 2500;
 
 function sicher(fn, wo) {
@@ -139,8 +144,9 @@ function quelle() {
   // Antworten dieser Sitzung (fuer die Zusammenfassung); je Oeffnen neu
   let sitzung = [];
   return {
-    titel: 'Fehler wiederholen',
-    unter: 'Fehler-Kartei',
+    // Getter: der Raetsel-Bildschirm liest Titel und Unterzeile erst beim Oeffnen (Sprache von dann)
+    get titel() { return t('p-kartei.titel'); },
+    get unter() { return t('p-kartei.name'); },
     liste() {
       sitzung = [];
       const tag = heute();
@@ -166,8 +172,8 @@ function quelle() {
     leer() {
       const u = L.uebersicht(roh(), heute());
       return u.stand.gesamt
-        ? { titel: 'Stapel leer. Gut gemacht.', text: naechsteText(u.naechster) }
-        : { titel: 'Noch keine Karten', text: 'Nach jeder analysierten Partie werden bis zu drei deiner Fehler hier zu Karten.' };
+        ? { titel: t('p-kartei.karte.leerGut'), text: naechsteText(u.naechster) }
+        : { titel: t('p-kartei.karte.keine'), text: t('p-kartei.karte.keineText') };
     },
   };
 }
@@ -176,9 +182,9 @@ function naechsteText(n) {
   const tag = heute();
   if (!n || n === tag) return '';
   const tage = tageZwischen(tag, n);
-  if (tage === 1) return 'Die nächste Karte kommt morgen.';
-  if (tage > 1 && tage < 7) return `Die nächste Karte kommt am ${WOCHENTAG[wochentag(n)]}.`;
-  return tage > 1 ? `Die nächste Karte kommt in ${tage} Tagen.` : '';
+  if (tage === 1) return t('p-kartei.naechste.morgen');
+  if (tage > 1 && tage < 7) return t('p-kartei.naechste.am', { tag: wochentagName(n) });
+  return tage > 1 ? t('p-kartei.naechste.in', { n: tage }) : '';
 }
 
 // ---------- Elemente ----------
@@ -201,37 +207,37 @@ function trainingKarte(app) {
   el.className = 't-karte kt-karte';
   el.dataset.paket = L.PAKET;
   el.dataset.faellig = String(st.faellig);
-  el.setAttribute('aria-label', 'Fehler-Kartei');
+  el.setAttribute('aria-label', t('p-kartei.name'));
   if (st.faellig > 0) {
     const zeigen = faellig.slice(0, 4);
-    el.innerHTML = `<span class="ueberzeile">Fehler-Kartei</span>
+    el.innerHTML = `<span class="ueberzeile">${esc(t('p-kartei.name'))}</span>
       <div class="kartei-stapel kt-stapel" data-anzahl="${zeigen.length}">${zeigen.map((k) =>
-        `<div class="kk" data-farbe="${k.farbe}">${mini(k)}${k.san ? `<em>${esc(k.san)}</em>` : ''}</div>`).join('')}</div>
-      <h2>Fehler wiederholen · ${st.faellig} fällig</h2>
-      <p>Deine eigenen Fehler als Karten. Jede kommt wieder, bis sie sitzt.</p>
+        `<div class="kk" data-farbe="${k.farbe}">${mini(k)}${k.san ? `<em>${esc(sanAnzeige(k.san))}</em>` : ''}</div>`).join('')}</div>
+      <h2>${esc(L.stapelText(st))}</h2>
+      <p>${esc(t('p-kartei.karte.text'))}</p>
       <div class="t-fuss"><span class="kt-zahlen">${zahlenText(st)}</span>
-        <button class="knopf dr kt-los" type="button">Üben${icon('vor')}</button></div>`;
+        <button class="knopf dr kt-los" type="button">${esc(t('p-kartei.ueben'))}${icon('vor')}</button></div>`;
     el.querySelector('.kt-los').addEventListener('click', (ev) => oeffne(app, ev));
   } else if (st.gesamt > 0) {
     el.classList.add('kt-ruhig');
-    el.innerHTML = `<span class="ueberzeile">Fehler-Kartei</span>
+    el.innerHTML = `<span class="ueberzeile">${esc(t('p-kartei.name'))}</span>
       <span class="kt-symbol" aria-hidden="true">${icon('haken')}</span>
-      <h2>Stapel leer. Gut gemacht.</h2>
-      <p>${esc(naechsteText(naechster) || 'Für heute ist alles geübt.')}</p>
+      <h2>${esc(t('p-kartei.karte.leerGut'))}</h2>
+      <p>${esc(naechsteText(naechster) || t('p-kartei.karte.allesGeuebt'))}</p>
       <div class="t-fuss"><span class="kt-zahlen">${zahlenText(st)}</span></div>`;
   } else {
     el.classList.add('kt-ruhig', 'kt-leer');
-    el.innerHTML = `<span class="ueberzeile">Fehler-Kartei</span>
+    el.innerHTML = `<span class="ueberzeile">${esc(t('p-kartei.name'))}</span>
       <span class="kt-symbol" aria-hidden="true">${icon('kartei')}</span>
-      <h2>Noch keine Karten</h2>
-      <p>Nach jeder analysierten Partie werden bis zu drei deiner Fehler hier zu Karten. Sie kommen wieder, bis sie sitzen.</p>`;
+      <h2>${esc(t('p-kartei.karte.keine'))}</h2>
+      <p>${esc(t('p-kartei.karte.keineTextLang'))}</p>`;
   }
   return el;
 }
 
 function zahlenText(st) {
-  const teile = [`${st.gesamt} im Training`];
-  if (st.gemeistert) teile.push(`${st.gemeistert} für immer gelöst`);
+  const teile = [t('p-kartei.zahlen.training', { n: st.gesamt })];
+  if (st.gemeistert) teile.push(t('p-kartei.zahlen.gemeistert', { n: st.gemeistert }));
   return esc(teile.join(' · '));
 }
 
@@ -242,8 +248,8 @@ function heuteZeile(app, tag) {
   el.className = 'kt-heute';
   el.dataset.paket = L.PAKET;
   el.innerHTML = `<span class="kt-heute-symbol" aria-hidden="true">${icon('kartei')}</span>
-    <span class="kt-heute-text"><b>Fehler wiederholen</b> · ${st.faellig} fällig</span>
-    <button class="knopf dr kt-heute-los" type="button">Üben</button>`;
+    <span class="kt-heute-text"><b>${esc(t('p-kartei.titel'))}</b> · ${esc(t('p-kartei.faellig', { n: st.faellig }))}</span>
+    <button class="knopf dr kt-heute-los" type="button">${esc(t('p-kartei.ueben'))}</button>`;
   el.querySelector('.kt-heute-los').addEventListener('click', (ev) => oeffne(app, ev));
   return el;
 }

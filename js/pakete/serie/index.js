@@ -29,6 +29,8 @@ import { registriereIcon } from '../../ui/icons.js';
 import { ladeFortschritt, hoechsteFreieStufe, ladePartien, eigeneZuege } from '../../storage.js';
 import { tagSchluessel, addiereTage } from '../../tag.js';
 import { klang } from '../../sounds.js';
+import { t } from '../../sprache.js';
+import './texte.js';
 import * as T from './tag.js';
 import * as LA from './lauf.js';
 import * as S from './stand.js';
@@ -77,22 +79,18 @@ function sendeStand(st, { meilenstein = null } = {}) {
 }
 
 // ---------- Feier ----------
-const BRIEFE = {
-  7: ['benno', 'Sieben Schachtage! Bei uns auf dem Hof sagt man: Wer jeden Tag ein bisschen sät, hat bald ein ganzes Feld.'],
-  30: ['hilde', 'Dreißig Tage! Das ist länger, als mein Sauerteig je durchgehalten hat.'],
-  100: ['rudi', 'Hundert Schachtage! Ich lasse ein Banner sticken. So eines hat mein Ross noch nie getragen.'],
-  365: ['greta', 'Ein ganzes Jahr Schach. Ich habe nachgerechnet: Das ist kein Zufall mehr.'],
-};
+// Absender der Briefe zu den Meilensteinen; der Text steht im Woerterbuch (p-serie.brief.<n>)
+const BRIEFE = { 7: 'benno', 30: 'hilde', 100: 'rudi', 365: 'greta' };
 function briefText(n) {
   const b = BRIEFE[n];
   if (!b) return null;
-  const bot = botNachId(b[0]);
-  return `Post von ${bot && bot.name ? bot.name : 'einem Bot'}: „${b[1]}“`;
+  const bot = botNachId(b);
+  return t('p-serie.brief.post', { name: bot && bot.name ? bot.name : t('p-serie.brief.einemBot'), text: t('p-serie.brief.' + n) });
 }
 
 function beweisFuer(st, r) {
   if (!r.plakette) return null;
-  if (r.meilenstein < T.BEWEIS_AB) return `${T.datumText(r.plakette.von)} bis ${T.datumText(r.plakette.bis)}`;
+  if (r.meilenstein < T.BEWEIS_AB) return t('p-serie.zeitraum', { von: T.datumText(r.plakette.von), bis: T.datumText(r.plakette.bis) });
   const partien = sicher(() => ladePartien().map((p) => ({
     datum: p.datum, genauigkeit: p.genauigkeit, liveKlassen: p.liveKlassen, eigeneZuege: eigeneZuege(p), modus: p.modus,
   })), 'Beweis') || [];
@@ -106,13 +104,13 @@ function feiern(st, r, partieId, einst) {
   }
   if (r.umwandlungen.length) {
     const nr = r.umwandlungen[r.umwandlungen.length - 1];
-    melde({ partieId, quelle: 'umwandlung', titel: `Umwandlung! Deine ${nr}. Figur zieht in die Ehrenreihe.`,
-      text: 'Wähle sie in der Arena: Dame, Turm, Läufer oder Springer.', symbol: 'se-bauer', klang: 'umwandlung' });
+    melde({ partieId, quelle: 'umwandlung', titel: t('p-serie.feier.umwandlung', { nr }),
+      text: t('p-serie.feier.umwandlungText'), symbol: 'se-bauer', klang: 'umwandlung' });
   }
   // ausserhalb einer Partie (Raetsel, Kartei, Uebung, Lektion): eine Zeile fuer die Nachlese
   if (!partieId) {
-    const text = (r.doppelschritt ? 'Willkommen zurück. Doppelschritt. ' : '') + A.bisText(T.FELDER - (st.felder % T.FELDER));
-    melde({ partieId: null, quelle: 'marsch', titel: `Tag ${r.aktuell} der Serie`, text, symbol: 'se-bauer', klang: 'bauer' });
+    const text = (r.doppelschritt ? t('p-serie.doppelKurz') + ' ' : '') + A.bisText(T.FELDER - (st.felder % T.FELDER));
+    melde({ partieId: null, quelle: 'marsch', titel: t('p-serie.feier.marsch', { n: r.aktuell }), text, symbol: 'se-bauer', klang: 'bauer' });
   }
 }
 
@@ -181,8 +179,8 @@ function partieBeendet(d) {
   });
   S.speichere(st);
   if (lb.meilenstein && einst.anzeigen) {
-    sicher(() => melde({ partieId: d.partieId, quelle: 'siegeslauf', titel: `Siegeslauf ${lb.meilenstein} · Flamme`,
-      text: `${A.laufText(lb.meilenstein)} gegen Gegner auf Augenhöhe.`, symbol: 'se-flamme' }), 'Siegeslauf');
+    sicher(() => melde({ partieId: d.partieId, quelle: 'siegeslauf', titel: t('p-serie.lauf.feierTitel', { n: lb.meilenstein }),
+      text: t('p-serie.lauf.feierText', { lauf: A.laufText(lb.meilenstein) }), symbol: 'se-flamme' }), 'Siegeslauf');
   }
   if (r || lb.wirkung === 'sieg' || lb.wirkung === 'ende') nachZaehlen(st, r, { partieId: d.partieId, einst, meilensteinLauf: null });
 }
@@ -204,18 +202,18 @@ function lernen(art, schluessel) {
 // ---------- Oberflaeche ----------
 function botName(id) {
   const b = botNachId(id);
-  return b && b.name ? b.name : 'Gegner';
+  return b && b.name ? b.name : t('p-serie.gegner');
 }
 
 function heuteTexte(st, h, einst) {
-  const t = {};
-  if (st.brief && st.brief.tag === h) t.brief = briefText(st.brief.n);
-  if (st.ms66 === h) t.gewohnheit = '66 Schachtage: laut einer Studie der Median, ab dem eine Gewohnheit von selbst läuft. Deine Serie darf jetzt leiser werden.';
+  const aus = {};
+  if (st.brief && st.brief.tag === h) aus.brief = briefText(st.brief.n);
+  if (st.ms66 === h) aus.gewohnheit = t('p-serie.hinweis.gewohnheit');
   for (const x of st.hinweise.filter((y) => y.tag === h)) {
-    if (x.art === 'doppel') t.doppel = 'Willkommen zurück. Doppelschritt: Dein Bauer ist zwei Felder gezogen.';
-    if (x.art === 'gesamt') t.gesamt = `${x.n} Spieltage gesamt. Diese Zahl sinkt nie.`;
+    if (x.art === 'doppel') aus.doppel = t('p-serie.hinweis.doppel');
+    if (x.art === 'gesamt') aus.gesamt = t('p-serie.hinweis.gesamt', { wert: x.n });
   }
-  return t;
+  return aus;
 }
 
 function anbieterHeute(k) {
@@ -286,7 +284,7 @@ function zeigeBlatt() {
       }, 'Wahl'),
     });
   };
-  const blatt = A.oeffneBlatt(baue(), { titel: 'Bauernmarsch' });
+  const blatt = A.oeffneBlatt(baue(), { titel: t('p-serie.name') });
   function neu() { if (blatt && A.offenesBlatt() === blatt) blatt.ersetze(baue()); }
 }
 
