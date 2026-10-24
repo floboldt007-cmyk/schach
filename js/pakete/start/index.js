@@ -21,6 +21,7 @@
 // Speicher:   Modul "start" (Budget 6.000, logik.js), Paket-Einstellungen "start" { hinweise: true }.
 // Test:       zustand() -> { modul, einstellungen, hinweis, training }   hinweis: der Hinweis des Tages (auch wenn die Zeile
 //             gerade zuruecktritt), training: letzter training:stand
+// Texte:      t('p-start.x') aus texte.js (Englische Version, Teil 2), erst beim Zeichnen.
 // Ein Fehler im Paket stoppt nie die App: jeder Anbieter liefert im Zweifel null.
 import { anbieten, angeboten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
@@ -30,10 +31,13 @@ import { BOTS, botNachId } from '../../bots.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { schalter } from '../../ui/bauteile.js';
 import { anim, tempo } from '../../bewegung.js';
+import { t } from '../../sprache.js';
 import * as D from './dienst.js';
 import * as L from './logik.js';
+import './texte.js';
 
 const sicher = D.sicher;
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let letzterHinweis = null;
 // letzter Stand des Trainings (Ereignis training:stand { faellig, gesamt, gemeistert }), null: niemand hat gemeldet
 let trainingStand = null;
@@ -81,9 +85,9 @@ function neuZeile(k) {
   el.dataset.entdeckung = e.id;
   // die ganze Zeile fuehrt hin (SPIELKONZEPT 3.16 "Antippen fuehrt hin"), daneben nur das Kreuz zum Ausblenden
   el.innerHTML = `<button class="st-neu-los dr" type="button"><span class="st-neu-siegel" aria-hidden="true">${icon('neu-siegel')}</span>
-    <span class="st-neu-text"><span class="st-neu-kopf"><b>Neu für dich:</b> <span class="st-neu-titel"></span></span> <small></small></span>
+    <span class="st-neu-text"><span class="st-neu-kopf"><b>${esc(t('p-start.neu.kopf'))}</b> <span class="st-neu-titel"></span></span> <small></small></span>
     <span class="st-neu-pfeil" aria-hidden="true">${icon('vor')}</span></button>
-    <button class="icon-knopf dr st-neu-weg" type="button" aria-label="Hinweis ausblenden">${icon('kreuz')}</button>`;
+    <button class="icon-knopf dr st-neu-weg" type="button" aria-label="${esc(t('p-start.neu.weg'))}">${icon('kreuz')}</button>`;
   el.querySelector('.st-neu-titel').textContent = e.titel;
   el.querySelector('small').textContent = e.text;
   const erledigt = () => D.aendere((x) => L.erledige(x, e.id));
@@ -110,30 +114,30 @@ function neuZeile(k) {
 }
 
 // ---------- Einstellungen: Gruppe "Erste Schritte" ----------
-const tagText = (t) => (typeof t === 'string' && t.length === 10 ? `${t.slice(8, 10)}.${t.slice(5, 7)}.` : '');
+const tagText = (tag) => (typeof tag === 'string' && tag.length === 10 ? t('p-start.tag', { tag: tag.slice(8, 10), monat: tag.slice(5, 7) }) : '');
 
 function gruppe(app) {
   const el = document.createElement('section');
   el.className = 'es-gruppe flaeche st-gruppe';
   el.dataset.paket = L.PAKET;
   el.setAttribute('aria-labelledby', 'st-g-titel');
-  el.innerHTML = `<h3 class="es-titel" id="st-g-titel">Erste Schritte</h3>
-    <div class="st-g-zeile st-g-hinweise"><div class="st-g-text"><b id="st-g-hinweise">Neu für dich</b>
-      <span>In den ersten vier Wochen höchstens ein Hinweis am Tag in der Heute-Karte. Aus: alles auf einmal, ohne Hinweise.</span></div></div>
-    <div class="st-g-zeile st-g-einstufung"><div class="st-g-text"><b>Einstufung</b><span class="st-g-stand"></span></div>
+  el.innerHTML = `<h3 class="es-titel" id="st-g-titel">${esc(t('p-start.gruppe.titel'))}</h3>
+    <div class="st-g-zeile st-g-hinweise"><div class="st-g-text"><b id="st-g-hinweise">${esc(t('p-start.gruppe.neu'))}</b>
+      <span>${esc(t('p-start.gruppe.neuText'))}</span></div></div>
+    <div class="st-g-zeile st-g-einstufung"><div class="st-g-text"><b>${esc(t('p-start.gruppe.einstufung'))}</b><span class="st-g-stand"></span></div>
       <button class="knopf dr st-g-einstufen" type="button"></button></div>
-    <div class="st-g-knoepfe"><button class="knopf dr st-g-willkommen" type="button">Willkommen ansehen</button>
-      <button class="knopf dr st-g-regeln" type="button">Regel-Hilfe</button></div>`;
-  const s = schalter({ name: 'start-hinweise', an: D.einstellungen().hinweise, label: 'Neu für dich',
+    <div class="st-g-knoepfe"><button class="knopf dr st-g-willkommen" type="button">${esc(t('p-start.gruppe.willkommen'))}</button>
+      <button class="knopf dr st-g-regeln" type="button">${esc(t('p-start.gruppe.regeln'))}</button></div>`;
+  const s = schalter({ name: 'start-hinweise', an: D.einstellungen().hinweise, label: t('p-start.gruppe.neu'),
     beiWechsel: (an) => sicher(() => D.setzeEinstellungen({ hinweise: !!an }), 'Einstellung') });
   s.el.setAttribute('aria-labelledby', 'st-g-hinweise');
   el.querySelector('.st-g-hinweise').append(s.el);
   const em = sicher(() => D.aktuelleEmpfehlung(), 'Empfehlung');
   el.querySelector('.st-g-stand').textContent = em
-    ? `${tagText(em.tag)} · ${em.e.geloest} von ${em.e.gesamt} gelöst · Empfehlung ${em.bot.name}`
-    : '8 kurze Aufgaben, danach ein passender Gegner. Wertet nichts.';
+    ? t('p-start.gruppe.stand', { tag: tagText(em.tag), geloest: em.e.geloest, gesamt: em.e.gesamt, name: em.bot.name })
+    : t('p-start.gruppe.standLeer');
   const k = el.querySelector('.st-g-einstufen');
-  k.textContent = em ? 'Zur Empfehlung' : 'Einstufung machen';
+  k.textContent = em ? t('p-start.gruppe.zurEmpfehlung') : t('p-start.gruppe.einstufen');
   k.addEventListener('click', () => sicher(() => app.gehe('start', { seite: em ? 'empfehlung' : 'einstufung' }), 'Einstufung'));
   el.querySelector('.st-g-willkommen').addEventListener('click', () => sicher(() => app.gehe('start', { seite: 'w1' }), 'Willkommen'));
   el.querySelector('.st-g-regeln').addEventListener('click', () => sicher(() => app.gehe('raetsel', { quelle: D.QUELLE_REGELN }), 'Regeln'));
@@ -195,8 +199,9 @@ function registriere() {
       const bot = botNachId(d.botId);
       const n = Number.isInteger(d.eigeneZuege) ? d.eigeneZuege : 0;
       melde({
-        partieId: d.partieId || null, quelle: 'erster-sieg', titel: 'Dein erster Sieg',
-        text: bot ? `Gegen ${bot.name}${n ? `, in ${n} ${n === 1 ? 'Zug' : 'Zügen'}` : ''}` : undefined, symbol: 'pokal', klang: 'rekord',
+        partieId: d.partieId || null, quelle: 'erster-sieg', titel: t('p-start.sieg.titel'),
+        text: bot ? (n ? t('p-start.sieg.zuege', { name: bot.name, n }) : t('p-start.sieg.gegen', { name: bot.name })) : undefined,
+        symbol: 'pokal', klang: 'rekord',
       });
       neu = { ...(neu || m), ersterSieg: d.partieId || 'ja' };
     }
