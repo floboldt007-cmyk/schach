@@ -118,8 +118,11 @@ async function nodeTeil() {
   pruefe('ids tragen Tag und Teil', auf.map((a) => a.id).join() === '2026-10-25:0,2026-10-25:1' && L.teileId('2026-10-25:1').index === 1 && L.teileId('quatsch') === null);
   pruefe('Text am Sonntag: "Teil 1 von 2 · Rätsel 7 · Sonntag"', /^Teil 1 von 2 · Rätsel 7 · Sonntag · Matt in 1$/.test(auf[0].text), auf[0].text);
   const mi = L.alsAufgaben(L.tagDaten(D, '2026-10-21'))[0];
-  pruefe('Titel aus der Seite am Zug', mi.titel === 'Schwarz am Zug' && auf[0].titel === 'Weiß am Zug');
+  pruefe('ohne eigenen Titel (der Bildschirm zeigt "Finde den besten Zug" und die Seite am Zug selbst)', !('titel' in mi) && !('titel' in auf[0]));
   pruefe('nur offene Teile, wenn gewuenscht', L.alsAufgaben(so, { nur: [1] }).map((a) => a.id).join() === '2026-10-25:1');
+  const halb = L.merkeErgebnis(L.leeresModul(), '2026-10-25', 0, { richtig: true }).modul;
+  pruefe('erste offene Aufgabe: Sonntag nach Teil 1 ist es Teil 2, fertig wieder Teil 1', L.ersteOffene(L.leeresModul(), so) === 0
+    && L.ersteOffene(halb, so) === 1 && L.ersteOffene(L.merkeErgebnis(halb, '2026-10-25', 1, { richtig: true }).modul, so) === 0);
   let spielbar = true;
   const fehler = [];
   for (const t of D.tage) {
@@ -197,6 +200,19 @@ async function nodeTeil() {
   pruefe('Matt-Raetsel: "Matt" ist nie ein falsches Wort', !mattFalsch);
   pruefe('das richtige Wort steht mal vorn, mal in der Mitte, mal hinten', verteilt.size === 3);
   pruefe('ohne Motiv: keine Frage', L.wortWahl({ id: 'x', motiv: null }) === null && L.wortWahl(null) === null);
+  // Sonntag: Teil 1 Gabel, Teil 2 Grundreihenmatt. Kein falsches Wort darf ein Motiv eines der beiden Teile sein
+  let sonntagOk = true;
+  for (let i = 0; i < 40; i++) {
+    const t1 = { id: 's1-' + i, motiv: 'gabel', matt: null };
+    const t2 = { id: 's2-' + i, motiv: 'grundreihe', matt: 1 };
+    const ww = L.wortWahl(t1, [t1, t2]);
+    const falsch = ww.filter((k) => k !== 'gabel');
+    if (ww.length !== 3 || falsch.some((k) => ['grundreihe', 'matt', 'gabel'].includes(k))) sonntagOk = false;
+  }
+  pruefe('Sonntag: die falschen Woerter sind Motive, die keiner der beiden Teile hat', sonntagOk);
+  const vier = [{ id: 'v1', motiv: 'gabel', matt: 2 }, { id: 'v2', motiv: 'fesselung', matt: null }];
+  pruefe('auch mit vier gesperrten Motiven bleiben drei Woerter', L.wortWahl(vier[0], vier).length === 3
+    && new Set(L.wortWahl(vier[0], vier)).size === 3);
 
   gruppe = 'Teilen';
   const di = L.tagDaten(D, '2026-10-22');
@@ -257,6 +273,7 @@ async function warteAufServer(url, ms = 10000) {
 }
 
 let DATEI_BROWSER = null;
+let DATEI_ZWEI = null;
 async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = false, datei = 'beispiel' } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: handy, isMobile: handy, colorScheme: dunkel ? 'dark' : 'light',
@@ -274,7 +291,7 @@ async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = f
   seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
   await seite.route('**/daten/tagesraetsel/raetsel.json*', (route) => (datei === 'fehlt'
     ? route.fulfill({ status: 404, body: 'fehlt' })
-    : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DATEI_BROWSER) })));
+    : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(datei === 'zweiteilig' ? DATEI_ZWEI : DATEI_BROWSER) })));
   return { kontext, seite, fehler };
 }
 
@@ -344,6 +361,10 @@ async function browserTeil(browser) {
   // Start zwei Montage vor heute: heute ist Tag 7 bis 13, das Archiv hat 7 bis 13 Tage
   const start = T.addiereTage(T.wochenSchluessel(), -7);
   DATEI_BROWSER = beispielDatei(start, 3, { ohneMotiv: false });
+  // jeden Tag zwei Teile wie sonntags (damit der halb geloeste Sonntag an jedem Wochentag pruefbar ist)
+  DATEI_ZWEI = JSON.parse(JSON.stringify(DATEI_BROWSER));
+  DATEI_ZWEI.tage = DATEI_ZWEI.tage.map((tg, k) => ({ aufgaben: [WOCHE[6][0], WOCHE[6][1]].map(([p, stufe], i) => ({
+    id: `zw-${k}-${i}`, fen: p.fen, loesung: p.loesung.slice(), motiv: p.motiv, stufe, matt: p.matt, titel: 'Weiß am Zug' })) }));
 
   // ---------- iPad quer, hell: der ganze Ablauf ----------
   gruppe = 'iPad hell';
@@ -390,8 +411,8 @@ async function browserTeil(browser) {
   z = await tz(seite);
   pruefe('Ergebnis im Modul: [1 Fehlversuch, richtig]', JSON.stringify(z.modul.tage[heute].e[0]) === '[1,1]', z.modul);
   let ev = await seite.evaluate(() => window.__tr_ev);
-  pruefe('raetsel:geloest mit id der Datei, quelle tagesraetsel, versuch 2', ev.length === 1 && ev[0].id === a0.id && ev[0].quelle === 'tagesraetsel'
-    && ev[0].richtig === true && ev[0].versuch === 2, ev);
+  pruefe('raetsel:geloest wie im Vertrag: id der Datei, quelle tag, versuch 2, wertung null', ev.length === 1 && ev[0].id === a0.id && ev[0].quelle === 'tag'
+    && ev[0].richtig === true && ev[0].versuch === 2 && ev[0].wertung === null, ev);
   for (let i = 1; i < td.aufgaben.length; i++) {
     await seite.locator('.rs-weiter').click();
     await loese(seite, td.aufgaben[i]);
@@ -458,8 +479,8 @@ async function browserTeil(browser) {
   await loese(seite, ag);
   z = await tz(seite);
   ev = await seite.evaluate(() => window.__tr_ev);
-  pruefe('Archiv: Ergebnis mit a = 1, Ereignis quelle tagesraetsel-archiv', z.modul.tage[gestern].a === 1 && z.modul.tage[gestern].e[0][1] === 1
-    && ev[ev.length - 1].quelle === 'tagesraetsel-archiv' && ev[ev.length - 1].id === ag.id, { tag: z.modul.tage[gestern], ev: ev[ev.length - 1] });
+  pruefe('Archiv: Ergebnis mit a = 1, Ereignis quelle archiv', z.modul.tage[gestern].a === 1 && z.modul.tage[gestern].e[0][1] === 1
+    && ev[ev.length - 1].quelle === 'archiv' && ev[ev.length - 1].id === ag.id, { tag: z.modul.tage[gestern], ev: ev[ev.length - 1] });
   pruefe('heute bleibt unverändert', JSON.stringify(z.modul.tage[heute].e[0]) === '[1,1]');
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
@@ -514,6 +535,28 @@ async function browserTeil(browser) {
   pruefe('kaputtes Modul: Karte steht trotzdem, Lösen geht', kapKarte);
   pruefe('keine Seitenfehler', !kap.fehler.some((f) => /Seitenfehler/.test(f)), kap.fehler.join(' | '));
   await kap.kontext.close();
+
+  // ---------- Sonntag halb geloest (zwei Teile) ----------
+  gruppe = 'Zwei Teile';
+  const zw = await neueSeite(browser, { datei: 'zweiteilig' });
+  await bereite(zw.seite, { modul: { v: 1, tage: { [heute]: { e: [[0, 1]] } } } });
+  await zw.seite.waitForSelector('.tr-karte .tr-los', { timeout: 10000 });
+  const zp = await zw.seite.locator('.tr-karte p').textContent();
+  pruefe('Karte zeigt den offenen Teil 2 (nicht den gelösten Teil 1)', zp === 'Weiß am Zug, Matt in 2, Teil 2 von 2. Für alle dasselbe.', zp);
+  await zw.seite.locator('.tr-karte .tr-los').click();
+  await warteZustand(zw.seite, 'z.offen && z.phase === "flo"');
+  const zr = await zw.seite.evaluate(() => window.__raetsel.zustand());
+  pruefe('Lösen öffnet genau diesen Teil 2', zr.gesamt === 1 && zr.aufgabe === `${heute}:1`, zr);
+  await loese(zw.seite, DATEI_ZWEI.tage[T.tageZwischen(start, heute)].aufgaben[1]);
+  await zw.seite.locator('.rs-weiter').click();
+  await warteZustand(zw.seite, 'z.phase === "ende"');
+  await zw.seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
+  await zw.seite.waitForSelector('.dialog-ort .dialog-knoepfe button', { timeout: 5000 });
+  const zworte = await zw.seite.evaluate(() => [...document.querySelectorAll('.dialog-ort .dialog-knoepfe button')].map((b) => b.textContent));
+  pruefe('Ein Wort am Sonntag: kein falsches Wort ist das Motiv eines Teils', zworte.length === 3 && zworte.includes('Matt') && !zworte.includes('Grundreihe'), zworte);
+  await zw.seite.keyboard.press('Escape');
+  pruefe('keine Konsolenfehler', zw.fehler.length === 0, zw.fehler.join(' | '));
+  await zw.kontext.close();
 
   // ---------- ohne Datei ----------
   gruppe = 'Ohne Datei';

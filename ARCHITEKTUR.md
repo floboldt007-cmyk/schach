@@ -2225,7 +2225,7 @@ länger als 14 Tage überfällige nicht), `merkeRaetsel`, `planeMeldung({ sofort
 frühestens nach 4 s; `nachholen` ohne die 4 s; beides höchstens eine Meldung je Minute; `sofort` nur nach dem Beitritt;
 dieselbe Meldung nie zweimal), `meldeJetzt`, `aufraeumen`, `sortiereMitglieder`, `zielText`, `faelligText` („bis Fr
 30.10.“, nie eine Restzeit), `WAS_DIE_LEITUNG_SIEHT` (sagt auch, dass der Stand nach jeder Partie kommt und nur der Tag
-gespeichert wird), `RAETSEL_AUFGABEN` (false, bis ein Paket `raetsel:geloest` sendet; `tests/schule.test.mjs` prüft, dass
+gespeichert wird), `RAETSEL_AUFGABEN` (true, seit das Paket `tagesraetsel` `raetsel:geloest` sendet; `tests/schule.test.mjs` prüft, dass
 der Schalter zum Code passt), Icon `tafel`.
 Speicher bewusst außerhalb von `schach-arena:v1:` (gehört zum Konto, nicht in Sicherung, Export oder Cloud-Spielstand):
 `schach-arena:schule:stand` `{ uid, daten, geholtAm, veraltet? }`, `schach-arena:schule:offen` `{ uid, seit }`,
@@ -2482,25 +2482,26 @@ in `daten/tagesraetsel/raetsel.json` (art `tagesraetsel`, format 1) aus `werkzeu
   nur die offenen Teile; ist der Tag fertig, darf man ihn wiederholen) oder `{ quelle: 'tagesraetsel', archiv: 1 }`
   (die offenen Raetsel der letzten 30 Tage, juengster zuerst; zaehlen fuer Funken und Serie, nicht als Tagesraetsel des
   Tages). Fehlversuche ohne Abzug, keine Uhr; das erste Ergebnis je Aufgabe zaehlt.
-- **Danach** "Ein Wort" (welches Motiv? drei Woerter, die zwei falschen hat das Raetsel sicher nicht; nur mit Motiv)
+- **Danach** "Ein Wort" (welches Motiv? drei Woerter, die zwei falschen hat keine Aufgabe des Tages; nur mit Motiv)
   und "Teilen": Text ohne Link und ohne Loesung (`navigator.share`, sonst Zwischenablage, sonst ein Dialog mit dem Text):
   ```
   Crownmate · Rätsel 12 · Dienstag ●●○○○○○
   ♛ Matt in 2 · □■ · Motiv: Gabel
   ```
   □ je Fehlversuch, ■ geloest, ✕ Loesung angesehen; das Motiv nur, wenn "Ein Wort" stimmte.
-- **Orte:** `training:karten` 5 (grosse Karte `.t-held` mit Mini-Brett, "Rätsel N", Schwierigkeit als sieben Punkte,
+- **Orte:** `training:karten` 5 (grosse Karte `.t-held` mit Mini-Brett des ersten offenen Teils, "Rätsel N", Schwierigkeit als sieben Punkte,
   "Lösen" oder nach dem Loesen "Teilen", dazu "Archiv · n"), `arena:heute` 20 (Zeile, solange heute offen).
-- **Ereignis:** sendet `raetsel:geloest { id, richtig, versuch, quelle: 'tagesraetsel' | 'tagesraetsel-archiv' }` je
-  Aufgabe (`id` aus der Datei, Funken und Serie zaehlen jede id einmal).
+- **Ereignis:** sendet `raetsel:geloest { id, richtig, versuch, quelle: 'tag' | 'archiv', wertung: null }` beim ersten
+  Ergebnis je Aufgabe (`id` aus der Datei; Wiederholen eines fertigen Tages sendet nichts). Damit stellt die Schule jetzt
+  Raetsel-Aufgaben (`RAETSEL_AUFGABEN` true).
 - **Speicher:** Modul `tagesraetsel` (Budget 4.000): `{ v, tage: { 'JJJJ-MM-TT': { e: [[fehlversuche, richtig]], w?, a? } } }`,
   hoechstens 60 Tage. Kaputte Staende werden ein leeres Modul, alte ohne `v` bleiben gueltig, ein Modul einer neueren
   App wird gelesen, aber nie ueberschrieben.
 - **Laden:** Das Paket laedt die Datei beim Start und wartet darauf hoechstens 1,5 s (die App wartet auf ihre Pakete);
   fehlt sie, zeigt die Karte eine ruhige Zeile und das Paket versucht es beim naechsten Zeichnen erneut.
 - **Offen:** "Fair zählen" (ein anderer, gleich starker Zug gilt auch) braucht Stockfish im Raetsel-Bildschirm und eine
-  Aenderung an `js/ui/raetsel.js`; Archiv ueber 30 Tage (Abo); Schul-Aufgaben "Rätsel lösen" (`js/schule.js`
-  RAETSEL_AUFGABEN) koennen jetzt eingeschaltet werden.
+  Aenderung an `js/ui/raetsel.js`; Archiv ueber 30 Tage (Abo); +5 Funken fuer ein richtiges "Ein Wort" (3.3) braucht
+  ein eigenes Ereignis fuer funken.
 
 ## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
 

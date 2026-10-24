@@ -12,7 +12,9 @@
 //
 //   pruefeDatei(json) -> [Fehlertext]              fuer registriereInhaltsart('tagesraetsel', ...)
 //   tagDaten(daten, tag) -> { nummer, tag, wochentag, aufgaben: [Aufgabe] } | null   null vor dem Start
-//   alsAufgaben(td) -> [Aufgabe fuer den Raetsel-Bildschirm] (Titel "Weiß am Zug", Text "Teil 1 von 2" am Sonntag)
+//   alsAufgaben(td, { nur }) -> [Aufgabe fuer den Raetsel-Bildschirm] (ohne eigenen Titel: der Bildschirm zeigt "Finde den
+//       besten Zug" und die Seite am Zug selbst; Text "Teil 1 von 2 · Rätsel 7 · Sonntag · Matt in 1")
+//   ersteOffene(modul, td) -> Index der ersten offenen Aufgabe (fertig: 0), fuer Karte und Heute-Zeile
 //   archivTage(daten, heute, modul) -> [tagDaten]  die letzten ARCHIV_TAGE Tage vor heute, juengste zuerst, nur offene
 //   Modul (Speicher "tagesraetsel", Budget BUDGET Zeichen):
 //     { v: RECHENSTAND, tage: { 'JJJJ-MM-TT': { e: [[fehlversuche, richtig 0|1] | null, ...], w?: 0|1, a?: 1 } } }
@@ -23,7 +25,8 @@
 //     schon ein Ergebnis da war (dann bleibt das Modul gleich)
 //   merkeWort(modul, tag, richtig) -> modul
 //   tagStand(modul, tag, anzahl) -> { fertig, geloest, archiv, wort }
-//   wortWahl(aufgabe) -> [motiv, motiv, motiv] | null   drei Woerter, eines richtig, Reihenfolge aus der id
+//   wortWahl(aufgabe, alle) -> [motiv, motiv, motiv] | null   drei Woerter, eines richtig, Reihenfolge aus der id; die
+//       falschen sind Motive, die KEINE Aufgabe des Tages hat (Sonntag: beide Teile)
 //   teilText(td, eintrag) -> Text zum Teilen, ohne Link und ohne Loesung (SPIELKONZEPT 3.6)
 import { addiereTage, tageZwischen, wochentag, istSchluessel } from '../../tag.js';
 
@@ -113,7 +116,6 @@ export function alsAufgaben(td, { nur = null } = {}) {
     id: `${td.tag}:${i}`,
     fen: a.fen,
     loesung: a.loesung.slice(),
-    titel: amZugText(a.fen),
     text: `${zwei ? `Teil ${i + 1} von 2 · ` : ''}Rätsel ${td.nummer} · ${WOCHENTAG[td.wochentag]} · ${zuegeText(a)}`,
     hinweis: a.matt ? `Es gibt ein Matt ${a.matt === 1 ? 'in einem Zug' : `in ${a.matt} Zügen`}.` : 'Such nach dem Zug, der etwas erzwingt.',
   }));
@@ -205,6 +207,11 @@ export function offeneIndizes(modul, td) {
   return st.fertig ? alle : alle.filter((i) => !st.ergebnisse[i]);
 }
 
+export function ersteOffene(modul, td) {
+  const l = offeneIndizes(modul, td);
+  return l.length ? l[0] : 0;
+}
+
 export function archivTage(daten, heute, modul) {
   const l = [];
   for (let n = 1; n <= ARCHIV_TAGE; n++) {
@@ -227,12 +234,13 @@ function hash(text) {
   return h >>> 0;
 }
 
-export function wortWahl(a) {
+export function wortWahl(a, alle = [a]) {
   if (!a || !a.motiv || !Object.hasOwn(MOTIVE, a.motiv)) return null;
-  // Falsche Woerter: Motive, die das Raetsel sicher nicht hat. "Matt" ist bei einem Matt-Raetsel nie falsch,
-  // "Grundreihe" endet immer im Matt.
-  const verboten = new Set([a.motiv]);
-  if (a.matt || a.motiv === 'grundreihe') { verboten.add('matt'); verboten.add('grundreihe'); }
+  // Falsche Woerter: Motive, die keine Aufgabe des Tages hat. "Matt" ist bei einem Matt-Raetsel nie falsch,
+  // "Grundreihe" endet immer im Matt. Es bleiben immer mindestens zwei (sechs Motive, hoechstens vier gesperrt).
+  const liste = (Array.isArray(alle) ? alle : [a]).filter(Boolean);
+  const verboten = new Set([a.motiv, ...liste.map((x) => x.motiv).filter(Boolean)]);
+  if (liste.some((x) => x.matt || x.motiv === 'grundreihe' || x.motiv === 'matt')) { verboten.add('matt'); verboten.add('grundreihe'); }
   const falsch = Object.keys(MOTIVE).filter((k) => !verboten.has(k));
   const h = hash(a.id);
   const erst = falsch[h % falsch.length];

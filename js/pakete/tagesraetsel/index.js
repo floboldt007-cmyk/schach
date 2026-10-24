@@ -8,8 +8,8 @@
 //   ohne Loesung: "Crownmate · Rätsel 12 · Dienstag ●●○○○○○").
 //
 // Orte:       training:karten (5, grosse Karte .t-held mit Mini-Brett), arena:heute (20, Zeile solange heute offen)
-// Ereignisse: sendet raetsel:geloest { id, richtig, versuch, quelle: 'tagesraetsel' | 'tagesraetsel-archiv' } je
-//             Aufgabe (id = id der Datei, z. B. 'tr-0012'; Funken und Serie zaehlen jede id einmal)
+// Ereignisse: sendet raetsel:geloest { id, richtig, versuch, quelle: 'tag' | 'archiv', wertung: null } beim ersten
+//             Ergebnis je Aufgabe (id = id der Datei, z. B. 'tr-0012'; Wiederholen eines fertigen Tages sendet nichts)
 // Register:   Raetsel-Quelle "tagesraetsel", Inhaltsart "tagesraetsel" (js/inhalte.js), Icon "tagesraetsel"
 // Speicher:   Modul "tagesraetsel" (Budget 4.000, logik.js), bei jedem Zugriff frisch gelesen; ein Modul aus einer
 //             neueren App (v > RECHENSTAND) wird gelesen, aber nie ueberschrieben.
@@ -39,6 +39,8 @@ function sicher(fn, wo) {
 // ---------- Daten ----------
 let daten = null;
 let laden = null;
+let fehlschlag = 0;
+const NEU_VERSUCH_MS = 30000;
 const wartende = new Set();
 function ladeDaten() {
   if (!laden) {
@@ -48,6 +50,7 @@ function ladeDaten() {
         console.warn('tagesraetsel: Rätsel nicht geladen', r && r.grund);
         // naechster Versuch beim naechsten Zeichnen (z. B. wieder online)
         laden = null;
+        fehlschlag = Date.now();
       }
       for (const f of wartende) sicher(f, 'Nachladen');
       wartende.clear();
@@ -55,6 +58,11 @@ function ladeDaten() {
     });
   }
   return laden;
+}
+
+// Fuer Orte, die oft neu zeichnen (Arena): nach einem Fehlschlag hoechstens alle NEU_VERSUCH_MS ein neuer Versuch
+function ladeSpaeter() {
+  if (!daten && !laden && Date.now() - fehlschlag >= NEU_VERSUCH_MS) ladeDaten();
 }
 
 // ---------- Modul-Speicher ----------
@@ -87,7 +95,7 @@ if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]tes
 // ---------- Ein Wort und Teilen ----------
 async function einWort(app, td) {
   const a = L.motivAufgabe(td);
-  const wahl = L.wortWahl(a);
+  const wahl = L.wortWahl(a, td.aufgaben);
   if (!wahl) return;
   const st = stand(td);
   if (st.wort != null) { app.meldung(`Das Motiv war: ${L.MOTIVE[a.motiv]}.`); return; }
@@ -96,10 +104,11 @@ async function einWort(app, td) {
     knoepfe: wahl.map((k) => ({ text: L.MOTIVE[k], wert: k })), abbrechen: null,
   });
   if (!wert || !Object.hasOwn(L.MOTIVE, wert)) return;
-  const richtig = wert === a.motiv;
+  // Sonntag: das Motiv eines der beiden Teile ist richtig
+  const richtig = td.aufgaben.some((x) => x.motiv === wert);
   sichere(L.merkeWort(roh(), td.tag, richtig));
   letztesWort = { wahl, gewaehlt: wert, richtig };
-  app.meldung(richtig ? `Richtig: ${L.MOTIVE[a.motiv]}.` : `Fast. Es war: ${L.MOTIVE[a.motiv]}.`);
+  app.meldung(richtig ? `Richtig: ${L.MOTIVE[wert]}.` : `Fast. Es war: ${L.MOTIVE[a.motiv]}.`);
 }
 
 async function teile(app, td) {
@@ -127,7 +136,7 @@ async function teile(app, td) {
 function endeKnoepfe(td) {
   const k = [];
   const st = stand(td);
-  if (L.wortWahl(L.motivAufgabe(td)) && st.wort == null) k.push({ text: 'Ein Wort', art: 'primaer', beiKlick: (app) => einWort(app, td) });
+  if (L.wortWahl(L.motivAufgabe(td), td.aufgaben) && st.wort == null) k.push({ text: 'Ein Wort', art: 'primaer', beiKlick: (app) => einWort(app, td) });
   k.push({ text: 'Teilen', art: k.length ? '' : 'primaer', beiKlick: (app) => teile(app, td) });
   return k;
 }
@@ -161,11 +170,14 @@ function quelle() {
       const fehlversuche = Number.isInteger(erg.fehlversuche) ? erg.fehlversuche : 0;
       const archiv = t.tag !== heute();
       const r = L.merkeErgebnis(roh(), t.tag, t.index, { fehlversuche, richtig }, { archiv });
-      if (r.neu) sichere(r.modul);
       sitzung.anzahl++;
-      sicher(() => sende('raetsel:geloest', {
-        id: a.id, richtig, versuch: Number.isInteger(erg.versuch) ? erg.versuch : 0, quelle: archiv ? 'tagesraetsel-archiv' : 'tagesraetsel',
-      }), 'raetsel:geloest');
+      if (r.neu) {
+        sichere(r.modul);
+        // Vertrag (ARCHITEKTUR.md, raetsel:geloest): quelle 'tag' | 'archiv'; eigene Raetsel haben keine Wertung
+        sicher(() => sende('raetsel:geloest', {
+          id: a.id, richtig, versuch: Number.isInteger(erg.versuch) ? erg.versuch : 0, quelle: archiv ? 'archiv' : 'tag', wertung: null,
+        }), 'raetsel:geloest');
+      }
       return L.rueckmeldung({ richtig, fehlversuche });
     },
     ende() {
@@ -206,8 +218,12 @@ function fuelleKarte(el, app) {
       <p>Für alle dasselbe, montags leicht, samstags knifflig.</p>`;
     return;
   }
-  const a = td.aufgaben[0];
   const st = stand(td);
+  // Sonntag halb geloest: Karte zeigt den offenen Teil (den "Lösen" auch oeffnet)
+  const i = L.ersteOffene(roh(), td);
+  const a = td.aufgaben[i];
+  const offen = L.offeneIndizes(roh(), td).length;
+  const teilText = td.aufgaben.length < 2 || st.fertig ? '' : offen > 1 ? ', in zwei Teilen' : `, Teil ${i + 1} von 2`;
   const stufe = Math.max(...td.aufgaben.map((x) => x.stufe));
   const offenArchiv = L.archivTage(daten, td.tag, roh()).length;
   el.dataset.fertig = st.fertig ? '1' : '0';
@@ -217,7 +233,7 @@ function fuelleKarte(el, app) {
       <span class="tr-punkte" role="img" aria-label="Schwierigkeit ${stufe} von ${L.STUFEN}">${L.punkte(stufe)}</span></div>
     <p>${st.fertig
       ? (st.geloest ? 'Gelöst. Morgen kommt das nächste.' : 'Geschafft. Morgen kommt das nächste.')
-      : `${esc(L.amZugText(a.fen))}, ${esc(L.zuegeText(a))}${td.aufgaben.length > 1 ? ', in zwei Teilen' : ''}. Für alle dasselbe.`}</p>
+      : `${esc(L.amZugText(a.fen))}, ${esc(L.zuegeText(a))}${teilText}. Für alle dasselbe.`}</p>
     <div class="t-fuss">
       ${offenArchiv ? `<button class="knopf dr tr-archiv" type="button">Archiv · ${offenArchiv}</button>` : '<span></span>'}
       ${st.fertig
@@ -249,13 +265,15 @@ function trainingKarte(app) {
 }
 
 function heuteZeile(app, tag) {
+  if (!daten) { ladeSpaeter(); return null; }
   const td = heuteDaten(tag);
   if (!td || stand(td).fertig) return null;
+  const a = td.aufgaben[L.ersteOffene(roh(), td)];
   const el = document.createElement('div');
   el.className = 'tr-heute';
   el.dataset.paket = L.PAKET;
   el.innerHTML = `<span class="tr-heute-symbol" aria-hidden="true">${icon('tagesraetsel')}</span>
-    <span class="tr-heute-text"><b>Tagesrätsel</b> · Rätsel ${td.nummer}, ${esc(L.zuegeText(td.aufgaben[0]))}</span>
+    <span class="tr-heute-text"><b>Tagesrätsel</b> · Rätsel ${td.nummer}, ${esc(L.zuegeText(a))}</span>
     <button class="knopf dr tr-heute-los" type="button">Lösen</button>`;
   el.querySelector('.tr-heute-los').addEventListener('click', (ev) => oeffne(app, ev));
   return el;
