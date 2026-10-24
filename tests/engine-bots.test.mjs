@@ -4,7 +4,7 @@
 //
 //   node tests/engine-bots.test.mjs              alles inkl. Staerke-Kurve und Kalibrierung
 //   node tests/engine-bots.test.mjs --schnell    nur Engine- und Bot-Pruefungen
-//   Optionen: --partien=6 --zuglimit=120 --paare=1-3,3-5,5-7,7-9 --proben=3 --parallel=4
+//   Optionen: --partien=6 --zuglimit=120 --paare=2-8,8-12,12-16,16-21 --proben=3 --parallel=4
 //             --anker (zusaetzlich Vergleich mit Stockfish UCI_Elo, nur Bericht) --ankerpartien=4
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst normales 'playwright'.
@@ -50,7 +50,7 @@ const optionen = {
     partien: Number(argument('partien', 6)),
     zuglimit: Number(argument('zuglimit', 120)),
     parallel: Number(argument('parallel', 4)),
-    paare: argument('paare', '1-3,3-5,5-7,7-9').split(',').map((p) => p.split('-').map(Number)),
+    paare: argument('paare', '2-8,8-12,12-16,16-21').split(',').map((p) => p.split('-').map(Number)),
   },
   staerke: { proben: Number(argument('proben', 3)), parallel: Number(argument('parallel', 4)) },
   anker: process.argv.includes('--anker') ? { partien: Number(argument('ankerpartien', 4)) } : null,

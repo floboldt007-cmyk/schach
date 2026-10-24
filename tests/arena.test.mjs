@@ -1,8 +1,10 @@
-// Tests fuer Paket U5 des Premium-Umbaus (PLAN 2.2, 2.3, 6.3; Flo 18.10.: Arena als Weltkarte aus Entwurf C):
-// Weltkarte mit zehn Stationen (js/ui/arena.js, css/arena.css), Detail-Panel, Orte auf Karte und Panel, Freischalten
-// nach einem Sieg, Duell-Intro (js/ui/duell.js, css/duell.css) mit dem Vertrag zur Partie, Modern-Portraets
-// (assets/avatare/modern, js/thema.js). Node-Teil ohne Browser, danach Browser-Teil (Playwright, Chromium) gegen die
-// echte App (index.html?test). Die Arena-Schritte in tests/app.test.mjs und tests/e2e.test.mjs bleiben daneben gueltig.
+// Tests fuer Paket U5 des Premium-Umbaus (PLAN 2.2, 2.3, 6.3; Flo 18.10.: Arena als Weltkarte aus Entwurf C), seit den
+// Welten (Flo 23.10.) mit fuenf Welten und 30 Bots: Weltkarte mit den sechs Stationen der gewaehlten Welt und Weltwahl
+// (Pfeile, gesperrte Welten, Schild NEU, Endgegner direkt herausforderbar; js/ui/arena.js, css/arena.css), Detail-Panel,
+// Orte auf Karte und Panel, Freischalten nach einem Sieg, Duell-Intro (js/ui/duell.js, css/duell.css) mit dem Vertrag zur
+// Partie, Modern-Portraets (assets/avatare/modern, js/thema.js). Node-Teil ohne Browser, danach Browser-Teil (Playwright,
+// Chromium) gegen die echte App (index.html?test). Die Arena-Schritte in tests/app.test.mjs und tests/e2e.test.mjs bleiben
+// daneben gueltig.
 //
 //   node tests/arena.test.mjs                 alles
 //   node tests/arena.test.mjs --nur-node      ohne Browser
@@ -16,7 +18,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { BOTS } from '../js/bots.js';
+import { BOTS, WELTEN, botsDerWelt } from '../js/bots.js';
 import { ORTE } from '../js/orte.js';
 import { THEMEN, avatarVon } from '../js/thema.js';
 import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN } from '../js/ui/duell.js';
@@ -40,23 +42,29 @@ function pruefe(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${gruppe ? gruppe + ': ' : ''}${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
 }
 
-// Fortschritt wie in app.test.mjs: vier Bots besiegt, Ritter Rudi ist der naechste Gegner
+// Fortschritt (Welten, Flo 23.10.): Welt 1, Fridolin (3 Sterne) und Benno (2 Sterne) besiegt, Postbotin Paula ist der naechste
+// Gegner (Stufe 3), Gustav und Hilde sind noch gesperrt, Janine vom Scheunenclub (Endgegner der Welt) ist direkt
+// herausforderbar; Welt 2 bis 5 sind gesperrt
 const SAAT = {
   bots: {
-    benno: { sterne: [true, true, true], partien: 3, siege: 2, remis: 0, niederlagen: 1, besteGenauigkeit: 84 },
-    hilde: { sterne: [true, true, false], partien: 2, siege: 1, remis: 0, niederlagen: 1, besteGenauigkeit: 81 },
-    kalle: { sterne: [true, true, true], partien: 3, siege: 2, remis: 1, niederlagen: 0, besteGenauigkeit: 88 },
-    lisa: { sterne: [true, false, false], partien: 3, siege: 1, remis: 0, niederlagen: 2, besteGenauigkeit: 71 },
+    fridolin: { sterne: [true, true, true], partien: 3, siege: 2, remis: 1, niederlagen: 0, besteGenauigkeit: 88 },
+    benno: { sterne: [true, true, false], partien: 2, siege: 1, remis: 0, niederlagen: 1, besteGenauigkeit: 81 },
   },
   brillanteZuege: [],
 };
-// nur Benno besiegt (fuer das Freischalten von Hilde)
+// nur Benno besiegt (fuer das Freischalten von Paula): frei sind Stufe 1 bis 3 (Fridolin ist neu eingezogen) und Janine
 const SAAT_BENNO = { bots: { benno: { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 } }, brillanteZuege: [] };
+// die ganze Welt 1 besiegt, alle Sterne (Weltsiegel): Bodo (Welt 2) ist der naechste Gegner
+const SAAT_WELT1 = { bots: Object.fromEntries(BOTS.filter((b) => b.welt === 1).map((b) => [b.id, { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 }])), brillanteZuege: [] };
 // alle besiegt, Sterne gemischt (Revanche gegen jeden Bot)
 const SAAT_ALLE = { bots: Object.fromEntries(BOTS.map((b, i) => [b.id, { sterne: [true, i % 2 === 0, i % 3 === 0], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 85 }])), brillanteZuege: [] };
-// alle bis auf den Endgegner besiegt (Anlass boss)
-const SAAT_BOSS = { bots: Object.fromEntries(BOTS.filter((b) => b.stufe < 10).map((b) => [b.id, { sterne: [true, true, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 85 }])), brillanteZuege: [] };
+// alle bis auf den letzten Endgegner (Der Stockfisch) besiegt (Anlass boss)
+const SAAT_BOSS = { bots: Object.fromEntries(BOTS.filter((b) => b.id !== 'stockfisch').map((b) => [b.id, { sterne: [true, true, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 85 }])), brillanteZuege: [] };
 const IDS = BOTS.map((b) => b.id);
+// die Bots je Welt in Leiter-Reihenfolge (fuenf Welten mit je sechs Bots)
+const WELT_IDS = WELTEN.map((w) => botsDerWelt(w.nr).map((b) => b.id));
+// die zehn Bots der alten Leiter haben ihr Pixel-Portraet als Rueckfall behalten
+const ALTE_ZEHN = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch'];
 
 // =====================================================================
 // Node-Teil
@@ -78,7 +86,8 @@ function nodeTeil() {
 
   gruppe = 'Portraets';
   const modern = THEMEN.modern;
-  pruefe('Theme modern: zehn Portraets unter assets/avatare/modern/', modern.avatare === 'assets/avatare/modern/' && JSON.stringify([...modern.portraets]) === JSON.stringify(IDS), [...modern.portraets].join());
+  pruefe('Theme modern: dreissig Portraets unter assets/avatare/modern/ (alle Bots der Leiter, jeder genau einmal)', modern.avatare === 'assets/avatare/modern/' && modern.portraets.length === 30
+    && JSON.stringify([...modern.portraets].sort()) === JSON.stringify([...IDS].sort()), [...modern.portraets].join());
   const fehlend = BOTS.filter((b) => avatarVon(b) !== `assets/avatare/modern/${b.id}.svg` || !existsSync(path.join(WURZEL, `assets/avatare/modern/${b.id}.svg`)));
   pruefe('avatarVon(bot) liefert fuer jeden Leiter-Bot die Modern-Datei, und sie existiert', fehlend.length === 0, fehlend.map((b) => b.id).join());
   const kaputt = [];
@@ -89,7 +98,10 @@ function nodeTeil() {
     if (!/\sxmlns="http:\/\/www\.w3\.org\/2000\/svg"/.test(kopf) || !/\sviewBox="0 0 120 120"/.test(kopf) || gross < 800 || gross > 4200 || /<script|<image|href=|url\(/i.test(t)) kaputt.push(b.id + ':' + gross);
   }
   pruefe('jede Portraet-Datei: eigenstaendiges SVG (xmlns, viewBox 0 0 120 120), 0,8 bis 4 KB, ohne Skript, Bild oder Verweis', kaputt.length === 0, kaputt.join());
-  pruefe('Pixel-Avatare bleiben als Rueckfall (bot.avatar zeigt weiter auf assets/avatare/<nr>-<name>.svg)', BOTS.every((b) => /^assets\/avatare\/\d\d-[a-z-]+\.svg$/.test(b.avatar) && existsSync(path.join(WURZEL, b.avatar))));
+  // die zehn Bots der alten Leiter behalten ihr Pixel-Portraet als Rueckfall, die zwanzig neuen haben nur das Modern-Portraet
+  pruefe('Pixel-Avatare bleiben als Rueckfall (die zehn alten Bots: bot.avatar zeigt weiter auf assets/avatare/<nr>-<name>.svg; die neuen auf ihr Modern-Portraet), alle Dateien da',
+    BOTS.every((b) => (ALTE_ZEHN.includes(b.id) ? /^assets\/avatare\/\d\d-[a-z-]+\.svg$/.test(b.avatar) : b.avatar === `assets/avatare/modern/${b.id}.svg`) && existsSync(path.join(WURZEL, b.avatar))),
+    BOTS.filter((b) => !existsSync(path.join(WURZEL, b.avatar))).map((b) => b.id).join());
 
   gruppe = 'Orte';
   pruefe('arena:karte-boss und arena:karte-event sind DOM-Orte', ORTE['arena:karte-boss'] === 'dom' && ORTE['arena:karte-event'] === 'dom');
@@ -135,6 +147,9 @@ function nodeTeil() {
   const arenaJs = lies('js/ui/arena.js');
   pruefe('arena.js: Stationen als button.stufe.knoten[data-bot], Scroll-Behaelter .karte, Orte auf der Karte', /stufe knoten/.test(arenaJs) && /class="karte"/.test(arenaJs)
     && /fuelle\('arena:karte-boss'/.test(arenaJs) && /fuelle\('arena:karte-event'/.test(arenaJs) && /fuelle\('arena:start'/.test(arenaJs));
+  pruefe('arena.js: Welten: Weltwahl mit Pfeilen (.weltwahl .ww-pfeil[data-richtung]), gesperrte Welt (.welt-sperre), Schild .k-neu, Endgegner (b.endgegner) statt fester Stufe',
+    /class="ww-pfeil dr" type="button" data-richtung="-1"/.test(arenaJs) && /data-richtung="1"/.test(arenaJs) && /class="welt-sperre"/.test(arenaJs) && /class="k-neu"/.test(arenaJs)
+    && /b\.endgegner \? ' boss'/.test(arenaJs) && !/stufe === 10/.test(arenaJs));
   pruefe('arena.js: Portraets ueber avatarVon, Flos Figur ueber floAvatar, Farbe als Segment, Duell ueber spieleDuell', /avatarVon\(/.test(arenaJs) && /floAvatar\(/.test(arenaJs) && /segment\(\{/.test(arenaJs) && /spieleDuell\(/.test(arenaJs));
   pruefe('arena.js: nach bereit app.gehe(\'partie\', ...)', /await duell\.bereit;[\s\S]{0,80}app\.gehe\('partie'/.test(arenaJs));
   pruefe('arena.js: laedt den Partie-Screen vorab (beim Vorwaermen und beim Tipp auf Spielen), damit er sich unter der Buehne schnell aufbaut',
@@ -144,7 +159,11 @@ function nodeTeil() {
     /dataset\.duell = 'laeuft'/.test(duellJs) && /new CustomEvent\('duell:fertig'/.test(duellJs) && /export function aktivesDuell/.test(duellJs) && /hoere\('app:screen'/.test(duellJs)
     && /\.spieler\.gegner \.av/.test(duellJs) && /\.spieler\.ich \.av/.test(duellJs) && /klang\.spiele\('start'\)/.test(duellJs));
   const sw = lies('sw.js');
-  pruefe('sw.js: duell.js, arena.css, duell.css und die zehn Portraets im Cache', /'js\/ui\/duell\.js'/.test(sw) && /'css\/arena\.css'/.test(sw) && /'css\/duell\.css'/.test(sw) && IDS.every((id) => sw.includes(`'assets/avatare/modern/${id}.svg'`)));
+  pruefe('sw.js: duell.js, arena.css, duell.css und die dreissig Portraets im Cache', /'js\/ui\/duell\.js'/.test(sw) && /'css\/arena\.css'/.test(sw) && /'css\/duell\.css'/.test(sw) && IDS.every((id) => sw.includes(`'assets/avatare/modern/${id}.svg'`)));
+  // die Leiter: dreissig Bots in fuenf Welten zu je sechs, Stufe = Elo / 100, der letzte jeder Welt ist der Endgegner
+  pruefe('Leiter: 30 Bots in 5 Welten zu je 6, Stufe = Elo / 100, genau ein Endgegner je Welt (der letzte)', BOTS.length === 30 && WELTEN.length === 5
+    && WELT_IDS.every((ids) => ids.length === 6) && BOTS.every((b, i) => b.stufe === i + 1 && b.elo === b.stufe * 100)
+    && WELTEN.every((w) => { const bs = botsDerWelt(w.nr); return bs.filter((b) => b.endgegner).length === 1 && bs[5].endgegner === true; }));
   const alle = lies('tests/alle.mjs');
   pruefe('tests/alle.mjs: Suite arena direkt nach navigation', /name: 'navigation'[^\n]*\n\s*\{ name: 'arena', datei: 'arena\.test\.mjs'/.test(alle));
 }
@@ -195,6 +214,9 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
     fehler.push('console: ' + m.text() + (url ? ' @ ' + url : ''));
   });
   seite.on('request', (r) => { if (!r.url().startsWith(`http://127.0.0.1:${PORT}/`) && !/^(data|blob):/.test(r.url())) fremd.push(r.url()); });
+  // Die 404-Ausnahme oben gilt nur fuer fehlende Paket-Screens: eine fehlende Datei unter assets/ (z. B. das Modern-Portraet eines
+  // Bots) ist ein Fehler
+  seite.on('response', (r) => { if (r.status() === 404 && /\/assets\//.test(r.url())) fehler.push('404: ' + r.url()); });
   return { kontext, seite, fehler };
 }
 
@@ -259,12 +281,12 @@ const spielenPasst = (seite) => seite.evaluate(() => {
   if (getComputedStyle(t).textOverflow === 'ellipsis') fehler.push('Ellipse');
   return fehler.length ? t.textContent.trim() + ': ' + fehler.join(', ') : null;
 });
-// Beschriftungen auf der Karte: jedes Schild, jede Fahne, Krone, Sterne-Pille und jedes Portraet liegt innerhalb der
+// Beschriftungen auf der Karte: jedes Schild, jede Fahne, Krone, Sterne-Pille, Schild NEU und jedes Portraet liegt innerhalb der
 // Karte (waagrecht im sichtbaren Ausschnitt, senkrecht in der Welt) und ueberdeckt keines einer anderen Station
 const kartenLage = (seite) => seite.evaluate(() => {
   const teile = [];
   for (const kn of document.querySelectorAll('.knoten')) {
-    for (const sel of ['.k-schild', '.fahne', '.boss-krone', '.k-sterne', '.avatar']) {
+    for (const sel of ['.k-schild', '.fahne', '.boss-krone', '.k-sterne', '.k-neu', '.avatar']) {
       const el = kn.querySelector(sel);
       if (el) teile.push({ n: kn.dataset.bot + sel, kn: kn.dataset.bot, r: el.getBoundingClientRect() });
     }
@@ -285,6 +307,16 @@ const kartenLage = (seite) => seite.evaluate(() => {
   const raus = teile.filter((x) => x.r.left < kb.left - 0.5 || x.r.right > kb.right + 0.5 || x.r.top < wb.top - 0.5 || x.r.bottom > wb.bottom + 0.5).map((x) => x.n);
   return { ueber, raus };
 });
+// Die Karte zeigt immer eine Welt: ueber die Pfeile .weltwahl .ww-pfeil zur Welt nr blaettern (liest die Nummer aus „Welt n von 5“)
+async function geheZuWelt(seite, nr) {
+  for (let i = 0; i < 6; i++) {
+    const jetzt = await seite.evaluate(() => Number((/Welt (\d)/.exec(document.querySelector('.ww-unter').textContent) || [])[1]));
+    if (jetzt === nr) return;
+    await seite.evaluate((r) => document.querySelector(`.ww-pfeil[data-richtung="${r}"]`).click(), nr > jetzt ? 1 : -1);
+    await warte(150);
+  }
+  throw new Error('Welt nicht erreicht: ' + nr);
+}
 const kleineTippflaechen = (seite) => seite.evaluate(() => [...document.querySelectorAll('.arena button')]
   .filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && (r.width < 44 || r.height < 44); }).map((b) => b.className.slice(0, 30)));
 
@@ -362,29 +394,39 @@ async function testeKarteQuer(browser) {
   await seite.goto(BASIS + '#arena');
   await seite.waitForSelector('.screen.arena .knoten');
   await warte(1500);
-  pruefe('zehn Stationen button.stufe.knoten[data-bot] in Leiter-Reihenfolge', await seite.evaluate((ids) => {
+  pruefe('sechs Stationen der Welt 1 (button.stufe.knoten[data-bot]) in Leiter-Reihenfolge, Kopfzeile „Fünf Welten, 30 Bots“', await seite.evaluate((ids) => {
     const k = [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')];
-    return k.length === 10 && k.map((b) => b.dataset.bot).join() === ids.join();
-  }, IDS));
-  pruefe('Zustaende: 4 besiegt, Rudi aktuell, 5 gesperrt, Stockfisch .boss', await seite.evaluate(() => document.querySelectorAll('.knoten.besiegt').length === 4
-    && document.querySelectorAll('.knoten.aktuell').length === 1 && !!document.querySelector('.knoten.aktuell[data-bot="rudi"]')
-    && document.querySelectorAll('.knoten.gesperrt').length === 5 && !!document.querySelector('.knoten.boss[data-bot="stockfisch"]')));
+    return k.length === 6 && k.map((b) => b.dataset.bot).join() === ids.join() && document.querySelector('.logo-unter').textContent.trim() === 'Fünf Welten, 30 Bots';
+  }, WELT_IDS[0]));
+  pruefe('Kopf-Chips: Sterne „5 / 90“ und Besiegt „2 / 30“', await seite.evaluate(() => {
+    const z = (s) => document.querySelector(s).textContent.replace(/\s+/g, ' ').trim();
+    return z('.kopf-chips .chip-sterne') === 'Sterne: 5 / 90' && z('.kopf-chips .chip-pokal') === 'Besiegt: 2 / 30';
+  }));
+  pruefe('Zustaende: 2 besiegt, Paula aktuell, Gustav und Hilde gesperrt, Janine (Endgegner) offen und .boss', await seite.evaluate(() => {
+    const ids = (s) => [...document.querySelectorAll(s)].map((k) => k.dataset.bot).join();
+    return ids('.knoten.besiegt') === 'fridolin,benno' && ids('.knoten.aktuell') === 'paula' && ids('.knoten.gesperrt') === 'gustav,hilde' && ids('.knoten.offen') === 'janine'
+      && ids('.knoten.boss') === 'janine';
+  }));
   pruefe('Fahne NÄCHSTER GEGNER nur beim aktuellen, Krone ENDGEGNER beim Boss', await seite.evaluate(() => document.querySelectorAll('.knoten .fahne').length === 1
-    && /NÄCHSTER GEGNER/.test(document.querySelector('.knoten.aktuell .fahne').textContent) && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)));
-  pruefe('Schloss bei jeder gesperrten Station, sonst nicht', await seite.evaluate(() => [...document.querySelectorAll('.knoten')].every((k) => (k.querySelectorAll('.schloss').length === 1) === k.classList.contains('gesperrt'))));
-  const f = await seite.evaluate(() => ({ g: getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="turm"] .avatar img')).filter, b: getComputedStyle(document.querySelector('.knoten.boss .avatar img')).filter,
+    && /NÄCHSTER GEGNER/.test(document.querySelector('.knoten.aktuell .fahne').textContent) && document.querySelectorAll('.knoten .boss-krone').length === 1
+    && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)));
+  pruefe('Schloss bei jeder gesperrten Station, sonst nicht (auch nicht beim offenen Endgegner)', await seite.evaluate(() => [...document.querySelectorAll('.knoten')].every((k) => (k.querySelectorAll('.schloss').length === 1) === k.classList.contains('gesperrt'))
+    && document.querySelectorAll('.knoten.gesperrt .schloss').length === 2));
+  const f = await seite.evaluate(() => ({ g: getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="hilde"] .avatar img')).filter, b: getComputedStyle(document.querySelector('.knoten.boss .avatar img')).filter,
     a: getComputedStyle(document.querySelector('.knoten.aktuell .avatar img')).filter }));
-  pruefe('gesperrt: Graustufen; Endgegner gesperrt: Silhouette; aktuell: ohne Filter', /grayscale/.test(f.g) && !/brightness\(0\)/.test(f.g) && /brightness\(0\)/.test(f.b) && f.a === 'none', JSON.stringify(f));
-  pruefe('Sterne nur bei besiegten (Benno 3, Hilde 2, Lisa 1), als SVG', await seite.evaluate(() => document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length === 3
-    && document.querySelectorAll('.knoten[data-bot="hilde"] .k-sterne .stern').length === 2 && document.querySelectorAll('.knoten[data-bot="lisa"] .k-sterne .stern').length === 1
-    && document.querySelectorAll('.knoten[data-bot="rudi"] .k-sterne').length === 0 && !!document.querySelector('.knoten[data-bot="benno"] .k-sterne svg') && !/★/.test(document.querySelector('.welt').textContent)));
-  pruefe('Schild mit Name und Elo (.k-name, .k-meta)', await seite.evaluate(() => document.querySelector('.knoten[data-bot="benno"] .k-name').textContent === 'Benno' && document.querySelector('.knoten[data-bot="benno"] .k-meta').textContent === '250'
-    && document.querySelector('.knoten[data-bot="turm"] .k-name').textContent === 'Prof. Turm'));
-  const labels = await seite.evaluate(() => [document.querySelector('.knoten[data-bot="benno"]').getAttribute('aria-label'), document.querySelector('.knoten[data-bot="rudi"]').getAttribute('aria-label'), document.querySelector('.knoten[data-bot="turm"]').getAttribute('aria-label')]);
-  pruefe('aria-label wie bisher („Stufe n: Name, Elo x, Zustand, k von 3 Sternen“)', labels[0] === 'Stufe 1: Bauer Benno, Elo 250, besiegt, 3 von 3 Sternen' && labels[1] === 'Stufe 5: Ritter Rudi, Elo 1200, nächster Gegner'
-    && labels[2] === 'Stufe 6: Professor Turm, Elo 1400, gesperrt', labels.join(' | '));
+  pruefe('gesperrt: Graustufen; Endgegner offen (direkt herausforderbar): sein Gesicht in Farbe, keine Silhouette; aktuell: ohne Filter', /grayscale/.test(f.g) && !/brightness\(0\)/.test(f.g) && f.b === 'none' && f.a === 'none', JSON.stringify(f));
+  pruefe('Sterne nur bei besiegten (Fridolin 3, Benno 2), als SVG', await seite.evaluate(() => document.querySelectorAll('.knoten[data-bot="fridolin"] .k-sterne .stern').length === 3
+    && document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length === 2 && document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .aus').length === 1
+    && ['paula', 'gustav', 'hilde', 'janine'].every((id) => document.querySelectorAll(`.knoten[data-bot="${id}"] .k-sterne`).length === 0)
+    && !!document.querySelector('.knoten[data-bot="fridolin"] .k-sterne svg') && !/★/.test(document.querySelector('.welt').textContent)));
+  pruefe('Schild mit Name und Elo (.k-name, .k-meta), Nummer der Stufe (.k-nr)', await seite.evaluate(() => document.querySelector('.knoten[data-bot="benno"] .k-name').textContent === 'Benno' && document.querySelector('.knoten[data-bot="benno"] .k-meta').textContent === '200'
+    && document.querySelector('.knoten[data-bot="hilde"] .k-name').textContent === 'Oma Hilde' && document.querySelector('.knoten[data-bot="hilde"] .k-meta').textContent === '500'
+    && document.querySelector('.knoten[data-bot="fridolin"] .k-nr').textContent === '1' && document.querySelector('.knoten[data-bot="janine"] .k-nr').textContent === '6'));
+  const labels = await seite.evaluate(() => ['benno', 'paula', 'hilde', 'janine'].map((id) => document.querySelector(`.knoten[data-bot="${id}"]`).getAttribute('aria-label')));
+  pruefe('aria-label wie bisher („Stufe n: Name, Elo x, Zustand, k von 3 Sternen“), der offene Endgegner „direkt herausfordern“', labels[0] === 'Stufe 2: Bauer Benno, Elo 200, besiegt, 2 von 3 Sternen' && labels[1] === 'Stufe 3: Postbotin Paula, Elo 300, nächster Gegner'
+    && labels[2] === 'Stufe 5: Oma Hilde, Elo 500, gesperrt' && labels[3] === 'Stufe 6: Janine vom Scheunenclub, Elo 600, Endgegner, direkt herausfordern', labels.join(' | '));
   pruefe('Portraets der Stationen und des Panels aus assets/avatare/modern/', await seite.evaluate(() => [...document.querySelectorAll('.knoten .avatar img')].every((i, n) => i.src.endsWith(`/assets/avatare/modern/${document.querySelectorAll('.knoten')[n].dataset.bot}.svg`))
-    && document.querySelector('.detail .detail-kopf .av img').src.endsWith('/assets/avatare/modern/rudi.svg')));
+    && document.querySelector('.detail .detail-kopf .av img').src.endsWith('/assets/avatare/modern/paula.svg')));
   const atmen = await seite.evaluate(() => {
     const av = document.querySelector('.knoten.aktuell .avatar');
     const vorher = { name: getComputedStyle(av).animationName, zustand: getComputedStyle(av).animationPlayState };
@@ -403,11 +445,13 @@ async function testeKarteQuer(browser) {
     return { klasse: document.querySelector('.arena').className, scrollH: k.scrollHeight, clientH: k.clientHeight, scrollTop: k.scrollTop, bossOben: boss.top - kb.top, bossUnten: kb.bottom - boss.bottom,
       floDrin: flo.left >= kb.left && flo.right <= kb.right && flo.top >= kb.top && flo.bottom <= kb.bottom && flo.width > 20,
       panelRechts: d.left >= kb.right, svg: !!document.querySelector('.karte svg.welt-svg'), fortschritt: !!document.querySelector('.welt-svg .w-fortschritt'),
-      szene: document.querySelectorAll('.welt-svg .w-laub, .welt-svg .w-tanne, .welt-svg .w-dach, .welt-svg .w-dach-2, .welt-svg .w-dach-3, .welt-svg .w-wasser').length,
+      szene: document.querySelectorAll('.welt-svg g[transform]').length, aecker: document.querySelectorAll('.welt-svg .w-acker').length, baeume: document.querySelectorAll('.welt-svg .w-laub').length,
+      haeuser: document.querySelectorAll('.welt-svg .w-dach, .welt-svg .w-dach-2, .welt-svg .w-dach-3').length,
       orteLeer: document.querySelector('.ort-karte-boss').hidden && document.querySelector('.ort-karte-event').hidden };
   });
   pruefe('iPad quer: .karte-quer, Karte links passt ganz (kein Scrollen), Endgegner oben sichtbar, Panel rechts', /karte-quer/.test(lage.klasse) && lage.scrollH <= lage.clientH + 1 && lage.scrollTop === 0 && lage.bossOben >= 0 && lage.bossUnten >= 0 && lage.panelRechts, JSON.stringify(lage));
-  pruefe('Welt-Zeichnung: SVG mit Baeumen, Haeusern, Wasser und Fortschritts-Pfad; Flos Figur auf der Karte', lage.svg && lage.fortschritt && lage.szene >= 12 && lage.floDrin, JSON.stringify(lage));
+  pruefe('Welt-Zeichnung der Karofelder: SVG mit Aeckern, Baeumen, Haeusern, gefuellter Szenerie und Fortschritts-Pfad; Flos Figur auf der Karte',
+    lage.svg && lage.fortschritt && lage.szene >= 20 && lage.aecker >= 2 && lage.baeume >= 2 && lage.haeuser >= 2 && lage.floDrin, JSON.stringify(lage));
   pruefe('Orte auf der Karte ohne Anbieter unsichtbar', lage.orteLeer);
   const kl = await kartenLage(seite);
   pruefe('Beschriftungen innerhalb der Karte, keine ueberdeckt eine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
@@ -421,7 +465,7 @@ async function testeKarteQuer(browser) {
     const d = document.querySelector('aside.detail');
     const kinder = [...d.children].map((k) => k.className.split(' ')[0]);
     const ziel = d.querySelector('.ziel-sterne');
-    return { kinder, h2: d.querySelector('h2').textContent, ueber: d.querySelector('.detail-ueber').textContent, elo: d.querySelector('.elo').textContent,
+    return { kinder, h2: d.querySelector('h2').textContent, ueber: d.querySelector('.detail-ueber').textContent, elo: d.querySelector('.elo').textContent, welt: d.querySelector('.detail-welt').textContent,
       merkmale: d.querySelectorAll('.merkmal').length, ziele: d.querySelectorAll('.ziel-sterne > div').length, an: d.querySelectorAll('.ziel-sterne .an').length,
       blase: d.querySelector('.sprechblase').textContent.trim().length, segment: !!d.querySelector('.farbwahl.segment[role="radiogroup"]'),
       weiss: d.querySelectorAll('.farbwahl [data-farbe="w"][aria-checked="true"]').length, farben: [...d.querySelectorAll('.farbwahl [data-farbe]')].map((b) => b.dataset.farbe).join(),
@@ -430,32 +474,38 @@ async function testeKarteQuer(browser) {
       tempo: !!d.querySelector('.ort-tempo'), bilanz: d.querySelectorAll('.bilanz b').length, miniSterne: d.querySelectorAll('.mini-sterne .stern').length,
       sternSvg: !!d.querySelector('.ziel-sterne b svg') && !/★/.test(d.textContent), ueberFarbe: getComputedStyle(d.querySelector('.detail-ueber')).color, akzentText: getComputedStyle(document.documentElement).getPropertyValue('--akzent-text').trim() };
   });
-  pruefe('Kopf: Ueberzeile „Stufe 5 · Nächster Gegner“ in --akzent-text, Name, „Elo 1200 · Der Gabelritter“', panel.h2 === 'Ritter Rudi' && panel.ueber === 'Stufe 5 · Nächster Gegner' && panel.elo === 'Elo 1200 · Der Gabelritter'
-    && panel.ueberFarbe === 'rgb(184, 62, 26)', JSON.stringify(panel));
+  pruefe('Kopf: Ueberzeile „Stufe 3 · Nächster Gegner“ in --akzent-text, Welt, Name, „Elo 300 · Die Eilige“', panel.h2 === 'Postbotin Paula' && panel.ueber === 'Stufe 3 · Nächster Gegner' && panel.elo === 'Elo 300 · Die Eilige'
+    && panel.welt === 'Welt 1 · Die Karofelder' && panel.ueberFarbe === 'rgb(184, 62, 26)', JSON.stringify(panel));
   pruefe('Orte: .ort-panel-oben erstes Kind, section.heute-karte danach, .ort-panel-bot direkt nach .ziel-sterne, .ort-tempo da', panel.kinder[0] === 'ort-panel-oben' && panel.kinder[1] === 'heute-karte' && panel.botOrtNachZielen && panel.tempo, panel.kinder.join());
   pruefe('Steckbrief 3 Kacheln, Bedingungen 3 (keine erreicht), Spruch-Karte, Bilanz 4 Zahlen, Sterne als SVG', panel.merkmale === 3 && panel.ziele === 3 && panel.an === 0 && panel.blase > 5 && panel.bilanz === 4 && panel.miniSterne === 0 && panel.sternSvg, JSON.stringify(panel));
   pruefe('Farbe als Segment (bauteile.segment) mit w, zufall, b; Weiß vorgewaehlt', panel.segment && panel.farben === 'w,zufall,b' && panel.weiss === 1, panel.farben);
-  pruefe('Spielen-Knopf im Panel: „Spielen gegen Ritter Rudi“', panel.spielenDrin && panel.spielenText === 'Spielen gegen Ritter Rudi', panel.spielenText);
-  await tippe(seite, '.knoten[data-bot="benno"]');
-  await warte(700);
-  const wahl = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, ueber: document.querySelector('.detail-ueber').textContent, an: document.querySelectorAll('.ziel-sterne .an').length,
-    mini: document.querySelectorAll('.mini-sterne .stern').length, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(),
-    gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, pressed: document.querySelector('.knoten[data-bot="benno"]').getAttribute('aria-pressed') + document.querySelector('.knoten[data-bot="rudi"]').getAttribute('aria-pressed') }));
-  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Benno, Besiegt, 3 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Benno' && wahl.ueber === 'Stufe 1 · Besiegt' && wahl.an === 3 && wahl.mini === 3
+  pruefe('Spielen-Knopf im Panel: „Spielen gegen Paula“', panel.spielenDrin && panel.spielenText === 'Spielen gegen Paula', panel.spielenText);
+  const waehleStation = async (id) => {
+    await tippe(seite, `.knoten[data-bot="${id}"]`);
+    await warte(700);
+    return seite.evaluate((i) => ({ h2: document.querySelector('.detail h2').textContent, ueber: document.querySelector('.detail-ueber').textContent, an: document.querySelectorAll('.ziel-sterne .an').length,
+      mini: document.querySelectorAll('.mini-sterne .stern').length, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(),
+      gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, pressed: document.querySelector(`.knoten[data-bot="${i}"]`).getAttribute('aria-pressed') + document.querySelector('.knoten[data-bot="paula"]').getAttribute('aria-pressed') }), id);
+  };
+  const wahl = await waehleStation('benno');
+  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Benno, Besiegt, 2 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Benno' && wahl.ueber === 'Stufe 2 · Besiegt' && wahl.an === 2 && wahl.mini === 2
     && wahl.spielen === 'Revanche gegen Benno' && wahl.gewaehlt === 'benno' && wahl.pressed === 'truefalse', JSON.stringify(wahl));
-  await tippe(seite, '.knoten[data-bot="turm"]');
+  const wahl3 = await waehleStation('fridolin');
+  pruefe('alle drei Ziele erreicht (Fridolin, 3 Sterne, Revanche)', wahl3.h2 === 'Vogelscheuche Fridolin' && wahl3.ueber === 'Stufe 1 · Besiegt' && wahl3.an === 3 && wahl3.mini === 3
+    && wahl3.spielen === 'Revanche gegen Fridolin' && wahl3.gewaehlt === 'fridolin' && wahl3.pressed === 'truefalse', JSON.stringify(wahl3));
+  await tippe(seite, '.knoten[data-bot="gustav"]');
   await seite.waitForSelector('.toast');
   const t1 = await seite.locator('.toast').innerText();
-  pruefe('gesperrt direkt hinter dem aktuellen: „Besiege erst Ritter Rudi“, Panel bleibt', /Besiege erst Ritter Rudi/.test(t1) && (await seite.locator('.detail h2').innerText()) === 'Bauer Benno', t1);
+  pruefe('gesperrt direkt hinter dem aktuellen: „Besiege erst Postbotin Paula“, Panel bleibt', /Besiege erst Postbotin Paula/.test(t1) && (await seite.locator('.detail h2').innerText()) === 'Vogelscheuche Fridolin', t1);
   await seite.evaluate(() => { for (const t of document.querySelectorAll('.toast')) t.remove(); });
-  await tippe(seite, '.knoten[data-bot="greta"]');
+  await tippe(seite, '.knoten[data-bot="hilde"]');
   await seite.waitForSelector('.toast');
   const t2 = await seite.locator('.toast').innerText();
-  pruefe('gesperrt weiter oben: „Besiege zuerst Ritter Rudi“', /Besiege zuerst Ritter Rudi/.test(t2), t2);
+  pruefe('gesperrt weiter oben: „Besiege zuerst Postbotin Paula“', /Besiege zuerst Postbotin Paula/.test(t2), t2);
   await tippe(seite, '.farbwahl [data-farbe="b"]');
   pruefe('Farbwahl Schwarz: aria-checked, Flos Figur zeigt den schwarzen Koenig', await seite.evaluate(() => document.querySelector('.farbwahl [data-farbe="b"]').getAttribute('aria-checked') === 'true'
     && /bK\.svg/.test(document.querySelector('.flo-figur image').getAttribute('href'))));
-  await tippe(seite, '.knoten[data-bot="rudi"]');
+  await tippe(seite, '.knoten[data-bot="paula"]');
   await warte(600);
   // Meldungen der Sperr-Tipps vor dem Bild entfernen (sonst verdecken sie Schilder am unteren Kartenrand)
   await seite.evaluate(() => { for (const t of document.querySelectorAll('.toast')) t.remove(); });
@@ -522,7 +572,7 @@ async function testeOrte(browser) {
     && JSON.stringify(o.kontexte['arena:karte-boss']) === '["app","fortschritt","karte","scrolleZu"]' && JSON.stringify(o.kontexte['arena:karte-event']) === '["app","fortschritt","karte","scrolleZu"]', JSON.stringify(o.kontexte));
   pruefe('arena:start: { app, s, karte, scrolleZu, neuId }, karte ist der Scroll-Behaelter .karte', o.start && JSON.stringify(o.start.schluessel) === '["app","karte","neuId","s","scrolleZu"]' && o.start.karteIstScrollBehaelter && o.start.scrolleZu === 'function' && o.start.neuId === null, JSON.stringify(o.start));
   // Bot wechseln: Panel-Orte werden neu gefuellt, Karten-Orte bleiben; verlassen raeumt auf
-  await tippe(seite, '.knoten[data-bot="kalle"]');
+  await tippe(seite, '.knoten[data-bot="benno"]');
   await warte(700);
   const n = await seite.evaluate(() => ({ panel: document.querySelectorAll('.detail .u5-test').length, karte: document.querySelectorAll('.karte .u5-test').length, kopf: document.querySelectorAll('.kopf-chips .u5-test').length }));
   pruefe('nach dem Botwechsel: je ein Element je Ort (nichts doppelt)', n.panel === 3 && n.karte === 2 && n.kopf === 1, JSON.stringify(n));
@@ -680,9 +730,9 @@ async function testeHandyQuer(browser) {
 }
 
 // Pruefer-Befund U5 (blockierend): der Text des Spielen-Knopfs wurde gekuerzt ("Spielen gegen den Stockfis…" auf dem
-// Handy, "Revanche gegen den Kommissar" auf dem iPad), geprueft war nur Rudi. Jetzt alle zehn Bots in beiden Fassungen
-// in allen Ziel-Lagen: echte Panels (alle besiegt, jede Station antippen: "Revanche gegen …") und der Spielen-Text jedes
-// Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
+// Handy, "Revanche gegen den Kommissar" auf dem iPad), geprueft war nur ein Bot. Jetzt alle 30 Bots in beiden Fassungen
+// in allen Ziel-Lagen: echte Panels (alle besiegt, Welt fuer Welt jede Station antippen: "Revanche gegen …") und der
+// Spielen-Text jedes Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
 async function testeKnopftext(browser) {
   for (const vp of [{ w: 375, h: 667, handy: true }, { w: 390, h: 844, handy: true }, { w: 820, h: 1180 }, { w: 1024, h: 768 }, { w: 1180, h: 820 }, { w: 844, h: 390, handy: true }]) {
     gruppe = `Knopftext ${vp.w} × ${vp.h}`;
@@ -693,12 +743,16 @@ async function testeKnopftext(browser) {
     const echt = [];
     const texte = [];
     const ab = new Set();
-    for (const id of IDS) {
-      await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
-      texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
-      const r = await spielenPasst(seite);
-      if (r) echt.push(r);
-      for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);
+    // die Karte zeigt eine Welt: Welt fuer Welt durchgehen (die Reihenfolge ist die der Leiter)
+    for (const [wi, ids] of WELT_IDS.entries()) {
+      await geheZuWelt(seite, wi + 1);
+      for (const id of ids) {
+        await seite.evaluate((i) => document.querySelector(`.knoten[data-bot="${i}"]`).click(), id);
+        texte.push(await seite.evaluate(() => document.querySelector('.detail [data-aktion="spielen"]').textContent.trim()));
+        const r = await spielenPasst(seite);
+        if (r) echt.push(r);
+        for (const x of await abgeschnitten(seite)) ab.add(id + ' ' + x);
+      }
     }
     const erwartet = await seite.evaluate(async () => {
       const { spielenText } = await import('./js/ui/arena.js');
@@ -706,7 +760,7 @@ async function testeKnopftext(browser) {
       const tmp = document.createElement('span');
       return BOTS.map((b) => { tmp.innerHTML = spielenText(b, true); return tmp.textContent; });
     });
-    pruefe('echte Panels: „Revanche gegen …“ fuer jeden der zehn Bots ganz im Knopf (hoechstens zwei Zeilen, Rufname nie getrennt)',
+    pruefe('echte Panels: „Revanche gegen …“ fuer jeden der 30 Bots ganz im Knopf (hoechstens zwei Zeilen, Rufname nie getrennt)',
       echt.length === 0 && texte.join('|') === erwartet.join('|') && texte.includes('Revanche gegen den Stockfisch'), echt.join(' | ') + ' ' + texte.join('|'));
     const synth = [];
     for (const b of BOTS) {
@@ -720,11 +774,169 @@ async function testeKnopftext(browser) {
         if (r) synth.push(r);
       }
     }
-    pruefe('„Spielen gegen …“ und „Revanche gegen …“ fuer jeden der zehn Bots ganz im echten Knopf', synth.length === 0, synth.join(' | '));
-    pruefe('alle zehn Panels: kein Name, kein Steckbrief, keine Bedingung und keine Farbwahl abgeschnitten oder herausragend', ab.size === 0, [...ab].slice(0, 6).join(' | '));
+    pruefe('„Spielen gegen …“ und „Revanche gegen …“ fuer jeden der 30 Bots ganz im echten Knopf', synth.length === 0, synth.join(' | '));
+    pruefe('alle 30 Panels und alle fuenf Karten: kein Name, kein Schild, kein Steckbrief, keine Bedingung und keine Farbwahl abgeschnitten oder herausragend', ab.size === 0, [...ab].slice(0, 6).join(' | '));
     await seite.evaluate(() => document.querySelector('.knoten[data-bot="stockfisch"]').click());
     await warte(800);
     await bild(seite, `knopftext-${vp.w}x${vp.h}`);
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
+// Welten (Flo 23.10.): die Karte zeigt die sechs Stationen einer Welt; Weltwahl mit Pfeilen, gesperrte Welten
+// (.welt-sperre), Schild NEU (.k-neu), Endgegner direkt herausforderbar, alle 30 Bots Welt fuer Welt
+const weltwahl = (seite) => seite.evaluate(() => {
+  const ww = document.querySelector('.weltwahl');
+  const sperre = document.querySelector('.welt-sperre');
+  const w = document.querySelector('.welt');
+  return { name: ww.querySelector('.ww-name').textContent, unter: ww.querySelector('.ww-unter').textContent,
+    zurueckAus: ww.querySelector('[data-richtung="-1"]').disabled, vorAus: ww.querySelector('[data-richtung="1"]').disabled,
+    siegel: ww.classList.contains('mit-siegel'), wwGesperrt: ww.classList.contains('gesperrt'), welt: w.dataset.welt, weltGesperrt: w.classList.contains('gesperrt'),
+    sperre: !sperre.hidden, sperreText: sperre.textContent.replace(/\s+/g, ' ').trim(), flo: getComputedStyle(document.querySelector('.flo-figur')).display,
+    ids: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => k.dataset.bot),
+    zustaende: [...document.querySelectorAll('.welt button.stufe.knoten[data-bot]')].map((k) => ['besiegt', 'aktuell', 'offen', 'gesperrt'].find((z) => k.classList.contains(z))).join(),
+    nr: [...document.querySelectorAll('.welt .knoten .k-nr')].map((e) => e.textContent).join(), elo: [...document.querySelectorAll('.welt .knoten .k-meta')].map((e) => e.textContent).join() };
+});
+// ein neuer Aufruf der Arena (wie nach einer Partie oder ueber einen Link): die alte Arena merken, die neue abwarten
+async function arenaNeu(seite, params) {
+  await seite.evaluate((p) => { document.querySelector('.screen.arena').dataset.alt = 'ja'; window.__app.gehe('arena', p); }, params);
+  await seite.waitForSelector('.screen.arena:not([data-alt]) .knoten');
+  await seite.waitForFunction(() => document.querySelectorAll('.screen.arena').length === 1);
+  await warte(500);
+}
+async function testeWelten(browser) {
+  gruppe = 'Welten';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820 });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1200);
+    let w = await weltwahl(seite);
+    pruefe('Weltwahl: die Karte beginnt in der Welt des naechsten Gegners (Die Karofelder, 5/18 Sterne), „Zurueck“ aus, „Vor“ an, Landschaft der Welt, keine Sperre',
+      w.name === 'Die Karofelder' && w.unter === 'Welt 1 von 5 · 5/18 Sterne' && w.zurueckAus && !w.vorAus && !w.siegel && !w.wwGesperrt && w.welt === 'karofelder' && !w.weltGesperrt && !w.sperre && w.flo !== 'none',
+      JSON.stringify(w));
+    // Endgegner direkt herausforderbar: offen (nicht gesperrt), ein Tipp waehlt ihn, Spielen ist moeglich
+    await tippe(seite, '.knoten[data-bot="janine"]');
+    await warte(700);
+    const jan = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, ueber: document.querySelector('.detail-ueber').textContent.replace(/\s+/g, ' ').trim(),
+      welt: document.querySelector('.detail-welt').textContent, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(),
+      gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, offen: document.querySelector('.knoten[data-bot="janine"]').classList.contains('offen'),
+      toast: document.querySelectorAll('.toast').length }));
+    pruefe('Endgegner offen: Janine ist ohne Sieg ueber Gustav und Hilde waehlbar (Panel „Stufe 6 · Endgegner · direkt herausfordern“, Spielen gegen Janine), keine Sperr-Meldung',
+      jan.h2 === 'Janine vom Scheunenclub' && jan.ueber === 'Stufe 6 · Endgegner · direkt herausfordern' && jan.welt === 'Welt 1 · Die Karofelder' && jan.spielen === 'Spielen gegen Janine'
+      && jan.gewaehlt === 'janine' && jan.offen && jan.toast === 0, JSON.stringify(jan));
+    // Pfeil „Vor“ (mit dem Finger): Welt 2 ist gesperrt, die Karte zeigt sie als ruhige Silhouette mit Sperre
+    await tippe(seite, '.ww-pfeil[data-richtung="1"]');
+    await warte(500);
+    w = await weltwahl(seite);
+    pruefe('Pfeil vor: Welt 2 „Der Springerforst“, gesperrt (Weltwahl und Karte grau, .welt-sperre nennt den Schluessel: Sieg gegen Janine), Flos Figur weg',
+      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · gesperrt' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && w.sperre && !w.zurueckAus && !w.vorAus && w.flo === 'none'
+      && /Dichter Mischwald mit Lichtungen und Bach\. Ein Sieg gegen Janine vom Scheunenclub öffnet sie\.$/.test(w.sperreText) && w.sperreText.startsWith('Der Springerforst'), JSON.stringify(w));
+    pruefe('gesperrte Welt: alle sechs Stationen gesperrt mit Schloss, der Endgegner (Ritter Rudi) als Silhouette mit „?“, die anderen in Graustufen',
+      w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten.gesperrt .schloss').length === 6
+        && /brightness\(0\)/.test(getComputedStyle(document.querySelector('.knoten.boss[data-bot="rudi"] .avatar img')).filter) && /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="kalle"] .avatar img')).filter)
+        && document.querySelectorAll('.knoten .fahne').length === 0 && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)), JSON.stringify(w));
+    await tippe(seite, '.knoten[data-bot="kalle"]');
+    await seite.waitForSelector('.toast');
+    const sp = await seite.evaluate(() => ({ toast: document.querySelector('.toast').textContent, h2: document.querySelector('.detail h2').textContent }));
+    pruefe('Tipp auf eine Station der gesperrten Welt: „Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.“, das Panel bleibt bei Janine',
+      sp.toast === 'Diese Welt öffnet sich mit einem Sieg gegen Janine vom Scheunenclub.' && sp.h2 === 'Janine vom Scheunenclub', JSON.stringify(sp));
+    await seite.evaluate(() => { for (const x of document.querySelectorAll('.toast')) x.remove(); });
+    // alle fuenf Welten der Reihe nach: sechs Stationen, Stufe 1 bis 30 mit Elo 100 bis 3000, nichts ueberdeckt oder abgeschnitten
+    await geheZuWelt(seite, 1);
+    const alle = [];
+    const probleme = [];
+    for (const [wi, ids] of WELT_IDS.entries()) {
+      await geheZuWelt(seite, wi + 1);
+      await warte(250);
+      const x = await weltwahl(seite);
+      const stufen = ids.map((id) => BOTS.find((b) => b.id === id).stufe);
+      alle.push(...x.ids);
+      if (x.name !== WELTEN[wi].name || !x.unter.startsWith(`Welt ${wi + 1} von 5`) || x.ids.join() !== ids.join() || x.nr !== stufen.join() || x.elo !== stufen.map((s) => s * 100).join()
+        || x.zurueckAus !== (wi === 0) || x.vorAus !== (wi === 4) || x.welt !== WELTEN[wi].id || x.weltGesperrt !== (wi > 0)) probleme.push('Welt ' + (wi + 1) + ': ' + JSON.stringify(x));
+      const kl = await kartenLage(seite);
+      if (kl.ueber.length || kl.raus.length) probleme.push('Lage Welt ' + (wi + 1) + ': ' + JSON.stringify(kl));
+      const ab = await abgeschnitten(seite);
+      if (ab.length) probleme.push('abgeschnitten Welt ' + (wi + 1) + ': ' + ab.join(' | '));
+      if (await seite.evaluate(() => document.querySelectorAll('.welt button.stufe.knoten.boss').length !== 1)) probleme.push('Welt ' + (wi + 1) + ': nicht genau ein Endgegner');
+      // jede Welt hat ihre eigene Landschaft (Aecker, Tannen, Tuerme, Wellen, Algen) und ihr Wahrzeichen am Endgegner
+      const eigen = ['.w-acker', '.w-tanne', '.w-stein', '.w-welle', '.w-alge'][wi];
+      if (await seite.evaluate((e) => document.querySelectorAll(`.welt-svg ${e}`).length === 0, eigen)) probleme.push('Welt ' + (wi + 1) + ': keine Landschaft ' + eigen);
+      await bild(seite, `arena-welt${wi + 1}-1180x820`);
+    }
+    pruefe('Pfeile durch alle fuenf Welten: Name, „Welt n von 5“, sechs Stationen in Leiter-Reihenfolge (Stufe = Nummer, Elo = 100 x Stufe), ein Endgegner, Beschriftungen innerhalb der Karte und nicht abgeschnitten, an den Enden ist der Pfeil aus',
+      probleme.length === 0 && alle.join() === IDS.join(), probleme.join(' ## ').slice(0, 600));
+    pruefe('Weltwahl-Pfeile mindestens 44 px', (await kleineTippflaechen(seite)).length === 0);
+    // Aufruf mit Welt: app.gehe('arena', { welt }) zeigt diese Welt, { waehle } waehlt einen offenen Bot vor
+    await arenaNeu(seite, { welt: 3 });
+    w = await weltwahl(seite);
+    const h3 = await seite.evaluate(() => document.querySelector('.detail h2').textContent);
+    pruefe('gehe(arena, { welt: 3 }): zeigt Die Turmstadt (gesperrt), das Panel bleibt beim naechsten Gegner', w.name === 'Die Turmstadt' && w.unter === 'Welt 3 von 5 · gesperrt' && w.weltGesperrt && h3 === 'Postbotin Paula', JSON.stringify([w.name, w.unter, h3]));
+    await arenaNeu(seite, { waehle: 'janine' });
+    w = await weltwahl(seite);
+    const hj = await seite.evaluate(() => ({ h2: document.querySelector('.detail h2').textContent, gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot }));
+    pruefe('gehe(arena, { waehle: "janine" }): der frei herausforderbare Endgegner ist vorgewaehlt, die Karte zeigt seine Welt', w.name === 'Die Karofelder' && hj.h2 === 'Janine vom Scheunenclub' && hj.gewaehlt === 'janine', JSON.stringify([w.name, hj]));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // Schild NEU: Fridolin ist frei, aber nicht der naechste Gegner und liegt unter Flos bestem Sieg (Benno)
+  gruppe = 'Welten neu eingezogen';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_BENNO });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1200);
+    const n = await seite.evaluate(() => {
+      const f = document.querySelector('.knoten[data-bot="fridolin"]');
+      return { neu: [...document.querySelectorAll('.k-neu')].map((e) => e.closest('.knoten').dataset.bot + ':' + e.textContent).join(), fridolin: f.classList.contains('offen'), schloss: f.querySelectorAll('.schloss').length,
+        grau: getComputedStyle(f.querySelector('.avatar img')).filter, label: f.getAttribute('aria-label'),
+        zustaende: [...document.querySelectorAll('.welt .knoten')].map((k) => k.dataset.bot + '=' + ['besiegt', 'aktuell', 'offen', 'gesperrt'].find((z) => k.classList.contains(z))).join() };
+    });
+    pruefe('Schild NEU nur an Fridolin (frei, unbesiegt, unter dem besten Sieg): offen, ohne Schloss und in Farbe, Beschriftung „neu eingezogen“',
+      n.neu === 'fridolin:NEU' && n.fridolin && n.schloss === 0 && n.grau === 'none' && n.label === 'Stufe 1: Vogelscheuche Fridolin, Elo 100, neu eingezogen', JSON.stringify(n));
+    pruefe('Zustaende nach Benno-Sieg: Fridolin offen, Benno besiegt, Paula aktuell, Gustav und Hilde gesperrt, Janine offen', n.zustaende === 'fridolin=offen,benno=besiegt,paula=aktuell,gustav=gesperrt,hilde=gesperrt,janine=offen', n.zustaende);
+    const kl = await kartenLage(seite);
+    pruefe('Schild NEU liegt innerhalb der Karte und ueberdeckt keine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
+    await tippe(seite, '.knoten[data-bot="fridolin"]');
+    await warte(700);
+    const pf = await seite.evaluate(() => ({ ueber: document.querySelector('.detail-ueber').textContent, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(), toast: document.querySelectorAll('.toast').length }));
+    pruefe('Tipp auf den neu eingezogenen Bot waehlt ihn: „Stufe 1 · Neu eingezogen“, Spielen gegen Fridolin', pf.ueber === 'Stufe 1 · Neu eingezogen' && pf.spielen === 'Spielen gegen Fridolin' && pf.toast === 0, JSON.stringify(pf));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
+  // Weltsiegel und alles besiegt
+  gruppe = 'Welten Siegel';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_WELT1 });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1200);
+    let w = await weltwahl(seite);
+    pruefe('Welt 1 ganz besiegt: die Karte beginnt in Welt 2 (Bodo ist der naechste Gegner), offen und ohne Sperre',
+      w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · 0/18 Sterne' && !w.weltGesperrt && !w.sperre && w.zustaende === 'aktuell,gesperrt,gesperrt,gesperrt,gesperrt,offen' && w.flo !== 'none', JSON.stringify(w));
+    await tippe(seite, '.ww-pfeil[data-richtung="-1"]');
+    await warte(500);
+    w = await weltwahl(seite);
+    pruefe('Pfeil zurueck: Welt 1 mit Weltsiegel (alle 18 Sterne, goldener Rand, „· Weltsiegel“), alle sechs besiegt', w.name === 'Die Karofelder' && w.unter === 'Welt 1 von 5 · 18/18 Sterne · Weltsiegel' && w.siegel
+      && w.zustaende === 'besiegt,besiegt,besiegt,besiegt,besiegt,besiegt', JSON.stringify(w));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'Welten alles besiegt';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_ALLE });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(1200);
+    const sterne = Object.values(SAAT_ALLE.bots).reduce((n, b) => n + b.sterne.filter(Boolean).length, 0);
+    // (vor „Sterne“ steht ein geschuetztes Leerzeichen: erst die Leerraeume gleichsetzen)
+    const a = await seite.evaluate(() => ({ unter: document.querySelector('.logo-unter').textContent.replace(/\s+/g, ' ').trim(), aktuell: document.querySelectorAll('.knoten.aktuell').length, fahne: document.querySelectorAll('.knoten .fahne').length,
+      sterne: document.querySelector('.kopf-chips .chip-sterne').textContent.replace(/\s+/g, ' ').trim(), besiegt: document.querySelector('.kopf-chips .chip-pokal').textContent.replace(/\s+/g, ' ').trim() }));
+    pruefe('Alle 30 besiegt: Kopfzeile „Arena bezwungen! x/90 Sterne“, Chips „x / 90“ und „30 / 30“, kein naechster Gegner und keine Fahne',
+      a.unter === `Arena bezwungen! ${sterne}/90 Sterne` && a.sterne === `Sterne: ${sterne} / 90` && a.besiegt === 'Besiegt: 30 / 30' && a.aktuell === 0 && a.fahne === 0, JSON.stringify(a));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -748,19 +960,19 @@ async function testeFreischalten(browser) {
       DOMTokenList.prototype.add = function (...k) { if (k.includes('wird-frei') && t.setzen == null) t.setzen = performance.now(); return add.apply(this, k); };
       DOMTokenList.prototype.remove = function (...k) { if (k.includes('wird-frei') && t.setzen != null && t.entfernen == null && this.contains('wird-frei')) t.entfernen = performance.now(); return remove.apply(this, k); };
       const mo = new MutationObserver(() => {
-        const k = document.querySelector('.knoten[data-bot="hilde"]');
+        const k = document.querySelector('.knoten[data-bot="paula"]');
         if (!k) return;
         if (t.an == null && k.classList.contains('wird-frei')) t.an = performance.now();
         if (t.an != null && t.aus == null && !k.classList.contains('wird-frei')) { t.aus = performance.now(); mo.disconnect(); }
       });
       mo.observe(document.getElementById('app'), { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
-      window.__app.gehe('arena', { neuFreigeschaltet: 'hilde' });
+      window.__app.gehe('arena', { neuFreigeschaltet: 'paula' });
     });
-    await seite.waitForSelector('.knoten.wird-frei[data-bot="hilde"]');
-    const anfang = await seite.evaluate(() => ({ schloss: document.querySelectorAll('.knoten[data-bot="hilde"] .schloss').length, aktuell: !!document.querySelector('.knoten.aktuell[data-bot="hilde"]:not(.gesperrt)'),
-      panel: document.querySelector('.detail h2').textContent, fahneDa: !!document.querySelector('.knoten[data-bot="hilde"] .fahne'),
-      grau: /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="hilde"] .avatar img')).filter) }));
-    pruefe('Beginn: .wird-frei auf Hilde, Schloss noch da, Gesicht noch grau, Hilde im Panel', anfang.schloss === 1 && anfang.aktuell && anfang.panel === 'Oma Hilde' && anfang.fahneDa && anfang.grau, JSON.stringify(anfang));
+    await seite.waitForSelector('.knoten.wird-frei[data-bot="paula"]');
+    const anfang = await seite.evaluate(() => ({ schloss: document.querySelectorAll('.knoten[data-bot="paula"] .schloss').length, aktuell: !!document.querySelector('.knoten.aktuell[data-bot="paula"]:not(.gesperrt)'),
+      panel: document.querySelector('.detail h2').textContent, fahneDa: !!document.querySelector('.knoten[data-bot="paula"] .fahne'),
+      grau: /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="paula"] .avatar img')).filter) }));
+    pruefe('Beginn: .wird-frei auf Paula, Schloss noch da, Gesicht noch grau, Paula im Panel', anfang.schloss === 1 && anfang.aktuell && anfang.panel === 'Postbotin Paula' && anfang.fahneDa && anfang.grau, JSON.stringify(anfang));
     await seite.waitForFunction(() => window.__frei.aus != null, null, { timeout: 15000 });
     const frei = await seite.evaluate(() => window.__frei);
     pruefe('Choreografie endet nach 2,7 s (nicht frueher, hoechstens 1 s spaeter)', frei.setzen != null && frei.entfernen != null && frei.an != null && frei.aus != null
@@ -768,19 +980,38 @@ async function testeFreischalten(browser) {
     const ende = await seite.evaluate(async () => {
       const { klang } = await import('./js/sounds.js');
       const k = document.querySelector('.karte').getBoundingClientRect();
-      const h = document.querySelector('.knoten[data-bot="hilde"] .avatar').getBoundingClientRect();
-      return { schloss: document.querySelectorAll('.knoten[data-bot="hilde"] .schloss').length, sterne: document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length,
-        fahne: (document.querySelector('.knoten.aktuell[data-bot="hilde"] .fahne') || {}).textContent, bunt: getComputedStyle(document.querySelector('.knoten[data-bot="hilde"] .avatar img')).filter,
+      const h = document.querySelector('.knoten[data-bot="paula"] .avatar').getBoundingClientRect();
+      return { schloss: document.querySelectorAll('.knoten[data-bot="paula"] .schloss').length, sterne: document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length,
+        fahne: (document.querySelector('.knoten.aktuell[data-bot="paula"] .fahne') || {}).textContent, bunt: getComputedStyle(document.querySelector('.knoten[data-bot="paula"] .avatar img')).filter,
         toast: [...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | '), imBild: h.top >= k.top && h.bottom <= k.bottom,
         sternKlang: klang.protokoll().some((e) => e.name === 'stern'), floX: document.querySelector('.flo-figur').style.left,
         floBeiBenno: (() => { const f = document.querySelector('.flo-figur').getBoundingClientRect(); const b = document.querySelector('.knoten[data-bot="benno"] .avatar').getBoundingClientRect();
           return Math.hypot(f.left + f.width / 2 - (b.left + b.width / 2), f.top + f.height / 2 - (b.top + b.height / 2)) < b.width; })() };
     });
-    pruefe('Ende: Schloss weg, Hilde bunt mit Fahne, Benno drei Sterne, Meldung „Neu freigeschaltet“, Stern-Klang', ende.schloss === 0 && ende.sterne === 3 && /NÄCHSTER GEGNER/.test(ende.fahne || '') && ende.bunt === 'none'
-      && /Neu freigeschaltet: Oma Hilde/.test(ende.toast) && ende.sternKlang, JSON.stringify(ende));
+    pruefe('Ende: Schloss weg, Paula bunt mit Fahne, Benno drei Sterne, Meldung „Neu freigeschaltet“, Stern-Klang', ende.schloss === 0 && ende.sterne === 3 && /NÄCHSTER GEGNER/.test(ende.fahne || '') && ende.bunt === 'none'
+      && /Neu freigeschaltet: Postbotin Paula/.test(ende.toast) && ende.sternKlang, JSON.stringify(ende));
     pruefe('Handy: die Karte hat zur neuen Station gescrollt', ende.imBild, JSON.stringify(ende));
     pruefe('Flo ist zur gerade bezwungenen Station (Benno) weitergezogen', ende.floBeiBenno, JSON.stringify(ende));
     await bild(seite, 'arena-freigeschaltet-390x844');
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // der erste Bot einer neuen Welt: die Meldung nennt die Welt
+  gruppe = 'Freischalten neue Welt';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_WELT1 });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(600);
+    await seite.evaluate(() => { document.querySelector('.screen.arena').dataset.alt = 'ja'; window.__app.gehe('arena', { neuFreigeschaltet: 'bodo' }); });
+    await seite.waitForSelector('.screen.arena:not([data-alt]) .knoten.wird-frei[data-bot="bodo"]');
+    const anfang = await seite.evaluate(() => ({ welt: document.querySelector('.ww-name').textContent, schloss: document.querySelectorAll('.knoten[data-bot="bodo"] .schloss').length, panel: document.querySelector('.detail h2').textContent,
+      stationen: document.querySelectorAll('.welt .knoten').length }));
+    pruefe('Beginn: die Karte zeigt die neue Welt (Der Springerforst), Bodo mit Schloss, Bodo im Panel', anfang.welt === 'Der Springerforst' && anfang.schloss === 1 && anfang.panel === 'Holzfäller Bodo' && anfang.stationen === 6, JSON.stringify(anfang));
+    await seite.waitForFunction(() => !document.querySelector('.knoten.wird-frei'), null, { timeout: 15000 });
+    const ende = await seite.evaluate(() => ({ toast: [...document.querySelectorAll('.toast')].map((x) => x.textContent).join(' | '), schloss: document.querySelectorAll('.knoten[data-bot="bodo"] .schloss').length,
+      aktuell: !!document.querySelector('.knoten.aktuell[data-bot="bodo"]') }));
+    pruefe('Ende: Meldung „Neue Welt offen: Der Springerforst!“ (statt „Neu freigeschaltet“), Schloss weg, Bodo ist der naechste Gegner', ende.toast === 'Neue Welt offen: Der Springerforst!' && ende.schloss === 0 && ende.aktuell, JSON.stringify(ende));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -789,11 +1020,11 @@ async function testeFreischalten(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_BENNO, bewegung: 'reduce' });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .knoten');
-    await seite.evaluate(() => { document.querySelector('.screen.arena').dataset.alt = 'ja'; window.__app.gehe('arena', { neuFreigeschaltet: 'hilde' }); });
-    await seite.waitForSelector('.screen.arena:not([data-alt]) .knoten.aktuell[data-bot="hilde"]');
+    await seite.evaluate(() => { document.querySelector('.screen.arena').dataset.alt = 'ja'; window.__app.gehe('arena', { neuFreigeschaltet: 'paula' }); });
+    await seite.waitForSelector('.screen.arena:not([data-alt]) .knoten.aktuell[data-bot="paula"]');
     await seite.waitForFunction(() => document.querySelectorAll('.screen.arena').length === 1);
-    const r = await seite.evaluate(() => ({ wirdFrei: document.querySelectorAll('.wird-frei').length, schloss: document.querySelectorAll('.knoten[data-bot="hilde"] .schloss').length,
-      bunt: getComputedStyle(document.querySelector('.knoten[data-bot="hilde"] .avatar img')).filter, weg: !!document.querySelector('.welt-svg .w-fortschritt-neu') && getComputedStyle(document.querySelector('.welt-svg .w-fortschritt-neu')).opacity === '1',
+    const r = await seite.evaluate(() => ({ wirdFrei: document.querySelectorAll('.wird-frei').length, schloss: document.querySelectorAll('.knoten[data-bot="paula"] .schloss').length,
+      bunt: getComputedStyle(document.querySelector('.knoten[data-bot="paula"] .avatar img')).filter, weg: !!document.querySelector('.welt-svg .w-fortschritt-neu') && getComputedStyle(document.querySelector('.welt-svg .w-fortschritt-neu')).opacity === '1',
       atmen: getComputedStyle(document.querySelector('.knoten.aktuell .avatar')).animationName }));
     pruefe('reduzierte Bewegung: sofort frei (kein .wird-frei, kein Schloss, Gesicht bunt, Weg sichtbar), kein Atmen', r.wirdFrei === 0 && r.schloss === 0 && r.bunt === 'none' && r.weg && r.atmen === 'none', JSON.stringify(r));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -836,7 +1067,7 @@ async function testeDuell(browser) {
       gleich(flipLage.start && flipLage.start.bot, flipLage.quelle.bot) && gleich(flipLage.start && flipLage.start.flo, flipLage.quelle.flo), JSON.stringify(flipLage));
     const mitte = await seite.evaluate(() => {
       const d = document.querySelector('.duell');
-      const bf = getComputedStyle(document.documentElement).getPropertyValue('--bot-rudi').trim();
+      const bf = getComputedStyle(document.documentElement).getPropertyValue('--bot-paula').trim();
       const probe = document.createElement('i');
       probe.style.color = bf;
       document.body.append(probe);
@@ -845,11 +1076,11 @@ async function testeDuell(browser) {
       return { art: d.dataset.art, bot: d.dataset.bot, anlass: d.dataset.anlass, attr: document.documentElement.dataset.duell, buehne: getComputedStyle(d.querySelector('.duell-buehne')).backgroundColor, bfRgb,
         gegen: d.querySelector('.duell-gegen').textContent, botName: d.querySelector('.duell-seite.bot .duell-name').textContent, floName: d.querySelector('.duell-seite.flo .duell-name').textContent,
         unter: d.querySelector('.duell-seite.bot .duell-unter').textContent, chip: (d.querySelector('.duell-chip') || {}).textContent, naht: getComputedStyle(d.querySelector('.duell-flo i')).clipPath,
-        portraet: d.querySelector('[data-rolle="bot"] img').src.endsWith('/assets/avatare/modern/rudi.svg'), koenig: /wK\.svg/.test(d.querySelector('[data-rolle="flo"] image').getAttribute('href')),
+        portraet: d.querySelector('[data-rolle="bot"] img').src.endsWith('/assets/avatare/modern/paula.svg'), koenig: /wK\.svg/.test(d.querySelector('[data-rolle="flo"] image').getAttribute('href')),
         rolle: d.getAttribute('role'), screen: document.documentElement.dataset.screen };
     });
-    pruefe('Ueberlagerung .duell.voll an body: Bot-Haelfte in Bot-Farbe, „gegen“, Namen, Elo und Farben, Chip „Stufe 5 · Erste Partie“', mitte.art === 'voll' && mitte.bot === 'rudi' && mitte.anlass === 'erste' && mitte.buehne === mitte.bfRgb
-      && mitte.gegen === 'gegen' && mitte.botName === 'Ritter Rudi' && mitte.floName === 'Flo' && mitte.unter === 'Elo 1200 · Schwarz' && mitte.chip === 'Stufe 5 · Erste Partie' && mitte.rolle === 'dialog', JSON.stringify(mitte));
+    pruefe('Ueberlagerung .duell.voll an body: Bot-Haelfte in Bot-Farbe, „gegen“, Namen, Elo und Farben, Chip „Stufe 3 · Erste Partie“', mitte.art === 'voll' && mitte.bot === 'paula' && mitte.anlass === 'erste' && mitte.buehne === mitte.bfRgb
+      && mitte.gegen === 'gegen' && mitte.botName === 'Postbotin Paula' && mitte.floName === 'Flo' && mitte.unter === 'Elo 300 · Schwarz' && mitte.chip === 'Stufe 3 · Erste Partie' && mitte.rolle === 'dialog', JSON.stringify(mitte));
     pruefe('Portraets: Modern-Portraet des Bots, Flos weisser Koenig; Naht schraeg (quer)', mitte.portraet && mitte.koenig && /56%/.test(mitte.naht), JSON.stringify(mitte));
     pruefe('Vertrag: html[data-duell="laeuft"] solange das Intro laeuft', mitte.attr === 'laeuft');
     await warte(300);
@@ -867,7 +1098,7 @@ async function testeDuell(browser) {
     pruefe('Dauer hoechstens 1,4 s (plus 100 ms und die gemessene Blockade des Hauptfadens), Start-Klang genau einmal', danach.prot && danach.prot.length === 1
       && danach.prot[0].dauer <= 1500 + danach.block && danach.prot[0].dauer >= 1000 && danach.start === 1, JSON.stringify(danach.prot) + ' start=' + danach.start + ' block=' + danach.block);
     await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
-    pruefe('Partie gegen Ritter Rudi laeuft', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:laufend') || 'null')?.botId === 'rudi'));
+    pruefe('Partie gegen Postbotin Paula laeuft', await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:laufend') || 'null')?.botId === 'paula'));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -901,22 +1132,39 @@ async function testeDuell(browser) {
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForSelector('.duell.voll', { timeout: 5000 });
     const b = await seite.evaluate(() => ({ anlass: document.querySelector('.duell').dataset.anlass, chip: (document.querySelector('.duell-chip') || {}).textContent }));
-    pruefe('Endgegner: Anlass boss, volle Buehne mit Chip „Stufe 10 · Endgegner“', b.anlass === 'boss' && b.chip === 'Stufe 10 · Endgegner', JSON.stringify(b));
+    pruefe('Endgegner: Anlass boss, volle Buehne mit Chip „Stufe 30 · Endgegner“', b.anlass === 'boss' && b.chip === 'Stufe 30 · Endgegner', JSON.stringify(b));
     await warte(300);
     await bild(seite, 'duell-boss-1180x820-dunkel');
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
+  // der Endgegner einer Welt ist direkt herausforderbar (offen), auch ohne Sieg ueber die Bots davor: volle Buehne mit Anlass boss
   {
-    const partie = { id: 'u5-p1', datum: '2026-10-20T10:00:00.000Z', botId: 'rudi', botStufe: 5, spielerFarbe: 'w', startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'],
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'besondere', klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(800);
+    await duellHorcher(seite);
+    await tippe(seite, '.knoten[data-bot="janine"]');
+    await warte(500);
+    await tippe(seite, '.detail [data-aktion="spielen"]');
+    await seite.waitForSelector('.duell.voll', { timeout: 5000 });
+    const b = await seite.evaluate(() => ({ anlass: document.querySelector('.duell').dataset.anlass, bot: document.querySelector('.duell').dataset.bot, chip: (document.querySelector('.duell-chip') || {}).textContent }));
+    pruefe('offener Endgegner (Janine, Welt 1): Anlass boss, volle Buehne mit Chip „Stufe 6 · Endgegner“', b.anlass === 'boss' && b.bot === 'janine' && b.chip === 'Stufe 6 · Endgegner', JSON.stringify(b));
+    await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  {
+    const partie = { id: 'u5-p1', datum: '2026-10-20T10:00:00.000Z', botId: 'paula', botStufe: 3, spielerFarbe: 'w', startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'],
       ergebnis: 'niederlage', grund: 'aufgabe', hinweise: 0, zuruecknahmen: 0, liveKlassen: [null, null], genauigkeit: null, genauigkeitBot: null, spielstaerke: null, eroeffnung: null, sterne: [false, false, false], modus: 'normal' };
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, partien: [partie], einstellungen: { duellIntro: 'besondere', klang: false } });
     await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="rudi"]');
+    await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="paula"]');
     await warte(800);
-    const erkannt = await seite.evaluate(async () => (await import('./js/storage.js')).ladePartien().some((p) => p.botId === 'rudi'));
-    pruefe('Vorbedingung: eine fruehere Partie gegen Rudi ist gespeichert', erkannt);
+    const erkannt = await seite.evaluate(async () => (await import('./js/storage.js')).ladePartien().some((p) => p.botId === 'paula'));
+    pruefe('Vorbedingung: eine fruehere Partie gegen Paula ist gespeichert', erkannt);
     await duellHorcher(seite);
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 6000 });
@@ -1047,17 +1295,17 @@ async function testeDuell(browser) {
   // Figur auf der Karte in die Spielerleisten (PLAN 2.3 "von der Stufe"), obwohl die Arena beim Flug schon weg ist
   gruppe = 'Duell Kurzfassung Portraetflug';
   {
-    const partie = { id: 'u5-p2', datum: '2026-10-20T10:00:00.000Z', botId: 'rudi', botStufe: 5, spielerFarbe: 'w', startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'],
+    const partie = { id: 'u5-p2', datum: '2026-10-20T10:00:00.000Z', botId: 'paula', botStufe: 3, spielerFarbe: 'w', startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', zuege: ['e2e4', 'e7e5'], san: ['e4', 'e5'],
       ergebnis: 'niederlage', grund: 'aufgabe', hinweise: 0, zuruecknahmen: 0, liveKlassen: [null, null], genauigkeit: null, genauigkeitBot: null, spielstaerke: null, eroeffnung: null, sterne: [false, false, false], modus: 'normal' };
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, partien: [partie], einstellungen: { duellIntro: 'besondere', klang: false } });
     await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="rudi"]');
+    await seite.waitForSelector('.screen.arena .knoten.aktuell[data-bot="paula"]');
     await warte(1500);
     await duellHorcher(seite);
     await zieleEinsetzen(seite);
     const quellen = await seite.evaluate(() => {
       const m = (el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), w: Math.round(r.width) }; };
-      return { bot: m(document.querySelector('.knoten[data-bot="rudi"] .avatar')), flo: m(document.querySelector('.flo-figur')) };
+      return { bot: m(document.querySelector('.knoten[data-bot="paula"] .avatar')), flo: m(document.querySelector('.flo-figur')) };
     });
     await tippe(seite, '.detail [data-aktion="spielen"]');
     await seite.waitForFunction(() => !!window.__flugBlick || window.__fertig.length > 0, null, { timeout: 6000 }).catch(() => {});
@@ -1095,7 +1343,7 @@ async function testeDuell(browser) {
       window.__fliegerMax = 0;
       window.__block = 0;
       const t0 = performance.now();
-      const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
+      const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'paula'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
       await d.bereit;
       const tBereit = Math.round(performance.now() - t0);
       const r = document.querySelector('.duell-buehne').getBoundingClientRect();
@@ -1159,7 +1407,7 @@ async function testeDuell(browser) {
         window.__tipps = 0;
         window.__vorher = null;
         window.__fertig = [];
-        const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'rudi'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
+        const d = spieleDuell({ bot: BOTS.find((b) => b.id === 'paula'), farbe: 'w', anlass: 'erste', von: document.querySelector('.detail-kopf .av'), art: 'voll' });
         d.bereit.then(() => {
           const p = document.createElement('section');
           p.className = 'screen partie schein-partie';
@@ -1193,7 +1441,7 @@ async function testeDuell(browser) {
     const r = await seite.evaluate(async () => {
       const { spieleDuell, aktivesDuell } = await import('./js/ui/duell.js');
       const { BOTS } = await import('./js/bots.js');
-      const bot = BOTS.find((b) => b.id === 'rudi');
+      const bot = BOTS.find((b) => b.id === 'paula');
       const t0 = performance.now();
       // 1. Kurzfassung ohne Partie: bereit sofort, fertig an der harten Grenze (1,4 s)
       const d1 = spieleDuell({ bot, farbe: 'b', anlass: null, von: document.querySelector('.detail-kopf .av'), einstellung: 'besondere' });
@@ -1216,7 +1464,7 @@ async function testeDuell(browser) {
       const d3 = spieleDuell({ bot, farbe: 'w', anlass: 'erste', art: 'voll' });
       const d4 = spieleDuell({ bot: BOTS[0], farbe: 'w', anlass: 'erste', art: 'voll' });
       await new Promise((res) => setTimeout(res, 50));
-      const nurEins = document.querySelectorAll('.duell').length === 1 && document.querySelector('.duell').dataset.bot === 'benno';
+      const nurEins = document.querySelectorAll('.duell').length === 1 && document.querySelector('.duell').dataset.bot === BOTS[0].id;
       const drittesFertig = await Promise.race([d3.fertig.then(() => true), new Promise((res) => setTimeout(() => res(false), 100))]);
       d4.ueberspringe();
       return { bereitSofort, aktiv1, huelle, t1: Math.round(t1), block: Math.round(window.__block), aktiv2, lief, sofortWeg, warteZeit, nurEins, drittesFertig, fertig: window.__fertig.map((f) => f.art + (f.uebersprungen ? '!' : '')).join(), prot: window.__duellProtokoll.map((p) => p.art + ':' + p.ziele).join() };
@@ -1236,6 +1484,7 @@ async function browserTeil(browser) {
   await testeHochformate(browser);
   await testeHandyQuer(browser);
   await testeKnopftext(browser);
+  await testeWelten(browser);
   await testeFreischalten(browser);
   await testeDuell(browser);
   gruppe = 'Netz';

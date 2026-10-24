@@ -724,11 +724,17 @@ function serverMitKlasse() {
   s.aufgaben.push({ id: uuid(12), klasse: uuid(1), titel: 'Zwei Rätsel', art: 'raetsel', ziel: { anzahl: 2 }, faellig: null, erstellt_am: new Date(Date.now() - 72e5).toISOString() });
   return s;
 }
-// Spielstand, in dem Benno bis Lisa besiegt sind (Rudi ist frei)
-function fortschrittBisLisa(rudi = false) {
+// Welten: bis Edda (Stufe 11) besiegt, damit Ritter Rudi (Stufe 12, Endgegner von Welt 2) der naechste Gegner ist
+function fortschrittBisEdda(rudi = false) {
   const bots = {};
-  for (const id of ['benno', 'hilde', 'kalle', 'lisa']) bots[id] = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 70 };
+  for (const id of ['fridolin', 'benno', 'paula', 'gustav', 'hilde', 'janine', 'bodo', 'kalle', 'leo', 'lisa', 'edda']) bots[id] = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 70 };
   if (rudi) bots.rudi = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 70 };
+  return { bots, brillanteZuege: [] };
+}
+// Spielstand mit vier besiegten Bots (fuer das Melden: der Server nimmt hoechstens 10 Bots und 30 Sterne an)
+function fortschrittVier(mehr = false) {
+  const bots = {};
+  for (const id of mehr ? ['fridolin', 'benno', 'paula', 'gustav', 'hilde'] : ['fridolin', 'benno', 'paula', 'gustav']) bots[id] = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 70 };
   return { bots, brillanteZuege: [] };
 }
 
@@ -815,7 +821,7 @@ async function browserTeil(browser) {
     await seite.waitForFunction(() => document.querySelectorAll('.sm-tabelle tbody tr').length === 3);
     const z1 = await zeilen(seite);
     pruefe('Mitglieder: Name, Bots, Sterne, Partien, Genauigkeit, häufigste Fehler (Klartext-Namen), Aufgaben, Stand', z1.length === 3 && z1[0][0] === 'Anna'
-      && z1[0][1] === '3 / 10' && z1[0][2] === '7 / 30' && z1[0][3] === '12' && z1[0][4] === '81,5 %' && z1[0][5] === 'Daneben 9 · Unscharf 7' && z1[0][6] === '1 / 2'
+      && z1[0][1] === '3 / 30' && z1[0][2] === '7 / 90' && z1[0][3] === '12' && z1[0][4] === '81,5 %' && z1[0][5] === 'Daneben 9 · Unscharf 7' && z1[0][6] === '1 / 2'
       && z1[1][0] === 'Ben' && z1[1][7] === 'noch nichts' && z1[2][4] === '–' && z1[2][5] === 'Weit daneben 2', z1);
     const [jj, mm, tt] = tagIso().split('-');
     pruefe('Stand: nur der Tag der letzten Meldung ("TT.MM.", ohne Uhrzeit), Hilfe sagt es so', z1[0][7] === `${tt}.${mm}.` && jj.length === 4
@@ -967,7 +973,7 @@ async function browserTeil(browser) {
     const srv = serverMitKlasse();
     srv.mitglieder.push({ id: uuid(41), klasse: uuid(1), uid: UID_A, anzeigename: 'Anna', beigetreten_am: new Date().toISOString() });
     const stand = rpcAntwort(srv, 'schule_meine_klassen', UID_A, {}).body;
-    const vorher = { 'schach-arena:schule:stand': { uid: UID_A, daten: stand, geholtAm: Date.now() }, 'schach-arena:v1:fortschritt': fortschrittBisLisa() };
+    const vorher = { 'schach-arena:schule:stand': { uid: UID_A, daten: stand, geholtAm: Date.now() }, 'schach-arena:v1:fortschritt': fortschrittBisEdda() };
     const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: A, srv, vorher });
     await bereit(seite, '#arena');
     await seite.waitForSelector('.heute-karte:not([hidden]) .sm-heute', { timeout: 20000 });
@@ -1004,7 +1010,7 @@ async function browserTeil(browser) {
     pruefe('"Zu Rudi" waehlt Ritter Rudi in der Arena (dann ohne eigenen Knopf)', /Ritter Rudi/.test(gewaehlt)
       && (await seite.locator('.sm-heute .sm-heute-los').count()) === 0, gewaehlt);
     // Rudi besiegt: die Raetsel-Aufgabe ist dran, Knopf "Ueben" fuehrt ins Training
-    await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('arena', {}, { ersetzen: true }); }, fortschrittBisLisa(true));
+    await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('arena', {}, { ersetzen: true }); }, fortschrittBisEdda(true));
     await seite.waitForFunction(() => document.querySelector('.sm-heute')?.dataset.art === 'raetsel', null, { timeout: 10000 });
     const r = await seite.evaluate(() => ({ text: document.querySelector('.sm-heute').innerText.replace(/\s+/g, ' '), knopf: document.querySelector('.sm-heute-los')?.textContent }));
     pruefe('Bot-Aufgabe erledigt: die Raetsel-Aufgabe mit "0 von 2" und "Üben"', r.text.includes('Zwei Rätsel') && r.text.includes('0 von 2') && r.knopf === 'Üben', r);
@@ -1031,13 +1037,13 @@ async function browserTeil(browser) {
     const srv = serverMitKlasse();
     srv.mitglieder.push({ id: uuid(41), klasse: uuid(1), uid: UID_A, anzeigename: 'Anna', beigetreten_am: new Date().toISOString() });
     const stand = rpcAntwort(srv, 'schule_meine_klassen', UID_A, {}).body;
-    const vorher = { 'schach-arena:schule:stand': { uid: UID_A, daten: stand, geholtAm: Date.now() }, 'schach-arena:v1:fortschritt': fortschrittBisLisa() };
+    const vorher = { 'schach-arena:schule:stand': { uid: UID_A, daten: stand, geholtAm: Date.now() }, 'schach-arena:v1:fortschritt': fortschrittVier() };
     srv.offline = true;
     const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: A, srv, vorher });
     await bereit(seite, '#arena');
     const beendet = () => seite.evaluate(async () => {
       const { sende } = await import('./js/ereignisse.js');
-      sende('partie:beendet', { laufId: 'l1', partieId: 'p1', botId: 'lisa', botStufe: 4, farbe: 'w', modus: 'normal', wertet: true, ergebnis: 'sieg', grund: 'matt',
+      sende('partie:beendet', { laufId: 'l1', partieId: 'p1', botId: 'gustav', botStufe: 4, farbe: 'w', modus: 'normal', wertet: true, ergebnis: 'sieg', grund: 'matt',
         eigeneZuege: 20, liveKlassen: [], maxSerie: 3, hinweise: 0, zuruecknahmen: 0, neueSterne: [], neuFreigeschaltet: null, extra: {}, datum: new Date().toISOString(), dauerMs: 1000 });
     });
     await beendet();
@@ -1059,9 +1065,9 @@ async function browserTeil(browser) {
     await beendet();
     await warte(BUENDEL_MS + 1500);
     pruefe('zwei weitere Partien kurz danach: keine zweite Meldung in derselben Minute', srv.meldungen.length === 1);
-    // neuer Stand (Rudi besiegt), dann zurueck in die App und wieder online, alles in derselben Minute: auch das
+    // neuer Stand (ein Bot mehr besiegt), dann zurueck in die App und wieder online, alles in derselben Minute: auch das
     // Nachholen wartet die Minute ab (die gleich-Sperre greift hier nicht, der Stand ist ein anderer)
-    await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), fortschrittBisLisa(true));
+    await seite.evaluate((f) => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)), fortschrittVier(true));
     await beendet();
     await seite.evaluate(async () => { const { sende } = await import('./js/ereignisse.js'); sende('app:sichtbar', { sichtbar: true }); window.dispatchEvent(new Event('online')); });
     await warte(BUENDEL_MS + 1500);

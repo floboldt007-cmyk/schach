@@ -15,6 +15,7 @@
 //     svg.brett-pfeile > g.pfeil[data-von][data-nach]    Coach-Pfeile (viewBox 0 0 8 8), pfeile(liste)
 //     svg.brett-nutzer > g.pfeil[data-von][data-nach]    Flos eigene Pfeile ueber den Figuren (getrennt von den Coach-Pfeilen)
 //     .abzeichen-ort.k-<klasse>[data-feld][data-klasse]  Klassen-Symbol oben rechts am Feld (bleibt in der Brett-Box)
+//     .brett-nummern > .nummer[data-feld]                kleine Zahlen ueber den Figuren (Vorzug-Kette: 1, 2, ...)
 //     .brett-umwandlung > .umwandlung-wahl > button.umwandlung-figur[data-figur="q"]
 //     svg.brett-striche > g.strich[data-art][data-von][data-nach]   W0+a: Striche (im Brett oder in einer Effekt-Ebene)
 // Alles, was auf einem Feld sitzt, traegt --x/--y (Spalte/Zeile am Bildschirm, 0..7) UND fertig berechnete
@@ -23,7 +24,8 @@
 //
 // Oeffentliche API (Vertrag, ARCHITEKTUR.md "Brett"):
 //   new Brett(el, { ausrichtung, figurenPfad, beiZug, koordinaten, koordLage, animation (ms, Standard 150),
-//                   fen, beiAbgelehnt, beiLeer, beiVorschau, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
+//                   fen, beiAbgelehnt, beiLeer, beiVorschau, beiPfeil, autoDame, bestaetigen, steuerung, turmRochade, pfeile })
+//   beiPfeil(von, nach): Flo hat einen eigenen Pfeil gezeichnet (nicht beim Wegnehmen, nicht bei Marken)
 //   beiVorschau(von, nach): Zug bestaetigen hat die Vorschau gezeigt (die Partie erklaert den zweiten Tipp);
 //       beiVorschau(null, null): die Vorschau ist vorbei (bestaetigt oder zurueckgenommen)
 //   beiZug(von, nach, umwandlung, { art: 'tippen' | 'ziehen', landung }) -> true | false | Promise
@@ -33,7 +35,8 @@
 //   pfeile, markiere, koordinaten(an), setzeKoordLage('ecke' | 'rand'), setzeAutoDame, setzeBestaetigen(bool),
 //   setzeSteuerung('beides' | 'ziehen' | 'tippen'), setzeTurmRochade(bool), setzeDauer(ms), gleitDauer() (ms, mit
 //   Tempo; 0 = sofort), setzePfeileErlaubt(bool), nutzerPfeile() -> [{ art: 'pfeil', von, nach } | { art: 'marke', feld }],
-//   loescheNutzerPfeile(), striche, kippeKoenig, richteAuf, figurAuf, zerstoere
+//   loescheNutzerPfeile(), nummern([{ feld, text }]) (Zahl oben links am Feld, ueber den Figuren; [] loescht; mehrere
+//   am selben Feld stehen nebeneinander), striche, kippeKoenig, richteAuf, figurAuf, zerstoere
 //   zielKarte(chess, { turmRochade }) erlaubt mit turmRochade Koenig -> eigener Turm als Rochade.
 //
 // Komfort (Premium-Umbau U6, PLAN Abschnitt 4):
@@ -298,7 +301,7 @@ function pfeilElement(von, nach, [x1, y1], [x2, y2], breite) {
 export class Brett {
   constructor(element, { ausrichtung = 'w', figurenPfad = 'assets/pieces/', beiZug = null,
     koordinaten = true, koordLage = 'ecke', animation = STANDARD_DAUER, fen = null, beiAbgelehnt = null, beiLeer = null,
-    beiVorschau = null, autoDame = false, bestaetigen = false, steuerung = 'beides', turmRochade = false, pfeile = true } = {}) {
+    beiVorschau = null, beiPfeil = null, autoDame = false, bestaetigen = false, steuerung = 'beides', turmRochade = false, pfeile = true } = {}) {
     if (!element) throw new Error('Brett braucht ein Element');
     this.el = element;
     this.figurenPfad = figurenPfad.endsWith('/') ? figurenPfad : figurenPfad + '/';
@@ -306,6 +309,7 @@ export class Brett {
     this.beiAbgelehnt = typeof beiAbgelehnt === 'function' ? beiAbgelehnt : null;
     this.beiLeer = typeof beiLeer === 'function' ? beiLeer : null;
     this.beiVorschau = typeof beiVorschau === 'function' ? beiVorschau : null;
+    this.beiPfeil = typeof beiPfeil === 'function' ? beiPfeil : null;
     this.autoDame = !!autoDame;
     this.bestaetigen = !!bestaetigen;
     this.steuerung = STEUERUNGEN.includes(steuerung) ? steuerung : 'beides';
@@ -333,6 +337,7 @@ export class Brett {
     this._nutzer = { pfeile: [], marken: [] };   // Flos eigene Pfeile und Marken
     this._abzeichen = null;
     this._abzeichenEl = null;
+    this._nummern = [];          // [{ feld, text }] Zahlen ueber den Figuren (Vorzug-Kette)
     this._geste = null;          // laufende Tipp-/Zieh-Geste { id, von, x0, y0, typ, zieht, warSchon, el, ueberSeit, malZeit, malBereit }
     this._halten = null;         // Tipp aufs Ziel bis zum Loslassen (Finger; Umwandlung mit autoDame auch Maus) { id, von, nach, x0, y0, timer, bewegt }
     this._halteMal = null;       // Finger liegt auf einem Feld (400 ms -> malen) { id, feld, x0, y0, timer, geste }
@@ -382,6 +387,7 @@ export class Brett {
     for (const [feld, el] of this._figuren) { this._stoppeGleiten(el); this._platziere(el, feld); }
     for (const el of this._lagen.values()) this._platziere(el, el.dataset.feld);
     if (this._abzeichenEl) this._platziereAbzeichen(this._abzeichenEl, this._abzeichen.feld);
+    this._zeichneNummern();
     this._zeichnePfeile();
     this._zeichneNutzer();
     for (const h of this._striche) this._zeichneStriche(h);
@@ -444,6 +450,13 @@ export class Brett {
     }
     this._zeigeFiguren(figuren, false);
     this._zeichneLagen();
+  }
+
+  // [{ feld, text }]: kleine Zahl oben links am Feld, ueber den Figuren (die Partie nummeriert damit die Vorzuege).
+  // Steht mehr als eine Zahl auf einem Feld (Figur kommt zweimal dorthin), stehen sie nebeneinander. [] loescht.
+  nummern(liste) {
+    this._nummern = (liste || []).filter((n) => n && gueltigesFeld(n.feld) && n.text != null && String(n.text) !== '');
+    this._zeichneNummern();
   }
 
   zeigeAbzeichen(feld, klasse) {
@@ -687,13 +700,17 @@ export class Brett {
     this._pfeileEl = svgEl('svg', { class: 'brett-pfeile', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
     this._nutzerEl = svgEl('svg', { class: 'brett-nutzer', viewBox: '0 0 8 8', 'aria-hidden': 'true' });
 
+    this._nummernEl = document.createElement('div');
+    this._nummernEl.className = 'brett-nummern';
+    this._nummernEl.setAttribute('aria-hidden', 'true');
+
     this._umwandlungEl = document.createElement('div');
     this._umwandlungEl.className = 'brett-umwandlung';
     this._umwandlungEl.hidden = true;
     this._umwandlungEl.setAttribute('role', 'dialog');
     this._umwandlungEl.setAttribute('aria-label', 'Umwandlung wählen');
 
-    el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._umwandlungEl);
+    el.append(this._felderEl, this._koordRandEl, this._pfeileEl, this._nutzerEl, this._nummernEl, this._umwandlungEl);
     el.classList.toggle('ohne-koordinaten', !this._koord);
     this._beschrifte();
 
@@ -1006,6 +1023,21 @@ export class Brett {
     for (const el of this._figuren.values()) el.classList.toggle('angehoben', el === heben);
   }
 
+  _zeichneNummern() {
+    const jeFeld = new Map();
+    for (const n of this._nummern) jeFeld.set(n.feld, [...(jeFeld.get(n.feld) || []), String(n.text)]);
+    this._nummernEl.replaceChildren();
+    for (const [feld, texte] of jeFeld) {
+      const el = document.createElement('div');
+      el.className = 'nummer';
+      const s = document.createElement('span');
+      s.textContent = texte.join(' ');
+      el.append(s);
+      this._platziere(el, feld);
+      this._nummernEl.append(el);
+    }
+  }
+
   _zeichneAbzeichen(plopp) {
     if (!this._abzeichen) return;
     const { feld, klasse } = this._abzeichen;
@@ -1092,8 +1124,9 @@ export class Brett {
   _schaltePfeil(von, nach) {
     const p = this._nutzer.pfeile;
     const i = p.findIndex((x) => x.von === von && x.nach === nach);
-    if (i >= 0) p.splice(i, 1);
-    else p.push({ von, nach });
+    if (i >= 0) { p.splice(i, 1); return; }
+    p.push({ von, nach });
+    if (this.beiPfeil) { try { this.beiPfeil(von, nach); } catch (err) { console.error(err); } }
   }
 
   _schalteMarke(feld) {

@@ -293,7 +293,7 @@ const PROFIL = {
   const b = botNachId('bergwirt');
   pruefe('registriereBot: angemeldet, botNachId findet ihn, stufe null, eingefroren', b && b.name === 'Der Bergwirt' && b.stufe === null && b.art === 'boss'
     && b.archiv === true && Object.isFrozen(b) && Object.isFrozen(b.staerke) && b.elo === 1100 && alleBots().length === BOTS.length + 1);
-  pruefe('registriereBot: Leiter unveraendert (10 Bots, Stufen 1 bis 10)', BOTS.length === 10 && BOTS.every((x, i) => x.stufe === i + 1));
+  pruefe('registriereBot: Leiter unveraendert (Welten: 30 Bots, Stufen 1 bis 30)', BOTS.length === 30 && BOTS.every((x, i) => x.stufe === i + 1));
   pruefe('registriereBot: Satzbuch des Bosses ueber botSatz', botSatz(b, 'begruessung', () => 0) === 'Grüß Gott! Heute gibt es kein Remis.');
   pruefe('registriereBot: doppelte id oder id eines Leiter-Bots wirft', wirft(() => registriereBot(PROFIL), /schon vergeben/)
     && wirft(() => registriereBot({ ...PROFIL, id: 'rudi' }), /schon vergeben/));
@@ -323,19 +323,20 @@ const PROFIL = {
 {
   // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080"): vor der Eichung der naechstliegende Leiter-Bot
   const w = (elo) => (staerkeFuerElo(elo) || {}).botId;
-  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1080 Lisa, 1150 Rudi, 1100 Gleichstand: der schwaechere, 0 Benno, 5000 Stockfisch)',
-    w(1080) === 'lisa' && w(1150) === 'rudi' && w(1100) === 'lisa' && w(0) === 'benno' && w(5000) === 'stockfisch' && staerkeFuerElo(NaN) === null
-    && staerkeFuerElo('1080') === null, [1080, 1150, 1100, 0, 5000].map(w));
+  // Welten: die Leiter hat alle 100 Elo einen Bot (Lisa 1000, Edda 1100, Rudi 1200)
+  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1030 Lisa, 1180 Rudi, 1050 Gleichstand: der schwaechere, 0 Fridolin, 5000 Stockfisch)',
+    w(1030) === 'lisa' && w(1180) === 'rudi' && w(1050) === 'lisa' && w(0) === 'fridolin' && w(5000) === 'stockfisch' && staerkeFuerElo(NaN) === null
+    && staerkeFuerElo('1030') === null, [1030, 1180, 1050, 0, 5000].map(w));
   const lisa = BOTS.find((b) => b.id === 'lisa');
-  const st = staerkeFuerElo(1080).staerke;
+  const st = staerkeFuerElo(1030).staerke;
   st.tiefe = 99;
-  pruefe('staerkeFuerElo: Kopie des Profils (die Leiter bleibt unveraendert)', JSON.stringify(staerkeFuerElo(1080).staerke) === JSON.stringify(lisa.staerke) && lisa.staerke.tiefe !== 99);
+  pruefe('staerkeFuerElo: Kopie des Profils (die Leiter bleibt unveraendert)', JSON.stringify(staerkeFuerElo(1030).staerke) === JSON.stringify(lisa.staerke) && lisa.staerke.tiefe !== 99);
   // w0plus-a-fix: die Elo, mit der der Bot wirklich spielt (Kopf und Analyse zeigen sie, nie die Anfrage)
   const e = (elo) => (staerkeFuerElo(elo) || {}).elo;
-  pruefe('staerkeFuerElo: elo des gespielten Profils (1080 -> 1000 Lisa, 1150 -> 1200 Rudi, 2550 -> 2100 Greta)', e(1080) === 1000 && e(1150) === 1200
-    && e(2550) === 2100 && e(5000) === 3000, [1080, 1150, 2550, 5000].map(e));
+  pruefe('staerkeFuerElo: elo des gespielten Profils (1030 -> 1000 Lisa, 1180 -> 1200 Rudi, 2530 -> 2500 Keetan)', e(1030) === 1000 && e(1180) === 1200
+    && e(2530) === 2500 && e(5000) === 3000, [1030, 1180, 2530, 5000].map(e));
   pruefe('eloDerPartie: Boss mit boss.staerke spielt mit der Elo des Profils, sonst die Elo des Bots',
-    eloDerPartie({ modus: 'boss', botId: 'unbekannter-boss', boss: { id: 'x', stufe: 'standard', staerke: 1080 } }) === 1000
+    eloDerPartie({ modus: 'boss', botId: 'unbekannter-boss', boss: { id: 'x', stufe: 'standard', staerke: 1030 } }) === 1000
     && eloDerPartie({ modus: 'normal', botId: 'rudi' }) === 1200 && eloDerPartie({ modus: 'boss', botId: 'kalle', boss: { id: 'kalle', stufe: 'meister' } }) === 800
     && eloDerPartie({ botId: 'gibt-es-nicht' }) === null && eloDerPartie(null) === null);
 }

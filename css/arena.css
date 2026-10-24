@@ -32,6 +32,8 @@
   --welt-blume-1: #FFD25A; --welt-blume-2: #FF8FA8; --welt-blume-3: #FFFFFF;
   --welt-sonne: #F2CF6A; --welt-sonne-2: #DDB24A; --welt-lampe: #FFC531;
   --welt-schatten: rgba(0, 0, 0, .1); --welt-weiss: rgba(255, 255, 255, .2);
+  --welt-acker: #E6CB7E; --welt-acker-2: #C9A35A; --welt-halm: #9DB65E; --welt-welle: rgba(255, 255, 255, .8); --welt-muschel: #F2C9B6;
+  --welt-alge: #3F9E7A; --welt-koralle: #F08A6E; --welt-blase: rgba(255, 255, 255, .75); --welt-fisch: #FFB54A; --welt-tiefe: #12324E;
 }
 /* ---------- Abendstimmung (dunkel): tiefer Himmel, gedaempftes Gruen, erleuchtete Fenster ---------- */
 :root[data-modus="dunkel"] .arena {
@@ -53,6 +55,8 @@
   --welt-blume-1: #D1AC48; --welt-blume-2: #C8728A; --welt-blume-3: #CFCFCF;
   --welt-sonne: #E8E2C8; --welt-sonne-2: #CFC8A8; --welt-lampe: #FFC531;
   --welt-schatten: rgba(0, 0, 0, .25); --welt-weiss: rgba(255, 255, 255, .12);
+  --welt-acker: #A8904F; --welt-acker-2: #8A7240; --welt-halm: #6E8442; --welt-welle: rgba(255, 255, 255, .4); --welt-muschel: #B8968A;
+  --welt-alge: #2D7458; --welt-koralle: #B8664F; --welt-blase: rgba(255, 255, 255, .4); --welt-fisch: #C98A3A; --welt-tiefe: #0A1E30;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-modus="system"] .arena {
@@ -74,6 +78,8 @@
     --welt-blume-1: #D1AC48; --welt-blume-2: #C8728A; --welt-blume-3: #CFCFCF;
     --welt-sonne: #E8E2C8; --welt-sonne-2: #CFC8A8; --welt-lampe: #FFC531;
     --welt-schatten: rgba(0, 0, 0, .25); --welt-weiss: rgba(255, 255, 255, .12);
+  --welt-acker: #A8904F; --welt-acker-2: #8A7240; --welt-halm: #6E8442; --welt-welle: rgba(255, 255, 255, .4); --welt-muschel: #B8968A;
+  --welt-alge: #2D7458; --welt-koralle: #B8664F; --welt-blase: rgba(255, 255, 255, .4); --welt-fisch: #C98A3A; --welt-tiefe: #0A1E30;
   }
 }
 
@@ -91,8 +97,104 @@
 .arena.karte-hoch .karte { flex: 1 0 var(--karte-h); height: auto; min-height: var(--karte-h); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; scrollbar-width: none; }
 .arena.karte-hoch .karte::-webkit-scrollbar { display: none; }
-.arena .welt { position: relative; width: 100%; height: 100%; --kn-basis: 76px; }
+.arena .welt { position: relative; width: 100%; height: 100%; --kn-basis: 76px; background: var(--welt-gras); }
 .arena .welt-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---------- Welten (Flo, 23.10.): jede Welt faerbt die Karte um (.welt[data-welt], js/ui/arena.js layout) ----------
+   Karofelder = die Grundpalette oben. Hell und dunkel getrennt, dunkel gilt fuer data-modus="dunkel" und System. */
+.arena .welt[data-welt="springerforst"] {
+  --welt-himmel: #CFE6EE; --welt-berg: #8FA5B8; --welt-berg-2: #7E95AA;
+  --welt-strand: #A6C98A; --welt-gras: #74AE5E; --welt-gras-2: #7FB667; --welt-gras-3: #8ABD71; --welt-gras-4: #95C47B;
+  --welt-laub: #3F8F4F; --welt-laub-2: #4C9A58; --welt-laub-3: #58A462; --welt-tanne: #2C7A50; --welt-tanne-2: #36885B;
+  --welt-weg-rand: #B8946A; --welt-weg: #E9D3AA; --welt-weg-strich: #CDAF80;
+}
+.arena .welt[data-welt="turmstadt"] {
+  --welt-himmel: #C8DDF2; --welt-strand: #D9D2C1;
+  --welt-gras: #CBD8AE; --welt-gras-2: #D3DDB9; --welt-gras-3: #DBE2C4; --welt-gras-4: #E2E6CF;
+  --welt-weg-rand: #B7AFA0; --welt-weg: #EFEAE0; --welt-weg-strich: #CFC7B8; --welt-wasser: #86C3E2;
+}
+.arena .welt[data-welt="gezeitenkueste"] {
+  --welt-himmel: #BFE4F2; --welt-berg: #EDEBE3; --welt-berg-2: #DDD9CC; --welt-schnee: #FFFFFF;
+  --welt-strand: #7FC6DF; --welt-gras: #E9DCAE; --welt-gras-2: #EFE3BA; --welt-gras-3: #F3E8C4; --welt-gras-4: #D8CBA4;
+  --welt-laub: #8DB878; --welt-laub-2: #9BC184; --welt-laub-3: #A7C98F;
+  --welt-weg-rand: #CDB98C; --welt-weg: #FFF7E2; --welt-weg-strich: #E2CFA0;
+}
+.arena .welt[data-welt="stockfisch-tiefe"] {
+  --welt-himmel: #5EA6CF; --welt-wolke: rgba(255, 255, 255, .35); --welt-sonne: rgba(255, 255, 255, .28); --welt-sonne-2: rgba(255, 255, 255, .2);
+  --welt-berg: #2F5F82; --welt-berg-2: #2A5678; --welt-schnee: #4C82A8;
+  --welt-strand: #3F7FA7; --welt-gras: #1E4F78; --welt-gras-2: #245A84; --welt-gras-3: #2B6590; --welt-gras-4: #33719A;
+  --welt-stamm-2: #6E5640; --welt-stein-2: #24486A; --welt-schatten: rgba(0, 0, 0, .2);
+  --welt-weg-rand: #A89A6E; --welt-weg: #D8CFA8; --welt-weg-strich: #BCAF84;
+}
+:root[data-modus="dunkel"] .arena .welt[data-welt="springerforst"] {
+  --welt-himmel: #263547; --welt-strand: #4E6E43; --welt-gras: #42683A; --welt-gras-2: #4A7140; --welt-gras-3: #527A46; --welt-gras-4: #5A834D;
+  --welt-tanne: #1F5A3B; --welt-tanne-2: #276444; --welt-weg: #C6B48C; --welt-weg-rand: #8E7A56;
+}
+:root[data-modus="dunkel"] .arena .welt[data-welt="turmstadt"] {
+  --welt-himmel: #2A3352; --welt-strand: #7E7868; --welt-gras: #6E7660; --welt-gras-2: #767E67; --welt-gras-3: #7E866F; --welt-gras-4: #868D77;
+  --welt-weg: #C9C1B0; --welt-weg-rand: #8D8574;
+}
+:root[data-modus="dunkel"] .arena .welt[data-welt="gezeitenkueste"] {
+  --welt-himmel: #263A50; --welt-berg: #9C9A92; --welt-berg-2: #8A887F; --welt-schnee: #C8C6BE;
+  --welt-strand: #3F6F8A; --welt-gras: #A8986E; --welt-gras-2: #AF9F75; --welt-gras-3: #B6A67C; --welt-gras-4: #988A64;
+  --welt-weg: #D9CDAA; --welt-weg-rand: #9E8E64;
+}
+:root[data-modus="dunkel"] .arena .welt[data-welt="stockfisch-tiefe"] {
+  --welt-himmel: #1E4A6A; --welt-berg: #183650; --welt-berg-2: #152F47; --welt-schnee: #28506E;
+  --welt-strand: #1F4A6C; --welt-gras: #0E2A44; --welt-gras-2: #12304C; --welt-gras-3: #163755; --welt-gras-4: #1B3F5F;
+  --welt-weg: #A99F7E; --welt-weg-rand: #73694C;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .arena .welt[data-welt="springerforst"] {
+    --welt-himmel: #263547; --welt-strand: #4E6E43; --welt-gras: #42683A; --welt-gras-2: #4A7140; --welt-gras-3: #527A46; --welt-gras-4: #5A834D;
+    --welt-tanne: #1F5A3B; --welt-tanne-2: #276444; --welt-weg: #C6B48C; --welt-weg-rand: #8E7A56;
+  }
+  :root[data-modus="system"] .arena .welt[data-welt="turmstadt"] {
+    --welt-himmel: #2A3352; --welt-strand: #7E7868; --welt-gras: #6E7660; --welt-gras-2: #767E67; --welt-gras-3: #7E866F; --welt-gras-4: #868D77;
+    --welt-weg: #C9C1B0; --welt-weg-rand: #8D8574;
+  }
+  :root[data-modus="system"] .arena .welt[data-welt="gezeitenkueste"] {
+    --welt-himmel: #263A50; --welt-berg: #9C9A92; --welt-berg-2: #8A887F; --welt-schnee: #C8C6BE;
+    --welt-strand: #3F6F8A; --welt-gras: #A8986E; --welt-gras-2: #AF9F75; --welt-gras-3: #B6A67C; --welt-gras-4: #988A64;
+    --welt-weg: #D9CDAA; --welt-weg-rand: #9E8E64;
+  }
+  :root[data-modus="system"] .arena .welt[data-welt="stockfisch-tiefe"] {
+    --welt-himmel: #1E4A6A; --welt-berg: #183650; --welt-berg-2: #152F47; --welt-schnee: #28506E;
+    --welt-strand: #1F4A6C; --welt-gras: #0E2A44; --welt-gras-2: #12304C; --welt-gras-3: #163755; --welt-gras-4: #1B3F5F;
+    --welt-weg: #A99F7E; --welt-weg-rand: #73694C;
+  }
+}
+/* gesperrte Welt: ruhige Silhouette */
+.arena .welt.gesperrt .welt-svg { filter: grayscale(.85) brightness(1.04) contrast(.8); opacity: .6; }
+:root[data-modus="dunkel"] .arena .welt.gesperrt .welt-svg { filter: grayscale(.85) brightness(.8) contrast(.8); }
+.arena .welt.gesperrt .flo-figur { display: none; }
+.arena .welt-sperre { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 24px; pointer-events: none; }
+.arena .welt-sperre[hidden] { display: none; }
+.arena .ws-karte { max-width: 320px; display: grid; justify-items: center; gap: 6px; padding: 18px 20px; border-radius: var(--r-l, 20px); text-align: center;
+  background: var(--flaeche); color: var(--text-2); box-shadow: var(--s3), var(--kante); font-size: 14px; line-height: 1.4; }
+.arena .ws-karte .ico { width: 22px; height: 22px; color: var(--text-2); }
+.arena .ws-karte b { font-family: var(--display); font-size: 20px; color: var(--text); }
+/* Weltwahl: Pfeile und Name der Welt ueber der Karte (klebt oben, auch wenn die Karte im Hochformat scrollt) */
+.arena .weltwahl { position: sticky; top: 10px; z-index: 30; height: 0; display: flex; justify-content: center; align-items: flex-start; gap: 6px;
+  pointer-events: none; }
+.arena .weltwahl > * { pointer-events: auto; }
+.arena .ww-pfeil { width: var(--tipp); height: var(--tipp); flex: none; display: grid; place-items: center; padding: 0; margin: 0; border: 0;
+  border-radius: 50%; background: var(--flaeche); color: var(--text); box-shadow: var(--s2), var(--kante); cursor: pointer; }
+.arena .ww-pfeil .ico { width: 20px; height: 20px; }
+.arena .ww-pfeil:disabled { opacity: .35; cursor: default; box-shadow: var(--kante); }
+.arena .ww-pfeil:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.arena .ww-mitte { min-height: var(--tipp); min-width: 0; max-width: min(320px, calc(100% - 2 * var(--tipp) - 40px)); display: grid; align-content: center;
+  padding: 4px 16px; border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2), var(--kante); text-align: center; }
+.arena .ww-name { font-family: var(--display); font-size: 16px; line-height: 1.15; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena .ww-unter { font-size: 11.5px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
+.arena .weltwahl.mit-siegel .ww-mitte { box-shadow: var(--s2), 0 0 0 2px var(--gold); }
+.arena .weltwahl.gesperrt .ww-name { color: var(--text-2); }
+/* Schild "neu eingezogen" an offenen Bots unter Flos bestem Sieg */
+.arena .knoten .k-neu { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 2px 8px 3px; border-radius: var(--r-pille);
+  font-size: 10.5px; font-weight: var(--gw-titel); letter-spacing: .14em; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s1); z-index: 3; pointer-events: none; }
+/* Endgegner mit Schild NEU (unter Flos bestem Sieg neu eingezogen): das Schild steht ueber der Krone */
+.arena .knoten.boss .k-neu { bottom: calc(100% + 32px); }
+.arena .detail-welt { margin-top: 3px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 
 /* Farben der Zeichnung (Klassen im SVG, js/ui/arena.js weltSvg) */
 .welt-svg .w-himmel { fill: var(--welt-himmel); }
@@ -124,6 +226,14 @@
 .welt-svg .w-sonne { fill: var(--welt-sonne); } .welt-svg .w-sonne-2 { fill: none; stroke: var(--welt-sonne-2); stroke-width: 2; }
 .welt-svg .w-lampe { fill: var(--welt-lampe); }
 .welt-svg .w-schatten { fill: var(--welt-schatten); } .welt-svg .w-weiss { fill: var(--welt-weiss); }
+.welt-svg .w-acker { fill: var(--welt-acker); } .welt-svg .w-acker-2 { fill: var(--welt-acker-2); }
+.welt-svg .w-halm { fill: none; stroke: var(--welt-halm); stroke-width: 2; stroke-linecap: round; }
+.welt-svg .w-welle { fill: none; stroke: var(--welt-welle); stroke-width: 2.4; stroke-linecap: round; }
+.welt-svg .w-muschel { fill: var(--welt-muschel); }
+.welt-svg .w-alge { fill: none; stroke: var(--welt-alge); stroke-width: 3.2; stroke-linecap: round; }
+.welt-svg .w-koralle { fill: none; stroke: var(--welt-koralle); stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.welt-svg .w-blase { fill: none; stroke: var(--welt-blase); stroke-width: 1.4; }
+.welt-svg .w-fisch { fill: var(--welt-fisch); } .welt-svg .w-tiefe { fill: var(--welt-tiefe); }
 
 /* ---------- Stationen (button.stufe.knoten[data-bot]) ---------- */
 .arena .knoten { --kn: var(--kn-basis); --bf: var(--linie-2); position: absolute; width: var(--kn); height: var(--kn);
@@ -231,7 +341,8 @@
 .arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
 .arena .m-label { display: block; font-size: 11.5px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
-.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text); }
+.arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
+  hyphens: auto; overflow-wrap: break-word; }
 .arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
 .arena .m-figur img { width: 20px; height: 20px; }
 @container (max-width: 330px) {

@@ -54,7 +54,7 @@ export const VORTEILE = Object.freeze([
   vorteil('foerderer-nadel', 'Förderer-Nadel am Namen, wächst mit der Dauer (abschaltbar)'),
 ]);
 export const GRATIS = Object.freeze([
-  'Alle 10 Bots der Leiter, Schachuhr und Wochen-Boss',
+  'Alle 30 Bots in fünf Welten, Schachuhr und Wochen-Boss',
   'Live-Bewertung und Spielanalyse ohne Grenze',
   'Fehler-Kartei, Tagesrätsel und Rätsel ohne Tageslimit',
   'Lernpfad: Einheiten 1 bis 4',

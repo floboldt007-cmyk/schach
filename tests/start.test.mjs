@@ -213,26 +213,26 @@ async function nodeTeil() {
   pruefe('Punkte je Aufgabe: erster Versuch 1, spaeter geloest 0,5, Loesung gezeigt 0', L.punkteVon({ richtig: true, versuch: 1 }) === 1
     && L.punkteVon({ richtig: true, versuch: 2 }) === 0.5 && L.punkteVon({ richtig: true, versuch: 3 }) === 0.5 && L.punkteVon({ richtig: false, versuch: 0, loesungGezeigt: true }) === 0
     && L.punkteVon(null) === 0);
-  const tabelle = [[0, 'benno'], [1, 'benno'], [1.5, 'benno'], [2, 'hilde'], [3, 'hilde'], [3.5, 'kalle'], [4.5, 'kalle'], [5, 'lisa'], [5.5, 'lisa'], [6, 'lisa'],
-    [6.5, 'rudi'], [7, 'rudi'], [7.5, 'turm'], [8, 'turm'], [99, 'turm'], [-3, 'benno'], [NaN, 'benno']];
-  pruefe('Tabelle Punkte -> Bot (0 bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, darueber Professor Turm)',
+  const tabelle = [[0, 'fridolin'], [0.5, 'fridolin'], [1, 'benno'], [1.5, 'benno'], [2, 'hilde'], [3, 'hilde'], [3.5, 'kalle'], [4.5, 'kalle'], [5, 'lisa'], [5.5, 'lisa'], [6, 'lisa'],
+    [6.5, 'rudi'], [7, 'rudi'], [7.5, 'turm'], [8, 'turm'], [99, 'turm'], [-3, 'fridolin'], [NaN, 'fridolin']];
+  pruefe('Tabelle Punkte -> Bot (0 bis 0,5 Fridolin, bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, bis 8 Professor Turm)',
     tabelle.every(([p, b]) => L.botFuerPunkte(p) === b), tabelle.filter(([p, b]) => L.botFuerPunkte(p) !== b));
   const stufe = (id) => BOTS.find((b) => b.id === id).stufe;
   let monoton = true;
   for (let p = 0; p <= 8; p += 0.5) if (stufe(L.botFuerPunkte(p + 0.5)) < stufe(L.botFuerPunkte(p))) monoton = false;
-  pruefe('mehr Punkte nie ein schwaecherer Bot; hoechstens Professor Turm (Stufe 6): 8 Aufgaben sagen ueber die oberen Stufen zu wenig',
-    monoton && Math.max(...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((p) => stufe(L.botFuerPunkte(p)))) === 6);
+  pruefe('mehr Punkte nie ein schwaecherer Bot; hoechstens Professor Turm (Stufe 14): 8 Aufgaben sagen ueber die oberen Stufen zu wenig',
+    monoton && Math.max(...[0, 1, 2, 3, 4, 5, 6, 7, 8].map((p) => stufe(L.botFuerPunkte(p)))) === 14);
   pruefe('jeder Bot der Tabelle steht auf der Leiter (sonst nimmt botFuerPunkte den naechstschwaecheren)', L.EMPFEHLUNG.every((x) => BOTS.some((b) => b.id === x.botId)),
     L.EMPFEHLUNG.filter((x) => !BOTS.some((b) => b.id === x.botId)).map((x) => x.botId));
   const fest = [...['stufe-1', 'stufe-2', 'stufe-3', 'stufe-4'].map((id) => ({ id, richtig: true, versuch: 1 })), { id: 'stufe-5', richtig: true, versuch: 2 },
     { id: 'stufe-6', richtig: false, versuch: 0, loesungGezeigt: true }, { id: 'stufe-7', richtig: true, versuch: 1 }, { id: 'stufe-8', richtig: false, versuch: 1, loesungGezeigt: true }];
   const e1 = L.empfehlung({ ergebnisse: fest, hoechsteFrei: 1 });
   pruefe('feste Antworten (4 + 1 im zweiten Versuch + Matt in 2, zweimal Loesung gezeigt) = 5,5 Punkte -> Lisa Laeufer', e1.punkte === 5.5 && e1.botId === 'lisa'
-    && e1.geloest === 6 && e1.ersterVersuch === 5 && e1.gesamt === 8 && e1.stufe === 4, e1);
-  pruefe('nur Benno frei: Lisa nur als Probepartie; mit Lisa frei (Stufe 4): normale Partie', e1.probe === true && L.empfehlung({ ergebnisse: fest, hoechsteFrei: 4 }).probe === false
-    && L.empfehlung({ ergebnisse: fest, hoechsteFrei: 7 }).probe === false);
+    && e1.geloest === 6 && e1.ersterVersuch === 5 && e1.gesamt === 8 && e1.stufe === 10, e1);
+  pruefe('nur Fridolin frei: Lisa nur als Probepartie; mit Lisa frei (Stufe 10): normale Partie', e1.probe === true && L.empfehlung({ ergebnisse: fest, hoechsteFrei: 10 }).probe === false
+    && L.empfehlung({ ergebnisse: fest, hoechsteFrei: 14 }).probe === false);
   const e0 = L.empfehlung({ ergebnisse: [], hoechsteFrei: 1 });
-  pruefe('ohne geloeste Aufgabe: Bauer Benno, nie eine Probepartie (Stufe 1 ist immer frei)', e0.botId === 'benno' && e0.probe === false && e0.punkte === 0 && e0.geloest === 0);
+  pruefe('ohne geloeste Aufgabe: Vogelscheuche Fridolin, nie eine Probepartie (Stufe 1 ist immer frei)', e0.botId === 'fridolin' && e0.probe === false && e0.punkte === 0 && e0.geloest === 0);
   const alle = L.empfehlung({ ergebnisse: E.map((a) => ({ id: a.id, richtig: true, versuch: 1 })), hoechsteFrei: 1 });
   pruefe('alles im ersten Versuch: Professor Turm als Probepartie', alle.botId === 'turm' && alle.probe && alle.punkte === 8);
   pruefe('doppelte oder fremde Ergebnisse zaehlen nicht mit (je Aufgabe hoechstens einmal, nur die 8 IDs)',
@@ -245,7 +245,7 @@ async function nodeTeil() {
     && b1.saetze[2] === 'Als Nächstes lohnt es sich, Fesselungen auszunutzen.' && b1.saetze[3] === L.BOT_GRUND.lisa && b1.kurz.startsWith(b1.saetze[0]), b1);
   pruefe('Begruendung ohne Treffer: freundlich, ohne Zahl', L.begruendung(e0).saetze[0].startsWith('Diesmal ging keine Aufgabe auf. Kein Problem'));
   pruefe('Begruendung alles im ersten Versuch: "alle im ersten Versuch"', L.begruendung(alle).saetze[0] === 'Du hast 8 von 8 Aufgaben gelöst, alle im ersten Versuch.');
-  pruefe('jeder empfohlene Bot hat einen eigenen Grund', ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm'].every((id) => typeof L.BOT_GRUND[id] === 'string' && L.BOT_GRUND[id].length > 20));
+  pruefe('jeder empfohlene Bot hat einen eigenen Grund', ['fridolin', 'benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm'].every((id) => typeof L.BOT_GRUND[id] === 'string' && L.BOT_GRUND[id].length > 20));
   const texte = [...Object.values(L.BOT_GRUND), L.SCHAETZUNG, ...b1.saetze, ...L.ENTDECKUNGEN.map((e) => e.titel + ' ' + e.text)].join(' ');
   pruefe('Saetze der Entdeckungen kurz (hoechstens 34 Zeichen: eine Zeile in der Heute-Karte, Spielen-Knopf bleibt im Bild)',
     L.ENTDECKUNGEN.every((e) => e.text.length <= 34 && e.titel.length <= 18), L.ENTDECKUNGEN.filter((e) => e.text.length > 34 || e.titel.length > 18).map((e) => e.id));
@@ -327,7 +327,7 @@ async function nodeTeil() {
     alleJs.flatMap((d) => lies(d).split('\n').filter((z) => /^\s*\/\/.*[^\x00-\x7F]/.test(z)).map((z) => d + ': ' + z.trim().slice(0, 50))));
   const ohneKommentar = (d) => lies(d).replace(/\/\/.*$/gm, '');
   pruefe('kein fester Bot im Dienst und im Screen: der Gegner nach der Regel-Hilfe ist der erste Bot der Leiter (BOTS[0])',
-    ['js/pakete/start/dienst.js', 'js/ui/start.js'].every((d) => !/botNachId\('benno'\)|botId: 'benno'|Bauer Benno/.test(ohneKommentar(d)))
+    ['js/pakete/start/dienst.js', 'js/ui/start.js'].every((d) => !/botNachId\('benno'\)|botId: 'benno'|Bauer Benno|botNachId\('fridolin'\)|botId: 'fridolin'|Vogelscheuche Fridolin/.test(ohneKommentar(d)))
     && /export const ersterGegner = \(\) => BOTS\[0\]/.test(lies('js/pakete/start/dienst.js')));
   const cssRoh = lies('css/pakete/start.css');
   pruefe('Kommentare in ASCII auch im CSS und in dieser Testdatei', [...cssRoh.matchAll(/\/\*[\s\S]*?\*\//g)].every((x) => !/[^\x00-\x7F]/.test(x[0]))
@@ -492,10 +492,10 @@ async function browserTeil(browser) {
     bilder: [...document.querySelectorAll('.st-leiter img')].every((i) => i.complete && i.naturalWidth > 0), aktuell: document.querySelector('.st-punkte [aria-current]').dataset.ziel,
     fokus: document.activeElement && document.activeElement.classList.contains('st-titel'), h1: document.querySelector('.st-titel').textContent,
     p: document.querySelector('.st-text p').textContent }));
-  pruefe('Seite 2 "deine Gegner": alle 10 Bots als Leiter, Benno als Start, Bilder geladen, Fokus auf dem Titel', w2.bots === 10 && w2.erster === 1 && w2.bilder && w2.aktuell === 'w2' && w2.fokus,
+  pruefe('Seite 2 "deine Gegner": fuenf Welten (Endgegner je Welt, Nummer = Welt), Welt 1 als Start, Bilder geladen, Fokus auf dem Titel', w2.bots === 5 && w2.erster === 1 && w2.bilder && w2.aktuell === 'w2' && w2.fokus,
     JSON.stringify(w2));
-  pruefe('Seite 2: Zahl und Namen aus der Leiter ("Zehn Gegner, eine Leiter.", "Von Bauer Benno bis zum Stockfisch: ...")', w2.h1 === 'Zehn Gegner, eine Leiter.'
-    && w2.p.startsWith('Von Bauer Benno bis zum Stockfisch: Jeder Sieg schaltet den nächsten frei'), JSON.stringify({ h1: w2.h1, p: w2.p }));
+  pruefe('Seite 2: Zahl und Namen aus der Leiter ("Dreißig Gegner, fünf Welten.", "Von Vogelscheuche Fridolin bis zum Stockfisch: ...")', w2.h1 === 'Dreißig Gegner, fünf Welten.'
+    && w2.p.startsWith('Von Vogelscheuche Fridolin bis zum Stockfisch: Jeder Sieg schaltet den nächsten frei'), JSON.stringify({ h1: w2.h1, p: w2.p }));
   await bild(seite, 'w2-ipad');
   await seite.keyboard.press('ArrowRight');
   await warteSeite(seite, 'w3');
@@ -603,21 +603,21 @@ async function browserTeil(browser) {
   await seite.locator('.rs-weiter').click();
   await seite.waitForSelector('.rs-ende:not([hidden]) .rs-ende-karte', { timeout: 8000 });
   const endeR = await seite.evaluate(() => ({ h2: document.querySelector('.rs-ende h2').textContent, knoepfe: [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
-  pruefe('Ende: "Du kennst alle Figuren", Knopf "Gegen Bauer Benno spielen" und "Fertig"', endeR.h2 === 'Du kennst alle Figuren'
-    && endeR.knoepfe.join('|') === 'Gegen Bauer Benno spielen|Fertig', JSON.stringify(endeR));
+  pruefe('Ende: "Du kennst alle Figuren", Knopf "Gegen Vogelscheuche Fridolin spielen" und "Fertig"', endeR.h2 === 'Du kennst alle Figuren'
+    && endeR.knoepfe.join('|') === 'Gegen Vogelscheuche Fridolin spielen|Fertig', JSON.stringify(endeR));
   pruefe('Ergebnis im Modul start: regeln { 7 von 7 }', JSON.stringify((await modulImBrowser(seite)).regeln) === JSON.stringify({ tag: heute, geloest: 7, gesamt: 7 }));
   await bild(seite, 'regeln-ende-ipad');
   await seite.locator('.rs-ende .rs-fertig').click();
   await warteSeite(seite, 'nach-regeln');
   const nr = await seite.evaluate(() => ({ ueber: document.querySelector('.st-text .ueberzeile').textContent, h1: document.querySelector('.st-titel').textContent,
     knoepfe: [...document.querySelectorAll('.st-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
-  pruefe('"Fertig": zurueck zum Willkommen, Seite "Bereit für deine erste Partie?" mit Benno', nr.ueber === 'Regel-Hilfe geschafft' && nr.h1 === 'Bereit für deine erste Partie?'
-    && nr.knoepfe.join('|') === 'Gegen Bauer Benno spielen|Einstufung machen|Zur Arena', JSON.stringify(nr));
+  pruefe('"Fertig": zurueck zum Willkommen, Seite "Bereit für deine erste Partie?" mit Fridolin', nr.ueber === 'Regel-Hilfe geschafft' && nr.h1 === 'Bereit für deine erste Partie?'
+    && nr.knoepfe.join('|') === 'Gegen Vogelscheuche Fridolin spielen|Einstufung machen|Zur Arena', JSON.stringify(nr));
   await bild(seite, 'nach-regeln-ipad');
   await seite.locator('[data-st="benno"]').click();
   await seite.waitForFunction(() => !!window.__partie && document.querySelector('.screen.partie'), null, { timeout: 15000 });
   const pb = await seite.evaluate(() => ({ bot: window.__partie.z.bot.id, modus: window.__partie.z.modus, farbe: window.__partie.z.farbe }));
-  pruefe('"Gegen Bauer Benno spielen" startet eine normale Partie (wertet) mit Weiss', pb.bot === 'benno' && pb.modus === 'normal' && pb.farbe === 'w', JSON.stringify(pb));
+  pruefe('"Gegen Vogelscheuche Fridolin spielen" startet eine normale Partie (wertet) mit Weiss', pb.bot === 'fridolin' && pb.modus === 'normal' && pb.farbe === 'w', JSON.stringify(pb));
   await seite.evaluate(() => window.__app.gehe('arena', {}, { ersetzen: true }));
   await seite.waitForSelector('.screen.arena .knoten', { timeout: 15000 });
 
@@ -698,7 +698,7 @@ async function browserTeil(browser) {
     knoepfe: [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
   pruefe('Ende: Empfehlung "Starte gegen Lisa Läufer" mit Begruendung, Probepartie, Leiter und Fertig', endeE.h2 === 'Starte gegen Lisa Läufer' && endeE.zahl === '6 von 8 gelöst'
     && /^Du hast 6 von 8 Aufgaben gelöst/.test(endeE.p) && /Probepartie wertet nicht/.test(endeE.p)
-    && endeE.knoepfe.join('|') === 'Probepartie gegen Lisa Läufer|Leiter: Bauer Benno|Fertig', JSON.stringify(endeE));
+    && endeE.knoepfe.join('|') === 'Probepartie gegen Lisa Läufer|Leiter: Vogelscheuche Fridolin|Fertig', JSON.stringify(endeE));
   const mE = await modulImBrowser(seite);
   pruefe('Ergebnis im Modul start: einstufung { 5,5 Punkte, 6 geloest, 5 im ersten Versuch, Lisa, Rechenstand 1 }', mE.einstufung && mE.einstufung.punkte === 5.5
     && mE.einstufung.geloest === 6 && mE.einstufung.ersterVersuch === 5 && mE.einstufung.botId === 'lisa' && mE.einstufung.rechenstand === 1 && mE.einstufung.tag === heute
@@ -712,9 +712,9 @@ async function browserTeil(browser) {
     portraet: !!document.querySelector('.st-portraet img') && document.querySelector('.st-portraet-name b').textContent }));
   pruefe('"Fertig": Seite "Deine Empfehlung" mit Portraet, Ergebnis, Begruendung und Hinweis, dass die Probepartie nicht wertet', em.h1 === 'Starte gegen Lisa Läufer'
     && em.portraet === 'Lisa Läufer' && em.chips.join('|') === '6 von 8 gelöst|5 im ersten Versuch' && em.grund.length === 4 && /Probepartie wertet nicht/.test(em.notiz)
-    && /Bauer Benno dein nächster Gegner/.test(em.notiz), JSON.stringify(em));
+    && /Vogelscheuche Fridolin dein nächster Gegner/.test(em.notiz), JSON.stringify(em));
   pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zur Arena', em.knoepfe.join('|')
-    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Bauer Benno|Einstufung wiederholen|Zur Arena', em.knoepfe.join('|'));
+    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Vogelscheuche Fridolin|Einstufung wiederholen|Zur Arena', em.knoepfe.join('|'));
   await seite.reload();
   await warteSeite(seite, 'empfehlung', 20000);
   pruefe('Neuladen auf der Empfehlung: wieder die Empfehlung (nicht Seite 1)', (await sz(seite)).seite === 'empfehlung'
@@ -744,15 +744,15 @@ async function browserTeil(browser) {
     && await seite.evaluate((P) => (JSON.parse(localStorage.getItem(P + 'laufend') || 'null') || {}).botId, P) === 'lisa');
   await seite.locator('[data-st="leiter"]').click();
   await seite.locator('.dialog-knoepfe .knopf', { hasText: 'Neue Partie' }).click();
-  await seite.waitForFunction(() => !!window.__partie && window.__partie.z.bot.id === 'benno', null, { timeout: 15000 });
-  pruefe('"Leiter: Bauer Benno" startet die normale Partie auf der Leiter', await seite.evaluate(() => window.__partie.z.modus) === 'normal');
+  await seite.waitForFunction(() => !!window.__partie && window.__partie.z.bot.id === 'fridolin', null, { timeout: 15000 });
+  pruefe('"Leiter: Vogelscheuche Fridolin" startet die normale Partie auf der Leiter', await seite.evaluate(() => window.__partie.z.modus) === 'normal');
   // mit Lisa freigeschaltet: keine Probepartie, sondern die normale Partie
   await bereite(seite, { modul: mE, fortschritt: { bots: { benno: { sterne: [true, false, false], partien: 1, siege: 1 }, hilde: { sterne: [true, false, false], partien: 1, siege: 1 },
-    kalle: { sterne: [true, false, false], partien: 1, siege: 1 } } } }, '#arena');
+    kalle: { sterne: [true, false, false], partien: 1, siege: 1 }, leo: { sterne: [true, false, false], partien: 1, siege: 1 } } } }, '#arena');
   await seite.evaluate(() => window.__app.gehe('start', { seite: 'empfehlung' }));
   await warteSeite(seite, 'empfehlung');
   const frei = await seite.evaluate(() => ({ notiz: !!document.querySelector('.st-notiz'), knoepfe: [...document.querySelectorAll('.st-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
-  pruefe('Lisa freigeschaltet (Kalle besiegt): "Gegen Lisa Läufer spielen", keine Probepartie', !frei.notiz && frei.knoepfe[0] === 'Gegen Lisa Läufer spielen'
+  pruefe('Lisa freigeschaltet (Leo besiegt, Stufe 9): "Gegen Lisa Läufer spielen", keine Probepartie', !frei.notiz && frei.knoepfe[0] === 'Gegen Lisa Läufer spielen'
     && !frei.knoepfe.some((t) => /Probepartie/.test(t)), JSON.stringify(frei));
   await seite.locator('[data-st="spielen"]').click();
   await seite.waitForFunction(() => !!window.__partie && window.__partie.z.bot.id === 'lisa', null, { timeout: 15000 });
@@ -1016,7 +1016,8 @@ async function browserTeil(browser) {
       if (name !== 'handy-klein' || s === 'w1') await bild(hs.seite, `${s}-${name}`);
     }
     if (handy && w === 390) {
-      // Einstufung bis zur Empfehlung: alles mit "Loesung zeigen" (0 Punkte -> Bauer Benno, normale Partie)
+      // Einstufung bis zur Empfehlung: erste Aufgabe geloest, alles andere mit "Loesung zeigen" (1 Punkt -> Bauer Benno, Stufe 2;
+      // auf der frischen Leiter ist nur Fridolin frei, also gibt es Benno als Probepartie)
       await hs.seite.locator('[data-st="ja"]').click();
       await warteSeite(hs.seite, 'einstufung');
       await bild(hs.seite, `einstufung-${name}`);
@@ -1033,8 +1034,8 @@ async function browserTeil(browser) {
       }
       await hs.seite.locator('.rs-weiter').click();
       await hs.seite.waitForSelector('.rs-ende:not([hidden]) .rs-ende-karte', { timeout: 8000 });
-      pruefe('Einstufung mit 1 Punkt: "Starte gegen Bauer Benno", normale Partie', await hs.seite.evaluate(() => document.querySelector('.rs-ende h2').textContent) === 'Starte gegen Bauer Benno'
-        && await hs.seite.evaluate(() => [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()).join('|')) === 'Gegen Bauer Benno spielen|Fertig');
+      pruefe('Einstufung mit 1 Punkt: "Starte gegen Bauer Benno" (Stufe 2, auf der frischen Leiter nur als Probepartie), Leiter: Fridolin', await hs.seite.evaluate(() => document.querySelector('.rs-ende h2').textContent) === 'Starte gegen Bauer Benno'
+        && await hs.seite.evaluate(() => [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()).join('|')) === 'Probepartie gegen Bauer Benno|Leiter: Vogelscheuche Fridolin|Fertig');
       await hs.seite.locator('.rs-ende .rs-fertig').click();
       await warteSeite(hs.seite, 'empfehlung');
       const l = await layout(hs.seite);

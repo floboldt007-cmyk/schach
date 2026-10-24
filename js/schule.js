@@ -469,8 +469,8 @@ export function fortschrittJetzt({ stand = meineKlassenGespeichert(), partien = 
   }
   const gen = Number.isFinite(st.schnittGenauigkeit) ? Math.round(Math.min(100, Math.max(0, st.schnittGenauigkeit)) * 10) / 10 : null;
   return {
-    bots_besiegt: Math.min(10, besiegteBots(f)),
-    sterne: Math.min(30, gesamtSterne(f)),
+    bots_besiegt: Math.min(BOTS.length, besiegteBots(f)),
+    sterne: Math.min(BOTS.length * 3, gesamtSterne(f)),
     partien: Math.min(100000, Number(st.partien) || 0),
     genauigkeit_schnitt: gen,
     haeufigste_fehler: haeufigsteFehler(p),

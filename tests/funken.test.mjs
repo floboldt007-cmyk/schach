@@ -647,7 +647,7 @@ gruppe = 'Ereignisse';
   sende('uebung:ergebnis', { partieId: 'pz1', ply: 4, getroffen: true });
   pruefe('Übung erhöht die Funken (Lernen), nie Wertung, Sterne oder Statistik', log.some((x) => x.n === 'funken:gebucht' && x.d.quelle === 'lernen' && x.d.menge === 15)
     && JSON.stringify(ladeFortschritt()) === fortschrittVor && JSON.stringify(statistik()) === statistikVor);
-  // Faktor aus echten Partien: 12 Siege gegen Benno -> Lage 650, Kalle (800) +150 -> x1,25
+  // Faktor aus echten Partien: 12 Siege gegen Benno (Elo 200) -> Lage 600, Kalle (800) +200 -> x1,25
   setzeSpeicher(fakeSpeicher());
   for (let i = 0; i < 12; i++) {
     speicherePartie({ datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: 'benno', botStufe: 1, spielerFarbe: 'w',
@@ -658,7 +658,7 @@ gruppe = 'Ereignisse';
   await warte(10);
   const lauf = S.lade().lauf;
   pruefe('Faktor wird beim Start festgelegt (12 Siege gegen Benno: Kalle ist „Herausforderung · × 1,25“)', lauf && lauf.id === 'lk' && lauf.fa === 1.25
-    && lauf.fn === 'Herausforderung' && lauf.ab === 150, lauf);
+    && lauf.fn === 'Herausforderung' && lauf.ab === 200, lauf);
 }
 
 // =====================================================================
@@ -1072,7 +1072,7 @@ async function testeBrowser(browser) {
       spielerFarbe: 'w', zuege: Array.from({ length: 30 }, () => 'e2e4'), san: ['e4'], ergebnis: 'sieg', grund: 'matt', hinweise: 0, zuruecknahmen: 0,
       liveKlassen: [], genauigkeit: 70, modus: 'normal', sterne: [true, true, true] }));
     const fortschritt = { bots: { benno: { sterne: [true, true, true], partien: 12, siege: 12, remis: 0, niederlagen: 0, besteGenauigkeit: 70 },
-      hilde: { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 60 } }, brillanteZuege: [] };
+      bodo: { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 60 } }, brillanteZuege: [] };
     const lokal = { 'schach-arena:v1:partien': partien, 'schach-arena:v1:fortschritt': fortschritt };
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { lokal });
     const hh = hilfen(s);
@@ -1086,12 +1086,17 @@ async function testeBrowser(browser) {
       /Die erste Rückenwind-Karte kommt an deinem 4\. Tag, danach jeden Montag eine\./.test(await s.locator('.fk-spiegel .fk-s-rw').innerText()));
     await s.locator('.fk-spiegel .fk-schliessen').click();
     await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
+    // Welten: Kalle (Stufe 8) ist nach Bodo der naechste Gegner, die Arena zeigt Welt 2; Benno steht in Welt 1
+    await hh.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
+    await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
-    pruefe('Benno nach 12 Siegen: „Training · Funken × 0,5“ (Lage 650, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
+    pruefe('Benno nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
+    await hh.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
+    await warte(500);
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
-    pruefe('Kalle: „Herausforderung · Funken × 1,25“ (Abstand +150)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
+    pruefe('Kalle: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
     // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });

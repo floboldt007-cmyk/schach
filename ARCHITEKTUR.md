@@ -172,6 +172,7 @@ export class Brett {
   setzeAusrichtung('w' | 'b')
   erlaubeZuege(map | null)        // { e2: ['e3','e4'], ... } oder null = gesperrt
   zeigeVorzuege([{ von, nach, umwandlung? }]) // reine Vorschau ohne beiZug; setzeStellung stellt die echte Stellung her
+  nummern([{ feld, text }])       // kleine Zahl oben links am Feld ueber den Figuren (.brett-nummern), [] loescht
   setzeAutoDame(boolean)          // Umwandlung ohne Auswahl als Dame; 450 ms auf dem Zielfeld halten zeigt D T L S
   setzeBestaetigen(boolean)       // Zug bestaetigen: Vorschau, zweiter Tipp aufs Ziel macht fest, Tipp anderswo nimmt zurueck
   setzeSteuerung('beides' | 'ziehen' | 'tippen')
@@ -331,6 +332,22 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
 8. Waehrend der Partie nach jedem Zug `speichereLaufendePartie(stand)`.
 
 ## Sterne und Freischaltung (storage.js)
+
+**Welten (Flo 23.10., gebaut 24.10.):** 30 Bots in fuenf Welten (`WELTEN` in `js/bots.js`: Karofelder, Springerforst,
+Turmstadt, Gezeitenkueste, Stockfisch-Tiefe), je sechs, Elo 100 bis 3000 in 100er-Schritten (`stufe` 1..30 = Elo/100,
+`welt` 1..5, `endgegner: true` am sechsten jeder Welt, `rufname` fuer Schilder und Knoepfe, `merkmale` fuer das Panel).
+Die zehn bisherigen Bots behalten id, Bild und Sterne; Benno spielt jetzt mit Elo 200, Fridolin (100) ist der erste.
+Ab Elo 2200 spielt Stockfish selbst (`staerke.voll` mit `elo`, UCI_Elo), der Stockfisch ohne Bremse.
+Freischaltung (`storage.js`): frei ist jede Stufe bis `hoechsterSieg() + 1` (alte Spielstaende behalten alles unter
+ihrem besten Sieg, neu eingezogene Bots darunter sind offen und tragen das Schild NEU), dazu der Endgegner jeder Welt,
+deren erste Stufe frei ist (direkt herausfordern; sein Sieg oeffnet die ganze Welt und die naechste).
+`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Fridolin). `hoechsteFreieStufe()` zaehlt
+die Endgegner-Ausnahme nicht mit (Massstab fuer Empfehlungen). `istWeltFrei(nr)`, `hatWeltsiegel(nr)` (alle 18 Sterne).
+Oeffnet ein Sieg mehrere Stufen, meldet `neuFreigeschaltet` den neuen naechsten Gegner.
+Arena (`js/ui/arena.js`): die Karte zeigt eine Welt (`params.welt`, sonst die des gewaehlten Bots) mit sechs Stationen,
+Weltwahl mit Pfeilen oben auf der Karte (`.weltwahl`, wechselt ohne Neuaufbau), Landschaft aus `SZENEN[welt.id]` und
+den Farben `.welt[data-welt]` in `css/arena.css`; gesperrte Welten als ruhige Silhouette mit `.welt-sperre`.
+Zustaende der Stationen: besiegt | aktuell (naechster Gegner) | offen | gesperrt.
 Drei **einzelne** Sterne je Bot, jeder fuer immer verdient: (1) Sieg, (2) Sieg mit
 Genauigkeit >= 80 %, (3) Sieg ohne Hinweis und ohne Zuruecknahme. Stufe n ist frei, sobald
 Stufe n-1 besiegt ist. Brillante Zuege werden gesammelt (`fortschritt.brillanteZuege`).
@@ -1209,6 +1226,19 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
 - `beiLeer(feld)` (Tipp ohne Zug, die Partie bricht damit Vorzuege ab): Maus beim Druecken, Finger erst beim Loslassen
   und nur, wenn kein Halten (Marke) daraus wurde. `setzeTurmRochade(true)` ergaenzt auch eine einfache `zielKarte(chess)`
   um den Turm und wirkt sofort.
+- `beiPfeil(von, nach)`: Flo hat einen eigenen Pfeil gezeichnet (nicht beim Wegnehmen, nicht bei Marken). Die Partie
+  schliesst damit den Pfeil-Tipp.
+- **Vorzug-Kette** (Flo 23.10., `tests/vorzuege.test.mjs`): waehrend der Bot denkt, merkt `beiZug` bis zu 5 Zuege vor
+  (`z.vorzuege`). Das Brett zieht jeden Vorzug sichtbar, die Ziele des naechsten kommen aus dieser gedachten Stellung
+  (`vorzugZiele()` liest das Brett), also geht e2-e4 und danach e4-e5 mit derselben Figur; `z.chess` bleibt echt. Jeder
+  Vorzug traegt am Ziel seine Nummer (`brett.nummern`). Je Bot-Zug wird der vorderste ausgefuehrt; ist er regelwidrig
+  geworden, fallen er und der Rest leise weg (Klang `zurueck`, Protokoll `vorzug:verworfen`). Ein sechster springt
+  zurueck, die Kette bleibt. Tipp ins Leere, Hinweis, Zuruecknehmen, Aufgeben und Partie-Ende loeschen die Kette.
+  Zu zweit und online gibt es keine Vorzuege (eigene Bildschirme), Raetsel auch nicht.
+- **Pfeil-Tipp** (`PFEIL_TIPP_MERKER` = `schach-arena:v1:hinweis-pfeile`, `{ partien, erledigt }`): einmal je Geraet ab der
+  zweiten neu begonnenen Partie eine ruhige Zeile `.pfeil-tipp` (hoch unter dem Brett, quer unter der Zugliste) mit
+  "Verstanden". Weg mit dem ersten Pfeil, mit "Verstanden" oder am Partie-Ende. Im Testmodus nur mit
+  `window.__test.pfeilTipp`, damit sie fremde Layout-Pruefungen nicht verschiebt.
 
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)

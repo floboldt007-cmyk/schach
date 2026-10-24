@@ -12,7 +12,7 @@
 //       knoepfe: [{ aktion, icon, label }] als .icon-knopf[data-aktion] vor Mond, Klang und Zahnrad.
 //       zurueck: Zurueck-Knopf links (.kopf-zurueck[data-aktion="zurueck"]); auf einem Reiter-Screen mit sichtbarer
 //       Leiste blendet css/navigation.css ihn aus (html[data-reiter-wurzel="ja"]).
-//   standardChips(fortschritt = ladeFortschritt()) -> HTML   Sterne (x / 30) und besiegte Bots (x / 10)
+//   standardChips(fortschritt = ladeFortschritt()) -> HTML   Sterne (x / 90) und besiegte Bots (x / 30); Welten: aus BOTS
 //   seitenKopf({ ueber, titel, text }) -> HTML (div.seiten-kopf: Ueberzeile, grosser Titel h1.disp, Satz)
 //   verbindeKopf(wurzel, app, { beiZurueck, beiEinstellungen }) -> { verlasse() }
 //       bindet (als Delegation an wurzel, ein neu gezeichneter Kopf bleibt bedienbar) den Klang-Schalter
@@ -22,6 +22,7 @@
 //       und Knoepfen nicht einmal der erste Chip, bekommt der Kopf .ohne-chips (Chips aus, nie ein Stummel).
 //   kopfEintritt(wurzel)   Marke und rechte Seite gleiten gestaffelt ein (bei Tempo 0 nichts)
 import { icon } from './icons.js';
+import { BOTS } from '../bots.js';
 import { ladeFortschritt, gesamtSterne, besiegteBots, ladeEinstellungen } from '../storage.js';
 import { aufgeloesterModus } from '../thema.js';
 import { klang as klangDienst } from '../sounds.js';
@@ -34,8 +35,8 @@ export function standardChips(fortschritt = null) {
   if (!f) { try { f = ladeFortschritt(); } catch (e) { f = null; } }
   const sterne = f ? gesamtSterne(f) : 0;
   const besiegt = f ? besiegteBots(f) : 0;
-  return `<span class="chip zahl chip-sterne" title="Gesammelte Sterne">${icon('stern', 'stern')}<span class="sr">Sterne:</span> ${sterne}<span class="von"> / 30</span></span>` +
-    `<span class="chip zahl chip-pokal" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegt}<span class="von"> / 10</span></span>`;
+  return `<span class="chip zahl chip-sterne" title="Gesammelte Sterne">${icon('stern', 'stern')}<span class="sr">Sterne:</span> ${sterne}<span class="von"> / ${BOTS.length * 3}</span></span>` +
+    `<span class="chip zahl chip-pokal" title="Besiegte Bots">${icon('pokal')}<span class="sr">Besiegt:</span> ${besiegt}<span class="von"> / ${BOTS.length}</span></span>`;
 }
 
 export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],

@@ -27,7 +27,7 @@ import { icon } from './icons.js';
 import { miniBrett } from './bauteile.js';
 import { klang } from '../sounds.js';
 import { anim, staffel, tempo } from '../bewegung.js';
-import { BOTS } from '../bots.js';
+import { BOTS, WELTEN, endgegnerDerWelt } from '../bots.js';
 import { avatarVon, botFarbe } from '../thema.js';
 import { angeboten } from '../orte.js';
 import { KLASSEN_NAME } from '../zugklassen.js';
@@ -71,6 +71,8 @@ const portraet = (b) => `<div class="st-portraet" style="${farben(b)}"><img src=
   <div class="st-portraet-name"><b>${esc(b.name)}</b><span>Stufe ${b.stufe} · ${esc(b.titel)}</span></div>`;
 // Seite 2: "Zehn Gegner", "bis zum Stockfisch" (Artikel im Namen: Der/Die -> zum/zur)
 const ZAHLWORT = ['', 'Ein', 'Zwei', 'Drei', 'Vier', 'Fünf', 'Sechs', 'Sieben', 'Acht', 'Neun', 'Zehn', 'Elf', 'Zwölf'];
+ZAHLWORT[20] = 'Zwanzig';
+ZAHLWORT[30] = 'Dreißig';
 const zahlWort = (n) => ZAHLWORT[n] || String(n);
 function bisZu(name) {
   const t = String(name || '');
@@ -97,12 +99,13 @@ function seite(name) {
     const erster = BOTS[0];
     const letzter = BOTS[BOTS.length - 1];
     return {
-      bild: `<div class="st-leiter">${BOTS.map((b) => `<span class="st-bot${b === erster ? ' st-erster' : ''}" style="${farben(b)}">
-          <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${b.stufe}</b></span>`).join('')}</div>
+      // Welten: je Welt ihr Endgegner mit der Nummer der Welt (dreissig Portraets passten nicht in eine Reihe)
+      bild: `<div class="st-leiter">${WELTEN.map((w) => { const b = endgegnerDerWelt(w.nr) || erster; return `<span class="st-bot${w.nr === 1 ? ' st-erster' : ''}" style="${farben(b)}" title="${esc(w.name)}">
+          <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${w.nr}</b></span>`; }).join('')}</div>
         <div class="st-leiter-fuss"><span>Start: ${esc(erster.name)}</span><span>Ziel: ${esc(letzter.name)}</span></div>`,
       text: `<div class="ueberzeile">Deine Gegner</div>
-        <h1 class="disp st-titel" tabindex="-1">${esc(zahlWort(BOTS.length))} Gegner, eine Leiter.</h1>
-        <p>Von ${esc(erster.name)} ${esc(bisZu(letzter.name))}: Jeder Sieg schaltet den nächsten frei, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.</p>
+        <h1 class="disp st-titel" tabindex="-1">${esc(zahlWort(BOTS.length))} Gegner, ${esc(zahlWort(WELTEN.length).toLowerCase())} Welten.</h1>
+        <p>Von ${esc(erster.name)} ${esc(bisZu(letzter.name))}: Jeder Sieg schaltet den nächsten frei, jede Welt endet mit einem Endgegner, und gegen jeden gibt es drei Sterne zu holen. Alle spielen ehrlich, keiner wird heimlich schwächer.</p>
         <div class="st-knoepfe">${knopf('weiter', 'Weiter', { art: 'primaer' })}${knopf('ueberspringen', 'Überspringen', { art: 'leise' })}</div>`,
     };
   }

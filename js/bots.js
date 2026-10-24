@@ -1,10 +1,10 @@
-// Bot-Leiter: zehn Gegner mit Charakter, Saetzen und einem Staerke-Modell.
-// Zugwahl (Stufe 1 bis 9): Die Engine bewertet viele Zuege (MultiPV) in der Rechentiefe des
+// Bot-Leiter: dreissig Gegner in fuenf Welten (WELTEN) mit Charakter, Saetzen und einem Staerke-Modell.
+// Zugwahl (Elo 100 bis 2100): Die Engine bewertet viele Zuege (MultiPV) in der Rechentiefe des
 // Bots. Der Bot betrachtet nur einige Kandidaten: die besten n laut Engine ("Intuition") plus
 // ein paar "naheliegende" Zuege (Schlagen, Schach, Entwicklung). Jeder Kandidat bekommt die
 // Engine-Bewertung + Charakter-Bonus + Rauschen, der hoechste gewinnt. Dazu kommen
 // Spontanzuege (grober Fehlzug) und manchmal zu flaches Rechnen (uebersehene Taktik).
-// Stufe 10 spielt mit voller Staerke.
+// Ab Elo 2200 spielt Stockfish selbst (voll) mit seiner eigenen Elo-Bremse (UCI_Elo), der Stockfisch ohne Bremse.
 //
 // Saetze (Runde 4): botSatz(bot, anlass, zufall = Math.random, werte = null) -> Satz | null
 // sucht zuerst bot.saetze[anlass], dann das Register; registriereSaetze(anlass, { [botId]: [Satz] })
@@ -63,7 +63,58 @@ export const ANLAESSE = ['begruessung', 'schlagen', 'spielerFehler', 'spielerGut
 //  voll        Engine-Zug direkt (movetime; optional elo/skill fuer Stockfishs eigene Bremse)
 export const BOTS = [
   {
-    id: 'benno', stufe: 1, name: 'Bauer Benno', elo: 250, titel: 'Der Gutmütige',
+    id: 'fridolin', stufe: 1, welt: 1, name: 'Vogelscheuche Fridolin', rufname: 'Fridolin', elo: 100, titel: 'Der Windige',
+    avatar: 'assets/avatare/modern/fridolin.svg', farbe: '#4AAFC9',
+    kurz: 'Zieht, wohin der Wind weht. Aber immer nach den Regeln.',
+    bio: 'Fridolin steht seit Jahren auf dem ersten Acker und hat vom Zuschauen gelernt, wie die Figuren ziehen. Er zieht, wohin der Wind ihn gerade schiebt, aber immer regelgerecht. Über jeden guten Zug von dir freut er sich mit.',
+    merkmale: { figur: 'P', lieblings: 'Bauer', tempo: 'Windig', schwaeche: 'Zieht fast zufällig' },
+    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 0, blick: 4, rauschen: 450, patzer: 0.7, mattInEins: 0.2, gier: 0.3, vorlieben: {  }, zeit: [400, 900] },
+    saetze: {
+      begruessung: [
+        'Hallo! Ich bin Fridolin. Ich stehe hier schon lange und hab gut aufgepasst.',
+        'Willkommen auf dem ersten Acker! Hier fängt jede große Reise an.',
+        'Oh, Besuch! Die Krähen haben mir schon erzählt, dass du kommst.',
+        'Schön, dass du da bist! Ich bin aus Stroh, aber mit ganzem Herzen dabei.',
+      ],
+      schlagen: [
+        'Huch, die hat mir der Wind direkt in die Arme geweht.',
+        'Oh, eine Figur! Die stopf ich mir in die Jackentasche.',
+        'Genommen! Die Krähen werden staunen.',
+      ],
+      spielerFehler: [
+        'Kein Problem! Mir fällt auch ständig Stroh aus dem Ärmel.',
+        'Das war nicht ganz rund, oder? Macht nichts, wir lernen hier beide.',
+        'Da hat dich wohl eine Böe erwischt. Weiter geht’s!',
+      ],
+      spielerGut: [
+        'Oh, das war richtig gut! Mir fliegt vor Staunen der Hut weg.',
+        'Toll gezogen! Du lernst schneller als ich, und ich steh schon ewig hier.',
+        'Das sah schlau aus! Sogar die Krähen nicken.',
+      ],
+      schach: [
+        'Schach! Ich glaub, das war der Wind.',
+        'Schach! Entschuldige, König, ich wollte nicht stören.',
+        'Schach! Das hab ich mir vom Zuschauen abgeguckt.',
+      ],
+      verliert: [
+        'Super gespielt! Die Spatzen klatschen mit den Flügeln.',
+        'Du hast gewonnen! Ich wusste, dass du das kannst.',
+        'Toll gemacht! Drüben auf dem Hof freut sich Bauer Benno schon auf dich.',
+      ],
+      gewinnt: [
+        'Oh, ich hab gewonnen? Das war bestimmt nur der Rückenwind.',
+        'Gewonnen, aber du warst nah dran! Probier’s gleich noch mal.',
+        'Der Wind war heute auf meiner Seite. Beim nächsten Mal weht er für dich.',
+      ],
+      remis: [
+        'Unentschieden! Wir stehen beide noch, das ist doch schön.',
+        'Remis! Der Wind konnte sich nicht entscheiden.',
+        'Unentschieden! Die Krähen sagen, das zählt als halber Sieg.',
+      ],
+    },
+  },
+  {
+    id: 'benno', stufe: 2, welt: 1, name: 'Bauer Benno', rufname: 'Benno', elo: 200, titel: 'Der Gutmütige',
     avatar: 'assets/avatare/01-bauer-benno.svg', farbe: '#7ee06a',
     kurz: 'Kennt die Zugregeln, meistens. Freut sich über jede Figur.',
     bio: 'Benno hat Schach im Winter gelernt, als auf dem Hof nichts zu tun war. Er zieht, was gerade in der Nähe steht, und schnappt sich jede Figur, die er erwischen kann. Ob sie gedeckt war, merkt er meistens erst hinterher.',
@@ -107,7 +158,7 @@ export const BOTS = [
         'Ach, verloren. Aber schön war’s trotzdem!',
         'Gut gespielt! Ich geh dann mal wieder die Hühner füttern.',
         'Nächstes Mal übe ich vorher. Versprochen!',
-        'Du warst zu stark für mich. Oma Hilde wartet schon mit Keksen auf dich.',
+        'Du warst zu stark für mich. Postbotin Paula bringt dir schon die nächste Partie.',
       ],
       gewinnt: [
         'Was, ich hab gewonnen? Das muss ich der Kuh Elsa erzählen!',
@@ -123,7 +174,109 @@ export const BOTS = [
     },
   },
   {
-    id: 'hilde', stufe: 2, name: 'Oma Hilde', elo: 500, titel: 'Die Gemütliche',
+    id: 'paula', stufe: 3, welt: 1, name: 'Postbotin Paula', rufname: 'Paula', elo: 300, titel: 'Die Eilige',
+    avatar: 'assets/avatare/modern/paula.svg', farbe: '#9891C7',
+    kurz: 'Hat nie Zeit. Holt die Dame früh raus, gibt jedes Schach.',
+    bio: 'Paula radelt jeden Morgen über die Feldwege und hat dabei nie Zeit. Ihre Dame schickt sie so früh los wie die erste Post, und jedes Schach wird zugestellt. Ob die Dame unterwegs in Gefahr gerät, merkt sie oft erst später.',
+    merkmale: { figur: 'Q', lieblings: 'Dame', tempo: 'Eilig', schwaeche: 'Holt die Dame zu früh' },
+    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 0, blick: 3, rauschen: 320, patzer: 0.45, mattInEins: 0.45, gier: 0.6, vorlieben: { schach: 70, dame: 35 }, zeit: [300, 800] },
+    saetze: {
+      begruessung: [
+        'Moin! Kurz anhalten, Partie zustellen, weiterradeln. Bereit?',
+        'Hallo! Ich hab heute noch dreißig Briefe in der Tasche, also los!',
+        'Eilzustellung! Eine Partie Schach, persönlich an dich.',
+        'Fahrrad abgestellt, Klingel geputzt. Jetzt wird gespielt!',
+      ],
+      schlagen: [
+        'Eingesammelt! Die kommt in meine Posttasche.',
+        'Abgeholt! Bitte hier unterschreiben.',
+        'Die nehm ich mit, die liegt eh auf meiner Route.',
+      ],
+      spielerFehler: [
+        'Oh, da ist dir was aus dem Briefkasten gefallen.',
+        'Falsche Adresse, glaub ich. Kann jedem passieren!',
+        'Das sah nach einem Umweg aus. Kenn ich, ich verfahr mich auch mal.',
+      ],
+      spielerGut: [
+        'Hui! Das kam schneller an als ein Eilbrief.',
+        'Sauber zugestellt! Da muss ich kurz absteigen und nachdenken.',
+        'Starker Zug! Den schreib ich mir auf eine Postkarte.',
+      ],
+      schach: [
+        'Schach! Einschreiben für deinen König.',
+        'Schach! Ding-dong, die Post ist da!',
+        'Schach! Zustellung erfolgt, bitte quittieren.',
+      ],
+      verliert: [
+        'Verloren! Ich war wohl wieder zu schnell unterwegs.',
+        'Gut gespielt! Ich radel jetzt meine Runde zu Ende.',
+        'Glückwunsch! Hinter der Mühle freut sich Imker Gustav schon auf dich.',
+      ],
+      gewinnt: [
+        'Gewonnen! Und pünktlich zur Mittagspause.',
+        'Zugestellt! Revanche gern, ich dreh heute noch eine Runde.',
+        'Sieg! Meine Dame war heute mal wieder als Erste da.',
+      ],
+      remis: [
+        'Unentschieden! Dann geht die Post an uns beide.',
+        'Remis! Wir haben uns wohl unterwegs getroffen.',
+        'Remis! Zwei Stempel auf einem Brief, ganz amtlich.',
+      ],
+    },
+  },
+  {
+    id: 'gustav', stufe: 4, welt: 1, name: 'Imker Gustav', rufname: 'Gustav', elo: 400, titel: 'Der Vorsichtige',
+    avatar: 'assets/avatare/modern/gustav.svg', farbe: '#ADA145',
+    kurz: 'Rochiert früh, deckt alles, sticht nur, wenn’s sicher ist.',
+    bio: 'Gustav hält dreißig Bienenvölker hinter der Mühle und hat Respekt vor jedem Stich. Genauso spielt er: Er rochiert früh, deckt jede Figur und baut sich eine Stellung wie einen Bienenstock. Losgehen mag er erst, wenn alles summt.',
+    merkmale: { figur: 'K', lieblings: 'Rochade', tempo: 'Bedächtig', schwaeche: 'Greift selten an' },
+    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3, rauschen: 295, patzer: 0.42, mattInEins: 0.5, gier: 0.75, vorlieben: { rochade: 90, ruhig: 15 }, zeit: [700, 1300] },
+    saetze: {
+      begruessung: [
+        'Hallo! Schutzanzug ausgezogen, jetzt spielen wir ganz in Ruhe.',
+        'Willkommen hinter der Mühle! Bitte keine Hektik, das mögen die Bienen nicht.',
+        'Schön, dass du da bist! Ich bau mir erst mal einen sicheren Stock.',
+        'Moin! Meine Bienen summen, und mein König steht bald gut geschützt.',
+      ],
+      schlagen: [
+        'Die nehm ich vorsichtig vom Brett. Wie eine volle Wabe.',
+        'Geerntet! Langsam und ohne Stich.',
+        'Die stand zu nah an meinem Stock. Weg damit!',
+      ],
+      spielerFehler: [
+        'Oh, da summt es aber gefährlich bei dir.',
+        'Vorsicht, da ist was offen. Wie eine Wabe ohne Deckel.',
+        'Nur ein kleiner Stich. Halb so wild, kurz kühlen und weiter.',
+      ],
+      spielerGut: [
+        'Fleißig wie meine Bienen! Starker Zug.',
+        'Oha, das sitzt. Da zieh ich lieber meinen Schleier fester.',
+        'Gut gemacht! So viel Mut hätten meine Bienen auch gern.',
+      ],
+      schach: [
+        'Schach! Aber ganz sanft, versprochen.',
+        'Schach! Jetzt summt es um deinen König.',
+        'Schach! Das hab ich mir gut überlegt.',
+      ],
+      verliert: [
+        'Verloren. Selbst der beste Stock hat irgendwo eine Ritze.',
+        'Gut gespielt! Nimm ein Glas Honig mit, das hast du dir verdient.',
+        'Glückwunsch! Oma Hilde hat bestimmt schon Tee für dich aufgesetzt.',
+      ],
+      gewinnt: [
+        'Gewonnen! Geduld bringt Honig, sag ich immer.',
+        'Sieg! Mein Stock hat gehalten. Magst du noch mal?',
+        'Gewonnen, ganz ohne Stich. Revanche gibt’s jederzeit hinter der Mühle.',
+      ],
+      remis: [
+        'Unentschieden! Dann teilen wir uns die Wabe.',
+        'Remis. Beide Stöcke stehen noch, alle Bienen sind zufrieden.',
+        'Unentschieden. Kein Stich, kein Honig, aber auch kein Ärger.',
+      ],
+    },
+  },
+  {
+    id: 'hilde', stufe: 5, welt: 1, name: 'Oma Hilde', rufname: 'Oma Hilde', elo: 500, titel: 'Die Gemütliche',
     avatar: 'assets/avatare/02-oma-hilde.svg', farbe: '#ff9ed6',
     kurz: 'Gemütlich, nimmt alles, was ungedeckt steht.',
     bio: 'Hilde spielt seit über fünfzig Jahren, am liebsten mit Tee und Keksen. Sie hat keinen Plan und braucht auch keinen: Was ungedeckt herumsteht, räumt sie freundlich ab. Ihre eigenen Figuren vergisst sie dabei gern mal.',
@@ -167,7 +320,7 @@ export const BOTS = [
       verliert: [
         'Gut gemacht, Kind! Jetzt hast du dir ein Stück Kuchen verdient.',
         'Ach, verloren. Aber ich hab ja auch nebenbei gestrickt.',
-        'Du bist mir zu flink! Grüß mir den Kalle, der wartet schon auf dich.',
+        'Du bist mir zu flink! Grüß mir die Janine in ihrer Scheune, die freut sich auf dich.',
         'Sehr schön gespielt! Komm bald wieder vorbei.',
       ],
       gewinnt: [
@@ -184,7 +337,109 @@ export const BOTS = [
     },
   },
   {
-    id: 'kalle', stufe: 3, name: 'Kalle vom Stammtisch', elo: 800, titel: 'Der Draufgänger',
+    id: 'janine', stufe: 6, welt: 1, endgegner: true, name: 'Janine vom Scheunenclub', rufname: 'Janine', elo: 600, titel: 'Die Clubchefin',
+    avatar: 'assets/avatare/modern/janine.svg', farbe: '#C35141',
+    kurz: 'Clubchefin der Karofelder. Kann alles, patzt kaum.',
+    bio: 'Janine hat in der großen Scheune am Ende der Karofelder einen Schachclub gegründet, mit Strohballen als Stühlen und einer Kreidetafel als Demobrett. Sie spielt von allem ein bisschen und lässt kaum noch etwas stehen.',
+    merkmale: { figur: 'N', lieblings: 'Alle', tempo: 'Überlegt', schwaeche: 'Lange Rechnungen' },
+    staerke: { tiefe: 2, kurzTiefe: 1, kurzChance: 0.5, breite: 60, intuition: 1, blick: 4, rauschen: 225, patzer: 0.3, mattInEins: 0.75, gier: 0.8, vorlieben: {  }, zeit: [500, 1100] },
+    saetze: {
+      begruessung: [
+        'Willkommen im Scheunenclub! Ich bewache das Ende der Karofelder.',
+        'Nimm dir einen Strohballen. Die Übungsrunden sind vorbei, jetzt zählt’s.',
+        'Hallo! An der Kreidetafel hab ich schon ein paar Ideen für uns aufgemalt.',
+        'Schön, dass du bis zur Scheune gekommen bist. Zeig mal, was du gelernt hast!',
+      ],
+      schlagen: [
+        'Die kommt an die Kreidetafel. Als Lehrbeispiel.',
+        'Genommen! So was üben wir im Club jeden Dienstag.',
+        'Danke! Die legt sich zu den anderen ins Stroh.',
+      ],
+      spielerFehler: [
+        'Den Zug besprechen wir nachher an der Tafel. Ganz in Ruhe.',
+        'Da ist eine Lücke. Im Club sagen wir: erst schauen, dann ziehen.',
+        'Kleiner Ausrutscher im Stroh. Passiert jedem mal.',
+      ],
+      spielerGut: [
+        'Starker Zug! Darf ich den im Club vorzeigen?',
+        'Sehr gut! Dafür male ich dir einen Stern an die Tafel.',
+        'Oho, du hast auf den Feldern gut aufgepasst.',
+      ],
+      schach: [
+        'Schach! Das war letzte Woche Thema im Training.',
+        'Schach! Achtung, in der Scheune zieht’s.',
+        'Schach! Kreide gezückt, Pfeil auf deinen König.',
+      ],
+      verliert: [
+        'Du hast mich geschlagen und die Karofelder gemeistert. Respekt!',
+        'Starke Partie! Ich schreib deinen Namen ganz oben an die Tafel.',
+        'Glückwunsch! Im Springerforst freut sich Holzfäller Bodo auf dich.',
+      ],
+      gewinnt: [
+        'Gewonnen! Komm wieder, die Scheune hat immer offen.',
+        'Sieg für den Scheunenclub! Revanche? Ich hol schon mal einen Strohballen.',
+        'Gute Partie! Schau dir die Analyse an, das ist wie Training an der Tafel.',
+      ],
+      remis: [
+        'Unentschieden! Das kommt so an die Tafel, ganz ohne Fragezeichen.',
+        'Remis. Im Club würden jetzt alle klatschen.',
+        'Remis! Das tragen wir beide stolz in die Clubliste ein.',
+      ],
+    },
+  },
+  {
+    id: 'bodo', stufe: 7, welt: 2, name: 'Holzfäller Bodo', rufname: 'Bodo', elo: 700, titel: 'Der Kahlschläger',
+    avatar: 'assets/avatare/modern/bodo.svg', farbe: '#9467A6',
+    kurz: 'Tauscht ab, was geht. Hauptsache, das Brett wird leer.',
+    bio: 'Bodo fällt Bäume, seit er eine Axt halten kann, und genauso spielt er Schach. Er tauscht ab, wo er nur kann, bis auf dem Brett eine Lichtung entsteht. Da sieht man wenigstens, wo der König wohnt, sagt er.',
+    merkmale: { figur: 'R', lieblings: 'Turm', tempo: 'Kräftig', schwaeche: 'Tauscht auch Gutes ab' },
+    staerke: { tiefe: 2, kurzTiefe: 1, kurzChance: 0.48, breite: 60, intuition: 1, blick: 4, rauschen: 205, patzer: 0.25, mattInEins: 0.8, gier: 0.85, vorlieben: { schlagen: 70 }, zeit: [400, 1000] },
+    saetze: {
+      begruessung: [
+        'Moin! Axt geschärft, Brett voll. Das ändern wir jetzt.',
+        'Hallo! Ich mag es übersichtlich. Je weniger Figuren, desto besser.',
+        'Setz dich auf den Baumstumpf. Gleich wird hier ordentlich gelichtet.',
+        'Na, bereit? Bei mir fallen die Figuren wie Fichten im Herbststurm.',
+      ],
+      schlagen: [
+        'Baum fällt! Äh, Figur fällt.',
+        'Gefällt! Die stapel ich zu den anderen ans Brennholz.',
+        'Zack, gelichtet! Da wird’s gleich luftiger.',
+      ],
+      spielerFehler: [
+        'Da steht eine Figur ganz allein auf der Lichtung.',
+        'Morscher Ast! Den hätte ich nicht so stehen lassen.',
+        'Holla, da hat’s bei dir ordentlich geknackt.',
+      ],
+      spielerGut: [
+        'Starker Zug! Der steht wie eine alte Eiche.',
+        'Donnerwetter, da beißt sich meine Axt die Zähne aus.',
+        'Gut gemacht! So festes Holz hab ich selten erwischt.',
+      ],
+      schach: [
+        'Schach! Achtung, Baum fällt!',
+        'Schach! Ich hab mir freie Bahn geschlagen.',
+        'Schach! Mit Schwung aus der Hüfte.',
+      ],
+      verliert: [
+        'Verloren! Da hab ich wohl zu viel abgeholzt.',
+        'Gut gespielt! Ich setz mich jetzt erst mal auf meinen Stumpf.',
+        'Glückwunsch! Kalle vom Stammtisch freut sich schon auf eine Runde mit dir.',
+      ],
+      gewinnt: [
+        'Gewonnen! Kahlschlag, wie geplant.',
+        'Sieg! Auf der Lichtung war am Ende alles klar.',
+        'Gewonnen! Holzhacken lernt man auch nicht an einem Tag. Revanche?',
+      ],
+      remis: [
+        'Unentschieden! Die Lichtung gehört uns beiden.',
+        'Remis. Zwei Könige, kein Holz mehr, Feierabend.',
+        'Unentschieden. Da war einfach kein Baum mehr zum Fällen.',
+      ],
+    },
+  },
+  {
+    id: 'kalle', stufe: 8, welt: 2, name: 'Kalle vom Stammtisch', rufname: 'Kalle', elo: 800, titel: 'Der Draufgänger',
     avatar: 'assets/avatare/03-kalle-vom-stammtisch.svg', farbe: '#ffd23f',
     kurz: 'Greift sofort an, übersieht dabei viel.',
     bio: 'Kalle ist der Schachkönig seiner Stammkneipe, behauptet er jedenfalls. Er kennt nur eine Richtung: nach vorne. Schach geben findet er großartig, auf seine eigene Deckung achtet er dagegen eher selten.',
@@ -245,7 +500,58 @@ export const BOTS = [
     },
   },
   {
-    id: 'lisa', stufe: 4, name: 'Lisa Läufer', elo: 1000, titel: 'Die Flinke',
+    id: 'leo', stufe: 9, welt: 2, name: 'Waldläufer Leo', rufname: 'Leo', elo: 900, titel: 'Der Fallensteller',
+    avatar: 'assets/avatare/modern/leo.svg', farbe: '#3BAA81',
+    kurz: 'Kennt jeden Schleichweg und legt überall kleine Fallen.',
+    bio: 'Leo kennt jeden Schleichweg im Springerforst und legt überall kleine Fallen aus, nur aus Spaß. Auf dem Brett sieht vieles harmlos aus, bis es plötzlich zuschnappt. Wer genau hinschaut, entdeckt seine Stolperdrähte rechtzeitig.',
+    merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Leise', schwaeche: 'Vergisst die eigene Deckung' },
+    staerke: { tiefe: 2, kurzTiefe: 1, kurzChance: 0.42, breite: 60, intuition: 2, blick: 4, rauschen: 175, patzer: 0.18, mattInEins: 0.95, gier: 0.85, vorlieben: { gabel: 50, springer: 25 }, zeit: [500, 1100] },
+    saetze: {
+      begruessung: [
+        'Pssst! Hallo. Schau ruhig genau hin, wo du hintrittst.',
+        'Willkommen im Forst! Die Wege hier sind nicht immer, wie sie aussehen.',
+        'Hey! Ich hab ein paar Überraschungen vorbereitet. Ganz harmlos. Meistens.',
+        'Hallo! Pass aufs Moos auf, da liegt manchmal mehr drunter.',
+      ],
+      schlagen: [
+        'Schnapp! Die Falle hat funktioniert.',
+        'Erwischt! Die ist mir direkt ins Netz gelaufen.',
+        'Die nehm ich mit. War ein schöner Schleichweg bis dahin.',
+      ],
+      spielerFehler: [
+        'Uh, da bist du in eine meiner Gruben getappt. Kommt vor!',
+        'Kleiner Tipp vom Waldläufer: erst das Gelände prüfen.',
+        'Hm, da liegt jetzt was offen auf dem Weg. Ich hab’s gesehen.',
+      ],
+      spielerGut: [
+        'Ha, du hast meine Falle entdeckt! Gute Augen.',
+        'Sauber umgangen! Du schleichst ja fast wie ich.',
+        'Starker Zug! Den Pfad kannte nicht mal ich.',
+      ],
+      schach: [
+        'Schach! Direkt aus dem Unterholz.',
+        'Schach! Hast du mich kommen hören? Eben.',
+        'Schach! Ich hab mich von der Seite angeschlichen.',
+      ],
+      verliert: [
+        'Verloren! Du hast jede Falle gesehen. Respekt!',
+        'Gut gespielt! Ich bau meine Fallen jetzt neu auf.',
+        'Glückwunsch! Am Waldrand macht sich Lisa Läufer schon für dich warm.',
+      ],
+      gewinnt: [
+        'Gewonnen! Am Ende hat eine Falle zugeschnappt.',
+        'Sieg! Schau in der Analyse nach, wo der Stolperdraht lag.',
+        'Gewonnen! Morgen lege ich neue Fallen. Bring eine Taschenlampe mit.',
+      ],
+      remis: [
+        'Unentschieden! Wir sind beide heil durch den Forst gekommen.',
+        'Remis. Keine Falle hat geschnappt, auch mal schön.',
+        'Remis! Wir haben uns gegenseitig jede Spur verwischt.',
+      ],
+    },
+  },
+  {
+    id: 'lisa', stufe: 10, welt: 2, name: 'Lisa Läufer', rufname: 'Lisa', elo: 1000, titel: 'Die Flinke',
     avatar: 'assets/avatare/04-lisa-laeufer.svg', farbe: '#5ad1ff',
     kurz: 'Schnelle Schülerin, liebt ihre Läufer.',
     bio: 'Lisa ist in der Schach-AG ihrer Schule und läuft nebenbei im Verein. Sie zieht flott, sieht kurze Taktiken sofort und hat eine Schwäche für lange Diagonalen. Ein Matt in eins lässt sie sich nie entgehen.',
@@ -289,7 +595,7 @@ export const BOTS = [
         'Gut gespielt! Ich muss jetzt eh zum Training.',
         'Mist, verloren! Aber das war ein faires Rennen.',
         'Respekt! Ich üb noch ein bisschen mit meinen Läufern.',
-        'Du warst heute schneller. Ritter Rudi wartet schon auf dich!',
+        'Du warst heute schneller. Köhlerin Edda hat schon die Glut für dich angefacht!',
       ],
       gewinnt: [
         'Gewonnen! Ziellinie überquert!',
@@ -305,7 +611,58 @@ export const BOTS = [
     },
   },
   {
-    id: 'rudi', stufe: 5, name: 'Ritter Rudi', elo: 1200, titel: 'Der Gabelritter',
+    id: 'edda', stufe: 11, welt: 2, name: 'Köhlerin Edda', rufname: 'Edda', elo: 1100, titel: 'Die Glutwächterin',
+    avatar: 'assets/avatare/modern/edda.svg', farbe: '#E46380',
+    kurz: 'Baut langsam Druck auf offenen Linien auf.',
+    bio: 'Edda hütet ihren Kohlenmeiler tagelang, denn gute Glut braucht Zeit. Auf dem Brett öffnet sie Linien, stellt ihre Türme dahinter und lässt den Druck langsam steigen. Wenn es knistert, hat sie längst angeheizt.',
+    merkmale: { figur: 'R', lieblings: 'Turm', tempo: 'Geduldig', schwaeche: 'Schnelle Konter' },
+    staerke: { tiefe: 3, kurzTiefe: 1, kurzChance: 0.38, breite: 60, intuition: 2, blick: 4, rauschen: 140, patzer: 0.12, mattInEins: 1, gier: 0.95, vorlieben: { turm: 35, vorwaerts: 15 }, zeit: [700, 1400] },
+    saetze: {
+      begruessung: [
+        'Hallo! Mein Meiler qualmt schon, wir haben also Zeit.',
+        'Setz dich ans Feuer. Hier wird nichts überstürzt.',
+        'Willkommen an der Köhlerhütte! Gute Glut braucht Geduld, gute Partien auch.',
+        'Moin. Ich mach erst mal die Linien frei, dann sehen wir weiter.',
+      ],
+      schlagen: [
+        'Die kommt in den Meiler. Gibt gute Kohle.',
+        'Genommen. Der Druck hat gewirkt.',
+        'Die hat zu nah an der Glut gestanden.',
+      ],
+      spielerFehler: [
+        'Da ist ein Funke rübergesprungen. Achte auf deine Linien.',
+        'Hm, da qualmt es bei dir. Das nutze ich.',
+        'Oh, da hast du eine Linie offen gelassen. Da zieht’s.',
+      ],
+      spielerGut: [
+        'Gut gelöscht! Der Zug hat meine Glut gedämpft.',
+        'Stark! Da muss ich meinen Meiler neu aufschichten.',
+        'Respekt! Der Zug hat Feuer.',
+      ],
+      schach: [
+        'Schach! Die Linie ist heiß.',
+        'Schach. Langsam angeheizt, jetzt glüht es.',
+        'Schach! Achtung, Funkenflug.',
+      ],
+      verliert: [
+        'Verloren. Meine Glut war heute nicht heiß genug.',
+        'Gut gespielt! Ich leg erst mal neues Holz nach.',
+        'Glückwunsch! Ritter Rudi sattelt schon sein Ross für dich.',
+      ],
+      gewinnt: [
+        'Gewonnen. Gute Glut braucht eben Zeit.',
+        'Sieg! Der Druck ist am Ende durchgebrannt.',
+        'Gewonnen! Komm wieder ans Feuer, wann immer du magst.',
+      ],
+      remis: [
+        'Unentschieden. Die Glut reicht für uns beide.',
+        'Remis! Wir wärmen uns am selben Feuer.',
+        'Unentschieden. Das Feuer brennt weiter, für uns beide.',
+      ],
+    },
+  },
+  {
+    id: 'rudi', stufe: 12, welt: 2, endgegner: true, name: 'Ritter Rudi', rufname: 'Ritter Rudi', elo: 1200, titel: 'Der Gabelritter',
     avatar: 'assets/avatare/05-ritter-rudi.svg', farbe: '#ff8a1e',
     kurz: 'Springer-Fan, sucht Gabeln.',
     bio: 'Rudi trägt seine Rüstung auch beim Frühstück. Seine Springer sind ihm heilig, und nichts macht ihn glücklicher als eine Gabel auf König und Dame. Er rechnet schon ein paar Züge voraus, verliert aber manchmal den Überblick.',
@@ -348,7 +705,7 @@ export const BOTS = [
       verliert: [
         'Ich senke mein Schwert. Du hast ehrenvoll gesiegt!',
         'Verloren! Mein Ross braucht jetzt erst mal Hafer.',
-        'Ein glorreicher Sieg für dich! Der Professor erwartet dich schon.',
+        'Ein glorreicher Sieg für dich! Die Tore der Turmstadt stehen dir offen.',
         'Geschlagen … aber mit Würde! Gut gekämpft.',
       ],
       gewinnt: [
@@ -365,7 +722,58 @@ export const BOTS = [
     },
   },
   {
-    id: 'turm', stufe: 6, name: 'Professor Turm', elo: 1400, titel: 'Der Geduldige',
+    id: 'luke', stufe: 13, welt: 3, name: 'Luke vom Marktplatz', rufname: 'Luke', elo: 1300, titel: 'Der Blitzer',
+    avatar: 'assets/avatare/modern/luke.svg', farbe: '#A15C2F',
+    kurz: 'Straßenschach unter der Rathausuhr. Liebt Gambits.',
+    bio: 'Luke spielt jeden Nachmittag Straßenschach unter der Rathausuhr, zehn Partien in der Stunde. Einen Bauern opfert er für schnelles Spiel ohne zu zögern, und ein lockerer Spruch ist immer dabei. Mit ihm wird es nie langweilig.',
+    merkmale: { figur: 'P', lieblings: 'Gambit', tempo: 'Blitzschnell', schwaeche: 'Opfert zu leicht' },
+    staerke: { tiefe: 3, kurzTiefe: 1, kurzChance: 0.34, breite: 50, intuition: 2, blick: 4, rauschen: 110, patzer: 0.075, mattInEins: 1, gier: 0.9, vorlieben: { opfer: 30, schach: 25, vorwaerts: 20 }, zeit: [300, 900] },
+    saetze: {
+      begruessung: [
+        'Hey! Komm, setz dich. Unter der Rathausuhr ist noch ein Platz frei.',
+        'Na? Lust auf eine flotte Runde? Ich hab heute schon neun gespielt.',
+        'Willkommen auf dem Marktplatz! Hier wird geredet, gezogen und gelacht.',
+        'Hallo! Ich schenk dir gleich einen Bauern. Mal sehen, ob du ihn behältst.',
+      ],
+      schlagen: [
+        'Hab ich mir geholt! Der Markt ist eröffnet.',
+        'Zack, eingesackt! Wie das letzte Brötchen am Bäckerstand.',
+        'Genommen! Hier am Markt wird nicht lange gefeilscht.',
+      ],
+      spielerFehler: [
+        'Na, hat dich die Rathausuhr nervös gemacht?',
+        'Moment, da liegt doch was auf der Straße. Darf ich?',
+        'Das war fix, aber nicht ganz fein. Passiert mir zehnmal am Tag.',
+      ],
+      spielerGut: [
+        'Uff, starker Zug! Da bleiben sogar die Marktleute stehen.',
+        'Nicht schlecht! So was sieht man hier nicht jeden Nachmittag.',
+        'Okay, den Bauern hätte ich lieber behalten. Gut gespielt!',
+      ],
+      schach: [
+        'Schach! Kein Feilschen, bitte.',
+        'Schach! Gambit gespielt, Angriff geliefert.',
+        'Schach! Na, wer schaut denn da so überrascht?',
+      ],
+      verliert: [
+        'Verloren! Mein Gambit war wohl zu großzügig.',
+        'Gut gespielt! Ich such mir jetzt einen neuen Gegner am Brunnen.',
+        'Respekt! Im Hörsaal nebenan freut sich Professor Turm auf dich.',
+      ],
+      gewinnt: [
+        'Gewonnen! Und die Rathausuhr hat nicht mal die Viertelstunde geschlagen.',
+        'Sieg! Gleich noch eine? Hier gibt’s immer eine Revanche.',
+        'Gewonnen! Der Bauer am Anfang hat sich gelohnt.',
+      ],
+      remis: [
+        'Unentschieden! Handschlag, und weiter zur nächsten Runde.',
+        'Remis. Der Marktplatz hat heute zwei Gewinner.',
+        'Remis! Unter der Rathausuhr gibt’s dafür trotzdem Applaus.',
+      ],
+    },
+  },
+  {
+    id: 'turm', stufe: 14, welt: 3, name: 'Professor Turm', rufname: 'Prof. Turm', elo: 1400, titel: 'Der Geduldige',
     avatar: 'assets/avatare/06-professor-turm.svg', farbe: '#8fa8ff',
     kurz: 'Solide, positionell, geduldig.',
     bio: 'Der Professor lehrt seit Jahrzehnten Positionsspiel und hat noch nie einen Zug überstürzt. Er rochiert früh, stellt seine Türme auf offene Linien und wartet geduldig, bis du einen Fehler machst.',
@@ -408,7 +816,7 @@ export const BOTS = [
       verliert: [
         'Gratuliere, du hast die Prüfung bestanden!',
         'Verloren. Ich werde meine Notizen überarbeiten müssen.',
-        'Sehr gut gespielt. Dame Delia wird dich weniger geduldig empfangen.',
+        'Sehr gut gespielt. Zauberer Moritz wird dich weniger berechenbar empfangen.',
         'Eine verdiente Niederlage. Wissenschaftlich einwandfrei.',
       ],
       gewinnt: [
@@ -425,7 +833,58 @@ export const BOTS = [
     },
   },
   {
-    id: 'delia', stufe: 7, name: 'Dame Delia', elo: 1600, titel: 'Die Opferbereite',
+    id: 'moritz', stufe: 15, welt: 3, name: 'Zauberer Moritz', rufname: 'Moritz', elo: 1500, titel: 'Der Trickkünstler',
+    avatar: 'assets/avatare/modern/moritz.svg', farbe: '#C372C7',
+    kurz: 'Zwischenzüge, Abzugsschach und lauter Überraschungen.',
+    bio: 'Moritz zaubert auf der alten Brücke und verblüfft am liebsten mit Dingen, die eben noch nicht da waren. Auf dem Brett liebt er Zwischenzüge und Abzugsschach: Eine Figur zieht weg, und plötzlich steht eine ganz andere im Rampenlicht.',
+    merkmale: { figur: 'B', lieblings: 'Läufer', tempo: 'Verblüffend', schwaeche: 'Ruhige Stellungen' },
+    staerke: { tiefe: 4, kurzTiefe: 2, kurzChance: 0.32, breite: 35, intuition: 3, blick: 3, rauschen: 90, patzer: 0.05, mattInEins: 1, gier: 1, vorlieben: { schach: 30, gabel: 30 }, zeit: [700, 1400] },
+    saetze: {
+      begruessung: [
+        'Hereinspaziert! Schau genau hin, gleich verschwindet etwas.',
+        'Willkommen auf der Brücke! Nichts in meinen Ärmeln, versprochen.',
+        'Hallo! Zieh eine Karte. Ach nein, wir spielen ja Schach.',
+        'Verehrtes Publikum, und du! Die Vorstellung beginnt.',
+      ],
+      schlagen: [
+        'Simsalabim, weg ist sie!',
+        'Und schwupp, verschwunden! Applaus bitte.',
+        'Schau mal in deinen Ärmel. Nichts? Dann hab ich die Figur.',
+      ],
+      spielerFehler: [
+        'Oh, da hast du dich vom Zauberstab ablenken lassen.',
+        'Psst. Da ist gerade etwas Unsichtbares passiert.',
+        'Hm, der Zug war ein Trick. Leider einer für mich.',
+      ],
+      spielerGut: [
+        'Oha! Du hast meinen Trick durchschaut.',
+        'Starker Zug! Den würde ich gern in meine Vorstellung aufnehmen.',
+        'Verblüffend! Da bleibt mir glatt das Kaninchen im Hut.',
+      ],
+      schach: [
+        'Schach! Und das kam aus dem Nichts.',
+        'Schach! Der Trick heißt Abzug. Ta-daa!',
+        'Schach! Bitte nicht so genau auf meine Hände schauen.',
+      ],
+      verliert: [
+        'Verloren! Du hast mir den Trick vor der Nase weggezaubert.',
+        'Gut gespielt! Ich verbeuge mich und verschwinde im Rauch.',
+        'Glückwunsch! Dame Delia hat schon die Bühne für dich vorbereitet.',
+      ],
+      gewinnt: [
+        'Gewonnen! Und keiner hat gesehen, wie.',
+        'Ta-daa! Ein Zauberer verrät seine Tricks nie. Die Analyse schon.',
+        'Sieg! Komm wieder, ich hab noch Tauben im Hut.',
+      ],
+      remis: [
+        'Unentschieden! Der Trick ist bei uns beiden aufgegangen.',
+        'Remis! Wir verschwinden gleichzeitig. Großes Finale.',
+        'Unentschieden! Und ich dachte, ich hätte noch einen Hasen im Hut.',
+      ],
+    },
+  },
+  {
+    id: 'delia', stufe: 16, welt: 3, name: 'Dame Delia', rufname: 'Delia', elo: 1600, titel: 'Die Opferbereite',
     avatar: 'assets/avatare/07-dame-delia.svg', farbe: '#ff2d78',
     kurz: 'Angriffslustig, opfert gern.',
     bio: 'Delia spielt Schach wie eine Opernaufführung: laut, leidenschaftlich und mit großem Finale. Sie gibt gern Schach und opfert auch mal eine Figur, wenn der Angriff dafür rollt. Langweilige Remis-Partien sind ihr ein Graus.',
@@ -470,7 +929,7 @@ export const BOTS = [
         'Verloren … aber mit Glanz und Gloria! Bravo!',
         'Mein Opfer war wohl ein bisschen zu mutig. Gratuliere!',
         'Du hast meinen Angriff überlebt. Respekt, Schätzchen!',
-        'Bravo! Der Kommissar wird dir nicht so viel schenken wie ich.',
+        'Bravo! Bei Bibliothekarin Ottilie wird es leiser, aber nicht leichter.',
       ],
       gewinnt: [
         'Gewonnen! Ein Opfer zur rechten Zeit, und der Vorhang fällt.',
@@ -486,7 +945,58 @@ export const BOTS = [
     },
   },
   {
-    id: 'koenig', stufe: 8, name: 'Kommissar König', elo: 1800, titel: 'Der Endspiel-Ermittler',
+    id: 'ottilie', stufe: 17, welt: 3, name: 'Bibliothekarin Ottilie', rufname: 'Ottilie', elo: 1700, titel: 'Die Belesene',
+    avatar: 'assets/avatare/modern/ottilie.svg', farbe: '#567931',
+    kurz: 'Kennt jede Eröffnung aus viertausend Büchern.',
+    bio: 'Ottilie verwaltet die Turmbibliothek mit viertausend Schachbüchern und hat jedes davon gelesen. Ihre Eröffnungen spielt sie wie aus dem Lehrbuch. Spannend wird es erst, wenn die Buchseiten aufhören.',
+    merkmale: { figur: 'B', lieblings: 'Läuferpaar', tempo: 'Belesen', schwaeche: 'Unbekannte Wege' },
+    staerke: { tiefe: 5, kurzTiefe: 2, kurzChance: 0.27, breite: 25, intuition: 3, blick: 2, rauschen: 72, patzer: 0.032, mattInEins: 1, gier: 1, vorlieben: { ruhig: 12 }, zeit: [800, 1500] },
+    saetze: {
+      begruessung: [
+        'Willkommen in der Bibliothek. Bitte leise ziehen.',
+        'Guten Tag! Such dir eine Eröffnung aus, ich hab sie alle im Regal.',
+        'Schön, dass du da bist. Ich hab dir schon ein Lesezeichen eingelegt.',
+        'Hallo. Ich kenne jede Eröffnung, aber dich kenne ich noch nicht.',
+      ],
+      schlagen: [
+        'Ausgeliehen. Rückgabe nicht vorgesehen.',
+        'Diese Figur wird archiviert. Regal sieben.',
+        'Genommen. Das stand so schon im Buch.',
+      ],
+      spielerFehler: [
+        'Hm, diese Seite solltest du später noch mal nachlesen.',
+        'Psst. Da ist dir ein Lesezeichen herausgefallen.',
+        'Ein kleiner Druckfehler. Kommt in den besten Büchern vor.',
+      ],
+      spielerGut: [
+        'Ausgezeichnet. Den Zug trage ich in meinen Katalog ein.',
+        'Oh, das ist Theorie vom Feinsten. Woher kennst du das?',
+        'Sehr belesen! Ich bin beeindruckt.',
+      ],
+      schach: [
+        'Schach. Kapitel drei, erster Absatz.',
+        'Schach. Leise, aber deutlich.',
+        'Schach. Bitte den König ins richtige Regal zurückstellen.',
+      ],
+      verliert: [
+        'Verloren. Das Kapitel muss ich neu schreiben.',
+        'Gut gespielt! Diese Partie bekommt einen Ehrenplatz im Regal.',
+        'Glückwunsch! Kommissar König hat schon eine Akte über dich angelegt.',
+      ],
+      gewinnt: [
+        'Gewonnen. Wie es im Buch steht.',
+        'Sieg. Ich leih dir gern ein Buch über diese Eröffnung.',
+        'Gewonnen! Die Bibliothek hat jeden Tag geöffnet, komm gern wieder.',
+      ],
+      remis: [
+        'Remis. Ein Klassiker, schon oft gelesen, immer wieder schön.',
+        'Unentschieden. Das wird ein Buch mit zwei Hauptfiguren.',
+        'Remis. Das kommt ins Regal für besonders ausgewogene Werke.',
+      ],
+    },
+  },
+  {
+    id: 'koenig', stufe: 18, welt: 3, endgegner: true, name: 'Kommissar König', rufname: 'König', elo: 1800, titel: 'Der Endspiel-Ermittler',
     avatar: 'assets/avatare/08-kommissar-koenig.svg', farbe: '#d9b36c',
     kurz: 'Endspiel-Spezialist, gibt nie auf.',
     bio: 'Kommissar König hat schon jeden Fall gelöst, meistens im Endspiel. Er tauscht gern ab, sammelt Indizien in Form von kleinen Vorteilen und spielt jede Stellung bis zum letzten Bauern aus. Aufgeben steht nicht in seiner Dienstvorschrift.',
@@ -530,7 +1040,7 @@ export const BOTS = [
       verliert: [
         'Der Fall ist gelöst … leider zu deinen Gunsten. Gratuliere!',
         'Ich gebe zu: überführt. Sauber gespielt.',
-        'Verloren. Die Akte Greta wartet schon auf dich.',
+        'Verloren. Die Akte Gezeitenküste liegt schon für dich bereit.',
         'Gut gemacht. Selbst ich finde keine Spur mehr.',
       ],
       gewinnt: [
@@ -547,7 +1057,109 @@ export const BOTS = [
     },
   },
   {
-    id: 'greta', stufe: 9, name: 'Großmeisterin Greta', elo: 2100, titel: 'Die Unerbittliche',
+    id: 'lasse', stufe: 19, welt: 4, name: 'Fischer Lasse', rufname: 'Lasse', elo: 1900, titel: 'Der Netzwerfer',
+    avatar: 'assets/avatare/modern/lasse.svg', farbe: '#058894',
+    kurz: 'Wirft sein Netz direkt um deinen König.',
+    bio: 'Lasse fährt vor Sonnenaufgang mit dem Kutter raus und kommt nie mit leerem Netz zurück. Auf dem Brett zieht er alle Figuren Richtung König und wirft dann aus. Wenn er die Ärmel hochkrempelt, schau lieber nach deiner Rochade.',
+    merkmale: { figur: 'Q', lieblings: 'Dame', tempo: 'Zupackend', schwaeche: 'Lässt hinten Lücken' },
+    staerke: { tiefe: 6, kurzTiefe: 2, kurzChance: 0.22, breite: 18, intuition: 3, blick: 2, rauschen: 58, patzer: 0.018, mattInEins: 1, gier: 1, vorlieben: { schach: 25, vorwaerts: 15 }, zeit: [800, 1500], maxZeit: 2500 },
+    saetze: {
+      begruessung: [
+        'Moin! Ich war heute schon draußen auf See. Jetzt bist du dran.',
+        'Willkommen an der Küste! Mein Netz ist geflickt und trocken.',
+        'Hallo! Bei mir zappelt am Ende meistens ein König im Netz.',
+        'Moin moin. Kutter vertäut, Netz bereit. Los geht’s.',
+      ],
+      schlagen: [
+        'Ins Netz gegangen!',
+        'Fang des Tages! Die kommt in die Kiste.',
+        'Eingeholt. Danke für den Beifang.',
+      ],
+      spielerFehler: [
+        'Da hat sich eine Masche bei dir geöffnet.',
+        'Hm, das riecht nach einem guten Fang. Für mich.',
+        'Oh, du treibst direkt auf mein Netz zu.',
+      ],
+      spielerGut: [
+        'Starker Zug! Der ist mir glatt durch die Maschen gegangen.',
+        'Respekt, du kennst dich auf See aus.',
+        'Oha. Da muss ich das Netz neu auswerfen.',
+      ],
+      schach: [
+        'Schach! Netz ausgeworfen.',
+        'Schach! Da zappelt was.',
+        'Schach! Volle Fahrt auf deinen König.',
+      ],
+      verliert: [
+        'Verloren! Heute bleibt mein Netz wohl leer.',
+        'Gut gespielt! Ich fahr dann mal wieder raus und übe.',
+        'Glückwunsch! Hafenmeisterin Wiebke hat schon einen Liegeplatz für dich.',
+      ],
+      gewinnt: [
+        'Gewonnen! Guter Fang heute.',
+        'Sieg! Das Netz hat gehalten.',
+        'Gewonnen! Komm wieder, das Meer ist jeden Tag neu.',
+      ],
+      remis: [
+        'Unentschieden. Heute teilen wir uns den Fang.',
+        'Remis! Beide Kutter sicher im Hafen.',
+        'Unentschieden. Das Netz blieb leer, aber das Wetter war schön.',
+      ],
+    },
+  },
+  {
+    id: 'wiebke', stufe: 20, welt: 4, name: 'Hafenmeisterin Wiebke', rufname: 'Wiebke', elo: 2000, titel: 'Die Vorausschauende',
+    avatar: 'assets/avatare/modern/wiebke.svg', farbe: '#2772B0',
+    kurz: 'Spielt vorausschauend und nimmt dir die guten Felder.',
+    bio: 'Wiebke ist Hafenmeisterin: Jedes Schiff hat seinen Liegeplatz, jede Leine sitzt. Auf dem Brett denkt sie an deine Pläne, bevor du sie hast, und belegt die besten Felder zuerst. Ohne Anmeldung legt bei ihr niemand an.',
+    merkmale: { figur: 'N', lieblings: 'Springer', tempo: 'Umsichtig', schwaeche: 'Scharfe Opfer' },
+    staerke: { tiefe: 7, kurzTiefe: 3, kurzChance: 0.18, breite: 14, intuition: 3, blick: 2, rauschen: 50, patzer: 0.013, mattInEins: 1, gier: 1, vorlieben: { ruhig: 10 }, zeit: [800, 1500], maxZeit: 2500 },
+    saetze: {
+      begruessung: [
+        'Moin. Bitte anmelden, Liegeplatz zuweisen, dann spielen wir.',
+        'Willkommen im Hafen! Hier hat alles seinen Platz. Auch deine Figuren.',
+        'Hallo. Die Seekarte hab ich studiert. Mal sehen, wo du anlegen willst.',
+        'Schön, dass du da bist. Bei mir wird vorher an alles gedacht.',
+      ],
+      schlagen: [
+        'Die lag falsch vor Anker. Abgeschleppt.',
+        'Genommen. Das Feld war ohnehin reserviert.',
+        'Ohne Anmeldung kein Liegeplatz. Die nehm ich mit.',
+      ],
+      spielerFehler: [
+        'Da hat sich eine Leine gelöst. Ist notiert.',
+        'Hm, da hat ein Schiff schief angelegt.',
+        'Oh, da treibt eine Figur ohne Leine. Das sehe ich.',
+      ],
+      spielerGut: [
+        'Sauber angelegt. Das gefällt der Hafenmeisterin.',
+        'Gut! Den Liegeplatz hatte ich eigentlich für mich vorgesehen.',
+        'Stark. Den Kurs hatte ich nicht auf der Karte.',
+      ],
+      schach: [
+        'Schach. Bitte den Liegeplatz räumen.',
+        'Schach. Das war so angemeldet.',
+        'Schach. Leinen los, König.',
+      ],
+      verliert: [
+        'Verloren. Dein Kurs war besser geplant als meiner.',
+        'Gut gespielt! Ich trag dich als Ehrengast ins Hafenbuch ein.',
+        'Glückwunsch! Großmeisterin Greta hat ihr Brett schon aufgebaut.',
+      ],
+      gewinnt: [
+        'Gewonnen. Alles lief nach Plan, wie im Hafen.',
+        'Sieg. Gute Planung ist die halbe Überfahrt.',
+        'Gewonnen. Der Hafen ist immer offen für eine Revanche.',
+      ],
+      remis: [
+        'Remis. Beide Schiffe liegen sicher vertäut.',
+        'Unentschieden. Ordentlicher Hafenbetrieb, keine Schäden.',
+        'Remis. Ich trage es ins Hafenbuch ein: ruhige See.',
+      ],
+    },
+  },
+  {
+    id: 'greta', stufe: 21, welt: 4, name: 'Großmeisterin Greta', rufname: 'Greta', elo: 2100, titel: 'Die Unerbittliche',
     avatar: 'assets/avatare/09-grossmeisterin-greta.svg', farbe: '#a06bff',
     kurz: 'Kaum Fehler, bestraft jeden.',
     bio: 'Greta redet nicht viel, sie rechnet. Sie macht kaum Fehler und findet jede Lücke, die du ihr lässt. Wer sie schlagen will, muss eine ganze Partie lang konzentriert bleiben.',
@@ -590,7 +1202,7 @@ export const BOTS = [
       verliert: [
         'Glückwunsch. Das war verdient.',
         'Du hast mich geschlagen. Das passiert nicht oft.',
-        'Respekt. Der Stockfisch wartet. Viel Glück, du wirst es brauchen.',
+        'Respekt. Als Nächstes: Wattführer Henning. Viel Erfolg.',
         'Sauber gespielt. Ich analysiere das heute Nacht.',
       ],
       gewinnt: [
@@ -607,7 +1219,415 @@ export const BOTS = [
     },
   },
   {
-    id: 'stockfisch', stufe: 10, name: 'Der Stockfisch', elo: 3000, titel: 'Der Endgegner',
+    id: 'henning', stufe: 22, welt: 4, name: 'Wattführer Henning', rufname: 'Henning', elo: 2200, titel: 'Der Gezeitenkenner',
+    avatar: 'assets/avatare/modern/henning.svg', farbe: '#7E8D75',
+    kurz: 'Kennt den richtigen Moment. Dann kommt die Flut.',
+    bio: 'Henning führt Wanderer bei Ebbe übers Watt und weiß auf die Minute, wann das Wasser kommt. Genauso spielt er: ruhig, geduldig und mit dem Blick auf die Uhr der Gezeiten. Wenn die Stellung reif ist, schlägt er genau im richtigen Moment zu.',
+    merkmale: { figur: 'P', lieblings: 'Bauernhebel', tempo: 'Abwartend', schwaeche: 'Kaum eine' },
+    staerke: { voll: true, elo: 2200, movetime: 900, mattInEins: 1, zeit: [700, 1400] },
+    saetze: {
+      begruessung: [
+        'Moin. Gerade ist Ebbe, wir haben Zeit für eine Partie.',
+        'Willkommen im Watt! Bleib dicht bei mir und achte auf die Priele.',
+        'Hallo! Ich kenne die Gezeiten. Auf dem Brett gibt’s die auch.',
+        'Schön, dass du da bist. Stiefel an, wir gehen raus.',
+      ],
+      schlagen: [
+        'Die hat die Flut geholt.',
+        'Genommen. Genau zur richtigen Zeit.',
+        'Im Schlick stecken geblieben. Ich nehm sie mit.',
+      ],
+      spielerFehler: [
+        'Achtung, da bist du in einen Priel getreten.',
+        'Hm, da kommt das Wasser schneller, als du denkst.',
+        'Der Zeitpunkt passte nicht ganz. Im Watt merkt man so was sofort.',
+      ],
+      spielerGut: [
+        'Gut abgepasst! Du hast ein Gefühl für die Gezeiten.',
+        'Starker Zug. Da hast du festen Sand unter den Füßen.',
+        'Respekt, der kam genau im richtigen Moment.',
+      ],
+      schach: [
+        'Schach. Die Flut kommt.',
+        'Schach. Genau jetzt, keine Minute früher.',
+        'Schach. Halt dich fest, das Wasser steigt.',
+      ],
+      verliert: [
+        'Verloren. Diesmal hast du die Gezeiten besser gelesen.',
+        'Gut gespielt! Den Weg übers Watt findest du jetzt auch ohne mich.',
+        'Glückwunsch! Seenotretterin Ilka hat ihr Boot schon für dich klargemacht.',
+      ],
+      gewinnt: [
+        'Gewonnen. Alles eine Frage des richtigen Moments.',
+        'Sieg. Die Flut kam pünktlich wie immer.',
+        'Gewonnen. Komm wieder, die nächste Ebbe kommt bestimmt.',
+      ],
+      remis: [
+        'Unentschieden. Stillwasser, keiner bewegt sich mehr.',
+        'Remis. Wir sind beide trockenen Fußes heimgekommen.',
+        'Unentschieden. Die Flut kam für uns beide zur gleichen Zeit.',
+      ],
+    },
+  },
+  {
+    id: 'ilka', stufe: 23, welt: 4, name: 'Seenotretterin Ilka', rufname: 'Ilka', elo: 2300, titel: 'Die Unsinkbare',
+    avatar: 'assets/avatare/modern/ilka.svg', farbe: '#A75B87',
+    kurz: 'Verteidigt zäh und findet Rettung, wo keiner sie sieht.',
+    bio: 'Ilka fährt als Seenotretterin bei jedem Wetter raus und hat noch nie jemanden aufgegeben, sich selbst auch nicht. Auf dem Brett verteidigt sie zäh und findet einen Ausweg, wo andere längst die Segel streichen.',
+    merkmale: { figur: 'K', lieblings: 'König', tempo: 'Zäh', schwaeche: 'Kaum eine' },
+    staerke: { voll: true, elo: 2300, movetime: 900, mattInEins: 1, zeit: [700, 1400] },
+    saetze: {
+      begruessung: [
+        'Moin! Rettungsweste an? Gut, dann kann’s losgehen.',
+        'Willkommen an Bord! Bei mir geht nichts unter. Auch kein König.',
+        'Hallo! Sturmwarnung? Dann fahr ich erst recht raus.',
+        'Schön, dass du da bist. Ich geb nie auf, das sag ich lieber gleich.',
+      ],
+      schlagen: [
+        'Die hab ich aus dem Wasser gefischt.',
+        'Geborgen! Die kommt mit an Bord.',
+        'Genommen. Ein Rettungsring für meine Stellung.',
+      ],
+      spielerFehler: [
+        'Oh, da ist dir was über Bord gegangen.',
+        'Da hat dein Rumpf ein Leck. Das nutze ich.',
+        'Mann über Bord! Äh, Figur über Bord.',
+      ],
+      spielerGut: [
+        'Starker Zug! Da muss ich ganz schön rudern.',
+        'Respekt. Der hat meine Stellung ordentlich durchgeschüttelt.',
+        'Gut gespielt! Untergehen tu ich trotzdem nicht.',
+      ],
+      schach: [
+        'Schach! Alle Mann an Deck.',
+        'Schach! Kurs auf deinen König.',
+        'Schach! Auch aus der Verteidigung heraus kann ich zupacken.',
+      ],
+      verliert: [
+        'Verloren. Diesmal hat mich keiner rausgefischt. Respekt!',
+        'Gut gespielt! Ich hab gekämpft bis zur allerletzten Welle.',
+        'Glückwunsch! Johann vom Leuchtturm hat schon das Licht für dich angemacht.',
+      ],
+      gewinnt: [
+        'Gewonnen! Unsinkbar, wie versprochen.',
+        'Sieg! Ich war schon fast unter Wasser, aber eben nur fast.',
+        'Gewonnen. Gib nie auf, das hab ich auf See gelernt.',
+      ],
+      remis: [
+        'Remis! Gerettet, und zwar wir beide.',
+        'Unentschieden. Alle sicher an Land, so mag ich das.',
+        'Remis! Kein Schiff verloren, das ist der schönste Ausgang.',
+      ],
+    },
+  },
+  {
+    id: 'johann', stufe: 24, welt: 4, endgegner: true, name: 'Johann vom Leuchtturm', rufname: 'Johann', elo: 2400, titel: 'Der Weitblickende',
+    avatar: 'assets/avatare/modern/johann.svg', farbe: '#DE8F81',
+    kurz: 'Hütet die Küste. Kann alles und sieht weit voraus.',
+    bio: 'Johann hält seit vierzig Jahren den Leuchtturm am Ende der Küste. In jeder langen Nacht hat er eine Partie aus alten Büchern nachgespielt, deshalb beherrscht er Angriff, Verteidigung und Endspiel gleichermaßen.',
+    merkmale: { figur: 'R', lieblings: 'Alle', tempo: 'Gelassen', schwaeche: 'Kaum eine' },
+    staerke: { voll: true, elo: 2400, movetime: 1000, mattInEins: 1, zeit: [800, 1500] },
+    saetze: {
+      begruessung: [
+        'Guten Abend. Ich hüte den Leuchtturm und mit ihm die Gezeitenküste.',
+        'Komm herein, die Treppe hat dreihundert Stufen. Jetzt spielen wir.',
+        'Von hier oben sehe ich weit. Mal sehen, wie weit du siehst.',
+        'Vierzig Jahre, jede Nacht eine Partie. Heute spiele ich mit dir.',
+      ],
+      schlagen: [
+        'Die hat mein Lichtkegel erfasst.',
+        'Genommen. Das hab ich von Weitem kommen sehen.',
+        'Die stand im Schatten. Jetzt steht sie bei mir.',
+      ],
+      spielerFehler: [
+        'Hm, da ist bei dir eine Lampe ausgegangen.',
+        'Von hier oben sieht man das deutlich. Leider für dich.',
+        'Nebel auf deiner Seite. Ich leuchte mal hinein.',
+      ],
+      spielerGut: [
+        'Ein Zug mit Weitblick. Das schätze ich.',
+        'Stark. So einen hab ich in meinen Büchern selten gefunden.',
+        'Gut gespielt. Da muss ich das Licht heller drehen.',
+      ],
+      schach: [
+        'Schach. Der Lichtkegel hat dich gefunden.',
+        'Schach. Das hab ich vor fünf Zügen gesehen.',
+        'Schach. Halte Kurs, König.',
+      ],
+      verliert: [
+        'Verloren. Du hast weiter gesehen als mein Licht.',
+        'Gut gespielt. Diese Partie trag ich ins Logbuch ein, ganz oben.',
+        'Glückwunsch! In der Stockfisch-Tiefe zeigt dir Taucher Keetan den Weg.',
+      ],
+      gewinnt: [
+        'Gewonnen. Vierzig Jahre Nachtschicht zahlen sich aus.',
+        'Sieg. Das Licht brennt weiter, komm jederzeit wieder.',
+        'Gewonnen. Schau dir die Analyse an, dort ist alles ausgeleuchtet.',
+      ],
+      remis: [
+        'Remis. Zwei Leuchtfeuer, ein Horizont.',
+        'Unentschieden. Eine Partie für meine Bücher.',
+        'Remis. Das Licht hat heute für uns beide geleuchtet.',
+      ],
+    },
+  },
+  {
+    id: 'keetan', stufe: 25, welt: 5, name: 'Taucher Keetan', rufname: 'Keetan', elo: 2500, titel: 'Der Furchtlose',
+    avatar: 'assets/avatare/modern/keetan.svg', farbe: '#C28E65',
+    kurz: 'Opfert ohne Zögern, Hauptsache, er bestimmt das Tempo.',
+    bio: 'Keetan ist als Erster ohne Zögern in die Tiefe gesprungen. Jetzt zeigt er allen, die es über die Küste hinaus geschafft haben, den Weg nach unten. Auf dem Brett opfert er gern Material, solange er dafür das Tempo bestimmt.',
+    merkmale: { figur: 'N', lieblings: 'Initiative', tempo: 'Furchtlos', schwaeche: 'Kaum eine' },
+    staerke: { voll: true, elo: 2500, movetime: 1000, mattInEins: 1, zeit: [600, 1300] },
+    saetze: {
+      begruessung: [
+        'Hey! Maske auf, Flossen an. Wir springen!',
+        'Willkommen in der Tiefe! Hier unten zählt Mut.',
+        'Hallo! Ich zeig dir den Weg nach unten. Halt dich gut fest.',
+        'Na, bereit für den Sprung? Ich zögere nie.',
+      ],
+      schlagen: [
+        'Geschnappt, beim Tauchen nebenbei.',
+        'Abgetaucht und mitgenommen!',
+        'Die hab ich vom Meeresgrund geholt.',
+      ],
+      spielerFehler: [
+        'Hm, da hast du die Strömung unterschätzt.',
+        'Da ist eine Lücke in deinem Netz. Ich schwimm durch.',
+        'Da zieht eine Strömung durch deine Stellung. Ich nutze sie.',
+      ],
+      spielerGut: [
+        'Mutiger Zug! So mag ich das.',
+        'Starker Zug! Da musste ich kurz auftauchen und Luft holen.',
+        'Respekt, du traust dich was. Das gefällt mir.',
+      ],
+      schach: [
+        'Schach! Direkt aus der Tiefe.',
+        'Schach! Ohne Zögern, wie immer.',
+        'Schach! Ich hab was geopfert, jetzt hol ich es mir zurück.',
+      ],
+      verliert: [
+        'Verloren! Du bist ja noch mutiger als ich.',
+        'Gut gespielt! Ich tauch kurz auf und atme durch.',
+        'Glückwunsch! Lotsin Ragna bringt dich jetzt noch tiefer.',
+      ],
+      gewinnt: [
+        'Gewonnen! Wer sich traut, kommt weiter.',
+        'Sieg! Das Opfer hat sich gelohnt.',
+        'Gewonnen! Spring gleich noch mal mit mir rein.',
+      ],
+      remis: [
+        'Unentschieden! Wir tauchen beide gleichzeitig auf.',
+        'Remis. Gleich tief getaucht, gleich viel Luft.',
+        'Unentschieden! Nächstes Mal tauche ich tiefer.',
+      ],
+    },
+  },
+  {
+    id: 'ragna', stufe: 26, welt: 5, name: 'Lotsin Ragna', rufname: 'Ragna', elo: 2600, titel: 'Die Lautlose',
+    avatar: 'assets/avatare/modern/ragna.svg', farbe: '#4F58A6',
+    kurz: 'Nimmt dir leise den Raum, Zug um Zug.',
+    bio: 'Ragna steuert ihr kleines Tauchboot durch die dunkelsten Gräben, ohne je anzustoßen. Auf dem Brett gewinnt sie Raum, ganz leise und mit viel Geduld. Irgendwann merkst du, dass deine Figuren kaum Platz zum Atmen haben.',
+    merkmale: { figur: 'P', lieblings: 'Raum', tempo: 'Lautlos', schwaeche: 'Keine bekannt' },
+    staerke: { voll: true, elo: 2600, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    saetze: {
+      begruessung: [
+        'Hallo. Bitte leise sprechen, wir sind tief unten.',
+        'Willkommen an Bord. Ich lotse dich durch die Gräben.',
+        'Psst. Hier unten gewinnt, wer Geduld hat.',
+        'Schön, dass du da bist. Wir nehmen den ruhigen Weg.',
+      ],
+      schlagen: [
+        'Lautlos genommen.',
+        'Die stand im Fahrwasser. Jetzt nicht mehr.',
+        'Genommen. Ohne anzustoßen.',
+      ],
+      spielerFehler: [
+        'Hm. Da ist dein Boot an der Wand entlanggeschrammt.',
+        'Da wird es eng in deinem Graben.',
+        'Leise, aber deutlich: Das war nicht dein bester Kurs.',
+      ],
+      spielerGut: [
+        'Gut gesteuert. Das hätte ich auch so gemacht.',
+        'Stark. Du hast dir Raum verschafft.',
+        'Präzise. Hier unten zählt das doppelt.',
+      ],
+      schach: [
+        'Schach. Ganz leise.',
+        'Schach. Der Graben wird eng.',
+        'Schach. Du hast mich nicht kommen hören.',
+      ],
+      verliert: [
+        'Verloren. Du hast den Weg durch die Gräben gefunden.',
+        'Gut gespielt. Ich tauche jetzt leise ab.',
+        'Glückwunsch. Im alten Wrack freut sich Schatzsucher Silas auf dich.',
+      ],
+      gewinnt: [
+        'Gewonnen. Langsam, leise, sicher.',
+        'Sieg. Geduld ist das beste Echolot.',
+        'Gewonnen. Komm wieder, ich lotse dich gern noch einmal.',
+      ],
+      remis: [
+        'Remis. Wir haben beide nirgends angestoßen.',
+        'Unentschieden. Zwei Boote, ein stiller Graben.',
+        'Remis. Ruhiges Fahrwasser, so soll es sein.',
+      ],
+    },
+  },
+  {
+    id: 'silas', stufe: 27, welt: 5, name: 'Schatzsucher Silas', rufname: 'Silas', elo: 2700, titel: 'Der Feinsinnige',
+    avatar: 'assets/avatare/modern/silas.svg', farbe: '#7A6F39',
+    kurz: 'Endspiel-Feinschmecker. Findet jeden kleinen Vorteil.',
+    bio: 'Silas wohnt in einem alten Schiffswrack am Grund und sammelt, was andere übersehen. Im Endspiel ist er zu Hause: Ein halber Bauer mehr ist für ihn ein ganzer Schatz. Er tauscht gern ab, bis die Kostbarkeiten übrig bleiben.',
+    merkmale: { figur: 'K', lieblings: 'Endspiel', tempo: 'Feinsinnig', schwaeche: 'Keine bekannt' },
+    staerke: { voll: true, elo: 2700, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    saetze: {
+      begruessung: [
+        'Willkommen in meinem Wrack! Vorsicht, hier liegen überall Schätze.',
+        'Hallo! Ich sammle, was andere übersehen. Auch auf dem Brett.',
+        'Schön, dass du da bist. Ich hab schon die Lupe geputzt.',
+        'Hallo. Die besten Schätze liegen ganz am Ende. Im Endspiel.',
+      ],
+      schlagen: [
+        'Ein Fundstück! Das kommt in die Truhe.',
+        'Geborgen. Klein, aber kostbar.',
+        'Genommen. Wieder ein Stück für meine Sammlung.',
+      ],
+      spielerFehler: [
+        'Oh, da ist dir eine Münze aus der Tasche gefallen.',
+        'Hm, ein winziger Fehler. Aber ich sammle auch winzige.',
+        'Da glitzert was auf deiner Seite. Darf ich?',
+      ],
+      spielerGut: [
+        'Ein feiner Zug. Den leg ich in meine Schatztruhe.',
+        'Sehr fein! Du hast ein Auge für Kleinigkeiten.',
+        'Stark. Diesen Schatz hätte ich selbst gern gehoben.',
+      ],
+      schach: [
+        'Schach. Fein säuberlich.',
+        'Schach. Ein kleiner Glanzpunkt.',
+        'Schach. Den hab ich unter dem Sand gefunden.',
+      ],
+      verliert: [
+        'Verloren. Du hast den größeren Schatz gehoben.',
+        'Gut gespielt. Diese Partie kommt in meine Sammlung, ganz nach oben.',
+        'Glückwunsch! Forscherin Merle macht ihre Tauchkugel schon für dich klar.',
+      ],
+      gewinnt: [
+        'Gewonnen. Am Ende hat ein halber Bauer gereicht.',
+        'Sieg. Kleine Vorteile, großer Schatz.',
+        'Gewonnen. Schau dir das Endspiel in der Analyse an, da glänzt es.',
+      ],
+      remis: [
+        'Remis. Wir teilen uns die Truhe.',
+        'Unentschieden. Ein ehrlicher Fund für beide.',
+        'Remis. Kein halber Bauer weit und breit, schade eigentlich.',
+      ],
+    },
+  },
+  {
+    id: 'merle', stufe: 28, welt: 5, name: 'Forscherin Merle', rufname: 'Merle', elo: 2800, titel: 'Die Gründliche',
+    avatar: 'assets/avatare/modern/merle.svg', farbe: '#93A564',
+    kurz: 'Gründlich in jeder Phase. Notiert sich alles.',
+    bio: 'Merle erforscht die Tiefsee aus einer gläsernen Tauchkugel und notiert alles, was sie sieht. So spielt sie auch: Eröffnung, Mittelspiel und Endspiel mit derselben Sorgfalt. Lücken in ihren Notizen findet man selten.',
+    merkmale: { figur: 'B', lieblings: 'Alle', tempo: 'Gründlich', schwaeche: 'Keine bekannt' },
+    staerke: { voll: true, elo: 2800, movetime: 1200, mattInEins: 1, zeit: [800, 1500] },
+    saetze: {
+      begruessung: [
+        'Hallo! Neue Beobachtung: Ein Gegner nähert sich der Kugel.',
+        'Willkommen in meiner Tauchkugel. Ich mach mir Notizen, wenn’s recht ist.',
+        'Schön, dass du da bist. Ich hab Stift, Block und ganz viel Zeit.',
+        'Guten Tag. Versuchsreihe Schach, eine neue Partie. Wir beginnen.',
+      ],
+      schlagen: [
+        'Probe genommen. Ab ins Glas.',
+        'Notiert und eingesammelt.',
+        'Genommen. Das bestätigt meine Theorie.',
+      ],
+      spielerFehler: [
+        'Interessant. Das notiere ich als Abweichung.',
+        'Hm. Meine Messwerte zeigen da eine Lücke bei dir.',
+        'Beobachtung: eine ungedeckte Figur. Ich werte sie aus.',
+      ],
+      spielerGut: [
+        'Bemerkenswert! Das kommt dick unterstrichen in mein Notizbuch.',
+        'Sehr gründlich gespielt. Kollegin, würde ich sagen. Oder Kollege.',
+        'Stark. Diesen Zug muss ich nachher genauer untersuchen.',
+      ],
+      schach: [
+        'Schach. Wie erwartet.',
+        'Schach. Ich hab’s vorher aufgeschrieben.',
+        'Schach. Beobachtung bestätigt.',
+      ],
+      verliert: [
+        'Verloren. Das Ergebnis widerlegt meine Hypothese. Respekt!',
+        'Gut gespielt. Diese Partie werte ich noch wochenlang aus.',
+        'Glückwunsch. Am letzten Durchgang hält Hüterin Alva schon Wache.',
+      ],
+      gewinnt: [
+        'Gewonnen. Gründlichkeit zahlt sich aus.',
+        'Sieg. Alles sauber protokolliert.',
+        'Gewonnen. Lies gern meine Notizen, ich meine: die Analyse.',
+      ],
+      remis: [
+        'Remis. Ergebnis ausgeglichen, Versuch gelungen.',
+        'Unentschieden. Das notiere ich als gemeinsame Entdeckung.',
+        'Remis. Das Experiment ist wiederholbar, das gefällt mir.',
+      ],
+    },
+  },
+  {
+    id: 'alva', stufe: 29, welt: 5, name: 'Hüterin Alva', rufname: 'Alva', elo: 2900, titel: 'Die Torwächterin',
+    avatar: 'assets/avatare/modern/alva.svg', farbe: '#9E7AE2',
+    kurz: 'Bewacht den letzten Durchgang. Macht fast keine Fehler.',
+    bio: 'Alva bewacht den letzten Durchgang zum Grund, dort, wo der Stockfisch wohnt. Seit Ewigkeiten lässt sie niemanden vorbei, der nicht ganz bei der Sache ist. Fehler macht sie fast nie.',
+    merkmale: { figur: 'Q', lieblings: 'Alle', tempo: 'Präzise', schwaeche: 'Keine bekannt' },
+    staerke: { voll: true, elo: 2900, movetime: 1300, mattInEins: 1, zeit: [700, 1500] },
+    saetze: {
+      begruessung: [
+        'Halt. Hier ist der letzte Durchgang.',
+        'Willkommen. Wer hier vorbei will, muss jeden Zug ernst nehmen.',
+        'Ich hüte dieses Tor schon sehr lange. Zeig mir, was du kannst.',
+        'Schön, dass du so weit gekommen bist. Jetzt wird es still.',
+      ],
+      schlagen: [
+        'Abgefangen.',
+        'Die kommt nicht durch.',
+        'Genommen. Das Tor bleibt zu.',
+      ],
+      spielerFehler: [
+        'Das sehe ich.',
+        'Da öffnet sich ein Spalt. Ich gehe hindurch.',
+        'Hm. Diese Stelle bewache ich jetzt.',
+      ],
+      spielerGut: [
+        'Gut. Sehr gut.',
+        'Stark. Das Tor wackelt.',
+        'Präzise. Du bist bereit für mehr.',
+      ],
+      schach: [
+        'Schach. Halt.',
+        'Schach. Das Tor schließt sich.',
+        'Schach. Hier kommt niemand unbemerkt vorbei.',
+      ],
+      verliert: [
+        'Du darfst passieren. Das hast du dir verdient.',
+        'Verloren. Lange hat mich niemand so gefordert.',
+        'Glückwunsch. Unten am Grund erwartet dich der Stockfisch.',
+      ],
+      gewinnt: [
+        'Gewonnen. Das Tor bleibt heute zu.',
+        'Sieg. Komm wieder, das Tor ist immer da.',
+        'Gewonnen. In der Analyse siehst du, wo der Spalt war.',
+      ],
+      remis: [
+        'Remis. Das Tor steht einen Spalt offen.',
+        'Unentschieden. Wir halten beide stand.',
+        'Remis. Heute kommt keiner durch, auch ich nicht.',
+      ],
+    },
+  },
+  {
+    id: 'stockfisch', stufe: 30, welt: 5, endgegner: true, name: 'Der Stockfisch', rufname: 'Stockfisch', elo: 3000, titel: 'Der Endgegner',
     avatar: 'assets/avatare/10-der-stockfisch.svg', farbe: '#19f6e8',
     kurz: 'Endgegner. Volle Stärke.',
     bio: 'Der Stockfisch ist eine der stärksten Schach-Engines der Welt und spielt hier ohne jede Bremse. Ein Remis gegen ihn ist ein Triumph, ein Sieg eine Legende.',
@@ -663,6 +1683,21 @@ export const BOTS = [
     },
   },
 ];
+
+// Welten (Flo, 23.10.): fuenf Welten mit je sechs Bots, jeder 100 Elo staerker als der davor; der letzte jeder Welt ist
+// ihr Endgegner (bot.endgegner). bot.welt ist die Nummer (1..5). Die Landschaft zeichnet js/ui/arena.js je id.
+export const WELTEN = Object.freeze([
+  Object.freeze({ nr: 1, id: 'karofelder', name: 'Die Karofelder', kurz: 'Karofelder', text: 'Sanfte Hügel mit Äckern im Schachbrettmuster.', ort: 'die große Scheune' }),
+  Object.freeze({ nr: 2, id: 'springerforst', name: 'Der Springerforst', kurz: 'Springerforst', text: 'Dichter Mischwald mit Lichtungen und Bach.', ort: 'die Waldburg' }),
+  Object.freeze({ nr: 3, id: 'turmstadt', name: 'Die Turmstadt', kurz: 'Turmstadt', text: 'Altstadt am Fluss mit vielen Türmen.', ort: 'das Präsidium im Rathausturm' }),
+  Object.freeze({ nr: 4, id: 'gezeitenkueste', name: 'Die Gezeitenküste', kurz: 'Gezeitenküste', text: 'Dünen, Kreideklippen und Watt.', ort: 'der Leuchtturm' }),
+  Object.freeze({ nr: 5, id: 'stockfisch-tiefe', name: 'Die Stockfisch-Tiefe', kurz: 'Stockfisch-Tiefe', text: 'Ein Tauchgang bis zum Grund.', ort: 'der Grund' }),
+]);
+export const weltVon = (bot) => (bot && WELTEN.find((w) => w.nr === bot.welt)) || null;
+export const botsDerWelt = (nr) => BOTS.filter((b) => b.welt === nr).sort((a, c) => a.stufe - c.stufe);
+export const endgegnerDerWelt = (nr) => BOTS.find((b) => b.welt === nr && b.endgegner) || null;
+// Kurzer Rufname fuer Schilder, Knoepfe und Saetze ("Spielen gegen Kalle"); Rueckfall der Name
+export const rufname = (bot) => (bot && (bot.rufname || bot.name)) || '';
 
 // Angemeldete Bots (W0+a): id -> eingefrorenes Profil
 const angemeldet = new Map();
@@ -880,7 +1915,8 @@ export async function botZug(engine, fen, bot, {
   let zug = null;
   let art = 'normal';
   const mattZuege = zuege.filter((z) => z.san.endsWith('#'));
-  const siehtMatt = mattZuege.length > 0 && (bot.stufe >= 4 || zufall() < (s.mattInEins ?? 1));
+  // ab Elo 1000 (Lisa) sieht jeder Leiter-Bot ein Matt in 1 immer (vor den Welten: ab Stufe 4)
+  const siehtMatt = mattZuege.length > 0 && ((bot.stufe != null && bot.elo >= 1000) || zufall() < (s.mattInEins ?? 1));
 
   if (zuege.length === 1) {
     zug = zuege[0];

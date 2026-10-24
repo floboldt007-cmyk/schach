@@ -31,10 +31,10 @@
 // "Heute · <Wochentag>" (Tag mit Grenze 4:00, tag.js), Zeilen der Pakete in .ort-heute. Gefuellt bei jedem zeigeDetail();
 // ohne Anbieter versteckt. Kontext { app, bot, fortschritt, tag, woche }. Die Karte "Offene Partie" und der Dialog vor
 // einer neuen Partie finden auch angemeldete Bots (botNachId, z. B. eine verlassene Boss-Partie).
-import { BOTS, botSatz, botNachId } from '../bots.js';
+import { BOTS, WELTEN, botsDerWelt, endgegnerDerWelt, rufname, botSatz, botNachId } from '../bots.js';
 import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
-  ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, statistik,
+  ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, statistik, hoechsterSieg, istWeltFrei, hatWeltsiegel,
   ladeLaufendePartie, loescheLaufendePartie, ladePartien,
 } from '../storage.js';
 import { klang } from '../sounds.js';
@@ -69,54 +69,68 @@ const KURZ = {
 const RUF = { ...KURZ, turm: 'den Professor', koenig: 'den Kommissar', stockfisch: 'den Stockfisch' };
 // Text des Spielen-Knopfs ("Spielen gegen Kalle", besiegt "Revanche gegen ..."). Der Rufname steht in .sp-name und
 // bricht nie in sich um; wird es eng (schmales Panel, langer Rufname), bricht der Knopf vor dem Namen auf zwei Zeilen
-// um, statt etwas abzuschneiden (css/arena.css .spielen .sp-text, tests/arena.test.mjs prueft alle zehn Bots)
+// um, statt etwas abzuschneiden (css/arena.css .spielen .sp-text, tests/arena.test.mjs prueft alle Bots)
 export function spielenText(b, besiegt) {
-  return `${besiegt ? 'Revanche' : 'Spielen'} gegen <span class="sp-name">${esc((b && (RUF[b.id] || b.name)) || '')}</span>`;
+  return `${besiegt ? 'Revanche' : 'Spielen'} gegen <span class="sp-name">${esc((b && (RUF[b.id] || rufname(b))) || '')}</span>`;
 }
 
 // Lagen der Karte: Stationen und Szenerie in Anteilen der Kartengroesse (0..1). quer = fast quadratische Karte
-// (iPad quer, passt ganz), hoch = schmale, hohe Karte (Entwurf C: 400 x 760, scrollt). start = wo Flos Weg beginnt,
-// boss/event = Plaetze der Orte arena:karte-boss (Zelt) und arena:karte-event (Fahne am Turm).
-// Szene: [Art, x, y, Groesse?, Variante?]
+// (iPad quer, passt ganz), hoch = schmale, hohe Karte (scrollt). start = wo Flos Weg beginnt, boss/event = Plaetze der
+// Orte arena:karte-boss (Zelt) und arena:karte-event (Fahne am Turm), wahrzeichen = Ort des Endgegners der Welt.
+// Welten (Flo, 23.10.): die Karte zeigt immer eine Welt mit ihren sechs Stationen; die Landschaft kommt aus
+// SZENEN[welt.id] (Platz-Liste je Lage, Arten im Wechsel aus der Palette der Welt) und den Farben in css/arena.css
+// (.welt[data-welt="<id>"]). Szene: [Art, x, y, Groesse?, Variante?]
 const LAGEN = {
   quer: {
     himmel: 0.15,
     baender: [0.15, 0.36, 0.56, 0.76],
-    stationen: [[0.13, 0.86], [0.36, 0.80], [0.60, 0.86], [0.84, 0.75], [0.70, 0.545], [0.45, 0.60], [0.20, 0.52], [0.26, 0.32], [0.52, 0.28], [0.78, 0.22]],
+    stationen: [[0.12, 0.84], [0.40, 0.79], [0.70, 0.84], [0.85, 0.59], [0.42, 0.53], [0.56, 0.26]],
     start: [0.03, 0.96],
-    boss: [0.92, 0.42],
-    event: [0.06, 0.40],
+    boss: [0.91, 0.36],
+    event: [0.09, 0.45],
+    wahrzeichen: [0.79, 0.23],
     berge: [[0.30, 1.3], [0.56, 1.0], [0.88, 1.15]],
-    szene: [
-      ['sonne', 0.93, 0.07], ['wolke', 0.10, 0.06], ['wolke', 0.47, 0.09], ['wolke', 0.72, 0.05],
-      ['burg', 0.06, 0.40], ['zelt', 0.92, 0.42], ['tempel', 0.92, 0.26], ['haus', 0.60, 0.44, 1, 1], ['haus', 0.10, 0.70, 1, 2], ['haus', 0.84, 0.92, 1, 3],
-      ['see', 0.36, 0.42, 1.2], ['ring', 0.62, 0.70], ['zaun', 0.24, 0.94], ['muehle', 0.40, 0.14],
-      ['tanne', 0.04, 0.22], ['tanne', 0.08, 0.26, 0.8], ['tanne', 0.66, 0.20, 0.9], ['tanne', 0.98, 0.18, 0.9], ['tanne', 0.20, 0.17, 0.8],
-      ['baum', 0.37, 0.52], ['baum', 0.92, 0.60, 0.9, 2], ['baum', 0.30, 0.68, 0.8], ['baum', 0.50, 0.73, 0.8, 2], ['baum', 0.97, 0.80, 0.9],
-      ['baum', 0.73, 0.40, 0.8, 2], ['baum', 0.16, 0.60, 0.9, 2], ['baum', 0.44, 0.95, 0.9], ['baum', 0.70, 0.95, 0.8, 2], ['baum', 0.04, 0.82, 0.8],
-      ['busch', 0.57, 0.50], ['busch', 0.22, 0.80], ['busch', 0.86, 0.50], ['busch', 0.63, 0.32],
-      ['blumen', 0.33, 0.90], ['blumen', 0.50, 0.90], ['blumen', 0.08, 0.60], ['blumen', 0.62, 0.62], ['blumen', 0.88, 0.70], ['blumen', 0.40, 0.36],
-    ],
+    himmelSzene: [['sonne', 0.93, 0.07], ['wolke', 0.10, 0.06], ['wolke', 0.47, 0.09], ['wolke', 0.72, 0.05]],
+    plaetze: [[0.05, 0.70, 0.9], [0.25, 0.93, 1], [0.55, 0.94, 0.9], [0.88, 0.94, 1], [0.97, 0.76, 0.9], [0.57, 0.67, 1],
+      [0.25, 0.66, 0.9], [0.62, 0.42, 0.9], [0.97, 0.50, 0.8], [0.22, 0.40, 1], [0.36, 0.33, 0.8], [0.72, 0.44, 0.9],
+      [0.06, 0.28, 0.9], [0.24, 0.20, 0.8], [0.40, 0.18, 0.8], [0.96, 0.21, 0.8], [0.47, 0.70, 0.8], [0.16, 0.74, 0.8],
+      [0.33, 0.58, 0.8], [0.68, 0.60, 0.8], [0.12, 0.58, 0.8], [0.91, 0.84, 0.8]],
   },
   hoch: {
     himmel: 0.197,
     baender: [0.197, 0.40, 0.57, 0.79],
-    stationen: [[0.275, 0.921], [0.695, 0.842], [0.315, 0.753], [0.71, 0.658], [0.295, 0.568], [0.705, 0.479], [0.315, 0.392], [0.715, 0.305], [0.345, 0.221], [0.71, 0.108]],
+    stationen: [[0.28, 0.90], [0.70, 0.77], [0.30, 0.62], [0.70, 0.47], [0.30, 0.32], [0.62, 0.135]],
     start: [0.51, 0.99],
-    boss: [0.125, 0.385],
-    event: [0.115, 0.52],
+    boss: [0.87, 0.31],
+    event: [0.11, 0.46],
+    wahrzeichen: [0.87, 0.12],
     berge: [[0.72, 1.3], [0.90, 1.0], [0.12, 1.0]],
-    szene: [
-      ['sonne', 0.93, 0.04], ['wolke', 0.10, 0.05], ['wolke', 0.40, 0.04], ['wolke', 0.18, 0.13], ['wolke', 0.55, 0.15],
-      ['tempel', 0.71, 0.125], ['tanne', 0.07, 0.345], ['tanne', 0.13, 0.363, 0.8], ['tanne', 0.92, 0.353], ['tanne', 0.52, 0.33, 0.8], ['tanne', 0.57, 0.345, 0.7],
-      ['zelt', 0.125, 0.385], ['haus', 0.89, 0.445, 1, 1], ['baum', 0.175, 0.503], ['baum', 0.24, 0.49, 0.8, 2], ['baum', 0.83, 0.39, 0.8], ['baum', 0.50, 0.52, 0.7, 2],
-      ['burg', 0.115, 0.52], ['ring', 0.89, 0.53], ['baum', 0.15, 0.68], ['baum', 0.22, 0.70, 0.8, 2], ['baum', 0.815, 0.585, 0.9], ['baum', 0.89, 0.566, 0.7, 2],
-      ['baum', 0.795, 0.774, 0.9], ['baum', 0.875, 0.79, 0.75, 2], ['busch', 0.515, 0.737], ['busch', 0.475, 0.618],
-      ['haus', 0.11, 0.745, 1, 2], ['haus', 0.83, 0.915, 1, 3], ['see', 0.62, 0.942], ['zaun', 0.13, 0.86],
-      ['baum', 0.10, 0.937], ['baum', 0.925, 0.855, 0.8], ['blumen', 0.465, 0.953], ['blumen', 0.825, 0.99], ['blumen', 0.09, 0.805], ['blumen', 0.58, 0.63], ['blumen', 0.175, 0.618],
-    ],
+    himmelSzene: [['sonne', 0.93, 0.04], ['wolke', 0.10, 0.05], ['wolke', 0.40, 0.04], ['wolke', 0.18, 0.13]],
+    plaetze: [[0.08, 0.95, 0.9], [0.85, 0.93, 0.9], [0.62, 0.95, 0.8], [0.10, 0.80, 0.9], [0.48, 0.84, 0.8], [0.90, 0.70, 0.9],
+      [0.52, 0.69, 0.8], [0.10, 0.66, 0.9], [0.90, 0.57, 0.8], [0.50, 0.55, 0.8], [0.12, 0.36, 0.8], [0.52, 0.39, 0.8],
+      [0.90, 0.42, 0.8], [0.10, 0.22, 0.9], [0.36, 0.20, 0.8], [0.90, 0.24, 0.8]],
   },
 };
+// Landschaft je Welt: Wahrzeichen am Endgegner und die Palette, aus der die Plaetze der Reihe nach gefuellt werden
+const SZENEN = {
+  karofelder: { wahrzeichen: ['scheune', 1.1], palette: [['acker'], ['baum'], ['blumen'], ['acker', 0.9], ['busch'], ['haus', 1, 1], ['zaun'], ['baum', 0.9, 2], ['muehle'], ['acker'], ['blumen'], ['busch']] },
+  springerforst: { wahrzeichen: ['burg', 1.05], palette: [['tanne'], ['baum'], ['tanne', 0.8], ['busch'], ['tanne', 1.1], ['baum', 0.9, 2], ['pilz'], ['tanne', 0.9], ['see', 0.9], ['baum'], ['pilz'], ['tanne', 0.7]] },
+  turmstadt: { wahrzeichen: ['rathaus', 1.05], palette: [['haus', 1, 3], ['turm'], ['baum'], ['haus', 1, 1], ['busch'], ['turm', 0.85], ['haus', 1, 2], ['blumen'], ['see', 1.1], ['turm', 0.9], ['baum', 0.9, 2], ['haus', 0.9, 3]] },
+  gezeitenkueste: { wahrzeichen: ['leuchtturm', 1.1], palette: [['duene'], ['welle'], ['boot'], ['muschel'], ['duene', 0.9], ['welle'], ['haus', 0.9, 1], ['busch', 0.8], ['boot', 0.9], ['welle'], ['muschel'], ['duene', 1.1]] },
+  'stockfisch-tiefe': { wahrzeichen: ['grund', 1.1], palette: [['alge'], ['koralle'], ['blase'], ['fisch'], ['alge', 0.9], ['wrack', 0.9], ['blase'], ['koralle', 0.9], ['fisch', 0.8], ['alge', 1.1], ['blase'], ['koralle']] },
+};
+// Szene einer Welt in einer Lage (Himmel, Wahrzeichen, gefuellte Plaetze)
+function szeneVon(welt, modus) {
+  const lage = LAGEN[modus];
+  const sz = SZENEN[welt && welt.id] || SZENEN.karofelder;
+  const aus = [...lage.himmelSzene];
+  aus.push([sz.wahrzeichen[0], lage.wahrzeichen[0], lage.wahrzeichen[1], sz.wahrzeichen[1] || 1]);
+  lage.plaetze.forEach(([x, y, gr], i) => {
+    const [art, g2 = 1, v = 1] = sz.palette[i % sz.palette.length];
+    aus.push([art, x, y, gr * g2, v]);
+  });
+  return aus;
+}
 
 // Partie-Screen vorab laden (dasselbe Modul, das app.js beim Wechsel importiert: danach kommt es aus dem Modul-Speicher).
 // Ein Fehler hier ist egal, app.js zeigt beim Wechsel selbst den Platzhalter.
@@ -183,6 +197,23 @@ const SZENE = {
   see: (x, y, s = 1) => g(x, y, s, '<ellipse rx="26" ry="10" class="w-wasser"/><ellipse cx="-6" cy="-3" rx="9" ry="2.4" class="w-glanz"/>'),
   ring: (x, y, s = 1) => g(x, y, s, '<ellipse rx="36" ry="21" class="w-ring"/><ellipse rx="27" ry="13" class="w-ring-2"/><ellipse rx="31.5" ry="17" class="w-glanz-linie"/>'),
   zaun: (x, y, s = 1) => g(x - 34, y, s, '<path d="M0 0h70M0 12h70M8-6v26M28-6v26M48-6v26M68-6v26" class="w-zaun"/>'),
+  // Welten: Karofelder, Springerforst, Turmstadt, Gezeitenkueste, Stockfisch-Tiefe
+  acker: (x, y, s = 1) => g(x - 28, y - 10, s, `<g transform="skewX(-18)">${[0, 1, 2, 3].map((i) => [0, 1].map((j) => `<rect x="${i * 14}" y="${j * 10}" width="14" height="10" class="${(i + j) % 2 ? 'w-acker-2' : 'w-acker'}"/>`).join('')).join('')}</g>`),
+  scheune: (x, y, s = 1) => g(x - 34, y - 44, s, '<ellipse cx="34" cy="56" rx="40" ry="5" class="w-schatten"/><rect y="16" width="68" height="40" rx="4" class="w-dach-3"/><path d="M-5 18 34-10 73 18z" class="w-dach-2"/><rect x="24" y="30" width="20" height="26" rx="2" class="w-wand"/><path d="M24 30l20 26M44 30 24 56" class="w-mast"/><rect x="28" y="20" width="12" height="7" rx="2" class="w-fenster"/>'),
+  pilz: (x, y, s = 1) => g(x, y, s, '<rect x="-2" y="-8" width="4" height="8" rx="2" class="w-wand"/><path d="M-8-7q8-11 16 0z" class="w-dach"/><circle cx="-2" cy="-10" r="1.3" class="w-weiss"/><rect x="6" y="-5" width="3" height="5" rx="1.5" class="w-wand"/><path d="M3-4q4.5-7 9 0z" class="w-dach"/>'),
+  turm: (x, y, s = 1) => g(x - 12, y - 60, s, '<ellipse cx="12" cy="60" rx="15" ry="4" class="w-schatten"/><rect x="2" y="16" width="20" height="44" class="w-stein"/><path d="M0 18 12-8 24 18z" class="w-dach"/><rect x="8" y="26" width="8" height="10" rx="4" class="w-fenster"/><rect x="8" y="44" width="8" height="16" rx="4" class="w-tuer"/>'),
+  rathaus: (x, y, s = 1) => g(x - 30, y - 70, s, '<ellipse cx="30" cy="70" rx="36" ry="5" class="w-schatten"/><rect x="0" y="34" width="60" height="36" rx="4" class="w-wand-2"/><rect x="20" y="4" width="20" height="66" class="w-stein"/><path d="M18 6 30-14 42 6z" class="w-dach-2"/><circle cx="30" cy="20" r="6" class="w-wand"/><path d="M30 16v4h3" class="w-mast"/><rect x="25" y="52" width="10" height="18" rx="5" class="w-tuer"/><rect x="6" y="42" width="10" height="10" rx="2" class="w-fenster"/><rect x="44" y="42" width="10" height="10" rx="2" class="w-fenster"/>'),
+  duene: (x, y, s = 1) => g(x, y, s, '<path d="M-32 0q16-16 34-12t30 12z" class="w-gras-4"/><path d="M-6-9q4-6 2-12M2-10q5-4 4-11" class="w-halm"/>'),
+  welle: (x, y, s = 1) => g(x, y, s, '<path d="M-18 0q6-6 12 0t12 0t12 0" class="w-welle"/>'),
+  boot: (x, y, s = 1) => g(x - 16, y - 14, s, '<ellipse cx="16" cy="19" rx="20" ry="3" class="w-schatten"/><path d="M0 10h32l-6 8H6z" class="w-dach-3"/><path d="M15 10V-10" class="w-mast"/><path d="M16-9 28 8H16z" class="w-wand"/>'),
+  muschel: (x, y, s = 1) => g(x, y, s, '<path d="M-7 0a7 7 0 0 1 14 0z" class="w-muschel"/><path d="M0 0-4-6M0 0V-7M0 0l4-6" class="w-mast"/><circle cx="12" cy="-1" r="2.4" class="w-muschel"/>'),
+  leuchtturm: (x, y, s = 1) => g(x - 12, y - 66, s, '<ellipse cx="12" cy="66" rx="18" ry="4" class="w-schatten"/><path d="M3 66 6 12h12l3 54z" class="w-wand"/><path d="M4.6 44h14.8l.9 12H3.7zM5.4 24h13.2l.6 10H4.8z" class="w-dach-3"/><rect x="4" y="2" width="16" height="11" rx="2" class="w-stein-2"/><circle cx="12" cy="7.5" r="3.5" class="w-lampe"/><path d="M12-2 7 2h10z" class="w-dach-3"/>'),
+  alge: (x, y, s = 1) => g(x, y, s, '<path d="M0 0q-6-8 0-16t0-18" class="w-alge"/><path d="M7 0q-5-7 0-14t0-12" class="w-alge"/>'),
+  koralle: (x, y, s = 1) => g(x, y, s, '<path d="M0 0V-16M0-8l-7-6M0-11l6-7M-7-14v-5M6-18v-4" class="w-koralle"/>'),
+  blase: (x, y, s = 1) => g(x, y, s, '<circle r="4" class="w-blase"/><circle cx="7" cy="-9" r="2.6" class="w-blase"/><circle cx="2" cy="-17" r="1.8" class="w-blase"/>'),
+  fisch: (x, y, s = 1) => g(x, y, s, '<path d="M0 0q10-8 20 0q-10 8-20 0z" class="w-fisch"/><path d="M19 0l8-6v12z" class="w-fisch"/><circle cx="5" cy="-1" r="1.3" class="w-tuer"/>'),
+  wrack: (x, y, s = 1) => g(x - 30, y - 16, s, '<path d="M0 10 60 4l-8 18H8z" class="w-stamm-2"/><path d="M26 6V-18M40 5V-8" class="w-mast"/><path d="M27-16l12 6-12 4z" class="w-fahne"/><circle cx="16" cy="14" r="2.4" class="w-tiefe"/><circle cx="30" cy="13" r="2.4" class="w-tiefe"/>'),
+  grund: (x, y, s = 1) => g(x - 30, y - 26, s, '<path d="M-4 30q0-44 34-44t34 44z" class="w-stein-2"/><path d="M12 30q0-26 18-26t18 26z" class="w-tiefe"/><circle cx="30" cy="16" r="3.4" class="w-lampe"/><path d="M-8 30h76" class="w-welle"/>'),
   muehle: (x, y, s = 1) => g(x, y, s, '<ellipse cx="0" cy="22" rx="14" ry="4" class="w-schatten"/><path d="M-10 22 -6-10h12l4 32z" class="w-wand"/><path d="M-7-10 0-20 7-10z" class="w-dach-2"/><path d="M0-14 18-26M0-14-18-2M0-14 12 4M0-14-12-32" class="w-mast"/><circle cy="-14" r="2.2" class="w-tuer"/><rect x="-3" y="10" width="6" height="12" rx="3" class="w-tuer"/>'),
 };
 
@@ -202,7 +233,7 @@ function berg(x, y, s, w) {
 // neuIdx: Station, die gerade frei wird (ihr Stueck Weg zeichnet sich spaeter, Klasse .w-fortschritt-neu).
 // y0/hy: senkrechte Abbildung der Anteile auf Pixel, Y(f) = y0 + f * hy (Hochformat: Rand oben fuer Krone und Fahne
 // des Endgegners, unten fuer das Schild der ersten Station; die Flaeche darunter bleibt Wiese, darueber Himmel)
-export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0, hy = h }) {
+export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0, hy = h, szene: szeneListe = null }) {
   const Y = (f) => y0 + f * hy;
   const himmel = Y(lage.himmel);
   const amp = Math.max(8, Math.min(16, 14 * s));
@@ -213,7 +244,7 @@ export function weltSvg({ w, h, s, lage, punkte, start, bis, neuIdx = -1, y0 = 0
   const klassen = ['w-gras-3', 'w-gras-2', 'w-gras'];
   lage.baender.slice(1).forEach((f, i) => teile.push(band(Y(f), w, h, klassen[i] || 'w-gras', amp * (1 + i * 0.3))));
   // Szenerie: hintere (hoehere) zuerst, damit Vorderes ueberdeckt
-  const szene = [...lage.szene].sort((a, b) => a[2] - b[2]);
+  const szene = [...(szeneListe || lage.szene || [])].sort((a, b) => a[2] - b[2]);
   for (const [art, fx, fy, gr = 1, v = 1] of szene) {
     const fn = SZENE[art];
     if (fn) teile.push(fn(fx * w, Y(fy), gr * s, v));
@@ -250,15 +281,35 @@ export function zeige(root, params, app) {
   let gewaehlt = neuId || (params && params.waehle && BOTS.some((b) => b.id === params.waehle) ? params.waehle : null)
     || (fehlendeSterne ? fehlendeSterne.id : naechster.id);
   if (!istFreigeschaltet(BOTS.find((b) => b.id === gewaehlt).stufe, fortschritt)) gewaehlt = naechster.id;
-  const idx = (id) => BOTS.findIndex((b) => b.id === id);
-  const aktuellIdx = aktuellId ? idx(aktuellId) : BOTS.length - 1;
+  // Welten: die Karte zeigt eine Welt (params.welt, sonst die des gewaehlten Bots); idx und aktuellIdx zaehlen in ihr
+  const bestSieg = hoechsterSieg(fortschritt);
+  let weltNr = params && WELTEN.some((w) => w.nr === params.welt) ? params.welt : BOTS.find((b) => b.id === gewaehlt).welt;
+  let LBOTS = botsDerWelt(weltNr);
+  let welt = WELTEN.find((w) => w.nr === weltNr);
+  let weltFrei = istWeltFrei(weltNr, fortschritt);
+  // ganze Welt hinter Flo: alle besiegt oder der naechste Gegner liegt in einer spaeteren Welt (Flo steht am Endgegner)
+  const istWeltFertig = () => alleBesiegt || naechster.stufe > LBOTS[LBOTS.length - 1].stufe;
+  let weltFertig = istWeltFertig();
+  const idx = (id) => LBOTS.findIndex((b) => b.id === id);
+  let aktuellIdx = weltFertig ? LBOTS.length - 1 : idx(naechster.id);
+  // in einer anderen Welt als vorgewaehlt: dort den sinnvollsten Bot waehlen (naechster Gegner, sonst der erste offene
+  // ohne Sieg, sonst der Endgegner)
+  function standardInWelt() {
+    if (LBOTS.some((b) => b.id === naechster.id) && !alleBesiegt) return naechster.id;
+    const offen = LBOTS.find((b) => istFreigeschaltet(b.stufe, fortschritt) && !fortschritt.bots[b.id].sterne[0]);
+    return (offen || LBOTS[LBOTS.length - 1]).id;
+  }
+  if (params && params.welt && weltFrei && !LBOTS.some((b) => b.id === gewaehlt)) gewaehlt = standardInWelt();
 
+  // besiegt | aktuell (der naechste Gegner) | offen (frei, nicht besiegt: neu eingezogen unter dem besten Sieg oder ein
+  // direkt herausforderbarer Endgegner) | gesperrt
   const zustandVon = (b) => {
     if (fortschritt.bots[b.id].sterne[0]) return 'besiegt';
-    if (istFreigeschaltet(b.stufe, fortschritt)) return 'aktuell';
+    if (b.id === naechster.id && !alleBesiegt) return 'aktuell';
+    if (istFreigeschaltet(b.stufe, fortschritt)) return 'offen';
     return 'gesperrt';
   };
-  const kurzName = (b) => KURZ[b.id] || b.name;
+  const kurzName = (b) => KURZ[b.id] || rufname(b);
 
   // ---------- Aufbau ----------
   const s = document.createElement('section');
@@ -269,17 +320,23 @@ export function zeige(root, params, app) {
   s.classList.add(querVorab ? 'karte-quer' : 'karte-hoch');
   s.innerHTML = `
     ${hauptKopf({
-    unter: alleBesiegt ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/30 Sterne` : 'Besiege alle 10 Bots',
+    unter: alleBesiegt ? `Arena bezwungen! ${gesamtSterne(fortschritt)}/${BOTS.length * 3} Sterne` : `Fünf Welten, ${BOTS.length} Bots`,
     chips: standardChips(fortschritt),
     knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: 'Verlauf' }],
   })}
     <div class="inhalt">
       <div class="karte" tabindex="-1" aria-label="Weltkarte">
+        <div class="weltwahl" role="group" aria-label="Welt wählen">
+          <button class="ww-pfeil dr" type="button" data-richtung="-1" aria-label="Vorige Welt">${icon('zurueck')}</button>
+          <div class="ww-mitte" aria-live="polite"><b class="ww-name"></b><span class="ww-unter"></span></div>
+          <button class="ww-pfeil dr" type="button" data-richtung="1" aria-label="Nächste Welt">${icon('vor')}</button>
+        </div>
         <div class="welt">
           <div class="welt-bild" aria-hidden="true"></div>
           <div class="ort-karte-boss" hidden></div>
           <div class="ort-karte-event" hidden></div>
           <div class="flo-figur" aria-hidden="true">${floAvatar(letzteFarbe === 'b' ? 'b' : 'w')}</div>
+          <div class="welt-sperre" hidden></div>
         </div>
       </div>
       <aside class="detail" aria-label="Gegner"></aside>
@@ -287,7 +344,8 @@ export function zeige(root, params, app) {
   root.append(s);
 
   const karte = s.querySelector('.karte');
-  const welt = s.querySelector('.welt');
+  const weltEl = s.querySelector('.welt');
+  const weltSperre = s.querySelector('.welt-sperre');
   const bild = s.querySelector('.welt-bild');
   const detail = s.querySelector('.detail');
   const floFigur = s.querySelector('.flo-figur');
@@ -297,31 +355,39 @@ export function zeige(root, params, app) {
   const kopfHandle = verbindeKopf(s, app, { beiEinstellungen: () => app.gehe('einstellungen') });
   orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
 
-  // ---------- Stationen ----------
-  const knoten = BOTS.map((b) => {
+  // ---------- Stationen (nur die der gezeigten Welt) ----------
+  let knoten = [];
+  const neuEingezogen = (b) => !fortschritt.bots[b.id].sterne[0] && b.stufe < bestSieg;
+  function baueKnoten() {
+    for (const el of knoten) el.remove();
+    knoten = LBOTS.map(baueStation);
+  }
+  function baueStation(b) {
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
     const el = document.createElement('button');
     el.type = 'button';
-    el.className = `stufe knoten ${z}${b.stufe === 10 ? ' boss' : ''}`;
+    el.className = `stufe knoten ${z}${b.endgegner ? ' boss' : ''}`;
     el.dataset.bot = b.id;
     el.style.setProperty('--bf', botFarbe(b));
     const sterne = fortschritt.bots[b.id].sterne;
     el.setAttribute('aria-label', knotenLabel(b, z));
     el.innerHTML = `
-      ${b.stufe === 10 ? '<span class="boss-krone">ENDGEGNER</span>' : ''}
+      ${b.endgegner ? '<span class="boss-krone">ENDGEGNER</span>' : ''}
       ${z === 'aktuell' && b.id === aktuellId ? '<span class="fahne">NÄCHSTER GEGNER</span>' : ''}
       ${z === 'besiegt' ? `<span class="k-sterne" aria-hidden="true">${kSterneHtml(sterne)}</span>` : ''}
       <span class="avatar"><img src="${esc(avatarVon(b))}" alt="" draggable="false"></span>
       <span class="k-nr zahl" aria-hidden="true">${b.stufe}</span>
       ${z === 'gesperrt' || b.id === neuId ? `<span class="schloss">${icon('schloss')}</span>` : ''}
+      ${z === 'offen' && neuEingezogen(b) ? '<span class="k-neu">NEU</span>' : ''}
       <span class="k-schild"><span class="k-name">${esc(kurzName(b))}</span><span class="k-meta zahl">${b.elo}</span></span>`;
     el.addEventListener('click', () => tippeKnoten(b, el));
-    welt.append(el);
+    weltEl.insertBefore(el, weltSperre);
     return el;
-  });
+  }
+  baueKnoten();
 
   function knotenLabel(b, z) {
-    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', gesperrt: 'gesperrt' }[z];
+    const zustandText = { besiegt: 'besiegt', aktuell: 'nächster Gegner', offen: neuEingezogen(b) ? 'neu eingezogen' : b.endgegner ? 'Endgegner, direkt herausfordern' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
     return `Stufe ${b.stufe}: ${b.name}, Elo ${b.elo}, ${zustandText}${z === 'besiegt' ? `, ${sterne.filter(Boolean).length} von 3 Sternen` : ''}`;
   }
@@ -330,9 +396,10 @@ export function zeige(root, params, app) {
     if (el.classList.contains('gesperrt')) {
       // den Bot nennen, den Flo jetzt spielen kann (der direkte Vorgaenger ist evtl. selbst gesperrt)
       const vorher = BOTS.find((x) => x.stufe === b.stufe - 1);
-      app.meldung(vorher && vorher.id === naechster.id
-        ? `Besiege erst ${vorher.name}.`
-        : `Gesperrt. Besiege zuerst ${naechster.name}, dann geht es Stufe für Stufe weiter.`);
+      const tor = weltFrei ? null : endgegnerDerWelt(weltNr - 1);
+      app.meldung(tor ? `Diese Welt öffnet sich mit einem Sieg gegen ${tor.name}.`
+        : vorher && vorher.id === naechster.id ? `Besiege erst ${vorher.name}.`
+          : `Gesperrt. Besiege zuerst ${naechster.name}, dann geht es Stufe für Stufe weiter.`);
       el.classList.remove('ruettel');
       void el.offsetWidth;
       el.classList.add('ruettel');
@@ -382,10 +449,12 @@ export function zeige(root, params, app) {
     s.classList.toggle('karte-hoch', !quer);
     const lage = LAGEN[modus];
     const w = kw;
+    weltEl.dataset.welt = welt.id;
+    weltEl.classList.toggle('gesperrt', !weltFrei);
     // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C;
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
     // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen
-    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 2.3 : 1.45)), kw < 600 ? WELT_MIN_H : 0);
+    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
     const sk = Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
@@ -396,19 +465,19 @@ export function zeige(root, params, app) {
       const ys = lage.stationen.map((p) => p[1]);
       const fMin = Math.min(...ys);
       const fMax = Math.max(...ys);
-      const oben = kn * 0.65 + 72;
+      const oben = kn * 0.65 + 118;   // Krone und Fahne des Endgegners unter der Weltwahl
       const unten = kn * 0.61 + 36;
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
     masse = { w, h, s: sk, y0, hy };
-    welt.style.width = w + 'px';
-    welt.style.height = h + 'px';
-    welt.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
+    weltEl.style.width = w + 'px';
+    weltEl.style.height = h + 'px';
+    weltEl.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
-    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy });
+    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy, szene: szeneVon(welt, modus) });
     const neuWeg = bild.querySelector('.w-fortschritt-neu');
     if (neuWeg && !wegGezeichnet) neuWeg.style.opacity = '0';
     // Stationen und Orte in Prozent der Welt (folgen damit jeder Groesse; hoch haengt y an der Abbildung)
@@ -441,12 +510,12 @@ export function zeige(root, params, app) {
     const lage = LAGEN[modus];
     // zuletzt bezwungen: die Station vor dem naechsten Gegner (alle besiegt: der Endgegner); waehrend des Freischaltens
     // noch die Station davor
-    const letzte = alleBesiegt ? BOTS.length - 1 : aktuellIdx - 1;
+    const letzte = weltFertig ? LBOTS.length - 1 : aktuellIdx - 1;
     const i = vorStation != null ? vorStation : (neuId && !wegGezeichnet ? idx(neuId) - 2 : letzte);
     const kn = 76 * masse.s;
     if (i < 0) return [lage.start[0] * masse.w + kn * 0.1, yVon(lage.start[1]) - kn * 0.45];
     const [fx, fy] = lage.stationen[i];
-    const gross = BOTS[i].id === aktuellId ? 1.22 : 1;
+    const gross = LBOTS[i].id === aktuellId ? 1.22 : 1;
     return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
   }
   function stelleFlo([x, y]) {
@@ -459,7 +528,8 @@ export function zeige(root, params, app) {
     const i = idx(id);
     if (i < 0) return;
     const y = yVon(LAGEN.hoch.stationen[i][1]);
-    const ziel = Math.max(0, Math.min(welt.offsetHeight - karte.clientHeight, y - karte.clientHeight * 0.55));
+    // Hoehe aus der Rechnung (masse.h), nicht offsetHeight: das gilt erst nach einer Transition (Bewegung aus: 0,01 ms)
+    const ziel = Math.max(0, Math.min((masse.h || weltEl.offsetHeight) - karte.clientHeight, y - karte.clientHeight * 0.55));
     if (sanft && !reduziert() && karte.scrollTo) {
       try { karte.scrollTo({ top: ziel, behavior: 'smooth' }); } catch (e) { karte.scrollTop = ziel; }
     } else karte.scrollTop = ziel;
@@ -471,13 +541,14 @@ export function zeige(root, params, app) {
     const lauf = ++panelLauf;
     const b = BOTS.find((x) => x.id === gewaehlt);
     const f = fortschritt.bots[b.id];
-    const mm = MERKMALE[b.id] || MERKMALE.benno;
+    const mm = b.merkmale || MERKMALE[b.id] || MERKMALE.benno;
     const z = b.id === neuId ? 'aktuell' : zustandVon(b);
     const st = statistik();
     const laufend = ladeLaufendePartie();
     // W0+a: auch angemeldete Bots (z. B. ein Boss), solange ihr Paket geladen ist (sonst gibt es keine laufende Partie)
     const laufBot = laufend ? botNachId(laufend.botId) : null;
-    const status = z === 'besiegt' ? 'Besiegt' : 'Nächster Gegner';
+    const status = z === 'besiegt' ? 'Besiegt' : z === 'aktuell' ? 'Nächster Gegner'
+      : neuEingezogen(b) ? 'Neu eingezogen' : b.endgegner ? 'Endgegner · direkt herausfordern' : 'Offen';
     const satz = begruessung(b);
     detail.style.setProperty('--bf', botFarbe(b));
     if (orte.oben) orte.oben.verlasse();
@@ -499,6 +570,7 @@ export function zeige(root, params, app) {
           <div class="av"><img src="${esc(avatarVon(b))}" alt=""></div>
           <div class="detail-name">
             <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">Stufe ${b.stufe} · ${status}</div>
+            <div class="detail-welt">Welt ${b.welt} · ${esc((WELTEN.find((w) => w.nr === b.welt) || {}).name || '')}</div>
             <h2 class="disp">${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>
             <div class="mini-sterne" aria-label="${f.sterne.filter(Boolean).length} von 3 Sternen">${kSterneHtml(f.sterne)}</div>
@@ -585,8 +657,8 @@ export function zeige(root, params, app) {
     for (const b of BOTS) fortschritt.bots[b.id] = neu.bots[b.id];
     const zahl = s.querySelector('.kopf-chips .chip .sr');
     if (zahl && zahl.nextSibling && zahl.nextSibling.nodeType === 3) zahl.nextSibling.textContent = ' ' + gesamtSterne(fortschritt);
-    if (alleBesiegt) s.querySelector('.logo-unter').textContent = `Arena bezwungen! ${gesamtSterne(fortschritt)}/30 Sterne`;
-    BOTS.forEach((b, i) => {
+    if (alleBesiegt) s.querySelector('.logo-unter').textContent = `Arena bezwungen! ${gesamtSterne(fortschritt)}/${BOTS.length * 3} Sterne`;
+    LBOTS.forEach((b, i) => {
       const el = knoten[i];
       const z = b.id === neuId ? 'aktuell' : zustandVon(b);
       const ks = el.querySelector('.k-sterne');
@@ -660,9 +732,9 @@ export function zeige(root, params, app) {
     try { einstellung = (app.einstellungen && app.einstellungen().duellIntro) || 'besondere'; } catch (e) { /* Standard */ }
     let erste = true;
     try { erste = !ladePartien().some((p) => p.botId === b.id); } catch (e) { erste = true; }
-    const anlass = b.stufe === 10 ? 'boss' : (erste ? 'erste' : null);
+    const anlass = b.endgegner ? 'boss' : (erste ? 'erste' : null);
     const art = duellArt({ einstellung, anlass, reduziert: reduziert() });
-    const von = detail.querySelector('.detail-kopf .av') || knoten[idx(b.id)].querySelector('.avatar');
+    const von = detail.querySelector('.detail-kopf .av') || (knoten[idx(b.id)] && knoten[idx(b.id)].querySelector('.avatar'));
     const duell = spieleDuell({ bot: b, farbe, anlass, von, art });
     await duell.bereit;
     if (weg) return;
@@ -782,15 +854,59 @@ export function zeige(root, params, app) {
       s.classList.remove('freischaltung');
       const fahne = el.querySelector('.fahne');
       if (fahne) fahne.getAnimations().forEach((a) => a.cancel());
-      app.meldung(`Neu freigeschaltet: ${BOTS[i].name}!`);
+      app.meldung(i === 0 && weltNr > 1 ? `Neue Welt offen: ${welt.name}!` : `Neu freigeschaltet: ${LBOTS[i].name}!`);
     }, FREI_DAUER_MS);
   }
+
+  // ---------- Weltwahl (Pfeile ueber der Karte) ----------
+  function zeichneWeltwahl() {
+    const ww = s.querySelector('.weltwahl');
+    ww.querySelector('.ww-name').textContent = welt.name;
+    const sterne = LBOTS.reduce((n, b) => n + fortschritt.bots[b.id].sterne.filter(Boolean).length, 0);
+    ww.querySelector('.ww-unter').textContent = !weltFrei ? `Welt ${weltNr} von ${WELTEN.length} · gesperrt`
+      : `Welt ${weltNr} von ${WELTEN.length} · ${sterne}/${LBOTS.length * 3} Sterne${hatWeltsiegel(weltNr, fortschritt) ? ' · Weltsiegel' : ''}`;
+    ww.classList.toggle('mit-siegel', hatWeltsiegel(weltNr, fortschritt));
+    ww.classList.toggle('gesperrt', !weltFrei);
+    for (const k of ww.querySelectorAll('.ww-pfeil')) {
+      const ziel = weltNr + Number(k.dataset.richtung);
+      k.disabled = !WELTEN.some((w) => w.nr === ziel);
+    }
+    // gesperrte Welt: ruhige Silhouette und wer sie oeffnet
+    const tor = endgegnerDerWelt(weltNr - 1);
+    weltSperre.hidden = weltFrei;
+    weltSperre.innerHTML = weltFrei ? '' : `<div class="ws-karte">${icon('schloss')}<b>${esc(welt.name)}</b>`
+      + `<span>${esc(welt.text)} Ein Sieg gegen ${esc(tor ? tor.name : 'den Endgegner davor')} öffnet sie.</span></div>`;
+  }
+  function wechsleWelt(nr) {
+    if (!WELTEN.some((w) => w.nr === nr) || nr === weltNr) return;
+    weltNr = nr;
+    welt = WELTEN.find((w) => w.nr === nr);
+    LBOTS = botsDerWelt(nr);
+    weltFrei = istWeltFrei(nr, fortschritt);
+    weltFertig = istWeltFertig();
+    aktuellIdx = weltFertig ? LBOTS.length - 1 : idx(naechster.id);
+    wegGezeichnet = true;
+    baueKnoten();
+    if (weltFrei && !LBOTS.some((b) => b.id === gewaehlt)) { gewaehlt = standardInWelt(); zeigeDetail(true, true); }
+    markiereGewaehlt();
+    zeichneWeltwahl();
+    layout();
+    karte.scrollTop = 0;
+    scrolleZu(idx(gewaehlt) >= 0 ? gewaehlt : (LBOTS[Math.max(0, aktuellIdx)] || LBOTS[0]).id, false);
+    try { klang.spiele('wechsel'); } catch (e) { /* still */ }
+    if (tempo() > 0) {
+      anim(bild, [{ opacity: 0.4 }, { opacity: 1 }], { d: 360, k: 'weich' });
+      knoten.forEach((el, i) => anim(el.querySelector('.avatar'), [{ opacity: 0, transform: 'translateY(-12px) scale(.7)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 60 + i * 40, k: 'hupf' }));
+    }
+  }
+  for (const k of s.querySelectorAll('.weltwahl .ww-pfeil')) k.addEventListener('click', () => wechsleWelt(weltNr + Number(k.dataset.richtung)));
 
   // ---------- Start ----------
   markiereGewaehlt();
   zeigeDetail(true);
   layout();
-  scrolleZu(neuId ? BOTS[Math.max(0, idx(neuId) - 1)].id : gewaehlt, false);
+  zeichneWeltwahl();
+  scrolleZu(neuId ? LBOTS[Math.max(0, idx(neuId) - 1)].id : (idx(gewaehlt) >= 0 ? gewaehlt : LBOTS[0].id), false);
   eintritt();
   if (neuId) freischalten();
   // Plaetze auf der Karte (Zelt des Wochen-Boss, Event-Fahne): ohne Anbieter unsichtbar

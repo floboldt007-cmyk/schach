@@ -362,3 +362,15 @@
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
 }
+
+/* ---------- Pfeil-Tipp (einmal je Geraet, js/ui/partie.js PFEIL_TIPP_MERKER): ruhige Zeile unter dem Brett ----------
+   Hoch (iPad und Handy) direkt unter dem Brett, quer in der Spalte unter der Zugliste. Kein Leuchten, nur Tokens. */
+.partie .pfeil-tipp { display: flex; align-items: center; gap: 8px; min-height: var(--tipp); padding: 0 4px 0 14px; border-radius: 16px;
+  background: var(--flaeche); box-shadow: var(--s1), var(--kante); color: var(--text-2); font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.partie .pfeil-tipp[hidden] { display: none; }
+.partie .pfeil-tipp .pt-text { flex: 1; min-width: 0; padding: 6px 0; }
+.partie .pt-ok { flex: none; min-height: var(--tipp); padding: 0 12px; margin: 0; border: 0; border-radius: 12px; background: none;
+  color: var(--akzent-text); font: inherit; font-weight: 700; cursor: pointer; }
+.partie .pt-ok:focus-visible { outline: var(--fokus); outline-offset: -2px; }
+@media (orientation: landscape) { .partie .pfeil-tipp { order: 3; } }
+@media (orientation: portrait) { .partie .pfeil-tipp { order: 2; } }

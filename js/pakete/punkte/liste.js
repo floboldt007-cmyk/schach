@@ -48,7 +48,7 @@ function el(tag, klasse, html) {
 }
 const schluesselText = (k) => `${String(k).slice(8, 10)}.${String(k).slice(5, 7)}.`;
 const datumText = (t) => schluesselText(tagSchluessel(t));
-const kurzName = (botId) => KURZNAME[botId] || (botNachId(botId) && botNachId(botId).name) || 'Gegner';
+const kurzName = (botId) => KURZNAME[botId] || (botNachId(botId) && (botNachId(botId).rufname || botNachId(botId).name)) || 'Gegner';
 const nameVon = (id) => tafelName(id, botNachId);
 const genauText = (g) => (Number.isFinite(g) ? `${String(Math.round(g * 10) / 10).replace('.', ',')} %` : null);
 
@@ -173,7 +173,7 @@ export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
 
 // ---------- Reiter Bots: je Bot eine Tafel ----------
 function tafelAuswahl(st) {
-  const aus = BOTS.map((b) => ({ id: 'bot:' + b.id, name: KURZNAME[b.id] || b.name, botId: b.id, stufe: b.stufe }));
+  const aus = BOTS.map((b) => ({ id: 'bot:' + b.id, name: KURZNAME[b.id] || b.rufname || b.name, botId: b.id, stufe: b.stufe }));
   for (const id of Object.keys(st.tafeln).sort()) {
     const z = T.zerlegeId(id);
     if (z && z.art === 'boss' && st.tafeln[id].eintraege.length) {

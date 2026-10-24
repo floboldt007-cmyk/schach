@@ -254,20 +254,28 @@ async function testEngine() {
 }
 
 // ---------------- Bots ----------------
+// Fuenf Welten zu je sechs Bots, Stufe = Elo / 100 (Welten-Bauplan 24.10.2026)
 const TABELLE = [
-  [1, 'Bauer Benno', 250], [2, 'Oma Hilde', 500], [3, 'Kalle vom Stammtisch', 800], [4, 'Lisa Läufer', 1000],
-  [5, 'Ritter Rudi', 1200], [6, 'Professor Turm', 1400], [7, 'Dame Delia', 1600], [8, 'Kommissar König', 1800],
-  [9, 'Großmeisterin Greta', 2100], [10, 'Der Stockfisch', 3000],
+  [1, 'Vogelscheuche Fridolin', 100], [2, 'Bauer Benno', 200], [3, 'Postbotin Paula', 300], [4, 'Imker Gustav', 400],
+  [5, 'Oma Hilde', 500], [6, 'Janine vom Scheunenclub', 600], [7, 'Holzfäller Bodo', 700], [8, 'Kalle vom Stammtisch', 800],
+  [9, 'Waldläufer Leo', 900], [10, 'Lisa Läufer', 1000], [11, 'Köhlerin Edda', 1100], [12, 'Ritter Rudi', 1200],
+  [13, 'Luke vom Marktplatz', 1300], [14, 'Professor Turm', 1400], [15, 'Zauberer Moritz', 1500], [16, 'Dame Delia', 1600],
+  [17, 'Bibliothekarin Ottilie', 1700], [18, 'Kommissar König', 1800], [19, 'Fischer Lasse', 1900],
+  [20, 'Hafenmeisterin Wiebke', 2000], [21, 'Großmeisterin Greta', 2100], [22, 'Wattführer Henning', 2200],
+  [23, 'Seenotretterin Ilka', 2300], [24, 'Johann vom Leuchtturm', 2400], [25, 'Taucher Keetan', 2500],
+  [26, 'Lotsin Ragna', 2600], [27, 'Schatzsucher Silas', 2700], [28, 'Forscherin Merle', 2800], [29, 'Hüterin Alva', 2900],
+  [30, 'Der Stockfisch', 3000],
 ];
+const bot = (id) => BOTS.find((b) => b.id === id);
 
 async function testBots() {
   log('--- Bots ---');
-  pruefe('10 Bots in der Leiter', BOTS.length === 10);
+  pruefe('30 Bots in der Leiter', BOTS.length === 30);
   pruefe('Stufen, Namen und Ziel-Elo laut Bauplan',
     TABELLE.every(([s, n, elo], i) => BOTS[i].stufe === s && BOTS[i].name === n && BOTS[i].elo === elo));
   const felder = ['id', 'stufe', 'name', 'elo', 'titel', 'avatar', 'farbe', 'kurz', 'bio', 'staerke', 'saetze'];
   pruefe('Alle Felder vorhanden', BOTS.every((b) => felder.every((f) => b[f] != null && b[f] !== '')));
-  pruefe('ids eindeutig', new Set(BOTS.map((b) => b.id)).size === 10);
+  pruefe('ids eindeutig', new Set(BOTS.map((b) => b.id)).size === BOTS.length);
   let satzOk = true;
   let satzInfo = '';
   for (const b of BOTS) {
@@ -284,7 +292,7 @@ async function testBots() {
   pruefe('Saetze mit echten Umlauten, keine ae/oe/ue-Ersatzschreibung in typischen Woertern',
     !alleSaetze.some((s) => /\b(fuer|schoen|ueber|Koenig|Laeufer|gruess|zurueck|muess)/i.test(s)), alleSaetze.length + ' Saetze');
 
-  const hilde = BOTS[1];
+  const hilde = bot('hilde');
   const s1 = botSatz(hilde, 'begruessung', () => 0);
   const s2 = botSatz(hilde, 'begruessung', () => 0);
   pruefe('botSatz liefert Satz aus der Liste', hilde.saetze.begruessung.includes(s1));
@@ -335,18 +343,20 @@ async function testBots() {
   const mattStellungen = MATT_IN_1_STELLUNGEN.filter((f) => {
     try { return new Chess(f).moves().some((m) => m.endsWith('#')); } catch (err) { return false; }
   });
+  // Ab Elo 1000 (Lisa) sieht jeder Bot Matt in 1 (siehtMatt in js/bots.js). Volle Staerke rechnet ohnehin sauber,
+  // dort reicht ein Versuch je Stellung (spart rund eine Sekunde Denkzeit je Zug).
   let ab4 = true;
-  for (const b of BOTS.slice(3)) {
+  for (const b of BOTS.filter((x) => x.elo >= 1000)) {
     for (const f of mattStellungen) {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < (b.staerke.voll ? 1 : 3); i++) {
         const r = await botZug(e, f, b, { ohnePause: true });
         if (!r.san.endsWith('#')) ab4 = false;
       }
     }
   }
-  pruefe('Ab Stufe 4 wird Matt in 1 nie uebersehen', ab4, mattStellungen.length + ' Stellungen x 3 je Bot');
+  pruefe('Ab Elo 1000 wird Matt in 1 nie uebersehen', ab4, mattStellungen.length + ' Stellungen x 3 je Bot (volle Staerke x 1)');
   const raten = [];
-  for (const b of BOTS.slice(0, 3)) {
+  for (const b of [bot('fridolin'), bot('benno'), bot('kalle')]) {
     let n = 0;
     let treffer = 0;
     for (const f of mattStellungen) {
@@ -359,7 +369,8 @@ async function testBots() {
     raten.push(b.name + ' ' + Math.round(100 * treffer / n) + ' %');
     BOTS_MATT[b.id] = treffer / n;
   }
-  pruefe('Stufe 1 bis 3 uebersehen Matt in 1 manchmal', BOTS_MATT.benno < 1 && BOTS_MATT.benno > 0 && BOTS_MATT.kalle >= BOTS_MATT.benno, raten.join(', '));
+  pruefe('Unter Elo 1000 wird Matt in 1 manchmal uebersehen (Fridolin, Benno), Kalle seltener',
+    BOTS_MATT.fridolin < 1 && BOTS_MATT.benno < 1 && BOTS_MATT.benno > 0 && BOTS_MATT.kalle >= BOTS_MATT.benno, raten.join(', '));
 
   // Denkzeit (mit Pause)
   let t = jetzt();
@@ -367,11 +378,11 @@ async function testBots() {
   const dz = jetzt() - t;
   pruefe('Denkzeit: menschliche Pause 400 bis 1500 ms', dz >= 390 && dz <= 1700 && Math.abs(r.denkzeitMs - dz) < 50, Math.round(dz) + ' ms');
   t = jetzt();
-  r = await botZug(e, '4k3/8/8/8/8/8/4r3/4K3 w - - 0 1', BOTS[5], {});
+  r = await botZug(e, '4k3/8/8/8/8/8/4r3/4K3 w - - 0 1', bot('turm'), {});
   pruefe('Denkzeit auch bei fast erzwungenem Zug mindestens 400 ms', jetzt() - t >= 390, Math.round(jetzt() - t) + ' ms');
   const ac = new AbortController();
   t = jetzt();
-  const abbruch = botZug(e, START, BOTS[2], { signal: ac.signal });
+  const abbruch = botZug(e, START, bot('kalle'), { signal: ac.signal });
   setTimeout(() => ac.abort(), 100);
   r = await abbruch;
   pruefe('Abbruch per signal liefert null', r === null && jetzt() - t < 400, Math.round(jetzt() - t) + ' ms');
@@ -379,7 +390,7 @@ async function testBots() {
   // Charakter: freie Dame schlagen
   const freieDame = 'rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3'; // Sxh4
   const quoten = [];
-  for (const b of [BOTS[0], BOTS[1], BOTS[3], BOTS[6]]) {
+  for (const b of [bot('benno'), bot('hilde'), bot('lisa'), bot('delia')]) {
     let n = 0;
     for (let i = 0; i < 20; i++) {
       const z = await botZug(e, freieDame, b, { ohnePause: true });
@@ -535,13 +546,13 @@ async function testStaerke({ proben = 3, parallel = 4 } = {}) {
     log(`Stufe ${String(b.stufe).padStart(2)} ${b.name.padEnd(22)} Ø-Verlust ${String(acpl).padStart(4)} cp  Ø-Chancenverlust ${chance.toFixed(3)}  Patzer ${Math.round(100 * w.patzer / w.n)} %  (n=${w.n})`);
   }
   const k = (s) => kurve[s - 1];
-  // Gruppen statt Einzelstufen: einzelne Stufen schwanken bei wenigen Proben zu stark
-  const gruppen = [[1, 2], [3, 4], [5, 6], [7, 8, 9], [10]];
+  // Gruppen statt Einzelstufen: einzelne Stufen schwanken bei wenigen Proben zu stark. Eine Gruppe je Welt.
+  const gruppen = [1, 2, 3, 4, 5].map((w) => BOTS.filter((b) => b.welt === w).map((b) => b.stufe));
   const mittel = gruppen.map((g) => g.reduce((x, s) => x + k(s).chanceVerlust, 0) / g.length);
-  pruefe('Staerke-Kurve faellt: Stufe 1-2 > 3-4 > 5-6 > 7-9 > 10 (Chancenverlust)',
+  pruefe('Staerke-Kurve faellt von Welt zu Welt (Chancenverlust)',
     mittel.every((m, i) => i === 0 || m < mittel[i - 1]), mittel.map((m) => m.toFixed(3)).join(' > '));
   pruefe('Stufe 1 laesst oft Material haengen (Patzer >= 20 %)', k(1).patzerQuote >= 0.2, Math.round(100 * k(1).patzerQuote) + ' %');
-  pruefe('Stufe 10 spielt nahezu fehlerfrei (Patzer 0 %, Ø-Verlust < 20 cp)', k(10).patzerQuote === 0 && k(10).acpl < 20, k(10).acpl + ' cp');
+  pruefe('Stufe 30 spielt nahezu fehlerfrei (Patzer 0 %, Ø-Verlust < 20 cp)', k(30).patzerQuote === 0 && k(30).acpl < 20, k(30).acpl + ' cp');
   return kurve;
 }
 
@@ -579,7 +590,7 @@ async function spielePartie(e, botW, botB, zuglimit) {
 
 // Pruefung: je Paar liegt die staerkere Stufe nicht hinten (>= 50 %), ueber alle Paare zusammen klar (>= 70 %).
 // Einzelne Paare mit nur 4 bis 6 Partien schwanken stark, deshalb die Summe als harte Grenze.
-async function testKalibrierung({ paare = [[1, 3], [3, 5], [5, 7], [7, 9]], partien = 6, zuglimit = 120, parallel = 4, minPaar = 0.5, minGesamt = 0.7 } = {}) {
+async function testKalibrierung({ paare = [[2, 8], [8, 12], [12, 16], [16, 21]], partien = 6, zuglimit = 120, parallel = 4, minPaar = 0.5, minGesamt = 0.7 } = {}) {
   log(`--- Kalibrierung: ${partien} Partien je Paar, Zuglimit ${zuglimit} Halbzuege ---`);
   const aufgaben = [];
   for (const [schwach, stark] of paare) {
@@ -625,9 +636,9 @@ async function testKalibrierung({ paare = [[1, 3], [3, 5], [5, 7], [7, 9]], part
 
 // Grober Vergleich mit Stockfishs eigener Bremse (UCI_Elo). Nur Bericht, keine Pruefung:
 // der Elo-Regler ist bei kurzer Bedenkzeit selbst nicht sauber gestaffelt.
-async function testAnker({ paare = [[4, 1320], [6, 1400], [7, 1600], [8, 1800], [9, 2100]], partien = 4, parallel = 4 } = {}) {
+async function testAnker({ paare = [[10, 1320], [14, 1400], [16, 1600], [18, 1800], [21, 2100]], partien = 4, parallel = 4 } = {}) {
   log(`--- Vergleich mit Stockfish UCI_Elo (${partien} Partien je Paar) ---`);
-  const sf = (elo) => ({ id: 'sf' + elo, stufe: 10, name: 'Stockfish ' + elo, staerke: { voll: true, movetime: 200, elo } });
+  const sf = (elo) => ({ id: 'sf' + elo, stufe: 30, name: 'Stockfish ' + elo, staerke: { voll: true, movetime: 200, elo } });
   const aufgaben = [];
   for (const [stufe, elo] of paare) for (let i = 0; i < partien; i++) aufgaben.push({ stufe, elo, botWeiss: i % 2 === 0 });
   const erg = [];

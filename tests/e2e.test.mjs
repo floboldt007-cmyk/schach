@@ -1,8 +1,8 @@
 // Ende-zu-Ende-Test der ganzen App wie auf GitHub Pages: ein kleiner Node-Server liefert den
 // Projektordner unter /schach/ aus (Port 8833), Chromium mit iPad-Viewport und Touch.
-// Ablauf: Arena -> Sieg gegen Benno (Matt in 1) -> Overlay -> Analyse (sofort fertig) ->
+// Ablauf: Arena -> Sieg gegen Benno (Schaefermatt) -> Overlay -> Analyse (sofort fertig) ->
 // Naechster Gegner / Nochmal -> Verlauf -> Analyse -> Einstellungen (Holz, Klang aus) ->
-// Arena zeigt Hilde frei -> echte Partie gegen Hilde per Tippen (Live-Bewertung) ->
+// Arena zeigt Paula frei -> echte Partie gegen Paula per Tippen (Live-Bewertung) ->
 // Neuladen und Zurueck-Wisch auf jedem Screen -> offline neu laden (App + Engine laufen) ->
 // Update auf eine neue Version (Hinweis "Neu laden" und Wechsel beim naechsten Start).
 // Prueft ausserdem den Cache des Service Workers gegen die Liste in sw.js, keine 404,
@@ -286,7 +286,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   gruppe = 'Start';
   await seite.goto(APP + '#arena');
   await h.screen('arena');
-  pruefe('Arena unter /schach/ geladen', await seite.locator('.screen.arena .knoten').count() === 10);
+  pruefe('Arena unter /schach/ geladen (eine Welt mit sechs Stationen)', await seite.locator('.screen.arena .knoten').count() === 6);
   pruefe('Seitentitel', (await seite.title()) === 'Crownmate');
   const links = await seite.evaluate(() => ({
     manifest: document.querySelector('link[rel="manifest"]')?.href,
@@ -354,14 +354,14 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
 // ---------- 2. Sieg gegen Benno, Overlay, Analyse, Naechster Gegner, Nochmal ----------
 async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
-  pruefe('Benno ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="benno"]').count() === 1);
-  pruefe('Hilde ist gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
+  pruefe('Fridolin ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Paula ist gesperrt', await seite.locator('.knoten.gesperrt[data-bot="paula"]').count() === 1);
   await schaefermatt(seite, h, { pruefeHash: true });
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
   await warte(2600);
   pruefe('Overlay "Sieg!"', /^Sieg!$/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Drei Sterne', await seite.locator('.erg-stern.an').count() === 3);
-  pruefe('Kachel: Oma Hilde freigeschaltet', /Oma Hilde/.test(await seite.locator('.erg-frei').innerText()));
+  pruefe('Kachel: Postbotin Paula freigeschaltet (nach Benno ist Paula frei)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
   const partien = await h.partien();
   const id = partien[0] && partien[0].id;
   pruefe('Partie gespeichert', partien.length === 1 && partien[0].ergebnis === 'sieg', JSON.stringify(partien).slice(0, 120));
@@ -378,7 +378,7 @@ async function testeSieg(seite, h, fehler) {
   await h.screen('analyse');
   pruefe('Hash #analyse/<id>', (await h.hash()) === '#analyse/' + id);
   pruefe('Sofort fertig (kein Rechnen dank vorab)', await seite.locator('.an-laden').count() === 0 && await seite.locator('.an-inhalt').count() === 1);
-  pruefe('Freischalt-Banner: Oma Hilde', /Oma Hilde/.test(await seite.locator('.an-banner').innerText()));
+  pruefe('Freischalt-Banner: Postbotin Paula', /Postbotin Paula/.test(await seite.locator('.an-banner').innerText()));
   // gezeigt wird genau die gespeicherte Genauigkeit der Partie (auf ihr beruht Stern 2), mit Komma
   const genau = await seite.locator('.an-genau .an-ich-wert').innerText();
   const gespeichert = ((await h.partien())[0] || {}).genauigkeit;
@@ -392,10 +392,10 @@ async function testeSieg(seite, h, fehler) {
   gruppe = 'Nächster Gegner';
   await h.tippe('[data-aktion="weiter"]');
   await h.screen('arena');
-  pruefe('Arena mit Freischalt-Animation', await seite.locator('.knoten.wird-frei[data-bot="hilde"]').count() === 1);
-  pruefe('Panel zeigt Hilde', /Oma Hilde/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Arena mit Freischalt-Animation', await seite.locator('.knoten.wird-frei[data-bot="paula"]').count() === 1);
+  pruefe('Panel zeigt Paula', /Postbotin Paula/.test(await seite.locator('.detail h2').innerText()));
   await warte(3000);
-  pruefe('Hilde frei und aktuell', await seite.locator('.knoten.aktuell[data-bot="hilde"]:not(.gesperrt)').count() === 1);
+  pruefe('Paula frei und aktuell', await seite.locator('.knoten.aktuell[data-bot="paula"]:not(.gesperrt)').count() === 1);
   await seite.goBack();
   await h.screen('analyse');
   pruefe('Zurück-Wisch: wieder in der Analyse', (await h.hash()) === '#analyse/' + id && await seite.locator('.an-inhalt').count() === 1);
@@ -403,11 +403,11 @@ async function testeSieg(seite, h, fehler) {
   await h.screen('arena');
   await warte(300);
   pruefe('Vorwärts: keine zweite Freischalt-Animation', await seite.locator('.knoten.wird-frei').count() === 0);
-  pruefe('Vorwärts: Hilde bleibt gewählt', /Oma Hilde/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Vorwärts: Paula bleibt gewählt', /Postbotin Paula/.test(await seite.locator('.detail h2').innerText()));
   await seite.reload();
   await h.screen('arena');
   await warte(300);
-  pruefe('Neuladen der Arena: keine Animation, Hilde gewählt', await seite.locator('.knoten.wird-frei').count() === 0 && /Oma Hilde/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Neuladen der Arena: keine Animation, Paula gewählt', await seite.locator('.knoten.wird-frei').count() === 0 && /Postbotin Paula/.test(await seite.locator('.detail h2').innerText()));
 
   gruppe = 'Nochmal';
   await seite.goBack();
@@ -461,21 +461,21 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   await seite.goBack();
   await h.screen('arena');
   pruefe('Zurück-Wisch: Arena', (await h.hash()) === '#arena');
-  pruefe('Arena zeigt Hilde frei', await seite.locator('.knoten[data-bot="hilde"]:not(.gesperrt)').count() === 1
-    && await seite.locator('.knoten[data-bot="hilde"] .schloss').count() === 0);
-  pruefe('Kalle noch gesperrt', await seite.locator('.knoten.gesperrt[data-bot="kalle"]').count() === 1);
+  pruefe('Arena zeigt Paula frei', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
+    && await seite.locator('.knoten[data-bot="paula"] .schloss').count() === 0);
+  pruefe('Gustav noch gesperrt', await seite.locator('.knoten.gesperrt[data-bot="gustav"]').count() === 1);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
 }
 
-// ---------- 4. Echte Partie gegen Hilde per Tippen ----------
+// ---------- 4. Echte Partie gegen Paula per Tippen ----------
 async function testePartie(seite, h, fehler) {
   gruppe = 'Partie';
-  await h.tippe('.knoten[data-bot="hilde"]');
+  await h.tippe('.knoten[data-bot="paula"]');
   await h.tippe('.farbwahl [data-farbe="w"]');
   await h.tippe('.detail [data-aktion="spielen"]');
   await h.screen('partie');
   await h.warteBereit();
-  pruefe('Partie gegen Oma Hilde', /Hilde/.test(await seite.locator('.screen.partie .kopf').innerText()));
+  pruefe('Partie gegen Postbotin Paula', /Paula/.test(await seite.locator('.screen.partie .kopf').innerText()));
   const hell = await seite.evaluate(() => getComputedStyle(document.querySelector('.screen.partie .feld.h')).backgroundColor);
   pruefe('Brettfarbe Holz wirkt in der Partie', hell === 'rgb(240, 217, 181)', hell);
   pruefe('Klang aus wirkt (klang.aus)', await seite.evaluate(async () => (await import('./js/sounds.js')).klang.aus === true));
@@ -502,7 +502,7 @@ async function testePartie(seite, h, fehler) {
   await h.screen('arena');
   pruefe('Zurück-Wisch aus der Partie: Arena mit "Fortsetzen"', await seite.locator('.detail .fortsetzen [data-aktion="fortsetzen"]').count() === 1);
   const lauf = await h.laufend();
-  pruefe('Laufende Partie gesichert', lauf && lauf.botId === 'hilde' && lauf.zuege.length === zuege.length);
+  pruefe('Laufende Partie gesichert', lauf && lauf.botId === 'paula' && lauf.zuege.length === zuege.length);
   await seite.goForward();
   await h.screen('partie');
   await h.warteBereit();
@@ -548,10 +548,10 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   // "Nochmal" in der Analyse ueberschreibt die pausierte Partie nicht ungefragt
   await h.tippe('[data-aktion="nochmal"]');
   await seite.waitForSelector('.dialog-ort .dialog', { timeout: 5000 });
-  pruefe('Nochmal fragt nach, wenn eine Partie pausiert ist', /offene Partie gegen Oma Hilde/.test(await seite.locator('.dialog').innerText()));
+  pruefe('Nochmal fragt nach, wenn eine Partie pausiert ist', /offene Partie gegen Postbotin Paula/.test(await seite.locator('.dialog').innerText()));
   await h.tippe('.dialog-knoepfe .knopf:not(.primaer)');
   await warte(300);
-  pruefe('Abbrechen: Analyse bleibt, Partie bleibt gespeichert', (await h.hash()) === '#analyse/' + id && (await h.laufend()) && (await h.laufend()).botId === 'hilde');
+  pruefe('Abbrechen: Analyse bleibt, Partie bleibt gespeichert', (await h.hash()) === '#analyse/' + id && (await h.laufend()) && (await h.laufend()).botId === 'paula');
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await h.screen('verlauf');
   pruefe('Offline: Verlauf-Screen', await seite.locator('.vl-zeile').count() >= 1);
@@ -562,7 +562,7 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   const neu = await kontext.newPage();
   await neu.goto(START);
   await neu.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
-  pruefe('Offline: Start über ./ (wie vom Home-Bildschirm)', await neu.locator('.screen.arena .knoten').count() === 10);
+  pruefe('Offline: Start über ./ (wie vom Home-Bildschirm)', await neu.locator('.screen.arena .knoten').count() === 6);
   await neu.close();
   // (die Update-Pruefung des Browsers auf sw.js laeuft an der Offline-Simulation vorbei: zaehlt nicht)
   const abrufe = serverLog.slice(vorher).filter((l) => l.pfad !== PRAEFIX + 'sw.js');
@@ -588,7 +588,7 @@ async function testeAufgabe(seite, h, fehler) {
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
   pruefe('Overlay: Niederlage mit Genauigkeit', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
     && /\d/.test(await seite.locator('.erg-genau b').innerText()));
-  const p = (await h.partien()).find((x) => x.botId === 'hilde');
+  const p = (await h.partien()).find((x) => x.botId === 'paula');
   pruefe('Partie mit Analyse gespeichert', p && p.zuege.length === n && Number.isFinite(p.genauigkeit)
     && await seite.evaluate((i) => localStorage.getItem('schach-arena:v1:review:' + i) != null, p && p.id));
   await h.tippe('.erg-knoepfe [data-ziel="analyse"]');
@@ -599,7 +599,7 @@ async function testeAufgabe(seite, h, fehler) {
   await h.tippe('[data-aktion="nochmal"]');
   await h.screen('partie');
   await h.warteBereit();
-  pruefe('Nochmal: neue Partie gegen Hilde mit Weiß', /Hilde/.test(await seite.locator('.screen.partie .kopf').innerText())
+  pruefe('Nochmal: neue Partie gegen Paula mit Weiß', /Paula/.test(await seite.locator('.screen.partie .kopf').innerText())
     && await seite.locator('.screen.partie .brett[data-ausrichtung="w"]').count() === 1 && (await h.zuege()).length === 0);
   await h.tippe('.screen.partie [data-aktion="zurueck"]');
   await h.screen('arena');
@@ -650,7 +650,7 @@ async function testeUpdate(seite, h, fehler) {
 // ---------- 8. Schluss-Bilder aller Screens (iPad quer und hoch) ----------
 async function bilder(browser, id) {
   gruppe = 'Bilder';
-  // Stand aus dem Ablauf: eine gewonnene Partie, Hilde frei; dazu ein paar Sterne wie im Mockup
+  // Stand aus dem Ablauf: eine gewonnene Partie, Paula frei; dazu ein paar Sterne wie im Mockup
   for (const vp of [{ name: 'ipad-quer', w: 1180, h: 820 }, { name: 'ipad-hoch', w: 820, h: 1180 }]) {
     const { kontext, seite, fehler } = await neuerKontext(browser, vp);
     const h = hilfen(seite);
@@ -665,7 +665,7 @@ async function bilder(browser, id) {
     pruefe(`${vp.name}: Arena ohne Überlauf`, u.seite <= 0 && u.screen <= 0, JSON.stringify(u));
     await seite.screenshot({ path: path.join(BILDER, `final-arena-${vp.name}.png`) });
 
-    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'hilde', farbe: 'w' }));
+    await seite.evaluate(() => window.__app.gehe('partie', { botId: 'paula', farbe: 'w' }));
     await h.screen('partie');
     await h.warteBereit();
     await h.warteFlo();
@@ -797,7 +797,7 @@ try {
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
   speicher = await seite.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('schach-arena:') && !k.endsWith(':laufend')).map((k) => [k, localStorage.getItem(k)])));
-  const lang = (JSON.parse(speicher['schach-arena:v1:partien'] || '[]').find((p) => p.botId === 'hilde') || {}).id;
+  const lang = (JSON.parse(speicher['schach-arena:v1:partien'] || '[]').find((p) => p.botId === 'paula') || {}).id;
   await kontext.close();
   if (!OHNE_BILDER) await bilder(browser, lang || id);
   const schlecht = ergebnisse.filter((r) => !r.ok);

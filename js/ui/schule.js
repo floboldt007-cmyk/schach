@@ -396,8 +396,8 @@ export function zeige(root, params = {}, app) {
         ? f.haeufigste_fehler.arten.slice(0, 2).map((a) => `${fehlerArtName(a.art)} ${a.anzahl}`).join(' · ') : '';
       const zellen = [
         m.anzeigename,
-        f ? zahl(f.bots_besiegt) + ' / 10' : '–',
-        f ? zahl(f.sterne) + ' / 30' : '–',
+        f ? zahl(f.bots_besiegt) + ' / ' + BOTS.length : '–',
+        f ? zahl(f.sterne) + ' / ' + BOTS.length * 3 : '–',
         f ? zahl(f.partien) : '–',
         f && f.genauigkeit_schnitt != null ? zahl(f.genauigkeit_schnitt, 1) + ' %' : '–',
         fehler || '–',

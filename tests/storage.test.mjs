@@ -1,7 +1,7 @@
 // Tests fuer js/storage.js (Node, ohne Browser): node tests/storage.test.mjs
 import {
   setzeSpeicher, ladeEinstellungen, speichereEinstellungen, STANDARD_EINSTELLUNGEN, EINSTELLUNG_WERTE,
-  ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne,
+  ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne, hoechsterSieg, istWeltFrei, hatWeltsiegel,
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
   ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
@@ -72,7 +72,7 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   const std = ladeEinstellungen();
   const erwartet = {
     klangpaket: '', lautstaerke: 0.8, klangstufe: 'alle', zugBestaetigen: 'aus', haltenAufgeben: true, turmRochade: false,
-    autoDame: true, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
+    autoDame: false, steuerung: 'beides', bewegung: 'normal', thema: 'modern', modus: 'system', koordLage: 'ecke', pfeile: true,
     duellIntro: 'besondere', figuren: 'cburnett', coachStil: 'ausfuehrlich', sprueche: 'an',
   };
   pruefe('U1: Standards der neuen Einstellungen (Klangstufe alle nach D4, Duell-Intro besondere nach D3)',
@@ -106,7 +106,7 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   // oder nicht: einmal auf 'aus'. 'immer' bleibt, und wer nach der Umstellung 'ohneUhr' waehlt, behaelt es.
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'holz', zugBestaetigen: 'ohneUhr' }));
   const m1 = ladeEinstellungen();
-  pruefe('Fassung 2: alter Stand mit ohneUhr -> aus, andere Werte bleiben, Fassung 2', m1.zugBestaetigen === 'aus' && m1.brett === 'holz' && m1.fassung === 2, m1);
+  pruefe('Fassung 2: alter Stand mit ohneUhr -> aus, andere Werte bleiben, jetzt Fassung 3', m1.zugBestaetigen === 'aus' && m1.brett === 'holz' && m1.fassung === 3, m1);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'immer' }));
   pruefe('Fassung 2: alter Stand mit immer bleibt immer', ladeEinstellungen().zugBestaetigen === 'immer');
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 2 }));
@@ -114,10 +114,18 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ brett: 'gruen', zugBestaetigen: 'ohneUhr' }));
   const m2 = speichereEinstellungen({ zugBestaetigen: 'ohneUhr' });
   const m2roh = JSON.parse(s.getItem('schach-arena:v1:einstellungen'));
-  pruefe('Fassung 2: nach der Umstellung gewaehltes ohneUhr wird mit Fassung 2 gespeichert und bleibt', m2.zugBestaetigen === 'ohneUhr' && m2roh.fassung === 2
+  pruefe('Fassung 2: nach der Umstellung gewaehltes ohneUhr wird mit Fassung 2 gespeichert und bleibt', m2.zugBestaetigen === 'ohneUhr' && m2roh.fassung === 3
     && ladeEinstellungen().zugBestaetigen === 'ohneUhr' && ladeEinstellungen().brett === 'gruen', m2roh);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ zugBestaetigen: 'ohneUhr', fassung: 'zwei' }));
   pruefe('Fassung 2: kaputte Fassung zaehlt als alt', ladeEinstellungen().zugBestaetigen === 'aus');
+  // Fassung 3 (24.10.): "Automatisch Dame" Standard aus (Flo will die Figur waehlen); alte Staende mit an -> aus, danach bleibt an
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ autoDame: true, fassung: 2, brett: 'holz' }));
+  const m3 = ladeEinstellungen();
+  pruefe('Fassung 3: alter Stand mit Automatisch Dame an -> aus, anderes bleibt', m3.autoDame === false && m3.brett === 'holz' && m3.fassung === 3, m3);
+  s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ autoDame: true, fassung: 3 }));
+  pruefe('Fassung 3: danach gewaehltes Automatisch Dame bleibt an', ladeEinstellungen().autoDame === true);
+  s.removeItem('schach-arena:v1:einstellungen');
+  pruefe('Fassung 3: neuer Stand ohne Eintrag: Auswahl bei der Umwandlung (aus)', ladeEinstellungen().autoDame === false);
   s.setItem('schach-arena:v1:einstellungen', JSON.stringify({ lautstaerke: 0.333, klanggruppen: [false, false] }));
   const g = ladeEinstellungen();
   pruefe('U1: Lautstaerke auf 0,05 gerundet, Klanggruppen als Liste ignoriert', g.lautstaerke === 0.35 && Object.values(g.klanggruppen).every((x) => x === true), g);
@@ -164,9 +172,10 @@ pruefe('Einstellungen: falsche Typen/Werte ignoriert, Tiefe begrenzt', e.brett =
 s = fakeSpeicher();
 setzeSpeicher(s);
 let f = ladeFortschritt();
-pruefe('Fortschritt: leer, 10 Bots', Object.keys(f.bots).length === 10 && gesamtSterne(f) === 0);
+pruefe('Fortschritt: leer, 30 Bots (Welten)', Object.keys(f.bots).length === 30 && gesamtSterne(f) === 0);
 pruefe('Freischaltung: nur Stufe 1 frei', istFreigeschaltet(1, f) && !istFreigeschaltet(2, f) && hoechsteFreieStufe(f) === 1);
-pruefe('Naechster Gegner: Benno', naechsterGegner(f).id === 'benno');
+pruefe('Naechster Gegner: Fridolin (Welten: Stufe 1)', naechsterGegner(f).id === 'fridolin');
+pruefe('Welten: der Endgegner der ersten Welt ist direkt herausforderbar, die Stufen dazwischen nicht', istFreigeschaltet(6, f) && !istFreigeschaltet(5, f) && !istFreigeschaltet(7, f) && !istFreigeschaltet(12, f));
 
 pruefe('Sterne: Niederlage 0', JSON.stringify(sterneFuerPartie(partie({ ergebnis: 'niederlage' }))) === '[false,false,false]');
 pruefe('Sterne: Sieg 79,9 % mit Hinweis', JSON.stringify(sterneFuerPartie(partie({ genauigkeit: 79.9, hinweise: 1 }))) === '[true,false,false]');
@@ -178,12 +187,12 @@ let r = speicherePartie(partie({ ergebnis: 'niederlage', genauigkeit: 50 }));
 f = ladeFortschritt();
 pruefe('Niederlage: keine Sterne, nicht frei', !r.neuFreigeschaltet && gesamtSterne(f) === 0 && f.bots.benno.niederlagen === 1 && f.bots.benno.partien === 1);
 
-// Sieg mit Hinweis -> Stern 1, Lisa? nein: Hilde frei
+// Sieg mit Hinweis gegen Benno (Stufe 2) -> Stern 1 und 2, frei bis Paula (Stufe 3, der naechste Gegner)
 r = speicherePartie(partie({ genauigkeit: 85, hinweise: 1 }), { zuege: [{ ply: 0, farbe: 'w', san: 'e4', klasse: 'brillant' }, { ply: 1, farbe: 'b', san: 'e5', klasse: 'brillant' }] });
 f = ladeFortschritt();
-pruefe('Sieg mit Hinweis: Sterne 1+2 neu, Hilde frei', JSON.stringify(r.neueSterne) === '[true,true,false]' && r.neuFreigeschaltet && r.neuFreigeschaltet.id === 'hilde', r);
-pruefe('Freischaltung: Stufe 2 frei, 3 nicht', istFreigeschaltet(2, f) && !istFreigeschaltet(3, f) && hoechsteFreieStufe(f) === 2 && besiegteBots(f) === 1);
-pruefe('Naechster Gegner: Hilde', naechsterGegner(f).id === 'hilde');
+pruefe('Sieg mit Hinweis: Sterne 1+2 neu, Paula frei', JSON.stringify(r.neueSterne) === '[true,true,false]' && r.neuFreigeschaltet && r.neuFreigeschaltet.id === 'paula', r.neuFreigeschaltet && r.neuFreigeschaltet.id);
+pruefe('Freischaltung: bis Stufe 3 frei (Fridolin darunter auch), 4 nicht', istFreigeschaltet(1, f) && istFreigeschaltet(3, f) && !istFreigeschaltet(4, f) && hoechsteFreieStufe(f) === 3 && besiegteBots(f) === 1);
+pruefe('Naechster Gegner: Paula (ueber dem besten Sieg, nicht zurueck zu Fridolin)', naechsterGegner(f).id === 'paula');
 pruefe('Brillant-Sammlung: nur eigene Zuege', r.brillant === 1 && f.bots.benno.besteGenauigkeit === 85 && f.brillanteZuege.length === 1);
 const id2 = r.partie.id;
 pruefe('Review gespeichert', hatReview(id2) && ladeReview(id2).zuege.length === 2);
@@ -210,6 +219,38 @@ pruefe('Eigene Zuege: Weiss 3 von 5, Schwarz 2 von 5, Schwarz ab FEN 3 von 5',
   loeschePartie(kurzId);
 }
 
+// ---------- Welten (Flo 23.10.): Freischaltung ueber den besten Sieg, Endgegner direkt, Weltsiegel ----------
+{
+  const merk = s;
+  const w = fakeSpeicher();
+  setzeSpeicher(w);
+  const sieg3 = { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 };
+  const sieg1 = { ...sieg3, sterne: [true, false, false] };
+  // alter Spielstand bis Grossmeisterin Greta (frueher Stufe 9, jetzt 21): alles darunter bleibt frei, auch neue Bots
+  w.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { benno: sieg1, hilde: sieg1, kalle: sieg1, lisa: sieg1, rudi: sieg1,
+    turm: sieg1, delia: sieg1, koenig: sieg1, greta: sieg1 } }));
+  let fw = ladeFortschritt();
+  pruefe('Welten: alter Stand bis Greta: Fridolin, Paula und Henning frei, Ilka nicht, naechster Gegner Henning',
+    istFreigeschaltet(1, fw) && istFreigeschaltet(3, fw) && istFreigeschaltet(22, fw) && !istFreigeschaltet(23, fw)
+    && naechsterGegner(fw).id === 'henning' && hoechsteFreieStufe(fw) === 22);
+  pruefe('Welten: Endgegner der eigenen Welt (Johann, 24) direkt frei, die Stockfisch-Tiefe noch zu',
+    istFreigeschaltet(24, fw) && istWeltFrei(4, fw) && !istWeltFrei(5, fw) && !istFreigeschaltet(25, fw) && !istFreigeschaltet(30, fw));
+  // frischer Stand: Endgegner Janine direkt besiegt -> ganze Welt 1 und Bodo (Welt 2) frei, Bodo ist der naechste Gegner
+  w.removeItem('schach-arena:v1:fortschritt');
+  const rj = speicherePartie(partie({ botId: 'janine', botStufe: 6, genauigkeit: 85 }));
+  fw = ladeFortschritt();
+  pruefe('Welten: Sieg gegen den Endgegner direkt oeffnet die ganze Welt und die naechste (neu frei: Bodo)',
+    [2, 3, 4, 5, 7].every((st) => istFreigeschaltet(st, fw)) && !istFreigeschaltet(8, fw) && istWeltFrei(2, fw)
+    && rj.neuFreigeschaltet && rj.neuFreigeschaltet.id === 'bodo' && naechsterGegner(fw).id === 'bodo', rj.neuFreigeschaltet && rj.neuFreigeschaltet.id);
+  // Weltsiegel: alle 18 Sterne der Welt
+  w.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { fridolin: sieg3, benno: sieg3, paula: sieg3, gustav: sieg3, hilde: sieg3, janine: sieg1 } }));
+  pruefe('Welten: Weltsiegel erst mit allen 18 Sternen', !hatWeltsiegel(1, ladeFortschritt()));
+  w.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { fridolin: sieg3, benno: sieg3, paula: sieg3, gustav: sieg3, hilde: sieg3, janine: sieg3 } }));
+  pruefe('Welten: Weltsiegel mit allen 18 Sternen, gesamt 90 moeglich', hatWeltsiegel(1, ladeFortschritt()) && !hatWeltsiegel(2, ladeFortschritt())
+    && gesamtSterne(ladeFortschritt()) === 18 && hoechsterSieg(ladeFortschritt()) === 6);
+  setzeSpeicher(merk);
+}
+
 // ---------- Partien ----------
 const liste = ladePartien();
 pruefe('Partien: neueste zuerst', liste.length === 3 && liste[0].datum > liste[1].datum && liste[1].datum > liste[2].datum);
@@ -226,7 +267,7 @@ setzeSpeicher(s);
   const sofort = speicherePartie(partie({ genauigkeit: null, hinweise: 1 }));
   let fs = ladeFortschritt();
   pruefe('Sofort gespeichert: Sieg und Freischaltung gebucht, Stern 2 offen', JSON.stringify(sofort.neueSterne) === '[true,false,false]'
-    && sofort.neuFreigeschaltet && sofort.neuFreigeschaltet.id === 'hilde' && fs.bots.benno.sterne[1] === false);
+    && sofort.neuFreigeschaltet && sofort.neuFreigeschaltet.id === 'paula' && fs.bots.benno.sterne[1] === false);
   const review = { genauigkeit: { w: 86.5, b: 70 }, spielstaerke: { w: 1600, b: 300 }, eroeffnung: 'Spanisch',
     zuege: [{ ply: 4, farbe: 'w', san: 'Nxf7', klasse: 'brillant' }, { ply: 5, farbe: 'b', san: 'Kxf7', klasse: 'gut' }] };
   const nach = ergaenzeAnalyse(sofort.partie.id, review);
@@ -373,7 +414,7 @@ pruefe('Reviews: nur die neuesten ' + MAX_REVIEWS, mit.length === MAX_REVIEWS &&
 
 // Grenze 6500 (vorher 6000): seit w0-fix traegt jeder Datensatz genauigkeitQuelle und analysiert (ca. 48 Zeichen),
 // sonst passte nicht einmal die neueste Analyse neben die Liste; die Pruefung selbst bleibt gleich
-s = fakeSpeicher(6500);
+s = fakeSpeicher(9000);   // Welten: der Fortschritt hat 30 statt 10 Bots (gut 2000 Zeichen mehr; geht von 8700 bis ueber 9500)
 setzeSpeicher(s);
 const gross = { zuege: Array.from({ length: 10 }, (_, i) => ({ ply: i, farbe: 'w', klasse: 'gut', coach: 'x'.repeat(100) })) };
 const ids2 = [];
@@ -479,7 +520,7 @@ setzeSpeicher(s);
   const n = speicherePartie(partie({ genauigkeit: 91, maxSerie: 7.2 }), brillantReview);
   fs = ladeFortschritt();
   pruefe('normale Partie: wertet true, bucht wie bisher', n.wertet === true && JSON.stringify(n.neueSterne) === '[true,true,true]'
-    && n.neuFreigeschaltet && n.neuFreigeschaltet.id === 'hilde' && fs.bots.benno.partien === 1 && n.brillant === 1);
+    && n.neuFreigeschaltet && n.neuFreigeschaltet.id === 'paula' && fs.bots.benno.partien === 1 && n.brillant === 1);
   pruefe('normale Partie: modus normal, maxSerie gerundet, kein ziel', ladePartie(n.partie.id).modus === 'normal' && ladePartie(n.partie.id).maxSerie === 7
     && !('ziel' in ladePartie(n.partie.id)));
   const nNochmal = ergaenzeAnalyse(n.partie.id, { genauigkeit: { w: 93, b: 10 }, zuege: [] });
@@ -716,7 +757,7 @@ setzeSpeicher(s);
   const sieg = speicherePartie(partie({ genauigkeit: 90 }));
   const fs = ladeFortschritt();
   pruefe('Reihenfolge: Fortschritt vor der Liste (Sieg und Freischaltung gebucht)', fs.bots.benno.sterne[0] === true && fs.bots.benno.siege === 1
-    && sieg.neuFreigeschaltet && sieg.neuFreigeschaltet.id === 'hilde', fs.bots.benno);
+    && sieg.neuFreigeschaltet && sieg.neuFreigeschaltet.id === 'paula', fs.bots.benno);
   pruefe('Liste scheitert: speicher:fehler fuer die Partienliste', fehlerEreignisse.length === 1 && fehlerEreignisse[0].schluessel === 'schach-arena:v1:partien', fehlerEreignisse);
 
   // anderer Fehler als "voll" (z. B. gesperrter Speicher): grund fehler

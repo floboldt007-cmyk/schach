@@ -103,8 +103,8 @@ pruefe('Grenzen im Schema = GRENZEN in js/schule.js (60 Mitglieder, 20 Klassen, 
   && /t\.user_id = uid\) >= 10 then/.test(fn('schule_tritt_bei').rumpf) && GRENZEN.mitgliedschaften === 10
   && /t\.klasse = k\.id\) >= 30 then/.test(fn('schule_aufgabe_anlegen').rumpf) && GRENZEN.aufgaben === 30
   && /v_zahl > 100/.test(fn('schule_aufgabe_anlegen').rumpf) && GRENZEN.anzahl === 100);
-const sqlBots = ((fn('schule_aufgabe_anlegen').rumpf.match(/not in \(('benno'[\s\S]*?)\)/) || [])[1] || '').match(/'([a-z]+)'/g) || [];
-pruefe('Bot-Aufgaben: genau die zehn Bots der Leiter aus js/bots.js', JSON.stringify(sqlBots.map((b) => b.slice(1, -1))) === JSON.stringify(BOTS.map((b) => b.id)), sqlBots);
+const sqlBots = ((fn('schule_aufgabe_anlegen').rumpf.match(/\(v_ziel ->> 'bot'\) not in \(([\s\S]*?)\)/) || [])[1] || '').match(/'([a-z]+)'/g) || [];
+pruefe('Bot-Aufgaben: genau die Bots der Leiter aus js/bots.js (Welten: dreissig)', JSON.stringify(sqlBots.map((b) => b.slice(1, -1))) === JSON.stringify(BOTS.map((b) => b.id)), sqlBots);
 pruefe('Arten: bot, raetsel, partien (Tabelle, Funktion, js/schule.js)', JSON.stringify(ARTEN) === '["bot","raetsel","partien"]'
   && /art in \('bot', 'raetsel', 'partien'\)/.test(ohne) && /v_art not in \('bot', 'raetsel', 'partien'\)/.test(fn('schule_aufgabe_anlegen').rumpf));
 pruefe('Fehlerarten: dieselben vier Zugklassen-IDs im Schema und in js/schule.js',

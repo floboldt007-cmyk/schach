@@ -559,13 +559,16 @@ gruppe = 'Bot-Läufe (vorläufig, 3.13 „Schon in S1 nicht leer“)';
   pruefe('daten/punkte/bot-laeufe.json: Kopf art „bot-laeufe“, Format 1, Rechenstand der Formel und der App, Inhalt gültig, klein (unter 8 KB)',
     kopfOk.ok && datei.kopf.format === 1 && datei.kopf.rechenstand === F.STAND && datei.kopf.rechenstand === RECHENSTAND && S.pruefeBotLaeufe(datei).length === 0
     && roh.length < 8000 && datei.quelle && datei.quelle.vorlaeufig === true && datei.quelle.tiefe === 14, { kopf: datei.kopf, fehler: S.pruefeBotLaeufe(datei), laenge: roh.length });
-  // Nachbarn: Stufe k spielt gegen k - 1 und k + 1 (Benno nur gegen Hilde, Greta nur gegen Koenig, Stockfisch gegen niemanden)
-  const leiter = BOTS.filter((b) => b.stufe >= 1 && b.stufe <= 9);
-  const erwartet = Object.fromEntries(leiter.map((b) => [`bot:${b.id}`, leiter.filter((x) => Math.abs(x.stufe - b.stufe) === 1).map((x) => x.id).sort().join()]));
+  // Nachbarn der Eichungs-Leiter (zehn Bots, 23.10.): Benno gegen Hilde, Hilde gegen Kalle, ... Koenig gegen Greta, je in
+  // beide Richtungen; der Stockfisch hat keine Tafel. Welten (24.10.): die zwanzig neuen Bots haben noch keine Laeufe,
+  // ihre Tafeln zeigen den Leer-Zustand ("Erste Partie"), bis die Eichung der Welten ihre Nachbar-Partien rechnet.
+  const alt = ['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta'];
+  const erwartet = Object.fromEntries(alt.map((id, i) => [`bot:${id}`, [alt[i - 1], alt[i + 1]].filter(Boolean).sort().join()]));
   const ist = Object.fromEntries(Object.entries(datei.tafeln).map(([t, l]) => [t, [...new Set(l.map((x) => x.bot))].sort().join()]));
-  pruefe('Jede Leiter-Tafel hat ihre Nachbar-Bots als Gäste (Benno und Greta je einen), die Stockfisch-Tafel noch keinen',
-    JSON.stringify(ist) === JSON.stringify(Object.fromEntries(Object.keys(ist).map((k) => [k, erwartet[k]]))) && Object.keys(ist).length === 9
-    && !ist['bot:stockfisch'], { ist, erwartet });
+  pruefe('Jede Tafel der Eichungs-Leiter hat ihre alten Nachbarn als Gäste, die Stockfisch-Tafel und die neuen Bots (noch) keine',
+    JSON.stringify(Object.keys(ist).sort()) === JSON.stringify(Object.keys(erwartet).sort()) && Object.keys(ist).every((k) => ist[k] === erwartet[k])
+    && !ist['bot:stockfisch'] && Object.keys(ist).every((k) => BOTS.some((b) => `bot:${b.id}` === k)),
+    { ohneTafel: Object.keys(erwartet).filter((k) => !(k in ist)).join(' '), abweichend: Object.keys(ist).filter((k) => ist[k] !== erwartet[k]).map((k) => `${k}: Datei ${ist[k]}, erwartet ${erwartet[k]}`) });
   const paare = Object.values(datei.tafeln).flatMap((l) => [...new Set(l.map((x) => x.bot))].map((b) => [l.find((x) => x.bot === b && x.lauf === 'best'), l.find((x) => x.bot === b && x.lauf === 'mittel')]));
   pruefe('Je Nachbar ein bester und ein mittlerer Lauf (bester ≥ mittlerer), ganze Punkte, Farbe, Ergebnis und Züge dabei',
     paare.every(([b, m]) => b && Number.isInteger(b.w) && b.w >= 0 && (!m || (Number.isInteger(m.w) && m.w <= b.w))) && paare.filter(([, m]) => m).length >= 14
@@ -1016,8 +1019,8 @@ async function testeBrowser(browser) {
     && /Hier landet jeder neue Rekord/.test(await seite.locator('.bl-rekordbuch').innerText()));
   await h.reiter('bots');
   const leerBots = await seite.locator('.bl-tafel').innerText();
-  pruefe('Bots leer: Tafel des nächsten Gegners mit Satz und „Erste Partie: Benno, Weiß“', /Bennos Tafel/.test(leerBots) && /Noch keine Partie auf Bennos Tafel/.test(leerBots)
-    && /Erste Partie: Benno, Weiß/.test(leerBots), leerBots);
+  pruefe('Bots leer: Tafel des nächsten Gegners (Fridolin) mit Satz und „Erste Partie: Fridolin, Weiß“', /Fridolins Tafel/.test(leerBots) && /Noch keine Partie auf Fridolins Tafel/.test(leerBots)
+    && /Erste Partie: Fridolin, Weiß/.test(leerBots), leerBots);
   await bild(seite, 'bestenliste-leer-1180');
   await h.reiter('freunde');
   pruefe('Freunde: ohne eigene Partie kein Teilen, Einlesen geht, Fenster-Segment ausgeblendet', /Sobald du eine Partie auf einer Tafel hast/.test(await seite.locator('.bl-teilen').innerText())
@@ -1323,6 +1326,12 @@ async function testeBrowser(browser) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { botLaeufe: 'echt' });
     const hs = hilfen(s);
     await s.goto(MIT() + '#arena');
+    await s.waitForSelector('.screen.arena');
+    // Welten: Benno ist erst nach einem Sieg gegen Fridolin frei und dann der naechste Gegner (seine Tafel steht in der Datei,
+    // und nur ein freier Bot hat den Knopf "Erste Partie")
+    await s.evaluate(() => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { fridolin: { sterne: [true, false, false], partien: 1,
+      siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 60 } }, brillanteZuege: [] })));
+    await s.reload();
     await s.waitForSelector('.screen.arena');
     await s.waitForFunction(() => window.__punkte && window.__punkte.S.botLaeufe('bot:benno').length > 0, null, { timeout: 10000 }).catch(() => {});
     await hs.bestenliste({ reiter: 'bots' });
