@@ -21,22 +21,30 @@ import { segment } from './bauteile.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../storage.js';
+import { t } from '../sprache.js';
+import '../sprachen/rahmen.js';
 
-const FENSTER = [{ id: 'woche', text: 'Woche' }, { id: 'monat', text: 'Monat' }, { id: 'allzeit', text: 'Allzeit' }];
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Zeitfenster; die Namen kommen erst beim Zeichnen (t('rahmen.bestenliste.<id>'))
+const FENSTER = [{ id: 'woche' }, { id: 'monat' }, { id: 'allzeit' }];
+function fensterOptionen() {
+  return FENSTER.map((f) => ({ id: f.id, text: t('rahmen.bestenliste.' + f.id) }));
+}
 
 function zeigeBestenliste(root, params = {}, app) {
   const s = document.createElement('section');
   s.className = 'screen bl-screen';
-  s.setAttribute('aria-label', 'Bestenliste');
+  s.setAttribute('aria-label', t('rahmen.bestenliste.titel'));
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
     <div class="bl-rumpf">
-      ${seitenKopf({ ueber: 'Jede Zeile eine echte Partie', titel: 'Bestenliste',
-    text: 'Deine besten Partien gegen jeden Bot, Woche für Woche. Freunde vergleichst du per Code, ganz ohne Server.' })}
+      ${seitenKopf({ ueber: t('rahmen.bestenliste.ueber'), titel: t('rahmen.bestenliste.titel'),
+    text: t('rahmen.bestenliste.text') })}
       <div class="bl-steuer"><div class="bl-steuer-reiter"></div><div class="bl-steuer-fenster"></div></div>
       <div class="bl-ort"></div>
       <div class="bl-leer-screen t-karte" hidden>
         <span class="t-symbol" aria-hidden="true">${icon('podest')}</span>
-        <div><h2>Die Bestenliste kommt mit der nächsten Welle</h2><p>Bis dahin warten die Bots in der Arena.</p></div>
+        <div><h2>${esc(t('rahmen.bestenliste.leerTitel'))}</h2><p>${esc(t('rahmen.bestenliste.leerText'))}</p></div>
       </div>
     </div>`;
   root.append(s);
@@ -52,7 +60,7 @@ function zeigeBestenliste(root, params = {}, app) {
 
   const ort = s.querySelector('.bl-ort');
   const platzReiter = s.querySelector('.bl-steuer-reiter');
-  const fensterSeg = segment({ name: 'bl-fenster', label: 'Zeitraum', optionen: FENSTER, wert: fenster,
+  const fensterSeg = segment({ name: 'bl-fenster', label: t('rahmen.bestenliste.zeitraum'), optionen: fensterOptionen(), wert: fenster,
     beiWahl: (id) => { fenster = id; merke(); fuelleOrt(); } });
   s.querySelector('.bl-steuer-fenster').append(fensterSeg.el);
   let reiterSeg = null;
@@ -81,7 +89,7 @@ function zeigeBestenliste(root, params = {}, app) {
       platzReiter.replaceChildren();
       reiterSeg = null;
       if (alle.length > 1) {
-        reiterSeg = segment({ name: 'bl-reiter', label: 'Bereich', wert: reiter,
+        reiterSeg = segment({ name: 'bl-reiter', label: t('rahmen.bestenliste.bereich'), wert: reiter,
           optionen: alle.map((x) => ({ id: x.dataset.reiter, text: x.dataset.name || x.dataset.reiter })),
           beiWahl: (id) => { reiter = id; merke(); fuelleOrt(); } });
         platzReiter.append(reiterSeg.el);

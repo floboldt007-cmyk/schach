@@ -30,6 +30,8 @@ import { ladePartien, ladePartie, hatReview, ergaenzeAnalyse, eigeneZuege, werte
 import { botNachId, eloDerPartie } from './bots.js';
 import { sende } from './ereignisse.js';
 import { melde } from './feier.js';
+import { t, zahl } from './sprache.js';
+import './sprachen/rahmen.js';
 
 const versucht = new Set();
 let lauf = null;
@@ -58,7 +60,8 @@ export function offenePartien({ max = 2, aus = 10 } = {}) {
 // eine eigene Aufgabe im Hauptthread (die Arena bleibt bedienbar)
 const frei = () => new Promise((r) => setTimeout(r, 0));
 
-const komma = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+// eine Nachkommastelle mit dem Komma der Sprache (de 87,5 | en 87.5)
+const komma = (x) => zahl(Math.round(x * 10) / 10, { maximumFractionDigits: 1, useGrouping: false });
 
 export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
   if (lauf) lauf.stop();
@@ -121,8 +124,8 @@ export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
         try {
           melde({
             partieId: p.id, quelle: 'stern-nachgeholt', art: 'zeile', prio: 40,
-            titel: bot ? `Neuer Stern gegen ${bot.name}` : 'Neuer Stern',
-            text: Number.isFinite(g) ? `Nachträglich ausgewertet: ${komma(g)} % Genauigkeit.` : 'Nachträglich ausgewertet.',
+            titel: bot ? t('rahmen.nachholen.sternGegen', { name: bot.name }) : t('rahmen.nachholen.stern'),
+            text: Number.isFinite(g) ? t('rahmen.nachholen.genauigkeit', { wert: komma(g) }) : t('rahmen.nachholen.ohneGenauigkeit'),
           });
         } catch (e) { console.error(e); }
       }

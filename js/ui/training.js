@@ -13,20 +13,25 @@ import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
+import { t } from '../sprache.js';
+import '../sprachen/allgemein.js';
+import '../sprachen/rahmen.js';
+
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen training-screen';
-  s.setAttribute('aria-label', 'Training');
+  s.setAttribute('aria-label', t('allgemein.training'));
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
     <div class="training-rumpf">
-      ${seitenKopf({ ueber: 'Üben ohne Druck', titel: 'Training', text: 'Kurze Rätsel, deine eigenen Fehler als Karten und nichts, was abläuft.' })}
+      ${seitenKopf({ ueber: t('rahmen.training.ueber'), titel: t('rahmen.training.titel'), text: t('rahmen.training.text') })}
       <div class="training-gitter" data-anzahl="0"></div>
       <div class="training-leer t-karte" hidden>
         <span class="t-symbol" aria-hidden="true">${icon('ziel')}</span>
-        <div><h2>Training kommt mit der nächsten Welle</h2>
-          <p>Hier stehen bald Rätsel, ein Lernpfad und deine eigenen Fehler als Karten. Bis dahin warten die Bots in der Arena.</p></div>
-        <div class="t-fuss"><button class="knopf dr" type="button" data-aktion="arena">Zur Arena ${icon('vor')}</button></div>
+        <div><h2>${esc(t('rahmen.training.leerTitel'))}</h2>
+          <p>${esc(t('rahmen.training.leerText'))}</p></div>
+        <div class="t-fuss"><button class="knopf dr" type="button" data-aktion="arena">${esc(t('rahmen.zurArena'))} ${icon('vor')}</button></div>
       </div>
     </div>`;
   root.append(s);
