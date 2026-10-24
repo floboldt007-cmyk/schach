@@ -2284,8 +2284,12 @@ Deutsch ist die Quelle, Englisch die zweite Sprache (24.10.2026, Teil 1 Kern und
   (`js/bots.js`), Zugklassen (`js/zugklassen.js`) und Gedaechtnis-Saetze liefern ihre Texte ueber Getter in der
   eingestellten Sprache; Aufrufer bleiben unveraendert. Gespeicherte Texte (Feier-Zeilen, Coach-Saetze in Analysen,
   Namen) bleiben in der Sprache, in der sie entstanden sind.
-- **Einstellung** `sprache` (`'de'` | `'en'`, Standard `'de'`), Wahl in den Einstellungen unter "Anzeige" (`SPRACHWAHL`),
-  ein Wechsel laedt die Seite neu. `?sprache=en` schaltet ebenfalls um und merkt es sich. `<html lang>` folgt.
+- **Einstellung** `sprache` (`'de'` | `'en'`) gilt nur mit `spracheGewaehlt: true`. Ohne eigene Wahl (Standard) nimmt die
+  App die Sprache des Geraets (`geraeteSprache()`: erste deutsche oder englische Geraetesprache, sonst Region DE/AT/LI
+  deutsch, sonst englisch; kein Standort, kein Netz). Wahl in den Einstellungen unter "Anzeige": Geraet, Deutsch,
+  English; ein Wechsel laedt die Seite neu. `?sprache=en` schaltet ebenfalls um und merkt es sich als Wahl. Alte Staende:
+  `'en'` bleibt Wahl, das alte Standard-Deutsch folgt dem Geraet. Automatisierte Laeufe (`navigator.webdriver`, `?test`)
+  bleiben ohne Wahl deutsch, `?autosprache` prueft das Geraete-Verhalten. `<html lang>` folgt.
 - **Tests:** `tests/sprache.test.mjs` (Node: API, gleiche Schluessel und Platzhalter in beiden Sprachen, kein HTML, keine
   langen Gedankenstriche, keine Zugklassen-Namen fremder Schachseiten, kein `t()` auf Modulebene; Browser: alle
   Screens auf Englisch ohne deutsche Woerter, Umlaute und rohe Schluessel, ohne Ueberlauf, hell und dunkel, iPad und

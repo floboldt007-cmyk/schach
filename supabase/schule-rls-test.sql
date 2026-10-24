@@ -327,8 +327,8 @@ begin
     jsonb_build_array(current_setting('schule.aufgabe1')));
   -- ungueltige Meldungen
   begin
-    perform public.schule_melde_fortschritt(11, 7, 12);
-    raise exception 'FEHLER: 11 besiegte Bots angenommen';
+    perform public.schule_melde_fortschritt(31, 7, 12);
+    raise exception 'FEHLER: 31 besiegte Bots angenommen';
   exception when raise_exception then
     if sqlerrm <> 'SCHULE_FORTSCHRITT_UNGUELTIG' then raise; end if;
   end;

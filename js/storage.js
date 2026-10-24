@@ -172,7 +172,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   // Daten (DSGVO): Partien und anonyme Nutzung mit dem Betreiber teilen, nur angemeldet und nur ausdruecklich
   datenfreigabe: 'aus',  // 'aus' | 'an' (Opt-in, Standard aus)
   // Sprache der Oberflaeche (js/sprache.js); Deutsch ist die Quelle
-  sprache: 'de',         // 'de' | 'en'
+  sprache: 'de',         // 'de' | 'en' (gilt nur mit spracheGewaehlt; sonst die Sprache des Geraets, js/sprache.js)
+  spracheGewaehlt: false, // true: in den Einstellungen (oder per ?sprache=) gewaehlt; false: Sprache des Geraets
   // Fassung des gespeicherten Stands (fuer einmalige Umstellungen in ladeEinstellungen)
   fassung: 3,
 });
@@ -304,6 +305,9 @@ export function ladeEinstellungen() {
   // Fassung 3 (24.10.): "Automatisch Dame" war Standard an und stand so in jedem Stand; Flo will bei der Umwandlung die
   // Figur waehlen. Einmal auf aus; wer es danach anschaltet, behaelt es.
   if (roh && typeof roh === 'object' && !(Number(roh.fassung) >= 3) && e.autoDame === true) e.autoDame = false;
+  // Sprache nach Geraet (24.10.): Vorher war Deutsch der Standard und stand in jedem gespeicherten Stand. Nur Englisch
+  // kann also bewusst gewaehlt sein: das bleibt als Wahl, alles andere folgt ab jetzt dem Geraet.
+  if (roh && typeof roh === 'object' && typeof roh.spracheGewaehlt !== 'boolean' && roh.sprache === 'en') e.spracheGewaehlt = true;
   e.fassung = STANDARD_EINSTELLUNGEN.fassung;
   if (!THEMA_ID.test(e.thema)) e.thema = STANDARD_EINSTELLUNGEN.thema;
   e.tiefe = Number.isFinite(e.tiefe) ? Math.max(8, Math.min(20, Math.round(e.tiefe))) : STANDARD_EINSTELLUNGEN.tiefe;

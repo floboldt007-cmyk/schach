@@ -141,6 +141,14 @@ pruefe('schule-rls-test.sql: anon, Leitung, Mitglieder, Fremde, zweite Leitung, 
     'f3333333-3333-4333-8333-333333333333', 'd4444444-4444-4444-8444-444444444444'].every((u) => test.includes(`"sub":"${u}"`))
   && ['SCHULE_KLASSE_VOLL', 'SCHULE_ZU_VIELE_KLASSEN', 'SCHULE_ZU_VIELE_VERSUCHE', 'SCHULE_NAME_VERGEBEN', 'SCHULE_KLASSE_GESCHLOSSEN']
     .every((k) => test.includes(`'${k}'`)) && /delete from auth\.users where id = 'a1111111/.test(test));
+{
+  // Grenze besiegter Bots: der Test muss knapp ueber der Grenze des Schemas pruefen (Welten: 30 Bots; vorher stand im
+  // Test noch die alte Grenze 10, und der Lauf im SQL Editor brach mit "11 besiegte Bots angenommen" ab)
+  const grenze = Number((sql.match(/v_bots > (\d+)/) || [])[1]);
+  const imTest = Number((test.match(/schule_melde_fortschritt\((\d+), 7, 12\);\s*raise exception 'FEHLER: \d+ besiegte Bots angenommen'/) || [])[1]);
+  pruefe('schule-rls-test.sql: prueft die Bot-Grenze des Schemas (eins darueber)', grenze === 30 && imTest === grenze + 1
+    && /check \(bots_besiegt between 0 and 30\)/.test(sql), { grenze, imTest });
+}
 pruefe('schule-rls-test.sql: jede Kennung des Schemas kommt im Test vor (ausser SCHULE_KEIN_CODE)',
   kennungen.filter((k) => k !== 'SCHULE_KEIN_CODE').every((k) => test.includes(k)), kennungen.filter((k) => !test.includes(k)));
 

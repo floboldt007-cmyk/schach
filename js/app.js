@@ -68,7 +68,7 @@ import { waehle } from './orte.js';
 import { wendeThemaAn, themaVon, aktuellesThema } from './thema.js';
 import { setzeBewegung, starteDruck, anim, tempo } from './bewegung.js';
 import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
-import { setzeSprache, SPRACHEN, t } from './sprache.js';
+import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import './konto.js';
@@ -107,7 +107,7 @@ const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 function wendeEinstellungenAn(e) {
   // Sprache zuerst (die Screens zeichnen danach mit t()); ein Wechsel zur Laufzeit laedt die Seite neu (Einstellungen)
-  setzeSprache(e.sprache);
+  setzeSprache(e.spracheGewaehlt ? e.sprache : spracheOhneWahl());
   klang.aus = !e.klang;
   // Premium-Umbau: Klang-Einstellungen (Paket, Lautstaerke, Stufe, Gruppen), sobald sounds.js sie kennt (U3)
   if (typeof klang.einstellen === 'function') {
@@ -922,13 +922,24 @@ function setzeSichtbar() {
 
 // ---------- Start ----------
 
-// Englische Version (Teil 1): ?sprache=en schaltet um und merkt es sich (?sprache=de zurueck), solange die Wahl in den
-// Einstellungen noch nicht sichtbar ist (SPRACHWAHL in js/sprache.js)
+// ?sprache=en schaltet um und merkt es sich als Wahl (?sprache=de zurueck); wie die Wahl in den Einstellungen
 function spracheAusAdresse() {
   try {
     const s = new URLSearchParams(location.search).get('sprache');
-    if (s && SPRACHEN.includes(s) && ladeEinstellungen().sprache !== s) speichereEinstellungen({ sprache: s });
+    const e = ladeEinstellungen();
+    if (s && SPRACHEN.includes(s) && (e.sprache !== s || !e.spracheGewaehlt)) speichereEinstellungen({ sprache: s, spracheGewaehlt: true });
   } catch (e) { /* egal */ }
+}
+
+// Ohne eigene Wahl gilt die Sprache des Geraets (js/sprache.js geraeteSprache). Automatisierte Laeufe (Tests, ?test)
+// bleiben deutsch, damit die Suiten nicht von der Sprache des Rechners abhaengen; ?autosprache prueft das Verhalten.
+function spracheOhneWahl() {
+  try {
+    const suche = location.search || '';
+    const automat = (typeof navigator !== 'undefined' && navigator.webdriver === true) || /[?&]test\b/.test(suche);
+    if (automat && !/[?&]autosprache\b/.test(suche)) return 'de';
+  } catch (e) { return 'de'; }
+  return geraeteSprache();
 }
 
 // Lade-Screen aus index.html (steht, bis die Pakete geladen sind) in der gewaehlten Sprache
