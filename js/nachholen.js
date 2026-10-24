@@ -60,8 +60,8 @@ export function offenePartien({ max = 2, aus = 10 } = {}) {
 // eine eigene Aufgabe im Hauptthread (die Arena bleibt bedienbar)
 const frei = () => new Promise((r) => setTimeout(r, 0));
 
-// eine Nachkommastelle mit dem Komma der Sprache (de 87,5 | en 87.5)
-const komma = (x) => zahl(Math.round(x * 10) / 10, { maximumFractionDigits: 1, useGrouping: false });
+// eine Nachkommastelle mit dem Komma der Sprache (de 87,5 | en 87.5); || 0: nie "-0" (wie vorher String())
+const komma = (x) => zahl(Math.round(x * 10) / 10 || 0, { maximumFractionDigits: 1, useGrouping: false });
 
 export function starteNachholen(app, { max = 2, beiPartie = null } = {}) {
   if (lauf) lauf.stop();

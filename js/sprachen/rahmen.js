@@ -162,7 +162,7 @@ registriereTexte('rahmen', {
     'training.titel': 'Training',
     'training.text': 'Short puzzles, your own slip-ups as cards, and nothing that expires.',
     'training.leerTitel': 'Training arrives with the next update',
-    'training.leerText': 'Soon you will find puzzles, a learning path and your own slip-ups as cards here. Until then, the bots are waiting in the Arena.',
+    'training.leerText': 'Soon you will find puzzles, a learning path, and your own slip-ups as cards here. Until then, the bots are waiting in the Arena.',
     'bestenliste.titel': 'Leaderboard',
     'bestenliste.ueber': 'Every row is a real game',
     'bestenliste.text': 'Your best games against every bot, week by week. Compare with friends using a code, no server needed.',
