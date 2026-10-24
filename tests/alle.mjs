@@ -51,6 +51,7 @@ const SUITEN = [
   { name: 'teilen', datei: 'teilen.test.mjs', args: [], was: 'Paket teilen: Siegesbild (Welle A1)' },
   { name: 'gedaechtnis', datei: 'gedaechtnis.test.mjs', args: [], was: 'Paket gedaechtnis: Bots erinnern sich, Revanche, Erzfeind (Welle A2)' },
   { name: 'kartei', datei: 'kartei.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Paket kartei: Fehler-Kartei und Rätsel-Bildschirm (Welle A3)' },
+  { name: 'tagesraetsel', datei: 'tagesraetsel.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Paket tagesraetsel: Rätsel des Tages, Archiv, Ein Wort, Teilen (S1-5)' },
   { name: 'start', datei: 'start.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Paket start: Willkommen, Regel-Hilfe, Einstufung, Fahrplan (Welle A4)' },
   { name: 'app', datei: 'app.test.mjs', args: SCHNELL ? ['--schnell'] : [], was: 'Arena, Partie, Ergebnis' },
   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },

@@ -165,6 +165,7 @@ export function zeige(root, params = {}, app) {
             <li><b>chess.js 1.4.0</b><span>Schachregeln, BSD-2-Clause</span></li>
             <li><b>Figuren „cburnett“</b><span>von Colin M. L. Burnett, GPLv2+</span></li>
             <li><b>Schriften Manrope und Bricolage Grotesque</b><span>SIL Open Font License 1.1: <a href="${esc(pfad('assets/schriften/OFL-Manrope.txt'))}" target="_blank" rel="noopener">Manrope</a>, <a href="${esc(pfad('assets/schriften/OFL-Bricolage-Grotesque.txt'))}" target="_blank" rel="noopener">Bricolage Grotesque</a></span></li>
+            <li><b>Tagesrätsel</b><span>Eigene Rätsel, mit Stockfish geprüft. Entstanden aus Partien der Engine gegen sich selbst und eigenen Lehr-Stellungen, keine Rätsel aus fremden Sammlungen.</span></li>
             <li><b>Klänge „Holz“ und „Arcade“</b><span>Eigene Werke, alle Rechte vorbehalten, nur zur Nutzung in dieser App</span></li>
             <li><b>Avatare, Zug-Symbole und App-Icon</b><span>Für dieses Projekt entstanden, GPL-3.0</span></li>
           </ul>

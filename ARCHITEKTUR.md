@@ -2464,6 +2464,44 @@ Dateien: `js/pakete/kartei/index.js` (Orte, Ereignisse, Raetsel-Quelle), `logik.
   dem Dateinamen). Mit der Kartei in `PAKETE` muessen beide trotzdem in `DATEIEN` (die Integration setzt
   `SCREEN_PAKET.raetsel` auf `kartei` oder traegt sie von Hand ein), sonst fehlt der Bildschirm offline.
 
+## Paket tagesraetsel (S1-5): jeden Tag ein Raetsel, fuer alle dasselbe
+
+Dateien: `js/pakete/tagesraetsel/index.js` (Orte, Ereignis, Raetsel-Quelle, Inhaltsart), `logik.js` (rein, Node-testbar,
+kein `Math.random`, keine Uhr), `css/pakete/tagesraetsel.css` (nur Tokens, `link[data-paket="tagesraetsel"]`), die Raetsel
+in `daten/raetsel/tagesraetsel.json` (art `tagesraetsel`, format 1) aus `werkzeuge/raetsel-fabrik.mjs`. Tests:
+`tests/tagesraetsel.test.mjs` (Paket), `tests/tagesraetsel-daten.test.mjs` (Datei und Fabrik).
+
+- **Eigene Raetsel.** Die Fabrik erzeugt Stellungen aus Partien der Engine gegen sich selbst (gebremst, fester Seed)
+  und aus eigenen Lehr-Stellungen (`daten/raetsel/eigene.json`) und prueft jede mit Stockfish (eindeutiger bester Zug,
+  1 bis 4 eigene Zuege, am Ende Matt oder klarer Gewinn). Keine fremden Raetsel-Sammlungen. In den Einstellungen unter
+  "Info und Lizenzen": "Eigene Rätsel, mit Stockfish geprüft".
+- **Aus dem Datum.** Tag k der Datei gehoert zu `start + k` (`start` ist ein Montag, Grenze 4:00 aus `tag.js`). Nach dem
+  letzten Tag geht es in ganzen Wochen von vorn, die Nummer ("Rätsel 291") zaehlt weiter. Wochenkurve der Datei: Montag
+  Stufe 1 bis 2, jeden Tag schwerer bis Samstag 6 bis 7, Sonntag zwei Teile.
+- **Loesen** im Raetsel-Bildschirm, Quelle `tagesraetsel`: `app.gehe('raetsel', { quelle: 'tagesraetsel' })` (heute,
+  nur die offenen Teile; ist der Tag fertig, darf man ihn wiederholen) oder `{ quelle: 'tagesraetsel', archiv: 1 }`
+  (die offenen Raetsel der letzten 30 Tage, juengster zuerst; zaehlen fuer Funken und Serie, nicht als Tagesraetsel des
+  Tages). Fehlversuche ohne Abzug, keine Uhr; das erste Ergebnis je Aufgabe zaehlt.
+- **Danach** "Ein Wort" (welches Motiv? drei Woerter, die zwei falschen hat das Raetsel sicher nicht; nur mit Motiv)
+  und "Teilen": Text ohne Link und ohne Loesung (`navigator.share`, sonst Zwischenablage, sonst ein Dialog mit dem Text):
+  ```
+  Crownmate · Rätsel 12 · Dienstag ●●○○○○○
+  ♛ Matt in 2 · □■ · Motiv: Gabel
+  ```
+  □ je Fehlversuch, ■ geloest, ✕ Loesung angesehen; das Motiv nur, wenn "Ein Wort" stimmte.
+- **Orte:** `training:karten` 5 (grosse Karte `.t-held` mit Mini-Brett, "Rätsel N", Schwierigkeit als sieben Punkte,
+  "Lösen" oder nach dem Loesen "Teilen", dazu "Archiv · n"), `arena:heute` 20 (Zeile, solange heute offen).
+- **Ereignis:** sendet `raetsel:geloest { id, richtig, versuch, quelle: 'tagesraetsel' | 'tagesraetsel-archiv' }` je
+  Aufgabe (`id` aus der Datei, Funken und Serie zaehlen jede id einmal).
+- **Speicher:** Modul `tagesraetsel` (Budget 4.000): `{ v, tage: { 'JJJJ-MM-TT': { e: [[fehlversuche, richtig]], w?, a? } } }`,
+  hoechstens 60 Tage. Kaputte Staende werden ein leeres Modul, alte ohne `v` bleiben gueltig, ein Modul einer neueren
+  App wird gelesen, aber nie ueberschrieben.
+- **Laden:** Das Paket laedt die Datei beim Start und wartet darauf hoechstens 1,5 s (die App wartet auf ihre Pakete);
+  fehlt sie, zeigt die Karte eine ruhige Zeile und das Paket versucht es beim naechsten Zeichnen erneut.
+- **Offen:** "Fair zählen" (ein anderer, gleich starker Zug gilt auch) braucht Stockfish im Raetsel-Bildschirm und eine
+  Aenderung an `js/ui/raetsel.js`; Archiv ueber 30 Tage (Abo); Schul-Aufgaben "Rätsel lösen" (`js/schule.js`
+  RAETSEL_AUFGABEN) koennen jetzt eingeschaltet werden.
+
 ## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
 
 Dateien: `js/pakete/start/index.js` (Orte, Ereignisse, Feier), `dienst.js` (Speicher, Raetsel-Quellen, Spielstart; gemeinsam
