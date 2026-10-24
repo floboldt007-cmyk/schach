@@ -32,8 +32,8 @@ import { ladePartien, wertet, eigeneZuege as eigeneZuegeVon } from '../../storag
 import { ladeSpielplan, funkenWochenendeAktiv, spielplanWoche } from '../../inhalte.js';
 import { wochenSchluessel, wochentag, istSchluessel } from '../../tag.js';
 import { klang } from '../../sounds.js';
-import { t, sprache } from '../../sprache.js';
-import { GRUSS_BOTS } from './texte.js';
+import { t, sprache, texte } from '../../sprache.js';
+import { DE, GRUSS_BOTS } from './texte.js';
 import * as S from './stand.js';
 import * as R from './rechnung.js';
 import * as L from './level.js';
@@ -74,6 +74,13 @@ const ladeStand = (t = jetzt()) => S.lade(t, { plan });
 function botNameVon(id) {
   const b = typeof id === 'string' ? botNachId(id) : null;
   return b && b.name ? b.name : tx('denBot');
+}
+// fuer den Speicher (Lichtblick-Texte im Verlauf): immer der deutsche Name wie vor der englischen Version, damit ein
+// gespeicherter Satz nie zwei Sprachen mischt; die Anzeige setzt den Namen in der Sprache der App ein (lichtblickText)
+function speicherName(id) {
+  const b = typeof id === 'string' ? botNachId(id) : null;
+  if (!b || !b.name) return DE.denBot;
+  return texte('de')['bots.' + id + '.name'] || b.name;
 }
 // in Listen (Verlauf, Spiegel): unbekannte Gegner (z. B. ein Boss, dessen Paket fehlt) heissen neutral "Gegner"
 function listenName(id) {
@@ -261,7 +268,7 @@ function partieBeendet(d) {
     l = { ...(l || { id: d.laufId, z: {} }), fa: f.faktor, fn: f.name, ab: f.abstand };
   }
   const gegner = l && l.ref ? l.ref : gegnerRef(d.botId, d.partieId);
-  const res = S.buchePartie(st, d, { lauf: l, jetzt: t, wochenende: wochenende(t), botName: botNameVon(d.botId), gegner });
+  const res = S.buchePartie(st, d, { lauf: l, jetzt: t, wochenende: wochenende(t), botName: speicherName(d.botId), gegner });
   if (passt(d)) { lauf = null; linie = null; }
   if (!res) { S.speichere(st); return; }
   // partie:analysiert kommt fuer jede wertende Partie und jede Boss-Partie mit eigenem Zug (sonst holt die Arena es nach)
