@@ -77,7 +77,8 @@ const sanDe = (san) => (sprache() === 'de' ? String(san || '').replace(/[QRBN]/g
 function datumText(iso, jetzt = new Date()) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const uhr = d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+  // Englisch ohne fuehrende Null in der Stunde ("2:05 PM" statt "02:05 PM"), Deutsch wie bisher ("09:12")
+  const uhr = d.toLocaleTimeString(locale(), { hour: sprache() === 'de' ? '2-digit' : 'numeric', minute: '2-digit' });
   const tag = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((tag(jetzt) - tag(d)) / 86400000);
   if (diff === 0) return t('analyse.vl.heute', { uhr });
