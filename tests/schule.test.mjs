@@ -186,7 +186,7 @@ async function nodeTeil() {
     .flatMap((e) => (e.isDirectory() ? jsDateien(path.join(dir, e.name)) : e.name.endsWith('.js') ? [path.join(dir, e.name)] : []));
   const raetselSender = jsDateien(path.join(WURZEL, 'js')).filter((d) => /sende\(\s*['"`]raetsel:geloest['"`]/.test(readFileSync(d, 'utf8')))
     .map((d) => path.relative(WURZEL, d));
-  pruefe('RAETSEL_AUFGABEN genau dann, wenn ein Paket raetsel:geloest sendet (heute keins: keine Raetsel-Aufgaben stellen)',
+  pruefe('RAETSEL_AUFGABEN genau dann, wenn ein Paket raetsel:geloest sendet (seit dem Tagesraetsel: Raetsel-Aufgaben stellen)',
     RAETSEL_AUFGABEN === (raetselSender.length > 0), { RAETSEL_AUFGABEN, raetselSender });
 
   // ---------- Vertrag: jeder Aufruf schickt genau die Parameter der SQL-Funktion ----------
@@ -787,7 +787,7 @@ async function browserTeil(browser) {
 
     // Aufgaben
     const arten = await seite.evaluate(() => [...document.querySelectorAll('.sm-aufgabe-neu input[name="sm-art"]')].map((x) => x.value));
-    pruefe('Arten im Formular: Raetsel nur, wenn ein Paket Raetsel zaehlt (RAETSEL_AUFGABEN, heute aus)', JSON.stringify(arten)
+    pruefe('Arten im Formular: Raetsel nur, wenn ein Paket Raetsel zaehlt (RAETSEL_AUFGABEN, seit dem Tagesraetsel an)', JSON.stringify(arten)
       === JSON.stringify(RAETSEL_AUFGABEN ? ['bot', 'raetsel', 'partien'] : ['bot', 'partien']), arten);
     await seite.fill('.sm-a-titel', 'Gabeln mit Rudi');
     await seite.selectOption('.sm-a-bot', 'rudi');

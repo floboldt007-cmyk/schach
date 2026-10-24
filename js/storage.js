@@ -109,6 +109,8 @@ export const MODUL_BUDGET = Object.freeze({
   finisher: 10000, ausdruck: 6000, siegeslauf: 6000, werkstatt: 8000,
   // Welle A: Siegesbild (A1, Paket teilen: Wahl hell/dunkel und Benutzername, gemerkte geteilte Partien)
   teilen: 2000,
+  // Welle C: Tagesraetsel (S1-5): Ergebnisse der letzten 60 Tage, "Ein Wort"
+  tagesraetsel: 4000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;

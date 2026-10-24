@@ -7,14 +7,19 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 71;
-const STAND = '6249c2f98f75';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 74;
+const STAND = '0bd45ba34d11';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  // Welle C: Tagesraetsel (S1-5), mit seinen Raetseln (Inhalte unter daten/tagesraetsel/)
+  'css/pakete/tagesraetsel.css',
+  'js/pakete/tagesraetsel/index.js',
+  'js/pakete/tagesraetsel/logik.js',
+  'daten/tagesraetsel/raetsel.json',
   'css/pakete/liga.css',
   'js/pakete/liga/ansicht.js',
   'js/pakete/liga/index.js',

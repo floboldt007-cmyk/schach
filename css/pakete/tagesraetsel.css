@@ -1,0 +1,29 @@
+/* ============================================================
+   Crownmate · Paket tagesraetsel (Welle C, S1-5): grosse Karte im Training (Ort training:karten, .t-held mit
+   Mini-Brett) und Zeile in der Heute-Karte (Ort arena:heute). Bausteine (.t-karte, .t-held, .t-fuss, .mini) aus
+   css/training.css und css/bauteile.css. Nur Tokens, hell und dunkel; keine rote Zahl, keine Uhr (Fairness).
+   Das Paket haengt diese Datei selbst ein (link[data-paket="tagesraetsel"]).
+   ============================================================ */
+.tr-karte .tr-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tr-karte h2 { font-size: 28px; }
+.tr-punkte { color: var(--akzent-text); font-size: 15px; letter-spacing: .12em; white-space: nowrap; }
+.tr-karte .t-fuss > span:empty { display: none; }
+.tr-karte .t-fuss { justify-content: flex-end; }
+.tr-los .ico { width: 18px; height: 18px; }
+.tr-symbol { width: 52px; height: 52px; border-radius: 17px; display: grid; place-items: center; background: var(--flaeche-3); color: var(--text-2); }
+.tr-symbol .ico { width: 28px; height: 28px; }
+.tr-laedt p { color: var(--text-3); }
+
+/* Zeile in der Heute-Karte der Arena */
+.tr-heute { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; }
+.tr-heute-symbol { flex: none; width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--flaeche);
+  color: var(--text-2); box-shadow: var(--kante); }
+.tr-heute-symbol .ico { width: 18px; height: 18px; }
+.tr-heute-text { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 650; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-heute-text b { color: var(--text); font-weight: 800; }
+.tr-heute-los { flex: none; min-height: 44px; padding: 0 14px; font-size: 14.5px; }
+
+@media (max-width: 700px) {
+  .tr-karte h2 { font-size: 24px; }
+  .tr-karte .mini { width: min(100%, 260px); }
+}

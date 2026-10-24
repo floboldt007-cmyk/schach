@@ -38,9 +38,9 @@
 //   haeufigsteFehler(partien) -> { zuege, arten: [{ art, anzahl }] }   letzte FEHLER_FENSTER wertende Partien, nur eigene Zuege
 //   aufgabeStand(aufgabe, { fortschritt, partien, geloest }) -> { erledigt, stand, ziel }   stand/ziel bei Partien und Raetseln
 //   zielText(aufgabe) -> 'Ritter Rudi besiegen' | '5 Partien spielen' | '10 Raetsel loesen' (mit Sternen: '... mit 2 Sternen')
-//   RAETSEL_AUFGABEN   false, solange kein Paket raetsel:geloest sendet (Tagesraetsel S1-5): Dann bietet die
-//       Lehrkraft-Ansicht die Art 'raetsel' nicht an (niemand koennte sie erfuellen). Wer den Sender einbaut, stellt hier
-//       auf true; tests/schule.test.mjs prueft, dass der Schalter zum Code passt.
+//   RAETSEL_AUFGABEN   true, seit das Paket tagesraetsel (S1-5) raetsel:geloest sendet; ohne Sender bietet die
+//       Lehrkraft-Ansicht die Art 'raetsel' nicht an (niemand koennte sie erfuellen). tests/schule.test.mjs prueft,
+//       dass der Schalter zum Code passt.
 //   faelligText(faellig) -> 'bis Fr 30.10.' | ''   (ein Termin, nie ein Countdown)
 //   offeneAufgabe(stand = meineKlassenGespeichert(), { heute, ... }) -> { klasse, aufgabe, stand } | null
 //       die naechste nicht erledigte Aufgabe einer aktiven Klasse (Heute-Karte), Faellige zuerst; laenger als
@@ -88,8 +88,8 @@ export const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const ALT_TAGE = 14;
 export const WARTE_MS = 15000;
 export const ARTEN = Object.freeze(['bot', 'raetsel', 'partien']);
-// Raetsel-Aufgaben erst anbieten, wenn ein Paket raetsel:geloest sendet (Tagesraetsel S1-5); siehe Kopf
-export const RAETSEL_AUFGABEN = false;
+// Raetsel-Aufgaben nur, wenn ein Paket raetsel:geloest sendet (seit dem Tagesraetsel S1-5); siehe Kopf
+export const RAETSEL_AUFGABEN = true;
 export const GRENZEN = Object.freeze({ mitglieder: 60, klassen: 20, mitgliedschaften: 10, aufgaben: 30, anzahl: 100 });
 
 export const WAS_DIE_LEITUNG_SIEHT = 'Deine Lehrkraft oder Trainerin sieht deinen Anzeigenamen, wie viele Bots du besiegt hast, '
