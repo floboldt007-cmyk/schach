@@ -1,7 +1,10 @@
 // Die Datenbank fuehrt Reihenfolge und Uhr; jede Stellung wird hier aus legalen Zuegen rekonstruiert.
 import { Chess } from '../../vendor/chess/chess.js';
+import { t } from '../sprache.js';
+import '../sprachen/online.js';
+const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
-import { sanDeutsch } from '../review.js';
+import { sanAnzeige } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 
@@ -9,25 +12,26 @@ const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const andere = f => f === 'w' ? 'b' : 'w';
 const TEMPI = { ohne: [null, 0], '5': [300, 0], '10': [600, 0], '15': [900, 10] };
-const GRUND = { matt: 'Schachmatt', patt: 'Patt', material: 'Zu wenig Material', wiederholung: 'Dreifache Wiederholung',
-  '50-zuege': '50-Züge-Regel', zeit: 'Zeit abgelaufen', aufgabe: 'Aufgabe', remis: 'Remis vereinbart', abgebrochen: 'Einladung zurückgezogen' };
-const STATUS = { offen: 'Offen', laeuft: 'Laufend', beendet: 'Beendet' };
 const uhrText = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 export function zeige(root, params, app) {
+  const GRUND = { matt: O('matt'), patt: O('patt'), material: O('material'), wiederholung: O('wiederholung'),
+    '50-zuege': O('fuenfzig'), zeit: O('zeit'), aufgabe: O('aufgabe'), remis: O('remis'), abgebrochen: O('zurueckgezogen') };
+  const STATUS = { offen: O('offen'), laeuft: O('laeuft'), beendet: O('beendet') };
+
   if (!document.querySelector('link[data-online]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = new URL('css/online.css', WURZEL).href;
     link.dataset.online = ''; document.head.append(link);
   }
-  const s = document.createElement('section'); s.className = 'screen online-screen'; s.setAttribute('aria-label', 'Gegen Freunde');
-  s.innerHTML = '<header class="kopf"><button class="knopf" type="button" data-online="training">Training</button><h2>Gegen Freunde</h2></header>'
-    + '<div class="on-rumpf"><p class="on-meldung" role="status" hidden></p><div class="on-inhalt"></div></div>';
+  const s = document.createElement('section'); s.className = 'screen online-screen'; s.setAttribute('aria-label', O('titel'));
+  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-online="training">${esc(O('training'))}</button><h2>${esc(O('titel'))}</h2></header>`
+    + `<div class="on-rumpf"><p class="on-meldung" role="status" hidden></p><div class="on-inhalt"></div></div>`;
   root.append(s);
   const inhalt = s.querySelector('.on-inhalt'), status = s.querySelector('.on-meldung');
   let weg = false, busy = false, blockiert = false, beobachter = null, brett = null, p = null, chess = null, wartend = null;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
-  const fehler = e => { melde(e?.message || 'Das hat nicht geklappt. Bitte erneut versuchen.'); };
+  const fehler = e => { melde(e?.message || O('fehler')); };
   const oeffne = partie => { if (!weg) { online.vergissEinladung(); app.gehe('online', { partieId: partie.id }); } };
   function sperre() {
     if (weg) return;
@@ -56,13 +60,13 @@ export function zeige(root, params, app) {
   }
   function start() {
     if (!sitzung()?.access_token) {
-      inhalt.innerHTML = '<section class="on-karte flaeche"><h3>Zusammen Schach spielen</h3><p>Für Partien gegen Freunde brauchst du ein Konto.</p>'
-        + (online.gemerkteEinladung() ? '<p>Deine Einladung bleibt bis nach der Anmeldung gespeichert.</p>' : '')
-        + '<button class="knopf primaer" type="button" data-online="konto">Zu Einstellungen · Konto</button></section>';
+      inhalt.innerHTML = `<section class="on-karte flaeche"><h3>${esc(O('zusammen'))}</h3><p>${esc(O('konto'))}</p>`
+        + (online.gemerkteEinladung() ? `<p>${esc(O('merker'))}</p>` : '')
+        + `<button class="knopf primaer" type="button" data-online="konto">${esc(O('einstellungen'))}</button></section>`;
       return;
     }
     if (params.partieId) {
-      inhalt.innerHTML = '<p>Partie wird geladen …</p>';
+      inhalt.innerHTML = `<p>${esc(O('ladePartie'))}</p>`;
       aktion(() => online.ladePartie(params.partieId), neu => {
         uebernehme(neu);
         if (!blockiert && neu.status !== 'beendet') beobachter = online.beobachte(neu.id, {
@@ -75,27 +79,27 @@ export function zeige(root, params, app) {
       return;
     }
     const code = online.gemerkteEinladung() || '';
-    inhalt.innerHTML = `<div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>Freund einladen</h3>
-      <label>Eigene Farbe<select name="farbe"><option value="w">Weiß</option><option value="b">Schwarz</option><option value="zufall" selected>Zufall</option></select></label>
-      <label>Bedenkzeit<select name="tempo"><option value="ohne">Ohne Uhr</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
-      <button class="knopf primaer" type="submit">Einladung erstellen</button></form>
-      <form class="on-karte flaeche" data-form="beitreten"><h3>Code eingeben</h3><label>Einladungscode<input name="code" value="${esc(code)}" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" required></label>
-      <button class="knopf primaer" type="submit">Beitreten</button></form></div>
-      <section class="on-karte flaeche"><h3>Meine Partien</h3><p class="on-liste">Partien werden geladen …</p><button class="knopf" type="button" data-online="liste">Aktualisieren</button></section>`;
+    inhalt.innerHTML = `<div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>${esc(O('einladen'))}</h3>
+      <label>${esc(O('farbe'))}<select name="farbe"><option value="w">${esc(O('weiss'))}</option><option value="b">${esc(O('schwarz'))}</option><option value="zufall" selected>${esc(O('zufall'))}</option></select></label>
+      <label>${esc(O('bedenkzeit'))}<select name="tempo"><option value="ohne">${esc(O('ohneUhr'))}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
+      <button class="knopf primaer" type="submit">${esc(O('erstellen'))}</button></form>
+      <form class="on-karte flaeche" data-form="beitreten"><h3>${esc(O('codeEingeben'))}</h3><label>${esc(O('code'))}<input name="code" value="${esc(code)}" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" required></label>
+      <button class="knopf primaer" type="submit">${esc(O('beitreten'))}</button></form></div>
+      <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>`;
     inhalt.querySelector('[name="code"]').addEventListener('input', e => { e.target.value = online.normalisiereCode(e.target.value).slice(0, 6); });
     ladeListe();
   }
   async function ladeListe() {
     await aktion(() => online.meinePartien({ beendete: true }), liste => {
       const el = inhalt.querySelector('.on-liste');
-      el.innerHTML = liste.length ? liste.map(row => `<button class="knopf on-listeneintrag" type="button" data-partie="${esc(row.id)}"><span>${esc(STATUS[row.status] || 'Partie')} · ${esc(row.code)}</span><span>${row.bedenkzeit_s == null ? 'Ohne Uhr' : `${Math.round(row.bedenkzeit_s / 60)}+${row.inkrement_s || 0}`}${row.ergebnis ? ' · ' + esc(row.ergebnis) : ''}</span></button>`).join('') : 'Noch keine Online-Partien.';
+      el.innerHTML = liste.length ? liste.map(row => `<button class="knopf on-listeneintrag" type="button" data-partie="${esc(row.id)}"><span>${esc(STATUS[row.status] || O('partie'))} · ${esc(row.code)}</span><span>${row.bedenkzeit_s == null ? O('ohneUhr') : `${Math.round(row.bedenkzeit_s / 60)}+${row.inkrement_s || 0}`}${row.ergebnis ? ' · ' + esc(row.ergebnis) : ''}</span></button>`).join('') : O('keine');
     });
   }
   function nachspielen(stand) {
-    if (!online.meineFarbe(stand)) throw new Error('Diese Partie gehört nicht zu deinem Konto.');
+    if (!online.meineFarbe(stand)) throw new Error(O('fremd'));
     const c = new Chess();
     for (const uci of online.zuegeListe(stand)) c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
-    if (c.fen() !== stand.fen || c.turn() !== stand.am_zug) throw new Error('Stellung stimmt nicht');
+    if (c.fen() !== stand.fen || c.turn() !== stand.am_zug) throw new Error(O('stellung'));
     return c;
   }
   function uebernehme(neu) {
@@ -104,19 +108,19 @@ export function zeige(root, params, app) {
     let c;
     try { c = nachspielen(neu); } catch (e) {
       blockiert = true; beobachter?.stop();
-      melde('Die empfangene Stellung passt nicht zu den Zügen. Die Partie bleibt angehalten. Bitte erneut öffnen.');
+      melde(O('stellungFehler'));
       sperre(); return;
     }
     p = neu; chess = c;
     if (p.status === 'offen') {
-      inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>Einladung für deinen Freund</h3><p class="on-code zahl">${esc(p.code)}</p>
-        <label>Einladungslink<input class="on-link" readonly value="${esc(online.einladungsLink(p.code))}"></label>
-        <button class="knopf primaer" type="button" data-online="teilen">Teilen</button><p>Die Einladung gilt 24 Stunden.</p><p>Warten auf deinen Freund …</p>
-        <button class="knopf" type="button" data-online="liste-zurueck">Meine Partien</button></section>`;
+      inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
+        <label>${esc(O('link'))}<input class="on-link" readonly value="${esc(online.einladungsLink(p.code))}"></label>
+        <button class="knopf primaer" type="button" data-online="teilen">${esc(O('teilen'))}</button><p>${esc(O('gueltig'))}</p><p>${esc(O('warte'))}</p>
+        <button class="knopf" type="button" data-online="liste-zurueck">${esc(O('meine'))}</button></section>`;
     } else {
       if (!brett) {
-        inhalt.innerHTML = '<div class="on-spiel"><div class="on-spieler on-oben"></div><div class="brett-rahmen"><div class="brett on-brett"></div></div><div class="on-spieler on-unten"></div>'
-          + '<p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><div class="on-aktionen"></div><p class="on-zuege" aria-label="Züge"></p><section class="on-ergebnis on-karte flaeche" hidden></section></div>';
+        inhalt.innerHTML = `<div class="on-spiel"><div class="on-spieler on-oben"></div><div class="brett-rahmen"><div class="brett on-brett"></div></div><div class="on-spieler on-unten"></div>`
+          + `<p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><div class="on-aktionen"></div><p class="on-zuege" aria-label="${esc(O('zuege'))}"></p><section class="on-ergebnis on-karte flaeche" hidden></section></div>`;
         const e = app.einstellungen();
         brett = new Brett(inhalt.querySelector('.brett'), { beiZug, figurenPfad: new URL('assets/pieces/', WURZEL).href,
           koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
@@ -133,8 +137,8 @@ export function zeige(root, params, app) {
     if (!brett) return;
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const name = f === eigen ? profil?.benutzername || 'Ich' : 'Freund';
-      inhalt.querySelector('.on-' + ort).innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b><span>${f === 'w' ? 'Weiß' : 'Schwarz'}</span></div>
+      const name = f === eigen ? profil?.benutzername || O('ich') : O('freund');
+      inhalt.querySelector('.on-' + ort).innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b><span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
         <span class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}></span>`;
     }
     tick();
@@ -160,18 +164,18 @@ export function zeige(root, params, app) {
     const m = chess.history({ verbose: true }).at(-1);
     brett.setzeStellung(chess.fen(), { letzterZug: m ? [m.from, m.to] : null, schach: chess.inCheck() ? true : null });
     karten();
-    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? 'Partie beendet' : busy ? 'Zug wird bestätigt …' : online.binAmZug(p) ? 'Du bist am Zug' : 'Dein Freund ist am Zug';
-    inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? 'Die Uhr beginnt nach dem ersten Zug beider Seiten.' : '';
-    inhalt.querySelector('.on-zuege').textContent = chess.history().map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanDeutsch(san)}`).join(' ');
+    inhalt.querySelector('.on-zug').textContent = p.status === 'beendet' ? O('fertig') : busy ? O('bestaetigt') : online.binAmZug(p) ? O('du') : O('gegner');
+    inhalt.querySelector('.on-uhr-hinweis').textContent = p.bedenkzeit_s != null && online.zuegeListe(p).length < 2 ? O('uhr') : '';
+    inhalt.querySelector('.on-zuege').textContent = chess.history().map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanAnzeige(san)}`).join(' ');
     const angebot = p.remis_angebot && p.remis_angebot !== online.meineFarbe(p);
     inhalt.querySelector('.on-aktionen').innerHTML = p.status === 'laeuft'
-      ? `<button class="knopf" type="button" data-online="${angebot ? 'annehmen' : 'remis'}">${angebot ? 'Remis annehmen' : p.remis_angebot ? 'Remis angeboten' : 'Remis anbieten'}</button><button class="knopf" type="button" data-online="aufgeben">Aufgeben</button>` : '';
+      ? `<button class="knopf" type="button" data-online="${angebot ? 'annehmen' : 'remis'}">${angebot ? O('annehmen') : p.remis_angebot ? O('angeboten') : O('anbieten')}</button><button class="knopf" type="button" data-online="aufgeben">${esc(O('aufgeben'))}</button>` : '';
     const ergebnis = inhalt.querySelector('.on-ergebnis');
     ergebnis.hidden = p.status !== 'beendet';
     if (!ergebnis.hidden) {
-      const titel = p.ergebnis === '1/2-1/2' ? 'Remis' : !p.ergebnis ? 'Partie beendet'
-        : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p) ? 'Sieg' : 'Niederlage';
-      ergebnis.innerHTML = `<h3>${titel}</h3><p>${esc(GRUND[p.grund] || 'Partie beendet')}</p><div class="on-aktionen"><button class="knopf primaer" type="button" data-online="revanche">Revanche</button><button class="knopf" type="button" data-online="liste-zurueck">Meine Partien</button></div>`;
+      const titel = p.ergebnis === '1/2-1/2' ? O('remisKurz') : !p.ergebnis ? O('fertig')
+        : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p) ? O('sieg') : O('niederlage');
+      ergebnis.innerHTML = `<h3>${titel}</h3><p>${esc(GRUND[p.grund] || O('fertig'))}</p><div class="on-aktionen"><button class="knopf primaer" type="button" data-online="revanche">${esc(O('revanche'))}</button><button class="knopf" type="button" data-online="liste-zurueck">${esc(O('meine'))}</button></div>`;
     }
     sperre();
   }
@@ -207,9 +211,9 @@ export function zeige(root, params, app) {
     if (a === 'teilen' && p) {
       const url = online.einladungsLink(p.code);
       try {
-        if (navigator.share) await navigator.share({ title: 'Schach mit mir', url });
-        else { await navigator.clipboard.writeText(url); melde('Einladungslink kopiert.'); }
-      } catch (f) { if (f.name !== 'AbortError') { inhalt.querySelector('.on-link')?.select(); melde('Bitte den markierten Einladungslink kopieren.'); } }
+        if (navigator.share) await navigator.share({ title: O('teilenTitel'), url });
+        else { await navigator.clipboard.writeText(url); melde(O('kopiert')); }
+      } catch (f) { if (f.name !== 'AbortError') { inhalt.querySelector('.on-link')?.select(); melde(O('kopieren')); } }
       return;
     }
     if (busy || blockiert || !p) return;
@@ -217,7 +221,7 @@ export function zeige(root, params, app) {
     if (a === 'annehmen') aktion(() => online.nimmRemisAn(p.id));
     if (a === 'aufgeben') {
       busy = true; sperre();
-      const ja = await app.frage({ titel: 'Partie aufgeben?', text: 'Dein Freund gewinnt dann die Partie.', knoepfe: [{ text: 'Weiterspielen', wert: false }, { text: 'Aufgeben', wert: true, art: 'gefahr' }], abbrechen: false });
+      const ja = await app.frage({ titel: O('aufgebenTitel'), text: O('freundGewinnt'), knoepfe: [{ text: O('weiter'), wert: false }, { text: O('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
       busy = false;
       if (weg) return;
       if (wartend) { const neu = wartend; wartend = null; uebernehme(neu); }

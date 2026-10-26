@@ -81,6 +81,10 @@
 //   schach-arena:abo:kauf     Zeitpunkt (ms) des letzten Kauf-Starts
 //   schach-arena:abo:alter    { uid, ab18 }   Antwort auf die Altersfrage (nur ja/nein, kein Geburtsdatum)
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { t } from './sprache.js';
+import './sprachen/abo.js';
+const A = (k, w) => t('abo.' + k, w);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { sitzung, erneuereSitzung } from './konto.js';
 import { icon } from './ui/icons.js';
 
@@ -121,7 +125,7 @@ export function nutzerId(s = sitzung()) {
 // Gueltige Sitzung, bei Bedarf erneuert (wie aktiveSitzung in js/konto.js)
 async function gueltigeSitzung() {
   const s = sitzung();
-  if (!s) throw new Error('Nicht angemeldet.');
+  if (!s) throw new Error(A('nichtAn'));
   return Number(s.expires_at) <= Math.floor(uhr() / 1000) + 30 ? erneuereSitzung() : s;
 }
 
@@ -133,11 +137,11 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   try {
     r = await fetchFn(SUPABASE_URL + pfad, { method: methode, headers: kopf, body: daten === undefined ? undefined : JSON.stringify(daten) });
   } catch (e) {
-    const f = new Error('Keine Verbindung.'); f.offline = true; throw f;
+    const f = new Error(A('offline')); f.offline = true; throw f;
   }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leer */ } }
-  if (!r.ok) { const f = new Error((d && (d.message || d.msg)) || `Serverfehler (${r.status})`); f.status = r.status; throw f; }
+  if (!r.ok) { const f = new Error((d && (d.message || d.msg)) || A('server', { status: r.status })); f.status = r.status; throw f; }
   return d;
 }
 
@@ -363,8 +367,7 @@ export function aufraeumen() {
 // Satz fuer den Dialog "Konto löschen" (Integration, js/daten.js loescheKontoDialog): Das Loeschen kuendigt nicht.
 export function aboHinweisZumLoeschen(st = premiumStand()) {
   if (!st.premium || st.quelle !== 'stripe' || st.status !== 'aktiv') return '';
-  return 'Dein Abo „Crownmate Trainer“ läuft bei Stripe weiter, bis du es kündigst. Kündige es vorher unter Einstellungen, '
-    + 'Crownmate Trainer, Abo verwalten.';
+  return A('loeschen');
 }
 
 // ---------- Oberflaeche fuer andere Pakete ----------
@@ -382,9 +385,9 @@ export function premiumHinweis(el, was = '', { app = null } = {}) {
   h.setAttribute('role', 'note');
   h.dataset.premium = String(was || '').slice(0, 80);
   h.innerHTML = `<span class="ph-zeichen" aria-hidden="true">${icon('stern')}</span>
-    <p class="ph-text"><b></b><span>Teil von Crownmate Trainer. Alles andere bleibt gratis.</span></p>
-    <button class="knopf ph-mehr dr" type="button">Mehr zum Trainer</button>`;
-  h.querySelector('.ph-text b').textContent = String(was || 'Diese Funktion');
+    <p class="ph-text"><b></b><span>${esc(A('teil'))}</span></p>
+    <button class="knopf ph-mehr dr" type="button">${esc(A('mehr'))}</button>`;
+  h.querySelector('.ph-text b').textContent = String(was || A('funktion'));
   h.querySelector('.ph-mehr').addEventListener('click', () => { oeffneTrainer({ app }); });
   if (el && typeof el.appendChild === 'function') {
     for (const alt of [...(el.children || [])]) if (alt.classList && alt.classList.contains('premium-hinweis')) alt.remove();

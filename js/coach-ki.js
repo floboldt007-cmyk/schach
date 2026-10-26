@@ -24,6 +24,9 @@
 //                             je Nutzer-ID und lebt nur im Arbeitsspeicher)
 //   setzeCoachFetch(fn), setzeCoachWartezeit(ms)   nur fuer Tests (null: Standard)
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { t } from './sprache.js';
+import './sprachen/coach-ki.js';
+const C = (k, w) => t('coach-ki.' + k, w);
 import { sitzung, erneuereSitzung } from './konto.js';
 import { istPremium, nutzerId } from './abo.js';
 
@@ -32,15 +35,16 @@ export const MERKER_MAX = 40;
 export const WARTE_MS = 100000;
 export const KI_HINWEIS = 'Erklärung von einer KI, kann sich irren.';
 export const TEXTE = Object.freeze({
-  eingabe: 'Zu diesem Zug kann der Coach nichts sagen.',
-  abgemeldet: 'Melde dich an, dann kannst du den Coach fragen.',
-  offline: 'Gerade keine Verbindung. Der Coach antwortet, sobald du wieder online bist.',
-  limit: 'Für heute hast du alle Fragen an den Coach gestellt. Ab 4 Uhr morgens kannst du wieder fragen.',
-  abgelehnt: 'Zu diesem Zug hat der Coach gerade keine Erklärung. Die Bewertung oben gilt weiter.',
-  nicht_eingerichtet: 'Der Coach ist noch nicht eingerichtet.',
-  ki: 'Der Coach ist gerade nicht erreichbar. Versuch es gleich noch einmal.',
-  premium: 'Frag den Coach gehört zu Crownmate Trainer.',
+  get eingabe() { return C('eingabe'); },
+  get abgemeldet() { return C('abgemeldet'); },
+  get offline() { return C('offline'); },
+  get limit() { return C('limit'); },
+  get abgelehnt() { return C('abgelehnt'); },
+  get nicht_eingerichtet() { return C('nicht_eingerichtet'); },
+  get ki() { return C('ki'); },
+  get premium() { return C('premium'); },
 });
+export function kiHinweis() { return C('hinweis'); }
 const GRUENDE = new Set(Object.keys(TEXTE));
 const UCI = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
@@ -55,7 +59,7 @@ export function vergissAntworten() { merker.clear(); laufend.clear(); }
 
 export function restText(rest) {
   if (!Number.isInteger(rest) || rest < 0 || rest > 5) return '';
-  return rest === 0 ? 'Das war deine letzte Frage für heute.' : `Heute noch ${rest} ${rest === 1 ? 'Frage' : 'Fragen'}.`;
+  return rest === 0 ? C('letzte') : C('rest', { n: rest });
 }
 
 function bewertung(ev) {

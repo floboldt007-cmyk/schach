@@ -67,6 +67,9 @@
 //   schach-arena:schule:gemeldet  { uid, inhalt, am }   zuletzt gemeldet (gleiche Meldung geht nicht zweimal)
 //   schach-arena:schule:raetsel   { uid, geloest: { <aufgabeId>: [raetselId, ...] } }
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { t, locale } from './sprache.js';
+import './sprachen/schule.js';
+const S = (k, w) => t('schule.' + k, w);
 import { sitzung, erneuereSitzung } from './konto.js';
 import { ladePartien, ladeFortschritt, statistik, besiegteBots, gesamtSterne, sterneZahl, wertet } from './storage.js';
 import { tagSchluessel, istSchluessel, wochentag, tageZwischen } from './tag.js';
@@ -96,30 +99,30 @@ export const WAS_DIE_LEITUNG_SIEHT = 'Deine Lehrkraft oder Trainerin sieht deine
   + 'deine Sterne, die Zahl deiner Partien, deine durchschnittliche Genauigkeit, deine häufigsten Fehlerarten und welche '
   + 'Aufgaben erledigt sind. Dein Stand wird nach jeder Partie aktualisiert, gespeichert wird dazu nur der Tag, keine Uhrzeit. '
   + 'Nicht: deine E-Mail-Adresse, deine Partien oder Züge. Austreten geht jederzeit.';
+export function leitungHinweis() { return S('sicht'); }
 
 export const TEXTE = Object.freeze({
-  abgemeldet: 'Melde dich zuerst mit deinem Konto an.',
-  offline: 'Gerade keine Verbindung. Versuch es gleich noch einmal.',
-  server: 'Der Server antwortet gerade nicht. Versuch es später noch einmal.',
-  nicht_eingerichtet: 'Der Schulmodus ist auf dem Server noch nicht eingerichtet.',
-  SCHULE_NICHT_ANGEMELDET: 'Melde dich zuerst mit deinem Konto an.',
-  SCHULE_NAME_UNGUELTIG: 'Der Anzeigename braucht 2 bis 24 Zeichen: Buchstaben, Ziffern, Leerzeichen, Punkt oder Bindestrich. Eine E-Mail-Adresse geht nicht.',
-  SCHULE_NAME_UNGUELTIG_KLASSE: 'Der Name der Klasse braucht 2 bis 40 Zeichen, ohne @.',
-  SCHULE_NAME_VERGEBEN: 'Diesen Anzeigenamen gibt es in der Klasse schon. Nimm zum Beispiel den ersten Buchstaben deines Nachnamens dazu.',
-  SCHULE_CODE_UNGUELTIG: 'Zu diesem Code gibt es keine Klasse. Prüfe die 6 Zeichen.',
-  SCHULE_KLASSE_GESCHLOSSEN: 'Diese Klasse ist geschlossen.',
-  SCHULE_EIGENE_KLASSE: 'Das ist deine eigene Klasse. Du leitest sie schon.',
-  SCHULE_KLASSE_VOLL: 'Die Klasse hat schon 60 Mitglieder.',
-  SCHULE_ZU_VIELE_KLASSEN: 'Mit einem Konto gehen höchstens 20 eigene Klassen und 10 Klassen als Mitglied.',
-  SCHULE_ZU_VIELE_VERSUCHE: 'Heute waren es zu viele falsche Codes. Morgen geht es wieder.',
-  SCHULE_KEIN_CODE: 'Gerade ließ sich kein Code erzeugen. Versuch es gleich noch einmal.',
-  SCHULE_KEINE_LEITUNG: 'Diese Klasse gibt es nicht mehr, oder du leitest sie nicht.',
-  SCHULE_AUFGABE_UNGUELTIG: 'So passt die Aufgabe nicht: Titel 2 bis 80 Zeichen, Anzahl 1 bis 100, Datum höchstens ein Jahr voraus.',
-  SCHULE_ZU_VIELE_AUFGABEN: 'Eine Klasse hat höchstens 30 Aufgaben. Lösche eine alte, dann geht eine neue.',
-  SCHULE_FORTSCHRITT_UNGUELTIG: 'Der Fortschritt ließ sich nicht melden.',
+  get abgemeldet() { return S('fehler.abgemeldet'); },
+  get offline() { return S('fehler.offline'); },
+  get server() { return S('fehler.server'); },
+  get nicht_eingerichtet() { return S('fehler.nicht_eingerichtet'); },
+  get SCHULE_NICHT_ANGEMELDET() { return S('fehler.SCHULE_NICHT_ANGEMELDET'); },
+  get SCHULE_NAME_UNGUELTIG() { return S('fehler.SCHULE_NAME_UNGUELTIG'); },
+  get SCHULE_NAME_UNGUELTIG_KLASSE() { return S('fehler.SCHULE_NAME_UNGUELTIG_KLASSE'); },
+  get SCHULE_NAME_VERGEBEN() { return S('fehler.SCHULE_NAME_VERGEBEN'); },
+  get SCHULE_CODE_UNGUELTIG() { return S('fehler.SCHULE_CODE_UNGUELTIG'); },
+  get SCHULE_KLASSE_GESCHLOSSEN() { return S('fehler.SCHULE_KLASSE_GESCHLOSSEN'); },
+  get SCHULE_EIGENE_KLASSE() { return S('fehler.SCHULE_EIGENE_KLASSE'); },
+  get SCHULE_KLASSE_VOLL() { return S('fehler.SCHULE_KLASSE_VOLL'); },
+  get SCHULE_ZU_VIELE_KLASSEN() { return S('fehler.SCHULE_ZU_VIELE_KLASSEN'); },
+  get SCHULE_ZU_VIELE_VERSUCHE() { return S('fehler.SCHULE_ZU_VIELE_VERSUCHE'); },
+  get SCHULE_KEIN_CODE() { return S('fehler.SCHULE_KEIN_CODE'); },
+  get SCHULE_KEINE_LEITUNG() { return S('fehler.SCHULE_KEINE_LEITUNG'); },
+  get SCHULE_AUFGABE_UNGUELTIG() { return S('fehler.SCHULE_AUFGABE_UNGUELTIG'); },
+  get SCHULE_ZU_VIELE_AUFGABEN() { return S('fehler.SCHULE_ZU_VIELE_AUFGABEN'); },
+  get SCHULE_FORTSCHRITT_UNGUELTIG() { return S('fehler.SCHULE_FORTSCHRITT_UNGUELTIG'); },
 });
 
-const WOCHENTAG_KURZ = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const NAME_ZEICHEN = /^[A-Za-zÀ-ÖØ-öø-ÿĀ-ž0-9 .'-]+$/;
 const NAME_BUCHSTABE = /[A-Za-zÀ-ÖØ-öø-ÿĀ-ž]/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -148,11 +151,11 @@ export function nutzerId(s = sitzung()) {
 }
 async function gueltigeSitzung() {
   const s = sitzung();
-  if (!s) { const f = new Error('Nicht angemeldet.'); f.grund = 'abgemeldet'; throw f; }
+  if (!s) { const f = new Error(S('nichtAn')); f.grund = 'abgemeldet'; throw f; }
   if (Number(s.expires_at) > Math.floor(uhr() / 1000) + 30) return s;
   try { return await erneuereSitzung(); } catch (e) {
     const f = new Error(e.message);
-    f.grund = /Verbindung/.test(String(e.message)) ? 'offline' : 'abgemeldet';
+    f.grund = e.message === t('einstellungen.konto.offline') ? 'offline' : 'abgemeldet';
     throw f;
   }
 }
@@ -165,13 +168,13 @@ async function rpc(name, daten = {}) {
   let zeitgeber = null;
   const zuSpaet = new Promise((_, nein) => {
     zeitgeber = setTimeout(() => {
-      nein(Object.assign(new Error('Keine Antwort.'), { grund: 'offline', zeit: true }));
+      nein(Object.assign(new Error(S('keineAntwort')), { grund: 'offline', zeit: true }));
       try { if (abbruch) abbruch.abort(); } catch (e) { /* egal */ }
     }, wartezeit);
   });
   zuSpaet.catch(() => {});
   const abgelaufen = (e) => !!(e && e.zeit) || !!(abbruch && abbruch.signal.aborted);
-  const offline = () => { const f = new Error('Keine Verbindung.'); f.grund = 'offline'; return f; };
+  const offline = () => { const f = new Error(S('keineVerbindung')); f.grund = 'offline'; return f; };
   try {
     return await rpcMitFrist(name, daten, { zuSpaet, abbruch, abgelaufen, offline });
   } finally {
@@ -194,7 +197,7 @@ async function rpcMitFrist(name, daten, { zuSpaet, abbruch, abgelaufen, offline 
   }
   if (!r.ok) {
     const text = String((d && (d.message || d.msg)) || '');
-    const f = new Error(text || `Serverfehler (${r.status})`);
+    const f = new Error(text || S('server', { status: r.status }));
     const kennung = text.match(/SCHULE_[A-Z_]+/);
     if (kennung) f.grund = kennung[0];
     else if (r.status === 401 || r.status === 403) f.grund = 'abgemeldet';
@@ -342,17 +345,17 @@ export function zielText(a) {
   const z = (a && a.ziel) || {};
   if (a && a.art === 'bot') {
     const s = Number(z.sterne) || 1;
-    return `${botName(z.bot)} besiegen${s > 1 ? ` mit ${s} Sternen` : ''}`;
+    return S(s > 1 ? 'zielSterne' : 'zielBot', { name: botName(z.bot), n: s });
   }
   const n = Number(z.anzahl) || 1;
-  if (a && a.art === 'raetsel') return `${n} Rätsel lösen`;
-  return `${n} ${n === 1 ? 'Partie' : 'Partien'} spielen`;
+  if (a && a.art === 'raetsel') return S('zielRaetsel', { n });
+  return S('zielPartien', { n });
 }
 // Faelligkeit als Termin ("bis Fr 30.10."), nie als Restzeit
 export function faelligText(faellig) {
   if (typeof faellig !== 'string' || !istSchluessel(faellig)) return '';
   const [, m, t] = faellig.split('-');
-  return `bis ${WOCHENTAG_KURZ[wochentag(faellig)]} ${t}.${m}.`;
+  return S('faellig', { w: S('wochentag.' + wochentag(faellig)), tag: t, monat: m });
 }
 const msVon = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? t : 0; };
 function geloestFuer(uid) {
@@ -548,7 +551,7 @@ export const SPALTEN = Object.freeze(['name', 'bots', 'sterne', 'partien', 'gena
 function wert(m, spalte) {
   const f = m && m.fortschritt;
   switch (spalte) {
-    case 'name': return String((m && m.anzeigename) || '').toLocaleLowerCase('de');
+    case 'name': return String((m && m.anzeigename) || '').toLocaleLowerCase(locale());
     case 'bots': return f ? f.bots_besiegt : null;
     case 'sterne': return f ? f.sterne : null;
     case 'partien': return f ? f.partien : null;
@@ -565,11 +568,11 @@ export function sortiereMitglieder(liste, spalte = 'name', richtung = 'auf') {
     const x = wert(a, s);
     const y = wert(b, s);
     if (x == null || y == null || Number.isNaN(x) || Number.isNaN(y)) {
-      if ((x == null || Number.isNaN(x)) && (y == null || Number.isNaN(y))) return wert(a, 'name').localeCompare(wert(b, 'name'), 'de');
+      if ((x == null || Number.isNaN(x)) && (y == null || Number.isNaN(y))) return wert(a, 'name').localeCompare(wert(b, 'name'), locale());
       return x == null || Number.isNaN(x) ? 1 : -1;
     }
-    const c = typeof x === 'string' ? x.localeCompare(y, 'de') : x - y;
-    return c * r || wert(a, 'name').localeCompare(wert(b, 'name'), 'de');
+    const c = typeof x === 'string' ? x.localeCompare(y, locale()) : x - y;
+    return c * r || wert(a, 'name').localeCompare(wert(b, 'name'), locale());
   });
 }
 
