@@ -39,6 +39,25 @@ vorhanden. Ein vorgezogener Partie-Aufruf kann sonst mit diesem Routing konkurri
 Bei einem Fehler werden Hash, Screen, Bereitschaft, Phase und beide Zuglisten
 mit einer eigenen kurzen Frist ausgegeben.
 
+## Weitere Zeitrennen im lokalen Gesamtlauf
+
+Der lokale Gesamtlauf lief unter paralleler Stockfish-Last in 2.701 Sekunden
+durch, ohne Haenger. Zwei unveraenderte Pruefungen scheiterten an Zeitannahmen:
+
+- Brett: Die kuenstliche Antwort von `beiZug` kam nach 150 ms. Bis der Test nach
+  Eingabe und 40 ms seine beiden Beobachtungen lesen konnte, konnte die Antwort
+  schon da sein. Jetzt gibt der Test die Antwort erst nach der Pruefung von
+  sichtbarem Zug und Eingabesperre frei; die Ruecknahme bleibt voll geprueft.
+- Klang: Der Vorlade-Timer startet eine Sekunde nach den Einstellungen, unabhaengig
+  davon, ob die Arena schon gezeichnet ist. Auf dem belasteten Rechner waren bei
+  der ersten Beobachtung bereits 6 Dateien dekodiert. Die Test-Route haelt nun die
+  MP3-Dateien bis zur Beobachtung des leeren Anfangszustands zurueck und gibt sie
+  danach frei. Anschliessend muessen weiterhin alle 40 echten Dateien dekodiert
+  und alle Klang-, Pegel- und Rueckfall-Aussagen erfuellt sein.
+
+Die gezielt nachgeprueften Suiten bestehen mit 280/280 (Brett, 72,3 s) und
+105/105 (Klang, 8,5 s). Keine ihrer Aussagen wurde entfernt oder gelockert.
+
 Der historische Hänger von 40 bis 60 Minuten ist in dieser Sitzung nicht
 aufgetreten. Eine eindeutige Zuordnung der alten Laeufe zur Service-Worker-Stelle
 ist ohne deren damaligen Zustand nicht moeglich. Der unbeschraenkte Fehlerpfad

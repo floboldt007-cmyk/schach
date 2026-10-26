@@ -248,15 +248,18 @@ async function testeDesktop(browser) {
   await h.setzeFen(START);
   await seite.evaluate(() => {
     window.altBeiZug = demo.brett.beiZug;
-    demo.brett.beiZug = () => new Promise((r) => setTimeout(() => r(false), 150));
+    // Die Antwort bleibt offen, bis Sichtbarkeit und Eingabesperre wirklich geprueft sind.
+    window.antwortBeiZug = null;
+    demo.brett.beiZug = () => new Promise((r) => { window.antwortBeiZug = r; });
   });
   await h.klickFeld('e2');
   await h.klickFeld('e4');
-  await warte(40);
+  await seite.waitForFunction(() => typeof window.antwortBeiZug === 'function');
   const optimistisch = (await h.figur('e4')) === 'wP';
   await h.klickFeld('d2');
   const gesperrtWaehrend = (await h.anzahl('.lage.auswahl')) === 0;
-  await warte(350);
+  await seite.evaluate(() => window.antwortBeiZug(false));
+  await animationenFertig(seite, '#brett');
   pruefe('Async beiZug: Zug sofort sichtbar, Eingabe solange gesperrt', optimistisch && gesperrtWaehrend);
   pruefe('Async beiZug false: zurueckgenommen', (await h.figurSitzt('e2')) && !(await h.figur('e4')) &&
     (await h.anzahl('.lage.zuletzt')) === 0);
