@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
 await begrenzt('Vorzug-Serverstart', () => new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); }), 10000);
 const START = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const MERKER = 'schach-arena:v1:hinweis-pfeile';
-let browser, kontext, ok = 0, gesamt = 0;
+let browser, kontext, seite, ok = 0, gesamt = 0;
 const fehler = [];
 function pruefe(name, gut, detail = '') {
   gesamt++; if (gut) ok++;
@@ -50,22 +50,30 @@ try {
       localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ klang: false, bewegung: 'aus', liveBewertung: false, tiefe: 8, vorzuege: true }));
     }
     // Der Bot zieht nach Plan; ist der Plan leer, haelt er an (botAnhalten) und spielt danach den ersten Zug (sortiert)
-    window.__plan = [];
-    window.__test = { botAnhalten: true, maxWarten: 0, botPause: 30, botZug: () => {
-      const u = window.__plan.shift();
-      if (u) return u;
-      window.__test.botAnhalten = true;
-      return window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0];
-    } };
+    window.__neuerBotPlan = (plan) => {
+      const zuege = plan.slice();
+      const test = { ...window.__test, botAnhalten: true, maxWarten: 0, botPause: 30 };
+      test.botZug = (fen) => {
+        // Ein abgebrochener alter Aufruf darf weder den neuen Plan noch dessen Halteschalter aendern.
+        if (window.__partie.chess().fen() !== fen) return null;
+        const u = zuege.shift();
+        if (u) return u;
+        test.botAnhalten = true;
+        return window.__partie.chess().moves({ verbose: true }).map((m) => m.lan).sort()[0];
+      };
+      window.__plan = zuege;
+      window.__test = test;
+    };
+    window.__neuerBotPlan([]);
   });
   };
   await vorbereite(kontext);
-  let seite = await kontext.newPage();
+  seite = await kontext.newPage();
   seite.setDefaultTimeout(45000);   // unter Last (CI, volle Suite) braucht der Partie-Start mit Engine laenger
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
   await seite.goto(START);
-  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function');
+  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.arena'));
 
   const feld = async (f) => {
     const b = await seite.locator(`.screen.partie .brett-felder .feld[data-feld="${f}"]`).boundingBox();
@@ -91,7 +99,7 @@ try {
   async function neuePartie(plan = []) {
     await seite.evaluate((p) => {
       localStorage.removeItem('schach-arena:v1:laufend');
-      window.__plan = p.slice(); window.__test.botAnhalten = true; window.__altesZ = window.__partie ? window.__partie.z : null;
+      window.__neuerBotPlan(p); window.__altesZ = window.__partie ? window.__partie.z : null;
     }, plan);
     await seite.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
     await seite.waitForFunction(() => window.__partie && window.__partie.z !== window.__altesZ && window.__partie.bereit === true);
@@ -124,6 +132,8 @@ try {
   }));
 
   // ---------- 2. Ausfuehrung ueber zwei Bot-Zuege ----------
+  // Der dritte Bot-Aufruf wartet sicher noch, wenn gleich danach die naechste Partie beginnt.
+  await seite.evaluate(() => { window.__test.botPause = 1000; });
   await lasBotLos();
   await seite.waitForFunction(() => window.__partie.z.zuege.length >= 5);
   await seite.waitForFunction(() => window.__partie.phase() === 'bot' && window.__partie.z.vorzuege.length === 0 && !document.querySelector('.brett-nummern .nummer'));
@@ -133,6 +143,9 @@ try {
 
   // ---------- 3. Ungueltig gewordener Vorzug faellt mit dem Rest weg ----------
   await neuePartie(['e7e5', 'a7a6']);
+  await bildFertig();
+  pruefe('Partiewechsel: ein abgebrochener alter Bot-Aufruf verbraucht keinen Zug des neuen Plans',
+    await seite.evaluate(() => window.__plan.join(',') === 'e7e5,a7a6'));
   await bisBotDenkt();
   await zug('e2e4');
   await zug('e4e5');
@@ -193,7 +206,7 @@ try {
   seite.on('pageerror', (e) => fehler.push(e.message));
   seite.on('console', (m) => { if (m.type() === 'error') fehler.push(m.text()); });
   await seite.goto(START);
-  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function');
+  await seite.waitForFunction(() => window.__app && typeof window.__app.gehe === 'function' && document.querySelector('.screen.arena'));
   await seite.evaluate((m) => { localStorage.removeItem(m); window.__test.pfeilTipp = true; }, MERKER);
   await neuePartie();
   const t1 = await seite.evaluate((m) => ({ sichtbar: !document.querySelector('.screen.partie .pfeil-tipp').hidden, merker: localStorage.getItem(m) }), MERKER);
@@ -263,7 +276,12 @@ try {
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `vorzuege-${name}-${modus}.png`) }); }
   }
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
-} catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
+} catch (e) {
+  const zustand = await begrenzt('Vorzug: Fehlerstand', () => seite.evaluate(() => ({ hash: location.hash,
+    screen: document.documentElement.dataset.screen, bereit: window.__partie?.bereit, phase: window.__partie?.phase(),
+    plan: window.__plan, zuege: window.__partie?.z.zuege, vorzuege: window.__partie?.z.vorzuege })), 2000).catch(() => null);
+  pruefe('Ablauf ohne Abbruch', false, { fehler: e.stack, zustand, konsole: fehler });
+}
 finally {
   await begrenzt('Vorzug: Browser schliessen', () => browser?.close(), 10000).catch(e => { pruefe('Aufraeumen', false, e.message); });
   server.closeAllConnections();
