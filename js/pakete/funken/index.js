@@ -8,7 +8,7 @@
 // Hoert:   partie:gestartet (Faktor festlegen, Lauf anlegen), zug:gespielt, hilfe:genutzt, zug:zurueckgenommen,
 //          zug:bewertet, stellung:analysiert (Live-Daten der laufenden Partie), partie:beendet (Partie-Funken buchen,
 //          VOR den Feier-Zeilen des Ergebnisses), partie:analysiert (Nachtrag: Stern 2, Genauigkeits-Lichtblick),
-//          uebung:ergebnis, analyse:gesehen, training:geloest, lektion:beendet, raetsel:geloest (Lern-Funken),
+//          uebung:ergebnis, analyse:gesehen, training:geloest, lektion:beendet, raetsel:geloest, raetsel:wort (Lern-Funken),
 //          boss:siegel, rekord:neu, bestmarke:neu (Meilensteine), tag:gezaehlt (nur Aktivitaet, nie Funken),
 //          app:bereit, app:screen, app:sichtbar, speicher:zurueckgesetzt, spielplan:geladen (das Boss-Paket hat den
 //          Spielplan geladen: erst dann liest funken ihn); liga:geaendert (Arena-Wertung als Lage fuer den Faktor), sobald
@@ -302,7 +302,16 @@ function lernEreignis(fn, d, { partieId = null } = {}) {
 // ---------- Oberflaeche ----------
 function zeigeSpiegel() {
   const st = ladeStand();
-  A.oeffneSpiegel(A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() }), { titel: tx('spiegel.titel') });
+  const inhalt = A.spiegelInhalt({ st, botName: listenName, wochenende: wochenende() });
+  if (st.heute.wort > 0) {
+    const dt = document.createElement('dt');
+    dt.textContent = tx('lern.wort');
+    const dd = document.createElement('dd');
+    dd.className = 'fk-s-wort';
+    dd.textContent = tx('spiegel.wortWert', { n: st.heute.wort });
+    inhalt.querySelector('.fk-s-heute').after(dt, dd);
+  }
+  A.oeffneSpiegel(inhalt, { titel: tx('spiegel.titel') });
 }
 
 const gezeigt = new Set();   // Partien, deren Abrechnungszeile schon gelaufen ist (der Nachtrag rollt nicht neu)
@@ -434,6 +443,7 @@ function registriere() {
   hoere('training:geloest', (d) => sicher(() => { if (d && d.richtig === true) lernEreignis(S.lernKarte, d); }, 'training:geloest'));
   hoere('lektion:beendet', (d) => sicher(() => lernEreignis(S.lernLektion, d), 'lektion:beendet'));
   hoere('raetsel:geloest', (d) => sicher(() => lernEreignis(S.lernRaetsel, d), 'raetsel:geloest'));
+  hoere('raetsel:wort', (d) => sicher(() => lernEreignis(S.lernWort, d), 'raetsel:wort'));
   hoere('boss:siegel', (d) => sicher(() => lernEreignis((st) => S.siegel(st, d), d), 'boss:siegel'));
   hoere('rekord:neu', (d) => sicher(() => lernEreignis((st) => S.rekord(st, d, letztePartieId), d, { partieId: letztePartieId }), 'rekord:neu'));
   hoere('bestmarke:neu', (d) => sicher(() => lernEreignis((st) => S.rekord(st, d, d && d.partieId), d, { partieId: d && d.partieId }), 'bestmarke:neu'));

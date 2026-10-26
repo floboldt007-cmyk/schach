@@ -26,7 +26,7 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8871);
-const ERW = 'pakete/tagesraetsel/index';
+const ERW = 'pakete/tagesraetsel/index,pakete/funken/index';
 const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=${ERW}`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const OHNE_BILDER = process.argv.includes('--ohne-bilder');
@@ -394,7 +394,9 @@ async function browserTeil(browser) {
   await seite.evaluate(async () => {
     const E = await import('/js/ereignisse.js');
     window.__tr_ev = [];
+    window.__tr_wort = [];
     E.hoere('raetsel:geloest', (d) => window.__tr_ev.push(d));
+    E.hoere('raetsel:wort', (d) => window.__tr_wort.push(d));
   });
   await seite.locator('.tr-heute-los').click();
   await warteZustand(seite, 'z.offen && z.quelle === "tagesraetsel" && z.phase === "flo"');
@@ -427,6 +429,7 @@ async function browserTeil(browser) {
   pruefe('kein Überlauf (Ende)', (await keinUeberlauf(seite)).ok);
 
   // Ein Wort
+  const funkenVorWort = await seite.evaluate(() => window.__funken.stand().gesamt);
   await seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
   await seite.waitForSelector('.dialog-ort .dialog-knoepfe button', { timeout: 5000 });
   const worte = await seite.evaluate(() => [...document.querySelectorAll('.dialog-ort .dialog-knoepfe button')].map((b) => b.textContent));
@@ -439,6 +442,12 @@ async function browserTeil(browser) {
   await seite.waitForFunction(() => /Richtig/.test((document.querySelector('.toast-ort') || {}).textContent || ''), null, { timeout: 5000 });
   z = await tz(seite);
   pruefe('Ein Wort richtig: Meldung und w = 1 im Modul', z.modul.tage[heute].w === 1 && z.letztesWort && z.letztesWort.richtig);
+  const wortBuchung = await seite.evaluate(() => ({ st: window.__funken.stand(), ev: window.__tr_wort }));
+  pruefe('Ein Wort richtig: genau 5 weitere Funken und ein Ereignis mit Tag und richtig', wortBuchung.st.gesamt === funkenVorWort + 5
+    && wortBuchung.st.heute.wort === 5 && wortBuchung.ev.length === 1 && wortBuchung.ev[0].tag === heute && wortBuchung.ev[0].richtig === true, wortBuchung);
+  await seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
+  pruefe('Zweiter Klick am selben Tag: kein Dialog, kein Ereignis und keine weiteren Funken', await seite.locator('.dialog-ort').count() === 0
+    && await seite.evaluate((vor) => window.__funken.stand().gesamt === vor + 5 && window.__tr_wort.length === 1, funkenVorWort));
 
   // Teilen
   await seite.locator('.rs-ende-knoepfe button', { hasText: 'Teilen' }).click();
@@ -464,6 +473,20 @@ async function browserTeil(browser) {
   await seite.waitForSelector('.screen.arena', { timeout: 10000 });
   await warte(400);
   pruefe('Heute-Zeile ist nach dem Lösen weg', await seite.locator('.tr-heute').count() === 0);
+  await seite.locator('.fk-chip').click();
+  await seite.waitForSelector('.fk-s-wort');
+  pruefe('Spiegel zeigt eigene Zeile Motiv erkannt mit gebuchter Menge', await seite.locator('.fk-s-wort').textContent() === '+5 Funken'
+    && await seite.locator('.fk-s-liste dt', { hasText: 'Motiv erkannt' }).count() === 1);
+  await seite.keyboard.press('Escape');
+  await seite.locator('.fk-s-wort').waitFor({ state: 'detached' });
+  await seite.evaluate(async () => (await import('/js/sprache.js')).setzeSprache('en'));
+  await seite.locator('.fk-chip').click();
+  await seite.waitForSelector('.fk-s-wort');
+  pruefe('Spiegel uebersetzt die eigene Zeile beim Anzeigen ins Englische', await seite.locator('.fk-s-wort').textContent() === '+5 sparks'
+    && await seite.locator('.fk-s-liste dt', { hasText: 'Motif spotted' }).count() === 1);
+  await seite.keyboard.press('Escape');
+  await seite.locator('.fk-s-wort').waitFor({ state: 'detached' });
+  await seite.evaluate(async () => (await import('/js/sprache.js')).setzeSprache('de'));
 
   // Archiv
   await seite.evaluate(() => { location.hash = '#training'; });
@@ -555,6 +578,12 @@ async function browserTeil(browser) {
   const zworte = await zw.seite.evaluate(() => [...document.querySelectorAll('.dialog-ort .dialog-knoepfe button')].map((b) => b.textContent));
   pruefe('Ein Wort am Sonntag: kein falsches Wort ist das Motiv eines Teils', zworte.length === 3 && zworte.includes('Matt') && !zworte.includes('Grundreihe'), zworte);
   await zw.seite.keyboard.press('Escape');
+  const falschVor = await zw.seite.evaluate(() => window.__funken.stand().gesamt);
+  await zw.seite.locator('.rs-ende-knoepfe button', { hasText: 'Ein Wort' }).click();
+  await zw.seite.locator('.dialog-ort .dialog-knoepfe button', { hasText: zworte.find((w) => w !== 'Matt') }).click();
+  await zw.seite.waitForFunction(() => window.__tagesraetsel.zustand().modul.tage[window.__tagesraetsel.zustand().td.tag].w === 0);
+  pruefe('Falsches Wort gibt 0 und nennt keine entgangenen Funken', await zw.seite.evaluate((vor) => window.__funken.stand().gesamt === vor
+    && window.__funken.stand().heute.wort === 0 && !/Funken|verpasst|verloren/.test(document.querySelector('.toast-ort').textContent), falschVor));
   pruefe('keine Konsolenfehler', zw.fehler.length === 0, zw.fehler.join(' | '));
   await zw.kontext.close();
 

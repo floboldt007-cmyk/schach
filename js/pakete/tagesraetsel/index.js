@@ -10,6 +10,7 @@
 // Orte:       training:karten (5, grosse Karte .t-held mit Mini-Brett), arena:heute (20, Zeile solange heute offen)
 // Ereignisse: sendet raetsel:geloest { id, richtig, versuch, quelle: 'tag' | 'archiv', wertung: null } beim ersten
 //             Ergebnis je Aufgabe (id = id der Datei, z. B. 'tr-0012'; Wiederholen eines fertigen Tages sendet nichts)
+//             sowie raetsel:wort { tag, richtig } nach gespeicherter Wortwahl, hoechstens einmal je Tag.
 // Register:   Raetsel-Quelle "tagesraetsel", Inhaltsart "tagesraetsel" (js/inhalte.js), Icon "tagesraetsel"
 // Speicher:   Modul "tagesraetsel" (Budget 4.000, logik.js), bei jedem Zugriff frisch gelesen; ein Modul aus einer
 //             neueren App (v > RECHENSTAND) wird gelesen, aber nie ueberschrieben.
@@ -108,9 +109,13 @@ async function einWort(app, td) {
     knoepfe: wahl.map((k) => ({ text: L.motivName(k), wert: k })), abbrechen: null,
   });
   if (!wert || !Object.hasOwn(L.MOTIVE, wert)) return;
+  // Waehrend der Frage kann bereits eine andere Wahl gespeichert worden sein.
+  if (stand(td).wort != null) return;
   // Sonntag: das Motiv eines der beiden Teile ist richtig
   const richtig = td.aufgaben.some((x) => x.motiv === wert);
-  sichere(L.merkeWort(roh(), td.tag, richtig));
+  if (sichere(L.merkeWort(roh(), td.tag, richtig))) {
+    sicher(() => sende('raetsel:wort', { tag: td.tag, richtig }), 'raetsel:wort');
+  }
   letztesWort = { wahl, gewaehlt: wert, richtig };
   app.meldung(richtig ? t('p-tagesraetsel.wort.richtig', { motiv: L.motivName(wert) }) : t('p-tagesraetsel.wort.fast', { motiv: L.motivName(a.motiv) }));
 }
