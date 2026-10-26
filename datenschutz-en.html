@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en" data-thema="modern" data-modus="system">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F4F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171B" media="(prefers-color-scheme: dark)">
+<title>Privacy Policy · Crownmate</title>
+<script>
+  // Hell oder Dunkel wie in der App (gespeicherte Einstellung "modus"), sonst nach dem System.
+  try {
+    var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+    if (e && (e.modus === 'hell' || e.modus === 'dunkel')) document.documentElement.setAttribute('data-modus', e.modus);
+  } catch (f) { /* privater Modus: System */ }
+</script>
+<link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/themes/modern.css">
+<style>
+  /* Schlichte Textseite mit den Tokens der App (hell und dunkel ueber css/themes/modern.css), keine festen Farben. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background-color: var(--grund); color: var(--text); font-family: var(--schrift); font-size: var(--fs-text); line-height: 1.55;
+    -webkit-text-size-adjust: 100%; }
+  main { max-width: 760px; margin: 0 auto; padding: var(--a6) var(--rand) var(--a7); padding-bottom: calc(var(--a7) + env(safe-area-inset-bottom)); }
+  h1 { margin: var(--a4) 0 var(--a2); font-family: var(--display); font-size: var(--fs-h1); font-weight: var(--gw-titel); letter-spacing: var(--lw-titel); line-height: 1.1; }
+  h2 { margin: var(--a6) 0 var(--a2); font-size: var(--fs-h2); font-weight: var(--gw-stark); line-height: 1.2; }
+  h3 { margin: var(--a5) 0 var(--a1); font-size: var(--fs-text); font-weight: var(--gw-stark); }
+  p, li { margin: 0 0 var(--a3); color: var(--text); }
+  ul { padding-left: 1.2em; }
+  a { color: var(--akzent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .stand { color: var(--text-2); font-size: var(--fs-klein); }
+  .entwurf { margin: 0 0 var(--a5); padding: var(--a4); border: 2px solid var(--warn); border-radius: var(--r-l); background: var(--warn-weich); }
+  .entwurf p { margin: 0; }
+  .entwurf b { display: block; margin-bottom: var(--a1); }
+  .kasten { margin: 0 0 var(--a4); padding: var(--a4); border-radius: var(--r-l); background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); }
+  .kasten p:last-child, .kasten ul:last-child { margin-bottom: 0; }
+  .platz { padding: 0 .3em; border-radius: var(--r-s); background: var(--flaeche-2); border: 1px dashed var(--linie-2); color: var(--text-2);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; overflow-wrap: anywhere; }
+  .zurueck { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 18px; border-radius: var(--r-knopf); background: var(--flaeche); color: var(--text);
+    border: 1px solid var(--linie); text-decoration: none; font-weight: var(--gw-stark); }
+  .fuss { margin-top: var(--a6); padding-top: var(--a4); border-top: 1px solid var(--linie); color: var(--text-2); font-size: var(--fs-klein); }
+  .fuss a { margin-right: var(--a3); }
+</style>
+</head>
+<body>
+<main>
+  <p><a class="zurueck" href="./#einstellungen">Back to Crownmate</a></p>
+  <p class="stand">This is a courtesy translation. <a href="datenschutz.html" lang="de" hreflang="de">The German version is legally binding.</a></p>
+  <h1>Privacy Policy</h1>
+  <p class="stand">Draft, last updated <span class="platz">[Date]</span></p>
+
+  <div class="entwurf" role="note">
+    <p><b>Draft. Have a qualified person review this before publication.</b>
+    All fields in square brackets are placeholders and must be replaced. This text does not apply until then.</p>
+  </div>
+
+  <h2>1. Who is responsible?</h2>
+  <div class="kasten">
+    <p><span class="platz">[Full name]</span><br>
+    <span class="platz">[Street and house number]</span><br>
+    <span class="platz">[Postal code and city]</span>, Germany<br>
+    Email: <span class="platz">[Email address]</span></p>
+  </div>
+  <p>Crownmate is a chess app that runs in your browser (a web app). This policy explains what data the app processes,
+  why, on what legal basis, and what rights you have.</p>
+
+  <h2>2. At a glance</h2>
+  <ul>
+    <li>Without an account, Crownmate runs entirely on your device. Your progress is stored in your browser, not on a server.</li>
+    <li>An account is optional. It lets you back up your progress in the cloud (servers in Frankfurt).</li>
+    <li>Sharing games and usage data is optional, off by default, and can be turned off at any time.</li>
+    <li>No advertising, no advertising trackers, no disclosure to third parties, and no sale of data.</li>
+    <li>You can download your data and delete your account yourself in the app at any time.</li>
+  </ul>
+
+  <h2>3. Web app hosting (GitHub Pages)</h2>
+  <p>The app is served through GitHub Pages, a service provided by GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco,
+  CA 94107, USA. When you open the app, your browser sends technically necessary data to GitHub's servers, including
+  your IP address, the date and time, the requested file, and your browser's user agent. GitHub may store this data in
+  server logs. The legal basis is our legitimate interest in providing the app securely and reliably
+  (Art. 6 Abs. 1 lit. f DSGVO, the EU General Data Protection Regulation, or GDPR).</p>
+  <p>GitHub also processes data in the USA. GitHub is certified under the EU-US Data Privacy Framework
+  <span class="platz">[Check current status]</span>; the EU Standard Contractual Clauses also apply. See
+  <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub's privacy statement</a> for details.</p>
+
+  <h2>4. Storage on your device (without cookies)</h2>
+  <p>Crownmate stores settings, progress, games, and analyses in your browser's local storage (localStorage) and caches
+  the app files for offline use (Service Worker). This data stays on your device unless you create an account or turn on
+  sharing. The app does not set cookies. Fonts, images, and sounds are supplied with the app, not by external servers
+  (for example, not by Google Fonts). Local storage is strictly necessary for the app to function
+  (§ 25 Abs. 2 Nr. 2 TDDDG, Germany's law on data protection in telecommunications and digital services).
+  You can delete this data under Settings → Reset progress, or through your browser's website data settings.</p>
+
+  <h2>5. Account (optional)</h2>
+  <p>With an account, your progress is backed up in the cloud so you can continue on more than one device.
+  You sign in with your email address and a one-time code, or with your Google account.</p>
+  <h3>What data</h3>
+  <ul>
+    <li>Your email address and sign-in times,</li>
+    <li>when signing in with Google: your email address, name, profile image URL as provided by your Google profile, and a Google user identifier,</li>
+    <li>a username you choose,</li>
+    <li>your progress (settings, progress, games, and analyses as stored by the app),</li>
+    <li>the browser family and operating system of the device used for the most recent backup (for example, “iPadOS Safari”),
+    rather than the full user agent,</li>
+    <li>your device's IP address: Supabase stores it in technical server logs with every request, and in the authentication
+    log together with the time and sign-in method whenever you sign in, to protect your account.</li>
+  </ul>
+  <h3>Where and by whom</h3>
+  <p>The data is stored by Supabase, Inc., <span class="platz">[Address from the data processing agreement]</span>, on servers
+  in Frankfurt am Main (Amazon Web Services, eu-central-1 region). Supabase acts as a processor under Art. 28 DSGVO (GDPR)
+  on the basis of a data processing agreement <span class="platz">[Date the agreement was concluded]</span>.
+  Supabase is a company outside the EU; access from outside the EU is safeguarded by
+  <span class="platz">[Check Standard Contractual Clauses in the data processing agreement / other safeguards]</span>.
+  Sign-in emails are sent by <span class="platz">[Email service name, address, data processing agreement]</span>.</p>
+  <p><b>Sign in with Google (optional):</b> Instead of using an email code, you can sign in with your Google account.
+  The app redirects you to Google. Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland, learns that you
+  are signing in to Crownmate. After you confirm with Google, it sends your email address, name, profile image URL,
+  and a Google user identifier to Supabase. We use nothing beyond that; Crownmate does not receive access to other
+  Google data (contacts, calendars, or files). Signing in to Google is covered by
+  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.
+  The link is removed when you delete your account; you can also remove access in your Google account.</p>
+  <h3>Legal basis and retention</h3>
+  <p>Processing is necessary to provide the account (Art. 6 Abs. 1 lit. b DSGVO, GDPR). The data is retained until you
+  delete your account. You can do so at any time in the app under Settings → Data → Delete account.
+  We then immediately delete everything associated with your account in our database: the account and authentication
+  data (including the Google link), username, cloud progress, shared games and usage data, and the authentication log.
+  Supabase's technical server logs and backups cannot be accessed immediately: they are deleted automatically according
+  to Supabase's retention periods <span class="platz">[Check Supabase retention periods: server logs, backups]</span>
+  and are not used further in the meantime. Your progress on your device is unaffected.</p>
+
+  <h3>Online games with friends</h3>
+  <p>When you play a friend online, we store both account IDs, the moves, current position, chess clock, invitation code,
+  and game timestamps. Only the two players can read the game; an open invitation is initially visible only to its creator.
+  This data is necessary to play together (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
+  just like your account.</p>
+  <p>Download my data also includes your online games. If either participating account is deleted, its associated online
+  games are automatically deleted too (cascading deletion). Otherwise, games remain stored in the account.
+  Technical server logs and backups follow the retention periods described in section 5.</p>
+
+  <h2>6. Sharing games and usage data (optional, with consent)</h2>
+  <p>With an account, you can turn on Share games and usage under Settings → Data. It is off by default.
+  Only after you turn it on does the app transmit the following data:</p>
+  <ul>
+    <li><b>Completed games:</b> moves, move assessments (move classes), result and reason, opponent bot, game mode,
+    accuracy, number of hints and takebacks, duration, timestamp, and app version.</li>
+    <li><b>Usage events:</b> which area of the app was opened, the start and end of a game, enabling sharing, and app errors
+    (only error type and message, without addresses), each with a timestamp, app version, browser family, and operating
+    system (for example, “iOS Safari”), rather than the full user agent.</li>
+  </ul>
+  <p><b>Purpose:</b> to calibrate bot strength using real games, improve the coach's move explanations, and offer personal
+  training plans; also to identify where players stop using the app. For bots, the coach, and the app, we evaluate data
+  only in aggregate across all players. Your individual data is used only for your own training plans, which only you can
+  see; it is not used to assess you against others. There are no automated decisions with legal effects (Art. 22 DSGVO, GDPR).</p>
+  <p>The data is linked to your account (pseudonymous: events contain neither your name nor your email address) so that
+  you can download it and delete it along with your account. It is therefore not anonymous.</p>
+  <p><b>The legal basis</b> is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). We store when you consented as evidence
+  (Art. 7 Abs. 1 DSGVO). You can withdraw consent at any time for the future by turning the switch off. The app then stops
+  sending data, discards unsent data, and deletes all previously shared games and usage data associated with your account
+  from the server (Art. 17 Abs. 1 lit. b DSGVO). If you are offline, the app completes this as soon as a connection is
+  available, before it sends anything else. We store the withdrawal time as evidence. Withdrawal does not affect the
+  lawfulness of processing carried out before it (Art. 7 Abs. 3 DSGVO).</p>
+  <p><b>Retention:</b> The data is tied to your account and deleted with it. Independently of that, shared games and usage
+  data are deleted or aggregated so they can no longer be linked to an account after at most
+  <span class="platz">[For example, 24 months]</span>.</p>
+
+  <h2>7. What never happens</h2>
+  <ul>
+    <li>No advertising or advertising trackers (no Google Analytics, Facebook Pixel, or fingerprinting).</li>
+    <li>No tracking across websites.</li>
+    <li>No disclosure to third parties for their own purposes and no sale of data. The processors listed above act
+    only on our instructions.</li>
+    <li>No profiles about you for other companies.</li>
+  </ul>
+
+  <h2>8. Children and parents</h2>
+  <p>Children and young people can also use Crownmate. Without an account, all data stays on the device. If you are under 16,
+  ask your parents or legal guardians before creating an account. You may turn on sharing of games and usage data only
+  with their consent (Art. 8 DSGVO, GDPR); the switch is therefore off by default, and the app explains this right beside
+  it. Parents can request information about an account or its deletion at <span class="platz">[Email address]</span>.
+  <span class="platz">[Check: set a minimum age for the app; is an age check or parental confirmation needed?]</span></p>
+
+  <h2>9. Your rights</h2>
+  <ul>
+    <li><b>Access</b> (Art. 15) and <b>data portability</b> (Art. 20): in the app under Settings → Data → Download my data,
+    you receive a file containing all your account data.</li>
+    <li><b>Erasure</b> (Art. 17): use Delete account in the app, immediately for everything in our database; Supabase server
+    logs and backups expire according to their retention periods (see section 5).</li>
+    <li><b>Rectification</b> (Art. 16): change your username in the app; request any other corrections by email.</li>
+    <li><b>Restriction</b> (Art. 18) and <b>objection</b> (Art. 21): email the address given above.</li>
+    <li><b>Withdrawal of consent</b> (Art. 7 Abs. 3): turn off Share games and usage; previously shared data is then deleted
+    from the server.</li>
+    <li><b>Complaint</b> (Art. 77): contact a data protection supervisory authority, for example
+    <span class="platz">[Competent supervisory authority of the German federal state, address]</span>.</li>
+  </ul>
+  <p>The article references in this section refer to the DSGVO (GDPR).</p>
+
+  <h2>10. Security</h2>
+  <p>All connections are encrypted (TLS). On the server, row-level access rules (Row Level Security) ensure that each
+  account can create and read only its own data; an account can only create shared usage data, which can be read only
+  through the data access request. The app contains only a public key; secrets are held exclusively by the operator.</p>
+
+  <h2>11. Changes</h2>
+  <p>This policy is updated when the app or applicable law changes. The current version is linked in the app under
+  Settings → Info.</p>
+
+  <p class="fuss"><a href="impressum-en.html">Legal Notice</a> <a href="./#einstellungen">Back to Crownmate</a></p>
+</main>
+</body>
+</html>

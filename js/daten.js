@@ -50,7 +50,7 @@ import { ladeEinstellungen, speichereEinstellungen, ladePartie } from './storage
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
 import { schalter, sheet } from './ui/bauteile.js';
-import { t } from './sprache.js';
+import { t, sprache } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/einstellungen.js';
 
@@ -462,7 +462,7 @@ export function datenGruppe({ app } = {}) {
       </div>
       ${angemeldet ? `<div class="es-knoepfe"><button class="knopf" type="button" data-daten="auskunft">${D('daten.herunterladen')}</button><button class="knopf es-rot-rand" type="button" data-daten="loeschen">${D('daten.kontoLoeschen')}</button></div>` : ''}
       <p class="daten-status" aria-live="polite"></p>
-      <p class="es-hilfe daten-links"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">${D('info.datenschutz')}</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">${D('info.impressum')}</a></p>`;
+      <p class="es-hilfe daten-links"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${D('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${D('info.impressum')}</a></p>`;
     sch = schalter({
       name: 'datenfreigabe', an,
       beiWechsel: (neu) => {
