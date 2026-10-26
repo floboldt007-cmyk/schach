@@ -8,6 +8,7 @@
 // Ausfuehrung ueber zwei Bot-Zuege, ungueltig gewordener Vorzug (er und der Rest fallen leise weg), Tipp ins leere Brett
 // und auf eine gegnerische Figur, Grenze 5, Pfeil-Tipp einmal je Geraet (weg nach dem ersten Pfeil, mit "Verstanden").
 import http from 'node:http';
+import { begrenzt } from './zeitwaechter.mjs';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +30,7 @@ const server = http.createServer((req, res) => {
   try { const inhalt = readFileSync(p); res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(inhalt); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-await new Promise((r) => server.listen(PORT, '127.0.0.1', r));
+await begrenzt('Vorzug-Serverstart', () => new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); }), 10000);
 const START = `http://127.0.0.1:${PORT}/index.html?test&kern`;
 const MERKER = 'schach-arena:v1:hinweis-pfeile';
 let browser, kontext, ok = 0, gesamt = 0;
@@ -38,7 +39,6 @@ function pruefe(name, gut, detail = '') {
   gesamt++; if (gut) ok++;
   console.log(`${gut ? 'OK' : 'FEHLER'} ${name}${gut ? '' : ' ' + JSON.stringify(detail)}`);
 }
-const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 try {
   browser = await browserTyp(pw).launch({ headless: true });
@@ -71,8 +71,14 @@ try {
     const b = await seite.locator(`.screen.partie .brett-felder .feld[data-feld="${f}"]`).boundingBox();
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   };
-  const tippe = async (f) => { const p = await feld(f); await seite.touchscreen.tap(p.x, p.y); await warte(90); };
-  const zug = async (uci) => { await tippe(uci.slice(0, 2)); await tippe(uci.slice(2, 4)); };
+  const bildFertig = () => begrenzt('Vorzug: Render-Schritt', () => seite.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+  const tippe = async (f) => { const p = await feld(f); await seite.touchscreen.tap(p.x, p.y); await bildFertig(); };
+  const zug = async (uci) => {
+    await tippe(uci.slice(0, 2));
+    await seite.waitForFunction(f => !!document.querySelector(`.screen.partie .lage.auswahl[data-feld="${f}"]`), uci.slice(0, 2));
+    await tippe(uci.slice(2, 4));
+    await seite.waitForFunction(() => !document.querySelector('.screen.partie .lage.auswahl'));
+  };
   const stand = () => seite.evaluate(() => {
     const p = window.__partie;
     const nummern = {};
@@ -120,7 +126,7 @@ try {
   // ---------- 2. Ausfuehrung ueber zwei Bot-Zuege ----------
   await lasBotLos();
   await seite.waitForFunction(() => window.__partie.z.zuege.length >= 5);
-  await warte(200);
+  await seite.waitForFunction(() => window.__partie.phase() === 'bot' && window.__partie.z.vorzuege.length === 0 && !document.querySelector('.brett-nummern .nummer'));
   const k2 = await stand();
   pruefe('Ausfuehrung: je Bot-Zug der vorderste Vorzug (e2-e4, dann e4-e5)', k2.zuege.startsWith('g1f3,a7a6,e2e4,h7h6,e4e5'), k2.zuege);
   pruefe('Ausfuehrung: danach keine Vorzuege und keine Nummern mehr', k2.vorzuege === '' && !Object.keys(k2.nummern).length, k2);
@@ -148,13 +154,13 @@ try {
   await zug('e2e4');
   await zug('d2d4');
   await tippe('a5');
-  await warte(150);
+  await seite.waitForFunction(() => window.__partie.z.vorzuege.length === 0);
   const k4 = await stand();
   pruefe('Tipp ins leere Brett loescht die ganze Kette und die Nummern', k4.vorzuege === '' && !Object.keys(k4.nummern).length, k4);
   pruefe('Tipp ins leere Brett: das Brett zeigt wieder die echte Stellung', (await figur('e2')) === 'wP' && (await figur('d2')) === 'wP' && !(await figur('e4')));
   await zug('e2e4');
   await tippe('a7');
-  await warte(150);
+  await seite.waitForFunction(() => window.__partie.z.vorzuege.length === 0);
   const k4b = await stand();
   pruefe('Tipp auf eine gegnerische Figur ohne Auswahl loescht die Kette', k4b.vorzuege === '' && (await figur('e2')) === 'wP', k4b);
 
@@ -164,7 +170,7 @@ try {
   pruefe('Grenze: hoechstens 5 Vorzuege, der sechste springt zurueck und die Kette bleibt', k5.vorzuege === 'a2a3,b2b3,c2c3,d2d3,h2h3' && (await figur('g2')) === 'wP', k5.vorzuege);
   pruefe('Grenze: Nummern 1 bis 5', ['a3', 'b3', 'c3', 'd3', 'h3'].map((f) => k5.nummern[f]).join('') === '12345', k5.nummern);
   await tippe('a5');
-  await warte(120);
+  await seite.waitForFunction(() => window.__partie.z.vorzuege.length === 0);
 
   // ---------- 6. Aufgeben loescht die Kette ----------
   await zug('e2e4');
@@ -204,12 +210,13 @@ try {
   // langsam zeichnen (CI: zu schnelle Zeiger-Ereignisse kamen nicht als Malen an) und auf den Pfeil warten
   await seite.waitForFunction(() => window.__partie.phase() === 'flo');
   const a = await feld('e2'), b = await feld('e4');
-  await seite.mouse.move(a.x, a.y); await warte(80);
-  await seite.mouse.down({ button: 'right' }); await warte(80);
-  for (let i = 1; i <= 10; i++) { await seite.mouse.move(a.x + (b.x - a.x) * i / 10, a.y + (b.y - a.y) * i / 10); await warte(20); }
+  await seite.bringToFront();
+  await seite.mouse.move(a.x, a.y); await bildFertig();
+  await seite.mouse.down({ button: 'right' }); await bildFertig();
+  for (let i = 1; i <= 10; i++) { await seite.mouse.move(a.x + (b.x - a.x) * i / 10, a.y + (b.y - a.y) * i / 10); await bildFertig(); }
   await seite.mouse.up({ button: 'right' });
   await seite.waitForFunction(() => window.__partie.brett.nutzerPfeile().some((x) => x.art === 'pfeil'), null, { timeout: 8000 }).catch(() => {});
-  await warte(150);
+  await seite.waitForFunction(() => document.querySelector('.screen.partie .pfeil-tipp').hidden);
   const t3 = await seite.evaluate((m) => ({ pfeile: window.__partie.brett.nutzerPfeile().filter((x) => x.art === 'pfeil').length,
     sichtbar: !document.querySelector('.screen.partie .pfeil-tipp').hidden, merker: JSON.parse(localStorage.getItem(m)) }), MERKER);
   pruefe('Pfeil-Tipp: nach dem ersten gezeichneten Pfeil weg und erledigt', t3.pfeile === 1 && !t3.sichtbar && t3.merker.erledigt === true, t3);
@@ -239,7 +246,7 @@ try {
     await bisBotDenkt();
     await zug('e2e4');
     await zug('e4e5');
-    await warte(250);
+    await bildFertig();
     const m = await seite.evaluate(() => {
       const brett = document.querySelector('.screen.partie .brett').getBoundingClientRect();
       const nr = [...document.querySelectorAll('.screen.partie .brett-nummern .nummer span')].map((s) => s.getBoundingClientRect());
@@ -257,6 +264,10 @@ try {
   }
   pruefe('Keine Konsolen- oder Seitenfehler', fehler.length === 0, fehler);
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
-finally { await kontext?.close(); await browser?.close(); await new Promise((r) => server.close(r)); }
+finally {
+  await begrenzt('Vorzug: Browser schliessen', () => browser?.close(), 10000).catch(e => { pruefe('Aufraeumen', false, e.message); });
+  server.closeAllConnections();
+  await begrenzt('Vorzug: Server schliessen', () => new Promise(r => server.close(r)), 5000).catch(e => { pruefe('Server-Aufraeumen', false, e.message); });
+}
 console.log(`\n${ok}/${gesamt} bestanden`);
 process.exitCode = ok === gesamt ? 0 : 1;

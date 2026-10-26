@@ -7,7 +7,7 @@
 //
 // Jede Suite startet ihren eigenen Server auf ihrem eigenen Port und beendet ihn wieder.
 // Exitcode 0 nur, wenn alle Suiten bestehen.
-import { spawn } from 'node:child_process';
+import { prozess } from './zeitwaechter.mjs';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -19,6 +19,7 @@ const nurArg = process.argv.find((a) => a.startsWith('--nur='));
 const NUR = nurArg ? nurArg.slice(6).split(',').map((s) => s.trim()).filter(Boolean) : null;
 
 const SUITEN = [
+  { name: 'zeitwaechter', datei: 'zeitwaechter.test.mjs', args: [], was: 'Zeitgrenzen, Fehler und Prozess-Aufraeumen' },
   { name: 'konto', datei: 'konto.test.mjs', args: [], was: 'Konto, Anmeldung und Cloud-Spielstand' },
   { name: 'online', datei: 'online.test.mjs', args: [], was: 'Online gegen Freunde: Einladung, Zuege, Abfrage' },
   { name: 'online-ui', datei: 'online-ui.test.mjs', args: [], was: 'Online-Oberflaeche mit abgefangenen Server-Anfragen' },
@@ -62,33 +63,30 @@ const SUITEN = [
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
 ];
 
-function lauf(suite) {
-  return new Promise((resolve) => {
-    const t0 = Date.now();
-    // eine fehlende Suite-Datei ist ein Fehler, nie ein stilles Ueberspringen
-    if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
-      resolve({ ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] });
-      return;
-    }
-    const kind = spawn(process.execPath, [path.join(WURZEL, 'tests', suite.datei), ...suite.args], {
-      cwd: WURZEL, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+async function lauf(suite) {
+  if (!existsSync(path.join(WURZEL, 'tests', suite.datei))) {
+    return { ...suite, code: 1, sekunden: 0, ok: null, gesamt: null, fehler: [`FEHLER Suite-Datei fehlt: tests/${suite.datei}`], ende: [] };
+  }
+  let letzte = 'Start';
+  const puls = setInterval(() => console.log(`… ${suite.name}: laeuft, zuletzt ${letzte}`), 30000);
+  try {
+    const e = await prozess(process.execPath, [path.join(WURZEL, 'tests', suite.datei), ...suite.args], {
+      cwd: WURZEL,
+      // 20 Minuten je Suite, nicht fuer die gesamte Sammlung (der volle Lauf braucht laenger).
+      zeitlimitMs: 20 * 60 * 1000,
+      ausgabe(s) {
+        const zeilen = s.trim().split(/\r?\n/).filter(Boolean);
+        if (zeilen.length) letzte = zeilen.at(-1).slice(0, 180);
+        if (LAUT) process.stdout.write(s);
+      },
     });
-    let text = '';
-    const nimm = (d) => {
-      const s = d.toString();
-      text += s;
-      if (LAUT) process.stdout.write(s);
-    };
-    kind.stdout.on('data', nimm);
-    kind.stderr.on('data', nimm);
-    kind.on('close', (code) => {
-      const zeilen = text.split(/\r?\n/);
-      // "123/124 bestanden" (letzte Zahl dieser Art in der Ausgabe)
-      const zahl = zeilen.map((z) => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
-      const fehler = zeilen.filter((z) => /^FEHLER/.test(z.trim()));
-      resolve({ ...suite, code, sekunden: (Date.now() - t0) / 1000, ok: zahl ? +zahl[1] : null, gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15) });
-    });
-  });
+    const zeilen = e.text.split(/\r?\n/);
+    const zahl = zeilen.map(z => z.match(/(\d+)\s*\/\s*(\d+)\s+bestanden/)).filter(Boolean).pop();
+    const fehler = zeilen.filter(z => /^FEHLER/.test(z.trim()));
+    if (e.zeitlimit) fehler.push(`FEHLER Suite ${suite.name} ueberschritt ihr Zeitlimit (20 Minuten)`);
+    return { ...suite, code: e.code, sekunden: e.dauerMs / 1000, ok: zahl ? +zahl[1] : null,
+      gesamt: zahl ? +zahl[2] : null, fehler, ende: zeilen.slice(-15) };
+  } finally { clearInterval(puls); }
 }
 
 const auswahl = NUR ? SUITEN.filter((s) => NUR.includes(s.name)) : SUITEN;
