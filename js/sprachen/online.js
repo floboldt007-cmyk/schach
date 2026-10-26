@@ -149,7 +149,7 @@ export const EN = {
   "weiss": "White",
   "schwarz": "Black",
   "zufall": "Random",
-  "fertig": "Game over",
+  "fertig": "Game finished",
   "bestaetigt": "Confirming move …",
   "du": "Your turn",
   "gegner": "Your friend’s turn",
