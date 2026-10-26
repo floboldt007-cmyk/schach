@@ -75,34 +75,30 @@ export class Engine {
 
 ## js/bots.js
 ```js
-export const BOTS = [ { id, stufe, name, elo, titel, avatar, farbe, kurz, bio,
+export const BOTS = [ { id, stufe, welt, endgegner?, name, elo, titel, avatar, farbe, kurz, bio,
                         staerke: {...}, saetze: { begruessung:[], schlagen:[], spielerFehler:[],
                         spielerGut:[], schach:[], verliert:[], gewinnt:[], remis:[] } }, ... ]
 export async function botZug(engine, fen, bot, { zugNummer }): Promise<{ uci, san, denkzeitMs }>
 export function botSatz(bot, anlass, zufall = Math.random): string|null
 ```
-Die Leiter (Namen und Charakter stehen fest, Avatare/Farben macht das Design):
-| Stufe | Name | Ziel-Elo | Charakter |
-|---|---|---|---|
-| 1 | Bauer Benno | 250 | Kennt die Zugregeln, meistens. Freut sich ueber jede Figur. |
-| 2 | Oma Hilde | 500 | Gemuetlich, nimmt alles, was ungedeckt steht. |
-| 3 | Kalle vom Stammtisch | 800 | Greift sofort an, uebersieht dabei viel. |
-| 4 | Lisa Laeufer | 1000 | Schnelle Schuelerin, liebt ihre Laeufer. |
-| 5 | Ritter Rudi | 1200 | Springer-Fan, sucht Gabeln. |
-| 6 | Professor Turm | 1400 | Solide, positionell, geduldig. |
-| 7 | Dame Delia | 1600 | Angriffslustig, opfert gern. |
-| 8 | Kommissar Koenig | 1800 | Endspiel-Spezialist, gibt nie auf. |
-| 9 | Grossmeisterin Greta | 2100 | Kaum Fehler, bestraft jeden. |
-| 10 | Der Stockfisch | 3000 | Endgegner. Volle Staerke. |
+Die Leiter hat 30 Bots in fuenf Welten (`WELTEN`), je sechs Bots mit 100 Elo Abstand.
+`botsDerWelt(nr)` liefert die Stationen, `endgegnerDerWelt(nr)` den letzten Bot der Welt.
+Namen, Charakter und Staerke-Profile stehen in `js/bots.js` bzw. im Woerterbuch `js/sprachen/bots.js`.
 
-Staerke-Modell (Vorschlag, Kalibrierung folgt im Test): untere Stufen = geringe Tiefe,
-MultiPV mit gewichtetem Zufall nach Bewertung (Temperatur in cp) plus Patzer-Wahrscheinlichkeit
-(zufaelliger legaler Zug, bevorzugt "menschliche" Zuege: Schlagen, Schach, Entwicklung),
-ab Stufe 6 Stockfish `UCI_LimitStrength`/`UCI_Elo` (Minimum 1320), Stufe 10 volle Staerke
-(movetime ca. 1500 ms). Charakter darf die Wahl leicht faerben (Rudi bevorzugt Springerzuege
-bei fast gleicher Bewertung, Hilde schlaegt gern, Delia mag Schachgebote und Opfer).
-Denkzeit: kurze, menschlich wirkende Pause (400 bis 1500 ms, auch wenn die Engine schneller ist).
-Ein Matt in 1 uebersehen die untersten Stufen manchmal, ab Stufe 4 nie.
+| Welt | Stufen | Angezeigte Elo | Endgegner |
+|---|---|---|---|
+| Karofelder | 1 bis 6 | 100 bis 600 | Janine vom Scheunenclub |
+| Springerforst | 7 bis 12 | 700 bis 1200 | Ritter Rudi |
+| Turmstadt | 13 bis 18 | 1300 bis 1800 | Kommissar Koenig |
+| Gezeitenkueste | 19 bis 24 | 1900 bis 2400 | Johann vom Leuchtturm |
+| Stockfisch-Tiefe | 25 bis 30 | 2500 bis 3000 | Der Stockfisch |
+
+Staerke-Modell: Stufen 1 bis 21 nutzen Suchprofile mit Tiefe, Kandidaten, Bewertungsrauschen,
+Patzer-Wahrscheinlichkeit und Charakter-Vorlieben. Stufen 22 bis 29 nutzen Stockfish mit
+`UCI_LimitStrength`/`UCI_Elo` gemaess Profil; Stufe 30 ohne Elo-Bremse mit `movetime: 1500`.
+Suchgrenzen und Denkpausen kommen aus dem jeweiligen `staerke`-Profil. Ab Elo 1000 erkennt
+`botZug()` ein Matt in 1 sicher, darunter entscheidet `mattInEins`. Eine belastbare Eichung
+der angezeigten Elo steht noch aus.
 
 ## js/review.js (rein, ohne DOM, in Node testbar)
 ```js
@@ -210,7 +206,8 @@ Klassen-Farben: `--k-brillant, --k-stark, --k-bester, --k-exzellent, --k-gut, --
  --k-ungenau, --k-fehler, --k-verpasst, --k-patzer, --k-erzwungen`.
 
 ## Screens (js/app.js)
-1. **Arena / Bot-Leiter:** alle 10 Bots als Leiter, gesperrte grau mit Schloss, Sterne je Bot
+1. **Arena / Bot-Leiter:** 30 Bots in fuenf Welten, die Weltkarte zeigt je sechs Stationen.
+   Weltwahl und direkt herausforderbarer Endgegner je offener Welt, gesperrte Bots grau mit Schloss, Sterne je Bot
    (1 Stern Sieg, 2 Sterne Sieg mit Genauigkeit >= 80 %, 3 Sterne Sieg ohne Hinweis und ohne
    Zuruecknahme). Weiter-Knopf "Naechster Gegner". Statistik.
 2. **Partie:** Brett, Bewertungsbalken (abschaltbar), Bot-Karte mit Sprechblase, Coach-Zeile
@@ -400,7 +397,7 @@ Bau B:
 
 # Runde 4: Erweiterungspunkte (Welle 0, verbindlich)
 
-P4 Liga (`js/pakete/liga/index.js`, reine Formeln in `wertung.js`, eigene Ansichten in `ansicht.js`, Tokens in `css/pakete/liga.css`) nutzt ausschliesslich `arena:panel-oben` (30), `arena:panel-bot` (15), `ergebnis:abrechnung` (30), `verlauf:seite` (20), Ereignisse, Icon-Register und Feier-Budget. `liga:geaendert` liefert `{ wertung, klasse, saison, stufe, aufstieg }` (Stufenname und Aufstiegs-Boolean). Modul `liga`, Rechenstand 1, Budget 10.000 Zeichen: normale/Blitz-Wertung getrennt, dauerhafte Haupt-Spielklasse, 84-Tage-Saison ab 19.10.2026 (4:00 lokal), Archiv-Abzeichen, beste Ergebnisse gegen die zehn Bots, letzte 40 normale Wertungen und hoechstens 100 Buchungsbelege. Negative rohe Elo-Schritte werden gemaess dem ausdruecklichen P4-Verlustschutz mit 0 uebernommen; die Oberflaeche benennt das und die ausstehende Eichung. Analysen ergaenzen ausschliesslich die Genauigkeit eines bekannten Belegs; die Liga rechnet die nachfolgenden Belege derselben Saison in Reihenfolge nach, damit Stufengrenzen unabhaengig vom Analysezeitpunkt bleiben. Kommt die Analyse einer Partie der zuletzt archivierten Saison erst nach dem Wechsel (Partie 3:59, Analyse 4:01), zieht die Liga Archiv und Startstufe der laufenden Saison so nach, als waere sie vorher gekommen, ohne Feier; aeltere Analysen aendern nichts mehr. Saisonwechsel archivieren den letzten Stand und setzen einmal um eine Stufe zurueck, auch nach mehreren ausgelassenen Saisons; eine laufende Partie wird nie unterbrochen. Der erste Start zaehlt keine alten Partien nach. Alte Partie-Felder und `pruefeLiga()` bleiben unveraendert. Das Modul kuerzt bei Bedarf nur alte Belege und Kurvenpunkte, nie Abzeichen. Die neue Suite ist `node tests/liga.test.mjs` (Node und Browser; `--nur-node` fuer Formeln).
+P4 Liga (`js/pakete/liga/index.js`, reine Formeln in `wertung.js`, eigene Ansichten in `ansicht.js`, Tokens in `css/pakete/liga.css`) nutzt ausschliesslich `arena:panel-oben` (30), `arena:panel-bot` (15), `ergebnis:abrechnung` (30), `verlauf:seite` (20), Ereignisse, Icon-Register und Feier-Budget. `liga:geaendert` liefert `{ wertung, klasse, saison, stufe, aufstieg }` (Stufenname und Aufstiegs-Boolean). Modul `liga`, Rechenstand 1, Budget 10.000 Zeichen: normale/Blitz-Wertung getrennt, dauerhafte Haupt-Spielklasse, 84-Tage-Saison ab 19.10.2026 (4:00 lokal), Archiv-Abzeichen, beste Ergebnisse gegen die 30 Bots, letzte 40 normale Wertungen und hoechstens 100 Buchungsbelege. Negative rohe Elo-Schritte werden gemaess dem ausdruecklichen P4-Verlustschutz mit 0 uebernommen; die Oberflaeche benennt das und die ausstehende Eichung. Analysen ergaenzen ausschliesslich die Genauigkeit eines bekannten Belegs; die Liga rechnet die nachfolgenden Belege derselben Saison in Reihenfolge nach, damit Stufengrenzen unabhaengig vom Analysezeitpunkt bleiben. Kommt die Analyse einer Partie der zuletzt archivierten Saison erst nach dem Wechsel (Partie 3:59, Analyse 4:01), zieht die Liga Archiv und Startstufe der laufenden Saison so nach, als waere sie vorher gekommen, ohne Feier; aeltere Analysen aendern nichts mehr. Saisonwechsel archivieren den letzten Stand und setzen einmal um eine Stufe zurueck, auch nach mehreren ausgelassenen Saisons; eine laufende Partie wird nie unterbrochen. Der erste Start zaehlt keine alten Partien nach. Alte Partie-Felder und `pruefeLiga()` bleiben unveraendert. Das Modul kuerzt bei Bedarf nur alte Belege und Kurvenpunkte, nie Abzeichen. Die neue Suite ist `node tests/liga.test.mjs` (Node und Browser; `--nur-node` fuer Formeln).
 
 P3 Serie (`js/pakete/serie/index.js`, reine Logik in `tag.js` (Tageswerk, Serie, Bruecken, Kapitel, Bauernmarsch, Meilensteine, Kalender, Wochen-Ring, Pause) und `lauf.js` (Siegeslauf), Speicher in `stand.js`, Ansichten in `ansicht.js`, Tokens in `css/pakete/serie.css`) nutzt ausschliesslich `arena:heute` (10), `arena:kopf` (20, Chip mit Tagzahl, Flamme ab 3 Siegen in Folge), `ergebnis:abrechnung` (40, Zeile nur beim ersten Tageswerk des Tages), `partie:spieler-leiste` (30) und `einstellungen:gruppen` (20), dazu Ereignisse, Icon-Register (`se-bauer`, `se-flamme`, `se-ring`, `se-mond`, `se-liege`) und das Feier-Budget (`umwandlung` gross 66, `meilenstein` gross 72, `marsch` Zeile 50 nur ausserhalb einer Partie, `siegeslauf` Zeile 44). Es sendet `tag:gezaehlt` einmal je Tag und `serie:geaendert` `{ tag, lauf, meilenstein, ruht, kapitel, rekord, gesamt, heute }`; `liga:geaendert` liefert die Wertung fuer die Siegeslauf-Grenze. Modul `serie`, Rechenstand 1, Budget 4.000 Zeichen (hoechstens 49 Tage in der Liste, Abrechnungs-Belege je Partie); Einstellungen `{ anzeigen, ruhetag, strenge, leise }` ueberstehen "Fortschritt zuruecksetzen". Der Tag wechselt um 4:00 (`js/tag.js`), eine Partie um 3:59 zaehlt zum Vortag. Die Serie zerbricht nie mit einem Vorwurf: ein freier Tag wird zur Bruecke, danach ruht sie ("ruht", nie "0"). Ein Stand aus einer neueren App wird gelesen, aber nie ueberschrieben. Die Suite ist `node tests/serie.test.mjs` (Node und Browser; `--nur-node` fuer die Logik).
 
@@ -1697,7 +1694,7 @@ Allzeit, ohne das gemerkte Fenster zu aendern) und nach dem Ueberholen einer Fre
 nichts geht automatisch raus). Rechnet die Analyse noch: "Punkte werden gezählt …" mit endlichem Schimmer (nur opacity), danach
 der Nachtrag; ohne Analyse "Punkte folgen mit der Analyse" (die Arena holt sie nach). Uebungen: keine Zeile.
 `bestenliste:reiter` Ich 10 (Spielerkarte, "Deine besten Partien" ueber alle Tafeln im Fenster, Rekordbuch mit Rechenstand),
-Bots 20 (Tafel-Wahl der 10 Leiter-Bots und der Boss-Tafeln mit Eintraegen, die Tafel mit Platz, Name, Datum, Farbe, Ergebnis,
+Bots 20 (Tafel-Wahl der 30 Leiter-Bots und der Boss-Tafeln mit Eintraegen, die Tafel mit Platz, Name, Datum, Farbe, Ergebnis,
 Zuegen, Genauigkeit, Punkten, eigene Zeile mit Akzentlinie, Freunde als Gast-Zeilen mit Initiale und Pruefstufe, Chronik,
 "Rekord angreifen: Rudi, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
 nachspielen, mit `app.engine('bewertung')` neu analysieren und mit derselben Formel rechnen, "Nachgerechnet ✓"; Freunde-Liste,
@@ -1939,7 +1936,7 @@ Huegelbaender, Baeume, Haeuser, Zelt, Burgturm, Pfad als Bezier `pfadD()` durch 
 
 **Portraets** (`assets/avatare/modern/<bot.id>.svg`, viewBox 0 0 120 120): aus `AV.svg(id)` in Entwurf A erzeugt (eigene
 Werke fuer dieses Projekt, GPL-3.0 wie die Pixel-Avatare, die als Rueckfall bleiben). `THEMEN.modern.portraets` nennt
-die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`, sonst `bot.avatar`.
+die 30 Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`, sonst `bot.avatar`.
 
 **Duell-Intro** (`js/ui/duell.js`, `css/duell.css`, PLAN 2.3):
 - `duellArt({ einstellung, anlass, reduziert })` -> `'voll' | 'kurz' | 'aus'`: `aus` bei Einstellung `duellIntro: 'aus'`
@@ -1970,7 +1967,7 @@ die zehn Leiter-Bots, `avatarVon(bot)` liefert `assets/avatare/modern/<id>.svg`,
 
 **Tests:** `node tests/arena.test.mjs` (Suite `arena` in `tests/alle.mjs`): Node (Duell-Regeln, Portraet-Dateien, Orte,
 CSS-Regeln, Cache) und Browser (Karte quer/hoch/Handy hell und dunkel, Zustaende, Panel, Orte mit Test-Paket, Lage und
-Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle zehn Bots in beiden Fassungen und allen
+Ueberdeckung der Beschriftungen, Handy quer, Text des Spielen-Knopfs fuer alle 30 Bots in beiden Fassungen und allen
 Ziel-Lagen, Freischalten mit und ohne Bewegung, Duell `immer`/`besondere`/`aus`/ohne Bewegung, Ueberspringen, Tipp zur
 Partie, Portraetflug auf eingesetzte Ziele, Zeitplan mit Schein-Partie bei normal/langsam/schnell und spaeter Partie,
 harte Grenze).
@@ -2186,7 +2183,7 @@ Tabellenzugriff ab.
   Leerzeichen, `.`, `-`, `'`, mindestens ein Buchstabe, nie @; in der Klasse eindeutig ohne Groß/Klein,
   `beigetreten_am`): lesen Leitung und das Mitglied selbst; **Spaltenrechte ohne `user_id`** (die Leitung sieht nie die
   Konto-ID, Policy liest sie trotzdem).
-- `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0–10, `sterne` 0–30, `partien`, `genauigkeit_schnitt`
+- `klassen_fortschritt` (je Mitglied: `bots_besiegt` 0 bis 30, `sterne` 0 bis 90, `partien`, `genauigkeit_schnitt`
   numeric(4,1), `haeufigste_fehler` jsonb `{ zuege, arten: [{ art, anzahl }] }` höchstens 300 Zeichen und 4 Arten aus
   `patzer`, `fehler`, `verpasst`, `ungenau`, `erledigt` uuid[] höchstens 30, `aktualisiert_am` **date** (Europe/Berlin,
   keine Uhrzeit: die Meldung kommt nach jeder Partie, ein Zeitstempel verriete, wann jemand spielt; eine ältere Fassung
@@ -2339,7 +2336,7 @@ Paket haengt sein CSS selbst als `link[data-paket="teilen"]` ein). Test: `tests/
 ## Paket gedaechtnis (A2): Bots erinnern sich, Revanche, Erzfeind
 
 Dateien: `js/pakete/gedaechtnis/index.js` (Orte, Ereignisse, Register), `logik.js` (rein, Node-testbar, kein
-`Math.random`), `saetze.js` (eigene Texte: 10 Anlaesse x 10 Leiter-Bots x 3 Varianten, je Bot im Ton seiner Bio, hoechstens
+`Math.random`), `saetze.js` (eigene Texte: 10 Anlaesse x 30 Leiter-Bots x 3 Varianten, je Bot im Ton seiner Bio, hoechstens
 110 Zeichen), `css/pakete/gedaechtnis.css` (nur Tokens; das Paket haengt sein CSS selbst als `link[data-paket="gedaechtnis"]`
 ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `tests/fairness.test.mjs` (SPIELKONZEPT 5.3).
 
