@@ -586,8 +586,11 @@ async function testeAufgabe(seite, h, fehler) {
   await seite.waitForSelector('.dialog-ort .dialog');
   await h.tippe('.dialog-knoepfe .knopf.gefahr');
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
-  pruefe('Overlay: Niederlage mit Genauigkeit', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
-    && /\d/.test(await seite.locator('.erg-genau b').innerText()));
+  const genauText = await seite.locator('.erg-genau').innerText();
+  pruefe('Overlay: kurze Niederlage zeigt zu kurz mit Hinweis, keine Prozentzahl oder Spielstaerke',
+    /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
+    && Math.ceil(n / 2) < 10 && (await seite.locator('.erg-genau b').innerText()).trim() === 'zu kurz'
+    && genauText.includes('Zu wenige Züge für eine verlässliche Bewertung') && !/%|spielte wie/.test(genauText), genauText);
   const p = (await h.partien()).find((x) => x.botId === 'paula');
   pruefe('Partie mit Analyse gespeichert', p && p.zuege.length === n && Number.isFinite(p.genauigkeit)
     && await seite.evaluate((i) => localStorage.getItem('schach-arena:v1:review:' + i) != null, p && p.id));
@@ -735,6 +738,58 @@ async function testeOhnePakete(browser) {
   await kontext.close();
 }
 
+// Kurze Aufgabe und kurzer Sieg auf Deutsch und Englisch, mit echten Zuegen und gespeicherter Analyse.
+async function testeKurzesErgebnis(browser) {
+  for (const sprache of ['de', 'en']) {
+    gruppe = `Kurzes Ergebnis ${sprache}`;
+    const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+    const h = hilfen(seite);
+    try {
+      await seite.goto(START + `?test&kern&sprache=${sprache}#arena`);
+      await h.screen('arena');
+      await seite.evaluate(() => {
+        window.__app.setzeEinstellungen({ bewegung: 'aus' });
+        window.__test = { botZug: () => 'e7e5' };
+        window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+      });
+      await h.screen('partie');
+      await h.warteBereit();
+      await h.warteFlo();
+      await h.zugTippen('e2e4');
+      await h.warteFlo();
+      await h.aufgebenFragen();
+      await seite.waitForSelector('.dialog-ort .dialog', { timeout: 5000 });
+      await h.tippe('.dialog-knoepfe .knopf.gefahr');
+      await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
+      const kurz = sprache === 'de' ? 'zu kurz' : 'too short';
+      const hinweis = sprache === 'de' ? 'Zu wenige Züge für eine verlässliche Bewertung' : 'Too few moves for a reliable assessment';
+      const text = await seite.locator('.erg-genau').innerText();
+      pruefe('Aufgabe nach einem eigenen Zug: zu kurz mit Hinweis, ohne Prozent und Elo',
+        (await seite.locator('.erg-genau b').innerText()).trim() === kurz
+        && text.includes(hinweis) && !/%|spielte wie|played like|≈/.test(text), text);
+      const verloren = (await h.partien())[0];
+      pruefe('Niederlage: Genauigkeit und Spielstaerke bleiben gespeichert, keine Sterne',
+        verloren.ergebnis === 'niederlage' && verloren.zuege.length === 2
+        && Number.isFinite(verloren.genauigkeit) && Number.isFinite(verloren.spielstaerke)
+        && verloren.sterne.every((s) => s === false), JSON.stringify(verloren));
+
+      await schaefermatt(seite, h);
+      await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+      const gewonnen = (await h.partien())[0];
+      const siegText = await seite.locator('.erg-genau').innerText();
+      pruefe('Schaefermatt nach vier eigenen Zuegen: gespeicherte Genauigkeit, Spielstaerke und drei Sterne',
+        gewonnen.ergebnis === 'sieg' && gewonnen.zuege.length === 7 && Number.isFinite(gewonnen.genauigkeit)
+        && Number(await seite.locator('.erg-genau b').getAttribute('data-ziel')) === gewonnen.genauigkeit
+        && /%/.test(siegText) && siegText.includes(sprache === 'de' ? 'spielte wie' : 'played like')
+        && !siegText.includes(kurz) && await seite.locator('.erg-stern.an').count() === 3, siegText);
+      pruefe('Keine Konsolenfehler oder fehlgeschlagenen Anfragen', fehler.length === 0 && fehlgeschlagen.length === 0,
+        [...fehler, ...fehlgeschlagen].join(' | '));
+    } finally {
+      await kontext.close();
+    }
+  }
+}
+
 // ---------- Kopf mit den echten Paketen: Zahlenruhe (Flo 23.10.: Sterne, Level, Serie) ----------
 // Mit Level (funken) und Serie im Kopf tritt "Besiegt" zurueck; jeder sichtbare Chip steht ganz in der Chip-Reihe, auf dem
 // iPad (quer 1180 und 1024, hoch 820) und am Handy (390, dort ohne die Marke und ohne die Flamme der Serie).
@@ -792,6 +847,7 @@ try {
   await testeAufgabe(seite, h, fehler);
   await testeUpdate(seite, h, fehler);
   await testeOhnePakete(browser);
+  await testeKurzesErgebnis(browser);
   await testeKopfZahlenruhe(browser);
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
