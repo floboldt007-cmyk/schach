@@ -49,7 +49,9 @@ publishable key und dem Sitzungs-Token auf. Züge gehen seit Anti-Cheat Etappe 1
 (Abschnitt unten), die sie über `online_zug_verbuchen` verbucht. Es gibt keinen Websocket und keine Supabase-Bibliothek im Projekt.
 Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Server vor.
 
-1. **Schema einspielen:** Erst `supabase/schema.sql` (falls noch nicht geschehen), dann im **SQL Editor** den
+1. **Schema einspielen:** Seit Etappe 1a zuerst die Edge Function `online-zug` hochladen (Abschnitt „Anti-Cheat
+   Etappe 1a“, Schritt 1), denn `online-schema.sql` schließt den alten Zugweg. Ohne die Function kann danach niemand
+   mehr ziehen. Dann `supabase/schema.sql` (falls noch nicht geschehen), dann im **SQL Editor** den
    vollständigen Inhalt von `supabase/online-schema.sql` ausführen. Ein erneuter Lauf ist erlaubt. Wer später
    Parameternamen oder den Rückgabetyp einer Funktion ändert, entfernt sie vorher mit `drop function`
    (`create or replace` kann das nicht).
@@ -83,16 +85,27 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
 
 ### Anti-Cheat Etappe 0 (Stand 29.10.2026): bitte neu einspielen
 
-**Für Flo:** Nach diesem Stand `supabase/online-schema.sql` im **SQL Editor** neu einspielen (vollständiger Inhalt,
-**Run**) und danach `supabase/online-rls-test.sql` laufen lassen. Am Ende muss `Online-RLS-Test erfolgreich` stehen.
-Geändert haben sich auch `supabase/schema.sql` (Längengrenze für das Gerät beim Spielstand) und
-`supabase/daten-schema.sql` (Mengenbremse mit Zähltabelle). Am einfachsten alles in dieser Reihenfolge, jede Datei in
-einer eigenen Query:
+**Für Flo, seit Etappe 1a wichtig: zuerst die Edge Function `online-zug` hochladen**, erst danach
+`supabase/online-schema.sql` einspielen. Die SQL-Datei schließt seit Etappe 1a den alten Zugweg. Fehlt die Function
+dann, kann niemand mehr ziehen, und `online-rls-test.sql` meldet trotzdem Erfolg, weil der Test die Function nicht
+braucht.
 
-1. `supabase/schema.sql`, dann `supabase/rls-test.sql` (muss `RLS-Test erfolgreich` melden).
-2. `supabase/daten-schema.sql` (falls schon einmal eingespielt), dann `supabase/daten-rls-test.sql`
+Nach diesem Stand `supabase/online-schema.sql` im **SQL Editor** neu einspielen (vollständiger Inhalt, **Run**) und
+danach `supabase/online-rls-test.sql` laufen lassen. Am Ende muss `Online-RLS-Test erfolgreich` stehen.
+Geändert haben sich auch `supabase/schema.sql` (Längengrenze für das Gerät beim Spielstand) und
+`supabase/daten-schema.sql` (Mengenbremse mit Zähltabelle). Am einfachsten alles in dieser Reihenfolge, jede SQL-Datei
+in einer eigenen Query:
+
+1. Edge Function hochladen: im Terminal im Projektordner `npx supabase functions deploy online-zug` (Einzelheiten im
+   Abschnitt „Anti-Cheat Etappe 1a“, Schritt 1).
+2. `supabase/schema.sql`, dann `supabase/rls-test.sql` (muss `RLS-Test erfolgreich` melden).
+3. `supabase/daten-schema.sql` (falls schon einmal eingespielt), dann `supabase/daten-rls-test.sql`
    (`Daten-RLS-Test erfolgreich`).
-3. `supabase/online-schema.sql`, dann `supabase/online-rls-test.sql` (`Online-RLS-Test erfolgreich`).
+4. `supabase/online-schema.sql`, dann `supabase/online-rls-test.sql` (`Online-RLS-Test erfolgreich`).
+5. Nachsehen, ob die Function wirklich da ist: Im Dashboard unter **Edge Functions** muss `online-zug` stehen, das
+   merken die RLS-Tests nicht. Danach mit zwei Konten einen Zug probieren (Abschnitt „Anti-Cheat Etappe 1a“, Schritt 4).
+
+Damit ist auch Etappe 1a eingerichtet.
 
 Alle Dateien dürfen mehrfach laufen, die Tests rollen alles zurück. `online-schema.sql` entfernt dabei die alte Fassung
 von `online_tritt_bei` (`drop function`), weil die Funktion jetzt eine andere Antwort liefert. Meldet die App danach
@@ -135,7 +148,9 @@ niemand mehr melden.
 2. **SQL neu einspielen:** Im **SQL Editor** den vollständigen Inhalt von `supabase/online-schema.sql` ausführen
    (**Run**), danach `supabase/online-rls-test.sql`. Am Ende muss `Online-RLS-Test erfolgreich` stehen. Erst jetzt gibt
    es `online_zug_verbuchen`, und angemeldete Nutzer können den alten Weg `online_zug` nicht mehr aufrufen. Beide
-   Dateien dürfen mehrfach laufen, der Test rollt alles zurück.
+   Dateien dürfen mehrfach laufen, der Test rollt alles zurück. Ist Etappe 0 noch nicht eingespielt, vorher
+   `supabase/schema.sql` und `supabase/daten-schema.sql` mit ihren Tests (Abschnitt „Anti-Cheat Etappe 0“, Schritte 2
+   und 3). Der RLS-Test prüft die Function nicht: Unter **Edge Functions** muss `online-zug` stehen.
 3. **Falls die App danach beim Ziehen „Die Zugprüfung ist auf dem Server noch nicht eingerichtet.“ sagt:** im SQL Editor
    einmal `notify pgrst, 'reload schema';` ausführen.
 4. **Testen:** Mit zwei Konten eine Partie spielen. Unter **Edge Functions > online-zug > Logs** stehen nur kurze

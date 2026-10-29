@@ -1923,7 +1923,10 @@ jetzt, zieht bis dahin die Uhr ab (die Uhr des Gegners startet mit dem Verbuchen
 (intern), dort gelten die Regeln von Etappe 0 als zweite Linie. Antworten: 200 die Zeile, sonst `{ fehler, text }` mit
 400/401/404/405/409/413/422/503; `js/online.js` uebersetzt jede Kennung (`FEHLER_TEXTE`, Deutsch und Englisch in
 `js/sprachen/online.js`). Ins Protokoll nur Kennungen, nie Nutzer, Zuege oder Schluessel. Noch offen (Teil 2 und spaeter):
-faire Uhr, Zeitstempel je Zug in eigener Tabelle, Drosselung je Konto.
+faire Uhr, Zeitstempel je Zug in eigener Tabelle, Drosselung je Konto. Einrichtung immer erst die Function, dann
+`online-schema.sql` (die SQL schliesst den alten Weg, eine fehlende Function merkt der RLS-Test nicht); jeder Abschnitt
+in `supabase/ANLEITUNG.md`, der `online-schema.sql` einspielen laesst, nennt das Hochladen davor (geprueft in
+`tests/server-online-zug.test.mjs`).
 
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 

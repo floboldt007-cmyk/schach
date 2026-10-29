@@ -609,6 +609,41 @@ const ZUG = { partie: PARTIE, zug: 'e2e4' };
     alt.length === 2 && alt.every((t) => /^public\.online_zug\([^;]*\);\s+raise exception 'FEHLER: [^']*online_zug[^']*';\s+exception\s+when insufficient_privilege then null;/.test(t)), alt.map((t) => t.slice(0, 120)));
 }
 {
+  // Anleitung: Reihenfolge beim Einrichten. Die 1a-Fassung von online-schema.sql schliesst den alten Zugweg. Wer sie
+  // einspielt, bevor die Function hochgeladen ist, kann danach nicht mehr ziehen, und online-rls-test.sql meldet
+  // trotzdem Erfolg. Deshalb muss JEDER Abschnitt, der zum Einspielen von online-schema.sql auffordert, das Hochladen
+  // vorher nennen (auch der Abschnitt "Anti-Cheat Etappe 0", auf den Flos offener Punkt zeigt).
+  const a = lies('supabase/ANLEITUNG.md');
+  const abschnitte = a.split(/\n(?=#{2,3} )/);
+  const titel = (s) => s.split('\n')[0];
+  const HOCHLADEN_RE = /functions deploy online-zug|Edge Function `online-zug`[^.\n]*hochladen/;
+  const mitSql = abschnitte.filter((s) => s.includes('`supabase/online-schema.sql`'));
+  const erwartet = ['## Online gegen Freunde', '### Anti-Cheat Etappe 0', '### Anti-Cheat Etappe 1a'];
+  pruefe('ANLEITUNG: die drei Abschnitte, die online-schema.sql einspielen lassen, werden gefunden',
+    erwartet.every((e) => mitSql.some((s) => titel(s).startsWith(e))), mitSql.map(titel));
+  const ohne = mitSql.filter((s) => !HOCHLADEN_RE.test(s.slice(0, s.indexOf('online-schema.sql'))));
+  pruefe('ANLEITUNG: jeder Abschnitt nennt das Hochladen von online-zug VOR dem ersten online-schema.sql',
+    mitSql.length > 0 && ohne.length === 0, ohne.map(titel));
+  const e0 = abschnitte.find((s) => titel(s).startsWith('### Anti-Cheat Etappe 0')) || '';
+  const punkte = e0.split('\n').filter((z) => /^\d+\. /.test(z) || /^ {3}\S/.test(z))
+    .reduce((l, z) => (/^\d+\. /.test(z) ? [...l, z] : (l.length ? [...l.slice(0, -1), l[l.length - 1] + ' ' + z.trim()] : l)), []);
+  const iFn = punkte.findIndex((p) => p.includes('functions deploy online-zug'));
+  const iSql = punkte.findIndex((p) => p.includes('`supabase/online-schema.sql`'));
+  const iSchema = punkte.findIndex((p) => p.includes('`supabase/schema.sql`'));
+  const iDaten = punkte.findIndex((p) => p.includes('`supabase/daten-schema.sql`'));
+  pruefe('ANLEITUNG Etappe 0: Liste 1. Function hochladen, dann schema.sql, daten-schema.sql, online-schema.sql; danach Function im Dashboard nachsehen',
+    iFn === 0 && iFn < iSchema && iSchema < iDaten && iDaten < iSql
+    && punkte.slice(iSql + 1).some((p) => p.includes('**Edge Functions**') && p.includes('`online-zug`')), punkte.map((p) => p.slice(0, 60)));
+  pruefe('ANLEITUNG Etappe 0: sagt, dass der RLS-Test eine fehlende Function nicht bemerkt',
+    /meldet trotzdem Erfolg, weil der Test die Function nicht\s+braucht/.test(e0));
+  const e1 = abschnitte.find((s) => titel(s).startsWith('### Anti-Cheat Etappe 1a')) || '';
+  const schritt2 = (e1.match(/\n2\. \*\*SQL neu einspielen:\*\*[\s\S]*?(?=\n3\. )/) || [''])[0];
+  pruefe('ANLEITUNG Etappe 1a, Schritt 2: verweist fuer schema.sql und daten-schema.sql auf Etappe 0 und aufs Nachsehen der Function',
+    /Ist Etappe 0 noch nicht eingespielt/.test(schritt2) && schritt2.includes('`supabase/schema.sql`')
+    && schritt2.includes('`supabase/daten-schema.sql`') && /„Anti-Cheat Etappe 0“/.test(schritt2) && schritt2.includes('**Edge Functions**'));
+  pruefe('ANLEITUNG Etappe 0 und 1a: keine Gedankenstriche (wie im Rest der Anleitung)', !/[–—]/.test(e0 + e1));
+}
+{
   // Keine Geheimnisse und keine Preise in den Dateien dieser Etappe (oeffentliches Repo)
   const dateien = ['supabase/functions/_gemeinsam/online-zug.js', 'supabase/functions/online-zug/index.ts', 'supabase/online-schema.sql',
     'supabase/online-rls-test.sql', 'js/online.js', 'js/ui/online.js', 'js/sprachen/online.js', 'supabase/ANLEITUNG.md'];
