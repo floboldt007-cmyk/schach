@@ -88,7 +88,7 @@ Namen, Charakter und Staerke-Profile stehen in `js/bots.js` bzw. im Woerterbuch 
 | Welt | Stufen | Angezeigte Elo | Endgegner |
 |---|---|---|---|
 | Karofelder | 1 bis 6 | 100 bis 600 | Janine vom Scheunenclub |
-| Springerforst | 7 bis 12 | 700 bis 1200 | Ritter Rudi |
+| Springerforst | 7 bis 12 | 700 bis 1200 | Ritter Thorsten |
 | Turmstadt | 13 bis 18 | 1300 bis 1800 | Kommissar Koenig |
 | Gezeitenkueste | 19 bis 24 | 1900 bis 2400 | Johann vom Leuchtturm |
 | Stockfisch-Tiefe | 25 bis 30 | 2500 bis 3000 | Der Stockfisch |
@@ -333,12 +333,19 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
 **Welten (Flo 23.10., gebaut 24.10.):** 30 Bots in fuenf Welten (`WELTEN` in `js/bots.js`: Karofelder, Springerforst,
 Turmstadt, Gezeitenkueste, Stockfisch-Tiefe), je sechs, Elo 100 bis 3000 in 100er-Schritten (`stufe` 1..30 = Elo/100,
 `welt` 1..5, `endgegner: true` am sechsten jeder Welt, `rufname` fuer Schilder und Knoepfe, `merkmale` fuer das Panel).
-Die zehn bisherigen Bots behalten id, Bild und Sterne; Benno spielt jetzt mit Elo 200, Fridolin (100) ist der erste.
+Die zehn bisherigen Bots behalten id, Bild und Sterne; Lukas spielt jetzt mit Elo 200, Willi (100) ist der erste.
+Namen (Flo 29.10.): sechs Bots heissen anders als ihre id, weil die id in Spielstaenden steckt und nie wechselt:
+`fridolin` = Willi, `gustav` = Maik, `bodo` = Jan, `henning` = René, `ottilie` = Bibliothekar Florian,
+`ragna` = Lotse Anestis (die beiden letzten mit neuem Portraet, gleiche Datei). Neue Namen nur in `js/sprachen/bots.js`.
+Zweite Runde am selben Tag: `benno` = Bauer Lukas, `kalle` = Maxi vom Stammtisch, `edda` = Koehlerin Irmi,
+`rudi` = Ritter Thorsten, `merle` = Forscherin Viki, `turm` = Professor Oliver Turm, `koenig` = Kommissar Tobias Koenig
+(bei den beiden letzten bleibt der Nachname wegen des Wortspiels, Kurzformen `Oliver`/`Tobias` in `arena.ruf.*`,
+`rufname.koenig`, `kurz.*` der Punkte und `KURZ` in `js/ui/analyse.js`).
 Ab Elo 2200 spielt Stockfish selbst (`staerke.voll` mit `elo`, UCI_Elo), der Stockfisch ohne Bremse.
 Freischaltung (`storage.js`): frei ist jede Stufe bis `hoechsterSieg() + 1` (alte Spielstaende behalten alles unter
 ihrem besten Sieg, neu eingezogene Bots darunter sind offen und tragen das Schild NEU), dazu der Endgegner jeder Welt,
 deren erste Stufe frei ist (direkt herausfordern; sein Sieg oeffnet die ganze Welt und die naechste).
-`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Fridolin). `hoechsteFreieStufe()` zaehlt
+`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Willi). `hoechsteFreieStufe()` zaehlt
 die Endgegner-Ausnahme nicht mit (Massstab fuer Empfehlungen). `istWeltFrei(nr)`, `hatWeltsiegel(nr)` (alle 18 Sterne).
 Oeffnet ein Sieg mehrere Stufen, meldet `neuFreigeschaltet` den neuen naechsten Gegner.
 Arena (`js/ui/arena.js`): die Karte zeigt eine Welt (`params.welt`, sonst die des gewaehlten Bots) mit sechs Stationen,
@@ -1087,7 +1094,7 @@ rechnet, ist `kontext.rechnet` gesetzt („Punkte werden gezaehlt …“ ist Sac
     nie ueber die Figuren; kein Kuerzen; die Begruessung steht hoch wie jeder Satz 3,5 s, quer 6 s). Karten haben
     `role="group"`. Flo `.spieler.ich` (Zusatzklassen `.spielerleiste`, `.spieler-quer`, `.spieler-hoch`): `.av` (`thema.floAvatar`),
     `.name`, direkt danach `.ort-spieler-leiste`, Unterzeile, `.uhr[data-wer="flo"]`. Der Name wird nie mit „…“ gekuerzt:
-    passt er nicht in zwei Zeilen, steht der Rufname da (Benno, Hilde, Kalle, Lisa, Rudi, Prof. Turm, Delia, Kommissar,
+    passt er nicht in zwei Zeilen, steht der Rufname da (Lukas, Hilde, Maxi, Lisa, Thorsten, Prof. Turm, Delia, Kommissar,
     Greta, Stockfisch), der volle Name im `aria-label` der Karte. `lage()` meldet weiter `'hoch'`/`'quer'`.
   - **Uhr** (Anzeige, W0+b bringt die Logik): `export fmtUhr(ms)` („M:SS“ ab 20 s, darunter „0:SS,z“). Beide `.uhr` sind
     versteckt ohne Bedenkzeit (`z.tempo`), mit Bedenkzeit steht die Grundzeit da. `uhr.setze(wer, ms, { laeuft })` (intern,
@@ -1241,7 +1248,7 @@ vorliebeWert(vorliebe, zug, kontext), VORLIEBE_FENSTER_CP = 30, VORLIEBE_NAEHE_C
 ## Speicher (js/storage.js)
 - `MODI = ['normal', 'uebung', 'boss', 'frei', 'spiel']`; `wertet()`: nur `normal` aus der Grundstellung und (w0plus-a-fix)
   nur gegen Leiter-Bots. Partien gegen angemeldete Bots (Bosse, Sparring, Gaeste; `stufe: null`) werten nie, auch im
-  Modus `normal`: vorher bekam ein Gast drei Sterne, zaehlte in der Statistik und bot „Nächster Gegner“ (Benno) an. Ohne
+  Modus `normal`: vorher bekam ein Gast drei Sterne, zaehlte in der Statistik und bot „Nächster Gegner“ (Lukas) an. Ohne
   `botId` (`wertet({ modus, startFen })`) zaehlen nur Modus und Stellung. Ob eine spaetere Art (z. B. geeichte Gaeste aus
   S3-1) fuer die Arena-Wertung von S1-2 zaehlt, entscheidet ein eigenes Feld, nicht `wertet()`; bis dahin zaehlen
   Gast-Partien nirgends (wie Bosse).
@@ -1330,7 +1337,7 @@ uebrigen Zusaetze haengen an Logik, die erst mit den Paketen kommt; jedes Paket 
 | Pruefung (5.3) | Paket |
 |---|---|
 | Funken nie negativ; Zuege ausserhalb 10 bis 90 % bringen 0; hoechstens 40 offene Zuege; Rueckenwind und Funken-Wochenende zusammen hoechstens ×2; Tagesbogen mit den Funken vor der Verdopplung; Uebung erhoeht Funken, nie die Wertung; Level sinkt nie; Level-Titel ohne „Meister“, „Großmeister“, „Profi“, „Experte“, „Elo“; Tafel-Rekord-Funken nur fuer Allzeit-Rekorde; Treppenlauf bucht keine Einzel-Funken | S1-1 `funken` (Treppenlauf: S2-2) |
-| Punkte nie negativ; „120 Zuege Schieben gegen Benno“ unter der zuegig verwerteten Fassung; ohne Hilfe-Flag kein Tafeleintrag | S1-3 `punkte` |
+| Punkte nie negativ; „120 Zuege Schieben gegen Lukas“ unter der zuegig verwerteten Fassung; ohne Hilfe-Flag kein Tafeleintrag | S1-3 `punkte` |
 | Serie zeigt nach einer Pause nie „0“; Pause nur fuer kuenftige Tage; Reise-Regel; keine Funken aus `tag:gezaehlt`; „Willkommen zurueck“ hoechstens einmal je Kalendermonat | S1-4 `alltag` (Pause: S2-6) |
 | Boss-Leiste ist eine reine Funktion der Bewertung; Boss-Staerke innerhalb einer Woche fuer denselben Spieler gleich | S1-6 `boss` |
 | Liga: Bot-gegen-Bot-Partien einer Saison identisch, egal wie Flo spielt | S3-2 |
@@ -1635,7 +1642,7 @@ die eigene Spielanalyse nutzt schon gerechnete Live-Suchen gleicher Tiefe wieder
 kleine Abweichungen sind moeglich. Die Beispiele aus 3.2 und 3.13 (10.400,
 18.000, 6.400/9.400, 14.900, 20.100) sind Pruefwerte in `tests/punkte.test.mjs`.
 
-**Tafeln (`tafel.js`).** Je Leiter-Bot `bot:<id>` ("Rudis Tafel") und je Boss und Stufe `boss:<id>:standard|meister`.
+**Tafeln (`tafel.js`).** Je Leiter-Bot `bot:<id>` ("Thorstens Tafel") und je Boss und Stufe `boss:<id>:standard|meister`.
 Eingetragen wird eine wertende Partie gegen einen Leiter-Bot oder eine Boss-Partie, beide nur ohne Hinweis und ohne
 Zuruecknehmen (sonst Punkte in der Abrechnung, aber `grund: 'hilfe'`); Uebungen (gar keine Rechnung), freie Partien,
 Spielhalle, Gaeste und eigene Stellungen nie (`grund`). Regeln aus 3.13: 10 Zeilen, davon hoechstens 3 eigene; dein Bestwert steht
@@ -1651,7 +1658,7 @@ Ausduennen: behalten werden die 3 Allzeit-Besten und je 3 Beste der laufenden Wo
 Allzeit-Besten. **Gaeste** sind Freunde aus Codes und die **vorlaeufigen Bot-Laeufe** (3.13 "Schon in S1 nicht leer", unten).
 
 **Vorlaeufige Bot-Laeufe.** `daten/punkte/bot-laeufe.json` (art `bot-laeufe`, format 1, rechenstand 1, ca. 4 KB): je Leiter-Tafel
-der beste und der mittlere Lauf jedes Nachbar-Bots (Stufe k-1 und k+1; Bennos und Gretas Tafel je einen Nachbarn, die
+der beste und der mittlere Lauf jedes Nachbar-Bots (Stufe k-1 und k+1; Lukas’ und Gretas Tafel je einen Nachbarn, die
 Stockfisch-Tafel keinen), Lauf `{ bot, lauf: 'best'|'mittel', w, f, e, z, g, partie, von }`. Erzeugt mit
 `werkzeuge/nachbar-laeufe.mjs` aus den 320 Nachbar-Partien der Eichung (`eichung/messung/roh/botpartien.jsonl`, nicht im Repo;
 Partien mit Zuglimit zaehlen nicht): Analyse mit der App-Engine (Stockfish 19 lite unter Node) und der unveraenderten
@@ -1684,33 +1691,33 @@ zaehlt 0, die Liste haengt an der laufenden Partie), `partie:beendet` (merkt die
 bewerteter Partie und danach bei einem neuen eigenen Allzeit-Rekord `rekord:neu { tafel, wert, vorher, platz, fenster:
 'allzeit', partieId }` (Tabelle "Ereignisse" oben; funken bucht dafuer seine 25 Funken nur bei `platz` 1).
 
-**Orte.** `ergebnis:abrechnung` 10: `div.pk-abr[data-zeile="punkte"]` "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ▲ 2",
-"Rekord auf Rudis Tafel · +1.820", "Erster Eintrag auf ...", "Diese Woche: Platz 2 ...", "So nah wie noch nie: 97 % ..." oder
+**Orte.** `ergebnis:abrechnung` 10: `div.pk-abr[data-zeile="punkte"]` "PUNKTE 21.300", darunter "Platz 3 auf Thorstens Tafel ▲ 2",
+"Rekord auf Thorstens Tafel · +1.820", "Erster Eintrag auf ...", "Diese Woche: Platz 2 ...", "So nah wie noch nie: 97 % ..." oder
 ohne Tafel der ehrliche Grund; bei einem Rekord bleibt die alte Zahl durchgestrichen stehen (`.pk-alt`), die neue zaehlt hoch;
 beim Ueberholen eine Mini-Tafel (ueber dir, du, unter dir), deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken
 (`klick`), Klang `rekord` nur mit Rekord, Platz 1 oder Aufstieg (Niederlagen ohne Rekord bleiben still); hoechstens 1,2 s,
 Antippen der Karte zeigt sofort das Endbild, Tempo 0 und reduzierte Bewegung nur das Endbild (`data-fertig`). Antippen der Zeile
 zeigt die Aufschluesselung, "Zur Bestenliste" (oeffnet die Tafel im Fenster des Satzes: "Diese Woche: Platz 2" die Woche, sonst
 Allzeit, ohne das gemerkte Fenster zu aendern) und nach dem Ueberholen einer Freundin einmal still "Überhol-Post an Jule"
-(Vorschau des Texts "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..." mit Kopieren oder Teilen-Blatt,
+(Vorschau des Texts "Ich hab deine 21.800 auf Thorstens Tafel geknackt, jetzt 23.100. Code: SA1-..." mit Kopieren oder Teilen-Blatt,
 nichts geht automatisch raus). Rechnet die Analyse noch: "Punkte werden gezählt …" mit endlichem Schimmer (nur opacity), danach
 der Nachtrag; ohne Analyse "Punkte folgen mit der Analyse" (die Arena holt sie nach). Uebungen: keine Zeile.
 `bestenliste:reiter` Ich 10 (Spielerkarte, "Deine besten Partien" ueber alle Tafeln im Fenster, Rekordbuch mit Rechenstand),
 Bots 20 (Tafel-Wahl der 30 Leiter-Bots und der Boss-Tafeln mit Eintraegen, die Tafel mit Platz, Name, Datum, Farbe, Ergebnis,
 Zuegen, Genauigkeit, Punkten, eigene Zeile mit Akzentlinie, Freunde als Gast-Zeilen mit Initiale und Pruefstufe, Chronik,
-"Rekord angreifen: Rudi, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
+"Rekord angreifen: Thorsten, Weiß" fuer freigeschaltete Bots), Freunde 50 (Code teilen mit Vorschau, Code einlesen: pruefen,
 nachspielen, mit `app.engine('bewertung')` neu analysieren und mit derselben Formel rechnen, "Nachgerechnet ✓"; Freunde-Liste,
 ein Tipp entfernt). Jeder Anbieter liefert `section.bl-reiter[data-reiter][data-name]`, nicht gewaehlt eine leere Huelle (daraus
 baut der Host die Reiterzeile); `data-ohne-fenster` blendet das Fenster-Segment aus (Freunde). `arena:panel-bot` 40 (3.17
-"Rudis Tafel: Platz 4"): `button.pk-panel` "Rudis Tafel · Bestwert 12.300", mit Gaesten auf der Tafel dazu "· Platz 2", nur fuer
+"Thorstens Tafel: Platz 4"): `button.pk-panel` "Thorstens Tafel · Bestwert 12.300", mit Gaesten auf der Tafel dazu "· Platz 2", nur fuer
 Leiter-Bots mit eigenem Eintrag; Antippen oeffnet die Tafel in der Bestenliste.
 
 **Feier.** Platz 1 einer Tafel mit Gaesten dahinter: `bot-rekord` (gross 78) "PLATZ 1 AUF RUDIS TAFEL"; stand vorher ein
 Bot-Lauf vorn, sagt dieser Bot dazu seinen Satz (Register `registriereSaetze('tafel-platz1')`, fest gewaehlt, kein Zufall:
 "Oma Hilde: „Na sowas, an mir vorbei! ...“"). Neuer eigener Allzeit-Rekord: eigene Quelle `tafel-rekord` (gross 70, wie
 "Eigener Allzeit-Rekord" in 3.13) "NEUER REKORD AUF RUDIS TAFEL" mit altem Wert und, beim Ueberholen, "Platz 3 ▲ 1". Ist der
-grosse Platz der Partie schon belegt, kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Rudis Tafel ▲ 2" (vorher Platz 6) bzw.
-"Rekord auf Rudis Tafel: 23.100". Belegt heisst: ein grosser Moment, den das Ergebnis schon zeigt (Status `overlay`, egal mit
+grosse Platz der Partie schon belegt, kommt der Moment als Zeile `rekord` (58): "Platz 4 auf Thorstens Tafel ▲ 2" (vorher Platz 6) bzw.
+"Rekord auf Thorstens Tafel: 23.100". Belegt heisst: ein grosser Moment, den das Ergebnis schon zeigt (Status `overlay`, egal mit
 welcher Prioritaet, z. B. eine Umwandlung 66 vom Partie-Ende: `fuerOverlay` vergibt den Platz kein zweites Mal), oder ein
 wartender mit gleicher oder hoeherer Prioritaet (z. B. ein Level-Titel 75); ein wartender kleinerer weicht (Pruefer-Befund P2).
 Dafuer liest `index.js` die Feier-Warteschlange (`ladeModul('feier')`, nur lesen) in einer Mikroaufgabe nach dem Ereignis, also
@@ -1738,7 +1745,7 @@ ohne Paket geht der Router still zur Arena wie ohne Datei (die Pruefung "Bestenl
 `tests/app.test.mjs` bleibt so gruen). Handy einspaltig, Tafel-Wahl waagrecht wischbar, Tippflaechen mindestens 44 px.
 
 **Fairness** (5.3, in `tests/fairness.test.mjs`): Punkte nie negativ und ganzzahlig (2.160 Faelle), "120 Zuege Schieben gegen
-Benno" 6.400 unter der zuegig verwerteten Fassung 9.400 und Schieben bringt nie mehr, Tafeleintrag nur ohne Hilfe-Flag (Uebung,
+Lukas" 6.400 unter der zuegig verwerteten Fassung 9.400 und Schieben bringt nie mehr, Tafeleintrag nur ohne Hilfe-Flag (Uebung,
 freie Partie, Spielhalle, eigene Stellung nie); `formel.js` und `tafel.js` stehen in der Liste ohne `Math.random`.
 
 Tests: `node tests/punkte.test.mjs` (Node und Browser, `PORT`, `BILDER`, `--nur-node`, `--schnell`: Bilder nur 1180 hell und
@@ -1999,7 +2006,7 @@ Huegelbaender, Baeume, Haeuser, Zelt, Burgturm, Pfad als Bezier `pfadD()` durch 
   „Stufe n · Nächster Gegner“ in `--akzent-text`, `h2`, `.elo`, `.mini-sterne`), `.sprechblase` (Spruch-Karte),
   `.merkmale` (3 x `.merkmal`), `.ziel-sterne` (3 x `div`, erreicht `.an`), `.ort-panel-bot`, Farbe als
   `bauteile.segment` mit `.farbwahl [data-farbe="w|zufall|b"][aria-checked]`, `.ort-tempo` (leer, `hidden`, fuer W0+b),
-  `.cta-platz [data-aktion="spielen"]` („Spielen gegen Kalle“, besiegt „Revanche gegen …“, Text aus dem Export
+  `.cta-platz [data-aktion="spielen"]` („Spielen gegen Maxi“, besiegt „Revanche gegen …“, Text aus dem Export
   `spielenText(bot, besiegt)`; der Rufname steht in `.sp-name` und bleibt zusammen, wird es eng, bricht der Text auf zwei
   Zeilen um, nie abgeschnitten), `.bilanz`. Sterne und Pokal als SVG (`icons.js` `stern`), nie „★“. Farbwahl: die
   Figuren stehen auf einem hellen Feld (`.fig-bg`, `--feld-hell`). Steckbrief und „Offene Partie“ ragen nie aus ihrer
@@ -2646,7 +2653,7 @@ Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus 
   und einer Suche mit Material und Matt: jeder eigene Zug ist der einzige beste (Tiefe 4, Endspiel 7), Antworten sind
   erzwungen. Quelle: selbst erstellt (Kopf von `aufgaben.js`).
 - **Empfehlung (RECHENSTAND 1):** Punkte je Aufgabe 1 (erster Versuch), 0,5 (spaeter geloest), 0 (Loesung gezeigt);
-  `EMPFEHLUNG`: bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, darueber hoechstens Professor Turm (8
+  `EMPFEHLUNG`: bis 1,5 Lukas, bis 3 Hilde, bis 4,5 Maxi, bis 6 Lisa, bis 7 Thorsten, darueber hoechstens Professor Turm (8
   Aufgaben sagen ueber die oberen Stufen zu wenig). Begruendung aus den Ergebnissen (geloest, Staerken = die zwei schwersten
   im ersten Versuch, naechster Schritt = die leichteste nicht geloeste, ein Satz zum Bot), keine Elo-Zahl. **Leiter bleibt:**
   Steht der Bot ueber der hoechsten freigeschalteten Stufe, gibt es ihn nur als „Probepartie“ (`app.gehe('partie', { botId,

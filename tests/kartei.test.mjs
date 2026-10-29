@@ -344,13 +344,13 @@ async function nodeTeil() {
 
   // ---------- Aufgaben und Texte ----------
   gruppe = 'Aufgabe';
-  const a = L.alsAufgabe(r1.modul.karten[0], { botName: 'Ritter Rudi', heute: '2026-10-21' });
+  const a = L.alsAufgabe(r1.modul.karten[0], { botName: 'Ritter Thorsten', heute: '2026-10-21' });
   pruefe('Aufgabe fuer den Raetsel-Bildschirm: { fen, loesung: [besterZug], titel, hinweis } und mehr', a.fen === FENS[2] && JSON.stringify(a.loesung) === '["g1f3"]'
     && a.titel === 'Finde den besseren Zug' && a.hinweis === 'Schau dir den Springer auf g1 an.' && a.vorZug === 'a2a3' && a.marke === 'Weit daneben' && a.klasse === 'patzer', a);
-  pruefe('Satz: "Gestern gegen Ritter Rudi hast du hier 2. Dh5 gespielt." (geschuetztes Leerzeichen)', a.text === 'Gestern gegen Ritter Rudi hast du hier 2. Dh5 gespielt.', a.text);
+  pruefe('Satz: "Gestern gegen Ritter Thorsten hast du hier 2. Dh5 gespielt." (geschuetztes Leerzeichen)', a.text === 'Gestern gegen Ritter Thorsten hast du hier 2. Dh5 gespielt.', a.text);
   const a2 = L.alsAufgabe({ ...r1.modul.karten[0], farbe: 'b', datum: '2026-10-12' }, { botName: '', heute: '2026-10-21' });
   pruefe('Schwarz und ohne Bot: "Am 12. Okt. hast du hier 2. … Dh5 gespielt."', a2.text === 'Am 12. Okt. hast du hier 2. … Dh5 gespielt.', a2.text);
-  pruefe('heute: "Heute gegen …"', L.alsAufgabe({ ...r1.modul.karten[0], datum: '2026-10-21' }, { botName: 'Bauer Benno', heute: '2026-10-21' }).text.startsWith('Heute gegen Bauer Benno'));
+  pruefe('heute: "Heute gegen …"', L.alsAufgabe({ ...r1.modul.karten[0], datum: '2026-10-21' }, { botName: 'Bauer Lukas', heute: '2026-10-21' }).text.startsWith('Heute gegen Bauer Lukas'));
   pruefe('Erklaerung aus dem Coach-Satz, mit dem alten Zug davor', a.erklaerung === '2.\u00a0Dh5: Verliert die Dame. Besser war Sf3.', a.erklaerung);
   pruefe('Loesung jeder Aufgabe aus der Kartei ist mit chess.js spielbar', r1.modul.karten.every((k) => {
     const c = new Chess(k.fen);
@@ -690,7 +690,7 @@ async function browserTeil(browser) {
     text: document.querySelector('.rs-status p').textContent }));
   pruefe('Üben oeffnet den Raetsel-Bildschirm mit 10 Karten der Kartei, aelteste zuerst (die schwarze Karte: gedreht)', z.quelle === 'kartei' && z.gesamt === 10
     && z.aufgabe === 'pb1x:0' && kk.titel === 'Fehler wiederholen' && kk.aus === 'b', JSON.stringify({ z, kk }));
-  pruefe('Satz der Karte: "Heute gegen Ritter Rudi hast du hier 4. … h6 gespielt."', kk.text === 'Heute gegen Ritter Rudi hast du hier 4. … h6 gespielt.', kk.text);
+  pruefe('Satz der Karte: "Heute gegen Ritter Thorsten hast du hier 4. … h6 gespielt."', kk.text === 'Heute gegen Ritter Thorsten hast du hier 4. … h6 gespielt.', kk.text);
   await ziehe(seite, 'a8a1');
   await warteZustand(seite, 'z.phase === "geloest"');
   const nach1 = await kz(seite);
@@ -817,7 +817,7 @@ async function browserTeil(browser) {
     pruefe('nach der Analyse: Feier-Zeile "1 neue Karte in deinem Stapel" im Ergebnis', fz.includes('1 neue Karte in deinem Stapel'), fz);
     await s2.waitForFunction(() => ((JSON.parse(localStorage.getItem('schach-arena:v1:modul:kartei') || 'null') || {}).karten || []).length === 1, null, { timeout: 10000 });
     const kp = (await kz(s2)).modul.karten[0];
-    pruefe('Karte aus der echten Analyse: Stellung vor a3, bester Zug Sxh4 (f3h4), gespielt a2a3, Weit daneben, Benno', kp.fen.startsWith(FEN_DAME.split(' ').slice(0, 2).join(' '))
+    pruefe('Karte aus der echten Analyse: Stellung vor a3, bester Zug Sxh4 (f3h4), gespielt a2a3, Weit daneben, Lukas', kp.fen.startsWith(FEN_DAME.split(' ').slice(0, 2).join(' '))
       && kp.besterZug === 'f3h4' && kp.gespielt === 'a2a3' && kp.klasse === 'patzer' && kp.botId === 'benno' && kp.stufe === 0, JSON.stringify(kp));
     // Bild erst, wenn die Zeile fertig eingeblendet ist (bei einer Niederlage 700 ms Verzoegerung plus 400 ms Einblenden)
     const voll = await s2.waitForFunction(() => {

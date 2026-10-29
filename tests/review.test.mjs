@@ -268,9 +268,9 @@ function nodeTests() {
 
   // Spielstaerke der Bot-Seite (eigene Elo bekannt): Bot-Tabelle, halber Weg zur eigenen Elo
   const bot = (g, elo, n = 40) => schaetzeSpielstaerke(g, undefined, n, { eigeneElo: elo });
-  pruefe('Spielstaerke Bot: Benno 65,7 % ~ 250', Math.abs(bot(65.7, 250) - 250) <= 50, bot(65.7, 250));
+  pruefe('Spielstaerke Bot: Lukas 65,7 % ~ 250', Math.abs(bot(65.7, 250) - 250) <= 50, bot(65.7, 250));
   pruefe('Spielstaerke Bot: Hilde 75,9 % ~ 500', Math.abs(bot(75.9, 500) - 500) <= 50, bot(75.9, 500));
-  pruefe('Spielstaerke Bot: Kalle 78,5 % ~ 800', Math.abs(bot(78.5, 800) - 800) <= 100, bot(78.5, 800));
+  pruefe('Spielstaerke Bot: Maxi 78,5 % ~ 800', Math.abs(bot(78.5, 800) - 800) <= 100, bot(78.5, 800));
   pruefe('Spielstaerke Bot: Greta 92,9 % ~ 2100', Math.abs(bot(92.9, 2100) - 2100) <= 100, bot(92.9, 2100));
   pruefe('Spielstaerke Bot: kurze Partie zur eigenen Elo (nicht 1000)', bot(45, 500, 10) <= 500, bot(45, 500, 10));
   pruefe('Spielstaerke Mensch unveraendert (80 % ~ 1350)', schaetzeSpielstaerke(80) === 1350);

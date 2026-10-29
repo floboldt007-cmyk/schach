@@ -72,9 +72,9 @@ registriereTexte('arena', {
     'farbe.zufall': 'Zufall',
     'spielen.gegen': 'Spielen gegen {name}',
     'spielen.revanche': 'Revanche gegen {name}',
-    // eigene Form des Rufnamens im Spielen-Knopf ("Spielen gegen den Professor")
-    'ruf.turm': 'den Professor',
-    'ruf.koenig': 'den Kommissar',
+    // eigene Form des Rufnamens im Spielen-Knopf ("Spielen gegen den Stockfisch"); Turm und König seit 29.10. mit Vornamen
+    'ruf.turm': 'Oliver',
+    'ruf.koenig': 'Tobias',
     'ruf.stockfisch': 'den Stockfisch',
     'bilanz.partien': 'Partien',
     'bilanz.siege': 'Siege',
@@ -167,8 +167,8 @@ registriereTexte('arena', {
     'farbe.zufall': 'Random',
     'spielen.gegen': 'Play {name}',
     'spielen.revanche': 'Rematch with {name}',
-    'ruf.turm': 'the Professor',
-    'ruf.koenig': 'the Inspector',
+    'ruf.turm': 'Oliver',
+    'ruf.koenig': 'Tobias',
     'ruf.stockfisch': 'the Stockfish',
     'bilanz.partien': 'Games',
     'bilanz.siege': 'Wins',

@@ -224,7 +224,7 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
   el.dataset.aufgabe = aufgabe.id;
   el.dataset.art = aufgabe.art;
   // zwei Zeilen: der Titel (zur Not gekuerzt), darunter Ziel, Stand, Termin und Klasse (bricht um, damit der Termin auch
-  // auf dem iPad neben "Zu Rudi" sichtbar bleibt; ein title hilft auf Touch-Geraeten nicht). Der Trenner zwischen den
+  // auf dem iPad neben "Zu Thorsten" sichtbar bleibt; ein title hilft auf Touch-Geraeten nicht). Der Trenner zwischen den
   // Zeilen steht nur im Text (Vorlesen, textContent), sichtbar ist er nicht.
   el.innerHTML = `<span class="sm-heute-symbol" aria-hidden="true">${icon(ICON)}</span>
     <span class="sm-heute-text"><b></b><span class="sm-heute-trenn"> · </span><span class="sm-heute-ziel"></span></span>`;

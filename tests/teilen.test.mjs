@@ -67,7 +67,7 @@ const hexRgb = (h) => {
   return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null;
 };
 
-// Schaefermatt gegen Benno (wertende Partie, Weiss): 4. Dxf7#
+// Schaefermatt gegen Lukas (wertende Partie, Weiss): 4. Dxf7#
 const SCHAEFER = ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6', 'h5f7'];
 const SCHAEFER_FEN = 'r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR';
 
@@ -146,7 +146,7 @@ async function nodeTeil() {
   gruppe = 'Bilddaten';
   const bot = { id: koenig.id, name: koenig.name, avatar: koenig.avatar };
   const d = L.bildDaten({ ...sieg, botId: 'koenig' }, { bot, adresse: 'floboldt007-cmyk.github.io/schach' });
-  pruefe('Titel "Sieg gegen Kommissar König"', d.titel === 'Sieg gegen Kommissar König' && d.wort === 'Sieg' && d.ausruf === '!' && d.gegner === 'gegen Kommissar König', d.titel);
+  pruefe('Titel "Sieg gegen Kommissar Tobias König"', d.titel === 'Sieg gegen Kommissar Tobias König' && d.wort === 'Sieg' && d.ausruf === '!' && d.gegner === 'gegen Kommissar Tobias König', d.titel);
   pruefe('Ueberzeile mit dem Mattzug', d.ueber === 'Schachmatt im 4. Zug', d.ueber);
   pruefe('Genauigkeit mit Komma, Zuege, Datum, Sterne', d.genauigkeit === '87,4 %' && d.zuege === 4 && d.datum === '22.10.2026' && JSON.stringify(d.sterne) === '[true,true,false]');
   pruefe('Endstellung, letzter Zug, Farbe unten', d.fen === SCHAEFER_FEN && d.zuletzt.join() === 'h5,f7' && d.unten === 'w');
@@ -155,7 +155,7 @@ async function nodeTeil() {
   pruefe('genau die Felder aus FELDER, eingefroren', JSON.stringify(Object.keys(d)) === JSON.stringify(L.FELDER) && Object.isFrozen(d));
   const remis = L.bildDaten({ ...sieg, ergebnis: 'remis', grund: 'patt', genauigkeit: null }, { bot });
   pruefe('Remis: Wort ohne Ausrufezeichen, Grund Patt, keine Sterne, keine Genauigkeit ohne Analyse', remis.wort === 'Remis' && remis.ausruf === '' && remis.ueber === 'Patt'
-    && remis.sterne === null && remis.genauigkeit === null && remis.titel === 'Remis gegen Kommissar König');
+    && remis.sterne === null && remis.genauigkeit === null && remis.titel === 'Remis gegen Kommissar Tobias König');
   const boss = L.bildDaten({ ...sieg, modus: 'boss', botId: 'boss-x' }, { bot: { id: 'boss-x', name: 'Der Eiserne', avatar: 'data:image/svg+xml,<svg/>' } });
   pruefe('Boss: Ueberzeile "Boss · …", keine Sterne (wertet nie)', boss.ueber === 'Boss · Schachmatt im 4. Zug' && boss.sterne === null, boss.ueber);
   pruefe('ohne Bot: "gegen deinen Gegner"', L.bildDaten(sieg, {}).titel === 'Sieg gegen deinen Gegner');
@@ -238,8 +238,8 @@ async function nodeTeil() {
     ...'abcdefgh12345678', ...'KDTLSB', 'K']);
   const fremdeTexte = r.texte.filter((t) => !erlaubt.has(t));
   pruefe('im Bild stehen nur Texte aus den Bilddaten (dazu Koordinaten und Beschriftungen)', fremdeTexte.length === 0, fremdeTexte.join(' | '));
-  pruefe('Titel-Teile im Bild: "Sieg", "!", "gegen Kommissar König", Genauigkeit, Datum, crownmate, Adresse',
-    ['Sieg', '!', 'gegen Kommissar König', '87,4 %', '22.10.2026', 'crownmate', 'floboldt007-cmyk.github.io/schach', 'Crownmate'].every((t) => r.texte.includes(t)), r.texte.join(' | '));
+  pruefe('Titel-Teile im Bild: "Sieg", "!", "gegen Kommissar Tobias König", Genauigkeit, Datum, crownmate, Adresse',
+    ['Sieg', '!', 'gegen Kommissar Tobias König', '87,4 %', '22.10.2026', 'crownmate', 'floboldt007-cmyk.github.io/schach', 'Crownmate'].every((t) => r.texte.includes(t)), r.texte.join(' | '));
   const rFremd = B.zeichne(fake(), dFremd, farben, {});
   pruefe('Datensatz mit E-Mail und Klarname: nichts davon im Bild', !rFremd.texte.some((t) => /@|Max|Beispiel|geheim/.test(t)), rFremd.texte.join(' | '));
   const rName = B.zeichne(fake(), L.bildDaten(sieg, { bot, name: 'FloTest' }), farben, {});
@@ -426,7 +426,7 @@ async function browserTeil(browser) {
   const f7Soll = mische(fh, p1.zuletzt);   // h5 und f7 sind beide helle Felder
   pruefe('letzter Zug: h5 (leer) und f7 (Ecke neben der Dame) mit --zuletzt getoent, andere Felder nicht', nah(p1.h5, [...h5Soll, 255], 3) && nah(p1.f7, [...f7Soll, 255], 3)
     && !nah(p1.h5, [...fh, 255], 6), JSON.stringify({ h5: p1.h5, h5Soll, f7: p1.f7, f7Soll }));
-  pruefe('Texte im Bild: Sieg, "gegen Bauer Benno", Schachmatt im 4. Zug, Genauigkeit, Datum, crownmate, Adresse', z1.texte.includes('Sieg') && z1.texte.includes('gegen Bauer Benno')
+  pruefe('Texte im Bild: Sieg, "gegen Bauer Lukas", Schachmatt im 4. Zug, Genauigkeit, Datum, crownmate, Adresse', z1.texte.includes('Sieg') && z1.texte.includes('gegen Bauer Lukas')
     && z1.texte.includes('SCHACHMATT IM 4. ZUG') && z1.texte.some((t) => /^\d{1,3},\d %$/.test(t)) && z1.texte.some((t) => /^\d\d\.\d\d\.\d{4}$/.test(t))
     && z1.texte.includes('crownmate') && z1.texte.includes(`127.0.0.1:${PORT}`), z1.texte.join(' | '));
   pruefe('Figuren als Bilder gezeichnet (keine Ersatz-Buchstaben)', !z1.texte.includes('D') && !z1.texte.includes('T'), z1.texte.join(' | '));
@@ -439,7 +439,7 @@ async function browserTeil(browser) {
       verhaeltnis: c.width / c.height, imFenster: k.top >= 0 && k.bottom <= innerHeight + 1, name: !b.querySelector('.tl-name').hidden, share: typeof navigator.share };
   });
   pruefe('Blatt: Titel, Vorschau 4:5, ganz im Fenster, Bildbeschreibung fuer VoiceOver', blatt.titel === 'Siegesbild teilen' && Math.abs(blatt.verhaeltnis - 0.8) < 0.01 && blatt.imFenster
-    && /Sieg gegen Bauer Benno/.test(blatt.label || ''), JSON.stringify(blatt));
+    && /Sieg gegen Bauer Lukas/.test(blatt.label || ''), JSON.stringify(blatt));
   pruefe('ohne navigator.share: Knopf "Bild speichern", ohne Konto kein Namensschalter', blatt.share === 'undefined' && /Bild speichern/.test(blatt.los) && blatt.aktiv && !blatt.name, JSON.stringify(blatt));
   await warte(450);   // Knopf-Uebergang (aktiv) und Einblenden fertig
   await seite.screenshot({ path: path.join(BILDER, 'blatt-ipad-hell.png') });
@@ -497,7 +497,7 @@ async function browserTeil(browser) {
   const geteilt = await seite.evaluate(() => window.__geteilt[0]);
   writeFileSync(path.join(BILDER, 'siegesbild-dunkel.png'), Buffer.from(geteilt.daten.split(',')[1], 'base64'));
   pruefe('navigator.share mit genau einer PNG-Datei (crownmate-sieg-<Tag>.png), Titel und Text ohne persoenliche Daten', geteilt.anzahl === 1 && geteilt.type === 'image/png'
-    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && geteilt.text === 'Sieg gegen Bauer Benno',
+    && /^crownmate-sieg-\d{4}-\d{2}-\d{2}\.png$/.test(geteilt.name) && geteilt.size > 20000 && geteilt.title === 'Crownmate' && geteilt.text === 'Sieg gegen Bauer Lukas',
   JSON.stringify({ ...geteilt, daten: undefined }));
   await seite.waitForFunction(() => !document.querySelector('.tl-blatt'), null, { timeout: 5000 });
   const nachTeilen = await seite.evaluate(() => ({
@@ -690,7 +690,7 @@ async function browserTeil(browser) {
     pruefe(`${modus}: Blatt passt (Rand, kein Quer-Scrollen, Knoepfe sichtbar und gross genug)`, lage.links >= 8 && lage.rechts >= 8 && lage.oben >= 0 && lage.ueber <= 0 && lage.los
       && lage.losH >= 44 && lage.cw >= 240, JSON.stringify(lage));
     const z = await zustand(h.seite);
-    pruefe(`${modus}: Kommissar König im Bild`, z.texte.includes('gegen Kommissar König'), z.texte.join(' | '));
+    pruefe(`${modus}: Kommissar Tobias König im Bild`, z.texte.includes('gegen Kommissar Tobias König'), z.texte.join(' | '));
     await h.seite.screenshot({ path: path.join(BILDER, `blatt-handy-${modus}.png`) });
     pruefe(`${modus}: keine Konsolenfehler`, h.fehler.length === 0, h.fehler.join(' | '));
     await h.kontext.close();
@@ -722,7 +722,7 @@ async function browserTeil(browser) {
   pruefe('gesperrte Leinwand: Bild entsteht neu ohne Figurenbilder (Buchstaben), Datei liegt bereit, Knopf aktiv', gesperrt.bereit && gesperrt.datei && gesperrt.datei.type === 'image/png'
     && gesperrt.datei.size > 20000 && ['K', 'D', 'T', 'L', 'S', 'B'].every((t) => gesperrt.texte.includes(t)) && fpAufrufe === 2
     && await fp.seite.locator('.tl-blatt [data-tl="los"]').isEnabled(), JSON.stringify({ ...gesperrt, texte: gesperrt.texte.join(' ') , fpAufrufe }));
-  pruefe('gesperrte Leinwand: Brett trotzdem in den Feldfarben, Texte vollstaendig', nah(pg.d3, [...fh, 255]) && nah(pg.e3, [...fd, 255]) && gesperrt.texte.includes('gegen Bauer Benno')
+  pruefe('gesperrte Leinwand: Brett trotzdem in den Feldfarben, Texte vollstaendig', nah(pg.d3, [...fh, 255]) && nah(pg.e3, [...fd, 255]) && gesperrt.texte.includes('gegen Bauer Lukas')
     && gesperrt.texte.includes('crownmate'), JSON.stringify({ d3: pg.d3, e3: pg.e3 }));
   // 2. Tab-Lauf wie die Bauteile: im Segment nur die gewaehlte Option (roving tabindex), dazu Abbrechen und der Hauptknopf
   await eingeglitten(fp.seite);
