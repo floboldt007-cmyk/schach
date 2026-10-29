@@ -7,6 +7,7 @@ import { ladeModul, speichereModul } from '../../storage.js';
 import { t, locale } from '../../sprache.js';
 import * as L from './logik.js';
 import './texte.js';
+import { protokolliere } from '../../protokoll.js';
 
 const IDS = ['bergwirt', 'baron-gambit', 'springerzuechterin', 'festungsbauer'];
 const ELOS = [700, 1300, 1900, 2500]; // jeweils 100 ueber dem Endgegner der zugeordneten Welt
@@ -15,7 +16,13 @@ const VORLIEBEN = [{ rochade: 30 }, { schach: 45, vorwaerts: 25 }, { springer: 4
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let plan = null;
 
-function sicher(fn, wo) { try { return fn(); } catch (e) { console.error('boss: ' + wo, e); return null; } }
+function sicher(fn, wo) {
+  try { return fn(); } catch (e) {
+    try { console.error(`Paket boss (${wo || 'unbekannt'}):`, e); } catch (x) { /* egal */ }
+    protokolliere('paket', e, { vorsatz: `Paket boss (${wo || 'unbekannt'})` });
+    return null;
+  }
+}
 function profil(id, i) {
   const basis = BOTS.find((b) => b.elo === ELOS[i]);
   return {
