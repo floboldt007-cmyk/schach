@@ -2490,7 +2490,7 @@ const EN = {
   lasse: {
     name: 'Fisherman Lasse', rufname: 'Lasse', titel: 'The Net Caster',
     kurz: 'Casts his net right around your king.',
-    bio: 'Lasse heads out in his fishing boat before sunrise and never comes back with an empty net. On the board he steers all his pieces toward the king and then casts. When he rolls up his sleeves, better look after your castled king.',
+    bio: 'Lasse heads out in his fishing boat before sunrise and always comes home with a full net. On the board he steers all his pieces toward the king and then casts. When he rolls up his sleeves, better look after your castled king.',
     merkmale: { lieblings: 'Queen', tempo: 'Hands-on', schwaeche: 'Leaves gaps at the back' },
     saetze: {
       begruessung: [

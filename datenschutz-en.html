@@ -138,6 +138,16 @@
   <p>Download my data also includes your online games. If either participating account is deleted, its associated online
   games are automatically deleted too (cascading deletion). Otherwise, games remain stored in the account.
   Technical server logs and backups follow the retention periods described in section 5.</p>
+  <p><b>Protection against misuse:</b> So that nobody can try out invitation codes or flood the database, the server counts,
+  per account and day, how often a wrong invitation code was entered (after 20, joining is blocked until the next day), and,
+  per hour, how many games and usage events your account has shared (section 6). These counters contain only numbers, no
+  content. We delete the failed attempts after two days and the counters of shared data after 48 hours, each at the next
+  automatic cleanup. Until then, the counters of shared data remain even after you withdraw consent; otherwise the limit
+  could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours. If no move
+  is made for too long in a game (with a clock, 10 minutes before the second half-move; without a clock, 7 days), the server
+  ends it as abandoned, without a result. Both counters are included in Download my data. The legal basis is our legitimate
+  interest in a secure, working service (Art. 6 Abs. 1 lit. f DSGVO, GDPR)
+  <span class="platz">[Have legal basis and retention periods confirmed by the expert]</span>.</p>
 
   <h2>6. Sharing games and usage data (optional, with consent)</h2>
   <p>With an account, you can turn on Share games and usage under Settings → Data. It is off by default.

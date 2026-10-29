@@ -1790,25 +1790,31 @@ ausfuehrbar), `supabase/online-rls-test.sql` (Pruefung mit drei Nutzern, rollt a
 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, immer vom Server), `weiss`, `schwarz`, `erstellt_von` (Nutzer-IDs), `status`
 `'offen' | 'laeuft' | 'beendet'`, `fen` (aktuelle Stellung), `zuege` (UCI durch Leerzeichen, wie `zuege: [uci]` im
 Partie-Datensatz von `storage.js`), `am_zug` `'w' | 'b'`, `ergebnis` `'1-0' | '0-1' | '1/2-1/2' | null`, `grund`
-(vom Client z. B. `'matt'`, `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'`; vom Server `'zeit'`, `'aufgabe'`,
-`'remis'`, `'abgebrochen'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
+(vom Client nur `'matt'` als Sieg des Ziehenden und `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'` als Remis; vom
+Server `'zeit'`, `'zeit-material'`, `'aufgabe'`, `'remis'`, `'abgebrochen'` (zurueckgezogene Einladung oder haengende
+Partie) und `'strittig'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
 `uhr_weiss_ms`, `uhr_schwarz_ms`, `letzter_zug_am`, `erstellt_am`, `aktualisiert_am` (Trigger; Grundlage der Abfrage).
 Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
 
 **Server-Funktionen (nur `authenticated`, `security definer`; direktes `insert`, `update` und `delete` sind gesperrt,
 `authenticated` darf nur lesen; der Trigger `online_vor_anlegen` setzt Code, Grundstellung und Anfangszustand):**
 `online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
-`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug), `online_zug(partie, zug,
-fen_danach, am_zug_danach, ergebnis, grund)` (prueft Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel),
+`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug; liefert `jsonb`: die Zeile oder
+`{ fehler }`, siehe Anti-Cheat Etappe 0), `online_zug(partie, zug, fen_danach, am_zug_danach, ergebnis, grund)` (prueft
+Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel, Ergebnis-Regeln und grob die Folgestellung),
+`online_strittig(partie)` (Ende ohne Ergebnis, grund `'strittig'`),
 `online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`; in einer laufenden Partie
 nur fuer die beiden Spieler), `online_biete_remis(partie)` (liegt das Angebot des Gegners schon vor: Annahme),
 `online_nimm_remis_an(partie)`, `online_pruefe_zeit(partie)` (Zeit reklamieren, fuer beide Spieler; liefert immer die
-aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst,
-laeuft unter RLS). Interne Helfer ohne Recht fuer `authenticated`: `online_hole_laufende`, `online_uhr_pruefen`.
+aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst;
+raeumt vorher fuer alle auf und laeuft deshalb als Besitzer, filtert selbst auf den Aufrufer). Interne Helfer ohne
+Recht fuer `authenticated` und `anon`: `online_hole_laufende`, `online_uhr_pruefen`, `online_zeitende`, `online_haengt`,
+`online_aufraeumen`, `online_brett`, `online_folge_passt`, `online_kann_nicht_matt_setzen`. Alle Funktionen laufen mit
+`search_path = ''` und voll qualifizierten Namen.
 `online_tritt_bei` lehnt Einladungen ab, die aelter als 24 Stunden sind (`ONLINE_CODE_ABGELAUFEN`) oder in denen der
-Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
-in der SQL-Datei); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`), `tests/online.test.mjs` prueft, dass
-keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
+Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (`raise exception`, bei `online_tritt_bei` fuer
+falsche und abgelaufene Codes als `{ fehler }`); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`),
+`tests/online.test.mjs` prueft, dass keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
 
 **Uhr-Regeln:** Beide starten beim Beitritt mit `bedenkzeit_s * 1000` ms. Der jeweils erste Zug von Weiss und von
 Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden). Ab dem dritten Halbzug zieht
@@ -1818,13 +1824,14 @@ Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerech
 Durchsetzbar ist die Uhr ueber `online_uhr_pruefen` (intern): Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
 laufende Uhr der Seite am Zug und beenden die Partie bei <= 0 mit `'zeit'` (Rueckgabe der beendeten Zeile statt
 `raise`, damit die Beendigung nicht zurueckgerollt wird). Steht die heruntergerechnete Gegneruhr bei 0, ruft die
-Oberflaeche `pruefeZeit(id)`. Ob der Gewinner ueberhaupt noch matt setzen koennte, prueft der Server nicht.
+Oberflaeche `pruefeZeit(id)`. Kann der Gewinner gar nicht mehr matt setzen (nur der Koenig, Koenig und eine Leichtfigur
+gegen den blanken Koenig, nur gleichfarbige Laeufer), endet das Zeitende remis mit grund `'zeit-material'`.
 Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck).
 
 **Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
 `tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
 `sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
-`nimmRemisAn(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
+`nimmRemisAn(id)`, `meldeStrittig(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
 bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`,
 pausiert bei `document.hidden` und fragt beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, nach `stop()`
 kein Hoerer-Aufruf mehr, Fehler gehen an `beiFehler`, derselbe Text nur einmal hintereinander, Abstand bei Fehlern
@@ -1844,6 +1851,58 @@ traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Fu
 zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
 `beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
 und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+
+## Anti-Cheat Etappe 0 (Online gegen Freunde, ohne Edge Function)
+
+Zwischenloesung unter Freunden ohne Wertung (Konzept im Vault: `Schach-App/Arbeitsstand-2026-10-29/Konzept-Anti-Cheat.md`,
+Abschnitte 2, 5.1, 5.9, 9). Sie verhindert keinen Betrug, macht ihn aber sichtbar und nimmt ihm die bequemen Wege.
+Eine Sperre im Browser ist kein Schutz: Was zaehlt, prueft der Server. Das Engine-Schloss ist eine Hilfe fuer Ehrliche:
+Es nimmt die Versuchung weg, haelt aber niemanden mit einem zweiten Geraet oder einer veraenderten App auf. Fuer Partien
+gegen Fremde kommt Etappe 1a (Edge Function `online-zug`, die jeden Zug nachrechnet).
+
+**Server** (`supabase/online-schema.sql`, Test `supabase/online-rls-test.sql` ab Abschnitt 13):
+- **Einladungs-Bremse:** `online_erstelle` sperrt je Konto (`pg_advisory_xact_lock`) und lehnt ab, wenn schon 5 offene
+  (noch gueltige) oder 50 neue Einladungen in 24 Stunden da sind (`ONLINE_ZU_VIELE_EINLADUNGEN`; zurueckgezogene zaehlen
+  bei den neuen mit).
+- **Aufraeumen** (`online_aufraeumen`, bei jedem `online_erstelle`, `online_meine` und `meine_daten`, fuer alle,
+  `skip locked`, je Aufruf hoechstens 1000 Zeilen): Einladungen, die nie zu einer Partie wurden (offen oder
+  zurueckgezogen) und aelter als 48 Stunden sind, werden geloescht; haengende Partien enden als `'abgebrochen'`;
+  Fehlversuche von vor mehr als 2 Tagen werden geloescht und, wenn `daten-schema.sql` eingespielt ist, Zaehler der
+  Mengenbremse, die aelter als 48 Stunden sind (`daten_zaehler_aufraeumen`, dynamisch aufgerufen). `pg_cron` ist nicht
+  eingerichtet: Ohne jede Aktivitaet auf dem Server raeumt niemand auf.
+- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug
+  (vorlaeufig, Flo entscheidet: `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16).
+  Ab dem 2. Halbzug entscheidet bei Partien mit Uhr die Uhr. Geprueft auch in `online_uhr_pruefen` (Zug, Remis,
+  Aufgabe, `online_pruefe_zeit`); ein verspaeteter Zug in einer haengenden Partie verfaellt.
+- **Fehlversuche:** Tabelle `online_versuche` (Konto, Tag Europe/Berlin, Anzahl; kein Recht fuer Nutzer, in
+  `meine_daten()`, `on delete cascade`). Hoechstens 20 falsche oder abgelaufene Codes je Tag, danach
+  `ONLINE_ZU_VIELE_VERSUCHE` (raise, auch fuer einen richtigen Code). Ein Fehlversuch kommt als `{ fehler }` ohne
+  raise zurueck, weil ein raise den Zaehler zurueckrollte; `online_tritt_bei` liefert deshalb `jsonb` (vorher
+  `drop function`). Wer schon am Brett sitzt (Partie laeuft oder ist beendet), bekommt seine Zeile unveraendert zurueck,
+  ohne Fehlversuch (verlorene Antwort, Link noch einmal geoeffnet).
+- **Ergebnis-Regeln** in `online_zug`: ein Ergebnis nur mit Grund; `'matt'` nur als Sieg des Ziehenden, `'patt'`,
+  `'material'`, `'wiederholung'`, `'50-zuege'` nur als `'1/2-1/2'`; alles andere `ONLINE_ERGEBNIS_FORM`. Ein Grund ohne
+  Ergebnis faellt still weg.
+- **Folgestellung grob** (`online_folge_passt`): Das Brett von `fen_danach` muss aus dem gespeicherten Brett plus dem Zug
+  entstehen (Rochade mit Turm und freien Feldern zwischen Koenig und Turm, en passant nur gegen einen Bauern, Umwandlung
+  in den angegebenen Stein), sonst `ONLINE_STELLUNG_FALSCH`. Gangart, Schach und sonst freie Wege prueft das nicht.
+- **strittig** (`online_strittig`): Ein Spieler beendet eine laufende Partie ohne Ergebnis, auch bei laufender oder schon
+  abgelaufener eigener Uhr (keine Uhr-Pruefung vorweg). `online_uhr_pruefen` entscheidet bei `grund = 'strittig'` nie auf
+  Zeit. Missbrauch durch einen Verlierer ist moeglich und ohne Wertung tragbar.
+- **Zeitende mit zu wenig Material:** `online_zeitende` (aus `online_uhr_pruefen` und `online_zug`) prueft mit
+  `online_kann_nicht_matt_setzen` die gespeicherte Stellung.
+
+**Browser** (`js/ui/online.js`): verglichen werden nur Brett und Seite am Zug (`am_zug` und das Feld im FEN-Text), nicht
+Rochaderechte, en-passant-Feld und Zaehler. Passt es nicht oder steht ein illegaler Zug in der Liste, friert nichts ein:
+Meldung `stellungFehler`, keine Zuege und keine Zeit-Reklamation mehr, und die laufende Partie wird **einmal von selbst**
+als strittig gemeldet (`meldeStrittig`, ohne Tippen; danach Meldung `stellungStrittig`), damit der Schummler nicht auf
+die Uhr des Opfers warten kann (Konzept 5.1, L5). Scheitert das am Netz, sagt die Meldung es (`strittigVonHand`), und
+die Knoepfe `[data-online="strittig"]` und `[data-online="aufgeben"]` bleiben bedienbar; die Abfrage laeuft weiter
+(`window.__online.widerspruch()`). Ist die Partie inzwischen schon beendet (der Gegner hat die Zeit zuerst reklamiert,
+`ONLINE_PARTIE_BEENDET`), bleibt nur die Meldung des Servers, die Karte zeigt "nicht nachvollziehbar". Ein gemeldetes
+Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
+ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
+2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
 
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 
@@ -1888,11 +1947,18 @@ exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `u
 Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
 dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
 Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
-insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). `konto_loeschen()`, `meine_daten()` und
+insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). Sie zählt seit Anti-Cheat Etappe 0 in
+der Zähltabelle `daten_zaehler` (Konto, Tabelle, Stunde, Anzahl; kein Recht für Nutzer, in `meine_daten()` als
+`mengenzaehler`). Zähler, die älter als 48 h sind, löscht `daten_zaehler_aufraeumen()` für alle Konten (bei jedem
+Einfügen irgendeines Kontos, bei `freigabe_widerrufen`, vor `meine_daten` und über `online_aufraeumen`), also auch für
+ein Konto, das nach dem Widerruf nichts mehr teilt. Sperre je Konto und Tabelle: Löschen (direkt oder per Widerruf) und neu
+Einfügen setzt sie nicht zurück. Zusätzlich zählen die vorhandenen Zeilen der letzten 24 h (der größere Wert gilt).
+`spielstaende.geraet` hat in `schema.sql` eine Längengrenze von 120 Zeichen (`not valid`: alte, längere Einträge bleiben
+bis zum nächsten Speichern). `konto_loeschen()`, `meine_daten()` und
 `freigabe_widerrufen()` sind `security definer`, nur für `authenticated`. `konto_loeschen()` löscht auch
 `auth.audit_log_entries` des Aufrufers (Ausnahme bei fehlender Tabelle oder fehlendem Recht abgefangen); `meine_daten()`
-liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn die Tabelle existiert) und
-`anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
+liefert zusätzlich `freigabe_widerruf`, `partien_online` und `online_versuche` (dynamisch, nur wenn die Tabellen
+existieren), `mengenzaehler` und `anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
 `meine_daten()`. `konto.js` speichert als `geraet` des Cloud-Spielstands nur noch `geraetKurz()` (Familie und System).
 
 **Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
@@ -2285,6 +2351,82 @@ Melden auch offline, Handy und iPad, hell und dunkel; dazu Wettlauf Änderung ge
 Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenbank prüft der RLS-Test im PGlite-Prüfer
 (auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).
 ---
+
+# Limitierte Editionen: Server-Teil Etappe 1 (Werkstatt, nur Stripe-Testmodus, ohne Oberflaeche)
+
+Entscheidung des Besitzers vom 29.10. (`design/runde4/ENTSCHEIDUNGEN.md`): Form B, feste Auflage (im Schema ab 100) plus
+Verkaufsfenster, nie Neuauflage, Nummern der Reihe nach, nur Optik, Nummer nur fuer den Besitzer, vorerst nur im Web (Weg
+ueber die Stores spaeter). Claudes Empfehlungen (nur ab 18 sichtbar, 28 Tage Vorlauf, Kassen-Grenze ...) sind dort als
+solche markiert. Konzept im Vault (`Schach-App/Arbeitsstand-2026-10-29/Konzept-Limitierte-Editionen.md`). Einrichtung fuer Flo
+(spaeter): `supabase/ANLEITUNG.md`, Abschnitt „Editionen“. Nichts davon steht in `PAKETE`, die App kennt es noch nicht.
+
+**Datenfluss:** App (spaeter) → POST `/functions/v1/werkstatt-kasse` mit Token und `{ produkt, textversion,
+zustimmung_sofort: true, kenntnis_widerruf: true }` → `/auth/v1/user` (Nutzer-ID nur aus dem Token, E-Mail bestaetigt) →
+`rpc/edition_reserviere` → Stripe `POST /v1/checkout/sessions` (eingeschraenkter Test-Schluessel `STRIPE_RK`) →
+`rpc/edition_kasse_setzen` → `{ kassen_url }`. Stripe → `werkstatt-webhook` (eigenes Geheimnis
+`STRIPE_WERKSTATT_WEBHOOK_SECRET`) → `rpc/edition_stripe_ereignis` → bei `erstatten` Stripe `POST /v1/refunds` →
+`rpc/edition_erstattung_gesendet`; bei `von_hand` keine Erstattung (Flo prueft). Der Abo-Webhook (`stripe-webhook`,
+`_gemeinsam/stripe.js`) bleibt unveraendert und ignoriert Einmalkaeufe; umgekehrt ignoriert der Werkstatt-Webhook
+Abo-Kaeufe, Kassen ohne `metadata.crownmate_reservierung` und Kassen eines anderen Supabase-Projekts am selben
+Stripe-Konto (`metadata.crownmate_projekt` = `projektKennung(SUPABASE_URL)`, SHA-256 des Hosts, 16 Hex-Zeichen).
+
+**Server** (`supabase/werkstatt-schema.sql`, Test `supabase/werkstatt-rls-test.sql`, beide im PGlite-Pruefer und im SQL
+Editor; Voraussetzung `schema.sql`):
+- Tabellen `altersangaben` (Selbstauskunft „18 oder aelter“ mit Zeitpunkt, schreiben nur `alter_angeben(ab18)`),
+  `editionen` (`auflage >= 100`, `vergeben + reserviert <= auflage`, `verkauf_freigegeben` und `zeige_restzahl` Standard
+  aus, `endzahl = vergeben` sobald festgeschrieben, Name einmalig ohne Gross- und Kleinschreibung), `reservierungen`
+  (Teilindex: ein offener Kauf je Konto und Edition; hoechstens 3 je Konto und Edition in 24 Stunden),
+  `edition_zustimmungen` (je Reservierung, Textversion und Zeitpunkt), `besitz` (Primaerschluessel `produkt_id, nummer`,
+  Nummer ab 1, ein Stueck je Konto und Edition, Status `aktiv | strittig | erstattet | zurueckgebucht | widerrufen`),
+  `edition_ereignisse` (Idempotenz je `evt_`, offene Erstattungen, Faelle `von_hand` | `erledigt` fuer Flo, Angaben der
+  Zahlungs-Ereignisse zum Nachholen, `nachgeholt_am`), `sonderstuecke` (Erfinder-Profil, Nr. 0, nur der Besitzer der
+  Datenbank traegt ein).
+- Trigger: `editionen_schutz` (neue Editionen mit Zaehlern 0, `EDITION_VERGEBEN_SINKT`, `EDITION_EINGEFROREN` ab
+  `angekuendigt_am`: Name, Auflage, Zeitraum, Preis-ID, Betrag, Waehrung; Ende nur vorziehbar, wenn alles vergeben;
+  angekuendigte Editionen nicht loeschbar), `besitz_schutz` (`EDITION_BESITZ_BLEIBT`: keine Loeschung, Edition, Nummer und
+  Reservierung unveraenderlich). Ankuendigung mindestens 28 Tage vor dem Start (Pruefung in der Tabelle).
+- Funktionen (security definer, `search_path = ''`): fuer `authenticated` nur `alter_angeben`, `edition_stand(produkt)`
+  und `edition_staende()` (nur ab 18, sonst `null` bzw. `[]`; Status `angekuendigt | erhaeltlich | pausiert | ausverkauft |
+  beendet` (`pausiert`: nach dem Start mit Schalter aus),
+  `restzahl` nur mit `zeige_restzahl`, `endzahl` nur fuer Besitzer eines Stuecks oder mit dem Schalter, `endzahl_folgt`;
+  „alles reserviert“ zeigt „erhaeltlich“). Nur Service-Rolle: `edition_reserviere` (Schalter zuerst, dann Zustimmung,
+  E-Mail, Alter; Sperre je Konto und Edition; bestehende offene Reservierung kommt zurueck; ein `update` mit allen
+  Bedingungen; danach `EDITION_ZU_OFT` ab der vierten Kasse in 24 Stunden; liefert `stripe_ablauf_s` = Reservierung + 31
+  Minuten), `edition_kasse_setzen`, `edition_kasse_abbrechen`
+  (nur ohne Kasse), `edition_stripe_ereignis` (Nummer = naechste in der Reihenfolge der Verbuchung; prueft Zahlstatus,
+  Betrag und Waehrung gegen die eingefrorenen Werte und die Sitzung gegen die Reservierung; spaete Zahlung: frei →
+  `zugeteilt_spaet`, sonst `erstatten`; Gruende `ausverkauft | endzahl | doppelt | betrag | sitzung | konto_geloescht`;
+  unbekannte Reservierung: Ergebnis `unbekannt`, `von_hand`, nie automatisch erstattet; Erstattung, Widerruf
+  (`metadata.grund = widerruf`, kommt nur mit alten Stripe-API-Versionen an, sonst von Hand), Teilerstattung und
+  Rueckbuchung aendern nur den Status, gemeinsam in `edition_zahlung_anwenden`; kommen sie vor dem Kauf an
+  (`ohne_besitz`), holt die Zuteilung sie in Stripe-Zeit-Reihenfolge nach; Sperre je Zahlung per
+  `pg_advisory_xact_lock`; doppeltes Ereignis liefert das gespeicherte Ergebnis), `edition_erstattung_gesendet`,
+  `edition_aufraeumen` (Reservierung ohne Kasse nach 2 Stunden frei, Endzahl festschreiben, nach 90 Tagen loeschen, offene
+  Erstattungen und `von_hand` bleiben). Spaltenrechte: Nutzer lesen nie
+  `vergeben`, `reserviert`, `endzahl`, Preis-ID, Schalter, `zahlung_id`, `sitzung_id`; niemand schreibt direkt.
+- Kassenschluss `edition_kassenschluss(bis)` = Ende minus 31 Minuten (Stripe-Kassen leben mindestens 30 Minuten), gleiche
+  Zahl wie `KASSE_S` in `werkstatt.js`.
+- Kontoloeschung: `altersangaben` per Kaskade weg, `besitz`, `reservierungen`, `edition_zustimmungen`, `sonderstuecke`
+  pseudonym (`on delete set null`). `meine_daten()` (`daten-schema.sql`) liefert dazu `abo`, `altersangabe`, `besitz`,
+  `reservierungen`, `edition_zustimmungen`, `sonderstuecke` (dynamisch, nur wenn die Schemata eingespielt sind).
+
+**Edge Functions** `supabase/functions/werkstatt-kasse/index.ts` (mit JWT-Pruefung) und
+`supabase/functions/werkstatt-webhook/index.ts` (`--no-verify-jwt`), nur Huellen; die Logik in
+`supabase/functions/_gemeinsam/werkstatt.js` (reines ES-Modul, Signatur aus `stripe.js`): `stripeArt` (nur `rk_test_`
+bis Etappe 6, `sk_` nie), `pruefeKaufEingabe`, `kassenParameter` (mode=payment, Menge 1, nur Karte, `expires_at` aus der
+Reservierung, Metadaten an Sitzung und Zahlung; feste Reihenfolge, damit jeder Versuch mit dem Idempotency-Key
+`crownmate-kasse-<reservierung>` gleich ist), `auswertenEdition` (→ genau die Parameter von `edition_stripe_ereignis`),
+`verarbeiteKasse` (200, 204, 400, 401, 403, 404, 405, 409, 413, 502, 503; Stripe unklar: einmal wiederholen, dann 503
+und Reservierung bleibt; Stripe lehnt ab: `edition_kasse_abbrechen`), `verarbeiteWebhook` (405, 413, 400, 200, 500;
+Erstattung mit Idempotency-Key `crownmate-erstattung-<pi_>`). Fehlertexte Deutsch und Englisch (`TEXTE`).
+
+**Tests:** `node tests/server-werkstatt.test.mjs` (Suite `server-werkstatt`: gefaelschtes fetch fuer Supabase und
+Stripe, Deno-Attrappe fuer beide Huellen, Vertrag mit dem Schema, keine Schluessel und Preise), SQL im PGlite-Pruefer
+(Scratchpad) und im SQL Editor (`Werkstatt-RLS-Test erfolgreich`). `tests/fairness.test.mjs` prueft die erweiterte
+Verbotsliste (keine Knappheits- und Wert-Versprechen) auch in den Texten unter `supabase/functions/`. **Offen:** ein
+dauerhafter Test mit zwei gleichzeitigen Kaeufern gegen echtes Postgres (von Hand geprueft, gruen), aktives `expire`
+ueberfaelliger Kassen, Oberflaeche (Etappe 3), sichtbare Kosmetik fuer Gegner (Etappe 3b), Bestaetigungs-Mail, Weg ueber
+die App-Stores, Live-Schluessel (Etappe 6).
 
 # Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
 

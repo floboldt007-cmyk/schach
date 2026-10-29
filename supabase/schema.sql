@@ -23,6 +23,24 @@ begin
 end
 $$;
 
+-- Das Geraet ist nur ein kurzes Kuerzel (z. B. "iOS Safari", js/konto.js geraetKurz), hoechstens 120 Zeichen.
+-- "not valid": aeltere, laengere Eintraege (frueher stand dort der ganze User-Agent) bleiben bis zum naechsten
+-- Speichern stehen, das sie durch das Kuerzel ersetzt; jedes neue Anlegen und Aendern wird geprueft.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.spielstaende'::regclass
+      and conname = 'spielstaende_geraet_groesse'
+  ) then
+    alter table public.spielstaende
+      add constraint spielstaende_geraet_groesse
+      check (geraet is null or char_length(geraet) <= 120) not valid;
+  end if;
+end
+$$;
+
 -- Reserviert fuer Freunde: Der Name darf nur A-Z, a-z, 0-9 und _ enthalten (keine Umlaute oder fremden
 -- Schriftzeichen, damit niemand einen Namen mit aehnlich aussehenden Zeichen nachbauen kann).
 create table if not exists public.profile (

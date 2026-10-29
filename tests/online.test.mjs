@@ -7,7 +7,7 @@ import path from 'node:path';
 import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL, SICHTBAR_SCHLUESSEL } from '../js/konto.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../js/konto-config.js';
 import {
-  erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit,
+  erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit, meldeStrittig,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
   zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL,
 } from '../js/online.js';
@@ -98,6 +98,34 @@ anmelden();
   antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_EIGENE_PARTIE' } });
   const e4 = await fehlerVon(() => tritteBei('ABC234'));
   pruefe('tritteBei: eigene Einladung freundlich', /eigene Einladung/.test(e4?.message || ''));
+  // Anti-Cheat Etappe 0: online_tritt_bei antwortet mit jsonb. Ein falscher Code ist ein gezaehlter Fehlversuch und
+  // kommt deshalb mit Status 200 als { fehler } (ein raise rollte den Zaehler zurueck).
+  antworten.push({ status: 200, body: { fehler: 'ONLINE_CODE_UNGUELTIG' } });
+  const j1 = await fehlerVon(() => tritteBei('ZZZZZZ'));
+  pruefe('tritteBei: neue Antwortform { fehler } wird zum Satz, Kennung und Status bleiben am Fehler',
+    j1?.message === FEHLER_TEXTE.ONLINE_CODE_UNGUELTIG && j1.kennung === 'ONLINE_CODE_UNGUELTIG' && j1.status === 200 && j1.detail === 'ONLINE_CODE_UNGUELTIG');
+  antworten.push({ status: 200, body: { fehler: 'ONLINE_CODE_ABGELAUFEN' } });
+  const j2 = await fehlerVon(() => tritteBei('ABC234'));
+  pruefe('tritteBei: { fehler: ONLINE_CODE_ABGELAUFEN } nennt die 24 Stunden', j2?.message === FEHLER_TEXTE.ONLINE_CODE_ABGELAUFEN && /24 Stunden/.test(j2.message) && j2.kennung === 'ONLINE_CODE_ABGELAUFEN');
+  antworten.push({ status: 200, body: { fehler: 'ONLINE_GANZ_NEU' } });
+  const j3 = await fehlerVon(() => tritteBei('ABC234'));
+  pruefe('tritteBei: unbekannte Kennung in { fehler } zeigt einen ganzen Satz, nie die Kennung', j3?.message === 'Das hat nicht geklappt. Bitte erneut versuchen.'
+    && !/ONLINE_/.test(j3.message) && j3.kennung === undefined && j3.detail === 'ONLINE_GANZ_NEU');
+  for (const kniff of ['constructor', 'toString', '__proto__']) {
+    antworten.push({ status: 200, body: { fehler: kniff } });
+    const jx = await fehlerVon(() => tritteBei('ABC234'));
+    pruefe(`tritteBei: { fehler: '${kniff}' } ist eine unbekannte Kennung`, typeof jx?.message === 'string' && jx.message === 'Das hat nicht geklappt. Bitte erneut versuchen.' && jx.kennung === undefined);
+  }
+  antworten.push({ status: 200, body: { ...partie, status: 'laeuft', schwarz: 'u2', code: 'DEF567' } });
+  const j4 = await tritteBei('DEF567');
+  pruefe('tritteBei: neue Antwortform bei Erfolg ist die Zeile (wie bisher)', j4.id === ID && j4.status === 'laeuft' && j4.schwarz === 'u2');
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_ZU_VIELE_VERSUCHE' } });
+  const j5 = await fehlerVon(() => tritteBei('ABC234'));
+  pruefe('tritteBei: zu viele Fehlversuche freundlich (morgen wieder)', j5?.message === FEHLER_TEXTE.ONLINE_ZU_VIELE_VERSUCHE && /morgen/.test(j5.message) && j5.kennung === 'ONLINE_ZU_VIELE_VERSUCHE');
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_ZU_VIELE_EINLADUNGEN' } });
+  const j6 = await fehlerVon(() => erstelleEinladung({ farbe: 'w' }));
+  pruefe('erstelleEinladung: Bremse freundlich, nennt 5 offene und 50 neue in 24 Stunden', j6?.message === FEHLER_TEXTE.ONLINE_ZU_VIELE_EINLADUNGEN
+    && /5 offene/.test(j6.message) && /50 neue/.test(j6.message) && /24 Stunden/.test(j6.message) && j6.kennung === 'ONLINE_ZU_VIELE_EINLADUNGEN');
 }
 
 // ---------- Partie laden ----------
@@ -139,6 +167,9 @@ anmelden();
   antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_PARTIE_NICHT_GESTARTET' } });
   const e8 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
   pruefe('sendeZug: Serverkennungen werden zu Saetzen', e6?.message === 'Du bist nicht am Zug.' && e7?.message === FEHLER_TEXTE.ONLINE_PARTIE_BEENDET && /noch nicht begonnen/.test(e8?.message || ''));
+  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_STELLUNG_FALSCH' } });
+  const e9 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
+  pruefe('sendeZug: falsche Folgestellung freundlich', e9?.message === FEHLER_TEXTE.ONLINE_STELLUNG_FALSCH && /Stellung auf dem Server/.test(e9.message) && e9.kennung === 'ONLINE_STELLUNG_FALSCH');
 }
 
 // ---------- aufgeben, Remis, meine Partien ----------
@@ -158,6 +189,10 @@ anmelden();
   antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_CODE_ABGELAUFEN' } });
   const ea = await fehlerVon(() => tritteBei('ABC234'));
   pruefe('tritteBei: abgelaufene Einladung freundlich (24 Stunden)', ea?.message === FEHLER_TEXTE.ONLINE_CODE_ABGELAUFEN && /24 Stunden/.test(ea.message) && ea.kennung === 'ONLINE_CODE_ABGELAUFEN');
+  antworten.push({ status: 200, body: { ...partie, status: 'beendet', ergebnis: null, grund: 'strittig' } });
+  const st = await meldeStrittig(ID);
+  pruefe('meldeStrittig: POST rpc/online_strittig mit { partie }, liefert die beendete Partie ohne Ergebnis', letzter().url.endsWith('/rest/v1/rpc/online_strittig')
+    && letzter().methode === 'POST' && JSON.stringify(bodyVon(letzter())) === JSON.stringify({ partie: ID }) && st.grund === 'strittig' && st.ergebnis === null);
   antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_KEIN_REMISANGEBOT' } });
   const e = await fehlerVon(() => nimmRemisAn(ID));
   pruefe('nimmRemisAn: ohne Angebot freundlich', e?.message === FEHLER_TEXTE.ONLINE_KEIN_REMISANGEBOT);
@@ -384,13 +419,38 @@ anmelden();
   const sql = quelle('supabase/online-schema.sql');
   const kennungen = [...new Set([...sql.matchAll(/raise exception '(ONLINE_[A-Z_]+)'/g)].map((x) => x[1]))];
   pruefe('online-schema.sql: jede Fehlerkennung des Servers ist in FEHLER_TEXTE uebersetzt', kennungen.length >= 12 && kennungen.every((k) => typeof FEHLER_TEXTE[k] === 'string' && FEHLER_TEXTE[k].length > 10), kennungen.filter((k) => !FEHLER_TEXTE[k]).join(', '));
-  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_zug', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine', 'online_pruefe_zeit'];
+  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_zug', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine', 'online_pruefe_zeit', 'online_strittig'];
   pruefe('online-schema.sql: alle Funktionen, die online.js aufruft, sind definiert und nur fuer authenticated freigegeben', funktionen.every((n) => new RegExp(`create or replace function public\\.${n}\\(`).test(sql) && new RegExp(`grant execute on function public\\.${n}\\([^)]*\\) to authenticated;`).test(sql) && new RegExp(`revoke all on function public\\.${n}\\([^)]*\\) from anon, public;`).test(sql)));
   pruefe('online-schema.sql: kein insert, update und delete fuer authenticated (nur lesen), RLS an', /revoke all on table public\.partien_online from anon, authenticated, public;/.test(sql) && /grant select on table public\.partien_online to authenticated;/.test(sql) && !/grant[^;]*\b(insert|update|delete)\b[^;]*partien_online/.test(sql) && !/create policy[^;]*for insert/.test(sql) && /alter table public\.partien_online enable row level security;/.test(sql));
   pruefe('online-schema.sql: Uhr-Pruefung in Zug, Remis, Remis-Annahme und Aufgabe; Helfer intern', (sql.match(/p := public\.online_uhr_pruefen\(p\);/g) || []).length >= 4 && /revoke all on function public\.online_uhr_pruefen\(public\.partien_online\) from anon, authenticated, public;/.test(sql) && !/grant execute on function public\.online_uhr_pruefen/.test(sql));
   pruefe('online-schema.sql: Code aus gen_random_uuid (nicht random()), Einladungen 24 Stunden', /gen_random_uuid/.test(sql.slice(sql.indexOf('online_vor_anlegen'), sql.indexOf('online_erstelle('))) && !/random\(\) \* 32/.test(sql) && /interval '24 hours'/.test(sql));
   pruefe('online-schema.sql: Zugregel (UCI) und Code-Alphabet wie in online.js', sql.includes("'^[a-h][1-8][a-h][1-8][qrbn]?$'") && sql.includes('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'));
+  // Anti-Cheat Etappe 0: jede Kennung im Schema (auch die aus jsonb-Antworten ohne raise) hat einen Satz
+  const alleKennungen = [...new Set([...sql.matchAll(/'(ONLINE_[A-Z_]+)'/g)].map((x) => x[1]))];
+  pruefe('online-schema.sql: jede Kennung (raise und { fehler }) ist in FEHLER_TEXTE uebersetzt', alleKennungen.length >= 17
+    && ['ONLINE_ZU_VIELE_EINLADUNGEN', 'ONLINE_ZU_VIELE_VERSUCHE', 'ONLINE_STELLUNG_FALSCH', 'ONLINE_CODE_UNGUELTIG', 'ONLINE_CODE_ABGELAUFEN'].every((k) => alleKennungen.includes(k))
+    && alleKennungen.every((k) => typeof FEHLER_TEXTE[k] === 'string' && FEHLER_TEXTE[k].length > 10), alleKennungen.filter((k) => !FEHLER_TEXTE[k]).join(', '));
+  pruefe('online-schema.sql: online_tritt_bei liefert jsonb, alte Fassung wird vorher entfernt, Fehlversuch ohne raise',
+    sql.indexOf('drop function if exists public.online_tritt_bei(text);') >= 0
+    && sql.indexOf('drop function if exists public.online_tritt_bei(text);') < sql.indexOf('create or replace function public.online_tritt_bei(')
+    && /create or replace function public\.online_tritt_bei\(code text\)\s*returns jsonb/.test(sql)
+    && /return jsonb_build_object\('fehler', v_fehler\);/.test(sql) && /create table if not exists public\.online_versuche/.test(sql)
+    && /revoke all on table public\.online_versuche from anon, authenticated, public;/.test(sql) && !/grant[^;]*online_versuche/.test(sql));
+  const definer = [...sql.matchAll(/create or replace function (public\.[a-z_]+)\([^]*?\nas \$\$/g)].map((x) => x[0]).filter((k) => /security definer/.test(k));
+  pruefe('online-schema.sql: jede Security-Definer-Funktion mit leerem search_path, nirgends search_path = public',
+    definer.length === 9 && definer.every((k) => /security definer\nset search_path = ''\n/.test(k)) && !/search_path = public/.test(sql), definer.length);
+  pruefe('online-schema.sql: Bremse mit Sperre je Konto, Aufraeumen nach 48 Stunden, haengende Partien (10 Minuten mit Uhr, 7 Tage ohne)',
+    /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('online_erstelle:'/.test(sql) && />= 5\n/.test(sql) && />= 50 then/.test(sql)
+    && /interval '48 hours'/.test(sql) && /interval '10 minutes'/.test(sql) && /interval '7 days'/.test(sql) && />= 20 then/.test(sql)
+    && (sql.match(/perform public\.online_aufraeumen\(\);/g) || []).length === 2);
+  pruefe('online-schema.sql: Ergebnis nur mit passendem Grund, Folgestellung, strittig und zeit-material',
+    /elsif v_grund = 'matt' then/.test(sql) && /'patt', 'material', 'wiederholung', '50-zuege'/.test(sql) && /if not public\.online_folge_passt\(p\.fen, zug, fen_danach\) then/.test(sql)
+    && /grund = 'strittig'/.test(sql) && /'zeit-material'/.test(sql) && /p\.grund is not distinct from 'strittig'/.test(sql));
   const rls = quelle('supabase/online-rls-test.sql');
+  pruefe('online-rls-test.sql: neue Faelle der Etappe 0 (Bremse, Fehlversuche, Ergebnis, Folgestellung, strittig, Material, haengend, search_path)',
+    ['ONLINE_ZU_VIELE_EINLADUNGEN', 'ONLINE_ZU_VIELE_VERSUCHE', 'ONLINE_STELLUNG_FALSCH', 'die 6. offene Einladung', 'die 51. neue Einladung',
+      'aelter als 48 Stunden', 'richtiger Code nach 19 Fehlversuchen', 'Ergebnis ohne Grund', 'online_strittig', "'zeit-material'",
+      'nach strittig entschied die Uhr', 'Partie ohne Uhr nach 10 Minuten', "search_path=\"\""].every((t) => rls.includes(t)));
   pruefe('online-rls-test.sql: drei Nutzer, Erfolgsmeldung, rollback am Ende', (rls.match(/@example\.invalid/g) || []).length === 3 && /Online-RLS-Test erfolgreich/.test(rls) && /rollback;\s*$/.test(rls));
   pruefe('app.js uebernimmt Einladungen vor dem Routing und registriert den Online-Screen',
     /import \{ uebernimmEinladungsLink \} from '\.\/online\.js'/.test(quelle('js/app.js'))
