@@ -1503,7 +1503,8 @@ Hauptseiten sollen ihn benutzen, damit die Leiste im Querformat oben sitzt.
 **Bauteile** (`js/ui/bauteile.js`, Optik `css/bauteile.css`): `segment({ name, optionen, wert, beiWahl })` (Radiogruppe,
 gleitende `.seg-pille`, Pfeiltasten, Pos1/Ende), `schalter({ an, beiWechsel })` (`role="switch"`), `regler({ wert, min,
 max, schritt, beiAenderung, format })` (`role="slider"`, Ziehen und Tasten), `sheet({ titel, text, knoepfe, abbrechen })
--> Promise` und `schliesseSheet()` (Blatt von unten, Fokus bleibt drin; ein Screen-Wechsel schliesst es),
+-> Promise` und `schliesseSheet()` (Blatt von unten, Fokus bleibt drin; ein Screen-Wechsel schliesst es; Zusaetze fuer den
+Tester-Bericht: `inhalt`, `klasse`, je Knopf `name`, `aus`, `beiKlick`, `bleibt`),
 `halteKnopf({ text, icon, dauer = 1000, beiAusloesen, frage, hinweis })` (Ring fuellt sich, frueher loslassen bricht ab,
 Klick ohne Zeiger, also Tastatur oder Bedienhilfe, oeffnet die Rueckfrage als Blatt; die Haltezeit haengt nicht am
 Tempo), `toast(text, { art, dauer })`/`toastLeeren()` (dahinter steht `app.meldung`), `miniBrett(fen, { zuletzt })`.
@@ -2797,3 +2798,35 @@ Einstufung, reine Daten), der Paket-Screen `js/ui/start.js` (Screen `start` aus 
   und stilles Nachholen mit `modul:start.ersterSieg` vorab), `e2e.test.mjs` (Feier genau aus den eingetragenen Paketen),
   `gedaechtnis.test.mjs` (Erzfeind-Sieg mit einem frueheren Sieg, sonst gewinnt `erster-sieg` mit Prio 95 den grossen Platz)
   und `kartei.test.mjs` (zwei Anbieter an `arena:heute`).
+
+# Tester-Bericht (Luecken-Check 10): Fehlerprotokoll und „Bericht für die Testphase“
+Flo testet auf dem iPad ohne Mac, also ohne Web-Inspektor von Safari. Deshalb merkt sich die App ihre letzten Fehler selbst
+und zeigt sie mit ein paar Zaehlern in einem Bericht, den Flo von Hand kopiert oder teilt (BAUPLAN 2D Punkt 8, Gesamtschau T7).
+**Die App sendet dabei nie etwas** (kein fetch, kein Beacon; `tests/bericht.test.mjs` prueft Quelltext und Netz).
+- **`js/protokoll.js` (Kern):** erster Import von `js/app.js`, damit die Hoerer haengen, bevor die uebrigen Module auswerten
+  (ein Kern-Modul, das beim Start wirft, steht danach im Protokoll). Haengt nur an `js/ereignisse.js`. Faengt `window`
+  `error` (Capture; von Elementen nur ein `<script>`, das nicht laedt), `unhandledrejection` und `speicher:fehler`; `app.js`
+  meldet ein Paket, das nicht laedt (`ladePakete`), einen Engine-Abbruch und den Rueckfall vom Blob-Start (`engine()`,
+  `starteEngine`) und misst die Startzeit einer Engine (`merkeEngineStart`). Arten: `fehler`, `promise`, `skript`, `paket`,
+  `engine`, `speicher`. Eintrag `{ z, art, text, datei?, zeile?, n? }`, neueste zuerst, hoechstens 50 Eintraege und
+  20.000 Zeichen, Text hoechstens 200 Zeichen. `bereinige()` entfernt Adressen (bleibt nur der Dateiname), Abfragen, Anker,
+  Herkunft, E-Mail-Adressen, Token (JWT, Bearer, `token=` …), lange Kennungen und lokale Pfade; nie ein Stack. Derselbe
+  Eintrag direkt hintereinander zaehlt `n` hoch. Geschrieben wird sofort, danach hoechstens einmal je Sekunde.
+- **Speicher:** `schach-arena:protokoll`, bewusst **nicht** unter `schach-arena:v1:`: `rohSpeicher()` sieht ihn nie, also
+  weder Sicherung (`js/sicherung.js`) noch Cloud-Spielstand (`konto.lokalerStand`); Einlesen einer Sicherung, ein
+  Cloud-Stand und „Fortschritt zurücksetzen“ lassen ihn stehen (Diagnose, kein Fortschritt). Eine Sicherungsdatei mit diesem
+  Schluessel lehnt `pruefeSicherung` ab (nur `schach-arena:v1:` erlaubt). Leeren: „Fehlerliste leeren“ im Bericht.
+- **`js/bericht.js`:** `sammleFakten()` (Version und Stand ueber die Nachricht `version` an den Service Worker, sonst
+  „unbekannt“; Sprache; Home-Bildschirm; `persisted()`; `estimate()`; `speicherStand()`; WASM-SIMD; letzte Engine-Startzeit;
+  `klang.zustand()` und `vorrat()`; System und Browser nur als Familie und Hauptversion, z. B. „iPadOS 18“; Bildschirm-Klasse;
+  Spielzaehler; Protokoll), rein: `berichtText(fakten)`, `spielZaehler(partien, { heute, raetsel, kartei })` (Tage mit
+  Partien in 7 und 28 Tagen nach `js/tag.js`, Partien je Spieltag, Uebungen, Hinweise je Partie, zuletzt besiegter Bot und
+  Niederlagen in Folge ohne Uebungen und Zu zweit, Tagesraetsel und Fehler-Kartei aus ihren Modulen), `systemAus(ua)`,
+  `groesseVon()`. Nie im Bericht: E-Mail, Konto-ID, Token, Namen aus Zu zweit, Zuege, FEN.
+- **Oberflaeche:** Einstellungen, Gruppe „Info und Lizenzen“, `.es-bericht` mit `[data-aktion="bericht"]`; laedt
+  `js/bericht.js` erst beim Tipp (`import()`). Das Blatt ist `sheet()` aus `js/ui/bauteile.js` mit den Zusaetzen `inhalt`,
+  `klasse` und je Knopf `name` (`data-knopf`), `aus`, `beiKlick`, `bleibt`: `.bericht-blatt` mit `pre.bericht-text` (der
+  ganze Bericht, vor dem Teilen sichtbar), `.bericht-status` und den Knoepfen `kopieren` (`navigator.clipboard`, sonst
+  markiertes Textfeld und `execCommand('copy')`), `teilen` (nur mit `navigator.share`, nur Titel und Text), `leeren`,
+  `schliessen`. Texte in `js/sprachen/bericht.js` (Deutsch und Englisch), Stil in `css/einstellungen.css`.
+- **Test:** `node tests/bericht.test.mjs` (Port 8897, `PORT` verschiebt ihn; `--nur-node` ohne Browser).

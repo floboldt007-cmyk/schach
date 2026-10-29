@@ -67,6 +67,18 @@
 .es-lizenzen b { font-size: 14px; }
 .es-lizenzen span { font-size: 13px; color: var(--text-2); }
 
+/* ---------- Tester-Bericht (Luecken-Check 10): Eintrag in "Info und Lizenzen" und das Blatt (js/bericht.js) ---------- */
+.es-bericht { margin: var(--a2) 0 var(--a4); padding: var(--a3); border-radius: var(--r-m); background: var(--flaeche-2); border: 1px solid var(--linie); }
+.es-info .es-bericht p { margin: 0 0 var(--a3); }
+.es-bericht .knopf { min-height: var(--tipp); white-space: normal; text-align: center; }
+.sheet-karte.bericht-blatt { width: min(640px, calc(100% - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; text-align: left; }
+.bericht-text { margin: var(--a3) 0 0; padding: var(--a3); max-height: min(46vh, 460px); max-height: min(46dvh, 460px); overflow: auto; border-radius: var(--r-s);
+  background: var(--flaeche-2); border: 1px solid var(--linie); color: var(--text); font-family: var(--schrift); font-size: var(--fs-klein);
+  line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; -webkit-user-select: text; user-select: text; }
+.bericht-text:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.sheet-karte .bericht-status { min-height: 1.4em; margin: var(--a2) 0 0; color: var(--text-2); font-size: var(--fs-klein); }
+.bericht-blatt .sheet-knoepfe .knopf { white-space: normal; }
+
 @media (max-width: 520px) {
   .es-screen .kopf { height: 56px; padding: 0 10px; }
   .es-inhalt { padding: 0 10px 28px; gap: 12px; }

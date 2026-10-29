@@ -54,6 +54,11 @@
 //     er, und der Verlauf gehoert zum Reiter Ich (reiterVon()).
 //   - 'training' ist Kern-Screen (js/ui/training.js, Huelle fuer training:karten), nicht mehr in PAKET_SCREENS.
 //   - app.meldung() benutzt toast() aus js/ui/bauteile.js; ein Screen-Wechsel schliesst auch ein offenes Blatt (sheet).
+//
+// Tester-Bericht (Luecken-Check 10): js/protokoll.js ist der ERSTE Import (seine Fenster-Hoerer haengen, bevor die
+// uebrigen Module auswerten). ladePakete() meldet ein Paket, das nicht laedt, engine() einen Engine-Abbruch und den
+// Rueckfall vom Blob-Start dorthin, dazu die Startzeit einer Engine (merkeEngineStart). Alles bleibt auf dem Geraet.
+import { protokolliere, merkeEngineStart } from './protokoll.js';
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -251,6 +256,7 @@ async function starteEngine(wasmUrl, merke) {
     } catch (f) {
       try { e.terminate(); } catch (g) { /* egal */ }
       console.warn('Engine mit Blob-URL startet nicht, lade die .wasm direkt', f);
+      protokolliere('engine', f, { vorsatz: 'Blob-Start' });
       // ein Zeitlimit (gesperrtes iPad, Speicherdruck) ist kein Grund, es nie wieder per Blob zu versuchen
       if (!(f && f.zeitlimit)) merkeDirekt();
     }
@@ -267,8 +273,11 @@ function engine(name) {
   let p = engines.get(schluessel);
   if (!p) {
     let e = null;
+    const t0 = Date.now();
     p = pruefeWasm().then((wasmUrl) => starteEngine(wasmUrl, (x) => { e = x; }));
+    p.then(() => merkeEngineStart(Date.now() - t0), () => {});
     p.catch((f) => {
+      protokolliere('engine', f);
       meldeEngineFehler(f);
       // dauerhafte Fehler bleiben stehen (sofortige Absage statt neuer Versuche je Zug)
       if (!(f && f.dauerhaft) && engines.get(schluessel) === p) engines.delete(schluessel);
@@ -905,6 +914,7 @@ function ladePakete() {
   if (!pfade.length) return null;
   const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
     console.error('Paket nicht geladen: ' + p, e);
+    protokolliere('paket', e, { vorsatz: p });
   })));
   let uhr = 0;
   const zeit = new Promise((r) => {

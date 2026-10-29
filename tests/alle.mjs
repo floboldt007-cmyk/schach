@@ -62,6 +62,7 @@ const SUITEN = [
   { name: 'screens', datei: 'screens.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Analyse, Verlauf, Einstellungen' },
   { name: 'e2e', datei: 'e2e.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Ganzer Ablauf, offline, Update' },
   { name: 'notfall', datei: 'notfall.test.mjs', args: [], was: 'Notfall-Wächter: Reparieren, wenn die App nicht startet' },
+  { name: 'bericht', datei: 'bericht.test.mjs', args: [], was: 'Tester-Bericht: Fehlerprotokoll (nur lokal), Bericht ansehen, kopieren, teilen' },
   { name: 'native', datei: 'native.test.mjs', args: [], was: 'App-Store-Huelle (Capacitor): Konfiguration, Kopie der Web-App' },
 ];
 

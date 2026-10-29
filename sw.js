@@ -7,14 +7,15 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 93;
-const STAND = '69302a9b49a5';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 94;
+const STAND = '958899ad81e4';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'js/sprachen/bericht.js',
   'js/pakete/abo/texte.js',
   'js/pakete/coach-ki/texte.js',
   'js/pakete/online/texte.js',
@@ -154,6 +155,9 @@ const DATEIEN = [
   'js/tag.js',
   'js/sicherung.js',
   'js/daten.js',
+  // Tester-Bericht (Luecken-Check 10): Fehlerprotokoll (Kern, erster Import von app.js) und der Bericht
+  'js/protokoll.js',
+  'js/bericht.js',
   'js/thema.js',
   'js/ui/abrechnung.js',
   'js/ui/analyse.js',

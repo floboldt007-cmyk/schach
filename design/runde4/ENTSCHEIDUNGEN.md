@@ -119,3 +119,8 @@ App Store und Google Play (Capacitor) und weiter die Web-App.
     `index.html` selbst eine Tafel mit „Reparieren“. Das lädt die App frisch vom Server und löscht dafür nur den
     Offline-Speicher der App (Service Worker und seine Caches), nie den Spielstand. Ohne Internet wird nichts gelöscht.
     Nie automatisch: Hilft es nicht, sagt die Tafel das und rät, die App ganz zu schließen und es später zu versuchen.
+18. **Tester-Bericht (Lücken-Check 10):** Die App merkt sich ihre letzten 50 technischen Fehler nur auf dem Gerät
+    (`schach-arena:protokoll`, ohne Adressen, E-Mail-Adressen, Token und Kennungen) und sendet sie nie. In den Einstellungen
+    zeigt „Bericht für die Testphase“ den ganzen Bericht (nur Zähler und Gerätedaten); kopiert oder geteilt wird nur von
+    Hand. Die Fehlerliste gehört nicht zum Spielstand: Sie kommt nicht in die Sicherung und nicht in den Cloud-Spielstand
+    und bleibt bei „Fortschritt zurücksetzen“ stehen; gelöscht wird sie mit „Fehlerliste leeren“.
