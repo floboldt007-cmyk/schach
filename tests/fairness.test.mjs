@@ -12,6 +12,7 @@ import { wertet, sterneFuerPartie, MODI } from '../js/storage.js';
 import { pruefeInhalt, pruefeSpielplan, texteVon, COUNTDOWN_RE } from '../js/inhalte.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 import { ZUGKLASSEN } from '../js/zugklassen.js';
+import { DE as EMOTE_DE, EN as EMOTE_EN } from '../js/pakete/emotes/texte.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -25,6 +26,9 @@ const CHESS_COM_NAMEN = new Set(['Brillant', 'Großartig', 'Bester Zug', 'Exzell
 const VERBOTENE_KLASSENNAMEN = new Set(['Treffer', 'Klasse', 'Serie', 'Funken']);
 pruefe('Zugklassen: 11 verschiedene Klartext-Namen', ZUGKLASSEN.length === 11 && new Set(ZUGKLASSEN.map((k) => k.name)).size === 11);
 pruefe('Zugklassen: keine Namen der Vergleichs-App oder Verbotsliste', ZUGKLASSEN.every((k) => !CHESS_COM_NAMEN.has(k.name) && !VERBOTENE_KLASSENNAMEN.has(k.name)));
+const emoteTexte = [...Object.values(EMOTE_DE), ...Object.values(EMOTE_EN)].join(' ');
+pruefe('Emotes: vorgefertigte Texte sind freundlich und ohne Druck, Kauf oder Schuldgefuehl',
+  !/kauf|buy|nur heute|only today|musst|must|schuld|guilt|verlierer|loser/i.test(emoteTexte));
 
 // ---------------------------------------------------------------------------
 // Quelltext zerlegen: Zeichenketten (auch Template-Texte) und Code ohne Kommentare.

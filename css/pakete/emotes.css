@@ -1,0 +1,17 @@
+.em-popup { position: absolute; z-index: 45; left: 50%; bottom: calc(72px + env(safe-area-inset-bottom)); width: min(360px, calc(100% - 20px)); max-height: min(430px, calc(100% - 100px)); overflow: auto; transform: translateX(-50%); padding: 12px; border: 1px solid var(--linie); border-radius: var(--r-karte); background: var(--flaeche); color: var(--text); box-shadow: var(--s3); }
+.em-kopf { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.em-zu { width: var(--tap); height: var(--tap); border: 0; border-radius: var(--r-knopf); background: var(--flaeche-2); font-size: 25px; }
+.em-auswahl { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.em-rad { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.em-wahl { min-height: var(--tap); padding: 8px; border: 1px solid var(--linie); border-radius: var(--r-knopf); background: var(--flaeche-2); color: var(--text); font: inherit; font-weight: 700; }
+.em-wahl svg { display: block; width: 30px; height: 30px; margin: 0 auto 4px; }
+.em-wahl span { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.em-rand { position: absolute; z-index: 34; left: 12px; bottom: 12px; min-width: 64px; min-height: 64px; display: grid; place-items: center; padding: 8px 12px; border: 1px solid var(--linie); border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2); pointer-events: none; animation: em-kurz 1.8s var(--sanft) both; }
+.em-rand svg { width: 44px; height: 44px; }
+.em-botantwort { position: absolute; z-index: 34; top: 72px; right: 12px; max-width: min(260px, 70%); padding: 9px 13px; border: 1px solid var(--linie); border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2); font-weight: 700; pointer-events: none; }
+@keyframes em-kurz { 0% { opacity: 0; transform: translateY(8px) scale(.94); } 15%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-5px); } }
+.em-schalter { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 58px; padding: 8px 0; }
+.em-schalter span, .em-schalter small { display: block; } .em-schalter small { color: var(--text-2); }
+.em-schalter input { width: 24px; height: 24px; flex: none; }
+@media (prefers-reduced-motion: reduce) { .em-rand { animation: none; } }
+@media (max-width: 420px) { .em-popup { bottom: 58px; } .em-rad { grid-template-columns: repeat(4, minmax(0, 1fr)); } .em-wahl { padding: 6px 2px; } }
