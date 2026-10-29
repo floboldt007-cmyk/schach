@@ -831,7 +831,9 @@ async function testeScreensUndMelder(browser) {
     await neu.seite.route('**/js/pakete/haengt/index.js', (r) => {
       setTimeout(() => { r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export {};' }).catch(() => {}); }, 20000);
     });
-    await neu.seite.goto(BASIS + 'index.html?test&kern&erw=pakete/haengt/index#einstellungen');
+    // Nur bis die Seite da ist: Unter WebKit haelt die noch offene Anfrage des haengenden Pakets das load-Ereignis auf
+    // (Chromium nicht). Auf den Einstellungen-Screen wartet die naechste Zeile.
+    await neu.seite.goto(BASIS + 'index.html?test&kern&erw=pakete/haengt/index#einstellungen', { waitUntil: 'commit' });
     await neu.seite.waitForSelector('.es-screen .es-info [data-aktion="bericht"]', { timeout: 30000 });
     await neu.seite.waitForFunction(() => { const p = JSON.parse(localStorage.getItem('schach-arena:protokoll') || 'null'); return p && p.eintraege.some((e) => e.art === 'paket'); }, null, { timeout: 5000 }).catch(() => {});
     const p = await protokoll(neu.seite);
