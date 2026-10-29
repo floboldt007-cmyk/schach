@@ -19,6 +19,10 @@
 //   protokoll() -> [{ name, t }]   die letzten 200 gesendeten Ereignisse (t = performance.now() bzw.
 //                                  Date.now()); nur mit ?test in der Adresse bzw. in Node, sonst leer
 //   zuruecksetzen()                alle Hoerer und das Protokoll entfernen (nur fuer Tests)
+//   setzeFehlerMelder(fn | null)   Tester-Bericht (Luecken-Check 10): fn(name, fehler) bekommt zusaetzlich zur Konsole
+//                                  jeden Fehler eines Hoerers (js/protokoll.js meldet sich hier an, ohne Zyklus, weil
+//                                  ereignisse.js nichts importiert). Ein Fehler im Melder bleibt ohne Folgen.
+//                                  zuruecksetzen() laesst den Melder stehen (er ist kein Hoerer).
 //
 // Regeln fuer Hoerer: hoechstens 2 ms, schwere Arbeit per setTimeout(fn, 0); idempotent
 // (partie:analysiert kann je partieId zweimal kommen).
@@ -62,6 +66,11 @@ const uhr = typeof performance !== 'undefined' && typeof performance.now === 'fu
 // name -> Array von { fn }; Kopie beim An- und Abmelden, damit sende ohne Kopie laufen kann
 let hoererListe = new Map();
 let protokollListe = [];
+let fehlerMelder = null;
+
+export function setzeFehlerMelder(fn) {
+  fehlerMelder = typeof fn === 'function' ? fn : null;
+}
 
 function pruefeName(name) {
   if (!BEKANNT.has(name)) throw new Error('Unbekanntes Ereignis: ' + String(name));
@@ -100,6 +109,9 @@ export function sende(name, daten = {}) {
       e.fn(d);
     } catch (f) {
       try { console.error('Ereignis-Hoerer fuer ' + name + ' fehlgeschlagen:', f); } catch (x) { /* egal */ }
+      if (fehlerMelder) {
+        try { fehlerMelder(name, f); } catch (x) { /* egal */ }
+      }
     }
   }
 }

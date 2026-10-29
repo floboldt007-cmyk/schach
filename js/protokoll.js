@@ -1,12 +1,15 @@
 // Fehlerprotokoll fuer den Tester-Bericht (Luecken-Check 10, BAUPLAN 2D Punkt 8, Gesamtschau T7). Rein lokal: Es faengt
 // Laufzeitfehler (window 'error', dazu ein Skript, das nicht laedt), abgelehnte Promises ohne Fang ('unhandledrejection'),
-// Paket-Ladefehler und Engine-Abbrueche (js/app.js ruft protokolliere()) und "Speicher voll" (Ereignis speicher:fehler).
+// Fehler von Ereignis-Hoerern (js/ereignisse.js) und Anzeige-Anbietern (js/orte.js), die beide selbst fangen, Paket- und
+// Screen-Ladefehler, Screen-Abstuerze und Engine-Abbrueche (js/app.js ruft protokolliere()) und "Speicher voll"
+// (Ereignis speicher:fehler). Nicht erfasst: Fehler, die ein Paket in seinem eigenen sicher() faengt (nur Konsole).
 // Die App sendet das Protokoll NIE. Es steht nur im "Bericht fuer die Testphase" (js/bericht.js), den Flo vorher ganz
 // sieht und nur selbst kopiert oder teilt.
 //
 // Geladen wird die Datei als ERSTER Import von js/app.js: So haengen die Fenster-Hoerer, bevor die uebrigen Kern-Module
-// auswerten, und ein Fehler beim Start steht danach im Protokoll. Sie haengt nur an js/ereignisse.js und darf selbst nie
-// einen Fehler nach aussen geben (alles in try/catch). In Node ohne window: nur die Funktionen, keine Hoerer.
+// auswerten, und ein Fehler beim Start steht danach im Protokoll. Sie haengt nur an js/ereignisse.js und js/orte.js (beide
+// ohne eigene Imports, also kein Zyklus) und darf selbst nie einen Fehler nach aussen geben (alles in try/catch). In Node
+// ohne window: nur die Funktionen und die beiden Melder, keine Fenster-Hoerer.
 //
 // Speicher: localStorage PROTOKOLL_SCHLUESSEL = 'schach-arena:protokoll', bewusst NICHT unter 'schach-arena:v1:'. Damit
 //   sieht rohSpeicher() (js/storage.js) ihn nie: Er kommt weder in die Sicherung (js/sicherung.js) noch in den
@@ -19,8 +22,12 @@
 //     datei  nur der Dateiname (ohne Ordner, ohne ?... und #...), zeile nur die Zahl; nie ein Stack
 //     n      wie oft derselbe Eintrag direkt hintereinander kam (statt einer neuen Zeile je Wiederholung)
 //   Hoechstens MAX_EINTRAEGE und MAX_ZEICHEN (JSON des Ganzen), die aeltesten fallen weg. Geschrieben wird sofort und
-//   danach hoechstens einmal je SCHREIB_MS (dazu beim Verlassen der Seite). Ist der Speicher voll, bleibt das Protokoll im
-//   Arbeitsspeicher; protokoll.js sendet dabei nie speicher:fehler (keine Schleife).
+//   danach hoechstens einmal je SCHREIB_MS (dazu beim Verlassen der Seite). Ist der Speicher voll, bleiben die eigenen
+//   Eintraege im Arbeitsspeicher; protokoll.js sendet dabei nie speicher:fehler (keine Schleife).
+//   Zwei Tabs: Es gibt KEINEN Zwischenspeicher des gespeicherten Stands. Jeder Zugriff liest frisch aus dem Speicher, im
+//   Arbeitsspeicher stehen nur die eigenen, noch nicht geschriebenen Eintraege (ausstehend) und die eigene Engine-Startzeit.
+//   Beim Schreiben kommen sie vor den frisch gelesenen Stand. So bringt ein zweiter Tab nach "Fehlerliste leeren" keine
+//   geloeschten Eintraege zurueck, und zwei Tabs ueberschreiben nie die Eintraege des anderen (wie js/bots.js).
 //
 // API:
 //   protokolliere(art, fehler, { datei, zeile, vorsatz } = {}) -> Eintrag | null   fehler: Error, Text oder Wert
@@ -32,7 +39,8 @@
 //   ersterOrt(stack) -> { datei, zeile } | null   erste Stelle mit Datei und Zeile aus einem Stack-Text
 //   kuerze(liste, { maxEintraege, maxZeichen }) -> liste   die neuesten, die in die Grenzen passen
 //   setzeLager(fake | null)            nur fuer Tests (Node)
-import { hoere } from './ereignisse.js';
+import { hoere, setzeFehlerMelder as setzeHoererMelder } from './ereignisse.js';
+import { setzeFehlerMelder as setzeAnbieterMelder } from './orte.js';
 
 export const PROTOKOLL_SCHLUESSEL = 'schach-arena:protokoll';
 export const MAX_EINTRAEGE = 50;
@@ -45,14 +53,17 @@ const DATEI_MAX = 60;
 const RAHMEN = 100;
 
 let lagerFn = () => globalThis.localStorage;
-let zustand = null;
-let dreckig = false;
+// eigene Eintraege, die noch nicht im Speicher stehen (aelteste zuerst), und die eigene, noch nicht geschriebene
+// Engine-Startzeit; der gespeicherte Stand selbst wird nie zwischengespeichert (zwei Tabs, siehe oben)
+let ausstehend = [];
+let engineNeu = null;
 let uhr = null;
+const offen = () => ausstehend.length > 0 || !!engineNeu;
 
 export function setzeLager(lager) {
   lagerFn = lager ? () => lager : () => globalThis.localStorage;
-  zustand = null;
-  dreckig = false;
+  ausstehend = [];
+  engineNeu = null;
   if (uhr) { clearTimeout(uhr); uhr = null; }
 }
 
@@ -161,36 +172,55 @@ function leer() {
   return { v: 1, eintraege: [], engine: null };
 }
 
-function lade() {
-  if (zustand) return zustand;
-  zustand = leer();
+const gleich = (a, b) => a.art === b.art && a.text === b.text && a.datei === b.datei && a.zeile === b.zeile;
+
+// einen Eintrag vorn anfuegen; derselbe Eintrag direkt hintereinander zaehlt n hoch (statt einer neuen Zeile)
+function fuegeEin(liste, e) {
+  const letzter = liste[0];
+  if (letzter && gleich(letzter, e)) {
+    return [{ ...letzter, z: Math.max(letzter.z, e.z), n: Math.min((letzter.n || 1) + (e.n || 1), 9999) }, ...liste.slice(1)];
+  }
+  return kuerze([{ ...e }, ...liste]);
+}
+
+// der gespeicherte Stand, bei jedem Aufruf frisch gelesen (ein anderer Tab kann ihn inzwischen geleert oder ergaenzt haben)
+function gespeichert() {
+  const z = leer();
   try {
     const roh = JSON.parse(lagerFn().getItem(PROTOKOLL_SCHLUESSEL) || 'null');
     if (roh && typeof roh === 'object') {
-      if (Array.isArray(roh.eintraege)) zustand.eintraege = kuerze(roh.eintraege.map(pruefeEintrag).filter(Boolean));
+      if (Array.isArray(roh.eintraege)) z.eintraege = kuerze(roh.eintraege.map(pruefeEintrag).filter(Boolean));
       const ms = roh.engine ? Number(roh.engine.ms) : NaN;
-      if (Number.isFinite(ms) && ms >= 0) zustand.engine = { ms: Math.min(Math.round(ms), 600000), z: Number(roh.engine.z) || 0 };
+      if (Number.isFinite(ms) && ms >= 0) z.engine = { ms: Math.min(Math.round(ms), 600000), z: Number(roh.engine.z) || 0 };
     }
   } catch (e) { /* kaputt oder gesperrt: leer anfangen */ }
-  return zustand;
+  return z;
+}
+
+// gespeicherter Stand plus die eigenen, noch nicht geschriebenen Eintraege
+function stand() {
+  const z = gespeichert();
+  for (const e of ausstehend) z.eintraege = fuegeEin(z.eintraege, e);
+  if (engineNeu) z.engine = { ...engineNeu };
+  return z;
 }
 
 function schreibeJetzt() {
-  dreckig = false;
   try {
-    const z = lade();
+    const z = stand();
     const lager = lagerFn();
     if (!z.eintraege.length && !z.engine) lager.removeItem(PROTOKOLL_SCHLUESSEL);
     else lager.setItem(PROTOKOLL_SCHLUESSEL, JSON.stringify(z));
-  } catch (e) { /* voll oder gesperrt: bleibt im Arbeitsspeicher */ }
+    ausstehend = [];
+    engineNeu = null;
+  } catch (e) { /* voll oder gesperrt: bleibt im Arbeitsspeicher (ausstehend), der naechste Versuch kommt beim naechsten Schreiben */ }
 }
 
 // sofort schreiben, danach hoechstens einmal je SCHREIB_MS (eine Fehlerflut schreibt nicht jedes Mal den Speicher)
 function planeSchreiben() {
-  dreckig = true;
   if (uhr) return;
   schreibeJetzt();
-  uhr = setTimeout(() => { uhr = null; if (dreckig) schreibeJetzt(); }, SCHREIB_MS);
+  uhr = setTimeout(() => { uhr = null; if (offen()) schreibeJetzt(); }, SCHREIB_MS);
   if (uhr && typeof uhr.unref === 'function') uhr.unref();
 }
 
@@ -207,12 +237,15 @@ export function protokolliere(art, fehler, { datei = '', zeile = null, vorsatz =
       e.datei = ort.datei;
       e.zeile = ort.zeile;
     }
-    const z = lade();
-    const letzter = z.eintraege[0];
-    if (letzter && letzter.art === e.art && letzter.text === e.text && letzter.datei === e.datei && letzter.zeile === e.zeile) {
+    const letzter = ausstehend[ausstehend.length - 1];
+    if (letzter && gleich(letzter, e)) {
       letzter.n = Math.min((letzter.n || 1) + 1, 9999);
       letzter.z = e.z;
-    } else z.eintraege = kuerze([e, ...z.eintraege]);
+    } else {
+      ausstehend.push({ ...e });
+      // bleibt der Speicher voll, waechst die Liste im Arbeitsspeicher nicht ohne Grenze
+      if (ausstehend.length > MAX_EINTRAEGE) ausstehend = ausstehend.slice(-MAX_EINTRAEGE);
+    }
     planeSchreiben();
     return { ...e };
   } catch (f) {
@@ -221,27 +254,38 @@ export function protokolliere(art, fehler, { datei = '', zeile = null, vorsatz =
 }
 
 export function eintraege() {
-  try { return lade().eintraege.map((e) => ({ ...e })); } catch (e) { return []; }
+  try { return stand().eintraege.map((e) => ({ ...e })); } catch (e) { return []; }
 }
 
 export function leere() {
+  ausstehend = [];
+  let lager = null;
   try {
-    lade().eintraege = [];
-    schreibeJetzt();
-  } catch (e) { /* egal */ }
+    lager = lagerFn();
+    // frisch gelesen: die Engine-Startzeit (auch die eines anderen Tabs) bleibt, die Fehler aller Tabs gehen
+    const z = gespeichert();
+    z.eintraege = [];
+    if (engineNeu) z.engine = { ...engineNeu };
+    if (z.engine) lager.setItem(PROTOKOLL_SCHLUESSEL, JSON.stringify(z));
+    else lager.removeItem(PROTOKOLL_SCHLUESSEL);
+    engineNeu = null;
+  } catch (e) {
+    // voll oder gesperrt: die Fehler muessen trotzdem weg, die Engine-Startzeit darf dafuer fallen
+    try { if (lager) lager.removeItem(PROTOKOLL_SCHLUESSEL); } catch (f) { /* egal */ }
+  }
 }
 
 export function merkeEngineStart(ms) {
   const n = Number(ms);
   if (!Number.isFinite(n) || n < 0) return;
   try {
-    lade().engine = { ms: Math.min(Math.round(n), 600000), z: Date.now() };
+    engineNeu = { ms: Math.min(Math.round(n), 600000), z: Date.now() };
     planeSchreiben();
   } catch (e) { /* egal */ }
 }
 
 export function engineStart() {
-  try { const e = lade().engine; return e ? { ...e } : null; } catch (e) { return null; }
+  try { const e = stand().engine; return e ? { ...e } : null; } catch (e) { return null; }
 }
 
 // ---------- Hoerer ----------
@@ -270,15 +314,22 @@ function beiAblehnung(ev) {
 }
 
 try {
+  // Ereignis-Hoerer und Anzeige-Anbieter (meist aus Paketen) fangen ihre Fehler selbst und schreiben sie nur in die Konsole,
+  // die Flo auf dem iPad nicht sieht: beide melden sie zusaetzlich hierher
+  setzeHoererMelder((name, f) => protokolliere('fehler', f, { vorsatz: 'Ereignis ' + name }));
+  setzeAnbieterMelder((ort, paket, f) => protokolliere('fehler', f, { vorsatz: `Anbieter ${paket ? paket + ' ' : ''}an ${ort}` }));
+} catch (e) { /* die App laeuft auch ohne Protokoll */ }
+
+try {
   hoere('speicher:fehler', (d) => {
     protokolliere('speicher', `${d && d.grund === 'fehler' ? 'fehler' : 'voll'} (${bereichVon(d && d.schluessel)})`);
   });
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('error', beiFehler, true);
     window.addEventListener('unhandledrejection', beiAblehnung);
-    window.addEventListener('pagehide', () => { if (dreckig) schreibeJetzt(); });
+    window.addEventListener('pagehide', () => { if (offen()) schreibeJetzt(); });
   }
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && dreckig) schreibeJetzt(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && offen()) schreibeJetzt(); });
   }
 } catch (e) { /* die App laeuft auch ohne Protokoll */ }

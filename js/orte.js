@@ -26,6 +26,10 @@
 //       niemand etwas anbietet). Unbekannter Ort: Fehler.
 //   waehle(ort, kontext) -> Wert | null   nur Wahl-Orte: erster Wert != null in der Reihenfolge
 //   zuruecksetzen()                alle Anbieter entfernen (nur fuer Tests)
+//   setzeFehlerMelder(fn | null)   Tester-Bericht (Luecken-Check 10): fn(ort, paket, fehler) bekommt zusaetzlich zur
+//                                  Konsole jeden Fehler eines Anbieters (js/protokoll.js meldet sich hier an; orte.js
+//                                  importiert weiter nichts). Ein Fehler im Melder bleibt ohne Folgen; zuruecksetzen()
+//                                  laesst den Melder stehen.
 //
 // Regeln: Kontexte sind flach eingefroren. Ein Anbieter rechnet nichts Schweres (nur Modul-Speicher
 // lesen), bindet seine Klicks selbst an sein Element und liefert null, wenn er nichts zu zeigen hat.
@@ -63,6 +67,11 @@ export const ORTE = Object.freeze({
 
 let anbieterListe = new Map();   // ort -> [{ fn, reihenfolge, paket, nr }]
 let zaehler = 0;
+let fehlerMelder = null;
+
+export function setzeFehlerMelder(fn) {
+  fehlerMelder = typeof fn === 'function' ? fn : null;
+}
 
 function artVon(ort) {
   const art = Object.prototype.hasOwnProperty.call(ORTE, ort) ? ORTE[ort] : null;
@@ -72,6 +81,9 @@ function artVon(ort) {
 
 function meldeFehler(ort, eintrag, f) {
   try { console.error(`Anbieter ${eintrag && eintrag.paket ? '"' + eintrag.paket + '" ' : ''}an ${ort} fehlgeschlagen:`, f); } catch (x) { /* egal */ }
+  if (fehlerMelder) {
+    try { fehlerMelder(ort, (eintrag && eintrag.paket) || '', f); } catch (x) { /* egal */ }
+  }
 }
 
 const istElement = (x) => !!x && typeof x === 'object' && x.nodeType === 1;

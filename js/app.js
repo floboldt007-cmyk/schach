@@ -56,8 +56,10 @@
 //   - app.meldung() benutzt toast() aus js/ui/bauteile.js; ein Screen-Wechsel schliesst auch ein offenes Blatt (sheet).
 //
 // Tester-Bericht (Luecken-Check 10): js/protokoll.js ist der ERSTE Import (seine Fenster-Hoerer haengen, bevor die
-// uebrigen Module auswerten). ladePakete() meldet ein Paket, das nicht laedt, engine() einen Engine-Abbruch und den
-// Rueckfall vom Blob-Start dorthin, dazu die Startzeit einer Engine (merkeEngineStart). Alles bleibt auf dem Geraet.
+// uebrigen Module auswerten). ladePakete() meldet ein Paket, das nicht laedt, und Pakete, die nach PAKETE_WARTEN_MS noch
+// laden; zeigeScreen() einen Kern-Screen, der nicht laedt (Paket-Screens ohne Datei bleiben still, das ist kein Fehler),
+// und einen Screen, dessen zeige() oder verlasse() wirft; engine() einen Engine-Abbruch und den Rueckfall vom Blob-Start
+// dorthin, dazu die Startzeit einer Engine (merkeEngineStart). Alles bleibt auf dem Geraet.
 import { protokolliere, merkeEngineStart } from './protokoll.js';
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
@@ -714,7 +716,10 @@ async function zeigeScreen(name, params, hash) {
   }
   if (nr !== ladeNr) return;  // inzwischen woanders hin
   if (aktuell && aktuell.handle) {
-    try { aktuell.handle.verlasse(); } catch (e) { console.error(e); }
+    try { aktuell.handle.verlasse(); } catch (e) {
+      console.error(e);
+      protokolliere('fehler', e, { vorsatz: 'Screen ' + aktuell.name + ' verlassen' });
+    }
   }
   // Meldungen und ein offenes Blatt gehoeren zum alten Screen ("Zug zurückgenommen" nicht in der naechsten Partie)
   toastLeeren();
@@ -734,6 +739,9 @@ async function zeigeScreen(name, params, hash) {
       zeigeScreen('arena', {}, '#arena');
       return;
     }
+    // ein Kern-Screen, der nicht laedt (Netz, alter Cache, Fehler beim Auswerten): Flo sieht den Platzhalter, der
+    // Tester-Bericht nennt den Grund (ein gescheitertes import() loest kein window 'error' aus)
+    protokolliere('skript', ladeFehler || 'nicht geladen', { vorsatz: 'Screen ' + name });
     aktuell.handle = zeigePlatzhalter(root, name);
     zeigeReiter(null);
     return;
@@ -742,6 +750,7 @@ async function zeigeScreen(name, params, hash) {
     aktuell.handle = modul.zeige(root, params || {}, app) || { verlasse() {} };
   } catch (e) {
     console.error(e);
+    protokolliere('fehler', e, { vorsatz: 'Screen ' + name });
     root.replaceChildren();
     aktuell.handle = zeigePlatzhalter(root, name, true);
     zeigeReiter(null);
@@ -912,13 +921,18 @@ function ladePakete() {
   const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p) && !(kern && p.startsWith('pakete/'))) : [];
   const pfade = [...new Set([...liste, ...(TEST ? erwPfade(location.search) : [])])];
   if (!pfade.length) return null;
+  const laufend = new Set(pfade);
   const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
     console.error('Paket nicht geladen: ' + p, e);
     protokolliere('paket', e, { vorsatz: p });
-  })));
+  }).finally(() => laufend.delete(p))));
   let uhr = 0;
   const zeit = new Promise((r) => {
-    uhr = setTimeout(() => { console.error('Pakete laden zu lange, die App startet ohne zu warten'); r(); }, PAKETE_WARTEN_MS);
+    uhr = setTimeout(() => {
+      console.error('Pakete laden zu lange, die App startet ohne zu warten');
+      protokolliere('paket', `laden nach ${Math.round(PAKETE_WARTEN_MS / 1000)} s noch: ${[...laufend].join(', ')}`, { vorsatz: 'Pakete' });
+      r();
+    }, PAKETE_WARTEN_MS);
   });
   return Promise.race([alle, zeit]).then(() => clearTimeout(uhr));
 }

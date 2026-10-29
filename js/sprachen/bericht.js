@@ -1,13 +1,15 @@
 // Woerterbuch "bericht" (Tester-Bericht, Luecken-Check 10): Eintrag in den Einstellungen (Gruppe "Info und Lizenzen"),
 // das Blatt mit dem Bericht und der Berichtstext selbst (js/bericht.js). Schluessel t('bericht.x').
 // Ruhig formuliert, ohne Druck (tests/fairness.test.mjs): Der Bericht ist ein Angebot, kein Muss.
+// Aussagen zum Senden gelten nur fuer DIESEN Bericht: Mit Konto und eingeschalteter Datenfreigabe sendet js/daten.js
+// Fehler der App als Nutzungsereignis (datenschutz.html Abschnitt 6), "die App sendet nichts" waere dann falsch.
 import { registriereTexte } from '../sprache.js';
 
 registriereTexte('bericht', {
   de: {
     // ---------- Einstellungen und Blatt ----------
     eintrag: 'Bericht für die Testphase',
-    eintragText: 'Zeigt App-Stand, Gerät, ein paar Zähler und die letzten Fehler. Du siehst alles, bevor du es kopierst oder teilst. Die App sendet nichts von selbst.',
+    eintragText: 'Zeigt App-Stand, Gerät, ein paar Zähler und die letzten Fehler. Du siehst alles, bevor du es kopierst oder teilst. Den Bericht sendet die App nie von selbst.',
     blattText: 'Das steht im Bericht, vollständig. Er verlässt das Gerät nur, wenn du ihn kopierst oder teilst.',
     textLabel: 'Bericht als Text',
     kopieren: 'Kopieren',
@@ -22,7 +24,7 @@ registriereTexte('bericht', {
     // ---------- Berichtstext ----------
     titel: 'Crownmate · Bericht für die Testphase',
     erstellt: 'Erstellt: {zeit}',
-    hinweis: 'Nur Zähler und Gerätedaten. Die App hat nichts gesendet.',
+    hinweis: 'Nur Zähler und Gerätedaten. Diesen Bericht hat die App nicht gesendet.',
     'k.app': 'App',
     'k.geraet': 'Gerät',
     'k.speicher': 'Speicher',
@@ -76,7 +78,7 @@ registriereTexte('bericht', {
   },
   en: {
     eintrag: 'Report for the test phase',
-    eintragText: 'Shows the app version, device, a few counters and the latest errors. You see everything before you copy or share it. The app sends nothing on its own.',
+    eintragText: 'Shows the app version, device, a few counters and the latest errors. You see everything before you copy or share it. The app never sends this report on its own.',
     blattText: 'This is the whole report. It only leaves the device if you copy or share it.',
     textLabel: 'Report as text',
     kopieren: 'Copy',
@@ -90,7 +92,7 @@ registriereTexte('bericht', {
     erstellenFehler: 'The report could not be created right now.',
     titel: 'Crownmate · Report for the test phase',
     erstellt: 'Created: {zeit}',
-    hinweis: 'Counters and device facts only. The app has sent nothing.',
+    hinweis: 'Counters and device facts only. The app has not sent this report.',
     'k.app': 'App',
     'k.geraet': 'Device',
     'k.speicher': 'Storage',

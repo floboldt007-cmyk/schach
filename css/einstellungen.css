@@ -71,7 +71,11 @@
 .es-bericht { margin: var(--a2) 0 var(--a4); padding: var(--a3); border-radius: var(--r-m); background: var(--flaeche-2); border: 1px solid var(--linie); }
 .es-info .es-bericht p { margin: 0 0 var(--a3); }
 .es-bericht .knopf { min-height: var(--tipp); white-space: normal; text-align: center; }
-.sheet-karte.bericht-blatt { width: min(640px, calc(100% - 24px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; text-align: left; }
+/* Hoehe: .sheet-karte steht unten mit margin-bottom 12px + safe-area-inset-bottom (css/bauteile.css). Beide Sicherheits-
+   abstaende abziehen, sonst ragt das Blatt auf dem iPhone vom Home-Bildschirm (viewport-fit=cover) oben aus dem Bild. */
+.sheet-karte.bericht-blatt { width: min(640px, calc(100% - 24px)); overflow-y: auto; text-align: left;
+  max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 .bericht-text { margin: var(--a3) 0 0; padding: var(--a3); max-height: min(46vh, 460px); max-height: min(46dvh, 460px); overflow: auto; border-radius: var(--r-s);
   background: var(--flaeche-2); border: 1px solid var(--linie); color: var(--text); font-family: var(--schrift); font-size: var(--fs-klein);
   line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; -webkit-user-select: text; user-select: text; }

@@ -1,13 +1,16 @@
 // Tests fuer den Tester-Bericht (Luecken-Check 10): js/protokoll.js (rein lokales Fehlerprotokoll) und js/bericht.js
 // ("Bericht fuer die Testphase" in den Einstellungen, Gruppe "Info und Lizenzen").
 // Teil 1 in Node: Bereinigen (keine Adressen, Abfragen, E-Mail, Token, Kennungen, lokalen Pfade), Grenzen (50 Eintraege,
-//   20.000 Zeichen), Speicherort ausserhalb von rohSpeicher() (nicht in Sicherung und Cloud-Spielstand, bleibt bei
-//   "Fortschritt zuruecksetzen" und beim Einlesen einer alten Sicherung), Spielzaehler, System aus dem User-Agent,
-//   Berichtstext Deutsch und Englisch, kein Netz im Quelltext.
+//   20.000 Zeichen, auch auf dem echten Schreibweg), Speicherort ausserhalb von rohSpeicher() (nicht in Sicherung und
+//   Cloud-Spielstand, bleibt bei "Fortschritt zuruecksetzen" und beim Einlesen einer alten Sicherung), Spielzaehler, System
+//   aus dem User-Agent, Berichtstext Deutsch und Englisch (Sende-Aussagen nur fuer den Bericht), kein Netz im Quelltext,
+//   Fehler von Ereignis-Hoerern und Anzeige-Anbietern (Melder), zwei Tabs auf demselben Speicher.
 // Teil 2 im Browser (Playwright, echte App, eigener Server): gefangene Fehler und abgelehnte Promises, Paket- und
 //   Engine-Fehler, "Speicher voll", Grenzen, das Blatt mit dem ganzen Bericht, Kopieren (Zwischenablage und
-//   Rueckfall), Teilen nur mit navigator.share, Fehlerliste leeren, nichts geht ins Netz, weniger Bewegung, Englisch,
-//   App-Version vom Service Worker, Engine-Startzeit.
+//   Rueckfall), Teilen nur mit navigator.share, Fehlerliste leeren, Fokusfalle (Tab, Shift+Tab, abgeschalteter Knopf),
+//   nichts geht ins Netz, weniger Bewegung, Englisch, App-Version vom Service Worker, Engine-Startzeit, Screen-Abstuerze und
+//   Screens, die nicht laden, Hoerer- und Anbieter-Fehler, Pakete, die zu lange laden, zwei Tabs, Blatt auf dem iPhone mit
+//   Sicherheitsabstaenden (nur Chromium: CDP).
 //
 //   node tests/bericht.test.mjs              beides
 //   node tests/bericht.test.mjs --nur-node   nur Teil 1
@@ -161,6 +164,21 @@ async function nodeTeil() {
   pruefe('kuerze: Zeichengrenze greift (die neuesten bleiben)', klein.length > 0 && klein.length < 50 && JSON.stringify({ v: 1, eintraege: klein, engine: null }).length <= 2000
     && klein[0].text.includes('Nr. 59'), klein.length);
   pruefe('kuerze: Eintragsgrenze greift', P.kuerze(liste, { maxEintraege: 5 }).length === 5);
+  // Zeichengrenze auf dem echten Schreibweg (protokolliere): Anfuehrungszeichen und Rueckstriche verdoppelt JSON, so kommen
+  // 50 Eintraege ueber 20.000 Zeichen (die Flut oben mit 'y' bleibt bei etwa 13.000, dort griffe die Grenze nie)
+  const zeichenLager = new Speicher();
+  P.setzeLager(zeichenLager);
+  for (let i = 0; i < 60; i++) {
+    P.protokolliere('fehler', new Error(`Nr ${i} ` + '"\\'.repeat(150)), { datei: 'eine-recht-lange-datei-' + i + '.js', zeile: 123456 });
+  }
+  await warte(1150);
+  const zj = zeichenLager.getItem(P.PROTOKOLL_SCHLUESSEL) || '';
+  const zl = zj ? JSON.parse(zj).eintraege : [];
+  const ohneGrenze = zl.length ? JSON.stringify({ v: 1, eintraege: Array(50).fill(zl[0]), engine: null }).length : 0;
+  pruefe('Flut mit Anfuehrungszeichen waere ohne Zeichengrenze laenger als 20.000 Zeichen (sonst prueft der Test nichts)', ohneGrenze > 21000, ohneGrenze);
+  pruefe('Zeichengrenze auf dem Schreibweg: gespeichert hoechstens 20.000 Zeichen, deshalb weniger als 50 Eintraege, die neuesten lueckenlos zuerst',
+    zj.length <= 20000 && zj.length > 15000 && zl.length > 30 && zl.length < 50 && zl.every((e, i) => e.text.startsWith(`Error: Nr ${59 - i} `))
+    && P.eintraege().length === zl.length, { zeichen: zj.length, eintraege: zl.length, erster: zl[0] && zl[0].text.slice(0, 20) });
   // von Hand veraenderter Speicher: beim Laden noch einmal bereinigt
   const hand = new Speicher({ [P.PROTOKOLL_SCHLUESSEL]: JSON.stringify({ v: 1, eintraege: [{ z: 1, art: 'fehler', text: `https://x.example/a.js?token=${GEHEIM} ${EMAIL}`, datei: 'https://x.example/js/a.js?x=1', zeile: 3 },
     { z: 2, art: 'gibtsnicht', text: 'weg' }], engine: { ms: 900, z: 5 } }) });
@@ -259,7 +277,7 @@ async function nodeTeil() {
   };
   const de = B.berichtText(fakten);
   const zeilen = de.split('\n');
-  pruefe('Deutsch: Titel, Hinweis und alle Abschnitte', zeilen[0] === 'Crownmate · Bericht für die Testphase' && de.includes('Die App hat nichts gesendet.')
+  pruefe('Deutsch: Titel, Hinweis und alle Abschnitte', zeilen[0] === 'Crownmate · Bericht für die Testphase' && zeilen.includes('Nur Zähler und Gerätedaten. Diesen Bericht hat die App nicht gesendet.')
     && ['App', 'Gerät', 'Speicher', 'Spielen', 'Letzte Fehler (1)'].every((k) => zeilen.includes(k)), de);
   const muss = ['- Version: 94 (Stand abcdef123456)', '- Sprache: Deutsch', '- Vom Home-Bildschirm gestartet: ja', '- System: iPadOS 18', '- Browser: Safari 18',
     '- Bildschirm: mittel (Tablet), quer', '- WebAssembly mit SIMD: ja', '- Engine-Start: 850 ms (zuletzt gemessen)',
@@ -279,7 +297,7 @@ async function nodeTeil() {
   const zEn = B.spielZaehler(g.partien, { heute: g.heute, raetsel: g.raetsel, kartei: g.kartei });
   const en = B.berichtText({ ...fakten, app: { ...fakten.app, sprache: 'en' }, spiel: zEn });
   const zeilenEn = en.split('\n');
-  const mussEn = ['Crownmate · Report for the test phase', 'Counters and device facts only. The app has sent nothing.', 'Device', 'Storage', 'Playing',
+  const mussEn = ['Crownmate · Report for the test phase', 'Counters and device facts only. The app has not sent this report.', 'Device', 'Storage', 'Playing',
     'Latest errors (1)', '- Version: 94 (build abcdef123456)', '- Language: English', '- Started from the home screen: yes', '- Screen: medium (tablet), landscape',
     '- WebAssembly with SIMD: yes', '- Browser storage: 12.3 MB of 1,024 MB used', '- Days with games: 3 of 7, 5 of 28',
     '- Games in 28 days: 6 (1.2 per playing day; practice: 1)', `- Last bot beaten: ${name(g.bots.b)}`, '- Losses in a row: 2',
@@ -287,7 +305,22 @@ async function nodeTeil() {
   const fehltEn = mussEn.filter((x) => !zeilenEn.includes(x));
   pruefe('Englisch: Abschnitte, Zaehler und Fakten', fehltEn.length === 0, fehltEn);
   pruefe('Englisch: ohne Umlaute und ohne Spuren', !/[äöüÄÖÜß]/.test(en) && spurenIn(en).length === 0, en);
+  // Mit Konto und eingeschalteter Datenfreigabe sendet js/daten.js Fehler der App als Nutzungsereignis (datenschutz.html
+  // Abschnitt 6): Aussagen zum Senden duerfen deshalb nur fuer den Bericht gelten, nie "die App sendet nichts"
+  const absolut = /sendet nichts|hat nichts gesendet|nichts von selbst|sends nothing|has sent nothing|nothing on its own/i;
+  const enTexte = [sprache.t('bericht.eintragText'), sprache.t('bericht.hinweis'), sprache.t('bericht.blattText')];
   sprache.setzeSprache('de');
+  const deTexte = [sprache.t('bericht.eintragText'), sprache.t('bericht.hinweis'), sprache.t('bericht.blattText')];
+  pruefe('Sende-Aussagen gelten nur fuer den Bericht (Deutsch und Englisch), keine sagt "die App sendet nichts"',
+    deTexte[0].endsWith('Den Bericht sendet die App nie von selbst.') && deTexte[1] === 'Nur Zähler und Gerätedaten. Diesen Bericht hat die App nicht gesendet.'
+    && enTexte[0].endsWith('The app never sends this report on its own.') && enTexte[1] === 'Counters and device facts only. The app has not sent this report.'
+    && ![...deTexte, ...enTexte].some((x) => absolut.test(x)), { deTexte, enTexte });
+  const absatz = (datei, muster) => (lies(datei).split('</p>').find((x) => muster.test(x)) || '');
+  const dsDe = absatz('datenschutz.html', /Fehlerliste leeren/);
+  const dsEn = absatz('datenschutz-en.html', /Clear error list/);
+  pruefe('Datenschutz (de/en): der Absatz zur Fehlerliste nennt die Fehler, die mit Datenfreigabe gesendet werden (Abschnitt 6)',
+    /nie automatisch gesendet/.test(dsDe) && /Nutzungsereignis/.test(dsDe) && /Abschnitt 6/.test(dsDe)
+    && /never sent automatically/.test(dsEn) && /usage events/.test(dsEn) && /section 6/.test(dsEn), { dsDe, dsEn });
 
   gruppe = 'Quelltext';
   const netz = /\bfetch\s*\(|sendBeacon|XMLHttpRequest|WebSocket|EventSource|\.open\(\s*['"](GET|POST)|mailto:/;
@@ -298,6 +331,89 @@ async function nodeTeil() {
     && !/from '\.\.\/bericht\.js'/.test(lies('js/ui/einstellungen.js')));
   const sw = leseSw();
   pruefe('neue Dateien im Offline-Cache (sw.js DATEIEN)', ['js/protokoll.js', 'js/bericht.js', 'js/sprachen/bericht.js'].every((d) => sw.DATEIEN.includes(d)));
+  // auch fuer WebKit (dort fehlt der CDP-Test im Browser-Teil): die Hoehe des Blatts zieht beide Sicherheitsabstaende ab
+  const regel = (lies('css/einstellungen.css').match(/\.sheet-karte\.bericht-blatt\s*\{[^}]*\}/) || [''])[0];
+  const hoehen = regel.match(/max-height:[^;]+/g) || [];
+  pruefe('CSS: max-height des Blatts zieht safe-area-inset-top und -bottom ab (vh und dvh)', hoehen.length === 2
+    && hoehen.every((h) => h.includes('env(safe-area-inset-bottom') && h.includes('env(safe-area-inset-top')) && hoehen.some((h) => h.includes('100dvh')), hoehen);
+
+  // ---------- Melder: Ereignis-Hoerer und Anzeige-Anbieter fangen ihre Fehler selbst ----------
+  gruppe = 'Hoerer und Anbieter';
+  const melderLager = new Speicher();
+  P.setzeLager(melderLager);
+  const E = await import('../js/ereignisse.js');
+  const O = await import('../js/orte.js');
+  const konsole = console.error;
+  console.error = () => {};
+  let warfNachAussen = false;
+  try {
+    const ab = [
+      E.hoere('app:sichtbar', () => { throw new TypeError(`Hoerer kaputt ${EMAIL}`); }),
+      O.anbieten('einstellungen:gruppen', () => { throw new Error(`Anbieter kaputt https://beispiel.example/x?token=${GEHEIM}`); }, { paket: 'probe' }),
+      O.anbieten('partie:begruessung?', () => { throw new RangeError('Wahl kaputt'); }),
+    ];
+    E.sende('app:sichtbar', {});
+    O.fuelle('einstellungen:gruppen', { appendChild() {} }, {});
+    O.waehle('partie:begruessung?', {});
+    ab.forEach((f) => f());
+  } catch (e) { warfNachAussen = e; } finally { console.error = konsole; }
+  const mt = P.eintraege().map((e) => e.text);
+  pruefe('sende und fuelle geben den Fehler weiter nicht nach aussen', warfNachAussen === false, String(warfNachAussen));
+  pruefe('Fehler eines Ereignis-Hoerers (sende faengt ihn) steht im Protokoll, bereinigt', mt.includes('Ereignis app:sichtbar: TypeError: Hoerer kaputt [e-mail]'), mt);
+  pruefe('Fehler eines Anzeige-Anbieters (fuelle und waehle fangen ihn) steht im Protokoll, mit Paket und Ort, bereinigt',
+    mt.includes('Anbieter probe an einstellungen:gruppen: Error: Anbieter kaputt [adresse]') && mt.includes('Anbieter an partie:begruessung?: RangeError: Wahl kaputt'), mt);
+  pruefe('ohne Spuren', spurenIn(JSON.stringify(P.eintraege())).length === 0, P.eintraege());
+  // eigene Instanzen (Abfrage in der Adresse): ein Melder, der selbst wirft, stoert nichts, und zuruecksetzen() laesst ihn stehen
+  const E2 = await import('../js/ereignisse.js?melder');
+  const O2 = await import('../js/orte.js?melder');
+  const gemeldet = [];
+  E2.setzeFehlerMelder((name, f) => { gemeldet.push(name + ' ' + f.message); throw new Error('Melder kaputt'); });
+  O2.setzeFehlerMelder((ort, paket, f) => { gemeldet.push(ort + ' ' + paket + ' ' + f.message); throw new Error('Melder kaputt'); });
+  E2.zuruecksetzen();
+  O2.zuruecksetzen();
+  let stoert = false;
+  console.error = () => {};
+  try {
+    E2.hoere('app:bereit', () => { throw new Error('a'); });
+    E2.sende('app:bereit', {});
+    O2.anbieten('arena:kopf', () => { throw new Error('b'); }, { paket: 'p' });
+    O2.fuelle('arena:kopf', { appendChild() {} }, {});
+  } catch (e) { stoert = e; } finally { console.error = konsole; }
+  pruefe('Melder, der wirft: kein Fehler nach aussen; Melder bleibt nach zuruecksetzen()', stoert === false && gemeldet.join('|') === 'app:bereit a|arena:kopf p b', { stoert: String(stoert), gemeldet });
+  E2.setzeFehlerMelder(null);
+  O2.setzeFehlerMelder(null);
+
+  // ---------- Zwei Tabs (zwei Modul-Instanzen auf demselben Speicher, wie zwei offene Tabs) ----------
+  // Am Ende von Teil 1: Die zweite Instanz meldet sich selbst als Melder an.
+  gruppe = 'Zwei Tabs';
+  const geteilt = new Speicher();
+  const A = P;
+  const Bt = await import('../js/protokoll.js?tab=b');
+  A.setzeLager(geteilt);
+  Bt.setzeLager(geteilt);
+  const gespeicherteTexte = () => (JSON.parse(geteilt.getItem(P.PROTOKOLL_SCHLUESSEL) || '{"eintraege":[]}').eintraege || []).map((e) => e.text);
+  A.protokolliere('fehler', new Error('Alt aus Tab A'));
+  pruefe('Tab B sieht den Eintrag aus Tab A', Bt.eintraege().map((e) => e.text).join() === 'Error: Alt aus Tab A', Bt.eintraege());
+  A.leere();
+  pruefe('Tab A leert die Liste', geteilt.getItem(P.PROTOKOLL_SCHLUESSEL) === null && Bt.eintraege().length === 0);
+  Bt.merkeEngineStart(123);
+  const nachLeeren = JSON.parse(geteilt.getItem(P.PROTOKOLL_SCHLUESSEL) || 'null');
+  pruefe('nach "Fehlerliste leeren" in Tab A bringt ein Schreiben in Tab B (Engine-Start) die geloeschten Eintraege nicht zurueck',
+    !!nachLeeren && nachLeeren.eintraege.length === 0 && nachLeeren.engine && nachLeeren.engine.ms === 123 && A.engineStart() && A.engineStart().ms === 123, nachLeeren);
+  await warte(1150);   // beide Schreib-Uhren abgelaufen: der naechste Eintrag wird sofort geschrieben
+  Bt.protokolliere('fehler', new Error('Neu aus Tab B'));
+  A.protokolliere('fehler', new Error('Zweiter aus Tab A'));
+  pruefe('zwei Tabs ueberschreiben nie die Eintraege des anderen (beide neuen, kein alter, Engine-Startzeit bleibt)',
+    gespeicherteTexte().join('|') === 'Error: Zweiter aus Tab A|Error: Neu aus Tab B' && JSON.parse(geteilt.getItem(P.PROTOKOLL_SCHLUESSEL)).engine.ms === 123,
+    geteilt.getItem(P.PROTOKOLL_SCHLUESSEL));
+  pruefe('beide Tabs zeigen denselben Stand', A.eintraege().map((e) => e.text).join('|') === Bt.eintraege().map((e) => e.text).join('|'));
+  // ein eigener, noch nicht geschriebener Eintrag (Schreib-Uhr laeuft) bleibt erhalten, wenn der andere Tab inzwischen schreibt
+  A.protokolliere('fehler', new Error('Wartend in Tab A'));
+  Bt.leere();
+  Bt.protokolliere('fehler', new Error('Spaet aus Tab B'));
+  await warte(1150);
+  pruefe('ein noch wartender Eintrag kommt nach dem Leeren im anderen Tab dazu, der andere Tab verliert nichts',
+    [...gespeicherteTexte()].sort().join('|') === 'Error: Spaet aus Tab B|Error: Wartend in Tab A', gespeicherteTexte());
 }
 
 // =====================================================================
@@ -351,6 +467,11 @@ async function neueSeite(browser, { daten = null, init = null, reduziert = false
 }
 
 const protokoll = (seite) => seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:protokoll') || 'null'));
+// geschrieben wird sofort, danach hoechstens einmal je Sekunde: auf einen Eintrag warten (Text als RegExp-Quelle)
+const warteAufEintrag = (seite, muster, ms = 3000) => seite.waitForFunction((m) => {
+  const p = JSON.parse(localStorage.getItem('schach-arena:protokoll') || 'null');
+  return !!p && p.eintraege.some((e) => new RegExp(m).test(e.text));
+}, muster, { timeout: ms }).catch(() => {});
 const zuEinstellungen = async (seite, suche = '?test&kern') => {
   await seite.goto(BASIS + 'index.html' + suche + '#einstellungen');
   await seite.waitForSelector('.es-screen .es-info [data-aktion="bericht"]', { timeout: 20000 });
@@ -411,6 +532,16 @@ async function testeProtokoll(browser) {
     const laenge = await seite.evaluate(() => (localStorage.getItem('schach-arena:protokoll') || '').length);
     pruefe('Fehlerflut: hoechstens 50 Eintraege und 20.000 Zeichen, neueste zuerst', p3 && p3.eintraege.length === 50 && laenge <= 20000
       && /Flut Nr\. 59/.test(p3.eintraege[0].text), `${p3 && p3.eintraege.length} Eintraege, ${laenge} Zeichen`);
+    // Zeichengrenze: Anfuehrungszeichen und Rueckstriche verdoppelt JSON, 50 solche Eintraege kaemen ueber 20.000 Zeichen
+    await seite.evaluate(() => { for (let i = 0; i < 60; i++) setTimeout(() => { throw new Error('Zeichen Nr. ' + i + ' ' + '"\\'.repeat(150)); }, 0); });
+    await seite.waitForTimeout(1600);
+    const p4 = await protokoll(seite);
+    const laenge4 = await seite.evaluate(() => (localStorage.getItem('schach-arena:protokoll') || '').length);
+    const l4 = p4 ? p4.eintraege : [];
+    const ohneGrenze = l4.length ? JSON.stringify({ v: 1, eintraege: Array(50).fill(l4[0]), engine: null }).length : 0;
+    pruefe('Fehlerflut mit Anfuehrungszeichen: hoechstens 20.000 Zeichen, deshalb weniger als 50 Eintraege, die neuesten lueckenlos zuerst',
+      ohneGrenze > 21000 && laenge4 <= 20000 && laenge4 > 15000 && l4.length > 30 && l4.length < 50
+      && l4.every((e, i) => e.text.startsWith(`Error: Zeichen Nr. ${59 - i} `)), { eintraege: l4.length, zeichen: laenge4, ohneGrenze });
     pruefe('nichts ging ins Netz', fremd.length === 0, fremd);
   } finally { await kontext.close(); }
 }
@@ -478,7 +609,7 @@ async function testeBlatt(browser) {
         gruppe: k.closest('section').querySelector('h3').textContent };
     });
     pruefe('Eintrag in "Info und Lizenzen", Tippflaeche >= 44 px', eintrag.text === 'Bericht für die Testphase' && eintrag.gruppe === 'Info und Lizenzen'
-      && eintrag.h >= 44 && /sendet nichts von selbst/.test(eintrag.hilfe), eintrag);
+      && eintrag.h >= 44 && /Den Bericht sendet die App nie von selbst\.$/.test(eintrag.hilfe), eintrag);
     await seite.evaluate(({ GEHEIM, EMAIL }) => { setTimeout(() => { throw new Error(`Probe https://beispiel.example/a.js?token=${GEHEIM} ${EMAIL}`); }, 0); }, { GEHEIM, EMAIL });
     await seite.waitForTimeout(300);
     const text = await oeffneBericht(seite);
@@ -525,6 +656,22 @@ async function testeBlatt(browser) {
     const rest = nach.roh ? JSON.parse(nach.roh).eintraege.length : 0;
     pruefe('Fehlerliste leeren: Speicher leer, Bericht neu, Knopf aus, Hinweis', rest === 0 && nach.text.includes('Letzte Fehler (0)\nKeine Fehler gespeichert.')
       && nach.aus && nach.status === 'Fehlerliste geleert.', nach);
+    // Fokusfalle: "leeren" ist jetzt aus, der Fokus steht auf dem Text. Tab und Shift+Tab laufen ringfoermig ueber den Text
+    // ([tabindex="0"]) und die Knoepfe, bleiben im Blatt und landen nie auf dem abgeschalteten Knopf
+    const wo = () => seite.evaluate(() => {
+      const a = document.activeElement;
+      return { name: a ? (a.dataset.knopf || (a.classList.contains('bericht-text') ? 'text' : a.tagName)) : '', drin: !!(a && a.closest('.bericht-blatt')) };
+    });
+    const folge = [await wo()];
+    const tasten = ['Tab', 'Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab'];
+    for (const taste of tasten) { await seite.keyboard.press(taste); folge.push(await wo()); }
+    const reihe = blatt.teilen ? ['text', 'kopieren', 'teilen', 'schliessen'] : ['text', 'kopieren', 'schliessen'];
+    const erwartet = ['text'];
+    let stelle = 0;
+    for (const taste of tasten) { stelle = (stelle + (taste === 'Tab' ? 1 : -1) + reihe.length) % reihe.length; erwartet.push(reihe[stelle]); }
+    pruefe('Fokusfalle nach dem Leeren: Tab und Shift+Tab ringfoermig ueber Text und Knoepfe, im Blatt, nie auf dem abgeschalteten Knopf',
+      folge.every((f) => f.drin) && folge.map((f) => f.name).join() === erwartet.join() && !folge.some((f) => f.name === 'leeren'),
+      { folge: folge.map((f) => f.name + (f.drin ? '' : '(draussen)')), erwartet });
     if (CHROMIUM) {
       await seite.locator('.bericht-blatt [data-knopf="kopieren"]').click();
       await seite.waitForTimeout(200);
@@ -600,8 +747,173 @@ async function testeEnglischMitSw(browser) {
     pruefe('Englisch ohne Umlaute', !/[äöüÄÖÜß]/.test(text), text.match(/[^\n]*[äöüÄÖÜß][^\n]*/g));
     const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.bericht-blatt .sheet-knoepfe button')].map((b) => b.textContent));
     pruefe('Knoepfe auf Englisch', knoepfe.includes('Copy') && knoepfe.includes('Clear error list') && knoepfe.includes('Close'), knoepfe);
+    // leere Fehlerliste: "Clear error list" ist schon beim Oeffnen aus, Tab springt von Copy darueber hinweg
+    const vorTab = await seite.evaluate(() => ({ fokus: document.activeElement && document.activeElement.dataset.knopf,
+      aus: document.querySelector('.bericht-blatt [data-knopf="leeren"]').disabled, teilen: typeof navigator.share === 'function' }));
+    await seite.keyboard.press('Tab');
+    const nachTab = await seite.evaluate(() => document.activeElement && document.activeElement.dataset.knopf);
+    pruefe('leere Fehlerliste: Knopf aus, Tab springt von Copy ueber ihn hinweg', vorTab.fokus === 'kopieren' && vorTab.aus
+      && nachTab === (vorTab.teilen ? 'teilen' : 'schliessen'), { vorTab, nachTab });
     pruefe('nichts ging ins Netz', fremd.length === 0, fremd);
   } finally { await kontext.close(); }
+}
+
+// ---------- Screens, Ereignis-Hoerer und Anzeige-Anbieter (fangen ihre Fehler selbst, ohne window 'error') ----------
+async function testeScreensUndMelder(browser) {
+  gruppe = 'Browser Screens, Hoerer, Anbieter';
+  const { kontext, seite, fremd } = await neueSeite(browser);
+  try {
+    // ein Kern-Screen, dessen zeige() wirft (etwa eine WebKit-Luecke), und einer, der nicht laedt (Netz, alter Cache)
+    await seite.route('**/js/ui/training.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
+      body: `export function zeige() { throw new TypeError('Probe zeige wirft https://beispiel.example/x?token=${GEHEIM}'); }\n` }));
+    await seite.route('**/js/ui/verlauf.js', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'weg' }));
+    await zuEinstellungen(seite);
+    pruefe('ohne Fehler kein Protokoll im Speicher', (await protokoll(seite)) === null);
+    // Ereignis-Hoerer und Anzeige-Anbieter (DOM-Ort, Aufruf-Ort mit fertig), wie sie die Pakete anmelden
+    await seite.evaluate(async (EMAIL) => {
+      const { hoere, sende } = await import('/js/ereignisse.js');
+      const { anbieten, fuelle } = await import('/js/orte.js');
+      const ab = [
+        hoere('app:sichtbar', () => { throw new TypeError('Probe Hoerer ' + EMAIL); }),
+        anbieten('einstellungen:gruppen', () => { throw new Error('Probe Anbieter'); }, { paket: 'probe' }),
+        anbieten('arena:start', () => ({ fertig: Promise.reject(new RangeError('Probe fertig')) }), { paket: 'probe' }),
+      ];
+      sende('app:sichtbar', {});
+      const f = fuelle('einstellungen:gruppen', document.createElement('div'), {});
+      const g = fuelle('arena:start', document.createElement('div'), {});
+      await g.fertig;
+      f.verlasse();
+      g.verlasse();
+      ab.forEach((x) => x());
+    }, EMAIL);
+    await seite.waitForTimeout(1200);
+    const p1 = await protokoll(seite);
+    const t1 = p1 ? p1.eintraege.map((e) => e.text) : [];
+    pruefe('Fehler eines Ereignis-Hoerers steht im Protokoll (bereinigt)', t1.includes('Ereignis app:sichtbar: TypeError: Probe Hoerer [e-mail]'), t1);
+    pruefe('Fehler eines Anzeige-Anbieters (fuelle und abgelehntes fertig) steht im Protokoll, mit Paket und Ort',
+      t1.includes('Anbieter probe an einstellungen:gruppen: Error: Probe Anbieter') && t1.includes('Anbieter probe an arena:start: RangeError: Probe fertig'), t1);
+    // Screen, dessen zeige() wirft: Platzhalter "Hoppla" und ein Eintrag
+    await seite.evaluate(() => { location.hash = '#training'; });
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'training' && !!document.querySelector('.screen.platzhalter'), null, { timeout: 10000 }).catch(() => {});
+    await warteAufEintrag(seite, '^Screen training: ');
+    const p2 = await protokoll(seite);
+    const absturz = p2 && p2.eintraege.find((e) => /^Screen training: /.test(e.text));
+    pruefe('Screen, dessen zeige() wirft: Platzhalter sichtbar und Eintrag im Protokoll (bereinigt)', !!absturz && absturz.art === 'fehler'
+      && absturz.text.startsWith('Screen training: TypeError: Probe zeige wirft') && spurenIn(absturz.text).length === 0
+      && await seite.locator('.screen.platzhalter').count() === 1, p2 && p2.eintraege.slice(0, 3));
+    // Kern-Screen, der nicht laedt (404)
+    await seite.evaluate(() => { location.hash = '#verlauf'; });
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'verlauf' && !!document.querySelector('.screen.platzhalter'), null, { timeout: 10000 }).catch(() => {});
+    await warteAufEintrag(seite, '^Screen verlauf: ');
+    const p3 = await protokoll(seite);
+    const laden = p3 && p3.eintraege.find((e) => /^Screen verlauf: /.test(e.text));
+    pruefe('Kern-Screen, der nicht laedt: Platzhalter sichtbar und Eintrag (Art skript) ohne Adresse', !!laden && laden.art === 'skript'
+      && spurenIn(laden.text).length === 0 && await seite.locator('.screen.platzhalter').count() === 1, p3 && p3.eintraege.slice(0, 3));
+    // Paket-Screen ohne Datei (?kern: Pakete nicht geladen): still zur Arena, das ist kein Fehler und kommt nicht ins Protokoll
+    await seite.evaluate(() => { location.hash = '#ich'; });
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'arena', null, { timeout: 10000 }).catch(() => {});
+    await seite.waitForTimeout(1300);   // ein Eintrag stuende spaetestens jetzt im Speicher
+    const p4 = await protokoll(seite);
+    pruefe('Paket-Screen ohne Datei: still zur Arena, kein Eintrag', await seite.evaluate(() => document.documentElement.dataset.screen) === 'arena'
+      && !!p4 && !p4.eintraege.some((e) => /Screen ich/.test(e.text)), p4 && p4.eintraege.map((e) => e.text));
+    // der Bericht zeigt die Screen-Fehler (nicht "Keine Fehler gespeichert")
+    await zuEinstellungen(seite);
+    const text = await oeffneBericht(seite);
+    pruefe('Bericht zeigt Screen-, Hoerer- und Anbieter-Fehler', /· Fehler · [^\n]*Screen training: TypeError: Probe zeige wirft/.test(text)
+      && /· Skript · [^\n]*Screen verlauf: /.test(text) && /Ereignis app:sichtbar/.test(text) && !text.includes('Keine Fehler gespeichert.'),
+      text.split('Letzte Fehler')[1]);
+    pruefe('nichts ging ins Netz', fremd.length === 0, fremd);
+  } finally { await kontext.close(); }
+
+  // Pakete, die nach PAKETE_WARTEN_MS (10 s) noch laden: die App startet ohne sie, der Bericht nennt das Paket
+  const neu = await neueSeite(browser);
+  try {
+    await neu.seite.route('**/js/pakete/haengt/index.js', (r) => {
+      setTimeout(() => { r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export {};' }).catch(() => {}); }, 20000);
+    });
+    await neu.seite.goto(BASIS + 'index.html?test&kern&erw=pakete/haengt/index#einstellungen');
+    await neu.seite.waitForSelector('.es-screen .es-info [data-aktion="bericht"]', { timeout: 30000 });
+    await neu.seite.waitForFunction(() => { const p = JSON.parse(localStorage.getItem('schach-arena:protokoll') || 'null'); return p && p.eintraege.some((e) => e.art === 'paket'); }, null, { timeout: 5000 }).catch(() => {});
+    const p = await protokoll(neu.seite);
+    const e = p && p.eintraege.find((x) => x.art === 'paket');
+    pruefe('Paket, das nach 10 s noch laedt: Eintrag mit Pfad', !!e && e.text === 'Pakete: laden nach 10 s noch: pakete/haengt/index', p);
+  } finally { await neu.kontext.close(); }
+}
+
+// ---------- Zwei Tabs im selben Browser (gleicher Speicher) ----------
+async function testeZweiTabs(browser) {
+  gruppe = 'Browser Zwei Tabs';
+  const { kontext, seite: a, fremd } = await neueSeite(browser);
+  try {
+    const b = await kontext.newPage();
+    b.on('request', (r) => { if (!r.url().startsWith(BASIS) && !/^(data|blob):/.test(r.url())) fremd.push(r.method() + ' ' + r.url()); });
+    await zuEinstellungen(a);
+    await zuEinstellungen(b);
+    const wirf = (s, text) => s.evaluate((x) => { setTimeout(() => { throw new Error(x); }, 0); }, text);
+    const texte = async () => ((await protokoll(a)) || { eintraege: [] }).eintraege.map((e) => e.text).filter((x) => / Tab [AB]$/.test(x));
+    await wirf(a, 'Alt aus Tab A');
+    await a.waitForTimeout(300);
+    await wirf(b, 'Frueh aus Tab B');   // Tab B hat den Stand damit gelesen
+    await a.waitForTimeout(1300);       // beide haben geschrieben, keine Schreib-Uhr laeuft mehr
+    const vorher = await texte();
+    pruefe('beide Tabs schreiben in dieselbe Liste', vorher.join('|') === 'Error: Frueh aus Tab B|Error: Alt aus Tab A', vorher);
+    const textA = await oeffneBericht(a);
+    pruefe('der Bericht in Tab A zeigt auch den Fehler aus Tab B', /Frueh aus Tab B/.test(textA) && /Alt aus Tab A/.test(textA), textA.split('Letzte Fehler')[1]);
+    await a.locator('.bericht-blatt [data-knopf="leeren"]').click();
+    await a.waitForTimeout(200);
+    pruefe('Tab A leert die Liste', (await texte()).length === 0, await texte());
+    await wirf(b, 'Neu aus Tab B');
+    await warteAufEintrag(a, 'Neu aus Tab B$');
+    const nach = await texte();
+    pruefe('nach "Fehlerliste leeren" in Tab A bringt ein neuer Fehler in Tab B die geloeschten Eintraege nicht zurueck', nach.join('|') === 'Error: Neu aus Tab B', nach);
+    await wirf(a, 'Zweiter aus Tab A');
+    await warteAufEintrag(a, 'Zweiter aus Tab A$');
+    const beide = await texte();
+    pruefe('ein Tab ueberschreibt die Eintraege des anderen nicht', beide.join('|') === 'Error: Zweiter aus Tab A|Error: Neu aus Tab B', beide);
+    await a.keyboard.press('Escape');
+    // das alte Blatt gleitet noch hinaus: warten, bis es ganz weg ist (sonst laese oeffneBericht dessen Text)
+    await a.waitForFunction(() => !document.querySelector('.sheet-ort'), null, { timeout: 5000 }).catch(() => {});
+    const neuA = await oeffneBericht(a);
+    pruefe('der Bericht liest frisch: beide neuen Fehler, keiner der geloeschten', /Zweiter aus Tab A/.test(neuA) && /Neu aus Tab B/.test(neuA)
+      && !/Alt aus Tab A|Frueh aus Tab B/.test(neuA), neuA.split('Letzte Fehler')[1]);
+    pruefe('nichts ging ins Netz', fremd.length === 0, fremd);
+  } finally { await kontext.close(); }
+}
+
+// ---------- iPhone vom Home-Bildschirm (viewport-fit=cover): Sicherheitsabstaende oben und unten ----------
+async function testeIphone(browser) {
+  gruppe = 'Browser iPhone (Sicherheitsabstand)';
+  if (!CHROMIUM) { console.log('… bericht: iPhone-Abstaende nur in Chromium (CDP Emulation.setSafeAreaInsetsOverride), hier nur die CSS-Pruefung aus Teil 1'); return; }
+  const faelle = [
+    { name: 'Statusleiste normal (390x797, unten 34)', w: 390, h: 797, oben: 0, unten: 34 },
+    { name: 'Statusleiste durchscheinend (390x844, oben 47, unten 34)', w: 390, h: 844, oben: 47, unten: 34 },
+  ];
+  for (const fall of faelle) {
+    // mit navigator.share (wie Safari auf dem iPhone): ein Knopf mehr, das Blatt wird hoeher
+    const { kontext, seite, fremd } = await neueSeite(browser, { init: () => { navigator.share = () => Promise.resolve(); } });
+    try {
+      await seite.setViewportSize({ width: fall.w, height: fall.h });
+      const cdp = await kontext.newCDPSession(seite);
+      await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: fall.oben, bottom: fall.unten } });
+      await zuEinstellungen(seite);
+      await seite.evaluate(() => { for (let i = 0; i < 6; i++) setTimeout(() => { throw new Error('Probe iPhone ' + i); }, 0); });
+      await seite.waitForTimeout(300);
+      await oeffneBericht(seite);
+      await seite.waitForTimeout(900);   // das Blatt ist hereingeglitten
+      const m = await seite.evaluate(() => {
+        const k = document.querySelector('.bericht-blatt');
+        const r = k.getBoundingClientRect();
+        return { oben: r.top, unten: r.bottom, griff: k.querySelector('.sheet-griff').getBoundingClientRect().top,
+          titel: k.querySelector('h3').getBoundingClientRect().top, inhalt: k.scrollHeight, sichtbar: k.clientHeight, hoehe: innerHeight,
+          abstand: getComputedStyle(k).marginBottom, breite: document.documentElement.scrollWidth };
+      });
+      pruefe(`${fall.name}: Sicherheitsabstand wirkt (margin-bottom 12 + ${fall.unten})`, m.abstand === `${12 + fall.unten}px`, m);
+      pruefe(`${fall.name}: Inhalt laenger als das Blatt (sonst prueft der Test nichts)`, m.inhalt > m.sichtbar + 20, m);
+      pruefe(`${fall.name}: Blatt ganz im Bild, Oberkante mit Griff unter dem Abstand oben, unten ueber dem Abstand, kein waagrechter Ueberlauf`,
+        m.oben >= fall.oben - 0.5 && m.griff >= fall.oben && m.titel > m.griff && m.unten <= m.hoehe - fall.unten + 0.5 && m.breite <= fall.w, m);
+      pruefe(`${fall.name}: nichts ging ins Netz`, fremd.length === 0, fremd);
+    } finally { await kontext.close(); }
+  }
 }
 
 async function abschnitt(name, arbeit, ms = 120000) {
@@ -624,6 +936,9 @@ try {
     await abschnitt('Bericht', () => testeBlatt(browser));
     await abschnitt('Rueckfall', () => testeRueckfall(browser));
     await abschnitt('Englisch', () => testeEnglischMitSw(browser), 180000);
+    await abschnitt('Screens und Melder', () => testeScreensUndMelder(browser));
+    await abschnitt('Zwei Tabs', () => testeZweiTabs(browser));
+    await abschnitt('iPhone', () => testeIphone(browser));
   }
   const schlecht = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
