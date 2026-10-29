@@ -1,6 +1,7 @@
-// Online gegen Freunde (Stufe 2, Fundament): Einladung per Code oder Link, Zuege ueber die Funktionen aus
-// supabase/online-schema.sql, Stand der Partie per Abfrage alle 2 s. Nur fetch (keine Bibliothek, kein
-// Websocket; Realtime kann spaeter dazukommen), Sitzung aus konto.js (sitzung, erneuereSitzung).
+// Online gegen Freunde (Stufe 2, Fundament): Einladung per Code oder Link, Partien ueber die Funktionen aus
+// supabase/online-schema.sql, Zuege seit Anti-Cheat Etappe 1a ueber die Edge Function online-zug, Stand der Partie per
+// Abfrage alle 2 s. Nur fetch (keine Bibliothek, kein Websocket; Realtime kann spaeter dazukommen), Sitzung aus konto.js
+// (sitzung, erneuereSitzung).
 // Die Oberflaeche liegt in js/ui/online.js; Bot-Partie und Arena bleiben unabhaengig.
 //
 // API (alles ausser den reinen Helfern braucht eine Anmeldung ueber konto.js):
@@ -10,8 +11,11 @@
 //       antwortet seit Anti-Cheat Etappe 0 mit jsonb: die Zeile oder { fehler: 'ONLINE_...' } (ein falscher Code ist
 //       ein gezaehlter Fehlversuch, deshalb kein raise); beides wird hier zur Partie oder zu einem Fehler mit Satz.
 //   ladePartie(id) -> Partie             Fehler, wenn es sie nicht gibt oder sie einem Fremden gehoert
-//   sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null }) -> Partie
-//       ergebnis '1-0' | '0-1' | '1/2-1/2' beendet die Partie (grund z. B. 'matt', 'patt', 'wiederholung')
+//   sendeZug(id, { uci }) -> Partie     POST an die Edge Function online-zug (ZUG_PFAD) mit genau { partie, zug }.
+//       Seit Anti-Cheat Etappe 1a schickt der Browser nur noch den Zug (UCI, z. B. e2e4 oder e7e8q): Stellung, Seite am
+//       Zug und das Ende (Matt, Patt, Material, Wiederholung, 50 Zuege) rechnet der Server mit chess.js selbst aus.
+//       Andere Felder (frueher fenDanach, amZugDanach, ergebnis, grund) werden nicht mehr gesendet. Fehler kommen als
+//       { fehler: 'ONLINE_...' } mit HTTP-Status und werden wie die Kennungen der Datenbank zu Saetzen.
 //   gibAuf(id), bieteRemis(id), nimmRemisAn(id) -> Partie   (gibAuf auf einer offenen Einladung: zurueckziehen)
 //   meldeStrittig(id) -> Partie         die Stellung auf dem Server passt nicht zu den Zuegen: Die Partie endet ohne
 //       Ergebnis (grund 'strittig'), auch wenn die eigene Uhr laeuft; danach entscheidet die Uhr nicht mehr.
@@ -55,10 +59,10 @@ import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId, kontoF
 export const EINLADUNG_SCHLUESSEL = 'schach-arena:online:einladung';
 export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
 export const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// Edge Function, die jeden Zug prueft und verbucht (supabase/functions/online-zug, Anti-Cheat Etappe 1a)
+export const ZUG_PFAD = '/functions/v1/online-zug';
 const CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
-const FEN_RE = /^([pnbrqkPNBRQK1-8]{1,8}\/){7}[pnbrqkPNBRQK1-8]{1,8} [wb] (-|[KQkq]{1,4}) (-|[a-h][36]) \d+ \d+$/;
-const ERGEBNISSE = Object.freeze(['1-0', '0-1', '1/2-1/2']);
 let fetchFn = (...a) => fetch(...a);
 export function setzeOnlineFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 
@@ -82,6 +86,14 @@ export const FEHLER_TEXTE = Object.freeze({
   get ONLINE_ZU_VIELE_EINLADUNGEN() { return O('fehler.ONLINE_ZU_VIELE_EINLADUNGEN'); },
   get ONLINE_ZU_VIELE_VERSUCHE() { return O('fehler.ONLINE_ZU_VIELE_VERSUCHE'); },
   get ONLINE_STELLUNG_FALSCH() { return O('fehler.ONLINE_STELLUNG_FALSCH'); },
+  // Edge Function online-zug (Anti-Cheat Etappe 1a)
+  get ONLINE_ZUG_ILLEGAL() { return O('fehler.ONLINE_ZUG_ILLEGAL'); },
+  get ONLINE_STAND_VERALTET() { return O('fehler.ONLINE_STAND_VERALTET'); },
+  get ONLINE_PARTIE_DEFEKT() { return O('fehler.ONLINE_PARTIE_DEFEKT'); },
+  get ONLINE_NICHT_EINGERICHTET() { return O('fehler.ONLINE_NICHT_EINGERICHTET'); },
+  get ONLINE_SERVER() { return O('fehler.ONLINE_SERVER'); },
+  get ONLINE_ANFRAGE() { return O('fehler.ONLINE_ANFRAGE'); },
+  get ONLINE_METHODE() { return O('fehler.ONLINE_METHODE'); },
 });
 
 function lager() { return globalThis.localStorage; }
@@ -95,17 +107,22 @@ function allgemeinerText(status, code) {
   if (code === '23505') return O('doppelt');
   return O('abgelehnt', { status });
 }
+// Kennung: message (Datenbank ueber PostgREST), msg (Anmeldung) oder fehler (Edge Function online-zug). Nur eigene
+// Schluessel von FEHLER_TEXTE zaehlen (nicht constructor, toString usw.).
 function fehlerText(d, status) {
-  const kennung = String(d?.message || d?.msg || '');
-  let text = FEHLER_TEXTE[kennung];
+  const roh = String(d?.message || d?.msg || d?.fehler || '');
+  const bekannt = Object.prototype.hasOwnProperty.call(FEHLER_TEXTE, roh);
+  const kennung = bekannt ? roh : '';
+  // 401 mit lokaler Sitzung (nur mit ihr fragt die App): Der Server lehnt das Token ab, also abgelaufen
+  let text = status === 401 ? '' : bekannt ? FEHLER_TEXTE[kennung] : '';
   if (!text) {
     if (status === 401) text = O('abgelaufen');
     else if (status === 404) text = O('einrichtung');
     else text = allgemeinerText(status, d?.code);
   }
   const e = new Error(text);
-  e.status = status; e.code = d?.code; e.kennung = FEHLER_TEXTE[kennung] ? kennung : undefined;
-  e.detail = kennung || d?.error_description || '';
+  e.status = status; e.code = d?.code; e.kennung = bekannt ? kennung : undefined;
+  e.detail = roh || d?.error_description || '';
   return e;
 }
 async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
@@ -174,14 +191,13 @@ export async function ladePartie(id) {
   return p;
 }
 
-export async function sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null } = {}) {
-  if (!UCI_RE.test(String(uci || ''))) throw new Error(FEHLER_TEXTE.ONLINE_ZUG_FORM);
-  const fen = String(fenDanach || '');
-  if (!FEN_RE.test(fen) || fen.length > 120) throw new Error(FEHLER_TEXTE.ONLINE_FEN_FORM);
-  if (!['w', 'b'].includes(amZugDanach)) throw new Error(FEHLER_TEXTE.ONLINE_AM_ZUG_FORM);
-  if (ergebnis != null && !ERGEBNISSE.includes(ergebnis)) throw new Error(FEHLER_TEXTE.ONLINE_ERGEBNIS_FORM);
-  const g = ergebnis == null || grund == null ? null : String(grund).slice(0, 40);
-  return partieAus(await rpc('online_zug', { partie: id, zug: uci, fen_danach: fen, am_zug_danach: amZugDanach, ergebnis: ergebnis ?? null, grund: g }));
+// Zug an die Edge Function online-zug: nur Partie und Zug (UCI). Die Form des Zugs wird vorher geprueft (spart eine
+// Anfrage); ob er erlaubt ist und wie die Partie danach steht, entscheidet der Server (er prueft auch die Partie-ID).
+export async function sendeZug(id, { uci } = {}) {
+  const zug = String(uci || '');
+  if (!UCI_RE.test(zug)) throw new Error(FEHLER_TEXTE.ONLINE_ZUG_FORM);
+  const s = await aktiveSitzung();
+  return partieAus(await anfrage(ZUG_PFAD, { methode: 'POST', token: s.access_token, daten: { partie: String(id || ''), zug } }));
 }
 
 export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', { partie: id })); }
