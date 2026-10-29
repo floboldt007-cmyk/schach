@@ -929,9 +929,9 @@ async function browserTeil(browser) {
     return { gruss: o.angeboten('partie:begruessung?'), erg: o.angeboten('ergebnis:karte'), css: !!document.querySelector('link[data-paket="gedaechtnis"]'),
       blase: (document.querySelector('.detail .sprechblase') || {}).textContent || '' };
   });
-  // Welten: der erste Gegner eines frischen Spielstands ist Fridolin (Stufe 1)
+  // Welten: der erste Gegner eines frischen Spielstands ist Willi (Stufe 1)
   const sollP = await erwartet(pr.seite, 'fridolin');
-  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Fridolin begruesst zum Kennenlernen', prod.gruss === 2 && prod.erg === 1 && prod.css
+  pruefe('ohne ?test aus PAKETE geladen (Anbieter und CSS da), Willi begruesst zum Kennenlernen', prod.gruss === 2 && prod.erg === 1 && prod.css
     && sollP && sollP.grund === 'kennenlernen' && prod.blase === `„${sollP.text}“`, JSON.stringify({ prod, sollP }));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();

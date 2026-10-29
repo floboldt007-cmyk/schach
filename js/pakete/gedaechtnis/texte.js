@@ -80,7 +80,7 @@ const DE = {
         'Erste Begegnung. Willkommen in der Tiefsee. Keine Angst, ich fresse nur Figuren.',
       ],
       fridolin: [
-        'Hallo, ich bin Fridolin! Wir haben noch nie gespielt. Ich steh schon ganz aufgeregt im Wind.',
+        'Hallo, ich bin Willi! Wir haben noch nie gespielt. Ich steh schon ganz aufgeregt im Wind.',
         'Ein neues Gesicht auf meinem Acker! Keine Sorge, ich bin aus Stroh und ganz harmlos.',
         'Grüß dich! Ich hab vielen beim Spielen zugeschaut. Mit dir spiel ich jetzt zum ersten Mal selbst.',
       ],
@@ -90,7 +90,7 @@ const DE = {
         'Hallo! Für dich hatte ich noch nie Post. Heute bring ich dir eine Partie Schach vorbei.',
       ],
       gustav: [
-        'Hallo, ich bin Gustav. Wir haben noch nie gespielt. Keine Sorge, ich steche nicht gleich.',
+        'Hallo, ich bin Maik. Wir haben noch nie gespielt. Keine Sorge, ich steche nicht gleich.',
         'Ein neues Gesicht hinter der Mühle! Komm langsam näher, das mögen meine Bienen.',
         'Willkommen! Unsere erste Partie. Ich bau mir erst mal in Ruhe meinen Stock.',
       ],
@@ -100,7 +100,7 @@ const DE = {
         'Erste Partie gegen dich? Dann schreib ich deinen Namen schon mal an die Kreidetafel.',
       ],
       bodo: [
-        'Moin, ich bin Bodo! Wir haben noch nie gespielt. Setz dich ruhig auf den Baumstumpf.',
+        'Moin, ich bin Jan! Wir haben noch nie gespielt. Setz dich ruhig auf den Baumstumpf.',
         'Ein neues Gesicht im Wald! Keine Angst vor der Axt, die ist fürs Holz. Und ein bisschen für Figuren.',
         'Erste Partie gegen dich? Dann schauen wir mal, wie viel Holz da auf dem Brett steht.',
       ],
@@ -125,7 +125,7 @@ const DE = {
         'Erste Partie gegen dich? Dann zaubere ich mal ganz behutsam. Am Anfang jedenfalls.',
       ],
       ottilie: [
-        'Guten Tag. Ich bin Ottilie. Wir haben noch nie gespielt. Ich lege gleich eine Karteikarte an.',
+        'Guten Tag. Ich bin Florian. Wir haben noch nie gespielt. Ich lege gleich eine Karteikarte an.',
         'Ein neues Gesicht in der Bibliothek! Bitte leise, und herzlich willkommen.',
         'Unsere erste Partie? Über dich steht noch in keinem meiner Bücher etwas. Das ändern wir.',
       ],
@@ -140,7 +140,7 @@ const DE = {
         'Unsere erste Partie? Dann trag ich dich mal mit Datum und Liegeplatz ins Hafenbuch ein.',
       ],
       henning: [
-        'Moin, ich bin Henning. Wir haben noch nie gespielt. Stiefel an, ich zeig dir das Watt.',
+        'Moin, ich bin René. Wir haben noch nie gespielt. Stiefel an, ich zeig dir das Watt.',
         'Ein neues Gesicht am Deich! Willkommen. Bleib dicht bei mir, dann passiert dir nichts.',
         'Erste Partie gegen dich? Gut, dass gerade Ebbe ist. Da haben wir alle Zeit der Welt.',
       ],
@@ -160,7 +160,7 @@ const DE = {
         'Erste Partie gegen dich? Dann zeig ich dir mal, wie man ohne Zögern springt.',
       ],
       ragna: [
-        'Hallo. Ich bin Ragna. Wir haben noch nie gespielt. Bitte leise, wir sind tief unten.',
+        'Hallo. Ich bin Anestis. Wir haben noch nie gespielt. Bitte leise, wir sind tief unten.',
         'Ein neues Gesicht in meinem Tauchboot. Willkommen. Ich lotse dich ganz ruhig durch die Gräben.',
         'Unsere erste Partie? Dann lerne ich dich lieber leise kennen, Zug um Zug.',
       ],
@@ -1625,7 +1625,7 @@ const EN = {
         'First encounter. Welcome to the deep sea. Relax, I only eat pieces.',
       ],
       fridolin: [
-        'Hello, I’m Fridolin! We’ve never played. I’m flapping in the wind with excitement.',
+        'Hello, I’m Willi! We’ve never played. I’m flapping in the wind with excitement.',
         'A new face in my field! Don’t worry, I’m made of straw and totally harmless.',
         'Hi there! I’ve watched plenty of games. Now, with you, I get to play one myself.',
       ],
@@ -1635,7 +1635,7 @@ const EN = {
         'Hello! I’ve never had mail for you before. Today I’m bringing you a game of chess.',
       ],
       gustav: [
-        'Hello, I’m Gustav. We’ve never played. Don’t worry, I won’t sting right away.',
+        'Hello, I’m Maik. We’ve never played. Don’t worry, I won’t sting right away.',
         'A new face behind the mill! Come closer slowly, my bees like that.',
         'Welcome! Our first game. First I’ll build my hive, nice and calm.',
       ],
@@ -1645,7 +1645,7 @@ const EN = {
         'Our first game? Then I’ll write your name on the chalkboard right away.',
       ],
       bodo: [
-        'Hey there, I’m Bodo! We’ve never played. Go ahead, have a seat on the stump.',
+        'Hey there, I’m Jan! We’ve never played. Go ahead, have a seat on the stump.',
         'A new face in the woods! Don’t mind the ax, it’s for wood. And a little for pieces.',
         'Our first game? Let’s see how much timber is standing on the board.',
       ],
@@ -1670,7 +1670,7 @@ const EN = {
         'Our first game? Then I’ll work my magic very gently. At first, anyway.',
       ],
       ottilie: [
-        'Good day. I’m Ottilie. We’ve never played. I’ll start an index card for you.',
+        'Good day. I’m Florian. We’ve never played. I’ll start an index card for you.',
         'A new face in the library! Quietly, please, and a warm welcome.',
         'Our first game? None of my books mention you yet. Let’s change that.',
       ],
@@ -1685,7 +1685,7 @@ const EN = {
         'Our first game? Then I’ll enter you in the harbor log, with date and berth.',
       ],
       henning: [
-        'Hello, I’m Henning. We’ve never played. Boots on, I’ll show you the mudflats.',
+        'Hello, I’m René. We’ve never played. Boots on, I’ll show you the mudflats.',
         'A new face at the dike! Welcome. Stay close to me and you’ll be fine.',
         'Our first game? Good thing it’s low tide. We have all the time in the world.',
       ],
@@ -1705,7 +1705,7 @@ const EN = {
         'Our first game? Then I’ll show you how to jump without hesitating.',
       ],
       ragna: [
-        'Hello. I’m Ragna. We’ve never played. Quietly, please, we’re deep down.',
+        'Hello. I’m Anestis. We’ve never played. Quietly, please, we’re deep down.',
         'A new face in my submarine. Welcome. I’ll guide you calmly through the trenches.',
         'Our first game? Then I’ll get to know you quietly, move by move.',
       ],

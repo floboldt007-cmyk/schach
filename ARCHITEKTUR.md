@@ -333,12 +333,15 @@ laesst sich nach Neuladen ueber die laufende Partie im Speicher fortsetzen.
 **Welten (Flo 23.10., gebaut 24.10.):** 30 Bots in fuenf Welten (`WELTEN` in `js/bots.js`: Karofelder, Springerforst,
 Turmstadt, Gezeitenkueste, Stockfisch-Tiefe), je sechs, Elo 100 bis 3000 in 100er-Schritten (`stufe` 1..30 = Elo/100,
 `welt` 1..5, `endgegner: true` am sechsten jeder Welt, `rufname` fuer Schilder und Knoepfe, `merkmale` fuer das Panel).
-Die zehn bisherigen Bots behalten id, Bild und Sterne; Benno spielt jetzt mit Elo 200, Fridolin (100) ist der erste.
+Die zehn bisherigen Bots behalten id, Bild und Sterne; Benno spielt jetzt mit Elo 200, Willi (100) ist der erste.
+Namen (Flo 29.10.): sechs Bots heissen anders als ihre id, weil die id in Spielstaenden steckt und nie wechselt:
+`fridolin` = Willi, `gustav` = Maik, `bodo` = Jan, `henning` = René, `ottilie` = Bibliothekar Florian,
+`ragna` = Lotse Anestis (die beiden letzten mit neuem Portraet, gleiche Datei). Neue Namen nur in `js/sprachen/bots.js`.
 Ab Elo 2200 spielt Stockfish selbst (`staerke.voll` mit `elo`, UCI_Elo), der Stockfisch ohne Bremse.
 Freischaltung (`storage.js`): frei ist jede Stufe bis `hoechsterSieg() + 1` (alte Spielstaende behalten alles unter
 ihrem besten Sieg, neu eingezogene Bots darunter sind offen und tragen das Schild NEU), dazu der Endgegner jeder Welt,
 deren erste Stufe frei ist (direkt herausfordern; sein Sieg oeffnet die ganze Welt und die naechste).
-`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Fridolin). `hoechsteFreieStufe()` zaehlt
+`naechsterGegner()` = die Stufe ueber dem hoechsten Sieg (nie zurueck zu Willi). `hoechsteFreieStufe()` zaehlt
 die Endgegner-Ausnahme nicht mit (Massstab fuer Empfehlungen). `istWeltFrei(nr)`, `hatWeltsiegel(nr)` (alle 18 Sterne).
 Oeffnet ein Sieg mehrere Stufen, meldet `neuFreigeschaltet` den neuen naechsten Gegner.
 Arena (`js/ui/arena.js`): die Karte zeigt eine Welt (`params.welt`, sonst die des gewaehlten Bots) mit sechs Stationen,

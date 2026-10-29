@@ -372,7 +372,7 @@ export function besiegteBots(f = ladeFortschritt()) {
 }
 
 // Welten (Flo, 23.10.): frei ist Stufe 1 und jede Stufe bis eine ueber dem hoechsten Sieg. Wer frueher Greta besiegt
-// hat, behaelt damit alles darunter, auch neu eingezogene Bots (niemand wird zu Fridolin zurueckgeschickt). Dazu ist
+// hat, behaelt damit alles darunter, auch neu eingezogene Bots (niemand wird zu Willi zurueckgeschickt). Dazu ist
 // der Endgegner jeder Welt frei, deren erste Stufe frei ist (direkt herausfordern, freiwillig): sein Sieg oeffnet die
 // ganze Welt und die naechste. Welten schliessen sich nie wieder.
 export function hoechsterSieg(f = ladeFortschritt()) {

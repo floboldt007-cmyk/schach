@@ -362,7 +362,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
 // ---------- 2. Sieg gegen Benno, Overlay, Analyse, Naechster Gegner, Nochmal ----------
 async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
-  pruefe('Fridolin ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Willi ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
   pruefe('Paula ist gesperrt', await seite.locator('.knoten.gesperrt[data-bot="paula"]').count() === 1);
   await schaefermatt(seite, h, { pruefeHash: true });
   await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
@@ -471,7 +471,7 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   pruefe('Zurück-Wisch: Arena', (await h.hash()) === '#arena');
   pruefe('Arena zeigt Paula frei', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
     && await seite.locator('.knoten[data-bot="paula"] .schloss').count() === 0);
-  pruefe('Gustav noch gesperrt', await seite.locator('.knoten.gesperrt[data-bot="gustav"]').count() === 1);
+  pruefe('Maik noch gesperrt', await seite.locator('.knoten.gesperrt[data-bot="gustav"]').count() === 1);
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
 }
 

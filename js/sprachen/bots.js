@@ -14,13 +14,13 @@ import { registriereTexte } from '../sprache.js';
 // Deutsch (Quelle)
 const DE = {
   fridolin: {
-    name: 'Vogelscheuche Fridolin', rufname: 'Fridolin', titel: 'Der Windige',
+    name: 'Vogelscheuche Willi', rufname: 'Willi', titel: 'Der Windige',
     kurz: 'Zieht, wohin der Wind weht. Aber immer nach den Regeln.',
-    bio: 'Fridolin steht seit Jahren auf dem ersten Acker und hat vom Zuschauen gelernt, wie die Figuren ziehen. Er zieht, wohin der Wind ihn gerade schiebt, aber immer regelgerecht. Über jeden guten Zug von dir freut er sich mit.',
+    bio: 'Willi steht seit Jahren auf dem ersten Acker und hat vom Zuschauen gelernt, wie die Figuren ziehen. Er zieht, wohin der Wind ihn gerade schiebt, aber immer regelgerecht. Über jeden guten Zug von dir freut er sich mit.',
     merkmale: { lieblings: 'Bauer', tempo: 'Windig', schwaeche: 'Zieht fast zufällig' },
     saetze: {
       begruessung: [
-        'Hallo! Ich bin Fridolin. Ich stehe hier schon lange und hab gut aufgepasst.',
+        'Hallo! Ich bin Willi. Ich stehe hier schon lange und hab gut aufgepasst.',
         'Willkommen auf dem ersten Acker! Hier fängt jede große Reise an.',
         'Oh, Besuch! Die Krähen haben mir schon erzählt, dass du kommst.',
         'Schön, dass du da bist! Ich bin aus Stroh, aber mit ganzem Herzen dabei.',
@@ -151,7 +151,7 @@ const DE = {
       verliert: [
         'Verloren! Ich war wohl wieder zu schnell unterwegs.',
         'Gut gespielt! Ich radel jetzt meine Runde zu Ende.',
-        'Glückwunsch! Hinter der Mühle freut sich Imker Gustav schon auf dich.',
+        'Glückwunsch! Hinter der Mühle freut sich Imker Maik schon auf dich.',
       ],
       gewinnt: [
         'Gewonnen! Und pünktlich zur Mittagspause.',
@@ -166,9 +166,9 @@ const DE = {
     },
   },
   gustav: {
-    name: 'Imker Gustav', rufname: 'Gustav', titel: 'Der Vorsichtige',
+    name: 'Imker Maik', rufname: 'Maik', titel: 'Der Vorsichtige',
     kurz: 'Rochiert früh, deckt alles, sticht nur, wenn’s sicher ist.',
-    bio: 'Gustav hält dreißig Bienenvölker hinter der Mühle und hat Respekt vor jedem Stich. Genauso spielt er: Er rochiert früh, deckt jede Figur und baut sich eine Stellung wie einen Bienenstock. Losgehen mag er erst, wenn alles summt.',
+    bio: 'Maik hält dreißig Bienenvölker hinter der Mühle und hat Respekt vor jedem Stich. Genauso spielt er: Er rochiert früh, deckt jede Figur und baut sich eine Stellung wie einen Bienenstock. Losgehen mag er erst, wenn alles summt.',
     merkmale: { lieblings: 'Rochade', tempo: 'Bedächtig', schwaeche: 'Greift selten an' },
     saetze: {
       begruessung: [
@@ -304,7 +304,7 @@ const DE = {
       verliert: [
         'Du hast mich geschlagen und die Karofelder gemeistert. Respekt!',
         'Starke Partie! Ich schreib deinen Namen ganz oben an die Tafel.',
-        'Glückwunsch! Im Springerforst freut sich Holzfäller Bodo auf dich.',
+        'Glückwunsch! Im Springerforst freut sich Holzfäller Jan auf dich.',
       ],
       gewinnt: [
         'Gewonnen! Komm wieder, die Scheune hat immer offen.',
@@ -319,9 +319,9 @@ const DE = {
     },
   },
   bodo: {
-    name: 'Holzfäller Bodo', rufname: 'Bodo', titel: 'Der Kahlschläger',
+    name: 'Holzfäller Jan', rufname: 'Jan', titel: 'Der Kahlschläger',
     kurz: 'Tauscht ab, was geht. Hauptsache, das Brett wird leer.',
-    bio: 'Bodo fällt Bäume, seit er eine Axt halten kann, und genauso spielt er Schach. Er tauscht ab, wo er nur kann, bis auf dem Brett eine Lichtung entsteht. Da sieht man wenigstens, wo der König wohnt, sagt er.',
+    bio: 'Jan fällt Bäume, seit er eine Axt halten kann, und genauso spielt er Schach. Er tauscht ab, wo er nur kann, bis auf dem Brett eine Lichtung entsteht. Da sieht man wenigstens, wo der König wohnt, sagt er.',
     merkmale: { lieblings: 'Turm', tempo: 'Kräftig', schwaeche: 'Tauscht auch Gutes ab' },
     saetze: {
       begruessung: [
@@ -820,7 +820,7 @@ const DE = {
         'Verloren … aber mit Glanz und Gloria! Bravo!',
         'Mein Opfer war wohl ein bisschen zu mutig. Gratuliere!',
         'Du hast meinen Angriff überlebt. Respekt, Schätzchen!',
-        'Bravo! Bei Bibliothekarin Ottilie wird es leiser, aber nicht leichter.',
+        'Bravo! Bei Bibliothekar Florian wird es leiser, aber nicht leichter.',
       ],
       gewinnt: [
         'Gewonnen! Ein Opfer zur rechten Zeit, und der Vorhang fällt.',
@@ -836,9 +836,9 @@ const DE = {
     },
   },
   ottilie: {
-    name: 'Bibliothekarin Ottilie', rufname: 'Ottilie', titel: 'Die Belesene',
+    name: 'Bibliothekar Florian', rufname: 'Florian', titel: 'Der Belesene',
     kurz: 'Kennt jede Eröffnung aus viertausend Büchern.',
-    bio: 'Ottilie verwaltet die Turmbibliothek mit viertausend Schachbüchern und hat jedes davon gelesen. Ihre Eröffnungen spielt sie wie aus dem Lehrbuch. Spannend wird es erst, wenn die Buchseiten aufhören.',
+    bio: 'Florian verwaltet die Turmbibliothek mit viertausend Schachbüchern und hat jedes davon gelesen. Seine Eröffnungen spielt er wie aus dem Lehrbuch. Spannend wird es erst, wenn die Buchseiten aufhören.',
     merkmale: { lieblings: 'Läuferpaar', tempo: 'Belesen', schwaeche: 'Unbekannte Wege' },
     saetze: {
       begruessung: [
@@ -1074,7 +1074,7 @@ const DE = {
       verliert: [
         'Glückwunsch. Das war verdient.',
         'Du hast mich geschlagen. Das passiert nicht oft.',
-        'Respekt. Als Nächstes: Wattführer Henning. Viel Erfolg.',
+        'Respekt. Als Nächstes: Wattführer René. Viel Erfolg.',
         'Sauber gespielt. Ich analysiere das heute Nacht.',
       ],
       gewinnt: [
@@ -1091,9 +1091,9 @@ const DE = {
     },
   },
   henning: {
-    name: 'Wattführer Henning', rufname: 'Henning', titel: 'Der Gezeitenkenner',
+    name: 'Wattführer René', rufname: 'René', titel: 'Der Gezeitenkenner',
     kurz: 'Kennt den richtigen Moment. Dann kommt die Flut.',
-    bio: 'Henning führt Wanderer bei Ebbe übers Watt und weiß auf die Minute, wann das Wasser kommt. Genauso spielt er: ruhig, geduldig und mit dem Blick auf die Uhr der Gezeiten. Wenn die Stellung reif ist, schlägt er genau im richtigen Moment zu.',
+    bio: 'René führt Wanderer bei Ebbe übers Watt und weiß auf die Minute, wann das Wasser kommt. Genauso spielt er: ruhig, geduldig und mit dem Blick auf die Uhr der Gezeiten. Wenn die Stellung reif ist, schlägt er genau im richtigen Moment zu.',
     merkmale: { lieblings: 'Bauernhebel', tempo: 'Abwartend', schwaeche: 'Kaum eine' },
     saetze: {
       begruessung: [
@@ -1272,7 +1272,7 @@ const DE = {
       verliert: [
         'Verloren! Du bist ja noch mutiger als ich.',
         'Gut gespielt! Ich tauch kurz auf und atme durch.',
-        'Glückwunsch! Lotsin Ragna bringt dich jetzt noch tiefer.',
+        'Glückwunsch! Lotse Anestis bringt dich jetzt noch tiefer.',
       ],
       gewinnt: [
         'Gewonnen! Wer sich traut, kommt weiter.',
@@ -1287,9 +1287,9 @@ const DE = {
     },
   },
   ragna: {
-    name: 'Lotsin Ragna', rufname: 'Ragna', titel: 'Die Lautlose',
+    name: 'Lotse Anestis', rufname: 'Anestis', titel: 'Der Lautlose',
     kurz: 'Nimmt dir leise den Raum, Zug um Zug.',
-    bio: 'Ragna steuert ihr kleines Tauchboot durch die dunkelsten Gräben, ohne je anzustoßen. Auf dem Brett gewinnt sie Raum, ganz leise und mit viel Geduld. Irgendwann merkst du, dass deine Figuren kaum Platz zum Atmen haben.',
+    bio: 'Anestis steuert sein kleines Tauchboot durch die dunkelsten Gräben, ohne je anzustoßen. Auf dem Brett gewinnt er Raum, ganz leise und mit viel Geduld. Irgendwann merkst du, dass deine Figuren kaum Platz zum Atmen haben.',
     merkmale: { lieblings: 'Raum', tempo: 'Lautlos', schwaeche: 'Keine bekannt' },
     saetze: {
       begruessung: [
@@ -1563,13 +1563,13 @@ const DE = {
 // Englisch
 const EN = {
   fridolin: {
-    name: 'Scarecrow Fridolin', rufname: 'Fridolin', titel: 'The Breezy One',
+    name: 'Scarecrow Willi', rufname: 'Willi', titel: 'The Breezy One',
     kurz: 'Moves wherever the wind blows. But always by the rules.',
-    bio: 'Fridolin has stood in the first field for years and learned how the pieces move just by watching. He moves wherever the wind happens to push him, but always by the rules. He cheers along with every good move you make.',
+    bio: 'Willi has stood in the first field for years and learned how the pieces move just by watching. He moves wherever the wind happens to push him, but always by the rules. He cheers along with every good move you make.',
     merkmale: { lieblings: 'Pawn', tempo: 'Breezy', schwaeche: 'Moves almost at random' },
     saetze: {
       begruessung: [
-        'Hello! I’m Fridolin. I’ve been standing here a long time, and I’ve paid close attention.',
+        'Hello! I’m Willi. I’ve been standing here a long time, and I’ve paid close attention.',
         'Welcome to the first field! Every great journey starts right here.',
         'Oh, a visitor! The crows told me you were coming.',
         'So glad you’re here! I’m made of straw, but my heart is all in.',
@@ -1700,7 +1700,7 @@ const EN = {
       verliert: [
         'I lost! Guess I was going too fast again.',
         'Well played! I’ll go finish my route now.',
-        'Congrats! Behind the mill, Beekeeper Gustav is looking forward to meeting you.',
+        'Congrats! Behind the mill, Beekeeper Maik is looking forward to meeting you.',
       ],
       gewinnt: [
         'I won! And right on time for my lunch break.',
@@ -1715,9 +1715,9 @@ const EN = {
     },
   },
   gustav: {
-    name: 'Beekeeper Gustav', rufname: 'Gustav', titel: 'The Careful One',
+    name: 'Beekeeper Maik', rufname: 'Maik', titel: 'The Careful One',
     kurz: 'Castles early, guards everything, only stings when it’s safe.',
-    bio: 'Gustav keeps thirty bee colonies behind the mill and respects every sting. That’s how he plays, too: he castles early, guards every piece and builds his position like a beehive. He only gets going once everything is humming.',
+    bio: 'Maik keeps thirty bee colonies behind the mill and respects every sting. That’s how he plays, too: he castles early, guards every piece and builds his position like a beehive. He only gets going once everything is humming.',
     merkmale: { lieblings: 'Castling', tempo: 'Unhurried', schwaeche: 'Rarely attacks' },
     saetze: {
       begruessung: [
@@ -1853,7 +1853,7 @@ const EN = {
       verliert: [
         'You beat me and conquered the Checkered Fields. Respect!',
         'Strong game! I’m writing your name at the very top of the chalkboard.',
-        'Congrats! In the Knightwood, Lumberjack Bodo is looking forward to meeting you.',
+        'Congrats! In the Knightwood, Lumberjack Jan is looking forward to meeting you.',
       ],
       gewinnt: [
         'I won! Come back anytime, the barn is always open.',
@@ -1868,9 +1868,9 @@ const EN = {
     },
   },
   bodo: {
-    name: 'Lumberjack Bodo', rufname: 'Bodo', titel: 'The Clear-Cutter',
+    name: 'Lumberjack Jan', rufname: 'Jan', titel: 'The Clear-Cutter',
     kurz: 'Trades off whatever he can. As long as the board gets empty.',
-    bio: 'Bodo has been felling trees since he could hold an ax, and he plays chess the same way. He trades off wherever he can until a clearing opens up on the board. At least then you can see where the king lives, he says.',
+    bio: 'Jan has been felling trees since he could hold an ax, and he plays chess the same way. He trades off wherever he can until a clearing opens up on the board. At least then you can see where the king lives, he says.',
     merkmale: { lieblings: 'Rook', tempo: 'Forceful', schwaeche: 'Trades off good pieces too' },
     saetze: {
       begruessung: [
@@ -2369,7 +2369,7 @@ const EN = {
         'Defeated … but in a blaze of glory! Bravo!',
         'My sacrifice was a bit too bold, I suppose. Congratulations!',
         'You survived my attack. Respect, darling!',
-        'Bravo! With Librarian Ottilie it gets quieter, but not easier.',
+        'Bravo! With Librarian Florian it gets quieter, but not easier.',
       ],
       gewinnt: [
         'I won! One sacrifice at the right moment, and the curtain falls.',
@@ -2385,9 +2385,9 @@ const EN = {
     },
   },
   ottilie: {
-    name: 'Librarian Ottilie', rufname: 'Ottilie', titel: 'The Well-Read One',
+    name: 'Librarian Florian', rufname: 'Florian', titel: 'The Well-Read One',
     kurz: 'Knows every opening from four thousand books.',
-    bio: 'Ottilie runs the tower library with four thousand chess books and has read every one of them. She plays her openings straight out of the textbook. Things only get exciting once the pages run out.',
+    bio: 'Florian runs the tower library with four thousand chess books and has read every one of them. He plays his openings straight out of the textbook. Things only get exciting once the pages run out.',
     merkmale: { lieblings: 'Bishop pair', tempo: 'Well-read', schwaeche: 'Unknown paths' },
     saetze: {
       begruessung: [
@@ -2623,7 +2623,7 @@ const EN = {
       verliert: [
         'Congratulations. You earned that.',
         'You beat me. That doesn’t happen often.',
-        'Respect. Next up: Mudflat Guide Henning. Good luck.',
+        'Respect. Next up: Mudflat Guide René. Good luck.',
         'Cleanly played. I’ll analyze it tonight.',
       ],
       gewinnt: [
@@ -2640,9 +2640,9 @@ const EN = {
     },
   },
   henning: {
-    name: 'Mudflat Guide Henning', rufname: 'Henning', titel: 'The Tide Reader',
+    name: 'Mudflat Guide René', rufname: 'René', titel: 'The Tide Reader',
     kurz: 'Knows the right moment. Then the tide comes in.',
-    bio: 'Henning guides hikers across the mudflats at low tide and knows to the minute when the water will return. He plays the same way: calm, patient and with an eye on the clock of the tides. When the position is ripe, he strikes at exactly the right moment.',
+    bio: 'René guides hikers across the mudflats at low tide and knows to the minute when the water will return. He plays the same way: calm, patient and with an eye on the clock of the tides. When the position is ripe, he strikes at exactly the right moment.',
     merkmale: { lieblings: 'Pawn breaks', tempo: 'Watchful', schwaeche: 'Hardly any' },
     saetze: {
       begruessung: [
@@ -2821,7 +2821,7 @@ const EN = {
       verliert: [
         'I lost! You’re even braver than I am.',
         'Well played! I’ll surface and catch my breath.',
-        'Congrats! Navigator Ragna will take you even deeper now.',
+        'Congrats! Navigator Anestis will take you even deeper now.',
       ],
       gewinnt: [
         'I won! Those who dare go further.',
@@ -2836,9 +2836,9 @@ const EN = {
     },
   },
   ragna: {
-    name: 'Navigator Ragna', rufname: 'Ragna', titel: 'The Silent One',
+    name: 'Navigator Anestis', rufname: 'Anestis', titel: 'The Silent One',
     kurz: 'Quietly takes away your space, move by move.',
-    bio: 'Ragna steers her little submarine through the darkest trenches without ever bumping into anything. On the board she gains space, very quietly and with lots of patience. At some point you notice your pieces hardly have room to breathe.',
+    bio: 'Anestis steers his little submarine through the darkest trenches without ever bumping into anything. On the board he gains space, very quietly and with lots of patience. At some point you notice your pieces hardly have room to breathe.',
     merkmale: { lieblings: 'Space', tempo: 'Silent', schwaeche: 'None known' },
     saetze: {
       begruessung: [

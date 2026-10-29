@@ -1136,7 +1136,7 @@ async function testeBrowser(browser) {
       /Die erste Rückenwind-Karte kommt an deinem 4\. Tag, danach jeden Montag eine\./.test(await s.locator('.fk-spiegel .fk-s-rw').innerText()));
     await s.locator('.fk-spiegel .fk-schliessen').click();
     await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
-    // Welten: Kalle (Stufe 8) ist nach Bodo der naechste Gegner, die Arena zeigt Welt 2; Benno steht in Welt 1
+    // Welten: Kalle (Stufe 8) ist nach Jan der naechste Gegner, die Arena zeigt Welt 2; Benno steht in Welt 1
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');

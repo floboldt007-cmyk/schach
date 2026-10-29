@@ -1019,8 +1019,8 @@ async function testeBrowser(browser) {
     && /Hier landet jeder neue Rekord/.test(await seite.locator('.bl-rekordbuch').innerText()));
   await h.reiter('bots');
   const leerBots = await seite.locator('.bl-tafel').innerText();
-  pruefe('Bots leer: Tafel des nächsten Gegners (Fridolin) mit Satz und „Erste Partie: Fridolin, Weiß“', /Fridolins Tafel/.test(leerBots) && /Noch keine Partie auf Fridolins Tafel/.test(leerBots)
-    && /Erste Partie: Fridolin, Weiß/.test(leerBots), leerBots);
+  pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
+    && /Erste Partie: Willi, Weiß/.test(leerBots), leerBots);
   await bild(seite, 'bestenliste-leer-1180');
   await h.reiter('freunde');
   pruefe('Freunde: ohne eigene Partie kein Teilen, Einlesen geht, Fenster-Segment ausgeblendet', /Sobald du eine Partie auf einer Tafel hast/.test(await seite.locator('.bl-teilen').innerText())
@@ -1327,7 +1327,7 @@ async function testeBrowser(browser) {
     const hs = hilfen(s);
     await s.goto(MIT() + '#arena');
     await s.waitForSelector('.screen.arena');
-    // Welten: Benno ist erst nach einem Sieg gegen Fridolin frei und dann der naechste Gegner (seine Tafel steht in der Datei,
+    // Welten: Benno ist erst nach einem Sieg gegen Willi frei und dann der naechste Gegner (seine Tafel steht in der Datei,
     // und nur ein freier Bot hat den Knopf "Erste Partie")
     await s.evaluate(() => localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { fridolin: { sterne: [true, false, false], partien: 1,
       siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 60 } }, brillanteZuege: [] })));

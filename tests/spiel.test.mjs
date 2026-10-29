@@ -324,7 +324,7 @@ const PROFIL = {
   // Staerke fuer eine offen angesagte Zahl (Boss "≈ 1080"): vor der Eichung der naechstliegende Leiter-Bot
   const w = (elo) => (staerkeFuerElo(elo) || {}).botId;
   // Welten: die Leiter hat alle 100 Elo einen Bot (Lisa 1000, Edda 1100, Rudi 1200)
-  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1030 Lisa, 1180 Rudi, 1050 Gleichstand: der schwaechere, 0 Fridolin, 5000 Stockfisch)',
+  pruefe('staerkeFuerElo: naechstliegender Leiter-Bot (1030 Lisa, 1180 Rudi, 1050 Gleichstand: der schwaechere, 0 Willi, 5000 Stockfisch)',
     w(1030) === 'lisa' && w(1180) === 'rudi' && w(1050) === 'lisa' && w(0) === 'fridolin' && w(5000) === 'stockfisch' && staerkeFuerElo(NaN) === null
     && staerkeFuerElo('1030') === null, [1030, 1180, 1050, 0, 5000].map(w));
   const lisa = BOTS.find((b) => b.id === 'lisa');

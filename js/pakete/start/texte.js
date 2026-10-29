@@ -5,7 +5,7 @@
 // aus aufgaben.js selbst (gleiche Zeichen).
 // Englisch: Einstufung = placement, Regel-Hilfe = rules guide, Probepartie = trial game, Leiter = ladder, Aufgabe (der
 // Einstufung) = puzzle, "im ersten Versuch" = on the first try, Heute-Karte = Today card, Fehler (Training) = slips.
-// Bot-Namen wie in js/sprachen/bots.js (Scarecrow Fridolin, Farmer Benno, Granny Hilde, Kalle, Lisa Bishop, Sir Rudi,
+// Bot-Namen wie in js/sprachen/bots.js (Scarecrow Willi, Farmer Benno, Granny Hilde, Kalle, Lisa Bishop, Sir Rudi,
 // Professor Rook). Die Saetze der Entdeckungen bleiben kurz: Titel hoechstens 18, Text hoechstens 34 Zeichen (eine Zeile).
 import { registriereTexte } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
@@ -68,7 +68,7 @@ export const DE = {
   'einstufung.leiter': 'Leiter: {name}',
   'einstufung.probeText': 'Die Probepartie wertet nicht: keine Sterne, keine Freischaltung.',
   // Empfehlung: warum dieser Gegner (logik.BOT_GRUND)
-  'grund.fridolin': 'Vogelscheuche Fridolin zieht fast zufällig, aber immer nach den Regeln. Der sanfteste Einstieg in die erste Welt.',
+  'grund.fridolin': 'Vogelscheuche Willi zieht fast zufällig, aber immer nach den Regeln. Der sanfteste Einstieg in die erste Welt.',
   'grund.benno': 'Bauer Benno kennt die Zugregeln und freut sich über jede Figur. Gut für einen ersten Sieg.',
   'grund.hilde': 'Oma Hilde nimmt alles, was ungedeckt steht. Wer seine Figuren deckt, hat gegen sie gute Chancen.',
   'grund.kalle': 'Kalle greift sofort an und übersieht dabei viel. Wer Gabeln und Matt in 1 sieht, kommt gegen ihn weit.',
@@ -227,7 +227,7 @@ export const EN = {
   'einstufung.leiter': 'Ladder: {name}',
   'einstufung.probeText': 'The trial game does not count: no stars, no unlocks.',
   // Warum dieser Gegner
-  'grund.fridolin': 'Scarecrow Fridolin moves almost at random, but always by the rules. The gentlest way into the first world.',
+  'grund.fridolin': 'Scarecrow Willi moves almost at random, but always by the rules. The gentlest way into the first world.',
   'grund.benno': 'Farmer Benno knows how the pieces move and is delighted by every piece he grabs. Good for a first win.',
   'grund.hilde': 'Granny Hilde grabs anything left undefended. Keep your pieces protected and you have a good chance against her.',
   'grund.kalle': 'Kalle attacks right away and misses a lot along the way. If you can spot forks and mate in 1, you can go far against him.',

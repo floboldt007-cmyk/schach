@@ -614,7 +614,7 @@ async function testeVerlauf(browser, d) {
   await seite.evaluate(() => testseite.leere());
   await oeffne(seite, 'screen=verlauf');
   const leer = await seite.locator('.vl-leer').textContent();
-  pruefe('Leer: "Noch keine Partien. Fordere Vogelscheuche Fridolin heraus!"', leer.includes('Noch keine Partien.') && leer.includes('Fordere Vogelscheuche Fridolin heraus!'), leer.replace(/\s+/g, ' '));
+  pruefe('Leer: "Noch keine Partien. Fordere Vogelscheuche Willi heraus!"', leer.includes('Noch keine Partien.') && leer.includes('Fordere Vogelscheuche Willi heraus!'), leer.replace(/\s+/g, ' '));
   await seite.click('[data-aktion="arena"]');
   g = (await protokoll(seite)).filter((x) => x.art === 'gehe').pop();
   pruefe('Leer: Knopf zur Arena', g && g.name === 'arena');

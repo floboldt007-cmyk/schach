@@ -293,7 +293,7 @@ function nodeTeil() {
   ab();
   ab2();
   pruefe('abmelden() entfernt das Theme', themaListe().length === 1 && themaVon('edel') === null && themaVon('modern') === THEMEN.modern);
-  // Welten: Benno ist jetzt der zweite Bot (Fridolin ist der erste), also ueber die ID nehmen
+  // Welten: Benno ist jetzt der zweite Bot (Willi ist der erste), also ueber die ID nehmen
   const benno = BOTS.find((b) => b.id === 'benno');
   // Premium-Umbau U5 / Welten: die dreissig Leiter-Bots haben Modern-Portraets; der Rueckfall gilt weiter fuer jeden Bot ohne
   // Portraet im Theme (z. B. einen angemeldeten Boss) und fuer unsaubere IDs

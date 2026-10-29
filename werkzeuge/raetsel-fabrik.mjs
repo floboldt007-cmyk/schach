@@ -1,6 +1,6 @@
 // Raetsel-Fabrik fuer das Tagesraetsel (codex-auftraege/tagesraetsel.md, Abschnitt 1). Werkzeug am PC, laeuft unter
 // Node, wird nicht ausgeliefert. Schreibt daten/tagesraetsel/raetsel.json, nur aus EIGENEN Stellungen:
-//   1. Partien der App-Bots gegeneinander: js/bots.js botZug mit den Leiter-Bots Bodo (700) bis Greta (2100), Zufall
+//   1. Partien der App-Bots gegeneinander: js/bots.js botZug mit den Leiter-Bots Jan (700) bis Greta (2100), Zufall
 //      je Halbzug aus tag.js zugZufall(seed, ply), feste Knotenzahl. Die Bots waehlen selbst unter ihren MultiPV-
 //      Kandidaten (Rauschen, Uebersehen, Spontanzuege), daher die menschenaehnlichen Fehler.
 //   2. eigene Lehr-Stellungen aus werkzeuge/raetsel-eigene.json (selbst gebaut, nicht ausgeliefert: Grundreihe, Gabel,

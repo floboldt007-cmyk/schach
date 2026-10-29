@@ -267,7 +267,7 @@ async function testeArena(seite, h) {
   pruefe('6 Knoten (eine Welt)', (await seite.locator('.knoten').count()) === 6);
   pruefe('Welt 1 gezeigt: Die Karofelder', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()));
   pruefe('4 Bots gesperrt (Benno bis Hilde)', (await seite.locator('.knoten.gesperrt').count()) === 4);
-  pruefe('Fridolin ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Willi ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
   pruefe('Nur ein aktueller Gegner', await seite.locator('.knoten.aktuell').count() === 1);
   const filter = await seite.evaluate(() => getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="hilde"] .avatar img')).filter);
   pruefe('Gesperrt: Gesicht in Graustufen (keine Silhouette)', /grayscale/.test(filter) && !/brightness\(0\)/.test(filter), filter);
@@ -284,10 +284,10 @@ async function testeArena(seite, h) {
   pruefe('Gesperrter Endgegner als Glitch-Silhouette', /brightness\(0\)/.test(bossFilter), bossFilter);
   await h.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
   await seite.waitForSelector('.knoten[data-bot="fridolin"]');
-  pruefe('Weltwahl: zurück zu Welt 1, Fridolin aktuell', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()) && await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Weltwahl: zurück zu Welt 1, Willi aktuell', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()) && await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
   pruefe('Kopf-Chips 0/90 und 0/30', /0\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 30/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
   pruefe('Kopfzeile: "Fünf Welten, 30 Bots"', /Fünf Welten, 30 Bots/.test(await seite.locator('.kopf').innerText()));
-  pruefe('Panel zeigt Fridolin', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Panel zeigt Willi', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
   pruefe('Panel: drei Merkmal-Kacheln', await seite.locator('.detail .merkmal').count() === 3);
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
@@ -295,15 +295,15 @@ async function testeArena(seite, h) {
   await h.tippe('.knoten[data-bot="benno"]');
   await seite.waitForSelector('.toast');
   const toast = await seite.locator('.toast').innerText();
-  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Fridolin"', /Besiege erst Vogelscheuche Fridolin/.test(toast), toast);
-  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Willi"', /Besiege erst Vogelscheuche Willi/.test(toast), toast);
+  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
 
   await h.tippe('.farbwahl [data-farbe="w"]');
   pruefe('Farbwahl Weiß aktiv', await seite.locator('.farbwahl [data-farbe="w"][aria-checked="true"]').count() === 1);
   await bild(seite, 'test-arena-start');
 }
 
-// ---------- 2. Partie gegen Fridolin (der erste Gegner, Welten) ----------
+// ---------- 2. Partie gegen Willi (der erste Gegner, Welten) ----------
 async function testePartie(seite, h, fehler) {
   gruppe = 'Partie';
   await h.tippe('.detail [data-aktion="spielen"]');
@@ -457,7 +457,7 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Paula freigeschaltet und aktuell', await seite.locator('.knoten.aktuell[data-bot="paula"]:not(.gesperrt)').count() === 1);
   pruefe('Schloss ist weg', await seite.locator('.knoten[data-bot="paula"] .schloss').count() === 0);
   pruefe('Benno mit drei Sternen', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 3);
-  pruefe('Fridolin (unter dem besten Sieg) bleibt offen, mit Schild "NEU"', await seite.locator('.knoten.offen[data-bot="fridolin"] .k-neu').count() === 1);
+  pruefe('Willi (unter dem besten Sieg) bleibt offen, mit Schild "NEU"', await seite.locator('.knoten.offen[data-bot="fridolin"] .k-neu').count() === 1);
   pruefe('Hilde bleibt gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
   pruefe('Kopf: 3 / 90 Sterne', /3\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -829,7 +829,7 @@ async function testePruefrunde(browser) {
     await h.tippe('.knoten[data-bot="hilde"]');
     await seite.waitForSelector('.toast');
     const t = await seite.locator('.toast').innerText();
-    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Fridolin/.test(t), t);
+    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Willi/.test(t), t);
     // gesperrte Welt: ihr Bot nennt den Endgegner davor, der die Welt öffnet
     await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await seite.waitForSelector('.knoten[data-bot="lisa"]');
@@ -843,7 +843,7 @@ async function testePruefrunde(browser) {
     await seite.reload();
     await seite.waitForSelector('.screen.arena .knoten');
     pruefe('Alle besiegt: "Arena bezwungen! 86/90 Sterne"', /Arena bezwungen!\s+86\/90\s+Sterne/.test(await seite.locator('.arena .logo-unter').textContent()), await seite.locator('.arena .logo-unter').textContent());
-    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
     await kontext.close();
   }
 
@@ -2083,7 +2083,7 @@ if (q.has('wpaktion')) {
   }
 }
 if (q.has('wpgast')) {
-  registriereBot({ id: 'test-gast', art: 'gast', name: 'Gast Gustav', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('benno').staerke } });
+  registriereBot({ id: 'test-gast', art: 'gast', name: 'Gast Maik', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('benno').staerke } });
 }
 if (q.has('wpboss')) {
   registriereBot({
