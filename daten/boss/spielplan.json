@@ -1,0 +1,18 @@
+{
+  "kopf": { "art": "spielplan", "format": 1, "rechenstand": 1, "stand": "2026-10-29", "titel": "Vorsaison: Wochen-Bosse" },
+  "saison": { "id": "vorsaison-2026", "name": "Vorsaison" },
+  "wochen": [
+    { "montag": "2026-11-02", "boss": "bergwirt", "thema": null, "funkenWochenende": false, "text": "Der Bergwirt verteidigt seine Höhenburg mit ruhigem Spiel." },
+    { "montag": "2026-11-09", "boss": "baron-gambit", "thema": null, "funkenWochenende": false, "text": "Der Baron öffnet Linien und sucht die Initiative." },
+    { "montag": "2026-11-16", "boss": "springerzuechterin", "thema": null, "funkenWochenende": false, "text": "Die Springerzüchterin stellt ihre Rösser ins Zentrum." },
+    { "montag": "2026-11-23", "boss": "festungsbauer", "thema": null, "funkenWochenende": true, "text": "Der Festungsbauer hält geduldig jede offene Linie." },
+    { "montag": "2026-11-30", "boss": "bergwirt", "thema": null, "funkenWochenende": false },
+    { "montag": "2026-12-07", "boss": "baron-gambit", "thema": null, "funkenWochenende": false },
+    { "montag": "2026-12-14", "boss": "springerzuechterin", "thema": null, "funkenWochenende": false },
+    { "montag": "2026-12-21", "boss": "festungsbauer", "thema": null, "funkenWochenende": true, "text": "Funken-Wochenende: Lern-Funken zählen doppelt." },
+    { "montag": "2026-12-28", "boss": "bergwirt", "thema": null, "funkenWochenende": false },
+    { "montag": "2027-01-04", "boss": "baron-gambit", "thema": "gambit", "funkenWochenende": false },
+    { "montag": "2027-01-11", "boss": "springerzuechterin", "thema": null, "funkenWochenende": false },
+    { "montag": "2027-01-18", "boss": "festungsbauer", "thema": "endspiel", "funkenWochenende": true, "text": "Funken-Wochenende: Lern-Funken zählen doppelt." }
+  ]
+}
