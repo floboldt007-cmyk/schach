@@ -65,13 +65,13 @@ function merkmaleVon(id) {
     schwaeche: t(`arena.merkmal.${k}.schwaeche`),
   };
 }
-// Kurze Namen fuer die Schilder auf der Karte (nie abgeschnitten) und den Spielen-Knopf ("Spielen gegen Kalle"): der
-// Rufname aus js/bots.js; drei Bots haben im Spielen-Knopf eine eigene Form (arena.ruf.<id>: "den Professor")
+// Kurze Namen fuer die Schilder auf der Karte (nie abgeschnitten) und den Spielen-Knopf ("Spielen gegen Maxi"): der
+// Rufname aus js/bots.js; drei Bots haben im Spielen-Knopf eine eigene Form (arena.ruf.<id>: "den Stockfisch")
 const RUF = ['turm', 'koenig', 'stockfisch'];
 function rufForm(b) {
   return RUF.includes(b.id) ? t(`arena.ruf.${b.id}`) : rufname(b);
 }
-// Text des Spielen-Knopfs ("Spielen gegen Kalle", besiegt "Revanche gegen ..."). Der Rufname steht in .sp-name und
+// Text des Spielen-Knopfs ("Spielen gegen Maxi", besiegt "Revanche gegen ..."). Der Rufname steht in .sp-name und
 // bricht nie in sich um; wird es eng (schmales Panel, langer Rufname), bricht der Knopf vor dem Namen auf zwei Zeilen
 // um, statt etwas abzuschneiden (css/arena.css .spielen .sp-text, tests/arena.test.mjs prueft alle Bots)
 export function spielenText(b, besiegt) {

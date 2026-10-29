@@ -293,7 +293,7 @@ function nodeTeil() {
   ab();
   ab2();
   pruefe('abmelden() entfernt das Theme', themaListe().length === 1 && themaVon('edel') === null && themaVon('modern') === THEMEN.modern);
-  // Welten: Benno ist jetzt der zweite Bot (Fridolin ist der erste), also ueber die ID nehmen
+  // Welten: Lukas ist jetzt der zweite Bot (Willi ist der erste), also ueber die ID nehmen
   const benno = BOTS.find((b) => b.id === 'benno');
   // Premium-Umbau U5 / Welten: die dreissig Leiter-Bots haben Modern-Portraets; der Rueckfall gilt weiter fuer jeden Bot ohne
   // Portraet im Theme (z. B. einen angemeldeten Boss) und fuer unsaubere IDs
@@ -473,7 +473,7 @@ async function browserTeil(browser) {
   const metas = () => seite.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute('content')).join());
   pruefe('theme-color je System-Modus (#F4F1EC hell, #15171B dunkel)', await metas() === '#F4F1EC,#15171B');
   pruefe('Tempo 1, Federn als linear() (Chromium kann es)', await stil(seite, 'html', '--tempo') === '1' && /^linear\(/.test(await stil(seite, 'html', '--feder')));
-  pruefe('Bot-Farbe aus dem Theme (--bf von Benno = --bot-benno)', await seite.evaluate(() => {
+  pruefe('Bot-Farbe aus dem Theme (--bf von Lukas = --bot-benno)', await seite.evaluate(() => {
     const el = document.querySelector('.knoten[data-bot="benno"]');
     const p = document.createElement('i');
     p.style.color = 'var(--bf)';

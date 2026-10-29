@@ -2,12 +2,12 @@
 // 6.3 S1-3). Werkzeug am PC, laeuft unter Node, wird nicht ausgeliefert.
 //
 // Die Messung der Eichung hat 320 Partien zwischen Nachbar-Bots gespielt (eichung/messung/roh/botpartien.jsonl,
-// typ 'nachbar': je Paar Stufe k gegen k+1 2 x 20 Partien, Benno-Hilde bis Koenig-Greta; die Datei liegt nicht im
+// typ 'nachbar': je Paar Stufe k gegen k+1 2 x 20 Partien, Lukas-Hilde bis Koenig-Greta; die Datei liegt nicht im
 // Repo). Dieses Werkzeug analysiert jede Partie mit derselben Engine und derselben Funktion wie die App
 // (Stockfish 19 lite aus vendor/stockfish als Kindprozess, js/review.js analysierePartie, Tiefe 14, MultiPV 2),
 // bewertet beide Seiten mit js/pakete/punkte/formel.js (tafelwert) und schreibt je Tafel und Nachbar den besten und
 // den mittleren Lauf nach daten/punkte/bot-laeufe.json (art 'bot-laeufe', format 1, rechenstand = formel.STAND).
-// Beispiel: Lisa gegen Rudi ergibt Lisas Laeufe auf Rudis Tafel und Rudis Laeufe auf Lisas Tafel.
+// Beispiel: Lisa gegen Thorsten ergibt Lisas Laeufe auf Thorstens Tafel und Thorstens Laeufe auf Lisas Tafel.
 //
 //   1. Analysieren (fortsetzbar, mehrere Prozesse mit --teil teilen sich die Partien, je Prozess ein eigener Cache):
 //      node werkzeuge/nachbar-laeufe.mjs --partien=<botpartien.jsonl> --cache=<analysen-0.jsonl> --teil=0/2

@@ -56,7 +56,7 @@ export const ERFAHREN_AB = 5;
 const ERLEDIGT_MAX = 20;
 
 // Punkte -> Bot (bis einschliesslich). 8 Aufgaben: hoechstens Professor Turm (Elo 1400). Welten (24.10.): ohne
-// geloeste Aufgabe die Vogelscheuche Fridolin (Stufe 1, immer frei), sonst dieselben Bots wie vorher
+// geloeste Aufgabe die Vogelscheuche Willi (Stufe 1, immer frei), sonst dieselben Bots wie vorher
 export const EMPFEHLUNG = Object.freeze([
   Object.freeze({ bis: 0.5, botId: 'fridolin' }),
   Object.freeze({ bis: 1.5, botId: 'benno' }),

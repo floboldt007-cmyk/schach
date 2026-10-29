@@ -19,8 +19,8 @@
 //          vorn, sagt dieser Bot einen Satz, 3.13); tafel-rekord (gross 70, eigene Quelle wie "Eigener Allzeit-Rekord" in
 //          3.13) bei einem neuen Rekord. Ist der grosse Platz dieser Partie schon belegt (ein grosser Moment, den das
 //          Ergebnis schon zeigt, egal mit welcher Prioritaet, oder ein wartender mit gleicher oder hoeherer), kommt der
-//          Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf Rudis Tafel ^ 2" (vorher Platz 6), sonst "Rekord auf
-//          Rudis Tafel: 23.100". Klang "rekord" genau einmal: zeigt das Ergebnis den grossen Moment (der klingt dort), bleibt
+//          Moment als Zeile rekord (58): mit Ueberholen "Platz 4 auf Thorstens Tafel ^ 2" (vorher Platz 6), sonst "Rekord auf
+//          Thorstens Tafel: 23.100". Klang "rekord" genau einmal: zeigt das Ergebnis den grossen Moment (der klingt dort), bleibt
 //          die Abrechnungszeile still. Erster Eintrag, Wochen- und Monatsbeste und "so nah wie noch nie": keine Feier.
 // Inhalte: daten/punkte/bot-laeufe.json (art 'bot-laeufe', format 1; werkzeuge/nachbar-laeufe.mjs): vorlaeufige Bot-
 //          Laeufe der Nachbar-Bots als Gaeste auf den Tafeln (3.13 "Schon in S1 nicht leer"), nur mit dem Rechenstand der
@@ -161,7 +161,7 @@ function feiern(e) {
     return;
   }
   // eigener Allzeit-Rekord: grosser Moment 70 (alte Zahl daneben); ist der schon vergeben, eine Zeile: mit Ueberholen
-  // "Platz 4 auf Rudis Tafel ^ 2" (Platz gewonnen, 58), sonst "Rekord auf Rudis Tafel: 23.100"
+  // "Platz 4 auf Thorstens Tafel ^ 2" (Platz gewonnen, 58), sonst "Rekord auf Thorstens Tafel: 23.100"
   if (e.rekord) {
     const plus = t('p-punkte.feier.plus', { wert: A.zahlText(e.w), vorher: A.zahlText(e.vorher), diff: A.zahlText(e.w - e.vorher) });
     if (grossFrei(e.id, 70)) {
@@ -247,7 +247,7 @@ function miniTafel(e) {
   return aus;
 }
 
-// Ueberhol-Post (3.13): "Ich hab deine 21.800 auf Rudis Tafel geknackt, jetzt 23.100. Code: SA1-..."; erst beim Antippen
+// Ueberhol-Post (3.13): "Ich hab deine 21.800 auf Thorstens Tafel geknackt, jetzt 23.100. Code: SA1-..."; erst beim Antippen
 function postText(e) {
   const name = A.tafelName(e.tafel, botNachId);
   const st = S.lade();
@@ -325,7 +325,7 @@ function anbieterAbrechnung(k) {
   };
 }
 
-// Bot-Panel der Arena (3.17 "Rudis Tafel: Platz 4"): nur Leiter-Bots mit eigenem Eintrag, Platz nur mit Gaesten
+// Bot-Panel der Arena (3.17 "Thorstens Tafel: Platz 4"): nur Leiter-Bots mit eigenem Eintrag, Platz nur mit Gaesten
 function anbieterPanel(k) {
   const bot = k && k.bot;
   if (!bot || bot.stufe == null) return null;

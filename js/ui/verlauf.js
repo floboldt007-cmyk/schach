@@ -243,7 +243,7 @@ export function zeige(root, params = {}, app) {
       <div class="vl-leer flaeche">
         ${g ? `<span class="an-avatar vl-leer-avatar" style="--bf:${esc(botFarbe(g))}"><img src="${esc(pfad(g.avatar))}" alt=""></span>` : ''}
         <h3>${esc(t('analyse.vl.leer.titel'))}</h3>
-        <p>${esc(t('analyse.vl.leer.text', { name: g ? g.name : (botNachId('benno')?.name || 'Bauer Benno') }))}</p>
+        <p>${esc(t('analyse.vl.leer.text', { name: g ? g.name : (botNachId('benno')?.name || 'Bauer Lukas') }))}</p>
         <button class="knopf primaer" type="button" data-aktion="arena">${esc(t('analyse.vl.leer.arena'))} ${icon('pfeil')}</button>
       </div>`;
   }
