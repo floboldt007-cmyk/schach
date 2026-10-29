@@ -751,7 +751,11 @@ Element von `.ort-panel-oben`, vor den Paketen) still die Karte `.nachlese` „S
   `#app > .lade-screen` fuer immer stehen und eine reparierte Version wartete vergeblich. Deshalb steht am Ende von
   `index.html` ein klassisches Inline-Skript (ES5, kein Modul, Stil inline mit Systemfarben, haengt an keiner anderen
   Datei): Steht der Lade-Screen 15 s nach Ladebeginn noch (nach einem Skriptfehler oder `unhandledrejection` schon 3 s
-  danach), erscheint die Tafel `#notfall` (`role="alertdialog"`, ein Satz, Knopf „Reparieren“, Sprache wie `app.js`).
+  danach; ein Fehler an Bild, Stylesheet oder Schrift zaehlt nicht), erscheint die Tafel `#notfall` (`role="alertdialog"`,
+  ein Satz, Knopf „Reparieren“). Die Sprache folgt `app.js` samt der Migration alter Staende aus `storage.js` (ohne
+  `spracheGewaehlt` gilt ein gespeichertes `'en'` als Wahl); aendert sich die Sprachregel, muss `index.html` mitziehen
+  (die Suite vergleicht Tafel und App). Waehrend
+  der Pruefung ist der Knopf per `aria-disabled` gesperrt (nicht `disabled`), damit der Tastaturfokus auf ihm bleibt.
   Der Knopf prueft das Netz (`HEAD sw.js?notfall=…`, `cache: 'no-store'`; HEAD, weil `sw.js` nur GET aus dem Cache
   beantwortet), ohne Netz wird nichts geloescht. Sonst meldet er die Service Worker im Ordner der Seite ab (andere Apps
   auf github.io bleiben), loescht nur Caches mit `schach-arena-` und laedt neu; localStorage, IndexedDB, Cookies und die

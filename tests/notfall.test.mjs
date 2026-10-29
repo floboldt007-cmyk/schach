@@ -3,10 +3,13 @@
 // Ein kleiner Node-Server liefert den Projektordner wie GitHub Pages unter /schach/ aus (Port 8879), dazu einen leeren
 // Test-Service-Worker unter /schach/ und unter /andere/ (fremde App auf demselben Ursprung, wie auf github.io).
 // Geprueft: normaler Start ohne Tafel; app.js als werfendes Modul (Deutsch, Englisch nach Wahl und nach Geraet);
-// app.js haengt ohne Fehler (Wartezeit, ?notfall nur mit ?test); Reparieren mit Service Worker, Caches, localStorage,
-// sessionStorage, IndexedDB und Cookie (nur der eigene Worker und die eigenen Caches gehen, nichts sonst, ein Doppel-Tipp
-// prueft das Netz nur einmal); ohne Netz wird nichts geloescht; "hat nicht geholfen" nach dem Neuladen; die Tafel geht,
-// sobald die App doch startet; ohne Service Worker (iOS-Huelle) und unter file:// nur Neuladen; ohne CSS und dunkel.
+// Sprache der Tafel gleich der App, auch bei alten gespeicherten Staenden; frueh (3 s) bei 404/Abbruch von app.js oder
+// eines importierten Moduls und bei unbehandelter Promise-Ablehnung; app.js haengt ohne Fehler (Wartezeit, ?notfall
+// nur mit ?test); Reparieren mit Service Worker, Caches, localStorage, sessionStorage, IndexedDB und Cookie (nur der
+// eigene Worker und die eigenen Caches gehen, nichts sonst, ein Doppel-Tipp prueft das Netz nur einmal, der Fokus
+// bleibt auf dem Knopf); ohne Netz wird nichts geloescht, ein zweites Enter repariert; "hat nicht geholfen" nach dem
+// Neuladen; die Tafel geht, sobald die App doch startet; eine fehlende Schrift loest bei langsamem Start keine Tafel
+// aus; ohne Service Worker (iOS-Huelle) und unter file:// nur Neuladen; ohne CSS und dunkel.
 //
 //   node tests/notfall.test.mjs
 //   PORT=9740 node tests/notfall.test.mjs    eigener Port (Standard 8879)
@@ -127,7 +130,8 @@ const tafel = (seite) => seite.evaluate(() => {
   const cs = getComputedStyle(t);
   return {
     rolle: t.getAttribute('role'), modal: t.getAttribute('aria-modal'), lang: t.getAttribute('lang'), zustand: t.dataset.zustand,
-    satz: satz ? satz.textContent : null, erklaerung: erkl ? erkl.textContent : null, knopf: k.textContent, knopfAus: k.disabled,
+    satz: satz ? satz.textContent : null, erklaerung: erkl ? erkl.textContent : null, knopf: k.textContent,
+    knopfAus: k.disabled || k.getAttribute('aria-disabled') === 'true',
     knoepfe: t.querySelectorAll('button').length, hinweis: hinweis ? hinweis.textContent : null, fokus: document.activeElement === k,
     deckt: r.left <= 0 && r.top <= 0 && r.right >= innerWidth && r.bottom >= innerHeight && cs.position === 'fixed',
     knopfHoch: Math.round(kb.height), knopfBreit: Math.round(kb.width), lade: !!document.querySelector('#app > .lade-screen'),
@@ -273,6 +277,59 @@ async function testeKaputt(browser) {
   }
 }
 
+// Die Sprache der Tafel muss genau der Sprache der App folgen, auch bei alten gespeicherten Staenden (js/storage.js
+// ladeEinstellungen): je Fall einmal die echte App (<html lang>), einmal die Tafel mit kaputter app.js
+async function testeSpracheWieApp(browser) {
+  gruppe = 'Sprache wie die App';
+  const faelle = [
+    { name: 'alter Stand {sprache:en} ohne spracheGewaehlt (vor dem 24.10.), deutsches Geraet', locale: 'de-DE', e: { sprache: 'en' }, soll: 'en' },
+    { name: 'alter Stand {sprache:de} ohne spracheGewaehlt, englisches Geraet', locale: 'en-US', e: { sprache: 'de' }, soll: 'en' },
+    { name: 'spracheGewaehlt:false mit en, deutsches Geraet', locale: 'de-DE', e: { sprache: 'en', spracheGewaehlt: false }, soll: 'de' },
+    { name: 'gewaehlt, aber unbekannte Sprache, englisches Geraet', locale: 'en-US', e: { sprache: 'fr', spracheGewaehlt: true }, soll: 'de' },
+  ];
+  for (const f of faelle) {
+    const { kontext, seite } = await neueSeite(browser, {
+      locale: f.locale, init: (e) => localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify(e)), initArg: f.e,
+    });
+    await seite.goto(`${START}?test&autosprache`);
+    const app = await seite.waitForFunction(() => !document.querySelector('#app > .lade-screen'), null, { timeout: 20000 })
+      .then(() => seite.evaluate(() => document.documentElement.lang), () => null);
+    await ersetzeApp(seite, KAPUTT);
+    await seite.goto(`${START}?test&autosprache&notfall=${KURZ}`);
+    const t = await warteAufTafel(seite) && await tafel(seite);
+    pruefe(`${f.name}: App und Tafel ${f.soll}`, app === f.soll && t && t.lang === f.soll && t.knopf === (f.soll === 'en' ? 'Repair' : 'Reparieren'),
+      JSON.stringify({ app, tafel: t && t.lang }));
+    await kontext.close();
+  }
+}
+
+// Laedt ein Skript nicht (404, Abbruch, auch ein importiertes Modul) oder endet der Start in einer unbehandelten
+// Promise-Ablehnung, kommt die Tafel 3 s danach, nicht erst nach der vollen Wartezeit. LANG trennt frueh und spaet.
+const LANG = 10000;
+async function testeFrueh(browser) {
+  gruppe = 'Frueh erkannt';
+  const faelle = [
+    { name: 'app.js 404', route: (s) => s.route('**/js/app.js', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'Nicht gefunden' })) },
+    { name: 'app.js bricht ab', route: (s) => s.route('**/js/app.js', (r) => r.abort('failed')) },
+    { name: 'importiertes Modul js/sprache.js 404', route: (s) => s.route('**/js/sprache.js', (r) => r.fulfill({ status: 404, contentType: 'text/plain', body: 'Nicht gefunden' })) },
+    { name: 'unbehandelte Promise-Ablehnung', route: (s) => ersetzeApp(s, "Promise.resolve().then(() => { throw new Error('notfall-test: kaputt'); });\n"), ablehnung: true },
+  ];
+  for (const f of faelle) {
+    const { kontext, seite, seitenfehler } = await neueSeite(browser);
+    await f.route(seite);
+    const t0 = Date.now();
+    await seite.goto(`${START}?test&notfall=${LANG}`);
+    const da = await warteAufTafel(seite, LANG + 3000);
+    const ms = Date.now() - t0;
+    pruefe(`${f.name}: Tafel frueh (nach ${ms} ms, erwartet 2,5 bis 6 s statt ${LANG / 1000} s)`, da && ms >= 2500 && ms < 6000, String(ms));
+    const t = da && await tafel(seite);
+    pruefe(`${f.name}: Tafel bereit, Lade-Screen steht`, t && t.zustand === 'bereit' && t.lade && t.knopf === 'Reparieren', JSON.stringify(t));
+    // ein Ladefehler ist kein Seitenfehler; bei der Ablehnung nur der absichtliche
+    pruefe(`${f.name}: kein Seitenfehler aus dem Waechter`, f.ablehnung ? nurAbsicht(seitenfehler) : seitenfehler.length === 0, seitenfehler.join(' | '));
+    await kontext.close();
+  }
+}
+
 async function testeHaengt(browser) {
   gruppe = 'app.js haengt ohne Fehler';
   const { kontext, seite, seitenfehler } = await neueSeite(browser);
@@ -313,12 +370,13 @@ async function testeReparieren(browser) {
       k.click();
       k.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       const t = document.getElementById('notfall');
-      return { aus: k.disabled, zustand: t.dataset.zustand, hinweis: t.querySelector('[role="status"]').textContent };
+      return { aus: k.getAttribute('aria-disabled') === 'true', fokus: document.activeElement === k, zustand: t.dataset.zustand,
+        hinweis: t.querySelector('[role="status"]').textContent };
     });
   });
   headVerzoegerung = 0;
-  pruefe('waehrend der Reparatur: Knopf gesperrt, "Einen Moment …"', zwischen && zwischen.aus && zwischen.zustand === 'arbeitet'
-    && zwischen.hinweis === 'Einen Moment …', JSON.stringify(zwischen));
+  pruefe('waehrend der Reparatur: Knopf gesperrt (aria-disabled), Fokus bleibt darauf, "Einen Moment …"', zwischen && zwischen.aus
+    && zwischen.fokus && zwischen.zustand === 'arbeitet' && zwischen.hinweis === 'Einen Moment …', JSON.stringify(zwischen));
   pruefe('Seite wurde neu geladen', neu);
   const pruefungen = netzPruefungen().slice(anzahl);
   pruefe('Netz genau einmal geprueft: HEAD auf sw.js (am Cache des Workers vorbei)', pruefungen.length === 1 && pruefungen[0].methode === 'HEAD',
@@ -354,21 +412,26 @@ async function testeOffline(browser) {
   let abgefangen = 0;
   await seite.route(/\/sw\.js\?notfall=\d+/, (r) => { abgefangen++; return r.abort('internetdisconnected'); });
   await seite.evaluate(() => { window.__vorher = 1; });
-  await seite.click('#notfall button');
+  // per Tastatur wie auf dem iPad mit Tastatur: Enter auf dem Knopf, der beim Erscheinen den Fokus bekommt
+  const vorFokus = await tafel(seite);
+  pruefe('Knopf hat vor dem ersten Enter den Fokus', vorFokus && vorFokus.fokus, JSON.stringify(vorFokus));
+  await seite.keyboard.press('Enter');
   await seite.waitForFunction(() => document.getElementById('notfall').dataset.zustand !== 'arbeitet', null, { timeout: 15000 });
   const t = await tafel(seite);
   pruefe('Netzpruefung scheitert: Hinweis, nichts geloescht gemeldet', t && t.zustand === 'offline' && t.hinweis === DE.offline, JSON.stringify(t));
-  pruefe('Knopf wieder frei, kein Neuladen', t && !t.knopfAus && await seite.evaluate(() => window.__vorher === 1));
+  pruefe('Knopf wieder frei, kein Neuladen', t && !t.knopfAus && await seite.evaluate(() => window.__vorher === 1), JSON.stringify(t));
+  pruefe('Fokus bleibt auf "Reparieren" (nicht auf body)', t && t.fokus,
+    await seite.evaluate(() => document.activeElement && document.activeElement.tagName));
   pruefe('die Pruefung lief wirklich (abgefangen, nicht beim Server)', abgefangen === 1 && netzPruefungen().length === anzahl, `${abgefangen} / ${netzPruefungen().length - anzahl}`);
   const nachher = await bestand(seite);
   pruefe('Service Worker, Caches, Speicher unveraendert, kein Merker', JSON.stringify(nachher.regs) === JSON.stringify(vorher.regs)
     && JSON.stringify(nachher.namen) === JSON.stringify(vorher.namen) && JSON.stringify(nachher.lokal) === JSON.stringify(vorher.lokal)
     && !(MERKER in nachher.sitzung), JSON.stringify(nachher));
-  // wieder online: derselbe Knopf repariert
+  // wieder online: ein zweites Enter (ohne Tab zurueck) repariert
   await seite.unroute(/\/sw\.js\?notfall=\d+/);
-  const neu = await mitNeuladen(seite, () => seite.click('#notfall button'));
+  const neu = await mitNeuladen(seite, () => seite.keyboard.press('Enter')).catch(() => false);
   const danach = await bestand(seite);
-  pruefe('wieder online: Reparieren laeuft (neu geladen, eigene Caches weg)', neu && JSON.stringify(danach.namen) === JSON.stringify(['anderes-projekt-v1']),
+  pruefe('wieder online: zweites Enter repariert (neu geladen, eigene Caches weg)', neu && JSON.stringify(danach.namen) === JSON.stringify(['anderes-projekt-v1']),
     JSON.stringify(danach.namen));
   pruefe('nur der absichtliche Fehler', nurAbsicht(seitenfehler), seitenfehler.join(' | '));
   await kontext.close();
@@ -420,6 +483,34 @@ async function testeSpaeterStart(browser) {
   await warte(500);
   pruefe('Tafel bleibt weg, keine Seitenfehler', !(await seite.evaluate(() => !!document.getElementById('notfall'))) && seitenfehler.length === 0,
     seitenfehler.join(' | '));
+  await kontext.close();
+}
+
+// Eine fehlende Schrift (Preload-<link>, Fehler im Capture sichtbar) ist kein Startfehler: Bei einem gesunden, aber
+// langsamen Start darf die Tafel nicht frueh aufblitzen. Die Schrift fehlt nach 1,5 s, app.js kommt nach 6 s; zaehlte
+// der Fehler, stuende die Tafel ab etwa 4,5 s bis zum Start. Die Wartezeit (20 s) liegt weit hinter dem Start.
+async function testeAssetFehler(browser) {
+  gruppe = 'Fehlende Schrift, langsamer Start';
+  const { kontext, seite, seitenfehler } = await neueSeite(browser, {
+    init: () => {
+      window.__linkFehler = 0;
+      addEventListener('error', (e) => { if (e.target && e.target.tagName === 'LINK') window.__linkFehler++; }, true);
+    },
+  });
+  let schrift = 0;
+  await seite.route('**/assets/schriften/manrope.woff2', async (r) => {
+    schrift++;
+    await warte(1500);
+    await r.fulfill({ status: 404, contentType: 'text/plain', body: 'Nicht gefunden' });
+  });
+  await seite.route('**/js/app.js', async (r) => { await warte(6000); await r.continue(); });
+  await seite.goto(`${START}?test&notfall=20000#arena`, { waitUntil: 'commit' });
+  await seite.waitForSelector('.screen.arena .knoten', { timeout: 25000 });
+  const r = await seite.evaluate(() => ({ je: !!window.__notfallGesehen, linkFehler: window.__linkFehler,
+    lade: !!document.querySelector('#app > .lade-screen') }));
+  pruefe('die Schrift fehlte wirklich (Fehler am <link> vor dem Start)', schrift >= 1 && r.linkFehler >= 1, JSON.stringify({ schrift, ...r }));
+  pruefe('App startet, keine Tafel, auch nicht kurz', !r.lade && !r.je, JSON.stringify(r));
+  pruefe('keine Seitenfehler', seitenfehler.length === 0, seitenfehler.join(' | '));
   await kontext.close();
 }
 
@@ -504,11 +595,14 @@ try {
   browser = await begrenzt('Browserstart', () => browserTyp(ladePlaywright()).launch(), 45000);
   await abschnitt('Normaler Start', () => testeNormalerStart(browser));
   await abschnitt('app.js wirft', () => testeKaputt(browser));
+  await abschnitt('Sprache wie die App', () => testeSpracheWieApp(browser));
+  await abschnitt('Frueh erkannt', () => testeFrueh(browser));
   await abschnitt('app.js haengt', () => testeHaengt(browser));
   await abschnitt('Reparieren', () => testeReparieren(browser));
   await abschnitt('Ohne Netz', () => testeOffline(browser));
   await abschnitt('Merker', () => testeMerker(browser));
   await abschnitt('App startet spaeter', () => testeSpaeterStart(browser));
+  await abschnitt('Fehlende Schrift', () => testeAssetFehler(browser));
   await abschnitt('Ohne Service Worker', () => testeOhneServiceWorker(browser));
   await abschnitt('Ohne CSS', () => testeOhneCss(browser));
   const schlecht = ergebnisse.filter((r) => !r.ok);

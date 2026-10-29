@@ -306,7 +306,8 @@ export function ladeEinstellungen() {
   // Figur waehlen. Einmal auf aus; wer es danach anschaltet, behaelt es.
   if (roh && typeof roh === 'object' && !(Number(roh.fassung) >= 3) && e.autoDame === true) e.autoDame = false;
   // Sprache nach Geraet (24.10.): Vorher war Deutsch der Standard und stand in jedem gespeicherten Stand. Nur Englisch
-  // kann also bewusst gewaehlt sein: das bleibt als Wahl, alles andere folgt ab jetzt dem Geraet.
+  // kann also bewusst gewaehlt sein: das bleibt als Wahl, alles andere folgt ab jetzt dem Geraet. Der Notfall-Waechter
+  // in index.html bildet diese Regel nach (tests/notfall.test.mjs vergleicht).
   if (roh && typeof roh === 'object' && typeof roh.spracheGewaehlt !== 'boolean' && roh.sprache === 'en') e.spracheGewaehlt = true;
   e.fassung = STANDARD_EINSTELLUNGEN.fassung;
   if (!THEMA_ID.test(e.thema)) e.thema = STANDARD_EINSTELLUNGEN.thema;

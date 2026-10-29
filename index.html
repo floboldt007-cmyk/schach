@@ -109,8 +109,13 @@
       var m = /[?&]sprache=(de|en)(?:&|#|$)/.exec(suche);
       if (m) return m[1];
       try {
+        // wie js/storage.js ladeEinstellungen: Ohne booleschen Wert spracheGewaehlt (Stand vor dem 24.10.) gilt ein
+        // gespeichertes 'en' als Wahl, eine unbekannte Sprache wird Deutsch
         var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
-        if (e && e.spracheGewaehlt && (e.sprache === 'de' || e.sprache === 'en')) return e.sprache;
+        if (e && typeof e === 'object') {
+          var gewaehlt = typeof e.spracheGewaehlt === 'boolean' ? e.spracheGewaehlt : e.sprache === 'en';
+          if (gewaehlt) return e.sprache === 'en' ? 'en' : 'de';
+        }
       } catch (f) { /* privater Modus */ }
       try {
         if ((navigator.webdriver === true || test) && !/[?&]autosprache\b/.test(suche)) return 'de';
@@ -277,11 +282,18 @@
       location.reload();
     }
 
+    // Gesperrt wird mit aria-disabled statt disabled: Ein abgeschalteter Knopf verliert den Tastaturfokus, und nach der
+    // Meldung ohne Netz liefe ein zweites Enter ins Leere. Doppelte Tipps haelt 'laeuft' ab.
+    function sperre(an) {
+      if (an) knopf.setAttribute('aria-disabled', 'true');
+      else knopf.removeAttribute('aria-disabled');
+      knopf.style.opacity = an ? '0.6' : '';
+    }
+
     function repariere() {
       if (laeuft || aus) return;
       laeuft = true;
-      knopf.disabled = true;
-      knopf.style.opacity = '0.6';
+      sperre(true);
       tafel.setAttribute('data-zustand', 'arbeitet');
       hinweis.textContent = T.arbeitet;
       if (!mitServiceWorker()) { neuLaden(); return; }
@@ -289,8 +301,9 @@
         if (aus) return null;   // die App ist inzwischen doch gestartet
         if (!da) {
           laeuft = false;
-          knopf.disabled = false;
-          knopf.style.opacity = '';
+          sperre(false);
+          // Fokus zurueck auf den einzigen Knopf (Safari fokussiert Knoepfe beim Klicken nicht)
+          if (document.activeElement !== knopf) { try { knopf.focus(); } catch (e) { /* egal */ } }
           tafel.setAttribute('data-zustand', 'offline');
           hinweis.textContent = T.offline;
           return null;
