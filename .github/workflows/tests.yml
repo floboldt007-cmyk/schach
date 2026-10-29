@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir -p artifacts/screenshots
           set -o pipefail
-          BROWSER=webkit BILDER=artifacts/screenshots node tests/alle.mjs --nur=storage,board,screens,e2e --laut 2>&1 | tee artifacts/webkit.log
+          BROWSER=webkit BILDER=artifacts/screenshots node tests/alle.mjs --nur=storage,board,screens,e2e,notfall --laut 2>&1 | tee artifacts/webkit.log
       - name: Fehlerartefakte hochladen
         if: failure()
         uses: actions/upload-artifact@v4

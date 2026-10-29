@@ -115,3 +115,7 @@ App Store und Google Play (Capacitor) und weiter die Web-App.
     und wer nie mehr zieht, hielte den Freund fest. Die Alternative aus dem Konzept: nach 7 Tagen nur ein „Verlassen“
     durch einen der beiden Spieler erlauben, nichts automatisch. Flo entscheidet; bis dahin gilt die automatische
     Regel (`supabase/online-schema.sql`, `online_haengt`).
+17. **Notfallweg beim Start (Lücken-Check 7):** Startet die App nicht (Lade-Screen steht nach 15 s noch), zeigt
+    `index.html` selbst eine Tafel mit „Reparieren“. Das lädt die App frisch vom Server und löscht dafür nur den
+    Offline-Speicher der App (Service Worker und seine Caches), nie den Spielstand. Ohne Internet wird nichts gelöscht.
+    Nie automatisch: Hilft es nicht, sagt die Tafel das und rät, die App ganz zu schließen und es später zu versuchen.
