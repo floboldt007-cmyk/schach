@@ -2,7 +2,8 @@
 -- Drei kurzlebige Nutzer: A und B spielen, C ist ein Dritter, der nichts sehen darf.
 -- online_tritt_bei liefert seit Anti-Cheat Etappe 0 jsonb: die Zeile oder { "fehler": "ONLINE_..." } (ohne raise).
 -- Ab Abschnitt 13: Einladungs-Bremse, Aufraeumen, Fehlversuche, Ergebnis-Regeln, Folgestellung, strittig,
--- Zeitende mit zu wenig Material, haengende Partien, Rechte und search_path.
+-- Zeitende mit zu wenig Material, haengende Partien, Rechte und search_path. Abschnitt 21: erneuter Beitritt zur
+-- eigenen Partie und Aufraeumen alter Fehlversuche und Zaehler fuer alle Konten.
 begin;
 
 insert into auth.users (id, email)
@@ -194,10 +195,14 @@ begin
     raise exception 'FEHLER: B sieht die Partie nach dem Beitritt nicht';
   end if;
 
-  -- noch einmal beitreten: die Partie ist voll
+  -- noch einmal beitreten (verlorene Antwort, Link noch einmal geoeffnet): B sitzt schon am Brett und bekommt die
+  -- Partie unveraendert zurueck, ohne Fehlversuch (Abschnitt 14 zaehlt nach). Dass ein Dritter einer vollen Partie
+  -- nicht beitreten kann, prueft der Block mit C direkt danach.
   r := public.online_tritt_bei(code1);
-  if r ->> 'fehler' is distinct from 'ONLINE_CODE_UNGUELTIG' then
-    raise exception 'FEHLER: Beitritt zu einer laufenden Partie war moeglich (%)', r;
+  if r ? 'fehler' or (r ->> 'id')::uuid is distinct from p.id or r ->> 'status' is distinct from 'laeuft'
+     or (r ->> 'weiss')::uuid is distinct from p.weiss or (r ->> 'schwarz')::uuid is distinct from p.schwarz
+     or (r ->> 'letzter_zug_am')::timestamptz is distinct from p.letzter_zug_am then
+    raise exception 'FEHLER: erneuter Beitritt des eigenen Spielers liefert nicht die unveraenderte Partie (%)', r;
   end if;
 
   -- Schwarz ist nicht am Zug
@@ -213,6 +218,22 @@ begin
   exception
     when others then if sqlerrm <> 'ONLINE_KEIN_REMISANGEBOT' then raise; end if;
   end;
+end
+$$;
+
+-- Ein Dritter kann der vollen, laufenden Partie nicht beitreten (der erste Fehlversuch von C, siehe Abschnitt 14).
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.online_tritt_bei(current_setting('online_test.code1'));
+  if r ->> 'fehler' is distinct from 'ONLINE_CODE_UNGUELTIG' or r ? 'id' then
+    raise exception 'FEHLER: Beitritt zu einer laufenden Partie war moeglich (%)', r;
+  end if;
+  if (select count(*) from public.partien_online) <> 0 then
+    raise exception 'FEHLER: der abgewiesene Dritte sieht die Partie';
+  end if;
 end
 $$;
 
@@ -818,7 +839,8 @@ set local role authenticated;
 -- ---------------------------------------------------------------------------
 -- 14. Fehlversuche beim Beitreten: hoechstens 20 falsche Codes je Konto und Tag. Ein Fehlversuch kommt als jsonb
 --     { fehler } ohne raise zurueck, der Zaehler steht danach also wirklich (ein raise rollte ihn zurueck).
---     Ein richtiger Code nach 19 Fehlversuchen geht, nach 20 Fehlversuchen nichts mehr. C hat noch keinen.
+--     Ein richtiger Code nach 19 Fehlversuchen geht, nach 20 Fehlversuchen nichts mehr. C hat schon einen aus
+--     Abschnitt 3 (volle Partie).
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 do $$
 declare
@@ -845,11 +867,12 @@ $$;
 reset role;
 do $$
 begin
-  if (select v.anzahl from public.online_versuche v where v.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') is distinct from 1 then
+  if (select v.anzahl from public.online_versuche v where v.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') is distinct from 2 then
     raise exception 'FEHLER: der Fehlversuch wurde nicht gezaehlt';
   end if;
-  -- B hatte in den Abschnitten 3 und 12 vier Fehlversuche (unbekannt, voll, abgelaufen, ohne Spieler)
-  if (select v.anzahl from public.online_versuche v where v.user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') is distinct from 4 then
+  -- B hatte in den Abschnitten 3 und 12 drei Fehlversuche (unbekannt, abgelaufen, ohne Spieler); der erneute
+  -- Beitritt zur eigenen laufenden Partie in Abschnitt 3 zaehlt nicht
+  if (select v.anzahl from public.online_versuche v where v.user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') is distinct from 3 then
     raise exception 'FEHLER: Fehlversuche werden nicht je Konto gezaehlt';
   end if;
 end
@@ -861,7 +884,7 @@ declare
   p public.partien_online;
   i integer;
 begin
-  for i in 2..19 loop
+  for i in 3..19 loop
     -- falsche Codes, auch in falscher Form (die App faengt die ab, ein eigenes Werkzeug nicht)
     r := public.online_tritt_bei(case when i % 2 = 0 then 'ZZZZZ3' else 'ab' end);
     if r ->> 'fehler' is distinct from 'ONLINE_CODE_UNGUELTIG' then
@@ -1125,6 +1148,47 @@ begin
   end if;
 end
 $$;
+-- Rochade auf ein besetztes Feld: Eine Rochade schlaegt nie. Steht zwischen Koenig und Turm ein Stein (auch auf dem
+-- Zielfeld des Koenigs oder bei der langen Rochade auf b1/b8), darf er nicht verschwinden (vorher fiel die gegnerische
+-- Dame auf f1 einfach weg). Einmal ueber online_zug, die weiteren Faelle direkt an der Hilfsfunktion (als Besitzer).
+reset role;
+update public.partien_online
+set fen = '4k3/8/8/8/8/8/8/4Kq1R w K - 0 1', am_zug = 'w'
+where id = current_setting('online_test.partie_f')::uuid;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  perform public.online_zug(current_setting('online_test.partie_f')::uuid, 'e1g1', '4k3/8/8/8/8/8/8/5RK1 b - - 1 1', 'b');
+  raise exception 'FEHLER: Rochade hat die schwarze Dame auf f1 verschwinden lassen';
+exception
+  when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
+end
+$$;
+reset role;
+do $$
+declare
+  faelle text[] := array[
+    -- Stellung vorher, Zug, Stellung danach, erwartet (j = angenommen, n = abgelehnt)
+    '4k3/8/8/8/8/8/8/4K1qR w K - 0 1', 'e1g1', '4k3/8/8/8/8/8/8/5RK1 b - - 1 1', 'n',      -- Dame auf g1 (Ziel des Koenigs)
+    '4k3/8/8/8/8/8/8/R2qK3 w Q - 0 1', 'e1c1', '4k3/8/8/8/8/8/8/2KR4 b - - 1 1', 'n',      -- Dame auf d1
+    'r3k3/8/8/8/8/8/8/Rn2K3 w Q - 0 1', 'e1c1', 'r3k3/8/8/8/8/8/8/1nKR4 b - - 1 1', 'n',    -- ueber den Springer auf b1
+    'r2Qk3/8/8/8/8/8/8/4K3 b q - 0 1', 'e8c8', '2kr4/8/8/8/8/8/8/4K3 w - - 1 2', 'n',       -- weisse Dame auf d8
+    'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'e1g1', 'r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1', 'j',
+    'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'e1c1', 'r3k2r/8/8/8/8/8/8/2KR3R b kq - 1 1', 'j',
+    'r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1', 'e8g8', 'r4rk1/8/8/8/8/8/8/R3K2R w KQ - 1 2', 'j',
+    'r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1', 'e8c8', '2kr3r/8/8/8/8/8/8/R3K2R w KQ - 1 2', 'j'];
+  i integer;
+begin
+  for i in 1..array_length(faelle, 1) / 4 loop
+    if public.online_folge_passt(faelle[4 * i - 3], faelle[4 * i - 2], faelle[4 * i - 1]) is distinct from (faelle[4 * i] = 'j') then
+      raise exception 'FEHLER: Rochade % (% aus %) falsch beurteilt, erwartet %', i, faelle[4 * i - 2], faelle[4 * i - 3], faelle[4 * i];
+    end if;
+  end loop;
+end
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 reset role;
 update public.partien_online
 set fen = 'rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 3', am_zug = 'b'
@@ -1629,6 +1693,72 @@ begin
   where f.pronamespace = 'public'::regnamespace and f.proname like 'online\_%' and f.prosecdef;
   if offen is distinct from 'online_biete_remis, online_erstelle, online_gib_auf, online_meine, online_nimm_remis_an, online_pruefe_zeit, online_strittig, online_tritt_bei, online_zug' then
     raise exception 'FEHLER: unerwartete Security-Definer-Funktionen: %', offen;
+  end if;
+end
+$$;
+set local role authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 21. Wer schon am Brett sitzt, bekommt auch eine beendete Partie zurueck (kein Fehlversuch, keine Aenderung).
+--     Fehlversuche von vor mehr als 2 Tagen und, wenn daten-schema.sql eingespielt ist, Zaehler der Mengenbremse, die
+--     aelter als 48 Stunden sind, raeumt online_aufraeumen fuer ALLE Konten weg, auch fuer C, das selbst nichts tut.
+reset role;
+insert into public.online_versuche (user_id, tag, anzahl)
+values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', (now() at time zone 'Europe/Berlin')::date - 3, 5),
+       ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', (now() at time zone 'Europe/Berlin')::date - 2, 4);
+do $$
+begin
+  if pg_catalog.to_regclass('public.daten_zaehler') is not null then
+    execute $q$insert into public.daten_zaehler (user_id, tabelle, stunde, anzahl)
+      values ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'nutzung', date_trunc('hour', now()) - interval '49 hours', 7),
+             ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'nutzung', date_trunc('hour', now()) - interval '47 hours', 3)$q$;
+  end if;
+end
+$$;
+select set_config('online_test.versuche_b',
+  (select coalesce(sum(v.anzahl), 0)::text from public.online_versuche v where v.user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'), true);
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  -- Partie 1 (Abschnitte 1 bis 7) ist auf Zeit beendet, B hat Schwarz gespielt
+  r := public.online_tritt_bei(current_setting('online_test.code1'));
+  if r ? 'fehler' or (r ->> 'id')::uuid is distinct from current_setting('online_test.partie1')::uuid
+     or r ->> 'status' is distinct from 'beendet' or r ->> 'grund' is distinct from 'zeit' then
+    raise exception 'FEHLER: erneuter Beitritt zur eigenen beendeten Partie liefert sie nicht unveraendert (%)', r;
+  end if;
+  perform count(*) from public.online_meine(); -- raeumt fuer alle auf
+end
+$$;
+reset role;
+do $$
+declare
+  n integer;
+begin
+  if (select coalesce(sum(v.anzahl), 0) from public.online_versuche v where v.user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')::text
+     <> current_setting('online_test.versuche_b') then
+    raise exception 'FEHLER: erneuter Beitritt zur eigenen Partie zaehlt als Fehlversuch';
+  end if;
+  if exists (select 1 from public.online_versuche v
+             where v.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and v.tag = (now() at time zone 'Europe/Berlin')::date - 3) then
+    raise exception 'FEHLER: ein Fehlversuch von vor 3 Tagen steht nach dem Aufraeumen noch da';
+  end if;
+  if not exists (select 1 from public.online_versuche v
+                 where v.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' and v.tag = (now() at time zone 'Europe/Berlin')::date - 2) then
+    raise exception 'FEHLER: ein Fehlversuch von vor 2 Tagen wurde zu frueh geloescht';
+  end if;
+  if pg_catalog.to_regclass('public.daten_zaehler') is not null then
+    execute $q$select count(*) from public.daten_zaehler z where z.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+               and z.stunde < date_trunc('hour', now()) - interval '48 hours'$q$ into n;
+    if n <> 0 then
+      raise exception 'FEHLER: ein 49 Stunden alter Zaehler der Mengenbremse steht nach online_meine noch da';
+    end if;
+    execute $q$select count(*) from public.daten_zaehler z where z.user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'$q$ into n;
+    if n <> 1 then
+      raise exception 'FEHLER: ein 47 Stunden alter Zaehler der Mengenbremse wurde zu frueh geloescht';
+    end if;
   end if;
 end
 $$;

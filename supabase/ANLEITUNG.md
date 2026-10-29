@@ -102,12 +102,17 @@ neue Konten geschlossen lassen.
 Was neu ist (Werte stehen bewusst im SQL, sie zu kennen hilft einem Angreifer kaum):
 - **Einladungs-Bremse:** höchstens 5 offene und 50 neue Einladungen je Konto in 24 Stunden.
 - **Aufräumen:** Einladungen, die älter als 48 Stunden sind, werden beim nächsten Anlegen oder beim Laden von „Meine
-  Partien“ gelöscht. Partien mit Uhr, in denen 10 Minuten nach dem Beitritt oder dem ersten Zug nichts passiert, enden
-  als „abgebrochen“ (ohne Ergebnis); Partien ohne Uhr erst nach 7 Tagen ohne Zug.
+  Partien“ gelöscht (von irgendeinem Konto, auch bei einer Datenauskunft). Partien mit Uhr, in denen 10 Minuten nach dem
+  Beitritt oder dem ersten Zug nichts passiert, enden als „abgebrochen“ (ohne Ergebnis); Partien ohne Uhr erst nach
+  7 Tagen ohne Zug (vorläufige Regel, siehe `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16). Dabei verschwinden
+  auch Fehlversuche von vor mehr als 2 Tagen und Zähler der Mengenbremse, die älter als 48 Stunden sind. Ohne jede
+  Aktivität auf dem Server läuft kein Aufräumen; dafür ließe sich später `pg_cron` einschalten.
 - **Fehlversuche beim Beitreten:** höchstens 20 falsche Codes je Konto und Tag (Tabelle `online_versuche`, nur für den
-  Server lesbar, steht in der Datenauskunft).
+  Server lesbar, steht in der Datenauskunft). Wer schon mitspielt und den Link noch einmal öffnet, bekommt seine Partie,
+  das zählt nicht als Fehlversuch.
 - **Ergebnis-Regeln, grobe Prüfung der Folgestellung, Ausgang „strittig“** und **Zeitende mit zu wenig Material als
-  Remis** (Grund `zeit-material`).
+  Remis** (Grund `zeit-material`). Passt die Stellung auf dem Server nicht zu den Zügen, meldet die App die Partie von
+  selbst als strittig; der Knopf „Strittig melden“ bleibt nur als Rückfall, wenn das Netz weg ist.
 - **Leerer `search_path`** in allen Online-Funktionen. Bitte danach unter **Advisors > Security Advisor** nachsehen, ob
   der Linter für die Online-Funktionen noch „Function Search Path Mutable“ meldet (erwartet: nein).
 
@@ -140,8 +145,10 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
-     Kennung `DATEN_MENGE`). Gezählt wird in der Tabelle `daten_zaehler` (nur Zahlen je Stunde, nach 48 Stunden
-     gelöscht, für Nutzer nicht lesbar), damit Löschen und neu Einfügen die Bremse nicht zurücksetzt.
+     Kennung `DATEN_MENGE`). Gezählt wird in der Tabelle `daten_zaehler` (nur Zahlen je Stunde, für Nutzer nicht
+     lesbar), damit Löschen und neu Einfügen die Bremse nicht zurücksetzt. Zähler, die älter als 48 Stunden sind, löscht
+     das nächste Aufräumen für alle Konten: bei jeder neuen geteilten Zeile, jedem Widerruf, jeder Datenauskunft und
+     (mit dem Online-Schema) bei jedem Laden von „Meine Partien“.
 4. **Auswerten nur zusammengefasst:** Für die Eichung der Bots und den Coach die Daten nur im SQL Editor zusammenfassen
    (zum Beispiel Ergebnisse je Bot und Spielstärke), nie einzelne Spieler herausgreifen und nichts exportieren, das ein
    Konto erkennen lässt. Eine Löschfrist für alte Zeilen ist noch nicht eingerichtet (siehe `design/runde4/DATEN.md`).

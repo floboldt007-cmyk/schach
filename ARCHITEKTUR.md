@@ -1849,30 +1849,36 @@ und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (S
 
 Zwischenloesung unter Freunden ohne Wertung (Konzept im Vault: `Schach-App/Arbeitsstand-2026-10-29/Konzept-Anti-Cheat.md`,
 Abschnitte 2, 5.1, 5.9, 9). Sie verhindert keinen Betrug, macht ihn aber sichtbar und nimmt ihm die bequemen Wege.
-Eine Sperre im Browser ist kein Schutz: Was zaehlt, prueft der Server. Fuer Partien gegen Fremde kommt Etappe 1a (Edge
-Function `online-zug`, die jeden Zug nachrechnet).
+Eine Sperre im Browser ist kein Schutz: Was zaehlt, prueft der Server. Das Engine-Schloss ist eine Hilfe fuer Ehrliche:
+Es nimmt die Versuchung weg, haelt aber niemanden mit einem zweiten Geraet oder einer veraenderten App auf. Fuer Partien
+gegen Fremde kommt Etappe 1a (Edge Function `online-zug`, die jeden Zug nachrechnet).
 
 **Server** (`supabase/online-schema.sql`, Test `supabase/online-rls-test.sql` ab Abschnitt 13):
 - **Einladungs-Bremse:** `online_erstelle` sperrt je Konto (`pg_advisory_xact_lock`) und lehnt ab, wenn schon 5 offene
   (noch gueltige) oder 50 neue Einladungen in 24 Stunden da sind (`ONLINE_ZU_VIELE_EINLADUNGEN`; zurueckgezogene zaehlen
   bei den neuen mit).
-- **Aufraeumen** (`online_aufraeumen`, bei jedem `online_erstelle` und `online_meine`, fuer alle, `skip locked`, je Aufruf
-  hoechstens 1000 Zeilen): Einladungen, die nie zu einer Partie wurden (offen oder zurueckgezogen) und aelter als
-  48 Stunden sind, werden geloescht; haengende Partien enden als `'abgebrochen'`.
-- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug.
+- **Aufraeumen** (`online_aufraeumen`, bei jedem `online_erstelle`, `online_meine` und `meine_daten`, fuer alle,
+  `skip locked`, je Aufruf hoechstens 1000 Zeilen): Einladungen, die nie zu einer Partie wurden (offen oder
+  zurueckgezogen) und aelter als 48 Stunden sind, werden geloescht; haengende Partien enden als `'abgebrochen'`;
+  Fehlversuche von vor mehr als 2 Tagen werden geloescht und, wenn `daten-schema.sql` eingespielt ist, Zaehler der
+  Mengenbremse, die aelter als 48 Stunden sind (`daten_zaehler_aufraeumen`, dynamisch aufgerufen). `pg_cron` ist nicht
+  eingerichtet: Ohne jede Aktivitaet auf dem Server raeumt niemand auf.
+- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug
+  (vorlaeufig, Flo entscheidet: `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16).
   Ab dem 2. Halbzug entscheidet bei Partien mit Uhr die Uhr. Geprueft auch in `online_uhr_pruefen` (Zug, Remis,
   Aufgabe, `online_pruefe_zeit`); ein verspaeteter Zug in einer haengenden Partie verfaellt.
 - **Fehlversuche:** Tabelle `online_versuche` (Konto, Tag Europe/Berlin, Anzahl; kein Recht fuer Nutzer, in
   `meine_daten()`, `on delete cascade`). Hoechstens 20 falsche oder abgelaufene Codes je Tag, danach
   `ONLINE_ZU_VIELE_VERSUCHE` (raise, auch fuer einen richtigen Code). Ein Fehlversuch kommt als `{ fehler }` ohne
   raise zurueck, weil ein raise den Zaehler zurueckrollte; `online_tritt_bei` liefert deshalb `jsonb` (vorher
-  `drop function`).
+  `drop function`). Wer schon am Brett sitzt (Partie laeuft oder ist beendet), bekommt seine Zeile unveraendert zurueck,
+  ohne Fehlversuch (verlorene Antwort, Link noch einmal geoeffnet).
 - **Ergebnis-Regeln** in `online_zug`: ein Ergebnis nur mit Grund; `'matt'` nur als Sieg des Ziehenden, `'patt'`,
   `'material'`, `'wiederholung'`, `'50-zuege'` nur als `'1/2-1/2'`; alles andere `ONLINE_ERGEBNIS_FORM`. Ein Grund ohne
   Ergebnis faellt still weg.
 - **Folgestellung grob** (`online_folge_passt`): Das Brett von `fen_danach` muss aus dem gespeicherten Brett plus dem Zug
-  entstehen (Rochade mit Turm, en passant nur gegen einen Bauern, Umwandlung in den angegebenen Stein), sonst
-  `ONLINE_STELLUNG_FALSCH`. Gangart, Schach und freie Wege prueft das nicht.
+  entstehen (Rochade mit Turm und freien Feldern zwischen Koenig und Turm, en passant nur gegen einen Bauern, Umwandlung
+  in den angegebenen Stein), sonst `ONLINE_STELLUNG_FALSCH`. Gangart, Schach und sonst freie Wege prueft das nicht.
 - **strittig** (`online_strittig`): Ein Spieler beendet eine laufende Partie ohne Ergebnis, auch bei laufender oder schon
   abgelaufener eigener Uhr (keine Uhr-Pruefung vorweg). `online_uhr_pruefen` entscheidet bei `grund = 'strittig'` nie auf
   Zeit. Missbrauch durch einen Verlierer ist moeglich und ohne Wertung tragbar.
@@ -1881,8 +1887,12 @@ Function `online-zug`, die jeden Zug nachrechnet).
 
 **Browser** (`js/ui/online.js`): verglichen werden nur Brett und Seite am Zug (`am_zug` und das Feld im FEN-Text), nicht
 Rochaderechte, en-passant-Feld und Zaehler. Passt es nicht oder steht ein illegaler Zug in der Liste, friert nichts ein:
-Meldung `stellungFehler`, keine Zuege und keine Zeit-Reklamation mehr, Knoepfe `[data-online="strittig"]` und
-`[data-online="aufgeben"]` bleiben bedienbar, die Abfrage laeuft weiter (`window.__online.widerspruch()`). Ein gemeldetes
+Meldung `stellungFehler`, keine Zuege und keine Zeit-Reklamation mehr, und die laufende Partie wird **einmal von selbst**
+als strittig gemeldet (`meldeStrittig`, ohne Tippen; danach Meldung `stellungStrittig`), damit der Schummler nicht auf
+die Uhr des Opfers warten kann (Konzept 5.1, L5). Scheitert das am Netz, sagt die Meldung es (`strittigVonHand`), und
+die Knoepfe `[data-online="strittig"]` und `[data-online="aufgeben"]` bleiben bedienbar; die Abfrage laeuft weiter
+(`window.__online.widerspruch()`). Ist die Partie inzwischen schon beendet (der Gegner hat die Zeit zuerst reklamiert,
+`ONLINE_PARTIE_BEENDET`), bleibt nur die Meldung des Servers, die Karte zeigt "nicht nachvollziehbar". Ein gemeldetes
 Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
 ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
 2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
@@ -1931,8 +1941,10 @@ Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` 
 dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
 Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
 insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). Sie zählt seit Anti-Cheat Etappe 0 in
-der Zähltabelle `daten_zaehler` (Konto, Tabelle, Stunde, Anzahl; kein Recht für Nutzer, nach 48 h gelöscht, in
-`meine_daten()` als `mengenzaehler`), mit Sperre je Konto und Tabelle: Löschen (direkt oder per Widerruf) und neu
+der Zähltabelle `daten_zaehler` (Konto, Tabelle, Stunde, Anzahl; kein Recht für Nutzer, in `meine_daten()` als
+`mengenzaehler`). Zähler, die älter als 48 h sind, löscht `daten_zaehler_aufraeumen()` für alle Konten (bei jedem
+Einfügen irgendeines Kontos, bei `freigabe_widerrufen`, vor `meine_daten` und über `online_aufraeumen`), also auch für
+ein Konto, das nach dem Widerruf nichts mehr teilt. Sperre je Konto und Tabelle: Löschen (direkt oder per Widerruf) und neu
 Einfügen setzt sie nicht zurück. Zusätzlich zählen die vorhandenen Zeilen der letzten 24 h (der größere Wert gilt).
 `spielstaende.geraet` hat in `schema.sql` eine Längengrenze von 120 Zeichen (`not valid`: alte, längere Einträge bleiben
 bis zum nächsten Speichern). `konto_loeschen()`, `meine_daten()` und

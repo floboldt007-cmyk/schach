@@ -129,8 +129,13 @@ grant insert on table public.nutzung to authenticated;
 -- nicht zurueck. Das Fenster sind die laufende und die 24 vollen Stunden davor (also 24 bis 25 Stunden). Damit ein
 -- frisch eingespieltes Schema nicht bei 0 anfaengt, zaehlen zusaetzlich die vorhandenen Zeilen der letzten 24
 -- Stunden (der groessere Wert gilt). Gleichzeitige Anfragen eines Kontos zaehlen nacheinander (Sperre je Konto und
--- Tabelle bis zum Ende der Transaktion). Die Zaehler enthalten keine Inhalte und werden nach 48 Stunden geloescht,
--- mit dem Konto sofort (on delete cascade). Sie stehen in der Datenauskunft (meine_daten, mengenzaehler).
+-- Tabelle bis zum Ende der Transaktion). Die Zaehler enthalten keine Inhalte. Aelter als 48 Stunden zaehlen sie nicht
+-- mehr und werden beim naechsten Aufraeumen fuer ALLE Konten geloescht (daten_zaehler_aufraeumen): bei jeder neuen
+-- geteilten Zeile irgendeines Kontos, bei jedem Widerruf, bei jeder Datenauskunft und, wenn online-schema.sql
+-- eingespielt ist, bei jedem online_erstelle und online_meine. So bleiben sie auch fuer ein Konto, das nach einem
+-- Widerruf nichts mehr teilt, nicht stehen. Ohne jede Aktivitaet auf dem Server laeuft kein Aufraeumen; dafuer liesse
+-- sich pg_cron einschalten. Mit dem Konto verschwinden sie sofort (on delete cascade). Sie stehen in der
+-- Datenauskunft (meine_daten, mengenzaehler); die Auskunft raeumt vorher auf, zeigt also keine abgelaufenen.
 -- ---------------------------------------------------------------------------
 create table if not exists public.daten_zaehler (
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -140,9 +145,29 @@ create table if not exists public.daten_zaehler (
   primary key (user_id, tabelle, stunde),
   constraint daten_zaehler_tabelle check (tabelle in ('partien_archiv', 'nutzung'))
 );
+-- fuer das Aufraeumen ueber alle Konten
+create index if not exists daten_zaehler_stunde on public.daten_zaehler (stunde);
 alter table public.daten_zaehler enable row level security;
 -- kein Recht fuer Nutzer (weder lesen noch schreiben); geschrieben wird nur ueber den Trigger unten
 revoke all on table public.daten_zaehler from anon, authenticated, public;
+
+-- Zaehler, die aelter als 48 Stunden sind, fuer alle Konten loeschen (nur intern, kein Recht fuer Nutzer). Zeilen, die
+-- gerade ein anderer Aufruf sperrt, bleiben fuer das naechste Mal (skip locked); hoechstens 1000 je Aufruf.
+create or replace function public.daten_zaehler_aufraeumen()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  delete from public.daten_zaehler t
+  where (t.user_id, t.tabelle, t.stunde) in (
+    select z.user_id, z.tabelle, z.stunde from public.daten_zaehler z
+    where z.stunde < pg_catalog.date_trunc('hour', now()) - interval '48 hours'
+    limit 1000
+    for update skip locked);
+end;
+$$;
+revoke all on function public.daten_zaehler_aufraeumen() from anon, authenticated, public;
 
 create or replace function public.daten_mengenbremse()
 returns trigger
@@ -173,7 +198,8 @@ begin
   insert into public.daten_zaehler as z (user_id, tabelle, stunde, anzahl)
   values (new.user_id, tg_table_name, v_stunde, 1)
   on conflict (user_id, tabelle, stunde) do update set anzahl = z.anzahl + 1;
-  delete from public.daten_zaehler z where z.user_id = new.user_id and z.stunde < v_stunde - interval '48 hours';
+  -- alte Zaehler aller Konten weg, nicht nur die eigenen (sonst blieben sie nach einem Widerruf stehen)
+  perform public.daten_zaehler_aufraeumen();
   return new;
 end;
 $$;
@@ -192,8 +218,8 @@ for each row execute function public.daten_mengenbremse('2000');
 -- ---------------------------------------------------------------------------
 -- Freigabe widerrufen: loescht alles bisher Geteilte des Aufrufers (Archiv und Nutzung) und haelt den Zeitpunkt
 -- fest. Mehrfach aufrufbar. Die App ruft das beim Ausschalten (offline: beim naechsten Start, immer vor neuem Senden).
--- Die Zaehler der Mengenbremse (daten_zaehler, nur Zahlen) bleiben bis zu 48 Stunden stehen, sonst setzte ein
--- Widerruf die Bremse zurueck.
+-- Die laufenden Zaehler der Mengenbremse (daten_zaehler, nur Zahlen) bleiben bis zu 48 Stunden stehen, sonst setzte
+-- ein Widerruf die Bremse zurueck. Aeltere Zaehler (aller Konten) raeumt der Widerruf dabei weg.
 -- ---------------------------------------------------------------------------
 create or replace function public.freigabe_widerrufen()
 returns jsonb
@@ -214,6 +240,7 @@ begin
   get diagnostics n_partien = row_count;
   delete from public.nutzung where user_id = uid;
   get diagnostics n_nutzung = row_count;
+  perform public.daten_zaehler_aufraeumen();
   insert into public.freigabe_widerrufe (user_id, widerrufen_am, geloescht_partien, geloescht_nutzung)
   values (uid, am, n_partien, n_nutzung)
   on conflict (user_id) do update
@@ -269,7 +296,9 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- (den Stand selbst hat der Spieler schon lokal und ueber die Sicherung).
 -- ---------------------------------------------------------------------------
 -- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql) und das Anmeldeprotokoll kommen nur dazu, wenn
--- es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne das Online-Schema.
+-- es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne das Online-Schema. Vorher wird aufgeraeumt
+-- (alte Zaehler, und mit dem Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte
+-- Fehlversuche), damit die Auskunft nichts zeigt, was laut Doku schon geloescht sein muesste.
 create or replace function public.meine_daten()
 returns jsonb
 language plpgsql
@@ -284,6 +313,16 @@ declare
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
+  end if;
+  -- die eigenen abgelaufenen Eintraege immer (ohne Obergrenze), danach das allgemeine Aufraeumen fuer alle
+  delete from public.daten_zaehler z where z.user_id = uid and z.stunde < date_trunc('hour', now()) - interval '48 hours';
+  if to_regclass('public.online_versuche') is not null then
+    execute 'delete from public.online_versuche v where v.user_id = $1
+             and v.tag < (now() at time zone ''Europe/Berlin'')::date - 2' using uid;
+  end if;
+  perform public.daten_zaehler_aufraeumen();
+  if to_regprocedure('public.online_aufraeumen()') is not null then
+    execute 'select public.online_aufraeumen()';
   end if;
   if to_regclass('public.partien_online') is not null then
     execute 'select coalesce(jsonb_agg(to_jsonb(o) order by o.erstellt_am), ''[]''::jsonb)
@@ -328,7 +367,8 @@ begin
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,
-    -- Zaehler der Mengenbremse (Zahl der geteilten Zeilen je Tabelle und Stunde, ohne Inhalte, hoechstens 48 Stunden)
+    -- Zaehler der Mengenbremse (Zahl der geteilten Zeilen je Tabelle und Stunde, ohne Inhalte; aeltere als 48 Stunden
+    -- hat das Aufraeumen oben schon entfernt)
     'mengenzaehler', coalesce(
       (select jsonb_agg(jsonb_build_object('tabelle', z.tabelle, 'stunde', z.stunde, 'anzahl', z.anzahl)
                         order by z.stunde, z.tabelle)

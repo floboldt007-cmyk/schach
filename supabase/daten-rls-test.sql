@@ -181,6 +181,51 @@ begin
 end
 $$;
 
+-- Die Auskunft raeumt vorher auf: Ein 49 Stunden alter Zaehler von A und (mit online-schema.sql) ein Fehlversuch von
+-- vor 3 Tagen erscheinen nicht mehr und sind danach geloescht. Ein 47 Stunden alter Zaehler bleibt und steht darin.
+reset role;
+insert into public.daten_zaehler (user_id, tabelle, stunde, anzahl)
+values ('11111111-1111-4111-8111-111111111111', 'nutzung', date_trunc('hour', now()) - interval '49 hours', 7),
+       ('11111111-1111-4111-8111-111111111111', 'nutzung', date_trunc('hour', now()) - interval '47 hours', 3);
+do $$
+begin
+  if to_regclass('public.online_versuche') is not null then
+    execute $q$insert into public.online_versuche (user_id, tag, anzahl)
+               values ('11111111-1111-4111-8111-111111111111', (now() at time zone 'Europe/Berlin')::date - 3, 2)$q$;
+  end if;
+end
+$$;
+set local role authenticated;
+do $$
+declare
+  d jsonb;
+begin
+  d := public.meine_daten();
+  if (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z
+      where z ->> 'tabelle' = 'nutzung') <> 4 then
+    raise exception 'FEHLER: Auskunft zeigt abgelaufene Zaehler oder verliert laufende: %', d -> 'mengenzaehler';
+  end if;
+  if exists (select 1 from jsonb_array_elements(d -> 'mengenzaehler') z
+             where (z ->> 'stunde')::timestamptz < date_trunc('hour', now()) - interval '48 hours') then
+    raise exception 'FEHLER: Auskunft zeigt einen Zaehler, der aelter als 48 Stunden ist: %', d -> 'mengenzaehler';
+  end if;
+  if exists (select 1 from jsonb_array_elements(d -> 'online_versuche') v
+             where (v ->> 'tag')::date < (now() at time zone 'Europe/Berlin')::date - 2) then
+    raise exception 'FEHLER: Auskunft zeigt einen Fehlversuch von vor mehr als 2 Tagen: %', d -> 'online_versuche';
+  end if;
+end
+$$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.daten_zaehler z
+             where z.user_id = '11111111-1111-4111-8111-111111111111' and z.stunde < date_trunc('hour', now()) - interval '48 hours') then
+    raise exception 'FEHLER: der 49 Stunden alte Zaehler steht nach der Auskunft noch in der Tabelle';
+  end if;
+end
+$$;
+set local role authenticated;
+
 -- Nutzer B sieht nichts von A, auch nicht ueber die Auskunft, und darf fuer sich archivieren.
 select set_config(
   'request.jwt.claims',
@@ -326,6 +371,28 @@ begin
 end
 $$;
 
+-- Der Widerruf raeumt dabei alte Zaehler ALLER Konten weg (hier ein 50 Stunden alter von A), nicht die laufenden:
+-- B widerruft noch einmal (harmlos, nichts mehr zu loeschen), ohne dazwischen etwas anderes aufzurufen.
+reset role;
+insert into public.daten_zaehler (user_id, tabelle, stunde, anzahl)
+values ('11111111-1111-4111-8111-111111111111', 'partien_archiv', date_trunc('hour', now()) - interval '50 hours', 9);
+set local role authenticated;
+do $$ begin perform public.freigabe_widerrufen(); end $$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.daten_zaehler z
+             where z.user_id = '11111111-1111-4111-8111-111111111111' and z.stunde < date_trunc('hour', now()) - interval '48 hours') then
+    raise exception 'FEHLER: der Widerruf von B hat den 50 Stunden alten Zaehler von A nicht weggeraeumt';
+  end if;
+  if (select coalesce(sum(z.anzahl), 0) from public.daten_zaehler z
+      where z.user_id = '22222222-2222-4222-8222-222222222222' and z.tabelle = 'partien_archiv') <> 300 then
+    raise exception 'FEHLER: der Widerruf hat laufende Zaehler von B angefasst';
+  end if;
+end
+$$;
+set local role authenticated;
+
 -- Loeschen setzt die Bremse nicht zurueck (Anti-Cheat Etappe 0): Nach dem Widerruf ist B noch am Limit, obwohl
 -- keine Zeile mehr da ist. Die Bremse zaehlt in daten_zaehler, nicht die vorhandenen Zeilen.
 do $$
@@ -389,6 +456,39 @@ begin
   raise exception 'FEHLER: anon darf freigabe_widerrufen() aufrufen';
 exception
   when insufficient_privilege then null;
+end
+$$;
+
+-- Alte Zaehler verschwinden fuer ALLE Konten, nicht nur fuer das, das gerade teilt: A teilt nichts mehr (wie nach
+-- einem Widerruf), trotzdem ist sein 49 Stunden alter Zaehler nach dem naechsten Einfuegen von B weg. Ein 46 Stunden
+-- alter bleibt. Die Aufraeum-Funktion selbst ist intern (kein Recht fuer Nutzer) und hat einen leeren search_path.
+reset role;
+insert into public.daten_zaehler (user_id, tabelle, stunde, anzahl)
+values ('11111111-1111-4111-8111-111111111111', 'partien_archiv', date_trunc('hour', now()) - interval '49 hours', 5),
+       ('11111111-1111-4111-8111-111111111111', 'partien_archiv', date_trunc('hour', now()) - interval '46 hours', 2);
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+insert into public.nutzung (user_id, ereignis) values ('22222222-2222-4222-8222-222222222222', 'screen');
+reset role;
+do $$
+begin
+  if exists (select 1 from public.daten_zaehler z
+             where z.user_id = '11111111-1111-4111-8111-111111111111' and z.stunde < date_trunc('hour', now()) - interval '48 hours') then
+    raise exception 'FEHLER: ein 49 Stunden alter Zaehler von A steht nach einem Einfuegen von B noch da';
+  end if;
+  if not exists (select 1 from public.daten_zaehler z
+                 where z.user_id = '11111111-1111-4111-8111-111111111111' and z.stunde = date_trunc('hour', now()) - interval '46 hours') then
+    raise exception 'FEHLER: ein 46 Stunden alter Zaehler von A wurde zu frueh geloescht';
+  end if;
+  if has_function_privilege('authenticated', 'public.daten_zaehler_aufraeumen()', 'execute')
+     or has_function_privilege('anon', 'public.daten_zaehler_aufraeumen()', 'execute') then
+    raise exception 'FEHLER: daten_zaehler_aufraeumen ist fuer Nutzer aufrufbar';
+  end if;
+  if not exists (select 1 from pg_catalog.pg_proc f
+                 where f.oid = 'public.daten_zaehler_aufraeumen()'::regprocedure
+                   and f.proconfig @> array['search_path=""']) then
+    raise exception 'FEHLER: daten_zaehler_aufraeumen ohne leeren search_path';
+  end if;
 end
 $$;
 

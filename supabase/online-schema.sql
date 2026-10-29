@@ -13,13 +13,15 @@
 --     48 Stunden sind, werden geloescht; haengende Partien enden als 'abgebrochen' (siehe online_haengt).
 --   * Fehlversuche beim Beitreten: hoechstens 20 falsche Codes je Konto und Tag (Tabelle online_versuche,
 --     ONLINE_ZU_VIELE_VERSUCHE). Ein falscher Code kommt deshalb als jsonb { fehler } zurueck und nicht als
---     raise: Ein raise rollte den Zaehler mit zurueck.
+--     raise: Ein raise rollte den Zaehler mit zurueck. Wer schon am Brett sitzt, bekommt seine Partie zurueck (kein
+--     Fehlversuch). Alte Tage (mehr als 2 Tage) raeumt online_aufraeumen fuer alle weg.
 --   * Ergebnis-Regeln: ein Ergebnis nur mit passendem Grund. 'matt' nur als Sieg des Ziehenden, 'patt',
 --     'material', 'wiederholung' und '50-zuege' nur als Remis. 'zeit', 'zeit-material', 'aufgabe', 'remis',
 --     'abgebrochen' und 'strittig' setzt nur der Server selbst.
 --   * Grobe Pruefung der Folgestellung: Die neue Stellung muss aus der alten plus dem Zug (von, nach, mit Rochade,
---     en passant und Umwandlung) entstehen (ONLINE_STELLUNG_FALSCH). Ob der Zug nach den Regeln erlaubt ist, prueft
---     das nicht. Es faengt aber "die gegnerische Dame ist einfach weg".
+--     en passant und Umwandlung) entstehen (ONLINE_STELLUNG_FALSCH). Eine Rochade braucht freie Felder zwischen
+--     Koenig und Turm. Ob der Zug sonst nach den Regeln erlaubt ist, prueft das nicht. Es faengt aber "die
+--     gegnerische Dame ist einfach weg".
 --   * Ausgang 'strittig' (online_strittig): Ein Spieler beendet eine Partie, deren Stellung nicht zu den Zuegen
 --     passt, ohne Ergebnis. Das geht auch, wenn seine eigene Uhr laeuft. Danach entscheidet die Uhr nicht mehr.
 --     Ehrlich: Auch ein Verlierer kann so einer Niederlage entgehen. Ohne Wertung ist das tragbar.
@@ -108,8 +110,9 @@ create index if not exists partien_online_status_letzter_zug on public.partien_o
 create index if not exists partien_online_ersteller_erstellt on public.partien_online (erstellt_von, erstellt_am);
 
 -- Fehlversuche beim Beitreten je Konto und Tag (Europe/Berlin), gegen das Durchprobieren von Codes. Nur intern:
--- kein Recht fuer angemeldete Nutzer (geschrieben wird nur in online_tritt_bei). Tage aelter als 2 Tage raeumt
--- online_tritt_bei selbst weg. Mit dem Konto verschwinden die Zeilen (on delete cascade).
+-- kein Recht fuer angemeldete Nutzer (geschrieben wird nur in online_tritt_bei). Tage aelter als 2 Tage raeumen
+-- online_tritt_bei (bei jedem Fehlversuch) und online_aufraeumen (bei jedem online_erstelle, online_meine und
+-- meine_daten irgendeines Kontos) fuer alle weg. Mit dem Konto verschwinden die Zeilen (on delete cascade).
 create table if not exists public.online_versuche (
   user_id uuid not null references auth.users (id) on delete cascade,
   tag date not null,
@@ -217,7 +220,8 @@ $$;
 -- Grobe Pruefung der Folgestellung: Entsteht das Brett von fen_danach aus dem Brett von fen_vorher, wenn man den
 -- Zug (UCI) ausfuehrt? Beachtet Rochade (der Turm springt mit), en passant (der geschlagene Bauer verschwindet) und
 -- Umwandlung. Der Stein auf dem Startfeld muss der Seite am Zug gehoeren, geschlagen wird nie ein eigener Stein und
--- nie ein Koenig. Ob der Zug nach den Schachregeln erlaubt ist (Gangart, Schach, Wege frei), prueft das NICHT.
+-- nie ein Koenig. Eine Rochade schlaegt nie: Alle Felder zwischen Koenig und Turm muessen leer sein. Ob der Zug sonst
+-- nach den Schachregeln erlaubt ist (Gangart, Schach, Wege frei), prueft das NICHT.
 create or replace function public.online_folge_passt(fen_vorher text, zug text, fen_danach text)
 returns boolean
 language plpgsql
@@ -240,6 +244,7 @@ declare
   weiss_zieht boolean;
   feld integer;
   turm text;
+  i integer;
 begin
   if char_length(brett) <> 64 or char_length(ziel) <> 64 or seite not in ('w', 'b')
      or zug is null or zug !~ '^[a-h][1-8][a-h][1-8][qrbn]?$' then
@@ -285,12 +290,18 @@ begin
     return false;
   elsif lower(stein) = 'k' and von_linie = 5 and von_reihe = nach_reihe
         and von_reihe = (case when weiss_zieht then 1 else 8 end) and nach_linie in (3, 7) then
-    -- Rochade: Koenig zwei Felder, der Turm aus der Ecke springt neben ihn
+    -- Rochade: Koenig zwei Felder, der Turm aus der Ecke springt neben ihn. Sie schlaegt nie: Die Felder zwischen
+    -- Koenig und Turm (kurz f und g, lang b, c und d) muessen leer sein, sonst verschwaende dort ein Stein.
     turm := case when weiss_zieht then 'R' else 'r' end;
     feld := (8 - von_reihe) * 8 + (case when nach_linie = 7 then 8 else 1 end);
     if substr(brett, feld, 1) <> turm then
       return false;
     end if;
+    for i in (case when nach_linie = 7 then 6 else 2 end)..(case when nach_linie = 7 then 7 else 4 end) loop
+      if substr(brett, (8 - von_reihe) * 8 + i, 1) <> '.' then
+        return false;
+      end if;
+    end loop;
     brett := overlay(brett placing '.' from feld for 1);
     brett := overlay(brett placing turm from (8 - von_reihe) * 8 + (case when nach_linie = 7 then 6 else 4 end) for 1);
   end if;
@@ -357,9 +368,12 @@ as $$
 $$;
 
 -- Aufraeumen fuer alle (nur intern): Einladungen, die nie zu einer Partie wurden (offen oder zurueckgezogen) und
--- aelter als 48 Stunden sind, werden geloescht; haengende Partien enden als 'abgebrochen' ohne Ergebnis. Zeilen, die
--- gerade ein anderer Aufruf sperrt, bleiben fuer das naechste Mal (skip locked). Hoechstens 1000 Zeilen je Art und
--- Aufruf, damit kein einzelner Aufruf lange dauert.
+-- aelter als 48 Stunden sind, werden geloescht; haengende Partien enden als 'abgebrochen' ohne Ergebnis. Fehlversuche
+-- (online_versuche) von vor mehr als 2 Tagen werden geloescht, und ist daten-schema.sql eingespielt, auch die Zaehler
+-- der Mengenbremse, die aelter als 48 Stunden sind (daten_zaehler_aufraeumen). So verschwinden sie auch fuer Konten, die
+-- selbst nichts mehr tun. Zeilen, die gerade ein anderer Aufruf sperrt, bleiben fuer das naechste Mal (skip locked).
+-- Hoechstens 1000 Zeilen je Art und Aufruf, damit kein einzelner Aufruf lange dauert. Aufgerufen von online_erstelle,
+-- online_meine und meine_daten (daten-schema.sql); mit pg_cron liesse es sich zusaetzlich regelmaessig aufrufen.
 create or replace function public.online_aufraeumen()
 returns void
 language plpgsql
@@ -380,6 +394,16 @@ begin
     where h.status = 'laeuft' and public.online_haengt(h)
     limit 1000
     for update skip locked);
+  delete from public.online_versuche t
+  where (t.user_id, t.tag) in (
+    select v.user_id, v.tag from public.online_versuche v
+    where v.tag < (now() at time zone 'Europe/Berlin')::date - 2
+    limit 1000
+    for update skip locked);
+  -- daten-schema.sql kann fehlen oder spaeter kommen: nur aufrufen, wenn es die Funktion gibt
+  if pg_catalog.to_regprocedure('public.daten_zaehler_aufraeumen()') is not null then
+    execute 'select public.daten_zaehler_aufraeumen()';
+  end if;
 end;
 $$;
 
@@ -456,7 +480,9 @@ $$;
 -- Antwort (jsonb): bei Erfolg die Zeile aus partien_online (gleiche Felder wie bisher), bei einem falschen oder
 -- abgelaufenen Code { "fehler": "ONLINE_CODE_UNGUELTIG" | "ONLINE_CODE_ABGELAUFEN" }. Dieser Fehlversuch wird
 -- gezaehlt; deshalb kein raise (das rollte den Zaehler zurueck). Nach 20 Fehlversuchen am Tag kommt
--- ONLINE_ZU_VIELE_VERSUCHE (raise), auch fuer einen richtigen Code.
+-- ONLINE_ZU_VIELE_VERSUCHE (raise), auch fuer einen richtigen Code. Wer schon am Brett sitzt (Partie laeuft oder ist
+-- beendet), bekommt seine Partie unveraendert zurueck, ohne Fehlversuch: etwa nach einer verlorenen Antwort oder
+-- wenn er den Einladungslink noch einmal oeffnet.
 -- Bis Etappe 0 lieferte die Funktion die Zeile als partien_online: anderer Rueckgabetyp, also drop function vorweg.
 drop function if exists public.online_tritt_bei(text);
 create or replace function public.online_tritt_bei(code text)
@@ -485,6 +511,9 @@ begin
   end if;
   if v_code ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$' then
     select * into p from public.partien_online t where t.code = v_code for update;
+  end if;
+  if p.id is not null and p.status <> 'offen' and uid in (p.weiss, p.schwarz) then
+    return pg_catalog.to_jsonb(p); -- schon am Brett: gleichwertig zum Beitritt, kein Fehlversuch
   end if;
   if p.id is null or p.status <> 'offen' then
     v_fehler := 'ONLINE_CODE_UNGUELTIG';

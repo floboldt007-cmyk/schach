@@ -1,8 +1,11 @@
 // Die Datenbank fuehrt Reihenfolge und Uhr; jede Stellung wird hier aus legalen Zuegen rekonstruiert.
 // Anti-Cheat Etappe 0: Passt die Stellung des Servers nicht zu den Zuegen (verglichen werden nur Brett und Seite am
-// Zug, nicht der ganze FEN-Text), friert die Partie nicht mehr ein: Es erscheint eine Meldung und der Knopf
-// "Strittig melden" (online_strittig, Ende ohne Ergebnis). Ein gemeldetes Ende (Matt, Patt, Remis-Regeln) wird mit
-// chess.js nachgeprueft; stimmt es nicht, steht dort "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage.
+// Zug, nicht der ganze FEN-Text), friert die Partie nicht mehr ein: Es erscheint eine Meldung, und der Browser meldet
+// die laufende Partie einmal von selbst als strittig (online_strittig, Ende ohne Ergebnis), ohne dass jemand tippen
+// muss. Sonst koennte der Schummler einfach warten, bis die Uhr des Opfers ablaeuft (Konzept Anti-Cheat 5.1, L5).
+// Scheitert die Meldung (Netz), bleibt der Knopf "Strittig melden" als Rueckfall. Ein gemeldetes Ende (Matt, Patt,
+// Remis-Regeln) wird mit chess.js nachgeprueft; stimmt es nicht, steht dort "Ergebnis nicht nachvollziehbar" statt
+// Sieg oder Niederlage.
 import { Chess } from '../../vendor/chess/chess.js';
 import { t } from '../sprache.js';
 import '../sprachen/online.js';
@@ -52,7 +55,9 @@ export function zeige(root, params, app) {
   const inhalt = s.querySelector('.on-inhalt'), status = s.querySelector('.on-meldung');
   // blockiert: abgemeldet oder fremde Partie (nichts mehr senden). widerspruch: die Serverstellung passt nicht zu den
   // Zuegen; keine Zuege und keine Zeit-Reklamation mehr, aber "Strittig melden" und "Aufgeben" bleiben bedienbar.
+  // strittigFaellig: der Widerspruch ist neu, die Partie wird gleich einmal von selbst als strittig gemeldet.
   let weg = false, busy = false, blockiert = false, widerspruch = false, beobachter = null, brett = null, p = null, chess = null, wartend = null;
+  let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
   const fehler = e => { melde(e?.message || O('fehler')); };
@@ -64,13 +69,13 @@ export function zeige(root, params, app) {
     if (angebot && p?.remis_angebot === online.meineFarbe(p)) angebot.disabled = true;
     brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true }) : null);
   }
-  async function aktion(fn, danach = uebernehme) {
+  async function aktion(fn, danach = uebernehme, beiFehler = fehler) {
     if (busy || weg || blockiert) return;
     busy = true; melde(''); sperre();
     try { const ergebnis = await fn(); if (!weg) danach(ergebnis); }
     catch (e) {
       if (weg) return;
-      fehler(e);
+      beiFehler(e);
       // Eine verlorene Antwort kann trotzdem einen verbuchten Zug bedeuten. Serverstand nachladen.
       if (p) try { const neu = await online.ladePartie(p.id); if (!weg) uebernehme(neu); } catch (x) { /* Abfrage versucht es weiter */ }
     } finally {
@@ -79,8 +84,21 @@ export function zeige(root, params, app) {
         if (wartend) { const neu = wartend; wartend = null; uebernehme(neu); }
         if (p && !blockiert) { try { const r = nachspielen(p); chess = r.chess; widerspruch = !r.passt; } catch (e) { /* bleibt beim letzten Stand */ } zeichne(); }
         sperre();
+        meldeStrittigVonSelbst();
       }
     }
+  }
+  // Ein neuer Widerspruch in einer laufenden Partie wird genau einmal von selbst als strittig gemeldet (laeuft gerade
+  // eine andere Aktion, danach). Scheitert das, bleibt der Knopf "Strittig melden" stehen, und die Meldung sagt es.
+  function meldeStrittigVonSelbst() {
+    if (!strittigFaellig || busy || weg || blockiert) return;
+    strittigFaellig = false;
+    if (!widerspruch || p?.status !== 'laeuft') return;
+    // Ist die Partie inzwischen schon beendet (etwa weil der Gegner gerade die Zeit reklamiert hat), gibt es keinen
+    // Knopf mehr: dann nur die Meldung des Servers, die Ergebniskarte zeigt das Ende ("nicht nachvollziehbar").
+    aktion(() => online.meldeStrittig(p.id), neu => { uebernehme(neu); melde(O('stellungStrittig')); },
+      e => melde(e?.kennung === 'ONLINE_PARTIE_BEENDET' ? e.message : `${e?.message || O('fehler')} ${O('strittigVonHand')}`));
+    melde(O('stellungFehler')); // aktion leert die Zeile beim Start; waehrend der Meldung bleibt der Grund sichtbar
   }
   function start() {
     if (!sitzung()?.access_token) {
@@ -145,7 +163,7 @@ export function zeige(root, params, app) {
     }
     const neuerWiderspruch = !r.passt && !widerspruch;
     p = neu; chess = r.chess; widerspruch = !r.passt;
-    if (neuerWiderspruch && p.status === 'laeuft') melde(O('stellungFehler'));
+    if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
     if (p.status === 'offen') {
       inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
         <label>${esc(O('link'))}<input class="on-link" readonly value="${esc(online.einladungsLink(p.code))}"></label>
@@ -166,6 +184,7 @@ export function zeige(root, params, app) {
       if (p.status === 'beendet') { beobachter?.stop(); clearInterval(uhrTimer); }
     }
     sperre();
+    meldeStrittigVonSelbst();
   }
   function karten() {
     if (!brett) return;

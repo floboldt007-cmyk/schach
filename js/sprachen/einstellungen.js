@@ -284,6 +284,8 @@ registriereTexte('einstellungen', {
     'daten.fehler.sonst': 'Das hat auf dem Server nicht geklappt ({status}). Bitte später noch einmal versuchen.',
     'daten.auskunftHinweis': 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat (mit Online-Partien, Widerruf und '
       + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
+      + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
+      + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
       + 'geraet: der Spielstand in diesem Browser. noch_nicht_gesendet: geteilte Daten, die noch auf diesem Gerät warten. '
       + 'zustimmung: wann du das Teilen eingeschaltet hast. widerruf_offen: ein Widerruf, der den Server noch nicht erreicht hat.',
     'daten.teilenTitel': 'Crownmate: meine Daten',
@@ -635,6 +637,8 @@ registriereTexte('einstellungen', {
     'daten.fehler.sonst': 'That did not work on the server ({status}). Please try again later.',
     'daten.auskunftHinweis': 'server: everything the Crownmate server has stored about your account (including online games, withdrawal of consent and '
       + 'sign-in log; anmeldeprotokoll null means: not readable for this report, available from the operator on request). '
+      + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
+      + '(numbers only, for the rate limit, deleted after 48 hours). '
       + 'geraet: the progress in this browser. noch_nicht_gesendet: shared data that is still waiting on this device. '
       + 'zustimmung: when you turned on sharing. widerruf_offen: a withdrawal of consent that has not reached the server yet.',
     'daten.teilenTitel': 'Crownmate: my data',

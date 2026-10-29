@@ -26,6 +26,9 @@ const PORT = Number(process.env.PORT || 8887);
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false;
+// Antwort auf die naechste Strittig-Meldung: null wie der Server, 'netz' ohne Verbindung, 'beendet' wenn der Gegner
+// gerade vorher die Zeit reklamiert hat (Wettlauf, siehe Konzept Anti-Cheat L5)
+let strittigAntwort = null;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
@@ -80,6 +83,11 @@ try {
     }
     if (rpc === 'online_biete_remis') { p.remis_angebot = p.weiss === 'u1' ? 'w' : 'b'; return antwort(aktualisieren(p)); }
     if (rpc === 'online_nimm_remis_an') { p.status = 'beendet'; p.ergebnis = '1/2-1/2'; p.grund = 'remis'; p.remis_angebot = null; return antwort(aktualisieren(p)); }
+    if (rpc === 'online_strittig' && strittigAntwort === 'netz') { strittigAntwort = null; return route.abort('failed'); }
+    if (rpc === 'online_strittig' && strittigAntwort === 'beendet') {
+      strittigAntwort = null; Object.assign(p, { status: 'beendet', grund: 'zeit', ergebnis: p.weiss === 'u1' ? '0-1' : '1-0' }); aktualisieren(p);
+      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'ONLINE_PARTIE_BEENDET' }) });
+    }
     if (rpc === 'online_strittig') { p.status = 'beendet'; p.grund = 'strittig'; p.ergebnis = null; p.remis_angebot = null; return antwort(aktualisieren(p)); }
     // wie der Server: mit Uhr vor dem 2. Halbzug beendet die Zeit-Reklamation eine haengende Partie ohne Ergebnis
     if (rpc === 'online_pruefe_zeit' && p.zuege.split(' ').filter(Boolean).length < 2) { p.status = 'beendet'; p.grund = 'abgebrochen'; p.ergebnis = null; return antwort(aktualisieren(p)); }
@@ -165,25 +173,51 @@ try {
   pruefe('Gegnerzeit auf null: Server entscheidet das Ergebnis', calls.some(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === mitUhr.id)
     && (await seite.locator('.on-ergebnis').innerText()).includes('Sieg') && mitUhr.grund === 'zeit');
   await seite.evaluate(() => { window.__versatz = 0; });
-  // Anti-Cheat Etappe 0: eine kaputte Serverstellung friert die Partie nicht mehr ein. Es gibt eine Meldung, keine
-  // Zuege mehr, aber "Strittig melden" und "Aufgeben" bleiben bedienbar, und die Abfrage laeuft weiter.
+  // Anti-Cheat Etappe 0: eine kaputte Serverstellung friert die Partie nicht mehr ein. Der Browser meldet die Partie
+  // einmal von selbst als strittig, ohne dass jemand tippt: Sonst wartete der Schummler, bis die Uhr des Opfers ablaeuft.
   const defekt = partie(); await oeffne(defekt);
+  const vorDefekt = calls.length;
   defekt.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(defekt);
-  await seite.getByText(/Die empfangene Stellung passt nicht/).waitFor();
-  await knopf('strittig').waitFor();
-  pruefe('Unpassende Serverstellung: Meldung und "Strittig melden" statt Einfrieren', await seite.evaluate(() => window.__online.widerspruch()
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  const strittigRufe = calls.slice(vorDefekt).filter(c => c.pfad.endsWith('online_strittig'));
+  pruefe('Unpassende Serverstellung: ohne Tippen von selbst als strittig gemeldet, Meldung, Karte "Strittig" ohne Sieg oder Niederlage',
+    strittigRufe.length === 1 && strittigRufe[0].body.partie === defekt.id && defekt.grund === 'strittig' && defekt.ergebnis === null
+    && (await seite.locator('.on-ergebnis h3').innerText()) === 'Strittig'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('ohne Ergebnis') && await knopf('strittig').count() === 0
+    && (await seite.locator('.on-meldung').innerText()).includes('als strittig beendet')
+    && await seite.evaluate(() => window.__online.widerspruch() && !window.__online.blockiert()), strittigRufe);
+  // Rueckfall: Erreicht die Meldung den Server nicht, friert trotzdem nichts ein. Es gibt eine Meldung, keine Zuege mehr,
+  // aber "Strittig melden" und "Aufgeben" bleiben bedienbar, und die Abfrage laeuft weiter.
+  const rueckfall = partie(); await oeffne(rueckfall);
+  strittigAntwort = 'netz';
+  rueckfall.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(rueckfall);
+  await seite.getByText(/selbst als strittig/).waitFor();
+  await knopf('strittig').waitFor(); await bereit();
+  pruefe('Meldung scheitert am Netz: Hinweis, "Strittig melden" und "Aufgeben" bleiben bedienbar statt Einfrieren', await seite.evaluate(() => window.__online.widerspruch()
     && !window.__online.blockiert() && window.__online.chess().turn() === 'w' && window.__online.brett()._karte === null)
     && await knopf('strittig').isEnabled() && await knopf('aufgeben').isEnabled() && await knopf('remis').count() === 0
     && (await seite.locator('.on-zug').innerText()) === 'Stellung stimmt nicht'
-    && (await seite.locator('.on-meldung').innerText()).includes('als strittig melden'));
+    && (await seite.locator('.on-meldung').innerText()).includes('Keine Verbindung')
+    && calls.filter(c => c.pfad.endsWith('online_strittig') && c.body.partie === rueckfall.id).length === 1 && rueckfall.status === 'laeuft');
   await knopf('strittig').click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
-  pruefe('Strittig melden: Server beendet ohne Ergebnis, Karte "Strittig" ohne Sieg oder Niederlage', calls.some(c => c.pfad.endsWith('online_strittig') && c.body.partie === defekt.id)
-    && defekt.grund === 'strittig' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Strittig'
+  pruefe('Strittig melden von Hand: Server beendet ohne Ergebnis, Karte "Strittig" ohne Sieg oder Niederlage', calls.filter(c => c.pfad.endsWith('online_strittig') && c.body.partie === rueckfall.id).length === 2
+    && rueckfall.grund === 'strittig' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Strittig'
     && (await seite.locator('.on-ergebnis').innerText()).includes('ohne Ergebnis') && await knopf('strittig').count() === 0);
-  const ungueltig = partie(); await oeffne(ungueltig); ungueltig.zuege = 'e2e5'; aktualisieren(ungueltig);
-  await seite.getByText(/Die empfangene Stellung passt nicht/).waitFor();
-  await knopf('strittig').waitFor();
+  // Wettlauf: Der Gegner reklamiert die Zeit, kurz bevor die Meldung ankommt. Dann gibt es keinen Knopf mehr und keine
+  // Aufforderung dazu; das Ende auf der kaputten Stellung zaehlt nicht als Niederlage.
+  const wettlauf = partie(); await oeffne(wettlauf);
+  strittigAntwort = 'beendet';
+  wettlauf.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(wettlauf);
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await bereit();
+  pruefe('Wettlauf: Zeit zuerst reklamiert, Meldung des Servers ohne Knopf-Hinweis, "Ergebnis nicht nachvollziehbar"', wettlauf.grund === 'zeit'
+    && (await seite.locator('.on-ergebnis h3').innerText()) === 'Ergebnis nicht nachvollziehbar' && await knopf('strittig').count() === 0
+    && (await seite.locator('.on-meldung').innerText()) === 'Diese Partie ist schon beendet.');
+  const ungueltig = partie(); await oeffne(ungueltig);
+  strittigAntwort = 'netz';
+  ungueltig.zuege = 'e2e5'; aktualisieren(ungueltig);
+  await seite.getByText(/selbst als strittig/).waitFor();
+  await knopf('strittig').waitFor(); await bereit();
   const vorTipp = calls.length;
   await tippe('e2e4'); await seite.waitForTimeout(300);
   pruefe('Illegaler Serverzug: letzter stimmiger Stand, keine Zuege, Knoepfe bedienbar', await seite.evaluate(() => window.__online.widerspruch()
