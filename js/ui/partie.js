@@ -129,7 +129,7 @@ import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
-  ladePartien, GENAUIGKEIT_STERN, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
+  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle, waehle, angeboten } from '../orte.js';
@@ -1984,7 +1984,13 @@ export function zeige(root, params, app) {
             <span class="denkt grau"><i></i><i></i><i></i></span><div class="erg-balken"><i></i></div></div>`;
         const mitte = o.querySelector('.erg-mitte');
         const staerke = p.spielstaerke ? ` · ${t('partie.erg.spielteWie', { elo: p.spielstaerke })}` : '';
-        const genauHtml = (gross) => `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
+        // Wie in der Analyse: kurze Partien ohne Sieg liefern keine verlaessliche Bewertung.
+        // Nur die Anzeige aendert sich; kurze Siege behalten den Wert fuer Stern 2.
+        const zuKurz = eigeneZuege(p) < BESTWERT_MIN_ZUEGE && p.ergebnis !== 'sieg';
+        const genauHtml = (gross) => {
+          if (zuKurz) return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b>${esc(t('partie.erg.zuKurz'))}</b><span>${esc(t('partie.erg.hinweis'))}</span></div>`;
+          return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
+        };
         if (ergebnis === 'sieg' && wertet) {
           if (nachtrag && mitte.querySelector('.erg-sterne')) {
             // nur Stern 2 und die Genauigkeit erneuern (die anderen Sterne nicht neu animieren)
