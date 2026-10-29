@@ -1892,6 +1892,11 @@ liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn d
 (`css/tokens.css`, `css/themes/modern.css`, hell und dunkel wie die App), im Offline-Cache. Beide sind Entwürfe mit
 Platzhaltern in eckigen Klammern.
 
+`datenschutz-en.html` und `impressum-en.html` sind gleich aufgebaute englische Uebersetzungen mit unverbindlichem
+Uebersetzungshinweis und Link zur massgeblichen deutschen Fassung; beide Sprachen behalten alle Platzhalter und
+verlinken aufeinander. Info und Daten waehlen die Adresse beim Zeichnen mit `sprache()`, auch die englischen Seiten
+liegen im Offline-Cache. `tests/daten.test.mjs` prueft Abschnitte, Platzhalter, Sprachlinks und beide App-Orte.
+
 **Tests:** `node tests/daten.test.mjs` (Node: falsches `fetch` und der echte Ereignis-Bus; Browser: die echte App mit
 abgefangenen Supabase-Anfragen, Google-Weiterleitung und -Rückkehr, Schalter, Versand beim Verlassen, Download, Löschen
 in zwei Stufen, beide Rechtstexte), `node tests/konto.test.mjs` (Google-Adresse und Rückkehr), `tests/storage.test.mjs`

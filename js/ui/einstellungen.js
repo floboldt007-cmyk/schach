@@ -12,7 +12,7 @@
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
-import { SPRACHWAHL, t } from '../sprache.js';
+import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
@@ -174,7 +174,7 @@ export function zeige(root, params = {}, app) {
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
-          <p class="es-recht"><a href="${esc(pfad('datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad('impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
+          <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <ul class="es-lizenzen">
             <li><b>Stockfish 19</b><span>${E('info.stockfish', { link: '<a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a>' })}</span></li>
             <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span></li>

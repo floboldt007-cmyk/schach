@@ -135,7 +135,8 @@ function main() {
     // Neue Woerterbuecher gehoeren zu den bereits gecachten Modulen, auch vor dem Einschalten eines Pakets.
     const woerter = [...alleDateien('js/sprachen', /\.js$/),
       ...kandidaten.filter((d) => /\/texte\.js$/.test(d) && vorhanden.has(d.replace(/texte\.js$/, 'index.js')))];
-    const neu = [...paketDateien(kandidaten, pakete).pflicht, ...woerter].filter((d) => !vorhanden.has(d));
+    const html = alleDateien('.', /\.html$/).map((d) => d.slice(2));
+    const neu = [...paketDateien(kandidaten, pakete).pflicht, ...woerter, ...html].filter((d) => !vorhanden.has(d));
     if (neu.length) text = text.replace('const DATEIEN = [', 'const DATEIEN = [\n' + neu.sort().map((d) => `  '${d}',`).join('\n'));
   }
   const sw = leseSw(text);
@@ -166,6 +167,7 @@ function main() {
     'index.html', 'manifest.webmanifest', 'LICENSE',
     // Daten-Fundament: Datenschutzerklaerung und Impressum muessen auch offline erreichbar sein
     'datenschutz.html', 'impressum.html',
+    ...alleDateien('.', /\.html$/).map((d) => d.slice(2)),
     ...alleDateien('css', /\.css$/),
     // Premium-Umbau (PLAN 3.8): Themes, Schriften mit Lizenztext, Klangpakete, Portraets des Themes
     ...alleDateien('css/themes', /\.css$/),

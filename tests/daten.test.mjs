@@ -516,6 +516,39 @@ async function browserAblauf(browser) {
     pruefe(`Browser: ${datei} nutzt die Farben der App (Tokens)`, css.grund !== 'rgba(0, 0, 0, 0)' && css.grund !== css.text, css);
     await s2.close();
   }
+  for (const name of ['datenschutz', 'impressum']) {
+    const recht = await kontext.newPage();
+    const rechtFehler = [];
+    recht.on('pageerror', (e) => rechtFehler.push(e.message));
+    recht.on('console', (m) => { if (m.type() === 'error') rechtFehler.push(m.text()); });
+    await recht.goto(BASIS + name + '.html');
+    const de = await recht.evaluate(() => ({ h2: document.querySelectorAll('h2').length, h3: document.querySelectorAll('h3').length,
+      platz: document.querySelectorAll('.platz').length, css: document.querySelector('style').textContent }));
+    await recht.locator('a[hreflang="en"]').click();
+    const en = await recht.evaluate(() => ({ text: document.body.innerText, lang: document.documentElement.lang,
+      h2: document.querySelectorAll('h2').length, h3: document.querySelectorAll('h3').length,
+      platz: [...document.querySelectorAll('.platz')].map((s) => s.textContent), css: document.querySelector('style').textContent,
+      fuss: document.querySelector('.fuss a').getAttribute('href') }));
+    pruefe(`Browser: ${name} Sprachlink oeffnet englische Fassung mit Hinweis`, recht.url().endsWith(name + '-en.html') && en.lang === 'en'
+      && en.text.includes('This is a courtesy translation.') && en.text.includes('The German version is legally binding.'));
+    pruefe(`Browser: ${name} gleiche Abschnitte, Unterabschnitte und Gestaltung`, en.h2 === de.h2 && en.h3 === de.h3 && en.css === de.css && en.h2 > 0);
+    pruefe(`Browser: ${name} alle Platzhalter bleiben, keine echten Kontaktdaten`, en.platz.length === de.platz && en.platz.every((p) => /^\[[\s\S]+\]$/.test(p))
+      && !/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[a-z]{2,}|\+49/.test(en.text), en.platz);
+    pruefe(`Browser: ${name} Englisch ohne deutsche Umlaute und lange Gedankenstriche`, !/[äöüÄÖÜß\u2013\u2014]/.test(en.text));
+    pruefe(`Browser: ${name} Fusszeile bleibt in derselben Sprache`, en.fuss === (name === 'datenschutz' ? 'impressum-en.html' : 'datenschutz-en.html'));
+    await recht.locator('a[hreflang="de"]').click();
+    pruefe(`Browser: ${name} Ruecklink oeffnet deutsche Fassung ohne Konsolenfehler`, recht.url().endsWith(name + '.html')
+      && await recht.locator('html').getAttribute('lang') === 'de' && rechtFehler.length === 0, rechtFehler);
+    await recht.close();
+  }
+  for (const sprache of ['en', 'de']) {
+    await seite.goto(BASIS + '?test&sprache=' + sprache + '#einstellungen');
+    await seite.waitForSelector('.daten-gruppe');
+    const links = await seite.locator('.es-recht a, .daten-links a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    const ende = sprache === 'en' ? '-en.html' : '.html';
+    pruefe(`Browser: Info und Daten verlinken Rechtstexte in ${sprache}`, links.length === 4
+      && links.filter((h) => h.endsWith('datenschutz' + ende)).length === 2 && links.filter((h) => h.endsWith('impressum' + ende)).length === 2, links);
+  }
   pruefe('Browser: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 }
