@@ -605,7 +605,9 @@ async function testeNebenlaeufig(seite, h, fehler) {
 const LAUF = (zuege, extra = {}) => ({ botId: 'benno', spielerFarbe: 'w', startFen: null, zuege, hinweise: 0, zuruecknahmen: 0,
   liveKlassen: zuege.map(() => null), gestartet: new Date().toISOString(), ...extra });
 const SCHAEFER = ['e2e4', 'e7e5', 'f1c4', 'b8c6', 'd1h5', 'g8f6'];   // danach Dxf7#
-const ITALIENISCH = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'f8c5', 'c2c3', 'g8f6', 'd2d3', 'd7d6', 'e1g1', 'e8g8'];
+// Zehn eigene Zuege: ab dieser Grenze zeigt auch eine Niederlage weiter ihre Genauigkeit.
+const ITALIENISCH = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'f8c5', 'c2c3', 'g8f6', 'd2d3', 'd7d6', 'e1g1', 'e8g8',
+  'c1g5', 'c8e6', 'b1d2', 'd8d7', 'd1e2', 'a7a6', 'a2a4', 'a6a5'];
 
 // Bewertungs-Engine kuenstlich verlangsamen (Auswertung dauert dann laenger als das Overlay wartet)
 const bremse = (seite, ms) => seite.evaluate(async (m) => {

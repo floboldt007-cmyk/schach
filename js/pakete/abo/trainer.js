@@ -31,6 +31,9 @@
 // Schliessen: Knopf, Escape, Tipp auf den Schleier, jeder Screen-Wechsel (app:screen). Das DOM-Ereignis "abo:stand"
 // (Stand oder Kauf-Pruefung geaendert, js/abo.js) zeichnet ein offenes Blatt neu.
 import { hoere } from '../../ereignisse.js';
+import { t, locale, sprache } from '../../sprache.js';
+import './texte.js';
+const A = (k, w) => t('p-abo.' + k, w);
 import { anim, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
 import { kontoFreigeschaltet } from '../../konto.js';
@@ -39,7 +42,7 @@ import {
   alterAngabe, setzeAlterAngabe, vorteilBereit, produktOffline, istTestLink,
 } from '../../abo.js';
 
-const vorteil = (id, text) => Object.freeze({ id, text });
+const vorteil = (id, text) => Object.freeze({ id, get text() { return sprache() === 'de' ? text : A('vorteil.' + id); } });
 export const VORTEILE = Object.freeze([
   vorteil('coaches', 'Drei Coaches: Henrike, Mats und Yusuf, mit Mappe, Wochenplan und Sparring'),
   vorteil('coach-erklaerungen', 'Coach-Erklärungen in ganzen Sätzen in der Spielanalyse'),
@@ -85,11 +88,13 @@ const TEXTE = Object.freeze({
   unter18: UNTER_18,
 });
 
+const zustandText = (z) => Object.hasOwn(TEXTE, z) ? A('zustand.' + z) : '';
+
 export function bereiteVorteile() { return VORTEILE.filter((v) => vorteilBereit(v.id)); }
 export function verkaufbar(p) { return !!(p && p.kaufLink) && (bereiteVorteile().length > 0 || istTestLink(p)); }
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const datum = (ms) => new Date(ms).toLocaleDateString('de-DE');
+const datum = (ms) => new Date(ms).toLocaleDateString(locale());
 
 let offen = null;
 export function schliesseTrainer() { if (offen) offen.ende(); }
@@ -97,10 +102,10 @@ export function schliesseTrainer() { if (offen) offen.ende(); }
 // Text zum eigenen Stand (auch fuer die Gruppe in den Einstellungen)
 export function standText(st = premiumStand()) {
   if (!st.angemeldet) return '';
-  if (st.premium && st.status === 'gekuendigt' && st.gueltigBis) return `Gekündigt, dein Trainer gilt bis ${datum(st.gueltigBis)}.`;
-  if (st.premium && st.gueltigBis) return `Dein Trainer ist aktiv bis ${datum(st.gueltigBis)}${st.quelle === 'stripe' ? ' und verlängert sich automatisch' : ''}.`;
-  if (st.premium) return 'Dein Trainer ist aktiv.';
-  return st.status ? 'Kein Abo aktiv.' : '';
+  if (st.premium && st.status === 'gekuendigt' && st.gueltigBis) return A('gekuendigt', { datum: datum(st.gueltigBis) });
+  if (st.premium && st.gueltigBis) return A(st.quelle === 'stripe' ? 'aktivAuto' : 'aktivBis', { datum: datum(st.gueltigBis) });
+  if (st.premium) return A('aktiv');
+  return st.status ? A('kein') : '';
 }
 
 export function zeigeTrainer({ app = null } = {}) {
@@ -118,21 +123,21 @@ export function zeigeTrainer({ app = null } = {}) {
       <div class="trainer-kopf">
         <span class="trainer-marke" aria-hidden="true">${icon('stern')}</span>
         <div class="trainer-kopf-text"><h3 id="trainer-titel">Crownmate Trainer</h3>
-          <p class="trainer-unter">Lehrer und Lernstoff für dein Schach. Das Spiel selbst bleibt gratis.</p></div>
+          <p class="trainer-unter">${esc(A('untertitel'))}</p></div>
       </div>
       <p class="trainer-beschreibung" hidden></p>
-      <div class="trainer-preis"><b class="trainer-preis-text">Preis folgt</b><span class="trainer-kuendbar">Jederzeit kündbar</span></div>
+      <div class="trainer-preis"><b class="trainer-preis-text">${esc(A('preis'))}</b><span class="trainer-kuendbar">${esc(A('kuendbar'))}</span></div>
       <p class="trainer-stand" aria-live="polite"></p>
       <div class="trainer-listen" data-anzahl="${(drin.length ? 1 : 0) + (geplant.length ? 1 : 0) + 1}">
-        <section class="trainer-liste trainer-im-abo" aria-labelledby="trainer-l1"${drin.length ? '' : ' hidden'}><h4 id="trainer-l1">Im Trainer</h4>
+        <section class="trainer-liste trainer-im-abo" aria-labelledby="trainer-l1"${drin.length ? '' : ' hidden'}><h4 id="trainer-l1">${esc(A('drin'))}</h4>
           <ul>${drin.map((v) => li(v.text)).join('')}</ul></section>
-        <section class="trainer-liste trainer-geplant" aria-labelledby="trainer-l3"${geplant.length ? '' : ' hidden'}><h4 id="trainer-l3">In Arbeit</h4>
-          <ul>${geplant.map((v) => li(v.text)).join('')}</ul><p class="trainer-geplant-hinweis">${esc(GEPLANT_HINWEIS)}</p></section>
-        <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">Immer gratis</h4><ul>${GRATIS.map(li).join('')}</ul></section>
+        <section class="trainer-liste trainer-geplant" aria-labelledby="trainer-l3"${geplant.length ? '' : ' hidden'}><h4 id="trainer-l3">${esc(A('arbeit'))}</h4>
+          <ul>${geplant.map((v) => li(v.text)).join('')}</ul><p class="trainer-geplant-hinweis">${esc(A('geplant'))}</p></section>
+        <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">${esc(A('gratisTitel'))}</h4><ul>${GRATIS.map((_, i) => li(A('gratis.' + i))).join('')}</ul></section>
       </div>
-      <ul class="trainer-zusagen">${ZUSAGEN.map(li).join('')}</ul>
-      <p class="trainer-alter">${esc(ALTER_HINWEIS)}</p>
-      <p class="trainer-test" hidden>${esc(TEST_HINWEIS)}</p>
+      <ul class="trainer-zusagen">${ZUSAGEN.map((_, i) => li(A('zusagen.' + i))).join('')}</ul>
+      <p class="trainer-alter">${esc(A('alterHinweis'))}</p>
+      <p class="trainer-test" hidden>${esc(A('test'))}</p>
       <div class="trainer-knoepfe"></div>
     </div>`;
   const karte = ort.querySelector('.trainer-karte');
@@ -173,7 +178,7 @@ export function zeigeTrainer({ app = null } = {}) {
     if (fertig) return;
     const st = premiumStand();
     const p = produkt || null;
-    ort.querySelector('.trainer-preis-text').textContent = (p && p.preisText) || 'Preis folgt';
+    ort.querySelector('.trainer-preis-text').textContent = (p && p.preisText) || A('preis');
     const besch = ort.querySelector('.trainer-beschreibung');
     besch.hidden = !(p && p.beschreibung);
     besch.textContent = (p && p.beschreibung) || '';
@@ -183,27 +188,27 @@ export function zeigeTrainer({ app = null } = {}) {
     ort.querySelector('.trainer-alter').hidden = ['premium', 'store', 'alter', 'unter18'].includes(zustand);
     ort.querySelector('.trainer-test').hidden = !(istTestLink(p) && ['kaufbar', 'alter', 'wartet', 'bestaetigen'].includes(zustand));
     // Zustandstexte, die eine Antwort brauchen, gehen vor; sonst Meldung zum letzten Klick, eigener Stand, Zustand
-    const stand = ['bestaetigen', 'alter', 'unter18', 'offline'].includes(zustand) ? TEXTE[zustand] : (meldung || standText(st) || TEXTE[zustand] || '');
+    const stand = ['bestaetigen', 'alter', 'unter18', 'offline'].includes(zustand) ? zustandText(zustand) : (meldung || standText(st) || zustandText(zustand) || '');
     ort.querySelector('.trainer-stand').textContent = stand;
     const knoepfe = [];
     if (zustand === 'premium') {
-      if (p && p.portalLink && !huelle) knoepfe.push(knopf('Abo verwalten', 'primaer', 'verwalten'));
+      if (p && p.portalLink && !huelle) knoepfe.push(knopf(A('verwalten'), 'primaer', 'verwalten'));
     } else if (zustand === 'kaufbar') {
-      knoepfe.push(knopf('Trainer abschließen', 'primaer', 'kaufen'));
+      knoepfe.push(knopf(A('kaufen'), 'primaer', 'kaufen'));
     } else if (zustand === 'alter') {
-      knoepfe.push(knopf('Ja, 18 oder älter', 'primaer', 'alter-ja'), knopf('Nein, jünger', '', 'alter-nein'));
+      knoepfe.push(knopf(A('ja'), 'primaer', 'alter-ja'), knopf(A('nein'), '', 'alter-nein'));
     } else if (zustand === 'unter18') {
-      knoepfe.push(knopf('Angabe ändern', '', 'alter-aendern'));
+      knoepfe.push(knopf(A('aendern'), '', 'alter-aendern'));
     } else if (zustand === 'wartet') {
-      knoepfe.push(knopf('Zahlung prüfen', 'primaer', 'pruefen'), knopf('Neu abschließen', '', 'kaufen'));
+      knoepfe.push(knopf(A('pruefen'), 'primaer', 'pruefen'), knopf(A('neu'), '', 'kaufen'));
     } else if (zustand === 'bestaetigen') {
-      knoepfe.push(knopf('Wird bestätigt', '', '', { aus: true }));
+      knoepfe.push(knopf(A('wirdBestaetigt'), '', '', { aus: true }));
     } else if (zustand === 'abgemeldet') {
-      if (app && typeof app.gehe === 'function') knoepfe.push(knopf('Zum Konto', 'primaer', 'konto'));
+      if (app && typeof app.gehe === 'function') knoepfe.push(knopf(A('kontoKnopf'), 'primaer', 'konto'));
     } else if (zustand !== 'offline') {
-      knoepfe.push(knopf(zustand === 'laedt' ? 'Wird geladen' : 'Bald verfügbar', '', '', { aus: true }));   // vorschau, store
+      knoepfe.push(knopf(zustand === 'laedt' ? A('laedt') : A('bald'), '', '', { aus: true }));   // vorschau, store
     }
-    knoepfe.push(knopf('Schließen', '', 'schliessen'));
+    knoepfe.push(knopf(A('schliessen'), '', 'schliessen'));
     // Fokus ueberlebt das Neuzeichnen (gleiche Aktion, sonst der erste Knopf)
     const hatteFokus = leiste.contains(document.activeElement) ? (document.activeElement.dataset.trainer || '') : null;
     leiste.replaceChildren(...knoepfe);
@@ -217,10 +222,10 @@ export function zeigeTrainer({ app = null } = {}) {
   // Kauf: ohne await bis zum Oeffnen (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
   function kaufe() {
     kaufen({ produkt: produkt || null }).then((r) => {
-      meldung = r.ok ? 'Die Bezahlseite von Stripe ist offen. Nach der Zahlung prüft die App hier von selbst.'
-        : r.grund === 'abgemeldet' ? TEXTE.abgemeldet
+      meldung = r.ok ? A('stripe')
+        : r.grund === 'abgemeldet' ? zustandText('abgemeldet')
           : r.grund === 'alter' ? ''
-            : 'Der Kauf ist gerade nicht möglich. Versuch es später noch einmal.';
+            : A('kaufFehler');
       aktualisiere();
     });
   }
@@ -256,7 +261,7 @@ export function zeigeTrainer({ app = null } = {}) {
     }
     if (a === 'verwalten') {
       verwalten({ produkt: produkt || null }).then((r) => {
-        if (!r.ok) { meldung = 'Die Verwaltung ist gerade nicht erreichbar.'; aktualisiere(); }
+        if (!r.ok) { meldung = A('verwaltungFehler'); aktualisiere(); }
       });
     }
   });

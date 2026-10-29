@@ -457,10 +457,19 @@ const geste = async (seite) => { await seite.mouse.click(3, 500); await warte(15
 
 async function testeBrowser(browser) {
   gruppe = 'Vorladen';
-  const { kontext, seite, fehler, anfragen } = await neueSeite(browser);
-  await seite.goto(BASIS + '#arena');
-  await seite.waitForSelector('.screen.arena');
-  const frueh = await vorrat(seite);
+  // Der erste Screen kann unter Last spaeter als der Vorlade-Timer fertig sein. Die Dateien erst nach der
+  // Beobachtung des leeren Anfangszustands freigeben, danach weiterhin alle echten Dateien dekodieren.
+  let dateienFreigeben;
+  const dateienFrei = new Promise((resolve) => { dateienFreigeben = resolve; });
+  const { kontext, seite, fehler, anfragen } = await neueSeite(browser, { routen: [
+    ['**/assets/klang/arcade/*.mp3', async (route) => { await dateienFrei; await route.continue(); }],
+  ] });
+  let frueh;
+  try {
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena');
+    frueh = await vorrat(seite);
+  } finally { dateienFreigeben(); }
   const v = await warteDekodiert(seite);
   pruefe('Standard der Ansicht modern: arcade, vor dem Vorladen nichts dekodiert', frueh.paket === 'arcade' && frueh.gewaehlt === '' && frueh.dekodiert === 0, frueh);
   pruefe('alle 40 Dateien geholt und dekodiert, schon vor der ersten Beruehrung, ohne Live-Kontext', v.dekodiert === 40 && v.fehlt === 0 && v.kontext === null

@@ -18,6 +18,9 @@
 // Solange eine Klasse offen ist, holt der Screen alle AUFFRISCHEN_MS die Uebersicht neu (nur sichtbar), damit neue
 // Mitglieder waehrend der Stunde auftauchen. Rueckfragen ueber app.frage. Zurueck: aus einer Klasse zur Liste.
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
+import { t, locale, sprache } from '../sprache.js';
+import '../sprachen/schule.js';
+const S = (k, w) => t('schule.' + k, w);
 import { icon } from './icons.js';
 import { staffel, tempo, anim } from '../bewegung.js';
 import { kontoFreigeschaltet } from '../konto.js';
@@ -30,49 +33,51 @@ import {
 } from '../schule.js';
 
 export const AUFFRISCHEN_MS = 20000;
-const SPALTEN = [
-  { id: 'name', text: 'Name' },
-  { id: 'bots', text: 'Bots' },
-  { id: 'sterne', text: 'Sterne' },
-  { id: 'partien', text: 'Partien' },
-  { id: 'genauigkeit', text: 'Genauigkeit' },
-  { id: 'fehler', text: 'Häufigste Fehler', fest: true },
-  { id: 'aufgaben', text: 'Aufgaben' },
-  { id: 'aktualisiert', text: 'Stand' },
-];
-// Raetsel-Aufgaben erst, wenn ein Paket raetsel:geloest sendet (sonst koennte niemand sie erfuellen)
-const ARTEN = [
-  { id: 'bot', text: 'Bot besiegen' },
-  { id: 'raetsel', text: 'Rätsel lösen' },
-  { id: 'partien', text: 'Partien spielen' },
-].filter((a) => a.id !== 'raetsel' || RAETSEL_AUFGABEN);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Tag als "23.10.": ein Datum ohne Uhrzeit (aktualisiert_am) direkt, ohne Umweg ueber die Zeitzone des Geraets
 const datum = (iso) => {
   const tag = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
-  if (tag) return `${tag[3]}.${tag[2]}.`;
+  if (tag) return sprache() === 'en' ? `${tag[2]}/${tag[3]}` : `${tag[3]}.${tag[2]}.`;
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return '–';
   const d = new Date(t);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+  return sprache() === 'en' ? `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+    : `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
 };
 const zahl = (x, stellen = 0) => (x == null || !Number.isFinite(Number(x)) ? '–'
-  : Number(x).toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen }));
+  : Number(x).toLocaleString(locale(), { minimumFractionDigits: stellen, maximumFractionDigits: stellen }));
 
 export function zeige(root, params = {}, app) {
+  const SPALTEN = [
+    { id: 'name', text: S('spalte.name') },
+    { id: 'bots', text: S('spalte.bots') },
+    { id: 'sterne', text: S('spalte.sterne') },
+    { id: 'partien', text: S('spalte.partien') },
+    { id: 'genauigkeit', text: S('spalte.genauigkeit') },
+    { id: 'fehler', text: S('spalte.fehler'), fest: true },
+    { id: 'aufgaben', text: S('spalte.aufgaben') },
+    { id: 'aktualisiert', text: S('spalte.stand') },
+  ];
+  // Raetsel-Aufgaben erst, wenn ein Paket raetsel:geloest sendet (sonst koennte niemand sie erfuellen)
+  const ARTEN = [
+    { id: 'bot', text: S('art.bot') },
+    { id: 'raetsel', text: S('art.raetsel') },
+    { id: 'partien', text: S('art.partien') },
+  ].filter((a) => a.id !== 'raetsel' || RAETSEL_AUFGABEN);
+
   stelleSchuleCssSicher();
   const s = document.createElement('section');
   s.className = 'screen schule-screen';
-  s.setAttribute('aria-label', 'Schulmodus');
+  s.setAttribute('aria-label', S('titel'));
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '' })}
     <div class="schule-rumpf">
-      ${seitenKopf({ ueber: 'Für Lehrkräfte und Vereine', titel: 'Schulmodus', text: 'Klasse anlegen, den Code an die Tafel schreiben und sehen, wie alle vorankommen. Für die Oberstufe und den Verein, Crownmate ist ab 16.' })}
+      ${seitenKopf({ ueber: S('ueber'), titel: S('titel'), text: S('beschreibung') })}
       <div class="sm-inhalt" data-ansicht="laedt"></div>
     </div>
-    <div class="sm-tafel" role="dialog" aria-modal="true" aria-label="Code für die Tafel" hidden>
+    <div class="sm-tafel" role="dialog" aria-modal="true" aria-label="${esc(S('tafel'))}" hidden>
       <div class="sm-tafel-karte"><p class="sm-tafel-name"></p><div class="sm-tafel-code" aria-hidden="true"></div>
-        <p class="sm-tafel-satz">In Crownmate: Einstellungen, Klasse, Code und Anzeigename eingeben.</p>
-        <button class="knopf dr sm-tafel-zu" type="button">Schließen</button></div>
+        <p class="sm-tafel-satz">${esc(S('tafelSatz'))}</p>
+        <button class="knopf dr sm-tafel-zu" type="button">${esc(S('zu'))}</button></div>
     </div>`;
   root.append(s);
 
@@ -116,10 +121,9 @@ export function zeige(root, params = {}, app) {
     stoppeTimer();
     setze('nicht-frei', `<div class="t-karte sm-hinweis-karte">
         <span class="sm-symbol" aria-hidden="true">${icon(ICON)}</span>
-        <div><h2>Der Schulmodus ist noch nicht freigeschaltet</h2>
-          <p>Er braucht ein Konto, und Konten gibt es in Crownmate noch nicht für alle. Sobald es so weit ist, steht er in den
-            Einstellungen unter „Klasse“.</p></div>
-        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="arena">Zur Arena ${icon('vor')}</button></div>
+        <div><h2>${esc(S('nichtFrei'))}</h2>
+          <p>${esc(S('nichtFreiText'))}</p></div>
+        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="arena">${esc(S('arena'))} ${icon('vor')}</button></div>
       </div>`);
     inhalt.querySelector('[data-sm="arena"]').addEventListener('click', () => app.gehe('arena'));
     eintritt();
@@ -130,9 +134,9 @@ export function zeige(root, params = {}, app) {
     stoppeTimer();
     setze('abgemeldet', `<div class="t-karte sm-hinweis-karte">
         <span class="sm-symbol" aria-hidden="true">${icon('person')}</span>
-        <div><h2>Der Schulmodus braucht ein Konto</h2>
-          <p>Melde dich in den Einstellungen mit deiner E-Mail-Adresse an. Deine Klassen liegen dann auf dem Server in Frankfurt.</p></div>
-        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="einstellungen">Zu den Einstellungen ${icon('vor')}</button></div>
+        <div><h2>${esc(S('brauchtKonto'))}</h2>
+          <p>${esc(S('anmelden'))}</p></div>
+        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="einstellungen">${esc(S('einstellungen'))} ${icon('vor')}</button></div>
       </div>`);
     inhalt.querySelector('[data-sm="einstellungen"]').addEventListener('click', () => app.gehe('einstellungen'));
     eintritt();
@@ -142,8 +146,8 @@ export function zeige(root, params = {}, app) {
     stoppeTimer();
     setze('fehler', `<div class="t-karte sm-hinweis-karte">
         <span class="sm-symbol" aria-hidden="true">${icon('ziel')}</span>
-        <div><h2>Das hat nicht geklappt</h2><p class="sm-fehler-text"></p></div>
-        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="nochmal">${icon('nochmal')} Nochmal</button></div>
+        <div><h2>${esc(S('fehler'))}</h2><p class="sm-fehler-text"></p></div>
+        <div class="t-fuss"><button class="knopf dr" type="button" data-sm="nochmal">${icon('nochmal')} ${esc(S('nochmal'))}</button></div>
       </div>`);
     inhalt.querySelector('.sm-fehler-text').textContent = fehlerText(grund);
     inhalt.querySelector('[data-sm="nochmal"]').addEventListener('click', nochmal);
@@ -158,7 +162,7 @@ export function zeige(root, params = {}, app) {
     if (!nutzerId()) { zeigeAbgemeldet(); return; }
     const gespeichert = meineKlassenGespeichert();
     if (gespeichert) baueListe(gespeichert.leitung);
-    else setze('laedt', '<p class="sm-laedt">Klassen werden geladen …</p>');
+    else setze('laedt', `<p class="sm-laedt">${esc(S('ladeKlassen'))}</p>`);
     const r = await meineKlassen({ neu });
     if (weg || offen) return;
     if (!r.ok) {
@@ -179,15 +183,14 @@ export function zeige(root, params = {}, app) {
     const liste = Array.isArray(klassen) ? klassen : [];
     setze('liste', `<div class="sm-klassen" data-anzahl="${liste.length}"></div>
       <form class="t-karte sm-neu" novalidate>
-        <span class="t-marke">${icon('stern')} Neue Klasse</span>
-        <h2>${liste.length ? 'Noch eine Klasse' : 'Deine erste Klasse'}</h2>
-        <p>Ein Name, den deine Gruppe wiedererkennt, zum Beispiel „Q1 Schach-AG“ oder „Verein Mittwoch“. Den Code erzeugt der Server.</p>
-        <label class="sm-feld">Name der Klasse <input class="sm-neu-name" maxlength="40" autocomplete="off" required></label>
-        <div class="t-fuss"><button class="knopf primaer dr" type="submit">Klasse anlegen</button></div>
+        <span class="t-marke">${icon('stern')} ${esc(S('neu'))}</span>
+        <h2>${liste.length ? S('nochEine') : S('erste')}</h2>
+        <p>${esc(S('nameHilfe'))}</p>
+        <label class="sm-feld">${esc(S('klassenname'))} <input class="sm-neu-name" maxlength="40" autocomplete="off" required></label>
+        <div class="t-fuss"><button class="knopf primaer dr" type="submit">${esc(S('anlegen'))}</button></div>
         <p class="sm-status" aria-live="polite"></p>
       </form>
-      <p class="sm-datenschutz">Mitglieder wählen selbst einen Anzeigenamen. Du siehst keine E-Mail-Adressen, keine Partien und keine Züge,
-        nur Kennzahlen. Der Server steht in Frankfurt.</p>`);
+      <p class="sm-datenschutz">${esc(S('datenschutz'))}</p>`);
     const box = inhalt.querySelector('.sm-klassen');
     box.hidden = liste.length === 0;
     for (const k of liste) {
@@ -196,12 +199,12 @@ export function zeige(root, params = {}, app) {
       b.className = 't-karte sm-klasse-karte dr';
       b.dataset.klasse = k.id;
       b.dataset.aktiv = k.aktiv ? 'ja' : 'nein';
-      b.innerHTML = `<span class="t-marke">${k.aktiv ? 'Code <span class="sm-k-code"></span>' : 'geschlossen'}</span>
+      b.innerHTML = `<span class="t-marke">${k.aktiv ? 'Code <span class="sm-k-code"></span>' : S('geschlossen')}</span>
         <h2></h2><p class="sm-k-zahl"></p>`;
       b.querySelector('h2').textContent = k.name;
       if (k.aktiv) b.querySelector('.sm-k-code').textContent = k.code;
       const n = Number(k.mitglieder) || 0;
-      b.querySelector('.sm-k-zahl').textContent = `${n} ${n === 1 ? 'Mitglied' : 'Mitglieder'}`;
+      b.querySelector('.sm-k-zahl').textContent = `${n} ${n === 1 ? S('mitglied.eins') : S('mitglied.mehr')}`;
       b.addEventListener('click', () => oeffneKlasse(k.id));
       box.append(b);
     }
@@ -214,7 +217,7 @@ export function zeige(root, params = {}, app) {
       if (!n.ok) { status(form, fehlerText(n.grund, { was: 'klasse' }), true); feld.focus(); return; }
       beschaeftigt = true;
       form.querySelector('[type="submit"]').disabled = true;
-      status(form, 'Einen Moment …');
+      status(form, S('moment'));
       const r = await erstelleKlasse(n.name);
       beschaeftigt = false;
       if (weg) return;
@@ -229,7 +232,7 @@ export function zeige(root, params = {}, app) {
   async function oeffneKlasse(id, { neu = false } = {}) {
     stoppeTimer();
     offen = id;
-    setze('laedt', '<p class="sm-laedt">Klasse wird geladen …</p>');
+    setze('laedt', `<p class="sm-laedt">${esc(S('ladeKlasse'))}</p>`);
     const r = await uebersicht(id);
     if (weg || offen !== id) return;
     if (!r.ok) {
@@ -269,56 +272,54 @@ export function zeige(root, params = {}, app) {
     const k = daten.klasse;
     const aktiv = k.aktiv === true;
     setze('klasse', `<div class="sm-klasse-kopf">
-        <button class="knopf dr sm-alle" type="button">${icon('zurueck')} Alle Klassen</button>
-        <h2 class="sm-klasse-name"></h2>${aktiv ? '' : '<span class="t-marke sm-geschlossen">geschlossen</span>'}
+        <button class="knopf dr sm-alle" type="button">${icon('zurueck')} ${esc(S('alle'))}</button>
+        <h2 class="sm-klasse-name"></h2>${aktiv ? '' : `<span class="t-marke sm-geschlossen">geschlossen</span>`}
       </div>
       ${aktiv ? `<section class="t-karte sm-code-karte" aria-labelledby="sm-code-titel">
-        <span class="t-marke" id="sm-code-titel">${icon(ICON)} Code für die Tafel</span>
+        <span class="t-marke" id="sm-code-titel">${icon(ICON)} ${esc(S('tafel'))}</span>
         <div class="sm-code" aria-label=""></div>
-        <p>So kommt man in die Klasse: In Crownmate unter Einstellungen, Klasse, den Code und einen Anzeigenamen eingeben.
-          Neue Mitglieder erscheinen hier von selbst.</p>
-        <div class="t-fuss"><button class="knopf dr sm-gross" type="button">${icon('auge')} Groß zeigen</button></div>
+        <p>${esc(S('tafelHilfe'))}</p>
+        <div class="t-fuss"><button class="knopf dr sm-gross" type="button">${icon('auge')} ${esc(S('gross'))}</button></div>
       </section>` : ''}
       <section class="t-karte sm-mitglieder-karte" aria-labelledby="sm-m-titel">
-        <div class="sm-karten-kopf"><h3 id="sm-m-titel">Mitglieder</h3>
-          <button class="icon-knopf dr sm-neu-laden" type="button" aria-label="Neu laden">${icon('nochmal')}</button></div>
-        <p class="sm-leer" hidden>Noch niemand beigetreten. Gib den Code weiter.</p>
-        <div class="sm-tabelle-huelle" tabindex="0" role="region" aria-label="Mitglieder und Fortschritt">
+        <div class="sm-karten-kopf"><h3 id="sm-m-titel">${esc(S('mitglieder'))}</h3>
+          <button class="icon-knopf dr sm-neu-laden" type="button" aria-label="${esc(S('laden'))}">${icon('nochmal')}</button></div>
+        <p class="sm-leer" hidden>${esc(S('leer'))}</p>
+        <div class="sm-tabelle-huelle" tabindex="0" role="region" aria-label="${esc(S('fortschritt'))}">
           <table class="sm-tabelle">
-            <caption class="sr">Mitglieder und Fortschritt, sortierbar</caption>
+            <caption class="sr">${esc(S('tabelle'))}</caption>
             <thead><tr>${SPALTEN.map((sp) => `<th scope="col" data-spalte="${sp.id}"${sp.fest ? '' : ' aria-sort="none"'}>${sp.fest ? esc(sp.text)
               : `<button class="sm-sort" type="button" data-spalte="${sp.id}">${esc(sp.text)}<span class="sm-pfeil" aria-hidden="true"></span></button>`}</th>`).join('')}
-              <th scope="col"><span class="sr">Entfernen</span></th></tr></thead>
+              <th scope="col"><span class="sr">${esc(S('entfernen'))}</span></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
-        <p class="sm-hilfe">Stand: an welchem Tag zuletzt ein Fortschritt kam (er kommt nach jeder Partie, gespeichert wird nur der
-          Tag). Genauigkeit: Durchschnitt aller gespeicherten Partien gegen die Bots; Fehler: die eigenen Züge der letzten 20 davon.</p>
+        <p class="sm-hilfe">${esc(S('standHilfe'))}</p>
         <p class="sm-status" aria-live="polite"></p>
       </section>
       <section class="t-karte sm-aufgaben-karte" aria-labelledby="sm-a-titel">
-        <div class="sm-karten-kopf"><h3 id="sm-a-titel">Aufgaben</h3></div>
+        <div class="sm-karten-kopf"><h3 id="sm-a-titel">${esc(S('aufgaben'))}</h3></div>
         <ul class="sm-aufgaben"></ul>
-        <p class="sm-keine-aufgabe" hidden>Noch keine Aufgabe gestellt.</p>
+        <p class="sm-keine-aufgabe" hidden>${esc(S('keineAufgabe'))}</p>
         ${aktiv ? `<form class="sm-aufgabe-neu" novalidate>
-          <h4>Neue Aufgabe</h4>
-          <label class="sm-feld sm-titel-feld">Titel <input class="sm-a-titel" maxlength="80" autocomplete="off" placeholder="z. B. Gabeln üben mit Rudi"></label>
-          <fieldset class="sm-arten"><legend>Art</legend>
+          <h4>${esc(S('neueAufgabe'))}</h4>
+          <label class="sm-feld sm-titel-feld">${esc(S('aufgabeTitel'))} <input class="sm-a-titel" maxlength="80" autocomplete="off" placeholder="${esc(S('aufgabeBeispiel'))}"></label>
+          <fieldset class="sm-arten"><legend>${esc(S('art'))}</legend>
             ${ARTEN.map((a, i) => `<label class="sm-art"><input type="radio" name="sm-art" value="${a.id}"${i === 0 ? ' checked' : ''}><span>${esc(a.text)}</span></label>`).join('')}
           </fieldset>
           <div class="sm-ziel-felder">
-            <label class="sm-feld" data-fuer="bot">Bot <select class="sm-a-bot">${BOTS.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>
-            <label class="sm-feld" data-fuer="bot">Sterne <select class="sm-a-sterne"><option value="1">1 Stern (Sieg)</option>
-              <option value="2">2 Sterne</option><option value="3">3 Sterne</option></select></label>
-            <label class="sm-feld" data-fuer="anzahl" hidden>Anzahl <input class="sm-a-anzahl" type="number" min="1" max="${GRENZEN.anzahl}" value="5" inputmode="numeric"></label>
-            <label class="sm-feld">Fällig (frei lassen geht) <input class="sm-a-faellig" type="date"></label>
+            <label class="sm-feld" data-fuer="bot">${esc(S('bot'))} <select class="sm-a-bot">${BOTS.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>
+            <label class="sm-feld" data-fuer="bot">${esc(S('sterne'))} <select class="sm-a-sterne"><option value="1">${esc(S('stern1'))}</option>
+              <option value="2">${esc(S('stern2'))}</option><option value="3">${esc(S('stern3'))}</option></select></label>
+            <label class="sm-feld" data-fuer="anzahl" hidden>${esc(S('anzahl'))} <input class="sm-a-anzahl" type="number" min="1" max="${GRENZEN.anzahl}" value="5" inputmode="numeric"></label>
+            <label class="sm-feld">${esc(S('datum'))} <input class="sm-a-faellig" type="date"></label>
           </div>
-          <div class="t-fuss"><button class="knopf primaer dr" type="submit">Aufgabe stellen</button></div>
+          <div class="t-fuss"><button class="knopf primaer dr" type="submit">${esc(S('stellen'))}</button></div>
           <p class="sm-status" aria-live="polite"></p>
         </form>` : ''}
       </section>
       <section class="t-karte sm-ende" aria-labelledby="sm-e-titel">
-        <h3 id="sm-e-titel">${aktiv ? 'Am Ende des Schuljahrs' : 'Klasse geschlossen'}</h3>
+        <h3 id="sm-e-titel">${aktiv ? S('endeAktiv') : S('endeZu')}</h3>
         <p class="sm-ende-text"></p>
         <div class="t-fuss"><button class="knopf gefahr dr sm-ende-knopf" type="button"></button></div>
         <p class="sm-status" aria-live="polite"></p>
@@ -335,7 +336,7 @@ export function zeige(root, params = {}, app) {
       daten = r.daten;
       fuelleMitglieder();
       fuelleAufgabenListe();
-      status(karte, 'Neu geladen.');
+      status(karte, S('geladen'));
     });
     for (const b of inhalt.querySelectorAll('.sm-sort')) {
       b.addEventListener('click', () => {
@@ -355,10 +356,10 @@ export function zeige(root, params = {}, app) {
     });
     const ende = inhalt.querySelector('.sm-ende');
     ende.querySelector('.sm-ende-text').textContent = aktiv
-      ? 'Klasse schließen: Danach tritt niemand mehr bei und es kommen keine neuen Stände. Die Übersicht bleibt lesbar, bis du die Klasse löschst. Nach 90 Tagen löscht der Server eine geschlossene Klasse von selbst.'
-      : `Geschlossen am ${datum(k.geschlossen_am)}. Die Übersicht bleibt lesbar, bis du die Klasse löschst, spätestens 90 Tage nach dem Schließen löscht der Server sie.`;
+      ? S('geschlossenInfo')
+      : S('geschlossenDatum', { datum: datum(k.geschlossen_am) });
     const endeKnopf = ende.querySelector('.sm-ende-knopf');
-    endeKnopf.textContent = aktiv ? 'Klasse schließen' : 'Klasse löschen';
+    endeKnopf.textContent = aktiv ? S('schliessen') : S('loeschen');
     endeKnopf.addEventListener('click', () => (aktiv ? schliesse() : loesche()));
     const form = inhalt.querySelector('.sm-aufgabe-neu');
     if (form) verbindeAufgabeForm(form);
@@ -367,7 +368,7 @@ export function zeige(root, params = {}, app) {
     fuelleTafel();
     const code = inhalt.querySelector('.sm-code');
     if (code) {
-      code.setAttribute('aria-label', `Code: ${[...k.code].join(' ')}`);
+      code.setAttribute('aria-label', S('codeLabel', { code: [...k.code].join(' ') }));
       code.innerHTML = [...k.code].map((z) => `<span>${esc(z)}</span>`).join('');
     }
     eintritt();
@@ -378,7 +379,7 @@ export function zeige(root, params = {}, app) {
     if (!karte || !daten) return;
     const liste = sortiereMitglieder(daten.mitglieder, sortierung.spalte, sortierung.richtung);
     const aufgaben = Array.isArray(daten.aufgaben) ? daten.aufgaben.length : 0;
-    karte.querySelector('#sm-m-titel').textContent = `Mitglieder (${liste.length})`;
+    karte.querySelector('#sm-m-titel').textContent = S('mitgliederZahl', { n: liste.length });
     karte.querySelector('.sm-leer').hidden = liste.length > 0;
     karte.querySelector('.sm-tabelle-huelle').hidden = liste.length === 0;
     for (const th of karte.querySelectorAll('th[aria-sort]')) {
@@ -402,7 +403,7 @@ export function zeige(root, params = {}, app) {
         f && f.genauigkeit_schnitt != null ? zahl(f.genauigkeit_schnitt, 1) + ' %' : '–',
         fehler || '–',
         f && aufgaben ? `${Array.isArray(f.erledigt) ? f.erledigt.length : 0} / ${aufgaben}` : '–',
-        f ? datum(f.aktualisiert_am) : 'noch nichts',
+        f ? datum(f.aktualisiert_am) : S('nochNichts'),
       ];
       zellen.forEach((t, i) => {
         const td = document.createElement(i === 0 ? 'th' : 'td');
@@ -416,7 +417,7 @@ export function zeige(root, params = {}, app) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'icon-knopf dr sm-entfernen';
-      b.setAttribute('aria-label', `${m.anzeigename} entfernen`);
+      b.setAttribute('aria-label', S('entfernenLabel', { name: m.anzeigename }));
       b.innerHTML = icon('kreuz');
       td.append(b);
       tr.append(td);
@@ -442,8 +443,8 @@ export function zeige(root, params = {}, app) {
       li.querySelector('b').textContent = a.titel;
       const f = faelligText(a.faellig);
       li.querySelector('.sm-a-ziel').textContent = zielText(a) + (f ? ` · ${f}` : '');
-      li.querySelector('.sm-a-erledigt').textContent = `${zahl(a.erledigt)} von ${mitglieder} erledigt`;
-      li.querySelector('.sm-a-loeschen').setAttribute('aria-label', `Aufgabe „${a.titel}“ löschen`);
+      li.querySelector('.sm-a-erledigt').textContent = S('erledigt', { n: zahl(a.erledigt), gesamt: mitglieder });
+      li.querySelector('.sm-a-loeschen').setAttribute('aria-label', S('aufgabeLoeschenLabel', { titel: a.titel }));
       ul.append(li);
     }
     const form = karte.querySelector('.sm-aufgabe-neu');
@@ -471,15 +472,15 @@ export function zeige(root, params = {}, app) {
       const ziel = a === 'bot'
         ? { bot: form.querySelector('.sm-a-bot').value, sterne: Number(form.querySelector('.sm-a-sterne').value) || 1 }
         : { anzahl: Math.round(Number(form.querySelector('.sm-a-anzahl').value)) };
-      if (titel.length < 2) { status(form, 'Gib der Aufgabe einen Titel (2 bis 80 Zeichen).', true); titelFeld.focus(); return; }
+      if (titel.length < 2) { status(form, S('titelFehler'), true); titelFeld.focus(); return; }
       if (a !== 'bot' && !(ziel.anzahl >= 1 && ziel.anzahl <= GRENZEN.anzahl)) {
-        status(form, `Die Anzahl geht von 1 bis ${GRENZEN.anzahl}.`, true);
+        status(form, S('anzahlFehler', { max: GRENZEN.anzahl }), true);
         form.querySelector('.sm-a-anzahl').focus();
         return;
       }
       beschaeftigt = true;
       form.querySelector('[type="submit"]').disabled = true;
-      status(form, 'Einen Moment …');
+      status(form, S('moment'));
       const r = await aufgabeAnlegen(daten.klasse.id, { titel, art: a, ziel, faellig: faellig.value || null });
       beschaeftigt = false;
       if (weg) return;
@@ -490,16 +491,16 @@ export function zeige(root, params = {}, app) {
       faellig.value = '';
       fuelleAufgabenListe();
       fuelleMitglieder();
-      status(form, `Aufgabe „${r.aufgabe.titel}“ gestellt. Sie steht bei allen Mitgliedern in der Arena.`);
+      status(form, S('aufgabeGestellt', { titel: r.aufgabe.titel }));
     });
   }
 
   async function entferne(mitgliedId) {
     const m = (daten && daten.mitglieder || []).find((x) => x.id === mitgliedId);
     if (!m || beschaeftigt) return;
-    const ja = await app.frage({ titel: `${m.anzeigename} entfernen?`,
-      text: 'Die Zeile und der Fortschritt verschwinden aus der Klasse. Mit dem Code kann die Person wieder beitreten.',
-      knoepfe: [{ text: 'Entfernen', wert: true, art: 'gefahr' }, { text: 'Abbrechen', wert: false, art: 'primaer' }], abbrechen: false });
+    const ja = await app.frage({ titel: S('entfernenTitel', { name: m.anzeigename }),
+      text: S('entfernenText'),
+      knoepfe: [{ text: S('entfernen'), wert: true, art: 'gefahr' }, { text: S('abbrechen'), wert: false, art: 'primaer' }], abbrechen: false });
     if (!ja || weg) return;
     beschaeftigt = true;
     const r = await entferneMitglied(mitgliedId);
@@ -510,14 +511,14 @@ export function zeige(root, params = {}, app) {
     daten = { ...daten, mitglieder: daten.mitglieder.filter((x) => x.id !== mitgliedId) };
     fuelleMitglieder();
     fuelleAufgabenListe();
-    status(karte, `${m.anzeigename} ist nicht mehr in der Klasse.`);
+    status(karte, S('entfernt', { name: m.anzeigename }));
   }
 
   async function loescheAufgabe(aufgabeId) {
     const a = (daten && daten.aufgaben || []).find((x) => x.id === aufgabeId);
     if (!a || beschaeftigt) return;
-    const ja = await app.frage({ titel: 'Aufgabe löschen?', text: `„${a.titel}“ verschwindet bei allen Mitgliedern.`,
-      knoepfe: [{ text: 'Löschen', wert: true, art: 'gefahr' }, { text: 'Abbrechen', wert: false, art: 'primaer' }], abbrechen: false });
+    const ja = await app.frage({ titel: S('aufgabeLoeschen'), text: S('aufgabeLoeschenText', { titel: a.titel }),
+      knoepfe: [{ text: S('loeschenKnopf'), wert: true, art: 'gefahr' }, { text: S('abbrechen'), wert: false, art: 'primaer' }], abbrechen: false });
     if (!ja || weg) return;
     beschaeftigt = true;
     const r = await aufgabeLoeschen(aufgabeId);
@@ -534,9 +535,9 @@ export function zeige(root, params = {}, app) {
 
   async function schliesse() {
     if (!daten || beschaeftigt) return;
-    const ja = await app.frage({ titel: `„${daten.klasse.name}“ schließen?`,
-      text: 'Niemand kann mehr beitreten, und es kommen keine neuen Stände. Die Übersicht bleibt lesbar. Wieder öffnen geht nicht.',
-      knoepfe: [{ text: 'Schließen', wert: true, art: 'gefahr' }, { text: 'Abbrechen', wert: false, art: 'primaer' }], abbrechen: false });
+    const ja = await app.frage({ titel: S('klasseSchliessen', { name: daten.klasse.name }),
+      text: S('zuText'),
+      knoepfe: [{ text: S('schliessenKnopf'), wert: true, art: 'gefahr' }, { text: S('abbrechen'), wert: false, art: 'primaer' }], abbrechen: false });
     if (!ja || weg) return;
     beschaeftigt = true;
     const r = await schliesseKlasse(daten.klasse.id);
@@ -548,9 +549,9 @@ export function zeige(root, params = {}, app) {
 
   async function loesche() {
     if (!daten || beschaeftigt) return;
-    const ja = await app.frage({ titel: `„${daten.klasse.name}“ löschen?`,
-      text: 'Die Klasse mit allen Mitgliedern, Ständen und Aufgaben wird gelöscht. Das lässt sich nicht rückgängig machen.',
-      knoepfe: [{ text: 'Endgültig löschen', wert: true, art: 'gefahr' }, { text: 'Abbrechen', wert: false, art: 'primaer' }], abbrechen: false });
+    const ja = await app.frage({ titel: S('klasseLoeschen', { name: daten.klasse.name }),
+      text: S('loeschText'),
+      knoepfe: [{ text: S('endgueltig'), wert: true, art: 'gefahr' }, { text: S('abbrechen'), wert: false, art: 'primaer' }], abbrechen: false });
     if (!ja || weg) return;
     beschaeftigt = true;
     const r = await loescheKlasse(daten.klasse.id);
@@ -565,7 +566,7 @@ export function zeige(root, params = {}, app) {
     if (!daten) return;
     tafel.querySelector('.sm-tafel-name').textContent = daten.klasse.name;
     tafel.querySelector('.sm-tafel-code').innerHTML = [...String(daten.klasse.code || '')].map((z) => `<span>${esc(z)}</span>`).join('');
-    tafel.setAttribute('aria-label', `Code für die Tafel: ${[...String(daten.klasse.code || '')].join(' ')}`);
+    tafel.setAttribute('aria-label', S('tafelLabel', { code: [...String(daten.klasse.code || '')].join(' ') }));
   }
   let vorherFokus = null;
   function zeigeTafel() {

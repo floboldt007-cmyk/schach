@@ -16,6 +16,10 @@
 // das Blatt zeichnen neu; mit detail.bestaetigt sagt das Paket genau einmal Danke (Toast).
 // Defensiv: ein Fehler hier haelt die App nie an (das Abo ist nie wichtiger als das Spiel).
 import { anbieten } from '../../orte.js';
+import { t } from '../../sprache.js';
+import './texte.js';
+const A = (k, w) => t('p-abo.' + k, w);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { hoere } from '../../ereignisse.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import { toast } from '../../ui/bauteile.js';
@@ -28,9 +32,9 @@ export const DANKE = 'Crownmate Trainer ist aktiv. Danke für deine Unterstützu
 // Text der Gruppe: eigener Stand, sonst die laufende Kauf-Pruefung, sonst "kein Abo" bzw. "Konto noetig"
 export function gruppenText(st = premiumStand(), ks = kaufStand()) {
   if (st.premium) return standText(st);
-  if (st.angemeldet && ks === 'prueft') return 'Stripe bestätigt deine Zahlung. Das dauert meist nur ein paar Sekunden.';
-  if (st.angemeldet && ks === 'offen') return 'Noch keine Bestätigung von Stripe. Hast du bezahlt, kommt sie meist in ein paar Minuten.';
-  return standText(st) || (st.angemeldet ? 'Kein Abo aktiv. Das Spiel bleibt gratis.' : 'Zum Abschließen brauchst du ein Konto.');
+  if (st.angemeldet && ks === 'prueft') return A('bestaetigt');
+  if (st.angemeldet && ks === 'offen') return A('offen');
+  return standText(st) || (st.angemeldet ? A('keinAbo') : A('konto'));
 }
 
 export function aboGruppe({ app } = {}) {
@@ -42,15 +46,14 @@ export function aboGruppe({ app } = {}) {
   // Einmal bauen, danach nur Texte aendern: so bleibt der Fokus auf dem Knopf (auch fuer die Rueckkehr aus dem Blatt)
   el.innerHTML = `<h3 class="es-titel" id="es-g-abo">Crownmate Trainer</h3>
     <p class="abo-stand" aria-live="polite"></p>
-    <p class="es-hilfe">Coaches, Erklärungen in ganzen Sätzen und mehr Lernstoff. Alle Bots, die Analyse und Rätsel ohne
-      Tageslimit bleiben gratis.</p>
+    <p class="es-hilfe">${esc(A('gruppe'))}</p>
     <div class="es-knoepfe"><button class="knopf dr" type="button" data-abo="zeigen"></button></div>`;
   let weg = false;
   const render = () => {
     if (weg) return;
     const st = premiumStand();
     el.dataset.premium = st.premium ? 'ja' : 'nein';
-    el.querySelector('[data-abo="zeigen"]').textContent = st.premium ? 'Mein Trainer' : 'Mehr zum Trainer';
+    el.querySelector('[data-abo="zeigen"]').textContent = st.premium ? A('mein') : A('mehr');
     el.querySelector('.abo-stand').textContent = gruppenText(st);
   };
   el.addEventListener('click', (e) => { if (e.target.closest('[data-abo="zeigen"]')) zeigeTrainer({ app }); });
@@ -90,7 +93,7 @@ export function pruefeNachKauf() {
 
 try {
   anbieten('einstellungen:gruppen', aboGruppe, { reihenfolge: 7, paket: 'abo' });
-  if (typeof document !== 'undefined') document.addEventListener('abo:stand', (e) => { if (e.detail && e.detail.bestaetigt) toast(DANKE); });
+  if (typeof document !== 'undefined') document.addEventListener('abo:stand', (e) => { if (e.detail && e.detail.bestaetigt) toast(A('danke')); });
   hoere('app:bereit', () => { aufraeumen(); pruefeNachKauf(); });
   hoere('app:sichtbar', (d) => { if (d && d.sichtbar) pruefeNachKauf(); });
 } catch (e) {

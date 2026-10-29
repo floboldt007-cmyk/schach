@@ -96,6 +96,7 @@ export const BOSS_VERSUCHE = 3;
 export const LERN = Object.freeze({
   uebungGetroffen: 15, uebungDaneben: 5, uebungVersuche: 2,
   moment: 5, momenteMax: 3,
+  wort: 5,
   karte1: 10, karte2: 4, kartenTag: 8,
   lektion: 40, ringSicher: 20, ringGemeistert: 40,
   raetsel: Object.freeze([[200, 12], [-199, 8], [-399, 4], [-Infinity, 1]]), raetselFalsch: 1,

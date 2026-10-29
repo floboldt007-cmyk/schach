@@ -15,6 +15,7 @@
 //
 // Playwright: PLAYWRIGHT_PFAD, sonst 'playwright', sonst /opt/node-tools/node_modules/playwright.
 import http from 'node:http';
+import { begrenzt } from './zeitwaechter.mjs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, statSync, mkdirSync } from 'node:fs';
@@ -106,9 +107,13 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: false, userAgent: IPAD_UA,
   });
+  kontext.setDefaultTimeout(30000);
+  kontext.setDefaultNavigationTimeout(30000);
   const fehler = [];
   const fehlgeschlagen = [];
   const beobachte = (seite) => {
+    const auswerten = seite.evaluate.bind(seite);
+    seite.evaluate = (...args) => begrenzt(`${gruppe}: Browserauswertung`, () => auswerten(...args));
     seite.on('console', (m) => {
       if (m.type() !== 'error') return;
       const url = (m.location() && m.location().url) || '';
@@ -127,6 +132,9 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
   // Abrufe der 1,8-MB-.wasm ueber ihre Adresse (Seite und Worker; Blob-Abrufe zaehlen nicht)
   kontext.on('request', (r) => {
     if (/\.wasm$/.test(r.url().split(/[?#]/)[0]) && !/^blob:/.test(r.url())) wasmAbrufe.push({ url: r.url(), sw: !!r.serviceWorker() });
+  });
+  if (process.env.TEST_E2E_SW_STILL === '1') await kontext.addInitScript(() => {
+    Object.defineProperty(navigator.serviceWorker, 'ready', { get: () => new Promise(() => {}) });
   });
   const seite = await kontext.newPage();
   return { kontext, seite, fehler, fehlgeschlagen };
@@ -321,10 +329,10 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   pruefe('Manifest: maskable-Icon', man.icons.some((i) => i.zweck === 'maskable' && i.sizes === '512x512'));
 
   // Service Worker: registriert, aktiv, steuert die Seite
-  const reg = await seite.evaluate(async () => {
+  const reg = await begrenzt('Service Worker aktivieren', () => seite.evaluate(async () => {
     const r = await navigator.serviceWorker.ready;
     return { scope: r.scope, skript: r.active && r.active.scriptURL };
-  });
+  }), process.env.TEST_E2E_SW_STILL === '1' ? 2000 : 30000);
   pruefe('Service Worker aktiv, Bereich /schach/', reg.scope === START && reg.skript === START + 'sw.js', JSON.stringify(reg));
   await seite.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
   pruefe('Service Worker steuert die Seite (clients.claim)', await seite.evaluate(() => !!navigator.serviceWorker.controller));
@@ -586,8 +594,11 @@ async function testeAufgabe(seite, h, fehler) {
   await seite.waitForSelector('.dialog-ort .dialog');
   await h.tippe('.dialog-knoepfe .knopf.gefahr');
   await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
-  pruefe('Overlay: Niederlage mit Genauigkeit', /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
-    && /\d/.test(await seite.locator('.erg-genau b').innerText()));
+  const genauText = await seite.locator('.erg-genau').innerText();
+  pruefe('Overlay: kurze Niederlage zeigt zu kurz mit Hinweis, keine Prozentzahl oder Spielstaerke',
+    /^Partie verloren$/.test(await seite.locator('.erg-wort').innerText())
+    && Math.ceil(n / 2) < 10 && (await seite.locator('.erg-genau b').innerText()).trim() === 'zu kurz'
+    && genauText.includes('Zu wenige Züge für eine verlässliche Bewertung') && !/%|spielte wie/.test(genauText), genauText);
   const p = (await h.partien()).find((x) => x.botId === 'paula');
   pruefe('Partie mit Analyse gespeichert', p && p.zuege.length === n && Number.isFinite(p.genauigkeit)
     && await seite.evaluate((i) => localStorage.getItem('schach-arena:v1:review:' + i) != null, p && p.id));
@@ -735,6 +746,58 @@ async function testeOhnePakete(browser) {
   await kontext.close();
 }
 
+// Kurze Aufgabe und kurzer Sieg auf Deutsch und Englisch, mit echten Zuegen und gespeicherter Analyse.
+async function testeKurzesErgebnis(browser) {
+  for (const sprache of ['de', 'en']) {
+    gruppe = `Kurzes Ergebnis ${sprache}`;
+    const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
+    const h = hilfen(seite);
+    try {
+      await seite.goto(START + `?test&kern&sprache=${sprache}#arena`);
+      await h.screen('arena');
+      await seite.evaluate(() => {
+        window.__app.setzeEinstellungen({ bewegung: 'aus' });
+        window.__test = { botZug: () => 'e7e5' };
+        window.__app.gehe('partie', { botId: 'benno', farbe: 'w' });
+      });
+      await h.screen('partie');
+      await h.warteBereit();
+      await h.warteFlo();
+      await h.zugTippen('e2e4');
+      await h.warteFlo();
+      await h.aufgebenFragen();
+      await seite.waitForSelector('.dialog-ort .dialog', { timeout: 5000 });
+      await h.tippe('.dialog-knoepfe .knopf.gefahr');
+      await seite.waitForSelector('.ergebnis-overlay.niederlage.gefuellt', { timeout: 90000 });
+      const kurz = sprache === 'de' ? 'zu kurz' : 'too short';
+      const hinweis = sprache === 'de' ? 'Zu wenige Züge für eine verlässliche Bewertung' : 'Too few moves for a reliable assessment';
+      const text = await seite.locator('.erg-genau').innerText();
+      pruefe('Aufgabe nach einem eigenen Zug: zu kurz mit Hinweis, ohne Prozent und Elo',
+        (await seite.locator('.erg-genau b').innerText()).trim() === kurz
+        && text.includes(hinweis) && !/%|spielte wie|played like|≈/.test(text), text);
+      const verloren = (await h.partien())[0];
+      pruefe('Niederlage: Genauigkeit und Spielstaerke bleiben gespeichert, keine Sterne',
+        verloren.ergebnis === 'niederlage' && verloren.zuege.length === 2
+        && Number.isFinite(verloren.genauigkeit) && Number.isFinite(verloren.spielstaerke)
+        && verloren.sterne.every((s) => s === false), JSON.stringify(verloren));
+
+      await schaefermatt(seite, h);
+      await seite.waitForSelector('.ergebnis-overlay.sieg.gefuellt', { timeout: 40000 });
+      const gewonnen = (await h.partien())[0];
+      const siegText = await seite.locator('.erg-genau').innerText();
+      pruefe('Schaefermatt nach vier eigenen Zuegen: gespeicherte Genauigkeit, Spielstaerke und drei Sterne',
+        gewonnen.ergebnis === 'sieg' && gewonnen.zuege.length === 7 && Number.isFinite(gewonnen.genauigkeit)
+        && Number(await seite.locator('.erg-genau b').getAttribute('data-ziel')) === gewonnen.genauigkeit
+        && /%/.test(siegText) && siegText.includes(sprache === 'de' ? 'spielte wie' : 'played like')
+        && !siegText.includes(kurz) && await seite.locator('.erg-stern.an').count() === 3, siegText);
+      pruefe('Keine Konsolenfehler oder fehlgeschlagenen Anfragen', fehler.length === 0 && fehlgeschlagen.length === 0,
+        [...fehler, ...fehlgeschlagen].join(' | '));
+    } finally {
+      await kontext.close();
+    }
+  }
+}
+
 // ---------- Kopf mit den echten Paketen: Zahlenruhe (Flo 23.10.: Sterne, Level, Serie) ----------
 // Mit Level (funken) und Serie im Kopf tritt "Besiegt" zurueck; jeder sichtbare Chip steht ganz in der Chip-Reihe, auf dem
 // iPad (quer 1180 und 1024, hoch 820) und am Handy (390, dort ohne die Marke und ohne die Flamme der Serie).
@@ -742,7 +805,11 @@ async function testeKopfZahlenruhe(browser) {
   gruppe = 'Kopf';
   for (const [name, w, h, mobil] of [['iPad quer', 1180, 820, false], ['iPad 1024', 1024, 768, false], ['iPad hoch', 820, 1180, false], ['Handy', 390, 844, true]]) {
     const kontext = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: true, isMobile: mobil });
+    kontext.setDefaultTimeout(30000);
+    kontext.setDefaultNavigationTimeout(30000);
     const seite = await kontext.newPage();
+    const auswerten = seite.evaluate.bind(seite);
+    seite.evaluate = (...args) => begrenzt(`${gruppe}: Browserauswertung`, () => auswerten(...args));
     await seite.goto(START + '?test#arena');
     await seite.waitForFunction(() => !!window.__serie, null, { timeout: 20000 });
     await seite.waitForSelector('.screen.arena .kopf-chips .fk-chip', { timeout: 20000 });
@@ -775,31 +842,44 @@ async function testeKopfZahlenruhe(browser) {
   }
 }
 
+async function abschnitt(name, arbeit, ms = 180000) {
+  const start = Date.now();
+  gruppe = name;
+  console.log(`… e2e: ${name}`);
+  const puls = setInterval(() => console.log(`… e2e: ${name}, Gruppe ${gruppe}, ${Math.round((Date.now() - start) / 1000)} s`), 15000);
+  try {
+    return await begrenzt(`e2e ${name} (Gruppe ${gruppe})`, arbeit, ms);
+  } catch (e) {
+    throw new Error(`e2e ${name}, letzte Gruppe ${gruppe}: ${e.message}`, { cause: e });
+  } finally { clearInterval(puls); }
+}
+
 // ---------- Ablauf ----------
 let browser;
 let code = 1;
 const t0 = Date.now();
 try {
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); });
-  browser = await browserTyp(ladePlaywright()).launch();
+  await abschnitt('Serverstart', () => new Promise((resolve, reject) => { server.once('error', reject); server.listen(PORT, '127.0.0.1', resolve); }), 10000);
+  browser = await abschnitt('Browserstart', () => browserTyp(ladePlaywright()).launch(), 45000);
   const { kontext, seite, fehler, fehlgeschlagen } = await neuerKontext(browser);
   const h = hilfen(seite);
-  await testeStart(seite, h, fehler, fehlgeschlagen);
-  const id = await testeSieg(seite, h, fehler);
-  await testeVerlaufEinstellungen(seite, h, fehler, id);
-  await testePartie(seite, h, fehler);
-  await testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id);
-  await testeAufgabe(seite, h, fehler);
-  await testeUpdate(seite, h, fehler);
-  await testeOhnePakete(browser);
-  await testeKopfZahlenruhe(browser);
+  await abschnitt('Start, Cache und Engines', () => testeStart(seite, h, fehler, fehlgeschlagen));
+  const id = await abschnitt('Sieg und Analyse', () => testeSieg(seite, h, fehler));
+  await abschnitt('Verlauf und Einstellungen', () => testeVerlaufEinstellungen(seite, h, fehler, id));
+  await abschnitt('Partie und Fortsetzen', () => testePartie(seite, h, fehler));
+  await abschnitt('Offline', () => testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id));
+  await abschnitt('Aufgabe', () => testeAufgabe(seite, h, fehler));
+  await abschnitt('Update', () => testeUpdate(seite, h, fehler));
+  await abschnitt('Kern ohne Pakete', () => testeOhnePakete(browser));
+  await abschnitt('Kurzes Ergebnis', () => testeKurzesErgebnis(browser));
+  await abschnitt('Kopf und Zahlenruhe', () => testeKopfZahlenruhe(browser));
   gruppe = 'Gesamt';
   pruefe('Keine 404 im ganzen Ablauf', server404.length === 0, server404.join(', '));
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
   speicher = await seite.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('schach-arena:') && !k.endsWith(':laufend')).map((k) => [k, localStorage.getItem(k)])));
   const lang = (JSON.parse(speicher['schach-arena:v1:partien'] || '[]').find((p) => p.botId === 'paula') || {}).id;
   await kontext.close();
-  if (!OHNE_BILDER) await bilder(browser, lang || id);
+  if (!OHNE_BILDER) await abschnitt('Schlussbilder', () => bilder(browser, lang || id), 300000);
   const schlecht = ergebnisse.filter((r) => !r.ok);
   console.log(`\n${ergebnisse.length - schlecht.length}/${ergebnisse.length} bestanden in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   for (const f of schlecht) console.log('FEHLER: ' + f.name + (f.detail ? ' (' + f.detail + ')' : ''));
@@ -809,7 +889,8 @@ try {
   console.error(e);
   code = 1;
 } finally {
-  if (browser) await browser.close();
-  server.close();
+  if (browser) await begrenzt('Browser schliessen', () => browser.close(), 10000).catch(e => { console.error(e); code = 1; });
+  server.closeAllConnections();
+  await begrenzt('Server schliessen', () => new Promise(resolve => server.close(resolve)), 5000).catch(e => { console.error(e); code = 1; });
 }
 process.exit(code);

@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL } from '../js/konto.js';
+import { setzeKontoFetch, sitzung, SITZUNG_SCHLUESSEL, SICHTBAR_SCHLUESSEL } from '../js/konto.js';
 import { SUPABASE_URL, SUPABASE_KEY } from '../js/konto-config.js';
 import {
   erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit,
@@ -356,7 +356,11 @@ anmelden();
   pruefe('codeAusLink: nichts bei anderen Hashes, falscher Laenge oder verbotenen Zeichen', codeAusLink('#arena') === null && codeAusLink('#online/ABC') === null && codeAusLink('#online/ABC2340') === null && codeAusLink('#online/ABC0I1') === null && codeAusLink('') === null && codeAusLink(null) === null);
   pruefe('normalisiereCode', normalisiereCode(' ab-c2 34 ') === 'ABC234' && normalisiereCode(null) === '');
   vergissEinladung();
+  localStorage.removeItem(SICHTBAR_SCHLUESSEL);
+  pruefe('Ungueltiger Einladungslink schaltet kein Konto frei', uebernimmEinladungsLink({ hash: '#online/ABC0I1' }) === null
+    && localStorage.getItem(SICHTBAR_SCHLUESSEL) === null && gemerkteEinladung() === null);
   pruefe('uebernimmEinladungsLink: merkt den Code aus #online/CODE', uebernimmEinladungsLink({ hash: '#online/abc234' }) === 'ABC234' && gemerkteEinladung() === 'ABC234' && localStorage.getItem(EINLADUNG_SCHLUESSEL) === 'ABC234');
+  pruefe('Gueltiger Einladungslink schaltet das Konto dauerhaft frei', localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1');
   pruefe('uebernimmEinladungsLink: andere Hashes lassen den Merker in Ruhe', uebernimmEinladungsLink({ hash: '#arena' }) === null && gemerkteEinladung() === 'ABC234');
   vergissEinladung();
   pruefe('vergissEinladung: Merker leer', gemerkteEinladung() === null);
@@ -393,7 +397,8 @@ anmelden();
     && /const einladung = uebernimmEinladungsLink\(\);\s*const ziel = einladung/.test(quelle('js/app.js'))
     && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Gegen Freunde'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
-  pruefe('online.js importiert nur konto-config.js und konto.js, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js');
+  pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
+    && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');
   pruefe('online.js: kein setInterval, keine Supabase-Bibliothek, kein geheimer Schluessel', !/setInterval|@supabase|service_role|eyJ[A-Za-z0-9_-]{20,}/.test(eigene));
   pruefe('sw.js: js/online.js im Offline-Cache', /'js\/online\.js'/.test(quelle('sw.js')));
   const alle = quelle('tests/alle.mjs');

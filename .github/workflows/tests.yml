@@ -37,7 +37,9 @@ jobs:
           if-no-files-found: ignore
 
   webkit:
-    runs-on: ubuntu-latest
+    # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test
+    # (setzeDauer 400) unter WebKit nicht mehr nach 520 ms an (gleiche Playwright-WebKit v2370, aber deren Build fuer 26.04). Offen: Ursache klaeren.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

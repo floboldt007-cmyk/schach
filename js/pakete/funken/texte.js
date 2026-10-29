@@ -70,6 +70,8 @@ export const DE = {
   'chip.wort': 'Level ',
   // Funken-Spiegel
   'spiegel.titel': 'Funken-Spiegel',
+  'lern.wort': 'Motiv erkannt',
+  'spiegel.wortWert': '+{n} Funken',
   'spiegel.heute': 'Heute',
   'spiegel.bogen': 'Tagesbogen',
   'spiegel.rw': 'Rückenwind',
@@ -207,6 +209,8 @@ export const EN = {
   'chip.label': 'Level {level}, {titel}: {wert} of {kostet} sparks to Level {naechstes}',
   'chip.wort': 'Level ',
   'spiegel.titel': 'Spark overview',
+  'lern.wort': 'Motif spotted',
+  'spiegel.wortWert': '+{n} sparks',
   'spiegel.heute': 'Today',
   'spiegel.bogen': 'Daily pace',
   'spiegel.rw': 'Tailwind',

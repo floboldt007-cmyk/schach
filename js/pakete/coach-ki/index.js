@@ -23,11 +23,15 @@
 //   nur weil gerade das Netz fehlt (dann "offline").
 // Defensiv: Ein Fehler hier stoert nie die Analyse.
 import { anbieten } from '../../orte.js';
+import { t } from '../../sprache.js';
+import './texte.js';
+const C = (k, w) => t('p-coach-ki.' + k, w);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { kontoFreigeschaltet } from '../../konto.js';
 import { registriereVorteil, premiumHinweis, istPremium, premiumStand, nutzerId } from '../../abo.js';
 import { icon, registriereIcon } from '../../ui/icons.js';
 import { tempo } from '../../bewegung.js';
-import { frageCoach, eingabeAusZug, restText, TEXTE, KI_HINWEIS } from '../../coach-ki.js';
+import { frageCoach, eingabeAusZug, restText, TEXTE, kiHinweis } from '../../coach-ki.js';
 
 export const VORTEIL = 'frag-den-coach';
 export const KNOPF_TEXT = 'Frag den Coach';
@@ -55,7 +59,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
   knopf.className = 'knopf ck-knopf';
   knopf.dataset.paket = 'coach-ki';
   knopf.setAttribute('aria-expanded', 'false');
-  knopf.innerHTML = `${icon('coach-frage')}<span>${KNOPF_TEXT}</span>`;
+  knopf.innerHTML = `${icon('coach-frage')}<span>${C('knopf')}</span>`;
   let karte = null;
   let weg = false;
   let laeuft = false;
@@ -83,7 +87,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
   const kopf = (k) => {
     const h = document.createElement('div');
     h.className = 'ck-kopf';
-    h.innerHTML = '<span class="ck-marke">KI</span><span class="ck-titel">Der Coach erklärt</span>';
+    h.innerHTML = `<span class="ck-marke">${esc(C('marke'))}</span><span class="ck-titel">${esc(C('titel'))}</span>`;
     k.append(h);
   };
   const absatz = (k, klasse, text) => {
@@ -102,7 +106,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
     const k = zeigeKarte('antwort');
     kopf(k);
     absatz(k, 'ck-text', a.text);
-    const fuss = absatz(k, 'ck-fuss', KI_HINWEIS);
+    const fuss = absatz(k, 'ck-fuss', kiHinweis());
     fuss.classList.add('ck-ki-hinweis');
     const rest = restText(a.rest);
     if (rest && !a.gemerkt) absatz(k, 'ck-rest', rest);
@@ -112,7 +116,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
     if (grund === 'premium') {
       const k = zeigeKarte('premium');
       // ruhiger Hinweis aus B1; in Partie und Lektion liefert er null, dann bleibt die Karte zu
-      if (!premiumHinweis(k, KNOPF_TEXT, { app })) schliesse();
+      if (!premiumHinweis(k, C('knopf'), { app })) schliesse();
       else insBild(k);
       return;
     }
@@ -122,7 +126,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'knopf ck-konto';
-      b.textContent = 'Zum Konto';
+      b.textContent = C('konto');
       b.addEventListener('click', () => {
         if (document.documentElement.dataset.screen !== 'einstellungen') app.gehe('einstellungen');
         requestAnimationFrame(() => {
@@ -151,7 +155,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
       if (!premium && premiumStand().geprueftAm) { zeigeGrund('premium'); return; }
       const k = zeigeKarte('laedt');
       kopf(k);
-      absatz(k, 'ck-meldung', LAEDT_TEXT);
+      absatz(k, 'ck-meldung', C('laedt'));
       insBild(k);
       const a = await frageCoach(eingabe);
       if (weg) return;
@@ -182,8 +186,8 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
 }
 
 try {
-  registriereIcon('coach-frage', '<path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H12l-4.5 3.5v-3.5h-3A1.5 1.5 0 0 1 3 16V7a1.5 1.5 0 0 1 1.5-1.5z"/>'
-    + '<path d="M10 9.6a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.3"/><path d="M12 15.2v.1"/>');
+  registriereIcon('coach-frage', `<path d="M4.5 5.5h15a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H12l-4.5 3.5v-3.5h-3A1.5 1.5 0 0 1 3 16V7a1.5 1.5 0 0 1 1.5-1.5z"/>`
+    + `<path d="M10 9.6a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.3"/><path d="M12 15.2v.1"/>`);
   registriereVorteil(VORTEIL);
   anbieten('analyse:coach', coachKnopf, { reihenfolge: 30, paket: 'coach-ki' });
 } catch (e) {
