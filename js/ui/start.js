@@ -7,7 +7,7 @@
 //          'frage'              "Kennst du die Schachregeln?": Ja -> Einstufung, Nein -> Regel-Hilfe (Raetsel-Bildschirm)
 //          'einstufung'         Angebot des Einstufungstests (8 Aufgaben im Raetsel-Bildschirm)
 //          'empfehlung'         Ergebnis der letzten Einstufung: Bot mit Begruendung, Probepartie oder Partie, Leiter
-//          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen den ersten Bot der Leiter (BOTS[0], Bauer Benno)
+//          'nach-regeln'        nach der Regel-Hilfe: erste Partie gegen den ersten Bot der Leiter (BOTS[0], Bauer Lukas)
 //   Ohne geladenen Paket-Einstieg (dienst.paketGeladen) geht es still zur Arena, wie bei einem fehlenden Paket-Screen.
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
 //   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags

@@ -4,7 +4,7 @@
 //   - mit Arena-Wertung (ab WERTUNG_AB wertenden Partien, Paket Wertung/Liga ueber liga:geaendert): Bot-Staerke
 //     mindestens eigene Wertung minus ABSTAND (150, bewusst weiter als "Augenhoehe" mit 99) [E]
 //   - davor (erste 10 Partien, und solange es keine Wertung gibt): Stufe des Bots mindestens hoechster freigeschalteter
-//     Bot minus eine Stufe. Damit lohnt Benno-Farmen nicht.
+//     Bot minus eine Stufe. Damit lohnt Lukas-Farmen nicht.
 // Pausieren (zaehlen nicht, brechen nicht): Partien mit Hinweis oder Zuruecknehmen, gegen schwaechere Gegner, Uebungen,
 // freie Partien, Boss-Partien, Spielhalle, Gaeste und eigene Stellungen (alles, was nicht wertet).
 // Remis oder Niederlage einer zaehlenden Partie beenden den Lauf still ("Siegeslauf beendet bei 4. Dein Rekord: 7.").

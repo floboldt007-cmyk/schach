@@ -1,7 +1,7 @@
 // Tafeln der Bestenliste (Paket punkte, SPIELKONZEPT 3.13 "Alle Tabellen" und "Rekord-Momente"). Rein: ohne DOM,
 // ohne Speicher, ohne Zufall; die Zeit kommt als Parameter. In Node testbar.
 //
-// Eine Tafel ist eine Bestenliste aus EINZELNEN Partien, nie eine Summe: je Bot ("Rudis Tafel", id 'bot:rudi') und je
+// Eine Tafel ist eine Bestenliste aus EINZELNEN Partien, nie eine Summe: je Bot ("Thorstens Tafel", id 'bot:rudi') und je
 // Boss und Stufe (Wochen-Tafel, id 'boss:<boss>:standard|meister'). Regeln (3.13):
 //   - 10 Zeilen, davon hoechstens 3 eigene (damit Gaeste sichtbar bleiben); dein Bestwert steht immer da, auch unter
 //     Platz 10.

@@ -67,9 +67,9 @@ function phasenName(name) {
   return PHASE[name] ? t(`analyse.phase.${PHASE[name]}`) : name;
 }
 
-// Kurzname des Bots fuer Beschriftungen ("Rudi"); Englisch: der Rufname des Bots (KURZ sind deutsche Kurzformen)
-const KURZ = { benno: 'Benno', hilde: 'Hilde', kalle: 'Kalle', lisa: 'Lisa', rudi: 'Rudi', turm: 'Prof. Turm',
-  delia: 'Delia', koenig: 'Kommissar', greta: 'Greta', stockfisch: 'Stockfisch' };
+// Kurzname des Bots fuer Beschriftungen ("Thorsten"); Englisch: der Rufname des Bots (KURZ sind deutsche Kurzformen)
+const KURZ = { benno: 'Lukas', hilde: 'Hilde', kalle: 'Maxi', lisa: 'Lisa', rudi: 'Thorsten', turm: 'Oliver',
+  delia: 'Delia', koenig: 'Tobias', greta: 'Greta', stockfisch: 'Stockfisch' };
 function kurzName(bot) {
   if (!bot) return 'Bot';
   return (sprache() === 'de' ? KURZ[bot.id] : null) || bot.rufname || bot.name;

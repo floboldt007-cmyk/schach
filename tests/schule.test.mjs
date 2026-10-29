@@ -122,7 +122,7 @@ async function nodeTeil() {
   srv.stand = { leitung: [], mitglied: [{ klasse: KLASSE, name: 'Q1 Schach-AG', aktiv: true, mitglied: uuid(5), anzeigename: 'Anna', erledigt: [],
     beigetreten_am: new Date(T0 - 86400e3).toISOString(),
     aufgaben: [
-      { id: A_BOT, titel: 'Gabeln mit Rudi', art: 'bot', ziel: { bot: 'rudi', sterne: 1 }, faellig: '2026-10-30', erstellt_am: new Date(T0 - 3600e3).toISOString() },
+      { id: A_BOT, titel: 'Gabeln mit Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 1 }, faellig: '2026-10-30', erstellt_am: new Date(T0 - 3600e3).toISOString() },
       { id: A_PARTIEN, titel: 'Drei Partien', art: 'partien', ziel: { anzahl: 3 }, faellig: null, erstellt_am: new Date(T0 - 7200e3).toISOString() },
       { id: A_RAETSEL, titel: 'Zwei Rätsel', art: 'raetsel', ziel: { anzahl: 2 }, faellig: null, erstellt_am: new Date(T0 - 7200e3).toISOString() },
     ] }] };
@@ -222,8 +222,8 @@ async function nodeTeil() {
     && !String(a.body || '').includes(UID_L)));
 
   // ---------- Aufgaben: Texte ----------
-  pruefe('zielText', zielText({ art: 'bot', ziel: { bot: 'rudi', sterne: 1 } }) === 'Ritter Rudi besiegen'
-    && zielText({ art: 'bot', ziel: { bot: 'benno', sterne: 2 } }) === 'Bauer Benno besiegen mit 2 Sternen'
+  pruefe('zielText', zielText({ art: 'bot', ziel: { bot: 'rudi', sterne: 1 } }) === 'Ritter Thorsten besiegen'
+    && zielText({ art: 'bot', ziel: { bot: 'benno', sterne: 2 } }) === 'Bauer Lukas besiegen mit 2 Sternen'
     && zielText({ art: 'partien', ziel: { anzahl: 5 } }) === '5 Partien spielen' && zielText({ art: 'partien', ziel: { anzahl: 1 } }) === '1 Partie spielen'
     && zielText({ art: 'raetsel', ziel: { anzahl: 10 } }) === '10 Rätsel lösen');
   pruefe('faelligText: ein Termin mit Wochentag, kein Countdown', faelligText('2026-10-30') === 'bis Fr 30.10.' && faelligText('2026-11-02') === 'bis Mo 02.11.'
@@ -256,12 +256,12 @@ async function nodeTeil() {
   const fj = fortschrittJetzt({ stand, fortschritt: f, partien: partienSeit, statistikWerte: { partien: 12, schnittGenauigkeit: 81.46 }, geloest: {} });
   pruefe('fortschrittJetzt: Bots, Sterne, Partien, Genauigkeit gerundet, genau die Felder der SQL-Funktion', fj.bots_besiegt === 2 && fj.sterne === 4
     && fj.partien === 12 && fj.genauigkeit_schnitt === 81.5 && JSON.stringify(Object.keys(fj)) === JSON.stringify(SQL_PARAMS.schule_melde_fortschritt), fj);
-  pruefe('fortschrittJetzt: noch nichts erledigt (Rudi nicht besiegt, 1 von 3 Partien seit der Aufgabe, Übung zählt nicht)', fj.erledigt.length === 0
+  pruefe('fortschrittJetzt: noch nichts erledigt (Thorsten nicht besiegt, 1 von 3 Partien seit der Aufgabe, Übung zählt nicht)', fj.erledigt.length === 0
     && JSON.stringify(aufgabeStand(stand.mitglied[0].aufgaben[1], { partien: partienSeit })) === '{"erledigt":false,"stand":1,"ziel":3}', fj.erledigt);
   f.bots.rudi.sterne = [true, false, false];
   const zwei = [...partienSeit, partie(4, { datum: nachher(30) }), partie(5, { datum: nachher(40) })];
   const fj2 = fortschrittJetzt({ stand, fortschritt: f, partien: zwei, statistikWerte: { partien: 14, schnittGenauigkeit: null }, geloest: { [A_RAETSEL]: ['r1', 'r2'] } });
-  pruefe('fortschrittJetzt: Rudi besiegt, 3 Partien, 2 Rätsel -> alle drei erledigt; Genauigkeit ohne Wert null',
+  pruefe('fortschrittJetzt: Thorsten besiegt, 3 Partien, 2 Rätsel -> alle drei erledigt; Genauigkeit ohne Wert null',
     JSON.stringify([...fj2.erledigt].sort()) === JSON.stringify([A_BOT, A_PARTIEN, A_RAETSEL].sort()) && fj2.genauigkeit_schnitt === null, fj2);
   pruefe('aufgabeStand Bot mit 2 Sternen: Sieg allein reicht nicht', aufgabeStand({ art: 'bot', ziel: { bot: 'rudi', sterne: 2 } }, { fortschritt: f }).erledigt === false
     && aufgabeStand({ art: 'bot', ziel: { bot: 'benno', sterne: 2 } }, { fortschritt: f }).erledigt === true);
@@ -720,11 +720,11 @@ const IN_7 = addiereTage(HEUTE, 7);
 function serverMitKlasse() {
   const s = neuerServer();
   s.klassen.push({ id: uuid(1), name: 'Q1 Schach-AG', code: 'K7Q2MX', leitung: UID_L, aktiv: true, erstellt_am: new Date(Date.now() - 864e5).toISOString(), geschlossen_am: null });
-  s.aufgaben.push({ id: uuid(11), klasse: uuid(1), titel: 'Gabeln mit Rudi', art: 'bot', ziel: { bot: 'rudi', sterne: 1 }, faellig: IN_7, erstellt_am: new Date(Date.now() - 36e5).toISOString() });
+  s.aufgaben.push({ id: uuid(11), klasse: uuid(1), titel: 'Gabeln mit Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 1 }, faellig: IN_7, erstellt_am: new Date(Date.now() - 36e5).toISOString() });
   s.aufgaben.push({ id: uuid(12), klasse: uuid(1), titel: 'Zwei Rätsel', art: 'raetsel', ziel: { anzahl: 2 }, faellig: null, erstellt_am: new Date(Date.now() - 72e5).toISOString() });
   return s;
 }
-// Welten: bis Edda (Stufe 11) besiegt, damit Ritter Rudi (Stufe 12, Endgegner von Welt 2) der naechste Gegner ist
+// Welten: bis Irmi (Stufe 11) besiegt, damit Ritter Thorsten (Stufe 12, Endgegner von Welt 2) der naechste Gegner ist
 function fortschrittBisEdda(rudi = false) {
   const bots = {};
   for (const id of ['fridolin', 'benno', 'paula', 'gustav', 'hilde', 'janine', 'bodo', 'kalle', 'leo', 'lisa', 'edda']) bots[id] = { sterne: [true, false, false], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 70 };
@@ -789,13 +789,13 @@ async function browserTeil(browser) {
     const arten = await seite.evaluate(() => [...document.querySelectorAll('.sm-aufgabe-neu input[name="sm-art"]')].map((x) => x.value));
     pruefe('Arten im Formular: Raetsel nur, wenn ein Paket Raetsel zaehlt (RAETSEL_AUFGABEN, seit dem Tagesraetsel an)', JSON.stringify(arten)
       === JSON.stringify(RAETSEL_AUFGABEN ? ['bot', 'raetsel', 'partien'] : ['bot', 'partien']), arten);
-    await seite.fill('.sm-a-titel', 'Gabeln mit Rudi');
+    await seite.fill('.sm-a-titel', 'Gabeln mit Thorsten');
     await seite.selectOption('.sm-a-bot', 'rudi');
     await seite.fill('.sm-a-faellig', IN_7);
     await seite.click('.sm-aufgabe-neu [type="submit"]');
     await seite.waitForSelector('.sm-aufgaben li', { timeout: 10000 });
     const a1 = await seite.evaluate(() => [...document.querySelectorAll('.sm-aufgaben li')].map((li) => li.innerText.replace(/\s+/g, ' ').trim()));
-    pruefe('Bot-Aufgabe gestellt: Ziel und Termin, 0 von 0 erledigt; Server bekommt { bot, sterne } und das Datum', a1.length === 1 && a1[0].includes('Ritter Rudi besiegen · bis ')
+    pruefe('Bot-Aufgabe gestellt: Ziel und Termin, 0 von 0 erledigt; Server bekommt { bot, sterne } und das Datum', a1.length === 1 && a1[0].includes('Ritter Thorsten besiegen · bis ')
       && a1[0].includes('0 von 0 erledigt') && JSON.stringify(srv.aufgaben[0].ziel) === '{"bot":"rudi","sterne":1}' && srv.aufgaben[0].faellig === IN_7, a1);
     await seite.click('.sm-art:has(input[value="partien"])');
     const felder = await seite.evaluate(() => ({ bot: document.querySelector('.sm-a-bot').closest('label').hidden, anzahl: document.querySelector('.sm-a-anzahl').closest('label').hidden }));
@@ -850,7 +850,7 @@ async function browserTeil(browser) {
     await seite.click(`li[data-aufgabe="${srv.aufgaben[1].id}"] .sm-a-loeschen`);
     await antworte(seite, 'Löschen');
     await seite.waitForFunction(() => document.querySelectorAll('.sm-aufgaben li').length === 1);
-    pruefe('Aufgabe loeschen (mit Rueckfrage)', srv.aufgaben.length === 1 && srv.aufgaben[0].titel === 'Gabeln mit Rudi');
+    pruefe('Aufgabe loeschen (mit Rueckfrage)', srv.aufgaben.length === 1 && srv.aufgaben[0].titel === 'Gabeln mit Thorsten');
     // Zurueck im Kopf: aus der Klasse zur Liste
     await seite.click('.schule-screen .kopf-zurueck');
     await seite.waitForSelector('.sm-inhalt[data-ansicht="liste"] .sm-klasse-karte');
@@ -944,7 +944,7 @@ async function browserTeil(browser) {
       status: document.querySelector('.schule-gruppe .sm-status').textContent, code: document.querySelector('.sm-code-eingabe').value }));
     pruefe('Austreten: sichtbarer Text steht im zugaenglichen Namen', (await seite.getAttribute('.sm-austreten', 'aria-label')) === 'Austreten aus „Q1 Schach-AG“');
     pruefe('beigetreten: Klasse mit Anzeigename und Aufgaben (Ziel, Stand, Termin), Felder leer', m.titel === 'Q1 Schach-AG als „Anna“' && m.aufgaben.length === 2
-      && m.aufgaben.some((t) => t.includes('Gabeln mit Rudi') && t.includes('Ritter Rudi besiegen') && t.includes('bis '))
+      && m.aufgaben.some((t) => t.includes('Gabeln mit Thorsten') && t.includes('Ritter Thorsten besiegen') && t.includes('bis '))
       && m.aufgaben.some((t) => t.includes('2 Rätsel lösen · 0 von 2')) && m.status === 'Willkommen in „Q1 Schach-AG“.' && m.code === '', m);
     pruefe('Server: Code normalisiert, Name sauber', srv.mitglieder.length === 1 && srv.mitglieder[0].anzeigename === 'Anna' && srv.mitglieder[0].uid === UID_A);
     await seite.waitForFunction(() => true);
@@ -978,12 +978,12 @@ async function browserTeil(browser) {
     await bereit(seite, '#arena');
     await seite.waitForSelector('.heute-karte:not([hidden]) .sm-heute', { timeout: 20000 });
     await cssDa(seite);
-    // Rudi ist der naechste Gegner und schon gewaehlt: kein Knopf; mit Benno im Panel steht "Zu Rudi" da
+    // Thorsten ist der naechste Gegner und schon gewaehlt: kein Knopf; mit Lukas im Panel steht "Zu Thorsten" da
     const ohneKnopf = await seite.evaluate(() => ({ bot: document.querySelector('.arena .detail .detail-name')?.textContent || '',
       knopf: document.querySelectorAll('.sm-heute .sm-heute-los').length }));
-    pruefe('Rudi schon gewaehlt: Zeile ohne Knopf', /Ritter Rudi/.test(ohneKnopf.bot) && ohneKnopf.knopf === 0, ohneKnopf);
+    pruefe('Thorsten schon gewaehlt: Zeile ohne Knopf', /Ritter Thorsten/.test(ohneKnopf.bot) && ohneKnopf.knopf === 0, ohneKnopf);
     await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }, { ersetzen: true }));
-    await seite.waitForFunction(() => /Benno/.test(document.querySelector('.arena .detail .detail-name')?.textContent || '') && document.querySelector('.sm-heute'), null, { timeout: 10000 });
+    await seite.waitForFunction(() => /Lukas/.test(document.querySelector('.arena .detail .detail-name')?.textContent || '') && document.querySelector('.sm-heute'), null, { timeout: 10000 });
     const z = await seite.evaluate(() => {
       const el = document.querySelector('.sm-heute');
       return { titel: el.querySelector('b').textContent, text: el.querySelector('.sm-heute-text').textContent.replace(/\s+/g, ' '), knopf: el.querySelector('.sm-heute-los')?.textContent || null,
@@ -991,8 +991,8 @@ async function browserTeil(browser) {
     });
     pruefe('Knoepfe: der sichtbare Text steht im zugaenglichen Namen (WCAG 2.5.3)', await seite.evaluate(() => [...document.querySelectorAll('.sm-heute button')]
       .every((k) => !k.hasAttribute('aria-label') || k.getAttribute('aria-label').includes(k.textContent.trim()))));
-    pruefe('Heute-Karte: naechste Aufgabe mit Ziel, Termin, Klasse (zuletzt) und Knopf zum Bot', z.titel === 'Gabeln mit Rudi'
-      && z.text.includes('Gabeln mit Rudi · Ritter Rudi besiegen · bis ') && z.text.endsWith('· Q1 Schach-AG') && z.knopf === 'Zu Rudi' && z.art === 'bot' && fair(z.text), z);
+    pruefe('Heute-Karte: naechste Aufgabe mit Ziel, Termin, Klasse (zuletzt) und Knopf zum Bot', z.titel === 'Gabeln mit Thorsten'
+      && z.text.includes('Gabeln mit Thorsten · Ritter Thorsten besiegen · bis ') && z.text.endsWith('· Q1 Schach-AG') && z.knopf === 'Zu Thorsten' && z.art === 'bot' && fair(z.text), z);
     const sicht = await seite.evaluate(() => {
       const z = document.querySelector('.sm-heute .sm-heute-ziel');
       const t = document.querySelector('.sm-heute .sm-heute-text').getBoundingClientRect();
@@ -1001,15 +1001,15 @@ async function browserTeil(browser) {
       const teile = [...r.getClientRects()];
       return { text: z.innerText.replace(/\s+/g, ' '), innen: teile.length > 0 && teile.every((x) => x.left >= t.left - 1 && x.right <= t.right + 1 && x.bottom <= t.bottom + 1) };
     });
-    pruefe('iPad neben "Zu Rudi": Ziel, Termin und Klasse ganz zu sehen (zweite Zeile, nichts abgeschnitten)', sicht.innen && /bis \S+ \d\d\.\d\d\./.test(sicht.text)
+    pruefe('iPad neben "Zu Thorsten": Ziel, Termin und Klasse ganz zu sehen (zweite Zeile, nichts abgeschnitten)', sicht.innen && /bis \S+ \d\d\.\d\d\./.test(sicht.text)
       && sicht.text.endsWith('Q1 Schach-AG'), sicht);
     await bild(seite, 'heute-aufgabe-ipad-hell');
     await seite.click('.sm-heute-los');
-    await seite.waitForFunction(() => /Rudi/.test(document.querySelector('.arena .detail .detail-name')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+    await seite.waitForFunction(() => /Thorsten/.test(document.querySelector('.arena .detail .detail-name')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     const gewaehlt = await seite.evaluate(() => document.querySelector('.arena .detail .detail-name')?.textContent || '');
-    pruefe('"Zu Rudi" waehlt Ritter Rudi in der Arena (dann ohne eigenen Knopf)', /Ritter Rudi/.test(gewaehlt)
+    pruefe('"Zu Thorsten" waehlt Ritter Thorsten in der Arena (dann ohne eigenen Knopf)', /Ritter Thorsten/.test(gewaehlt)
       && (await seite.locator('.sm-heute .sm-heute-los').count()) === 0, gewaehlt);
-    // Rudi besiegt: die Raetsel-Aufgabe ist dran, Knopf "Ueben" fuehrt ins Training
+    // Thorsten besiegt: die Raetsel-Aufgabe ist dran, Knopf "Ueben" fuehrt ins Training
     await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('arena', {}, { ersetzen: true }); }, fortschrittBisEdda(true));
     await seite.waitForFunction(() => document.querySelector('.sm-heute')?.dataset.art === 'raetsel', null, { timeout: 10000 });
     const r = await seite.evaluate(() => ({ text: document.querySelector('.sm-heute').innerText.replace(/\s+/g, ' '), knopf: document.querySelector('.sm-heute-los')?.textContent }));

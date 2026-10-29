@@ -599,7 +599,7 @@ gruppe = 'Ereignisse';
   sende('partie:beendet', partie('h1', { botId: 'gustav', botStufe: 4, neuFreigeschaltet: 'hilde' }));
   sende('partie:beendet', partie('h2', { botId: 'paula', botStufe: 3 }));
   const lst = S.lade();
-  pruefe('Freischaltung durch diese Partie zählt erst danach (Gustav zählt, Paula danach nicht mehr: Hilde ist frei)', lst.lauf.n === 1
+  pruefe('Freischaltung durch diese Partie zählt erst danach (Maik zählt, Paula danach nicht mehr: Hilde ist frei)', lst.lauf.n === 1
     && lst.abr.find((a) => a.id === 'h2').l === null, lst.lauf);
   // Reset: nur Arbeitsspeicher, nie schreiben
   const sp2 = fakeSpeicher();
@@ -717,7 +717,7 @@ function hilfen(seite) {
         } };
       }, p);
     },
-    // Partie nach Plan bis zum Ergebnis (wertend gegen Benno)
+    // Partie nach Plan bis zum Ergebnis (wertend gegen Lukas)
     async spiele(zuege, plan, { botId = 'benno', warteAuf = '.ergebnis-overlay.gefuellt:not(.vorlaeufig)' } = {}) {
       await h.plan(plan);
       await h.starte({ botId, farbe: 'w' });

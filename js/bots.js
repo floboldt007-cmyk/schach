@@ -343,7 +343,7 @@ export const WELTEN = Object.freeze([
 export const weltVon = (bot) => (bot && WELTEN.find((w) => w.nr === bot.welt)) || null;
 export const botsDerWelt = (nr) => BOTS.filter((b) => b.welt === nr).sort((a, c) => a.stufe - c.stufe);
 export const endgegnerDerWelt = (nr) => BOTS.find((b) => b.welt === nr && b.endgegner) || null;
-// Kurzer Rufname fuer Schilder, Knoepfe und Saetze ("Spielen gegen Kalle"); Rueckfall der Name
+// Kurzer Rufname fuer Schilder, Knoepfe und Saetze ("Spielen gegen Maxi"); Rueckfall der Name
 export const rufname = (bot) => (bot && (bot.rufname || bot.name)) || '';
 
 // Angemeldete Bots (W0+a): id -> eingefrorenes Profil

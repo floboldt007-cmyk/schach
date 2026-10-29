@@ -158,7 +158,7 @@ window.testseite = {
   starte,
   aktuell: () => aktuell && aktuell.name,
   leere() { speicher.setzeZurueck({ mitEinstellungen: true }); app.vorab.clear(); },
-  // Opernpartie (Morphy 1858): Flo spielt Weiss gegen Ritter Rudi
+  // Opernpartie (Morphy 1858): Flo spielt Weiss gegen Ritter Thorsten
   async opernpartie({ mitReview = false, tiefe = 12, datum = Date.now() - 3600e3, hinweise = 0 } = {}) {
     const { uci, san } = alsUci(OPER);
     const bot = botNachId('rudi');

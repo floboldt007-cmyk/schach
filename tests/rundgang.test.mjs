@@ -1,5 +1,5 @@
 // Visueller Rundgang fuer den halb fertigen Look "Modern und klar".
-// Startet die echte App auf einem eigenen Port, spielt gegen Benno, besucht alle
+// Startet die echte App auf einem eigenen Port, spielt gegen Lukas, besucht alle
 // vorhandenen Ansichten und legt belegbare Screenshots in rundgang-shots ab.
 //
 //   PORT=8895 node tests/rundgang.test.mjs
