@@ -20,7 +20,7 @@ bessere Zuege zum Durchklicken). Wer einen Bot besiegt, schaltet den naechsten f
 
 ## Ordner
 ```
-index.html                 Einstieg, laedt css/app.css und js/app.js (type=module)
+index.html                 Einstieg, laedt css/app.css und js/app.js (type=module), dazu der Notfall-Waechter (Inline-Skript)
 manifest.webmanifest       PWA
 sw.js                      Service Worker (Cache aller Dateien, Versionsnummer)
 css/app.css                Gesamtes Aussehen (CSS-Variablen siehe unten)
@@ -746,6 +746,24 @@ Element von `.ort-panel-oben`, vor den Paketen) still die Karte `.nachlese` „S
   `erweiterungen.js` als Liste statischer Importe gedacht: ein Fehler in einem Paket haette dort den ganzen
   Modulgraphen abgebrochen (App bleibt auf „wird geladen“, im Test mit `?erw` aber nicht). Deshalb: **nie ein
   Paket statisch importieren**, auch nicht in `erweiterungen.js` (`tests/sw.test.mjs` prueft das).
+- **Notfall-Waechter (index.html, Luecken-Check 7):** Der Update-Weg (`registriereSW`, Nachricht `'aktivieren'`) steckt
+  in `app.js` und laeuft erst am Ende von `ersterStart()`. Bricht `app.js` oder ein statisch importiertes Modul ab, bliebe
+  `#app > .lade-screen` fuer immer stehen und eine reparierte Version wartete vergeblich. Deshalb steht am Ende von
+  `index.html` ein klassisches Inline-Skript (ES5, kein Modul, Stil inline mit Systemfarben, haengt an keiner anderen
+  Datei): Steht der Lade-Screen 15 s nach Ladebeginn noch (nach einem Skriptfehler oder `unhandledrejection` schon 3 s
+  danach; ein Fehler an Bild, Stylesheet oder Schrift zaehlt nicht), erscheint die Tafel `#notfall` (`role="alertdialog"`,
+  ein Satz, Knopf „Reparieren“). Die Sprache folgt `app.js` samt der Migration alter Staende aus `storage.js` (ohne
+  `spracheGewaehlt` gilt ein gespeichertes `'en'` als Wahl); aendert sich die Sprachregel, muss `index.html` mitziehen
+  (die Suite vergleicht Tafel und App). Waehrend
+  der Pruefung ist der Knopf per `aria-disabled` gesperrt (nicht `disabled`), damit der Tastaturfokus auf ihm bleibt.
+  Der Knopf prueft das Netz (`HEAD sw.js?notfall=…`, `cache: 'no-store'`; HEAD, weil `sw.js` nur GET aus dem Cache
+  beantwortet), ohne Netz wird nichts geloescht. Sonst meldet er die Service Worker im Ordner der Seite ab (andere Apps
+  auf github.io bleiben), loescht nur Caches mit `schach-arena-` und laedt neu; localStorage, IndexedDB, Cookies und die
+  uebrigen sessionStorage-Schluessel bleiben. Ohne Service Worker (iOS-Huelle, `file://`, http) laedt er nur neu. Der
+  Merker `schach-arena:notfall-repariert` (sessionStorage, 10 Minuten) laesst die Tafel danach „hat nicht geholfen“
+  sagen; nie automatisch, keine Schleife. Verschwindet der Lade-Screen, geht die Tafel und der Merker. Test:
+  `?test&notfall=<ms>` (nur mit `?test`), Suite `node tests/notfall.test.mjs` (Port 8879); `tests/fairness.test.mjs`
+  prueft die Texte der Inline-Skripte mit.
 - `SCREENS` zusaetzlich `training` („Training“) und `start` („Willkommen“). Fehlt deren Datei (noch kein Paket),
   geht es ohne Platzhalter still zur Arena (Verlaufseintrag wird `#arena`).
 - `app:bereit { app }` einmal vor dem ersten Screen; `app:screen { name, params }` nach erfolgreichem `zeige()`
