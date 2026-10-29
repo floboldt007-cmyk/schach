@@ -9,6 +9,8 @@
 // Runde 4: Anzeige-Ort einstellungen:gruppen (Gruppen der Pakete, vor der Gruppe "Fortschritt"), nach
 // "Fortschritt zuruecksetzen" neu gefuellt. Die Einstellungen bleiben dabei, auch die der Pakete
 // (storage.ladeModulEinstellungen).
+// Tester-Bericht (Luecken-Check 10): in "Info und Lizenzen" der Eintrag .es-bericht mit dem Knopf
+// [data-aktion="bericht"]; er laedt js/bericht.js erst beim Tipp (import()) und oeffnet dort das Blatt mit dem Bericht.
 import { klang } from '../sounds.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
@@ -16,6 +18,7 @@ import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
+import '../sprachen/bericht.js';
 
 // Sprachwahl erst, wenn alles uebersetzt ist (SPRACHWAHL); mit ?test schon jetzt (tests/sprache.test.mjs)
 const ZEIGE_SPRACHE = SPRACHWAHL || (typeof location !== 'undefined' && /[?&]test\b/.test(location.search || ''));
@@ -175,6 +178,10 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
           <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
+          <div class="es-bericht">
+            <p class="es-hilfe" id="es-t-bericht">${t('bericht.eintragText')}</p>
+            <button class="knopf" type="button" data-aktion="bericht" aria-describedby="es-t-bericht">${t('bericht.eintrag')}</button>
+          </div>
           <ul class="es-lizenzen">
             <li><b>Stockfish 19</b><span>${E('info.stockfish', { link: '<a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">github.com/nmrugg/stockfish.js</a>' })}</span></li>
             <li><b>chess.js 1.4.0</b><span>${E('info.chessjs')}</span></li>
@@ -273,6 +280,11 @@ export function zeige(root, params = {}, app) {
           break;
         }
         setze({ [k.dataset.key]: k.dataset.key === 'tiefe' ? Number(k.dataset.wert) : k.dataset.wert });
+        break;
+      case 'bericht':
+        // erst beim Tipp laden: ein Fehler im Bericht stoppt nie den Screen (zeigeBericht oeffnet nie zwei Blaetter)
+        import('../bericht.js').then((m) => m.zeigeBericht(app))
+          .catch(() => { try { app.meldung(t('bericht.erstellenFehler'), { art: 'fehler' }); } catch (f) { /* egal */ } });
         break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
