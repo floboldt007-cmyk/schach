@@ -132,7 +132,10 @@ function main() {
     const pakete = lesePakete(readFileSync(path.join(WURZEL, 'js/erweiterungen.js'), 'utf8')) || [];
     const kandidaten = [...alleDateienTief('js/pakete', /\.(js|json|svg|png)$/), ...alleDateienTief('css/pakete', /\.(css|svg|png)$/)];
     const vorhanden = new Set(leseSw(text).DATEIEN);
-    const neu = paketDateien(kandidaten, pakete).pflicht.filter((d) => !vorhanden.has(d));
+    // Neue Woerterbuecher gehoeren zu den bereits gecachten Modulen, auch vor dem Einschalten eines Pakets.
+    const woerter = [...alleDateien('js/sprachen', /\.js$/),
+      ...kandidaten.filter((d) => /\/texte\.js$/.test(d) && vorhanden.has(d.replace(/texte\.js$/, 'index.js')))];
+    const neu = [...paketDateien(kandidaten, pakete).pflicht, ...woerter].filter((d) => !vorhanden.has(d));
     if (neu.length) text = text.replace('const DATEIEN = [', 'const DATEIEN = [\n' + neu.sort().map((d) => `  '${d}',`).join('\n'));
   }
   const sw = leseSw(text);

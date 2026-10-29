@@ -41,7 +41,10 @@
 //   uhr_*_ms und letzter_zug_am selbst herunter.
 // Fehlerkennungen des Servers (ONLINE_...) werden hier in ganze Saetze uebersetzt (FEHLER_TEXTE).
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
-import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId } from './konto.js';
+import { t } from './sprache.js';
+import './sprachen/online.js';
+const O = (k, w) => t('online.' + k, w);
+import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId, kontoFreigeschaltet } from './konto.js';
 
 export const EINLADUNG_SCHLUESSEL = 'schach-arena:online:einladung';
 export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
@@ -54,44 +57,41 @@ let fetchFn = (...a) => fetch(...a);
 export function setzeOnlineFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 
 export const FEHLER_TEXTE = Object.freeze({
-  ONLINE_NICHT_ANGEMELDET: 'Bitte zuerst anmelden (Einstellungen > Konto), um online zu spielen.',
-  ONLINE_FARBE: 'Bitte eine Farbe wählen: Weiß, Schwarz oder Zufall.',
-  ONLINE_BEDENKZEIT: 'Die Bedenkzeit muss zwischen 1 Sekunde und 3 Stunden liegen, der Zuschlag zwischen 0 und 600 Sekunden.',
-  ONLINE_KEIN_CODE: 'Es konnte kein freier Einladungscode erzeugt werden. Bitte noch einmal versuchen.',
-  ONLINE_CODE_UNGUELTIG: 'Dieser Code ist ungültig oder die Partie ist schon voll.',
-  ONLINE_EIGENE_PARTIE: 'Das ist deine eigene Einladung. Schick den Code an deinen Freund.',
-  ONLINE_PARTIE_UNBEKANNT: 'Diese Partie wurde nicht gefunden.',
-  ONLINE_PARTIE_NICHT_GESTARTET: 'Die Partie hat noch nicht begonnen. Warte, bis dein Freund beitritt.',
-  ONLINE_PARTIE_BEENDET: 'Diese Partie ist schon beendet.',
-  ONLINE_NICHT_DEIN_ZUG: 'Du bist nicht am Zug.',
-  ONLINE_ZUG_FORM: 'Der Zug hat ein ungültiges Format.',
-  ONLINE_FEN_FORM: 'Die Stellung hat ein ungültiges Format.',
-  ONLINE_AM_ZUG_FORM: 'Nach dem Zug muss die andere Seite am Zug sein.',
-  ONLINE_ERGEBNIS_FORM: 'Das Ergebnis hat ein ungültiges Format.',
-  ONLINE_KEIN_REMISANGEBOT: 'Es liegt kein Remisangebot deines Gegners vor.',
-  ONLINE_CODE_ABGELAUFEN: 'Diese Einladung ist abgelaufen (Einladungen gelten 24 Stunden). Bitte deinen Freund um einen neuen Code.',
+  get ONLINE_NICHT_ANGEMELDET() { return O('fehler.ONLINE_NICHT_ANGEMELDET'); },
+  get ONLINE_FARBE() { return O('fehler.ONLINE_FARBE'); },
+  get ONLINE_BEDENKZEIT() { return O('fehler.ONLINE_BEDENKZEIT'); },
+  get ONLINE_KEIN_CODE() { return O('fehler.ONLINE_KEIN_CODE'); },
+  get ONLINE_CODE_UNGUELTIG() { return O('fehler.ONLINE_CODE_UNGUELTIG'); },
+  get ONLINE_EIGENE_PARTIE() { return O('fehler.ONLINE_EIGENE_PARTIE'); },
+  get ONLINE_PARTIE_UNBEKANNT() { return O('fehler.ONLINE_PARTIE_UNBEKANNT'); },
+  get ONLINE_PARTIE_NICHT_GESTARTET() { return O('fehler.ONLINE_PARTIE_NICHT_GESTARTET'); },
+  get ONLINE_PARTIE_BEENDET() { return O('fehler.ONLINE_PARTIE_BEENDET'); },
+  get ONLINE_NICHT_DEIN_ZUG() { return O('fehler.ONLINE_NICHT_DEIN_ZUG'); },
+  get ONLINE_ZUG_FORM() { return O('fehler.ONLINE_ZUG_FORM'); },
+  get ONLINE_FEN_FORM() { return O('fehler.ONLINE_FEN_FORM'); },
+  get ONLINE_AM_ZUG_FORM() { return O('fehler.ONLINE_AM_ZUG_FORM'); },
+  get ONLINE_ERGEBNIS_FORM() { return O('fehler.ONLINE_ERGEBNIS_FORM'); },
+  get ONLINE_KEIN_REMISANGEBOT() { return O('fehler.ONLINE_KEIN_REMISANGEBOT'); },
+  get ONLINE_CODE_ABGELAUFEN() { return O('fehler.ONLINE_CODE_ABGELAUFEN'); },
 });
-const TEXT_OFFLINE = 'Keine Verbindung. Die Partie bleibt auf dem Server gespeichert, versuch es gleich noch einmal.';
-const TEXT_ABGELAUFEN = 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.';
-const TEXT_NICHT_EINGERICHTET = 'Der Online-Teil ist auf dem Server noch nicht eingerichtet.';
 
 function lager() { return globalThis.localStorage; }
 // Unbekannte Antworten des Servers (Englisch, technisch) gehen nie roh an den Nutzer: Die Meldung ist ein ganzer
-// deutscher Satz, der Originaltext bleibt in fehler.detail (fuer die Konsole und Tests).
+// Satz in der Sprache der App, der Originaltext bleibt in fehler.detail (fuer Konsole und Tests).
 function allgemeinerText(status, code) {
-  if (status === 403 || code === '42501') return 'Dafür fehlt dir auf dem Server die Berechtigung.';
-  if (status === 429) return 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.';
-  if (status >= 500) return `Der Server antwortet gerade nicht (${status}). Bitte gleich noch einmal versuchen.`;
-  if (code === '23514' || code === '22001' || code === '23502') return 'Der Server hat die Daten abgelehnt (zu groß oder unvollständig).';
-  if (code === '23505') return 'Das gibt es auf dem Server schon.';
-  return `Der Server hat die Anfrage abgelehnt (${status}).`;
+  if (status === 403 || code === '42501') return O('berechtigung');
+  if (status === 429) return O('anfragen');
+  if (status >= 500) return O('server', { status });
+  if (code === '23514' || code === '22001' || code === '23502') return O('daten');
+  if (code === '23505') return O('doppelt');
+  return O('abgelehnt', { status });
 }
 function fehlerText(d, status) {
   const kennung = String(d?.message || d?.msg || '');
   let text = FEHLER_TEXTE[kennung];
   if (!text) {
-    if (status === 401) text = TEXT_ABGELAUFEN;
-    else if (status === 404) text = TEXT_NICHT_EINGERICHTET;
+    if (status === 401) text = O('abgelaufen');
+    else if (status === 404) text = O('einrichtung');
     else text = allgemeinerText(status, d?.code);
   }
   const e = new Error(text);
@@ -105,7 +105,7 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   if (token) kopf.Authorization = `Bearer ${token}`;
   let r;
   try { r = await fetchFn(SUPABASE_URL + pfad, { method: methode, headers: kopf, body: daten === undefined ? undefined : JSON.stringify(daten) }); }
-  catch (e) { throw new Error(TEXT_OFFLINE); }
+  catch (e) { throw new Error(O('offline')); }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leere Antwort */ } }
   if (!r.ok) throw fehlerText(d, r.status);
@@ -124,7 +124,7 @@ async function rpc(name, daten) {
 // PostgREST liefert eine einzelne Zeile als Objekt, setof als Liste: beides annehmen
 function partieAus(d) {
   const p = Array.isArray(d) ? d[0] : d;
-  if (!p || typeof p !== 'object' || !p.id) throw new Error('Der Server hat keine Partie zurückgegeben.');
+  if (!p || typeof p !== 'object' || !p.id) throw new Error(O('keinePartie'));
   return p;
 }
 
@@ -208,7 +208,7 @@ export function beobachte(id, { alle = 2000, seit = null, beiAenderung, beiFehle
     try { dokument?.removeEventListener?.('visibilitychange', beiSichtbarkeit); } catch (e) { /* egal */ }
   }
   function abmelden(e) {
-    const f = new Error(e?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET ? FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET : TEXT_ABGELAUFEN);
+    const f = new Error(e?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET ? FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET : O('abgelaufen'));
     f.abgemeldet = true; f.status = e?.status; f.detail = e?.detail || e?.message || '';
     melde(beiFehler, f);
     anhalten('abgemeldet');
@@ -290,6 +290,7 @@ export function codeAusLink(text) {
 export function uebernimmEinladungsLink(ort = globalThis.location) {
   const c = codeAusLink(ort?.hash || '');
   if (!c) return null;
+  kontoFreigeschaltet('#konto');
   try { lager()?.setItem(EINLADUNG_SCHLUESSEL, c); } catch (e) { /* ohne Merker weiter */ }
   return c;
 }

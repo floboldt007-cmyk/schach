@@ -20,13 +20,17 @@
 //                           eine Meldung je Minute (planeMeldung({ nachholen: true }))
 // Defensiv: Ein Fehler hier haelt die App nie an.
 import { anbieten } from '../../orte.js';
+import { t } from '../../sprache.js';
+import './texte.js';
+const S = (k, w) => t('p-schule.' + k, w);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 import { hoere } from '../../ereignisse.js';
 import { kontoFreigeschaltet } from '../../konto.js';
 import { icon } from '../../ui/icons.js';
 import {
   nutzerId, meineKlassen, meineKlassenGespeichert, trittBei, verlasse, offeneAufgabe, aufgabeStand, zielText, faelligText,
   planeMeldung, meldungOffen, merkeRaetsel, aufraeumen, fehlerText, normalisiereCode, pruefeAnzeigename,
-  stelleSchuleCssSicher, WAS_DIE_LEITUNG_SIEHT, ICON,
+  stelleSchuleCssSicher, leitungHinweis, ICON,
 } from '../../schule.js';
 import { BOTS } from '../../bots.js';
 import { istFreigeschaltet, ladeFortschritt } from '../../storage.js';
@@ -41,28 +45,26 @@ export function schuleGruppe({ app } = {}) {
   const el = document.createElement('section');
   el.className = 'es-gruppe flaeche schule-gruppe';
   el.setAttribute('aria-labelledby', 'es-g-schule');
-  el.innerHTML = `<h3 class="es-titel" id="es-g-schule">Klasse</h3>
+  el.innerHTML = `<h3 class="es-titel" id="es-g-schule">${esc(S('titel'))}</h3>
     <div class="sm-meine"></div>
-    <div class="sm-abgemeldet" hidden><p class="es-hilfe">Mit deinem Konto kannst du der Klasse deiner Schule oder deines
-      Vereins beitreten. Melde dich dazu oben an.</p></div>
+    <div class="sm-abgemeldet" hidden><p class="es-hilfe">${esc(S('anmelden'))}</p></div>
     <div class="sm-beitreten" hidden>
-      <h4>Klasse beitreten</h4>
+      <h4>${esc(S('beitretenTitel'))}</h4>
       <div class="sm-felder">
-        <label>Code der Klasse <input class="sm-code-eingabe" maxlength="9" autocomplete="off" autocapitalize="characters"
-          spellcheck="false" inputmode="text" placeholder="z. B. K7Q2MX"></label>
-        <label>Anzeigename <input class="sm-name-eingabe" maxlength="24" autocomplete="off" spellcheck="false"
-          placeholder="Vorname oder Spitzname"></label>
+        <label>${esc(S('code'))} <input class="sm-code-eingabe" maxlength="9" autocomplete="off" autocapitalize="characters"
+          spellcheck="false" inputmode="text" placeholder="${esc(S('codeBeispiel'))}"></label>
+        <label>${esc(S('name'))} <input class="sm-name-eingabe" maxlength="24" autocomplete="off" spellcheck="false"
+          placeholder="${esc(S('nameBeispiel'))}"></label>
       </div>
       <p class="es-hilfe sm-sieht"></p>
-      <div class="es-knoepfe"><button class="knopf dr" type="button" data-schule="beitreten">Beitreten</button></div>
+      <div class="es-knoepfe"><button class="knopf dr" type="button" data-schule="beitreten">${esc(S('beitreten'))}</button></div>
     </div>
     <p class="sm-status" aria-live="polite"></p>
     <div class="sm-leiten" hidden>
-      <p class="es-hilfe">Du unterrichtest in der Oberstufe oder trainierst im Verein? Lege eine Klasse an, schreib den Code an
-        die Tafel und sieh, wie alle vorankommen.</p>
-      <div class="es-knoepfe"><button class="knopf dr" type="button" data-schule="leiten">${icon(ICON)} Klassen leiten</button></div>
+      <p class="es-hilfe">${esc(S('leitung'))}</p>
+      <div class="es-knoepfe"><button class="knopf dr" type="button" data-schule="leiten">${icon(ICON)} ${esc(S('leiten'))}</button></div>
     </div>`;
-  el.querySelector('.sm-sieht').textContent = WAS_DIE_LEITUNG_SIEHT;
+  el.querySelector('.sm-sieht').textContent = leitungHinweis();
   let weg = false;
   let beschaeftigt = false;
   const status = (t, fehler = false) => {
@@ -93,14 +95,14 @@ export function schuleGruppe({ app } = {}) {
       const b = document.createElement('b');
       b.textContent = k.name;
       const als = document.createElement('span');
-      als.textContent = ` als „${k.anzeigename}“${k.aktiv ? '' : ' · geschlossen'}`;
+      als.textContent = S('als', { name: k.anzeigename, status: k.aktiv ? '' : S('geschlossen') });
       titel.append(b, als);
       const raus = document.createElement('button');
       raus.type = 'button';
       raus.className = 'knopf sm-austreten';
       raus.dataset.schule = 'verlassen';
-      raus.textContent = 'Austreten';
-      raus.setAttribute('aria-label', `Austreten aus „${k.name}“`);
+      raus.textContent = S('austreten');
+      raus.setAttribute('aria-label', S('austretenLabel', { name: k.name }));
       kopf.append(titel, raus);
       karte.append(kopf);
       const aufgaben = Array.isArray(k.aufgaben) ? k.aufgaben : [];
@@ -117,8 +119,8 @@ export function schuleGruppe({ app } = {}) {
           const z = document.createElement('span');
           z.className = 'sm-m-a-ziel';
           const teile = [zielText(a)];
-          if (st.erledigt) teile.push('erledigt');
-          else if (a.art !== 'bot' && st.stand != null) teile.push(`${st.stand} von ${st.ziel}`);
+          if (st.erledigt) teile.push(S('erledigt'));
+          else if (a.art !== 'bot' && st.stand != null) teile.push(S('fortschritt', { n: st.stand, ziel: st.ziel }));
           const f = faelligText(a.faellig);
           if (f && !st.erledigt) teile.push(f);
           z.textContent = teile.join(' · ');
@@ -144,7 +146,7 @@ export function schuleGruppe({ app } = {}) {
       if (!n.ok) { status(fehlerText(n.grund), true); nameFeld.focus(); return; }
       beschaeftigt = true;
       knopf.disabled = true;
-      status('Einen Moment …');
+      status(S('moment'));
       const r = await trittBei(codeFeld.value, nameFeld.value);
       beschaeftigt = false;
       if (weg) return;
@@ -153,7 +155,7 @@ export function schuleGruppe({ app } = {}) {
         codeFeld.value = '';
         nameFeld.value = '';
         render();
-        status(`Willkommen in „${r.klasse && r.klasse.name}“.`);
+        status(S('willkommen', { name: r.klasse && r.klasse.name }));
       } else {
         status(fehlerText(r.grund), true);
       }
@@ -164,8 +166,8 @@ export function schuleGruppe({ app } = {}) {
       const k = ((meineKlassenGespeichert() || {}).mitglied || []).find((x) => x.klasse === (karte && karte.dataset.klasse));
       if (!k) return;
       const ja = app && typeof app.frage === 'function'
-        ? await app.frage({ titel: 'Klasse verlassen?', text: `Deine Zeile in „${k.name}“ wird gelöscht. Mit dem Code kannst du wieder beitreten.`,
-          knoepfe: [{ text: 'Austreten', wert: true, art: 'gefahr' }, { text: 'Bleiben', wert: false, art: 'primaer' }], abbrechen: false })
+        ? await app.frage({ titel: S('verlassenTitel'), text: S('verlassenText', { name: k.name }),
+          knoepfe: [{ text: S('austreten'), wert: true, art: 'gefahr' }, { text: S('bleiben'), wert: false, art: 'primaer' }], abbrechen: false })
         : true;
       if (!ja || weg) return;
       beschaeftigt = true;
@@ -173,7 +175,7 @@ export function schuleGruppe({ app } = {}) {
       beschaeftigt = false;
       if (weg) return;
       render();
-      status(r.ok ? `Du bist aus „${k.name}“ ausgetreten.` : fehlerText(r.grund), !r.ok);
+      status(r.ok ? S('verlassen', { name: k.name }) : fehlerText(r.grund), !r.ok);
     }
   });
   el.querySelector('.sm-code-eingabe').addEventListener('keydown', (e) => { if (e.key === 'Enter') el.querySelector('.sm-name-eingabe').focus(); });
@@ -212,7 +214,7 @@ export function schuleGruppe({ app } = {}) {
 
 // ---------- Zeile in der Heute-Karte ----------
 export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) {
-  if (typeof document === 'undefined' || !nutzerId()) return null;
+  if (typeof document === 'undefined' || !kontoFreigeschaltet() || !nutzerId()) return null;
   const o = offeneAufgabe(undefined, fortschritt ? { fortschritt } : {});
   if (!o) return null;
   stelleSchuleCssSicher();
@@ -228,7 +230,7 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
     <span class="sm-heute-text"><b></b><span class="sm-heute-trenn"> · </span><span class="sm-heute-ziel"></span></span>`;
   el.querySelector('b').textContent = aufgabe.titel;
   const teile = [zielText(aufgabe)];
-  if (aufgabe.art !== 'bot') teile.push(`${stand.stand} von ${stand.ziel}`);
+  if (aufgabe.art !== 'bot') teile.push(S('fortschritt', { n: stand.stand, ziel: stand.ziel }));
   const f = faelligText(aufgabe.faellig);
   if (f) teile.push(f);
   teile.push(klasse.name);
@@ -244,15 +246,15 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
     knopf = document.createElement('button');
     knopf.type = 'button';
     knopf.className = 'knopf dr sm-heute-los';
-    knopf.textContent = `Zu ${botName(ziel.bot).split(' ').slice(-1)[0]}`;
-    knopf.title = `Zu ${botName(ziel.bot)}`;
+    knopf.textContent = S('zu', { name: botName(ziel.bot).split(' ').slice(-1)[0] });
+    knopf.title = S('zu', { name: botName(ziel.bot) });
     knopf.addEventListener('click', () => app.gehe('arena', { waehle: ziel.bot }, { ersetzen: true }));
   } else if (aufgabe.art === 'raetsel' && app && typeof app.gehe === 'function') {
     knopf = document.createElement('button');
     knopf.type = 'button';
     knopf.className = 'knopf dr sm-heute-los';
-    knopf.textContent = 'Üben';
-    knopf.title = 'Zum Training';
+    knopf.textContent = S('ueben');
+    knopf.title = S('training');
     knopf.addEventListener('click', () => app.gehe('training'));
   }
   if (knopf) el.append(knopf);

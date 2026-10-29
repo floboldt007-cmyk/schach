@@ -1989,6 +1989,16 @@ Push-Mitteilungen. Test: `node tests/native.test.mjs` (reines Node, Suite `nativ
 
 # Welle B1: Abo „Crownmate Trainer“ (Stripe, Supabase, Paket abo)
 
+**Schritt 2 vorbereiten:** Online-Karte und gemerkte Einladung erscheinen wie Konto, Trainer-Gruppe und Coach-Knopf
+nur nach `kontoFreigeschaltet()`; ein gueltiger Link `#online/CODE` merkt den Code und schaltet das Konto dauerhaft
+frei, ein ungueltiger nicht. Auch Klassenaufgaben in der Heute-Karte beachten die Freischaltung. Konto, Daten und
+Sicherung nutzen bereits ihre Kern-Woerterbuecher; Online, Schule, Abo und Coach ergaenzen `js/sprachen/<bereich>.js`
+und `js/pakete/<paket>/texte.js`, die Texte erst beim Zeichnen oder beim Lesen von Text-Gettern auswaehlen.
+`tests/sprache.test.mjs` prueft alle vier echten Pakete mit abgefangenen Server-Antworten auf iPad und Handy, die
+gesperrten Anbieter auch mit alter Sitzung, Einladung und Klassenaufgabe. Bestehende deutsche Export-Konstanten
+bleiben fuer Verbraucher erhalten. Vom Server gelieferte Inhalte (Klassen-/Aufgabennamen, Produkttexte, KI-Antworten)
+bleiben in ihrer gelieferten Sprache; Server-Vertraege und das Einschalten in `erweiterungen.js` bleiben unveraendert.
+
 Das Abo verkauft Lehrer und Lernstoff, nie den Zugang zum Spiel (SPIELKONZEPT 2b.5 und 5). B1 baut nur das Gerüst:
 wer Premium hat, wie man abschließt und kündigt. Was Premium freischaltet, entscheiden die jeweiligen Pakete (z. B. B2
 „Frag den Coach“) über `istPremium()` bzw. auf dem Server über `ist_premium_von(uid)`. Einrichtung für Flo:

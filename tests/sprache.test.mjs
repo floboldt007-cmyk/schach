@@ -92,7 +92,7 @@ async function nodeTeil() {
   const paketTexte = readdirSync(paketOrdner).filter((p) => existsSync(path.join(paketOrdner, p, 'texte.js'))).sort();
   for (const p of paketTexte) await import(pathToFileURL(path.join(paketOrdner, p, 'texte.js')).href);
   pruefe('Woerterbuecher der live geschalteten Pakete vorhanden', ['funken', 'gedaechtnis', 'kartei', 'liga', 'punkte', 'serie', 'start',
-    'tagesraetsel', 'teilen', 'zuzweit'].every((p) => paketTexte.includes(p)), paketTexte);
+    'tagesraetsel', 'teilen', 'zuzweit', 'online', 'schule', 'abo', 'coach-ki'].every((p) => paketTexte.includes(p)), paketTexte);
   const de = S.texte('de');
   const en = S.texte('en');
   const eigene = (o) => Object.keys(o).filter((k) => !k.startsWith('probe.'));
@@ -154,6 +154,27 @@ async function nodeTeil() {
       st.setzeSpeicher(null);
     }
   }
+  gruppe = 'Schritt 2 Texte';
+  S.setzeSprache('en');
+  const online = await import('../js/online.js');
+  const schule = await import('../js/schule.js');
+  const coach = await import('../js/coach-ki.js');
+  pruefe('Servermeldungen folgen der Sprache beim Lesen', Object.values(online.FEHLER_TEXTE).every((x) => deutschIn(x).length === 0)
+    && Object.values(schule.TEXTE).every((x) => deutschIn(x).length === 0) && Object.values(coach.TEXTE).every((x) => deutschIn(x).length === 0));
+  pruefe('Schulziele und Termine sind englisch, Tage bleiben lokale Schluessel', schule.zielText({ art: 'partien', ziel: { anzahl: 1 } }) === 'Play 1 game'
+    && schule.zielText({ art: 'raetsel', ziel: { anzahl: 2 } }) === 'Solve 2 puzzles' && schule.faelligText('2026-10-30') === 'by Fri 10/30');
+  pruefe('Coach: KI-Hinweis und Restfragen sind englisch', coach.kiHinweis().startsWith('Explanation by an AI')
+    && coach.restText(1) === '1 question left today.' && coach.restText(5) === '5 questions left today.' && coach.restText(12) === '');
+  const konto = await import('../js/konto.js');
+  const alterSpeicher = globalThis.localStorage;
+  const speicher = new Map([[konto.SITZUNG_SCHLUESSEL, JSON.stringify({ access_token: 'probe', refresh_token: 'probe', expires_at: 1, user: { id: 'offline-en' } })]]);
+  globalThis.localStorage = { getItem: (k) => speicher.get(k) ?? null, setItem: (k, v) => speicher.set(k, String(v)), removeItem: (k) => speicher.delete(k) };
+  konto.setzeKontoFetch(async () => { throw new Error('offline'); });
+  try {
+    const r = await schule.meineKlassen({ neu: true });
+    pruefe('Englische Fehlermeldung bei Sitzungs-Erneuerung bleibt im Schulmodus offline', !r.ok && r.grund === 'offline');
+  } finally { konto.setzeKontoFetch(null); globalThis.localStorage = alterSpeicher; }
+  S.setzeSprache('de');
   gruppe = '';
 }
 
@@ -176,10 +197,10 @@ async function warteAufServer(url, ms = 10000) {
   throw new Error('Server startet nicht: ' + url);
 }
 
-async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = false, locale = 'de-DE' } = {}) {
+async function neueSeite(browser, { w = 1180, h = 820, handy = false, dunkel = false, locale = 'de-DE', serviceWorkers = 'allow' } = {}) {
   const kontext = await browser.newContext({
     viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: handy, isMobile: handy, colorScheme: dunkel ? 'dark' : 'light',
-    timezoneId: 'Europe/Berlin', locale,
+    timezoneId: 'Europe/Berlin', locale, serviceWorkers,
   });
   const seite = await kontext.newPage();
   const fehler = [];
@@ -327,6 +348,127 @@ const SCREENS_PAKETE = [
 ];
 const SCREENS = PAKETE_MODUS ? [...SCREENS_KERN, ...SCREENS_PAKETE] : SCREENS_KERN;
 
+// Die echten vier Pakete mit abgefangenen Server-Antworten. Kein Aufruf erreicht Supabase.
+async function schrittZwei(browser) {
+  const { SUPABASE_URL } = await import('../js/konto-config.js');
+  const basis = `http://127.0.0.1:${PORT}/index.html?test&erw=pakete/online/index,pakete/schule/index,pakete/abo/index,pakete/coach-ki/index&sprache=en`;
+  const uid = 'sprachprobe';
+  const klasse = { id: '11111111-1111-4111-8111-111111111111', name: 'Chess club', code: 'K7Q2MX', aktiv: true, mitglieder: 1 };
+  const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: uid })).toString('base64url') + '.x', refresh_token: 'probe', expires_at: 9999999999, user: { id: uid, email: 'probe@example.invalid' } };
+  for (const [ansicht, opt] of [['ipad', {}], ['handy', { w: 390, h: 844, handy: true }]]) {
+    const { kontext, seite, fehler } = await neueSeite(browser, { ...opt, serviceWorkers: 'block' });
+    seite.setDefaultTimeout(15000);
+    const unerwartet = [];
+    await kontext.route(SUPABASE_URL + '/**', async (route) => {
+      const u = new URL(route.request().url());
+      let body;
+      if (u.pathname.endsWith('/schule_meine_klassen')) body = { leitung: [klasse], mitglied: [] };
+      else if (u.pathname.endsWith('/schule_klassen_uebersicht')) body = { klasse, mitglieder: [{ id: 'mitglied', anzeigename: 'Alex', fortschritt: {
+        bots_besiegt: 2, sterne: 4, partien: 5, genauigkeit_schnitt: 61.5, haeufigste_fehler: { arten: [{ art: 'fehler', anzahl: 2 }] }, erledigt: [], aktualisiert_am: '2026-10-22' } }],
+      aufgaben: [{ id: 'aufgabe', titel: 'Play Rudi', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
+      else if (u.pathname.endsWith('/ist_premium')) body = false;
+      else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
+      else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];
+      else if (u.pathname === '/functions/v1/coach') body = { text: 'Develop your knight and protect the center.', rest: 4, modell: 'probe' };
+      else { unerwartet.push(u.pathname); body = {}; }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+    const pruefeAnsicht = async (name, sel) => {
+      gruppe = `Schritt 2 ${ansicht} ${name}`;
+      const text = await sichtbarerText(seite, sel);
+      const treffer = deutschIn(text);
+      pruefe('keine deutschen Woerter, Umlaute oder rohen Schluessel', text.length > 10 && treffer.length === 0, treffer);
+      pruefe('kein Ueberlauf', await keinUeberlauf(seite));
+      pruefe('keine fehlenden Texte, Konsolenfehler oder unerwarteten Serveraufrufe', fehler.length === 0 && unerwartet.length === 0, [...fehler, ...unerwartet]);
+      await bild(seite, `schritt2-${ansicht}-${name}`);
+    };
+    try {
+      await seite.goto(basis + '#training');
+      await seite.waitForFunction(() => !!window.__app && document.documentElement.lang === 'en' && !!document.querySelector('.training-screen'));
+      // Auch eine alte Sitzung, eine gemerkte Einladung und eine Klassenaufgabe duerfen die Freischaltung nicht umgehen.
+      await seite.evaluate(({ sitzung, klasse }) => {
+        localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+        localStorage.setItem('schach-arena:online:einladung', 'ABC234');
+        localStorage.setItem('schach-arena:schule:stand', JSON.stringify({ uid: sitzung.user.id, geholtAm: Date.now(), daten: { leitung: [], mitglied: [{ ...klasse, klasse: klasse.id,
+          aufgaben: [{ id: 'offen', art: 'bot', titel: 'Practice', ziel: { bot: 'rudi', sterne: 1 } }] }] } }));
+      }, { sitzung, klasse });
+      gruppe = `Schritt 2 ${ansicht} gesperrt`;
+      const gate = await seite.evaluate(async () => {
+        const { fuelle } = await import('/js/orte.js');
+        const k = document.createElement('div');
+        const kontext = { app: window.__app, zug: { fenVorher: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', uci: 'g1f3' } };
+        const aus = ['training:karten', 'einstellungen:gruppen', 'arena:heute', 'analyse:coach'].map((ort) => fuelle(ort, k, kontext));
+        const ok = !k.querySelector('.online-karte,.abo-gruppe,.schule-gruppe,.sm-heute,.ck-knopf') && !k.textContent.includes('Chess invitation');
+        aus.forEach((a) => a.verlasse());
+        return ok && localStorage.getItem('schach-arena:konto:sichtbar') !== '1';
+      });
+      pruefe('ohne Konto-Freischaltung zeigt keines der vier Pakete einen Einstieg, Hinweis oder eine Aufgabe', gate && await seite.locator('.online-karte').count() === 0);
+      await seite.evaluate(() => localStorage.clear());
+      await seite.goto('about:blank');
+      await seite.goto(basis + '#konto');
+      await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1');
+      await seite.evaluate(() => window.__app.gehe('einstellungen'));
+      await seite.waitForSelector('.konto-gruppe');
+      await pruefeAnsicht('konto-abgemeldet', '.konto-gruppe');
+      await seite.evaluate(() => window.__app.gehe('online'));
+      await seite.waitForSelector('[data-online="konto"]');
+      await pruefeAnsicht('online-abgemeldet', '.online-screen');
+      await seite.evaluate((s) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(s)), sitzung);
+      await seite.goto(basis + '#einstellungen');
+      await seite.reload();
+      await seite.waitForSelector('.sm-beitreten:not([hidden])');
+      await pruefeAnsicht('klasse-beitreten', '.schule-gruppe');
+      await pruefeAnsicht('daten-sicherung', '.es-inhalt');
+      await seite.evaluate(() => window.__app.gehe('online'));
+      await seite.waitForSelector('.on-start');
+      await pruefeAnsicht('online-formular', '.online-screen');
+      await seite.evaluate(() => window.__app.gehe('schule'));
+      await seite.waitForSelector('.sm-klasse-karte');
+      await pruefeAnsicht('klassen-liste', '.schule-screen');
+      await seite.locator('.sm-klasse-karte').click();
+      await seite.waitForSelector('.sm-aufgabe-neu');
+      await pruefeAnsicht('klasse-leiten', '.schule-screen');
+      await seite.evaluate(() => window.__app.gehe('einstellungen'));
+      await seite.locator('[data-abo="zeigen"]').click();
+      await seite.waitForSelector('.trainer-karte[data-zustand="kaufbar"]');
+      await pruefeAnsicht('trainer', '.trainer-karte');
+      await seite.locator('[data-trainer="schliessen"]').click();
+      await seite.locator('.trainer-ort').waitFor({ state: 'detached' });
+      await seite.evaluate(() => window.__app.gehe('training'));
+      await seite.waitForSelector('.training-screen');
+      const coachKarte = async (premium = false) => {
+        await seite.evaluate(async ({ premium, uid }) => {
+          if (window.__sprachCoach) window.__sprachCoach.verlasse();
+          document.querySelector('#sprach-coach')?.remove();
+          localStorage.setItem('schach-arena:abo:stand', JSON.stringify({ uid, premium, status: 'aktiv', quelle: 'manuell', gueltigBis: Date.now() + 86400000, geprueftAm: Date.now() }));
+          const { fuelle } = await import('/js/orte.js');
+          const host = document.createElement('section'); host.id = 'sprach-coach'; host.className = 'an-coach';
+          const fuss = document.createElement('div'); fuss.className = 'an-c-fuss'; host.append(fuss);
+          document.querySelector('.training-screen').append(host);
+          window.__sprachCoach = fuelle('analyse:coach', fuss, { app: window.__app, zug: { fenVorher: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', uci: 'g1f3', besterZug: 'e2e4', klasse: 'gut', evalVorher: { cp: 20 }, evalNachher: { cp: 15 } } });
+        }, { premium, uid });
+        await seite.locator('.ck-knopf').click();
+      };
+      await coachKarte();
+      await seite.waitForSelector('.ck-karte[data-zustand="premium"] .premium-hinweis');
+      await pruefeAnsicht('coach-hinweis', '#sprach-coach');
+      await coachKarte(true);
+      await seite.waitForSelector('.ck-karte[data-zustand="antwort"]');
+      await pruefeAnsicht('coach-ki-hinweis', '#sprach-coach');
+      await seite.evaluate(() => { window.__sprachCoach.verlasse(); document.querySelector('#sprach-coach').remove(); localStorage.clear(); });
+      await seite.goto('about:blank');
+      await seite.goto(basis + '#online/abc234');
+      await seite.waitForSelector('[data-online="konto"]');
+      gruppe = `Schritt 2 ${ansicht} Einladung`;
+      pruefe('gueltiger Einladungslink schaltet Konto frei und behaelt den Code ohne Anmeldung', await seite.evaluate(() => localStorage.getItem('schach-arena:konto:sichtbar') === '1'
+        && localStorage.getItem('schach-arena:online:einladung') === 'ABC234' && !localStorage.getItem('schach-arena:konto:sitzung')));
+    } catch (e) {
+      pruefe('Schritt-2-Oberflaechen erreichbar', false, { fehler: String(e && e.message).slice(0, 500),
+        seite: await seite.evaluate(() => ({ hash: location.hash, konto: localStorage.getItem('schach-arena:konto:sichtbar'), text: document.body.innerText.slice(0, 700) })).catch(() => ({ url: seite.url() })), konsole: fehler });
+    } finally { await kontext.close(); }
+  }
+}
+
 async function browserTeil(browser) {
   if (!OHNE_BILDER) mkdirSync(BILDER, { recursive: true });
   // Ohne Wahl bleibt alles deutsch
@@ -394,6 +536,7 @@ async function browserTeil(browser) {
       await kontext.close();
     }
   }
+  if (!NUR.length || NUR.includes('schritt2')) await schrittZwei(browser);
   gruppe = '';
 }
 
