@@ -96,5 +96,44 @@ begin
 end
 $$;
 
+-- Das Geraet ist nur ein kurzes Kuerzel: hoechstens 120 Zeichen, beim Anlegen wie beim Aendern.
+do $$
+begin
+  update public.spielstaende set geraet = repeat('g', 120)
+  where user_id = '11111111-1111-4111-8111-111111111111';
+  if not exists (select 1 from public.spielstaende where char_length(geraet) = 120) then
+    raise exception 'FEHLER: 120 Zeichen fuer geraet wurden abgelehnt';
+  end if;
+  begin
+    update public.spielstaende set geraet = repeat('g', 121)
+    where user_id = '11111111-1111-4111-8111-111111111111';
+    raise exception 'FEHLER: Laengengrenze fuer spielstaende.geraet fehlt (aendern)';
+  exception
+    when check_violation then null;
+  end;
+end
+$$;
+
+-- B legt nach dem Loeschen neu an (eigene Zeile): mit 121 Zeichen abgelehnt, mit dem Kuerzel erlaubt.
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  true
+);
+delete from public.spielstaende where user_id = '22222222-2222-4222-8222-222222222222';
+do $$
+begin
+  begin
+    insert into public.spielstaende (user_id, stand, format_version, geraet)
+    values ('22222222-2222-4222-8222-222222222222', '{"besitzer":"B"}', 1, repeat('u', 121));
+    raise exception 'FEHLER: Laengengrenze fuer spielstaende.geraet fehlt (anlegen)';
+  exception
+    when check_violation then null;
+  end;
+  insert into public.spielstaende (user_id, stand, format_version, geraet)
+  values ('22222222-2222-4222-8222-222222222222', '{"besitzer":"B"}', 1, 'iOS Safari');
+end
+$$;
+
 select 'RLS-Test erfolgreich' as ergebnis;
 rollback;

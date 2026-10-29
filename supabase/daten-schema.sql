@@ -124,27 +124,56 @@ grant insert on table public.nutzung to authenticated;
 -- Mengenbremse: Ein Konto schreibt hoechstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden (die App
 -- kommt im Alltag nie in die Naehe). Darueber lehnt der Server jede weitere Zeile ab (Kennung DATEN_MENGE), damit
 -- ein manipulierter Client die Tabellen nicht fluten kann. Zaehlt auch Zeilen, die dieselbe Anfrage gerade anlegt.
+-- Gezaehlt wird in einer eigenen Zaehltabelle (daten_zaehler, je Konto, Tabelle und Stunde), nicht an den
+-- vorhandenen Zeilen: Loeschen (direkt oder ueber freigabe_widerrufen) und neu Einfuegen setzt die Bremse also
+-- nicht zurueck. Das Fenster sind die laufende und die 24 vollen Stunden davor (also 24 bis 25 Stunden). Damit ein
+-- frisch eingespieltes Schema nicht bei 0 anfaengt, zaehlen zusaetzlich die vorhandenen Zeilen der letzten 24
+-- Stunden (der groessere Wert gilt). Gleichzeitige Anfragen eines Kontos zaehlen nacheinander (Sperre je Konto und
+-- Tabelle bis zum Ende der Transaktion). Die Zaehler enthalten keine Inhalte und werden nach 48 Stunden geloescht,
+-- mit dem Konto sofort (on delete cascade). Sie stehen in der Datenauskunft (meine_daten, mengenzaehler).
 -- ---------------------------------------------------------------------------
+create table if not exists public.daten_zaehler (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  tabelle text not null,
+  stunde timestamptz not null,
+  anzahl integer not null default 0,
+  primary key (user_id, tabelle, stunde),
+  constraint daten_zaehler_tabelle check (tabelle in ('partien_archiv', 'nutzung'))
+);
+alter table public.daten_zaehler enable row level security;
+-- kein Recht fuer Nutzer (weder lesen noch schreiben); geschrieben wird nur ueber den Trigger unten
+revoke all on table public.daten_zaehler from anon, authenticated, public;
+
 create or replace function public.daten_mengenbremse()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   grenze integer := tg_argv[0]::integer;
-  n integer;
+  v_stunde timestamptz := date_trunc('hour', now());
+  gezaehlt integer;
+  vorhanden integer;
 begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('daten_zaehler:' || tg_table_name || ':' || new.user_id::text, 0));
+  select coalesce(sum(z.anzahl), 0) into gezaehlt from public.daten_zaehler z
+  where z.user_id = new.user_id and z.tabelle = tg_table_name and z.stunde >= v_stunde - interval '24 hours';
   if tg_table_name = 'partien_archiv' then
-    select count(*) into n from public.partien_archiv a
+    select count(*) into vorhanden from public.partien_archiv a
     where a.user_id = new.user_id and a.erstellt_am > now() - interval '24 hours';
   else
-    select count(*) into n from public.nutzung u
+    select count(*) into vorhanden from public.nutzung u
     where u.user_id = new.user_id and u.erstellt_am > now() - interval '24 hours';
   end if;
-  if n >= grenze then
+  if greatest(gezaehlt, vorhanden) >= grenze then
     raise exception 'DATEN_MENGE';
   end if;
+  insert into public.daten_zaehler as z (user_id, tabelle, stunde, anzahl)
+  values (new.user_id, tg_table_name, v_stunde, 1)
+  on conflict (user_id, tabelle, stunde) do update set anzahl = z.anzahl + 1;
+  delete from public.daten_zaehler z where z.user_id = new.user_id and z.stunde < v_stunde - interval '48 hours';
   return new;
 end;
 $$;
@@ -163,6 +192,8 @@ for each row execute function public.daten_mengenbremse('2000');
 -- ---------------------------------------------------------------------------
 -- Freigabe widerrufen: loescht alles bisher Geteilte des Aufrufers (Archiv und Nutzung) und haelt den Zeitpunkt
 -- fest. Mehrfach aufrufbar. Die App ruft das beim Ausschalten (offline: beim naechsten Start, immer vor neuem Senden).
+-- Die Zaehler der Mengenbremse (daten_zaehler, nur Zahlen) bleiben bis zu 48 Stunden stehen, sonst setzte ein
+-- Widerruf die Bremse zurueck.
 -- ---------------------------------------------------------------------------
 create or replace function public.freigabe_widerrufen()
 returns jsonb
@@ -237,8 +268,8 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- Datenauskunft (Art. 15/20): alles, was der Server ueber den Aufrufer hat. Vom Spielstand nur die Metadaten
 -- (den Stand selbst hat der Spieler schon lokal und ueber die Sicherung).
 -- ---------------------------------------------------------------------------
--- Online-Partien (online-schema.sql) und das Anmeldeprotokoll kommen nur dazu, wenn es sie gibt: Die Datei laeuft
--- so in jeder Reihenfolge und auch ohne das Online-Schema.
+-- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql) und das Anmeldeprotokoll kommen nur dazu, wenn
+-- es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne das Online-Schema.
 create or replace function public.meine_daten()
 returns jsonb
 language plpgsql
@@ -248,6 +279,7 @@ as $$
 declare
   uid uuid := auth.uid();
   online jsonb := '[]'::jsonb;
+  versuche jsonb := '[]'::jsonb;
   protokoll jsonb := '[]'::jsonb;
 begin
   if uid is null then
@@ -257,6 +289,11 @@ begin
     execute 'select coalesce(jsonb_agg(to_jsonb(o) order by o.erstellt_am), ''[]''::jsonb)
              from public.partien_online o where $1 in (o.weiss, o.schwarz, o.erstellt_von)'
       into online using uid;
+  end if;
+  if to_regclass('public.online_versuche') is not null then
+    execute 'select coalesce(jsonb_agg(jsonb_build_object(''tag'', v.tag, ''anzahl'', v.anzahl) order by v.tag), ''[]''::jsonb)
+             from public.online_versuche v where v.user_id = $1'
+      into versuche using uid;
   end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
@@ -289,6 +326,14 @@ begin
       '[]'::jsonb),
     'freigabe_widerruf', (select to_jsonb(w) from public.freigabe_widerrufe w where w.user_id = uid),
     'partien_online', online,
+    -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
+    'online_versuche', versuche,
+    -- Zaehler der Mengenbremse (Zahl der geteilten Zeilen je Tabelle und Stunde, ohne Inhalte, hoechstens 48 Stunden)
+    'mengenzaehler', coalesce(
+      (select jsonb_agg(jsonb_build_object('tabelle', z.tabelle, 'stunde', z.stunde, 'anzahl', z.anzahl)
+                        order by z.stunde, z.tabelle)
+       from public.daten_zaehler z where z.user_id = uid),
+      '[]'::jsonb),
     -- Anmeldeprotokoll von Supabase (Zeitpunkt, Art, IP); null, wenn die Funktion es nicht lesen darf
     'anmeldeprotokoll', protokoll
   );

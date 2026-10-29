@@ -165,6 +165,15 @@ begin
      or not (d ? 'anmeldeprotokoll') then
     raise exception 'FEHLER: meine_daten ohne partien_online, freigabe_widerruf oder anmeldeprotokoll: %', d;
   end if;
+  -- Zaehler der Mengenbremse (A hat eine Partie und ein Nutzungsereignis geteilt), Fehlversuche immer als Liste
+  if jsonb_typeof(d -> 'mengenzaehler') <> 'array'
+     or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z
+         where z ->> 'tabelle' = 'partien_archiv') <> 1
+     or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z
+         where z ->> 'tabelle' = 'nutzung') <> 1
+     or jsonb_typeof(d -> 'online_versuche') <> 'array' then
+    raise exception 'FEHLER: meine_daten ohne Zaehler der Mengenbremse oder ohne online_versuche: %', d;
+  end if;
   if current_setting('daten_test.protokoll', true) = 'ja'
      and (jsonb_array_length(d -> 'anmeldeprotokoll') <> 1 or (d -> 'anmeldeprotokoll' -> 0 ->> 'ip') <> '192.0.2.1') then
     raise exception 'FEHLER: meine_daten liefert das eigene Anmeldeprotokoll nicht (genau eine Zeile): %', d -> 'anmeldeprotokoll';
@@ -264,6 +273,26 @@ begin
   exception
     when insufficient_privilege then null;
   end;
+  -- die Zaehler der Mengenbremse kann B weder lesen noch aendern oder loeschen
+  begin
+    perform 1 from public.daten_zaehler;
+    raise exception 'FEHLER: daten_zaehler direkt lesbar';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    delete from public.daten_zaehler where user_id = '22222222-2222-4222-8222-222222222222';
+    raise exception 'FEHLER: daten_zaehler direkt loeschbar (die Bremse liesse sich zuruecksetzen)';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.daten_zaehler (user_id, tabelle, stunde, anzahl)
+    values ('22222222-2222-4222-8222-222222222222', 'nutzung', now() - interval '30 hours', -5000);
+    raise exception 'FEHLER: daten_zaehler direkt beschreibbar';
+  exception
+    when insufficient_privilege then null;
+  end;
 end
 $$;
 
@@ -285,6 +314,10 @@ begin
      or (d -> 'freigabe_widerruf' ->> 'geloescht_nutzung')::integer <> 2000 then
     raise exception 'FEHLER: Auskunft nach dem Widerruf falsch: %', d;
   end if;
+  if (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z
+      where z ->> 'tabelle' = 'partien_archiv') <> 300 then
+    raise exception 'FEHLER: nach dem Widerruf fehlen die Zaehler der Mengenbremse: %', d -> 'mengenzaehler';
+  end if;
   -- ein zweiter Widerruf ist harmlos und haelt die Summen
   r := public.freigabe_widerrufen();
   if (r ->> 'geloescht_partien')::integer <> 0 then
@@ -293,9 +326,51 @@ begin
 end
 $$;
 
--- Nach dem Widerruf darf B (mit neuer Zustimmung) wieder teilen: die Bremse zaehlt nur vorhandene Zeilen.
+-- Loeschen setzt die Bremse nicht zurueck (Anti-Cheat Etappe 0): Nach dem Widerruf ist B noch am Limit, obwohl
+-- keine Zeile mehr da ist. Die Bremse zaehlt in daten_zaehler, nicht die vorhandenen Zeilen.
+do $$
+begin
+  begin
+    insert into public.partien_archiv (user_id, zuege) values ('22222222-2222-4222-8222-222222222222', 'e2e4');
+    raise exception 'FEHLER: der Widerruf (Loeschen) setzte die Mengenbremse fuer das Archiv zurueck';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+  begin
+    insert into public.nutzung (user_id, ereignis) values ('22222222-2222-4222-8222-222222222222', 'screen');
+    raise exception 'FEHLER: der Widerruf (Loeschen) setzte die Mengenbremse fuer die Nutzung zurueck';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+end
+$$;
+
+-- 24 Stunden spaeter (Zaehler als Besitzer kuenstlich 25 Stunden zurueck) darf B mit neuer Zustimmung wieder teilen.
+reset role;
+update public.daten_zaehler set stunde = stunde - interval '25 hours'
+where user_id = '22222222-2222-4222-8222-222222222222';
+set local role authenticated;
 insert into public.partien_archiv (user_id, bot_id, farbe, ergebnis, zuege)
 values ('22222222-2222-4222-8222-222222222222', 'hilde', 'b', 'niederlage', 'd2d4 d7d5');
+
+-- Auch direktes Loeschen und neu Einfuegen setzt die Bremse nicht zurueck: B fuellt bis 300 auf, loescht die 299
+-- neuen Zeilen selbst und versucht es noch einmal.
+insert into public.partien_archiv (user_id, zuege)
+select '22222222-2222-4222-8222-222222222222', 'e2e4' from generate_series(1, 299);
+delete from public.partien_archiv where user_id = '22222222-2222-4222-8222-222222222222' and zuege = 'e2e4';
+do $$
+begin
+  if (select count(*) from public.partien_archiv where user_id = '22222222-2222-4222-8222-222222222222') <> 1 then
+    raise exception 'FEHLER: B konnte die eigenen Archiv-Zeilen nicht loeschen';
+  end if;
+  begin
+    insert into public.partien_archiv (user_id, zuege) values ('22222222-2222-4222-8222-222222222222', 'e2e4');
+    raise exception 'FEHLER: Loeschen und neu Einfuegen setzte die Mengenbremse zurueck';
+  exception
+    when others then if sqlerrm <> 'DATEN_MENGE' then raise; end if;
+  end;
+end
+$$;
 
 reset role;
 do $$
@@ -353,6 +428,12 @@ begin
   end if;
   if exists (select 1 from public.nutzung where user_id = '11111111-1111-4111-8111-111111111111') then
     raise exception 'FEHLER: konto_loeschen hat die Nutzung nicht geloescht';
+  end if;
+  if exists (select 1 from public.daten_zaehler where user_id = '11111111-1111-4111-8111-111111111111') then
+    raise exception 'FEHLER: konto_loeschen hat die Zaehler der Mengenbremse nicht geloescht';
+  end if;
+  if not exists (select 1 from public.daten_zaehler where user_id = '22222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: konto_loeschen hat fremde Zaehler der Mengenbremse geloescht';
   end if;
   if not exists (select 1 from auth.users where id = '22222222-2222-4222-8222-222222222222') then
     raise exception 'FEHLER: konto_loeschen hat einen fremden Nutzer geloescht';

@@ -1783,25 +1783,31 @@ ausfuehrbar), `supabase/online-rls-test.sql` (Pruefung mit drei Nutzern, rollt a
 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, immer vom Server), `weiss`, `schwarz`, `erstellt_von` (Nutzer-IDs), `status`
 `'offen' | 'laeuft' | 'beendet'`, `fen` (aktuelle Stellung), `zuege` (UCI durch Leerzeichen, wie `zuege: [uci]` im
 Partie-Datensatz von `storage.js`), `am_zug` `'w' | 'b'`, `ergebnis` `'1-0' | '0-1' | '1/2-1/2' | null`, `grund`
-(vom Client z. B. `'matt'`, `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'`; vom Server `'zeit'`, `'aufgabe'`,
-`'remis'`, `'abgebrochen'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
+(vom Client nur `'matt'` als Sieg des Ziehenden und `'patt'`, `'wiederholung'`, `'material'`, `'50-zuege'` als Remis; vom
+Server `'zeit'`, `'zeit-material'`, `'aufgabe'`, `'remis'`, `'abgebrochen'` (zurueckgezogene Einladung oder haengende
+Partie) und `'strittig'`), `remis_angebot` `'w' | 'b' | null`, `bedenkzeit_s` und `inkrement_s` (null: ohne Uhr),
 `uhr_weiss_ms`, `uhr_schwarz_ms`, `letzter_zug_am`, `erstellt_am`, `aktualisiert_am` (Trigger; Grundlage der Abfrage).
 Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
 
 **Server-Funktionen (nur `authenticated`, `security definer`; direktes `insert`, `update` und `delete` sind gesperrt,
 `authenticated` darf nur lesen; der Trigger `online_vor_anlegen` setzt Code, Grundstellung und Anfangszustand):**
 `online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
-`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug), `online_zug(partie, zug,
-fen_danach, am_zug_danach, ergebnis, grund)` (prueft Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel),
+`offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug; liefert `jsonb`: die Zeile oder
+`{ fehler }`, siehe Anti-Cheat Etappe 0), `online_zug(partie, zug, fen_danach, am_zug_danach, ergebnis, grund)` (prueft
+Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel, Ergebnis-Regeln und grob die Folgestellung),
+`online_strittig(partie)` (Ende ohne Ergebnis, grund `'strittig'`),
 `online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`; in einer laufenden Partie
 nur fuer die beiden Spieler), `online_biete_remis(partie)` (liegt das Angebot des Gegners schon vor: Annahme),
 `online_nimm_remis_an(partie)`, `online_pruefe_zeit(partie)` (Zeit reklamieren, fuer beide Spieler; liefert immer die
-aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst,
-laeuft unter RLS). Interne Helfer ohne Recht fuer `authenticated`: `online_hole_laufende`, `online_uhr_pruefen`.
+aktuelle Zeile), `online_meine()` (laufend und offene Einladungen der letzten 24 Stunden, zuletzt geaendert zuerst;
+raeumt vorher fuer alle auf und laeuft deshalb als Besitzer, filtert selbst auf den Aufrufer). Interne Helfer ohne
+Recht fuer `authenticated` und `anon`: `online_hole_laufende`, `online_uhr_pruefen`, `online_zeitende`, `online_haengt`,
+`online_aufraeumen`, `online_brett`, `online_folge_passt`, `online_kann_nicht_matt_setzen`. Alle Funktionen laufen mit
+`search_path = ''` und voll qualifizierten Namen.
 `online_tritt_bei` lehnt Einladungen ab, die aelter als 24 Stunden sind (`ONLINE_CODE_ABGELAUFEN`) oder in denen der
-Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (alle `raise exception`
-in der SQL-Datei); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`), `tests/online.test.mjs` prueft, dass
-keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
+Ersteller keine Farbe hat. Fehler kommen als Kennungen `ONLINE_...` (`raise exception`, bei `online_tritt_bei` fuer
+falsche und abgelaufene Codes als `{ fehler }`); `js/online.js` uebersetzt jede in einen Satz (`FEHLER_TEXTE`),
+`tests/online.test.mjs` prueft, dass keine fehlt. Wer eine Kennung aendert, aendert beide Seiten.
 
 **Uhr-Regeln:** Beide starten beim Beitritt mit `bedenkzeit_s * 1000` ms. Der jeweils erste Zug von Weiss und von
 Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden). Ab dem dritten Halbzug zieht
@@ -1811,13 +1817,14 @@ Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerech
 Durchsetzbar ist die Uhr ueber `online_uhr_pruefen` (intern): Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
 laufende Uhr der Seite am Zug und beenden die Partie bei <= 0 mit `'zeit'` (Rueckgabe der beendeten Zeile statt
 `raise`, damit die Beendigung nicht zurueckgerollt wird). Steht die heruntergerechnete Gegneruhr bei 0, ruft die
-Oberflaeche `pruefeZeit(id)`. Ob der Gewinner ueberhaupt noch matt setzen koennte, prueft der Server nicht.
+Oberflaeche `pruefeZeit(id)`. Kann der Gewinner gar nicht mehr matt setzen (nur der Koenig, Koenig und eine Leichtfigur
+gegen den blanken Koenig, nur gleichfarbige Laeufer), endet das Zeitende remis mit grund `'zeit-material'`.
 Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck).
 
 **Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
 `tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
 `sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
-`nimmRemisAn(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
+`nimmRemisAn(id)`, `meldeStrittig(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
 bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`,
 pausiert bei `document.hidden` und fragt beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, nach `stop()`
 kein Hoerer-Aufruf mehr, Fehler gehen an `beiFehler`, derselbe Text nur einmal hintereinander, Abstand bei Fehlern
@@ -1837,6 +1844,48 @@ traegt `apikey` (publishable key) und `Authorization: Bearer <access_token>`; Fu
 zurueck und ersetzt den Hash. Die Integration muss `js/online.js` vor dem Routing importieren (oder den Hash vor
 `beiVerlauf` lesen), damit `uebernimmEinladungsLink()` den Code noch sieht, und einen Screen `online` in `SCREENS`
 und im Cache eintragen. Engine-Schloss, Schnell-Chat und Emotes bleiben offen (SPIELKONZEPT 2b.7).
+
+## Anti-Cheat Etappe 0 (Online gegen Freunde, ohne Edge Function)
+
+Zwischenloesung unter Freunden ohne Wertung (Konzept im Vault: `Schach-App/Arbeitsstand-2026-10-29/Konzept-Anti-Cheat.md`,
+Abschnitte 2, 5.1, 5.9, 9). Sie verhindert keinen Betrug, macht ihn aber sichtbar und nimmt ihm die bequemen Wege.
+Eine Sperre im Browser ist kein Schutz: Was zaehlt, prueft der Server. Fuer Partien gegen Fremde kommt Etappe 1a (Edge
+Function `online-zug`, die jeden Zug nachrechnet).
+
+**Server** (`supabase/online-schema.sql`, Test `supabase/online-rls-test.sql` ab Abschnitt 13):
+- **Einladungs-Bremse:** `online_erstelle` sperrt je Konto (`pg_advisory_xact_lock`) und lehnt ab, wenn schon 5 offene
+  (noch gueltige) oder 50 neue Einladungen in 24 Stunden da sind (`ONLINE_ZU_VIELE_EINLADUNGEN`; zurueckgezogene zaehlen
+  bei den neuen mit).
+- **Aufraeumen** (`online_aufraeumen`, bei jedem `online_erstelle` und `online_meine`, fuer alle, `skip locked`, je Aufruf
+  hoechstens 1000 Zeilen): Einladungen, die nie zu einer Partie wurden (offen oder zurueckgezogen) und aelter als
+  48 Stunden sind, werden geloescht; haengende Partien enden als `'abgebrochen'`.
+- **Haengende Partien** (`online_haengt`): mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage ohne Zug.
+  Ab dem 2. Halbzug entscheidet bei Partien mit Uhr die Uhr. Geprueft auch in `online_uhr_pruefen` (Zug, Remis,
+  Aufgabe, `online_pruefe_zeit`); ein verspaeteter Zug in einer haengenden Partie verfaellt.
+- **Fehlversuche:** Tabelle `online_versuche` (Konto, Tag Europe/Berlin, Anzahl; kein Recht fuer Nutzer, in
+  `meine_daten()`, `on delete cascade`). Hoechstens 20 falsche oder abgelaufene Codes je Tag, danach
+  `ONLINE_ZU_VIELE_VERSUCHE` (raise, auch fuer einen richtigen Code). Ein Fehlversuch kommt als `{ fehler }` ohne
+  raise zurueck, weil ein raise den Zaehler zurueckrollte; `online_tritt_bei` liefert deshalb `jsonb` (vorher
+  `drop function`).
+- **Ergebnis-Regeln** in `online_zug`: ein Ergebnis nur mit Grund; `'matt'` nur als Sieg des Ziehenden, `'patt'`,
+  `'material'`, `'wiederholung'`, `'50-zuege'` nur als `'1/2-1/2'`; alles andere `ONLINE_ERGEBNIS_FORM`. Ein Grund ohne
+  Ergebnis faellt still weg.
+- **Folgestellung grob** (`online_folge_passt`): Das Brett von `fen_danach` muss aus dem gespeicherten Brett plus dem Zug
+  entstehen (Rochade mit Turm, en passant nur gegen einen Bauern, Umwandlung in den angegebenen Stein), sonst
+  `ONLINE_STELLUNG_FALSCH`. Gangart, Schach und freie Wege prueft das nicht.
+- **strittig** (`online_strittig`): Ein Spieler beendet eine laufende Partie ohne Ergebnis, auch bei laufender oder schon
+  abgelaufener eigener Uhr (keine Uhr-Pruefung vorweg). `online_uhr_pruefen` entscheidet bei `grund = 'strittig'` nie auf
+  Zeit. Missbrauch durch einen Verlierer ist moeglich und ohne Wertung tragbar.
+- **Zeitende mit zu wenig Material:** `online_zeitende` (aus `online_uhr_pruefen` und `online_zug`) prueft mit
+  `online_kann_nicht_matt_setzen` die gespeicherte Stellung.
+
+**Browser** (`js/ui/online.js`): verglichen werden nur Brett und Seite am Zug (`am_zug` und das Feld im FEN-Text), nicht
+Rochaderechte, en-passant-Feld und Zaehler. Passt es nicht oder steht ein illegaler Zug in der Liste, friert nichts ein:
+Meldung `stellungFehler`, keine Zuege und keine Zeit-Reklamation mehr, Knoepfe `[data-online="strittig"]` und
+`[data-online="aufgeben"]` bleiben bedienbar, die Abfrage laeuft weiter (`window.__online.widerspruch()`). Ein gemeldetes
+Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
+ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
+2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
 
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 
@@ -1881,11 +1930,16 @@ exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `u
 Format-Checks), `nutzung` (nur insert eigener Zeilen, `daten` <= 2 KB, `geraet` <= 120), alle Rechte erst entzogen und
 dann genau vergeben (Supabase gäbe sonst auch update und truncate). `freigabe_widerrufe` (eine Zeile je Konto: letzter
 Widerruf und Summe der gelöschten Zeilen, kein Recht für Nutzer). Mengenbremse `daten_mengenbremse()` (Trigger vor
-insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). `konto_loeschen()`, `meine_daten()` und
+insert: 300 Partien, 2000 Nutzungsereignisse je Konto und 24 h, `DATEN_MENGE`). Sie zählt seit Anti-Cheat Etappe 0 in
+der Zähltabelle `daten_zaehler` (Konto, Tabelle, Stunde, Anzahl; kein Recht für Nutzer, nach 48 h gelöscht, in
+`meine_daten()` als `mengenzaehler`), mit Sperre je Konto und Tabelle: Löschen (direkt oder per Widerruf) und neu
+Einfügen setzt sie nicht zurück. Zusätzlich zählen die vorhandenen Zeilen der letzten 24 h (der größere Wert gilt).
+`spielstaende.geraet` hat in `schema.sql` eine Längengrenze von 120 Zeichen (`not valid`: alte, längere Einträge bleiben
+bis zum nächsten Speichern). `konto_loeschen()`, `meine_daten()` und
 `freigabe_widerrufen()` sind `security definer`, nur für `authenticated`. `konto_loeschen()` löscht auch
 `auth.audit_log_entries` des Aufrufers (Ausnahme bei fehlender Tabelle oder fehlendem Recht abgefangen); `meine_daten()`
-liefert zusätzlich `freigabe_widerruf`, `partien_online` (dynamisch, nur wenn die Tabelle existiert) und
-`anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
+liefert zusätzlich `freigabe_widerruf`, `partien_online` und `online_versuche` (dynamisch, nur wenn die Tabellen
+existieren), `mengenzaehler` und `anmeldeprotokoll` (null, wenn nicht lesbar). Neue Tabellen mit Konto-Bezug brauchen `on delete cascade` und gehören in
 `meine_daten()`. `konto.js` speichert als `geraet` des Cloud-Spielstands nur noch `geraetKurz()` (Familie und System).
 
 **Rechtstexte:** `datenschutz.html` und `impressum.html` im Wurzelverzeichnis, statisch, eigenes kleines CSS auf den Tokens
