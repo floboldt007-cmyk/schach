@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
 const PORT = Number(process.env.PORT || 8887);
 await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
-let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false;
+let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false, veraltet = false;
 // Antwort auf die naechste Strittig-Meldung: null wie der Server, 'netz' ohne Verbindung, 'beendet' wenn der Gegner
 // gerade vorher die Zeit reklamiert hat (Wettlauf, siehe Konzept Anti-Cheat L5)
 let strittigAntwort = null;
@@ -74,12 +74,23 @@ try {
       if (!neu) throw new Error('Test-Einladung fehlt');
       neu[neu.weiss ? 'schwarz' : 'weiss'] = 'u1'; neu.status = 'laeuft'; return antwort(aktualisieren(neu));
     }
-    if (rpc === 'online_zug') {
-      if (ablehnen) { ablehnen = false; return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'ONLINE_NICHT_DEIN_ZUG' }) }); }
-      zug(p, body.zug);
-      if (p.fen !== body.fen_danach || p.am_zug !== body.am_zug_danach) unerwartet.push('Falsche Stellung gesendet');
-      if (body.ergebnis) { p.status = 'beendet'; p.ergebnis = body.ergebnis; p.grund = body.grund; }
-      return antwort(p);
+    // Anti-Cheat Etappe 1a: Zuege gehen an die Edge Function online-zug, nur mit Partie und Zug. Wie der Server prueft die
+    // Attrappe den Zug mit chess.js und rechnet Stellung und Ende selbst aus. Der alte Weg rpc/online_zug ist unerwartet.
+    if (url.pathname === '/functions/v1/online-zug') {
+      const fehlt = (status, fehler) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ fehler, text: 'Rueckfall' }) });
+      if (Object.keys(body).sort().join(',') !== 'partie,zug') unerwartet.push('Zug mit anderen Feldern als partie und zug: ' + Object.keys(body).join(','));
+      if (ablehnen) { ablehnen = false; return fehlt(409, 'ONLINE_NICHT_DEIN_ZUG'); }
+      if (veraltet) { veraltet = false; return fehlt(409, 'ONLINE_STAND_VERALTET'); }
+      const q = partien.get(body.partie), c = new Chess();
+      for (const m of q.zuege.split(' ').filter(Boolean)) c.move({ from: m.slice(0, 2), to: m.slice(2, 4), promotion: m[4] });
+      let m;
+      try { m = c.move({ from: body.zug.slice(0, 2), to: body.zug.slice(2, 4), promotion: body.zug[4] }); } catch (e) { return fehlt(422, 'ONLINE_ZUG_ILLEGAL'); }
+      zug(q, m.lan);
+      const ende = c.isCheckmate() ? [c.turn() === 'b' ? '1-0' : '0-1', 'matt'] : c.isStalemate() ? ['1/2-1/2', 'patt']
+        : c.isInsufficientMaterial() ? ['1/2-1/2', 'material'] : c.isThreefoldRepetition() ? ['1/2-1/2', 'wiederholung']
+          : c.isDrawByFiftyMoves() ? ['1/2-1/2', '50-zuege'] : null;
+      if (ende) { q.status = 'beendet'; q.ergebnis = ende[0]; q.grund = ende[1]; aktualisieren(q); }
+      return antwort(q);
     }
     if (rpc === 'online_biete_remis') { p.remis_angebot = p.weiss === 'u1' ? 'w' : 'b'; return antwort(aktualisieren(p)); }
     if (rpc === 'online_nimm_remis_an') { p.status = 'beendet'; p.ergebnis = '1/2-1/2'; p.grund = 'remis'; p.remis_angebot = null; return antwort(aktualisieren(p)); }
@@ -138,7 +149,9 @@ try {
   await seite.waitForFunction(() => window.__online.chess().history().length === 1);
   pruefe('Gegnerzug aus der Abfrage erscheint legal auf dem Brett', await seite.evaluate(() => window.__online.chess().get('e4')?.color === 'w'));
   await tippe('c7c5'); await seite.waitForFunction(() => window.__online.partie().zuege.endsWith('c7c5') && !window.__online.busy());
-  pruefe('Eigener Zug sendet UCI, FEN und Seitenwechsel', calls.some(c => c.pfad.endsWith('online_zug') && c.body.zug === 'c7c5' && c.body.am_zug_danach === 'w' && c.body.fen_danach === eingeladen.fen));
+  pruefe('Eigener Zug geht nur als Partie und UCI an die Edge Function online-zug, nicht mehr an rpc/online_zug', calls.some(c => c.pfad === '/functions/v1/online-zug'
+    && c.methode === 'POST' && c.body.zug === 'c7c5' && c.body.partie === eingeladen.id && Object.keys(c.body).length === 2)
+    && !calls.some(c => c.pfad.endsWith('/rpc/online_zug')) && eingeladen.am_zug === 'w');
   await seite.reload(); await bereit();
   pruefe('Neuladen setzt Serverpartie fort, kein lokaler Verlauf', await seite.evaluate(() => window.__online.chess().history().length === 2
     && JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]').length === 0));
@@ -222,7 +235,7 @@ try {
   await tippe('e2e4'); await seite.waitForTimeout(300);
   pruefe('Illegaler Serverzug: letzter stimmiger Stand, keine Zuege, Knoepfe bedienbar', await seite.evaluate(() => window.__online.widerspruch()
     && !window.__online.blockiert() && window.__online.chess().history().length === 0 && window.__online.brett()._karte === null)
-    && !calls.slice(vorTipp).some(c => c.pfad.endsWith('online_zug')) && await knopf('strittig').isEnabled());
+    && !calls.slice(vorTipp).some(c => c.pfad.endsWith('online_zug') || c.pfad.endsWith('online-zug')) && await knopf('strittig').isEnabled());
   // Der Schummler reklamiert danach die Zeit (L5 im Konzept): Die Abfrage laeuft weiter, das Ende kommt an, zaehlt aber
   // auf der kaputten Stellung nicht als Niederlage.
   ungueltig.status = 'beendet'; ungueltig.grund = 'zeit'; ungueltig.ergebnis = '0-1'; aktualisieren(ungueltig);
@@ -248,6 +261,20 @@ try {
   await oeffne(echt); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Echtes Matt wird bestaetigt: Sieg mit Schachmatt', (await seite.locator('.on-ergebnis h3').innerText()) === 'Sieg'
     && (await seite.locator('.on-ergebnis').innerText()).includes('Schachmatt'));
+  // Etappe 1a: Ein eigener Zug, der matt setzt, schickt nur den Zug; das Ende rechnet der Server aus und die Karte zeigt es
+  const mattZug = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4' }); await oeffne(mattZug);
+  await tippe('d8h4'); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  const mattRuf = calls.filter(c => c.pfad === '/functions/v1/online-zug' && c.body.partie === mattZug.id);
+  pruefe('Eigener Mattzug: nur { partie, zug } gesendet, Server meldet 0-1 matt, Karte zeigt Sieg mit Schachmatt', mattRuf.length === 1
+    && JSON.stringify(mattRuf[0].body) === JSON.stringify({ partie: mattZug.id, zug: 'd8h4' }) && mattZug.grund === 'matt' && mattZug.ergebnis === '0-1'
+    && (await seite.locator('.on-ergebnis h3').innerText()) === 'Sieg' && (await seite.locator('.on-ergebnis').innerText()).includes('Schachmatt'));
+  // Etappe 1a: Kam inzwischen ein anderer Zug an (veralteter Stand), sagt die App das ruhig und laedt den Stand neu
+  const doppelt = partie({ zuege: 'e2e4 e7e5' }); await oeffne(doppelt);
+  veraltet = true; await tippe('g1f3');
+  await seite.getByText('Die Partie hat sich gerade geändert. Der aktuelle Stand wird geladen.', { exact: true }).waitFor();
+  await seite.waitForFunction(() => !window.__online.busy());
+  pruefe('Veralteter Stand: ruhige Meldung, Zug nicht verbucht, Stand neu geladen, Brett wieder bedienbar', doppelt.zuege === 'e2e4 e7e5'
+    && await seite.evaluate(() => window.__online.chess().history().length === 2 && window.__online.chess().get('g1')?.type === 'n' && window.__online.brett()._karte !== null));
   const material = partie({ zuege: 'e2e4 e7e5 g1f3' }); Object.assign(material, { status: 'beendet', ergebnis: '1/2-1/2', grund: 'zeit-material' }); aktualisieren(material);
   await oeffne(material); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
   pruefe('Zeitende mit zu wenig Material: Remis mit eigenem Grund', (await seite.locator('.on-ergebnis h3').innerText()) === 'Remis'

@@ -1823,8 +1823,9 @@ Groessen: `fen` <= 120, `zuege` <= 20000, `grund` <= 40 Zeichen.
 `authenticated` darf nur lesen; der Trigger `online_vor_anlegen` setzt Code, Grundstellung und Anfangszustand):**
 `online_erstelle(farbe, bedenkzeit_s, inkrement_s)` (farbe `'w' | 'b' | 'zufall'`), `online_tritt_bei(code)` (nur
 `offen`, nicht der Ersteller; setzt die freie Farbe, Uhren, `laeuft`, Weiss am Zug; liefert `jsonb`: die Zeile oder
-`{ fehler }`, siehe Anti-Cheat Etappe 0), `online_zug(partie, zug, fen_danach, am_zug_danach, ergebnis, grund)` (prueft
-Spieler, Status, Reihenfolge, Form von Zug und FEN, Seitenwechsel, Ergebnis-Regeln und grob die Folgestellung),
+`{ fehler }`, siehe Anti-Cheat Etappe 0), `online_zug(partie, zug, fen_danach, am_zug_danach, ergebnis, grund)` (seit
+Anti-Cheat Etappe 1a fuer `authenticated` geschlossen; Zuege verbucht nur noch `online_zug_verbuchen` fuer die Edge
+Function `online-zug`, siehe unten),
 `online_strittig(partie)` (Ende ohne Ergebnis, grund `'strittig'`),
 `online_gib_auf(partie)` (auf einer offenen Einladung: zurueckziehen, `grund 'abgebrochen'`; in einer laufenden Partie
 nur fuer die beiden Spieler), `online_biete_remis(partie)` (liegt das Angebot des Gegners schon vor: Annahme),
@@ -1841,7 +1842,8 @@ falsche und abgelaufene Codes als `{ fehler }`); `js/online.js` uebersetzt jede 
 
 **Uhr-Regeln:** Beide starten beim Beitritt mit `bedenkzeit_s * 1000` ms. Der jeweils erste Zug von Weiss und von
 Schwarz kostet keine Zeit (eine Einladung darf Stunden spaeter angenommen werden). Ab dem dritten Halbzug zieht
-`online_zug` `clock_timestamp() - letzter_zug_am` von der Uhr des Ziehenden ab und addiert `inkrement_s`; bei <= 0
+der Zug (`online_zug_buchen`) die Zeit bis zur Ankunft (seit Etappe 1a, sonst `clock_timestamp()`) minus
+`letzter_zug_am` von der Uhr des Ziehenden ab und addiert `inkrement_s`; bei <= 0
 endet die Partie durch `'zeit'`, der Zug wird nicht verbucht und der Verlierer bleibt mit leerer Uhr `am_zug`. Der
 Client zeigt die laufende Uhr aus `uhr_*_ms` und `letzter_zug_am` heruntergerechnet an; massgeblich ist der Server.
 Durchsetzbar ist die Uhr ueber `online_uhr_pruefen` (intern): Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
@@ -1853,7 +1855,7 @@ Ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es
 
 **Modul `js/online.js`:** `erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 })`,
 `tritteBei(code)` (Code darf klein, mit Leerzeichen oder Bindestrichen kommen), `ladePartie(id)`,
-`sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null })`, `gibAuf(id)`, `bieteRemis(id)`,
+`sendeZug(id, { uci })` (seit Etappe 1a `POST /functions/v1/online-zug` mit genau `{ partie, zug }`), `gibAuf(id)`, `bieteRemis(id)`,
 `nimmRemisAn(id)`, `meldeStrittig(id)`, `pruefeZeit(id)`, `meinePartien()`, `beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler,
 bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }` (fragt nur nach Zeilen mit `aktualisiert_am > stand`,
 pausiert bei `document.hidden` und fragt beim Sichtbarwerden sofort, nie zwei Anfragen gleichzeitig, nach `stop()`
@@ -1926,6 +1928,28 @@ die Knoepfe `[data-online="strittig"]` und `[data-online="aufgeben"]` bleiben be
 Ende (`matt`, `patt`, `material`, `wiederholung`, `50-zuege`) wird mit chess.js nachgeprueft; stimmt es nicht oder liegt
 ein Widerspruch vor, zeigt die Ergebniskarte "Ergebnis nicht nachvollziehbar" statt Sieg oder Niederlage. Mit Uhr vor dem
 2. Halbzug fragt die Oberflaeche nach 10 Minuten ohne Zug hoechstens einmal je Minute `pruefeZeit`.
+
+## Anti-Cheat Etappe 1a, Teil 1 (Edge Function `online-zug`)
+
+Der Server ist Schiedsrichter (Konzept 5.1): Der Browser schickt nur noch `{ partie, zug }` (UCI) an
+`POST /functions/v1/online-zug`, nie Stellung oder Ergebnis. Gebaut nach dem Coach-Muster: Huelle
+`supabase/functions/online-zug/index.ts` (misst die Ankunftszeit als Erstes, liest hoechstens 512 Bytes, importiert
+`npm:chess.js@1.4.0`, dieselbe Datei wie `vendor/chess`), Logik `supabase/functions/_gemeinsam/online-zug.js` (in Node
+getestet: `tests/server-online-zug.test.mjs`, Suite `server-online-zug`). Ablauf: Anmeldung ueber `/auth/v1/user`,
+Partie mit dem Service-Schluessel laden, alle Zuege mit chess.js nachspielen (passt das nicht zu Brett und Seite am Zug:
+`ONLINE_PARTIE_DEFEKT`, nichts verbucht), den Zug pruefen (`ONLINE_ZUG_ILLEGAL`; gespeichert wird `move.lan`, also
+`e2e4q` als `e2e4`), Stellung, Seite und Ende ausrechnen (Matt, Patt, Material, Wiederholung, 50 Zuege), dann
+`online_zug_verbuchen(partie, nutzer, zug, fen_danach, am_zug_danach, ergebnis, grund, ankunft, halbzuege_vorher)`.
+Diese SQL-Funktion darf nur `service_role` aufrufen; sie begrenzt `ankunft` auf den Bereich zwischen letztem Zug und
+jetzt, zieht bis dahin die Uhr ab (die Uhr des Gegners startet mit dem Verbuchen) und lehnt einen veralteten Stand ab
+(`ONLINE_STAND_VERALTET`, zwei Zuege auf denselben Stand). Gemeinsamer Kern mit dem alten Weg ist `online_zug_buchen`
+(intern), dort gelten die Regeln von Etappe 0 als zweite Linie. Antworten: 200 die Zeile, sonst `{ fehler, text }` mit
+400/401/404/405/409/413/422/503; `js/online.js` uebersetzt jede Kennung (`FEHLER_TEXTE`, Deutsch und Englisch in
+`js/sprachen/online.js`). Ins Protokoll nur Kennungen, nie Nutzer, Zuege oder Schluessel. Noch offen (Teil 2 und spaeter):
+faire Uhr, Zeitstempel je Zug in eigener Tabelle, Drosselung je Konto. Einrichtung immer erst die Function, dann
+`online-schema.sql` (die SQL schliesst den alten Weg, eine fehlende Function merkt der RLS-Test nicht); jeder Abschnitt
+in `supabase/ANLEITUNG.md`, der `online-schema.sql` einspielen laesst, nennt das Hochladen davor (geprueft in
+`tests/server-online-zug.test.mjs`).
 
 # Daten-Fundament: Konto, Datenfreigabe, Auskunft und Löschung (DSGVO)
 

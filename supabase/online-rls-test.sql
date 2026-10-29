@@ -3,7 +3,13 @@
 -- online_tritt_bei liefert seit Anti-Cheat Etappe 0 jsonb: die Zeile oder { "fehler": "ONLINE_..." } (ohne raise).
 -- Ab Abschnitt 13: Einladungs-Bremse, Aufraeumen, Fehlversuche, Ergebnis-Regeln, Folgestellung, strittig,
 -- Zeitende mit zu wenig Material, haengende Partien, Rechte und search_path. Abschnitt 21: erneuter Beitritt zur
--- eigenen Partie und Aufraeumen alter Fehlversuche und Zaehler fuer alle Konten.
+-- eigenen Partie und Aufraeumen alter Fehlversuche und Zaehler fuer alle Konten. Abschnitt 22 (Anti-Cheat Etappe 1a):
+-- der alte Weg online_zug ist fuer Nutzer zu, online_zug_verbuchen nur fuer die Service-Rolle, veralteter Stand,
+-- begrenzte Ankunftszeit.
+-- Seit Etappe 1a verbucht Zuege nur noch die Edge Function online-zug ueber online_zug_verbuchen. Die Abschnitte 1 bis 21
+-- ziehen deshalb mit der Testhilfe pg_temp.ziehe(...): Sie ruft online_zug_verbuchen so auf, wie es die Function tut
+-- (Nutzer-ID aus der Anmeldung, Ankunft jetzt, Stand aus der Zeile). Die Schachregeln selbst prueft die Function
+-- (tests/server-online-zug.test.mjs); hier geht es um Rechte, Uhr, Ergebnis-Regeln und die grobe Folgestellung.
 begin;
 
 insert into auth.users (id, email)
@@ -11,6 +17,26 @@ values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'online-a@example.invalid'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'online-b@example.invalid'),
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'online-c@example.invalid');
+
+-- Testhilfe (nur in dieser Sitzung, verschwindet mit dem rollback): ein Zug wie von der Edge Function online-zug.
+-- Sie laeuft als Besitzer (security definer), weil angemeldete Nutzer online_zug_verbuchen nicht aufrufen duerfen.
+create function pg_temp.ziehe(partie uuid, zug text, fen_danach text, am_zug_danach text, ergebnis text default null,
+  grund text default null)
+returns public.partien_online
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return public.online_zug_verbuchen(partie, auth.uid(), zug, fen_danach, am_zug_danach, ergebnis, grund,
+    pg_catalog.clock_timestamp(),
+    coalesce((select case when t.zuege = '' then 0
+                          else pg_catalog.array_length(pg_catalog.string_to_array(t.zuege, ' '), 1) end
+              from public.partien_online t where t.id = partie), 0));
+end;
+$$;
+revoke all on function pg_temp.ziehe(uuid, text, text, text, text, text) from public;
+grant execute on function pg_temp.ziehe(uuid, text, text, text, text, text) to authenticated;
 
 set local role authenticated;
 
@@ -83,7 +109,7 @@ begin
 
   -- ziehen, bevor jemand beigetreten ist: verboten
   begin
-    perform public.online_zug(p.id, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+    perform pg_temp.ziehe(p.id, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
     raise exception 'FEHLER: A konnte vor dem Beitritt ziehen';
   exception
     when others then if sqlerrm <> 'ONLINE_PARTIE_NICHT_GESTARTET' then raise; end if;
@@ -146,7 +172,7 @@ begin
     raise exception 'FEHLER: online_meine zeigt dem Dritten fremde Partien';
   end if;
   begin
-    perform public.online_zug(id1, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+    perform pg_temp.ziehe(id1, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
     raise exception 'FEHLER: Dritter konnte ziehen';
   exception
     when others then if sqlerrm <> 'ONLINE_PARTIE_UNBEKANNT' then raise; end if;
@@ -207,7 +233,7 @@ begin
 
   -- Schwarz ist nicht am Zug
   begin
-    perform public.online_zug(p.id, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR w KQkq e6 0 2', 'w');
+    perform pg_temp.ziehe(p.id, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/8/8/PPPPPPPP/RNBQKBNR w KQkq e6 0 2', 'w');
     raise exception 'FEHLER: B konnte ziehen, obwohl Weiss am Zug ist';
   exception
     when others then if sqlerrm <> 'ONLINE_NICHT_DEIN_ZUG' then raise; end if;
@@ -248,37 +274,37 @@ declare
   fen_e4 constant text := 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
 begin
   begin
-    perform public.online_zug(id1, 'e2e9', fen_e4, 'b');
+    perform pg_temp.ziehe(id1, 'e2e9', fen_e4, 'b');
     raise exception 'FEHLER: Zug mit falscher Form angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ZUG_FORM' then raise; end if;
   end;
   begin
-    perform public.online_zug(id1, 'e2e4 e7e5', fen_e4, 'b');
+    perform pg_temp.ziehe(id1, 'e2e4 e7e5', fen_e4, 'b');
     raise exception 'FEHLER: zwei Zuege auf einmal angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ZUG_FORM' then raise; end if;
   end;
   begin
-    perform public.online_zug(id1, 'e2e4', 'kaputt', 'b');
+    perform pg_temp.ziehe(id1, 'e2e4', 'kaputt', 'b');
     raise exception 'FEHLER: kaputter FEN angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_FEN_FORM' then raise; end if;
   end;
   begin
-    perform public.online_zug(id1, 'e2e4', fen_e4, 'w');
+    perform pg_temp.ziehe(id1, 'e2e4', fen_e4, 'w');
     raise exception 'FEHLER: am_zug_danach ohne Seitenwechsel angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_AM_ZUG_FORM' then raise; end if;
   end;
   begin
-    perform public.online_zug(id1, 'e2e4', fen_e4, 'b', 'gewonnen');
+    perform pg_temp.ziehe(id1, 'e2e4', fen_e4, 'b', 'gewonnen');
     raise exception 'FEHLER: ungueltiges Ergebnis angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
   end;
 
-  p := public.online_zug(id1, 'e2e4', fen_e4, 'b');
+  p := pg_temp.ziehe(id1, 'e2e4', fen_e4, 'b');
   if p.zuege <> 'e2e4' or p.am_zug <> 'b' or p.fen <> fen_e4 or p.status <> 'laeuft'
      or p.uhr_weiss_ms <> 300000 or p.uhr_schwarz_ms <> 300000 or p.letzter_zug_am is null then
     raise exception 'FEHLER: erster Zug falsch verbucht (der erste Zug jeder Seite kostet keine Zeit)';
@@ -286,7 +312,7 @@ begin
 
   -- gleich noch einmal: jetzt ist Schwarz dran
   begin
-    perform public.online_zug(id1, 'd2d4', 'rnbqkbnr/pppppppp/8/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 1', 'b');
+    perform pg_temp.ziehe(id1, 'd2d4', 'rnbqkbnr/pppppppp/8/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq d3 0 1', 'b');
     raise exception 'FEHLER: A konnte zweimal hintereinander ziehen';
   exception
     when others then if sqlerrm <> 'ONLINE_NICHT_DEIN_ZUG' then raise; end if;
@@ -302,7 +328,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie1')::uuid, 'e7e5',
+  p := pg_temp.ziehe(current_setting('online_test.partie1')::uuid, 'e7e5',
                          'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w');
   if p.zuege <> 'e2e4 e7e5' or p.am_zug <> 'w' or p.uhr_schwarz_ms <> 300000 then
     raise exception 'FEHLER: zweiter Zug falsch verbucht';
@@ -323,7 +349,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie1')::uuid, 'g1f3',
+  p := pg_temp.ziehe(current_setting('online_test.partie1')::uuid, 'g1f3',
                          'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b');
   -- 300000 - 5000 (bis 6000, je nach Rechner) + 2000
   if p.uhr_weiss_ms > 297000 or p.uhr_weiss_ms < 296000 then
@@ -349,7 +375,7 @@ declare
   p public.partien_online;
   id1 uuid := current_setting('online_test.partie1')::uuid;
 begin
-  p := public.online_zug(id1, 'b8c6', 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'w');
+  p := pg_temp.ziehe(id1, 'b8c6', 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'w');
   -- der Zug wird nicht verbucht, Schwarz bleibt (mit leerer Uhr) am Zug
   if p.status <> 'beendet' or p.ergebnis <> '1-0' or p.grund <> 'zeit' or p.uhr_schwarz_ms <> 0
      or p.zuege <> 'e2e4 e7e5 g1f3' or p.am_zug <> 'b' then
@@ -358,7 +384,7 @@ begin
   end if;
   -- danach geht nichts mehr
   begin
-    perform public.online_zug(id1, 'b8c6', 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'w');
+    perform pg_temp.ziehe(id1, 'b8c6', 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'w');
     raise exception 'FEHLER: Zug in beendeter Partie angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_PARTIE_BEENDET' then raise; end if;
@@ -416,7 +442,7 @@ begin
   if p.remis_angebot <> 'w' or p.status <> 'laeuft' then
     raise exception 'FEHLER: doppeltes Remisangebot aendert den Zustand';
   end if;
-  p := public.online_zug(id2, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+  p := pg_temp.ziehe(id2, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
   if p.remis_angebot <> 'w' or p.uhr_weiss_ms is not null then
     raise exception 'FEHLER: eigener Zug nimmt das Remisangebot zurueck oder startet eine Uhr';
   end if;
@@ -438,7 +464,7 @@ declare
   id2 uuid := current_setting('online_test.partie2')::uuid;
 begin
   -- B zieht statt anzunehmen: das Angebot verfaellt
-  p := public.online_zug(id2, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w');
+  p := pg_temp.ziehe(id2, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w');
   if p.remis_angebot is not null then
     raise exception 'FEHLER: Gegenzug nimmt das Remisangebot nicht zurueck';
   end if;
@@ -537,16 +563,16 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 do $$ begin if public.online_tritt_bei(current_setting('online_test.code5')) ? 'fehler' then raise exception 'FEHLER: Beitritt zu Partie 5 gescheitert'; end if; end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie5')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie5')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie5')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie5')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 do $$
 declare
   p public.partien_online;
   id5 uuid := current_setting('online_test.partie5')::uuid;
 begin
-  p := public.online_zug(id5, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b');
+  p := pg_temp.ziehe(id5, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b');
   -- A bietet gleich Remis an (B koennte es spaeter annehmen wollen)
   p := public.online_biete_remis(id5);
   -- solange die Uhr laeuft, aendert das Reklamieren nichts
@@ -556,7 +582,7 @@ begin
   end if;
   -- nicht am Zug: ziehen geht weiterhin nicht
   begin
-    perform public.online_zug(id5, 'b1c3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 2 2', 'b');
+    perform pg_temp.ziehe(id5, 'b1c3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 2 2', 'b');
     raise exception 'FEHLER: A konnte ziehen, obwohl Schwarz am Zug ist';
   exception
     when others then if sqlerrm <> 'ONLINE_NICHT_DEIN_ZUG' then raise; end if;
@@ -607,11 +633,11 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 do $$ begin if public.online_tritt_bei(current_setting('online_test.code6')) ? 'fehler' then raise exception 'FEHLER: Beitritt zu Partie 6 gescheitert'; end if; end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie6')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie6')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie6')::uuid, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie6')::uuid, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b'); end $$;
 reset role;
 update public.partien_online
 set letzter_zug_am = clock_timestamp() - interval '10 minutes'
@@ -960,7 +986,7 @@ declare
 begin
   -- Ergebnis ohne Grund
   begin
-    perform public.online_zug(id_e, 'f2f3', fen_f3, 'b', '1-0', null);
+    perform pg_temp.ziehe(id_e, 'f2f3', fen_f3, 'b', '1-0', null);
     raise exception 'FEHLER: Ergebnis ohne Grund angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
@@ -968,7 +994,7 @@ begin
   -- "matt" nur als Sieg des Ziehenden, Remis-Gruende nur als Remis
   foreach e in array array['0-1', '1/2-1/2'] loop
     begin
-      perform public.online_zug(id_e, 'f2f3', fen_f3, 'b', e, 'matt');
+      perform pg_temp.ziehe(id_e, 'f2f3', fen_f3, 'b', e, 'matt');
       raise exception 'FEHLER: % mit Grund matt nach einem Zug von Weiss angenommen', e;
     exception
       when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
@@ -977,7 +1003,7 @@ begin
   foreach g in array array['patt', 'material', 'wiederholung', '50-zuege'] loop
     foreach e in array array['1-0', '0-1'] loop
       begin
-        perform public.online_zug(id_e, 'f2f3', fen_f3, 'b', e, g);
+        perform pg_temp.ziehe(id_e, 'f2f3', fen_f3, 'b', e, g);
         raise exception 'FEHLER: % mit Remis-Grund % angenommen', e, g;
       exception
         when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
@@ -988,7 +1014,7 @@ begin
   foreach g in array array['zeit', 'zeit-material', 'aufgabe', 'remis', 'abgebrochen', 'strittig', 'gewonnen'] loop
     foreach e in array array['1-0', '0-1', '1/2-1/2'] loop
       begin
-        perform public.online_zug(id_e, 'f2f3', fen_f3, 'b', e, g);
+        perform pg_temp.ziehe(id_e, 'f2f3', fen_f3, 'b', e, g);
         raise exception 'FEHLER: Grund % (Ergebnis %) vom Browser angenommen', g, e;
       exception
         when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
@@ -996,7 +1022,7 @@ begin
     end loop;
   end loop;
   -- ohne Ergebnis geht der Zug durch; ein Grund ohne Ergebnis faellt still weg
-  p := public.online_zug(id_e, 'f2f3', fen_f3, 'b', null, 'matt');
+  p := pg_temp.ziehe(id_e, 'f2f3', fen_f3, 'b', null, 'matt');
   if p.zuege <> 'f2f3' or p.status <> 'laeuft' or p.grund is not null or p.ergebnis is not null then
     raise exception 'FEHLER: Zug ohne Ergebnis falsch verbucht';
   end if;
@@ -1009,29 +1035,29 @@ declare
   fen_e5 constant text := 'rnbqkbnr/pppp1ppp/8/4p3/8/5P2/PPPPP1PP/RNBQKBNR w KQkq - 0 2';
 begin
   begin
-    perform public.online_zug(id_e, 'e7e5', fen_e5, 'w', '1-0', 'matt');
+    perform pg_temp.ziehe(id_e, 'e7e5', fen_e5, 'w', '1-0', 'matt');
     raise exception 'FEHLER: "1-0, matt" nach einem Zug von Schwarz angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
   end;
   begin
-    perform public.online_zug(id_e, 'e7e5', fen_e5, 'w', '1-0', 'wiederholung');
+    perform pg_temp.ziehe(id_e, 'e7e5', fen_e5, 'w', '1-0', 'wiederholung');
     raise exception 'FEHLER: "1-0, wiederholung" angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
   end;
-  perform public.online_zug(id_e, 'e7e5', fen_e5, 'w');
+  perform pg_temp.ziehe(id_e, 'e7e5', fen_e5, 'w');
 end
 $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie_e')::uuid, 'g2g4', 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie_e')::uuid, 'g2g4', 'rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2', 'b'); end $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 do $$
 declare
   p public.partien_online;
 begin
   -- Narrenmatt: "0-1, matt" vom Ziehenden geht durch
-  p := public.online_zug(current_setting('online_test.partie_e')::uuid, 'd8h4',
+  p := pg_temp.ziehe(current_setting('online_test.partie_e')::uuid, 'd8h4',
                          'rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3', 'w', '0-1', 'matt');
   if p.status <> 'beendet' or p.ergebnis <> '0-1' or p.grund <> 'matt' then
     raise exception 'FEHLER: Matt des Ziehenden nicht verbucht (status %, ergebnis %, grund %)', p.status, p.ergebnis, p.grund;
@@ -1049,7 +1075,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie_e2')::uuid, 'e2e4',
+  p := pg_temp.ziehe(current_setting('online_test.partie_e2')::uuid, 'e2e4',
                          'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b', '1/2-1/2', 'wiederholung');
   if p.status <> 'beendet' or p.ergebnis <> '1/2-1/2' or p.grund <> 'wiederholung' then
     raise exception 'FEHLER: Remis mit Remis-Grund nicht verbucht';
@@ -1098,14 +1124,14 @@ begin
     'e2e4', 'rnbqkbnr/pppppppp/8/8/4P2/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'];
   for i in 1..array_length(falsch, 1) / 2 loop
     begin
-      perform public.online_zug(id_f, falsch[2 * i - 1], falsch[2 * i], 'b');
+      perform pg_temp.ziehe(id_f, falsch[2 * i - 1], falsch[2 * i], 'b');
       raise exception 'FEHLER: falsche Folgestellung % angenommen (%)', i, falsch[2 * i];
     exception
       when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
     end;
   end loop;
   -- nur Brett und Seite zaehlen: andere Zaehler im FEN-Text sind kein Fehler
-  p := public.online_zug(id_f, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 3 9', 'b');
+  p := pg_temp.ziehe(id_f, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 3 9', 'b');
   if p.zuege <> 'e2e4' then
     raise exception 'FEHLER: richtiger Zug (andere Zaehler) abgelehnt';
   end if;
@@ -1123,7 +1149,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie_f')::uuid, 'e1g1', 'r3k2r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 b kq - 1 1', 'b');
+  p := pg_temp.ziehe(current_setting('online_test.partie_f')::uuid, 'e1g1', 'r3k2r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 b kq - 1 1', 'b');
   if p.fen <> 'r3k2r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 b kq - 1 1' then
     raise exception 'FEHLER: kurze Rochade von Weiss abgelehnt oder falsch verbucht';
   end if;
@@ -1137,12 +1163,12 @@ declare
 begin
   -- Rochade, bei der der Turm nicht mitspringt
   begin
-    perform public.online_zug(id_f, 'e8c8', 'r1k4r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 w - - 2 2', 'w');
+    perform pg_temp.ziehe(id_f, 'e8c8', 'r1k4r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 w - - 2 2', 'w');
     raise exception 'FEHLER: Rochade ohne Turm angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
   end;
-  p := public.online_zug(id_f, 'e8c8', '2kr3r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 w - - 2 2', 'w');
+  p := pg_temp.ziehe(id_f, 'e8c8', '2kr3r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 w - - 2 2', 'w');
   if p.fen <> '2kr3r/pppqpppp/8/8/8/8/PPPQPPPP/R4RK1 w - - 2 2' then
     raise exception 'FEHLER: lange Rochade von Schwarz abgelehnt';
   end if;
@@ -1150,7 +1176,8 @@ end
 $$;
 -- Rochade auf ein besetztes Feld: Eine Rochade schlaegt nie. Steht zwischen Koenig und Turm ein Stein (auch auf dem
 -- Zielfeld des Koenigs oder bei der langen Rochade auf b1/b8), darf er nicht verschwinden (vorher fiel die gegnerische
--- Dame auf f1 einfach weg). Einmal ueber online_zug, die weiteren Faelle direkt an der Hilfsfunktion (als Besitzer).
+-- Dame auf f1 einfach weg). Einmal ueber online_zug_verbuchen, die weiteren Faelle direkt an der Hilfsfunktion (als
+-- Besitzer).
 reset role;
 update public.partien_online
 set fen = '4k3/8/8/8/8/8/8/4Kq1R w K - 0 1', am_zug = 'w'
@@ -1159,7 +1186,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 do $$
 begin
-  perform public.online_zug(current_setting('online_test.partie_f')::uuid, 'e1g1', '4k3/8/8/8/8/8/8/5RK1 b - - 1 1', 'b');
+  perform pg_temp.ziehe(current_setting('online_test.partie_f')::uuid, 'e1g1', '4k3/8/8/8/8/8/8/5RK1 b - - 1 1', 'b');
   raise exception 'FEHLER: Rochade hat die schwarze Dame auf f1 verschwinden lassen';
 exception
   when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
@@ -1201,12 +1228,12 @@ declare
 begin
   -- en passant, bei dem der geschlagene Bauer stehen bleibt
   begin
-    perform public.online_zug(id_f, 'd4e3', 'rnbqkbnr/ppp1pppp/8/8/4P3/4p3/PPPP1PPP/RNBQKBNR w KQkq - 0 4', 'w');
+    perform pg_temp.ziehe(id_f, 'd4e3', 'rnbqkbnr/ppp1pppp/8/8/4P3/4p3/PPPP1PPP/RNBQKBNR w KQkq - 0 4', 'w');
     raise exception 'FEHLER: en passant ohne geschlagenen Bauern angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
   end;
-  p := public.online_zug(id_f, 'd4e3', 'rnbqkbnr/ppp1pppp/8/8/8/4p3/PPPP1PPP/RNBQKBNR w KQkq - 0 4', 'w');
+  p := pg_temp.ziehe(id_f, 'd4e3', 'rnbqkbnr/ppp1pppp/8/8/8/4p3/PPPP1PPP/RNBQKBNR w KQkq - 0 4', 'w');
   if p.am_zug <> 'w' then
     raise exception 'FEHLER: en passant abgelehnt';
   end if;
@@ -1220,7 +1247,7 @@ where id = current_setting('online_test.partie_f')::uuid;
 set local role authenticated;
 do $$
 begin
-  perform public.online_zug(current_setting('online_test.partie_f')::uuid, 'd4e3',
+  perform pg_temp.ziehe(current_setting('online_test.partie_f')::uuid, 'd4e3',
                             'rnbqkbnr/ppp1pppp/8/8/8/4p3/PPPP1PPP/R1BQKBNR w KQkq - 0 4', 'w');
   raise exception 'FEHLER: en passant hat einen Springer vom Brett genommen';
 exception
@@ -1240,18 +1267,18 @@ declare
 begin
   -- Bauer auf der letzten Reihe ohne Umwandlung, oder ein anderer Stein als angegeben
   begin
-    perform public.online_zug(id_f, 'b7a8', 'P3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
+    perform pg_temp.ziehe(id_f, 'b7a8', 'P3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
     raise exception 'FEHLER: Bauer auf der letzten Reihe ohne Umwandlung angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
   end;
   begin
-    perform public.online_zug(id_f, 'b7a8q', 'N3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
+    perform pg_temp.ziehe(id_f, 'b7a8q', 'N3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
     raise exception 'FEHLER: Umwandlung in einen anderen Stein als angegeben angenommen';
   exception
     when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
   end;
-  p := public.online_zug(id_f, 'b7a8q', 'Q3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
+  p := pg_temp.ziehe(id_f, 'b7a8q', 'Q3k3/8/8/8/8/8/8/4K3 b - - 0 1', 'b');
   if p.fen <> 'Q3k3/8/8/8/8/8/8/4K3 b - - 0 1' then
     raise exception 'FEHLER: Umwandlung mit Schlagen abgelehnt';
   end if;
@@ -1267,7 +1294,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie_f')::uuid, 'b2a1r', '4k3/8/8/8/8/8/8/r3K3 w - - 0 2', 'w');
+  p := pg_temp.ziehe(current_setting('online_test.partie_f')::uuid, 'b2a1r', '4k3/8/8/8/8/8/8/r3K3 w - - 0 2', 'w');
   if p.fen <> '4k3/8/8/8/8/8/8/r3K3 w - - 0 2' then
     raise exception 'FEHLER: Unterverwandlung von Schwarz abgelehnt';
   end if;
@@ -1297,11 +1324,11 @@ $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
 do $$ begin if public.online_tritt_bei(current_setting('online_test.code_s')) ? 'fehler' then raise exception 'FEHLER: Beitritt zu Partie S gescheitert'; end if; end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie_s')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie_s')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b'); end $$;
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie_s')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie_s')::uuid, 'e7e5', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w'); end $$;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$ begin perform public.online_zug(current_setting('online_test.partie_s')::uuid, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b'); end $$;
+do $$ begin perform pg_temp.ziehe(current_setting('online_test.partie_s')::uuid, 'g1f3', 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b'); end $$;
 -- B ist am Zug, seine Uhr laeuft seit 30 Sekunden (noch nicht abgelaufen)
 reset role;
 update public.partien_online set letzter_zug_am = clock_timestamp() - interval '30 seconds'
@@ -1470,7 +1497,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie_t2')::uuid, 'e1d1', '4k3/8/8/2n5/8/8/8/3K4 b - - 1 40', 'b');
+  p := pg_temp.ziehe(current_setting('online_test.partie_t2')::uuid, 'e1d1', '4k3/8/8/2n5/8/8/8/3K4 b - - 1 40', 'b');
   if p.status <> 'beendet' or p.ergebnis <> '1/2-1/2' or p.grund <> 'zeit-material' or p.zuege <> 'e2e4 e7e5 g1f3 b8c6' then
     raise exception 'FEHLER: Koenig und Springer gegen den blanken Koenig ist auf Zeit kein Remis (ergebnis %, grund %)', p.ergebnis, p.grund;
   end if;
@@ -1558,7 +1585,7 @@ do $$
 declare
   p public.partien_online;
 begin
-  p := public.online_zug(current_setting('online_test.partie_h7')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+  p := pg_temp.ziehe(current_setting('online_test.partie_h7')::uuid, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
   if p.status <> 'beendet' or p.grund <> 'abgebrochen' or p.ergebnis is not null or p.zuege <> '' then
     raise exception 'FEHLER: Zug in einer haengenden Partie wurde verbucht (status %, grund %)', p.status, p.grund;
   end if;
@@ -1652,6 +1679,20 @@ begin
   exception
     when insufficient_privilege then null;
   end;
+  begin
+    perform public.online_zug_verbuchen(current_setting('online_test.partie_s')::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b', null, null, now(), 0);
+    raise exception 'FEHLER: anon darf online_zug_verbuchen aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform public.online_zug(current_setting('online_test.partie_s')::uuid, 'e2e4',
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+    raise exception 'FEHLER: anon darf online_zug aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
 end
 $$;
 reset role;
@@ -1665,20 +1706,32 @@ begin
     'public.online_folge_passt(text, text, text)', 'public.online_kann_nicht_matt_setzen(text, text)',
     'public.online_haengt(public.partien_online)', 'public.online_zeitende(public.partien_online)',
     'public.online_uhr_pruefen(public.partien_online)', 'public.online_hole_laufende(uuid, uuid)',
-    'public.online_vor_anlegen()'] loop
+    'public.online_vor_anlegen()', 'public.online_haengt(public.partien_online, timestamptz)',
+    'public.online_uhr_pruefen(public.partien_online, timestamptz)',
+    'public.online_zug_buchen(uuid, uuid, text, text, text, text, text, timestamptz, integer)'] loop
     if has_function_privilege('authenticated', f, 'execute') or has_function_privilege('anon', f, 'execute') then
       raise exception 'FEHLER: interner Helfer fuer Nutzer aufrufbar: %', f;
     end if;
   end loop;
   -- Einstiege: nur angemeldete Nutzer
   foreach f in array array['public.online_erstelle(text, integer, integer)', 'public.online_tritt_bei(text)',
-    'public.online_zug(uuid, text, text, text, text, text)', 'public.online_strittig(uuid)', 'public.online_gib_auf(uuid)',
+    'public.online_strittig(uuid)', 'public.online_gib_auf(uuid)',
     'public.online_biete_remis(uuid)', 'public.online_nimm_remis_an(uuid)', 'public.online_pruefe_zeit(uuid)',
     'public.online_meine()'] loop
     if not has_function_privilege('authenticated', f, 'execute') or has_function_privilege('anon', f, 'execute') then
       raise exception 'FEHLER: falsche Rechte fuer %', f;
     end if;
   end loop;
+  -- Zuege (Etappe 1a): der alte Weg fuer Nutzer zu, online_zug_verbuchen nur fuer die Service-Rolle
+  if has_function_privilege('authenticated', 'public.online_zug(uuid, text, text, text, text, text)', 'execute')
+     or has_function_privilege('anon', 'public.online_zug(uuid, text, text, text, text, text)', 'execute') then
+    raise exception 'FEHLER: der alte Weg online_zug ist fuer Nutzer noch offen';
+  end if;
+  f := 'public.online_zug_verbuchen(uuid, uuid, text, text, text, text, text, timestamptz, integer)';
+  if not has_function_privilege('service_role', f, 'execute') or has_function_privilege('authenticated', f, 'execute')
+     or has_function_privilege('anon', f, 'execute') then
+    raise exception 'FEHLER: falsche Rechte fuer online_zug_verbuchen (nur die Service-Rolle)';
+  end if;
   -- jede Funktion des Online-Schemas (online_..., auch die Helfer) mit leerem search_path
   select string_agg(f.proname, ', ' order by f.proname) into offen
   from pg_catalog.pg_proc f
@@ -1691,7 +1744,7 @@ begin
   select string_agg(f.proname, ', ' order by f.proname) into offen
   from pg_catalog.pg_proc f
   where f.pronamespace = 'public'::regnamespace and f.proname like 'online\_%' and f.prosecdef;
-  if offen is distinct from 'online_biete_remis, online_erstelle, online_gib_auf, online_meine, online_nimm_remis_an, online_pruefe_zeit, online_strittig, online_tritt_bei, online_zug' then
+  if offen is distinct from 'online_biete_remis, online_erstelle, online_gib_auf, online_meine, online_nimm_remis_an, online_pruefe_zeit, online_strittig, online_tritt_bei, online_zug, online_zug_verbuchen' then
     raise exception 'FEHLER: unerwartete Security-Definer-Funktionen: %', offen;
   end if;
 end
@@ -1762,6 +1815,192 @@ begin
   end if;
 end
 $$;
+set local role authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 22. Anti-Cheat Etappe 1a: Zuege verbucht nur noch die Edge Function online-zug ueber online_zug_verbuchen
+--     (Service-Rolle, Nutzer-ID und Ankunftszeit als Parameter). Der alte Weg online_zug ist fuer angemeldete Nutzer
+--     geschlossen. Zwei Zuege auf demselben Stand: der zweite ist veraltet. Die Ankunftszeit wird begrenzt (nicht vor
+--     dem letzten Zug, nicht in der Zukunft), und bis zu ihr laeuft die Uhr. Partie Z: B (Weiss) gegen A (Schwarz),
+--     1 Minute ohne Zuschlag.
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_erstelle('w', 60, 0);
+  perform set_config('online_test.code_z', p.code, true);
+  perform set_config('online_test.partie_z', p.id::text, true);
+end
+$$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$ begin if public.online_tritt_bei(current_setting('online_test.code_z')) ? 'fehler' then raise exception 'FEHLER: Beitritt zu Partie Z gescheitert'; end if; end $$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+declare
+  id_z uuid := current_setting('online_test.partie_z')::uuid;
+begin
+  -- B ist am Zug, darf aber weder den alten Weg noch die Server-Funktion selbst aufrufen
+  begin
+    perform public.online_zug(id_z, 'e2e4', 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b');
+    raise exception 'FEHLER: ein angemeldeter Nutzer kann online_zug noch direkt aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'e2e4',
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b', '1-0', 'matt', now(), 0);
+    raise exception 'FEHLER: ein angemeldeter Nutzer kann online_zug_verbuchen aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  if (select zuege from public.partien_online where id = id_z) <> '' then
+    raise exception 'FEHLER: ein verbotener Aufruf hat einen Zug verbucht';
+  end if;
+end
+$$;
+-- Ab hier wie die Edge Function: als Service-Rolle
+reset role;
+set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  p public.partien_online;
+  id_z uuid := current_setting('online_test.partie_z')::uuid;
+  fen_e4 constant text := 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+begin
+  -- ohne Nutzer, fremder Nutzer, ohne Stand
+  begin
+    perform public.online_zug_verbuchen(id_z, null, 'e2e4', fen_e4, 'b', null, null, clock_timestamp(), 0);
+    raise exception 'FEHLER: online_zug_verbuchen ohne Nutzer angenommen';
+  exception
+    when others then if sqlerrm <> 'ONLINE_NICHT_ANGEMELDET' then raise; end if;
+  end;
+  begin
+    perform public.online_zug_verbuchen(id_z, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'e2e4', fen_e4, 'b', null, null, clock_timestamp(), 0);
+    raise exception 'FEHLER: online_zug_verbuchen fuer einen Dritten angenommen';
+  exception
+    when others then if sqlerrm <> 'ONLINE_PARTIE_UNBEKANNT' then raise; end if;
+  end;
+  begin
+    perform public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'e2e4', fen_e4, 'b', null, null, clock_timestamp(), null);
+    raise exception 'FEHLER: online_zug_verbuchen ohne Stand angenommen';
+  exception
+    when others then if sqlerrm <> 'ONLINE_STAND_VERALTET' then raise; end if;
+  end;
+  -- die Regeln von Etappe 0 gelten auch fuer die Service-Rolle: kein falsches Ende, keine erfundene Stellung
+  begin
+    perform public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'e2e4', fen_e4, 'b', '1-0', 'zeit', clock_timestamp(), 0);
+    raise exception 'FEHLER: online_zug_verbuchen hat ein Ende angenommen, das nur der Server selbst setzt';
+  exception
+    when others then if sqlerrm <> 'ONLINE_ERGEBNIS_FORM' then raise; end if;
+  end;
+  begin
+    perform public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'e2e4',
+      'rnb1kbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1', 'b', null, null, clock_timestamp(), 0);
+    raise exception 'FEHLER: online_zug_verbuchen hat eine erfundene Stellung angenommen (Dame weg)';
+  exception
+    when others then if sqlerrm <> 'ONLINE_STELLUNG_FALSCH' then raise; end if;
+  end;
+  -- zwei Zuege gleichzeitig auf demselben Stand (Doppelklick, zwei Tabs): der erste gilt, der zweite ist veraltet,
+  -- nicht "nicht dein Zug"
+  p := public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'e2e4', fen_e4, 'b', null, null, clock_timestamp(), 0);
+  if p.zuege <> 'e2e4' or p.am_zug <> 'b' or p.status <> 'laeuft' or p.fen <> fen_e4 then
+    raise exception 'FEHLER: online_zug_verbuchen hat den ersten Zug falsch verbucht (%)', p.zuege;
+  end if;
+  begin
+    perform public.online_zug_verbuchen(id_z, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'd2d4',
+      'rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq d3 0 1', 'b', null, null, clock_timestamp(), 0);
+    raise exception 'FEHLER: ein zweiter Zug auf veraltetem Stand wurde verbucht';
+  exception
+    when others then if sqlerrm <> 'ONLINE_STAND_VERALTET' then raise; end if;
+  end;
+  -- ein Stand, den es noch gar nicht gibt, ist ebenso veraltet
+  begin
+    perform public.online_zug_verbuchen(id_z, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'e7e5',
+      'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w', null, null, clock_timestamp(), 2);
+    raise exception 'FEHLER: ein Zug auf einem Stand aus der Zukunft wurde verbucht';
+  exception
+    when others then if sqlerrm <> 'ONLINE_STAND_VERALTET' then raise; end if;
+  end;
+  p := public.online_zug_verbuchen(id_z, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'e7e5',
+    'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2', 'w', null, null, clock_timestamp(), 1);
+  if p.zuege <> 'e2e4 e7e5' or p.uhr_weiss_ms <> 60000 or p.uhr_schwarz_ms <> 60000 then
+    raise exception 'FEHLER: die ersten beiden Zuege ueber online_zug_verbuchen kosten Zeit oder fehlen (%)', p.zuege;
+  end if;
+end
+$$;
+-- Ankunft vor dem letzten Zug: zaehlt wie der letzte Zug selbst, die Uhr verliert nichts (sonst liefe sie rueckwaerts
+-- oder ein erfundener alter Zeitpunkt schenkte Zeit). Der letzte Zug liegt 5 Sekunden zurueck.
+reset role;
+update public.partien_online set letzter_zug_am = clock_timestamp() - interval '5 seconds'
+where id = current_setting('online_test.partie_z')::uuid;
+set local role service_role;
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_zug_verbuchen(current_setting('online_test.partie_z')::uuid, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'g1f3',
+    'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', 'b', null, null, clock_timestamp() - interval '1 hour', 2);
+  if p.zuege <> 'e2e4 e7e5 g1f3' or p.uhr_weiss_ms <> 60000 then
+    raise exception 'FEHLER: eine Ankunftszeit vor dem letzten Zug wurde nicht begrenzt (Uhr Weiss %)', p.uhr_weiss_ms;
+  end if;
+end
+$$;
+-- Ankunft in der Zukunft: zaehlt wie jetzt (sonst endete die Partie auf Zeit). Der letzte Zug liegt 5 Sekunden zurueck.
+reset role;
+update public.partien_online set letzter_zug_am = clock_timestamp() - interval '5 seconds'
+where id = current_setting('online_test.partie_z')::uuid;
+set local role service_role;
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_zug_verbuchen(current_setting('online_test.partie_z')::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'b8c6',
+    'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', 'w', null, null, clock_timestamp() + interval '1 hour', 3);
+  if p.status <> 'laeuft' or p.zuege <> 'e2e4 e7e5 g1f3 b8c6' or p.uhr_schwarz_ms not between 54000 and 55000 then
+    raise exception 'FEHLER: eine Ankunftszeit in der Zukunft wurde nicht auf jetzt begrenzt (Uhr Schwarz %, status %)', p.uhr_schwarz_ms, p.status;
+  end if;
+end
+$$;
+-- Ein Zug, der rechtzeitig ankam, zaehlt mit seiner Ankunftszeit: Weiss hat noch 2 Sekunden, der letzte Zug liegt
+-- 3 Sekunden zurueck, der Zug kam nach 1 Sekunde an. Gemessen bis jetzt waere die Zeit abgelaufen.
+reset role;
+update public.partien_online set letzter_zug_am = clock_timestamp() - interval '3 seconds', uhr_weiss_ms = 2000
+where id = current_setting('online_test.partie_z')::uuid;
+set local role service_role;
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_zug_verbuchen(current_setting('online_test.partie_z')::uuid, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'f1c4',
+    'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3', 'b', null, null, clock_timestamp() - interval '2 seconds', 4);
+  if p.status <> 'laeuft' or p.zuege <> 'e2e4 e7e5 g1f3 b8c6 f1c4' or p.uhr_weiss_ms not between 700 and 1000 then
+    raise exception 'FEHLER: der rechtzeitig angekommene Zug zaehlt nicht mit der Ankunftszeit (Uhr Weiss %, status %, grund %)',
+      p.uhr_weiss_ms, p.status, p.grund;
+  end if;
+end
+$$;
+-- Zeitende gegen einen blanken Koenig ueber online_zug_verbuchen: Remis mit Grund zeit-material. Schwarz (A) ist am
+-- Zug und 10 Minuten ueber der Zeit, Weiss hat nur noch den Koenig. Der verspaetete Zug verfaellt.
+reset role;
+update public.partien_online
+set fen = '4k3/8/8/2n5/8/8/8/4K3 b - - 0 40', uhr_schwarz_ms = 1000, letzter_zug_am = clock_timestamp() - interval '10 minutes'
+where id = current_setting('online_test.partie_z')::uuid;
+set local role service_role;
+do $$
+declare
+  p public.partien_online;
+begin
+  p := public.online_zug_verbuchen(current_setting('online_test.partie_z')::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'e8d8',
+    '3k4/8/8/2n5/8/8/8/4K3 w - - 1 41', 'w', null, null, clock_timestamp(), 5);
+  if p.status <> 'beendet' or p.ergebnis <> '1/2-1/2' or p.grund <> 'zeit-material' or p.uhr_schwarz_ms <> 0
+     or p.zuege <> 'e2e4 e7e5 g1f3 b8c6 f1c4' then
+    raise exception 'FEHLER: Zeitende gegen den blanken Koenig ueber online_zug_verbuchen ist kein Remis (ergebnis %, grund %)', p.ergebnis, p.grund;
+  end if;
+end
+$$;
+reset role;
 set local role authenticated;
 
 select 'Online-RLS-Test erfolgreich' as ergebnis;

@@ -373,7 +373,10 @@ const blattZustand = (seite) => seite.evaluate(() => {
     vorteile: k.querySelector('.trainer-im-abo').hidden ? 0 : k.querySelectorAll('.trainer-im-abo li').length,
     imAbo: [...k.querySelectorAll('.trainer-im-abo li')].map((l) => l.textContent),
     geplant: k.querySelector('.trainer-geplant').hidden ? 0 : k.querySelectorAll('.trainer-geplant li').length,
-    geplantHinweis: k.querySelector('.trainer-geplant-hinweis')?.textContent || '', gratis: k.querySelectorAll('.trainer-gratis li').length,
+    geplantHinweis: k.querySelector('.trainer-geplant-hinweis')?.textContent || '', gratis: k.querySelectorAll('.trainer-gratis > ul > li').length,
+    gratisListe: [...k.querySelectorAll('.trainer-gratis > ul > li')].map((l) => l.textContent),
+    gratisKommt: k.querySelector('.trainer-gratis-kommt').hidden ? 0 : k.querySelectorAll('.trainer-gratis-kommt li').length,
+    gratisKommtListe: [...k.querySelectorAll('.trainer-gratis-kommt li')].map((l) => l.textContent),
     test: (() => { const a = k.querySelector('.trainer-test'); return a && !a.hidden && a.getClientRects().length ? a.textContent : ''; })(),
     alter: (() => { const a = k.querySelector('.trainer-alter'); return a && !a.hidden && a.getClientRects().length ? a.textContent : ''; })(),
     fokusDrin: k.contains(document.activeElement), links: r.left, rechts: r.right, breite: innerWidth, ueber: document.scrollingElement.scrollWidth - innerWidth,
@@ -425,9 +428,20 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: Dialog, Preis folgt, "Bald verfügbar" aus, Schließen', z.dialog && z.zustand === 'vorschau' && z.preis === 'Preis folgt'
       && JSON.stringify(z.knoepfe) === JSON.stringify(['Bald verfügbar (aus)', 'Schließen']) && /in Vorbereitung/.test(z.stand), z);
-    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 8 unter "In Arbeit" (noch nicht enthalten), 5 immer gratis, jederzeit kündbar',
-      z.vorteile === 0 && z.geplant === 8 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 5
+    pruefe('Blatt: ohne gebauten Vorteil nichts unter "Im Trainer", alle 8 unter "In Arbeit" (noch nicht enthalten), 4 immer gratis, jederzeit kündbar',
+      z.vorteile === 0 && z.geplant === 8 && /Noch nicht enthalten/.test(z.geplantHinweis) && z.gratis === 4
       && /Jederzeit kündbar/.test(await seite.locator('.trainer-karte').innerText()), z);
+    // Luecken-Check 2 (Paragraf 5 UWG): "Immer gratis" nennt nur Gebautes; Wochen-Boss, Raetsel ohne Tageslimit, Lernpfad 1
+    // bis 4 und Medaillen stehen gesondert als "Kommt noch, ebenfalls gratis"
+    const ungebaut = /Wochen-Boss|ohne Tageslimit|Lernpfad|Medaillen/;
+    pruefe('Blatt: "Immer gratis" nur mit Gebautem (Bots, Schachuhr, Analyse, Kartei, Tagesrätsel, Level, Wertung, Serie)',
+      JSON.stringify(z.gratisListe) === JSON.stringify(['Alle 30 Bots in fünf Welten und die Schachuhr', 'Live-Bewertung und Spielanalyse ohne Grenze',
+        'Fehler-Kartei und Tagesrätsel', 'Level, Wertung und Serie']) && !z.gratisListe.some((t) => ungebaut.test(t)), z.gratisListe);
+    pruefe('Blatt: Ungebautes unter "Kommt noch, ebenfalls gratis" mit Hinweis "Noch nicht enthalten"',
+      JSON.stringify(z.gratisKommtListe) === JSON.stringify(['Wochen-Boss', 'Rätsel ohne Tageslimit', 'Lernpfad: Einheiten 1 bis 4', 'Medaillen'])
+      && await seite.evaluate(() => /Kommt noch, ebenfalls gratis/.test(document.querySelector('.trainer-gratis-kommt').textContent)
+        && /Noch nicht enthalten/.test(document.querySelector('.trainer-gratis-kommt .trainer-geplant-hinweis').textContent)), z.gratisKommtListe);
+    pruefe('Einstellungen: der Satz zur Abo-Gruppe verspricht nichts Ungebautes', !/ohne Tageslimit|Lernpfad|Medaillen|Wochen-Boss/.test(lage.text), lage.text);
     pruefe('Blatt: Fokus im Blatt', z.fokusDrin);
     const t = await fairPruefung(seite);
     pruefe('Fairness: kein Druck, kein Countdown, kein Prozent, kein Streichpreis', fair(t), t.text.slice(0, 200));
@@ -437,6 +451,18 @@ async function browserTeil(browser) {
     await seite.keyboard.press('Escape');
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     pruefe('Escape schliesst, Fokus zurueck auf den Knopf', await seite.evaluate(() => document.activeElement && document.activeElement.dataset.abo === 'zeigen'));
+    // Meldet ein Paket einen Gratis-Teil als gebaut (wie spaeter der Wochen-Boss), rueckt er nach "Immer gratis"; einen
+    // Kauf macht das nicht moeglich (nur gebaute VORTEILE zaehlen)
+    await meldeVorteil(seite, 'wochen-boss');
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForSelector('.trainer-karte');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte').dataset.zustand !== 'laedt');
+    const zb = await blattZustand(seite);
+    pruefe('gemeldeter Gratis-Teil (wochen-boss) steht unter "Immer gratis", nicht mehr unter "Kommt noch"; kein Kauf dadurch',
+      zb.gratis === 5 && zb.gratisListe.includes('Wochen-Boss') && zb.gratisKommt === 3 && !zb.gratisKommtListe.includes('Wochen-Boss')
+      && zb.zustand === 'vorschau' && zb.vorteile === 0, zb);
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
