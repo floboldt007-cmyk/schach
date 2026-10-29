@@ -103,7 +103,10 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
      payload->>'actor_id' = '<id>'` muss 0 ergeben.
    - Funktion `meine_daten()`: liefert alles, was der Server über den Aufrufer hat (Konto, Profil, Spielstand-Metadaten,
      Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
-     Datei „Meine Daten herunterladen“.
+     Datei „Meine Daten herunterladen“. Seit dem 29.10. auch die eigene Zeile aus `abos` (falls `abo-schema.sql`
+     eingespielt ist) und die Werkstatt-Daten (Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstücke, falls
+     `werkstatt-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt hat, führt die Datei dafür
+     einmal neu aus.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
@@ -193,6 +196,10 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    AGB** verlangen (das Häkchen ist nie vorausgewählt); für digitale Inhalte braucht es die ausdrückliche Zustimmung
    zum sofortigen Beginn und die Bestätigung, dass damit das Widerrufsrecht erlischt (§ 356 Abs. 5 BGB), dazu eine
    Bestätigung per E-Mail (Stripe-Belege einschalten). Den fertigen Link (`https://buy.stripe.com/...`) kopieren.
+   **Wichtig: In Stripe keinen Einmal-Zahlungslink anlegen** (also keinen Zahlungslink mit einem einmaligen Preis), auch
+   nicht zum Ausprobieren. Der Abo-Webhook verschluckt ihn: Er antwortet Stripe mit „ok“, verbucht aber nichts. Die
+   Person zahlt und bekommt nichts. Einmalkäufe (Editionen) laufen nur über die eigene Function `werkstatt-kasse`
+   (Abschnitt „Editionen“ ganz unten).
 5. **Kundenportal:** **Einstellungen > Billing > Kundenportal** aktivieren: Kündigen erlauben (zum Ende der
    Laufzeit), Zahlungsmethode ändern und Rechnungen ansehen erlauben, Links zu AGB und Datenschutz eintragen. Den
    **Login-Link** des Portals (`https://billing.stripe.com/p/login/...`) kopieren. „Abo verwalten“ in der App öffnet ihn.
@@ -410,3 +417,81 @@ keine Edge Function und kein Secret: Alles läuft über Datenbank-Funktionen mit
    in `design/runde4/SCHULE.md`), einen Abschnitt in der Datenschutzerklärung und die Klärung, wie die Schule
    Schülerinnen, Schüler und bei Minderjährigen die Eltern informiert bzw. ihre Einwilligung einholt. Crownmate ist ab
    16; für jüngere Kinder (etwa im Verein) ist der Schulmodus nicht gedacht.
+
+## Editionen (später, noch nicht ausführen)
+
+**Stand:** Server-Teil Etappe 1 ist gebaut (Datenbank, zwei Edge Functions, Tests), **nur für den Stripe-Testmodus und
+ohne Oberfläche**. Grundlage ist deine Entscheidung vom 29.10.: höchstens eine feste Auflage (kleinste 100), dazu ein
+Verkaufszeitraum, nie eine Neuauflage, Nummern der Reihe nach (`design/runde4/ENTSCHEIDUNGEN.md`). Echtes Geld fließt
+erst nach Gewerbe, AGB, Widerrufsbelehrung, eigener Bestätigungs-Mail, Steuerberatung und der Prüfung durch eine
+Fachperson (keine Rechtsberatung hier). Die Schritte unten sind für später, wenn Claude oder Cowork den Probelauf mit dir
+macht. **Bis dahin nichts davon ausführen.**
+
+**Was der Server sicherstellt** (`supabase/werkstatt-schema.sql`):
+- Auflage mindestens 100; vergeben plus reserviert nie mehr als die Auflage; `vergeben` sinkt nie, eine vergebene
+  Nummer kommt nie zurück (auch nach Erstattung, Widerruf oder Rückbuchung nicht, nur der Status ändert sich).
+- Ab `angekuendigt_am` sind Name, Auflage, Zeitraum, Stripe-Preis, Betrag und Währung eingefroren
+  (`EDITION_EINGEFROREN`). Das Ende lässt sich dann nur vorziehen, wenn alles vergeben ist, nie verschieben. Angekündigt
+  wird mindestens 28 Tage vor dem Verkaufsstart. Eine angekündigte Edition lässt sich nicht löschen.
+- Der Schalter `verkauf_freigegeben` (Standard aus) steht vor allen anderen Bedingungen. `zeige_restzahl` (Standard aus)
+  entscheidet, ob die App eine Restzahl bekommt. Beide darfst du jederzeit umschalten; abschalten stoppt nur neue Käufe,
+  gekaufte Stücke bleiben.
+- Ein offener Kauf je Konto und Edition, ein Stück je Konto und Edition, nur für Konten mit bestätigter E-Mail und
+  „18 oder älter“ (Selbstauskunft auf dem Server, mit Zeitpunkt). Gäste, Konten unter 18 und Konten ohne Antwort sehen
+  Editionen gar nicht. Die Zahlen `vergeben` und `reserviert` sieht kein Nutzer.
+- Kassenschluss: Ab 31 Minuten vor dem Ende öffnet der Server keine neue Kasse mehr (eine Stripe-Kasse lebt mindestens
+  30 Minuten, dazu eine Minute Puffer). So endet jede Kasse spätestens mit dem angekündigten Ende.
+- Zahlt jemand zu spät und es ist nichts mehr frei (oder das Konto zahlt doppelt, der Betrag stimmt nicht, das Konto
+  wurde gelöscht), erstattet die Function automatisch.
+
+1. **Erst im Testprojekt:** Am besten ein eigenes Supabase-Projekt nur für den Probelauf nehmen. Eine angekündigte
+   Edition lässt sich absichtlich nicht mehr löschen, und im echten Projekt sähen Konten ab 18 sie sofort.
+2. **Schema einspielen:** Im **SQL Editor** nacheinander `supabase/schema.sql`, `supabase/daten-schema.sql` (neu, wegen
+   `meine_daten()`), freiwillig `supabase/abo-schema.sql` und dann `supabase/werkstatt-schema.sql` ausführen. Ein
+   erneuter Lauf ist erlaubt. Danach `supabase/werkstatt-rls-test.sql` ausführen: Am Ende muss
+   `Werkstatt-RLS-Test erfolgreich` stehen; der Test rollt alles zurück und hinterlässt nichts. Die Warnung
+   „destructive operation“ (wegen `drop policy if exists` und `drop trigger if exists`) bei genau diesen Dateien
+   bestätigen.
+3. **Stripe, nur Testmodus:** Oben rechts den **Testmodus** (Sandbox) einschalten. **Produktkatalog > Produkt
+   hinzufügen** mit einem **einmaligen** Preis. **Keinen Zahlungslink** dazu anlegen (siehe Warnsatz im Abschnitt
+   „Abo mit Stripe“). Die Preis-ID (`price_...`) kopieren.
+4. **Eingeschränkter Schlüssel:** **Entwickler > API-Schlüssel > Eingeschränkten Schlüssel erstellen**, Name zum Beispiel
+   `crownmate-werkstatt-test`. Genau diese Rechte: **Checkout Sessions: Schreiben** und **Refunds (Rückerstattungen):
+   Schreiben**, alles andere **Keine**. Meldet Stripe beim Probekauf ein fehlendes Recht, nur genau dieses eine ergänzen
+   (zum Beispiel Products oder Prices: Lesen). Den Schlüssel (`rk_test_...`) **einmal** kopieren. Nie den geheimen
+   Hauptschlüssel (`sk_...`) nehmen: Die Function lehnt ihn ab, und bis Etappe 6 auch jeden Live-Schlüssel (`rk_live_...`).
+5. **Secrets setzen:** Im Terminal `npx supabase secrets set STRIPE_RK=rk_test_...` (dein Wert). Freiwillig
+   `WERKSTATT_RUECKKEHR` mit der https-Adresse der App, auf die Stripe nach dem Kauf zurückleitet (Standard: die
+   Live-Seite). Geheimnisse nur dort: nie in Dateien, Git, Screenshots oder Chats.
+6. **Functions hochladen:** `npx supabase functions deploy werkstatt-kasse` (mit JWT-Prüfung: die App schickt die
+   Anmeldung mit, die Nutzer-ID kommt nur daraus) und `npx supabase functions deploy werkstatt-webhook --no-verify-jwt`
+   (Stripe schickt keine Anmeldung, geschützt ist die Function durch die Stripe-Signatur).
+7. **Zweiter Webhook-Endpunkt in Stripe:** **Workbench > Webhooks > Ziel hinzufügen** (Nutzlast **Snapshot**), Adresse
+   `https://<Projekt>.supabase.co/functions/v1/werkstatt-webhook`, genau diese Ereignisse: `checkout.session.completed`,
+   `checkout.session.expired`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`. Das
+   **Signaturgeheimnis** dieses neuen Endpunkts setzen: `npx supabase secrets set STRIPE_WERKSTATT_WEBHOOK_SECRET=whsec_...`.
+   Der Abo-Endpunkt bleibt, wie er ist; beide bekommen Käufe zu sehen und lassen die des anderen in Ruhe.
+8. **Edition anlegen (SQL Editor, als Besitzer):**
+   `insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, angekuendigt_am, verkauf_ab, verkauf_bis) values ('[id]', '[Name]', '[price_...]', [Betrag in Cent], 'eur', [Auflage ab 100], '[Ankündigung]', '[Start]', '[Ende]');`
+   Zeiten mit Zeitzone schreiben, zum Beispiel `2027-01-01 00:00 Europe/Berlin` für „bis 31.12., 23:59 Uhr“. Der Betrag
+   muss genau zum Stripe-Preis passen, sonst wird jede Zahlung erstattet. Erst wenn alles stimmt:
+   `update public.editionen set verkauf_freigegeben = true where produkt_id = '[id]';`
+   **Notaus:** dasselbe mit `false`.
+9. **Probekauf:** Ohne Oberfläche braucht ein Kauf ein Anmelde-Token. Das macht Claude mit dir zusammen (Testkarte
+   `4242 4242 4242 4242`). Danach stehen in **Table Editor > besitz** die Nummer und in `edition_ereignisse` jedes
+   Stripe-Ereignis mit Ergebnis.
+10. **Hängende Reservierungen finden** (zum Beispiel einmal im Monat):
+    `select * from public.reservierungen where status = 'offen' and erstellt_am < now() - interval '2 hours';`
+    Normal ist eine leere Liste. Ohne Kasse (`sitzung_id` leer) räumt `select public.edition_aufraeumen();` sie weg;
+    mit Kasse wartet die Reservierung auf das Ereignis `checkout.session.expired` von Stripe.
+    Offene automatische Erstattungen: `select * from public.edition_ereignisse where erstattung = 'offen';`
+11. **Widerruf:** Eine volle Erstattung im Stripe-Dashboard setzt den Besitz auf `erstattet`. Ist es ein Widerruf, danach
+    `update public.besitz set status = 'widerrufen' where zahlung_id = 'pi_...';` (die Nummer bleibt vergeben).
+12. **Erfinder-Profil (nur einmal, nur du):** deine `user_id` steht unter **Authentication > Users**.
+    `insert into public.sonderstuecke (stueck_id, art, user_id) values ('erfinder-banner-blatt-0', 'banner', '<deine user_id>'), ('erfinder-titel', 'titel', '<deine user_id>'), ('erfinder-figuren-blaupause', 'figurensatz', '<deine user_id>'), ('erfinder-finisher-signatur', 'finisher', '<deine user_id>');`
+    Kein Nutzer und keine Function kann dort schreiben. Was Gegner sehen, kommt erst mit Etappe 3b.
+
+**Was noch fehlt (Etappen 2 bis 6):** die Oberfläche (Kaufknopf bleibt „Bald verfügbar“), ein Aufräum-Schritt, der
+überfällige Kassen aktiv bei Stripe beendet, ein Test mit zwei gleichzeitigen Käufern gegen echtes Postgres, die eigene
+Bestätigungs-Mail, AGB und Widerrufsbutton, Kontoschutz, die Prüfung durch die Fachperson und erst danach ein
+Live-Schlüssel (das ist eine bewusste Code-Änderung in `supabase/functions/_gemeinsam/werkstatt.js`, kein Secret).

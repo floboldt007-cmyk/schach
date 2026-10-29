@@ -224,7 +224,13 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
   'nur heute', 'limitiert', 'Leben verloren', 'Game Over', 'Funken verfallen', 'Boost kaufen', 'am Stück',
   // Englische Version (js/sprachen/*.js): dieselben Regeln auf Englisch
   'last chance', 'streak in danger', 'streak at risk', 'save your streak', 'we miss you', 'only today', 'limited time',
-  'you lose your', 'you will lose', 'overtook you', 'is waiting for you', 'lives lost', 'buy a boost', 'gone forever'];
+  'you lose your', 'you will lose', 'overtook you', 'is waiting for you', 'lives lost', 'buy a boost', 'gone forever',
+  // Limitierte Editionen (Entscheidung 29.10.): keine Knappheits- und Wert-Versprechen, "Keine Neuauflage" steht nur als
+  // ruhiger Fakt da. Vergleich ohne Gross/Klein, echte Umlaute wie in den Texten.
+  'kommt nie wieder', 'nie wieder erhältlich', 'letzte Gelegenheit', 'Wertsteigerung', 'Investition', 'Sammlerwert',
+  'wird mehr wert',
+  'never comes back', 'never coming back', 'never available again', 'last opportunity', 'increase in value',
+  'value increase', 'investment', "collector's value", 'collector’s value', 'collector value', 'will be worth more'];
 {
   const dateien = jsDateien('js');
   const treffer = [];
@@ -236,6 +242,27 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
   }
   const pakete = dateien.filter((d) => d.startsWith(path.join('js', 'pakete')));
   pruefe(`Verbotsliste: kein Treffer in den Texten von ${dateien.length} Dateien unter js/ (davon ${pakete.length} in js/pakete/)`, treffer.length === 0, treffer);
+  // Dieselbe Liste fuer die Texte der Server-Funktionen (Fehlertexte von Kasse, Coach usw. landen spaeter in der App)
+  const server = jsDateien(path.join('supabase', 'functions'));
+  const serverTreffer = [];
+  for (const d of server) {
+    for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) {
+      for (const w of VERBOTEN) if (t.toLowerCase().includes(w.toLowerCase())) serverTreffer.push(`${d}: "${w}" in "${t.slice(0, 80)}"`);
+    }
+  }
+  pruefe(`Verbotsliste: kein Treffer in den Texten der Server-Funktionen (${server.length} Dateien unter supabase/functions/)`,
+    server.length >= 3 && serverTreffer.length === 0, serverTreffer);
+  // Selbstprobe der neuen Muster (Editionen): Drucktexte werden erkannt, ruhige Fakten und harmlose Saetze nicht
+  const trifft = (t) => VERBOTEN.some((w) => t.toLowerCase().includes(w.toLowerCase()));
+  const druck = ['Diese Edition kommt nie wieder!', 'Danach nie wieder erhältlich', 'Letzte Gelegenheit', 'Mit Wertsteigerung',
+    'Eine Investition in deine Sammlung', 'Hoher Sammlerwert', 'Das Stück wird mehr wert', 'This edition never comes back',
+    'Never available again', 'Last opportunity to buy', 'Watch the increase in value', 'A smart investment',
+    'Real collector’s value', "Real collector's value", 'It will be worth more'];
+  const ruhig = ['Keine Neuauflage', 'Auflage höchstens 100', 'Verkauf bis 31.12.2026, 23:59 Uhr (deutsche Zeit)', 'No reprint',
+    'It was worth more than any gambit.', 'That goes with my collector’s teacups.', 'I investigate every position.',
+    'Der war mehr wert als jedes Gambit.', 'kommt nie mit leerem Netz zurück'];
+  pruefe('Verbotsliste Editionen: faengt Druck- und Wert-Texte (deutsch und englisch), laesst ruhige Fakten durch',
+    druck.every(trifft) && !ruhig.some(trifft), { durch: druck.filter((t) => !trifft(t)), falsch: ruhig.filter(trifft) });
 }
 
 // ---------- Regel 1: kein Zufall in Feier und Paket-Logik ----------

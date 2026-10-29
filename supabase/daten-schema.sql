@@ -204,6 +204,9 @@ grant execute on function public.freigabe_widerrufen() to authenticated;
 -- (auth.audit_log_entries: E-Mail und IP je Anmeldung, ohne Fremdschluessel) wird hier ebenfalls geloescht, soweit
 -- die Rechte reichen; fehlt die Tabelle oder das Recht, laeuft die Loeschung trotzdem durch. Nicht erreichbar sind
 -- Server-Logs und Sicherungen des Anbieters: Sie laufen nach dessen Fristen ab (Datenschutzerklaerung).
+-- Werkstatt (werkstatt-schema.sql, falls eingespielt): Die Altersangabe geht per Kaskade mit. Besitz, Reservierungen,
+-- Zustimmungen und Sonderstuecke bleiben pseudonym (on delete set null: user_id wird leer, eine Editions-Nummer bleibt
+-- vergeben, die Zahlungs-ID bleibt fuer die gesetzliche Aufbewahrungsfrist).
 -- ---------------------------------------------------------------------------
 create or replace function public.konto_loeschen()
 returns void
@@ -237,8 +240,10 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- Datenauskunft (Art. 15/20): alles, was der Server ueber den Aufrufer hat. Vom Spielstand nur die Metadaten
 -- (den Stand selbst hat der Spieler schon lokal und ueber die Sicherung).
 -- ---------------------------------------------------------------------------
--- Online-Partien (online-schema.sql) und das Anmeldeprotokoll kommen nur dazu, wenn es sie gibt: Die Datei laeuft
--- so in jeder Reihenfolge und auch ohne das Online-Schema.
+-- Online-Partien (online-schema.sql), das Abo (abo-schema.sql), die Werkstatt (werkstatt-schema.sql: Altersangabe,
+-- Besitz, Reservierungen, Zustimmungen, Sonderstuecke) und das Anmeldeprotokoll kommen nur dazu, wenn es sie gibt: Die
+-- Datei laeuft so in jeder Reihenfolge und auch ohne diese Schemata. Fehlt eines, stehen die Schluessel trotzdem da
+-- (null bzw. leere Liste).
 create or replace function public.meine_daten()
 returns jsonb
 language plpgsql
@@ -249,6 +254,9 @@ declare
   uid uuid := auth.uid();
   online jsonb := '[]'::jsonb;
   protokoll jsonb := '[]'::jsonb;
+  abo jsonb := null;
+  werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
+    'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -257,6 +265,24 @@ begin
     execute 'select coalesce(jsonb_agg(to_jsonb(o) order by o.erstellt_am), ''[]''::jsonb)
              from public.partien_online o where $1 in (o.weiss, o.schwarz, o.erstellt_von)'
       into online using uid;
+  end if;
+  -- Abo (bisher fehlte die eigene Zeile in der Auskunft)
+  if to_regclass('public.abos') is not null then
+    execute 'select to_jsonb(a) from public.abos a where a.user_id = $1' into abo using uid;
+  end if;
+  -- Werkstatt: alles zum Konto, auch Zahlungs- und Sitzungskennungen (es sind die eigenen Daten)
+  if to_regclass('public.besitz') is not null then
+    execute 'select jsonb_build_object(
+               ''altersangabe'', (select to_jsonb(a) from public.altersangaben a where a.user_id = $1),
+               ''besitz'', coalesce((select jsonb_agg(to_jsonb(b) order by b.erworben_am, b.nummer)
+                 from public.besitz b where b.user_id = $1), ''[]''::jsonb),
+               ''reservierungen'', coalesce((select jsonb_agg(to_jsonb(r) order by r.erstellt_am)
+                 from public.reservierungen r where r.user_id = $1), ''[]''::jsonb),
+               ''edition_zustimmungen'', coalesce((select jsonb_agg(to_jsonb(z) order by z.zeitpunkt)
+                 from public.edition_zustimmungen z where z.user_id = $1), ''[]''::jsonb),
+               ''sonderstuecke'', coalesce((select jsonb_agg(to_jsonb(s) order by s.stueck_id)
+                 from public.sonderstuecke s where s.user_id = $1), ''[]''::jsonb))'
+      into werkstatt using uid;
   end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
@@ -289,9 +315,10 @@ begin
       '[]'::jsonb),
     'freigabe_widerruf', (select to_jsonb(w) from public.freigabe_widerrufe w where w.user_id = uid),
     'partien_online', online,
+    'abo', abo,
     -- Anmeldeprotokoll von Supabase (Zeitpunkt, Art, IP); null, wenn die Funktion es nicht lesen darf
     'anmeldeprotokoll', protokoll
-  );
+  ) || werkstatt;
 end;
 $$;
 
