@@ -33,6 +33,7 @@ import { registriereRaetselQuelle } from '../../ui/raetsel.js';
 import { t } from '../../sprache.js';
 import * as L from './logik.js';
 import './texte.js';
+import { protokolliere } from '../../protokoll.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // wochentag() aus tag.js: 0 = Montag; Name in der eingestellten Sprache (p-kartei.wochentag.0..6)
@@ -46,6 +47,7 @@ function sicher(fn, wo) {
     return fn();
   } catch (e) {
     console.error('kartei: ' + wo, e);
+    protokolliere('paket', e, { vorsatz: 'Paket kartei (' + (wo || 'unbekannt') + ')' });
     return null;
   }
 }

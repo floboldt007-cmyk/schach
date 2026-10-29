@@ -42,12 +42,14 @@ import { t, sprache } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
 import './texte.js';
 import * as L from './logik.js';
+import { protokolliere } from '../../protokoll.js';
 
 function sicher(fn, wo) {
   try {
     return fn();
   } catch (e) {
     console.error('gedaechtnis: ' + wo, e);
+    protokolliere('paket', e, { vorsatz: 'Paket gedaechtnis (' + (wo || 'unbekannt') + ')' });
     return null;
   }
 }

@@ -542,8 +542,30 @@ async function testeProtokoll(browser) {
     pruefe('Fehlerflut mit Anfuehrungszeichen: hoechstens 20.000 Zeichen, deshalb weniger als 50 Eintraege, die neuesten lueckenlos zuerst',
       ohneGrenze > 21000 && laenge4 <= 20000 && laenge4 > 15000 && l4.length > 30 && l4.length < 50
       && l4.every((e, i) => e.text.startsWith(`Error: Zeichen Nr. ${59 - i} `)), { eintraege: l4.length, zeichen: laenge4, ohneGrenze });
+    // Pakete fangen Fehler in ihrem eigenen sicher() (nur Konsole); seit 29.10. melden sie sie auch ans Protokoll
+    await seite.evaluate(() => localStorage.removeItem('schach-arena:protokoll'));
+    const huelle = await seite.evaluate(async (EMAIL) => {
+      const D = await import('/js/pakete/start/dienst.js');
+      const P = await import('/js/protokoll.js');
+      P.leere();
+      const r = D.sicher(() => { throw new Error(`Probe Huelle fuer ${EMAIL}`); }, 'Test');
+      return { r, e: P.eintraege()[0] || null };
+    }, EMAIL);
+    pruefe('Paket-Huelle sicher() (start): faengt (null) und schreibt einen bereinigten Eintrag der Art paket mit Paket und Stelle',
+      huelle.r === null && !!huelle.e && huelle.e.art === 'paket' && /^Paket start \(Test\): Error: Probe Huelle fuer /.test(huelle.e.text)
+      && spurenIn(JSON.stringify(huelle.e)).length === 0, huelle);
     pruefe('nichts ging ins Netz', fremd.length === 0, fremd);
   } finally { await kontext.close(); }
+  // Quelltext: jede sicher()-Huelle der Pakete meldet ans Protokoll (Schule ist raus und bleibt unberuehrt)
+  const huellen = ['funken', 'gedaechtnis', 'kartei', 'liga', 'punkte', 'serie', 'tagesraetsel'].map((x) => `js/pakete/${x}/index.js`)
+    .concat(['js/pakete/start/dienst.js']);
+  const ohne = huellen.filter((d) => {
+    const q = readFileSync(path.join(WURZEL, d), 'utf8');
+    const m = /(?:function sicher\s*\()[\s\S]*?\n\}/.exec(q);
+    return !m || !m[0].includes("protokolliere('paket'") || !q.includes("from '../../protokoll.js'");
+  });
+  pruefe('jede sicher()-Huelle der Pakete meldet ans Protokoll (funken, gedaechtnis, kartei, liga, punkte, serie, tagesraetsel, start)',
+    ohne.length === 0, ohne);
 }
 
 async function testePaketUndEngine(browser) {
