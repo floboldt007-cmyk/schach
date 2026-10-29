@@ -7,6 +7,9 @@
 -- Nicht hier pruefbar: zwei Kaeufer gleichzeitig (im SQL Editor ist jeder Aufruf eine Transaktion, hier laeuft alles in
 -- einer). Das letzte Stueck ist trotzdem sicher, weil das Reservieren ein einziges update mit der Bedingung
 -- vergeben + reserviert < auflage ist, dazu die Tabellen-Pruefung vergeben + reserviert <= auflage.
+-- Ebenfalls hier: Notaus bei offener Kasse, Erstattung und Rueckbuchung vor dem Kauf-Ereignis (werden nachgeholt),
+-- hoechstens 3 Kassen je Konto und Edition in 24 Stunden, unbekannte Reservierung (von Hand, nie automatisch erstattet),
+-- Name einmalig (keine Neuauflage unter neuer produkt_id).
 begin;
 
 -- ---------- Hilfen nur fuer diesen Test (temporaeres Schema, der Rollback nimmt sie mit) ----------
@@ -131,6 +134,9 @@ begin
     now() + interval '1 day')$q$, '23514');
   perform pg_temp.erwarte_fehler($q$insert into public.reservierungen (produkt_id, user_id, kassen_url)
     values ('rls-haupt', 'a7000000-0000-4000-8000-00000000000a', 'javascript:alert(1)')$q$, '23514');
+  -- Keine Neuauflage unter neuer produkt_id: derselbe Name (auch in anderer Schreibweise) geht nicht
+  perform pg_temp.erwarte_fehler($q$insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis)
+    values ('rls-neuauflage', 'PROBE-EDITION', 100, now() + interval '40 days', now() + interval '50 days')$q$, '23505');
 end
 $$;
 
@@ -216,7 +222,8 @@ begin
     raise exception 'FEHLER: edition_stand fuer A falsch (%)', s;
   end if;
   if public.edition_stand('rls-bald') ->> 'status' <> 'angekuendigt'
-    or public.edition_stand('rls-gesperrt') ->> 'status' <> 'angekuendigt'
+    -- Verkauf hat begonnen, Schalter aus (Notaus): 'pausiert', nicht 'angekuendigt'
+    or public.edition_stand('rls-gesperrt') ->> 'status' <> 'pausiert'
     or public.edition_stand('rls-vorbei') ->> 'status' <> 'beendet'
     or (public.edition_stand('rls-vorbei') ->> 'endzahl_folgt')::boolean is distinct from true
     or public.edition_stand('rls-knapp-nach') ->> 'status' <> 'beendet'
@@ -437,9 +444,14 @@ begin
   if e ->> 'ergebnis' <> 'erstatten' or e ->> 'erstattung_grund' <> 'sitzung' then
     raise exception 'FEHLER: fremde Sitzung (%)', e;
   end if;
-  -- Unbekannte Reservierung: erstatten; nicht bezahlt: nichts
+  -- Unbekannte Reservierung (etwa eine Kasse eines anderen Projekts am selben Stripe-Konto): nie automatisch erstatten,
+  -- sondern als Fall fuer Flo markieren (erstattung = 'von_hand'); nicht bezahlt: nichts
   e := pg_temp.bezahlt('evt_RlsUnbekannt', gen_random_uuid(), 'cs_test_RlsUnbekannt', 'pi_RlsUnbekannt');
-  if e ->> 'ergebnis' <> 'erstatten' or e ->> 'erstattung_grund' <> 'unbekannt' then
+  if e ->> 'ergebnis' <> 'unbekannt' or (e ->> 'erstatten')::boolean or (e ->> 'von_hand')::boolean is distinct from true
+    or e ->> 'erstattung_grund' <> 'unbekannt'
+    or (select erstattung from public.edition_ereignisse where id = 'evt_RlsUnbekannt') <> 'von_hand'
+    or public.edition_erstattung_gesendet('evt_RlsUnbekannt') <> 'unveraendert'
+    or (pg_temp.bezahlt('evt_RlsUnbekannt', gen_random_uuid(), 'cs_test_RlsUnbekannt', 'pi_RlsUnbekannt') ->> 'erstatten')::boolean then
     raise exception 'FEHLER: unbekannte Reservierung (%)', e;
   end if;
   e := public.edition_stripe_ereignis('evt_RlsUnbezahlt', 'checkout.session.completed', now(), gen_random_uuid(),
@@ -496,10 +508,95 @@ begin
     raise exception 'FEHLER: Reservierung mit Kasse wurde ohne Ablauf freigegeben';
   end if;
   perform pg_temp.abgelaufen('evt_RlsGVor2x', (r ->> 'reservierung')::uuid, 'cs_test_RlsGVor2');
+  -- G hat in rls-knapp-vor jetzt dreimal eine Kasse geoeffnet (falsche Waehrung, abgebrochen, abgelaufen): eine vierte
+  -- geht in 24 Stunden nicht, und der Fehler reserviert nichts
+  perform pg_temp.erwarte_fehler($q$select pg_temp.reserviere('97000000-0000-4000-8000-000000000097', 'rls-knapp-vor')$q$, 'EDITION_ZU_OFT');
+  if pg_temp.zaehler('rls-knapp-vor') <> '2/0' or (select count(*) from public.reservierungen
+      where user_id = '97000000-0000-4000-8000-000000000097' and produkt_id = 'rls-knapp-vor') <> 3 then
+    raise exception 'FEHLER: vierte Kasse in 24 Stunden (%)', pg_temp.zaehler('rls-knapp-vor');
+  end if;
   -- A reserviert noch einmal (fuer den Test "Konto geloescht" unten)
   r := pg_temp.reserviere('a7000000-0000-4000-8000-00000000000a', 'rls-knapp-vor');
   perform pg_temp.kasse(r, 'cs_test_RlsA3');
   perform set_config('t.res_a3', r ->> 'reservierung', true);
+end
+$$;
+
+
+-- ---------- Notaus bei offener Kasse; Erstattung und Rueckbuchung vor dem Kauf-Ereignis (rls-gesperrt) ----------
+-- Der Besitzer gibt rls-gesperrt kurz frei, vier Konten oeffnen eine Kasse, dann Notaus.
+reset role;
+update public.editionen set verkauf_freigegeben = true where produkt_id = 'rls-gesperrt';
+set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+do $$
+declare
+  r jsonb;
+  i integer;
+begin
+  for i in 1..4 loop
+    r := pg_temp.reserviere(('e0000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid, 'rls-gesperrt');
+    perform pg_temp.kasse(r, 'cs_test_RlsPause' || i);
+    perform set_config('t.res_pause' || i, r ->> 'reservierung', true);
+  end loop;
+  if pg_temp.zaehler('rls-gesperrt') <> '0/4' then
+    raise exception 'FEHLER: vier Kassen vor dem Notaus (%)', pg_temp.zaehler('rls-gesperrt');
+  end if;
+end
+$$;
+reset role;
+update public.editionen set verkauf_freigegeben = false where produkt_id = 'rls-gesperrt';
+set local role service_role;
+do $$
+declare
+  e jsonb;
+begin
+  -- Notaus: keine neue Kasse, und eine bestehende wird auch nicht wieder geoeffnet
+  perform pg_temp.erwarte_fehler($q$select pg_temp.reserviere('e0000000-0000-4000-8000-000000000001', 'rls-gesperrt')$q$, 'EDITION_GESPERRT');
+  perform pg_temp.erwarte_fehler($q$select pg_temp.reserviere('e0000000-0000-4000-8000-000000000005', 'rls-gesperrt')$q$, 'EDITION_GESPERRT');
+  -- Erstattung vor dem Kauf (etwa weil Stripe das Kauf-Ereignis nach einem Fehler erst spaeter erneut zustellt):
+  -- erst 'ohne_besitz', die Angaben bleiben gespeichert
+  if pg_temp.zahlung('evt_RlsVorKauf2', 'charge.refunded', 'pi_RlsPause2', now() + interval '10 minutes', 1234, 'widerruf') ->> 'ergebnis' <> 'ohne_besitz'
+    or pg_temp.zahlung('evt_RlsVorKauf3a', 'charge.dispute.created', 'pi_RlsPause3', now() + interval '5 minutes') ->> 'ergebnis' <> 'ohne_besitz'
+    or pg_temp.zahlung('evt_RlsVorKauf3b', 'charge.dispute.closed', 'pi_RlsPause3', now() + interval '20 minutes', null, null, 'lost') ->> 'ergebnis' <> 'ohne_besitz'
+    or pg_temp.zahlung('evt_RlsVorKauf4', 'charge.refunded', 'pi_RlsPause4', now() + interval '10 minutes', 1234) ->> 'ergebnis' <> 'ohne_besitz' then
+    raise exception 'FEHLER: Zahlungs-Ereignisse vor dem Kauf';
+  end if;
+  -- Wer vor dem Notaus schon an der Kasse war, bekommt sein Stueck (bewusst, ANLEITUNG): Nummer 1
+  e := pg_temp.bezahlt('evt_RlsPause1', current_setting('t.res_pause1')::uuid, 'cs_test_RlsPause1', 'pi_RlsPause1');
+  if e ->> 'ergebnis' <> 'zugeteilt' or (e ->> 'nummer')::int <> 1
+    or (select status from public.besitz where zahlung_id = 'pi_RlsPause1') <> 'aktiv' then
+    raise exception 'FEHLER: offene Kasse nach dem Notaus (%)', e;
+  end if;
+  -- Der Kauf kommt nach der Erstattung: Nummer 2, die Erstattung (Widerruf) wird sofort nachgeholt
+  e := pg_temp.bezahlt('evt_RlsPause2', current_setting('t.res_pause2')::uuid, 'cs_test_RlsPause2', 'pi_RlsPause2');
+  if e ->> 'ergebnis' <> 'zugeteilt' or (e ->> 'nummer')::int <> 2
+    or (select status from public.besitz where zahlung_id = 'pi_RlsPause2') <> 'widerrufen'
+    or (select ergebnis || '#' || nummer from public.edition_ereignisse where id = 'evt_RlsVorKauf2') <> 'widerrufen#2'
+    or (select nachgeholt_am from public.edition_ereignisse where id = 'evt_RlsVorKauf2') is null then
+    raise exception 'FEHLER: Erstattung vor dem Kauf nicht nachgeholt (%)', e;
+  end if;
+  -- dieselbe Erstattung noch einmal zugestellt: gespeichertes Ergebnis, nichts aendert sich
+  e := pg_temp.zahlung('evt_RlsVorKauf2', 'charge.refunded', 'pi_RlsPause2', now() + interval '10 minutes', 1234, 'widerruf');
+  if (e ->> 'doppelt')::boolean is distinct from true or e ->> 'ergebnis' <> 'widerrufen'
+    or (select status from public.besitz where zahlung_id = 'pi_RlsPause2') <> 'widerrufen' then
+    raise exception 'FEHLER: doppelt zugestellte, nachgeholte Erstattung (%)', e;
+  end if;
+  -- Verbucht wird in der Reihenfolge der Ereignisse: Nummer 3 fuer Konto 4 (volle Erstattung ohne Grund: erstattet)
+  e := pg_temp.bezahlt('evt_RlsPause4', current_setting('t.res_pause4')::uuid, 'cs_test_RlsPause4', 'pi_RlsPause4');
+  if e ->> 'ergebnis' <> 'zugeteilt' or (e ->> 'nummer')::int <> 3
+    or (select status from public.besitz where zahlung_id = 'pi_RlsPause4') <> 'erstattet' then
+    raise exception 'FEHLER: Erstattung ohne Grund vor dem Kauf (%)', e;
+  end if;
+  -- Rueckbuchung eroeffnet und verloren, beides vor dem Kauf: nachgeholt in der Reihenfolge der Stripe-Zeit
+  e := pg_temp.bezahlt('evt_RlsPause3', current_setting('t.res_pause3')::uuid, 'cs_test_RlsPause3', 'pi_RlsPause3');
+  if e ->> 'ergebnis' <> 'zugeteilt' or (e ->> 'nummer')::int <> 4
+    or (select status from public.besitz where zahlung_id = 'pi_RlsPause3') <> 'zurueckgebucht'
+    or (select string_agg(ergebnis, ',' order by erstellt) from public.edition_ereignisse
+        where zahlung_id = 'pi_RlsPause3' and typ like 'charge.%') <> 'strittig,zurueckgebucht'
+    or pg_temp.zaehler('rls-gesperrt') <> '4/0' then
+    raise exception 'FEHLER: Rueckbuchung vor dem Kauf (% / %)', e, pg_temp.zaehler('rls-gesperrt');
+  end if;
 end
 $$;
 
@@ -510,6 +607,8 @@ insert into public.reservierungen (id, produkt_id, user_id, status, erstellt_am)
 values ('e0e00000-0000-4000-8000-000000000050', 'rls-knapp-vor', 'e0000000-0000-4000-8000-000000000050', 'offen',
   now() - interval '3 hours');
 update public.editionen set reserviert = reserviert + 1 where produkt_id = 'rls-knapp-vor';
+-- zwei alte Ereignisse: eine gesendete Erstattung (darf weg) und ein offener Fall fuer Flo (bleibt, bis er erledigt ist)
+update public.edition_ereignisse set eingegangen_am = now() - interval '91 days' where id in ('evt_RlsB2', 'evt_RlsUnbekannt');
 set local role service_role;
 do $$
 declare
@@ -518,7 +617,9 @@ begin
   j := public.edition_aufraeumen();
   if (j ->> 'freigegeben')::int < 1 or pg_temp.zaehler('rls-knapp-vor') <> '2/1'
     or (select status from public.reservierungen where id = 'e0e00000-0000-4000-8000-000000000050') <> 'abgebrochen'
-    or (select status from public.reservierungen where id = current_setting('t.res_a3')::uuid) <> 'offen' then
+    or (select status from public.reservierungen where id = current_setting('t.res_a3')::uuid) <> 'offen'
+    or exists (select 1 from public.edition_ereignisse where id = 'evt_RlsB2')
+    or not exists (select 1 from public.edition_ereignisse where id = 'evt_RlsUnbekannt' and erstattung = 'von_hand') then
     raise exception 'FEHLER: Aufraeumen (%)', j;
   end if;
 end

@@ -8,44 +8,58 @@
 // Datenbank: supabase/werkstatt-schema.sql. Die Regeln (Auflage, Schalter, Alter, ein Kauf je Konto, Nummern,
 // Einfrieren) stehen dort; dieses Modul vertraut der Datenbank und prueft nur Form, Anmeldung und Stripe.
 //
+// Projektkennung: Haengen zwei Supabase-Projekte (Test und echt) am selben Stripe-Konto, bekommt jeder werkstatt-webhook
+// auch die Kaeufe des anderen. Deshalb traegt jede Kasse in den Metadaten von Sitzung und Zahlung eine Kennung des eigenen
+// Projekts (projektKennung: SHA-256 aus der Adresse SUPABASE_URL, die Supabase jeder Function selbst gibt; nichts
+// einzurichten). Der Webhook ignoriert Kassen ohne oder mit fremder Kennung ('fremdes_projekt'), sonst erstattete ein
+// Projekt die echten Kaeufe des anderen.
+//
 // Ablauf Kasse (verarbeiteKasse): CORS-Vorabfrage -> nur POST -> Einstellungen (nur ein eingeschraenkter TEST-Schluessel
 // rk_test_..., Live erst in Etappe 6) -> Anmeldung (Bearer) -> Groesse und JSON -> Eingabe { produkt, textversion,
 // zustimmung_sofort: true, kenntnis_widerruf: true } -> Nutzer ueber /auth/v1/user (die Nutzer-ID kommt NUR aus dem
 // geprueften Token, die E-Mail muss bestaetigt sein) -> rpc/edition_reserviere (Schalter, Alter, Stand, ein Kauf je
 // Konto) -> hat die Reservierung schon eine Kasse: dieselbe Adresse zurueck -> Kassenschluss pruefen -> Stripe
 // POST /v1/checkout/sessions (mode=payment, Menge 1, nur Karte, expires_at = Reservierung + 31 Minuten, Metadaten mit der
-// Reservierung an Sitzung und Zahlung, Idempotency-Key je Reservierung) -> rpc/edition_kasse_setzen -> 200 { kassen_url }.
+// Reservierung und der Projektkennung an Sitzung und Zahlung, Idempotency-Key je Reservierung) ->
+// rpc/edition_kasse_setzen -> 200 { kassen_url }.
 //   Stripe antwortet nicht oder mit 5xx/429/409: einmal mit DEMSELBEN Key und derselben Anfrage wiederholen. Bleibt es
 //   unklar, bleibt die Reservierung stehen (503): Ein neuer Versuch der App bekommt ueber denselben Key dieselbe Kasse,
 //   und eine Kasse, die es doch gibt, meldet sich nach Ablauf mit checkout.session.expired. Sofort freigeben koennte ein
 //   Stueck zweimal verkaufen. Lehnt Stripe sicher ab (4xx), gibt es keine Kasse: rpc/edition_kasse_abbrechen.
 //
 // Ablauf Webhook (verarbeiteWebhook): nur POST -> Groesse -> Signatur (pruefeSignatur aus stripe.js, eigenes Geheimnis
-// STRIPE_WERKSTATT_WEBHOOK_SECRET) -> JSON -> auswertenEdition -> rpc/edition_stripe_ereignis -> sagt die Datenbank
-// "erstatten" (Ueberverkauf, Doppelzahlung, falscher Betrag, Konto geloescht ...): Stripe POST /v1/refunds mit
-// Idempotency-Key je Zahlung und metadata[grund], danach rpc/edition_erstattung_gesendet -> 200. Scheitert etwas, 500:
-// Stripe stellt bis zu 3 Tage erneut zu, die Datenbank liefert dann das gespeicherte Ergebnis, die Erstattung wird mit
-// demselben Key wiederholt (Stripe zahlt nie doppelt aus). Abo-Kaeufe (mode=subscription) und fremde Kassen ohne die
-// Metadaten dieser Werkstatt werden ignoriert (200), der Abo-Webhook (stripe.js) bleibt unberuehrt.
+// STRIPE_WERKSTATT_WEBHOOK_SECRET) -> JSON -> auswertenEdition (mit der eigenen Projektkennung) ->
+// rpc/edition_stripe_ereignis -> sagt die Datenbank "erstatten" (Ueberverkauf, Doppelzahlung, falscher Betrag, Konto
+// geloescht ...): Stripe POST /v1/refunds mit Idempotency-Key je Zahlung und metadata[grund], danach
+// rpc/edition_erstattung_gesendet -> 200. Sagt sie "von_hand" (bezahlte Kasse zu einer Reservierung, die es hier nicht
+// gibt), wird nie automatisch erstattet: 200, Flo prueft den Fall. Scheitert etwas, 500: Stripe stellt bis zu 3 Tage
+// erneut zu, die Datenbank liefert dann das gespeicherte Ergebnis, die Erstattung wird mit demselben Key wiederholt
+// (Stripe zahlt nie doppelt aus). Abo-Kaeufe (mode=subscription), fremde Kassen ohne die Metadaten dieser Werkstatt und
+// Kassen eines anderen Projekts werden ignoriert (200), der Abo-Webhook (stripe.js) bleibt unberuehrt.
+// Widerruf: Stripe schickt den Grund einer Erstattung (metadata[grund] an der Erstattung) bei API-Versionen ab 2022-11-15
+// nicht mehr im Ereignis mit (das Charge-Objekt enthaelt keine Liste der Erstattungen). Eine volle Erstattung wird dann
+// "erstattet"; "widerrufen" setzt Flo von Hand (ANLEITUNG, Abschnitt Editionen), bis der Widerrufsbutton das selbst tut.
 //
 // API:
 //   KASSE_S = 1860              Lebensdauer einer Kasse und Abstand des Kassenschlusses zum Ende (31 Minuten: Stripe
 //                               verlangt mindestens 30, eine Minute Puffer; gleiche Zahl wie edition_kassenschluss)
 //   MAX_KOERPER_KASSE = 4096, MAX_KOERPER_WEBHOOK = 524288
-//   STRIPE_API, RUECKKEHR_STANDARD, META_RESERVIERUNG, META_PRODUKT, TYPEN, GRUENDE, KENNUNGEN, TEXTE, KOPF
+//   STRIPE_API, RUECKKEHR_STANDARD, META_RESERVIERUNG, META_PRODUKT, META_PROJEKT, TYPEN, GRUENDE, KENNUNGEN, TEXTE, KOPF
 //   stripeArt(schluessel) -> 'test' | 'live' | 'falsch' | 'fehlt'   nur rk_test_ ist in Etappe 1 bis 5 erlaubt
 //   rueckkehrAus(wert) -> https-Adresse | null                       Secret WERKSTATT_RUECKKEHR, sonst die Live-Seite
+//   projektKennung(supabaseUrl) -> Promise<16 Hex-Zeichen | null>     aus dem Host der Adresse, je Projekt verschieden
 //   pruefeKaufEingabe(daten) -> { ok, eingabe } | { ok: false, grund }
-//   kassenParameter({ reservierung, produkt, stripe_preis, ablauf_s, rueckkehr }) -> URLSearchParams (feste Reihenfolge)
+//   kassenParameter({ reservierung, produkt, projekt, stripe_preis, ablauf_s, rueckkehr }) -> URLSearchParams (feste
+//       Reihenfolge)
 //   erstattungsParameter({ zahlung, grund, reservierung }) -> URLSearchParams
-//   auswertenEdition(ereignis) -> { daten } | { ignoriert: grund }
+//   auswertenEdition(ereignis, projekt) -> { daten } | { ignoriert: grund }   projekt = projektKennung des Webhooks
 //       daten sind genau die Parameter von public.edition_stripe_ereignis: { ereignis_id, typ, erstellt, reservierung,
 //       sitzung, zahlung, zahlstatus, betrag, waehrung, erstattet, grund, streit }
 //   verarbeiteKasse({ methode, koerper, autorisierung }, umgebung, { fetch, jetzt, protokoll })
 //       umgebung: { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY?, STRIPE_RK, WERKSTATT_RUECKKEHR? }
 //       Antworten immer JSON mit CORS: 200 { kassen_url, reservierung, kasse_bis, neu }, 204 OPTIONS,
 //       400 eingabe | zustimmung, 401 anmeldung, 403 email | alter, 404 unbekannt, 405 methode, 409 gesperrt |
-//       noch_nicht | beendet | ausverkauft | nicht_verfuegbar | besitz | kasse_abgelaufen, 413 eingabe,
+//       noch_nicht | beendet | ausverkauft | nicht_verfuegbar | besitz | kasse_abgelaufen, 413 eingabe, 429 zu_oft,
 //       502 stripe (abgelehnt, Reservierung frei), 503 nicht_eingerichtet | server | stripe (unklar, Reservierung bleibt).
 //       Jede Fehlerantwort { fehler, text, text_en }.
 //   verarbeiteWebhook({ methode, koerper, signatur }, umgebung, { fetch, jetzt, protokoll })
@@ -63,6 +77,7 @@ export const STRIPE_API = 'https://api.stripe.com/v1';
 export const RUECKKEHR_STANDARD = 'https://floboldt007-cmyk.github.io/schach/';
 export const META_RESERVIERUNG = 'crownmate_reservierung';
 export const META_PRODUKT = 'crownmate_produkt';
+export const META_PROJEKT = 'crownmate_projekt';
 export const TYPEN = Object.freeze([
   'checkout.session.completed',
   'checkout.session.expired',
@@ -71,7 +86,9 @@ export const TYPEN = Object.freeze([
   'charge.dispute.closed',
 ]);
 // Gruende an einer Erstattung (metadata[grund]): die automatischen aus edition_stripe_ereignis und die von Hand
-// (widerruf, kulanz). Nur "widerruf" macht aus einer vollen Erstattung den Status "widerrufen".
+// (widerruf, kulanz). Nur "widerruf" macht aus einer vollen Erstattung den Status "widerrufen", und nur, wenn Stripe die
+// Erstattungen im Ereignis mitschickt (alte API-Versionen). Sonst setzt Flo "widerrufen" von Hand (Kopf, Widerruf).
+// "unbekannt" erstattet der Webhook nie selbst (von_hand).
 export const GRUENDE = Object.freeze(['widerruf', 'kulanz', 'ausverkauft', 'endzahl', 'doppelt', 'betrag', 'sitzung',
   'konto_geloescht', 'unbekannt']);
 
@@ -88,6 +105,7 @@ export const KENNUNGEN = Object.freeze({
   EDITION_AUSVERKAUFT: [409, 'ausverkauft'],
   EDITION_NICHT_VERFUEGBAR: [409, 'nicht_verfuegbar'],
   EDITION_SCHON_IM_BESITZ: [409, 'besitz'],
+  EDITION_ZU_OFT: [429, 'zu_oft'],
 });
 
 // Rueckfall-Texte (die App hat spaeter eigene). Ruhig, ohne Druck: keine Restzahl, kein "nur noch", keine Uhr.
@@ -106,6 +124,7 @@ export const TEXTE = Object.freeze({
   ausverkauft: { de: 'Ausverkauft.', en: 'Sold out.' },
   nicht_verfuegbar: { de: 'Im Moment nicht verfügbar.', en: 'Not available at the moment.' },
   besitz: { de: 'Diese Edition gehört dir schon.', en: 'You already own this edition.' },
+  zu_oft: { de: 'Du hast die Kasse für diese Edition in den letzten 24 Stunden schon dreimal geöffnet. Bitte versuch es später noch einmal.', en: 'You have opened the checkout for this edition three times in the last 24 hours. Please try again later.' },
   kasse_abgelaufen: { de: 'Deine Kasse ist abgelaufen. Bitte versuch es gleich noch einmal.', en: 'Your checkout has expired. Please try again in a moment.' },
   server: { de: 'Der Server ist gerade nicht erreichbar. Bitte versuch es später noch einmal.', en: 'The server is not reachable right now. Please try again later.' },
   stripe: { de: 'Die Zahlungsseite ist gerade nicht erreichbar. Bitte versuch es später noch einmal.', en: 'The payment page is not reachable right now. Please try again later.' },
@@ -121,6 +140,7 @@ const MUSTER = Object.freeze({
   preis: /^price_[A-Za-z0-9]{1,200}$/,
   waehrung: /^[a-z]{3}$/,
   wort: /^[a-z_]{1,40}$/,
+  projekt: /^[0-9a-f]{16}$/,
   kasse: /^https:\/\/checkout\.stripe\.com\/[^\s<>"'`]{1,1900}$/,
 });
 
@@ -141,6 +161,20 @@ export function rueckkehrAus(wert) {
   const w = String(wert || '').trim();
   if (!w) return RUECKKEHR_STANDARD;
   return /^https:\/\/[^\s<>"'`#?]{3,300}$/.test(w) ? w : null;
+}
+
+// Kennung des eigenen Supabase-Projekts (siehe Kopf): die ersten 8 Bytes von SHA-256 ueber den Host der Adresse, als Hex.
+// Kein Geheimnis, nur ein Unterscheidungsmerkmal; derselbe Wert in werkstatt-kasse und werkstatt-webhook.
+export async function projektKennung(adresse) {
+  let host = '';
+  try { host = new URL(String(adresse || '').trim()).host.toLowerCase(); } catch (e) { return null; }
+  if (!host) return null;
+  try {
+    const roh = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('crownmate-werkstatt:' + host));
+    return [...new Uint8Array(roh)].slice(0, 8).map((x) => x.toString(16).padStart(2, '0')).join('');
+  } catch (e) {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +263,7 @@ export function pruefeKaufEingabe(d) {
 
 // Feste Reihenfolge und nur Werte aus der Reservierung: Jeder Versuch schickt genau dieselbe Anfrage, sonst lehnte
 // Stripe den Idempotency-Key ab. Die Rueckkehr-Adresse traegt nur #werkstatt (keine Kennung im Verlauf des Browsers).
-export function kassenParameter({ reservierung, produkt, stripe_preis: preis, ablauf_s: ablauf, rueckkehr }) {
+export function kassenParameter({ reservierung, produkt, projekt, stripe_preis: preis, ablauf_s: ablauf, rueckkehr }) {
   const p = new URLSearchParams();
   p.append('mode', 'payment');
   p.append('line_items[0][price]', preis);
@@ -241,8 +275,10 @@ export function kassenParameter({ reservierung, produkt, stripe_preis: preis, ab
   p.append('cancel_url', `${rueckkehr}#werkstatt`);
   p.append(`metadata[${META_RESERVIERUNG}]`, reservierung);
   p.append(`metadata[${META_PRODUKT}]`, produkt);
+  p.append(`metadata[${META_PROJEKT}]`, projekt);
   p.append(`payment_intent_data[metadata][${META_RESERVIERUNG}]`, reservierung);
   p.append(`payment_intent_data[metadata][${META_PRODUKT}]`, produkt);
+  p.append(`payment_intent_data[metadata][${META_PROJEKT}]`, projekt);
   return p;
 }
 
@@ -265,6 +301,11 @@ export async function verarbeiteKasse({ methode, koerper, autorisierung } = {}, 
   const rueckkehr = rueckkehrAus(umgebung.WERKSTATT_RUECKKEHR);
   if (!rueckkehr) {
     log('werkstatt-kasse nicht_eingerichtet WERKSTATT_RUECKKEHR');
+    return fehler(503, 'nicht_eingerichtet');
+  }
+  const projekt = await projektKennung(basis);
+  if (!projekt) {
+    log('werkstatt-kasse nicht_eingerichtet projekt');
     return fehler(503, 'nicht_eingerichtet');
   }
   const jwt = bearer(autorisierung);
@@ -339,8 +380,8 @@ export async function verarbeiteKasse({ methode, koerper, autorisierung } = {}, 
     return fehler(409, 'beendet');
   }
 
-  const parameter = kassenParameter({ reservierung: r.reservierung, produkt: p.eingabe.produkt, stripe_preis: r.stripe_preis,
-    ablauf_s: r.stripe_ablauf_s, rueckkehr });
+  const parameter = kassenParameter({ reservierung: r.reservierung, produkt: p.eingabe.produkt, projekt,
+    stripe_preis: r.stripe_preis, ablauf_s: r.stripe_ablauf_s, rueckkehr });
   const schluessel = `crownmate-kasse-${r.reservierung}`;
   let s = await stripeAufruf(f, '/checkout/sessions', parameter, umgebung.STRIPE_RK, schluessel);
   if (!s.ok && s.wiederholen) {
@@ -388,8 +429,9 @@ const idVon = (x) => (typeof x === 'string' ? x : (x && typeof x === 'object' &&
 const zeitstempel = (s) => (Number.isFinite(s) && s > 0 ? new Date(s * 1000).toISOString() : null);
 const ganzzahl = (x) => (Number.isInteger(x) && x >= 0 && x <= 100000000 ? x : null);
 
-// Grund einer Erstattung aus den Metadaten der Erstattungen an der Zahlung (nur wenn Stripe sie mitschickt; neuere
-// API-Versionen tun das nicht, dann gilt eine volle Erstattung als "erstattet", nie als "widerrufen").
+// Grund einer Erstattung aus den Metadaten der Erstattungen an der Zahlung. Nur alte API-Versionen (vor 2022-11-15)
+// schicken die Erstattungen im Charge-Objekt mit. Mit jeder neueren (also bei jedem heute angelegten Stripe-Konto) ist
+// der Grund hier immer null: Eine volle Erstattung wird "erstattet", "widerrufen" setzt Flo von Hand (ANLEITUNG).
 function erstattungsGrund(charge) {
   const liste = charge && charge.refunds && Array.isArray(charge.refunds.data) ? charge.refunds.data : [];
   const neueste = [...liste].filter((x) => x && typeof x === 'object')
@@ -401,7 +443,7 @@ function erstattungsGrund(charge) {
   return null;
 }
 
-export function auswertenEdition(e) {
+export function auswertenEdition(e, projekt) {
   if (!e || typeof e !== 'object' || Array.isArray(e)) return { ignoriert: 'form' };
   if (!TYPEN.includes(e.type)) return { ignoriert: 'typ' };
   if (typeof e.id !== 'string' || !MUSTER.evt.test(e.id)) return { ignoriert: 'form' };
@@ -413,8 +455,13 @@ export function auswertenEdition(e) {
   if (e.type === 'checkout.session.completed' || e.type === 'checkout.session.expired') {
     // Nur Einmalkaeufe dieser Werkstatt. Abo-Kaeufe gehoeren dem Abo-Webhook, fremde Kassen sind nicht unsere.
     if (o.mode !== 'payment') return { ignoriert: 'kein_kauf' };
-    const res = o.metadata && typeof o.metadata === 'object' ? o.metadata[META_RESERVIERUNG] : null;
+    const meta = o.metadata && typeof o.metadata === 'object' ? o.metadata : {};
+    const res = meta[META_RESERVIERUNG];
     if (typeof res !== 'string' || !MUSTER.uuid.test(res)) return { ignoriert: 'fremd' };
+    // Kasse eines anderen Supabase-Projekts am selben Stripe-Konto (oder ohne Kennung): nie verbuchen, nie erstatten
+    if (typeof projekt !== 'string' || !MUSTER.projekt.test(projekt) || meta[META_PROJEKT] !== projekt) {
+      return { ignoriert: 'fremdes_projekt' };
+    }
     if (typeof o.id !== 'string' || !MUSTER.cs.test(o.id)) return { ignoriert: 'form' };
     d.reservierung = res.toLowerCase();
     d.sitzung = o.id;
@@ -431,6 +478,11 @@ export function auswertenEdition(e) {
   } else {
     const zahlung = idVon(o.payment_intent);
     if (!zahlung || !MUSTER.pi.test(zahlung)) return { ignoriert: 'keine_zahlung' };
+    // Traegt das Objekt in seinen Metadaten die Kennung eines anderen Projekts, gehoert es nicht hierher. Ohne Kennung
+    // (eine Rueckbuchung hat keine; ob eine Charge sie von der Zahlung uebernimmt, ist nicht mit Stripe geprueft)
+    // entscheidet die Datenbank ueber die Zahlungs-ID: Eine fremde Zahlung findet dort nie ein Stueck ('ohne_besitz').
+    const fremd = o.metadata && typeof o.metadata === 'object' ? o.metadata[META_PROJEKT] : undefined;
+    if (fremd !== undefined && fremd !== null && fremd !== projekt) return { ignoriert: 'fremdes_projekt' };
     d.zahlung = zahlung;
     if (e.type === 'charge.refunded') {
       d.betrag = ganzzahl(o.amount);
@@ -472,7 +524,12 @@ export async function verarbeiteWebhook({ methode, koerper, signatur } = {}, umg
   if (!sig.ok) return aus(400, { fehler: 'Signatur ungueltig', grund: sig.grund });
   let ereignis = null;
   try { ereignis = JSON.parse(koerper); } catch (e) { return aus(400, { fehler: 'Kein JSON' }); }
-  const a = auswertenEdition(ereignis);
+  const projekt = await projektKennung(basis);
+  if (!projekt) {
+    log('werkstatt-webhook nicht_eingerichtet projekt');
+    return aus(500, { fehler: 'Konfiguration unvollstaendig' });
+  }
+  const a = auswertenEdition(ereignis, projekt);
   if (!a.daten) return aus(200, { ok: true, ignoriert: a.ignoriert });
   const f = holen || globalThis.fetch;
   const v = await rpc(f, basis, dienst, 'edition_stripe_ereignis', a.daten);
@@ -483,8 +540,10 @@ export async function verarbeiteWebhook({ methode, koerper, signatur } = {}, umg
   const w = v.wert && typeof v.wert === 'object' ? v.wert : {};
   const ergebnis = typeof w.ergebnis === 'string' ? w.ergebnis.slice(0, 40) : null;
   if (w.erstatten !== true) {
-    log(`werkstatt-webhook ${a.daten.typ} ${ergebnis}${w.doppelt === true ? ' doppelt' : ''}`);
-    return aus(200, { ok: true, ergebnis, doppelt: w.doppelt === true });
+    // von_hand: eine bezahlte Kasse, die diese Datenbank nicht zuordnen kann. Nie automatisch erstatten, Flo prueft.
+    const vonHand = w.von_hand === true;
+    log(`werkstatt-webhook ${a.daten.typ} ${ergebnis}${w.doppelt === true ? ' doppelt' : ''}${vonHand ? ' von_hand' : ''}`);
+    return aus(200, { ok: true, ergebnis, doppelt: w.doppelt === true, von_hand: vonHand });
   }
 
   // Automatische Erstattung (Ueberverkauf, Doppelzahlung, Betrag, Konto geloescht ...). Derselbe Key je Zahlung: Stripe

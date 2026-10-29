@@ -421,8 +421,9 @@ keine Edge Function und kein Secret: Alles läuft über Datenbank-Funktionen mit
 ## Editionen (später, noch nicht ausführen)
 
 **Stand:** Server-Teil Etappe 1 ist gebaut (Datenbank, zwei Edge Functions, Tests), **nur für den Stripe-Testmodus und
-ohne Oberfläche**. Grundlage ist deine Entscheidung vom 29.10.: höchstens eine feste Auflage (kleinste 100), dazu ein
-Verkaufszeitraum, nie eine Neuauflage, Nummern der Reihe nach (`design/runde4/ENTSCHEIDUNGEN.md`). Echtes Geld fließt
+ohne Oberfläche**. Grundlage ist deine Entscheidung vom 29.10.: eine feste Auflage (im Schema mindestens 100), dazu ein
+Verkaufszeitraum, nie eine Neuauflage, Nummern der Reihe nach, verkauft wird vorerst nur im Web
+(`design/runde4/ENTSCHEIDUNGEN.md`, dort steht auch, was noch offen ist). Echtes Geld fließt
 erst nach Gewerbe, AGB, Widerrufsbelehrung, eigener Bestätigungs-Mail, Steuerberatung und der Prüfung durch eine
 Fachperson (keine Rechtsberatung hier). Die Schritte unten sind für später, wenn Claude oder Cowork den Probelauf mit dir
 macht. **Bis dahin nichts davon ausführen.**
@@ -435,7 +436,12 @@ macht. **Bis dahin nichts davon ausführen.**
   wird mindestens 28 Tage vor dem Verkaufsstart. Eine angekündigte Edition lässt sich nicht löschen.
 - Der Schalter `verkauf_freigegeben` (Standard aus) steht vor allen anderen Bedingungen. `zeige_restzahl` (Standard aus)
   entscheidet, ob die App eine Restzahl bekommt. Beide darfst du jederzeit umschalten; abschalten stoppt nur neue Käufe,
-  gekaufte Stücke bleiben.
+  gekaufte Stücke bleiben. **Ehrlich zum Notaus:** Er stoppt neue Kassen sofort, und niemand kann eine schon angelegte Kasse
+  wieder öffnen. Wer aber in diesem Moment schon auf der Zahlungsseite von Stripe ist, kann dort noch bis zu 31 Minuten
+  bezahlen und bekommt sein Stück. Nach dem Verkaufsstart zeigt die App dann „pausiert“.
+- Jeden Namen gibt es nur einmal (auch in anderer Schreibweise nicht): So entsteht keine Neuauflage unter neuer Kennung.
+- Höchstens 3 Kassen je Konto und Edition in 24 Stunden. Sonst könnten wenige Konten mit immer neuen Kassen alle Stücke
+  blockieren. Wer an der Kasse scheitert, kann es auf derselben Zahlungsseite noch einmal versuchen.
 - Ein offener Kauf je Konto und Edition, ein Stück je Konto und Edition, nur für Konten mit bestätigter E-Mail und
   „18 oder älter“ (Selbstauskunft auf dem Server, mit Zeitpunkt). Gäste, Konten unter 18 und Konten ohne Antwort sehen
   Editionen gar nicht. Die Zahlen `vergeben` und `reserviert` sieht kein Nutzer.
@@ -443,9 +449,16 @@ macht. **Bis dahin nichts davon ausführen.**
   30 Minuten, dazu eine Minute Puffer). So endet jede Kasse spätestens mit dem angekündigten Ende.
 - Zahlt jemand zu spät und es ist nichts mehr frei (oder das Konto zahlt doppelt, der Betrag stimmt nicht, das Konto
   wurde gelöscht), erstattet die Function automatisch.
+- Kommt eine Erstattung oder Rückbuchung bei der Datenbank an, bevor der Kauf selbst verbucht ist (Stripe stellt
+  Ereignisse nicht immer der Reihe nach zu), wird sie gespeichert und nachgeholt, sobald der Kauf seine Nummer bekommt.
+- **Testprojekt und echtes Projekt am selben Stripe-Konto:** Jede Kasse trägt eine Kennung des Supabase-Projekts (aus der
+  Projektadresse berechnet, nichts einzurichten). Jeder `werkstatt-webhook` verbucht nur die Käufe seines eigenen Projekts
+  und lässt die anderen in Ruhe. Bezahlt jemand eine Kasse, deren Reservierung die Datenbank nicht kennt, wird **nie
+  automatisch** erstattet: Der Fall steht für dich in `edition_ereignisse` (`erstattung = 'von_hand'`, siehe Schritt 10).
 
 1. **Erst im Testprojekt:** Am besten ein eigenes Supabase-Projekt nur für den Probelauf nehmen. Eine angekündigte
-   Edition lässt sich absichtlich nicht mehr löschen, und im echten Projekt sähen Konten ab 18 sie sofort.
+   Edition lässt sich absichtlich nicht mehr löschen, und im echten Projekt sähen Konten ab 18 sie sofort. Beide Projekte
+   dürfen am selben Stripe-Konto (Testmodus) hängen, die Projektkennung hält ihre Käufe auseinander.
 2. **Schema einspielen:** Im **SQL Editor** nacheinander `supabase/schema.sql`, `supabase/daten-schema.sql` (neu, wegen
    `meine_daten()`), freiwillig `supabase/abo-schema.sql` und dann `supabase/werkstatt-schema.sql` ausführen. Ein
    erneuter Lauf ist erlaubt. Danach `supabase/werkstatt-rls-test.sql` ausführen: Am Ende muss
@@ -470,13 +483,19 @@ macht. **Bis dahin nichts davon ausführen.**
    `https://<Projekt>.supabase.co/functions/v1/werkstatt-webhook`, genau diese Ereignisse: `checkout.session.completed`,
    `checkout.session.expired`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`. Das
    **Signaturgeheimnis** dieses neuen Endpunkts setzen: `npx supabase secrets set STRIPE_WERKSTATT_WEBHOOK_SECRET=whsec_...`.
-   Der Abo-Endpunkt bleibt, wie er ist; beide bekommen Käufe zu sehen und lassen die des anderen in Ruhe.
+   Der Abo-Endpunkt bleibt, wie er ist; beide bekommen Käufe zu sehen und lassen die des anderen in Ruhe. Hat auch das
+   Testprojekt einen `werkstatt-webhook`, bekommt jeder Endpunkt die Käufe beider Projekte und verbucht nur die eigenen.
 8. **Edition anlegen (SQL Editor, als Besitzer):**
    `insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, angekuendigt_am, verkauf_ab, verkauf_bis) values ('[id]', '[Name]', '[price_...]', [Betrag in Cent], 'eur', [Auflage ab 100], '[Ankündigung]', '[Start]', '[Ende]');`
    Zeiten mit Zeitzone schreiben, zum Beispiel `2027-01-01 00:00 Europe/Berlin` für „bis 31.12., 23:59 Uhr“. Der Betrag
    muss genau zum Stripe-Preis passen, sonst wird jede Zahlung erstattet. Erst wenn alles stimmt:
    `update public.editionen set verkauf_freigegeben = true where produkt_id = '[id]';`
-   **Notaus:** dasselbe mit `false`.
+   **Notaus:** dasselbe mit `false` (wer schon auf der Zahlungsseite ist, kann dort noch bis zu 31 Minuten bezahlen).
+   **Nur im Testprojekt, für den Probekauf:** Die Ankündigung muss 28 Tage vor dem Start liegen. Damit du nicht 28 Tage
+   wartest, trägst du dort `angekuendigt_am` zurückdatiert ein, zum Beispiel `now() - interval '29 days'`, und als Start
+   `now()`. **Im echten Projekt nie zurückdatieren:** `angekuendigt_am` ist der Zeitpunkt, ab dem Konten ab 18 die Edition
+   sehen, und die 28 Tage sollen eine echte Vorlaufzeit sein. Die Datenbank kann das nicht unterscheiden, das hältst nur
+   du ein.
 9. **Probekauf:** Ohne Oberfläche braucht ein Kauf ein Anmelde-Token. Das macht Claude mit dir zusammen (Testkarte
    `4242 4242 4242 4242`). Danach stehen in **Table Editor > besitz** die Nummer und in `edition_ereignisse` jedes
    Stripe-Ereignis mit Ergebnis.
@@ -485,13 +504,23 @@ macht. **Bis dahin nichts davon ausführen.**
     Normal ist eine leere Liste. Ohne Kasse (`sitzung_id` leer) räumt `select public.edition_aufraeumen();` sie weg;
     mit Kasse wartet die Reservierung auf das Ereignis `checkout.session.expired` von Stripe.
     Offene automatische Erstattungen: `select * from public.edition_ereignisse where erstattung = 'offen';`
-11. **Widerruf:** Eine volle Erstattung im Stripe-Dashboard setzt den Besitz auf `erstattet`. Ist es ein Widerruf, danach
+    **Fälle für dich** (bezahlte Kasse, deren Reservierung die Datenbank nicht kennt; normal ist eine leere Liste):
+    `select * from public.edition_ereignisse where erstattung = 'von_hand';`
+    Prüfe die Zahlung (`zahlung_id`) im Stripe-Dashboard und erstatte sie dort, wenn sie wirklich zu diesem Projekt gehört
+    und niemand ein Stück bekommen hat. Danach
+    `update public.edition_ereignisse set erstattung = 'erledigt' where id = 'evt_...';`
+    Bis dahin bleibt die Zeile stehen (sie wird auch nach 90 Tagen nicht gelöscht).
+11. **Widerruf:** Eine volle Erstattung im Stripe-Dashboard setzt den Besitz auf `erstattet`. Ist es ein Widerruf, setzt du
+    den Status **immer von Hand**:
     `update public.besitz set status = 'widerrufen' where zahlung_id = 'pi_...';` (die Nummer bleibt vergeben).
+    Ein Grund an der Erstattung (Metadaten `grund = widerruf`) kommt nicht automatisch an: Stripe schickt ihn bei jedem
+    heute angelegten Konto nicht mehr im Ereignis mit. Den Widerruf erledigt später der Widerrufsbutton selbst.
 12. **Erfinder-Profil (nur einmal, nur du):** deine `user_id` steht unter **Authentication > Users**.
     `insert into public.sonderstuecke (stueck_id, art, user_id) values ('erfinder-banner-blatt-0', 'banner', '<deine user_id>'), ('erfinder-titel', 'titel', '<deine user_id>'), ('erfinder-figuren-blaupause', 'figurensatz', '<deine user_id>'), ('erfinder-finisher-signatur', 'finisher', '<deine user_id>');`
     Kein Nutzer und keine Function kann dort schreiben. Was Gegner sehen, kommt erst mit Etappe 3b.
 
 **Was noch fehlt (Etappen 2 bis 6):** die Oberfläche (Kaufknopf bleibt „Bald verfügbar“), ein Aufräum-Schritt, der
-überfällige Kassen aktiv bei Stripe beendet, ein Test mit zwei gleichzeitigen Käufern gegen echtes Postgres, die eigene
+überfällige Kassen aktiv bei Stripe beendet, ein dauerhafter Test mit zwei gleichzeitigen Käufern gegen echtes Postgres
+(einmal von Hand geprüft, Ergebnis grün, aber nicht im Repo), der Weg über die App-Stores, die eigene
 Bestätigungs-Mail, AGB und Widerrufsbutton, Kontoschutz, die Prüfung durch die Fachperson und erst danach ein
 Live-Schlüssel (das ist eine bewusste Code-Änderung in `supabase/functions/_gemeinsam/werkstatt.js`, kein Secret).

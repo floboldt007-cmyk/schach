@@ -22,8 +22,11 @@
 --                         der Verbuchung. Ein Stueck je Konto und Edition. Eine Nummer wird nie neu vergeben, auch nach
 --                         Erstattung, Widerruf oder Rueckbuchung nicht (nur der Status aendert sich). Nach Kontoloeschung
 --                         bleibt die Zeile pseudonym (user_id leer, die Nummer bleibt verbrannt). Nur der Besitzer liest.
---   edition_ereignisse    jedes Stripe-Ereignis genau einmal samt Ergebnis (Idempotenz), dazu offene Erstattungen. Nur
---                         Service-Rolle (lesen). Nach 90 Tagen geloescht.
+--   edition_ereignisse    jedes Stripe-Ereignis genau einmal samt Ergebnis (Idempotenz), dazu offene Erstattungen und
+--                         Faelle fuer Flo (erstattung = 'von_hand'). Zahlungs-Ereignisse (charge.*) behalten Betrag,
+--                         Grund und Streit-Status: Kommt eine Erstattung oder Rueckbuchung VOR dem (verspaeteten)
+--                         Kauf-Ereignis an, wird sie nach der Zuteilung nachgeholt (nachgeholt_am). Nur Service-Rolle
+--                         (lesen). Nach 90 Tagen geloescht, ausser offenen Erstattungen und offenen Faellen fuer Flo.
 --   sonderstuecke         Flos Erfinder-Profil (Nr. 0, 1 von 1): je Stueck genau eine Zeile. Eintragen nur der Besitzer
 --                         der Datenbank im SQL Editor, keine Funktion und kein Nutzer kann schreiben. Angemeldete lesen
 --                         die eigenen Zeilen. Was Gegner sehen, kommt spaeter ueber einen Server-Kanal (Etappe 3b).
@@ -34,16 +37,26 @@
 --   eingefroren (Trigger EDITION_EINGEFROREN), das Ende laesst sich dann nur vorziehen, wenn alles vergeben ist, nie
 --   verschieben; eine angekuendigte Edition laesst sich nicht loeschen. Angekuendigt wird mindestens 28 Tage vor dem
 --   Verkaufsstart (vorsichtige Empfehlung aus dem Konzept, wie Fairness-Regel 19 fuer Events). Neue Editionen beginnen
---   mit vergeben = reserviert = 0 (EDITION_NEU_MIT_ZAEHLERN), so ist die Zahl der Nummern immer gleich vergeben.
+--   mit vergeben = reserviert = 0 (EDITION_NEU_MIT_ZAEHLERN), so ist die Zahl der Nummern immer gleich vergeben. Jeden
+--   Namen gibt es nur einmal (ohne Gross- und Kleinschreibung, Index editionen_name_einmalig): auch so keine Neuauflage.
 --   Der Schalter verkauf_freigegeben (Standard aus) steht in edition_reserviere vor allen anderen Verkaufsbedingungen.
+--   Er ist der Notaus: keine neue Kasse mehr und keine bestehende wieder oeffnen. Wer schon an der Stripe-Kasse ist, kann
+--   dort noch bis zu 31 Minuten bezahlen und bekommt sein Stueck (bewusst, siehe ANLEITUNG). Nach dem Verkaufsstart
+--   zeigt edition_stand dann 'pausiert'.
 --   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt. Kassenschluss: ab verkauf_bis minus
 --   31 Minuten oeffnet der Server keine neue Kasse mehr (Stripe-Kassen leben mindestens 30 Minuten, eine Minute Puffer
---   fuer Laufzeit und Uhren), so endet jede Kasse spaetestens mit dem angekuendigten Ende.
+--   fuer Laufzeit und Uhren), so endet jede Kasse spaetestens mit dem angekuendigten Ende. Hoechstens 3 Kassen je Konto
+--   und Edition in 24 Stunden (EDITION_ZU_OFT): sonst koennten wenige Konten mit immer neuen Kassen alle Stuecke
+--   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen.
+--   Projektkennung: Die Kasse traegt eine Kennung des Supabase-Projekts in den Stripe-Metadaten. Der Webhook eines anderen
+--   Projekts am selben Stripe-Konto ignoriert sie (supabase/functions/_gemeinsam/werkstatt.js). Kommt trotzdem ein
+--   bezahlter Kauf mit einer Reservierung an, die diese Datenbank nicht kennt, wird nie automatisch erstattet: Ergebnis
+--   'unbekannt', erstattung = 'von_hand' (Flo prueft).
 --
 -- Funktionen (security definer, search_path = ''):
 --   alter_angeben(ab18)                          angemeldete Nutzer: eigene Selbstauskunft setzen (mit Zeitpunkt)
 --   edition_stand(produkt), edition_staende()   angemeldete Nutzer ab 18: feste Angaben und Status 'angekuendigt' |
---                                                'erhaeltlich' | 'ausverkauft' | 'beendet'; Restzahl nur mit
+--                                                'erhaeltlich' | 'pausiert' | 'ausverkauft' | 'beendet'; Restzahl nur mit
 --                                                zeige_restzahl, Endzahl nur fuer Besitzer eines Stuecks oder mit dem
 --                                                Schalter. Unter 18, ohne Antwort und anon: nichts.
 --   edition_reserviere(...)                      Service-Rolle (Edge Function werkstatt-kasse): atomar reservieren
@@ -54,7 +67,7 @@
 --   edition_aufraeumen()                         Service-Rolle und Besitzer: Reservierungen ohne Kasse nach 2 Stunden
 --                                                freigeben, Endzahlen festschreiben, alte Zeilen nach 90 Tagen loeschen
 --   intern (fuer niemanden freigegeben): edition_kassenschluss, edition_schliesse_ab, edition_stand_json,
---   edition_ereignis_json, editionen_schutz, besitz_schutz
+--   edition_ereignis_json, edition_zahlung_anwenden, editionen_schutz, besitz_schutz
 --
 -- Fehler kommen als Kennungen EDITION_... (raise exception). Vertrag mit supabase/functions/_gemeinsam/werkstatt.js
 -- (KENNUNGEN); tests/server-werkstatt.test.mjs prueft, dass jede Kennung aus edition_reserviere dort steht.
@@ -108,6 +121,10 @@ create table if not exists public.editionen (
   constraint editionen_endzahl check (endzahl is null or endzahl = vergeben)
 );
 
+-- Keine Neuauflage unter neuer produkt_id: jeden Namen gibt es nur einmal (fast gleiche Namen faengt das nicht, die
+-- verbieten AGB und Flos Wort)
+create unique index if not exists editionen_name_einmalig on public.editionen (lower(name));
+
 create table if not exists public.reservierungen (
   id uuid primary key default gen_random_uuid(),
   produkt_id text not null references public.editionen (produkt_id) on delete restrict,
@@ -131,6 +148,8 @@ create table if not exists public.reservierungen (
 create unique index if not exists reservierungen_offen_je_konto
   on public.reservierungen (user_id, produkt_id) where status = 'offen';
 create index if not exists reservierungen_produkt_status on public.reservierungen (produkt_id, status);
+-- fuer die Grenze "hoechstens 3 Kassen je Konto und Edition in 24 Stunden"
+create index if not exists reservierungen_konto_zeit on public.reservierungen (user_id, produkt_id, erstellt_am);
 
 create table if not exists public.edition_zustimmungen (
   id uuid primary key default gen_random_uuid(),
@@ -174,19 +193,28 @@ create table if not exists public.edition_ereignisse (
   erstellt timestamptz not null,
   reservierung_id uuid,
   zahlung_id text,
+  -- Angaben des Ereignisses, damit eine zu frueh gekommene Erstattung oder Rueckbuchung nachgeholt werden kann
+  betrag integer,
+  erstattet integer,
+  grund text,
+  streit text,
   ergebnis text not null default 'offen',
   nummer integer,
+  -- 'offen' | 'gesendet': automatische Erstattung; 'von_hand' | 'erledigt': ein Fall, den Flo prueft (ANLEITUNG)
   erstattung text,
   erstattung_grund text,
+  nachgeholt_am timestamptz,
   eingegangen_am timestamptz not null default now(),
   constraint edition_ereignisse_id_form check (id ~ '^evt_[A-Za-z0-9]{1,200}$'),
   constraint edition_ereignisse_typ check (typ in ('checkout.session.completed', 'checkout.session.expired',
     'charge.refunded', 'charge.dispute.created', 'charge.dispute.closed')),
-  constraint edition_ereignisse_erstattung check (erstattung is null or erstattung in ('offen', 'gesendet')),
+  constraint edition_ereignisse_erstattung check (erstattung is null
+    or erstattung in ('offen', 'gesendet', 'von_hand', 'erledigt')),
   constraint edition_ereignisse_grund check (erstattung_grund is null or erstattung_grund in
     ('ausverkauft', 'endzahl', 'doppelt', 'betrag', 'sitzung', 'konto_geloescht', 'unbekannt'))
 );
 create index if not exists edition_ereignisse_eingang on public.edition_ereignisse (eingegangen_am);
+create index if not exists edition_ereignisse_zahlung on public.edition_ereignisse (zahlung_id);
 
 create table if not exists public.sonderstuecke (
   stueck_id text primary key,              -- jedes Stueck gibt es genau einmal
@@ -347,10 +375,12 @@ declare
   v_endzahl integer;
   v_darf_zahl boolean;
 begin
+  -- 'pausiert': der Verkauf hat begonnen, aber der Schalter ist aus (Notaus). Vor dem Start bleibt es 'angekuendigt'.
   v_status := case
     when e.vergeben >= e.auflage then 'ausverkauft'
     when now() >= public.edition_kassenschluss(e.verkauf_bis) or e.endzahl is not null then 'beendet'
-    when now() < e.verkauf_ab or not e.verkauf_freigegeben then 'angekuendigt'
+    when now() < e.verkauf_ab then 'angekuendigt'
+    when not e.verkauf_freigegeben then 'pausiert'
     else 'erhaeltlich'
   end;
   -- Die Endzahl verraet den Umsatz: nur fuer Besitzer eines Stuecks dieser Edition oder mit dem Schalter
@@ -390,8 +420,57 @@ as $$
     'reservierung', ev.reservierung_id,
     'zahlung', ev.zahlung_id,
     'erstatten', coalesce(ev.erstattung = 'offen', false),
+    'von_hand', coalesce(ev.erstattung = 'von_hand', false),
     'erstattung_grund', ev.erstattung_grund
   );
+$$;
+
+-- Erstattung oder Rueckbuchung auf ein Stueck anwenden (intern). Gleiche Regeln, ob das Ereignis gerade kommt oder nach
+-- der Zuteilung nachgeholt wird. Rueckgabe: neuer Status ('erstattet' | 'widerrufen' | 'strittig' | 'aktiv' |
+-- 'zurueckgebucht') oder 'veraltet' | 'teilerstattung' | 'unveraendert'. Die Nummer bleibt immer vergeben.
+create or replace function public.edition_zahlung_anwenden(
+  b public.besitz,
+  art text,
+  zeit timestamptz,
+  betrag integer,
+  erstattet integer,
+  grund text,
+  streit text)
+returns text
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_neu text;
+begin
+  if b.status_zeit is not null and zeit < b.status_zeit then
+    return 'veraltet';
+  end if;
+  if art = 'charge.refunded' then
+    if not (betrag > 0 and erstattet >= betrag) then
+      return 'teilerstattung';   -- Kulanz: das Stueck bleibt
+    end if;
+    if b.status in ('aktiv', 'strittig') then
+      v_neu := case when grund = 'widerruf' then 'widerrufen' else 'erstattet' end;
+    end if;
+  elsif art = 'charge.dispute.created' then
+    if b.status = 'aktiv' then
+      v_neu := 'strittig';
+    end if;
+  elsif art = 'charge.dispute.closed' and b.status = 'strittig' then
+    if streit = 'lost' then
+      v_neu := 'zurueckgebucht';
+    elsif streit in ('won', 'warning_closed') then
+      v_neu := 'aktiv';
+    end if;
+  end if;
+  if v_neu is null then
+    return 'unveraendert';
+  end if;
+  update public.besitz x set status = v_neu, status_zeit = zeit
+  where x.produkt_id = b.produkt_id and x.nummer = b.nummer;
+  return v_neu;
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -550,6 +629,13 @@ begin
       -- Alle restlichen Stuecke sind gerade an einer Kasse reserviert
       raise exception 'EDITION_NICHT_VERFUEGBAR';
     end if;
+    -- Hoechstens 3 Kassen je Konto und Edition in 24 Stunden (zaehlt jede angelegte Reservierung, auch abgelaufene).
+    -- Sonst koennten wenige Konten mit immer neuen Kassen alle restlichen Stuecke dauerhaft blockieren. Erst nach dem
+    -- Stand geprueft (ausverkauft und beendet gehen vor); der Fehler nimmt die Reservierung von eben zurueck.
+    if (select count(*) from public.reservierungen x
+        where x.user_id = v_nutzer and x.produkt_id = v_produkt and x.erstellt_am > now() - interval '24 hours') >= 3 then
+      raise exception 'EDITION_ZU_OFT';
+    end if;
     insert into public.reservierungen as t (produkt_id, user_id) values (v_produkt, v_nutzer) returning * into r;
     insert into public.edition_zustimmungen as t (reservierung_id, produkt_id, user_id, textversion,
       zustimmung_sofortige_lieferung, kenntnis_widerruf_erlischt)
@@ -672,8 +758,9 @@ begin
     n_frei := n_frei + 1;
   end loop;
   perform public.edition_schliesse_ab(x.produkt_id) from public.editionen x where x.endzahl is null;
+  -- offene Erstattungen und offene Faelle fuer Flo (von_hand) bleiben, bis sie erledigt sind
   delete from public.edition_ereignisse t
-  where t.eingegangen_am < now() - interval '90 days' and t.erstattung is distinct from 'offen';
+  where t.eingegangen_am < now() - interval '90 days' and (t.erstattung is null or t.erstattung in ('gesendet', 'erledigt'));
   get diagnostics n_ereignisse = row_count;
   delete from public.reservierungen t
   where t.status in ('abgelaufen', 'abgebrochen') and t.aktualisiert_am < now() - interval '90 days'
@@ -686,14 +773,21 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Stripe-Ereignis verbuchen (nur Service-Rolle). Die Parameter liefert supabase/functions/_gemeinsam/werkstatt.js
--- (auswertenEdition). Rueckgabe: { ereignis, ergebnis, doppelt, nummer, reservierung, zahlung, erstatten,
+-- (auswertenEdition). Rueckgabe: { ereignis, ergebnis, doppelt, nummer, reservierung, zahlung, erstatten, von_hand,
 -- erstattung_grund }. Bei erstatten = true erstattet die Edge Function die Zahlung bei Stripe (Idempotency-Key je
--- Zahlung) und meldet das mit edition_erstattung_gesendet. Ein doppeltes Ereignis liefert das gespeicherte Ergebnis.
+-- Zahlung) und meldet das mit edition_erstattung_gesendet. Bei von_hand = true wird nie automatisch erstattet, Flo
+-- prueft den Fall (ANLEITUNG). Ein doppeltes Ereignis liefert das gespeicherte Ergebnis.
 --
 -- Ergebnisse: checkout.session.completed 'zugeteilt' | 'zugeteilt_spaet' | 'erstatten' | 'schon_verbucht' |
--- 'nicht_bezahlt'; checkout.session.expired 'freigegeben' | 'unveraendert' | 'unbekannt'; charge.* 'erstattet' |
--- 'widerrufen' | 'teilerstattung' | 'strittig' | 'aktiv' | 'zurueckgebucht' | 'unveraendert' | 'veraltet' | 'ohne_besitz'.
+-- 'nicht_bezahlt' | 'unbekannt' (Reservierung gibt es hier nicht: von_hand); checkout.session.expired 'freigegeben' |
+-- 'unveraendert' | 'unbekannt'; charge.* 'erstattet' | 'widerrufen' | 'teilerstattung' | 'strittig' | 'aktiv' |
+-- 'zurueckgebucht' | 'unveraendert' | 'veraltet' | 'ohne_besitz'.
 -- Ob eine Zahlung ins Fenster faellt, entscheidet der Zeitpunkt der Reservierung, nie die Uhr beim Verbuchen.
+-- Reihenfolge: Stripe stellt Ereignisse nicht der Reihe nach zu. Kommt charge.* an, bevor das Kauf-Ereignis verbucht ist
+-- (etwa weil Stripe den Kauf nach einem Fehler erneut zustellt), ist das Ergebnis erst 'ohne_besitz'. Die Angaben bleiben
+-- gespeichert, und sobald der Kauf eine Nummer bekommt, werden diese Ereignisse in der Reihenfolge ihrer Stripe-Zeit
+-- nachgeholt (Ergebnis und nachgeholt_am im Ereignis). Eine Sperre je Zahlung (pg_advisory_xact_lock) laesst Kauf und
+-- Zahlungs-Ereignis derselben Zahlung nie gleichzeitig laufen, sonst saehe keiner den anderen.
 -- ---------------------------------------------------------------------------
 create or replace function public.edition_stripe_ereignis(
   ereignis_id text,
@@ -734,8 +828,10 @@ declare
   v_ergebnis text;
   v_nummer integer;
   v_erstatten text;
-  v_neu_status text;
+  v_von_hand text;
   v_gefunden boolean;
+  v_nach text;
+  ev2 public.edition_ereignisse;
 begin
   -- Form pruefen (die Auswertung im Modul prueft dasselbe; hier zur Sicherheit noch einmal)
   if v_id is null or v_id !~ '^evt_[A-Za-z0-9]{1,200}$' or v_zeit is null or v_typ is null
@@ -763,13 +859,18 @@ begin
   end if;
 
   -- Idempotenz: dasselbe Ereignis nur einmal. Ein gleichzeitiger zweiter Aufruf wartet am Primaerschluessel.
-  insert into public.edition_ereignisse as t (id, typ, erstellt, reservierung_id, zahlung_id)
-  values (v_id, v_typ, v_zeit, v_res, v_zahlung)
+  insert into public.edition_ereignisse as t (id, typ, erstellt, reservierung_id, zahlung_id, betrag, erstattet, grund,
+    streit)
+  values (v_id, v_typ, v_zeit, v_res, v_zahlung, v_betrag, v_erstattet, v_grund, v_streit)
   on conflict (id) do nothing;
   get diagnostics n = row_count;
   if n = 0 then
     select * into ev from public.edition_ereignisse t where t.id = v_id;
     return public.edition_ereignis_json(ev, true);
+  end if;
+  -- Kauf und Zahlungs-Ereignisse derselben Zahlung nacheinander (siehe Kopf: Reihenfolge)
+  if v_zahlung is not null then
+    perform pg_advisory_xact_lock(hashtextextended('edition-zahlung:' || v_zahlung, 0));
   end if;
 
   if v_typ = 'checkout.session.completed' then
@@ -782,7 +883,10 @@ begin
       -- Nur Karte ist erlaubt, das kommt praktisch nicht vor. Die Reservierung bleibt, bis die Kasse ablaeuft.
       v_ergebnis := 'nicht_bezahlt';
     elsif not v_gefunden then
-      v_erstatten := 'unbekannt';
+      -- Nie automatisch erstatten: Die Kasse kann zu einem anderen Projekt am selben Stripe-Konto gehoeren (dessen
+      -- Kassen filtert schon die Projektkennung im Webhook heraus) oder von Hand geloescht worden sein. Flo prueft.
+      v_ergebnis := 'unbekannt';
+      v_von_hand := 'unbekannt';
     elsif r.sitzung_id is not null and r.sitzung_id <> v_sitzung then
       v_erstatten := 'sitzung';
     else
@@ -821,6 +925,22 @@ begin
         where x.id = r.id;
         insert into public.besitz as t (produkt_id, nummer, user_id, reservierung_id, zahlung_id, sitzung_id, status_zeit)
         values (r.produkt_id, v_nummer, r.user_id, r.id, v_zahlung, v_sitzung, v_zeit);
+        -- Erstattungen und Rueckbuchungen, die schon vor diesem Kauf-Ereignis kamen, jetzt nachholen
+        for ev2 in
+          select * from public.edition_ereignisse t
+          where t.zahlung_id = v_zahlung and t.typ like 'charge.%' and t.ergebnis = 'ohne_besitz' and t.id <> v_id
+          order by t.erstellt, t.eingegangen_am, t.id
+        loop
+          select * into b from public.besitz x where x.zahlung_id = v_zahlung for update;
+          v_nach := public.edition_zahlung_anwenden(b, ev2.typ, ev2.erstellt, ev2.betrag, ev2.erstattet, ev2.grund,
+            ev2.streit);
+          update public.edition_ereignisse t
+          set ergebnis = v_nach,
+              nummer = case when v_nach in ('erstattet', 'widerrufen', 'strittig', 'aktiv', 'zurueckgebucht')
+                then b.nummer end,
+              nachgeholt_am = now()
+          where t.id = ev2.id;
+        end loop;
         perform public.edition_schliesse_ab(r.produkt_id);
       elsif v_erstatten is not null then
         -- Der Kauf scheitert: eine noch offene Reservierung wird frei, die Zahlung geht zurueck
@@ -855,40 +975,16 @@ begin
     end if;
 
   else
-    -- Erstattung und Rueckbuchung: zugeordnet ueber die Zahlung (pi_...). Die Nummer bleibt immer vergeben.
+    -- Erstattung und Rueckbuchung: zugeordnet ueber die Zahlung (pi_...). Die Nummer bleibt immer vergeben. Gibt es
+    -- (noch) kein Stueck zu dieser Zahlung, bleibt das Ereignis mit seinen Angaben gespeichert ('ohne_besitz') und wird
+    -- nachgeholt, sobald das Kauf-Ereignis eine Nummer vergibt.
     select * into b from public.besitz x where x.zahlung_id = v_zahlung for update;
     if not found then
       v_ergebnis := 'ohne_besitz';
-    elsif b.status_zeit is not null and v_zeit < b.status_zeit then
-      v_ergebnis := 'veraltet';
     else
-      v_neu_status := null;
-      if v_typ = 'charge.refunded' then
-        if v_betrag > 0 and v_erstattet >= v_betrag then
-          if b.status in ('aktiv', 'strittig') then
-            v_neu_status := case when v_grund = 'widerruf' then 'widerrufen' else 'erstattet' end;
-          end if;
-        else
-          v_ergebnis := 'teilerstattung';   -- Kulanz: das Stueck bleibt
-        end if;
-      elsif v_typ = 'charge.dispute.created' then
-        if b.status = 'aktiv' then
-          v_neu_status := 'strittig';
-        end if;
-      elsif b.status = 'strittig' then
-        if v_streit = 'lost' then
-          v_neu_status := 'zurueckgebucht';
-        elsif v_streit in ('won', 'warning_closed') then
-          v_neu_status := 'aktiv';
-        end if;
-      end if;
-      if v_neu_status is not null then
-        update public.besitz x set status = v_neu_status, status_zeit = v_zeit
-        where x.produkt_id = b.produkt_id and x.nummer = b.nummer;
-        v_ergebnis := v_neu_status;
+      v_ergebnis := public.edition_zahlung_anwenden(b, v_typ, v_zeit, v_betrag, v_erstattet, v_grund, v_streit);
+      if v_ergebnis in ('erstattet', 'widerrufen', 'strittig', 'aktiv', 'zurueckgebucht') then
         v_nummer := b.nummer;
-      elsif v_ergebnis is null then
-        v_ergebnis := 'unveraendert';
       end if;
     end if;
   end if;
@@ -897,8 +993,9 @@ begin
   set ergebnis = v_ergebnis,
       nummer = v_nummer,
       zahlung_id = coalesce(t.zahlung_id, v_zahlung),
-      erstattung = case when v_erstatten is not null and v_zahlung is not null then 'offen' end,
-      erstattung_grund = v_erstatten
+      erstattung = case when v_erstatten is not null and v_zahlung is not null then 'offen'
+        when v_von_hand is not null then 'von_hand' end,
+      erstattung_grund = coalesce(v_erstatten, v_von_hand)
   where t.id = v_id
   returning * into ev;
   perform public.edition_aufraeumen();
@@ -998,6 +1095,8 @@ revoke all on function public.edition_kassenschluss(timestamptz) from anon, auth
 revoke all on function public.edition_schliesse_ab(text) from anon, authenticated, service_role, public;
 revoke all on function public.edition_stand_json(public.editionen, uuid) from anon, authenticated, service_role, public;
 revoke all on function public.edition_ereignis_json(public.edition_ereignisse, boolean)
+  from anon, authenticated, service_role, public;
+revoke all on function public.edition_zahlung_anwenden(public.besitz, text, timestamptz, integer, integer, text, text)
   from anon, authenticated, service_role, public;
 revoke all on function public.alter_angeben(boolean) from anon, authenticated, service_role, public;
 revoke all on function public.edition_stand(text) from anon, authenticated, service_role, public;

@@ -10,9 +10,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import {
-  KASSE_S, MAX_KOERPER_KASSE, MAX_KOERPER_WEBHOOK, STRIPE_API, RUECKKEHR_STANDARD, META_RESERVIERUNG, META_PRODUKT, TYPEN,
-  GRUENDE, KENNUNGEN, TEXTE, stripeArt, rueckkehrAus, pruefeKaufEingabe, kassenParameter, erstattungsParameter,
-  auswertenEdition, verarbeiteKasse, verarbeiteWebhook,
+  KASSE_S, MAX_KOERPER_KASSE, MAX_KOERPER_WEBHOOK, STRIPE_API, RUECKKEHR_STANDARD, META_RESERVIERUNG, META_PRODUKT, META_PROJEKT,
+  TYPEN, GRUENDE, KENNUNGEN, TEXTE, stripeArt, rueckkehrAus, projektKennung, pruefeKaufEingabe, kassenParameter,
+  erstattungsParameter, auswertenEdition as auswertenEditionRoh, verarbeiteKasse, verarbeiteWebhook,
 } from '../supabase/functions/_gemeinsam/werkstatt.js';
 import { auswerten as auswertenAbo } from '../supabase/functions/_gemeinsam/stripe.js';
 
@@ -42,6 +42,11 @@ const TESTBETRAG = 1234; // Testbetrag, kein Preis
 const T = Date.UTC(2026, 10, 1, 12, 0, 0); // 01.11.2026 12:00 UTC, in Millisekunden
 const TS = T / 1000;
 const UMGEBUNG = { SUPABASE_URL: 'https://probe.supabase.example/', SUPABASE_SERVICE_ROLE_KEY: DIENST, SUPABASE_ANON_KEY: 'anon-probe', STRIPE_RK: RK };
+// Projektkennung dieses (Probe-)Projekts und eines zweiten Projekts am selben Stripe-Konto
+const PROJEKT = await projektKennung(UMGEBUNG.SUPABASE_URL);
+const PROJEKT_B = await projektKennung('https://anderes.supabase.example');
+// Der Webhook ruft auswertenEdition immer mit der eigenen Kennung auf; die Tests tun dasselbe (ohne Kennung: eigene Pruefung)
+const auswertenEdition = (e, projekt = PROJEKT) => auswertenEditionRoh(e, projekt);
 const KAUF = { produkt: 'probe-edition', textversion: 'agb-2026-11', zustimmung_sofort: true, kenntnis_widerruf: true };
 const SITZUNG = 'cs_test_a1B2c3D4';
 const KASSEN_URL = `https://checkout.stripe.com/c/pay/${SITZUNG}#fidProbe`;
@@ -117,6 +122,10 @@ pruefe('rueckkehrAus: Standard die Live-Seite, nur https ohne # und ?', rueckkeh
   && rueckkehrAus('https://probe.example/schach/') === 'https://probe.example/schach/' && rueckkehrAus('http://probe.example/') === null
   && rueckkehrAus('javascript:alert(1)') === null && rueckkehrAus('https://probe.example/#x') === null
   && RUECKKEHR_STANDARD === 'https://floboldt007-cmyk.github.io/schach/');
+pruefe('projektKennung: 16 Hex-Zeichen aus dem Host (gleich mit und ohne Schraegstrich oder Pfad), je Projekt verschieden, ohne Adresse null',
+  /^[0-9a-f]{16}$/.test(PROJEKT) && PROJEKT === await projektKennung('https://probe.supabase.example')
+  && PROJEKT === await projektKennung('HTTPS://PROBE.supabase.example/rest/v1') && /^[0-9a-f]{16}$/.test(PROJEKT_B) && PROJEKT_B !== PROJEKT
+  && await projektKennung('') === null && await projektKennung('keine adresse') === null && META_PROJEKT === 'crownmate_projekt');
 pruefe('pruefeKaufEingabe: gueltig, nur produkt und textversion gehen weiter',
   JSON.stringify(pruefeKaufEingabe({ ...KAUF, nutzer: FREMD, betrag: 1 })) === JSON.stringify({ ok: true, eingabe: { produkt: 'probe-edition', textversion: 'agb-2026-11' } }));
 pruefe('pruefeKaufEingabe: beide Erklaerungen muessen ausdruecklich true sein', ['zustimmung_sofort', 'kenntnis_widerruf']
@@ -140,8 +149,10 @@ pruefe('pruefeKaufEingabe: Form von produkt und textversion', pruefeKaufEingabe(
   const voll = await kasse(f, { umgebung: { ...UMGEBUNG, STRIPE_RK: SK }, zeilen });
   const ohneDb = await kasse(f, { umgebung: { ...UMGEBUNG, SUPABASE_SERVICE_ROLE_KEY: '' }, zeilen });
   const http = await kasse(f, { umgebung: { ...UMGEBUNG, WERKSTATT_RUECKKEHR: 'http://probe.example/' }, zeilen });
-  pruefe('Nur Testmodus: ohne Schluessel, mit Live-Schluessel, mit vollem sk_-Schluessel, ohne Datenbank oder mit http-Rueckkehr 503 nicht_eingerichtet',
-    [ohneRk, live, voll, ohneDb, http].every((r) => r.status === 503 && json(r).fehler === 'nicht_eingerichtet') && f.aufrufe.length === 0
+  const ohneProjekt = await kasse(f, { umgebung: { ...UMGEBUNG, SUPABASE_URL: 'kaputt' }, zeilen });
+  pruefe('Nur Testmodus: ohne Schluessel, mit Live-Schluessel, mit vollem sk_-Schluessel, ohne Datenbank, mit http-Rueckkehr oder ohne Projektkennung 503 nicht_eingerichtet',
+    [ohneRk, live, voll, ohneDb, http, ohneProjekt].every((r) => r.status === 503 && json(r).fehler === 'nicht_eingerichtet') && f.aufrufe.length === 0
+    && zeilen.includes('werkstatt-kasse nicht_eingerichtet projekt')
     && zeilen.includes('werkstatt-kasse nicht_eingerichtet STRIPE_RK live') && zeilen.includes('werkstatt-kasse nicht_eingerichtet STRIPE_RK falsch'), zeilen);
   const ohne = await kasse(f, { anfrage: kaufAnfrage(KAUF, '') });
   const leer = await kasse(f, { anfrage: kaufAnfrage('') });
@@ -207,14 +218,16 @@ pruefe('pruefeKaufEingabe: Form von produkt und textversion', pruefeKaufEingabe(
     && form.get(`metadata[${META_PRODUKT}]`) === 'probe-edition' && form.get(`payment_intent_data[metadata][${META_PRODUKT}]`) === 'probe-edition'
     && form.get('success_url') === RUECKKEHR_STANDARD + '#werkstatt' && form.get('cancel_url') === RUECKKEHR_STANDARD + '#werkstatt'
     && META_RESERVIERUNG === 'crownmate_reservierung');
+  pruefe('Stripe-Kasse: Projektkennung in den Metadaten von Sitzung und Zahlung (zwei Projekte am selben Stripe-Konto)',
+    form.get(`metadata[${META_PROJEKT}]`) === PROJEKT && form.get(`payment_intent_data[metadata][${META_PROJEKT}]`) === PROJEKT);
   pruefe('Stripe-Kasse: keine E-Mail, keine Nutzer-ID an Stripe', !s[0].body.includes('example.invalid') && !s[0].body.includes(UID));
   const g = f.rpcs('edition_kasse_setzen');
   pruefe('Kasse an die Reservierung gehaengt (Sitzung, Adresse, Ablauf)', g.length === 1
     && JSON.stringify(g[0].daten) === JSON.stringify({ reservierung: RES, sitzung: SITZUNG, kassen_url: KASSEN_URL, kasse_bis: d.kasse_bis }));
   pruefe('Antwort und Protokoll ohne Schluessel, Nutzer-ID oder E-Mail', ![RK, DIENST, UID, 'example.invalid'].some((x) => r.koerper.includes(x))
     && zeilen.length > 0 && zeilen.every((z) => /^werkstatt-kasse /.test(z) && ![RK, DIENST, UID, '@'].some((x) => z.includes(x))), zeilen);
-  pruefe('kassenParameter: feste Reihenfolge, gleiche Eingabe gleiche Anfrage', kassenParameter({ reservierung: RES, produkt: 'p-1', stripe_preis: 'price_A', ablauf_s: 5, rueckkehr: 'https://x.example/' }).toString()
-    === kassenParameter({ rueckkehr: 'https://x.example/', ablauf_s: 5, stripe_preis: 'price_A', produkt: 'p-1', reservierung: RES }).toString());
+  pruefe('kassenParameter: feste Reihenfolge, gleiche Eingabe gleiche Anfrage', kassenParameter({ reservierung: RES, produkt: 'p-1', projekt: PROJEKT, stripe_preis: 'price_A', ablauf_s: 5, rueckkehr: 'https://x.example/' }).toString()
+    === kassenParameter({ rueckkehr: 'https://x.example/', ablauf_s: 5, stripe_preis: 'price_A', projekt: PROJEKT, produkt: 'p-1', reservierung: RES }).toString());
 }
 {
   // Ein spaeterer Versuch (die App fragt nach einem 503 neu) schickt Stripe genau dieselbe Anfrage mit demselben Key:
@@ -262,6 +275,11 @@ pruefe('pruefeKaufEingabe: Form von produkt und textversion', pruefeKaufEingabe(
   pruefe(`alle ${Object.keys(KENNUNGEN).length} Kennungen aus edition_reserviere werden richtig beantwortet, ohne Stripe`, Object.values(ergebnisse).every(Boolean), ergebnisse);
   pruefe('Kennungen: Alter 403, ausverkauft und nicht verfuegbar 409, unbekannt 404', KENNUNGEN.EDITION_ALTER[0] === 403
     && KENNUNGEN.EDITION_AUSVERKAUFT[1] === 'ausverkauft' && KENNUNGEN.EDITION_NICHT_VERFUEGBAR[1] === 'nicht_verfuegbar' && KENNUNGEN.EDITION_UNBEKANNT[0] === 404);
+  const oft = server({ rpc: { edition_reserviere: { status: 400, body: { code: 'P0001', message: 'EDITION_ZU_OFT' } } } });
+  const rOft = await kasse(oft);
+  pruefe('Mehr als 3 Kassen je Konto und Edition in 24 Stunden: 429 zu_oft, ruhiger Text auf Deutsch und Englisch, keine Kasse',
+    rOft.status === 429 && json(rOft).fehler === 'zu_oft' && /24 Stunden/.test(json(rOft).text) && /24 hours/.test(json(rOft).text_en)
+    && oft.stripe('kasse').length === 0 && !/nur noch|beeil|schnell|letzte Gelegenheit/i.test(TEXTE.zu_oft.de));
   const fremd = server({ rpc: { edition_reserviere: { status: 400, body: { message: 'irgendwas' } } } });
   const netz = server({ rpc: { edition_reserviere: { wirft: true } } });
   const kaputt = server({ rpc: { edition_reserviere: { status: 200, body: { reservierung: 'x' } } } });
@@ -309,7 +327,7 @@ const iso = (s) => new Date(s * 1000).toISOString();
 const ereignis = (type, object, extra = {}) => ({ id: 'evt_1W' + type.replace(/[^a-z]/g, '').slice(0, 20), object: 'event', type, created: TS, livemode: false, data: { object }, ...extra });
 const sitzung = (o = {}) => ({ id: SITZUNG, object: 'checkout.session', mode: 'payment', payment_status: 'paid', status: 'complete',
   payment_intent: 'pi_Probe1', amount_total: TESTBETRAG, currency: 'eur', customer_details: { email: 'privat@example.invalid' },
-  metadata: { [META_RESERVIERUNG]: RES, [META_PRODUKT]: 'probe-edition' }, ...o });
+  metadata: { [META_RESERVIERUNG]: RES, [META_PRODUKT]: 'probe-edition', [META_PROJEKT]: PROJEKT }, ...o });
 const charge = (o = {}) => ({ id: 'ch_Probe1', object: 'charge', payment_intent: 'pi_Probe1', amount: TESTBETRAG, amount_refunded: TESTBETRAG,
   currency: 'eur', refunded: true, billing_details: { email: 'privat@example.invalid' }, ...o });
 const streit = (o = {}) => ({ id: 'dp_Probe1', object: 'dispute', payment_intent: 'pi_Probe1', charge: 'ch_Probe1', status: 'needs_response', ...o });
@@ -321,11 +339,20 @@ const streit = (o = {}) => ({ id: 'dp_Probe1', object: 'dispute', payment_intent
   }) && !JSON.stringify(a).includes('example.invalid'), a);
   pruefe('Abo-Kauf (mode=subscription) gehoert dem Abo-Webhook: ignoriert', auswertenEdition(ereignis('checkout.session.completed', sitzung({ mode: 'subscription' }))).ignoriert === 'kein_kauf');
   pruefe('Kasse ohne Werkstatt-Metadaten (fremder Einmalkauf): ignoriert', auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: {} }))).ignoriert === 'fremd'
-    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: 'drop table' } }))).ignoriert === 'fremd');
+    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: 'drop table', [META_PROJEKT]: PROJEKT } }))).ignoriert === 'fremd');
+  const fremdesProjekt = { [META_RESERVIERUNG]: RES, [META_PRODUKT]: 'probe-edition', [META_PROJEKT]: PROJEKT_B };
+  pruefe('Kasse eines anderen Projekts am selben Stripe-Konto, ohne Kennung oder ohne eigene Kennung: ignoriert (nie verbuchen, nie erstatten)',
+    auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: fremdesProjekt }))).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('checkout.session.expired', sitzung({ metadata: fremdesProjekt, status: 'expired' }))).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: RES } }))).ignoriert === 'fremdes_projekt'
+    && auswertenEditionRoh(ereignis('checkout.session.completed', sitzung())).ignoriert === 'fremdes_projekt'
+    && auswertenEditionRoh(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: RES } }))).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('checkout.session.completed', sitzung()), PROJEKT_B).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ mode: 'subscription', metadata: fremdesProjekt }))).ignoriert === 'kein_kauf');
   pruefe('Waehrung klein, Zahlung als Objekt, Reservierung klein', auswertenEdition(ereignis('checkout.session.completed', sitzung({ currency: 'EUR', payment_intent: { id: 'pi_Obj1' },
-    metadata: { [META_RESERVIERUNG]: RES.toUpperCase() } }))).daten.waehrung === 'eur'
+    metadata: { [META_RESERVIERUNG]: RES.toUpperCase(), [META_PROJEKT]: PROJEKT } }))).daten.waehrung === 'eur'
     && auswertenEdition(ereignis('checkout.session.completed', sitzung({ payment_intent: { id: 'pi_Obj1' } }))).daten.zahlung === 'pi_Obj1'
-    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: RES.toUpperCase() } }))).daten.reservierung === RES);
+    && auswertenEdition(ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: RES.toUpperCase(), [META_PROJEKT]: PROJEKT } }))).daten.reservierung === RES);
   const offen = auswertenEdition(ereignis('checkout.session.completed', sitzung({ payment_status: 'unpaid', payment_intent: null })));
   pruefe('Kasse ohne Zahlung (unpaid): weiter an die Datenbank (die sagt nicht_bezahlt)', offen.daten && offen.daten.zahlstatus === 'unpaid' && offen.daten.zahlung === null);
   pruefe('bezahlt ohne Zahlung, ohne Betrag oder Waehrung: ignoriert (Form)', auswertenEdition(ereignis('checkout.session.completed', sitzung({ payment_intent: null }))).ignoriert === 'keine_zahlung'
@@ -340,6 +367,11 @@ const streit = (o = {}) => ({ id: 'dp_Probe1', object: 'dispute', payment_intent
     && voll.daten.betrag === TESTBETRAG && voll.daten.erstattet === TESTBETRAG && voll.daten.grund === 'widerruf' && voll.daten.reservierung === null);
   pruefe('Erstattung ohne Grund (neuere Stripe-API) oder mit fremdem Grund: grund null', auswertenEdition(ereignis('charge.refunded', charge())).daten.grund === null
     && auswertenEdition(ereignis('charge.refunded', charge({ refunds: { data: [{ metadata: { grund: 'egal' } }] } }))).daten.grund === null);
+  pruefe('Zahlungs-Ereignis mit der Kennung eines anderen Projekts: ignoriert; mit eigener oder ohne Kennung: an die Datenbank',
+    auswertenEdition(ereignis('charge.refunded', charge({ metadata: { [META_PROJEKT]: PROJEKT_B } }))).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('charge.dispute.created', streit({ metadata: { [META_PROJEKT]: PROJEKT_B } }))).ignoriert === 'fremdes_projekt'
+    && auswertenEdition(ereignis('charge.refunded', charge({ metadata: { [META_PROJEKT]: PROJEKT } }))).daten.zahlung === 'pi_Probe1'
+    && auswertenEdition(ereignis('charge.dispute.created', streit({ metadata: {} }))).daten.zahlung === 'pi_Probe1');
   const teil = auswertenEdition(ereignis('charge.refunded', charge({ amount_refunded: 500, refunded: false })));
   pruefe('Teilerstattung: erstattet < Betrag (die Datenbank laesst das Stueck aktiv)', teil.daten.erstattet === 500 && teil.daten.betrag === TESTBETRAG);
   const s1 = auswertenEdition(ereignis('charge.dispute.created', streit()));
@@ -441,6 +473,28 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
   pruefe('erstatten ohne Zahlung aus der Datenbank: 500, keine Stripe-Anfrage', (await hook(ohneZahlung, KAUF_EREIGNIS)).status === 500 && ohneZahlung.stripe('erstattung').length === 0);
   const gesendetFehlt = server({ rpc: { edition_stripe_ereignis: erstatten(), edition_erstattung_gesendet: { status: 500, body: {} } } });
   pruefe('Erstattung ok, Meldung an die Datenbank scheitert: 500 (beim naechsten Mal wiederholt mit demselben Key)', (await hook(gesendetFehlt, KAUF_EREIGNIS)).status === 500);
+}
+{
+  // Zwei Supabase-Projekte (Test und echt) am selben Stripe-Konto: Jeder Webhook bekommt die Kaeufe beider Projekte.
+  const kaufB = ereignis('checkout.session.completed', sitzung({ metadata: { [META_RESERVIERUNG]: RES, [META_PRODUKT]: 'probe-edition', [META_PROJEKT]: PROJEKT_B } }));
+  const a = server({ rpc: { edition_stripe_ereignis: erstatten({ erstattung_grund: 'unbekannt' }) } });
+  const zeilen = [];
+  const r = await hook(a, kaufB, { zeilen });
+  const b = server();
+  const rB = await hook(b, kaufB, { umgebung: { ...W_UMGEBUNG, SUPABASE_URL: 'https://anderes.supabase.example' } });
+  pruefe('Kauf aus Projekt B am Webhook von Projekt A: 200 ignoriert, keine Datenbank, keine Erstattung; Projekt B verbucht ihn selbst',
+    r.status === 200 && json(r).ignoriert === 'fremdes_projekt' && a.aufrufe.length === 0
+    && rB.status === 200 && json(rB).ergebnis === 'zugeteilt' && b.rpcs('edition_stripe_ereignis').length === 1 && b.stripe('erstattung').length === 0, { r: r.koerper, rB: rB.koerper });
+  const vonHand = server({ rpc: { edition_stripe_ereignis: { status: 200, body: { ereignis: KAUF_EREIGNIS.id, ergebnis: 'unbekannt', doppelt: false, nummer: null,
+    reservierung: RES, zahlung: 'pi_Probe1', erstatten: false, von_hand: true, erstattung_grund: 'unbekannt' } } } });
+  const z2 = [];
+  const rH = await hook(vonHand, KAUF_EREIGNIS, { zeilen: z2 });
+  pruefe('Datenbank kennt die Reservierung nicht (von_hand): 200, nie automatisch erstattet, im Protokoll markiert',
+    rH.status === 200 && json(rH).von_hand === true && json(rH).ergebnis === 'unbekannt' && vonHand.stripe('erstattung').length === 0
+    && vonHand.rpcs('edition_erstattung_gesendet').length === 0 && z2.includes('werkstatt-webhook checkout.session.completed unbekannt von_hand'), { k: rH.koerper, z2 });
+  const ohneProjekt = server();
+  pruefe('Webhook ohne gueltige Projektadresse: 500, keine Datenbank', (await hook(ohneProjekt, KAUF_EREIGNIS, { umgebung: { ...W_UMGEBUNG, SUPABASE_URL: 'kaputt' } })).status === 500
+    && ohneProjekt.aufrufe.length === 0);
 }
 {
   const kaputt = server({ rpc: { edition_stripe_ereignis: { status: 400, body: { code: 'P0001', message: 'EDITION_EREIGNIS_UNGUELTIG' } } } });
@@ -549,6 +603,22 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
   const ereignisRumpf = rumpf('edition_stripe_ereignis');
   pruefe('Vertrag: Erstattungs-Gruende der Datenbank stehen alle in GRUENDE', [...ereignisRumpf.matchAll(/v_erstatten := '([a-z_]+)'/g)].map((m) => m[1])
     .concat(['ausverkauft', 'endzahl']).every((g) => GRUENDE.includes(g)) && /'erstatten', coalesce\(ev\.erstattung = 'offen', false\)/.test(ohneKommentar));
+  pruefe('Vertrag: Zahlungs-Ereignisse vor dem Kauf bleiben gespeichert und werden nach der Zuteilung nachgeholt, je Zahlung gesperrt',
+    /pg_advisory_xact_lock\(hashtextextended\('edition-zahlung:' \|\| v_zahlung, 0\)\)/.test(ereignisRumpf)
+    && /t\.typ like 'charge\.%' and t\.ergebnis = 'ohne_besitz'/.test(ereignisRumpf)
+    && /public\.edition_zahlung_anwenden\(b, ev2\.typ, ev2\.erstellt, ev2\.betrag, ev2\.erstattet, ev2\.grund,\s+ev2\.streit\)/.test(ereignisRumpf)
+    && /nachgeholt_am = now\(\)/.test(ereignisRumpf)
+    && /insert into public\.edition_ereignisse as t \(id, typ, erstellt, reservierung_id, zahlung_id, betrag, erstattet, grund,\s+streit\)/.test(ereignisRumpf)
+    && /revoke all on function public\.edition_zahlung_anwenden\(/.test(ohneKommentar) && !/grant execute on function public\.edition_zahlung_anwenden/.test(ohneKommentar));
+  pruefe('Vertrag: unbekannte Reservierung nie automatisch erstattet (von_hand), Aufraeumen behaelt offene Faelle fuer Flo',
+    /v_ergebnis := 'unbekannt';\s+v_von_hand := 'unbekannt';/.test(ereignisRumpf) && !/v_erstatten := 'unbekannt'/.test(ohneKommentar)
+    && /when v_von_hand is not null then 'von_hand'/.test(ereignisRumpf) && /'von_hand', coalesce\(ev\.erstattung = 'von_hand', false\)/.test(ohneKommentar)
+    && /\(t\.erstattung is null or t\.erstattung in \('gesendet', 'erledigt'\)\)/.test(ohneKommentar));
+  pruefe('Vertrag: Notaus nach dem Start heisst pausiert, Name einmalig, hoechstens 3 Kassen je Konto und Edition in 24 Stunden',
+    /when now\(\) < e\.verkauf_ab then 'angekuendigt'\s+when not e\.verkauf_freigegeben then 'pausiert'/.test(ohneKommentar)
+    && /create unique index if not exists editionen_name_einmalig on public\.editionen \(lower\(name\)\);/.test(ohneKommentar)
+    && /x\.erstellt_am > now\(\) - interval '24 hours'\) >= 3 then\s+raise exception 'EDITION_ZU_OFT'/.test(rumpf('edition_reserviere'))
+    && rumpf('edition_reserviere').indexOf("raise exception 'EDITION_NICHT_VERFUEGBAR'") < rumpf('edition_reserviere').indexOf("raise exception 'EDITION_ZU_OFT'"));
   pruefe('Kassenschluss: 31 Minuten in SQL und JS gleich', /select bis - interval '31 minutes';/.test(ohneKommentar)
     && /'stripe_ablauf_s', floor\(extract\(epoch from r\.erstellt_am\)\)::bigint \+ 31 \* 60/.test(ohneKommentar) && KASSE_S === 31 * 60);
   const TABELLEN = ['altersangaben', 'editionen', 'reservierungen', 'edition_zustimmungen', 'besitz', 'edition_ereignisse', 'sonderstuecke'];
@@ -598,7 +668,8 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
   pruefe('werkstatt-rls-test.sql: alle Faelle aus dem Auftrag', ['set local role anon', 'd7000000', 'e7000000', '42501', 'EDITION_NICHT_VERFUEGBAR', 'EDITION_AUSVERKAUFT',
     'EDITION_EINGEFROREN', 'EDITION_VERGEBEN_SINKT', 'zugeteilt_spaet', "'ausverkauft'", "'doppelt'", "'endzahl'", 'konto_loeschen', 'rls-knapp-nach',
     'rls-knapp-vor', "'erstattet,aktiv,widerrufen,zurueckgebucht,aktiv'", 'sonderstuecke', 'meine_daten', 'EDITION_BESITZ_BLEIBT', 'edition_aufraeumen',
-    'Testbetrag, kein Preis'].every((x) => test.includes(x)));
+    'Testbetrag, kein Preis', 'EDITION_ZU_OFT', "'pausiert'", "'von_hand'", 'nachgeholt_am', 'evt_RlsVorKauf2', "'strittig,zurueckgebucht'",
+    'PROBE-EDITION', "'23505'"].every((x) => test.includes(x)));
   const daten = lies('supabase/daten-schema.sql');
   pruefe('meine_daten: auch die Abo-Zeile und die Werkstatt (jeweils nur, wenn das Schema eingespielt ist)', /to_regclass\('public\.abos'\)/.test(daten)
     && /'abo', abo,/.test(daten) && /to_regclass\('public\.besitz'\)/.test(daten) && /\|\| werkstatt;/.test(daten)
@@ -612,6 +683,22 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
     && ['STRIPE_RK', 'STRIPE_WERKSTATT_WEBHOOK_SECRET', 'werkstatt-kasse', 'werkstatt-webhook --no-verify-jwt', 'werkstatt-schema.sql',
       'werkstatt-rls-test.sql', 'checkout.session.completed', 'checkout.session.expired', 'charge.refunded', 'charge.dispute.created',
       'charge.dispute.closed', 'Testmodus'].every((x) => a.includes(x)));
+  const ed = a.slice(a.indexOf('## Editionen (später, noch nicht ausführen)'));
+  pruefe('ANLEITUNG Editionen: Fälle von Hand, Projektkennung, ehrlicher Notaus, Probekauf nur im Testprojekt zurückdatieren, Widerruf von Hand',
+    ed.includes("erstattung = 'von_hand'") && ed.includes("set erstattung = 'erledigt'") && /Kennung des Supabase-Projekts/.test(ed)
+    && /bis zu 31 Minuten/.test(ed) && /„pausiert“/.test(ed) && /Im echten Projekt nie zurückdatieren/.test(ed)
+    && /Höchstens 3 Kassen je Konto und Edition in 24 Stunden/.test(ed) && /immer von Hand/.test(ed) && !/[\u2013\u2014]/.test(ed));
+}
+{
+  // ENTSCHEIDUNGEN, Eintrag 29.10.: entschieden und empfohlen getrennt, Offenes nur unter "Offen"
+  const e = lies('design/runde4/ENTSCHEIDUNGEN.md');
+  const z = e.split('\n').find((x) => x.startsWith('| 29.10. |')) || '';
+  const offen = z.indexOf('**Offen (Flo entscheidet):**');
+  const empf = z.indexOf('**Claudes Empfehlung, von Flo zu bestätigen**');
+  pruefe('ENTSCHEIDUNGEN 29.10.: Nummer nur für den Besitzer entschieden, Shop vorerst nur im Web, Store-Weg später, Empfehlungen markiert',
+    z.includes('Nur zur Info, so lassen') && z.includes('Verkauft wird vorerst nur im Web') && z.includes('Den Weg über die App-Stores entscheidet Flo später')
+    && z.includes('sichtbares Prestige bleibt erspielbar') && empf > 0 && offen > empf
+    && z.indexOf('1 bis 2 im Jahr') > offen && z.indexOf('nur für Konten mit bestätigtem „18 oder älter“') > empf && z.indexOf('Lesart von „höchstens 100“') > offen && !/[\u2013\u2014]/.test(z));
 }
 {
   // Keine Geheimnisse und keine Preise in den Dateien der Editionen (oeffentliches Repo)
