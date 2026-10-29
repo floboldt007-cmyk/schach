@@ -448,7 +448,8 @@ export function zeige(root, params, app) {
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
-        <div class="coach coach-karte leer" role="status" aria-live="polite"></div>
+        <div class="coach coach-karte leer" role="status"></div>
+        <div class="sr zugansage" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="zugbox"><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
         <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
         <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
@@ -472,6 +473,7 @@ export function zeige(root, params, app) {
   const effekteEl = $('.brett-effekte');
   const balken = $('.evalbalken');
   const coachEl = $('.coach');
+  const zugansageEl = $('.zugansage');
   const gegnerKarte = $('.spieler.gegner');
   const floKarte = $('.spieler.ich');
   s.classList.toggle('ohne-balken', !einst.balken);
@@ -859,6 +861,7 @@ export function zeige(root, params, app) {
         <p class="c-text">${coachText(t('partie.coach.buchText'))}</p>`,
       `k-${k} buch${neu ? ' neu' : ''}`, ply);
       coachEl.style.setProperty('--kf', `var(--k-${k})`);
+      if (neu) sageZugAn(ply, erg, t('partie.coach.buchText'));
       return;
     }
     const knoepfe = [];
@@ -878,6 +881,20 @@ export function zeige(root, params, app) {
       ${knoepfe.length ? `<div class="coach-knoepfe">${knoepfe.join('')}</div>` : ''}`,
     `k-${k}${neu ? ' neu' : ''}`, ply);
     coachEl.style.setProperty('--kf', `var(--k-${k})`);
+    if (neu) sageZugAn(ply, erg, coachKern(erg.coach));
+  }
+
+  // Eigene, unveraenderliche Live-Region: Rechenstand und spaetere Coach-Umbauten werden nicht
+  // erneut vorgelesen. Der fertige Text bleibt bis zur Bewertung des naechsten eigenen Zuges stehen.
+  let angesagterPly = -1;
+  function sageZugAn(ply, erg, erklaerung) {
+    if (!zugansageEl || ply === angesagterPly) return;
+    angesagterPly = ply;
+    zugansageEl.textContent = t('partie.coach.ansage', {
+      klasse: KLASSEN_WORT[erg.klasse] || erg.klasse,
+      zug: zugLabel(ply),
+      erklaerung: String(erklaerung || '').trim(),
+    });
   }
 
   function zeigeIdee(ply) {
@@ -2055,6 +2072,10 @@ export function zeige(root, params, app) {
               liga: z.liga ? { ...z.liga } : undefined,
             }));
           }
+          // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
+          // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
+          const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
+          if (folge) folge.focus({ preventScroll: true });
         }
         o.classList.add(rechnet ? 'vorlaeufig' : 'gefuellt');
         if (!rechnet) o.classList.remove('vorlaeufig');

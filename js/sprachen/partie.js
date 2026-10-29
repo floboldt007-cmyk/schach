@@ -89,6 +89,7 @@ registriereTexte('partie', {
     'coach.fehlerText': 'Diesen Zug konnte ich gerade nicht bewerten. In der Analyse siehst du ihn trotzdem.',
     'coach.weiter': 'Weiter geht’s',
     'coach.letzterZug': 'Dein letzter Zug: {wort}.',
+    'coach.ansage': '{klasse} Zug {zug}. {erklaerung}',
     // Uhr
     'uhr.flo': 'Deine Bedenkzeit {zeit}',
     'uhr.bot': 'Gegnerische Bedenkzeit {zeit}',
@@ -228,6 +229,7 @@ registriereTexte('partie', {
     'coach.fehlerText': 'I couldn’t rate this move just now. You can still see it in the analysis.',
     'coach.weiter': 'Let’s keep going',
     'coach.letzterZug': 'Your last move: {wort}.',
+    'coach.ansage': '{klasse} Move {zug}. {erklaerung}',
     'uhr.flo': 'Your clock {zeit}',
     'uhr.bot': 'Opponent’s clock {zeit}',
     'grund.matt': 'Checkmate',
