@@ -1668,20 +1668,26 @@ async function testePfeile(browser) {
   const tippe = async (feld) => { const m = await ht.mitte(feld); await s.touchscreen.tap(m.x, m.y); };
   await ht.setzeFen(START);
   const zustand = () => s.evaluate(() => ({ auswahl: document.querySelectorAll('.lage.auswahl').length, malt: document.querySelector('#brett').classList.contains('malt'),
-    vorschau: document.querySelectorAll('svg.brett-nutzer .vorschau').length }));
+    vorschau: document.querySelectorAll('svg.brett-nutzer .vorschau').length,
+    seit: window.__runter == null ? -1 : Math.round(performance.now() - window.__runter) }));
   // 400 ms halten und ziehen = Pfeil, hier von einer gegnerischen Figur aus (Weiss am Zug, e7 ist schwarz): kein Zug
   let a = await ht.mitte('e7');
   let b = await ht.mitte('e5');
+  // "vor 400 ms" zaehlt nur, wenn die Messung nachweislich vor 400 ms lag: Auf einem langsamen Runner (WebKit in der CI)
+  // waren zwischen pointerdown und Lesen schon ueber 400 ms vergangen, und das Brett malte zu Recht (PR #76, 29.10.2026).
+  await s.evaluate(() => { window.__runter = null; addEventListener('pointerdown', () => { window.__runter = performance.now(); }, { capture: true, once: true }); });
   await finger.runter(a.x, a.y);
-  await warte(150);
+  await warte(50);
   const vorHalten = await zustand();
-  await warte(350);
+  await warte(450);
   const nachHalten = await zustand();
+  const vorMessbar = vorHalten.seit >= 0 && vorHalten.seit < 400;
+  if (!vorMessbar) console.log(`Hinweis: Finger-Vorlauf nicht messbar (${vorHalten.seit} ms seit pointerdown), nur "danach" geprueft`);
   for (let i = 1; i <= 6; i++) await finger.bewege(a.x + (b.x - a.x) * i / 6, a.y + (b.y - a.y) * i / 6);
   await finger.hoch(b.x, b.y);
   await warte(100);
   let nt = await nutzer(s);
-  pruefe('Finger: vor 400 ms malt das Brett nicht, danach schon (Marken-Vorschau, keine Auswahl)', !vorHalten.malt && vorHalten.vorschau === 0 && vorHalten.auswahl === 0
+  pruefe('Finger: vor 400 ms malt das Brett nicht, danach schon (Marken-Vorschau, keine Auswahl)', (!vorMessbar || (!vorHalten.malt && vorHalten.vorschau === 0)) && vorHalten.auswahl === 0
     && nachHalten.malt && nachHalten.auswahl === 0 && nachHalten.vorschau === 1, JSON.stringify({ vorHalten, nachHalten }));
   pruefe('Finger: halten und ziehen malt den Pfeil e7-e5, kein Zug', nt.pfeile.join() === 'e7e5' && (await ht.fen()) === START && (await ht.figurSitzt('e7')), JSON.stringify(nt));
   // halten ohne ziehen = Marke (leeres Feld)
