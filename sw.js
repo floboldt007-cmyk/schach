@@ -15,6 +15,9 @@ const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'css/pakete/finisher.css',
+  'js/pakete/finisher/index.js',
+  'js/pakete/finisher/texte.js',
   'js/sprachen/bericht.js',
   'js/pakete/abo/texte.js',
   'js/pakete/coach-ki/texte.js',
