@@ -64,10 +64,12 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
    gar nicht mehr zieht: Zug, Remis, Remis-Annahme und Aufgabe prüfen zuerst die laufende Uhr, und jeder der beiden
    Spieler kann mit `online_pruefe_zeit` die Zeit reklamieren. Der Einladungscode (6 Zeichen ohne 0, O, 1 und I)
    entsteht immer serverseitig aus kryptografischem Zufall, eine Einladung gilt 24 Stunden.
-   **Vertrauenssache unter Freunden:** Die Schachregeln selbst prüft der Server **nicht**, und auch das Ergebnis, das
-   der Ziehende mit seinem Zug meldet (zum Beispiel „matt“), übernimmt er ungeprüft. Beide Clients prüfen mit
-   chess.js, unter Freunden reicht das. Für Partien gegen Fremde kommt später eine Edge Function, die jeden Zug und
-   jedes Ergebnis nachrechnet.
+   **Vertrauenssache unter Freunden:** Die Schachregeln selbst prüft der Server **nicht** vollständig. Seit Anti-Cheat
+   Etappe 0 (siehe unten) prüft er aber, ob ein gemeldetes Ergebnis zum Grund passt („matt“ nur als Sieg des
+   Ziehenden), ob die neue Stellung grob aus der alten plus dem Zug entsteht, und bremst Einladungen und falsche
+   Codes. Beide Clients prüfen mit chess.js; passt etwas nicht, kann ein Spieler die Partie als „strittig“ beenden.
+   Unter Freunden reicht das. Für Partien gegen Fremde kommt später eine Edge Function, die jeden Zug und jedes
+   Ergebnis nachrechnet.
 4. **Abfrage statt Echtzeit:** Die App fragt alle 2 Sekunden über REST nach einer neueren Zeile (`aktualisiert_am`)
    und pausiert, solange die Seite verborgen ist. Bei Fehlern wird der Abstand größer (bis 30 Sekunden), nach einer
    beendeten Partie oder einer abgelaufenen Anmeldung hört die Abfrage von selbst auf. Das reicht für Partien unter Freunden und braucht keine weitere
@@ -77,6 +79,42 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
 5. **Anfragen im Blick behalten:** Zwei Spieler mit offener Partie erzeugen zusammen etwa 60 kleine Anfragen pro
    Minute. Bei vielen gleichzeitigen Partien die Grenzen unter **Settings > API** prüfen oder den Abstand in
    `js/online.js` (`beobachte`, `alle`) vergrößern.
+
+### Anti-Cheat Etappe 0 (Stand 29.10.2026): bitte neu einspielen
+
+**Für Flo:** Nach diesem Stand `supabase/online-schema.sql` im **SQL Editor** neu einspielen (vollständiger Inhalt,
+**Run**) und danach `supabase/online-rls-test.sql` laufen lassen. Am Ende muss `Online-RLS-Test erfolgreich` stehen.
+Geändert haben sich auch `supabase/schema.sql` (Längengrenze für das Gerät beim Spielstand) und
+`supabase/daten-schema.sql` (Mengenbremse mit Zähltabelle). Am einfachsten alles in dieser Reihenfolge, jede Datei in
+einer eigenen Query:
+
+1. `supabase/schema.sql`, dann `supabase/rls-test.sql` (muss `RLS-Test erfolgreich` melden).
+2. `supabase/daten-schema.sql` (falls schon einmal eingespielt), dann `supabase/daten-rls-test.sql`
+   (`Daten-RLS-Test erfolgreich`).
+3. `supabase/online-schema.sql`, dann `supabase/online-rls-test.sql` (`Online-RLS-Test erfolgreich`).
+
+Alle Dateien dürfen mehrfach laufen, die Tests rollen alles zurück. `online-schema.sql` entfernt dabei die alte Fassung
+von `online_tritt_bei` (`drop function`), weil die Funktion jetzt eine andere Antwort liefert. Meldet die App danach
+beim Beitreten „noch nicht eingerichtet“, im SQL Editor einmal `notify pgrst, 'reload schema';` ausführen. Ist das
+Online-Schema noch gar nicht eingespielt, gilt weiter das Konzept: erst nach Etappe 0 einspielen und die Anmeldung für
+neue Konten geschlossen lassen.
+
+Was neu ist (Werte stehen bewusst im SQL, sie zu kennen hilft einem Angreifer kaum):
+- **Einladungs-Bremse:** höchstens 5 offene und 50 neue Einladungen je Konto in 24 Stunden.
+- **Aufräumen:** Einladungen, die älter als 48 Stunden sind, werden beim nächsten Anlegen oder beim Laden von „Meine
+  Partien“ gelöscht (von irgendeinem Konto, auch bei einer Datenauskunft). Partien mit Uhr, in denen 10 Minuten nach dem
+  Beitritt oder dem ersten Zug nichts passiert, enden als „abgebrochen“ (ohne Ergebnis); Partien ohne Uhr erst nach
+  7 Tagen ohne Zug (vorläufige Regel, siehe `design/runde4/ENTSCHEIDUNGEN.md` Abschnitt 5 Nr. 16). Dabei verschwinden
+  auch Fehlversuche von vor mehr als 2 Tagen und Zähler der Mengenbremse, die älter als 48 Stunden sind. Ohne jede
+  Aktivität auf dem Server läuft kein Aufräumen; dafür ließe sich später `pg_cron` einschalten.
+- **Fehlversuche beim Beitreten:** höchstens 20 falsche Codes je Konto und Tag (Tabelle `online_versuche`, nur für den
+  Server lesbar, steht in der Datenauskunft). Wer schon mitspielt und den Link noch einmal öffnet, bekommt seine Partie,
+  das zählt nicht als Fehlversuch.
+- **Ergebnis-Regeln, grobe Prüfung der Folgestellung, Ausgang „strittig“** und **Zeitende mit zu wenig Material als
+  Remis** (Grund `zeit-material`). Passt die Stellung auf dem Server nicht zu den Zügen, meldet die App die Partie von
+  selbst als strittig; der Knopf „Strittig melden“ bleibt nur als Rückfall, wenn das Netz weg ist.
+- **Leerer `search_path`** in allen Online-Funktionen. Bitte danach unter **Advisors > Security Advisor** nachsehen, ob
+  der Linter für die Online-Funktionen noch „Function Search Path Mutable“ meldet (erwartet: nein).
 
 ## Daten-Schema einspielen (Partien-Archiv, Nutzung, Konto löschen, Datenauskunft)
 
@@ -110,7 +148,10 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
-     Kennung `DATEN_MENGE`).
+     Kennung `DATEN_MENGE`). Gezählt wird in der Tabelle `daten_zaehler` (nur Zahlen je Stunde, für Nutzer nicht
+     lesbar), damit Löschen und neu Einfügen die Bremse nicht zurücksetzt. Zähler, die älter als 48 Stunden sind, löscht
+     das nächste Aufräumen für alle Konten: bei jeder neuen geteilten Zeile, jedem Widerruf, jeder Datenauskunft und
+     (mit dem Online-Schema) bei jedem Laden von „Meine Partien“.
 4. **Auswerten nur zusammengefasst:** Für die Eichung der Bots und den Coach die Daten nur im SQL Editor zusammenfassen
    (zum Beispiel Ergebnisse je Bot und Spielstärke), nie einzelne Spieler herausgreifen und nichts exportieren, das ein
    Konto erkennen lässt. Eine Löschfrist für alte Zeilen ist noch nicht eingerichtet (siehe `design/runde4/DATEN.md`).
