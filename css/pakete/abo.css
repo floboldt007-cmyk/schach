@@ -36,6 +36,12 @@
 .trainer-geplant li { color: var(--text-2); }
 .trainer-geplant li::before { background: transparent; border: 2px solid var(--linie-2); width: 6px; height: 6px; }
 .trainer-geplant-hinweis { margin: 10px 0 0; font-size: 13px; color: var(--text-2); }
+/* Immer gratis, aber noch nicht gebaut: wie "In Arbeit" (Ring, gedaempft), unter den gebauten Gratis-Punkten */
+.trainer-gratis-kommt { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linie); }
+.trainer-gratis-kommt[hidden] { display: none; }
+.trainer-gratis-kommt-titel { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.trainer-gratis .trainer-gratis-kommt li { color: var(--text-2); }
+.trainer-gratis .trainer-gratis-kommt li::before { background: transparent; border: 2px solid var(--linie-2); width: 6px; height: 6px; }
 .trainer-liste[hidden] { display: none; }
 /* Reihenfolge immer: "Im Trainer", "Immer gratis", "In Arbeit"; bei drei Listen "In Arbeit" ueber die ganze Breite */
 .trainer-gratis { order: 2; }
