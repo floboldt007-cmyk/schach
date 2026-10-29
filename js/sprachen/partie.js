@@ -158,7 +158,7 @@ registriereTexte('partie', {
     'kopf.brettfarbe': 'Board color',
     'kopf.brett': '{name} board',
     'kopf.klang': 'Sound',
-    'kopf.stufe': 'Level {stufe}',
+    'kopf.stufe': 'Stage {stufe}',
     'kopf.duSpielst': 'You play ',
     'kopf.eigeneStellung': 'Custom position',
     'kopf.regel': 'Rule: {regel}',

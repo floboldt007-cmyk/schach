@@ -167,6 +167,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   modus: 'system',       // 'system' | 'hell' | 'dunkel'
   koordLage: 'ecke',     // 'ecke' | 'rand'
   pfeile: true,          // Pfeile malen
+  arenaKarteHinweis: false, // einmaliger Zieh-Hinweis auf der schmalen Weltkarte wurde geschlossen
   duellIntro: 'besondere', // 'immer' | 'besondere' | 'aus' (Flo, D3)
   figuren: 'cburnett',   // Figuren-Satz (vorbereitet)
   // Coach
