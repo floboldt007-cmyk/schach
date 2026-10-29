@@ -43,9 +43,10 @@ weitergeben oder in ein Fehlerprotokoll kopieren.
 ## Online gegen Freunde (Stufe 2, Fundament)
 
 Partien gegen Freunde liegen in der Tabelle `partien_online` und werden ausschließlich über Datenbank-Funktionen
-verändert (`online_erstelle`, `online_tritt_bei`, `online_zug`, `online_gib_auf`, `online_biete_remis`,
+verändert (`online_erstelle`, `online_tritt_bei`, `online_gib_auf`, `online_biete_remis`,
 `online_nimm_remis_an`, `online_pruefe_zeit`, `online_meine`). Die App ruft sie über die REST-Schnittstelle (`/rest/v1/rpc/...`) mit dem
-publishable key und dem Sitzungs-Token auf. Es gibt keinen Websocket und keine Supabase-Bibliothek im Projekt.
+publishable key und dem Sitzungs-Token auf. Züge gehen seit Anti-Cheat Etappe 1a an die Edge Function `online-zug`
+(Abschnitt unten), die sie über `online_zug_verbuchen` verbucht. Es gibt keinen Websocket und keine Supabase-Bibliothek im Projekt.
 Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Server vor.
 
 1. **Schema einspielen:** Erst `supabase/schema.sql` (falls noch nicht geschehen), dann im **SQL Editor** den
@@ -59,8 +60,9 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
    einfach noch einmal ein: Sie entfernt dabei die frühere Regel, nach der man eine Einladung auch direkt anlegen
    durfte.
 3. **Was der Server schützt:** Lesen dürfen nur die beiden Spieler und der Ersteller. Anlegen, Ändern und Löschen
-   sind für angemeldete Nutzer direkt gesperrt; neue Partien entstehen nur über `online_erstelle`, Züge nur über
-   `online_zug`, das prüft, wer am Zug ist, und die Uhr mit der Serverzeit führt. Die Uhr gilt auch, wenn jemand
+   sind für angemeldete Nutzer direkt gesperrt; neue Partien entstehen nur über `online_erstelle`, Züge nur über die
+   Edge Function `online-zug` (seit Etappe 1a), die jeden Zug nach den Regeln prüft; die Datenbank prüft, wer am Zug ist,
+   und führt die Uhr mit der Serverzeit. Die Uhr gilt auch, wenn jemand
    gar nicht mehr zieht: Zug, Remis, Remis-Annahme und Aufgabe prüfen zuerst die laufende Uhr, und jeder der beiden
    Spieler kann mit `online_pruefe_zeit` die Zeit reklamieren. Der Einladungscode (6 Zeichen ohne 0, O, 1 und I)
    entsteht immer serverseitig aus kryptografischem Zufall, eine Einladung gilt 24 Stunden.
@@ -68,8 +70,7 @@ Eine Oberfläche dafür gibt es noch nicht; die Schritte hier bereiten den Serve
    Etappe 0 (siehe unten) prüft er aber, ob ein gemeldetes Ergebnis zum Grund passt („matt“ nur als Sieg des
    Ziehenden), ob die neue Stellung grob aus der alten plus dem Zug entsteht, und bremst Einladungen und falsche
    Codes. Beide Clients prüfen mit chess.js; passt etwas nicht, kann ein Spieler die Partie als „strittig“ beenden.
-   Unter Freunden reicht das. Für Partien gegen Fremde kommt später eine Edge Function, die jeden Zug und jedes
-   Ergebnis nachrechnet.
+   Seit Etappe 1a rechnet die Edge Function `online-zug` jeden Zug und jedes Ergebnis selbst nach (Abschnitt unten).
 4. **Abfrage statt Echtzeit:** Die App fragt alle 2 Sekunden über REST nach einer neueren Zeile (`aktualisiert_am`)
    und pausiert, solange die Seite verborgen ist. Bei Fehlern wird der Abstand größer (bis 30 Sekunden), nach einer
    beendeten Partie oder einer abgelaufenen Anmeldung hört die Abfrage von selbst auf. Das reicht für Partien unter Freunden und braucht keine weitere
@@ -115,6 +116,56 @@ Was neu ist (Werte stehen bewusst im SQL, sie zu kennen hilft einem Angreifer ka
   selbst als strittig; der Knopf „Strittig melden“ bleibt nur als Rückfall, wenn das Netz weg ist.
 - **Leerer `search_path`** in allen Online-Funktionen. Bitte danach unter **Advisors > Security Advisor** nachsehen, ob
   der Linter für die Online-Funktionen noch „Function Search Path Mutable“ meldet (erwartet: nein).
+
+### Anti-Cheat Etappe 1a (Stand 29.10.2026): Züge prüft jetzt der Server
+
+Bisher hat der Browser nach jedem Zug die neue Stellung und ein mögliches Ergebnis mitgeschickt, und der Server hat das
+nur grob geprüft. Jetzt schickt die App nur noch „Partie und Zug“ (zum Beispiel `e2e4`) an die Edge Function
+`online-zug`. Die Function rechnet alles andere selbst aus. Ein falsches Matt oder eine erfundene Stellung kann
+niemand mehr melden.
+
+**Für Flo, genau in dieser Reihenfolge** (Schritt 2 schließt den alten Weg, deshalb zuerst die Function):
+
+1. **Edge Function hochladen:** Im Terminal im Projektordner `npx supabase functions deploy online-zug` (ohne
+   `--no-verify-jwt`, wie beim Coach). Secrets braucht sie keine: `SUPABASE_URL`, `SUPABASE_ANON_KEY` und
+   `SUPABASE_SERVICE_ROLE_KEY` stellt Supabase selbst bereit. Beim Hochladen holt Supabase chess.js in der festen
+   Version 1.4.0 (dieselbe wie in der App). Weist schon das Gateway das Token ab (in den Logs steht gar keine Zeile
+   `online-zug …`, die App sagt „Anmeldung abgelaufen“), wie beim Coach mit `--no-verify-jwt` neu hochladen: Die
+   Function prüft die Anmeldung ohnehin selbst über `/auth/v1/user`.
+2. **SQL neu einspielen:** Im **SQL Editor** den vollständigen Inhalt von `supabase/online-schema.sql` ausführen
+   (**Run**), danach `supabase/online-rls-test.sql`. Am Ende muss `Online-RLS-Test erfolgreich` stehen. Erst jetzt gibt
+   es `online_zug_verbuchen`, und angemeldete Nutzer können den alten Weg `online_zug` nicht mehr aufrufen. Beide
+   Dateien dürfen mehrfach laufen, der Test rollt alles zurück.
+3. **Falls die App danach beim Ziehen „Die Zugprüfung ist auf dem Server noch nicht eingerichtet.“ sagt:** im SQL Editor
+   einmal `notify pgrst, 'reload schema';` ausführen.
+4. **Testen:** Mit zwei Konten eine Partie spielen. Unter **Edge Functions > online-zug > Logs** stehen nur kurze
+   Zeilen ohne Namen oder Züge, zum Beispiel `online-zug ende matt`. `online-zug illegal` heißt: Jemand hat einen Zug
+   geschickt, den die Regeln nicht erlauben. `online-zug defekt` heißt: Eine gespeicherte Partie passt nicht zu ihren
+   Zügen (etwa eine alte Partie von früher); die App meldet sie dann als strittig.
+
+Zwischen Schritt 2 und dem Update der App (wenn die neue Fassung auf GitHub Pages live ist) kann eine alte App nicht
+mehr ziehen, sie zeigt „Dafür fehlt dir auf dem Server die Berechtigung.“. Online ist noch nicht freigeschaltet (nur über
+Einladungslinks), deshalb ist das tragbar. Am besten Schritt 2 und das App-Update am selben Tag.
+
+Was neu ist:
+- **Nur Partie und Zug vom Browser.** Stellung, Seite am Zug und das Ende (Matt, Patt, zu wenig Material, dreifache
+  Wiederholung, 50 Züge) rechnet die Function mit chess.js aus. Andere Felder lehnt sie ab.
+- **Jeder Zug nach den Regeln:** auch Rochade durch Schach (verboten), en passant und Umwandlung. `e2e4q` wird als
+  `e2e4` gespeichert, eine Umwandlung ohne Figur ist nicht erlaubt.
+- **Die Zeit misst der Server:** Die Function merkt sich, wann der Zug ankam. Die Datenbank begrenzt diese Zeit (nie vor
+  dem letzten Zug, nie in der Zukunft) und zieht bis dahin die Bedenkzeit ab. Ein Zug, der rechtzeitig ankam, verliert
+  also nicht durch die Zeit, die der Server danach braucht.
+- **Zwei Züge gleichzeitig** (Doppelklick, zwei Tabs): Der zweite wird abgelehnt, die App sagt „Die Partie hat sich
+  gerade geändert. Der aktuelle Stand wird geladen.“
+- **Rechte:** `online_zug_verbuchen` darf nur die Service-Rolle aufrufen, also nur die Function. Der Schlüssel dafür
+  liegt nur bei Supabase, nie in der App.
+- **Unverändert:** Zeitende mit zu wenig Material bleibt Remis (`zeit-material`), „strittig“, Einladungs-Bremse und
+  alle anderen Regeln von Etappe 0.
+- **Kosten:** ein Aufruf der Function je Halbzug. Wie viele Aufrufe im Monat frei sind, steht auf der Preisseite von
+  Supabase.
+
+Noch offen (Teil 2 und später): eine faire Uhr (Realtime oder Ausgleich, Flos Wahl), Zeitstempel je Zug in einer eigenen
+Tabelle, CAPTCHA und Drosselung, bevor die Anmeldung wieder aufgeht. Partien gegen Fremde erst danach.
 
 ## Daten-Schema einspielen (Partien-Archiv, Nutzung, Konto löschen, Datenauskunft)
 

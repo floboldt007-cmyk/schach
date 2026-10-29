@@ -9,8 +9,9 @@ import { SUPABASE_URL, SUPABASE_KEY } from '../js/konto-config.js';
 import {
   erstelleEinladung, tritteBei, ladePartie, sendeZug, gibAuf, bieteRemis, nimmRemisAn, meinePartien, beobachte, pruefeZeit, meldeStrittig,
   einladungsLink, codeAusLink, uebernimmEinladungsLink, gemerkteEinladung, vergissEinladung, meineFarbe, binAmZug,
-  zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL,
+  zuegeListe, normalisiereCode, setzeOnlineFetch, FEHLER_TEXTE, LINK_BASIS, EINLADUNG_SCHLUESSEL, ZUG_PFAD,
 } from '../js/online.js';
+import { KENNUNGEN as FUNCTION_KENNUNGEN } from '../supabase/functions/_gemeinsam/online-zug.js';
 
 let ok = 0, gesamt = 0;
 function pruefe(name, wert, extra = '') { gesamt++; if (wert) ok++; else console.error('FEHLER ' + name, extra); }
@@ -140,36 +141,70 @@ anmelden();
   pruefe('ladePartie: leere Liste (fremd oder unbekannt) ist ein lesbarer Fehler', e?.message === FEHLER_TEXTE.ONLINE_PARTIE_UNBEKANNT);
 }
 
-// ---------- Zug senden ----------
+// ---------- Zug senden (Anti-Cheat Etappe 1a: Edge Function online-zug, nur Partie und Zug) ----------
 {
   antworten.push({ status: 200, body: { ...partie, zuege: 'e2e4', am_zug: 'b', fen: FEN_E4 } });
-  const p = await sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' });
+  const p = await sendeZug(ID, { uci: 'e2e4' });
   const c = letzter();
-  pruefe('sendeZug: POST auf rpc/online_zug', c.url.endsWith('/rest/v1/rpc/online_zug') && c.methode === 'POST');
-  pruefe('sendeZug: Body mit partie, zug, fen_danach, am_zug_danach, ergebnis und grund null', JSON.stringify(bodyVon(c)) === JSON.stringify({ partie: ID, zug: 'e2e4', fen_danach: FEN_E4, am_zug_danach: 'b', ergebnis: null, grund: null }) && p.zuege === 'e2e4');
-  antworten.push({ status: 200, body: { ...partie, status: 'beendet' } });
+  pruefe('sendeZug: POST an die Edge Function online-zug, nicht mehr an rpc/online_zug', ZUG_PFAD === '/functions/v1/online-zug'
+    && c.url === `${SUPABASE_URL}/functions/v1/online-zug` && c.methode === 'POST');
+  pruefe('sendeZug: apikey, Bearer und JSON-Kopf wie bei den Datenbank-Aufrufen', c.headers.apikey === SUPABASE_KEY && c.headers.Authorization === `Bearer ${tokenFuer('u1')}`
+    && c.headers['Content-Type'] === 'application/json');
+  pruefe('sendeZug: Body ist genau { partie, zug }, die Antwort ist die Partie', JSON.stringify(bodyVon(c)) === JSON.stringify({ partie: ID, zug: 'e2e4' }) && p.zuege === 'e2e4');
+  // Ein alter Aufrufer mit Stellung, Seite, Ergebnis und Grund: Diese Felder gehen nie mehr an den Server
+  antworten.push({ status: 200, body: { ...partie, status: 'beendet', ergebnis: '0-1', grund: 'matt' } });
   await sendeZug(ID, { uci: 'd8h4', fenDanach: 'rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3', amZugDanach: 'w', ergebnis: '0-1', grund: 'matt' });
-  pruefe('sendeZug: Ergebnis und Grund werden mitgeschickt', bodyVon(letzter()).ergebnis === '0-1' && bodyVon(letzter()).grund === 'matt');
-  antworten.push({ status: 200, body: partie });
-  await sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b', grund: 'matt' });
-  pruefe('sendeZug: Grund ohne Ergebnis wird nicht gesendet', bodyVon(letzter()).grund === null);
+  pruefe('sendeZug: Stellung, Seite am Zug, Ergebnis und Grund werden nie mitgeschickt (rechnet der Server)', JSON.stringify(bodyVon(letzter())) === JSON.stringify({ partie: ID, zug: 'd8h4' }));
+  antworten.push({ status: 200, body: { ...partie, zuege: 'e7e8q' } });
+  await sendeZug(ID, { uci: 'e7e8q' });
+  pruefe('sendeZug: Umwandlung mit Buchstaben', bodyVon(letzter()).zug === 'e7e8q');
   const n = calls.length;
-  const e1 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e9', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  const e2 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: 'kaputt', amZugDanach: 'b' }));
-  const e3 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'x' }));
-  const e4 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b', ergebnis: 'gewonnen' }));
-  const e5 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4 e7e5', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  pruefe('sendeZug: Zug, FEN, Seite und Ergebnis werden vor der Anfrage geprueft', e1?.message === FEHLER_TEXTE.ONLINE_ZUG_FORM && e2?.message === FEHLER_TEXTE.ONLINE_FEN_FORM && e3?.message === FEHLER_TEXTE.ONLINE_AM_ZUG_FORM && e4?.message === FEHLER_TEXTE.ONLINE_ERGEBNIS_FORM && e5?.message === FEHLER_TEXTE.ONLINE_ZUG_FORM && calls.length === n);
-  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_NICHT_DEIN_ZUG' } });
-  const e6 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_PARTIE_BEENDET' } });
-  const e7 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_PARTIE_NICHT_GESTARTET' } });
-  const e8 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  pruefe('sendeZug: Serverkennungen werden zu Saetzen', e6?.message === 'Du bist nicht am Zug.' && e7?.message === FEHLER_TEXTE.ONLINE_PARTIE_BEENDET && /noch nicht begonnen/.test(e8?.message || ''));
-  antworten.push({ status: 400, body: { code: 'P0001', message: 'ONLINE_STELLUNG_FALSCH' } });
-  const e9 = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4', fenDanach: FEN_E4, amZugDanach: 'b' }));
-  pruefe('sendeZug: falsche Folgestellung freundlich', e9?.message === FEHLER_TEXTE.ONLINE_STELLUNG_FALSCH && /Stellung auf dem Server/.test(e9.message) && e9.kennung === 'ONLINE_STELLUNG_FALSCH');
+  const formen = [];
+  for (const uci of ['e2e9', 'e2e4 e7e5', 'E2E4', 'e7e8k', '', undefined]) formen.push(await fehlerVon(() => sendeZug(ID, { uci })));
+  formen.push(await fehlerVon(() => sendeZug(ID)));
+  pruefe('sendeZug: die Zugform wird vor der Anfrage geprueft (Pruefung im Browser bleibt)', formen.every((e) => e?.message === FEHLER_TEXTE.ONLINE_ZUG_FORM) && calls.length === n);
+  // Fehler der Edge Function kommen als { fehler, text } mit HTTP-Status und werden zu Saetzen der App
+  const faelle = [[422, 'ONLINE_ZUG_ILLEGAL', /nicht erlaubt/], [409, 'ONLINE_STAND_VERALTET', /aktuelle Stand wird geladen/],
+    [409, 'ONLINE_PARTIE_DEFEKT', /als strittig melden/], [409, 'ONLINE_NICHT_DEIN_ZUG', /^Du bist nicht am Zug\.$/],
+    [409, 'ONLINE_PARTIE_BEENDET', /schon beendet/], [409, 'ONLINE_PARTIE_NICHT_GESTARTET', /noch nicht begonnen/],
+    [404, 'ONLINE_PARTIE_UNBEKANNT', /nicht gefunden/], [400, 'ONLINE_ZUG_FORM', /ungültiges Format/], [400, 'ONLINE_ANFRAGE', /ungültiges Format/],
+    [413, 'ONLINE_ANFRAGE', /ungültiges Format/], [405, 'ONLINE_METHODE', /nur Züge/],
+    [503, 'ONLINE_NICHT_EINGERICHTET', /Zugprüfung ist auf dem Server noch nicht eingerichtet/], [503, 'ONLINE_SERVER', /gerade nicht prüfen/]];
+  const falsch = [];
+  for (const [status, kennung, muster] of faelle) {
+    antworten.push({ status, body: { fehler: kennung, text: 'Rueckfall der Function' } });
+    const e = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+    if (!(e?.message === FEHLER_TEXTE[kennung] && muster.test(e.message) && e.kennung === kennung && e.status === status && e.detail === kennung)) falsch.push(kennung);
+  }
+  pruefe(`sendeZug: ${faelle.length} Antworten der Function werden zu ruhigen Saetzen, Kennung und Status bleiben am Fehler`, falsch.length === 0, falsch);
+  pruefe('jede Kennung der Edge Function hat einen Satz in FEHLER_TEXTE', FUNCTION_KENNUNGEN.length >= 13
+    && FUNCTION_KENNUNGEN.every((k) => typeof FEHLER_TEXTE[k] === 'string' && FEHLER_TEXTE[k].length > 10), FUNCTION_KENNUNGEN.filter((k) => !FEHLER_TEXTE[k]));
+  antworten.push({ status: 401, body: { fehler: 'ONLINE_NICHT_ANGEMELDET', text: 'Rueckfall' } });
+  const a = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+  antworten.push({ status: 401, body: { code: 401, message: 'Invalid JWT' } });
+  const g = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+  pruefe('sendeZug: 401 der Function oder des Gateways heisst "Anmeldung abgelaufen" (mit lokaler Sitzung)', a?.message === 'Die Anmeldung ist abgelaufen. Bitte neu anmelden.'
+    && a.kennung === 'ONLINE_NICHT_ANGEMELDET' && a.status === 401 && g?.message === a.message && g.kennung === undefined);
+  antworten.push({ status: 404, body: { code: 'NOT_FOUND', message: 'Requested function was not found' } });
+  const nf = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+  pruefe('sendeZug: Function noch nicht hochgeladen (404 des Gateways): "noch nicht eingerichtet", kein englischer Rohtext', nf?.message === 'Der Online-Teil ist auf dem Server noch nicht eingerichtet.'
+    && nf.kennung === undefined && nf.detail === 'Requested function was not found');
+  const unbekannt = [];
+  for (const kennung of ['ONLINE_GANZ_NEU', 'constructor', 'toString', '__proto__']) {
+    antworten.push({ status: 409, body: { fehler: kennung } });
+    const e = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+    if (!(typeof e?.message === 'string' && e.message === 'Der Server hat die Anfrage abgelehnt (409).' && e.kennung === undefined)) unbekannt.push(kennung);
+  }
+  pruefe('sendeZug: unbekannte Kennung (auch constructor, toString) zeigt einen ganzen Satz, nie die Kennung', unbekannt.length === 0, unbekannt);
+  fetchKaputt = new Error('Netz weg');
+  const off = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+  fetchKaputt = null;
+  pruefe('sendeZug: ohne Netz der Offline-Satz', off?.message === 'Keine Verbindung. Die Partie bleibt auf dem Server gespeichert, versuch es gleich noch einmal.');
+  abmelden();
+  const n2 = calls.length;
+  const ab = await fehlerVon(() => sendeZug(ID, { uci: 'e2e4' }));
+  anmelden();
+  pruefe('sendeZug: ohne Anmeldung keine Anfrage', ab?.message === FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET && calls.length === n2);
 }
 
 // ---------- aufgeben, Remis, meine Partien ----------
@@ -419,10 +454,19 @@ anmelden();
   const sql = quelle('supabase/online-schema.sql');
   const kennungen = [...new Set([...sql.matchAll(/raise exception '(ONLINE_[A-Z_]+)'/g)].map((x) => x[1]))];
   pruefe('online-schema.sql: jede Fehlerkennung des Servers ist in FEHLER_TEXTE uebersetzt', kennungen.length >= 12 && kennungen.every((k) => typeof FEHLER_TEXTE[k] === 'string' && FEHLER_TEXTE[k].length > 10), kennungen.filter((k) => !FEHLER_TEXTE[k]).join(', '));
-  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_zug', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine', 'online_pruefe_zeit', 'online_strittig'];
+  const funktionen = ['online_erstelle', 'online_tritt_bei', 'online_gib_auf', 'online_biete_remis', 'online_nimm_remis_an', 'online_meine', 'online_pruefe_zeit', 'online_strittig'];
   pruefe('online-schema.sql: alle Funktionen, die online.js aufruft, sind definiert und nur fuer authenticated freigegeben', funktionen.every((n) => new RegExp(`create or replace function public\\.${n}\\(`).test(sql) && new RegExp(`grant execute on function public\\.${n}\\([^)]*\\) to authenticated;`).test(sql) && new RegExp(`revoke all on function public\\.${n}\\([^)]*\\) from anon, public;`).test(sql)));
   pruefe('online-schema.sql: kein insert, update und delete fuer authenticated (nur lesen), RLS an', /revoke all on table public\.partien_online from anon, authenticated, public;/.test(sql) && /grant select on table public\.partien_online to authenticated;/.test(sql) && !/grant[^;]*\b(insert|update|delete)\b[^;]*partien_online/.test(sql) && !/create policy[^;]*for insert/.test(sql) && /alter table public\.partien_online enable row level security;/.test(sql));
-  pruefe('online-schema.sql: Uhr-Pruefung in Zug, Remis, Remis-Annahme und Aufgabe; Helfer intern', (sql.match(/p := public\.online_uhr_pruefen\(p\);/g) || []).length >= 4 && /revoke all on function public\.online_uhr_pruefen\(public\.partien_online\) from anon, authenticated, public;/.test(sql) && !/grant execute on function public\.online_uhr_pruefen/.test(sql));
+  // Anti-Cheat Etappe 1a: Zuege nur noch ueber die Edge Function (online_zug_verbuchen, Service-Rolle); der alte Weg ist zu
+  pruefe('online-schema.sql: der alte Weg online_zug ist fuer angemeldete Nutzer geschlossen, online_zug_verbuchen nur fuer die Service-Rolle',
+    /create or replace function public\.online_zug\(/.test(sql) && /revoke all on function public\.online_zug\(uuid, text, text, text, text, text\) from anon, authenticated, public;/.test(sql)
+    && !/grant execute on function public\.online_zug\(/.test(sql) && /create or replace function public\.online_zug_verbuchen\(/.test(sql)
+    && /grant execute on function public\.online_zug_verbuchen\([^)]*\) to service_role;/.test(sql) && !/grant execute on function public\.online_zug_verbuchen[^;]*(anon|authenticated)/.test(sql)
+    && /revoke all on function public\.online_zug_verbuchen\([^)]*\) from anon, authenticated, public;/.test(sql));
+  pruefe('online-schema.sql: Uhr-Pruefung in Zug (bis zur Ankunft), Remis, Remis-Annahme und Aufgabe; Helfer intern', (sql.match(/p := public\.online_uhr_pruefen\(p\);/g) || []).length >= 3
+    && sql.includes('p := public.online_uhr_pruefen(p, v_ankunft);')
+    && /revoke all on function public\.online_uhr_pruefen\(public\.partien_online\) from anon, authenticated, public;/.test(sql)
+    && /revoke all on function public\.online_uhr_pruefen\(public\.partien_online, timestamptz\) from anon, authenticated, public;/.test(sql) && !/grant execute on function public\.online_uhr_pruefen/.test(sql));
   pruefe('online-schema.sql: Code aus gen_random_uuid (nicht random()), Einladungen 24 Stunden', /gen_random_uuid/.test(sql.slice(sql.indexOf('online_vor_anlegen'), sql.indexOf('online_erstelle('))) && !/random\(\) \* 32/.test(sql) && /interval '24 hours'/.test(sql));
   pruefe('online-schema.sql: Zugregel (UCI) und Code-Alphabet wie in online.js', sql.includes("'^[a-h][1-8][a-h][1-8][qrbn]?$'") && sql.includes('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'));
   // Anti-Cheat Etappe 0: jede Kennung im Schema (auch die aus jsonb-Antworten ohne raise) hat einen Satz
@@ -438,7 +482,7 @@ anmelden();
     && /revoke all on table public\.online_versuche from anon, authenticated, public;/.test(sql) && !/grant[^;]*online_versuche/.test(sql));
   const definer = [...sql.matchAll(/create or replace function (public\.[a-z_]+)\([^]*?\nas \$\$/g)].map((x) => x[0]).filter((k) => /security definer/.test(k));
   pruefe('online-schema.sql: jede Security-Definer-Funktion mit leerem search_path, nirgends search_path = public',
-    definer.length === 9 && definer.every((k) => /security definer\nset search_path = ''\n/.test(k)) && !/search_path = public/.test(sql), definer.length);
+    definer.length === 10 && definer.every((k) => /security definer\nset search_path = ''\n/.test(k)) && !/search_path = public/.test(sql), definer.length);
   pruefe('online-schema.sql: Bremse mit Sperre je Konto, Aufraeumen nach 48 Stunden, haengende Partien (10 Minuten mit Uhr, 7 Tage ohne)',
     /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('online_erstelle:'/.test(sql) && />= 5\n/.test(sql) && />= 50 then/.test(sql)
     && /interval '48 hours'/.test(sql) && /interval '10 minutes'/.test(sql) && /interval '7 days'/.test(sql) && />= 20 then/.test(sql)
@@ -450,7 +494,9 @@ anmelden();
   pruefe('online-rls-test.sql: neue Faelle der Etappe 0 (Bremse, Fehlversuche, Ergebnis, Folgestellung, strittig, Material, haengend, search_path)',
     ['ONLINE_ZU_VIELE_EINLADUNGEN', 'ONLINE_ZU_VIELE_VERSUCHE', 'ONLINE_STELLUNG_FALSCH', 'die 6. offene Einladung', 'die 51. neue Einladung',
       'aelter als 48 Stunden', 'richtiger Code nach 19 Fehlversuchen', 'Ergebnis ohne Grund', 'online_strittig', "'zeit-material'",
-      'nach strittig entschied die Uhr', 'Partie ohne Uhr nach 10 Minuten', "search_path=\"\""].every((t) => rls.includes(t)));
+      'nach strittig entschied die Uhr', 'Partie ohne Uhr nach 10 Minuten', "search_path=\"\"",
+      // Etappe 1a
+      'ONLINE_STAND_VERALTET', 'Ankunftszeit in der Zukunft', 'online_zug noch direkt aufrufen'].every((t) => rls.includes(t)));
   pruefe('online-rls-test.sql: drei Nutzer, Erfolgsmeldung, rollback am Ende', (rls.match(/@example\.invalid/g) || []).length === 3 && /Online-RLS-Test erfolgreich/.test(rls) && /rollback;\s*$/.test(rls));
   pruefe('app.js uebernimmt Einladungen vor dem Routing und registriert den Online-Screen',
     /import \{ uebernimmEinladungsLink \} from '\.\/online\.js'/.test(quelle('js/app.js'))
@@ -460,6 +506,8 @@ anmelden();
   pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
     && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');
   pruefe('online.js: kein setInterval, keine Supabase-Bibliothek, kein geheimer Schluessel', !/setInterval|@supabase|service_role|eyJ[A-Za-z0-9_-]{20,}/.test(eigene));
+  pruefe('online.js: Zuege nur ueber die Edge Function, rpc/online_zug kommt nicht mehr vor', !/['"`]online_zug['"`]/.test(eigene) && !/rpc\('online_zug'/.test(eigene)
+    && /export const ZUG_PFAD = '\/functions\/v1\/online-zug';/.test(eigene));
   pruefe('sw.js: js/online.js im Offline-Cache', /'js\/online\.js'/.test(quelle('sw.js')));
   const alle = quelle('tests/alle.mjs');
   pruefe('tests/alle.mjs: Suite online direkt nach konto', alle.indexOf("name: 'online'") > alle.indexOf("name: 'konto'") && alle.indexOf("name: 'online'") < alle.indexOf("name: 'storage'") && /datei: 'online\.test\.mjs'/.test(alle));

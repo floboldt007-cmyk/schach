@@ -1,4 +1,6 @@
 // Die Datenbank fuehrt Reihenfolge und Uhr; jede Stellung wird hier aus legalen Zuegen rekonstruiert.
+// Anti-Cheat Etappe 1a: Ein eigener Zug geht nur noch als UCI an die Edge Function online-zug. Stellung, Seite am Zug und
+// das Ende rechnet der Server selbst aus; der Browser meldet kein Ergebnis mehr. Die Pruefungen unten bleiben trotzdem.
 // Anti-Cheat Etappe 0: Passt die Stellung des Servers nicht zu den Zuegen (verglichen werden nur Brett und Seite am
 // Zug, nicht der ganze FEN-Text), friert die Partie nicht mehr ein: Es erscheint eine Meldung, und der Browser meldet
 // die laufende Partie einmal von selbst als strittig (online_strittig, Ende ohne Ergebnis), ohne dass jemand tippen
@@ -253,11 +255,8 @@ export function zeige(root, params, app) {
     if (busy || blockiert || widerspruch || weg || !online.binAmZug(p)) return false;
     let m;
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
-    const matt = chess.isCheckmate();
-    const grund = matt ? 'matt' : chess.isStalemate() ? 'patt' : chess.isInsufficientMaterial() ? 'material'
-      : chess.isThreefoldRepetition() ? 'wiederholung' : chess.isDrawByFiftyMoves() ? '50-zuege' : null;
-    const daten = { uci: m.lan, fenDanach: chess.fen(), amZugDanach: chess.turn(), grund,
-      ergebnis: grund ? matt ? (chess.turn() === 'b' ? '1-0' : '0-1') : '1/2-1/2' : null };
+    // Nur der Zug geht an den Server; ob er gilt und wie die Partie danach steht, entscheidet er (Etappe 1a)
+    const daten = { uci: m.lan };
     queueMicrotask(() => { if (!weg) { zeichne(); aktion(() => online.sendeZug(p.id, daten)); } });
     // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt.
     brett.erlaubeZuege(null);
