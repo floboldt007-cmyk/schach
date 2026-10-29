@@ -79,7 +79,7 @@ export const BOTS = [
     avatar: 'assets/avatare/01-bauer-benno.svg', farbe: '#7ee06a',
     staerke: {
       tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 0, blick: 3,
-      rauschen: 600, patzer: 0.78, mattInEins: 0.2, gier: 0.35,
+      rauschen: 720, patzer: 0.9, mattInEins: 0.12, gier: 0.25,
       vorlieben: { schlagen: 90 }, zeit: [400, 900],
     },
   },
@@ -87,7 +87,7 @@ export const BOTS = [
     id: 'paula', stufe: 3, welt: 1, elo: 300,
     avatar: 'assets/avatare/modern/paula.svg', farbe: '#9891C7',
     merkmale: { figur: 'Q' },
-    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3, rauschen: 500, patzer: 0.6, mattInEins: 0.35, gier: 0.65, vorlieben: { schach: 70, dame: 35 }, zeit: [300, 800] },
+    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3, rauschen: 380, patzer: 0.42, mattInEins: 0.45, gier: 0.75, vorlieben: { schach: 70, dame: 35 }, zeit: [300, 800] },
   },
   {
     id: 'gustav', stufe: 4, welt: 1, elo: 400,
@@ -244,19 +244,19 @@ export const BOTS = [
     id: 'keetan', stufe: 25, welt: 5, elo: 2500,
     avatar: 'assets/avatare/modern/keetan.svg', farbe: '#C28E65',
     merkmale: { figur: 'N' },
-    staerke: { voll: true, elo: 2600, movetime: 1000, mattInEins: 1, zeit: [600, 1300] },
+    staerke: { voll: true, elo: 2500, movetime: 1000, mattInEins: 1, zeit: [600, 1300] },
   },
   {
     id: 'ragna', stufe: 26, welt: 5, elo: 2600,
     avatar: 'assets/avatare/modern/ragna.svg', farbe: '#4F58A6',
     merkmale: { figur: 'P' },
-    staerke: { voll: true, elo: 2670, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    staerke: { voll: true, elo: 2600, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
   },
   {
     id: 'silas', stufe: 27, welt: 5, elo: 2700,
     avatar: 'assets/avatare/modern/silas.svg', farbe: '#7A6F39',
     merkmale: { figur: 'K' },
-    staerke: { voll: true, elo: 2770, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    staerke: { voll: true, elo: 2700, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
   },
   {
     id: 'merle', stufe: 28, welt: 5, elo: 2800,
@@ -268,7 +268,7 @@ export const BOTS = [
     id: 'alva', stufe: 29, welt: 5, elo: 2900,
     avatar: 'assets/avatare/modern/alva.svg', farbe: '#9E7AE2',
     merkmale: { figur: 'Q' },
-    staerke: { voll: true, elo: 2970, movetime: 1300, mattInEins: 1, zeit: [700, 1500] },
+    staerke: { voll: true, elo: 3190, movetime: 1300, mattInEins: 1, zeit: [700, 1500] },
   },
   {
     id: 'stockfisch', stufe: 30, welt: 5, endgegner: true, elo: 3000,
