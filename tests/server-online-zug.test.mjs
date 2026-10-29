@@ -507,8 +507,9 @@ const ZUG = { partie: PARTIE, zug: 'e2e4' };
     imp.length === 2 && imp[0] === "import { Chess } from 'npm:chess.js@1.4.0';" && imp[1] === "import { leseKoerper, verarbeite } from '../_gemeinsam/online-zug.js';"
     && ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'].every((k) => ts.includes(`Deno.env.get('${k}')`))
     && (ts.match(/Deno\.env\.get\(/g) || []).length === 3 && ts.split('\n').length < 50, imp);
-  pruefe('index.ts: Ankunftszeit als Erstes gemessen, vor dem Lesen des Koerpers', ts.indexOf('const ankunft = new Date().toISOString();') > 0
-    && ts.indexOf('const ankunft = new Date().toISOString();') < ts.indexOf('await leseKoerper(anfrage)'));
+  pruefe('index.ts: Ankunftszeit erst nach dem Lesen des ganzen Koerpers gemessen, vor verarbeite()', ts.indexOf('const ankunft = new Date().toISOString();') > 0
+    && ts.indexOf('const ankunft = new Date().toISOString();') > ts.indexOf('await leseKoerper(anfrage)')
+    && ts.indexOf('const ankunft = new Date().toISOString();') < ts.indexOf('await verarbeite('));
   if (process.features && process.features.typescript && typeof module.registerHooks === 'function') {
     const chessUrl = pathToFileURL(path.join(WURZEL, 'vendor/chess/chess.js')).href;
     const haken = module.registerHooks({
@@ -538,6 +539,18 @@ const ZUG = { partie: PARTIE, zug: 'e2e4' };
       pruefe('index.ts laeuft: 200 mit der Partie, Ankunftszeit gemessen, OPTIONS 204 ohne Koerper (Deno-Attrappe)', typeof handler === 'function' && r.status === 200
         && d.zuege === 'e2e4' && ank >= vorher - 5 && ank <= Date.now() + 5 && o.status === 204 && (await o.text()) === ''
         && r.headers.get('access-control-allow-origin') === '*' && /application\/json/.test(r.headers.get('content-type')), { status: r.status, d });
+      // Koerper kommt absichtlich langsam (400 ms nach dem Kopf): Die Ankunft zaehlt erst, wenn der ganze Zug da ist
+      const s2 = server();
+      globalThis.fetch = s2.f;
+      const kopfAb = Date.now();
+      const strom = new ReadableStream({
+        async start(c) { await new Promise((f) => setTimeout(f, 400)); c.enqueue(new TextEncoder().encode(JSON.stringify(ZUG))); c.close(); },
+      });
+      const rl = await handler(new Request(url, { method: 'POST', body: strom, duplex: 'half', headers: { Authorization: 'Bearer ' + JWT_W } }));
+      const ankL = Date.parse(rpcAufrufe(s2)[0]?.daten?.ankunft);
+      pruefe('index.ts: langsamer Koerper schenkt keine Bedenkzeit (Ankunft erst, wenn der Zug ganz da ist)', rl.status === 200
+        && ankL >= kopfAb + 380 && ankL <= Date.now() + 5, { status: rl.status, versatz: ankL - kopfAb });
+      globalThis.fetch = s.f;
       const ohne = await post(JSON.stringify(ZUG), {});
       const gross = await post('x'.repeat(2000), { Authorization: 'Bearer ' + JWT_W });
       const get = await handler(new Request(url, { method: 'GET' }));

@@ -11,10 +11,11 @@ import { Chess } from 'npm:chess.js@1.4.0';
 import { leseKoerper, verarbeite } from '../_gemeinsam/online-zug.js';
 
 Deno.serve(async (anfrage: Request): Promise<Response> => {
-  // Ankunftszeit zuerst messen, bevor irgendetwas anderes passiert (die Datenbank begrenzt sie noch einmal)
-  const ankunft = new Date().toISOString();
   try {
     const k = anfrage.method === 'POST' ? await leseKoerper(anfrage) : { text: '', zuGross: false };
+    // Ankunftszeit erst messen, wenn der ganze Zug da ist: Wer den Koerper absichtlich langsam schickt, bekommt die
+    // Wartezeit nicht als Bedenkzeit geschenkt (die Datenbank begrenzt sie noch einmal auf letzter Zug bis jetzt)
+    const ankunft = new Date().toISOString();
     const ergebnis = await verarbeite(
       { methode: anfrage.method, koerper: k.text, zuGross: k.zuGross, autorisierung: anfrage.headers.get('authorization'), ankunft },
       {
