@@ -8,7 +8,10 @@
 //   VORTEILE   [{ id, text }] was der Trainer bringen soll (SPIELKONZEPT 2b.5). Unter "Im Trainer" steht nur, was ein
 //              Paket mit registriereVorteil(id) (js/abo.js) als gebaut gemeldet hat; der Rest steht unter "In Arbeit"
 //              mit dem Satz "Noch nicht enthalten". Verkauft wird nur, was es gibt (Paragraf 5 UWG).
-//   GRATIS     was immer gratis bleibt
+//   GRATIS     [{ id, gebaut }] was immer gratis bleibt. Unter "Immer gratis" steht nur Gebautes: gebaut: true fuer den
+//              Kern, die anderen meldet ihr Paket wie die VORTEILE mit registriereVorteil(id) an (z. B. 'wochen-boss').
+//              Bis dahin stehen sie unter "Kommt noch, ebenfalls gratis" (Luecken-Check 2, Paragraf 5 UWG).
+//   bereiteGratis(), geplanteGratis()
 //   bereiteVorteile(), verkaufbar(produkt)   Kauf nur mit mindestens einem gebauten Vorteil (oder Stripe-Testmodus)
 //   ALTER_HINWEIS, ALTER_FRAGE, UNTER_18   Texte zum Alter: Crownmate ist ab 16, das Abo im Web ab 18 (SPIELKONZEPT 2b.8
 //              Regel 22: Abo fuer Minderjaehrige nur ueber die Familienfreigabe der Stores, die gibt es im Web nicht).
@@ -56,13 +59,19 @@ export const VORTEILE = Object.freeze([
   vorteil('liga-archiv', 'Ältere Liga-Saisons zum Nachspielen'),
   vorteil('foerderer-nadel', 'Förderer-Nadel am Namen, wächst mit der Dauer (abschaltbar)'),
 ]);
+const gratis = (id, gebaut = false) => Object.freeze({ id, gebaut });
 export const GRATIS = Object.freeze([
-  'Alle 30 Bots in fünf Welten, Schachuhr und Wochen-Boss',
-  'Live-Bewertung und Spielanalyse ohne Grenze',
-  'Fehler-Kartei, Tagesrätsel und Rätsel ohne Tageslimit',
-  'Lernpfad: Einheiten 1 bis 4',
-  'Level, Wertung, Serie und Medaillen',
+  gratis('bots', true),
+  gratis('analyse', true),
+  gratis('training', true),
+  gratis('fortschritt', true),
+  gratis('wochen-boss'),
+  gratis('raetsel-ohne-limit'),
+  gratis('lernpfad-1-4'),
+  gratis('medaillen'),
 ]);
+export function bereiteGratis() { return GRATIS.filter((g) => g.gebaut || vorteilBereit(g.id)); }
+export function geplanteGratis() { return GRATIS.filter((g) => !g.gebaut && !vorteilBereit(g.id)); }
 const ZUSAGEN = Object.freeze([
   'Was du erspielt hast, bleibt dir auch ohne Abo.',
   'Das Abo bringt nie mehr Funken, Punkte oder Wertung.',
@@ -115,6 +124,8 @@ export function zeigeTrainer({ app = null } = {}) {
   const li = (t) => `<li>${esc(t)}</li>`;
   const drin = bereiteVorteile();
   const geplant = VORTEILE.filter((v) => !drin.includes(v));
+  const gratisDa = bereiteGratis();
+  const gratisKommt = geplanteGratis();
   const ort = document.createElement('div');
   ort.className = 'sheet-ort trainer-ort';
   ort.innerHTML = `<div class="sheet-schleier"></div>
@@ -133,7 +144,9 @@ export function zeigeTrainer({ app = null } = {}) {
           <ul>${drin.map((v) => li(v.text)).join('')}</ul></section>
         <section class="trainer-liste trainer-geplant" aria-labelledby="trainer-l3"${geplant.length ? '' : ' hidden'}><h4 id="trainer-l3">${esc(A('arbeit'))}</h4>
           <ul>${geplant.map((v) => li(v.text)).join('')}</ul><p class="trainer-geplant-hinweis">${esc(A('geplant'))}</p></section>
-        <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">${esc(A('gratisTitel'))}</h4><ul>${GRATIS.map((_, i) => li(A('gratis.' + i))).join('')}</ul></section>
+        <section class="trainer-liste trainer-gratis" aria-labelledby="trainer-l2"><h4 id="trainer-l2">${esc(A('gratisTitel'))}</h4><ul>${gratisDa.map((g) => li(A('gratis.' + g.id))).join('')}</ul>
+          <div class="trainer-gratis-kommt"${gratisKommt.length ? '' : ' hidden'}><p class="trainer-gratis-kommt-titel">${esc(A('gratisKommt'))}</p>
+            <ul>${gratisKommt.map((g) => li(A('gratis.' + g.id))).join('')}</ul><p class="trainer-geplant-hinweis">${esc(A('gratisKommtHinweis'))}</p></div></section>
       </div>
       <ul class="trainer-zusagen">${ZUSAGEN.map((_, i) => li(A('zusagen.' + i))).join('')}</ul>
       <p class="trainer-alter">${esc(A('alterHinweis'))}</p>
