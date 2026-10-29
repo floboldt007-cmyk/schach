@@ -53,13 +53,23 @@ const TYPEN = {
 };
 const anfragen = [];          // { methode, pfad, suche }
 let headVerzoegerung = 0;     // ms, damit ein Doppel-Tipp waehrend der Netzpruefung kommt
+// Netz weg fuer die Netzpruefung: Der Server kappt die Verbindung. page.route allein reicht nicht: Unter WebKit greift
+// es bei einer Seite mit Service Worker nicht (Playwright), die Pruefung kaeme dort doch beim Server an.
+let netzWeg = false;
+const gekappt = [];           // gekappte Netzpruefungen (zaehlen nicht als Anfrage beim Server)
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   let pfad;
   try { pfad = decodeURIComponent(url.pathname); } catch (e) { pfad = url.pathname; }
+  if (netzWeg && pfad === PRAEFIX + 'sw.js' && /[?&]notfall=\d+/.test(url.search)) {
+    gekappt.push({ methode: req.method });
+    return req.socket.destroy();
+  }
   anfragen.push({ methode: req.method, pfad, suche: url.search });
+  // Connection: close, damit keine Verbindung wiederverwendet wird: Bricht eine wiederverwendete Verbindung ab, wiederholt
+  // der Browser die Anfrage sonst womoeglich von selbst, und eine gekappte Netzpruefung zaehlte doppelt
   const sende = (status, typ, inhalt) => {
-    res.writeHead(status, { 'Content-Type': typ, 'Content-Length': inhalt.length, 'Cache-Control': 'no-cache' });
+    res.writeHead(status, { 'Content-Type': typ, 'Content-Length': inhalt.length, 'Cache-Control': 'no-cache', Connection: 'close' });
     res.end(req.method === 'HEAD' ? undefined : inhalt);
   };
   if (pfad === PRAEFIX + 'notfall-test-sw.js' || pfad === '/andere/notfall-test-sw.js') {
@@ -409,7 +419,11 @@ async function testeOffline(browser) {
   const vorher = await bestand(seite);
   await warteAufTafel(seite);
   const anzahl = netzPruefungen().length;
+  const gekapptVorher = gekappt.length;
   let abgefangen = 0;
+  // Chromium: page.route bricht die Pruefung im Browser ab; WebKit: dort kommt sie am Service Worker vorbei beim
+  // Server an, und der kappt die Verbindung (netzWeg). Beides ist fuer die Seite ein Netzfehler.
+  netzWeg = true;
   await seite.route(/\/sw\.js\?notfall=\d+/, (r) => { abgefangen++; return r.abort('internetdisconnected'); });
   await seite.evaluate(() => { window.__vorher = 1; });
   // per Tastatur wie auf dem iPad mit Tastatur: Enter auf dem Knopf, der beim Erscheinen den Fokus bekommt
@@ -422,13 +436,16 @@ async function testeOffline(browser) {
   pruefe('Knopf wieder frei, kein Neuladen', t && !t.knopfAus && await seite.evaluate(() => window.__vorher === 1), JSON.stringify(t));
   pruefe('Fokus bleibt auf "Reparieren" (nicht auf body)', t && t.fokus,
     await seite.evaluate(() => document.activeElement && document.activeElement.tagName));
-  pruefe('die Pruefung lief wirklich (abgefangen, nicht beim Server)', abgefangen === 1 && netzPruefungen().length === anzahl, `${abgefangen} / ${netzPruefungen().length - anzahl}`);
+  const kappt = gekappt.length - gekapptVorher;
+  pruefe('die Pruefung lief genau einmal und scheiterte am Netz (nie beim Server beantwortet)',
+    abgefangen + kappt === 1 && netzPruefungen().length === anzahl, `abgefangen ${abgefangen}, gekappt ${kappt}, beantwortet ${netzPruefungen().length - anzahl}`);
   const nachher = await bestand(seite);
   pruefe('Service Worker, Caches, Speicher unveraendert, kein Merker', JSON.stringify(nachher.regs) === JSON.stringify(vorher.regs)
     && JSON.stringify(nachher.namen) === JSON.stringify(vorher.namen) && JSON.stringify(nachher.lokal) === JSON.stringify(vorher.lokal)
     && !(MERKER in nachher.sitzung), JSON.stringify(nachher));
   // wieder online: ein zweites Enter (ohne Tab zurueck) repariert
   await seite.unroute(/\/sw\.js\?notfall=\d+/);
+  netzWeg = false;
   const neu = await mitNeuladen(seite, () => seite.keyboard.press('Enter')).catch(() => false);
   const danach = await bestand(seite);
   pruefe('wieder online: zweites Enter repariert (neu geladen, eigene Caches weg)', neu && JSON.stringify(danach.namen) === JSON.stringify(['anderes-projekt-v1']),
