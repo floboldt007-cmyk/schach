@@ -1,5 +1,5 @@
 // WebKit-Pruefung der kompletten App in den drei wichtigsten Touch-Groessen.
-// Spielt pro Groesse eine vollstaendige Partie gegen Bauer Benno und schreibt
+// Spielt pro Groesse eine vollstaendige Partie gegen Bauer Lukas und schreibt
 // Screenshots von Arena, Partie, Ergebnis, Analyse, Verlauf und Einstellungen.
 //
 //   node tests/webkit.test.mjs

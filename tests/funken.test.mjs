@@ -178,9 +178,9 @@ gruppe = 'Ergebnis und Verwertung';
 gruppe = 'Lichtblicke';
 {
   const g = { partien: 3, maxZuege: 30, letzteGenauigkeit: 70 };
-  const lb = (o) => R.lichtblicke({ ergebnis: 'niederlage', eigeneZuege: 31, botName: 'Ritter Rudi', gegner: g, ...o });
+  const lb = (o) => R.lichtblicke({ ergebnis: 'niederlage', eigeneZuege: 31, botName: 'Ritter Thorsten', gegner: g, ...o });
   pruefe('So lange wie noch nie gegen diesen Gegner (nur, wenn es schon eine Partie gab)', lb({}).map((x) => x.art).join() === 'lang'
-    && lb({ gegner: { ...g, partien: 0 } }).length === 0 && lb({ eigeneZuege: 30 }).length === 0 && /So lange wie noch nie gegen Ritter Rudi/.test(lb({})[0].text));
+    && lb({ gegner: { ...g, partien: 0 } }).length === 0 && lb({ eigeneZuege: 30 }).length === 0 && /So lange wie noch nie gegen Ritter Thorsten/.test(lb({})[0].text));
   pruefe('Genauigkeit mindestens 5 Punkte über der letzten Partie gegen ihn', lb({ eigeneZuege: 10, genauigkeit: 75 }).map((x) => x.art).join() === 'genau'
     && lb({ eigeneZuege: 10, genauigkeit: 74.9 }).length === 0);
   const strafe = [{ klasse: 'bester', gewinnVorigerZug: 0.45, gewinnVorher: 0.7 }];
@@ -211,23 +211,23 @@ gruppe = 'Herausforderungs-Faktor';
 
 gruppe = 'Rechenbeispiele aus 3.2 und 3.10';
 {
-  // 1. Tapfere Niederlage gegen Ritter Rudi (x1,25): 4 Theorie, offen 1 Goldrichtig, 6 Praezise, 8 Sauber, 6 Solide, 2 Unscharf,
+  // 1. Tapfere Niederlage gegen Ritter Thorsten (x1,25): 4 Theorie, offen 1 Goldrichtig, 6 Praezise, 8 Sauber, 6 Solide, 2 Unscharf,
   //    1 Daneben, 1 Weit daneben, 3 triviale; Kampfgeist 10, Lichtblick 10 -> (94 + 10 + 10) x 1,25 = 143
   const z1 = [...Array.from({ length: 4 }, () => ({ klasse: 'buch' })), ...offen('stark', 1), ...offen('bester', 6), ...offen('exzellent', 8),
     ...offen('gut', 6), ...offen('ungenau', 2), ...offen('fehler', 1), ...offen('patzer', 1), ...offen('gut', 3, { trivial: true }),
     ...offen('gut', 6, { gewinnVorher: 0.04 })];
-  const p1 = R.partieFunken({ zuege: z1, ergebnis: 'niederlage', eigeneZuege: 38, faktor: 1.25, gegner: { partien: 4, maxZuege: 35 }, botName: 'Rudi' });
-  pruefe('Beispiel 1: tapfere Niederlage gegen Rudi = 143 Funken', p1.zugwerte + p1.theorie === 94 && p1.ergebnis === 10 && p1.lichtblicke.length === 1
+  const p1 = R.partieFunken({ zuege: z1, ergebnis: 'niederlage', eigeneZuege: 38, faktor: 1.25, gegner: { partien: 4, maxZuege: 35 }, botName: 'Thorsten' });
+  pruefe('Beispiel 1: tapfere Niederlage gegen Thorsten = 143 Funken', p1.zugwerte + p1.theorie === 94 && p1.ergebnis === 10 && p1.lichtblicke.length === 1
     && R.endMenge({ vor: p1.vorRueckenwind }).menge === 143, p1);
-  // 2. Pflichtsieg gegen Benno (x0,25): 3 Buch, 6 offene Zuege (30), Sieg 40, Verwertung 30 -> 103 x 0,25 = 26
+  // 2. Pflichtsieg gegen Lukas (x0,25): 3 Buch, 6 offene Zuege (30), Sieg 40, Verwertung 30 -> 103 x 0,25 = 26
   const z2 = [...Array.from({ length: 3 }, () => ({ klasse: 'buch' })), ...offen('bester', 6, { gewinnNachher: 0.95 }),
     ...offen('exzellent', 13, { gewinnVorher: 0.97, gewinnNachher: 0.99 })];
   const p2 = R.partieFunken({ zuege: z2, ergebnis: 'sieg', eigeneZuege: 22, faktor: 0.25 });
-  pruefe('Beispiel 2: Pflichtsieg gegen Benno = 26 Funken (Mut und gute Züge zählen, Menge nicht)', p2.basis === 103
+  pruefe('Beispiel 2: Pflichtsieg gegen Lukas = 26 Funken (Mut und gute Züge zählen, Menge nicht)', p2.basis === 103
     && R.endMenge({ vor: p2.vorRueckenwind }).menge === 26 && R.endMenge({ vor: p1.vorRueckenwind }).menge > 5 * 26, p2);
-  // 3. Sieg gegen Rudi mit neuem Stern: 165 x 1,25 = 206, Stern 50, erster Sieg 100 -> 356
+  // 3. Sieg gegen Thorsten mit neuem Stern: 165 x 1,25 = 206, Stern 50, erster Sieg 100 -> 356
   const p3 = R.endMenge({ vor: 165 * 1.25 }).menge + R.sternFunken([true, false, false], { botId: 'rudi' }).reduce((s, x) => s + x.menge, 0);
-  pruefe('Beispiel 3: Sieg gegen Rudi mit neuem Stern = 356 Funken', p3 === 356, p3);
+  pruefe('Beispiel 3: Sieg gegen Thorsten mit neuem Stern = 356 Funken', p3 === 356, p3);
   const k = R.endMenge({ vor: 164 * 1.25, kartenAktiv: 3, einheit: true });
   pruefe('3.10: 164 × 1,25 × 2 = 410 (Rückenwind-Karte)', k.menge === 410 && k.faktor === 2 && k.quelle === 'karte' && k.verbraucht, k);
   pruefe('Kaufmännisch gerundet, nie negativ', R.runde(142.5) === 143 && R.runde(25.75) === 26 && R.runde(0.49) === 0 && R.runde(-12) === 0 && R.runde(NaN) === 0);
@@ -433,7 +433,7 @@ gruppe = 'Partie buchen';
   S.merkeMatt(lauf, 52, 3);
   const d = { partieId: 'p1', laufId: 'l1', botId: 'rudi', modus: 'normal', wertet: true, ergebnis: 'sieg', eigeneZuege: 30, liveKlassen: klassen,
     hinweise: 0, zuruecknahmen: 0, neueSterne: [true, false, false] };
-  const r = S.buchePartie(st, d, { lauf, jetzt, botName: 'Ritter Rudi' });
+  const r = S.buchePartie(st, d, { lauf, jetzt, botName: 'Ritter Thorsten' });
   // 26 offene Praezise (130) + 4 Theorie + Sieg 40 + Verwertung (Par 3 + 3 = 6, 3 Zuege danach: 30) = 204 x 1,25 = 255; Stern 50 + erster Sieg 100
   pruefe('Wertende Partie: (130 + 4 + 40 + 30) × 1,25 = 255, dazu Stern 50 und erster Sieg 100', r.eintrag.p === 255 && r.eintrag.m === 150 && r.eintrag.f === 405
     && r.eintrag.ba === 204 && r.eintrag.v === 30 && st.gesamt === 405 && st.heute.partien === 1, r.eintrag);
@@ -697,7 +697,7 @@ gruppe = 'Ereignisse';
   sende('uebung:ergebnis', { partieId: 'pz1', ply: 4, getroffen: true });
   pruefe('Übung erhöht die Funken (Lernen), nie Wertung, Sterne oder Statistik', log.some((x) => x.n === 'funken:gebucht' && x.d.quelle === 'lernen' && x.d.menge === 15)
     && JSON.stringify(ladeFortschritt()) === fortschrittVor && JSON.stringify(statistik()) === statistikVor);
-  // Faktor aus echten Partien: 12 Siege gegen Benno (Elo 200) -> Lage 600, Kalle (800) +200 -> x1,25
+  // Faktor aus echten Partien: 12 Siege gegen Lukas (Elo 200) -> Lage 600, Maxi (800) +200 -> x1,25
   setzeSpeicher(fakeSpeicher());
   for (let i = 0; i < 12; i++) {
     speicherePartie({ datum: new Date(Date.UTC(2026, 9, 1, 10, i)).toISOString(), botId: 'benno', botStufe: 1, spielerFarbe: 'w',
@@ -707,7 +707,7 @@ gruppe = 'Ereignisse';
   sende('partie:gestartet', { laufId: 'lk', botId: 'kalle', farbe: 'w', modus: 'normal', wertet: true, fortgesetzt: false, buehne: null });
   await warte(10);
   const lauf = S.lade().lauf;
-  pruefe('Faktor wird beim Start festgelegt (12 Siege gegen Benno: Kalle ist „Herausforderung · × 1,25“)', lauf && lauf.id === 'lk' && lauf.fa === 1.25
+  pruefe('Faktor wird beim Start festgelegt (12 Siege gegen Lukas: Maxi ist „Herausforderung · × 1,25“)', lauf && lauf.id === 'lk' && lauf.fa === 1.25
     && lauf.fn === 'Herausforderung' && lauf.ab === 200, lauf);
 }
 
@@ -819,7 +819,7 @@ function hilfen(seite) {
         } };
       }, SCHAEFER_PLAN);
     },
-    // Schaefermatt gegen Benno (wertende Partie), endet mit 4. Dxf7#
+    // Schaefermatt gegen Lukas (wertende Partie), endet mit 4. Dxf7#
     async schaefermatt() {
       await h.planBot();
       await h.starte({ botId: 'benno', farbe: 'w' });
@@ -1030,7 +1030,7 @@ async function testeBrowser(browser) {
   const det = await seite.locator('.fk-details').innerText();
   pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, Verwertung, × 2 Rückenwind-Karte, Meilensteine)', await seite.locator('.fk-details:not([hidden])').count() === 1
     && await seite.locator('.fk-abr-knopf[aria-expanded="true"]').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det) && /Verwertung/.test(det)
-    && /× 2 Rückenwind-Karte/.test(det) && /Meilensteine: neue Sterne, erster Sieg gegen Bauer Benno/.test(det), det);
+    && /× 2 Rückenwind-Karte/.test(det) && /Meilensteine: neue Sterne, erster Sieg gegen Bauer Lukas/.test(det), det);
   pruefe('Kurzer Sieg (Schäfermatt, 4 Züge): die Aufschlüsselung sagt, warum der Ergebnis-Bonus fehlt', e1.e === 0 && e1.erg === 'sieg' && e1.p > 0
     && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det), { e: e1.e, p: e1.p, det });
   await bild(seite, 'ergebnis-aufstieg');
@@ -1047,7 +1047,7 @@ async function testeBrowser(browser) {
   await h.starte({ botId: 'benno', farbe: 'w' });
   await warte(300);
   const blase = await seite.locator('.blase-ort .sprechblase').first().innerText().catch(() => '');
-  pruefe('Benno grüßt einmal das neue Level (eigener Satz, kein fremder Text)', /Ein neues Level\? Donnerwetter/.test(blase), blase);
+  pruefe('Lukas grüßt einmal das neue Level (eigener Satz, kein fremder Text)', /Ein neues Level\? Donnerwetter/.test(blase), blase);
   pruefe('Der Gruß kommt nur einmal (Merker gelöscht)', (await h.stand()).gruss === false);
   await seite.evaluate(() => { window.__klaenge = []; });
   for (const zug of SCHAEFER_ZUEGE) {
@@ -1076,7 +1076,7 @@ async function testeBrowser(browser) {
   const stv = await h.stand();
   pruefe('verlauf:seite: Karte mit Level, Titel, Balken, heute und den letzten Partien', /Level 5 · Glut/.test(karte) && await seite.locator('.fk-karte .fk-balken').count() === 1
     && new RegExp(`Heute ${zahlText(stv.heute.funken)} Funken`).test(karte) && await seite.locator('.fk-karte .fk-partien li').count() === 2
-    && /Bauer Benno/.test(karte) && new RegExp(`\\+${zahlText(stv.verlauf[0].f)}`).test(karte), karte);
+    && /Bauer Lukas/.test(karte) && new RegExp(`\\+${zahlText(stv.verlauf[0].f)}`).test(karte), karte);
   await bild(seite, 'verlauf');
   await h.tippe('.fk-karte .fk-k-mehr');
   await seite.waitForSelector('.fk-spiegel');
@@ -1136,17 +1136,17 @@ async function testeBrowser(browser) {
       /Die erste Rückenwind-Karte kommt an deinem 4\. Tag, danach jeden Montag eine\./.test(await s.locator('.fk-spiegel .fk-s-rw').innerText()));
     await s.locator('.fk-spiegel .fk-schliessen').click();
     await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
-    // Welten: Kalle (Stufe 8) ist nach Jan der naechste Gegner, die Arena zeigt Welt 2; Benno steht in Welt 1
+    // Welten: Maxi (Stufe 8) ist nach Jan der naechste Gegner, die Arena zeigt Welt 2; Lukas steht in Welt 1
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
-    pruefe('Benno nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
+    pruefe('Lukas nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
-    pruefe('Kalle: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
+    pruefe('Maxi: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
     // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });
@@ -1165,7 +1165,7 @@ async function testeBrowser(browser) {
     pruefe('Tippfläche der Abrechnungszeile mindestens 44 px', hoehe >= 44, hoehe);
     await s.waitForSelector('.ergebnis-overlay.gefuellt:not(.vorlaeufig)', { timeout: 60000 });
     const { e } = await hh.abrFertig();
-    pruefe('Die Partie gegen Benno rechnet mit dem angesagten Faktor × 0,5', e.fa === 0.5 && e.fn === 'Training' && /× 0,5/.test(await s.locator('.fk-formel').innerText()), e);
+    pruefe('Die Partie gegen Lukas rechnet mit dem angesagten Faktor × 0,5', e.fa === 0.5 && e.fn === 'Training' && /× 0,5/.test(await s.locator('.fk-formel').innerText()), e);
     pruefe('Keine Konsolenfehler', f.length === 0, f.join(' | '));
     await k.close();
   }

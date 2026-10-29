@@ -256,14 +256,14 @@ async function testEngine() {
 // ---------------- Bots ----------------
 // Fuenf Welten zu je sechs Bots, Stufe = Elo / 100 (Welten-Bauplan 24.10.2026)
 const TABELLE = [
-  [1, 'Vogelscheuche Willi', 100], [2, 'Bauer Benno', 200], [3, 'Postbotin Paula', 300], [4, 'Imker Maik', 400],
-  [5, 'Oma Hilde', 500], [6, 'Janine vom Scheunenclub', 600], [7, 'Holzfäller Jan', 700], [8, 'Kalle vom Stammtisch', 800],
-  [9, 'Waldläufer Leo', 900], [10, 'Lisa Läufer', 1000], [11, 'Köhlerin Edda', 1100], [12, 'Ritter Rudi', 1200],
-  [13, 'Luke vom Marktplatz', 1300], [14, 'Professor Turm', 1400], [15, 'Zauberer Moritz', 1500], [16, 'Dame Delia', 1600],
-  [17, 'Bibliothekar Florian', 1700], [18, 'Kommissar König', 1800], [19, 'Fischer Lasse', 1900],
+  [1, 'Vogelscheuche Willi', 100], [2, 'Bauer Lukas', 200], [3, 'Postbotin Paula', 300], [4, 'Imker Maik', 400],
+  [5, 'Oma Hilde', 500], [6, 'Janine vom Scheunenclub', 600], [7, 'Holzfäller Jan', 700], [8, 'Maxi vom Stammtisch', 800],
+  [9, 'Waldläufer Leo', 900], [10, 'Lisa Läufer', 1000], [11, 'Köhlerin Irmi', 1100], [12, 'Ritter Thorsten', 1200],
+  [13, 'Luke vom Marktplatz', 1300], [14, 'Professor Oliver Turm', 1400], [15, 'Zauberer Moritz', 1500], [16, 'Dame Delia', 1600],
+  [17, 'Bibliothekar Florian', 1700], [18, 'Kommissar Tobias König', 1800], [19, 'Fischer Lasse', 1900],
   [20, 'Hafenmeisterin Wiebke', 2000], [21, 'Großmeisterin Greta', 2100], [22, 'Wattführer René', 2200],
   [23, 'Seenotretterin Ilka', 2300], [24, 'Johann vom Leuchtturm', 2400], [25, 'Taucher Keetan', 2500],
-  [26, 'Lotse Anestis', 2600], [27, 'Schatzsucher Silas', 2700], [28, 'Forscherin Merle', 2800], [29, 'Hüterin Alva', 2900],
+  [26, 'Lotse Anestis', 2600], [27, 'Schatzsucher Silas', 2700], [28, 'Forscherin Viki', 2800], [29, 'Hüterin Alva', 2900],
   [30, 'Der Stockfisch', 3000],
 ];
 const bot = (id) => BOTS.find((b) => b.id === id);
@@ -369,7 +369,7 @@ async function testBots() {
     raten.push(b.name + ' ' + Math.round(100 * treffer / n) + ' %');
     BOTS_MATT[b.id] = treffer / n;
   }
-  pruefe('Unter Elo 1000 wird Matt in 1 manchmal uebersehen (Willi, Benno), Kalle seltener',
+  pruefe('Unter Elo 1000 wird Matt in 1 manchmal uebersehen (Willi, Lukas), Maxi seltener',
     BOTS_MATT.fridolin < 1 && BOTS_MATT.benno < 1 && BOTS_MATT.benno > 0 && BOTS_MATT.kalle >= BOTS_MATT.benno, raten.join(', '));
 
   // Denkzeit (mit Pause)
@@ -450,7 +450,7 @@ async function testBots() {
   pruefe('Charakter färbt die Zugwahl (Lieblingszüge häufiger als ohne Vorliebe)', mit > ohne,
     `${Math.round(100 * mit / 6)} % gegen ${Math.round(100 * ohne / 6)} % im Mittel`);
 
-  pruefe('Freie Dame: Hilde nimmt sie fast immer, Benno oft, Lisa fast immer, Delia immer',
+  pruefe('Freie Dame: Hilde nimmt sie fast immer, Lukas oft, Lisa fast immer, Delia immer',
     BOTS_DAME.hilde >= 0.7 && BOTS_DAME.benno >= 0.3 && BOTS_DAME.lisa >= 0.9 && BOTS_DAME.delia === 1, quoten.join(', '));
   e.terminate();
 }

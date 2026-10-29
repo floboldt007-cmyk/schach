@@ -42,7 +42,7 @@ function pruefe(name, ok, detail = '') {
   console.log(`${ok ? 'ok  ' : 'FEHLER'} ${gruppe ? gruppe + ': ' : ''}${name}${!ok && detail ? ' (' + detail + ')' : ''}`);
 }
 
-// Fortschritt (Welten, Flo 23.10.): Welt 1, Willi (3 Sterne) und Benno (2 Sterne) besiegt, Postbotin Paula ist der naechste
+// Fortschritt (Welten, Flo 23.10.): Welt 1, Willi (3 Sterne) und Lukas (2 Sterne) besiegt, Postbotin Paula ist der naechste
 // Gegner (Stufe 3), Maik und Hilde sind noch gesperrt, Janine vom Scheunenclub (Endgegner der Welt) ist direkt
 // herausforderbar; Welt 2 bis 5 sind gesperrt
 const SAAT = {
@@ -52,7 +52,7 @@ const SAAT = {
   },
   brillanteZuege: [],
 };
-// nur Benno besiegt (fuer das Freischalten von Paula): frei sind Stufe 1 bis 3 (Willi ist neu eingezogen) und Janine
+// nur Lukas besiegt (fuer das Freischalten von Paula): frei sind Stufe 1 bis 3 (Willi ist neu eingezogen) und Janine
 const SAAT_BENNO = { bots: { benno: { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 } }, brillanteZuege: [] };
 // die ganze Welt 1 besiegt, alle Sterne (Weltsiegel): Jan (Welt 2) ist der naechste Gegner
 const SAAT_WELT1 = { bots: Object.fromEntries(BOTS.filter((b) => b.welt === 1).map((b) => [b.id, { sterne: [true, true, true], partien: 1, siege: 1, remis: 0, niederlagen: 0, besteGenauigkeit: 90 }])), brillanteZuege: [] };
@@ -415,15 +415,15 @@ async function testeKarteQuer(browser) {
   const f = await seite.evaluate(() => ({ g: getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="hilde"] .avatar img')).filter, b: getComputedStyle(document.querySelector('.knoten.boss .avatar img')).filter,
     a: getComputedStyle(document.querySelector('.knoten.aktuell .avatar img')).filter }));
   pruefe('gesperrt: Graustufen; Endgegner offen (direkt herausforderbar): sein Gesicht in Farbe, keine Silhouette; aktuell: ohne Filter', /grayscale/.test(f.g) && !/brightness\(0\)/.test(f.g) && f.b === 'none' && f.a === 'none', JSON.stringify(f));
-  pruefe('Sterne nur bei besiegten (Willi 3, Benno 2), als SVG', await seite.evaluate(() => document.querySelectorAll('.knoten[data-bot="fridolin"] .k-sterne .stern').length === 3
+  pruefe('Sterne nur bei besiegten (Willi 3, Lukas 2), als SVG', await seite.evaluate(() => document.querySelectorAll('.knoten[data-bot="fridolin"] .k-sterne .stern').length === 3
     && document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .stern').length === 2 && document.querySelectorAll('.knoten[data-bot="benno"] .k-sterne .aus').length === 1
     && ['paula', 'gustav', 'hilde', 'janine'].every((id) => document.querySelectorAll(`.knoten[data-bot="${id}"] .k-sterne`).length === 0)
     && !!document.querySelector('.knoten[data-bot="fridolin"] .k-sterne svg') && !/★/.test(document.querySelector('.welt').textContent)));
-  pruefe('Schild mit Name und Elo (.k-name, .k-meta), Nummer der Stufe (.k-nr)', await seite.evaluate(() => document.querySelector('.knoten[data-bot="benno"] .k-name').textContent === 'Benno' && document.querySelector('.knoten[data-bot="benno"] .k-meta').textContent === '200'
+  pruefe('Schild mit Name und Elo (.k-name, .k-meta), Nummer der Stufe (.k-nr)', await seite.evaluate(() => document.querySelector('.knoten[data-bot="benno"] .k-name').textContent === 'Lukas' && document.querySelector('.knoten[data-bot="benno"] .k-meta').textContent === '200'
     && document.querySelector('.knoten[data-bot="hilde"] .k-name').textContent === 'Oma Hilde' && document.querySelector('.knoten[data-bot="hilde"] .k-meta').textContent === '500'
     && document.querySelector('.knoten[data-bot="fridolin"] .k-nr').textContent === '1' && document.querySelector('.knoten[data-bot="janine"] .k-nr').textContent === '6'));
   const labels = await seite.evaluate(() => ['benno', 'paula', 'hilde', 'janine'].map((id) => document.querySelector(`.knoten[data-bot="${id}"]`).getAttribute('aria-label')));
-  pruefe('aria-label wie bisher („Stufe n: Name, Elo x, Zustand, k von 3 Sternen“), der offene Endgegner „direkt herausfordern“', labels[0] === 'Stufe 2: Bauer Benno, Elo 200, besiegt, 2 von 3 Sternen' && labels[1] === 'Stufe 3: Postbotin Paula, Elo 300, nächster Gegner'
+  pruefe('aria-label wie bisher („Stufe n: Name, Elo x, Zustand, k von 3 Sternen“), der offene Endgegner „direkt herausfordern“', labels[0] === 'Stufe 2: Bauer Lukas, Elo 200, besiegt, 2 von 3 Sternen' && labels[1] === 'Stufe 3: Postbotin Paula, Elo 300, nächster Gegner'
     && labels[2] === 'Stufe 5: Oma Hilde, Elo 500, gesperrt' && labels[3] === 'Stufe 6: Janine vom Scheunenclub, Elo 600, Endgegner, direkt herausfordern', labels.join(' | '));
   pruefe('Portraets der Stationen und des Panels aus assets/avatare/modern/', await seite.evaluate(() => [...document.querySelectorAll('.knoten .avatar img')].every((i, n) => i.src.endsWith(`/assets/avatare/modern/${document.querySelectorAll('.knoten')[n].dataset.bot}.svg`))
     && document.querySelector('.detail .detail-kopf .av img').src.endsWith('/assets/avatare/modern/paula.svg')));
@@ -488,8 +488,8 @@ async function testeKarteQuer(browser) {
       gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, pressed: document.querySelector(`.knoten[data-bot="${i}"]`).getAttribute('aria-pressed') + document.querySelector('.knoten[data-bot="paula"]').getAttribute('aria-pressed') }), id);
   };
   const wahl = await waehleStation('benno');
-  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Benno, Besiegt, 2 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Benno' && wahl.ueber === 'Stufe 2 · Besiegt' && wahl.an === 2 && wahl.mini === 2
-    && wahl.spielen === 'Revanche gegen Benno' && wahl.gewaehlt === 'benno' && wahl.pressed === 'truefalse', JSON.stringify(wahl));
+  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Lukas, Besiegt, 2 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Lukas' && wahl.ueber === 'Stufe 2 · Besiegt' && wahl.an === 2 && wahl.mini === 2
+    && wahl.spielen === 'Revanche gegen Lukas' && wahl.gewaehlt === 'benno' && wahl.pressed === 'truefalse', JSON.stringify(wahl));
   const wahl3 = await waehleStation('fridolin');
   pruefe('alle drei Ziele erreicht (Willi, 3 Sterne, Revanche)', wahl3.h2 === 'Vogelscheuche Willi' && wahl3.ueber === 'Stufe 1 · Besiegt' && wahl3.an === 3 && wahl3.mini === 3
     && wahl3.spielen === 'Revanche gegen Willi' && wahl3.gewaehlt === 'fridolin' && wahl3.pressed === 'truefalse', JSON.stringify(wahl3));
@@ -730,7 +730,7 @@ async function testeHandyQuer(browser) {
 }
 
 // Pruefer-Befund U5 (blockierend): der Text des Spielen-Knopfs wurde gekuerzt ("Spielen gegen den Stockfis…" auf dem
-// Handy, "Revanche gegen den Kommissar" auf dem iPad), geprueft war nur ein Bot. Jetzt alle 30 Bots in beiden Fassungen
+// Handy, "Revanche gegen Tobias" auf dem iPad), geprueft war nur ein Bot. Jetzt alle 30 Bots in beiden Fassungen
 // in allen Ziel-Lagen: echte Panels (alle besiegt, Welt fuer Welt jede Station antippen: "Revanche gegen …") und der
 // Spielen-Text jedes Bots im echten Knopf (spielenText aus js/ui/arena.js, dieselbe Funktion wie im Panel)
 async function testeKnopftext(browser) {
@@ -833,7 +833,7 @@ async function testeWelten(browser) {
     pruefe('Pfeil vor: Welt 2 „Der Springerforst“, gesperrt (Weltwahl und Karte grau, .welt-sperre nennt den Schluessel: Sieg gegen Janine), Flos Figur weg',
       w.name === 'Der Springerforst' && w.unter === 'Welt 2 von 5 · gesperrt' && w.wwGesperrt && w.weltGesperrt && w.welt === 'springerforst' && w.sperre && !w.zurueckAus && !w.vorAus && w.flo === 'none'
       && /Dichter Mischwald mit Lichtungen und Bach\. Ein Sieg gegen Janine vom Scheunenclub öffnet sie\.$/.test(w.sperreText) && w.sperreText.startsWith('Der Springerforst'), JSON.stringify(w));
-    pruefe('gesperrte Welt: alle sechs Stationen gesperrt mit Schloss, der Endgegner (Ritter Rudi) als Silhouette mit „?“, die anderen in Graustufen',
+    pruefe('gesperrte Welt: alle sechs Stationen gesperrt mit Schloss, der Endgegner (Ritter Thorsten) als Silhouette mit „?“, die anderen in Graustufen',
       w.ids.join() === WELT_IDS[1].join() && w.zustaende === 'gesperrt,gesperrt,gesperrt,gesperrt,gesperrt,gesperrt' && await seite.evaluate(() => document.querySelectorAll('.welt .knoten.gesperrt .schloss').length === 6
         && /brightness\(0\)/.test(getComputedStyle(document.querySelector('.knoten.boss[data-bot="rudi"] .avatar img')).filter) && /grayscale/.test(getComputedStyle(document.querySelector('.knoten[data-bot="kalle"] .avatar img')).filter)
         && document.querySelectorAll('.knoten .fahne').length === 0 && /ENDGEGNER/.test(document.querySelector('.knoten.boss .boss-krone').textContent)), JSON.stringify(w));
@@ -881,7 +881,7 @@ async function testeWelten(browser) {
     await kontext.close();
   }
 
-  // Schild NEU: Willi ist frei, aber nicht der naechste Gegner und liegt unter Flos bestem Sieg (Benno)
+  // Schild NEU: Willi ist frei, aber nicht der naechste Gegner und liegt unter Flos bestem Sieg (Lukas)
   gruppe = 'Welten neu eingezogen';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, saat: SAAT_BENNO });
@@ -896,7 +896,7 @@ async function testeWelten(browser) {
     });
     pruefe('Schild NEU nur an Willi (frei, unbesiegt, unter dem besten Sieg): offen, ohne Schloss und in Farbe, Beschriftung „neu eingezogen“',
       n.neu === 'fridolin:NEU' && n.fridolin && n.schloss === 0 && n.grau === 'none' && n.label === 'Stufe 1: Vogelscheuche Willi, Elo 100, neu eingezogen', JSON.stringify(n));
-    pruefe('Zustaende nach Benno-Sieg: Willi offen, Benno besiegt, Paula aktuell, Maik und Hilde gesperrt, Janine offen', n.zustaende === 'fridolin=offen,benno=besiegt,paula=aktuell,gustav=gesperrt,hilde=gesperrt,janine=offen', n.zustaende);
+    pruefe('Zustaende nach Lukas-Sieg: Willi offen, Lukas besiegt, Paula aktuell, Maik und Hilde gesperrt, Janine offen', n.zustaende === 'fridolin=offen,benno=besiegt,paula=aktuell,gustav=gesperrt,hilde=gesperrt,janine=offen', n.zustaende);
     const kl = await kartenLage(seite);
     pruefe('Schild NEU liegt innerhalb der Karte und ueberdeckt keine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
     await tippe(seite, '.knoten[data-bot="fridolin"]');
@@ -988,10 +988,10 @@ async function testeFreischalten(browser) {
         floBeiBenno: (() => { const f = document.querySelector('.flo-figur').getBoundingClientRect(); const b = document.querySelector('.knoten[data-bot="benno"] .avatar').getBoundingClientRect();
           return Math.hypot(f.left + f.width / 2 - (b.left + b.width / 2), f.top + f.height / 2 - (b.top + b.height / 2)) < b.width; })() };
     });
-    pruefe('Ende: Schloss weg, Paula bunt mit Fahne, Benno drei Sterne, Meldung „Neu freigeschaltet“, Stern-Klang', ende.schloss === 0 && ende.sterne === 3 && /NÄCHSTER GEGNER/.test(ende.fahne || '') && ende.bunt === 'none'
+    pruefe('Ende: Schloss weg, Paula bunt mit Fahne, Lukas drei Sterne, Meldung „Neu freigeschaltet“, Stern-Klang', ende.schloss === 0 && ende.sterne === 3 && /NÄCHSTER GEGNER/.test(ende.fahne || '') && ende.bunt === 'none'
       && /Neu freigeschaltet: Postbotin Paula/.test(ende.toast) && ende.sternKlang, JSON.stringify(ende));
     pruefe('Handy: die Karte hat zur neuen Station gescrollt', ende.imBild, JSON.stringify(ende));
-    pruefe('Flo ist zur gerade bezwungenen Station (Benno) weitergezogen', ende.floBeiBenno, JSON.stringify(ende));
+    pruefe('Flo ist zur gerade bezwungenen Station (Lukas) weitergezogen', ende.floBeiBenno, JSON.stringify(ende));
     await bild(seite, 'arena-freigeschaltet-390x844');
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();

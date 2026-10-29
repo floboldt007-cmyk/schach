@@ -2,7 +2,7 @@
 // woertlich. Bereich: Paket punkte (Abrechnung im Ergebnis, Feier-Zeilen, Bot-Panel der Arena, Reiter der Bestenliste,
 // Freunde-Codes). Rein, ohne DOM: auch code.js (Node-Tests) liest hier seine Fehlertexte.
 // Englisch: Tafel = scoreboard, Platz = #, Rechenstand = scoring version, Nachgerechnet = Rechecked. Die Besitzform der
-// Leiter-Bots (besitz.<id>) steht je Sprache fest, weil sie nicht ueberall dem Rufnamen folgt (Professor Turms, Rudis).
+// Leiter-Bots (besitz.<id>) steht je Sprache fest, weil sie nicht ueberall dem Rufnamen folgt (Professor Turms, Thorstens).
 // Gemeinsame Woerter (Weiss, Schwarz, Sieg, Remis, Niederlage, Kopieren ...) kommen aus allgemein bzw. stehen hier.
 import { registriereTexte } from '../../sprache.js';
 
@@ -20,13 +20,13 @@ registriereTexte('p-punkte', {
     'tafel.wochenBoss': 'Wochen-Boss',
     'stufe.standard': 'Standard',
     'stufe.meister': 'Meister',
-    'besitz.benno': 'Bennos', 'besitz.hilde': 'Hildes', 'besitz.kalle': 'Kalles', 'besitz.lisa': 'Lisas', 'besitz.rudi': 'Rudis',
+    'besitz.benno': 'Lukas’', 'besitz.hilde': 'Hildes', 'besitz.kalle': 'Maxis', 'besitz.lisa': 'Lisas', 'besitz.rudi': 'Thorstens',
     'besitz.turm': 'Professor Turms', 'besitz.delia': 'Delias', 'besitz.koenig': 'Kommissar Königs', 'besitz.greta': 'Gretas',
     'besitz.stockfisch': 'Stockfischs', 'besitz.fridolin': 'Willis', 'besitz.paula': 'Paulas', 'besitz.gustav': 'Maiks',
-    'besitz.janine': 'Janines', 'besitz.bodo': 'Jans', 'besitz.leo': 'Leos', 'besitz.edda': 'Eddas', 'besitz.luke': 'Lukes',
+    'besitz.janine': 'Janines', 'besitz.bodo': 'Jans', 'besitz.leo': 'Leos', 'besitz.edda': 'Irmis', 'besitz.luke': 'Lukes',
     'besitz.moritz': 'Moritz’', 'besitz.ottilie': 'Florians', 'besitz.lasse': 'Lasses', 'besitz.wiebke': 'Wiebkes',
     'besitz.henning': 'Renés', 'besitz.ilka': 'Ilkas', 'besitz.johann': 'Johanns', 'besitz.keetan': 'Keetans',
-    'besitz.ragna': 'Anestis’', 'besitz.silas': 'Silas’', 'besitz.merle': 'Merles', 'besitz.alva': 'Alvas',
+    'besitz.ragna': 'Anestis’', 'besitz.silas': 'Silas’', 'besitz.merle': 'Vikis', 'besitz.alva': 'Alvas',
     // Satz der Abrechnungszeile (ansicht.unterText)
     'grund.hilfe': 'Ohne Tafel-Eintrag: Hinweis oder Zurücknehmen genutzt',
     'grund.frei': 'Freie Partie: zählt für keine Tafel',
@@ -100,8 +100,8 @@ registriereTexte('p-punkte', {
     'fenster.woche': 'Diese Woche',
     'fenster.monat': 'Dieser Monat',
     'fenster.allzeit': 'Allzeit',
-    'kurz.benno': 'Benno', 'kurz.hilde': 'Hilde', 'kurz.kalle': 'Kalle', 'kurz.lisa': 'Lisa', 'kurz.rudi': 'Rudi', 'kurz.turm': 'Turm',
-    'kurz.delia': 'Delia', 'kurz.koenig': 'König', 'kurz.greta': 'Greta', 'kurz.stockfisch': 'Stockfisch',
+    'kurz.benno': 'Lukas', 'kurz.hilde': 'Hilde', 'kurz.kalle': 'Maxi', 'kurz.lisa': 'Lisa', 'kurz.rudi': 'Thorsten', 'kurz.turm': 'Oliver',
+    'kurz.delia': 'Delia', 'kurz.koenig': 'Tobias', 'kurz.greta': 'Greta', 'kurz.stockfisch': 'Stockfisch',
     gegner: 'Gegner',
     'pruef.nachgerechnet': 'Nachgerechnet ✓',
     'pruef.angabe': 'Angabe',
@@ -231,13 +231,13 @@ registriereTexte('p-punkte', {
     'tafel.wochenBoss': 'Weekly boss',
     'stufe.standard': 'Standard',
     'stufe.meister': 'Master',
-    'besitz.benno': 'Benno’s', 'besitz.hilde': 'Hilde’s', 'besitz.kalle': 'Kalle’s', 'besitz.lisa': 'Lisa’s', 'besitz.rudi': 'Rudi’s',
+    'besitz.benno': 'Lukas’s', 'besitz.hilde': 'Hilde’s', 'besitz.kalle': 'Maxi’s', 'besitz.lisa': 'Lisa’s', 'besitz.rudi': 'Thorsten’s',
     'besitz.turm': 'Professor Rook’s', 'besitz.delia': 'Delia’s', 'besitz.koenig': 'Inspector King’s', 'besitz.greta': 'Greta’s',
     'besitz.stockfisch': 'Stockfish’s', 'besitz.fridolin': 'Willi’s', 'besitz.paula': 'Paula’s', 'besitz.gustav': 'Maik’s',
-    'besitz.janine': 'Janine’s', 'besitz.bodo': 'Jan’s', 'besitz.leo': 'Leo’s', 'besitz.edda': 'Edda’s', 'besitz.luke': 'Luke’s',
+    'besitz.janine': 'Janine’s', 'besitz.bodo': 'Jan’s', 'besitz.leo': 'Leo’s', 'besitz.edda': 'Irmi’s', 'besitz.luke': 'Luke’s',
     'besitz.moritz': 'Moritz’s', 'besitz.ottilie': 'Florian’s', 'besitz.lasse': 'Lasse’s', 'besitz.wiebke': 'Wiebke’s',
     'besitz.henning': 'René’s', 'besitz.ilka': 'Ilka’s', 'besitz.johann': 'Johann’s', 'besitz.keetan': 'Keetan’s',
-    'besitz.ragna': 'Anestis’s', 'besitz.silas': 'Silas’s', 'besitz.merle': 'Merle’s', 'besitz.alva': 'Alva’s',
+    'besitz.ragna': 'Anestis’s', 'besitz.silas': 'Silas’s', 'besitz.merle': 'Viki’s', 'besitz.alva': 'Alva’s',
     'grund.hilfe': 'No scoreboard entry: a hint or takeback was used',
     'grund.frei': 'Free play: does not count for a scoreboard',
     'grund.spiel': 'Arcade: its own scoreboards are coming later',
@@ -304,8 +304,8 @@ registriereTexte('p-punkte', {
     'fenster.woche': 'This week',
     'fenster.monat': 'This month',
     'fenster.allzeit': 'All time',
-    'kurz.benno': 'Benno', 'kurz.hilde': 'Hilde', 'kurz.kalle': 'Kalle', 'kurz.lisa': 'Lisa', 'kurz.rudi': 'Rudi', 'kurz.turm': 'Prof. Rook',
-    'kurz.delia': 'Delia', 'kurz.koenig': 'Inspector King', 'kurz.greta': 'Greta', 'kurz.stockfisch': 'Stockfish',
+    'kurz.benno': 'Lukas', 'kurz.hilde': 'Hilde', 'kurz.kalle': 'Maxi', 'kurz.lisa': 'Lisa', 'kurz.rudi': 'Thorsten', 'kurz.turm': 'Oliver',
+    'kurz.delia': 'Delia', 'kurz.koenig': 'Tobias', 'kurz.greta': 'Greta', 'kurz.stockfisch': 'Stockfish',
     gegner: 'Opponent',
     'pruef.nachgerechnet': 'Rechecked ✓',
     'pruef.angabe': 'Claimed',

@@ -47,7 +47,7 @@ const TIEFEN = [
 ];
 function E(k, w) { return t('einstellungen.' + k, w); }
 // der Bot, bei dem die Leiter nach dem Zuruecksetzen wieder beginnt (Name aus bots.js, beim Zeichnen gelesen)
-// Erster Gegner der Leiter (seit den Welten Vogelscheuche Willi, vorher Bauer Benno): dort beginnt sie nach dem Zuruecksetzen
+// Erster Gegner der Leiter (seit den Welten Vogelscheuche Willi, vorher Bauer Lukas): dort beginnt sie nach dem Zuruecksetzen
 function ersterGegner() {
   return (BOTS[0] || {}).name || '';
 }

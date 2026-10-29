@@ -1965,7 +1965,7 @@ export function zeige(root, params, app) {
         if (p.hinweise > 0) hilfe.push(t('partie.erg.hinweise', { n: p.hinweise }));
         if (p.zuruecknahmen > 0) hilfe.push(t('partie.erg.zuruecknahmen', { n: p.zuruecknahmen }));
         const ziele = [
-          // Deutsch wie bisher das letzte Wort des Namens; Englisch die Kurzform ("Kalle from the Pub" -> "Kalle", nicht "Pub")
+          // Deutsch wie bisher das letzte Wort des Namens; Englisch die Kurzform ("Maxi from the Pub" -> "Maxi", nicht "Pub")
           [t('partie.erg.gewonnen'), t('partie.erg.besiegt', { name: sprache() === 'de' ? bot.name.split(' ').pop() : rufnameVon(bot) })],
           rechnet ? [t('partie.erg.genauigkeit'), t('partie.erg.wirdBerechnet')]
             : [Number.isFinite(gen) ? t('partie.erg.genau', { wert: genText }) : t('partie.erg.genauigkeit'),

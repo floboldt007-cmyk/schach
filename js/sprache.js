@@ -6,7 +6,7 @@
 //   import '../sprachen/arena.js';                 // meldet die Texte des Bereichs an (Seiteneffekt)
 //   el.textContent = t('arena.kopf.titel');         // "Fünf Welten, 30 Bots" | "Five worlds, 30 bots"
 //   t('partie.zuege', { n: 2 })                     // Mehrzahl: Schluessel 'zuege.eins' (n = 1) und 'zuege.mehr'
-//   t('ergebnis.gegen', { name: 'Benno' })          // Platzhalter {name}
+//   t('ergebnis.gegen', { name: 'Lukas' })          // Platzhalter {name}
 //
 // API:
 //   SPRACHEN = ['de', 'en']

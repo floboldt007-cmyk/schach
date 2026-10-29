@@ -1,6 +1,6 @@
 // Ende-zu-Ende-Test der ganzen App wie auf GitHub Pages: ein kleiner Node-Server liefert den
 // Projektordner unter /schach/ aus (Port 8833), Chromium mit iPad-Viewport und Touch.
-// Ablauf: Arena -> Sieg gegen Benno (Schaefermatt) -> Overlay -> Analyse (sofort fertig) ->
+// Ablauf: Arena -> Sieg gegen Lukas (Schaefermatt) -> Overlay -> Analyse (sofort fertig) ->
 // Naechster Gegner / Nochmal -> Verlauf -> Analyse -> Einstellungen (Holz, Klang aus) ->
 // Arena zeigt Paula frei -> echte Partie gegen Paula per Tippen (Live-Bewertung) ->
 // Neuladen und Zurueck-Wisch auf jedem Screen -> offline neu laden (App + Engine laufen) ->
@@ -257,7 +257,7 @@ function hilfen(seite) {
   return h;
 }
 
-// Schaefermatt gegen Benno in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
+// Schaefermatt gegen Lukas in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
 async function schaefermatt(seite, h, { pruefeHash = false } = {}) {
   await seite.evaluate((plan) => {
     localStorage.removeItem('schach-arena:v1:laufend');
@@ -359,7 +359,7 @@ async function testeStart(seite, h, fehler, fehlgeschlagen) {
   pruefe('Keine fehlgeschlagenen Anfragen', fehlgeschlagen.length === 0, fehlgeschlagen.join(' | '));
 }
 
-// ---------- 2. Sieg gegen Benno, Overlay, Analyse, Naechster Gegner, Nochmal ----------
+// ---------- 2. Sieg gegen Lukas, Overlay, Analyse, Naechster Gegner, Nochmal ----------
 async function testeSieg(seite, h, fehler) {
   gruppe = 'Sieg';
   pruefe('Willi ist der aktuelle Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
@@ -369,7 +369,7 @@ async function testeSieg(seite, h, fehler) {
   await warte(2600);
   pruefe('Overlay "Sieg!"', /^Sieg!$/.test(await seite.locator('.erg-wort').innerText()));
   pruefe('Drei Sterne', await seite.locator('.erg-stern.an').count() === 3);
-  pruefe('Kachel: Postbotin Paula freigeschaltet (nach Benno ist Paula frei)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
+  pruefe('Kachel: Postbotin Paula freigeschaltet (nach Lukas ist Paula frei)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
   const partien = await h.partien();
   const id = partien[0] && partien[0].id;
   pruefe('Partie gespeichert', partien.length === 1 && partien[0].ergebnis === 'sieg', JSON.stringify(partien).slice(0, 120));
@@ -423,7 +423,7 @@ async function testeSieg(seite, h, fehler) {
   await h.tippe('[data-aktion="nochmal"]');
   await h.screen('partie');
   await h.warteBereit();
-  pruefe('Nochmal: neue Partie gegen Benno', /Benno/.test(await seite.locator('.screen.partie .kopf').innerText()) && (await h.zuege()).length === 0);
+  pruefe('Nochmal: neue Partie gegen Lukas', /Lukas/.test(await seite.locator('.screen.partie .kopf').innerText()) && (await h.zuege()).length === 0);
   pruefe('Nochmal: Grundstellung (32 Figuren)', await seite.locator('.screen.partie .brett > img.figur').count() === 32);
   await h.tippe('.screen.partie [data-aktion="zurueck"]');
   await h.screen('arena');

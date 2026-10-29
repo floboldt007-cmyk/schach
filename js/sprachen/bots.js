@@ -5,8 +5,8 @@
 // Schluessel (flach): t('bots.<id>.name'), t('bots.<id>.merkmale.tempo'), t('bots.<id>.saetze.<anlass>.<i>'),
 // t('bots.welten.<welt-id>.name'). Neue Saetze am Ende einer Liste anhaengen, Deutsch und Englisch gleich viele: die
 // Anzahl je Anlass liest js/bots.js aus dem Deutschen.
-// Englisch: Titel uebersetzt, Rufnamen bleiben (Bauer Benno -> Farmer Benno); wo der Rufname einen Titel oder ein
-// deutsches Wortspiel traegt, ist er mit uebersetzt (Oma Hilde -> Granny Hilde, Ritter Rudi -> Sir Rudi, Prof. Turm ->
+// Englisch: Titel uebersetzt, Rufnamen bleiben (Bauer Lukas -> Farmer Lukas); wo der Rufname einen Titel oder ein
+// deutsches Wortspiel traegt, ist er mit uebersetzt (Oma Hilde -> Granny Hilde, Ritter Thorsten -> Sir Thorsten, Prof. Turm ->
 // Prof. Rook, Kommissar König -> Inspector King, Der Stockfisch -> The Stockfish). Eigene Wortspiele statt woertlicher
 // Uebersetzung, amerikanisches Englisch, keine langen Gedankenstriche, keine Zugklassen-Namen fremder Schachseiten.
 import { registriereTexte } from '../sprache.js';
@@ -48,7 +48,7 @@ const DE = {
       verliert: [
         'Super gespielt! Die Spatzen klatschen mit den Flügeln.',
         'Du hast gewonnen! Ich wusste, dass du das kannst.',
-        'Toll gemacht! Drüben auf dem Hof freut sich Bauer Benno schon auf dich.',
+        'Toll gemacht! Drüben auf dem Hof freut sich Bauer Lukas schon auf dich.',
       ],
       gewinnt: [
         'Oh, ich hab gewonnen? Das war bestimmt nur der Rückenwind.',
@@ -63,9 +63,9 @@ const DE = {
     },
   },
   benno: {
-    name: 'Bauer Benno', rufname: 'Benno', titel: 'Der Gutmütige',
+    name: 'Bauer Lukas', rufname: 'Lukas', titel: 'Der Gutmütige',
     kurz: 'Kennt die Zugregeln, meistens. Freut sich über jede Figur.',
-    bio: 'Benno hat Schach im Winter gelernt, als auf dem Hof nichts zu tun war. Er zieht, was gerade in der Nähe steht, und schnappt sich jede Figur, die er erwischen kann. Ob sie gedeckt war, merkt er meistens erst hinterher.',
+    bio: 'Lukas hat Schach im Winter gelernt, als auf dem Hof nichts zu tun war. Er zieht, was gerade in der Nähe steht, und schnappt sich jede Figur, die er erwischen kann. Ob sie gedeckt war, merkt er meistens erst hinterher.',
     saetze: {
       begruessung: [
         'Moin! Ich hab extra die Gummistiefel ausgezogen. Los geht’s!',
@@ -353,7 +353,7 @@ const DE = {
       verliert: [
         'Verloren! Da hab ich wohl zu viel abgeholzt.',
         'Gut gespielt! Ich setz mich jetzt erst mal auf meinen Stumpf.',
-        'Glückwunsch! Kalle vom Stammtisch freut sich schon auf eine Runde mit dir.',
+        'Glückwunsch! Maxi vom Stammtisch freut sich schon auf eine Runde mit dir.',
       ],
       gewinnt: [
         'Gewonnen! Kahlschlag, wie geplant.',
@@ -368,9 +368,9 @@ const DE = {
     },
   },
   kalle: {
-    name: 'Kalle vom Stammtisch', rufname: 'Kalle', titel: 'Der Draufgänger',
+    name: 'Maxi vom Stammtisch', rufname: 'Maxi', titel: 'Der Draufgänger',
     kurz: 'Greift sofort an, übersieht dabei viel.',
-    bio: 'Kalle ist der Schachkönig seiner Stammkneipe, behauptet er jedenfalls. Er kennt nur eine Richtung: nach vorne. Schach geben findet er großartig, auf seine eigene Deckung achtet er dagegen eher selten.',
+    bio: 'Maxi ist der Schachkönig seiner Stammkneipe, behauptet er jedenfalls. Er kennt nur eine Richtung: nach vorne. Schach geben findet er großartig, auf seine eigene Deckung achtet er dagegen eher selten.',
     saetze: {
       begruessung: [
         'Na, Kollege! Setz dich, ich hab heute richtig Bock auf Angriff!',
@@ -510,7 +510,7 @@ const DE = {
         'Gut gespielt! Ich muss jetzt eh zum Training.',
         'Mist, verloren! Aber das war ein faires Rennen.',
         'Respekt! Ich üb noch ein bisschen mit meinen Läufern.',
-        'Du warst heute schneller. Köhlerin Edda hat schon die Glut für dich angefacht!',
+        'Du warst heute schneller. Köhlerin Irmi hat schon die Glut für dich angefacht!',
       ],
       gewinnt: [
         'Gewonnen! Ziellinie überquert!',
@@ -526,9 +526,9 @@ const DE = {
     },
   },
   edda: {
-    name: 'Köhlerin Edda', rufname: 'Edda', titel: 'Die Glutwächterin',
+    name: 'Köhlerin Irmi', rufname: 'Irmi', titel: 'Die Glutwächterin',
     kurz: 'Baut langsam Druck auf offenen Linien auf.',
-    bio: 'Edda hütet ihren Kohlenmeiler tagelang, denn gute Glut braucht Zeit. Auf dem Brett öffnet sie Linien, stellt ihre Türme dahinter und lässt den Druck langsam steigen. Wenn es knistert, hat sie längst angeheizt.',
+    bio: 'Irmi hütet ihren Kohlenmeiler tagelang, denn gute Glut braucht Zeit. Auf dem Brett öffnet sie Linien, stellt ihre Türme dahinter und lässt den Druck langsam steigen. Wenn es knistert, hat sie längst angeheizt.',
     merkmale: { lieblings: 'Turm', tempo: 'Geduldig', schwaeche: 'Schnelle Konter' },
     saetze: {
       begruessung: [
@@ -560,7 +560,7 @@ const DE = {
       verliert: [
         'Verloren. Meine Glut war heute nicht heiß genug.',
         'Gut gespielt! Ich leg erst mal neues Holz nach.',
-        'Glückwunsch! Ritter Rudi sattelt schon sein Ross für dich.',
+        'Glückwunsch! Ritter Thorsten sattelt schon sein Ross für dich.',
       ],
       gewinnt: [
         'Gewonnen. Gute Glut braucht eben Zeit.',
@@ -575,14 +575,14 @@ const DE = {
     },
   },
   rudi: {
-    name: 'Ritter Rudi', rufname: 'Ritter Rudi', titel: 'Der Gabelritter',
+    name: 'Ritter Thorsten', rufname: 'Ritter Thorsten', titel: 'Der Gabelritter',
     kurz: 'Springer-Fan, sucht Gabeln.',
-    bio: 'Rudi trägt seine Rüstung auch beim Frühstück. Seine Springer sind ihm heilig, und nichts macht ihn glücklicher als eine Gabel auf König und Dame. Er rechnet schon ein paar Züge voraus, verliert aber manchmal den Überblick.',
+    bio: 'Thorsten trägt seine Rüstung auch beim Frühstück. Seine Springer sind ihm heilig, und nichts macht ihn glücklicher als eine Gabel auf König und Dame. Er rechnet schon ein paar Züge voraus, verliert aber manchmal den Überblick.',
     saetze: {
       begruessung: [
         'Sei gegrüßt! Mein Ross ist gesattelt und hat Hunger auf Gabeln.',
         'Fürwahr, ein würdiger Gegner! Lasst die Fanfaren erschallen!',
-        'Hüa! Ritter Rudi ist bereit zur Schlacht. Bist du es auch?',
+        'Hüa! Ritter Thorsten ist bereit zur Schlacht. Bist du es auch?',
         'Willkommen auf meiner Burg! Hier springt man im L, merk dir das.',
       ],
       schlagen: [
@@ -678,7 +678,7 @@ const DE = {
     },
   },
   turm: {
-    name: 'Professor Turm', rufname: 'Prof. Turm', titel: 'Der Geduldige',
+    name: 'Professor Oliver Turm', rufname: 'Oliver', titel: 'Der Geduldige',
     kurz: 'Solide, positionell, geduldig.',
     bio: 'Der Professor lehrt seit Jahrzehnten Positionsspiel und hat noch nie einen Zug überstürzt. Er rochiert früh, stellt seine Türme auf offene Linien und wartet geduldig, bis du einen Fehler machst.',
     saetze: {
@@ -885,7 +885,7 @@ const DE = {
     },
   },
   koenig: {
-    name: 'Kommissar König', rufname: 'König', titel: 'Der Endspiel-Ermittler',
+    name: 'Kommissar Tobias König', rufname: 'Tobias', titel: 'Der Endspiel-Ermittler',
     kurz: 'Endspiel-Spezialist, gibt nie auf.',
     bio: 'Kommissar König hat schon jeden Fall gelöst, meistens im Endspiel. Er tauscht gern ab, sammelt Indizien in Form von kleinen Vorteilen und spielt jede Stellung bis zum letzten Bauern aus. Aufgeben steht nicht in seiner Dienstvorschrift.',
     saetze: {
@@ -1370,7 +1370,7 @@ const DE = {
       verliert: [
         'Verloren. Du hast den größeren Schatz gehoben.',
         'Gut gespielt. Diese Partie kommt in meine Sammlung, ganz nach oben.',
-        'Glückwunsch! Forscherin Merle macht ihre Tauchkugel schon für dich klar.',
+        'Glückwunsch! Forscherin Viki macht ihre Tauchkugel schon für dich klar.',
       ],
       gewinnt: [
         'Gewonnen. Am Ende hat ein halber Bauer gereicht.',
@@ -1385,9 +1385,9 @@ const DE = {
     },
   },
   merle: {
-    name: 'Forscherin Merle', rufname: 'Merle', titel: 'Die Gründliche',
+    name: 'Forscherin Viki', rufname: 'Viki', titel: 'Die Gründliche',
     kurz: 'Gründlich in jeder Phase. Notiert sich alles.',
-    bio: 'Merle erforscht die Tiefsee aus einer gläsernen Tauchkugel und notiert alles, was sie sieht. So spielt sie auch: Eröffnung, Mittelspiel und Endspiel mit derselben Sorgfalt. Lücken in ihren Notizen findet man selten.',
+    bio: 'Viki erforscht die Tiefsee aus einer gläsernen Tauchkugel und notiert alles, was sie sieht. So spielt sie auch: Eröffnung, Mittelspiel und Endspiel mit derselben Sorgfalt. Lücken in ihren Notizen findet man selten.',
     merkmale: { lieblings: 'Alle', tempo: 'Gründlich', schwaeche: 'Keine bekannt' },
     saetze: {
       begruessung: [
@@ -1597,7 +1597,7 @@ const EN = {
       verliert: [
         'Great game! The sparrows are clapping their wings.',
         'You won! I knew you could do it.',
-        'Well done! Over at the farm, Farmer Benno is already looking forward to meeting you.',
+        'Well done! Over at the farm, Farmer Lukas is already looking forward to meeting you.',
       ],
       gewinnt: [
         'Oh, I won? That must have been the tailwind.',
@@ -1612,9 +1612,9 @@ const EN = {
     },
   },
   benno: {
-    name: 'Farmer Benno', rufname: 'Benno', titel: 'The Good-Natured One',
+    name: 'Farmer Lukas', rufname: 'Lukas', titel: 'The Good-Natured One',
     kurz: 'Knows the rules, mostly. Delighted by every piece he grabs.',
-    bio: 'Benno learned chess one winter when there was nothing to do on the farm. He moves whatever is closest and grabs every piece he can reach. Whether it was protected, he usually notices only afterward.',
+    bio: 'Lukas learned chess one winter when there was nothing to do on the farm. He moves whatever is closest and grabs every piece he can reach. Whether it was protected, he usually notices only afterward.',
     saetze: {
       begruessung: [
         'Howdy! I even took off my rubber boots for this. Let’s go!',
@@ -1902,7 +1902,7 @@ const EN = {
       verliert: [
         'I lost! Guess I chopped down too much.',
         'Well played! I’m going to sit on my stump for a bit.',
-        'Congrats! Kalle from the Pub is looking forward to a round with you.',
+        'Congrats! Maxi from the Pub is looking forward to a round with you.',
       ],
       gewinnt: [
         'I won! Clear-cut, just as planned.',
@@ -1917,9 +1917,9 @@ const EN = {
     },
   },
   kalle: {
-    name: 'Kalle from the Pub', rufname: 'Kalle', titel: 'The Daredevil',
+    name: 'Maxi from the Pub', rufname: 'Maxi', titel: 'The Daredevil',
     kurz: 'Attacks right away and misses a lot along the way.',
-    bio: 'Kalle is the chess king of his local pub, or so he claims. He knows only one direction: forward. He loves giving check, but he rarely pays attention to his own defense.',
+    bio: 'Maxi is the chess king of his local pub, or so he claims. He knows only one direction: forward. He loves giving check, but he rarely pays attention to his own defense.',
     saetze: {
       begruessung: [
         'Hey, buddy! Sit down, I’m itching to attack today!',
@@ -2059,7 +2059,7 @@ const EN = {
         'Well played! I have to get to practice anyway.',
         'Shoot, I lost! But that was a fair race.',
         'Respect! I’ll practice a bit more with my bishops.',
-        'You were faster today. Charcoal Burner Edda has already stoked the embers for you!',
+        'You were faster today. Charcoal Burner Irmi has already stoked the embers for you!',
       ],
       gewinnt: [
         'I won! Across the finish line!',
@@ -2075,9 +2075,9 @@ const EN = {
     },
   },
   edda: {
-    name: 'Charcoal Burner Edda', rufname: 'Edda', titel: 'The Ember Keeper',
+    name: 'Charcoal Burner Irmi', rufname: 'Irmi', titel: 'The Ember Keeper',
     kurz: 'Slowly builds pressure on open files.',
-    bio: 'Edda tends her charcoal kiln for days, because good embers take time. On the board she opens files, lines up her rooks behind them and lets the pressure rise slowly. By the time things crackle, she has long since stoked the fire.',
+    bio: 'Irmi tends her charcoal kiln for days, because good embers take time. On the board she opens files, lines up her rooks behind them and lets the pressure rise slowly. By the time things crackle, she has long since stoked the fire.',
     merkmale: { lieblings: 'Rook', tempo: 'Patient', schwaeche: 'Quick counterplay' },
     saetze: {
       begruessung: [
@@ -2109,7 +2109,7 @@ const EN = {
       verliert: [
         'I lost. My embers weren’t hot enough today.',
         'Well played! I’ll go add some more wood.',
-        'Congrats! Sir Rudi is already saddling his steed for you.',
+        'Congrats! Sir Thorsten is already saddling his steed for you.',
       ],
       gewinnt: [
         'I won. Good embers just take time.',
@@ -2124,14 +2124,14 @@ const EN = {
     },
   },
   rudi: {
-    name: 'Sir Rudi', rufname: 'Sir Rudi', titel: 'The Knight of Forks',
+    name: 'Sir Thorsten', rufname: 'Sir Thorsten', titel: 'The Knight of Forks',
     kurz: 'Knight fan, hunts for forks.',
-    bio: 'Rudi even wears his armor at breakfast. His knights are sacred to him, and nothing makes him happier than a fork on king and queen. He already calculates a few moves ahead, but sometimes loses track of the big picture.',
+    bio: 'Thorsten even wears his armor at breakfast. His knights are sacred to him, and nothing makes him happier than a fork on king and queen. He already calculates a few moves ahead, but sometimes loses track of the big picture.',
     saetze: {
       begruessung: [
         'Greetings! My steed is saddled and hungry for forks.',
         'Verily, a worthy opponent! Let the trumpets sound!',
-        'Giddyup! Sir Rudi is ready for battle. Are you?',
+        'Giddyup! Sir Thorsten is ready for battle. Are you?',
         'Welcome to my castle! Here we jump in an L, remember that.',
       ],
       schlagen: [
@@ -2227,7 +2227,7 @@ const EN = {
     },
   },
   turm: {
-    name: 'Professor Rook', rufname: 'Prof. Rook', titel: 'The Patient One',
+    name: 'Professor Oliver Rook', rufname: 'Oliver', titel: 'The Patient One',
     kurz: 'Solid, positional, patient.',
     bio: 'The professor has taught positional play for decades and has never rushed a move. He castles early, puts his rooks on open files and waits patiently for you to slip up.',
     saetze: {
@@ -2434,7 +2434,7 @@ const EN = {
     },
   },
   koenig: {
-    name: 'Inspector King', rufname: 'Inspector', titel: 'The Endgame Detective',
+    name: 'Inspector Tobias King', rufname: 'Tobias', titel: 'The Endgame Detective',
     kurz: 'Endgame specialist, never gives up.',
     bio: 'Inspector King has solved every case, usually in the endgame. He likes to trade pieces, gathers evidence in the form of small advantages and plays every position down to the last pawn. Resigning is not in his rule book.',
     saetze: {
@@ -2919,7 +2919,7 @@ const EN = {
       verliert: [
         'I lost. You raised the bigger treasure.',
         'Well played. This game goes in my collection, right at the top.',
-        'Congrats! Explorer Merle is already getting her diving sphere ready for you.',
+        'Congrats! Explorer Viki is already getting her diving sphere ready for you.',
       ],
       gewinnt: [
         'I won. In the end, half a pawn was enough.',
@@ -2934,9 +2934,9 @@ const EN = {
     },
   },
   merle: {
-    name: 'Explorer Merle', rufname: 'Merle', titel: 'The Thorough One',
+    name: 'Explorer Viki', rufname: 'Viki', titel: 'The Thorough One',
     kurz: 'Thorough in every phase. Writes everything down.',
-    bio: 'Merle explores the deep sea from a glass diving sphere and writes down everything she sees. That’s how she plays too: opening, middlegame and endgame with the same care. You rarely find gaps in her notes.',
+    bio: 'Viki explores the deep sea from a glass diving sphere and writes down everything she sees. That’s how she plays too: opening, middlegame and endgame with the same care. You rarely find gaps in her notes.',
     merkmale: { lieblings: 'All of them', tempo: 'Thorough', schwaeche: 'None known' },
     saetze: {
       begruessung: [

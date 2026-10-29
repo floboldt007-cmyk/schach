@@ -365,7 +365,7 @@ async function schrittZwei(browser) {
       if (u.pathname.endsWith('/schule_meine_klassen')) body = { leitung: [klasse], mitglied: [] };
       else if (u.pathname.endsWith('/schule_klassen_uebersicht')) body = { klasse, mitglieder: [{ id: 'mitglied', anzeigename: 'Alex', fortschritt: {
         bots_besiegt: 2, sterne: 4, partien: 5, genauigkeit_schnitt: 61.5, haeufigste_fehler: { arten: [{ art: 'fehler', anzahl: 2 }] }, erledigt: [], aktualisiert_am: '2026-10-22' } }],
-      aufgaben: [{ id: 'aufgabe', titel: 'Play Rudi', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
+      aufgaben: [{ id: 'aufgabe', titel: 'Play Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
       else if (u.pathname.endsWith('/ist_premium')) body = false;
       else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
       else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];

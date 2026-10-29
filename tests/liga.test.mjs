@@ -394,12 +394,12 @@ async function browserTeil(browser, start) {
           return JSON.stringify(t.speicher.ladeModul('liga')) === vorher;
         }));
       });
-      // Welten: nach dem Sieg ueber Rudi (Endgegner Welt 2) zeigt die Arena die Turmstadt; Rudi steht in Welt 2
+      // Welten: nach dem Sieg ueber Thorsten (Endgegner Welt 2) zeigt die Arena die Turmstadt; Thorsten steht in Welt 2
       await page.evaluate(() => window.__app.gehe('arena', { welt: 2 }));
       await page.waitForSelector('.liga-bilanz');
       await page.locator('.knoten[data-bot="rudi"]').tap();
       await browserPruefe(name + ': Bot-Bilanz und Vereinsmeisterschaft zeigen den echten Sieg', async () => {
-        assert.match(await page.locator('.liga-bilanz').innerText(), /Rudi: 1 Sieg/);
+        assert.match(await page.locator('.liga-bilanz').innerText(), /Thorsten: 1 Sieg/);
         assert.match(await page.locator('.liga-club').innerText(), /1 von 30 Bots geschlagen/);
       });
       await page.evaluate(() => window.__app.gehe('verlauf'));

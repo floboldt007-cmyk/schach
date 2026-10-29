@@ -717,7 +717,7 @@ function hilfen(seite) {
         } };
       }, p);
     },
-    // Partie nach Plan bis zum Ergebnis (wertend gegen Benno)
+    // Partie nach Plan bis zum Ergebnis (wertend gegen Lukas)
     async spiele(zuege, plan, { botId = 'benno', warteAuf = '.ergebnis-overlay.gefuellt:not(.vorlaeufig)' } = {}) {
       await h.plan(plan);
       await h.starte({ botId, farbe: 'w' });

@@ -182,12 +182,12 @@ pruefe('Sterne: Sieg 79,9 % mit Hinweis', JSON.stringify(sterneFuerPartie(partie
 pruefe('Sterne: Sieg 80 % ohne Hilfe', JSON.stringify(sterneFuerPartie(partie({ genauigkeit: 80 }))) === '[true,true,true]');
 pruefe('Sterne: Genauigkeit null', JSON.stringify(sterneFuerPartie(partie({ genauigkeit: null, zuruecknahmen: 2 }))) === '[true,false,false]');
 
-// Niederlage gegen Benno: nichts frei
+// Niederlage gegen Lukas: nichts frei
 let r = speicherePartie(partie({ ergebnis: 'niederlage', genauigkeit: 50 }));
 f = ladeFortschritt();
 pruefe('Niederlage: keine Sterne, nicht frei', !r.neuFreigeschaltet && gesamtSterne(f) === 0 && f.bots.benno.niederlagen === 1 && f.bots.benno.partien === 1);
 
-// Sieg mit Hinweis gegen Benno (Stufe 2) -> Stern 1 und 2, frei bis Paula (Stufe 3, der naechste Gegner)
+// Sieg mit Hinweis gegen Lukas (Stufe 2) -> Stern 1 und 2, frei bis Paula (Stufe 3, der naechste Gegner)
 r = speicherePartie(partie({ genauigkeit: 85, hinweise: 1 }), { zuege: [{ ply: 0, farbe: 'w', san: 'e4', klasse: 'brillant' }, { ply: 1, farbe: 'b', san: 'e5', klasse: 'brillant' }] });
 f = ladeFortschritt();
 pruefe('Sieg mit Hinweis: Sterne 1+2 neu, Paula frei', JSON.stringify(r.neueSterne) === '[true,true,false]' && r.neuFreigeschaltet && r.neuFreigeschaltet.id === 'paula', r.neuFreigeschaltet && r.neuFreigeschaltet.id);
@@ -968,7 +968,7 @@ function gleich(a, b) {
     && !fake.aufrufe.some((a) => stellungsSchluessel(a.fen) === stellungsSchluessel(NACH_E4)), fake.aufrufe.length);
   const nl = nachlese();
   pruefe('Nachholen: neu verdienter Stern kommt in die Nachlese (still, nicht ins Overlay)', nl.length === 2 && nl.every((f) => f.quelle === 'stern-nachgeholt' && f.art === 'zeile')
-    && nl.some((f) => f.titel === 'Neuer Stern gegen Bauer Benno' && /Nachträglich ausgewertet: 100 % Genauigkeit\./.test(f.text)), nl);
+    && nl.some((f) => f.titel === 'Neuer Stern gegen Bauer Lukas' && /Nachträglich ausgewertet: 100 % Genauigkeit\./.test(f.text)), nl);
   pruefe('Nachholen: kaputte Partie nur einmal versucht', offenePartien({ max: 5 }).length === 0 && zustand().laeuft === false);
 
   // Abbruch (Arena verlassen, Partie startet): laufende Suche gestoppt, nichts gespeichert, spaeter weiter
@@ -1050,7 +1050,7 @@ function gleich(a, b) {
     && statistik().partien === vorher && !istFreigeschaltet(2), erg.map((e) => e.wertet));
   pruefe('wertet: boss, frei, spiel nie, auch aus der Grundstellung', ['boss', 'frei', 'spiel'].every((m) => !wertet({ modus: m })));
   // w0plus-a-fix (Befund des Pruefers): ein angemeldeter Gast im Modus normal wertete wie ein Leiter-Bot (3 Sterne,
-  // Statistik, "Nächster Gegner" Benno). Angemeldete Bots gehoeren nie zur Leiter.
+  // Statistik, "Nächster Gegner" Lukas). Angemeldete Bots gehoeren nie zur Leiter.
   const abGast = registriereBot({ id: 'pruefer-gast', art: 'gast', name: 'Gast Maik', avatar: 'assets/avatare/01-bauer-benno.svg',
     staerke: { ...botNachId('benno').staerke } });
   const vorGast = statistik().partien;

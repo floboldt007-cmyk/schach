@@ -215,7 +215,7 @@ async function nodeTeil() {
     && L.punkteVon(null) === 0);
   const tabelle = [[0, 'fridolin'], [0.5, 'fridolin'], [1, 'benno'], [1.5, 'benno'], [2, 'hilde'], [3, 'hilde'], [3.5, 'kalle'], [4.5, 'kalle'], [5, 'lisa'], [5.5, 'lisa'], [6, 'lisa'],
     [6.5, 'rudi'], [7, 'rudi'], [7.5, 'turm'], [8, 'turm'], [99, 'turm'], [-3, 'fridolin'], [NaN, 'fridolin']];
-  pruefe('Tabelle Punkte -> Bot (0 bis 0,5 Willi, bis 1,5 Benno, bis 3 Hilde, bis 4,5 Kalle, bis 6 Lisa, bis 7 Rudi, bis 8 Professor Turm)',
+  pruefe('Tabelle Punkte -> Bot (0 bis 0,5 Willi, bis 1,5 Lukas, bis 3 Hilde, bis 4,5 Maxi, bis 6 Lisa, bis 7 Thorsten, bis 8 Professor Turm)',
     tabelle.every(([p, b]) => L.botFuerPunkte(p) === b), tabelle.filter(([p, b]) => L.botFuerPunkte(p) !== b));
   const stufe = (id) => BOTS.find((b) => b.id === id).stufe;
   let monoton = true;
@@ -327,7 +327,7 @@ async function nodeTeil() {
     alleJs.flatMap((d) => lies(d).split('\n').filter((z) => /^\s*\/\/.*[^\x00-\x7F]/.test(z)).map((z) => d + ': ' + z.trim().slice(0, 50))));
   const ohneKommentar = (d) => lies(d).replace(/\/\/.*$/gm, '');
   pruefe('kein fester Bot im Dienst und im Screen: der Gegner nach der Regel-Hilfe ist der erste Bot der Leiter (BOTS[0])',
-    ['js/pakete/start/dienst.js', 'js/ui/start.js'].every((d) => !/botNachId\('benno'\)|botId: 'benno'|Bauer Benno|botNachId\('fridolin'\)|botId: 'fridolin'|Vogelscheuche Willi/.test(ohneKommentar(d)))
+    ['js/pakete/start/dienst.js', 'js/ui/start.js'].every((d) => !/botNachId\('benno'\)|botId: 'benno'|Bauer Lukas|botNachId\('fridolin'\)|botId: 'fridolin'|Vogelscheuche Willi/.test(ohneKommentar(d)))
     && /export const ersterGegner = \(\) => BOTS\[0\]/.test(lies('js/pakete/start/dienst.js')));
   const cssRoh = lies('css/pakete/start.css');
   pruefe('Kommentare in ASCII auch im CSS und in dieser Testdatei', [...cssRoh.matchAll(/\/\*[\s\S]*?\*\//g)].every((x) => !/[^\x00-\x7F]/.test(x[0]))
@@ -863,8 +863,8 @@ async function browserTeil(browser) {
     const b = fuerOverlay('psieg2').map((f) => f.quelle);
     return { a, b };
   });
-  pruefe('erster wertender Sieg: grosse Feier-Zeile "Dein erster Sieg · Gegen Bauer Benno, in 23 Zügen"', sieg.a.length === 1 && sieg.a[0].quelle === 'erster-sieg'
-    && sieg.a[0].art === 'gross' && sieg.a[0].titel === 'Dein erster Sieg' && sieg.a[0].text === 'Gegen Bauer Benno, in 23 Zügen', JSON.stringify(sieg));
+  pruefe('erster wertender Sieg: grosse Feier-Zeile "Dein erster Sieg · Gegen Bauer Lukas, in 23 Zügen"', sieg.a.length === 1 && sieg.a[0].quelle === 'erster-sieg'
+    && sieg.a[0].art === 'gross' && sieg.a[0].titel === 'Dein erster Sieg' && sieg.a[0].text === 'Gegen Bauer Lukas, in 23 Zügen', JSON.stringify(sieg));
   const ms = await modulImBrowser(n.seite);
   pruefe('nur einmal (gemerkt im Modul), letzte Partie gemerkt', sieg.b.length === 0 && ms.ersterSieg === 'psieg1' && ms.letzte === 'psieg2', JSON.stringify({ b: sieg.b, ms }));
   pruefe('keine Konsolenfehler (Heute-Karte, Einstellungen, Feier)', n.fehler.length === 0, n.fehler.join(' | '));
@@ -1016,8 +1016,8 @@ async function browserTeil(browser) {
       if (name !== 'handy-klein' || s === 'w1') await bild(hs.seite, `${s}-${name}`);
     }
     if (handy && w === 390) {
-      // Einstufung bis zur Empfehlung: erste Aufgabe geloest, alles andere mit "Loesung zeigen" (1 Punkt -> Bauer Benno, Stufe 2;
-      // auf der frischen Leiter ist nur Willi frei, also gibt es Benno als Probepartie)
+      // Einstufung bis zur Empfehlung: erste Aufgabe geloest, alles andere mit "Loesung zeigen" (1 Punkt -> Bauer Lukas, Stufe 2;
+      // auf der frischen Leiter ist nur Willi frei, also gibt es Lukas als Probepartie)
       await hs.seite.locator('[data-st="ja"]').click();
       await warteSeite(hs.seite, 'einstufung');
       await bild(hs.seite, `einstufung-${name}`);
@@ -1034,8 +1034,8 @@ async function browserTeil(browser) {
       }
       await hs.seite.locator('.rs-weiter').click();
       await hs.seite.waitForSelector('.rs-ende:not([hidden]) .rs-ende-karte', { timeout: 8000 });
-      pruefe('Einstufung mit 1 Punkt: "Starte gegen Bauer Benno" (Stufe 2, auf der frischen Leiter nur als Probepartie), Leiter: Willi', await hs.seite.evaluate(() => document.querySelector('.rs-ende h2').textContent) === 'Starte gegen Bauer Benno'
-        && await hs.seite.evaluate(() => [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()).join('|')) === 'Probepartie gegen Bauer Benno|Leiter: Vogelscheuche Willi|Fertig');
+      pruefe('Einstufung mit 1 Punkt: "Starte gegen Bauer Lukas" (Stufe 2, auf der frischen Leiter nur als Probepartie), Leiter: Willi', await hs.seite.evaluate(() => document.querySelector('.rs-ende h2').textContent) === 'Starte gegen Bauer Lukas'
+        && await hs.seite.evaluate(() => [...document.querySelectorAll('.rs-ende-knoepfe .knopf')].map((k) => k.textContent.trim()).join('|')) === 'Probepartie gegen Bauer Lukas|Leiter: Vogelscheuche Willi|Fertig');
       await hs.seite.locator('.rs-ende .rs-fertig').click();
       await warteSeite(hs.seite, 'empfehlung');
       const l = await layout(hs.seite);
