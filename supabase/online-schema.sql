@@ -2,9 +2,20 @@
 -- Mehrfach ausfuehrbar (Muster: schema.sql). Vorher schema.sql einspielen (gleicher Zeitstempel-Trigger).
 --
 -- Was der Server prueft: wer am Zug ist, Status der Partie, Form von Zug und Stellung, und er fuehrt die Uhr
--- mit seiner eigenen Zeit. Die Schachregeln selbst prueft er NICHT vollstaendig: Beide Clients rechnen mit
--- chess.js, unter Freunden reicht das. Fuer Partien gegen Fremde kommt spaeter eine Edge Function, die jeden Zug
--- nachrechnet (Konzept Anti-Cheat, Etappe 1a).
+-- mit seiner eigenen Zeit. Die Schachregeln selbst prueft diese Datei NICHT vollstaendig (das kann SQL nicht gut);
+-- das macht seit Anti-Cheat Etappe 1a die Edge Function online-zug (siehe unten).
+--
+-- Anti-Cheat Etappe 1a, Teil 1 (Stand 29.10.2026): Zuege laufen nur noch ueber die Edge Function online-zug
+-- (supabase/functions/online-zug, Logik in supabase/functions/_gemeinsam/online-zug.js). Der Browser schickt nur
+-- { partie, zug }. Die Function prueft die Anmeldung selbst, spielt die gespeicherten Zuege mit chess.js 1.4.0 nach,
+-- prueft den neuen Zug nach den Regeln und rechnet Stellung, Seite am Zug und das Ende (Matt, Patt, zu wenig Material,
+-- dreifache Wiederholung, 50 Zuege) selbst aus. Verbucht wird ueber online_zug_verbuchen, das NUR die Service-Rolle
+-- aufrufen darf (unter ihr ist auth.uid() leer, deshalb kommt die Nutzer-ID als Parameter). Die Ankunftszeit misst die
+-- Function; die Datenbank begrenzt sie auf den Bereich zwischen letztem Zug und jetzt und zieht bis dahin die Uhr ab.
+-- Kam inzwischen ein anderer Zug (Zahl der Halbzuege passt nicht mehr), lehnt sie ab (ONLINE_STAND_VERALTET). Der alte
+-- Weg online_zug (Stellung und Ergebnis vom Browser) ist fuer angemeldete Nutzer geschlossen; beide teilen sich den
+-- Kern online_zug_buchen, die Regeln von Etappe 0 (Ergebnis nur mit passendem Grund, grobe Folgestellung, Uhr)
+-- gelten dort weiter als zweite Linie.
 --
 -- Anti-Cheat Etappe 0 (Stand 29.10.2026), eine Zwischenloesung unter Freunden ohne Wertung:
 --   * Einladungs-Bremse: hoechstens 5 offene und 50 neue Einladungen je Konto in 24 Stunden
@@ -33,9 +44,10 @@
 --
 -- Uhr: `bedenkzeit_s` null heisst ohne Uhr. Sonst bekommen beide beim Beitritt `bedenkzeit_s * 1000` ms.
 -- Der jeweils erste Zug von Weiss und von Schwarz kostet keine Zeit (eine Einladung darf in Ruhe angenommen
--- werden, auch Stunden spaeter). Ab dem dritten Halbzug zieht der Server `clock_timestamp() - letzter_zug_am`
--- von der Uhr des Ziehenden ab und addiert danach `inkrement_s`. Ist die Uhr dabei auf 0 oder darunter, ist die
--- Partie durch Zeitueberschreitung beendet und der Zug wird nicht mehr verbucht.
+-- werden, auch Stunden spaeter). Ab dem dritten Halbzug zieht der Server die Zeit vom letzten Zug bis zur Ankunft
+-- des neuen Zugs (Etappe 1a: von der Edge Function gemessen und hier begrenzt; beim alten Weg jetzt) von der Uhr des
+-- Ziehenden ab und addiert danach `inkrement_s`. Ist die Uhr dabei auf 0 oder darunter, ist die Partie durch
+-- Zeitueberschreitung beendet und der Zug wird nicht mehr verbucht. Die Uhr des Gegners laeuft ab dem Verbuchen.
 -- Die Uhr wird nicht nur beim eigenen Zug geprueft: Zug, Remis, Remis-Annahme und Aufgabe pruefen zuerst die
 -- laufende Uhr der Seite am Zug (online_uhr_pruefen), und mit online_pruefe_zeit kann jeder der beiden Spieler
 -- die Zeit reklamieren, wenn der Gegner einfach nicht mehr zieht. Wer ueber der Zeit ist, verliert also auch,
@@ -55,7 +67,8 @@
 -- online_erstelle: Ein direktes insert ist fuer authenticated nicht erlaubt.
 --
 -- Fehler melden die Funktionen als kurze Kennungen (z. B. ONLINE_NICHT_DEIN_ZUG); js/online.js uebersetzt sie
--- in ganze Saetze. Die Kennungen sind ein Vertrag: wer eine aendert, aendert auch js/online.js.
+-- in ganze Saetze. Die Kennungen sind ein Vertrag: wer eine aendert, aendert auch js/online.js (und, fuer Zuege, die
+-- Liste SQL_KENNUNGEN in supabase/functions/_gemeinsam/online-zug.js).
 --
 -- Alle Funktionen laufen mit leerem search_path und sprechen Tabellen und Funktionen voll qualifiziert an
 -- (public., auth., pg_catalog.). So kann kein Objekt in einem anderen Schema eine Security-Definer-Funktion
@@ -353,9 +366,10 @@ begin
 end;
 $$;
 
--- Haengt die Partie? MIT Uhr: noch keine 2 Halbzuege (die Uhr laeuft noch nicht) und seit 10 Minuten kein Zug.
--- OHNE Uhr: seit 7 Tagen kein Zug. (letzter_zug_am setzt auch der Beitritt.)
-create or replace function public.online_haengt(p public.partien_online)
+-- Haengt die Partie zum Zeitpunkt bezug? MIT Uhr: noch keine 2 Halbzuege (die Uhr laeuft noch nicht) und seit
+-- 10 Minuten kein Zug. OHNE Uhr: seit 7 Tagen kein Zug. (letzter_zug_am setzt auch der Beitritt.) bezug ist sonst
+-- jetzt; beim Zug ueber die Edge Function die gemessene Ankunftszeit (Etappe 1a).
+create or replace function public.online_haengt(p public.partien_online, bezug timestamptz)
 returns boolean
 language sql
 volatile
@@ -363,8 +377,18 @@ set search_path = ''
 as $$
   select p.status = 'laeuft' and p.letzter_zug_am is not null and (
     (p.bedenkzeit_s is not null and position(' ' in p.zuege) = 0
-      and p.letzter_zug_am < pg_catalog.clock_timestamp() - interval '10 minutes')
-    or (p.bedenkzeit_s is null and p.letzter_zug_am < pg_catalog.clock_timestamp() - interval '7 days'));
+      and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '10 minutes')
+    or (p.bedenkzeit_s is null and p.letzter_zug_am < coalesce(bezug, pg_catalog.clock_timestamp()) - interval '7 days'));
+$$;
+
+-- Haengt die Partie jetzt? (Aufraeumen, Zeit-Reklamation, Remis, Aufgabe)
+create or replace function public.online_haengt(p public.partien_online)
+returns boolean
+language sql
+volatile
+set search_path = ''
+as $$
+  select public.online_haengt(p, pg_catalog.clock_timestamp());
 $$;
 
 -- Aufraeumen fuer alle (nur intern): Einladungen, die nie zu einer Partie wurden (offen oder zurueckgezogen) und
@@ -604,13 +628,15 @@ begin
 end;
 $$;
 
--- Laufende Uhr der Seite am Zug pruefen (die Zeile muss schon gesperrt sein). Ist sie abgelaufen, endet die Partie
--- hier auf Zeit (online_zeitende) und die Funktion gibt die beendete Zeile zurueck; sonst die unveraenderte. Eine
--- haengende Partie (online_haengt) endet hier als 'abgebrochen'. Kein raise: eine Ausnahme wuerde die Beendigung
--- wieder zurueckrollen. Nur intern (kein Recht fuer authenticated).
--- Wie in online_zug kostet der jeweils erste Zug von Weiss und Schwarz keine Zeit (weniger als 2 Halbzuege).
+-- Laufende Uhr der Seite am Zug pruefen, gemessen bis zum Zeitpunkt bezug (die Zeile muss schon gesperrt sein). Ist
+-- sie abgelaufen, endet die Partie hier auf Zeit (online_zeitende) und die Funktion gibt die beendete Zeile zurueck;
+-- sonst die unveraenderte. Eine haengende Partie (online_haengt) endet hier als 'abgebrochen'. Kein raise: eine
+-- Ausnahme wuerde die Beendigung wieder zurueckrollen. Nur intern (kein Recht fuer authenticated).
+-- bezug ist sonst jetzt (Fassung mit einem Parameter unten); beim Zug ueber die Edge Function die gemessene
+-- Ankunftszeit (Etappe 1a): Ein Zug, der rechtzeitig ankam, verliert nicht durch die Zeit, die der Server danach braucht.
+-- Wie in online_zug_buchen kostet der jeweils erste Zug von Weiss und Schwarz keine Zeit (weniger als 2 Halbzuege).
 -- Nach einer strittigen Meldung (grund 'strittig') entscheidet die Uhr nicht mehr.
-create or replace function public.online_uhr_pruefen(p public.partien_online)
+create or replace function public.online_uhr_pruefen(p public.partien_online, bezug timestamptz)
 returns public.partien_online
 language plpgsql
 set search_path = ''
@@ -618,11 +644,12 @@ as $$
 declare
   halbzuege integer;
   rest_ms bigint;
+  v_bezug timestamptz := coalesce(bezug, pg_catalog.clock_timestamp());
 begin
   if p.status <> 'laeuft' or p.grund is not distinct from 'strittig' then
     return p;
   end if;
-  if public.online_haengt(p) then
+  if public.online_haengt(p, v_bezug) then
     update public.partien_online t
     set status = 'beendet', ergebnis = null, grund = 'abgebrochen', remis_angebot = null
     where t.id = p.id
@@ -637,11 +664,22 @@ begin
     return p;
   end if;
   rest_ms := (case when p.am_zug = 'w' then p.uhr_weiss_ms else p.uhr_schwarz_ms end)
-             - floor(extract(epoch from (clock_timestamp() - p.letzter_zug_am)) * 1000);
+             - floor(extract(epoch from (v_bezug - p.letzter_zug_am)) * 1000);
   if rest_ms > 0 then
     return p;
   end if;
   return public.online_zeitende(p);
+end;
+$$;
+
+-- Uhr jetzt pruefen (Zeit-Reklamation, Remis, Remis-Annahme, Aufgabe). Nur intern.
+create or replace function public.online_uhr_pruefen(p public.partien_online)
+returns public.partien_online
+language plpgsql
+set search_path = ''
+as $$
+begin
+  return public.online_uhr_pruefen(p, pg_catalog.clock_timestamp());
 end;
 $$;
 
@@ -670,33 +708,51 @@ begin
 end;
 $$;
 
--- Einen Zug verbuchen. zug: UCI (e2e4, e7e8q). fen_danach und am_zug_danach kommen vom Client (chess.js). Der
--- Server prueft die Form, dass die Seite am Zug wechselt und grob, ob das neue Brett aus dem alten plus dem Zug
--- entsteht (online_folge_passt). Ein Ergebnis braucht einen passenden Grund: 'matt' nur als Sieg des Ziehenden,
--- 'patt', 'material', 'wiederholung' und '50-zuege' nur als '1/2-1/2'. Andere Gruende setzt nur der Server.
-create or replace function public.online_zug(partie uuid, zug text, fen_danach text, am_zug_danach text, ergebnis text default null, grund text default null)
+-- Kern fuer einen Zug (nur intern, kein Recht fuer Nutzer oder die Service-Rolle). Aufgerufen von
+-- online_zug_verbuchen (Edge Function online-zug, Etappe 1a) und vom alten Weg online_zug (fuer Nutzer geschlossen).
+--   uid: der Ziehende (muss Weiss oder Schwarz sein). zug: UCI (e2e4, e7e8q). fen_danach, am_zug_danach, ergebnis und
+--   grund hat die Edge Function mit chess.js ausgerechnet. ankunft: wann der Zug ankam (die Edge Function misst es;
+--   hier begrenzt auf den Bereich vom letzten Zug bis jetzt, null heisst jetzt). halbzuege_vorher: die Zahl der
+--   Halbzuege, auf die sich der Zug bezieht; passt sie nicht mehr, kam inzwischen ein anderer Zug
+--   (ONLINE_STAND_VERALTET; null heisst nicht pruefen, nur der alte Weg).
+-- Zweite Linie (Regeln von Etappe 0, unveraendert): Form von Zug und Stellung, die Seite am Zug wechselt, das neue
+-- Brett entsteht grob aus dem alten plus dem Zug (online_folge_passt), ein Ergebnis braucht einen passenden Grund
+-- ('matt' nur als Sieg des Ziehenden, 'patt', 'material', 'wiederholung' und '50-zuege' nur als '1/2-1/2'; andere Gruende
+-- setzt nur der Server selbst). Die Uhr laeuft bis zur Ankunft; die Uhr des Gegners startet mit dem Verbuchen.
+create or replace function public.online_zug_buchen(partie uuid, uid uuid, zug text, fen_danach text, am_zug_danach text,
+  ergebnis text, grund text, ankunft timestamptz, halbzuege_vorher integer)
 returns public.partien_online
 language plpgsql
-security definer
 set search_path = ''
 as $$
 declare
-  uid uuid := auth.uid();
   v_ergebnis text := ergebnis;
   v_grund text := grund;
   p public.partien_online;
   farbe text;
   gegner text;
   halbzuege integer;
-  jetzt timestamptz := clock_timestamp();
+  jetzt timestamptz;
+  v_ankunft timestamptz;
   verbraucht_ms bigint;
   uhr_ms bigint;
 begin
   p := public.online_hole_laufende(partie, uid);
-  -- zuerst die Uhr der Seite am Zug: ist sie abgelaufen, endet die Partie hier (auch wenn der Gegner ruft)
-  p := public.online_uhr_pruefen(p);
+  -- erst nach der Sperre messen: Ein Aufruf, der auf die Sperre gewartet hat, rechnet mit der Zeit danach
+  jetzt := pg_catalog.clock_timestamp();
+  -- Ankunft begrenzen: nie spaeter als jetzt, nie vor dem letzten Zug (sonst liefe die Uhr rueckwaerts)
+  v_ankunft := greatest(least(coalesce(ankunft, jetzt), jetzt), coalesce(p.letzter_zug_am, jetzt));
+  -- zuerst die Uhr der Seite am Zug, gemessen bis zur Ankunft: ist sie abgelaufen, endet die Partie hier (auch wenn
+  -- der Gegner ruft)
+  p := public.online_uhr_pruefen(p, v_ankunft);
   if p.status <> 'laeuft' then
     return p; -- Zeit abgelaufen oder Partie abgebrochen, bevor der Zug kam: Partie beendet, Zug verfaellt
+  end if;
+  halbzuege := case when p.zuege = '' then 0 else array_length(string_to_array(p.zuege, ' '), 1) end;
+  -- veralteter Stand vor allem anderen: Zwei gleichzeitige Zuege desselben Spielers bezogen sich auf dieselbe Stellung,
+  -- der erste ist verbucht, der zweite kommt hier an (sonst hiesse es "nicht dein Zug")
+  if halbzuege_vorher is not null and halbzuege_vorher is distinct from halbzuege then
+    raise exception 'ONLINE_STAND_VERALTET';
   end if;
   farbe := case when p.weiss = uid then 'w' else 'b' end;
   gegner := case when farbe = 'w' then 'b' else 'w' end;
@@ -737,10 +793,9 @@ begin
     raise exception 'ONLINE_STELLUNG_FALSCH';
   end if;
 
-  halbzuege := case when p.zuege = '' then 0 else array_length(string_to_array(p.zuege, ' '), 1) end;
   uhr_ms := case when farbe = 'w' then p.uhr_weiss_ms else p.uhr_schwarz_ms end;
   if p.bedenkzeit_s is not null and halbzuege >= 2 then
-    verbraucht_ms := floor(extract(epoch from (jetzt - coalesce(p.letzter_zug_am, jetzt))) * 1000);
+    verbraucht_ms := floor(extract(epoch from (v_ankunft - coalesce(p.letzter_zug_am, v_ankunft))) * 1000);
     uhr_ms := uhr_ms - verbraucht_ms;
     if uhr_ms <= 0 then
       -- Zeit abgelaufen, bevor der Zug kam: Partie beendet, Zug verfaellt (die Seite am Zug ist der Ziehende)
@@ -755,6 +810,7 @@ begin
       am_zug = am_zug_danach,
       uhr_weiss_ms = case when farbe = 'w' then uhr_ms else t.uhr_weiss_ms end,
       uhr_schwarz_ms = case when farbe = 'b' then uhr_ms else t.uhr_schwarz_ms end,
+      -- ab jetzt laeuft die Uhr des Gegners (der Zug ist ab hier fuer ihn sichtbar)
       letzter_zug_am = jetzt,
       -- ein Remisangebot gilt bis zum naechsten Zug des Gegners (der eigene Zug nimmt es nicht zurueck)
       remis_angebot = case when t.remis_angebot = farbe then t.remis_angebot else null end,
@@ -764,6 +820,40 @@ begin
   where t.id = p.id
   returning * into p;
   return p;
+end;
+$$;
+
+-- Einen Zug verbuchen, nur fuer die Edge Function online-zug (Service-Rolle; Etappe 1a). Die Function hat die
+-- Anmeldung geprueft (nutzer), den Zug nach den Regeln geprueft und Stellung, Seite am Zug und Ende mit chess.js
+-- ausgerechnet; ankunft hat sie selbst gemessen, halbzuege_vorher ist der Stand, auf dem sie gerechnet hat. Ohne Stand
+-- kein Zug (ONLINE_STAND_VERALTET). Antwort: die Zeile, auch wenn die Partie dabei auf Zeit oder als 'abgebrochen' endet.
+create or replace function public.online_zug_verbuchen(partie uuid, nutzer uuid, zug text, fen_danach text, am_zug_danach text,
+  ergebnis text, grund text, ankunft timestamptz, halbzuege_vorher integer)
+returns public.partien_online
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if halbzuege_vorher is null or halbzuege_vorher < 0 then
+    raise exception 'ONLINE_STAND_VERALTET';
+  end if;
+  return public.online_zug_buchen(partie, nutzer, zug, fen_danach, am_zug_danach, ergebnis, grund, ankunft, halbzuege_vorher);
+end;
+$$;
+
+-- Alter Weg (bis Etappe 1a): Stellung, Seite und Ergebnis kamen vom Browser. Seit Etappe 1a fuer angemeldete Nutzer
+-- geschlossen (revoke unten, insufficient_privilege); die Funktion bleibt, damit eine alte App eine klare Absage bekommt
+-- und die Rechte sich bei Bedarf gezielt zurueckdrehen lassen. Gleicher Kern wie online_zug_verbuchen, Ankunft = jetzt.
+create or replace function public.online_zug(partie uuid, zug text, fen_danach text, am_zug_danach text, ergebnis text default null, grund text default null)
+returns public.partien_online
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  return public.online_zug_buchen(partie, auth.uid(), zug, fen_danach, am_zug_danach, ergebnis, grund,
+    pg_catalog.clock_timestamp(), null);
 end;
 $$;
 
@@ -949,23 +1039,34 @@ using ((select auth.uid()) in (weiss, schwarz, erstellt_von));
 drop policy if exists "Eigene Online-Einladung anlegen" on public.partien_online;
 revoke all on table public.partien_online from anon, authenticated, public;
 grant select on table public.partien_online to authenticated;
+-- Die Edge Function online-zug liest die Partie mit dem Service-Schluessel, bevor sie den Zug prueft (in Supabase hat
+-- die Service-Rolle das Recht ohnehin; hier steht es ausdruecklich, damit die Abhaengigkeit sichtbar ist). Schreiben
+-- tut sie nur ueber online_zug_verbuchen.
+grant select on table public.partien_online to service_role;
 -- Fehlversuche: weder lesen noch schreiben (keine Policy, kein Tabellenrecht); nur online_tritt_bei schreibt.
 revoke all on table public.online_versuche from anon, authenticated, public;
 
--- Funktionen: nur fuer angemeldete Nutzer, nie fuer anon oder public. Die Helfer bleiben intern.
+-- Funktionen: nur fuer angemeldete Nutzer, nie fuer anon oder public. Die Helfer bleiben intern. Zuege verbucht seit
+-- Etappe 1a nur noch die Service-Rolle (online_zug_verbuchen, aufgerufen von der Edge Function online-zug); der alte
+-- Weg online_zug ist fuer angemeldete Nutzer geschlossen (das revoke nimmt das fruehere grant beim erneuten Einspielen
+-- zurueck).
 revoke all on function public.online_vor_anlegen() from anon, authenticated, public;
 revoke all on function public.online_brett(text) from anon, authenticated, public;
 revoke all on function public.online_folge_passt(text, text, text) from anon, authenticated, public;
 revoke all on function public.online_kann_nicht_matt_setzen(text, text) from anon, authenticated, public;
 revoke all on function public.online_haengt(public.partien_online) from anon, authenticated, public;
+revoke all on function public.online_haengt(public.partien_online, timestamptz) from anon, authenticated, public;
 revoke all on function public.online_aufraeumen() from anon, authenticated, public;
 revoke all on function public.online_hole_laufende(uuid, uuid) from anon, authenticated, public;
 revoke all on function public.online_zeitende(public.partien_online) from anon, authenticated, public;
 revoke all on function public.online_uhr_pruefen(public.partien_online) from anon, authenticated, public;
+revoke all on function public.online_uhr_pruefen(public.partien_online, timestamptz) from anon, authenticated, public;
+revoke all on function public.online_zug_buchen(uuid, uuid, text, text, text, text, text, timestamptz, integer) from anon, authenticated, public;
 revoke all on function public.online_pruefe_zeit(uuid) from anon, public;
 revoke all on function public.online_erstelle(text, integer, integer) from anon, public;
 revoke all on function public.online_tritt_bei(text) from anon, public;
-revoke all on function public.online_zug(uuid, text, text, text, text, text) from anon, public;
+revoke all on function public.online_zug(uuid, text, text, text, text, text) from anon, authenticated, public;
+revoke all on function public.online_zug_verbuchen(uuid, uuid, text, text, text, text, text, timestamptz, integer) from anon, authenticated, public;
 revoke all on function public.online_strittig(uuid) from anon, public;
 revoke all on function public.online_gib_auf(uuid) from anon, public;
 revoke all on function public.online_biete_remis(uuid) from anon, public;
@@ -973,10 +1074,10 @@ revoke all on function public.online_nimm_remis_an(uuid) from anon, public;
 revoke all on function public.online_meine() from anon, public;
 grant execute on function public.online_erstelle(text, integer, integer) to authenticated;
 grant execute on function public.online_tritt_bei(text) to authenticated;
-grant execute on function public.online_zug(uuid, text, text, text, text, text) to authenticated;
 grant execute on function public.online_strittig(uuid) to authenticated;
 grant execute on function public.online_gib_auf(uuid) to authenticated;
 grant execute on function public.online_biete_remis(uuid) to authenticated;
 grant execute on function public.online_nimm_remis_an(uuid) to authenticated;
 grant execute on function public.online_meine() to authenticated;
 grant execute on function public.online_pruefe_zeit(uuid) to authenticated;
+grant execute on function public.online_zug_verbuchen(uuid, uuid, text, text, text, text, text, timestamptz, integer) to service_role;
