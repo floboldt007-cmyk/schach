@@ -1,15 +1,17 @@
-# Schach-Arena
+# Crownmate
 
-Schach gegen eine Leiter von zehn Bots, von **Bauer Benno** bis zum Endgegner **Der Stockfisch**.
-Jeder deiner Züge wird sofort bewertet wie bei chess.com: ein Symbol erscheint auf dem Brett
-(Genial, Präzise, Unscharf, Weit daneben …) und der Coach sagt dir in einem Satz, was los war.
-Nach der Partie gibt es eine Spielanalyse mit Genauigkeit, Bewertungskurve, Schlüsselmomenten
-und den besseren Zügen zum Durchklicken. Wer einen Bot besiegt, schaltet den nächsten frei.
+Schach gegen **30 Bots in fünf Welten**, mit angezeigter Elo von 100 bis 3000 und einem
+Endgegner je Welt. Die Live-Bewertung ordnet deine Züge ein und der Coach erklärt sie.
+Nach der Partie zeigt die Spielanalyse Genauigkeit, Bewertungskurve, Schlüsselmomente und
+bessere Züge zum Durchklicken. Dazu gibt es ein Tagesrätsel und ein Archiv zum Weiterüben.
+
+Die Oberfläche ist auf **Deutsch und Englisch** verfügbar. Ohne eigene Sprachwahl folgt sie
+der Sprache des Geräts; in den Einstellungen lässt sie sich ändern.
 
 **Spielen:** https://floboldt007-cmyk.github.io/schach/
 
-Alles läuft direkt auf deinem Gerät, auch ohne Internet. Es gibt kein Konto und keinen Server:
-Deine Partien und Sterne liegen nur im Speicher des Browsers.
+Bot-Partien und Spielanalyse laufen direkt auf deinem Gerät, auch ohne Internet.
+Deine Partien und Sterne werden im Browser gespeichert.
 
 ## Auf dem iPad installieren
 
@@ -20,7 +22,7 @@ Softwareupdate.
 1. Den Link oben in **Safari** öffnen.
 2. Auf **Teilen** tippen (das Quadrat mit dem Pfeil nach oben).
 3. **Zum Home-Bildschirm** wählen und mit **Hinzufügen** bestätigen.
-4. Ab jetzt startet die Schach-Arena über das Neon-Springer-Icon wie eine normale App,
+4. Ab jetzt startet Crownmate über das App-Icon wie eine normale App,
    ohne Adressleiste. Nach dem ersten Start klappt das auch im Flugmodus.
 
 Gut zu wissen:
@@ -85,21 +87,20 @@ Partie holen:
 2. ★ **Sieg mit mindestens 80 % Genauigkeit.**
 3. ★ **Sieg ohne Hinweis und ohne Zurücknehmen.**
 
-Besiegst du einen Bot, ist der **nächste Bot frei**. Insgesamt gibt es 30 Sterne. Deine
-genialen Züge sammelt die **Schatzkiste** im Verlauf.
+Besiegst du einen Bot, wird der **nächste Bot frei**. In jeder offenen Welt kannst du den
+Endgegner direkt herausfordern. Ein Sieg gegen ihn schaltet alle Bots dieser Welt und die
+nächste Welt frei. Insgesamt gibt es **90 Sterne**; alle 18 Sterne einer Welt ergeben ihr Weltsiegel.
+Deine genialen Züge sammelt die **Schatzkiste** im Verlauf.
 
-| Stufe | Bot | Elo |
+Jede Welt hat sechs Bots mit jeweils 100 Elo Abstand:
+
+| Welt | Stufen | Angezeigte Elo |
 |---|---|---|
-| 1 | Bauer Benno | 250 |
-| 2 | Oma Hilde | 500 |
-| 3 | Kalle vom Stammtisch | 800 |
-| 4 | Lisa Läufer | 1000 |
-| 5 | Ritter Rudi | 1200 |
-| 6 | Professor Turm | 1400 |
-| 7 | Dame Delia | 1600 |
-| 8 | Kommissar König | 1800 |
-| 9 | Großmeisterin Greta | 2100 |
-| 10 | Der Stockfisch | 3000 |
+| Die Karofelder | 1 bis 6 | 100 bis 600 |
+| Der Springerforst | 7 bis 12 | 700 bis 1200 |
+| Die Turmstadt | 13 bis 18 | 1300 bis 1800 |
+| Die Gezeitenküste | 19 bis 24 | 1900 bis 2400 |
+| Die Stockfisch-Tiefe | 25 bis 30 | 2500 bis 3000 |
 
 In den **Einstellungen** kannst du Klang, Bewertungsbalken, Live-Bewertung, Koordinaten,
 Brettfarbe (Nacht, Grün, Holz) und die Rechentiefe einstellen und den Fortschritt zurücksetzen.
@@ -112,12 +113,12 @@ dem Netz. Bauplan und Schnittstellen stehen in `ARCHITEKTUR.md`.
 | Ordner/Datei | Inhalt |
 |---|---|
 | `index.html`, `js/app.js` | Einstieg, Routing (`#arena`, `#partie`, `#analyse/<id>`, `#verlauf`, `#einstellungen`) |
-| `js/ui/` | Die fünf Screens |
+| `js/ui/` | Ansichten und Bedienung |
 | `js/` | Engine-Wrapper, Bots, Bewertung, Eröffnungen, Brett, Klänge, Speicher |
-| `css/` | `board.css`, `app.css`, `screens.css` (Design „Neon-Arena“) |
+| `css/` | Design-Tokens, Theme „Modern und klar“, Brett und Ansichten |
 | `sw.js`, `manifest.webmanifest`, `assets/icons/` | Offline-Cache, App-Daten und Icons fürs iPad |
 | `vendor/` | Stockfish 19 (WebAssembly) und chess.js |
-| `daten/` | Statische Inhalte als JSON (Spielplan, später Rätsel, Bosse); `daten/beispiel/` nur Format-Beispiele |
+| `daten/` | Statische Inhalte als JSON, darunter Tagesrätsel; `daten/beispiel/` nur Format-Beispiele |
 | `tests/` | Alle Tests |
 
 **Lokal starten:** im Projektordner `python3 -m http.server 8000` und dann
