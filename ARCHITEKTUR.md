@@ -968,6 +968,7 @@ Nur der Steckbrief-Text darf sich aendern.
 | `spielplan:geladen` | `{}` (keine Daten; der Spielplan selbst kommt aus `ladeSpielplan()`, also aus dem Zwischenspeicher von `inhalte.js`) | S1-6 `boss`, nach `app:bereit` (die Pakete laden parallel; vorher koennte ein Hoerer noch fehlen) einmal nach dem ersten erfolgreichen `ladeSpielplan()` (`r.ok`), und nach jedem neu geladenen Plan wieder. Erst danach liest `funken` den Spielplan (Funken-Wochenende): so fragt nie ein Paket nach `daten/boss/spielplan.json`, solange es die Datei nicht gibt (kein 404, auch nicht mit dem Test-Boss in `tests/app.test.mjs`). Neu mit der P1-Nachbesserung |
 | `tag:gezaehlt` | `{ tag, quelle, serie, kapitel }` (`tag` = `tagSchluessel`; `quelle`: `'partie'` \| `'kartei'` \| `'uebung'` \| `'raetsel'` \| `'lektion'`; `serie` Schachtage in Serie danach; `kapitel` Nummer) | S1-4, einmal je Tag beim ersten Tageswerk; bringt nie Funken |
 | `raetsel:geloest` | `{ id, richtig, versuch, quelle, wertung, blick? }` (`richtig` boolean; `versuch` 1, 2, ...; `quelle`: `'tag'` \| `'archiv'` \| `'pool'` \| `'treppe'` \| `'lektion'`; `wertung` Raetselwertung oder `null`; `blick` freiwillig (P1-Nachbesserung): Raetsel-Blick vor dem Versuch, dann rechnet funken die Stufe nach 3.3 aus `wertung - blick` (12/8/4/1), ohne `blick` wie auf Augenhoehe (8)) | S1-5 (spaeter S2-2), nach jedem Loesungsversuch |
+| `raetsel:wort` | `{ tag, richtig }` (Tagesschluessel aus `tag.js`, `richtig` boolean) | Tagesraetsel, nach gespeicherter Wortwahl, hoechstens einmal je Tag |
 | `lektion:beendet` | `{ id, ringe }` (`ringe`: `{ gelernt, sicher, gemeistert }` als boolean, Stand danach) | S1-10, am Ende einer Lektion |
 | `boss:treffer` | `{ laufId, ply, vorher, nachher }` (Gewinnchance des Bosses 0..1, also der Stand der Lebensleiste: `vorher` nach Flos vorigem Zug, d. h. vor dem letzten Boss-Zug, = `1 - (gewinnVorigerZug ?? gewinnVorher)` aus `zug:bewertet`; `nachher` nach Flos Zug = `1 - gewinnNachher`; Treffer ab `vorher - nachher >= 0,03`). So zaehlt ein sofort bestrafter Boss-Fehler als Treffer (3.8); ein guter Zug in ruhiger Stellung haelt die Leiste nur. w0plus-a-fix: vorher stand hier „vor Flos Zug“, mit `gewinnVorher` gab es praktisch nie einen Treffer, auch nicht beim Matt | S1-6, nach `zug:bewertet` in Boss-Partien |
 | `boss:siegel` | `{ bossId, stufe, woche }` (`stufe`: `'bronze'` \| `'silber'` \| `'gold'`; `woche` Wochenschluessel der Boss-Woche oder `null` im Archiv) | S1-6, einmal je Boss und Stufe |
@@ -1550,6 +1551,7 @@ ohne `blick` zaehlt ein Raetsel wie auf Augenhoehe), `boss:siegel`, `rekord:neu`
 `'allzeit'`), `bestmarke:neu` (je Partie hoechstens ein Rekord), `tag:gezaehlt` (nur Aktivitaet, nie Funken),
 `speicher:zurueckgesetzt`, `spielplan:geladen` (erst dann liest es den Spielplan). Sendet `funken:gebucht` je Quelle, `funken:geaendert` einmal je Ereignis, `level:aufstieg`.
 Andere Pakete lesen Funken nie aus dem Modul, sondern ueber diese Ereignisse.
+`raetsel:wort` bucht bei richtiger Wahl 5 Lern-Funken nach Tagesbogen und Wochenende, merkt die letzten 60 Tage in `lernen.wort` und zeigt die tatsaechliche Tagesmenge aus `heute.wort` als "Motiv erkannt" im Spiegel; alte Staende ohne diese Felder bleiben gueltig, falsche Antworten bringen still 0.
 
 **Orte.** `ergebnis:abrechnung` 20 (`.fk-abr[data-zeile="funken"]`: "+Funken", Formel, Level-Balken vom alten zum neuen
 Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um, Klang `level`; `data-aufstieg`,
@@ -1575,7 +1577,7 @@ dieses Signal (z. B. `wpboss` in `tests/app.test.mjs`) loest keine Anfrage aus, 
 der Ereignis-Tabelle.
 
 **Noch nicht verdrahtet (es fehlt das Ereignis oder ein Feld darin).** Aus Tabelle B: Karteikarte "für immer gelöst" +30
-(`training:geloest` braucht ein Feld wie `fuerImmer`), Tagesraetsel "Ein Wort" +5 (Feld in `raetsel:geloest`), Pruefung
+(`training:geloest` braucht ein Feld wie `fuerImmer`), Pruefung
 beim Lehrmeister 40/+60 (`lektion:beendet` kennt nur Ringe), Endspiel-Fall, Heimbringer, Mission je Stufe 30 und
 Treppenlauf-Bestleistung 25 (kein Ereignis). Aus Tabelle C: Tagesaufgabe 20 und "Tageskrone" +30 (kein Ereignis; die
 Quelle `'tag'` steht in `funken:gebucht` schon bereit), Liga-Saison beendet 100 (P4), Erste Schritte je 50 (kein
@@ -2517,14 +2519,14 @@ in `daten/tagesraetsel/raetsel.json` (art `tagesraetsel`, format 1) aus `werkzeu
 - **Ereignis:** sendet `raetsel:geloest { id, richtig, versuch, quelle: 'tag' | 'archiv', wertung: null }` beim ersten
   Ergebnis je Aufgabe (`id` aus der Datei; Wiederholen eines fertigen Tages sendet nichts). Damit stellt die Schule jetzt
   Raetsel-Aufgaben (`RAETSEL_AUFGABEN` true).
+  "Ein Wort" sendet nach erfolgreichem Speichern einmal je Tag `raetsel:wort { tag, richtig }`; funken vergibt fuer richtig 5 Lern-Funken.
 - **Speicher:** Modul `tagesraetsel` (Budget 4.000): `{ v, tage: { 'JJJJ-MM-TT': { e: [[fehlversuche, richtig]], w?, a? } } }`,
   hoechstens 60 Tage. Kaputte Staende werden ein leeres Modul, alte ohne `v` bleiben gueltig, ein Modul einer neueren
   App wird gelesen, aber nie ueberschrieben.
 - **Laden:** Das Paket laedt die Datei beim Start und wartet darauf hoechstens 1,5 s (die App wartet auf ihre Pakete);
   fehlt sie, zeigt die Karte eine ruhige Zeile und das Paket versucht es beim naechsten Zeichnen erneut.
 - **Offen:** "Fair zählen" (ein anderer, gleich starker Zug gilt auch) braucht Stockfish im Raetsel-Bildschirm und eine
-  Aenderung an `js/ui/raetsel.js`; Archiv ueber 30 Tage (Abo); +5 Funken fuer ein richtiges "Ein Wort" (3.3) braucht
-  ein eigenes Ereignis fuer funken.
+  Aenderung an `js/ui/raetsel.js`; Archiv ueber 30 Tage (Abo).
 
 ## Paket start (A4): Willkommen, erste 5 Minuten, Einstufungstest
 

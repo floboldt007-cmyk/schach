@@ -529,6 +529,56 @@ gruppe = 'Lernen buchen';
   pruefe('Lern-Funken stehen unter „lernen“, Meilensteine unter „meilenstein“', st.heute.quellen.lernen > 0 && st.heute.quellen.meilenstein === 200);
 }
 
+gruppe = 'Ein Wort buchen';
+{
+  setzeSpeicher(fakeSpeicher());
+  const jetzt = ort(2026, 10, 22, 20);
+  const tag = '2026-10-22';
+  const d = { tag, richtig: true };
+  const st = S.lade(jetzt);
+  const b = S.lernWort(st, d);
+  pruefe('Richtig: 5 Lern-Funken, eigene Spiegel-Summe, Tagesbogen und Gesamtstand', b.length === 1 && b[0].menge === 5
+    && b[0].quelle === 'lernen' && st.gesamt === 5 && st.heute.quellen.lernen === 5 && st.heute.wort === 5 && st.heute.bogen === 5);
+  pruefe('Derselbe Tag bucht nur einmal', S.lernWort(st, d).length === 0 && st.gesamt === 5 && st.lernen.wort.join() === tag);
+  S.speichere(st);
+  const geladen = S.lade(jetzt);
+  pruefe('Neuladen behaelt Tagesliste und Spiegel-Summe, kein erneutes Buchen', geladen.heute.wort === 5
+    && S.lernWort(geladen, d).length === 0 && geladen.gesamt === 5);
+  const falsch = S.leer(jetzt);
+  pruefe('Falsch gibt 0 und sperrt denselben Tag auch fuer eine spaetere richtige Meldung', S.lernWort(falsch, { tag, richtig: false }).length === 0
+    && S.lernWort(falsch, d).length === 0 && falsch.gesamt === 0 && falsch.heute.wort === 0 && falsch.heute.bogen === 0);
+  const alt = S.leer(jetzt);
+  delete alt.lernen.wort;
+  delete alt.heute.wort;
+  const norm = S.normalisiere(alt, jetzt);
+  pruefe('Alter Stand ohne neue Felder bleibt gueltig', norm.lernen.wort.length === 0 && norm.heute.wort === 0
+    && S.lernWort(norm, d)[0].menge === 5 && S.lernWort(alt, d)[0].menge === 5);
+  const kaputt = S.leer(jetzt);
+  pruefe('Ungueltiger Tag und nicht-boolesches Ergebnis werden nicht gespeichert', [null, {}, { ...d, tag: '2026-02-30' },
+    { ...d, tag: '2026-10-22T12:00:00Z' }, { ...d, richtig: 1 }, { tag }].every((x) => S.lernWort(kaputt, x).length === 0)
+    && kaputt.lernen.wort.length === 0 && kaputt.gesamt === 0);
+  const halb = S.leer(jetzt);
+  halb.heute.bogen = R.TAGESBOGEN;
+  pruefe('Tagesgrenze halbiert auch Ein Wort und Spiegel zeigt die gebuchte Menge', S.lernWort(halb, d)[0].menge === 3
+    && halb.gesamt === 3 && halb.heute.wort === 3 && halb.heute.bogen === R.TAGESBOGEN + 5);
+  const wochenende = S.leer(jetzt);
+  pruefe('Funken-Wochenende verdoppelt nach derselben Lern-Regel', S.lernWort(wochenende, d, { wochenende: true })[0].menge === 10
+    && wochenende.heute.wort === 10 && wochenende.heute.bogen === 5);
+  const karte = S.leer(jetzt);
+  karte.rw.aktiv = 3;
+  pruefe('Ein Wort verbraucht keine Rueckenwind-Einheit', S.lernWort(karte, d)[0].menge === 5 && karte.rw.aktiv === 3);
+  const tage = Array.from({ length: 65 }, (_, i) => `2026-${i < 31 ? '08' : i < 61 ? '09' : '10'}-${String(i < 31 ? i + 1 : i < 61 ? i - 30 : i - 60).padStart(2, '0')}`);
+  const ring = S.leer(jetzt);
+  for (const t of tage) S.lernWort(ring, { tag: t, richtig: true });
+  pruefe('Nur die letzten 60 Tage werden behalten', ring.lernen.wort.length === 60 && ring.lernen.wort[0] === tage[5]
+    && ring.lernen.wort[59] === tage[64]);
+  const repariert = S.normalisiere({ lernen: { wort: ['kaputt', tag, tag, '2026-02-30', '2026-10-21'] } }, jetzt);
+  pruefe('Normalisieren entfernt ungueltige und doppelte Tagesschluessel', repariert.lernen.wort.join() === '2026-10-22,2026-10-21');
+  S.tagWechsel(st, ort(2026, 10, 23, 4));
+  pruefe('Ab 4 Uhr neuer Tag: eigene Summe leer, neuer Schluessel bringt wieder 5', st.heute.wort === 0
+    && S.lernWort(st, { tag: '2026-10-23', richtig: true })[0].menge === 5 && st.gesamt === 10 && st.heute.wort === 5);
+}
+
 gruppe = 'Arena-Wertung';
 {
   setzeSpeicher(fakeSpeicher());

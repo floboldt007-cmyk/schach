@@ -22,7 +22,7 @@
 //     gruss: boolean                    der naechste Partiestart gruesst das neue Level
 //     ids: [partieId ...]               verarbeitete partie:beendet (Ringpuffer, hoechstens IDS_MAX)
 //     lernen: { ueb: { 'pid:ply': n }, mom: { pid: n }, lek: { id: 'asg' }, karten: { tag, n }, siegel: ['boss:stufe'],
-//               rekord: [pid], raetsel: [id], sitzung: null | { id, rw } }   sitzung: laufende Stapel-Sitzung im Training
+//               rekord: [pid], raetsel: [id], wort: [tag], sitzung: null | { id, rw } }   sitzung: laufende Stapel-Sitzung im Training
 //               (rw: die Sitzung zaehlt doppelt, sie hat eine Rueckenwind-Einheit verbraucht)
 //     lauf: null | { id, fa, fn, ab, start, hilfe, ref, z: { ply: [klasse, gv, gn, flags, gvv, matt] } },
 //     lage: null | { wert, t } }   Arena-Wertung aus liga:geaendert (Paket Wertung), sonst rechnet funken die Lage selbst
@@ -64,7 +64,7 @@ const liste = (x) => (Array.isArray(x) ? x : []);
 const objekt = (x) => (x && typeof x === 'object' && !Array.isArray(x) ? x : {});
 
 function leererTag(tag) {
-  return { tag, partien: 0, funken: 0, bogen: 0, boss: 0, quellen: { partie: 0, lernen: 0, tag: 0, meilenstein: 0 } };
+  return { tag, partien: 0, funken: 0, bogen: 0, boss: 0, wort: 0, quellen: { partie: 0, lernen: 0, tag: 0, meilenstein: 0 } };
 }
 
 export function leer(jetzt = new Date()) {
@@ -75,7 +75,7 @@ export function leer(jetzt = new Date()) {
     rw: { karten: 0, woche: null, aktiv: 0, start: null, letzterTag: null, willkommen: null, gespielt: [], aufgehoben: [], neu: null,
       planBis: null },
     aufstiege: [], gruss: false, ids: [], lage: null,
-    lernen: { ueb: {}, mom: {}, lek: {}, karten: { tag: null, n: 0 }, siegel: [], rekord: [], raetsel: [], sitzung: null },
+    lernen: { ueb: {}, mom: {}, lek: {}, karten: { tag: null, n: 0 }, siegel: [], rekord: [], raetsel: [], wort: [], sitzung: null },
     lauf: null,
   };
 }
@@ -89,7 +89,7 @@ export function normalisiere(roh, jetzt = new Date()) {
   st.level = Math.max(L.levelVon(st.gesamt), 1);
   const h = objekt(r.heute);
   if (istSchluessel(h.tag)) {
-    st.heute = { tag: h.tag, partien: ganz(h.partien), funken: ganz(h.funken), bogen: Math.max(0, zahl(h.bogen)), boss: ganz(h.boss),
+    st.heute = { tag: h.tag, partien: ganz(h.partien), funken: ganz(h.funken), bogen: Math.max(0, zahl(h.bogen)), boss: ganz(h.boss), wort: ganz(h.wort),
       quellen: Object.fromEntries(QUELLEN.map((q) => [q, ganz(objekt(h.quellen)[q])])) };
   }
   st.verlauf = liste(r.verlauf).filter((e) => e && typeof e.id === 'string' && Number.isFinite(e.f)).slice(0, VERLAUF_MAX);
@@ -118,6 +118,7 @@ export function normalisiere(roh, jetzt = new Date()) {
     karten: { tag: istSchluessel(kar.tag) ? kar.tag : null, n: ganz(kar.n) },
     siegel: liste(le.siegel).filter((x) => typeof x === 'string'), rekord: liste(le.rekord).filter((x) => typeof x === 'string').slice(-40),
     raetsel: liste(le.raetsel).filter((x) => typeof x === 'string').slice(-400),
+    wort: [...new Set(liste(le.wort).filter(istSchluessel))].slice(-60),
     sitzung: typeof objekt(le.sitzung).id === 'string' ? { id: le.sitzung.id.slice(0, 40), rw: le.sitzung.rw === true } : null,
   };
   const lauf = objekt(r.lauf);
@@ -489,6 +490,18 @@ export function lernRaetsel(st, d, ctx = {}) {
   const f = R.raetselFunken({ richtig: d.richtig === true, versuch: ganz(d.versuch, 1), wertung: d.wertung,
     blick: Number.isFinite(d.blick) ? d.blick : null });
   return lernBuchung(st, f, { ...ctx, einheit: false });
+}
+
+// Ein Wort: das erste Ergebnis je Tag zaehlt, richtig gibt Lern-Funken ohne Kartenverbrauch.
+export function lernWort(st, d, ctx = {}) {
+  if (!d || !istSchluessel(d.tag) || typeof d.richtig !== 'boolean') return [];
+  const tage = liste(st.lernen.wort);
+  if (tage.includes(d.tag)) return [];
+  st.lernen.wort = [...tage, d.tag].slice(-60);
+  if (!d.richtig) return [];
+  const b = lernBuchung(st, R.LERN.wort, { ...ctx, einheit: false });
+  st.heute.wort = ganz(st.heute.wort) + b.reduce((n, x) => n + x.menge, 0);
+  return b;
 }
 
 // ---------- Tabelle C ----------

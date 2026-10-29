@@ -40,7 +40,7 @@ const TABELLE = ['app:bereit', 'app:screen', 'app:sichtbar', 'partie:gestartet',
   // w0-fix: "Fortschritt zuruecksetzen" meldet sich (Pakete leeren ihren Zustand im Arbeitsspeicher)
   'speicher:zurueckgesetzt',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2 und 3.18)
-  'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
+  'funken:gebucht', 'level:aufstieg', 'tag:gezaehlt', 'raetsel:geloest', 'raetsel:wort', 'lektion:beendet', 'boss:treffer', 'boss:siegel',
   'rekord:neu', 'uhr:knapp', 'zug:abgelehnt',
   // Paket funken (S1-1): { funken, level, delta, aufstieg } einmal je Ereignis mit Buchungen
   'funken:geaendert',
