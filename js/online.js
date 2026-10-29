@@ -6,14 +6,20 @@
 // API (alles ausser den reinen Helfern braucht eine Anmeldung ueber konto.js):
 //   erstelleEinladung({ farbe = 'zufall', bedenkzeit = null, inkrement = 0 }) -> Partie
 //       farbe 'w' | 'b' | 'zufall' (eigene Farbe), bedenkzeit in Sekunden (null: ohne Uhr), inkrement in Sekunden
-//   tritteBei(code) -> Partie            der Code darf klein, mit Leerzeichen oder Bindestrichen kommen
+//   tritteBei(code) -> Partie            der Code darf klein, mit Leerzeichen oder Bindestrichen kommen. Der Server
+//       antwortet seit Anti-Cheat Etappe 0 mit jsonb: die Zeile oder { fehler: 'ONLINE_...' } (ein falscher Code ist
+//       ein gezaehlter Fehlversuch, deshalb kein raise); beides wird hier zur Partie oder zu einem Fehler mit Satz.
 //   ladePartie(id) -> Partie             Fehler, wenn es sie nicht gibt oder sie einem Fremden gehoert
 //   sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = null, grund = null }) -> Partie
 //       ergebnis '1-0' | '0-1' | '1/2-1/2' beendet die Partie (grund z. B. 'matt', 'patt', 'wiederholung')
 //   gibAuf(id), bieteRemis(id), nimmRemisAn(id) -> Partie   (gibAuf auf einer offenen Einladung: zurueckziehen)
+//   meldeStrittig(id) -> Partie         die Stellung auf dem Server passt nicht zu den Zuegen: Die Partie endet ohne
+//       Ergebnis (grund 'strittig'), auch wenn die eigene Uhr laeuft; danach entscheidet die Uhr nicht mehr.
 //   pruefeZeit(id) -> Partie             Zeit reklamieren: ist die Uhr der Seite am Zug abgelaufen, endet die
-//       Partie auf dem Server (grund 'zeit'); sonst kommt die unveraenderte Partie zurueck. Die Oberflaeche ruft das,
-//       wenn die heruntergerechnete Uhr des Gegners bei 0 steht.
+//       Partie auf dem Server (grund 'zeit', mit zu wenig Mattmaterial des Gegners 'zeit-material' als Remis); eine
+//       haengende Partie (mit Uhr vor dem 2. Halbzug 10 Minuten ohne Zug, ohne Uhr 7 Tage) endet als 'abgebrochen';
+//       sonst kommt die unveraenderte Partie zurueck. Die Oberflaeche ruft das, wenn die heruntergerechnete Uhr des
+//       Gegners bei 0 steht, und vor dem 2. Halbzug einer Partie mit Uhr nach 10 Minuten ohne Zug.
 //   meinePartien({ beendete = false } = {}) -> [Partie], optional mit den letzten 100 beendeten Partien
 //   beobachte(id, { alle = 2000, seit, beiAenderung, beiFehler, bisEnde = true }) -> { stop(), laeuft(), stand(), grund() }
 //       fragt alle `alle` ms nach einer neueren Zeile (aktualisiert_am) und ruft beiAenderung(partie) nur bei
@@ -73,6 +79,9 @@ export const FEHLER_TEXTE = Object.freeze({
   get ONLINE_ERGEBNIS_FORM() { return O('fehler.ONLINE_ERGEBNIS_FORM'); },
   get ONLINE_KEIN_REMISANGEBOT() { return O('fehler.ONLINE_KEIN_REMISANGEBOT'); },
   get ONLINE_CODE_ABGELAUFEN() { return O('fehler.ONLINE_CODE_ABGELAUFEN'); },
+  get ONLINE_ZU_VIELE_EINLADUNGEN() { return O('fehler.ONLINE_ZU_VIELE_EINLADUNGEN'); },
+  get ONLINE_ZU_VIELE_VERSUCHE() { return O('fehler.ONLINE_ZU_VIELE_VERSUCHE'); },
+  get ONLINE_STELLUNG_FALSCH() { return O('fehler.ONLINE_STELLUNG_FALSCH'); },
 });
 
 function lager() { return globalThis.localStorage; }
@@ -121,9 +130,18 @@ async function rpc(name, daten) {
   const s = await aktiveSitzung();
   return anfrage(`/rest/v1/rpc/${name}`, { methode: 'POST', token: s.access_token, daten });
 }
-// PostgREST liefert eine einzelne Zeile als Objekt, setof als Liste: beides annehmen
+// PostgREST liefert eine einzelne Zeile als Objekt, setof als Liste: beides annehmen. Antworten mit jsonb (zuerst
+// online_tritt_bei) melden einen Fehler ohne raise als { fehler: 'ONLINE_...' }: daraus wird derselbe Fehler wie aus
+// einer Serverkennung (Satz, kennung, Originaltext in detail). Eine unbekannte Kennung zeigt nie den rohen Text.
 function partieAus(d) {
   const p = Array.isArray(d) ? d[0] : d;
+  if (p && typeof p === 'object' && typeof p.fehler === 'string') {
+    const kennung = p.fehler;
+    const bekannt = Object.prototype.hasOwnProperty.call(FEHLER_TEXTE, kennung);
+    const e = new Error(bekannt ? FEHLER_TEXTE[kennung] : O('fehler'));
+    e.status = 200; e.kennung = bekannt ? kennung : undefined; e.detail = kennung;
+    throw e;
+  }
   if (!p || typeof p !== 'object' || !p.id) throw new Error(O('keinePartie'));
   return p;
 }
@@ -169,6 +187,7 @@ export async function sendeZug(id, { uci, fenDanach, amZugDanach, ergebnis = nul
 export async function gibAuf(id) { return partieAus(await rpc('online_gib_auf', { partie: id })); }
 export async function bieteRemis(id) { return partieAus(await rpc('online_biete_remis', { partie: id })); }
 export async function nimmRemisAn(id) { return partieAus(await rpc('online_nimm_remis_an', { partie: id })); }
+export async function meldeStrittig(id) { return partieAus(await rpc('online_strittig', { partie: id })); }
 export async function pruefeZeit(id) { return partieAus(await rpc('online_pruefe_zeit', { partie: id })); }
 export async function meinePartien({ beendete = false } = {}) {
   const d = await rpc('online_meine', {});

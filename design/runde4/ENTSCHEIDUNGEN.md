@@ -109,3 +109,8 @@ App Store und Google Play (Capacitor) und weiter die Web-App.
 13. Werbefrei bleibt.
 14. „Roblox“ nie im Namen oder in der Werbung. Der Name „Neonturm“ fällt mit dem Neon-Look weg.
 15. Die ersten 5 Minuten zählen am meisten: Einstufung, schneller erster Sieg, erster Finisher, erstes Level.
+16. **Online ohne Uhr, vorläufig (Anti-Cheat Etappe 0, noch ohne Flos Ja):** Eine Partie ohne Uhr, in der 7 Tage lang
+    kein Zug kommt, endet beim nächsten Aufräumen als „abgebrochen“, ohne Ergebnis. Sonst bliebe sie für immer offen,
+    und wer nie mehr zieht, hielte den Freund fest. Die Alternative aus dem Konzept: nach 7 Tagen nur ein „Verlassen“
+    durch einen der beiden Spieler erlauben, nichts automatisch. Flo entscheidet; bis dahin gilt die automatische
+    Regel (`supabase/online-schema.sql`, `online_haengt`).

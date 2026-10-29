@@ -1,4 +1,5 @@
 // Netzwerk ausschliesslich simuliert: kein Test schreibt ins echte Supabase-Projekt.
+//   PORT=9620 node tests/online-ui.test.mjs   eigener Port (Standard 8887)
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { readFileSync, mkdirSync } from 'node:fs';
@@ -21,9 +22,13 @@ const server = http.createServer((req, res) => {
   try { res.writeHead(200, { 'Content-Type': typen[path.extname(p)] || 'application/octet-stream' }); res.end(readFileSync(p)); }
   catch (e) { res.writeHead(404); res.end(); }
 });
-await new Promise(r => server.listen(8887, '127.0.0.1', r));
+const PORT = Number(process.env.PORT || 8887);
+await new Promise(r => server.listen(PORT, '127.0.0.1', r));
 const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })).toString('base64url') + '.x', refresh_token: 'test-r', expires_at: 9999999999, user: { id: 'u1', email: 'spieler@example.invalid' } };
 let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehnen = false;
+// Antwort auf die naechste Strittig-Meldung: null wie der Server, 'netz' ohne Verbindung, 'beendet' wenn der Gegner
+// gerade vorher die Zeit reklamiert hat (Wettlauf, siehe Konzept Anti-Cheat L5)
+let strittigAntwort = null;
 const partien = new Map(), calls = [], fehler = [], unerwartet = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
@@ -78,6 +83,14 @@ try {
     }
     if (rpc === 'online_biete_remis') { p.remis_angebot = p.weiss === 'u1' ? 'w' : 'b'; return antwort(aktualisieren(p)); }
     if (rpc === 'online_nimm_remis_an') { p.status = 'beendet'; p.ergebnis = '1/2-1/2'; p.grund = 'remis'; p.remis_angebot = null; return antwort(aktualisieren(p)); }
+    if (rpc === 'online_strittig' && strittigAntwort === 'netz') { strittigAntwort = null; return route.abort('failed'); }
+    if (rpc === 'online_strittig' && strittigAntwort === 'beendet') {
+      strittigAntwort = null; Object.assign(p, { status: 'beendet', grund: 'zeit', ergebnis: p.weiss === 'u1' ? '0-1' : '1-0' }); aktualisieren(p);
+      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'ONLINE_PARTIE_BEENDET' }) });
+    }
+    if (rpc === 'online_strittig') { p.status = 'beendet'; p.grund = 'strittig'; p.ergebnis = null; p.remis_angebot = null; return antwort(aktualisieren(p)); }
+    // wie der Server: mit Uhr vor dem 2. Halbzug beendet die Zeit-Reklamation eine haengende Partie ohne Ergebnis
+    if (rpc === 'online_pruefe_zeit' && p.zuege.split(' ').filter(Boolean).length < 2) { p.status = 'beendet'; p.grund = 'abgebrochen'; p.ergebnis = null; return antwort(aktualisieren(p)); }
     if (rpc === 'online_gib_auf' || rpc === 'online_pruefe_zeit') {
       p.status = 'beendet'; p.grund = rpc === 'online_gib_auf' ? 'aufgabe' : 'zeit';
       p.ergebnis = rpc === 'online_gib_auf' ? (p.weiss === 'u1' ? '0-1' : '1-0') : (p.am_zug === 'w' ? '0-1' : '1-0');
@@ -95,7 +108,7 @@ try {
   });
   const seite = await kontext.newPage(); seite.setDefaultTimeout(15000);
   seite.on('pageerror', e => fehler.push(e.message));
-  const start = 'http://127.0.0.1:8887/?test&kern&erw=pakete/online/index';
+  const start = `http://127.0.0.1:${PORT}/?test&kern&erw=pakete/online/index`;
   const knopf = a => seite.locator(`[data-online="${a}"]`);
   const bereit = () => seite.waitForFunction(() => window.__online?.brett() && !window.__online.busy());
   async function oeffne(p) { await seite.evaluate(id => window.__app.gehe('online', { partieId: id }), p.id); await bereit(); }
@@ -160,13 +173,96 @@ try {
   pruefe('Gegnerzeit auf null: Server entscheidet das Ergebnis', calls.some(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === mitUhr.id)
     && (await seite.locator('.on-ergebnis').innerText()).includes('Sieg') && mitUhr.grund === 'zeit');
   await seite.evaluate(() => { window.__versatz = 0; });
+  // Anti-Cheat Etappe 0: eine kaputte Serverstellung friert die Partie nicht mehr ein. Der Browser meldet die Partie
+  // einmal von selbst als strittig, ohne dass jemand tippt: Sonst wartete der Schummler, bis die Uhr des Opfers ablaeuft.
   const defekt = partie(); await oeffne(defekt);
+  const vorDefekt = calls.length;
   defekt.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(defekt);
-  await seite.getByText(/Die empfangene Stellung passt nicht/).waitFor();
-  pruefe('Unpassende Serverstellung haelt die Partie an', await seite.evaluate(() => window.__online.blockiert() && window.__online.chess().turn() === 'w'));
-  const ungueltig = partie(); await oeffne(ungueltig); ungueltig.zuege = 'e2e5'; aktualisieren(ungueltig);
-  await seite.getByText(/Die empfangene Stellung passt nicht/).waitFor();
-  pruefe('Illegaler Serverzug haelt die Partie ebenfalls an', await seite.evaluate(() => window.__online.blockiert()));
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  const strittigRufe = calls.slice(vorDefekt).filter(c => c.pfad.endsWith('online_strittig'));
+  pruefe('Unpassende Serverstellung: ohne Tippen von selbst als strittig gemeldet, Meldung, Karte "Strittig" ohne Sieg oder Niederlage',
+    strittigRufe.length === 1 && strittigRufe[0].body.partie === defekt.id && defekt.grund === 'strittig' && defekt.ergebnis === null
+    && (await seite.locator('.on-ergebnis h3').innerText()) === 'Strittig'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('ohne Ergebnis') && await knopf('strittig').count() === 0
+    && (await seite.locator('.on-meldung').innerText()).includes('als strittig beendet')
+    && await seite.evaluate(() => window.__online.widerspruch() && !window.__online.blockiert()), strittigRufe);
+  // Rueckfall: Erreicht die Meldung den Server nicht, friert trotzdem nichts ein. Es gibt eine Meldung, keine Zuege mehr,
+  // aber "Strittig melden" und "Aufgeben" bleiben bedienbar, und die Abfrage laeuft weiter.
+  const rueckfall = partie(); await oeffne(rueckfall);
+  strittigAntwort = 'netz';
+  rueckfall.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(rueckfall);
+  await seite.getByText(/selbst als strittig/).waitFor();
+  await knopf('strittig').waitFor(); await bereit();
+  pruefe('Meldung scheitert am Netz: Hinweis, "Strittig melden" und "Aufgeben" bleiben bedienbar statt Einfrieren', await seite.evaluate(() => window.__online.widerspruch()
+    && !window.__online.blockiert() && window.__online.chess().turn() === 'w' && window.__online.brett()._karte === null)
+    && await knopf('strittig').isEnabled() && await knopf('aufgeben').isEnabled() && await knopf('remis').count() === 0
+    && (await seite.locator('.on-zug').innerText()) === 'Stellung stimmt nicht'
+    && (await seite.locator('.on-meldung').innerText()).includes('Keine Verbindung')
+    && calls.filter(c => c.pfad.endsWith('online_strittig') && c.body.partie === rueckfall.id).length === 1 && rueckfall.status === 'laeuft');
+  await knopf('strittig').click();
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Strittig melden von Hand: Server beendet ohne Ergebnis, Karte "Strittig" ohne Sieg oder Niederlage', calls.filter(c => c.pfad.endsWith('online_strittig') && c.body.partie === rueckfall.id).length === 2
+    && rueckfall.grund === 'strittig' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Strittig'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('ohne Ergebnis') && await knopf('strittig').count() === 0);
+  // Wettlauf: Der Gegner reklamiert die Zeit, kurz bevor die Meldung ankommt. Dann gibt es keinen Knopf mehr und keine
+  // Aufforderung dazu; das Ende auf der kaputten Stellung zaehlt nicht als Niederlage.
+  const wettlauf = partie(); await oeffne(wettlauf);
+  strittigAntwort = 'beendet';
+  wettlauf.fen = new Chess().fen().replace(' w ', ' b '); aktualisieren(wettlauf);
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor(); await bereit();
+  pruefe('Wettlauf: Zeit zuerst reklamiert, Meldung des Servers ohne Knopf-Hinweis, "Ergebnis nicht nachvollziehbar"', wettlauf.grund === 'zeit'
+    && (await seite.locator('.on-ergebnis h3').innerText()) === 'Ergebnis nicht nachvollziehbar' && await knopf('strittig').count() === 0
+    && (await seite.locator('.on-meldung').innerText()) === 'Diese Partie ist schon beendet.');
+  const ungueltig = partie(); await oeffne(ungueltig);
+  strittigAntwort = 'netz';
+  ungueltig.zuege = 'e2e5'; aktualisieren(ungueltig);
+  await seite.getByText(/selbst als strittig/).waitFor();
+  await knopf('strittig').waitFor(); await bereit();
+  const vorTipp = calls.length;
+  await tippe('e2e4'); await seite.waitForTimeout(300);
+  pruefe('Illegaler Serverzug: letzter stimmiger Stand, keine Zuege, Knoepfe bedienbar', await seite.evaluate(() => window.__online.widerspruch()
+    && !window.__online.blockiert() && window.__online.chess().history().length === 0 && window.__online.brett()._karte === null)
+    && !calls.slice(vorTipp).some(c => c.pfad.endsWith('online_zug')) && await knopf('strittig').isEnabled());
+  // Der Schummler reklamiert danach die Zeit (L5 im Konzept): Die Abfrage laeuft weiter, das Ende kommt an, zaehlt aber
+  // auf der kaputten Stellung nicht als Niederlage.
+  ungueltig.status = 'beendet'; ungueltig.grund = 'zeit'; ungueltig.ergebnis = '0-1'; aktualisieren(ungueltig);
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Abfrage laeuft weiter: Zeitsieg auf kaputter Stellung ist "Ergebnis nicht nachvollziehbar"', (await seite.locator('.on-ergebnis h3').innerText()) === 'Ergebnis nicht nachvollziehbar'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('nicht als Sieg oder Niederlage') && ungueltig.grund === 'zeit');
+  // Nur Brett und Seite am Zug zaehlen: andere Zaehler, Rochaderechte oder en-passant-Feld im FEN-Text sind kein Fehler
+  const zaehler = partie({ zuege: 'e2e4' });
+  { const t = zaehler.fen.split(' '); zaehler.fen = [t[0], t[1], 'Kq', 'e3', '7', '23'].join(' '); aktualisieren(zaehler); }
+  await oeffne(zaehler);
+  pruefe('FEN nur in Zaehlern, Rochade und en passant anders: kein Widerspruch, Partie laeuft normal', await seite.evaluate(() => !window.__online.widerspruch()
+    && !window.__online.blockiert() && window.__online.chess().history().length === 1)
+    && (await seite.locator('.on-zug').innerText()) === 'Dein Freund ist am Zug' && await knopf('remis').count() === 1 && await knopf('strittig').count() === 0);
+  // Ein behauptetes Ende wird mit chess.js nachgeprueft
+  const scheinmatt = partie({ zuege: 'e2e4 e7e5' }); Object.assign(scheinmatt, { status: 'beendet', ergebnis: '0-1', grund: 'matt' }); aktualisieren(scheinmatt);
+  await oeffne(scheinmatt); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Behauptetes Matt, das keins ist: "Ergebnis nicht nachvollziehbar" statt Niederlage', (await seite.locator('.on-ergebnis h3').innerText()) === 'Ergebnis nicht nachvollziehbar'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('passt nicht zum Brett'));
+  const scheinremis = partie({ zuege: 'e2e4 e7e5' }); Object.assign(scheinremis, { status: 'beendet', ergebnis: '1/2-1/2', grund: 'wiederholung' }); aktualisieren(scheinremis);
+  await oeffne(scheinremis); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Behauptete Wiederholung, die keine ist: ebenfalls nicht nachvollziehbar', (await seite.locator('.on-ergebnis h3').innerText()) === 'Ergebnis nicht nachvollziehbar');
+  const echt = partie({ farbe: 'b', zuege: 'f2f3 e7e5 g2g4 d8h4' }); Object.assign(echt, { status: 'beendet', ergebnis: '0-1', grund: 'matt' }); aktualisieren(echt);
+  await oeffne(echt); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Echtes Matt wird bestaetigt: Sieg mit Schachmatt', (await seite.locator('.on-ergebnis h3').innerText()) === 'Sieg'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('Schachmatt'));
+  const material = partie({ zuege: 'e2e4 e7e5 g1f3' }); Object.assign(material, { status: 'beendet', ergebnis: '1/2-1/2', grund: 'zeit-material' }); aktualisieren(material);
+  await oeffne(material); await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Zeitende mit zu wenig Material: Remis mit eigenem Grund', (await seite.locator('.on-ergebnis h3').innerText()) === 'Remis'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('zu wenig Material zum Mattsetzen'));
+  // Mit Uhr vor dem 2. Halbzug laeuft keine Uhr: nach 10 Minuten ohne Zug fragt die Oberflaeche nach, der Server bricht ab
+  const haengt = partie({ zuege: 'e2e4', zeit: 300 }); await oeffne(haengt);
+  await seite.waitForTimeout(300);
+  const zuFrueh = calls.some(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === haengt.id);
+  await seite.evaluate(() => { window.__versatz += 11 * 60 * 1000; });
+  await seite.locator('.on-ergebnis:not([hidden])').waitFor();
+  pruefe('Haengende Partie mit Uhr: vor 10 Minuten keine Abfrage, danach abgebrochen ohne Ergebnis', !zuFrueh
+    && calls.filter(c => c.pfad.endsWith('online_pruefe_zeit') && c.body.partie === haengt.id).length === 1
+    && haengt.grund === 'abgebrochen' && (await seite.locator('.on-ergebnis h3').innerText()) === 'Partie beendet'
+    && (await seite.locator('.on-ergebnis').innerText()).includes('zu lange kein Zug'));
+  await seite.evaluate(() => { window.__versatz = 0; });
   const aufgabe = partie(); await oeffne(aufgabe);
   await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Aufgeben', exact: true }).click();
   await seite.locator('.on-ergebnis:not([hidden])').waitFor();
