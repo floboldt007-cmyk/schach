@@ -34,6 +34,7 @@ import { t } from '../../sprache.js';
 import * as L from './logik.js';
 import { REGEL_AUFGABEN, EINSTUFUNG } from './aufgaben.js';
 import './texte.js';
+import { protokolliere } from '../../protokoll.js';
 
 export const QUELLE_REGELN = 'start-regeln';
 export const QUELLE_EINSTUFUNG = 'start-einstufung';
@@ -44,6 +45,7 @@ export function sicher(fn, wo) {
     return fn();
   } catch (e) {
     console.error('start: ' + wo, e);
+    protokolliere('paket', e, { vorsatz: 'Paket start (' + (wo || 'unbekannt') + ')' });
     return null;
   }
 }

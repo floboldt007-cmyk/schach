@@ -29,6 +29,7 @@ import { registriereRaetselQuelle } from '../../ui/raetsel.js';
 import { t } from '../../sprache.js';
 import * as L from './logik.js';
 import './texte.js';
+import { protokolliere } from '../../protokoll.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -37,6 +38,7 @@ function sicher(fn, wo) {
     return fn();
   } catch (e) {
     console.error('tagesraetsel: ' + wo, e);
+    protokolliere('paket', e, { vorsatz: 'Paket tagesraetsel (' + (wo || 'unbekannt') + ')' });
     return null;
   }
 }

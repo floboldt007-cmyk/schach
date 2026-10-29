@@ -35,6 +35,7 @@ import * as T from './tag.js';
 import * as LA from './lauf.js';
 import * as S from './stand.js';
 import * as A from './ansicht.js';
+import { protokolliere } from '../../protokoll.js';
 
 const PAKET = 'serie';
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '');
@@ -48,6 +49,7 @@ const heute = () => tagSchluessel(jetzt());
 function sicher(fn, wo) {
   try { return fn(); } catch (e) {
     try { console.error(`Paket serie (${wo || 'unbekannt'}):`, e); } catch (x) { /* egal */ }
+    protokolliere('paket', e, { vorsatz: `Paket serie (${wo || 'unbekannt'})` });
     return null;
   }
 }

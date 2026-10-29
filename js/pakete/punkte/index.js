@@ -44,6 +44,7 @@ import * as C from './code.js';
 import * as F from './formel.js';
 import * as A from './ansicht.js';
 import * as B from './liste.js';
+import { protokolliere } from '../../protokoll.js';
 
 const PAKET = 'punkte';
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '');
@@ -52,6 +53,7 @@ const UMZUG_MAX = 12;
 function sicher(fn, wo) {
   try { return fn(); } catch (e) {
     try { console.error(`Paket punkte (${wo || 'unbekannt'}):`, e); } catch (x) { /* egal */ }
+    protokolliere('paket', e, { vorsatz: `Paket punkte (${wo || 'unbekannt'})` });
     return null;
   }
 }
