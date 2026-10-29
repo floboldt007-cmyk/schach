@@ -43,10 +43,14 @@ async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
   return d;
 }
 
-export async function fordereCodeAn(email) {
+// basis: Adresse der App ohne Hash. Sie geht als redirect_to mit, damit der Anmelde-Link (Rueckfall ohne SMTP) hierher
+// zurueckfuehrt. Ohne redirect_to nimmt Supabase den Referer, und der Browser schickt quer zu supabase.co nur die
+// Herkunft (https://floboldt007-cmyk.github.io/ ohne /schach/): Der Link landete auf einer 404-Seite (29.10.2026).
+export async function fordereCodeAn(email, basis = basisAdresse()) {
   email = String(email || '').trim();
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error(K('emailUngueltig'));
-  await anfrage('/auth/v1/otp', { methode: 'POST', daten: { email, create_user: true } });
+  const ziel = /^https?:\/\//.test(basis) ? '?redirect_to=' + encodeURIComponent(basis) : '';
+  await anfrage('/auth/v1/otp' + ziel, { methode: 'POST', daten: { email, create_user: true } });
   return true;
 }
 export function userId(s) {
@@ -183,7 +187,7 @@ export async function gleicheNachAnmeldung(wahl) {
 export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (sitzung()) speichereCloudStand().catch(() => {}); }, ms); }
 
 // Rueckfall, solange Supabase ohne eigenen SMTP-Versand einen Anmelde-Link statt des Codes schickt:
-// Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite.
+// Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite (redirect_to aus fordereCodeAn).
 let abgleichOffen = false;
 export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = globalThis.history) {
   let h = String(ort?.hash || '');

@@ -16,6 +16,13 @@ const session = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'u1' })
 
 antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de');
 pruefe('Code anfordern', calls.at(-1).url.endsWith('/auth/v1/otp') && JSON.parse(calls.at(-1).body).create_user === true);
+antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de', 'https://floboldt007-cmyk.github.io/schach/?sprache=en');
+pruefe('Code anfordern schickt die App-Adresse als redirect_to (sonst fuehrt der Link nach github.io/ ohne /schach/)',
+  calls.at(-1).url === SUPABASE_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent('https://floboldt007-cmyk.github.io/schach/?sprache=en'), calls.at(-1).url);
+for (const basis of ['', 'capacitor://localhost/', 'javascript:alert(1)']) {
+  antworten.push({ status: 200, body: {} }); await fordereCodeAn('a@b.de', basis);
+  pruefe('Code anfordern ohne redirect_to bei Adresse "' + basis + '"', calls.at(-1).url === SUPABASE_URL + '/auth/v1/otp', calls.at(-1).url);
+}
 antworten.push({ status: 200, body: session }); await pruefeCode('a@b.de', '123456');
 pruefe('Code prüfen und Sitzung speichern', sitzung().refresh_token === 'r' && calls.at(-1).url.endsWith('/auth/v1/verify'));
 localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); antworten.push({ status: 200, body: { ...session, refresh_token: 'r2' } }); await erneuereSitzung();
