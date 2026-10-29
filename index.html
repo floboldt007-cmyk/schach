@@ -54,5 +54,272 @@
   </section>
 </div>
 <noscript><p class="ohne-js">Crownmate braucht JavaScript.</p></noscript>
+<script>
+  // Notfall-Waechter (Luecken-Check 7). Der ganze Update-Weg steckt in js/app.js: Bricht app.js oder ein Modul, das es
+  // importiert, ab, bliebe der Lade-Screen fuer immer stehen, und eine spaeter reparierte Version wartete im Service Worker
+  // vergeblich auf 'aktivieren'. Dieses Skript haengt an nichts davon (kein Modul, kein CSS, ES5, Stil inline): Steht der
+  // Lade-Screen nach 15 s noch (nach einem Skriptfehler schon 3 s nach dem Fehler), erscheint eine Tafel mit "Reparieren".
+  // Der Knopf prueft erst das Netz (ohne Netz wird nichts geloescht), meldet dann den Service Worker dieser App ab, loescht
+  // nur ihre Caches (Praefix aus sw.js) und laedt neu. localStorage, IndexedDB und Cookies (der Spielstand) bleiben
+  // unberuehrt. Ohne Service Worker (iOS-Huelle capacitor://, file://, http) laedt er nur neu. Ein Merker in sessionStorage
+  // sagt nach dem Neuladen, dass es nicht geholfen hat (nie automatisch, keine Schleife). Startet die App doch noch,
+  // verschwindet die Tafel. Test: ?test&notfall=<ms> verkuerzt die Wartezeit (nur mit ?test). tests/notfall.test.mjs
+  (function () {
+    var PRAEFIX = 'schach-arena-';                   // Cache-Namen (sw.js PRAEFIX)
+    var MERKER = 'schach-arena:notfall-repariert';   // sessionStorage: Zeitpunkt der letzten Reparatur
+    var MERKER_MS = 600000;                          // so lange gilt "hat nicht geholfen" (10 Minuten)
+    var LADE = '#app > .lade-screen';
+    var TEXTE = {
+      de: {
+        satz: 'Crownmate startet gerade nicht wie gewohnt.',
+        erklaerung: '„Reparieren“ lädt die App frisch vom Server. Dein Spielstand bleibt erhalten.',
+        knopf: 'Reparieren',
+        arbeitet: 'Einen Moment …',
+        offline: 'Zum Reparieren braucht es eine Internetverbindung. Es wurde nichts gelöscht.',
+        nichtGeholfen: 'Die Reparatur hat nicht geholfen. Schließe die App ganz und versuche es später noch einmal.'
+      },
+      en: {
+        satz: 'Crownmate is not starting as expected.',
+        erklaerung: '“Repair” reloads the app fresh from the server. Your progress is kept.',
+        knopf: 'Repair',
+        arbeitet: 'One moment …',
+        offline: 'Repairing needs an internet connection. Nothing was deleted.',
+        nichtGeholfen: 'The repair did not help. Close the app completely and try again later.'
+      }
+    };
+    var wurzel = document.getElementById('app');
+    if (!wurzel || !window.addEventListener || !document.querySelector(LADE)) return;
+    var suche = '';
+    try { suche = String(location.search || ''); } catch (e) { /* egal */ }
+    var test = /[?&]test\b/.test(suche);
+    var vorgabe = test ? /[?&]notfall=(\d+)/.exec(suche) : null;
+    var warten = vorgabe ? Math.min(Number(vorgabe[1]), 60000) : 15000;
+    var frueh = Math.min(3000, warten);
+    // Zeit seit dem Beginn des Ladens (performance.now zaehlt ab der Navigation)
+    var t0 = Date.now();
+    try { if (window.performance && performance.now) t0 = Date.now() - performance.now(); } catch (e) { /* egal */ }
+    var tafel = null, knopf = null, hinweis = null, T = TEXTE.de;
+    var fehlerAb = 0, uhr = 0, puls = 0, beob = null, aus = false, laeuft = false;
+
+    function ladeScreen() { return !!document.querySelector(LADE); }
+
+    // Wie js/app.js: ?sprache=de|en, sonst die gespeicherte Wahl, automatisierte Laeufe deutsch (ausser ?autosprache),
+    // sonst die Sprache des Geraets wie js/sprache.js geraeteSprache
+    function sprache() {
+      var m = /[?&]sprache=(de|en)(?:&|#|$)/.exec(suche);
+      if (m) return m[1];
+      try {
+        // wie js/storage.js ladeEinstellungen: Ohne booleschen Wert spracheGewaehlt (Stand vor dem 24.10.) gilt ein
+        // gespeichertes 'en' als Wahl, eine unbekannte Sprache wird Deutsch
+        var e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || 'null');
+        if (e && typeof e === 'object') {
+          var gewaehlt = typeof e.spracheGewaehlt === 'boolean' ? e.spracheGewaehlt : e.sprache === 'en';
+          if (gewaehlt) return e.sprache === 'en' ? 'en' : 'de';
+        }
+      } catch (f) { /* privater Modus */ }
+      try {
+        if ((navigator.webdriver === true || test) && !/[?&]autosprache\b/.test(suche)) return 'de';
+        var liste = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+        var i, teile;
+        for (i = 0; i < liste.length; i++) {
+          teile = String(liste[i] || '').replace('_', '-').split('-');
+          if (teile[0].toLowerCase() === 'de' || teile[0].toLowerCase() === 'en') return teile[0].toLowerCase();
+        }
+        for (i = 0; i < liste.length; i++) {
+          teile = String(liste[i] || '').replace('_', '-').split('-');
+          if (/^(DE|AT|LI)$/.test(String(teile[1] || '').toUpperCase())) return 'de';
+        }
+      } catch (f) { return 'de'; }
+      return 'en';
+    }
+
+    function merkerAktiv() {
+      try {
+        var w = Number(sessionStorage.getItem(MERKER) || 0);
+        if (w && Date.now() - w < MERKER_MS) return true;
+        if (w) sessionStorage.removeItem(MERKER);
+      } catch (e) { /* egal */ }
+      return false;
+    }
+
+    function element(tag, stil) {
+      var el = document.createElement(tag);
+      el.style.cssText = stil;
+      return el;
+    }
+
+    function zeige() {
+      if (tafel || aus) return;
+      var s = sprache();
+      T = TEXTE[s];
+      var gescheitert = merkerAktiv();
+      var modus = document.documentElement.getAttribute('data-modus');
+      var schema = modus === 'hell' ? 'light' : modus === 'dunkel' ? 'dark' : 'light dark';
+      tafel = element('div', 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;overflow:auto;box-sizing:border-box;'
+        + 'display:flex;align-items:center;justify-content:center;padding:24px 16px;'
+        + 'padding:max(24px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));'
+        + 'color-scheme:' + schema + ';background:#fff;background:Canvas;color:#111;color:CanvasText;'
+        + 'font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.45;font-weight:400;'
+        + 'text-align:center;-webkit-text-size-adjust:100%;text-size-adjust:100%');
+      tafel.id = 'notfall';
+      tafel.setAttribute('role', 'alertdialog');
+      tafel.setAttribute('aria-modal', 'true');
+      tafel.setAttribute('aria-labelledby', 'notfall-satz');
+      tafel.setAttribute('aria-describedby', 'notfall-erklaerung');
+      tafel.setAttribute('lang', s);
+      tafel.setAttribute('data-zustand', gescheitert ? 'nicht-geholfen' : 'bereit');
+      var box = element('div', 'width:100%;max-width:26em;margin:auto');
+      var satz = element('p', 'margin:0 0 10px;font-size:21px;line-height:1.3;font-weight:600');
+      satz.id = 'notfall-satz';
+      satz.textContent = gescheitert ? T.nichtGeholfen : T.satz;
+      var erklaerung = element('p', 'margin:0 0 22px');
+      erklaerung.id = 'notfall-erklaerung';
+      erklaerung.textContent = T.erklaerung;
+      knopf = element('button', 'font:inherit;font-weight:600;min-height:48px;min-width:12em;margin:0;padding:12px 28px;border:0;'
+        + 'border-radius:12px;cursor:pointer;-webkit-appearance:none;appearance:none;background:#111;background:CanvasText;color:#fff;color:Canvas');
+      knopf.type = 'button';
+      knopf.textContent = T.knopf;
+      knopf.addEventListener('click', repariere);
+      hinweis = element('p', 'margin:18px 0 0;min-height:1.45em;font-weight:600');
+      hinweis.setAttribute('role', 'status');
+      box.appendChild(satz);
+      box.appendChild(erklaerung);
+      box.appendChild(knopf);
+      box.appendChild(hinweis);
+      tafel.appendChild(box);
+      document.body.appendChild(tafel);
+      try { knopf.focus(); } catch (e) { /* egal */ }
+    }
+
+    // App laeuft (Lade-Screen weg): Tafel weg, Waechter aus, Merker der Reparatur geloest
+    function beende() {
+      if (aus) return;
+      aus = true;
+      clearTimeout(uhr);
+      clearInterval(puls);
+      if (beob) beob.disconnect();
+      window.removeEventListener('error', beiFehler, true);
+      window.removeEventListener('unhandledrejection', beiFehler);
+      if (tafel && tafel.parentNode) tafel.parentNode.removeChild(tafel);
+      tafel = null;
+      try { sessionStorage.removeItem(MERKER); } catch (e) { /* egal */ }
+    }
+
+    function plane() {
+      clearTimeout(uhr);
+      if (aus || tafel) return;
+      if (!ladeScreen()) { beende(); return; }
+      var faellig = fehlerAb ? Math.min(warten, fehlerAb + frueh) : warten;
+      var rest = faellig - (Date.now() - t0);
+      if (rest <= 0) zeige();
+      else uhr = setTimeout(plane, rest + 20);
+    }
+
+    // Laufzeitfehler und Promise-Fehler am Fenster sowie ein Skript, das nicht laedt (Fehler am <script>, nur im
+    // Capture zu sehen), zaehlen; ein fehlendes Bild, Stylesheet oder eine Schrift nicht
+    function beiFehler(ev) {
+      if (aus || fehlerAb) return;
+      var ziel = ev && ev.target;
+      if (ziel && ziel !== window && ziel.tagName && String(ziel.tagName).toUpperCase() !== 'SCRIPT') return;
+      fehlerAb = Math.max(1, Date.now() - t0);
+      plane();
+    }
+
+    function mitFrist(versprechen, ms, ersatz) {
+      return new Promise(function (fertig) {
+        var u = setTimeout(function () { fertig(ersatz); }, ms);
+        versprechen.then(function (w) { clearTimeout(u); fertig(w); }, function () { clearTimeout(u); fertig(ersatz); });
+      });
+    }
+
+    // Service Worker gibt es nur ueber https oder localhost (wie registriereSW in js/app.js)
+    function mitServiceWorker() {
+      try {
+        var lokal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+        return !!navigator.serviceWorker && typeof fetch === 'function' && typeof Promise === 'function'
+          && (location.protocol === 'https:' || (location.protocol === 'http:' && lokal));
+      } catch (e) { return false; }
+    }
+
+    // Netz da? HEAD statt GET: sw.js beantwortet nur GET aus dem Cache, HEAD geht also sicher bis zum Server
+    function netzDa() {
+      var anfrage;
+      try {
+        anfrage = fetch('sw.js?notfall=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function (r) { return !!(r && r.ok); }, function () { return false; });
+      } catch (e) { return Promise.resolve(false); }
+      return mitFrist(anfrage, 10000, false);
+    }
+
+    // Service Worker im Ordner dieser Seite abmelden (auf github.io teilen sich mehrere Apps den Ursprung), dann nur
+    // die Caches mit dem Praefix der App loeschen. Ein Fehler in einem Schritt haelt den naechsten nicht auf.
+    function aufraeumen() {
+      var basis = location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '');
+      var sw = navigator.serviceWorker;
+      var nichts = function () { return null; };
+      var liste = sw.getRegistrations ? sw.getRegistrations()
+        : sw.getRegistration().then(function (r) { return r ? [r] : []; });
+      return mitFrist(liste.then(function (regs) {
+        var aufgaben = [];
+        for (var i = 0; i < regs.length; i++) {
+          if (regs[i] && String(regs[i].scope).indexOf(basis) === 0) aufgaben.push(regs[i].unregister());
+        }
+        return Promise.all(aufgaben);
+      }), 8000, null).then(nichts, nichts).then(function () {
+        if (typeof caches === 'undefined' || !caches || !caches.keys) return null;
+        return mitFrist(caches.keys().then(function (namen) {
+          var aufgaben = [];
+          for (var i = 0; i < namen.length; i++) {
+            if (String(namen[i]).indexOf(PRAEFIX) === 0) aufgaben.push(caches['delete'](namen[i]));
+          }
+          return Promise.all(aufgaben);
+        }), 8000, null);
+      }).then(nichts, nichts);
+    }
+
+    function neuLaden() {
+      try { sessionStorage.setItem(MERKER, String(Date.now())); } catch (e) { /* egal */ }
+      location.reload();
+    }
+
+    // Gesperrt wird mit aria-disabled statt disabled: Ein abgeschalteter Knopf verliert den Tastaturfokus, und nach der
+    // Meldung ohne Netz liefe ein zweites Enter ins Leere. Doppelte Tipps haelt 'laeuft' ab.
+    function sperre(an) {
+      if (an) knopf.setAttribute('aria-disabled', 'true');
+      else knopf.removeAttribute('aria-disabled');
+      knopf.style.opacity = an ? '0.6' : '';
+    }
+
+    function repariere() {
+      if (laeuft || aus) return;
+      laeuft = true;
+      sperre(true);
+      tafel.setAttribute('data-zustand', 'arbeitet');
+      hinweis.textContent = T.arbeitet;
+      if (!mitServiceWorker()) { neuLaden(); return; }
+      netzDa().then(function (da) {
+        if (aus) return null;   // die App ist inzwischen doch gestartet
+        if (!da) {
+          laeuft = false;
+          sperre(false);
+          // Fokus zurueck auf den einzigen Knopf (Safari fokussiert Knoepfe beim Klicken nicht)
+          if (document.activeElement !== knopf) { try { knopf.focus(); } catch (e) { /* egal */ } }
+          tafel.setAttribute('data-zustand', 'offline');
+          hinweis.textContent = T.offline;
+          return null;
+        }
+        return aufraeumen().then(neuLaden);
+      }).then(null, function () { if (!aus) neuLaden(); });
+    }
+
+    window.addEventListener('error', beiFehler, true);
+    window.addEventListener('unhandledrejection', beiFehler);
+    if (window.MutationObserver) {
+      beob = new MutationObserver(function () { if (!ladeScreen()) beende(); });
+      beob.observe(wurzel, { childList: true });
+    } else puls = setInterval(function () { if (!ladeScreen()) beende(); }, 1000);
+    plane();
+  })();
+</script>
 </body>
 </html>

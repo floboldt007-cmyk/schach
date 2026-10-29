@@ -252,6 +252,14 @@ const VERBOTEN = ['Serie verloren', 'stirbt', 'letzte Chance', 'nur noch', 'verp
   }
   pruefe(`Verbotsliste: kein Treffer in den Texten der Server-Funktionen (${server.length} Dateien unter supabase/functions/)`,
     server.length >= 3 && serverTreffer.length === 0, serverTreffer);
+  // Inline-Skripte in index.html (Notfall-Waechter: Texte der Reparatur-Tafel, laufen ohne js/)
+  const html = readFileSync(path.join(WURZEL, 'index.html'), 'utf8');
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const inlineTexte = inline.flatMap((s) => zerlege(s).texte);
+  const inlineTreffer = [];
+  for (const t of inlineTexte) for (const w of VERBOTEN) if (t.toLowerCase().includes(w.toLowerCase())) inlineTreffer.push(`index.html: "${w}" in "${t.slice(0, 80)}"`);
+  pruefe(`Verbotsliste: kein Treffer in den Texten der ${inline.length} Inline-Skripte von index.html`,
+    inline.length >= 2 && inlineTexte.some((t) => t.includes('Reparieren')) && inlineTreffer.length === 0, inlineTreffer);
   // Selbstprobe der neuen Muster (Editionen): Drucktexte werden erkannt, ruhige Fakten und harmlose Saetze nicht
   const trifft = (t) => VERBOTEN.some((w) => t.toLowerCase().includes(w.toLowerCase()));
   const druck = ['Diese Edition kommt nie wieder!', 'Danach nie wieder erhältlich', 'Letzte Gelegenheit', 'Mit Wertsteigerung',
