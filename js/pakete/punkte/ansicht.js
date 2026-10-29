@@ -3,18 +3,18 @@
 // (js/bewegung.js: anim, tempo); bei reduzierter Bewegung oder Tempo 0 steht sofort das Endbild, der Klang bleibt.
 //
 //   zahlText(n) -> '21.300'
-//   tafelName(tafelId, botNachId) -> 'Rudis Tafel' | 'Boss-Tafel Baron von Gambit / Meister' | 'Tafel'
-//   unterText(ergebnis, name) -> Satz der Abrechnungszeile ("Platz 3 auf Rudis Tafel", "Rekord auf ...", ...)
+//   tafelName(tafelId, botNachId) -> 'Thorstens Tafel' | 'Boss-Tafel Baron von Gambit / Meister' | 'Tafel'
+//   unterText(ergebnis, name) -> Satz der Abrechnungszeile ("Platz 3 auf Thorstens Tafel", "Rekord auf ...", ...)
 //   abrechnungsZeile({ ergebnis, tafelName, schonGezeigt, merke, mini, beiListe, post, stumm }) -> { el, beende(), verlasse() }
-//       div.pk-abr[data-zeile="punkte"]: "PUNKTE 21.300", darunter "Platz 3 auf Rudis Tafel ^ 2"; bei einem Rekord bleibt
+//       div.pk-abr[data-zeile="punkte"]: "PUNKTE 21.300", darunter "Platz 3 auf Thorstens Tafel ^ 2"; bei einem Rekord bleibt
 //       der alte Wert durchgestrichen stehen (.pk-alt), der neue zaehlt hoch. Bei ueberholten Zeilen (^) eine Mini-Tafel mit
 //       drei Zeilen (ueber dir, du, unter dir): deine Zeile gleitet nach oben, je ueberholter Zeile ein Klacken (Klang
 //       "klick"). Antippen zeigt die Aufschluesselung und "Zur Bestenliste". data-fertig="1", sobald das Endbild steht.
 //       stumm: true, wenn das Ergebnis den grossen Moment schon mit Klang "rekord" zeigt (dann nur das Klacken, kein Echo).
 //       post: { name, text() -> Text } (Ueberhol-Post, 3.13): in der Aufschluesselung einmal still "Ueberhol-Post an Jule";
 //       Antippen zeigt den Text mit Code als Vorschau, verschickt wird nur von Hand (Kopieren oder Teilen-Blatt).
-//   panelZeile({ name, best, platz, beiTipp }) -> HTMLElement   Ort arena:panel-bot (3.17 "Rudis Tafel: Platz 4"):
-//       button.pk-panel "Rudis Tafel / Bestwert 12.300" (mit Gaesten dazu "/ Platz 2"), Antippen oeffnet die Tafel
+//   panelZeile({ name, best, platz, beiTipp }) -> HTMLElement   Ort arena:panel-bot (3.17 "Thorstens Tafel: Platz 4"):
+//       button.pk-panel "Thorstens Tafel / Bestwert 12.300" (mit Gaesten dazu "/ Platz 2"), Antippen oeffnet die Tafel
 //   wartezeile({ fehlt }) -> HTMLElement   "Punkte werden gezaehlt ..." (Analyse rechnet noch, ruhiger Schimmer, endlich)
 //       bzw. mit fehlt: "Punkte folgen mit der Analyse" (die Arena holt sie nach)
 import { anim, tempo } from '../../bewegung.js';
@@ -28,7 +28,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 // Zahlen in der eingestellten Sprache ('21.300' | '21,300')
 export const zahlText = (n) => zahl(Math.round(Number(n) || 0));
 
-// Besitzform der Leiter-Bots ("Rudis Tafel", Woerterbuch besitz.<id>); andere Gegner heissen "Tafel: <Name>"
+// Besitzform der Leiter-Bots ("Thorstens Tafel", Woerterbuch besitz.<id>); andere Gegner heissen "Tafel: <Name>"
 const BESITZ = new Set(['benno', 'hilde', 'kalle', 'lisa', 'rudi', 'turm', 'delia', 'koenig', 'greta', 'stockfisch',
   // Welten (24.10.): die neuen Bots
   'fridolin', 'paula', 'gustav', 'janine', 'bodo', 'leo', 'edda', 'luke', 'moritz', 'ottilie', 'lasse', 'wiebke', 'henning', 'ilka',
@@ -56,7 +56,7 @@ export function unterText(e, name = t('p-punkte.tafel.allein')) {
   if (!e) return '';
   if (!e.tafel) return t('p-punkte.grund.' + (GRUENDE.includes(e.grund) ? e.grund : 'gast'));
   if (e.erster) return t('p-punkte.erster', { name });
-  // Platz gewonnen: "Platz 3 auf Rudis Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
+  // Platz gewonnen: "Platz 3 auf Thorstens Tafel" (der Pfeil ^ 2 und die durchgestrichene alte Zahl stehen daneben)
   if (e.rekord && e.aufstieg > 0 && e.platz != null) return t('p-punkte.platzAuf', { platz: e.platz, name });
   if (e.rekord) return t('p-punkte.rekordPlus', { name, plus: zahlText(e.w - (e.vorher || 0)) });
   // "So nah" vor dem Platz: eine Partie mit 90 % des Rekords steht fast immer unter deinen drei Besten, und der leise

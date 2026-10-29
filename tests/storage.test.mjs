@@ -174,7 +174,7 @@ setzeSpeicher(s);
 let f = ladeFortschritt();
 pruefe('Fortschritt: leer, 30 Bots (Welten)', Object.keys(f.bots).length === 30 && gesamtSterne(f) === 0);
 pruefe('Freischaltung: nur Stufe 1 frei', istFreigeschaltet(1, f) && !istFreigeschaltet(2, f) && hoechsteFreieStufe(f) === 1);
-pruefe('Naechster Gegner: Fridolin (Welten: Stufe 1)', naechsterGegner(f).id === 'fridolin');
+pruefe('Naechster Gegner: Willi (Welten: Stufe 1)', naechsterGegner(f).id === 'fridolin');
 pruefe('Welten: der Endgegner der ersten Welt ist direkt herausforderbar, die Stufen dazwischen nicht', istFreigeschaltet(6, f) && !istFreigeschaltet(5, f) && !istFreigeschaltet(7, f) && !istFreigeschaltet(12, f));
 
 pruefe('Sterne: Niederlage 0', JSON.stringify(sterneFuerPartie(partie({ ergebnis: 'niederlage' }))) === '[false,false,false]');
@@ -182,17 +182,17 @@ pruefe('Sterne: Sieg 79,9 % mit Hinweis', JSON.stringify(sterneFuerPartie(partie
 pruefe('Sterne: Sieg 80 % ohne Hilfe', JSON.stringify(sterneFuerPartie(partie({ genauigkeit: 80 }))) === '[true,true,true]');
 pruefe('Sterne: Genauigkeit null', JSON.stringify(sterneFuerPartie(partie({ genauigkeit: null, zuruecknahmen: 2 }))) === '[true,false,false]');
 
-// Niederlage gegen Benno: nichts frei
+// Niederlage gegen Lukas: nichts frei
 let r = speicherePartie(partie({ ergebnis: 'niederlage', genauigkeit: 50 }));
 f = ladeFortschritt();
 pruefe('Niederlage: keine Sterne, nicht frei', !r.neuFreigeschaltet && gesamtSterne(f) === 0 && f.bots.benno.niederlagen === 1 && f.bots.benno.partien === 1);
 
-// Sieg mit Hinweis gegen Benno (Stufe 2) -> Stern 1 und 2, frei bis Paula (Stufe 3, der naechste Gegner)
+// Sieg mit Hinweis gegen Lukas (Stufe 2) -> Stern 1 und 2, frei bis Paula (Stufe 3, der naechste Gegner)
 r = speicherePartie(partie({ genauigkeit: 85, hinweise: 1 }), { zuege: [{ ply: 0, farbe: 'w', san: 'e4', klasse: 'brillant' }, { ply: 1, farbe: 'b', san: 'e5', klasse: 'brillant' }] });
 f = ladeFortschritt();
 pruefe('Sieg mit Hinweis: Sterne 1+2 neu, Paula frei', JSON.stringify(r.neueSterne) === '[true,true,false]' && r.neuFreigeschaltet && r.neuFreigeschaltet.id === 'paula', r.neuFreigeschaltet && r.neuFreigeschaltet.id);
-pruefe('Freischaltung: bis Stufe 3 frei (Fridolin darunter auch), 4 nicht', istFreigeschaltet(1, f) && istFreigeschaltet(3, f) && !istFreigeschaltet(4, f) && hoechsteFreieStufe(f) === 3 && besiegteBots(f) === 1);
-pruefe('Naechster Gegner: Paula (ueber dem besten Sieg, nicht zurueck zu Fridolin)', naechsterGegner(f).id === 'paula');
+pruefe('Freischaltung: bis Stufe 3 frei (Willi darunter auch), 4 nicht', istFreigeschaltet(1, f) && istFreigeschaltet(3, f) && !istFreigeschaltet(4, f) && hoechsteFreieStufe(f) === 3 && besiegteBots(f) === 1);
+pruefe('Naechster Gegner: Paula (ueber dem besten Sieg, nicht zurueck zu Willi)', naechsterGegner(f).id === 'paula');
 pruefe('Brillant-Sammlung: nur eigene Zuege', r.brillant === 1 && f.bots.benno.besteGenauigkeit === 85 && f.brillanteZuege.length === 1);
 const id2 = r.partie.id;
 pruefe('Review gespeichert', hatReview(id2) && ladeReview(id2).zuege.length === 2);
@@ -230,16 +230,16 @@ pruefe('Eigene Zuege: Weiss 3 von 5, Schwarz 2 von 5, Schwarz ab FEN 3 von 5',
   w.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { benno: sieg1, hilde: sieg1, kalle: sieg1, lisa: sieg1, rudi: sieg1,
     turm: sieg1, delia: sieg1, koenig: sieg1, greta: sieg1 } }));
   let fw = ladeFortschritt();
-  pruefe('Welten: alter Stand bis Greta: Fridolin, Paula und Henning frei, Ilka nicht, naechster Gegner Henning',
+  pruefe('Welten: alter Stand bis Greta: Willi, Paula und René frei, Ilka nicht, naechster Gegner René',
     istFreigeschaltet(1, fw) && istFreigeschaltet(3, fw) && istFreigeschaltet(22, fw) && !istFreigeschaltet(23, fw)
     && naechsterGegner(fw).id === 'henning' && hoechsteFreieStufe(fw) === 22);
   pruefe('Welten: Endgegner der eigenen Welt (Johann, 24) direkt frei, die Stockfisch-Tiefe noch zu',
     istFreigeschaltet(24, fw) && istWeltFrei(4, fw) && !istWeltFrei(5, fw) && !istFreigeschaltet(25, fw) && !istFreigeschaltet(30, fw));
-  // frischer Stand: Endgegner Janine direkt besiegt -> ganze Welt 1 und Bodo (Welt 2) frei, Bodo ist der naechste Gegner
+  // frischer Stand: Endgegner Janine direkt besiegt -> ganze Welt 1 und Jan (Welt 2) frei, Jan ist der naechste Gegner
   w.removeItem('schach-arena:v1:fortschritt');
   const rj = speicherePartie(partie({ botId: 'janine', botStufe: 6, genauigkeit: 85 }));
   fw = ladeFortschritt();
-  pruefe('Welten: Sieg gegen den Endgegner direkt oeffnet die ganze Welt und die naechste (neu frei: Bodo)',
+  pruefe('Welten: Sieg gegen den Endgegner direkt oeffnet die ganze Welt und die naechste (neu frei: Jan)',
     [2, 3, 4, 5, 7].every((st) => istFreigeschaltet(st, fw)) && !istFreigeschaltet(8, fw) && istWeltFrei(2, fw)
     && rj.neuFreigeschaltet && rj.neuFreigeschaltet.id === 'bodo' && naechsterGegner(fw).id === 'bodo', rj.neuFreigeschaltet && rj.neuFreigeschaltet.id);
   // Weltsiegel: alle 18 Sterne der Welt
@@ -968,7 +968,7 @@ function gleich(a, b) {
     && !fake.aufrufe.some((a) => stellungsSchluessel(a.fen) === stellungsSchluessel(NACH_E4)), fake.aufrufe.length);
   const nl = nachlese();
   pruefe('Nachholen: neu verdienter Stern kommt in die Nachlese (still, nicht ins Overlay)', nl.length === 2 && nl.every((f) => f.quelle === 'stern-nachgeholt' && f.art === 'zeile')
-    && nl.some((f) => f.titel === 'Neuer Stern gegen Bauer Benno' && /Nachträglich ausgewertet: 100 % Genauigkeit\./.test(f.text)), nl);
+    && nl.some((f) => f.titel === 'Neuer Stern gegen Bauer Lukas' && /Nachträglich ausgewertet: 100 % Genauigkeit\./.test(f.text)), nl);
   pruefe('Nachholen: kaputte Partie nur einmal versucht', offenePartien({ max: 5 }).length === 0 && zustand().laeuft === false);
 
   // Abbruch (Arena verlassen, Partie startet): laufende Suche gestoppt, nichts gespeichert, spaeter weiter
@@ -1050,8 +1050,8 @@ function gleich(a, b) {
     && statistik().partien === vorher && !istFreigeschaltet(2), erg.map((e) => e.wertet));
   pruefe('wertet: boss, frei, spiel nie, auch aus der Grundstellung', ['boss', 'frei', 'spiel'].every((m) => !wertet({ modus: m })));
   // w0plus-a-fix (Befund des Pruefers): ein angemeldeter Gast im Modus normal wertete wie ein Leiter-Bot (3 Sterne,
-  // Statistik, "Nächster Gegner" Benno). Angemeldete Bots gehoeren nie zur Leiter.
-  const abGast = registriereBot({ id: 'pruefer-gast', art: 'gast', name: 'Gast Gustav', avatar: 'assets/avatare/01-bauer-benno.svg',
+  // Statistik, "Nächster Gegner" Lukas). Angemeldete Bots gehoeren nie zur Leiter.
+  const abGast = registriereBot({ id: 'pruefer-gast', art: 'gast', name: 'Gast Maik', avatar: 'assets/avatare/01-bauer-benno.svg',
     staerke: { ...botNachId('benno').staerke } });
   const vorGast = statistik().partien;
   const gastErg = speicherePartie(partie({ botId: 'pruefer-gast', botStufe: null, modus: 'normal' }));

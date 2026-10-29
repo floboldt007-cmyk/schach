@@ -37,7 +37,7 @@
 //       schule_melde_fortschritt: { bots_besiegt, sterne, partien, genauigkeit_schnitt, haeufigste_fehler, erledigt }
 //   haeufigsteFehler(partien) -> { zuege, arten: [{ art, anzahl }] }   letzte FEHLER_FENSTER wertende Partien, nur eigene Zuege
 //   aufgabeStand(aufgabe, { fortschritt, partien, geloest }) -> { erledigt, stand, ziel }   stand/ziel bei Partien und Raetseln
-//   zielText(aufgabe) -> 'Ritter Rudi besiegen' | '5 Partien spielen' | '10 Raetsel loesen' (mit Sternen: '... mit 2 Sternen')
+//   zielText(aufgabe) -> 'Ritter Thorsten besiegen' | '5 Partien spielen' | '10 Raetsel loesen' (mit Sternen: '... mit 2 Sternen')
 //   RAETSEL_AUFGABEN   true, seit das Paket tagesraetsel (S1-5) raetsel:geloest sendet; ohne Sender bietet die
 //       Lehrkraft-Ansicht die Art 'raetsel' nicht an (niemand koennte sie erfuellen). tests/schule.test.mjs prueft,
 //       dass der Schalter zum Code passt.

@@ -434,12 +434,12 @@ pruefe('QUELLEN: feste Prioritaeten aus BAUPLAN 3.6 (W0+a: 21 Quellen aus SPIELK
   pruefe('PLATZHALTER: zuege, genauigkeit, name, tage', JSON.stringify(PLATZHALTER) === '["zuege","genauigkeit","name","tage"]' && Object.isFrozen(PLATZHALTER));
   const ab = registriereSaetze('rueckkampf', {
     hilde: ['Nach {zuege} Zügen hast du mich erwischt.', 'Schon wieder du, {name}?', 'Du warst {tage} Tage weg und {unbekannt}.'],
-    rudi: ['Rudi grüßt mit {genauigkeit} %.'],
+    rudi: ['Thorsten grüßt mit {genauigkeit} %.'],
   });
   pruefe('Register: Satz mit Platzhalter gefuellt', botSatz(hilde, 'rueckkampf', () => 0, { zuege: 31 }) === 'Nach 31 Zügen hast du mich erwischt.');
   pruefe('Register: fehlt ein Wert, wird der Satz uebersprungen', [0, 0.4, 0.9].every((z) => botSatz(hilde, 'rueckkampf', () => z, { zuege: 7 }) === 'Nach 7 Zügen hast du mich erwischt.'));
   pruefe('Register: unbekannter Platzhalter wird nie gezeigt', [0, 0.5, 0.99].every((z) => !/weg und/.test(botSatz(hilde, 'rueckkampf', () => z, { zuege: 1, name: 'Flo', tage: 4, unbekannt: 'x' }) || '')));
-  pruefe('Register: Kommazahl mit Komma', botSatz(rudi, 'rueckkampf', () => 0, { genauigkeit: 81.44 }) === 'Rudi grüßt mit 81,4 %.');
+  pruefe('Register: Kommazahl mit Komma', botSatz(rudi, 'rueckkampf', () => 0, { genauigkeit: 81.44 }) === 'Thorsten grüßt mit 81,4 %.');
   pruefe('Register: ohne werte kein Satz mit Platzhalter', botSatz(hilde, 'rueckkampf', () => 0) === null && botSatz(rudi, 'rueckkampf') === null);
   pruefe('Register: anderer Bot ohne Saetze -> null', botSatz(BOTS.find((b) => b.id === 'greta'), 'rueckkampf', () => 0, { zuege: 3 }) === null);
   // zuerst bot.saetze, dann das Register

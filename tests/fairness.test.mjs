@@ -525,14 +525,14 @@ function jsonDateien(ordner) {
     }
   }
   pruefe(`Punkte: nie negativ und immer ganze Zahlen (${faelle} Fälle)`, negativ === 0 && P.runde(-5) === 0 && P.leistungspunkte(-100, 1200) === 0, negativ);
-  // 120 Zuege Schieben gegen Benno bleibt unter der zuegig verwerteten Fassung; je laenger geschoben, desto weniger (nie mehr)
+  // 120 Zuege Schieben gegen Lukas bleibt unter der zuegig verwerteten Fassung; je laenger geschoben, desto weniger (nie mehr)
   const z = (klasse, n, g = 0.5) => Array.from({ length: n }, () => ({ klasse, gewinnVorher: g, gewinnNachher: g }));
   const anfang = [...z('buch', 3), ...z('exzellent', 3), ...z('gut', 2), { klasse: 'gut', gewinnVorher: 0.6, gewinnNachher: 0.95 }];
   const lauf = (n) => P.tafelwert({ zuege: [...anfang, ...z('bester', n, 0.97)], ergebnis: 'sieg', eigeneZuege: anfang.length + n }).wert;
   // ab dem 10. eigenen Zug (vorher gibt es noch keinen Ergebnis-Bonus)
   let monoton = true;
   for (let n = 2; n <= 160; n++) if (lauf(n) > lauf(n - 1)) monoton = false;
-  pruefe('Punkte: „120 Züge Schieben gegen Benno“ bleibt unter der zügig verwerteten Fassung (und Schieben bringt nie mehr)',
+  pruefe('Punkte: „120 Züge Schieben gegen Lukas“ bleibt unter der zügig verwerteten Fassung (und Schieben bringt nie mehr)',
     lauf(120 - anfang.length) < lauf(25) && lauf(120 - anfang.length) === 6400 && lauf(25) === 9400 && monoton, [lauf(111), lauf(25)]);
   // Tafeleintrag nur ohne Hilfe-Flag (Hinweis oder Zuruecknehmen), Uebung, freie Partien, Spielhalle und eigene Stellung nie
   const m = new Map();

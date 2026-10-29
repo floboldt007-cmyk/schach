@@ -18,7 +18,7 @@
 //     Partie offen, fragt es wie die Arena, ob sie verworfen werden soll
 //   aktuelleEmpfehlung() -> { e, bot, leiter, probe, begruendung } | null   letzte Einstufung mit dem heutigen Stand der
 //     Leiter (probe: der Bot ist noch nicht freigeschaltet)
-//   ersterGegner() -> Bot   der erste Bot der Leiter (BOTS[0], heute Bauer Benno; immer frei): Gegner nach der
+//   ersterGegner() -> Bot   der erste Bot der Leiter (BOTS[0], heute Bauer Lukas; immer frei): Gegner nach der
 //     Regel-Hilfe. Aus BOTS statt mit festem Namen, damit es nach einem Umbau der Leiter (Welten) weiter stimmt
 // Texte ueber t('p-start.x') (texte.js), erst beim Zeichnen: Titel und Untertitel der Quellen sind Getter, die Aufgaben
 // bekommen ihre Texte in liste() (Daten in aufgaben.js deutsch, angezeigt in der Sprache der App).

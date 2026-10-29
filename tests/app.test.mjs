@@ -215,7 +215,7 @@ function hilfen(seite, { touch = true } = {}) {
       await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     },
     botAnhalten: (an) => seite.evaluate((a) => { window.__test = window.__test || {}; window.__test.botAnhalten = a; }, an),
-    // Schaefermatt gegen Benno in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
+    // Schaefermatt gegen Lukas in einer normalen (wertenden) Partie, endet mit 4. Dxf7#
     async schaefermatt() {
       await seite.evaluate((plan) => {
         localStorage.removeItem('schach-arena:v1:laufend');
@@ -266,8 +266,8 @@ async function testeArena(seite, h) {
   // Welten: die Karte zeigt eine Welt mit sechs Stationen, frisch die erste (Karofelder)
   pruefe('6 Knoten (eine Welt)', (await seite.locator('.knoten').count()) === 6);
   pruefe('Welt 1 gezeigt: Die Karofelder', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()));
-  pruefe('4 Bots gesperrt (Benno bis Hilde)', (await seite.locator('.knoten.gesperrt').count()) === 4);
-  pruefe('Fridolin ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('4 Bots gesperrt (Lukas bis Hilde)', (await seite.locator('.knoten.gesperrt').count()) === 4);
+  pruefe('Willi ist aktueller Gegner', await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
   pruefe('Nur ein aktueller Gegner', await seite.locator('.knoten.aktuell').count() === 1);
   const filter = await seite.evaluate(() => getComputedStyle(document.querySelector('.knoten.gesperrt[data-bot="hilde"] .avatar img')).filter);
   pruefe('Gesperrt: Gesicht in Graustufen (keine Silhouette)', /grayscale/.test(filter) && !/brightness\(0\)/.test(filter), filter);
@@ -284,10 +284,10 @@ async function testeArena(seite, h) {
   pruefe('Gesperrter Endgegner als Glitch-Silhouette', /brightness\(0\)/.test(bossFilter), bossFilter);
   await h.tippe('.weltwahl .ww-pfeil[data-richtung="-1"]');
   await seite.waitForSelector('.knoten[data-bot="fridolin"]');
-  pruefe('Weltwahl: zurück zu Welt 1, Fridolin aktuell', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()) && await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
+  pruefe('Weltwahl: zurück zu Welt 1, Willi aktuell', /Karofelder/.test(await seite.locator('.weltwahl .ww-name').innerText()) && await seite.locator('.knoten.aktuell[data-bot="fridolin"]').count() === 1);
   pruefe('Kopf-Chips 0/90 und 0/30', /0\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 30/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
   pruefe('Kopfzeile: "Fünf Welten, 30 Bots"', /Fünf Welten, 30 Bots/.test(await seite.locator('.kopf').innerText()));
-  pruefe('Panel zeigt Fridolin', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Panel zeigt Willi', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
   pruefe('Panel: drei Merkmal-Kacheln', await seite.locator('.detail .merkmal').count() === 3);
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
@@ -295,15 +295,15 @@ async function testeArena(seite, h) {
   await h.tippe('.knoten[data-bot="benno"]');
   await seite.waitForSelector('.toast');
   const toast = await seite.locator('.toast').innerText();
-  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Fridolin"', /Besiege erst Vogelscheuche Fridolin/.test(toast), toast);
-  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+  pruefe('Gesperrter Bot: "Besiege erst Vogelscheuche Willi"', /Besiege erst Vogelscheuche Willi/.test(toast), toast);
+  pruefe('Gesperrter Bot wird nicht ausgewählt', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
 
   await h.tippe('.farbwahl [data-farbe="w"]');
   pruefe('Farbwahl Weiß aktiv', await seite.locator('.farbwahl [data-farbe="w"][aria-checked="true"]').count() === 1);
   await bild(seite, 'test-arena-start');
 }
 
-// ---------- 2. Partie gegen Fridolin (der erste Gegner, Welten) ----------
+// ---------- 2. Partie gegen Willi (der erste Gegner, Welten) ----------
 async function testePartie(seite, h, fehler) {
   gruppe = 'Partie';
   await h.tippe('.detail [data-aktion="spielen"]');
@@ -427,10 +427,10 @@ async function testeSieg(seite, h, fehler) {
   const genGespeichert = ((await h.gespeichert())[0] || {}).genauigkeit;
   pruefe('Genauigkeit zählt hoch bis zum gespeicherten Wert (mindestens 80 %)', Number.isFinite(genGespeichert) && genGespeichert >= 80
     && genText.trim() === genGespeichert.toFixed(1).replace('.', ',') + ' %', `${genText} / ${genGespeichert}`);
-  pruefe('Kachel "Neu freigeschaltet" mit Postbotin Paula (nach Benno ist Paula der nächste Gegner)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
+  pruefe('Kachel "Neu freigeschaltet" mit Postbotin Paula (nach Lukas ist Paula der nächste Gegner)', /Postbotin Paula/.test(await seite.locator('.erg-frei').innerText()));
   pruefe('Abschiedssatz des Bots', (await seite.locator('.erg-bot .sprechblase').innerText()).length > 5);
   const f = await h.fortschritt();
-  pruefe('Fortschritt: Benno drei Sterne', JSON.stringify(f.bots && f.bots.benno && f.bots.benno.sterne) === '[true,true,true]');
+  pruefe('Fortschritt: Lukas drei Sterne', JSON.stringify(f.bots && f.bots.benno && f.bots.benno.sterne) === '[true,true,true]');
   await bild(seite, 'test-sieg');
   // Beginn und Ende der Freischalt-Animation in der Seite mitschreiben (Seitenzeit). Vorher wartete der Test
   // fest 3000 ms auf das Ende bei 2700 ms; die Pruefungen davor kosten Zeit, unter Last reichte das nicht immer.
@@ -456,8 +456,8 @@ async function testeSieg(seite, h, fehler) {
     Math.round(frei.aus - frei.an) + ' ms');
   pruefe('Paula freigeschaltet und aktuell', await seite.locator('.knoten.aktuell[data-bot="paula"]:not(.gesperrt)').count() === 1);
   pruefe('Schloss ist weg', await seite.locator('.knoten[data-bot="paula"] .schloss').count() === 0);
-  pruefe('Benno mit drei Sternen', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 3);
-  pruefe('Fridolin (unter dem besten Sieg) bleibt offen, mit Schild "NEU"', await seite.locator('.knoten.offen[data-bot="fridolin"] .k-neu').count() === 1);
+  pruefe('Lukas mit drei Sternen', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 3);
+  pruefe('Willi (unter dem besten Sieg) bleibt offen, mit Schild "NEU"', await seite.locator('.knoten.offen[data-bot="fridolin"] .k-neu').count() === 1);
   pruefe('Hilde bleibt gesperrt', await seite.locator('.knoten.gesperrt[data-bot="hilde"]').count() === 1);
   pruefe('Kopf: 3 / 90 Sterne', /3\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
@@ -638,7 +638,7 @@ async function testePruefrunde(browser) {
     pruefe('Stern 1 und Freischaltung bleiben', f.bots && f.bots.benno && f.bots.benno.sterne[0] === true);
     pruefe('Keine laufende Partie mehr', (await h.laufend()) === null);
     await seite.waitForSelector('.screen.arena');
-    pruefe('Arena: Paula frei (nach Benno), Hilde noch gesperrt', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
+    pruefe('Arena: Paula frei (nach Lukas), Hilde noch gesperrt', await seite.locator('.knoten[data-bot="paula"]:not(.gesperrt)').count() === 1
       && await seite.locator('.knoten[data-bot="hilde"].gesperrt').count() === 1);
 
     // Fortgesetzte Partie, Auswertung langsam: Overlay zeigt Knoepfe trotzdem gleich
@@ -781,7 +781,7 @@ async function testePruefrunde(browser) {
     pruefe('Fortsetzen: Bewertung des letzten Zugs nachgeholt', (await seite.locator('.zugliste .z.du .z-sym').count()) === 2);
     pruefe('Fortsetzen: keine Begrüßung mitten in der Partie', !(await seite.evaluate(() => window.__partie.protokoll.some((e) => e.typ === 'blase' && e.anlass === 'begruessung'))));
     const saetze = await seite.evaluate(() => Array.from({ length: 40 }, () => window.__partie.satzFuer('begruessung')));
-    pruefe('Benno sagt nicht "ich fang an", wenn Flo Weiß hat', saetze.every((t) => !/ich fang/i.test(t)), saetze.find((t) => /ich fang/i.test(t)));
+    pruefe('Lukas sagt nicht "ich fang an", wenn Flo Weiß hat', saetze.every((t) => !/ich fang/i.test(t)), saetze.find((t) => /ich fang/i.test(t)));
     await seite.evaluate(() => { window.__test = {}; });
     await seite.evaluate(() => window.__app.gehe('arena'));
     await seite.waitForSelector('.screen.arena');
@@ -829,7 +829,7 @@ async function testePruefrunde(browser) {
     await h.tippe('.knoten[data-bot="hilde"]');
     await seite.waitForSelector('.toast');
     const t = await seite.locator('.toast').innerText();
-    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Fridolin/.test(t), t);
+    pruefe('Gesperrter Bot weiter oben: nennt den aktuellen Gegner', /Besiege zuerst Vogelscheuche Willi/.test(t), t);
     // gesperrte Welt: ihr Bot nennt den Endgegner davor, der die Welt öffnet
     await h.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await seite.waitForSelector('.knoten[data-bot="lisa"]');
@@ -843,7 +843,7 @@ async function testePruefrunde(browser) {
     await seite.reload();
     await seite.waitForSelector('.screen.arena .knoten');
     pruefe('Alle besiegt: "Arena bezwungen! 86/90 Sterne"', /Arena bezwungen!\s+86\/90\s+Sterne/.test(await seite.locator('.arena .logo-unter').textContent()), await seite.locator('.arena .logo-unter').textContent());
-    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Vogelscheuche Fridolin/.test(await seite.locator('.detail h2').innerText()));
+    pruefe('Alle besiegt: erster Bot mit fehlenden Sternen gewählt', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
     await kontext.close();
   }
 
@@ -1115,9 +1115,9 @@ async function testeNachpruefung(browser) {
     const fVorher = await h.fortschritt();
     pruefe('Nach dem Abbruch: Sieg gespeichert, Genauigkeit fehlt, Stern 2 fehlt', vorher.ergebnis === 'sieg' && vorher.genauigkeit == null
       && JSON.stringify(fVorher.bots.benno.sterne) === '[true,false,true]', JSON.stringify({ g: vorher.genauigkeit, s: fVorher.bots && fVorher.bots.benno.sterne }));
-    pruefe('Arena zeigt vorher 2 Sterne bei Benno', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 2);
+    pruefe('Arena zeigt vorher 2 Sterne bei Lukas', await seite.locator('.knoten[data-bot="benno"] .k-sterne .stern').count() === 2);
     await h.tippe('.knoten[data-bot="benno"]');
-    pruefe('Panel Benno: Ziel "Genauigkeit" offen', await seite.locator('.detail .ziel-sterne .an').count() === 2);
+    pruefe('Panel Lukas: Ziel "Genauigkeit" offen', await seite.locator('.detail .ziel-sterne .an').count() === 2);
     await seite.waitForFunction(() => window.__an.length > 0, null, { timeout: 60000 });
     await warte(200);
     const an = await seite.evaluate(() => window.__an);
@@ -1138,7 +1138,7 @@ async function testeNachpruefung(browser) {
     await seite.waitForSelector('.screen.vl-screen');
     await seite.evaluate(() => window.__app.gehe('arena'));
     await seite.waitForSelector('.screen.arena');
-    pruefe('Nächster Arena-Besuch: Nachlese "Neuer Stern gegen Bauer Benno"', /Neuer Stern gegen Bauer Benno/.test(await seite.locator('.nachlese').innerText().catch(() => '')));
+    pruefe('Nächster Arena-Besuch: Nachlese "Neuer Stern gegen Bauer Lukas"', /Neuer Stern gegen Bauer Lukas/.test(await seite.locator('.nachlese').innerText().catch(() => '')));
 
     // Abbruch beim Start einer Partie: die Engine ist sofort frei, nichts wird halb gespeichert, spaeter geht es weiter
     gruppe = 'Nachholen: Abbruch';
@@ -2083,7 +2083,7 @@ if (q.has('wpaktion')) {
   }
 }
 if (q.has('wpgast')) {
-  registriereBot({ id: 'test-gast', art: 'gast', name: 'Gast Gustav', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('benno').staerke } });
+  registriereBot({ id: 'test-gast', art: 'gast', name: 'Gast Maik', avatar: 'assets/avatare/01-bauer-benno.svg', staerke: { ...botNachId('benno').staerke } });
 }
 if (q.has('wpboss')) {
   registriereBot({
@@ -2524,7 +2524,7 @@ async function testeSpielFundament(browser) {
     });
     await seite.evaluate(() => { window.__test = {}; });
     // w0plus-a-fix (Befund des Pruefers): Kopf und Bot-Zeile nennen die Elo des Profils, mit dem der Boss wirklich spielt
-    // (vor der Eichung Köhlerin Edda, 1100, der nächste Bot in 100er-Schritten), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
+    // (vor der Eichung Köhlerin Irmi, 1100, der nächste Bot in 100er-Schritten), nicht die Anfrage 1080; die Anfrage bleibt im Datensatz
     pruefe('Boss: Stärke-Anfrage 1080, gespielt mit dem nächstliegenden Leiter-Profil, Kopf und Bot-Zeile nennen dessen Elo ("Standard ≈ 1100"), Anfrage gespeichert',
       st.h2 === 'Testboss · Standard ≈ 1100' && st.meta.startsWith('Wochen-Boss · ≈ 1100') && st.wieEdda && st.id === 'test-boss' && st.laufend.staerke === 1080, JSON.stringify(st));
     // Welten: Leiter in 100er-Schritten; bei Gleichstand (1050) der schwächere Bot
@@ -2766,7 +2766,7 @@ async function testeSpielFundament(browser) {
     pruefe('Matt-Hook-Zeit: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
-  // Angemeldeter Gast im Modus normal: wertet nie (vorher 3 Sterne, Statistik und "Nächster Gegner" Benno); Verlauf-Kopf je Art
+  // Angemeldeter Gast im Modus normal: wertet nie (vorher 3 Sterne, Statistik und "Nächster Gegner" Lukas); Verlauf-Kopf je Art
   gruppe = 'w0plus-a-fix: Gast und Verlauf';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true, saat: SAAT });
@@ -3098,7 +3098,7 @@ async function testeU7(browser) {
       const m = await u7Masse(seite);
       pruefe('Brett zuerst: Brettbreite >= Breite - 2 x 12 - 8 (und ein Vielfaches von 8)', m.brett.w >= m.iw - 2 * 12 - 8 && Math.round(m.brett.w) % 8 === 0, JSON.stringify(m.brett));
       pruefe('Name des Gegners ohne Ellipse (Scroll-/Clientbreite, text-overflow), höchstens zwei Zeilen, voller Name im aria-label',
-        m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Kalle vom Stammtisch', JSON.stringify(m.name));
+        m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Maxi vom Stammtisch', JSON.stringify(m.name));
       pruefe('Bewertungsbalken waagrecht über dem Brett (6 px)', m.balken.w > m.balken.h * 20 && m.balken.h <= 7 && m.balken.b <= m.rahmen.t + 0.5, JSON.stringify([m.balken, m.rahmen]));
       const breit = m.rahmen.w;
       pruefe('Eine Spalte: Gegner, Balken, Brett, Flo, Coach, Aktionen (und Zugstreifen) gleich breit und bündig (1 px)', m.spalte.every((x) => Math.abs(x.w - breit) <= 1 && Math.abs(x.l - m.rahmen.l) <= 1),
@@ -3113,7 +3113,7 @@ async function testeU7(browser) {
         pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
       }
-      pruefe('Kopf: Rufname „Kalle“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Kalle' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
+      pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
       pruefe('Genug Höhe: Coach in voller Höhe, Brett in voller Breite', !m.eng && Math.round(m.brett.w) === Math.floor((m.iw - 2 * 10 - 8) / 8) * 8, JSON.stringify([m.eng, m.brett.w]));
       // Sprechblase hoch (Nachbesserung): in der Karte neben dem Portraet, nie ueber den Figuren, nie gekuerzt
       const bl = await u7Blase(seite);
@@ -3351,12 +3351,12 @@ async function testeU7(browser) {
         rollen: [g.getAttribute('role'), ich.getAttribute('role')], label: g.getAttribute('aria-label'),
       };
     });
-    pruefe('Spielerkarten mit role="group", der volle Name im aria-label (Bedienhilfen lesen ihn verlässlich)', JSON.stringify(k.rollen) === '["group","group"]' && k.label === 'Kalle vom Stammtisch',
+    pruefe('Spielerkarten mit role="group", der volle Name im aria-label (Bedienhilfen lesen ihn verlässlich)', JSON.stringify(k.rollen) === '["group","group"]' && k.label === 'Maxi vom Stammtisch',
       JSON.stringify([k.rollen, k.label]));
     pruefe('Gegner-Karte .spieler.gegner mit den alten Klassen (.botbox, .botleiste-hoch, .botkarte), Gegner-Leiste als erstes Kind', k.klassen && k.erstes, JSON.stringify(k));
     pruefe('Portraets als Flugziele des Duells (.spieler.gegner .av, .spieler.ich .av), Spieler-Leiste nach Flos Namen, Flos Zusatzklassen', k.av && k.leisteNachName && k.ich, JSON.stringify(k));
-    pruefe('Ohne Bedenkzeit: beide Uhren versteckt; Kopf „Kalle vom Stammtisch“, Unterzeile mit Stufe und Farbe, Brettwahl (3), Klang-Schalter an', k.uhren.every(Boolean)
-      && k.kopf === 'Kalle vom Stammtisch' && /Stufe 8/.test(k.unter) && /Du spielst Weiß/.test(k.unter) && k.brettwahl === 3 && k.klang === 'true' && k.lage === 'quer', JSON.stringify(k));
+    pruefe('Ohne Bedenkzeit: beide Uhren versteckt; Kopf „Maxi vom Stammtisch“, Unterzeile mit Stufe und Farbe, Brettwahl (3), Klang-Schalter an', k.uhren.every(Boolean)
+      && k.kopf === 'Maxi vom Stammtisch' && /Stufe 8/.test(k.unter) && /Du spielst Weiß/.test(k.unter) && k.brettwahl === 3 && k.klang === 'true' && k.lage === 'quer', JSON.stringify(k));
     const fmt = await seite.evaluate(() => { const f = window.__partie.fmtUhr; return [f(65000), f(20000), f(19999), f(1200), f(0), f(-5), f(600000)]; });
     pruefe('fmtUhr: M:SS ab 20 s, darunter 0:SS,z, nie negativ', JSON.stringify(fmt) === JSON.stringify(['1:05', '0:20', '0:19,9', '0:01,2', '0:00,0', '0:00,0', '10:00']), JSON.stringify(fmt));
     await h.starte({ botId: 'kalle', farbe: 'w', tempo: { grund: 180, zuschlag: 2 } });

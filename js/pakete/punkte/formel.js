@@ -31,7 +31,7 @@
 //   leistungspunkte(wert, staerke) -> Zahl   nur intern fuer spaetere Vergleiche ueber alle Bots (Phase 2):
 //       Tafelwert x (0,5 + Bot-Staerke / 2.000).
 //
-// Fairness (5.3): Punkte nie negativ; "120 Zuege Schieben gegen Benno" liegt unter der zuegig verwerteten Fassung;
+// Fairness (5.3): Punkte nie negativ; "120 Zuege Schieben gegen Lukas" liegt unter der zuegig verwerteten Fassung;
 // ohne Hilfe-Flag kein Tafeleintrag. Kein Math.random in dieser Datei.
 
 export const STAND = 1;
