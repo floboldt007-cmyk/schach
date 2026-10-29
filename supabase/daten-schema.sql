@@ -262,6 +262,9 @@ grant execute on function public.freigabe_widerrufen() to authenticated;
 -- (auth.audit_log_entries: E-Mail und IP je Anmeldung, ohne Fremdschluessel) wird hier ebenfalls geloescht, soweit
 -- die Rechte reichen; fehlt die Tabelle oder das Recht, laeuft die Loeschung trotzdem durch. Nicht erreichbar sind
 -- Server-Logs und Sicherungen des Anbieters: Sie laufen nach dessen Fristen ab (Datenschutzerklaerung).
+-- Werkstatt (werkstatt-schema.sql, falls eingespielt): Die Altersangabe geht per Kaskade mit. Besitz, Reservierungen,
+-- Zustimmungen und Sonderstuecke bleiben pseudonym (on delete set null: user_id wird leer, eine Editions-Nummer bleibt
+-- vergeben, die Zahlungs-ID bleibt fuer die gesetzliche Aufbewahrungsfrist).
 -- ---------------------------------------------------------------------------
 create or replace function public.konto_loeschen()
 returns void
@@ -295,10 +298,12 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- Datenauskunft (Art. 15/20): alles, was der Server ueber den Aufrufer hat. Vom Spielstand nur die Metadaten
 -- (den Stand selbst hat der Spieler schon lokal und ueber die Sicherung).
 -- ---------------------------------------------------------------------------
--- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql) und das Anmeldeprotokoll kommen nur dazu, wenn
--- es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne das Online-Schema. Vorher wird aufgeraeumt
--- (alte Zaehler, und mit dem Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte
--- Fehlversuche), damit die Auskunft nichts zeigt, was laut Doku schon geloescht sein muesste.
+-- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql), das Abo (abo-schema.sql), die Werkstatt
+-- (werkstatt-schema.sql: Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstuecke) und das Anmeldeprotokoll
+-- kommen nur dazu, wenn es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne diese Schemata. Fehlt
+-- eines, stehen die Schluessel trotzdem da (null bzw. leere Liste). Vorher wird aufgeraeumt (alte Zaehler, und mit dem
+-- Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte Fehlversuche), damit die Auskunft nichts
+-- zeigt, was laut Doku schon geloescht sein muesste.
 create or replace function public.meine_daten()
 returns jsonb
 language plpgsql
@@ -310,6 +315,9 @@ declare
   online jsonb := '[]'::jsonb;
   versuche jsonb := '[]'::jsonb;
   protokoll jsonb := '[]'::jsonb;
+  abo jsonb := null;
+  werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
+    'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -333,6 +341,24 @@ begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''tag'', v.tag, ''anzahl'', v.anzahl) order by v.tag), ''[]''::jsonb)
              from public.online_versuche v where v.user_id = $1'
       into versuche using uid;
+  end if;
+  -- Abo (bisher fehlte die eigene Zeile in der Auskunft)
+  if to_regclass('public.abos') is not null then
+    execute 'select to_jsonb(a) from public.abos a where a.user_id = $1' into abo using uid;
+  end if;
+  -- Werkstatt: alles zum Konto, auch Zahlungs- und Sitzungskennungen (es sind die eigenen Daten)
+  if to_regclass('public.besitz') is not null then
+    execute 'select jsonb_build_object(
+               ''altersangabe'', (select to_jsonb(a) from public.altersangaben a where a.user_id = $1),
+               ''besitz'', coalesce((select jsonb_agg(to_jsonb(b) order by b.erworben_am, b.nummer)
+                 from public.besitz b where b.user_id = $1), ''[]''::jsonb),
+               ''reservierungen'', coalesce((select jsonb_agg(to_jsonb(r) order by r.erstellt_am)
+                 from public.reservierungen r where r.user_id = $1), ''[]''::jsonb),
+               ''edition_zustimmungen'', coalesce((select jsonb_agg(to_jsonb(z) order by z.zeitpunkt)
+                 from public.edition_zustimmungen z where z.user_id = $1), ''[]''::jsonb),
+               ''sonderstuecke'', coalesce((select jsonb_agg(to_jsonb(s) order by s.stueck_id)
+                 from public.sonderstuecke s where s.user_id = $1), ''[]''::jsonb))'
+      into werkstatt using uid;
   end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
@@ -374,9 +400,10 @@ begin
                         order by z.stunde, z.tabelle)
        from public.daten_zaehler z where z.user_id = uid),
       '[]'::jsonb),
+    'abo', abo,
     -- Anmeldeprotokoll von Supabase (Zeitpunkt, Art, IP); null, wenn die Funktion es nicht lesen darf
     'anmeldeprotokoll', protokoll
-  );
+  ) || werkstatt;
 end;
 $$;
 

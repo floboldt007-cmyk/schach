@@ -2352,6 +2352,82 @@ Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenban
 (auch: `aktualisiert_am` ist ein Tag, in der Übersicht und beim direkten Lesen).
 ---
 
+# Limitierte Editionen: Server-Teil Etappe 1 (Werkstatt, nur Stripe-Testmodus, ohne Oberflaeche)
+
+Entscheidung des Besitzers vom 29.10. (`design/runde4/ENTSCHEIDUNGEN.md`): Form B, feste Auflage (im Schema ab 100) plus
+Verkaufsfenster, nie Neuauflage, Nummern der Reihe nach, nur Optik, Nummer nur fuer den Besitzer, vorerst nur im Web (Weg
+ueber die Stores spaeter). Claudes Empfehlungen (nur ab 18 sichtbar, 28 Tage Vorlauf, Kassen-Grenze ...) sind dort als
+solche markiert. Konzept im Vault (`Schach-App/Arbeitsstand-2026-10-29/Konzept-Limitierte-Editionen.md`). Einrichtung fuer Flo
+(spaeter): `supabase/ANLEITUNG.md`, Abschnitt „Editionen“. Nichts davon steht in `PAKETE`, die App kennt es noch nicht.
+
+**Datenfluss:** App (spaeter) → POST `/functions/v1/werkstatt-kasse` mit Token und `{ produkt, textversion,
+zustimmung_sofort: true, kenntnis_widerruf: true }` → `/auth/v1/user` (Nutzer-ID nur aus dem Token, E-Mail bestaetigt) →
+`rpc/edition_reserviere` → Stripe `POST /v1/checkout/sessions` (eingeschraenkter Test-Schluessel `STRIPE_RK`) →
+`rpc/edition_kasse_setzen` → `{ kassen_url }`. Stripe → `werkstatt-webhook` (eigenes Geheimnis
+`STRIPE_WERKSTATT_WEBHOOK_SECRET`) → `rpc/edition_stripe_ereignis` → bei `erstatten` Stripe `POST /v1/refunds` →
+`rpc/edition_erstattung_gesendet`; bei `von_hand` keine Erstattung (Flo prueft). Der Abo-Webhook (`stripe-webhook`,
+`_gemeinsam/stripe.js`) bleibt unveraendert und ignoriert Einmalkaeufe; umgekehrt ignoriert der Werkstatt-Webhook
+Abo-Kaeufe, Kassen ohne `metadata.crownmate_reservierung` und Kassen eines anderen Supabase-Projekts am selben
+Stripe-Konto (`metadata.crownmate_projekt` = `projektKennung(SUPABASE_URL)`, SHA-256 des Hosts, 16 Hex-Zeichen).
+
+**Server** (`supabase/werkstatt-schema.sql`, Test `supabase/werkstatt-rls-test.sql`, beide im PGlite-Pruefer und im SQL
+Editor; Voraussetzung `schema.sql`):
+- Tabellen `altersangaben` (Selbstauskunft „18 oder aelter“ mit Zeitpunkt, schreiben nur `alter_angeben(ab18)`),
+  `editionen` (`auflage >= 100`, `vergeben + reserviert <= auflage`, `verkauf_freigegeben` und `zeige_restzahl` Standard
+  aus, `endzahl = vergeben` sobald festgeschrieben, Name einmalig ohne Gross- und Kleinschreibung), `reservierungen`
+  (Teilindex: ein offener Kauf je Konto und Edition; hoechstens 3 je Konto und Edition in 24 Stunden),
+  `edition_zustimmungen` (je Reservierung, Textversion und Zeitpunkt), `besitz` (Primaerschluessel `produkt_id, nummer`,
+  Nummer ab 1, ein Stueck je Konto und Edition, Status `aktiv | strittig | erstattet | zurueckgebucht | widerrufen`),
+  `edition_ereignisse` (Idempotenz je `evt_`, offene Erstattungen, Faelle `von_hand` | `erledigt` fuer Flo, Angaben der
+  Zahlungs-Ereignisse zum Nachholen, `nachgeholt_am`), `sonderstuecke` (Erfinder-Profil, Nr. 0, nur der Besitzer der
+  Datenbank traegt ein).
+- Trigger: `editionen_schutz` (neue Editionen mit Zaehlern 0, `EDITION_VERGEBEN_SINKT`, `EDITION_EINGEFROREN` ab
+  `angekuendigt_am`: Name, Auflage, Zeitraum, Preis-ID, Betrag, Waehrung; Ende nur vorziehbar, wenn alles vergeben;
+  angekuendigte Editionen nicht loeschbar), `besitz_schutz` (`EDITION_BESITZ_BLEIBT`: keine Loeschung, Edition, Nummer und
+  Reservierung unveraenderlich). Ankuendigung mindestens 28 Tage vor dem Start (Pruefung in der Tabelle).
+- Funktionen (security definer, `search_path = ''`): fuer `authenticated` nur `alter_angeben`, `edition_stand(produkt)`
+  und `edition_staende()` (nur ab 18, sonst `null` bzw. `[]`; Status `angekuendigt | erhaeltlich | pausiert | ausverkauft |
+  beendet` (`pausiert`: nach dem Start mit Schalter aus),
+  `restzahl` nur mit `zeige_restzahl`, `endzahl` nur fuer Besitzer eines Stuecks oder mit dem Schalter, `endzahl_folgt`;
+  „alles reserviert“ zeigt „erhaeltlich“). Nur Service-Rolle: `edition_reserviere` (Schalter zuerst, dann Zustimmung,
+  E-Mail, Alter; Sperre je Konto und Edition; bestehende offene Reservierung kommt zurueck; ein `update` mit allen
+  Bedingungen; danach `EDITION_ZU_OFT` ab der vierten Kasse in 24 Stunden; liefert `stripe_ablauf_s` = Reservierung + 31
+  Minuten), `edition_kasse_setzen`, `edition_kasse_abbrechen`
+  (nur ohne Kasse), `edition_stripe_ereignis` (Nummer = naechste in der Reihenfolge der Verbuchung; prueft Zahlstatus,
+  Betrag und Waehrung gegen die eingefrorenen Werte und die Sitzung gegen die Reservierung; spaete Zahlung: frei →
+  `zugeteilt_spaet`, sonst `erstatten`; Gruende `ausverkauft | endzahl | doppelt | betrag | sitzung | konto_geloescht`;
+  unbekannte Reservierung: Ergebnis `unbekannt`, `von_hand`, nie automatisch erstattet; Erstattung, Widerruf
+  (`metadata.grund = widerruf`, kommt nur mit alten Stripe-API-Versionen an, sonst von Hand), Teilerstattung und
+  Rueckbuchung aendern nur den Status, gemeinsam in `edition_zahlung_anwenden`; kommen sie vor dem Kauf an
+  (`ohne_besitz`), holt die Zuteilung sie in Stripe-Zeit-Reihenfolge nach; Sperre je Zahlung per
+  `pg_advisory_xact_lock`; doppeltes Ereignis liefert das gespeicherte Ergebnis), `edition_erstattung_gesendet`,
+  `edition_aufraeumen` (Reservierung ohne Kasse nach 2 Stunden frei, Endzahl festschreiben, nach 90 Tagen loeschen, offene
+  Erstattungen und `von_hand` bleiben). Spaltenrechte: Nutzer lesen nie
+  `vergeben`, `reserviert`, `endzahl`, Preis-ID, Schalter, `zahlung_id`, `sitzung_id`; niemand schreibt direkt.
+- Kassenschluss `edition_kassenschluss(bis)` = Ende minus 31 Minuten (Stripe-Kassen leben mindestens 30 Minuten), gleiche
+  Zahl wie `KASSE_S` in `werkstatt.js`.
+- Kontoloeschung: `altersangaben` per Kaskade weg, `besitz`, `reservierungen`, `edition_zustimmungen`, `sonderstuecke`
+  pseudonym (`on delete set null`). `meine_daten()` (`daten-schema.sql`) liefert dazu `abo`, `altersangabe`, `besitz`,
+  `reservierungen`, `edition_zustimmungen`, `sonderstuecke` (dynamisch, nur wenn die Schemata eingespielt sind).
+
+**Edge Functions** `supabase/functions/werkstatt-kasse/index.ts` (mit JWT-Pruefung) und
+`supabase/functions/werkstatt-webhook/index.ts` (`--no-verify-jwt`), nur Huellen; die Logik in
+`supabase/functions/_gemeinsam/werkstatt.js` (reines ES-Modul, Signatur aus `stripe.js`): `stripeArt` (nur `rk_test_`
+bis Etappe 6, `sk_` nie), `pruefeKaufEingabe`, `kassenParameter` (mode=payment, Menge 1, nur Karte, `expires_at` aus der
+Reservierung, Metadaten an Sitzung und Zahlung; feste Reihenfolge, damit jeder Versuch mit dem Idempotency-Key
+`crownmate-kasse-<reservierung>` gleich ist), `auswertenEdition` (→ genau die Parameter von `edition_stripe_ereignis`),
+`verarbeiteKasse` (200, 204, 400, 401, 403, 404, 405, 409, 413, 502, 503; Stripe unklar: einmal wiederholen, dann 503
+und Reservierung bleibt; Stripe lehnt ab: `edition_kasse_abbrechen`), `verarbeiteWebhook` (405, 413, 400, 200, 500;
+Erstattung mit Idempotency-Key `crownmate-erstattung-<pi_>`). Fehlertexte Deutsch und Englisch (`TEXTE`).
+
+**Tests:** `node tests/server-werkstatt.test.mjs` (Suite `server-werkstatt`: gefaelschtes fetch fuer Supabase und
+Stripe, Deno-Attrappe fuer beide Huellen, Vertrag mit dem Schema, keine Schluessel und Preise), SQL im PGlite-Pruefer
+(Scratchpad) und im SQL Editor (`Werkstatt-RLS-Test erfolgreich`). `tests/fairness.test.mjs` prueft die erweiterte
+Verbotsliste (keine Knappheits- und Wert-Versprechen) auch in den Texten unter `supabase/functions/`. **Offen:** ein
+dauerhafter Test mit zwei gleichzeitigen Kaeufern gegen echtes Postgres (von Hand geprueft, gruen), aktives `expire`
+ueberfaelliger Kassen, Oberflaeche (Etappe 3), sichtbare Kosmetik fuer Gegner (Etappe 3b), Bestaetigungs-Mail, Weg ueber
+die App-Stores, Live-Schluessel (Etappe 6).
+
 # Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
 
 Jedes Paket haengt sich nur ueber Orte, Ereignisse, Register, Modul-Speicher und eigene Paket-Screens ein. Bis die
