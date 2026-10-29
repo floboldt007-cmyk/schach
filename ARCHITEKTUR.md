@@ -2843,8 +2843,9 @@ sendet nichts“.
   `PAKETE_WARTEN_MS` noch laden (`ladePakete`, Vorsatz `Pakete`), einen Kern-Screen, der nicht laedt (Art `skript`, Vorsatz
   `Screen <name>`; ein Paket-Screen ohne Datei geht weiter still zur Arena und kommt nicht ins Protokoll), einen Screen, dessen
   `zeige()` oder `verlasse()` wirft (`zeigeScreen`), einen Engine-Abbruch und den Rueckfall vom Blob-Start (`engine()`,
-  `starteEngine`) und misst die Startzeit einer Engine (`merkeEngineStart`). Nicht erfasst: Fehler, die ein Paket in seinem
-  eigenen `sicher()` faengt (z. B. funken, punkte, serie, liga); die schreiben weiter nur in die Konsole. Arten: `fehler`,
+  `starteEngine`) und misst die Startzeit einer Engine (`merkeEngineStart`). Die `sicher()`-Huellen der Pakete (funken,
+  gedaechtnis, kartei, liga, punkte, serie, tagesraetsel, start) melden ihre gefangenen Fehler ebenfalls (Art `paket`,
+  Vorsatz `Paket <name> (<stelle>)`), zusaetzlich zur Konsole. Arten: `fehler`,
   `promise`, `skript`, `paket`, `engine`, `speicher`. Eintrag `{ z, art, text, datei?, zeile?, n? }`, neueste zuerst, hoechstens 50 Eintraege und
   20.000 Zeichen, Text hoechstens 200 Zeichen. `bereinige()` entfernt Adressen (bleibt nur der Dateiname), Abfragen, Anker,
   Herkunft, E-Mail-Adressen, Token (JWT, Bearer, `token=` …), lange Kennungen und lokale Pfade; nie ein Stack. Derselbe

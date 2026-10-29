@@ -12,6 +12,7 @@ import {
   normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
 import { saisonKarte, verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
+import { protokolliere } from '../../protokoll.js';
 
 const MODUL = 'liga';
 const laufend = new Map();
@@ -20,7 +21,7 @@ const LEITER = new Set(BOTS.map((b) => b.id));
 function sicher(fn) {
   return (...args) => {
     try { return fn(...args); }
-    catch (e) { console.error('Liga konnte nicht aktualisiert werden:', e); return null; }
+    catch (e) { console.error('Liga konnte nicht aktualisiert werden:', e); protokolliere('paket', e, { vorsatz: 'Paket liga' }); return null; }
   };
 }
 

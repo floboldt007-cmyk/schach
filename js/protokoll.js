@@ -2,7 +2,7 @@
 // Laufzeitfehler (window 'error', dazu ein Skript, das nicht laedt), abgelehnte Promises ohne Fang ('unhandledrejection'),
 // Fehler von Ereignis-Hoerern (js/ereignisse.js) und Anzeige-Anbietern (js/orte.js), die beide selbst fangen, Paket- und
 // Screen-Ladefehler, Screen-Abstuerze und Engine-Abbrueche (js/app.js ruft protokolliere()) und "Speicher voll"
-// (Ereignis speicher:fehler). Nicht erfasst: Fehler, die ein Paket in seinem eigenen sicher() faengt (nur Konsole).
+// (Ereignis speicher:fehler). Seit 29.10. melden auch die sicher()-Huellen der Pakete (Vorsatz "Paket <name> (<stelle>)").
 // Die App sendet das Protokoll NIE. Es steht nur im "Bericht fuer die Testphase" (js/bericht.js), den Flo vorher ganz
 // sieht und nur selbst kopiert oder teilt.
 //

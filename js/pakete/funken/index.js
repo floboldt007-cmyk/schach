@@ -38,6 +38,7 @@ import * as S from './stand.js';
 import * as R from './rechnung.js';
 import * as L from './level.js';
 import * as A from './ansicht.js';
+import { protokolliere } from '../../protokoll.js';
 
 const PAKET = 'funken';
 // Texte aus dem Woerterbuch (texte.js), erst beim Erzeugen eines Textes
@@ -48,6 +49,7 @@ const jetzt = () => new Date();
 function sicher(fn, wo) {
   try { return fn(); } catch (e) {
     try { console.error(`Paket funken (${wo || 'unbekannt'}):`, e); } catch (x) { /* egal */ }
+    protokolliere('paket', e, { vorsatz: `Paket funken (${wo || 'unbekannt'})` });
     return null;
   }
 }
