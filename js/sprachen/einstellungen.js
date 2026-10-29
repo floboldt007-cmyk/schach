@@ -357,6 +357,10 @@ registriereTexte('einstellungen', {
     'konto.cloudLaden': 'Cloud laden',
     'konto.cloudGeladen': 'Cloud-Spielstand geladen.',
     'konto.hochgeladen': 'Gerätestand hochgeladen.',
+    'konto.abgleichOffen': 'Noch nicht abgeglichen. Mit „Jetzt sichern“ kannst du wählen, welcher Spielstand gilt.',
+    'konto.linkHier': 'Kommt statt des Codes ein Link, öffne ihn hier im selben Browser.',
+    'konto.linkNichtInApp': 'Kommt statt des Codes ein Link: Er meldet nur den Browser an, nicht diese App auf dem Home-Bildschirm.',
+    'konto.linkUngueltig': 'Der Anmelde-Link ist abgelaufen oder wurde schon benutzt. Bitte neu anfordern, es gilt nur der zuletzt geschickte.',
   },
   en: {
     // ---------- Screen Einstellungen ----------
@@ -710,5 +714,9 @@ registriereTexte('einstellungen', {
     'konto.cloudLaden': 'Load from cloud',
     'konto.cloudGeladen': 'Cloud progress loaded.',
     'konto.hochgeladen': 'Device progress uploaded.',
+    'konto.abgleichOffen': 'Not synced yet. Tap “Back up now” to choose which progress to keep.',
+    'konto.linkHier': 'If you get a link instead of a code, open it here in the same browser.',
+    'konto.linkNichtInApp': 'If you get a link instead of a code: it only signs in the browser, not this home screen app.',
+    'konto.linkUngueltig': 'This sign-in link has expired or was already used. Please request a new one; only the latest one works.',
   },
 });

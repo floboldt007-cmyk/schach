@@ -1,7 +1,8 @@
 import { setzeSpeicher } from '../js/storage.js';
 import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudStand, ladeCloudStand,
   speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
-  SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId } from '../js/konto.js';
+  SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
+  ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
 
 let ok = 0, gesamt = 0;
@@ -83,5 +84,46 @@ setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} }))
   pruefe('Google: #konto allein ist keine Rückkehr', uebernimmLinkSitzung({ hash: '#konto', pathname: '/', search: '' }, { replaceState: () => { throw new Error('nicht aufrufen'); } }) === false);
   // fuer js/daten.js exportiert
   pruefe('aktiveSitzung und userId exportiert (Sitzung, Benutzer-ID aus dem Token)', userId(sitzung()) === 'u7' && (await aktiveSitzung()).refresh_token === 'rg');
+}
+{ // Abgleich-Riegel (Ultracode-Pruefung PR #76): automatisch hochgeladen wird erst nach einem Abgleich auf diesem Geraet.
+  // Anlass: Der Anmelde-Link oeffnet einen zweiten Tab oder Safari (leerer Speicher); ein abgebrochener Konflikt-Dialog
+  // oder ein Tab ohne Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand.
+  const rufe = []; const antw = [];
+  setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
+  const uploads = () => rufe.filter((c) => c.url.endsWith('/rest/v1/spielstaende') && c.method === 'POST').length;
+  const warteKurz = () => new Promise((r) => setTimeout(r, 20));
+  const sitzungVon = (sub) => JSON.stringify({ access_token: 'a.' + Buffer.from(JSON.stringify({ sub, email: sub + '@b.de' })).toString('base64url') + '.x', refresh_token: 'r-' + sub, expires_at: 9999999999, email: sub + '@b.de' });
+  const cloudMit = (n) => ({ status: 200, body: [{ stand: { 'schach-arena:v1:partien': JSON.stringify(Array.from({ length: n }, (_, i) => ({ id: 'c' + i }))) }, format_version: 1 }] });
+  const leereV1 = () => { for (const k of Object.keys(Object.fromEntries([...Array(localStorage.length)].map((_, i) => [localStorage.key(i), 1])))) if (k.startsWith('schach-arena:v1:')) localStorage.removeItem(k); };
+  localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u5')); localStorage.removeItem(ABGEGLICHEN_SCHLUESSEL);
+  leereV1(); localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'p1' }, { id: 'p2' }]));
+  planeSicherung(0); await warteKurz();
+  pruefe('Ohne Abgleich lädt planeSicherung nichts hoch (anderer Tab, abgebrochener Dialog)', uploads() === 0 && !istAbgeglichen());
+  antw.push(cloudMit(7)); const k = await gleicheNachAnmeldung(true);
+  pruefe('Abbruch-Wert (true) entscheidet keinen Konflikt: nichts geschrieben, Riegel bleibt zu', k?.konflikt === true && k.cloud.partien === 7 && k.geraet.partien === 2
+    && uploads() === 0 && !istAbgeglichen() && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 2, JSON.stringify(k));
+  antw.push(cloudMit(7), { status: 201, body: null });
+  pruefe('Wahl "geraet" lädt hoch und öffnet den Riegel für genau diese Nutzer-ID', (await gleicheNachAnmeldung('geraet')) === 'geraet' && uploads() === 1
+    && istAbgeglichen() && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === 'u5');
+  antw.push({ status: 201, body: null }); planeSicherung(0); await warteKurz();
+  pruefe('Nach dem Abgleich sichert planeSicherung wie bisher', uploads() === 2);
+  localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u6'));
+  pruefe('Der Riegel gilt nur für die Nutzer-ID, mit der abgeglichen wurde', !istAbgeglichen());
+  localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u5')); antw.push({ status: 204, body: null }); await abmelden();
+  pruefe('Abmelden schließt den Riegel wieder', localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null && sitzung() === null);
+  // Safari nach dem Link: nur die Eintraege eines frischen Starts, keine Partie
+  leereV1();
+  for (const k2 of ['hinweis-installieren', 'modul:start', 'modul:funken', 'modul:punkte']) localStorage.setItem('schach-arena:v1:' + k2, '{}');
+  pruefe('Frischer Start ohne Partie ist kein Spielstand', !hatSpielstand());
+  localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u5')); antw.push(cloudMit(7));
+  const leer = await gleicheNachAnmeldung();
+  pruefe('Leerer Browser lädt die Cloud ohne Rückfrage und lädt nichts hoch', leer === 'cloud' && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 7
+    && uploads() === 2 && istAbgeglichen(), String(leer));
+  pruefe('Mit einer Partie oder einem anderen Eintrag zählt der Browser als Spielstand',
+    hatSpielstand({ 'schach-arena:v1:partien': '[{"id":"x"}]' }) && hatSpielstand({ 'schach-arena:v1:serie': '{}' }) && !hatSpielstand({}));
+  localStorage.removeItem(SICHTBAR_SCHLUESSEL);
+  uebernimmLinkSitzung({ hash: '#error=access_denied&error_code=otp_expired', pathname: '/', search: '' }, { replaceState() {} });
+  pruefe('Abgelaufener Link: Konto-Gruppe wird sichtbar (Meldung beim Zeichnen), Installations-Hinweis wartet',
+    localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1' && linkAnmeldungFrisch());
 }
 console.log(`${ok}/${gesamt} bestanden`); process.exit(ok === gesamt ? 0 : 1);
