@@ -14,7 +14,8 @@ jobs:
           node-version: 22
       - name: Playwright installieren
         run: |
-          npm install --no-save playwright
+          # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
+          npm install --no-save playwright@1.64.1
           npx playwright install --with-deps chromium webkit
       - name: Schnelle Tests bei Push
         if: github.event_name == 'push'
@@ -47,13 +48,14 @@ jobs:
           node-version: 22
       - name: Playwright installieren
         run: |
-          npm install --no-save playwright
+          # Feste Version (Luecken-Check 7): ein Update kommt nur bewusst, nie still ueber Nacht
+          npm install --no-save playwright@1.64.1
           npx playwright install --with-deps chromium webkit
       - name: Browser-Suiten mit WebKit
         run: |
           mkdir -p artifacts/screenshots
           set -o pipefail
-          BROWSER=webkit BILDER=artifacts/screenshots node tests/alle.mjs --nur=storage,board,screens,e2e,notfall --laut 2>&1 | tee artifacts/webkit.log
+          BROWSER=webkit BILDER=artifacts/screenshots node tests/alle.mjs --nur=storage,board,screens,e2e,notfall,bericht --laut 2>&1 | tee artifacts/webkit.log
       - name: Fehlerartefakte hochladen
         if: failure()
         uses: actions/upload-artifact@v4

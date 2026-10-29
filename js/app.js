@@ -54,6 +54,13 @@
 //     er, und der Verlauf gehoert zum Reiter Ich (reiterVon()).
 //   - 'training' ist Kern-Screen (js/ui/training.js, Huelle fuer training:karten), nicht mehr in PAKET_SCREENS.
 //   - app.meldung() benutzt toast() aus js/ui/bauteile.js; ein Screen-Wechsel schliesst auch ein offenes Blatt (sheet).
+//
+// Tester-Bericht (Luecken-Check 10): js/protokoll.js ist der ERSTE Import (seine Fenster-Hoerer haengen, bevor die
+// uebrigen Module auswerten). ladePakete() meldet ein Paket, das nicht laedt, und Pakete, die nach PAKETE_WARTEN_MS noch
+// laden; zeigeScreen() einen Kern-Screen, der nicht laedt (Paket-Screens ohne Datei bleiben still, das ist kein Fehler),
+// und einen Screen, dessen zeige() oder verlasse() wirft; engine() einen Engine-Abbruch und den Rueckfall vom Blob-Start
+// dorthin, dazu die Startzeit einer Engine (merkeEngineStart). Alles bleibt auf dem Geraet.
+import { protokolliere, merkeEngineStart } from './protokoll.js';
 import * as erweiterungen from './erweiterungen.js';
 import { Engine } from './engine.js';
 import { klang } from './sounds.js';
@@ -251,6 +258,7 @@ async function starteEngine(wasmUrl, merke) {
     } catch (f) {
       try { e.terminate(); } catch (g) { /* egal */ }
       console.warn('Engine mit Blob-URL startet nicht, lade die .wasm direkt', f);
+      protokolliere('engine', f, { vorsatz: 'Blob-Start' });
       // ein Zeitlimit (gesperrtes iPad, Speicherdruck) ist kein Grund, es nie wieder per Blob zu versuchen
       if (!(f && f.zeitlimit)) merkeDirekt();
     }
@@ -267,8 +275,11 @@ function engine(name) {
   let p = engines.get(schluessel);
   if (!p) {
     let e = null;
+    const t0 = Date.now();
     p = pruefeWasm().then((wasmUrl) => starteEngine(wasmUrl, (x) => { e = x; }));
+    p.then(() => merkeEngineStart(Date.now() - t0), () => {});
     p.catch((f) => {
+      protokolliere('engine', f);
       meldeEngineFehler(f);
       // dauerhafte Fehler bleiben stehen (sofortige Absage statt neuer Versuche je Zug)
       if (!(f && f.dauerhaft) && engines.get(schluessel) === p) engines.delete(schluessel);
@@ -705,7 +716,10 @@ async function zeigeScreen(name, params, hash) {
   }
   if (nr !== ladeNr) return;  // inzwischen woanders hin
   if (aktuell && aktuell.handle) {
-    try { aktuell.handle.verlasse(); } catch (e) { console.error(e); }
+    try { aktuell.handle.verlasse(); } catch (e) {
+      console.error(e);
+      protokolliere('fehler', e, { vorsatz: 'Screen ' + aktuell.name + ' verlassen' });
+    }
   }
   // Meldungen und ein offenes Blatt gehoeren zum alten Screen ("Zug zurückgenommen" nicht in der naechsten Partie)
   toastLeeren();
@@ -725,6 +739,9 @@ async function zeigeScreen(name, params, hash) {
       zeigeScreen('arena', {}, '#arena');
       return;
     }
+    // ein Kern-Screen, der nicht laedt (Netz, alter Cache, Fehler beim Auswerten): Flo sieht den Platzhalter, der
+    // Tester-Bericht nennt den Grund (ein gescheitertes import() loest kein window 'error' aus)
+    protokolliere('skript', ladeFehler || 'nicht geladen', { vorsatz: 'Screen ' + name });
     aktuell.handle = zeigePlatzhalter(root, name);
     zeigeReiter(null);
     return;
@@ -733,6 +750,7 @@ async function zeigeScreen(name, params, hash) {
     aktuell.handle = modul.zeige(root, params || {}, app) || { verlasse() {} };
   } catch (e) {
     console.error(e);
+    protokolliere('fehler', e, { vorsatz: 'Screen ' + name });
     root.replaceChildren();
     aktuell.handle = zeigePlatzhalter(root, name, true);
     zeigeReiter(null);
@@ -903,12 +921,18 @@ function ladePakete() {
   const liste = Array.isArray(PAKETE) ? PAKETE.filter((p) => typeof p === 'string' && ERW_PFAD.test(p) && !(kern && p.startsWith('pakete/'))) : [];
   const pfade = [...new Set([...liste, ...(TEST ? erwPfade(location.search) : [])])];
   if (!pfade.length) return null;
+  const laufend = new Set(pfade);
   const alle = Promise.all(pfade.map((p) => import(`./${p}.js`).catch((e) => {
     console.error('Paket nicht geladen: ' + p, e);
-  })));
+    protokolliere('paket', e, { vorsatz: p });
+  }).finally(() => laufend.delete(p))));
   let uhr = 0;
   const zeit = new Promise((r) => {
-    uhr = setTimeout(() => { console.error('Pakete laden zu lange, die App startet ohne zu warten'); r(); }, PAKETE_WARTEN_MS);
+    uhr = setTimeout(() => {
+      console.error('Pakete laden zu lange, die App startet ohne zu warten');
+      protokolliere('paket', `laden nach ${Math.round(PAKETE_WARTEN_MS / 1000)} s noch: ${[...laufend].join(', ')}`, { vorsatz: 'Pakete' });
+      r();
+    }, PAKETE_WARTEN_MS);
   });
   return Promise.race([alle, zeit]).then(() => clearTimeout(uhr));
 }

@@ -13,6 +13,9 @@
 //       (ein Schritt), Bild auf/ab (zehn), Pos1/Ende. fertig ist true beim Loslassen und bei Tasten.
 //   sheet({ titel, text, knoepfe: [{ text, wert, art }], abbrechen = null }) -> Promise<wert>   Blatt von unten ueber
 //       einem Schleier; Escape und Tipp auf den Schleier liefern abbrechen, der Fokus bleibt im Blatt.
+//       Zusaetze (Tester-Bericht): inhalt (Element zwischen Text und Knoepfen), klasse (zusaetzliche Klasse der
+//       .sheet-karte); je Knopf name (data-knopf), aus (disabled), beiKlick(knopf) und bleibt (true: der Knopf ruft nur
+//       beiKlick, das Blatt bleibt offen). Der Fokus wandert ueber alle Knoepfe und [tabindex="0"] im Blatt.
 //   schliesseSheet()   offenes Blatt mit abbrechen schliessen (app.js beim Screen-Wechsel)
 //   halteKnopf({ text, icon, dauer = 1000, beiAusloesen(), frage: { titel, text, ja, nein }, klasse, label, hinweis })
 //       -> { el, verlasse() }   Finger oder Maus halten: ein Ring fuellt sich in dauer ms, dann beiAusloesen(); frueher
@@ -186,26 +189,28 @@ export function schliesseSheet() {
   if (offenesSheet) offenesSheet.ende();
 }
 
-export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null } = {}) {
+export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null, inhalt = null,
+  klasse = '' } = {}) {
   schliesseSheet();
   return new Promise((resolve) => {
     const ort = document.createElement('div');
     ort.className = 'sheet-ort';
     const id = 'sh' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
     ort.innerHTML = `<div class="sheet-schleier"></div>
-      <div class="sheet-karte" role="alertdialog" aria-modal="true" aria-labelledby="${id}-t"${text ? ` aria-describedby="${id}-x"` : ''}>
+      <div class="sheet-karte${klasse ? ' ' + esc(klasse) : ''}" role="alertdialog" aria-modal="true" aria-labelledby="${id}-t"${text ? ` aria-describedby="${id}-x"` : ''}>
         <div class="sheet-griff" aria-hidden="true"></div><h3 id="${id}-t"></h3>${text ? `<p id="${id}-x"></p>` : ''}<div class="sheet-knoepfe"></div></div>`;
     ort.querySelector('h3').textContent = titel;
     if (text) ort.querySelector('p').textContent = text;
     const karte = ort.querySelector('.sheet-karte');
     const schleier = ort.querySelector('.sheet-schleier');
     const leiste = ort.querySelector('.sheet-knoepfe');
+    if (inhalt) leiste.before(inhalt);
     const vorherFokus = document.activeElement;
     let fertig = false;
     const taste = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); ende(abbrechen); return; }
       if (e.key === 'Tab') {
-        const k = [...leiste.querySelectorAll('button')];
+        const k = [...karte.querySelectorAll('button, [tabindex="0"]')].filter((b) => !b.disabled);
         if (!k.length) return;
         const i = k.indexOf(document.activeElement);
         const naechster = e.shiftKey ? (i <= 0 ? k[k.length - 1] : k[i - 1]) : (i < 0 || i === k.length - 1 ? k[0] : k[i + 1]);
@@ -235,7 +240,14 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       b.type = 'button';
       b.className = 'knopf gross dr' + (k.art ? ' ' + k.art : '');
       b.textContent = k.text;
-      b.addEventListener('click', () => ende(k.wert));
+      if (k.name) b.dataset.knopf = k.name;
+      if (k.aus) b.disabled = true;
+      b.addEventListener('click', () => {
+        if (typeof k.beiKlick === 'function') {
+          try { Promise.resolve(k.beiKlick(b)).catch((f) => console.error(f)); } catch (f) { console.error(f); }
+        }
+        if (!k.bleibt) ende(k.wert);
+      });
       leiste.append(b);
     }
     schleier.addEventListener('pointerdown', () => ende(abbrechen));
