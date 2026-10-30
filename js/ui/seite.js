@@ -19,7 +19,8 @@
 //       (app.setzeEinstellungen({ klang }), Meldung "Klang an/aus") und Mond/Sonne (app.setzeEinstellungen({ modus }),
 //       Kreis-Aufdecken ueber View Transitions, wo es sie gibt und Bewegung an ist), dazu Zurueck und Zahnrad, wenn ein
 //       Handler uebergeben wird. Haelt beide Knoepfe aktuell (schach:einstellungen, schach:thema). Passt neben Titel
-//       und Knoepfen nicht einmal der erste Chip, bekommt der Kopf .ohne-chips (Chips aus, nie ein Stummel).
+//       und Knoepfen nicht einmal der erste Chip, bekommt der Kopf .ohne-chips (Chips aus, nie ein Stummel); jeder
+//       weitere Chip, der nicht ganz passt, bekommt .passt-nicht und tritt zurueck.
 //   kopfEintritt(wurzel)   Marke und rechte Seite gleiten gestaffelt ein (bei Tempo 0 nichts)
 import { icon } from './icons.js';
 import { BOTS } from '../bots.js';
@@ -130,6 +131,15 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
       const erster = chips && [...chips.children].find((c) => c.offsetWidth > 0 || c.getClientRects().length);
       kopf.classList.remove('ohne-chips');
       if (chips && erster && chips.clientWidth + 1 < erster.offsetWidth) kopf.classList.add('ohne-chips');
+      // Ansicht (Flo 30.10.): auch spaetere Chips nie als Stummel; was nicht ganz passt, tritt zurueck
+      if (!chips) continue;
+      for (const c of chips.children) c.classList.remove('passt-nicht');
+      if (kopf.classList.contains('ohne-chips')) continue;
+      const links = chips.getBoundingClientRect().left;
+      for (const c of chips.children) {
+        if (!(c.offsetWidth > 0)) continue;
+        if (c.getBoundingClientRect().right - links > chips.clientWidth + 1) c.classList.add('passt-nicht');
+      }
     }
   };
   const spaeter = () => { if (!rahmen && typeof requestAnimationFrame === 'function') rahmen = requestAnimationFrame(passeChips); };

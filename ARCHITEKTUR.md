@@ -508,6 +508,7 @@ export function setzeFehlerMelder(fn)            // fn(ort, paket, fehler) bekom
 | `analyse:oben` | DOM | `analyse.js` `baue()`, oben in `.an-rechts` nach dem Banner | `{ app, partie, review }` | frei |
 | `verlauf:seite` | DOM | `verlauf.js` `baue()`, in `.vl-seite` zwischen Statistik und Schatzkiste | `{ app }` | 2A 10 · 2A 15 · 1C 30 · 2D 40 |
 | `einstellungen:gruppen` | DOM | `einstellungen.js`, vor der Gruppe „Fortschritt“ | `{ app }` | B3 Klasse 7 · 1A 10 · 1D 20 · 2C 30 · 2B 40 · 2D 90 |
+| `einstellungen:klang` | DOM | `einstellungen.js`, am Ende der Gruppe „Klang“ (Ansicht 30.10.2026) | `{ app }` | Lobby-Musik 4 |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`, nur ohne Hash und ohne Verlaufseintrag | `{ partienZahl }` -> `'start'` oder `null` | 2D |
 
 **Hosts im Detail (Welle 0b).** Jeder DOM-Ort hat einen eigenen Behaelter; leer ist er versteckt (`hidden`
@@ -527,6 +528,7 @@ diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete bin
 | `analyse:oben` | `.an-rechts > .an-ort-oben` | nach dem Banner (Hochformat: `order: 1`) | bei jedem `baue()` |
 | `verlauf:seite` | `.vl-seite > .vl-ort` | zwischen Statistik und Schatzkiste | bei jedem `baue()` (auch nach dem Loeschen) |
 | `einstellungen:gruppen` | `.es-ort` (`display: contents`) | vor der Gruppe „Fortschritt“ | bei jedem `baue()` |
+| `einstellungen:klang` | `.es-ort-klang` (`display: contents`) | Ende der Gruppe „Klang“ | bei jedem `baue()` |
 | `app:erster-screen?` | Wahl | `app.js` `beiVerlauf()`; jeder Screen-Name aus `SCREENS` geht, sonst der normale Weg | beim frischen Start |
 
 ## Feier-Warteschlange: js/feier.js

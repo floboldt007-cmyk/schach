@@ -54,7 +54,7 @@ img { display: block; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kopf .unter { font-size: 13px; font-weight: 650; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .logo { font-family: var(--display); font-weight: var(--gw-titel); font-size: 23px; letter-spacing: .02em; line-height: 1; color: var(--text); white-space: nowrap; }
-.logo-unter { margin-top: 5px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+.logo-unter { margin-top: 5px; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
 
 /* ---------- Knoepfe (Look A: ruhige Karten-Knoepfe, Zinnober nur fuer die Hauptaktion) ---------- */
 .icon-knopf { flex: none; width: var(--tap); height: var(--tap); border-radius: 14px; display: grid; place-items: center;
@@ -190,7 +190,7 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
 .evalbalken.gedreht .weiss { transform: translateY(calc(var(--w, 50%) - 100%)); }
 .evalbalken.gedreht .weiss::before { top: auto; bottom: -1px; }
 .evalbalken .mitte { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(128, 128, 128, .5); z-index: 1; }
-.evalbalken .wert { position: absolute; z-index: 2; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 9px; font-weight: 800;
+.evalbalken .wert { position: absolute; z-index: 2; left: 0; right: 0; bottom: 7px; text-align: center; font-size: 10px; font-weight: 800;
   color: var(--balken-schwarz); writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .evalbalken[data-fuehrt="b"] .wert { bottom: auto; top: 7px; color: var(--balken-weiss); }
 .evalbalken.gedreht[data-fuehrt="w"] .wert { bottom: auto; top: 7px; }
@@ -304,7 +304,7 @@ html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)
 .arena .detail > .ort-panel-oben { grid-column: 1 / -1; }
 .an-ort-oben, .vl-ort { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .vl-ort { gap: 14px; }
-.es-ort, .an-c-paket { display: contents; }
+.es-ort, .es-ort-klang, .an-c-paket { display: contents; }
 .erg-karte-ort { display: grid; gap: 10px; min-width: 0; text-align: left; }
 @media (orientation: portrait) {
   /* Analyse hoch: die rechte Spalte ist aufgeloest (display: contents), der Ort folgt dem Banner */
@@ -314,7 +314,7 @@ html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)
 /* Nachlese oben im Arena-Panel: "Seit deiner letzten Partie" (still, ohne Klang) */
 .nachlese { display: grid; gap: 4px; padding: 10px 14px; border-radius: 14px; background: var(--flaeche-2);
   border: 1px solid var(--linie); font-size: 14px; line-height: 1.35; color: var(--text-2); }
-.nl-titel { font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.nl-titel { font-size: 12px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
 .nl-zeile b { color: var(--text); font-weight: 800; }
 .nl-zeile.gross b { color: var(--text); }
 
@@ -366,7 +366,7 @@ html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)
    rutscht der Chip unter das Wort */
 .erg-kopf { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 0 48px; }
 .erg-kopf .erg-wort { padding: 0 0 0 .16em; }
-.vl-uebung { height: 22px; padding: 0 8px; font-size: 11px; letter-spacing: .08em; }
+.vl-uebung { height: 22px; padding: 0 8px; font-size: 12px; letter-spacing: .08em; }
 
 /* Tab im Hintergrund (app.js setzt html[data-sichtbar]): Animationen anhalten */
 html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-sichtbar="nein"] *::after { animation-play-state: paused !important; }
@@ -403,8 +403,8 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 .spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 /* mit Knoepfen der Pakete etwas enger, damit alle Beschriftungen passen (gemessen 375 bis 1366 px Breite) */
 .partie .spielknoepfe[data-aktionen] { gap: 5px; }
-.partie .spielknoepfe[data-aktionen] .knopf { font-size: 11px; padding: 6px 1px; letter-spacing: -.02em; }
-.partie .spielknoepfe[data-aktionen="2"] .knopf { font-size: 10.5px; letter-spacing: -.03em; }
+.partie .spielknoepfe[data-aktionen] .knopf { font-size: 12px; padding: 6px 1px; letter-spacing: -.02em; }
+.partie .spielknoepfe[data-aktionen="2"] .knopf { font-size: 12px; letter-spacing: -.03em; }
 /* Abrechnung im Ergebnis (Ort ergebnis:abrechnung, Huelle aus js/ui/abrechnung.js): Zeilen rollen ein */
 .abrechnung { display: grid; gap: 4px; min-width: 0; }
 .abrechnung > .abr-rollt { animation: abr-rollen .3s ease-out var(--t, 0ms) both; }

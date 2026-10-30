@@ -1,6 +1,8 @@
 /* Paket sammlung: Reiter "Ich" mit der Sammlung (js/ui/ich.js). Eine Sache pro Blick: ein Bereich zur Zeit, ruhige Karten,
    gesperrte Stuecke mit Schloss statt Bild, kein Glanz und keine Bewegung, die zum Kaufen draengt. */
-.sa-rumpf { display: grid; gap: 14px; padding-bottom: 120px; min-width: 0; }
+.sa-rumpf { display: grid; align-content: start; grid-auto-rows: max-content; gap: 14px; padding-bottom: 120px; min-width: 0; }
+/* der Rumpf scrollt (Flo 30.10., iPad quer im Browser: der untere Teil war abgeschnitten, der Screen selbst scrollt nicht) */
+.sa-screen .sa-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .sa-stand, .sa-steuer, .sa-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
 .sa-stand { margin: -6px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2); }
 /* sechs Bereiche: auf schmalen Schirmen waagrecht wischbar statt gequetscht */
@@ -17,7 +19,10 @@
 .sa-bild .sa-zahl { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; font-variant-numeric: tabular-nums; }
 .sa-teil[data-zustand="zu"] .sa-bild { color: var(--text-3, var(--text-2)); background: var(--grund-2, var(--flaeche-2)); }
 .sa-teil[data-zustand="zu"] .sa-bild svg { width: 30px; height: 30px; }
-.sa-text { display: grid; gap: 3px; min-width: 0; }
+/* Karten einer Reihe gleich gebaut (Ansicht 30.10.): Titel oben auf einer Linie, Fortschrittsbalken unten auf einer Linie */
+.sa-teil { grid-template-rows: auto 1fr; }
+.sa-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sa-text > .sa-balken { margin-top: auto; }
 .sa-text b { font-weight: var(--gw-stark); font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
 .sa-zeile { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .sa-teil[data-zustand="an"] .sa-zeile { color: var(--akzent); }
@@ -54,7 +59,7 @@
 @keyframes er-zeichnen { from { stroke-dashoffset: 700; } to { stroke-dashoffset: 0; } }
 html[data-bewegung="aus"] .er-krone { animation: none; }
 @media (prefers-reduced-motion: reduce) { .er-krone { animation: none; } }
-.er-ecke { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .14em; color: rgba(244, 241, 236, .72); }
+.er-ecke { position: absolute; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: rgba(244, 241, 236, .72); }
 .er-oben { left: 16px; top: 12px; }
 .er-unten { right: 16px; bottom: 10px; font-weight: 600; color: rgba(244, 241, 236, .55); }
 .er-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -97,7 +102,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .pr-rahmen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
 .pr-rahmen { display: grid; justify-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--linie); background: var(--flaeche);
   color: var(--text); font: inherit; text-align: center; }
-.pr-rahmen b { font-size: 12px; } .pr-rahmen small { font-size: 11px; color: var(--text-2); line-height: 1.25; }
+.pr-rahmen b { font-size: 12px; } .pr-rahmen small { font-size: 12px; color: var(--text-2); line-height: 1.25; }
 .pr-rahmen:disabled { opacity: .55; }
 .pr-rahmen-bild { width: 44px; height: 44px; }
 .sa-bild .pr-rahmen-bild { width: 56px; height: 56px; }

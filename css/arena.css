@@ -190,12 +190,12 @@
 .arena .ww-mitte { min-height: var(--tipp); min-width: 0; max-width: min(320px, calc(100% - 2 * var(--tipp) - 40px)); display: grid; align-content: center;
   padding: 4px 16px; border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2), var(--kante); text-align: center; }
 .arena .ww-name { font-family: var(--display); font-size: 16px; line-height: 1.15; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.arena .ww-unter { font-size: 11.5px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
+.arena .ww-unter { font-size: 12px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
 .arena .weltwahl.mit-siegel .ww-mitte { box-shadow: var(--s2), 0 0 0 2px var(--gold); }
 .arena .weltwahl.gesperrt .ww-name { color: var(--text-2); }
 /* Schild "neu eingezogen" an offenen Bots unter Flos bestem Sieg */
 .arena .knoten .k-neu { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 2px 8px 3px; border-radius: var(--r-pille);
-  font-size: 10.5px; font-weight: var(--gw-titel); letter-spacing: .14em; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s1); z-index: 3; pointer-events: none; }
+  font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .14em; color: var(--auf-tinte); background: var(--tinte); box-shadow: var(--s1); z-index: 3; pointer-events: none; }
 /* Endgegner mit Schild NEU (unter Flos bestem Sieg neu eingezogen): das Schild steht ueber der Krone */
 .arena .knoten.boss .k-neu { bottom: calc(100% + 32px); }
 .arena .detail-welt { margin-top: 3px; font-size: 12.5px; font-weight: 650; color: var(--text-2); }
@@ -285,18 +285,18 @@
   white-space: nowrap; padding: 3px 10px 4px; border-radius: var(--r-pille); background: var(--flaeche); color: var(--text);
   font-size: 13px; font-weight: var(--gw-titel); line-height: 1.2; box-shadow: var(--s1), var(--kante); pointer-events: none; z-index: 2;
   transition: background-color var(--d-s) var(--sanft), color var(--d-s) var(--sanft), box-shadow var(--d-s) var(--sanft); }
-.arena .knoten .k-meta { font-size: 11px; font-weight: 700; color: var(--text-2); }
+.arena .knoten .k-meta { font-size: 12px; font-weight: 700; color: var(--text-2); }
 .arena .knoten.gesperrt .k-schild { color: var(--text-2); }
 .arena .knoten.gewaehlt .k-schild { background: var(--tinte); color: var(--auf-tinte); box-shadow: var(--s2); }
 .arena .knoten.gewaehlt .k-meta { color: var(--auf-tinte); opacity: .72; }
 /* Fahne "Naechster Gegner" ueber der aktuellen Station */
 .arena .knoten .fahne { position: absolute; left: 50%; bottom: calc(100% + 13px); transform: translateX(-50%); white-space: nowrap; padding: 5px 11px 6px;
-  border-radius: 10px; font-size: 11px; font-weight: var(--gw-titel); letter-spacing: .1em; color: var(--auf-akzent); background: var(--akzent);
+  border-radius: 10px; font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .1em; color: var(--auf-akzent); background: var(--akzent);
   box-shadow: var(--s2); z-index: 4; pointer-events: none; }
 .arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
 /* Endgegner: Krone ueber der Station (ueber der Fahne, wenn er der naechste ist) */
 .arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 2px 9px 3px;
-  border-radius: var(--r-pille); font-size: 10.5px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
+  border-radius: var(--r-pille); font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
   box-shadow: var(--kante); z-index: 3; pointer-events: none; }
 .arena .knoten.besiegt .boss-krone { bottom: calc(100% + 30px); }
 .arena .knoten.aktuell .boss-krone { bottom: calc(100% + 46px); }
@@ -344,14 +344,16 @@
    Handy, Handy quer) werden die Kacheln kompakter, und reicht es dann noch nicht, rutscht der Wert unter das Figurzeichen */
 .arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
-.arena .m-label { display: block; font-size: 11.5px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
+/* nie abgeschnitten (Ansicht, Flo 30.10.): passt ein Wort wie "Lieblingsfigur" nicht, trennt es mit Bindestrich */
+.arena .m-label { display: block; font-size: 12px; font-weight: var(--gw-stark); letter-spacing: 0; color: var(--text-2);
+  -webkit-hyphens: auto; hyphens: auto; overflow-wrap: normal; }
 .arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
   hyphens: auto; overflow-wrap: break-word; }
 .arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }
 .arena .m-figur img { width: 20px; height: 20px; }
 @container (max-width: 330px) {
   .arena .merkmal { padding: 8px; }
-  .arena .m-label { font-size: 10.5px; letter-spacing: 0; }
+  .arena .m-label { font-size: 12px; letter-spacing: 0; }
   .arena .m-wert { font-size: 12.5px; gap: 2px 3px; }
   .arena .m-figur { width: 15px; height: 15px; }
   .arena .m-figur img { width: 15px; height: 15px; }
@@ -386,7 +388,7 @@
 .arena .bilanz { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 0 18px; border-top: 1px solid var(--linie); }
 .arena .bilanz div { text-align: center; min-width: 0; }
 .arena .bilanz b { display: block; font-family: var(--display); font-size: 20px; font-weight: var(--gw-titel); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
-.arena .bilanz span { font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; white-space: nowrap; }
+.arena .bilanz span { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; white-space: nowrap; }
 /* Offene Partie: Bild, Text, Knopf in einer Zeile; reicht der Platz nicht (Handy, schmales Panel), steht der Knopf in
    voller Breite darunter (nichts wird abgeschnitten oder ueberdeckt) */
 .arena .fortsetzen { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px; border-radius: 16px;
@@ -437,8 +439,8 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   .arena .spielen { min-height: 60px; font-size: 17px; }
   .arena .bilanz { display: none; }
   .arena .knoten .k-schild { font-size: 12px; padding: 2px 9px 3px; }
-  .arena .knoten .fahne { font-size: 10px; letter-spacing: .08em; padding: 4px 9px 5px; bottom: calc(100% + 10px); }
-  .arena .knoten .boss-krone { font-size: 10px; letter-spacing: .16em; }
+  .arena .knoten .fahne { font-size: 12px; letter-spacing: .08em; padding: 4px 9px 5px; bottom: calc(100% + 10px); }
+  .arena .knoten .boss-krone { font-size: 12px; letter-spacing: .16em; }
   .arena .knoten .k-nr { width: 23px; height: 23px; font-size: 12px; left: -6px; }
   .arena .knoten .schloss { width: 25px; height: 25px; right: -6px; }
   .arena .flo-figur { width: 30px; height: 30px; margin: -15px 0 0 -15px; }

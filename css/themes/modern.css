@@ -97,7 +97,7 @@
   --display: "Bricolage", "Manrope", -apple-system, "SF Pro Display", system-ui, sans-serif;
   --gw-text: 550; --gw-stark: 750; --gw-titel: 800;
   --lw-titel: -.03em; --lw-ueber: .09em;
-  --fs-display: clamp(36px, 4.6vw, 64px); --fs-h1: 30px; --fs-h2: 22px; --fs-text: 16px; --fs-klein: 13.5px; --fs-ueber: 11.5px;
+  --fs-display: clamp(36px, 4.6vw, 64px); --fs-h1: 30px; --fs-h2: 22px; --fs-text: 16px; --fs-klein: 13.5px; --fs-ueber: 12px;
 
   /* Radien */
   --r-s: 10px; --r-m: 16px; --r-l: 24px; --r-xl: 30px; --r-pille: 999px;
