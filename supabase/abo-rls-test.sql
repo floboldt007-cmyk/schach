@@ -294,6 +294,12 @@ begin
       null, 'abgelaufen', t0 + interval '106 seconds', null) <> 'wartet' then
     raise exception 'FEHLER: fremder Kunde wurde nicht abgelehnt';
   end if;
+  -- B fuer die folgenden Pruefungen wieder aktiv machen (die Streit-Faelle oben enden mit "abgelaufen")
+  r := public.abo_stripe_ereignis('evt_b17', 'invoice.paid', t0 + interval '107 seconds', 'cus_B1', 'sub_B1',
+    null, 'aktiv', t0 + interval '60 days', null);
+  if r <> 'neu' or not public.ist_premium_von('b2222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: neue Zahlung nach verlorenem Streit hat Premium nicht wieder aktiviert (%)', r;
+  end if;
 
   -- 10. Reihenfolge vertauscht: das Abo-Ereignis fuer C kommt VOR dem Kauf, wartet und wird beim Kauf angewendet
   r := public.abo_stripe_ereignis('evt_c1', 'customer.subscription.updated', t0 + interval '3 seconds', 'cus_C1', 'sub_C1',
@@ -377,7 +383,7 @@ begin
     if sqlerrm <> 'ABO_EREIGNIS_UNGUELTIG' then raise; end if;
   end;
   begin
-    perform public.abo_stripe_ereignis('evt_z1', 'charge.refunded', t0, 'cus_B1', null, null, 'aktiv', t0 + interval '1 day', null);
+    perform public.abo_stripe_ereignis('evt_z1', 'charge.succeeded', t0, 'cus_B1', null, null, 'aktiv', t0 + interval '1 day', null);
     raise exception 'FEHLER: unbekannter Ereignistyp angenommen';
   exception when raise_exception then
     if sqlerrm <> 'ABO_EREIGNIS_UNGUELTIG' then raise; end if;
