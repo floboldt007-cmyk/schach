@@ -1,0 +1,48 @@
+/* Paket sammlung: Reiter "Ich" mit der Sammlung (js/ui/ich.js). Eine Sache pro Blick: ein Bereich zur Zeit, ruhige Karten,
+   gesperrte Stuecke mit Schloss statt Bild, kein Glanz und keine Bewegung, die zum Kaufen draengt. */
+.sa-rumpf { display: grid; gap: 14px; padding-bottom: 120px; min-width: 0; }
+.sa-stand, .sa-steuer, .sa-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
+.sa-stand { margin: -6px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2); }
+/* sechs Bereiche: auf schmalen Schirmen waagrecht wischbar statt gequetscht */
+.sa-steuer { overflow-x: auto; scrollbar-width: none; }
+.sa-steuer::-webkit-scrollbar { display: none; }
+.sa-steuer .segment { min-width: max(100%, 560px); }
+.sa-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.sa-teil { display: grid; gap: 10px; padding: 12px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
+  box-shadow: var(--s1); min-width: 0; }
+.sa-teil[data-zustand="an"] { border-color: var(--akzent); box-shadow: inset 0 0 0 1px var(--akzent), var(--s1); }
+.sa-bild { display: grid; place-items: center; height: 84px; border-radius: var(--r-m, 14px); background: var(--flaeche-2); color: var(--text); }
+.sa-bild img, .sa-bild svg { width: 56px; height: 56px; }
+.sa-bild .sa-brett { width: 64px; height: 64px; border-radius: 8px; }
+.sa-bild .sa-zahl { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; font-variant-numeric: tabular-nums; }
+.sa-teil[data-zustand="zu"] .sa-bild { color: var(--text-3, var(--text-2)); background: var(--grund-2, var(--flaeche-2)); }
+.sa-teil[data-zustand="zu"] .sa-bild svg { width: 30px; height: 30px; }
+.sa-text { display: grid; gap: 3px; min-width: 0; }
+.sa-text b { font-weight: var(--gw-stark); font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.sa-zeile { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.sa-teil[data-zustand="an"] .sa-zeile { color: var(--akzent); }
+.sa-balken { display: block; height: 6px; margin-top: 4px; border-radius: 99px; background: var(--grund-2, var(--flaeche-2)); overflow: hidden; }
+.sa-balken i { display: block; height: 100%; background: var(--text-2); transform-origin: left center; }
+.sa-hinweis { margin: 12px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+/* Shop (shop.js): eine Karte je Edition, ruhig wie die uebrige Sammlung; die Restzahl sieht bei 9 und bei 1 gleich aus */
+.sh-inhalt { display: grid; gap: 12px; max-width: 680px; }
+.sh-satz { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-2); max-width: 46ch; }
+.sh-inhalt > .knopf { justify-self: start; }
+.sh-karte { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px 16px; align-items: center; padding: 14px; border-radius: var(--r-l, 18px);
+  background: var(--flaeche); border: 1px solid var(--linie); box-shadow: var(--s1); min-width: 0; }
+.sh-bild { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--r-m, 14px); background: var(--flaeche-2); }
+.sh-brett { width: 78%; height: auto; border-radius: 6px; }
+.sh-text { display: grid; gap: 4px; min-width: 0; }
+.sh-ueber { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.sh-name { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.sh-stand { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sh-klein { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.sh-knoepfe { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; }
+.sh-knoepfe .knopf { flex: 1 1 160px; }
+.sh-anprobe { display: grid; place-items: center; margin: 4px 0 12px; }
+.sh-brett.gross { width: min(280px, 70vw); border-radius: 10px; }
+@media (max-width: 520px) {
+  .sa-raster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .sa-bild { height: 72px; }
+  .sh-karte { grid-template-columns: 96px minmax(0, 1fr); }
+}

@@ -21,7 +21,8 @@
 // 'pakete/abo/index', 'pakete/coach-ki/index', 'pakete/schule/index'.
 export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 'pakete/funken/index', 'pakete/punkte/index',
   'pakete/serie/index', 'pakete/teilen/index', 'pakete/gedaechtnis/index', 'pakete/kartei/index', 'pakete/start/index',
-  'pakete/zuzweit/index', 'pakete/tagesraetsel/index', 'pakete/finisher/index', 'pakete/emotes/index', 'pakete/musik/index']);
+  'pakete/zuzweit/index', 'pakete/tagesraetsel/index', 'pakete/finisher/index', 'pakete/emotes/index', 'pakete/musik/index',
+  'pakete/sammlung/index']);
 // pakete/boss/index (Wochen-Boss, Funken-Wochenende) ist gebaut, aber bewusst noch nicht eingeschaltet: Countdown und eine
 // nur in einer Woche erspielbare Trophaee widersprechen den Fairness-Regeln, es fehlt ein Archiv (Ultracode-Pruefung 30.10.).
 // Ohne das Paket gibt es auch kein Funken-Wochenende (funken liest den Spielplan nur auf sein Signal).
@@ -30,4 +31,4 @@ export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 
 // 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
 // traegt hier etwas ein, sobald der Screen des Reiters da ist, z. B.
 //   export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
-export const REITER = Object.freeze(['training', 'bestenliste']);
+export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);

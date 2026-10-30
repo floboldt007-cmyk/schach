@@ -1,0 +1,46 @@
+// Sichtbare Texte des Pakets sammlung (Bereiche Bretter, Klaenge, Erfolge, Shop). Den Screen-Rahmen fuehrt js/sprachen/rahmen.js.
+import { registriereTexte } from '../../sprache.js';
+
+registriereTexte('p-sammlung', {
+  de: {
+    an: 'Ausgerüstet', frei: 'Freigeschaltet', geschafft: 'Geschafft',
+    bretter: 'Bretter', klaenge: 'Klänge', erfolge: 'Erfolge',
+    'brett.nacht': 'Nacht', 'brett.gruen': 'Grün', 'brett.holz': 'Holz',
+    'klang.holz': 'Holz', 'klang.arcade': 'Arcade',
+    'erfolg.ersterSieg': 'Erster Sieg', 'erfolg.ersterSiegWeg': 'Besiege einen Bot',
+    'erfolg.dreiSterne': 'Alle drei Sterne', 'erfolg.dreiSterneWeg': 'Hol alle drei Sterne gegen einen Bot',
+    'erfolg.welt': '{name} gemeistert', 'erfolg.weltWeg': '{n} von {alle} Bots besiegt',
+    'erfolg.alleBots': 'Alle 30 Bots', 'erfolg.alleBotsWeg': '{n} von {alle} besiegt',
+    'erfolg.alleSterne': 'Alle Sterne', 'erfolg.alleSterneWeg': '{n} von {alle} Sternen',
+    // Shop (Editionen): ruhige Fakten, kein Druck (tests/fairness.test.mjs)
+    'shop.name': 'Shop', 'shop.anmelden': 'Editionen gibt es mit Konto und ab 18 Jahren.', 'shop.zumKonto': 'Zum Konto',
+    'shop.laedt': 'Editionen werden geladen …', 'shop.alterFrage': 'Editionen kaufen kann, wer 18 oder älter ist.',
+    'shop.alterJa': 'Ich bin 18 oder älter', 'shop.fehler': 'Das hat gerade nicht geklappt. Versuch es später noch einmal.',
+    'shop.vorbereitung': 'Die erste Edition ist in Vorbereitung. Sie erscheint hier mit Datum, bevor der Verkauf beginnt.',
+    'shop.edition': 'Edition · {auflage} Stück', 'shop.regel': 'Höchstens 1 Stück je Konto. Keine Neuauflage.',
+    'shop.anprobieren': 'Anprobieren', 'shop.bald': 'Bald verfügbar',
+    'shop.anprobeText': 'So sieht das Brett aus. Benutzen kannst du es, sobald es dir gehört.',
+    'shop.verfuegbar': '{n} von {auflage} verfügbar', 'shop.erhaeltlich': 'Erhältlich', 'shop.angekuendigt': 'Verkauf ab {datum}',
+    'shop.pausiert': 'Verkauf pausiert', 'shop.vergeben': 'Alle {auflage} vergeben', 'shop.beendet': 'Verkauf beendet',
+  },
+  en: {
+    an: 'Equipped', frei: 'Unlocked', geschafft: 'Done',
+    bretter: 'Boards', klaenge: 'Sounds', erfolge: 'Achievements',
+    'brett.nacht': 'Night', 'brett.gruen': 'Green', 'brett.holz': 'Wood',
+    'klang.holz': 'Wood', 'klang.arcade': 'Arcade',
+    'erfolg.ersterSieg': 'First win', 'erfolg.ersterSiegWeg': 'Beat a bot',
+    'erfolg.dreiSterne': 'All three stars', 'erfolg.dreiSterneWeg': 'Earn all three stars against a bot',
+    'erfolg.welt': '{name} mastered', 'erfolg.weltWeg': '{n} of {alle} bots beaten',
+    'erfolg.alleBots': 'All 30 bots', 'erfolg.alleBotsWeg': '{n} of {alle} beaten',
+    'erfolg.alleSterne': 'All stars', 'erfolg.alleSterneWeg': '{n} of {alle} stars',
+    'shop.name': 'Shop', 'shop.anmelden': 'Editions need an account and are for ages 18 and up.', 'shop.zumKonto': 'Go to account',
+    'shop.laedt': 'Loading editions …', 'shop.alterFrage': 'Editions can be bought by people aged 18 or older.',
+    'shop.alterJa': 'I am 18 or older', 'shop.fehler': 'That did not work just now. Please try again later.',
+    'shop.vorbereitung': 'The first edition is being prepared. It will appear here with a date before sales begin.',
+    'shop.edition': 'Edition · {auflage} pieces', 'shop.regel': 'At most 1 per account. No reissue.',
+    'shop.anprobieren': 'Try on', 'shop.bald': 'Coming soon',
+    'shop.anprobeText': 'This is how the board looks. You can use it once it is yours.',
+    'shop.verfuegbar': '{n} of {auflage} available', 'shop.erhaeltlich': 'Available', 'shop.angekuendigt': 'On sale from {datum}',
+    'shop.pausiert': 'Sales paused', 'shop.vergeben': 'All {auflage} taken', 'shop.beendet': 'Sales ended',
+  },
+});
