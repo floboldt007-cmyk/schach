@@ -132,8 +132,9 @@ try {
   pruefe('Analyse spricht neutral', !/\b(du|dein|deine|deinen)\b/i.test(await seite.locator('.an-screen').innerText()));
   // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   const klasse = seite.locator('.an-kl:not([aria-disabled="true"])').first();
-  await klasse.click(); const erster = await seite.locator('.an-c-zug').innerText();
-  await klasse.click(); const zweiter = await seite.locator('.an-c-zug').innerText();
+  // Seit 30.10. abends steht der Name als eigenes Schild neben dem Zug (.an-c-wer), deshalb der ganze Kopf
+  await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();
+  await klasse.click(); const zweiter = await seite.locator('.an-c-kopf').innerText();
   pruefe('Klassen-Tabelle springt zu beiden Seiten', erster !== zweiter && /Anna|Ben/.test(erster + zweiter), { erster, zweiter });
   for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height });
