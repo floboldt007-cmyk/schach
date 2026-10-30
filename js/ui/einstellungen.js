@@ -12,7 +12,7 @@
 // Tester-Bericht (Luecken-Check 10): in "Info und Lizenzen" der Eintrag .es-bericht mit dem Knopf
 // [data-aktion="bericht"]; er laedt js/bericht.js erst beim Tipp (import()) und oeffnet dort das Blatt mit dem Bericht.
 import { klang } from '../sounds.js';
-import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
+import { setzeZurueck, loescheAlleAppDaten, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
@@ -68,6 +68,7 @@ export function zeige(root, params = {}, app) {
   const lausche = (ziel, typ, f, opt) => { ziel.addEventListener(typ, f, opt); aufraeumen.push(() => ziel.removeEventListener(typ, f, opt)); };
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   let resetStufe = 0;
+  let allesLoeschen = false;
   let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
@@ -229,7 +230,10 @@ export function zeige(root, params = {}, app) {
       box.innerHTML = `
         <p class="es-hilfe">${E('reset.hilfe')}
           ${E('reset.stand', { partien: E('reset.partien', { n: s.partien, zahl: `<b class="zahl">${s.partien}</b>` }), sterne: E('reset.sterne', { n: sterne, zahl: `<b class="zahl">${sterne}</b>` }) })}</p>
-        <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button>`;
+        <div class="es-knoepfe"><button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button><button class="knopf es-rot-rand" type="button" data-aktion="alles-1">${icon('muell')} ${E('reset.allesKnopf')}</button></div>`;
+    } else if (allesLoeschen) {
+      box.innerHTML = `<div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E('reset.allesFrage')}</b> ${E('reset.allesText')}</p></div><div class="es-knoepfe"><button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button><button class="knopf es-rot" type="button" data-aktion="alles-ok">${icon('muell')} ${E('reset.allesEndgueltig')}</button></div>`;
+      box.querySelector('[data-aktion="reset-ab"]').focus();
     } else if (resetStufe === 1) {
       box.innerHTML = `
         <div class="es-warnung" role="alert">${icon('warnung')}<p><b>${E('reset.frage1')}</b> ${E('reset.text1', { bot: esc(ersterGegner()) })}</p></div>
@@ -254,7 +258,7 @@ export function zeige(root, params = {}, app) {
     zeigeStand();
   }
 
-  lausche(sec, 'click', (e) => {
+  lausche(sec, 'click', async (e) => {
     const k = e.target.closest('[data-aktion]');
     if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort')) return;   // Pakete binden selbst
     const e0 = lies();
@@ -287,8 +291,16 @@ export function zeige(root, params = {}, app) {
           .catch(() => { try { app.meldung(t('bericht.erstellenFehler'), { art: 'fehler' }); } catch (f) { /* egal */ } });
         break;
       case 'reset-1': resetStufe = 1; zeigeReset(); break;
+      case 'alles-1': allesLoeschen = true; resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
-      case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
+      case 'reset-ab': resetStufe = 0; allesLoeschen = false; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
+      case 'alles-ok':
+        await loescheAlleAppDaten();
+        allesLoeschen = false; resetStufe = 0; zeigeReset();
+        try { app.meldung(E('reset.allesFertig')); } catch (f) { /* egal */ }
+        // Neu starten, damit kein Zustand aus dem Arbeitsspeicher die geloeschten Daten wieder schreibt
+        setTimeout(() => { try { globalThis.location.reload(); } catch (f) { /* egal */ } }, 1500);
+        break;
       case 'reset-ok':
         // setzeZurueck sendet speicher:zurueckgesetzt (Pakete leeren ihren Zustand); danach die Gruppen der
         // Pakete neu fuellen, damit sie den frischen Stand zeigen

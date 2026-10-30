@@ -689,6 +689,19 @@ async function testeEinstellungen(browser) {
     && /chess\.js/.test(document.body.innerText) && /cburnett/.test(document.body.innerText)));
   await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'nacht', tiefe: 12 }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+
+  // Alle App-Daten auf diesem Geraet loeschen: eine Rueckfrage, fremde Schluessel bleiben, danach startet die App neu
+  await seite.evaluate(() => { localStorage.setItem('fremde-app', 'bleibt'); localStorage.setItem('schach-arena:konto:sitzung', '{}'); });
+  await seite.click('[data-aktion="alles-1"]');
+  pruefe('Alles löschen: eine Rückfrage', (await seite.locator('.es-reset').textContent()).includes('Alle App-Daten auf diesem Gerät löschen?'));
+  await seite.click('[data-aktion="reset-ab"]');
+  pruefe('Alles löschen abgebrochen: nichts weg', await seite.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung') === '{}'));
+  await seite.click('[data-aktion="alles-1"]');
+  const neuGeladen = seite.waitForEvent('load', { timeout: 10000 }).then(() => true, () => false);
+  await seite.click('[data-aktion="alles-ok"]');
+  const direkt = await seite.evaluate(() => Object.keys(localStorage));
+  pruefe('Alles gelöscht: kein schach-arena-Schlüssel mehr, fremde bleiben', !direkt.some((k) => k.startsWith('schach-arena:')) && direkt.includes('fremde-app'), direkt);
+  pruefe('Danach startet die App neu', await neuGeladen);
   await kontext.close();
 }
 

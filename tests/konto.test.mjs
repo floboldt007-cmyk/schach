@@ -50,6 +50,14 @@ let offline = ''; setzeKontoFetch(async () => { throw new Error('offline'); }); 
 localStorage.setItem('schach-arena:v1:partien', '[1]'); ladeStandAufGeraet({ format_version: 1, stand: { 'schach-arena:v1:partien': '[2]' } });
 pruefe('Cloud laden mit Rückfall-Sicherung', localStorage.getItem('schach-arena:v1:partien') === '[2]' && !!localStorage.getItem(RUECKFALL_SCHLUESSEL));
 setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} })); await abmelden(); pruefe('Abmelden löscht lokale Sitzung', sitzung() === null);
+for (const k of ['schach-arena:konto:sitzung', 'schach-arena:konto:rueckfall', 'schach-arena:abo:stand', 'schach-arena:daten:zustimmung', 'schach-arena:online:einladung', 'schach-arena:schule:stand']) localStorage.setItem(k, k);
+localStorage.setItem('schach-arena:v1:partien', '[1]');
+await abmelden({ geraet: true });
+pruefe('Abmelden und Kontodaten entfernen: alle Kontobereiche weg, lokaler Spielstand bleibt',
+  ![...m.keys()].some((k) => /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k)) && localStorage.getItem('schach-arena:v1:partien') === '[1]');
+setzeKontoFetch(async () => ({ ok: false, status: 400, async json() { return { error_code: 'otp_expired', msg: 'internal secret detail' }; } }));
+let serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Bekannte Serverkennung wird übersetzt, Originaltext nicht angezeigt', /abgelaufen/.test(serverFehler) && !/secret|internal/.test(serverFehler));
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };

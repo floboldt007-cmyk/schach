@@ -4,7 +4,7 @@ import {
   ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne, hoechsterSieg, istWeltFrei, hatWeltsiegel,
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
-  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, ergaenzeAnalyse, eigeneZuege,
+  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, loescheAlleAppDaten, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
   duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog, pruefeZuzweit,
@@ -449,6 +449,13 @@ setzeZurueck();
 pruefe('Zuruecksetzen: Fortschritt weg, Einstellungen bleiben', ladePartien().length === 0 && gesamtSterne() === 0 && ladeEinstellungen().klang === false);
 setzeZurueck({ mitEinstellungen: true });
 pruefe('Zuruecksetzen mit Einstellungen', ladeEinstellungen().klang === true && s.m.size === 0);
+s.setItem('schach-arena:v1:partien', '[]'); s.setItem('schach-arena:konto:sitzung', '{}'); s.setItem('fremde-app', 'bleibt');
+const alteCaches = globalThis.caches; const cachesWeg = [];
+globalThis.caches = { async keys() { return ['schach-arena-v101', 'schach-arena-v100', 'fremde-seite-v1']; }, async delete(k) { cachesWeg.push(k); return true; } };
+await loescheAlleAppDaten();
+pruefe('Alle App-Daten: jedes schach-arena-Praefix und die eigenen Service-Worker-Caches weg, fremde Daten und Caches bleiben',
+  ![...s.m.keys()].some((k) => k.startsWith('schach-arena:')) && s.getItem('fremde-app') === 'bleibt' && cachesWeg.join() === 'schach-arena-v101,schach-arena-v100');
+globalThis.caches = alteCaches;
 
 // ---------- Kein localStorage ----------
 setzeSpeicher(null);

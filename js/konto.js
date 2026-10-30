@@ -34,8 +34,14 @@ export function setzeKontoFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 
 function fehlerText(d, status) {
-  const e = new Error(d?.msg || d?.message || d?.error_description || K('serverfehler', { status }));
-  e.status = status; e.code = d?.code; return e;
+  const code = String(d?.error_code || d?.code || d?.error || '');
+  const bekannt = {
+    email_address_invalid: 'emailUngueltig', otp_expired: 'codeAbgelaufen',
+    invalid_credentials: 'codeFalsch', over_email_send_rate_limit: 'codeZuOft',
+    over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
+  }[code];
+  const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status }));
+  e.status = status; e.code = d?.code; e.serverDetails = d; return e;
 }
 async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
   const kopf = { apikey: SUPABASE_KEY };
@@ -89,10 +95,20 @@ export async function aktiveSitzung() {
   const s = sitzung(); if (!s) throw new Error(K('nichtAngemeldet'));
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
-export async function abmelden() {
+export async function abmelden({ geraet = false } = {}) {
   const s = sitzung();
   try { if (s?.access_token) await anfrage('/auth/v1/logout', { methode: 'POST', token: s.access_token }); } catch (e) { /* lokal immer abmelden */ }
   try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ }
+  if (geraet) {
+    try {
+      const weg = [];
+      for (let i = 0; i < lager().length; i++) {
+        const k = lager().key(i);
+        if (k && /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k)) weg.push(k);
+      }
+      for (const k of weg) lager().removeItem(k);
+    } catch (e) { /* die Sitzung ist bereits entfernt */ }
+  }
 }
 export function istAbgeglichen(s = sitzung()) {
   try { return !!s && !!userId(s) && lager().getItem(ABGEGLICHEN_SCHLUESSEL) === userId(s); } catch (e) { return false; }
@@ -273,7 +289,7 @@ export function kontoGruppe({ app } = {}) {
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button><button class="knopf" data-konto="abmelden-geraet">${K('abmeldenGeraet')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       <p class="es-hilfe konto-oder">${K('oder')}</p><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`}
@@ -292,8 +308,9 @@ export function kontoGruppe({ app } = {}) {
         const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
       }
       if (a === 'abmelden') { await abmelden(); render(); }
+      if (a === 'abmelden-geraet') { await abmelden({ geraet: true }); render(); }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
-    } catch (f) { melden(f.message || t('einstellungen.nichtGeklappt'), true); }
+    } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
   el.addEventListener('input', (e) => {
     const z = e.target.closest('.konto-ziffern input'); if (!z) return;

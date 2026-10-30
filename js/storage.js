@@ -1038,3 +1038,26 @@ export function setzeZurueck({ mitEinstellungen = false } = {}) {
   for (const k of weg) entferne(k);
   try { sende('speicher:zurueckgesetzt', { mitEinstellungen: !!mitEinstellungen }); } catch (e) { /* egal */ }
 }
+
+// Entfernt bewusst mehr als setzeZurueck: alle Daten dieser App, auch Konto-Merker,
+// Warteschlangen und Offline-Dateien. Fremde localStorage-Schluessel und fremde Caches bleiben erhalten:
+// GitHub Pages teilt sich den Ursprung mit Flos anderen Seiten, darum nur Caches mit dem Praefix aus sw.js.
+export async function loescheAlleAppDaten() {
+  const s = sp();
+  const weg = [];
+  try {
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k?.startsWith('schach-arena:')) weg.push(k);
+    }
+  } catch (e) { /* Arbeitsspeicher unten dennoch leeren */ }
+  for (const k of weg) entferne(k);
+  if (globalThis.caches?.keys) {
+    try {
+      const eigene = (await globalThis.caches.keys()).filter((k) => typeof k === 'string' && k.startsWith('schach-arena-'));
+      await Promise.all(eigene.map((k) => globalThis.caches.delete(k)));
+    } catch (e) { /* Browserdaten sind trotzdem weg */ }
+  }
+  try { sende('speicher:zurueckgesetzt', { mitEinstellungen: true, alles: true }); } catch (e) { /* egal */ }
+  return true;
+}
