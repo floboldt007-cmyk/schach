@@ -80,6 +80,7 @@ import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
+import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
 export { icon };
@@ -691,11 +692,16 @@ function ersterScreen() {
   return typeof wahl === 'string' && SCREENS.includes(wahl) ? pruefeZiel({ name: wahl, params: {} }) : null;
 }
 
+// Freundes-Link #freund/<code>: merken und die Bestenliste mit dem Reiter Freunde zeigen, dort wird gefragt
+function freundZiel() {
+  return uebernimmFreundLink() ? { name: 'bestenliste', params: { reiter: 'freunde' }, freund: true } : null;
+}
+
 function beiVerlauf() {
   const einladung = uebernimmEinladungsLink();
-  const ziel = einladung ? { name: 'online', params: {} } : ersterScreen() || ausVerlauf();
+  const ziel = einladung ? { name: 'online', params: {} } : freundZiel() || ersterScreen() || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
-  if (!einladung && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  if (!einladung && !ziel.freund && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }

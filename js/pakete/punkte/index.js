@@ -36,6 +36,7 @@ import { registriereIcon } from '../../ui/icons.js';
 import { ladeModul, ladePartie, ladePartien, ladeReview, hatReview, ladeEinstellungen, eigeneZuege } from '../../storage.js';
 import { tagSchluessel } from '../../tag.js';
 import { freischalten } from '../../ui/bestenliste.js';
+import * as FK from './freunde.js';
 import { t, locale, texte } from '../../sprache.js';
 import './texte.js';
 import * as S from './stand.js';
@@ -182,6 +183,8 @@ function feiern(e) {
 function senden(e) {
   sende('punkte:geaendert', { punkte: e.w, platz: e.platz, tafel: e.tafel, rekord: !!e.rekord });
   if (e.rekord) sende('rekord:neu', { tafel: e.tafel, wert: e.w, vorher: e.vorher, platz: e.platz, fenster: 'allzeit', partieId: e.id });
+  // Wochenwertung fuer die Freunde-Rangliste melden (nur angemeldet, nur bei Aenderung; wirft nie)
+  try { FK.meldeWoche().catch(() => {}); } catch (x) { /* egal */ }
 }
 
 function partieAnalysiert(d) {
@@ -418,7 +421,8 @@ function registriere() {
   anbieten('arena:panel-bot', (k) => sicher(() => anbieterPanel(k), 'Panel'), { reihenfolge: 40, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('ich', B.reiterIch), { reihenfolge: 10, paket: PAKET });
   anbieten('bestenliste:reiter', anbieterReiter('bots', B.reiterBots), { reihenfolge: 20, paket: PAKET });
-  anbieten('bestenliste:reiter', anbieterReiter('freunde', B.reiterFreunde), { reihenfolge: 50, paket: PAKET });
+  // Freunde mit Konto (Entwurf "Bestenliste", 30.10.2026): Rangliste nach Wochenwertung, darunter die Codes ohne Konto
+  anbieten('bestenliste:reiter', anbieterReiter('freunde', FK.reiterFreunde), { reihenfolge: 50, paket: PAKET });
 
   if (TEST && typeof window !== 'undefined') {
     window.__punkte = { stand: () => S.lade(), speichere: (st) => S.speichere(st), umzug, ladeBotLaeufe, fastZeigen, S, T, C, F };

@@ -222,6 +222,36 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
   .bl-f-liste .bl-f-weg { grid-column: 1 / -1; justify-self: start; }
 }
 
+/* ---------- Freunde mit Konto (Entwurf "Bestenliste", 30.10.2026) ---------- */
+.bl-fr-satz { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.45; color: var(--text-2); max-width: 60ch; }
+.bl-fr-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bl-fr-zeile { display: grid; grid-template-columns: 26px 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: 12px; }
+.bl-fr-zeile.du { background: var(--akzent-weich); }
+.bl-fr-platz { font-weight: 800; color: var(--text-2); text-align: center; }
+.bl-fr-zeile.du .bl-fr-platz { color: var(--akzent-text); }
+.bl-fr-av { display: inline-grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 50%; overflow: hidden;
+  background: var(--flaeche-3); color: var(--text); font-weight: 800; font-size: 15px; }
+.bl-fr-av svg { display: block; width: 100%; height: 100%; }
+.bl-fr-text { display: grid; min-width: 0; }
+.bl-fr-text b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-fr-text small { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.bl-fr-punkte { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bl-fr-plus { justify-self: stretch; }
+.bl-fr-hinweis { justify-self: start; min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--r-pille); font: inherit; font-size: 13px;
+  font-weight: 800; color: var(--akzent-text); background: var(--akzent-weich); cursor: pointer; }
+.bl-fr-codes { display: grid; gap: 12px; }
+.bl-fr-codes > summary { min-height: var(--tipp); display: flex; align-items: center; font-size: 14px; font-weight: 700; color: var(--text-2); cursor: pointer; }
+.bl-fr-blatt { display: grid; gap: 10px; text-align: left; }
+.bl-fr-oder { text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.bl-fr-status { margin: 0; min-height: 0; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.bl-fr-link-feld { display: block; width: 100%; margin-top: 6px; box-sizing: border-box; min-height: var(--tipp); padding: 8px 10px; border-radius: 12px;
+  border: 1px solid var(--linie); background: var(--flaeche); color: var(--text); font: inherit; font-size: 13px; }
+.bl-fr-blatt h4 { margin: 6px 0 0; font-size: 13px; font-weight: 800; color: var(--text-2); }
+.bl-fr-anfragen { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bl-fr-anfragen li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bl-fr-anfragen li b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-fr-anfragen .knopf.klein { min-height: 36px; padding: 0 12px; font-size: 13px; }
+
 /* ---------- reduzierte Bewegung ---------- */
 @media (prefers-reduced-motion: reduce) {
   .pk-schimmer .pk-text, .pk-schimmer .pk-wert { animation: none; }
