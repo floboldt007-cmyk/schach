@@ -22,6 +22,6 @@ Neue eigene Klänge und Bilder kommen erst in diese Tabelle, wenn Flo das für d
 ## Was nicht darunter fällt
 
 - Alles, was im README unter „Lizenzen“ mit einer anderen Lizenz steht, behält diese Lizenz: Stockfish
-  (GPL-3.0), chess.js (BSD-2-Clause), die Figuren „cburnett“ (GPLv2 oder neuer), die Schriften Manrope und
+  (GPL-3.0), chess.js (BSD-2-Clause), die Figuren „cburnett“ und die daraus abgeleitete „Blaupause“ (GPLv2 oder neuer), die Schriften Manrope und
   Bricolage Grotesque (SIL OFL 1.1) sowie Avatare, Zug-Symbole, App-Icon und Design, die schon unter der
   GPL-3.0 veröffentlicht sind.

@@ -12,10 +12,20 @@
 @keyframes fi-glanz { 0% { transform: translate(-10%, -20%) scale(.4); opacity: 0; } 45% { opacity: 1; } 100% { transform: translate(30%, -75%) scale(1.2); opacity: 0; } }
 @keyframes fi-koenig { 0%, 18% { transform: translate(-50%, -50%) rotate(0); opacity: 1; } 78% { transform: translate(-50%, -50%) rotate(72deg); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(72deg); opacity: 0; } }
 @keyframes fi-welle { 0% { transform: perspective(180px) rotateX(0); opacity: 0; } 30% { transform: perspective(180px) rotateX(32deg); opacity: .72; } 75% { transform: perspective(180px) rotateX(0); opacity: .35; } 100% { transform: none; opacity: 0; } }
+.finisher-signatur { color: #E0A22B; }
+.fi-signatur { position: absolute; left: 10%; bottom: 9%; width: 80%; height: auto; overflow: visible; }
+.fi-signatur path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.fi-zug { stroke-width: 2.4; stroke-dasharray: 120; stroke-dashoffset: 120; animation: fi-zeichnen .8s var(--gleiten) both; }
+.fi-linie { stroke-width: 1.6; stroke-dasharray: 84; stroke-dashoffset: 84; animation: fi-zeichnen .45s .7s var(--gleiten) both; }
+.fi-nr { position: absolute; right: 12%; bottom: 3%; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(12px, 3.4cqw, 22px);
+  letter-spacing: .08em; color: #E0A22B; text-shadow: 0 1px 0 rgba(0, 0, 0, .35); animation: fi-nr .5s 1.05s var(--gleiten) both; }
+@keyframes fi-zeichnen { to { stroke-dashoffset: 0; } }
+@keyframes fi-nr { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.finisher.ist-ruhig .fi-signatur path, html[data-bewegung="aus"] .fi-signatur path { animation: none !important; stroke-dashoffset: 0; }
 .finisher.ist-ruhig > * { animation: none !important; opacity: .72; }
 .finisher.ist-ruhig .fi-glanz { display: none; }
 html[data-bewegung="aus"] .finisher > * { animation: none !important; }
-@media (prefers-reduced-motion: reduce) { .finisher > * { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .finisher > *, .fi-signatur path { animation: none !important; stroke-dashoffset: 0; } }
 .fi-einstellungen > p { margin: 0 0 12px; color: var(--text-2); }
 .fi-auswahl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .fi-wahl { min-width: 0; min-height: var(--tap); padding: 10px 12px; border: 1px solid var(--linie); border-radius: var(--r-knopf); background: var(--flaeche-2); color: var(--text); text-align: left; }

@@ -13,6 +13,7 @@ import { t } from '../sprache.js';
 import '../sprachen/online.js';
 const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { sanAnzeige } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
@@ -176,7 +177,7 @@ export function zeige(root, params, app) {
         inhalt.innerHTML = `<div class="on-spiel"><div class="on-spieler on-oben"></div><div class="brett-rahmen"><div class="brett on-brett"></div></div><div class="on-spieler on-unten"></div>`
           + `<p class="on-zug" role="status"></p><p class="on-uhr-hinweis"></p><div class="on-aktionen"></div><p class="on-zuege" aria-label="${esc(O('zuege'))}"></p><section class="on-ergebnis on-karte flaeche" hidden></section></div>`;
         const e = app.einstellungen();
-        brett = new Brett(inhalt.querySelector('.brett'), { beiZug, figurenPfad: new URL('assets/pieces/', WURZEL).href,
+        brett = new Brett(inhalt.querySelector('.brett'), { beiZug, figurenPfad: new URL(figurenPfad(), WURZEL).href,
           koordinaten: e.koordinaten !== false, koordLage: e.koordLage, autoDame: e.autoDame !== false, turmRochade: e.turmRochade === true,
           steuerung: e.steuerung, pfeile: e.pfeile !== false });
         brett.setzeAusrichtung(online.meineFarbe(p)); brett.setzeDauer(300);

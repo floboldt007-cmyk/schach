@@ -194,7 +194,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   modus: Object.freeze(['system', 'hell', 'dunkel']),
   koordLage: Object.freeze(['ecke', 'rand']),
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
-  figuren: Object.freeze(['cburnett']),
+  figuren: Object.freeze(['cburnett', 'blaupause']),   // blaupause nur mit Sonderstueck (js/figurensatz.js)
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),

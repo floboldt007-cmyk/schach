@@ -38,6 +38,7 @@
 // .brett-rahmen.rs-rahmen > .brett, .rs-seite mit .rs-status, .rs-meldung[data-art], .rs-aktionen) bzw. .rs-ende.
 // Optik: css/pakete/raetsel.css (haengt sich selbst als link[data-screen="raetsel"] ein, nur Tokens).
 import { Brett, zielKarte } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
@@ -51,7 +52,7 @@ import '../sprachen/raetsel.js';
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const UCI_RE = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 const NAME_RE = /^[a-z][a-z0-9-]*$/;
-const PIECES = new URL('../../assets/pieces/', import.meta.url).href;
+const WURZEL_RAETSEL = new URL('../../', import.meta.url);
 const MAX_AUFGABEN = 60;
 const PUNKTE_MAX = 20;
 
@@ -217,7 +218,7 @@ export function zeige(root, params, app) {
 
   // ---------- Brett ----------
   brett = new Brett($('.rs-brett'), {
-    ausrichtung: 'w', figurenPfad: PIECES, beiZug, koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
+    ausrichtung: 'w', figurenPfad: new URL(figurenPfad(einst), WURZEL_RAETSEL).href, beiZug, koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
   });
   inhalt.hidden = false;
   const zaehlerEl = $('.rs-zaehler');

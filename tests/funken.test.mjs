@@ -142,7 +142,8 @@ gruppe = 'Belohnungen gegen Pakete';
   const { EMOTES } = await import('../js/pakete/emotes/index.js');
   const alle = L.alleStuecke();
   const leiter = alle.filter((s) => s.art === 'finisher').map((s) => `${s.id}@${s.level}`).sort();
-  const echt = FINISHER.filter((f) => f.id !== 'aus').map((f) => `finisher-${f.id}@${f.level}`).sort();
+  // Sonderstuecke (Signatur, Erfinder-Profil) stehen nicht auf der Level-Leiter
+  const echt = FINISHER.filter((f) => f.id !== 'aus' && !f.sonder).map((f) => `finisher-${f.id}@${f.level}`).sort();
   pruefe('Finisher: die Leiter verspricht genau die Stufen aus finisher/index.js (gleiches Stück, gleiches Level)', JSON.stringify(leiter) === JSON.stringify(echt), { leiter, echt });
   pruefe('Finisher: jedes Leiter-Stück ist sofort nutzbar und trägt den Namen aus dem Finisher-Paket', alle.filter((s) => s.art === 'finisher')
     .every((s) => L.nutzbar(s) && s.name.endsWith(FDE[FINISHER.find((f) => 'finisher-' + f.id === s.id).text])));
