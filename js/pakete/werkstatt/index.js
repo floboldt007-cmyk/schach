@@ -4,6 +4,13 @@ import { ladeEinstellungen, speichereEinstellungen, ladeFortschritt, hatWeltsieg
 import { klang } from '../../sounds.js';
 import { sprache } from '../../sprache.js';
 import { ladeKatalog, alleArtikel, istFrei, zugangVon, registriereArtikel } from './katalog.js';
+
+// Paket-CSS nur zusammen mit dem Paket laden (wie finisher und musik); ?test&kern bleibt dadurch wirklich paketfrei.
+if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="werkstatt"]')) {
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = 'werkstatt';
+  css.href = new URL('../../../css/pakete/werkstatt.css', import.meta.url).href;
+  document.head.appendChild(css);
+}
 export { istFrei, zugangVon, registriereArtikel };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 const DE={titel:'Werkstatt',unter:'Bretter, Figuren und Klänge ansehen und ausrüsten.',oeffnen:'Werkstatt öffnen',gratis:'Gratis',spiel:'Erspielbar',shop:'Shop',anprobieren:'Anprobieren',ausruesten:'Ausrüsten',angelegt:'Ausgerüstet',preis:'Preis folgt',bald:'Bald verfügbar',fortschritt:'Fortschritt',schliessen:'Schließen',laden:'Katalog wird geladen',premium:'Crownmate Trainer ansehen',kategorien:{bretter:'Bretter',figuren:'Figuren',klaenge:'Klänge',finisher:'Finisher',emotes:'Emotes',musik:'Musik',banner:'Banner'}};

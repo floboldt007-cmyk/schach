@@ -6,6 +6,13 @@ import { musik, MUSIK_WELTEN } from '../../musik.js';
 import { t } from '../../sprache.js';
 import './texte.js';
 
+// Paket-CSS nur zusammen mit dem Paket laden (wie finisher); ?test&kern bleibt dadurch wirklich paketfrei.
+if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="musik"]')) {
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = 'musik';
+  css.href = new URL('../../../css/pakete/musik.css', import.meta.url).href;
+  document.head.appendChild(css);
+}
+
 let app = null;
 let screen = 'arena';
 let partie = false;
