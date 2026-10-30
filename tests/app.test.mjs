@@ -2634,8 +2634,9 @@ async function testeSpielFundament(browser) {
         spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button').length,
         klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
     });
-    pruefe('Ohne Paket: Spieler-Leiste und Aktionen versteckt, Knopfreihe mit 4 Spalten wie vorher', ohne.spieler && ohne.aktionen && ohne.spalten === 4 && ohne.attr
-      && ohne.knoepfe === 4 && !ohne.klasse, JSON.stringify(ohne));
+    // Seit 30.10. abends ohne "Zuruecknehmen": drei Grundknoepfe (Hinweis, Drehen, Aufgeben)
+    pruefe('Ohne Paket: Spieler-Leiste und Aktionen versteckt, Knopfreihe mit 3 Spalten', ohne.spieler && ohne.aktionen && ohne.spalten === 3 && ohne.attr
+      && ohne.knoepfe === 3 && !ohne.klasse, JSON.stringify(ohne));
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
     await seite.goto(MIT_W0PLUS('wpspieler&wpaktion') + '#arena');
     await seite.waitForSelector('.screen.arena');
@@ -2658,8 +2659,8 @@ async function testeSpielFundament(browser) {
     pruefe('partie:spieler-leiste: quer in der Spielerleiste nach dem Namen, sichtbar, Kontext { app, boss, bot, buehne, farbe, lage, modus }',
       quer.inQuer && quer.sichtbar && quer.lage === 'quer' && quer.paketLage === 'quer'
       && JSON.stringify(quer.kontext) === '["app","boss","bot","buehne","farbe","lage","modus"]', JSON.stringify(quer));
-    pruefe('partie:aktionen: Knopf des Pakets in der Knopfreihe vor "Aufgeben", eine Spalte mehr (5), Kontext { app, boss, bot, buehne, farbe, modus }',
-      quer.vorAufgeben && quer.attr === '1' && quer.spalten === 5 && quer.imRaster
+    pruefe('partie:aktionen: Knopf des Pakets in der Knopfreihe vor "Aufgeben", eine Spalte mehr (4), Kontext { app, boss, bot, buehne, farbe, modus }',
+      quer.vorAufgeben && quer.attr === '1' && quer.spalten === 4 && quer.imRaster
       && JSON.stringify(quer.aktionenKontext) === '["app","boss","bot","buehne","farbe","modus"]', JSON.stringify(quer));
     await h.tippe('.spielknoepfe .wp-emote');
     const klick = await seite.evaluate(() => ({ emote: window.__wp.emote, dialog: !!document.querySelector('.dialog-ort .dialog') }));
@@ -2691,7 +2692,7 @@ async function testeSpielFundament(browser) {
         ueberlauf: reihe.scrollWidth - reihe.clientWidth,
         zuEng: [...reihe.querySelectorAll('button')].filter((b) => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1).map((b) => b.textContent.trim()) };
     });
-    pruefe('partie:aktionen: höchstens zwei Knöpfe (6 Spalten), kein Überlauf, alle Beschriftungen passen', drei.knoepfe === 2 && drei.attr === '2' && drei.spalten === 6
+    pruefe('partie:aktionen: höchstens zwei Knöpfe (5 Spalten), kein Überlauf, alle Beschriftungen passen', drei.knoepfe === 2 && drei.attr === '2' && drei.spalten === 5
       && drei.ueberlauf <= 0 && drei.zuEng.length === 0, JSON.stringify(drei));
     pruefe('Spieler-Leiste und Aktionen: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -3274,7 +3275,7 @@ async function testeU7(browser) {
       && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Großmeisterin Greta', JSON.stringify([m.name, wort]));
     pruefe('Beide Uhren sichtbar, die Uhr des Gegners überdeckt den Namen nicht', k.uhren.length === 2 && k.uhren.every((u) => u.an) && k.info.r <= k.uhren[0].l + 0.5,
       JSON.stringify([k.uhren, k.info]));
-    pruefe('Aktionen: Wörter ganz lesbar, Tippflächen >= 44 px', k.woerter.length === 4 && k.woerter.every((w) => w.ganz) && m.tipp >= 44, JSON.stringify([k.woerter, m.tipp]));
+    pruefe('Aktionen: Wörter ganz lesbar, Tippflächen >= 44 px', k.woerter.length === 3 && k.woerter.every((w) => w.ganz) && m.tipp >= 44, JSON.stringify([k.woerter, m.tipp]));
     pruefe('Kopf: Titel „Großmeisterin Greta“ ganz, kein waagrechter Überlauf', k.titel === 'Großmeisterin Greta' && k.titelGanz && m.ueber.seite <= 0 && m.ueber.screen <= 0
       && m.ueber.inhalt <= 0, JSON.stringify([k.titel, k.titelGanz, m.ueber]));
     const bl = await u7Blase(seite, U7_LANGER_SATZ);
@@ -3299,7 +3300,7 @@ async function testeU7(browser) {
         delete sk.dataset.aktionen;
         return raus;
       });
-      pruefe('Sechs Knöpfe (zwei der Pakete): zwei Reihen, alle im Bild, mindestens 44 px, Wörter ganz', pk.n === 6 && pk.ok, JSON.stringify(pk));
+      pruefe('Fünf Knöpfe (zwei der Pakete): alle im Bild, mindestens 44 px, Wörter ganz', pk.n === 5 && pk.ok, JSON.stringify(pk));
       // niedriges Querfenster: Begruessung, Uhr und Aktionen passen in 800 x 560
       await seite.setViewportSize({ width: 800, height: 560 });
       await warte(400);

@@ -390,7 +390,7 @@ async function browserTeil(browser, start) {
       await page.waitForFunction(() => window.__ligaProbe.ereignisse.some((d) => d.wertung.n === 10), null, { timeout: 30000 });
       await browserPruefe(name + ': echte Partie bucht Liga-Zeile und belegten Klassen-Aufstieg', async () => {
         // Liga als Karte (Flo 30.10. abends): Stand, Aenderung und Wappen; die Summe liest die Bedienhilfe im Label
-        assert.match(await page.locator('.liga-abrechnung').getAttribute('aria-label'), /^Liga \+\d+ · Bronze$/);
+        assert.match(await page.locator('.liga-abrechnung').getAttribute('title'), /^Liga \+\d+ · Bronze$/);
         assert.match(await page.locator('.liga-abrechnung .liga-erg-stand').innerText(), /^Bronze · \d+ Punkte$/);
         assert.equal(await page.locator('.liga-abrechnung .liga-erg-wappen svg').count(), 1);
         assert.match(await page.locator('.erg-feier').innerText(), /AUFSTIEG: Läuferklasse/);

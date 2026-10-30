@@ -186,8 +186,8 @@ export function abrechnungsZeile(k, st) {
   zeile.dataset.stufe = String(stufe);
   zeile.style.setProperty('--liga-f', LIGA_FARBEN[stufe] || LIGA_FARBEN[0]);
   zeile.dataset.richtung = r[3] > 0 ? 'plus' : r[3] < 0 ? 'minus' : 'null';
-  zeile.setAttribute('role', 'group');
-  zeile.setAttribute('aria-label', tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(stufe) }));
+  // Die Huelle der Abrechnung macht jede Zeile zum Listeneintrag; die Summe steht fuer die Bedienhilfe im Titel
+  zeile.title = tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(stufe) });
   zeile.innerHTML = `<span class="liga-erg-wappen" aria-hidden="true">${ligaWappen(stufe)}</span>
     <span class="liga-erg-mitte"><span class="liga-erg-titel">${esc(tx('abr.titel'))}</span>
       <b class="liga-erg-stand">${esc(tx('abr.stand', { stufe: stufeName(stufe), punkte: st.saison.punkte }))}</b>
