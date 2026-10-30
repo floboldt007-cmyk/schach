@@ -43,9 +43,23 @@ const klaenge = teileKlaenge({ brett: 'nacht', klangpaket: '' });
 pruefe('Klänge: Holz und Arcade frei, ohne Wahl gilt Arcade (Standard)', klaenge.length === 2 && klaenge.every((x) => x.frei)
   && klaenge.filter((x) => x.an).map((x) => x.id).join() === 'klang-arcade');
 
+// Flo 30.10.: "Merk dir sowas, braucht auch ein besseres Design" (Klangsets mit demselben Lautsprecher). Jedes Stueck
+// hat ein eigenes Bild; Verlauf-Ids (rk...) unterscheiden sich je Aufruf und zaehlen nicht
+const ohneIds = (s) => String(s).replace(/rk[a-z]\d+/g, '');
+pruefe('Eigenes Bild: Klangsets verschieden', new Set(klaenge.map((x) => ohneIds(x.bild))).size === klaenge.length);
+pruefe('Eigenes Bild: Bretter verschieden und mit Figuren', new Set(bretter.map((x) => x.bild)).size === bretter.length
+  && bretter.every((x) => /class="sk-brett"/.test(x.bild)));
+
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
 const e0 = teileErfolge(leer, NULL_STAND);
+pruefe('Eigenes Bild: alle 21 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
+  new Set(e0.map((x) => ohneIds(x.bild))).size === e0.length && e0.every((x) => /class="sk-erfolg"/.test(x.bild)));
+const rang = { frei: 0, selten: 1, episch: 2, legende: 3 };
+const sel = (id) => rang[e0.find((x) => x.id === 'erfolg-' + id).seltenheit];
+pruefe('Erfolge gestaffelt: je schwerer, desto seltener (erster Sieg < Welt 1 < Welt 3 < Welt 5, Liga 1 < 3 < 6, Serie 7 < 30 < 100)',
+  sel('erster-sieg') < sel('welt-1') && sel('welt-1') < sel('welt-3') && sel('welt-3') < sel('welt-5')
+  && sel('liga-1') < sel('liga-3') && sel('liga-3') < sel('liga-6') && sel('serie-7') < sel('serie-30') && sel('serie-30') < sel('serie-100'));
 pruefe('Erfolge ohne Partie: 21 (Bots, Liga, Serie, Level), alle gesperrt, mit Weg dahin', e0.length === 21 && e0.every((x) => !x.frei && x.zeile)
   && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt' && e0.find((x) => x.id === 'erfolg-liga-1').zeile === 'Erreiche Liga Bronze');
 const welt1 = BOTS.filter((b) => b.welt === 1);

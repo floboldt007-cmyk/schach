@@ -213,11 +213,12 @@ function nodeTeil() {
   pruefe('Zugklassen: Zeichen auf der Fuellung gut lesbar (PLAN 5.2, mindestens 4,3:1)', zeichen.length === 0, zeichen.join(', '));
   pruefe('Zugklassen: Fuellung und Zeichen in hell und dunkel gleich (Wiedererkennung)', KLASSEN.every((k) => hell[`--k-${k}`] === dunkel[`--k-${k}`]
     && hell[`--kg-${k}`] === dunkel[`--kg-${k}`]));
-  // Variante A "Ruhig" (Flo, 30.10.2026) ersetzt D1 (Amethyst): fuenf Farbfamilien, Genial und Goldrichtig in Gold
+  // Variante A "Ruhig" (Flo, 30.10.2026) ersetzt D1 (Amethyst): Farbfamilien statt elf Farben. Seit Flo 30.10. abends
+  // ("die brillanten Zuege brauchen eine Farbe") hat Genial ein eigenes Violett, Goldrichtig bleibt Gold
   const familie = (ks) => new Set(ks.map((k) => hell[`--k-${k}`])).size === 1;
-  pruefe('Zugklassen: fuenf Farbfamilien (Gold, Gruen, Orange, Rot paarweise gleich), Gold #B98A1E fuer Genial, kein Tuerkis',
-    hell['--k-brillant'] === '#B98A1E' && familie(['brillant', 'stark']) && familie(['bester', 'exzellent']) && familie(['verpasst', 'patzer'])
-    && new Set(KLASSEN.map((k) => hell[`--k-${k}`])).size === 8 && !/17A398|19f6e8/i.test(modern));
+  pruefe('Zugklassen: Familien (Gruen, Rot paarweise gleich), Genial violett #7C3AED, Goldrichtig Gold #B98A1E, kein Tuerkis',
+    hell['--k-brillant'] === '#7C3AED' && hell['--k-stark'] === '#B98A1E' && familie(['bester', 'exzellent']) && familie(['verpasst', 'patzer'])
+    && new Set(KLASSEN.map((k) => hell[`--k-${k}`])).size === 9 && !/17A398|19f6e8/i.test(modern));
   pruefe('Bot-Farben: jede Leiter-ID mit Farbe und Toenung (hell und dunkel)', BOT_IDS.length === 30
     && BOT_IDS.every((b) => hexRgb(hell[`--bot-${b}`]) && hexRgb(hell[`--bot-${b}-tint`]) && hexRgb(dunkel[`--bot-${b}-tint`])));
   pruefe('--meta-farbe = metaFarbe aus thema.js', hell['--meta-farbe'] === THEMEN.modern.metaFarbe.hell && dunkel['--meta-farbe'] === THEMEN.modern.metaFarbe.dunkel);

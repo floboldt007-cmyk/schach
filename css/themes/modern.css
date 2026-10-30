@@ -45,10 +45,11 @@
   --meta-farbe: #F4F1EC;
 
   /* Zugklassen: Fuellung (in hell und dunkel gleich), Zeichen auf der Fuellung, Textfassung (>= 4,5:1).
-     Variante A "Ruhig" (Flo, 30.10.2026): fuenf Farbfamilien statt elf, gold besonders (Genial, Goldrichtig), gruen gut
-     (Praezise, Sauber), grau neutral (Solide, Theorie, Pflichtzug), orange schwach (Unscharf, Daneben), rot schlecht
-     (Verschenkt, Weit daneben). Die Symbole (js/symbole.js) zeigen das Zeichen in --kt-* auf einer zarten Kachel. */
-  --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #7A5B0E;
+     Variante A "Ruhig" (Flo, 30.10.2026): Farbfamilien statt elf Farben, violett genial (Flo 30.10. abends: "die
+     brillanten Zuege brauchen eine Farbe"), gold besonders (Goldrichtig), gruen gut (Praezise, Sauber), grau neutral
+     (Solide, Theorie, Pflichtzug), orange schwach (Unscharf, Daneben), rot schlecht (Verschenkt, Weit daneben). Die
+     Symbole (js/symbole.js) zeigen das Zeichen in --kt-* auf einer getoenten Kachel. */
+  --k-brillant: #7C3AED; --kg-brillant: #FFFFFF; --kt-brillant: #6D28D9;
   --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #7A5B0E;
   --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #226548;
   --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #226548;
@@ -153,7 +154,7 @@
   --sockel: #2A2E36;
   --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
   --meta-farbe: #15171B;
-  --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #E3BC5C;
+  --k-brillant: #7C3AED; --kg-brillant: #FFFFFF; --kt-brillant: #C4B5FD;
   --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;
   --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #6CCB9E;
   --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #6CCB9E;
@@ -225,7 +226,7 @@
     --sockel: #2A2E36;
     --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
     --meta-farbe: #15171B;
-    --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #E3BC5C;
+    --k-brillant: #7C3AED; --kg-brillant: #FFFFFF; --kt-brillant: #C4B5FD;
     --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;
     --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #6CCB9E;
     --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #6CCB9E;

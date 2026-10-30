@@ -604,10 +604,10 @@ export function zeige(root, params = {}, app) {
     const links = KLASSEN.slice(0, 6).map(zeile).join('');
     const rechts = KLASSEN.slice(6).map(zeile).join('');
     const summe = (o) => Object.values(o).reduce((s, x) => s + (x || 0), 0);
-    // Eine Sache pro Blick (Entwurf "Crownmate aufgeraeumt", 30.10.): die Tabelle aller Zugklassen ist zugeklappt,
-    // sichtbar bleiben Genauigkeit, Kurve und die Schluesselmomente
+    // Flo 30.10. abends: "Das kann immer aufgeklappt sein, wenn man die Analyse macht" (vorher zugeklappt, Entwurf
+    // "Crownmate aufgeraeumt"); zuklappen geht weiter
     return `
-      <details class="an-klassen flaeche">
+      <details class="an-klassen flaeche" open>
         <summary class="an-kl-auf"><span>${esc(t('analyse.an.klassen.auf'))}</span>${icon('vor')}</summary>
         <div class="an-kl-raster">
           ${kopf}${links}

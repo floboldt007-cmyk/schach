@@ -107,6 +107,9 @@ const KUNST = {
   pixel: () => um(24, 46, (x, y, d, i) => `<rect x="${(x - 5).toFixed(2)}" y="${(y - 5).toFixed(2)}" width="10" height="10" fill="${['#FF5A5F', '#FFD23F', '#3BCEAC', '#4D9DE0'][i % 4]}" stroke="#1C1B19" stroke-width="1.2"/>`),
 };
 
+// Bausteine fuer weitere Kunst im selben Stil (js/sammlung-kunst.js: Klaenge, Bretter, Erfolge)
+export const KUNST_TEILE = Object.freeze({ id, um, verlauf, aura, strahlen, kranz, orbit, lorbeer, fluegel, funke, glut, krone });
+
 export const RAHMEN_KUNST = Object.freeze({
   holz: 'frei', brett: 'frei',
   'liga-1': 'selten', 'liga-2': 'selten', 'liga-3': 'episch', 'liga-4': 'episch', 'liga-5': 'legende', 'liga-6': 'legende',

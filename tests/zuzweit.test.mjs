@@ -130,7 +130,7 @@ try {
   pruefe('Analyse zeigt Namen und Genauigkeit beider Seiten', genau.includes('Anna') && genau.includes('Ben') && werte.length === 2
     && werte.every(w => Number.isFinite(Number(w.replace(',', '.'))) && Number(w.replace(',', '.')) >= 0 && Number(w.replace(',', '.')) <= 100), { genau, werte });
   pruefe('Analyse spricht neutral', !/\b(du|dein|deine|deinen)\b/i.test(await seite.locator('.an-screen').innerText()));
-  await seite.click('.an-kl-auf');
+  // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   const klasse = seite.locator('.an-kl:not([aria-disabled="true"])').first();
   await klasse.click(); const erster = await seite.locator('.an-c-zug').innerText();
   await klasse.click(); const zweiter = await seite.locator('.an-c-zug').innerText();
