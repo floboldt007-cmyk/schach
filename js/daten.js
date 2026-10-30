@@ -416,9 +416,12 @@ export function fehlerEreignis(ev) {
 
 // ---------- Oberflaeche: Gruppe "Daten" in den Einstellungen ----------
 export async function loescheKontoDialog(app) {
+  // Ein laufendes Stripe-Abo endet mit dem Konto nicht: dann sagt der Dialog, wo man es vorher kuendigt
+  let aboHinweis = '';
+  try { aboHinweis = (await import('./abo.js')).aboHinweisZumLoeschen() || ''; } catch (e) { /* ohne Abo-Modul */ }
   const weiter = await sheet({
     titel: D('daten.loeschen1Titel'),
-    text: D('daten.loeschen1Text'),
+    text: D('daten.loeschen1Text') + (aboHinweis ? ' ' + aboHinweis : ''),
     knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false,
   });
   if (!weiter) return false;

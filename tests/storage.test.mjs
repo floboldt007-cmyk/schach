@@ -4,7 +4,7 @@ import {
   ladeFortschritt, istFreigeschaltet, hoechsteFreieStufe, naechsterGegner, sterneZahl, gesamtSterne, hoechsterSieg, istWeltFrei, hatWeltsiegel,
   besiegteBots, sterneFuerPartie, speicherePartie, ladePartien, ladePartie, aktualisierePartie,
   loeschePartie, ladeReview, speichereReview, hatReview, MAX_REVIEWS, speichereLaufendePartie,
-  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, loescheAlleAppDaten, ergaenzeAnalyse, eigeneZuege,
+  ladeLaufendePartie, loescheLaufendePartie, statistik, setzeZurueck, loescheAlleAppDaten, ALLES_LOESCHEN_BLEIBT, ergaenzeAnalyse, eigeneZuege,
   MODI, wertet, EXTRA_MAX, MODUL_BUDGET, ladeModul, speichereModul, speicherStand, rohSpeicher, SPEICHER_GRENZE,
   ladeModulEinstellungen, speichereModulEinstellungen, MODUL_EINSTELLUNGEN_MAX,
   duenneAnalysenAus, dauerhaftAnfragen, dauerhaftStatus, BOSS_STUFEN, persistOhneDialog, pruefeZuzweit,
@@ -450,12 +450,16 @@ pruefe('Zuruecksetzen: Fortschritt weg, Einstellungen bleiben', ladePartien().le
 setzeZurueck({ mitEinstellungen: true });
 pruefe('Zuruecksetzen mit Einstellungen', ladeEinstellungen().klang === true && s.m.size === 0);
 s.setItem('schach-arena:v1:partien', '[]'); s.setItem('schach-arena:konto:sitzung', '{}'); s.setItem('fremde-app', 'bleibt');
+s.setItem('schach-arena:daten:widerruf', '{"konto":"u1"}'); s.setItem('schach-arena:konto:sichtbar', '1');
 const alteCaches = globalThis.caches; const cachesWeg = [];
-globalThis.caches = { async keys() { return ['schach-arena-v101', 'schach-arena-v100', 'fremde-seite-v1']; }, async delete(k) { cachesWeg.push(k); return true; } };
+globalThis.caches = { async keys() { return ['schach-arena-v101', 'fremde-seite-v1']; }, async delete(k) { cachesWeg.push(k); return true; } };
 await loescheAlleAppDaten();
-pruefe('Alle App-Daten: jedes schach-arena-Praefix und die eigenen Service-Worker-Caches weg, fremde Daten und Caches bleiben',
-  ![...s.m.keys()].some((k) => k.startsWith('schach-arena:')) && s.getItem('fremde-app') === 'bleibt' && cachesWeg.join() === 'schach-arena-v101,schach-arena-v100');
+pruefe('Alle App-Daten: jeder schach-arena-Schluessel weg ausser offenem Widerruf und Freischalt-Merker, fremde Daten bleiben',
+  [...s.m.keys()].filter((k) => k.startsWith('schach-arena:')).sort().join() === 'schach-arena:daten:widerruf,schach-arena:konto:sichtbar'
+  && s.getItem('fremde-app') === 'bleibt' && ALLES_LOESCHEN_BLEIBT.length === 2, [...s.m.keys()]);
+pruefe('Alle App-Daten: die Programmdateien im Cache bleiben (ohne sie startet die App offline nicht mehr)', cachesWeg.length === 0, cachesWeg);
 globalThis.caches = alteCaches;
+s.removeItem('schach-arena:daten:widerruf'); s.removeItem('schach-arena:konto:sichtbar');
 
 // ---------- Kein localStorage ----------
 setzeSpeicher(null);

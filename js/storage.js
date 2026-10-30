@@ -1039,25 +1039,22 @@ export function setzeZurueck({ mitEinstellungen = false } = {}) {
   try { sende('speicher:zurueckgesetzt', { mitEinstellungen: !!mitEinstellungen }); } catch (e) { /* egal */ }
 }
 
-// Entfernt bewusst mehr als setzeZurueck: alle Daten dieser App, auch Konto-Merker,
-// Warteschlangen und Offline-Dateien. Fremde localStorage-Schluessel und fremde Caches bleiben erhalten:
-// GitHub Pages teilt sich den Ursprung mit Flos anderen Seiten, darum nur Caches mit dem Praefix aus sw.js.
-export async function loescheAlleAppDaten() {
+// Entfernt bewusst mehr als setzeZurueck: alle Daten dieser App mit dem Praefix schach-arena:, auch Konto-Merker und
+// Warteschlangen. Es bleiben (wie js/konto.js BLEIBT_BEIM_ENTFERNEN) der Freischalt-Merker und ein offener Widerruf der
+// Datenfreigabe (offene Loeschpflicht, js/daten.js holt ihn nach). Fremde Schluessel bleiben ebenfalls (GitHub Pages
+// teilt sich den Ursprung mit Flos anderen Seiten). Die Programmdateien im Cache des Service Workers bleiben bewusst:
+// Sie enthalten nichts Persoenliches, und ohne sie startet die App offline nicht mehr (Ultracode-Pruefung 30.10.).
+export const ALLES_LOESCHEN_BLEIBT = Object.freeze(['schach-arena:konto:sichtbar', 'schach-arena:daten:widerruf']);
+export function loescheAlleAppDaten() {
   const s = sp();
   const weg = [];
   try {
     for (let i = 0; i < s.length; i++) {
       const k = s.key(i);
-      if (k?.startsWith('schach-arena:')) weg.push(k);
+      if (k?.startsWith('schach-arena:') && !ALLES_LOESCHEN_BLEIBT.includes(k)) weg.push(k);
     }
   } catch (e) { /* Arbeitsspeicher unten dennoch leeren */ }
   for (const k of weg) entferne(k);
-  if (globalThis.caches?.keys) {
-    try {
-      const eigene = (await globalThis.caches.keys()).filter((k) => typeof k === 'string' && k.startsWith('schach-arena-'));
-      await Promise.all(eigene.map((k) => globalThis.caches.delete(k)));
-    } catch (e) { /* Browserdaten sind trotzdem weg */ }
-  }
   try { sende('speicher:zurueckgesetzt', { mitEinstellungen: true, alles: true }); } catch (e) { /* egal */ }
   return true;
 }

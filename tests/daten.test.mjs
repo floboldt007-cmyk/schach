@@ -319,7 +319,7 @@ const nurRest = () => anfragen.filter((a) => a.url.includes('/rest/v1/'));
   antworten.push({ status: 204, body: null }, { status: 204, body: null });
   await loescheKonto();
   pruefe('Löschen: rpc/konto_loeschen per POST mit dem Token, danach Abmelden', anfragen[0].url === SUPABASE_URL + '/rest/v1/rpc/konto_loeschen' && anfragen[0].method === 'POST'
-    && anfragen[0].headers.Authorization === 'Bearer ' + token('u1', 'u1@b.de') && anfragen[1].url === SUPABASE_URL + '/auth/v1/logout', anfragen.map((x) => x.url));
+    && anfragen[0].headers.Authorization === 'Bearer ' + token('u1', 'u1@b.de') && anfragen[1].url === SUPABASE_URL + '/auth/v1/logout?scope=local', anfragen.map((x) => x.url));
   pruefe('Löschen: lokal abgemeldet, Warteschlange leer, Freigabe aus, Zustimmung entfernt', konto.sitzung() === null && warteschlange().length === 0
     && storage.ladeEinstellungen().datenfreigabe === 'aus' && !m.has(ZUSTIMMUNG_SCHLUESSEL) && darfTeilen() === false);
   pruefe('Löschen: Spielstand auf dem Gerät bleibt', !!m.get('schach-arena:v1:partien'));

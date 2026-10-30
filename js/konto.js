@@ -33,15 +33,24 @@ function jsonSchreib(k, v) { try { lager().setItem(k, JSON.stringify(v)); return
 export function setzeKontoFetch(fn) { fetchFn = fn || ((...a) => fetch(...a)); }
 export function sitzung() { return jsonLies(SITZUNG_SCHLUESSEL); }
 
+// Kennungen von Supabase Auth (GoTrue) in eigenen Worten. Nie den Server-Text (msg) zeigen: Darin kann die E-Mail-Adresse
+// stehen. Unbekannte Kennungen erscheinen im Sammeltext ("Serverfehler (400, kennung)"), damit Flo sie im Tester-Bericht
+// sieht. Ein falscher und ein abgelaufener Code liefern beide otp_expired, darum ein Text fuer beides.
+const SITZUNG_TOT = new Set(['refresh_token_not_found', 'refresh_token_already_used', 'session_not_found', 'session_expired', 'bad_jwt']);
 function fehlerText(d, status) {
-  const code = String(d?.error_code || d?.code || d?.error || '');
-  const bekannt = {
-    email_address_invalid: 'emailUngueltig', otp_expired: 'codeAbgelaufen',
-    invalid_credentials: 'codeFalsch', over_email_send_rate_limit: 'codeZuOft',
-    over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
+  const code = String(d?.error_code || (typeof d?.code === 'string' ? d.code : '') || d?.error || '');
+  const bekannt = SITZUNG_TOT.has(code) ? 'sitzungAbgelaufen' : {
+    email_address_invalid: 'emailUngueltig', otp_expired: 'codeUngueltig',
+    over_email_send_rate_limit: 'codeZuOft', over_request_rate_limit: 'codeZuOft', user_banned: 'kontoGesperrt',
+    email_address_not_authorized: 'emailNichtFreigegeben',
   }[code];
-  const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status }));
-  e.status = status; e.code = d?.code; e.serverDetails = d; return e;
+  const kennung = /^[a-z0-9_]{1,60}$/.test(code) ? code : '';
+  const e = new Error(bekannt ? K(bekannt) : K('serverfehler', { status: kennung ? `${status}, ${kennung}` : status }));
+  e.status = status; e.code = d?.code; e.kennung = kennung; e.serverDetails = d; return e;
+}
+function mitFrist(versprechen, ms) {
+  let t; const frist = new Promise((_, nein) => { t = setTimeout(() => nein(new Error(K('offline'))), ms); });
+  return Promise.race([versprechen, frist]).finally(() => clearTimeout(t));
 }
 async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
   const kopf = { apikey: SUPABASE_KEY };
@@ -89,26 +98,47 @@ export async function pruefeCode(email, token) {
 function neueAnmeldung() { try { lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ } }
 export async function erneuereSitzung() {
   const s = sitzung(); if (!s?.refresh_token) throw new Error(K('nichtAngemeldet'));
-  return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
+  try {
+    return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
+  } catch (e) {
+    // Tote Sitzung (auf dem Server abgemeldet oder abgelaufen): lokal entfernen, damit die Gruppe "abgemeldet" zeigt,
+    // statt still nie mehr zu sichern
+    if (SITZUNG_TOT.has(e.kennung)) { epoche++; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
+    throw e;
+  }
 }
 export async function aktiveSitzung() {
   const s = sitzung(); if (!s) throw new Error(K('nichtAngemeldet'));
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
-export async function abmelden({ geraet = false } = {}) {
+// Bleiben beim Entfernen der Kontodaten: der Freischalt-Merker (kein Kontodatum) und ein offener Widerruf der
+// Datenfreigabe (eine offene Loeschpflicht: js/daten.js holt ihn nach, sobald dasselbe Konto wieder angemeldet ist).
+export const BLEIBT_BEIM_ENTFERNEN = Object.freeze([SICHTBAR_SCHLUESSEL, 'schach-arena:daten:widerruf']);
+// epoche: zaehlt jedes Abmelden und Loeschen. Ein Abgleich, der waehrenddessen laeuft, schreibt danach nichts mehr.
+let epoche = 0;
+// Lokal sofort abmelden, danach den Server mit kurzer Frist benachrichtigen, nur fuer diese Sitzung (scope=local):
+// Andere Geraete bleiben angemeldet. geraet: zusaetzlich alle Kontodaten auf diesem Geraet entfernen.
+export async function abmelden({ geraet = false, frist = 5000 } = {}) {
   const s = sitzung();
-  try { if (s?.access_token) await anfrage('/auth/v1/logout', { methode: 'POST', token: s.access_token }); } catch (e) { /* lokal immer abmelden */ }
+  epoche++;
   try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ }
   if (geraet) {
     try {
       const weg = [];
       for (let i = 0; i < lager().length; i++) {
         const k = lager().key(i);
-        if (k && /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k)) weg.push(k);
+        if (k && /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k) && !BLEIBT_BEIM_ENTFERNEN.includes(k)) weg.push(k);
       }
       for (const k of weg) lager().removeItem(k);
     } catch (e) { /* die Sitzung ist bereits entfernt */ }
   }
+  try { if (s?.access_token) await mitFrist(anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }), frist); } catch (e) { /* lokal ist schon abgemeldet */ }
+}
+// Vor "Alle Daten dieser App loeschen": den Stand noch einmal sichern, wenn dieses Geraet abgeglichen ist.
+// 'ohne' (nicht angemeldet oder nicht abgeglichen), 'gesichert' oder 'fehlgeschlagen'.
+export async function sichereVorDemLoeschen(ms = 8000) {
+  if (!istAbgeglichen()) return 'ohne';
+  try { await mitFrist(speichereCloudStand(), ms); return 'gesichert'; } catch (e) { return 'fehlgeschlagen'; }
 }
 export function istAbgeglichen(s = sitzung()) {
   try { return !!s && !!userId(s) && lager().getItem(ABGEGLICHEN_SCHLUESSEL) === userId(s); } catch (e) { return false; }
@@ -217,11 +247,16 @@ export function hatSpielstand(stand = lokalerStand()) {
 }
 // wahl: nur 'geraet' oder 'cloud' entscheiden einen Konflikt. Alles andere (auch der Abbruch-Wert eines Dialogs)
 // laesst ihn offen: dann wird nichts geschrieben und der Riegel bleibt zu.
+// Liefert null, wenn waehrenddessen abgemeldet oder geloescht wurde: dann schreibt der Abgleich nichts mehr aufs Geraet.
 export async function gleicheNachAnmeldung(wahl) {
+  const e0 = epoche;
+  const id0 = userId(sitzung());
+  const gilt = () => epoche === e0 && !!id0 && userId(sitzung()) === id0;
   const cloud = await ladeCloudStand();
-  if (!cloud) { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
+  if (!gilt()) return null;
+  if (!cloud) { await speichereCloudStand(); if (!gilt()) return null; merkeAbgleich(); return 'geraet'; }
   if (!hatSpielstand()) { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
-  if (wahl === 'geraet') { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
+  if (wahl === 'geraet') { await speichereCloudStand(); if (!gilt()) return null; merkeAbgleich(); return 'geraet'; }
   if (wahl === 'cloud') { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
   neueAnmeldung();   // Konflikt: Geraet und Cloud weichen ab, also Riegel zu, auch wenn ein alter Merker stand
   return { konflikt: true, geraet: vorschau(lokalerStand()), cloud: vorschau(cloud) };
@@ -304,7 +339,7 @@ export function kontoGruppe({ app } = {}) {
       if (a === 'sichern') {
         const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name);
         // Ohne Abgleich auf diesem Geraet (z. B. der Tab, in dem der Link angefordert wurde) erst fragen, nie still hochladen
-        if (!istAbgeglichen()) { const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); else melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); return; }
+        if (!istAbgeglichen()) { const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); else if (abgleich) melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); return; }
         const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
       }
       if (a === 'abmelden') { await abmelden(); render(); }
@@ -331,7 +366,7 @@ export function kontoGruppe({ app } = {}) {
     if (w !== 'geraet' && w !== 'cloud') { melden(K('abgleichOffen')); return; }
     // Ein anderer Tab hat inzwischen entschieden: nicht noch einmal (womoeglich entgegengesetzt) schreiben
     if (istAbgeglichen()) { melden(K('schonAbgeglichen')); return; }
-    await gleicheNachAnmeldung(w); melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
+    if (await gleicheNachAnmeldung(w)) melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
   }
   // Angemeldet, aber auf diesem Geraet noch nicht abgeglichen (Link-Tab, anderer Tab, abgebrochener Dialog, Sitzung von
   // vor dem Riegel): beim Zeichnen der Gruppe abgleichen, statt still nie mehr zu sichern.
@@ -342,7 +377,7 @@ export function kontoGruppe({ app } = {}) {
     gleicheNachAnmeldung().then((abgleich) => {
       render();
       if (abgleich?.konflikt) return konfliktDialog(abgleich);
-      melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
+      if (abgleich) melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
     }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true)).finally(() => { abgleichLaeuft = false; });
   };
   render();
@@ -359,4 +394,5 @@ function alsApp() {
 function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // Registrierung ist defensiv: Das Konto darf die Offline-App nie am Start hindern.
-try { uebernimmLinkSitzung(); kontoSichtbar(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung()); } catch (e) { /* App laeuft ohne Konto weiter */ }
+try { uebernimmLinkSitzung(); kontoSichtbar(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung());
+  hoere('speicher:zurueckgesetzt', (d) => { if (d.alles) epoche++; }); } catch (e) { /* App laeuft ohne Konto weiter */ }

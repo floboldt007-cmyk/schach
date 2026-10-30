@@ -690,17 +690,34 @@ async function testeEinstellungen(browser) {
   await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'nacht', tiefe: 12 }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
 
-  // Alle App-Daten auf diesem Geraet loeschen: eine Rueckfrage, fremde Schluessel bleiben, danach startet die App neu
-  await seite.evaluate(() => { localStorage.setItem('fremde-app', 'bleibt'); localStorage.setItem('schach-arena:konto:sitzung', '{}'); });
+  // Alle App-Daten auf diesem Geraet loeschen: eine Rueckfrage; angemeldet und abgeglichen sichert die App vorher, scheitert
+  // das, fragt sie noch einmal. Fremde Schluessel, ein offener Widerruf und der Freischalt-Merker bleiben, danach Neustart.
+  await seite.route(/supabase\.co/, (r) => r.abort());
+  await seite.evaluate(() => {
+    const jwt = 'a.' + btoa(JSON.stringify({ sub: 'u1' })).replace(/=+$/, '') + '.x';
+    localStorage.setItem('fremde-app', 'bleibt');
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: jwt, refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1' } }));
+    localStorage.setItem('schach-arena:konto:abgeglichen', 'u1');
+    localStorage.setItem('schach-arena:daten:widerruf', JSON.stringify({ konto: 'u2', datum: '2026-10-30' }));
+  });
   await seite.click('[data-aktion="alles-1"]');
   pruefe('Alles löschen: eine Rückfrage', (await seite.locator('.es-reset').textContent()).includes('Alle App-Daten auf diesem Gerät löschen?'));
   await seite.click('[data-aktion="reset-ab"]');
-  pruefe('Alles löschen abgebrochen: nichts weg', await seite.evaluate(() => localStorage.getItem('schach-arena:konto:sitzung') === '{}'));
+  pruefe('Alles löschen abgebrochen: nichts weg, Fokus zurück auf den Knopf', await seite.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen') === 'u1'
+    && document.activeElement?.dataset?.aktion === 'alles-1'));
   await seite.click('[data-aktion="alles-1"]');
-  const neuGeladen = seite.waitForEvent('load', { timeout: 10000 }).then(() => true, () => false);
   await seite.click('[data-aktion="alles-ok"]');
-  const direkt = await seite.evaluate(() => Object.keys(localStorage));
-  pruefe('Alles gelöscht: kein schach-arena-Schlüssel mehr, fremde bleiben', !direkt.some((k) => k.startsWith('schach-arena:')) && direkt.includes('fremde-app'), direkt);
+  await seite.waitForSelector('.es-reset >> text=Die Sicherung in die Cloud hat nicht geklappt', { timeout: 15000 }).catch(() => {});
+  pruefe('Sicherung gescheitert: zweite Rückfrage, noch nichts gelöscht', (await seite.locator('.es-reset').textContent()).includes('Trotzdem löschen')
+    && await seite.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen') === 'u1'));
+  const neuGeladen = seite.waitForEvent('load', { timeout: 20000 }).then(() => true, () => false);
+  await seite.click('[data-aktion="alles-ok"]');
+  const BLEIBT = ['schach-arena:konto:sichtbar', 'schach-arena:daten:widerruf'];
+  await seite.waitForFunction((b) => !Object.keys(localStorage).some((k) => k.startsWith('schach-arena:') && !b.includes(k)), BLEIBT, { timeout: 15000 }).catch(() => {});
+  const direkt = await seite.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
+  pruefe('Alles gelöscht: nur offener Widerruf und Freischalt-Merker bleiben, fremde Schlüssel auch',
+    !Object.keys(direkt).some((k) => k.startsWith('schach-arena:') && !BLEIBT.includes(k)) && direkt['fremde-app'] === 'bleibt'
+    && JSON.parse(direkt['schach-arena:daten:widerruf'] || '{}').konto === 'u2', Object.keys(direkt));
   pruefe('Danach startet die App neu', await neuGeladen);
   await kontext.close();
 }

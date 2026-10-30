@@ -69,6 +69,8 @@ export function zeige(root, params = {}, app) {
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   let resetStufe = 0;
   let allesLoeschen = false;
+  let allesTrotzdem = false;    // die Sicherung vor dem Loeschen ist gescheitert: zweite Rueckfrage
+  let ausloeser = 'reset-1';    // Fokus nach dem Abbrechen zurueck auf den Knopf, der die Rueckfrage geoeffnet hat
   let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
@@ -232,7 +234,7 @@ export function zeige(root, params = {}, app) {
           ${E('reset.stand', { partien: E('reset.partien', { n: s.partien, zahl: `<b class="zahl">${s.partien}</b>` }), sterne: E('reset.sterne', { n: sterne, zahl: `<b class="zahl">${sterne}</b>` }) })}</p>
         <div class="es-knoepfe"><button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button><button class="knopf es-rot-rand" type="button" data-aktion="alles-1">${icon('muell')} ${E('reset.allesKnopf')}</button></div>`;
     } else if (allesLoeschen) {
-      box.innerHTML = `<div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E('reset.allesFrage')}</b> ${E('reset.allesText')}</p></div><div class="es-knoepfe"><button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button><button class="knopf es-rot" type="button" data-aktion="alles-ok">${icon('muell')} ${E('reset.allesEndgueltig')}</button></div>`;
+      box.innerHTML = `<div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E(allesTrotzdem ? 'reset.allesNichtGesichert' : 'reset.allesFrage')}</b> ${E(allesTrotzdem ? 'reset.allesNichtGesichertText' : 'reset.allesText')}</p></div><div class="es-knoepfe"><button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button><button class="knopf es-rot" type="button" data-aktion="alles-ok">${icon('muell')} ${E(allesTrotzdem ? 'reset.allesTrotzdem' : 'reset.allesEndgueltig')}</button></div>`;
       box.querySelector('[data-aktion="reset-ab"]').focus();
     } else if (resetStufe === 1) {
       box.innerHTML = `
@@ -290,17 +292,31 @@ export function zeige(root, params = {}, app) {
         import('../bericht.js').then((m) => m.zeigeBericht(app))
           .catch(() => { try { app.meldung(t('bericht.erstellenFehler'), { art: 'fehler' }); } catch (f) { /* egal */ } });
         break;
-      case 'reset-1': resetStufe = 1; zeigeReset(); break;
-      case 'alles-1': allesLoeschen = true; resetStufe = 1; zeigeReset(); break;
+      case 'reset-1': ausloeser = 'reset-1'; resetStufe = 1; zeigeReset(); break;
+      case 'alles-1': ausloeser = 'alles-1'; allesLoeschen = true; allesTrotzdem = false; resetStufe = 1; zeigeReset(); break;
       case 'reset-2': resetStufe = 2; zeigeReset(); break;
-      case 'reset-ab': resetStufe = 0; allesLoeschen = false; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
-      case 'alles-ok':
-        await loescheAlleAppDaten();
-        allesLoeschen = false; resetStufe = 0; zeigeReset();
+      case 'reset-ab': resetStufe = 0; allesLoeschen = false; allesTrotzdem = false; zeigeReset(); sec.querySelector(`[data-aktion="${ausloeser}"]`)?.focus(); break;
+      case 'alles-ok': {
+        k.disabled = true;
+        // Erst sichern (wenn dieses Geraet mit der Cloud abgeglichen ist), einen offenen Widerruf senden und die Sitzung
+        // abmelden, dann loeschen. Scheitert die Sicherung, fragt die App noch einmal, statt still Daten zu verlieren.
+        let konto = null;
+        try { konto = await import('../konto.js'); } catch (f) { /* ohne Konto-Modul */ }
+        if (konto && !allesTrotzdem && (await konto.sichereVorDemLoeschen()) === 'fehlgeschlagen') {
+          allesTrotzdem = true; zeigeReset(); break;
+        }
+        try {
+          const daten = await import('../daten.js');
+          await Promise.race([daten.widerrufeJetzt(), new Promise((ja) => setTimeout(ja, 5000))]);
+        } catch (f) { /* offen bleibt er trotzdem gemerkt */ }
+        try { await konto?.abmelden({ geraet: true }); } catch (f) { /* lokal wird unten ohnehin geloescht */ }
+        loescheAlleAppDaten();
+        allesLoeschen = false; allesTrotzdem = false; resetStufe = 0; zeigeReset();
         try { app.meldung(E('reset.allesFertig')); } catch (f) { /* egal */ }
         // Neu starten, damit kein Zustand aus dem Arbeitsspeicher die geloeschten Daten wieder schreibt
         setTimeout(() => { try { globalThis.location.reload(); } catch (f) { /* egal */ } }, 1500);
         break;
+      }
       case 'reset-ok':
         // setzeZurueck sendet speicher:zurueckgesetzt (Pakete leeren ihren Zustand); danach die Gruppen der
         // Pakete neu fuellen, damit sie den frischen Stand zeigen
