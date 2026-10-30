@@ -5,13 +5,16 @@
 //   zeige(root, { partieId, neuFreigeschaltet?, neueSterne?, ply? }, app) -> { verlasse() }
 //
 // Klassen mit Praefix an- (Stil in css/screens.css), Basis-Klassen aus css/app.css.
-// Runde 4: Anzeige-Orte analyse:oben (oben rechts nach dem Banner) und analyse:coach (Knopfzeile der
+// Runde 4: Anzeige-Orte analyse:oben (oben rechts nach Ergebnis und Banner) und analyse:coach (Knopfzeile der
 // Coach-Karte, je Zug neu gefuellt); Ereignisse analyse:gesehen (Zug gewechselt, nicht beim
 // Variantenspiel) und partie:analysiert (nach dem Nachrechnen, quelle 'analyse').
 // W0+a: Boss-Partien mit boss.staerke rechnen die Spielstaerke gegen die Elo, mit der der Boss wirklich spielte
 // (w0plus-a-fix: bots.eloDerPartie, die Elo des Profils aus staerkeFuerElo, nicht die Anfrage; wie partie.js).
 // Englische Version (Teil 1): Texte aus js/sprachen/analyse.js (an.*, ergebnis.*), Zugklassen und Eroeffnung in der
 // eingestellten Sprache, SAN ueber review.sanAnzeige, Dezimalzeichen nach Sprache.
+// Entwurf "Analyse ruhig" (Flo, 30.10.2026: "Das sieht auch so clean aus?", dann "Ja"): jede Angabe nur einmal (Ergebnis
+// in der Karte, der Kopf nennt Gegner und Eroeffnung), Flos Profilbild statt "F", beide Seiten gleich gebaut, die Sterne
+// beim Ergebnis, der neue Gegner als schlanke Zeile, "Leistung ≈", Verlauf hell, Ueberschriften ohne Grossbuchstaben.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
@@ -31,7 +34,7 @@ import {
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle } from '../orte.js';
-import { botFarbe } from '../thema.js';
+import { botFarbe, floAvatar } from '../thema.js';
 
 // Pfade relativ zum Projekt (klappt aus index.html und aus tests/)
 const WURZEL = new URL('../../', import.meta.url);
@@ -250,29 +253,20 @@ export function zeige(root, params = {}, app) {
 
   function baueKopf() {
     const p = st.partie;
-    const nummer = (() => {
-      const r = ladeReview(p.id);
-      if (r && r.zuege && r.zuege.length) return r.zuege[r.zuege.length - 1].nummer;
-      return Math.max(1, Math.ceil((p.zuege || []).length / 2));
-    })();
-    const info = ergebnisInfo(p, nummer);
     const name = st.bot ? st.bot.name : 'Bot';
-    // Name und Grund stehen in eigenen Spans: im kleinen Querfenster zeigt der Kopf den kurzen Namen, und der Grund
-    // entfaellt dort (die Genauigkeits-Karte nennt ihn); sichtbar ist immer nur eine Fassung des Namens
+    // Der Kopf nennt Gegner und Eroeffnung; Ergebnis und Grund stehen nur in der Genauigkeits-Karte (vorher doppelt).
+    // Name und Eroeffnung in eigenen Spans: im kleinen Querfenster zeigt der Kopf den kurzen Namen, und die Eroeffnung
+    // entfaellt dort; sichtbar ist immer nur eine Fassung des Namens
     const unter = sec.querySelector('.an-unter');
     const namensSpan = (klasse, text) => { const e = document.createElement('span'); e.className = klasse; e.textContent = text; return e; };
     if (zuzweit()) unter.textContent = t('analyse.an.kopf.gegen', { weiss: personenName('w'), schwarz: personenName('b') });
     else {
-      unter.textContent = t('analyse.an.kopf.duGegen');
+      unter.textContent = t('analyse.an.kopf.gegenBot');
       unter.append(namensSpan('an-unter-voll', name), namensSpan('an-unter-kurz', st.bot ? kurzName(st.bot) : name));
     }
-    if (info.stand) unter.append(' · ' + info.stand);
-    if (info.grund) {
-      const grund = document.createElement('span');
-      grund.className = 'an-unter-grund';
-      grund.textContent = ' · ' + info.grund;
-      unter.append(grund);
-    }
+    const rv = st.review || ladeReview(p.id);
+    const eroeffnung = eroeffnungsAnzeige((rv && rv.eroeffnung) || p.eroeffnung);
+    if (eroeffnung) unter.append(namensSpan('an-unter-zusatz', ' · ' + eroeffnung));
     const ng = naechsterGegner();
     // Ist der naechste Gegner derselbe Bot (noch nicht besiegt), gibt es keinen "Nächsten Gegner":
     // dann ist "Nochmal" der Hauptknopf und "Arena" der zweite
@@ -302,7 +296,7 @@ export function zeige(root, params = {}, app) {
     koerper.innerHTML = `
       <div class="an-laden flaeche" role="status" aria-live="polite">
         <div class="an-laden-duell">
-          ${zuzweit() ? personenBild('w') : '<div class="an-avatar an-ich" aria-hidden="true">F</div>'}
+          ${zuzweit() ? personenBild('w') : floBild()}
           <span class="an-laden-vs">${esc(t('analyse.an.laden.gegen'))}</span>
           ${zuzweit() ? personenBild('b') : avatarHtml(st.bot)}
         </div>
@@ -368,6 +362,11 @@ export function zeige(root, params = {}, app) {
     }
   }
 
+  // Flos Profilbild (Figur und Rahmen aus js/profil.js), wie im Duell-Intro in seiner Farbe
+  function floBild() {
+    return `<div class="an-avatar an-ich" aria-hidden="true">${floAvatar(st.sf)}</div>`;
+  }
+
   function avatarHtml(bot, extra = '') {
     if (!bot) return `<div class="an-avatar ${extra}" aria-hidden="true"></div>`;
     return `<div class="an-avatar ${extra}" style="--bf:${esc(botFarbe(bot))}"><img src="${esc(pfad(bot.avatar))}" alt="${esc(bot.name)}"></div>`;
@@ -406,16 +405,16 @@ export function zeige(root, params = {}, app) {
           <div class="an-coach" aria-live="polite"></div>
         </div>
         <div class="an-rechts">
+          ${genauHtml()}
           ${bannerHtml()}
           <div class="an-ort-oben" hidden></div>
-          ${genauHtml()}
           ${kurveHtml()}
           ${momenteHtml()}
           ${klassenHtml()}
         </div>
       </div>`;
 
-    // Ort analyse:oben (oben rechts nach dem Banner)
+    // Ort analyse:oben (oben rechts nach Ergebnis und Banner)
     if (orte.oben) orte.oben.verlasse();
     const obenEl = koerper.querySelector('.an-ort-oben');
     orte.oben = fuelle('analyse:oben', obenEl, { app, partie: st.partie, review: r });
@@ -445,24 +444,34 @@ export function zeige(root, params = {}, app) {
   }
 
   // ---------- Bausteine rechts ----------
+  // Neuer Gegner als schlanke Zeile; antippen fuehrt wie "Naechster Gegner" in die Arena. Neue Sterne leuchten in der
+  // Genauigkeits-Karte beim Ergebnis auf (neben dem neuen Gegner lasen sie sich wie dessen Sterne).
   function bannerHtml() {
     if (zuzweit()) return '';
     const neuBot = params.neuFreigeschaltet ? botNachId(params.neuFreigeschaltet) : null;
+    if (!neuBot) return '';
+    const titel = t('analyse.an.banner.gegner');
+    const stufe = t('analyse.an.banner.stufe', { stufe: neuBot.stufe });
+    return `
+      <button class="an-banner" type="button" data-aktion="weiter" style="--bf:${esc(botFarbe(neuBot))}" aria-label="${esc(titel)}: ${esc(neuBot.name)}, ${esc(stufe)}">
+        ${avatarHtml(neuBot)}
+        <span class="an-banner-text"><span class="an-ft-titel">${esc(titel)}</span>
+          <span class="an-ft-name">${esc(neuBot.name)} <small>${esc(stufe)}</small></span></span>
+        <span class="an-banner-pfeil">${icon('vor')}</span>
+      </button>`;
+  }
+
+  // Sterne der Partie unter dem Ergebnis, neue leuchten auf; nur Bot-Partien mit mindestens einem Stern
+  function sterneHtml() {
+    if (zuzweit() || !st.bot) return '';
     const neue = Array.isArray(params.neueSterne) ? params.neueSterne : [false, false, false];
-    if (!neuBot && !neue.some(Boolean)) return '';
-    const sterne = Array.isArray(st.partie.sterne) ? st.partie.sterne : [false, false, false];
+    const sterne = (Array.isArray(st.partie.sterne) ? st.partie.sterne : [false, false, false]).map((s, i) => !!(s || neue[i]));
+    if (!sterne.some(Boolean)) return '';
     const fehlt = sterne.findIndex((s) => !s);
     const grund = fehlt < 0 ? t('analyse.an.banner.alle') : t('analyse.an.banner.stern', { nr: fehlt + 1, grund: sternGrund(fehlt) });
-    const sterneHtml = sterne.map((s, i) => `<span class="${s ? 'an' : 'aus'}${neue[i] ? ' neu' : ''}" style="--i:${i}">★</span>`).join('');
-    const titel = t(neuBot ? 'analyse.an.banner.gegner' : (neue.filter(Boolean).length > 1 ? 'analyse.an.banner.sterne' : 'analyse.an.banner.stern1'));
-    const name = neuBot ? t('analyse.an.banner.stufe', { stufe: neuBot.stufe, name: neuBot.name }) : (st.bot ? st.bot.name : '');
-    const b = neuBot || st.bot;
-    return `
-      <div class="an-banner" style="--bf:${esc(b ? botFarbe(b) : 'var(--linie-2)')}" role="status">
-        ${avatarHtml(b)}
-        <div class="an-banner-text"><div class="an-ft-titel">${esc(titel)}</div><div class="an-ft-name">${esc(name)}</div></div>
-        <div class="an-ft-sterne"><b aria-label="${esc(t('analyse.sterne', { n: sterne.filter(Boolean).length }))}">${sterneHtml}</b><span>${esc(grund)}</span></div>
-      </div>`;
+    const n = sterne.filter(Boolean).length;
+    return `<span class="an-vs-sterne" role="img" title="${esc(grund)}" aria-label="${esc(t('analyse.sterne', { n }))}. ${esc(grund)}">${sterne
+      .map((s, i) => `<span class="${s ? 'an' : 'aus'}${neue[i] ? ' neu' : ''}" style="--i:${i}" aria-hidden="true">★</span>`).join('')}</span>`;
   }
 
   function genauHtml() {
@@ -478,7 +487,6 @@ export function zeige(root, params = {}, app) {
     const du = r.genauigkeit ? r.genauigkeit[st.sf] : null;
     const gegner = r.genauigkeit ? r.genauigkeit[st.bf] : null;
     const staerke = r.spielstaerke ? r.spielstaerke[st.sf] : null;
-    const staerkeBot = r.spielstaerke ? r.spielstaerke[st.bf] : null;
     const nummer = st.zuege.length ? st.zuege[st.zuege.length - 1].nummer : 1;
     const info = ergebnisInfo(st.partie, nummer);
     const kurz = kurzName(st.bot);
@@ -499,25 +507,21 @@ export function zeige(root, params = {}, app) {
       if (zuKurz) return `<div class="an-g-wert an-g-leer an-g-kurz">${esc(t('analyse.an.genau.zuKurz'))}</div>`;
       return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`;
     };
-    const eroeffnung = eroeffnungsAnzeige(r.eroeffnung || st.partie.eroeffnung);
-    const spielteWie = esc(t('analyse.an.genau.spielteWie'));
     return `
       <div class="an-genau flaeche">
+        <div class="an-g-kopf"><span class="an-g-titel">${esc(t('analyse.an.genau.genauigkeit'))}</span><span class="an-g-chips">${!zuKurz && Number.isFinite(staerke)
+          ? `<span class="chip an-chip-staerke">${esc(t('analyse.an.genau.leistung'))} <b class="zahl">${staerke}</b></span>` : ''}${rekord
+          ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}</span></div>
         <div class="an-seite">
-          <div class="an-avatar an-ich" aria-hidden="true">F</div>
-          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label"><span class="an-g-zusatz">${esc(t('analyse.an.genau.deine'))}</span>${esc(t('analyse.an.genau.genauigkeit'))}</div></div>
+          ${floBild()}
+          <div class="an-seite-text">${wert(eigen, true)}<div class="an-g-label">${esc(t('analyse.an.genau.du'))}</div></div>
         </div>
-        <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span></div>
+        <div class="an-vs an-${info.art}"><span class="an-vs-wort">${info.wort}</span><b class="zahl">${info.stand}</b><span class="an-vs-grund">${esc(info.grund)}</span>${sterneHtml()}</div>
         <div class="an-seite an-re">
           ${avatarHtml(st.bot)}
-          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div>${!zuKurz && Number.isFinite(staerkeBot) ? `<div class="an-g-label an-g-zusatz an-g-zweit">${spielteWie} ${staerkeBot}</div>` : ''}</div>
+          <div class="an-seite-text">${wert(gegner, false)}<div class="an-g-label">${esc(kurz)}</div></div>
         </div>
-        <div class="an-g-chips">
-          ${zuKurz ? `<span class="an-g-hinweis">${esc(t('analyse.an.genau.hinweis'))}</span>` : ''}
-          ${!zuKurz && Number.isFinite(staerke) ? `<span class="chip an-chip-staerke">${spielteWie} <b class="zahl">${staerke}</b></span>` : ''}
-          ${rekord ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}
-          ${eroeffnung ? `<span class="an-eroeffnung">${icon('buch')}<span>${esc(eroeffnung)}</span></span>` : ''}
-        </div>
+        ${zuKurz ? `<p class="an-g-hinweis">${esc(t('analyse.an.genau.hinweis'))}</p>` : ''}
       </div>`;
   }
 
@@ -539,19 +543,15 @@ export function zeige(root, params = {}, app) {
     }).join('');
     return `
       <div class="an-kurve-box flaeche">
-        <div class="an-kurve-kopf"><span class="an-k-titel"><b>${esc(t('analyse.an.kurve.titel'))}</b> · ${esc(t('analyse.an.kurve.tippen'))}</span><span class="an-k-legende">${esc(t('analyse.an.kurve.legende'))}</span></div>
+        <div class="an-kurve-kopf"><span class="an-k-titel">${esc(t('analyse.an.kurve.titel'))}</span><span class="an-k-tipp">${esc(t('analyse.an.kurve.tippen'))}<span class="an-k-legende"> · ${esc(t('analyse.an.kurve.legende'))}</span></span></div>
         <div class="an-kurve-wrap">
           <svg class="an-kurve" viewBox="0 0 ${KW} ${KH}" preserveAspectRatio="none" role="slider" tabindex="0"
                aria-label="${esc(t('analyse.an.kurve.aria'))}" aria-valuemin="0" aria-valuemax="${st.zuege.length}" aria-valuenow="0">
-            <defs>
-              <linearGradient id="an-kurve-weiss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef1ff" stop-opacity=".95"/><stop offset="1" stop-color="#c9d2f5" stop-opacity=".82"/></linearGradient>
-              <linearGradient id="an-kurve-linie" x1="0" x2="1"><stop offset="0" stop-color="#19f6e8"/><stop offset=".6" stop-color="#a06bff"/><stop offset="1" stop-color="#ff2d78"/></linearGradient>
-            </defs>
-            <rect width="${KW}" height="${KH}" fill="#141833"/>
-            <path d="${flaeche}" fill="url(#an-kurve-weiss)"/>
-            <line x1="0" x2="${KW}" y1="${KH / 2}" y2="${KH / 2}" stroke="#7c87b6" stroke-dasharray="3 5" stroke-width="1" vector-effect="non-scaling-stroke"/>
+            <rect class="an-k-grund" width="${KW}" height="${KH}"/>
+            <path class="an-k-flaeche" d="${flaeche}"/>
+            <line class="an-k-mitte" x1="0" x2="${KW}" y1="${KH / 2}" y2="${KH / 2}" vector-effect="non-scaling-stroke"/>
             ${trenner}
-            <path class="an-k-linie" d="${linie}" fill="none" stroke="url(#an-kurve-linie)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+            <path class="an-k-linie" d="${linie}" fill="none" vector-effect="non-scaling-stroke"/>
             <line class="an-k-cursor" x1="0" x2="0" y1="0" y2="${KH}" vector-effect="non-scaling-stroke"/>
           </svg>
           <div class="an-k-punkte" aria-hidden="true">${punkteHtml()}</div>

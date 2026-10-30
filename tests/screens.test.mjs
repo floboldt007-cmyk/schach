@@ -201,12 +201,16 @@ async function testeAnalyse(browser, d) {
   pruefe('Mit Review sofort da', await seite.locator('.an-coach').isVisible() && !(await seite.locator('.an-laden').count()));
   pruefe('Kein Freischalt-Banner ohne Parameter', (await seite.locator('.an-banner').count()) === 0);
   const unter = await seite.locator('.an-unter').textContent();
-  pruefe('Kopf: Gegner, Ergebnis, Grund', unter.includes('Ritter Thorsten') && unter.includes('1:0') && /Matt im 17\.\sZug/.test(unter), unter);
+  // Entwurf "Analyse ruhig": der Kopf nennt Gegner und Eroeffnung, Ergebnis und Grund nur die Karte (vorher doppelt)
+  pruefe('Kopf: Gegner und Eröffnung, kein Ergebnis', unter.includes('Ritter Thorsten') && unter.includes('Philidor') && !unter.includes('1:0'), unter);
+  const karte = await seite.locator('.an-genau').innerText();
+  pruefe('Karte: Ergebnis und Grund, „Genauigkeit“, Du und Thorsten', karte.includes('1:0') && /Matt im 17\.\sZug/.test(karte)
+    && /Genauigkeit/.test(karte) && /\bDu\b/.test(karte) && /Thorsten/.test(karte), karte);
+  pruefe('Karte: Flos Profilbild statt „F“', await seite.locator('.an-genau .an-avatar.an-ich svg[data-figur]').count() === 1);
   pruefe('Kein langer Gedankenstrich in den Texten', await seite.evaluate(() => !/[—–]/.test(document.querySelector('.screen').innerText)));
   pruefe('Startstellung, Stand "Start / 17"', (await stand(seite)) === 'Start / 17', await stand(seite));
   const chips = await seite.locator('.an-g-chips').textContent();
-  pruefe('Chip "spielte wie ≈ …"', /spielte wie ≈ \d+/.test(chips), chips);
-  pruefe('Eröffnung angezeigt', chips.includes('Philidor'), chips);
+  pruefe('Chip "Leistung ≈ …"', /Leistung ≈ \d+/.test(chips), chips);
   pruefe('Genauigkeit beider Seiten', (await seite.locator('.an-g-wert.zahl').count()) === 2);
   pruefe('Zugklassen zugeklappt (eine Zeile „Alle Zugklassen“), aufgeklappt elf Zeilen', await seite.locator('details.an-klassen:not([open])').count() === 1
     && /Alle Zugklassen/.test(await seite.locator('.an-kl-auf').innerText()));
@@ -326,7 +330,9 @@ async function testeAnalyse(browser, d) {
   await oeffne(seite, `screen=analyse&partieId=${d.oper}&neuFreigeschaltet=turm&neueSterne=1,1,0`);
   const banner = await seite.locator('.an-banner').textContent();
   pruefe('Freischalt-Banner mit Stufe und Name', banner.includes('Stufe 14') && banner.includes('Professor Oliver Turm'), banner.replace(/\s+/g, ' '));
-  pruefe('Neue Sterne leuchten auf', (await seite.locator('.an-ft-sterne .neu').count()) === 2);
+  pruefe('Neuer Gegner als schlanke Zeile ohne Sterne, Sterne beim Ergebnis', (await seite.locator('.an-banner .an-vs-sterne, .an-banner [class*="stern"]').count()) === 0
+    && (await seite.locator('.an-genau .an-vs-sterne').count()) === 1);
+  pruefe('Neue Sterne leuchten auf', (await seite.locator('.an-vs-sterne .neu').count()) === 2);
   await bild(seite, 'analyse-ipad-quer');
   await seite.click('.kopf [data-aktion="nochmal"]');
   let p = await protokoll(seite);
@@ -435,7 +441,7 @@ async function testePruefrunde(browser, d) {
   }));
   pruefe('Kurze Partie: keine Genauigkeit, zweimal "zu kurz"', kurz.zahlen === 0 && kurz.kurz === 2, JSON.stringify(kurz));
   pruefe('Kurze Partie: Hinweis statt Bewertung', kurz.text.includes('Zu wenige Züge für eine verlässliche Bewertung'), kurz.text);
-  pruefe('Kurze Partie: kein "spielte wie" und keine 100 %', !/spielte wie/.test(kurz.text) && !/100/.test(kurz.text), kurz.text);
+  pruefe('Kurze Partie: keine Leistung und keine 100 %', !/Leistung|spielte wie/.test(kurz.text) && !/100/.test(kurz.text), kurz.text);
 
   // Bewertung in der Coach-Karte aus Sicht der Seite, die gezogen hat (wie im Coach-Satz)
   const fall = await seite.evaluate((id) => {
