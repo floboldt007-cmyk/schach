@@ -1880,9 +1880,10 @@ async function testeErweiterungenFix(browser) {
     });
     const vorher = await seite.evaluate(() => window.__w0.aufrufe['einstellungen:gruppen']);
     // die Gruppe "Fortschritt" liegt unten im scrollenden Screen: click() scrollt sie ins Bild
+    // 700 ms zwischen den Stufen: der Doppeltipp-Schutz nimmt einen eben gezeichneten Knopf erst nach 600 ms an
     for (const a of ['reset-1', 'reset-2', 'reset-ok']) {
       await seite.locator(`[data-aktion="${a}"]`).click();
-      await warte(120);
+      await warte(700);
     }
     const r = await seite.evaluate(async () => {
       const st = await import('./js/storage.js');

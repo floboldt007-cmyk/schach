@@ -189,8 +189,10 @@ export function schliesseSheet() {
   if (offenesSheet) offenesSheet.ende();
 }
 
+// sperreMs: Knoepfe der Art "gefahr" nehmen erst so viele ms nach dem Oeffnen einen Tipp an und nie einen Doppeltipp
+// (detail > 1). Sonst landet der zweite Tipp eines Doppeltipps auf dem Knopf, der an derselben Stelle des naechsten Blatts sitzt.
 export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: true, art: 'primaer' }], abbrechen = null, inhalt = null,
-  klasse = '' } = {}) {
+  klasse = '', sperreMs = 0 } = {}) {
   schliesseSheet();
   return new Promise((resolve) => {
     const ort = document.createElement('div');
@@ -235,6 +237,7 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       }
       resolve(wert);
     }
+    const offenSeit = Date.now();
     for (const k of knoepfe) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -242,7 +245,8 @@ export function sheet({ titel = '', text = '', knoepfe = [{ text: 'OK', wert: tr
       b.textContent = k.text;
       if (k.name) b.dataset.knopf = k.name;
       if (k.aus) b.disabled = true;
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        if (sperreMs > 0 && k.art === 'gefahr' && (e.detail > 1 || Date.now() - offenSeit < sperreMs)) return;
         if (typeof k.beiKlick === 'function') {
           try { Promise.resolve(k.beiKlick(b)).catch((f) => console.error(f)); } catch (f) { console.error(f); }
         }

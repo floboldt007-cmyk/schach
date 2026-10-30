@@ -68,10 +68,12 @@
 
   <h2>2. Kurz gesagt</h2>
   <ul>
-    <li>Crownmate läuft ohne Konto vollständig auf deinem Gerät. Dein Spielstand liegt im Speicher deines Browsers, nicht auf einem Server.</li>
+    <li>Ohne Konto liegt dein Spielstand nur im Speicher deines Browsers, nicht auf einem Server. Technisch nötige Abrufe
+    (das Laden der App, Abschnitt 3, und die Abfrage des Abo-Angebots, Abschnitt 9) gibt es trotzdem.</li>
     <li>Ein Konto ist freiwillig. Damit wird dein Spielstand in der Cloud gesichert (Server in Frankfurt).</li>
     <li>Das Teilen von Partien und Nutzungsdaten ist freiwillig, standardmäßig aus und jederzeit abschaltbar.</li>
-    <li>Keine Werbung, keine Werbe-Tracker, keine Weitergabe an Dritte, kein Verkauf von Daten.</li>
+    <li>Keine Werbung, keine Werbe-Tracker, kein Verkauf von Daten. Weitergegeben wird nur, was ein Dienst für dich
+    erledigen muss (Abschnitte 3 bis 8).</li>
     <li>Du kannst deine Daten jederzeit in der App herunterladen und dein Konto selbst löschen.</li>
   </ul>
 
@@ -90,8 +92,19 @@
   (localStorage) und legt die App-Dateien für die Offline-Nutzung in einem Cache ab (Service Worker). Diese Daten
   verlassen dein Gerät nicht, es sei denn, du legst ein Konto an oder schaltest das Teilen ein. Cookies werden nicht gesetzt.
   Schriften, Bilder und Klänge kommen aus der App selbst, nicht von fremden Servern (zum Beispiel nicht von Google Fonts).
-  Die lokale Speicherung ist für die Funktion der App unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Du löschst diese
-  Daten in den Einstellungen unter „Fortschritt zurücksetzen“ oder über die Website-Daten deines Browsers.</p>
+  Die lokale Speicherung ist für die Funktion der App unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). „Fortschritt
+  zurücksetzen“ in den Einstellungen löscht Spielstand, Partien und Analysen; die Einstellungen, die Anmeldung und die
+  übrigen Daten unten bleiben. Bist du angemeldet und ist dieses Gerät mit der Cloud abgeglichen, ersetzt der leere Stand
+  danach auch deine Cloud-Sicherung; ist es noch nicht abgeglichen, lädt die App danach deinen Cloud-Spielstand. Alle
+  Daten dieser App in diesem Browser löschst du über die Website-Daten deines Browsers; dein Konto und deine
+  Cloud-Sicherung bleiben dabei bestehen (Konto löschen: Abschnitt 5).</p>
+  <p>Mit einem Konto speichert das Gerät außerdem deine Anmeldung (Sitzungs-Token mit deinen Kontoangaben: E-Mail-Adresse,
+  bei Google auch Name, Adresse des Profilbilds und Google-Kennung), eine Rückfallkopie deines Spielstands vor einer
+  Übernahme aus der Cloud, einen Merker, ob dieses Gerät schon mit der Cloud abgeglichen ist, Merker für Abo und
+  Altersangabe, den Nachweis deiner Einwilligung und eine Warteschlange für noch nicht übermittelte Daten. Folgst du einem
+  Einladungslink, merkt sich das Gerät die offene Online-Einladung, auch ohne Konto. Diese Daten dienen nur der jeweiligen
+  Funktion. „Abmelden“ entfernt die Anmeldung aus diesem Browser (andere Geräte und Browser bleiben angemeldet); die
+  übrigen Einträge bleiben, bis du die Website-Daten deines Browsers löschst.</p>
   <p>Außerdem merkt sich die App die letzten technischen Fehler (höchstens 50; Adressen, E-Mail-Adressen und
   Kennungen entfernt sie vorher). Diese Liste bleibt auf deinem Gerät und wird nie automatisch gesendet. Du siehst sie in den Einstellungen
   unter „Bericht für die Testphase“, kannst sie dort selbst kopieren oder teilen und mit „Fehlerliste leeren“ löschen.
@@ -131,6 +144,9 @@
   gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
   Dabei löschen wir sofort alles, was in unserer Datenbank zu deinem Konto gehört: Konto und Anmeldedaten (auch die
   Verknüpfung mit Google), Benutzername, Cloud-Spielstand, geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll.
+  Ausnahme beim Abo: Technische Zahlungsereignisse von Stripe (Abschnitt 7) bleiben ohne deine Konto-Kennung, aber mit der
+  Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht werden. Ein laufendes Abo endet mit dem Konto nicht; kündige
+  es vorher (bei einem aktiven Abo weist die App beim Löschen darauf hin).
   Nicht sofort erreichbar sind die technischen Protokolle (Server-Logs) und die Datensicherungen von Supabase: Sie werden
   nach deren Fristen automatisch gelöscht <span class="platz">[Fristen laut Supabase prüfen: Server-Logs, Datensicherungen]</span>
   und bis dahin nicht weiter verwendet. Der Spielstand auf deinem Gerät bleibt davon unberührt.</p>
@@ -149,7 +165,7 @@
   Zähler enthalten nur Zahlen, keine Inhalte. Die Fehlversuche löschen wir nach zwei Tagen, die Zähler der geteilten Daten
   nach 48 Stunden, jeweils beim nächsten automatischen Aufräumen. Die Zähler der geteilten Daten bleiben bis dahin auch nach
   einem Widerruf stehen, sonst ließe sich die Grenze durch Löschen und neu Senden umgehen. Einladungen, die niemand
-  angenommen hat, löschen wir nach 48 Stunden. Eine Partie, in der zu lange kein Zug kommt (mit Uhr 10 Minuten vor dem
+  angenommen hat, löschen wir nach 48 Stunden beim nächsten Aufräumen. Eine Partie, in der zu lange kein Zug kommt (mit Uhr 10 Minuten vor dem
   zweiten Halbzug, ohne Uhr 7 Tage), beendet der Server als abgebrochen, ohne Ergebnis. Beide Zähler stehen in „Meine
   Daten herunterladen“. Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren, funktionierenden Dienst
   (Art. 6 Abs. 1 lit. f DSGVO) <span class="platz">[Rechtsgrundlage und Fristen von der Fachperson bestätigen lassen]</span>.</p>
@@ -175,35 +191,59 @@
   Nachweis (Art. 7 Abs. 1 DSGVO). Du kannst die Einwilligung jederzeit mit Wirkung für die Zukunft widerrufen, indem du den
   Schalter ausschaltest; danach sendet die App nichts mehr, noch nicht gesendete Daten werden verworfen, und alle bereits
   geteilten Partien und Nutzungsdaten deines Kontos werden auf dem Server gelöscht (Art. 17 Abs. 1 lit. b DSGVO). Bist du
-  dabei offline, holt die App das nach, sobald wieder eine Verbindung besteht, und zwar bevor sie je wieder etwas sendet.
+  dabei offline, holt die App das Löschen nach, sobald du wieder online und auf diesem Gerät mit demselben Konto angemeldet
+  bist, und zwar bevor sie je wieder etwas sendet. Meldest du dich vorher ab, schalte den Schalter nach der nächsten
+  Anmeldung noch einmal aus, oder schreib uns eine E-Mail.
   Den Zeitpunkt des Widerrufs speichern wir als Nachweis. Die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung bleibt
   unberührt (Art. 7 Abs. 3 DSGVO).</p>
   <p><b>Dauer:</b> Die Daten sind an dein Konto gebunden und werden mit dem Konto gelöscht. Unabhängig davon werden
   geteilte Partien und Nutzungsdaten spätestens nach <span class="platz">[z. B. 24 Monaten]</span> gelöscht oder so
   zusammengefasst, dass kein Bezug zu einem Konto mehr besteht.</p>
 
-  <h2>7. Was nie passiert</h2>
+
+  <h2>7. Trainer-Abo und Stripe</h2>
+  <p>Für das optionale Trainer-Abo wird Stripe als Zahlungsdienst eingesetzt: Stripe Payments Europe, Limited, <span class="platz">[ADRESSE]</span>. An Stripe werden insbesondere Konto-ID, E-Mail-Adresse, gewähltes Produkt sowie Zahlungs- und Vorgangsdaten übermittelt. Zahlungsdaten wie Kartennummern verarbeitet Stripe direkt; Crownmate erhält sie nicht vollständig. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Rolle von Stripe (eigene Verantwortung oder Auftragsverarbeitung) und Vertrag: <span class="platz">[PRÜFEN]</span>.</p>
+  <p>In Supabase speichern wir den Stand deines Abos (Status, Plan, gültig bis, Stripe-Kundennummer und Abo-Kennung); er
+  wird mit deinem Konto sofort gelöscht. Damit jedes Ereignis von Stripe genau einmal verarbeitet wird, speichern wir
+  außerdem technische Zahlungsereignisse (Kennung und Art des Ereignisses, Stripe-Kundennummer, Abo-Kennung, Status, Plan,
+  Zeitpunkte). Sie werden nach Ablauf von 90 Tagen beim nächsten eingehenden Ereignis gelöscht; nach dem Löschen
+  deines Kontos bleiben sie bis dahin ohne deine Konto-Kennung stehen. Rechnungen und Zahlungsdaten liegen bei Stripe.
+  Weitere Empfänger, Drittlandgarantien und gesetzliche Aufbewahrungsfristen: <span class="platz">[PRÜFEN UND ERGÄNZEN]</span>.</p>
+
+  <h2>8. Coach mit Anthropic</h2>
+  <p>Wenn du den KI-Coach einen Zug erklären lässt, übermittelt der Server an Anthropic, PBC, <span class="platz">[ADRESSE]</span>, nur Fakten zur Stellung: die Stellung (FEN), den gespielten und den stärksten Zug, die Bewertungen der Engine, die Einordnung des Zugs, ob du selbst gezogen hast, und deine grobe Spielstärke als Wort (zum Beispiel „Einsteiger“). Einen freien Text von dir gibt es nicht. E-Mail-Adresse, Benutzername und Konto-ID werden nicht übermittelt. Crownmate speichert weder die Stellung noch die Antwort. Gespeichert wird nur, wie viele Fragen du an einem Tag gestellt hast (zur Begrenzung); diese Zähler werden nach gut einer Woche beim nächsten Coach-Aufruf gelöscht und verschwinden mit dem Konto sofort. Speicherdauer bei Anthropic: <span class="platz">[PRÜFEN]</span>. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO; Auftragsverarbeitung und Drittlandtransfer: <span class="platz">[AV-VERTRAG DATUM / GARANTIEN]</span>.</p>
+
+  <h2>9. Öffentliche Produktabfrage</h2>
+  <p>Wenn du die Seite „Crownmate Trainer“ öffnest, fragt die App bei Supabase ab, welches Abo angeboten wird, immer ohne deine Konto-Kennung, auch wenn du angemeldet bist. Dabei fallen technisch IP-Adresse, Zeitpunkt und Verbindungsdaten in Serverprotokollen an. Die Produktabfrage enthält keine Konto-ID. Aufbewahrung: <span class="platz">[FRIST]</span>.</p>
+
+  <h2>10. Grenzen der Datenfreigabe und Aufbewahrung</h2>
+  <p>Der Schalter „Partien und Nutzung teilen“ steuert ausschließlich das freiwillig geteilte Partienarchiv und Nutzungsereignisse. Er steuert nicht Konto, Cloud-Spielstand, Online-Partien, Abo, Coach oder technisch notwendige Protokolle.</p>
+  <p>Für Online-Partien gelten die Fristen aus Abschnitt 5: Unbeantwortete Einladungen werden nach 48 Stunden beim nächsten Aufräumen gelöscht, beendete Partien bleiben, bis eines der beiden Konten gelöscht wird. Für Serverprotokolle, Backups und alle nicht oben festgelegten Bereiche gilt jeweils <span class="platz">[FRIST]</span>; es werden keine Fristen behauptet, bevor diese festgelegt und geprüft sind.</p>
+
+  <h2>11. Was nie passiert</h2>
   <ul>
     <li>Keine Werbung und keine Werbe-Tracker (kein Google Analytics, kein Facebook-Pixel, kein Fingerprinting).</li>
     <li>Keine Verfolgung über andere Websites hinweg.</li>
     <li>Keine Weitergabe an Dritte zu deren eigenen Zwecken und kein Verkauf von Daten. Die genannten Auftragsverarbeiter
-    handeln nur nach unserer Weisung.</li>
+    handeln nur nach unserer Weisung. Für das Abo erhält Stripe die für die Zahlung nötigen Daten (Abschnitt 7; ob Stripe
+    dabei eigenverantwortlich handelt, wird noch geprüft).</li>
     <li>Keine Profile über dich für andere Unternehmen.</li>
   </ul>
 
-  <h2>8. Kinder und Eltern</h2>
-  <p>Crownmate kann auch von Kindern und Jugendlichen genutzt werden. Ohne Konto bleiben alle Daten auf dem Gerät. Bist du jünger als 16, frag deine
+  <h2>12. Kinder und Eltern</h2>
+  <p>Crownmate kann auch von Kindern und Jugendlichen genutzt werden. Ohne Konto bleibt der Spielstand auf dem Gerät. Bist du jünger als 16, frag deine
   Eltern oder Erziehungsberechtigten, bevor du ein Konto anlegst. Das Teilen von Partien und Nutzungsdaten darfst du nur mit
   ihrer Zustimmung einschalten (Art. 8 DSGVO); der Schalter ist deshalb standardmäßig aus, und die App weist direkt daneben
   darauf hin. Eltern können über <span class="platz">[E-Mail-Adresse]</span> Auskunft über ein Konto oder seine Löschung
   verlangen. <span class="platz">[prüfen: Mindestalter der App festlegen; Altersabfrage oder Elternbestätigung nötig?]</span></p>
 
-  <h2>9. Deine Rechte</h2>
+  <h2>13. Deine Rechte</h2>
   <ul>
     <li><b>Auskunft</b> (Art. 15) und <b>Datenübertragbarkeit</b> (Art. 20): in der App unter Einstellungen → Daten →
-    „Meine Daten herunterladen“ erhältst du alle Daten deines Kontos als Datei.</li>
-    <li><b>Löschung</b> (Art. 17): in der App unter „Konto löschen“, sofort für alles in unserer Datenbank; Server-Logs und
-    Datensicherungen von Supabase laufen nach deren Fristen ab (siehe Abschnitt 5).</li>
+    „Meine Daten herunterladen“ erhältst du eine Datei. <span class="platz">[PLATZHALTER: Die Aussage „alle Daten deines Kontos“ gilt erst, wenn die parallele Datenauskunft vollständig geprüft ist.]</span></li>
+    <li><b>Löschung</b> (Art. 17): in der App unter „Konto löschen“, sofort für alles in unserer Datenbank außer den in
+    Abschnitt 5 genannten Ausnahmen; Server-Logs und Datensicherungen von Supabase laufen nach deren Fristen ab (siehe
+    Abschnitt 5).</li>
     <li><b>Berichtigung</b> (Art. 16): Benutzername in der App ändern; alles Weitere per E-Mail.</li>
     <li><b>Einschränkung</b> (Art. 18) und <b>Widerspruch</b> (Art. 21): per E-Mail an die oben genannte Adresse.</li>
     <li><b>Widerruf der Einwilligung</b> (Art. 7 Abs. 3): Schalter „Partien und Nutzung teilen“ ausschalten; bereits
@@ -212,13 +252,13 @@
     <span class="platz">[zuständige Aufsichtsbehörde des Bundeslands, Anschrift]</span>.</li>
   </ul>
 
-  <h2>10. Sicherheit</h2>
+  <h2>14. Sicherheit</h2>
   <p>Alle Verbindungen sind verschlüsselt (TLS). Auf dem Server sorgen Zugriffsregeln je Zeile (Row Level Security) dafür,
   dass jedes Konto nur seine eigenen Daten anlegen und lesen kann; geteilte Nutzungsdaten kann ein Konto nur anlegen, gelesen
   werden sie nur über die Datenauskunft. In der App steckt nur ein öffentlicher Schlüssel; Geheimnisse liegen ausschließlich
   beim Betreiber.</p>
 
-  <h2>11. Änderungen</h2>
+  <h2>15. Änderungen</h2>
   <p>Diese Erklärung wird angepasst, wenn sich die App oder die Rechtslage ändert. Die jeweils aktuelle Fassung ist in
   der App unter Einstellungen → Info verlinkt.</p>
 

@@ -2,7 +2,8 @@ import { setzeSpeicher } from '../js/storage.js';
 import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudStand, ladeCloudStand,
   speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
   SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
-  ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau } from '../js/konto.js';
+  ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau,
+ } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
 
 let ok = 0, gesamt = 0;
@@ -50,6 +51,35 @@ let offline = ''; setzeKontoFetch(async () => { throw new Error('offline'); }); 
 localStorage.setItem('schach-arena:v1:partien', '[1]'); ladeStandAufGeraet({ format_version: 1, stand: { 'schach-arena:v1:partien': '[2]' } });
 pruefe('Cloud laden mit Rückfall-Sicherung', localStorage.getItem('schach-arena:v1:partien') === '[2]' && !!localStorage.getItem(RUECKFALL_SCHLUESSEL));
 setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} })); await abmelden(); pruefe('Abmelden löscht lokale Sitzung', sitzung() === null);
+{ // Abmelden: lokal sofort, der Server nur fuer diese Sitzung (scope=local) und mit Frist
+  const rufe = []; let haengt = true;
+  setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); if (haengt) await new Promise(() => {}); return { ok: true, status: 204, async json() { return null; } }; });
+  localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
+  const fertig = abmelden({ frist: 30 });
+  pruefe('Abmelden entfernt die Sitzung sofort, ohne auf den Server zu warten', sitzung() === null);
+  await fertig;
+  pruefe('Abmelden meldet nur diese Sitzung beim Server ab (scope=local) und haengt nie', rufe.length === 1 && rufe[0].url.endsWith('/auth/v1/logout?scope=local'), rufe[0]?.url);
+  haengt = false;
+}
+const mitAntwort = (status, body) => setzeKontoFetch(async () => ({ ok: status < 400, status, async json() { return body; } }));
+mitAntwort(403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid for a@b.de' });
+let serverFehler = ''; try { await pruefeCode('a@b.de', '123456'); } catch (e) { serverFehler = e.message; }
+pruefe('Falscher oder abgelaufener Code (GoTrue: otp_expired): ein Text fuer beides, Server-Text nie angezeigt',
+  /stimmt nicht oder ist abgelaufen/.test(serverFehler) && !/Token|a@b\.de/.test(serverFehler), serverFehler);
+mitAntwort(400, { code: 400, error_code: 'email_address_not_authorized', msg: 'Email address "a@b.de" cannot be used' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('E-Mail nicht freigegeben (eingebauter Versand, Testphase): eigener Text', /Testphase/.test(serverFehler) && !/a@b\.de/.test(serverFehler), serverFehler);
+mitAntwort(400, { code: 400, error_code: 'validation_failed', msg: 'Unable to validate email address: a@b.de' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Unbekannte Kennung erscheint im Sammeltext (fuer den Tester-Bericht), nie die E-Mail', serverFehler === 'Serverfehler (400, validation_failed)', serverFehler);
+mitAntwort(500, { msg: 'Error sending magic link email to a@b.de' });
+serverFehler = ''; try { await fordereCodeAn('a@b.de'); } catch (e) { serverFehler = e.message; }
+pruefe('Ohne Kennung nur der Status', serverFehler === 'Serverfehler (500)', serverFehler);
+localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...session, expires_at: 1 })); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u1');
+mitAntwort(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
+serverFehler = ''; try { await aktiveSitzung(); } catch (e) { serverFehler = e.message; }
+pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel zu (die Gruppe zeigt dann "abgemeldet")',
+  /Anmeldung ist abgelaufen/.test(serverFehler) && sitzung() === null && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null, serverFehler);
 { // Anmelde-Link (Rueckfall ohne SMTP): Sitzung uebernehmen, Token aus der Adresse entfernen
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };
@@ -111,6 +141,60 @@ setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} }))
   pruefe('Der Riegel gilt nur für die Nutzer-ID, mit der abgeglichen wurde', !istAbgeglichen());
   localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u5')); antw.push({ status: 204, body: null }); await abmelden();
   pruefe('Abmelden schließt den Riegel wieder', localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null && sitzung() === null);
+  { // Wettlauf (Ultracode-Pruefung 30.10.): Abmelden, waehrend der Abgleich auf die Cloud wartet
+    let gib; const spaet = new Promise((r) => { gib = r; });
+    setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); if (url.includes('/rest/v1/spielstaende') && opt.method !== 'POST') { await spaet; return { ok: true, status: 200, async json() { return cloudMit(4).body; } }; } return { ok: true, status: 204, async json() { return null; } }; });
+    leereV1(); localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u7')); localStorage.removeItem(ABGEGLICHEN_SCHLUESSEL);
+    localStorage.removeItem(RUECKFALL_SCHLUESSEL);
+    const abgleich = gleicheNachAnmeldung();
+    await warteKurz(); await abmelden({ frist: 10 });
+    gib(); const ergebnis = await abgleich;
+    pruefe('Abmelden waehrend des Abgleichs: nichts zurueck aufs Geraet geschrieben', ergebnis === null && localStorage.getItem('schach-arena:v1:partien') === null
+      && localStorage.getItem(RUECKFALL_SCHLUESSEL) === null && !istAbgeglichen(), String(ergebnis));
+  }
+  { // Spaete Erneuerung (Ultracode-Pruefung 30.10.): Die Antwort kommt erst nach dem Abmelden und darf die Sitzung nicht
+    // zurueckbringen; ein Upload, der auf die Erneuerung wartet, geht nicht mehr raus
+    let gib; const spaet = new Promise((r) => { gib = r; }); const posts = [];
+    const alt = JSON.parse(sitzungVon('u9')); localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...alt, expires_at: 1 }));
+    localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u9'); localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'q1' }]));
+    setzeKontoFetch(async (url, opt) => {
+      if (url.includes('grant_type=refresh_token')) { await spaet; return { ok: true, status: 200, async json() { return { ...alt, refresh_token: 'r-neu', expires_at: 9999999999 }; } }; }
+      if (opt.method === 'POST' && url.endsWith('/rest/v1/spielstaende')) posts.push(url);
+      return { ok: true, status: 204, async json() { return null; } };
+    });
+    const upload = speichereCloudStand().then(() => 'hochgeladen', (e) => e.message);
+    await warteKurz(); await abmelden({ frist: 10 });
+    gib(); const ergebnis = await upload;
+    pruefe('Spaete Erneuerung nach dem Abmelden: Sitzung kommt nicht zurueck, nichts hochgeladen', sitzung() === null && posts.length === 0
+      && ergebnis !== 'hochgeladen' && !istAbgeglichen(), ergebnis);
+    localStorage.removeItem('schach-arena:v1:partien');
+    setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
+  }
+  { // Gleichzeitige Erneuerungen (Ultracode-Pruefung 30.10., zweite Runde): teilen sich eine Anfrage, keiner scheitert;
+    // hat ein anderer Tab schon erneuert (gleiches Konto), gilt dessen Sitzung; bei einem anderen Konto nicht
+    const alt = JSON.parse(sitzungVon('u8'));
+    const fremd = (sub, rt) => ({ ...JSON.parse(sitzungVon(sub)), refresh_token: rt });
+    const lauf = async (waehrend) => {
+      let gib; const spaet = new Promise((r) => { gib = r; }); let anfragen = 0;
+      localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...alt, expires_at: 1 }));
+      setzeKontoFetch(async (url) => {
+        if (url.includes('grant_type=refresh_token')) { anfragen++; await spaet; return { ok: true, status: 200, async json() { return { ...alt, refresh_token: 'r-neu', expires_at: 9999999999 }; } }; }
+        return { ok: true, status: 200, async json() { return []; } };
+      });
+      const a = aktiveSitzung().then((x) => x.refresh_token, (e) => 'FEHLER ' + e.message);
+      const b = aktiveSitzung().then((x) => x.refresh_token, (e) => 'FEHLER ' + e.message);
+      await warteKurz(); if (waehrend) waehrend(); gib();
+      return { a: await a, b: await b, anfragen, gespeichert: sitzung()?.refresh_token || null };
+    };
+    const r1 = await lauf(null);
+    pruefe('Zweimal aktiveSitzung() gleichzeitig: eine Anfrage, beide bekommen die neue Sitzung', r1.anfragen === 1 && r1.a === 'r-neu' && r1.b === 'r-neu' && r1.gespeichert === 'r-neu', r1);
+    const r2 = await lauf(() => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(fremd('u8', 'r-tab2'))));
+    pruefe('Anderer Tab erneuert dasselbe Konto währenddessen: dessen Sitzung gilt, kein „Nicht angemeldet.“', r2.a === 'r-tab2' && r2.b === 'r-tab2' && r2.gespeichert === 'r-tab2', r2);
+    const r3 = await lauf(() => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(fremd('u7', 'r-u7'))));
+    pruefe('Anderer Tab meldet währenddessen ein anderes Konto an: Antwort verworfen, die fremde Sitzung bleibt', /^FEHLER/.test(r3.a) && /^FEHLER/.test(r3.b) && r3.gespeichert === 'r-u7', r3);
+    localStorage.removeItem('schach-arena:konto:sitzung');
+    setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
+  }
   // Safari nach dem Link: nur die Eintraege eines frischen Starts, keine Partie
   leereV1();
   for (const k2 of ['hinweis-installieren', 'modul:start', 'modul:funken', 'modul:punkte']) localStorage.setItem('schach-arena:v1:' + k2, '{}');
