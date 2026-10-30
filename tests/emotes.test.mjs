@@ -8,10 +8,11 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { setzeSpeicher, MODUL_BUDGET, speichereModulEinstellungen } from '../js/storage.js';
 import {
-  EMOTES, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER, antwortText, einstellungen,
+  EMOTES, KREATUR_EMOTES, kreaturAktiv, radEintraege, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER, antwortText, einstellungen,
   neuerStand, pruefeStand, imFenster, emoteFrei, chatFrei, nachEmote, nachChat, nachEigenemZug,
 } from '../js/pakete/emotes/index.js';
 import { DE, EN } from '../js/pakete/emotes/texte.js';
+import { KREATUREN, KREATUR_ARTEN, kreaturSvg } from '../js/kreaturen-kunst.js';
 import { setzeSprache, t } from '../js/sprache.js';
 import { ZUGKLASSEN } from '../js/zugklassen.js';
 import { alleBots } from '../js/bots.js';
@@ -56,6 +57,33 @@ pruefe('Deutsch und Englisch sind vollstaendig', Object.keys(DE).length === Obje
 pruefe('Kein freier Texteingang', !/<input[^>]+type=["']text|textarea/i.test(quelle));
 pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(css) && /prefers-reduced-motion/.test(css) && /calc\(100% - 20px\)/.test(css));
 
+// Emote-Kreaturen (Flo 30.10. abends: "verschiedene Figuren oder Kreaturen, eben in meinem Stil"; zuerst: "Alle")
+{
+  const svgs = KREATUREN.flatMap((k) => KREATUR_ARTEN.map((a) => kreaturSvg(k.id, a)));
+  pruefe('Sechs Kreaturen: je Welt eine, dazu Kronli; jede in fuenf Ausdruecken als eigenes SVG',
+    KREATUREN.length === 6 && new Set(KREATUREN.map((k) => k.id)).size === 6 && KREATUREN.filter((k) => k.welt).length === 5
+    && KREATUREN.some((k) => k.id === 'kronli' && k.welt === null)
+    && KREATUREN.filter((k) => k.welt).every((k) => typeof t(`bots.welten.${k.welt}.kurz`) === 'string' && !/^bots\./.test(t(`bots.welten.${k.welt}.kurz`)))
+    && svgs.every((x) => /^<svg viewBox="0 0 120 120"/.test(x) && !/undefined|NaN/.test(x)) && new Set(svgs).size === svgs.length);
+  const ids = (x) => [...x.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+  const a = kreaturSvg('glimm', 'normal'); const b = kreaturSvg('glimm', 'normal');
+  pruefe('Jedes Bild hat eigene Verlaufs-Ids (zwei Glimm auf einer Seite stoeren sich nicht)', ids(a).length === 2 && ids(a).every((i) => !ids(b).includes(i)) && ids(a).every((i) => a.includes(`url(#${i})`)));
+  pruefe('Kein Spott-Ausdruck bei den Kreaturen, unbekannte Kreatur ergibt kein Bild', !KREATUR_ARTEN.some((x) => /lach|wein|gaehn|spott/.test(x)) && kreaturSvg('drache') === '');
+  pruefe('Kreatur zeigt Hallo, Staunen, Nachdenken und Gut gespielt; Id, Text und Bot-Antwort bleiben die des Emotes',
+    Object.keys(KREATUR_EMOTES).join() === 'hallo,staunen,denken,gut' && Object.keys(KREATUR_EMOTES).every((id) => EMOTES.some(([e]) => e === id) && ARTEN['emote.' + id])
+    && Object.values(KREATUR_EMOTES).every((x) => KREATUR_ARTEN.includes(x)));
+  pruefe('Labor: nur das Erfinder-Konto bekommt die Kreatur', kreaturAktiv({ kreatur: 'karo' }, true) === 'karo' && kreaturAktiv({ kreatur: 'karo' }, false) === null && kreaturAktiv({ kreatur: null }, true) === null);
+  const rad = radEintraege('glimm');
+  pruefe('Rad mit Kreatur: acht Eintraege, die Kreatur vorn (Hallo, Staunen, Nachdenken, Gut gespielt), danach die Strichsymbole',
+    rad.length === 8 && rad.slice(0, 4).map((e) => e.id).join() === 'hallo,staunen,denken,gut' && rad.slice(0, 4).every((e) => e.kreatur && /data-kreatur="glimm"/.test(e.svg))
+    && rad.slice(4).every((e) => !e.kreatur && !/kreatur/.test(e.svg)) && rad.every((e) => e.schluessel === 'emote.' + e.id && e.text === t('p-emotes.emote.' + e.id)), rad.map((e) => e.id));
+  pruefe('Rad ohne Kreatur wie bisher', radEintraege(null).map((e) => e.id).join() === EMOTES.map((e) => e[0]).join() && radEintraege(null).every((e) => !e.kreatur));
+  pruefe('Kreaturen bewegen sich nur, wo es passt: still bei reduzierter Bewegung und gedaempft, im Rad erst beim Zeigen',
+    /prefers-reduced-motion: reduce\) \{ \.kreatur, \.kreatur \* \{ animation: none !important/.test(css) && /\.em-blase\.still \.kreatur/.test(css)
+    && /\.em-wahl\.em-kreatur:not\(:hover\):not\(:focus-visible\) \.kreatur/.test(css) && /@keyframes kr-wink/.test(css));
+  pruefe('Namen der Kreaturen auf Deutsch und Englisch', KREATUREN.every((k) => DE['kreatur.' + k.id] && EN['kreatur.' + k.id]));
+}
+
 // Speicher: das reservierte Budget 'ausdruck', beide Schalter kommen nach dem Laden zurueck
 {
   const daten = new Map();
@@ -66,6 +94,10 @@ pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(c
   pruefe('Speichern gelingt', r.ok === true, r);
   pruefe('Beide Schalter gelten nach dem Laden', einstellungen().an === false && einstellungen().daempfen === true);
   pruefe('Schluessel steht im Speicher', [...daten.keys()].some((k) => /einstellungen:ausdruck$/.test(k)), [...daten.keys()]);
+  speichereModulEinstellungen(SPEICHER, { an: true, daempfen: false, kreatur: 'drache' });
+  const fremd = einstellungen().kreatur;
+  speichereModulEinstellungen(SPEICHER, { an: true, daempfen: false, kreatur: 'kronli' });
+  pruefe('Gewaehlte Kreatur kommt zurueck, eine unbekannte faellt auf keine zurueck', fremd === null && einstellungen().kreatur === 'kronli', fremd);
 }
 
 // Takt (rein, mit vorgestellter Uhr statt Warten)
@@ -422,6 +454,55 @@ async function browserTeil(browser) {
   await kontext.close();
 }
 
+// Labor: Emote-Kreaturen nur fuer das Erfinder-Konto (Merker der Sonderstuecke wie in finisher.test.mjs, Server gesperrt)
+async function kreaturTeil(browser) {
+  const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
+  await kontext.route(/supabase\.co/, (r) => r.abort());
+  const seite = await kontext.newPage();
+  const seitenfehler = [];
+  seite.on('pageerror', (e) => seitenfehler.push(e.message));
+  await oeffne(seite, '#arena');
+  const anmelden = (erfinder) => seite.evaluate((e) => {
+    localStorage.clear();
+    if (!e) return;
+    const tok = 'a.' + btoa(JSON.stringify({ sub: 'u-flo' })).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_') + '.x';
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: tok, refresh_token: 'r', expires_at: 9999999999 }));
+    localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel'] }));
+  }, erfinder);
+  await anmelden(true);
+  await oeffne(seite, '#einstellungen');
+  await seite.waitForSelector('.em-einstellungen', { timeout: 20000 });
+  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.em-kreaturen input[name="em-kreatur"]')].map((x) => x.value + (x.checked ? '*' : '')));
+  pruefe('Browser Labor: Erfinder waehlt die Emote-Kreatur in den Einstellungen (Keine und sechs Kreaturen)', wahl.join() === 'keine*,karo,stups,zinni,klippa,glimm,kronli', wahl);
+  await seite.locator('.em-kreaturen input[value="kronli"]').check({ force: true });
+  const gespeichert = await seite.evaluate(() => Object.keys(localStorage).filter((k) => /einstellungen:ausdruck$/.test(k)).map((k) => localStorage.getItem(k)).join());
+  pruefe('Browser Labor: Wahl steht unter ausdruck', /"kreatur":"kronli"/.test(gespeichert), gespeichert);
+  await seite.evaluate(SCHNELLER_BOT);
+  await partie(seite);
+  await warteFlo(seite);
+  await seite.locator('.em-aktion[data-emote-aktion="emotes"]').click({ timeout: 5000 });
+  const rad = await seite.evaluate(() => [...document.querySelectorAll('.em-popup .em-wahl')].map((b) => b.dataset.wert + (b.classList.contains('em-kreatur') ? ':' + (b.querySelector('svg.kreatur') || { dataset: {} }).dataset.art : '')));
+  pruefe('Browser Labor: im Rad steht Kronli vorn (winken, staunen, denken, verbeugen), danach die Strichsymbole',
+    rad.slice(0, 4).join() === 'hallo:winken,staunen:staunen,denken:denken,gut:verbeugen' && rad.length === 8 && rad.slice(4).every((x) => !x.includes(':')), rad);
+  await seite.locator('.em-popup .em-wahl[data-wert="hallo"]').click({ timeout: 5000 });
+  await warte(200);
+  const blase = await seite.evaluate(() => { const k = document.querySelector('.em-blase.em-eigen svg.kreatur'); return k ? { art: k.dataset.art, anim: getComputedStyle(k).animationName, b: Math.round(k.getBoundingClientRect().width) } : null; });
+  pruefe('Browser Labor: die Blase zeigt die winkende Kreatur, sie huepft', !!blase && blase.art === 'winken' && blase.anim === 'kr-hops' && blase.b >= 30, blase);
+  // Ohne Erfinder (abgemeldet): keine Wahl, das Rad wie bisher, auch wenn die Einstellung noch kronli sagt
+  await seite.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+  await oeffne(seite, '#einstellungen');
+  await seite.waitForSelector('.em-einstellungen', { timeout: 20000 });
+  const ohne = await seite.evaluate(() => document.querySelectorAll('.em-kreaturen').length);
+  await seite.evaluate(SCHNELLER_BOT);
+  await partie(seite);
+  await warteFlo(seite);
+  await seite.locator('.em-aktion[data-emote-aktion="emotes"]').click({ timeout: 5000 });
+  const radOhne = await seite.evaluate(() => document.querySelectorAll('.em-popup .em-wahl.em-kreatur, .em-popup svg.kreatur').length);
+  pruefe('Browser Labor: abgemeldet keine Kreaturen-Wahl und keine Kreatur im Rad', ohne === 0 && radOhne === 0, { ohne, radOhne });
+  pruefe('Browser Labor: keine Seitenfehler', seitenfehler.length === 0, seitenfehler.slice(0, 2));
+  await kontext.close();
+}
+
 // Darstellung (Flo 30.10.): Beschriftungen im Rad brechen nie mitten im Wort; das eigene Emote und die Bot-Antwort stehen
 // ganz im Bild an der eigenen bzw. der Bot-Karte, ohne Knopf, Kopfzeile oder Uhr zu verdecken. Handy, iPad hoch und quer;
 // Deutsch ohne Uhr, Englisch (laengere Texte) mit Bedenkzeit, damit beide Uhren in den Karten stehen.
@@ -509,6 +590,7 @@ try {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await browserTeil(browser);
+    await kreaturTeil(browser);
     await layoutTeil(browser);
   }
   code = fehler ? 1 : 0;
