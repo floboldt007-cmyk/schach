@@ -1,6 +1,7 @@
 // Lokaler Modus des Partie-Screens. Beide Menschen ziehen; eine Engine startet erst in der Analyse.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { anim } from '../bewegung.js';
 import { klang } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
@@ -131,7 +132,7 @@ function partie(root, quelle, app, fortgesetzt) {
     </div></div>`;
   root.append(s);
   const brettEl = s.querySelector('.brett');
-  const brett = new Brett(brettEl, { figurenPfad: new URL('assets/pieces/', WURZEL).href, beiZug,
+  const brett = new Brett(brettEl, { figurenPfad: new URL(figurenPfad(), WURZEL).href, beiZug,
     koordinaten: einst.koordinaten !== false, koordLage: einst.koordLage, autoDame: einst.autoDame !== false,
     turmRochade: einst.turmRochade === true, steuerung: einst.steuerung, pfeile: einst.pfeile !== false });
   brett.setzeDauer(300);
