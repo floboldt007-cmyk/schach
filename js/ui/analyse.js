@@ -94,6 +94,36 @@ const dezimal = (text) => (sprache() === 'de' ? text.replace('.', ',') : text);
 const komma1 = (x) => dezimal(x.toFixed(1));
 const sanDe = (san) => sanAnzeige(san || '').replace(/O-O-O/g, '0-0-0').replace(/O-O/g, '0-0');
 const zugText = (z) => `${z.nummer}${z.farbe === 'w' ? '.' : '…'} ${sanDe(z.san)}`;
+// Flo 30.10. abends ("Das sieht noch nicht gut aus", Coach-Karte): die Zahlen stehen schon im Chip. Der alte Satz
+// "Die Bewertung ... sinkt von X auf Y." (auch in gespeicherten Analysen) wird zu einem Satz ueber die Lage.
+const BEWERTUNG_SATZ = [/\s*Die Bewertung aus (?:deiner Sicht|Sicht von \S+) sinkt von \S+ auf \S+\./,
+  /\s*From (?:your|[^.']+'s) point of view, the evaluation drops from \S+ to \S+\./];
+function lageSatz(z, du, name) {
+  const v = z.gewinnVorher; const n = z.gewinnNachher;
+  if (!Number.isFinite(v) || !Number.isFinite(n)) return '';
+  const art = n < 0.2 ? 'klar' : v >= 0.6 && n < 0.55 ? 'vorteil' : 'schlechter';
+  return t(`analyse.an.coach.lage.${art}.${du ? 'du' : 'gegner'}`, { name });
+}
+function ohneDoppelteZahlen(text, z, du, name) {
+  for (const r of BEWERTUNG_SATZ) {
+    if (!r.test(text)) continue;
+    const satz = lageSatz(z, du, name);
+    return text.replace(r, satz ? ' ' + satz : '').trim();
+  }
+  return text;
+}
+// Beste Fortsetzung mit Zugnummern ("7… Sxe4 8. Lxe4 cxd5"), hoechstens LINIE_MAX Halbzuege
+const LINIE_MAX = 6;
+function linieMitNummern(z, linie) {
+  let nr = z.nummer; let weiss = z.farbe === 'w';
+  return linie.slice(0, LINIE_MAX).map((s, i) => {
+    const nummer = weiss ? `<i>${nr}.</i>` : i === 0 ? `<i>${nr}…</i>` : '';
+    const html = `${nummer}<span data-i="${i}">${esc(sanDe(s))}</span>`;
+    if (!weiss) nr++;
+    weiss = !weiss;
+    return html;
+  }).join(' ') + (linie.length > LINIE_MAX ? ' …' : '');
+}
 const reduziert = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Bewertung als Text: "+4,7", "−0,3", "M2", "−M2". Gespeichert ist die Sicht von Weiss;
@@ -505,10 +535,13 @@ export function zeige(root, params = {}, app) {
     const wert = (g, ich) => {
       if (!Number.isFinite(g)) return `<div class="an-g-wert an-g-leer">${esc(t('analyse.an.genau.keineZuege'))}</div>`;
       if (zuKurz) return `<div class="an-g-wert an-g-leer an-g-kurz">${esc(t('analyse.an.genau.zuKurz'))}</div>`;
-      return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}">${komma1(g)}</div>`;
+      // Flo 30.10. abends ("sieht billig aus"): Wert in der Farbe seiner Guete, Prozentzeichen und Messbalken
+      const band = g >= 85 ? 'stark' : g >= 70 ? 'gut' : g >= 50 ? 'mittel' : 'schwach';
+      return `<div class="an-g-wert zahl${ich ? ' an-ich-wert' : ''}" data-band="${band}">${komma1(g)}<small>%</small></div>`
+        + `<span class="an-g-mess" data-band="${band}" aria-hidden="true"><i style="transform:scaleX(${(Math.max(0, Math.min(100, g)) / 100).toFixed(3)})"></i></span>`;
     };
     return `
-      <div class="an-genau flaeche">
+      <div class="an-genau flaeche" data-ergebnis="${esc(info.art)}">
         <div class="an-g-kopf"><span class="an-g-titel">${esc(t('analyse.an.genau.genauigkeit'))}</span><span class="an-g-chips">${!zuKurz && Number.isFinite(staerke)
           ? `<span class="chip an-chip-staerke">${esc(t('analyse.an.genau.leistung'))} <b class="zahl">${staerke}</b></span>` : ''}${rekord
           ? `<span class="chip an-chip-rekord">${icon('pokal')} ${esc(t('analyse.an.genau.bestwert'))}</span>` : ''}</span></div>
@@ -547,6 +580,8 @@ export function zeige(root, params = {}, app) {
         <div class="an-kurve-wrap">
           <svg class="an-kurve" viewBox="0 0 ${KW} ${KH}" preserveAspectRatio="none" role="slider" tabindex="0"
                aria-label="${esc(t('analyse.an.kurve.aria'))}" aria-valuemin="0" aria-valuemax="${st.zuege.length}" aria-valuenow="0">
+            <defs><linearGradient id="an-k-weiss" x1="0" y1="0" x2="0" y2="1"><stop class="an-k-w1" offset="0"/><stop class="an-k-w2" offset="1"/></linearGradient>
+              <linearGradient id="an-k-schwarz" x1="0" y1="0" x2="0" y2="1"><stop class="an-k-s1" offset="0"/><stop class="an-k-s2" offset="1"/></linearGradient></defs>
             <rect class="an-k-grund" width="${KW}" height="${KH}"/>
             <path class="an-k-flaeche" d="${flaeche}"/>
             <line class="an-k-mitte" x1="0" x2="${KW}" y1="${KH / 2}" y2="${KH / 2}" vector-effect="non-scaling-stroke"/>
@@ -592,13 +627,16 @@ export function zeige(root, params = {}, app) {
     const du = (r.anzahl && r.anzahl[st.sf]) || {};
     const gegner = (r.anzahl && r.anzahl[st.bf]) || {};
     const kurz = zuzweit() ? personenName(st.bf) : kurzName(st.bot);
+    // Flo 30.10. abends ("kann aufgeklappt sein, aber muss angepasst werden"): links du, rechts der Gegner, je ein Balken
+    // in der Farbe der Klasse (Laenge relativ zur haeufigsten Klasse der Partie)
+    const hoechstens = Math.max(1, ...KLASSEN.map((k) => Math.max(du[k] || 0, gegner[k] || 0)));
     const zeile = (k) => {
       const a = du[k] || 0;
       const b = gegner[k] || 0;
       const aktiv = a || (zuzweit() && b);
-      return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k})"
+      return `<button class="an-kl${aktiv ? '' : ' leer'}${a || b ? '' : ' null'}" type="button" data-aktion="klasse" data-klasse="${k}" style="--kf:var(--k-${k});--a:${(a / hoechstens).toFixed(3)};--b:${(b / hoechstens).toFixed(3)}"
         aria-label="${esc(KLASSEN_NAME[k])}: ${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.du'))} ${a}, ${esc(kurz)} ${b}${aktiv ? ', ' + esc(t(zuzweit() ? 'analyse.an.klassen.springen' : 'analyse.an.klassen.springenDu')) : ''}"${aktiv ? '' : ' aria-disabled="true"'}>
-        <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-mitte">${symbol(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
+        <span class="an-n du${a ? '' : ' nul'}">${a}</span><span class="an-kl-balken links" aria-hidden="true"><i></i></span><span class="an-kl-mitte">${symbol(k)}<span>${esc(KLASSEN_NAME[k])}</span></span><span class="an-kl-balken rechts" aria-hidden="true"><i></i></span><span class="an-n${b ? '' : ' nul'}">${b}</span></button>`;
     };
     const kopf = `<div class="an-kl-kopf"><span>${zuzweit() ? esc(personenName(st.sf)) : esc(t('analyse.an.klassen.kopf'))}</span><span>${esc(kurz)}</span></div>`;
     const links = KLASSEN.slice(0, 6).map(zeile).join('');
@@ -788,15 +826,15 @@ export function zeige(root, params = {}, app) {
     const sicht = z.farbe === 'b' ? 'b' : 'w';
     const nachTxt = /#$/.test(z.san) ? t('analyse.an.coach.matt') : evalText(z.evalNachher, { sicht });
     const evalHtml = VERLUST_KLASSEN.has(z.klasse) && z.evalVorher
-      ? `${esc(evalText(z.evalVorher, { sicht }))} → ${esc(nachTxt)}`
+      ? `<span class="an-c-vorher">${esc(evalText(z.evalVorher, { sicht }))}</span> → <b class="an-c-nachher">${esc(nachTxt)}</b>`
       : esc(nachTxt);
     const linie = Array.isArray(z.besteLinieSan) ? z.besteLinieSan : [];
     const andererZug = z.besterZug && z.besterZug !== z.uci;
     const linieHtml = linie.length ? `
       <div class="an-c-fuss">
         <div class="an-c-linie">
-          <span class="an-c-linie-titel">${esc(t(andererZug ? 'analyse.an.coach.staerkster' : 'analyse.an.coach.hauptvariante'))} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
-          <span class="an-c-zuege">${linie.map((s, i) => `<span data-i="${i}">${esc(sanDe(s))}</span>`).join(' ')}${linie.length >= 8 ? ' …' : ''}</span>
+          <span class="an-c-linie-titel">${esc(t(andererZug ? 'analyse.an.coach.besser' : 'analyse.an.coach.hauptvariante'))} <b class="zahl">${esc(evalText(z.evalVorher, { sicht }))}</b></span>
+          <span class="an-c-zuege">${linieMitNummern(z, linie)}</span>
         </div>
         <div class="an-c-knoepfe">
           <button class="knopf" type="button" data-aktion="variante" aria-label="${esc(t('analyse.an.coach.varianteZeigen'))}">${icon('play')}<span>${esc(t('analyse.an.coach.varianteZeigen'))}</span></button>
@@ -805,9 +843,9 @@ export function zeige(root, params = {}, app) {
       </div>` : '';
     el.innerHTML = `
       <div class="an-c-symbol">${symbol(z.klasse)}</div>
-      <div class="an-c-kopf"><span class="an-c-klasse">${esc(WORT[z.klasse] || KLASSEN_NAME[z.klasse])}</span><span class="an-c-zug">${esc(zugText(z))}${zuzweit() ? ` (${esc(personenName(z.farbe))})` : du ? '' : ` (${esc(kurz)})`}</span></div>
-      <span class="an-c-eval zahl">${evalHtml}</span>
-      <p class="an-c-text">${esc(zuzweit() ? `${t('analyse.an.coach.spielt', { name: personenName(z.farbe), zug: sanDe(z.san) })}${andererZug && linie.length ? ' ' + t('analyse.an.coach.staerkerWar', { zug: sanDe(linie[0]) }) : ''}` : coachKern(z.coach))}</p>
+      <div class="an-c-kopf"><span class="an-c-klasse">${esc(WORT[z.klasse] || KLASSEN_NAME[z.klasse])}</span><span class="an-c-zug">${esc(zugText(z))}</span>${zuzweit() ? `<span class="an-c-wer">${esc(personenName(z.farbe))}</span>` : du ? '' : `<span class="an-c-wer">${esc(kurz)}</span>`}</div>
+      <span class="an-c-eval zahl" data-richtung="${VERLUST_KLASSEN.has(z.klasse) ? 'minus' : ''}">${evalHtml}</span>
+      <p class="an-c-text">${esc(zuzweit() ? `${t('analyse.an.coach.spielt', { name: personenName(z.farbe), zug: sanDe(z.san) })}${andererZug && linie.length ? ' ' + t('analyse.an.coach.staerkerWar', { zug: sanDe(linie[0]) }) : ''}` : ohneDoppelteZahlen(coachKern(z.coach), z, du, kurz))}</p>
       ${linieHtml}`;
     fuelleCoachOrt(el, z, du);
     neuAnimieren(el);

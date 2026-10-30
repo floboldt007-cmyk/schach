@@ -124,6 +124,14 @@
 .an-c-kopf { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
 .an-c-klasse { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; line-height: 1.15; color: var(--kt); }
 .an-c-zug { font-weight: 800; font-size: 16px; }
+/* Flo 30.10. abends ("Das sieht noch nicht gut aus"): wer gezogen hat als kleines Schild, Chip mit farbigem Nachher-Wert,
+   Fortsetzung mit Zugnummern, der bessere Zug hervorgehoben */
+.an-c-wer { align-self: center; padding: 2px 9px; border-radius: var(--r-pille); background: var(--flaeche-3); color: var(--text-2);
+  font-size: 12.5px; font-weight: 750; }
+.an-c-eval .an-c-vorher { color: var(--text-2); font-weight: 700; }
+.an-c-eval[data-richtung="minus"] .an-c-nachher { color: var(--kt-patzer); }
+.an-c-zuege i { font-style: normal; font-weight: 650; color: var(--text-2); margin-right: 3px; }
+.an-c-zuege span[data-i="0"] { color: var(--kt-bester); font-weight: 800; }
 .an-c-eval { align-self: start; padding: 4px 9px; border-radius: 9px; background: var(--flaeche-3); color: var(--text); font-weight: 800; font-size: 14px; white-space: nowrap;
   font-variant-numeric: tabular-nums; }
 .an-c-text { grid-column: 2 / 4; margin: 0; font-size: 15px; line-height: 1.4; color: var(--text); }
@@ -170,6 +178,20 @@
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .an-ich-wert { color: var(--text); }
 .an-g-leer { font-size: 16px; color: var(--text-2); }
+/* Flo 30.10. abends ("sieht billig aus"): Genauigkeit in der Farbe ihrer Guete mit Messbalken, Ergebnis als farbige Pille,
+   die Karte leicht in der Farbe des Ergebnisses getoent */
+.an-g-wert small { margin-left: 2px; font-size: .5em; font-weight: 750; letter-spacing: 0; color: var(--text-2); }
+.an-g-wert[data-band="stark"] { color: var(--kt-bester); } .an-g-wert[data-band="gut"] { color: var(--kt-gut); }
+.an-g-wert[data-band="mittel"] { color: var(--kt-ungenau); } .an-g-wert[data-band="schwach"] { color: var(--kt-patzer); }
+.an-g-mess { display: block; width: 100%; max-width: 110px; height: 5px; margin-top: 6px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
+.an-re .an-g-mess { margin-left: auto; }
+.an-g-mess > i { display: block; height: 100%; border-radius: inherit; transform-origin: left center; background: var(--k-gut); }
+.an-re .an-g-mess > i { transform-origin: right center; }
+.an-g-mess[data-band="stark"] > i { background: var(--k-bester); } .an-g-mess[data-band="mittel"] > i { background: var(--k-ungenau); }
+.an-g-mess[data-band="schwach"] > i { background: var(--k-patzer); }
+.an-genau { background: linear-gradient(180deg, color-mix(in srgb, var(--erg-f, var(--gold)) 10%, var(--flaeche)), var(--flaeche) 70%); }
+.an-genau[data-ergebnis="sieg"] { --erg-f: var(--gold); } .an-genau[data-ergebnis="niederlage"] { --erg-f: var(--warn); }
+.an-genau[data-ergebnis="remis"] { --erg-f: var(--k-gut); }
 .an-g-label { font-size: 13px; font-weight: 800; color: var(--text); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-vs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; min-width: 64px; }
 .an-vs-wort { font-size: 12px; font-weight: 800; padding: 2px 10px; border-radius: var(--r-pille, 999px); background: var(--flaeche-2); color: var(--text); }
@@ -177,7 +199,8 @@
 @supports (color: color-mix(in srgb, red 50%, blue)) {
   .an-vs.an-sieg .an-vs-wort { background: color-mix(in srgb, var(--k-bester) 14%, var(--flaeche)); }
 }
-.an-vs.an-niederlage .an-vs-wort { color: var(--text-2); }
+.an-vs.an-niederlage .an-vs-wort { color: var(--kt-patzer); background: color-mix(in srgb, var(--k-patzer) 14%, var(--flaeche)); }
+.an-vs.an-remis .an-vs-wort { color: var(--kt-gut); background: color-mix(in srgb, var(--k-gut) 16%, var(--flaeche)); }
 /* Sterne der Partie unter dem Ergebnis, neue leuchten auf */
 .an-vs-sterne { display: flex; gap: 2px; margin-top: 3px; font-size: 15px; line-height: 1; }
 .an-vs-sterne span { display: inline-block; }
@@ -201,7 +224,7 @@
 .an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 800; color: var(--text); }
 .an-k-tipp { flex: none; font-size: 12px; color: var(--text-2); white-space: nowrap; }
 .an-k-legende { font-variant-numeric: tabular-nums; }
-.an-kurve-wrap { position: relative; height: 100px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.an-kurve-wrap { position: relative; height: 120px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .an-kurve { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
 .an-kurve:focus-visible { outline: var(--fokus); outline-offset: 3px; }
 /* Kurve hell (Entwurf "Analyse ruhig"): Weiss-Anteil in Balken-Weiss, Schwarz als warmes Grau statt Schiefer-Block,
@@ -210,9 +233,12 @@
 @supports (color: color-mix(in srgb, red 50%, blue)) {
   .an-kurve > .an-k-grund { fill: color-mix(in srgb, var(--balken-schwarz) 20%, var(--flaeche-2)); }
 }
-.an-k-flaeche { fill: var(--balken-weiss); }
+.an-k-flaeche { fill: url(#an-k-weiss); }
+.an-kurve > .an-k-grund { fill: url(#an-k-schwarz); }
+.an-k-w1 { stop-color: var(--balken-weiss); } .an-k-w2 { stop-color: color-mix(in srgb, var(--balken-weiss) 82%, var(--balken-schwarz)); }
+.an-k-s1 { stop-color: var(--balken-schwarz); } .an-k-s2 { stop-color: color-mix(in srgb, var(--balken-schwarz) 70%, var(--balken-weiss)); }
 .an-k-mitte { stroke: var(--linie-2); stroke-width: 1; stroke-dasharray: 3 5; }
-.an-k-linie { stroke: var(--text); stroke-width: 1.5; filter: none; }
+.an-k-linie { stroke: var(--akzent); stroke-width: 2.2; filter: none; }
 .an-k-phase { stroke: var(--linie-2); stroke-width: 1; }
 .an-kurve-wrap::after { content: ""; position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--linie); pointer-events: none; }
 .an-k-cursor { stroke: var(--akzent); stroke-width: 2; filter: none; }
@@ -233,9 +259,11 @@
 .an-momente::-webkit-scrollbar { display: none; }
 .an-momente::after { content: ""; flex: 0 0 28px; }
 .an-moment.knopf { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; gap: 6px; background: var(--flaeche); }
-.an-moment.knopf svg { width: 18px; height: 18px; }
+.an-moment.knopf svg { width: 22px; height: 22px; }
+/* Schluesselmomente in der Farbe ihrer Klasse (Flo 30.10. abends: "sieht billig aus") */
+.an-moment.knopf { background: color-mix(in srgb, var(--kf) 12%, var(--flaeche)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kf) 40%, transparent); }
 .an-moment:not(.du) { color: var(--text-2); font-weight: 600; }
-.an-moment.an { box-shadow: inset 0 0 0 1.5px var(--text); background: var(--flaeche-3); color: var(--text); }
+.an-moment.an { box-shadow: inset 0 0 0 2px var(--kf), 0 0 0 3px color-mix(in srgb, var(--kf) 25%, transparent); background: color-mix(in srgb, var(--kf) 22%, var(--flaeche)); color: var(--text); }
 .an-momente-leer { font-size: 14px; color: var(--text-2); padding: 4px 2px; -webkit-mask-image: none; mask-image: none; }
 
 /* ---------- Klassen-Zaehler ---------- */
@@ -254,7 +282,7 @@
   text-transform: uppercase; color: var(--text-2); }
 .an-kl-kopf span:first-child { flex: none; width: 34px; text-align: center; }
 .an-kl-kopf span:last-child { min-width: 34px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; }
-.an-kl { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; width: 100%; min-height: 44px; padding: 0; margin: 0;
+.an-kl { display: grid; grid-template-columns: 30px minmax(10px, 1fr) minmax(min-content, 9.6em) minmax(10px, 1fr) 30px; column-gap: 6px; align-items: center; width: 100%; min-height: 44px; padding: 0; margin: 0;
   background: none; border: 0; border-bottom: 1px solid var(--linie); border-radius: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .an-kl:active:not(.leer) { background: var(--flaeche-2); }
 .an-kl.leer { cursor: default; }
@@ -265,6 +293,11 @@
 .an-kl-mitte span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .an-kl-mitte svg { width: 28px; height: 28px; flex: none; }   /* Flo 30.10. abends: groesser */
 .an-kl.null .an-kl-mitte > span { opacity: .45; }
+.an-kl-balken { position: relative; display: block; height: 8px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
+.an-kl-balken > i { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: var(--kf); }
+.an-kl-balken.links > i { right: 0; width: calc(var(--a, 0) * 100%); }
+.an-kl-balken.rechts > i { left: 0; width: calc(var(--b, 0) * 100%); opacity: .6; }
+.an-kl-gesamt { grid-template-columns: 30px minmax(0, 1fr) 30px; }
 .an-kl.null .an-kl-mitte svg { opacity: .7; }
 .an-kl-gesamt { grid-column: 1 / -1; grid-row: 8; cursor: default; border-bottom: 0; border-top: 1px solid var(--linie-2); min-height: 40px;
   grid-template-columns: 34px minmax(0, 1fr) 34px; }
