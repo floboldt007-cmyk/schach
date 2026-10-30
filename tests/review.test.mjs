@@ -217,6 +217,25 @@ function nodeTests() {
   pruefe('Matt-Saettigung: wer matt wird und Matt in 3 haelt, spielt bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-3) })).klasse === 'bester');
   pruefe('Matt-Saettigung: wer matt wird und es auf Matt in 2 verkuerzt, nicht bester', klassifiziere(basis(0, { evalVorher: matt(-3), evalNachher: matt(-2) })).klasse !== 'bester');
 
+  // Untergrenze aus Bewertung und Matt (Flo 30.10.: "Moves, die komplett schlecht von mir sind, werden als gut
+  // bewertet"): in klar verlorener Stellung ist die Gewinnchance gesaettigt
+  const boden = (v, n, extra = {}) => klassifiziere(basis(0, { evalVorher: v, evalNachher: n, ...extra }));
+  const bDame = boden(ev(-800), ev(-1700));
+  pruefe('Boden: verloren, Dame weg (-8 -> -17) -> patzer statt gut', bDame.klasse === 'patzer', `${bDame.klasse} ${bDame.notiz}`);
+  pruefe('Boden: angehobener Zug zaehlt mindestens als Patzer-Verlust (Genauigkeit, Kartei)', bDame.verlust > GRENZEN.fehler && zugGenauigkeit(bDame.details.wv, bDame.details.wv - bDame.verlust) < 45, `${bDame.verlust}`);
+  pruefe('Boden: verloren, Figur weg (-8 -> -11,5) -> fehler', boden(ev(-800), ev(-1150)).klasse === 'fehler', boden(ev(-800), ev(-1150)).klasse);
+  pruefe('Boden: verloren, Turm weg (-15 -> -20) -> fehler', boden(ev(-1500), ev(-2000)).klasse === 'fehler', boden(ev(-1500), ev(-2000)).klasse);
+  pruefe('Boden: verloren, Bauer weg (-8 -> -9,5) bleibt bei der Gewinnchance', ['exzellent', 'gut'].includes(boden(ev(-800), ev(-950)).klasse));
+  pruefe('Boden: Suchrauschen in einseitiger Stellung (-12 -> -14,5) hebt nichts an', ['exzellent', 'gut'].includes(boden(ev(-1200), ev(-1450)).klasse));
+  pruefe('Boden: Schwarz am Zug, Sicht des Ziehenden', klassifiziere({ fenVorher: MITTE_S, uci: 'h7h6', besterZug: 'c5d4', evalVorher: ev(800), evalNachher: ev(1700) }).klasse === 'patzer');
+  pruefe('Boden: verloren, laeuft ins Matt in 1 -> patzer', boden(ev(-900), matt(-1)).klasse === 'patzer', boden(ev(-900), matt(-1)).klasse);
+  pruefe('Boden: laesst langes Matt zu (ausgeglichen) bleibt patzer', boden(ev(0), matt(-6)).klasse === 'patzer');
+  pruefe('Boden: laesst langes Matt zu (schon -12) -> ungenau', boden(ev(-1200), matt(-6)).klasse === 'ungenau', boden(ev(-1200), matt(-6)).klasse);
+  pruefe('Boden: wird matt, Matt in 8 -> Matt in 2 -> fehler', boden(matt(-8), matt(-2)).klasse === 'fehler', boden(matt(-8), matt(-2)).klasse);
+  pruefe('Boden: wird matt, Matt in 4 -> Matt in 3 bleibt mild', ['bester', 'exzellent'].includes(boden(matt(-4), matt(-3)).klasse));
+  pruefe('Boden: klar gewonnen bleibt gewonnen (+15 -> +8) -> ungenau, nicht gut', boden(ev(1500), ev(800)).klasse === 'ungenau', boden(ev(1500), ev(800)).klasse);
+  pruefe('Boden: Coach nennt den Materialverlust nicht falsch als gut', !/^Gut/.test(coachText(basis(0, { evalVorher: ev(-800), evalNachher: ev(-1700) }), bDame)));
+
   // stark
   const STARK = START_FEN;
   const stark = (zweiter, extra = {}) => klassifiziere({ fenVorher: STARK, uci: 'g1f3', besterZug: 'g1f3', evalVorher: ev(30), evalNachher: ev(30), evalZweiter: zweiter, ...extra });

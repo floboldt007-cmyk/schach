@@ -34,6 +34,18 @@ export const KLASSEN_NAMEN = KLASSEN_NAME;
 // Grenzen fuer den Erwartungsverlust (Gewinnchance 0..1, Sicht des Ziehenden)
 export const GRENZEN = { exzellent: 0.02, gut: 0.05, ungenau: 0.10, fehler: 0.20 };
 
+// Untergrenze in Centipawn (Sicht des Ziehenden), wenn die Gewinnchance gesaettigt ist: Steht man schon klar
+// schlechter, kostet eine weitere Dame kaum noch Gewinnchance (-8 -> -17: 5 %). Ab hier ist es trotzdem
+// mindestens Fehler bzw. Patzer. Die Schwelle waechst mit der Bewertung, weil Suchen in einseitigen Stellungen
+// staerker streuen (BODEN_STREUUNG je cp ueber BODEN_STREUUNG_AB).
+export const BODEN_CP = { fehler: 300, patzer: 600 };
+const BODEN_STREUUNG = 0.10;
+const BODEN_STREUUNG_AB = 400;
+// Wer danach immer noch klar gewinnt (ab +5), bekommt hoechstens "ungenau"
+const BODEN_GEWONNEN_CP = 500;
+// So viel Gewinnchance zaehlt ein angehobener Zug mindestens (fuer Genauigkeit und Kartei)
+const BODEN_VERLUST = { ungenau: GRENZEN.gut + 0.01, fehler: GRENZEN.ungenau + 0.01, patzer: GRENZEN.fehler + 0.01 };
+
 const EPS = 1e-9;
 const K_LICHESS = 0.00368208;
 const WERT = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -577,7 +589,11 @@ export function klassifiziere(eingabe) {
     const mn = d.mattNachher;
     if (mv != null && mn != null && Math.sign(mv) === Math.sign(mn)) {
       if (mv > 0 && mn > mv + 2) return ergebnis(mn > mv + 5 ? 'gut' : 'exzellent', 0, 'Matt dauert länger');
-      if (mv < 0 && -mn < -mv - 1) return ergebnis(-mn < -mv - 2 ? 'gut' : 'exzellent', 0, 'Matt kommt schneller');
+      if (mv < 0 && -mn < -mv - 1) {
+        // Matt in hoechstens 2, obwohl es mindestens 3 Zuege laenger gehalten haette: Fehler
+        if (-mn <= 2 && -mv + mn >= 3) return ergebnis('fehler', BODEN_VERLUST.fehler, 'Matt kommt viel schneller');
+        return ergebnis(-mn < -mv - 2 ? 'gut' : 'exzellent', 0, 'Matt kommt schneller');
+      }
     }
     // Gewinnchance gesaettigt (klar gewonnen/verloren): dann zaehlt die Bewertung selbst
     if (!gleichGut(d)) return ergebnis('exzellent', 0, 'fast so gut wie der Engine-Zug');
@@ -604,7 +620,39 @@ export function klassifiziere(eingabe) {
     klasse = 'verpasst';
     notiz = mattNotiz;
   }
-  return ergebnis(klasse, roh, notiz);
+
+  // 8. Untergrenze aus Bewertung und Matt: Flo 30.10. "Moves, die komplett schlecht von mir sind, werden als gut
+  // bewertet". In klar verlorener Stellung kostet Dame weg oder ein Zug ins Matt kaum Gewinnchance.
+  let verlust = roh;
+  const boden = untergrenze(d);
+  if (boden && RANG[klasse] < RANG[boden.klasse]) {
+    klasse = boden.klasse;
+    notiz = boden.notiz;
+    verlust = Math.max(roh, BODEN_VERLUST[klasse]);
+  }
+  return ergebnis(klasse, verlust, notiz);
+}
+
+// Mindestklasse eines Zugs aus der Bewertung selbst (siehe BODEN_CP), oder null
+function untergrenze(d) {
+  const mv = d.mattVorher;
+  const mn = d.mattNachher;
+  const v = cpFuer(d.evalVorher, d.farbe);
+  // laesst ein Matt zu, das es vorher nicht gab (war man schon matt, entscheidet die Mattlaenge, siehe oben)
+  if (mn != null && mn < 0) {
+    if (mv != null) return null;
+    const notiz = `lässt Matt in ${-mn} zu`;
+    if (-mn <= 3) return { klasse: 'patzer', notiz };
+    return { klasse: v != null && v <= -1000 ? 'ungenau' : 'fehler', notiz };
+  }
+  const n = cpFuer(d.evalNachher, d.farbe);
+  if (v == null || n == null) return null;
+  const minus = v - n;
+  const streuung = BODEN_STREUUNG * Math.max(0, Math.abs(v) - BODEN_STREUUNG_AB);
+  if (minus < BODEN_CP.fehler + streuung) return null;
+  const notiz = `Bewertung −${(minus / 100).toFixed(1).replace('.', ',')}`;
+  if (n >= BODEN_GEWONNEN_CP) return { klasse: 'ungenau', notiz };
+  return { klasse: minus >= BODEN_CP.patzer + streuung ? 'patzer' : 'fehler', notiz };
 }
 
 // Ist der gespielte Zug wirklich so gut wie der Engine-Zug (gleiche oder bessere Bewertung)?
