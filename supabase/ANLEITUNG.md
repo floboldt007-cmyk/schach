@@ -18,7 +18,9 @@ heißen.
    `Dein Anmeldecode für Crownmate` und als Inhalt den Inhalt von `supabase/mail-vorlage.html`. Die Vorlage enthält
    absichtlich nur `{{ .Token }}` und keinen Anmelde-Link. Absendername `Crownmate`. Speichern.
    Ohne diesen Schritt verschickt Supabase einen Anmelde-Link statt des 6-stelligen Codes, und der eingebaute
-   Versand stellt nur an Mitglieder des Supabase-Teams zu.
+   Versand stellt nur an Mitglieder des Supabase-Teams zu. Der Link meldet nur den Browser an, in dem er geöffnet
+   wird: nicht die App auf dem Home-Bildschirm (iPad, iPhone) und nicht den Browser eines anderen Geräts. Vor Testern
+   mit iPad deshalb zuerst SMTP und die Code-Vorlage einrichten.
 5. **Adressen setzen:** Unter **Authentication > URL Configuration** als **Site URL** exakt
    `https://floboldt007-cmyk.github.io/schach/` eintragen. Dieselbe exakte Adresse bei **Redirect URLs** hinzufügen.
    Keine pauschale Wildcard für die Produktionsseite verwenden.
