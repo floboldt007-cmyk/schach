@@ -359,9 +359,11 @@ async function testePartie(seite, h, fehler) {
   pruefe('Hinweis 2: Pfeil', await seite.locator('.screen.partie .brett-pfeile .pfeil').count() === 1);
   pruefe('Zweites Tippen zählt nicht doppelt', (await h.z('hinweise')) === 1);
 
-  // Zuruecknehmen (Bot hat geantwortet: zwei Halbzuege)
+  // Flo 30.10. abends: keine Zuruecknahme mehr in der Oberflaeche (Knopfreihe und Coach); intern nur noch per Test-Haken
+  pruefe('Kein Knopf "Zurücknehmen" (Knopfreihe und Coach)', await seite.locator('.screen.partie [data-aktion="zuruecknehmen"]').count() === 0);
+  // Zuruecknehmen ueber den Test-Haken (Bot hat geantwortet: zwei Halbzuege)
   const vorher = (await h.zuege()).length;
-  await h.tippe('.spielknoepfe [data-aktion="zuruecknehmen"]');
+  await seite.evaluate(() => window.__partie.zuruecknehmen());
   await warte(250);
   const nachher = (await h.zuege()).length;
   pruefe('Zurücknehmen nimmt eigenen Zug und Bot-Zug', nachher === vorher - 2, `${vorher} -> ${nachher}`);
@@ -375,7 +377,7 @@ async function testePartie(seite, h, fehler) {
   const leg2 = await seite.evaluate(() => window.__partie.chess().moves({ verbose: true }).map((m) => m.lan));
   await h.zugTippen(leg2.includes('d2d4') ? 'd2d4' : leg2[0]);
   await seite.waitForFunction(() => window.__partie.phase() === 'bot');
-  await h.tippe('.spielknoepfe [data-aktion="zuruecknehmen"]');
+  await seite.evaluate(() => window.__partie.zuruecknehmen());
   await warte(250);
   pruefe('Zurücknehmen bricht den Bot ab', (await h.zuege()).length === nachher && (await h.phase()) === 'flo');
   await h.botAnhalten(false);
@@ -592,7 +594,7 @@ async function testeNebenlaeufig(seite, h, fehler) {
   const a = legal.includes('g1f3') ? 'g1f3' : legal[0];
   const b = legal.find((u) => u !== a && u.startsWith('b1')) || legal.find((u) => u !== a);
   await h.zugTippen(a);
-  await h.tippe('.spielknoepfe [data-aktion="zuruecknehmen"]');
+  await seite.evaluate(() => window.__partie.zuruecknehmen());
   await seite.evaluate(() => { window.__test.botAnhalten = false; });
   await h.warteFlo();
   await h.zugTippen(b);
@@ -1471,7 +1473,7 @@ async function testeErweiterungen(browser) {
   await seite.waitForFunction(() => window.__partie.z.live[2] && window.__partie.z.live[2].status === 'fertig', null, { timeout: 30000 });
   await h.tippe('.spielknoepfe [data-aktion="hinweis"]');
   await seite.waitForFunction(() => window.__w0.ereignisse.some((e) => e.name === 'hilfe:genutzt'), null, { timeout: 30000 });
-  await h.tippe('.spielknoepfe [data-aktion="zuruecknehmen"]');
+  await seite.evaluate(() => window.__partie.zuruecknehmen());
   await h.warteFlo();
   await h.zugTippen('f1c4');
   await h.warteFlo();

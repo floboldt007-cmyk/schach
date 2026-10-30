@@ -399,8 +399,8 @@ html[data-sichtbar="nein"] *, html[data-sichtbar="nein"] *::before, html[data-si
 .ort-spieler-leiste { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; overflow: hidden; white-space: nowrap; }
 /* Knoepfe der Pakete in der Knopfreihe (Ort partie:aktionen, z. B. Emote-Rad): je Knopf eine Spalte mehr */
 .ort-aktionen { display: contents; }
-.spielknoepfe[data-aktionen="1"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.spielknoepfe[data-aktionen="1"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.spielknoepfe[data-aktionen="2"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* mit Knoepfen der Pakete etwas enger, damit alle Beschriftungen passen (gemessen 375 bis 1366 px Breite) */
 .partie .spielknoepfe[data-aktionen] { gap: 5px; }
 .partie .spielknoepfe[data-aktionen] .knopf { font-size: 12px; padding: 6px 1px; letter-spacing: -.02em; }

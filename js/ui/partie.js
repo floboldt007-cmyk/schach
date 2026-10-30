@@ -461,7 +461,7 @@ export function zeige(root, params, app) {
           ${uhrHtml('flo')}
         </div>
         <div class="spielknoepfe aktionen">
-          ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}${knopf('zuruecknehmen', 'undo', t('partie.knopf.zurueck'), '', t('partie.knopf.zurueckLabel'))}
+          ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}
           ${knopf('drehen', 'drehen', t('partie.knopf.drehen'))}${knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben')}
         </div>
       </div>
@@ -505,7 +505,6 @@ export function zeige(root, params, app) {
     else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
     else if (a === 'klang') klangUmschalten(k);
     else if (a === 'hinweis') hinweis();
-    else if (a === 'zuruecknehmen') zuruecknehmen();
     else if (a === 'drehen') drehen();
     // U7: mit "Halten zum Aufgeben" entscheidet der Halte-Knopf (Tastatur: Rueckfrage, siehe unten)
     else if (a === 'aufgeben') { if (!halte) aufgebenFragen(); }
@@ -664,7 +663,6 @@ export function zeige(root, params, app) {
     const am = z.phase === 'flo';
     const ende = z.phase === 'ende';
     $('.spielknoepfe > [data-aktion="hinweis"]').disabled = !am;
-    $('.spielknoepfe > [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
     $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
     const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
@@ -893,9 +891,6 @@ export function zeige(root, params, app) {
     }
     if (anders && !['brillant', 'stark', 'bester', 'erzwungen', 'buch'].includes(k)) {
       knoepfe.push(`<button class="knopf" type="button" data-aktion="besser" data-ply="${ply}">${icon('ziel')} ${esc(t('partie.coach.besser'))}</button>`);
-    }
-    if (SCHLECHT.has(k) && ply === letzterFloPly() && z.phase !== 'ende') {
-      knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="${esc(t('partie.coach.zurueckTitel'))}">${icon('undo')} ${esc(t('partie.coach.zurueck'))}</button>`);
     }
     coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
       <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span><span class="c-eval zahl">${esc(evalT)}</span>${combo}</div>
@@ -1515,6 +1510,8 @@ export function zeige(root, params, app) {
     zeichneKnoepfe();
   }
 
+  // Flo 30.10. abends: "moechte es machen, dass man keine Zuege zuruecknehmen kann". Kein Knopf mehr (Knopfreihe und
+  // Coach); die Funktion bleibt nur fuer den Test-Haken window.__partie.zuruecknehmen (Pruefung der Live-Bewertung)
   function zuruecknehmen() {
     loescheVorzuege();
     if (z.phase === 'ende' || z.phase === 'start') return;
@@ -2557,7 +2554,7 @@ export function zeige(root, params, app) {
       z, brett, protokoll, bereit: false, buehne, laufId,
       chess: () => z.chess,
       phase: () => z.phase,
-      effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
+      effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase, zuruecknehmen,
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
       // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
       uhr, fmtUhr, layout, duellBereit, halte: () => halte,
