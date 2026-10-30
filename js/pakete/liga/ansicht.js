@@ -1,10 +1,10 @@
 // Alle Elemente gehoeren dem Paket. Der Host raeumt sie ueber verlasse() wieder ab.
 import { hoere } from '../../ereignisse.js';
 import { icon } from '../../ui/icons.js';
-import { tagSchluessel, addiereTage, tageZwischen } from '../../tag.js';
-import { t } from '../../sprache.js';
+import { addiereTage } from '../../tag.js';
+import { t, datum } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
-import { STUFEN, SAISON_TAGE, unsicherheit, vorlaeufig, saisonAm, kreuztabelle, belegFuer } from './wertung.js';
+import { STUFEN, SAISON_TAGE, unsicherheit, vorlaeufig, kreuztabelle, belegFuer } from './wertung.js';
 import './texte.js';
 
 const el = (tag, klasse, text) => {
@@ -81,23 +81,28 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
   auf.append(summary);
   const balken = el('progress', 'liga-balken');
   balken.max = 100;
-  const weg = el('p', 'liga-hilfe liga-weg zahl'), wertung = el('p', 'liga-wertung zahl'), club = el('p', 'liga-hilfe liga-club');
+  // Flo, 30.10.2026 (Entwurf Bestenliste): vorn nur die Liga und der Weg zur naechsten; Wertung, Klasse und
+  // Vereinsmeisterschaft stehen in den Details (aufklappen)
+  const weg = el('p', 'liga-hilfe liga-weg zahl'), regel = el('p', 'liga-hilfe liga-regel', tx('karte.regel'));
+  const wertung = el('p', 'liga-wertung zahl'), club = el('p', 'liga-hilfe liga-club');
   const wechsel = el('div', 'liga-wechsel');
   const hinweis = el('p', 'liga-hilfe', tx('karte.neu'));
   const quitt = el('button', 'liga-knopf', tx('karte.verstanden'));
   quitt.type = 'button'; quitt.addEventListener('click', verstanden);
   wechsel.append(hinweis, quitt);
   const detailOrt = el('div');
-  auf.append(detailOrt);
-  // Zusammenfassung und Balken bleiben sichtbar; die Kreuztabelle oeffnet sich erst auf Antippen.
-  karte.append(auf, balken, weg, wertung, club, wechsel);
+  auf.append(wertung, club, detailOrt);
+  // Zusammenfassung, Balken und Weg bleiben sichtbar; Wertung, Klasse und Kreuztabelle oeffnen sich erst auf Antippen.
+  karte.append(auf, balken, weg, regel, wechsel);
   const zeichne = () => {
     const s = lese();
     if (!s) { karte.hidden = true; return; }
     const naechste = STUFEN[s.saison.stufe + 1];
-    const tage = s.saison.nr ? Math.max(0, tageZwischen(tagSchluessel(), addiereTage(s.saison.start, SAISON_TAGE))) : saisonAm(new Date()).tage;
-    titel.textContent = s.saison.nr ? tx('karte.titel', { stufe: stufeName(s.saison.stufe), nr: s.saison.nr }) : tx('karte.vorStart');
-    unter.textContent = s.saison.nr ? tx('karte.tage', { n: tage }) : tx('karte.beginnt');
+    // ruhiges Enddatum statt Countdown (SPIELKONZEPT 7.1): letzter Tag der Saison
+    const ende = s.saison.nr ? String(addiereTage(s.saison.start, SAISON_TAGE - 1)).split('-').map(Number) : null;
+    titel.textContent = s.saison.nr ? tx('karte.titel', { stufe: stufeName(s.saison.stufe) }) : tx('karte.vorStart');
+    unter.textContent = s.saison.nr ? tx('karte.saison', { nr: s.saison.nr, datum: datum(new Date(ende[0], ende[1] - 1, ende[2]), { day: 'numeric', month: 'long' }) })
+      : tx('karte.beginnt');
     const unten = STUFEN[s.saison.stufe].schwelle;
     balken.value = naechste ? Math.min(100, (s.saison.punkte - unten) / (naechste.schwelle - unten) * 100) : 100;
     // die oberste Stufe ("Meister") ist die letzte in STUFEN
