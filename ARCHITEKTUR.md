@@ -1964,6 +1964,17 @@ Antwort mit einem zweiten `#` an) wie auch `#access_token=...` vom Anmelde-Link 
 die Tokens (auch `provider_token`) per `replaceState` und springt zu `#einstellungen`. Die Konto-Gruppe am Ort
 `einstellungen:gruppen` (Reihenfolge 5) erscheint erst nach einmal `#konto` (`kontoFreigeschaltet`). Für `daten.js`
 exportiert: `sitzung`, `aktiveSitzung` (erneuert ein bald ablaufendes Token), `userId`, `abmelden`, `lokalerStand`.
+- **Anmelde-Link (Rückfall ohne SMTP):** `fordereCodeAn(email, basis)` schickt die App-Adresse ohne Hash als
+  `redirect_to` mit (nur `http(s)`), sonst nähme Supabase den Referer (nur die Herkunft, ohne `/schach/`). Der Link wirkt
+  nur im Browser, in dem er geöffnet wird, nicht in der App auf dem Home-Bildschirm; dafür sagt „Code senden“ einen Satz.
+  Ein `#error=...`-Rücksprung (abgelaufen, schon benutzt) zeigt beim Zeichnen `linkUngueltig`.
+- **Abgleich-Riegel:** `planeSicherung()` und `verlasse()` laden nur hoch, wenn `istAbgeglichen()`:
+  `schach-arena:konto:abgeglichen` (gilt in allen Tabs) ist genau die Nutzer-ID der Sitzung. Gesetzt von
+  `gleicheNachAnmeldung` bei jedem Ergebnis außer Konflikt, gelöscht von `abmelden()`. Einen Konflikt entscheiden nur
+  `'geraet'` oder `'cloud'`; ein Abbruch lässt ihn offen. „Jetzt sichern“ ohne Abgleich fragt erst. `hatSpielstand()`
+  zählt die Einträge eines frischen Starts (Installations-Hinweis, `modul:start|funken|punkte`) nicht, ein leerer
+  Browser lädt die Cloud also ohne Rückfrage. Nach einer Link-Rückkehr wartet der Installations-Hinweis
+  (`linkAnmeldungFrisch()`), sonst schlösse er den Abgleich-Dialog. Test: `tests/konto-link.test.mjs`.
 
 **Datenfreigabe** (`js/daten.js`, Paket `daten` in `PAKETE`, Stil `css/daten.css`):
 - Einstellung `datenfreigabe` `'aus' | 'an'` (Standard aus, `EINSTELLUNG_WERTE`). Wirksam nur, wenn angemeldet und die
