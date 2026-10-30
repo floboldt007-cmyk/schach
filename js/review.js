@@ -705,15 +705,6 @@ function bauernText(n, kasus) {
   return t('analyse.bauern.mehr', { anzahl: n >= 2 && n <= 8 ? t(`analyse.zahlwort.${n}`) : n });
 }
 
-// Betrag runden, damit -1,25 und +1,25 gleich lang werden (wie die Anzeige in Partie und Analyse);
-// Dezimalzeichen nach Sprache (Deutsch Komma)
-function cpText(cp) {
-  const w = Math.round(Math.abs(cp) / 10) / 10;
-  const dezimal = (x) => (sprache() === 'de' ? x.replace('.', ',') : x);
-  if (w === 0) return dezimal('0.0');
-  return (cp > 0 ? '+' : '−') + dezimal(w.toFixed(1));
-}
-
 // Materialtext aus einer materialFolge: 'gewinn' oder 'verlust' aus Sicht der Folge-Farbe
 // Liefert { text, mehrzahl } oder bei einer Umwandlung { umwandlung: { figur, san } }.
 function materialText(folge, art, kasus = 'akk') {
@@ -802,12 +793,14 @@ function besserText(d) {
   return grund ? t('analyse.coach.besser.grund', { zug: b, grund }) : t('analyse.coach.besser.zug', { zug: b });
 }
 
+// Flo 30.10. abends ("Das sieht noch nicht gut aus"): die Zahlen stehen schon im Chip neben dem Zug; der Satz beschreibt
+// die Lage danach (klar schlechter, Vorteil weg, schlechter) statt "Die Bewertung ... sinkt von X auf Y"
 function bewertungsText(d) {
   const v = cpFuer(d.evalVorher, d.farbe);
   const n = cpFuer(d.evalNachher, d.farbe);
   if (v == null || n == null) return null;
-  const werte = { vorher: cpText(v), nachher: cpText(n) };
-  return d.du ? t('analyse.coach.bewertung.du', werte) : t('analyse.coach.bewertung.farbe', { ...werte, farbe: farbName(d.farbe) });
+  const art = d.wn < 0.2 ? 'klar' : d.wv >= 0.6 && d.wn < 0.55 ? 'vorteil' : 'schlechter';
+  return t(`analyse.an.coach.lage.${art}.${d.du ? 'du' : 'gegner'}`, { name: farbName(d.farbe) });
 }
 
 function auswahl(d, texte) {
