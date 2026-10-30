@@ -2,7 +2,7 @@ import { setzeSpeicher } from '../js/storage.js';
 import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudStand, ladeCloudStand,
   speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
   SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
-  ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch } from '../js/konto.js';
+  ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
 
 let ok = 0, gesamt = 0;
@@ -119,6 +119,12 @@ setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} }))
   const leer = await gleicheNachAnmeldung();
   pruefe('Leerer Browser lädt die Cloud ohne Rückfrage und lädt nichts hoch', leer === 'cloud' && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 7
     && uploads() === 2 && istAbgeglichen(), String(leer));
+  pruefe('Reine Einstellungen zählen nicht als Spielstand', !hatSpielstand({ 'schach-arena:v1:einstellungen': '{}', 'schach-arena:v1:einstellungen:musik': '{}' }));
+  pruefe('Vorschau liest das Level aus dem Funken-Modul (vorher immer Level 1)', vorschau({ 'schach-arena:v1:modul:funken': JSON.stringify({ level: 5, gesamt: 900 }) }).level === 5
+    && hatSpielstand({ 'schach-arena:v1:modul:funken': JSON.stringify({ level: 2 }) }));
+  localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u5'); antw.push({ status: 200, body: JSON.parse(sitzungVon('u5')) });
+  await pruefeCode('u5@b.de', '123456');
+  pruefe('Neue Anmeldung per Code verlangt einen neuen Abgleich', localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null);
   pruefe('Mit einer Partie oder einem anderen Eintrag zählt der Browser als Spielstand',
     hatSpielstand({ 'schach-arena:v1:partien': '[{"id":"x"}]' }) && hatSpielstand({ 'schach-arena:v1:serie': '{}' }) && !hatSpielstand({}));
   localStorage.removeItem(SICHTBAR_SCHLUESSEL);
