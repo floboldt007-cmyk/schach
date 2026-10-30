@@ -23,6 +23,9 @@
 .on-spieler .uhr[hidden], .on-ergebnis[hidden] { display: none; }
 .on-brett { width: 100%; aspect-ratio: 1; }
 .on-aktionen { display: flex; flex-wrap: wrap; gap: var(--a3); justify-content: center; }
+/* Fahne (Flo 30.10.): Remis anbieten oder Aufgeben in einem Knopf */
+.on-fahne { gap: 8px; }
+.on-fahne svg { width: 18px; height: 18px; flex: none; }
 .on-zug, .on-uhr-hinweis, .on-zuege { margin: 0; text-align: center; }
 .on-uhr-hinweis:empty { display: none; }
 .on-zuege { max-height: 4em; overflow: auto; }

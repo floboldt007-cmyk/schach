@@ -45,6 +45,11 @@
 .fk-d-summe { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .fk-d-summe b { color: var(--text); }
 .fk-abr.aufgestiegen .fk-level { color: var(--text); }
+/* Im Ergebnis: Glut-Orange nur in Ring, Balken und Zahl (Flo 30.10. abends: erst "farbiger", dann "eleganter") */
+.fk-abr .fk-emblem { background: none; color: var(--kt-fehler); box-shadow: inset 0 0 0 1.5px var(--k-fehler); }
+.fk-abr .fk-balken { height: 5px; }
+.fk-abr .fk-balken > i { background: linear-gradient(90deg, var(--gold), var(--k-fehler)); }
+.fk-abr .fk-wert { color: var(--kt-fehler); }
 
 /* ---------- Kopf-Chip (arena:kopf) und Spieler-Leiste (partie:spieler-leiste) ---------- */
 /* Antippbarer Chip (role="button"): sichtbar so hoch wie Sterne und Pokal, die Tippflaeche (::before) reicht 3 px darueber

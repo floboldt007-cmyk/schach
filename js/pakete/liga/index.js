@@ -4,7 +4,7 @@ import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
 import { melde } from '../../feier.js';
 import { BOTS, botNachId } from '../../bots.js';
-import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET } from '../../storage.js';
+import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET, eigeneZuege, BESTWERT_MIN_ZUEGE } from '../../storage.js';
 import { registriereIcon } from '../../ui/icons.js';
 import { t } from '../../sprache.js';
 import './texte.js';
@@ -103,6 +103,8 @@ hoere('partie:analysiert', sicher((d) => {
   const frisch = wechsleSaison(st, new Date()).stand;
   const genauigkeit = p.genauigkeitQuelle === 'analyse' && Number.isFinite(p.genauigkeit)
     ? p.genauigkeit : d.review?.genauigkeit?.[p.spielerFarbe];
+  // Zu kurze Partien zeigen keine Genauigkeit ("zu kurz"), dann zaehlt sie auch in der Liga nicht
+  if (eigeneZuege(p) < BESTWERT_MIN_ZUEGE) return;
   uebernehme(bucheGenauigkeit(frisch, p.id, genauigkeit), p.id);
 }));
 

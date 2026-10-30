@@ -25,6 +25,11 @@ export const DE = {
   'antwort.geduld.0': 'Lass dir Zeit.', 'antwort.geduld.1': 'Nur keine Eile.', 'antwort.geduld.2': 'Ich warte gern.',
   'antwort.spannend.0': 'Eine spannende Partie!', 'antwort.spannend.1': 'Spannend, oder?', 'antwort.spannend.2': 'Da ist was los!',
   'antwort.zusage.0': 'Gern, jederzeit!', 'antwort.zusage.1': 'Ich bin dabei!', 'antwort.zusage.2': 'Sehr gern, noch eine!',
+  // Emote-Kreaturen (js/kreaturen-kunst.js), erst im Labor des Erfinder-Kontos
+  kreaturen: 'Kreaturen', labor: 'Labor', keine: 'Keine', maskottchen: 'Maskottchen',
+  begleiter: 'Emote-Kreatur', begleiterText: 'Zeigt Hallo, Staunen, Nachdenken und Gut gespielt als kleine Kreatur. Nur du siehst sie, solange sie im Labor sind.',
+  kreaturenHinweis: 'Im Labor sieht sie nur dein Erfinder-Konto. Später schaltet jede Welt ihre Kreatur frei. Auswählen kannst du sie in den Einstellungen unter Emotes und Chat.',
+  'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 
 export const EN = {
@@ -50,6 +55,10 @@ export const EN = {
   'antwort.geduld.0': 'Take your time.', 'antwort.geduld.1': 'No rush.', 'antwort.geduld.2': 'Happy to wait.',
   'antwort.spannend.0': 'An exciting game!', 'antwort.spannend.1': 'Exciting, isn’t it?', 'antwort.spannend.2': 'Lots going on!',
   'antwort.zusage.0': 'Sure, anytime!', 'antwort.zusage.1': 'Count me in!', 'antwort.zusage.2': 'Gladly, one more!',
+  kreaturen: 'Creatures', labor: 'Lab', keine: 'None', maskottchen: 'Mascot',
+  begleiter: 'Emote creature', begleiterText: 'Shows Hello, Surprised, Thinking and Good game as a little creature. Only you can see them while they are in the lab.',
+  kreaturenHinweis: 'While they are in the lab, only your creator account can see them. Later each world unlocks its creature. Pick one in Settings under Emotes and chat.',
+  'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
 };
 
 registriereTexte('p-emotes', { de: DE, en: EN });

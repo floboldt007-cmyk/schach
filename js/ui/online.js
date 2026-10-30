@@ -13,6 +13,7 @@ import { t } from '../sprache.js';
 import '../sprachen/online.js';
 const O = (k, w) => t('online.' + k, w);
 import { Brett, zielKarte } from '../board.js';
+import { icon } from './icons.js';
 import { figurenPfad } from '../figurensatz.js';
 import { sanAnzeige } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
@@ -68,8 +69,8 @@ export function zeige(root, params, app) {
   function sperre() {
     if (weg) return;
     for (const el of inhalt.querySelectorAll('button, input, select')) el.disabled = busy || blockiert;
-    const angebot = inhalt.querySelector('[data-online="remis"]');
-    if (angebot && p?.remis_angebot === online.meineFarbe(p)) angebot.disabled = true;
+    const angebot = inhalt.querySelector('[data-online="angeboten"]');
+    if (angebot) angebot.disabled = true;
     brett?.erlaubeZuege(!busy && !blockiert && !widerspruch && online.binAmZug(p) ? zielKarte(chess, { turmRochade: app.einstellungen().turmRochade === true }) : null);
   }
   async function aktion(fn, danach = uebernehme, beiFehler = fehler) {
@@ -232,7 +233,11 @@ export function zeige(root, params, app) {
     const angebot = p.remis_angebot && p.remis_angebot !== online.meineFarbe(p);
     inhalt.querySelector('.on-aktionen').innerHTML = p.status !== 'laeuft' ? ''
       : widerspruch ? `<button class="knopf primaer" type="button" data-online="strittig">${esc(O('strittigMelden'))}</button><button class="knopf" type="button" data-online="aufgeben">${esc(O('aufgeben'))}</button>`
-      : `<button class="knopf" type="button" data-online="${angebot ? 'annehmen' : 'remis'}">${angebot ? O('annehmen') : p.remis_angebot ? O('angeboten') : O('anbieten')}</button><button class="knopf" type="button" data-online="aufgeben">${esc(O('aufgeben'))}</button>`;
+      // Flo 30.10. abends: "Remis anbieten okay, das mit der Fahne ist gut, Remis nur online". Die Fahne oeffnet die Wahl
+      // Remis anbieten oder Aufgeben; ein Angebot des Freundes steht als eigener Knopf daneben.
+      : `${angebot ? `<button class="knopf primaer" type="button" data-online="annehmen">${esc(O('annehmen'))}</button>`
+        : p.remis_angebot ? `<button class="knopf" type="button" data-online="angeboten" disabled>${esc(O('angeboten'))}</button>` : ''}`
+        + `<button class="knopf on-fahne" type="button" data-online="aufgeben" aria-label="${esc(O('fahneLabel'))}">${icon('flagge')}<span>${esc(O('fahne'))}</span></button>`;
     const ergebnis = inhalt.querySelector('.on-ergebnis');
     ergebnis.hidden = p.status !== 'beendet';
     if (!ergebnis.hidden) {
@@ -292,11 +297,16 @@ export function zeige(root, params, app) {
     if (a === 'strittig') aktion(() => online.meldeStrittig(p.id));
     if (a === 'aufgeben') {
       busy = true; sperre();
-      const ja = await app.frage({ titel: O('aufgebenTitel'), text: O('freundGewinnt'), knoepfe: [{ text: O('weiter'), wert: false }, { text: O('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
+      // Fahne: Remis anbieten (nur solange noch keins von dir steht) oder Aufgeben; im Widerspruch nur Aufgeben
+      const remisGeht = !widerspruch && !p.remis_angebot;
+      const wahl = await app.frage({ titel: O(remisGeht ? 'fahneTitel' : 'aufgebenTitel'), text: O(remisGeht ? 'fahneText' : 'freundGewinnt'),
+        knoepfe: [{ text: O('weiter'), wert: false }, ...(remisGeht ? [{ text: O('anbieten'), wert: 'remis' }] : []),
+          { text: O('aufgeben'), wert: true, art: 'gefahr' }], abbrechen: false });
       busy = false;
       if (weg) return;
       if (wartend) { const neu = wartend; wartend = null; uebernehme(neu); }
-      if (ja && p.status === 'laeuft') aktion(() => online.gibAuf(p.id)); else sperre();
+      if (wahl === 'remis' && p.status === 'laeuft') aktion(() => online.bieteRemis(p.id));
+      else if (wahl === true && p.status === 'laeuft') aktion(() => online.gibAuf(p.id)); else sperre();
     }
     if (a === 'revanche') aktion(() => online.erstelleEinladung({ farbe: andere(online.meineFarbe(p)), bedenkzeit: p.bedenkzeit_s, inkrement: p.inkrement_s }), oeffne);
   });

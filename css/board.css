@@ -99,7 +99,9 @@
 /* ---------- Ueberlagerungen (unter den Figuren; z-index nur fuer die Reihenfolge untereinander, .brett-felder kapselt) ---------- */
 .brett-lagen { position: absolute; inset: 0; pointer-events: none; }
 .brett .lage { position: absolute; width: 12.5%; height: 12.5%; }
-.brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; animation: brett-ein var(--b-d-m) var(--b-sanft) both; }
+/* Flo 30.10. abends: "damit man sehen kann, was der letzte Zug vom Bot war": warmes Bernstein mit Ring auf jedem Brett */
+.brett .lage.zuletzt { background: var(--b-zuletzt); z-index: 1; animation: brett-ein var(--b-d-m) var(--b-sanft) both;
+  box-shadow: inset 0 0 0 max(2px, .45cqw) var(--zuletzt-rand, rgba(232, 128, 0, .8)); }
 .brett .lage[class*="mark-"] { z-index: 2; }
 .brett .lage.schach {
   z-index: 3;

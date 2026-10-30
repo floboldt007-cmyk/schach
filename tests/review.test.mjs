@@ -385,7 +385,8 @@ function nodeTests() {
   const rf = klassifiziere(figur);
   const tf = coachText(figur, rf);
   pruefe('Coach: "Besser war Lxe4, das gewinnt den Springer auf e4"', /Besser war Lxe4, das gewinnt den Springer auf e4/.test(tf), tf);
-  pruefe('Coach: Bewertung mit Komma ("+3,5 auf +0,6")', /von \+3,5 auf \+0,6/.test(tf), tf);
+  // Flo 30.10. abends: die Zahlen stehen im Chip, der Satz beschreibt die Lage
+  pruefe('Coach: Lage statt doppelter Zahlen ("Danach stehst du schlechter")', /Danach stehst du schlechter\./.test(tf) && !/sinkt von/.test(tf), tf);
 
   const gut = coachText(basis(0.03));
   pruefe('Coach gut: "Noch etwas genauer war dxc5"', /genauer war dxc5/.test(gut), gut);

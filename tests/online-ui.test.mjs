@@ -165,7 +165,8 @@ try {
   await seite.evaluate(() => { window.__versatz += 2500; });
   const danach = await seite.evaluate(() => ({ w: window.__online.rest('w'), b: window.__online.rest('b') }));
   pruefe('Nur die aktive Server-Uhr laeuft herunter', danach.w === vorher.w && danach.b <= vorher.b - 2400, { vorher, danach });
-  await knopf('remis').click();
+  // Flo 30.10. abends: Remis ueber die Fahne (Remis anbieten oder Aufgeben)
+  await knopf('aufgeben').click(); await seite.getByRole('alertdialog').getByRole('button', { name: 'Remis anbieten', exact: true }).click();
   await seite.getByRole('button', { name: 'Remis angeboten', exact: true }).waitFor();
   pruefe('Remis anbieten erreicht den Server', weiss.remis_angebot === 'w');
   weiss.remis_angebot = 'b'; aktualisieren(weiss);
@@ -248,7 +249,7 @@ try {
   await oeffne(zaehler);
   pruefe('FEN nur in Zaehlern, Rochade und en passant anders: kein Widerspruch, Partie laeuft normal', await seite.evaluate(() => !window.__online.widerspruch()
     && !window.__online.blockiert() && window.__online.chess().history().length === 1)
-    && (await seite.locator('.on-zug').innerText()) === 'Dein Freund ist am Zug' && await knopf('remis').count() === 1 && await knopf('strittig').count() === 0);
+    && (await seite.locator('.on-zug').innerText()) === 'Dein Freund ist am Zug' && await knopf('aufgeben').count() === 1 && await knopf('strittig').count() === 0);
   // Ein behauptetes Ende wird mit chess.js nachgeprueft
   const scheinmatt = partie({ zuege: 'e2e4 e7e5' }); Object.assign(scheinmatt, { status: 'beendet', ergebnis: '0-1', grund: 'matt' }); aktualisieren(scheinmatt);
   await oeffne(scheinmatt); await seite.locator('.on-ergebnis:not([hidden])').waitFor();

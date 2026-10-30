@@ -4,6 +4,8 @@ import { hoere } from '../../ereignisse.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
+import { istErfinder } from '../../sonderstuecke.js';
+import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
 import './texte.js';
 
 const MODUL = 'emotes';
@@ -36,10 +38,25 @@ const EMOTES = Object.freeze([
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const T = (k, w) => t('p-emotes.' + k, w);
 const einstellungen = () => {
-  const e = ladeModulEinstellungen(SPEICHER, { an: true, daempfen: false });
-  return { an: e.an !== false, daempfen: e.daempfen === true };
+  const e = ladeModulEinstellungen(SPEICHER, { an: true, daempfen: false, kreatur: null });
+  return { an: e.an !== false, daempfen: e.daempfen === true, kreatur: KREATUREN.some((k) => k.id === e.kreatur) ? e.kreatur : null };
 };
 const setze = (teil) => speichereModulEinstellungen(SPEICHER, { ...einstellungen(), ...teil });
+
+// ---------- Kreaturen (js/kreaturen-kunst.js) ----------
+// Vier Emotes des Rads zeigt die gewaehlte Kreatur statt des Strichsymbols; Id, Text und Bot-Antwort bleiben gleich.
+// Erst im Labor: nur das Erfinder-Konto waehlt und sieht sie (Flo 30.10.2026); spaeter schaltet die Welt sie frei.
+const KREATUR_EMOTES = Object.freeze({ hallo: 'winken', staunen: 'staunen', denken: 'denken', gut: 'verbeugen' });
+const kreaturAktiv = (e = einstellungen(), erfinder = istErfinder()) => (erfinder && e.kreatur ? e.kreatur : null);
+// Eintraege des Rads: mit Kreatur stehen ihre vier Emotes vorn (eine Reihe), die Strichsymbole danach
+function radEintraege(kreatur = null) {
+  const eintrag = ([id]) => {
+    const art = kreatur && KREATUR_EMOTES[id];
+    return { id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: art ? kreaturSvg(kreatur, art) : icon(id), kreatur: !!art };
+  };
+  const alle = EMOTES.map(eintrag);
+  return kreatur ? [...alle.filter((e) => e.kreatur).sort((a, b) => Object.keys(KREATUR_EMOTES).indexOf(a.id) - Object.keys(KREATUR_EMOTES).indexOf(b.id)), ...alle.filter((e) => !e.kreatur)] : alle;
+}
 
 // ---------- Takt (rein, ohne DOM, in Node testbar) ----------
 // Stand je Partie: n Emotes gesendet, t Zeit des letzten Emotes (null: noch keins), a Bot-Antworten, w eigene Zuege
@@ -133,7 +150,7 @@ function popup(knopf, art, eintraege, waehlen) {
   el.innerHTML = `<div class="em-kopf"><b>${esc(T(art))}</b><button type="button" class="em-zu" aria-label="${esc(T('schliessen'))}">×</button></div><div class="em-auswahl ${art === 'emotes' ? 'em-rad' : ''}"></div>`;
   const auswahl = el.querySelector('.em-auswahl');
   for (const e of eintraege) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'em-wahl';
+    const b = document.createElement('button'); b.type = 'button'; b.className = e.kreatur ? 'em-wahl em-kreatur' : 'em-wahl';
     b.dataset.wert = e.id; b.setAttribute('aria-label', e.text); b.innerHTML = (e.svg || '') + `<span>${esc(e.text)}</span>`;
     b.addEventListener('click', () => { if (waehlen(e)) schliessen(); }); auswahl.append(b);
   }
@@ -252,7 +269,7 @@ function aktionsKnopf(k, art) {
     const vorher = auffrischen();
     if (!vorher.frei) { gesperrt(vorher); return; }
     const daten = istEmote
-      ? EMOTES.map(([id]) => ({ id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: icon(id) }))
+      ? radEintraege(kreaturAktiv())
       : Array.from({ length: 6 }, (_, i) => ({ id: String(i), schluessel: 'chat.' + i, text: T('chat.' + i) }));
     popup(b, art, daten, (e) => {
       // erneut pruefen: waehrend das Fenster offen war, kann der Gegner gezogen oder die Partie geendet haben
@@ -264,7 +281,10 @@ function aktionsKnopf(k, art) {
       const antwortet = !!bot && nr < ANTWORTEN_MAX;
       if (antwortet) s = { ...s, a: nr + 1 };
       speichere(buehne, s);
-      const inhalt = document.createElement('span'); inhalt.className = 'em-text'; inhalt.innerHTML = (e.svg || '') + `<span>${esc(e.text)}</span>`;
+      // Kreatur neben dem Text, nicht darin: der Text kuerzt auf zwei Zeilen und wuerde Kopf und Laterne abschneiden
+      const inhalt = document.createElement('span');
+      if (e.kreatur) { inhalt.className = 'em-mit-kreatur'; inhalt.innerHTML = e.svg + `<span class="em-text"><span>${esc(e.text)}</span></span>`; }
+      else { inhalt.className = 'em-text'; inhalt.innerHTML = (e.svg || '') + `<span>${esc(e.text)}</span>`; }
       kartenBlase(buehne, 'flo', 'em-eigen', inhalt, 1800);
       vorlesen(buehne, T('gesendet', { text: e.text }));
       if (antwortet) zeigeAntwort(k, e.schluessel, nr);
@@ -280,7 +300,28 @@ function gruppe() {
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche em-einstellungen';
   el.innerHTML = `<h3>${esc(T('gruppe'))}</h3>${[['an', e.an, 'anText'], ['daempfen', e.daempfen, 'daempfenText']].map(([id, an, text]) => `<label class="em-schalter"><span><b>${esc(T(id))}</b><small>${esc(T(text))}</small></span><input type="checkbox" data-em-einst="${id}" ${an ? 'checked' : ''}></label>`).join('')}`;
   el.querySelectorAll('input').forEach((x) => x.addEventListener('change', () => setze({ [x.dataset.emEinst]: x.checked })));
+  if (istErfinder()) el.append(kreaturWahl(e.kreatur));
   return el;
+}
+
+// Labor: Wahl der Emote-Kreatur (Radioknoepfe mit Bild), "Keine" zeigt wieder die Strichsymbole
+function kreaturWahl(aktiv) {
+  const f = document.createElement('fieldset'); f.className = 'em-kreaturen';
+  const wahl = (id, bild, name) => `<label class="em-k-wahl"><input type="radio" name="em-kreatur" value="${id}" ${(aktiv || 'keine') === id ? 'checked' : ''}><span class="em-k-bild" aria-hidden="true">${bild}</span><span class="em-k-name">${esc(name)}</span></label>`;
+  f.innerHTML = `<legend><b>${esc(T('begleiter'))}</b><span class="em-k-labor">${esc(T('labor'))}</span><small>${esc(T('begleiterText'))}</small></legend>
+    <div class="em-k-raster">${wahl('keine', icon('daumen'), T('keine'))}${KREATUREN.map((k) => wahl(k.id, kreaturSvg(k.id, 'normal'), T('kreatur.' + k.id))).join('')}</div>`;
+  f.querySelectorAll('input').forEach((x) => x.addEventListener('change', () => { if (x.checked) setze({ kreatur: x.value === 'keine' ? null : x.value }); }));
+  return f;
+}
+
+// Sammlung: die Kreaturen des Labors, nur fuer den Erfinder (andere sehen den Bereich erst, wenn Welten sie freischalten)
+function kreaturenBereich() {
+  if (!istErfinder()) return null;
+  const aktiv = kreaturAktiv(einstellungen(), true);
+  return bereich({ id: 'kreaturen', name: T('kreaturen'), hinweis: T('kreaturenHinweis'), teile: KREATUREN.map((k) => ({
+    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true,
+    zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
+  })) });
 }
 
 function ladeCss() {
@@ -298,8 +339,9 @@ anbieten('sammlung:bereich', () => bereich({ id: 'emotes', name: T('emotes'), te
   id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '',
   bild: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${pfad}</svg>`,
 })) }), { paket: MODUL, reihenfolge: 20 });
+anbieten('sammlung:bereich', () => kreaturenBereich(), { paket: MODUL, reihenfolge: 21 });
 
 export {
-  EMOTES, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER,
+  EMOTES, KREATUR_EMOTES, kreaturAktiv, radEintraege, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER,
   antwortText, einstellungen, neuerStand, pruefeStand, imFenster, emoteFrei, chatFrei, nachEmote, nachChat, nachEigenemZug,
 };

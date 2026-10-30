@@ -63,11 +63,14 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
   const sterne = gesamtSterne(f);
   const dreiSterne = BOTS.some((b) => sterneZahl(b.id, f) === 3);
   // eigenes Abzeichen je Erfolg, gestaffelt nach Seltenheit (js/sammlung-kunst.js); der Stern bleibt nur Rueckfall
+  const gruppe = (id) => S('gruppe.' + (/^welt-/.test(id) ? 'welten' : /^liga-/.test(id) ? 'liga' : /^serie-/.test(id) ? 'serie' : /^level-/.test(id) ? 'level' : 'meilensteine'));
   const erfolg = (id, frei, name, weg, fortschritt) => ({ id: 'erfolg-' + id, name, frei, zeile: frei ? S('geschafft') : weg,
-    bild: erfolgKunst(id) || sternBild, seltenheit: erfolgSeltenheit(id), fortschritt });
+    bild: erfolgKunst(id) || sternBild, seltenheit: erfolgSeltenheit(id), fortschritt, gruppe: gruppe(id) });
   const aus = [
     erfolg('erster-sieg', n > 0, S('erfolg.ersterSieg'), S('erfolg.ersterSiegWeg')),
     erfolg('drei-sterne', dreiSterne, S('erfolg.dreiSterne'), S('erfolg.dreiSterneWeg')),
+    erfolg('alle-bots', n === BOTS.length, S('erfolg.alleBots'), S('erfolg.alleBotsWeg', { n, alle: BOTS.length }), n / BOTS.length),
+    erfolg('alle-sterne', sterne === BOTS.length * 3, S('erfolg.alleSterne'), S('erfolg.alleSterneWeg', { n: sterne, alle: BOTS.length * 3 }), sterne / (BOTS.length * 3)),
   ];
   for (const w of WELTEN) {
     const bots = BOTS.filter((b) => b.welt === w.nr);
@@ -75,8 +78,6 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
     aus.push(erfolg('welt-' + w.nr, bots.length > 0 && k === bots.length, S('erfolg.welt', { name: w.name }),
       S('erfolg.weltWeg', { n: k, alle: bots.length }), bots.length ? k / bots.length : 0));
   }
-  aus.push(erfolg('alle-bots', n === BOTS.length, S('erfolg.alleBots'), S('erfolg.alleBotsWeg', { n, alle: BOTS.length }), n / BOTS.length));
-  aus.push(erfolg('alle-sterne', sterne === BOTS.length * 3, S('erfolg.alleSterne'), S('erfolg.alleSterneWeg', { n: sterne, alle: BOTS.length * 3 }), sterne / (BOTS.length * 3)));
   for (let s = 1; s <= LIGA_STUFEN; s++) {
     aus.push(erfolg('liga-' + s, z.ligaBest >= s, S('erfolg.liga', { stufe: S('liga.' + s) }), S('erfolg.ligaWeg', { stufe: S('liga.' + s) })));
   }
