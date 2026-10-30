@@ -8,6 +8,7 @@ import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul } from '../../storage.js';
 import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
+import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import { shopBereich } from './shop.js';
 import { erfinderBereich } from './erfinder.js';
@@ -17,7 +18,7 @@ import './texte.js';
 const PAKET = 'sammlung';
 const S = (k, w) => t('p-sammlung.' + k, w);
 // Farben wie die Brettwahl in js/ui/partie.js (BRETTER): hell, dunkel
-const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6'], ['gruen', '#eeeed2', '#769656'], ['holz', '#f0d9b5', '#b58863']]);
+const BRETTER = Object.freeze([['nacht', '#e4e8f6', '#7c87b6', '#2A3150'], ['gruen', '#eeeed2', '#769656', '#3E5A2A'], ['holz', '#f0d9b5', '#b58863', '#6E4420']]);
 
 if (typeof document !== 'undefined' && !document.querySelector('link[data-paket="sammlung"]')) {
   const css = document.createElement('link'); css.rel = 'stylesheet'; css.dataset.paket = PAKET;
@@ -25,18 +26,17 @@ if (typeof document !== 'undefined' && !document.querySelector('link[data-paket=
   document.head.appendChild(css);
 }
 
-const brettBild = (h, d) => `<svg viewBox="0 0 4 4" class="sa-brett"><path fill="${h}" d="M0 0h4v4H0z"/><path fill="${d}" d="M1 0h1v1H1zM3 0h1v1H3zM0 1h1v1H0zM2 1h1v1H2zM1 2h1v1H1zM3 2h1v1H3zM0 3h1v1H0zM2 3h1v1H2z"/></svg>`;
 const klangBild = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/></svg>';
 const sternBild = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg>';
 
 export function teileBretter(e = ladeEinstellungen()) {
-  return BRETTER.map(([id, h, d]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: e.brett === id, zeile: e.brett === id ? S('an') : S('frei'), bild: brettBild(h, d) }));
+  return BRETTER.map(([id, h, d, r]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: e.brett === id, zeile: e.brett === id ? S('an') : S('frei'), bild: brettKunst(h, d, r) }));
 }
 
 export function teileKlaenge(e = ladeEinstellungen()) {
   // '' heisst: Standard der Ansicht (heute Arcade, js/sounds.js)
   const gewaehlt = PAKETE_KLANG[e.klangpaket] ? e.klangpaket : 'arcade';
-  return Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangBild }));
+  return Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangKunst(id) || klangBild }));
 }
 
 // Was die Erfolge ausser den Bot-Ergebnissen lesen (nur lesen, nie schreiben): beste Liga-Stufe aller Saisons
@@ -62,7 +62,9 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
   const n = besiegteBots(f);
   const sterne = gesamtSterne(f);
   const dreiSterne = BOTS.some((b) => sterneZahl(b.id, f) === 3);
-  const erfolg = (id, frei, name, weg, fortschritt) => ({ id: 'erfolg-' + id, name, frei, zeile: frei ? S('geschafft') : weg, bild: sternBild, fortschritt });
+  // eigenes Abzeichen je Erfolg, gestaffelt nach Seltenheit (js/sammlung-kunst.js); der Stern bleibt nur Rueckfall
+  const erfolg = (id, frei, name, weg, fortschritt) => ({ id: 'erfolg-' + id, name, frei, zeile: frei ? S('geschafft') : weg,
+    bild: erfolgKunst(id) || sternBild, seltenheit: erfolgSeltenheit(id), fortschritt });
   const aus = [
     erfolg('erster-sieg', n > 0, S('erfolg.ersterSieg'), S('erfolg.ersterSiegWeg')),
     erfolg('drei-sterne', dreiSterne, S('erfolg.dreiSterne'), S('erfolg.dreiSterneWeg')),
