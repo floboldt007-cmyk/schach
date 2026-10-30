@@ -4,7 +4,8 @@
 // 'sammeln' (storage.js MODUL_BUDGET), Schluessel profil. Welche Rahmen und Errungenschaften frei sind, weiss nur das
 // Paket sammlung (js/pakete/sammlung/profil.js); hier stehen nur Aussehen und Wahl.
 //
-//   FIGUREN, RAHMEN                    Auswahl (Rahmen: id -> { ring, glanz? }; 'ohne' = kein Ring, der Standard)
+//   FIGUREN, RAHMEN                    Auswahl (Rahmen: id -> { ring, glanz? }; 'ohne' = kein Ring, der Standard); das Bild
+//                                      zeichnet js/rahmen-kunst.js, ring/glanz bleiben der Rueckfall
 //   profilWahl() -> { figur, rahmen, vitrine: [id|null x3] }
 //   setzeProfilWahl(teil)              merkt figur, rahmen oder vitrine (unbekannte Werte fallen auf den Standard)
 import { ladeModulEinstellungen, speichereModulEinstellungen } from './storage.js';
@@ -30,6 +31,11 @@ export const RAHMEN = Object.freeze({
   'serie-30': Object.freeze({ ring: '#C2561A', glanz: '#E0A22B' }),
   'serie-100': Object.freeze({ ring: '#B23A3A', glanz: '#E0A22B' }),
   'erfinder-blatt-0': Object.freeze({ ring: '#14161C', glanz: '#E0A22B' }),
+  // Labor (Flo 30.10.2026): neue Rahmen, zuerst nur fuer den Erfinder; Flo entscheidet frei, erspielbar oder Shop
+  brett: Object.freeze({ ring: '#26221E', glanz: '#F2EDE3' }),
+  drache: Object.freeze({ ring: '#2E1F47', glanz: '#3FA77A' }),
+  neon: Object.freeze({ ring: '#2CF2FF', glanz: '#FF3DCB' }),
+  pixel: Object.freeze({ ring: '#FFD23F', glanz: '#4D9DE0' }),
 });
 const ID = /^[a-z0-9-]{2,60}$/;
 

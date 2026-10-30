@@ -12,6 +12,7 @@ import { anbieten } from '../../orte.js';
 import { bereich } from '../../ui/ich.js';
 import { sheet } from '../../ui/bauteile.js';
 import { floAvatar } from '../../thema.js';
+import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
 import { profilWahl, setzeProfilWahl, FIGUREN, RAHMEN } from '../../profil.js';
 import { istErfinder, hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { WELTEN } from '../../bots.js';
@@ -33,6 +34,8 @@ function rahmenListe() {
   for (const w of WELTEN) liste.push({ id: 'welt-' + w.nr, gruppe: 'welten', name: w.name, erfolg: 'erfolg-welt-' + w.nr });
   for (const n of SERIE_ZIELE) liste.push({ id: 'serie-' + n, gruppe: 'treue', name: S('rahmen.serie', { n }), erfolg: 'erfolg-serie-' + n });
   if (hatSonderstueck(ERFINDER.banner)) liste.push({ id: 'erfinder-blatt-0', gruppe: 'erfinder', name: S('erfinder.banner'), erfolg: null });
+  // Labor: nur der Erfinder sieht und benutzt sie (Flo entscheidet spaeter frei, erspielbar oder Shop)
+  if (istErfinder()) for (const lid of ['brett', 'drache', 'neon', 'pixel']) liste.push({ id: lid, gruppe: 'labor', name: S('rahmen.' + lid), erfolg: null, labor: true });
   return liste.filter((r) => RAHMEN[r.id]);
 }
 
@@ -42,17 +45,14 @@ export function rahmenTeile(erfolge = teileErfolge()) {
   return rahmenListe().map((r) => {
     const e = r.erfolg ? nachId.get(r.erfolg) : null;
     const frei = erfinder || !r.erfolg || !!(e && e.frei);
-    return { id: r.id, gruppe: r.gruppe, name: r.name, frei, weg: frei ? '' : (e ? e.zeile : '') };
+    return { id: r.id, gruppe: r.gruppe, name: r.name, frei, weg: frei ? '' : (e ? e.zeile : ''), fortschritt: e && Number.isFinite(e.fortschritt) ? e.fortschritt : null,
+      seltenheit: RAHMEN_KUNST[r.id] || null, labor: !!r.labor };
   });
 }
 
-// kleines Bild eines Rahmens (Ring um eine dunkle Scheibe)
+// kleines Bild eines Rahmens: dunkle Scheibe mit der Rahmen-Kunst (js/rahmen-kunst.js), 'ohne' als gestrichelter Kreis
 function rahmenBild(id) {
-  const r = RAHMEN[id] || RAHMEN.ohne;
-  const ring = r.ring ? `<circle cx="24" cy="24" r="19" fill="none" stroke="${r.ring}" stroke-width="5"/>`
-    + (r.glanz ? `<circle cx="24" cy="24" r="16" fill="none" stroke="${r.glanz}" stroke-width="1.2"/>` : '')
-    : '<circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".5"/>';
-  return `<svg viewBox="0 0 48 48" class="pr-rahmen-bild" aria-hidden="true"><circle cx="24" cy="24" r="15.5" fill="#2C3038"/>${ring}</svg>`;
+  return rahmenSvg(id, { klasse: 'pr-rahmen-bild' });
 }
 
 // Errungenschaften der Vitrine, die (noch) frei sind; ein Platz mit einem nicht mehr freien Erfolg bleibt leer
@@ -153,5 +153,6 @@ anbieten('sammlung:bereich', () => {
   return bereich({ id: 'rahmen', name: S('rahmen'), teile: rahmenTeile().map((r) => ({
     id: 'rahmen-' + r.id, name: r.name, frei: r.frei, an: wahl.rahmen === r.id,
     zeile: wahl.rahmen === r.id ? S('an') : r.frei ? S('frei') : r.weg, bild: rahmenBild(r.id),
+    fortschritt: r.fortschritt, seltenheit: r.seltenheit, labor: r.labor,
   })) });
 }, { reihenfolge: 35, paket: PAKET });

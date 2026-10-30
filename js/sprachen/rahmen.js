@@ -81,6 +81,7 @@ registriereTexte('rahmen', {
     // Bestenliste
     'bestenliste.titel': 'Bestenliste',
     'sammlung.titel': 'Sammlung',
+    'sammlung.labor': 'Labor', 'sammlung.selten.selten': 'Selten', 'sammlung.selten.episch': 'Episch', 'sammlung.selten.legende': 'Legendär', 'sammlung.selten.einzig': 'Einzigartig',
     'sammlung.stand': '{frei} von {alle} freigeschaltet',
     'sammlung.leer': 'Hier erscheint, was du sammelst.',
     'sammlung.bereiche': 'Bereiche der Sammlung',
@@ -171,6 +172,7 @@ registriereTexte('rahmen', {
     'training.leerText': 'Soon you will find puzzles, a learning path, and your own slip-ups as cards here. Until then, the bots are waiting in the Arena.',
     'bestenliste.titel': 'Leaderboard',
     'sammlung.titel': 'Collection',
+    'sammlung.labor': 'Lab', 'sammlung.selten.selten': 'Rare', 'sammlung.selten.episch': 'Epic', 'sammlung.selten.legende': 'Legendary', 'sammlung.selten.einzig': 'One of a kind',
     'sammlung.stand': '{frei} of {alle} unlocked',
     'sammlung.leer': 'What you collect shows up here.',
     'sammlung.bereiche': 'Collection sections',

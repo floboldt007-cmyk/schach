@@ -111,3 +111,32 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   background: var(--flaeche); color: var(--text); font: inherit; text-align: center; }
 .pr-orden-knopf b { font-size: 12.5px; }
 .pr-leer-text { margin: 0; color: var(--text-2); }
+
+/* Aura (Flo 30.10.2026: "mehr Aura, mysterioeser, cooler"): gesperrte Stuecke als dunkle Silhouette mit "?" und leisem
+   Schimmer, Seltenheit mit eigenem Leuchten und Schild, Labor-Stuecke mit Schild "Labor" (nur der Erfinder sieht sie) */
+.sa-bild { position: relative; overflow: hidden; }
+.sa-bild > svg, .sa-geheim > svg { width: 64px; height: 64px; }
+.sa-geheim { display: grid; place-items: center; filter: brightness(0) saturate(0); opacity: .5; }
+.sa-frage { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-weight: var(--gw-titel);
+  font-size: 30px; color: var(--text-2); text-shadow: 0 0 18px color-mix(in srgb, var(--text) 30%, transparent); }
+.sa-teil[data-zustand="zu"] .sa-bild::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--text) 10%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%); animation: sa-schimmer 4.5s ease-in-out infinite; }
+@keyframes sa-schimmer { 0%, 55% { transform: translateX(-100%); } 85%, 100% { transform: translateX(100%); } }
+.sa-schild { position: absolute; top: 6px; right: 6px; font-size: 12px; font-weight: 800; letter-spacing: .04em; padding: 3px 8px;
+  border-radius: 99px; background: var(--flaeche); color: var(--text-2); box-shadow: var(--kante); }
+.sa-schild[data-seltenheit="selten"] { color: #1F5FA8; background: #DCEBFF; }
+.sa-schild[data-seltenheit="episch"] { color: #6236C4; background: #EADFFF; }
+.sa-schild[data-seltenheit="legende"] { color: #8A5300; background: #FFE9C2; }
+.sa-schild[data-seltenheit="einzig"], .sa-schild.sa-labor { color: #F5C451; background: #1C1B19; }
+.sa-teil[data-zustand="frei"][data-seltenheit="episch"], .sa-teil[data-zustand="an"][data-seltenheit="episch"] { box-shadow: var(--s1), 0 0 0 1px #A78BFA55, 0 6px 22px #8B5CF61F; }
+.sa-teil[data-zustand="frei"][data-seltenheit="legende"], .sa-teil[data-zustand="an"][data-seltenheit="legende"] { box-shadow: var(--s1), 0 0 0 1px #F5C45188, 0 8px 26px #E0A22B33; }
+.sa-teil[data-seltenheit="einzig"] { box-shadow: var(--s1), 0 0 0 1px #F5C451, 0 10px 30px #F5C45140; }
+@media (prefers-reduced-motion: reduce) { .sa-teil[data-zustand="zu"] .sa-bild::after { animation: none; } }
+.sa-teil[data-zustand="zu"] .sa-geheim > svg { width: 64px; height: 64px; }
+/* "N von M freigeschaltet" mit Balken in Gold (Flo 30.10.) */
+.sa-stand { display: grid; gap: 8px; max-width: 520px; }
+.sa-stand::after { content: ''; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--gold) calc(var(--anteil, 0) * 100%),
+  var(--grund-2, var(--flaeche-2)) calc(var(--anteil, 0) * 100%)); box-shadow: var(--kante); }
+/* gesperrte Silhouette etwas sichtbarer, in hell und dunkel */
+.sa-geheim { filter: grayscale(1) brightness(.45); opacity: .8; }

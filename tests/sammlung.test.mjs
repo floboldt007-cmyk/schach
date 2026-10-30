@@ -70,7 +70,7 @@ pruefe('Profil: Standard Koenig ohne Rahmen, leere Vitrine', JSON.stringify(prof
   && /wK\.svg/.test(floAvatar('w')) && !/stroke-width="8"/.test(floAvatar('w')));
 setzeProfilWahl({ figur: 'Q', rahmen: 'liga-2', vitrine: ['erfolg-welt-1', 'kaputt!', 'erfolg-liga-2', 'zuviel'] });
 pruefe('Profil: Figur Dame, Rahmen Silber, Vitrine hoechstens drei Plaetze, Unsinn faellt raus', profilWahl().figur === 'Q' && profilWahl().rahmen === 'liga-2'
-  && JSON.stringify(profilWahl().vitrine) === JSON.stringify(['erfolg-welt-1', null, 'erfolg-liga-2']) && /wQ\.svg/.test(floAvatar('w')) && /stroke="#C0C6CF"/.test(floAvatar('w')));
+  && JSON.stringify(profilWahl().vitrine) === JSON.stringify(['erfolg-welt-1', null, 'erfolg-liga-2']) && /wQ\.svg/.test(floAvatar('w')) && /#A9B2BE/.test(floAvatar('w')) && /rk-glanz/.test(floAvatar('w')));
 setzeProfilWahl({ figur: 'X', rahmen: 'gibts-nicht' });
 pruefe('Profil: unbekannte Figur oder Rahmen fallen auf den Standard', profilWahl().figur === 'K' && profilWahl().rahmen === 'ohne');
 pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen',
@@ -336,8 +336,8 @@ async function browserTeil() {
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
       pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
       const fin = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => ({
-        id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild svg') && !x.querySelector('.sa-bild img'), zeile: x.querySelector('.sa-zeile').textContent })));
-      pruefe(`${name}: Finisher Krone ausgewählt, Welle und König mit Schloss und Level`, fin.length === 3 && fin[0].z === 'an'
+        id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent })));
+      pruefe(`${name}: Finisher Krone ausgewählt, Welle und König geheimnisvoll (?) mit Level`, fin.length === 3 && fin[0].z === 'an'
         && fin[1].z === 'zu' && fin[1].schloss && fin[1].zeile === 'Ab Level 5' && fin[2].zeile === 'Ab Level 10', fin);
       pruefe(`${name}: nur ein Bereich sichtbar`, await s.locator('.sa-bereich:not([hidden])').count() === 1);
       await s.locator('.sa-steuer .seg[data-wert="erfolge"]').click();

@@ -22,6 +22,7 @@
 // Ereignis: window 'schach:thema' { thema, modus, aufgeloest } nach jedem Wechsel und wenn das System den
 // Modus wechselt (nur bei modus 'system').
 import { profilWahl, RAHMEN } from './profil.js';
+import { rahmenKunst } from './rahmen-kunst.js';
 import { setzeFedern } from './bewegung.js';
 
 export const MODI = Object.freeze(['system', 'hell', 'dunkel']);
@@ -138,7 +139,11 @@ export function floAvatar(farbe = 'w') {
   const r = RAHMEN[p.rahmen] || RAHMEN.ohne;
   // Pfad vom Projekt aus, damit das Bild auch auf Seiten unter tests/ und in Unterordnern laedt
   const datei = new URL(`${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}${p.figur}.svg`, new URL('../', import.meta.url)).href;
-  const ring = r.ring ? `<circle cx="60" cy="64" r="46" fill="none" stroke="${r.ring}" stroke-width="8"/>`
+  // Rahmen-Kunst (js/rahmen-kunst.js, Mitte 60/60, Ring r 46) in einem eigenen Ausschnitt um die Scheibe (60/64, r 42), damit
+  // die Bewegungen ihren Ursprung im Raum des Rahmens behalten; ohne Kunst der einfache Ring wie bisher
+  const kunst = rahmenKunst(p.rahmen);
+  const ring = kunst ? `<svg x="5" y="9" width="110" height="110" viewBox="0 0 120 120" overflow="visible">${kunst}</svg>`
+    : r.ring ? `<circle cx="60" cy="64" r="46" fill="none" stroke="${r.ring}" stroke-width="8"/>`
     + (r.glanz ? `<circle cx="60" cy="64" r="41.5" fill="none" stroke="${r.glanz}" stroke-width="1.6"/>` : '') : '';
   return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-figur="${p.figur}" data-rahmen="${p.rahmen}">`
     + `<rect width="120" height="120" fill="${w ? '#2C3038' : '#E9E3D8'}"/>`
