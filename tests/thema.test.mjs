@@ -254,8 +254,9 @@ function nodeTeil() {
   const holz = brett('html[data-brett="holz"]');
   pruefe('Feldfarben Nacht, Gruen, Holz unveraendert', nacht['--feld-hell'] === '#e4e8f6' && nacht['--feld-dunkel'] === '#7c87b6'
     && gruen['--feld-hell'] === '#eeeed2' && gruen['--feld-dunkel'] === '#769656' && holz['--feld-hell'] === '#f0d9b5' && holz['--feld-dunkel'] === '#b58863');
-  pruefe('Markierungen je Brettfarbe aus Entwurf A (zuletzt, auswahl, punkt)', [nacht, gruen, holz].every((b) => b['--zuletzt'] && b['--auswahl'] && b['--punkt'])
-    && nacht['--zuletzt'] === 'rgba(118, 206, 255, .5)' && holz['--auswahl'] === 'rgba(84, 46, 14, .24)');
+  // Flo 30.10. abends ("damit man sehen kann, was der letzte Zug vom Bot war"): letzter Zug warm in Bernstein statt hellblau
+  pruefe('Markierungen je Brettfarbe aus Entwurf A (zuletzt, auswahl, punkt), letzter Zug in Bernstein', [nacht, gruen, holz].every((b) => b['--zuletzt'] && b['--auswahl'] && b['--punkt'])
+    && nacht['--zuletzt'] === 'rgba(255, 178, 46, .5)' && holz['--auswahl'] === 'rgba(84, 46, 14, .24)');
   pruefe('Bruecke: alte Namen zeigen auf die neuen Tokens', /--ui-bg: var\(--grund\)/.test(tok) && /--ui-text: var\(--text\)/.test(tok)
     && /--stern: var\(--gold\)/.test(tok) && /--tap: var\(--tipp\)/.test(tok) && /--eval-weiss: var\(--balken-weiss\)/.test(tok));
 

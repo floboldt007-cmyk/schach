@@ -388,7 +388,8 @@ async function testeSieg(seite, h, fehler) {
   pruefe('Sofort fertig (kein Rechnen dank vorab)', await seite.locator('.an-laden').count() === 0 && await seite.locator('.an-inhalt').count() === 1);
   pruefe('Freischalt-Banner: Postbotin Paula', /Postbotin Paula/.test(await seite.locator('.an-banner').innerText()));
   // gezeigt wird genau die gespeicherte Genauigkeit der Partie (auf ihr beruht Stern 2), mit Komma
-  const genau = await seite.locator('.an-genau .an-ich-wert').innerText();
+  // seit 30.10. abends mit kleinem Prozentzeichen (<small>%</small>) dahinter
+  const genau = (await seite.locator('.an-genau .an-ich-wert').innerText()).replace(/\s*%$/, '');
   const gespeichert = ((await h.partien())[0] || {}).genauigkeit;
   pruefe('Genauigkeit sichtbar: genau der gespeicherte Wert (mindestens 80 %)', Number.isFinite(gespeichert) && gespeichert >= 80
     && genau.trim() === gespeichert.toFixed(1).replace('.', ','), `${genau} / ${gespeichert}`);

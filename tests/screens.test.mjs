@@ -305,7 +305,8 @@ async function testeAnalyse(browser, d) {
   const pfeil = await seite.evaluate(() => [...document.querySelectorAll('.an-brett .pfeil')].map((g) => g.dataset.von + g.dataset.nach));
   pruefe('Pfeil des besten Zugs', pfeil.includes(mitAnderemBesten.von + mitAnderemBesten.nach), pfeil.join(','));
   const linie = await seite.locator('.an-c-linie').textContent();
-  pruefe('Zeile "Stärkster Zug +x,y · Züge"', /Stärkster Zug\s+[+−]\d+,\d/.test(linie) && /[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
+  // Flo 30.10. abends: Zeile "Besser +x,y", Fortsetzung mit Zugnummern
+  pruefe('Zeile "Besser +x,y · Züge mit Nummern"', /Besser\s+[+−]\d+,\d/.test(linie) && /\d+(\.|…)\s*[KDTLS]?[a-h]?x?[a-h][1-8]/.test(linie), linie.replace(/\s+/g, ' '));
   const evalChip = await seite.locator('.an-c-eval').textContent();
   pruefe('Bewertungs-Chip', /[+−]?\d+,\d|M\d/.test(evalChip), evalChip);
   await bild(seite, 'analyse-bester-zug');

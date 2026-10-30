@@ -26,6 +26,10 @@
 .pk-alt { font-size: 13px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; text-decoration-thickness: 1.5px; }
 .pk-abr[data-rekord] .pk-symbol { background: var(--gold-weich); }
 .pk-abr[data-rekord] .pk-symbol .ico { color: var(--text); }
+/* Im Ergebnis: Gold nur in Ring und Zahl (Flo 30.10. abends: erst "farbiger", dann "eleganter") */
+.pk-abr .pk-symbol, .pk-abr[data-rekord] .pk-symbol { background: none; color: var(--kt-stark); box-shadow: inset 0 0 0 1.5px var(--gold); }
+.pk-abr .pk-symbol .ico, .pk-abr[data-rekord] .pk-symbol .ico { color: var(--kt-stark); }
+.pk-abr .pk-wert { color: var(--kt-stark); }
 
 /* Mini-Tafel: ueber dir, du, unter dir (deine Zeile gleitet nach oben) */
 .pk-mini { display: grid; gap: 2px; margin: 0 12px 10px; padding: 0; list-style: none; overflow: hidden; border-radius: var(--r-s); }

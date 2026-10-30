@@ -461,7 +461,7 @@ export function zeige(root, params, app) {
           ${uhrHtml('flo')}
         </div>
         <div class="spielknoepfe aktionen">
-          ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}${knopf('zuruecknehmen', 'undo', t('partie.knopf.zurueck'), '', t('partie.knopf.zurueckLabel'))}
+          ${knopf('hinweis', 'hinweis', t('partie.knopf.hinweis'), 'hinweis-k')}
           ${knopf('drehen', 'drehen', t('partie.knopf.drehen'))}${knopf('aufgeben', 'flagge', t('partie.knopf.aufgeben'), 'aufgeben')}
         </div>
       </div>
@@ -505,7 +505,6 @@ export function zeige(root, params, app) {
     else if (a === 'einstellungen') { speichereLaufend(); app.gehe('einstellungen'); }
     else if (a === 'klang') klangUmschalten(k);
     else if (a === 'hinweis') hinweis();
-    else if (a === 'zuruecknehmen') zuruecknehmen();
     else if (a === 'drehen') drehen();
     // U7: mit "Halten zum Aufgeben" entscheidet der Halte-Knopf (Tastatur: Rueckfrage, siehe unten)
     else if (a === 'aufgeben') { if (!halte) aufgebenFragen(); }
@@ -664,7 +663,6 @@ export function zeige(root, params, app) {
     const am = z.phase === 'flo';
     const ende = z.phase === 'ende';
     $('.spielknoepfe > [data-aktion="hinweis"]').disabled = !am;
-    $('.spielknoepfe > [data-aktion="zuruecknehmen"]').disabled = ende || letzterFloPly() < 0;
     $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
     const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
@@ -767,13 +765,17 @@ export function zeige(root, params, app) {
   // mehr (geoeffneter Coach-Rest ausgenommen); die Zugliste nimmt den Rest und steht still.
   const ruhig = new Map();
   let ruhigFenster = '';
-  function halteCoachHoehe() {
+  // Neues Fenster (Drehen, Fenster ziehen): die gemerkten Hoehen gelten nur fuer das alte. layout() loest sie sofort, nicht
+  // erst beim naechsten Coach-Satz; sonst schob quer eine zu hohe Gegnerkarte Flos Karte samt Uhr aus dem Bild (CI 30.10.)
+  function loeseRuhe() {
     const fenster = innerWidth + 'x' + innerHeight;
-    if (fenster !== ruhigFenster) {
-      ruhigFenster = fenster;
-      for (const el of ruhig.keys()) el.style.minHeight = '';
-      ruhig.clear();
-    }
+    if (fenster === ruhigFenster) return;
+    ruhigFenster = fenster;
+    for (const el of ruhig.keys()) el.style.minHeight = '';
+    ruhig.clear();
+  }
+  function halteCoachHoehe() {
+    loeseRuhe();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
       const h = el.offsetHeight;
@@ -893,9 +895,6 @@ export function zeige(root, params, app) {
     }
     if (anders && !['brillant', 'stark', 'bester', 'erzwungen', 'buch'].includes(k)) {
       knoepfe.push(`<button class="knopf" type="button" data-aktion="besser" data-ply="${ply}">${icon('ziel')} ${esc(t('partie.coach.besser'))}</button>`);
-    }
-    if (SCHLECHT.has(k) && ply === letzterFloPly() && z.phase !== 'ende') {
-      knoepfe.push(`<button class="knopf" type="button" data-aktion="zuruecknehmen" title="${esc(t('partie.coach.zurueckTitel'))}">${icon('undo')} ${esc(t('partie.coach.zurueck'))}</button>`);
     }
     coachZeige(`<span class="c-symbol">${symbolSvg(k)}</span>
       <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc(zugLabel(ply))}</span><span class="c-eval zahl">${esc(evalT)}</span>${combo}</div>
@@ -1515,6 +1514,8 @@ export function zeige(root, params, app) {
     zeichneKnoepfe();
   }
 
+  // Flo 30.10. abends: "moechte es machen, dass man keine Zuege zuruecknehmen kann". Kein Knopf mehr (Knopfreihe und
+  // Coach); die Funktion bleibt nur fuer den Test-Haken window.__partie.zuruecknehmen (Pruefung der Live-Bewertung)
   function zuruecknehmen() {
     loescheVorzuege();
     if (z.phase === 'ende' || z.phase === 'start') return;
@@ -1897,6 +1898,7 @@ export function zeige(root, params, app) {
         <div class="erg-bot"><span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
         <div class="erg-knoepfe"></div>
+        <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button>
       </div>`;
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis
@@ -2028,7 +2030,10 @@ export function zeige(root, params, app) {
         const zuKurz = eigeneZuege(p) < BESTWERT_MIN_ZUEGE && p.ergebnis !== 'sieg';
         const genauHtml = (gross) => {
           if (zuKurz) return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b>${esc(t('partie.erg.zuKurz'))}</b><span>${esc(t('partie.erg.hinweis'))}</span></div>`;
-          return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
+          // Farbe nach Guete (Flo 30.10. abends: "farbiger"), im grossen Block mit Messbalken
+          const band = !Number.isFinite(gen) ? '' : gen >= 85 ? 'stark' : gen >= 70 ? 'gut' : gen >= 50 ? 'mittel' : 'schwach';
+          const mess = gross && band ? `<span class="erg-mess" aria-hidden="true"><i style="transform:scaleX(${(Math.max(0, Math.min(100, gen)) / 100).toFixed(3)})"></i></span>` : '';
+          return `<div class="erg-genau${gross ? ' gross' : ''}"${band ? ` data-band="${band}"` : ''}>${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${mess}${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
         };
         if (ergebnis === 'sieg' && wertet) {
           if (nachtrag && mitte.querySelector('.erg-sterne')) {
@@ -2094,6 +2099,9 @@ export function zeige(root, params, app) {
               liga: z.liga ? { ...z.liga } : undefined,
             }));
           }
+          // Flo 30.10. abends: "mich stoert, dass ich nicht von da aus direkt zur Lobby kann (Startseite)"
+          const lobby = o.querySelector('.erg-lobby');
+          if (lobby) { lobby.hidden = false; lobby.onclick = () => app.gehe('arena'); }
           // Sobald das Ergebnis vollstaendig ist, steht die sinnvolle Folgeaktion im Fokus.
           // So landet VoiceOver nicht auf der inzwischen nur noch dekorativen Ergebniskarte.
           const folge = knoepfe.querySelector('[data-ziel="weiter"], [data-ziel="nochmal"], [data-ziel="ab-hier"]');
@@ -2283,6 +2291,7 @@ export function zeige(root, params, app) {
   }
   function layout() {
     if (weg || !inhaltEl || !s.isConnected) return;
+    loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
     const h2 = $('.kopf h2');
@@ -2554,7 +2563,7 @@ export function zeige(root, params, app) {
       z, brett, protokoll, bereit: false, buehne, laufId,
       chess: () => z.chess,
       phase: () => z.phase,
-      effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase,
+      effekt, zeigeBewertung, satzFuer, serieBis, merkeSerie, coachErgebnis, zeigeBlase, zuruecknehmen,
       gegnerLeiste, spielerLeiste, aktionen, mattOrt: () => mattOrt, zugBot: () => zugBot,
       // U7: Uhr-Anzeige (W0+b), Groessenrechnung, Duell-Vertrag
       uhr, fmtUhr, layout, duellBereit, halte: () => halte,

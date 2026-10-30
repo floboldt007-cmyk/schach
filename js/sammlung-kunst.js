@@ -8,9 +8,10 @@
 //   brettKunst(hell, dunkel, rand) -> string ganzes <svg> fuer ein Brett-Design
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
+//   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
 import { KUNST_TEILE } from './rahmen-kunst.js';
 
-const { id, um, verlauf, aura, kranz, orbit, lorbeer, fluegel, funke, glut, krone } = KUNST_TEILE;
+const { id, um, verlauf, orbit, funke, krone } = KUNST_TEILE;
 const svg = (inhalt, klasse = '') => `<svg viewBox="0 0 120 120"${klasse ? ` class="${klasse}"` : ''} aria-hidden="true" overflow="visible">${inhalt}</svg>`;
 const schrift = 'font-family="Manrope, system-ui, sans-serif" font-weight="800" text-anchor="middle"';
 
@@ -84,104 +85,141 @@ export function erfolgSeltenheit(eid) {
   return SELTEN[eid] || 'frei';
 }
 
-// Glanz und Aura je Seltenheit hinter dem Abzeichen
+// Eleganter Stil (Flo 30.10. abends zu den Abzeichen: "Eleganter"): feiner Metallrand, emaillierte Flaeche mit weichem
+// Licht, haarfeine Strahlen statt Zacken, kleine Funken. Je seltener, desto mehr Licht und Bewegung.
+const GOLD = ['#FFF1C1', '#D9A441', '#FFE08A', '#9C6B12'];
+const SILBER = ['#FFFFFF', '#AEB6C2', '#EEF1F5', '#7D8796'];
+const BRONZE = ['#F6C59A', '#A8622F', '#EBA978', '#6E3B17'];
+const halo = (farbe, r = 54, o = 0.4) => {
+  const g = id('h');
+  return `<defs><radialGradient id="${g}"><stop offset=".55" stop-color="${farbe}" stop-opacity="${o}"/><stop offset="1" stop-color="${farbe}" stop-opacity="0"/></radialGradient></defs>`
+    + `<circle class="rk rk-atmen" cx="60" cy="60" r="${r}" fill="url(#${g})"/>`;
+};
+// haarfeine Strahlen (jede zweite kuerzer), langsam drehend
+const haar = (n, farbe, r1, r2, o = 0.45, w = 0.7, rueck = false) => `<g class="rk ${rueck ? 'rk-drehen-langsam-rueck' : 'rk-drehen-langsam'}" style="transform-origin:60px 60px" opacity="${o}">${
+  Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2; const r = i % 2 ? r1 + (r2 - r1) * 0.55 : r2;
+    return `<line x1="${(60 + r1 * Math.cos(a)).toFixed(2)}" y1="${(60 + r1 * Math.sin(a)).toFixed(2)}" x2="${(60 + r * Math.cos(a)).toFixed(2)}" y2="${(60 + r * Math.sin(a)).toFixed(2)}" stroke="${farbe}" stroke-width="${w}" stroke-linecap="round"/>`;
+  }).join('')}</g>`;
 function hof(eid, farbe) {
   const s = erfolgSeltenheit(eid);
-  if (s === 'legende') return kranz(farbe, 8, 12) + aura(farbe, 50, 6);
-  if (s === 'episch') return aura(farbe, 50, 5) + lorbeer('#C9A13B', '#5A3A06');
+  if (s === 'legende') return halo(farbe, 60, 0.5) + haar(48, farbe, 45, 60, 0.6, 0.8) + haar(24, '#FFF6D6', 46, 53, 0.35, 0.6, true);
+  if (s === 'episch') return halo(farbe, 56, 0.38) + haar(32, farbe, 46, 56, 0.4, 0.6);
+  if (s === 'selten') return halo(farbe, 52, 0.26);
   return '';
 }
 function funken(eid, farbe = '#FFF6D6') {
   const s = erfolgSeltenheit(eid);
-  if (s === 'legende') return orbit(6, farbe, 54, 1.5) + funke(24, 26, 1, 0, farbe) + funke(96, 30, 0.8, 0.9, farbe);
-  if (s === 'episch') return funke(92, 28, 0.8, 0.4, farbe);
+  if (s === 'legende') return orbit(8, farbe, 55, 0.9) + funke(22, 30, 0.55, 0, farbe) + funke(98, 26, 0.5, 0.8, farbe) + funke(94, 96, 0.45, 1.5, farbe);
+  if (s === 'episch') return funke(96, 28, 0.5, 0.4, farbe) + funke(24, 92, 0.42, 1.2, farbe);
   return '';
 }
+// Medaillon: Metallrand, emaillierte Flaeche (Licht oben links), feine Innenlinie und Glanzbogen
+function medaillon(rand, hell, dunkel, r = 41) {
+  const gr = id('r'); const gf = id('e');
+  return `<defs>${verlauf(gr, rand)}<radialGradient id="${gf}" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${hell}"/><stop offset="1" stop-color="${dunkel}"/></radialGradient></defs>`
+    + `<circle cx="60" cy="60" r="${r + 3.2}" fill="url(#${gr})"/><circle cx="60" cy="60" r="${r}" fill="url(#${gf})"/>`
+    + `<circle cx="60" cy="60" r="${r - 3.5}" fill="none" stroke="url(#${gr})" stroke-width=".8" opacity=".55"/>`
+    + `<path d="M${60 - r * 0.72} ${60 - r * 0.42}A${r} ${r} 0 0 1 ${60 - r * 0.1} ${60 - r * 0.86}" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".28"/>`;
+}
+// schmales Schild unten mit Zahl
+const plakette = (text, rand, schriftFarbe = '#1C1B19') => {
+  const g = id('p');
+  return `<defs>${verlauf(g, rand, 1, 0)}</defs><rect x="${60 - 6 - text.length * 4}" y="88" width="${12 + text.length * 8}" height="15" rx="7.5" fill="url(#${g})"/>`
+    + `<text x="60" y="99.3" ${schrift} font-size="10.5" letter-spacing=".6" fill="${schriftFarbe}">${text}</text>`;
+};
+const glyphe = (pfad, rand, extra = '') => { const g = id('g'); return `<defs>${verlauf(g, rand, 0, 1)}</defs><path d="${pfad}" fill="url(#${g})"${extra ? ' ' + extra : ''}/>`; };
 
-const SCHILD = 'M60 14L96 26V58C96 82 80 98 60 108C40 98 24 82 24 58V26Z';
+const SCHILD = 'M60 16L94 27V57C94 80 79 95 60 105C41 95 26 80 26 57V27Z';
+const SCHILD_INNEN = 'M60 21L89 30.5V57C89 77 76 90.5 60 99.5C44 90.5 31 77 31 57V30.5Z';
 const WELT = [
   null,
-  { farbe: '#8CC66A', dunkel: '#3E6B2A', bild: (c) => `<g clip-path="url(#${c})" opacity=".55">${Array.from({ length: 30 }, (_, i) => {
-    const x = i % 6; const y = Math.floor(i / 6); return (x + y) % 2 ? '' : `<rect x="${24 + x * 12}" y="${30 + y * 12}" width="12" height="12" fill="#3E6B2A"/>`;
+  { farbe: '#7FBF62', dunkel: '#2F5A22', bild: (c) => `<g clip-path="url(#${c})" opacity=".35">${Array.from({ length: 30 }, (_, i) => {
+    const x = i % 6; const y = Math.floor(i / 6); return (x + y) % 2 ? '' : `<rect x="${24 + x * 12}" y="${30 + y * 12}" width="12" height="12" fill="#D8F0C8"/>`;
   }).join('')}</g>` },
-  { farbe: '#4E7A4A', dunkel: '#22391F', bild: () => [[44, 76, 14], [60, 68, 18], [76, 76, 14]].map(([x, y, h]) => `<path d="M${x} ${y - h * 2}L${x + h * 0.8} ${y}H${x - h * 0.8}Z" fill="#A9D59A"/><rect x="${x - 2}" y="${y}" width="4" height="6" fill="#22391F"/>`).join('') },
-  { farbe: '#9AA3AE', dunkel: '#4B535D', bild: () => '<path d="M46 44h5v6h5v-6h8v6h5v-6h5v12l-5 5v17h5v7H46v-7h5V61l-5-5Z" fill="#EEF1F5" stroke="#4B535D" stroke-width="1.5" stroke-linejoin="round"/>' },
-  { farbe: '#3E8DA8', dunkel: '#17485A', bild: () => [52, 64, 76].map((y, i) => `<path d="M32 ${y}c6-6 10-6 14 0s8 6 14 0 10-6 14 0 8 6 14 0" fill="none" stroke="#BFF1FF" stroke-width="3.5" stroke-linecap="round" opacity="${(1 - i * 0.22).toFixed(2)}"/>`).join('') },
-  { farbe: '#1F2A4F', dunkel: '#0B1230', bild: () => '<path d="M38 64c8-12 22-14 32-6l10-8v24l-10-8c-10 8-24 6-32-2Z" fill="#5FD3A6"/><circle cx="50" cy="61" r="2.2" fill="#0B1230"/>'
-    + '<circle class="rk rk-steigen" cx="72" cy="50" r="2.5" fill="#BFF1FF"/><circle class="rk rk-steigen" cx="78" cy="44" r="1.6" fill="#BFF1FF" style="animation-delay:.8s"/>' },
+  { farbe: '#4E7A4A', dunkel: '#1C3019', bild: () => [[46, 76, 12], [60, 70, 16], [74, 76, 12]].map(([x, y, h]) => `<path d="M${x} ${y - h * 2}L${x + h * 0.75} ${y}H${x - h * 0.75}Z" fill="#CDEBC2" opacity=".9"/>`).join('') },
+  { farbe: '#8E98A6', dunkel: '#3A414B', bild: () => '<path d="M48 44h4.5v5.5h4v-5.5h7v5.5h4v-5.5h4.5v11l-4.5 4.5v16h4.5v6.5H48V81h4.5V61l-4.5-4.5Z" fill="#F2F4F7" opacity=".95"/>' },
+  { farbe: '#3E8DA8', dunkel: '#123A49', bild: () => [52, 63, 74].map((y, i) => `<path d="M34 ${y}c5-5 9-5 13 0s8 5 13 0 8-5 13 0 8 5 13 0" fill="none" stroke="#D6F6FF" stroke-width="2.4" stroke-linecap="round" opacity="${(0.95 - i * 0.22).toFixed(2)}"/>`).join('') },
+  { farbe: '#24305A', dunkel: '#0A1028', bild: () => '<path d="M40 64c8-11 20-13 30-6l9-7v22l-9-7c-10 7-22 5-30-2Z" fill="#6FE0B5"/><circle cx="51" cy="61" r="1.9" fill="#0A1028"/>'
+    + '<circle class="rk rk-steigen" cx="72" cy="50" r="2" fill="#D6F6FF"/><circle class="rk rk-steigen" cx="78" cy="44" r="1.3" fill="#D6F6FF" style="animation-delay:.8s"/>' },
 ];
 
 const LIGA = [
-  null,
-  ['#F2B887', '#9A5A2E', '#E7A26C', '#7E4520'],
-  ['#FFFFFF', '#A9B2BE', '#EEF1F5', '#8792A1'],
-  ['#FFF0B0', '#D9981E', '#FFD86A', '#A86B0C'],
+  ['#E9C08C', '#A8743F', '#D4A06A', '#7C4F27'],
+  ['#F6C59A', '#A8622F', '#EBA978', '#6E3B17'],
+  ['#FFFFFF', '#AEB6C2', '#EEF1F5', '#7D8796'],
+  ['#FFF1C1', '#D9A441', '#FFE08A', '#9C6B12'],
   ['#F4FFFD', '#8FB7B3', '#E2F4F1', '#5F8F8A'],
-  ['#E6F6FF', '#5AA6F0', '#BDE8FF', '#2F7DD6'],
-  ['#F5C451', '#8B5CF6', '#F5C451', '#C084FC'],
+  ['#EAF6FF', '#5AA6F0', '#C4E6FF', '#2F6FC2'],
+  ['#F3E8FF', '#A06BF0', '#E2C8FF', '#6D3BC4'],
 ];
-const LIGA_GLANZ = [null, '#E7A26C', '#EEF1F5', '#F5C451', '#9FE8DF', '#8FD3FF', '#C084FC'];
+const LIGA_GLANZ = ['#C8925A', '#E7A26C', '#E6EAF0', '#F5C451', '#9FE8DF', '#8FD3FF', '#C084FC'];
 
 function welt(eid, nr) {
-  const w = WELT[nr]; const c = id('c'); const g = id('w');
-  return `<defs>${verlauf(g, [w.farbe, w.dunkel], 0, 1)}<clipPath id="${c}"><path d="${SCHILD}"/></clipPath></defs>${hof(eid, w.farbe)}`
-    + `<path d="${SCHILD}" fill="url(#${g})" stroke="#F5E6B8" stroke-width="4" stroke-linejoin="round"/>${w.bild(c)}`
-    + `<path d="${SCHILD}" fill="none" stroke="#1C1B19" stroke-width="1.2" opacity=".5"/>`
-    + `<text x="60" y="38" ${schrift} font-size="13" fill="#F5E6B8">${nr}</text>${funken(eid)}`;
+  const w = WELT[nr]; const c = id('c'); const g = id('w'); const gr = id('r');
+  return `<defs>${verlauf(g, [w.farbe, w.dunkel], 0, 1)}${verlauf(gr, GOLD)}<clipPath id="${c}"><path d="${SCHILD_INNEN}"/></clipPath></defs>${hof(eid, w.farbe)}`
+    + `<path d="${SCHILD}" fill="url(#${gr})"/><path d="${SCHILD_INNEN}" fill="url(#${g})"/>${w.bild(c)}`
+    + `<path d="${SCHILD_INNEN}" fill="none" stroke="#fff" stroke-width=".8" opacity=".25"/>`
+    + `<text x="60" y="40" ${schrift} font-size="10" letter-spacing="1" fill="#FFF1C1" opacity=".9">${nr}</text>${funken(eid)}`;
 }
 
 function liga(eid, stufe) {
-  const g = id('l'); const glanz = LIGA_GLANZ[stufe];
-  const pips = Array.from({ length: Math.min(stufe, 5) }, (_, i) => stern(60 + (i - (Math.min(stufe, 5) - 1) / 2) * 11, 86, 4.6, '#1C1B19', 'opacity=".55"')).join('');
-  return `<defs>${verlauf(g, LIGA[stufe])}</defs>${hof(eid, glanz)}${stufe === 6 ? fluegel('#F5C451') : ''}`
-    + `<path d="${SCHILD}" fill="url(#${g})" stroke="#1C1B19" stroke-width="2" stroke-linejoin="round" stroke-opacity=".45"/>`
-    + '<path d="M38 46L60 60L82 46V58L60 72L38 58Z" fill="#1C1B19" opacity=".28"/>'
-    + '<path d="M36 30L60 22L84 30" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/>'
-    + pips + (stufe === 6 ? krone(10, 1.1) : '') + funken(eid);
+  const g = id('l'); const gr = id('r'); const glanz = LIGA_GLANZ[stufe];
+  const n = Math.min(stufe, 5);
+  const pips = Array.from({ length: n }, (_, i) => stern(60 + (i - (n - 1) / 2) * 8.5, 85, 3, '#fff', 'opacity=".75"')).join('');
+  return `<defs>${verlauf(g, LIGA[stufe])}${verlauf(gr, stufe >= 5 ? GOLD : SILBER)}</defs>${hof(eid, glanz)}`
+    + `<path d="${SCHILD}" fill="url(#${gr})"/><path d="${SCHILD_INNEN}" fill="url(#${g})"/>`
+    + `<path d="${SCHILD_INNEN}" fill="none" stroke="#fff" stroke-width=".8" opacity=".35"/>`
+    + '<path d="M42 50L60 61L78 50" fill="none" stroke="#1C1B19" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".22"/>'
+    + '<path d="M42 60L60 71L78 60" fill="none" stroke="#1C1B19" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".14"/>'
+    + '<path d="M40 33L60 26L80 33" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>'
+    + pips + (stufe === 6 ? krone(12, 0.85, '#F5C451') : '') + funken(eid);
 }
 
 function serie(eid, n) {
-  const farben = n >= 100 ? ['#F5F3FF', '#C084FC', '#7C3AED'] : n >= 30 ? ['#E0F2FF', '#5AA6F0', '#1E5BB8'] : ['#FFE7A3', '#FF9A3C', '#E04A1F'];
+  const art = n >= 100 ? { rand: GOLD, fl: ['#FFFFFF', '#D8B4FE', '#7C3AED'], hell: '#3B1F66', dunkel: '#120726' }
+    : n >= 30 ? { rand: SILBER, fl: ['#F0F8FF', '#7CC0F5', '#1E5BB8'], hell: '#163A60', dunkel: '#061120' }
+      : { rand: BRONZE, fl: ['#FFF1C1', '#FFA94D', '#D9461E'], hell: '#4A2210', dunkel: '#1C0A04' };
   const g = id('f');
-  return `<defs>${verlauf(g, farben, 0, 1)}</defs>${hof(eid, farben[1])}`
-    + `<g class="rk-flamme"><path d="M60 10C72 28 88 40 84 64C82 84 70 96 60 96C46 96 34 86 36 66C38 50 48 44 50 28C56 38 58 42 60 48C62 36 62 24 60 10Z" fill="url(#${g})"/>`
-    + `<path d="M60 44C66 54 72 60 70 72C69 82 65 88 60 88C53 88 49 82 50 73C51 64 56 60 60 44Z" fill="${farben[0]}" opacity=".85"/></g>`
-    + '<rect x="34" y="88" width="52" height="22" rx="11" fill="#1C1B19"/>'
-    + `<text x="60" y="104" ${schrift} font-size="${n >= 100 ? 14 : 16}" fill="${farben[0]}">${n}</text>`
-    + (n >= 30 ? glut(farben[1], 4) : '') + funken(eid);
+  return `${hof(eid, art.fl[1])}${medaillon(art.rand, art.hell, art.dunkel)}<defs>${verlauf(g, art.fl, 0, 1)}</defs>`
+    + `<g class="rk-flamme"><path d="M60 30C67 40 76 47 74 61C73 73 66 80 60 80C51 80 45 73 46 62C47 53 53 49 54 40C57 45 59 48 60 51C61 44 61 37 60 30Z" fill="url(#${g})"/>`
+    + `<path d="M60 52C64 58 67 62 66 68C65 74 63 77 60 77C56 77 54 74 54 69C55 63 58 61 60 52Z" fill="${art.fl[0]}" opacity=".85"/></g>`
+    + plakette(String(n), art.rand) + funken(eid);
 }
 
 function level(eid, n) {
-  const metall = n >= 30 ? ['#FFF0B0', '#D9981E', '#FFD86A', '#A86B0C'] : n >= 20 ? ['#FFFFFF', '#A9B2BE', '#EEF1F5', '#8792A1'] : ['#F2B887', '#9A5A2E', '#E7A26C', '#7E4520'];
-  const g = id('m');
-  return `<defs>${verlauf(g, metall)}</defs>${hof(eid, metall[1])}`
-    + '<path d="M40 6H54L66 46H52Z" fill="#C2410C"/><path d="M80 6H66L54 46H68Z" fill="#1D4ED8"/>'
-    + `<circle cx="60" cy="72" r="32" fill="url(#${g})" stroke="#1C1B19" stroke-width="2" stroke-opacity=".4"/>`
-    + um(16, 27, (x, y) => `<circle cx="${x}" cy="${(y + 12).toFixed(2)}" r="1.4" fill="#1C1B19" opacity=".35"/>`)
-    + `<circle cx="60" cy="72" r="21" fill="none" stroke="#fff" stroke-width="2" opacity=".55"/>`
-    + `<text x="60" y="80" ${schrift} font-size="22" fill="#1C1B19" opacity=".8">${n}</text>` + funken(eid);
+  const art = n >= 30 ? { rand: GOLD, hell: '#5A3F0A', dunkel: '#1E1403', zahl: '#FFE08A' }
+    : n >= 20 ? { rand: SILBER, hell: '#3A4250', dunkel: '#12161D', zahl: '#EEF1F5' }
+      : { rand: BRONZE, hell: '#4A2A16', dunkel: '#1A0D05', zahl: '#F6C59A' };
+  const gz = id('z');
+  return `${hof(eid, art.rand[1])}`
+    + '<path d="M47 8H57L64 30H54Z" fill="#9F2D2D" opacity=".9"/><path d="M73 8H63L56 30H66Z" fill="#2B4C9B" opacity=".9"/>'
+    + `<g transform="translate(0 6)">${medaillon(art.rand, art.hell, art.dunkel, 36)}<defs>${verlauf(gz, art.rand, 0, 1)}</defs>`
+    + `<text x="60" y="69" ${schrift} font-size="24" letter-spacing="-.5" fill="url(#${gz})">${n}</text>`
+    + `<text x="60" y="80" ${schrift} font-size="6.5" letter-spacing="1.6" fill="${art.zahl}" opacity=".7">LEVEL</text></g>` + funken(eid);
 }
 
 const ERFOLG = {
-  'erster-sieg': () => {
-    const g = id('t');
-    return `<defs>${verlauf(g, ['#FFE7A3', '#D9981E', '#FFD86A', '#A86B0C'])}</defs>`
-      + '<path d="M38 34H26c0 14 7 22 16 24M82 34h12c0 14-7 22-16 24" fill="none" stroke="#A86B0C" stroke-width="5" stroke-linecap="round"/>'
-      + `<path d="M36 24h48v14c0 18-11 30-24 30S36 56 36 38Z" fill="url(#${g})" stroke="#6B4205" stroke-width="2"/>`
-      + '<rect x="54" y="68" width="12" height="12" fill="#A86B0C"/><path d="M42 80h36l5 16H37Z" fill="#6B4205"/>'
-      + stern(60, 44, 9, '#FFF6D6', 'opacity=".9"') + '<path d="M42 28v8" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".6"/>';
-  },
-  'drei-sterne': () => '<path d="M30 88h60l-6 12H36Z" fill="#6B4205"/>'
-    + stern(36, 64, 15, '#F5C451', 'stroke="#6B4205" stroke-width="2"') + stern(84, 64, 15, '#F5C451', 'stroke="#6B4205" stroke-width="2"')
-    + stern(60, 46, 21, '#FFD86A', 'stroke="#6B4205" stroke-width="2"') + funke(60, 16, 0.9, 0.2, '#FFF6D6'),
-  'alle-bots': () => `${hof('alle-bots', '#C084FC')}`
-    + [24, 42, 60, 78, 96].map((x, i) => figur(BAUER, x - 9, 58 + (i % 2) * 4, 0.75, ['#A9B2BE', '#E7A26C', '#F5C451', '#9FE8DF', '#8FD3FF'][i], '#1C1B19')).join('')
-    + '<path d="M22 92h76" stroke="#1C1B19" stroke-width="3" stroke-linecap="round" opacity=".4"/>'
-    + krone(38, 1.9) + `<text x="60" y="110" ${schrift} font-size="12" fill="#F5E6B8">30</text>${funken('alle-bots')}`,
-  'alle-sterne': () => `${hof('alle-sterne', '#F5C451')}`
-    + `<g class="rk rk-drehen-langsam" style="transform-origin:60px 60px">${um(8, 40, (x, y) => stern(x, y, 5, '#FFE7A3'))}</g>`
-    + stern(60, 60, 27, '#F5C451', 'stroke="#6B4205" stroke-width="2.4"') + stern(60, 60, 13, '#FFF6D6', 'opacity=".7"') + funken('alle-sterne'),
+  'erster-sieg': () => medaillon(BRONZE, '#20304F', '#0B1222')
+    + glyphe('M44 34h32v9c0 11-7 19-16 19s-16-8-16-19Z', GOLD)
+    + '<path d="M44 38h-6c0 8 4 13 9 14M76 38h6c0 8-4 13-9 14" fill="none" stroke="#D9A441" stroke-width="2.2" stroke-linecap="round"/>'
+    + glyphe('M57 61h6v9h-6ZM49 70h22l2 7H47Z', GOLD) + stern(60, 45, 5.5, '#FFF6D6', 'opacity=".9"'),
+  'drei-sterne': () => hof('drei-sterne', '#F5C451') + medaillon(GOLD, '#3D2C0C', '#140E03')
+    + glyphe(starPfad(43, 64, 9), GOLD) + glyphe(starPfad(77, 64, 9), GOLD) + glyphe(starPfad(60, 52, 13), GOLD)
+    + '<path d="M38 80Q60 90 82 80" fill="none" stroke="#D9A441" stroke-width="1.2" opacity=".6"/>' + funken('drei-sterne'),
+  'alle-bots': () => hof('alle-bots', '#C084FC') + medaillon(GOLD, '#3B2366', '#140A2A')
+    + [36, 48, 60, 72, 84].map((x, i) => `<circle cx="${x}" cy="${68 + (i % 2) * 2}" r="4" fill="${['#AEB6C2', '#EBA978', '#FFE08A', '#9FE8DF', '#8FD3FF'][i]}"/><path d="M${x - 4} ${80 + (i % 2) * 2}c0-6 2-8 4-8s4 2 4 8Z" fill="${['#AEB6C2', '#EBA978', '#FFE08A', '#9FE8DF', '#8FD3FF'][i]}" opacity=".85"/>`).join('')
+    + krone(46, 1.25, '#FFE08A') + plakette('30', GOLD) + funken('alle-bots'),
+  'alle-sterne': () => hof('alle-sterne', '#F5C451') + medaillon(GOLD, '#3D2C0C', '#140E03')
+    + `<g class="rk rk-drehen-langsam" style="transform-origin:60px 60px" opacity=".85">${um(10, 28, (x, y) => stern(x, y, 2.6, '#FFE08A'))}</g>`
+    + glyphe(starPfad(60, 60, 17), GOLD) + stern(60, 60, 7, '#FFF6D6', 'opacity=".75"') + funken('alle-sterne'),
 };
+function starPfad(cx, cy, r, n = 5, innen = 0.45) {
+  return Array.from({ length: n * 2 }, (_, i) => {
+    const a = (i / (n * 2)) * Math.PI * 2 - Math.PI / 2; const rr = i % 2 ? r * innen : r;
+    return `${i ? 'L' : 'M'}${(cx + rr * Math.cos(a)).toFixed(2)} ${(cy + rr * Math.sin(a)).toFixed(2)}`;
+  }).join('') + 'Z';
+}
 
 export function erfolgKunst(eid) {
   const s = String(eid || '');
@@ -191,9 +229,15 @@ export function erfolgKunst(eid) {
     const m = /^(welt|liga|serie|level)-(\d+)$/.exec(s);
     const n = m ? Number(m[2]) : 0;
     if (m && m[1] === 'welt' && WELT[n]) inhalt = welt(s, n);
-    else if (m && m[1] === 'liga' && LIGA[n]) inhalt = liga(s, n);
+    else if (m && m[1] === 'liga' && n >= 1 && LIGA[n]) inhalt = liga(s, n);
     else if (m && m[1] === 'serie' && SELTEN[s]) inhalt = serie(s, n);
     else if (m && m[1] === 'level' && SELTEN[s]) inhalt = level(s, n);
   }
   return inhalt ? svg(inhalt, 'sk-erfolg') : null;
+}
+
+// Liga-Wappen der Stufe 0 (Holz) bis 6 (Meister), z. B. fuer die Liga-Karte im Ergebnis
+export function ligaWappen(stufe) {
+  const n = Math.max(0, Math.min(6, Math.floor(Number(stufe) || 0)));
+  return svg(liga('liga-' + n, n), 'sk-liga');
 }

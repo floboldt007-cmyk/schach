@@ -5,6 +5,7 @@ import { addiereTage } from '../../tag.js';
 import { t, datum } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
 import { STUFEN, SAISON_TAGE, unsicherheit, vorlaeufig, kreuztabelle, belegFuer } from './wertung.js';
+import { ligaWappen } from '../../sammlung-kunst.js';
 import './texte.js';
 
 const el = (tag, klasse, text) => {
@@ -74,7 +75,9 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
   const karte = el('section', 'liga-karte');
   karte.setAttribute('aria-label', tx('karte.label'));
   const auf = el('details', 'liga-aufklappen'), summary = el('summary', 'liga-summary');
-  const badge = mitIcon('liga-wappen', 'liga-wappen');
+  // Wappen der aktuellen Stufe statt eines Sammel-Symbols (Flo 30.10.: eigenes Bild je Stueck)
+  const badge = el('span', 'liga-wappen liga-wappen-kunst');
+  badge.setAttribute('aria-hidden', 'true');
   const kopf = el('span', 'liga-kurz'), titel = el('strong', 'liga-titel'), unter = el('span', 'liga-unter');
   kopf.append(titel, unter);
   summary.append(badge, kopf, mitIcon('vor', 'liga-mehr'));
@@ -91,7 +94,9 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
   quitt.type = 'button'; quitt.addEventListener('click', verstanden);
   wechsel.append(hinweis, quitt);
   const detailOrt = el('div');
-  auf.append(wertung, club, detailOrt);
+  // Flo 30.10. abends: "Man muss sehen koennen, was fuer Ligen es gibt": die Leiter aller Stufen zuerst in den Details
+  const leiterOrt = el('div');
+  auf.append(leiterOrt, wertung, club, detailOrt);
   // Zusammenfassung, Balken und Weg bleiben sichtbar; Wertung, Klasse und Kreuztabelle oeffnen sich erst auf Antippen.
   karte.append(auf, balken, weg, regel, wechsel);
   const zeichne = () => {
@@ -114,11 +119,35 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
     club.textContent = tx('karte.club', { siege: kreuztabelle(s.meisterschaft, bots).siege, n: bots.length });
     wechsel.hidden = !s.wechsel;
     detailOrt.replaceChildren(details(s, bots));
+    leiterOrt.replaceChildren(leiter(s));
+    badge.innerHTML = ligaWappen(s.saison.stufe);
   };
   zeichne();
   const ab = hoere('liga:geaendert', zeichne);
   const timer = setInterval(() => { saisonPruefen(); zeichne(); }, 60000);
   return { el: karte, verlasse() { ab(); clearInterval(timer); } };
+}
+
+// Leiter aller Liga-Stufen von Meister bis Holz: Wappen, Schwelle, Zustand (erreicht, du bist hier, noch n Punkte)
+function leiter(s) {
+  const box = el('div', 'liga-leiter');
+  box.append(el('p', 'liga-leiter-titel', tx('leiter.titel')));
+  const liste = el('ol', 'liga-stufen');
+  liste.setAttribute('aria-label', tx('leiter.titel'));
+  for (let i = STUFEN.length - 1; i >= 0; i--) {
+    const zustand = i < s.saison.stufe ? 'erreicht' : i === s.saison.stufe ? 'hier' : 'offen';
+    const z = el('li', 'liga-stufe');
+    z.dataset.zustand = zustand;
+    z.style.setProperty('--liga-f', LIGA_FARBEN[i]);
+    const stand = zustand === 'erreicht' ? tx('leiter.erreicht') : zustand === 'hier' ? tx('leiter.hier', { punkte: s.saison.punkte })
+      : tx('leiter.noch', { n: STUFEN[i].schwelle - s.saison.punkte });
+    z.innerHTML = `<span class="liga-stufe-wappen" aria-hidden="true">${ligaWappen(i)}</span>`
+      + `<span class="liga-stufe-text"><b>${esc(stufeName(i))}</b><span>${esc(tx('leiter.ab', { n: STUFEN[i].schwelle }))}</span></span>`
+      + `<span class="liga-stufe-stand zahl">${esc(stand)}</span>`;
+    liste.append(z);
+  }
+  box.append(liste);
+  return box;
 }
 
 export function botBilanz({ bot, fortschritt }) {
@@ -129,15 +158,43 @@ export function botBilanz({ bot, fortschritt }) {
     remis: tx('bilanz.remis', { n: remis }), niederlagen: tx('bilanz.niederlagen', { n: b.niederlagen || 0 }) }));
 }
 
+// Liga im Ergebnis (Flo 30.10. abends: "Liga anzeigen", "farbiger und mehr durchdacht"): Karte mit Wappen der Stufe,
+// Stand, Balken bis zur naechsten Stufe, Aenderung und warum (Ergebnis, Genauigkeit, geschuetzte Stufe)
+const ERG = ['niederlage', 'remis', 'sieg'];
+// Farbe je Stufe: Holz, Bronze, Silber, Gold, Platin, Diamant, Meister (wie die Wappen in js/sammlung-kunst.js)
+const LIGA_FARBEN = ['#A8743F', '#C27A3E', '#A9B2BE', '#E0A22B', '#5FB3AA', '#5AA6F0', '#A855F7'];
 export function abrechnungsZeile(k, st) {
   if (!st || k.wertet !== true) return null;
   const r = belegFuer(st, k.erg?.partie?.id);
   if (!r) return null;
   const zeile = el('div', 'liga-abrechnung zahl');
   zeile.dataset.zeile = 'liga';
-  if (r[1] === st.saison.nr && r[1] > 0) {
-    zeile.textContent = tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(st.saison.stufe) });
-  } else zeile.textContent = tx(r[4] ? 'abr.blitz' : 'abr.arena', { diff: differenz(r[2]) });
+  if (!(r[1] === st.saison.nr && r[1] > 0)) {
+    zeile.textContent = tx(r[4] ? 'abr.blitz' : 'abr.arena', { diff: differenz(r[2]) });
+    return zeile;
+  }
+  const stufe = st.saison.stufe;
+  const naechste = STUFEN[stufe + 1];
+  const unten = STUFEN[stufe].schwelle;
+  const anteil = naechste ? Math.max(0, Math.min(1, (st.saison.punkte - unten) / (naechste.schwelle - unten))) : 1;
+  const grund = [];
+  if (r.length > 10 && ERG[r[10]]) grund.push(`${tx('abr.ergebnis.' + ERG[r[10]])} ${differenz(r[6])}`);
+  const g = k.erg?.partie?.genauigkeit;
+  if (r[7]) grund.push(`${Number.isFinite(g) ? tx('abr.genau', { g: Math.round(g) }) : tx('abr.genauOhne')} ${differenz(r[7])}`);
+  if (r[3] > r[6] + r[7]) grund.push(tx('abr.geschuetzt'));
+  zeile.classList.add('liga-erg');
+  zeile.dataset.stufe = String(stufe);
+  zeile.style.setProperty('--liga-f', LIGA_FARBEN[stufe] || LIGA_FARBEN[0]);
+  zeile.dataset.richtung = r[3] > 0 ? 'plus' : r[3] < 0 ? 'minus' : 'null';
+  // Die Huelle der Abrechnung macht jede Zeile zum Listeneintrag; die Summe steht fuer die Bedienhilfe im Titel
+  zeile.title = tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(stufe) });
+  zeile.innerHTML = `<span class="liga-erg-wappen" aria-hidden="true">${ligaWappen(stufe)}</span>
+    <span class="liga-erg-mitte"><span class="liga-erg-titel">${esc(tx('abr.titel'))}</span>
+      <b class="liga-erg-stand">${esc(tx('abr.stand', { stufe: stufeName(stufe), punkte: st.saison.punkte }))}</b>
+      <span class="liga-erg-balken" aria-hidden="true"><i style="transform:scaleX(${anteil.toFixed(3)})"></i></span>
+      <span class="liga-erg-weg">${esc(naechste ? tx('abr.weg', { n: naechste.schwelle - st.saison.punkte, stufe: stufeName(stufe + 1) }) : tx('abr.oben'))}</span>
+      ${grund.length ? `<span class="liga-erg-grund">${esc(grund.join(' · '))}</span>` : ''}</span>
+    <span class="liga-erg-diff">${esc(differenz(r[3]))}</span>`;
   return zeile;
 }
 

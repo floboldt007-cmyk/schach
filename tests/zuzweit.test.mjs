@@ -87,6 +87,11 @@ try {
   pruefe('Tippen und Ziehen beider Seiten, keine Engine oder Bot-Antwort', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6' && window.__workerZahl === 0));
   pruefe('Keine Hilfen, Weiss unten, obere Spielerkarte umgedreht', await seite.evaluate(() => !document.querySelector('.zz-screen .balken, .zz-screen .coach, .zz-screen [data-aktion="hinweis"], .zz-screen [data-aktion="zuruecknahme"]')
     && window.__partie.brett.ausrichtung === 'w' && document.querySelector('.zz-oben').classList.contains('zz-gegenueber')));
+  // Flo 30.10. abends: zu zweit darf man einen Zug zuruecknehmen (gegen Bots nicht)
+  await zug('f1c4');
+  await knopf('zugzurueck').click();
+  pruefe('Zu zweit: "Zug zurück" nimmt genau einen Halbzug zurück, die Seite ist wieder am Zug', await seite.evaluate(() => window.__partie.z.zuege.join(',') === 'e2e4,e7e5,g1f3,b8c6'
+    && window.__partie.chess().turn() === 'w' && window.__partie.chess().history().length === 4));
   await knopf('remis').click();
   pruefe('Andere Person entscheidet ueber Remis', (await seite.getByRole('alertdialog').innerText()).includes('Ben entscheidet'));
   await seite.getByRole('button', { name: 'Weiterspielen', exact: true }).click();
@@ -132,8 +137,9 @@ try {
   pruefe('Analyse spricht neutral', !/\b(du|dein|deine|deinen)\b/i.test(await seite.locator('.an-screen').innerText()));
   // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   const klasse = seite.locator('.an-kl:not([aria-disabled="true"])').first();
-  await klasse.click(); const erster = await seite.locator('.an-c-zug').innerText();
-  await klasse.click(); const zweiter = await seite.locator('.an-c-zug').innerText();
+  // Seit 30.10. abends steht der Name als eigenes Schild neben dem Zug (.an-c-wer), deshalb der ganze Kopf
+  await klasse.click(); const erster = await seite.locator('.an-c-kopf').innerText();
+  await klasse.click(); const zweiter = await seite.locator('.an-c-kopf').innerText();
   pruefe('Klassen-Tabelle springt zu beiden Seiten', erster !== zweiter && /Anna|Ben/.test(erster + zweiter), { erster, zweiter });
   for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height });

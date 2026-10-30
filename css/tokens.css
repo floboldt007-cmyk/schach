@@ -38,17 +38,17 @@
    Innenkante von Auswahl, Vorschau und Zielfeld unter dem Finger, A "Runde 2"). */
 :root, html[data-brett="nacht"] {
   --feld-hell: #e4e8f6; --feld-dunkel: #7c87b6;
-  --zuletzt: rgba(118, 206, 255, .5); --auswahl: rgba(28, 34, 92, .26); --punkt: rgba(28, 30, 60, .2);
+  --zuletzt: rgba(255, 178, 46, .5); --auswahl: rgba(28, 34, 92, .26); --punkt: rgba(28, 30, 60, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
 html[data-brett="gruen"] {
   --feld-hell: #eeeed2; --feld-dunkel: #769656;
-  --zuletzt: rgba(255, 236, 80, .5); --auswahl: rgba(24, 58, 12, .24); --punkt: rgba(20, 30, 10, .2);
+  --zuletzt: rgba(255, 196, 46, .55); --auswahl: rgba(24, 58, 12, .24); --punkt: rgba(20, 30, 10, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
 html[data-brett="holz"] {
   --feld-hell: #f0d9b5; --feld-dunkel: #b58863;
-  --zuletzt: rgba(214, 220, 92, .52); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
+  --zuletzt: rgba(255, 170, 40, .5); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
 :root {

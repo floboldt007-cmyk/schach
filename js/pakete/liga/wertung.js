@@ -68,15 +68,30 @@ export function ligaStufe(punkte) {
   return stufe;
 }
 
-// [E] Ein Bonuspunkt je angefangenen 100 Elo Abstand nach oben, hoechstens 15.
-// Der Sieg bleibt auch mit Genauigkeitsbonus bei hoechstens 25 Punkten.
-export function ligaPunkte(ergebnis, botElo, eigenerWert, genauigkeit = null) {
-  const bonus = Number.isFinite(genauigkeit) && genauigkeit >= 80 && genauigkeit <= 100 ? 2 : 0;
-  if (ergebnis === 'sieg') return Math.min(25, 10 + Math.min(15, Math.max(0, Math.ceil((botElo - eigenerWert) / 100))) + bonus);
-  if (ergebnis === 'remis') return 4 + bonus;
-  if (ergebnis === 'niederlage') return -3 + bonus;
+// Flo 30.10. abends (Rueckfrage zu "Liga -3"): "harte, sinnvolle Bewertung". Die Genauigkeit zaehlt stark:
+// Grundwert aus Ergebnis und Staerke des Gegners, dazu die Qualitaet der Partie. Die Schwelle der erreichten Stufe
+// bleibt geschuetzt (ligaSchritt).
+//   Sieg 10..25 (+1 je angefangenen 100 Punkten staerkerem Bot), Remis 0..12, Niederlage -20..-2 (gegen einen
+//   schwaecheren Bot teurer); Qualitaet +8 (ab 90 %) bis -12 (unter 40 %); ein Sieg bleibt immer mindestens +2.
+export function ligaBasis(ergebnis, botElo, eigenerWert) {
+  const abstand = (botElo - eigenerWert) / 100;   // > 0: der Bot ist staerker
+  if (ergebnis === 'sieg') return 10 + Math.min(15, Math.max(0, Math.ceil(abstand)));
+  if (ergebnis === 'remis') return 4 + Math.max(-4, Math.min(8, Math.round(abstand * 2)));
+  if (ergebnis === 'niederlage') return -8 + Math.max(-12, Math.min(6, Math.round(abstand * 2)));
   return 0;
 }
+export const QUALITAET = Object.freeze([[90, 8], [80, 5], [70, 2], [60, 0], [50, -4], [40, -8], [0, -12]]);
+export function ligaQualitaet(ergebnis, genauigkeit, basis = 0) {
+  if (!Number.isFinite(genauigkeit) || genauigkeit < 0 || genauigkeit > 100 || punktwert(ergebnis) == null) return 0;
+  const q = QUALITAET.find(([ab]) => genauigkeit >= ab)[1];
+  return ergebnis === 'sieg' ? Math.max(q, 2 - basis) : q;
+}
+export function ligaPunkte(ergebnis, botElo, eigenerWert, genauigkeit = null) {
+  const basis = ligaBasis(ergebnis, botElo, eigenerWert);
+  return basis + ligaQualitaet(ergebnis, genauigkeit, basis);
+}
+// Ergebnis im Beleg (Feld 11): 0 Niederlage, 1 Remis, 2 Sieg
+const ERGEBNIS = ['niederlage', 'remis', 'sieg'];
 
 export function ligaSchritt(saison, delta) {
   const alt = Math.max(stufeZahl(saison.stufe), ligaStufe(saison.punkte));
@@ -128,8 +143,9 @@ export function normalisiereStand(daten, datum) {
   }
   st.kurve = (Array.isArray(d.kurve) ? d.kurve : []).filter((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))
     .map(([n, wert]) => [ganz(n), ganz(wert)]).slice(-KURVE_MAX);
-  // Beleg: [ID, Saison, Wertungsplus, Liga-Aenderung, Blitz, Analyse erledigt, Basis, Bonus, Punkte vorher, Stufe vorher].
-  st.belege = (Array.isArray(d.belege) ? d.belege : []).filter((r) => Array.isArray(r) && r.length === 10
+  // Beleg: [ID, Saison, Wertungsplus, Liga-Aenderung, Blitz, Analyse erledigt, Basis, Qualitaet, Punkte vorher, Stufe vorher,
+  // Ergebnis]. Belege vor dem 30.10.2026 haben 10 Felder (ohne Ergebnis, Qualitaet nur +2 ab 80 %).
+  st.belege = (Array.isArray(d.belege) ? d.belege : []).filter((r) => Array.isArray(r) && (r.length === 10 || r.length === 11)
     && typeof r[0] === 'string' && r[0].length <= 40 && r.slice(1).every(Number.isFinite)).slice(-BELEGE_MAX).map((r) => r.slice());
   if (d.wechsel && Number.isInteger(d.wechsel.von) && Number.isInteger(d.wechsel.nach)) st.wechsel = { von: d.wechsel.von, nach: d.wechsel.nach };
   return st;
@@ -191,9 +207,9 @@ export function buchePartie(stand, partie, botElo, datum) {
     st.kurve.push([w.n, w.wert]);
     st.kurve = st.kurve.slice(-KURVE_MAX);
   }
-  const basis = ligaPunkte(partie.ergebnis, botElo, altWert);
+  const basis = ligaBasis(partie.ergebnis, botElo, altWert);
   const fertig = Number.isFinite(partie.genauigkeit) && partie.genauigkeit >= 0 && partie.genauigkeit <= 100 && partie.genauigkeitQuelle !== 'live';
-  const qualitaet = fertig ? ligaPunkte(partie.ergebnis, botElo, altWert, partie.genauigkeit) - basis : 0;
+  const qualitaet = fertig ? ligaQualitaet(partie.ergebnis, partie.genauigkeit, basis) : 0;
   let ligaDelta = 0;
   const punkteVorher = st.saison.punkte;
   if (st.saison.nr > 0) {
@@ -203,7 +219,8 @@ export function buchePartie(stand, partie, botElo, datum) {
     ligaDelta = st.saison.punkte - vorher;
     st.meisterschaft[partie.botId] = bestesErgebnis(st.meisterschaft[partie.botId], partie.ergebnis);
   }
-  st.belege.push([partie.id, st.saison.nr, w.wert - altWert, ligaDelta, blitz ? 1 : 0, fertig ? 1 : 0, basis, qualitaet, punkteVorher, altStufe]);
+  st.belege.push([partie.id, st.saison.nr, w.wert - altWert, ligaDelta, blitz ? 1 : 0, fertig ? 1 : 0, basis, qualitaet, punkteVorher, altStufe,
+    punktwert(partie.ergebnis) * 2]);
   st.belege = st.belege.slice(-BELEGE_MAX);
   return { stand: st, gebucht: true, elo, aufstieg: aufstiege(st, altKlasse, altStufe) };
 }
@@ -229,9 +246,11 @@ export function bucheGenauigkeit(stand, partieId, genauigkeit) {
   const laufend = r[1] === st.saison.nr;
   // Zaehlt fuer die laufende Saison oder die zuletzt archivierte (deren Stufe bestimmt den Start der laufenden).
   // Aeltere Analysen aendern nichts mehr.
-  if (r[1] > 0 && genauigkeit >= 80 && (laufend || (letzte && r[1] === letzte.nr))) {
-    const bonus = r[6] >= 10 ? Math.min(2, 25 - r[6]) : 2;
-    r[7] = bonus;
+  // Belege mit Ergebnis (seit 30.10.2026): volle Qualitaet aus der Genauigkeit, auch ins Minus. Aeltere: +2 ab 80 %.
+  const qualitaet = r.length > 10 ? ligaQualitaet(ERGEBNIS[r[10]], genauigkeit, r[6])
+    : genauigkeit >= 80 ? (r[6] >= 10 ? Math.min(2, 25 - r[6]) : 2) : 0;
+  if (r[1] > 0 && qualitaet !== 0 && (laufend || (letzte && r[1] === letzte.nr))) {
+    r[7] = qualitaet;
     // In Buchungsreihenfolge nachrechnen: auch an einer Stufengrenze ist das Ergebnis unabhaengig
     // davon, ob die Genauigkeit vor oder nach der naechsten Partie ankommt.
     if (laufend) {

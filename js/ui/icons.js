@@ -45,6 +45,7 @@ const ICONS = {
   regler: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.3"/><circle cx="9" cy="17" r="2.3"/>',
   haken: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   bauer: '<path d="M12 3.4a2.55 2.55 0 0 1 1.58 4.57c1.42.9 2.25 2.25 2.25 3.83 0 1.12-.45 2.1-1.2 2.85l.9 3.07H8.47l.9-3.07a3.98 3.98 0 0 1-1.2-2.85c0-1.58.83-2.93 2.25-3.83A2.55 2.55 0 0 1 12 3.4z" fill="currentColor" stroke="none"/><rect x="6.4" y="18.45" width="11.2" height="2.55" rx="1.27" fill="currentColor" stroke="none"/>',
+  haus: '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>',
   podest: '<path d="M3.5 20.5h17M4.5 20.5v-6h5v6M9.5 20.5V9h5v11.5M14.5 20.5v-4h5v4"/>',
   person: '<circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20.2a7.2 7.2 0 0 1 14.4 0"/>',
 };
