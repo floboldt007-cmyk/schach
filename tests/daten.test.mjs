@@ -319,7 +319,7 @@ const nurRest = () => anfragen.filter((a) => a.url.includes('/rest/v1/'));
   antworten.push({ status: 204, body: null }, { status: 204, body: null });
   await loescheKonto();
   pruefe('Löschen: rpc/konto_loeschen per POST mit dem Token, danach Abmelden', anfragen[0].url === SUPABASE_URL + '/rest/v1/rpc/konto_loeschen' && anfragen[0].method === 'POST'
-    && anfragen[0].headers.Authorization === 'Bearer ' + token('u1', 'u1@b.de') && anfragen[1].url === SUPABASE_URL + '/auth/v1/logout', anfragen.map((x) => x.url));
+    && anfragen[0].headers.Authorization === 'Bearer ' + token('u1', 'u1@b.de') && anfragen[1].url === SUPABASE_URL + '/auth/v1/logout?scope=local', anfragen.map((x) => x.url));
   pruefe('Löschen: lokal abgemeldet, Warteschlange leer, Freigabe aus, Zustimmung entfernt', konto.sitzung() === null && warteschlange().length === 0
     && storage.ladeEinstellungen().datenfreigabe === 'aus' && !m.has(ZUSTIMMUNG_SCHLUESSEL) && darfTeilen() === false);
   pruefe('Löschen: Spielstand auf dem Gerät bleibt', !!m.get('schach-arena:v1:partien'));
@@ -488,12 +488,27 @@ async function browserAblauf(browser) {
   await seite.click('.sheet-knoepfe .knopf:not(.gefahr)');
   await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg)'));
   pruefe('Browser: Abbrechen in Stufe 1 löscht nichts', !netz.some((x) => x.url.includes('konto_loeschen')) && await seite.evaluate(() => !!localStorage.getItem('schach-arena:konto:sitzung')));
+  // Doppeltipp auf "Weiter": der zweite Tipp landet nicht auf "Endgültig löschen" (gleiche Stelle im zweiten Blatt)
   await seite.click('[data-daten="loeschen"]');
+  await seite.waitForSelector('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(700);
+  await seite.dblclick('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(400);
+  pruefe('Browser: Doppeltipp auf „Weiter“ überspringt die zweite Rückfrage nicht (nichts gelöscht, Stufe 2 offen)', !netz.some((x) => x.url.includes('konto_loeschen'))
+    && /endgültig/.test(await seite.evaluate(() => document.querySelector('.sheet-ort:not(.weg) .sheet-karte')?.textContent || '')));
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg)'));
+  await seite.click('[data-daten="loeschen"]');
+  await seite.waitForSelector('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(700);
   await seite.click('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
   await seite.waitForFunction(() => /endgültig/.test(document.querySelector('.sheet-ort:not(.weg) .sheet-karte')?.textContent || ''));
   pruefe('Browser: Stufe 2 fragt noch einmal, noch nichts gelöscht', !netz.some((x) => x.url.includes('konto_loeschen')));
+  await warte(700);
   await seite.click('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
-  await seite.waitForFunction(() => !localStorage.getItem('schach-arena:konto:sitzung'), null, { timeout: 5000 }).catch(() => {});
+  // Auf das Ende warten (Meldung sichtbar), nicht nur auf das Abmelden: das entfernt die Sitzung schon vor dem Rest
+  await seite.waitForFunction(() => !localStorage.getItem('schach-arena:konto:sitzung')
+    && /Konto gelöscht/.test((document.querySelector('.daten-gruppe')?.textContent || '') + (document.querySelector('.toast')?.textContent || '')), null, { timeout: 8000 }).catch(() => {});
   const nachLoeschen = await seite.evaluate(() => ({ s: localStorage.getItem('schach-arena:konto:sitzung'), e: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).datenfreigabe,
     text: document.querySelector('.daten-gruppe')?.textContent || '', toast: document.querySelector('.toast')?.textContent || '' }));
   pruefe('Browser: nach Stufe 2 rpc/konto_loeschen, abgemeldet, Freigabe aus, Meldung', netz.some((x) => x.url.endsWith('/rest/v1/rpc/konto_loeschen') && x.methode === 'POST')

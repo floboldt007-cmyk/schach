@@ -215,6 +215,12 @@ html[data-koordinaten="aus"] .brett .koord { display: none; }
   .avatar.ich { background: var(--flo-grund); }
 }
 
+/* Als erstes fokussierbares Element nur fuer Tastaturnutzer sichtbar. */
+.zum-inhalt { position: fixed; z-index: 80; top: var(--a2); left: var(--a2); min-height: var(--tipp);
+  display: flex; align-items: center; padding: 0 var(--a4); border-radius: var(--r-m); color: var(--text);
+  background: var(--flaeche); box-shadow: var(--s2), var(--kante); transform: translateY(calc(-100% - var(--a4))); }
+.zum-inhalt:focus { transform: none; }
+
 /* ---------- Coach-Zeile: seit U7 die Coach-Karte in css/bauteile.css ---------- */
 /* ---------- Zugliste, Zugleiste, Spielknoepfe, Spielerleiste: seit U7 in css/partie.css ---------- */
 

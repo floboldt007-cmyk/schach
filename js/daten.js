@@ -346,10 +346,12 @@ function rpcFehlerText(status, code) {
 export async function loescheKonto(app = null) {
   const s = await aktiveSitzung();
   await rpc('konto_loeschen', s.access_token);
-  await abmelden();
+  // abmelden() entfernt die Sitzung sofort und wartet danach bis zu 5 s auf den Server: erst lokal aufraeumen, dann warten
+  const abgemeldet = abmelden();
   leereWarteschlange();
   try { lager().removeItem(ZUSTIMMUNG_SCHLUESSEL); lager().removeItem(WIDERRUF_SCHLUESSEL); } catch (e) { /* egal */ }
   einstellen({ datenfreigabe: 'aus' }, app);
+  await abgemeldet;
   return true;
 }
 
@@ -416,16 +418,19 @@ export function fehlerEreignis(ev) {
 
 // ---------- Oberflaeche: Gruppe "Daten" in den Einstellungen ----------
 export async function loescheKontoDialog(app) {
+  // Ein laufendes Stripe-Abo endet mit dem Konto nicht: dann sagt der Dialog, wo man es vorher kuendigt
+  let aboHinweis = '';
+  try { aboHinweis = (await import('./abo.js')).aboHinweisZumLoeschen() || ''; } catch (e) { /* ohne Abo-Modul */ }
   const weiter = await sheet({
     titel: D('daten.loeschen1Titel'),
-    text: D('daten.loeschen1Text'),
-    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false,
+    text: D('daten.loeschen1Text') + (aboHinweis ? ' ' + aboHinweis : ''),
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false, sperreMs: 600,
   });
   if (!weiter) return false;
   const ja = await sheet({
     titel: D('daten.loeschen2Titel'),
     text: D('daten.loeschen2Text'),
-    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.endgueltig'), wert: true, art: 'gefahr' }], abbrechen: false,
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.endgueltig'), wert: true, art: 'gefahr' }], abbrechen: false, sperreMs: 600,
   });
   if (!ja) return false;
   await loescheKonto(app);

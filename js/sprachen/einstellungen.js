@@ -112,10 +112,12 @@ registriereTexte('einstellungen', {
     'reset.weiter': 'Ja, weiter',
     'reset.frage2': 'Letzte Rückfrage.',
     'reset.text2': 'Das lässt sich nicht rückgängig machen.',
+    'reset.textAbgeglichen': 'Dieses Gerät ist mit der Cloud abgeglichen: Der leere Stand ersetzt auch deine Cloud-Sicherung.',
+    'reset.textNichtAbgeglichen': 'Dieses Gerät ist noch nicht mit der Cloud abgeglichen: Danach lädt die App deinen Cloud-Spielstand, falls es einen gibt.',
     'reset.endgueltig': 'Endgültig löschen',
     'reset.fertig': 'Fortschritt zurückgesetzt. {bot} wartet schon!',
     speichernFehler: 'Speichern hat nicht geklappt',
-    'info.frei': '{app} ist freie Software unter der {lizenz}. Alles läuft auf deinem Gerät, auch offline.',
+    'info.frei': '{app} ist freie Software unter der {lizenz}. Spielen, Bots und Analyse laufen auf deinem Gerät, auch offline.',
     'info.datenschutz': 'Datenschutzerklärung',
     'info.impressum': 'Impressum',
     'info.stockfish': 'Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: {link}',
@@ -125,7 +127,7 @@ registriereTexte('einstellungen', {
     'info.schriften': 'Schriften Manrope und Bricolage Grotesque',
     'info.tagesraetsel': 'Tagesrätsel',
     'info.tagesraetselText': 'Eigene Rätsel, mit Stockfish geprüft. Entstanden aus Partien der Engine gegen sich selbst und eigenen Lehr-Stellungen, keine Rätsel aus fremden Sammlungen.',
-    'info.klaenge': 'Klänge „Holz“ und „Arcade“',
+    'info.klaenge': 'Klänge „Holz“ und „Arcade“, Lobby-Melodien',
     'info.klaengeText': 'Eigene Werke, alle Rechte vorbehalten, nur zur Nutzung in dieser App',
     'info.bilder': 'Avatare, Zug-Symbole und App-Icon',
     'info.bilderText': 'Für dieses Projekt entstanden, GPL-3.0',
@@ -173,7 +175,7 @@ registriereTexte('einstellungen', {
     'start.willkommen': 'Willkommen',
     'start.seiten': 'Seiten',
     'start.seite': 'Seite {nr} von {gesamt}',
-    'start.raus': 'Ich kenne mich aus',
+    'start.raus': 'Einführung überspringen',
     'start.stufe': 'Stufe {stufe} · {titel}',
     'start.ueberspringen': 'Überspringen',
     'start.praezise': 'Präzise',
@@ -282,7 +284,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.viele': 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.',
     'daten.fehler.server': 'Der Server antwortet gerade nicht ({status}). Bitte später noch einmal versuchen.',
     'daten.fehler.sonst': 'Das hat auf dem Server nicht geklappt ({status}). Bitte später noch einmal versuchen.',
-    'daten.auskunftHinweis': 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat (mit Online-Partien, Widerruf und '
+    'daten.auskunftHinweis': 'server: was der Server von Crownmate zu deinem Konto liefert (Konto, Profil, Cloud-Spielstand-Daten, geteilte Partien und Nutzung, Online-Partien, Widerruf und '
       + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
@@ -322,6 +324,11 @@ registriereTexte('einstellungen', {
     // ---------- Konto (js/konto.js) ----------
     'konto.offline': 'Keine Verbindung. Die App funktioniert weiter offline.',
     'konto.serverfehler': 'Serverfehler ({status})',
+    'konto.codeUngueltig': 'Der Code stimmt nicht oder ist abgelaufen. Prüfe die Ziffern oder fordere einen neuen an.',
+    'konto.sitzungAbgelaufen': 'Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.',
+    'konto.emailNichtFreigegeben': 'An diese E-Mail-Adresse kann die App im Moment noch keinen Code schicken (Testphase).',
+    'konto.codeZuOft': 'Zu viele Versuche. Warte bitte kurz und versuche es dann erneut.',
+    'konto.kontoGesperrt': 'Dieses Konto ist derzeit gesperrt.',
     'konto.emailUngueltig': 'Bitte eine gültige E-Mail-Adresse eingeben.',
     'konto.sitzungUnvollstaendig': 'Die Sitzung vom Server ist unvollständig.',
     'konto.codeZiffern': 'Der Code muss aus 6 Ziffern bestehen.',
@@ -470,10 +477,12 @@ registriereTexte('einstellungen', {
     'reset.weiter': 'Yes, continue',
     'reset.frage2': 'One last check.',
     'reset.text2': 'This cannot be undone.',
+    'reset.textAbgeglichen': 'This device is synced with the cloud: the empty progress also replaces your cloud backup.',
+    'reset.textNichtAbgeglichen': 'This device is not synced with the cloud yet: afterwards the app loads your cloud progress, if there is one.',
     'reset.endgueltig': 'Delete for good',
     'reset.fertig': 'Progress reset. {bot} is already waiting!',
     speichernFehler: 'Saving did not work',
-    'info.frei': '{app} is free software under the {lizenz}. Everything runs on your device, even offline.',
+    'info.frei': '{app} is free software under the {lizenz}. Playing, bots and analysis run on your device, even offline.',
     'info.datenschutz': 'Privacy policy',
     'info.impressum': 'Legal notice',
     'info.stockfish': 'Chess engine as WebAssembly (stockfish.js, lite), GPL-3.0. Source code: {link}',
@@ -483,7 +492,7 @@ registriereTexte('einstellungen', {
     'info.schriften': 'Fonts Manrope and Bricolage Grotesque',
     'info.tagesraetsel': 'Daily puzzle',
     'info.tagesraetselText': 'Our own puzzles, checked with Stockfish. Made from games the engine played against itself and from our own teaching positions, no puzzles from other collections.',
-    'info.klaenge': 'Sounds “Wood” and “Arcade”',
+    'info.klaenge': 'Sounds “Wood” and “Arcade”, lobby melodies',
     'info.klaengeText': 'Original works, all rights reserved, for use in this app only',
     'info.bilder': 'Avatars, move icons and app icon',
     'info.bilderText': 'Made for this project, GPL-3.0',
@@ -531,8 +540,8 @@ registriereTexte('einstellungen', {
     'start.willkommen': 'Welcome',
     'start.seiten': 'Pages',
     'start.seite': 'Page {nr} of {gesamt}',
-    'start.raus': 'I know my way around',
-    'start.stufe': 'Level {stufe} · {titel}',
+    'start.raus': 'Skip intro',
+    'start.stufe': 'Stage {stufe} · {titel}',
     'start.ueberspringen': 'Skip',
     'start.praezise': 'Precise',
     'start.w1.ueber': 'Welcome to Crownmate',
@@ -640,7 +649,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.viele': 'Too many requests are coming in right now. Please wait a moment.',
     'daten.fehler.server': 'The server is not responding right now ({status}). Please try again later.',
     'daten.fehler.sonst': 'That did not work on the server ({status}). Please try again later.',
-    'daten.auskunftHinweis': 'server: everything the Crownmate server has stored about your account (including online games, withdrawal of consent and '
+    'daten.auskunftHinweis': 'server: what the Crownmate server returns for your account (account, profile, cloud progress data, shared games and usage, online games, withdrawal of consent and '
       + 'sign-in log; anmeldeprotokoll null means: not readable for this report, available from the operator on request). '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '
@@ -680,6 +689,11 @@ registriereTexte('einstellungen', {
     // ---------- Konto (js/konto.js) ----------
     'konto.offline': 'No connection. The app keeps working offline.',
     'konto.serverfehler': 'Server error ({status})',
+    'konto.codeUngueltig': 'The code is wrong or has expired. Check the digits or request a new one.',
+    'konto.sitzungAbgelaufen': 'Your sign-in has expired. Please sign in again.',
+    'konto.emailNichtFreigegeben': 'The app cannot send a code to this email address yet (test phase).',
+    'konto.codeZuOft': 'Too many attempts. Please wait briefly and try again.',
+    'konto.kontoGesperrt': 'This account is currently suspended.',
     'konto.emailUngueltig': 'Please enter a valid email address.',
     'konto.sitzungUnvollstaendig': 'The session from the server is incomplete.',
     'konto.codeZiffern': 'The code must have 6 digits.',

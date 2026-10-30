@@ -5,7 +5,7 @@
 // Leiter), Begruendung, Entdeckungs-Fahrplan (hoechstens einer je Tag, erst nach der ersten Partie, benutzt, erfahren,
 // Ende, aus), erster Screen, erster Sieg, Modul robust, Dateien (kein Math.random, keine Uhr, CSS nur Tokens), Offline-Cache.
 // Danach Browser-Teil (Playwright, Chromium) gegen die echte App mit ?test&erw=pakete/start/index: erster Start zeigt
-// Willkommen, zweiter nicht, nicht mit gespeicherter Partie; Seiten, Ueberspringen, Pfeiltasten, "Ich kenne mich aus";
+// Willkommen, zweiter nicht, nicht mit gespeicherter Partie; Seiten, Ueberspringen, Pfeiltasten, "Einfuehrung ueberspringen";
 // Regel-Hilfe (Punkte am Brett, falscher Zug, alle Figuren, Ende, Rueckweg); Einstufung mit festen Antworten -> Lisa Laeufer
 // als Probepartie (Modus frei), Leiter-Knopf, freigeschaltet ohne Probe; Heute-Karte "Neu fuer dich" (nach der ersten
 // Partie, einer je Tag, Ausblenden, naechster Tag, abschaltbar); Gruppe "Erste Schritte" (mit Zurueck); erster Sieg als
@@ -442,7 +442,7 @@ async function weiterImRaetsel(seite, index) {
   await seite.locator('.rs-weiter').click();
   if (index != null) await warteRaetsel(seite, 'z.index === a && z.phase === "flo"', index);
 }
-// Layout einer Seite: nichts ragt seitlich heraus, Knoepfe mindestens 44 px, "Ich kenne mich aus" sichtbar, Titel ganz
+// Layout einer Seite: nichts ragt seitlich heraus, Knoepfe mindestens 44 px, "Einfuehrung ueberspringen" sichtbar, Titel ganz
 const layout = (seite) => seite.evaluate(() => {
   const s = document.querySelector('.st-screen');
   const r = document.querySelector('.st-rumpf');
@@ -473,9 +473,9 @@ async function browserTeil(browser) {
     raus: !!document.querySelector('.haupt-kopf .st-raus'), punkte: document.querySelectorAll('.st-punkte button').length,
     aktuell: document.querySelector('.st-punkte [aria-current]') && document.querySelector('.st-punkte [aria-current]').dataset.ziel,
     css: !!document.querySelector('link[data-paket="start"]') }));
-  pruefe('frischer Start ohne Partien: Willkommen (#start, Seite 1 von 3, "Ich kenne mich aus" im Kopf, eigenes CSS)', erst.hash === '#start' && erst.titel === 'Willkommen · Crownmate'
+  pruefe('frischer Start ohne Partien: Willkommen (#start, Seite 1 von 3, "Einführung überspringen" im Kopf, eigenes CSS)', erst.hash === '#start' && erst.titel === 'Willkommen · Crownmate'
     && erst.h1 === 'Schach, das mit dir wächst.' && erst.raus && erst.punkte === 3 && erst.aktuell === 'w1' && erst.css, JSON.stringify(erst));
-  pruefe('beim allerersten Start kein Zurueck im Kopf (es gibt keinen Weg zurueck), nur "Ich kenne mich aus"',
+  pruefe('beim allerersten Start kein Zurueck im Kopf (es gibt keinen Weg zurueck), nur "Einführung überspringen"',
     await seite.evaluate(() => !document.querySelector('.st-screen .kopf-zurueck') && !!document.querySelector('.st-screen .st-raus')));
   pruefe('Willkommen gilt als gesehen (Modul start, Tag mit Grenze 4:00)', (await modulImBrowser(seite)).gesehen === heute);
   pruefe('Fahrplan beginnt beim ersten Start (neuer Spieler)', await seite.waitForFunction((P) => {
@@ -510,7 +510,7 @@ async function browserTeil(browser) {
   await warteSeite(seite, 'frage');
   const fr = await seite.evaluate(() => ({ h1: document.querySelector('.st-titel').textContent, wahl: [...document.querySelectorAll('.st-wahl-knopf b')].map((b) => b.textContent),
     punkte: document.querySelector('.st-punkte').hidden, raus: !!document.querySelector('.st-raus') }));
-  pruefe('danach die Frage "Kennst du die Schachregeln?" mit Ja und Nein; keine Seiten-Punkte mehr, "Ich kenne mich aus" bleibt', fr.h1 === 'Kennst du die Schachregeln?'
+  pruefe('danach die Frage "Kennst du die Schachregeln?" mit Ja und Nein; keine Seiten-Punkte mehr, "Einführung überspringen" bleibt', fr.h1 === 'Kennst du die Schachregeln?'
     && fr.wahl.join('|') === 'Ja, ich kenne sie|Nein, zeig sie mir' && fr.punkte && fr.raus, JSON.stringify(fr));
   await bild(seite, 'frage-ipad');
   // Neuladen bleibt auf der Seite (params.seite im eigenen Verlaufseintrag), nicht Seite 1
@@ -518,10 +518,10 @@ async function browserTeil(browser) {
   await warteSeite(seite, 'frage', 20000);
   pruefe('Neuladen auf der Frage: wieder die Frage (Seite im Verlaufseintrag), Hash #start', (await sz(seite)).seite === 'frage'
     && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
-  // "Ich kenne mich aus" -> Arena; der zweite Start zeigt kein Willkommen
+  // "Einfuehrung ueberspringen" -> Arena; der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
   await seite.waitForSelector('.screen.arena .knoten', { timeout: 15000 });
-  pruefe('"Ich kenne mich aus" fuehrt zur Arena', await seite.evaluate(() => location.hash) === '#arena');
+  pruefe('"Einführung überspringen" fuehrt zur Arena', await seite.evaluate(() => location.hash) === '#arena');
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
   await warte(300);
@@ -849,7 +849,7 @@ async function browserTeil(browser) {
   const zk = await n.seite.evaluate(() => ({ zurueck: !!document.querySelector('.st-screen .haupt-kopf .kopf-zurueck'), raus: !!document.querySelector('.st-screen .st-raus') }));
   if (zk.zurueck) await n.seite.locator('.st-screen .kopf-zurueck').click();
   const zuruckDa = zk.zurueck && await n.seite.waitForSelector('.es-screen .st-gruppe', { timeout: 15000 }).then(() => true, () => false);
-  pruefe('aus den Einstellungen geoeffnet: Zurueck im Kopf (neben "Ich kenne mich aus") fuehrt wieder in die Einstellungen', zk.zurueck && zk.raus && zuruckDa
+  pruefe('aus den Einstellungen geoeffnet: Zurueck im Kopf (neben "Einführung überspringen") fuehrt wieder in die Einstellungen', zk.zurueck && zk.raus && zuruckDa
     && await n.seite.evaluate(() => location.hash) === '#einstellungen', JSON.stringify(zk));
   // erster Sieg (Ereignis wie aus partie.js, Fortschritt mit genau einem Sieg)
   gruppe = 'Erster Sieg';
@@ -980,7 +980,7 @@ async function browserTeil(browser) {
   await mh.seite.goto(URL_K + '#arena');
   await mh.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
   await kopfK(mh.seite, 'kleines Handy 375 x 667');
-  // Willkommen aus den Einstellungen auf dem kleinen Handy: Zurueck, "Ich kenne mich aus" und Klang passen in den Kopf
+  // Willkommen aus den Einstellungen auf dem kleinen Handy: Zurueck, "Einfuehrung ueberspringen" und Klang passen in den Kopf
   await mh.seite.evaluate(() => window.__app.gehe('einstellungen'));
   await mh.seite.waitForSelector('.es-screen .st-gruppe', { timeout: 15000 });
   await mh.seite.locator('.st-gruppe .st-g-willkommen').click();
@@ -992,11 +992,30 @@ async function browserTeil(browser) {
       drin: knoepfe.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1 && r.height >= 44; }) };
   });
   const lk = await layout(mh.seite);
-  pruefe('kleines Handy, aus den Einstellungen geoeffnet: Zurueck, "Ich kenne mich aus" und Klang ganz im Kopf (die Marke tritt zurueck), nichts ragt heraus',
+  pruefe('kleines Handy, aus den Einstellungen geoeffnet: Zurueck, "Einführung überspringen" und Klang ganz im Kopf (die Marke tritt zurueck), nichts ragt heraus',
     kh.zurueck && kh.anzahl === 3 && kh.drin && lk.quer && lk.raus && lk.titel && !lk.klein.length, JSON.stringify({ kh, lk }));
   await bild(mh.seite, 'w1-zurueck-handy-klein');
   pruefe('keine Konsolenfehler (mit Kartei, Handy 375 x 667)', mh.fehler.length === 0, mh.fehler.join(' | '));
   await mh.kontext.close();
+
+  // Der Einstiegskopf zeigt Marke, Ueberspringen und Klang auch in der laengeren Sprache vollstaendig.
+  for (const breite of [390, 360]) for (const sprache of ['de', 'en']) {
+    const hk = await neueSeite(browser, { w: breite, h: 844, handy: true });
+    await hk.seite.goto(BASIS + `&sprache=${sprache}`);
+    await hk.seite.waitForSelector('.st-screen .st-raus', { timeout: 20000 });
+    const mass = await hk.seite.evaluate(() => {
+      const elemente = [document.querySelector('.st-screen .marke'), document.querySelector('.st-screen .st-raus'), document.querySelector('.st-screen [data-aktion="klang"]')];
+      return { texte: elemente.map((e) => e && e.textContent.trim()), drin: elemente.every((e) => {
+        if (!e || !e.getClientRects().length) return false;
+        const r = e.getBoundingClientRect();
+        return r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight && e.scrollWidth <= e.clientWidth + 1;
+      }) };
+    });
+    pruefe(`${breite} px ${sprache}: Marke, Einführung überspringen/Skip intro und Klang vollständig im Viewport`, mass.drin
+      && mass.texte[1] === (sprache === 'en' ? 'Skip intro' : 'Einführung überspringen'), JSON.stringify(mass));
+    pruefe(`${breite} px ${sprache}: keine Konsolenfehler`, hk.fehler.length === 0, hk.fehler.join(' | '));
+    await hk.kontext.close();
+  }
 
   // ---------- Handy und dunkel ----------
   for (const [name, w, h, handy, dunkel] of [['handy-hell', 390, 844, true, false], ['handy-dunkel', 390, 844, true, true], ['ipad-dunkel', 1180, 820, false, true],
@@ -1012,7 +1031,7 @@ async function browserTeil(browser) {
       }
       await warte(500);
       const l = await layout(hs.seite);
-      pruefe(`${s}: nichts ragt seitlich heraus, "Ich kenne mich aus" im Bild, Titel ganz, Knoepfe mindestens 44 px`, l.quer && l.raus && l.titel && !l.klein.length && l.punkte, JSON.stringify(l));
+      pruefe(`${s}: nichts ragt seitlich heraus, "Einführung überspringen" im Bild, Titel ganz, Knoepfe mindestens 44 px`, l.quer && l.raus && l.titel && !l.klein.length && l.punkte, JSON.stringify(l));
       if (name !== 'handy-klein' || s === 'w1') await bild(hs.seite, `${s}-${name}`);
     }
     if (handy && w === 390) {

@@ -68,10 +68,12 @@
 
   <h2>2. At a glance</h2>
   <ul>
-    <li>Without an account, Crownmate runs entirely on your device. Your progress is stored in your browser, not on a server.</li>
+    <li>Without an account, your progress is stored only in your browser, not on a server. Technically necessary requests
+    (loading the app, section 3, and the request for the subscription offer, section 9) still happen.</li>
     <li>An account is optional. It lets you back up your progress in the cloud (servers in Frankfurt).</li>
     <li>Sharing games and usage data is optional, off by default, and can be turned off at any time.</li>
-    <li>No advertising, no advertising trackers, no disclosure to third parties, and no sale of data.</li>
+    <li>No advertising, no advertising trackers, and no sale of data. Data is passed on only where a service has to do
+    something for you (sections 3 to 8).</li>
     <li>You can download your data and delete your account yourself in the app at any time.</li>
   </ul>
 
@@ -91,7 +93,18 @@
   sharing. The app does not set cookies. Fonts, images, and sounds are supplied with the app, not by external servers
   (for example, not by Google Fonts). Local storage is strictly necessary for the app to function
   (§ 25 Abs. 2 Nr. 2 TDDDG, Germany's law on data protection in telecommunications and digital services).
-  You can delete this data under Settings → Reset progress, or through your browser's website data settings.</p>
+  “Reset progress” in the settings deletes your progress, games and analyses; your settings, your sign-in and the other
+  data below remain. If you are signed in and this device is synced with the cloud, the empty progress then also
+  replaces your cloud backup; if it is not synced yet, the app then loads your cloud progress. You delete all data of
+  this app in this browser through your browser's website data settings; your account and your cloud backup remain
+  (deleting the account: section 5).</p>
+  <p>With an account, the device also stores your sign-in (session token with your account details: email address, with
+  Google also your name, profile picture address and Google ID), a fallback copy of your progress before an import from
+  the cloud, a marker showing whether this device is already synced with the cloud, subscription and age markers,
+  the record of your consent and a queue of data not yet transmitted. If you follow an invitation link, the device
+  remembers the pending online invitation, even without an account. These data are used only for the respective
+  function. “Sign out” removes the sign-in from this browser (other devices and browsers stay signed in); the other
+  entries remain until you delete the website data in your browser.</p>
   <p>The app also keeps a list of its latest technical errors (at most 50; it removes addresses, email addresses and
   identifiers first). This list stays on your device and is never sent automatically. You can see it in the settings under
   “Report for the test phase”, copy or share it yourself there, and delete it with “Clear error list”.
@@ -131,6 +144,10 @@
   delete your account. You can do so at any time in the app under Settings → Data → Delete account.
   We then immediately delete everything associated with your account in our database: the account and authentication
   data (including the Google link), username, cloud progress, shared games and usage data, and the authentication log.
+  Exception for the subscription: technical payment events from Stripe (section 7) remain without your account ID but
+  with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
+  subscription does not end with the account; cancel it first (with an active subscription the app points this out when
+  you delete the account).
   Supabase's technical server logs and backups cannot be accessed immediately: they are deleted automatically according
   to Supabase's retention periods <span class="platz">[Check Supabase retention periods: server logs, backups]</span>
   and are not used further in the meantime. Your progress on your device is unaffected.</p>
@@ -148,7 +165,7 @@
   per hour, how many games and usage events your account has shared (section 6). These counters contain only numbers, no
   content. We delete the failed attempts after two days and the counters of shared data after 48 hours, each at the next
   automatic cleanup. Until then, the counters of shared data remain even after you withdraw consent; otherwise the limit
-  could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours. If no move
+  could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours at the next clean-up. If no move
   is made for too long in a game (with a clock, 10 minutes before the second half-move; without a clock, 7 days), the server
   ends it as abandoned, without a result. Both counters are included in Download my data. The legal basis is our legitimate
   interest in a secure, working service (Art. 6 Abs. 1 lit. f DSGVO, GDPR)
@@ -173,35 +190,57 @@
   <p><b>The legal basis</b> is your consent (Art. 6 Abs. 1 lit. a DSGVO, GDPR). We store when you consented as evidence
   (Art. 7 Abs. 1 DSGVO). You can withdraw consent at any time for the future by turning the switch off. The app then stops
   sending data, discards unsent data, and deletes all previously shared games and usage data associated with your account
-  from the server (Art. 17 Abs. 1 lit. b DSGVO). If you are offline, the app completes this as soon as a connection is
-  available, before it sends anything else. We store the withdrawal time as evidence. Withdrawal does not affect the
+  from the server (Art. 17 Abs. 1 lit. b DSGVO). If you are offline, the app completes the deletion as soon as you are
+  online again and signed in on this device with the same account, before it sends anything else. If you sign out first,
+  turn the switch off once more after your next sign-in, or send us an email. We store the withdrawal time as evidence. Withdrawal does not affect the
   lawfulness of processing carried out before it (Art. 7 Abs. 3 DSGVO).</p>
   <p><b>Retention:</b> The data is tied to your account and deleted with it. Independently of that, shared games and usage
   data are deleted or aggregated so they can no longer be linked to an account after at most
   <span class="platz">[For example, 24 months]</span>.</p>
 
-  <h2>7. What never happens</h2>
+
+  <h2>7. Trainer subscription and Stripe</h2>
+  <p>The optional trainer subscription uses Stripe as payment provider: Stripe Payments Europe, Limited, <span class="platz">[ADDRESS]</span>. In particular, the account ID, email address, selected product, and payment and transaction data are sent to Stripe. Stripe processes payment details such as card numbers directly; Crownmate does not receive them in full. The legal basis is Art. 6(1)(b) GDPR. Role of Stripe (independent controller or processor) and agreement: <span class="platz">[CHECK]</span>.</p>
+  <p>In Supabase we store the state of your subscription (status, plan, valid until, Stripe customer number and
+  subscription ID); it is deleted immediately with your account. So that each Stripe event is processed exactly once, we
+  also store technical payment events (event ID and type, Stripe customer number, subscription ID, status, plan, times).
+  They are deleted at the next incoming event after 90 days; after your account is deleted they remain until then without
+  your account ID. Invoices and payment data are held by Stripe. Other recipients, transfer safeguards, and statutory
+  retention periods: <span class="platz">[CHECK AND COMPLETE]</span>.</p>
+
+  <h2>8. Coach using Anthropic</h2>
+  <p>When you have the AI coach explain a move, the server sends Anthropic, PBC, <span class="platz">[ADDRESS]</span>, only facts about the position: the position (FEN), the move played and the strongest move, the engine evaluations, the classification of the move, whether you made the move yourself, and your rough playing strength as a word (for example “beginner”). There is no free text from you. Email address, username, and account ID are not sent. Crownmate stores neither the position nor the answer. It only stores how many questions you asked on a given day (to enforce the limit); these counters are deleted after a little more than a week at the next coach request and immediately with the account. Retention at Anthropic: <span class="platz">[CHECK]</span>. The legal basis is Art. 6(1)(b) GDPR; processing agreement and international transfer: <span class="platz">[DPA DATE / SAFEGUARDS]</span>.</p>
+
+  <h2>9. Public product request</h2>
+  <p>When you open the “Crownmate Trainer” page, the app asks Supabase which subscription is offered, always without your account ID, even when you are signed in. This technically places the IP address, time, and connection data in server logs. The product request contains no account ID. Retention: <span class="platz">[PERIOD]</span>.</p>
+
+  <h2>10. Scope of data sharing and retention</h2>
+  <p>The “Share games and usage” switch controls only the voluntarily shared game archive and usage events. It does not control the account, cloud progress, online games, subscription, coach, or technically necessary logs.</p>
+  <p>Online games follow the periods in section 5: unanswered invitations are deleted after 48 hours at the next clean-up, completed games remain until one of the two accounts is deleted. Server logs, backups, and every area not fixed above are retained for <span class="platz">[PERIOD]</span>; no period is claimed until it has been set and checked.</p>
+
+  <h2>11. What never happens</h2>
   <ul>
     <li>No advertising or advertising trackers (no Google Analytics, Facebook Pixel, or fingerprinting).</li>
     <li>No tracking across websites.</li>
     <li>No disclosure to third parties for their own purposes and no sale of data. The processors listed above act
-    only on our instructions.</li>
+    only on our instructions. For the subscription, Stripe receives the data needed for the payment (section 7; whether
+    Stripe acts as an independent controller is still being checked).</li>
     <li>No profiles about you for other companies.</li>
   </ul>
 
-  <h2>8. Children and parents</h2>
-  <p>Children and young people can also use Crownmate. Without an account, all data stays on the device. If you are under 16,
+  <h2>12. Children and parents</h2>
+  <p>Children and young people can also use Crownmate. Without an account, your progress stays on the device. If you are under 16,
   ask your parents or legal guardians before creating an account. You may turn on sharing of games and usage data only
   with their consent (Art. 8 DSGVO, GDPR); the switch is therefore off by default, and the app explains this right beside
   it. Parents can request information about an account or its deletion at <span class="platz">[Email address]</span>.
   <span class="platz">[Check: set a minimum age for the app; is an age check or parental confirmation needed?]</span></p>
 
-  <h2>9. Your rights</h2>
+  <h2>13. Your rights</h2>
   <ul>
     <li><b>Access</b> (Art. 15) and <b>data portability</b> (Art. 20): in the app under Settings → Data → Download my data,
-    you receive a file containing all your account data.</li>
-    <li><b>Erasure</b> (Art. 17): use Delete account in the app, immediately for everything in our database; Supabase server
-    logs and backups expire according to their retention periods (see section 5).</li>
+    you receive a file. <span class="platz">[PLACEHOLDER: “all your account data” applies only after the parallel data-access implementation has been fully verified.]</span></li>
+    <li><b>Erasure</b> (Art. 17): use Delete account in the app, immediately for everything in our database except the
+    exceptions in section 5; Supabase server logs and backups expire according to their retention periods (see section 5).</li>
     <li><b>Rectification</b> (Art. 16): change your username in the app; request any other corrections by email.</li>
     <li><b>Restriction</b> (Art. 18) and <b>objection</b> (Art. 21): email the address given above.</li>
     <li><b>Withdrawal of consent</b> (Art. 7 Abs. 3): turn off Share games and usage; previously shared data is then deleted
@@ -211,12 +250,12 @@
   </ul>
   <p>The article references in this section refer to the DSGVO (GDPR).</p>
 
-  <h2>10. Security</h2>
+  <h2>14. Security</h2>
   <p>All connections are encrypted (TLS). On the server, row-level access rules (Row Level Security) ensure that each
   account can create and read only its own data; an account can only create shared usage data, which can be read only
   through the data access request. The app contains only a public key; secrets are held exclusively by the operator.</p>
 
-  <h2>11. Changes</h2>
+  <h2>15. Changes</h2>
   <p>This policy is updated when the app or applicable law changes. The current version is linked in the app under
   Settings → Info.</p>
 

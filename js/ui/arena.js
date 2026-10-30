@@ -35,7 +35,7 @@ import { BOTS, WELTEN, botsDerWelt, endgegnerDerWelt, rufname, botSatz, botNachI
 import { tagSchluessel, wochenSchluessel, wochentag } from '../tag.js';
 import {
   ladeFortschritt, istFreigeschaltet, naechsterGegner, gesamtSterne, statistik, hoechsterSieg, istWeltFrei, hatWeltsiegel,
-  ladeLaufendePartie, loescheLaufendePartie, ladePartien,
+  ladeLaufendePartie, loescheLaufendePartie, ladePartien, ladeEinstellungen, speichereEinstellungen,
 } from '../storage.js';
 import { klang } from '../sounds.js';
 import { fuelle, waehle } from '../orte.js';
@@ -343,6 +343,7 @@ export function zeige(root, params, app) {
   })}
     <div class="inhalt">
       <div class="karte" tabindex="-1" aria-label="${esc(t('arena.aria.karte'))}">
+        <div class="karte-zieh-hinweis" aria-hidden="true" hidden>${esc(t('arena.karte.ziehen'))}</div>
         <div class="weltwahl" role="group" aria-label="${esc(t('arena.aria.weltwahl'))}">
           <button class="ww-pfeil dr" type="button" data-richtung="-1" aria-label="${esc(t('arena.aria.vorige'))}">${icon('zurueck')}</button>
           <div class="ww-mitte" aria-live="polite"><b class="ww-name"></b><span class="ww-unter"></span></div>
@@ -361,11 +362,40 @@ export function zeige(root, params, app) {
   root.append(s);
 
   const karte = s.querySelector('.karte');
+  const ziehHinweis = s.querySelector('.karte-zieh-hinweis');
   const weltEl = s.querySelector('.welt');
   const weltSperre = s.querySelector('.welt-sperre');
   const bild = s.querySelector('.welt-bild');
   const detail = s.querySelector('.detail');
   const floFigur = s.querySelector('.flo-figur');
+
+  // Auf dem Handy ist nicht auf den ersten Blick sichtbar, dass die Landschaft selbst scrollt. Der ruhige Hinweis
+  // erscheint nur beim ersten Besuch und wird nach der ersten Zieh-Geste oder von selbst dauerhaft abgehakt.
+  const einstellungen = ladeEinstellungen();
+  let ziehStart = null;
+  let ziehErledigt = !!einstellungen.arenaKarteHinweis;
+  const schliesseZiehHinweis = () => {
+    if (ziehErledigt) return;
+    ziehErledigt = true;
+    speichereEinstellungen({ arenaKarteHinweis: true });
+    anim(ziehHinweis, [{ opacity: 1 }, { opacity: 0 }], { d: 260, k: 'raus', fill: 'forwards' }).finished.then(() => {
+      if (ziehHinweis) ziehHinweis.hidden = true;
+    });
+  };
+  const beiZiehStart = (e) => { ziehStart = e.isPrimary === false ? null : { x: e.clientX, y: e.clientY }; };
+  const beiZiehen = (e) => {
+    if (ziehStart && Math.hypot(e.clientX - ziehStart.x, e.clientY - ziehStart.y) >= 8) schliesseZiehHinweis();
+  };
+  const beiZiehEnde = () => { ziehStart = null; };
+  karte.addEventListener('pointerdown', beiZiehStart, { passive: true });
+  karte.addEventListener('pointermove', beiZiehen, { passive: true });
+  karte.addEventListener('pointerup', beiZiehEnde, { passive: true });
+  karte.addEventListener('pointercancel', beiZiehEnde, { passive: true });
+  if (!ziehErledigt && window.matchMedia('(max-width: 600px)').matches) {
+    ziehHinweis.hidden = false;
+    anim(ziehHinweis, [{ opacity: 0 }, { opacity: 1 }], { d: 360, v: 300, k: 'weich' });
+    spaeter(schliesseZiehHinweis, 5200);
+  }
 
   s.querySelector('[data-aktion="verlauf"]').addEventListener('click', () => app.gehe('verlauf'));
   // Premium-Umbau U2: Hauptseiten-Kopf (Klang-Schalter, Hell/Dunkel, Zahnrad), js/ui/seite.js
@@ -971,6 +1001,10 @@ export function zeige(root, params, app) {
       uhren.clear();
       if (beobachter) beobachter.disconnect();
       window.removeEventListener('orientationchange', beiGroesse);
+      karte.removeEventListener('pointerdown', beiZiehStart);
+      karte.removeEventListener('pointermove', beiZiehen);
+      karte.removeEventListener('pointerup', beiZiehEnde);
+      karte.removeEventListener('pointercancel', beiZiehEnde);
       for (const o of Object.values(orte)) if (o) o.verlasse();
       kopfHandle.verlasse();
     },

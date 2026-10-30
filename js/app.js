@@ -756,8 +756,32 @@ async function zeigeScreen(name, params, hash) {
     zeigeReiter(null);
     return;
   }
+  richteSprunglinkEin(root);
   zeigeReiter(name);
   sende('app:screen', { name, params: params || {} });
+}
+
+// Der Sprunglink lebt ausserhalb der einzelnen Screens, damit er bei jedem Wechsel das erste
+// fokussierbare Element bleibt. Das Ziel wird dagegen bei jedem Zeichnen neu vergeben.
+function richteSprunglinkEin(root) {
+  let link = document.querySelector('.zum-inhalt');
+  if (!link) {
+    link = document.createElement('a');
+    link.className = 'zum-inhalt';
+    link.href = '#hauptinhalt';
+    // Kein Hash-Wechsel: der Router kennt #hauptinhalt nicht und zeigte sonst die Arena (auch mitten in einer Partie)
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('hauptinhalt')?.focus();
+    });
+    document.body.insertBefore(link, document.body.firstChild);
+  }
+  link.textContent = t('rahmen.zumInhalt');
+  const ziel = root && root.querySelector('.screen');
+  if (ziel) {
+    ziel.id = 'hauptinhalt';
+    ziel.tabIndex = -1;
+  }
 }
 
 // Freundlicher Ersatz, wenn ein Screen-Modul nicht laedt (Netz) oder abstuerzt. Ein gescheiterter
@@ -789,6 +813,7 @@ function zeigePlatzhalter(root, name, kaputt = false) {
   s.querySelector('[data-aktion="neu-laden"]').addEventListener('click', () => location.reload());
   s.querySelector('[data-aktion="arena"]').addEventListener('click', () => gehe('arena', {}, { ersetzen: true }));
   root.append(s);
+  richteSprunglinkEin(root);
   return { verlasse() {} };
 }
 

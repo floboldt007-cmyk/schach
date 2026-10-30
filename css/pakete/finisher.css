@@ -1,0 +1,26 @@
+/* Finisher: Look A, nur transform und opacity bewegen. Die Effektflaeche begrenzt alles aufs Brett. */
+.finisher { position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--akzent); }
+.fi-krone, .fi-koenig { position: absolute; left: var(--fx); top: var(--fy); width: 12.5%; height: 12.5%; display: grid; place-items: center;
+  font-family: serif; font-size: clamp(24px, 7cqw, 56px); line-height: 1; transform: translate(-50%, -50%); color: var(--akzent); text-shadow: 0 1px 0 var(--flaeche); }
+.fi-krone { animation: fi-krone 1.25s var(--gleiten) both; }
+.fi-glanz { position: absolute; left: var(--fx); top: var(--fy); font-size: clamp(16px, 4cqw, 32px); color: var(--gold);
+  animation: fi-glanz .65s .65s var(--gleiten) both; }
+.fi-koenig { transform-origin: 50% 85%; animation: fi-koenig 1.55s var(--sanft) both; }
+.finisher-welle i { position: absolute; left: calc(var(--x) * 12.5%); top: calc(var(--y) * 12.5%); width: 12.5%; height: 12.5%;
+  border: 1px solid var(--linie-2); background: var(--akzent-weich); opacity: 0; animation: fi-welle .7s var(--v) var(--gleiten) both; }
+@keyframes fi-krone { 0% { transform: translate(-50%, -180%); opacity: 0; } 32%, 82% { transform: translate(-50%, -50%); opacity: 1; } 100% { transform: translate(-50%, -50%); opacity: 0; } }
+@keyframes fi-glanz { 0% { transform: translate(-10%, -20%) scale(.4); opacity: 0; } 45% { opacity: 1; } 100% { transform: translate(30%, -75%) scale(1.2); opacity: 0; } }
+@keyframes fi-koenig { 0%, 18% { transform: translate(-50%, -50%) rotate(0); opacity: 1; } 78% { transform: translate(-50%, -50%) rotate(72deg); opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(72deg); opacity: 0; } }
+@keyframes fi-welle { 0% { transform: perspective(180px) rotateX(0); opacity: 0; } 30% { transform: perspective(180px) rotateX(32deg); opacity: .72; } 75% { transform: perspective(180px) rotateX(0); opacity: .35; } 100% { transform: none; opacity: 0; } }
+.finisher.ist-ruhig > * { animation: none !important; opacity: .72; }
+.finisher.ist-ruhig .fi-glanz { display: none; }
+html[data-bewegung="aus"] .finisher > * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .finisher > * { animation: none !important; } }
+.fi-einstellungen > p { margin: 0 0 12px; color: var(--text-2); }
+.fi-auswahl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.fi-wahl { min-width: 0; min-height: var(--tap); padding: 10px 12px; border: 1px solid var(--linie); border-radius: var(--r-knopf); background: var(--flaeche-2); color: var(--text); text-align: left; }
+.fi-wahl b, .fi-wahl span { display: block; overflow-wrap: anywhere; }
+.fi-wahl span { margin-top: 2px; color: var(--text-2); font-size: 12px; }
+.fi-wahl[aria-checked="true"] { border-color: var(--akzent); background: var(--akzent-weich); }
+.fi-wahl:disabled { opacity: .58; }
+@media (max-width: 430px) { .fi-auswahl { grid-template-columns: 1fr; } }

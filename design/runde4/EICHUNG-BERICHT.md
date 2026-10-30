@@ -463,3 +463,40 @@ try {
 }
 ```
 
+
+## Runde 2: Nachkalibrierung und Blindprobe (29.10.2026)
+
+### Änderungen gegenüber der vorläufigen Fassung
+
+Die zweite Runde verändert weiterhin ausschließlich `staerke`-Werte. Benno wurde durch mehr Rauschen und spontane Züge abgeschwächt, Paula zugleich durch weniger Rauschen und Patzer gestärkt. Damit wird der in Runde 1 gemessene Abstand von nur 6 Elo nicht bloß auf einer Seite der Grenze korrigiert. Bei den gebremsten Stockfish-Profilen entsprechen Keetan, Ragna und Silas nun wieder ihren angezeigten 2500, 2600 und 2700 UCI_Elo. Der unbegrenzte Stockfisch bleibt unverändert. Alva nutzt als letzte gebremste Gegnerin die vom eingebauten Stockfish angebotene Obergrenze UCI_Elo 3190; das macht den unvermeidlichen Sprung zum unbegrenzten Profil so klein wie mit der erlaubten Stärke-Konfiguration möglich.
+
+| Übergang | Vor Runde 2 | Nach Runde 2 | Begründung |
+| --- | ---: | ---: | --- |
+| Benno/Paula | Modellabstand 6 Elo; direkt 50,8 % (64 Partien) | blind direkt 68,8 % für Paula (16 Partien), entsprechend 137 Elo | getrennte Profile statt statistischem Gleichstand |
+| Johann/Keetan | Modellabstand 280 Elo; Keetan mit UCI_Elo 2600 | UCI-Regler 2400/2500, also 100 Elo Sollabstand | versehentliche Zusatzstufe entfernt |
+| Keetan/Ragna/Silas | UCI_Elo 2600/2670/2770 | UCI_Elo 2500/2600/2700 | Anzeige und Bremse wieder deckungsgleich |
+| Alva/Stockfisch | Modellabstand 586 Elo; Alva UCI_Elo 2970 | Alva UCI_Elo 3190; Stockfisch weiterhin unbegrenzt | kleinster technisch möglicher Sprung ohne Begrenzung des Endgegners |
+
+Die Punktschätzung für Benno/Paula ist `400 log10(p/(1-p))` mit p = 11/16. Ein ungefähres 95-%-Wilson-Intervall für Paulas Quote ist 44,4 bis 85,8 %. Die Richtung und der gewünschte Abstand sind damit in der neuen Stichprobe sichtbar, aber bei nur 16 Partien noch nicht statistisch scharf bewiesen. Für die UCI-Profile bezeichnet „100 Elo Sollabstand“ die konfigurierte Stockfish-Bremse, nicht eine aus 16 Partien zurückgerechnete menschliche Wertung.
+
+### Unabhängige Blindprobe
+
+Die endgültigen Benno-/Paula-Werte wurden nach ihrer Festlegung nicht mehr anhand der folgenden Partien verändert. Der Lauf verwendete eine neue, zuvor nicht zur Abstimmung verwendete Zufallsfolge der vorhandenen Paarprüfung, beide Farben gleich oft und ein Zuglimit von 120 Halbzügen. Paula erzielte **11/16 Punkte (68,8 %, +11 =0 -5)**. Die stärkere Stufe liegt damit klar vorn und sehr nah an den nach der Elo-Formel für 100 Punkte erwarteten 64,0 %.
+
+Der gesamte Aufruf meldete dennoch 62/63 Prüfungen: Die generische Sammelgrenze der Paarprüfung verlangt mindestens 70 % und wurde mit 68,8 % um einen halben Punkt verfehlt. Diese Grenze prüft im regulären Lauf wesentlich weiter auseinanderliegende Stufen und ist für ein einzelnes 100-Elo-Nachbarpaar strenger als das Eichziel. Die Prüfung wurde ausdrücklich **nicht** abgeschwächt. Der reguläre Testlauf mit seinen unveränderten Standardpaaren bleibt davon getrennt.
+
+Für Johann/Keetan ist der unabhängige Beleg die unveränderte UCI-Schnittstelle selbst: Beide Profile verwenden `voll: true` und nun die benachbarten UCI_Elo-Werte 2400/2500. Für Alva/Stockfisch kann ein Abstand von 100 Elo nicht hergestellt werden: UCI_Elo endet laut Engine-Probe bei 3190, während Stockfisch laut Besitzerentscheidung ohne `elo`-Bremse bleibt. Die Runde verkleinert den Abstand deshalb maximal, behauptet aber keinen nicht messbaren 100-Elo-Abstand.
+
+### Offen nach Runde 2
+
+1. Die Blindprobe Benno/Paula bestätigt Richtung und Größenordnung, ihr breites Intervall schließt einen kleinen Abstand aber weiterhin ein. Eine Freigabemessung mit mindestens 64 neuen, protokollierten Seeds und mehreren Eröffnungen bleibt sinnvoll.
+2. Die interne Zufallswahl von Stockfish mit `UCI_LimitStrength` ist nicht vollständig über den App-Seed steuerbar. Auch bei festem App-Seed sind UCI-Partien deshalb nicht bitgenau wiederholbar.
+3. Alva/Stockfisch bleiben zwangsläufig weiter als 100 Elo auseinander. Das ist die direkte Folge aus maximaler UCI-Bremse 3190 und dem ausdrücklich unbegrenzten Endgegner, nicht ein noch abstimmbarer Profilfehler.
+4. Die menschliche chess.com-Skala bleibt mangels Partien gegen passend gewertete Menschen offen. Runde 2 verbessert die interne Leiter; sie macht aus UCI_Elo keine menschliche Messung.
+
+## Stand 30.10.2026 (Ultracode-Pruefung vor dem Live-Gang)
+
+Uebernommen: Benno schwaecher, Keetan, Ragna und Silas mit UCI_Elo gleich der Anzeige. Zurueckgestellt, bis neu gemessen ist:
+Paula (die neuen Werte machten sie so stark wie Gustav, die Leiter waere am Einstieg umgekehrt) und Alva (3190 statt der
+Anzeige 2900 widerspricht "ehrliche Zahlen"; Flo entscheidet, ob Anzeige oder Staerke angepasst wird). Beide bleiben auf dem
+bisherigen Live-Stand.
