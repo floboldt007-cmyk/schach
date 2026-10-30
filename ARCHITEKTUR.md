@@ -2446,7 +2446,8 @@ Editor; Voraussetzung `schema.sql`):
 - Funktionen (security definer, `search_path = ''`): fuer `authenticated` nur `alter_angeben`, `edition_stand(produkt)`
   und `edition_staende()` (nur ab 18, sonst `null` bzw. `[]`; Status `angekuendigt | erhaeltlich | pausiert | ausverkauft |
   beendet` (`pausiert`: nach dem Start mit Schalter aus),
-  `restzahl` nur mit `zeige_restzahl` und = Auflage - vergeben - reserviert (was gerade kaufbar ist, seit 30.10.),
+  `restzahl` nur mit `zeige_restzahl` und nur bei `erhaeltlich`, = Auflage - vergeben - reserviert (was gerade kaufbar
+  ist, seit 30.10.; sonst `null`),
   `endzahl` nur fuer Besitzer eines Stuecks oder mit dem Schalter, `endzahl_folgt`; „alles reserviert“ zeigt
   „erhaeltlich“, mit Schalter dann Restzahl 0). `zeige_restzahl` ab der Ankuendigung nur noch ausschaltbar. Nur Service-Rolle: `edition_reserviere` (Schalter zuerst, dann Zustimmung,
   E-Mail, Alter; Sperre je Konto und Edition; bestehende offene Reservierung kommt zurueck; ein `update` mit allen
@@ -2462,7 +2463,8 @@ Editor; Voraussetzung `schema.sql`):
   `pg_advisory_xact_lock`; doppeltes Ereignis liefert das gespeicherte Ergebnis), `edition_erstattung_gesendet`,
   `edition_aufraeumen` (Reservierung ohne Kasse nach 2 Stunden frei, Endzahl festschreiben, nach 90 Tagen loeschen, offene
   Erstattungen und `von_hand` bleiben). Spaltenrechte: Nutzer lesen nie
-  `vergeben`, `reserviert`, `endzahl`, Preis-ID, Schalter, `zahlung_id`, `sitzung_id`; niemand schreibt direkt.
+  `vergeben`, `reserviert`, `endzahl`, Preis-ID, Schalter, `zahlung_id`, `sitzung_id` (mit `zeige_restzahl` ist der
+  Verkauf ueber `restzahl` ungefaehr sichtbar, nach dem Ende auch die Endzahl); niemand schreibt direkt.
 - Kassenschluss `edition_kassenschluss(bis)` = Ende minus 31 Minuten (Stripe-Kassen leben mindestens 30 Minuten), gleiche
   Zahl wie `KASSE_S` in `werkstatt.js`.
 - Kontoloeschung: `altersangaben` per Kaskade weg, `besitz`, `reservierungen`, `edition_zustimmungen`, `sonderstuecke`
@@ -2485,7 +2487,9 @@ Stripe, Deno-Attrappe fuer beide Huellen, Vertrag mit dem Schema, keine Schluess
 Verbotsliste (keine Knappheits- und Wert-Versprechen) auch in den Texten unter `supabase/functions/`. **Offen:** ein
 dauerhafter Test mit zwei gleichzeitigen Kaeufern gegen echtes Postgres (von Hand geprueft, gruen), aktives `expire`
 ueberfaelliger Kassen, Oberflaeche (Etappe 3), sichtbare Kosmetik fuer Gegner (Etappe 3b), Bestaetigungs-Mail, Weg ueber
-die App-Stores, Live-Schluessel (Etappe 6).
+die App-Stores, Live-Schluessel (Etappe 6). Vor dem ersten echten Verkauf ausserdem: Kontoschutz (vor allem bei 10 Stueck),
+sofortige Freigabe beim Abbrechen (Kasse bei Stripe beenden) und Flos Entscheidung, ob kleine Auflagen eine strengere
+Kassen-Regel brauchen (10 Stueck: rund 155 Konten blockieren einen ganzen Tag).
 
 # Welle A: Spiel-Pakete (Teilen, Gedaechtnis, Kartei, Start)
 

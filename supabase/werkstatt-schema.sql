@@ -47,16 +47,19 @@
 --   dort noch bis zu 31 Minuten bezahlen und bekommt sein Stueck (bewusst, siehe ANLEITUNG). Nach dem Verkaufsstart
 --   zeigt edition_stand dann 'pausiert'.
 --   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt: auflage - vergeben - reserviert,
---   also was gerade kaufbar ist (Stuecke an offenen Kassen zaehlen nicht mit; nicht bezahlte kommen zurueck). Ab
---   angekuendigt_am laesst sich der Schalter nur noch ausschalten, nie neu einschalten (EDITION_EINGEFROREN): Die Zahl
---   soll nicht erst bei wenig Rest auftauchen (Flo, 30.10.2026). Kassenschluss: ab verkauf_bis minus
+--   also was gerade kaufbar ist (Stuecke an offenen Kassen zaehlen nicht mit; nicht bezahlte kommen zurueck). Nur im
+--   Status 'erhaeltlich', sonst null (angekuendigt, pausiert, ausverkauft, beendet). Ab angekuendigt_am laesst sich der
+--   Schalter nur noch ausschalten, nie neu einschalten (EDITION_EINGEFROREN): Die Zahl soll nicht erst bei wenig Rest
+--   auftauchen (Claudes Ergaenzung zur Entscheidung vom 30.10.2026, per SQL aenderbar). Kassenschluss: ab verkauf_bis minus
 --   31 Minuten oeffnet der Server keine neue Kasse mehr (Stripe-Kassen leben mindestens 30 Minuten, eine Minute Puffer
 --   fuer Laufzeit und Uhren), so endet jede Kasse spaetestens mit dem angekuendigten Ende. Hoechstens 3 Kassen je Konto
 --   und Edition in 24 Stunden (EDITION_ZU_OFT): sonst koennten wenige Konten mit immer neuen Kassen alle Stuecke
---   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen. Ehrlich: Die Grenze
---   skaliert mit der Auflage. Bei 10 Stueck halten 10 Konten alle Stuecke 31 Minuten fest, mit drei Kassen je Konto
---   etwa 93 Minuten. Vor dem ersten echten Verkauf gehoeren dazu Kontoschutz und eine sofortige Freigabe beim
---   Abbrechen (Stripe-Kasse beenden), siehe ANLEITUNG "Was noch fehlt".
+--   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen. Ehrlich: Wie viele Konten
+--   es zum Blockieren braucht, waechst mit der Auflage. Bei 10 Stueck halten 10 Konten alle Stuecke 31 Minuten fest,
+--   mit drei Kassen je Konto etwa 93 Minuten, und nach 24 Stunden beginnt die Grenze von vorn: Mit rund 155 Konten
+--   bleiben 10 Stueck den ganzen Tag blockiert. Kontoschutz (CAPTCHA, Mengenbremsen bei der Anmeldung, keine
+--   Wegwerf-Adressen) erschwert das nur, die sofortige Freigabe beim Abbrechen hilft nur ehrlichen Kaeufern. Ob kleine
+--   Auflagen eine strengere Regel brauchen, entscheidet Flo vor dem ersten echten Verkauf (ANLEITUNG "Was noch fehlt").
 --   Projektkennung: Die Kasse traegt eine Kennung des Supabase-Projekts in den Stripe-Metadaten. Der Webhook eines anderen
 --   Projekts am selben Stripe-Konto ignoriert sie (supabase/functions/_gemeinsam/werkstatt.js). Kommt trotzdem ein
 --   bezahlter Kauf mit einer Reservierung an, die diese Datenbank nicht kennt, wird nie automatisch erstattet: Ergebnis

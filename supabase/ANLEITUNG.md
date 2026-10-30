@@ -534,8 +534,9 @@ ohne Oberfläche**. Grundlage ist deine Entscheidung vom 29.10.: eine feste Aufl
 30.10.; vorher 100), dazu ein
 Verkaufszeitraum, nie eine Neuauflage, Nummern der Reihe nach, verkauft wird vorerst nur im Web
 (`design/runde4/ENTSCHEIDUNGEN.md`, dort steht auch, was noch offen ist). Echtes Geld fließt
-erst nach Gewerbe, AGB, Widerrufsbelehrung, eigener Bestätigungs-Mail, Steuerberatung und der Prüfung durch eine
-Fachperson (keine Rechtsberatung hier). Die Schritte unten sind für später, wenn Claude oder Cowork den Probelauf mit dir
+erst nach Gewerbe, fertigem Impressum, Datenschutzerklärung (Stripe nennen), AGB, Widerrufsbelehrung, eigener
+Bestätigungs-Mail, Steuerberatung und der Prüfung durch eine Fachperson (keine Rechtsberatung hier). Den Weg über die
+App-Stores braucht der erste Verkauf im Web nicht. Die Schritte unten sind für später, wenn Claude oder Cowork den Probelauf mit dir
 macht. **Bis dahin nichts davon ausführen.**
 
 **Was der Server sicherstellt** (`supabase/werkstatt-schema.sql`):
@@ -555,9 +556,11 @@ macht. **Bis dahin nichts davon ausführen.**
   bezahlen und bekommt sein Stück. Nach dem Verkaufsstart zeigt die App dann „pausiert“.
 - Jeden Namen gibt es nur einmal (auch in anderer Schreibweise nicht): So entsteht keine Neuauflage unter neuer Kennung.
 - Höchstens 3 Kassen je Konto und Edition in 24 Stunden. Sonst könnten wenige Konten mit immer neuen Kassen alle Stücke
-  blockieren. Wer an der Kasse scheitert, kann es auf derselben Zahlungsseite noch einmal versuchen. **Ehrlich:** Die
-  Grenze wächst mit der Auflage. Bei 10 Stück halten 10 Konten alle Stücke 31 Minuten fest, mit drei Kassen je Konto etwa
-  93 Minuten. Deshalb stehen Kontoschutz und das sofortige Freigeben beim Abbrechen unten unter „Was noch fehlt“.
+  blockieren. Wer an der Kasse scheitert, kann es auf derselben Zahlungsseite noch einmal versuchen. **Ehrlich:** Wie
+  viele Konten es zum Blockieren braucht, wächst mit der Auflage. Bei 10 Stück halten 10 Konten alle Stücke 31 Minuten
+  fest, mit drei Kassen je Konto etwa 93 Minuten, und nach 24 Stunden geht es von vorn: Mit rund 155 Konten bleiben
+  10 Stück den ganzen Tag blockiert. Kontoschutz erschwert das nur, die sofortige Freigabe beim Abbrechen hilft nur
+  ehrlichen Käufern. Darum steht unten unter „Was noch fehlt“ auch eine Entscheidung für dich.
 - Ein offener Kauf je Konto und Edition, ein Stück je Konto und Edition, nur für Konten mit bestätigter E-Mail und
   „18 oder älter“ (Selbstauskunft auf dem Server, mit Zeitpunkt). Gäste, Konten unter 18 und Konten ohne Antwort sehen
   Editionen gar nicht. Die Zahlen `vergeben` und `reserviert` sieht kein Nutzer. Ausnahme mit `zeige_restzahl`: Dann
@@ -605,8 +608,9 @@ macht. **Bis dahin nichts davon ausführen.**
    Testprojekt einen `werkstatt-webhook`, bekommt jeder Endpunkt die Käufe beider Projekte und verbucht nur die eigenen.
 8. **Edition anlegen (SQL Editor, als Besitzer):**
    `insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, zeige_restzahl, angekuendigt_am, verkauf_ab, verkauf_bis) values ('[id]', '[Name]', '[price_...]', [Betrag in Cent], 'eur', [Auflage ab 10], true, '[Ankündigung]', '[Start]', '[Ende]');`
-   `zeige_restzahl` auf `true` heißt: Die App zeigt „9 von 10 verfügbar“ (deine Entscheidung vom 30.10.). Mit `false` zeigt
-   sie keine Restzahl.
+   `zeige_restzahl` auf `true` heißt: Die App zeigt während des Verkaufs „9 von 10 verfügbar“ (deine Entscheidung vom
+   30.10.). Vor dem Start, bei „pausiert“ und danach gibt es keine Restzahl. Mit `false` zeigt sie nie eine. Den
+   Schalter legst du hier fest: Ab der Ankündigung lässt er sich nur noch ausschalten.
    Zeiten mit Zeitzone schreiben, zum Beispiel `2027-01-01 00:00 Europe/Berlin` für „bis 31.12., 23:59 Uhr“. Der Betrag
    muss genau zum Stripe-Preis passen, sonst wird jede Zahlung erstattet. Erst wenn alles stimmt:
    `update public.editionen set verkauf_freigegeben = true where produkt_id = '[id]';`
@@ -642,7 +646,9 @@ macht. **Bis dahin nichts davon ausführen.**
 **Was noch fehlt (Etappen 2 bis 6):** die Oberfläche (Kaufknopf bleibt „Bald verfügbar“), ein Aufräum-Schritt, der
 überfällige Kassen aktiv bei Stripe beendet, ein dauerhafter Test mit zwei gleichzeitigen Käufern gegen echtes Postgres
 (einmal von Hand geprüft, Ergebnis grün, aber nicht im Repo), der Weg über die App-Stores, die eigene
-Bestätigungs-Mail, AGB und Widerrufsbutton, Kontoschutz (vor allem bei kleinen Auflagen wie 10 Stück), eine sofortige
-Freigabe beim Abbrechen (die Kasse bei Stripe beenden, statt 31 Minuten zu warten), die Prüfung durch die Fachperson
-(auch der sichtbaren Restzahl) und erst danach ein
+Bestätigungs-Mail, AGB und Widerrufsbutton, fertiges Impressum und Datenschutzerklärung, Kontoschutz (CAPTCHA,
+Mengenbremsen bei der Anmeldung, keine Wegwerf-Adressen; vor allem bei kleinen Auflagen wie 10 Stück), eine sofortige
+Freigabe beim Abbrechen (die Kasse bei Stripe beenden, statt 31 Minuten zu warten), **deine Entscheidung, ob kleine
+Auflagen eine strengere Kassen-Regel brauchen** (zum Beispiel höchstens eine Kasse je Konto für den ganzen Verkauf statt
+drei je 24 Stunden), die Prüfung durch die Fachperson (auch der sichtbaren Restzahl) und erst danach ein
 Live-Schlüssel (das ist eine bewusste Code-Änderung in `supabase/functions/_gemeinsam/werkstatt.js`, kein Secret).
