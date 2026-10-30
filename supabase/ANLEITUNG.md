@@ -320,7 +320,8 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
 7. **Webhook in Stripe:** **Entwickler > Webhooks > Endpunkt hinzufügen** (in der neueren Ansicht **Workbench >
    Webhooks > Ziel hinzufügen**, Nutzlast **Snapshot**, nicht „Thin“), die Adresse aus Schritt 6 eintragen und genau
    diese Ereignisse wählen: `checkout.session.completed`, `customer.subscription.created`,
-   `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`. Danach beim Endpunkt das
+   `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `charge.refunded`,
+   `charge.dispute.created` und `charge.dispute.closed`. Danach beim Endpunkt das
    **Signaturgeheimnis** (`whsec_...`) aufdecken.
 8. **Geheimnis setzen:** Im Terminal `npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...` (dein Wert). Das
    Geheimnis gehört nur dorthin: nie in Dateien, Git, Screenshots oder Chats. `SUPABASE_URL` und
@@ -368,7 +369,9 @@ Kommt ein Kauf ohne Nutzer-ID an (z. B. weil jemand den Zahlungslink direkt gete
 **Hängende Ereignisse finden** (z. B. einmal im Monat im SQL Editor):
 `select * from public.stripe_ereignisse where ergebnis in ('wartet', 'ohne_nutzer') and eingegangen_am < now() - interval '1 hour';`
 Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wie oben zuordnen.
-**Konto löschen** entfernt die Zeile in `abos`, kündigt aber **nicht** das Stripe-Abo: vorher im Kundenportal kündigen.
+**Konto löschen** entfernt die Zeile in `abos` und alle zugehörigen Kennungen aus `stripe_ereignisse`, kündigt aber
+**nicht** das Stripe-Abo. Flo muss ein noch laufendes Abo deshalb vor der Kontolöschung im Stripe-Dashboard kündigen;
+die Buchungsbelege bleiben dort erhalten.
 
 **App Store und Google Play:** In einer iOS-App aus dem App Store müssen digitale Abos über Apples In-App-Kauf laufen
 (App Review Guideline 3.1.1), in Google Play über Google Play Billing. Stripe gilt nur für die Web-App. Für die

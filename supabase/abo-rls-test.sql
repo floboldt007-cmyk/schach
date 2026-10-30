@@ -254,6 +254,53 @@ begin
     raise exception 'FEHLER: invoice.paid nach dem Ende nicht verbucht (%, %)', r, row_to_json(a);
   end if;
 
+  -- 9b. Rueckbuchung offen entzieht Premium; gewonnen stellt den vorigen Stand wieder her.
+  r := public.abo_stripe_ereignis('evt_b9', 'charge.dispute.created', t0 + interval '100 seconds', 'cus_B1', 'sub_B1',
+    null, 'strittig', t0 + interval '100 seconds', null);
+  select * into a from public.abos where user_id = 'b2222222-2222-4222-8222-222222222222';
+  if r <> 'neu' or a.status <> 'strittig' or public.ist_premium_von(a.user_id) then
+    raise exception 'FEHLER: offene Rueckbuchung hat Premium nicht entzogen (%, %)', r, row_to_json(a);
+  end if;
+  r := public.abo_stripe_ereignis('evt_b10', 'charge.dispute.closed', t0 + interval '101 seconds', 'cus_B1', 'sub_B1',
+    null, 'wiederherstellen', t0 + interval '101 seconds', null);
+  select * into a from public.abos where user_id = 'b2222222-2222-4222-8222-222222222222';
+  if r <> 'neu' or a.status <> 'aktiv' or a.gueltig_bis <> t0 + interval '60 days' or not public.ist_premium_von(a.user_id) then
+    raise exception 'FEHLER: gewonnene Rueckbuchung hat den Stand nicht wiederhergestellt (%, %)', r, row_to_json(a);
+  end if;
+  -- Eine volle Erstattung beendet Premium sofort. Eine neue Zahlung aktiviert es fuer den Streit-Test wieder.
+  r := public.abo_stripe_ereignis('evt_b11', 'charge.refunded', t0 + interval '102 seconds', 'cus_B1', 'sub_B1',
+    null, 'abgelaufen', t0 + interval '102 seconds', null);
+  if r <> 'neu' or public.ist_premium_von('b2222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: volle Erstattung hat Premium nicht beendet (%)', r;
+  end if;
+  perform public.abo_stripe_ereignis('evt_b12', 'invoice.paid', t0 + interval '103 seconds', 'cus_B1', 'sub_B1',
+    null, 'aktiv', t0 + interval '60 days', null);
+  -- Verlorener Streit beendet Premium. Doppelte und verspaetete Ereignisse aendern den Stand nicht.
+  perform public.abo_stripe_ereignis('evt_b13', 'charge.dispute.created', t0 + interval '104 seconds', 'cus_B1', 'sub_B1',
+    null, 'strittig', t0 + interval '104 seconds', null);
+  r := public.abo_stripe_ereignis('evt_b14', 'charge.dispute.closed', t0 + interval '105 seconds', 'cus_B1', 'sub_B1',
+    null, 'abgelaufen', t0 + interval '105 seconds', null);
+  if r <> 'neu' or public.ist_premium_von('b2222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: verlorene Rueckbuchung hat Premium nicht beendet (%)', r;
+  end if;
+  if public.abo_stripe_ereignis('evt_b14', 'charge.dispute.closed', t0 + interval '105 seconds', 'cus_B1', 'sub_B1',
+      null, 'abgelaufen', t0 + interval '105 seconds', null) <> 'doppelt'
+    or public.abo_stripe_ereignis('evt_b15', 'charge.refunded', t0 + interval '99 seconds', 'cus_B1', 'sub_B1',
+      null, 'abgelaufen', t0 + interval '99 seconds', null) <> 'veraltet' then
+    raise exception 'FEHLER: doppelte oder verspaetete Rueckbuchung nicht abgewehrt';
+  end if;
+  -- Derselbe Abo-Verweis mit einem fremden Kunden darf die zugeordnete Zeile nicht aendern.
+  if public.abo_stripe_ereignis('evt_b16', 'charge.refunded', t0 + interval '106 seconds', 'cus_FREMD', 'sub_B1',
+      null, 'abgelaufen', t0 + interval '106 seconds', null) <> 'wartet' then
+    raise exception 'FEHLER: fremder Kunde wurde nicht abgelehnt';
+  end if;
+  -- B fuer die folgenden Pruefungen wieder aktiv machen (die Streit-Faelle oben enden mit "abgelaufen")
+  r := public.abo_stripe_ereignis('evt_b17', 'invoice.paid', t0 + interval '107 seconds', 'cus_B1', 'sub_B1',
+    null, 'aktiv', t0 + interval '60 days', null);
+  if r <> 'neu' or not public.ist_premium_von('b2222222-2222-4222-8222-222222222222') then
+    raise exception 'FEHLER: neue Zahlung nach verlorenem Streit hat Premium nicht wieder aktiviert (%)', r;
+  end if;
+
   -- 10. Reihenfolge vertauscht: das Abo-Ereignis fuer C kommt VOR dem Kauf, wartet und wird beim Kauf angewendet
   r := public.abo_stripe_ereignis('evt_c1', 'customer.subscription.updated', t0 + interval '3 seconds', 'cus_C1', 'sub_C1',
     null, 'aktiv', t0 + interval '365 days', 'jahr');
@@ -336,7 +383,7 @@ begin
     if sqlerrm <> 'ABO_EREIGNIS_UNGUELTIG' then raise; end if;
   end;
   begin
-    perform public.abo_stripe_ereignis('evt_z1', 'charge.refunded', t0, 'cus_B1', null, null, 'aktiv', t0 + interval '1 day', null);
+    perform public.abo_stripe_ereignis('evt_z1', 'charge.succeeded', t0, 'cus_B1', null, null, 'aktiv', t0 + interval '1 day', null);
     raise exception 'FEHLER: unbekannter Ereignistyp angenommen';
   exception when raise_exception then
     if sqlerrm <> 'ABO_EREIGNIS_UNGUELTIG' then raise; end if;
@@ -380,6 +427,18 @@ begin
   exception when raise_exception then
     if sqlerrm <> 'ABO_KUNDE_UNBEKANNT' then raise; end if;
   end;
+end
+$$;
+
+-- Das Loeschen eines Kontos entfernt vor dem FK-Nullsetzen alle lokalen Stripe-Kennungen.
+-- Die Transaktion wird unten zurueckgerollt und hinterlaesst deshalb auch den Testnutzer nicht.
+delete from auth.users where id = 'c3333333-3333-4333-8333-333333333333';
+do $$
+begin
+  if exists (select 1 from public.stripe_ereignisse
+      where user_id = 'c3333333-3333-4333-8333-333333333333' or kunde_id = 'cus_C1' or abo_id in ('sub_C1', 'sub_C2')) then
+    raise exception 'FEHLER: Stripe-Kennungen des geloeschten Kontos sind geblieben';
+  end if;
 end
 $$;
 
