@@ -161,6 +161,18 @@ function ausTabelle(tabelle, g) {
   return tabelle[tabelle.length - 1][1];
 }
 
+// Leistung wie im Turnier (Flo, 30.10.2026: "Ich spiele viel schlechter als 2000 Elo", die Analyse zeigte "Leistung ≈ 2500"
+// nach einem Sieg gegen einen schwachen Bot): gegen einen schwaecheren Gegner sind 97 % Genauigkeit leicht, weil seine Fehler
+// einfach zu bestrafen sind. Ist die Gegnerstaerke bekannt, bleibt die Schaetzung deshalb an ihr: hoechstens LEISTUNG_UEBER
+// darueber (wie ein Turniersieg, Leistung = Gegner + 400) und hoechstens LEISTUNG_UNTER darunter.
+export const LEISTUNG_UEBER = 400;
+export const LEISTUNG_UNTER = 500;
+export function begrenzeLeistung(elo, gegnerElo) {
+  if (typeof elo !== 'number' || !isFinite(elo)) return null;
+  if (typeof gegnerElo !== 'number' || !isFinite(gegnerElo)) return elo;
+  return gegnerElo + Math.max(-LEISTUNG_UNTER, Math.min(LEISTUNG_UEBER, elo - gegnerElo));
+}
+
 // anzahlZuege (optional): eigene Zuege; unter 20 wird zur Mitte (Gegner-Elo bzw. 1000) gezogen.
 // { eigeneElo } (optional, fuer Bots): Bot-Tabelle, halber Weg zur eigenen Elo (eine Partie
 // streut stark), kurze Partien zur eigenen Elo statt zur Mitte.
@@ -176,7 +188,7 @@ export function schaetzeSpielstaerke(genauigkeit, gegnerElo, anzahlZuege, { eige
   }
   elo = ausTabelle(ELO_TABELLE, g);
   const gegnerBekannt = typeof gegnerElo === 'number' && isFinite(gegnerElo);
-  if (gegnerBekannt) elo += 0.2 * Math.max(-500, Math.min(500, gegnerElo - elo));
+  if (gegnerBekannt) elo = begrenzeLeistung(elo, gegnerElo);
   if (kurz) {
     const w = anzahlZuege / 20;
     elo = w * elo + (1 - w) * (gegnerBekannt ? gegnerElo : 1000);

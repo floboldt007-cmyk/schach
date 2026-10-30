@@ -601,6 +601,7 @@ export function zeige(root, params, app) {
   }
 
   function zeichneGeschlagen() {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
     const vonFlo = [];
     const vonBot = [];
     for (const m of z.verbose) if (m.captured) (m.color === farbe ? vonFlo : vonBot).push(m.captured);
@@ -758,6 +759,26 @@ export function zeige(root, params, app) {
     if (ply == null) delete coachEl.dataset.ply; else coachEl.dataset.ply = String(ply);
     clearTimeout(z.kompaktUhr);
     pruefeCoachRest();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(halteCoachHoehe);
+  }
+  // Ruhige Spalte (Flo 30.10.2026: "manchmal flackert mein Bildschirm, wenn der Bot einen Zug macht"): Coach-Karte (wartet,
+  // Buch, Kommentar, kompakt), Karte des Gegners (mit und ohne Sprechblase) und Knopfreihe wechselten je Zug ihre Hoehe,
+  // die Zugliste dazwischen sprang 10 bis 30 px. Solange das Fenster gleich gross bleibt, schrumpfen sie deshalb nicht
+  // mehr (geoeffneter Coach-Rest ausgenommen); die Zugliste nimmt den Rest und steht still.
+  const ruhig = new Map();
+  let ruhigFenster = '';
+  function halteCoachHoehe() {
+    const fenster = innerWidth + 'x' + innerHeight;
+    if (fenster !== ruhigFenster) {
+      ruhigFenster = fenster;
+      for (const el of ruhig.keys()) el.style.minHeight = '';
+      ruhig.clear();
+    }
+    for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
+      if (!el || !el.isConnected || el.classList.contains('offen')) continue;
+      const h = el.offsetHeight;
+      if (h > (ruhig.get(el) || 0)) { ruhig.set(el, h); el.style.minHeight = h + 'px'; }
+    }
   }
   // U7: Coach-Stil "knapp": nur der erste Satz, der Rest auf Antippen (.c-rest)
   function coachText(text) {

@@ -440,8 +440,8 @@ loescheLaufendePartie();
 pruefe('Laufend: geloescht', ladeLaufendePartie() === null);
 
 // ---------- Statistik / Zuruecksetzen ----------
-speicherePartie(partie({ genauigkeit: 70, spielstaerke: 900 }));
-speicherePartie(partie({ ergebnis: 'remis', genauigkeit: 80, spielstaerke: 1000 }));
+speicherePartie(partie({ botId: 'rudi', botStufe: 7, genauigkeit: 70, spielstaerke: 900 }));
+speicherePartie(partie({ botId: 'rudi', botStufe: 7, ergebnis: 'remis', genauigkeit: 80, spielstaerke: 1000 }));
 speichereEinstellungen({ klang: false });
 const st = statistik();
 pruefe('Statistik', st.partien === 2 && st.siege === 1 && st.remis === 1 && st.schnittGenauigkeit === 75 && st.spielstaerke === 950 && st.besteGenauigkeit === 80, st);

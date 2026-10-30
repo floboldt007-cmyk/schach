@@ -12,7 +12,7 @@ import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 import { Chess } from '../vendor/chess/chess.js';
 import {
-  gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, coachText,
+  gewinnChance, klassifiziere, zugGenauigkeit, partieGenauigkeit, schaetzeSpielstaerke, begrenzeLeistung, coachText,
   sanDeutsch, materialBilanz, analysierePartie, bewerteZug, volatilitaetsGewichte, KLASSEN, START_FEN, warKnapp,
   GRENZEN, spielphasen, coachKern, seitenGenauigkeit,
 } from '../js/review.js';
@@ -119,7 +119,12 @@ function nodeTests() {
   const s80 = schaetzeSpielstaerke(80);
   pruefe('Spielstaerke 80 % ~ 1350', s80 === 1350, s80);
   pruefe('Spielstaerke monoton', schaetzeSpielstaerke(50) < schaetzeSpielstaerke(70) && schaetzeSpielstaerke(70) < schaetzeSpielstaerke(90));
-  pruefe('Spielstaerke staerkerer Gegner hebt leicht', schaetzeSpielstaerke(70, 2000) > schaetzeSpielstaerke(70) && schaetzeSpielstaerke(70, 2000) <= schaetzeSpielstaerke(70) + 150);
+  pruefe('Spielstaerke staerkerer Gegner hebt (hoechstens 500 unter ihm)', schaetzeSpielstaerke(70, 2000) > schaetzeSpielstaerke(70) && schaetzeSpielstaerke(70, 2000) === 1500);
+  // Flo 30.10.2026: 98,7 % gegen einen schwachen Bot zeigte "Leistung ≈ 2500"
+  pruefe('Leistung bleibt an der Gegnerstaerke: 98,7 % gegen 900 -> 1300 (nicht 2500)', schaetzeSpielstaerke(98.7, 900, 30) === 1300, schaetzeSpielstaerke(98.7, 900, 30));
+  pruefe('Leistung in der Naehe der Gegnerstaerke bleibt die Tabelle (80 % gegen 1300 -> 1350)', schaetzeSpielstaerke(80, 1300, 30) === 1350, schaetzeSpielstaerke(80, 1300, 30));
+  pruefe('begrenzeLeistung: ohne Gegner unveraendert, sonst Gegner -500 bis +400', begrenzeLeistung(2500, undefined) === 2500
+    && begrenzeLeistung(2500, 900) === 1300 && begrenzeLeistung(100, 900) === 400 && begrenzeLeistung(null, 900) === null);
   pruefe('Spielstaerke kurze Partie zur Mitte', schaetzeSpielstaerke(100, undefined, 2) < 1500);
   pruefe('Spielstaerke ohne Genauigkeit = null', schaetzeSpielstaerke(null) === null);
 
