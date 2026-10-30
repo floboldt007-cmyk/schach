@@ -7,15 +7,16 @@
 // Gezeigt wird nur, was es in der App wirklich gibt; gesperrte Stuecke tragen ein Schloss und den Weg dahin.
 //
 //   bereich({ id, name, teile, hinweis }) -> section.sa-bereich[data-bereich][data-name]
-//     teile: [{ id, name, frei, an, zeile, bild, fortschritt }]   bild: HTML (SVG oder <img>), nur fuer freie Teile
-//       gezeigt; an: gerade benutzt ("Ausgeruestet"); zeile: Weg dahin oder Stand; fortschritt 0..1 (Erfolge)
+//     teile: [{ id, name, frei, an, zeile, bild, fortschritt, seltenheit, labor, merkmal }]   bild: HTML (SVG oder <img>); gesperrt
+//       erscheint es als dunkle Silhouette mit "?" (Flo 30.10.: "mehr Aura, mysterioeser"), ohne Bild ein "?";
+//       an: gerade benutzt ("Ausgeruestet"); zeile: Weg dahin oder Stand; fortschritt 0..1; seltenheit 'frei' | 'selten'
+//       | 'episch' | 'legende' | 'einzig' (Leuchten und Schild); labor: nur fuer den Erfinder (Schild "Labor")
 //     hinweis: ein Satz unter dem Raster (z. B. was erst mit der Werkstatt kommt)
 //   zeige(root, params, app) -> { verlasse() }   erst nach freischalten(); params: { bereich? }
 //   freischalten()                                nur js/pakete/sammlung/index.js
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { segment } from './bauteile.js';
-import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../storage.js';
 import { t } from '../sprache.js';
@@ -35,8 +36,12 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
     const zustand = x.an ? 'an' : x.frei ? 'frei' : 'zu';
     const balken = Number.isFinite(x.fortschritt) && !x.frei
       ? `<span class="sa-balken" aria-hidden="true"><i style="transform:scaleX(${Math.max(0, Math.min(1, x.fortschritt)).toFixed(3)})"></i></span>` : '';
-    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}">
-      <span class="sa-bild" aria-hidden="true">${x.frei ? (x.bild || '') : icon('schloss')}</span>
+    const seltenheit = ['frei', 'selten', 'episch', 'legende', 'einzig'].includes(x.seltenheit) ? x.seltenheit : '';
+    const schild = x.labor ? `<span class="sa-schild sa-labor">${esc(t('rahmen.sammlung.labor'))}</span>`
+      : seltenheit && seltenheit !== 'frei' ? `<span class="sa-schild" data-seltenheit="${seltenheit}">${esc(t('rahmen.sammlung.selten.' + seltenheit))}</span>` : '';
+    const bild = x.frei ? (x.bild || '') : x.bild ? `<span class="sa-geheim">${x.bild}</span><span class="sa-frage">?</span>` : '<span class="sa-frage">?</span>';
+    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}>
+      <span class="sa-bild" aria-hidden="true">${bild}${schild}</span>
       <span class="sa-text"><b>${esc(x.name)}</b><span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
   }).join('')}</div>${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
   return s;
@@ -70,7 +75,10 @@ function zeigeIch(root, params = {}, app) {
   if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
   const teile = ort.querySelectorAll('.sa-teil');
   const frei = ort.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length;
-  s.querySelector('.sa-stand').textContent = teile.length ? t('rahmen.sammlung.stand', { frei, alle: teile.length }) : t('rahmen.sammlung.leer');
+  const stand = s.querySelector('.sa-stand');
+  stand.textContent = teile.length ? t('rahmen.sammlung.stand', { frei, alle: teile.length }) : t('rahmen.sammlung.leer');
+  // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
+  stand.style.setProperty('--anteil', teile.length ? (frei / teile.length).toFixed(3) : '0');
   const zeigeBereich = () => {
     for (const x of alle) x.hidden = x.dataset.bereich !== aktiv;
     s.dataset.bereich = aktiv || '';
