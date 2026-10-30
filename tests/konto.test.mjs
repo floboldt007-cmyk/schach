@@ -125,6 +125,9 @@ setzeKontoFetch(async () => ({ ok:true,status:204,async json(){return null;} }))
   localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u5'); antw.push({ status: 200, body: JSON.parse(sitzungVon('u5')) });
   await pruefeCode('u5@b.de', '123456');
   pruefe('Neue Anmeldung per Code verlangt einen neuen Abgleich', localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null);
+  leereV1(); localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'p1' }])); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u5'); antw.push(cloudMit(3));
+  const k2 = await gleicheNachAnmeldung();
+  pruefe('Ein gefundener Konflikt schließt den Riegel, auch mit altem Merker', k2?.konflikt === true && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null);
   pruefe('Mit einer Partie oder einem anderen Eintrag zählt der Browser als Spielstand',
     hatSpielstand({ 'schach-arena:v1:partien': '[{"id":"x"}]' }) && hatSpielstand({ 'schach-arena:v1:serie': '{}' }) && !hatSpielstand({}));
   localStorage.removeItem(SICHTBAR_SCHLUESSEL);

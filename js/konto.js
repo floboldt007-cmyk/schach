@@ -207,6 +207,7 @@ export async function gleicheNachAnmeldung(wahl) {
   if (!hatSpielstand()) { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
   if (wahl === 'geraet') { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
   if (wahl === 'cloud') { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
+  neueAnmeldung();   // Konflikt: Geraet und Cloud weichen ab, also Riegel zu, auch wenn ein alter Merker stand
   return { konflikt: true, geraet: vorschau(lokalerStand()), cloud: vorschau(cloud) };
 }
 export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (istAbgeglichen()) speichereCloudStand().catch(() => {}); }, ms); }
