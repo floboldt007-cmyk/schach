@@ -1,6 +1,6 @@
 // Paket Finisher: nutzt ausschliesslich den Aufruf-Ort partie:matt. Es aendert weder Partie noch Ergebnis.
-// Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
-// Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit.
+// Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5. Fallender Koenig gibt es nur im Shop
+// (Flo, 29.10.2026); bis der Kauf freigeschaltet ist, bleibt er gesperrt. Kein Zufall, keine Lootbox.
 import { anbieten } from '../../orte.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { klang } from '../../sounds.js';
@@ -20,7 +20,7 @@ export const FINISHER = Object.freeze([
   Object.freeze({ id: 'aus', text: 'aus', level: 1 }),
   Object.freeze({ id: 'krone', text: 'krone', level: 1 }),
   Object.freeze({ id: 'welle', text: 'welle', level: 5 }),
-  Object.freeze({ id: 'koenig', text: 'koenig', level: 10 }),
+  Object.freeze({ id: 'koenig', text: 'koenig', shop: true }),
 ]);
 
 export function aktuellesLevel() {
@@ -29,6 +29,7 @@ export function aktuellesLevel() {
 }
 export function istFrei(id, level = aktuellesLevel()) {
   const f = FINISHER.find((x) => x.id === id);
+  if (f?.shop) return false;   // Kaufen kommt mit dem Shop (echtes Geld erst nach Gewerbe, AGB und Impressum)
   return !!f && level >= f.level;
 }
 export function auswahl(level = aktuellesLevel()) {
@@ -83,7 +84,7 @@ function einstellungen() {
     const frei = istFrei(f.id, level); const aktiv = f.id === gewaehlt;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'fi-wahl'; b.dataset.finisherWahl = f.id;
     b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', aktiv ? 'true' : 'false'); b.disabled = !frei;
-    const hinweis = f.id === 'aus' ? '' : f.level === 1 ? F('frei') : F('level', { level: f.level });
+    const hinweis = f.id === 'aus' ? '' : f.shop ? F('shop') : f.level === 1 ? F('frei') : F('level', { level: f.level });
     b.innerHTML = `<b>${frei ? '' : '🔒 '}${esc(F(f.text))}</b><span>${esc(frei && aktiv ? F('gewaehlt') : hinweis)}</span>`;
     if (!frei) b.setAttribute('aria-label', `${F(f.text)}. ${F('gesperrt', { level: f.level })}`);
     b.addEventListener('click', () => {

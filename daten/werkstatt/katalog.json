@@ -298,6 +298,25 @@
       }
     },
     {
+      "id": "finisher-koenig",
+      "kategorie": "finisher",
+      "zugang": {
+        "art": "shop"
+      },
+      "name": {
+        "de": "Fallender König",
+        "en": "Falling King"
+      },
+      "beschreibung": {
+        "de": "Der König fällt langsam um. Nur im Shop.",
+        "en": "The king slowly topples. Shop only."
+      },
+      "vorschau": {
+        "hell": "#e9dcc3",
+        "dunkel": "#4a3f33"
+      }
+    },
+    {
       "id": "emote-gruss",
       "kategorie": "emotes",
       "zugang": {

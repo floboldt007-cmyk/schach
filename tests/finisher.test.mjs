@@ -10,6 +10,8 @@ assert.equal(istFrei('krone', 1), true);
 assert.equal(istFrei('welle', 4), false);
 assert.equal(istFrei('welle', 5), true);
 assert.equal(istFrei('koenig', 9), false);
-assert.equal(istFrei('koenig', 10), true);
+// Flo 29.10.2026: Fallender Koenig nur im Shop, nie ueber das Level
+assert.equal(istFrei('koenig', 10), false);
+assert.equal(istFrei('koenig', 99), false);
 assert.equal(auswahl(1), 'krone');
 console.log('finisher.test.mjs: Freischaltungen und sichere Standardwahl ok');
