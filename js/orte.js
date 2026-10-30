@@ -37,6 +37,7 @@
 
 export const ORTE = Object.freeze({
   'arena:kopf': 'dom',
+  'sammlung:bereich': 'dom',
   'arena:panel-oben': 'dom',
   'arena:panel-bot': 'dom',
   'arena:start': 'aufruf',

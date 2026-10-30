@@ -7,6 +7,7 @@ import { anbieten } from '../../orte.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { klang } from '../../sounds.js';
 import { t } from '../../sprache.js';
+import { bereich } from '../../ui/ich.js';
 import './texte.js';
 
 const MODUL = 'finisher';
@@ -105,5 +106,16 @@ function einstellungen() {
 
 anbieten('partie:matt', (ctx) => starteFinisher(ctx), { paket: MODUL });
 anbieten('einstellungen:gruppen', einstellungen, { paket: MODUL, reihenfolge: 45 });
+// Sammlung (Reiter Ich): jeder Finisher mit Schloss und Stufe, der ausgewaehlte als "Ausgeruestet"
+const FIGUR = { krone: 'wK', welle: 'wN', koenig: 'bK' };
+anbieten('sammlung:bereich', () => {
+  const lv = aktuellesLevel();
+  const gewaehlt = auswahl(lv);
+  return bereich({ id: 'finisher', name: F('titel'), teile: FINISHER.filter((x) => x.id !== 'aus').map((x) => ({
+    id: 'finisher-' + x.id, name: F(x.text), frei: istFrei(x.id, lv), an: gewaehlt === x.id,
+    zeile: gewaehlt === x.id ? F('gewaehlt') : istFrei(x.id, lv) ? F('frei') : F('level', { level: x.level }),
+    bild: `<img src="${new URL(`../../../assets/pieces/${FIGUR[x.id] || 'wK'}.svg`, import.meta.url).href}" alt="">`,
+  })) });
+}, { paket: MODUL, reihenfolge: 10 });
 
 if (typeof window !== 'undefined' && /[?&]test\b/.test(location.search || '')) window.__finisher = { FINISHER, istFrei, auswahl, starteFinisher };

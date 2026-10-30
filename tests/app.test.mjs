@@ -2099,7 +2099,10 @@ if (q.has('wpboss')) {
 }
 `;
 const MIT_W0PLUS = (flags) => `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/w0plus-test/index,pakete/liga/index${flags ? '&' + flags : ''}`;
-const FAKE_ICH = `export function zeige(root) { const s = document.createElement('section'); s.className = 'screen ich-test'; s.textContent = 'Ich'; root.append(s); return { verlasse() {} }; }`;
+// Attrappe fuer js/ui/ich.js: dieselben Exporte wie das Original (zeige, bereich fuer die Sammlungs-Anbieter, freischalten)
+const FAKE_ICH = `export function zeige(root) { const s = document.createElement('section'); s.className = 'screen ich-test'; s.textContent = 'Ich'; root.append(s); return { verlasse() {} }; }
+export function bereich() { return document.createElement('section'); }
+export function freischalten() {}`;
 const BOSS_START = 'r1bqkb1r/1ppp1ppp/p1n2n2/4p3/B3P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 5';
 
 async function testeSpielFundament(browser) {
@@ -2166,10 +2169,12 @@ async function testeSpielFundament(browser) {
     await seite.waitForSelector('.screen.es-screen');
     await seite.waitForFunction(() => document.querySelector('.reiter-leiste').hidden, null, { timeout: 2000 }).catch(() => {});
     pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=training,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
     await seite.waitForSelector('.screen.arena');
-    // mit fest eingetragenen REITER gibt es die Leiste, aber ?reiter fuegt nichts hinzu (hier: kein Reiter Ich)
-    pruefe('Leiste: ?reiter ohne ?test bleibt wirkungslos', await seite.evaluate(() => !document.querySelector('.reiter-leiste [data-reiter="ich"]')));
+    // mit fest eingetragenen REITER (seit der Sammlung 30.10.: Training, Bestenliste, Ich) gibt es die Leiste, aber ?reiter
+    // fuegt ohne ?test nichts hinzu
+    pruefe('Leiste: ohne ?test genau die festen Reiter, ?reiter bleibt wirkungslos', await seite.evaluate(() =>
+      [...document.querySelectorAll('.reiter-leiste [data-reiter]')].map((b) => b.dataset.reiter).join() === 'arena,training,bestenliste,ich'));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/training\.js/.test(f));
     pruefe('Leiste: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
     await kontext.close();

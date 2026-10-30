@@ -3,6 +3,7 @@ import { anbieten } from '../../orte.js';
 import { hoere } from '../../ereignisse.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { t } from '../../sprache.js';
+import { bereich } from '../../ui/ich.js';
 import './texte.js';
 
 const MODUL = 'emotes';
@@ -292,6 +293,11 @@ anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'emotes'), { paket: MODUL, re
 anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'chat'), { paket: MODUL, reihenfolge: 21 });
 anbieten('partie:spieler-leiste', ({ buehne }) => { if (!einstellungen().an) return null; const e = document.createElement('span'); e.className = 'em-live sr'; e.setAttribute('aria-live', 'polite'); buehne.el.append(e); return e; }, { paket: MODUL, reihenfolge: 80 });
 anbieten('einstellungen:gruppen', () => gruppe(), { paket: MODUL, reihenfolge: 40 });
+// Sammlung (Reiter Ich): die Emotes des Rads, alle frei (weitere kommen erst mit dem Emote-Rad, funken/level.js)
+anbieten('sammlung:bereich', () => bereich({ id: 'emotes', name: T('emotes'), teile: EMOTES.map(([id, pfad]) => ({
+  id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '',
+  bild: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${pfad}</svg>`,
+})) }), { paket: MODUL, reihenfolge: 20 });
 
 export {
   EMOTES, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER,
