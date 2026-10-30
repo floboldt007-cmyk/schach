@@ -344,7 +344,9 @@
    Handy, Handy quer) werden die Kacheln kompakter, und reicht es dann noch nicht, rutscht der Wert unter das Figurzeichen */
 .arena .merkmale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; container-type: inline-size; }
 .arena .merkmal { padding: 10px 12px; border-radius: 14px; background: var(--flaeche-2); box-shadow: var(--kante); min-width: 0; }
-.arena .m-label { display: block; font-size: 12px; font-weight: var(--gw-stark); letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
+/* nie abgeschnitten (Ansicht, Flo 30.10.): passt ein Wort wie "Lieblingsfigur" nicht, trennt es mit Bindestrich */
+.arena .m-label { display: block; font-size: 12px; font-weight: var(--gw-stark); letter-spacing: 0; color: var(--text-2);
+  -webkit-hyphens: auto; hyphens: auto; overflow-wrap: normal; }
 .arena .m-wert { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; margin-top: 3px; font-size: 13.5px; font-weight: var(--gw-stark); line-height: 1.2; color: var(--text);
   hyphens: auto; overflow-wrap: break-word; }
 .arena .m-figur { flex: none; width: 22px; height: 22px; display: grid; place-items: center; }

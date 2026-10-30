@@ -134,7 +134,7 @@ export function zeige(root, params = {}, app) {
           <label class="es-regler"><span><b>${E('klang.lautstaerke')}</b><output>${E('prozent', { wert: 80 })}</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
           ${segment('klangstufe', E('klang.stufe'), [['alle',E('klang.alle')],['wichtig',E('klang.wichtig')],['aus',t('allgemein.aus')]])}
           <div class="es-untergruppe"><h4>${E('klang.einzeln')}</h4>${['brett','bewertung','feier','uhr','boss','finisher','bedienung'].map((k) => schalter(`klanggruppe-${k}`,E('klang.' + k),'')).join('')}</div>
-          <div class="es-ort es-ort-klang"></div>
+          <div class="es-ort-klang"></div>
         </section>
 
         <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">${E('gruppe.spiel')}</h3>
@@ -206,7 +206,7 @@ export function zeige(root, params = {}, app) {
       </div>`;
     // Ort einstellungen:gruppen (vor der Gruppe "Fortschritt"; der Behaelter ist display: contents)
     if (ortGruppen) ortGruppen.verlasse();
-    ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort:not(.es-ort-klang)'), { app });
+    ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
     if (ortKlang) ortKlang.verlasse();
     ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
     zeigeStand();
@@ -216,7 +216,7 @@ export function zeige(root, params = {}, app) {
   function zeigeStand() {
     const e = lies();
     for (const k of sec.querySelectorAll('.es-schalter')) {
-      if (k.closest('.es-ort')) continue;   // Schalter der Pakete
+      if (k.closest('.es-ort, .es-ort-klang')) continue;   // Schalter der Pakete
       const an = k.dataset.key.startsWith('klanggruppe-') ? e.klanggruppen?.[k.dataset.key.slice(12)] !== false : e[k.dataset.key] !== false;
       k.setAttribute('aria-checked', an ? 'true' : 'false');
     }
@@ -272,7 +272,7 @@ export function zeige(root, params = {}, app) {
 
   lausche(sec, 'click', (e) => {
     const k = e.target.closest('[data-aktion]');
-    if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort')) return;   // Pakete binden selbst
+    if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort, .es-ort-klang')) return;   // Pakete binden selbst
     const e0 = lies();
     switch (k.dataset.aktion) {
       case 'zurueck': app.zurueck(); break;
@@ -312,7 +312,7 @@ export function zeige(root, params = {}, app) {
         setzeZurueck();
         resetStufe = 0;
         if (ortGruppen) ortGruppen.verlasse();
-        ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort:not(.es-ort-klang)'), { app });
+        ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
         if (ortKlang) ortKlang.verlasse();
         ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
         zeigeReset();

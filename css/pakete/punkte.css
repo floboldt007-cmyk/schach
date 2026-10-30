@@ -240,6 +240,8 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-fr-hinweis { justify-self: start; min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--r-pille); font: inherit; font-size: 13px;
   font-weight: 800; color: var(--akzent-text); background: var(--akzent-weich); cursor: pointer; }
 .bl-fr-codes { display: grid; gap: 12px; }
+/* <details> legt seinen Inhalt nicht ins Raster (gap wirkt nicht in jedem Browser): Abstand ueber die Karten selbst */
+.bl-fr-codes > :not(summary) + :not(summary) { margin-top: 12px; }
 .bl-fr-codes > summary { min-height: var(--tipp); display: flex; align-items: center; font-size: 14px; font-weight: 700; color: var(--text-2); cursor: pointer; }
 .bl-fr-blatt { display: grid; gap: 10px; text-align: left; }
 .bl-fr-oder { text-align: center; font-size: 12.5px; font-weight: 700; color: var(--text-2); }

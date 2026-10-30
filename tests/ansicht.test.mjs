@@ -1,5 +1,5 @@
 // Ansichts-Pruefung (Flo 30.10.2026: "Die Ansicht ist sehr wichtig ... nichts zu klein, nichts zu gross, nichts
-// verbuggt"): jeder Hauptbildschirm der echten App (index.html?test, mit allen PAKETE) in fuenf Groessen, vom
+// verbuggt"): jeder Hauptbildschirm der echten App (index.html?test, mit allen PAKETE) in sieben Groessen, vom
 // kleinen Handy bis zum PC. Geprueft wird, was man sieht:
 //   - nichts laeuft seitlich aus der Seite (kein waagrechtes Scrollen, kein Element ueber den Rand)
 //   - Schrift nie unter 12 px (Brett-Koordinaten und die Zahl im Bewertungsbalken: 10 px)
@@ -33,7 +33,9 @@ const nurArg = process.argv.find((a) => a.startsWith('--nur='));
 const NUR = nurArg ? nurArg.slice(6).split(',') : null;
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['ipad-hoch', 820, 1180], ['ipad-quer', 1180, 820], ['pc', 1440, 900]];
+export const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['handy-quer', 667, 375], ['ipad-hoch', 820, 1180], ['ipad-quer', 1180, 820],
+  // iPad quer im Browser mit Leisten (Flos Foto 30.10.: 1000 x 590 nutzbar)
+  ['ipad-browser', 1000, 590], ['pc', 1440, 900]];
 export const ZIELE = [
   ['arena', 'arena', {}], ['partie', 'partie', { botId: 'benno' }], ['zuzweit', 'partie', { modus: 'zuzweit' }],
   ['verlauf', 'verlauf', {}], ['einstellungen', 'einstellungen', {}], ['training', 'training', {}],
@@ -79,7 +81,13 @@ function befundeDerSeite() {
   };
   // .sr: nur fuer Vorleser (1 x 1 px, absichtlich abgeschnitten)
   const versteckt = (el) => !!el.closest('[aria-hidden="true"], [hidden], .sr');
-  const aus = { ueberlauf: document.documentElement.scrollWidth - W, klein: [], knopf: [], rand: [], ueberlapp: [], abgeschnitten: [] };
+  const aus = { ueberlauf: document.documentElement.scrollWidth - W, klein: [], knopf: [], rand: [], ueberlapp: [], abgeschnitten: [], gekappt: [] };
+  // Inhalt, der unten abgeschnitten ist und sich nicht scrollen laesst (Flo 30.10.: "kann den unteren Teil nicht sehen")
+  for (const el of document.querySelectorAll('.screen, .screen *')) {
+    if (!sichtbar(el) || versteckt(el) || el.closest('.welt, .karte, .brett, .duell, .evalbalken')) continue;
+    const st = getComputedStyle(el);
+    if (/(hidden|clip)/.test(st.overflowY) && el.clientHeight > 120 && el.scrollHeight > el.clientHeight + 24) aus.gekappt.push(`${pfad(el)} ${el.scrollHeight}/${el.clientHeight}`);
+  }
   const alle = [...document.querySelectorAll('body *')].filter(sichtbar);
   for (const el of alle) {
     if (versteckt(el)) continue;
@@ -174,6 +182,7 @@ try {
       pruefe(`${name}: Knoepfe ab 44 px`, !b.knopf.length, b.knopf.slice(0, 3).join('; '));
       pruefe(`${name}: keine Ueberlappung`, !b.ueberlapp.length, b.ueberlapp.slice(0, 3).join('; '));
       pruefe(`${name}: nichts abgeschnitten`, !b.abgeschnitten.length, b.abgeschnitten.slice(0, 3).join('; '));
+      pruefe(`${name}: alles erreichbar (nichts unten abgeschnitten ohne Scrollen)`, !b.gekappt.length, b.gekappt.slice(0, 3).join('; '));
       pruefe(`${name}: unten frei`, !b.unten.length, b.unten.slice(0, 3).join('; '));
       pruefe(`${name}: keine Skriptfehler`, !fehler.length, fehler.splice(0).slice(0, 2).join('; '));
       if (BILDER) await s.screenshot({ path: path.join(BILDER, `${ziel}-${gname}.png`) });

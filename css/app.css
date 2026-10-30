@@ -304,7 +304,7 @@ html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)
 .arena .detail > .ort-panel-oben { grid-column: 1 / -1; }
 .an-ort-oben, .vl-ort { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .vl-ort { gap: 14px; }
-.es-ort, .an-c-paket { display: contents; }
+.es-ort, .es-ort-klang, .an-c-paket { display: contents; }
 .erg-karte-ort { display: grid; gap: 10px; min-width: 0; text-align: left; }
 @media (orientation: portrait) {
   /* Analyse hoch: die rechte Spalte ist aufgeloest (display: contents), der Ort folgt dem Banner */

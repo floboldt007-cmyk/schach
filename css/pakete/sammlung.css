@@ -1,6 +1,8 @@
 /* Paket sammlung: Reiter "Ich" mit der Sammlung (js/ui/ich.js). Eine Sache pro Blick: ein Bereich zur Zeit, ruhige Karten,
    gesperrte Stuecke mit Schloss statt Bild, kein Glanz und keine Bewegung, die zum Kaufen draengt. */
-.sa-rumpf { display: grid; gap: 14px; padding-bottom: 120px; min-width: 0; }
+.sa-rumpf { display: grid; align-content: start; grid-auto-rows: max-content; gap: 14px; padding-bottom: 120px; min-width: 0; }
+/* der Rumpf scrollt (Flo 30.10., iPad quer im Browser: der untere Teil war abgeschnitten, der Screen selbst scrollt nicht) */
+.sa-screen .sa-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .sa-stand, .sa-steuer, .sa-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
 .sa-stand { margin: -6px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2); }
 /* sechs Bereiche: auf schmalen Schirmen waagrecht wischbar statt gequetscht */
