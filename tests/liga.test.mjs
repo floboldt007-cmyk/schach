@@ -79,10 +79,17 @@ function nodeTeil() {
     }
   });
   pruefe('Liga-Punkte: Sieg 10, staerkerer Bot Bonus, Deckel 25', () => assert.deepEqual([800, 801, 900, 901, 3000].map((e) => W.ligaPunkte('sieg', e, 800)), [10, 11, 11, 12, 25]));
-  pruefe('Liga-Punkte: Genauigkeit ab 80, Remis +4, Niederlage -3', () => {
-    assert.deepEqual([79.9, 80, 100].map((g) => W.ligaPunkte('sieg', 800, 800, g)), [10, 12, 12]);
-    assert.equal(W.ligaPunkte('sieg', 3000, 800, 100), 25);
-    assert.equal(W.ligaPunkte('remis', 800, 800, 80), 6); assert.equal(W.ligaPunkte('niederlage', 800, 800, 80), -1);
+  // Flo 30.10. abends: "harte, sinnvolle Bewertung", die Genauigkeit zaehlt stark
+  pruefe('Liga-Punkte: Genauigkeit zaehlt stark (+8 ab 90 % bis -12 unter 40 %), Sieg bleibt ein Plus', () => {
+    assert.deepEqual([95, 85, 75, 65, 55, 45, 30].map((g) => W.ligaPunkte('sieg', 800, 800, g)), [18, 15, 12, 10, 6, 2, 2]);
+    assert.equal(W.ligaPunkte('sieg', 3000, 800, 100), 33);
+    assert.deepEqual([95, 65, 30].map((g) => W.ligaPunkte('remis', 800, 800, g)), [12, 4, -8]);
+    assert.deepEqual([95, 85, 65, 45, 30].map((g) => W.ligaPunkte('niederlage', 800, 800, g)), [0, -3, -8, -16, -20]);
+  });
+  pruefe('Liga-Punkte: Niederlage gegen einen schwaecheren Bot kostet mehr, gegen einen staerkeren weniger', () => {
+    assert.deepEqual([200, 600, 800, 1000, 1400].map((e) => W.ligaPunkte('niederlage', e, 800)), [-20, -12, -8, -4, -2]);
+    assert.deepEqual([200, 800, 1400].map((e) => W.ligaPunkte('remis', e, 800)), [0, 4, 12]);
+    assert.equal(W.ligaPunkte('niederlage', 200, 800, 20), -32);
   });
   pruefe('Liga: jede erreichte Stufe haelt ihre Schwelle bei Verlusten', () => {
     for (let i = 0; i < W.STUFEN.length; i++) {
@@ -106,7 +113,7 @@ function nodeTeil() {
     const r = buche(neu(), partie('analyse', { genauigkeit: 99, genauigkeitQuelle: 'live' }));
     assert.equal(r.stand.saison.punkte, 14);
     const a = W.bucheGenauigkeit(r.stand, 'analyse', 80);
-    assert.equal(a.stand.saison.punkte, 16); assert.equal(a.stand.wertung.n, 1);
+    assert.equal(a.stand.saison.punkte, 19); assert.equal(a.stand.wertung.n, 1);
     assert.equal(W.bucheGenauigkeit(a.stand, 'analyse', 100).gebucht, false);
   });
   pruefe('Verspaetete Genauigkeit und Stufen-Untergrenzen: gleiche Rechnung wie sofort', () => {
@@ -125,7 +132,7 @@ function nodeTeil() {
     const st = neu(); st.saison.punkte = 89;
     const r = buche(st, partie('bonus'), 800); assert.equal(r.stand.saison.stufe, 0);
     const a = W.bucheGenauigkeit(r.stand, 'bonus', 80); assert.equal(a.stand.saison.stufe, 1);
-    assert.equal(a.aufstieg[0].art, 'liga'); assert.equal(a.stand.saison.punkte, 101);
+    assert.equal(a.aufstieg[0].art, 'liga'); assert.equal(a.stand.saison.punkte, 104);
   });
   pruefe('Unbekannte oder ungueltige Analyse bucht nichts', () => {
     const st = buche(neu(), partie('gueltig')).stand;
@@ -197,7 +204,7 @@ function nodeTeil() {
     const gewechselt = W.wechsleSaison(gebucht, new Date(2027, 0, 11, 4, 1)).stand;
     assert.equal(gewechselt.saison.stufe, 1);
     const a = W.bucheGenauigkeit(gewechselt, 'feier', 95);
-    assert.deepEqual(a.stand.archiv, [{ nr: 1, stufe: 3, punkte: 450, stand: 1 }]);
+    assert.deepEqual(a.stand.archiv, [{ nr: 1, stufe: 3, punkte: 456, stand: 1 }]);
     assert.equal(a.stand.saison.stufe, 2); assert.equal(a.stand.saison.punkte, W.STUFEN[2].schwelle);
     assert.deepEqual(a.aufstieg, []);
   });
@@ -382,7 +389,10 @@ async function browserTeil(browser, start) {
       await page.waitForSelector('.ergebnis-overlay.gefuellt .liga-abrechnung', { timeout: 60000 });
       await page.waitForFunction(() => window.__ligaProbe.ereignisse.some((d) => d.wertung.n === 10), null, { timeout: 30000 });
       await browserPruefe(name + ': echte Partie bucht Liga-Zeile und belegten Klassen-Aufstieg', async () => {
-        assert.match(await page.locator('.liga-abrechnung').innerText(), /Liga \+1[13] · Bronze/);
+        // Liga als Karte (Flo 30.10. abends): Stand, Aenderung und Wappen; die Summe liest die Bedienhilfe im Label
+        assert.match(await page.locator('.liga-abrechnung').getAttribute('aria-label'), /^Liga \+\d+ · Bronze$/);
+        assert.match(await page.locator('.liga-abrechnung .liga-erg-stand').innerText(), /^Bronze · \d+ Punkte$/);
+        assert.equal(await page.locator('.liga-abrechnung .liga-erg-wappen svg').count(), 1);
         assert.match(await page.locator('.erg-feier').innerText(), /AUFSTIEG: Läuferklasse/);
         assert.equal(await page.locator('.erg-feier .gross').count(), 1);
         assert.ok(await page.locator('.erg-feier .erg-f-zeile').count() <= 3);

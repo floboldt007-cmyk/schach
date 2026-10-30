@@ -49,3 +49,26 @@
 .liga-abzeichen { display: flex; flex-wrap: wrap; align-items: center; gap: var(--a2); padding-block: var(--a2); border-bottom: 1px solid var(--linie); }
 .liga-abzeichen .ico { width: 20px; height: 20px; color: var(--akzent-text); }
 .liga-abzeichen small { color: var(--text-2); font-size: var(--fs-klein); }
+
+/* Liga im Ergebnis als Karte (Flo 30.10. abends: "Liga anzeigen", "farbiger und mehr durchdacht"): Wappen der Stufe,
+   Stand mit Balken bis zur naechsten Stufe, Aenderung in Gruen oder Rot und warum. Die Farbe der Stufe (--liga-f) setzt
+   ansicht.js, weil diese Datei nur Tokens nutzt */
+.liga-abrechnung.liga-erg { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: var(--r-m); text-align: left; line-height: 1.3;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--liga-f, var(--gold)) 24%, var(--flaeche-2)), var(--flaeche-2) 62%);
+  box-shadow: var(--kante), inset 0 0 0 1px color-mix(in srgb, var(--liga-f, var(--gold)) 38%, transparent); }
+.liga-erg-wappen { display: block; width: 48px; height: 48px; }
+.liga-erg-wappen svg { display: block; width: 48px; height: 48px; overflow: hidden; }
+.liga-erg-mitte { display: grid; gap: 4px; min-width: 0; }
+.liga-erg-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.liga-erg-stand { font-size: 14px; font-weight: 750; color: var(--text); }
+.liga-erg-balken { position: relative; display: block; height: 8px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
+.liga-erg-balken > i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left center;
+  background: var(--liga-f, var(--gold)); }
+.liga-erg-weg, .liga-erg-grund { font-size: 12.5px; font-weight: 650; color: var(--text-2); overflow-wrap: anywhere; }
+.liga-erg-diff { font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; letter-spacing: -.02em; line-height: 1;
+  font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
+.liga-erg[data-richtung="plus"] .liga-erg-diff { color: var(--kt-bester); }
+.liga-erg[data-richtung="minus"] .liga-erg-diff { color: var(--kt-patzer); }
+@media (max-width: 420px) { .liga-erg-wappen, .liga-erg-wappen svg { width: 40px; height: 40px; } }
+

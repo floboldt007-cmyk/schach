@@ -45,6 +45,11 @@
 .fk-d-summe { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
 .fk-d-summe b { color: var(--text); }
 .fk-abr.aufgestiegen .fk-level { color: var(--text); }
+/* Farbe im Ergebnis (Flo 30.10. abends: "muss bisschen farbiger sein"): Glut-Orange fuer Funken */
+.fk-abr { background: linear-gradient(135deg, color-mix(in srgb, var(--k-fehler) 15%, var(--flaeche-2)), var(--flaeche-2) 62%); }
+.fk-abr .fk-emblem { background: linear-gradient(135deg, var(--gold), var(--k-fehler)); color: var(--kg-ungenau); }
+.fk-abr .fk-balken > i { background: linear-gradient(90deg, var(--gold), var(--k-fehler)); }
+.fk-abr .fk-wert { color: var(--kt-fehler); }
 
 /* ---------- Kopf-Chip (arena:kopf) und Spieler-Leiste (partie:spieler-leiste) ---------- */
 /* Antippbarer Chip (role="button"): sichtbar so hoch wie Sterne und Pokal, die Tippflaeche (::before) reicht 3 px darueber

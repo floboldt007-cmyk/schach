@@ -8,6 +8,7 @@
 //   brettKunst(hell, dunkel, rand) -> string ganzes <svg> fuer ein Brett-Design
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
+//   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
 import { KUNST_TEILE } from './rahmen-kunst.js';
 
 const { id, um, verlauf, aura, kranz, orbit, lorbeer, fluegel, funke, glut, krone } = KUNST_TEILE;
@@ -112,7 +113,7 @@ const WELT = [
 ];
 
 const LIGA = [
-  null,
+  ['#E2B47A', '#A8743F', '#C8925A', '#7C4F27'],
   ['#F2B887', '#9A5A2E', '#E7A26C', '#7E4520'],
   ['#FFFFFF', '#A9B2BE', '#EEF1F5', '#8792A1'],
   ['#FFF0B0', '#D9981E', '#FFD86A', '#A86B0C'],
@@ -120,7 +121,7 @@ const LIGA = [
   ['#E6F6FF', '#5AA6F0', '#BDE8FF', '#2F7DD6'],
   ['#F5C451', '#8B5CF6', '#F5C451', '#C084FC'],
 ];
-const LIGA_GLANZ = [null, '#E7A26C', '#EEF1F5', '#F5C451', '#9FE8DF', '#8FD3FF', '#C084FC'];
+const LIGA_GLANZ = ['#C8925A', '#E7A26C', '#EEF1F5', '#F5C451', '#9FE8DF', '#8FD3FF', '#C084FC'];
 
 function welt(eid, nr) {
   const w = WELT[nr]; const c = id('c'); const g = id('w');
@@ -191,9 +192,15 @@ export function erfolgKunst(eid) {
     const m = /^(welt|liga|serie|level)-(\d+)$/.exec(s);
     const n = m ? Number(m[2]) : 0;
     if (m && m[1] === 'welt' && WELT[n]) inhalt = welt(s, n);
-    else if (m && m[1] === 'liga' && LIGA[n]) inhalt = liga(s, n);
+    else if (m && m[1] === 'liga' && n >= 1 && LIGA[n]) inhalt = liga(s, n);
     else if (m && m[1] === 'serie' && SELTEN[s]) inhalt = serie(s, n);
     else if (m && m[1] === 'level' && SELTEN[s]) inhalt = level(s, n);
   }
   return inhalt ? svg(inhalt, 'sk-erfolg') : null;
+}
+
+// Liga-Wappen der Stufe 0 (Holz) bis 6 (Meister), z. B. fuer die Liga-Karte im Ergebnis
+export function ligaWappen(stufe) {
+  const n = Math.max(0, Math.min(6, Math.floor(Number(stufe) || 0)));
+  return svg(liga('liga-' + n, n), 'sk-liga');
 }

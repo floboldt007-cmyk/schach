@@ -24,6 +24,12 @@
 .ergebnis-karte::-webkit-scrollbar { display: none; }
 .ergebnis-karte:focus { outline: none; }
 .remis .ergebnis-karte { box-shadow: 0 0 0 1.5px var(--gold), var(--s3); }
+/* Farbe je Ergebnis (Flo 30.10. abends: "muss bisschen farbiger sein"): Leuchten oben hinter dem Titel */
+.ergebnis-karte { isolation: isolate; --erg-glanz: var(--k-gut); }
+.sieg .ergebnis-karte { --erg-glanz: var(--gold); }
+.niederlage .ergebnis-karte { --erg-glanz: var(--warn); }
+.ergebnis-karte::before { content: ""; position: absolute; z-index: -1; inset: 0 0 auto; height: 190px; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(110% 100% at 50% -10%, color-mix(in srgb, var(--erg-glanz) 34%, transparent), transparent 72%); }
 .erg-zu { position: absolute; z-index: 3; top: 12px; right: 12px; width: 44px; height: 44px; }
 @keyframes erg-karte { from { opacity: 0; transform: translateY(40px) scale(.96); } to { opacity: 1; transform: none; } }
 
@@ -69,6 +75,15 @@
 .erg-genau b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 20px; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
 .erg-genau.gross b { display: block; margin: 2px 0; font-size: 34px; }
 .erg-genau.gross span { display: block; font-size: 14px; }
+/* Genauigkeit in der Farbe ihrer Guete, darunter ein Messbalken */
+.erg-genau[data-band="stark"] b { color: var(--kt-bester); }
+.erg-genau[data-band="gut"] b { color: var(--kt-gut); }
+.erg-genau[data-band="mittel"] b { color: var(--kt-ungenau); }
+.erg-genau[data-band="schwach"] b { color: var(--kt-patzer); }
+.erg-genau .erg-mess { display: block; width: min(220px, 70%); height: 6px; margin: 6px auto 4px; border-radius: var(--r-pille); background: var(--grund-2); overflow: hidden; }
+.erg-genau .erg-mess > i { display: block; height: 100%; border-radius: inherit; transform-origin: left center; background: currentColor; }
+.erg-genau[data-band="stark"] .erg-mess { color: var(--k-bester); } .erg-genau[data-band="gut"] .erg-mess { color: var(--k-gut); }
+.erg-genau[data-band="mittel"] .erg-mess { color: var(--k-ungenau); } .erg-genau[data-band="schwach"] .erg-mess { color: var(--k-patzer); }
 .erg-tipp { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-2); }
 /* Lichtblick (Niederlage): Flos bester Zug der Partie, ruhig auf Gold */
 .erg-lichtblick { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; border-radius: 20px; text-align: left; background: var(--gold-weich);

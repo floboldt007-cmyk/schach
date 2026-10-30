@@ -26,6 +26,11 @@
 .pk-alt { font-size: 13px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; text-decoration-thickness: 1.5px; }
 .pk-abr[data-rekord] .pk-symbol { background: var(--gold-weich); }
 .pk-abr[data-rekord] .pk-symbol .ico { color: var(--text); }
+/* Farbe im Ergebnis (Flo 30.10. abends: "muss bisschen farbiger sein"): Gold fuer Punkte */
+.pk-abr { background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 16%, var(--flaeche-2)), var(--flaeche-2) 62%); }
+.pk-abr .pk-symbol, .pk-abr[data-rekord] .pk-symbol { background: var(--gold); color: var(--kg-stark); }
+.pk-abr .pk-symbol .ico, .pk-abr[data-rekord] .pk-symbol .ico { color: var(--kg-stark); }
+.pk-abr .pk-wert { color: var(--kt-stark); }
 
 /* Mini-Tafel: ueber dir, du, unter dir (deine Zeile gleitet nach oben) */
 .pk-mini { display: grid; gap: 2px; margin: 0 12px 10px; padding: 0; list-style: none; overflow: hidden; border-radius: var(--r-s); }

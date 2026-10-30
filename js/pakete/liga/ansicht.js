@@ -5,6 +5,7 @@ import { addiereTage } from '../../tag.js';
 import { t, datum } from '../../sprache.js';
 import '../../sprachen/allgemein.js';
 import { STUFEN, SAISON_TAGE, unsicherheit, vorlaeufig, kreuztabelle, belegFuer } from './wertung.js';
+import { ligaWappen } from '../../sammlung-kunst.js';
 import './texte.js';
 
 const el = (tag, klasse, text) => {
@@ -129,15 +130,43 @@ export function botBilanz({ bot, fortschritt }) {
     remis: tx('bilanz.remis', { n: remis }), niederlagen: tx('bilanz.niederlagen', { n: b.niederlagen || 0 }) }));
 }
 
+// Liga im Ergebnis (Flo 30.10. abends: "Liga anzeigen", "farbiger und mehr durchdacht"): Karte mit Wappen der Stufe,
+// Stand, Balken bis zur naechsten Stufe, Aenderung und warum (Ergebnis, Genauigkeit, geschuetzte Stufe)
+const ERG = ['niederlage', 'remis', 'sieg'];
+// Farbe je Stufe: Holz, Bronze, Silber, Gold, Platin, Diamant, Meister (wie die Wappen in js/sammlung-kunst.js)
+const LIGA_FARBEN = ['#A8743F', '#C27A3E', '#A9B2BE', '#E0A22B', '#5FB3AA', '#5AA6F0', '#A855F7'];
 export function abrechnungsZeile(k, st) {
   if (!st || k.wertet !== true) return null;
   const r = belegFuer(st, k.erg?.partie?.id);
   if (!r) return null;
   const zeile = el('div', 'liga-abrechnung zahl');
   zeile.dataset.zeile = 'liga';
-  if (r[1] === st.saison.nr && r[1] > 0) {
-    zeile.textContent = tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(st.saison.stufe) });
-  } else zeile.textContent = tx(r[4] ? 'abr.blitz' : 'abr.arena', { diff: differenz(r[2]) });
+  if (!(r[1] === st.saison.nr && r[1] > 0)) {
+    zeile.textContent = tx(r[4] ? 'abr.blitz' : 'abr.arena', { diff: differenz(r[2]) });
+    return zeile;
+  }
+  const stufe = st.saison.stufe;
+  const naechste = STUFEN[stufe + 1];
+  const unten = STUFEN[stufe].schwelle;
+  const anteil = naechste ? Math.max(0, Math.min(1, (st.saison.punkte - unten) / (naechste.schwelle - unten))) : 1;
+  const grund = [];
+  if (r.length > 10 && ERG[r[10]]) grund.push(`${tx('abr.ergebnis.' + ERG[r[10]])} ${differenz(r[6])}`);
+  const g = k.erg?.partie?.genauigkeit;
+  if (r[7]) grund.push(`${Number.isFinite(g) ? tx('abr.genau', { g: Math.round(g) }) : tx('abr.genauOhne')} ${differenz(r[7])}`);
+  if (r[3] > r[6] + r[7]) grund.push(tx('abr.geschuetzt'));
+  zeile.classList.add('liga-erg');
+  zeile.dataset.stufe = String(stufe);
+  zeile.style.setProperty('--liga-f', LIGA_FARBEN[stufe] || LIGA_FARBEN[0]);
+  zeile.dataset.richtung = r[3] > 0 ? 'plus' : r[3] < 0 ? 'minus' : 'null';
+  zeile.setAttribute('role', 'group');
+  zeile.setAttribute('aria-label', tx('abr.liga', { diff: differenz(r[3]), stufe: stufeName(stufe) }));
+  zeile.innerHTML = `<span class="liga-erg-wappen" aria-hidden="true">${ligaWappen(stufe)}</span>
+    <span class="liga-erg-mitte"><span class="liga-erg-titel">${esc(tx('abr.titel'))}</span>
+      <b class="liga-erg-stand">${esc(tx('abr.stand', { stufe: stufeName(stufe), punkte: st.saison.punkte }))}</b>
+      <span class="liga-erg-balken" aria-hidden="true"><i style="transform:scaleX(${anteil.toFixed(3)})"></i></span>
+      <span class="liga-erg-weg">${esc(naechste ? tx('abr.weg', { n: naechste.schwelle - st.saison.punkte, stufe: stufeName(stufe + 1) }) : tx('abr.oben'))}</span>
+      ${grund.length ? `<span class="liga-erg-grund">${esc(grund.join(' · '))}</span>` : ''}</span>
+    <span class="liga-erg-diff">${esc(differenz(r[3]))}</span>`;
   return zeile;
 }
 

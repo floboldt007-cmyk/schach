@@ -2028,7 +2028,10 @@ export function zeige(root, params, app) {
         const zuKurz = eigeneZuege(p) < BESTWERT_MIN_ZUEGE && p.ergebnis !== 'sieg';
         const genauHtml = (gross) => {
           if (zuKurz) return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b>${esc(t('partie.erg.zuKurz'))}</b><span>${esc(t('partie.erg.hinweis'))}</span></div>`;
-          return `<div class="erg-genau${gross ? ' gross' : ''}">${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
+          // Farbe nach Guete (Flo 30.10. abends: "farbiger"), im grossen Block mit Messbalken
+          const band = !Number.isFinite(gen) ? '' : gen >= 85 ? 'stark' : gen >= 70 ? 'gut' : gen >= 50 ? 'mittel' : 'schwach';
+          const mess = gross && band ? `<span class="erg-mess" aria-hidden="true"><i style="transform:scaleX(${(Math.max(0, Math.min(100, gen)) / 100).toFixed(3)})"></i></span>` : '';
+          return `<div class="erg-genau${gross ? ' gross' : ''}"${band ? ` data-band="${band}"` : ''}>${esc(t('partie.erg.genauigkeit'))} <b class="zahl" data-ziel="${Number.isFinite(gen) ? gen : ''}">${Number.isFinite(gen) ? esc(prozent(0)) : '-'}</b>${mess}${gross ? (p.spielstaerke ? `<span>${esc(t('partie.erg.spielteWie', { elo: p.spielstaerke }))}</span>` : '') : esc(staerke)}</div>`;
         };
         if (ergebnis === 'sieg' && wertet) {
           if (nachtrag && mitte.querySelector('.erg-sterne')) {
