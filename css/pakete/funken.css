@@ -105,7 +105,9 @@
 .fk-s-herkunft { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
 .fk-s-zwischen { margin: 4px 0 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase;
   color: var(--text-2); }
-.fk-regeln { border-top: 1px solid var(--linie); padding-top: 10px; }
+.fk-s-mehr, .fk-regeln { border-top: 1px solid var(--linie); padding-top: 10px; }
+.fk-s-mehr summary { min-height: var(--tipp); display: flex; align-items: center; font-weight: var(--gw-stark); cursor: pointer; }
+.fk-s-mehr[open] summary { margin-bottom: 6px; }
 .fk-regeln summary { min-height: var(--tipp); display: flex; align-items: center; font-weight: var(--gw-stark); cursor: pointer; }
 .fk-regeln p { margin: 0 0 8px; font-size: 13.5px; font-weight: 550; line-height: 1.45; color: var(--text-2); }
 .fk-spiegel-knoepfe { display: grid; margin-top: 16px; }

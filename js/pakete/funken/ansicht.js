@@ -492,14 +492,20 @@ export function spiegelInhalt({ st, botName = (id) => id, wochenende = false } =
     ${balkenHtml(fs.anteil, tx('balken', { level: fs.level, bis: bisText(fs) }))}
     <dl class="fk-s-liste">
       <dt>${esc(tx('spiegel.heute'))}</dt><dd class="fk-s-heute"></dd>
+      <dt>${esc(tx('spiegel.naechstes'))}</dt><dd class="fk-s-naechstes"></dd>
+    </dl>
+    <details class="fk-s-mehr"><summary>${esc(tx('spiegel.mehr'))}</summary>
+    <dl class="fk-s-liste fk-s-liste2">
       <dt>${esc(tx('spiegel.bogen'))}</dt><dd class="fk-s-bogen"></dd>
       <dt>${esc(tx('spiegel.rw'))}</dt><dd class="fk-s-rw"></dd>
-      <dt>${esc(tx('spiegel.naechstes'))}</dt><dd class="fk-s-naechstes"></dd>
       <dt>${esc(tx('spiegel.insgesamt'))}</dt><dd>${mitMarkup(tx('spiegel.insgesamtWert'), { a: `<span class="zahl">${zahlText(st.gesamt)}</span>` })}</dd>
-    </dl>`;
+    </dl></details>`;
+  // Eine Sache pro Blick (Entwurf "Crownmate aufgeraeumt", 30.10.): sichtbar Level, Balken, heute und als Naechstes;
+  // Tagesbogen, Rueckenwind, Summe, letzter Aufstieg und die letzten Partien liegen unter "Mehr zu deinen Funken"
+  const mehr = box.querySelector('.fk-s-mehr');
   const auf = st.aufstiege[0];
   if (auf && auf.satz) {
-    const dl = box.querySelector('.fk-s-liste');
+    const dl = box.querySelector('.fk-s-liste2');
     const dt = el('dt', null, esc(tx('spiegel.aufstieg')));
     const dd = el('dd', 'fk-s-aufstieg');
     dd.textContent = tx('spiegel.aufstiegText', { level: auf.level, satz: satzText(auf.satz) });
@@ -521,7 +527,7 @@ export function spiegelInhalt({ st, botName = (id) => id, wochenende = false } =
   box.querySelector('.fk-s-naechstes').textContent = n ? tx('spiegel.naechstesText', { level: n.level, text: n.text }) : '';
   if (st.verlauf.length) {
     const h = el('h4', 'fk-s-zwischen', esc(tx('spiegel.partien')));
-    box.append(h, partienListe(st, botName, 8));
+    mehr.append(h, partienListe(st, botName, 8));
   }
   box.append(soEntstehen());
   return box;
