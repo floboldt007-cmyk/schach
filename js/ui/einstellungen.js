@@ -12,7 +12,7 @@
 // Tester-Bericht (Luecken-Check 10): in "Info und Lizenzen" der Eintrag .es-bericht mit dem Knopf
 // [data-aktion="bericht"]; er laedt js/bericht.js erst beim Tipp (import()) und oeffnet dort das Blatt mit dem Bericht.
 import { klang } from '../sounds.js';
-import { setzeZurueck, loescheAlleAppDaten, statistik, gesamtSterne } from '../storage.js';
+import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
@@ -68,10 +68,9 @@ export function zeige(root, params = {}, app) {
   const lausche = (ziel, typ, f, opt) => { ziel.addEventListener(typ, f, opt); aufraeumen.push(() => ziel.removeEventListener(typ, f, opt)); };
   const nach = (ms, f) => { const t = setTimeout(() => { timer.delete(t); if (!beendet) f(); }, ms); timer.add(t); return t; };
   let resetStufe = 0;
-  let allesLoeschen = false;
-  let allesWarnung = null;      // zweite Rueckfrage vor dem Loeschen: 'nichtGesichert' | 'nichtAbgeglichen' | 'widerrufOffen'
-  let allesQuittiert = new Set(); // Warnungen, nach denen "Trotzdem loeschen" getippt wurde
-  let ausloeser = 'reset-1';    // Fokus nach dem Abbrechen zurueck auf den Knopf, der die Rueckfrage geoeffnet hat
+  // Doppeltipp-Schutz: Die Rueckfrage zeichnet ihren Knopf an die Stelle des Ausloesers. Ein zweiter Tipp (Doppeltipp,
+  // Doppelklick) darf sie nicht gleich bestaetigen, darum gilt ein neu gezeichneter Knopf erst nach kurzer Zeit.
+  let resetBereitAb = 0;
   let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
@@ -233,10 +232,7 @@ export function zeige(root, params = {}, app) {
       box.innerHTML = `
         <p class="es-hilfe">${E('reset.hilfe')}
           ${E('reset.stand', { partien: E('reset.partien', { n: s.partien, zahl: `<b class="zahl">${s.partien}</b>` }), sterne: E('reset.sterne', { n: sterne, zahl: `<b class="zahl">${sterne}</b>` }) })}</p>
-        <div class="es-knoepfe"><button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button><button class="knopf es-rot-rand" type="button" data-aktion="alles-1">${icon('muell')} ${E('reset.allesKnopf')}</button></div>`;
-    } else if (allesLoeschen) {
-      box.innerHTML = `<div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E(allesWarnung ? `reset.alles.${allesWarnung}` : 'reset.allesFrage')}</b> ${E(allesWarnung ? `reset.alles.${allesWarnung}Text` : 'reset.allesText')}</p></div><div class="es-knoepfe"><button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button><button class="knopf es-rot" type="button" data-aktion="alles-ok">${icon('muell')} ${E(allesWarnung ? 'reset.allesTrotzdem' : 'reset.allesEndgueltig')}</button></div>`;
-      box.querySelector('[data-aktion="reset-ab"]').focus();
+        <button class="knopf es-rot-rand" type="button" data-aktion="reset-1">${icon('muell')} ${E('reset.knopf')}</button>`;
     } else if (resetStufe === 1) {
       box.innerHTML = `
         <div class="es-warnung" role="alert">${icon('warnung')}<p><b>${E('reset.frage1')}</b> ${E('reset.text1', { bot: esc(ersterGegner()) })}</p></div>
@@ -261,7 +257,7 @@ export function zeige(root, params = {}, app) {
     zeigeStand();
   }
 
-  lausche(sec, 'click', async (e) => {
+  lausche(sec, 'click', (e) => {
     const k = e.target.closest('[data-aktion]');
     if (!k || !sec.contains(k) || k.disabled || k.closest('.es-ort')) return;   // Pakete binden selbst
     const e0 = lies();
@@ -293,40 +289,11 @@ export function zeige(root, params = {}, app) {
         import('../bericht.js').then((m) => m.zeigeBericht(app))
           .catch(() => { try { app.meldung(t('bericht.erstellenFehler'), { art: 'fehler' }); } catch (f) { /* egal */ } });
         break;
-      case 'reset-1': ausloeser = 'reset-1'; resetStufe = 1; zeigeReset(); break;
-      case 'alles-1': ausloeser = 'alles-1'; allesLoeschen = true; allesWarnung = null; allesQuittiert = new Set(); resetStufe = 1; zeigeReset(); break;
-      case 'reset-2': resetStufe = 2; zeigeReset(); break;
-      case 'reset-ab': resetStufe = 0; allesLoeschen = false; allesWarnung = null; allesQuittiert = new Set(); zeigeReset(); sec.querySelector(`[data-aktion="${ausloeser}"]`)?.focus(); break;
-      case 'alles-ok': {
-        k.disabled = true;
-        // Erst sichern (wenn dieses Geraet mit der Cloud abgeglichen ist), einen offenen Widerruf senden und die Sitzung
-        // abmelden, dann loeschen. Geht dabei etwas verloren (Sicherung gescheitert, Stand nie in der Cloud, Widerruf
-        // noch nicht beim Server), fragt die App noch einmal, statt still Daten oder eine Loeschpflicht zu verlieren.
-        if (allesWarnung) allesQuittiert.add(allesWarnung);
-        allesWarnung = null;
-        let konto = null;
-        try { konto = await import('../konto.js'); } catch (f) { /* ohne Konto-Modul */ }
-        if (konto && !allesQuittiert.has('nichtGesichert') && !allesQuittiert.has('nichtAbgeglichen')) {
-          const s = await konto.sichereVorDemLoeschen();
-          if (s === 'fehlgeschlagen') allesWarnung = 'nichtGesichert';
-          else if (s === 'nicht-abgeglichen') allesWarnung = 'nichtAbgeglichen';
-          if (allesWarnung) { zeigeReset(); break; }
-        }
-        let widerrufOffen = false;
-        try {
-          const daten = await import('../daten.js');
-          widerrufOffen = !(await Promise.race([daten.widerrufeJetzt(), new Promise((ja) => setTimeout(() => ja(false), 5000))]));
-        } catch (f) { /* ohne Daten-Modul */ }
-        if (widerrufOffen && !allesQuittiert.has('widerrufOffen')) { allesWarnung = 'widerrufOffen'; zeigeReset(); break; }
-        try { await konto?.abmelden({ geraet: true }); } catch (f) { /* lokal wird unten ohnehin geloescht */ }
-        loescheAlleAppDaten();
-        allesLoeschen = false; allesWarnung = null; allesQuittiert = new Set(); resetStufe = 0; zeigeReset();
-        try { app.meldung(E('reset.allesFertig')); } catch (f) { /* egal */ }
-        // Neu starten, damit kein Zustand aus dem Arbeitsspeicher die geloeschten Daten wieder schreibt
-        setTimeout(() => { try { globalThis.location.reload(); } catch (f) { /* egal */ } }, 1500);
-        break;
-      }
+      case 'reset-1': if (e.detail > 1) break; resetStufe = 1; resetBereitAb = Date.now() + 600; zeigeReset(); break;
+      case 'reset-2': if (e.detail > 1 || Date.now() < resetBereitAb) break; resetStufe = 2; resetBereitAb = Date.now() + 600; zeigeReset(); break;
+      case 'reset-ab': resetStufe = 0; zeigeReset(); sec.querySelector('[data-aktion="reset-1"]')?.focus(); break;
       case 'reset-ok':
+        if (e.detail > 1 || Date.now() < resetBereitAb) break;
         // setzeZurueck sendet speicher:zurueckgesetzt (Pakete leeren ihren Zustand); danach die Gruppen der
         // Pakete neu fuellen, damit sie den frischen Stand zeigen
         setzeZurueck();

@@ -493,7 +493,9 @@ async function browserAblauf(browser) {
   await seite.waitForFunction(() => /endgültig/.test(document.querySelector('.sheet-ort:not(.weg) .sheet-karte')?.textContent || ''));
   pruefe('Browser: Stufe 2 fragt noch einmal, noch nichts gelöscht', !netz.some((x) => x.url.includes('konto_loeschen')));
   await seite.click('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
-  await seite.waitForFunction(() => !localStorage.getItem('schach-arena:konto:sitzung'), null, { timeout: 5000 }).catch(() => {});
+  // Auf das Ende warten (Meldung sichtbar), nicht nur auf das Abmelden: das entfernt die Sitzung schon vor dem Rest
+  await seite.waitForFunction(() => !localStorage.getItem('schach-arena:konto:sitzung')
+    && /Konto gelöscht/.test((document.querySelector('.daten-gruppe')?.textContent || '') + (document.querySelector('.toast')?.textContent || '')), null, { timeout: 8000 }).catch(() => {});
   const nachLoeschen = await seite.evaluate(() => ({ s: localStorage.getItem('schach-arena:konto:sitzung'), e: JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).datenfreigabe,
     text: document.querySelector('.daten-gruppe')?.textContent || '', toast: document.querySelector('.toast')?.textContent || '' }));
   pruefe('Browser: nach Stufe 2 rpc/konto_loeschen, abgemeldet, Freigabe aus, Meldung', netz.some((x) => x.url.endsWith('/rest/v1/rpc/konto_loeschen') && x.methode === 'POST')

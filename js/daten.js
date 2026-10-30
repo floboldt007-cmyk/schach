@@ -346,10 +346,12 @@ function rpcFehlerText(status, code) {
 export async function loescheKonto(app = null) {
   const s = await aktiveSitzung();
   await rpc('konto_loeschen', s.access_token);
-  await abmelden();
+  // abmelden() entfernt die Sitzung sofort und wartet danach bis zu 5 s auf den Server: erst lokal aufraeumen, dann warten
+  const abgemeldet = abmelden();
   leereWarteschlange();
   try { lager().removeItem(ZUSTIMMUNG_SCHLUESSEL); lager().removeItem(WIDERRUF_SCHLUESSEL); } catch (e) { /* egal */ }
   einstellen({ datenfreigabe: 'aus' }, app);
+  await abgemeldet;
   return true;
 }
 

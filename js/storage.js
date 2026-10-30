@@ -1038,24 +1038,3 @@ export function setzeZurueck({ mitEinstellungen = false } = {}) {
   for (const k of weg) entferne(k);
   try { sende('speicher:zurueckgesetzt', { mitEinstellungen: !!mitEinstellungen }); } catch (e) { /* egal */ }
 }
-
-// Entfernt bewusst mehr als setzeZurueck: alle Daten dieser App mit dem Praefix schach-arena:, auch Konto-Merker und
-// Warteschlangen. Es bleiben (wie js/konto.js BLEIBT_BEIM_ENTFERNEN) der Freischalt-Merker, ein offener Widerruf der
-// Datenfreigabe (offene Loeschpflicht, js/daten.js holt ihn nach) und der Einwilligungsnachweis (damit der Schalter
-// "Teilen" nach der naechsten Anmeldung stimmt und sich zum Widerrufen ausschalten laesst). Fremde Schluessel bleiben ebenfalls (GitHub Pages
-// teilt sich den Ursprung mit Flos anderen Seiten). Die Programmdateien im Cache des Service Workers bleiben bewusst:
-// Sie enthalten nichts Persoenliches, und ohne sie startet die App offline nicht mehr (Ultracode-Pruefung 30.10.).
-export const ALLES_LOESCHEN_BLEIBT = Object.freeze(['schach-arena:konto:sichtbar', 'schach-arena:daten:widerruf', 'schach-arena:daten:zustimmung']);
-export function loescheAlleAppDaten() {
-  const s = sp();
-  const weg = [];
-  try {
-    for (let i = 0; i < s.length; i++) {
-      const k = s.key(i);
-      if (k?.startsWith('schach-arena:') && !ALLES_LOESCHEN_BLEIBT.includes(k)) weg.push(k);
-    }
-  } catch (e) { /* Arbeitsspeicher unten dennoch leeren */ }
-  for (const k of weg) entferne(k);
-  try { sende('speicher:zurueckgesetzt', { mitEinstellungen: true, alles: true }); } catch (e) { /* egal */ }
-  return true;
-}

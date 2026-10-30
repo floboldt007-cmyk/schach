@@ -670,14 +670,23 @@ async function testeEinstellungen(browser) {
 
   // Zuruecksetzen in zwei Stufen
   pruefe('Vor dem Zurücksetzen: 1 Partie', (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
+  // Doppeltipp-Schutz: ein Doppelklick auf "Fortschritt zuruecksetzen" oeffnet nur die erste Rueckfrage, ein Klick auf den
+  // eben gezeichneten Knopf gilt erst nach kurzer Zeit (Ultracode-Pruefung 30.10.: Doppeltipp auf dem iPad loeschte sonst)
+  await seite.dblclick('[data-aktion="reset-1"]');
+  await seite.click('[data-aktion="reset-2"]');
+  pruefe('Doppelklick und sofortiger Klick: noch Stufe 1, nichts gelöscht', (await seite.locator('.es-reset').textContent()).includes('Wirklich')
+    && (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
+  await seite.click('[data-aktion="reset-ab"]');
   await seite.click('[data-aktion="reset-1"]');
   pruefe('Stufe 1: Rückfrage', (await seite.locator('.es-reset').textContent()).includes('Wirklich'));
   await seite.click('[data-aktion="reset-ab"]');
   pruefe('Abbrechen: nichts gelöscht', (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
   await seite.click('[data-aktion="reset-1"]');
+  await seite.waitForTimeout(700);
   await seite.click('[data-aktion="reset-2"]');
   pruefe('Stufe 2: letzte Rückfrage', (await seite.locator('.es-reset').textContent()).includes('nicht rückgängig'));
   await bild(seite, 'einstellungen-zuruecksetzen');
+  await seite.waitForTimeout(700);
   await seite.click('[data-aktion="reset-ok"]');
   const nach = await seite.evaluate(() => ({ p: testseite.speicher.ladePartien().length, s: testseite.speicher.gesamtSterne(), e: testseite.speicher.ladeEinstellungen() }));
   pruefe('Zurückgesetzt: keine Partien, keine Sterne', nach.p === 0 && nach.s === 0, JSON.stringify(nach));
@@ -689,49 +698,6 @@ async function testeEinstellungen(browser) {
     && /chess\.js/.test(document.body.innerText) && /cburnett/.test(document.body.innerText)));
   await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'nacht', tiefe: 12 }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
-
-  // Alle App-Daten auf diesem Geraet loeschen: eine Rueckfrage; angemeldet und abgeglichen sichert die App vorher, scheitert
-  // das, fragt sie noch einmal. Fremde Schluessel, ein offener Widerruf und der Freischalt-Merker bleiben, danach Neustart.
-  await seite.route(/supabase\.co/, (r) => r.abort());
-  await seite.evaluate(() => {
-    const jwt = 'a.' + btoa(JSON.stringify({ sub: 'u1' })).replace(/=+$/, '') + '.x';
-    localStorage.setItem('fremde-app', 'bleibt');
-    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: jwt, refresh_token: 'r', expires_at: 9999999999, user: { id: 'u1' } }));
-    localStorage.setItem('schach-arena:konto:abgeglichen', 'u1');
-    localStorage.setItem('schach-arena:daten:widerruf', JSON.stringify({ konto: 'u2', datum: '2026-10-30' }));
-  });
-  await seite.click('[data-aktion="alles-1"]');
-  pruefe('Alles löschen: eine Rückfrage', (await seite.locator('.es-reset').textContent()).includes('Alle App-Daten auf diesem Gerät löschen?'));
-  await seite.click('[data-aktion="reset-ab"]');
-  pruefe('Alles löschen abgebrochen: nichts weg, Fokus zurück auf den Knopf', await seite.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen') === 'u1'
-    && document.activeElement?.dataset?.aktion === 'alles-1'));
-  // Angemeldet, aber nie abgeglichen: der Stand war nie in der Cloud, die App fragt nach
-  await seite.evaluate(() => { localStorage.removeItem('schach-arena:konto:abgeglichen'); localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'p-nie' }])); });
-  await seite.click('[data-aktion="alles-1"]');
-  await seite.click('[data-aktion="alles-ok"]');
-  await seite.waitForSelector('.es-reset >> text=Dieser Spielstand ist nicht in der Cloud', { timeout: 15000 }).catch(() => {});
-  pruefe('Nie abgeglichen: Rückfrage statt still löschen', (await seite.locator('.es-reset').textContent()).includes('Trotzdem löschen')
-    && await seite.evaluate(() => localStorage.getItem('schach-arena:v1:partien') !== null));
-  await seite.click('[data-aktion="reset-ab"]');
-  await seite.evaluate(() => localStorage.setItem('schach-arena:konto:abgeglichen', 'u1'));
-  await seite.click('[data-aktion="alles-1"]');
-  await seite.click('[data-aktion="alles-ok"]');
-  await seite.waitForSelector('.es-reset >> text=Die Sicherung in die Cloud hat nicht geklappt', { timeout: 15000 }).catch(() => {});
-  pruefe('Sicherung gescheitert: zweite Rückfrage, noch nichts gelöscht', (await seite.locator('.es-reset').textContent()).includes('Trotzdem löschen')
-    && await seite.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen') === 'u1'));
-  await seite.click('[data-aktion="alles-ok"]');
-  await seite.waitForSelector('.es-reset >> text=Das Löschen deiner geteilten Daten steht noch aus', { timeout: 15000 }).catch(() => {});
-  pruefe('Offener Widerruf (anderes Konto, kein Netz): eigene Rückfrage, noch nichts gelöscht', (await seite.locator('.es-reset').textContent()).includes('Trotzdem löschen')
-    && await seite.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen') === 'u1'));
-  const neuGeladen = seite.waitForEvent('load', { timeout: 20000 }).then(() => true, () => false);
-  await seite.click('[data-aktion="alles-ok"]');
-  const BLEIBT = ['schach-arena:konto:sichtbar', 'schach-arena:daten:widerruf', 'schach-arena:daten:zustimmung'];
-  await seite.waitForFunction((b) => !Object.keys(localStorage).some((k) => k.startsWith('schach-arena:') && !b.includes(k)), BLEIBT, { timeout: 15000 }).catch(() => {});
-  const direkt = await seite.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
-  pruefe('Alles gelöscht: nur offener Widerruf und Freischalt-Merker bleiben, fremde Schlüssel auch',
-    !Object.keys(direkt).some((k) => k.startsWith('schach-arena:') && !BLEIBT.includes(k)) && direkt['fremde-app'] === 'bleibt'
-    && JSON.parse(direkt['schach-arena:daten:widerruf'] || '{}').konto === 'u2', Object.keys(direkt));
-  pruefe('Danach startet die App neu', await neuGeladen);
   await kontext.close();
 }
 

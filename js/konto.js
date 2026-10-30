@@ -96,53 +96,37 @@ export async function pruefeCode(email, token) {
 // Jede neue Anmeldung (Code, Link, Google) verlangt einen neuen Abgleich: Die Cloud kann sich inzwischen auf einem
 // anderen Geraet geaendert haben. Das Erneuern einer Sitzung (erneuereSitzung) laesst den Merker stehen.
 function neueAnmeldung() { try { lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ } }
+// Die Antwort gilt nur, wenn inzwischen niemand abgemeldet hat (epoche) und noch derselbe Erneuerungsschluessel gespeichert
+// ist: Eine spaete Antwort darf eine Abmeldung nie rueckgaengig machen (sonst kaeme die Sitzung zurueck, Ultracode 30.10.).
 export async function erneuereSitzung() {
   const s = sitzung(); if (!s?.refresh_token) throw new Error(K('nichtAngemeldet'));
+  const e0 = epoche;
+  const gleich = () => epoche === e0 && sitzung()?.refresh_token === s.refresh_token;
+  let d;
   try {
-    return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
+    d = await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } });
   } catch (e) {
     // Tote Sitzung (auf dem Server abgemeldet oder abgelaufen): lokal entfernen, damit die Gruppe "abgemeldet" zeigt,
-    // statt still nie mehr zu sichern
-    if (SITZUNG_TOT.has(e.kennung)) { epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
+    // statt still nie mehr zu sichern. Nur wenn noch diese Sitzung gespeichert ist (ein anderer Tab kann sich neu angemeldet haben).
+    if (SITZUNG_TOT.has(e.kennung) && gleich()) { epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
     throw e;
   }
+  if (!gleich()) throw new Error(K('nichtAngemeldet'));
+  return merkeSitzung(d, s.email);
 }
 export async function aktiveSitzung() {
   const s = sitzung(); if (!s) throw new Error(K('nichtAngemeldet'));
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
-// Bleiben beim Entfernen der Kontodaten: der Freischalt-Merker (kein Kontodatum), ein offener Widerruf der Datenfreigabe
-// (eine offene Loeschpflicht: js/daten.js holt ihn nach, sobald dasselbe Konto auf diesem Geraet wieder angemeldet ist)
-// und der Einwilligungsnachweis zum Teilen: Die Einwilligung gilt auf dem Server weiter, und nur mit diesem Nachweis
-// zeigt der Schalter "Teilen" nach der naechsten Anmeldung "an" und laesst sich zum Widerrufen ausschalten.
-export const BLEIBT_BEIM_ENTFERNEN = Object.freeze([SICHTBAR_SCHLUESSEL, 'schach-arena:daten:widerruf', 'schach-arena:daten:zustimmung']);
 // epoche: zaehlt jedes Abmelden und Loeschen. Ein Abgleich, der waehrenddessen laeuft, schreibt danach nichts mehr.
 let epoche = 0;
 // Lokal sofort abmelden, danach den Server mit kurzer Frist benachrichtigen, nur fuer diese Sitzung (scope=local):
-// Andere Geraete bleiben angemeldet. geraet: zusaetzlich alle Kontodaten auf diesem Geraet entfernen.
-export async function abmelden({ geraet = false, frist = 5000 } = {}) {
+// Andere Geraete und Browser bleiben angemeldet.
+export async function abmelden({ frist = 5000 } = {}) {
   const s = sitzung();
   epoche++;
   try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ }
-  if (geraet) {
-    try {
-      const weg = [];
-      for (let i = 0; i < lager().length; i++) {
-        const k = lager().key(i);
-        if (k && /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k) && !BLEIBT_BEIM_ENTFERNEN.includes(k)) weg.push(k);
-      }
-      for (const k of weg) lager().removeItem(k);
-    } catch (e) { /* die Sitzung ist bereits entfernt */ }
-  }
   try { if (s?.access_token) await mitFrist(anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }), frist); } catch (e) { /* lokal ist schon abgemeldet */ }
-}
-// Vor "Alle Daten dieser App loeschen": den Stand noch einmal sichern, wenn dieses Geraet abgeglichen ist.
-// 'ohne' (nicht angemeldet oder kein Spielstand), 'nicht-abgeglichen' (angemeldet, aber dieser Stand war nie in der
-// Cloud: er ginge verloren), 'gesichert' oder 'fehlgeschlagen'.
-export async function sichereVorDemLoeschen(ms = 8000) {
-  if (!sitzung() || !hatSpielstand()) return 'ohne';
-  if (!istAbgeglichen()) return 'nicht-abgeglichen';
-  try { await mitFrist(speichereCloudStand(), ms); return 'gesichert'; } catch (e) { return 'fehlgeschlagen'; }
 }
 export function istAbgeglichen(s = sitzung()) {
   try { return !!s && !!userId(s) && lager().getItem(ABGEGLICHEN_SCHLUESSEL) === userId(s); } catch (e) { return false; }
@@ -198,7 +182,10 @@ export async function ladeProfil() {
   return Array.isArray(d) ? (d[0] || null) : d;
 }
 export async function speichereCloudStand() {
+  const e0 = epoche;
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error(K('keineId'));
+  // Waehrend des Erneuerns abgemeldet: nichts mehr hochladen
+  if (epoche !== e0 || userId(sitzung()) !== id) throw new Error(K('nichtAngemeldet'));
   // nur Familie und System ("iPadOS Safari"), nie der volle User-Agent-String (Datensparsamkeit)
   const daten = { user_id: id, stand: cloudStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
   await anfrage('/rest/v1/spielstaende', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
@@ -330,7 +317,7 @@ export function kontoGruppe({ app } = {}) {
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button><button class="knopf" data-konto="abmelden-geraet">${K('abmeldenGeraet')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       <p class="es-hilfe konto-oder">${K('oder')}</p><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`}
@@ -349,11 +336,6 @@ export function kontoGruppe({ app } = {}) {
         const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
       }
       if (a === 'abmelden') { await abmelden(); render(); }
-      if (a === 'abmelden-geraet') {
-        // Einen offenen Widerruf vorher senden (mit Frist): danach fehlt die Sitzung dafuer
-        try { const d = await import('./daten.js'); await mitFrist(d.widerrufeJetzt(), 5000); } catch (f) { /* bleibt gemerkt */ }
-        await abmelden({ geraet: true }); render();
-      }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
     } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
@@ -405,4 +387,4 @@ function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&
 
 // Registrierung ist defensiv: Das Konto darf die Offline-App nie am Start hindern.
 try { uebernimmLinkSitzung(); kontoSichtbar(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung());
-  hoere('speicher:zurueckgesetzt', (d) => { if (d.alles) epoche++; }); } catch (e) { /* App laeuft ohne Konto weiter */ }
+} catch (e) { /* App laeuft ohne Konto weiter */ }
