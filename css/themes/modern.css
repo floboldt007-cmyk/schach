@@ -44,18 +44,21 @@
   --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
   --meta-farbe: #F4F1EC;
 
-  /* Zugklassen: Fuellung (in hell und dunkel gleich), Zeichen auf der Fuellung, Textfassung (>= 4,5:1) */
-  --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #6234C2;
-  --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #2456BF;
-  --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #0E7553;
-  --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #43772F;
-  --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #56675F;
-  --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #7A5A36;
-  --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #8A6508;
-  --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #A65314;
-  --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #963676;
-  --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #A3233F;
-  --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #5C6373;
+  /* Zugklassen: Fuellung (in hell und dunkel gleich), Zeichen auf der Fuellung, Textfassung (>= 4,5:1).
+     Variante A "Ruhig" (Flo, 30.10.2026): fuenf Farbfamilien statt elf, gold besonders (Genial, Goldrichtig), gruen gut
+     (Praezise, Sauber), grau neutral (Solide, Theorie, Pflichtzug), orange schwach (Unscharf, Daneben), rot schlecht
+     (Verschenkt, Weit daneben). Die Symbole (js/symbole.js) zeigen das Zeichen in --kt-* auf einer zarten Kachel. */
+  --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #7A5B0E;
+  --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #7A5B0E;
+  --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #226548;
+  --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #226548;
+  --k-gut: #6E8A7C; --kg-gut: #1C1B19; --kt-gut: #4C6357;
+  --k-buch: #958571; --kg-buch: #1C1B19; --kt-buch: #66594A;
+  --k-ungenau: #C27A12; --kg-ungenau: #1C1B19; --kt-ungenau: #865408;
+  --k-fehler: #C2561A; --kg-fehler: #FFFFFF; --kt-fehler: #994212;
+  --k-verpasst: #B23A3A; --kg-verpasst: #FFFFFF; --kt-verpasst: #982F2F;
+  --k-patzer: #B23A3A; --kg-patzer: #FFFFFF; --kt-patzer: #982F2F;
+  --k-erzwungen: #8B8F99; --kg-erzwungen: #1C1B19; --kt-erzwungen: #5A616F;
 
   /* Bot-Farben (gedaempft) und ihre Toenung hinter dem Portraet */
   --bot-benno: #5FAE4E; --bot-benno-tint: #DCEFD3;
@@ -150,17 +153,17 @@
   --sockel: #2A2E36;
   --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
   --meta-farbe: #15171B;
-  --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #B9A0FF;
-  --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #8EAEFF;
-  --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #5FD3A6;
-  --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #9ED08B;
-  --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #B2C3BB;
-  --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #D4B08A;
-  --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #E9C35A;
-  --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #F3A464;
-  --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #F09AD0;
-  --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #FF8FA0;
-  --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B1B6C3;
+  --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #E3BC5C;
+  --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;
+  --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #6CCB9E;
+  --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #6CCB9E;
+  --k-gut: #6E8A7C; --kg-gut: #1C1B19; --kt-gut: #A9C2B5;
+  --k-buch: #958571; --kg-buch: #1C1B19; --kt-buch: #CDBBA3;
+  --k-ungenau: #C27A12; --kg-ungenau: #1C1B19; --kt-ungenau: #EAB458;
+  --k-fehler: #C2561A; --kg-fehler: #FFFFFF; --kt-fehler: #F09A64;
+  --k-verpasst: #B23A3A; --kg-verpasst: #FFFFFF; --kt-verpasst: #F08B8B;
+  --k-patzer: #B23A3A; --kg-patzer: #FFFFFF; --kt-patzer: #F08B8B;
+  --k-erzwungen: #8B8F99; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B8BCC6;
   /* Toenung im Dunkeln: 26 % Bot-Farbe auf --flaeche */
   --bot-benno: #5FAE4E; --bot-benno-tint: #2F4630;
   --bot-hilde: #D77CA8; --bot-hilde-tint: #4E3948;
@@ -222,17 +225,17 @@
     --sockel: #2A2E36;
     --balken-weiss: #FFFFFF; --balken-schwarz: #34363C;
     --meta-farbe: #15171B;
-    --k-brillant: #7A4FD6; --kg-brillant: #FFFFFF; --kt-brillant: #B9A0FF;
-    --k-stark: #2F67D8; --kg-stark: #FFFFFF; --kt-stark: #8EAEFF;
-    --k-bester: #14936A; --kg-bester: #1C1B19; --kt-bester: #5FD3A6;
-    --k-exzellent: #5E9C4E; --kg-exzellent: #1C1B19; --kt-exzellent: #9ED08B;
-    --k-gut: #7F928A; --kg-gut: #1C1B19; --kt-gut: #B2C3BB;
-    --k-buch: #A07A52; --kg-buch: #1C1B19; --kt-buch: #D4B08A;
-    --k-ungenau: #D6A21C; --kg-ungenau: #1C1B19; --kt-ungenau: #E9C35A;
-    --k-fehler: #DD7A2A; --kg-fehler: #1C1B19; --kt-fehler: #F3A464;
-    --k-verpasst: #B4468F; --kg-verpasst: #FFFFFF; --kt-verpasst: #F09AD0;
-    --k-patzer: #BC2A4C; --kg-patzer: #FFFFFF; --kt-patzer: #FF8FA0;
-    --k-erzwungen: #878E9E; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B1B6C3;
+    --k-brillant: #B98A1E; --kg-brillant: #1C1B19; --kt-brillant: #E3BC5C;
+    --k-stark: #B98A1E; --kg-stark: #1C1B19; --kt-stark: #E3BC5C;
+    --k-bester: #2F7D5B; --kg-bester: #FFFFFF; --kt-bester: #6CCB9E;
+    --k-exzellent: #2F7D5B; --kg-exzellent: #FFFFFF; --kt-exzellent: #6CCB9E;
+    --k-gut: #6E8A7C; --kg-gut: #1C1B19; --kt-gut: #A9C2B5;
+    --k-buch: #958571; --kg-buch: #1C1B19; --kt-buch: #CDBBA3;
+    --k-ungenau: #C27A12; --kg-ungenau: #1C1B19; --kt-ungenau: #EAB458;
+    --k-fehler: #C2561A; --kg-fehler: #FFFFFF; --kt-fehler: #F09A64;
+    --k-verpasst: #B23A3A; --kg-verpasst: #FFFFFF; --kt-verpasst: #F08B8B;
+    --k-patzer: #B23A3A; --kg-patzer: #FFFFFF; --kt-patzer: #F08B8B;
+    --k-erzwungen: #8B8F99; --kg-erzwungen: #1C1B19; --kt-erzwungen: #B8BCC6;
     --bot-benno: #5FAE4E; --bot-benno-tint: #2F4630;
     --bot-hilde: #D77CA8; --bot-hilde-tint: #4E3948;
     --bot-kalle: #D6A52E; --bot-kalle-tint: #4E4328;
