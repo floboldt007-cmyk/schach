@@ -13,6 +13,7 @@ import { pruefeInhalt, pruefeSpielplan, texteVon, COUNTDOWN_RE } from '../js/inh
 import { registriereBot, botNachId } from '../js/bots.js';
 import { ZUGKLASSEN } from '../js/zugklassen.js';
 import { DE as EMOTE_DE, EN as EMOTE_EN } from '../js/pakete/emotes/texte.js';
+import { EMOTES } from '../js/pakete/emotes/index.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -29,6 +30,14 @@ pruefe('Zugklassen: keine Namen der Vergleichs-App oder Verbotsliste', ZUGKLASSE
 const emoteTexte = [...Object.values(EMOTE_DE), ...Object.values(EMOTE_EN)].join(' ');
 pruefe('Emotes: vorgefertigte Texte sind freundlich und ohne Druck, Kauf oder Schuldgefuehl',
   !/kauf|buy|nur heute|only today|musst|must|schuld|guilt|verlierer|loser/i.test(emoteTexte));
+// SPIELKONZEPT 3.9 und 7.1: kein Emote, das verspottet (kein Lachen, Weinen, Gaehnen), weder als ID noch als Text
+const EMOTE_SPOTT = /lachen|laugh|weinen|cry|gaehnen|gähnen|yawn/i;
+const emoteIds = [...EMOTES.map(([id]) => id), ...Object.keys(EMOTE_DE).filter((k) => k.startsWith('emote.')).map((k) => k.slice(6))];
+const emoteNamen = [...Object.entries(EMOTE_DE), ...Object.entries(EMOTE_EN)].filter(([k]) => /^(emote|chat)\./.test(k)).map(([, v]) => v);
+pruefe('Emotes: Selbstprobe der Spott-Sperrliste', ['lachen', 'Laugh', 'weinen', 'cry', 'gaehnen', 'Gähnen', 'yawn'].every((t) => EMOTE_SPOTT.test(t)));
+pruefe('Emotes: keine Spott-Emotes (lachen, weinen, gaehnen) als ID oder Text',
+  emoteIds.length >= 8 && !emoteIds.some((id) => EMOTE_SPOTT.test(id)) && !emoteNamen.some((t) => EMOTE_SPOTT.test(t)),
+  [...emoteIds, ...emoteNamen].filter((t) => EMOTE_SPOTT.test(t)));
 
 // ---------------------------------------------------------------------------
 // Quelltext zerlegen: Zeichenketten (auch Template-Texte) und Code ohne Kommentare.
