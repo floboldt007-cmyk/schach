@@ -192,6 +192,10 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  pruefe('Erfinder: alle Finisher frei, auch auf Level 1 (kein Schloss)', await p.s.evaluate(() => {
+    const z = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => x.dataset.zustand);
+    return z.length === 4 && !z.includes('zu');
+  }));
   await p.s.locator('.er-figuren').click();
   await p.s.waitForFunction(() => document.querySelector('.er-figuren')?.getAttribute('aria-pressed') === 'true', null, { timeout: 10000 }).catch(() => {});
   pruefe('Erfinder: Blaupause ausgerüstet', await p.s.evaluate(() => document.querySelector('.sa-teil[data-teil="erfinder-figuren-blaupause"]')?.dataset.zustand) === 'an');

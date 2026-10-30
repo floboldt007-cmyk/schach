@@ -83,6 +83,11 @@ assert.equal(istFrei('signatur', 1), true, 'Signatur: Flos Konto frei');
 const { speichereModulEinstellungen } = await import('../js/storage.js');
 speichereModulEinstellungen('finisher', { auswahl: 'signatur' });
 assert.equal(auswahl(1), 'signatur', 'Signatur waehlbar');
+assert.equal(istFrei('koenig', 1), false, 'nur Signatur, ohne Erfinder-Titel: Koenig weiter ab Level 10');
+// Erfinder (Titel-Sonderstueck): alle Stufen frei, unabhaengig vom Level
+lager.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel', 'erfinder-finisher-signatur'] }));
+assert.ok(['welle', 'koenig'].every((id) => istFrei(id, 1)), 'Erfinder: Welle und Koenig auf Level 1 frei');
 lager.removeItem('schach-arena:konto:sitzung');
+assert.equal(istFrei('koenig', 1), false, 'Erfinder abgemeldet: wieder nach Level');
 assert.equal(auswahl(1), 'krone', 'nach dem Abmelden faellt die Wahl auf Krone zurueck');
 console.log('finisher.test.mjs: Freischaltungen, sichere Standardwahl, eigener Klang statt zweitem Sieg, abgebrochenes Signal ok');

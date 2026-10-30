@@ -7,6 +7,9 @@
 //
 //   ERFINDER                        die vier Stuecke (Ids wie im SQL-Beispiel der Anleitung)
 //   hatSonderstueck(id) -> boolean  aus dem Merker, nur fuer das angemeldete Konto
+//   istErfinder() -> boolean        Flo, 30.10.2026: als Erfinder ist alles Ausruestbare immer frei (Finisher, Emotes,
+//                                   Bretter, Klaenge, Figuren); Erfolge, Level und Wertung bleiben erspielt. Jede neue
+//                                   Sperre fuer Ausruestbares fragt hier nach.
 //   ladeSonderstuecke() -> Promise<string[]|null>   fragt den Server, merkt das Ergebnis; null ohne Anmeldung/bei Fehler
 //   setzeSonderFetch(fn)            nur fuer Tests
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
@@ -38,6 +41,7 @@ export function sonderstuecke() {
   return uid && m && m.konto === uid ? m.ids.filter((x) => typeof x === 'string' && ID.test(x)) : [];
 }
 export function hatSonderstueck(id) { return sonderstuecke().includes(id); }
+export function istErfinder() { return hatSonderstueck(ERFINDER.titel); }
 
 export async function ladeSonderstuecke() {
   if (!sitzung()) return null;

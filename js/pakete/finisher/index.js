@@ -1,5 +1,6 @@
 // Paket Finisher: nutzt ausschliesslich den Aufruf-Ort partie:matt. Es aendert weder Partie noch Ergebnis.
 // Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
+// Als Erfinder (Flo, Sonderstueck vom Server) sind alle Stufen frei, unabhaengig vom Level.
 // Signatur gehoert zu Flos Erfinder-Profil (js/sonderstuecke.js): frei nur mit dem Sonderstueck vom Server; wer es nicht
 // hat, sieht es weder in den Einstellungen noch in der Sammlung (kein leerer Platz).
 // Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit. Die Level-Leiter
@@ -10,7 +11,7 @@ import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '
 import { klang } from '../../sounds.js';
 import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
-import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
+import { hatSonderstueck, istErfinder, ERFINDER } from '../../sonderstuecke.js';
 import './texte.js';
 
 const MODUL = 'finisher';
@@ -39,6 +40,8 @@ export function aktuellesLevel() {
 export function istFrei(id, level = aktuellesLevel()) {
   const f = FINISHER.find((x) => x.id === id);
   if (f && f.sonder) return hatSonderstueck(f.sonder);
+  // Erfinder: alles Ausruestbare frei (js/sonderstuecke.js)
+  if (f && istErfinder()) return true;
   return !!f && level >= f.level;
 }
 export function auswahl(level = aktuellesLevel()) {
