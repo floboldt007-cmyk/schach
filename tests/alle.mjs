@@ -57,6 +57,7 @@ const SUITEN = [
   { name: 'emotes', datei: 'emotes.test.mjs', args: [], was: 'Paket Emotes: Rad, Schnell-Chat, Bot-Antwort und Barrierefreiheit' },
   { name: 'finisher', datei: 'finisher.test.mjs', args: [], was: 'Paket Finisher: Freischaltung und sichere Standardwahl' },
   { name: 'boss', datei: 'boss.test.mjs', args: [], was: 'Wochen-Boss und Funken-Wochenende: Spielplan und Logik' },
+  { name: 'werkstatt', datei: 'werkstatt.test.mjs', args: [], was: 'Werkstatt: Katalog, Anprobieren, nichts kaeuflich' },
   { name: 'kartei', datei: 'kartei.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Paket kartei: Fehler-Kartei und Rätsel-Bildschirm (Welle A3)' },
   { name: 'sprache', datei: 'sprache.test.mjs', args: SCHNELL ? ['--ohne-bilder'] : [], was: 'Sprachen: Deutsch und Englisch (Kern-Screens)' },
   { name: 'sprache-pakete', datei: 'sprache.test.mjs', args: ['--pakete', ...(SCHNELL ? ['--ohne-bilder'] : [])], was: 'Sprachen: Englisch mit allen Paketen' },
