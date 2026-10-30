@@ -1,5 +1,8 @@
 // Paket Finisher: nutzt ausschliesslich den Aufruf-Ort partie:matt. Es aendert weder Partie noch Ergebnis.
 // Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
+// Als Erfinder (Flo, Sonderstueck vom Server) sind alle Stufen frei, unabhaengig vom Level.
+// Signatur gehoert zu Flos Erfinder-Profil (js/sonderstuecke.js): frei nur mit dem Sonderstueck vom Server; wer es nicht
+// hat, sieht es weder in den Einstellungen noch in der Sammlung (kein leerer Platz).
 // Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit. Die Level-Leiter
 // (funken/level.js, Stuecke 'finisher-<id>') nennt genau diese Stufen; tests/funken.test.mjs vergleicht beide.
 // Klang: den Siegesklang spielt die Partie selbst; der Finisher hat einen eigenen Klang in der Gruppe 'finisher'.
@@ -8,6 +11,7 @@ import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '
 import { klang } from '../../sounds.js';
 import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
+import { hatSonderstueck, istErfinder, ERFINDER } from '../../sonderstuecke.js';
 import './texte.js';
 
 const MODUL = 'finisher';
@@ -24,7 +28,10 @@ export const FINISHER = Object.freeze([
   Object.freeze({ id: 'krone', text: 'krone', level: 1, klang: 'finisher-glocke' }),
   Object.freeze({ id: 'welle', text: 'welle', level: 5, klang: 'finisher-kreide' }),
   Object.freeze({ id: 'koenig', text: 'koenig', level: 10, klang: 'finisher-tinte' }),
+  Object.freeze({ id: 'signatur', text: 'signatur', level: 1, klang: 'finisher-tinte', sonder: ERFINDER.finisher }),
 ]);
+// was dieses Konto sehen darf: alle Stufen-Finisher, Sonderstuecke nur mit Besitz
+const sichtbar = (f) => !f.sonder || hatSonderstueck(f.sonder);
 
 export function aktuellesLevel() {
   const st = ladeModul('funken', {});
@@ -32,6 +39,9 @@ export function aktuellesLevel() {
 }
 export function istFrei(id, level = aktuellesLevel()) {
   const f = FINISHER.find((x) => x.id === id);
+  if (f && f.sonder) return hatSonderstueck(f.sonder);
+  // Erfinder: alles Ausruestbare frei (js/sonderstuecke.js)
+  if (f && istErfinder()) return true;
   return !!f && level >= f.level;
 }
 export function auswahl(level = aktuellesLevel()) {
@@ -60,6 +70,9 @@ export function starteFinisher(ctx, id = auswahl()) {
   el.style.setProperty('--fx', `${p.x}%`); el.style.setProperty('--fy', `${p.y}%`);
   if (id === 'krone') el.innerHTML = '<span class="fi-krone">♛</span><span class="fi-glanz">✦</span>';
   if (id === 'koenig') el.innerHTML = '<span class="fi-koenig">♚</span>';
+  // Signatur: ein goldener Namenszug und eine Linie unter der Partie, darunter "Nr. 0"
+  if (id === 'signatur') el.innerHTML = '<svg class="fi-signatur" viewBox="0 0 100 40"><path class="fi-zug" d="M10 26c9-2 16-12 20-21 2 9-2 18 2 20s9-12 11-16c0 7 2 12 11 12 6 0 10-4 14-8"/>'
+    + '<path class="fi-linie" d="M8 34h84"/></svg><span class="fi-nr">Nr. 0</span>';
   if (id === 'welle') {
     el.innerHTML = Array.from({ length: 64 }, (_, i) => {
       const x = i % 8, y = Math.floor(i / 8), abstand = Math.abs(x + .5 - p.x / 12.5) + Math.abs(y + .5 - p.y / 12.5);
@@ -85,11 +98,11 @@ function einstellungen() {
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche fi-einstellungen';
   el.innerHTML = `<h3 class="es-titel">${esc(F('titel'))}</h3><p>${esc(F('erklaerung'))}</p><div class="fi-auswahl" role="radiogroup" aria-label="${esc(F('titel'))}"></div>`;
   const gruppe = el.querySelector('.fi-auswahl');
-  for (const f of FINISHER) {
+  for (const f of FINISHER.filter(sichtbar)) {
     const frei = istFrei(f.id, level); const aktiv = f.id === gewaehlt;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'fi-wahl'; b.dataset.finisherWahl = f.id;
     b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', aktiv ? 'true' : 'false'); b.disabled = !frei;
-    const hinweis = f.id === 'aus' ? '' : f.level === 1 ? F('frei') : F('level', { level: f.level });
+    const hinweis = f.id === 'aus' ? '' : f.sonder ? F('einmalig') : f.level === 1 ? F('frei') : F('level', { level: f.level });
     b.innerHTML = `<b>${frei ? '' : '🔒 '}${esc(F(f.text))}</b><span>${esc(frei && aktiv ? F('gewaehlt') : hinweis)}</span>`;
     if (!frei) b.setAttribute('aria-label', `${F(f.text)}. ${F('gesperrt', { level: f.level })}`);
     b.addEventListener('click', () => {
@@ -107,11 +120,11 @@ function einstellungen() {
 anbieten('partie:matt', (ctx) => starteFinisher(ctx), { paket: MODUL });
 anbieten('einstellungen:gruppen', einstellungen, { paket: MODUL, reihenfolge: 45 });
 // Sammlung (Reiter Ich): jeder Finisher mit Schloss und Stufe, der ausgewaehlte als "Ausgeruestet"
-const FIGUR = { krone: 'wK', welle: 'wN', koenig: 'bK' };
+const FIGUR = { krone: 'wK', welle: 'wN', koenig: 'bK', signatur: 'blaupause/wK' };
 anbieten('sammlung:bereich', () => {
   const lv = aktuellesLevel();
   const gewaehlt = auswahl(lv);
-  return bereich({ id: 'finisher', name: F('titel'), teile: FINISHER.filter((x) => x.id !== 'aus').map((x) => ({
+  return bereich({ id: 'finisher', name: F('titel'), teile: FINISHER.filter((x) => x.id !== 'aus' && sichtbar(x)).map((x) => ({
     id: 'finisher-' + x.id, name: F(x.text), frei: istFrei(x.id, lv), an: gewaehlt === x.id,
     zeile: gewaehlt === x.id ? F('gewaehlt') : istFrei(x.id, lv) ? F('frei') : F('level', { level: x.level }),
     bild: `<img src="${new URL(`../../../assets/pieces/${FIGUR[x.id] || 'wK'}.svg`, import.meta.url).href}" alt="">`,

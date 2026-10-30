@@ -22,6 +22,13 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'So sieht das Brett aus. Benutzen kannst du es, sobald es dir gehört.',
     'shop.verfuegbar': '{n} von {auflage} verfügbar', 'shop.erhaeltlich': 'Erhältlich', 'shop.angekuendigt': 'Verkauf ab {datum}',
     'shop.pausiert': 'Verkauf pausiert', 'shop.vergeben': 'Alle {auflage} vergeben', 'shop.beendet': 'Verkauf beendet',
+    // Erfinder-Profil (nur mit Sonderstuecken vom Server)
+    'erfinder.name': 'Erfinder', 'erfinder.banner': 'Banner „Blatt 0“', 'erfinder.titel': 'Der Erfinder',
+    'erfinder.nr': 'Nr. 0 · 1 von 1', 'erfinder.figuren': 'Figurensatz „Blaupause“', 'erfinder.finisher': 'Finisher „Signatur“',
+    'erfinder.finisherWo': 'Wählbar bei den Finishern', 'erfinder.figurenAn': 'Blaupause-Figuren benutzen',
+    'erfinder.figurenAus': 'Standardfiguren benutzen', 'erfinder.ersterZug': 'ERSTER ZUG 16.10.2026',
+    'erfinder.bannerBild': 'Banner Blatt 0: eine goldene Krone auf Bauplan-Papier',
+    'erfinder.hinweis': 'Gibt es genau einmal. Nicht käuflich, nicht erspielbar, vergeben nur vom Server.',
   },
   en: {
     an: 'Equipped', frei: 'Unlocked', geschafft: 'Done',
@@ -42,5 +49,11 @@ registriereTexte('p-sammlung', {
     'shop.anprobeText': 'This is how the board looks. You can use it once it is yours.',
     'shop.verfuegbar': '{n} of {auflage} available', 'shop.erhaeltlich': 'Available', 'shop.angekuendigt': 'On sale from {datum}',
     'shop.pausiert': 'Sales paused', 'shop.vergeben': 'All {auflage} taken', 'shop.beendet': 'Sales ended',
+    'erfinder.name': 'Creator', 'erfinder.banner': 'Banner “Sheet 0”', 'erfinder.titel': 'The Creator',
+    'erfinder.nr': 'No. 0 · 1 of 1', 'erfinder.figuren': 'Piece set “Blueprint”', 'erfinder.finisher': 'Finisher “Signature”',
+    'erfinder.finisherWo': 'Choose it under finishers', 'erfinder.figurenAn': 'Use blueprint pieces',
+    'erfinder.figurenAus': 'Use standard pieces', 'erfinder.ersterZug': 'FIRST MOVE 16 OCT 2026',
+    'erfinder.bannerBild': 'Banner Sheet 0: a golden crown on blueprint paper',
+    'erfinder.hinweis': 'Exists exactly once. Not for sale, not earnable, granted only by the server.',
   },
 });

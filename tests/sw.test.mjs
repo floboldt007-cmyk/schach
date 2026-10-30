@@ -187,6 +187,8 @@ function main() {
     ...alleDateien('vendor/chess', /\.js$/),
     ...alleDateien('vendor/stockfish', /\.(js|wasm)$/),
     ...alleDateien('assets/pieces', /\.(svg|png)$/),
+    // Figurensatz Blaupause (Erfinder-Profil, js/figurensatz.js): offline noetig wie der Standardsatz
+    ...alleDateien('assets/pieces/blaupause', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte
