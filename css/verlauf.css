@@ -14,7 +14,7 @@
 .vl-statistik { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px 8px; }
 .vl-kachel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; padding: 4px 2px; text-align: center; min-width: 0; }
 .vl-kachel b { font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; }
-.vl-kachel > span { font-size: 11px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
+.vl-kachel > span { font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.2; }
 .vl-kachel b .stern { font-size: .85em; }
 .vl-kachel.sieg b { color: var(--kt-bester); }
 .vl-kachel.remis b { color: var(--text); }
@@ -94,7 +94,7 @@
   .vl-statistik { padding: 8px 4px; }
   .vl-kachel { min-height: 56px; }
   .vl-kachel b { font-size: 17px; }
-  .vl-kachel > span { font-size: 10px; }
+  .vl-kachel > span { font-size: 12px; }
   .vl-oeffnen { gap: 10px; padding: 4px 2px; }
   .vl-oeffnen .an-avatar { --g: 44px; border-radius: 12px; }
   .vl-name { font-size: 16px; }

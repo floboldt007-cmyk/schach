@@ -28,4 +28,4 @@
 .em-schalter span, .em-schalter small { display: block; } .em-schalter small { color: var(--text-2); }
 .em-schalter input { width: 24px; height: 24px; flex: none; }
 @media (prefers-reduced-motion: reduce) { .em-blase { animation: none; } }
-@media (max-width: 420px) { .em-popup { bottom: 58px; } .em-rad { grid-template-columns: repeat(4, minmax(0, 1fr)); } .em-wahl { padding: 6px 2px; } .em-wahl span { font-size: 11.5px; } .partie .spieler > .em-blase { padding: 3px 10px; font-size: 13px; } }
+@media (max-width: 420px) { .em-popup { bottom: 58px; } .em-rad { grid-template-columns: repeat(4, minmax(0, 1fr)); } .em-wahl { padding: 6px 2px; } .em-wahl span { font-size: 12px; } .partie .spieler > .em-blase { padding: 3px 10px; font-size: 13px; } }
