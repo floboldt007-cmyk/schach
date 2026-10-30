@@ -48,7 +48,7 @@ registriereTexte('arena', {
     'detail.welt': 'Welt {nr} · {name}',
     'sterne.von': '{anzahl} von 3 Sternen',
     zitat: '„{satz}“',
-    'merkmal.lieblings': 'Lieblingsfigur',
+    'merkmal.lieblings': 'Lieblings\u00ADfigur',
     'merkmal.tempo': 'Tempo',
     'merkmal.schwaeche': 'Schwäche',
     'merkmal.benno.lieblings': 'Bauer', 'merkmal.benno.tempo': 'Flott', 'merkmal.benno.schwaeche': 'Lässt Figuren hängen',
