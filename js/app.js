@@ -692,14 +692,16 @@ function ersterScreen() {
   return typeof wahl === 'string' && SCREENS.includes(wahl) ? pruefeZiel({ name: wahl, params: {} }) : null;
 }
 
+// Freundes-Link #freund/<code>: merken und die Bestenliste mit dem Reiter Freunde zeigen, dort wird gefragt
+function freundZiel() {
+  return uebernimmFreundLink() ? { name: 'bestenliste', params: { reiter: 'freunde' }, freund: true } : null;
+}
+
 function beiVerlauf() {
   const einladung = uebernimmEinladungsLink();
-  // Freundes-Link #freund/<code>: merken und die Bestenliste mit dem Reiter Freunde zeigen, dort wird gefragt
-  const freund = einladung ? null : uebernimmFreundLink();
-  const ziel = einladung ? { name: 'online', params: {} } : freund ? { name: 'bestenliste', params: { reiter: 'freunde' } }
-    : ersterScreen() || ausVerlauf();
+  const ziel = einladung ? { name: 'online', params: {} } : freundZiel() || ersterScreen() || ausVerlauf();
   const hash = hashFuer(ziel.name, ziel.params);
-  if (!einladung && !freund && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
+  if (!einladung && !ziel.freund && aktuell && aktuell.hash === hash && aktuell.name === ziel.name && ziel.name !== 'partie') return;
   if (hash !== location.hash || !(history.state && history.state.schach)) {
     try { history.replaceState({ schach: true, name: ziel.name, params: sauber(ziel.params), tiefe }, '', hash); } catch (e) { /* egal */ }
   }
