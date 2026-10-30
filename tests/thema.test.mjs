@@ -324,8 +324,9 @@ async function nodeTeilAsync({ ab3, benno }) {
     && botFarbe({ id: 'boss-1', farbe: '#a07040' }) === 'var(--bot-boss-1, #a07040)' && botFarbe({ id: 'x;y', farbe: 'red;}' }) === '#8a93a8' && botFarbe(null) === '#8a93a8');
   const fw = floAvatar('w');
   const fb = floAvatar('b');
-  pruefe('floAvatar: Flos Koenig aus dem Figurensatz, Schiefer bei Weiss, Papier bei Schwarz', /href="assets\/pieces\/wK\.svg"/.test(fw) && /#2C3038/.test(fw)
-    && /href="assets\/pieces\/bK\.svg"/.test(fb) && /#E9E3D8/.test(fb) && /^<svg[^>]+aria-hidden="true"/.test(fw));
+  // Pfad vom Projekt aus (Analyse: Seiten unter tests/ luden das Bild sonst nicht), also eine volle Adresse
+  pruefe('floAvatar: Flos Koenig aus dem Figurensatz, Schiefer bei Weiss, Papier bei Schwarz', /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/wK\.svg"/.test(fw) && /#2C3038/.test(fw)
+    && /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/bK\.svg"/.test(fb) && /#E9E3D8/.test(fb) && /^<svg[^>]+aria-hidden="true"/.test(fw));
 
   gruppe = 'bewegung.js';
   pruefe('TEMPI wie PLAN 4 (langsam 1,5, normal 1, schnell 0,6, aus 0)', JSON.stringify(TEMPI) === '{"langsam":1.5,"normal":1,"schnell":0.6,"aus":0}'

@@ -28,8 +28,8 @@
   .an-avatar { background: color-mix(in srgb, var(--bf) 24%, var(--flaeche)); }
 }
 .an-avatar img { width: 84%; height: 84%; image-rendering: pixelated; }
-.an-avatar.an-ich { background: var(--flo-grund); border-color: var(--flo-grund); color: #F3F1EC;
-  font-family: var(--display); font-weight: var(--gw-titel); font-size: calc(var(--g) * .46); line-height: 1; }
+.an-avatar.an-ich { background: var(--flo-grund); border-color: var(--flo-grund); border-radius: 50%; }
+.an-avatar.an-ich svg { display: block; width: 100%; height: 100%; }
 
 /* ============================================================
    SPIELANALYSE
@@ -145,26 +145,18 @@
 .an-coach.start .an-c-klasse { color: var(--text); }
 .an-coach.variante { box-shadow: var(--s2), 0 0 0 1.5px var(--k-bester); }
 
-/* ---------- Freischalt-Banner ---------- */
-.an-banner { --bf: var(--linie-2); position: relative; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: var(--radius); overflow: hidden;
-  background-color: var(--flaeche); background-image: var(--textur-banner, none); color: var(--text); border: 1.5px solid var(--linie); box-shadow: var(--s2); }
-@supports (color: color-mix(in srgb, red 50%, blue)) {
-  .an-banner { border-color: color-mix(in srgb, var(--bf) 55%, var(--linie)); }
-}
-.an-banner::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -50%; pointer-events: none;
-  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .22), transparent); animation: an-streif 1.6s ease-out .4s 1 both; }
-@keyframes an-streif { to { left: 120%; } }
-.an-banner .an-avatar { --g: 52px; }
-.an-banner-text { min-width: 0; }
-.an-ft-titel { font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--akzent-text); }
-.an-ft-name { font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel); letter-spacing: -.02em; line-height: 1.2; }
-.an-ft-sterne { margin-left: auto; flex: none; text-align: right; font-size: 12px; color: var(--text-2); max-width: 45%; }
-.an-ft-sterne b { display: block; font-size: 24px; letter-spacing: 2px; line-height: 1; margin-bottom: 3px; }
-.an-ft-sterne b span { display: inline-block; }
-.an-ft-sterne b .an { color: var(--gold); }
-.an-ft-sterne b .aus { color: var(--linie-2); }
-.an-ft-sterne b .neu { animation: an-stern-ein .55s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i, 0) * .3s); }
-@keyframes an-stern-ein { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* ---------- Neuer Gegner (schlanke Zeile, antippen fuehrt in die Arena; Entwurf "Analyse ruhig") ---------- */
+.an-banner { --bf: var(--linie-2); display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--tipp, 44px); padding: 8px 12px;
+  border-radius: var(--radius); background: var(--flaeche); color: var(--text); border: 1px solid var(--linie); box-shadow: var(--s1);
+  font: inherit; text-align: left; cursor: pointer; }
+.an-banner:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.an-banner .an-avatar { --g: 40px; border-radius: 12px; box-shadow: none; }
+.an-banner-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.an-ft-titel { font-size: 12px; font-weight: var(--gw-stark); color: var(--akzent-text); }
+.an-ft-name { font-size: 15px; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.an-ft-name small { white-space: nowrap; margin-left: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.an-banner-pfeil { display: grid; place-items: center; flex: none; color: var(--text-2); }
+.an-banner-pfeil svg { width: 20px; height: 20px; }
 
 /* ---------- Genauigkeit ---------- */
 .an-genau { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 14px 18px; }
@@ -172,53 +164,70 @@
 .an-seite.an-re { flex-direction: row-reverse; text-align: right; }
 .an-seite-text { min-width: 0; }
 .an-genau .an-avatar { --g: 48px; border-radius: 14px; }
+.an-genau .an-avatar.an-ich { border-radius: 50%; }
+.an-g-kopf { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 26px; }
+.an-g-titel { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .an-ich-wert { color: var(--text); }
 .an-g-leer { font-size: 16px; color: var(--text-2); }
-.an-g-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.an-g-label.an-g-zweit { margin-top: 1px; }
+.an-g-label { font-size: 13px; font-weight: 800; color: var(--text); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .an-vs { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1px; min-width: 64px; }
-.an-vs-wort { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.an-vs-wort { font-size: 12px; font-weight: 800; padding: 2px 10px; border-radius: var(--r-pille, 999px); background: var(--flaeche-2); color: var(--text); }
 .an-vs.an-sieg .an-vs-wort { color: var(--kt-bester); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-vs.an-sieg .an-vs-wort { background: color-mix(in srgb, var(--k-bester) 14%, var(--flaeche)); }
+}
 .an-vs.an-niederlage .an-vs-wort { color: var(--text-2); }
-.an-vs.an-remis .an-vs-wort { color: var(--text); }
+/* Sterne der Partie unter dem Ergebnis, neue leuchten auf */
+.an-vs-sterne { display: flex; gap: 2px; margin-top: 3px; font-size: 15px; line-height: 1; }
+.an-vs-sterne span { display: inline-block; }
+.an-vs-sterne .an { color: var(--gold); }
+.an-vs-sterne .aus { color: var(--linie-2); }
+.an-vs-sterne .neu { animation: an-stern-ein .55s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i, 0) * .3s); }
+@keyframes an-stern-ein { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .an-vs-sterne .neu { animation: none; } }
 .an-vs b { font-family: var(--display); font-size: 22px; font-weight: var(--gw-titel); line-height: 1.1; }
 .an-vs-grund { font-size: 12px; color: var(--text-2); max-width: 120px; }
-.an-g-chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 2px; }
+.an-g-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.an-g-chips .chip { height: 26px; padding: 0 10px; font-size: 12.5px; }
 .an-chip-staerke { color: var(--text-2); background: var(--flaeche-2); }
 .an-chip-staerke b { font-weight: 800; color: var(--text); }
 .an-chip-rekord { color: var(--text); border-color: var(--gold); background: var(--gold-weich); }
-.an-g-hinweis { flex: 1 1 100%; font-size: 13px; color: var(--text-2); }
-.an-eroeffnung { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; color: var(--text-2); }
-.an-eroeffnung svg { width: 18px; height: 18px; flex: none; color: var(--k-buch); }
+.an-g-hinweis { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--text-2); }
 
 /* ---------- Bewertungskurve ---------- */
 .an-kurve-box { padding: 10px 12px 6px; }
-.an-kurve-kopf { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; letter-spacing: .04em; }
-.an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.an-k-titel b { font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
-.an-k-legende { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.an-kurve-wrap { position: relative; height: 112px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.an-kurve-kopf { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.an-k-titel { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; font-weight: 800; color: var(--text); }
+.an-k-tipp { flex: none; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.an-k-legende { font-variant-numeric: tabular-nums; }
+.an-kurve-wrap { position: relative; height: 100px; cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .an-kurve { display: block; width: 100%; height: 100%; border-radius: 10px; overflow: hidden; }
 .an-kurve:focus-visible { outline: var(--fokus); outline-offset: 3px; }
-/* Kurve wie der Bewertungsbalken: Weiss-Anteil hell auf Schiefer (Farben der SVG-Attribute per CSS ersetzt) */
-.an-kurve > rect { fill: var(--balken-schwarz); }
-.an-kurve > line:not(.an-k-phase):not(.an-k-cursor) { stroke: rgba(255, 255, 255, .28); }
-.an-k-linie { stroke: #9A9EA8; filter: none; }
-.an-k-phase { stroke: rgba(255, 255, 255, .22); stroke-width: 1; stroke-dasharray: 2 4; }
+/* Kurve hell (Entwurf "Analyse ruhig"): Weiss-Anteil in Balken-Weiss, Schwarz als warmes Grau statt Schiefer-Block,
+   eine dunkle Linie; alle Farben per CSS, das SVG traegt keine */
+.an-kurve > .an-k-grund { fill: var(--flaeche-3); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .an-kurve > .an-k-grund { fill: color-mix(in srgb, var(--balken-schwarz) 20%, var(--flaeche-2)); }
+}
+.an-k-flaeche { fill: var(--balken-weiss); }
+.an-k-mitte { stroke: var(--linie-2); stroke-width: 1; stroke-dasharray: 3 5; }
+.an-k-linie { stroke: var(--text); stroke-width: 1.5; filter: none; }
+.an-k-phase { stroke: var(--linie-2); stroke-width: 1; }
+.an-kurve-wrap::after { content: ""; position: absolute; inset: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--linie); pointer-events: none; }
 .an-k-cursor { stroke: var(--akzent); stroke-width: 2; filter: none; }
 .an-k-punkte { position: absolute; inset: 0; pointer-events: none; }
 .an-k-punkte i { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--kf);
-  border: 1.5px solid var(--balken-schwarz); opacity: .9; }
-.an-k-punkte i.du { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; border-color: #FFFFFF; }
-.an-k-marke { position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: #FFFFFF;
+  border: 1.5px solid var(--flaeche); opacity: .9; }
+.an-k-punkte i.du { width: 12px; height: 12px; margin: -6px 0 0 -6px; opacity: 1; }
+.an-k-marke { position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: var(--flaeche);
   border: 3px solid var(--akzent); box-shadow: var(--s1); pointer-events: none; transition: left .15s ease, top .15s ease; }
 .an-phasen { position: relative; height: 20px; margin-top: 2px; }
 .an-phasen span { position: absolute; top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px;
-  font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); text-align: center; }
+  font-size: 12px; font-weight: 650; color: var(--text-2); text-align: center; }
 
 /* ---------- Schluesselmomente ---------- */
-.an-momente-titel { margin: 0 0 6px 2px; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.an-momente-titel { margin: 0 0 6px 2px; font-size: 15px; font-weight: 800; color: var(--text); }
 .an-momente { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px;
   -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
 .an-momente::-webkit-scrollbar { display: none; }
@@ -268,7 +277,7 @@
 .an-laden, .an-meldung { width: min(520px, calc(100% - 36px)); margin: 6vh auto 24px; padding: 26px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .an-laden-duell { display: flex; align-items: center; gap: 16px; }
 .an-laden-duell .an-avatar { --g: 72px; }
-.an-laden-vs { font-size: 12px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+.an-laden-vs { font-size: 13px; font-weight: 650; color: var(--text-2); }
 .an-laden-titel, .an-meldung h3 { margin: 0; font-family: var(--display); font-size: 21px; font-weight: var(--gw-titel); letter-spacing: -.02em; }
 .an-fortschritt { position: relative; width: 100%; height: 12px; border-radius: 999px; overflow: hidden; background: var(--flaeche-3); border: 1px solid var(--linie); }
 .an-fortschritt i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--wert, 0%); border-radius: inherit; background: var(--tinte);
@@ -297,7 +306,7 @@
   .an-koerper { flex: none; display: block; }
   .an-inhalt { display: flex; flex-direction: column; gap: 12px; width: calc(var(--an-brett) + 8px + var(--an-balken)); max-width: 100%; padding: 0 0 18px; }
   .an-links, .an-rechts { display: contents; }
-  .an-banner { order: 1; } .an-genau { order: 2; } .an-kurve-box { order: 3; }
+  .an-genau { order: 1; } .an-banner, .an-ort-oben { order: 2; } .an-kurve-box { order: 3; }
   .an-brettzone { order: 4; } .an-navi { order: 5; } .an-coach { order: 6; }
   .an-momente-box, .an-momente-leer { order: 7; } .an-klassen { order: 8; }
   .an-screen.ohne-balken { --an-brett: min(calc(100vw - 36px - 8px), 720px); }
@@ -315,12 +324,6 @@
   .an-brett-rahmen .brett { --brett-radius: 11px; }
   .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .an-stand { display: none; }
-  .an-banner { padding: 10px 12px; gap: 10px; }
-  .an-banner .an-avatar { --g: 44px; }
-  .an-ft-titel { font-size: 10px; letter-spacing: .08em; }
-  .an-ft-name { font-size: 15px; }
-  .an-ft-sterne span { display: none; }
-  .an-ft-sterne b { font-size: 20px; margin: 0; }
   .an-genau { padding: 12px; gap: 8px 6px; }
   .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
   .an-seite { gap: 8px; }
@@ -328,11 +331,10 @@
   .an-g-label { font-size: 11px; }
   .an-vs { min-width: 52px; }
   .an-vs b { font-size: 18px; }
-  .an-vs-wort { font-size: 10px; letter-spacing: .1em; }
+  .an-vs-wort { font-size: 11px; }
   .an-vs-grund { font-size: 11px; max-width: 84px; }
-  .an-kurve-wrap { height: 92px; }
+  .an-kurve-wrap { height: 64px; }
   .an-k-legende { display: none; }
-  .an-g-zusatz { display: none; }
   .an-c-fuss { flex-wrap: wrap; }
   .an-c-linie { flex-basis: 100%; }
   .an-coach { padding: 10px 12px; gap: 2px 10px; }
@@ -378,12 +380,6 @@
   .an-links { container: an-links / inline-size; }
 }
 @container an-rechts (max-width: 400px) {
-  .an-banner { padding: 10px 12px; gap: 10px; }
-  .an-banner .an-avatar { --g: 44px; }
-  .an-ft-titel { font-size: 10px; letter-spacing: .08em; }
-  .an-ft-name { font-size: 15px; }
-  .an-ft-sterne span { display: none; }
-  .an-ft-sterne b { font-size: 20px; margin: 0; }
   .an-genau { padding: 12px; gap: 8px 6px; }
   .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
   .an-seite { gap: 8px; }
@@ -391,11 +387,10 @@
   .an-g-label { font-size: 11px; }
   .an-vs { min-width: 52px; }
   .an-vs b { font-size: 18px; }
-  .an-vs-wort { font-size: 10px; letter-spacing: .1em; }
+  .an-vs-wort { font-size: 11px; }
   .an-vs-grund { font-size: 11px; max-width: 84px; }
-  .an-kurve-wrap { height: 92px; }
+  .an-kurve-wrap { height: 64px; }
   .an-k-legende { display: none; }
-  .an-g-zusatz { display: none; }
   .an-klassen { padding: 6px 12px; }
   .an-kl-raster { display: flex; flex-direction: column; }
   .an-kl-kopf2, .an-kl-platz { display: none; }
@@ -404,7 +399,6 @@
 @container an-rechts (max-width: 330px) {
   .an-genau .an-avatar { display: none; }
   .an-g-wert { font-size: 25px; }
-  .an-g-label > .an-g-zusatz { display: inline; }
 }
 /* Texte in der schmalen Spalte umbrechen statt sie mit "..." zu kuerzen (bis 520 px: auch bei 800 x 600 passte
    "Deine Genauigkeit" nicht in eine Zeile) */
@@ -417,7 +411,7 @@
 .an-unter-kurz { display: none; }
 @media (orientation: landscape) and (max-width: 1000px) {
   .an-screen .kopf .an-unter { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.25; }
-  .an-unter-grund, .an-unter-voll { display: none; }
+  .an-unter-zusatz, .an-unter-voll { display: none; }
   .an-unter-kurz { display: inline; }
 }
 /* Navigation unter einem kleinen Brett: vier Knoepfe ueber die volle Breite, der Zugstand entfaellt (wie am Handy) */

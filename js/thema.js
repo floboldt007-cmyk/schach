@@ -136,7 +136,8 @@ export function floAvatar(farbe = 'w') {
   const t = themaVon(aktuell.thema) || MODERN;
   const p = profilWahl();
   const r = RAHMEN[p.rahmen] || RAHMEN.ohne;
-  const datei = `${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}${p.figur}.svg`;
+  // Pfad vom Projekt aus, damit das Bild auch auf Seiten unter tests/ und in Unterordnern laedt
+  const datei = new URL(`${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}${p.figur}.svg`, new URL('../', import.meta.url)).href;
   const ring = r.ring ? `<circle cx="60" cy="64" r="46" fill="none" stroke="${r.ring}" stroke-width="8"/>`
     + (r.glanz ? `<circle cx="60" cy="64" r="41.5" fill="none" stroke="${r.glanz}" stroke-width="1.6"/>` : '') : '';
   return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-figur="${p.figur}" data-rahmen="${p.rahmen}">`
