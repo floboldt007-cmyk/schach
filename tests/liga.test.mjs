@@ -338,10 +338,16 @@ async function browserTeil(browser, start) {
     try {
       await page.goto(start + '?test&erw=pakete/liga-probe/index#arena');
       await page.waitForSelector('.liga-titel');
-      await browserPruefe(name + ': Saison-Karte, Wertung, Klasse und Countdown', async () => {
-        assert.match(await page.locator('.liga-titel').innerText(), /Holz · Saison 1/);
-        assert.match(await page.locator('.liga-unter').innerText(), /noch 80 Tage/);
-        assert.match(await page.locator('.liga-wertung').innerText(), /Springerklasse.*1190.*111.*vorläufig/);
+      // Flo 30.10. (Entwurf Bestenliste): vorn nur Liga, Saison mit Enddatum (kein Countdown), Weg und Regel;
+      // Wertung und Klasse stehen in den Details
+      await browserPruefe(name + ': Saison-Karte vorn nur Liga, Enddatum, Weg und Regel; Wertung und Klasse in den Details', async () => {
+        assert.match(await page.locator('.liga-titel').innerText(), /^Liga Holz$/);
+        assert.match(await page.locator('.liga-unter').innerText(), /^Saison 1 · bis 10\. Januar$/);
+        assert.match(await page.locator('.liga-weg').innerText(), /von 100 Punkten bis Bronze/);
+        assert.match(await page.locator('.liga-regel').innerText(), /Sieg 3 Punkte · Remis 1 Punkt/);
+        assert.ok(!/noch \d+ Tag/.test(await page.locator('.liga-karte').innerText()), 'kein Countdown');
+        assert.ok(await page.locator('.liga-karte .liga-wertung').isHidden(), 'Wertung erst in den Details');
+        assert.match(await page.locator('.liga-karte .liga-wertung').textContent(), /Springerklasse.*1190.*111.*vorläufig/);
         assert.equal(await page.locator('.kopf-chips .liga-karte').count(), 0);
       });
       await page.locator('.liga-summary').tap();
@@ -400,7 +406,7 @@ async function browserTeil(browser, start) {
       await page.locator('.knoten[data-bot="rudi"]').tap();
       await browserPruefe(name + ': Bot-Bilanz und Vereinsmeisterschaft zeigen den echten Sieg', async () => {
         assert.match(await page.locator('.liga-bilanz').innerText(), /Thorsten: 1 Sieg/);
-        assert.match(await page.locator('.liga-club').innerText(), /1 von 30 Bots geschlagen/);
+        assert.match(await page.locator('.liga-karte .liga-club').textContent(), /1 von 30 Bots geschlagen/);
       });
       await page.evaluate(() => window.__app.gehe('verlauf'));
       await page.waitForSelector('.liga-verlauf');
@@ -422,11 +428,12 @@ async function browserTeil(browser, start) {
         assert.equal(await page.evaluate(() => window.__ligaProbe.speicher.ladeModul('liga').saison.nr), 1);
       });
       await page.evaluate(() => window.__app.gehe('arena'));
-      await page.waitForFunction(() => document.querySelector('.liga-titel')?.textContent.includes('Saison 2'));
+      await page.waitForFunction(() => document.querySelector('.liga-unter')?.textContent.includes('Saison 2'));
       await browserPruefe(name + ': neue Saison, ruhige Karte und Reset um eine Stufe', async () => {
-        assert.match(await page.locator('.liga-titel').innerText(), /Holz · Saison 2/);
+        assert.match(await page.locator('.liga-titel').innerText(), /^Liga Holz$/);
+        assert.match(await page.locator('.liga-unter').innerText(), /^Saison 2 · bis 4\. April$/);
         assert.match(await page.locator('.liga-wechsel').innerText(), /Neue Saison, neue Chance/);
-        assert.match(await page.locator('.liga-wertung').innerText(), /Läuferklasse.*1211/);
+        assert.match(await page.locator('.liga-karte .liga-wertung').textContent(), /Läuferklasse.*1211/);
       });
       await page.locator('.liga-knopf').tap();
       await browserPruefe(name + ': Saison-Hinweis laesst sich schliessen', async () => assert.ok(await page.locator('.liga-wechsel').isHidden()));
