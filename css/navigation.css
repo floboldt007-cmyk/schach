@@ -52,6 +52,13 @@
 .screen .haupt-kopf .chip .ico { width: 18px; height: 18px; }
 .screen .haupt-kopf .chip .ico.stern { color: var(--gold); }
 .haupt-kopf .chip .von { color: var(--text-2); }
+/* Status-Kapsel (Flo 30.10.: "das hier oben kann man noch besser machen"): Sterne, Level und Serie stehen in EINER ruhigen
+   Kapsel mit feinen Trennstrichen statt als lose Einzel-Pillen; was nicht ganz passt, tritt zurueck (seite.js) */
+.screen .haupt-kopf .kopf-chips { gap: 0; padding: 3px 2px; border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+.screen .haupt-kopf .kopf-chips > .chip { position: relative; background: transparent; box-shadow: none; }
+.screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { content: ''; position: absolute; left: 0; top: 11px; bottom: 11px; width: 1px;
+  background: var(--linie-2, var(--linie)); pointer-events: none; }
+.screen .haupt-kopf .kopf-chips > .chip:hover { background: var(--flaeche-2); }
 .screen .haupt-kopf .kopf-knopf { flex: none; width: 46px; height: 46px; border-radius: var(--r-m); border: 0; box-shadow: var(--s1), var(--kante); }
 .haupt-kopf .kopf-knopf .ico { width: 22px; height: 22px; }
 .haupt-kopf .kopf-zurueck { margin-right: 2px; }
