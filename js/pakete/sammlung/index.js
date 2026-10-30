@@ -2,7 +2,7 @@
 // Dieses Paket fuellt die Bereiche, die zum Kern gehoeren: Bretter und Klaenge (frei waehlbar in den Einstellungen) und
 // Erfolge, die sich aus dem Spielstand ablesen lassen (keine eigene Buchfuehrung, nichts zum Kaufen). Finisher, Emotes
 // und Titel bringen ihre Pakete selbst am Ort sammlung:bereich mit.
-// Orte: sammlung:bereich Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
+// Orte: sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
 import { anbieten } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl } from '../../storage.js';
@@ -10,6 +10,7 @@ import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { t } from '../../sprache.js';
 import { shopBereich } from './shop.js';
+import { erfinderBereich } from './erfinder.js';
 import './texte.js';
 
 const PAKET = 'sammlung';
@@ -60,6 +61,7 @@ export function teileErfolge(f = ladeFortschritt()) {
 }
 
 freischalten();
+anbieten('sammlung:bereich', ({ app }) => erfinderBereich({ app }), { reihenfolge: 5, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'bretter', name: S('bretter'), teile: teileBretter() }), { reihenfolge: 40, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge() }), { reihenfolge: 50, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolge() }), { reihenfolge: 90, paket: PAKET });

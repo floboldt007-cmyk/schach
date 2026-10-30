@@ -14,6 +14,7 @@
 // eingestellten Sprache, SAN ueber review.sanAnzeige, Dezimalzeichen nach Sprache.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { botNachId, eloDerPartie } from '../bots.js';
 import { analysierePartie, gewinnChance, KLASSEN, sanAnzeige, warKnapp, spielphasen, coachKern } from '../review.js';
 import { SYMBOLE } from '../symbole.js';
@@ -422,7 +423,7 @@ export function zeige(root, params = {}, app) {
 
     const brettEl = koerper.querySelector('.an-brett');
     st.brett = new Brett(brettEl, {
-      ausrichtung: st.sf, figurenPfad: pfad('assets/pieces/'), koordinaten: einst.koordinaten !== false, fen: st.fens[0],
+      ausrichtung: st.sf, figurenPfad: pfad(figurenPfad(einst)), koordinaten: einst.koordinaten !== false, fen: st.fens[0],
     });
     st.brett.erlaubeZuege(null);
     sec.classList.toggle('ohne-balken', einst.balken === false);

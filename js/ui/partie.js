@@ -118,6 +118,7 @@
 //   Remis gold-neutral.
 import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte, symbolSvg } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { BOTS, botNachId, botZug, botSatz, staerkeFuerElo } from '../bots.js';
 import { zugZufall } from '../tag.js';
 import {
@@ -481,7 +482,7 @@ export function zeige(root, params, app) {
   if (bot.stufe) s.classList.add('mit-stufe');
 
   const brett = new Brett($('.brett'), {
-    ausrichtung: farbe, figurenPfad: 'assets/pieces/', beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
+    ausrichtung: farbe, figurenPfad: figurenPfad(einst), beiZug, koordinaten: einst.koordinaten, beiAbgelehnt,
     beiLeer: () => { if (z.phase === 'bot') loescheVorzuege(); }, beiVorschau, beiPfeil: () => pfeilTippWeg(), autoDame: einst.autoDame,
     koordLage: einst.koordLage, steuerung: einst.steuerung, turmRochade: einst.turmRochade === true, pfeile: einst.pfeile !== false,
   });

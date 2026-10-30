@@ -1,6 +1,7 @@
 // Paket Sammlung (Reiter "Ich"): Bereiche und Erfolge aus dem Spielstand ohne Browser, dazu ein Browser-Teil (Playwright)
 // in der vollen App: Reiter, sieben Bereiche, Schloss und Weg dahin, Zaehler, Handy ohne waagrechtes Scrollen, Englisch.
 // Shop (Editionen) mit gefaelschtem Supabase-Server ueber page.route: abgemeldet, ohne Altersangabe, mit Edition.
+// Erfinder-Profil (Sonderstuecke vom Server): Bereich, Blaupause in der Partie, Signatur bei den Finishern; ohne Zeilen nichts.
 //   node tests/sammlung.test.mjs            Node und Browser
 //   node tests/sammlung.test.mjs --nur-node nur der Node-Teil
 import { spawn } from 'node:child_process';
@@ -90,10 +91,10 @@ const EDITION = { produkt_id: 'brett-mitternacht', name: 'Mitternacht & Gold', a
   verkauf_ab: '2026-11-28T10:00:00Z' };
 
 // Shop mit gefaelschtem Server: edition_staende liefert [] ohne Altersangabe (wie supabase/werkstatt-schema.sql)
-async function shopSeite(browser, { sitzung = null, server = {} } = {}) {
+async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop', vorher = {} } = {}) {
   const k = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
-  const srv = { ab18: false, editionen: [EDITION], ...server };
+  const srv = { ab18: false, editionen: [EDITION], sonder: [], ...server };
   const anfragen = [];
   const fehlerListe = [];
   s.on('pageerror', (e) => fehlerListe.push(e.message));
@@ -102,20 +103,22 @@ async function shopSeite(browser, { sitzung = null, server = {} } = {}) {
     anfragen.push({ url: u, body: r.request().postData() });
     if (u.includes('/rpc/alter_angeben')) { srv.ab18 = true; return r.fulfill({ status: 204, body: '' }); }
     const body = u.includes('/rpc/edition_staende') ? (srv.ab18 ? srv.editionen : [])
-      : u.includes('/rest/v1/altersangaben') ? (srv.ab18 ? [{ ab18: true }] : []) : {};
+      : u.includes('/rest/v1/altersangaben') ? (srv.ab18 ? [{ ab18: true }] : [])
+      : u.includes('/rest/v1/sonderstuecke') ? srv.sonder : {};
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
-  await s.addInitScript(({ sitzung }) => {
+  await s.addInitScript(({ sitzung, vorher }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+      for (const [k, v] of Object.entries(vorher)) localStorage.setItem(k, v);
     } catch (e) { /* egal */ }
-  }, { sitzung });
+  }, { sitzung, vorher });
   await s.goto(BASIS + '#ich');
   await s.waitForSelector('.sa-screen', { timeout: 30000 });
-  await s.locator('.sa-steuer .seg[data-wert="shop"]').click();
+  if (bereich) await s.locator(`.sa-steuer .seg[data-wert="${bereich}"]`).click();
   await warte(500);
   return { k, s, srv, anfragen, fehlerListe };
 }
@@ -171,6 +174,55 @@ async function shopTeil(browser) {
   await p.k.close();
 }
 
+const ERFINDER_ZEILEN = ['erfinder-banner-blatt-0', 'erfinder-titel', 'erfinder-figuren-blaupause', 'erfinder-finisher-signatur']
+  .map((stueck_id) => ({ stueck_id }));
+const figurenQuellen = (s) => s.evaluate(() => [...document.querySelectorAll('img.figur')].map((x) => x.getAttribute('src')));
+
+async function erfinderTeil(browser) {
+  // Flos Konto mit allen vier Zeilen: der Bereich erscheint nach der Antwort des Servers von selbst
+  let p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: ERFINDER_ZEILEN }, bereich: null });
+  await p.s.waitForSelector('.sa-bereich[data-bereich="erfinder"]:not([hidden])', { timeout: 15000 }).catch(() => {});
+  const info = await p.s.evaluate(() => {
+    const b = document.querySelector('.sa-bereich[data-bereich="erfinder"]');
+    return b && { teile: [...b.querySelectorAll('.sa-teil')].map((x) => x.dataset.teil).join(), chips: [...b.querySelectorAll('.er-chip')].map((x) => x.textContent).join('|'),
+      knopf: b.querySelector('.er-figuren')?.textContent, erster: document.querySelector('.sa-steuer .seg')?.dataset.wert, sichtbar: !b.hidden };
+  });
+  pruefe('Erfinder: eigener Bereich (zuerst, gewählt) mit Banner, Titel, Blaupause und Signatur', !!info && info.sichtbar && info.erster === 'erfinder'
+    && info.teile === ERFINDER_ZEILEN.map((z) => z.stueck_id).join(), info);
+  pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
+    && info.knopf === 'Blaupause-Figuren benutzen', info);
+  pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  await p.s.locator('.er-figuren').click();
+  await p.s.waitForFunction(() => document.querySelector('.er-figuren')?.getAttribute('aria-pressed') === 'true', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Erfinder: Blaupause ausgerüstet', await p.s.evaluate(() => document.querySelector('.sa-teil[data-teil="erfinder-figuren-blaupause"]')?.dataset.zustand) === 'an');
+  await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
+  let quellen = await figurenQuellen(p.s);
+  pruefe('Erfinder: in der Partie stehen alle 32 Figuren im Blaupause-Satz', quellen.length === 32 && quellen.every((q) => q.includes('/blaupause/')), quellen.slice(0, 3));
+  await p.s.evaluate(() => window.__app.gehe('einstellungen'));
+  await p.s.waitForSelector('[data-finisher-wahl]', { timeout: 15000 }).catch(() => {});
+  pruefe('Erfinder: Signatur bei den Finishern wählbar', await p.s.evaluate(() => {
+    const b = document.querySelector('[data-finisher-wahl="signatur"]');
+    return !!b && !b.disabled && /Erfinder · Nr\. 0/.test(b.textContent);
+  }));
+  pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.k.close();
+
+  // ein anderes Konto ohne Zeilen, das die Einstellung von Hand auf blaupause setzt: nichts davon wirkt
+  p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: [] }, bereich: null,
+    vorher: { 'schach-arena:v1:einstellungen': JSON.stringify({ figuren: 'blaupause' }) } });
+  await warte(800);
+  pruefe('Ohne Sonderstücke: kein Erfinder-Bereich und kein leerer Platz', await p.s.locator('.sa-bereich[data-bereich="erfinder"], .seg[data-wert="erfinder"]').count() === 0);
+  await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
+  quellen = await figurenQuellen(p.s);
+  pruefe('Ohne Sonderstücke: Standardfiguren, auch wenn die Einstellung blaupause sagt', quellen.length === 32 && !quellen.some((q) => q.includes('blaupause')), quellen.slice(0, 3));
+  await p.s.evaluate(() => window.__app.gehe('einstellungen'));
+  await p.s.waitForSelector('[data-finisher-wahl]', { timeout: 15000 }).catch(() => {});
+  pruefe('Ohne Sonderstücke: keine Signatur bei den Finishern', await p.s.locator('[data-finisher-wahl="signatur"]').count() === 0);
+  await p.k.close();
+}
+
 async function browserTeil() {
   const pw = ladePlaywright();
   const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
@@ -218,6 +270,7 @@ async function browserTeil() {
       await k.close();
     }
     await shopTeil(browser);
+    await erfinderTeil(browser);
     // Englisch
     const k = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block' });
     const s = await k.newPage();

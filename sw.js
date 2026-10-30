@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 117;
-const STAND = '574b3caa1d18';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 118;
+const STAND = '95301826b483';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -31,6 +31,7 @@ const DATEIEN = [
   'css/pakete/sammlung.css',
   'js/pakete/sammlung/index.js',
   'js/pakete/sammlung/shop.js',
+  'js/pakete/sammlung/erfinder.js',
   'js/pakete/sammlung/texte.js',
   'css/pakete/finisher.css',
   'js/pakete/finisher/index.js',
@@ -157,6 +158,8 @@ const DATEIEN = [
   'js/inhalte.js',
   'js/konto-config.js',
   'js/konto.js',
+  'js/sonderstuecke.js',
+  'js/figurensatz.js',
   'js/abo.js',
   'js/pakete/abo/index.js',
   'js/pakete/abo/trainer.js',
@@ -211,6 +214,18 @@ const DATEIEN = [
   'assets/pieces/wP.svg',
   'assets/pieces/wQ.svg',
   'assets/pieces/wR.svg',
+  'assets/pieces/blaupause/bB.svg',
+  'assets/pieces/blaupause/bK.svg',
+  'assets/pieces/blaupause/bN.svg',
+  'assets/pieces/blaupause/bP.svg',
+  'assets/pieces/blaupause/bQ.svg',
+  'assets/pieces/blaupause/bR.svg',
+  'assets/pieces/blaupause/wB.svg',
+  'assets/pieces/blaupause/wK.svg',
+  'assets/pieces/blaupause/wN.svg',
+  'assets/pieces/blaupause/wP.svg',
+  'assets/pieces/blaupause/wQ.svg',
+  'assets/pieces/blaupause/wR.svg',
   'assets/avatare/01-bauer-benno.svg',
   'assets/avatare/02-oma-hilde.svg',
   'assets/avatare/03-kalle-vom-stammtisch.svg',

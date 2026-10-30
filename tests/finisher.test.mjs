@@ -6,7 +6,9 @@ setzeSpeicher(new Speicher());
 const { FINISHER, istFrei, auswahl, starteFinisher } = await import('../js/pakete/finisher/index.js');
 const { klang, KATALOG } = await import('../js/sounds.js');
 
-assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig']);
+assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig', 'signatur']);
+// Signatur (Erfinder-Profil): nie ueber das Level, nur mit dem Sonderstueck des angemeldeten Kontos
+assert.equal(istFrei('signatur', 99), false, 'Signatur ohne Sonderstueck gesperrt');
 assert.equal(istFrei('krone', 1), true);
 assert.equal(istFrei('welle', 4), false);
 assert.equal(istFrei('welle', 5), true);
@@ -68,4 +70,19 @@ assert.equal(c3.buehne.effekte.kinder.length, 0, 'Abbruch waehrend des Effekts: 
 // Nie fuer den Bot, nie bei aus
 assert.equal(starteFinisher(ctx({ gewinner: 'bot' }), 'krone'), null);
 assert.equal(starteFinisher(ctx(), 'aus'), null);
+// Signatur mit Sonderstueck: nur fuer das Konto, dem der Merker gehoert
+const lager = new Speicher();
+globalThis.localStorage = lager;
+const tok = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
+lager.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-finisher-signatur'] }));
+assert.equal(istFrei('signatur', 1), false, 'Signatur: abgemeldet gesperrt');
+lager.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: tok('u-anders'), refresh_token: 'r', expires_at: 9999999999 }));
+assert.equal(istFrei('signatur', 1), false, 'Signatur: anderes Konto gesperrt');
+lager.setItem('schach-arena:konto:sitzung', JSON.stringify({ access_token: tok('u-flo'), refresh_token: 'r', expires_at: 9999999999 }));
+assert.equal(istFrei('signatur', 1), true, 'Signatur: Flos Konto frei');
+const { speichereModulEinstellungen } = await import('../js/storage.js');
+speichereModulEinstellungen('finisher', { auswahl: 'signatur' });
+assert.equal(auswahl(1), 'signatur', 'Signatur waehlbar');
+lager.removeItem('schach-arena:konto:sitzung');
+assert.equal(auswahl(1), 'krone', 'nach dem Abmelden faellt die Wahl auf Krone zurueck');
 console.log('finisher.test.mjs: Freischaltungen, sichere Standardwahl, eigener Klang statt zweitem Sieg, abgebrochenes Signal ok');
