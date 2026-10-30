@@ -318,6 +318,7 @@ declare
   abo jsonb := null;
   werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
     'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
+  freunde jsonb := jsonb_build_object('freundschaften', '[]'::jsonb, 'einladung', null, 'wochenpunkte', '[]'::jsonb);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -360,6 +361,21 @@ begin
                  from public.sonderstuecke s where s.user_id = $1), ''[]''::jsonb))'
       into werkstatt using uid;
   end if;
+  -- Freunde (freunde-schema.sql): Freundschaften und Anfragen mit dem Benutzernamen der anderen Seite, der eigene
+  -- Einladungscode und die Wochenwertung
+  if to_regclass('public.freundschaften') is not null then
+    execute 'select jsonb_build_object(
+               ''freundschaften'', coalesce((select jsonb_agg(jsonb_build_object(
+                   ''mit'', p.benutzername, ''angefragt_von_mir'', f.von = $1, ''status'', f.status,
+                   ''erstellt_am'', f.erstellt_am, ''geaendert_am'', f.geaendert_am) order by f.erstellt_am)
+                 from public.freundschaften f
+                 left join public.profile p on p.user_id = case when f.von = $1 then f.an else f.von end
+                 where f.von = $1 or f.an = $1), ''[]''::jsonb),
+               ''einladung'', (select to_jsonb(e) - ''von'' from public.freund_einladungen e where e.von = $1),
+               ''wochenpunkte'', coalesce((select jsonb_agg(to_jsonb(w) - ''user_id'' order by w.woche)
+                 from public.wochenpunkte w where w.user_id = $1), ''[]''::jsonb))'
+      into freunde using uid;
+  end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -390,6 +406,8 @@ begin
       (select jsonb_agg(to_jsonb(n) order by n.erstellt_am) from public.nutzung n where n.user_id = uid),
       '[]'::jsonb),
     'freigabe_widerruf', (select to_jsonb(w) from public.freigabe_widerrufe w where w.user_id = uid),
+    -- Freunde: Freundschaften und Anfragen (mit Benutzername der anderen Seite), Einladungscode, Wochenwertung
+    'freunde', freunde,
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,
