@@ -1027,6 +1027,7 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 | `bestenliste:reiter` | DOM | Screen `bestenliste` (S1-3 `punkte`), Reiterzeile der Bestenliste; bis dahin nur die Node-Pruefung in `tests/ereignisse.test.mjs` | `{ app, reiter, fenster }` (`reiter`: gewaehlter Reiter, `fenster`: `'woche'` \| `'monat'` \| `'allzeit'`) | Ich 10 · Bots 20 (S1-3) · Liga 30 (S3-2) · Raetsel 40 (S2-2) · Freunde 50 (S3-3) |
 | `training:karten` | DOM | Screen `training` (seit U2 Kern-Screen, `js/ui/training.js`): `.training-gitter`, Karten des Trainings; ohne Anbieter eine ruhige Karte | `{ app }` | Stapel 10 (S2-1) · Tagesraetsel und Archiv 20 (S1-5) · Treppenlauf 30 (S2-2) · Lernpfad 40 (S1-10/S2-3) |
 | `ich:vitrine` | DOM | Screen `ich` (Paket `ich`, mit der Integration S1), Vitrine unter der Spielerkarte | `{ app }` | Wertung und Bestmarken 10 (S1-2) · Medaillen 20 (S2-5) · Siegel 30 (S1-6) · Matt-Atlas 40 (S3-5) |
+| `sammlung:bereich` | DOM | Screen `ich` (`js/ui/ich.js`, Paket `sammlung`, Flo 30.10.2026): je Anbieter ein `section.sa-bereich` aus `bereich()`, ein Bereich zur Zeit (Segment), oben „N von M freigeschaltet“ ueber alle `.sa-teil` | `{ app }` | Finisher 10 · Emotes 20 · Titel 30 (Funken) · Bretter 40 · Klaenge 50 · Erfolge 90 · Shop 95 (Editionen, `js/pakete/sammlung/shop.js`, zaehlt nicht mit) |
 | `spielplan:tage` | DOM | Screen `spielplan` (S1-6 `boss`), Steckbrief des angetippten Tages | `{ app, plan, woche, tag }` (`plan` aus `ladeSpielplan()`, also `daten/boss/spielplan.json`) | Boss 10 (S1-6) · Funken-Wochenende 20 (S1-1) · Tagesraetsel 30 (S1-5) |
 Die vier Screen-Orte haben noch keinen Host in der App: Die Pakete, die die Screens bauen, rufen `fuelle()` mit genau
 diesem Kontext auf (und schreiben die Stelle in ihren Kopfkommentar). Bis dahin gibt es zwei Test-Huellen:
@@ -1049,6 +1050,7 @@ Die Reihenfolgen sind die Vorgabe des Spielkonzepts, kein Zwang.
 | `bestenliste:reiter` | `tests/orte-huelle.html` | Screen `bestenliste` (`js/ui/bestenliste.js`, S1-3 `punkte`) |
 | `training:karten` | `js/ui/training.js` (Premium-Umbau U2, Training-Huelle); `tests/orte-huelle.html` bleibt | bleibt |
 | `ich:vitrine` | `tests/orte-huelle.html` | Screen `ich` (`js/ui/ich.js`, Paket `ich` mit der Integration S1) |
+| `sammlung:bereich` | `js/ui/ich.js` (Paket `sammlung`, 30.10.2026) | bleibt |
 | `spielplan:tage` | `tests/orte-huelle.html` | Screen `spielplan` (`js/ui/spielplan.js`, S1-6 `boss`) |
 
 **Abrechnung.** Hoechstens `ABRECHNUNG_MAX` = 4 Zeilen (weitere: console.warn, nicht gezeigt). Neue Zeilen rollen im

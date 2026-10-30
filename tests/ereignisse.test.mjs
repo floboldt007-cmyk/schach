@@ -196,6 +196,8 @@ const ORT_TABELLE = {
   'partie:spieler-leiste': 'dom', 'partie:aktionen': 'dom',
   // Premium-Umbau U5: Plaetze auf der Weltkarte (Zelt des Wochen-Boss, Event-Fahne), Host arena.js
   'arena:karte-boss': 'dom', 'arena:karte-event': 'dom',
+  // Sammlung (Reiter Ich, Flo 30.10.2026): ein Bereich je Anbieter, Host js/ui/ich.js
+  'sammlung:bereich': 'dom',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));
