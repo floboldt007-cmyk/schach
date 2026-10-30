@@ -19,7 +19,10 @@
 .sa-bild .sa-zahl { font-family: var(--display); font-weight: var(--gw-titel); font-size: 34px; font-variant-numeric: tabular-nums; }
 .sa-teil[data-zustand="zu"] .sa-bild { color: var(--text-3, var(--text-2)); background: var(--grund-2, var(--flaeche-2)); }
 .sa-teil[data-zustand="zu"] .sa-bild svg { width: 30px; height: 30px; }
-.sa-text { display: grid; gap: 3px; min-width: 0; }
+/* Karten einer Reihe gleich gebaut (Ansicht 30.10.): Titel oben auf einer Linie, Fortschrittsbalken unten auf einer Linie */
+.sa-teil { grid-template-rows: auto 1fr; }
+.sa-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sa-text > .sa-balken { margin-top: auto; }
 .sa-text b { font-weight: var(--gw-stark); font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
 .sa-zeile { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .sa-teil[data-zustand="an"] .sa-zeile { color: var(--akzent); }
