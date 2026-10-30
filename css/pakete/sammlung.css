@@ -92,6 +92,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .pr-orden.leer { border-style: dashed; background: transparent; color: var(--text-2); }
 .pr-orden-bild { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--flaeche); color: var(--text); }
 .pr-orden-bild svg { width: 24px; height: 24px; }
+.pr-orden-bild svg.sk-erfolg, .pr-orden-knopf .pr-orden-bild svg.sk-erfolg { width: 40px; height: 40px; }   /* eigene Abzeichen (js/sammlung-kunst.js) */
 .pr-plus { font-size: 26px; line-height: 40px; }
 .pr-hilfe { margin: 0; font-size: 13px; color: var(--text-2); }
 .pr-wahl h4 { margin: 4px 0 8px; font-size: 13px; color: var(--text-2); }
@@ -140,3 +141,6 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   var(--grund-2, var(--flaeche-2)) calc(var(--anteil, 0) * 100%)); box-shadow: var(--kante); }
 /* gesperrte Silhouette etwas sichtbarer, in hell und dunkel */
 .sa-geheim { filter: grayscale(1) brightness(.45); opacity: .8; }
+/* Eigene Bilder je Stueck (Flo 30.10.: Klangsets mit gleichem Lautsprecher "braucht ein besseres Design") */
+.sa-bild > svg.sk-klang, .sa-bild > svg.sk-erfolg, .sa-geheim > svg.sk-erfolg { width: 70px; height: 70px; }
+.sa-bild > svg.sk-brett { width: 64px; height: 64px; }

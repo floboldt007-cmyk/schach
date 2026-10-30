@@ -212,9 +212,9 @@ async function testeAnalyse(browser, d) {
   const chips = await seite.locator('.an-g-chips').textContent();
   pruefe('Chip "Leistung ≈ …"', /Leistung ≈ \d+/.test(chips), chips);
   pruefe('Genauigkeit beider Seiten', (await seite.locator('.an-g-wert.zahl').count()) === 2);
-  pruefe('Zugklassen zugeklappt (eine Zeile „Alle Zugklassen“), aufgeklappt elf Zeilen', await seite.locator('details.an-klassen:not([open])').count() === 1
+  // Flo 30.10. abends: "Das kann immer aufgeklappt sein, wenn man die Analyse macht"
+  pruefe('Zugklassen gleich aufgeklappt (Zeile „Alle Zugklassen“ zum Zuklappen)', await seite.locator('details.an-klassen[open]').count() === 1
     && /Alle Zugklassen/.test(await seite.locator('.an-kl-auf').innerText()));
-  await seite.click('.an-kl-auf');
   pruefe('Elf Klassen-Zeilen plus "Züge gesamt"', (await seite.locator('.an-kl[data-klasse]').count()) === 11
     && (await seite.locator('.an-kl-gesamt').textContent()).includes('Züge gesamt'));
   const gesamt = await seite.locator('.an-kl-gesamt .an-n').allTextContents();
@@ -519,7 +519,7 @@ async function testeTouch(browser, d) {
   const kb = await seite.locator('.an-kurve-wrap').boundingBox();
   await seite.touchscreen.tap(kb.x + kb.width * (11 / 33), kb.y + kb.height / 2);
   pruefe('Kurve antippen mit dem Finger', (await aktuellerPly(seite)) === 10, String(await aktuellerPly(seite)));
-  await seite.click('.an-kl-auf');
+  // Zugklassen sind seit 30.10. abends gleich aufgeklappt
   await seite.locator('.an-kl[data-klasse="brillant"]').scrollIntoViewIfNeeded();
   const kl = await seite.locator('.an-kl[data-klasse="brillant"]').boundingBox();
   await seite.touchscreen.tap(kl.x + kl.width / 2, kl.y + kl.height / 2);

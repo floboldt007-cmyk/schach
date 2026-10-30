@@ -9,7 +9,7 @@ import { ZUGKLASSEN, KLASSEN_NAME } from './zugklassen.js';
 // symbolSvg(klasse) aus board.js das Symbol auch fuer Coach-Zeile und Zugliste.
 
 // Ersatzfarben wie --k-* in css/themes/modern.css (Variante A, fuenf Familien)
-const FARBEN = ['#B98A1E', '#B98A1E', '#2F7D5B', '#2F7D5B', '#6E8A7C', '#958571', '#C27A12', '#C2561A', '#B23A3A', '#B23A3A', '#8B8F99'];
+const FARBEN = ['#7C3AED', '#B98A1E', '#2F7D5B', '#2F7D5B', '#6E8A7C', '#958571', '#C27A12', '#C2561A', '#B23A3A', '#B23A3A', '#8B8F99'];
 export const KLASSEN = ZUGKLASSEN.map((k, i) => ({ ...k, kurz: k.zeichen, farbe: FARBEN[i] }));
 
 const D = 'currentColor';
@@ -76,10 +76,11 @@ const RUHIG = {
   patzer: text('??'),
   erzwungen: `<path d="M6.5 12h10M12.5 8l4 4-4 4" ${L()}/>`,
 };
-// Kachel: deckender Grund (Flaeche), darueber die Klassenfarbe zart; so bleibt das Zeichen auch auf dem Brett lesbar
+// Kachel: deckender Grund (Flaeche), darueber die Klassenfarbe getoent; so bleibt das Zeichen auch auf dem Brett lesbar.
+// Flo 30.10. abends ("die Symbole muessen bisschen staerker sein"): Toenung .16 -> .30, Rand .28 -> .65
 const kachel = (id, farbe) => `<rect x="1" y="1" width="22" height="22" rx="7" style="fill:var(--flaeche, #fff)"/>`
-  + `<rect x="1" y="1" width="22" height="22" rx="7" style="fill:var(--k-${id}, ${farbe}); fill-opacity:.16"/>`
-  + `<rect x="1.5" y="1.5" width="21" height="21" rx="6.5" fill="none" style="stroke:var(--k-${id}, ${farbe}); stroke-opacity:.28" stroke-width="1"/>`;
+  + `<rect x="1" y="1" width="22" height="22" rx="7" style="fill:var(--k-${id}, ${farbe}); fill-opacity:.3"/>`
+  + `<rect x="1.6" y="1.6" width="20.8" height="20.8" rx="6.4" fill="none" style="stroke:var(--k-${id}, ${farbe}); stroke-opacity:.65" stroke-width="1.3"/>`;
 
 // Fertige SVG-Texte je Klasse fuer board.js setzeSymbole(); Farbe ueber die CSS-Variablen
 // (mit Ersatzwert, falls die Variable fehlt).
