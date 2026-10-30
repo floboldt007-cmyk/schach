@@ -1,5 +1,6 @@
 -- Limitierte Editionen der Werkstatt, Server-Teil Etappe 1 (Entscheidung des Besitzers vom 29.10.2026, Form B: feste
--- Auflage ab 100 plus Verkaufszeitraum, nie Neuauflage, Nummern der Reihe nach). Nur Stripe-Testmodus, ohne
+-- Auflage plus Verkaufszeitraum, nie Neuauflage, Nummern der Reihe nach; Auflage ab 10 seit dem 30.10.2026, vorher ab
+-- 100). Nur Stripe-Testmodus, ohne
 -- Oberflaeche. Mehrfach ausfuehrbar (Muster: schema.sql). Vorher schema.sql einspielen (auth.users und die
 -- Zeitstempel-Funktion stehen dort; sie wird hier fuer den Fall, dass diese Datei allein laeuft, noch einmal angelegt).
 -- Konzept: Vault, Schach-App/Arbeitsstand-2026-10-29/Konzept-Limitierte-Editionen.md (Abschnitte 4, 6 und 8).
@@ -14,6 +15,8 @@
 --   editionen             eine Zeile je Edition. Flo legt sie im SQL Editor an. Lesen nur Konten mit bestaetigtem
 --                         "18 oder aelter", und nur die festen Angaben (Spaltenrechte): vergeben, reserviert, endzahl,
 --                         stripe_preis und die Schalter nie, sonst waere der Umsatz je Edition live oeffentlich.
+--                         Ausnahme mit zeige_restzahl: Dann sieht jedes Konto ab 18, wie viele Stuecke gerade kaufbar
+--                         sind, und damit ungefaehr den Verkauf (nach dem Ende auch die Endzahl).
 --   reservierungen        haelt ein Stueck, solange jemand an der Stripe-Kasse ist. Ein offener Kauf je Konto und
 --                         Edition (Teilindex). Nutzer lesen die eigenen Zeilen ohne sitzung_id und zahlung_id.
 --   edition_zustimmungen  Beleg fuer die beiden Erklaerungen zum Widerruf (sofortige Lieferung, Kenntnis vom Erloeschen)
@@ -32,7 +35,7 @@
 --                         die eigenen Zeilen. Was Gegner sehen, kommt spaeter ueber einen Server-Kanal (Etappe 3b).
 --
 -- Regeln in der Datenbank (nicht nur in der App):
---   auflage >= 100; vergeben + reserviert <= auflage; vergeben sinkt nie (Trigger EDITION_VERGEBEN_SINKT); ab
+--   auflage >= 10; vergeben + reserviert <= auflage; vergeben sinkt nie (Trigger EDITION_VERGEBEN_SINKT); ab
 --   angekuendigt_am (sobald der Zeitpunkt erreicht ist) sind Name, Auflage, Zeitraum, Stripe-Preis, Betrag und Waehrung
 --   eingefroren (Trigger EDITION_EINGEFROREN), das Ende laesst sich dann nur vorziehen, wenn alles vergeben ist, nie
 --   verschieben; eine angekuendigte Edition laesst sich nicht loeschen. Angekuendigt wird mindestens 28 Tage vor dem
@@ -43,11 +46,20 @@
 --   Er ist der Notaus: keine neue Kasse mehr und keine bestehende wieder oeffnen. Wer schon an der Stripe-Kasse ist, kann
 --   dort noch bis zu 31 Minuten bezahlen und bekommt sein Stueck (bewusst, siehe ANLEITUNG). Nach dem Verkaufsstart
 --   zeigt edition_stand dann 'pausiert'.
---   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt. Kassenschluss: ab verkauf_bis minus
+--   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt: auflage - vergeben - reserviert,
+--   also was gerade kaufbar ist (Stuecke an offenen Kassen zaehlen nicht mit; nicht bezahlte kommen zurueck). Nur im
+--   Status 'erhaeltlich', sonst null (angekuendigt, pausiert, ausverkauft, beendet). Ab angekuendigt_am laesst sich der
+--   Schalter nur noch ausschalten, nie neu einschalten (EDITION_EINGEFROREN): Die Zahl soll nicht erst bei wenig Rest
+--   auftauchen (Claudes Ergaenzung zur Entscheidung vom 30.10.2026, per SQL aenderbar). Kassenschluss: ab verkauf_bis minus
 --   31 Minuten oeffnet der Server keine neue Kasse mehr (Stripe-Kassen leben mindestens 30 Minuten, eine Minute Puffer
 --   fuer Laufzeit und Uhren), so endet jede Kasse spaetestens mit dem angekuendigten Ende. Hoechstens 3 Kassen je Konto
 --   und Edition in 24 Stunden (EDITION_ZU_OFT): sonst koennten wenige Konten mit immer neuen Kassen alle Stuecke
---   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen.
+--   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen. Ehrlich: Wie viele Konten
+--   es zum Blockieren braucht, waechst mit der Auflage. Bei 10 Stueck halten 10 Konten alle Stuecke 31 Minuten fest,
+--   mit drei Kassen je Konto etwa 93 Minuten, und nach 24 Stunden beginnt die Grenze von vorn: Mit rund 155 Konten
+--   bleiben 10 Stueck den ganzen Tag blockiert. Kontoschutz (CAPTCHA, Mengenbremsen bei der Anmeldung, keine
+--   Wegwerf-Adressen) erschwert das nur, die sofortige Freigabe beim Abbrechen hilft nur ehrlichen Kaeufern. Ob kleine
+--   Auflagen eine strengere Regel brauchen, entscheidet Flo vor dem ersten echten Verkauf (ANLEITUNG "Was noch fehlt").
 --   Projektkennung: Die Kasse traegt eine Kennung des Supabase-Projekts in den Stripe-Metadaten. Der Webhook eines anderen
 --   Projekts am selben Stripe-Konto ignoriert sie (supabase/functions/_gemeinsam/werkstatt.js). Kommt trotzdem ein
 --   bezahlter Kauf mit einer Reservierung an, die diese Datenbank nicht kennt, wird nie automatisch erstattet: Ergebnis
@@ -111,7 +123,7 @@ create table if not exists public.editionen (
   constraint editionen_preis_form check (stripe_preis is null or stripe_preis ~ '^price_[A-Za-z0-9]{1,200}$'),
   constraint editionen_betrag check (betrag_cent is null or betrag_cent > 0),
   constraint editionen_waehrung check (waehrung is null or waehrung ~ '^[a-z]{3}$'),
-  constraint editionen_auflage check (auflage >= 100 and auflage <= 1000000),
+  constraint editionen_auflage check (auflage >= 10 and auflage <= 1000000),
   constraint editionen_fenster check (verkauf_bis > verkauf_ab),
   constraint editionen_vorlauf check (angekuendigt_am is null or angekuendigt_am <= verkauf_ab - interval '28 days'),
   constraint editionen_angekuendigt_vollstaendig
@@ -120,6 +132,12 @@ create table if not exists public.editionen (
   constraint editionen_zaehler check (vergeben >= 0 and reserviert >= 0 and vergeben + reserviert <= auflage),
   constraint editionen_endzahl check (endzahl is null or endzahl = vergeben)
 );
+
+-- Auflage ab 10 (Flo, 30.10.2026: die erste Edition hat 10 Stueck). "create table if not exists" aendert eine schon
+-- eingespielte Tabelle nicht, darum wird die alte Regel (ab 100) hier ersetzt. Vorhandene Editionen haben alle
+-- mindestens 100 Stueck und erfuellen die neue Regel.
+alter table public.editionen drop constraint if exists editionen_auflage;
+alter table public.editionen add constraint editionen_auflage check (auflage >= 10 and auflage <= 1000000);
 
 -- Keine Neuauflage unter neuer produkt_id: jeden Namen gibt es nur einmal (fast gleiche Namen faengt das nicht, die
 -- verbieten AGB und Flos Wort)
@@ -301,6 +319,10 @@ begin
       and (new.verkauf_bis > old.verkauf_bis or new.vergeben < new.auflage) then
       raise exception 'EDITION_EINGEFROREN';
     end if;
+    -- Die Restzahl gilt ab der Ankuendigung oder gar nicht: ausschalten geht, neu einschalten nicht
+    if new.zeige_restzahl and not old.zeige_restzahl then
+      raise exception 'EDITION_EINGEFROREN';
+    end if;
   end if;
   return new;
 end;
@@ -399,7 +421,10 @@ begin
     'betrag_cent', e.betrag_cent,
     'waehrung', e.waehrung,
     'status', v_status,
-    'restzahl', case when e.zeige_restzahl and v_status = 'erhaeltlich' then e.auflage - e.vergeben end,
+    -- Was gerade kaufbar ist: Stuecke an offenen Kassen zaehlen nicht mit. 0 bei 'erhaeltlich' heisst, alle uebrigen
+    -- sind gerade an einer Kasse (nicht bezahlte kommen zurueck), nicht ausverkauft.
+    'restzahl', case when e.zeige_restzahl and v_status = 'erhaeltlich'
+      then greatest(e.auflage - e.vergeben - e.reserviert, 0) end,
     'endzahl', v_endzahl,
     'endzahl_folgt', v_status = 'beendet' and e.endzahl is null and e.reserviert > 0
   );

@@ -108,7 +108,8 @@ export const KENNUNGEN = Object.freeze({
   EDITION_ZU_OFT: [429, 'zu_oft'],
 });
 
-// Rueckfall-Texte (die App hat spaeter eigene). Ruhig, ohne Druck: keine Restzahl, kein "nur noch", keine Uhr.
+// Rueckfall-Texte (die App hat spaeter eigene). Ruhig, ohne Druck: keine Restzahl, kein "nur noch", keine Uhr. Die
+// Restzahl zeigt nur die App, und nur fuer Editionen, bei denen Flo zeige_restzahl einschaltet (Entscheidung 30.10.).
 export const TEXTE = Object.freeze({
   methode: { de: 'Diese Anfrage geht nur per POST.', en: 'This request only accepts POST.' },
   nicht_eingerichtet: { de: 'Der Kauf ist noch nicht eingerichtet.', en: 'Purchasing is not set up yet.' },

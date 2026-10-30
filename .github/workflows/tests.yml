@@ -6,6 +6,10 @@ on:
 
 jobs:
   chromium:
+    strategy:
+      fail-fast: false
+      matrix:
+        teil: [1, 2, 3]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,18 +26,18 @@ jobs:
         run: |
           mkdir -p artifacts/screenshots
           set -o pipefail
-          BILDER=artifacts/screenshots node tests/alle.mjs --schnell --laut 2>&1 | tee artifacts/chromium.log
+          BILDER=artifacts/screenshots node tests/alle.mjs --schnell --parallel=3 --teil=${{ matrix.teil }}/3 --laut 2>&1 | tee artifacts/chromium.log
       - name: Vollständige Tests bei Pull Requests
         if: github.event_name == 'pull_request'
         run: |
           mkdir -p artifacts/screenshots
           set -o pipefail
-          BILDER=artifacts/screenshots node tests/alle.mjs --laut 2>&1 | tee artifacts/chromium.log
+          BILDER=artifacts/screenshots node tests/alle.mjs --parallel=3 --teil=${{ matrix.teil }}/3 --laut 2>&1 | tee artifacts/chromium.log
       - name: Fehlerartefakte hochladen
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: chromium-fehler
+          name: chromium-${{ matrix.teil }}-fehler
           path: artifacts/
           if-no-files-found: ignore
 
