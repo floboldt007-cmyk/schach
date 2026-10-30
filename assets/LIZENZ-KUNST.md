@@ -15,6 +15,7 @@ offline laden kann.
 |---|---|---|
 | `assets/klang/holz/*.mp3` | Klangpaket „Holz“ (40 Dateien) | eigene Synthese, Einzelheiten in `assets/klang/LIZENZEN.md` |
 | `assets/klang/arcade/*.mp3` | Klangpaket „Arcade“ (40 Dateien) | eigene Synthese, Einzelheiten in `assets/klang/LIZENZEN.md` |
+| `assets/klang/melodien.json` | Melodien der Lobby-Musik (fünf Weltstimmungen) | selbst geschrieben, vorläufig eingetragen (Flo kann es ändern), Abspieler `js/musik.js` bleibt GPL-3.0; Einzelheiten und Stand in `assets/klang/MUSIK-LIZENZ.md` |
 
 Neue eigene Klänge und Bilder kommen erst in diese Tabelle, wenn Flo das für die Datei so festlegt.
 
