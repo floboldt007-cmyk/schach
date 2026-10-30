@@ -640,8 +640,9 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
       .every((f) => new RegExp(`grant execute on function public\\.${f}\\([^)]*\\)\\s+to service_role;`).test(ohneKommentar)
         && !new RegExp(`grant execute on function public\\.${f}[^;]*authenticated`).test(ohneKommentar))
     && !/grant execute[^;]*(anon|public;)/.test(ohneKommentar));
-  pruefe('Regeln in der Tabelle: Auflage ab 100, vergeben + reserviert <= Auflage, Schalter Standard aus, Endzahl = vergeben',
-    /check \(auflage >= 100 and auflage <= 1000000\)/.test(ohneKommentar) && /vergeben \+ reserviert <= auflage/.test(ohneKommentar)
+  pruefe('Regeln in der Tabelle: Auflage ab 10 (auch in einer schon eingespielten Datenbank), vergeben + reserviert <= Auflage, Schalter Standard aus, Endzahl = vergeben',
+    /check \(auflage >= 10 and auflage <= 1000000\)/.test(ohneKommentar) && !/auflage >= 100\b/.test(ohneKommentar)
+    && /alter table public\.editionen drop constraint if exists editionen_auflage;\s*alter table public\.editionen add constraint editionen_auflage check \(auflage >= 10 and auflage <= 1000000\);/.test(ohneKommentar) && /vergeben \+ reserviert <= auflage/.test(ohneKommentar)
     && /verkauf_freigegeben boolean not null default false/.test(ohneKommentar) && /zeige_restzahl boolean not null default false/.test(ohneKommentar)
     && /check \(endzahl is null or endzahl = vergeben\)/.test(ohneKommentar));
   pruefe('Trigger: vergeben sinkt nie, eingefroren ab der Ankuendigung, Ende nur vorziehbar wenn ausverkauft, Besitz bleibt',

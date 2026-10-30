@@ -119,7 +119,11 @@ $$;
 do $$
 begin
   perform pg_temp.erwarte_fehler($q$insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis)
-    values ('rls-klein', 'Zu klein', 99, now() + interval '40 days', now() + interval '50 days')$q$, '23514');
+    values ('rls-klein', 'Zu klein', 9, now() + interval '40 days', now() + interval '50 days')$q$, '23514');
+  -- Kleinste Auflage ist 10 (Flo, 30.10.2026): geht, und mehr als 10 vergebene Stuecke gehen nie
+  insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis, zeige_restzahl)
+    values ('rls-zehn', 'Probe zehn Stueck', 10, now() + interval '40 days', now() + interval '50 days', true);
+  perform pg_temp.erwarte_fehler($q$update public.editionen set vergeben = 11 where produkt_id = 'rls-zehn'$q$, '23514');
   perform pg_temp.erwarte_fehler($q$insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis, vergeben)
     values ('rls-zaehler', 'Mit Zaehler', 100, now() + interval '40 days', now() + interval '50 days', 3)$q$,
     'EDITION_NEU_MIT_ZAEHLERN');

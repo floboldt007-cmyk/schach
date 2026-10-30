@@ -538,7 +538,8 @@ Fachperson (keine Rechtsberatung hier). Die Schritte unten sind für später, we
 macht. **Bis dahin nichts davon ausführen.**
 
 **Was der Server sicherstellt** (`supabase/werkstatt-schema.sql`):
-- Auflage mindestens 100; vergeben plus reserviert nie mehr als die Auflage; `vergeben` sinkt nie, eine vergebene
+- Auflage mindestens 10 (seit 30.10.2026, vorher 100; hast du die Datei schon früher eingespielt, führe sie einfach noch
+  einmal aus, dann gilt die neue Regel); vergeben plus reserviert nie mehr als die Auflage; `vergeben` sinkt nie, eine vergebene
   Nummer kommt nie zurück (auch nach Erstattung, Widerruf oder Rückbuchung nicht, nur der Status ändert sich).
 - Ab `angekuendigt_am` sind Name, Auflage, Zeitraum, Stripe-Preis, Betrag und Währung eingefroren
   (`EDITION_EINGEFROREN`). Das Ende lässt sich dann nur vorziehen, wenn alles vergeben ist, nie verschieben. Angekündigt
@@ -595,7 +596,9 @@ macht. **Bis dahin nichts davon ausführen.**
    Der Abo-Endpunkt bleibt, wie er ist; beide bekommen Käufe zu sehen und lassen die des anderen in Ruhe. Hat auch das
    Testprojekt einen `werkstatt-webhook`, bekommt jeder Endpunkt die Käufe beider Projekte und verbucht nur die eigenen.
 8. **Edition anlegen (SQL Editor, als Besitzer):**
-   `insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, angekuendigt_am, verkauf_ab, verkauf_bis) values ('[id]', '[Name]', '[price_...]', [Betrag in Cent], 'eur', [Auflage ab 100], '[Ankündigung]', '[Start]', '[Ende]');`
+   `insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, zeige_restzahl, angekuendigt_am, verkauf_ab, verkauf_bis) values ('[id]', '[Name]', '[price_...]', [Betrag in Cent], 'eur', [Auflage ab 10], true, '[Ankündigung]', '[Start]', '[Ende]');`
+   `zeige_restzahl` auf `true` heißt: Die App zeigt „9 von 10 verfügbar“ (deine Entscheidung vom 30.10.). Mit `false` zeigt
+   sie keine Restzahl.
    Zeiten mit Zeitzone schreiben, zum Beispiel `2027-01-01 00:00 Europe/Berlin` für „bis 31.12., 23:59 Uhr“. Der Betrag
    muss genau zum Stripe-Preis passen, sonst wird jede Zahlung erstattet. Erst wenn alles stimmt:
    `update public.editionen set verkauf_freigegeben = true where produkt_id = '[id]';`

@@ -2412,7 +2412,7 @@ Nachholen höchstens einmal je Minute, Fokusfalle der Tafel). Die echte Datenban
 
 # Limitierte Editionen: Server-Teil Etappe 1 (Werkstatt, nur Stripe-Testmodus, ohne Oberflaeche)
 
-Entscheidung des Besitzers vom 29.10. (`design/runde4/ENTSCHEIDUNGEN.md`): Form B, feste Auflage (im Schema ab 100) plus
+Entscheidung des Besitzers vom 29.10. (`design/runde4/ENTSCHEIDUNGEN.md`): Form B, feste Auflage (im Schema ab 10, seit 30.10.; vorher ab 100) plus
 Verkaufsfenster, nie Neuauflage, Nummern der Reihe nach, nur Optik, Nummer nur fuer den Besitzer, vorerst nur im Web (Weg
 ueber die Stores spaeter). Claudes Empfehlungen (nur ab 18 sichtbar, 28 Tage Vorlauf, Kassen-Grenze ...) sind dort als
 solche markiert. Konzept im Vault (`Schach-App/Arbeitsstand-2026-10-29/Konzept-Limitierte-Editionen.md`). Einrichtung fuer Flo
@@ -2431,7 +2431,7 @@ Stripe-Konto (`metadata.crownmate_projekt` = `projektKennung(SUPABASE_URL)`, SHA
 **Server** (`supabase/werkstatt-schema.sql`, Test `supabase/werkstatt-rls-test.sql`, beide im PGlite-Pruefer und im SQL
 Editor; Voraussetzung `schema.sql`):
 - Tabellen `altersangaben` (Selbstauskunft „18 oder aelter“ mit Zeitpunkt, schreiben nur `alter_angeben(ab18)`),
-  `editionen` (`auflage >= 100`, `vergeben + reserviert <= auflage`, `verkauf_freigegeben` und `zeige_restzahl` Standard
+  `editionen` (`auflage >= 10`, `vergeben + reserviert <= auflage`, `verkauf_freigegeben` und `zeige_restzahl` Standard
   aus, `endzahl = vergeben` sobald festgeschrieben, Name einmalig ohne Gross- und Kleinschreibung), `reservierungen`
   (Teilindex: ein offener Kauf je Konto und Edition; hoechstens 3 je Konto und Edition in 24 Stunden),
   `edition_zustimmungen` (je Reservierung, Textversion und Zeitpunkt), `besitz` (Primaerschluessel `produkt_id, nummer`,
