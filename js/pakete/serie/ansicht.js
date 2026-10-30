@@ -10,7 +10,9 @@
 //   abrechnungsZeile({ e, schonGezeigt, merke, stumm }) -> { el, beende(), verlasse() } | null   div.se-abr[data-zeile="serie"];
 //       stumm: boolean oder Funktion (beim Schritt gefragt): true = kein Klang "bauer" (der grosse Moment klingt selbst)
 //   flamme({ n }) -> HTMLElement                         Flamme mit Zahl an Flos Namen (partie:spieler-leiste)
-//   blattInhalt({ ... }) -> HTMLElement                  Serien-Blatt (Kopf, Bauernmarsch, Kalender, Ring, Kapitel, Lauf, Regeln)
+//   blattInhalt({ ..., ansicht, kamVon, beiAnsicht }) -> HTMLElement   Serien-Blatt, eine Sache pro Blick: ansicht 'start'
+//       (Serie, Bauernmarsch, diese Woche, drei Wege), 'ruhe' (Ruhetag, Pause), 'mehr' (Rekorde, Ehrenreihe, Kapitel,
+//       Kalender), 'regeln'; kamVon: von welcher Unterseite man zurueckkommt (bekommt den Fokus)
 //   oeffneBlatt(inhalt, { titel }) -> { schliesse() }, schliesseBlatt()
 //   einstellungsGruppe({ einst, beiAenderung }) -> HTMLElement   Gruppe "Bauernmarsch" (einstellungen:gruppen)
 //   umwandlungAnimation(el)
@@ -331,15 +333,17 @@ function ehrenreihen(st) {
   return box;
 }
 
-function kalenderTabelle(wochen) {
-  const tab = el('div', 'se-kalender');
+function kalenderTabelle(wochen, { kompakt = false } = {}) {
+  // kompakt: nur die laufende Woche ohne KW-Spalte (erste Seite des Blatts)
+  const tab = el('div', `se-kalender${kompakt ? ' kompakt' : ''}`);
   tab.setAttribute('role', 'table');
-  tab.setAttribute('aria-label', t('p-serie.kalender.label'));
-  tab.innerHTML = `<div class="se-k-zeile se-k-kopf" role="row"><span role="columnheader"></span>${KURZ.map((k) => `<span role="columnheader">${esc(k)}</span>`).join('')}</div>`;
+  tab.setAttribute('aria-label', t(kompakt ? 'p-serie.blatt.woche' : 'p-serie.kalender.label'));
+  const kw = kompakt ? '' : '<span role="columnheader"></span>';
+  tab.innerHTML = `<div class="se-k-zeile se-k-kopf" role="row">${kw}${KURZ.map((k) => `<span role="columnheader">${esc(k)}</span>`).join('')}</div>`;
   for (const w of wochen) {
     const z = el('div', 'se-k-zeile');
     z.setAttribute('role', 'row');
-    z.innerHTML = `<span class="se-k-kw" role="rowheader">${esc(t('p-serie.kalender.kw', { kw: w.kw }))}</span>`;
+    if (!kompakt) z.innerHTML = `<span class="se-k-kw" role="rowheader">${esc(t('p-serie.kalender.kw', { kw: w.kw }))}</span>`;
     for (const d of w.tage) {
       const c = el('span', `se-k-tag ${d.art}${d.heute ? ' heute' : ''}`);
       c.setAttribute('role', 'cell');
@@ -427,52 +431,109 @@ function pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb = 
 }
 
 function regeln() {
-  const d = el('details', 'se-regeln');
-  d.innerHTML = `<summary>${esc(t('p-serie.regeln.titel'))}</summary>`
-    + ['tag', 'frei', 'bauer', 'lauf', 'ohne'].map((k) => `\n    <p>${esc(t('p-serie.regeln.' + k))}</p>`).join('');
-  return d;
+  const box = el('div', 'se-regeln');
+  for (const k of ['tag', 'frei', 'bauer', 'lauf', 'ohne']) box.append(el('p', '', esc(t('p-serie.regeln.' + k))));
+  return box;
 }
 
-export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, beiPause, beiPauseEnde, beiWahl, pauseRest = T.PAUSE_JAHR_MAX, pauseAb = 'heute' } = {}) {
+// Eine Sache pro Blick (Entwurf "Crownmate aufgeraeumt", 30.10.): Die erste Seite zeigt nur die Serie, den Bauernmarsch
+// und diese Woche. Ruhetag und Pause, Rekorde und Kalender sowie die Regeln liegen je eine Ebene tiefer (ansicht).
+const WEGE = ['ruhe', 'mehr', 'regeln'];
+function wegKnopf(ansicht, titel, info, beiAnsicht, fokus) {
+  const k = el('button', 'se-weg dr');
+  k.type = 'button';
+  k.dataset.ansicht = ansicht;
+  if (fokus) k.dataset.fokus = '';
+  k.innerHTML = `<span class="se-weg-text"><b></b>${info ? '<small></small>' : ''}</span>${icon('vor', 'se-weg-pfeil')}`;
+  k.querySelector('b').textContent = titel;
+  if (info) k.querySelector('small').textContent = info;
+  k.addEventListener('click', () => { if (typeof beiAnsicht === 'function') beiAnsicht(ansicht); });
+  return k;
+}
+
+function startSeite({ st, lage, einst, heute, wochen, beiWahl, beiAnsicht, kamVon }) {
   const box = el('div', 'se-blatt-inhalt');
-  const kopf = el('div', 'se-b-kopf');
-  let titel;
-  if (lage.art === 'neu') titel = t('p-serie.blatt.neu');
-  else if (lage.art === 'ruht') titel = t('p-serie.blatt.ruht', { best: zahl(lage.best), kapitel: lage.kapitel });
-  else titel = t('p-serie.blatt.laeuft', { schachtage: schachtage(lage.aktuell), best: zahl(lage.best), kapitel: lage.kapitel });
+  box.dataset.ansicht = 'start';
+  const gross = el('div', 'se-b-gross');
+  if (lage.art === 'laeuft') {
+    const n = Math.round(Number(lage.aktuell) || 0);
+    gross.innerHTML = '<span class="se-b-zahl zahl"></span><span class="se-b-was"></span>';
+    gross.querySelector('.se-b-zahl').textContent = zahl(n);
+    gross.querySelector('.se-b-was').textContent = t('p-serie.blatt.inSerie', { n });
+  } else {
+    gross.innerHTML = '<span class="se-b-was nur"></span>';
+    gross.querySelector('.se-b-was').textContent = lage.art === 'ruht' ? t('p-serie.blatt.ruhtKurz') : t('p-serie.blatt.neu');
+  }
+  if (lage.best > 0) gross.insertAdjacentHTML('beforeend', `<span class="se-b-rekord">${esc(t('p-serie.rekord', { wert: zahl(lage.best) }))}</span>`);
+  box.append(gross);
+
+  const marsch = el('section', 'se-b-teil');
+  marsch.setAttribute('aria-label', t('p-serie.name'));
+  marsch.innerHTML = streifenHtml({ feld: lage.feld, heute: lage.heuteGezaehlt ? 'gezaehlt' : (lage.art === 'ruht' ? null : 'offen') });
+  marsch.append(el('p', 'se-b-satz', esc(t('p-serie.blatt.bisSatz', { n: lage.bisUmwandlung }))));
+  if (lage.offeneWahl > 0 && typeof beiWahl === 'function') marsch.append(wahlBlock({ beiWahl, nr: offeneNr(st) }));
+  box.append(marsch);
+
+  const woche = el('section', 'se-b-teil');
+  woche.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.woche'))}</h4>`;
+  woche.append(kalenderTabelle(wochen.slice(-1), { kompakt: true }));
+  box.append(woche);
+
+  const kommend = st.pausen.filter((k) => k >= heute);
+  const ruheInfo = kommend.length ? t('p-serie.blatt.pauseAb', { von: datumKurz(kommend[0]) })
+    : einst.ruhetag != null ? t('p-serie.ruhetag.label', { tag: WOCHENTAGE[einst.ruhetag] }) : '';
+  const wege = el('nav', 'se-b-wege');
+  wege.setAttribute('aria-label', t('p-serie.blatt.mehrLabel'));
+  wege.append(
+    wegKnopf('ruhe', t('p-serie.blatt.ruheTitel'), ruheInfo, beiAnsicht, kamVon === 'ruhe'),
+    wegKnopf('mehr', t('p-serie.blatt.mehrTitel'), '', beiAnsicht, kamVon === 'mehr'),
+    wegKnopf('regeln', t('p-serie.regeln.titel'), '', beiAnsicht, kamVon === 'regeln'),
+  );
+  box.append(wege);
+  return box;
+}
+
+function unterSeite(ansicht, titel, beiAnsicht) {
+  const box = el('div', 'se-blatt-inhalt se-unter');
+  box.dataset.ansicht = ansicht;
+  const z = el('button', 'se-zurueck dr');
+  z.type = 'button';
+  z.dataset.fokus = '';
+  z.setAttribute('aria-label', t('p-serie.blatt.zurueckLabel'));
+  z.innerHTML = `${icon('zurueck', 'se-weg-pfeil')}<span></span>`;
+  z.querySelector('span').textContent = t('p-serie.blatt.zurueck');
+  z.addEventListener('click', () => { if (typeof beiAnsicht === 'function') beiAnsicht('start'); });
+  const h = el('h4', 'se-unter-titel');
+  h.textContent = titel;
+  box.append(z, h);
+  return box;
+}
+
+function ruheSeite({ st, einst, heute, beiRuhetag, beiPause, beiPauseEnde, pauseRest, pauseAb, beiAnsicht }) {
+  const box = unterSeite('ruhe', t('p-serie.blatt.ruheTitel'), beiAnsicht);
+  const ein = el('section', 'se-b-teil');
+  ein.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.ruhetag.name'))}</h4><p class="se-b-text">${esc(t('p-serie.blatt.ruhetagText'))}</p>`;
+  ein.append(ruhetagWahl({ einst, beiRuhetag }));
+  const pause = el('section', 'se-b-teil');
+  pause.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.pause'))}</h4>`;
+  pause.append(pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb }));
+  box.append(ein, pause);
+  return box;
+}
+
+function mehrSeite({ st, lage, wochen, ring, beiAnsicht }) {
+  const box = unterSeite('mehr', t('p-serie.blatt.mehrTitel'), beiAnsicht);
   const unter = [];
   if (lage.art === 'laeuft' && lage.seit) {
     unter.push(t('p-serie.blatt.seit', { datum: datumKurz(lage.seit), bruecken: lage.bruecken ? t('p-serie.blatt.bruecken', { n: lage.bruecken }) : t('p-serie.blatt.ohneBruecke') }));
   }
   if (lage.art === 'ruht') unter.push(t('p-serie.blatt.naechstes', { kapitel: lage.naechstesKapitel }));
-  unter.push(bisText(lage.bisUmwandlung));
-  kopf.innerHTML = `<span class="se-b-symbol" aria-hidden="true">${icon('se-bauer', 'se-ico')}</span><div><b class="se-b-titel"></b><span class="se-b-unter"></span></div>`;
-  kopf.querySelector('.se-b-titel').textContent = titel;
-  kopf.querySelector('.se-b-unter').textContent = unter.join(' · ');
+  const titel = lage.art === 'neu' ? t('p-serie.blatt.neu')
+    : lage.art === 'ruht' ? t('p-serie.blatt.ruht', { best: zahl(lage.best), kapitel: lage.kapitel })
+      : t('p-serie.blatt.laeuft', { schachtage: schachtage(lage.aktuell), best: zahl(lage.best), kapitel: lage.kapitel });
+  const kopf = el('p', 'se-b-text se-b-stand');
+  kopf.textContent = [titel, ...unter].join(' · ');
   box.append(kopf);
-
-  const marsch = el('section', 'se-b-teil');
-  marsch.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.name'))}</h4>${streifenHtml({ feld: lage.feld, heute: lage.heuteGezaehlt ? 'gezaehlt' : (lage.art === 'ruht' ? null : 'offen') })}`;
-  const umw = st.bretter * T.BRETT + st.figuren.length;
-  const info = el('p', 'se-b-text');
-  info.textContent = umw ? (st.bretter
-    ? t('p-serie.blatt.umwInfoBretter', { umw: t('p-serie.blatt.umw', { n: umw }), bretter: t('p-serie.blatt.bretter', { n: st.bretter }) })
-    : t('p-serie.blatt.umwInfo', { umw: t('p-serie.blatt.umw', { n: umw }) }))
-    : t('p-serie.blatt.umwKeine');
-  marsch.append(info);
-  if (umw) marsch.append(ehrenreihen(st));
-  if (lage.offeneWahl > 0 && typeof beiWahl === 'function') marsch.append(wahlBlock({ beiWahl, nr: offeneNr(st) }));
-  box.append(marsch);
-
-  const kal = el('section', 'se-b-teil');
-  kal.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.kalender'))}</h4>`;
-  kal.append(kalenderTabelle(wochen));
-  const leg = el('p', 'se-legende');
-  const legende = (k) => esc(t('p-serie.blatt.legende.' + k));
-  leg.innerHTML = `<span>${icon('se-bauer', 'se-ico')} ${legende('schachtag')}</span><span><i class="se-l-bruecke"></i> ${legende('bruecke')}</span><span>${icon('se-mond', 'se-ico')} ${legende('ruhetag')}</span>`
-    + `<span>${icon('se-liege', 'se-ico')} ${legende('pause')}</span><span>${legende('leer')}</span>`;
-  kal.append(leg);
-  box.append(kal);
 
   const zahlen = el('dl', 'se-b-zahlen');
   const ringText = ring.n > 0 ? t('p-serie.blatt.ring', { n: ring.n, best: ring.best })
@@ -491,6 +552,19 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
     zahlen.querySelector('.se-b-plakette').textContent = t('p-serie.blatt.plaketteText', { schachtage: schachtage(p.n), von: datumKurz(p.von), bis: datumKurz(p.bis) });
   }
   box.append(zahlen);
+
+  const umw = st.bretter * T.BRETT + st.figuren.length;
+  const ehren = el('section', 'se-b-teil');
+  ehren.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.ehrenreihe'))}</h4>`;
+  const info = el('p', 'se-b-text');
+  info.textContent = umw ? (st.bretter
+    ? t('p-serie.blatt.umwInfoBretter', { umw: t('p-serie.blatt.umw', { n: umw }), bretter: t('p-serie.blatt.bretter', { n: st.bretter }) })
+    : t('p-serie.blatt.umwInfo', { umw: t('p-serie.blatt.umw', { n: umw }) }))
+    : t('p-serie.blatt.umwKeine');
+  ehren.append(info);
+  if (umw) ehren.append(ehrenreihen(st));
+  box.append(ehren);
+
   const kap = kapitelBalken(st, lage);
   if (kap) {
     const teil = el('section', 'se-b-teil');
@@ -498,14 +572,29 @@ export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, 
     teil.append(kap);
     box.append(teil);
   }
-  const ein = el('section', 'se-b-teil');
-  ein.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.ruhetag.name'))}</h4><p class="se-b-text">${esc(t('p-serie.blatt.ruhetagText'))}</p>`;
-  ein.append(ruhetagWahl({ einst, beiRuhetag }));
-  const pz = el('h4', 'se-b-ueber', esc(t('p-serie.blatt.pause')));
-  ein.append(pz, pauseBereich({ st, heute, beiPause, beiPauseEnde, pauseRest, pauseAb }));
-  box.append(ein);
-  box.append(regeln());
+
+  const kal = el('section', 'se-b-teil');
+  kal.innerHTML = `<h4 class="se-b-ueber">${esc(t('p-serie.blatt.kalender'))}</h4>`;
+  kal.append(kalenderTabelle(wochen));
+  const leg = el('p', 'se-legende');
+  const legende = (k) => esc(t('p-serie.blatt.legende.' + k));
+  leg.innerHTML = `<span>${icon('se-bauer', 'se-ico')} ${legende('schachtag')}</span><span><i class="se-l-bruecke"></i> ${legende('bruecke')}</span><span>${icon('se-mond', 'se-ico')} ${legende('ruhetag')}</span>`
+    + `<span>${icon('se-liege', 'se-ico')} ${legende('pause')}</span><span>${legende('leer')}</span>`;
+  kal.append(leg);
+  box.append(kal);
   return box;
+}
+
+export function blattInhalt({ st, lage, einst, heute, wochen, ring, beiRuhetag, beiPause, beiPauseEnde, beiWahl, pauseRest = T.PAUSE_JAHR_MAX, pauseAb = 'heute',
+  ansicht = 'start', kamVon = null, beiAnsicht } = {}) {
+  if (ansicht === 'ruhe') return ruheSeite({ st, einst, heute, beiRuhetag, beiPause, beiPauseEnde, pauseRest, pauseAb, beiAnsicht });
+  if (ansicht === 'mehr') return mehrSeite({ st, lage, wochen, ring, beiAnsicht });
+  if (ansicht === 'regeln') {
+    const box = unterSeite('regeln', t('p-serie.regeln.titel'), beiAnsicht);
+    box.append(regeln());
+    return box;
+  }
+  return startSeite({ st, lage, einst, heute, wochen, beiWahl, beiAnsicht, kamVon: WEGE.includes(kamVon) ? kamVon : null });
 }
 
 // ---------- Blatt ----------
@@ -561,7 +650,15 @@ export function oeffneBlatt(inhalt, { titel = t('p-serie.name') } = {}) {
   try { ort.querySelector('.se-schliessen').focus({ preventScroll: true }); } catch (f) { /* egal */ }
   offen = {
     ort, schliesse,
-    ersetze(neu) { const r = ort.querySelector('.se-blatt-rumpf'); r.replaceChildren(neu); },
+    // fokus: nach einem Wechsel der Ansicht (nicht nach Ruhetag oder Pause) Fokus auf [data-fokus], Blatt nach oben
+    ersetze(neu, { fokus = false } = {}) {
+      const r = ort.querySelector('.se-blatt-rumpf');
+      r.replaceChildren(neu);
+      if (!fokus) return;
+      karte.scrollTop = 0;
+      const z = neu.querySelector('[data-fokus]');
+      if (z) { try { z.focus({ preventScroll: true }); } catch (f) { /* egal */ } }
+    },
   };
   return offen;
 }
