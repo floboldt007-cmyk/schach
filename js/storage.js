@@ -70,7 +70,7 @@
 //   Partien und anonyme Nutzung nur mit dieser ausdruecklichen Freigabe (js/daten.js). Falscher Wert -> 'aus'.
 import { BOTS, botNachId } from './bots.js';
 import { sende } from './ereignisse.js';
-import { kompaktReview, ergaenzeReviewFelder } from './review.js';
+import { kompaktReview, ergaenzeReviewFelder, begrenzeLeistung } from './review.js';
 
 // Zug-Klassen (wie review.js KLASSEN), zum Pruefen gespeicherter Daten
 const KLASSEN_LISTE = ['brillant', 'stark', 'bester', 'exzellent', 'gut', 'buch', 'ungenau', 'fehler', 'verpasst', 'patzer', 'erzwungen'];
@@ -901,7 +901,8 @@ export function loescheLaufendePartie() {
 export function statistik() {
   const l = ladePartien().filter(wertet);
   const gen = l.filter(zaehltFuerBestwert).map((p) => p.genauigkeit);
-  const st = l.slice(0, 10).map((p) => p.spielstaerke).filter(Number.isFinite);
+  // gespeicherte Schaetzungen aus der Zeit vor der Begrenzung (bis 30.10.2026) an der Bot-Staerke messen
+  const st = l.slice(0, 10).map((p) => begrenzeLeistung(p.spielstaerke, botNachId(p.botId)?.elo)).filter(Number.isFinite);
   return {
     partien: l.length,
     siege: l.filter((p) => p.ergebnis === 'sieg').length,
