@@ -29,6 +29,9 @@
 .liga-balken::-moz-progress-bar { background: var(--akzent); border-radius: var(--r-pille); }
 .liga-wertung { font-size: var(--fs-klein); font-weight: var(--gw-stark); line-height: 1.55; margin: var(--a2) 0; }
 .liga-club, .liga-weg { margin-bottom: 0; }
+.liga-weg { font-weight: var(--gw-stark); }
+.liga-regel { margin-top: var(--a1); font-size: var(--fs-klein); color: var(--text-2); }
+.liga-aufklappen[open] .liga-wertung { margin-top: var(--a3); }
 .liga-details { border-top: 1px solid var(--linie); padding-top: var(--a2); margin-top: var(--a3); }
 .liga-tabelle { width: 100%; border-collapse: collapse; font-size: var(--fs-klein); line-height: 1.5; }
 .liga-tabelle caption { font-family: var(--display); font-weight: var(--gw-stark); padding-block: var(--a2); text-align: left; }
