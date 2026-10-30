@@ -886,7 +886,7 @@ async function testeOptik(browser) {
   });
   pruefe('Koordinate "8" endet innerhalb von 20 % der Feldecke', ecke.zahlRechts <= 0.2 && ecke.zahlUnten <= 0.2 && ecke.imFeld, JSON.stringify(ecke));
   pruefe('Koordinate "a" sitzt unten rechts innerhalb von 20 %', ecke.buchstLinks <= 0.2 && ecke.buchstOben <= 0.2, JSON.stringify(ecke));
-  pruefe('Koordinaten Gewicht 700, Groesse 8,5 bis 12 px', ecke.gewicht === '700' && ecke.groesse >= 8.5 && ecke.groesse <= 12, JSON.stringify(ecke));
+  pruefe('Koordinaten Gewicht 700, Groesse 10 bis 12 px (Ansicht: nie unter 10 px)', ecke.gewicht === '700' && ecke.groesse >= 10 && ecke.groesse <= 12, JSON.stringify(ecke));
   pruefe('Koordinaten in der Gegenfeldfarbe', ecke.zahlFarbe === ecke.dunkel && ecke.buchstFarbe === ecke.hell, JSON.stringify(ecke));
   // Feld unten rechts (h1, gedreht a8): das Brett-Eck ist abgerundet; der Buchstabe (unteres Viertel seiner Box, wo der Fuss
   // des Zeichens steht) liegt ganz innerhalb des Rundes (Pruefer U6: das "h" wurde angeschnitten), beide Ausrichtungen

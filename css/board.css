@@ -71,7 +71,7 @@
   font-weight: 700;
   line-height: 1;
   font-size: 11px;
-  font-size: clamp(10px, 2.4cqw, 12.5px);
+  font-size: clamp(10px, 2.4cqw, 12px);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
