@@ -38,6 +38,9 @@
 export const ORTE = Object.freeze({
   'arena:kopf': 'dom',
   'sammlung:bereich': 'dom',
+  // Profil (Flo 30.10.2026): Karte oben im Reiter Ich, Vitrine fuer das Duell-Intro
+  'ich:kopf': 'dom',
+  'duell:profil?': 'wahl',
   'arena:panel-oben': 'dom',
   'arena:panel-bot': 'dom',
   'arena:start': 'aufruf',
