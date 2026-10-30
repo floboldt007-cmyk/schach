@@ -2,15 +2,16 @@
 // Dieses Paket fuellt die Bereiche, die zum Kern gehoeren: Bretter und Klaenge (frei waehlbar in den Einstellungen) und
 // Erfolge, die sich aus dem Spielstand ablesen lassen (keine eigene Buchfuehrung, nichts zum Kaufen). Finisher, Emotes
 // und Titel bringen ihre Pakete selbst am Ort sammlung:bereich mit.
-// Orte: sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
+// Orte: ich:kopf Profil 10 und duell:profil? (profil.js); sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Rahmen 35 (profil.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
 import { anbieten } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
-import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl } from '../../storage.js';
+import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul } from '../../storage.js';
 import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { t } from '../../sprache.js';
 import { shopBereich } from './shop.js';
 import { erfinderBereich } from './erfinder.js';
+import './profil.js';
 import './texte.js';
 
 const PAKET = 'sammlung';
@@ -38,8 +39,25 @@ export function teileKlaenge(e = ladeEinstellungen()) {
   return Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangBild }));
 }
 
-// Erfolge nur aus dem Spielstand: Sieg, drei Sterne, je Welt alle Bots, alle Bots, alle Sterne
-export function teileErfolge(f = ladeFortschritt()) {
+// Was die Erfolge ausser den Bot-Ergebnissen lesen (nur lesen, nie schreiben): beste Liga-Stufe aller Saisons
+// (Paket liga), laengste Serie in Tagen (Paket serie, best) und das Funken-Level
+export function spielstand() {
+  const sicher = (m, f) => { try { return ladeModul(m, null) || f; } catch (e) { return f; } };
+  const liga = sicher('liga', {});
+  const stufen = [liga.saison && liga.saison.stufe, ...(Array.isArray(liga.archiv) ? liga.archiv.map((a) => a && a.stufe) : [])]
+    .filter((x) => Number.isInteger(x) && x >= 0);
+  const serie = sicher('serie', {});
+  const funken = sicher('funken', {});
+  return { ligaBest: stufen.length ? Math.max(...stufen) : 0, serieBest: Number.isInteger(serie.best) ? serie.best : 0,
+    level: Number.isInteger(funken.level) ? funken.level : 1 };
+}
+export const LIGA_STUFEN = 6;                       // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
+export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
+export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);
+
+// Erfolge nur aus dem Spielstand: Sieg, drei Sterne, je Welt alle Bots, alle Bots, alle Sterne, dazu (Flo 30.10.,
+// Profil mit Vitrine) Liga-Stufen, Serie und Level
+export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
   const besiegt = (b) => !!(f.bots[b.id] && f.bots[b.id].sterne[0]);
   const n = besiegteBots(f);
   const sterne = gesamtSterne(f);
@@ -57,6 +75,17 @@ export function teileErfolge(f = ladeFortschritt()) {
   }
   aus.push(erfolg('alle-bots', n === BOTS.length, S('erfolg.alleBots'), S('erfolg.alleBotsWeg', { n, alle: BOTS.length }), n / BOTS.length));
   aus.push(erfolg('alle-sterne', sterne === BOTS.length * 3, S('erfolg.alleSterne'), S('erfolg.alleSterneWeg', { n: sterne, alle: BOTS.length * 3 }), sterne / (BOTS.length * 3)));
+  for (let s = 1; s <= LIGA_STUFEN; s++) {
+    aus.push(erfolg('liga-' + s, z.ligaBest >= s, S('erfolg.liga', { stufe: S('liga.' + s) }), S('erfolg.ligaWeg', { stufe: S('liga.' + s) })));
+  }
+  for (const n of SERIE_ZIELE) {
+    aus.push(erfolg('serie-' + n, z.serieBest >= n, S('erfolg.serie', { n }), S('erfolg.serieWeg', { n: Math.min(z.serieBest, n), alle: n }),
+      Math.min(1, z.serieBest / n)));
+  }
+  for (const n of LEVEL_ZIELE) {
+    aus.push(erfolg('level-' + n, z.level >= n, S('erfolg.level', { n }), S('erfolg.levelWeg', { n: Math.min(z.level, n), alle: n }),
+      Math.min(1, z.level / n)));
+  }
   return aus;
 }
 

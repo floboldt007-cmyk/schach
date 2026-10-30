@@ -21,6 +21,7 @@
 //
 // Ereignis: window 'schach:thema' { thema, modus, aufgeloest } nach jedem Wechsel und wenn das System den
 // Modus wechselt (nur bei modus 'system').
+import { profilWahl, RAHMEN } from './profil.js';
 import { setzeFedern } from './bewegung.js';
 
 export const MODI = Object.freeze(['system', 'hell', 'dunkel']);
@@ -129,13 +130,18 @@ export function botFarbe(bot) {
   return id ? `var(--bot-${id}, ${farbe})` : farbe;
 }
 
+// Profil (js/profil.js, Flo 30.10.2026): gewaehlte Figur und Rahmen; ohne Wahl wie bisher der Koenig ohne Ring
 export function floAvatar(farbe = 'w') {
   const w = farbe !== 'b';
   const t = themaVon(aktuell.thema) || MODERN;
-  const datei = `${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}K.svg`;
-  return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`
+  const p = profilWahl();
+  const r = RAHMEN[p.rahmen] || RAHMEN.ohne;
+  const datei = `${t.figuren || 'assets/pieces/'}${w ? 'w' : 'b'}${p.figur}.svg`;
+  const ring = r.ring ? `<circle cx="60" cy="64" r="46" fill="none" stroke="${r.ring}" stroke-width="8"/>`
+    + (r.glanz ? `<circle cx="60" cy="64" r="41.5" fill="none" stroke="${r.glanz}" stroke-width="1.6"/>` : '') : '';
+  return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" data-figur="${p.figur}" data-rahmen="${p.rahmen}">`
     + `<rect width="120" height="120" fill="${w ? '#2C3038' : '#E9E3D8'}"/>`
-    + `<circle cx="60" cy="64" r="42" fill="${w ? '#3A3F48' : '#F7F3EC'}"/>`
+    + `<circle cx="60" cy="64" r="42" fill="${w ? '#3A3F48' : '#F7F3EC'}"/>${ring}`
     + `<image href="${datei}" x="21" y="22" width="78" height="78"/></svg>`;
 }
 
