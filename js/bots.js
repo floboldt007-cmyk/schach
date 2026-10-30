@@ -79,7 +79,7 @@ export const BOTS = [
     avatar: 'assets/avatare/01-bauer-benno.svg', farbe: '#7ee06a',
     staerke: {
       tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 0, blick: 3,
-      rauschen: 600, patzer: 0.78, mattInEins: 0.2, gier: 0.35,
+      rauschen: 720, patzer: 0.9, mattInEins: 0.12, gier: 0.25,
       vorlieben: { schlagen: 90 }, zeit: [400, 900],
     },
   },
@@ -244,19 +244,19 @@ export const BOTS = [
     id: 'keetan', stufe: 25, welt: 5, elo: 2500,
     avatar: 'assets/avatare/modern/keetan.svg', farbe: '#C28E65',
     merkmale: { figur: 'N' },
-    staerke: { voll: true, elo: 2600, movetime: 1000, mattInEins: 1, zeit: [600, 1300] },
+    staerke: { voll: true, elo: 2500, movetime: 1000, mattInEins: 1, zeit: [600, 1300] },
   },
   {
     id: 'ragna', stufe: 26, welt: 5, elo: 2600,
     avatar: 'assets/avatare/modern/ragna.svg', farbe: '#4F58A6',
     merkmale: { figur: 'P' },
-    staerke: { voll: true, elo: 2670, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    staerke: { voll: true, elo: 2600, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
   },
   {
     id: 'silas', stufe: 27, welt: 5, elo: 2700,
     avatar: 'assets/avatare/modern/silas.svg', farbe: '#7A6F39',
     merkmale: { figur: 'K' },
-    staerke: { voll: true, elo: 2770, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
+    staerke: { voll: true, elo: 2700, movetime: 1100, mattInEins: 1, zeit: [800, 1500] },
   },
   {
     id: 'merle', stufe: 28, welt: 5, elo: 2800,

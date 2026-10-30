@@ -326,7 +326,11 @@ async function testePartie(seite, h, fehler) {
   pruefe('Zielfeld in Klassenfarbe lasiert', await seite.locator(`.screen.partie .lage.mark-k-${k0}`).count() === 1);
   const coach0 = await seite.locator('.screen.partie .coach .c-klasse').innerText();
   pruefe('Coach zeigt die Klasse', /Theorie/.test(coach0), coach0);
-  pruefe('Coach mit role=status und aria-live', (await seite.locator('.coach[role="status"][aria-live="polite"]').count()) === 1);
+  // Barrierefreiheit (#69): Der Coach liest nicht selbst vor (role=status laese implizit mit), die Ansage macht eine eigene Region
+  pruefe('Coach ohne eigene Live-Region, Zugansage mit role=status und aria-live',
+    (await seite.locator('.screen.partie .coach[role], .screen.partie .coach[aria-live]').count()) === 0
+    && (await seite.locator('.screen.partie .zugansage[role="status"][aria-live="polite"]').count()) === 1
+    && /e4/.test(await seite.locator('.screen.partie .zugansage').textContent()), await seite.locator('.screen.partie .zugansage').textContent());
   pruefe('Zugliste: Symbol an Flos Zug', await seite.locator('.zugliste .z.du .z-sym').count() >= 1);
 
   // Bot antwortet

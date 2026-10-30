@@ -93,6 +93,10 @@
 /* ---------- Karte ---------- */
 .arena .karte { position: relative; min-height: 0; border-radius: var(--r-xl); overflow: hidden; outline: none;
   background: var(--welt-gras); box-shadow: var(--s2), var(--kante); }
+.arena .karte-zieh-hinweis { position: sticky; top: 62px; z-index: 12; width: max-content; max-width: calc(100% - 32px); margin: 0 auto -36px;
+  min-height: 36px; padding: 8px 14px; border-radius: var(--r-pille); background: var(--flaeche); color: var(--text-2);
+  box-shadow: var(--s1), var(--kante); font-size: 13px; font-weight: 750; pointer-events: none; }
+.arena .karte-zieh-hinweis[hidden] { display: none; }
 /* Hochformat: mindestens --karte-h hoch; bleibt unter dem Panel Platz (iPad hoch), waechst die Karte in ihn hinein */
 .arena.karte-hoch .karte { flex: 1 0 var(--karte-h); height: auto; min-height: var(--karte-h); overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; scrollbar-width: none; }

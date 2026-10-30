@@ -189,6 +189,9 @@ eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
 - **Klänge** (Klangpakete „Holz“ und „Arcade“, `assets/klang/`): eigene Werke von Flo, eigene Synthese ohne
   fremde Aufnahmen. **Alle Rechte vorbehalten**, Nutzung nur in der Schach-Arena; sie stehen nicht unter der
   GPL-3.0. Einzelheiten in `assets/klang/LIZENZEN.md` und `assets/LIZENZ-KUNST.md`.
+- **Lobby-Melodien** (`assets/klang/melodien.json`): selbst geschrieben, wie die Klänge **alle Rechte
+  vorbehalten** und nicht unter der GPL-3.0 (Einzelheiten in `assets/klang/MUSIK-LIZENZ.md`).
+  Der Abspieler `js/musik.js` ist Code und steht unter der GPL-3.0.
 - Avatare, Zug-Symbole, App-Icon und Design sind für dieses Projekt entstanden und stehen
   ebenfalls unter der GPL-3.0.
 

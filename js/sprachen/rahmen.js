@@ -7,6 +7,7 @@ import { registriereTexte } from '../sprache.js';
 
 registriereTexte('rahmen', {
   de: {
+    zumInhalt: 'Zum Inhalt springen',
     // Titel der Screens (document.title "<Titel> · Crownmate", Platzhalter)
     'titel.arena': 'Arena',
     'titel.partie': 'Partie',
@@ -104,6 +105,7 @@ registriereTexte('rahmen', {
     'nachholen.ohneGenauigkeit': 'Nachträglich ausgewertet.',
   },
   en: {
+    zumInhalt: 'Skip to content',
     'titel.arena': 'Arena',
     'titel.partie': 'Game',
     'titel.analyse': 'Game analysis',

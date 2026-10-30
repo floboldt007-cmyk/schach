@@ -7,14 +7,30 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 108;
-const STAND = '68dcc1177f47';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 112;
+const STAND = 'c11a4323cda2';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  'daten/boss/spielplan.json',
+  'css/pakete/boss.css',
+  'js/pakete/boss/index.js',
+  'js/pakete/boss/logik.js',
+  'js/pakete/boss/texte.js',
+  'css/pakete/musik.css',
+  'js/pakete/musik/index.js',
+  'js/pakete/musik/texte.js',
+  'js/musik.js',
+  'assets/klang/melodien.json',
+  'css/pakete/emotes.css',
+  'js/pakete/emotes/index.js',
+  'js/pakete/emotes/texte.js',
+  'css/pakete/finisher.css',
+  'js/pakete/finisher/index.js',
+  'js/pakete/finisher/texte.js',
   'js/sprachen/bericht.js',
   'js/pakete/abo/texte.js',
   'js/pakete/coach-ki/texte.js',
@@ -213,6 +229,10 @@ const DATEIEN = [
   'assets/avatare/modern/stockfisch.svg',
   'assets/avatare/modern/fridolin.svg',
   'assets/avatare/modern/paula.svg',
+  'assets/avatare/bosse/baron-gambit.svg',
+  'assets/avatare/bosse/bergwirt.svg',
+  'assets/avatare/bosse/festungsbauer.svg',
+  'assets/avatare/bosse/springerzuechterin.svg',
   'assets/avatare/modern/gustav.svg',
   'assets/avatare/modern/janine.svg',
   'assets/avatare/modern/bodo.svg',

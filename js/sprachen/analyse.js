@@ -412,7 +412,7 @@ registriereTexte('analyse', {
     'an.banner.gegner': 'New opponent unlocked',
     'an.banner.sterne': 'New stars earned',
     'an.banner.stern1': 'New star earned',
-    'an.banner.stufe': 'Level {stufe} · {name}',
+    'an.banner.stufe': 'Stage {stufe} · {name}',
     'an.genau.farbe': 'Accuracy · {farbe}',
     'an.genau.keineZuege': 'no moves',
     'an.genau.zuKurz': 'too short',
