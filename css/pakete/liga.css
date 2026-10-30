@@ -16,6 +16,23 @@
 .liga-summary:focus-visible, .liga-knopf:focus-visible { outline: var(--fokus); outline-offset: var(--a1); }
 .liga-wappen { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 40px; color: var(--akzent-text); background: var(--akzent-weich); border-radius: var(--r-s); }
 .liga-wappen .ico { width: 26px; height: 26px; }
+.liga-wappen.liga-wappen-kunst { background: none; }
+.liga-wappen.liga-wappen-kunst svg { width: 40px; height: 40px; overflow: hidden; }
+/* Leiter aller Stufen (Flo 30.10. abends: "Man muss sehen koennen, was fuer Ligen es gibt") */
+.liga-leiter { display: grid; gap: var(--a2); margin-block: var(--a2); }
+.liga-leiter-titel { margin: 0; font-size: var(--fs-ueber); font-weight: var(--gw-stark); letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
+.liga-stufen { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.liga-stufe { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 48px; padding: 4px 10px 4px 6px;
+  border-radius: var(--r-m); }
+.liga-stufe-wappen svg { display: block; width: 40px; height: 40px; overflow: hidden; }
+.liga-stufe-text { display: grid; gap: 1px; min-width: 0; }
+.liga-stufe-text b { font-size: 14px; font-weight: 750; color: var(--text); }
+.liga-stufe-text span, .liga-stufe-stand { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
+.liga-stufe[data-zustand="offen"] .liga-stufe-wappen { opacity: .55; filter: grayscale(.6); }
+.liga-stufe[data-zustand="erreicht"] .liga-stufe-stand { color: var(--kt-bester); }
+.liga-stufe[data-zustand="hier"] { background: color-mix(in srgb, var(--liga-f, var(--gold)) 16%, var(--flaeche-2));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--liga-f, var(--gold)) 55%, transparent); }
+.liga-stufe[data-zustand="hier"] .liga-stufe-stand { color: var(--text); font-weight: 800; }
 .liga-kurz { display: grid; gap: var(--a1); min-width: 0; }
 .liga-titel { font-family: var(--display); font-size: var(--fs-text); }
 .liga-unter, .liga-hilfe, .liga-bilanz { color: var(--text-2); font-size: var(--fs-klein); line-height: 1.55; }

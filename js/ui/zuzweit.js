@@ -126,7 +126,7 @@ function partie(root, quelle, app, fortgesetzt) {
       <div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div>
       <div class="zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
-      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
+      <div class="zz-aktionen"><button class="knopf" type="button" data-zz="zugzurueck">${Z('zugZurueck')}</button><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
       <div class="zz-zuege" aria-label="${Z('zuege')}"></div>
       <section class="zz-ergebnis flaeche" aria-label="${Z('ergebnis')}" hidden></section>
     </div></div>`;
@@ -180,6 +180,8 @@ function partie(root, quelle, app, fortgesetzt) {
     }
     karten(); tick();
     s.querySelector('.zz-status').textContent = z.phase === 'spiel' ? Z(chess.inCheck() ? 'amZugSchach' : 'amZug', { name: name(chess.turn()) }) : Z('beendet');
+    const zurueckKnopf = s.querySelector('[data-zz="zugzurueck"]');
+    if (zurueckKnopf) zurueckKnopf.disabled = z.phase !== 'spiel' || !z.zuege.length;
     s.querySelector('.zz-zuege').textContent = z.san.map((san, i) => `${i % 2 === 0 ? Math.floor(i / 2) + 1 + '. ' : ''}${sanText(san)}`).join(' ');
   }
   function beiZug(von, nach, umwandlung) {
@@ -239,6 +241,15 @@ function partie(root, quelle, app, fortgesetzt) {
     if (aktion === 'analyse' && gespeichert) { app.gehe('analyse', { partieId: gespeichert.partie.id }); return; }
     if (aktion === 'revanche' && gespeichert) {
       app.gehe('partie', { modus: 'zuzweit', zuzweit: { weiss: namen.schwarz, schwarz: namen.weiss, drehen: namen.drehen }, tempo }); return;
+    }
+    // Flo 30.10. abends: gegen Bots kein Zuruecknehmen mehr, "Zu zweit" am selben Geraet aber erlaubt (ein Halbzug)
+    if (aktion === 'zugzurueck') {
+      if (fragt || z.phase !== 'spiel' || !z.zuege.length) return;
+      tick(); if (z.phase !== 'spiel') return;
+      chess.undo(); z.zuege.pop(); z.san.pop(); z.zeiten.pop();
+      seit = Date.now();
+      speichere(); zeichne(false);
+      return;
     }
     if (!['remis', 'aufgeben'].includes(aktion) || fragt || z.phase !== 'spiel') return;
     tick(); if (z.phase !== 'spiel') return;

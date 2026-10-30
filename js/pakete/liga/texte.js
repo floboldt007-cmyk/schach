@@ -68,6 +68,7 @@ export const DE = {
   'bilanz.niederlagen.mehr': '{n} Niederlagen',
   // Abrechnung im Ergebnis
   'abr.liga': 'Liga {diff} · {stufe}',
+  'leiter.titel': 'Alle Ligen', 'leiter.ab': 'ab {n} Punkten', 'leiter.erreicht': 'erreicht', 'leiter.hier': 'Du · {punkte}', 'leiter.noch': 'noch {n}',
   'abr.titel': 'Liga', 'abr.stand': '{stufe} · {punkte} Punkte', 'abr.weg': 'noch {n} bis {stufe}', 'abr.oben': 'Höchste Stufe',
   'abr.ergebnis.sieg': 'Sieg', 'abr.ergebnis.remis': 'Remis', 'abr.ergebnis.niederlage': 'Niederlage',
   'abr.genau': 'Genauigkeit {g} %', 'abr.genauOhne': 'Genauigkeit', 'abr.geschuetzt': 'Stufe geschützt',
@@ -138,6 +139,7 @@ export const EN = {
   'bilanz.niederlagen.eins': '{n} loss',
   'bilanz.niederlagen.mehr': '{n} losses',
   'abr.liga': 'League {diff} · {stufe}',
+  'leiter.titel': 'All leagues', 'leiter.ab': 'from {n} points', 'leiter.erreicht': 'reached', 'leiter.hier': 'You · {punkte}', 'leiter.noch': '{n} to go',
   'abr.titel': 'League', 'abr.stand': '{stufe} · {punkte} points', 'abr.weg': '{n} to {stufe}', 'abr.oben': 'Top tier',
   'abr.ergebnis.sieg': 'Win', 'abr.ergebnis.remis': 'Draw', 'abr.ergebnis.niederlage': 'Loss',
   'abr.genau': 'Accuracy {g}%', 'abr.genauOhne': 'Accuracy', 'abr.geschuetzt': 'Tier protected',

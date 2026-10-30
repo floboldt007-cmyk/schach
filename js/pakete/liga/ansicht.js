@@ -75,7 +75,9 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
   const karte = el('section', 'liga-karte');
   karte.setAttribute('aria-label', tx('karte.label'));
   const auf = el('details', 'liga-aufklappen'), summary = el('summary', 'liga-summary');
-  const badge = mitIcon('liga-wappen', 'liga-wappen');
+  // Wappen der aktuellen Stufe statt eines Sammel-Symbols (Flo 30.10.: eigenes Bild je Stueck)
+  const badge = el('span', 'liga-wappen liga-wappen-kunst');
+  badge.setAttribute('aria-hidden', 'true');
   const kopf = el('span', 'liga-kurz'), titel = el('strong', 'liga-titel'), unter = el('span', 'liga-unter');
   kopf.append(titel, unter);
   summary.append(badge, kopf, mitIcon('vor', 'liga-mehr'));
@@ -92,7 +94,9 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
   quitt.type = 'button'; quitt.addEventListener('click', verstanden);
   wechsel.append(hinweis, quitt);
   const detailOrt = el('div');
-  auf.append(wertung, club, detailOrt);
+  // Flo 30.10. abends: "Man muss sehen koennen, was fuer Ligen es gibt": die Leiter aller Stufen zuerst in den Details
+  const leiterOrt = el('div');
+  auf.append(leiterOrt, wertung, club, detailOrt);
   // Zusammenfassung, Balken und Weg bleiben sichtbar; Wertung, Klasse und Kreuztabelle oeffnen sich erst auf Antippen.
   karte.append(auf, balken, weg, regel, wechsel);
   const zeichne = () => {
@@ -115,11 +119,35 @@ export function saisonKarte({ lese, bots, saisonPruefen, verstanden }) {
     club.textContent = tx('karte.club', { siege: kreuztabelle(s.meisterschaft, bots).siege, n: bots.length });
     wechsel.hidden = !s.wechsel;
     detailOrt.replaceChildren(details(s, bots));
+    leiterOrt.replaceChildren(leiter(s));
+    badge.innerHTML = ligaWappen(s.saison.stufe);
   };
   zeichne();
   const ab = hoere('liga:geaendert', zeichne);
   const timer = setInterval(() => { saisonPruefen(); zeichne(); }, 60000);
   return { el: karte, verlasse() { ab(); clearInterval(timer); } };
+}
+
+// Leiter aller Liga-Stufen von Meister bis Holz: Wappen, Schwelle, Zustand (erreicht, du bist hier, noch n Punkte)
+function leiter(s) {
+  const box = el('div', 'liga-leiter');
+  box.append(el('p', 'liga-leiter-titel', tx('leiter.titel')));
+  const liste = el('ol', 'liga-stufen');
+  liste.setAttribute('aria-label', tx('leiter.titel'));
+  for (let i = STUFEN.length - 1; i >= 0; i--) {
+    const zustand = i < s.saison.stufe ? 'erreicht' : i === s.saison.stufe ? 'hier' : 'offen';
+    const z = el('li', 'liga-stufe');
+    z.dataset.zustand = zustand;
+    z.style.setProperty('--liga-f', LIGA_FARBEN[i]);
+    const stand = zustand === 'erreicht' ? tx('leiter.erreicht') : zustand === 'hier' ? tx('leiter.hier', { punkte: s.saison.punkte })
+      : tx('leiter.noch', { n: STUFEN[i].schwelle - s.saison.punkte });
+    z.innerHTML = `<span class="liga-stufe-wappen" aria-hidden="true">${ligaWappen(i)}</span>`
+      + `<span class="liga-stufe-text"><b>${esc(stufeName(i))}</b><span>${esc(tx('leiter.ab', { n: STUFEN[i].schwelle }))}</span></span>`
+      + `<span class="liga-stufe-stand zahl">${esc(stand)}</span>`;
+    liste.append(z);
+  }
+  box.append(liste);
+  return box;
 }
 
 export function botBilanz({ bot, fortschritt }) {
