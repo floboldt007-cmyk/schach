@@ -37,6 +37,7 @@ import { hoere } from '../ereignisse.js';
 import { anim, tempo } from '../bewegung.js';
 import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
+import { waehle } from '../orte.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
 
@@ -196,6 +197,13 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
   const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
   const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
+  // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
+  // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Kein eigener Ablauf, die Dauer bleibt.
+  let profil = null;
+  try { profil = voll ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
+  const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
+  const vitrine = profil ? `${profil.titel ? `<div class="duell-titel">${esc(profil.titel)}</div>` : ''}${orden.length
+    ? `<div class="duell-vitrine">${orden.map((o) => `<span class="duell-orden">${esc(o.name)}</span>`).join('')}</div>` : ''}` : '';
   if (voll) {
     ueber.innerHTML = `
       <div class="duell-buehne"></div>
@@ -211,7 +219,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-seite flo">
             <div class="duell-av" data-rolle="flo">${floAvatar(f)}</div>
             <div class="duell-name">Flo</div>
-            <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>
+            <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>${vitrine}
           </div>
         </div>
       </div>
@@ -376,6 +384,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   flip(ueber.querySelector('[data-rolle="bot"]'), qBot, { d: 560 * tk, k: 'weich' });
   flip(ueber.querySelector('[data-rolle="flo"]'), qFlo, { d: 600 * tk, v: 40 * tk, k: 'weich' });
   ueber.querySelectorAll('.duell-name, .duell-unter').forEach((t, n) => A(t, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 220 + (n % 2) * 40 + (n > 1 ? 40 : 0), k: 'weich' }));
+  // Titel und Vitrine kommen kurz nach Flos Namen
+  ueber.querySelectorAll('.duell-titel, .duell-vitrine').forEach((t) => A(t, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { d: 400, v: 360, k: 'weich' }));
   // "gegen" schlaegt auf der Naht ein, genau dann der Start-Klang
   A(ueber.querySelector('.duell-gegen'), [{ opacity: 0, transform: 'scale(2.1) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { d: 460, v: 300, k: 'hupf' });
   spaeter(() => { try { klang.spiele('start'); } catch (e) { /* still */ } }, KLANG_BEI * zf);

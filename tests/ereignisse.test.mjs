@@ -198,6 +198,8 @@ const ORT_TABELLE = {
   'arena:karte-boss': 'dom', 'arena:karte-event': 'dom',
   // Sammlung (Reiter Ich, Flo 30.10.2026): ein Bereich je Anbieter, Host js/ui/ich.js
   'sammlung:bereich': 'dom',
+  // Profil (Flo 30.10.2026): Host js/ui/ich.js und js/ui/duell.js
+  'ich:kopf': 'dom', 'duell:profil?': 'wahl',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));

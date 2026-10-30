@@ -66,3 +66,43 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   color: #E0A22B; font-family: var(--display); font-weight: var(--gw-titel); font-size: 26px; }
 .sa-teil[data-teil="erfinder-figuren-blaupause"] .sa-bild { background: #0E2C4C; }
 .er-figuren { justify-self: start; margin-top: 12px; }
+/* Profil (profil.js, Flo 30.10.2026): Karte oben im Reiter Ich, Figur- und Rahmenwahl, Vitrine mit drei Plaetzen */
+.sa-kopf-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
+.pr-karte { display: grid; gap: 12px; padding: 14px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
+  box-shadow: var(--s1); max-width: 680px; }
+.pr-kopf { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.pr-av { width: 76px; height: 76px; flex: none; border-radius: 50%; overflow: hidden; }
+.pr-av svg { display: block; width: 100%; height: 100%; }
+.pr-name { display: grid; gap: 6px; min-width: 0; }
+.pr-name b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; }
+.pr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-chip { font-size: 12.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: var(--flaeche-2); }
+.pr-chip-titel { color: #E0A22B; background: #1C1B19; }
+.pr-aendern { justify-self: start; }
+.pr-vitrine-titel { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
+.pr-vitrine { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pr-orden { display: grid; justify-items: center; align-content: start; gap: 6px; min-height: 96px; padding: 10px 6px; border-radius: var(--r-m, 14px);
+  border: 1px solid var(--linie); background: var(--flaeche-2); color: var(--text); text-align: center; font: inherit; }
+.pr-orden b { font-size: 12.5px; line-height: 1.25; overflow-wrap: anywhere; }
+.pr-orden.leer { border-style: dashed; background: transparent; color: var(--text-2); }
+.pr-orden-bild { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--flaeche); color: var(--text); }
+.pr-orden-bild svg { width: 24px; height: 24px; }
+.pr-plus { font-size: 26px; line-height: 40px; }
+.pr-hilfe { margin: 0; font-size: 13px; color: var(--text-2); }
+.pr-wahl h4 { margin: 4px 0 8px; font-size: 13px; color: var(--text-2); }
+.pr-figuren { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
+.pr-figur { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--linie); background: #2C3038; display: grid; place-items: center; padding: 4px; }
+.pr-figur img { width: 100%; height: 100%; }
+.pr-figur[aria-pressed="true"], .pr-rahmen[aria-pressed="true"], .pr-orden-knopf[aria-pressed="true"] { border-color: var(--akzent); box-shadow: inset 0 0 0 1px var(--akzent); }
+.pr-rahmen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
+.pr-rahmen { display: grid; justify-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--linie); background: var(--flaeche);
+  color: var(--text); font: inherit; text-align: center; }
+.pr-rahmen b { font-size: 12px; } .pr-rahmen small { font-size: 11px; color: var(--text-2); line-height: 1.25; }
+.pr-rahmen:disabled { opacity: .55; }
+.pr-rahmen-bild { width: 44px; height: 44px; }
+.sa-bild .pr-rahmen-bild { width: 56px; height: 56px; }
+.pr-orden-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 50vh; overflow-y: auto; }
+.pr-orden-knopf { display: grid; justify-items: center; gap: 6px; padding: 10px 6px; border-radius: 12px; border: 1px solid var(--linie);
+  background: var(--flaeche); color: var(--text); font: inherit; text-align: center; }
+.pr-orden-knopf b { font-size: 12.5px; }
+.pr-leer-text { margin: 0; color: var(--text-2); }

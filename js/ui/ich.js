@@ -2,7 +2,7 @@
 // nicht, welche gibt es ueberhaupt. So mit einem Schloss ... Fuer Erfolge gilt das Gleiche und alles andere auch."
 //
 // Gehoert dem Paket sammlung (PAKET_SCREENS 'ich' in js/app.js): zeige gibt es erst, wenn das Paket freischalten() ruft.
-// Host des Orts sammlung:bereich (Kontext { app }). Jeder Anbieter liefert ein Element aus bereich(); der Screen zeigt
+// Host der Orte ich:kopf (Profil, Kontext { app }) und sammlung:bereich (Kontext { app }). Jeder Anbieter liefert ein Element aus bereich(); der Screen zeigt
 // einen Bereich zur Zeit (Segment, gemerkt je Geraet) und oben "N von M freigeschaltet" ueber alle Bereiche.
 // Gezeigt wird nur, was es in der App wirklich gibt; gesperrte Stuecke tragen ein Schloss und den Weg dahin.
 //
@@ -49,6 +49,7 @@ function zeigeIch(root, params = {}, app) {
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
     <div class="sa-rumpf">
       ${seitenKopf({ titel: t('rahmen.sammlung.titel') })}
+      <div class="sa-kopf-ort"></div>
       <p class="sa-stand" aria-live="polite"></p>
       <div class="sa-steuer"></div>
       <div class="sa-ort"></div>
@@ -60,6 +61,10 @@ function zeigeIch(root, params = {}, app) {
   let aktiv = typeof params.bereich === 'string' ? params.bereich : gemerkt.bereich || null;
   const ort = s.querySelector('.sa-ort');
   let gefuellt = { anzahl: 0, verlasse() {} };
+  let kopfOrt = { anzahl: 0, verlasse() {} };
+  // Profil oben (Ort ich:kopf, Paket sammlung), ohne Anbieter bleibt die Stelle leer
+  try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
+  s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
   const alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
   if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
@@ -90,6 +95,7 @@ function zeigeIch(root, params = {}, app) {
   return {
     verlasse() {
       try { gefuellt.verlasse(); } catch (e) { console.error(e); }
+      try { kopfOrt.verlasse(); } catch (e) { console.error(e); }
       kopf.verlasse();
     },
   };
