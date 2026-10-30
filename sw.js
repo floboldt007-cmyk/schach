@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 106;
-const STAND = 'def476749f22';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 107;
+const STAND = '74540a281ff0';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -24,6 +24,7 @@ const DATEIEN = [
   'js/pakete/musik/index.js',
   'js/pakete/musik/texte.js',
   'js/musik.js',
+  'assets/klang/melodien.json',
   'css/pakete/emotes.css',
   'js/pakete/emotes/index.js',
   'js/pakete/emotes/texte.js',

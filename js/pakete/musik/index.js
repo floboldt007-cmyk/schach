@@ -82,6 +82,8 @@ hoere('app:screen', (d) => {
 });
 hoere('partie:gestartet', () => { partie = true; musik.partie(true); });
 hoere('partie:verlassen', () => { partie = false; musik.partie(false); aktualisiere(); });
+// App im Hintergrund: ausblenden und anhalten; zurueck: weiter ab jetzt (iOS notfalls erst mit der naechsten Geste)
+hoere('app:sichtbar', (d) => musik.sichtbarkeit(!(d && d.sichtbar === false)));
 
 if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test\b/.test(location.search || '')) {
   window.__musik = { musik, istMelodieFrei, aktualisiere, welt: () => welt };

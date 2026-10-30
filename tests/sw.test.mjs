@@ -175,6 +175,8 @@ function main() {
     ...alleDateien('assets/klang/holz', /\.mp3$/),
     ...alleDateien('assets/klang/arcade', /\.mp3$/),
     ...alleDateien('assets/klang', /^LIZENZEN\.md$/),
+    // Lobby-Musik: Melodien als eigene Datei (assets/klang/MUSIK-LIZENZ.md), offline noetig
+    ...alleDateien('assets/klang', /^melodien\.json$/),
     ...alleDateien('assets/avatare/modern', /\.(svg|png)$/),
     // Portraets der Wochen-Bosse (offline, auch solange das Paket aus ist: es liegt schon in DATEIEN)
     ...alleDateien('assets/avatare/bosse', /\.(svg|png)$/),
