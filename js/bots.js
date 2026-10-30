@@ -87,7 +87,7 @@ export const BOTS = [
     id: 'paula', stufe: 3, welt: 1, elo: 300,
     avatar: 'assets/avatare/modern/paula.svg', farbe: '#9891C7',
     merkmale: { figur: 'Q' },
-    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3, rauschen: 380, patzer: 0.42, mattInEins: 0.45, gier: 0.75, vorlieben: { schach: 70, dame: 35 }, zeit: [300, 800] },
+    staerke: { tiefe: 1, kurzTiefe: 1, kurzChance: 0, breite: 60, intuition: 1, blick: 3, rauschen: 500, patzer: 0.6, mattInEins: 0.35, gier: 0.65, vorlieben: { schach: 70, dame: 35 }, zeit: [300, 800] },
   },
   {
     id: 'gustav', stufe: 4, welt: 1, elo: 400,
@@ -268,7 +268,7 @@ export const BOTS = [
     id: 'alva', stufe: 29, welt: 5, elo: 2900,
     avatar: 'assets/avatare/modern/alva.svg', farbe: '#9E7AE2',
     merkmale: { figur: 'Q' },
-    staerke: { voll: true, elo: 3190, movetime: 1300, mattInEins: 1, zeit: [700, 1500] },
+    staerke: { voll: true, elo: 2970, movetime: 1300, mattInEins: 1, zeit: [700, 1500] },
   },
   {
     id: 'stockfisch', stufe: 30, welt: 5, endgegner: true, elo: 3000,

@@ -493,3 +493,10 @@ Für Johann/Keetan ist der unabhängige Beleg die unveränderte UCI-Schnittstell
 2. Die interne Zufallswahl von Stockfish mit `UCI_LimitStrength` ist nicht vollständig über den App-Seed steuerbar. Auch bei festem App-Seed sind UCI-Partien deshalb nicht bitgenau wiederholbar.
 3. Alva/Stockfisch bleiben zwangsläufig weiter als 100 Elo auseinander. Das ist die direkte Folge aus maximaler UCI-Bremse 3190 und dem ausdrücklich unbegrenzten Endgegner, nicht ein noch abstimmbarer Profilfehler.
 4. Die menschliche chess.com-Skala bleibt mangels Partien gegen passend gewertete Menschen offen. Runde 2 verbessert die interne Leiter; sie macht aus UCI_Elo keine menschliche Messung.
+
+## Stand 30.10.2026 (Ultracode-Pruefung vor dem Live-Gang)
+
+Uebernommen: Benno schwaecher, Keetan, Ragna und Silas mit UCI_Elo gleich der Anzeige. Zurueckgestellt, bis neu gemessen ist:
+Paula (die neuen Werte machten sie so stark wie Gustav, die Leiter waere am Einstieg umgekehrt) und Alva (3190 statt der
+Anzeige 2900 widerspricht "ehrliche Zahlen"; Flo entscheidet, ob Anzeige oder Staerke angepasst wird). Beide bleiben auf dem
+bisherigen Live-Stand.

@@ -769,6 +769,11 @@ function richteSprunglinkEin(root) {
     link = document.createElement('a');
     link.className = 'zum-inhalt';
     link.href = '#hauptinhalt';
+    // Kein Hash-Wechsel: der Router kennt #hauptinhalt nicht und zeigte sonst die Arena (auch mitten in einer Partie)
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('hauptinhalt')?.focus();
+    });
     document.body.insertBefore(link, document.body.firstChild);
   }
   link.textContent = t('rahmen.zumInhalt');
