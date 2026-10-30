@@ -82,9 +82,7 @@ insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehr
 values
   ('rls-haupt', 'Probe-Edition', 'price_RlsHaupt', 1234, 'eur', 100, now() - interval '40 days',
     now() - interval '1 day', now() + interval '10 days', true),
-  -- Grenzfall: Kassenschluss eine Sekunde in der Zukunft bzw. eine Sekunde vorbei
-  ('rls-knapp-vor', 'Probe knapp davor', 'price_RlsVor', 1234, 'eur', 100, now() - interval '40 days',
-    now() - interval '1 day', now() + interval '31 minutes 1 second', true),
+  -- Grenzfall: Kassenschluss eine Sekunde vorbei (knapp davor steht unten, mit Restzahl)
   ('rls-knapp-nach', 'Probe knapp danach', 'price_RlsNach', 1234, 'eur', 100, now() - interval '40 days',
     now() - interval '1 day', now() + interval '30 minutes 59 seconds', true),
   ('rls-gesperrt', 'Probe gesperrt', 'price_RlsGesperrt', 1234, 'eur', 100, now() - interval '40 days',
@@ -95,6 +93,12 @@ values
     now() + interval '40 days', now() + interval '50 days', false),
   ('rls-vorbei', 'Probe vorbei', 'price_RlsVorbei', 1234, 'eur', 100, now() - interval '50 days',
     now() - interval '20 days', now() - interval '1 hour', true);
+-- Grenzfall: Kassenschluss eine Sekunde in der Zukunft. Mit Restzahl von Anfang an (ab der Ankuendigung laesst sie sich
+-- nicht mehr einschalten).
+insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, angekuendigt_am,
+  verkauf_ab, verkauf_bis, verkauf_freigegeben, zeige_restzahl)
+values ('rls-knapp-vor', 'Probe knapp davor', 'price_RlsVor', 1234, 'eur', 100, now() - interval '40 days',
+    now() - interval '1 day', now() + interval '31 minutes 1 second', true, true);
 -- rls-vorbei: eine Kasse, die noch vor dem Ende begann (offen), und eine schon freigegebene
 insert into public.reservierungen (id, produkt_id, user_id, status, sitzung_id, kassen_url, kasse_bis, erstellt_am)
 values
@@ -119,7 +123,11 @@ $$;
 do $$
 begin
   perform pg_temp.erwarte_fehler($q$insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis)
-    values ('rls-klein', 'Zu klein', 99, now() + interval '40 days', now() + interval '50 days')$q$, '23514');
+    values ('rls-klein', 'Zu klein', 9, now() + interval '40 days', now() + interval '50 days')$q$, '23514');
+  -- Kleinste Auflage ist 10 (Flo, 30.10.2026): geht, und mehr als 10 vergebene Stuecke gehen nie
+  insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis, zeige_restzahl)
+    values ('rls-zehn', 'Probe zehn Stueck', 10, now() + interval '40 days', now() + interval '50 days', true);
+  perform pg_temp.erwarte_fehler($q$update public.editionen set vergeben = 11 where produkt_id = 'rls-zehn'$q$, '23514');
   perform pg_temp.erwarte_fehler($q$insert into public.editionen (produkt_id, name, auflage, verkauf_ab, verkauf_bis, vergeben)
     values ('rls-zaehler', 'Mit Zaehler', 100, now() + interval '40 days', now() + interval '50 days', 3)$q$,
     'EDITION_NEU_MIT_ZAEHLERN');
@@ -640,10 +648,27 @@ begin
   perform pg_temp.erwarte_fehler($q$update public.editionen set verkauf_bis = verkauf_bis + interval '1 day' where produkt_id = 'rls-haupt'$q$, 'EDITION_EINGEFROREN');
   update public.editionen set verkauf_bis = now() + interval '1 day' where produkt_id = 'rls-haupt';
   perform pg_temp.erwarte_fehler($q$delete from public.editionen where produkt_id = 'rls-bald'$q$, 'EDITION_EINGEFROREN');
-  -- Schalter duerfen sich immer aendern; vor der Ankuendigung ist alles frei. Verkauf aus: der Besitz bleibt sichtbar
-  -- (A liest ihn unten), nur neue Kaeufe gehen nicht.
+  -- verkauf_freigegeben darf sich immer aendern, zeige_restzahl ab der Ankuendigung nur noch aus; vor der Ankuendigung
+  -- ist alles frei. Verkauf aus: der Besitz bleibt sichtbar (A liest ihn unten), nur neue Kaeufe gehen nicht.
   update public.editionen set verkauf_freigegeben = false where produkt_id = 'rls-haupt';
-  update public.editionen set zeige_restzahl = true where produkt_id = 'rls-knapp-vor';
+  -- Restzahl: ab der Ankuendigung nur noch ausschalten, nie neu einschalten (sonst taucht sie erst bei wenig Rest auf)
+  perform pg_temp.erwarte_fehler($q$update public.editionen set zeige_restzahl = true where produkt_id = 'rls-haupt'$q$, 'EDITION_EINGEFROREN');
+  -- auch angekuendigt, aber vor dem Verkaufsstart (rls-bald)
+  perform pg_temp.erwarte_fehler($q$update public.editionen set zeige_restzahl = true where produkt_id = 'rls-bald'$q$, 'EDITION_EINGEFROREN');
+  begin
+    update public.editionen set zeige_restzahl = false where produkt_id = 'rls-knapp-vor';
+    perform pg_temp.erwarte_fehler($q$update public.editionen set zeige_restzahl = true where produkt_id = 'rls-knapp-vor'$q$, 'EDITION_EINGEFROREN');
+    raise exception 'ZURUECK';
+  exception when others then
+    if sqlerrm <> 'ZURUECK' then raise; end if;
+  end;
+  update public.editionen set zeige_restzahl = true where produkt_id = 'rls-geheim';
+  -- Ankuendigung in der Zukunft: noch frei (an und wieder aus)
+  update public.editionen set angekuendigt_am = now() + interval '1 day', stripe_preis = 'price_RlsGeheim', betrag_cent = 1234,
+    waehrung = 'eur', zeige_restzahl = false where produkt_id = 'rls-geheim';
+  update public.editionen set zeige_restzahl = true where produkt_id = 'rls-geheim';
+  update public.editionen set angekuendigt_am = null, stripe_preis = null, betrag_cent = null, waehrung = null
+    where produkt_id = 'rls-geheim';
   update public.editionen set auflage = 150, verkauf_bis = verkauf_bis + interval '1 day' where produkt_id = 'rls-geheim';
   -- vergeben sinkt nie, und mehr als die Auflage geht nie
   perform pg_temp.erwarte_fehler($q$update public.editionen set vergeben = 99 where produkt_id = 'rls-haupt'$q$, 'EDITION_VERGEBEN_SINKT');
@@ -664,6 +689,55 @@ begin
     values ('rls-erfinder-titel', 'titel', 'b7000000-0000-4000-8000-00000000000b')$q$, '23505');
   perform pg_temp.erwarte_fehler($q$insert into public.sonderstuecke (stueck_id, art, nummer) values ('rls-nummer-eins', 'titel', 1)$q$, '23514');
   perform pg_temp.erwarte_fehler($q$insert into public.sonderstuecke (stueck_id, art) values ('rls-emote', 'emote')$q$, '23514');
+end
+$$;
+
+-- ---------- Zehn Stueck mit Restzahl (Flo, 30.10.2026) ----------
+-- Die Restzahl ist, was gerade kaufbar ist: Nach einem Kauf stehen 9 da, reservierte Stuecke zaehlen nicht mit. Sind
+-- alle uebrigen reserviert (hier ohne Kasse), steht 0 da und der Status bleibt 'erhaeltlich' (nicht ausverkauft); ein
+-- weiterer Kauf bekommt EDITION_NICHT_VERFUEGBAR, und nach dem Abbrechen einer Reservierung ohne Kasse ist das Stueck
+-- wieder da. Mit Verkauf aus ('pausiert') gibt es keine Restzahl. Vergleiche null-sicher (is distinct from): eine
+-- fehlende Restzahl darf nicht als richtig durchgehen.
+do $$
+declare
+  r jsonb;
+  stand jsonb;
+begin
+  insert into public.editionen (produkt_id, name, stripe_preis, betrag_cent, waehrung, auflage, angekuendigt_am,
+    verkauf_ab, verkauf_bis, verkauf_freigegeben, zeige_restzahl)
+  values ('rls-zehn-kauf', 'Probe zehn im Verkauf', 'price_RlsZehn', 1234, 'eur', 10, now() - interval '40 days',
+    now() - interval '1 day', now() + interval '10 days', true, true);
+  r := pg_temp.reserviere('e0000000-0000-4000-8000-000000000001', 'rls-zehn-kauf');
+  perform pg_temp.kasse(r, 'cs_test_RlsZehn1');
+  perform pg_temp.bezahlt('evt_RlsZehn1', (r ->> 'reservierung')::uuid, 'cs_test_RlsZehn1', 'pi_RlsZehn1');
+  select public.edition_stand_json(e, null) into stand from public.editionen e where e.produkt_id = 'rls-zehn-kauf';
+  if stand ->> 'status' is distinct from 'erhaeltlich' or (stand ->> 'auflage')::int is distinct from 10
+    or (stand ->> 'restzahl')::int is distinct from 9 or pg_temp.zaehler('rls-zehn-kauf') is distinct from '1/0' then
+    raise exception 'FEHLER: zehn Stueck, ein Kauf (% / %)', stand, pg_temp.zaehler('rls-zehn-kauf');
+  end if;
+  for i in 2..10 loop
+    r := pg_temp.reserviere(('e0000000-0000-4000-8000-' || lpad(i::text, 12, '0'))::uuid, 'rls-zehn-kauf');
+  end loop;
+  select public.edition_stand_json(e, null) into stand from public.editionen e where e.produkt_id = 'rls-zehn-kauf';
+  if stand ->> 'status' is distinct from 'erhaeltlich' or (stand ->> 'restzahl')::int is distinct from 0
+    or pg_temp.zaehler('rls-zehn-kauf') is distinct from '1/9' then
+    raise exception 'FEHLER: zehn Stueck, alle uebrigen reserviert (% / %)', stand, pg_temp.zaehler('rls-zehn-kauf');
+  end if;
+  perform pg_temp.erwarte_fehler($q$select pg_temp.reserviere('e0000000-0000-4000-8000-000000000011', 'rls-zehn-kauf')$q$,
+    'EDITION_NICHT_VERFUEGBAR');
+  -- Die letzte Reservierung hat noch keine Kasse: abbrechen gibt das Stueck sofort frei
+  if public.edition_kasse_abbrechen((r ->> 'reservierung')::uuid) is distinct from 'freigegeben' then
+    raise exception 'FEHLER: zehn Stueck, abbrechen';
+  end if;
+  select public.edition_stand_json(e, null) into stand from public.editionen e where e.produkt_id = 'rls-zehn-kauf';
+  if (stand ->> 'restzahl')::int is distinct from 1 or pg_temp.zaehler('rls-zehn-kauf') is distinct from '1/8' then
+    raise exception 'FEHLER: zehn Stueck, nach dem Abbrechen (% / %)', stand, pg_temp.zaehler('rls-zehn-kauf');
+  end if;
+  update public.editionen set verkauf_freigegeben = false where produkt_id = 'rls-zehn-kauf';
+  select public.edition_stand_json(e, null) into stand from public.editionen e where e.produkt_id = 'rls-zehn-kauf';
+  if stand ->> 'status' is distinct from 'pausiert' or (stand -> 'restzahl') is distinct from 'null'::jsonb then
+    raise exception 'FEHLER: zehn Stueck, pausiert ohne Restzahl (%)', stand;
+  end if;
 end
 $$;
 
@@ -700,8 +774,8 @@ begin
   if public.edition_stand('rls-haupt') ->> 'status' <> 'ausverkauft' or (public.edition_stand('rls-haupt') ->> 'endzahl')::int <> 100 then
     raise exception 'FEHLER: ausverkauft (%)', public.edition_stand('rls-haupt');
   end if;
-  -- Restzahl nur mit dem Schalter (rls-knapp-vor: zeige_restzahl an, 2 vergeben)
-  if (public.edition_stand('rls-knapp-vor') ->> 'restzahl')::int <> 98 then
+  -- Restzahl nur mit dem Schalter (rls-knapp-vor: zeige_restzahl an, 2 vergeben, 1 an der Kasse): was gerade kaufbar ist
+  if (public.edition_stand('rls-knapp-vor') ->> 'restzahl')::int is distinct from 97 then
     raise exception 'FEHLER: Restzahl mit Schalter (%)', public.edition_stand('rls-knapp-vor');
   end if;
   -- Auskunft: Besitz, Zustimmungen, Altersangabe, Sonderstuecke und (falls eingespielt) das Abo
