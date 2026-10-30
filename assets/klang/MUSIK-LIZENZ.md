@@ -12,6 +12,5 @@ Einschränkung unter der GPL-3.0. Wer den Code weitergibt, darf ihn mit eigenen 
 
 Die Melodien sind selbst geschrieben. Es werden keine fremden Musikstücke, Aufnahmen oder Samples verwendet.
 
-Stand: vorläufige Festlegung (Variante b aus der Prüfung vom 30.10.2026). Flo kann sie ändern, etwa die
-Melodien ebenfalls unter die GPL-3.0 stellen; dann entfallen der Eintrag in `assets/LIZENZ-KUNST.md` und
-der Vorbehalt in dieser Datei.
+Stand: von Flo festgelegt am 30.10.2026 (Variante b: Vorbehalt behalten). Freigeben unter der GPL-3.0 geht
+später immer noch; dann entfallen der Eintrag in `assets/LIZENZ-KUNST.md` und der Vorbehalt in dieser Datei.
