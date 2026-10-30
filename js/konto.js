@@ -96,22 +96,37 @@ export async function pruefeCode(email, token) {
 // Jede neue Anmeldung (Code, Link, Google) verlangt einen neuen Abgleich: Die Cloud kann sich inzwischen auf einem
 // anderen Geraet geaendert haben. Das Erneuern einer Sitzung (erneuereSitzung) laesst den Merker stehen.
 function neueAnmeldung() { try { lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ } }
-// Die Antwort gilt nur, wenn inzwischen niemand abgemeldet hat (epoche) und noch derselbe Erneuerungsschluessel gespeichert
-// ist: Eine spaete Antwort darf eine Abmeldung nie rueckgaengig machen (sonst kaeme die Sitzung zurueck, Ultracode 30.10.).
-export async function erneuereSitzung() {
-  const s = sitzung(); if (!s?.refresh_token) throw new Error(K('nichtAngemeldet'));
+// Gleichzeitige Erneuerungen mit demselben Schluessel teilen sich eine Anfrage (sonst scheitert der zweite Aufrufer,
+// Ultracode 30.10.). Die Antwort gilt nur, wenn inzwischen niemand abgemeldet hat (epoche) und noch eine Sitzung desselben
+// Kontos gespeichert ist: Eine spaete Antwort darf eine Abmeldung nie rueckgaengig machen. Hat ein anderer Tab schon
+// erneuert (anderer Schluessel, gleiches Konto), gilt dessen Sitzung.
+let laufendeErneuerung = null;   // { token, versprechen }
+export function erneuereSitzung() {
+  const s = sitzung(); if (!s?.refresh_token) return Promise.reject(new Error(K('nichtAngemeldet')));
+  if (laufendeErneuerung && laufendeErneuerung.token === s.refresh_token) return laufendeErneuerung.versprechen;
+  const versprechen = erneuere(s).finally(() => { if (laufendeErneuerung?.versprechen === versprechen) laufendeErneuerung = null; });
+  laufendeErneuerung = { token: s.refresh_token, versprechen };
+  return versprechen;
+}
+async function erneuere(s) {
   const e0 = epoche;
-  const gleich = () => epoche === e0 && sitzung()?.refresh_token === s.refresh_token;
+  const id = userId(s);
+  // die gerade gespeicherte Sitzung, wenn sie zum selben Konto gehoert und ein anderer Tab sie inzwischen erneuert hat
+  const vonAnderemTab = () => { const j = sitzung(); return epoche === e0 && j && userId(j) === id && j.refresh_token !== s.refresh_token ? j : null; };
   let d;
   try {
     d = await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } });
   } catch (e) {
+    const j = vonAnderemTab(); if (j) return j;
     // Tote Sitzung (auf dem Server abgemeldet oder abgelaufen): lokal entfernen, damit die Gruppe "abgemeldet" zeigt,
-    // statt still nie mehr zu sichern. Nur wenn noch diese Sitzung gespeichert ist (ein anderer Tab kann sich neu angemeldet haben).
-    if (SITZUNG_TOT.has(e.kennung) && gleich()) { epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
+    // statt still nie mehr zu sichern. Nur wenn noch diese Sitzung gespeichert ist.
+    if (SITZUNG_TOT.has(e.kennung) && epoche === e0 && sitzung()?.refresh_token === s.refresh_token) {
+      epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ }
+    }
     throw e;
   }
-  if (!gleich()) throw new Error(K('nichtAngemeldet'));
+  const j = vonAnderemTab(); if (j) return j;
+  if (epoche !== e0 || sitzung()?.refresh_token !== s.refresh_token) throw new Error(K('nichtAngemeldet'));
   return merkeSitzung(d, s.email);
 }
 export async function aktiveSitzung() {

@@ -488,10 +488,23 @@ async function browserAblauf(browser) {
   await seite.click('.sheet-knoepfe .knopf:not(.gefahr)');
   await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg)'));
   pruefe('Browser: Abbrechen in Stufe 1 löscht nichts', !netz.some((x) => x.url.includes('konto_loeschen')) && await seite.evaluate(() => !!localStorage.getItem('schach-arena:konto:sitzung')));
+  // Doppeltipp auf "Weiter": der zweite Tipp landet nicht auf "Endgültig löschen" (gleiche Stelle im zweiten Blatt)
   await seite.click('[data-daten="loeschen"]');
+  await seite.waitForSelector('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(700);
+  await seite.dblclick('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(400);
+  pruefe('Browser: Doppeltipp auf „Weiter“ überspringt die zweite Rückfrage nicht (nichts gelöscht, Stufe 2 offen)', !netz.some((x) => x.url.includes('konto_loeschen'))
+    && /endgültig/.test(await seite.evaluate(() => document.querySelector('.sheet-ort:not(.weg) .sheet-karte')?.textContent || '')));
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.sheet-ort:not(.weg)'));
+  await seite.click('[data-daten="loeschen"]');
+  await seite.waitForSelector('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
+  await warte(700);
   await seite.click('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
   await seite.waitForFunction(() => /endgültig/.test(document.querySelector('.sheet-ort:not(.weg) .sheet-karte')?.textContent || ''));
   pruefe('Browser: Stufe 2 fragt noch einmal, noch nichts gelöscht', !netz.some((x) => x.url.includes('konto_loeschen')));
+  await warte(700);
   await seite.click('.sheet-ort:not(.weg) .sheet-knoepfe .knopf.gefahr');
   // Auf das Ende warten (Meldung sichtbar), nicht nur auf das Abmelden: das entfernt die Sitzung schon vor dem Rest
   await seite.waitForFunction(() => !localStorage.getItem('schach-arena:konto:sitzung')

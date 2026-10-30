@@ -111,11 +111,13 @@ registriereTexte('einstellungen', {
     'reset.text1': 'Alle Sterne, Partien und Analysen sind dann weg, und die Leiter beginnt wieder bei {bot}.',
     'reset.weiter': 'Ja, weiter',
     'reset.frage2': 'Letzte Rückfrage.',
-    'reset.text2': 'Das lässt sich nicht rückgängig machen. Bist du angemeldet und ist dieses Gerät mit der Cloud abgeglichen, ersetzt der leere Stand auch deine Cloud-Sicherung; sonst lädt die App danach deinen Cloud-Spielstand.',
+    'reset.text2': 'Das lässt sich nicht rückgängig machen.',
+    'reset.textAbgeglichen': 'Dieses Gerät ist mit der Cloud abgeglichen: Der leere Stand ersetzt auch deine Cloud-Sicherung.',
+    'reset.textNichtAbgeglichen': 'Dieses Gerät ist noch nicht mit der Cloud abgeglichen: Danach lädt die App deinen Cloud-Spielstand, falls es einen gibt.',
     'reset.endgueltig': 'Endgültig löschen',
     'reset.fertig': 'Fortschritt zurückgesetzt. {bot} wartet schon!',
     speichernFehler: 'Speichern hat nicht geklappt',
-    'info.frei': '{app} ist freie Software unter der {lizenz}. Alles läuft auf deinem Gerät, auch offline.',
+    'info.frei': '{app} ist freie Software unter der {lizenz}. Spielen, Bots und Analyse laufen auf deinem Gerät, auch offline.',
     'info.datenschutz': 'Datenschutzerklärung',
     'info.impressum': 'Impressum',
     'info.stockfish': 'Schach-Engine als WebAssembly (stockfish.js, lite), GPL-3.0. Quellen: {link}',
@@ -282,7 +284,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.viele': 'Gerade kommen zu viele Anfragen an. Bitte einen Moment warten.',
     'daten.fehler.server': 'Der Server antwortet gerade nicht ({status}). Bitte später noch einmal versuchen.',
     'daten.fehler.sonst': 'Das hat auf dem Server nicht geklappt ({status}). Bitte später noch einmal versuchen.',
-    'daten.auskunftHinweis': 'server: alles, was der Server von Crownmate über dein Konto gespeichert hat (mit Online-Partien, Widerruf und '
+    'daten.auskunftHinweis': 'server: was der Server von Crownmate zu deinem Konto liefert (Konto, Profil, Cloud-Spielstand-Daten, geteilte Partien und Nutzung, Online-Partien, Widerruf und '
       + 'Anmeldeprotokoll; anmeldeprotokoll null heißt: für diese Auskunft nicht lesbar, auf Anfrage beim Betreiber). '
       + 'online_versuche: falsch eingegebene Einladungscodes je Tag. mengenzaehler: wie viele Zeilen dein Konto je Stunde geteilt hat '
       + '(nur Zahlen, für die Mengenbremse, nach 48 Stunden gelöscht). '
@@ -474,11 +476,13 @@ registriereTexte('einstellungen', {
     'reset.text1': 'All stars, games and analyses will be gone, and the ladder starts again with {bot}.',
     'reset.weiter': 'Yes, continue',
     'reset.frage2': 'One last check.',
-    'reset.text2': 'This cannot be undone. If you are signed in and this device is synced with the cloud, the empty progress also replaces your cloud backup; otherwise the app then loads your cloud progress.',
+    'reset.text2': 'This cannot be undone.',
+    'reset.textAbgeglichen': 'This device is synced with the cloud: the empty progress also replaces your cloud backup.',
+    'reset.textNichtAbgeglichen': 'This device is not synced with the cloud yet: afterwards the app loads your cloud progress, if there is one.',
     'reset.endgueltig': 'Delete for good',
     'reset.fertig': 'Progress reset. {bot} is already waiting!',
     speichernFehler: 'Saving did not work',
-    'info.frei': '{app} is free software under the {lizenz}. Everything runs on your device, even offline.',
+    'info.frei': '{app} is free software under the {lizenz}. Playing, bots and analysis run on your device, even offline.',
     'info.datenschutz': 'Privacy policy',
     'info.impressum': 'Legal notice',
     'info.stockfish': 'Chess engine as WebAssembly (stockfish.js, lite), GPL-3.0. Source code: {link}',
@@ -645,7 +649,7 @@ registriereTexte('einstellungen', {
     'daten.fehler.viele': 'Too many requests are coming in right now. Please wait a moment.',
     'daten.fehler.server': 'The server is not responding right now ({status}). Please try again later.',
     'daten.fehler.sonst': 'That did not work on the server ({status}). Please try again later.',
-    'daten.auskunftHinweis': 'server: everything the Crownmate server has stored about your account (including online games, withdrawal of consent and '
+    'daten.auskunftHinweis': 'server: what the Crownmate server returns for your account (account, profile, cloud progress data, shared games and usage, online games, withdrawal of consent and '
       + 'sign-in log; anmeldeprotokoll null means: not readable for this report, available from the operator on request). '
       + 'online_versuche: wrong invitation codes entered per day. mengenzaehler: how many rows your account shared per hour '
       + '(numbers only, for the rate limit, deleted after 48 hours). '

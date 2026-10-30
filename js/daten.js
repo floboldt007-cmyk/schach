@@ -424,13 +424,13 @@ export async function loescheKontoDialog(app) {
   const weiter = await sheet({
     titel: D('daten.loeschen1Titel'),
     text: D('daten.loeschen1Text') + (aboHinweis ? ' ' + aboHinweis : ''),
-    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false,
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.loeschenWeiter'), wert: true, art: 'gefahr' }], abbrechen: false, sperreMs: 600,
   });
   if (!weiter) return false;
   const ja = await sheet({
     titel: D('daten.loeschen2Titel'),
     text: D('daten.loeschen2Text'),
-    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.endgueltig'), wert: true, art: 'gefahr' }], abbrechen: false,
+    knoepfe: [{ text: t('allgemein.abbrechen'), wert: false }, { text: D('daten.endgueltig'), wert: true, art: 'gefahr' }], abbrechen: false, sperreMs: 600,
   });
   if (!ja) return false;
   await loescheKonto(app);

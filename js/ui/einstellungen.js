@@ -16,6 +16,7 @@ import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
+import { sitzung, istAbgeglichen } from '../konto.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -223,6 +224,10 @@ export function zeige(root, params = {}, app) {
     if (regler) { regler.value = e.lautstaerke ?? .8; regler.previousElementSibling.querySelector('output').value = E('prozent', { wert: Math.round(regler.value * 100) }); }
   }
 
+  // Nur Angemeldete bekommen den Satz zur Cloud, je nachdem, ob dieses Geraet abgeglichen ist (Ultracode 30.10.)
+  function cloudSatz() {
+    try { return sitzung() ? ' ' + E(istAbgeglichen() ? 'reset.textAbgeglichen' : 'reset.textNichtAbgeglichen') : ''; } catch (e) { return ''; }
+  }
   function zeigeReset() {
     const box = sec.querySelector('.es-reset');
     if (!box) return;
@@ -243,7 +248,7 @@ export function zeige(root, params = {}, app) {
       box.querySelector('[data-aktion="reset-ab"]').focus();
     } else {
       box.innerHTML = `
-        <div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E('reset.frage2')}</b> ${E('reset.text2')}</p></div>
+        <div class="es-warnung stark" role="alert">${icon('warnung')}<p><b>${E('reset.frage2')}</b> ${E('reset.text2')}${cloudSatz()}</p></div>
         <div class="es-knoepfe">
           <button class="knopf" type="button" data-aktion="reset-ab">${t('allgemein.abbrechen')}</button>
           <button class="knopf es-rot" type="button" data-aktion="reset-ok">${icon('muell')} ${E('reset.endgueltig')}</button>

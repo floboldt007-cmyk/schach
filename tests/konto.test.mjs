@@ -170,6 +170,31 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
     localStorage.removeItem('schach-arena:v1:partien');
     setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
   }
+  { // Gleichzeitige Erneuerungen (Ultracode-Pruefung 30.10., zweite Runde): teilen sich eine Anfrage, keiner scheitert;
+    // hat ein anderer Tab schon erneuert (gleiches Konto), gilt dessen Sitzung; bei einem anderen Konto nicht
+    const alt = JSON.parse(sitzungVon('u8'));
+    const fremd = (sub, rt) => ({ ...JSON.parse(sitzungVon(sub)), refresh_token: rt });
+    const lauf = async (waehrend) => {
+      let gib; const spaet = new Promise((r) => { gib = r; }); let anfragen = 0;
+      localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify({ ...alt, expires_at: 1 }));
+      setzeKontoFetch(async (url) => {
+        if (url.includes('grant_type=refresh_token')) { anfragen++; await spaet; return { ok: true, status: 200, async json() { return { ...alt, refresh_token: 'r-neu', expires_at: 9999999999 }; } }; }
+        return { ok: true, status: 200, async json() { return []; } };
+      });
+      const a = aktiveSitzung().then((x) => x.refresh_token, (e) => 'FEHLER ' + e.message);
+      const b = aktiveSitzung().then((x) => x.refresh_token, (e) => 'FEHLER ' + e.message);
+      await warteKurz(); if (waehrend) waehrend(); gib();
+      return { a: await a, b: await b, anfragen, gespeichert: sitzung()?.refresh_token || null };
+    };
+    const r1 = await lauf(null);
+    pruefe('Zweimal aktiveSitzung() gleichzeitig: eine Anfrage, beide bekommen die neue Sitzung', r1.anfragen === 1 && r1.a === 'r-neu' && r1.b === 'r-neu' && r1.gespeichert === 'r-neu', r1);
+    const r2 = await lauf(() => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(fremd('u8', 'r-tab2'))));
+    pruefe('Anderer Tab erneuert dasselbe Konto währenddessen: dessen Sitzung gilt, kein „Nicht angemeldet.“', r2.a === 'r-tab2' && r2.b === 'r-tab2' && r2.gespeichert === 'r-tab2', r2);
+    const r3 = await lauf(() => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(fremd('u7', 'r-u7'))));
+    pruefe('Anderer Tab meldet währenddessen ein anderes Konto an: Antwort verworfen, die fremde Sitzung bleibt', /^FEHLER/.test(r3.a) && /^FEHLER/.test(r3.b) && r3.gespeichert === 'r-u7', r3);
+    localStorage.removeItem('schach-arena:konto:sitzung');
+    setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
+  }
   // Safari nach dem Link: nur die Eintraege eines frischen Starts, keine Partie
   leereV1();
   for (const k2 of ['hinweis-installieren', 'modul:start', 'modul:funken', 'modul:punkte']) localStorage.setItem('schach-arena:v1:' + k2, '{}');
