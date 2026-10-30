@@ -645,6 +645,9 @@ const erstatten = (o = {}) => ({ status: 200, body: { ereignis: KAUF_EREIGNIS.id
     && /alter table public\.editionen drop constraint if exists editionen_auflage;\s*alter table public\.editionen add constraint editionen_auflage check \(auflage >= 10 and auflage <= 1000000\);/.test(ohneKommentar) && /vergeben \+ reserviert <= auflage/.test(ohneKommentar)
     && /verkauf_freigegeben boolean not null default false/.test(ohneKommentar) && /zeige_restzahl boolean not null default false/.test(ohneKommentar)
     && /check \(endzahl is null or endzahl = vergeben\)/.test(ohneKommentar));
+  pruefe('Restzahl: nur was gerade kaufbar ist (offene Kassen zaehlen nicht mit), Schalter ab der Ankuendigung nur noch aus',
+    /'restzahl', case when e\.zeige_restzahl and v_status = 'erhaeltlich'\s+then greatest\(e\.auflage - e\.vergeben - e\.reserviert, 0\) end/.test(ohneKommentar)
+    && /if new\.zeige_restzahl and not old\.zeige_restzahl then\s+raise exception 'EDITION_EINGEFROREN';/.test(ohneKommentar));
   pruefe('Trigger: vergeben sinkt nie, eingefroren ab der Ankuendigung, Ende nur vorziehbar wenn ausverkauft, Besitz bleibt',
     /raise exception 'EDITION_VERGEBEN_SINKT'/.test(ohneKommentar) && /old\.angekuendigt_am is not null and old\.angekuendigt_am <= now\(\)/.test(ohneKommentar)
     && /new\.verkauf_bis > old\.verkauf_bis or new\.vergeben < new\.auflage/.test(ohneKommentar) && /raise exception 'EDITION_BESITZ_BLEIBT'/.test(ohneKommentar)

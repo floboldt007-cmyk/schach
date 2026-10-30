@@ -15,6 +15,8 @@
 --   editionen             eine Zeile je Edition. Flo legt sie im SQL Editor an. Lesen nur Konten mit bestaetigtem
 --                         "18 oder aelter", und nur die festen Angaben (Spaltenrechte): vergeben, reserviert, endzahl,
 --                         stripe_preis und die Schalter nie, sonst waere der Umsatz je Edition live oeffentlich.
+--                         Ausnahme mit zeige_restzahl: Dann sieht jedes Konto ab 18, wie viele Stuecke gerade kaufbar
+--                         sind, und damit ungefaehr den Verkauf (nach dem Ende auch die Endzahl).
 --   reservierungen        haelt ein Stueck, solange jemand an der Stripe-Kasse ist. Ein offener Kauf je Konto und
 --                         Edition (Teilindex). Nutzer lesen die eigenen Zeilen ohne sitzung_id und zahlung_id.
 --   edition_zustimmungen  Beleg fuer die beiden Erklaerungen zum Widerruf (sofortige Lieferung, Kenntnis vom Erloeschen)
@@ -44,11 +46,17 @@
 --   Er ist der Notaus: keine neue Kasse mehr und keine bestehende wieder oeffnen. Wer schon an der Stripe-Kasse ist, kann
 --   dort noch bis zu 31 Minuten bezahlen und bekommt sein Stueck (bewusst, siehe ANLEITUNG). Nach dem Verkaufsstart
 --   zeigt edition_stand dann 'pausiert'.
---   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt. Kassenschluss: ab verkauf_bis minus
+--   zeige_restzahl (Standard aus) entscheidet, ob edition_stand eine Restzahl nennt: auflage - vergeben - reserviert,
+--   also was gerade kaufbar ist (Stuecke an offenen Kassen zaehlen nicht mit; nicht bezahlte kommen zurueck). Ab
+--   angekuendigt_am laesst sich der Schalter nur noch ausschalten, nie neu einschalten (EDITION_EINGEFROREN): Die Zahl
+--   soll nicht erst bei wenig Rest auftauchen (Flo, 30.10.2026). Kassenschluss: ab verkauf_bis minus
 --   31 Minuten oeffnet der Server keine neue Kasse mehr (Stripe-Kassen leben mindestens 30 Minuten, eine Minute Puffer
 --   fuer Laufzeit und Uhren), so endet jede Kasse spaetestens mit dem angekuendigten Ende. Hoechstens 3 Kassen je Konto
 --   und Edition in 24 Stunden (EDITION_ZU_OFT): sonst koennten wenige Konten mit immer neuen Kassen alle Stuecke
---   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen.
+--   blockieren. Wer an der Kasse scheitert, kann es in derselben Kasse noch einmal versuchen. Ehrlich: Die Grenze
+--   skaliert mit der Auflage. Bei 10 Stueck halten 10 Konten alle Stuecke 31 Minuten fest, mit drei Kassen je Konto
+--   etwa 93 Minuten. Vor dem ersten echten Verkauf gehoeren dazu Kontoschutz und eine sofortige Freigabe beim
+--   Abbrechen (Stripe-Kasse beenden), siehe ANLEITUNG "Was noch fehlt".
 --   Projektkennung: Die Kasse traegt eine Kennung des Supabase-Projekts in den Stripe-Metadaten. Der Webhook eines anderen
 --   Projekts am selben Stripe-Konto ignoriert sie (supabase/functions/_gemeinsam/werkstatt.js). Kommt trotzdem ein
 --   bezahlter Kauf mit einer Reservierung an, die diese Datenbank nicht kennt, wird nie automatisch erstattet: Ergebnis
@@ -308,6 +316,10 @@ begin
       and (new.verkauf_bis > old.verkauf_bis or new.vergeben < new.auflage) then
       raise exception 'EDITION_EINGEFROREN';
     end if;
+    -- Die Restzahl gilt ab der Ankuendigung oder gar nicht: ausschalten geht, neu einschalten nicht
+    if new.zeige_restzahl and not old.zeige_restzahl then
+      raise exception 'EDITION_EINGEFROREN';
+    end if;
   end if;
   return new;
 end;
@@ -406,7 +418,10 @@ begin
     'betrag_cent', e.betrag_cent,
     'waehrung', e.waehrung,
     'status', v_status,
-    'restzahl', case when e.zeige_restzahl and v_status = 'erhaeltlich' then e.auflage - e.vergeben end,
+    -- Was gerade kaufbar ist: Stuecke an offenen Kassen zaehlen nicht mit. 0 bei 'erhaeltlich' heisst, alle uebrigen
+    -- sind gerade an einer Kasse (nicht bezahlte kommen zurueck), nicht ausverkauft.
+    'restzahl', case when e.zeige_restzahl and v_status = 'erhaeltlich'
+      then greatest(e.auflage - e.vergeben - e.reserviert, 0) end,
     'endzahl', v_endzahl,
     'endzahl_folgt', v_status = 'beendet' and e.endzahl is null and e.reserviert > 0
   );

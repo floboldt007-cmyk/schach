@@ -2446,8 +2446,9 @@ Editor; Voraussetzung `schema.sql`):
 - Funktionen (security definer, `search_path = ''`): fuer `authenticated` nur `alter_angeben`, `edition_stand(produkt)`
   und `edition_staende()` (nur ab 18, sonst `null` bzw. `[]`; Status `angekuendigt | erhaeltlich | pausiert | ausverkauft |
   beendet` (`pausiert`: nach dem Start mit Schalter aus),
-  `restzahl` nur mit `zeige_restzahl`, `endzahl` nur fuer Besitzer eines Stuecks oder mit dem Schalter, `endzahl_folgt`;
-  „alles reserviert“ zeigt „erhaeltlich“). Nur Service-Rolle: `edition_reserviere` (Schalter zuerst, dann Zustimmung,
+  `restzahl` nur mit `zeige_restzahl` und = Auflage - vergeben - reserviert (was gerade kaufbar ist, seit 30.10.),
+  `endzahl` nur fuer Besitzer eines Stuecks oder mit dem Schalter, `endzahl_folgt`; „alles reserviert“ zeigt
+  „erhaeltlich“, mit Schalter dann Restzahl 0). `zeige_restzahl` ab der Ankuendigung nur noch ausschaltbar. Nur Service-Rolle: `edition_reserviere` (Schalter zuerst, dann Zustimmung,
   E-Mail, Alter; Sperre je Konto und Edition; bestehende offene Reservierung kommt zurueck; ein `update` mit allen
   Bedingungen; danach `EDITION_ZU_OFT` ab der vierten Kasse in 24 Stunden; liefert `stripe_ablauf_s` = Reservierung + 31
   Minuten), `edition_kasse_setzen`, `edition_kasse_abbrechen`
