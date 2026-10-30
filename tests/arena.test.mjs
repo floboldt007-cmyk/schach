@@ -21,7 +21,7 @@ import path from 'node:path';
 import { BOTS, WELTEN, botsDerWelt } from '../js/bots.js';
 import { ORTE } from '../js/orte.js';
 import { THEMEN, avatarVon } from '../js/thema.js';
-import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN } from '../js/ui/duell.js';
+import { duellArt, BESONDERE, DAUER_MAX, WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN, HALTE_VITRINE, DAUER_VITRINE } from '../js/ui/duell.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -82,6 +82,11 @@ function nodeTeil() {
   pruefe('Zeitplan: Wechsel zur Partie, sobald die Buehne deckt (nach ihren 460 ms), lange vor dem Flug; der volle Flug passt vor die harte Grenze',
     WECHSEL_BEI >= 460 && WECHSEL_BEI <= 520 && HALTE_BIS - WECHSEL_BEI >= 300 && FLUG >= 400 && HALTE_BIS + FLUG + 30 + 40 <= DAUER_MAX - 60 && FLUG_MIN >= 150 && FLUG_MIN < FLUG,
     JSON.stringify({ WECHSEL_BEI, HALTE_BIS, FLUG, FLUG_MIN }));
+  pruefe('Vitrine (Titel oder Errungenschaften): besondere -> voll auch ohne Anlass; aus und reduziert bleiben aus',
+    duellArt({ einstellung: 'besondere', anlass: null, vitrine: true }) === 'voll' && duellArt({ einstellung: 'aus', vitrine: true }) === 'aus'
+    && duellArt({ einstellung: 'besondere', vitrine: true, reduziert: true }) === 'aus');
+  pruefe('lange Fassung: Haltephase mindestens 3 s, Flug passt vor die harte Grenze, hoechstens 4,5 s',
+    HALTE_VITRINE >= 3000 && HALTE_VITRINE + FLUG + 30 + 40 <= DAUER_VITRINE - 60 && DAUER_VITRINE <= 4500, JSON.stringify({ HALTE_VITRINE, DAUER_VITRINE }));
   pruefe('unbekannte Einstellung wirkt wie besondere (Standard)', duellArt({ einstellung: 'xyz', anlass: 'erste' }) === 'voll' && duellArt({ einstellung: 'xyz', anlass: null }) === 'kurz' && duellArt() === 'kurz');
 
   gruppe = 'Portraets';
@@ -1193,6 +1198,48 @@ async function testeDuell(browser) {
     const k = await seite.evaluate(() => ({ fertig: window.__fertig, prot: window.__duellProtokoll, voll: window.__duellGesehen, screen: document.documentElement.dataset.screen, block: Math.round(window.__block) }));
     pruefe('nicht die erste Partie: Kurzfassung (art kurz, keine Buehne), Vertrag erfuellt, Partie da', k.fertig.length === 1 && k.fertig[0].art === 'kurz' && k.prot[0].art === 'kurz' && k.prot[0].dauer <= 1500 + k.block && k.screen === 'partie'
       && (await seite.evaluate(() => document.querySelectorAll('.duell.voll, .duell-buehne').length === 0)), JSON.stringify(k));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // lange Fassung (Flo 30.10.2026): mit Vitrine haelt die Buehne zum Lesen, Errungenschaften nacheinander, Tippen startet
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, einstellungen: { duellIntro: 'besondere', klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(800);
+    await seite.evaluate(async () => (await import('./js/orte.js')).anbieten('duell:profil?', () => ({ titel: 'Der Erfinder', orden: [{ name: 'Welt 1 gemeistert' }, { name: 'Serie 30' }, { name: 'Liga Gold' }] }), { reihenfolge: 1, paket: 'test-vitrine' }));
+    await duellHorcher(seite);
+    await tippe(seite, '.detail [data-aktion="spielen"]');
+    await seite.waitForSelector('.duell.voll.lang', { timeout: 5000 });
+    await warte(1900);
+    const mitte = await seite.evaluate(() => ({ orden: [...document.querySelectorAll('.duell-orden')].map((o) => [o.textContent, +getComputedStyle(o).opacity]),
+      titel: (document.querySelector('.duell-titel') || {}).textContent, tipp: (document.querySelector('.duell-tipp') || {}).textContent, zeit: !!document.querySelector('.duell-zeit'),
+      fertig: window.__fertig.length, block: Math.round(window.__block) }));
+    pruefe('Vitrine ohne Anlass: volle Buehne in der langen Fassung, nach 1,9 s steht sie noch, alle drei Errungenschaften lesbar',
+      mitte.fertig === 0 && mitte.orden.length === 3 && mitte.orden.every(([, o]) => o > 0.95) && mitte.titel === 'Der Erfinder' && mitte.tipp === 'Tippen zum Starten' && mitte.zeit, JSON.stringify(mitte));
+    await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 8000 });
+    const k = await seite.evaluate(() => ({ prot: window.__duellProtokoll, block: Math.round(window.__block) }));
+    const pz = k.prot[k.prot.length - 1];
+    pruefe('lange Fassung: Portraets fliegen erst nach der Haltephase, Ende vor der harten Grenze',
+      pz.art === 'voll' && pz.flugAb >= HALTE_VITRINE - 5 && pz.dauer <= DAUER_VITRINE + 100 + k.block, JSON.stringify(k));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true, einstellungen: { duellIntro: 'besondere', klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(800);
+    await seite.evaluate(async () => (await import('./js/orte.js')).anbieten('duell:profil?', () => ({ titel: 'Der Erfinder', orden: [{ name: 'Welt 1 gemeistert' }] }), { reihenfolge: 1, paket: 'test-vitrine' }));
+    await duellHorcher(seite);
+    await tippe(seite, '.detail [data-aktion="spielen"]');
+    await seite.waitForSelector('.duell.voll.lang', { timeout: 5000 });
+    await warte(1200);
+    const t0 = Date.now();
+    await tippe(seite, '.duell');
+    await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 3000 });
+    const k = await seite.evaluate(() => ({ fertig: window.__fertig, screen: document.documentElement.dataset.screen }));
+    pruefe('lange Fassung, Handy: ein Tipp startet sofort (uebersprungen, Partie da)', k.fertig[0].uebersprungen === true && Date.now() - t0 < 1500, JSON.stringify(k));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
