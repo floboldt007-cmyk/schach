@@ -131,6 +131,7 @@ export const DE = {
   // Feier-Zeilen beim Aufstieg
   'feier.neu': 'Neu: {liste}',
   'feier.neuMehr': 'Neu: {liste} und {n} mehr',
+  'feier.naechstes': 'Als Nächstes: {text} (Level {level})',
   'feier.levelTitel': 'LEVEL {level} · {titel}',
   // Steckbrief-Zeile im Spielplan
   spielplan: 'Funken-Wochenende ab Freitag 16 Uhr: Partien und Lernen zählen doppelt. Wer nicht spielt, bekommt am Montag eine Rückenwind-Karte.',
@@ -264,6 +265,7 @@ export const EN = {
   'faktor.name.einstieg': 'Getting started',
   'feier.neu': 'New: {liste}',
   'feier.neuMehr': 'New: {liste} and {n} more',
+  'feier.naechstes': 'Next: {text} (level {level})',
   'feier.levelTitel': 'LEVEL {level} · {titel}',
   spielplan: 'Spark weekend from Friday 4 p.m.: games and learning count double. If you don’t play, you get a tailwind card on Monday.',
   'gruss.benno': 'A new level? Golly, I’d better pull my rubber boots back on.',

@@ -14,8 +14,8 @@
 //   istTitelLevel(level) -> bool    bringt dieses Level einen neuen Titel (jedes 5. Level bis 50, dann 60, 75, 100)?
 //   belohnungen(level) -> [{ art, id, name, kommt? }]   neue Stuecke dieses Levels (nur Schmuck und Titel, nie
 //                                   Spielwirkung); ueber 50: jedes 10. Level eine Wahl aus dem Katalog
-//   nutzbar(stueck) -> bool         sofort nutzbar? Stuecke mit kommt (z. B. 'emote-rad') werden gutgeschrieben, aber
-//                                   weder als "Neu" gefeiert noch als naechste Freischaltung genannt (Konzept S1-1)
+//   nutzbar(stueck) -> bool         sofort nutzbar? Stuecke mit kommt ('emote-rad', 'werkstatt') werden gutgeschrieben,
+//                                   aber weder als "Neu" gefeiert noch als naechste Freischaltung genannt (Konzept S1-1)
 //   BELOHNUNGEN                     eingefrorene Tabelle 1..50
 //   alleStuecke() -> [{ level, art, id, name }]   die ganze Tabelle flach (fuer den Katalog, ausgegraut mit "Level 15")
 //
@@ -66,12 +66,17 @@ export function istTitelLevel(level) {
   return TITEL.some(([ab]) => ab === level);
 }
 
-const s = (art, id, name, kommt) => Object.freeze(kommt ? { art, id, name, kommt } : { art, id, name });
+// Arten, die die App heute zeigen kann (Titel, Namensschild in js/ui/arena.js, Finisher, Grund-Emotes). Alle anderen
+// Arten (Zugspur, Rahmen, Banner, Wahl-Stuecke, Wappen, Brief) zeigt erst die Werkstatt: bis dahin kommt: 'werkstatt'.
+const MIT_ANZEIGE = new Set(['titel', 'sonst', 'finisher', 'emote']);
+const WERKSTATT = 'werkstatt';
+const s = (art, id, name, kommt = MIT_ANZEIGE.has(art) ? null : WERKSTATT) =>
+  Object.freeze(kommt ? { art, id, name, kommt } : { art, id, name });
 // Jedes Stueck: art (titel | zugspur | kartenrahmen | banner | brettrahmen | emote | finisher | figuren | oberflaeche
 // | wappen | wahl | brief | sonst), id (nur [a-z0-9-]), name (Anzeige), kommt (nur wenn die Anzeige erst spaeter kommt).
 // Alles nur Schmuck und Titel. Finisher-Stuecke 'finisher-<id>' muessen genau den Stufen in finisher/index.js
-// (FINISHER) entsprechen; Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'). Beides prueft
-// tests/funken.test.mjs gegen die Pakete.
+// (FINISHER) entsprechen; Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'), alles ohne Anzeige
+// bekommt kommt: 'werkstatt' (MIT_ANZEIGE oben). Das prueft tests/funken.test.mjs gegen die Pakete.
 const RAD = 'emote-rad';
 export const BELOHNUNGEN = Object.freeze({
   1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('finisher', 'finisher-krone', 'Finisher Krone'), s('emote', 'emotes-grund', 'Grund-Emotes im Emote-Rad')],

@@ -433,7 +433,8 @@ export function spielerEmblem({ st } = {}) {
 }
 
 // ---------- Spiegel und Verlaufskarte ----------
-function naechsteFreischaltung(level) {
+// das naechste Level mit Titel oder sofort nutzbarem Stueck: { level, text } oder null (Spiegel und Level-Feier)
+export function naechsteFreischaltung(level) {
   for (let l = level + 1; l <= level + 60; l++) {
     const neu = L.belohnungen(l).filter((s) => s.art !== 'titel' && L.nutzbar(s));
     const titel = L.istTitelLevel(l) ? tx('titelStueck', { name: titelName(l) }) : null;

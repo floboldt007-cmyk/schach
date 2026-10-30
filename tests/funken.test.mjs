@@ -120,8 +120,15 @@ gruppe = 'Titel und Belohnungen';
     && L.belohnungen(70).map((s) => s.id).join() === 'wahl-katalog-70' && L.belohnungen(75).map((s) => s.id).join() === 'titel-polarlicht'
     && L.belohnungen(100).map((s) => s.id).join() === 'titel-sonne,wahl-katalog-100' && L.belohnungen(51).length === 0);
   pruefe('Belohnungen nur Schmuck und Titel (keine Bots, Analyse, Lektionen, Klangpakete)', L.alleStuecke().every((s) => !/bot|analyse|lektion|klang/i.test(s.art + s.id)));
-  pruefe('kommt nur mit bekanntem Grund (emote-rad), nutzbar(s) genau ohne kommt', L.alleStuecke().every((s) => (s.kommt === undefined || s.kommt === 'emote-rad')
+  pruefe('kommt nur mit bekanntem Grund (emote-rad, werkstatt), nutzbar(s) genau ohne kommt', L.alleStuecke().every((s) => (s.kommt === undefined || s.kommt === 'emote-rad' || s.kommt === 'werkstatt')
     && L.nutzbar(s) === (s.kommt === undefined)) && !L.nutzbar(null));
+  // Nur was die App heute zeigen kann, gilt als nutzbar: Titel, Namensschild, die Finisher und die Grund-Emotes.
+  // Zugspur, Rahmen, Banner, Wahl-Stuecke, Wappen und Brief zeigt erst die Werkstatt (sonst feiert die App "Neu: Zugspur Bleistift").
+  const nutzbareIds = L.alleStuecke().filter(L.nutzbar).map((s) => s.id);
+  pruefe('Nutzbar sind nur Titel, Namensschild, Finisher und Grund-Emotes', nutzbareIds.length > 0 && nutzbareIds.every((id) => /^titel-|^finisher-/.test(id)
+    || id === 'namensschild' || id === 'emotes-grund') && L.belohnungen(60).every((s) => s.art === 'titel' || !L.nutzbar(s)), nutzbareIds);
+  pruefe('Stücke ohne Anzeige: werkstatt (Zugspur Level 2, Kartenrahmen Level 3, Wahl Level 10, Brief Level 50)',
+    ['zugspur-bleistift', 'kartenrahmen-fichte', 'wahl-figuren-1', 'brief-stockfisch'].every((id) => L.alleStuecke().find((s) => s.id === id)?.kommt === 'werkstatt'));
 }
 
 // =====================================================================
@@ -702,7 +709,7 @@ gruppe = 'Ereignisse';
   sende('partie:analysiert', { partieId: 'pz1', botId: 'benno', modus: 'normal', wertet: true, partie: { genauigkeit: 91 }, neueSterne: [true, true, false], quelle: 'partie' });
   const feier = fuerOverlay('pz1');
   pruefe('Nach der Analyse: Stern 2 gebucht und genau eine Level-Zeile mit dem endgültigen Level', feier.length === 1 && feier[0].quelle === 'level'
-    && /^Level 2 · Neu: Zugspur Bleistift/.test(feier[0].titel) && feier[0].klang === 'level', feier);
+    && /^Level 2 · Als Nächstes: Titel Glut · Finisher Schachbrett-Welle \(Level 5\)/.test(feier[0].titel) && !/Zugspur/.test(feier[0].titel) && feier[0].klang === 'level', feier);
   log.length = 0;
   // auf Level 5 (Titel Glut): der grosse Moment
   const st = S.lade();
@@ -726,6 +733,8 @@ gruppe = 'Ereignisse';
   const f8 = fuerOverlay('pz8');
   pruefe('Level 8: genau eine Level-Zeile ohne „Neu“ und ohne „Hut ab“, das Stück ist gutgeschrieben', f8.length === 1 && /^Level 8\b/.test(f8[0].titel)
     && !f8.some((x) => /Neu|Hut ab/.test(`${x.titel} ${x.text || ''}`)) && S.lade().freigeschaltet.includes('emote-hut-ab'), f8);
+  pruefe('Level 8: die Feier nennt stattdessen das nächste nutzbare Stück (Level 10)', f8.length === 1
+    && /^Level 8 · Als Nächstes: Titel Fackelträger · Finisher Fallender König \(Level 10\)$/.test(f8[0].titel), f8);
   log.length = 0;
   sende('tag:gezaehlt', { tag: '2026-10-22', quelle: 'partie', serie: 3, kapitel: 1 });
   pruefe('tag:gezaehlt bringt nie Funken', log.length === 0);
@@ -1013,7 +1022,7 @@ async function testeBrowser(browser) {
   const spiegel = await seite.locator('.fk-spiegel').innerText();
   pruefe('Antippen des Chips öffnet den Funken-Spiegel (Level, Balken, heute, Tagesbogen, Rückenwind, nächste Freischaltung, Regeln)',
     /Funken-Spiegel/.test(spiegel) && /Level 1 · Funke/.test(spiegel) && /0 von 100 bis Level 2/.test(spiegel) && /Heute zählen noch 800 Funken voll/.test(spiegel)
-    && /1 Rückenwind-Karte im Fach/.test(spiegel) && /Level 2: Zugspur Bleistift/.test(spiegel) && /So entstehen Funken/.test(spiegel), spiegel.slice(0, 300));
+    && /1 Rückenwind-Karte im Fach/.test(spiegel) && /Level 5: Titel Glut · Finisher Schachbrett-Welle/.test(spiegel) && !/Zugspur/.test(spiegel) && /So entstehen Funken/.test(spiegel), spiegel.slice(0, 300));
   await bild(seite, 'spiegel');
   await seite.keyboard.press('Escape');
   // wie navigation.test.mjs beim Blatt: hoechstens 2 s auf das Wegfahren warten (unter Last laeuft es spaeter aus)
@@ -1061,7 +1070,8 @@ async function testeBrowser(browser) {
   pruefe('Erste Partie: Aufstieg (data-aufstieg), Zahl im Emblem umgeklappt', e1.lv[1] > e1.lv[0] && await seite.locator(`.fk-abr[data-aufstieg="${fs1.level}"]`).count() === 1
     && (await seite.locator('.fk-abr .fk-z-neu').innerText()).trim() === String(fs1.level), e1.lv);
   const feier1 = await seite.locator('.erg-feier .erg-f-zeile[data-quelle="level"]').allInnerTexts();
-  pruefe('Feier-Zeile „Level n · Neu: …“ mit Können-Satz (genau eine Level-Zeile)', feier1.length === 1 && new RegExp(`^Level ${fs1.level} · Neu: Zugspur Bleistift`).test(feier1[0])
+  pruefe('Feier-Zeile „Level n · Als Nächstes: …“ mit Können-Satz (genau eine Level-Zeile, keine Zugspur)', feier1.length === 1
+    && new RegExp(`^Level ${fs1.level} · Als Nächstes: Titel Glut · Finisher Schachbrett-Welle \\(Level 5\\)`).test(feier1[0]) && !/Zugspur/.test(feier1[0])
     && /Züge gespielt|Seit Level/.test(feier1[0]), feier1);
   await warte(600);
   const k1 = await h.klaenge();

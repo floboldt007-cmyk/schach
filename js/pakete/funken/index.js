@@ -197,7 +197,10 @@ function feiern(auf, satz, partieId) {
       text: satzText || (neuText || null), symbol: 'funke', klang: 'level' });
     if (neuText) melde({ partieId, quelle: 'level', titel: neuText, symbol: 'funke' });
   } else {
-    melde({ partieId, quelle: 'level', titel: tx('level', { level: auf.nachher }) + (neuText ? ' · ' + neuText : ''),
+    // nichts Neues zum Ansehen: dann das naechste nutzbare Stueck nennen (SPIELKONZEPT S1-1)
+    const als = neuText ? null : A.naechsteFreischaltung(auf.nachher);
+    const zusatz = neuText || (als ? tx('feier.naechstes', als) : '');
+    melde({ partieId, quelle: 'level', titel: tx('level', { level: auf.nachher }) + (zusatz ? ' · ' + zusatz : ''),
       text: satzText, symbol: 'funke', klang: 'level' });
   }
 }
