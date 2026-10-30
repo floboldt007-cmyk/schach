@@ -32,7 +32,16 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
   s.dataset.bereich = id;
   s.dataset.name = name;
   s.setAttribute('aria-label', name);
-  s.innerHTML = `<div class="sa-raster" role="list">${teile.map((x) => {
+  // Gruppen (Feld gruppe, z. B. Erfolge: Meilensteine, Welten, Liga, Serie, Level) bekommen je eine Ueberschrift mit
+  // "n von m" und ein eigenes Raster; ohne Gruppen ein Raster wie bisher (Flo 30.10. abends: Erfolge "in meinem Stil")
+  const gruppen = [];
+  for (const x of teile) {
+    const g = x.gruppe || '';
+    if (!gruppen.length || gruppen[gruppen.length - 1].name !== g) gruppen.push({ name: g, teile: [] });
+    gruppen[gruppen.length - 1].teile.push(x);
+  }
+  s.innerHTML = `${gruppen.map((gr) => `${gr.name ? `<h4 class="sa-gruppe"><span>${esc(gr.name)}</span><small class="zahl">${gr.teile.filter((x) => x.frei).length} / ${gr.teile.length}</small></h4>` : ''}`
+    + `<div class="sa-raster" role="list">${gr.teile.map((x) => {
     const zustand = x.an ? 'an' : x.frei ? 'frei' : 'zu';
     const balken = Number.isFinite(x.fortschritt) && !x.frei
       ? `<span class="sa-balken" aria-hidden="true"><i style="transform:scaleX(${Math.max(0, Math.min(1, x.fortschritt)).toFixed(3)})"></i></span>` : '';
@@ -43,7 +52,7 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
     return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}>
       <span class="sa-bild" aria-hidden="true">${bild}${schild}</span>
       <span class="sa-text"><b>${esc(x.name)}</b><span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
-  }).join('')}</div>${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
+  }).join('')}</div>`).join('')}${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
   return s;
 }
 
