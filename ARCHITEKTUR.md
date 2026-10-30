@@ -1314,8 +1314,11 @@ dem Ergebnis laeuft und nicht ins Budget zaehlt.
   Integration die Zuordnung. Die Werkstatt gehoert zum Reiter Ich (3.17).
 - **Pakete aus Schub 2b** (Entscheidung 17.10., SPIELKONZEPT 6.3) docken so an, ohne fremde Dateien zu aendern:
   `ausdruck` (Emote-Rad und Schnell-Chat mit Bot-Antworten am Ort `partie:aktionen`, Banner mit Zeichen; Modul und
-  Einstellungen `ausdruck`), `siegeslauf` (Flamme an Flos Namen am Ort `partie:spieler-leiste`, Modul `siegeslauf`),
-  `werkstatt` (Screen `werkstatt`, Modul `werkstatt`). Ihre Fairness-Pruefungen stehen in der Tabelle unten.
+  Einstellungen `ausdruck`; gebaut als `js/pakete/emotes`, Takt-Zaehler je Partie in `partie.extra.emotes` ueber
+  `buehne.merke`, gesperrte Knoepfe mit `aria-disabled` und Grund; eigenes Emote und Bot-Antwort als `.sprechblase` absolut
+  im Raster von `.spieler.ich` bzw. `.spieler.gegner`, neben dem Portraet, Uhr und Knoepfe bleiben frei), `siegeslauf`
+  (Flamme an Flos Namen am Ort `partie:spieler-leiste`, Modul `siegeslauf`), `werkstatt` (Screen `werkstatt`, Modul
+  `werkstatt`). Ihre Fairness-Pruefungen stehen in der Tabelle unten.
 - **Untere Leiste** (`nav.reiter-leiste`, Reiter Arena, Training, Bestenliste, Ich): nur vorbereitet. Sie erscheint erst,
   wenn `REITER` in `js/erweiterungen.js` Screens nennt (`'training'`, `'bestenliste'`, `'ich'`; Arena ist immer dabei;
   im Testmodus auch `?reiter=training,ich`), und nur auf den Reiter-Screens (`arena`; `training`, `raetsel`, `lernen`;
@@ -1339,7 +1342,8 @@ Speicher (Firefox ohne Dialog), Gast-Partien werten nie, Nachholen von Boss-, fr
 (Verbotsliste erweitert, auch fuer `daten/`; kein Ablauf-Feld; Spielplaene gueltig; kein Countdown in Spielplan, Boss,
 Werkstatt; Bosse werten nie und haben `archiv: true`; Finisher-Grenzen; kein `Math.random` in den reinen Logik-Dateien der
 neuen Pakete und in `tag.js`/`inhalte.js`; `bots.js`/`engine.js` importieren nichts aus Paketen; Schnell-Chat ohne „Wow“,
-„Hoppla“, „Knapp“, „Glück gehabt“, „Endlich“ in jeder Datei mit `chat` oder `emote` im Namen). `sw`: Inhalte unter
+„Hoppla“, „Knapp“, „Glück gehabt“, „Endlich“ in jeder Datei mit `chat` oder `emote` im Pfad, Selbstprobe: mindestens die
+Texte des Emote-Pakets; dazu der Takt des Emote-Pakets mit seinen reinen Funktionen). `sw`: Inhalte unter
 `daten/<paket>/` folgen der Paket-Regel. `board`: abgelehnte Zuege (Maus und Finger), Striche, Koenigsfall, reduzierte
 Bewegung. `app --spiel` (auch in `--erweiterungen` und im vollen Lauf): neue Screens, untere Leiste, Start (persist,
 ausduennen), Heute-Karte, Gegner-Leiste (quer und hoch), Plaetze der Buehne, `zug:abgelehnt`, Abrechnung (Reihenfolge,

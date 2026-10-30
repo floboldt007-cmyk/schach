@@ -1,5 +1,6 @@
 // Emote-Rad und Schnell-Chat. Der Transport bleibt absichtlich hinter senden(): Online kann spaeter andocken.
 import { anbieten } from '../../orte.js';
+import { hoere } from '../../ereignisse.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { t } from '../../sprache.js';
 import './texte.js';
@@ -7,10 +8,19 @@ import './texte.js';
 const MODUL = 'emotes';
 // Speicher-Budget fuer Emote-Rad und Schnell-Chat (storage.js MODUL_BUDGET), Paketname bleibt 'emotes'
 const SPEICHER = 'ausdruck';
-const SPERRZEIT = 3000;
-// Bot-Antworten je Partie (SPIELKONZEPT 3.9), Vorlese-Text verschwindet nach LIVE_MS
+// Takt nach SPIELKONZEPT 3.9 (Pruefung 5.3): Emote-Rad hoechstens eins alle 8 s und 6 je Partie, nur in den
+// Zeitfenstern; Schnell-Chat hoechstens ein Satz je 3 eigene Zuege und 3 je Minute; der Bot antwortet hoechstens
+// 3-mal je Partie. Die Zaehler haengen an der Partie (buehne.merke), gelten also auch nach "Einstellungen und
+// zurueck" und nach dem Neuladen.
+const SPERRZEIT = 8000;
+const EMOTES_MAX = 6;
+const CHAT_ZUEGE = 3;
+const CHAT_JE_MINUTE = 3;
+const MINUTE = 60000;
 const ANTWORTEN_MAX = 3;
+// Vorlese-Text verschwindet nach LIVE_MS; die Knoepfe pruefen ihre Sperre alle PRUEF_MS (Phase, Ablauf der Sperrzeit)
 const LIVE_MS = 4000;
+const PRUEF_MS = 500;
 // Kein Emote, das verspottet (SPIELKONZEPT 3.9, 7.1): kein Lachen, Weinen, Gaehnen
 const EMOTES = Object.freeze([
   ['daumen', '<path d="M8 20H4V9h4m0 10c3 1 7 1 9 0l2-7c.3-1.5-.5-3-2-3h-4l1-4c.2-1-1-2-2-1L8 9z"/>'],
@@ -29,6 +39,87 @@ const einstellungen = () => {
   return { an: e.an !== false, daempfen: e.daempfen === true };
 };
 const setze = (teil) => speichereModulEinstellungen(SPEICHER, { ...einstellungen(), ...teil });
+
+// ---------- Takt (rein, ohne DOM, in Node testbar) ----------
+// Stand je Partie: n Emotes gesendet, t Zeit des letzten Emotes (null: noch keins), a Bot-Antworten, w eigene Zuege
+// bis zum naechsten Satz, c Zeiten der Saetze der letzten Minute. Kurz gehalten: alle Pakete teilen sich EXTRA_MAX Zeichen.
+const neuerStand = () => ({ n: 0, t: null, a: 0, w: 0, c: [] });
+const ganz = (x, max) => (Number.isFinite(x) ? Math.min(max, Math.max(0, Math.floor(x))) : 0);
+function pruefeStand(s) {
+  if (!s || typeof s !== 'object') return neuerStand();
+  return {
+    n: ganz(s.n, EMOTES_MAX), t: Number.isFinite(s.t) ? s.t : null, a: ganz(s.a, ANTWORTEN_MAX), w: ganz(s.w, CHAT_ZUEGE),
+    c: Array.isArray(s.c) ? s.c.filter(Number.isFinite).slice(-CHAT_JE_MINUTE) : [],
+  };
+}
+// Zeitfenster (SPIELKONZEPT 3.9): vor dem ersten Zug, direkt nach einem Zug des Gegners, nach der Partie. Mit der
+// Buehne: 'flo' (Flo ist am Zug, also noch kein Zug oder der Gegner hat gerade gezogen), 'ende', und 'start' nur in
+// einer neuen Partie (Flo hat Schwarz, der Bot hat noch nicht gezogen). Zu ist es, solange der Gegner nachdenkt
+// ('gezogen', 'bot') und in einer fortgesetzten Partie, bis der Bot gezogen hat.
+const imFenster = (phase, fortgesetzt = false) => phase === 'flo' || phase === 'ende' || (phase === 'start' && !fortgesetzt);
+// Liefert { frei: true } oder { frei: false, grund, ms? }. Laeuft die Uhr des Geraets zurueck, gilt eine Sperrzeit als
+// abgelaufen (nie eine Dauersperre); die Grenzen je Partie und je 3 eigene Zuege haengen an keiner Uhr.
+function emoteFrei(stand, { phase, fortgesetzt = false, jetzt = Date.now() } = {}) {
+  if (stand.n >= EMOTES_MAX) return { frei: false, grund: 'voll' };
+  if (!imFenster(phase, fortgesetzt)) return { frei: false, grund: 'fenster' };
+  const vergangen = stand.t == null ? Infinity : jetzt - stand.t;
+  const rest = vergangen >= 0 ? SPERRZEIT - vergangen : 0;
+  return rest > 0 ? { frei: false, grund: 'takt', ms: rest } : { frei: true };
+}
+const inDerMinute = (c, jetzt) => c.filter((x) => jetzt - x >= 0 && jetzt - x < MINUTE);
+function chatFrei(stand, { phase, jetzt = Date.now() } = {}) {
+  if (stand.w > 0) return { frei: false, grund: phase === 'ende' ? 'zuegeEnde' : 'zuege', n: stand.w };
+  const minute = inDerMinute(stand.c, jetzt);
+  if (minute.length >= CHAT_JE_MINUTE) return { frei: false, grund: 'minute', ms: Math.min(...minute) + MINUTE - jetzt };
+  return { frei: true };
+}
+const nachEmote = (stand, jetzt) => ({ ...stand, n: stand.n + 1, t: jetzt });
+const nachChat = (stand, jetzt) => ({ ...stand, w: CHAT_ZUEGE, c: [...inDerMinute(stand.c, jetzt), jetzt].slice(-CHAT_JE_MINUTE) });
+const nachEigenemZug = (stand) => (stand.w > 0 ? { ...stand, w: stand.w - 1 } : stand);
+
+// ---------- Stand je Partie ----------
+// Gemerkt in partie.extra (buehne.merke): ueberlebt einen Neuaufbau der Partie und das Neuladen. Die Kopie je laufId
+// haelt die Grenzen bis zum Neuladen, auch wenn merke scheitert (alle Pakete zusammen hoechstens EXTRA_MAX Zeichen).
+const staende = new Map();
+const partien = new Map();          // laufId -> Buehne der offenen Partie (fuer zug:gespielt)
+const fortgesetzt = new WeakMap();  // Buehne -> true, wenn die Partie fortgesetzt wurde
+const knoepfe = new WeakMap();      // Buehne -> Set der Auffrischer ihrer Knoepfe
+
+function stand(buehne) {
+  return pruefeStand(staende.get(buehne.laufId) || buehne.gemerkt(MODUL));
+}
+function speichere(buehne, s) {
+  staende.delete(buehne.laufId);
+  staende.set(buehne.laufId, s);
+  if (staende.size > 8) staende.delete(staende.keys().next().value);
+  buehne.merke(MODUL, s);
+}
+function frische(buehne) {
+  for (const f of knoepfe.get(buehne) || []) f();
+}
+hoere('partie:gestartet', (d) => {
+  if (!d.buehne) return;
+  partien.set(d.laufId, d.buehne);
+  fortgesetzt.set(d.buehne, d.fortgesetzt === true);
+  frische(d.buehne);
+});
+hoere('partie:verlassen', (d) => { partien.delete(d.laufId); });
+// Nach einem Bot-Zug wechselt die Phase erst nach zug:gespielt: deshalb danach pruefen (schwere Arbeit nie im Hoerer).
+// Eigene Zuege (auch Vorzuege) zaehlen fuer den Schnell-Chat.
+hoere('zug:gespielt', (d) => {
+  const buehne = partien.get(d.laufId);
+  if (!buehne) return;
+  buehne.spaeter(() => {
+    if (d.wer === 'flo') {
+      const s = stand(buehne);
+      if (s.w > 0) speichere(buehne, nachEigenemZug(s));
+    }
+    frische(buehne);
+  }, 0);
+});
+for (const name of ['zug:zurueckgenommen', 'partie:beendet']) {
+  hoere(name, (d) => { const b = partien.get(d.laufId); if (b) b.spaeter(() => frische(b), 0); });
+}
 
 function icon(id) {
   const daten = EMOTES.find(([k]) => k === id);
@@ -53,19 +144,21 @@ function popup(knopf, art, eintraege, waehlen) {
 }
 
 // Art jeder Eingabe: die Bot-Antwort haengt nur an ihr, nie an der Stellung oder der Engine (Regel 21).
-// Auf ein Missgeschick folgt Trost, nie Lob oder der Name einer Zugklasse.
+// Jede Art hat ihren eigenen Topf, jede Antwort darin passt zu jeder Eingabe dieser Art. Auf Lob folgt Dank, auf ein
+// Missgeschick Trost, nie Lob oder der Name einer Zugklasse.
 const ARTEN = Object.freeze({
-  'emote.daumen': 'lob', 'emote.applaus': 'lob', 'emote.staunen': 'neutral', 'emote.denken': 'neutral',
+  'emote.daumen': 'lob', 'emote.applaus': 'lob', 'emote.staunen': 'staunen', 'emote.denken': 'denken',
   'emote.respekt': 'lob', 'emote.hallo': 'gruss', 'emote.gut': 'lob', 'emote.uff': 'missgeschick',
-  'chat.0': 'gruss', 'chat.1': 'lob', 'chat.2': 'neutral', 'chat.3': 'lob', 'chat.4': 'dank', 'chat.5': 'neutral',
+  'chat.0': 'glueck', 'chat.1': 'lob', 'chat.2': 'denken', 'chat.3': 'lob', 'chat.4': 'dank', 'chat.5': 'nochmal',
 });
-const ANTWORT_ART = Object.freeze({ gruss: 'gruss', dank: 'dank', lob: 'dank', missgeschick: 'trost', neutral: 'neutral' });
+const ANTWORT_ART = Object.freeze({
+  gruss: 'gruss', glueck: 'gleichfalls', lob: 'dank', dank: 'gern', missgeschick: 'trost', denken: 'geduld',
+  staunen: 'spannend', nochmal: 'zusage',
+});
 const ANTWORT_JE_ART = 3;
-// Gezaehlte Antworten je Partie (Schluessel: die Buehne der Partie)
-const antworten = new WeakMap();
 
 function antwortText(eingabe, bot, nr = 0) {
-  const art = ANTWORT_ART[ARTEN[eingabe]] || 'neutral';
+  const art = ANTWORT_ART[ARTEN[eingabe]] || 'spannend';
   const i = (String(bot && bot.id).length + nr) % ANTWORT_JE_ART;
   return T(`antwort.${art}.${i}`);
 }
@@ -77,42 +170,105 @@ function vorlesen(buehne, text) {
   buehne.spaeter(() => { if (live.textContent === text) live.textContent = ''; }, LIVE_MS);
 }
 
-function reaktion(k, eingabe) {
+// Blase an einer Spielerkarte, wie die Sprechblase des Bots hoch: neben dem Portraet ueber Name und Unterzeile (Flo:
+// Spalten zwischen Portraet und Uhr), Portraet, Uhr und Knoepfe bleiben frei, nichts ragt aus der Karte (CSS .em-blase).
+// Ist die Karte nicht zu sehen (kurzes Querformat ohne Uhr), gibt es keine Blase; vorgelesen wird trotzdem (.em-live).
+function kartenBlase(buehne, wer, klasse, inhalt, ms) {
+  const karte = buehne.el.querySelector(wer === 'flo' ? '.spieler.ich' : '.spieler.gegner');
+  if (!karte || !karte.getClientRects().length) return null;
+  for (const alt of karte.querySelectorAll(':scope > .em-blase')) alt.remove();
+  const el = document.createElement('div');
+  el.className = `sprechblase links em-blase ${klasse}${einstellungen().daempfen || buehne.reduziert ? ' still' : ''}`;
+  el.setAttribute('aria-hidden', 'true');
+  el.append(inhalt);
+  karte.append(el);
+  karte.classList.add('em-spricht');
+  buehne.spaeter(() => {
+    el.classList.add('weg');
+    buehne.spaeter(() => { el.remove(); if (!karte.querySelector(':scope > .em-blase')) karte.classList.remove('em-spricht'); }, 220);
+  }, ms);
+  return el;
+}
+
+function zeigeAntwort(k, eingabe, nr) {
   const { buehne, bot } = k;
-  if (!bot) return;
-  const nr = antworten.get(buehne) || 0;
-  if (nr >= ANTWORTEN_MAX) return;
-  antworten.set(buehne, nr + 1);
   const text = antwortText(eingabe, bot, nr);
   const ms = einstellungen().daempfen ? 1500 : 800;
   buehne.spaeter(() => {
     if (!einstellungen().an) return;
-    const antwort = document.createElement('div'); antwort.className = 'em-botantwort'; antwort.textContent = text;
-    buehne.el.append(antwort); buehne.spaeter(() => antwort.remove(), einstellungen().daempfen ? 1400 : 2200);
+    const t = document.createElement('span'); t.className = 'em-text'; t.textContent = text;
+    kartenBlase(buehne, 'bot', 'em-botantwort', t, einstellungen().daempfen ? 1400 : 2200);
     vorlesen(buehne, T('botSagt', { name: bot.name, text }));
   }, ms);
 }
 
+// Warum der Knopf gerade gesperrt ist (steht sichtbar am Knopf, wird vorgelesen und beim Antippen gemeldet)
+function grundText(z, bot) {
+  if (z.grund === 'voll') return T('grund.voll', { n: EMOTES_MAX });
+  if (z.grund === 'fenster') return T('grund.fenster', { name: bot ? bot.name : '' });
+  if (z.grund === 'takt') return T('grund.takt', { s: SPERRZEIT / 1000 });
+  if (z.grund === 'zuege') return T('grund.zuege', { n: z.n });
+  if (z.grund === 'zuegeEnde') return T('grund.zuegeEnde', { n: CHAT_ZUEGE });
+  if (z.grund === 'minute') return T('grund.minute', { n: CHAT_JE_MINUTE });
+  return '';
+}
+
+let knopfNr = 0;
 function aktionsKnopf(k, art) {
   if (!einstellungen().an) return null;
-  let zuletzt = 0;
+  const { buehne, bot } = k;
+  const istEmote = art === 'emotes';
   const b = document.createElement('button'); b.type = 'button'; b.className = 'knopf em-aktion';
   b.dataset.emoteAktion = art; b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
-  b.innerHTML = `${art === 'emotes' ? icon('daumen') : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>'}<span>${esc(T(art))}</span>`;
+  b.innerHTML = `${istEmote ? icon('daumen') : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>'}<span>${esc(T(art))}</span>`;
+  // Grund der Sperre fuer Vorleser (aria-describedby); der Knopf selbst bleibt fokussierbar (aria-disabled statt disabled)
+  const hinweis = document.createElement('span'); hinweis.className = 'sr em-grund'; hinweis.id = `em-grund-${++knopfNr}`;
+  buehne.el.append(hinweis);
+  const zustand = () => {
+    const opt = { phase: buehne.phase(), fortgesetzt: fortgesetzt.get(buehne) === true, jetzt: Date.now() };
+    return istEmote ? emoteFrei(stand(buehne), opt) : chatFrei(stand(buehne), opt);
+  };
+  const auffrischen = () => {
+    const z = zustand();
+    const grund = z.frei ? '' : grundText(z, bot);
+    if (z.frei) { b.removeAttribute('aria-disabled'); b.removeAttribute('aria-describedby'); delete b.dataset.emGrund; }
+    else { b.setAttribute('aria-disabled', 'true'); b.setAttribute('aria-describedby', hinweis.id); b.dataset.emGrund = z.grund; }
+    if (hinweis.textContent !== grund) hinweis.textContent = grund;
+    return z;
+  };
+  // Gesperrt: nie still verschlucken, die Meldung sagt warum (Toast, wird vorgelesen)
+  const gesperrt = (z) => { k.app.meldung(grundText(z, bot)); auffrischen(); };
+  let menge = knoepfe.get(buehne);
+  if (!menge) {
+    menge = new Set(); knoepfe.set(buehne, menge);
+    const pruefen = () => { frische(buehne); buehne.spaeter(pruefen, PRUEF_MS); };
+    buehne.spaeter(pruefen, PRUEF_MS);
+  }
+  menge.add(auffrischen);
+  auffrischen();
   b.addEventListener('click', () => {
-    k.buehne.el.querySelector('.em-popup')?.remove();
-    const istEmote = art === 'emotes';
+    buehne.el.querySelector('.em-popup')?.remove();
+    const vorher = auffrischen();
+    if (!vorher.frei) { gesperrt(vorher); return; }
     const daten = istEmote
       ? EMOTES.map(([id]) => ({ id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: icon(id) }))
       : Array.from({ length: 6 }, (_, i) => ({ id: String(i), schluessel: 'chat.' + i, text: T('chat.' + i) }));
     popup(b, art, daten, (e) => {
+      // erneut pruefen: waehrend das Fenster offen war, kann der Gegner gezogen oder die Partie geendet haben
+      const z = zustand();
+      if (!z.frei) { gesperrt(z); return true; }
       const jetzt = Date.now();
-      if (istEmote && jetzt - zuletzt < SPERRZEIT) { k.app.meldung(T('bereit')); return false; }
-      if (istEmote) zuletzt = jetzt;
-      const rand = document.createElement('div'); rand.className = 'em-rand'; rand.innerHTML = e.svg || `<span>${esc(e.text)}</span>`;
-      rand.setAttribute('aria-label', e.text); k.buehne.el.append(rand); k.buehne.spaeter(() => rand.remove(), 1800);
-      vorlesen(k.buehne, T('gesendet', { text: e.text }));
-      reaktion(k, e.schluessel); return true;
+      let s = istEmote ? nachEmote(stand(buehne), jetzt) : nachChat(stand(buehne), jetzt);
+      const nr = s.a;
+      const antwortet = !!bot && nr < ANTWORTEN_MAX;
+      if (antwortet) s = { ...s, a: nr + 1 };
+      speichere(buehne, s);
+      const inhalt = document.createElement('span'); inhalt.className = 'em-text'; inhalt.innerHTML = (e.svg || '') + `<span>${esc(e.text)}</span>`;
+      kartenBlase(buehne, 'flo', 'em-eigen', inhalt, 1800);
+      vorlesen(buehne, T('gesendet', { text: e.text }));
+      if (antwortet) zeigeAntwort(k, e.schluessel, nr);
+      frische(buehne);
+      return true;
     });
   });
   return b;
@@ -137,4 +293,7 @@ anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'chat'), { paket: MODUL, reih
 anbieten('partie:spieler-leiste', ({ buehne }) => { if (!einstellungen().an) return null; const e = document.createElement('span'); e.className = 'em-live sr'; e.setAttribute('aria-live', 'polite'); buehne.el.append(e); return e; }, { paket: MODUL, reihenfolge: 80 });
 anbieten('einstellungen:gruppen', () => gruppe(), { paket: MODUL, reihenfolge: 40 });
 
-export { EMOTES, SPERRZEIT, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER, antwortText, einstellungen };
+export {
+  EMOTES, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER,
+  antwortText, einstellungen, neuerStand, pruefeStand, imFenster, emoteFrei, chatFrei, nachEmote, nachChat, nachEigenemZug,
+};
