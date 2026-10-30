@@ -184,7 +184,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
 export const EINSTELLUNG_WERTE = Object.freeze({
-  brett: Object.freeze(['nacht', 'gruen', 'holz']),
+  brett: Object.freeze(['nacht', 'gruen', 'holz', 'marmor', 'walnuss']),
   klangpaket: Object.freeze(['', 'holz', 'arcade']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
@@ -194,7 +194,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   modus: Object.freeze(['system', 'hell', 'dunkel']),
   koordLage: Object.freeze(['ecke', 'rand']),
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
-  figuren: Object.freeze(['cburnett']),
+  figuren: Object.freeze(['cburnett', 'holzschnitt']),
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),

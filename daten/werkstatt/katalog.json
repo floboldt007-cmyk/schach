@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "artikel": [
+    {
+      "id": "brett-nacht",
+      "kategorie": "bretter",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Nacht",
+        "en": "Night"
+      },
+      "beschreibung": {
+        "de": "Das ruhige Crownmate-Standardbrett.",
+        "en": "The calm Crownmate standard board."
+      },
+      "vorschau": {
+        "hell": "#8394a8",
+        "dunkel": "#273444"
+      },
+      "ausruestung": {
+        "brett": "nacht"
+      }
+    },
+    {
+      "id": "brett-marmor",
+      "kategorie": "bretter",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Marmor",
+        "en": "Marble"
+      },
+      "beschreibung": {
+        "de": "Heller Stein mit klaren Kontrasten.",
+        "en": "Light stone with crisp contrast."
+      },
+      "vorschau": {
+        "hell": "#e8e4dc",
+        "dunkel": "#777b82"
+      },
+      "ausruestung": {
+        "brett": "marmor"
+      }
+    },
+    {
+      "id": "brett-walnuss",
+      "kategorie": "bretter",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Walnuss",
+        "en": "Walnut"
+      },
+      "beschreibung": {
+        "de": "Ein warmes, dunkles Holzbrett.",
+        "en": "A warm, dark wooden board."
+      },
+      "vorschau": {
+        "hell": "#d6ad79",
+        "dunkel": "#70452e"
+      },
+      "ausruestung": {
+        "brett": "walnuss"
+      }
+    },
+    {
+      "id": "brett-schiefer",
+      "kategorie": "bretter",
+      "zugang": {
+        "art": "spiel",
+        "bedingung": {
+          "welt": 3
+        }
+      },
+      "name": {
+        "de": "Schiefer",
+        "en": "Slate"
+      },
+      "beschreibung": {
+        "de": "Verdient mit dem Siegel der dritten Welt.",
+        "en": "Earned with the third world seal."
+      },
+      "vorschau": {
+        "hell": "#aeb7b4",
+        "dunkel": "#45514f"
+      }
+    },
+    {
+      "id": "brett-nachtblau",
+      "kategorie": "bretter",
+      "zugang": {
+        "art": "shop"
+      },
+      "name": {
+        "de": "Nachtblau",
+        "en": "Midnight Blue"
+      },
+      "beschreibung": {
+        "de": "Tiefblaues Brett mit heller Kante.",
+        "en": "Deep blue board with a bright edge."
+      },
+      "vorschau": {
+        "hell": "#8ca5bc",
+        "dunkel": "#1d3855"
+      }
+    },
+    {
+      "id": "figuren-standard",
+      "kategorie": "figuren",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Klassisch",
+        "en": "Classic"
+      },
+      "beschreibung": {
+        "de": "Die vertrauten Crownmate-Figuren.",
+        "en": "The familiar Crownmate pieces."
+      },
+      "vorschau": {
+        "hell": "#f4f1ec",
+        "dunkel": "#30343a"
+      },
+      "ausruestung": {
+        "figuren": "cburnett"
+      }
+    },
+    {
+      "id": "figuren-holzschnitt",
+      "kategorie": "figuren",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Holzschnitt",
+        "en": "Woodcut"
+      },
+      "beschreibung": {
+        "de": "Eigene, kantige Figuren wie aus Holz geschnitten.",
+        "en": "Original angular pieces cut like wood."
+      },
+      "vorschau": {
+        "hell": "#d8b47c",
+        "dunkel": "#513521"
+      },
+      "ausruestung": {
+        "figuren": "holzschnitt"
+      }
+    },
+    {
+      "id": "figuren-messing",
+      "kategorie": "figuren",
+      "zugang": {
+        "art": "shop"
+      },
+      "name": {
+        "de": "Messing",
+        "en": "Brass"
+      },
+      "beschreibung": {
+        "de": "Warme Metalloptik als Vorschau.",
+        "en": "A warm metal look in preview."
+      },
+      "vorschau": {
+        "hell": "#d9bd72",
+        "dunkel": "#72551f"
+      }
+    },
+    {
+      "id": "figuren-glas",
+      "kategorie": "figuren",
+      "zugang": {
+        "art": "shop"
+      },
+      "name": {
+        "de": "Glas",
+        "en": "Glass"
+      },
+      "beschreibung": {
+        "de": "Klare Figuren als Vorschau.",
+        "en": "Clear pieces in preview."
+      },
+      "vorschau": {
+        "hell": "#d9edf0",
+        "dunkel": "#66838b"
+      }
+    },
+    {
+      "id": "klang-arcade",
+      "kategorie": "klaenge",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Arcade",
+        "en": "Arcade"
+      },
+      "beschreibung": {
+        "de": "Der moderne Crownmate-Klang.",
+        "en": "The modern Crownmate sound."
+      },
+      "vorschau": {
+        "hell": "#e19b54",
+        "dunkel": "#9d4935"
+      },
+      "ausruestung": {
+        "klangpaket": "arcade"
+      }
+    },
+    {
+      "id": "klang-holz",
+      "kategorie": "klaenge",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Holz",
+        "en": "Wood"
+      },
+      "beschreibung": {
+        "de": "Trockene Klänge eines Holzbretts.",
+        "en": "Dry sounds from a wooden board."
+      },
+      "vorschau": {
+        "hell": "#cfad7b",
+        "dunkel": "#69462d"
+      },
+      "ausruestung": {
+        "klangpaket": "holz"
+      }
+    },
+    {
+      "id": "banner-welt",
+      "kategorie": "banner",
+      "zugang": {
+        "art": "spiel",
+        "bedingung": {
+          "boss": true
+        }
+      },
+      "name": {
+        "de": "Boss-Siegel",
+        "en": "Boss Seal"
+      },
+      "beschreibung": {
+        "de": "Prestige nur für besiegte Wochen-Bosse.",
+        "en": "Prestige reserved for defeated weekly bosses."
+      },
+      "vorschau": {
+        "hell": "#e4c66d",
+        "dunkel": "#714a31"
+      }
+    },
+    {
+      "id": "musik-analyse",
+      "kategorie": "musik",
+      "zugang": {
+        "art": "shop"
+      },
+      "name": {
+        "de": "Ruhige Analyse",
+        "en": "Quiet Analysis"
+      },
+      "beschreibung": {
+        "de": "Eine spätere Musik-Vorschau.",
+        "en": "A preview of future music."
+      },
+      "vorschau": {
+        "hell": "#a9b9a4",
+        "dunkel": "#3d5146"
+      }
+    },
+    {
+      "id": "finisher-kreide",
+      "kategorie": "finisher",
+      "zugang": {
+        "art": "spiel",
+        "bedingung": {
+          "level": 10
+        }
+      },
+      "name": {
+        "de": "Kreidelinie",
+        "en": "Chalk Line"
+      },
+      "beschreibung": {
+        "de": "Ab Level 10 erspielbar.",
+        "en": "Earnable from level 10."
+      },
+      "vorschau": {
+        "hell": "#e8e0cc",
+        "dunkel": "#54524e"
+      }
+    },
+    {
+      "id": "emote-gruss",
+      "kategorie": "emotes",
+      "zugang": {
+        "art": "gratis"
+      },
+      "name": {
+        "de": "Gruß",
+        "en": "Greeting"
+      },
+      "beschreibung": {
+        "de": "Ein freundlicher Gruß für alle.",
+        "en": "A friendly greeting for everyone."
+      },
+      "vorschau": {
+        "hell": "#efc27a",
+        "dunkel": "#9a6336"
+      }
+    }
+  ]
+}

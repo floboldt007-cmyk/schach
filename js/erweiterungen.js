@@ -21,7 +21,7 @@
 // 'pakete/abo/index', 'pakete/coach-ki/index', 'pakete/schule/index'.
 export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 'pakete/funken/index', 'pakete/punkte/index',
   'pakete/serie/index', 'pakete/teilen/index', 'pakete/gedaechtnis/index', 'pakete/kartei/index', 'pakete/start/index',
-  'pakete/zuzweit/index', 'pakete/tagesraetsel/index', 'pakete/finisher/index', 'pakete/emotes/index', 'pakete/musik/index', 'pakete/boss/index']);
+  'pakete/zuzweit/index', 'pakete/tagesraetsel/index', 'pakete/finisher/index', 'pakete/emotes/index', 'pakete/musik/index', 'pakete/boss/index', 'pakete/werkstatt/index']);
 
 // W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
 // 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration

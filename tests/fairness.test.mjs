@@ -22,6 +22,13 @@ function pruefe(name, bedingung, info) {
   if (bedingung) { ok++; console.log('OK     ' + name); } else { fehler++; console.log('FEHLER ' + name + (info !== undefined ? '  -> ' + JSON.stringify(info) : '')); }
 }
 
+// Die Werkstatt darf weder einen Countdown noch kuenstliche Kauf-Eile erzeugen.
+{
+  const ws = ['js/pakete/werkstatt/index.js', 'daten/werkstatt/katalog.json']
+    .map((d) => readFileSync(path.join(WURZEL, d), 'utf8')).join('\n');
+  pruefe('Werkstatt ohne Countdown-Druck', !/(countdown|nur noch|letzte chance|endet in|ends in|hurry)/i.test(ws));
+}
+
 const CHESS_COM_NAMEN = new Set(['Brillant', 'Großartig', 'Bester Zug', 'Exzellent', 'Gut', 'Buch', 'Ungenauigkeit', 'Fehler', 'Verpasst', 'Patzer']);
 const VERBOTENE_KLASSENNAMEN = new Set(['Treffer', 'Klasse', 'Serie', 'Funken']);
 pruefe('Zugklassen: 11 verschiedene Klartext-Namen', ZUGKLASSEN.length === 11 && new Set(ZUGKLASSEN.map((k) => k.name)).size === 11);

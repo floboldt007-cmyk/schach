@@ -15,6 +15,7 @@ offline laden kann.
 |---|---|---|
 | `assets/klang/holz/*.mp3` | Klangpaket „Holz“ (40 Dateien) | eigene Synthese, Einzelheiten in `assets/klang/LIZENZEN.md` |
 | `assets/klang/arcade/*.mp3` | Klangpaket „Arcade“ (40 Dateien) | eigene Synthese, Einzelheiten in `assets/klang/LIZENZEN.md` |
+| `assets/pieces/holzschnitt/*.svg` | Figurensatz „Holzschnitt“ (12 Dateien) | für Crownmate selbst gezeichnet |
 
 Neue eigene Klänge und Bilder kommen erst in diese Tabelle, wenn Flo das für die Datei so festlegt.
 

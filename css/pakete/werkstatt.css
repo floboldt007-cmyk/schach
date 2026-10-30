@@ -1,0 +1,20 @@
+.ws-karte { min-height: 148px; display: grid; align-content: space-between; cursor: pointer; }
+.ws-karte .ws-farben { display: flex; height: 12px; overflow: hidden; border-radius: var(--r-klein); }
+.ws-karte .ws-farben i { flex: 1; background: var(--ws-farbe); }
+.ws-blatt { position: fixed; inset: 0; z-index: 90; background: var(--ui-bg); color: var(--ui-text); overflow: auto; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.ws-kopf { max-width: 1180px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ws-layout { max-width: 1180px; margin: 18px auto; display: grid; grid-template-columns: 180px minmax(280px, 1fr) minmax(260px, .75fr); gap: 16px; }
+.ws-kategorien { display: flex; flex-direction: column; gap: 8px; }
+.ws-kategorien button { min-height: 44px; text-align: left; }
+.ws-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-content: start; }
+.ws-artikel { min-height: 170px; padding: 14px; border: 2px solid transparent; text-align: left; background: var(--ui-flaeche); color: inherit; border-radius: var(--r-mittel); }
+.ws-artikel[aria-selected="true"] { border-color: var(--akzent); }
+.ws-marke { display: inline-flex; margin-bottom: 12px; padding: 3px 8px; border-radius: 999px; background: var(--ui-bg); font-size: .78rem; font-weight: 750; }
+.ws-vorschau { position: sticky; top: 16px; padding: 18px; }
+.ws-mini { aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); overflow: hidden; border-radius: var(--r-mittel); margin-bottom: 16px; }
+.ws-mini i:nth-child(16n + 1),.ws-mini i:nth-child(16n + 3),.ws-mini i:nth-child(16n + 5),.ws-mini i:nth-child(16n + 7),.ws-mini i:nth-child(16n + 10),.ws-mini i:nth-child(16n + 12),.ws-mini i:nth-child(16n + 14),.ws-mini i:nth-child(16n + 16) { background: var(--ws-hell); }
+.ws-mini i { background: var(--ws-dunkel); }
+.ws-aktionen { display: grid; gap: 8px; }
+.ws-aktionen .knopf { min-height: 44px; }
+.ws-hinweis { color: var(--ui-gedimmt); }
+@media (max-width: 800px) { .ws-layout { grid-template-columns: 1fr; } .ws-kategorien { flex-direction: row; overflow-x: auto; } .ws-kategorien button { flex: 0 0 auto; } .ws-vorschau { position: static; } }

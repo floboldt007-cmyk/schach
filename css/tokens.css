@@ -51,6 +51,16 @@ html[data-brett="holz"] {
   --zuletzt: rgba(214, 220, 92, .52); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
+html[data-brett="marmor"] {
+  --feld-hell: #e8e4dc; --feld-dunkel: #777b82;
+  --zuletzt: rgba(196, 107, 72, .45); --auswahl: rgba(52, 55, 61, .22); --punkt: rgba(35, 38, 42, .2);
+  --auswahl-kante: rgba(255, 255, 255, .88);
+}
+html[data-brett="walnuss"] {
+  --feld-hell: #d6ad79; --feld-dunkel: #70452e;
+  --zuletzt: rgba(231, 185, 79, .5); --auswahl: rgba(66, 35, 18, .28); --punkt: rgba(45, 24, 12, .22);
+  --auswahl-kante: rgba(255, 244, 220, .84);
+}
 :root {
   --hinweis: rgba(76, 110, 245, .34);
   /* Flos eigene Pfeile und Marken: das Theme setzt --pfeil-nutzer/--marke-nutzer hell und dunkel, hier der Rueckfall */
