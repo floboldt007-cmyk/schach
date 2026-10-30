@@ -75,8 +75,12 @@ function merkeSitzung(d, email) {
 export async function pruefeCode(email, token) {
   token = String(token || '').replace(/\D/g, '');
   if (token.length !== 6) throw new Error(K('codeZiffern'));
-  return merkeSitzung(await anfrage('/auth/v1/verify', { methode: 'POST', daten: { type: 'email', email: String(email).trim(), token } }), email);
+  const s = merkeSitzung(await anfrage('/auth/v1/verify', { methode: 'POST', daten: { type: 'email', email: String(email).trim(), token } }), email);
+  neueAnmeldung(); return s;
 }
+// Jede neue Anmeldung (Code, Link, Google) verlangt einen neuen Abgleich: Die Cloud kann sich inzwischen auf einem
+// anderen Geraet geaendert haben. Das Erneuern einer Sitzung (erneuereSitzung) laesst den Merker stehen.
+function neueAnmeldung() { try { lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ } }
 export async function erneuereSitzung() {
   const s = sitzung(); if (!s?.refresh_token) throw new Error(K('nichtAngemeldet'));
   return merkeSitzung(await anfrage('/auth/v1/token?grant_type=refresh_token', { methode: 'POST', daten: { refresh_token: s.refresh_token } }), s.email);
@@ -185,12 +189,15 @@ export function ladeStandAufGeraet(cloud) {
 export function vorschau(stand) {
   const s = stand?.stand || stand || {}; let partien = 0; let level = 1;
   try { const p = JSON.parse(s['schach-arena:v1:partien']); partien = Array.isArray(p) ? p.length : 0; } catch (e) { /* leer */ }
-  try { const f = JSON.parse(s['schach-arena:v1:fortschritt']); level = Number(f.level) || 1; } catch (e) { /* leer */ }
+  // Das Level fuehrt das Funken-Modul (frueher stand hier nur fortschritt.level, das es nicht gibt: immer Level 1)
+  try { const f = JSON.parse(s['schach-arena:v1:modul:funken']); level = Number(f?.level) || 1; } catch (e) { /* leer */ }
   return { datum: stand?.aktualisiert_am || null, partien, level };
 }
 export function hatSpielstand(stand = lokalerStand()) {
   const v = vorschau(stand);
-  return v.partien > 0 || v.level > 1 || Object.keys(stand).some((k) => !OHNE_SPIELSTAND.has(k));
+  // Reine Einstellungen (Brett, Klang, Sprache) sind kein Spielstand: sonst bekaeme ein leerer Browser den Konflikt-Dialog
+  return v.partien > 0 || v.level > 1
+    || Object.keys(stand).some((k) => !OHNE_SPIELSTAND.has(k) && !/^schach-arena:v1:einstellungen(?::|$)/.test(k));
 }
 // wahl: nur 'geraet' oder 'cloud' entscheiden einen Konflikt. Alles andere (auch der Abbruch-Wert eines Dialogs)
 // laesst ihn offen: dann wird nichts geschrieben und der Riegel bleibt zu.
@@ -200,6 +207,7 @@ export async function gleicheNachAnmeldung(wahl) {
   if (!hatSpielstand()) { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
   if (wahl === 'geraet') { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
   if (wahl === 'cloud') { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
+  neueAnmeldung();   // Konflikt: Geraet und Cloud weichen ab, also Riegel zu, auch wenn ein alter Merker stand
   return { konflikt: true, geraet: vorschau(lokalerStand()), cloud: vorschau(cloud) };
 }
 export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (istAbgeglichen()) speichereCloudStand().catch(() => {}); }, ms); }
@@ -222,6 +230,7 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
       try { email = JSON.parse(atob(p.get('access_token').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email; } catch (e) { /* ohne */ }
       merkeSitzung({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
         expires_at: p.get('expires_at'), expires_in: p.get('expires_in') }, email);
+      neueAnmeldung();
       lager().setItem(SICHTBAR_SCHLUESSEL, '1');
       abgleichOffen = true;
     } catch (e) { /* unvollstaendiger Link: ignorieren */ }
@@ -303,16 +312,28 @@ export function kontoGruppe({ app } = {}) {
     const text = c.datum ? K('konfliktTextDatum', { ...zahlen, datum: new Date(c.datum).toLocaleString(locale()) }) : K('konfliktText', zahlen);
     const w = await app?.frage?.({ titel: K('konfliktTitel'), text, knoepfe: [{ text: K('geraetBehalten'), wert: 'geraet', art: 'primaer' }, { text: K('cloudLaden'), wert: 'cloud' }], abbrechen: true });
     if (w !== 'geraet' && w !== 'cloud') { melden(K('abgleichOffen')); return; }
+    // Ein anderer Tab hat inzwischen entschieden: nicht noch einmal (womoeglich entgegengesetzt) schreiben
+    if (istAbgeglichen()) { melden(K('schonAbgeglichen')); return; }
     await gleicheNachAnmeldung(w); melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
   }
+  // Angemeldet, aber auf diesem Geraet noch nicht abgeglichen (Link-Tab, anderer Tab, abgebrochener Dialog, Sitzung von
+  // vor dem Riegel): beim Zeichnen der Gruppe abgleichen, statt still nie mehr zu sichern.
+  let abgleichLaeuft = false;
+  const gleicheAb = () => {
+    if (abgleichLaeuft || !sitzung() || istAbgeglichen()) return;
+    abgleichLaeuft = true;
+    gleicheNachAnmeldung().then((abgleich) => {
+      render();
+      if (abgleich?.konflikt) return konfliktDialog(abgleich);
+      melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
+    }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true)).finally(() => { abgleichLaeuft = false; });
+  };
   render();
   if (linkFehler) { linkFehler = false; melden(K('linkUngueltig'), true); }
-  if (abgleichOffen && sitzung()) {
-    abgleichOffen = false;
-    gleicheNachAnmeldung().then((abgleich) => { render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true));
-  }
-  // Abmelden von aussen (Konto loeschen in der Gruppe "Daten"): neu zeichnen
-  const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) render(); }, 1000);
+  abgleichOffen = false;
+  gleicheAb();
+  // Abmelden von aussen (Konto loeschen in der Gruppe "Daten") oder Anmeldung in einem anderen Tab: neu zeichnen
+  const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) { render(); gleicheAb(); } }, 1000);
   return { el, verlasse() { clearInterval(uhr); if (istAbgeglichen()) speichereCloudStand().catch(() => {}); } };
 }
 function alsApp() {

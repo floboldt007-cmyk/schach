@@ -119,14 +119,36 @@ try {
     const b = await seite(k, zustand, LINK);
     await b.waitForTimeout(1800);
     pruefe('Zwei Tabs: Der Konflikt-Dialog steht im Link-Tab', /Spielstand behalten/.test(await dialogTitel(b)));
-    await a.bringToFront(); await a.waitForTimeout(1300);
-    await a.evaluate(() => window.__app.gehe('arena')); await a.waitForTimeout(600);
-    pruefe('Zwei Tabs: Der alte Tab lädt beim Verlassen nichts hoch (Riegel zu)', zustand.uploads.length === 0, { uploads: zustand.uploads.length });
-    await a.evaluate(() => window.__app.gehe('einstellungen')); await a.waitForTimeout(800);
-    await a.locator('[data-konto="sichern"]').click(); await a.waitForTimeout(1200);
-    pruefe('Zwei Tabs: „Jetzt sichern“ im alten Tab fragt erst nach, statt still hochzuladen',
-      /Spielstand behalten/.test(await dialogTitel(a)) && zustand.uploads.length === 0, { dialog: await dialogTitel(a), uploads: zustand.uploads.length });
+    await a.bringToFront(); await a.waitForTimeout(1600);
+    pruefe('Zwei Tabs: Der alte Tab fragt selbst nach, statt still zu sichern', /Spielstand behalten/.test(await dialogTitel(a)) && zustand.uploads.length === 0,
+      { dialog: await dialogTitel(a), uploads: zustand.uploads.length });
+    await b.bringToFront(); await b.getByRole('button', { name: 'Cloud laden' }).click(); await b.waitForTimeout(900);
+    pruefe('Zwei Tabs: „Cloud laden“ im Link-Tab lädt die 7 Partien und öffnet den Riegel', (await lokalePartien(b)) === 7
+      && (await b.evaluate(() => localStorage.getItem('schach-arena:konto:abgeglichen'))) === 'u1' && zustand.uploads.length === 0);
+    await a.bringToFront(); await a.getByRole('button', { name: /Gerät behalten/ }).click(); await a.waitForTimeout(900);
+    pruefe('Zwei Tabs: Die spätere, entgegengesetzte Antwort im alten Tab schreibt nichts',
+      zustand.uploads.length === 0 && JSON.parse(zustand.cloud.stand['schach-arena:v1:partien']).length === 7 && /anderen Fenster/.test((await status(a)).text),
+      { uploads: zustand.uploads.length, status: await status(a) });
     pruefe('Zwei Tabs: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
+    await k.close();
+  }
+  { // 3b. Neue Anmeldung in einem schon abgeglichenen Browser: der alte Abgleich gilt nicht mehr
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:v1:partien': partienJson(2, 'pc-'), 'schach-arena:konto:abgeglichen': 'u1' } });
+    const s = await seite(k, zustand, LINK);
+    await s.waitForTimeout(1800);
+    pruefe('Neue Anmeldung: Konflikt-Dialog trotz altem Abgleich', /Spielstand behalten/.test(await dialogTitel(s)));
+    await s.keyboard.press('Escape'); await s.waitForTimeout(300);
+    await s.evaluate(() => window.__app.gehe('arena')); await s.waitForTimeout(600);
+    pruefe('Neue Anmeldung, Dialog abgebrochen: nichts hochgeladen, die 7 Cloud-Partien bleiben',
+      zustand.uploads.length === 0 && JSON.parse(zustand.cloud.stand['schach-arena:v1:partien']).length === 7, { uploads: zustand.uploads.length });
+    await k.close();
+  }
+  { // 3c. Ein Browser mit nur Einstellungen (kein Spiel) gilt als leer und laedt die Cloud ohne Rueckfrage
+    const { k, zustand } = await speicher({ lokal: { 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'holz' }) } });
+    const s = await seite(k, zustand, LINK);
+    await s.waitForTimeout(2200);
+    pruefe('Nur Einstellungen: Cloud geladen ohne Dialog, „Cloud-Spielstand geladen“', (await lokalePartien(s)) === 7 && (await dialogTitel(s)) === ''
+      && /Cloud-Spielstand geladen/.test((await status(s)).text), { dialog: await dialogTitel(s), status: await status(s) });
     await k.close();
   }
   { // 4. Abgelaufener oder schon benutzter Link: Konto-Gruppe sichtbar, klare Meldung
