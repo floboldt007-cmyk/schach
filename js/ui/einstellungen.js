@@ -73,6 +73,7 @@ export function zeige(root, params = {}, app) {
   // Doppelklick) darf sie nicht gleich bestaetigen, darum gilt ein neu gezeichneter Knopf erst nach kurzer Zeit.
   let resetBereitAb = 0;
   let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
+  let ortKlang = null;     // Fuellung des Orts einstellungen:klang (Lobby-Musik am Ende der Gruppe Klang)
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
 
@@ -117,9 +118,14 @@ export function zeige(root, params = {}, app) {
       </header>
       <div class="es-layout">
        <nav class="es-nav" aria-label="${E('nav')}">
-        ${['klang','spiel','bewegung','anzeige','coach','fortschritt','info'].map((id, i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${E('gruppe.' + id)}</a>`).join('')}
+        ${[...(ZEIGE_SPRACHE ? ['sprache'] : []),'klang','spiel','bewegung','anzeige','coach','fortschritt','info'].map((id, i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${E('gruppe.' + id)}</a>`).join('')}
        </nav>
        <div class="es-inhalt">
+        ${ZEIGE_SPRACHE ? `<section class="es-gruppe flaeche es-sprache" aria-labelledby="es-g-sprache">
+          <h3 class="es-titel" id="es-g-sprache">Sprache · Language</h3>
+          ${segment('sprache',E('sprache.wahl'),[['auto',E('anzeige.geraet')],['de','Deutsch'],['en','English']],E('sprache.hilfe'))}
+        </section>` : ''}
+
         <section class="es-gruppe flaeche" aria-labelledby="es-g-klang">
           <h3 class="es-titel" id="es-g-klang">${E('gruppe.klang')}</h3>
           ${schalter('klang', E('klang.titel'), E('klang.text'),
@@ -128,6 +134,7 @@ export function zeige(root, params = {}, app) {
           <label class="es-regler"><span><b>${E('klang.lautstaerke')}</b><output>${E('prozent', { wert: 80 })}</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
           ${segment('klangstufe', E('klang.stufe'), [['alle',E('klang.alle')],['wichtig',E('klang.wichtig')],['aus',t('allgemein.aus')]])}
           <div class="es-untergruppe"><h4>${E('klang.einzeln')}</h4>${['brett','bewertung','feier','uhr','boss','finisher','bedienung'].map((k) => schalter(`klanggruppe-${k}`,E('klang.' + k),'')).join('')}</div>
+          <div class="es-ort es-ort-klang"></div>
         </section>
 
         <section class="es-gruppe flaeche" aria-labelledby="es-g-spiel"><h3 class="es-titel" id="es-g-spiel">${E('gruppe.spiel')}</h3>
@@ -148,7 +155,6 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-anzeige">${E('gruppe.anzeige')}</h3>
           ${segment('thema',E('anzeige.ansicht'),[['modern',E('anzeige.modern')]])}
           ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
-          ${ZEIGE_SPRACHE ? segment('sprache','Sprache · Language',[['auto',E('anzeige.geraet')],['de','Deutsch'],['en','English']]) : ''}
           <h4>${E('anzeige.brettfarbe')}</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
             ${BRETTER.map((b) => `
@@ -200,7 +206,9 @@ export function zeige(root, params = {}, app) {
       </div>`;
     // Ort einstellungen:gruppen (vor der Gruppe "Fortschritt"; der Behaelter ist display: contents)
     if (ortGruppen) ortGruppen.verlasse();
-    ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
+    ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort:not(.es-ort-klang)'), { app });
+    if (ortKlang) ortKlang.verlasse();
+    ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
     zeigeStand();
     zeigeReset();
   }
@@ -304,7 +312,9 @@ export function zeige(root, params = {}, app) {
         setzeZurueck();
         resetStufe = 0;
         if (ortGruppen) ortGruppen.verlasse();
-        ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
+        ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort:not(.es-ort-klang)'), { app });
+        if (ortKlang) ortKlang.verlasse();
+        ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
         zeigeReset();
         try { app.meldung(E('reset.fertig', { bot: ersterGegner() })); } catch (f) { /* egal */ }
         break;

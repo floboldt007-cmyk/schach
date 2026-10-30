@@ -41,6 +41,7 @@
 .screen .haupt-kopf .kopf-chips::-webkit-scrollbar { display: none; }
 /* passt nicht einmal der erste Chip, blendet js/ui/seite.js die Chips aus (kein abgeschnittener Stummel) */
 .screen .haupt-kopf.ohne-chips .kopf-chips { display: none; }
+.screen .haupt-kopf .kopf-chips > .passt-nicht { display: none; }
 .haupt-kopf.ohne-chips .rechts > .kopf-knopf:first-of-type { margin-left: auto; }
 .screen .haupt-kopf .kopf-chips > * { flex: none; }
 /* Zahlenruhe (SPIELKONZEPT 3.1, Flo 23.10.: "Sterne, Level, Serie"): bringt ein Paket einen eigenen Chip (Level, Serie),
