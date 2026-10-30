@@ -148,20 +148,28 @@ function merkeGesehen(ids) {
 }
 
 // ---------- Spielerkarte ----------
+// Eine Sache pro Blick (Entwurf "Crownmate aufgeraeumt", 30.10.): oben gross die beste Partie, darunter drei Zahlen,
+// keine Erklaersaetze
 function spielerkarte(st) {
   const s = S.tafelStatistik(st);
   const k = el('article', 'bl-karte bl-spieler');
-  const beste = s.beste ? `<b class="zahl">${zahlText(s.beste.e.w)}</b><span>${esc(nameVon(s.beste.tafel))}</span>`
+  const beste = s.beste ? `<b class="zahl">${zahlText(s.beste.e.w)}</b><span>${esc(t('p-punkte.karte.punkteAuf', { tafel: nameVon(s.beste.tafel) }))}</span>`
     : `<b>–</b><span>${esc(t('p-punkte.karte.nochKeine'))}</span>`;
-  k.innerHTML = `<div class="bl-s-kopf"><span class="bl-s-avatar" aria-hidden="true">${icon('person')}</span>
-      <div class="bl-s-name"><b>${esc(t('p-punkte.du'))}</b><span>${esc(st.level ? t('p-punkte.karte.level', { level: st.level }) : t('p-punkte.karte.deine'))}</span></div></div>
+  k.innerHTML = `<div class="bl-s-beste"><span class="ueberzeile">${esc(t('p-punkte.karte.beste'))}</span>${beste}</div>
     <dl class="bl-s-zahlen">
-      <div><dt>${esc(t('p-punkte.karte.rekorde'))}</dt><dd class="zahl">${s.rekorde}</dd></div>
-      <div><dt>${esc(t('p-punkte.karte.platz1'))}</dt><dd class="zahl">${s.platz1}</dd></div>
-      <div><dt>${esc(t('p-punkte.karte.tafeln'))}</dt><dd class="zahl">${s.tafeln}</dd></div>
-    </dl>
-    <div class="bl-s-beste"><span class="ueberzeile">${esc(t('p-punkte.karte.beste'))}</span>${beste}</div>
-    <p class="bl-s-satz">${esc(t('p-punkte.karte.satz'))}</p>`;
+      <div><dd class="zahl">${s.rekorde}</dd><dt>${esc(t('p-punkte.karte.rekorde'))}</dt></div>
+      <div><dd class="zahl">${s.platz1}</dd><dt>${esc(t('p-punkte.karte.platz1'))}</dt></div>
+      <div><dd class="zahl">${s.tafeln}</dd><dt>${esc(t('p-punkte.karte.tafeln'))}</dt></div>
+    </dl>`;
+  return k;
+}
+
+function leerKarte(app, fenster) {
+  const k = el('div', 'bl-leer-gross');
+  k.innerHTML = `<b></b><span></span><button type="button" class="knopf primaer bl-spielen">${esc(t('p-punkte.ich.spielen'))}${icon('pfeil')}</button>`;
+  k.querySelector('b').textContent = fenster === 'allzeit' ? t('p-punkte.ich.leerKurz') : t('p-punkte.ich.leerFensterKurz', { fenster: fensterText(fenster) });
+  k.querySelector('span').textContent = fenster === 'woche' ? t('p-punkte.ich.leerWoche') : t('p-punkte.ich.leerSonst');
+  k.querySelector('.bl-spielen').addEventListener('click', () => { try { app?.gehe?.('arena'); } catch (e) { /* egal */ } });
   return k;
 }
 
@@ -177,18 +185,21 @@ export function reiterIch({ app, fenster = 'woche', jetzt = new Date() } = {}) {
   beste.forEach((r, i) => { r.platz = i + 1; });
   const neu = new Set(st.neu);
   const liste = el('article', 'bl-karte bl-gesamt');
-  liste.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
-      <h2>${esc(t('p-punkte.ich.titel'))}</h2></div><span class="bl-k-hinweis">${esc(t('p-punkte.ich.hinweis'))}</span></header>
-    ${beste.length ? `<ol class="bl-zeilen">${beste.map((r) => zeileHtml(r, { neu: neu.has(r.id), mitTafel: true })).join('')}</ol>`
-    : `<p class="bl-leer">${esc(fenster === 'allzeit' ? t('p-punkte.ich.leer') : t('p-punkte.ich.leerFenster', { fenster: fensterText(fenster) }))}</p>`}`;
-  const buch = el('article', 'bl-karte bl-rekordbuch');
-  buch.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(t('p-punkte.buch.ueber'))}</span><h2>${esc(t('p-punkte.buch.titel'))}</h2></div></header>
-    ${st.rekorde.length ? `<ol class="bl-buch">${st.rekorde.slice(0, 12).map((r) => `<li><span class="bl-b-name">${esc(nameVon(r.tafel))}</span>`
+  if (beste.length) {
+    liste.innerHTML = `<header class="bl-k-kopf"><div><span class="ueberzeile">${esc(fensterText(fenster))}</span>
+      <h2>${esc(t('p-punkte.ich.titel'))}</h2></div></header>
+    <ol class="bl-zeilen">${beste.map((r) => zeileHtml(r, { neu: neu.has(r.id), mitTafel: true })).join('')}</ol>`;
+  } else liste.append(leerKarte(app, fenster));
+  s.append(spielerkarte(st), liste);
+  // Rekordbuch nur, wenn es Rekorde gibt; der Rechenstand steht nur dabei, wenn ein Rekord nach alten Regeln zaehlt
+  if (st.rekorde.length) {
+    const buch = el('article', 'bl-karte bl-rekordbuch');
+    buch.innerHTML = `<header class="bl-k-kopf"><div><h2>${esc(t('p-punkte.buch.titel'))}</h2></div></header>
+    <ol class="bl-buch">${st.rekorde.slice(0, 12).map((r) => `<li><span class="bl-b-name">${esc(nameVon(r.tafel))}</span>`
       + `<span class="bl-b-werte">${r.vorher != null ? `<s class="zahl">${zahlText(r.vorher)}</s>` : ''}<b class="zahl">${zahlText(r.w)}</b></span>`
-      + `<span class="bl-b-info">${esc([datumText(r.t), t('p-punkte.buch.rechenstand', { stand: r.stand }), r.n ? t('p-punkte.buch.nachweis') : ''].filter(Boolean).join(' · '))}</span></li>`).join('')}</ol>`
-    : `<p class="bl-leer">${esc(t('p-punkte.buch.leer'))}</p>`}
-    <p class="bl-klein">${esc(t('p-punkte.buch.klein'))}</p>`;
-  s.append(spielerkarte(st), liste, buch);
+      + `<span class="bl-b-info">${esc([datumText(r.t), r.stand !== F.STAND ? t('p-punkte.buch.rechenstand', { stand: r.stand }) : '', r.n ? t('p-punkte.buch.nachweis') : ''].filter(Boolean).join(' · '))}</span></li>`).join('')}</ol>`;
+    s.append(buch);
+  }
   bindeAnalyse(s, app);
   merkeGesehen(beste.filter((r) => neu.has(r.id)).map((r) => r.id));
   return { el: s, verlasse() {} };

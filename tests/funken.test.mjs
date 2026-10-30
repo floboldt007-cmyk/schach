@@ -1019,6 +1019,10 @@ async function testeBrowser(browser) {
   await h.tippe('.fk-chip');
   await seite.waitForSelector('.fk-spiegel-ort .fk-spiegel');
   await warte(500);
+  const vorn = await seite.locator('.fk-spiegel').innerText();
+  pruefe('Funken-Spiegel vorn nur Level, Balken, heute und als Nächstes; Tagesbogen und Rückenwind zugeklappt', /Level 1 · Funke/.test(vorn)
+    && /Level 5: Titel Glut/.test(vorn) && /Mehr zu deinen Funken/.test(vorn) && !/Heute zählen noch/.test(vorn) && !/Rückenwind-Karte im Fach/.test(vorn), vorn.slice(0, 300));
+  await seite.locator('.fk-spiegel .fk-s-mehr summary').click();
   const spiegel = await seite.locator('.fk-spiegel').innerText();
   pruefe('Antippen des Chips öffnet den Funken-Spiegel (Level, Balken, heute, Tagesbogen, Rückenwind, nächste Freischaltung, Regeln)',
     /Funken-Spiegel/.test(spiegel) && /Level 1 · Funke/.test(spiegel) && /0 von 100 bis Level 2/.test(spiegel) && /Heute zählen noch 800 Funken voll/.test(spiegel)
@@ -1130,6 +1134,7 @@ async function testeBrowser(browser) {
   await bild(seite, 'verlauf');
   await h.tippe('.fk-karte .fk-k-mehr');
   await seite.waitForSelector('.fk-spiegel');
+  await seite.locator('.fk-spiegel .fk-s-mehr summary').click();
   const sp2 = await seite.locator('.fk-spiegel').innerText();
   pruefe('Funken-Spiegel aus dem Verlauf: letzter Aufstieg mit Satz und Herkunft, heute nach Quellen', /Letzter Aufstieg/.test(sp2) && /Level 5:/.test(sp2)
     && /Partien \d/.test(sp2) && /Meilensteine \d/.test(sp2) && /Gezählt in deinen letzten|Verglichen/.test(sp2), sp2.slice(0, 400));
@@ -1182,6 +1187,7 @@ async function testeBrowser(browser) {
     pruefe('Alter Spielstand (12 Partien, kein Modul): Level 1, 0 Funken', /Level\s*1/.test(await s.locator('.fk-chip').innerText()) && (await hh.stand()).gesamt === 0);
     await hh.tippe('.fk-chip');
     await s.waitForSelector('.fk-spiegel-ort .fk-spiegel');
+    await s.locator('.fk-spiegel .fk-s-mehr summary').click();
     pruefe('Funken-Spiegel vor der ersten Karte: „Die erste Rückenwind-Karte kommt an deinem 4. Tag, danach jeden Montag eine.“',
       /Die erste Rückenwind-Karte kommt an deinem 4\. Tag, danach jeden Montag eine\./.test(await s.locator('.fk-spiegel .fk-s-rw').innerText()));
     await s.locator('.fk-spiegel .fk-schliessen').click();

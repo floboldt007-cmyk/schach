@@ -253,13 +253,18 @@ function anbieterHeute(k) {
 }
 
 function zeigeBlatt() {
+  // Ansicht des Blatts (start, ruhe, mehr, regeln): bleibt beim Neuzeichnen nach Ruhetag oder Pause stehen
+  let ansicht = 'start';
+  let kamVon = null;
+  let wechsel = false;
   const baue = () => {
     const st = S.lade();
     const einst = S.einstellungen();
     const h = heute();
     return A.blattInhalt({
       st, lage: T.lage(st, h, einst), einst, heute: h, wochen: T.kalender(st, h, einst, 6), ring: T.ringStand(st, h, einst),
-      pauseRest: T.pauseRest(st, h.slice(0, 4)), pauseAb: st.letzter === h ? 'morgen' : 'heute',
+      pauseRest: T.pauseRest(st, h.slice(0, 4)), pauseAb: st.letzter === h ? 'morgen' : 'heute', ansicht, kamVon,
+      beiAnsicht: (a) => { kamVon = ansicht; ansicht = a; wechsel = true; neu(); },
       beiRuhetag: (w) => sicher(() => { S.speichereEinstellungen({ ruhetag: w }); neu(); }, 'Ruhetag'),
       beiPause: (n) => sicher(() => {
         const s2 = S.lade();
@@ -287,7 +292,10 @@ function zeigeBlatt() {
     });
   };
   const blatt = A.oeffneBlatt(baue(), { titel: t('p-serie.name') });
-  function neu() { if (blatt && A.offenesBlatt() === blatt) blatt.ersetze(baue()); }
+  function neu() {
+    if (blatt && A.offenesBlatt() === blatt) blatt.ersetze(baue(), { fokus: wechsel });
+    wechsel = false;
+  }
 }
 
 const gezeigt = new Set();   // Partien, deren Abrechnungszeile schon gelaufen ist (der Nachtrag rollt nicht neu)

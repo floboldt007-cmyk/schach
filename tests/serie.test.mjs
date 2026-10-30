@@ -849,12 +849,13 @@ async function testeBrowser(browser) {
   await seite.waitForSelector('.se-blatt-ort .se-blatt');
   await warte(500);
   const blatt = await seite.locator('.se-blatt').innerText();
-  pruefe('Antippen des Chips öffnet das Serien-Blatt (Serie, Rekord, Kapitel, Felder bis zur Umwandlung, Kalender, Ring, Spieltage, Siegeslauf, Ruhetag, Pause, Regeln)',
-    /1 Schachtag in Serie · Rekord 1 · Kapitel 1/.test(blatt) && /noch 5 Felder bis zur Umwandlung/.test(blatt) && /KW \d+/.test(blatt)
-    && /Wochen-Ring/.test(blatt) && /Spieltage gesamt/.test(blatt) && /Siegeslauf/.test(blatt) && /Ruhetag/i.test(blatt) && /Pause ansagen/i.test(blatt)
-    && /So zählt der Bauernmarsch/.test(blatt) && !/am Stück/i.test(blatt), blatt.slice(0, 400));
+  pruefe('Antippen des Chips öffnet das Serien-Blatt: erste Seite nur Serie, Rekord, Bauernmarsch, diese Woche und drei Wege (eine Sache pro Blick)',
+    /^1\s*Schachtag in Serie/m.test(blatt) && /Rekord 1/.test(blatt) && /Noch 5 Felder bis zur Umwandlung\./.test(blatt) && /Diese Woche/i.test(blatt)
+    && /Ruhetag und Pause/.test(blatt) && /Rekorde und Kalender/.test(blatt) && /So zählt der Bauernmarsch/.test(blatt)
+    && !/KW \d+/.test(blatt) && !/Wochen-Ring/.test(blatt) && !/Spieltage gesamt/.test(blatt) && !/Ein Tag reicht von 4 Uhr/.test(blatt) && !/am Stück/i.test(blatt), blatt.slice(0, 400));
   pruefe('Kalender: heute gezählt (mit Bauer), keine roten Tage', await seite.locator('.se-kalender .se-k-tag.gezaehlt.heute').count() === 1
     && await seite.locator('.se-kalender .se-k-tag.gezaehlt .ico').count() === 1);
+  pruefe('Erste Seite: genau eine Woche (7 Tage), ohne KW-Spalte', await seite.locator('.se-kalender.kompakt .se-k-tag').count() === 7 && await seite.locator('.se-kalender .se-k-kw').count() === 0);
   await bild(seite, 'blatt');
   // modal: Tab bleibt im Blatt
   const imBlatt = [];
@@ -865,27 +866,51 @@ async function testeBrowser(browser) {
   await seite.keyboard.press('Shift+Tab');
   imBlatt.push(await seite.evaluate(() => !!document.activeElement && !!document.activeElement.closest('.se-blatt')));
   pruefe('Serien-Blatt ist modal: Tab und Umschalt+Tab bleiben im Blatt', imBlatt.every(Boolean), imBlatt);
+  // Rekorde und Kalender: eine Ebene tiefer, Fokus auf "Zurueck"
+  await seite.locator('.se-blatt .se-weg[data-ansicht="mehr"]').click();
+  await warte(200);
+  const mehr = await seite.locator('.se-blatt').innerText();
+  pruefe('Rekorde und Kalender: Stand mit Kapitel, Wochen-Ring, Spieltage, Siegeslauf, Ehrenreihe, Kalender mit KW, Fokus auf Zurück',
+    /1 Schachtag in Serie · Rekord 1 · Kapitel 1/.test(mehr) && /Wochen-Ring/.test(mehr) && /Spieltage gesamt/.test(mehr) && /Siegeslauf/.test(mehr)
+    && /Ehrenreihe/.test(mehr) && /KW \d+/.test(mehr) && await seite.evaluate(() => document.activeElement && document.activeElement.matches('.se-zurueck')), mehr.slice(0, 400));
+  await bild(seite, 'blatt-mehr');
+  await seite.locator('.se-blatt .se-zurueck').click();
+  await warte(200);
+  pruefe('Zurück: erste Seite, Fokus auf „Rekorde und Kalender“', await seite.locator('.se-blatt-inhalt[data-ansicht="start"]').count() === 1
+    && await seite.evaluate(() => document.activeElement && document.activeElement.matches('.se-weg[data-ansicht="mehr"]')));
+  await seite.locator('.se-blatt .se-weg[data-ansicht="regeln"]').click();
+  await warte(200);
+  pruefe('So zählt der Bauernmarsch: Regeln als eigene Seite', /Ein Tag reicht von 4 Uhr bis 4 Uhr/.test(await seite.locator('.se-blatt').innerText()));
+  await seite.locator('.se-blatt .se-zurueck').click();
+  await warte(200);
   // Ruhetag waehlen
+  await seite.locator('.se-blatt .se-weg[data-ansicht="ruhe"]').click();
+  await warte(200);
   await seite.locator('.se-blatt .se-rt[data-wert="6"]').click();
   await warte(200);
-  pruefe('Ruhetag Sonntag gewählt (gespeichert in den Einstellungen des Pakets, das Blatt zeigt ihn)', await seite.evaluate(() => window.__serie.einstellungen().ruhetag) === 6
-    && await seite.locator('.se-blatt .se-rt[data-wert="6"][aria-checked="true"]').count() === 1);
+  pruefe('Ruhetag Sonntag gewählt (gespeichert in den Einstellungen des Pakets, das Blatt zeigt ihn, die Seite bleibt offen)', await seite.evaluate(() => window.__serie.einstellungen().ruhetag) === 6
+    && await seite.locator('.se-blatt .se-rt[data-wert="6"][aria-checked="true"]').count() === 1 && await seite.locator('.se-blatt-inhalt[data-ansicht="ruhe"]').count() === 1);
   await seite.locator('.se-blatt .se-rt[data-wert=""]').click();
   // Pause ansagen
   await seite.locator('.se-blatt .se-p-tage[data-tage="3"]').click();
   await warte(200);
   const pst = await h.stand();
-  // Der Kalender reicht bis zum Sonntag der laufenden Woche: samstags ist nur ein Pausentag zu sehen, sonntags keiner
+  pruefe('Pause für 3 Tage angesagt, ab morgen (heute ist schon gezählt); der Text nennt den Zeitraum', pst.pausen.length === 3
+    && pst.pausen[0] === await seite.evaluate(async () => (await import('./js/tag.js')).addiereTage(window.__serie.heute(), 1))
+    && /Pause angesagt: .* \(3 Tage\)/.test(await seite.locator('.se-blatt .se-p-info').innerText()), { pausen: pst.pausen });
+  // Die Woche auf der ersten Seite reicht bis Sonntag: samstags ist nur ein Pausentag zu sehen, sonntags keiner
+  await seite.locator('.se-blatt .se-zurueck').click();
+  await warte(200);
   const sichtbar = await seite.evaluate(async (pausen) => {
     const T = await import('./js/tag.js');
     const heute = window.__serie.heute();
     const sonntag = T.addiereTage(heute, 6 - T.wochentag(heute));
     return pausen.filter((k) => k <= sonntag).length;
   }, pst.pausen);
-  pruefe('Pause für 3 Tage angesagt, ab morgen (heute ist schon gezählt); Kalender zeigt den Liegestuhl bis Sonntag, Text nennt den Zeitraum', pst.pausen.length === 3
-    && pst.pausen[0] === await seite.evaluate(async () => (await import('./js/tag.js')).addiereTage(window.__serie.heute(), 1))
-    && /Pause angesagt: .* \(3 Tage\)/.test(await seite.locator('.se-blatt .se-p-info').innerText())
-    && await seite.locator('.se-blatt .se-k-tag.pause').count() === sichtbar, { pausen: pst.pausen, sichtbar });
+  pruefe('Erste Seite: Woche zeigt den Liegestuhl bis Sonntag, der Weg nennt die Pause', await seite.locator('.se-blatt .se-k-tag.pause').count() === sichtbar
+    && /Pause ab/.test(await seite.locator('.se-blatt .se-weg[data-ansicht="ruhe"]').innerText()), { sichtbar });
+  await seite.locator('.se-blatt .se-weg[data-ansicht="ruhe"]').click();
+  await warte(200);
   await seite.locator('.se-blatt .se-p-ende').click();
   await warte(200);
   pruefe('Pause beenden: weg, die Tage zählen wieder fürs Jahr', (await h.stand()).pausen.length === 0 && /noch 30 von 30 Pausentagen/.test(await seite.locator('.se-blatt .se-p-info').innerText()));
@@ -950,6 +975,8 @@ async function testeBrowser(browser) {
   pruefe('Springer gewählt: steht in der Ehrenreihe, die Wahl ist weg, Klang umwandlung', (await h.stand()).figuren === 'S' && await seite.locator('.se-heute .se-wahl').count() === 0
     && (await h.klaenge()).includes('umwandlung'));
   await h.tippe('.se-heute .se-h-titel');
+  await seite.waitForSelector('.se-blatt .se-weg[data-ansicht="mehr"]');
+  await seite.locator('.se-blatt .se-weg[data-ansicht="mehr"]').click();
   await seite.waitForSelector('.se-blatt .se-ehren');
   pruefe('Serien-Blatt: Ehrenreihe mit dem Springer', await seite.locator('.se-blatt .se-ehren .se-ehre[aria-label="Springer"]').count() === 1);
   await seite.keyboard.press('Escape');
@@ -1100,8 +1127,17 @@ async function testeBrowser(browser) {
       const r = b.getBoundingClientRect();
       return { kalender: kal.right <= r.right + 1, quer: b.scrollWidth <= b.clientWidth + 1 };
     });
-    pruefe('Serien-Blatt: Kalender passt, kein waagrechtes Scrollen', blattMass.kalender && blattMass.quer, blattMass);
     await bild(s, `${name}-blatt`);
+    await s.locator('.se-blatt .se-weg[data-ansicht="mehr"]').click();
+    await warte(300);
+    const mehrMass = await s.evaluate(() => {
+      const b = document.querySelector('.se-blatt');
+      const kal = document.querySelector('.se-kalender').getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      return { kalender: kal.right <= r.right + 1, quer: b.scrollWidth <= b.clientWidth + 1 };
+    });
+    pruefe('Serien-Blatt: Woche und Kalender (Rekorde) passen, kein waagrechtes Scrollen', blattMass.kalender && blattMass.quer && mehrMass.kalender && mehrMass.quer, { blattMass, mehrMass });
+    await bild(s, `${name}-blatt-mehr`);
     pruefe('Keine Konsolenfehler', f.length === 0, f.join(' | '));
     await k.close();
   }
