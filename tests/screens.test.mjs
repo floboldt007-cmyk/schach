@@ -670,14 +670,23 @@ async function testeEinstellungen(browser) {
 
   // Zuruecksetzen in zwei Stufen
   pruefe('Vor dem Zurücksetzen: 1 Partie', (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
+  // Doppeltipp-Schutz: ein Doppelklick auf "Fortschritt zuruecksetzen" oeffnet nur die erste Rueckfrage, ein Klick auf den
+  // eben gezeichneten Knopf gilt erst nach kurzer Zeit (Ultracode-Pruefung 30.10.: Doppeltipp auf dem iPad loeschte sonst)
+  await seite.dblclick('[data-aktion="reset-1"]');
+  await seite.click('[data-aktion="reset-2"]');
+  pruefe('Doppelklick und sofortiger Klick: noch Stufe 1, nichts gelöscht', (await seite.locator('.es-reset').textContent()).includes('Wirklich')
+    && (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
+  await seite.click('[data-aktion="reset-ab"]');
   await seite.click('[data-aktion="reset-1"]');
   pruefe('Stufe 1: Rückfrage', (await seite.locator('.es-reset').textContent()).includes('Wirklich'));
   await seite.click('[data-aktion="reset-ab"]');
   pruefe('Abbrechen: nichts gelöscht', (await seite.evaluate(() => testseite.speicher.ladePartien().length)) === 1);
   await seite.click('[data-aktion="reset-1"]');
+  await seite.waitForTimeout(700);
   await seite.click('[data-aktion="reset-2"]');
   pruefe('Stufe 2: letzte Rückfrage', (await seite.locator('.es-reset').textContent()).includes('nicht rückgängig'));
   await bild(seite, 'einstellungen-zuruecksetzen');
+  await seite.waitForTimeout(700);
   await seite.click('[data-aktion="reset-ok"]');
   const nach = await seite.evaluate(() => ({ p: testseite.speicher.ladePartien().length, s: testseite.speicher.gesamtSterne(), e: testseite.speicher.ladeEinstellungen() }));
   pruefe('Zurückgesetzt: keine Partien, keine Sterne', nach.p === 0 && nach.s === 0, JSON.stringify(nach));
