@@ -71,7 +71,7 @@
   font-weight: 700;
   line-height: 1;
   font-size: 11px;
-  font-size: clamp(8.5px, 2.4cqw, 12px);
+  font-size: clamp(10px, 2.4cqw, 12.5px);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
@@ -90,7 +90,7 @@
 .brett-koord-rand .koord {
   display: grid;
   place-items: center;
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: var(--text-2, #6E6A63);
 }
 .brett-koord-rand .koord.zahl { left: calc(-1 * var(--koord-rand)); width: var(--koord-rand); height: 12.5%; }

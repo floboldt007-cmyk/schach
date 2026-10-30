@@ -197,7 +197,7 @@
   .partie.mit-uhr .spieler.ich > .unter { display: none; }
   .partie.mit-uhr .zugbox { display: none; }
   .partie .zugbox { min-height: 60px; }
-  .partie .spielknoepfe > .knopf { min-height: 46px; font-size: 11px; }
+  .partie .spielknoepfe > .knopf { min-height: 46px; font-size: 12px; }
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
 }
 /* kleine Querfenster (Vorschau-Fenster anderer Apps, Stage Manager, Desktop; nicht Handy quer): Die Spalte darf bis
@@ -221,7 +221,7 @@
   .zugliste { grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
   .zugliste .z { gap: 5px; padding: 0 6px; font-size: 14px; }
   .partie .spielknoepfe { gap: 6px; }
-  .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { font-size: 11.5px; letter-spacing: -.01em; }
+  .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { font-size: 12px; letter-spacing: -.01em; }
   /* Knoepfe der Pakete: fuenf oder sechs passen nicht in eine Reihe (unter 44 px, Woerter abgeschnitten). Zwei Reihen zu
      drei; den Platz dafuer gibt die Zugliste ab (der Coach nennt den letzten Zug weiter) */
   .partie .spielknoepfe[data-aktionen] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -335,7 +335,7 @@
   .partie .coach .c-zug { font-size: 13.5px; }
   .partie .coach .c-eval { font-size: 12px; }
   .partie .coach .c-buch { font-size: 12.5px; }
-  .partie .coach .combo { height: 22px; padding: 0 8px; font-size: 10.5px; top: 8px; right: 8px; }
+  .partie .coach .combo { height: 22px; padding: 0 8px; font-size: 12px; top: 8px; right: 8px; }
   .partie .coach:has(.combo) > .c-kopf { padding-right: 84px; }
   .partie .coach > .c-text { margin-top: 3px; font-size: 13.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 1;
     -webkit-box-orient: vertical; overflow: hidden; }
@@ -357,7 +357,7 @@
   .partie .zugleiste .z { height: 30px; }
   .partie .spielknoepfe { gap: 6px; }
   .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { min-height: 48px; height: 48px; padding: 3px 2px; gap: 1px;
-    border-radius: 14px; font-size: 11.5px; letter-spacing: -.01em; }
+    border-radius: 14px; font-size: 12px; letter-spacing: -.01em; }
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }

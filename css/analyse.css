@@ -250,7 +250,7 @@
 .an-kl-auf:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .an-kl-auf svg { transition: none; } }
 .an-kl-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(7, auto) auto; grid-auto-flow: column; column-gap: 18px; }
-.an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 11px; font-weight: 750; letter-spacing: .1em;
+.an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 12px; font-weight: 750; letter-spacing: .1em;
   text-transform: uppercase; color: var(--text-2); }
 .an-kl-kopf span:first-child { flex: none; width: 34px; text-align: center; }
 .an-kl-kopf span:last-child { min-width: 34px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; }
@@ -328,11 +328,11 @@
   .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
   .an-seite { gap: 8px; }
   .an-g-wert { font-size: 27px; }
-  .an-g-label { font-size: 11px; }
+  .an-g-label { font-size: 12px; }
   .an-vs { min-width: 52px; }
   .an-vs b { font-size: 18px; }
-  .an-vs-wort { font-size: 11px; }
-  .an-vs-grund { font-size: 11px; max-width: 84px; }
+  .an-vs-wort { font-size: 12px; }
+  .an-vs-grund { font-size: 12px; max-width: 84px; }
   .an-kurve-wrap { height: 64px; }
   .an-k-legende { display: none; }
   .an-c-fuss { flex-wrap: wrap; }
@@ -384,11 +384,11 @@
   .an-genau .an-avatar { --g: 36px; border-radius: 11px; }
   .an-seite { gap: 8px; }
   .an-g-wert { font-size: 27px; }
-  .an-g-label { font-size: 11px; }
+  .an-g-label { font-size: 12px; }
   .an-vs { min-width: 52px; }
   .an-vs b { font-size: 18px; }
-  .an-vs-wort { font-size: 11px; }
-  .an-vs-grund { font-size: 11px; max-width: 84px; }
+  .an-vs-wort { font-size: 12px; }
+  .an-vs-grund { font-size: 12px; max-width: 84px; }
   .an-kurve-wrap { height: 64px; }
   .an-k-legende { display: none; }
   .an-klassen { padding: 6px 12px; }

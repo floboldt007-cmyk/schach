@@ -54,7 +54,7 @@
 @keyframes er-zeichnen { from { stroke-dashoffset: 700; } to { stroke-dashoffset: 0; } }
 html[data-bewegung="aus"] .er-krone { animation: none; }
 @media (prefers-reduced-motion: reduce) { .er-krone { animation: none; } }
-.er-ecke { position: absolute; font-size: 11px; font-weight: 700; letter-spacing: .14em; color: rgba(244, 241, 236, .72); }
+.er-ecke { position: absolute; font-size: 12px; font-weight: 700; letter-spacing: .14em; color: rgba(244, 241, 236, .72); }
 .er-oben { left: 16px; top: 12px; }
 .er-unten { right: 16px; bottom: 10px; font-weight: 600; color: rgba(244, 241, 236, .55); }
 .er-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -97,7 +97,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .pr-rahmen-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 46vh; overflow-y: auto; }
 .pr-rahmen { display: grid; justify-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--linie); background: var(--flaeche);
   color: var(--text); font: inherit; text-align: center; }
-.pr-rahmen b { font-size: 12px; } .pr-rahmen small { font-size: 11px; color: var(--text-2); line-height: 1.25; }
+.pr-rahmen b { font-size: 12px; } .pr-rahmen small { font-size: 12px; color: var(--text-2); line-height: 1.25; }
 .pr-rahmen:disabled { opacity: .55; }
 .pr-rahmen-bild { width: 44px; height: 44px; }
 .sa-bild .pr-rahmen-bild { width: 56px; height: 56px; }
