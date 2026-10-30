@@ -12,8 +12,10 @@
 //                                   Profi, Experte oder Elo sind verboten (Fairness 12, Test in fairness.test.mjs)
 //   titelVon(level) -> Text         der hoechste Titel bis zu diesem Level
 //   istTitelLevel(level) -> bool    bringt dieses Level einen neuen Titel (jedes 5. Level bis 50, dann 60, 75, 100)?
-//   belohnungen(level) -> [{ art, id, name }]   neue Stuecke dieses Levels (nur Schmuck und Titel, nie Spielwirkung);
-//                                   ueber 50: jedes 10. Level eine Wahl aus dem Katalog
+//   belohnungen(level) -> [{ art, id, name, kommt? }]   neue Stuecke dieses Levels (nur Schmuck und Titel, nie
+//                                   Spielwirkung); ueber 50: jedes 10. Level eine Wahl aus dem Katalog
+//   nutzbar(stueck) -> bool         sofort nutzbar? Stuecke mit kommt (z. B. 'emote-rad') werden gutgeschrieben, aber
+//                                   weder als "Neu" gefeiert noch als naechste Freischaltung genannt (Konzept S1-1)
 //   BELOHNUNGEN                     eingefrorene Tabelle 1..50
 //   alleStuecke() -> [{ level, art, id, name }]   die ganze Tabelle flach (fuer den Katalog, ausgegraut mit "Level 15")
 //
@@ -64,44 +66,48 @@ export function istTitelLevel(level) {
   return TITEL.some(([ab]) => ab === level);
 }
 
-const s = (art, id, name) => Object.freeze({ art, id, name });
+const s = (art, id, name, kommt) => Object.freeze(kommt ? { art, id, name, kommt } : { art, id, name });
 // Jedes Stueck: art (titel | zugspur | kartenrahmen | banner | brettrahmen | emote | finisher | figuren | oberflaeche
-// | wappen | wahl | brief | sonst), id (nur [a-z0-9-]), name (Anzeige). Alles nur Schmuck und Titel.
+// | wappen | wahl | brief | sonst), id (nur [a-z0-9-]), name (Anzeige), kommt (nur wenn die Anzeige erst spaeter kommt).
+// Alles nur Schmuck und Titel. Finisher-Stuecke 'finisher-<id>' muessen genau den Stufen in finisher/index.js
+// (FINISHER) entsprechen; Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'). Beides prueft
+// tests/funken.test.mjs gegen die Pakete.
+const RAD = 'emote-rad';
 export const BELOHNUNGEN = Object.freeze({
-  1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('finisher', 'finisher-tinte', 'Finisher-Stil Tinte'), s('emote', 'emotes-grund', '12 Grund-Emotes')],
+  1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('finisher', 'finisher-krone', 'Finisher Krone'), s('emote', 'emotes-grund', 'Grund-Emotes im Emote-Rad')],
   2: [s('zugspur', 'zugspur-bleistift', 'Zugspur Bleistift')],
   3: [s('kartenrahmen', 'kartenrahmen-fichte', 'Kartenrahmen Fichte')],
   4: [s('banner', 'banner-leinen', 'Banner-Stoff Leinen (6 Farben)')],
-  5: [s('titel', 'titel-glut', 'Titel Glut')],
+  5: [s('titel', 'titel-glut', 'Titel Glut'), s('finisher', 'finisher-welle', 'Finisher Schachbrett-Welle')],
   6: [s('zugspur', 'zugspur-kreide', 'Zugspur Kreidestrich')],
   7: [s('brettrahmen', 'brettrahmen-eiche', 'Brett-Rahmen Eiche')],
-  8: [s('emote', 'emote-hut-ab', 'Emote „Hut ab“')],
+  8: [s('emote', 'emote-hut-ab', 'Emote „Hut ab“', RAD)],
   9: [s('kartenrahmen', 'kartenrahmen-leder', 'Kartenrahmen Leder')],
-  10: [s('titel', 'titel-fackeltraeger', 'Titel Fackelträger'), s('finisher', 'finisher-glocke', 'Finisher-Stil Glocke'), s('wahl', 'wahl-figuren-1', 'Wahl: Figurensatz Chessnut, Merida oder Celtic')],
+  10: [s('titel', 'titel-fackeltraeger', 'Titel Fackelträger'), s('finisher', 'finisher-koenig', 'Finisher Fallender König'), s('wahl', 'wahl-figuren-1', 'Wahl: Figurensatz Chessnut, Merida oder Celtic')],
   11: [s('banner', 'banner-wolle', 'Banner-Stoff Wolle')],
   12: [s('zugspur', 'zugspur-federkiel', 'Zugspur Federkiel')],
   13: [s('brettrahmen', 'brettrahmen-ahorn', 'Brett-Rahmen Ahorn')],
   14: [s('banner', 'banner-zweifarbig', 'Banner zweifarbig (Teilung)')],
   15: [s('titel', 'titel-lagerfeuer', 'Titel Lagerfeuer'), s('kartenrahmen', 'kartenrahmen-kupfer', 'Kartenrahmen Kupfer')],
-  16: [s('emote', 'emote-lupe', 'Emote „Lupe“')],
+  16: [s('emote', 'emote-lupe', 'Emote „Lupe“', RAD)],
   17: [s('banner', 'banner-samt', 'Banner-Stoff Samt')],
   18: [s('zugspur', 'zugspur-pinsel', 'Zugspur Pinsel')],
   19: [s('brettrahmen', 'brettrahmen-schiefer', 'Brett-Rahmen Schiefer')],
   20: [s('titel', 'titel-fackel', 'Titel Fackel'), s('wahl', 'wahl-oberflaeche-1', 'Wahl: Brett-Oberfläche Maserung, Filz oder Papier')],
   21: [s('kartenrahmen', 'kartenrahmen-nussbaum', 'Kartenrahmen Nussbaum')],
-  22: [s('emote', 'emote-notizbuch', 'Emote „Notizbuch“')],
+  22: [s('emote', 'emote-notizbuch', 'Emote „Notizbuch“', RAD)],
   23: [s('banner', 'banner-wimpel', 'Banner-Form Wimpel')],
   24: [s('zugspur', 'zugspur-kohle', 'Zugspur Kohle')],
   25: [s('titel', 'titel-kaminfeuer', 'Titel Kaminfeuer'), s('brettrahmen', 'brettrahmen-kirsche', 'Brett-Rahmen Kirsche')],
   26: [s('oberflaeche', 'wahl-oberflaeche-2', 'Zweite Brett-Oberfläche (aus der Wahl von Level 20)')],
   27: [s('kartenrahmen', 'kartenrahmen-zinn', 'Kartenrahmen Zinn')],
-  28: [s('emote', 'emote-kerze', 'Emote „Kerze“')],
+  28: [s('emote', 'emote-kerze', 'Emote „Kerze“', RAD)],
   29: [s('banner', 'banner-seide', 'Banner-Stoff Seide')],
-  30: [s('titel', 'titel-esse', 'Titel Esse'), s('finisher', 'finisher-holzschnitt', 'Finisher-Stil Holzschnitt'), s('wahl', 'wahl-zugspur-1', 'Wahl: Zugspur Silberstift, Goldfaden oder Tintenlinie')],
+  30: [s('titel', 'titel-esse', 'Titel Esse'), s('wahl', 'wahl-zugspur-1', 'Wahl: Zugspur Silberstift, Goldfaden oder Tintenlinie')],
   31: [s('brettrahmen', 'brettrahmen-ebenholz', 'Brett-Rahmen Ebenholz')],
   32: [s('banner', 'banner-fahne', 'Banner-Form Fahne')],
   33: [s('kartenrahmen', 'kartenrahmen-messing', 'Kartenrahmen Messing')],
-  34: [s('emote', 'emote-kompass', 'Emote „Kompass“')],
+  34: [s('emote', 'emote-kompass', 'Emote „Kompass“', RAD)],
   35: [s('titel', 'titel-leuchtfeuer', 'Titel Leuchtfeuer'), s('figuren', 'wahl-figuren-2', 'Zweiter Figurensatz (aus der Wahl von Level 10)')],
   36: [s('zugspur', 'wahl-zugspur-2', 'Zweite Zugspur (aus der Wahl von Level 30)')],
   37: [s('brettrahmen', 'brettrahmen-intarsie', 'Brett-Rahmen Intarsie')],
@@ -111,7 +117,7 @@ export const BELOHNUNGEN = Object.freeze({
   41: [s('banner', 'banner-brokat', 'Banner-Stoff Brokat')],
   42: [s('zugspur', 'wahl-zugspur-3', 'Dritte Zugspur (aus der Wahl von Level 30)')],
   43: [s('brettrahmen', 'brettrahmen-marmorkante', 'Brett-Rahmen Marmorkante')],
-  44: [s('emote', 'emote-fernrohr', 'Emote „Fernrohr“')],
+  44: [s('emote', 'emote-fernrohr', 'Emote „Fernrohr“', RAD)],
   45: [s('titel', 'titel-leuchtturm', 'Titel Leuchtturm'), s('figuren', 'wahl-figuren-3', 'Dritter Figurensatz (aus der Wahl von Level 10)')],
   46: [s('wappen', 'wahl-wappen-2', 'Zweites Wappenfeld (aus der Wahl von Level 40)')],
   47: [s('kartenrahmen', 'kartenrahmen-perlmutt', 'Kartenrahmen Perlmutt')],
@@ -127,6 +133,10 @@ export function belohnungen(level) {
   if (istTitelLevel(level)) aus.push(s('titel', `titel-${titelVon(level).toLowerCase()}`, `Titel ${titelVon(level)}`));
   if (level % 10 === 0) aus.push(s('wahl', `wahl-katalog-${level}`, 'Eine Wahl aus dem Katalog'));
   return aus;
+}
+
+export function nutzbar(stueck) {
+  return !!stueck && !stueck.kommt;
 }
 
 export function alleStuecke() {

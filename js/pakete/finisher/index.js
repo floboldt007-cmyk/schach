@@ -1,6 +1,8 @@
 // Paket Finisher: nutzt ausschliesslich den Aufruf-Ort partie:matt. Es aendert weder Partie noch Ergebnis.
 // Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
-// Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit.
+// Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit. Die Level-Leiter
+// (funken/level.js, Stuecke 'finisher-<id>') nennt genau diese Stufen; tests/funken.test.mjs vergleicht beide.
+// Klang: den Siegesklang spielt die Partie selbst; der Finisher hat einen eigenen Klang in der Gruppe 'finisher'.
 import { anbieten } from '../../orte.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
 import { klang } from '../../sounds.js';
@@ -17,10 +19,10 @@ if (typeof document !== 'undefined' && !document.querySelector('link[data-paket=
   document.head.appendChild(css);
 }
 export const FINISHER = Object.freeze([
-  Object.freeze({ id: 'aus', text: 'aus', level: 1 }),
-  Object.freeze({ id: 'krone', text: 'krone', level: 1 }),
-  Object.freeze({ id: 'welle', text: 'welle', level: 5 }),
-  Object.freeze({ id: 'koenig', text: 'koenig', level: 10 }),
+  Object.freeze({ id: 'aus', text: 'aus', level: 1, klang: null }),
+  Object.freeze({ id: 'krone', text: 'krone', level: 1, klang: 'finisher-glocke' }),
+  Object.freeze({ id: 'welle', text: 'welle', level: 5, klang: 'finisher-kreide' }),
+  Object.freeze({ id: 'koenig', text: 'koenig', level: 10, klang: 'finisher-tinte' }),
 ]);
 
 export function aktuellesLevel() {
@@ -45,6 +47,8 @@ function punkt(buehne, feld) {
 
 export function starteFinisher(ctx, id = auswahl()) {
   if (id === 'aus' || ctx.gewinner !== 'flo') return null;
+  // schon abgebrochen (frueher Tipp): ohne Klang und Animation sofort fertig, das Ergebnis wartet nicht
+  if (ctx.signal && ctx.signal.aborted) return { fertig: Promise.resolve(), verlasse: () => {} };
   const reduziert = !!ctx.reduziert;
   const ziel = id === 'koenig' ? ctx.koenigFeld : (ctx.letzterZug && ctx.letzterZug.nach);
   const p = punkt(ctx.buehne, ziel);
@@ -62,8 +66,9 @@ export function starteFinisher(ctx, id = auswahl()) {
     }).join('');
   }
   ctx.buehne.effekte.appendChild(el);
-  // Ein vorhandener grosser Moment; bei ruhigem Standbild bleibt auch der Klang aus.
-  if (!reduziert) klang.spiele('sieg');
+  // Eigener Klang (Gruppe 'finisher', einzeln abschaltbar), nie ein zweites 'sieg'; bei ruhigem Standbild still.
+  const f = FINISHER.find((x) => x.id === id);
+  if (!reduziert && f && f.klang) klang.spiele(f.klang);
   let timer = null, fertig;
   const aufraeumen = () => { if (timer) clearTimeout(timer); el.remove(); fertig(); };
   const promise = new Promise((resolve) => { fertig = resolve; });
