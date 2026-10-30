@@ -765,13 +765,17 @@ export function zeige(root, params, app) {
   // mehr (geoeffneter Coach-Rest ausgenommen); die Zugliste nimmt den Rest und steht still.
   const ruhig = new Map();
   let ruhigFenster = '';
-  function halteCoachHoehe() {
+  // Neues Fenster (Drehen, Fenster ziehen): die gemerkten Hoehen gelten nur fuer das alte. layout() loest sie sofort, nicht
+  // erst beim naechsten Coach-Satz; sonst schob quer eine zu hohe Gegnerkarte Flos Karte samt Uhr aus dem Bild (CI 30.10.)
+  function loeseRuhe() {
     const fenster = innerWidth + 'x' + innerHeight;
-    if (fenster !== ruhigFenster) {
-      ruhigFenster = fenster;
-      for (const el of ruhig.keys()) el.style.minHeight = '';
-      ruhig.clear();
-    }
+    if (fenster === ruhigFenster) return;
+    ruhigFenster = fenster;
+    for (const el of ruhig.keys()) el.style.minHeight = '';
+    ruhig.clear();
+  }
+  function halteCoachHoehe() {
+    loeseRuhe();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
       const h = el.offsetHeight;
@@ -2283,6 +2287,7 @@ export function zeige(root, params, app) {
   }
   function layout() {
     if (weg || !inhaltEl || !s.isConnected) return;
+    loeseRuhe();
     const handy = istHandy();
     s.classList.toggle('handy', handy);
     const h2 = $('.kopf h2');
