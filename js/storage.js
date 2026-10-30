@@ -148,6 +148,9 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   // Premium-Umbau (PLAN 4): Klang
   klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade'
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
+  musik: false,          // ruhige Menue-Musik (bewusst standardmaessig aus)
+  musikLautstaerke: 0.35,// getrennt von Zugklaengen
+  musikMelodie: 'welt',  // 'welt' oder eine freigeschaltete Weltmelodie
   klangstufe: 'alle',    // 'alle' | 'wichtig' | 'aus' (Flo, D4: Standard alle)
   klanggruppen: Object.freeze({ brett: true, bewertung: true, feier: true, uhr: true, boss: true, finisher: true, bedienung: true }),
   // Spiel (Fingerschutz). Zug bestaetigen ist seit 23.10. Standard aus (Flo: ohne Hinweis wirkte das Spiel kaputt)
@@ -164,6 +167,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   modus: 'system',       // 'system' | 'hell' | 'dunkel'
   koordLage: 'ecke',     // 'ecke' | 'rand'
   pfeile: true,          // Pfeile malen
+  arenaKarteHinweis: false, // einmaliger Zieh-Hinweis auf der schmalen Weltkarte wurde geschlossen
   duellIntro: 'besondere', // 'immer' | 'besondere' | 'aus' (Flo, D3)
   figuren: 'cburnett',   // Figuren-Satz (vorbereitet)
   // Coach
@@ -183,6 +187,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   brett: Object.freeze(['nacht', 'gruen', 'holz']),
   klangpaket: Object.freeze(['', 'holz', 'arcade']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
+  musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
   zugBestaetigen: Object.freeze(['aus', 'ohneUhr', 'immer']),
   steuerung: Object.freeze(['beides', 'ziehen', 'tippen']),
   bewegung: Object.freeze(['langsam', 'normal', 'schnell', 'aus']),
@@ -314,6 +319,8 @@ export function ladeEinstellungen() {
   e.tiefe = Number.isFinite(e.tiefe) ? Math.max(8, Math.min(20, Math.round(e.tiefe))) : STANDARD_EINSTELLUNGEN.tiefe;
   e.lautstaerke = Number.isFinite(e.lautstaerke)
     ? Math.round(Math.max(0, Math.min(1, e.lautstaerke)) * 20) / 20 : STANDARD_EINSTELLUNGEN.lautstaerke;
+  e.musikLautstaerke = Number.isFinite(e.musikLautstaerke)
+    ? Math.round(Math.max(0, Math.min(1, e.musikLautstaerke)) * 20) / 20 : STANDARD_EINSTELLUNGEN.musikLautstaerke;
   return e;
 }
 

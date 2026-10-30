@@ -1,0 +1,9 @@
+.musik-einstellung { display: grid; gap: var(--abstand-3); }
+.musik-kopf { display: flex; align-items: center; justify-content: space-between; gap: var(--abstand-3); }
+.musik-kopf p, .musik-abend p { margin: 4px 0 0; color: var(--text-2); }
+.musik-schalter { min-width: var(--tap); min-height: var(--tap); border: 1px solid var(--linie); border-radius: var(--r-pille); background: var(--flaeche-2); font-weight: 750; }
+.musik-schalter[aria-checked="true"] { background: var(--akzent); color: var(--auf-akzent); }
+.musik-einstellung label { display: grid; gap: 6px; font-weight: 700; }
+.musik-einstellung input, .musik-einstellung select { min-height: var(--tap); accent-color: var(--akzent); }
+.musik-abend { padding-top: var(--abstand-3); border-top: 1px solid var(--linie); }
+.musik-abend .knopf { margin-top: 10px; }

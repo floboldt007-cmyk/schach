@@ -1,0 +1,10 @@
+{
+  "lizenz": "Eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in Crownmate. Nicht Teil der GPL-3.0 des Codes, siehe assets/LIZENZ-KUNST.md und assets/klang/MUSIK-LIZENZ.md.",
+  "melodien": {
+    "karofelder": { "bpm": 66, "grund": 220, "typ": "sine", "folge": [0, 4, 7, 11, 7, 4] },
+    "springerforst": { "bpm": 58, "grund": 196, "typ": "triangle", "folge": [0, 3, 7, 10, 7, 3] },
+    "turmstadt": { "bpm": 72, "grund": 174.61, "typ": "triangle", "folge": [0, 7, 5, 12, 10, 7] },
+    "gezeitenkueste": { "bpm": 54, "grund": 233.08, "typ": "sine", "folge": [0, 2, 7, 9, 7, 2] },
+    "stockfisch-tiefe": { "bpm": 48, "grund": 164.81, "typ": "sine", "folge": [0, 6, 10, 13, 10, 6] }
+  }
+}

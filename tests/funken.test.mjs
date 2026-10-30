@@ -120,6 +120,42 @@ gruppe = 'Titel und Belohnungen';
     && L.belohnungen(70).map((s) => s.id).join() === 'wahl-katalog-70' && L.belohnungen(75).map((s) => s.id).join() === 'titel-polarlicht'
     && L.belohnungen(100).map((s) => s.id).join() === 'titel-sonne,wahl-katalog-100' && L.belohnungen(51).length === 0);
   pruefe('Belohnungen nur Schmuck und Titel (keine Bots, Analyse, Lektionen, Klangpakete)', L.alleStuecke().every((s) => !/bot|analyse|lektion|klang/i.test(s.art + s.id)));
+  pruefe('kommt nur mit bekanntem Grund (emote-rad, werkstatt), nutzbar(s) genau ohne kommt', L.alleStuecke().every((s) => (s.kommt === undefined || s.kommt === 'emote-rad' || s.kommt === 'werkstatt')
+    && L.nutzbar(s) === (s.kommt === undefined)) && !L.nutzbar(null));
+  // Nur was die App heute zeigen kann, gilt als nutzbar: Titel, Namensschild, die Finisher und die Grund-Emotes.
+  // Zugspur, Rahmen, Banner, Wahl-Stuecke, Wappen und Brief zeigt erst die Werkstatt (sonst feiert die App "Neu: Zugspur Bleistift").
+  const nutzbareIds = L.alleStuecke().filter(L.nutzbar).map((s) => s.id);
+  pruefe('Nutzbar sind nur Titel, Namensschild, Finisher und Grund-Emotes', nutzbareIds.length > 0 && nutzbareIds.every((id) => /^titel-|^finisher-/.test(id)
+    || id === 'namensschild' || id === 'emotes-grund') && L.belohnungen(60).every((s) => s.art === 'titel' || !L.nutzbar(s)), nutzbareIds);
+  pruefe('Stücke ohne Anzeige: werkstatt (Zugspur Level 2, Kartenrahmen Level 3, Wahl Level 10, Brief Level 50)',
+    ['zugspur-bleistift', 'kartenrahmen-fichte', 'wahl-figuren-1', 'brief-stockfisch'].every((id) => L.alleStuecke().find((s) => s.id === id)?.kommt === 'werkstatt'));
+}
+
+// =====================================================================
+// Level-Belohnungen gegen die echten Freischaltungen (Pakete finisher und emotes, eine Quelle)
+// =====================================================================
+gruppe = 'Belohnungen gegen Pakete';
+{
+  setzeSpeicher(fakeSpeicher());
+  const { FINISHER } = await import('../js/pakete/finisher/index.js');
+  const { DE: FDE } = await import('../js/pakete/finisher/texte.js');
+  const { EMOTES } = await import('../js/pakete/emotes/index.js');
+  const alle = L.alleStuecke();
+  const leiter = alle.filter((s) => s.art === 'finisher').map((s) => `${s.id}@${s.level}`).sort();
+  const echt = FINISHER.filter((f) => f.id !== 'aus').map((f) => `finisher-${f.id}@${f.level}`).sort();
+  pruefe('Finisher: die Leiter verspricht genau die Stufen aus finisher/index.js (gleiches Stück, gleiches Level)', JSON.stringify(leiter) === JSON.stringify(echt), { leiter, echt });
+  pruefe('Finisher: jedes Leiter-Stück ist sofort nutzbar und trägt den Namen aus dem Finisher-Paket', alle.filter((s) => s.art === 'finisher')
+    .every((s) => L.nutzbar(s) && s.name.endsWith(FDE[FINISHER.find((f) => 'finisher-' + f.id === s.id).text])));
+  const emotes = alle.filter((s) => s.art === 'emote');
+  pruefe('Emotes: Level 1 nennt die Grund-Emotes des Rads (alle frei, ohne Level), das Rad hat Emotes', EMOTES.length > 0
+    && emotes.filter((s) => s.level === 1).map((s) => s.id).join() === 'emotes-grund' && L.nutzbar(emotes.find((s) => s.id === 'emotes-grund'))
+    && !/\d/.test(emotes.find((s) => s.id === 'emotes-grund').name));
+  pruefe('Emotes: kein Emote über Level 1 wird als nutzbar versprochen, solange das Rad keine Freischaltung kennt (kommt: emote-rad)',
+    emotes.filter((s) => s.level > 1).length > 0 && emotes.filter((s) => s.level > 1).every((s) => s.kommt === 'emote-rad' && !L.nutzbar(s)));
+  const st = S.lade(ort(2026, 10, 22, 20));
+  const auf = S.schliesseLevel((st.gesamt = L.funkenBis(8), st), 7, ort(2026, 10, 22, 20));
+  pruefe('Ein kommendes Emote wird trotzdem gutgeschrieben (freigeschaltet), Level 8 bringt sonst nichts Nutzbares',
+    auf && st.freigeschaltet.includes('emote-hut-ab') && auf.neu.filter(L.nutzbar).length === 0, { auf, frei: st.freigeschaltet });
 }
 
 // =====================================================================
@@ -301,7 +337,7 @@ gruppe = 'Speicher';
   sp.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { benno: { sterne: [true, true, true], partien: 3, siege: 3 } } }));
   let st = S.lade(ort(2026, 10, 22, 20));
   pruefe('Alter Spielstand ohne Modul startet bei 0 Funken, Level 1, mit den Stücken von Level 1', st.gesamt === 0 && st.level === 1 && st.stand === 1
-    && st.freigeschaltet.join() === 'titel-funke,namensschild,finisher-tinte,emotes-grund' && st.verlauf.length === 0, st);
+    && st.freigeschaltet.join() === 'titel-funke,namensschild,finisher-krone,emotes-grund' && st.verlauf.length === 0, st);
   // Entdeckungs-Fahrplan 3.16: die erste Karte kommt an Tag 4 (Start Donnerstag 22.10.: Tag 4 = Sonntag 25.10. ab 4:00)
   pruefe('Erster Start: Tag gemerkt, noch keine Rückenwind-Karte', st.rw.karten === 0 && st.rw.woche === null && st.rw.start === '2026-10-22', st.rw);
   {
@@ -673,7 +709,7 @@ gruppe = 'Ereignisse';
   sende('partie:analysiert', { partieId: 'pz1', botId: 'benno', modus: 'normal', wertet: true, partie: { genauigkeit: 91 }, neueSterne: [true, true, false], quelle: 'partie' });
   const feier = fuerOverlay('pz1');
   pruefe('Nach der Analyse: Stern 2 gebucht und genau eine Level-Zeile mit dem endgültigen Level', feier.length === 1 && feier[0].quelle === 'level'
-    && /^Level 2 · Neu: Zugspur Bleistift/.test(feier[0].titel) && feier[0].klang === 'level', feier);
+    && /^Level 2 · Als Nächstes: Titel Glut · Finisher Schachbrett-Welle \(Level 5\)/.test(feier[0].titel) && !/Zugspur/.test(feier[0].titel) && feier[0].klang === 'level', feier);
   log.length = 0;
   // auf Level 5 (Titel Glut): der grosse Moment
   const st = S.lade();
@@ -686,6 +722,19 @@ gruppe = 'Ereignisse';
   const a2 = log.find((x) => x.n === 'level:aufstieg');
   pruefe('Level 5: level:aufstieg mit Titel „Glut“, Feier groß („LEVEL 5 · Glut“) mit Klang level', a2 && a2.d.level === 5 && a2.d.titel === 'Glut'
     && f2.length >= 1 && f2[0].art === 'gross' && f2[0].quelle === 'level-titel' && f2[0].titel === 'LEVEL 5 · Glut' && f2[0].klang === 'level', { a2, f2 });
+  pruefe('Level 5: die Feier nennt den echten Finisher Schachbrett-Welle', f2.some((x) => /Neu: Finisher Schachbrett-Welle/.test(`${x.titel} ${x.text || ''}`)), f2);
+  // auf Level 8: das Emote „Hut ab“ kommt erst mit dem Emote-Rad, die Feier verspricht es nicht als „Neu“
+  const st8 = S.lade();
+  st8.gesamt = L.funkenBis(8) - 2;
+  S.speichere(st8);
+  sende('partie:beendet', { laufId: 'l8', partieId: 'pz8', botId: 'benno', modus: 'normal', wertet: true, ergebnis: 'sieg', eigeneZuege: 3,
+    liveKlassen: ['buch', null, 'buch', null, 'buch'], hinweise: 0, zuruecknahmen: 0, neueSterne: [false, false, false] });
+  sende('partie:analysiert', { partieId: 'pz8', botId: 'benno', wertet: true, partie: { genauigkeit: 50 }, neueSterne: [false, false, false] });
+  const f8 = fuerOverlay('pz8');
+  pruefe('Level 8: genau eine Level-Zeile ohne „Neu“ und ohne „Hut ab“, das Stück ist gutgeschrieben', f8.length === 1 && /^Level 8\b/.test(f8[0].titel)
+    && !f8.some((x) => /Neu|Hut ab/.test(`${x.titel} ${x.text || ''}`)) && S.lade().freigeschaltet.includes('emote-hut-ab'), f8);
+  pruefe('Level 8: die Feier nennt stattdessen das nächste nutzbare Stück (Level 10)', f8.length === 1
+    && /^Level 8 · Als Nächstes: Titel Fackelträger · Finisher Fallender König \(Level 10\)$/.test(f8[0].titel), f8);
   log.length = 0;
   sende('tag:gezaehlt', { tag: '2026-10-22', quelle: 'partie', serie: 3, kapitel: 1 });
   pruefe('tag:gezaehlt bringt nie Funken', log.length === 0);
@@ -973,7 +1022,7 @@ async function testeBrowser(browser) {
   const spiegel = await seite.locator('.fk-spiegel').innerText();
   pruefe('Antippen des Chips öffnet den Funken-Spiegel (Level, Balken, heute, Tagesbogen, Rückenwind, nächste Freischaltung, Regeln)',
     /Funken-Spiegel/.test(spiegel) && /Level 1 · Funke/.test(spiegel) && /0 von 100 bis Level 2/.test(spiegel) && /Heute zählen noch 800 Funken voll/.test(spiegel)
-    && /1 Rückenwind-Karte im Fach/.test(spiegel) && /Level 2: Zugspur Bleistift/.test(spiegel) && /So entstehen Funken/.test(spiegel), spiegel.slice(0, 300));
+    && /1 Rückenwind-Karte im Fach/.test(spiegel) && /Level 5: Titel Glut · Finisher Schachbrett-Welle/.test(spiegel) && !/Zugspur/.test(spiegel) && /So entstehen Funken/.test(spiegel), spiegel.slice(0, 300));
   await bild(seite, 'spiegel');
   await seite.keyboard.press('Escape');
   // wie navigation.test.mjs beim Blatt: hoechstens 2 s auf das Wegfahren warten (unter Last laeuft es spaeter aus)
@@ -1021,7 +1070,8 @@ async function testeBrowser(browser) {
   pruefe('Erste Partie: Aufstieg (data-aufstieg), Zahl im Emblem umgeklappt', e1.lv[1] > e1.lv[0] && await seite.locator(`.fk-abr[data-aufstieg="${fs1.level}"]`).count() === 1
     && (await seite.locator('.fk-abr .fk-z-neu').innerText()).trim() === String(fs1.level), e1.lv);
   const feier1 = await seite.locator('.erg-feier .erg-f-zeile[data-quelle="level"]').allInnerTexts();
-  pruefe('Feier-Zeile „Level n · Neu: …“ mit Können-Satz (genau eine Level-Zeile)', feier1.length === 1 && new RegExp(`^Level ${fs1.level} · Neu: Zugspur Bleistift`).test(feier1[0])
+  pruefe('Feier-Zeile „Level n · Als Nächstes: …“ mit Können-Satz (genau eine Level-Zeile, keine Zugspur)', feier1.length === 1
+    && new RegExp(`^Level ${fs1.level} · Als Nächstes: Titel Glut · Finisher Schachbrett-Welle \\(Level 5\\)`).test(feier1[0]) && !/Zugspur/.test(feier1[0])
     && /Züge gespielt|Seit Level/.test(feier1[0]), feier1);
   await warte(600);
   const k1 = await h.klaenge();

@@ -12,6 +12,8 @@ import { wertet, sterneFuerPartie, MODI } from '../js/storage.js';
 import { pruefeInhalt, pruefeSpielplan, texteVon, COUNTDOWN_RE } from '../js/inhalte.js';
 import { registriereBot, botNachId } from '../js/bots.js';
 import { ZUGKLASSEN } from '../js/zugklassen.js';
+import { DE as EMOTE_DE, EN as EMOTE_EN } from '../js/pakete/emotes/texte.js';
+import { EMOTES } from '../js/pakete/emotes/index.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -25,6 +27,17 @@ const CHESS_COM_NAMEN = new Set(['Brillant', 'Großartig', 'Bester Zug', 'Exzell
 const VERBOTENE_KLASSENNAMEN = new Set(['Treffer', 'Klasse', 'Serie', 'Funken']);
 pruefe('Zugklassen: 11 verschiedene Klartext-Namen', ZUGKLASSEN.length === 11 && new Set(ZUGKLASSEN.map((k) => k.name)).size === 11);
 pruefe('Zugklassen: keine Namen der Vergleichs-App oder Verbotsliste', ZUGKLASSEN.every((k) => !CHESS_COM_NAMEN.has(k.name) && !VERBOTENE_KLASSENNAMEN.has(k.name)));
+const emoteTexte = [...Object.values(EMOTE_DE), ...Object.values(EMOTE_EN)].join(' ');
+pruefe('Emotes: vorgefertigte Texte sind freundlich und ohne Druck, Kauf oder Schuldgefuehl',
+  !/kauf|buy|nur heute|only today|musst|must|schuld|guilt|verlierer|loser/i.test(emoteTexte));
+// SPIELKONZEPT 3.9 und 7.1: kein Emote, das verspottet (kein Lachen, Weinen, Gaehnen), weder als ID noch als Text
+const EMOTE_SPOTT = /lachen|laugh|weinen|cry|gaehnen|gähnen|yawn/i;
+const emoteIds = [...EMOTES.map(([id]) => id), ...Object.keys(EMOTE_DE).filter((k) => k.startsWith('emote.')).map((k) => k.slice(6))];
+const emoteNamen = [...Object.entries(EMOTE_DE), ...Object.entries(EMOTE_EN)].filter(([k]) => /^(emote|chat)\./.test(k)).map(([, v]) => v);
+pruefe('Emotes: Selbstprobe der Spott-Sperrliste', ['lachen', 'Laugh', 'weinen', 'cry', 'gaehnen', 'Gähnen', 'yawn'].every((t) => EMOTE_SPOTT.test(t)));
+pruefe('Emotes: keine Spott-Emotes (lachen, weinen, gaehnen) als ID oder Text',
+  emoteIds.length >= 8 && !emoteIds.some((id) => EMOTE_SPOTT.test(id)) && !emoteNamen.some((t) => EMOTE_SPOTT.test(t)),
+  [...emoteIds, ...emoteNamen].filter((t) => EMOTE_SPOTT.test(t)));
 
 // ---------------------------------------------------------------------------
 // Quelltext zerlegen: Zeichenketten (auch Template-Texte) und Code ohne Kommentare.
@@ -390,11 +403,11 @@ function jsonDateien(ordner) {
 }
 {
   // Schnell-Chat (Phase 2, SPIELKONZEPT 5.3 und Regel 21): keine Saetze "Wow", "Hoppla", "Knapp", "Glück gehabt",
-  // "Endlich" (wirken nach einem Fehler des Gegners wie Spott). Gilt fuer jede Datei mit "chat" oder "emote" im Namen
-  // unter js/ und daten/; bisher gibt es keine, die Pruefung greift mit dem Paket.
+  // "Endlich" (wirken nach einem Fehler des Gegners wie Spott). Gilt fuer jede Datei mit "chat" oder "emote" im Pfad
+  // unter js/ und daten/ (das Paket heisst js/pakete/emotes/index.js und texte.js: nur der Dateiname traf nie etwas).
   const CHAT_VERBOTEN = /(^|[^a-zäöüß])(wow|hoppla|knapp|endlich)(?![a-zäöüß])|glück gehabt/i;
-  const chatJs = jsDateien('js').filter((d) => /chat|emote/i.test(path.basename(d)));
-  const chatJson = jsonDateien('daten').filter((d) => /chat|emote/i.test(path.basename(d)));
+  const chatJs = jsDateien('js').filter((d) => /chat|emote/i.test(d));
+  const chatJson = jsonDateien('daten').filter((d) => /chat|emote/i.test(d));
   const treffer = [];
   for (const d of chatJs) for (const t of zerlege(readFileSync(path.join(WURZEL, d), 'utf8')).texte) if (CHAT_VERBOTEN.test(t)) treffer.push(`${d}: "${t.slice(0, 60)}"`);
   for (const d of chatJson) {
@@ -402,10 +415,46 @@ function jsonDateien(ordner) {
     try { json = JSON.parse(readFileSync(path.join(WURZEL, d), 'utf8')); } catch (e) { treffer.push(`${d}: kein JSON`); continue; }
     for (const t of texteVon(json)) if (CHAT_VERBOTEN.test(t)) treffer.push(`${d}: "${t.slice(0, 60)}"`);
   }
-  // Selbstprobe des Musters (sonst prueft die leere Liste nichts)
+  // Selbstprobe des Musters und der Dateiliste (sonst prueft eine leere Liste nichts): mindestens die Texte des Pakets
   const probe = ['Wow!', 'Hoppla', 'Knapp!', 'Glück gehabt', 'Endlich.'].every((t) => CHAT_VERBOTEN.test(t))
     && !['Gut gespielt!', 'Knapper Sieg für dich', 'Danke für die Partie'].some((t) => CHAT_VERBOTEN.test(t));
+  const geprueft = chatJs.map((d) => d.split(path.sep).join('/'));
+  pruefe('Schnell-Chat: Selbstprobe (Muster greift, mindestens eine Datei, darunter die Texte des Emote-Pakets)',
+    probe && chatJs.length + chatJson.length >= 1 && geprueft.includes('js/pakete/emotes/texte.js'), geprueft);
   pruefe(`Schnell-Chat ohne "Wow", "Hoppla", "Knapp", "Glück gehabt", "Endlich" (${chatJs.length + chatJson.length} Dateien)`, probe && treffer.length === 0, treffer);
+}
+{
+  // Emote-Rad und Schnell-Chat (SPIELKONZEPT 3.9 und 5.3, Paket emotes): hoechstens ein Emote je 8 s und 6 je Partie, nur
+  // in den Zeitfenstern (vor dem ersten Zug, nach einem Bot-Zug, nach der Partie); hoechstens ein Satz je 3 eigene Zuege
+  // und 3 je Minute; der Bot antwortet hoechstens 3-mal je Partie. Durchgespielt mit den reinen Funktionen des Pakets.
+  const E = await import('../js/pakete/emotes/index.js');
+  pruefe('Emotes: Grenzen hoechstens wie im Spielkonzept (8 s, 6 je Partie, 3 Antworten, 1 Satz je 3 Zuege, 3 je Minute)',
+    E.SPERRZEIT >= 8000 && E.EMOTES_MAX <= 6 && E.ANTWORTEN_MAX <= 3 && E.CHAT_ZUEGE >= 3 && E.CHAT_JE_MINUTE <= 3);
+  // Wer so oft wie moeglich drueckt (jede Sekunde, 10 Minuten lang, immer im Fenster), schafft nie mehr als erlaubt
+  let s = E.neuerStand();
+  const emotes = [];
+  for (let ms = 0; ms <= 600000; ms += 1000) {
+    if (E.emoteFrei(s, { phase: 'flo', jetzt: ms }).frei) { s = E.nachEmote(s, ms); emotes.push(ms); }
+  }
+  const abstand = emotes.every((x, i) => i === 0 || x - emotes[i - 1] >= 8000);
+  const phasen = ['start', 'flo', 'gezogen', 'bot', 'ende'].filter((phase) => E.emoteFrei(E.neuerStand(), { phase, jetzt: 0 }).frei);
+  pruefe('Emotes: hoechstens 6 je Partie, mindestens 8 s Abstand, nur vor dem ersten Zug, nach einem Bot-Zug und nach der Partie',
+    emotes.length === E.EMOTES_MAX && abstand && phasen.join() === 'start,flo,ende'
+    && !E.emoteFrei(E.neuerStand(), { phase: 'start', fortgesetzt: true, jetzt: 0 }).frei, { emotes, phasen });
+  // Schnell-Chat: jede Sekunde druecken, jede vierte Sekunde ein eigener Zug
+  let c = E.neuerStand();
+  const saetze = [];
+  let zuege = 0;
+  for (let ms = 0; ms <= 300000; ms += 1000) {
+    if (E.chatFrei(c, { phase: 'flo', jetzt: ms }).frei) { c = E.nachChat(c, ms); saetze.push({ ms, zuege }); }
+    if (ms % 4000 === 0) { c = E.nachEigenemZug(c); zuege++; }
+  }
+  const jeZuege = saetze.every((x, i) => i === 0 || x.zuege - saetze[i - 1].zuege >= 3);
+  const jeMinute = saetze.every((x) => saetze.filter((y) => y.ms > x.ms - 60000 && y.ms <= x.ms).length <= 3);
+  pruefe('Schnell-Chat: hoechstens ein Satz je 3 eigene Zuege und 3 je Minute', saetze.length > 1 && jeZuege && jeMinute, saetze.slice(0, 6));
+  const quelle = zerlege(readFileSync(path.join(WURZEL, 'js/pakete/emotes/index.js'), 'utf8')).code;
+  pruefe('Emotes: Bot-Antwort hoechstens ANTWORTEN_MAX-mal, Zaehler haengen an der Partie (buehne.merke), keine Sperrzeit im Knopf',
+    /nr < ANTWORTEN_MAX/.test(quelle) && /buehne\.merke\(MODUL, s\)/.test(quelle) && !/let zuletzt/.test(quelle));
 }
 {
   // Bot-Ton (SPIELKONZEPT 3.12 und 5.3, Paket gedaechtnis, Welle A2): hoechstens eine Bot-Stichelei je Partie (nur die

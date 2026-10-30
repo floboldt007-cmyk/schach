@@ -633,6 +633,28 @@ async function testeHochformate(browser) {
     await d.kontext.close();
   }
 
+  // Der ruhige Zieh-Hinweis erscheint auf dem Handy genau einmal und merkt die erste Geste dauerhaft.
+  gruppe = 'Handy Zieh-Hinweis';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.karte-zieh-hinweis:not([hidden])');
+    pruefe('erster Besuch zeigt „Karte ziehen“', (await seite.locator('.karte-zieh-hinweis').innerText()).trim() === 'Karte ziehen');
+    const kb = await seite.locator('.karte').boundingBox();
+    await seite.touchscreen.tap(kb.x + kb.width / 2, kb.y + kb.height / 2);
+    await seite.dispatchEvent('.karte', 'pointerdown', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 180 });
+    await seite.dispatchEvent('.karte', 'pointermove', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 140 });
+    await seite.dispatchEvent('.karte', 'pointerup', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 140 });
+    await seite.waitForFunction(() => document.querySelector('.karte-zieh-hinweis')?.hasAttribute('hidden'));
+    const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).arenaKarteHinweis);
+    pruefe('nach dem ersten Ziehen verschwindet der Hinweis und der erweiterte Einstellungsstand merkt ihn', gemerkt === true);
+    await seite.reload();
+    await seite.waitForSelector('.screen.arena .knoten');
+    pruefe('nach einem Neuladen kommt der Hinweis nicht wieder', await seite.locator('.karte-zieh-hinweis:not([hidden])').count() === 0);
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // Handy: Karte senkrecht scrollbar, Spielen-Knopf sichtbar ueber der Reiter-Leiste (Testmodus ?reiter=verlauf)
   for (const vp of [{ w: 390, h: 844 }, { w: 375, h: 667 }]) {
     for (const schema of ['light', 'dark']) {

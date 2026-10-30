@@ -341,6 +341,35 @@ async function testeLeiste(browser) {
   }
 }
 
+async function testeSprunglink(browser) {
+  gruppe = 'Sprunglink';
+  const { kontext, seite, fehler } = await neueSeite(browser);
+  await seite.goto(BASIS + '#arena');
+  await seite.waitForSelector('.screen.arena .knoten');
+  await seite.keyboard.press('Tab');
+  const de = await seite.evaluate(() => ({ text: document.activeElement.textContent, klasse: document.activeElement.className,
+    sichtbar: document.activeElement.getBoundingClientRect().top >= 0 }));
+  pruefe('erstes fokussierbares Element ist der sichtbare Sprunglink', de.klasse === 'zum-inhalt'
+    && de.text === 'Zum Inhalt springen' && de.sichtbar, JSON.stringify(de));
+  await seite.keyboard.press('Enter');
+  pruefe('Sprunglink fokussiert den Hauptinhalt', await seite.evaluate(() => document.activeElement.id === 'hauptinhalt'));
+  await seite.evaluate(() => { window.__app.setzeEinstellungen({ sprache: 'en', spracheGewaehlt: true }); window.__app.gehe('training'); });
+  await seite.waitForSelector('.screen.training-screen');
+  pruefe('Ziel folgt dem Screenwechsel und Text ist englisch', await seite.evaluate(() =>
+    document.querySelector('.zum-inhalt').textContent === 'Skip to content'
+    && document.querySelector('#app > .screen').id === 'hauptinhalt'));
+  // Auf anderen Screens bleibt der Screen stehen (vorher fuehrte #hauptinhalt ueber den Router zur Arena)
+  await seite.evaluate(() => window.__app.gehe('einstellungen'));
+  await seite.waitForSelector('.screen.es-screen');
+  await seite.focus('.zum-inhalt');
+  await seite.keyboard.press('Enter');
+  await seite.waitForTimeout(300);
+  pruefe('Sprunglink in den Einstellungen: Screen und Adresse bleiben, Fokus im Hauptinhalt', await seite.evaluate(() =>
+    location.hash === '#einstellungen' && !!document.querySelector('.screen.es-screen') && document.activeElement.id === 'hauptinhalt'));
+  pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
+}
+
 // Kopf: Klang-Schalter, Hell/Dunkel, Titel nie gekuerzt
 async function testeKopf(browser) {
   gruppe = 'Kopf';
@@ -638,6 +667,7 @@ async function testeBauteile(browser) {
 }
 
 async function browserTeil(browser) {
+  await testeSprunglink(browser);
   await testeLeiste(browser);
   await testeKopf(browser);
   await testeTraining(browser);

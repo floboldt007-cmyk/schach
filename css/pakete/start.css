@@ -159,7 +159,7 @@
   .st-stapel { width: min(100%, 250px); }
   .st-portraet { width: min(46%, 150px); }
   .st-portraet-name b { font-size: 19px; }
-  .screen .haupt-kopf .st-raus { padding: 0 12px; font-size: 13.5px; }
+  .screen .haupt-kopf .st-raus { max-width: 132px; padding: 5px 10px; font-size: 13.5px; line-height: 1.2; white-space: normal; }
   .st-screen .haupt-kopf .unter { display: none; }
   /* mit Zurueck (aus Einstellungen oder Heute-Karte geoeffnet) passen Marke, "Ich kenne mich aus" und Klang nicht mehr
      nebeneinander: die Marke tritt zurueck, die Seite hat ihren eigenen Titel */
