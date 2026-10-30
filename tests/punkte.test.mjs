@@ -1015,8 +1015,10 @@ async function testeBrowser(browser) {
   const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster .seg')].map((s) => s.dataset.wert + (s.getAttribute('aria-checked') === 'true' ? '*' : '')).join());
   pruefe('Kopf über hauptKopf, Reiter Ich · Bots · Freunde (Ort bestenliste:reiter), Fenster Woche · Monat · Allzeit (Standard Woche)',
     await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'ich:Ich,bots:Bots,freunde:Freunde' && fensterIds === 'woche*,monat,allzeit', [reiterIds, fensterIds]);
-  pruefe('Leer: freundliche Sätze statt leerer Tabellen', /Noch keine Partie|noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-gesamt').innerText())
-    && /Hier landet jeder neue Rekord/.test(await seite.locator('.bl-rekordbuch').innerText()));
+  pruefe('Leer: ein ruhiger Satz und „Jetzt spielen“ statt leerer Tabellen, kein leeres Rekordbuch, keine Erklärsätze im Kopf',
+    /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-gesamt').innerText())
+    && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
+    && !/ganz ohne Server|Jede Zeile eine echte Partie|wie treu/.test(await seite.locator('.bl-screen').innerText()));
   await h.reiter('bots');
   const leerBots = await seite.locator('.bl-tafel').innerText();
   pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
@@ -1108,7 +1110,8 @@ async function testeBrowser(browser) {
     && Number.isInteger(mPly) && an.gesehen[0] === mPly, { an, mPly });
   await h.bestenliste({ reiter: 'ich' });
   const ich = await seite.locator('.bl-reiter[data-reiter="ich"]').innerText();
-  pruefe('Reiter Ich: Spielerkarte (Rekorde, Platz 1, Tafeln, beste Partie) und „Deine besten Partien“ über alle Tafeln', /Rekorde\s*0/.test(ich) && /Tafeln\s*1/.test(ich)
+  pruefe('Reiter Ich: beste Partie groß („Punkte auf Lukas’ Tafel“), Rekorde, Platz 1, Tafeln und „Deine besten Partien“ über alle Tafeln', /0\s*Rekorde/.test(ich) && /1\s*Tafeln/.test(ich)
+    && /Punkte auf Lukas’ Tafel/.test(ich)
     && new RegExp(zahlText(e1.w)).test(ich) && /Lukas’ Tafel ·/.test(await seite.locator('.bl-gesamt .bl-z-info').first().innerText()), ich.slice(0, 300));
 
   // Bot-Panel der Arena (3.17 "Thorstens Tafel: Platz 4"): Tafel des gewaehlten Bots mit Bestwert, Antippen oeffnet sie
@@ -1156,7 +1159,7 @@ async function testeBrowser(browser) {
   await bild(seite, 'ergebnis-rekord');
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'ich' });
-  pruefe('Rekordbuch: neuer Wert, alter Wert durchgestrichen, Rechenstand 1', /Rechenstand 1/.test(await seite.locator('.bl-rekordbuch').innerText())
+  pruefe('Rekordbuch: neuer Wert, alter Wert durchgestrichen (Rechenstand steht nur bei alten Regeln dabei)', !/Rechenstand/.test(await seite.locator('.bl-rekordbuch').innerText())
     && (await seite.locator('.bl-rekordbuch s').first().innerText()).trim() === '1.000');
 
   // ---------- 7. Platz 1 mit Ueberholen: Freund als Gast, Mini-Tafel gleitet, Klacken ----------

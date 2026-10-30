@@ -231,6 +231,15 @@
 
 /* ---------- Klassen-Zaehler ---------- */
 .an-klassen { padding: 8px 16px 6px; }
+/* zugeklappt (Entwurf "aufgeraeumt"): eine ruhige Zeile, aufgeklappt die ganze Tabelle */
+.an-kl-auf { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--tipp); font-weight: var(--gw-stark);
+  cursor: pointer; list-style: none; }
+.an-kl-auf::-webkit-details-marker { display: none; }
+.an-kl-auf svg { width: 18px; height: 18px; flex: none; color: var(--text-2); transition: transform .2s; }
+.an-klassen[open] .an-kl-auf svg { transform: rotate(90deg); }
+.an-klassen[open] .an-kl-auf { margin-bottom: 4px; }
+.an-kl-auf:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .an-kl-auf svg { transition: none; } }
 .an-kl-raster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: repeat(7, auto) auto; grid-auto-flow: column; column-gap: 18px; }
 .an-kl-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; height: 24px; font-size: 11px; font-weight: 750; letter-spacing: .1em;
   text-transform: uppercase; color: var(--text-2); }

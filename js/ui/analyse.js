@@ -603,14 +603,17 @@ export function zeige(root, params = {}, app) {
     const links = KLASSEN.slice(0, 6).map(zeile).join('');
     const rechts = KLASSEN.slice(6).map(zeile).join('');
     const summe = (o) => Object.values(o).reduce((s, x) => s + (x || 0), 0);
+    // Eine Sache pro Blick (Entwurf "Crownmate aufgeraeumt", 30.10.): die Tabelle aller Zugklassen ist zugeklappt,
+    // sichtbar bleiben Genauigkeit, Kurve und die Schluesselmomente
     return `
-      <div class="an-klassen flaeche">
+      <details class="an-klassen flaeche">
+        <summary class="an-kl-auf"><span>${esc(t('analyse.an.klassen.auf'))}</span>${icon('vor')}</summary>
         <div class="an-kl-raster">
           ${kopf}${links}
           ${kopf.replace('an-kl-kopf', 'an-kl-kopf an-kl-kopf2')}${rechts}<div class="an-kl-platz" aria-hidden="true"></div>
           <div class="an-kl an-kl-gesamt"><span class="an-n zahl">${summe(du)}</span><span class="an-kl-mitte"><span>${esc(t('analyse.an.klassen.gesamt'))}</span></span><span class="an-n zahl">${summe(gegner)}</span></div>
         </div>
-      </div>`;
+      </details>`;
   }
 
   // ---------- Navigation ----------
@@ -771,7 +774,7 @@ export function zeige(root, params = {}, app) {
       el.innerHTML = `
         <div class="an-c-symbol an-c-start">${icon('ziel')}</div>
         <div class="an-c-kopf"><span class="an-c-klasse">${esc(info.wort)}</span><span class="an-c-zug">${esc(t('analyse.an.startstellung'))}</span></div>
-        <p class="an-c-text">${esc(satz)} ${esc(t(zuzweit() ? 'analyse.an.start.bedienungZuzweit' : 'analyse.an.start.bedienung'))}</p>`;
+        <p class="an-c-text">${esc(satz)}</p>`;
       neuAnimieren(el);
       return;
     }
