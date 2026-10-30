@@ -184,7 +184,8 @@ function koennen(st) {
 }
 
 function feiern(auf, satz, partieId) {
-  const stuecke = auf.neu.filter((s) => s.art !== 'titel');
+  // nur sofort nutzbare Stuecke als "Neu" (ein Emote vor dem Emote-Rad ist gutgeschrieben, aber nicht zu sehen)
+  const stuecke = auf.neu.filter((s) => s.art !== 'titel' && L.nutzbar(s));
   const liste = stuecke.slice(0, 2).map(A.stueckName).join(' · ');
   const neuText = stuecke.length
     ? (stuecke.length > 2 ? tx('feier.neuMehr', { liste, n: stuecke.length - 2 }) : tx('feier.neu', { liste }))

@@ -120,6 +120,35 @@ gruppe = 'Titel und Belohnungen';
     && L.belohnungen(70).map((s) => s.id).join() === 'wahl-katalog-70' && L.belohnungen(75).map((s) => s.id).join() === 'titel-polarlicht'
     && L.belohnungen(100).map((s) => s.id).join() === 'titel-sonne,wahl-katalog-100' && L.belohnungen(51).length === 0);
   pruefe('Belohnungen nur Schmuck und Titel (keine Bots, Analyse, Lektionen, Klangpakete)', L.alleStuecke().every((s) => !/bot|analyse|lektion|klang/i.test(s.art + s.id)));
+  pruefe('kommt nur mit bekanntem Grund (emote-rad), nutzbar(s) genau ohne kommt', L.alleStuecke().every((s) => (s.kommt === undefined || s.kommt === 'emote-rad')
+    && L.nutzbar(s) === (s.kommt === undefined)) && !L.nutzbar(null));
+}
+
+// =====================================================================
+// Level-Belohnungen gegen die echten Freischaltungen (Pakete finisher und emotes, eine Quelle)
+// =====================================================================
+gruppe = 'Belohnungen gegen Pakete';
+{
+  setzeSpeicher(fakeSpeicher());
+  const { FINISHER } = await import('../js/pakete/finisher/index.js');
+  const { DE: FDE } = await import('../js/pakete/finisher/texte.js');
+  const { EMOTES } = await import('../js/pakete/emotes/index.js');
+  const alle = L.alleStuecke();
+  const leiter = alle.filter((s) => s.art === 'finisher').map((s) => `${s.id}@${s.level}`).sort();
+  const echt = FINISHER.filter((f) => f.id !== 'aus').map((f) => `finisher-${f.id}@${f.level}`).sort();
+  pruefe('Finisher: die Leiter verspricht genau die Stufen aus finisher/index.js (gleiches Stück, gleiches Level)', JSON.stringify(leiter) === JSON.stringify(echt), { leiter, echt });
+  pruefe('Finisher: jedes Leiter-Stück ist sofort nutzbar und trägt den Namen aus dem Finisher-Paket', alle.filter((s) => s.art === 'finisher')
+    .every((s) => L.nutzbar(s) && s.name.endsWith(FDE[FINISHER.find((f) => 'finisher-' + f.id === s.id).text])));
+  const emotes = alle.filter((s) => s.art === 'emote');
+  pruefe('Emotes: Level 1 nennt die Grund-Emotes des Rads (alle frei, ohne Level), das Rad hat Emotes', EMOTES.length > 0
+    && emotes.filter((s) => s.level === 1).map((s) => s.id).join() === 'emotes-grund' && L.nutzbar(emotes.find((s) => s.id === 'emotes-grund'))
+    && !/\d/.test(emotes.find((s) => s.id === 'emotes-grund').name));
+  pruefe('Emotes: kein Emote über Level 1 wird als nutzbar versprochen, solange das Rad keine Freischaltung kennt (kommt: emote-rad)',
+    emotes.filter((s) => s.level > 1).length > 0 && emotes.filter((s) => s.level > 1).every((s) => s.kommt === 'emote-rad' && !L.nutzbar(s)));
+  const st = S.lade(ort(2026, 10, 22, 20));
+  const auf = S.schliesseLevel((st.gesamt = L.funkenBis(8), st), 7, ort(2026, 10, 22, 20));
+  pruefe('Ein kommendes Emote wird trotzdem gutgeschrieben (freigeschaltet), Level 8 bringt sonst nichts Nutzbares',
+    auf && st.freigeschaltet.includes('emote-hut-ab') && auf.neu.filter(L.nutzbar).length === 0, { auf, frei: st.freigeschaltet });
 }
 
 // =====================================================================
@@ -301,7 +330,7 @@ gruppe = 'Speicher';
   sp.setItem('schach-arena:v1:fortschritt', JSON.stringify({ bots: { benno: { sterne: [true, true, true], partien: 3, siege: 3 } } }));
   let st = S.lade(ort(2026, 10, 22, 20));
   pruefe('Alter Spielstand ohne Modul startet bei 0 Funken, Level 1, mit den Stücken von Level 1', st.gesamt === 0 && st.level === 1 && st.stand === 1
-    && st.freigeschaltet.join() === 'titel-funke,namensschild,finisher-tinte,emotes-grund' && st.verlauf.length === 0, st);
+    && st.freigeschaltet.join() === 'titel-funke,namensschild,finisher-krone,emotes-grund' && st.verlauf.length === 0, st);
   // Entdeckungs-Fahrplan 3.16: die erste Karte kommt an Tag 4 (Start Donnerstag 22.10.: Tag 4 = Sonntag 25.10. ab 4:00)
   pruefe('Erster Start: Tag gemerkt, noch keine Rückenwind-Karte', st.rw.karten === 0 && st.rw.woche === null && st.rw.start === '2026-10-22', st.rw);
   {
@@ -686,6 +715,17 @@ gruppe = 'Ereignisse';
   const a2 = log.find((x) => x.n === 'level:aufstieg');
   pruefe('Level 5: level:aufstieg mit Titel „Glut“, Feier groß („LEVEL 5 · Glut“) mit Klang level', a2 && a2.d.level === 5 && a2.d.titel === 'Glut'
     && f2.length >= 1 && f2[0].art === 'gross' && f2[0].quelle === 'level-titel' && f2[0].titel === 'LEVEL 5 · Glut' && f2[0].klang === 'level', { a2, f2 });
+  pruefe('Level 5: die Feier nennt den echten Finisher Schachbrett-Welle', f2.some((x) => /Neu: Finisher Schachbrett-Welle/.test(`${x.titel} ${x.text || ''}`)), f2);
+  // auf Level 8: das Emote „Hut ab“ kommt erst mit dem Emote-Rad, die Feier verspricht es nicht als „Neu“
+  const st8 = S.lade();
+  st8.gesamt = L.funkenBis(8) - 2;
+  S.speichere(st8);
+  sende('partie:beendet', { laufId: 'l8', partieId: 'pz8', botId: 'benno', modus: 'normal', wertet: true, ergebnis: 'sieg', eigeneZuege: 3,
+    liveKlassen: ['buch', null, 'buch', null, 'buch'], hinweise: 0, zuruecknahmen: 0, neueSterne: [false, false, false] });
+  sende('partie:analysiert', { partieId: 'pz8', botId: 'benno', wertet: true, partie: { genauigkeit: 50 }, neueSterne: [false, false, false] });
+  const f8 = fuerOverlay('pz8');
+  pruefe('Level 8: genau eine Level-Zeile ohne „Neu“ und ohne „Hut ab“, das Stück ist gutgeschrieben', f8.length === 1 && /^Level 8\b/.test(f8[0].titel)
+    && !f8.some((x) => /Neu|Hut ab/.test(`${x.titel} ${x.text || ''}`)) && S.lade().freigeschaltet.includes('emote-hut-ab'), f8);
   log.length = 0;
   sende('tag:gezaehlt', { tag: '2026-10-22', quelle: 'partie', serie: 3, kapitel: 1 });
   pruefe('tag:gezaehlt bringt nie Funken', log.length === 0);

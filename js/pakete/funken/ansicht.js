@@ -435,7 +435,7 @@ export function spielerEmblem({ st } = {}) {
 // ---------- Spiegel und Verlaufskarte ----------
 function naechsteFreischaltung(level) {
   for (let l = level + 1; l <= level + 60; l++) {
-    const neu = L.belohnungen(l).filter((s) => s.art !== 'titel');
+    const neu = L.belohnungen(l).filter((s) => s.art !== 'titel' && L.nutzbar(s));
     const titel = L.istTitelLevel(l) ? tx('titelStueck', { name: titelName(l) }) : null;
     const namen = [titel, ...neu.map(stueckName)].filter(Boolean);
     if (namen.length) return { level: l, text: namen.join(' · ') };
