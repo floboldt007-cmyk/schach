@@ -1,6 +1,12 @@
 // Freunde (js/freunde.js): Anfragen an die Funktionen aus supabase/freunde-schema.sql mit abgefangenem fetch, Link und
 // Code. Die Rechte und Regeln auf dem Server prueft supabase/freunde-rls-test.sql (im Supabase SQL Editor).
-//   node tests/freunde.test.mjs
+//   node tests/freunde.test.mjs            Node-Teil und Browser (Reiter Freunde der Bestenliste, Server abgefangen)
+//   node tests/freunde.test.mjs --nur-node
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { browserTyp } from './browser.mjs';
 import { setzeSpeicher } from '../js/storage.js';
 import { NAME, meldeWochenpunkte, ladeRangliste, ladeFreunde, frageAn, antworte, entferne, einladung, nutzeEinladung, einladungsLink, codeAusLink,
   uebernimmLink, gemerkterCode, vergissCode, setzeFreundeFetch, CODE_SCHLUESSEL } from '../js/freunde.js';
@@ -101,6 +107,148 @@ antworten.push({ status: 500, body: { message: 'intern' } });
 pruefe('500: server, kein Rohtext', await fehlerVon(() => frageAn('Max')) === 'server');
 pruefe('NAME wie im Schema', NAME.test('Flo_2026') && !NAME.test('ab') && !NAME.test('a'.repeat(21)));
 pruefe('keine E-Mail in Anfragen', !calls.some((c) => String(c.body || '').includes('@')));
+
+// ---------------------------------------------------------------------------
+// Browser: Reiter Freunde der Bestenliste mit abgefangenem Supabase
+// ---------------------------------------------------------------------------
+const require = createRequire(import.meta.url);
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PORT = Number(process.env.PORT || 8931);
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test`;
+const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+function ladePlaywright() {
+  for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
+    try { return require(k); } catch (e) { /* naechster */ }
+  }
+  throw new Error('Playwright nicht gefunden');
+}
+const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
+const SITZUNG_B = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1', expires_at: 9999999999,
+  user: { id: UID, email: 'probe@example.invalid' } };
+
+async function seiteMit(browser, { sitzung = null, server = {}, hash = '#bestenliste', vorher = {} } = {}) {
+  const k = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
+  const s = await k.newPage();
+  const srv = { profil: [{ user_id: UID, benutzername: 'Flo' }], liste: [{ id: 'b', name: 'lena_spielt', punkte: 340, partien: 12, ich: false },
+    { id: UID, name: 'Flo', punkte: 280, partien: 9, ich: true }], freunde: [{ id: 'c', name: 'Max', status: 'eingehend' }], status: 200, ...server };
+  const anfragen = [];
+  const fehlerListe = [];
+  s.on('pageerror', (e) => fehlerListe.push(e.message));
+  await s.route(SUPA + '/**', async (r) => {
+    const u = r.request().url();
+    const body = r.request().postData();
+    anfragen.push({ url: u, body });
+    if (srv.status !== 200 && u.includes('/rpc/')) return r.fulfill({ status: srv.status, contentType: 'application/json', body: '{"message":"x"}' });
+    const antwort = u.includes('/rest/v1/profile') ? srv.profil
+      : u.includes('/rpc/freunde_rangliste') ? srv.liste
+      : u.includes('/rpc/freunde') ? srv.freunde
+      : u.includes('/rpc/freund_anfragen') ? { ergebnis: 'gesendet' }
+      : u.includes('/rpc/freund_antworten') ? { ergebnis: JSON.parse(body || '{}').annehmen ? 'freunde' : 'abgelehnt' }
+      : u.includes('/rpc/freund_einladung_nutzen') ? { ergebnis: 'freunde', name: 'lena_spielt' }
+      : u.includes('/rpc/freund_einladung') ? { code: 'abcdef0123456789', gueltig_bis: '2026-11-06T10:00:00Z' }
+      : u.includes('/rpc/wochenpunkte_melden') ? { ergebnis: 'ok' } : {};
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
+  });
+  await s.addInitScript(({ sitzung, vorher }) => {
+    try {
+      if (sessionStorage.getItem('probe-start')) return;
+      sessionStorage.setItem('probe-start', '1');
+      localStorage.clear();
+      if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+      for (const [k, v] of Object.entries(vorher)) localStorage.setItem(k, v);
+    } catch (e) { /* egal */ }
+  }, { sitzung, vorher });
+  await s.goto(BASIS + hash);
+  await s.waitForSelector('.bl-steuer', { timeout: 30000 });
+  if (hash === '#bestenliste') await s.locator('.bl-steuer .seg[data-wert="freunde"]').click();
+  await s.waitForSelector('.bl-fr', { timeout: 15000 });
+  await warte(600);
+  return { k, s, srv, anfragen, fehlerListe };
+}
+
+async function browserTeil() {
+  const pw = ladePlaywright();
+  const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
+  let browser;
+  try {
+    for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
+    browser = await browserTyp(pw).launch();
+    // abgemeldet: Satz, Weg zum Konto, Codes offen, keine Anfrage
+    let p = await seiteMit(browser);
+    let text = await p.s.locator('.bl-fr').innerText();
+    pruefe('abgemeldet: Satz und „Zum Konto“, Codes offen, keine Server-Anfrage', /Mit einem Konto/.test(text) && /Zum Konto/.test(text)
+      && await p.s.locator('details.bl-fr-codes[open]').count() === 1 && !p.anfragen.some((a) => a.url.includes('/rpc/'))
+      && await p.s.locator('.bl-steuer-fenster').isHidden(), text);
+    pruefe('abgemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+
+    // angemeldet mit Namen: Rangliste, du-Zeile, Anfragen-Hinweis, Wochenwertung gemeldet
+    p = await seiteMit(browser, { sitzung: SITZUNG_B });
+    await p.s.waitForSelector('.bl-fr-liste', { timeout: 15000 }).catch(() => {});
+    const z = await p.s.evaluate(() => [...document.querySelectorAll('.bl-fr-zeile')].map((x) => ({ text: x.innerText.replace(/\s+/g, ' '), du: x.classList.contains('du'), av: !!x.querySelector('.bl-fr-av svg') })));
+    pruefe('Rangliste: Lena vor dir, du-Zeile mit Profilbild, Punkte und Partien', z.length === 2 && /lena_spielt/.test(z[0].text) && /340/.test(z[0].text)
+      && z[1].du && z[1].av && /Flo \(du\)/.test(z[1].text) && /9 gewertete Partien/.test(z[1].text), z);
+    pruefe('Hinweis „Anfragen an dich: 1“, Codes zu, Zeitfenster sichtbar', /Anfragen an dich: 1/.test(await p.s.locator('.bl-fr').innerText())
+      && await p.s.locator('details.bl-fr-codes[open]').count() === 0 && await p.s.locator('.bl-steuer-fenster').isVisible());
+    const melden = p.anfragen.find((a) => a.url.includes('/rpc/wochenpunkte_melden'));
+    const mb = melden && JSON.parse(melden.body);
+    pruefe('Wochenwertung gemeldet: Montag dieser Woche, ganze Zahlen', !!mb && /^\d{4}-\d{2}-\d{2}$/.test(mb.woche) && new Date(mb.woche + 'T12:00:00Z').getUTCDay() === 1
+      && Number.isInteger(mb.punkte) && Number.isInteger(mb.partien), mb);
+    const rl = p.anfragen.find((a) => a.url.includes('/rpc/freunde_rangliste'));
+    pruefe('Rangliste fuer das gewaehlte Fenster (Woche)', !!rl && JSON.parse(rl.body).fenster === 'woche');
+    pruefe('Keine E-Mail in Anfragen an die Freunde-Funktionen', !p.anfragen.filter((a) => /rpc\/(freund|wochen)/.test(a.url)).some((a) => String(a.body || '').includes('@')));
+    // Blatt: Anfrage schicken und Max annehmen
+    await p.s.locator('.bl-fr-plus').click();
+    await p.s.waitForSelector('.bl-fr-blatt .bl-fr-name-ein', { timeout: 5000 });
+    await p.s.locator('.bl-fr-name-ein').fill('lena_spielt');
+    await p.s.locator('.bl-fr-senden').click();
+    await p.s.waitForFunction(() => /geschickt/.test(document.querySelector('.bl-fr-status')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const anfr = p.anfragen.find((a) => a.url.includes('/rpc/freund_anfragen'));
+    pruefe('Blatt: Anfrage an lena_spielt geschickt', !!anfr && JSON.parse(anfr.body).name === 'lena_spielt'
+      && /Anfrage an lena_spielt geschickt/.test(await p.s.locator('.bl-fr-status').innerText()));
+    await p.s.waitForSelector('.bl-fr-anfragen [data-aktion="annehmen"]', { timeout: 5000 }).catch(() => {});
+    await p.s.locator('.bl-fr-anfragen [data-aktion="annehmen"]').first().click();
+    await p.s.waitForFunction(() => /Angenommen/.test(document.querySelector('.bl-fr-status')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const antw = p.anfragen.find((a) => a.url.includes('/rpc/freund_antworten'));
+    pruefe('Blatt: Max angenommen', !!antw && JSON.parse(antw.body).anderer === 'c' && JSON.parse(antw.body).annehmen === true);
+    await p.s.locator('.bl-fr-link').click();
+    await p.s.waitForFunction(() => /7 Tage/.test(document.querySelector('.bl-fr-status')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const linkWert = await p.s.locator('.bl-fr-link-feld').inputValue().catch(() => '');
+    pruefe('Blatt: Einladungslink mit #freund/<code>', /#freund\/abcdef0123456789$/.test(linkWert) || /7 Tage/.test(await p.s.locator('.bl-fr-status').innerText()), linkWert);
+    pruefe('Blatt passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+    pruefe('angemeldet: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+    await p.k.close();
+
+    // Freundes-Link: die App merkt den Code, zeigt den Reiter Freunde und fragt einmal
+    p = await seiteMit(browser, { sitzung: SITZUNG_B, hash: '#freund/abcdef0123456789' });
+    await p.s.waitForSelector('.sheet-karte', { timeout: 10000 }).catch(() => {});
+    pruefe('Link: Frage „Einladung annehmen?“', /Einladung annehmen/.test(await p.s.locator('.sheet-karte').innerText().catch(() => '')));
+    await p.s.locator('.sheet-knoepfe button', { hasText: 'Annehmen' }).click();
+    await p.s.waitForFunction(() => [...document.querySelectorAll('.toast, [role="status"]')].some((x) => /lena_spielt/.test(x.textContent)), null, { timeout: 5000 }).catch(() => {});
+    const nutz = p.anfragen.find((a) => a.url.includes('/rpc/freund_einladung_nutzen'));
+    pruefe('Link: Einladung mit dem Code eingeloest, Code vergessen', !!nutz && JSON.parse(nutz.body).code === 'abcdef0123456789'
+      && await p.s.evaluate(() => localStorage.getItem('schach-arena:konto:freund-einladung')) === null);
+    await p.k.close();
+
+    // ohne Benutzername: Name waehlen; Server nicht erreichbar: ruhiger Satz
+    p = await seiteMit(browser, { sitzung: SITZUNG_B, server: { profil: [] } });
+    await p.s.waitForSelector('.bl-fr-eigen', { timeout: 10000 }).catch(() => {});
+    pruefe('ohne Benutzername: Feld und „Namen speichern“', await p.s.locator('.bl-fr-eigen').count() === 1 && /Benutzernamen/.test(await p.s.locator('.bl-fr').innerText()));
+    await p.k.close();
+    p = await seiteMit(browser, { sitzung: SITZUNG_B, server: { status: 404 } });
+    await p.s.waitForFunction(() => /nicht erreichbar/.test(document.querySelector('.bl-fr')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+    pruefe('Server ohne Freunde-Funktionen (404): ruhiger Satz, keine Seitenfehler', /nicht erreichbar/.test(await p.s.locator('.bl-fr').innerText()) && p.fehlerListe.length === 0,
+      await p.s.locator('.bl-fr').innerText());
+    await p.k.close();
+  } catch (e) {
+    pruefe('Browser-Teil laeuft durch', false, e.message);
+  } finally {
+    if (browser) await browser.close();
+    server.kill();
+  }
+}
+if (!process.argv.includes('--nur-node')) await browserTeil();
 
 console.log(`${ok}/${gesamt} bestanden`);
 process.exit(ok === gesamt ? 0 : 1);

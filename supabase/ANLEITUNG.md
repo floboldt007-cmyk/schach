@@ -227,6 +227,25 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
    cascade`, sonst scheitert `konto_loeschen()` am Fremdschlüssel. Am besten die Tabelle zusätzlich in
    `meine_daten()` aufnehmen (die Online-Partien sind dort schon drin, sobald `online-schema.sql` eingespielt ist).
 
+## Freunde und Freunde-Rangliste (Stand 30.10.2026)
+
+Damit der Reiter „Freunde“ der Bestenliste mit Konto funktioniert (Freund per Benutzername oder Einladungslink,
+Rangliste nach Wochenwertung), braucht die Datenbank die Datei `supabase/freunde-schema.sql`. Ohne sie zeigt die App dort
+nur „Freunde sind gerade nicht erreichbar“, alles andere läuft weiter.
+
+1. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/freunde-schema.sql`
+   einfügen und **Run** drücken. Die Datei darf mehrfach laufen. Vorher muss `supabase/schema.sql` eingespielt sein
+   (Benutzernamen).
+2. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch
+   Freundschaften, Anfragen, den Einladungscode und die Wochenwertung.
+3. Prüfen: Im SQL Editor `select count(*) from public.freundschaften;` muss ohne Fehler `0` (oder mehr) liefern.
+
+**Was der Server sicherstellt:** Die Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte). Freunde
+sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgelehnte Anfrage sperrt 30 Tage still
+(auch nach Zurückziehen), höchstens 100 Freunde und offene Anfragen je Konto, höchstens 20 neue Anfragen am Tag. Ein
+Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
+1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase
