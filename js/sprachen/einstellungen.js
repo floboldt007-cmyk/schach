@@ -9,6 +9,9 @@ registriereTexte('einstellungen', {
     // ---------- Screen Einstellungen ----------
     unter: 'Wirkt sofort und bleibt gespeichert',
     nav: 'Einstellungsbereiche',
+    'gruppe.sprache': 'Sprache',
+    'sprache.wahl': 'App-Sprache',
+    'sprache.hilfe': 'Automatisch nimmt die Sprache deines Geräts.',
     'gruppe.klang': 'Klang',
     'gruppe.spiel': 'Spiel',
     'gruppe.bewegung': 'Bewegung',
@@ -374,6 +377,9 @@ registriereTexte('einstellungen', {
     // ---------- Screen Einstellungen ----------
     unter: 'Takes effect right away and is saved',
     nav: 'Settings sections',
+    'gruppe.sprache': 'Language',
+    'sprache.wahl': 'App language',
+    'sprache.hilfe': 'Automatic uses your device language.',
     'gruppe.klang': 'Sound',
     'gruppe.spiel': 'Game',
     'gruppe.bewegung': 'Motion',

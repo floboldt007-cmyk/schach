@@ -39,7 +39,7 @@
 .se-spieler-flamme { display: inline-flex; align-items: center; gap: 2px; flex: none; height: 18px; padding: 0 6px 0 3px; border-radius: var(--r-pille);
   background: var(--akzent-weich); color: var(--akzent-text); }
 .se-spieler-flamme .se-ico { width: 13px; height: 13px; }
-.se-spieler-flamme b { font-size: 11px; font-weight: 800; line-height: 1; }
+.se-spieler-flamme b { font-size: 12px; font-weight: 800; line-height: 1; }
 
 /* ---------- Heute-Karte (arena:heute) ---------- */
 .se-heute { display: grid; gap: 4px; min-width: 0; }
@@ -105,7 +105,7 @@
 
 .se-kalender { display: grid; gap: 4px; justify-content: start; }
 .se-k-zeile { display: grid; grid-template-columns: 52px repeat(7, 34px); gap: 4px; align-items: center; }
-.se-k-kopf span { font-size: 11.5px; font-weight: var(--gw-stark); color: var(--text-2); text-align: center; }
+.se-k-kopf span { font-size: 12px; font-weight: var(--gw-stark); color: var(--text-2); text-align: center; }
 .se-k-kw { font-size: 12px; font-weight: 650; color: var(--text-2); }
 .se-k-tag { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r-s); background: var(--grund-2); color: var(--text-2); }
 .se-k-tag .se-ico { width: 18px; height: 18px; }

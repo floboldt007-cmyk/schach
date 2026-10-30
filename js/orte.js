@@ -50,6 +50,7 @@ export const ORTE = Object.freeze({
   'analyse:oben': 'dom',
   'verlauf:seite': 'dom',
   'einstellungen:gruppen': 'dom',
+  'einstellungen:klang': 'dom',
   'app:erster-screen?': 'wahl',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2), Hosts und Kontexte in ARCHITEKTUR.md "W0+a: Spiel-Fundament"
   'arena:heute': 'dom',

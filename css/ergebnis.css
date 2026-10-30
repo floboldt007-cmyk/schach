@@ -61,7 +61,7 @@
 .erg-stern small { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 .erg-stern.aus b { color: var(--text-2); }
 .erg-stern > b, .erg-stern > small { animation: erg-zeile calc(420ms * var(--tempo)) var(--feder-weich) calc((540ms + var(--i) * 250ms) * var(--tempo)) both; }
-.e-neu { position: absolute; top: -4px; left: calc(50% + 18px); padding: 2px 6px; border-radius: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+.e-neu { position: absolute; top: -4px; left: calc(50% + 18px); padding: 2px 6px; border-radius: 7px; font-size: 12px; font-weight: 800; letter-spacing: .06em;
   color: var(--auf-akzent); background: var(--akzent);
   animation: combo calc(400ms * var(--tempo)) var(--feder-hupf) calc((700ms + var(--i) * 250ms) * var(--tempo)) both; }
 @keyframes erg-stern { from { opacity: 0; transform: translateY(46px) scale(.2) rotate(-60deg); } to { opacity: 1; transform: none; } }
@@ -117,7 +117,7 @@
   .e-stern { width: 50px; height: 50px; }
   .erg-stern:nth-child(2) .e-stern { width: 60px; height: 60px; margin-top: -6px; }
   .erg-stern b { font-size: 13px; }
-  .erg-stern small { font-size: 11.5px; }
+  .erg-stern small { font-size: 12px; }
   .erg-knoepfe { grid-template-columns: 1fr; }
   .erg-knoepfe .knopf { min-height: 52px; font-size: 16px; }
   .erg-bot .av { width: 42px; height: 42px; border-radius: 14px; }
