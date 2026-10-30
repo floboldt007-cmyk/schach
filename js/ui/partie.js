@@ -448,7 +448,7 @@ export function zeige(root, params, app) {
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
-        <div class="coach coach-karte leer" role="status"></div>
+        <div class="coach coach-karte leer"></div>
         <div class="sr zugansage" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="zugbox"><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
         <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
