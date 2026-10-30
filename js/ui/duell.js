@@ -3,12 +3,15 @@
 // schiebt sich mit schraeger Naht herein (Hochformat: waagrecht), "gegen" schlaegt auf der Naht ein (genau dann der
 // Start-Klang), Haltephase, dann fliegen beide Portraets an ihren Platz in der Partie. Optik: css/duell.css.
 //
-//   duellArt({ einstellung, anlass, reduziert }) -> 'voll' | 'kurz' | 'aus'
+//   duellArt({ einstellung, anlass, reduziert, vitrine }) -> 'voll' | 'kurz' | 'aus'
 //       einstellung = duellIntro aus den Einstellungen ('immer' | 'besondere' | 'aus', Flo D3), anlass = 'boss' |
 //       'liga' | 'erste' | null (erste Partie gegen diesen Bot), reduziert = bewegung.js reduziert().
 //       'aus' bei reduzierter Bewegung oder Einstellung aus (kein Intro, nur Start-Klang); 'voll' bei 'immer' oder bei
-//       'besondere' mit besonderem Anlass; sonst 'kurz' (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von
-//       seiner Figur auf der Karte in die Spielerleisten).
+//       'besondere' mit besonderem Anlass oder wenn Flo etwas zu zeigen hat (vitrine: Titel oder Errungenschaften); sonst
+//       'kurz' (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von seiner Figur auf der Karte in die Spielerleisten).
+//       Lange Fassung (Flo, 30.10.2026: "viel zu kurz, man kann nicht lesen, was er fuer Errungenschaften hat"): hat Flo
+//       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (3,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
+//       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (4,3 s). Tippen startet sofort.
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
@@ -57,6 +60,10 @@ export const FLUG = 440;
 const FLUG_VERSATZ = 30;                 // Flos Portraet startet etwas spaeter
 export const FLUG_MIN = 180;             // kuerzer lohnt kein Flug: dann blendet die Buehne nur aus
 const PUFFER = 60;                       // Abstand zur harten Grenze: der Flug endet spaetestens DAUER_MAX - PUFFER ms
+export const HALTE_VITRINE = 3300;       // lange Fassung: Haltephase zum Lesen der Vitrine
+export const DAUER_VITRINE = 4300;       // lange Fassung: harte Grenze
+const ORDEN_AB = 900;                    // lange Fassung: erste Errungenschaft (ms), dann je ORDEN_TAKT spaeter
+const ORDEN_TAKT = 300;
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * zf)
 // Texte als Schluessel (Woerterbuecher allgemein und arena), gelesen beim Zeichnen
@@ -68,9 +75,9 @@ const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.searc
 
 let aktiv = null;
 
-export function duellArt({ einstellung = 'besondere', anlass = null, reduziert = false } = {}) {
+export function duellArt({ einstellung = 'besondere', anlass = null, reduziert = false, vitrine = false } = {}) {
   if (reduziert || einstellung === 'aus') return 'aus';
-  if (einstellung === 'immer') return 'voll';
+  if (einstellung === 'immer' || vitrine) return 'voll';
   return anlass && BESONDERE.includes(anlass) ? 'voll' : 'kurz';
 }
 
@@ -139,7 +146,14 @@ function flieger(html, von, nach, { d = 440, v = 0, k = 'weich', rund = true } =
 
 export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art = null, einstellung = 'besondere' } = {}) {
   const f = farbe === 'b' ? 'b' : 'w';
-  const gewaehlteArt = ['voll', 'kurz', 'aus'].includes(art) ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0 });
+  // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
+  // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Wer etwas zu zeigen hat, bekommt die Buehne.
+  let profil = null;
+  const vorgegeben = ['voll', 'kurz', 'aus'].includes(art);
+  try { profil = (vorgegeben ? art === 'voll' : einstellung !== 'aus' && tempo() !== 0) && bot ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
+  const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
+  const hatVitrine = !!(profil && (profil.titel || orden.length));
+  const gewaehlteArt = vorgegeben ? art : duellArt({ einstellung, anlass, reduziert: tempo() === 0, vitrine: hatVitrine });
   const t0 = jetzt();
   // Zeitfaktor: hoechstens normales Tempo (das Intro muss in DAUER_MAX passen). A() bewegt mit diesem Faktor statt mit
   // tempo() (anim rechnet selbst mit tempo(), daher der Ausgleich tk); absolut() rechnet absolute ms fuer anim um.
@@ -197,12 +211,12 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   if (voll) ueber.setAttribute('aria-label', t('arena.duell.aria', { name: bot.name }));
   const stufeText = bot.stufe ? t('arena.duell.stufe', { stufe: bot.stufe }) : '';
   const anlassText = ANLASS_TEXT[anlass] ? t(ANLASS_TEXT[anlass]) : '';
-  // Vitrine (Flo, 30.10.2026: "beim Matchbeginn kurz flexen"): Titel und bis zu drei Errungenschaften unter Flos Namen,
-  // vom Ort duell:profil? (Paket sammlung); ohne Anbieter wie bisher. Kein eigener Ablauf, die Dauer bleibt.
-  let profil = null;
-  try { profil = voll ? waehle('duell:profil?', {}) : null; } catch (e) { profil = null; }
-  const orden = profil && Array.isArray(profil.orden) ? profil.orden.slice(0, 3) : [];
-  const vitrine = profil ? `${profil.titel ? `<div class="duell-titel">${esc(profil.titel)}</div>` : ''}${orden.length
+  // lange Fassung nur in der Vollfassung mit Vitrine (Zeiten absolut, die Haltephase dehnt sich nicht mit dem Tempo)
+  const lang = voll && hatVitrine;
+  const halteBis = lang ? HALTE_VITRINE : HALTE_BIS;
+  const dauerMax = lang ? DAUER_VITRINE : DAUER_MAX;
+  if (lang) ueber.classList.add('lang');
+  const vitrine = voll && profil ? `${profil.titel ? `<div class="duell-titel">${esc(profil.titel)}</div>` : ''}${orden.length
     ? `<div class="duell-vitrine">${orden.map((o) => `<span class="duell-orden">${esc(o.name)}</span>`).join('')}</div>` : ''}` : '';
   if (voll) {
     ueber.innerHTML = `
@@ -224,7 +238,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
         </div>
       </div>
       ${stufeText || anlassText ? `<div class="duell-oben"><span class="duell-chip">${esc([stufeText, anlassText].filter(Boolean).join(' · '))}</span></div>` : ''}
-      <div class="duell-tipp">${esc(t('arena.duell.tipp'))}</div>`;
+      <div class="duell-tipp">${esc(t(lang ? 'arena.duell.start' : 'arena.duell.tipp'))}</div>${lang ? '<div class="duell-zeit" aria-hidden="true"><i></i></div>' : ''}`;
   } else {
     // Kurzfassung: nur eine unsichtbare Huelle (Tipps gehen durch und beenden das Intro); die Portraets fliegen aus der Arena
     ueber.innerHTML = '';
@@ -233,7 +247,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   // Sicherheitsnetz fuer langsame Geraete: blockiert der Aufbau der Partie den Hauptfaden, kann die harte Grenze (ein
   // Timer) nicht rechtzeitig feuern; die Ueberlagerung ist dann trotzdem zur harten Grenze ausgeblendet (Opazitaet
   // laeuft im Compositor). Absolute Zeit: anim() rechnet mit Tempo, deshalb durch tempo() geteilt.
-  anim(ueber, [{ opacity: 1 }, { opacity: 1, offset: (DAUER_MAX - 160) / DAUER_MAX }, { opacity: 0 }], { d: absolut(DAUER_MAX), k: 'linear', fill: 'forwards' });
+  anim(ueber, [{ opacity: 1 }, { opacity: 1, offset: (dauerMax - 160) / dauerMax }, { opacity: 0 }], { d: absolut(dauerMax), k: 'linear', fill: 'forwards' });
   const meldeBereit = () => { if (wechsel == null) wechsel = Math.round(jetzt() - t0); bereitLoes(); };
 
   const zeigeZiele = () => {
@@ -292,7 +306,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     zieleZahl = ziele.length;
     // Flugdauer (absolute ms): wie im Entwurf, aber so gekuerzt, dass das Intro vor der harten Grenze endet; reicht die
     // Zeit nicht fuer FLUG_MIN (Partie kam sehr spaet), fliegt nichts und die Buehne blendet nur aus
-    const rest = DAUER_MAX - PUFFER - (jetzt() - t0);
+    const rest = dauerMax - PUFFER - (jetzt() - t0);
     const versatz = FLUG_VERSATZ * zf;
     const moeglich = Math.min((voll ? FLUG : KURZ_DAUER) * zf, rest - versatz - 40);
     const fliegt = ziele.length > 0 && moeglich >= FLUG_MIN * zf;
@@ -331,14 +345,14 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar).
   // Ab dann gehen Tipps zur Partie durch (.durch); die Portraets fliegen am Ende der Haltephase, oder sofort, wenn sie
   // schon vorbei ist
-  const halteEnde = voll ? HALTE_BIS * zf : 0;
+  const halteEnde = voll ? halteBis * zf : 0;
   const beiPartie = (d) => {
     if (!d || d.name !== 'partie' || zuEnde) return;
     if (abPartie) { try { abPartie(); } catch (e) { /* egal */ } abPartie = null; }
     partieAb = Math.round(jetzt() - t0);
     ueber.classList.add('durch');
     // kam die Partie so spaet, dass kein Flug mehr passt (langsames Geraet), nicht noch ein Bild warten
-    if (DAUER_MAX - PUFFER - (jetzt() - t0) < (FLUG_MIN + FLUG_VERSATZ + 40) * zf) { phase2(); return; }
+    if (dauerMax - PUFFER - (jetzt() - t0) < (FLUG_MIN + FLUG_VERSATZ + 40) * zf) { phase2(); return; }
     requestAnimationFrame(() => {
       if (zuEnde) return;
       const warten = halteEnde - (jetzt() - t0);
@@ -347,8 +361,8 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     });
   };
   try { abPartie = hoere('app:screen', beiPartie); } catch (e) { abPartie = null; }
-  // haerteste Grenze: hoechstens DAUER_MAX ms, auch wenn die Partie nicht kommt
-  spaeter(() => { if (!zuEnde) ende(); }, DAUER_MAX);
+  // haerteste Grenze: hoechstens dauerMax ms (DAUER_MAX, lange Fassung DAUER_VITRINE), auch wenn die Partie nicht kommt
+  spaeter(() => { if (!zuEnde) ende(); }, dauerMax);
 
   const hoch = () => innerHeight > innerWidth;
 
@@ -384,8 +398,16 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   flip(ueber.querySelector('[data-rolle="bot"]'), qBot, { d: 560 * tk, k: 'weich' });
   flip(ueber.querySelector('[data-rolle="flo"]'), qFlo, { d: 600 * tk, v: 40 * tk, k: 'weich' });
   ueber.querySelectorAll('.duell-name, .duell-unter').forEach((t, n) => A(t, [{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { d: 440, v: 220 + (n % 2) * 40 + (n > 1 ? 40 : 0), k: 'weich' }));
-  // Titel und Vitrine kommen kurz nach Flos Namen
-  ueber.querySelectorAll('.duell-titel, .duell-vitrine').forEach((t) => A(t, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { d: 400, v: 360, k: 'weich' }));
+  // Titel und Vitrine kommen kurz nach Flos Namen; in der langen Fassung die Errungenschaften nacheinander, gut lesbar
+  if (!lang) ueber.querySelectorAll('.duell-titel, .duell-vitrine').forEach((t) => A(t, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { d: 400, v: 360, k: 'weich' }));
+  else {
+    const titelEl = ueber.querySelector('.duell-titel');
+    if (titelEl) A(titelEl, [{ opacity: 0, transform: 'translateY(10px) scale(.92)' }, { opacity: 1, transform: 'none' }], { d: 420, v: 520, k: 'hupf' });
+    ueber.querySelectorAll('.duell-orden').forEach((o, i) => anim(o, [{ opacity: 0, transform: 'translateY(12px) scale(.7)' }, { opacity: 1, transform: 'none' }],
+      { d: absolut(420 * zf), v: absolut((ORDEN_AB + i * ORDEN_TAKT) * zf), k: 'hupf', fill: 'backwards' }));
+    const zeit = ueber.querySelector('.duell-zeit i');
+    if (zeit) anim(zeit, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { d: absolut((halteBis - 600) * zf), v: absolut(600 * zf), k: 'linear', fill: 'both' });
+  }
   // "gegen" schlaegt auf der Naht ein, genau dann der Start-Klang
   A(ueber.querySelector('.duell-gegen'), [{ opacity: 0, transform: 'scale(2.1) rotate(-10deg)' }, { opacity: 1, transform: 'none' }], { d: 460, v: 300, k: 'hupf' });
   spaeter(() => { try { klang.spiele('start'); } catch (e) { /* still */ } }, KLANG_BEI * zf);
