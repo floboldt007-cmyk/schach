@@ -4,6 +4,10 @@
 // Google (Supabase OAuth, impliziter Ablauf): googleAnmeldeUrl(basis) -> Adresse von /auth/v1/authorize,
 // meldeMitGoogleAn(ort) leitet dorthin. Zurueck kommt der Browser mit #konto#access_token=...; das liest
 // uebernimmLinkSitzung() wie den Anmelde-Link (auch ohne das vorangestellte #konto).
+// Abgleich-Riegel (30.10.2026): Automatisch hochgeladen wird erst, wenn auf diesem Geraet fuer genau diese Nutzer-ID
+// ein Abgleich abgeschlossen ist (ABGEGLICHEN_SCHLUESSEL, gilt fuer alle Tabs). Anlass: Der Anmelde-Link oeffnet einen
+// zweiten Tab oder Safari statt der App auf dem Home-Bildschirm; ein abgebrochener Konflikt-Dialog oder ein Tab ohne
+// Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand (Ultracode-Pruefung PR #76).
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
@@ -14,6 +18,10 @@ import './sprachen/einstellungen.js';
 export const SITZUNG_SCHLUESSEL = 'schach-arena:konto:sitzung';
 export const SICHTBAR_SCHLUESSEL = 'schach-arena:konto:sichtbar';
 export const RUECKFALL_SCHLUESSEL = 'schach-arena:konto:rueckfall';
+export const ABGEGLICHEN_SCHLUESSEL = 'schach-arena:konto:abgeglichen';
+// Eintraege, die ein frischer Start ohne jede Partie anlegt: Sie machen aus einem leeren Browser keinen Spielstand.
+const OHNE_SPIELSTAND = new Set(['schach-arena:v1:hinweis-installieren', 'schach-arena:v1:modul:start',
+  'schach-arena:v1:modul:funken', 'schach-arena:v1:modul:punkte']);
 const NAME = /^[A-Za-z0-9_]{3,20}$/;
 let fetchFn = (...a) => fetch(...a);
 let timer = null;
@@ -43,10 +51,14 @@ async function anfrage(pfad, { methode = 'GET', daten, token, prefer } = {}) {
   return d;
 }
 
-export async function fordereCodeAn(email) {
+// basis: Adresse der App ohne Hash. Sie geht als redirect_to mit, damit der Anmelde-Link (Rueckfall ohne SMTP) hierher
+// zurueckfuehrt. Ohne redirect_to nimmt Supabase den Referer, und der Browser schickt quer zu supabase.co nur die
+// Herkunft (https://floboldt007-cmyk.github.io/ ohne /schach/): Der Link landete auf einer 404-Seite (29.10.2026).
+export async function fordereCodeAn(email, basis = basisAdresse()) {
   email = String(email || '').trim();
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error(K('emailUngueltig'));
-  await anfrage('/auth/v1/otp', { methode: 'POST', daten: { email, create_user: true } });
+  const ziel = /^https?:\/\//.test(basis) ? '?redirect_to=' + encodeURIComponent(basis) : '';
+  await anfrage('/auth/v1/otp' + ziel, { methode: 'POST', daten: { email, create_user: true } });
   return true;
 }
 export function userId(s) {
@@ -76,8 +88,12 @@ export async function aktiveSitzung() {
 export async function abmelden() {
   const s = sitzung();
   try { if (s?.access_token) await anfrage('/auth/v1/logout', { methode: 'POST', token: s.access_token }); } catch (e) { /* lokal immer abmelden */ }
-  try { lager().removeItem(SITZUNG_SCHLUESSEL); } catch (e) { /* egal */ }
+  try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ }
 }
+export function istAbgeglichen(s = sitzung()) {
+  try { return !!s && !!userId(s) && lager().getItem(ABGEGLICHEN_SCHLUESSEL) === userId(s); } catch (e) { return false; }
+}
+function merkeAbgleich() { const id = userId(sitzung()); if (id) try { lager().setItem(ABGEGLICHEN_SCHLUESSEL, id); } catch (e) { /* egal */ } }
 
 // ---------- Geraet: nur Familie und System, nie der User-Agent-String ----------
 export function geraetKurz(ua = globalThis.navigator?.userAgent, nav = globalThis.navigator) {
@@ -172,19 +188,27 @@ export function vorschau(stand) {
   try { const f = JSON.parse(s['schach-arena:v1:fortschritt']); level = Number(f.level) || 1; } catch (e) { /* leer */ }
   return { datum: stand?.aktualisiert_am || null, partien, level };
 }
+export function hatSpielstand(stand = lokalerStand()) {
+  const v = vorschau(stand);
+  return v.partien > 0 || v.level > 1 || Object.keys(stand).some((k) => !OHNE_SPIELSTAND.has(k));
+}
+// wahl: nur 'geraet' oder 'cloud' entscheiden einen Konflikt. Alles andere (auch der Abbruch-Wert eines Dialogs)
+// laesst ihn offen: dann wird nichts geschrieben und der Riegel bleibt zu.
 export async function gleicheNachAnmeldung(wahl) {
   const cloud = await ladeCloudStand();
-  if (!cloud) { await speichereCloudStand(); return 'geraet'; }
-  if (!Object.keys(lokalerStand()).length) { ladeStandAufGeraet(cloud); return 'cloud'; }
-  if (wahl === 'geraet') { await speichereCloudStand(); return 'geraet'; }
-  if (wahl === 'cloud') { ladeStandAufGeraet(cloud); return 'cloud'; }
+  if (!cloud) { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
+  if (!hatSpielstand()) { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
+  if (wahl === 'geraet') { await speichereCloudStand(); merkeAbgleich(); return 'geraet'; }
+  if (wahl === 'cloud') { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
   return { konflikt: true, geraet: vorschau(lokalerStand()), cloud: vorschau(cloud) };
 }
-export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (sitzung()) speichereCloudStand().catch(() => {}); }, ms); }
+export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (istAbgeglichen()) speichereCloudStand().catch(() => {}); }, ms); }
 
 // Rueckfall, solange Supabase ohne eigenen SMTP-Versand einen Anmelde-Link statt des Codes schickt:
-// Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite.
+// Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite (redirect_to aus fordereCodeAn).
 let abgleichOffen = false;
+let linkFehler = false;     // abgelaufener oder schon benutzter Link (#error=...): Meldung beim ersten Zeichnen
+export function linkAnmeldungFrisch() { return abgleichOffen || linkFehler; }
 export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = globalThis.history) {
   let h = String(ort?.hash || '');
   // Google-Anmeldung: Supabase haengt die Antwort mit einem weiteren "#" an redirect_to an (#konto#access_token=...)
@@ -201,6 +225,9 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
       lager().setItem(SICHTBAR_SCHLUESSEL, '1');
       abgleichOffen = true;
     } catch (e) { /* unvollstaendiger Link: ignorieren */ }
+  } else {
+    linkFehler = true;
+    try { lager().setItem(SICHTBAR_SCHLUESSEL, '1'); } catch (e) { /* egal */ }
   }
   try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen'); } catch (e) { /* egal */ }
   return true;
@@ -247,9 +274,14 @@ export function kontoGruppe({ app } = {}) {
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
-      if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet')); }
+      if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
       if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }
-      if (a === 'sichern') { const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name); const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render(); }
+      if (a === 'sichern') {
+        const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name);
+        // Ohne Abgleich auf diesem Geraet (z. B. der Tab, in dem der Link angefordert wurde) erst fragen, nie still hochladen
+        if (!istAbgeglichen()) { const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); else melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); return; }
+        const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
+      }
       if (a === 'abmelden') { await abmelden(); render(); }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
     } catch (f) { melden(f.message || t('einstellungen.nichtGeklappt'), true); }
@@ -270,16 +302,21 @@ export function kontoGruppe({ app } = {}) {
     const zahlen = { gp: g.partien, gl: g.level, cp: c.partien, cl: c.level };
     const text = c.datum ? K('konfliktTextDatum', { ...zahlen, datum: new Date(c.datum).toLocaleString(locale()) }) : K('konfliktText', zahlen);
     const w = await app?.frage?.({ titel: K('konfliktTitel'), text, knoepfe: [{ text: K('geraetBehalten'), wert: 'geraet', art: 'primaer' }, { text: K('cloudLaden'), wert: 'cloud' }], abbrechen: true });
-    if (w) { await gleicheNachAnmeldung(w); melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); }
+    if (w !== 'geraet' && w !== 'cloud') { melden(K('abgleichOffen')); return; }
+    await gleicheNachAnmeldung(w); melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
   }
   render();
+  if (linkFehler) { linkFehler = false; melden(K('linkUngueltig'), true); }
   if (abgleichOffen && sitzung()) {
     abgleichOffen = false;
     gleicheNachAnmeldung().then((abgleich) => { render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true));
   }
   // Abmelden von aussen (Konto loeschen in der Gruppe "Daten"): neu zeichnen
   const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) render(); }, 1000);
-  return { el, verlasse() { clearInterval(uhr); if (sitzung()) speichereCloudStand().catch(() => {}); } };
+  return { el, verlasse() { clearInterval(uhr); if (istAbgeglichen()) speichereCloudStand().catch(() => {}); } };
+}
+function alsApp() {
+  try { return globalThis.navigator?.standalone === true || !!globalThis.matchMedia?.('(display-mode: standalone)')?.matches; } catch (e) { return false; }
 }
 function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 

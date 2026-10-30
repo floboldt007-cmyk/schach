@@ -78,7 +78,7 @@ import { toast, toastLeeren, schliesseSheet } from './ui/bauteile.js';
 import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
-import './konto.js';
+import { linkAnmeldungFrisch } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
@@ -910,6 +910,8 @@ function pruefeInstallation() {
   // Home-Bildschirm-App: dauerhaften Speicher fragt starte() an (W0+a: storage.dauerhaftAnfragen, fuer alle)
   if (navigator.standalone === true) return;
   if (navigator.standalone !== false) return;
+  // Gerade per Anmelde-Link gekommen: Der Hinweis wuerde den Abgleich-Dialog schliessen (kommt beim naechsten Start)
+  try { if (linkAnmeldungFrisch()) return; } catch (e) { /* ohne Konto weiter */ }
   try {
     if (localStorage.getItem(HINWEIS_MERKER)) return;
     localStorage.setItem(HINWEIS_MERKER, '1');
