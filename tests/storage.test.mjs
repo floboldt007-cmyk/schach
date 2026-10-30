@@ -450,16 +450,16 @@ pruefe('Zuruecksetzen: Fortschritt weg, Einstellungen bleiben', ladePartien().le
 setzeZurueck({ mitEinstellungen: true });
 pruefe('Zuruecksetzen mit Einstellungen', ladeEinstellungen().klang === true && s.m.size === 0);
 s.setItem('schach-arena:v1:partien', '[]'); s.setItem('schach-arena:konto:sitzung', '{}'); s.setItem('fremde-app', 'bleibt');
-s.setItem('schach-arena:daten:widerruf', '{"konto":"u1"}'); s.setItem('schach-arena:konto:sichtbar', '1');
+s.setItem('schach-arena:daten:widerruf', '{"konto":"u1"}'); s.setItem('schach-arena:konto:sichtbar', '1'); s.setItem('schach-arena:daten:zustimmung', '{"konto":"u1"}');
 const alteCaches = globalThis.caches; const cachesWeg = [];
 globalThis.caches = { async keys() { return ['schach-arena-v101', 'fremde-seite-v1']; }, async delete(k) { cachesWeg.push(k); return true; } };
 await loescheAlleAppDaten();
-pruefe('Alle App-Daten: jeder schach-arena-Schluessel weg ausser offenem Widerruf und Freischalt-Merker, fremde Daten bleiben',
-  [...s.m.keys()].filter((k) => k.startsWith('schach-arena:')).sort().join() === 'schach-arena:daten:widerruf,schach-arena:konto:sichtbar'
-  && s.getItem('fremde-app') === 'bleibt' && ALLES_LOESCHEN_BLEIBT.length === 2, [...s.m.keys()]);
+pruefe('Alle App-Daten: jeder schach-arena-Schluessel weg ausser offenem Widerruf, Einwilligungsnachweis und Freischalt-Merker, fremde Daten bleiben',
+  [...s.m.keys()].filter((k) => k.startsWith('schach-arena:')).sort().join() === 'schach-arena:daten:widerruf,schach-arena:daten:zustimmung,schach-arena:konto:sichtbar'
+  && s.getItem('fremde-app') === 'bleibt' && ALLES_LOESCHEN_BLEIBT.length === 3, [...s.m.keys()]);
 pruefe('Alle App-Daten: die Programmdateien im Cache bleiben (ohne sie startet die App offline nicht mehr)', cachesWeg.length === 0, cachesWeg);
 globalThis.caches = alteCaches;
-s.removeItem('schach-arena:daten:widerruf'); s.removeItem('schach-arena:konto:sichtbar');
+s.removeItem('schach-arena:daten:widerruf'); s.removeItem('schach-arena:konto:sichtbar'); s.removeItem('schach-arena:daten:zustimmung');
 
 // ---------- Kein localStorage ----------
 setzeSpeicher(null);

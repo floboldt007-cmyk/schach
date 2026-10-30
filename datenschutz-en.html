@@ -96,9 +96,12 @@
   “Reset progress” in the settings deletes your progress, games and analyses; your settings, your sign-in and the other
   data below remain. If you are signed in and this device has been matched with the cloud, the empty progress then also
   replaces your cloud backup. “Delete all app data on this device” removes your progress, your settings and all account
-  data on this device; if you are signed in, the app backs up to the cloud once more first. Only the app's program files
-  (for starting without a connection, no personal data), a marker showing which areas are unlocked, and a pending
-  withdrawal of your data sharing, which the app completes later (section 6), remain. Your account and your cloud backup
+  data on this device; if this device has been matched with the cloud, the app backs up once more first, otherwise it
+  asks you. Only the app's program files (for starting without a connection, no personal data), a marker showing which
+  areas are unlocked, the record of your consent to sharing (so that you can still withdraw it with the switch after your
+  next sign-in) and a pending withdrawal of your data sharing remain. The app completes that withdrawal as soon as you
+  sign in again on this device with the same account (section 6); it therefore asks you before deleting while it is still
+  pending. Your account and your cloud backup
   remain (deleting the account: section 5). You can also delete the data through your browser's website data settings.</p>
   <p>With an account, the device also stores your sign-in (session token with your account details: email address, with
   Google also your name, profile picture address and Google ID), a fallback copy of your progress before an import from
@@ -106,7 +109,8 @@
   the record of your consent and a queue of data not yet transmitted. If you follow an invitation link, the device
   remembers the pending online invitation, even without an account. These data are used only for the respective
   function. “Sign out and remove account data from this device” deletes them (other devices stay signed in); your
-  progress on the device remains, as do a pending withdrawal and the marker for unlocked areas.</p>
+  progress on the device remains, as do the record of your consent, a pending withdrawal and the marker for unlocked
+  areas.</p>
   <p>The app also keeps a list of its latest technical errors (at most 50; it removes addresses, email addresses and
   identifiers first). This list stays on your device and is never sent automatically. You can see it in the settings under
   “Report for the test phase”, copy or share it yourself there, and delete it with “Clear error list”.
@@ -148,7 +152,8 @@
   data (including the Google link), username, cloud progress, shared games and usage data, and the authentication log.
   Exception for the subscription: technical payment events from Stripe (section 7) remain without your account ID but
   with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
-  subscription does not end with the account; cancel it first (the app points this out when you delete the account).
+  subscription does not end with the account; cancel it first (with an active subscription the app points this out when
+  you delete the account).
   Supabase's technical server logs and backups cannot be accessed immediately: they are deleted automatically according
   to Supabase's retention periods <span class="platz">[Check Supabase retention periods: server logs, backups]</span>
   and are not used further in the meantime. Your progress on your device is unaffected.</p>
@@ -166,7 +171,7 @@
   per hour, how many games and usage events your account has shared (section 6). These counters contain only numbers, no
   content. We delete the failed attempts after two days and the counters of shared data after 48 hours, each at the next
   automatic cleanup. Until then, the counters of shared data remain even after you withdraw consent; otherwise the limit
-  could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours. If no move
+  could be bypassed by deleting and sending again. Invitations that nobody accepted are deleted after 48 hours at the next clean-up. If no move
   is made for too long in a game (with a clock, 10 minutes before the second half-move; without a clock, 7 days), the server
   ends it as abandoned, without a result. Both counters are included in Download my data. The legal basis is our legitimate
   interest in a secure, working service (Art. 6 Abs. 1 lit. f DSGVO, GDPR)
@@ -216,7 +221,7 @@
 
   <h2>10. Scope of data sharing and retention</h2>
   <p>The “Share games and usage” switch controls only the voluntarily shared game archive and usage events. It does not control the account, cloud progress, online games, subscription, coach, or technically necessary logs.</p>
-  <p>Online games follow the periods in section 5: unanswered invitations are deleted after 48 hours, completed games remain until one of the two accounts is deleted. Server logs, backups, and every area not fixed above are retained for <span class="platz">[PERIOD]</span>; no period is claimed until it has been set and checked.</p>
+  <p>Online games follow the periods in section 5: unanswered invitations are deleted after 48 hours at the next clean-up, completed games remain until one of the two accounts is deleted. Server logs, backups, and every area not fixed above are retained for <span class="platz">[PERIOD]</span>; no period is claimed until it has been set and checked.</p>
 
   <h2>11. What never happens</h2>
   <ul>

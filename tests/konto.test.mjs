@@ -59,9 +59,11 @@ localStorage.setItem(SICHTBAR_SCHLUESSEL, '1');
 await abmelden({ geraet: true });
 pruefe('Abmelden und Kontodaten entfernen: alle Kontobereiche weg, lokaler Spielstand bleibt',
   ![...m.keys()].some((k) => /^(schach-arena:(?:konto|abo|daten|online:einladung|schule))(?::|$)/.test(k) && !BLEIBT_BEIM_ENTFERNEN.includes(k)) && localStorage.getItem('schach-arena:v1:partien') === '[1]');
-pruefe('Abmelden und Kontodaten entfernen: offener Widerruf (Loeschpflicht) und Freischalt-Merker bleiben',
+pruefe('Abmelden und Kontodaten entfernen: offener Widerruf (Loeschpflicht), Einwilligungsnachweis und Freischalt-Merker bleiben',
   JSON.parse(localStorage.getItem('schach-arena:daten:widerruf') || '{}').konto === 'u1' && localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1'
-  && BLEIBT_BEIM_ENTFERNEN.length === 2 && JSON.stringify([...BLEIBT_BEIM_ENTFERNEN].sort()) === JSON.stringify([...ALLES_LOESCHEN_BLEIBT].sort()));
+  && localStorage.getItem('schach-arena:daten:zustimmung') !== null
+  && BLEIBT_BEIM_ENTFERNEN.length === 3 && JSON.stringify([...BLEIBT_BEIM_ENTFERNEN].sort()) === JSON.stringify([...ALLES_LOESCHEN_BLEIBT].sort()));
+localStorage.removeItem('schach-arena:daten:zustimmung');
 localStorage.removeItem('schach-arena:daten:widerruf');
 { // Abmelden: lokal sofort, der Server nur fuer diese Sitzung (scope=local) und mit Frist
   const rufe = []; let haengt = true;
@@ -167,13 +169,17 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
     }
     pruefe('Vor dem Loeschen sichern: ohne Anmeldung nichts zu tun', (await sichereVorDemLoeschen(10)) === 'ohne');
     setzeKontoFetch(async () => { throw new Error('offline'); });
-    localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u8')); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u8');
+    localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u8')); localStorage.removeItem(ABGEGLICHEN_SCHLUESSEL);
+    pruefe('Vor dem Loeschen sichern: angemeldet ohne Spielstand nichts zu tun', (await sichereVorDemLoeschen(10)) === 'ohne');
+    localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'x1' }]));
+    pruefe('Vor dem Loeschen sichern: angemeldet, aber nie abgeglichen: der Stand ginge verloren (die App fragt nach)', (await sichereVorDemLoeschen(10)) === 'nicht-abgeglichen');
+    localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u8');
     pruefe('Vor dem Loeschen sichern: Fehler wird gemeldet (die App fragt dann noch einmal)', (await sichereVorDemLoeschen(10)) === 'fehlgeschlagen');
     const gesichert = [];
     setzeKontoFetch(async (url, opt) => { gesichert.push({ url, ...opt }); return { ok: true, status: 201, async json() { return null; } }; });
     pruefe('Vor dem Loeschen sichern: abgeglichen und online wird hochgeladen', (await sichereVorDemLoeschen(1000)) === 'gesichert'
       && gesichert.some((c) => c.url.endsWith('/rest/v1/spielstaende') && c.method === 'POST'));
-    localStorage.removeItem('schach-arena:konto:sitzung'); localStorage.removeItem(ABGEGLICHEN_SCHLUESSEL);
+    localStorage.removeItem('schach-arena:konto:sitzung'); localStorage.removeItem(ABGEGLICHEN_SCHLUESSEL); leereV1();
     setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
   }
   // Safari nach dem Link: nur die Eintraege eines frischen Starts, keine Partie

@@ -103,7 +103,7 @@ export async function erneuereSitzung() {
   } catch (e) {
     // Tote Sitzung (auf dem Server abgemeldet oder abgelaufen): lokal entfernen, damit die Gruppe "abgemeldet" zeigt,
     // statt still nie mehr zu sichern
-    if (SITZUNG_TOT.has(e.kennung)) { epoche++; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
+    if (SITZUNG_TOT.has(e.kennung)) { epoche++; sitzungTot = true; try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (f) { /* egal */ } }
     throw e;
   }
 }
@@ -111,9 +111,11 @@ export async function aktiveSitzung() {
   const s = sitzung(); if (!s) throw new Error(K('nichtAngemeldet'));
   return Number(s.expires_at) <= Math.floor(Date.now() / 1000) + 30 ? erneuereSitzung() : s;
 }
-// Bleiben beim Entfernen der Kontodaten: der Freischalt-Merker (kein Kontodatum) und ein offener Widerruf der
-// Datenfreigabe (eine offene Loeschpflicht: js/daten.js holt ihn nach, sobald dasselbe Konto wieder angemeldet ist).
-export const BLEIBT_BEIM_ENTFERNEN = Object.freeze([SICHTBAR_SCHLUESSEL, 'schach-arena:daten:widerruf']);
+// Bleiben beim Entfernen der Kontodaten: der Freischalt-Merker (kein Kontodatum), ein offener Widerruf der Datenfreigabe
+// (eine offene Loeschpflicht: js/daten.js holt ihn nach, sobald dasselbe Konto auf diesem Geraet wieder angemeldet ist)
+// und der Einwilligungsnachweis zum Teilen: Die Einwilligung gilt auf dem Server weiter, und nur mit diesem Nachweis
+// zeigt der Schalter "Teilen" nach der naechsten Anmeldung "an" und laesst sich zum Widerrufen ausschalten.
+export const BLEIBT_BEIM_ENTFERNEN = Object.freeze([SICHTBAR_SCHLUESSEL, 'schach-arena:daten:widerruf', 'schach-arena:daten:zustimmung']);
 // epoche: zaehlt jedes Abmelden und Loeschen. Ein Abgleich, der waehrenddessen laeuft, schreibt danach nichts mehr.
 let epoche = 0;
 // Lokal sofort abmelden, danach den Server mit kurzer Frist benachrichtigen, nur fuer diese Sitzung (scope=local):
@@ -135,9 +137,11 @@ export async function abmelden({ geraet = false, frist = 5000 } = {}) {
   try { if (s?.access_token) await mitFrist(anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }), frist); } catch (e) { /* lokal ist schon abgemeldet */ }
 }
 // Vor "Alle Daten dieser App loeschen": den Stand noch einmal sichern, wenn dieses Geraet abgeglichen ist.
-// 'ohne' (nicht angemeldet oder nicht abgeglichen), 'gesichert' oder 'fehlgeschlagen'.
+// 'ohne' (nicht angemeldet oder kein Spielstand), 'nicht-abgeglichen' (angemeldet, aber dieser Stand war nie in der
+// Cloud: er ginge verloren), 'gesichert' oder 'fehlgeschlagen'.
 export async function sichereVorDemLoeschen(ms = 8000) {
-  if (!istAbgeglichen()) return 'ohne';
+  if (!sitzung() || !hatSpielstand()) return 'ohne';
+  if (!istAbgeglichen()) return 'nicht-abgeglichen';
   try { await mitFrist(speichereCloudStand(), ms); return 'gesichert'; } catch (e) { return 'fehlgeschlagen'; }
 }
 export function istAbgeglichen(s = sitzung()) {
@@ -267,6 +271,7 @@ export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTime
 // Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite (redirect_to aus fordereCodeAn).
 let abgleichOffen = false;
 let linkFehler = false;     // abgelaufener oder schon benutzter Link (#error=...): Meldung beim ersten Zeichnen
+let sitzungTot = false;     // die Sitzung ist auf dem Server abgelaufen: Meldung bleibt ueber das Neuzeichnen stehen
 export function linkAnmeldungFrisch() { return abgleichOffen || linkFehler; }
 export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = globalThis.history) {
   let h = String(ort?.hash || '');
@@ -321,6 +326,7 @@ export function kontoGruppe({ app } = {}) {
   let gezeichnetMit = null;   // angemeldet beim letzten Zeichnen (die Gruppe "Daten" kann das Konto loeschen)
   const render = () => {
     const s = sitzung();
+    if (s) sitzungTot = false;
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
@@ -328,7 +334,7 @@ export function kontoGruppe({ app } = {}) {
       <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       <p class="es-hilfe konto-oder">${K('oder')}</p><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`}
-      <p class="konto-status" aria-live="polite">${zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
+      <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
   };
   el.addEventListener('click', async (e) => {
@@ -343,7 +349,11 @@ export function kontoGruppe({ app } = {}) {
         const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
       }
       if (a === 'abmelden') { await abmelden(); render(); }
-      if (a === 'abmelden-geraet') { await abmelden({ geraet: true }); render(); }
+      if (a === 'abmelden-geraet') {
+        // Einen offenen Widerruf vorher senden (mit Frist): danach fehlt die Sitzung dafuer
+        try { const d = await import('./daten.js'); await mitFrist(d.widerrufeJetzt(), 5000); } catch (f) { /* bleibt gemerkt */ }
+        await abmelden({ geraet: true }); render();
+      }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
     } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });

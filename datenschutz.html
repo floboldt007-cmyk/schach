@@ -96,9 +96,12 @@
   zurücksetzen“ in den Einstellungen löscht Spielstand, Partien und Analysen; die Einstellungen, die Anmeldung und die
   übrigen Daten unten bleiben. Bist du angemeldet und ist dieses Gerät mit der Cloud abgeglichen, ersetzt der leere Stand
   danach auch deine Cloud-Sicherung. „Alle Daten dieser App auf diesem Gerät löschen“ entfernt deinen Spielstand, deine
-  Einstellungen und alle Kontodaten auf diesem Gerät; bist du angemeldet, sichert die App vorher noch einmal in die Cloud.
-  Es bleiben nur die Programmdateien der App (für den Start ohne Netz, ohne persönliche Daten), ein Merker, welche Bereiche
-  freigeschaltet sind, und ein noch offener Widerruf deiner Datenfreigabe, den die App nachholt (Abschnitt 6). Dein Konto
+  Einstellungen und alle Kontodaten auf diesem Gerät; ist dieses Gerät mit der Cloud abgeglichen, sichert die App vorher
+  noch einmal, sonst fragt sie nach. Es bleiben nur die Programmdateien der App (für den Start ohne Netz, ohne persönliche
+  Daten), ein Merker, welche Bereiche freigeschaltet sind, der Nachweis deiner Einwilligung zum Teilen (damit du sie nach
+  der nächsten Anmeldung weiter mit dem Schalter widerrufen kannst) und ein noch offener Widerruf deiner Datenfreigabe.
+  Diesen holt die App nach, sobald du dich auf diesem Gerät wieder mit demselben Konto anmeldest (Abschnitt 6); vor dem
+  Löschen fragt sie deshalb nach, wenn er noch offen ist. Dein Konto
   und deine Cloud-Sicherung bleiben bestehen (Konto löschen: Abschnitt 5). Du kannst die Daten auch über die
   Website-Daten deines Browsers löschen.</p>
   <p>Mit einem Konto speichert das Gerät außerdem deine Anmeldung (Sitzungs-Token mit deinen Kontoangaben: E-Mail-Adresse,
@@ -107,7 +110,8 @@
   Altersangabe, den Nachweis deiner Einwilligung und eine Warteschlange für noch nicht übermittelte Daten. Folgst du einem
   Einladungslink, merkt sich das Gerät die offene Online-Einladung, auch ohne Konto. Diese Daten dienen nur der jeweiligen
   Funktion. „Abmelden und Kontodaten von diesem Gerät entfernen“ löscht sie (andere Geräte bleiben angemeldet); dein
-  Spielstand auf dem Gerät bleibt, ebenso ein noch offener Widerruf und der Merker für freigeschaltete Bereiche.</p>
+  Spielstand auf dem Gerät bleibt, ebenso der Nachweis deiner Einwilligung, ein noch offener Widerruf und der Merker für
+  freigeschaltete Bereiche.</p>
   <p>Außerdem merkt sich die App die letzten technischen Fehler (höchstens 50; Adressen, E-Mail-Adressen und
   Kennungen entfernt sie vorher). Diese Liste bleibt auf deinem Gerät und wird nie automatisch gesendet. Du siehst sie in den Einstellungen
   unter „Bericht für die Testphase“, kannst sie dort selbst kopieren oder teilen und mit „Fehlerliste leeren“ löschen.
@@ -149,7 +153,7 @@
   Verknüpfung mit Google), Benutzername, Cloud-Spielstand, geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll.
   Ausnahme beim Abo: Technische Zahlungsereignisse von Stripe (Abschnitt 7) bleiben ohne deine Konto-Kennung, aber mit der
   Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht werden. Ein laufendes Abo endet mit dem Konto nicht; kündige
-  es vorher (die App weist beim Löschen darauf hin).
+  es vorher (bei einem aktiven Abo weist die App beim Löschen darauf hin).
   Nicht sofort erreichbar sind die technischen Protokolle (Server-Logs) und die Datensicherungen von Supabase: Sie werden
   nach deren Fristen automatisch gelöscht <span class="platz">[Fristen laut Supabase prüfen: Server-Logs, Datensicherungen]</span>
   und bis dahin nicht weiter verwendet. Der Spielstand auf deinem Gerät bleibt davon unberührt.</p>
@@ -168,7 +172,7 @@
   Zähler enthalten nur Zahlen, keine Inhalte. Die Fehlversuche löschen wir nach zwei Tagen, die Zähler der geteilten Daten
   nach 48 Stunden, jeweils beim nächsten automatischen Aufräumen. Die Zähler der geteilten Daten bleiben bis dahin auch nach
   einem Widerruf stehen, sonst ließe sich die Grenze durch Löschen und neu Senden umgehen. Einladungen, die niemand
-  angenommen hat, löschen wir nach 48 Stunden. Eine Partie, in der zu lange kein Zug kommt (mit Uhr 10 Minuten vor dem
+  angenommen hat, löschen wir nach 48 Stunden beim nächsten Aufräumen. Eine Partie, in der zu lange kein Zug kommt (mit Uhr 10 Minuten vor dem
   zweiten Halbzug, ohne Uhr 7 Tage), beendet der Server als abgebrochen, ohne Ergebnis. Beide Zähler stehen in „Meine
   Daten herunterladen“. Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren, funktionierenden Dienst
   (Art. 6 Abs. 1 lit. f DSGVO) <span class="platz">[Rechtsgrundlage und Fristen von der Fachperson bestätigen lassen]</span>.</p>
@@ -212,14 +216,14 @@
   Weitere Empfänger, Drittlandgarantien und gesetzliche Aufbewahrungsfristen: <span class="platz">[PRÜFEN UND ERGÄNZEN]</span>.</p>
 
   <h2>8. Coach mit Anthropic</h2>
-  <p>Wenn du den KI-Coach einen Zug erklären lässt, übermittelt der Server an Anthropic, PBC, <span class="platz">[ADRESSE]</span>, nur Fakten zur Stellung: die Stellung (FEN), den gespielten und den stärksten Zug, die Bewertungen der Engine, die Einordnung des Zugs, ob du selbst gezogen hast, und deine grobe Spielstärke als Wort (zum Beispiel „Anfänger“). Einen freien Text von dir gibt es nicht. E-Mail-Adresse, Benutzername und Konto-ID werden nicht übermittelt. Crownmate speichert weder die Stellung noch die Antwort. Gespeichert wird nur, wie viele Fragen du an einem Tag gestellt hast (zur Begrenzung); diese Zähler werden nach gut einer Woche beim nächsten Coach-Aufruf gelöscht und verschwinden mit dem Konto sofort. Speicherdauer bei Anthropic: <span class="platz">[PRÜFEN]</span>. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO; Auftragsverarbeitung und Drittlandtransfer: <span class="platz">[AV-VERTRAG DATUM / GARANTIEN]</span>.</p>
+  <p>Wenn du den KI-Coach einen Zug erklären lässt, übermittelt der Server an Anthropic, PBC, <span class="platz">[ADRESSE]</span>, nur Fakten zur Stellung: die Stellung (FEN), den gespielten und den stärksten Zug, die Bewertungen der Engine, die Einordnung des Zugs, ob du selbst gezogen hast, und deine grobe Spielstärke als Wort (zum Beispiel „Einsteiger“). Einen freien Text von dir gibt es nicht. E-Mail-Adresse, Benutzername und Konto-ID werden nicht übermittelt. Crownmate speichert weder die Stellung noch die Antwort. Gespeichert wird nur, wie viele Fragen du an einem Tag gestellt hast (zur Begrenzung); diese Zähler werden nach gut einer Woche beim nächsten Coach-Aufruf gelöscht und verschwinden mit dem Konto sofort. Speicherdauer bei Anthropic: <span class="platz">[PRÜFEN]</span>. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO; Auftragsverarbeitung und Drittlandtransfer: <span class="platz">[AV-VERTRAG DATUM / GARANTIEN]</span>.</p>
 
   <h2>9. Öffentliche Produktabfrage</h2>
   <p>Wenn du die Seite „Crownmate Trainer“ öffnest, fragt die App bei Supabase ab, welches Abo angeboten wird, immer ohne deine Konto-Kennung, auch wenn du angemeldet bist. Dabei fallen technisch IP-Adresse, Zeitpunkt und Verbindungsdaten in Serverprotokollen an. Die Produktabfrage enthält keine Konto-ID. Aufbewahrung: <span class="platz">[FRIST]</span>.</p>
 
   <h2>10. Grenzen der Datenfreigabe und Aufbewahrung</h2>
   <p>Der Schalter „Partien und Nutzung teilen“ steuert ausschließlich das freiwillig geteilte Partienarchiv und Nutzungsereignisse. Er steuert nicht Konto, Cloud-Spielstand, Online-Partien, Abo, Coach oder technisch notwendige Protokolle.</p>
-  <p>Für Online-Partien gelten die Fristen aus Abschnitt 5: Unbeantwortete Einladungen werden nach 48 Stunden gelöscht, beendete Partien bleiben, bis eines der beiden Konten gelöscht wird. Für Serverprotokolle, Backups und alle nicht oben festgelegten Bereiche gilt jeweils <span class="platz">[FRIST]</span>; es werden keine Fristen behauptet, bevor diese festgelegt und geprüft sind.</p>
+  <p>Für Online-Partien gelten die Fristen aus Abschnitt 5: Unbeantwortete Einladungen werden nach 48 Stunden beim nächsten Aufräumen gelöscht, beendete Partien bleiben, bis eines der beiden Konten gelöscht wird. Für Serverprotokolle, Backups und alle nicht oben festgelegten Bereiche gilt jeweils <span class="platz">[FRIST]</span>; es werden keine Fristen behauptet, bevor diese festgelegt und geprüft sind.</p>
 
   <h2>11. Was nie passiert</h2>
   <ul>
