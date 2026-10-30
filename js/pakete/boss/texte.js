@@ -14,6 +14,6 @@ registriereTexte('p-boss', {
     'bergwirt.name': 'The Mountain Innkeeper', 'bergwirt.titel': 'Keeper of the Hill Fort', 'bergwirt.kurz': 'Calm, steady, and one move ahead.', 'bergwirt.bio': 'He knows every path to the hill fort and defends patiently.', 'bergwirt.regel': 'Steady play: the Innkeeper prefers safe moves.',
     'baron-gambit.name': 'Baron Gambit', 'baron-gambit.titel': 'Master of Open Files', 'baron-gambit.kurz': 'Trades material for initiative.', 'baron-gambit.bio': 'The Baron opens files before others see a door.', 'baron-gambit.regel': 'The Baron prefers checks and advances.',
     'springerzuechterin.name': 'The Knight Breeder', 'springerzuechterin.titel': 'Master of Forks', 'springerzuechterin.kurz': 'Her knights find every strong square.', 'springerzuechterin.bio': 'On her farm, every detour becomes an attack.', 'springerzuechterin.regel': 'Knight moves and forks take priority.',
-    'festungsbauer.name': 'The Fortress Farmer', 'festungsbauer.titel': 'Guardian of the Back Rank', 'festungsbauer.kurz': 'His position yields no square.', 'festungsbauer.bio': 'Stone by stone, he builds a position made to last.', 'festungsbauer.regel': 'He prefers trades and calm defence.'
+    'festungsbauer.name': 'The Fortress Builder', 'festungsbauer.titel': 'Guardian of the Back Rank', 'festungsbauer.kurz': 'His position yields no square.', 'festungsbauer.bio': 'Stone by stone, he builds a position made to last.', 'festungsbauer.regel': 'He prefers trades and calm defence.'
   }
 });
