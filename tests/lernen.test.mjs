@@ -236,9 +236,26 @@ async function erfinderTeil(browser) {
     && await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'matt', liste);
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
-  // Lektion 1: Grundreihenmatt in einem Zug
+  // Flo 31.10.2026 abends: "wenn ich in der Meisterschule auf eine Lektion tippe, springt er auf die Bots". Laedt die
+  // Lektions-Datei nicht (etwa mitten im Wechsel auf eine neue Version), laedt die App einmal neu und oeffnet die Lektion,
+  // statt still zur Arena zu gehen. Hier scheitert der erste Abruf von js/ui/lektion.js absichtlich.
+  let ersterAbruf = true;
+  await p.s.route('**/js/ui/lektion.js', (r) => {
+    if (ersterAbruf) { ersterAbruf = false; return r.fulfill({ status: 500, contentType: 'text/plain', body: 'kaputt' }); }
+    return r.continue();
+  });
+  const neuGeladen = p.s.waitForEvent('load', { timeout: 20000 }).then(() => true, () => false);
   await p.s.locator('.ms-lektion[data-id="grundreihe"]').click();
+  const nl = await neuGeladen;
   await p.s.waitForSelector('.ls-screen .brett-felder .feld', { timeout: 15000 }).catch(() => {});
+  pruefe('Lektion laedt nicht: einmal neu laden, dann ist die Lektion offen (nicht die Arena)', nl && !ersterAbruf
+    && await p.s.evaluate(() => document.documentElement.dataset.screen === 'lektion' && location.hash === '#lektion'),
+    await p.s.evaluate(() => [document.documentElement.dataset.screen, location.hash].join()));
+  await p.s.unroute('**/js/ui/lektion.js');
+  // der absichtlich gescheiterte Abruf steht als Konsolenfehler in der Liste, er gehoert zur Pruefung
+  for (let i = p.fehlerListe.length - 1; i >= 0; i--) if (/status of 500/.test(p.fehlerListe[i])) p.fehlerListe.splice(i, 1);
+  await setzeVerteidigung(p.s);
+
   let z = await lz(p.s);
   pruefe('Lektion: beginnt mit der Idee (Phase intro), Titel und Ziel sichtbar', z.phase === 'intro'
     && /Grundreihenmatt/.test(await p.s.locator('.ls-status').innerText()) && /Matt in einem Zug ist möglich/.test(await p.s.locator('.ls-status').innerText()), z);
