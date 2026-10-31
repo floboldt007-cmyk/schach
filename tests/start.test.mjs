@@ -981,7 +981,7 @@ async function browserTeil(browser) {
   await mh.seite.waitForSelector('.screen.arena .knoten', { timeout: 20000 });
   await kopfK(mh.seite, 'kleines Handy 375 x 667');
   // Willkommen aus den Einstellungen auf dem kleinen Handy: Zurueck, "Einfuehrung ueberspringen" und Klang passen in den Kopf
-  await mh.seite.evaluate(() => window.__app.gehe('einstellungen'));
+  await mh.seite.evaluate(() => window.__app.gehe('einstellungen', { seite: 'start' }));   // Handy: "Erste Schritte" als eigene Seite
   await mh.seite.waitForSelector('.es-screen .st-gruppe', { timeout: 15000 });
   await mh.seite.locator('.st-gruppe .st-g-willkommen').click();
   await warteSeite(mh.seite, 'w1');

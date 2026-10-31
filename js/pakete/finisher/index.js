@@ -2,7 +2,7 @@
 // Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
 // Als Erfinder (Flo, Sonderstueck vom Server) sind alle Stufen frei, unabhaengig vom Level.
 // Signatur gehoert zu Flos Erfinder-Profil (js/sonderstuecke.js): frei nur mit dem Sonderstueck vom Server; wer es nicht
-// hat, sieht es weder in den Einstellungen noch in der Sammlung (kein leerer Platz).
+// hat, sieht es nicht in der Sammlung (kein leerer Platz).
 // Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit. Die Level-Leiter
 // (funken/level.js, Stuecke 'finisher-<id>') nennt genau diese Stufen; tests/funken.test.mjs vergleicht beide.
 // Klang: den Siegesklang spielt die Partie selbst; der Finisher hat einen eigenen Klang in der Gruppe 'finisher'.
@@ -94,28 +94,27 @@ export function starteFinisher(ctx, id = auswahl()) {
   return { fertig: promise, verlasse: aufraeumen };
 }
 
+// Einstellungen (Flo 31.10.2026: "doppelt sich"): nur noch an oder aus. Welcher Finisher laeuft, waehlt man in der
+// Sammlung; "zuletzt" merkt sich die Wahl, damit Einschalten den vorigen Finisher zurueckbringt.
 function einstellungen() {
-  const level = aktuellesLevel();
-  const gewaehlt = auswahl(level);
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche fi-einstellungen';
-  el.innerHTML = `<h3 class="es-titel">${esc(F('titel'))}</h3><p>${esc(F('erklaerung'))}</p><div class="fi-auswahl" role="radiogroup" aria-label="${esc(F('titel'))}"></div>`;
-  const gruppe = el.querySelector('.fi-auswahl');
-  for (const f of FINISHER.filter(sichtbar)) {
-    const frei = istFrei(f.id, level); const aktiv = f.id === gewaehlt;
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'fi-wahl'; b.dataset.finisherWahl = f.id;
-    b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', aktiv ? 'true' : 'false'); b.disabled = !frei;
-    const hinweis = f.id === 'aus' ? '' : f.sonder ? F('einmalig') : f.level === 1 ? F('frei') : F('level', { level: f.level });
-    b.innerHTML = `<b>${frei ? '' : '🔒 '}${esc(F(f.text))}</b><span>${esc(frei && aktiv ? F('gewaehlt') : hinweis)}</span>`;
-    if (!frei) b.setAttribute('aria-label', `${F(f.text)}. ${F('gesperrt', { level: f.level })}`);
-    b.addEventListener('click', () => {
-      if (!frei) return;
-      speichereModulEinstellungen(MODUL, { auswahl: f.id });
-      for (const x of gruppe.querySelectorAll('.fi-wahl')) x.setAttribute('aria-checked', x === b ? 'true' : 'false');
-      for (const x of gruppe.querySelectorAll('.fi-wahl span')) x.textContent = '';
-      b.querySelector('span').textContent = F('gewaehlt');
-    });
-    gruppe.appendChild(b);
-  }
+  const an = () => auswahl() !== 'aus';
+  el.innerHTML = `<h3 class="es-titel">${esc(F('titel'))}</h3>
+    <div class="es-zeile">
+      <div class="es-text"><b id="es-l-finisher">${esc(F('an'))}</b><span id="es-t-finisher">${esc(F('anText'))}</span></div>
+      <button class="es-schalter fi-schalter" type="button" role="switch" aria-labelledby="es-l-finisher" aria-describedby="es-t-finisher"
+        aria-checked="${an()}"><i></i></button>
+    </div>
+    <p class="es-hilfe">${esc(F('wahlHinweis'))}</p>`;
+  const schalter = el.querySelector('.fi-schalter');
+  const umschalten = () => {
+    const e = ladeModulEinstellungen(MODUL, {}) || {};
+    if (an()) speichereModulEinstellungen(MODUL, { auswahl: 'aus', zuletzt: auswahl() });
+    else speichereModulEinstellungen(MODUL, { auswahl: e.zuletzt && e.zuletzt !== 'aus' && istFrei(e.zuletzt) ? e.zuletzt : 'krone' });
+    schalter.setAttribute('aria-checked', String(an()));
+  };
+  schalter.addEventListener('click', umschalten);
+  el.querySelector('.es-text').addEventListener('click', umschalten);
   return el;
 }
 
@@ -129,6 +128,9 @@ anbieten('sammlung:bereich', () => {
   const figuren = new URL('../../../' + figurenPfad(), import.meta.url).href;
   return bereich({ id: 'finisher', name: F('titel'), teile: FINISHER.filter((x) => x.id !== 'aus' && sichtbar(x)).map((x) => ({
     id: 'finisher-' + x.id, name: F(x.text), frei: istFrei(x.id, lv), an: gewaehlt === x.id,
+    // Tipp waehlt, ein zweiter Tipp auf den gewaehlten schaltet den Finisher aus (wie die Lobby-Musik)
+    wahl: () => speichereModulEinstellungen(MODUL, { auswahl: x.id, zuletzt: x.id }),
+    abwahl: () => speichereModulEinstellungen(MODUL, { auswahl: 'aus', zuletzt: x.id }),
     zeile: gewaehlt === x.id ? F('gewaehlt') : istFrei(x.id, lv) ? F('frei') : F('level', { level: x.level }),
     bild: finisherKunst(x.id, figuren) || '',
   })) });

@@ -107,7 +107,7 @@ export function shopBereich({ app } = {}) {
   async function lade() {
     if (!sitzung()) {
       // wie js/ui/online.js: die Konto-Gruppe ist je Geraet verborgen, bis jemand sie aufruft
-      satz(S('shop.anmelden'), knopf(S('shop.zumKonto'), () => { kontoFreigeschaltet('#konto'); try { app?.gehe?.('einstellungen'); } catch (e) { /* egal */ } }));
+      satz(S('shop.anmelden'), knopf(S('shop.zumKonto'), () => { kontoFreigeschaltet('#konto'); try { app?.gehe?.('einstellungen', { seite: 'konto' }); } catch (e) { /* egal */ } }));
       return;
     }
     satz(S('shop.laedt'));

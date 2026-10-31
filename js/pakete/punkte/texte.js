@@ -156,6 +156,7 @@ registriereTexte('p-punkte', {
     'karte.tafeln': 'Tafeln',
     'karte.beste': 'Beste Partie',
     'karte.nochKeine': 'noch keine',
+    'karte.leer': 'Noch keine Partie gewertet. Deine beste steht dann hier.',
     'karte.satz': 'Level: wie weit. Wertung: wie stark. Tafel: wie gut diese eine Partie war. Serie: wie treu.',
     'karte.punkteAuf': 'Punkte auf {tafel}',
     // Reiter Ich
@@ -398,6 +399,7 @@ registriereTexte('p-punkte', {
     'karte.tafeln': 'Scoreboards',
     'karte.beste': 'Best game',
     'karte.nochKeine': 'none yet',
+    'karte.leer': 'No game scored yet. Your best one will show up here.',
     'karte.satz': 'Level: how far. Rating: how strong. Scoreboard: how good that one game was. Streak: how steady.',
     'karte.punkteAuf': 'points on {tafel}',
     'ich.titel': 'Your best games',

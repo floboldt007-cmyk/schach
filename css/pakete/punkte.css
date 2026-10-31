@@ -191,6 +191,7 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-s-beste { display: grid; gap: 4px; }
 .bl-s-beste b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 56px; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .bl-s-beste span:not(.ueberzeile) { font-size: 15px; font-weight: 650; color: var(--text-2); }
+.bl-s-leer { margin: 2px 0 0; font-size: 16px; font-weight: 650; line-height: 1.35; color: var(--text-2); }
 /* leerer Zeitraum: ein ruhiger Satz und ein Weg zum Spielen statt einer leeren Tabelle */
 .bl-leer-gross { display: grid; justify-items: start; gap: 10px; padding: 8px 4px; }
 .bl-leer-gross b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 24px; line-height: 1.15; }
