@@ -465,7 +465,7 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .inhalt { gap: 10px; }
 .arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
 .arena.karte-kompakt .knoten .fahne { display: none; }
-.arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 16px; }
+.arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
 .arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
 .arena.karte-kompakt .detail .mini-sterne { margin-left: 8px; }
 .arena.karte-kompakt .cta-platz { padding: 6px 16px 10px; }
@@ -484,7 +484,8 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .detail-kopf { order: 1; }
 .arena.karte-kompakt .wahl-farbe { order: 3; }
 .arena.karte-kompakt .ort-tempo { order: 4; }
-.arena.karte-kompakt .cta-platz { order: 5; margin-top: 0; }
+/* der Knopf ist das letzte Teil: so klebt er unten, auch ganz nach unten gerollt (nichts schiebt ihn nach oben) */
+.arena.karte-kompakt .cta-platz { order: 10; margin-top: 0; }
 .arena.karte-kompakt .ort-panel-bot { order: 6; }
 .arena.karte-kompakt .ort-panel-oben { order: 7; }
 .arena.karte-kompakt .heute-karte { order: 8; }
