@@ -3,6 +3,7 @@ import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudSta
   speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
   SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
   ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau,
+  anmeldeUrl, anmeldewege, setzeAnmeldewege, mehrFortschritt,
  } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
 
@@ -103,11 +104,12 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
     && new URL(ziel).searchParams.get('redirect_to') === 'http://127.0.0.1:9500/schach/?test#konto', ziel);
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u7', email: 'g@gmail.example' })).toString('base64url') + '.x';
   let neu = null;
+  localStorage.removeItem(SICHTBAR_SCHLUESSEL);
   const genommen = uebernimmLinkSitzung({ hash: `#konto#access_token=${tok}&expires_at=9999999999&expires_in=3600&provider_token=GOOGLE&refresh_token=rg&token_type=bearer`, pathname: '/schach/', search: '' },
     { replaceState: (_, __, u) => { neu = u; } });
   pruefe('Google: Rückkehr mit #konto#access_token übernommen, Tokens (auch provider_token) aus der Adresse entfernt',
     genommen && sitzung()?.refresh_token === 'rg' && sitzung()?.email === 'g@gmail.example' && neu === '/schach/#einstellungen'
-    && !JSON.stringify(sitzung()).includes('GOOGLE') && localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1', JSON.stringify({ neu, s: sitzung() }));
+    && !JSON.stringify(sitzung()).includes('GOOGLE') && localStorage.getItem(SICHTBAR_SCHLUESSEL) === null, JSON.stringify({ neu, s: sitzung() }));
   neu = null;
   pruefe('Google: abgebrochene Anmeldung (#error=...) räumt die Adresse auf, Sitzung bleibt', uebernimmLinkSitzung({ hash: '#error=access_denied&error_description=abgebrochen', pathname: '/schach/', search: '' },
     { replaceState: (_, __, u) => { neu = u; } }) && neu === '/schach/#einstellungen' && sitzung()?.refresh_token === 'rg');
@@ -216,7 +218,22 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
     hatSpielstand({ 'schach-arena:v1:partien': '[{"id":"x"}]' }) && hatSpielstand({ 'schach-arena:v1:serie': '{}' }) && !hatSpielstand({}));
   localStorage.removeItem(SICHTBAR_SCHLUESSEL);
   uebernimmLinkSitzung({ hash: '#error=access_denied&error_code=otp_expired', pathname: '/', search: '' }, { replaceState() {} });
-  pruefe('Abgelaufener Link: Konto-Gruppe wird sichtbar (Meldung beim Zeichnen), Installations-Hinweis wartet',
-    localStorage.getItem(SICHTBAR_SCHLUESSEL) === '1' && linkAnmeldungFrisch());
+  pruefe('Abgelaufener Link: Meldung beim Zeichnen der (immer sichtbaren) Konto-Gruppe, Installations-Hinweis wartet, Testbereiche bleiben zu',
+    localStorage.getItem(SICHTBAR_SCHLUESSEL) === null && linkAnmeldungFrisch());
+}
+// Konto fuer alle (Flo 31.10.2026): Anmeldewege vom Server, Apple-Adresse, Empfehlung im Konflikt-Dialog
+{
+  const apple = anmeldeUrl('apple', 'https://floboldt007-cmyk.github.io/schach/');
+  pruefe('Apple: gleiche Form wie Google (provider=apple, redirect_to mit #konto)', new URL(apple).searchParams.get('provider') === 'apple'
+    && new URL(apple).searchParams.get('redirect_to') === 'https://floboldt007-cmyk.github.io/schach/#konto', apple);
+  pruefe('Anmeldewege: E-Mail und Google an, Apple aus, bis es in Supabase eingerichtet ist (feste Liste, keine Abfrage beim Server)',
+    anmeldewege().email === true && anmeldewege().google === true && anmeldewege().apple === false);
+  setzeAnmeldewege({ email: true, google: true, apple: true });
+  pruefe('Anmeldewege: zum Testen umschaltbar', anmeldewege().apple === true);
+  setzeAnmeldewege(null);
+  pruefe('Mehr Fortschritt: erst Level, dann Partien, Gleichstand ohne Empfehlung',
+    mehrFortschritt({ level: 5, partien: 3 }, { level: 2, partien: 40 }) === 'geraet' && mehrFortschritt({ level: 2, partien: 3 }, { level: 2, partien: 9 }) === 'cloud'
+    && mehrFortschritt({ level: 3, partien: 7 }, { level: 3, partien: 7 }) === null && mehrFortschritt({}, { level: 4 }) === 'cloud');
+  pruefe('Ohne #konto: Testbereiche bleiben zu (kontoFreigeschaltet), auch nach einer Anmeldung', (() => { localStorage.removeItem(SICHTBAR_SCHLUESSEL); return !kontoFreigeschaltet('#einstellungen'); })());
 }
 console.log(`${ok}/${gesamt} bestanden`); process.exit(ok === gesamt ? 0 : 1);
