@@ -3117,7 +3117,7 @@ async function testeU7(browser) {
       const brettTeile = m.spalte.filter((x) => x.s === '.evalbalken' || x.s === '.brett-rahmen');
       const karten = m.spalte.filter((x) => x.s !== '.evalbalken' && x.s !== '.brett-rahmen');
       pruefe('Brett und Balken von Rand zu Rand (mittig), Gegner, Flo, Coach, Aktionen (und Zugstreifen) gleich breit mit 10 px Rand (1 px)',
-        brettTeile.every((x) => Math.abs(x.w - m.rahmen.w) <= 1 && Math.abs(x.l - (m.iw - m.rahmen.w) / 2) <= 1) && m.rahmen.w >= m.iw - 8
+        brettTeile.every((x) => Math.abs(x.w - m.rahmen.w) <= 1 && Math.abs(x.l - (m.iw - m.rahmen.w) / 2) <= 1) && m.rahmen.w >= m.iw - (m.ih < 700 ? 16 : 8)
         && karten.every((x) => Math.abs(x.w - (m.iw - 20)) <= 1 && Math.abs(x.l - 10) <= 1),
         JSON.stringify(m.spalte.map((x) => [x.s, Math.round(x.l), Math.round(x.w)])));
       pruefe('Unterste Kante <= Höhe (Kopf bis Aktionen im Bild)', m.unten <= m.ih + 0.5, `${m.unten} von ${m.ih}`);
@@ -3131,7 +3131,12 @@ async function testeU7(browser) {
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
       }
       pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
-      pruefe('Genug Höhe: Coach in voller Höhe, Brett in voller Breite (von Rand zu Rand)', !m.eng && Math.round(m.brett.w) === Math.floor(m.iw / 8) * 8, JSON.stringify([m.eng, m.brett.w]));
+      // unter 700 px Hoehe (390 x 664) reicht die Hoehe nicht ganz: erst wird der Coach einzeilig, dann das Brett hoechstens
+      // eine Stufe (8 px) schmaler; darueber volle Breite und Coach in voller Hoehe
+      const vollBreit = Math.floor(m.iw / 8) * 8;
+      pruefe('Brett von Rand zu Rand, Coach in voller Höhe (unter 700 px Höhe: Coach einzeilig, Brett höchstens 8 px schmaler)',
+        m.ih >= 700 ? (!m.eng && Math.round(m.brett.w) === vollBreit) : (Math.round(m.brett.w) === vollBreit ? true : (m.eng && Math.round(m.brett.w) >= vollBreit - 8)),
+        JSON.stringify([m.ih, m.eng, m.brett.w]));
       // Sprechblase hoch (Nachbesserung): in der Karte neben dem Portraet, nie ueber den Figuren, nie gekuerzt
       const bl = await u7Blase(seite);
       const blLang = await u7Blase(seite, U7_LANGER_SATZ);
@@ -3201,7 +3206,7 @@ async function testeU7(browser) {
       ergebnis.push({ hoehe, eng: m.eng, brett: Math.round(m.brett.w), unten: Math.round(m.unten), ih: m.ih, scrollt: m.scrollt });
     }
     const [a, b, c] = ergebnis;
-    pruefe('390 x 655: Coach auf eine Zeile (Rest auf Antippen), das Brett bleibt voll (360 px), alles im Bild', a.eng && a.brett === 360 && a.unten <= a.ih, JSON.stringify(a));
+    pruefe('390 x 655: Coach auf eine Zeile (Rest auf Antippen), das Brett bleibt groß (mindestens 360 px, seit 31.10. ohne Sockel), alles im Bild', a.eng && a.brett >= 360 && a.brett % 8 === 0 && a.unten <= a.ih, JSON.stringify(a));
     pruefe('390 x 600: Coach eine Zeile, erst dann ein kleineres Brett (Vielfaches von 8, mindestens 280), alles im Bild', b.eng && b.brett < 360 && b.brett >= 280 && b.brett % 8 === 0
       && b.unten <= b.ih, JSON.stringify(b));
     pruefe('390 x 540: das Brett nie unter 280 px (die Spalte scrollt)', c.brett === 280 && c.scrollt > 0, JSON.stringify(c));

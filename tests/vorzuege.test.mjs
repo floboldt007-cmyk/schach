@@ -22,6 +22,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 }
 if (!pw) throw new Error('Playwright fehlt');
 const PORT = Number(process.env.PORT || 8891);
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2' };
 const server = http.createServer((req, res) => {
@@ -81,9 +82,23 @@ try {
   };
   const bildFertig = () => begrenzt('Vorzug: Render-Schritt', () => seite.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
   const tippe = async (f) => { const p = await feld(f); await seite.touchscreen.tap(p.x, p.y); await bildFertig(); };
+  // Unter Last (volle Suite) ging der erste Tipp einer frischen Partie manchmal ins Leere (das Brett lief noch in seine
+  // Eintritts-Animation): bis zu dreimal nachtippen, solange nichts ausgewaehlt ist; sonst sagen, was unter dem Finger lag
   const zug = async (uci) => {
-    await tippe(uci.slice(0, 2));
-    await seite.waitForFunction(f => !!document.querySelector(`.screen.partie .lage.auswahl[data-feld="${f}"]`), uci.slice(0, 2));
+    const von = uci.slice(0, 2);
+    const gewaehlt = (f) => seite.waitForFunction((x) => !!document.querySelector(`.screen.partie .lage.auswahl[data-feld="${x}"]`), f, { timeout: 6000 })
+      .then(() => true, () => false);
+    let ok = false;
+    for (let i = 0; i < 4 && !ok; i++) {
+      if (i) await warte(400);
+      await tippe(von);
+      ok = await gewaehlt(von);
+    }
+    if (!ok) {
+      const p = await feld(von);
+      const unter = await seite.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? e.tagName + '.' + [...e.classList].join('.') : null; }, p);
+      throw new Error(`Zug ${uci}: ${von} nicht ausgewaehlt (Phase ${await seite.evaluate(() => window.__partie?.phase())}, unter dem Finger ${unter})`);
+    }
     await tippe(uci.slice(2, 4));
     await seite.waitForFunction(() => !document.querySelector('.screen.partie .lage.auswahl'));
   };

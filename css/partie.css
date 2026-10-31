@@ -318,8 +318,11 @@
   .partie .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; gap: 4px; }
   .partie .uhr .uhr-ic { width: 14px; height: 14px; }
   .partie .spieler > .ort-gegner-leiste { margin-bottom: 4px; }
-  /* Blase in der Karte (Abschnitt "Sprechblase hoch" oben), etwas kleiner */
-  .partie .p-blase { padding: 6px 10px; font-size: 13px; }
+  /* Blase in der Karte (Abschnitt "Sprechblase hoch" oben), etwas kleiner. Seit das Brett ohne Sockel von Rand zu Rand
+     geht (31.10.2026), faengt sie an der Oberkante der Karte an und ist etwas dichter gesetzt: so passen auch neben der
+     Uhr drei Zeilen ueber Luecke und Balken, ohne die Figuren zu beruehren. */
+  .partie .spieler.gegner > .blase-ort { top: -4px; bottom: -4px; }
+  .partie .p-blase { padding: 5px 10px; font-size: 13px; line-height: 1.25; }
   /* Bewertungsbalken waagrecht ueber dem Brett (6 px, volle Breite, Weiss von links, gedreht von rechts), Zahl auf Antippen */
   .partie .evalbalken { width: 100%; height: 6px; border-radius: var(--r-pille); overflow: visible; cursor: pointer;
     box-shadow: 0 0 0 1px var(--linie-2); }
