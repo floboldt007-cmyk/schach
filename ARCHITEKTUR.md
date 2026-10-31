@@ -2924,6 +2924,12 @@ kommt. Andere Konten sehen keine Karte, `#lernen` und `#lektion` fuehren sie sti
   weitere Bereiche im Vault (Schach-App/Meisterschule.md). Nachgerechnet mit
   `werkzeuge/mattbilder-pruefen.mjs` (Stockfish in Node; bei langen Matts der kuerzeste je gefundene Weg). Sterne: 3 bis
   `ziel + ziel/4` Zuege, 2 bis `1,5 * ziel + 2`, sonst 1; mit Hinweis hoechstens 2. Grenze `2 * ziel + 10` Zuege.
+- `js/pakete/lernen/taktik.js` (reine Daten, 31.10.2026): 16 Taktik-Lektionen mit `art: 'taktik'`: geschafft, wenn nach
+  dem Gegenzug mindestens `gewinn` Punkte Material mehr als am Anfang da sind, oder bei Matt. Teil 1 (leicht, mittel):
+  Gabeln, Spiesse, Fesselungen, Abzug. Teil 2 (mittel, schwer): Doppelschach, Doppeldrohung, Ueberlastung, Ablenkung,
+  Hinlenkung. `opfer` (Punkte) erlaubt einen bewussten Rueckstand unterwegs (Hinlenkung: Turmopfer), sonst gilt ein
+  Minus von 3 Punkten nach Flos Zug als verloren. Stellungen eigene, jede Antwort des Gegners zwei Zuege tief
+  durchgerechnet plus Stockfish MultiPV 3 (Schluesselzug klar vorn).
 - `js/ui/lernen.js` (Uebersicht mit Bereichswahl, params `{ bereich }`, die Wahl bleibt im Verlauf) und `js/ui/lektion.js`
   (eine Lektion, Ziel per `pruefeZiel`; Ereignis-id `<bereich>-<id>`): Flo spielt, die Engine `bewertung` verteidigt
   (450 ms je Zug, Hinweis 900 ms). Ende bei Matt (Sterne), Patt, Remis, zu vielen Zuegen oder Matt gegen Flo. Im

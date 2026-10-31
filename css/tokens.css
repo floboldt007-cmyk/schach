@@ -77,6 +77,43 @@ html[data-brett="thron"] {
   --zuletzt: rgba(255, 240, 160, .55); --auswahl: rgba(70, 44, 6, .26); --punkt: rgba(60, 38, 6, .22);
   --auswahl-kante: rgba(255, 252, 235, .85);
 }
+/* Welten-Bretter (Labor, Flo 31.10.2026 nach den Themen-Brettern bei chess.com: "Schau mal wie cool die Designs sind"):
+   je Welt ein Brett mit leichter, eigener Struktur je Feld (--feld-muster-hell/-dunkel, css/board.css). Spaeter (Flos Entscheidung) erspielbar ueber den Endgegner der Welt. */
+html[data-brett="acker"] {
+  --feld-hell: #eedcaa; --feld-dunkel: #7f9a4e;
+  --zuletzt: rgba(255, 214, 80, .55); --auswahl: rgba(40, 52, 10, .28); --punkt: rgba(34, 44, 10, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg stroke='rgba%28150%2C112%2C40%2C.22%29' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M14 22l9 3M58 16l8 4M30 58l9-2M72 64l7 4M18 86l8-3M80 34l6 3'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2840%2C56%2C12%2C.2%29' stroke-width='3.2'%3E%3Cpath d='M0 22q25-6 50 0t50 0M0 52q25-6 50 0t50 0M0 82q25-6 50 0t50 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="moos"] {
+  --feld-hell: #dfe7c9; --feld-dunkel: #567d4b;
+  --zuletzt: rgba(255, 220, 90, .55); --auswahl: rgba(16, 40, 14, .3); --punkt: rgba(16, 36, 12, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28110%2C140%2C70%2C.14%29'%3E%3Ccircle cx='22' cy='26' r='5'/%3E%3Ccircle cx='70' cy='18' r='3.5'/%3E%3Ccircle cx='56' cy='70' r='6'/%3E%3Ccircle cx='16' cy='78' r='3'/%3E%3Ccircle cx='86' cy='56' r='4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%2820%2C48%2C18%2C.2%29'%3E%3Ccircle cx='24' cy='30' r='14'/%3E%3Ccircle cx='74' cy='66' r='17'/%3E%3C/g%3E%3Cg fill='rgba%28180%2C214%2C140%2C.14%29'%3E%3Ccircle cx='70' cy='22' r='9'/%3E%3Ccircle cx='22' cy='78' r='10'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="pflaster"] {
+  --feld-hell: #e8dfcf; --feld-dunkel: #7d8795;
+  --zuletzt: rgba(255, 196, 70, .55); --auswahl: rgba(24, 30, 42, .28); --punkt: rgba(20, 26, 36, .22);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28130%2C108%2C72%2C.13%29' stroke-width='2'%3E%3Crect x='6' y='6' width='40' height='38' rx='12'/%3E%3Crect x='54' y='8' width='40' height='36' rx='12'/%3E%3Crect x='8' y='54' width='38' height='40' rx='12'/%3E%3Crect x='54' y='54' width='40' height='40' rx='12'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2824%2C30%2C42%2C.17%29' stroke-width='2.2'%3E%3Crect x='6' y='6' width='40' height='38' rx='12'/%3E%3Crect x='54' y='8' width='40' height='36' rx='12'/%3E%3Crect x='8' y='54' width='38' height='40' rx='12'/%3E%3Crect x='54' y='54' width='40' height='40' rx='12'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="brandung"] {
+  --feld-hell: #f3e7cc; --feld-dunkel: #4f93a6;
+  --zuletzt: rgba(255, 210, 90, .55); --auswahl: rgba(10, 50, 62, .28); --punkt: rgba(8, 40, 50, .24);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='rgba%28176%2C140%2C84%2C.22%29'%3E%3Ccircle cx='18' cy='20' r='1.8'/%3E%3Ccircle cx='62' cy='14' r='1.4'/%3E%3Ccircle cx='40' cy='46' r='1.6'/%3E%3Ccircle cx='82' cy='40' r='1.8'/%3E%3Ccircle cx='24' cy='74' r='1.4'/%3E%3Ccircle cx='70' cy='80' r='1.8'/%3E%3Ccircle cx='50' cy='90' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28255%2C255%2C255%2C.2%29' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M8 34q10-8 20 0t20 0M52 70q10-8 20 0t20 0'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-brett="tiefsee"] {
+  --feld-hell: #d2e4ec; --feld-dunkel: #3c6a8c;
+  --zuletzt: rgba(255, 210, 90, .55); --auswahl: rgba(10, 24, 40, .3); --punkt: rgba(8, 20, 34, .26);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+  --feld-muster-hell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%2860%2C110%2C140%2C.18%29' stroke-width='1.6'%3E%3Ccircle cx='24' cy='70' r='5'/%3E%3Ccircle cx='34' cy='54' r='3'/%3E%3Ccircle cx='76' cy='28' r='4'/%3E%3C/g%3E%3C/svg%3E");
+  --feld-muster-dunkel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='rgba%28225%2C245%2C255%2C.2%29' stroke-width='2'%3E%3Ccircle cx='26' cy='74' r='7'/%3E%3Ccircle cx='38' cy='52' r='4'/%3E%3Ccircle cx='44' cy='36' r='2.5'/%3E%3Ccircle cx='74' cy='30' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
 :root {
   --hinweis: rgba(76, 110, 245, .34);
   /* Flos eigene Pfeile und Marken: das Theme setzt --pfeil-nutzer/--marke-nutzer hell und dunkel, hier der Rueckfall */

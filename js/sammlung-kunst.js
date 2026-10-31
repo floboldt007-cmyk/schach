@@ -87,11 +87,15 @@ export function klangKunst(kid) {
 // Flo 31.10.2026 (Foto der Brett-Auswahl): "der Koenig sieht ganz anders aus". Mit figuren (Ordner-URL des
 // ausgeruesteten Satzes, mit Schraegstrich am Ende) zeigt die Vorschau die echten Spielfiguren auf einem 3 x 3
 // Ausschnitt, gross genug zum Erkennen. Ohne figuren (Node-Tests, alte Aufrufer) die gezeichneten Ersatzfiguren.
-export function brettKunst(hell, dunkel, rand = '#2A2A2A', figuren = '') {
+// muster (Welten-Bretter, js/labor.js): { h, d } SVG-Inhalt je Feld in viewBox 0 0 100 100, wie im Spiel ueber der Farbe
+export function brettKunst(hell, dunkel, rand = '#2A2A2A', figuren = '', muster = null) {
   const N = 3; const Z = 32; const A = (120 - N * Z) / 2;
   const felder = Array.from({ length: N * N }, (_, i) => {
-    const x = i % N; const y = Math.floor(i / N);
-    return `<rect x="${A + x * Z}" y="${A + y * Z}" width="${Z}" height="${Z}" fill="${(x + y) % 2 ? dunkel : hell}"/>`;
+    const x = i % N; const y = Math.floor(i / N); const d = (x + y) % 2;
+    const zeichnung = muster && (d ? muster.d : muster.h);
+    return `<rect x="${A + x * Z}" y="${A + y * Z}" width="${Z}" height="${Z}" fill="${d ? dunkel : hell}"/>`
+      // als Gruppe, nicht als verschachteltes svg: css/pakete/sammlung.css setzt jedem svg in .sa-bild eine Groesse
+      + (zeichnung ? `<g class="sk-muster" transform="translate(${A + x * Z} ${A + y * Z}) scale(${Z / 100})">${zeichnung}</g>` : '');
   }).join('');
   // oben: schwarzer Bauer und Koenig, unten: weisser Koenig und Bauer (je eine Figur auf hellem und dunklem Feld)
   const stellung = [['bP', 1, 0], ['bK', 2, 0], ['wK', 0, 2], ['wP', 1, 2]];

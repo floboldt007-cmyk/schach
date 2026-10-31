@@ -185,7 +185,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
 export const EINSTELLUNG_WERTE = Object.freeze({
   // dahinter die Bretter des Labors (js/labor.js, nur das Erfinder-Konto; app.js faellt fuer andere auf 'nacht')
-  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron']),
+  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron', 'acker', 'moos', 'pflaster', 'brandung', 'tiefsee']),
   klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
