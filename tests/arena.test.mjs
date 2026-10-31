@@ -508,8 +508,9 @@ async function testeKarteQuer(browser) {
   const t2 = await seite.locator('.toast').innerText();
   pruefe('gesperrt weiter oben: „Besiege zuerst Postbotin Paula“', /Besiege zuerst Postbotin Paula/.test(t2), t2);
   await tippe(seite, '.farbwahl [data-farbe="b"]');
-  pruefe('Farbwahl Schwarz: aria-checked, Flos Figur zeigt den schwarzen Koenig', await seite.evaluate(() => document.querySelector('.farbwahl [data-farbe="b"]').getAttribute('aria-checked') === 'true'
-    && /bK\.svg/.test(document.querySelector('.flo-figur image').getAttribute('href'))));
+  // Standard-Profilbild ist seit 31.10.2026 der Bauer (der Koenig gehoert dem Erfinder, js/profil.js NUR_ERFINDER)
+  pruefe('Farbwahl Schwarz: aria-checked, Flos Figur zeigt den schwarzen Bauern', await seite.evaluate(() => document.querySelector('.farbwahl [data-farbe="b"]').getAttribute('aria-checked') === 'true'
+    && /bP\.svg/.test(document.querySelector('.flo-figur image').getAttribute('href'))));
   await tippe(seite, '.knoten[data-bot="paula"]');
   await warte(600);
   // Meldungen der Sperr-Tipps vor dem Bild entfernen (sonst verdecken sie Schilder am unteren Kartenrand)
@@ -1103,12 +1104,12 @@ async function testeDuell(browser) {
       return { art: d.dataset.art, bot: d.dataset.bot, anlass: d.dataset.anlass, attr: document.documentElement.dataset.duell, buehne: getComputedStyle(d.querySelector('.duell-buehne')).backgroundColor, bfRgb,
         gegen: d.querySelector('.duell-gegen').textContent, botName: d.querySelector('.duell-seite.bot .duell-name').textContent, floName: d.querySelector('.duell-seite.flo .duell-name').textContent,
         unter: d.querySelector('.duell-seite.bot .duell-unter').textContent, chip: (d.querySelector('.duell-chip') || {}).textContent, naht: getComputedStyle(d.querySelector('.duell-flo i')).clipPath,
-        portraet: d.querySelector('[data-rolle="bot"] img').src.endsWith('/assets/avatare/modern/paula.svg'), koenig: /wK\.svg/.test(d.querySelector('[data-rolle="flo"] image').getAttribute('href')),
+        portraet: d.querySelector('[data-rolle="bot"] img').src.endsWith('/assets/avatare/modern/paula.svg'), koenig: /wP\.svg/.test(d.querySelector('[data-rolle="flo"] image').getAttribute('href')),
         rolle: d.getAttribute('role'), screen: document.documentElement.dataset.screen };
     });
     pruefe('Ueberlagerung .duell.voll an body: Bot-Haelfte in Bot-Farbe, „gegen“, Namen, Elo und Farben, Chip „Stufe 3 · Erste Partie“', mitte.art === 'voll' && mitte.bot === 'paula' && mitte.anlass === 'erste' && mitte.buehne === mitte.bfRgb
       && mitte.gegen === 'gegen' && mitte.botName === 'Postbotin Paula' && mitte.floName === 'Flo' && mitte.unter === 'Elo 300 · Schwarz' && mitte.chip === 'Stufe 3 · Erste Partie' && mitte.rolle === 'dialog', JSON.stringify(mitte));
-    pruefe('Portraets: Modern-Portraet des Bots, Flos weisser Koenig; Naht schraeg (quer)', mitte.portraet && mitte.koenig && /56%/.test(mitte.naht), JSON.stringify(mitte));
+    pruefe('Portraets: Modern-Portraet des Bots, Flos weisser Bauer (Standard-Profilbild); Naht schraeg (quer)', mitte.portraet && mitte.koenig && /56%/.test(mitte.naht), JSON.stringify(mitte));
     pruefe('Vertrag: html[data-duell="laeuft"] solange das Intro laeuft', mitte.attr === 'laeuft');
     await warte(300);
     await bild(seite, 'duell-1180x820-hell');

@@ -164,6 +164,21 @@ export function melodieKunst(nr) {
     + funke(18, 100, 0.4, 0.6, '#FFF6D6'), 'sk-klang sk-melodie');
 }
 
+// ---------- Profilbild: Hintergrund je Welt ----------
+// Flo 31.10.2026 ("mehr Optionen"): Flaeche in der dunklen Weltfarbe, Scheibe (60/64, r 42 wie in thema.floAvatar) mit
+// Licht oben links und dem Motiv der Welt ganz leise. 'standard' zeichnet thema.js selbst (Schiefer oder Papier).
+export function profilGrund(gid) {
+  const nr = Number((/^welt-([1-5])$/.exec(String(gid)) || [])[1]);
+  const w = WELT[nr];
+  if (!w) return null;
+  const g = id('pg'); const c = id('pc'); const ci = id('pc');
+  return `<defs><radialGradient id="${g}" cx=".36" cy=".3" r=".9"><stop offset="0" stop-color="${w.farbe}"/><stop offset="1" stop-color="${w.dunkel}"/></radialGradient>`
+    + `<clipPath id="${c}"><circle cx="60" cy="64" r="42"/></clipPath><clipPath id="${ci}"><circle cx="60" cy="60" r="60"/></clipPath></defs>`
+    + `<rect width="120" height="120" fill="${w.dunkel}"/><circle cx="60" cy="64" r="42" fill="url(#${g})"/>`
+    + `<g clip-path="url(#${c})" opacity=".28"><g transform="translate(60 64) scale(1.25) translate(-60 -60)">${w.bild(ci)}</g></g>`
+    + '<path d="M28 50A36 36 0 0 1 50 27" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".18"/>';
+}
+
 const LIGA = [
   ['#E9C08C', '#A8743F', '#D4A06A', '#7C4F27'],
   ['#F6C59A', '#A8622F', '#EBA978', '#6E3B17'],

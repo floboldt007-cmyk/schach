@@ -11,7 +11,7 @@ import path from 'node:path';
 import { setzeSpeicher } from '../js/storage.js';
 import { teileBretter, teileKlaenge, teileErfolge } from '../js/pakete/sammlung/index.js';
 import { standText } from '../js/pakete/sammlung/shop.js';
-import { rahmenTeile } from '../js/pakete/sammlung/profil.js';
+import { rahmenTeile, motivTeile, grundTeile } from '../js/pakete/sammlung/profil.js';
 import { profilWahl, setzeProfilWahl } from '../js/profil.js';
 import { floAvatar } from '../js/thema.js';
 import { BOTS } from '../js/bots.js';
@@ -80,13 +80,37 @@ const rf = (id) => r1.find((r) => r.id === id);
 pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga Gold mit Weg, kein Blatt 0 ohne Sonderstueck',
   rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3').frei && rf('liga-3').weg === 'Erreiche Liga Gold'
   && !rf('welt-2').frei && !r1.some((r) => r.id === 'erfinder-blatt-0'), r1.map((r) => r.id + (r.frei ? '+' : '-')).join());
-pruefe('Profil: Standard Koenig ohne Rahmen, leere Vitrine', JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'K', rahmen: 'ohne', vitrine: [null, null, null] })
-  && /wK\.svg/.test(floAvatar('w')) && !/stroke-width="8"/.test(floAvatar('w')));
+pruefe('Profil: Standard Bauer (der Koenig gehoert dem Erfinder), Standard-Hintergrund, ohne Rahmen, leere Vitrine',
+  JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null] })
+  && /wP\.svg/.test(floAvatar('w')) && !/stroke-width="8"/.test(floAvatar('w')));
 setzeProfilWahl({ figur: 'Q', rahmen: 'liga-2', vitrine: ['erfolg-welt-1', 'kaputt!', 'erfolg-liga-2', 'zuviel'] });
 pruefe('Profil: Figur Dame, Rahmen Silber, Vitrine hoechstens drei Plaetze, Unsinn faellt raus', profilWahl().figur === 'Q' && profilWahl().rahmen === 'liga-2'
   && JSON.stringify(profilWahl().vitrine) === JSON.stringify(['erfolg-welt-1', null, 'erfolg-liga-2']) && /wQ\.svg/.test(floAvatar('w')) && /#A9B2BE/.test(floAvatar('w')) && /rk-glanz/.test(floAvatar('w')));
-setzeProfilWahl({ figur: 'X', rahmen: 'gibts-nicht' });
-pruefe('Profil: unbekannte Figur oder Rahmen fallen auf den Standard', profilWahl().figur === 'K' && profilWahl().rahmen === 'ohne');
+setzeProfilWahl({ figur: 'X', rahmen: 'gibts-nicht', grund: 'mond' });
+pruefe('Profil: unbekannte Figur, Rahmen oder Hintergrund fallen auf den Standard', profilWahl().figur === 'P' && profilWahl().rahmen === 'ohne' && profilWahl().grund === 'standard');
+// Flo 31.10.: "mehr Optionen ... nur ich der Erschaffer kann den Koenig waehlen"
+setzeProfilWahl({ figur: 'K' });
+pruefe('Profil: ohne Erfinder-Konto kein Koenig und kein Kronli (fallen auf den Bauern)', profilWahl().figur === 'P'
+  && (setzeProfilWahl({ figur: 'kronli' }), profilWahl().figur === 'P'));
+setzeProfilWahl({ figur: 'glimm', grund: 'welt-5' });
+const glimm = floAvatar('w');
+pruefe('Profil: Kreatur als Motiv, still (ohne Bewegungs-Klassen), auf dem Hintergrund der Stockfisch-Tiefe',
+  profilWahl().figur === 'glimm' && profilWahl().grund === 'welt-5' && /data-figur="glimm"/.test(glimm) && /data-kreatur="glimm"/.test(glimm)
+  && !/class="kr-|kreatur kr-/.test(glimm) && /#24305A/.test(glimm) && !/\.svg"/.test(glimm) && !/undefined|NaN/.test(glimm));
+const m0 = motivTeile(e0, false);
+const m1 = motivTeile(e1, false);
+const mf = (l, id) => l.find((m) => m.id === id);
+pruefe('Motive ohne Erfinder: fuenf Figuren ohne Koenig, fuenf Kreaturen ohne Kronli; Karo erst mit Welt 1 gemeistert, sonst mit Weg',
+  m0.filter((m) => m.art === 'figur').map((m) => m.id).join() === 'Q,R,B,N,P' && m0.filter((m) => m.art === 'kreatur').map((m) => m.id).join() === 'karo,stups,zinni,klippa,glimm'
+  && !mf(m0, 'karo').frei && mf(m0, 'karo').weg === 'Karofelder: 0 von 6 Bots besiegt' && mf(m1, 'karo').frei && !mf(m1, 'stups').frei, m0.map((m) => m.id + (m.frei ? '+' : '-')).join());
+const mE = motivTeile(e0, true);
+pruefe('Motive als Erfinder: Koenig und Kronli dabei und markiert, alles frei', mf(mE, 'K') && mf(mE, 'K').erfinder && mf(mE, 'kronli') && mf(mE, 'kronli').erfinder
+  && mE.every((m) => m.frei) && mE.length === 12);
+const g0 = grundTeile(false);
+pruefe('Hintergruende: Standard immer frei, Welt 1 erreicht, Welt 2 mit Weg', g0.length === 6 && g0[0].id === 'standard' && g0[0].frei
+  && g0.find((g) => g.id === 'welt-1').frei && !g0.find((g) => g.id === 'welt-2').frei && g0.find((g) => g.id === 'welt-2').weg === 'Erreiche Springerforst',
+  g0.map((g) => g.id + (g.frei ? '+' : '-') + g.weg).join());
+setzeProfilWahl({ figur: 'P', grund: 'standard' });
 pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen',
   !e1.some((x) => /€|kauf|shop|verfügbar|nur noch/i.test(x.name + ' ' + x.zeile)));
 
@@ -276,7 +300,7 @@ async function profilTeil(browser) {
   await p.s.waitForSelector('.pr-karte', { timeout: 15000 }).catch(() => {});
   const vorher = await p.s.evaluate(() => ({ karte: !!document.querySelector('.pr-karte'), figur: document.querySelector('.pr-av svg')?.dataset.figur,
     leer: document.querySelectorAll('.pr-orden.leer').length, oben: !!document.querySelector('.sa-kopf-ort .pr-karte') }));
-  pruefe('Profil: Karte oben im Reiter „Ich“, König als Bild, drei leere Plätze', vorher.karte && vorher.oben && vorher.figur === 'K' && vorher.leer === 3, vorher);
+  pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, drei leere Plätze', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 3, vorher);
   const rahmen = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="rahmen"] .sa-teil')].map((x) => ({
     id: x.dataset.teil, z: x.dataset.zustand, zeile: x.querySelector('.sa-zeile')?.textContent })));
   const r = (id) => rahmen.find((x) => x.id === 'rahmen-' + id) || {};
@@ -286,6 +310,22 @@ async function profilTeil(browser) {
   await p.s.locator('.pr-aendern').click();
   await p.s.waitForSelector('.pr-blatt .pr-figur', { timeout: 5000 });
   pruefe('Profil-Blatt: gesperrter Rahmen ist nicht wählbar', await p.s.locator('.pr-rahmen[data-rahmen="liga-3"]').isDisabled());
+  // das Blatt gleitet herein: erst messen, wenn es steht
+  await p.s.waitForFunction(() => { const b = document.querySelector('.pr-blatt .sheet-knoepfe button'); return !!b && b.getBoundingClientRect().bottom <= innerHeight; },
+    null, { timeout: 3000 }).catch(() => {});
+  const wahlInfo = await p.s.evaluate(() => ({ figuren: [...document.querySelectorAll('.pr-blatt .pr-figur')].map((b) => b.dataset.figur).join(),
+    kreaturen: [...document.querySelectorAll('.pr-blatt .pr-kreatur')].map((b) => b.dataset.figur + (b.disabled ? '-' : '+')).join(),
+    gruende: [...document.querySelectorAll('.pr-blatt .pr-grund')].map((b) => b.dataset.grund + (b.disabled ? '-' : '+')).join(),
+    vorschau: !!document.querySelector('.pr-blatt .pr-vorschau svg'),
+    scrollt: getComputedStyle(document.querySelector('.pr-blatt .pr-wahl')).overflowY,
+    fertigImBild: document.querySelector('.pr-blatt .sheet-knoepfe button').getBoundingClientRect().bottom <= innerHeight }));
+  // Flo 31.10.: "mehr Optionen ... nur ich der Erschaffer kann den Koenig waehlen"
+  pruefe('Profil-Blatt: kein König (nur der Erfinder), Kreaturen gesperrt bis die Welt gemeistert ist, Karofelder-Hintergrund frei, Vorschau oben, nur die Wahl scrollt',
+    wahlInfo.figuren === 'Q,R,B,N,P' && wahlInfo.kreaturen === 'karo-,stups-,zinni-,klippa-,glimm-' && /welt-1\+/.test(wahlInfo.gruende)
+    && /welt-2-/.test(wahlInfo.gruende) && wahlInfo.vorschau && wahlInfo.scrollt === 'auto' && wahlInfo.fertigImBild, wahlInfo);
+  await p.s.locator('.pr-grund[data-grund="welt-1"]').click();
+  pruefe('Profil-Blatt: Hintergrund Karofelder wählen, die Vorschau zeigt ihn sofort',
+    await p.s.evaluate(() => document.querySelector('.pr-blatt .pr-vorschau svg')?.dataset.grund === 'welt-1'));
   await p.s.locator('.pr-figur[data-figur="Q"]').click();
   await p.s.locator('.pr-rahmen[data-rahmen="holz"]').click();
   await p.s.locator('.pr-blatt .sheet-knoepfe button', { hasText: 'Fertig' }).click();

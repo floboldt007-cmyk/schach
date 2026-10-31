@@ -13,9 +13,12 @@ import { bereich } from '../../ui/ich.js';
 import { sheet } from '../../ui/bauteile.js';
 import { floAvatar } from '../../thema.js';
 import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
-import { profilWahl, setzeProfilWahl, FIGUREN, RAHMEN } from '../../profil.js';
+import { profilWahl, setzeProfilWahl, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
 import { istErfinder, hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { WELTEN } from '../../bots.js';
+import { istWeltFrei } from '../../storage.js';
+import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
+import { profilGrund } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import { teileErfolge, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import './texte.js';
@@ -71,30 +74,88 @@ function neuZeichnen(app) {
   try { app?.gehe?.('ich', {}, { ersetzen: true }); } catch (e) { /* egal */ }
 }
 
+// Motive und Hintergruende fuers Profilbild (Flo 31.10.2026: "mehr Optionen, denk dir was aus, nur ich der Erschaffer kann
+// den Koenig waehlen"). Koenig und Kronli gibt es nur fuer den Erfinder; andere sehen sie gar nicht (es gibt keinen Weg
+// dahin). Kreatur einer Welt: frei mit dem Erfolg "Welt gemeistert"; Hintergrund einer Welt: frei, sobald sie erreicht ist.
+export function motivTeile(erfolge = teileErfolge(), erfinder = istErfinder()) {
+  const nachId = new Map(erfolge.map((e) => [e.id, e]));
+  const figuren = FIGUREN.filter((f) => erfinder || !NUR_ERFINDER.includes(f)).map((f) => ({ id: f, art: 'figur', name: S('figur.' + f), frei: true, weg: '',
+    erfinder: NUR_ERFINDER.includes(f) }));
+  const kreaturen = KREATUR_MOTIVE.filter((k) => erfinder || !NUR_ERFINDER.includes(k)).map((k) => {
+    const welt = WELTEN.find((w) => w.id === (KREATUREN.find((x) => x.id === k) || {}).welt);
+    const e = welt ? nachId.get('erfolg-welt-' + welt.nr) : null;
+    const frei = erfinder || !!(e && e.frei);
+    return { id: k, art: 'kreatur', name: S('kreatur.' + k), frei, weg: frei ? '' : (e ? S('kreatur.weg', { welt: welt.kurz, stand: e.zeile }) : ''),
+      erfinder: NUR_ERFINDER.includes(k),
+      fortschritt: !frei && e && Number.isFinite(e.fortschritt) ? e.fortschritt : null };
+  });
+  return [...figuren, ...kreaturen];
+}
+export function grundTeile(erfinder = istErfinder()) {
+  return GRUENDE.map((g) => {
+    const nr = Number((/^welt-(\d)$/.exec(g) || [])[1]);
+    const welt = nr ? WELTEN.find((w) => w.nr === nr) : null;
+    const frei = !welt || erfinder || istWeltFrei(nr);
+    return { id: g, name: welt ? welt.kurz : S('grund.standard'), frei, weg: frei ? '' : S('grund.weg', { welt: welt.kurz }) };
+  });
+}
+// kleines Vorschaubild eines Hintergrunds: wie das Profilbild ohne Motiv und Rahmen
+const grundBild = (g) => `<svg viewBox="0 0 120 120" class="pr-grund-bild" aria-hidden="true">${profilGrund(g)
+  || '<rect width="120" height="120" fill="#2C3038"/><circle cx="60" cy="64" r="42" fill="#3A3F48"/><path d="M60 22a42 42 0 0 1 0 84Z" fill="#F7F3EC" opacity=".9"/>'}</svg>`;
+const kreaturBild = (k) => kreaturSvg(k, 'normal').replace(/ class="[^"]*"/g, '').replace('<svg ', '<svg class="pr-kreatur-bild" ');
+
 function waehleAussehen(app) {
   const wahl = profilWahl();
   const inhalt = document.createElement('div');
   inhalt.className = 'pr-wahl';
-  const figuren = FIGUREN.map((f) => `<button type="button" class="pr-figur" data-figur="${f}" aria-pressed="${wahl.figur === f}"
-    aria-label="${esc(S('figur.' + f))}"><img src="${new URL(`../../../assets/pieces/w${f}.svg`, import.meta.url).href}" alt=""></button>`).join('');
+  const motive = motivTeile();
+  const figuren = motive.filter((m) => m.art === 'figur').map((m) => `<button type="button" class="pr-figur${m.erfinder ? ' pr-erfinder' : ''}" data-figur="${m.id}"
+    aria-pressed="${wahl.figur === m.id}" aria-label="${esc(m.name)}"><img src="${new URL(`../../../assets/pieces/w${m.id}.svg`, import.meta.url).href}" alt="">`
+    + `${m.erfinder ? `<span class="pr-erfinder-chip" aria-hidden="true">${esc(S('erfinder.name'))}</span>` : ''}</button>`).join('');
+  const kreaturen = motive.filter((m) => m.art === 'kreatur').map((m) => `<button type="button" class="pr-rahmen pr-kreatur" data-figur="${m.id}"
+    aria-pressed="${wahl.figur === m.id}" ${m.frei ? '' : 'disabled'}>${kreaturBild(m.id)}<b>${esc(m.name)}</b><small>${esc(m.frei
+    ? (m.erfinder ? S('erfinder.name') : wahl.figur === m.id ? S('an') : S('frei')) : m.weg)}</small></button>`).join('');
+  const gruende = grundTeile().map((g) => `<button type="button" class="pr-rahmen pr-grund" data-grund="${g.id}" aria-pressed="${wahl.grund === g.id}"
+    ${g.frei ? '' : 'disabled'}>${grundBild(g.id)}<b>${esc(g.name)}</b><small>${esc(g.frei ? (wahl.grund === g.id ? S('an') : S('frei')) : g.weg)}</small></button>`).join('');
   const rahmen = rahmenTeile().map((r) => `<button type="button" class="pr-rahmen" data-rahmen="${r.id}" aria-pressed="${wahl.rahmen === r.id}"
     ${r.frei ? '' : 'disabled'}>${rahmenBild(r.id)}<b>${esc(r.name)}</b><small>${esc(r.frei ? (wahl.rahmen === r.id ? S('an') : S('frei')) : r.weg)}</small></button>`).join('');
-  inhalt.innerHTML = `<h4>${esc(S('profil.figur'))}</h4><div class="pr-figuren">${figuren}</div>
+  inhalt.innerHTML = `<div class="pr-vorschau" aria-hidden="true">${floAvatar('w')}</div>
+    <h4>${esc(S('profil.figur'))}</h4><div class="pr-figuren" style="--n:${motive.filter((m) => m.art === 'figur').length}">${figuren}</div>
+    <h4>${esc(S('profil.kreatur'))}</h4><div class="pr-rahmen-raster pr-kreaturen">${kreaturen}</div>
+    <h4>${esc(S('profil.grund'))}</h4><div class="pr-rahmen-raster pr-gruende">${gruende}</div>
     <h4>${esc(S('profil.rahmen'))}</h4><div class="pr-rahmen-raster">${rahmen}</div>`;
+  const vorschau = () => { inhalt.querySelector('.pr-vorschau').innerHTML = floAvatar('w'); };
   inhalt.addEventListener('click', (ev) => {
-    const f = ev.target.closest('.pr-figur');
-    if (f) {
+    // Motiv: Figur oder Kreatur, eine Wahl fuer beide Reihen
+    const f = ev.target.closest('[data-figur]');
+    if (f && !f.disabled) {
       setzeProfilWahl({ figur: f.dataset.figur });
-      for (const b of inhalt.querySelectorAll('.pr-figur')) b.setAttribute('aria-pressed', String(b === f));
+      for (const b of inhalt.querySelectorAll('[data-figur]')) {
+        b.setAttribute('aria-pressed', String(b === f));
+        const z = b.querySelector('small');
+        if (z && !b.disabled && !NUR_ERFINDER.includes(b.dataset.figur)) z.textContent = b === f ? S('an') : S('frei');
+      }
+      vorschau();
       return;
     }
-    const r = ev.target.closest('.pr-rahmen');
+    const g = ev.target.closest('.pr-grund');
+    if (g && !g.disabled) {
+      setzeProfilWahl({ grund: g.dataset.grund });
+      for (const b of inhalt.querySelectorAll('.pr-grund')) {
+        b.setAttribute('aria-pressed', String(b === g));
+        if (!b.disabled) b.querySelector('small').textContent = b === g ? S('an') : S('frei');
+      }
+      vorschau();
+      return;
+    }
+    const r = ev.target.closest('.pr-rahmen:not(.pr-kreatur):not(.pr-grund)');
     if (r && !r.disabled) {
       setzeProfilWahl({ rahmen: r.dataset.rahmen });
-      for (const b of inhalt.querySelectorAll('.pr-rahmen')) {
+      for (const b of inhalt.querySelectorAll('.pr-rahmen[data-rahmen]')) {
         b.setAttribute('aria-pressed', String(b === r));
         if (!b.disabled) b.querySelector('small').textContent = b === r ? S('an') : S('frei');
       }
+      vorschau();
     }
   });
   sheet({ titel: S('profil.aendern'), inhalt, klasse: 'pr-blatt', knoepfe: [{ text: S('profil.fertig'), wert: true, art: 'primaer' }], abbrechen: true })

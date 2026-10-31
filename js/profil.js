@@ -6,12 +6,24 @@
 //
 //   FIGUREN, RAHMEN                    Auswahl (Rahmen: id -> { ring, glanz? }; 'ohne' = kein Ring, der Standard); das Bild
 //                                      zeichnet js/rahmen-kunst.js, ring/glanz bleiben der Rueckfall
-//   profilWahl() -> { figur, rahmen, vitrine: [id|null x3] }
-//   setzeProfilWahl(teil)              merkt figur, rahmen oder vitrine (unbekannte Werte fallen auf den Standard)
+//   MOTIVE, KREATUR_MOTIVE, GRUENDE    Flo 31.10.2026 ("Das Profilbild, mehr Optionen, denk dir was aus, nur ich der Erschaffer
+//                                      kann den Koenig waehlen"): Motiv = Figur oder Kreatur (js/kreaturen-kunst.js),
+//                                      Hintergrund 'standard' (nach Spielfarbe) oder je Welt; frei schaltet das Paket sammlung
+//   NUR_ERFINDER, STANDARD_FIGUR       Koenig und Kronli nur fuer den Erfinder (js/sonderstuecke.js); alle anderen starten als Bauer
+//   profilWahl() -> { figur, grund, rahmen, vitrine: [id|null x3] }   figur: Motiv-Id (Figur oder Kreatur)
+//   setzeProfilWahl(teil)              merkt figur, grund, rahmen oder vitrine (unbekannte Werte fallen auf den Standard)
 import { ladeModulEinstellungen, speichereModulEinstellungen } from './storage.js';
+import { istErfinder } from './sonderstuecke.js';
+import { KREATUREN } from './kreaturen-kunst.js';
 
 const MODUL = 'sammeln';
 export const FIGUREN = Object.freeze(['K', 'Q', 'R', 'B', 'N', 'P']);
+export const KREATUR_MOTIVE = Object.freeze(KREATUREN.map((k) => k.id));
+export const MOTIVE = Object.freeze([...FIGUREN, ...KREATUR_MOTIVE]);
+export const NUR_ERFINDER = Object.freeze(['K', 'kronli']);
+export const STANDARD_FIGUR = 'P';
+export const GRUENDE = Object.freeze(['standard', 'welt-1', 'welt-2', 'welt-3', 'welt-4', 'welt-5']);
+const motivErlaubt = (x) => MOTIVE.includes(x) && (!NUR_ERFINDER.includes(x) || istErfinder());
 // Ring als Farbe oder Verlauf (SVG-Farben); glanz: zweiter, feiner Innenring
 export const RAHMEN = Object.freeze({
   ohne: Object.freeze({ ring: null }),
@@ -45,18 +57,24 @@ export function profilWahl() {
   const vitrine = Array.isArray(e.vitrine) ? e.vitrine.slice(0, 3) : [];
   while (vitrine.length < 3) vitrine.push(null);
   return {
-    figur: FIGUREN.includes(e.figur) ? e.figur : 'K',
+    figur: motivErlaubt(e.figur) ? e.figur : STANDARD_FIGUR,
+    grund: GRUENDE.includes(e.grund) ? e.grund : 'standard',
     rahmen: RAHMEN[e.rahmen] ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
   };
 }
 
 export function setzeProfilWahl(teil = {}) {
-  const jetzt = profilWahl();
-  const neu = { ...jetzt, ...teil };
-  const sauber = { figur: FIGUREN.includes(neu.figur) ? neu.figur : 'K', rahmen: RAHMEN[neu.rahmen] ? neu.rahmen : 'ohne',
-    vitrine: (Array.isArray(neu.vitrine) ? neu.vitrine : []).slice(0, 3).map((x) => (typeof x === 'string' && ID.test(x) ? x : null)) };
   let alt = {};
   try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
+  const roh = (alt.profil && typeof alt.profil === 'object') ? alt.profil : {};
+  const neu = { ...profilWahl(), ...teil };
+  // Ohne neue Figur bleibt die gespeicherte stehen, auch ein Koenig des abgemeldeten Erfinders (sonst ginge er beim
+  // naechsten Speichern von Rahmen oder Vitrine verloren); eine neue Figur muss erlaubt sein
+  const figur = 'figur' in teil ? (motivErlaubt(teil.figur) ? teil.figur : STANDARD_FIGUR)
+    : (MOTIVE.includes(roh.figur) ? roh.figur : neu.figur);
+  const sauber = { figur, grund: GRUENDE.includes(neu.grund) ? neu.grund : 'standard',
+    rahmen: RAHMEN[neu.rahmen] ? neu.rahmen : 'ohne',
+    vitrine: (Array.isArray(neu.vitrine) ? neu.vitrine : []).slice(0, 3).map((x) => (typeof x === 'string' && ID.test(x) ? x : null)) };
   return speichereModulEinstellungen(MODUL, { ...alt, profil: sauber });
 }
