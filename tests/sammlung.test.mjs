@@ -332,7 +332,7 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  pruefe('Labor: fünf Bretter mit Schild, nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron', bretter);
+  pruefe('Labor: zehn Bretter mit Schild (fünf Themen, fünf Welten), nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker,brett-moos,brett-pflaster,brett-brandung,brett-tiefsee', bretter);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));

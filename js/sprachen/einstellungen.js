@@ -75,7 +75,7 @@ registriereTexte('einstellungen', {
     'brett.gruen': 'Grün',
     'brett.holz': 'Holz',
     // Labor (Flo 31.10.2026): nur im Erfinder-Konto, js/labor.js
-    'brett.kuerbis': 'Kürbis', 'brett.frost': 'Frost', 'brett.marmor': 'Marmor', 'brett.nussbaum': 'Nussbaum', 'brett.thron': 'Thron',
+    'brett.kuerbis': 'Kürbis', 'brett.frost': 'Frost', 'brett.marmor': 'Marmor', 'brett.nussbaum': 'Nussbaum', 'brett.thron': 'Thron', 'brett.acker': 'Acker', 'brett.moos': 'Moos', 'brett.pflaster': 'Pflaster', 'brett.brandung': 'Brandung', 'brett.tiefsee': 'Tiefsee',
     labor: 'Labor',
     'anzeige.koordinaten': 'Koordinaten',
     'anzeige.koordinatenText': 'Buchstaben und Zahlen am Brett.',
@@ -454,7 +454,7 @@ registriereTexte('einstellungen', {
     'brett.nacht': 'Night',
     'brett.gruen': 'Green',
     'brett.holz': 'Wood',
-    'brett.kuerbis': 'Pumpkin', 'brett.frost': 'Frost', 'brett.marmor': 'Marble', 'brett.nussbaum': 'Walnut', 'brett.thron': 'Throne',
+    'brett.kuerbis': 'Pumpkin', 'brett.frost': 'Frost', 'brett.marmor': 'Marble', 'brett.nussbaum': 'Walnut', 'brett.thron': 'Throne', 'brett.acker': 'Farmland', 'brett.moos': 'Moss', 'brett.pflaster': 'Cobblestone', 'brett.brandung': 'Surf', 'brett.tiefsee': 'Deep sea',
     labor: 'Lab',
     'anzeige.koordinaten': 'Coordinates',
     'anzeige.koordinatenText': 'Letters and numbers on the board.',

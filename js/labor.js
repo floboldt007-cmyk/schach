@@ -19,6 +19,12 @@ export const LABOR_BRETTER = Object.freeze([
   Object.freeze({ id: 'marmor', hell: '#edeae4', dunkel: '#8f8a84', rand: '#4A4642' }),
   Object.freeze({ id: 'nussbaum', hell: '#e6c49b', dunkel: '#7a4b2c', rand: '#3E2414' }),
   Object.freeze({ id: 'thron', hell: '#f2e2ae', dunkel: '#b0812a', rand: '#5C3D0A' }),
+  // Welten-Bretter (31.10.2026): je Welt eines mit leichter Struktur je Feld (css/tokens.css --feld-muster-*); welt = Nummer
+  Object.freeze({ id: 'acker', hell: '#eedcaa', dunkel: '#7f9a4e', rand: '#3d4a1f', welt: 1 }),
+  Object.freeze({ id: 'moos', hell: '#dfe7c9', dunkel: '#567d4b', rand: '#24391f', welt: 2 }),
+  Object.freeze({ id: 'pflaster', hell: '#e8dfcf', dunkel: '#7d8795', rand: '#2f3540', welt: 3 }),
+  Object.freeze({ id: 'brandung', hell: '#f3e7cc', dunkel: '#4f93a6', rand: '#1d4a57', welt: 4 }),
+  Object.freeze({ id: 'tiefsee', hell: '#d2e4ec', dunkel: '#3c6a8c', rand: '#14283a', welt: 5 }),
 ]);
 export const LABOR_FIGUREN = Object.freeze(['kuerbis', 'frost', 'gold']);
 export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
