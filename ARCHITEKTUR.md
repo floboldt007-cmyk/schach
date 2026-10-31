@@ -2915,10 +2915,17 @@ kommt. Andere Konten sehen keine Karte, `#lernen` und `#lektion` fuehren sie sti
   des Todes, Blackburne, zwei Tuerme; mittel: Anderssen, Lolli, Damiano, Greco, Anastasia, Oper, Boden, Legal, Arabisch,
   ersticktes Matt, Dame; schwer: Turm, zwei Laeufer; Meister: Laeufer und Springer) mit `ziel` = Flos Zuege bis Matt
   bei bester Verteidigung. `pruefeLektion` weist auch Stellungen ab, in denen Schwarz schon im Schach steht (daran
-  stuerzt Stockfish ab). Fortschritt haengt an der id, die Reihenfolge darf sich aendern. Nachgerechnet mit
+  stuerzt Stockfish ab). Fortschritt haengt an der id, die Reihenfolge darf sich aendern. Die Datei ist auch der Kern
+  aller Bereiche: `BEREICHE` (matt, end), `ALLE`, `artVon`, `bereichVon`, `bilanz`, `pruefeZiel`, `summe(st, bereichId)`.
+- `js/pakete/lernen/endspiele.js` (reine Daten): 11 Endspiele, Teil 1 leicht und mittel, je mit `art`:
+  `umwandeln` (neue Dame steht nach dem Gegenzug noch), `gewinnen` (Gegner ohne Bauern, du 5 Punkte mehr mit Dame oder
+  Turm, oder Matt), `halten` (`ziel` Zuege ueberstehen ohne 3 Punkte Verlust; Remis oder der letzte gegnerische Bauer
+  geschlagen zaehlen sofort). Flo spielt immer Weiss. Ziele mit Stockfish-Selbstspiel nachgerechnet. Lehrplan fuer
+  weitere Bereiche im Vault (Schach-App/Meisterschule.md). Nachgerechnet mit
   `werkzeuge/mattbilder-pruefen.mjs` (Stockfish in Node; bei langen Matts der kuerzeste je gefundene Weg). Sterne: 3 bis
   `ziel + ziel/4` Zuege, 2 bis `1,5 * ziel + 2`, sonst 1; mit Hinweis hoechstens 2. Grenze `2 * ziel + 10` Zuege.
-- `js/ui/lernen.js` (Uebersicht) und `js/ui/lektion.js` (eine Lektion): Flo setzt matt, die Engine `bewertung` verteidigt
+- `js/ui/lernen.js` (Uebersicht mit Bereichswahl, params `{ bereich }`, die Wahl bleibt im Verlauf) und `js/ui/lektion.js`
+  (eine Lektion, Ziel per `pruefeZiel`; Ereignis-id `<bereich>-<id>`): Flo spielt, die Engine `bewertung` verteidigt
   (450 ms je Zug, Hinweis 900 ms). Ende bei Matt (Sterne), Patt, Remis, zu vielen Zuegen oder Matt gegen Flo. Im
   Testmodus liefert `window.__test.lektionZug(fen)` die Engine-Zuege; `window.__lektion.zustand()` fuer Tests.
 - Ort `training:karten` (reihenfolge 3); Speicher im Modul `lernen` (`{ lek: { <id>: { s, z } } }`); nach einem Matt

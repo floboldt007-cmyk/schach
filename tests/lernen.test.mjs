@@ -1,6 +1,6 @@
-// Paket lernen (Meisterschule, Etappe 1 Mattbilder): Daten und Sterne ohne Browser, dazu ein Browser-Teil (Playwright) in
-// der vollen App. Als Erfinder (Sitzung und Sonderstuecke im Speicher, Supabase per page.route gefaelscht): Karte im
-// Training, Uebersicht mit 20 Lektionen, Lektion Grundreihe gespielt (Matt in 1, 3 Sterne, gespeichert, Karte zaehlt),
+// Paket lernen (Meisterschule: Mattbilder und Endspiele): Daten, Ziel-Regeln und Sterne ohne Browser, dazu ein Browser-Teil
+// (Playwright) in der vollen App. Als Erfinder (Sitzung und Sonderstuecke im Speicher, Supabase per page.route gefaelscht):
+// Karte im Training, Uebersicht mit 20 Mattbildern und Bereichswahl, Endspiel Quadratregel gehalten, Lektion Grundreihe gespielt (Matt in 1, 3 Sterne, gespeichert, Karte zaehlt),
 // Lektion Dame mit gefaelschter Verteidigung (window.__test.lektionZug): Hinweis, Neu starten, Gegenzug, Patt-Ende.
 // Ohne Labor (anderes Konto): keine Karte, #lernen und #lektion fuehren zur Arena.
 //   node tests/lernen.test.mjs            Node und Browser
@@ -10,7 +10,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
-import { LEKTIONEN, STUFEN, lektion, sterne, grenze, pruefeLektion, stand, merke, summe } from '../js/pakete/lernen/mattbilder.js';
+import { LEKTIONEN, STUFEN, BEREICHE, ALLE, lektion, sterne, grenze, pruefeLektion, stand, merke, summe, bilanz, pruefeZiel }
+  from '../js/pakete/lernen/mattbilder.js';
+import { ENDSPIELE } from '../js/pakete/lernen/endspiele.js';
 import { DE, EN } from '../js/pakete/lernen/texte.js';
 import { browserTyp } from './browser.mjs';
 
@@ -32,11 +34,15 @@ function pruefe(name, wert, info = '') {
 pruefe('Mattbilder: 20 Lektionen, ids eindeutig, Stufen von leicht bis Meister', LEKTIONEN.length === 20
   && new Set(LEKTIONEN.map((l) => l.id)).size === 20 && LEKTIONEN[0].stufe === 'leicht' && LEKTIONEN[19].stufe === 'meister'
   && LEKTIONEN.every((l) => STUFEN.includes(l.stufe)));
-const pf = LEKTIONEN.flatMap((l) => pruefeLektion(l, Chess));
+const pf = ALLE.flatMap((l) => pruefeLektion(l, Chess));
 pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, nicht schon vorbei, Ziel ganzzahlig', pf.length === 0, pf.join(' | '));
-pruefe('Stufen laufen nie rueckwaerts (leicht zuerst, Meister zuletzt)', LEKTIONEN.every((l, i) => i === 0
-  || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(LEKTIONEN[i - 1].stufe) - 1));
-const fehltText = LEKTIONEN.flatMap((l) => ['titel.', 'idee.'].flatMap((k) => [DE, EN].filter((d) => !d[k + l.id]).map(() => k + l.id)));
+pruefe('Stufen laufen nie rueckwaerts (leicht zuerst), in jedem Bereich', BEREICHE.every((b) => b.lektionen.every((l, i) => i === 0
+  || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(b.lektionen[i - 1].stufe) - 1)));
+pruefe('Bereiche: Mattbilder 20, Endspiele 11, alle ids eindeutig', BEREICHE.map((b) => b.id).join() === 'matt,end'
+  && ENDSPIELE.length === 11 && ALLE.length === 31 && new Set(ALLE.map((l) => l.id)).size === 31 && new Set(ALLE.map((l) => l.fen)).size === 31);
+pruefe('Endspiele: Arten umwandeln, gewinnen, halten; Flo immer Weiss', ENDSPIELE.every((l) => ['umwandeln', 'gewinnen', 'halten'].includes(l.art))
+  && ENDSPIELE.some((l) => l.art === 'halten') && ENDSPIELE.some((l) => l.art === 'gewinnen') && ENDSPIELE.every((l) => l.fen.split(' ')[1] === 'w'));
+const fehltText = ALLE.flatMap((l) => ['titel.', 'idee.'].flatMap((k) => [DE, EN].filter((d) => !d[k + l.id]).map(() => k + l.id)));
 pruefe('Texte: Titel und Idee je Lektion auf Deutsch und Englisch', fehltText.length === 0, fehltText.join(', '));
 pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche',
   JSON.stringify(Object.keys(DE).sort()) === JSON.stringify(Object.keys(EN).sort())
@@ -79,8 +85,34 @@ pruefe('Speicher: bessere Sterne und weniger Zuege bleiben, unbekannte Lektion f
   JSON.stringify(st) === '{"lek":{"dame":{"s":2,"z":9}}}');
 pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ lek: { dame: { s: 7, z: 3 }, turm: 'x', grundreihe: { s: 3, z: 1 } } }))
   === '{"lek":{"grundreihe":{"s":3,"z":1}}}' && JSON.stringify(stand(null)) === '{"lek":{}}');
-pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 })))
+pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 }), 'matt'))
   === '{"sterne":5,"max":60,"geschafft":2}');
+const stE = merke(merke({}, 'quadrat', { sterne: 3, zuege: 5 }), 'grundreihe', { sterne: 2, zuege: 2 });
+pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 31 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
+  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":93,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
+
+// Ziel-Regeln (pruefeZiel): nach Flos Zug ('flo') und nach dem Gegenzug ('gegner')
+const zielVon = (id, fen, wann, zuege = 1) => pruefeZiel(lektion(id), bilanz(new Chess(lektion(id).fen)), new Chess(fen), { wann, zuege });
+pruefe('Ziel Matt: Grundreihe nach Ta8 geschafft, Patt und Matt gegen Flo erkannt',
+  zielVon('grundreihe', spiele(lektion('grundreihe').fen, ['Ra8']).fen(), 'flo') === 'geschafft'
+  && zielVon('dame', '7k/5Q2/6K1/8/8/8/8/8 b - - 0 1', 'flo') === 'patt'
+  && zielVon('grundreihe', '6k1/5ppp/8/8/8/8/5PPP/r5K1 w - - 0 1', 'gegner') === 'matt');
+pruefe('Ziel Umwandeln: neue Dame nach dem Gegenzug geschafft, geschlagene Dame ist remis, ohne Bauern gescheitert',
+  zielVon('koenig-sechste', '4Q3/8/8/2k5/8/8/8/4K3 w - - 0 1', 'gegner') === 'geschafft'
+  && zielVon('koenig-sechste', '8/8/8/2k5/8/8/8/4K3 w - - 0 1', 'gegner') === 'remis'
+  && zielVon('durchbruch', '6k1/1pp5/8/8/8/8/8/6K1 b - - 0 1', 'flo') === 'bauerWeg'
+  && zielVon('koenig-sechste', lektion('koenig-sechste').fen, 'flo', grenze(5)) === 'zuViele'
+  && zielVon('koenig-sechste', lektion('koenig-sechste').fen, 'gegner') === null);
+pruefe('Ziel Gewinnen: Gegner ohne Bauern und du mit Turm mehr geschafft, mit Bauer noch nicht',
+  zielVon('lucena', '8/8/8/8/8/5k2/8/3KR3 w - - 0 1', 'gegner') === 'geschafft'
+  && zielVon('dame-bauer', lektion('dame-bauer').fen, 'gegner') === null);
+pruefe('Ziel Halten: Remis und geschlagener Bauer geschafft, Ziel-Zuege geschafft, Materialverlust gescheitert',
+  zielVon('quadrat', '7k/8/8/8/8/8/8/K7 w - - 0 1', 'gegner') === 'geschafft'
+  && zielVon('philidor', '8/8/8/8/4k3/R7/7r/3K4 w - - 0 1', 'gegner') === 'geschafft'
+  && zielVon('philidor', lektion('philidor').fen, 'gegner', 12) === 'geschafft'
+  && zielVon('philidor', lektion('philidor').fen, 'gegner', 11) === null
+  && zielVon('philidor', '8/8/8/8/4k3/8/7r/2K1q3 b - - 0 1', 'flo') === 'verloren'
+  && zielVon('randbauer', '8/8/8/8/8/6k1/7p/7K w - - 0 1', 'flo', 3) === 'geschafft');
 
 // ---------------------------------------------------------------------------
 // Browser-Teil (volle App, alle Pakete)
@@ -159,12 +191,13 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder“ im Training mit Labor-Schild und 0 von 60 Sternen und 20 Lektionen', !!karte
-    && /Mattbilder/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 60 Sternen/.test(karte.text) && /20 Lektionen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder und Endspiele“ im Training mit Labor-Schild, 0 von 93 Sternen, 31 Lektionen', !!karte
+    && /Mattbilder und Endspiele/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 93 Sternen/.test(karte.text) && /31 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
-  pruefe('Übersicht: 20 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS, liste);
+  pruefe('Übersicht: Bereichswahl steht auf Mattbilder, 20 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS
+    && await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'matt', liste);
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   // Lektion 1: Grundreihenmatt in einem Zug
@@ -201,6 +234,36 @@ async function erfinderTeil(browser) {
     return !!b && b.hasAttribute('data-geschafft') && b.querySelectorAll('.ms-sterne > i.an').length === 3 && /Dein Bestes: 1 Zug/.test(b.innerText);
   }));
   pruefe('Übersicht: Gesamt 3 von 60 Sternen', /3 von 60 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
+
+  // Endspiele: Bereich wechseln, Quadratregel halten (die gefaelschte Verteidigung zieht den ersten legalen Zug, also den König)
+  await setzeVerteidigung(p.s);
+  await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="end"]').click();
+  await p.s.waitForSelector('.ms-lektion[data-id="quadrat"]', { timeout: 8000 }).catch(() => {});
+  const endListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
+  pruefe('Endspiele: Liste in der Reihenfolge der Daten, Art „Halten“ an der Quadratregel, eigene Sternzahl',
+    endListe === ENDSPIELE.map((l) => l.id).join() && /Halten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText())
+    && /0 von 33 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()), endListe);
+  await p.s.locator('.ms-lektion[data-id="quadrat"]').click();
+  await warteLz(p.s, "z.id === 'quadrat' && z.phase === 'intro'");
+  const status = await p.s.locator('.ls-status').innerText();
+  pruefe('Endspiel-Lektion: Titel, Art und Ziel „Halte 8 Züge durch“, Nummer im Bereich', /Die Quadratregel/.test(status)
+    && /Halten/.test(status) && /Halte 8 Züge durch/.test(status) && /Lektion 4 von 11/.test(status), status);
+  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+  for (const [i, u] of ['f4e4', 'e4d4', 'd4c4', 'c4b5', 'b5a5'].entries()) {
+    await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
+    await ziehe(p.s, u);
+  }
+  await warteLz(p.s, "z.phase === 'ende'");
+  z = await lz(p.s);
+  pruefe('Quadratregel: Bauer geschlagen, „Gehalten!“ mit drei Sternen', z.phase === 'ende' && !z.grund && z.sterne === 3
+    && /Gehalten!/.test(await p.s.locator('.ls-meldung').innerText()), z);
+  await p.s.locator('.ls-aktionen [data-a="uebersicht"]').click();
+  await p.s.waitForSelector('.ms-lektion[data-id="quadrat"][data-geschafft]', { timeout: 10000 }).catch(() => {});
+  pruefe('Zur Übersicht: zurück im Bereich Endspiele, Quadratregel „Gehalten“',
+    await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'end'
+    && /Gehalten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText()));
+  await p.s.evaluate(() => window.__app.gehe('lernen'));
+  await p.s.waitForSelector('.ms-lektion[data-id="grundreihe"]', { timeout: 10000 }).catch(() => {});
 
   await setzeVerteidigung(p.s);
   await p.s.locator('.ms-lektion[data-id="dame"]').click();
