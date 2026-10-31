@@ -99,7 +99,8 @@
   this app in this browser through your browser's website data settings; your account and your cloud backup remain
   (deleting the account: section 5).</p>
   <p>With an account, the device also stores your sign-in (session token with your account details: email address, with
-  Google also your name, profile picture address and Google ID), a fallback copy of your progress before an import from
+  Google also your name, profile picture address and Google ID, with Apple your Apple ID identifier and, if shared, your
+  name), a fallback copy of your progress before an import from
   the cloud, a marker showing whether this device is already synced with the cloud, subscription and age markers,
   the record of your consent and a queue of data not yet transmitted. If you follow an invitation link, the device
   remembers the pending online invitation, even without an account. These data are used only for the respective
@@ -113,11 +114,14 @@
 
   <h2>5. Account (optional)</h2>
   <p>With an account, your progress is backed up in the cloud so you can continue on more than one device.
-  You sign in with your email address and a one-time code, or with your Google account.</p>
+  You sign in with your email address and a one-time code, or with your Google account; once the app offers it, also
+  with your Apple ID.</p>
   <h3>What data</h3>
   <ul>
     <li>Your email address and sign-in times,</li>
     <li>when signing in with Google: your email address, name, profile image URL as provided by your Google profile, and a Google user identifier,</li>
+    <li>when signing in with Apple: your email address (or an Apple relay address if you choose to hide it), your name if
+    you share it, and an Apple user identifier,</li>
     <li>a username you choose,</li>
     <li>if you add friends: who is friends with whom or has sent a request (with the time), your invite code (valid for 7
     days) and your weekly score (points and number of scored games per week). Your friends only see your username, your
@@ -143,11 +147,18 @@
   Google data (contacts, calendars, or files). Signing in to Google is covered by
   <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's privacy policy</a>.
   The link is removed when you delete your account; you can also remove access in your Google account.</p>
+  <p><b>Sign in with Apple (optional, once offered):</b> Instead of using an email code, you can sign in with your Apple ID.
+  The app redirects you to Apple. Apple Distribution International Limited, Hollyhill Industrial Estate, Hollyhill, Cork,
+  Ireland, learns that you are signing in to Crownmate. After you confirm with Apple, it sends your email address (or a
+  relay address if you choose "Hide My Email"), your name if you share it, and an Apple user identifier to Supabase. We
+  use nothing beyond that. Signing in to Apple is covered by
+  <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener">Apple's privacy policy</a>.
+  The link is removed when you delete your account; you can also remove it in your Apple ID settings.</p>
   <h3>Legal basis and retention</h3>
   <p>Processing is necessary to provide the account (Art. 6 Abs. 1 lit. b DSGVO, GDPR). The data is retained until you
   delete your account. You can do so at any time in the app under Settings → Data → Delete account.
   We then immediately delete everything associated with your account in our database: the account and authentication
-  data (including the Google link), username, friendships, requests, invite code and weekly score, cloud progress, shared games and usage data, and the
+  data (including the Google or Apple link), username, friendships, requests, invite code and weekly score, cloud progress, shared games and usage data, and the
   authentication log.
   Exception for the subscription: technical payment events from Stripe (section 7) remain without your account ID but
   with the Stripe customer number until they are deleted at the next incoming payment event after 90 days. A running
