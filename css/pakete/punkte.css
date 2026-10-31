@@ -304,3 +304,32 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
   .bl-s-zahlen div { padding: 8px 10px; }
   .bl-s-zahlen dd { font-size: 20px; }
 }
+
+/* Handy dicht (Flo 01.11.2026, iPhone-Bild der Bestenliste: "immer noch alles zu gross"): beide Umschalter eng
+   untereinander, Karten mit wenig Rand, die beste Partie als Zahl in normaler Groesse, die drei Werte als flache Leiste */
+@media (max-width: 520px) {
+  .bl-steuer { gap: 6px; padding-top: 2px; padding-bottom: 0; }
+  .bl-ort { padding-top: 8px; }
+  .bl-reiter { gap: 10px; }
+  .bl-karte { gap: 8px; padding: 12px 14px; }
+  .bl-k-kopf h2 { font-size: 18px; }
+  .bl-spieler { gap: 10px; }
+  .bl-s-avatar { width: 40px; height: 40px; }
+  .bl-s-avatar .ico { width: 20px; height: 20px; }
+  .bl-s-name b { font-size: 19px; }
+  .bl-s-beste { gap: 2px; }
+  .bl-s-beste b { font-size: 36px; }
+  .bl-s-beste span:not(.ueberzeile) { font-size: 13.5px; }
+  .bl-s-zahlen { gap: 6px; }
+  .bl-s-zahlen div { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px; }
+  .bl-s-zahlen dd { order: -1; font-size: 18px; }
+  .bl-s-zahlen dt { font-size: 12px; }
+  .bl-z-innen { min-height: 48px; }
+  .bl-gegner-zeile { min-height: 56px; padding: 6px 10px 6px 6px; }
+  .bl-g-av { width: 40px; height: 40px; border-radius: 12px; }
+  .bl-leer-screen { margin-top: 10px; gap: 12px; }
+}
+@media (max-width: 520px) {
+  .bl-s-beste { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 10px; }
+  .bl-s-beste > .ueberzeile, .bl-s-beste > .bl-s-leer { grid-column: 1 / -1; }
+}

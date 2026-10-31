@@ -75,7 +75,7 @@ function zeigeIch(root, params = {}, app) {
   const s = document.createElement('section');
   s.className = 'screen sa-screen';
   s.setAttribute('aria-label', t('rahmen.sammlung.titel'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: t('rahmen.sammlung.titel') })}
     <div class="sa-rumpf">
       ${seitenKopf({ titel: t('rahmen.sammlung.titel') })}
       <div class="sa-kopf-ort"></div>

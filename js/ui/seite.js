@@ -4,7 +4,9 @@
 // Importiert app.js NICHT (Testseiten laden Screens ohne App); die App kommt als Parameter.
 //
 //   hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
-//               modus = true, klang = true, einstellungen = true, titelElement = 'h1' }) -> HTML (header.kopf.haupt-kopf)
+//               modus = true, klang = true, einstellungen = true, titelElement = 'h1', seite = '' }) -> HTML (header.kopf.haupt-kopf)
+//       seite: Name der Seite (z. B. "Bestenliste"); auf dem Handy steht er statt der Marke im Kopf und der grosse
+//       Seitentitel darunter entfaellt (Flo 01.11.2026: "man muss alles sehen ohne viel scrollen"), css/navigation.css
 //       titelElement: 'h1' | 'h2' | 'div' (Seiten mit eigenem Seitentitel, z. B. Training, nehmen 'div')
 //       titel/unter: Titel (.marke-titel.logo) und Unterzeile (.unter.logo-unter); der Titel wird nie gekuerzt (kein
 //       Auslassungszeichen): er bricht nicht um, eng wird zuerst die Unterzeile, dann das Zeichen, dann die Chips.
@@ -44,13 +46,14 @@ export function standardChips(fortschritt = null) {
 }
 
 export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
-  modus = true, klang = true, einstellungen = true, titelElement = 'h1' } = {}) {
+  modus = true, klang = true, einstellungen = true, titelElement = 'h1', seite = '' } = {}) {
   const tt = ['h1', 'h2', 'div'].includes(titelElement) ? titelElement : 'h1';
   const eigene = (Array.isArray(knoepfe) ? knoepfe : []).filter((k) => k && /^[a-z][a-z0-9-]*$/.test(String(k.aktion || '')));
   const zahl = eigene.length + (klang ? 1 : 0) + (einstellungen ? 1 : 0) + (zurueck ? 1 : 0);
   const klassen = ['kopf', 'haupt-kopf'];
   if (zurueck) klassen.push('mit-zurueck');
   if (marke) klassen.push('mit-marke');
+  if (seite) klassen.push('mit-seite');
   // drei und mehr Knoepfe: auf dem Handy werden das Zeichen der Marke und der zweite Chip weggelassen (css/navigation.css);
   // ist der Verlauf-Knopf der dritte, gilt das nicht, sobald Verlauf ein Reiter ist (dann ist der Knopf weg)
   if (zahl >= 3) klassen.push('voll');
@@ -64,7 +67,7 @@ export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurue
         ${zurueck ? knopf('zurueck', 'zurueck', t('allgemein.zurueck'), 'kopf-zurueck') : ''}
         <div class="marke">
           ${marke ? `<span class="marke-zeichen" aria-hidden="true">${icon('bauer')}</span>` : ''}
-          <div class="marke-text"><${tt} class="marke-titel logo">${esc(titel)}</${tt}>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}</div>
+          <div class="marke-text"><${tt} class="marke-titel logo">${esc(titel)}</${tt}>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}${seite ? `<div class="kopf-seite" aria-hidden="true">${esc(seite)}</div>` : ''}</div>
         </div>
       </div>
       <div class="kopf-reiter-platz"></div>
