@@ -6,6 +6,7 @@
 //
 //   klangKunst(id) -> string | null          ganzes <svg> fuer ein Klangset (PAKETE_KLANG in js/sounds.js)
 //   brettKunst(hell, dunkel, rand, figuren?) -> string  ganzes <svg> fuer ein Brett-Design (figuren: Ordner des Satzes)
+//   finisherKunst(id, figuren?) -> string | null  ganzes <svg> fuer einen Finisher ('krone', 'welle', 'koenig', 'signatur')
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
 //   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
@@ -100,6 +101,92 @@ export function brettKunst(hell, dunkel, rand = '#2A2A2A', figuren = '') {
   return svg(`<rect x="${A - 6}" y="${A - 6}" width="${N * Z + 12}" height="${N * Z + 12}" rx="9" fill="${rand}"/>${felder}`
     + `<rect x="${A}" y="${A}" width="${N * Z}" height="${N * Z}" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`
     + steine, 'sk-brett');
+}
+
+// ---------- Finisher ----------
+// Flo 31.10.2026 (Foto der Finisher in der Sammlung: Krone und Signatur zeigten denselben Koenig): jeder Finisher zeigt
+// seinen Moment auf einer kleinen Brett-Buehne in Perspektive, mit den echten Figuren des ausgeruesteten Satzes
+// (figuren = Ordner-URL mit Schraegstrich, wie brettKunst). Farben wie im Spiel: Krone und Welle im Akzent, Funke und
+// Signatur in Gold. Je hoeher die Stufe, desto mehr Licht (Krone frei, Welle Level 5, Koenig Level 10, Signatur Erfinder).
+const AKZENT = ['#FF8A64', '#C8441E'];
+const FELD = ['#e4e8f6', '#7c87b6'];
+// Boden: Reihen von hinten (oben, schmal) nach vorn (unten, breit); liefert die Ecken eines Feldes
+function boden(reihen, spalten, oben = 74, unten = 108, hinten = 66, vorn = 108) {
+  const y = (r) => oben + (unten - oben) * (r / reihen);
+  const breite = (r) => hinten + (vorn - hinten) * (r / reihen);
+  const x = (r, c) => 60 - breite(r) / 2 + breite(r) * (c / spalten);
+  const feld = (r, c) => [[x(r, c), y(r)], [x(r, c + 1), y(r)], [x(r + 1, c + 1), y(r + 1)], [x(r + 1, c), y(r + 1)]];
+  const mitte = (r, c) => { const e = feld(r, c); return [(e[0][0] + e[1][0] + e[2][0] + e[3][0]) / 4, (e[0][1] + e[2][1]) / 2]; };
+  return { feld, mitte, y, x };
+}
+const punkte = (e, dy = 0) => e.map(([x, y]) => `${x.toFixed(1)},${(y + dy).toFixed(1)}`).join(' ');
+function buehne(b, reihen, spalten, extra = () => '') {
+  let felder = '';
+  for (let r = 0; r < reihen; r++) for (let c = 0; c < spalten; c++) {
+    felder += `<polygon points="${punkte(b.feld(r, c))}" fill="${FELD[(r + c) % 2]}"/>` + extra(r, c);
+  }
+  // Vorderkante als Brettrand und ein weicher Schatten darunter
+  const v = b.feld(reihen - 1, 0)[3]; const w = b.feld(reihen - 1, spalten - 1)[2];
+  return `<ellipse cx="60" cy="${(w[1] + 6).toFixed(1)}" rx="${((w[0] - v[0]) / 2 + 4).toFixed(1)}" ry="5" fill="#000" opacity=".22"/>`
+    + felder + `<path d="M${v[0].toFixed(1)} ${v[1].toFixed(1)}H${w[0].toFixed(1)}l-1 4H${(v[0] + 1).toFixed(1)}Z" fill="#2A3150"/>`;
+}
+// echte Figur (Bild) oder Ersatz ohne Satz; (x, fuss) = Mitte unten, h = Hoehe
+function stein(figuren, f, x, fuss, h, extra = '') {
+  if (figuren) return `<image href="${figuren}${f}.svg" x="${(x - h / 2).toFixed(1)}" y="${(fuss - h).toFixed(1)}" width="${h}" height="${h}"${extra}/>`;
+  const weiss = f[0] === 'w'; const s = h / 40;
+  return `<g${extra}>${figur(f[1] === 'K' ? KOENIG : BAUER, x - 12 * s, fuss - 36 * s, s, weiss ? '#FAFAF7' : '#26262B', weiss ? '#2A2A2A' : '#000')}</g>`;
+}
+const KRONE_FORM = 'M0 22L-3 4L9 12L18 0L27 12L39 4L36 22Z';
+const FINISHER = {
+  // Krone: die Krone senkt sich auf die mattsetzende Figur, ein goldener Funke blitzt
+  krone: (figuren) => {
+    const b = boden(2, 3, 76, 112, 80, 118); const g = id('k'); const [x, y] = b.mitte(0, 1);
+    return `<defs>${verlauf(g, AKZENT, 0, 1)}</defs>${buehne(b, 2, 3)}${stein(figuren, 'wK', x, y + 5, 50)}`
+      + `<g class="rk rk-schweben"><g transform="translate(37 4) scale(1.18)"><path d="${KRONE_FORM}" fill="url(#${g})" stroke="#7A2A12" stroke-width="1.1" stroke-linejoin="round"/>`
+      + '<rect x="-2" y="22" width="40" height="4.5" rx="2" fill="#7A2A12"/><circle cx="18" cy="0" r="2.6" fill="#FFE08A"/>'
+      + '<circle cx="-3" cy="4" r="1.8" fill="#FFE08A"/><circle cx="39" cy="4" r="1.8" fill="#FFE08A"/></g></g>'
+      + funke(96, 30, 1.3, 0.2, '#F2BE4A') + funke(24, 40, 0.7, 1.1, '#F2BE4A');
+  },
+  // Schachbrett-Welle: vom Mattfeld laufen die Felder in Ringen auf, nah kraeftig, fern leise
+  welle: (figuren) => {
+    const R = 3; const C = 5; const b = boden(R, C, 58, 112, 86, 120); const r0 = 1; const c0 = 2;
+    const welle = (r, c) => {
+      const d = Math.abs(r - r0) + Math.abs(c - c0);
+      if (d === 0 || d > 3) return '';
+      return `<polygon class="rk rk-atmen" style="animation-delay:${(d * 0.3).toFixed(2)}s" points="${punkte(b.feld(r, c))}" fill="#FF6A42" opacity="${[0, 0.75, 0.5, 0.28][d]}"/>`;
+    };
+    const [x, y] = b.mitte(r0, c0);
+    return buehne(b, R, C, welle)
+      + [20, 34].map((rx, i) => `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx * 1.5}" ry="${(rx * 0.5).toFixed(1)}" fill="none" stroke="#FFD2C2" stroke-width="${1.6 - i * 0.5}" opacity="${0.8 - i * 0.3}"/>`).join('')
+      + stein(figuren, 'wN', x, y + 4, 46);
+  },
+  // Fallender Koenig: der mattgesetzte Koenig ist umgekippt und liegt auf dem Brett; der Bogen zeigt den Fall
+  koenig: (figuren) => {
+    const b = boden(2, 3, 76, 112, 80, 118); const h = 56; const bx = 60 - h * 0.5; const fuss = b.mitte(0, 1)[1] + 8;
+    const kopf = [bx + h * 0.95, fuss - h * 0.42];
+    return buehne(b, 2, 3)
+      + `<path d="M${(bx - 2).toFixed(1)} ${(fuss - h - 4).toFixed(1)}A${h + 4} ${h + 4} 0 0 1 ${(kopf[0] + 6).toFixed(1)} ${(kopf[1] - 6).toFixed(1)}" fill="none" stroke="#FF8A64" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 6"/>`
+      + `<path d="M${(kopf[0] + 1).toFixed(1)} ${(kopf[1] - 8).toFixed(1)}l6 2l-1 6" fill="none" stroke="#FF8A64" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<g transform="translate(0 ${(-h * 0.36).toFixed(1)}) rotate(90 ${bx.toFixed(1)} ${fuss.toFixed(1)})">${stein(figuren, 'bK', bx, fuss, h)}</g>`
+      + `<g fill="#C9CFDF" opacity=".7"><circle cx="${(kopf[0] + 10).toFixed(1)}" cy="${(fuss - 2).toFixed(1)}" r="2.2"/><circle cx="${(kopf[0] + 15).toFixed(1)}" cy="${(fuss - 6).toFixed(1)}" r="1.5"/><circle cx="${(bx - 6).toFixed(1)}" cy="${(fuss - 3).toFixed(1)}" r="1.8"/></g>`
+      + funke(bx + 4, fuss - h - 14, 0.8, 0.5, '#F2BE4A');
+  },
+  // Signatur (Erfinder, Nr. 0): goldener Namenszug wie im Spiel, Linie, Nummer, Licht und Funken
+  signatur: () => {
+    const g = id('s'); const k = id('s');
+    return `<defs>${verlauf(g, GOLD, 1, 0)}<radialGradient id="${k}" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#2B3A5C"/><stop offset="1" stop-color="#0E1528"/></radialGradient></defs>`
+      + halo('#E0A22B', 60, 0.32)
+      + `<rect x="8" y="16" width="104" height="88" rx="16" fill="url(#${k})" stroke="url(#${g})" stroke-width="2.2"/>`
+      + `<g transform="translate(9 26) scale(1.02)"><path d="M10 26c9-2 16-12 20-21 2 9-2 18 2 20s9-12 11-16c0 7 2 12 11 12 6 0 10-4 14-8" fill="none" stroke="url(#${g})" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<path d="M8 40h86" stroke="url(#${g})" stroke-width="2" stroke-linecap="round"/></g>`
+      + `<text x="84" y="92" ${schrift} font-size="14" letter-spacing="1" fill="#F2BE4A">Nr. 0</text>`
+      + '<path d="M80 30l11 -11l3.5 3.5l-11 11l-5 1.5Z" fill="#F2BE4A" stroke="#9C6B12" stroke-width=".8" stroke-linejoin="round"/>'
+      + funke(106, 12, 0.9, 0, '#FFF1C1') + funke(14, 108, 0.7, 0.9, '#FFF1C1') + funke(108, 100, 0.55, 1.6, '#FFF1C1');
+  },
+};
+export function finisherKunst(fid, figuren = '') {
+  const f = FINISHER[fid];
+  return f ? svg(f(figuren), 'sk-finisher sk-finisher-' + fid) : null;
 }
 
 // ---------- Erfolge ----------

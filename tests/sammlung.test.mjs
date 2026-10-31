@@ -14,6 +14,7 @@ import { standText } from '../js/pakete/sammlung/shop.js';
 import { rahmenTeile, motivTeile, grundTeile } from '../js/pakete/sammlung/profil.js';
 import { profilWahl, setzeProfilWahl } from '../js/profil.js';
 import { floAvatar } from '../js/thema.js';
+import { finisherKunst } from '../js/sammlung-kunst.js';
 import { BOTS } from '../js/bots.js';
 import { browserTyp } from './browser.mjs';
 
@@ -55,6 +56,19 @@ const figurenIn = (x) => [...x.bild.matchAll(/<image href="([^"]+)"/g)].map((m) 
 pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern beider Farben), keine gezeichneten',
   bretter.every((x) => { const f = figurenIn(x); return f.length === 4 && f.every((q) => /\/assets\/pieces\/[wb][KP]\.svg$/.test(q))
     && ['wK', 'bK', 'wP', 'bP'].every((n) => f.some((q) => q.endsWith('/' + n + '.svg'))) && !/<path /.test(x.bild); }), figurenIn(bretter[0]));
+
+// Flo 31.10. (Foto der Finisher: Krone und Signatur zeigten denselben Koenig): jeder Finisher hat ein eigenes Szenenbild,
+// die drei Stufen-Finisher mit den echten Figuren des Satzes
+{
+  const fig = 'https://x.test/assets/pieces/';
+  const bilder = ['krone', 'welle', 'koenig', 'signatur'].map((f) => finisherKunst(f, fig));
+  const quellen = (b) => [...String(b).matchAll(/<image href="([^"]+)"/g)].map((m) => m[1].replace(fig, ''));
+  pruefe('Finisher-Bilder: vier verschieden, alle mit sk-finisher', bilder.every((b) => /class="sk-finisher /.test(b || ''))
+    && new Set(bilder.map(ohneIds)).size === 4);
+  pruefe('Finisher-Bilder: Krone mit weissem Koenig, Welle mit Springer, Fallender Koenig mit schwarzem Koenig (echte Figuren)',
+    quellen(bilder[0]).join() === 'wK.svg' && quellen(bilder[1]).join() === 'wN.svg' && quellen(bilder[2]).join() === 'bK.svg', bilder.map(quellen));
+  pruefe('Finisher-Bilder: unbekannte Id ohne Bild', finisherKunst('gibtsnicht') === null);
+}
 
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
@@ -486,9 +500,11 @@ async function browserTeil() {
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
       pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
       const fin = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => ({
-        id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent })));
+        id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
+        bild: !!x.querySelector('.sa-bild svg.sk-finisher'), figur: x.querySelector('.sa-bild svg image')?.getAttribute('href') || '' })));
       pruefe(`${name}: Finisher Krone ausgewählt, Welle und König geheimnisvoll (?) mit Level`, fin.length === 3 && fin[0].z === 'an'
         && fin[1].z === 'zu' && fin[1].schloss && fin[1].zeile === 'Ab Level 5' && fin[2].zeile === 'Ab Level 10', fin);
+      pruefe(`${name}: Finisher mit eigenem Szenenbild und echten Figuren aus assets/pieces/`, fin.every((f) => f.bild && /\/assets\/pieces\/[wb][KN]\.svg$/.test(f.figur)), fin);
       pruefe(`${name}: nur ein Bereich sichtbar`, await s.locator('.sa-bereich:not([hidden])').count() === 1);
       await s.locator('.sa-steuer .seg[data-wert="erfolge"]').click();
       await warte(400);
