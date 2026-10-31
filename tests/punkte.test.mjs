@@ -1024,13 +1024,13 @@ async function testeBrowser(browser) {
   pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
     && /Erste Partie: Willi, Weiß/.test(leerBots), leerBots);
   // Flo 31.10.2026 ("Die lange Liste ergibt irgendwie nicht so viel Sinn"): statt 30 Chips links "Deine Gegner" nach Welten,
-  // nur freigeschaltete (am Anfang Willi), je Zeile Portraet, Name und Platz; rechts die Tafel
+  // nur freigeschaltete (am Anfang Willi und die Endgegnerin Janine, Endgegner sind sofort spielbar), je Zeile Portraet, Name und Platz; rechts die Tafel
   const gegner = await seite.evaluate(() => [...document.querySelectorAll('.bl-gegner .bl-gegner-zeile')].map((z) => ({
     tafel: z.dataset.tafel, name: z.querySelector('b').textContent, info: z.querySelector('.bl-g-mitte span').textContent,
     bild: !!z.querySelector('.bl-g-av img'), an: z.getAttribute('aria-current') === 'true' })));
-  pruefe('Bots: Übersicht „Deine Gegner“ nur mit freigeschalteten (Willi), Welt-Überschrift, Porträt, „Noch keine Partie“, keine Chip-Leiste',
-    gegner.length === 1 && gegner[0].tafel === 'bot:fridolin' && gegner[0].name === 'Vogelscheuche Willi' && gegner[0].bild && gegner[0].an
-    && gegner[0].info === 'Noch keine Partie' && /Welt 1/i.test(await seite.locator('.bl-g-welt').first().innerText())
+  pruefe('Bots: Übersicht „Deine Gegner“ nur mit freigeschalteten (Willi, Endgegnerin Janine), Welt-Überschrift, Porträt, „Noch keine Partie“, keine Chip-Leiste',
+    gegner.length === 2 && gegner[0].tafel === 'bot:fridolin' && gegner[0].name === 'Vogelscheuche Willi' && gegner[0].bild && gegner[0].an
+    && gegner[1].tafel === 'bot:janine' && !gegner[1].an && gegner.every((g) => g.bild && g.info === 'Noch keine Partie') && /Welt 1/i.test(await seite.locator('.bl-g-welt').first().innerText())
     && await seite.locator('.bl-tafelwahl, .bl-wahl').count() === 0, gegner);
   await bild(seite, 'bestenliste-leer-1180');
   await h.reiter('freunde');
