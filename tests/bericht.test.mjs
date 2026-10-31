@@ -473,7 +473,8 @@ const warteAufEintrag = (seite, muster, ms = 3000) => seite.waitForFunction((m) 
   return !!p && p.eintraege.some((e) => new RegExp(m).test(e.text));
 }, muster, { timeout: ms }).catch(() => {});
 const zuEinstellungen = async (seite, suche = '?test&kern') => {
-  await seite.goto(BASIS + 'index.html' + suche + '#einstellungen');
+  // #einstellungen/info: auf dem Handy ist Info eine eigene Seite (Liste der Bereiche), breiter wird dorthin gerollt
+  await seite.goto(BASIS + 'index.html' + suche + '#einstellungen/info');
   await seite.waitForSelector('.es-screen .es-info [data-aktion="bericht"]', { timeout: 20000 });
 };
 async function oeffneBericht(seite) {

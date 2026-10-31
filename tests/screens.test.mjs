@@ -651,7 +651,15 @@ async function testeEinstellungen(browser) {
     pruefe(`${key} aus`, e[key] === false && (await an(key)) === 'false');
   }
   pruefe('Klang aus: klang.aus gesetzt, Probeton gesperrt', await seite.evaluate(() => document.querySelector('.es-probe').disabled));
-  await seite.click('.es-brett[data-wert="holz"]');
+  // Brett, Figuren und Klaenge nur noch in der Sammlung (Flo 31.10.2026): die Zeile fuehrt hin, gewaehlt wird dort
+  await seite.click('.es-zur-sammlung');
+  const zurSammlung = await seite.evaluate(() => testseite.protokoll.filter((x) => x.art === 'gehe').pop());
+  pruefe('„Zur Sammlung“ geht in die Sammlung (Bretter); kein Brett, kein Klangset mehr in den Einstellungen',
+    !!zurSammlung && zurSammlung.name === 'ich' && zurSammlung.params.bereich === 'bretter', zurSammlung);
+  if ((await seite.evaluate(() => testseite.aktuell())) !== 'einstellungen') await seite.evaluate(() => testseite.app.zurueck());
+  await seite.waitForSelector('.es-inhalt');
+  pruefe('Einstellungen ohne Brettwahl und Klangset', await seite.locator('.es-brett, [data-key="klangpaket"], .musik-wahl, .em-kreaturen, .fi-wahl').count() === 0);
+  await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'holz' }));
   pruefe('Brettfarbe Holz: <html data-brett> und Feldfarbe', await seite.evaluate(() => document.documentElement.dataset.brett === 'holz'
     && getComputedStyle(document.documentElement).getPropertyValue('--feld-hell').trim().toLowerCase() === '#f0d9b5'));
   await seite.click('.es-seg[data-wert="16"]');
@@ -663,8 +671,7 @@ async function testeEinstellungen(browser) {
   for (const key of ['klang', 'balken', 'liveBewertung', 'koordinaten']) {
     pruefe(`${key} bleibt nach Neuladen aus`, (await an(key)) === 'false');
   }
-  pruefe('Holz bleibt nach Neuladen', (await seite.locator('.es-brett[data-wert="holz"]').getAttribute('aria-checked')) === 'true'
-    && (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz');
+  pruefe('Holz bleibt nach Neuladen', (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz');
   pruefe('Tiefe 16 bleibt nach Neuladen', (await seite.locator('.es-seg[data-wert="16"]').getAttribute('aria-checked')) === 'true');
   // Menue (Flo 31.10.2026, "Das muss auch angepasst werden"): jeder Bereich mit eigenem Zeichen, auch die der Pakete,
   // Spiel zuerst, Info zuletzt, die Markierung folgt dem Tippen; auf dem Handy als Leiste (vorher gar kein Menue)
@@ -688,7 +695,7 @@ async function testeEinstellungen(browser) {
   pruefe('Klang wieder an (Tippen auf den Text)', (await lies()).klang === true && (await an('klang')) === 'true');
   await seite.click('.es-probe');
   for (const key of ['balken', 'liveBewertung', 'koordinaten']) await seite.click(`.es-schalter[data-key="${key}"]`);
-  await seite.click('.es-brett[data-wert="gruen"]');
+  await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'gruen' }));
   pruefe('Grün per Klick', (await lies()).brett === 'gruen' && await seite.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--feld-dunkel').trim().toLowerCase() === '#769656'));
   await seite.focus('.es-seg[data-wert="16"]');
   await seite.keyboard.press('ArrowLeft');
@@ -727,6 +734,33 @@ async function testeEinstellungen(browser) {
   await seite.evaluate(() => testseite.app.setzeEinstellungen({ brett: 'nacht', tiefe: 12 }));
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
+
+  // Handy (Flo 31.10.2026, Bild vom Menue bei chess.com): erst eine Liste der Bereiche mit Pfeil, ein Tipp oeffnet den
+  // Bereich als eigene Seite (app.gehe mit seite), der Kopf traegt seinen Namen, Zurueck fuehrt zur Liste
+  const handy = await neueSeite(browser, { breite: 390, hoehe: 844, touch: true });
+  await oeffne(handy.seite, 'screen=einstellungen');
+  const liste = await handy.seite.evaluate(() => ({ klasse: document.querySelector('.es-screen').className,
+    inhalt: getComputedStyle(document.querySelector('.es-inhalt')).display,
+    punkte: [...document.querySelectorAll('.es-nav-punkt')].map((b) => ({ seite: b.dataset.seite, h: Math.round(b.getBoundingClientRect().height),
+      pfeil: getComputedStyle(b.querySelector('.es-nav-pfeil')).display !== 'none' })),
+    breit: Math.round(document.querySelector('.es-nav').getBoundingClientRect().width), iw: innerWidth }));
+  pruefe('Handy: Liste der Bereiche (Inhalt verborgen), jede Zeile mit Pfeil und mindestens 44 px, Spiel zuerst, Info zuletzt',
+    /es-liste/.test(liste.klasse) && liste.inhalt === 'none' && liste.punkte.length >= 8 && liste.punkte.every((x) => x.pfeil && x.h >= 44)
+    && liste.punkte[0].seite === 'spiel' && liste.punkte[liste.punkte.length - 1].seite === 'info' && liste.breit >= liste.iw - 40, liste);
+  await handy.seite.click('.es-nav-punkt[data-seite="klang"]');
+  await handy.seite.waitForSelector('.es-screen.es-seite');
+  const unterseite = await handy.seite.evaluate(() => ({ gehe: testseite.protokoll.filter((x) => x.art === 'gehe').pop(),
+    titel: document.querySelector('.es-screen .kopf h2').textContent, nav: getComputedStyle(document.querySelector('.es-nav')).display,
+    sichtbar: [...document.querySelectorAll('.es-inhalt .es-gruppe')].filter((g) => getComputedStyle(g).display !== 'none').map((g) => g.querySelector('h3')?.id),
+    zurueck: document.querySelector('.es-screen .kopf .icon-knopf').dataset.aktion }));
+  pruefe('Handy: Tipp auf „Klang“ öffnet nur diesen Bereich als Seite, Name im Kopf, Menü weg',
+    unterseite.gehe?.name === 'einstellungen' && unterseite.gehe?.params?.seite === 'klang' && unterseite.titel === 'Klang' && unterseite.nav === 'none'
+    && unterseite.sichtbar.length === 1 && unterseite.sichtbar[0] === 'es-g-klang' && unterseite.zurueck === 'liste', unterseite);
+  await handy.seite.click('.es-screen .kopf [data-aktion="liste"]');
+  await handy.seite.waitForSelector('.es-screen.es-liste');
+  pruefe('Handy: Zurück führt zur Liste (app.zurueck)', (await protokoll(handy.seite)).some((x) => x.art === 'zurueck'));
+  pruefe('Handy: keine Konsolenfehler', handy.fehler.length === 0, handy.fehler.join(' | '));
+  await handy.kontext.close();
 }
 
 // ---------------------------------------------------------------------------

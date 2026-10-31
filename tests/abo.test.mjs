@@ -350,8 +350,9 @@ async function bild(seite, name) {
   if (!BILDER) return;
   await seite.screenshot({ path: path.join(BILDER, name + '.png') });
 }
+// Handy (bis 700 px): die Abo-Gruppe ist eine eigene Seite der Einstellungen (#einstellungen/abo); breiter angesprungen
 async function zuEinstellungen(seite) {
-  await seite.goto(BASIS + '#einstellungen');
+  await seite.goto(BASIS + '#einstellungen/abo');
   await seite.waitForSelector('.es-screen, .es-inhalt', { timeout: 15000 });
 }
 // sichtbarer Text der Abo-Oberflaeche ohne Druck, Countdown, Prozent und Streichpreis

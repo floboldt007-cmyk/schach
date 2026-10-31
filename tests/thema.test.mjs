@@ -666,7 +666,8 @@ async function browserTeil(browser) {
       gruppe = `Lesbar ${schema === 'light' ? 'hell' : 'dunkel'} ${breite}x${hoehe}`;
       const { kontext: k4, seite: s4, fehler: f4 } = await neueSeite(browser, { schema, breite, hoehe });
       for (const [name, hash, warte] of [['Arena', '#arena', '.screen.arena .knoten'], ['Verlauf', '#verlauf', '.vl-screen'],
-        ['Einstellungen', '#einstellungen', '.es-inhalt']]) {
+        // Handy: erst die Liste der Bereiche, die Anzeige als eigene Seite (31.10.2026); breiter alles untereinander
+        ['Einstellungen', '#einstellungen', '.es-screen'], ['Einstellungen Anzeige', '#einstellungen/anzeige', '.es-screen .es-gruppe.es-offen']]) {
         await s4.goto(START + hash);
         await s4.waitForSelector(warte);
         await s4.waitForTimeout(400);
