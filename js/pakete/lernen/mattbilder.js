@@ -92,7 +92,8 @@ export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0 } = {}) {
     if (chess.isDraw()) return halten ? 'geschafft' : 'remis';
     if (art !== 'matt') {
       const jetzt = bilanz(chess);
-      if (vorsprung(jetzt) - vorsprung(start) >= 3) return 'verloren';
+      // ein bewusstes Opfer (Taktik: l.opfer) ist noch kein Verlust
+      if (vorsprung(jetzt) - vorsprung(start) >= 3 + (Number(l.opfer) || 0)) return 'verloren';
       if (art === 'umwandeln' && jetzt.w.p === 0 && jetzt.w.q <= start.w.q) return 'bauerWeg';
     }
     if (!halten && zuege >= grenze(l.ziel)) return 'zuViele';
