@@ -882,11 +882,33 @@ export function zeige(root, params, app) {
   }
   function halteCoachHoehe() {
     loeseRuhe();
+    if (!ruhig.has(coachEl)) reserviereCoach();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
       const h = el.offsetHeight;
       if (h > (ruhig.get(el) || 0)) { ruhig.set(el, h); el.style.minHeight = h + 'px'; }
     }
+  }
+  // Quer (iPad, Flo 31.10.2026 abends: "der Bildschirm flackert gerade wieder auf dem iPad, wenn er Zuege macht"): Die
+  // Coach-Karte wuchs trotzdem noch Zug fuer Zug (Ueberschrift zweizeilig, laengerer Satz, dann die Knoepfe "Die Idee"
+  // oder "Besser war"), jedes Mal rutschten Zugliste, Flos Karte und die Knoepfe. Darum gleich zu Beginn die Hoehe des
+  // vollsten Coachs in dieser Spalte reservieren: unsichtbare Probe mit langem Klassenwort, Zug, Zahl, Satz und Knopf.
+  function reserviereCoach() {
+    if (!coachEl || !coachEl.isConnected || lage() !== 'quer' || istHandy() || !coachEl.offsetWidth) return;
+    const probe = coachEl.cloneNode(false);
+    probe.classList.remove('offen', 'neu');
+    probe.removeAttribute('id');
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;left:0;top:0;width:${coachEl.offsetWidth}px;min-height:0;height:auto`;
+    const k = Object.keys(KLASSEN_WORT).reduce((a, b) => (String(KLASSEN_WORT[b] || '').length > String(KLASSEN_WORT[a] || '').length ? b : a));
+    probe.innerHTML = `<span class="c-symbol">${symbolSvg(k)}</span>
+      <div class="c-kopf"><span class="c-klasse">${esc(KLASSEN_WORT[k] || k)}</span><span class="c-zug">${esc('88… Dxh8+')}</span><span class="c-eval zahl">+12,8</span></div>
+      <p class="c-text">${esc(t('partie.coach.probe'))}</p>
+      <div class="coach-knoepfe"><button class="knopf" type="button" tabindex="-1">${icon('ziel')} ${esc(t('partie.coach.besser'))}</button></div>`;
+    coachEl.parentElement.append(probe);
+    const h = probe.offsetHeight + 4;   // kleiner Puffer: echte Saetze brechen manchmal eine Spur anders um als die Probe
+    probe.remove();
+    if (h > (ruhig.get(coachEl) || 0)) { ruhig.set(coachEl, h); coachEl.style.minHeight = h + 'px'; }
   }
   // U7: Coach-Stil "knapp": nur der erste Satz, der Rest auf Antippen (.c-rest)
   function coachText(text) {

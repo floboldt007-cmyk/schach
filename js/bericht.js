@@ -214,7 +214,7 @@ function mitFrist(versprechen, ms = FRIST_MS, ersatz = null) {
 }
 
 // Version und Stand fragt die App beim Service Worker nach (Nachricht 'version', sw.js); ohne ihn: null
-function swVersion() {
+export function swVersion() {
   return new Promise((fertig) => {
     try {
       const sw = globalThis.navigator && globalThis.navigator.serviceWorker;

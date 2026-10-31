@@ -95,7 +95,9 @@ function zeigeIch(root, params = {}, app) {
   try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
   s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
-  // Ausruesten per Tipp: wahl() des Teils, dann den Screen mit demselben Bereich neu zeichnen (Zeilen "Ausgeruestet")
+  // Ausruesten per Tipp: wahl() des Teils, dann nur die Bereiche (und das Profil oben) an Ort und Stelle neu zeichnen.
+  // Vorher wurde der ganze Screen neu aufgebaut und die Scroll-Stelle danach wiederhergestellt; auf dem iPad (Safari)
+  // sah man dabei kurz den Anfang der Seite (Flo 31.10.2026 abends: "auf dem iPad springt es immer noch nach oben").
   ort.addEventListener('click', (ev) => {
     const b = ev.target.closest('.sa-wahl');
     const teil = b && b.closest('.sa-teil');
@@ -105,22 +107,45 @@ function zeigeIch(root, params = {}, app) {
     try { wahl.fn(); } catch (e) { console.error(e); return; }
     const name = teil.querySelector('.sa-text b')?.textContent || '';
     try { app.meldung?.(t(wahl.ab ? 'rahmen.sammlung.ausgeschaltet' : 'rahmen.sammlung.ausgeruestet', { name })); } catch (e) { /* egal */ }
-    // die Seite bleibt, wo sie war (sonst sprang sie nach jedem Tipp nach oben), und zeichnet ohne Einflug neu
-    const oben = Math.round(s.querySelector('.sa-rumpf')?.scrollTop || 0);
-    try { app.gehe('ich', { bereich: ber.dataset.bereich, oben, ruhig: true }, { ersetzen: true }); } catch (e) { /* egal */ }
+    aktiv = ber.dataset.bereich;
+    zeichneNeu();
   });
-  const alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
+  let alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
   if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
-  const teile = ort.querySelectorAll('.sa-teil');
-  const frei = ort.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length;
   const stand = s.querySelector('.sa-stand');
-  stand.textContent = teile.length ? t('rahmen.sammlung.stand', { frei, alle: teile.length }) : t('rahmen.sammlung.leer');
-  // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
-  stand.style.setProperty('--anteil', teile.length ? (frei / teile.length).toFixed(3) : '0');
+  const zeigeStand = () => {
+    const teile = ort.querySelectorAll('.sa-teil');
+    const frei = ort.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length;
+    stand.textContent = teile.length ? t('rahmen.sammlung.stand', { frei, alle: teile.length }) : t('rahmen.sammlung.leer');
+    // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
+    stand.style.setProperty('--anteil', teile.length ? (frei / teile.length).toFixed(3) : '0');
+  };
+  zeigeStand();
   const zeigeBereich = () => {
     for (const x of alle) x.hidden = x.dataset.bereich !== aktiv;
     s.dataset.bereich = aktiv || '';
   };
+  // Nach dem Ausruesten: Profil und Bereiche neu fuellen, die Hoehe haelt so lange, die Scroll-Stelle bleibt (im selben
+  // Durchlauf, vor dem naechsten Bild); keine Einflug-Bewegung
+  function zeichneNeu() {
+    const rumpf = s.querySelector('.sa-rumpf');
+    const oben = rumpf.scrollTop;
+    ort.style.minHeight = ort.offsetHeight + 'px';
+    try { kopfOrt.verlasse(); } catch (e) { console.error(e); }
+    try { gefuellt.verlasse(); } catch (e) { console.error(e); }
+    const kopfEl = s.querySelector('.sa-kopf-ort');
+    kopfEl.replaceChildren();
+    ort.replaceChildren();
+    try { kopfOrt = fuelle('ich:kopf', kopfEl, { app }); } catch (e) { console.error(e); kopfOrt = { anzahl: 0, verlasse() {} }; }
+    kopfEl.hidden = !kopfOrt.anzahl;
+    try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); gefuellt = { anzahl: 0, verlasse() {} }; }
+    alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
+    if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
+    zeigeBereich();
+    zeigeStand();
+    ort.style.minHeight = '';
+    rumpf.scrollTop = oben;
+  }
   if (alle.length > 1) {
     const seg = segment({ name: 'sa-bereich', label: t('rahmen.sammlung.bereiche'), wert: aktiv,
       optionen: alle.map((x) => ({ id: x.dataset.bereich, text: x.dataset.name })),

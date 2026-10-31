@@ -276,6 +276,27 @@ try {
   await bildFertig();
   pruefe('Ansehen: ein neuer Zug (der Bot zieht) schliesst die Ansicht', !(await ansicht()).offen);
 
+  // ---------- 6c. Ruhige Spalte quer (Flo 31.10.2026 abends: "der Bildschirm flackert gerade wieder auf dem iPad, wenn er
+  // Zuege macht"): iPad quer mit Safari-Leisten (1000 x 590). Die Coach-Karte reserviert ihre volle Hoehe gleich zu Beginn,
+  // Zugliste, Flos Karte und die Knoepfe stehen danach still, Zug fuer Zug.
+  await seite.setViewportSize({ width: 1000, height: 590 });
+  await neuePartie(['e7e5', 'b8c6', 'g8f6', 'f8c5']);
+  await lasBotLos();
+  const spalte = () => seite.evaluate(() => Object.fromEntries(['.spieler.ich', '.spielknoepfe', '.zugbox', '.coach'].map((q) => {
+    const e = document.querySelector('.screen.partie ' + q); const r = e ? e.getBoundingClientRect() : null;
+    return [q, r ? [Math.round(r.top), Math.round(r.height)] : null];
+  })));
+  const lagen = [];
+  for (const [i, u] of ['e2e4', 'g1f3', 'f1c4', 'b1c3'].entries()) {
+    await zug(u);
+    await seite.waitForFunction((n) => window.__partie.z.zuege.length >= n && window.__partie.phase() === 'flo', (i + 1) * 2);
+    await warte(700);
+    lagen.push(await spalte());
+  }
+  pruefe('Ruhige Spalte quer (1000 x 590): Zugliste, Flos Karte, Knoepfe und Coach stehen vom ersten bis zum vierten Zug still',
+    lagen.every((l) => JSON.stringify(l) === JSON.stringify(lagen[0])), lagen);
+  await seite.setViewportSize({ width: 1180, height: 820 });
+
   // ---------- 7. Pfeil-Tipp: einmal je Geraet, ab der zweiten Partie ----------
   // Am Rechner (Maus, ohne Touch, wie die Rechtsklick-Pruefungen in tests/board.test.mjs: mit Touch kam der Rechtsklick
   // in der CI nicht als Malen an)
