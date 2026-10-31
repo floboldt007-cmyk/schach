@@ -2911,8 +2911,11 @@ Flo: Premium-Lektionen "von leicht bis Meister" (Plan im Vault, Schach-App/Meist
 (`laborFrei()` aus js/labor.js, also nur fuers Erfinder-Konto); Flo entscheidet spaeter, was gratis wird und was ins Abo
 kommt. Andere Konten sehen keine Karte, `#lernen` und `#lektion` fuehren sie still zur Arena.
 
-- `js/pakete/lernen/mattbilder.js`: 8 Lektionen (Grundreihe, zwei Tuerme, Anastasia, Dame, ersticktes Matt, Turm, zwei
-  Laeufer, Laeufer und Springer) mit `ziel` = Flos Zuege bis Matt bei bester Verteidigung. Nachgerechnet mit
+- `js/pakete/lernen/mattbilder.js`: 20 Lektionen nach Stufen geordnet (leicht: Grundreihe, Pillsbury, Epaulette, Kuss
+  des Todes, Blackburne, zwei Tuerme; mittel: Anderssen, Lolli, Damiano, Greco, Anastasia, Oper, Boden, Legal, Arabisch,
+  ersticktes Matt, Dame; schwer: Turm, zwei Laeufer; Meister: Laeufer und Springer) mit `ziel` = Flos Zuege bis Matt
+  bei bester Verteidigung. `pruefeLektion` weist auch Stellungen ab, in denen Schwarz schon im Schach steht (daran
+  stuerzt Stockfish ab). Fortschritt haengt an der id, die Reihenfolge darf sich aendern. Nachgerechnet mit
   `werkzeuge/mattbilder-pruefen.mjs` (Stockfish in Node; bei langen Matts der kuerzeste je gefundene Weg). Sterne: 3 bis
   `ziel + ziel/4` Zuege, 2 bis `1,5 * ziel + 2`, sonst 1; mit Hinweis hoechstens 2. Grenze `2 * ziel + 10` Zuege.
 - `js/ui/lernen.js` (Uebersicht) und `js/ui/lektion.js` (eine Lektion): Flo setzt matt, die Engine `bewertung` verteidigt

@@ -1,5 +1,5 @@
 // Paket "lernen": die Meisterschule (Flo 31.10.2026, Vault Schach-App/Meisterschule.md). Etappe 1: Bereich Mattbilder
-// mit 8 Lektionen (js/pakete/lernen/mattbilder.js), Screens js/ui/lernen.js (Uebersicht) und js/ui/lektion.js (eine
+// mit 20 Lektionen (js/pakete/lernen/mattbilder.js), Screens js/ui/lernen.js (Uebersicht) und js/ui/lektion.js (eine
 // Lektion: Flo setzt matt, die Engine verteidigt). Vorerst nur im Labor (js/labor.js laborFrei, also nur fuers
 // Erfinder-Konto): Flo probiert aus und entscheidet dann, was gratis wird und was ins Abo kommt.
 //
@@ -14,7 +14,7 @@ import { ladeModul } from '../../storage.js';
 import { laborFrei } from '../../labor.js';
 import { icon } from '../../ui/icons.js';
 import { t } from '../../sprache.js';
-import { summe } from './mattbilder.js';
+import { summe, LEKTIONEN } from './mattbilder.js';
 import './texte.js';
 
 export const PAKET = 'lernen';
@@ -40,7 +40,7 @@ export function trainingKarte(app) {
   el.className = 't-karte ms-karte';
   el.dataset.paket = PAKET;
   el.innerHTML = `<span class="ueberzeile">${esc(S('name'))} <span class="ms-labor">${esc(S('labor'))}</span></span>
-    <div><h2>${esc(S('bereich'))}</h2><p>${esc(S('karteText'))}</p></div>
+    <div><h2>${esc(S('bereich'))}</h2><p>${esc(S('karteText', { n: LEKTIONEN.length }))}</p></div>
     <div class="t-fuss"><span class="ms-sterne-zahl">${icon('stern')}${esc(S('sterne', { n: sum.sterne, max: sum.max }))}</span>
       <button class="knopf primaer dr ms-oeffnen" type="button">${esc(S('oeffnen'))}${icon('vor')}</button></div>`;
   el.querySelector('.ms-oeffnen').addEventListener('click', () => app.gehe('lernen'));

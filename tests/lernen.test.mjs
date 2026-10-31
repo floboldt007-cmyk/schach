@@ -1,6 +1,6 @@
 // Paket lernen (Meisterschule, Etappe 1 Mattbilder): Daten und Sterne ohne Browser, dazu ein Browser-Teil (Playwright) in
 // der vollen App. Als Erfinder (Sitzung und Sonderstuecke im Speicher, Supabase per page.route gefaelscht): Karte im
-// Training, Uebersicht mit 8 Lektionen, Lektion Grundreihe gespielt (Matt in 1, 3 Sterne, gespeichert, Karte zaehlt),
+// Training, Uebersicht mit 20 Lektionen, Lektion Grundreihe gespielt (Matt in 1, 3 Sterne, gespeichert, Karte zaehlt),
 // Lektion Dame mit gefaelschter Verteidigung (window.__test.lektionZug): Hinweis, Neu starten, Gegenzug, Patt-Ende.
 // Ohne Labor (anderes Konto): keine Karte, #lernen und #lektion fuehren zur Arena.
 //   node tests/lernen.test.mjs            Node und Browser
@@ -29,11 +29,11 @@ function pruefe(name, wert, info = '') {
 // ---------------------------------------------------------------------------
 // Node-Teil
 // ---------------------------------------------------------------------------
-pruefe('Mattbilder: 8 Lektionen, ids eindeutig, Stufen von leicht bis Meister', LEKTIONEN.length === 8
-  && new Set(LEKTIONEN.map((l) => l.id)).size === 8 && LEKTIONEN[0].stufe === 'leicht' && LEKTIONEN[7].stufe === 'meister'
+pruefe('Mattbilder: 20 Lektionen, ids eindeutig, Stufen von leicht bis Meister', LEKTIONEN.length === 20
+  && new Set(LEKTIONEN.map((l) => l.id)).size === 20 && LEKTIONEN[0].stufe === 'leicht' && LEKTIONEN[19].stufe === 'meister'
   && LEKTIONEN.every((l) => STUFEN.includes(l.stufe)));
 const pf = LEKTIONEN.flatMap((l) => pruefeLektion(l, Chess));
-pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, nicht schon vorbei, Ziel ganzzahlig', pf.length === 0, pf.join(' | '));
+pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, nicht schon vorbei, Ziel ganzzahlig', pf.length === 0, pf.join(' | '));
 pruefe('Stufen laufen nie rueckwaerts (leicht zuerst, Meister zuletzt)', LEKTIONEN.every((l, i) => i === 0
   || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(LEKTIONEN[i - 1].stufe) - 1));
 const fehltText = LEKTIONEN.flatMap((l) => ['titel.', 'idee.'].flatMap((k) => [DE, EN].filter((d) => !d[k + l.id]).map(() => k + l.id)));
@@ -50,6 +50,18 @@ function spiele(fen, zuege) {
 }
 pruefe('Grundreihe: Ta8 ist matt', spiele(lektion('grundreihe').fen, ['Ra8']).isCheckmate());
 pruefe('Anastasia: Dxh7+ Kxh7 Th3 ist matt', spiele(lektion('anastasia').fen, ['Qxh7+', 'Kxh7', 'Rh3#']).isCheckmate());
+const MUSTER = [
+  ['pillsbury', ['Rg3#']], ['epaulette', ['Qe6#']], ['todeskuss', ['Qe7#']], ['blackburne', ['Bh7#']],
+  ['anderssen', ['Rh1+', 'Kg8', 'Rh8#']], ['lolli', ['Qh6', 'a6', 'Qg7#']], ['damiano', ['Qh6', 'a6', 'Qh7#']],
+  ['greco', ['Rxh7+', 'Kxh7', 'Qh5#']], ['oper', ['Qb8+', 'Nxb8', 'Rd8#']], ['boden', ['Qxc6+', 'bxc6', 'Ba6#']],
+  ['legal', ['Bxf7+', 'Ke7', 'Nd5#']], ['arabisch', ['Nf6', 'a5', 'Rh7#']],
+];
+const musterFehler = MUSTER.filter(([id, zuege]) => { try { return !spiele(lektion(id).fen, zuege).isCheckmate(); } catch { return true; } })
+  .map(([id]) => id);
+pruefe('Neue Mattbilder: jede bekannte Mattfuehrung endet wirklich matt', musterFehler.length === 0, musterFehler.join(', '));
+pruefe('Mattbilder: kein Muster doppelt (jede Stellung einmal)', new Set(LEKTIONEN.map((l) => l.fen)).size === LEKTIONEN.length);
+const kaputt = pruefeLektion({ id: 'probe', stufe: 'leicht', fen: '3rk3/3p1p2/8/8/7Q/8/5PPP/4R1K1 w - - 0 1', ziel: 1 }, Chess);
+pruefe('Pruefung erkennt eine Stellung, in der Schwarz schon im Schach steht', kaputt.some((f) => /im Schach/.test(f)), kaputt);
 pruefe('Ersticktes Matt: Sf7+ Kg8 Sh6+ Kh8 Dg8+ Txg8 Sf7 ist matt',
   spiele(lektion('erstickt').fen, ['Nf7+', 'Kg8', 'Nh6+', 'Kh8', 'Qg8+', 'Rxg8', 'Nf7#']).isCheckmate());
 
@@ -67,8 +79,8 @@ pruefe('Speicher: bessere Sterne und weniger Zuege bleiben, unbekannte Lektion f
   JSON.stringify(st) === '{"lek":{"dame":{"s":2,"z":9}}}');
 pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ lek: { dame: { s: 7, z: 3 }, turm: 'x', grundreihe: { s: 3, z: 1 } } }))
   === '{"lek":{"grundreihe":{"s":3,"z":1}}}' && JSON.stringify(stand(null)) === '{"lek":{}}');
-pruefe('Summe: Sterne, Hoechstzahl 24, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 })))
-  === '{"sterne":5,"max":24,"geschafft":2}');
+pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 })))
+  === '{"sterne":5,"max":60,"geschafft":2}');
 
 // ---------------------------------------------------------------------------
 // Browser-Teil (volle App, alle Pakete)
@@ -147,12 +159,12 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder“ im Training mit Labor-Schild und 0 von 24 Sternen', !!karte
-    && /Mattbilder/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 24 Sternen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder“ im Training mit Labor-Schild und 0 von 60 Sternen und 20 Lektionen', !!karte
+    && /Mattbilder/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 60 Sternen/.test(karte.text) && /20 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
-  pruefe('Übersicht: 8 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS, liste);
+  pruefe('Übersicht: 20 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS, liste);
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   // Lektion 1: Grundreihenmatt in einem Zug
@@ -180,15 +192,15 @@ async function erfinderTeil(browser) {
 
   // weiter zur naechsten Lektion, dann ueber die Uebersicht zur Dame
   await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
-  await warteLz(p.s, "z.id === 'zwei-tuerme' && z.phase === 'intro'");
-  pruefe('„Nächste Lektion“ öffnet die zweite Lektion', (await lz(p.s)).id === 'zwei-tuerme');
+  await warteLz(p.s, `z.id === '${LEKTIONEN[1].id}' && z.phase === 'intro'`);
+  pruefe('„Nächste Lektion“ öffnet die zweite Lektion', (await lz(p.s)).id === LEKTIONEN[1].id);
   await p.s.evaluate(() => window.__app.gehe('lernen'));
   await p.s.waitForSelector('.ms-lektion[data-id="grundreihe"][data-geschafft]', { timeout: 10000 }).catch(() => {});
   pruefe('Übersicht: Grundreihe geschafft mit drei Sternen und „Dein Bestes: 1 Zug“', await p.s.evaluate(() => {
     const b = document.querySelector('.ms-lektion[data-id="grundreihe"]');
     return !!b && b.hasAttribute('data-geschafft') && b.querySelectorAll('.ms-sterne > i.an').length === 3 && /Dein Bestes: 1 Zug/.test(b.innerText);
   }));
-  pruefe('Übersicht: Gesamt 3 von 24 Sternen', /3 von 24 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
+  pruefe('Übersicht: Gesamt 3 von 60 Sternen', /3 von 60 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
 
   await setzeVerteidigung(p.s);
   await p.s.locator('.ms-lektion[data-id="dame"]').click();
