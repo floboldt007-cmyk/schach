@@ -13,13 +13,13 @@ import { bereich } from '../../ui/ich.js';
 import { sheet } from '../../ui/bauteile.js';
 import { floAvatar } from '../../thema.js';
 import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
-import { profilWahl, setzeProfilWahl, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
+import { profilWahl, setzeProfilWahl, dabeiSeit, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
 import { istErfinder, hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { WELTEN } from '../../bots.js';
 import { istWeltFrei } from '../../storage.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
 import { profilGrund } from '../../sammlung-kunst.js';
-import { t } from '../../sprache.js';
+import { t, locale } from '../../sprache.js';
 import { teileErfolge, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import './texte.js';
 
@@ -188,6 +188,13 @@ function waehleOrden(app, platz) {
   }).catch(() => {});
 }
 
+// "Dabei seit Okt. 2026" (Flo 31.10.2026: "soll man im Profil sehen koennen, wie lange jemand dabei ist")
+export function seitText(tag = dabeiSeit()) {
+  let monat = tag.slice(0, 7);
+  try { monat = new Intl.DateTimeFormat(locale(), { month: 'short', year: 'numeric' }).format(new Date(tag + 'T12:00:00')); } catch (e) { /* Rueckfall JJJJ-MM */ }
+  return S('profil.dabeiSeit', { datum: monat });
+}
+
 export function profilKarte({ app } = {}) {
   const erfolge = teileErfolge();
   const vitrine = vitrineTeile(erfolge);
@@ -195,7 +202,7 @@ export function profilKarte({ app } = {}) {
   k.className = 'pr-karte';
   const titel = istErfinder() ? `<span class="pr-chip pr-chip-titel">${esc(S('erfinder.titel'))}</span>` : '';
   k.innerHTML = `<div class="pr-kopf"><span class="pr-av">${floAvatar('w')}</span>
-      <div class="pr-name"><b>Flo</b><div class="pr-chips">${titel}</div></div></div>
+      <div class="pr-name"><b>Flo</b><div class="pr-chips">${titel}</div><small class="pr-seit">${esc(seitText())}</small></div></div>
     <button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
     <h4 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h4>
     <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"
@@ -214,6 +221,6 @@ anbieten('sammlung:bereich', () => {
   return bereich({ id: 'rahmen', name: S('rahmen'), teile: rahmenTeile().map((r) => ({
     id: 'rahmen-' + r.id, name: r.name, frei: r.frei, an: wahl.rahmen === r.id,
     zeile: wahl.rahmen === r.id ? S('an') : r.frei ? S('frei') : r.weg, bild: rahmenBild(r.id),
-    fortschritt: r.fortschritt, seltenheit: r.seltenheit, labor: r.labor,
+    fortschritt: r.fortschritt, seltenheit: r.seltenheit, labor: r.labor, wahl: () => setzeProfilWahl({ rahmen: r.id }),
   })) });
 }, { reihenfolge: 35, paket: PAKET });

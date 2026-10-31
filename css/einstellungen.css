@@ -154,3 +154,8 @@
 .konto-gruppe .konto-ziffern input { width: 2.6rem; padding-inline: .2rem; text-align: center; font-size: 1.25rem; }
 .konto-gruppe .konto-status { font-size: .9rem; }
 .konto-gruppe .konto-status[data-fehler="ja"] { color: var(--gefahr, #a32626); }
+/* Labor (Flo 31.10.2026): Stuecke nur im Erfinder-Konto, mit kleinem Schild wie in der Sammlung */
+.es-brett.es-labor { position: relative; }
+.es-labor-schild { position: absolute; top: 6px; right: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800;
+  letter-spacing: .04em; color: #F5C451; background: #1C1B19; }
+

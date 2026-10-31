@@ -10,6 +10,9 @@ import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
+import { LABOR_BRETTER, LABOR_FIGUREN, laborFrei, brettWahl } from '../../labor.js';
+import { figurenSatz } from '../../figurensatz.js';
+import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
 import { erfinderBereich } from './erfinder.js';
 import './profil.js';
@@ -29,14 +32,36 @@ if (typeof document !== 'undefined' && !document.querySelector('link[data-paket=
 const klangBild = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/></svg>';
 const sternBild = '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg>';
 
-export function teileBretter(e = ladeEinstellungen()) {
-  return BRETTER.map(([id, h, d, r]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: e.brett === id, zeile: e.brett === id ? S('an') : S('frei'), bild: brettKunst(h, d, r) }));
+// Ausruesten per Tipp (js/ui/ich.js): wahl() setzt die Einstellung ueber die App; ohne App (Node-Tests) keine Wahl
+const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'function' ? () => app.setzeEinstellungen(teil) : undefined);
+
+export function teileBretter(e = ladeEinstellungen(), app = null) {
+  const an = brettWahl(e.brett);
+  // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
+  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true]) : [])];
+  return liste.map(([id, h, d, r, labor]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),
+    bild: brettKunst(h, d, r), labor: !!labor, wahl: wahlVon(app, { brett: id }) }));
 }
 
-export function teileKlaenge(e = ladeEinstellungen()) {
+// Figurensaetze: Klassisch fuer alle, Blaupause mit Sonderstueck, die Saetze des Labors fuer den Erfinder. Bild: weisser
+// Springer und schwarzer Koenig des Satzes auf einer Scheibe
+const figurenBild = (satz) => {
+  const pfad = (f) => new URL(`../../../assets/pieces/${satz === 'cburnett' ? '' : satz + '/'}${f}.svg`, import.meta.url).href;
+  return `<span class="sk-figuren" data-satz="${satz}"><img src="${pfad('wN')}" alt=""><img src="${pfad('bK')}" alt=""></span>`;
+};
+export function teileFiguren(e = ladeEinstellungen(), app = null) {
+  const an = figurenSatz(e);
+  const saetze = [['cburnett', false], ...(hatSonderstueck(ERFINDER.figuren) ? [['blaupause', false]] : []),
+    ...(laborFrei() ? LABOR_FIGUREN.map((s) => [s, true]) : [])];
+  return saetze.map(([s, labor]) => ({ id: 'figuren-' + s, name: S('figuren.' + s), frei: true, an: an === s, zeile: an === s ? S('an') : S('frei'),
+    bild: figurenBild(s), labor, wahl: wahlVon(app, { figuren: s }) }));
+}
+
+export function teileKlaenge(e = ladeEinstellungen(), app = null) {
   // '' heisst: Standard der Ansicht (heute Arcade, js/sounds.js)
   const gewaehlt = PAKETE_KLANG[e.klangpaket] ? e.klangpaket : 'arcade';
-  const sets = Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangKunst(id) || klangBild, gruppe: S('gruppe.klangsets') }));
+  const sets = Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'),
+    bild: klangKunst(id) || klangBild, gruppe: S('gruppe.klangsets'), wahl: wahlVon(app, { klangpaket: id }) }));
   // Lobby-Musik (Paket musik, Ort sammlung:musik?): ohne das Paket gibt es sie nicht, dann nur die Klangsets
   let musik = null;
   try { musik = waehle('sammlung:musik?', {}); } catch (e) { musik = null; }
@@ -98,7 +123,12 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
 
 freischalten();
 anbieten('sammlung:bereich', ({ app }) => erfinderBereich({ app }), { reihenfolge: 5, paket: PAKET });
-anbieten('sammlung:bereich', () => bereich({ id: 'bretter', name: S('bretter'), teile: teileBretter() }), { reihenfolge: 40, paket: PAKET });
-anbieten('sammlung:bereich', () => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge() }), { reihenfolge: 50, paket: PAKET });
+anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'bretter', name: S('bretter'), teile: teileBretter(undefined, app) }), { reihenfolge: 40, paket: PAKET });
+// Figurensaetze nur, wenn es mehr als einen gibt (Blaupause oder Labor), sonst gaebe es nichts zu waehlen
+anbieten('sammlung:bereich', ({ app }) => {
+  const teile = teileFiguren(undefined, app);
+  return teile.length > 1 ? bereich({ id: 'figuren', name: S('figuren'), teile }) : null;
+}, { reihenfolge: 45, paket: PAKET });
+anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge(undefined, app) }), { reihenfolge: 50, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolge() }), { reihenfolge: 90, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => shopBereich({ app }), { reihenfolge: 95, paket: PAKET });

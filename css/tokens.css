@@ -51,6 +51,32 @@ html[data-brett="holz"] {
   --zuletzt: rgba(255, 170, 40, .5); --auswahl: rgba(84, 46, 14, .24); --punkt: rgba(50, 30, 10, .2);
   --auswahl-kante: rgba(255, 255, 255, .82);
 }
+/* Labor (Flo 31.10.2026, nur das Erfinder-Konto, js/labor.js): Kuerbis (Halloween), Frost, Marmor, Nussbaum, Thron */
+html[data-brett="kuerbis"] {
+  --feld-hell: #f6c27e; --feld-dunkel: #5a3478;
+  --zuletzt: rgba(255, 214, 92, .55); --auswahl: rgba(30, 10, 40, .3); --punkt: rgba(30, 10, 40, .26);
+  --auswahl-kante: rgba(255, 240, 210, .85);
+}
+html[data-brett="frost"] {
+  --feld-hell: #eef5fa; --feld-dunkel: #86a9c6;
+  --zuletzt: rgba(255, 190, 70, .5); --auswahl: rgba(20, 50, 90, .24); --punkt: rgba(20, 40, 70, .2);
+  --auswahl-kante: rgba(255, 255, 255, .85);
+}
+html[data-brett="marmor"] {
+  --feld-hell: #edeae4; --feld-dunkel: #8f8a84;
+  --zuletzt: rgba(255, 180, 50, .5); --auswahl: rgba(40, 36, 32, .24); --punkt: rgba(30, 28, 26, .2);
+  --auswahl-kante: rgba(255, 255, 255, .82);
+}
+html[data-brett="nussbaum"] {
+  --feld-hell: #e6c49b; --feld-dunkel: #7a4b2c;
+  --zuletzt: rgba(255, 176, 46, .5); --auswahl: rgba(60, 30, 10, .28); --punkt: rgba(50, 25, 8, .22);
+  --auswahl-kante: rgba(255, 245, 230, .82);
+}
+html[data-brett="thron"] {
+  --feld-hell: #f2e2ae; --feld-dunkel: #b0812a;
+  --zuletzt: rgba(255, 240, 160, .55); --auswahl: rgba(70, 44, 6, .26); --punkt: rgba(60, 38, 6, .22);
+  --auswahl-kante: rgba(255, 252, 235, .85);
+}
 :root {
   --hinweis: rgba(76, 110, 245, .34);
   /* Flos eigene Pfeile und Marken: das Theme setzt --pfeil-nutzer/--marke-nutzer hell und dunkel, hier der Rueckfall */

@@ -292,6 +292,56 @@ async function erfinderTeil(browser) {
   await p.k.close();
 }
 
+// Labor (Flo 31.10.2026): Bretter und Figuren nur im Erfinder-Konto, mit Schild "Labor"; Ausruesten per Tipp in der Sammlung
+async function laborTeil(browser) {
+  let p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: ERFINDER_ZEILEN }, bereich: null });
+  await p.s.waitForSelector('.sa-bereich[data-bereich="erfinder"]:not([hidden])', { timeout: 15000 }).catch(() => {});
+  await p.s.locator('.sa-steuer .seg[data-wert="bretter"]').click();
+  await warte(300);
+  const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
+    .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
+  const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
+  pruefe('Labor: fünf Bretter mit Schild, nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron', bretter);
+  await p.s.locator('.sa-teil[data-teil="brett-kuerbis"] .sa-wahl').click();
+  await p.s.waitForFunction(() => document.documentElement.dataset.brett === 'kuerbis', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
+    && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
+  await p.s.locator('.sa-steuer .seg[data-wert="figuren"]').click();
+  await warte(300);
+  const saetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="figuren"] .sa-teil')].map((x) => x.dataset.teil).join());
+  pruefe('Labor: Figurensätze Klassisch, Blaupause, Kürbis, Frost, Gold', saetze === 'figuren-cburnett,figuren-blaupause,figuren-kuerbis,figuren-frost,figuren-gold', saetze);
+  await p.s.locator('.sa-teil[data-teil="figuren-kuerbis"] .sa-wahl').click();
+  await warte(500);
+  await p.s.locator('.sa-steuer .seg[data-wert="klaenge"]').click();
+  await warte(300);
+  await p.s.locator('.sa-teil[data-teil="klang-holz"] .sa-wahl').click();
+  await warte(500);
+  pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
+  await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
+  let quellen = await figurenQuellen(p.s);
+  pruefe('Labor: in der Partie alle 32 Figuren im Kürbis-Satz', quellen.length === 32 && quellen.every((q) => q.includes('/kuerbis/')), quellen.slice(0, 3));
+  pruefe('Labor: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.k.close();
+
+  // anderes Konto, Einstellungen von Hand auf Labor gesetzt: nichts davon wirkt, nichts davon ist zu sehen
+  p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: [] }, bereich: 'bretter',
+    vorher: { 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'kuerbis', figuren: 'kuerbis' }) } });
+  await warte(500);
+  pruefe('Ohne Labor: Brett bleibt Nacht, keine Labor-Teile, kein Figuren-Bereich', await p.s.evaluate(() => document.documentElement.dataset.brett === 'nacht'
+    && !document.querySelector('.sa-labor') && !document.querySelector('.seg[data-wert="figuren"]')));
+  await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
+  quellen = await figurenQuellen(p.s);
+  pruefe('Ohne Labor: Standardfiguren, auch wenn die Einstellung kuerbis sagt', quellen.length === 32 && !quellen.some((q) => /kuerbis|frost|gold/.test(q)), quellen.slice(0, 3));
+  // Dabei seit (Flo 31.10.2026): ohne Partien zaehlt der erste Tag, Monat kurz und Jahr
+  await p.s.evaluate(() => window.__app.gehe('ich'));
+  await p.s.waitForSelector('.pr-karte .pr-seit', { timeout: 15000 }).catch(() => {});
+  const seit = await p.s.evaluate(() => document.querySelector('.pr-karte .pr-seit')?.textContent || '');
+  pruefe('Profil: „Dabei seit“ mit Monat und Jahr', /^Dabei seit \S+ 20\d\d$/.test(seit), seit);
+  await p.k.close();
+}
+
 // Profil (Flo, 30.10.2026): Figur und Rahmen waehlen, Vitrine mit einem erspielten Erfolg, Flexen im Duell-Intro
 async function profilTeil(browser) {
   const sieg = { bots: { [BOTS[0].id]: { sterne: [true, false, false] } }, brillanteZuege: [] };
@@ -408,6 +458,7 @@ async function browserTeil() {
     }
     await shopTeil(browser);
     await erfinderTeil(browser);
+    await laborTeil(browser);
     await profilTeil(browser);
     // Englisch
     const k = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block' });

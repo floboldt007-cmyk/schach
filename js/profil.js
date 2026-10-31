@@ -12,7 +12,9 @@
 //   NUR_ERFINDER, STANDARD_FIGUR       Koenig und Kronli nur fuer den Erfinder (js/sonderstuecke.js); alle anderen starten als Bauer
 //   profilWahl() -> { figur, grund, rahmen, vitrine: [id|null x3] }   figur: Motiv-Id (Figur oder Kreatur)
 //   setzeProfilWahl(teil)              merkt figur, grund, rahmen oder vitrine (unbekannte Werte fallen auf den Standard)
-import { ladeModulEinstellungen, speichereModulEinstellungen } from './storage.js';
+//   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
+//                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
+import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien } from './storage.js';
 import { istErfinder } from './sonderstuecke.js';
 import { KREATUREN } from './kreaturen-kunst.js';
 
@@ -76,5 +78,20 @@ export function setzeProfilWahl(teil = {}) {
   const sauber = { figur, grund: GRUENDE.includes(neu.grund) ? neu.grund : 'standard',
     rahmen: RAHMEN[neu.rahmen] ? neu.rahmen : 'ohne',
     vitrine: (Array.isArray(neu.vitrine) ? neu.vitrine : []).slice(0, 3).map((x) => (typeof x === 'string' && ID.test(x) ? x : null)) };
+  if (TAG.test(roh.dabeiSeit)) sauber.dabeiSeit = roh.dabeiSeit;
   return speichereModulEinstellungen(MODUL, { ...alt, profil: sauber });
+}
+
+const TAG = /^\d{4}-\d{2}-\d{2}$/;
+export function dabeiSeit() {
+  let alt = {};
+  try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
+  const roh = (alt.profil && typeof alt.profil === 'object') ? alt.profil : {};
+  if (TAG.test(roh.dabeiSeit)) return roh.dabeiSeit;
+  // ladePartien() ist neueste zuerst: die letzte ist die erste Partie
+  let erste = null;
+  try { const p = ladePartien(); erste = p.length ? String(p[p.length - 1].datum || '') : null; } catch (f) { erste = null; }
+  const tag = (erste && /^\d{4}-\d{2}-\d{2}/.test(erste) ? erste : new Date().toISOString()).slice(0, 10);
+  try { speichereModulEinstellungen(MODUL, { ...alt, profil: { ...roh, dabeiSeit: tag } }); } catch (f) { /* nur Komfort */ }
+  return tag;
 }

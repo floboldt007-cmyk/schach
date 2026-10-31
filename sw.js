@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 169;
-const STAND = '6567b32bcf0b';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 170;
+const STAND = '968321209e0f';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -161,7 +161,7 @@ const DATEIEN = [
   'js/konto-config.js',
   'js/konto.js',
   'js/profil.js', 'js/rahmen-kunst.js', 'js/sammlung-kunst.js', 'js/kreaturen-kunst.js',
-  'js/sonderstuecke.js',
+  'js/sonderstuecke.js', 'js/labor.js',
   'js/figurensatz.js',
   'js/abo.js',
   'js/pakete/abo/index.js',
@@ -230,6 +230,42 @@ const DATEIEN = [
   'assets/pieces/blaupause/wP.svg',
   'assets/pieces/blaupause/wQ.svg',
   'assets/pieces/blaupause/wR.svg',
+  'assets/pieces/kuerbis/bB.svg',
+  'assets/pieces/kuerbis/bK.svg',
+  'assets/pieces/kuerbis/bN.svg',
+  'assets/pieces/kuerbis/bP.svg',
+  'assets/pieces/kuerbis/bQ.svg',
+  'assets/pieces/kuerbis/bR.svg',
+  'assets/pieces/kuerbis/wB.svg',
+  'assets/pieces/kuerbis/wK.svg',
+  'assets/pieces/kuerbis/wN.svg',
+  'assets/pieces/kuerbis/wP.svg',
+  'assets/pieces/kuerbis/wQ.svg',
+  'assets/pieces/kuerbis/wR.svg',
+  'assets/pieces/frost/bB.svg',
+  'assets/pieces/frost/bK.svg',
+  'assets/pieces/frost/bN.svg',
+  'assets/pieces/frost/bP.svg',
+  'assets/pieces/frost/bQ.svg',
+  'assets/pieces/frost/bR.svg',
+  'assets/pieces/frost/wB.svg',
+  'assets/pieces/frost/wK.svg',
+  'assets/pieces/frost/wN.svg',
+  'assets/pieces/frost/wP.svg',
+  'assets/pieces/frost/wQ.svg',
+  'assets/pieces/frost/wR.svg',
+  'assets/pieces/gold/bB.svg',
+  'assets/pieces/gold/bK.svg',
+  'assets/pieces/gold/bN.svg',
+  'assets/pieces/gold/bP.svg',
+  'assets/pieces/gold/bQ.svg',
+  'assets/pieces/gold/bR.svg',
+  'assets/pieces/gold/wB.svg',
+  'assets/pieces/gold/wK.svg',
+  'assets/pieces/gold/wN.svg',
+  'assets/pieces/gold/wP.svg',
+  'assets/pieces/gold/wQ.svg',
+  'assets/pieces/gold/wR.svg',
   'assets/avatare/01-bauer-benno.svg',
   'assets/avatare/02-oma-hilde.svg',
   'assets/avatare/03-kalle-vom-stammtisch.svg',

@@ -72,6 +72,9 @@ registriereTexte('einstellungen', {
     'brett.nacht': 'Nacht',
     'brett.gruen': 'Grün',
     'brett.holz': 'Holz',
+    // Labor (Flo 31.10.2026): nur im Erfinder-Konto, js/labor.js
+    'brett.kuerbis': 'Kürbis', 'brett.frost': 'Frost', 'brett.marmor': 'Marmor', 'brett.nussbaum': 'Nussbaum', 'brett.thron': 'Thron',
+    labor: 'Labor',
     'anzeige.koordinaten': 'Koordinaten',
     'anzeige.koordinatenText': 'Buchstaben und Zahlen am Brett.',
     'anzeige.koordLage': 'Lage der Koordinaten',
@@ -441,6 +444,8 @@ registriereTexte('einstellungen', {
     'brett.nacht': 'Night',
     'brett.gruen': 'Green',
     'brett.holz': 'Wood',
+    'brett.kuerbis': 'Pumpkin', 'brett.frost': 'Frost', 'brett.marmor': 'Marble', 'brett.nussbaum': 'Walnut', 'brett.thron': 'Throne',
+    labor: 'Lab',
     'anzeige.koordinaten': 'Coordinates',
     'anzeige.koordinatenText': 'Letters and numbers on the board.',
     'anzeige.koordLage': 'Coordinate position',

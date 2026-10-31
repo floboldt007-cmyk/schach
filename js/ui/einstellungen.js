@@ -17,6 +17,7 @@ import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
+import { LABOR_BRETTER, laborFrei } from '../labor.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -181,9 +182,9 @@ export function zeige(root, params = {}, app) {
           ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
           <h4>${E('anzeige.brettfarbe')}</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
-            ${BRETTER.map((b) => `
-              <button class="es-brett" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
-                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>
+            ${[...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => ({ ...b, labor: true })) : [])].map((b) => `
+              <button class="es-brett${b.labor ? ' es-labor' : ''}" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
+                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>${b.labor ? `<span class="es-labor-schild">${E('labor')}</span>` : ''}
               </button>`).join('')}
           </div>
           ${schalter('koordinaten',E('anzeige.koordinaten'),E('anzeige.koordinatenText'))}
