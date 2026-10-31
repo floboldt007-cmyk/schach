@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 206;
-const STAND = '4e079cb5734a';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 207;
+const STAND = '41f62b5b0928';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -359,6 +359,30 @@ const DATEIEN = [
   'assets/pieces/marmor/wP.svg',
   'assets/pieces/marmor/wQ.svg',
   'assets/pieces/marmor/wR.svg',
+  'assets/pieces/moosgeister/bB.svg',
+  'assets/pieces/moosgeister/bK.svg',
+  'assets/pieces/moosgeister/bN.svg',
+  'assets/pieces/moosgeister/bP.svg',
+  'assets/pieces/moosgeister/bQ.svg',
+  'assets/pieces/moosgeister/bR.svg',
+  'assets/pieces/moosgeister/wB.svg',
+  'assets/pieces/moosgeister/wK.svg',
+  'assets/pieces/moosgeister/wN.svg',
+  'assets/pieces/moosgeister/wP.svg',
+  'assets/pieces/moosgeister/wQ.svg',
+  'assets/pieces/moosgeister/wR.svg',
+  'assets/pieces/tiefsee/bB.svg',
+  'assets/pieces/tiefsee/bK.svg',
+  'assets/pieces/tiefsee/bN.svg',
+  'assets/pieces/tiefsee/bP.svg',
+  'assets/pieces/tiefsee/bQ.svg',
+  'assets/pieces/tiefsee/bR.svg',
+  'assets/pieces/tiefsee/wB.svg',
+  'assets/pieces/tiefsee/wK.svg',
+  'assets/pieces/tiefsee/wN.svg',
+  'assets/pieces/tiefsee/wP.svg',
+  'assets/pieces/tiefsee/wQ.svg',
+  'assets/pieces/tiefsee/wR.svg',
   'assets/avatare/01-bauer-benno.svg',
   'assets/avatare/02-oma-hilde.svg',
   'assets/avatare/03-kalle-vom-stammtisch.svg',

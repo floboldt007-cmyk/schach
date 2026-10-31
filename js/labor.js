@@ -40,7 +40,9 @@ export const LABOR_BRETTER = Object.freeze([
 // Flo 31.10.2026 abends ("coole Figur-Designs ... in mein Konto", dann "Bessere Designs"): gedrechselte Formen mit Licht
 // und Schatten (werkzeuge/figuren-3d.mjs: Elfenbein, Holz, Marmor, Gold, Glas, Neon, Frost, Kuerbis) und eigene Stile
 // (werkzeuge/figuren-stile.mjs: Pixel, Geo)
-export const LABOR_FIGUREN = Object.freeze(['elfenbein', 'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
+// danach (Video: Figuren als kleine Wesen) Moosgeister und Tiefsee mit Gesichtern, eigene Gestaltung
+export const LABOR_FIGUREN = Object.freeze(['elfenbein', 'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'moosgeister', 'tiefsee',
+  'pixel', 'geo']);
 export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
 
 export function istLabor(art, id) {

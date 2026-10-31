@@ -51,6 +51,29 @@ const FORMEN = {
     { z: 'z', s: '<path d="M47 25V14.8h-6.2c-1.3 0-2.3-1-2.3-2.3v-2.2c0-1.3 1-2.3 2.3-2.3H47V4.3C47 3 48 2 49.3 2h1.4C52 2 53 3 53 4.3V8h6.2c1.3 0 2.3 1 2.3 2.3v2.2c0 1.3-1 2.3-2.3 2.3H53V25z"/>' }],
 };
 
+// ---------- Wesen mit Gesicht (Flo 31.10.2026 abends, Video: Figuren als kleine Wesen) ----------
+// Augen je Figur (Mittelpunkte, Radius), Mund als Pfad; eigene Gestaltung: runde Augen mit Glanzpunkt
+const GESICHT = {
+  P: { augen: [[44, 34], [56, 34]], r: 4.6, mund: 'M46.5 41.2q3.5 2.6 7 0' },
+  R: { augen: [[42, 53], [58, 53]], r: 5.2, mund: 'M45 62.5q5 3.4 10 0' },
+  B: { augen: [[45, 31.5], [55, 31.5]], r: 3.9, mund: 'M47.2 37.6q2.8 2 5.6 0' },
+  N: { augen: [[42.5, 29.5]], r: 4.6, mund: 'M24.6 45.4q2.2 1.4 4.4 0' },
+  Q: { augen: [[43.8, 56], [56.2, 56]], r: 4.6, mund: 'M46.5 64q3.5 2.6 7 0' },
+  K: { augen: [[44.2, 33.5], [55.8, 33.5]], r: 4.4, mund: 'M47 39.4q3 2.2 6 0' },
+};
+function gesichtSvg(fig, g) {
+  const f = GESICHT[fig];
+  const augen = f.augen.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${f.r}" fill="${g.sklera}" stroke="${g.rand}" stroke-width="1.1"/>`
+    + `<circle cx="${x - f.r * 0.22}" cy="${y + f.r * 0.12}" r="${f.r * 0.56}" fill="${g.pupille}"/>`
+    + `<circle cx="${x - f.r * 0.42}" cy="${y - f.r * 0.18}" r="${f.r * 0.2}" fill="#FFFFFF"/>`).join('');
+  const brauen = g.brauen ? f.augen.map(([x, y], i) => {
+    const s = f.augen.length === 1 ? 1 : (i === 0 ? 1 : -1);
+    return `<path d="M${x - f.r * 1.05} ${y - f.r * (s > 0 ? 1.45 : 1.05)}L${x + f.r * 1.05} ${y - f.r * (s > 0 ? 1.05 : 1.45)}" stroke="${g.rand}" stroke-width="1.6" stroke-linecap="round"/>`;
+  }).join('') : '';
+  const mund = `<path d="${f.mund}" fill="none" stroke="${g.rand}" stroke-width="1.5" stroke-linecap="round"/>`;
+  return augen + brauen + mund;
+}
+
 // ---------- Materialien ----------
 // je Seite: c0 Glanz, c1 hell, c2 mittel, c3 dunkel, l Kante, d Zeichnung (Schlitz, Fugen); optional: muster, schein, deck
 const MATERIALIEN = {
@@ -78,6 +101,16 @@ const MATERIALIEN = {
   kuerbis: {
     w: { c0: '#FFE2B8', c1: '#FBAE52', c2: '#E07B1E', c3: '#97450A', l: '#3B1A05', d: '#6B2E06' },
     b: { c0: '#7A55A0', c1: '#523274', c2: '#341E4D', c3: '#170A24', l: '#0A0410', d: '#F6A54A' } },
+  moosgeister: {
+    w: { c0: '#FBFFF0', c1: '#E4F0C8', c2: '#BCD394', c3: '#7E9A55', l: '#2F4419', d: '#4E6B2C',
+      gesicht: { sklera: '#FFFFFF', pupille: '#2F4419', rand: '#2F4419' }, zubehoer: 'wald', akzent: '#7FB241', akzent2: '#E9F6D2' },
+    b: { c0: '#5E8A4E', c1: '#3B6131', c2: '#264420', c3: '#10220D', l: '#060E05', d: '#A8D184',
+      gesicht: { sklera: '#E9F7C8', pupille: '#14240F', rand: '#060E05', brauen: true }, zubehoer: 'wald', akzent: '#9CD45A', akzent2: '#C2443A' } },
+  tiefsee: {
+    w: { c0: '#FFFFFF', c1: '#E6FAFB', c2: '#B8E4EA', c3: '#6FB2C0', l: '#1F5866', d: '#3A8392',
+      gesicht: { sklera: '#FFFFFF', pupille: '#16404A', rand: '#1F5866' }, zubehoer: 'meer', akzent: '#F6E7C8', akzent2: '#9FE7F0' },
+    b: { c0: '#4C4F9C', c1: '#2E2F72', c2: '#1B1B4D', c3: '#0A0A24', l: '#03030F', d: '#7CE3F2',
+      gesicht: { sklera: '#0B0B28', pupille: '#66F0FF', rand: '#03030F', brauen: true }, zubehoer: 'meer', akzent: '#F6E7C8', akzent2: '#66F0FF' } },
 };
 
 function defs(m) {
@@ -101,9 +134,41 @@ function teil(t, m) {
   return `<g fill="${fill}"${deck} stroke="${m.l}" stroke-width="1.7" stroke-linejoin="round">${t.s}</g>${muster}`;
 }
 
+// Zubehoer: Wald (Blatt am Bauern, Pilzhut-Punkte am Laeufer, Beeren an der Dame, Moos am Sockel, Blatt am Koenig),
+// Meer (Blasen, Perlen an der Dame, Dreizack statt Kreuz am Koenig, Wellen am Turm, Flosse am Bauern)
+function zubehoer(fig, m) {
+  const a = m.akzent, b = m.akzent2, l = m.l;
+  if (m.zubehoer === 'wald') {
+    const moos = `<path d="M24 81.5c3-2.6 6-2.4 8.5-.4 2.6-2.4 6-2.6 8.8-.2 2.8-2.4 6.2-2.4 9-.2 2.8-2.2 6.2-2.2 9 .2 2.6-2 5.6-2 8.2.6" fill="none" stroke="${a}" stroke-width="2.6" stroke-linecap="round"/>`;
+    const blatt = (x, y, w, dreh) => `<path transform="rotate(${dreh} ${x} ${y})" d="M${x} ${y}c${w * .2}-${w * .9} ${w * .9}-${w * 1.1} ${w * 1.2}-${w * .6}-${w * .2} ${w * .75}-${w * .7} ${w * 1}-${w * 1.2} ${w * .6}z" fill="${a}" stroke="${l}" stroke-width="1.1"/>`;
+    if (fig === 'P') return moos + blatt(50, 22, 9, -20);
+    if (fig === 'B') return moos + `<g fill="${m === undefined ? '#fff' : (b.startsWith('#C') ? '#F4EBDD' : '#C2443A')}" stroke="none"><circle cx="44.5" cy="20.5" r="1.9"/><circle cx="53.5" cy="17.5" r="1.6"/><circle cx="57.5" cy="25" r="1.8"/><circle cx="47" cy="26" r="1.3"/></g>`;
+    if (fig === 'Q') return moos + `<g fill="${b === '#E9F6D2' ? '#E2577A' : b}" stroke="${l}" stroke-width="1"><circle cx="27.5" cy="19.5" r="2.4"/><circle cx="39" cy="14" r="2.4"/><circle cx="50" cy="10.5" r="2.7"/><circle cx="61" cy="14" r="2.4"/><circle cx="72.5" cy="19.5" r="2.4"/></g>`;
+    if (fig === 'K') return moos + blatt(58, 8, 8, 35) + blatt(42, 8, 8, -125);
+    return moos;
+  }
+  if (m.zubehoer === 'meer') {
+    const blasen = `<g fill="none" stroke="${b}" stroke-width="1.2" opacity=".9"><circle cx="79" cy="30" r="2.6"/><circle cx="83" cy="22" r="1.7"/><circle cx="80.5" cy="15" r="1.1"/></g>`;
+    if (fig === 'P') return blasen + `<path d="M50 21.8c3-4.6 7.6-6.4 11-5.6-1.8 2.8-5.2 5.2-9 6.4" fill="${b}" stroke="${l}" stroke-width="1.1"/>`;
+    if (fig === 'R') return blasen + `<path d="M33.5 70q4-3 8 0t8 0 8 0 8 0" fill="none" stroke="${b}" stroke-width="1.8" stroke-linecap="round"/>`;
+    if (fig === 'Q') return blasen + `<g fill="${a}" stroke="${l}" stroke-width="1"><circle cx="27.5" cy="19.5" r="2.6"/><circle cx="39" cy="14" r="2.6"/><circle cx="50" cy="10.5" r="3"/><circle cx="61" cy="14" r="2.6"/><circle cx="72.5" cy="19.5" r="2.6"/></g>`;
+    if (fig === 'K') return blasen;
+    return blasen;
+  }
+  return '';
+}
+// Koenig im Meer: Dreizack statt Kreuz
+const DREIZACK = '<path d="M47.5 25V13.5h-3.8c-1.6 0-2.7-1.2-2.7-2.7V4.5l2.7 2.7v3.3h3.8V3.2L50 .8l2.5 2.4v7.3h3.8V7.2L59 4.5v6.3c0 1.5-1.1 2.7-2.7 2.7h-3.8V25z"/>';
+
 export function figur(fig, m) {
   const schatten = m.schein ? '' : '<ellipse cx="50" cy="92" rx="35" ry="5.5" fill="url(#sch)"/>';
-  const koerper = FORMEN[fig].map((t) => teil(t, m)).join('');
+  let teile = FORMEN[fig];
+  if (m.gesicht) {
+    // Wesen: Naehte am Turm, Schlitz am Laeufer und das gemalte Pferdeauge weichen dem Gesicht
+    teile = teile.filter((t) => !(t.z === 'a') && !(t.z === 'd' && (fig === 'R' || fig === 'B')));
+    if (m.zubehoer === 'meer' && fig === 'K') teile = teile.map((t, i) => (i === teile.length - 1 ? { z: 'z', s: DREIZACK } : t));
+  }
+  const koerper = teile.map((t) => teil(t, m)).join('') + (m.gesicht ? gesichtSvg(fig, m.gesicht) + zubehoer(fig, m) : '');
   const inhalt = m.schein ? `<g filter="url(#glow)">${koerper}</g>` : koerper;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 100 100"><defs>${defs(m)}</defs>${schatten}${inhalt}</svg>\n`;
 }

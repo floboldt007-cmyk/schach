@@ -11,7 +11,7 @@ import { istLabor, laborFrei } from './labor.js';
 const PFADE = Object.freeze({ cburnett: 'assets/pieces/', blaupause: 'assets/pieces/blaupause/', kuerbis: 'assets/pieces/kuerbis/',
   frost: 'assets/pieces/frost/', gold: 'assets/pieces/gold/', neon: 'assets/pieces/neon/', glas: 'assets/pieces/glas/',
   holz: 'assets/pieces/holz/', pixel: 'assets/pieces/pixel/', geo: 'assets/pieces/geo/', elfenbein: 'assets/pieces/elfenbein/',
-  marmor: 'assets/pieces/marmor/' });
+  marmor: 'assets/pieces/marmor/', moosgeister: 'assets/pieces/moosgeister/', tiefsee: 'assets/pieces/tiefsee/' });
 
 export function figurenSatz(e = ladeEinstellungen()) {
   const satz = e && e.figuren;
