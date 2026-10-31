@@ -410,6 +410,36 @@ async function erfinderTeil(browser) {
   z = await lz(p.s);
   pruefe('Eröffnung mit Schwarz: ohne Fehler drei Sterne, „Ohne einen einzigen Fehler“', z.phase === 'ende' && z.sterne === 3 && z.fehler === 0
     && /Ohne einen einzigen Fehler/.test(await p.s.locator('.ls-meldung').innerText()), z);
+  // "Zeig sie mir" (Flo 31.10.: "bei den Eroeffnungen muss man immer auf Hinweis klicken?"): Pfeil und Grund vor jedem Zug
+  await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'schottisch' }));
+  await warteLz(p.s, "z.id === 'schottisch' && z.phase === 'intro'");
+  pruefe('Zeig sie mir: neue Eröffnung bietet „Zeig sie mir“ (vorgewählt) und „Selbst spielen“',
+    await p.s.locator('.ls-aktionen [data-a="zeigen"].primaer').count() === 1 && /Zeig sie mir/.test(await p.s.locator('.ls-aktionen').innerText())
+    && /Selbst spielen/.test(await p.s.locator('.ls-aktionen').innerText()));
+  await p.s.locator('.ls-aktionen [data-a="zeigen"]').click();
+  await warteLz(p.s, "z.phase === 'flo' && z.modus === 'zeigen'");
+  pruefe('Zeig sie mir: vor dem ersten Zug Pfeil, „Spiele e4“ und der Grund, kein Hinweis-Knopf',
+    await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() >= 1 && /Spiele e4/.test(await p.s.locator('.ls-meldung').innerText())
+    && /Zentrum/.test(await p.s.locator('.ls-meldung').innerText()) && await p.s.locator('.ls-aktionen [data-a="hinweis"]').count() === 0);
+  await ziehe(p.s, 'd2d4');
+  await p.s.waitForSelector('.ls-meldung[data-art="fehler"]', { timeout: 5000 }).catch(() => {});
+  z = await lz(p.s);
+  pruefe('Zeig sie mir: anderer Zug springt zurück, Pfeil bleibt', z.schritt === 0 && /Hier kommt e4/.test(await p.s.locator('.ls-meldung').innerText())
+    && await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() >= 1, z);
+  for (const [i, u] of ['e2e4', 'g1f3', 'd2d4', 'f3d4'].entries()) {
+    await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
+    if (i === 1) pruefe('Zeig sie mir: nach der Antwort des Computers kommt der nächste Pfeil, „Spiele Sf3“',
+      /Spiele Sf3/.test(await p.s.locator('.ls-meldung').innerText()) && await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() >= 1);
+    await ziehe(p.s, u);
+  }
+  await warteLz(p.s, "z.phase === 'ende'");
+  z = await lz(p.s);
+  pruefe('Zeig sie mir: geschafft mit einem Stern, „Züge gelernt!“, weiter mit „Ohne Hilfe spielen“', z.sterne === 1
+    && /Züge gelernt!/.test(await p.s.locator('.ls-meldung').innerText()) && /Ohne Hilfe spielen/.test(await p.s.locator('.ls-aktionen [data-a="los"].primaer').innerText()), z);
+  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+  await warteLz(p.s, "z.phase === 'flo' && z.modus === 'selbst'");
+  pruefe('Ohne Hilfe: kein Pfeil, Hinweis-Knopf wieder da', await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() === 0
+    && await p.s.locator('.ls-aktionen [data-a="hinweis"]').count() === 1);
   pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 
