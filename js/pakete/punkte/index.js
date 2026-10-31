@@ -305,7 +305,7 @@ function anbieterAbrechnung(k) {
     // der grosse Moment im Ergebnis klingt schon "rekord": die Zeile schweigt (kein Echo)
     stumm: !!sicher(() => feierKlingt(p.id), 'Klang'),
     beiListe: e.tafel && k.app && typeof k.app.gehe === 'function' ? () => {
-      B.merkeEinstellung({ tafel: e.tafel, reiter: 'bots' });
+      B.merkeEinstellung({ tafel: e.tafel, reiter: 'bots', offen: true });
       k.app.gehe('bestenliste', { reiter: 'bots', fenster: fensterFuer(e) });
     } : null,
     post: e.post && e.tafel ? { name: e.post.name, text: () => postText(e) } : null,
@@ -343,7 +343,7 @@ function anbieterPanel(k) {
   return A.panelZeile({
     name: A.tafelName(id, botNachId), best: T.eigene(tf, 'allzeit')[0].w, platz: ich ? ich.platz : null,
     beiTipp: k.app && typeof k.app.gehe === 'function' ? () => {
-      B.merkeEinstellung({ tafel: id, reiter: 'bots' });
+      B.merkeEinstellung({ tafel: id, reiter: 'bots', offen: true });
       k.app.gehe('bestenliste', { reiter: 'bots', fenster: 'allzeit' });
     } : null,
   });
