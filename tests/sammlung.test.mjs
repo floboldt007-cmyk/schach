@@ -323,8 +323,7 @@ async function laborTeil(browser) {
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
   pruefe('Labor: Klangsets Grusel und Kristall mit Schild', klaenge === 'klang-grusel,klang-kristall', klaenge);
-  await p.s.locator('.sa-teil[data-teil="klang-grusel"] .sa-wahl').click();
-  await warte(500);
+  await ruesteAus(p.s, 'klang-grusel');
   pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');
     return klang.vorrat().paket === 'grusel' && document.querySelector('.sa-teil[data-teil="klang-grusel"]')?.dataset.zustand === 'an';
