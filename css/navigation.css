@@ -39,6 +39,8 @@
 .screen .haupt-kopf .kopf-chips { flex: 0 1 auto; min-width: 0; margin-left: auto; display: flex; align-items: center; gap: 8px;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 3px 2px; }
 .screen .haupt-kopf .kopf-chips::-webkit-scrollbar { display: none; }
+/* ohne Chips kein sichtbarer Kasten (Handy: er sah aus wie eine kleine "0" vor den Knoepfen); er bleibt als Abstandhalter */
+.screen .haupt-kopf .kopf-chips:empty { padding: 0; visibility: hidden; }
 /* passt nicht einmal der erste Chip, blendet js/ui/seite.js die Chips aus (kein abgeschnittener Stummel) */
 .screen .haupt-kopf.ohne-chips .kopf-chips { display: none; }
 .screen .haupt-kopf .kopf-chips > .passt-nicht { display: none; }
