@@ -13,7 +13,7 @@ const PFADE = Object.freeze({ cburnett: 'assets/pieces/', blaupause: 'assets/pie
   holz: 'assets/pieces/holz/', pixel: 'assets/pieces/pixel/', geo: 'assets/pieces/geo/', elfenbein: 'assets/pieces/elfenbein/',
   marmor: 'assets/pieces/marmor/', moosgeister: 'assets/pieces/moosgeister/', tiefsee: 'assets/pieces/tiefsee/',
   feuer: 'assets/pieces/feuer/', stein: 'assets/pieces/stein/', halloween: 'assets/pieces/halloween/', weihnachten: 'assets/pieces/weihnachten/',
-  ostern: 'assets/pieces/ostern/' });
+  ostern: 'assets/pieces/ostern/', weltraum: 'assets/pieces/weltraum/', roboter: 'assets/pieces/roboter/', naschwerk: 'assets/pieces/naschwerk/' });
 
 export function figurenSatz(e = ladeEinstellungen()) {
   const satz = e && e.figuren;

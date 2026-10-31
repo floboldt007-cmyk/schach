@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 208;
-const STAND = 'a9c768b3d694';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 209;
+const STAND = 'bcd4dd3a0beb';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -443,6 +443,42 @@ const DATEIEN = [
   'assets/pieces/ostern/wP.svg',
   'assets/pieces/ostern/wQ.svg',
   'assets/pieces/ostern/wR.svg',
+  'assets/pieces/weltraum/bB.svg',
+  'assets/pieces/weltraum/bK.svg',
+  'assets/pieces/weltraum/bN.svg',
+  'assets/pieces/weltraum/bP.svg',
+  'assets/pieces/weltraum/bQ.svg',
+  'assets/pieces/weltraum/bR.svg',
+  'assets/pieces/weltraum/wB.svg',
+  'assets/pieces/weltraum/wK.svg',
+  'assets/pieces/weltraum/wN.svg',
+  'assets/pieces/weltraum/wP.svg',
+  'assets/pieces/weltraum/wQ.svg',
+  'assets/pieces/weltraum/wR.svg',
+  'assets/pieces/roboter/bB.svg',
+  'assets/pieces/roboter/bK.svg',
+  'assets/pieces/roboter/bN.svg',
+  'assets/pieces/roboter/bP.svg',
+  'assets/pieces/roboter/bQ.svg',
+  'assets/pieces/roboter/bR.svg',
+  'assets/pieces/roboter/wB.svg',
+  'assets/pieces/roboter/wK.svg',
+  'assets/pieces/roboter/wN.svg',
+  'assets/pieces/roboter/wP.svg',
+  'assets/pieces/roboter/wQ.svg',
+  'assets/pieces/roboter/wR.svg',
+  'assets/pieces/naschwerk/bB.svg',
+  'assets/pieces/naschwerk/bK.svg',
+  'assets/pieces/naschwerk/bN.svg',
+  'assets/pieces/naschwerk/bP.svg',
+  'assets/pieces/naschwerk/bQ.svg',
+  'assets/pieces/naschwerk/bR.svg',
+  'assets/pieces/naschwerk/wB.svg',
+  'assets/pieces/naschwerk/wK.svg',
+  'assets/pieces/naschwerk/wN.svg',
+  'assets/pieces/naschwerk/wP.svg',
+  'assets/pieces/naschwerk/wQ.svg',
+  'assets/pieces/naschwerk/wR.svg',
   'assets/avatare/01-bauer-benno.svg',
   'assets/avatare/02-oma-hilde.svg',
   'assets/avatare/03-kalle-vom-stammtisch.svg',

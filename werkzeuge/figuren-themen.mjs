@@ -199,4 +199,149 @@ const OSTERN = {
   },
 };
 
-export const THEMEN = Object.freeze({ feuer: FEUER, stein: STEIN, halloween: HALLOWEEN, weihnachten: WEIHNACHTEN, ostern: OSTERN });
+// ---------- Weltraum: Astronautenhelm, Raumstation, Rakete, Ringplanet, Sternenkreuz, Pferd im Helm ----------
+const WELTRAUM = {
+  w: { c0: '#FFFFFF', c1: '#F2F5F9', c2: '#D3DBE5', c3: '#8D9AAC', l: '#26303E', d: '#F07A2B', v1: '#FFF4C2', v2: '#EDB13F', v3: '#7A4A0C' },
+  b: { c0: '#5E63A6', c1: '#363A7A', c2: '#1F2252', c3: '#0A0B24', l: '#000000', d: '#7FE8FF', v1: '#E8FDFF', v2: '#3CC8EC', v3: '#08405F', sterne: true },
+  defs: (m) => `<radialGradient id="vi" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${m.v1}"/><stop offset=".55" stop-color="${m.v2}"/><stop offset="1" stop-color="${m.v3}"/></radialGradient>`,
+  kopf(fig, m, h) {
+    const glanz = (d) => `<path d="${d}" fill="none" stroke="#FFFFFF" stroke-opacity=".8" stroke-width="1.5" stroke-linecap="round"/>`;
+    const sterne = (pts) => (m.sterne ? `<g fill="#FFFFFF">${pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>` : '');
+    const rumpfSterne = sterne([[40.5, 66, 0.9], [58, 61, 1.1], [47, 71.5, 0.8], [60.5, 70, 0.9], [52.5, 64.5, 0.7]]);
+    const antenne = (x, y0, y1) => `<path d="M${x} ${y0}V${y1}" stroke="${m.l}" stroke-width="1.6"/><circle cx="${x}" cy="${y1 - 1}" r="2.2" fill="${m.d}" ${L(m)}/>`;
+    if (fig === 'P') return `<rect x="36.5" y="45.5" width="27" height="5" rx="2.5" fill="${m.d}" ${L(m)}/>`
+      + `<path d="M58.5 25l4.6-6.2" stroke="${m.l}" stroke-width="1.6"/><circle cx="63.6" cy="17.8" r="2.2" fill="${m.d}" ${L(m)}/>`
+      + `<circle cx="50" cy="34" r="13.5" fill="${K}" ${L(m)}/><rect x="39.5" y="28" width="21" height="13" rx="6.5" fill="url(#vi)" ${L(m)}/>`
+      + glanz('M42.8 31.6q2-2 5-2.2') + rumpfSterne;
+    if (fig === 'R') return antenne(32.5, 17, 8.5) + `<g fill="${Z}" ${L(m)}>${h.form('R', 4)}</g>`
+      + `<g fill="url(#vi)" stroke="${m.l}" stroke-width="1.1"><circle cx="38" cy="32.5" r="3.2"/><circle cx="50" cy="32.5" r="3.2"/><circle cx="62" cy="32.5" r="3.2"/></g>`
+      + `<rect x="33.5" y="55" width="33" height="4.4" rx="1.2" fill="${m.d}" ${L(m)}/>` + rumpfSterne;
+    if (fig === 'B') return `<path d="M50 5.5c6.5 5.5 9.5 13.5 9.5 22V43h-19V27.5c0-8.5 3-16.5 9.5-22z" fill="${Z}" ${L(m)}/>`
+      + `<path d="M50 5.5c4 3.4 6.6 7.8 8 12.6H42c1.4-4.8 4-9.2 8-12.6z" fill="${m.d}" ${L(m)}/>`
+      + `<circle cx="50" cy="28" r="4.8" fill="url(#vi)" ${L(m)}/>` + glanz('M47.6 26.4q1-1.4 2.6-1.6')
+      + `<path d="M40.5 31.5l-6.5 7.5v6l6.5-2zM59.5 31.5l6.5 7.5v6l-6.5-2z" fill="${m.d}" ${L(m)}/>` + rumpfSterne;
+    if (fig === 'Q') {
+      const vorn = `<path transform="rotate(-16 50 22)" d="M34.5 22a15.5 4.2 0 0 0 31 0" fill="none" stroke="${m.d}" stroke-width="2.4" stroke-linecap="round"/>`;
+      const hinten = `<path transform="rotate(-16 50 22)" d="M34.5 22a15.5 4.2 0 0 1 31 0" fill="none" stroke="${m.d}" stroke-width="2.4" stroke-linecap="round"/>`;
+      const st = (x, y) => `<path d="${stern(x, y, 3.8)}" fill="${m.v2}" stroke="${m.l}" stroke-width="1"/>`;
+      return `<path d="M35 43.5 29 25l9 9 3-14.5 9 11.5 9-11.5 3 14.5 9-9-6 18.5z" fill="${Z}" ${L(m)}/>`
+        + st(29, 23.5) + st(41, 18.5) + st(59, 18.5) + st(71, 23.5)
+        + hinten + `<circle cx="50" cy="22" r="8.4" fill="${K}" ${L(m)}/><path d="M43.5 19.5q6.5 2 13 0" fill="none" stroke="${m.d}" stroke-width="1.1" opacity=".7"/>` + vorn
+        + `<rect x="33.5" y="42" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + rumpfSterne;
+    }
+    if (fig === 'K') return `<path d="M50 1l2.8 9 8.7 2.8-8.7 2.8L50 25l-2.8-9.4-8.7-2.8 8.7-2.8z" fill="${m.v2}" ${L(m)}/>`
+      + `<g fill="${K}" ${L(m)}>${h.form('K', 4)}</g>`
+      + `<path d="M38.5 36.5c0-5.4 5-9.5 11.5-9.5s11.5 4.1 11.5 9.5c0 2.6-2.2 4-5 4H43.5c-2.8 0-5-1.4-5-4z" fill="url(#vi)" ${L(m)}/>`
+      + glanz('M42.4 33.4q2.6-3 6.6-3.4') + rumpfSterne;
+    if (fig === 'N') return `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g><ellipse cx="42.5" cy="29.5" rx="2.4" ry="2.9" fill="${m.l}"/>`
+      + `<path d="M24.5 45.5c1.6.4 3 .1 4.2-.6" fill="none" stroke="${m.l}" stroke-width="1.6" stroke-linecap="round"/>`
+      + `<circle cx="40.5" cy="32" r="21.5" fill="${m.v1}" fill-opacity=".18" stroke="${m.v2}" stroke-width="1.8"/>` + glanz('M25.5 25a16.5 16.5 0 0 1 9.5-9.6')
+      + `<path d="M26.5 50.5c8 4.2 20 5.4 30 2.8" fill="none" stroke="${m.l}" stroke-width="5.4" stroke-linecap="round"/><path d="M26.5 50.5c8 4.2 20 5.4 30 2.8" fill="none" stroke="${m.d}" stroke-width="3" stroke-linecap="round"/>`
+      + sterne([[55, 63, 1], [63, 68.5, 0.9], [48, 69, 0.8]]);
+    return '';
+  },
+};
+
+// ---------- Roboter: Leuchtaugen, Antennen, Bolzen, Zahnradkrone; Weiss ist Chrom mit blauem Licht, Schwarz Stahl mit rotem ----------
+const ROBOTER = {
+  w: { c0: '#FFFFFF', c1: '#EEF2F5', c2: '#C7D0D8', c3: '#7D8994', l: '#26303A', d: '#4E5A66', led: '#38E1FF', led2: '#F0FEFF', dunkel: '#1B232B' },
+  b: { c0: '#6B7078', c1: '#41454C', c2: '#25282D', c3: '#0D0E10', l: '#000000', d: '#8D939C', led: '#FF4A3D', led2: '#FFE8E4', dunkel: '#050607' },
+  defs: (m) => `<radialGradient id="led" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${m.led2}"/><stop offset=".55" stop-color="${m.led}"/><stop offset="1" stop-color="${m.led}"/></radialGradient>`,
+  kopf(fig, m, h) {
+    const bolzen = (pts) => `<g fill="${m.c2}" stroke="${m.l}" stroke-width=".8">${pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('')}</g>`;
+    const augen = (pts, r) => pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#led)" stroke="${m.l}" stroke-width="1"/>`).join('');
+    const antenne = (x, y0, y1, r) => `<path d="M${x} ${y0}V${y1}" stroke="${m.l}" stroke-width="1.8"/><circle cx="${x}" cy="${y1 - r * 0.6}" r="${r}" fill="url(#led)" ${L(m)}/>`;
+    const gitter = (x, y, w) => `<rect x="${x}" y="${y}" width="${w}" height="3.6" rx="1.2" fill="${m.dunkel}"/>`
+      + `<path d="M${x + w * 0.25} ${y}v3.6M${x + w * 0.5} ${y}v3.6M${x + w * 0.75} ${y}v3.6" stroke="${m.d}" stroke-width=".9"/>`;
+    if (fig === 'P') return antenne(50, 24, 14.5, 2.6)
+      + `<g fill="${Z}" ${L(m)}><rect x="33.5" y="30" width="4.5" height="9" rx="1.6"/><rect x="62" y="30" width="4.5" height="9" rx="1.6"/><rect x="37" y="23.5" width="26" height="25.5" rx="5"/></g>`
+      + `<rect x="40" y="27.5" width="20" height="9.5" rx="3" fill="${m.dunkel}" ${L(m)}/>` + augen([[45, 32.2], [55, 32.2]], 2.6) + gitter(43.5, 41, 13);
+    if (fig === 'R') return `<g fill="${Z}" ${L(m)}><rect x="28" y="13" width="10" height="11" rx="1.4"/><rect x="45" y="13" width="10" height="11" rx="1.4"/><rect x="62" y="13" width="10" height="11" rx="1.4"/><path d="M28 40V22h44v18z"/></g>`
+      + `<rect x="32" y="26" width="36" height="9" rx="4.5" fill="${m.dunkel}" ${L(m)}/><rect x="36" y="28.7" width="28" height="3.6" rx="1.8" fill="url(#led)"/>`
+      + bolzen([[31.5, 37.6], [68.5, 37.6], [33, 18.5], [67, 18.5]]) + `<rect x="29" y="38" width="42" height="7.5" rx="3.2" fill="${Z}" ${L(m)}/>`
+      + `<rect x="40" y="53" width="20" height="13" rx="2" fill="none" stroke="${m.d}" stroke-width="1.3"/><circle cx="44.5" cy="59.5" r="1.8" fill="url(#led)"/>` + gitter(48.5, 57.7, 8.5);
+    if (fig === 'B') return antenne(50, 12.5, 5.2, 2.4) + `<g fill="${Z}" ${L(m)}>${h.form('B', 5)}</g>`
+      + `<path d="M55.5 21.5 45.5 32.5" stroke="${m.dunkel}" stroke-width="5" stroke-linecap="round"/><path d="M55.5 21.5 45.5 32.5" stroke="${m.led}" stroke-width="2.4" stroke-linecap="round"/>`
+      + `<path d="M39 36.5h22" stroke="${m.d}" stroke-width="1.2"/>` + bolzen([[42, 39.8], [58, 39.8]]);
+    if (fig === 'Q') {
+      const p = [];
+      const n = 10;
+      for (let i = 0; i < n; i++) {
+        const w0 = (i / n) * 2 * Math.PI - Math.PI / 2;
+        const s = (2 * Math.PI) / n;
+        for (const [r, f] of [[13.4, -0.3], [17, -0.17], [17, 0.17], [13.4, 0.3]]) p.push(`${(50 + r * Math.cos(w0 + f * s)).toFixed(2)} ${(24.5 + r * Math.sin(w0 + f * s)).toFixed(2)}`);
+      }
+      return `<path d="M${p.join('L')}Z" fill="${Z}" ${L(m)}/><circle cx="50" cy="24.5" r="6.8" fill="${m.dunkel}" ${L(m)}/><circle cx="50" cy="24.5" r="3.6" fill="url(#led)"/>`
+        + bolzen([[41.4, 19.6], [58.6, 19.6], [41.4, 29.4], [58.6, 29.4]])
+        + `<rect x="40" y="52" width="20" height="8.5" rx="3" fill="${m.dunkel}" ${L(m)}/>` + augen([[45, 56.2], [55, 56.2]], 2.3);
+    }
+    if (fig === 'K') return `<path d="M47 22V13h-6.5V7.5H47V2h6v5.5h6.5V13H53v9z" fill="${Z}" ${L(m)}/><circle cx="50" cy="10.2" r="2" fill="url(#led)"/>`
+      + `<g fill="${Z}" ${L(m)}><rect x="31.5" y="27" width="4.5" height="9" rx="1.6"/><rect x="64" y="27" width="4.5" height="9" rx="1.6"/><rect x="35" y="21" width="30" height="22" rx="5"/></g>`
+      + `<rect x="38.5" y="25" width="23" height="9" rx="3" fill="${m.dunkel}" ${L(m)}/>` + augen([[44.5, 29.5], [55.5, 29.5]], 2.6) + gitter(43, 37, 14)
+      + bolzen([[38, 40.4], [62, 40.4]]);
+    if (fig === 'N') {
+      const platten = [[63, 21, -10], [68.5, 29.5, 20], [72, 39.5, 40], [73, 50.5, 60]]
+        .map(([x, y, d]) => `<rect transform="rotate(${d} ${x} ${y})" x="${x - 3.5}" y="${y - 6}" width="7" height="10" rx="1.6" fill="${Z}" stroke="${m.l}" stroke-width="1.3"/>`).join('');
+      return platten + antenne(52.4, 13, 6.5, 1.9) + `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>`
+        + `<circle cx="42.5" cy="29.5" r="3.6" fill="url(#led)" stroke="${m.l}" stroke-width="1"/>`
+        + `<path d="M53 21c-3.2 6-3.6 13-1.2 20.5M34 38.5l9.5 6" fill="none" stroke="${m.d}" stroke-width="1.2"/><path d="M24.5 45.5h4.2" stroke="${m.dunkel}" stroke-width="2" stroke-linecap="round"/>`
+        + bolzen([[48.6, 44], [57.5, 52], [37.4, 34]]);
+    }
+    return '';
+  },
+};
+
+// ---------- Naschwerk: Cupcake mit Kirsche, Torte mit Kerzen, Zuckerstangen-Mitra, Lolli-Krone, Zuckerguss-Kuppel, Zuckerwatte-Maehne ----------
+const NASCHWERK = {
+  w: { c0: '#FFFFFF', c1: '#FFEFF5', c2: '#F9C9DB', c3: '#DB8EAE', l: '#6E2A47', d: '#B4507A', creme: '#FFFDF7', kirsche: '#E3263F', stiel: '#5A8A2A',
+    strGrund: '#FFFDF7', streifen: '#E3263F', watte: '#FFB3D1', bunt: ['#FF6B8B', '#45BDF0', '#FFC93F', '#6BCB4B', '#A97CF0'] },
+  b: { c0: '#B3679A', c1: '#86386E', c2: '#5C1F4C', c3: '#2E0A25', l: '#14030F', d: '#F7B8D6', creme: '#F9D7E8', kirsche: '#FF4D6D', stiel: '#7FB24A',
+    strGrund: '#4A1440', streifen: '#F7B8D6', watte: '#7A3592', bunt: ['#E0457B', '#2E8FD6', '#E8A92A', '#3FA34D', '#8E4FD6'] },
+  defs: (m) => `<pattern id="str" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="5" height="5" fill="${m.strGrund}"/><rect width="2.3" height="5" fill="${m.streifen}"/></pattern>`
+    + '<linearGradient id="sh" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset=".3" stop-color="#FFF" stop-opacity=".38"/><stop offset=".62" stop-color="#FFF" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></linearGradient>',
+  kopf(fig, m, h) {
+    const streusel = (pts) => pts.map(([x, y, d], i) => `<rect transform="rotate(${d} ${x} ${y})" x="${x - 1.7}" y="${y - 0.65}" width="3.4" height="1.3" rx=".65" fill="${m.bunt[i % 5]}"/>`).join('');
+    const rumpf = streusel([[41, 64, 30], [57, 60, -40], [48, 70, 70], [60, 69, 15], [52.5, 62, -10]]);
+    const gestreift = (inhalt) => `<g fill="url(#str)" ${L(m)}>${inhalt}</g><g fill="url(#sh)">${inhalt}</g>`;
+    if (fig === 'P') return `<g fill="${K}" ${L(m)}><path d="M35 49.5c-2.2-5.2 1-9.5 6-10h18c5 .5 8.2 4.8 6 10z"/><path d="M38.5 40.5c-1.6-4.6 1.4-8.2 5.6-8.4h11.8c4.2.2 7.2 3.8 5.6 8.4z"/><path d="M42 32.5c-1-4.6 2.4-7.8 8-9.4 5.6 1.6 9 4.8 8 9.4z"/></g>`
+      + streusel([[40.5, 45, 25], [58.5, 44.5, -30], [49, 46.5, 80], [45, 36, -15], [55, 36.5, 40]])
+      + `<path d="M50.6 18.5c.4-3.4 2-5.6 4.8-6.8" fill="none" stroke="${m.stiel}" stroke-width="1.6" stroke-linecap="round"/>`
+      + `<circle cx="50" cy="20.5" r="4.6" fill="${m.kirsche}" ${L(m)}/><circle cx="48.4" cy="18.9" r="1.3" fill="#FFFFFF" opacity=".8"/>` + rumpf;
+    if (fig === 'R') {
+      const kerze = (x) => `<path d="${flamme(x, 12.5, 7.5, 4.6)}" fill="#FFC23A" stroke="${m.l}" stroke-width=".9"/>`
+        + `<rect x="${x - 2.5}" y="12" width="5" height="11" rx="1" fill="url(#str)" stroke="${m.l}" stroke-width="1.2"/>`;
+      return kerze(36) + kerze(50) + kerze(64) + `<rect x="28" y="22" width="44" height="18.5" rx="2.5" fill="${Z}" ${L(m)}/>`
+        + `<path d="M28.5 33.5h43" stroke="${m.kirsche}" stroke-width="2.2"/>`
+        + `<path d="M28 26V24.5c0-1.4 1.1-2.5 2.5-2.5h39c1.4 0 2.5 1.1 2.5 2.5V26c-1.8 0-1.8 3.4-3.6 3.4s-1.8-2.6-3.6-2.6-1.8 4.6-3.8 4.6-1.8-3.6-3.6-3.6-1.8 3-3.6 3-1.8-3.2-3.6-3.2-1.8 4.4-3.8 4.4-1.8-3.4-3.6-3.4-1.8 2.6-3.6 2.6-1.8-3.6-3.6-3.6-1.4 1.6-2.6 1.6-1.6-1.4-1.6-2.4z" fill="${m.creme}" ${L(m)}/>`
+        + `<rect x="29" y="38" width="42" height="7.5" rx="3.2" fill="${Z}" ${L(m)}/>` + rumpf;
+    }
+    if (fig === 'B') return gestreift(h.form('B', 5))
+      + `<path d="M44.5 12.6c0-4.4 2.4-7.6 5.5-7.6s5.5 3.2 5.5 7.6c0 1.2-1 1.8-2.4 1.8h-6.2c-1.4 0-2.4-.6-2.4-1.8z" fill="${m.kirsche}" ${L(m)}/>`
+      + `<g fill="#FFFFFF" opacity=".75"><circle cx="48" cy="9" r=".8"/><circle cx="51.5" cy="11" r=".7"/><circle cx="52.4" cy="7.6" r=".6"/></g>` + rumpf;
+    if (fig === 'Q') {
+      const lollis = [[27.5, 19.5], [39, 14], [50, 10.5], [61, 14], [72.5, 19.5]];
+      const stiele = lollis.map(([x, y]) => `M${x} ${y}L${(50 + (x - 50) * 0.55).toFixed(1)} 38`).join('');
+      const kopfe = lollis.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="5.4" fill="${m.bunt[i]}" ${L(m)}/>`
+        + `<path d="M${x - 3.4} ${y}a3.4 3.4 0 1 0 3.4-3.4 2.2 2.2 0 1 0 2.2 2.2 1 1 0 1 0-1 1" fill="none" stroke="#FFFFFF" stroke-opacity=".85" stroke-width="1.1"/>`).join('');
+      return `<path d="${stiele}" stroke="${m.l}" stroke-width="3.4" stroke-linecap="round"/><path d="${stiele}" stroke="${m.creme}" stroke-width="1.6" stroke-linecap="round"/>` + kopfe
+        + `<path d="M34 43.5 31 34c2.6 1.4 5.4 1.6 8 0 2.8 1.8 5.6 1.8 8.4 0h5.2c2.8 1.8 5.6 1.8 8.4 0 2.6 1.6 5.4 1.4 8 0L66 43.5z" fill="${K}" ${L(m)}/>`
+        + streusel([[38, 39, 20], [46, 40.5, -35], [54, 39.5, 60], [62, 40, -10]])
+        + `<rect x="33.5" y="42" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + rumpf;
+    }
+    if (fig === 'K') return gestreift(h.form('K', 5)) + `<g fill="${K}" ${L(m)}>${h.form('K', 4)}</g>`
+      + `<path d="M36.6 38.5c1.8 0 1.8 3 3.6 3s1.8-2.4 3.6-2.4 1.8 3.6 3.8 3.6 1.8-2.8 3.4-2.8 2 3.4 3.8 3.4 1.8-2.6 3.6-2.6 1.8 2.2 3.4 2.2" fill="none" stroke="${m.creme}" stroke-width="2.2" stroke-linecap="round"/>`
+      + streusel([[42, 31, 30], [50, 28, -20], [57.5, 32, 70], [46, 36, -50], [54.5, 36.5, 15]]) + rumpf;
+    if (fig === 'N') {
+      const watte = [[61, 17, 4.6], [66.5, 23, 5], [70, 30.5, 5.2], [72.5, 38.5, 5.2], [73.5, 47, 5], [73.5, 55, 4.6]]
+        .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('');
+      return `<g fill="${m.watte}" stroke="${m.l}" stroke-width="1.2">${watte}</g><g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>`
+        + `<ellipse cx="42.5" cy="29.5" rx="2.4" ry="2.9" fill="${m.l}"/><circle cx="41.7" cy="28.4" r=".8" fill="#FFFFFF"/>`
+        + `<path d="M24.5 45.5c1.6.4 3 .1 4.2-.6" fill="none" stroke="${m.l}" stroke-width="1.6" stroke-linecap="round"/>`
+        + streusel([[52, 58, 30], [60, 63, -40], [47, 66, 70], [63, 70, 15], [55, 68, -10]]);
+    }
+    return '';
+  },
+};
+
+export const THEMEN = Object.freeze({ feuer: FEUER, stein: STEIN, halloween: HALLOWEEN, weihnachten: WEIHNACHTEN, ostern: OSTERN,
+  weltraum: WELTRAUM, roboter: ROBOTER, naschwerk: NASCHWERK });
