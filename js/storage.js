@@ -146,7 +146,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
   funkenlinie: false,    // Funkenlinie am Brett waehrend der Partie
   lebensleiste: true,    // Boss-Partien: Lebensleiste statt Bewertungsbalken
   // Premium-Umbau (PLAN 4): Klang
-  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade'
+  klangpaket: '',        // '' (Standard der Ansicht, modern: Arcade, D6) | 'holz' | 'arcade' | Labor: 'grusel' | 'kristall'
   lautstaerke: 0.8,      // 0..1 in Schritten von 0,05 (Master = Wert hoch 2)
   musik: false,          // ruhige Menue-Musik (bewusst standardmaessig aus)
   musikLautstaerke: 0.35,// getrennt von Zugklaengen
@@ -186,7 +186,7 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 export const EINSTELLUNG_WERTE = Object.freeze({
   // dahinter die Bretter des Labors (js/labor.js, nur das Erfinder-Konto; app.js faellt fuer andere auf 'nacht')
   brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron']),
-  klangpaket: Object.freeze(['', 'holz', 'arcade']),
+  klangpaket: Object.freeze(['', 'holz', 'arcade', 'grusel', 'kristall']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
   zugBestaetigen: Object.freeze(['aus', 'ohneUhr', 'immer']),

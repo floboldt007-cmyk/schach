@@ -79,7 +79,7 @@ import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
-import { brettWahl } from './labor.js';
+import { brettWahl, klangWahl } from './labor.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
@@ -119,8 +119,9 @@ function wendeEinstellungenAn(e) {
   setzeSprache(e.spracheGewaehlt ? e.sprache : spracheOhneWahl());
   klang.aus = !e.klang;
   // Premium-Umbau: Klang-Einstellungen (Paket, Lautstaerke, Stufe, Gruppen), sobald sounds.js sie kennt (U3)
+  // Labor-Klangsets nur fuer den Erfinder (js/labor.js), andere hoeren still den Standard der Ansicht
   if (typeof klang.einstellen === 'function') {
-    try { klang.einstellen(e); } catch (f) { console.error(f); }
+    try { klang.einstellen({ ...e, klangpaket: klangWahl(e.klangpaket) }); } catch (f) { console.error(f); }
   }
   // Theme (Ansicht, Hell/Dunkel) und Animationstempo; ein Fehler darf die App nie anhalten
   setzeBewegung(e.bewegung);
@@ -142,7 +143,7 @@ function themaNachPaketen() {
   wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
   // Codex-Befund (PR #4): ohne gewaehltes Klangpaket bestimmt das Theme den Standard, der gilt erst jetzt
   if (typeof klang.einstellen === 'function') {
-    try { klang.einstellen(e); } catch (f) { console.error(f); }
+    try { klang.einstellen({ ...e, klangpaket: klangWahl(e.klangpaket) }); } catch (f) { console.error(f); }
   }
 }
 

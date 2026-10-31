@@ -152,7 +152,7 @@ function leseMp3(b) {
 // Node
 // =====================================================================
 async function testeNode() {
-  const { KATALOG, PAKETE_KLANG, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang } = await import('../js/sounds.js');
+  const { KATALOG, PAKETE_KLANG, PAKETE_LABOR, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang } = await import('../js/sounds.js');
   gruppe = 'Katalog';
   const namen = Object.keys(KATALOG);
   pruefe('33 Namen wie in PLAN 3.2, eingefroren', namen.length === 33 && JSON.stringify([...namen].sort()) === JSON.stringify(Object.keys(SOLL).sort())
@@ -217,6 +217,26 @@ async function testeNode() {
   }
   pruefe(`beide Pakete zusammen ${Math.round(summe / 1000)} KB (hoechstens 1 MB)`, summe <= 1000000, String(summe));
 
+  // Labor-Klangsets (nur Erfinder, js/labor.js; werkzeuge/labor-klaenge.mjs aus Holz): dieselben Namen, gueltige MP3, klein
+  gruppe = 'Labor-Klaenge';
+  pruefe('PAKETE_LABOR: Grusel und Kristall, Ordner unter assets/klang/', JSON.stringify(Object.keys(PAKETE_LABOR)) === '["grusel","kristall"]'
+    && PAKETE_LABOR.grusel.pfad === 'assets/klang/grusel/' && PAKETE_LABOR.kristall.pfad === 'assets/klang/kristall/');
+  for (const p of Object.keys(PAKETE_LABOR)) {
+    const ordner = path.join(WURZEL, PAKETE_LABOR[p].pfad);
+    const da = existsSync(ordner) ? readdirSync(ordner) : [];
+    const fehlt = dateien.filter((d) => !da.includes(d + '.mp3'));
+    pruefe(`${p}: jeder Katalogname da, keine fremden Dateien`, fehlt.length === 0 && da.length === dateien.length, JSON.stringify({ fehlt, da: da.length }));
+    let groesse = 0;
+    const format = [];
+    for (const d of dateien.filter((n) => da.includes(n + '.mp3'))) {
+      const b = readFileSync(path.join(ordner, d + '.mp3'));
+      groesse += b.length;
+      const m = leseMp3(b);
+      if (!m.ende || m.fehler.length) format.push(`${d} ${m.fehler.join(' ')}`);
+    }
+    pruefe(`${p}: MP3 lesbar, Groesse ${Math.round(groesse / 1000)} KB (hoechstens 800 KB)`, format.length === 0 && groesse <= 800000, format.join(' | '));
+  }
+
   gruppe = 'Lizenz';
   const liz = existsSync(path.join(WURZEL, 'assets/klang/LIZENZEN.md')) ? readFileSync(path.join(WURZEL, 'assets/klang/LIZENZEN.md'), 'utf8') : '';
   pruefe('assets/klang/LIZENZEN.md: eigene Werke, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena, nicht CC0',
@@ -227,7 +247,7 @@ async function testeNode() {
     && kunst.includes('assets/klang/arcade/') && /GPL-3\.0/.test(kunst));
   pruefe('pegel.json (Werkzeug-Ausgabe) liegt nicht im Repo', !existsSync(path.join(WURZEL, 'assets/klang/pegel.json')));
   const quelltext = readFileSync(path.join(WURZEL, 'js/sounds.js'), 'utf8');
-  pruefe('sounds.js: keine externen Adressen, Dateien relativ zum Modul', !/https?:\/\//.test(quelltext) && /new URL\('\.\.\/' \+ PAKETE_KLANG\[p\]\.pfad/.test(quelltext));
+  pruefe('sounds.js: keine externen Adressen, Dateien relativ zum Modul', !/https?:\/\//.test(quelltext) && /new URL\('\.\.\/' \+ paketVon\(p\)\.pfad/.test(quelltext));
 
   gruppe = 'Klasse -> Klang';
   const fall = (k, info) => JSON.stringify(klassenKlang(k, info));

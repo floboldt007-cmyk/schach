@@ -242,6 +242,12 @@ export const PAKETE_KLANG = Object.freeze({
   holz: Object.freeze({ name: 'Holz', pfad: 'assets/klang/holz/' }),
   arcade: Object.freeze({ name: 'Arcade', pfad: 'assets/klang/arcade/' }),
 });
+// Labor-Klangsets (js/labor.js, nur der Erfinder): app.js reicht sie nur fuer ihn durch (klangWahl), sonst wie Holz/Arcade
+export const PAKETE_LABOR = Object.freeze({
+  grusel: Object.freeze({ name: 'Grusel', pfad: 'assets/klang/grusel/' }),
+  kristall: Object.freeze({ name: 'Kristall', pfad: 'assets/klang/kristall/' }),
+});
+const paketVon = (p) => (Object.hasOwn(PAKETE_KLANG, p) ? PAKETE_KLANG[p] : Object.hasOwn(PAKETE_LABOR, p) ? PAKETE_LABOR[p] : null);
 export const KLANGGRUPPEN = Object.freeze(['brett', 'bewertung', 'feier', 'uhr', 'boss', 'finisher', 'bedienung']);
 export const KLANGSTUFEN = Object.freeze(['alle', 'wichtig', 'aus']);
 const STIMMEN = 4;
@@ -297,7 +303,7 @@ function umgebung() {
 }
 
 function url(p, datei) {
-  return new URL('../' + PAKETE_KLANG[p].pfad + datei + '.mp3', import.meta.url).href;
+  return new URL('../' + paketVon(p).pfad + datei + '.mp3', import.meta.url).href;
 }
 
 let protokollNr = 0;
@@ -469,7 +475,7 @@ function vorladen() {
 
 // eine Datei bei Bedarf holen (Probe, klangProbe); das aktive Paket landet im normalen Vorrat
 function ladeEine(p, datei) {
-  if (!PAKETE_KLANG[p] || !umgebung()) return Promise.resolve(null);
+  if (!paketVon(p) || !umgebung()) return Promise.resolve(null);
   if (p === paket && puffer.has(datei)) return Promise.resolve(puffer.get(datei));
   const schl = p + '/' + datei;
   if (p !== paket && fremd.has(schl)) return Promise.resolve(fremd.get(schl));
@@ -489,7 +495,7 @@ function ladeEine(p, datei) {
 }
 
 function setzePaket(id) {
-  gewaehlt = PAKETE_KLANG[id] ? id : '';
+  gewaehlt = paketVon(id) ? id : '';
   const neu = gewaehlt || (PAKETE_KLANG[standardKlangpaket(thema)] ? standardKlangpaket(thema) : 'arcade');
   if (neu === paket) return paket;
   generation++;
@@ -557,7 +563,7 @@ function quelle(name, args, opt, { weiter = true, tiefe = 0 } = {}) {
   if (r) return { art: 'register', fn: r.fn, args };
   const info = KATALOG[name];
   if (info) {
-    const p = opt.paket && PAKETE_KLANG[opt.paket] ? opt.paket : paket;
+    const p = opt.paket && paketVon(opt.paket) ? opt.paket : paket;
     if (p) {
       const datei = variante(name, info, opt, weiter);
       const b = p === paket ? puffer.get(datei) : fremd.get(p + '/' + datei);
@@ -744,7 +750,7 @@ export const klang = {
   },
   vorladen() { return vorladen(); },
   async probe(id) {
-    const p = PAKETE_KLANG[id] ? id : (paket || 'arcade');
+    const p = paketVon(id) ? id : (paket || 'arcade');
     this.aktivieren();
     const szene = [['zug', 0], ['schlagen', 0.34], ['bester', 0.72], ['stern', 1.2]];
     if (p !== paket || puffer.size === 0) await Promise.all(szene.map(([n]) => ladeEine(p, KATALOG[n].varianten[0])));
@@ -766,7 +772,7 @@ export async function klangProbe(name, ...rest) {
   const { args, opt } = trenne(rest);
   const info = KATALOG[name];
   if (info && !REGISTER.has(name)) {
-    const p = opt.paket && PAKETE_KLANG[opt.paket] ? opt.paket : paket;
+    const p = opt.paket && paketVon(opt.paket) ? opt.paket : paket;
     if (p) await ladeEine(p, variante(name, info, opt, false));
   }
   const q = quelle(name, args, opt, { weiter: false });

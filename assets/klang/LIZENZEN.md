@@ -12,6 +12,10 @@ und Bilder steht in `assets/LIZENZ-KUNST.md`.
 | `holz/*.mp3` (40 Dateien) | eigene Synthese (Marimba, Handglocke, Klangschale, Holzbrett) | eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena |
 | `arcade/*.mp3` (40 Dateien) | eigene Synthese (Sinus-Punch, Supersaw, Kristalltöne) | eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena |
 
+**Labor-Klangsets „Grusel“ und „Kristall“** (`grusel/`, `kristall/`, je 40 Dateien, nur im Erfinder-Konto): mit
+`werkzeuge/labor-klaenge.mjs` aus den Holz-Klängen abgeleitet (Tonhöhe, Nachhall, Chor, Klangfarbe per ffmpeg).
+Darum ebenfalls eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
+
 Es steckt keine fremde Aufnahme, kein Sample und kein Klang aus einer anderen App darin (weder chess.com
 noch lichess noch eine Klangbibliothek). Rechte Dritter an den Klängen gibt es deshalb nicht.
 
