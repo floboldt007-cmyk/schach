@@ -383,7 +383,7 @@ async function laborTeil(browser) {
   await p.s.locator('.sa-steuer .seg[data-wert="figuren"]').click();
   await warte(300);
   const saetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="figuren"] .sa-teil')].map((x) => x.dataset.teil).join());
-  pruefe('Labor: Figurensätze Klassisch, Blaupause, Kürbis, Frost, Gold, Neon, Glas, Holz, Pixel, Geo', saetze === 'figuren-cburnett,figuren-blaupause,figuren-kuerbis,figuren-frost,figuren-gold,figuren-neon,figuren-glas,figuren-holz,figuren-pixel,figuren-geo', saetze);
+  pruefe('Labor: Figurensätze Klassisch, Blaupause, Elfenbein, Holz, Marmor, Gold, Glas, Neon, Frost, Kürbis, Pixel, Geo', saetze === 'figuren-cburnett,figuren-blaupause,figuren-elfenbein,figuren-holz,figuren-marmor,figuren-gold,figuren-glas,figuren-neon,figuren-frost,figuren-kuerbis,figuren-pixel,figuren-geo', saetze);
   await ruesteAus(p.s, 'figuren-kuerbis');
   await p.s.locator('.sa-steuer .seg[data-wert="klaenge"]').click();
   await warte(300);

@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 205;
-const STAND = '6faabd54a742';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 206;
+const STAND = '4e079cb5734a';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -335,6 +335,30 @@ const DATEIEN = [
   'assets/pieces/geo/wP.svg',
   'assets/pieces/geo/wQ.svg',
   'assets/pieces/geo/wR.svg',
+  'assets/pieces/elfenbein/bB.svg',
+  'assets/pieces/elfenbein/bK.svg',
+  'assets/pieces/elfenbein/bN.svg',
+  'assets/pieces/elfenbein/bP.svg',
+  'assets/pieces/elfenbein/bQ.svg',
+  'assets/pieces/elfenbein/bR.svg',
+  'assets/pieces/elfenbein/wB.svg',
+  'assets/pieces/elfenbein/wK.svg',
+  'assets/pieces/elfenbein/wN.svg',
+  'assets/pieces/elfenbein/wP.svg',
+  'assets/pieces/elfenbein/wQ.svg',
+  'assets/pieces/elfenbein/wR.svg',
+  'assets/pieces/marmor/bB.svg',
+  'assets/pieces/marmor/bK.svg',
+  'assets/pieces/marmor/bN.svg',
+  'assets/pieces/marmor/bP.svg',
+  'assets/pieces/marmor/bQ.svg',
+  'assets/pieces/marmor/bR.svg',
+  'assets/pieces/marmor/wB.svg',
+  'assets/pieces/marmor/wK.svg',
+  'assets/pieces/marmor/wN.svg',
+  'assets/pieces/marmor/wP.svg',
+  'assets/pieces/marmor/wQ.svg',
+  'assets/pieces/marmor/wR.svg',
   'assets/avatare/01-bauer-benno.svg',
   'assets/avatare/02-oma-hilde.svg',
   'assets/avatare/03-kalle-vom-stammtisch.svg',

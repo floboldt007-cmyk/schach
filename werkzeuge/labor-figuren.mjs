@@ -10,11 +10,9 @@ import path from 'node:path';
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUELLE = path.join(WURZEL, 'assets/pieces');
 // je Satz: helle Figur (Flaeche, Linie), dunkle Figur (Flaeche, Linie und Zeichnung)
-export const SAETZE = Object.freeze({
-  kuerbis: { hell: '#F28C28', hellLinie: '#2B1638', dunkel: '#2B1638', dunkelLinie: '#F6A54A' },
-  frost: { hell: '#F3FAFF', hellLinie: '#2D5B86', dunkel: '#24496E', dunkelLinie: '#CFE8FF' },
-  gold: { hell: '#F2CF6B', hellLinie: '#5C3D0A', dunkel: '#1C1A20', dunkelLinie: '#E8C15A' },
-});
+// Seit dem 31.10.2026 abends ("Bessere Designs") zeichnet werkzeuge/figuren-3d.mjs Kuerbis, Frost und Gold mit eigenen,
+// gedrechselten Formen; hier stehen keine Saetze mehr, damit dieses Werkzeug sie nicht mit der alten Umfaerbung ueberschreibt.
+export const SAETZE = Object.freeze({});
 
 export function faerbe(svg, weiss, s) {
   const innen = svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');

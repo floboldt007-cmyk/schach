@@ -1,52 +1,17 @@
 // Figurensaetze mit eigenem Stil fuers Labor (Flo 31.10.2026 abends: "Mach coole Figur-Designs ... und tu die in mein
-// Konto"). Nichts uebernommen von anderen Schachseiten: Neon, Glas und Holz leiten die Formen aus "cburnett" ab
-// (Colin M.L. Burnett, GPLv2 oder neuer, wie die Vorlage; assets/LIZENZ-KUNST.md) und geben ihnen Leuchten, Verlauf und
-// Maserung; Pixel und Geo sind eigene Zeichnungen (Raster und Grundformen unten, GPL-3.0 wie das Projekt).
+// Konto"). Nichts uebernommen von anderen Schachseiten: Pixel und Geo sind eigene Zeichnungen (Raster und Grundformen
+// unten, GPL-3.0 wie das Projekt). Die gedrechselten Saetze (Neon, Glas, Holz, Elfenbein, Marmor, Gold, Frost, Kuerbis)
+// zeichnet werkzeuge/figuren-3d.mjs.
 // Welche Saetze nur der Erfinder sieht, steht in js/labor.js (LABOR_FIGUREN).
-//   node werkzeuge/figuren-stile.mjs    schreibt assets/pieces/{neon,glas,holz,pixel,geo}/*.svg neu
+//   node werkzeuge/figuren-stile.mjs    schreibt assets/pieces/{pixel,geo}/*.svg neu
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { faerbe } from './labor-figuren.mjs';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const QUELLE = path.join(WURZEL, 'assets/pieces');
 const FIGUREN = ['K', 'Q', 'R', 'B', 'N', 'P'];
 const kopf = (defs, inhalt) => `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45">${defs ? `<defs>${defs}</defs>` : ''}${inhalt}</svg>\n`;
-const innen = (svg) => svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
-
-// ---------- aus cburnett: Neon, Glas, Holz ----------
-// Neon: dunkle Koerper, leuchtende Kanten (Weiss tuerkis, Schwarz pink); das Leuchten ist ein weicher Schein darunter
-const NEON = { w: { hell: '#123049', hellLinie: '#5CF2FF' }, b: { dunkel: '#2C0F35', dunkelLinie: '#FF5CD6' } };
-function neon(svg, weiss) {
-  const s = weiss ? { ...NEON.w, dunkel: '', dunkelLinie: '' } : { ...NEON.b, hell: '', hellLinie: '' };
-  // Teile ohne Linie (die Kugeln der Dame) bekommen die Kantenfarbe, sonst verschwinden sie im dunklen Koerper
-  const g = innen(faerbe(svg, weiss, s)).replace(/<g stroke="none">/g, `<g stroke="none" fill="${weiss ? NEON.w.hellLinie : NEON.b.dunkelLinie}">`);
-  const defs = '<filter id="schein" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="1.3" result="b"/>'
-    + '<feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
-  return kopf(defs, `<g filter="url(#schein)">${g}</g>`);
-}
-// Glas: Verlauf von hell nach kuehl, leicht durchscheinend, mit Lichtkante oben links
-function glas(svg, weiss) {
-  const defs = weiss
-    ? '<linearGradient id="gk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".97"/><stop offset=".55" stop-color="#DCEFFF" stop-opacity=".9"/><stop offset="1" stop-color="#9CC8EE" stop-opacity=".92"/></linearGradient>'
-    : '<linearGradient id="gk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5A6577" stop-opacity=".95"/><stop offset=".5" stop-color="#2A313D" stop-opacity=".93"/><stop offset="1" stop-color="#11151B" stop-opacity=".96"/></linearGradient>';
-  const s = weiss ? { hell: 'url(#gk)', hellLinie: '#3E6F99' } : { dunkel: 'url(#gk)', dunkelLinie: '#B9D3EA' };
-  return kopf(defs, innen(faerbe(svg, weiss, { hell: '', hellLinie: '', dunkel: '', dunkelLinie: '', ...s })));
-}
-// Holz: Ahorn hell, Nussbaum dunkel, Maserung als feine Linien ueber dem Verlauf
-function holz(svg, weiss) {
-  const defs = (weiss
-    ? '<linearGradient id="hk" x1="0" y1="0" x2="1" y2=".4"><stop offset="0" stop-color="#F6DFB2"/><stop offset=".6" stop-color="#E5BF85"/><stop offset="1" stop-color="#C99A5E"/></linearGradient>'
-    : '<linearGradient id="hk" x1="0" y1="0" x2="1" y2=".4"><stop offset="0" stop-color="#7A4A2A"/><stop offset=".6" stop-color="#5A341C"/><stop offset="1" stop-color="#3A2010"/></linearGradient>')
-    + `<pattern id="maser" width="9" height="7" patternUnits="userSpaceOnUse"><path d="M0 2.5q2.2-1 4.5 0t4.5 0M0 5.8q2.2-.8 4.5 0t4.5 0" fill="none" stroke="${weiss ? 'rgba(150,95,40,.28)' : 'rgba(20,8,2,.35)'}" stroke-width=".55"/></pattern>`;
-  const s = weiss ? { hell: 'url(#hk)', hellLinie: '#5B3416' } : { dunkel: 'url(#hk)', dunkelLinie: '#F0D3A4' };
-  const g = innen(faerbe(svg, weiss, { hell: '', hellLinie: '', dunkel: '', dunkelLinie: '', ...s }));
-  // Maserung: dieselben Flaechen noch einmal, nur mit dem Muster gefuellt und ohne Linien
-  const maser = g.replace(/stroke="[^"]*"/g, 'stroke="none"').replace(/fill="url\(#hk\)"/g, 'fill="url(#maser)"')
-    .replace(/fill="(#[0-9A-Fa-f]{3,6})"/g, 'fill="none"');
-  return kopf(defs, g + `<g pointer-events="none">${maser}</g>`);
-}
 
 // ---------- Pixel: eigene 8-Bit-Zeichnungen, 16 x 16 ----------
 // o Umriss, f Flaeche, h Licht, s Schatten, . leer
@@ -112,9 +77,6 @@ function geo(fig, weiss) {
 }
 
 export const STILE = Object.freeze({
-  neon: (fig, weiss, quelle) => neon(quelle, weiss),
-  glas: (fig, weiss, quelle) => glas(quelle, weiss),
-  holz: (fig, weiss, quelle) => holz(quelle, weiss),
   pixel: (fig, weiss) => pixel(fig, weiss),
   geo: (fig, weiss) => geo(fig, weiss),
 });
