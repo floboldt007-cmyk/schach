@@ -9,7 +9,8 @@ import { hatSonderstueck, ERFINDER } from './sonderstuecke.js';
 import { istLabor, laborFrei } from './labor.js';
 
 const PFADE = Object.freeze({ cburnett: 'assets/pieces/', blaupause: 'assets/pieces/blaupause/', kuerbis: 'assets/pieces/kuerbis/',
-  frost: 'assets/pieces/frost/', gold: 'assets/pieces/gold/' });
+  frost: 'assets/pieces/frost/', gold: 'assets/pieces/gold/', neon: 'assets/pieces/neon/', glas: 'assets/pieces/glas/',
+  holz: 'assets/pieces/holz/', pixel: 'assets/pieces/pixel/', geo: 'assets/pieces/geo/' });
 
 export function figurenSatz(e = ladeEinstellungen()) {
   const satz = e && e.figuren;

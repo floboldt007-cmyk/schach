@@ -193,6 +193,11 @@ function main() {
     ...alleDateien('assets/pieces/kuerbis', /\.svg$/),
     ...alleDateien('assets/pieces/frost', /\.svg$/),
     ...alleDateien('assets/pieces/gold', /\.svg$/),
+    ...alleDateien('assets/pieces/neon', /\.svg$/),
+    ...alleDateien('assets/pieces/glas', /\.svg$/),
+    ...alleDateien('assets/pieces/holz', /\.svg$/),
+    ...alleDateien('assets/pieces/pixel', /\.svg$/),
+    ...alleDateien('assets/pieces/geo', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte
