@@ -53,12 +53,18 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
       : seltenheit && seltenheit !== 'frei' ? `<span class="sa-schild" data-seltenheit="${seltenheit}">${esc(t('rahmen.sammlung.selten.' + seltenheit))}</span>` : '';
     const bild = x.frei ? (x.bild || '') : x.bild ? `<span class="sa-geheim">${x.bild}</span><span class="sa-frage">?</span>` : '<span class="sa-frage">?</span>';
     const waehlbar = x.frei && !x.an && typeof x.wahl === 'function';
-    const knopf = waehlbar ? `<button type="button" class="sa-wahl" aria-label="${esc(t('rahmen.sammlung.ausruesten', { name: x.name }))}"></button>` : '';
-    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}${waehlbar ? ' data-waehlbar' : ''}>${knopf}
+    // abwahl (z. B. Lobby-Musik): ein zweiter Tipp auf das ausgeruestete Teil schaltet es aus
+    const abwaehlbar = x.frei && x.an && typeof x.abwahl === 'function';
+    const knopf = waehlbar ? `<button type="button" class="sa-wahl" aria-label="${esc(t('rahmen.sammlung.ausruesten', { name: x.name }))}"></button>`
+      : abwaehlbar ? `<button type="button" class="sa-wahl" data-ab aria-label="${esc(t('rahmen.sammlung.ausschalten', { name: x.name }))}"></button>` : '';
+    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}${waehlbar || abwaehlbar ? ' data-waehlbar' : ''}>${knopf}
       <span class="sa-bild" aria-hidden="true">${bild}${schild}</span>
       <span class="sa-text"><b>${esc(x.name)}</b><span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
   }).join('')}</div>`).join('')}${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
-  const wahlen = new Map(teile.filter((x) => x.frei && !x.an && typeof x.wahl === 'function').map((x) => [String(x.id), x.wahl]));
+  const wahlen = new Map([
+    ...teile.filter((x) => x.frei && !x.an && typeof x.wahl === 'function').map((x) => [String(x.id), { fn: x.wahl, ab: false }]),
+    ...teile.filter((x) => x.frei && x.an && typeof x.abwahl === 'function').map((x) => [String(x.id), { fn: x.abwahl, ab: true }]),
+  ]);
   if (wahlen.size) WAHLEN.set(s, wahlen);
   return s;
 }
@@ -94,8 +100,9 @@ function zeigeIch(root, params = {}, app) {
     const ber = teil && teil.closest('.sa-bereich');
     const wahl = ber && WAHLEN.get(ber)?.get(teil.dataset.teil);
     if (!wahl) return;
-    try { wahl(); } catch (e) { console.error(e); return; }
-    try { app.meldung?.(t('rahmen.sammlung.ausgeruestet', { name: teil.querySelector('.sa-text b')?.textContent || '' })); } catch (e) { /* egal */ }
+    try { wahl.fn(); } catch (e) { console.error(e); return; }
+    const name = teil.querySelector('.sa-text b')?.textContent || '';
+    try { app.meldung?.(t(wahl.ab ? 'rahmen.sammlung.ausgeschaltet' : 'rahmen.sammlung.ausgeruestet', { name })); } catch (e) { /* egal */ }
     try { app.gehe('ich', { bereich: ber.dataset.bereich }, { ersetzen: true }); } catch (e) { /* egal */ }
   });
   const alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
@@ -120,7 +127,13 @@ function zeigeIch(root, params = {}, app) {
         const sichtbar = alle.find((x) => !x.hidden);
         if (sichtbar && tempo() > 0) staffel(sichtbar.querySelectorAll('.sa-teil'), { d: 360, abstand: 25, von: 'translateY(8px)' });
       } });
-    s.querySelector('.sa-steuer').append(seg.el);
+    const steuer = s.querySelector('.sa-steuer');
+    steuer.append(seg.el);
+    // Handy: die Leiste wischt waagrecht; der gewaehlte Reiter steht beim Oeffnen in der Mitte, nicht ausserhalb
+    requestAnimationFrame(() => {
+      const an = seg.el.querySelector('[aria-checked="true"]');
+      if (an && steuer.scrollWidth > steuer.clientWidth) steuer.scrollLeft = Math.max(0, an.offsetLeft - (steuer.clientWidth - an.offsetWidth) / 2);
+    });
   }
   zeigeBereich();
   if (tempo() > 0) {

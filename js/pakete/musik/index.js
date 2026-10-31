@@ -87,7 +87,8 @@ anbieten('einstellungen:klang', gruppe, { reihenfolge: 4, paket: 'musik' });
 export function melodienTeile(fortschritt = ladeFortschritt(), e = einstellung()) {
   return MUSIK_WELTEN.map((m, i) => {
     const frei = istMelodieFrei(m.id, fortschritt);
-    const an = frei && e.musikMelodie === m.id;
+    // ausgewaehlt heisst: sie laeuft (Musik an und diese Melodie); bei Musik aus ist keine ausgewaehlt
+    const an = frei && e.musik === true && e.musikMelodie === m.id;
     const sterne = BOTS.filter((b) => b.welt === i + 1).flatMap((b) => (fortschritt.bots[b.id] && fortschritt.bots[b.id].sterne) || [false, false, false]);
     return {
       id: 'melodie-' + m.id, name: t('p-musik.welt.' + m.id), frei, an, bild: melodieKunst(i + 1),
@@ -95,6 +96,8 @@ export function melodienTeile(fortschritt = ladeFortschritt(), e = einstellung()
       fortschritt: frei || !sterne.length ? undefined : sterne.filter(Boolean).length / sterne.length,
       // Ausruesten per Tipp in der Sammlung: diese Melodie, und die Musik geht an
       wahl: frei && app ? () => { app.setzeEinstellungen({ musik: true, musikMelodie: m.id }); aktualisiere(); } : undefined,
+      // Flo 31.10.: ein zweiter Tipp auf die laufende Melodie schaltet die Lobby-Musik aus
+      abwahl: an && app ? () => { app.setzeEinstellungen({ musik: false }); aktualisiere(); } : undefined,
     };
   });
 }

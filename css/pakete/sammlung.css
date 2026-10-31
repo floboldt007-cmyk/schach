@@ -5,10 +5,11 @@
 .sa-screen .sa-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .sa-stand, .sa-steuer, .sa-ort { padding-left: var(--rand); padding-right: var(--rand); min-width: 0; }
 .sa-stand { margin: -6px 0 0; font-size: 15px; font-weight: 650; color: var(--text-2); }
-/* sechs Bereiche: auf schmalen Schirmen waagrecht wischbar statt gequetscht */
-.sa-steuer { overflow-x: auto; scrollbar-width: none; }
+/* viele Bereiche (bis zu elf): auf schmalen Schirmen waagrecht wischbar statt gequetscht, jeder Reiter mindestens 104 px
+   (Flo 31.10., Handy: die Namen lagen uebereinander); --n setzt segment() in js/ui/bauteile.js */
+.sa-steuer { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sa-steuer::-webkit-scrollbar { display: none; }
-.sa-steuer .segment { min-width: max(100%, 560px); }
+.sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 104px)); }
 .sa-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .sa-teil { display: grid; gap: 10px; padding: 12px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
   box-shadow: var(--s1); min-width: 0; }

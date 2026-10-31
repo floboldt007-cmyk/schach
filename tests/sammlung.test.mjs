@@ -250,6 +250,10 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  pruefe('Handy: Reiter der Sammlung nicht gequetscht (jeder mindestens 90 px, keiner überlappt den nächsten)', await p.s.evaluate(() => {
+    const seg = [...document.querySelectorAll('.sa-steuer .seg')];
+    return seg.length > 6 && seg.every((b, i) => b.getBoundingClientRect().width >= 90 && (i === 0 || b.getBoundingClientRect().left >= seg[i - 1].getBoundingClientRect().right - 1));
+  }));
   pruefe('Erfinder: alle Finisher frei, auch auf Level 1 (kein Schloss)', await p.s.evaluate(() => {
     const z = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => x.dataset.zustand);
     return z.length === 4 && !z.includes('zu');
@@ -327,6 +331,18 @@ async function laborTeil(browser) {
   pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');
     return klang.vorrat().paket === 'grusel' && document.querySelector('.sa-teil[data-teil="klang-grusel"]')?.dataset.zustand === 'an';
+  }));
+  // Lobby-Musik (Flo 31.10.: "kann die Lobby-Musik nicht ausschalten, wenn ich zweimal drauf klicke")
+  await ruesteAus(p.s, 'melodie-karofelder');
+  pruefe('Lobby-Musik: Tipp auf Karofelder schaltet sie ein', await p.s.evaluate(() => {
+    const e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}');
+    return e.musik === true && e.musikMelodie === 'karofelder';
+  }));
+  await p.s.locator('.sa-teil[data-teil="melodie-karofelder"] .sa-wahl').click();
+  await p.s.waitForFunction(() => document.querySelector('.sa-teil[data-teil="melodie-karofelder"]')?.dataset.zustand === 'frei', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Lobby-Musik: zweiter Tipp auf die laufende Melodie schaltet die Musik aus', await p.s.evaluate(() => {
+    const e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}');
+    return e.musik === false && document.querySelector('.sa-teil[data-teil="melodie-karofelder"]')?.dataset.zustand === 'frei';
   }));
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
