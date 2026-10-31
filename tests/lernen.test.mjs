@@ -10,9 +10,10 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Chess } from '../vendor/chess/chess.js';
-import { LEKTIONEN, STUFEN, BEREICHE, ALLE, lektion, sterne, grenze, pruefeLektion, stand, merke, summe, bilanz, pruefeZiel }
+import { LEKTIONEN, STUFEN, BEREICHE, ALLE, lektion, sterne, sterneFolge, grenze, pruefeLektion, stand, merke, summe, bilanz, pruefeZiel }
   from '../js/pakete/lernen/mattbilder.js';
 import { ENDSPIELE } from '../js/pakete/lernen/endspiele.js';
+import { EROEFFNUNGEN } from '../js/pakete/lernen/eroeffnungen.js';
 import { DE, EN } from '../js/pakete/lernen/texte.js';
 import { browserTyp } from './browser.mjs';
 
@@ -38,8 +39,20 @@ const pf = ALLE.flatMap((l) => pruefeLektion(l, Chess));
 pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, nicht schon vorbei, Ziel ganzzahlig', pf.length === 0, pf.join(' | '));
 pruefe('Stufen laufen nie rueckwaerts (leicht zuerst), in jedem Bereich', BEREICHE.every((b) => b.lektionen.every((l, i) => i === 0
   || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(b.lektionen[i - 1].stufe) - 1)));
-pruefe('Bereiche: Mattbilder 20, Endspiele 11, alle ids eindeutig', BEREICHE.map((b) => b.id).join() === 'matt,end'
-  && ENDSPIELE.length === 11 && ALLE.length === 31 && new Set(ALLE.map((l) => l.id)).size === 31 && new Set(ALLE.map((l) => l.fen)).size === 31);
+const mitStellung = ALLE.filter((l) => l.art !== 'folge');
+pruefe('Bereiche: Mattbilder 20, Endspiele 11, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
+  BEREICHE.map((b) => b.id).join() === 'matt,end,eroeffnung' && ENDSPIELE.length === 11 && EROEFFNUNGEN.length === 11 && ALLE.length === 42
+  && new Set(ALLE.map((l) => l.id)).size === 42 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
+// Eroeffnungen (Zugfolge-Trainer): Flo spielt Weiss und Schwarz, jede Folge legal (pruefeLektion), Erklaerung je eigenem Zug
+pruefe('Eroeffnungen: Art folge, Weiss und Schwarz vertreten, Grundstellung, Stufen leicht und mittel',
+  EROEFFNUNGEN.every((l) => l.art === 'folge' && ['w', 'b'].includes(l.farbe) && l.fen.startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w'))
+  && EROEFFNUNGEN.some((l) => l.farbe === 'w') && EROEFFNUNGEN.some((l) => l.farbe === 'b') && EROEFFNUNGEN.every((l) => ['leicht', 'mittel'].includes(l.stufe)));
+const fehltZug = EROEFFNUNGEN.flatMap((l) => Array.from({ length: l.ziel }, (_, k) => `zug.${l.id}.${k}`)).filter((k) => !DE[k] || !EN[k]);
+pruefe('Eroeffnungen: zu jedem eigenen Zug ein Satz, warum (Deutsch und Englisch)', fehltZug.length === 0, fehltZug.join(', '));
+pruefe('Eroeffnungen: Légal-Falle endet mit Matt', (() => { const c = new Chess(); for (const z of lektion('legal-falle').folge) c.move(z); return c.isCheckmate(); })());
+pruefe('Sterne Zugfolge: 3 ohne Fehler, 2 bei ein bis zwei Fehlern oder Hinweisen, sonst 1',
+  sterneFolge({}) === 3 && sterneFolge({ fehler: 1 }) === 2 && sterneFolge({ fehler: 1, hinweise: 1 }) === 2 && sterneFolge({ fehler: 3 }) === 1
+  && sterneFolge({ hinweise: 3 }) === 1);
 pruefe('Endspiele: Arten umwandeln, gewinnen, halten; Flo immer Weiss', ENDSPIELE.every((l) => ['umwandeln', 'gewinnen', 'halten'].includes(l.art))
   && ENDSPIELE.some((l) => l.art === 'halten') && ENDSPIELE.some((l) => l.art === 'gewinnen') && ENDSPIELE.every((l) => l.fen.split(' ')[1] === 'w'));
 const fehltText = ALLE.flatMap((l) => ['titel.', 'idee.'].flatMap((k) => [DE, EN].filter((d) => !d[k + l.id]).map(() => k + l.id)));
@@ -88,8 +101,8 @@ pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ le
 pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 }), 'matt'))
   === '{"sterne":5,"max":60,"geschafft":2}');
 const stE = merke(merke({}, 'quadrat', { sterne: 3, zuege: 5 }), 'grundreihe', { sterne: 2, zuege: 2 });
-pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 31 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
-  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":93,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
+pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 42 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
+  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":126,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
 
 // Ziel-Regeln (pruefeZiel): nach Flos Zug ('flo') und nach dem Gegenzug ('gegner')
 const zielVon = (id, fen, wann, zuege = 1) => pruefeZiel(lektion(id), bilanz(new Chess(lektion(id).fen)), new Chess(fen), { wann, zuege });
@@ -191,8 +204,8 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder und Endspiele“ im Training mit Labor-Schild, 0 von 93 Sternen, 31 Lektionen', !!karte
-    && /Mattbilder und Endspiele/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 93 Sternen/.test(karte.text) && /31 Lektionen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 126 Sternen, 42 Lektionen', !!karte
+    && /Mattbilder, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 126 Sternen/.test(karte.text) && /42 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
@@ -285,6 +298,57 @@ async function erfinderTeil(browser) {
   await warteLz(p.s, "z.phase === 'flo' && z.zuege === 0 && z.hinweise === 0");
   z = await lz(p.s);
   pruefe('Neu starten: Ausgangsstellung, Zähler und Hinweise auf null', z.zuege === 0 && z.hinweise === 0 && z.fen === lektion('dame').fen, z);
+  // Eroeffnungen: Italienisch mit Weiss (ein falscher Zug zweimal, dann Pfeil), Skandinavisch mit Schwarz (Brett gedreht)
+  await p.s.evaluate(() => window.__app.gehe('lernen'));
+  await p.s.waitForSelector('.segment[data-seg="ms-bereich"] [data-wert="eroeffnung"]', { timeout: 10000 }).catch(() => {});
+  await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="eroeffnung"]').click();
+  await p.s.waitForSelector('.ms-lektion[data-id="italienisch"]', { timeout: 8000 }).catch(() => {});
+  pruefe('Eröffnungen: Liste in der Reihenfolge der Daten, Art „Zugfolge“, 0 von 33 Sternen', await p.s.evaluate(() =>
+    [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join()) === EROEFFNUNGEN.map((l) => l.id).join()
+    && /Zugfolge/.test(await p.s.locator('.ms-lektion[data-id="italienisch"]').innerText()) && /0 von 33 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
+  await p.s.locator('.ms-lektion[data-id="italienisch"]').click();
+  await warteLz(p.s, "z.id === 'italienisch' && z.phase === 'intro'");
+  pruefe('Eröffnung: Titel, Ziel „Spiel die 5 Züge der Eröffnung“', /Italienische Partie/.test(await p.s.locator('.ls-status').innerText())
+    && /Spiel die 5 Züge der Eröffnung/.test(await p.s.locator('.ls-status').innerText()));
+  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+  await warteLz(p.s, "z.phase === 'flo'");
+  await ziehe(p.s, 'e2e4');
+  await warteLz(p.s, "z.phase === 'flo' && z.schritt === 2");
+  z = await lz(p.s);
+  pruefe('Eröffnung: nach e4 antwortet der Computer mit e5, Satz zum Zug erscheint', z.schritt === 2 && /4p3\/4P3/.test(z.fen)
+    && /Zentrum/.test(await p.s.locator('.ls-meldung').innerText()), z);
+  await ziehe(p.s, 'd2d4');
+  await p.s.waitForSelector('.ls-meldung[data-art="fehler"]', { timeout: 5000 }).catch(() => {});
+  z = await lz(p.s);
+  pruefe('Eröffnung: d4 statt Sf3 springt zurück, zählt als Fehler, „Nicht der Zug dieser Eröffnung“', z.fehler === 1 && z.schritt === 2
+    && /Nicht der Zug dieser Eröffnung/.test(await p.s.locator('.ls-meldung').innerText()) && !/3P4/.test(z.fen.split(' ')[0].split('/')[4]), z);
+  await ziehe(p.s, 'd2d4');
+  await p.s.waitForSelector('.ls-meldung[data-art="hinweis"]', { timeout: 5000 }).catch(() => {});
+  pruefe('Eröffnung: zweiter Fehler am selben Zug zeigt „Hier kommt Sf3“ mit Pfeil', /Hier kommt Sf3/.test(await p.s.locator('.ls-meldung').innerText())
+    && await p.s.locator('.ls-screen .brett-pfeile .pfeil').count() >= 1);
+  for (const [i, u] of ['g1f3', 'f1c4', 'c2c3', 'd2d4'].entries()) {
+    await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i + 1}`);
+    await ziehe(p.s, u);
+  }
+  await warteLz(p.s, "z.phase === 'ende'");
+  z = await lz(p.s);
+  pruefe('Eröffnung: ganze Folge gespielt, „Eröffnung sitzt!“, 2 Fehler ergeben 2 Sterne', z.phase === 'ende' && z.zuege === 5 && z.sterne === 2
+    && /Eröffnung sitzt!/.test(await p.s.locator('.ls-meldung').innerText()), z);
+  await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
+  await warteLz(p.s, "z.id === 'skandinavisch' && z.phase === 'intro'");
+  pruefe('Eröffnung mit Schwarz: Brett gedreht', await p.s.locator('.ls-brett').getAttribute('data-ausrichtung') === 'b');
+  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+  await warteLz(p.s, "z.phase === 'flo' && z.schritt === 1");
+  z = await lz(p.s);
+  pruefe('Eröffnung mit Schwarz: der Computer eröffnet mit e4, dann ist Flo dran', z.schritt === 1 && new Chess(z.fen).turn() === 'b', z);
+  for (const [i, u] of ['d7d5', 'd8d5', 'd5a5', 'g8f6'].entries()) {
+    await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
+    await ziehe(p.s, u);
+  }
+  await warteLz(p.s, "z.phase === 'ende'");
+  z = await lz(p.s);
+  pruefe('Eröffnung mit Schwarz: ohne Fehler drei Sterne, „Ohne einen einzigen Fehler“', z.phase === 'ende' && z.sterne === 3 && z.fehler === 0
+    && /Ohne einen einzigen Fehler/.test(await p.s.locator('.ls-meldung').innerText()), z);
   pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 
