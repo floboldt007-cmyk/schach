@@ -10,6 +10,10 @@
 // dem naechsten Zug der Folge, ohne Engine. Ein anderer Zug springt zurueck und wird gezaehlt (fehler); beim zweiten
 // Fehler am selben Zug zeigt ein Pfeil den Zug der Eroeffnung. Nach jedem richtigen Zug sagt ein Satz, warum man ihn
 // spielt (zug.<id>.<k>). Geschafft am Ende der Folge, Sterne nach Fehlern und Hinweisen (sterneFolge).
+// Zwei Wege (Flo 31.10.2026: "bei den Eroeffnungen muss man immer auf Hinweis klicken?"): "Zeig sie mir" (modus 'zeigen')
+// zeigt vor jedem eigenen Zug Pfeil und Grund, Flo zieht nach; am Ende ein Stern (gelernt) und "Ohne Hilfe spielen".
+// "Selbst spielen" (modus 'selbst', Knopf data-a="los") ist der Pruefweg ohne Pfeile, bis zu drei Sterne. Vorgewaehlt ist
+// "Zeig sie mir", solange die Lektion noch keinen Stern hat.
 // Ablauf: phase 'intro' (Idee in zwei, drei Saetzen, Knopf "Los geht's", Brett still) -> 'flo' (Flo zieht) -> 'gegner'
 // (Engine antwortet) -> ... -> 'ende' (geschafft: Sterne, gespeichert im Modul lernen, Ereignis lektion:beendet mit id
 // '<bereich>-<id>'; sonst ein Grund: patt, remis, zuViele, matt, verloren, bauerWeg). "Hinweis" zeigt den besten Zug
@@ -29,7 +33,7 @@ import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { laborFrei } from '../labor.js';
 import { t } from '../sprache.js';
-import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel } from '../pakete/lernen/mattbilder.js';
+import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel, stand } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { sterneHtml } from './lernen.js';
 import '../sprachen/allgemein.js';
@@ -104,9 +108,9 @@ export function zeige(root, params, app) {
     timer.add(id);
   };
   const st = { phase: 'intro', chess: new Chess(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null,
-    schritt: 0, fehler: 0, fehlerHier: 0 };
+    schritt: 0, fehler: 0, fehlerHier: 0, modus: 'selbst' };
   aktiv = () => ({ offen: true, id: l.id, phase: st.phase, zuege: st.zuege, hinweise: st.hinweise, sterne: st.sterne, grund: st.grund,
-    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler });
+    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler, modus: st.modus });
 
   const brett = new Brett($('.ls-brett'), {
     ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
@@ -122,9 +126,11 @@ export function zeige(root, params, app) {
       + `${k.icon ? icon(k.icon) : ''}${esc(k.text)}${k.vor ? icon('vor') : ''}</button>`).join('');
   }
   const spielKnoepfe = () => knoepfe([
-    { a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' },
+    ...(st.modus === 'zeigen' ? [] : [{ a: 'hinweis', text: S('hinweis'), icon: 'hinweis', aus: st.phase !== 'flo' }]),
     { a: 'neu', text: S('neu'), icon: 'nochmal' },
   ]);
+  // schon ein Stern fuer diese Lektion? Dann ist "Selbst spielen" vorgewaehlt, sonst "Zeig sie mir"
+  const gelernt = () => { try { return !!stand(ladeModul(PAKET, {})).lek[l.id]; } catch (e) { return false; } };
 
   function meldung(art, kopfText, text = '', extra = '') {
     meldungEl.hidden = false;
@@ -157,8 +163,9 @@ export function zeige(root, params, app) {
     return a && typeof a.bestmove === 'string' && UCI_RE.test(a.bestmove) ? a.bestmove : null;
   }
 
-  function starte({ intro = false } = {}) {
+  function starte({ intro = false, modus = 'selbst' } = {}) {
     st.lauf++;
+    st.modus = folge && modus === 'zeigen' ? 'zeigen' : 'selbst';
     st.chess = new Chess(l.fen);
     st.start = bilanz(st.chess);
     st.zuege = 0;
@@ -175,7 +182,10 @@ export function zeige(root, params, app) {
     zeichne(null);
     zaehler();
     leiseMeldung();
-    if (intro) knoepfe([{ a: 'los', text: S('los'), primaer: true, vor: true }]);
+    if (intro && folge) {
+      const g = gelernt();
+      knoepfe([{ a: 'zeigen', text: S('folge.zeigen'), icon: 'hinweis', primaer: !g }, { a: 'los', text: S('folge.selbst'), primaer: g, vor: true }]);
+    } else if (intro) knoepfe([{ a: 'los', text: S('los'), primaer: true, vor: true }]);
     else spielKnoepfe();
     // Zugfolge mit Schwarz: der Computer eroeffnet mit dem ersten Zug der Folge
     if (folge && !intro && st.chess.turn() !== flo) {
@@ -186,6 +196,7 @@ export function zeige(root, params, app) {
       spaeter(() => { if (lauf === st.lauf) folgeGegner(); }, 450);
     }
     erlaube();
+    zeigeZug();
   }
 
   // ---------- Zugfolge (Eroeffnungen) ----------
@@ -198,6 +209,14 @@ export function zeige(root, params, app) {
   }
   // Zug in deutscher Kurzschrift fuer die Anzeige (Springer S, Laeufer L, Turm T, Dame D, Koenig K)
   const sanDe = (san) => String(san || '').replace(/[NBRQK]/g, (x) => (S('figur.' + x) || x));
+  // "Zeig sie mir": vor Flos Zug Pfeil und Grund des naechsten Zugs der Eroeffnung
+  function zeigeZug() {
+    if (!folge || st.modus !== 'zeigen' || st.phase !== 'flo') return;
+    const e = erwartet();
+    if (!e) return;
+    brett.pfeile([{ von: e.von, nach: e.nach, farbe: 'bester' }]);
+    meldung('zeigen', S('folge.spiele', { zug: sanDe(e.san) }), S(`zug.${l.id}.${st.zuege}`), `<span class="ls-symbol">${icon('hinweis')}</span>`);
+  }
   function folgeFloZug(von, nach, umw) {
     let m = null;
     try { m = st.chess.move({ from: von, to: nach, promotion: umw || 'q' }); } catch (e) { m = null; }
@@ -209,7 +228,10 @@ export function zeige(root, params, app) {
       st.fehlerHier++;
       spielKlang('raetsel-falsch');
       const e = erwartet();
-      if (st.fehlerHier >= 2 && e) {
+      if (st.modus === 'zeigen' && e) {
+        brett.pfeile([{ von: e.von, nach: e.nach, farbe: 'bester' }]);
+        meldung('fehler', S('folge.pfeil', { zug: sanDe(e.san) }), S('folge.pfeilText'), `<span class="ls-symbol">${icon('kreuz')}</span>`);
+      } else if (st.fehlerHier >= 2 && e) {
         brett.pfeile([{ von: e.von, nach: e.nach, farbe: 'bester' }]);
         meldung('hinweis', S('folge.zeig', { zug: sanDe(e.san) }), S('folge.zeigText'), `<span class="ls-symbol">${icon('hinweis')}</span>`);
       } else meldung('fehler', S('folge.anders'), S('folge.andersText'), `<span class="ls-symbol">${icon('kreuz')}</span>`);
@@ -225,8 +247,8 @@ export function zeige(root, params, app) {
       zeichne(m);
       zugKlang(m);
       zaehler();
-      // warum dieser Zug (eigener Satz je Zug der Eroeffnung)
-      meldung('info', sanDe(m.san), S(`zug.${l.id}.${k}`));
+      // warum dieser Zug (eigener Satz je Zug der Eroeffnung); bei "Zeig sie mir" stand er schon vor dem Zug da
+      if (st.modus !== 'zeigen') meldung('info', sanDe(m.san), S(`zug.${l.id}.${k}`));
       if (st.schritt >= l.folge.length) { geschafft(); return; }
       st.phase = 'gegner';
       s.dataset.phase = st.phase;
@@ -249,6 +271,7 @@ export function zeige(root, params, app) {
     s.dataset.phase = st.phase;
     erlaube();
     spielKnoepfe();
+    zeigeZug();
   }
 
   // Zug von Flo (Brett): true = angenommen
@@ -330,7 +353,8 @@ export function zeige(root, params, app) {
     st.phase = 'ende';
     s.dataset.phase = st.phase;
     // Halten: geschafft ist geschafft, Sterne nur nach Hinweisen
-    st.sterne = folge ? sterneFolge({ fehler: st.fehler, hinweise: st.hinweise })
+    const gezeigt = folge && st.modus === 'zeigen';
+    st.sterne = gezeigt ? 1 : folge ? sterneFolge({ fehler: st.fehler, hinweise: st.hinweise })
       : sterne({ ziel: l.ziel, zuege: art === 'halten' ? Math.min(st.zuege, l.ziel) : st.zuege, hinweise: st.hinweise });
     erlaube();
     try { speichereModul(PAKET, merke(ladeModul(PAKET, {}), l.id, { sterne: st.sterne, zuege: st.zuege })); } catch (e) { console.error(e); }
@@ -339,14 +363,18 @@ export function zeige(root, params, app) {
     } catch (e) { console.error(e); }
     spielKlang('raetsel-richtig');
     const matt = st.chess.isCheckmate();
-    const kopfText = folge ? S('geschafft.folge') : matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
-    const text = folge ? (st.fehler === 0 ? S('geschafftText.folge0') : st.fehler === 1 ? S('geschafftText.folge1') : S('geschafftText.folge', { n: st.fehler }))
+    const kopfText = gezeigt ? S('geschafft.gezeigt') : folge ? S('geschafft.folge') : matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
+    const text = gezeigt ? S('geschafftText.gezeigt') : folge ? (st.fehler === 0 ? S('geschafftText.folge0') : st.fehler === 1 ? S('geschafftText.folge1') : S('geschafftText.folge', { n: st.fehler }))
       : art === 'halten' ? S('geschafftText.halten')
       : !(matt || art === 'matt') ? S('geschafftText.' + art, { n: st.zuege, ziel: l.ziel })
         : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
     if (tempo() > 0) staffel(meldungEl.querySelectorAll('.ms-sterne > i.an'), { d: 460, v: 120, abstand: 110, von: 'scale(0) rotate(-30deg)', k: 'hupf' });
-    knoepfe([
+    knoepfe(gezeigt ? [
+      { a: 'los', text: S('folge.ohneHilfe'), primaer: true, vor: true },
+      { a: 'zeigen', text: S('folge.nochmalZeigen'), icon: 'nochmal' },
+      { a: 'uebersicht', text: S('uebersicht') },
+    ] : [
       ...(naechste ? [{ a: 'weiter', text: S('weiter'), primaer: true, vor: true }] : []),
       { a: 'nochmal', text: S('nochmal'), icon: 'nochmal', primaer: !naechste },
       { a: 'uebersicht', text: S('uebersicht') },
@@ -368,8 +396,9 @@ export function zeige(root, params, app) {
     if (!b || b.disabled) return;
     const a = b.dataset.a;
     if (a === 'los') starte();
+    else if (a === 'zeigen') starte({ modus: 'zeigen' });
     else if (a === 'hinweis') hinweis().catch((f) => console.error(f));
-    else if (a === 'neu' || a === 'nochmal') starte();
+    else if (a === 'neu' || a === 'nochmal') starte({ modus: st.modus });
     else if (a === 'weiter' && naechste) app.gehe('lektion', { id: naechste.id }, { ersetzen: true });
     else if (a === 'uebersicht') app.gehe('lernen', { bereich: ber.id }, { ersetzen: true });
   });
