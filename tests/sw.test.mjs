@@ -189,6 +189,10 @@ function main() {
     ...alleDateien('assets/pieces', /\.(svg|png)$/),
     // Figurensatz Blaupause (Erfinder-Profil, js/figurensatz.js): offline noetig wie der Standardsatz
     ...alleDateien('assets/pieces/blaupause', /\.svg$/),
+    // Labor-Figuren (nur Erfinder, js/labor.js): offline noetig wie Blaupause
+    ...alleDateien('assets/pieces/kuerbis', /\.svg$/),
+    ...alleDateien('assets/pieces/frost', /\.svg$/),
+    ...alleDateien('assets/pieces/gold', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte

@@ -17,6 +17,7 @@ import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
+import { LABOR_BRETTER, laborFrei } from '../labor.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -34,7 +35,33 @@ const ICON = {
   warnung: '<path d="M12 3.5 2.8 19.5h18.4zM12 10v4.2M12 17.2v.1"/>',
   muell: '<path d="M4.5 7h15M9.5 7V4.8h5V7M6.8 7l.9 12.2a1.6 1.6 0 0 0 1.6 1.5h5.4a1.6 1.6 0 0 0 1.6-1.5L17.2 7M10.2 10.5v6.5M13.8 10.5v6.5"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.1"/>',
+  // Menue (Flo 31.10.2026: "Das muss auch angepasst werden"): ein eigenes Zeichen je Bereich
+  spiel: '<path d="M12 4.2a2.6 2.6 0 0 1 1.6 4.65c1.4.9 2.2 2.25 2.2 3.85 0 1.1-.45 2.1-1.2 2.85l.9 3H8.5l.9-3a3.98 3.98 0 0 1-1.2-2.85c0-1.6.8-2.95 2.2-3.85A2.6 2.6 0 0 1 12 4.2zM6.5 20.5h11"/>',
+  anzeige: '<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 12h16M12 4v16"/><rect x="4" y="4" width="8" height="8" fill="currentColor" stroke="none" opacity=".35"/><rect x="12" y="12" width="8" height="8" fill="currentColor" stroke="none" opacity=".35"/>',
+  coach: '<path d="M5 5.5h14v9.5H10l-4.5 3.5V15H5z"/><path d="M9 9.2h6M9 11.8h4"/>',
+  bewegung: '<path d="M3.5 12c2.2-4 4.4-4 6.6 0s4.4 4 6.6 0 2.6-2.6 3.8-2"/><path d="M3.5 17c2.2-2.5 4.4-2.5 6.6 0" opacity=".5"/>',
+  fortschritt: '<path d="M4.5 19.5h15M6 19.5v-5h3.5v5M10.25 19.5V9h3.5v10.5M14.5 19.5v-7.5H18v7.5"/>',
+  sprache: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/>',
+  konto: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  daten: '<rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5M12 14.2v2"/>',
+  abo: '<path d="M4.5 17.5 3.5 8l5 3.5L12 5l3.5 6.5 5-3.5-1 9.5zM5 20h14"/>',
+  schule: '<path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.5v4.2c3.3 2.4 7.7 2.4 11 0v-4.2M21.5 9.5v5"/>',
+  start: '<path d="M6 21V4M6 4.5h11l-2.2 3.5L17 11.5H6"/>',
+  serie: '<path d="M12 3c.6 3-2.5 4.5-2.5 8 0 1.4.6 2.4 1.6 3-1.6-.2-3.4-1.6-3.6-3.8C6 12 5.5 13.6 5.5 15a6.5 6.5 0 0 0 13 0c0-5-4-7.5-6.5-12z"/>',
+  sicherung: '<path d="M12 3.5 5 6.5v5c0 4.3 3 7.5 7 9 4-1.5 7-4.7 7-9v-5z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+  emotes: '<path d="M4.5 5h15v10.5H11l-4.5 3.5v-3.5h-2z"/><circle cx="9.5" cy="10.2" r=".4" fill="currentColor"/><circle cx="14.5" cy="10.2" r=".4" fill="currentColor"/>',
+  finisher: '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6-4.6-1.9 4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
+  online: '<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 15.2a4.5 4.5 0 0 1 6.5 3.8"/>',
+  regler: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.3"/><circle cx="9" cy="17" r="2.3"/>',
 };
+// Menue: Zeichen je Bereich; Kern-Gruppen ueber die Id ihres Titels, Gruppen der Pakete ueber ihre Klasse
+const NAV_ICON = Object.freeze({ spiel: 'spiel', anzeige: 'anzeige', klang: 'klang', coach: 'coach', bewegung: 'bewegung',
+  fortschritt: 'fortschritt', sprache: 'sprache', info: 'info' });
+const PAKET_ICON = Object.freeze([['konto-gruppe', 'konto'], ['daten-gruppe', 'daten'], ['abo-gruppe', 'abo'], ['schule-gruppe', 'schule'],
+  ['st-gruppe', 'start'], ['se-es', 'serie'], ['si-gruppe', 'sicherung'], ['em-einstellungen', 'emotes'], ['fi-einstellungen', 'finisher'],
+  ['on-', 'online']]);
+// Reihenfolge (Flo 31.10.2026): Spielen zuerst, Sprache und Info unten
+const KERN_ORDNUNG = Object.freeze(['spiel', 'anzeige', 'klang', 'coach', 'bewegung']);
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
 // Brettfarben wie im Design-Konzept (nur --feld-hell/--feld-dunkel); Namen beim Zeichnen: t('einstellungen.brett.<id>')
@@ -117,9 +144,7 @@ export function zeige(root, params = {}, app) {
         <div class="titel"><h2>${t('allgemein.einstellungen')}</h2><div class="unter">${E('unter')}</div></div>
       </header>
       <div class="es-layout">
-       <nav class="es-nav" aria-label="${E('nav')}">
-        ${[...(ZEIGE_SPRACHE ? ['sprache'] : []),'klang','spiel','bewegung','anzeige','coach','fortschritt','info'].map((id, i) => `<a href="#es-g-${id}" class="${i ? '' : 'an'}">${E('gruppe.' + id)}</a>`).join('')}
-       </nav>
+       <nav class="es-nav" aria-label="${E('nav')}"></nav>
        <div class="es-inhalt">
         ${ZEIGE_SPRACHE ? `<section class="es-gruppe flaeche es-sprache" aria-labelledby="es-g-sprache">
           <h3 class="es-titel" id="es-g-sprache">Sprache · Language</h3>
@@ -157,9 +182,9 @@ export function zeige(root, params = {}, app) {
           ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
           <h4>${E('anzeige.brettfarbe')}</h4>
           <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
-            ${BRETTER.map((b) => `
-              <button class="es-brett" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
-                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>
+            ${[...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => ({ ...b, labor: true })) : [])].map((b) => `
+              <button class="es-brett${b.labor ? ' es-labor' : ''}" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
+                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>${b.labor ? `<span class="es-labor-schild">${E('labor')}</span>` : ''}
               </button>`).join('')}
           </div>
           ${schalter('koordinaten',E('anzeige.koordinaten'),E('anzeige.koordinatenText'))}
@@ -209,8 +234,81 @@ export function zeige(root, params = {}, app) {
     ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
     if (ortKlang) ortKlang.verlasse();
     ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
+    ordne();
+    baueNav();
     zeigeStand();
     zeigeReset();
+  }
+
+  // Reihenfolge: Spiel, Anzeige, Klang, Coach, Bewegung, dann die Gruppen der Pakete, Fortschritt, Sprache, Info
+  function ordne() {
+    const inhalt = sec.querySelector('.es-inhalt');
+    const ort = inhalt && inhalt.querySelector('.es-ort');
+    if (!ort) return;
+    for (const id of KERN_ORDNUNG) {
+      const g = inhalt.querySelector(`:scope > section[aria-labelledby="es-g-${id}"]`);
+      if (g) inhalt.insertBefore(g, ort);
+    }
+    const sp = inhalt.querySelector(':scope > .es-sprache');
+    const info = inhalt.querySelector(':scope > .es-info');
+    if (sp && info) inhalt.insertBefore(sp, info);
+  }
+
+  // Menue aus den Gruppen, die wirklich da sind (auch die der Pakete); die Markierung folgt dem Scrollen.
+  // Vorher: feste Liste ohne die Pakete, "Sprache" blieb immer markiert, auf dem Handy gab es kein Menue.
+  let navBeobachter = null;
+  function baueNav() {
+    const nav = sec.querySelector('.es-nav');
+    if (!nav) return;
+    if (navBeobachter) { navBeobachter.disconnect(); navBeobachter = null; }
+    let n = 0;
+    const eintraege = [];
+    for (const g of sec.querySelectorAll('.es-inhalt .es-gruppe')) {
+      const h = g.querySelector('h3');
+      if (!h || g.hidden) continue;
+      if (!h.id) h.id = 'es-g-paket-' + (++n);
+      const kern = (/^es-g-([a-z]+)$/.exec(h.id) || [])[1];
+      const zeichen = (kern && NAV_ICON[kern]) || (PAKET_ICON.find(([k]) => g.className.includes(k)) || [])[1] || 'regler';
+      const titel = kern === 'sprache' || kern === 'info' ? E('gruppe.' + kern) : h.textContent.trim();
+      eintraege.push({ g, h, zeichen, titel });
+    }
+    nav.innerHTML = eintraege.map((x, i) => `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}"${i ? '' : ' aria-current="true"'}>`
+      + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span></button>`).join('');
+    const markiere = (id) => {
+      for (const b of nav.querySelectorAll('.es-nav-punkt')) {
+        const an = b.dataset.ziel === id;
+        if (an) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+        // Handy: die Leiste rollt mit, der markierte Punkt bleibt sichtbar
+        if (an && nav.scrollWidth > nav.clientWidth + 1) nav.scrollTo({ left: Math.max(0, b.offsetLeft - 16), behavior: 'auto' });
+      }
+    };
+    // Nach einem Tipp gilt die Wahl, bis das sanfte Scrollen fertig ist (sonst markiert der Beobachter unterwegs andere)
+    let gewaehlt = null;
+    let gewaehltUhr = 0;
+    nav.onclick = (ev) => {
+      const b = ev.target.closest('.es-nav-punkt');
+      const ziel = b && sec.querySelector('#' + CSS.escape(b.dataset.ziel));
+      if (!ziel) return;
+      gewaehlt = b.dataset.ziel;
+      clearTimeout(gewaehltUhr);
+      gewaehltUhr = setTimeout(() => { gewaehlt = null; }, 1200);
+      markiere(b.dataset.ziel);
+      const sanft = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      ziel.closest('.es-gruppe').scrollIntoView({ block: 'start', behavior: sanft ? 'smooth' : 'auto' });
+    };
+    if (typeof IntersectionObserver !== 'function') return;
+    const sichtbar = new Set();
+    navBeobachter = new IntersectionObserver((liste) => {
+      for (const e of liste) { if (e.isIntersecting) sichtbar.add(e.target); else sichtbar.delete(e.target); }
+      if (gewaehlt) return;
+      // ganz unten (die letzten Gruppen kommen nie bis nach oben): die letzte sichtbare, sonst die erste
+      const box = sec.closest('.screen') || document.scrollingElement;
+      const unten = box && box.scrollHeight - box.scrollTop - box.clientHeight < 4;
+      const sicht = eintraege.filter((x) => sichtbar.has(x.g));
+      const x = unten ? sicht[sicht.length - 1] : sicht[0];
+      if (x) markiere(x.h.id);
+    }, { rootMargin: '-96px 0px -55% 0px' });
+    for (const x of eintraege) navBeobachter.observe(x.g);
   }
 
   function zeigeStand() {
@@ -315,6 +413,8 @@ export function zeige(root, params = {}, app) {
         ortGruppen = fuelle('einstellungen:gruppen', sec.querySelector('.es-ort'), { app });
         if (ortKlang) ortKlang.verlasse();
         ortKlang = fuelle('einstellungen:klang', sec.querySelector('.es-ort-klang'), { app });
+        ordne();
+        baueNav();
         zeigeReset();
         try { app.meldung(E('reset.fertig', { bot: ersterGegner() })); } catch (f) { /* egal */ }
         break;
@@ -359,6 +459,7 @@ export function zeige(root, params = {}, app) {
       timer.clear();
       for (const f of aufraeumen.splice(0)) { try { f(); } catch (e) { /* egal */ } }
       if (ortGruppen) { ortGruppen.verlasse(); ortGruppen = null; }
+      if (navBeobachter) { navBeobachter.disconnect(); navBeobachter = null; }
     },
   };
 }

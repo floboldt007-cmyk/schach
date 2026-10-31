@@ -327,8 +327,9 @@ async function nodeTeilAsync({ ab3, benno }) {
   const fw = floAvatar('w');
   const fb = floAvatar('b');
   // Pfad vom Projekt aus (Analyse: Seiten unter tests/ luden das Bild sonst nicht), also eine volle Adresse
-  pruefe('floAvatar: Flos Koenig aus dem Figurensatz, Schiefer bei Weiss, Papier bei Schwarz', /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/wK\.svg"/.test(fw) && /#2C3038/.test(fw)
-    && /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/bK\.svg"/.test(fb) && /#E9E3D8/.test(fb) && /^<svg[^>]+aria-hidden="true"/.test(fw));
+  // Standard ist der Bauer, den Koenig waehlt nur der Erfinder (Flo 31.10.2026, js/profil.js NUR_ERFINDER)
+  pruefe('floAvatar: Bauer aus dem Figurensatz, Schiefer bei Weiss, Papier bei Schwarz', /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/wP\.svg"/.test(fw) && /#2C3038/.test(fw)
+    && /href="[a-z]+:\/\/[^"]*\/assets\/pieces\/bP\.svg"/.test(fb) && /#E9E3D8/.test(fb) && /^<svg[^>]+aria-hidden="true"/.test(fw));
 
   gruppe = 'bewegung.js';
   pruefe('TEMPI wie PLAN 4 (langsam 1,5, normal 1, schnell 0,6, aus 0)', JSON.stringify(TEMPI) === '{"langsam":1.5,"normal":1,"schnell":0.6,"aus":0}'
