@@ -401,9 +401,10 @@ async function browserAblauf(browser) {
   });
 
   // Konto fuer alle (31.10.2026): auch ohne #konto stehen die Gruppen Konto und Daten in den Einstellungen
+  // Handy (390 px): die Einstellungen zeigen erst die Liste, Konto und Daten sind eigene Seiten (#einstellungen/<seite>)
   await seite.goto(BASIS + '?test#einstellungen');
-  await seite.waitForSelector('.es-inhalt');
-  await seite.waitForSelector('.daten-gruppe', { timeout: 8000 }).catch(() => {});
+  await seite.waitForSelector('.es-inhalt', { state: 'attached' });
+  await seite.waitForSelector('.daten-gruppe', { state: 'attached', timeout: 8000 }).catch(() => {});
   pruefe('Browser: ohne #konto sind Konto und Daten da, die Testbereiche bleiben zu', (await seite.locator('.daten-gruppe').count()) === 1
     && (await seite.locator('.konto-gruppe').count()) === 1 && await seite.evaluate(() => localStorage.getItem('schach-arena:konto:sichtbar') === null));
   pruefe('Browser: Info verlinkt Datenschutzerklärung und Impressum', await seite.evaluate(() => {
@@ -416,7 +417,7 @@ async function browserAblauf(browser) {
   await seite.goto('about:blank');
   await seite.goto(BASIS + '?test#konto');
   await seite.waitForFunction(() => localStorage.getItem('schach-arena:konto:sichtbar') === '1');
-  await seite.evaluate(() => { location.hash = '#einstellungen'; });
+  await seite.evaluate(() => { location.hash = '#einstellungen/daten'; });
   await seite.waitForSelector('.daten-gruppe');
   const vorKonto = await seite.evaluate(() => {
     const g = document.querySelector('.daten-gruppe');
@@ -435,6 +436,8 @@ async function browserAblauf(browser) {
   pruefe('Browser: gesperrter Schalter bleibt aus (auch per Tipp auf den Text)', (await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').datenfreigabe)) !== 'an');
 
   // Google-Anmeldung: Weiterleitung zu Supabase /auth/v1/authorize
+  await seite.evaluate(() => { location.hash = '#einstellungen/konto'; });
+  await seite.waitForSelector('.konto-gruppe [data-konto="google"]');
   await Promise.all([seite.waitForURL(/\/auth\/v1\/authorize/), seite.click('[data-konto="google"]')]);
   const ziel = new URL(seite.url());
   pruefe('Browser: "Mit Google anmelden" leitet zu /auth/v1/authorize?provider=google mit redirect_to auf die App (#konto)',
@@ -443,9 +446,11 @@ async function browserAblauf(browser) {
   // Rueckkehr wie von Supabase: #konto#access_token=...
   const tok = token('b-user', 'b@b.de');
   await seite.goto(`${BASIS}?test#konto#access_token=${tok}&expires_at=9999999999&expires_in=3600&provider_token=GOOGLE&refresh_token=rb&token_type=bearer`);
-  await seite.waitForSelector('.daten-gruppe [data-daten="auskunft"]');
+  await seite.waitForSelector('.konto-gruppe');
   const zurueck = await seite.evaluate(() => ({ hash: location.hash, s: JSON.parse(localStorage.getItem('schach-arena:konto:sitzung') || 'null') }));
-  pruefe('Browser: Rückkehr von Google angemeldet, Tokens aus der Adresse entfernt, Einstellungen offen', zurueck.hash === '#einstellungen' && zurueck.s?.refresh_token === 'rb'
+  await seite.evaluate(() => { location.hash = '#einstellungen/daten'; });
+  await seite.waitForSelector('.daten-gruppe [data-daten="auskunft"]');
+  pruefe('Browser: Rückkehr von Google angemeldet, Tokens aus der Adresse entfernt, Einstellungen offen', zurueck.hash === '#einstellungen/konto' && zurueck.s?.refresh_token === 'rb'
     && !JSON.stringify(zurueck.s).includes('GOOGLE'), zurueck);
 
   // angemeldet: Schalter an (per Tipp auf den Text), Zustimmung
@@ -560,7 +565,7 @@ async function browserAblauf(browser) {
   }
   for (const sprache of ['en', 'de']) {
     await seite.goto(BASIS + '?test&sprache=' + sprache + '#einstellungen');
-    await seite.waitForSelector('.daten-gruppe');
+    await seite.waitForSelector('.daten-gruppe', { state: 'attached' });
     const links = await seite.locator('.es-recht a, .daten-links a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     const ende = sprache === 'en' ? '-en.html' : '.html';
     pruefe(`Browser: Info und Daten verlinken Rechtstexte in ${sprache}`, links.length === 4

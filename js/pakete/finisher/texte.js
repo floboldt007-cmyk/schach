@@ -6,12 +6,16 @@ export const DE = {
   krone: 'Krone', welle: 'Schachbrett-Welle', koenig: 'Fallender König', frei: 'Frei',
   level: 'Ab Level {level}', gewaehlt: 'Ausgewählt', gesperrt: 'Gesperrt: ab Level {level}',
   signatur: 'Signatur', einmalig: 'Erfinder · Nr. 0',
+  an: 'Finisher nach dem Matt', anText: 'Spielt kurz ab, wenn du einen Bot mattsetzt.',
+  wahlHinweis: 'Welchen Finisher du zeigst, wählst du in der Sammlung.',
 };
 export const EN = {
   titel: 'Finishers', erklaerung: 'Your short finale when you checkmate a bot.', aus: 'Off',
   krone: 'Crown', welle: 'Chessboard wave', koenig: 'Falling king', frei: 'Free',
   level: 'From level {level}', gewaehlt: 'Selected', gesperrt: 'Locked: from level {level}',
   signatur: 'Signature', einmalig: 'Creator · No. 0',
+  an: 'Finisher after checkmate', anText: 'Plays briefly when you checkmate a bot.',
+  wahlHinweis: 'Pick which finisher to show in the collection.',
 };
 
 registriereTexte('p-finisher', { de: DE, en: EN });

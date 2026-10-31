@@ -128,7 +128,7 @@ export function coachKnopf({ app = null, partie = null, zug = null, du = null } 
       b.className = 'knopf ck-konto';
       b.textContent = C('konto');
       b.addEventListener('click', () => {
-        if (document.documentElement.dataset.screen !== 'einstellungen') app.gehe('einstellungen');
+        app.gehe('einstellungen', { seite: 'konto' });   // Handy: die Konto-Seite, iPad: zur Gruppe gerollt
         requestAnimationFrame(() => {
           const g = document.querySelector('.konto-gruppe');
           if (g) g.scrollIntoView({ block: 'start', behavior: tempo() === 0 ? 'auto' : 'smooth' });

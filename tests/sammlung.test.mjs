@@ -285,12 +285,28 @@ async function erfinderTeil(browser) {
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
   let quellen = await figurenQuellen(p.s);
   pruefe('Erfinder: in der Partie stehen alle 32 Figuren im Blaupause-Satz', quellen.length === 32 && quellen.every((q) => q.includes('/blaupause/')), quellen.slice(0, 3));
-  await p.s.evaluate(() => window.__app.gehe('einstellungen'));
-  await p.s.waitForSelector('[data-finisher-wahl]', { timeout: 15000 }).catch(() => {});
-  pruefe('Erfinder: Signatur bei den Finishern wählbar', await p.s.evaluate(() => {
-    const b = document.querySelector('[data-finisher-wahl="signatur"]');
-    return !!b && !b.disabled && /Erfinder · Nr\. 0/.test(b.textContent);
-  }));
+  // Finisher waehlt man seit 31.10.2026 nur in der Sammlung (Flo: nichts doppelt); die Einstellungen haben nur noch an/aus
+  const fiStand = () => p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:finisher') || '{}'));
+  await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'finisher' }));
+  await p.s.waitForSelector('.sa-teil[data-teil="finisher-signatur"]', { timeout: 15000 }).catch(() => {});
+  pruefe('Erfinder: Signatur bei den Finishern in der Sammlung wählbar', await p.s.locator('.sa-teil[data-teil="finisher-signatur"] .sa-wahl').count() === 1);
+  await ruesteAus(p.s, 'finisher-signatur');
+  pruefe('Erfinder: Tipp rüstet die Signatur als Finisher aus', (await fiStand()).auswahl === 'signatur', await fiStand());
+  await p.s.locator('.sa-teil[data-teil="finisher-signatur"] .sa-wahl[data-ab]').click();
+  await p.s.waitForFunction(() => document.querySelector('.sa-teil[data-teil="finisher-signatur"]')?.dataset.zustand !== 'an', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Erfinder: zweiter Tipp schaltet den Finisher aus', (await fiStand()).auswahl === 'aus', await fiStand());
+  await p.s.evaluate(() => window.__app.gehe('einstellungen', { seite: 'finisher' }));   // Handy: Finisher als eigene Seite
+  await p.s.waitForSelector('.fi-schalter', { timeout: 15000 }).catch(() => {});
+  pruefe('Einstellungen: beim Finisher nur ein Schalter (aus), keine Auswahl mehr', await p.s.locator('.fi-wahl, [data-finisher-wahl]').count() === 0
+    && await p.s.locator('.fi-schalter').getAttribute('aria-checked') === 'false');
+  // angemeldet ohne Abgleich fragt die Konto-Gruppe "Welchen Spielstand behalten?"; hier egal, das Blatt schliessen
+  if (await p.s.locator('.dialog-ort .knopf').count()) {
+    await p.s.keyboard.press('Escape');
+    await p.s.waitForFunction(() => !document.querySelector('.dialog-ort .knopf'), null, { timeout: 5000 }).catch(() => {});
+  }
+  await p.s.locator('.fi-schalter').click();
+  pruefe('Einstellungen: Einschalten bringt den zuletzt gewählten Finisher zurück (Signatur)', (await fiStand()).auswahl === 'signatur'
+    && await p.s.locator('.fi-schalter').getAttribute('aria-checked') === 'true', await fiStand());
   await p.s.evaluate(() => window.__app.gehe('ich'));
   await p.s.waitForSelector('.pr-karte', { timeout: 15000 }).catch(() => {});
   const erProfil = await p.s.evaluate(() => ({ titel: document.querySelector('.pr-karte .pr-chip-titel')?.textContent,
@@ -310,9 +326,10 @@ async function erfinderTeil(browser) {
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
   quellen = await figurenQuellen(p.s);
   pruefe('Ohne Sonderstücke: Standardfiguren, auch wenn die Einstellung blaupause sagt', quellen.length === 32 && !quellen.some((q) => q.includes('blaupause')), quellen.slice(0, 3));
-  await p.s.evaluate(() => window.__app.gehe('einstellungen'));
-  await p.s.waitForSelector('[data-finisher-wahl]', { timeout: 15000 }).catch(() => {});
-  pruefe('Ohne Sonderstücke: keine Signatur bei den Finishern', await p.s.locator('[data-finisher-wahl="signatur"]').count() === 0);
+  await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'finisher' }));
+  await p.s.waitForSelector('.sa-bereich[data-bereich="finisher"] .sa-teil', { timeout: 15000 }).catch(() => {});
+  pruefe('Ohne Sonderstücke: keine Signatur bei den Finishern', await p.s.locator('.sa-teil[data-teil="finisher-signatur"]').count() === 0
+    && await p.s.locator('.sa-bereich[data-bereich="finisher"] .sa-teil').count() === 3);
   await p.k.close();
 }
 

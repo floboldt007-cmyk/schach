@@ -472,9 +472,15 @@ async function kreaturTeil(browser) {
   await anmelden(true);
   await oeffne(seite, '#einstellungen');
   await seite.waitForSelector('.em-einstellungen', { timeout: 20000 });
-  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.em-kreaturen input[name="em-kreatur"]')].map((x) => x.value + (x.checked ? '*' : '')));
-  pruefe('Browser Labor: Erfinder waehlt die Emote-Kreatur in den Einstellungen (Keine und sechs Kreaturen)', wahl.join() === 'keine*,karo,stups,zinni,klippa,glimm,kronli', wahl);
-  await seite.locator('.em-kreaturen input[value="kronli"]').check({ force: true });
+  // Gewaehlt wird nur noch in der Sammlung (Flo 31.10.2026: nichts doppelt in den Einstellungen)
+  pruefe('Browser Labor: keine Kreaturwahl mehr in den Einstellungen', await seite.locator('.em-kreaturen, .em-k-wahl').count() === 0);
+  await seite.evaluate(() => window.__app.gehe('ich', { bereich: 'kreaturen' }));
+  await seite.waitForSelector('.sa-teil[data-teil="kreatur-kronli"]', { timeout: 20000 });
+  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="kreaturen"] .sa-teil')]
+    .map((x) => x.dataset.teil.replace('kreatur-', '') + (x.dataset.zustand === 'an' ? '*' : '')));
+  pruefe('Browser Labor: Erfinder waehlt die Emote-Kreatur in der Sammlung (sechs Kreaturen, keine ausgeruestet)', wahl.join() === 'karo,stups,zinni,klippa,glimm,kronli', wahl);
+  await seite.locator('.sa-teil[data-teil="kreatur-kronli"] .sa-wahl').click();
+  await seite.waitForFunction(() => document.querySelector('.sa-teil[data-teil="kreatur-kronli"]')?.dataset.zustand === 'an', null, { timeout: 10000 }).catch(() => {});
   const gespeichert = await seite.evaluate(() => Object.keys(localStorage).filter((k) => /einstellungen:ausdruck$/.test(k)).map((k) => localStorage.getItem(k)).join());
   pruefe('Browser Labor: Wahl steht unter ausdruck', /"kreatur":"kronli"/.test(gespeichert), gespeichert);
   await seite.evaluate(SCHNELLER_BOT);

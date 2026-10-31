@@ -120,6 +120,9 @@
 .es-nav-punkt[aria-current="true"] { color: var(--text); background: var(--flaeche-2); }
 .es-nav-punkt[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--akzent); }
 .es-nav-punkt[aria-current="true"] .es-nav-zeichen { color: var(--akzent); border-color: var(--akzent); }
+.es-nav-pfeil { display: none; }
+/* Zeile "Brett, Figuren und Klaenge": fuehrt in die Sammlung (dort wird gewaehlt, nicht mehr hier) */
+.es-aussehen .knopf { flex: none; min-height: 44px; }
 .es-inhalt .es-gruppe { scroll-margin-top: 96px; }
 .es-block, .es-untergruppe { margin: 12px 0; }
 .es-block h4, .es-untergruppe h4, .es-gruppe > h4 { margin: 14px 0 8px; font-size: 15px; }
@@ -143,6 +146,22 @@
   .es-nav-punkt[aria-current="true"]::before { left: 14px; right: 14px; top: auto; bottom: 2px; width: auto; height: 2px; }
   .es-inhalt .es-gruppe { scroll-margin-top: 128px; }
   .es-layout .es-inhalt { padding: 0; }
+  /* Handy (Flo 31.10.2026, Bild vom Menue bei chess.com): erst die Liste der Bereiche, ein Tipp oeffnet den Bereich als
+     eigene Seite mit seinem Namen im Kopf (js/ui/einstellungen.js wendeModusAn) */
+  .es-screen.es-liste .es-inhalt { display: none; }
+  .es-screen.es-liste .es-nav { position: static; flex-direction: column; gap: 0; margin: 4px 0 12px; padding: 4px 0; overflow: visible; }
+  .es-screen.es-liste .es-nav-punkt { min-height: 56px; padding: 0 12px 0 14px; gap: 12px; border-radius: 0; color: var(--text); }
+  .es-screen.es-liste .es-nav-punkt + .es-nav-punkt { box-shadow: inset 0 1px 0 var(--linie); }
+  .es-screen.es-liste .es-nav-punkt::before { display: none; }
+  .es-screen.es-liste .es-nav-text { flex: 1 1 auto; white-space: normal; font-size: 16px; }
+  .es-screen.es-liste .es-nav-zeichen { width: 34px; height: 34px; border-radius: 10px; color: var(--akzent); }
+  .es-screen.es-liste .es-nav-zeichen svg { width: 19px; height: 19px; }
+  .es-screen.es-liste .es-nav-pfeil { display: grid; place-items: center; flex: none; color: var(--text-2); }
+  .es-screen.es-liste .es-nav-pfeil svg { width: 18px; height: 18px; }
+  .es-screen.es-seite .es-nav { display: none; }
+  .es-screen.es-seite .es-inhalt .es-gruppe:not(.es-offen) { display: none; }
+  .es-screen.es-seite .es-inhalt .es-gruppe.es-offen > h3:first-child { display: none; }
+  .es-screen.es-seite .es-inhalt .es-gruppe.es-offen { margin-top: 4px; }
 }
 
 .konto-gruppe label { display: grid; gap: var(--abstand-1, .4rem); margin: var(--abstand-2, .75rem) 0; font-weight: 700; }
@@ -154,8 +173,4 @@
 .konto-gruppe .konto-ziffern input { width: 2.6rem; padding-inline: .2rem; text-align: center; font-size: 1.25rem; }
 .konto-gruppe .konto-status { font-size: .9rem; }
 .konto-gruppe .konto-status[data-fehler="ja"] { color: var(--gefahr, #a32626); }
-/* Labor (Flo 31.10.2026): Stuecke nur im Erfinder-Konto, mit kleinem Schild wie in der Sammlung */
-.es-brett.es-labor { position: relative; }
-.es-labor-schild { position: absolute; top: 6px; right: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800;
-  letter-spacing: .04em; color: #F5C451; background: #1C1B19; }
 

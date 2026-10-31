@@ -458,14 +458,21 @@ async function testeVerlaufEinstellungen(seite, h, fehler, id) {
   await h.tippe('.screen.arena [data-aktion="einstellungen"]');
   await h.screen('einstellungen');
   pruefe('Hash #einstellungen', (await h.hash()) === '#einstellungen');
-  await h.tippe('.es-brett[data-wert="holz"]');
-  pruefe('Holz gewählt, wirkt sofort', (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz'
-    && await seite.locator('.es-brett[data-wert="holz"][aria-checked="true"]').count() === 1);
+  // Brett, Figuren und Klaenge waehlt man seit 31.10.2026 nur in der Sammlung (Flo: nichts doppelt); die Zeile fuehrt hin
+  await h.tippe('.es-zur-sammlung');
+  await h.screen('ich');
+  pruefe('„Zur Sammlung“ führt in die Sammlung', (await h.hash()) === '#ich');
+  await seite.locator('.sa-teil[data-teil="brett-holz"] .sa-wahl').click();
+  await seite.waitForFunction(() => document.documentElement.dataset.brett === 'holz', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Holz in der Sammlung gewählt, wirkt sofort', (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz');
+  await seite.goBack();
+  await h.screen('einstellungen');
+  pruefe('Kein Brett mehr in den Einstellungen', await seite.locator('.es-brett').count() === 0);
   await h.tippe('.es-schalter[data-key="klang"]');
   pruefe('Klang aus', await seite.locator('.es-schalter[data-key="klang"][aria-checked="false"]').count() === 1);
   await seite.reload();
   await h.screen('einstellungen');
-  pruefe('Neuladen: Einstellungen bleiben (Holz, Klang aus)', await seite.locator('.es-brett[data-wert="holz"][aria-checked="true"]').count() === 1
+  pruefe('Neuladen: Einstellungen bleiben (Holz, Klang aus)', (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz'
     && await seite.locator('.es-schalter[data-key="klang"][aria-checked="false"]').count() === 1);
   await seite.goBack();
   await h.screen('arena');
@@ -519,7 +526,7 @@ async function testePartie(seite, h, fehler) {
   // Einstellungen aus der Partie und zurueck
   await h.tippe('.screen.partie [data-aktion="einstellungen"]');
   await h.screen('einstellungen');
-  await h.tippe('.es-brett[data-wert="nacht"]');
+  await seite.evaluate(() => window.__app.setzeEinstellungen({ brett: 'nacht' }));
   await h.tippe('.es-screen .kopf [data-aktion="zurueck"]');
   await h.screen('partie');
   await h.warteBereit();
@@ -566,7 +573,7 @@ async function testeOffline(kontext, seite, h, fehler, fehlgeschlagen, id) {
   pruefe('Offline: Verlauf-Screen', await seite.locator('.vl-zeile').count() >= 1);
   await seite.evaluate(() => window.__app.gehe('einstellungen'));
   await h.screen('einstellungen');
-  pruefe('Offline: Einstellungen-Screen', await seite.locator('.es-brett').count() === 3);
+  pruefe('Offline: Einstellungen-Screen', await seite.locator('.es-zur-sammlung').count() === 1 && await seite.locator('.es-inhalt .es-gruppe').count() >= 6);
   // Ganz neuer Start ohne Netz (neuer Tab, Startadresse wie vom Home-Bildschirm)
   const neu = await kontext.newPage();
   await neu.goto(START);
