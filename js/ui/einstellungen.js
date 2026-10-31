@@ -17,7 +17,7 @@ import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
-import { LABOR_BRETTER, laborFrei } from '../labor.js';
+import { LABOR_BRETTER, LABOR_KLAENGE, laborFrei } from '../labor.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -155,7 +155,8 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-klang">${E('gruppe.klang')}</h3>
           ${schalter('klang', E('klang.titel'), E('klang.text'),
             `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} ${E('klang.probe')}</button>`)}
-          ${segment('klangpaket', E('klang.paket'), [['',E('klang.paketAnsicht')],['arcade',E('klang.paketArcade')],['holz',E('klang.paketHolz')]])}
+          ${segment('klangpaket', E('klang.paket'), [['',E('klang.paketAnsicht')],['arcade',E('klang.paketArcade')],['holz',E('klang.paketHolz')],
+            ...(laborFrei() ? LABOR_KLAENGE.map((k) => [k, E('klang.paket.' + k), E('labor')]) : [])])}
           <label class="es-regler"><span><b>${E('klang.lautstaerke')}</b><output>${E('prozent', { wert: 80 })}</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
           ${segment('klangstufe', E('klang.stufe'), [['alle',E('klang.alle')],['wichtig',E('klang.wichtig')],['aus',t('allgemein.aus')]])}
           <div class="es-untergruppe"><h4>${E('klang.einzeln')}</h4>${['brett','bewertung','feier','uhr','boss','finisher','bedienung'].map((k) => schalter(`klanggruppe-${k}`,E('klang.' + k),'')).join('')}</div>

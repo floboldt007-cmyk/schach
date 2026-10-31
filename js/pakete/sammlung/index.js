@@ -10,7 +10,7 @@ import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
-import { LABOR_BRETTER, LABOR_FIGUREN, laborFrei, brettWahl } from '../../labor.js';
+import { LABOR_BRETTER, LABOR_FIGUREN, LABOR_KLAENGE, laborFrei, brettWahl, klangWahl } from '../../labor.js';
 import { figurenSatz } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
@@ -59,9 +59,12 @@ export function teileFiguren(e = ladeEinstellungen(), app = null) {
 
 export function teileKlaenge(e = ladeEinstellungen(), app = null) {
   // '' heisst: Standard der Ansicht (heute Arcade, js/sounds.js)
-  const gewaehlt = PAKETE_KLANG[e.klangpaket] ? e.klangpaket : 'arcade';
-  const sets = Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'),
-    bild: klangKunst(id) || klangBild, gruppe: S('gruppe.klangsets'), wahl: wahlVon(app, { klangpaket: id }) }));
+  // Labor-Klangsets (Grusel, Kristall) nur fuer den Erfinder (js/labor.js), mit Schild "Labor"
+  const labor = laborFrei() ? LABOR_KLAENGE : [];
+  const p = klangWahl(e.klangpaket);
+  const gewaehlt = PAKETE_KLANG[p] || labor.includes(p) ? p : 'arcade';
+  const sets = [...Object.keys(PAKETE_KLANG), ...labor].map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'),
+    bild: klangKunst(id) || klangBild, labor: labor.includes(id), gruppe: S('gruppe.klangsets'), wahl: wahlVon(app, { klangpaket: id }) }));
   // Lobby-Musik (Paket musik, Ort sammlung:musik?): ohne das Paket gibt es sie nicht, dann nur die Klangsets
   let musik = null;
   try { musik = waehle('sammlung:musik?', {}); } catch (e) { musik = null; }
