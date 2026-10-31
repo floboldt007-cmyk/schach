@@ -56,6 +56,8 @@ try {
     if (url.pathname === '/auth/v1/otp') return antwort({});
     if (url.pathname === '/auth/v1/verify') return antwort(sitzung);
     if (url.pathname === '/rest/v1/spielstaende') return antwort([]);
+    // Erfinder-Status: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (js/app.js); hier keine Stuecke
+    if (url.pathname === '/rest/v1/sonderstuecke') return antwort([]);
     if (url.pathname === '/rest/v1/profile') return antwort([{ user_id: 'u1', benutzername: 'Spieler_1' }]);
     if (url.pathname === '/rest/v1/partien_online') {
       if (url.searchParams.has('status')) return antwort([...partien.values()].filter(p => p.status === 'beendet'));

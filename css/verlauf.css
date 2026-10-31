@@ -107,3 +107,8 @@
   .vl-juwel-symbol { width: 26px; height: 26px; }
   .vl-juwel-text b { font-size: 14px; }
 }
+
+/* Handy (Flo 31.10.2026 abends: "zu gross"): leerer Verlauf mit kleinerem Titel */
+@media (max-width: 520px) {
+  .vl-leer h3 { font-size: 19px; }
+}

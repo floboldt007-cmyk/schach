@@ -368,7 +368,8 @@ async function schrittZwei(browser) {
       aufgaben: [{ id: 'aufgabe', titel: 'Play Thorsten', art: 'bot', ziel: { bot: 'rudi', sterne: 2 }, faellig: '2026-10-30', erledigt: 0 }] };
       else if (u.pathname.endsWith('/ist_premium')) body = false;
       else if (u.pathname === '/rest/v1/produkte') body = [{ id: 'trainer', name: 'Crownmate Trainer', preis_text: 'Test price from server', beschreibung: 'Training for your chess', kauf_link: 'https://buy.stripe.com/test_probe' }];
-      else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];
+      // Sonderstuecke: die App fragt seit dem 31.10.2026 fuer jedes angemeldete Konto nach (Erfinder-Status, js/app.js)
+      else if (['/rest/v1/abos', '/rest/v1/profile', '/rest/v1/spielstaende', '/rest/v1/sonderstuecke'].includes(u.pathname) || u.pathname.endsWith('/online_meine') || u.pathname === '/rest/v1/partien_online') body = [];
       else if (u.pathname === '/functions/v1/coach') body = { text: 'Develop your knight and protect the center.', rest: 4, modell: 'probe' };
       else { unerwartet.push(u.pathname); body = {}; }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });

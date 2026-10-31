@@ -294,3 +294,13 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
   .pk-schimmer .pk-text, .pk-schimmer .pk-wert { animation: none; }
 }
 :root[data-bewegung="aus"] .pk-schimmer .pk-text, :root[data-bewegung="aus"] .pk-schimmer .pk-wert { animation: none; }
+
+/* Handy (Flo 31.10.2026 abends: "zu gross"): leere Bestenliste und die Zahlen der besten Partie kleiner */
+@media (max-width: 520px) {
+  .bl-leer-gross { gap: 6px; padding: 4px 2px; }
+  .bl-leer-gross b { font-size: 19px; }
+  .bl-leer-gross span { font-size: 13.5px; }
+  .bl-s-leer { font-size: 14px; }
+  .bl-s-zahlen div { padding: 8px 10px; }
+  .bl-s-zahlen dd { font-size: 20px; }
+}
