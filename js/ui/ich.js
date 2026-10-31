@@ -16,7 +16,7 @@
 //   freischalten()                                nur js/pakete/sammlung/index.js
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
-import { segment } from './bauteile.js';
+import { segment, wischKanten } from './bauteile.js';
 import { staffel, tempo } from '../bewegung.js';
 import { ladeModulEinstellungen, speichereModulEinstellungen } from '../storage.js';
 import { t } from '../sprache.js';
@@ -59,7 +59,7 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
       : abwaehlbar ? `<button type="button" class="sa-wahl" data-ab aria-label="${esc(t('rahmen.sammlung.ausschalten', { name: x.name }))}"></button>` : '';
     return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}${waehlbar || abwaehlbar ? ' data-waehlbar' : ''}>${knopf}
       <span class="sa-bild" aria-hidden="true">${bild}${schild}</span>
-      <span class="sa-text"><b>${esc(x.name)}</b><span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
+      <span class="sa-text"><b>${esc(x.name)}</b>${schild ? `<span class="sa-text-schild">${schild}</span>` : ''}<span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
   }).join('')}</div>`).join('')}${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
   const wahlen = new Map([
     ...teile.filter((x) => x.frei && !x.an && typeof x.wahl === 'function').map((x) => [String(x.id), { fn: x.wahl, ab: false }]),
@@ -129,6 +129,7 @@ function zeigeIch(root, params = {}, app) {
       } });
     const steuer = s.querySelector('.sa-steuer');
     steuer.append(seg.el);
+    wischKanten(steuer);
     // Handy: die Leiste wischt waagrecht; der gewaehlte Reiter steht beim Oeffnen in der Mitte, nicht ausserhalb
     requestAnimationFrame(() => {
       const an = seg.el.querySelector('[aria-checked="true"]');

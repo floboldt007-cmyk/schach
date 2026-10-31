@@ -444,6 +444,13 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   .arena .knoten .k-nr { width: 23px; height: 23px; font-size: 12px; left: -6px; }
   .arena .knoten .schloss { width: 25px; height: 25px; right: -6px; }
   .arena .flo-figur { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+  /* Weltwahl kompakter (Flo 31.10., iPhone: Titel und Pfeile lagen ueber den Bots); in Welt 1 kein grauer Pfeil.
+     Die Pfeile bleiben 44 px (Tippflaeche). */
+  .arena .weltwahl { top: 8px; gap: 5px; }
+  .arena .ww-pfeil:disabled { visibility: hidden; }
+  .arena .ww-mitte { padding: 3px 14px; }
+  .arena .ww-name { font-size: 15px; }
+  .arena .ww-unter { font-size: 12px; }
 }
 @media (max-width: 380px) {
   .arena .knoten .k-meta { display: none; }
