@@ -158,7 +158,8 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .sa-geheim { filter: grayscale(1) brightness(.45); opacity: .8; }
 /* Eigene Bilder je Stueck (Flo 30.10.: Klangsets mit gleichem Lautsprecher "braucht ein besseres Design") */
 .sa-bild > svg.sk-klang, .sa-bild > svg.sk-erfolg, .sa-geheim > svg.sk-erfolg, .sa-geheim > svg.sk-klang { width: 70px; height: 70px; }
-.sa-bild > svg.sk-brett { width: 64px; height: 64px; }
+.sa-bild > svg.sk-brett { width: 72px; height: 72px; }
+.sa-bild > svg.sk-finisher, .sa-geheim > svg.sk-finisher { width: 76px; height: 76px; }
 /* Erfolge in Gruppen (Meilensteine, Welten, Liga, Serie, Level) mit "n / m" (Flo 30.10. abends: "in meinem Stil") */
 .sa-gruppe { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 18px 2px 8px; font-size: 13px; font-weight: 800;
   letter-spacing: var(--lw-ueber); text-transform: uppercase; color: var(--text-2); }
@@ -189,4 +190,14 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
   .sa-bild > .sa-schild { display: none; }
   .sa-text-schild { display: flex; margin: 1px 0 1px; }
   .sa-text-schild > .sa-schild { position: static; font-size: 11px; padding: 2px 8px; }
+}
+
+/* Handy schmal: Profilkarte dichter, die Vitrine kleiner, der Hilfesatz entfaellt (Flo 31.10.2026: "einfach und
+   uebersichtlich") */
+@media (max-width: 520px) {
+  .pr-av { width: 60px; height: 60px; }
+  .pr-orden { min-height: 70px; padding: 8px 4px; gap: 4px; }
+  .pr-orden-bild { width: 32px; height: 32px; }
+  .pr-plus { font-size: 22px; line-height: 32px; }
+  .pr-hilfe { display: none; }
 }
