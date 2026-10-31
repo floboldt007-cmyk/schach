@@ -88,6 +88,8 @@
 .ls-meldung[data-art="geschafft"] { background: var(--flaeche); box-shadow: var(--s2), var(--kante); }
 .ls-meldung[data-art="geschafft"] b { font-family: var(--display); font-size: 24px; color: var(--kt-bester); }
 .ls-meldung[data-art="geschafft"] .ms-sterne .ico { width: 30px; height: 30px; }
+/* Zugfolge: nach jedem richtigen Zug der Zug (gross) und warum man ihn spielt */
+.ls-meldung[data-art="info"] b { font-family: var(--display); font-size: 20px; color: var(--akzent-text); }
 .ls-symbol { flex: none; width: 44px; height: 44px; border-radius: var(--r-pille); display: grid; place-items: center;
   background: var(--flaeche-3); color: var(--text-2); }
 .ls-symbol .ico { width: 24px; height: 24px; }
