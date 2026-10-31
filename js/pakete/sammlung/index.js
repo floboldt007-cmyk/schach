@@ -38,11 +38,11 @@ const wahlVon = (app, teil) => (app && typeof app.setzeEinstellungen === 'functi
 export function teileBretter(e = ladeEinstellungen(), app = null) {
   const an = brettWahl(e.brett);
   // Labor (Flo 31.10.2026): Kuerbis, Frost, Marmor, Nussbaum, Thron nur im Erfinder-Konto (js/labor.js)
-  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true]) : [])];
+  const liste = [...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => [b.id, b.hell, b.dunkel, b.rand, true, b.muster]) : [])];
   // echte Figuren des ausgeruesteten Satzes (Flo 31.10.: "der Koenig sieht ganz anders aus")
   const figuren = new URL('../../../' + figurenPfad(e), import.meta.url).href;
-  return liste.map(([id, h, d, r, labor]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),
-    bild: brettKunst(h, d, r, figuren), labor: !!labor, wahl: wahlVon(app, { brett: id }) }));
+  return liste.map(([id, h, d, r, labor, muster]) => ({ id: 'brett-' + id, name: S('brett.' + id), frei: true, an: an === id, zeile: an === id ? S('an') : S('frei'),
+    bild: brettKunst(h, d, r, figuren, muster), labor: !!labor, wahl: wahlVon(app, { brett: id }) }));
 }
 
 // Figurensaetze: Klassisch fuer alle, Blaupause mit Sonderstueck, die Saetze des Labors fuer den Erfinder. Bild: weisser

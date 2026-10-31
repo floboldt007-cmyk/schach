@@ -68,6 +68,7 @@ export function zeige(root, params, app) {
   const folge = art === 'folge';
   const flo = folge && l.farbe === 'b' ? 'b' : 'w';
   const zielText = folge ? S('zielFolge', { n: l.ziel }) : art === 'umwandeln' ? S('zielUmwandeln', { n: l.ziel }) : art === 'gewinnen' ? S('zielGewinnen', { n: l.ziel })
+    : art === 'taktik' ? S('zielTaktik', { n: l.ziel, p: l.gewinn })
     : art === 'halten' ? S('zielHalten', { n: l.ziel }) : l.ziel === 1 ? S('zielEins') : S('ziel', { n: l.ziel });
   const titel = S('titel.' + l.id);
   const einst = (() => { try { return typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
