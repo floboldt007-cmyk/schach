@@ -51,6 +51,28 @@ const KLANG = {
       + '<path d="M86 22h6v4h4v4h-4v12h-2a4 4 0 1 1 0-4h2v-8h-2v-4h-4Z" fill="#FFE14D" transform="translate(-2 2)"/>'
       + funke(24, 26, 0.8, 0.3, '#3EF2E6');
   },
+  // Grusel (Labor, Halloween): Kuerbislaterne mit leuchtendem Gesicht, violette Schallbogen wie Nebel
+  grusel: () => {
+    const g = id('g');
+    return `<defs>${verlauf(g, ['#FFB04A', '#F28C28', '#C9601A'])}</defs>`
+      + '<ellipse cx="54" cy="96" rx="36" ry="8" fill="#2B1638" opacity=".35"/>'
+      + '<path d="M51 30c-2-6 1-11 6-13" fill="none" stroke="#3E6B2A" stroke-width="5" stroke-linecap="round"/>'
+      + `<ellipse cx="38" cy="64" rx="20" ry="28" fill="url(#${g})" stroke="#7A3A0E" stroke-width="2"/>`
+      + `<ellipse cx="70" cy="64" rx="20" ry="28" fill="url(#${g})" stroke="#7A3A0E" stroke-width="2"/>`
+      + `<ellipse cx="54" cy="64" rx="18" ry="30" fill="url(#${g})" stroke="#7A3A0E" stroke-width="2"/>`
+      + '<path class="rk rk-atmen" d="M38 56l8-8 8 8ZM58 56l8-8 8 8ZM36 72q18 14 36 0l-5 7-4-4-5 6-4-6-5 6-4-6-4 4Z" fill="#FFE14D"/>'
+      + [[14, 4, 0.9], [24, 3.2, 0.6], [34, 2.6, 0.35]].map(([r, w, o], i) => `<path class="rk rk-atmen" d="M${92 + i * 2} ${54 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#9B6BD0" stroke-width="${w}" stroke-linecap="round" opacity="${o}" style="animation-delay:${(i * 0.35).toFixed(2)}s"/>`).join('');
+  },
+  // Kristall (Labor, Winter): Eiskristall mit sechs Armen auf blauer Scheibe, Funken
+  kristall: () => {
+    const g = id('k');
+    const arm = (w) => `<g transform="rotate(${w} 60 60)"><path d="M60 60V22M60 34l-8-8M60 34l8-8M60 46l-6-6M60 46l6-6" fill="none" stroke="url(#${g})" stroke-width="4.5" stroke-linecap="round"/></g>`;
+    return `<defs>${verlauf(g, ['#FFFFFF', '#BFE3FF', '#7FB8E6'])}</defs>`
+      + '<circle cx="60" cy="60" r="48" fill="#1E3A5F"/><circle cx="60" cy="60" r="48" fill="none" stroke="#7FB8E6" stroke-width="2" opacity=".6"/>'
+      + `<g class="rk rk-atmen" style="transform-origin:60px 60px">${[0, 60, 120, 180, 240, 300].map(arm).join('')}</g>`
+      + '<circle cx="60" cy="60" r="6" fill="#fff"/>'
+      + funke(28, 30, 0.9, 0.2) + funke(92, 36, 0.7, 0.8) + funke(88, 90, 0.8, 1.3);
+  },
 };
 
 export function klangKunst(kid) {

@@ -6,9 +6,11 @@
 //
 //   LABOR_BRETTER   [{ id, hell, dunkel, rand }]   Farben wie css/tokens.css html[data-brett="<id>"], rand fuers Sammelbild
 //   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/labor-figuren.mjs)
-//   istLabor(art, id) -> boolean               art 'brett' | 'figuren'
+//   LABOR_KLAENGE   ['grusel', 'kristall']    Klangsets unter assets/klang/<id>/ (werkzeuge/labor-klaenge.mjs, js/sounds.js)
+//   istLabor(art, id) -> boolean               art 'brett' | 'figuren' | 'klang'
 //   laborFrei() -> boolean                     nur der Erfinder
 //   brettWahl(id) -> id                        ein Labor-Brett ohne Erfinder faellt still auf 'nacht'
+//   klangWahl(id) -> id                        ein Labor-Klangset ohne Erfinder faellt still auf '' (Standard der Ansicht)
 import { istErfinder } from './sonderstuecke.js';
 
 export const LABOR_BRETTER = Object.freeze([
@@ -19,11 +21,14 @@ export const LABOR_BRETTER = Object.freeze([
   Object.freeze({ id: 'thron', hell: '#f2e2ae', dunkel: '#b0812a', rand: '#5C3D0A' }),
 ]);
 export const LABOR_FIGUREN = Object.freeze(['kuerbis', 'frost', 'gold']);
+export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
 
 export function istLabor(art, id) {
   if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id);
   if (art === 'figuren') return LABOR_FIGUREN.includes(id);
+  if (art === 'klang') return LABOR_KLAENGE.includes(id);
   return false;
 }
 export const laborFrei = () => istErfinder();
 export const brettWahl = (id) => (istLabor('brett', id) && !laborFrei() ? 'nacht' : id);
+export const klangWahl = (id) => (istLabor('klang', id) && !laborFrei() ? '' : id);

@@ -321,6 +321,14 @@ async function laborTeil(browser) {
   await warte(300);
   await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
+  const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
+  pruefe('Labor: Klangsets Grusel und Kristall mit Schild', klaenge === 'klang-grusel,klang-kristall', klaenge);
+  await p.s.locator('.sa-teil[data-teil="klang-grusel"] .sa-wahl').click();
+  await warte(500);
+  pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
+    const { klang } = await import('./js/sounds.js');
+    return klang.vorrat().paket === 'grusel' && document.querySelector('.sa-teil[data-teil="klang-grusel"]')?.dataset.zustand === 'an';
+  }));
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
   let quellen = await figurenQuellen(p.s);
@@ -330,8 +338,12 @@ async function laborTeil(browser) {
 
   // anderes Konto, Einstellungen von Hand auf Labor gesetzt: nichts davon wirkt, nichts davon ist zu sehen
   p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: [] }, bereich: 'bretter',
-    vorher: { 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'kuerbis', figuren: 'kuerbis' }) } });
+    vorher: { 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'kuerbis', figuren: 'kuerbis', klangpaket: 'grusel' }) } });
   await warte(500);
+  pruefe('Ohne Labor: Klang bleibt beim Standard (Arcade), kein Grusel in der Sammlung', await p.s.evaluate(async () => {
+    const { klang } = await import('./js/sounds.js');
+    return klang.vorrat().paket === 'arcade' && !document.querySelector('[data-teil="klang-grusel"]');
+  }));
   pruefe('Ohne Labor: Brett bleibt Nacht, keine Labor-Teile, kein Figuren-Bereich', await p.s.evaluate(() => document.documentElement.dataset.brett === 'nacht'
     && !document.querySelector('.sa-labor') && !document.querySelector('.seg[data-wert="figuren"]')));
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
