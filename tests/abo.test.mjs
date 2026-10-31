@@ -400,8 +400,9 @@ async function browserTeil(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { konto: false });
     await zuEinstellungen(seite);
     await warte(300);
-    pruefe('ohne sichtbares Konto keine Abo-Gruppe (wie das Konto zuerst nur fuer Flo)', (await seite.locator('.abo-gruppe').count()) === 0
-      && (await seite.locator('.konto-gruppe').count()) === 0);
+    // Seit 31.10.2026 ist die Konto-Gruppe fuer alle da; das Abo bleibt Testbereich hinter #konto
+    pruefe('ohne Freischaltung keine Abo-Gruppe, die Konto-Gruppe ist fuer alle da', (await seite.locator('.abo-gruppe').count()) === 0
+      && (await seite.locator('.konto-gruppe').count()) === 1);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }
@@ -823,8 +824,8 @@ async function browserTeil(browser) {
     pruefe('Knopf "Mehr zum Trainer" oeffnet das Blatt', (await seite.locator('.trainer-karte h3').innerText()) === 'Crownmate Trainer');
     await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand !== 'laedt');
     const ohneKonto = await blattZustand(seite);
-    pruefe('Konto noch nicht freigeschaltet: kein "Zum Konto" (dort gibt es keine Gruppe Konto), sondern "in Vorbereitung"', ohneKonto.zustand === 'vorschau'
-      && !ohneKonto.knoepfe.includes('Zum Konto') && (await seite.locator('.konto-gruppe').count()) === 0, ohneKonto);
+    pruefe('Abo nicht freigeschaltet: kein "Zum Konto", sondern "in Vorbereitung"', ohneKonto.zustand === 'vorschau'
+      && !ohneKonto.knoepfe.includes('Zum Konto'), ohneKonto);
     const t = await fairPruefung(seite);
     pruefe('Fairness (Hinweis): kein Druck, kein Countdown', fair(t), t.text.slice(0, 200));
     await seite.keyboard.press('Escape');
