@@ -195,9 +195,43 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 /* Handy schmal: Profilkarte dichter, die Vitrine kleiner, der Hilfesatz entfaellt (Flo 31.10.2026: "einfach und
    uebersichtlich") */
 @media (max-width: 520px) {
-  .pr-av { width: 60px; height: 60px; }
-  .pr-orden { min-height: 70px; padding: 8px 4px; gap: 4px; }
-  .pr-orden-bild { width: 32px; height: 32px; }
-  .pr-plus { font-size: 22px; line-height: 32px; }
+  .pr-av { width: 52px; height: 52px; }
+  .pr-orden { min-height: 58px; padding: 6px 4px; gap: 2px; }
+  .pr-orden-bild { width: 28px; height: 28px; }
+  .pr-plus { font-size: 20px; line-height: 28px; }
   .pr-hilfe { display: none; }
+  .pr-karte { padding: 12px; gap: 8px; }
+  .pr-kopf { gap: 12px; }
+  .pr-name { gap: 2px; }
+  .pr-name b { font-size: 19px; }
+  .pr-vitrine-titel { margin: 0; font-size: 12.5px; }
+  .pr-orden b, .pr-orden-knopf b { font-size: 12px; }
+}
+
+/* Handy (Flo 31.10.2026 abends, iPhone-Bilder: "immer noch zu unuebersichtlich, die Sachen sind zu gross"): drei
+   Kacheln je Reihe statt zwei, kleinere Bilder und Namen; so sieht man einen ganzen Bereich fast auf einen Blick.
+   Jede Kachel bleibt eine Tippflaeche von gut 100 x 100 px. */
+@media (max-width: 520px) {
+  .sa-rumpf { gap: 10px; }
+  .sa-stand { font-size: 13.5px; }
+  .sa-gruppe { margin: 12px 2px 6px; font-size: 12.5px; }
+  .sa-raster { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .sa-raster > .sa-teil { gap: 6px; padding: 6px 6px 8px; border-radius: var(--r-m, 14px); }
+  .sa-raster > .sa-teil .sa-bild { height: 64px; border-radius: 10px; }
+  .sa-raster > .sa-teil .sa-bild > svg, .sa-raster > .sa-teil .sa-bild > img, .sa-raster > .sa-teil .sa-geheim > svg { width: 48px; height: 48px; }
+  .sa-raster > .sa-teil .sa-bild .sa-brett { width: 46px; height: 46px; border-radius: 6px; }
+  .sa-raster > .sa-teil .sa-bild .sa-zahl { font-size: 24px; }
+  .sa-raster > .sa-teil .sa-frage { font-size: 22px; }
+  .sa-raster > .sa-teil .sk-figuren { width: 50px; height: 50px; }
+  .sa-raster > .sa-teil .sk-figuren img { width: 24px; height: 24px; margin: 0 -2px 9px; }
+  .sa-raster > .sa-teil .sa-text { gap: 1px; padding: 0 2px; }
+  .sa-raster > .sa-teil .sa-text b { font-size: 13px; line-height: 1.2; hyphens: auto; overflow-wrap: break-word; }
+  .sa-raster > .sa-teil .sa-zeile { font-size: 12px; line-height: 1.25; }
+}
+/* sehr schmale Handys (iPhone SE, viele Android-Geraete): Namen etwas kleiner; lange Woerter wie "Sonnwendfeuer" trennt
+   der Browser per hyphens (lang="de" in index.html) */
+@media (max-width: 380px) {
+  .sa-raster { gap: 6px; }
+  .sa-raster > .sa-teil { padding: 5px 5px 7px; }
+  .sa-raster > .sa-teil .sa-text b { font-size: 12px; }
 }

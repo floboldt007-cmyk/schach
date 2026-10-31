@@ -155,6 +155,6 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
    die Erklaerzeile darunter entfaellt, damit der Inhalt ohne Scrollen beginnt */
 @media (max-width: 520px) {
   .seiten-kopf { padding-top: 8px; padding-bottom: 4px; }
-  .seiten-kopf h1 { font-size: 34px; }
+  .seiten-kopf h1 { font-size: 28px; }   /* Flo 31.10. abends (iPhone-Bilder): 34 px wirkte zu gross */
   .seiten-kopf p { display: none; }
 }
