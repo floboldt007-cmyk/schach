@@ -99,7 +99,8 @@
   Daten dieser App in diesem Browser löschst du über die Website-Daten deines Browsers; dein Konto und deine
   Cloud-Sicherung bleiben dabei bestehen (Konto löschen: Abschnitt 5).</p>
   <p>Mit einem Konto speichert das Gerät außerdem deine Anmeldung (Sitzungs-Token mit deinen Kontoangaben: E-Mail-Adresse,
-  bei Google auch Name, Adresse des Profilbilds und Google-Kennung), eine Rückfallkopie deines Spielstands vor einer
+  bei Google auch Name, Adresse des Profilbilds und Google-Kennung, bei Apple die Apple-Kennung und, falls freigegeben,
+  der Name), eine Rückfallkopie deines Spielstands vor einer
   Übernahme aus der Cloud, einen Merker, ob dieses Gerät schon mit der Cloud abgeglichen ist, Merker für Abo und
   Altersangabe, den Nachweis deiner Einwilligung und eine Warteschlange für noch nicht übermittelte Daten. Folgst du einem
   Einladungslink, merkt sich das Gerät die offene Online-Einladung, auch ohne Konto. Diese Daten dienen nur der jeweiligen
@@ -113,11 +114,14 @@
 
   <h2>5. Konto (freiwillig)</h2>
   <p>Mit einem Konto wird dein Spielstand in der Cloud gesichert, damit du auf mehreren Geräten weiterspielen kannst.
-  Du meldest dich mit deiner E-Mail-Adresse und einem einmaligen Code an oder über dein Google-Konto.</p>
+  Du meldest dich mit deiner E-Mail-Adresse und einem einmaligen Code an oder über dein Google-Konto; sobald die App die
+  Anmeldung mit Apple anbietet, auch über deine Apple-ID.</p>
   <h3>Welche Daten</h3>
   <ul>
     <li>E-Mail-Adresse und Zeitpunkte der Anmeldung,</li>
     <li>bei Anmeldung mit Google: E-Mail-Adresse, Name und Profilbild-Adresse laut deinem Google-Profil sowie eine Google-Nutzerkennung,</li>
+    <li>bei Anmeldung mit Apple: E-Mail-Adresse (auf Wunsch eine Weiterleitungsadresse von Apple), der Name, falls du ihn
+    freigibst, sowie eine Apple-Nutzerkennung,</li>
     <li>ein selbst gewählter Benutzername,</li>
     <li>wenn du Freunde hinzufügst: wer mit wem befreundet ist oder eine Anfrage geschickt hat (mit Zeitpunkt), dein
     Einladungscode (7 Tage gültig) und deine Wochenwertung (Punkte und Zahl der gewerteten Partien je Woche). Deine Freunde
@@ -144,11 +148,19 @@
   Zugriff auf weitere Google-Daten (Kontakte, Kalender, Dateien) erhält Crownmate nicht. Für die Anmeldung bei Google gilt die
   <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a>.
   Die Verknüpfung endet, wenn du dein Konto löschst; in deinem Google-Konto kannst du den Zugriff zusätzlich entfernen.</p>
+  <p><b>Anmeldung mit Apple (freiwillig, sobald angeboten):</b> Statt mit einem Code per E-Mail kannst du dich mit deiner
+  Apple-ID anmelden. Dann leitet die App dich zu Apple weiter. Apple Distribution International Limited, Hollyhill
+  Industrial Estate, Hollyhill, Cork, Irland, erfährt dabei, dass du dich bei Crownmate anmeldest, und übermittelt nach
+  deiner Bestätigung bei Apple deine E-Mail-Adresse (oder eine Weiterleitungsadresse, wenn du „E-Mail-Adresse verbergen“
+  wählst), deinen Namen, falls du ihn freigibst, und eine Apple-Nutzerkennung an Supabase. Mehr verwenden wir nicht. Für
+  die Anmeldung bei Apple gilt die <a href="https://www.apple.com/de/legal/privacy/" target="_blank" rel="noopener">Datenschutzrichtlinie
+  von Apple</a>. Die Verknüpfung endet, wenn du dein Konto löschst; in den Einstellungen deiner Apple-ID kannst du sie
+  zusätzlich entfernen.</p>
   <h3>Rechtsgrundlage und Dauer</h3>
   <p>Die Verarbeitung ist zur Bereitstellung des Kontos erforderlich (Art. 6 Abs. 1 lit. b DSGVO). Die Daten bleiben
   gespeichert, bis du dein Konto löschst. Das geht jederzeit in der App unter Einstellungen → Daten → „Konto löschen“.
   Dabei löschen wir sofort alles, was in unserer Datenbank zu deinem Konto gehört: Konto und Anmeldedaten (auch die
-  Verknüpfung mit Google), Benutzername, Freundschaften, Anfragen, Einladungscode und Wochenwertung, Cloud-Spielstand,
+  Verknüpfung mit Google oder Apple), Benutzername, Freundschaften, Anfragen, Einladungscode und Wochenwertung, Cloud-Spielstand,
   geteilte Partien und Nutzungsdaten sowie das Anmeldeprotokoll.
   Ausnahme beim Abo: Technische Zahlungsereignisse von Stripe (Abschnitt 7) bleiben ohne deine Konto-Kennung, aber mit der
   Stripe-Kundennummer stehen, bis sie nach Ablauf von 90 Tagen beim nächsten eingehenden Zahlungsereignis gelöscht werden. Ein laufendes Abo endet mit dem Konto nicht; kündige

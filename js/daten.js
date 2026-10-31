@@ -438,8 +438,9 @@ export async function loescheKontoDialog(app) {
   return true;
 }
 
+// Seit 31.10.2026 fuer alle sichtbar, wie die Konto-Gruppe (Konto fuer alle): Auskunft und Loeschen gehoeren dazu.
 export function datenGruppe({ app } = {}) {
-  if (typeof document === 'undefined' || !kontoFreigeschaltet()) return null;
+  if (typeof document === 'undefined') return null;
   const el = document.createElement('section');
   el.className = 'es-gruppe flaeche daten-gruppe';
   el.setAttribute('aria-labelledby', 'daten-titel');
