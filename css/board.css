@@ -63,6 +63,9 @@
 .brett .feld { position: absolute; width: 12.5%; height: 12.5%; }
 .brett .feld.h { background: var(--b-hell); }
 .brett .feld.d { background: var(--b-dunkel); }
+/* Bretter mit Struktur (Welten-Bretter, css/tokens.css): je Feld eine leichte Zeichnung ueber der Farbe */
+.brett .feld.h { background-image: var(--feld-muster-hell, none); background-size: 100% 100%; }
+.brett .feld.d { background-image: var(--feld-muster-dunkel, none); background-size: 100% 100%; }
 
 /* Koordinaten, Lage "ecke": klein in der Feldecke, Zahlen oben links, Buchstaben unten rechts (PLAN 2.5 Regel 4) */
 .brett .koord {

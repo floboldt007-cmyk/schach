@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { setzeSpeicher } from '../js/storage.js';
 import { teileBretter, teileKlaenge, teileErfolge } from '../js/pakete/sammlung/index.js';
 import { standText } from '../js/pakete/sammlung/shop.js';
@@ -68,6 +69,23 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
   pruefe('Finisher-Bilder: Krone mit weissem Koenig, Welle mit Springer, Fallender Koenig mit schwarzem Koenig (echte Figuren)',
     quellen(bilder[0]).join() === 'wK.svg' && quellen(bilder[1]).join() === 'wN.svg' && quellen(bilder[2]).join() === 'bK.svg', bilder.map(quellen));
   pruefe('Finisher-Bilder: unbekannte Id ohne Bild', finisherKunst('gibtsnicht') === null);
+}
+// Welten-Bretter (Labor, 31.10.): dieselbe Zeichnung je Feld im Spiel (css/tokens.css) und im Sammelbild (js/labor.js)
+{
+  const { LABOR_BRETTER } = await import('../js/labor.js');
+  const { brettKunst } = await import('../js/sammlung-kunst.js');
+  const css = readFileSync(path.join(WURZEL, 'css/tokens.css'), 'utf8');
+  const innen = (url) => decodeURIComponent(url).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  const welten = LABOR_BRETTER.filter((b) => b.welt);
+  const abweichend = welten.filter((b) => {
+    const block = new RegExp(`html\\[data-brett="${b.id}"\\] \\{([^}]*)\\}`).exec(css);
+    const url = (n) => (block && new RegExp(`--feld-muster-${n}: url\\("data:image/svg\\+xml,([^"]+)"\\)`).exec(block[1]) || [])[1] || '';
+    return !block || innen(url('hell')) !== b.muster.h || innen(url('dunkel')) !== b.muster.d;
+  }).map((b) => b.id);
+  pruefe('Welten-Bretter: fünf (Welt 1 bis 5), Zeichnung im Spiel und im Sammelbild gleich', welten.map((b) => b.welt).join() === '1,2,3,4,5'
+    && abweichend.length === 0, abweichend);
+  pruefe('Welten-Bretter: das Sammelbild trägt die Zeichnung je Feld, die Themen-Bretter ohne', (brettKunst('#fff', '#000', '#111', '', welten[0].muster).match(/class="sk-muster"/g) || []).length === 9
+    && !/sk-muster/.test(brettKunst('#fff', '#000', '#111', '')));
 }
 
 const leer = { bots: {} };
@@ -358,7 +376,7 @@ async function laborTeil(browser) {
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
-  pruefe('Labor: fünf Bretter mit Schild, nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron', bretter);
+  pruefe('Labor: zehn Bretter mit Schild (fünf Themen, fünf Welten), nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron,brett-acker,brett-moos,brett-pflaster,brett-brandung,brett-tiefsee', bretter);
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
