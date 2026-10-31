@@ -5,9 +5,9 @@
 //
 //   LEKTIONEN [{ id, stufe, fen, ziel }]   Mattbilder; ziel = Flos Zuege bis Matt bei bester Verteidigung, mit Stockfish
 //                                          nachgerechnet (werkzeuge/mattbilder-pruefen.mjs: kuerzeres aus Suche und Selbstspiel)
-//   BEREICHE [{ id, lektionen }]           'matt' (Mattbilder), 'end' (Endspiele, endspiele.js), 'eroeffnung' (Eroeffnungen,
+//   BEREICHE [{ id, lektionen }]           'matt' (Mattbilder), 'taktik' (taktik.js), 'end' (Endspiele, endspiele.js), 'eroeffnung' (Eroeffnungen,
 //                                          eroeffnungen.js); ALLE = alle Lektionen
-//   ARTEN ['matt', 'umwandeln', 'gewinnen', 'halten', 'folge']; artVon(l) (ohne art: 'matt'); bereichVon(l)
+//   ARTEN ['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik']; artVon(l) (ohne art: 'matt'); bereichVon(l)
 //   sterneFolge({ fehler, hinweise }) -> 1 | 2 | 3   Zugfolge: 3 ohne Fehler und Hinweis, 2 bei hoechstens zwei, sonst 1
 //   STUFEN ['leicht', 'mittel', 'schwer', 'meister']
 //   lektion(id) -> Lektion | null          sucht in allen Bereichen
@@ -26,6 +26,7 @@
 //   summe(st, bereichId?) -> { sterne, max, geschafft }   ohne bereichId ueber alle Bereiche
 import { ENDSPIELE } from './endspiele.js';
 import { EROEFFNUNGEN } from './eroeffnungen.js';
+import { TAKTIK } from './taktik.js';
 
 export const STUFEN = Object.freeze(['leicht', 'mittel', 'schwer', 'meister']);
 
@@ -51,9 +52,10 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 18 }),
   Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 23 }),
 ]);
-export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge']);
+export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge', 'taktik']);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
+  Object.freeze({ id: 'taktik', lektionen: TAKTIK }),
   Object.freeze({ id: 'end', lektionen: ENDSPIELE }),
   Object.freeze({ id: 'eroeffnung', lektionen: EROEFFNUNGEN }),
 ]);
@@ -101,6 +103,8 @@ export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0 } = {}) {
   if (art === 'matt') return null;
   const jetzt = bilanz(chess);
   if (art === 'umwandeln') return jetzt.w.q > start.w.q && jetzt.b.q <= start.b.q ? 'geschafft' : null;
+  // Taktik: nach dem Gegenzug zaehlt, was bleibt (die Rueckeroberung ist dann schon geschehen)
+  if (art === 'taktik') return vorsprung(start) - vorsprung(jetzt) >= (Number(l.gewinn) || 3) ? 'geschafft' : null;
   if (art === 'gewinnen') {
     return jetzt.b.p === 0 && jetzt.w.mat - jetzt.b.mat >= 5 && (jetzt.w.q > 0 || jetzt.w.r > 0) ? 'geschafft' : null;
   }
@@ -131,6 +135,7 @@ export function pruefeLektion(l, Chess) {
   if (!STUFEN.includes(l.stufe)) f.push(`${l.id}: Stufe ${l.stufe}`);
   if (!ARTEN.includes(artVon(l))) f.push(`${l.id}: Art ${l.art}`);
   if (!Number.isInteger(l.ziel) || l.ziel < 1) f.push(`${l.id}: ziel ${l.ziel}`);
+  if (artVon(l) === 'taktik' && !(Number.isInteger(l.gewinn) && l.gewinn >= 1 && l.gewinn <= 9)) f.push(`${l.id}: gewinn ${l.gewinn}`);
   let c = null;
   try { c = new Chess(l.fen); } catch (e) { f.push(`${l.id}: FEN ${e.message}`); return f; }
   if (c.turn() !== 'w') f.push(`${l.id}: Weiss muss am Zug sein`);
