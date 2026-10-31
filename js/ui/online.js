@@ -281,7 +281,7 @@ export function zeige(root, params, app) {
     const a = knopf.dataset.online;
     if (a === 'training') { app.gehe('training'); return; }
     if (a === 'liste-zurueck') { app.gehe('online'); return; }
-    if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen'); return; }
+    if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
     if (a === 'teilen' && p) {
       const url = online.einladungsLink(p.code);

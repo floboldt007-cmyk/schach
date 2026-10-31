@@ -85,9 +85,9 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   const tok = 'a.' + Buffer.from(JSON.stringify({ sub: 'u9', email: 'link@b.de' })).toString('base64url') + '.x';
   let neu = null; const ort = { hash: `#access_token=${tok}&expires_in=3600&refresh_token=rl&token_type=bearer&type=magiclink`, pathname: '/schach/', search: '' };
   const genommen = uebernimmLinkSitzung(ort, { replaceState: (_, __, u) => { neu = u; } });
-  pruefe('Anmelde-Link: Sitzung übernommen, Token aus der Adresse entfernt', genommen && sitzung()?.refresh_token === 'rl' && sitzung()?.email === 'link@b.de' && neu === '/schach/#einstellungen' && !neu.includes('token'), neu);
+  pruefe('Anmelde-Link: Sitzung übernommen, Token aus der Adresse entfernt', genommen && sitzung()?.refresh_token === 'rl' && sitzung()?.email === 'link@b.de' && neu === '/schach/#einstellungen/konto' && !neu.includes('token'), neu);
   neu = null; const fehler = uebernimmLinkSitzung({ hash: '#error=access_denied&error_code=otp_expired', pathname: '/', search: '' }, { replaceState: (_, __, u) => { neu = u; } });
-  pruefe('Abgelaufener Link: Fehler aus der Adresse entfernt, Sitzung unverändert', fehler && neu === '/#einstellungen' && sitzung()?.refresh_token === 'rl');
+  pruefe('Abgelaufener Link: Fehler aus der Adresse entfernt, Sitzung unverändert', fehler && neu === '/#einstellungen/konto' && sitzung()?.refresh_token === 'rl');
   pruefe('Normale Adresse bleibt unberührt', uebernimmLinkSitzung({ hash: '#arena', pathname: '/', search: '' }, { replaceState: () => { throw new Error('nicht aufrufen'); } }) === false);
 }
 { // Anmeldung mit Google (Supabase OAuth): Adresse, Weiterleitung, Rueckkehr mit #konto#access_token=...
@@ -108,11 +108,11 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   const genommen = uebernimmLinkSitzung({ hash: `#konto#access_token=${tok}&expires_at=9999999999&expires_in=3600&provider_token=GOOGLE&refresh_token=rg&token_type=bearer`, pathname: '/schach/', search: '' },
     { replaceState: (_, __, u) => { neu = u; } });
   pruefe('Google: Rückkehr mit #konto#access_token übernommen, Tokens (auch provider_token) aus der Adresse entfernt',
-    genommen && sitzung()?.refresh_token === 'rg' && sitzung()?.email === 'g@gmail.example' && neu === '/schach/#einstellungen'
+    genommen && sitzung()?.refresh_token === 'rg' && sitzung()?.email === 'g@gmail.example' && neu === '/schach/#einstellungen/konto'
     && !JSON.stringify(sitzung()).includes('GOOGLE') && localStorage.getItem(SICHTBAR_SCHLUESSEL) === null, JSON.stringify({ neu, s: sitzung() }));
   neu = null;
   pruefe('Google: abgebrochene Anmeldung (#error=...) räumt die Adresse auf, Sitzung bleibt', uebernimmLinkSitzung({ hash: '#error=access_denied&error_description=abgebrochen', pathname: '/schach/', search: '' },
-    { replaceState: (_, __, u) => { neu = u; } }) && neu === '/schach/#einstellungen' && sitzung()?.refresh_token === 'rg');
+    { replaceState: (_, __, u) => { neu = u; } }) && neu === '/schach/#einstellungen/konto' && sitzung()?.refresh_token === 'rg');
   pruefe('Google: #konto allein ist keine Rückkehr', uebernimmLinkSitzung({ hash: '#konto', pathname: '/', search: '' }, { replaceState: () => { throw new Error('nicht aufrufen'); } }) === false);
   // fuer js/daten.js exportiert
   pruefe('aktiveSitzung und userId exportiert (Sitzung, Benutzer-ID aus dem Token)', userId(sitzung()) === 'u7' && (await aktiveSitzung()).refresh_token === 'rg');

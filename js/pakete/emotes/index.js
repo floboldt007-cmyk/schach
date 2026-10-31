@@ -305,26 +305,18 @@ function gruppe() {
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche em-einstellungen';
   el.innerHTML = `<h3>${esc(T('gruppe'))}</h3>${[['an', e.an, 'anText'], ['daempfen', e.daempfen, 'daempfenText']].map(([id, an, text]) => `<label class="em-schalter"><span><b>${esc(T(id))}</b><small>${esc(T(text))}</small></span><input type="checkbox" data-em-einst="${id}" ${an ? 'checked' : ''}></label>`).join('')}`;
   el.querySelectorAll('input').forEach((x) => x.addEventListener('change', () => setze({ [x.dataset.emEinst]: x.checked })));
-  if (istErfinder()) el.append(kreaturWahl(e.kreatur));
   return el;
 }
 
-// Labor: Wahl der Emote-Kreatur (Radioknoepfe mit Bild), "Keine" zeigt wieder die Strichsymbole
-function kreaturWahl(aktiv) {
-  const f = document.createElement('fieldset'); f.className = 'em-kreaturen';
-  const wahl = (id, bild, name) => `<label class="em-k-wahl"><input type="radio" name="em-kreatur" value="${id}" ${(aktiv || 'keine') === id ? 'checked' : ''}><span class="em-k-bild" aria-hidden="true">${bild}</span><span class="em-k-name">${esc(name)}</span></label>`;
-  f.innerHTML = `<legend><b>${esc(T('begleiter'))}</b><span class="em-k-labor">${esc(T('labor'))}</span><small>${esc(T('begleiterText'))}</small></legend>
-    <div class="em-k-raster">${wahl('keine', icon('daumen'), T('keine'))}${KREATUREN.map((k) => wahl(k.id, kreaturSvg(k.id, 'normal'), T('kreatur.' + k.id))).join('')}</div>`;
-  f.querySelectorAll('input').forEach((x) => x.addEventListener('change', () => { if (x.checked) setze({ kreatur: x.value === 'keine' ? null : x.value }); }));
-  return f;
-}
-
-// Sammlung: die Kreaturen des Labors, nur fuer den Erfinder (andere sehen den Bereich erst, wenn Welten sie freischalten)
+// Sammlung: die Kreaturen des Labors, nur fuer den Erfinder (andere sehen den Bereich erst, wenn Welten sie freischalten).
+// Gewaehlt wird nur hier (Flo 31.10.2026: nichts doppelt in den Einstellungen); ein zweiter Tipp auf die ausgeruestete
+// Kreatur nimmt sie ab, dann zeigen die Emotes wieder die Strichsymbole.
 function kreaturenBereich() {
   if (!istErfinder()) return null;
   const aktiv = kreaturAktiv(einstellungen(), true);
   return bereich({ id: 'kreaturen', name: T('kreaturen'), hinweis: T('kreaturenHinweis'), teile: KREATUREN.map((k) => ({
     id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, wahl: () => setze({ kreatur: k.id }),
+    abwahl: () => setze({ kreatur: null }),
     zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
   })) });
 }

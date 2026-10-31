@@ -407,14 +407,15 @@ async function schrittZwei(browser) {
       await seite.goto('about:blank');
       await seite.goto(basis + '#konto');
       await seite.waitForFunction(() => !!window.__app && localStorage.getItem('schach-arena:konto:sichtbar') === '1');
-      await seite.evaluate(() => window.__app.gehe('einstellungen'));
+      // Handy: Konto, Schule und Abo sind eigene Seiten der Einstellungen (#einstellungen/<seite>, 31.10.2026)
+      await seite.evaluate(() => window.__app.gehe('einstellungen', { seite: 'konto' }));
       await seite.waitForSelector('.konto-gruppe');
       await pruefeAnsicht('konto-abgemeldet', '.konto-gruppe');
       await seite.evaluate(() => window.__app.gehe('online'));
       await seite.waitForSelector('[data-online="konto"]');
       await pruefeAnsicht('online-abgemeldet', '.online-screen');
       await seite.evaluate((s) => localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(s)), sitzung);
-      await seite.goto(basis + '#einstellungen');
+      await seite.goto(basis + '#einstellungen/schule');
       await seite.reload();
       await seite.waitForSelector('.sm-beitreten:not([hidden])');
       await pruefeAnsicht('klasse-beitreten', '.schule-gruppe');
@@ -428,7 +429,7 @@ async function schrittZwei(browser) {
       await seite.locator('.sm-klasse-karte').click();
       await seite.waitForSelector('.sm-aufgabe-neu');
       await pruefeAnsicht('klasse-leiten', '.schule-screen');
-      await seite.evaluate(() => window.__app.gehe('einstellungen'));
+      await seite.evaluate(() => window.__app.gehe('einstellungen', { seite: 'abo' }));
       await seite.locator('[data-abo="zeigen"]').click();
       await seite.waitForSelector('.trainer-karte[data-zustand="kaufbar"]');
       await pruefeAnsicht('trainer', '.trainer-karte');

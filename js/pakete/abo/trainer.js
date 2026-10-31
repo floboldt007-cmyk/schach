@@ -249,8 +249,8 @@ export function zeigeTrainer({ app = null } = {}) {
     if (a === 'schliessen') { ende(); return; }
     if (a === 'konto') {
       ende();
-      if (document.documentElement.dataset.screen !== 'einstellungen') app.gehe('einstellungen');
-      // zur Gruppe Konto (dort meldet man sich an); nach dem Zeichnen des Screens
+      // zur Gruppe Konto (dort meldet man sich an); Handy: als eigene Seite (js/ui/einstellungen.js, seite)
+      app.gehe('einstellungen', { seite: 'konto' });
       requestAnimationFrame(() => {
         const k = document.querySelector('.konto-gruppe');
         if (k) k.scrollIntoView({ block: 'start', behavior: tempo() === 0 ? 'auto' : 'smooth' });

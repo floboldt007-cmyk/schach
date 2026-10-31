@@ -51,12 +51,12 @@ if (typeof window !== 'undefined') {
 
 function gruppe({ app: a }) {
   // Lobby-Musik als Untergruppe der Gruppe Klang (Flo 30.10.: "optional, in den Einstellungen anmachen"), im Stil der
-  // Einstellungen: Schalter-Zeile, Regler, Auswahl. Die Werte setzt das Paket selbst (kein data-aktion des Screens).
+  // Einstellungen: Schalter-Zeile und Regler. Die Melodie waehlt man in der Sammlung (Flo 31.10.2026: nichts doppelt).
+  // Die Werte setzt das Paket selbst (kein data-aktion des Screens).
   const el = document.createElement('div');
   el.className = 'es-untergruppe musik-einstellung';
   const e = a.einstellungen();
   const laut = e.musikLautstaerke ?? .35;
-  const optionen = [['welt', t('p-musik.welt')], ...MUSIK_WELTEN.map((m) => [m.id, t('p-musik.welt.' + m.id)])];
   el.innerHTML = `<h4>${t('p-musik.titel')}</h4>
     <div class="es-zeile">
       <div class="es-text"><b id="es-l-musik">${t('p-musik.an')}</b><span id="es-t-musik">${t('p-musik.hilfe')}</span></div>
@@ -65,10 +65,7 @@ function gruppe({ app: a }) {
     </div>
     <label class="es-regler"><span><b>${t('p-musik.laut')}</b><output class="musik-prozent">${Math.round(laut * 100)} %</output></span>
       <input class="musik-laut" type="range" min="0" max="1" step="0.05" value="${laut}"></label>
-    <label class="musik-wahl-feld"><b>${t('p-musik.wahl')}</b><select class="musik-wahl">${optionen.map(([id, name]) => {
-      const frei = id === 'welt' || istMelodieFrei(id);
-      return `<option value="${id}" ${id === e.musikMelodie ? 'selected' : ''} ${frei ? '' : 'disabled'}>${name}${frei ? '' : ` · ${t('p-musik.gesperrt')}`}</option>`;
-    }).join('')}</select></label>
+    <p class="es-hilfe musik-wahl-hinweis">${t('p-musik.wahlHinweis')}</p>
     <div class="musik-abend"><span><b>${t('p-musik.abend')}</b><span>${t('p-musik.abendText')}</span></span><span class="musik-bald">${t('p-musik.bald')}</span></div>`;
   const schalter = el.querySelector('.musik-schalter');
   schalter.addEventListener('click', () => { entsperre(); a.setzeEinstellungen({ musik: a.einstellungen().musik !== true }); schalter.setAttribute('aria-checked', a.einstellungen().musik === true); aktualisiere(); });
@@ -76,7 +73,6 @@ function gruppe({ app: a }) {
     a.setzeEinstellungen({ musikLautstaerke: Number(ev.target.value) });
     el.querySelector('.musik-prozent').textContent = `${Math.round(Number(ev.target.value) * 100)} %`;
   });
-  el.querySelector('.musik-wahl').addEventListener('change', (ev) => a.setzeEinstellungen({ musikMelodie: ev.target.value }));
   return el;
 }
 

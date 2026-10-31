@@ -914,7 +914,7 @@ async function browserTeil(browser) {
   {
     const srv = serverMitKlasse();
     const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: A, srv, w: 390, h: 844, handy: true });
-    await bereit(seite, '#einstellungen');
+    await bereit(seite, '#einstellungen/schule');   // Handy: die Schul-Gruppe ist eine eigene Seite
     await seite.waitForSelector('.schule-gruppe[data-angemeldet="ja"]', { timeout: 20000 });
     await cssDa(seite);
     const g = await seite.evaluate(() => {

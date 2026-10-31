@@ -294,7 +294,8 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
   } else {
     linkFehler = true;
   }
-  try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen'); } catch (e) { /* egal */ }
+  // zur Konto-Seite der Einstellungen (Handy: eigene Seite, iPad: dorthin gerollt), dort steht "Angemeldet als ..."
+  try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen/konto'); } catch (e) { /* egal */ }
   return true;
 }
 

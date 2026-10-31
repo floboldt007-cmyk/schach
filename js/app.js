@@ -618,6 +618,8 @@ let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem ak
 function hashFuer(name, params) {
   if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
+  // Einstellungen auf dem Handy: ein Bereich als eigene Seite (js/ui/einstellungen.js), Zurueck fuehrt zur Liste
+  if (name === 'einstellungen' && params && typeof params.seite === 'string' && /^[a-z0-9-]{1,24}$/.test(params.seite)) return '#einstellungen/' + params.seite;
   return '#' + name;
 }
 
@@ -626,6 +628,7 @@ function ausHash(hash) {
   const [name, rest] = h.split('/');
   if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
+  if (name === 'einstellungen' && rest && /^[a-z0-9-]{1,24}$/.test(rest)) return { name, params: { seite: rest } };
   if (SCREENS.includes(name)) return { name, params: {} };
   return { name: 'arena', params: {} };
 }

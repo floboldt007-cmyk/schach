@@ -1,5 +1,4 @@
-// Screen "Einstellungen": Klang (mit Probeton), Bewertungsbalken, Live-Bewertung, Brettfarbe
-// mit Mini-Brett-Vorschau, Koordinaten, Rechentiefe, Fortschritt zuruecksetzen (zweistufige
+// Screen "Einstellungen": Klang (mit Probeton), Bewertungsbalken, Live-Bewertung, Koordinaten, Rechentiefe, Fortschritt zuruecksetzen (zweistufige
 // Rueckfrage) und Info/Lizenzen (mit Datenschutzerklaerung und Impressum, Daten-Fundament). Jede Aenderung geht sofort
 // ueber app.setzeEinstellungen(teil).
 //
@@ -11,6 +10,10 @@
 // (storage.ladeModulEinstellungen).
 // Tester-Bericht (Luecken-Check 10): in "Info und Lizenzen" der Eintrag .es-bericht mit dem Knopf
 // [data-aktion="bericht"]; er laedt js/bericht.js erst beim Tipp (import()) und oeffnet dort das Blatt mit dem Bericht.
+// Aufgeraeumt (Flo 31.10.2026, Bild vom Menue bei chess.com: "doppelt sich, dass man die Brettfarbe da auch einstellen
+// kann"): Brett, Figuren, Klangset, Melodie, Kreatur und Finisher waehlt man nur noch in der Sammlung (Zeile "Aussehen"
+// in der Gruppe Anzeige fuehrt hin). Handy (bis 700 px): erst eine Liste der Bereiche, ein Tipp oeffnet den Bereich als
+// eigene Seite (params.seite, Hash #einstellungen/<seite>, Zurueck fuehrt zur Liste); iPad: Menue links, alles untereinander.
 import { klang } from '../sounds.js';
 import { wischKanten } from './bauteile.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
@@ -18,7 +21,6 @@ import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
 import { BOTS } from '../bots.js';
 import { sitzung, istAbgeglichen } from '../konto.js';
-import { LABOR_BRETTER, LABOR_KLAENGE, laborFrei } from '../labor.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/einstellungen.js';
 import '../sprachen/bericht.js';
@@ -54,6 +56,7 @@ const ICON = {
   finisher: '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6-4.6-1.9 4.6-1.9z"/><path d="M18.5 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
   online: '<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 15.2a4.5 4.5 0 0 1 6.5 3.8"/>',
   regler: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.3"/><circle cx="9" cy="17" r="2.3"/>',
+  weiter: '<path d="m9 5 7 7-7 7"/>',
 };
 // Menue: Zeichen je Bereich; Kern-Gruppen ueber die Id ihres Titels, Gruppen der Pakete ueber ihre Klasse
 const NAV_ICON = Object.freeze({ spiel: 'spiel', anzeige: 'anzeige', klang: 'klang', coach: 'coach', bewegung: 'bewegung',
@@ -65,12 +68,8 @@ const PAKET_ICON = Object.freeze([['konto-gruppe', 'konto'], ['daten-gruppe', 'd
 const KERN_ORDNUNG = Object.freeze(['spiel', 'anzeige', 'klang', 'coach', 'bewegung']);
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
-// Brettfarben wie im Design-Konzept (nur --feld-hell/--feld-dunkel); Namen beim Zeichnen: t('einstellungen.brett.<id>')
-const BRETTER = [
-  { id: 'nacht', hell: '#e4e8f6', dunkel: '#7c87b6' },
-  { id: 'gruen', hell: '#eeeed2', dunkel: '#769656' },
-  { id: 'holz', hell: '#f0d9b5', dunkel: '#b58863' },
-];
+// Handy: Liste der Bereiche statt aller Gruppen untereinander (gleiche Grenze wie css/einstellungen.css)
+const HANDY = '(max-width: 700px)';
 // Namen beim Zeichnen: t('einstellungen.tiefe.<name>'), Text t('einstellungen.tiefe.text')
 const TIEFEN = [
   { wert: 12, name: 'schnell' },
@@ -83,9 +82,6 @@ function E(k, w) { return t('einstellungen.' + k, w); }
 function ersterGegner() {
   return (BOTS[0] || {}).name || '';
 }
-// Mini-Brett: 4x4 Ausschnitt mit ein paar Figuren
-const MINI = { 1: 'bN', 6: 'bP', 9: 'wB', 14: 'wK' };
-
 function esc(t) {
   return String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -102,6 +98,12 @@ export function zeige(root, params = {}, app) {
   let resetBereitAb = 0;
   let ortGruppen = null;   // Fuellung des Orts einstellungen:gruppen
   let ortKlang = null;     // Fuellung des Orts einstellungen:klang (Lobby-Musik am Ende der Gruppe Klang)
+  // Handy: offene Seite (Schluessel des Bereichs, z. B. 'spiel', 'konto') oder null fuer die Liste
+  const seite = typeof params.seite === 'string' && /^[a-z0-9-]{1,24}$/.test(params.seite) ? params.seite : null;
+  const mq = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(HANDY) : null;
+  const handy = () => !!(mq && mq.matches);
+  let eintraege = [];      // Bereiche { g, h, zeichen, titel, schluessel } (baueNav)
+  let seiteGerollt = false;
 
   const lies = () => { try { return app.einstellungen() || {}; } catch (e) { return {}; } };
 
@@ -117,17 +119,6 @@ export function zeige(root, params = {}, app) {
       <button class="es-schalter" type="button" role="switch" data-aktion="schalte" data-key="${key}"
         aria-labelledby="es-l-${key}" aria-describedby="es-t-${key}" aria-checked="false"><i></i></button>
     </div>`;
-
-  const miniBrett = (b) => {
-    let felder = '';
-    for (let i = 0; i < 16; i++) {
-      const zeile = Math.floor(i / 4);
-      const dunkel = (zeile + (i % 4)) % 2 === 1;
-      const fig = MINI[i] ? `<img src="${esc(pfad(`assets/pieces/${MINI[i]}.svg`))}" alt="">` : '';
-      felder += `<i class="${dunkel ? 'd' : 'h'}">${fig}</i>`;
-    }
-    return `<span class="es-mini" style="--feld-hell:${b.hell};--feld-dunkel:${b.dunkel}" aria-hidden="true">${felder}</span>`;
-  };
 
   const segment = (key, titel, werte, hilfe = '') => `
     <div class="es-block" data-einstellung="${key}">
@@ -156,8 +147,6 @@ export function zeige(root, params = {}, app) {
           <h3 class="es-titel" id="es-g-klang">${E('gruppe.klang')}</h3>
           ${schalter('klang', E('klang.titel'), E('klang.text'),
             `<button class="knopf es-probe" type="button" data-aktion="probe">${icon('play')} ${E('klang.probe')}</button>`)}
-          ${segment('klangpaket', E('klang.paket'), [['',E('klang.paketAnsicht')],['arcade',E('klang.paketArcade')],['holz',E('klang.paketHolz')],
-            ...(laborFrei() ? LABOR_KLAENGE.map((k) => [k, E('klang.paket.' + k), E('labor')]) : [])])}
           <label class="es-regler"><span><b>${E('klang.lautstaerke')}</b><output>${E('prozent', { wert: 80 })}</output></span><input type="range" min="0" max="1" step="0.05" data-key="lautstaerke"></label>
           ${segment('klangstufe', E('klang.stufe'), [['alle',E('klang.alle')],['wichtig',E('klang.wichtig')],['aus',t('allgemein.aus')]])}
           <div class="es-untergruppe"><h4>${E('klang.einzeln')}</h4>${['brett','bewertung','feier','uhr','boss','finisher','bedienung'].map((k) => schalter(`klanggruppe-${k}`,E('klang.' + k),'')).join('')}</div>
@@ -180,15 +169,11 @@ export function zeige(root, params = {}, app) {
 
         <section class="es-gruppe flaeche" aria-labelledby="es-g-anzeige">
           <h3 class="es-titel" id="es-g-anzeige">${E('gruppe.anzeige')}</h3>
-          ${segment('thema',E('anzeige.ansicht'),[['modern',E('anzeige.modern')]])}
-          ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
-          <h4>${E('anzeige.brettfarbe')}</h4>
-          <div class="es-bretter" role="radiogroup" aria-labelledby="es-g-brett">
-            ${[...BRETTER, ...(laborFrei() ? LABOR_BRETTER.map((b) => ({ ...b, labor: true })) : [])].map((b) => `
-              <button class="es-brett${b.labor ? ' es-labor' : ''}" type="button" role="radio" aria-checked="false" data-aktion="brett" data-wert="${b.id}">
-                ${miniBrett(b)}<span class="es-brett-name">${E('brett.' + b.id)}</span>${b.labor ? `<span class="es-labor-schild">${E('labor')}</span>` : ''}
-              </button>`).join('')}
+          <div class="es-zeile es-aussehen">
+            <div class="es-text"><b id="es-l-aussehen">${E('aussehen.titel')}</b><span>${E('aussehen.text')}</span></div>
+            <button class="knopf es-zur-sammlung" type="button" data-aktion="sammlung" aria-describedby="es-l-aussehen">${E('aussehen.knopf')}</button>
           </div>
+          ${segment('modus',E('anzeige.erscheinung'),[['system',E('anzeige.system')],['hell',E('anzeige.hell')],['dunkel',E('anzeige.dunkel')]])}
           ${schalter('koordinaten',E('anzeige.koordinaten'),E('anzeige.koordinatenText'))}
           ${segment('koordLage',E('anzeige.koordLage'),[['ecke',E('anzeige.ecke')],['rand',E('anzeige.rand')]])}
           ${schalter('balken',E('anzeige.balken'),E('anzeige.balkenText'))}${schalter('liveBewertung',E('anzeige.live'),E('anzeige.liveText'))}
@@ -264,19 +249,27 @@ export function zeige(root, params = {}, app) {
     if (!nav) return;
     if (navBeobachter) { navBeobachter.disconnect(); navBeobachter = null; }
     let n = 0;
-    const eintraege = [];
+    eintraege = [];
+    const vergeben = new Set();
     for (const g of sec.querySelectorAll('.es-inhalt .es-gruppe')) {
       const h = g.querySelector('h3');
       if (!h || g.hidden) continue;
       if (!h.id) h.id = 'es-g-paket-' + (++n);
       const kern = (/^es-g-([a-z]+)$/.exec(h.id) || [])[1];
-      const zeichen = (kern && NAV_ICON[kern]) || (PAKET_ICON.find(([k]) => g.className.includes(k)) || [])[1] || 'regler';
+      const paket = (PAKET_ICON.find(([k]) => g.className.includes(k)) || [])[1];
+      const zeichen = (kern && NAV_ICON[kern]) || paket || 'regler';
       const titel = kern === 'sprache' || kern === 'info' ? E('gruppe.' + kern) : h.textContent.trim();
-      eintraege.push({ g, h, zeichen, titel });
+      // fester Schluessel fuer die Handy-Seite (#einstellungen/<schluessel>): Kern-Id oder Zeichen des Pakets
+      let schluessel = kern || paket || 'bereich';
+      if (vergeben.has(schluessel)) schluessel += '-' + n;
+      vergeben.add(schluessel);
+      eintraege.push({ g, h, zeichen, titel, schluessel });
     }
     if (!nav.dataset.wischAn) { nav.dataset.wischAn = '1'; wischKanten(nav); }
-    nav.innerHTML = eintraege.map((x, i) => `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}"${i ? '' : ' aria-current="true"'}>`
-      + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span></button>`).join('');
+    nav.innerHTML = eintraege.map((x, i) => `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}" data-seite="${x.schluessel}"${i || handy() ? '' : ' aria-current="true"'}>`
+      + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span>`
+      + `<span class="es-nav-pfeil" aria-hidden="true">${icon('weiter')}</span></button>`).join('');
+    wendeModusAn();
     const markiere = (id) => {
       for (const b of nav.querySelectorAll('.es-nav-punkt')) {
         const an = b.dataset.ziel === id;
@@ -292,6 +285,8 @@ export function zeige(root, params = {}, app) {
       const b = ev.target.closest('.es-nav-punkt');
       const ziel = b && sec.querySelector('#' + CSS.escape(b.dataset.ziel));
       if (!ziel) return;
+      // Handy: der Bereich oeffnet als eigene Seite (eigener Verlaufseintrag, Zurueck fuehrt zur Liste)
+      if (handy()) { try { app.gehe('einstellungen', { seite: b.dataset.seite }); } catch (f) { /* egal */ } return; }
       gewaehlt = b.dataset.ziel;
       clearTimeout(gewaehltUhr);
       gewaehltUhr = setTimeout(() => { gewaehlt = null; }, 1200);
@@ -303,7 +298,7 @@ export function zeige(root, params = {}, app) {
     const sichtbar = new Set();
     navBeobachter = new IntersectionObserver((liste) => {
       for (const e of liste) { if (e.isIntersecting) sichtbar.add(e.target); else sichtbar.delete(e.target); }
-      if (gewaehlt) return;
+      if (gewaehlt || handy()) return;
       // ganz unten (die letzten Gruppen kommen nie bis nach oben): die letzte sichtbare, sonst die erste
       const box = sec.closest('.screen') || document.scrollingElement;
       const unten = box && box.scrollHeight - box.scrollTop - box.clientHeight < 4;
@@ -312,6 +307,30 @@ export function zeige(root, params = {}, app) {
       if (x) markiere(x.h.id);
     }, { rootMargin: '-96px 0px -55% 0px' });
     for (const x of eintraege) navBeobachter.observe(x.g);
+  }
+
+  // Handy: Liste (keine Seite) oder genau ein Bereich mit seinem Namen im Kopf; iPad: alles, Menue links (eine Seite aus
+  // dem Verlauf wird dort einmal angesprungen). Ein Drehen oder Wechsel der Fensterbreite ruft das erneut (mq change).
+  function wendeModusAn() {
+    const h = handy();
+    const offen = seite ? eintraege.find((x) => x.schluessel === seite) : null;
+    sec.classList.toggle('es-liste', h && !offen);
+    sec.classList.toggle('es-seite', h && !!offen);
+    for (const x of eintraege) x.g.classList.toggle('es-offen', !!offen && x === offen);
+    const titel = sec.querySelector('.kopf h2');
+    const unter = sec.querySelector('.kopf .unter');
+    const zurueckKnopf = sec.querySelector('.kopf [data-aktion="zurueck"], .kopf [data-aktion="liste"]');
+    if (titel) titel.textContent = h && offen ? offen.titel : t('allgemein.einstellungen');
+    if (unter) unter.hidden = !!(h && offen);
+    if (zurueckKnopf) {
+      zurueckKnopf.dataset.aktion = h && offen ? 'liste' : 'zurueck';
+      zurueckKnopf.setAttribute('aria-label', h && offen ? E('zurListe') : t('allgemein.zurueck'));
+    }
+    if (h) for (const b of sec.querySelectorAll('.es-nav-punkt')) b.removeAttribute('aria-current');
+    if (!h && offen && !seiteGerollt) {
+      seiteGerollt = true;
+      requestAnimationFrame(() => { if (!beendet) offen.g.scrollIntoView({ block: 'start', behavior: 'auto' }); });
+    }
   }
 
   function zeigeStand() {
@@ -323,7 +342,6 @@ export function zeige(root, params = {}, app) {
     }
     const probe = sec.querySelector('.es-probe');
     if (probe) probe.disabled = e.klang === false;
-    for (const b of sec.querySelectorAll('.es-brett')) b.setAttribute('aria-checked', b.dataset.wert === (e.brett || 'nacht') ? 'true' : 'false');
     for (const b of sec.querySelectorAll('.es-seg')) {
       // Sprache ohne eigene Wahl: "Geraet" (js/app.js spracheOhneWahl)
       const wert = b.dataset.key === 'sprache' && !e.spracheGewaehlt ? 'auto' : e[b.dataset.key];
@@ -387,7 +405,8 @@ export function zeige(root, params = {}, app) {
         break;
       }
       case 'probe': probeton(); break;
-      case 'brett': setze({ brett: k.dataset.wert }); break;
+      case 'sammlung': try { app.gehe('ich', { bereich: 'bretter' }); } catch (f) { /* egal */ } break;
+      case 'liste': app.zurueck(); break;
       case 'tiefe': setze({ tiefe: Number(k.dataset.wert) }); break;
       case 'wahl':
         if (k.dataset.key === 'sprache') {
@@ -453,6 +472,7 @@ export function zeige(root, params = {}, app) {
   }
 
   baue();
+  if (mq) lausche(mq, 'change', () => { if (!beendet) wendeModusAn(); });
 
   return {
     verlasse() {
