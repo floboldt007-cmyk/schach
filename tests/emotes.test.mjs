@@ -21,7 +21,8 @@ import { browserTyp } from './browser.mjs';
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 8913);
-const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/emotes/index`;
+// &emotes: seit 31.10.2026 gibt es Emotes nur noch online; die Tests pruefen Rad und Chat weiter in der Bot-Partie
+const BASIS = `http://127.0.0.1:${PORT}/index.html?test&kern&erw=pakete/emotes/index&emotes`;
 const NUR_NODE = process.argv.includes('--nur-node');
 const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 // laenger als ein Pruef-Takt der Knoepfe (PRUEF_MS 500)

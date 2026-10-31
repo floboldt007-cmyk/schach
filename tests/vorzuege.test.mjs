@@ -22,6 +22,7 @@ for (const p of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/nod
 }
 if (!pw) throw new Error('Playwright fehlt');
 const PORT = Number(process.env.PORT || 8891);
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const typen = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.wasm': 'application/wasm', '.json': 'application/json', '.woff2': 'font/woff2' };
 const server = http.createServer((req, res) => {
@@ -81,9 +82,23 @@ try {
   };
   const bildFertig = () => begrenzt('Vorzug: Render-Schritt', () => seite.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
   const tippe = async (f) => { const p = await feld(f); await seite.touchscreen.tap(p.x, p.y); await bildFertig(); };
+  // Unter Last (volle Suite) ging der erste Tipp einer frischen Partie manchmal ins Leere (das Brett lief noch in seine
+  // Eintritts-Animation): bis zu dreimal nachtippen, solange nichts ausgewaehlt ist; sonst sagen, was unter dem Finger lag
   const zug = async (uci) => {
-    await tippe(uci.slice(0, 2));
-    await seite.waitForFunction(f => !!document.querySelector(`.screen.partie .lage.auswahl[data-feld="${f}"]`), uci.slice(0, 2));
+    const von = uci.slice(0, 2);
+    const gewaehlt = (f) => seite.waitForFunction((x) => !!document.querySelector(`.screen.partie .lage.auswahl[data-feld="${x}"]`), f, { timeout: 6000 })
+      .then(() => true, () => false);
+    let ok = false;
+    for (let i = 0; i < 4 && !ok; i++) {
+      if (i) await warte(400);
+      await tippe(von);
+      ok = await gewaehlt(von);
+    }
+    if (!ok) {
+      const p = await feld(von);
+      const unter = await seite.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? e.tagName + '.' + [...e.classList].join('.') : null; }, p);
+      throw new Error(`Zug ${uci}: ${von} nicht ausgewaehlt (Phase ${await seite.evaluate(() => window.__partie?.phase())}, unter dem Finger ${unter})`);
+    }
     await tippe(uci.slice(2, 4));
     await seite.waitForFunction(() => !document.querySelector('.screen.partie .lage.auswahl'));
   };
@@ -194,6 +209,72 @@ try {
   await seite.waitForFunction(() => window.__partie.phase() === 'ende');
   const k6 = await stand();
   pruefe('Aufgeben loescht Vorzuege und Nummern', k6.vorzuege === '' && !Object.keys(k6.nummern).length, k6);
+
+  // ---------- 6b. Zuege ansehen (Flo 31.10.2026: "den letzten Move sehen ... wie bei Chess.com") ----------
+  await neuePartie(['e7e5', 'b8c6']);
+  await lasBotLos();
+  await zug('e2e4');
+  await seite.waitForFunction(() => window.__partie.z.zuege.length >= 2 && window.__partie.phase() === 'flo');
+  await zug('g1f3');
+  await seite.waitForFunction(() => window.__partie.z.zuege.length >= 4 && window.__partie.phase() === 'flo');
+  const ansicht = () => seite.evaluate(() => {
+    const a = document.querySelector('.screen.partie .zug-ansicht');
+    const fig = (f) => a?.querySelector(`img.figur[data-feld="${f}"]`)?.dataset.figur || null;
+    return a ? { offen: true, schild: a.querySelector('.za-schild').textContent, e5: fig('e5'), e4: fig('e4'), g1: fig('g1'), f3: fig('f3'),
+      zuletzt: [...a.querySelectorAll('.lage.zuletzt')].map((l) => l.dataset.feld).sort().join(),
+      zurueckAus: a.querySelector('[data-aktion="zug-zurueck"]').disabled,
+      knoepfe: [...a.querySelectorAll('button')].every((b) => b.getBoundingClientRect().height >= 44),
+      angesehen: [...document.querySelectorAll('.screen.partie .z.angesehen')].map((z) => z.dataset.ply).join() } : { offen: false };
+  });
+  await seite.locator('.screen.partie .z[data-ply="1"]').filter({ visible: true }).first().click();
+  await seite.waitForSelector('.screen.partie .zug-ansicht');
+  const a1 = await ansicht();
+  pruefe('Ansehen: Tipp auf 1… e5 zeigt die Stellung danach (Bauer e5, Springer noch g1), Zug markiert, Knoepfe ab 44 px',
+    a1.schild === '1… e5' && a1.e5 === 'bP' && a1.g1 === 'wN' && !a1.f3 && a1.zuletzt === 'e5,e7' && /^1(,1)*$/.test(a1.angesehen) && a1.knoepfe, a1);   // Liste und Band (eins davon verborgen)
+  pruefe('Ansehen: das Spielbrett bleibt unberuehrt (Springer f3, Laeufer f8 noch zu Hause, Bot-Springer c6)', await seite.evaluate(() =>
+    window.__partie.brett.figurAuf('f3') === 'wN' && window.__partie.brett.figurAuf('c6') === 'bN'));
+  await seite.locator('.za-steuer [data-aktion="zug-zurueck"]').click();
+  await seite.locator('.za-steuer [data-aktion="zug-zurueck"]').click();
+  const a2 = await ansicht();
+  pruefe('Ansehen: zweimal zurueck bis zur Ausgangsstellung, weiter zurueck geht nicht', a2.schild === 'Start' && !a2.e4 && a2.zurueckAus && a2.zuletzt === '', a2);
+  for (let i = 0; i < 3; i++) await seite.locator('.za-steuer [data-aktion="zug-vor"]').click();
+  const a3 = await ansicht();
+  pruefe('Ansehen: vor bis 2. Sf3', a3.schild === '2. Sf3' && a3.f3 === 'wN', a3);
+  await seite.locator('.za-steuer [data-aktion="zug-vor"]').click();
+  const a3b = await ansicht();
+  await seite.waitForFunction(() => !document.querySelector('.screen.partie .zug-ansicht'), null, { timeout: 5000 }).catch(() => {});
+  pruefe('Ansehen: vor auf den letzten Zug zeigt ihn noch einmal (1… Sc6), dann zur Partie (Ansicht zu, keine Markierung)',
+    a3b.schild === '2… Sc6' && a3b.zuletzt === 'b8,c6' && !(await ansicht()).offen && !(await seite.locator('.screen.partie .z.angesehen').count()), a3b);
+  // Tipp auf den letzten Zug: die Stellung davor, dann zieht der Bot-Springer noch einmal, danach von selbst zur Partie
+  await seite.locator('.screen.partie .z[data-ply="3"]').filter({ visible: true }).first().click();
+  await seite.waitForSelector('.screen.partie .zug-ansicht');
+  const r1 = await ansicht();
+  await seite.waitForFunction(() => document.querySelector('.screen.partie .za-schild')?.textContent === '2… Sc6', null, { timeout: 3000 }).catch(() => {});
+  const r2 = await ansicht();
+  await seite.waitForFunction(() => !document.querySelector('.screen.partie .zug-ansicht'), null, { timeout: 5000 }).catch(() => {});
+  pruefe('Ansehen: Tipp auf den letzten Zug spielt ihn noch einmal ab (erst 2. Sf3, dann 2… Sc6) und kehrt von selbst zurueck',
+    r1.schild === '2. Sf3' && r2.schild === '2… Sc6' && r2.zuletzt === 'b8,c6' && !(await ansicht()).offen, { r1, r2 });
+  await seite.locator('.screen.partie .z[data-ply="0"]').filter({ visible: true }).first().click();
+  await seite.waitForSelector('.screen.partie .zug-ansicht');
+  const zuegeVor = await seite.evaluate(() => window.__partie.z.zuege.length);
+  const mitte = await seite.locator('.screen.partie .zug-ansicht .za-brett').boundingBox();
+  await seite.touchscreen.tap(mitte.x + mitte.width / 2, mitte.y + mitte.height / 2);
+  await bildFertig();
+  pruefe('Ansehen: ein Tipp aufs Ansichts-Brett fuehrt zur Partie, ohne Zug', !(await ansicht()).offen
+    && (await seite.evaluate(() => window.__partie.z.zuege.length)) === zuegeVor && (await seite.evaluate(() => window.__partie.phase())) === 'flo');
+  await seite.keyboard.press('ArrowLeft');
+  const a4 = await ansicht();
+  await seite.keyboard.press('Escape');
+  pruefe('Ansehen: Tastatur (Pfeil links zeigt den Zug davor, Escape zur Partie)', a4.schild === '2. Sf3' && !(await ansicht()).offen, a4);
+  // Der Plan ist leer: nach d2-d4 haelt der Bot an. Waehrenddessen ansehen, dann zieht er: die Ansicht geht zu
+  await zug('d2d4');
+  await seite.waitForFunction(() => window.__partie.phase() === 'bot');
+  await seite.locator('.screen.partie .z[data-ply="2"]').filter({ visible: true }).first().click();
+  await seite.waitForSelector('.screen.partie .zug-ansicht');
+  await lasBotLos();
+  await seite.waitForFunction(() => window.__partie.z.zuege.length >= 6);
+  await bildFertig();
+  pruefe('Ansehen: ein neuer Zug (der Bot zieht) schliesst die Ansicht', !(await ansicht()).offen);
 
   // ---------- 7. Pfeil-Tipp: einmal je Geraet, ab der zweiten Partie ----------
   // Am Rechner (Maus, ohne Touch, wie die Rechtsklick-Pruefungen in tests/board.test.mjs: mit Touch kam der Rechtsklick
