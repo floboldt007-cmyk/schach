@@ -53,7 +53,7 @@ html[data-brett="holz"] {
 }
 /* Labor (Flo 31.10.2026, nur das Erfinder-Konto, js/labor.js): Kuerbis (Halloween), Frost, Marmor, Nussbaum, Thron */
 html[data-brett="kuerbis"] {
-  --feld-hell: #f6c27e; --feld-dunkel: #5a3478;
+  --feld-hell: #f6c27e; --feld-dunkel: #8a62b3;
   --zuletzt: rgba(255, 214, 92, .55); --auswahl: rgba(30, 10, 40, .3); --punkt: rgba(30, 10, 40, .26);
   --auswahl-kante: rgba(255, 240, 210, .85);
 }

@@ -12,7 +12,7 @@
 import { istErfinder } from './sonderstuecke.js';
 
 export const LABOR_BRETTER = Object.freeze([
-  Object.freeze({ id: 'kuerbis', hell: '#f6c27e', dunkel: '#5a3478', rand: '#2B1638' }),
+  Object.freeze({ id: 'kuerbis', hell: '#f6c27e', dunkel: '#8a62b3', rand: '#2B1638' }),
   Object.freeze({ id: 'frost', hell: '#eef5fa', dunkel: '#86a9c6', rand: '#2D5B86' }),
   Object.freeze({ id: 'marmor', hell: '#edeae4', dunkel: '#8f8a84', rand: '#4A4642' }),
   Object.freeze({ id: 'nussbaum', hell: '#e6c49b', dunkel: '#7a4b2c', rand: '#3E2414' }),
