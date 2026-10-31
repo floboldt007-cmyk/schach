@@ -12,6 +12,7 @@
 // Tester-Bericht (Luecken-Check 10): in "Info und Lizenzen" der Eintrag .es-bericht mit dem Knopf
 // [data-aktion="bericht"]; er laedt js/bericht.js erst beim Tipp (import()) und oeffnet dort das Blatt mit dem Bericht.
 import { klang } from '../sounds.js';
+import { wischKanten } from './bauteile.js';
 import { setzeZurueck, statistik, gesamtSterne } from '../storage.js';
 import { fuelle } from '../orte.js';
 import { SPRACHWAHL, t, sprache } from '../sprache.js';
@@ -273,6 +274,7 @@ export function zeige(root, params = {}, app) {
       const titel = kern === 'sprache' || kern === 'info' ? E('gruppe.' + kern) : h.textContent.trim();
       eintraege.push({ g, h, zeichen, titel });
     }
+    if (!nav.dataset.wischAn) { nav.dataset.wischAn = '1'; wischKanten(nav); }
     nav.innerHTML = eintraege.map((x, i) => `<button type="button" class="es-nav-punkt" data-ziel="${x.h.id}"${i ? '' : ' aria-current="true"'}>`
       + `<span class="es-nav-zeichen" aria-hidden="true">${icon(x.zeichen)}</span><span class="es-nav-text">${esc(x.titel)}</span></button>`).join('');
     const markiere = (id) => {

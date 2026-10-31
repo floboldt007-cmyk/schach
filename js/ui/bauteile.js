@@ -25,6 +25,9 @@
 //       in der Partie oben (CSS). app.meldung() benutzt toast().
 //   miniBrett(fen, { zuletzt: ['e4', ...], klasse }) -> HTML   kleines Vorschau-Brett in Flos Brettfarben (--feld-*),
 //       Figuren aus assets/pieces/ (cburnett)
+//   wischKanten(el) -> aufraeumen()   waagrecht wischbare Leiste (Sammlung, Bestenliste, Einstellungen auf dem Handy):
+//       setzt data-wisch="links rechts" nur auf den Seiten, auf denen es weitergeht; css/app.css blendet dort weich
+//       aus (Flo 31.10., iPhone: abgeschnittene Reiter sahen kaputt aus). Hoert auf, sobald el nicht mehr im Dokument ist.
 import { klang } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
 import { t } from '../sprache.js';
@@ -386,4 +389,31 @@ export function miniBrett(fen, { zuletzt = [], klasse = '' } = {}) {
     html += `<i class="${dunkel ? 'd' : 'h'}${markiert.has(name) ? ' z' : ''}">${fig ? `<img src="${PIECES}${fig}.svg" alt="" loading="lazy" draggable="false">` : ''}</i>`;
   }
   return `<div class="mini${klasse ? ' ' + esc(klasse) : ''}" aria-hidden="true">${html}</div>`;
+}
+
+// ---------- Wischleiste: weiche Kanten dort, wo es weitergeht ----------
+export function wischKanten(el) {
+  if (!el || typeof el.addEventListener !== 'function') return () => {};
+  let ro = null;
+  let weg = false;
+  let warDrin = false;   // oft wird die Leiste gebaut, bevor sie im Dokument steht: erst nach dem Einhaengen zaehlt "weg"
+  const setze = () => {
+    if (weg) return;
+    if (el.isConnected) warDrin = true;
+    else { if (warDrin) aufraeumen(); return; }
+    const links = el.scrollLeft > 2;
+    const rechts = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    const wert = [links ? 'links' : '', rechts ? 'rechts' : ''].filter(Boolean).join(' ');
+    if (el.dataset.wisch !== wert) el.dataset.wisch = wert;
+  };
+  function aufraeumen() {
+    weg = true;
+    el.removeEventListener('scroll', setze);
+    if (ro) { try { ro.disconnect(); } catch (e) { /* egal */ } ro = null; }
+  }
+  el.addEventListener('scroll', setze, { passive: true });
+  try { ro = new ResizeObserver(setze); ro.observe(el); } catch (e) { ro = null; }
+  setze();
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(setze);
+  return aufraeumen;
 }
