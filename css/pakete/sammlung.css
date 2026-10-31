@@ -180,3 +180,13 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .sk-figuren img { width: 34px; height: 34px; margin: 0 -3px 14px; }
 .pr-seit { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
 
+/* Handy (Flo 31.10., iPhone): Das Seltenheits-Schild lag ueber dem Bild. Auf schmalen Schirmen steht es unter dem
+   Namen (ich.js schreibt es dafuer ein zweites Mal in .sa-text-schild); im Bild bleibt es nur auf breiten Schirmen.
+   Gesperrte Titel zeigten die Levelzahl dunkel unter dem "?" ("2?0"): die Zahl steht schon in der Zeile darunter. */
+.sa-text-schild { display: none; }
+.sa-geheim > .sa-zahl { display: none; }
+@media (max-width: 520px) {
+  .sa-bild > .sa-schild { display: none; }
+  .sa-text-schild { display: flex; margin: 1px 0 1px; }
+  .sa-text-schild > .sa-schild { position: static; font-size: 11px; padding: 2px 8px; }
+}

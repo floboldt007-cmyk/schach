@@ -442,3 +442,24 @@ svg .rk { transform-box: view-box; }
 @keyframes rk-welle { to { transform: translateX(-24px); } }
 @keyframes rk-flackern { 0%, 100% { transform: scaleY(1); } 30% { transform: scaleY(1.22) skewX(-4deg); } 60% { transform: scaleY(.86) skewX(3deg); } }
 @media (prefers-reduced-motion: reduce) { .rk-glanz, .rk-funkeln, .rk-drehen, .rk-drehen-langsam, .rk-drehen-langsam-rueck, .rk-atmen, .rk-welle, .rk-flamme, .rk-schweben, .rk-steigen { animation: none; } }
+
+/* ---------- Weiche Kanten (Masken, keine Farbverlaeufe) ----------
+   Flo 31.10.2026 (iPhone-Bilder, "richtig schlechte Ansicht"): Der Inhalt endete oben unter dem Kopf und unten ueber der
+   Reiter-Pille an einer harten Linie, Karten sahen abgeschnitten aus; wischbare Leisten endeten hart am Rand. Die Masken
+   blenden nur die Darstellung aus (schwarz = sichtbar, durchsichtig = ausgeblendet), sie faerben nichts ein. Deshalb
+   stehen sie hier und nicht in navigation.css, bauteile.css oder arena.css (dort sind Verlaeufe als Gestaltung verboten).
+   1. Handy: Scroll-Flaechen oben und unten. Die Arena blendet unten nur 10 px aus, damit der klebende Spielen-Knopf
+      (14 px Abstand zum Rand) voll sichtbar bleibt.
+   2. Wischleisten (wischKanten in js/ui/bauteile.js): nur auf der Seite, auf der es weitergeht. */
+@media (max-width: 700px) {
+  .screen :is(.training-rumpf, .bl-rumpf, .sa-rumpf, .schule-rumpf, .ms-rumpf), .screen.arena.karte-hoch .inhalt {
+    --kante-oben: 14px; --kante-unten: 26px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black var(--kante-oben), black calc(100% - var(--kante-unten)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, black var(--kante-oben), black calc(100% - var(--kante-unten)), transparent 100%); }
+  .screen.arena.karte-hoch .inhalt { --kante-oben: 8px; --kante-unten: 10px; }
+}
+[data-wisch~="links"], [data-wisch~="rechts"] { --wl: 0px; --wr: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black var(--wl), black calc(100% - var(--wr)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black var(--wl), black calc(100% - var(--wr)), transparent 100%); }
+[data-wisch~="links"] { --wl: 26px; }
+[data-wisch~="rechts"] { --wr: 40px; }

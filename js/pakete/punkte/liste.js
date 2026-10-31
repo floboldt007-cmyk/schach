@@ -13,6 +13,7 @@
 // Einstellungen (Komfort je Geraet, speichereModulEinstellungen('punkte')): { reiter, fenster, tafel, name }.
 import { anim, staffel, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
+import { wischKanten } from '../../ui/bauteile.js';
 import { BOTS, botNachId } from '../../bots.js';
 import {
   ladePartie, ladeFortschritt, istFreigeschaltet, naechsterGegner, ladeModulEinstellungen, speichereModulEinstellungen, ladeEinstellungen,
@@ -248,6 +249,7 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
   }).join('');
   const karte = el('article', 'bl-karte bl-tafel');
   s.append(leiste, karte);
+  wischKanten(leiste);
 
   function zeichne(id, { erst = false } = {}) {
     st = S.lade();
