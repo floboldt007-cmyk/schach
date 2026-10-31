@@ -197,7 +197,7 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
   // blaupause nur mit Sonderstueck, kuerbis/frost/gold nur fuer den Erfinder (Labor, js/labor.js; beides js/figurensatz.js)
   figuren: Object.freeze(['cburnett', 'blaupause', 'kuerbis', 'frost', 'gold', 'neon', 'glas', 'holz', 'pixel', 'geo', 'elfenbein', 'marmor', 'moosgeister', 'tiefsee',
-    'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'zombies', 'geister', 'drachen', 'lavagolem']),
+    'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'zombies', 'geister', 'drachen', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos']),
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),

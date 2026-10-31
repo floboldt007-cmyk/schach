@@ -482,5 +482,159 @@ const LAVAGOLEM = {
     gesicht: { sklera: '#2A0A02', pupille: '#FFB23E', rand: '#000000', brauen: true } },
 };
 
+// ---------- Piraten (Flo 01.11.2026: "Denk dir mehr aus"): Kopftuch und Augenklappe, Totenkopf-Flagge, Kakadu als
+// Laeufer, Dreispitz mit Feder, Kapitaen mit Bart, Springer mit Ohrring ----------
+const PIRATEN = {
+  w: { c0: '#FFFFFF', c1: '#F7F0E2', c2: '#E2D2B2', c3: '#A88F66', l: '#3A2A16', d: '#7A5A32', rot: '#C8302E', gold: '#E8B33A', klappe: '#1A1410',
+    hut: '#2A2420', schopf: '#F5D547', schnabel: '#5A5048', bart: '#4A3020', fahne: '#1A1410', schaedel: '#FFFDF6',
+    gesicht: { sklera: '#FFFFFF', pupille: '#3A2A16', rand: '#3A2A16' } },
+  b: { c0: '#4E6A80', c1: '#2E4558', c2: '#1A2B3A', c3: '#0A131C', l: '#000000', d: '#9FB8CC', rot: '#B0242A', gold: '#E8B33A', klappe: '#000000',
+    hut: '#0E0A08', schopf: '#C2302A', schnabel: '#9A9088', bart: '#120A04', fahne: '#000000', schaedel: '#E9E2D2',
+    gesicht: { sklera: '#E9F0F6', pupille: '#0A131C', rand: '#000000' } },
+  kopf(fig, m, h) {
+    const klappe = (x, y, r) => `<path d="M${x - r * 2.6} ${y - r * 1.7}L${x + r * 2.4} ${y + r * 0.9}" stroke="${m.klappe}" stroke-width="1.3"/><ellipse cx="${x}" cy="${y}" rx="${r * 1.15}" ry="${r}" fill="${m.klappe}"/>`;
+    const auge = (x, y, r) => h.gesicht([[x, y]], r, '');
+    const grinsen = (x, y, w) => `<path d="M${x - w / 2} ${y}q${w / 2} ${w * 0.35} ${w} 0" fill="none" stroke="${m.l}" stroke-width="1.4" stroke-linecap="round"/>`;
+    const hut = (y, breite) => `<path d="M${50 - breite} ${y}c${breite * 0.3}-${breite * 0.32} ${breite * 0.55}-${breite * 0.52} ${breite}-${breite * 0.52}s${breite * 0.7} ${breite * 0.2} ${breite} ${breite * 0.52}c-${breite * 0.62} ${breite * 0.22}-${breite * 1.38} ${breite * 0.22}-${breite * 2} 0z" fill="${m.hut}" stroke="${m.l === '#000000' ? m.d : m.l}" stroke-width="1.4" stroke-linejoin="round"/>`
+      + `<path d="M${50 - breite * 0.92} ${y - 1.4}q${breite * 0.92} ${breite * 0.16} ${breite * 1.84} 0" fill="none" stroke="${m.gold}" stroke-width="1.6"/>`;
+    if (fig === 'P') return `<g fill="${K}" ${L(m)}>${h.form('P', 4)}</g>`
+      + `<path d="M37 32c1-8 6.4-12.4 13-12.4S62 24 63 32c-4.4-2.6-8.8-3.6-13-3.6S41.4 29.4 37 32z" fill="${m.rot}" ${L(m)}/>`
+      + `<path d="M62 29l6.4-2.4-1.4 4.6 4.4 1.4-6.6 1.4z" fill="${m.rot}" ${L(m)}/><g fill="#FFFFFF" opacity=".85"><circle cx="45" cy="24.4" r="1"/><circle cx="52" cy="22.6" r="1"/><circle cx="57.6" cy="25.4" r="1"/></g>`
+      + klappe(44.6, 36, 3.6) + auge(55.6, 36, 3.6) + grinsen(50, 42, 8);
+    if (fig === 'R') return `<path d="M60 26V5" stroke="${m.l}" stroke-width="1.8"/><path d="M60 5.5h16l-3 6 3 6H60z" fill="${m.fahne}" stroke="${m.l === '#000000' ? m.d : m.l}" stroke-width="1.2"/>`
+      + `<circle cx="67" cy="10.6" r="3" fill="${m.schaedel}"/><path d="M64.6 15.6l5 -2.4M64.6 13.2l5 2.4" stroke="${m.schaedel}" stroke-width="1.2"/><g fill="${m.fahne}"><circle cx="66" cy="10.4" r=".8"/><circle cx="68" cy="10.4" r=".8"/></g>`
+      + `<g fill="${Z}" ${L(m)}>${h.form('R', 4)}</g><path d="M28 31h44" stroke="${m.rot}" stroke-width="2.6"/>`
+      + `<circle cx="50" cy="57" r="6" fill="${m.c3}" ${L(m)}/><circle cx="50" cy="57" r="3.8" fill="${m.c0}" opacity=".45"/>`;
+    if (fig === 'B') return `<path d="M44 16c-3-5-2.6-10 0-13 .6 4 2.4 6.4 4.6 8M49.6 12.4c-.4-5.4 1.6-9 4.6-10.6-.6 4-.2 7.6 1.4 10.4M54.4 14c1.4-4.6 4.4-7.2 8-7.6-1.6 3.2-2.6 6.4-2.8 9.6" fill="${m.schopf}" ${L(m)}/>`
+      + `<g fill="${K}" ${L(m)}>${h.form('B', 5)}</g>` + auge(46, 25.6, 3.4)
+      + `<path d="M53 26c4.4-.6 8.2 1.6 8.8 6.2-2.8-1.6-5.6-1.6-7.6.4-1.4-1.6-1.8-4.4-1.2-6.6z" fill="${m.schnabel}" ${L(m)}/><path d="M54.6 33c1.6 2.6 4.4 3.6 6.4 2.4" fill="none" stroke="${m.l}" stroke-width="1.2"/>`;
+    if (fig === 'Q') return `<path d="M58 30c6-9.6 14.6-13 20-10.4-5.4.6-10 4.4-12.6 10.4" fill="${m.rot}" ${L(m)}/>` + hut(40, 19)
+      + `<rect x="33.5" y="42" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/><circle cx="50" cy="33.4" r="2.6" fill="${m.gold}" ${L(m)}/>` + koerperGesicht('Q', h);
+    if (fig === 'K') return `<g fill="${K}" ${L(m)}>${h.form('K', 4)}</g>`
+      + `<path d="M38.6 36.6c1.4 6.4 5.6 9.6 11.4 9.6s10-3.2 11.4-9.6c-2.6 2.2-6.4 3.2-11.4 3.2s-8.8-1-11.4-3.2z" fill="${m.bart}" ${L(m)}/>`
+      + klappe(44.6, 32.4, 3.4) + auge(55.6, 32.4, 3.4) + hut(27, 20)
+      + `<path d="M48 18.8V8.2h-3.6V5h3.6V1.4h4V5h3.6v3.2H52v10.6z" fill="${m.gold}" ${L(m)}/>`;
+    if (fig === 'N') return `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>`
+      + `<path d="M36.6 25.4c4.6-6.4 11-9.4 18.6-8.4l1.4 5.6c-7-1-12.8 1.4-17.4 6.4z" fill="${m.rot}" ${L(m)}/><path d="M56.6 22.4l6-1.4-2.4 4 3.6 2-6.4 0z" fill="${m.rot}" ${L(m)}/>`
+      + klappe(42.5, 31, 3.6) + `<circle cx="51" cy="42" r="2.6" fill="none" stroke="${m.gold}" stroke-width="1.6"/>`;
+    return '';
+  },
+};
+
+// ---------- Aegypten: Mumien-Bauer, Tempeltor mit Sonnenscheibe, Obelisk, Kronen in Lapisblau und Gold, Pharao mit Ankh,
+// Sphinx-Springer; Weiss Sandstein, Schwarz Basalt mit Gold ----------
+const AEGYPTEN = {
+  w: { c0: '#FFFDF2', c1: '#F7E7BE', c2: '#E2C27E', c3: '#A8843E', l: '#4A3410', d: '#8A6420', gold: '#E8B33A', lapis: '#2F5FA8', tuerkis: '#3FB8B0', binde: '#F6EEDC',
+    gesicht: { sklera: '#FFFFFF', pupille: '#1A1408', rand: '#1A1408', brauen: true } },
+  b: { c0: '#5A5650', c1: '#36322E', c2: '#201D1A', c3: '#0A0908', l: '#000000', d: '#E8B33A', gold: '#E8B33A', lapis: '#3A6FD0', tuerkis: '#3FB8B0', binde: '#8A8276',
+    gesicht: { sklera: '#F2E6C8', pupille: '#0A0908', rand: '#000000', brauen: true } },
+  kopf(fig, m, h) {
+    const ankh = (x, y, sk, fill) => `<path transform="translate(${x} ${y}) scale(${sk})" d="M-1.6 0v-7.4h-4.6v-3.2h3.4c-2.2-1.6-3.4-3.8-3.4-6.2 0-3.4 2.6-5.8 6.2-5.8s6.2 2.4 6.2 5.8c0 2.4-1.2 4.6-3.4 6.2h3.4v3.2H1.6V0zM0-13.4c1.6-1 2.6-2.2 2.6-3.6 0-1.6-1.2-2.6-2.6-2.6s-2.6 1-2.6 2.6c0 1.4 1 2.6 2.6 3.6z" fill="${fill}" fill-rule="evenodd" stroke="${m.l}" stroke-width="${(1.1 / sk).toFixed(2)}"/>`;
+    const streifen = (x1, x2, y1, y2, n, farbe) => {
+      let d = '';
+      for (let i = 1; i < n; i++) { const y = y1 + ((y2 - y1) * i) / n; d += `M${x1} ${y.toFixed(1)}H${x2}`; }
+      return `<path d="${d}" stroke="${farbe}" stroke-width="1.6"/>`;
+    };
+    if (fig === 'P') return `<g fill="${m.binde}" ${L(m)}>${h.form('P', 4)}</g>`
+      + `<path d="M37.4 28.6c6-3 18-3.6 25 .6M36.6 34.4c8-2.4 18.8-2.6 26.8.2M37.4 40.6c7.6 2.4 17.6 2.6 25.2-.6M40.6 45.6c5.6 2 13.4 2 18.8 0" fill="none" stroke="${m.c3}" stroke-width="1.2"/>`
+      + h.gesicht([[45, 37.4]], 3.4, '') + `<path d="M52 37.6h7" stroke="${m.l}" stroke-width="1.6" stroke-linecap="round"/>`;
+    if (fig === 'R') return `<path d="M27 40l3-22h14l1.4 22zM54.6 40l1.4-22h14l3 22z" fill="${Z}" ${L(m)}/><path d="M45.4 40V27h9.2v13z" fill="${m.c3}" ${L(m)}/>`
+      + `<circle cx="50" cy="15" r="4.6" fill="${m.gold}" ${L(m)}/><path d="M45 15.6c-4.6-2.4-9.6-2.4-13.6-.4 3.6.4 7 1.6 9.2 3.4zM55 15.6c4.6-2.4 9.6-2.4 13.6-.4-3.6.4-7 1.6-9.2 3.4z" fill="${m.lapis}" ${L(m)}/>`
+      + streifen(31, 43, 20, 38, 4, m.lapis) + streifen(57, 69, 20, 38, 4, m.lapis) + `<rect x="29" y="38" width="42" height="7.5" rx="1.6" fill="${Z}" ${L(m)}/>`
+      + `<path d="M40 55h4M46 55h8M56 55h4M42 62h6M52 62h6" stroke="${m.d}" stroke-width="1.6" stroke-linecap="round"/>`;
+    if (fig === 'B') return `<path d="M43.8 44l2.4-30h7.6l2.4 30z" fill="${Z}" ${L(m)}/><path d="M46.2 14L50 6.4l3.8 7.6z" fill="${m.gold}" ${L(m)}/>`
+      + `<path d="M48 20h4M47.6 25.6l2.4 2 2.4-2M48 32h4M47.4 37.6h5.2" stroke="${m.lapis}" stroke-width="1.5" stroke-linecap="round"/><circle cx="50" cy="41" r=".9" fill="${m.lapis}"/>`;
+    if (fig === 'Q') return `<path d="M36.6 42.5l-3.4-25h33.6l-3.4 25z" fill="${m.lapis}" ${L(m)}/>` + streifen(35.4, 64.6, 17.5, 42.5, 4, m.gold)
+      + `<path d="M50 17.5v-5" stroke="${m.l}" stroke-width="1.2"/><circle cx="50" cy="11" r="2.4" fill="${m.gold}" ${L(m)}/>`
+      + `<rect x="33.5" y="42" width="33" height="7" rx="3.5" fill="${m.gold}" ${L(m)}/>` + koerperGesicht('Q', h)
+      + `<path d="M40 56h-3.6M60 56h3.6" stroke="${m.l}" stroke-width="1.4" stroke-linecap="round"/>`;
+    if (fig === 'K') return ankh(50, 21, 0.85, m.gold)
+      + `<path d="M33.4 49l2.4-16c.6-6 6.4-10.4 14.2-10.4S63.6 27 64.2 33l2.4 16-6.4-2V38.6h-20.4V47z" fill="${m.lapis}" ${L(m)}/>`
+      + `<path d="M36.6 31.4h26.8M35.2 38.6h29.6M34.4 44.6h6M59.6 44.6h6" stroke="${m.gold}" stroke-width="2"/>`
+      + `<path d="M40 38.6c0-6 4.4-10.6 10-10.6s10 4.6 10 10.6v8.6H40z" fill="${K}" ${L(m)}/>`
+      + h.gesicht([[45.6, 35.6], [54.4, 35.6]], 2.8, 'M47.4 42q2.6 1.4 5.2 0') + `<path d="M48 47.2h4l-.8 5h-2.4z" fill="${m.gold}" ${L(m)}/>`;
+    if (fig === 'N') return `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>`
+      + `<path d="M45 20.6c6.4-3.6 14.6-2.6 18.4 3.6 3 4.6 3.6 11.6 2 18.6l-6.4 4.4c.6-6.4 0-12.6-2.6-16.6-2.2-3.4-6-5.2-10.4-5z" fill="${m.lapis}" ${L(m)}/>`
+      + `<path d="M50 20.4c4.6-.4 9 1.6 11.4 5.4M47.4 25.4c5-.4 9.4 1.6 11.6 5.6M59.4 33.6l4.4 2M58.6 39.6l5.4 1.6" fill="none" stroke="${m.gold}" stroke-width="1.8"/>`
+      + h.gesicht([[42.5, 30]], 3.8, '');
+    return '';
+  },
+};
+
+// ---------- Wikinger: Nasenhelm und Bart, Palisade mit Rundschilden, Runenstein, Fluegelhelm, Hoernerhelm mit Kreuz,
+// Springer mit Helm und Zoepfen; Weiss Holz und Stahl, Schwarz Eisen und Nacht ----------
+const WIKINGER = {
+  w: { c0: '#FFFFFF', c1: '#F2EEE6', c2: '#D6CDBD', c3: '#9A8E78', l: '#2E2A24', d: '#6E5E46', stahl: '#C9D2DA', horn: '#F2E6C8', bart: '#E0A64A', schild1: '#C8302E', schild2: '#2F5FA8', gold: '#E8B33A',
+    gesicht: { sklera: '#FFFFFF', pupille: '#2E2A24', rand: '#2E2A24', brauen: true } },
+  b: { c0: '#5E6A7A', c1: '#3A4452', c2: '#222A34', c3: '#0C1016', l: '#000000', d: '#A8B8CC', stahl: '#7E8A98', horn: '#E8DCC0', bart: '#7A4A22', schild1: '#9A2420', schild2: '#2A4A88', gold: '#E8B33A',
+    gesicht: { sklera: '#DCE6F0', pupille: '#0C1016', rand: '#000000', brauen: true } },
+  kopf(fig, m, h) {
+    const helm = (cy, r) => `<path d="M${50 - r} ${cy}c0-${r * 0.95} ${r * 0.45}-${r} ${r}-${r}s${r} ${r * 0.05} ${r} ${r}z" fill="${m.stahl}" ${L(m)}/>`
+      + `<path d="M${50 - r} ${cy}h${2 * r}" stroke="${m.l}" stroke-width="2.6"/><path d="M50 ${cy - r}v${r}" stroke="${m.l}" stroke-width="1" opacity=".5"/>`;
+    const bart = (y, w, lang) => `<path d="M${50 - w} ${y}c0 ${lang * 0.7} ${w * 0.5} ${lang} ${w} ${lang}s${w}-${lang * 0.3} ${w}-${lang}c-${w * 0.6} ${lang * 0.25}-${w * 1.4} ${lang * 0.25}-${2 * w} 0z" fill="${m.bart}" ${L(m)}/>`
+      + `<path d="M${50 - w * 0.4} ${y + lang * 0.3}v${lang * 0.5}M${50 + w * 0.4} ${y + lang * 0.3}v${lang * 0.5}" stroke="${m.l}" stroke-width=".9" opacity=".5"/>`;
+    const schild = (x, y, r, f) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${f}" ${L(m)}/><circle cx="${x}" cy="${y}" r="${r * 0.32}" fill="${m.stahl}" stroke="${m.l}" stroke-width="1"/><path d="M${x - r} ${y}h${2 * r}M${x} ${y - r}v${2 * r}" stroke="${m.l}" stroke-width=".8" opacity=".5"/>`;
+    const horn = (x, y, links) => `<path transform="translate(${x} ${y}) scale(${links ? -1 : 1} 1)" d="M0 0c4-1 7.6-4.4 8.6-10.6.4 5.8-1.4 11.4-6.6 14.6z" fill="${m.horn}" ${L(m)}/>`;
+    if (fig === 'P') return `<g fill="${K}" ${L(m)}>${h.form('P', 4)}</g>` + helm(33, 13.6) + `<path d="M48.4 33h3.2v8.4l-1.6 1.6-1.6-1.6z" fill="${m.stahl}" ${L(m)}/>`
+      + h.gesicht([[44.4, 37], [55.6, 37]], 3, '') + bart(42.6, 9, 9);
+    if (fig === 'R') return `<path d="M28 40V18l3-5 3 5v4h4.6v-4l3-5 3 5v4H49v-4l3-5 3 5v4h4.6v-4l3-5 3 5v4H72v18z" fill="${Z}" ${L(m)}/>`
+      + `<path d="M34 22v18M44.6 22v18M55 22v18M65.6 22v18" stroke="${m.d}" stroke-width="1" opacity=".6"/>`
+      + schild(37, 31, 5.4, m.schild1) + schild(50, 31, 5.4, m.schild2) + schild(63, 31, 5.4, m.schild1) + `<rect x="29" y="38" width="42" height="7.5" rx="2" fill="${Z}" ${L(m)}/>`;
+    if (fig === 'B') return `<path d="M39 44.5c-1.6-12 .4-24 4.6-30.6 3.6-5.6 9.2-5.6 12.8 0 4.2 6.6 6.2 18.6 4.6 30.6z" fill="${Z}" ${L(m)}/>`
+      + `<path d="M46 18v12l4-4 4 4V18M44.6 34.4h10.8M47 38l3 3.4 3-3.4M50 41.4V44" fill="none" stroke="${m.schild1}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if (fig === 'Q') return `<path d="M36 34c-6.4-2-10.6-7.4-11-14 4.6 3 8.4 4 12.6 3.6zM64 34c6.4-2 10.6-7.4 11-14-4.6 3-8.4 4-12.6 3.6z" fill="${m.c0}" ${L(m)}/>`
+      + `<path d="M28.6 22.6l6 3.4M71.4 22.6l-6 3.4" stroke="${m.l}" stroke-width=".9" opacity=".6"/>` + helm(38, 14) + `<circle cx="50" cy="31" r="1.6" fill="${m.gold}"/>`
+      + `<path d="M36.6 42c-2.6 5-2.6 10 0 14M63.4 42c2.6 5 2.6 10 0 14" fill="none" stroke="${m.bart}" stroke-width="3" stroke-linecap="round" stroke-dasharray="2.4 1.2"/>`
+      + `<rect x="33.5" y="40" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + koerperGesicht('Q', h);
+    if (fig === 'K') return horn(37, 27, true) + horn(63, 27, false) + helm(30, 13.6)
+      + `<path d="M48 16.4V8h-3.4V5h3.4V1.6h4V5h3.4v3H52v8.4z" fill="${m.gold}" ${L(m)}/>`
+      + `<path d="M36.4 30.2c0 7.6 6 12.6 13.6 12.6s13.6-5 13.6-12.6z" fill="${K}" ${L(m)}/>` + h.gesicht([[45, 34], [55, 34]], 2.9, '') + bart(38.6, 11, 12);
+    if (fig === 'N') return `<path d="M64 25c3 3.4 5 8 5.6 13M69.4 41c.4 4 .2 8-.6 11" fill="none" stroke="${m.bart}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="2.6 1.4"/>`
+      + `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g><path d="M39 26.4c3.4-6.6 9.4-10.2 16-9.6l1.6 6c-6.4-.8-12 1.6-15.6 6.4z" fill="${m.stahl}" ${L(m)}/>`
+      + horn(53, 17, false) + h.gesicht([[42.5, 30.4]], 3.8, '');
+    return '';
+  },
+};
+
+// ---------- Dinos: Baby im Ei, Stegosaurus-Platten als Zinnen, Langhals als Laeufer, Triceratops-Kragen als Krone,
+// T-Rex mit Kreuz, Raptor-Springer; Weiss mintgruen mit Flecken, Schwarz violett ----------
+const DINOS = {
+  w: { c0: '#FFFFFF', c1: '#EAF6DC', c2: '#C6E2A6', c3: '#86AE5E', l: '#2C3E1A', d: '#5E8A3A', flecken: '#F2B04A', platten: '#F2B04A', schale: '#FFFDF4', gold: '#E8B33A',
+    gesicht: { sklera: '#FFFFFF', pupille: '#2C3E1A', rand: '#2C3E1A' } },
+  b: { c0: '#7A6A9A', c1: '#524470', c2: '#33284A', c3: '#160F22', l: '#000000', d: '#C2A8F0', flecken: '#E07A3A', platten: '#E07A3A', schale: '#E9E2F2', gold: '#E8B33A',
+    gesicht: { sklera: '#F4EEFF', pupille: '#160F22', rand: '#000000', brauen: true } },
+  kopf(fig, m, h) {
+    const flecken = (pts) => `<g fill="${m.flecken}" opacity=".85">${pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
+    const zaehne = (x, y, n, w) => { let d = `M${x} ${y}`; for (let i = 0; i < n; i++) d += `l${w / 2} 2.2l${w / 2} -2.2`; return `<path d="${d}" fill="#FFFFFF" stroke="${m.l}" stroke-width=".8" stroke-linejoin="round"/>`; };
+    const platte = (x, y, gr, dreh) => `<path transform="rotate(${dreh} ${x} ${y})" d="M${x - gr * 0.6} ${y}L${x - gr * 0.55} ${y - gr * 0.6}L${x} ${y - gr * 1.2}L${x + gr * 0.55} ${y - gr * 0.6}L${x + gr * 0.6} ${y}z" fill="${m.platten}" ${L(m)}/>`;
+    if (fig === 'P') return `<g fill="${K}" ${L(m)}>${h.form('P', 4)}</g>` + flecken([[57, 26, 2], [60.6, 31.4, 1.4], [41.4, 27.4, 1.6]])
+      + h.gesicht([[44.6, 34], [55.4, 34]], 3.6, 'M46 41q4 2.6 8 0')
+      + `<path d="M34.6 42.6l3.4-3.4 3.4 3.6 3.6-3.6 3.4 3.6 3.6-3.6 3.4 3.6 3.6-3.6 3.4 3.4c-1 6-6.6 9.6-15.4 9.6s-14.4-3.6-15.4-9.6z" fill="${m.schale}" ${L(m)}/>`;
+    if (fig === 'R') return platte(35, 28, 13, -12) + platte(50, 26, 15, 0) + platte(65, 28, 13, 12)
+      + `<path d="M28 40V27.4c0-1.4 1-2.4 2.4-2.4h39.2c1.4 0 2.4 1 2.4 2.4V40z" fill="${Z}" ${L(m)}/>` + flecken([[36, 31, 1.8], [62, 33, 2], [46, 36, 1.4]])
+      + `<rect x="29" y="38" width="42" height="7.5" rx="3.2" fill="${Z}" ${L(m)}/>`;
+    if (fig === 'B') return `<path d="M44 44c-1.6-10 0-20 4.6-27.4 2.6-4.2 7-6.4 11.4-5.4 3 .6 4.6 3 3.6 5.6-1 2.6-3.6 3.4-6.4 3-3 3.6-4.6 13.6-3.6 24.2z" fill="${K}" ${L(m)}/>`
+      + flecken([[47.4, 32, 1.6], [50, 24.4, 1.4], [47.6, 39.6, 1.4]]) + h.gesicht([[58.6, 14.4]], 2.4, '') + `<circle cx="63.4" cy="16" r=".7" fill="${m.l}"/>`;
+    if (fig === 'Q') return `<path d="M30 40c-2.6-9.6 2-19.6 10.4-23.6 6.4-3 13-3 19.2 0 8.4 4 13 14 10.4 23.6z" fill="${m.platten}" ${L(m)}/>`
+      + `<g fill="${m.c0}" stroke="${m.l}" stroke-width="1"><path d="M31.4 26l-4-2.6 4.4-.6zM38 18.6l-2.6-4 4.4.6zM50 14.6l-1.6-4.4h3.2zM62 18.6l2.6-4-4.4.6zM68.6 26l4-2.6-4.4-.6z"/></g>`
+      + `<path d="M38 41c0-7 5.4-12.6 12-12.6S62 34 62 41z" fill="${K}" ${L(m)}/>`
+      + `<path d="M43 31.4c-1.6-3.4-1.4-6.4.6-8.6.4 3 1.4 5.2 3.4 6.6zM57 31.4c1.6-3.4 1.4-6.4-.6-8.6-.4 3-1.4 5.2-3.4 6.6z" fill="${m.schale}" ${L(m)}/>`
+      + `<rect x="33.5" y="40" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + koerperGesicht('Q', h) + flecken([[40, 64, 1.8], [61, 60, 2], [57, 70, 1.4]]);
+    if (fig === 'K') return `<path d="M48 22V12.6h-3.6V9.4H48V5.6h4v3.8h3.6v3.2H52V22z" fill="${m.gold}" ${L(m)}/>`
+      + `<path d="M34 44c-1.4-10.6 4-20.6 14.6-22 9.4-1.2 18 4 19.6 12.6l.4 4.4c-6 .6-12 .8-18 .4V44z" fill="${K}" ${L(m)}/>`
+      + `<path d="M50.6 39.4c6 .4 12 .2 18-.4-.6 3-3.6 5-7.6 5.2l-10.4.4z" fill="${Z}" ${L(m)}/>` + zaehne(51, 39.6, 6, 2.8)
+      + h.gesicht([[46, 30.6]], 3.6, '') + `<path d="M42 27.4l8-1.6" stroke="${m.l}" stroke-width="1.8" stroke-linecap="round"/><circle cx="64.6" cy="33.4" r=".9" fill="${m.l}"/>`
+      + flecken([[38.6, 33, 2], [41.6, 39, 1.6]]);
+    if (fig === 'N') {
+      const zacken = [[62, 21, -10], [68, 29, 20], [71.6, 39, 40], [72.6, 50, 60]]
+        .map(([x, y, d]) => `<path transform="rotate(${d} ${x} ${y})" d="M${x - 3.4} ${y + 2}L${x} ${y - 5}L${x + 3.4} ${y + 2}z" fill="${m.platten}" stroke="${m.l}" stroke-width="1.1" stroke-linejoin="round"/>`).join('');
+      return zacken + `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>` + h.gesicht([[42.5, 29.6]], 4, '') + zaehne(22.6, 47, 4, 2.4)
+        + flecken([[52, 30, 2], [57, 40, 2.4], [50, 49, 1.8], [60, 60, 2.2]]);
+    }
+    return '';
+  },
+};
+
 export const THEMEN = Object.freeze({ feuer: FEUER, stein: STEIN, halloween: HALLOWEEN, weihnachten: WEIHNACHTEN, ostern: OSTERN,
-  weltraum: WELTRAUM, roboter: ROBOTER, naschwerk: NASCHWERK, zombies: ZOMBIES, geister: GEISTER, drachen: DRACHEN, lavagolem: LAVAGOLEM });
+  weltraum: WELTRAUM, roboter: ROBOTER, naschwerk: NASCHWERK, zombies: ZOMBIES, geister: GEISTER, drachen: DRACHEN, lavagolem: LAVAGOLEM,
+  piraten: PIRATEN, aegypten: AEGYPTEN, wikinger: WIKINGER, dinos: DINOS });
