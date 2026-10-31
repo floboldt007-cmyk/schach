@@ -465,7 +465,7 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .inhalt { gap: 10px; }
 .arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
 .arena.karte-kompakt .knoten .fahne { display: none; }
-.arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
+.arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 16px; }
 .arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
 .arena.karte-kompakt .detail .mini-sterne { margin-left: 8px; }
 .arena.karte-kompakt .cta-platz { padding: 6px 16px 10px; }
@@ -473,8 +473,13 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
 .arena.karte-kompakt .detail-kopf { gap: 12px; }
 .arena.karte-kompakt .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
 .arena.karte-kompakt .detail h2 { font-size: 20px; }
-.arena.karte-kompakt .detail-welt, .arena.karte-kompakt .sprechblase, .arena.karte-kompakt .merkmale,
+.arena.karte-kompakt .detail-welt, .arena.karte-kompakt .merkmale,
 .arena.karte-kompakt .ziel-sterne, .arena.karte-kompakt .wahl-titel { display: none; }
+/* Die gewoehnliche Begruessung entfaellt kompakt (Karte, Gegner, Farbe und Knopf passen so ohne Scrollen). Ein besonderer
+   Satz (Mutmacher nach Niederlagen, Erzfeind) bleibt, knapp in hoechstens zwei Zeilen */
+.arena.karte-kompakt .detail .sprechblase:not(.besonders) { display: none; }
+.arena.karte-kompakt .detail .sprechblase { order: 2; padding: 8px 12px; font-size: 13.5px; line-height: 1.35;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .arena.karte-kompakt .fortsetzen { order: 0; }
 .arena.karte-kompakt .detail-kopf { order: 1; }
 .arena.karte-kompakt .wahl-farbe { order: 3; }

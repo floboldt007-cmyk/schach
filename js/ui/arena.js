@@ -615,6 +615,7 @@ export function zeige(root, params, app) {
 
   // ---------- Gegner-Panel ----------
   let panelLauf = 0;
+  let blaseBesonders = false;
   function zeigeDetail(neueBlase, animiert = false) {
     const lauf = ++panelLauf;
     const b = BOTS.find((x) => x.id === gewaehlt);
@@ -654,7 +655,7 @@ export function zeige(root, params, app) {
             <div class="mini-sterne" aria-label="${esc(t('arena.sterne.von', { anzahl: f.sterne.filter(Boolean).length }))}">${kSterneHtml(f.sterne)}</div>
           </div>
         </div>
-        <div class="sprechblase spruch${neueBlase ? '' : ' still'}">${esc(t('arena.zitat', { satz }))}</div>
+        <div class="sprechblase spruch${neueBlase ? '' : ' still'}${blaseBesonders ? ' besonders' : ''}">${esc(t('arena.zitat', { satz }))}</div>
         <div class="merkmale">
           <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
           <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
@@ -765,7 +766,10 @@ export function zeige(root, params, app) {
       });
     } catch (e) { wahl = null; }
     const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
-    return (anlass && botSatz(b, anlass, Math.random, wahl.werte || null)) || botSatz(b, 'begruessung') || '';
+    const besonders = anlass ? botSatz(b, anlass, Math.random, wahl.werte || null) : '';
+    // besonderer Satz (z. B. Mutmacher nach Niederlagen aus dem Gedaechtnis): auf dem Handy hoch auch kompakt sichtbar
+    blaseBesonders = !!besonders;
+    return besonders || botSatz(b, 'begruessung') || '';
   }
 
   // Nachlese: was nach der letzten Partie nicht mehr ins Ergebnis passte (still, ohne Klang)
