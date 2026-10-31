@@ -382,6 +382,7 @@ async function laborTeil(browser) {
   // und Flo 31.10. abends: "wenn ich auf die Lobby klicke, springt der nach oben": die Seite bleibt, wo sie war
   const obenVor = await p.s.evaluate(() => {
     document.querySelector('.sa-teil[data-teil="melodie-karofelder"]').scrollIntoView({ block: 'center' });
+    document.querySelector('.sa-screen').dataset.alt = '1';
     return document.querySelector('.sa-rumpf').scrollTop;
   });
   await ruesteAus(p.s, 'melodie-karofelder');
@@ -389,6 +390,9 @@ async function laborTeil(browser) {
   const obenNach = await p.s.evaluate(() => document.querySelector('.sa-rumpf').scrollTop);
   pruefe('Ausrüsten: die Sammlung springt nicht nach oben, sie bleibt an der Melodie', obenVor > 0 && Math.abs(obenNach - obenVor) <= 30,
     { obenVor, obenNach });
+  // iPad (Flo 31.10. abends: "springt immer noch nach oben"): kein Neuaufbau des Screens mehr, nur die Karten werden neu gezeichnet
+  pruefe('Ausrüsten: derselbe Screen bleibt stehen (kein Neuaufbau), die Stelle stimmt aufs Pixel',
+    await p.s.evaluate(() => document.querySelector('.sa-screen')?.dataset.alt === '1') && Math.abs(obenNach - obenVor) <= 1, { obenVor, obenNach });
   pruefe('Lobby-Musik: Tipp auf Karofelder schaltet sie ein', await p.s.evaluate(() => {
     const e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}');
     return e.musik === true && e.musikMelodie === 'karofelder';

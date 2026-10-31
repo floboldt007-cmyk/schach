@@ -669,6 +669,9 @@ function gehe(name, params = {}, { ersetzen = null } = {}) {
     else history.pushState(zustand, '', hash);
   } catch (e) { /* z. B. file:// */ }
   tiefe = neueTiefe;
+  // eine bereitliegende neue Version uebernimmt beim Seitenwechsel (nicht ins Spiel hinein); der Verlauf steht schon auf
+  // dem Ziel, nach dem Neuladen oeffnet also genau diese Seite
+  if (wartenderSW && aktiviereSW && !SPIEL_SCREENS.has(name) && !imSpiel()) { aktiviereSW(wartenderSW); return; }
   zeigeScreen(name, params, hash);
 }
 
@@ -714,6 +717,7 @@ function beiVerlauf() {
   zeigeScreen(ziel.name, ziel.params, hash);
 }
 
+const NEU_GELADEN = 'schach-arena:neu-geladen';
 async function zeigeScreen(name, params, hash) {
   const nr = ++ladeNr;
   schliesseDialog();
@@ -744,6 +748,22 @@ async function zeigeScreen(name, params, hash) {
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
+    // Screen eines Pakets, dessen Datei nicht laedt (Flo 31.10.2026 abends: "wenn ich in der Meisterschule auf eine Lektion
+    // tippe, springt er auf die Bots"; typisch mitten im Wechsel auf eine neue Version, alte und neue Dateien passen nicht
+    // zusammen): einmal neu laden, der Verlauf steht schon auf dem Ziel. Liegt eine neue Version bereit, uebernimmt sie dabei.
+    // Hoechstens einmal je Minute; danach wie bisher zur Arena, der Tester-Bericht nennt den Grund.
+    const echterFehler = !!ladeFehler && !/zeige\(\) fehlt/.test(String(ladeFehler.message || ladeFehler));
+    if (PAKET_SCREENS.has(name) && echterFehler) {
+      protokolliere('skript', ladeFehler, { vorsatz: 'Screen ' + name });
+      let zuletzt = 0;
+      try { zuletzt = Number(sessionStorage.getItem(NEU_GELADEN) || 0); } catch (e) { zuletzt = Date.now(); }
+      if (Date.now() - zuletzt > 60000) {
+        try { sessionStorage.setItem(NEU_GELADEN, String(Date.now())); } catch (e) { /* egal */ }
+        aktuell.handle = { verlasse() {} };
+        if (wartenderSW && aktiviereSW) aktiviereSW(wartenderSW); else location.reload();
+        return;
+      }
+    }
     // Screen eines Pakets, das (noch) nicht da ist: still zur Arena
     if (PAKET_SCREENS.has(name)) {
       aktuell.handle = { verlasse() {} };
@@ -855,6 +875,14 @@ export const app = {
 // (einmal neu laden), sonst erscheint der Hinweis "Neue Version" mit "Neu laden".
 const SW_MERKER = 'schach-arena:sw-wechsel';
 let updateHinweis = null;
+// Flo 31.10.2026 abends ("Auf dem Handy hat sich nichts veraendert", "Wann ist alles live?"): Eine neue Version wartete,
+// bis Flo im Hinweis tippte, und die App sah nur stuendlich nach. Jetzt: beim Zurueckkehren in die App alle 5 Minuten
+// nachsehen; liegt eine neue Version bereit, uebernimmt sie beim naechsten Seitenwechsel oder Zurueckkehren, nur nicht
+// mitten in einer Partie oder Lektion (dort bleibt der Hinweis).
+const SPIEL_SCREENS = new Set(['partie', 'lektion', 'online']);
+let wartenderSW = null;
+let aktiviereSW = null;
+const imSpiel = () => !!(aktuell && SPIEL_SCREENS.has(aktuell.name)) || /^#(partie|lektion|online\/partie)/.test(location.hash);
 
 function registriereSW() {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
@@ -879,8 +907,10 @@ function registriereSW() {
   const kuerzlich = () => {
     try { return Date.now() - Number(sessionStorage.getItem(SW_MERKER) || 0) < 15000; } catch (e) { return true; }
   };
+  aktiviereSW = aktiviere;
   sw.register('sw.js').then((reg) => {
     if (reg.waiting && sw.controller) {
+      wartenderSW = reg.waiting;
       const inPartie = (aktuell && aktuell.name === 'partie') || /^#partie/.test(location.hash);
       if (!kuerzlich() && !inPartie) aktiviere(reg.waiting);
       else zeigeUpdateHinweis(() => aktiviere(reg.waiting));
@@ -889,13 +919,16 @@ function registriereSW() {
       const neu = reg.installing;
       if (!neu) return;
       neu.addEventListener('statechange', () => {
-        if (neu.state === 'installed' && sw.controller) zeigeUpdateHinweis(() => aktiviere(neu));
+        if (neu.state === 'installed' && sw.controller) { wartenderSW = neu; zeigeUpdateHinweis(() => aktiviere(neu)); }
       });
     });
-    // Home-Bildschirm-Apps bleiben lange offen: beim Zurueckkehren hoechstens stuendlich nachsehen
+    // Home-Bildschirm-Apps bleiben lange offen: beim Zurueckkehren uebernimmt eine bereitliegende Version (ausser im
+    // Spiel), sonst hoechstens alle 5 Minuten nachsehen
     let geprueft = Date.now();
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible' || Date.now() - geprueft < 3600000) return;
+      if (document.visibilityState !== 'visible') return;
+      if (wartenderSW && !imSpiel() && !kuerzlich()) { aktiviere(wartenderSW); return; }
+      if (Date.now() - geprueft < 300000) return;
       geprueft = Date.now();
       reg.update().catch(() => {});
     });
