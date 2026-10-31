@@ -7,6 +7,8 @@
 import { bereich } from '../../ui/ich.js';
 import { sonderstuecke, ladeSonderstuecke, ERFINDER } from '../../sonderstuecke.js';
 import { figurenSatz } from '../../figurensatz.js';
+// Signatur: dasselbe Bild wie der Finisher in seinem Bereich (je Aufruf eigene Verlauf-Ids)
+import { finisherKunst } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import './texte.js';
 
@@ -23,7 +25,6 @@ export const BANNER = `<svg viewBox="0 0 520 200" class="er-banner-bild" aria-hi
   <path class="er-krone" d="M150 150 L162 72 L206 112 L260 46 L314 112 L358 72 L370 150 Z" fill="rgba(224,162,43,.10)" stroke="#E0A22B" stroke-width="3" stroke-linejoin="round"/>
   <g fill="#E0A22B"><circle cx="162" cy="72" r="6"/><circle cx="260" cy="46" r="7"/><circle cx="358" cy="72" r="6"/></g>
   <path d="M176 136h168" stroke="#E0A22B" stroke-width="2" stroke-dasharray="2 6"/></svg>`;
-const SIGNATUR = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 44c10-2 18-14 22-24 2 10-2 20 2 22s10-14 12-18c0 8 2 14 12 14" fill="none" stroke="#E0A22B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 52h48" stroke="#E0A22B" stroke-width="2.5" stroke-linecap="round"/></svg>';
 
 export function erfinderBereich({ app } = {}) {
   const besitz = new Set(sonderstuecke());
@@ -43,7 +44,7 @@ export function erfinderBereich({ app } = {}) {
     bild: '<span class="er-titel-bild">0</span>' });
   if (besitz.has(ERFINDER.figuren)) teile.push({ id: ERFINDER.figuren, name: S('erfinder.figuren'), frei: true, an: blaupause,
     zeile: blaupause ? S('an') : S('frei'), bild: `<img src="${new URL('assets/pieces/blaupause/wK.svg', WURZEL).href}" alt="">` });
-  if (besitz.has(ERFINDER.finisher)) teile.push({ id: ERFINDER.finisher, name: S('erfinder.finisher'), frei: true, zeile: S('erfinder.finisherWo'), bild: SIGNATUR });
+  if (besitz.has(ERFINDER.finisher)) teile.push({ id: ERFINDER.finisher, name: S('erfinder.finisher'), frei: true, zeile: S('erfinder.finisherWo'), bild: finisherKunst('signatur') });
   const s = bereich({ id: 'erfinder', name: S('erfinder.name'), teile, hinweis: S('erfinder.hinweis') });
   s.classList.add('er-bereich');
 

@@ -293,7 +293,8 @@ const kartenLage = (seite) => seite.evaluate(() => {
   for (const kn of document.querySelectorAll('.knoten')) {
     for (const sel of ['.k-schild', '.fahne', '.boss-krone', '.k-sterne', '.k-neu', '.avatar']) {
       const el = kn.querySelector(sel);
-      if (el) teile.push({ n: kn.dataset.bot + sel, kn: kn.dataset.bot, r: el.getBoundingClientRect() });
+      // nur was gezeichnet ist (kompakt blendet die Fahne aus, display: none hat keine Rechtecke)
+      if (el && el.getClientRects().length) teile.push({ n: kn.dataset.bot + sel, kn: kn.dataset.bot, r: el.getBoundingClientRect() });
     }
   }
   const ueber = [];
@@ -639,29 +640,34 @@ async function testeHochformate(browser) {
     await d.kontext.close();
   }
 
-  // Der ruhige Zieh-Hinweis erscheint auf dem Handy genau einmal und merkt die erste Geste dauerhaft.
-  gruppe = 'Handy Zieh-Hinweis';
+  // Handy hoch (seit 31.10.2026 kompakt, Flo: "alles auf einmal sehen, auch die Welt nicht viel um scrollen"): die Karte
+  // zeigt die ganze Welt, scrollt nicht, und der fruehere Hinweis "Karte ziehen" erscheint nicht mehr.
+  gruppe = 'Handy hoch kompakt';
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
     await seite.goto(BASIS + '#arena');
-    await seite.waitForSelector('.karte-zieh-hinweis:not([hidden])');
-    pruefe('erster Besuch zeigt „Karte ziehen“', (await seite.locator('.karte-zieh-hinweis').innerText()).trim() === 'Karte ziehen');
-    const kb = await seite.locator('.karte').boundingBox();
-    await seite.touchscreen.tap(kb.x + kb.width / 2, kb.y + kb.height / 2);
-    await seite.dispatchEvent('.karte', 'pointerdown', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 180 });
-    await seite.dispatchEvent('.karte', 'pointermove', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 140 });
-    await seite.dispatchEvent('.karte', 'pointerup', { pointerId: 1, isPrimary: true, clientX: kb.x + kb.width / 2, clientY: kb.y + 140 });
-    await seite.waitForFunction(() => document.querySelector('.karte-zieh-hinweis')?.hasAttribute('hidden'));
-    const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).arenaKarteHinweis);
-    pruefe('nach dem ersten Ziehen verschwindet der Hinweis und der erweiterte Einstellungsstand merkt ihn', gemerkt === true);
-    await seite.reload();
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('nach einem Neuladen kommt der Hinweis nicht wieder', await seite.locator('.karte-zieh-hinweis:not([hidden])').count() === 0);
+    await warte(1500);
+    const k = await seite.evaluate(() => {
+      const karte = document.querySelector('.karte');
+      const kb = karte.getBoundingClientRect();
+      const drin = [...document.querySelectorAll('.knoten')].every((kn) => [kn, kn.querySelector('.k-schild')].filter(Boolean)
+        .map((t) => t.getBoundingClientRect()).every((r) => r.top >= kb.top - 1 && r.bottom <= kb.bottom + 1 && r.left >= kb.left - 1 && r.right <= kb.right + 1));
+      const fw = document.querySelector('.wahl-farbe').getBoundingClientRect();
+      const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
+      const inh = document.querySelector('.arena .inhalt').getBoundingClientRect();
+      return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
+        scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
+        farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1 };
+    });
+    pruefe('ganze Welt auf einen Blick: sechs Stationen samt Schild in der Karte, Karte scrollt nicht, kein Zieh-Hinweis',
+      k.kompakt && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+    pruefe('darunter ohne Scrollen: Gegner, Farbwahl und Spielen-Knopf (Farbe ueber dem Knopf)', k.farbeVorKnopf && k.knopfDrin, JSON.stringify(k));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
 
-  // Handy: Karte senkrecht scrollbar, Spielen-Knopf sichtbar ueber der Reiter-Leiste (Testmodus ?reiter=verlauf)
+  // Handy: Karte kompakt (ganze Welt), Spielen-Knopf sichtbar ueber der Reiter-Leiste (Testmodus ?reiter=verlauf)
   for (const vp of [{ w: 390, h: 844 }, { w: 375, h: 667 }]) {
     for (const schema of ['light', 'dark']) {
       gruppe = `Handy ${vp.w} × ${vp.h} ${schema === 'dark' ? 'dunkel' : 'hell'}`;
@@ -680,7 +686,8 @@ async function testeHochformate(browser) {
           aktuellDrin: a.top >= kb.top && a.bottom <= kb.bottom, karteBreit: Math.abs(kb.width - (innerWidth - 32)) <= 1,
           spielen: { t: sp.top, b: sp.bottom, l: sp.left, r: sp.right, h: sp.height }, leiste: nb ? { t: nb.top, b: nb.bottom } : null, reiter: document.documentElement.dataset.reiter || null, ih: innerHeight, iw: innerWidth };
       });
-      pruefe('Karte senkrecht scrollbar, startet beim naechsten Gegner, volle Breite', /karte-hoch/.test(m.klasse) && m.scrollbar && m.scrollTop > 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
+      pruefe('Karte kompakt (ganze Welt, scrollt nicht), naechster Gegner sichtbar, volle Breite', /karte-hoch/.test(m.klasse) && /karte-kompakt/.test(m.klasse)
+        && !m.scrollbar && m.scrollTop === 0 && m.aktuellDrin && m.karteBreit, JSON.stringify(m));
       pruefe('Spielen-Knopf klebt sichtbar im Viewport, ueber der Reiter-Leiste, mindestens 56 px hoch', m.reiter === 'unten' && !!m.leiste && m.spielen.t >= 0 && m.spielen.b <= m.leiste.t && m.spielen.l >= 0 && m.spielen.r <= m.iw && m.spielen.h >= 56, JSON.stringify(m));
       // nach dem Scrollen des Panels bleibt der Knopf im Bild (sticky)
       await seite.evaluate(() => { document.querySelector('.arena .inhalt').scrollTop = 240; });
