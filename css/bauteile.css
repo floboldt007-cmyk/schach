@@ -215,3 +215,9 @@
   .denkt i { animation: none; }
   .coach.neu, .coach.neu > .c-symbol, .coach.neu .c-klasse, .coach.neu .combo, .sprechblase { animation-duration: 1ms; animation-delay: 0s; }
 }
+
+/* Handy dicht (Flo 01.11.2026): Umschalter flacher, die Tippflaeche bleibt 44 px */
+@media (max-width: 520px) {
+  .segment { padding: 3px; }
+  .seg { font-size: 13.5px; }
+}

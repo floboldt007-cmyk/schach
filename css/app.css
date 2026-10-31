@@ -463,3 +463,7 @@ svg .rk { transform-box: view-box; }
   mask-image: linear-gradient(to right, transparent 0, black var(--wl), black calc(100% - var(--wr)), transparent 100%); }
 [data-wisch~="links"] { --wl: 26px; }
 [data-wisch~="rechts"] { --wr: 40px; }
+/* Handy dicht (Flo 01.11.2026): der Seitentitel steht naeher am Kopf, darum blendet die obere Kante nur 6 px aus */
+@media (max-width: 520px) {
+  .screen :is(.training-rumpf, .bl-rumpf, .sa-rumpf, .schule-rumpf, .ms-rumpf) { --kante-oben: 6px; }
+}

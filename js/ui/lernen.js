@@ -39,7 +39,7 @@ export function zeige(root, params, app) {
   ladeLernenCss();
   const st = stand(ladeModul(PAKET, {}));
   let bereich = BEREICHE.find((b) => b.id === (params && params.bereich)) || BEREICHE[0];
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: S('name') })}
     <div class="ms-rumpf">
       <div class="ms-steuer"></div>
       <div class="ms-bereich"></div>

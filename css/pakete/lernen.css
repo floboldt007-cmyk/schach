@@ -47,9 +47,24 @@
 .ms-pfeil { display: grid; color: var(--text-3); }
 .ms-pfeil .ico { width: 18px; height: 18px; }
 .ms-bald { margin: 4px 2px 0; color: var(--text-2); font-weight: 600; font-size: 14px; }
+/* Handy dicht (Flo 01.11.2026: "man muss alles sehen ohne viel scrollen"): flache Zeilen, kleines Vorschaubild; der
+   Bereichstitel steht schon im Umschalter und bleibt nur fuer Vorleseprogramme */
+@media (max-width: 520px) {
+  .ms-screen .ms-rumpf { gap: 8px; padding-top: 4px; }
+  .ms-bereich { gap: 8px; }
+  .ms-bereich .seiten-kopf { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ms-gesamt { padding: 4px 12px; font-size: 13.5px; }
+  .ms-liste { gap: 6px; }
+  .ms-lektion { min-height: 56px; gap: 10px; padding: 6px 12px 6px 6px; border-radius: var(--r-m); }
+  .ms-mini { width: 44px; border-radius: 6px; }
+  .ms-text { gap: 2px; }
+  .ms-text b { font-size: 15px; }
+  .ms-stufe { height: 20px; padding: 0 8px; }
+  .ms-sterne .ico { width: 15px; height: 15px; }
+}
 @media (max-width: 420px) {
-  .ms-lektion { grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 6px; }
-  .ms-mini { width: 56px; grid-row: 1 / 3; }
+  .ms-lektion { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
+  .ms-mini { width: 44px; grid-row: 1 / 3; }
   .ms-nr { display: none; }
   .ms-text { grid-column: 2; }
   .ms-sterne { grid-column: 2; grid-row: 2; }

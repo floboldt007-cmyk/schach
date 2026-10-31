@@ -36,7 +36,7 @@ function zeigeBestenliste(root, params = {}, app) {
   const s = document.createElement('section');
   s.className = 'screen bl-screen';
   s.setAttribute('aria-label', t('rahmen.bestenliste.titel'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div' })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: t('rahmen.bestenliste.titel') })}
     <div class="bl-rumpf">
       ${seitenKopf({ titel: t('rahmen.bestenliste.titel') })}
       <div class="bl-steuer"><div class="bl-steuer-reiter"></div><div class="bl-steuer-fenster"></div></div>

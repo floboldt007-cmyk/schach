@@ -158,3 +158,28 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .seiten-kopf h1 { font-size: 28px; }   /* Flo 31.10. abends (iPhone-Bilder): 34 px wirkte zu gross */
   .seiten-kopf p { display: none; }
 }
+
+/* Handy dicht (Flo 01.11.2026, 00:30, iPhone-Bild der Bestenliste: "Auf dem Handy ist immer noch alles zu gross, man muss
+   alles sehen ohne viel scrollen"): flacherer Kopf, kleinere Seitentitel ohne Ueberzeile (bleibt fuer Vorleseprogramme im
+   Text), schmalere Reiter-Leiste naeher am Rand. Jede Tippflaeche bleibt mindestens 44 px. */
+@media (max-width: 520px) {
+  .screen .kopf.haupt-kopf { padding-top: 6px; min-height: 52px; }
+  .seiten-kopf { padding-top: 8px; padding-bottom: 0; }
+  .seiten-kopf h1 { font-size: 23px; letter-spacing: -.02em; }
+  .seiten-kopf .ueberzeile { display: none; }
+  .reiter-leiste { bottom: max(8px, env(safe-area-inset-bottom, 0px)); padding: 4px; }
+  .reiter-pille { top: 4px; bottom: 4px; }
+  .reiter-leiste.gestapelt .reiter { height: calc(var(--reiter-hoehe) + 2px); gap: 1px; }
+  .reiter-leiste.gestapelt .reiter .ico { width: 18px; height: 18px; }
+  html[data-reiter-form="gestapelt"] { --reiter-h: calc(var(--reiter-hoehe) + 2px + 8px + max(8px, env(safe-area-inset-bottom, 0px)) + 6px); }
+}
+/* Handy: der Name der Seite steht im Kopf statt der Marke (hauptKopf({ seite }) in js/ui/seite.js), der grosse
+   Seitentitel darunter entfaellt; beide bleiben fuer Vorleseprogramme im Dokument. Spart auf jeder Seite eine Zeile. */
+.haupt-kopf .kopf-seite { display: none; }
+@media (max-width: 520px) {
+  .haupt-kopf.mit-seite .marke-titel, .screen:has(> .haupt-kopf.mit-seite) .seiten-kopf {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .haupt-kopf.mit-seite .marke-zeichen { display: none; }
+  .haupt-kopf.mit-seite .kopf-seite { display: block; font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px;
+    letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; color: var(--text); }
+}
