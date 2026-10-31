@@ -41,9 +41,9 @@ pruefe('Mattbilder: jede Stellung legal, Weiss am Zug, Schwarz nicht im Schach, 
 pruefe('Stufen laufen nie rueckwaerts (leicht zuerst), in jedem Bereich', BEREICHE.every((b) => b.lektionen.every((l, i) => i === 0
   || STUFEN.indexOf(l.stufe) >= STUFEN.indexOf(b.lektionen[i - 1].stufe) - 1)));
 const mitStellung = ALLE.filter((l) => l.art !== 'folge');
-pruefe('Bereiche: Mattbilder 20, Taktik 8, Endspiele 11, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
-  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 8 && ENDSPIELE.length === 11 && EROEFFNUNGEN.length === 11
-  && ALLE.length === 50 && new Set(ALLE.map((l) => l.id)).size === 50 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
+pruefe('Bereiche: Mattbilder 20, Taktik 11, Endspiele 11, Eroeffnungen 11, alle ids eindeutig, Stellungen (ohne Zugfolgen) verschieden',
+  BEREICHE.map((b) => b.id).join() === 'matt,taktik,end,eroeffnung' && TAKTIK.length === 11 && ENDSPIELE.length === 11 && EROEFFNUNGEN.length === 11
+  && ALLE.length === 53 && new Set(ALLE.map((l) => l.id)).size === 53 && new Set(mitStellung.map((l) => l.fen)).size === mitStellung.length);
 // Taktik (31.10.2026): eigene Stellungen, mit Stockfish nachgeprueft; Ziel = Material nach dem Gegenzug
 pruefe('Taktik: Art taktik, gewinn 1 bis 9, ziel 2, Stufen leicht und mittel, Flo Weiss', TAKTIK.every((l) => l.art === 'taktik'
   && Number.isInteger(l.gewinn) && l.gewinn >= 1 && l.gewinn <= 9 && l.ziel === 2 && ['leicht', 'mittel'].includes(l.stufe) && / w /.test(l.fen)));
@@ -52,7 +52,9 @@ const taktikLauf = (id, zuege) => { const l = lektion(id); const c = new Chess(l
 pruefe('Taktik: Springergabel, Bauerngabel, Spiess, Fesselung, gefesselte Dame und Abzug sind erst nach dem Gegenzug geschafft',
   taktikLauf('gabel-springer', ['Nc6+', 'Kd6', 'Nxa7', 'Ke6']) === ',,,geschafft' && taktikLauf('gabel-bauer', ['d5', 'Ne5', 'dxe6', 'Nd3']) === ',,,geschafft'
   && taktikLauf('spiess', ['Be4+', 'Kd6', 'Bxa8', 'Ke5']) === ',,,geschafft' && taktikLauf('fesselung', ['Bb3', 'Kf8', 'Bxc4', 'Ke7']) === ',,,geschafft'
-  && taktikLauf('fesselung-dame', ['Re1', 'Qxe1+', 'Kxe1', 'Kd7']) === ',,,geschafft' && taktikLauf('abzug', ['Nf7+', 'Ke7', 'Bxh8', 'Kxf7']) === ',,,geschafft');
+  && taktikLauf('fesselung-dame', ['Re1', 'Qxe1+', 'Kxe1', 'Kd7']) === ',,,geschafft'
+  && taktikLauf('koenigsgabel', ['Nc7+', 'Kd7', 'Nxa8', 'Kc8']) === ',,,geschafft' && taktikLauf('turm-gabel', ['Rb6', 'Bf8', 'Rxa6', 'Kg8']) === ',,,geschafft'
+  && taktikLauf('abzug-turm', ['Nc6+', 'Qe7', 'Nxe7', 'Kf7']) === ',,,geschafft' && taktikLauf('abzug', ['Nf7+', 'Ke7', 'Bxh8', 'Kxf7']) === ',,,geschafft');
 pruefe('Taktik: ein Zug ohne Gewinn ist noch nichts, eine verschenkte Dame ist gescheitert',
   taktikLauf('turm-spiess', ['h3', 'Kb4']) === ',' && taktikLauf('gabel-dame', ['Qd8+', 'Rxd8', 'h3']) === ',,verloren');
 // Eroeffnungen (Zugfolge-Trainer): Flo spielt Weiss und Schwarz, jede Folge legal (pruefeLektion), Erklaerung je eigenem Zug
@@ -113,8 +115,8 @@ pruefe('Speicher: kaputte Eintraege fallen still weg', JSON.stringify(stand({ le
 pruefe('Summe: Sterne, Hoechstzahl 60, geschafft', JSON.stringify(summe(merke(st, 'grundreihe', { sterne: 3, zuege: 1 }), 'matt'))
   === '{"sterne":5,"max":60,"geschafft":2}');
 const stE = merke(merke({}, 'quadrat', { sterne: 3, zuege: 5 }), 'grundreihe', { sterne: 2, zuege: 2 });
-pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 50 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
-  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":150,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
+pruefe('Summe: Endspiele zaehlen getrennt, ohne Bereich alle 53 Lektionen', JSON.stringify(summe(stE, 'end')) === '{"sterne":3,"max":33,"geschafft":1}'
+  && JSON.stringify(summe(stE)) === '{"sterne":5,"max":159,"geschafft":2}' && stand(stE).lek.quadrat.s === 3);
 
 // Ziel-Regeln (pruefeZiel): nach Flos Zug ('flo') und nach dem Gegenzug ('gegner')
 const zielVon = (id, fen, wann, zuege = 1) => pruefeZiel(lektion(id), bilanz(new Chess(lektion(id).fen)), new Chess(fen), { wann, zuege });
@@ -216,8 +218,8 @@ async function erfinderTeil(browser) {
     const k = document.querySelector('.ms-karte');
     return k && { text: k.innerText, erste: document.querySelector('.training-gitter > *')?.classList.contains('ms-karte') };
   });
-  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 150 Sternen, 50 Lektionen', !!karte
-    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 150 Sternen/.test(karte.text) && /50 Lektionen/.test(karte.text), karte);
+  pruefe('Erfinder: Karte „Meisterschule · Mattbilder, Taktik, Endspiele, Eröffnungen“ im Training mit Labor-Schild, 0 von 159 Sternen, 53 Lektionen', !!karte
+    && /Mattbilder, Taktik, Endspiele, Eröffnungen/.test(karte.text) && /Labor/i.test(karte.text) && /0 von 159 Sternen/.test(karte.text) && /53 Lektionen/.test(karte.text), karte);
   await p.s.locator('.ms-karte .ms-oeffnen').click();
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
@@ -291,9 +293,9 @@ async function erfinderTeil(browser) {
   await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="taktik"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="gabel-springer"]', { timeout: 8000 }).catch(() => {});
   const taktikListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
-  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 24 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
+  pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 33 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
     && /Taktik/.test(await p.s.locator('.ms-lektion[data-id="gabel-springer"]').innerText())
-    && /0 von 24 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()), taktikListe);
+    && /0 von 33 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()), taktikListe);
   await p.s.locator('.ms-lektion[data-id="gabel-springer"]').click();
   await warteLz(p.s, "z.id === 'gabel-springer' && z.phase === 'intro'");
   const tStatus = await p.s.locator('.ls-status').innerText();
