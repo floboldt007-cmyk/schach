@@ -12,6 +12,8 @@ import { klang } from '../../sounds.js';
 import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
 import { hatSonderstueck, istErfinder, ERFINDER } from '../../sonderstuecke.js';
+import { finisherKunst } from '../../sammlung-kunst.js';
+import { figurenPfad } from '../../figurensatz.js';
 import './texte.js';
 
 const MODUL = 'finisher';
@@ -119,15 +121,16 @@ function einstellungen() {
 
 anbieten('partie:matt', (ctx) => starteFinisher(ctx), { paket: MODUL });
 anbieten('einstellungen:gruppen', einstellungen, { paket: MODUL, reihenfolge: 45 });
-// Sammlung (Reiter Ich): jeder Finisher mit Schloss und Stufe, der ausgewaehlte als "Ausgeruestet"
-const FIGUR = { krone: 'wK', welle: 'wN', koenig: 'bK', signatur: 'blaupause/wK' };
+// Sammlung (Reiter Ich): jeder Finisher mit Schloss und Stufe, der ausgewaehlte als "Ausgeruestet". Bild: der Moment
+// des Finishers mit den echten Figuren des ausgeruesteten Satzes (js/sammlung-kunst.js, Flo 31.10.2026)
 anbieten('sammlung:bereich', () => {
   const lv = aktuellesLevel();
   const gewaehlt = auswahl(lv);
+  const figuren = new URL('../../../' + figurenPfad(), import.meta.url).href;
   return bereich({ id: 'finisher', name: F('titel'), teile: FINISHER.filter((x) => x.id !== 'aus' && sichtbar(x)).map((x) => ({
     id: 'finisher-' + x.id, name: F(x.text), frei: istFrei(x.id, lv), an: gewaehlt === x.id,
     zeile: gewaehlt === x.id ? F('gewaehlt') : istFrei(x.id, lv) ? F('frei') : F('level', { level: x.level }),
-    bild: `<img src="${new URL(`../../../assets/pieces/${FIGUR[x.id] || 'wK'}.svg`, import.meta.url).href}" alt="">`,
+    bild: finisherKunst(x.id, figuren) || '',
   })) });
 }, { paket: MODUL, reihenfolge: 10 });
 

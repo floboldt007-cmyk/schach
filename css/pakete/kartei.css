@@ -29,3 +29,9 @@
   .kt-karte h2 { font-size: 23px; }
   .kt-stapel { height: 124px; }
 }
+
+/* Handy schmal: Symbol kleiner (Flo 31.10.2026: "einfach und uebersichtlich") */
+@media (max-width: 520px) {
+  .kt-symbol { width: 40px; height: 40px; border-radius: 13px; }
+  .kt-symbol .ico { width: 22px; height: 22px; }
+}

@@ -12,7 +12,9 @@
 //       an: gerade benutzt ("Ausgeruestet"); zeile: Weg dahin oder Stand; fortschritt 0..1; seltenheit 'frei' | 'selten'
 //       | 'episch' | 'legende' | 'einzig' (Leuchten und Schild); labor: nur fuer den Erfinder (Schild "Labor")
 //     hinweis: ein Satz unter dem Raster (z. B. was erst mit der Werkstatt kommt)
-//   zeige(root, params, app) -> { verlasse() }   erst nach freischalten(); params: { bereich? }
+//   zeige(root, params, app) -> { verlasse() }   erst nach freischalten(); params: { bereich?, oben?, ruhig? }
+//       oben: Scroll-Stand der Sammlung (nach dem Ausruesten bleibt die Seite, wo sie war; Flo 31.10.2026: "wenn ich
+//       auf die Lobby klicke, springt der nach oben"), ruhig: ohne Einflug-Bewegung neu zeichnen
 //   freischalten()                                nur js/pakete/sammlung/index.js
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
@@ -103,7 +105,9 @@ function zeigeIch(root, params = {}, app) {
     try { wahl.fn(); } catch (e) { console.error(e); return; }
     const name = teil.querySelector('.sa-text b')?.textContent || '';
     try { app.meldung?.(t(wahl.ab ? 'rahmen.sammlung.ausgeschaltet' : 'rahmen.sammlung.ausgeruestet', { name })); } catch (e) { /* egal */ }
-    try { app.gehe('ich', { bereich: ber.dataset.bereich }, { ersetzen: true }); } catch (e) { /* egal */ }
+    // die Seite bleibt, wo sie war (sonst sprang sie nach jedem Tipp nach oben), und zeichnet ohne Einflug neu
+    const oben = Math.round(s.querySelector('.sa-rumpf')?.scrollTop || 0);
+    try { app.gehe('ich', { bereich: ber.dataset.bereich, oben, ruhig: true }, { ersetzen: true }); } catch (e) { /* egal */ }
   });
   const alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
   if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
@@ -137,7 +141,14 @@ function zeigeIch(root, params = {}, app) {
     });
   }
   zeigeBereich();
-  if (tempo() > 0) {
+  const oben = Number(params.oben);
+  if (Number.isFinite(oben) && oben > 0) {
+    const rumpf = s.querySelector('.sa-rumpf');
+    rumpf.scrollTop = oben;
+    // nach dem ersten Layout noch einmal (Bilder und Orte koennen die Hoehe erst dann setzen)
+    requestAnimationFrame(() => { rumpf.scrollTop = oben; });
+  }
+  if (tempo() > 0 && !params.ruhig) {
     kopfEintritt(s);
     staffel(s.querySelectorAll('.seiten-kopf > *, .sa-stand, .sa-steuer'), { d: 520, v: 60, abstand: 50 });
   }

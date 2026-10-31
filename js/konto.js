@@ -8,7 +8,7 @@
 // ein Abgleich abgeschlossen ist (ABGEGLICHEN_SCHLUESSEL, gilt fuer alle Tabs). Anlass: Der Anmelde-Link oeffnet einen
 // zweiten Tab oder Safari statt der App auf dem Home-Bildschirm; ein abgebrochener Konflikt-Dialog oder ein Tab ohne
 // Abgleich ueberschrieb sonst beim Verlassen der Einstellungen den Cloud-Stand (Ultracode-Pruefung PR #76).
-import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
+import { SUPABASE_URL, SUPABASE_KEY, ANMELDEWEGE } from './konto-config.js';
 import { SPEICHER_VERSION, rohSpeicher } from './storage.js';
 import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
@@ -289,26 +289,39 @@ export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = global
       merkeSitzung({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
         expires_at: p.get('expires_at'), expires_in: p.get('expires_in') }, email);
       neueAnmeldung();
-      lager().setItem(SICHTBAR_SCHLUESSEL, '1');
       abgleichOffen = true;
     } catch (e) { /* unvollstaendiger Link: ignorieren */ }
   } else {
     linkFehler = true;
-    try { lager().setItem(SICHTBAR_SCHLUESSEL, '1'); } catch (e) { /* egal */ }
   }
   try { verlauf.replaceState(null, '', ort.pathname + ort.search + '#einstellungen'); } catch (e) { /* egal */ }
   return true;
 }
 
-// Anmeldung mit Google ueber Supabase (OAuth). basis: Adresse der App ohne Hash (im Test frei waehlbar).
+// Anmeldung mit Google oder Apple ueber Supabase (OAuth). basis: Adresse der App ohne Hash (im Test frei waehlbar).
 function basisAdresse(ort = globalThis.location) { return String(ort?.href || '').split('#')[0]; }
-export function googleAnmeldeUrl(basis = basisAdresse()) {
-  return SUPABASE_URL + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(basis + '#konto');
+export function anmeldeUrl(anbieter, basis = basisAdresse()) {
+  return SUPABASE_URL + '/auth/v1/authorize?provider=' + encodeURIComponent(anbieter) + '&redirect_to=' + encodeURIComponent(basis + '#konto');
 }
-export function meldeMitGoogleAn(ort = globalThis.location) {
-  const url = googleAnmeldeUrl(basisAdresse(ort));
+export function googleAnmeldeUrl(basis = basisAdresse()) { return anmeldeUrl('google', basis); }
+export function meldeMitAnbieterAn(anbieter, ort = globalThis.location) {
+  const url = anmeldeUrl(anbieter, basisAdresse(ort));
   ort.assign(url);
   return url;
+}
+export function meldeMitGoogleAn(ort = globalThis.location) { return meldeMitAnbieterAn('google', ort); }
+
+// Welche Anmeldewege die Konto-Gruppe zeigt (js/konto-config.js); setzeAnmeldewege nur fuer Tests
+let wegeTest = null;
+export function setzeAnmeldewege(w = null) { wegeTest = w; }
+export function anmeldewege() { return wegeTest || ANMELDEWEGE; }
+
+// Welcher Stand hat mehr Fortschritt? Erst das Level, dann die Zahl der Partien. Gleich: null (keine Empfehlung).
+export function mehrFortschritt(geraet, cloud) {
+  const g = geraet || {}; const c = cloud || {};
+  if ((g.level || 1) !== (c.level || 1)) return (g.level || 1) > (c.level || 1) ? 'geraet' : 'cloud';
+  if ((g.partien || 0) !== (c.partien || 0)) return (g.partien || 0) > (c.partien || 0) ? 'geraet' : 'cloud';
+  return null;
 }
 
 export function kontoFreigeschaltet(hash = globalThis.location?.hash || '', speicher = lager()) {
@@ -318,7 +331,9 @@ export function kontoFreigeschaltet(hash = globalThis.location?.hash || '', spei
   } catch (e) { return false; }
 }
 
-function kontoSichtbar() { return kontoFreigeschaltet(); }
+// Seit 31.10.2026 fuer alle sichtbar (Flo: "jeder soll ein Konto machen koennen"). kontoFreigeschaltet() bleibt der
+// Schalter fuer die Testbereiche (Online, Schule, Abo, Coach), die weiter erst nach #konto erscheinen.
+function kontoSichtbar() { return true; }
 
 export function kontoGruppe({ app } = {}) {
   if (!kontoSichtbar() || typeof document === 'undefined') return null;
@@ -335,9 +350,19 @@ export function kontoGruppe({ app } = {}) {
       <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
-      <p class="es-hilfe konto-oder">${K('oder')}</p><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`}
+      <p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
+      + `<button class="knopf konto-apple" type="button" data-konto="apple" hidden>${K('apple')}</button></div>`
+      + (alsApp() ? `<p class="es-hilfe konto-app-hinweis">${K('appHinweis')}</p>` : '')}
       <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
+    zeigeWege();
+  };
+  const zeigeWege = () => {
+    const wege = anmeldewege();
+    const g = el.querySelector('.konto-google'); const ap = el.querySelector('.konto-apple');
+    if (g) g.hidden = !wege.google;
+    if (ap) ap.hidden = !wege.apple;
+    const oder = el.querySelector('.konto-oder'); if (oder) oder.hidden = !wege.google && !wege.apple;
   };
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
@@ -352,6 +377,7 @@ export function kontoGruppe({ app } = {}) {
       }
       if (a === 'abmelden') { await abmelden(); render(); }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
+      if (a === 'apple') { melden(K('zuApple')); meldeMitAnbieterAn('apple'); }
     } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
   });
   el.addEventListener('input', (e) => {
@@ -368,8 +394,14 @@ export function kontoGruppe({ app } = {}) {
   async function konfliktDialog(k) {
     const c = k.cloud, g = k.geraet;
     const zahlen = { gp: g.partien, gl: g.level, cp: c.partien, cl: c.level };
-    const text = c.datum ? K('konfliktTextDatum', { ...zahlen, datum: new Date(c.datum).toLocaleString(locale()) }) : K('konfliktText', zahlen);
-    const w = await app?.frage?.({ titel: K('konfliktTitel'), text, knoepfe: [{ text: K('geraetBehalten'), wert: 'geraet', art: 'primaer' }, { text: K('cloudLaden'), wert: 'cloud' }], abbrechen: true });
+    const mehr = mehrFortschritt(g, c);
+    const text = (c.datum ? K('konfliktTextDatum', { ...zahlen, datum: new Date(c.datum).toLocaleString(locale()) }) : K('konfliktText', zahlen))
+      + (mehr ? ' ' + K(mehr === 'cloud' ? 'mehrCloud' : 'mehrGeraet') : '');
+    // Flo 31.10.2026: der Stand mit mehr Fortschritt steht vorn und ist hervorgehoben, damit niemand aus Versehen den
+    // kleineren behaelt. Gleichstand: wie bisher das Geraet vorn.
+    const geraetKnopf = { text: K('geraetBehalten') + (mehr === 'geraet' ? ' · ' + K('empfohlen') : ''), wert: 'geraet', art: mehr === 'cloud' ? undefined : 'primaer' };
+    const cloudKnopf = { text: K('cloudLaden') + (mehr === 'cloud' ? ' · ' + K('empfohlen') : ''), wert: 'cloud', art: mehr === 'cloud' ? 'primaer' : undefined };
+    const w = await app?.frage?.({ titel: K('konfliktTitel'), text, knoepfe: mehr === 'cloud' ? [cloudKnopf, geraetKnopf] : [geraetKnopf, cloudKnopf], abbrechen: true });
     if (w !== 'geraet' && w !== 'cloud') { melden(K('abgleichOffen')); return; }
     // Ein anderer Tab hat inzwischen entschieden: nicht noch einmal (womoeglich entgegengesetzt) schreiben
     if (istAbgeglichen()) { melden(K('schonAbgeglichen')); return; }
@@ -401,5 +433,5 @@ function alsApp() {
 function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
 // Registrierung ist defensiv: Das Konto darf die Offline-App nie am Start hindern.
-try { uebernimmLinkSitzung(); kontoSichtbar(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung());
+try { uebernimmLinkSitzung(); kontoFreigeschaltet(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung());
 } catch (e) { /* App laeuft ohne Konto weiter */ }
