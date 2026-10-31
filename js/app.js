@@ -80,6 +80,8 @@ import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { brettWahl, klangWahl } from './labor.js';
+import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
+import { sitzung } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
@@ -669,6 +671,7 @@ function gehe(name, params = {}, { ersetzen = null } = {}) {
     else history.pushState(zustand, '', hash);
   } catch (e) { /* z. B. file:// */ }
   tiefe = neueTiefe;
+  pruefeSonderstuecke();
   // eine bereitliegende neue Version uebernimmt beim Seitenwechsel (nicht ins Spiel hinein); der Verlauf steht schon auf
   // dem Ziel, nach dem Neuladen oeffnet also genau diese Seite
   if (wartenderSW && aktiviereSW && !SPIEL_SCREENS.has(name) && !imSpiel()) { aktiviereSW(wartenderSW); return; }
@@ -718,6 +721,7 @@ function beiVerlauf() {
 }
 
 const NEU_GELADEN = 'schach-arena:neu-geladen';
+let ladeFertig = 0;   // ladeNr des zuletzt gezeigten Screens; ungleich ladeNr = ein Screen laedt gerade
 async function zeigeScreen(name, params, hash) {
   const nr = ++ladeNr;
   schliesseDialog();
@@ -743,6 +747,7 @@ async function zeigeScreen(name, params, hash) {
   const root = document.getElementById('app');
   root.replaceChildren();
   aktuell = { name, params, hash, handle: null };
+  ladeFertig = nr;
   document.documentElement.dataset.screen = name;
   document.title = name === 'arena' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
   window.scrollTo(0, 0);
@@ -1072,6 +1077,27 @@ function starte() {
   else ersterStart();
 }
 
+// Erfinder-Status (Labor: Meisterschule, Labor-Bretter, Klaenge) vom Server holen, sobald ein Konto angemeldet ist und
+// fuer dieses Konto noch keine Antwort vorliegt: beim Start und bei jedem Seitenwechsel, nicht erst in der Sammlung (Flo
+// 31.10.2026 abends: "beim Handy habe ich die Lektionen immer noch nicht"; nach der Anmeldung auf dem Handy fehlte das
+// Labor, bis er einmal "Ich" geoeffnet hatte). Hat sich der Status geaendert, wird die offene Seite neu gezeigt, nur
+// nicht mitten im Spiel. Hoechstens eine Anfrage zur Zeit, nach einem Fehler fruehestens nach einer Minute wieder.
+let sonderLaeuft = false;
+let sonderFehlerBis = 0;
+function pruefeSonderstuecke() {
+  try {
+    if (sonderLaeuft || Date.now() < sonderFehlerBis || !sitzung() || sonderstueckeBekannt()) return;
+  } catch (e) { return; }
+  sonderLaeuft = true;
+  const vorher = istErfinder();
+  ladeSonderstuecke().then((ids) => {
+    if (!ids) { sonderFehlerBis = Date.now() + 60000; return; }
+    // laedt gerade ein Screen, zeigt der schon den neuen Stand
+    if (istErfinder() === vorher || !aktuell || SPIEL_SCREENS.has(aktuell.name) || ladeNr !== ladeFertig) return;
+    zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);
+  }).catch(() => { sonderFehlerBis = Date.now() + 60000; }).finally(() => { sonderLaeuft = false; });
+}
+
 function ersterStart() {
   window.addEventListener('popstate', beiVerlauf);
   window.addEventListener('hashchange', () => {
@@ -1080,6 +1106,7 @@ function ersterStart() {
   });
   sende('app:bereit', { app });
   beiVerlauf();
+  pruefeSonderstuecke();
   pruefeInstallation();
   // W0+a: Analysen ueber MAX_REVIEWS still entfernen (nach dem ersten Screen, bremst den Start nicht)
   setTimeout(() => { try { duenneAnalysenAus(); } catch (e) { /* egal */ } }, 0);

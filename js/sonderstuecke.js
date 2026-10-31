@@ -11,6 +11,8 @@
 //                                   Bretter, Klaenge, Figuren); Erfolge, Level und Wertung bleiben erspielt. Jede neue
 //                                   Sperre fuer Ausruestbares fragt hier nach.
 //   ladeSonderstuecke() -> Promise<string[]|null>   fragt den Server, merkt das Ergebnis; null ohne Anmeldung/bei Fehler
+//   sonderstueckeBekannt() -> boolean   fuer das angemeldete Konto liegt schon eine Server-Antwort im Merker
+//                                   (js/app.js fragt sonst beim Start und beim Seitenwechsel nach, nicht erst die Sammlung)
 //   setzeSonderFetch(fn)            nur fuer Tests
 import { SUPABASE_URL, SUPABASE_KEY } from './konto-config.js';
 import { sitzung, aktiveSitzung, userId } from './konto.js';
@@ -41,6 +43,13 @@ export function sonderstuecke() {
   return uid && m && m.konto === uid ? m.ids.filter((x) => typeof x === 'string' && ID.test(x)) : [];
 }
 export function hatSonderstueck(id) { return sonderstuecke().includes(id); }
+// true, wenn fuer das angemeldete Konto schon eine Antwort vom Server gemerkt ist (dann muss niemand nachfragen)
+export function sonderstueckeBekannt() {
+  const s = sitzung();
+  const uid = s ? userId(s) : null;
+  const m = merker();
+  return !!(uid && m && m.konto === uid);
+}
 export function istErfinder() { return hatSonderstueck(ERFINDER.titel); }
 
 export async function ladeSonderstuecke() {

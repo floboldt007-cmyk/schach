@@ -175,7 +175,7 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 const ERFINDER_ZEILEN = ['erfinder-banner-blatt-0', 'erfinder-titel', 'erfinder-figuren-blaupause', 'erfinder-finisher-signatur']
   .map((stueck_id) => ({ stueck_id }));
 
-async function seite(browser, { erfinder = true, groesse = { width: 1180, height: 820 }, hash = '#training' } = {}) {
+async function seite(browser, { erfinder = true, merker = true, groesse = { width: 1180, height: 820 }, hash = '#training' } = {}) {
   const k = await browser.newContext({ viewport: groesse, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -183,15 +183,15 @@ async function seite(browser, { erfinder = true, groesse = { width: 1180, height
   s.on('console', (m) => { if (m.type() === 'error') fehlerListe.push(m.text()); });
   await s.route(SUPA + '/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(r.request().url().includes('/rest/v1/sonderstuecke') && erfinder ? ERFINDER_ZEILEN : []) }));
-  await s.addInitScript(({ sitzung, erfinder, uid }) => {
+  await s.addInitScript(({ sitzung, erfinder, merker, uid }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
-      if (erfinder) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
+      if (erfinder && merker) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, erfinder, uid: UID });
+  }, { sitzung: SITZUNG, erfinder, merker, uid: UID });
   await s.goto(BASIS + hash);
   await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
   await warte(600);
@@ -444,6 +444,20 @@ async function ohneLaborTeil(browser) {
   await p.k.close();
 }
 
+// Flo 31.10.2026 abends ("beim Handy habe ich die Lektionen immer noch nicht"): auf einem neuen Geraet angemeldet, noch
+// keine Server-Antwort im Merker. Die App fragt beim Start nach; das Training zeigt die Meisterschule, ohne dass erst die
+// Sammlung offen war.
+async function neuesGeraetTeil(browser) {
+  const p = await seite(browser, { erfinder: true, merker: false, groesse: { width: 393, height: 660 } });
+  await p.s.waitForSelector('.ms-karte', { timeout: 10000 }).catch(() => {});
+  const r = await p.s.evaluate(() => ({ karte: document.querySelectorAll('.ms-karte').length, screen: document.documentElement.dataset.screen,
+    merker: localStorage.getItem('schach-arena:konto:sonderstuecke') }));
+  pruefe('Neues Gerät, angemeldet: Training zeigt die Meisterschule ohne Umweg über die Sammlung', r.karte === 1 && r.screen === 'training'
+    && /erfinder-titel/.test(r.merker || ''), r);
+  pruefe('Neues Gerät: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.k.close();
+}
+
 const LEKTIONEN_IDS = LEKTIONEN.map((l) => l.id).join();
 
 async function browserTeil() {
@@ -454,6 +468,7 @@ async function browserTeil() {
     browser = await browserTyp(ladePlaywright()).launch();
     await erfinderTeil(browser);
     await ohneLaborTeil(browser);
+    await neuesGeraetTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
   } finally {
