@@ -155,7 +155,8 @@ function spielerkarte(st) {
   const s = S.tafelStatistik(st);
   const k = el('article', 'bl-karte bl-spieler');
   const beste = s.beste ? `<b class="zahl">${zahlText(s.beste.e.w)}</b><span>${esc(t('p-punkte.karte.punkteAuf', { tafel: nameVon(s.beste.tafel) }))}</span>`
-    : `<b>–</b><span>${esc(t('p-punkte.karte.nochKeine'))}</span>`;
+    // ohne Partie kein grosser Strich (sah auf dem Handy wie ein Fehler aus, Durchsicht 31.10.2026), ein ruhiger Satz
+    : `<p class="bl-s-leer">${esc(t('p-punkte.karte.leer'))}</p>`;
   k.innerHTML = `<div class="bl-s-beste"><span class="ueberzeile">${esc(t('p-punkte.karte.beste'))}</span>${beste}</div>
     <dl class="bl-s-zahlen">
       <div><dd class="zahl">${s.rekorde}</dd><dt>${esc(t('p-punkte.karte.rekorde'))}</dt></div>

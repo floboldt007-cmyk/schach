@@ -307,6 +307,15 @@ async function erfinderTeil(browser) {
   await p.s.locator('.fi-schalter').click();
   pruefe('Einstellungen: Einschalten bringt den zuletzt gewählten Finisher zurück (Signatur)', (await fiStand()).auswahl === 'signatur'
     && await p.s.locator('.fi-schalter').getAttribute('aria-checked') === 'true', await fiStand());
+  // Kreatur (Labor): nur noch in der Sammlung, Tipp ruestet aus, zweiter Tipp nimmt sie ab
+  const kreatur = () => p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:ausdruck') || '{}').kreatur ?? null);
+  await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'kreaturen' }));
+  await p.s.waitForSelector('.sa-teil[data-teil="kreatur-kronli"]', { timeout: 15000 }).catch(() => {});
+  await ruesteAus(p.s, 'kreatur-kronli');
+  const kAn = await kreatur();
+  await p.s.locator('.sa-teil[data-teil="kreatur-kronli"] .sa-wahl[data-ab]').click();
+  await p.s.waitForFunction(() => document.querySelector('.sa-teil[data-teil="kreatur-kronli"]')?.dataset.zustand !== 'an', null, { timeout: 10000 }).catch(() => {});
+  pruefe('Erfinder: Kreatur in der Sammlung ausrüsten (Kronli) und mit zweitem Tipp wieder abnehmen', kAn === 'kronli' && (await kreatur()) === null, { kAn, nach: await kreatur() });
   await p.s.evaluate(() => window.__app.gehe('ich'));
   await p.s.waitForSelector('.pr-karte', { timeout: 15000 }).catch(() => {});
   const erProfil = await p.s.evaluate(() => ({ titel: document.querySelector('.pr-karte .pr-chip-titel')?.textContent,

@@ -436,7 +436,7 @@ async function browserTeil(browser) {
   pruefe('Browser: Vorlese-Text ist nach kurzer Zeit wieder leer', leer === '', leer);
 
   // 6) Schalter aus, neu laden: bleibt aus, Partie ohne Emote-Knoepfe und ohne Vorlese-Zeile
-  await oeffne(seite, '#einstellungen');
+  await oeffne(seite, '#einstellungen/emotes');   // Handy: Emotes als eigene Seite der Einstellungen
   await seite.waitForSelector('.em-einstellungen input[data-em-einst="an"]', { timeout: 20000 });
   await seite.locator('.em-einstellungen input[data-em-einst="an"]').uncheck();
   await seite.locator('.em-einstellungen input[data-em-einst="daempfen"]').check();
@@ -470,17 +470,16 @@ async function kreaturTeil(browser) {
     localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel'] }));
   }, erfinder);
   await anmelden(true);
-  await oeffne(seite, '#einstellungen');
+  await oeffne(seite, '#einstellungen/emotes');   // Handy: Emotes als eigene Seite der Einstellungen
   await seite.waitForSelector('.em-einstellungen', { timeout: 20000 });
   // Gewaehlt wird nur noch in der Sammlung (Flo 31.10.2026: nichts doppelt in den Einstellungen)
   pruefe('Browser Labor: keine Kreaturwahl mehr in den Einstellungen', await seite.locator('.em-kreaturen, .em-k-wahl').count() === 0);
-  await seite.evaluate(() => window.__app.gehe('ich', { bereich: 'kreaturen' }));
-  await seite.waitForSelector('.sa-teil[data-teil="kreatur-kronli"]', { timeout: 20000 });
-  const wahl = await seite.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="kreaturen"] .sa-teil')]
-    .map((x) => x.dataset.teil.replace('kreatur-', '') + (x.dataset.zustand === 'an' ? '*' : '')));
-  pruefe('Browser Labor: Erfinder waehlt die Emote-Kreatur in der Sammlung (sechs Kreaturen, keine ausgeruestet)', wahl.join() === 'karo,stups,zinni,klippa,glimm,kronli', wahl);
-  await seite.locator('.sa-teil[data-teil="kreatur-kronli"] .sa-wahl').click();
-  await seite.waitForFunction(() => document.querySelector('.sa-teil[data-teil="kreatur-kronli"]')?.dataset.zustand === 'an', null, { timeout: 10000 }).catch(() => {});
+  // Hier laeuft nur das Emote-Paket (?kern), ohne Sammlung: die Wahl, die dort ein Tipp setzt, direkt eintragen
+  // (das Ausruesten per Tipp prueft tests/sammlung.test.mjs mit der ganzen App)
+  await seite.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => /einstellungen:ausdruck$/.test(x)) || 'schach-arena:v1:einstellungen:ausdruck';
+    localStorage.setItem(k, JSON.stringify({ ...JSON.parse(localStorage.getItem(k) || '{}'), kreatur: 'kronli' }));
+  });
   const gespeichert = await seite.evaluate(() => Object.keys(localStorage).filter((k) => /einstellungen:ausdruck$/.test(k)).map((k) => localStorage.getItem(k)).join());
   pruefe('Browser Labor: Wahl steht unter ausdruck', /"kreatur":"kronli"/.test(gespeichert), gespeichert);
   await seite.evaluate(SCHNELLER_BOT);
@@ -496,7 +495,7 @@ async function kreaturTeil(browser) {
   pruefe('Browser Labor: die Blase zeigt die winkende Kreatur, sie huepft', !!blase && blase.art === 'winken' && blase.anim === 'kr-hops' && blase.b >= 30, blase);
   // Ohne Erfinder (abgemeldet): keine Wahl, das Rad wie bisher, auch wenn die Einstellung noch kronli sagt
   await seite.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
-  await oeffne(seite, '#einstellungen');
+  await oeffne(seite, '#einstellungen/emotes');   // Handy: Emotes als eigene Seite der Einstellungen
   await seite.waitForSelector('.em-einstellungen', { timeout: 20000 });
   const ohne = await seite.evaluate(() => document.querySelectorAll('.em-kreaturen').length);
   await seite.evaluate(SCHNELLER_BOT);
