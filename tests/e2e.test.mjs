@@ -637,7 +637,8 @@ async function testeUpdate(seite, h, fehler) {
   pruefe('Hinweis "Neue Version verfügbar"', /Neue Version/.test(await seite.locator('.update-hinweis').innerText()));
   const knopf = await seite.locator('.update-hinweis [data-aktion="neu-laden"]').boundingBox();
   pruefe('Knopf "Neu laden" mindestens 44 px', knopf && knopf.height >= 43.5, JSON.stringify(knopf));
-  pruefe('Alte Version läuft weiter, bis Flo tippt', (await h.swVersion()) === SW.VERSION);
+  const swAlt = await h.swVersion();
+  pruefe('Alte Version läuft weiter, bis Flo tippt', swAlt === SW.VERSION, [swAlt, SW.VERSION, await h.hash()]);
   if (!OHNE_BILDER) await seite.screenshot({ path: path.join(BILDER, 'final-update-ipad-quer.png') });
   const geladen = seite.waitForEvent('load', { timeout: 20000 });
   await h.tippe('.update-hinweis [data-aktion="neu-laden"]');
@@ -662,6 +663,18 @@ async function testeUpdate(seite, h, fehler) {
   pruefe('Beim nächsten Start: neue Version übernimmt', (await h.swVersion()) === neueVersion);
   cache = await h.cache();
   pruefe('Beim nächsten Start: nur der neue Cache', Object.keys(cache).join() === 'schach-arena-v' + neueVersion, Object.keys(cache).join(', '));
+
+  // c) Flo 31.10.2026 abends ("auf dem Handy hat sich nichts veraendert"): eine bereitliegende Version uebernimmt beim
+  // naechsten Seitenwechsel, ohne dass jemand "Neu laden" tippt; geoeffnet ist danach die Ziel-Seite
+  neueVersion += 1;
+  await seite.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()).then(() => true));
+  await seite.waitForSelector('.update-hinweis', { timeout: 30000 });
+  const geladenC = seite.waitForEvent('load', { timeout: 20000 });
+  await seite.evaluate(() => window.__app.gehe('verlauf'));
+  await geladenC;
+  await h.screen('verlauf');
+  pruefe('Seitenwechsel: neue Version übernimmt ohne Tippen, die Ziel-Seite ist offen', (await h.swVersion()) === neueVersion
+    && (await h.hash()) === '#verlauf', [await h.swVersion(), neueVersion, await h.hash()]);
   neueVersion = 0;
   pruefe('Keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
 }

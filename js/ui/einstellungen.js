@@ -199,6 +199,7 @@ export function zeige(root, params = {}, app) {
         <section class="es-gruppe flaeche es-info" aria-labelledby="es-g-info">
           <h3 class="es-titel" id="es-g-info">${E('gruppe.infoLizenzen')}</h3>
           <p>${E('info.frei', { app: '<b>Crownmate</b>', lizenz: `<a href="${esc(pfad('LICENSE'))}" target="_blank" rel="noopener">GPL-3.0</a>` })}</p>
+          <p class="es-hilfe es-version" hidden></p>
           <p class="es-recht"><a href="${esc(pfad(sprache() === 'en' ? 'datenschutz-en.html' : 'datenschutz.html'))}" target="_blank" rel="noopener">${E('info.datenschutz')}</a> · <a href="${esc(pfad(sprache() === 'en' ? 'impressum-en.html' : 'impressum.html'))}" target="_blank" rel="noopener">${E('info.impressum')}</a></p>
           <div class="es-bericht">
             <p class="es-hilfe" id="es-t-bericht">${t('bericht.eintragText')}</p>
@@ -225,6 +226,17 @@ export function zeige(root, params = {}, app) {
     baueNav();
     zeigeStand();
     zeigeReset();
+    zeigeVersion();
+  }
+  // Versionsnummer unter Info (Flo 31.10.2026 abends: "Wann ist alles live?"): so sieht man, ob das Geraet den neuesten
+  // Stand hat; ohne Service Worker (Test, erster Start) bleibt die Zeile weg
+  function zeigeVersion() {
+    import('../bericht.js').then((m) => m.swVersion()).then((v) => {
+      const el = sec.querySelector('.es-version');
+      if (beendet || !el || !v) return;
+      el.textContent = E('info.version', { version: v.version });
+      el.hidden = false;
+    }).catch(() => { /* ohne Version geht es auch */ });
   }
 
   // Reihenfolge: Spiel, Anzeige, Klang, Coach, Bewegung, dann die Gruppen der Pakete, Fortschritt, Sprache, Info

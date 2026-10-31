@@ -89,6 +89,8 @@ registriereTexte('partie', {
     'coach.buchText': 'Ein bekannter Eröffnungszug. Genau so spielen ihn auch die Profis.',
     'coach.idee': 'Idee zeigen',
     'coach.besser': 'Besser?',
+    // nur zum Messen (partie.js reserviereCoach): ein langer, zweizeiliger Coach-Satz, nie sichtbar
+    'coach.probe': 'Der Läufer greift jetzt zwei Figuren auf einmal an, und der Springer deckt das Feld davor. Sieh dir an, was dein Gegner damit vorhat.',
     'coach.zurueckTitel': 'Kostet den 3. Stern',
     'coach.zurueck': 'Zurücknehmen',
     'coach.titel': 'Coach',
@@ -236,6 +238,7 @@ registriereTexte('partie', {
     'coach.buchText': 'A well-known opening move. The pros play it exactly like this.',
     'coach.idee': 'Show idea',
     'coach.besser': 'Better?',
+    'coach.probe': 'The bishop now attacks two pieces at once, and the knight covers the square in front. Look at what your opponent is planning with it.',
     'coach.zurueckTitel': 'Costs the 3rd star',
     'coach.zurueck': 'Take back',
     'coach.titel': 'Coach',
