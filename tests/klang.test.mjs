@@ -525,9 +525,10 @@ async function testeBrowser(browser) {
   }, p);
   let r = await spieleAlle('arcade');
   pruefe('arcade: jede der 40 Dateien spielt aus der Datei', r.n === 40 && r.falsch.length === 0, r.falsch.slice(0, 3));
+  // Vorrat im selben Schritt wie die Wahl lesen: dazwischen koennte schon die erste Datei fertig dekodiert sein
   const wechsel = await seite.evaluate(async () => {
-    window.__app.setzeEinstellungen({ klangpaket: 'holz' });
     const { klang } = await import('./js/sounds.js');
+    window.__app.setzeEinstellungen({ klangpaket: 'holz' });
     return klang.vorrat();
   });
   pruefe('Paketwechsel: sofort holz, alte Puffer freigegeben', wechsel.paket === 'holz' && wechsel.gewaehlt === 'holz' && wechsel.dekodiert === 0 && wechsel.fremd === 0, wechsel);
@@ -549,9 +550,10 @@ async function testeBrowser(browser) {
   pruefe('Probe im nicht aktiven Paket: Zug, Schlagen, Bester Zug, Stern aus arcade, aktiv bleibt holz',
     JSON.stringify(probe.e.map((x) => x.split(':').slice(0, 3).join(':'))) === '["zug:arcade:datei","schlagen:arcade:datei","bester:arcade:datei","stern:arcade:datei"]'
     && probe.v.paket === 'holz' && probe.v.fremd === 4, probe);
+  // wie oben im selben Schritt lesen (CI 31.10.: dazwischen war schon eine fuenfte Datei dekodiert)
   const zurueck = await seite.evaluate(async () => {
-    window.__app.setzeEinstellungen({ klangpaket: '' });
     const { klang } = await import('./js/sounds.js');
+    window.__app.setzeEinstellungen({ klangpaket: '' });
     return klang.vorrat();
   });
   pruefe('zurueck zum Standard: arcade, Probe-Puffer uebernommen, keine fremden mehr', zurueck.paket === 'arcade' && zurueck.gewaehlt === '' && zurueck.fremd === 0

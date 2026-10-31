@@ -139,10 +139,13 @@ await pruefe('Sammlung: fuenf Melodien mit eigener Schallplatte, nur Karofelder 
   assert.equal(melodieKunst(0), null);
   assert.equal(melodieKunst(6), null);
 });
-await pruefe('Sammlung: gewaehlte Melodie heisst "Ausgewaehlt", Sterne der Welt fuellen den Balken', () => {
-  const t1 = melodienTeile({ bots: {} }, { musikMelodie: 'karofelder' });
+await pruefe('Sammlung: laufende Melodie heisst "Ausgewaehlt", bei Musik aus keine; Sterne der Welt fuellen den Balken', () => {
+  const t1 = melodienTeile({ bots: {} }, { musik: true, musikMelodie: 'karofelder' });
   assert.equal(t1[0].an, true);
   assert.equal(t1[0].zeile, 'Ausgewählt');
+  const aus = melodienTeile({ bots: {} }, { musik: false, musikMelodie: 'karofelder' });
+  assert.equal(aus[0].an, false, 'Musik aus: Karofelder nicht ausgewaehlt');
+  assert.equal(aus[0].zeile, 'Frei');
   const halb = { bots: { benno: { sterne: [true, true, true] } } };
   const t2 = melodienTeile(halb, { musikMelodie: 'springerforst' });
   assert.equal(t2[1].an, false, 'gesperrte Melodie ist nie ausgewaehlt');
