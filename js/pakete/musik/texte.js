@@ -7,6 +7,7 @@ registriereTexte('p-musik', {
     abend: 'Musikpaket „Abend“', abendText: 'Drei weitere ruhige Stücke für die Werkstatt.', bald: 'Bald verfügbar',
     'welt.karofelder': 'Karofelder', 'welt.springerforst': 'Springerforst', 'welt.turmstadt': 'Turmstadt',
     'welt.gezeitenkueste': 'Gezeitenküste', 'welt.stockfisch-tiefe': 'Stockfisch-Tiefe',
+    'sammlung.an': 'Ausgewählt', 'sammlung.frei': 'Frei', 'sammlung.weg': 'Weltsiegel {welt}',
   },
   en: {
     titel: 'Music', an: 'Background music', hilfe: 'Calm original melodies in the arena and menus. Games remain silent.',
@@ -14,5 +15,6 @@ registriereTexte('p-musik', {
     abend: '“Evening” music pack', abendText: 'Three more calm pieces for the workshop.', bald: 'Coming soon',
     'welt.karofelder': 'Checkered Fields', 'welt.springerforst': 'Knightwood', 'welt.turmstadt': 'Rookbury',
     'welt.gezeitenkueste': 'Tidal Coast', 'welt.stockfisch-tiefe': 'Stockfish Deep',
+    'sammlung.an': 'Selected', 'sammlung.frei': 'Unlocked', 'sammlung.weg': 'World badge: {welt}',
   },
 });

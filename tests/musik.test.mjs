@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { STANDARD_EINSTELLUNGEN, ladeEinstellungen, setzeSpeicher } from '../js/storage.js';
 import { MUSIK_WELTEN, musik, setzeMelodien } from '../js/musik.js';
-import { istMelodieFrei, ABEND_ARTIKEL } from '../js/pakete/musik/index.js';
+import { istMelodieFrei, ABEND_ARTIKEL, melodienTeile } from '../js/pakete/musik/index.js';
+import { melodieKunst } from '../js/sammlung-kunst.js';
+import { ORTE, waehle } from '../js/orte.js';
 import { sende } from '../js/ereignisse.js';
 
 let ok = 0;
@@ -122,6 +124,34 @@ await pruefe('iOS: lehnt der Kontext das Fortsetzen ohne Geste ab, weckt ihn die
   ac.resumeKlappt = true;
   musik.aktivieren();   // Beruehrung
   assert.equal(ac.state, 'running');
+});
+
+// Sammlung (Flo 31.10.: "Wo sind die anderen Klaenge?"): die fuenf Melodien unter Klaenge, eigene Bilder, Weg dahin
+await pruefe('Sammlung: fuenf Melodien mit eigener Schallplatte, nur Karofelder frei, die anderen nennen ihr Weltsiegel', () => {
+  const teile = melodienTeile({ bots: {} }, {});
+  assert.equal(teile.length, 5);
+  assert.deepEqual(teile.map((x) => x.frei), [true, false, false, false, false]);
+  assert.equal(teile[0].zeile, 'Frei');
+  assert.equal(teile[1].zeile, 'Weltsiegel Springerforst');
+  assert.equal(teile[1].fortschritt, 0);
+  assert.equal(new Set(teile.map((x) => x.bild)).size, 5);
+  assert.ok(teile.every((x) => /^<svg viewBox="0 0 120 120" class="sk-klang sk-melodie"/.test(x.bild) && !/undefined|NaN/.test(x.bild)));
+  assert.equal(melodieKunst(0), null);
+  assert.equal(melodieKunst(6), null);
+});
+await pruefe('Sammlung: gewaehlte Melodie heisst "Ausgewaehlt", Sterne der Welt fuellen den Balken', () => {
+  const t1 = melodienTeile({ bots: {} }, { musikMelodie: 'karofelder' });
+  assert.equal(t1[0].an, true);
+  assert.equal(t1[0].zeile, 'Ausgewählt');
+  const halb = { bots: { benno: { sterne: [true, true, true] } } };
+  const t2 = melodienTeile(halb, { musikMelodie: 'springerforst' });
+  assert.equal(t2[1].an, false, 'gesperrte Melodie ist nie ausgewaehlt');
+  assert.ok(t2.every((x) => x.frei || (x.fortschritt >= 0 && x.fortschritt <= 1)));
+});
+await pruefe('Sammlung: Ort sammlung:musik? ist ein Wahl-Ort, das Paket liefert dort die Melodien', () => {
+  assert.equal(ORTE['sammlung:musik?'], 'wahl');
+  const teile = waehle('sammlung:musik?', {});
+  assert.ok(Array.isArray(teile) && teile.length === 5 && teile.every((x) => /^melodie-/.test(x.id)));
 });
 
 musik.stop();
