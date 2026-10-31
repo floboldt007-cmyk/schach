@@ -34,4 +34,8 @@
 @media (max-width: 520px) {
   .kt-symbol { width: 40px; height: 40px; border-radius: 13px; }
   .kt-symbol .ico { width: 22px; height: 22px; }
+  /* abends (iPhone-Bilder): Titel so gross wie die anderen Karten, die leere Kartei ohne eigenes Symbol */
+  .kt-karte h2 { font-size: 19px; }
+  .kt-leer .kt-symbol { display: none; }
+  .kt-stapel { height: 112px; }
 }
