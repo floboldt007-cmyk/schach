@@ -2904,3 +2904,20 @@ sendet nichts“.
   Modul-Instanzen in Node, zwei Seiten im Browser), die Zeichengrenze auf dem echten Schreibweg (Text mit Anfuehrungszeichen),
   Screen-, Hoerer- und Anbieter-Fehler, ein haengendes Paket (10 s), die Fokusfalle und das Blatt auf dem iPhone mit
   Sicherheitsabstaenden (nur Chromium: CDP `Emulation.setSafeAreaInsetsOverride`; fuer WebKit prueft Teil 1 die CSS-Regel).
+
+## Paket lernen: Meisterschule, Etappe 1 Mattbilder (31.10.2026)
+
+Flo: Premium-Lektionen "von leicht bis Meister" (Plan im Vault, Schach-App/Meisterschule.md). Vorerst **nur im Labor**
+(`laborFrei()` aus js/labor.js, also nur fuers Erfinder-Konto); Flo entscheidet spaeter, was gratis wird und was ins Abo
+kommt. Andere Konten sehen keine Karte, `#lernen` und `#lektion` fuehren sie still zur Arena.
+
+- `js/pakete/lernen/mattbilder.js`: 8 Lektionen (Grundreihe, zwei Tuerme, Anastasia, Dame, ersticktes Matt, Turm, zwei
+  Laeufer, Laeufer und Springer) mit `ziel` = Flos Zuege bis Matt bei bester Verteidigung. Nachgerechnet mit
+  `werkzeuge/mattbilder-pruefen.mjs` (Stockfish in Node; bei langen Matts der kuerzeste je gefundene Weg). Sterne: 3 bis
+  `ziel + ziel/4` Zuege, 2 bis `1,5 * ziel + 2`, sonst 1; mit Hinweis hoechstens 2. Grenze `2 * ziel + 10` Zuege.
+- `js/ui/lernen.js` (Uebersicht) und `js/ui/lektion.js` (eine Lektion): Flo setzt matt, die Engine `bewertung` verteidigt
+  (450 ms je Zug, Hinweis 900 ms). Ende bei Matt (Sterne), Patt, Remis, zu vielen Zuegen oder Matt gegen Flo. Im
+  Testmodus liefert `window.__test.lektionZug(fen)` die Engine-Zuege; `window.__lektion.zustand()` fuer Tests.
+- Ort `training:karten` (reihenfolge 3); Speicher im Modul `lernen` (`{ lek: { <id>: { s, z } } }`); nach einem Matt
+  `lektion:beendet { id: 'matt-<id>', ringe }` (1 Stern gelernt, 2 sicher, 3 gemeistert), daraus bucht funken Lern-Funken.
+- Test: `tests/lernen.test.mjs` (Daten, Sterne, Speicher; Browser als Erfinder und ohne Labor).
