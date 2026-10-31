@@ -103,11 +103,24 @@
 
 
 /* Zweispaltige iPad-Navigation; auf dem Handy bleibt nur der Inhalt. */
-.es-layout { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 18px 36px; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; align-items: start; }
+.es-layout { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 18px 36px; display: grid; grid-template-columns: 212px minmax(0, 1fr); gap: 18px; align-items: start; }
 .es-layout .es-inhalt { width: auto; max-width: none; margin: 0; padding: 0; }
-.es-nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); box-shadow: var(--s1); }
-.es-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 12px; color: var(--text-2); font-weight: 750; text-decoration: none; }
-.es-nav a:hover, .es-nav a:focus-visible, .es-nav a.an { color: var(--text); background: var(--flaeche-2); }
+/* Menue (Flo 31.10.2026): jeder Bereich mit eigenem Zeichen, die Markierung folgt dem Scrollen (js baueNav), feiner Strich
+   in der Akzentfarbe am aktiven Punkt; auf dem Handy eine Leiste zum Wischen oben */
+.es-nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 2px; padding: 8px; border: 1px solid var(--linie);
+  border-radius: var(--r-m); background: var(--flaeche); box-shadow: var(--s1); max-height: calc(100vh - 110px); max-height: calc(100dvh - 110px); overflow-y: auto; }
+.es-nav-punkt { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 12px;
+  background: none; color: var(--text-2); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.es-nav-zeichen { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--flaeche-2);
+  border: 1px solid var(--linie); color: var(--text-2); }
+.es-nav-zeichen svg { width: 17px; height: 17px; }
+.es-nav-text { min-width: 0; line-height: 1.2; overflow-wrap: normal; hyphens: manual; }
+.es-nav-punkt:hover, .es-nav-punkt:focus-visible { color: var(--text); background: var(--flaeche-2); }
+.es-nav-punkt:focus-visible { outline: var(--fokus); outline-offset: 1px; }
+.es-nav-punkt[aria-current="true"] { color: var(--text); background: var(--flaeche-2); }
+.es-nav-punkt[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--akzent); }
+.es-nav-punkt[aria-current="true"] .es-nav-zeichen { color: var(--akzent); border-color: var(--akzent); }
+.es-inhalt .es-gruppe { scroll-margin-top: 96px; }
 .es-block, .es-untergruppe { margin: 12px 0; }
 .es-block h4, .es-untergruppe h4, .es-gruppe > h4 { margin: 14px 0 8px; font-size: 15px; }
 .es-regler { display: block; padding: 12px 0; }
@@ -121,7 +134,14 @@
 .es-coach-vorschau p { margin: 4px 0 0; color: var(--text-2); }
 @media (max-width: 700px) {
   .es-layout { display: block; padding: 0 10px 28px; }
-  .es-nav { display: none; }
+  .es-nav { position: sticky; top: 64px; z-index: 5; flex-direction: row; gap: 6px; margin: 0 0 10px; padding: 6px; max-height: none;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .es-nav::-webkit-scrollbar { display: none; }
+  .es-nav-punkt { flex: none; min-height: 44px; padding: 0 12px 0 6px; gap: 8px; border-radius: 999px; }
+  .es-nav-text { white-space: nowrap; }
+  .es-nav-zeichen { width: 28px; height: 28px; border-radius: 999px; }
+  .es-nav-punkt[aria-current="true"]::before { left: 14px; right: 14px; top: auto; bottom: 2px; width: auto; height: 2px; }
+  .es-inhalt .es-gruppe { scroll-margin-top: 128px; }
   .es-layout .es-inhalt { padding: 0; }
 }
 
