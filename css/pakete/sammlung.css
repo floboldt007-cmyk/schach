@@ -142,7 +142,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 /* gesperrte Silhouette etwas sichtbarer, in hell und dunkel */
 .sa-geheim { filter: grayscale(1) brightness(.45); opacity: .8; }
 /* Eigene Bilder je Stueck (Flo 30.10.: Klangsets mit gleichem Lautsprecher "braucht ein besseres Design") */
-.sa-bild > svg.sk-klang, .sa-bild > svg.sk-erfolg, .sa-geheim > svg.sk-erfolg { width: 70px; height: 70px; }
+.sa-bild > svg.sk-klang, .sa-bild > svg.sk-erfolg, .sa-geheim > svg.sk-erfolg, .sa-geheim > svg.sk-klang { width: 70px; height: 70px; }
 .sa-bild > svg.sk-brett { width: 64px; height: 64px; }
 /* Erfolge in Gruppen (Meilensteine, Welten, Liga, Serie, Level) mit "n / m" (Flo 30.10. abends: "in meinem Stil") */
 .sa-gruppe { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 18px 2px 8px; font-size: 13px; font-weight: 800;

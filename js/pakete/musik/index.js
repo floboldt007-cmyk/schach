@@ -4,6 +4,8 @@ import { hoere } from '../../ereignisse.js';
 import { hatWeltsiegel, ladeFortschritt } from '../../storage.js';
 import { musik, MUSIK_WELTEN } from '../../musik.js';
 import { istErfinder } from '../../sonderstuecke.js';
+import { BOTS } from '../../bots.js';
+import { melodieKunst } from '../../sammlung-kunst.js';
 import { t } from '../../sprache.js';
 import './texte.js';
 
@@ -79,6 +81,22 @@ function gruppe({ app: a }) {
 }
 
 anbieten('einstellungen:klang', gruppe, { reihenfolge: 4, paket: 'musik' });
+
+// Sammlung (Flo 31.10.2026: "Wo sind die anderen Klaenge?"): die fuenf Melodien unter Klaenge, jede mit eigener
+// Schallplatte; gesperrte zeigen den Weg (Weltsiegel) und wie viele Sterne der Welt schon da sind.
+export function melodienTeile(fortschritt = ladeFortschritt(), e = einstellung()) {
+  return MUSIK_WELTEN.map((m, i) => {
+    const frei = istMelodieFrei(m.id, fortschritt);
+    const an = frei && e.musikMelodie === m.id;
+    const sterne = BOTS.filter((b) => b.welt === i + 1).flatMap((b) => (fortschritt.bots[b.id] && fortschritt.bots[b.id].sterne) || [false, false, false]);
+    return {
+      id: 'melodie-' + m.id, name: t('p-musik.welt.' + m.id), frei, an, bild: melodieKunst(i + 1),
+      zeile: an ? t('p-musik.sammlung.an') : frei ? t('p-musik.sammlung.frei') : t('p-musik.sammlung.weg', { welt: t('p-musik.welt.' + m.id) }),
+      fortschritt: frei || !sterne.length ? undefined : sterne.filter(Boolean).length / sterne.length,
+    };
+  });
+}
+anbieten('sammlung:musik?', () => melodienTeile(), { reihenfolge: 10, paket: 'musik' });
 hoere('app:bereit', (d) => { app = d.app; aktualisiere(); });
 hoere('app:screen', (d) => {
   screen = d.name;
