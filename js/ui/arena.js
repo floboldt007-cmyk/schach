@@ -8,7 +8,7 @@
 // button.stufe.knoten[data-bot] mit Zustand besiegt | aktuell | gesperrt, Endgegner .boss) und aside.detail.
 // Die Zeichnung entsteht in Pixelmass (viewBox = Groesse der Karte): weltSvg() legt Himmel, Berge, Huegelbaender,
 // Baeume, Haeuser, See, Zaun und den Pfad (Bezier durch die Stationen, Fortschritt in Akzentfarbe bis zum naechsten
-// Gegner) je Lage neu an; die Stationen stehen in Prozent (LAGEN.quer / LAGEN.hoch).
+// Gegner) je Lage neu an; die Stationen stehen in Prozent (LAGEN.quer / LAGEN.hoch / LAGEN.kompakt).
 // Lagen: iPad quer = Karte links, passt ganz ohne Scrollen (Endgegner oben), Panel rechts; iPad hoch = Karte oben,
 // Panel zweispaltig darunter; Handy = Karte senkrecht scrollbar (startet beim naechsten Gegner), Panel darunter,
 // Spielen-Knopf klebt ueber der Reiter-Pille. Optik: css/arena.css.
@@ -114,6 +114,23 @@ const LAGEN = {
     plaetze: [[0.08, 0.95, 0.9], [0.85, 0.93, 0.9], [0.62, 0.95, 0.8], [0.10, 0.80, 0.9], [0.48, 0.84, 0.8], [0.90, 0.70, 0.9],
       [0.52, 0.69, 0.8], [0.10, 0.66, 0.9], [0.90, 0.57, 0.8], [0.50, 0.55, 0.8], [0.12, 0.36, 0.8], [0.52, 0.39, 0.8],
       [0.90, 0.42, 0.8], [0.10, 0.22, 0.9], [0.36, 0.20, 0.8], [0.90, 0.24, 0.8]],
+  },
+  // Handy hoch, kompakt (31.10.2026): ganze Welt in einer flachen Karte (etwa 360 x 300) als "Z": unten drei Stationen
+  // nach rechts, oben drei zurueck nach links bis zum Endgegner. Nie zwei Stationen uebereinander (Sterne ueber und
+  // Schild unter einer Station haben Platz); oben frei fuer die Weltwahl. Die Fahne "Naechster Gegner" entfaellt hier
+  // (css/arena.css), das Panel nennt ihn.
+  kompakt: {
+    himmel: 0.10,
+    baender: [0.10, 0.34, 0.60, 0.80],
+    stationen: [[0.18, 0.92], [0.50, 0.92], [0.84, 0.86], [0.80, 0.42], [0.46, 0.40], [0.17, 0.20]],
+    start: [0.02, 1.02],
+    boss: [0.94, 0.26],
+    event: [0.62, 0.66],
+    wahrzeichen: [0.88, 0.12],
+    berge: [[0.30, 1.1], [0.60, 0.9], [0.90, 1.0]],
+    himmelSzene: [['sonne', 0.93, 0.03], ['wolke', 0.12, 0.04], ['wolke', 0.46, 0.06]],
+    plaetze: [[0.10, 0.64, 0.8], [0.30, 0.68, 0.8], [0.62, 0.70, 0.8], [0.95, 0.64, 0.8], [0.96, 0.32, 0.8], [0.30, 1.01, 0.8],
+      [0.66, 1.01, 0.8], [0.97, 0.99, 0.7], [0.62, 0.22, 0.8], [0.06, 0.46, 0.7], [0.30, 0.30, 0.7], [0.62, 0.52, 0.7]],
   },
 };
 // Landschaft je Welt: Wahrzeichen am Endgegner und die Palette, aus der die Plaetze der Reihe nach gefuellt werden
@@ -391,7 +408,8 @@ export function zeige(root, params, app) {
   karte.addEventListener('pointermove', beiZiehen, { passive: true });
   karte.addEventListener('pointerup', beiZiehEnde, { passive: true });
   karte.addEventListener('pointercancel', beiZiehEnde, { passive: true });
-  if (!ziehErledigt && window.matchMedia('(max-width: 600px)').matches) {
+  // nur wenn die Karte scrollt: Handy hoch zeigt seit dem 31.10.2026 die ganze Welt (karte-kompakt), dort kein Hinweis
+  if (!ziehErledigt && window.matchMedia('(max-width: 600px) and (orientation: landscape)').matches) {
     ziehHinweis.hidden = false;
     anim(ziehHinweis, [{ opacity: 0 }, { opacity: 1 }], { d: 360, v: 300, k: 'weich' });
     spaeter(schliesseZiehHinweis, 5200);
@@ -479,6 +497,10 @@ export function zeige(root, params, app) {
 
   // ---------- Karte: Layout, Zeichnung ----------
   let modus = null;
+  // Lage der Stationen: quer (breite Welt, scrollt nie), hoch (hohe Welt, scrollt; iPad hoch, Handy quer) oder kompakt
+  // (Handy hoch seit dem 31.10.2026, ganze Welt in der Hoehe der Karte; Flo: "alles auf einmal sehen, auch die Welt
+  // nicht viel um scrollen")
+  let lageModus = null;
   let letzteKh = 0;
   let masse = { w: 0, h: 0, s: 1, y0: 0, hy: 0 };
   const yVon = (f) => masse.y0 + f * masse.hy;   // Anteil (0..1) -> Pixel in der Welt
@@ -493,28 +515,35 @@ export function zeige(root, params, app) {
     const quer = !window.matchMedia('(orientation: portrait), (max-width: 760px)').matches && kh >= 420;
     const vorher = modus;
     modus = quer ? 'quer' : 'hoch';
+    // Handy hoch (schmale Karte, Hochformat): ganze Welt auf einen Blick, kein Scrollen in der Karte
+    const kompakt = !quer && kw < 600 && window.matchMedia('(orientation: portrait)').matches;
+    lageModus = quer ? 'quer' : kompakt ? 'kompakt' : 'hoch';
     s.classList.toggle('karte-quer', quer);
     s.classList.toggle('karte-hoch', !quer);
-    const lage = LAGEN[modus];
+    s.classList.toggle('karte-kompakt', kompakt);
+    const lage = LAGEN[lageModus];
     const w = kw;
     weltEl.dataset.welt = welt.id;
     weltEl.classList.toggle('gesperrt', !weltFrei);
     // Hochformat: Handy gestreckter (Platz fuer Schilder, Sterne und Fahne zwischen den Stationen), iPad hoch wie C;
     // schmale Karten (Handy quer: Karte neben dem Panel) mindestens WELT_MIN_H hoch, sonst rueckten die Stationen so eng
     // zusammen, dass Sterne und Fahne auf das Schild der Station darueber stiessen
-    const h = quer ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
-    const sk = Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
+    const h = quer || kompakt ? kh : Math.max(kh, Math.round(kw * (kw < 600 ? 1.75 : 1.2)), kw < 600 ? WELT_MIN_H : 0);
+    // kompakt: kleinere Stationen, damit die ganze Welt in die Karte passt
+    const sk = kompakt ? Math.max(0.56, Math.min(0.78, Math.min(w, h * 1.25) / 560))
+      : Math.max(0.78, Math.min(1.12, Math.min(w, quer ? h : w * 1.1) / 700));
     // senkrechte Abbildung: quer 1:1 (die Lage ist dafuer gezeichnet); hoch mit Rand oben (Krone und Fahne ueber dem
     // Endgegner) und unten (Schild unter Station 1), damit keine Beschriftung aus der Karte ragt
     let y0 = 0;
     let hy = h;
-    if (!quer) {
+    if (lageModus === 'hoch' || kompakt) {
       const kn = 76 * sk;
       const ys = lage.stationen.map((p) => p[1]);
       const fMin = Math.min(...ys);
       const fMax = Math.max(...ys);
-      const oben = kn * 0.65 + 118;   // Krone und Fahne des Endgegners unter der Weltwahl
-      const unten = kn * 0.61 + 36;
+      // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
+      const oben = kn * 0.65 + (kompakt ? 70 : 118);
+      const unten = kn * 0.61 + (kompakt ? 26 : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
@@ -525,7 +554,7 @@ export function zeige(root, params, app) {
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
-    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy, szene: szeneVon(welt, modus) });
+    bild.innerHTML = weltSvg({ w, h, s: sk, lage, punkte, start, bis: aktuellIdx, neuIdx, y0, hy, szene: szeneVon(welt, lageModus) });
     const neuWeg = bild.querySelector('.w-fortschritt-neu');
     if (neuWeg && !wegGezeichnet) neuWeg.style.opacity = '0';
     // Stationen und Orte in Prozent der Welt (folgen damit jeder Groesse; hoch haengt y an der Abbildung)
@@ -534,13 +563,14 @@ export function zeige(root, params, app) {
     setze(s.querySelector('.ort-karte-boss'), lage.boss);
     setze(s.querySelector('.ort-karte-event'), lage.event);
     stelleFlo(floPosition());
-    // im Querformat scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
+    // im Querformat (und kompakt) scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
+    if (kompakt) karte.scrollTop = 0;
     // nach dem Drehen ins Hochformat den gewaehlten Gegner wieder ins Bild holen; ebenso, wenn sich nur die Hoehe der
     // Karte aendert (die Reiter-Pille kuerzt sie nach dem ersten Layout, die Karte waechst in freien Platz) und er dabei
     // aus dem sichtbaren Teil geraten ist
-    if (!quer && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
-    else if (!quer && vorher && kh !== letzteKh && !ganzImBild(gewaehlt)) scrolleZu(gewaehlt, false);
+    if (!quer && !kompakt && vorher && vorher !== modus) scrolleZu(gewaehlt, false);
+    else if (!quer && !kompakt && vorher && kh !== letzteKh && !ganzImBild(gewaehlt)) scrolleZu(gewaehlt, false);
     letzteKh = kh;
   }
 
@@ -555,7 +585,7 @@ export function zeige(root, params, app) {
 
   // Flo steht neben der zuletzt bezwungenen Station (sonst am Start des Wegs); beim Freischalten noch beim alten Platz
   function floPosition(vorStation = null) {
-    const lage = LAGEN[modus];
+    const lage = LAGEN[lageModus || modus];
     // zuletzt bezwungen: die Station vor dem naechsten Gegner (alle besiegt: der Endgegner); waehrend des Freischaltens
     // noch die Station davor
     const letzte = weltFertig ? LBOTS.length - 1 : aktuellIdx - 1;
@@ -572,7 +602,7 @@ export function zeige(root, params, app) {
   }
 
   function scrolleZu(id, sanft) {
-    if (modus !== 'hoch') return;
+    if (modus !== 'hoch' || lageModus !== 'hoch') return;
     const i = idx(id);
     if (i < 0) return;
     const y = yVon(LAGEN.hoch.stationen[i][1]);
@@ -585,6 +615,7 @@ export function zeige(root, params, app) {
 
   // ---------- Gegner-Panel ----------
   let panelLauf = 0;
+  let blaseBesonders = false;
   function zeigeDetail(neueBlase, animiert = false) {
     const lauf = ++panelLauf;
     const b = BOTS.find((x) => x.id === gewaehlt);
@@ -624,7 +655,7 @@ export function zeige(root, params, app) {
             <div class="mini-sterne" aria-label="${esc(t('arena.sterne.von', { anzahl: f.sterne.filter(Boolean).length }))}">${kSterneHtml(f.sterne)}</div>
           </div>
         </div>
-        <div class="sprechblase spruch${neueBlase ? '' : ' still'}">${esc(t('arena.zitat', { satz }))}</div>
+        <div class="sprechblase spruch${neueBlase ? '' : ' still'}${blaseBesonders ? ' besonders' : ''}">${esc(t('arena.zitat', { satz }))}</div>
         <div class="merkmale">
           <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.lieblings'))}</span><span class="m-wert"><span class="m-figur"><img src="assets/pieces/w${mm.figur}.svg" alt=""></span>${esc(mm.lieblings)}</span></div>
           <div class="merkmal"><span class="m-label">${esc(t('arena.merkmal.tempo'))}</span><span class="m-wert">${esc(mm.tempo)}</span></div>
@@ -735,7 +766,10 @@ export function zeige(root, params, app) {
       });
     } catch (e) { wahl = null; }
     const anlass = wahl && typeof wahl.anlass === 'string' && wahl.anlass ? wahl.anlass : null;
-    return (anlass && botSatz(b, anlass, Math.random, wahl.werte || null)) || botSatz(b, 'begruessung') || '';
+    const besonders = anlass ? botSatz(b, anlass, Math.random, wahl.werte || null) : '';
+    // besonderer Satz (z. B. Mutmacher nach Niederlagen aus dem Gedaechtnis): auf dem Handy hoch auch kompakt sichtbar
+    blaseBesonders = !!besonders;
+    return besonders || botSatz(b, 'begruessung') || '';
   }
 
   // Nachlese: was nach der letzten Partie nicht mehr ins Ergebnis passte (still, ohne Klang)

@@ -60,3 +60,10 @@ button.t-karte { cursor: pointer; width: 100%; }
   .kartei-stapel .kk:nth-child(4) { display: none; }
   .training-leer { padding: 18px; }
 }
+
+/* Handy schmal (Flo 31.10.2026: "einfach und uebersichtlich"): Karten dichter, Titel kleiner */
+@media (max-width: 520px) {
+  .t-karte { padding: 16px; gap: 8px; }
+  .t-karte h2 { font-size: 22px; }
+  .training-gitter { gap: 12px; }
+}
