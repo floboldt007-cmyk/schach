@@ -7,6 +7,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { THEMEN } from './figuren-themen.mjs';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ZIEL = path.join(WURZEL, 'assets/pieces');
@@ -61,8 +62,8 @@ const GESICHT = {
   Q: { augen: [[43.8, 56], [56.2, 56]], r: 4.6, mund: 'M46.5 64q3.5 2.6 7 0' },
   K: { augen: [[44.2, 33.5], [55.8, 33.5]], r: 4.4, mund: 'M47 39.4q3 2.2 6 0' },
 };
-function gesichtSvg(fig, g) {
-  const f = GESICHT[fig];
+function gesichtSvg(fig, g) { return gesichtPunkte(GESICHT[fig], g); }
+function gesichtPunkte(f, g) {
   const augen = f.augen.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${f.r}" fill="${g.sklera}" stroke="${g.rand}" stroke-width="1.1"/>`
     + `<circle cx="${x - f.r * 0.22}" cy="${y + f.r * 0.12}" r="${f.r * 0.56}" fill="${g.pupille}"/>`
     + `<circle cx="${x - f.r * 0.42}" cy="${y - f.r * 0.18}" r="${f.r * 0.2}" fill="#FFFFFF"/>`).join('');
@@ -70,7 +71,7 @@ function gesichtSvg(fig, g) {
     const s = f.augen.length === 1 ? 1 : (i === 0 ? 1 : -1);
     return `<path d="M${x - f.r * 1.05} ${y - f.r * (s > 0 ? 1.45 : 1.05)}L${x + f.r * 1.05} ${y - f.r * (s > 0 ? 1.05 : 1.45)}" stroke="${g.rand}" stroke-width="1.6" stroke-linecap="round"/>`;
   }).join('') : '';
-  const mund = `<path d="${f.mund}" fill="none" stroke="${g.rand}" stroke-width="1.5" stroke-linecap="round"/>`;
+  const mund = f.mund ? `<path d="${f.mund}" fill="none" stroke="${g.rand}" stroke-width="1.5" stroke-linecap="round"/>` : '';
   return augen + brauen + mund;
 }
 
@@ -173,7 +174,22 @@ export function figur(fig, m) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 100 100"><defs>${defs(m)}</defs>${schatten}${inhalt}</svg>\n`;
 }
 
-export const SAETZE_3D = Object.freeze(Object.keys(MATERIALIEN));
+// Themen (werkzeuge/figuren-themen.mjs): eigene Koepfe auf dem gedrechselten Rumpf, oder ganz eigene Figuren
+const KOPFTEILE = { P: 1, R: 2, B: 3, N: 4, Q: 2, K: 2 };
+export function themenFigur(fig, thema, seite) {
+  const m = thema[seite];
+  const h = {
+    gesicht: (augen, r, mund) => gesichtPunkte({ augen, r, mund }, m.gesicht),
+    form: (f, i) => FORMEN[f][i].s.replace(/^<g[^>]*>|<\/g>$/g, ''),
+  };
+  const k = thema.kopf(fig, m, h);
+  const rumpf = FORMEN[fig].slice(0, FORMEN[fig].length - KOPFTEILE[fig]).map((t) => teil(t, m)).join('');
+  const koerper = k && k.ganz ? k.ganz : rumpf + k;
+  const schatten = '<ellipse cx="50" cy="92" rx="35" ry="5.5" fill="url(#sch)"/>';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 100 100"><defs>${defs(m)}${thema.defs ? thema.defs(m) : ''}</defs>${schatten}${koerper}</svg>\n`;
+}
+
+export const SAETZE_3D = Object.freeze([...Object.keys(MATERIALIEN), ...Object.keys(THEMEN)]);
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   for (const [satz, mat] of Object.entries(MATERIALIEN)) {
@@ -181,6 +197,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     mkdirSync(ziel, { recursive: true });
     for (const f of Object.keys(FORMEN)) {
       for (const c of ['w', 'b']) writeFileSync(path.join(ziel, `${c}${f}.svg`), figur(f, mat[c]));
+    }
+  }
+  for (const [satz, thema] of Object.entries(THEMEN)) {
+    const ziel = path.join(ZIEL, satz);
+    mkdirSync(ziel, { recursive: true });
+    for (const f of Object.keys(FORMEN)) {
+      for (const c of ['w', 'b']) writeFileSync(path.join(ziel, `${c}${f}.svg`), themenFigur(f, thema, c));
     }
   }
   console.log(`${SAETZE_3D.length * 12} Figuren geschrieben: assets/pieces/{${SAETZE_3D.join(',')}}/`);

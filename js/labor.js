@@ -41,8 +41,10 @@ export const LABOR_BRETTER = Object.freeze([
 // und Schatten (werkzeuge/figuren-3d.mjs: Elfenbein, Holz, Marmor, Gold, Glas, Neon, Frost, Kuerbis) und eigene Stile
 // (werkzeuge/figuren-stile.mjs: Pixel, Geo)
 // danach (Video: Figuren als kleine Wesen) Moosgeister und Tiefsee mit Gesichtern, eigene Gestaltung
-export const LABOR_FIGUREN = Object.freeze(['elfenbein', 'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'moosgeister', 'tiefsee',
-  'pixel', 'geo']);
+// dann ("Du hast nur die Farben geaendert ... Feuer, Stein, Halloween, Christmas, Ostern"): Themen mit eigenen Koepfen und
+// Kronen (werkzeuge/figuren-themen.mjs), vorn in der Sammlung
+export const LABOR_FIGUREN = Object.freeze(['feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'moosgeister', 'tiefsee', 'elfenbein',
+  'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
 export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
 
 export function istLabor(art, id) {
