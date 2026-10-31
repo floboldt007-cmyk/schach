@@ -61,9 +61,16 @@ button.t-karte { cursor: pointer; width: 100%; }
   .training-leer { padding: 18px; }
 }
 
-/* Handy schmal (Flo 31.10.2026: "einfach und uebersichtlich"): Karten dichter, Titel kleiner */
+/* Handy schmal (Flo 31.10.2026: "einfach und uebersichtlich"; abends nach iPhone-Bildern: "zu unuebersichtlich, die
+   Sachen sind zu gross"): Karten dichter, Titel und Text kleiner */
 @media (max-width: 520px) {
-  .t-karte { padding: 16px; gap: 8px; }
-  .t-karte h2 { font-size: 22px; }
-  .training-gitter { gap: 12px; }
+  .t-karte { padding: 14px; gap: 6px; border-radius: var(--r-l); }
+  .t-karte h2 { font-size: 19px; letter-spacing: -.015em; }
+  .t-karte p { font-size: 13.5px; line-height: 1.4; }
+  .t-held { gap: 10px; }
+  .training-gitter { gap: 10px; padding-top: 10px; }
+  .training-leer { padding: 14px; gap: 10px; }
+  .training-leer h2 { font-size: 19px; }
+  .training-leer .t-symbol { width: 36px; height: 36px; border-radius: 12px; }
+  .training-leer .t-symbol .ico { width: 20px; height: 20px; }
 }
