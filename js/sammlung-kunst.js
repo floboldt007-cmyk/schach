@@ -144,6 +144,26 @@ const WELT = [
     + '<circle class="rk rk-steigen" cx="72" cy="50" r="2" fill="#D6F6FF"/><circle class="rk rk-steigen" cx="78" cy="44" r="1.3" fill="#D6F6FF" style="animation-delay:.8s"/>' },
 ];
 
+// ---------- Lobby-Musik ----------
+// Schallplatte je Welt (Flo 31.10.2026: "Wo sind die anderen Klaenge?"): Silberrand, dunkle Rillen, Etikett in der Farbe
+// der Welt mit ihrem Motiv, goldene Note. Jede Melodie hat damit ihr eigenes Bild (Design-Regel 30.10.).
+export function melodieKunst(nr) {
+  const w = WELT[nr];
+  if (!w) return null;
+  const c = id('c'); const ci = id('c'); const g = id('w'); const gr = id('r'); const gn = id('n');
+  const rillen = [44, 40, 36, 32, 28].map((r, i) => `<circle cx="60" cy="60" r="${r}" fill="none" stroke="#fff" stroke-width=".55" opacity="${(0.07 + (i % 2) * 0.05).toFixed(2)}"/>`).join('');
+  return svg(`<defs>${verlauf(gr, SILBER)}${verlauf(g, [w.farbe, w.dunkel], 0, 1)}${verlauf(gn, GOLD, 0, 1)}`
+    + `<clipPath id="${c}"><circle cx="60" cy="60" r="22"/></clipPath><clipPath id="${ci}"><circle cx="60" cy="60" r="38"/></clipPath></defs>`
+    + halo(w.farbe, 60, 0.22)
+    + `<circle cx="60" cy="60" r="51" fill="url(#${gr})"/><circle cx="60" cy="60" r="48.5" fill="#16171C"/>${rillen}`
+    + '<path d="M22 42A44 44 0 0 1 47 17" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".2"/>'
+    + `<circle cx="60" cy="60" r="22" fill="url(#${g})"/><g clip-path="url(#${c})"><g transform="translate(60 61) scale(.6) translate(-60 -60)">${w.bild(ci)}</g></g>`
+    + `<circle cx="60" cy="60" r="22" fill="none" stroke="url(#${gn})" stroke-width="1.3"/><circle cx="60" cy="60" r="2.4" fill="#16171C"/>`
+    + `<g class="rk rk-atmen" transform="translate(92 4)"><ellipse cx="-3" cy="23" rx="5.6" ry="4.2" transform="rotate(-22 -3 23)" fill="url(#${gn})"/>`
+    + `<rect x="1.2" y="0" width="2.4" height="23" rx="1" fill="url(#${gn})"/><path d="M3.6 0c5 1.6 8.6 4.6 9.2 10.4c-2.8-2.6-5.6-3.6-9.2-3.6Z" fill="url(#${gn})"/></g>`
+    + funke(18, 100, 0.4, 0.6, '#FFF6D6'), 'sk-klang sk-melodie');
+}
+
 const LIGA = [
   ['#E9C08C', '#A8743F', '#D4A06A', '#7C4F27'],
   ['#F6C59A', '#A8622F', '#EBA978', '#6E3B17'],

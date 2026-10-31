@@ -38,6 +38,8 @@
 export const ORTE = Object.freeze({
   'arena:kopf': 'dom',
   'sammlung:bereich': 'dom',
+  // Lobby-Musik in der Sammlung unter Klaenge (Flo 31.10.2026): Paket musik liefert die Teile, Paket sammlung zeigt sie
+  'sammlung:musik?': 'wahl',
   // Profil (Flo 30.10.2026): Karte oben im Reiter Ich, Vitrine fuer das Duell-Intro
   'ich:kopf': 'dom',
   'duell:profil?': 'wahl',

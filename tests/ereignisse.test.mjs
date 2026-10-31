@@ -200,6 +200,8 @@ const ORT_TABELLE = {
   'sammlung:bereich': 'dom',
   // Profil (Flo 30.10.2026): Host js/ui/ich.js und js/ui/duell.js
   'ich:kopf': 'dom', 'duell:profil?': 'wahl',
+  // Lobby-Musik in der Sammlung unter Klaenge (Flo 31.10.2026): Paket musik liefert, Paket sammlung zeigt
+  'sammlung:musik?': 'wahl',
 };
 pruefe('ORTE: alle Orte der Tabelle (BAUPLAN 3.4) mit ihrer Art', JSON.stringify(Object.entries(ORTE).sort()) === JSON.stringify(Object.entries(ORT_TABELLE).sort()), ORTE);
 pruefe('ORTE: eingefroren', Object.isFrozen(ORTE));

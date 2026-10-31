@@ -3,7 +3,7 @@
 // Erfolge, die sich aus dem Spielstand ablesen lassen (keine eigene Buchfuehrung, nichts zum Kaufen). Finisher, Emotes
 // und Titel bringen ihre Pakete selbst am Ort sammlung:bereich mit.
 // Orte: ich:kopf Profil 10 und duell:profil? (profil.js); sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Rahmen 35 (profil.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
-import { anbieten } from '../../orte.js';
+import { anbieten, waehle } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
 import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul } from '../../storage.js';
 import { BOTS, WELTEN } from '../../bots.js';
@@ -36,7 +36,11 @@ export function teileBretter(e = ladeEinstellungen()) {
 export function teileKlaenge(e = ladeEinstellungen()) {
   // '' heisst: Standard der Ansicht (heute Arcade, js/sounds.js)
   const gewaehlt = PAKETE_KLANG[e.klangpaket] ? e.klangpaket : 'arcade';
-  return Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangKunst(id) || klangBild }));
+  const sets = Object.keys(PAKETE_KLANG).map((id) => ({ id: 'klang-' + id, name: S('klang.' + id), frei: true, an: gewaehlt === id, zeile: gewaehlt === id ? S('an') : S('frei'), bild: klangKunst(id) || klangBild, gruppe: S('gruppe.klangsets') }));
+  // Lobby-Musik (Paket musik, Ort sammlung:musik?): ohne das Paket gibt es sie nicht, dann nur die Klangsets
+  let musik = null;
+  try { musik = waehle('sammlung:musik?', {}); } catch (e) { musik = null; }
+  return Array.isArray(musik) && musik.length ? [...sets, ...musik.map((m) => ({ ...m, gruppe: S('gruppe.musik') }))] : sets;
 }
 
 // Was die Erfolge ausser den Bot-Ergebnissen lesen (nur lesen, nie schreiben): beste Liga-Stufe aller Saisons
