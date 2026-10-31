@@ -292,6 +292,13 @@ async function erfinderTeil(browser) {
   await p.k.close();
 }
 
+// Ausruesten per Tipp: die Sammlung zeichnet danach neu (app.gehe ... ersetzen), erst dann steht das Teil auf "an".
+// Darauf warten, sonst misst der Test zwischen Einstellung und neuem Bild (CI, PR #103)
+async function ruesteAus(s, teil) {
+  await s.locator(`.sa-teil[data-teil="${teil}"] .sa-wahl`).click();
+  await s.waitForFunction((t) => document.querySelector(`.sa-teil[data-teil="${t}"]`)?.dataset.zustand === 'an', teil, { timeout: 10000 }).catch(() => {});
+}
+
 // Labor (Flo 31.10.2026): Bretter und Figuren nur im Erfinder-Konto, mit Schild "Labor"; Ausruesten per Tipp in der Sammlung
 async function laborTeil(browser) {
   let p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: ERFINDER_ZEILEN }, bereich: null });
@@ -302,20 +309,17 @@ async function laborTeil(browser) {
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
   pruefe('Labor: fünf Bretter mit Schild, nur diese markiert', lab === 'brett-kuerbis,brett-frost,brett-marmor,brett-nussbaum,brett-thron', bretter);
-  await p.s.locator('.sa-teil[data-teil="brett-kuerbis"] .sa-wahl').click();
-  await p.s.waitForFunction(() => document.documentElement.dataset.brett === 'kuerbis', null, { timeout: 10000 }).catch(() => {});
+  await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
   await p.s.locator('.sa-steuer .seg[data-wert="figuren"]').click();
   await warte(300);
   const saetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="figuren"] .sa-teil')].map((x) => x.dataset.teil).join());
   pruefe('Labor: Figurensätze Klassisch, Blaupause, Kürbis, Frost, Gold', saetze === 'figuren-cburnett,figuren-blaupause,figuren-kuerbis,figuren-frost,figuren-gold', saetze);
-  await p.s.locator('.sa-teil[data-teil="figuren-kuerbis"] .sa-wahl').click();
-  await warte(500);
+  await ruesteAus(p.s, 'figuren-kuerbis');
   await p.s.locator('.sa-steuer .seg[data-wert="klaenge"]').click();
   await warte(300);
-  await p.s.locator('.sa-teil[data-teil="klang-holz"] .sa-wahl').click();
-  await warte(500);
+  await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
