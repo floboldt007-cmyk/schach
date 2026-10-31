@@ -87,3 +87,8 @@
 .liga-erg[data-richtung="minus"] .liga-erg-diff { color: var(--kt-patzer); }
 @media (max-width: 420px) { .liga-erg-wappen, .liga-erg-wappen svg { width: 40px; height: 40px; } }
 
+
+/* Handy (Flo 31.10.2026 abends: "zu gross"): Kartentitel so gross wie im Training */
+@media (max-width: 520px) {
+  .liga-karte h3 { font-size: 19px; }
+}
