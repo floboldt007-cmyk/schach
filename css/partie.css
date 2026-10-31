@@ -263,7 +263,7 @@
   .partie .coach.offen { height: auto; }
   .partie .coach.offen > .c-text { display: block; }
   .partie .coach.offen > .coach-knoepfe { display: flex; }
-  .partie .zugleiste { order: 4; height: 40px; }
+  .partie .zugleiste { order: 4; height: var(--tap); }
   .partie .spielknoepfe { order: 5; }
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 2; }
   .partie .spieler { min-height: 58px; padding: 6px 8px 6px 10px; }
@@ -295,7 +295,13 @@
   .partie .inhalt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 4px;
     overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .partie .seite { display: contents; }
-  .partie .inhalt > *, .partie .seite > * { width: var(--spalte, calc(100% - 2 * var(--rand-brett-handy))); max-width: 100%; flex: none; }
+  /* Flo 31.10.2026 (Aufnahme von chess.com: "das ist viel groesser das Brett"): das Brett geht von Rand zu Rand, ohne Sockel
+     und ohne Rundung; Karten, Streifen und Knoepfe darunter behalten ihren Rand */
+  .partie { --rahmen: 0px; }
+  .partie .brett-rahmen { border-radius: 0; box-shadow: none; background: none; }
+  .partie .brett-rahmen > .brett { --brett-radius: 0px; }
+  .partie .inhalt > *, .partie .seite > * { width: calc(100% - 2 * var(--rand-brett-handy)); max-width: 100%; flex: none; }
+  .partie .inhalt > .brettzone { width: var(--spalte, 100%); }
   .partie .inhalt > .brettzone { flex-direction: column; gap: 4px; }
   .partie .zugbox { display: none; }
   .partie .spieler.gegner { order: 0; } .partie .brettzone { order: 1; } .partie .spieler.ich { order: 2; }
@@ -354,8 +360,8 @@
   .partie .coach.offen > .coach-knoepfe { display: flex; margin-top: 8px; }
   .partie .coach.offen > .c-zusatz { display: block; }
   /* Zugstreifen und Aktionen */
-  .partie .zugleiste { height: 34px; min-height: 34px; padding: 0; }
-  .partie .zugleiste .z { height: 30px; }
+  .partie .zugleiste { height: var(--tap); min-height: var(--tap); padding: 0; }
+  .partie .zugleiste .z { height: 32px; }
   .partie .spielknoepfe { gap: 6px; }
   .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { min-height: 48px; height: 48px; padding: 3px 2px; gap: 1px;
     border-radius: 14px; font-size: 12px; letter-spacing: -.01em; }
@@ -375,3 +381,35 @@
 .partie .pt-ok:focus-visible { outline: var(--fokus); outline-offset: -2px; }
 @media (orientation: landscape) { .partie .pfeil-tipp { order: 3; } }
 @media (orientation: portrait) { .partie .pfeil-tipp { order: 2; } }
+
+/* Zuege ansehen (js/ui/partie.js zeigeAnsicht, Flo 31.10.2026): eine Karte liegt ueber dem Spielbrett, oben ein etwas
+   kleineres Brett mit der frueheren Stellung (Rahmen im Akzent, Schild), darunter zurueck, vor und "Zur Partie". Nichts
+   liegt ueber den Figuren; ein Tipp aufs Ansichts-Brett fuehrt ebenfalls zur Partie. */
+.zug-ansicht { position: absolute; inset: var(--sockel-abstand, 0); z-index: 6; display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 6px; border-radius: var(--r-brett, 12px); background: var(--grund); box-shadow: var(--s2, var(--s1)); }
+.za-brett { position: relative; flex: 1 1 auto; min-height: 0; aspect-ratio: 1; max-width: 100%; cursor: pointer; touch-action: none; }
+.za-brett > .brett { width: 100%; height: 100%; }
+.za-brett::after { content: ''; position: absolute; inset: 0; border-radius: 8px; pointer-events: none; box-shadow: inset 0 0 0 3px var(--akzent); }
+.za-schild { flex: 0 1 auto; min-width: 64px; padding: 0 6px; text-align: center; font-size: 15px; font-weight: 800; color: var(--akzent-text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.za-steuer { flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.za-steuer .za-live { min-height: var(--tap); padding: 0 16px; }
+.za-steuer .icon-knopf:disabled { opacity: .4; cursor: default; }
+.zugliste .z[data-ply], .zugleiste .z[data-ply] { cursor: pointer; }
+.zugliste .z.angesehen, .zugleiste .z.angesehen { box-shadow: inset 0 0 0 2px var(--akzent); }
+
+/* Zugstreifen mit Pfeilen (Handy, js/ui/partie.js zeichneZugliste): links zurueck, rechts vor, klebend; dazwischen rollen
+   die Zuege. Ein Pfeil oeffnet die Ansicht der frueheren Stellung (zeigeAnsicht). */
+.zugleiste .zl-zuege { display: flex; align-items: center; gap: 6px; flex: 1 0 auto; min-width: 0; padding: 0 4px; }
+.zugleiste .zl-pfeil { position: sticky; z-index: 1; flex: none; width: var(--tap); height: var(--tap); display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 12px; background: var(--grund); color: var(--text); cursor: pointer; }
+.zugleiste .zl-zurueck { left: 0; }
+.zugleiste .zl-vor { right: 0; }
+.zugleiste .zl-pfeil .ico { width: 22px; height: 22px; }
+.zugleiste .zl-pfeil:disabled { color: var(--text-3, var(--text-2)); opacity: .45; cursor: default; }
+@media (orientation: portrait) and (max-width: 600px) {
+  /* Ansicht einer frueheren Stellung: ganzes Brett, die Pfeile stehen im Streifen darunter (wie beim Spiel) */
+  .partie .zug-ansicht { padding: 0; gap: 0; border-radius: 0; background: none; box-shadow: none; }
+  .partie .zug-ansicht .za-steuer { display: none; }
+  .partie .za-brett::after { border-radius: 0; }
+}

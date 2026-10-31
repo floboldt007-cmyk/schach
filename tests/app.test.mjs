@@ -3113,8 +3113,12 @@ async function testeU7(browser) {
       pruefe('Name des Gegners ohne Ellipse (Scroll-/Clientbreite, text-overflow), höchstens zwei Zeilen, voller Name im aria-label',
         m.name.scroll <= m.name.client + 1 && m.name.overflow !== 'ellipsis' && m.name.hoehe <= m.name.lh * 2 + 2 && m.name.label === 'Maxi vom Stammtisch', JSON.stringify(m.name));
       pruefe('Bewertungsbalken waagrecht über dem Brett (6 px)', m.balken.w > m.balken.h * 20 && m.balken.h <= 7 && m.balken.b <= m.rahmen.t + 0.5, JSON.stringify([m.balken, m.rahmen]));
-      const breit = m.rahmen.w;
-      pruefe('Eine Spalte: Gegner, Balken, Brett, Flo, Coach, Aktionen (und Zugstreifen) gleich breit und bündig (1 px)', m.spalte.every((x) => Math.abs(x.w - breit) <= 1 && Math.abs(x.l - m.rahmen.l) <= 1),
+      // Flo 31.10.2026 (Aufnahme von chess.com): Brett und Balken von Rand zu Rand, die Karten darunter mit 10 px Rand
+      const brettTeile = m.spalte.filter((x) => x.s === '.evalbalken' || x.s === '.brett-rahmen');
+      const karten = m.spalte.filter((x) => x.s !== '.evalbalken' && x.s !== '.brett-rahmen');
+      pruefe('Brett und Balken von Rand zu Rand (mittig), Gegner, Flo, Coach, Aktionen (und Zugstreifen) gleich breit mit 10 px Rand (1 px)',
+        brettTeile.every((x) => Math.abs(x.w - m.rahmen.w) <= 1 && Math.abs(x.l - (m.iw - m.rahmen.w) / 2) <= 1) && m.rahmen.w >= m.iw - 8
+        && karten.every((x) => Math.abs(x.w - (m.iw - 20)) <= 1 && Math.abs(x.l - 10) <= 1),
         JSON.stringify(m.spalte.map((x) => [x.s, Math.round(x.l), Math.round(x.w)])));
       pruefe('Unterste Kante <= Höhe (Kopf bis Aktionen im Bild)', m.unten <= m.ih + 0.5, `${m.unten} von ${m.ih}`);
       pruefe('Tippflächen >= 44 px (Aktionen 4 x 48, Kopf)', m.tipp >= 44, String(m.tipp));
@@ -3127,7 +3131,7 @@ async function testeU7(browser) {
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
       }
       pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
-      pruefe('Genug Höhe: Coach in voller Höhe, Brett in voller Breite', !m.eng && Math.round(m.brett.w) === Math.floor((m.iw - 2 * 10 - 8) / 8) * 8, JSON.stringify([m.eng, m.brett.w]));
+      pruefe('Genug Höhe: Coach in voller Höhe, Brett in voller Breite (von Rand zu Rand)', !m.eng && Math.round(m.brett.w) === Math.floor(m.iw / 8) * 8, JSON.stringify([m.eng, m.brett.w]));
       // Sprechblase hoch (Nachbesserung): in der Karte neben dem Portraet, nie ueber den Figuren, nie gekuerzt
       const bl = await u7Blase(seite);
       const blLang = await u7Blase(seite, U7_LANGER_SATZ);
