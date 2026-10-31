@@ -27,3 +27,14 @@
   .tr-karte h2 { font-size: 24px; }
   .tr-karte .mini { width: min(100%, 260px); }
 }
+
+/* Handy schmal (Flo 31.10.2026): kleines Brett links, Titel und Aufgabe rechts daneben, Knoepfe darunter; die Karte ist
+   damit etwa halb so hoch und das Training passt fast ohne Scrollen */
+@media (max-width: 520px) {
+  .tr-karte { display: grid; grid-template-columns: 116px minmax(0, 1fr); column-gap: 14px; row-gap: 6px; align-items: start; }
+  .tr-karte > .ueberzeile, .tr-karte > .t-fuss { grid-column: 1 / -1; }
+  .tr-karte > .mini { grid-column: 1; grid-row: 2 / span 2; width: 116px; align-self: start; }
+  .tr-karte > .tr-kopf, .tr-karte > p { grid-column: 2; }
+  .tr-karte h2 { font-size: 21px; }
+  .tr-karte > p { font-size: 13.5px; }
+}

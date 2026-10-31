@@ -5,7 +5,7 @@
 // "Bewegung aus" und prefers-reduced-motion stellen sie still). Ohne DOM, in Node testbar.
 //
 //   klangKunst(id) -> string | null          ganzes <svg> fuer ein Klangset (PAKETE_KLANG in js/sounds.js)
-//   brettKunst(hell, dunkel, rand) -> string ganzes <svg> fuer ein Brett-Design
+//   brettKunst(hell, dunkel, rand, figuren?) -> string  ganzes <svg> fuer ein Brett-Design (figuren: Ordner des Satzes)
 //   erfolgKunst(id) -> string | null         ganzes <svg> fuer einen Erfolg ('erster-sieg', 'welt-3', 'liga-6', ...)
 //   erfolgSeltenheit(id) -> string           'frei' | 'selten' | 'episch' | 'legende'
 //   ligaWappen(stufe) -> string              ganzes <svg> fuer die Liga-Stufe 0 (Holz) bis 6 (Meister)
@@ -83,14 +83,23 @@ export function klangKunst(kid) {
 // ---------- Bretter ----------
 
 // Kleines Brett 4 x 4 im Rahmen, darauf Koenig (hell) und Bauer (dunkel)
-export function brettKunst(hell, dunkel, rand = '#2A2A2A') {
-  const felder = Array.from({ length: 16 }, (_, i) => {
-    const x = i % 4; const y = Math.floor(i / 4);
-    return `<rect x="${18 + x * 21}" y="${18 + y * 21}" width="21" height="21" fill="${(x + y) % 2 ? dunkel : hell}"/>`;
+// Flo 31.10.2026 (Foto der Brett-Auswahl): "der Koenig sieht ganz anders aus". Mit figuren (Ordner-URL des
+// ausgeruesteten Satzes, mit Schraegstrich am Ende) zeigt die Vorschau die echten Spielfiguren auf einem 3 x 3
+// Ausschnitt, gross genug zum Erkennen. Ohne figuren (Node-Tests, alte Aufrufer) die gezeichneten Ersatzfiguren.
+export function brettKunst(hell, dunkel, rand = '#2A2A2A', figuren = '') {
+  const N = 3; const Z = 32; const A = (120 - N * Z) / 2;
+  const felder = Array.from({ length: N * N }, (_, i) => {
+    const x = i % N; const y = Math.floor(i / N);
+    return `<rect x="${A + x * Z}" y="${A + y * Z}" width="${Z}" height="${Z}" fill="${(x + y) % 2 ? dunkel : hell}"/>`;
   }).join('');
-  return svg(`<rect x="10" y="10" width="100" height="100" rx="12" fill="${rand}"/>${felder}`
-    + '<rect x="18" y="18" width="84" height="84" fill="none" stroke="#000" stroke-opacity=".25" stroke-width="1.5"/>'
-    + figur(KOENIG, 42, 21, 1.15, '#FAFAF7', '#2A2A2A') + figur(BAUER, 66, 61, 1.05, '#26262B', '#000'), 'sk-brett');
+  // oben: schwarzer Bauer und Koenig, unten: weisser Koenig und Bauer (je eine Figur auf hellem und dunklem Feld)
+  const stellung = [['bP', 1, 0], ['bK', 2, 0], ['wK', 0, 2], ['wP', 1, 2]];
+  const bild = (f, x, y) => `<image href="${figuren}${f}.svg" x="${A + x * Z + 1}" y="${A + y * Z + 1}" width="${Z - 2}" height="${Z - 2}"/>`;
+  const steine = figuren ? stellung.map(([f, x, y]) => bild(f, x, y)).join('')
+    : figur(KOENIG, A + 2 * Z + 5, A + 2, 0.8, '#26262B', '#000') + figur(KOENIG, A + 5, A + 2 * Z + 2, 0.8, '#FAFAF7', '#2A2A2A');
+  return svg(`<rect x="${A - 6}" y="${A - 6}" width="${N * Z + 12}" height="${N * Z + 12}" rx="9" fill="${rand}"/>${felder}`
+    + `<rect x="${A}" y="${A}" width="${N * Z}" height="${N * Z}" fill="none" stroke="#000" stroke-opacity=".2" stroke-width="1"/>`
+    + steine, 'sk-brett');
 }
 
 // ---------- Erfolge ----------

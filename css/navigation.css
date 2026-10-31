@@ -150,3 +150,11 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
     clip-path: inset(50%); white-space: nowrap; }
   .haupt-kopf:has(.kopf-chips > :nth-child(4)) .kopf-chips { margin-left: 0; }
 }
+
+/* Handy schmal (Flo 31.10.2026: "muss einfach und uebersichtlich sein, auf dem iPad ist das gut"): Seitentitel kleiner,
+   die Erklaerzeile darunter entfaellt, damit der Inhalt ohne Scrollen beginnt */
+@media (max-width: 520px) {
+  .seiten-kopf { padding-top: 8px; padding-bottom: 4px; }
+  .seiten-kopf h1 { font-size: 34px; }
+  .seiten-kopf p { display: none; }
+}

@@ -49,6 +49,12 @@ const ohneIds = (s) => String(s).replace(/rk[a-z]\d+/g, '');
 pruefe('Eigenes Bild: Klangsets verschieden', new Set(klaenge.map((x) => ohneIds(x.bild))).size === klaenge.length);
 pruefe('Eigenes Bild: Bretter verschieden und mit Figuren', new Set(bretter.map((x) => x.bild)).size === bretter.length
   && bretter.every((x) => /class="sk-brett"/.test(x.bild)));
+// Flo 31.10. (Foto der Brett-Auswahl): "der Koenig sieht ganz anders aus". Die Vorschau zeigt die echten Figuren des
+// ausgeruesteten Satzes, keine gezeichneten Ersatzfiguren
+const figurenIn = (x) => [...x.bild.matchAll(/<image href="([^"]+)"/g)].map((m) => m[1]);
+pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern beider Farben), keine gezeichneten',
+  bretter.every((x) => { const f = figurenIn(x); return f.length === 4 && f.every((q) => /\/assets\/pieces\/[wb][KP]\.svg$/.test(q))
+    && ['wK', 'bK', 'wP', 'bP'].every((n) => f.some((q) => q.endsWith('/' + n + '.svg'))) && !/<path /.test(x.bild); }), figurenIn(bretter[0]));
 
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
@@ -333,7 +339,16 @@ async function laborTeil(browser) {
     return klang.vorrat().paket === 'grusel' && document.querySelector('.sa-teil[data-teil="klang-grusel"]')?.dataset.zustand === 'an';
   }));
   // Lobby-Musik (Flo 31.10.: "kann die Lobby-Musik nicht ausschalten, wenn ich zweimal drauf klicke")
+  // und Flo 31.10. abends: "wenn ich auf die Lobby klicke, springt der nach oben": die Seite bleibt, wo sie war
+  const obenVor = await p.s.evaluate(() => {
+    document.querySelector('.sa-teil[data-teil="melodie-karofelder"]').scrollIntoView({ block: 'center' });
+    return document.querySelector('.sa-rumpf').scrollTop;
+  });
   await ruesteAus(p.s, 'melodie-karofelder');
+  await warte(300);
+  const obenNach = await p.s.evaluate(() => document.querySelector('.sa-rumpf').scrollTop);
+  pruefe('Ausrüsten: die Sammlung springt nicht nach oben, sie bleibt an der Melodie', obenVor > 0 && Math.abs(obenNach - obenVor) <= 30,
+    { obenVor, obenNach });
   pruefe('Lobby-Musik: Tipp auf Karofelder schaltet sie ein', await p.s.evaluate(() => {
     const e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}');
     return e.musik === true && e.musikMelodie === 'karofelder';

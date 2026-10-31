@@ -456,6 +456,35 @@ html[data-screen="arena"][data-reiter="unten"]:has(.screen.arena.karte-hoch) .to
   .arena .knoten .k-meta { display: none; }
 }
 
+/* ---------- Handy hoch, kompakt (js/ui/arena.js layout(): .karte-kompakt) ----------
+   Flo 31.10.2026: "Auf dem Handy ist noch alles zu unuebersichtlich, moechte alles auf einmal sehen, auch die Welt nicht
+   viel um scrollen." Die Karte zeigt die ganze Welt (breite Lage, kein Scrollen in der Karte) und ist so hoch, dass
+   darunter Gegner, Farbe und Spielen-Knopf ohne Scrollen Platz haben. Spruch, Merkmale und Ziel-Liste entfallen hier;
+   Liga und Heute stehen unter dem Spielen-Knopf (wer will, scrollt dorthin, der Knopf klebt dabei unten). */
+.arena.karte-kompakt { --panel-kompakt: 236px; }
+.arena.karte-kompakt .inhalt { gap: 10px; }
+.arena.karte-kompakt .karte { flex: 0 0 auto; height: max(300px, calc(100% - var(--panel-kompakt))); min-height: 0; overflow: hidden; }
+.arena.karte-kompakt .knoten .fahne { display: none; }
+.arena.karte-kompakt .detail { gap: 10px; padding: 10px 14px 0; }
+.arena.karte-kompakt .detail .elo, .arena.karte-kompakt .detail .mini-sterne { display: inline-flex; vertical-align: middle; }
+.arena.karte-kompakt .detail .mini-sterne { margin-left: 8px; }
+.arena.karte-kompakt .cta-platz { padding: 6px 16px 10px; }
+.arena.karte-kompakt .spielen { min-height: 56px; }
+.arena.karte-kompakt .detail-kopf { gap: 12px; }
+.arena.karte-kompakt .detail-kopf .av { width: 52px; height: 52px; border-radius: 16px; }
+.arena.karte-kompakt .detail h2 { font-size: 20px; }
+.arena.karte-kompakt .detail-welt, .arena.karte-kompakt .sprechblase, .arena.karte-kompakt .merkmale,
+.arena.karte-kompakt .ziel-sterne, .arena.karte-kompakt .wahl-titel { display: none; }
+.arena.karte-kompakt .fortsetzen { order: 0; }
+.arena.karte-kompakt .detail-kopf { order: 1; }
+.arena.karte-kompakt .wahl-farbe { order: 3; }
+.arena.karte-kompakt .ort-tempo { order: 4; }
+.arena.karte-kompakt .cta-platz { order: 5; margin-top: 0; }
+.arena.karte-kompakt .ort-panel-bot { order: 6; }
+.arena.karte-kompakt .ort-panel-oben { order: 7; }
+.arena.karte-kompakt .heute-karte { order: 8; }
+.arena.karte-kompakt .bilanz { order: 9; }
+
 /* ---------- Kurzes Querformat (Handy quer, flache Fenster) ----------
    js/ui/arena.js layout() zeichnet hier die hohe Karte (.karte-hoch, unter 420 px Kartenhoehe). Untereinander gestellt
    laege das Panel samt Spielen-Knopf unter dem Bildrand (sticky greift erst, wenn das Panel im Bild ist). Deshalb wie
