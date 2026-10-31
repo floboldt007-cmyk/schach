@@ -400,10 +400,12 @@ async function browserAblauf(browser) {
     return route.fulfill({ status: url.includes('/rest/v1/') && !url.includes('/rpc/') ? 201 : 204, body: '' });
   });
 
-  // ohne Konto-Freischaltung: keine Gruppe "Daten"
+  // Konto fuer alle (31.10.2026): auch ohne #konto stehen die Gruppen Konto und Daten in den Einstellungen
   await seite.goto(BASIS + '?test#einstellungen');
   await seite.waitForSelector('.es-inhalt');
-  pruefe('Browser: ohne #konto keine Gruppe "Daten" (wie die Konto-Gruppe)', (await seite.locator('.daten-gruppe').count()) === 0);
+  await seite.waitForSelector('.daten-gruppe', { timeout: 8000 }).catch(() => {});
+  pruefe('Browser: ohne #konto sind Konto und Daten da, die Testbereiche bleiben zu', (await seite.locator('.daten-gruppe').count()) === 1
+    && (await seite.locator('.konto-gruppe').count()) === 1 && await seite.evaluate(() => localStorage.getItem('schach-arena:konto:sichtbar') === null));
   pruefe('Browser: Info verlinkt Datenschutzerklärung und Impressum', await seite.evaluate(() => {
     const a = [...document.querySelectorAll('.es-info a')].map((x) => x.getAttribute('href'));
     return a.some((h) => /datenschutz\.html$/.test(h)) && a.some((h) => /impressum\.html$/.test(h));
