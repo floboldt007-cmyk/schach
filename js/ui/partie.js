@@ -346,6 +346,8 @@ export function zeige(root, params, app) {
   const laufId = 'l' + z.gestartet;
   const startFarbe = z.chess.turn();
   const startNummer = Number(z.chess.fen().split(' ')[5]) || 1;
+  // Zuege ansehen (zeigeAnsicht): vor dem Nachspielen einer fortgesetzten Partie anlegen, merkeZug liest es
+  const ansehen = { ply: null, el: null, brett: null };
   if (laufend) {
     for (const u of laufend.zuege) {
       let m = null;
@@ -359,6 +361,7 @@ export function zeige(root, params, app) {
 
   // ---------- Hilfen fuer Plies ----------
   function merkeZug(m) {
+    schliesseAnsicht();
     z.zuege.push(m.lan);
     z.san.push(m.san);
     z.verbose.push(m);
@@ -512,6 +515,21 @@ export function zeige(root, params, app) {
     else if (a === 'besser') zeigeBesser(Number(k.dataset.ply));
     else if (a === 'ergebnis') zeigeOverlayWieder();
     else if (a === 'pfeil-tipp') pfeilTippWeg();
+    else if (a === 'zug-zurueck') zeigeAnsicht((ansehen.ply ?? z.verbose.length - 1) - 1);
+    else if (a === 'zug-vor') { if (ansehen.ply != null) zeigeAnsicht(ansehen.ply + 1); }
+    else if (a === 'zug-live') schliesseAnsicht();
+  });
+  // Ein Zug in der Liste oder im Band: diese Stellung ansehen (der letzte Zug ist die Partie selbst)
+  s.addEventListener('click', (e) => {
+    const zelle = e.target.closest && e.target.closest('.zugliste .z[data-ply], .zugleiste .z[data-ply]');
+    if (!zelle || !s.contains(zelle)) return;
+    const ply = Number(zelle.dataset.ply);
+    // der letzte Zug: Stellung davor zeigen und ihn noch einmal ziehen (danach von selbst zurueck zur Partie)
+    if (ply === z.verbose.length - 1) {
+      zeigeAnsicht(ply - 1);
+      const el = ansehen.el;
+      spaeter(() => { if (el && ansehen.el === el && ansehen.ply === ply - 1) zeigeAnsicht(ply); }, 450);
+    } else zeigeAnsicht(ply);
   });
   // U7: Tastatur und Bedienhilfen (Klick ohne Zeiger) bekommen beim Halte-Knopf dieselbe Rueckfrage wie ohne Halten
   // (app.frage), nicht das Blatt des Bauteils: eine Rueckfrage fuer alle Wege
@@ -621,6 +639,90 @@ export function zeige(root, params, app) {
     }
   }
 
+  // ---------- Zuege ansehen (Flo 31.10.2026: "den letzten Move sehen ... wie bei Chess.com") ----------
+  // ansehen.ply: Stellung nach diesem Halbzug (-1 = Ausgangsstellung), null = die Partie selbst. Gezeigt auf einem eigenen
+  // Brett ueber dem Spielbrett: dessen Markierungen, Pfeile, Abzeichen und Vorzuege bleiben unberuehrt. Ein Tipp aufs
+  // Ansichts-Brett, "Zur Partie", "vor" am letzten Zug, Drehen oder ein neuer Zug kehren zur Partie zurueck.
+  function zeigeZugNav() {
+    for (const x of $$('.zugliste .z[data-ply], .zugleiste .z[data-ply]')) x.classList.toggle('angesehen', Number(x.dataset.ply) === ansehen.ply);
+    const n = z.verbose.length;
+    for (const b of $$('.zugleiste .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
+    for (const b of $$('.zugleiste .zl-vor')) b.disabled = ansehen.ply == null;
+    // der angesehene Zug rollt in die Mitte des Streifens
+    const an = $('.zugleiste .z.angesehen');
+    if (an) { const zl = an.closest('.zugleiste'); zl.scrollLeft = an.offsetLeft - zl.clientWidth / 2 + an.offsetWidth / 2; }
+    if (!ansehen.el) return;
+    ansehen.el.querySelector('[data-aktion="zug-zurueck"]').disabled = ansehen.ply === -1;
+  }
+  function zeigeAnsicht(ply) {
+    const n = z.verbose.length;
+    if (weg || !n || !Number.isFinite(ply)) return;
+    const p = Math.max(-1, Math.min(Math.trunc(ply), n - 1));
+    if (p === n - 1) {
+      // vor auf den letzten Zug: er laeuft noch einmal sichtbar, dann geht es zur Partie (Flo 31.10.: "manchmal macht der
+      // Bot einen Move und ich weiss nicht mehr, was fuer eine Figur der genommen hat")
+      if (!ansehen.el || ansehen.ply !== n - 2) { schliesseAnsicht(); return; }
+      const el = ansehen.el;
+      const m = z.verbose[p];
+      ansehen.ply = p;
+      ansehen.brett.setzeStellung(m.after, { animieren: true, letzterZug: [m.from, m.to], schach: /[+#]$/.test(m.san) ? true : null });
+      const schild = el.querySelector('.za-schild');
+      schild.textContent = zugLabel(p);
+      schild.setAttribute('aria-label', t('partie.zuege.ansicht', { zug: zugLabel(p) }));
+      el.querySelector('[data-aktion="zug-vor"]').disabled = true;
+      spaeter(() => { if (ansehen.el === el && ansehen.ply === p) schliesseAnsicht(); }, 1100);
+      return;
+    }
+    if (!ansehen.el) {
+      const e = app.einstellungen() || {};
+      const el = document.createElement('div');
+      el.className = 'zug-ansicht';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-label', t('partie.zuege.blaettern'));
+      // kleineres Brett oben, Steuerung darunter: nichts liegt ueber den Figuren
+      el.innerHTML = '<div class="za-brett"><div class="brett"></div></div>'
+        + '<div class="za-steuer">'
+        + `<button class="icon-knopf dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
+        + '<span class="za-schild zahl" aria-live="polite"></span>'
+        + `<button class="icon-knopf dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`
+        + `<button class="knopf primaer za-live dr" type="button" data-aktion="zug-live">${icon('play')} ${esc(t('partie.zuege.zurPartie'))}</button></div>`;
+      $('.brett-rahmen').appendChild(el);
+      ansehen.el = el;
+      ansehen.brett = new Brett(el.querySelector('.brett'), { ausrichtung: brett.ausrichtung, figurenPfad: figurenPfad(e),
+        koordinaten: e.koordinaten, koordLage: e.koordLage, pfeile: false });
+      ansehen.brett.setzeDauer(ZUG_MS);
+      // ein Tipp aufs Ansichts-Brett: zurueck zur Partie (nie ein Zug auf einer alten Stellung)
+      el.querySelector('.za-brett').addEventListener('pointerdown', (ev) => { ev.preventDefault(); schliesseAnsicht(); });
+    }
+    const vorher = ansehen.ply;
+    ansehen.ply = p;
+    const m = p >= 0 ? z.verbose[p] : null;
+    // ein Schritt ist eine Bewegung; ein Sprung (Zug angetippt) zeigt die Stellung sofort
+    const schritt = vorher != null ? Math.abs(vorher - p) === 1 : p === n - 2;
+    ansehen.brett.setzeStellung(m ? m.after : z.verbose[0].before, { animieren: schritt,
+      letzterZug: m ? [m.from, m.to] : null, schach: m && /[+#]$/.test(m.san) ? true : null });
+    const schild = ansehen.el.querySelector('.za-schild');
+    schild.textContent = m ? zugLabel(p) : t('partie.zuege.start');
+    schild.setAttribute('aria-label', m ? t('partie.zuege.ansicht', { zug: zugLabel(p) }) : t('partie.zuege.start'));
+    zeigeZugNav();
+  }
+  function schliesseAnsicht() {
+    if (!ansehen.el) return;
+    try { ansehen.brett.zerstoere(); } catch (e) { /* egal */ }
+    ansehen.el.remove();
+    ansehen.el = null; ansehen.brett = null; ansehen.ply = null;
+    zeigeZugNav();
+  }
+  // Tastatur (Rechner, iPad mit Tastatur): Pfeil links blaettert zurueck, rechts vor, Escape zur Partie
+  const zugTasten = (e) => {
+    if (weg || e.altKey || e.ctrlKey || e.metaKey || !s.isConnected) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]:not(.zug-ansicht)')) return;
+    if (e.key === 'ArrowLeft' && z.verbose.length) { e.preventDefault(); zeigeAnsicht((ansehen.ply ?? z.verbose.length - 1) - 1); }
+    else if (e.key === 'ArrowRight' && ansehen.ply != null) { e.preventDefault(); zeigeAnsicht(ansehen.ply + 1); }
+    else if (e.key === 'Escape' && ansehen.ply != null) { e.preventDefault(); schliesseAnsicht(); }
+  };
+  document.addEventListener('keydown', zugTasten);
+
   function zeichneZugliste() {
     const letzter = z.zuege.length - 1;
     const zelle = (i) => {
@@ -632,7 +734,7 @@ export function zeige(root, params, app) {
         if (k) sym = `<span class="z-sym k-${esc(k)}" title="${esc(KLASSEN_WORT[k])}">${symbolSvg(k)}<span class="sr">${esc(KLASSEN_WORT[k])}: </span></span>`;
         else if (e && e.status === 'rechnet') sym = '<i class="z-wartet" aria-hidden="true"></i>';
       }
-      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
+      return `<span class="z${i === letzter ? ' aktuell' : ''}${istFlo(i) ? ' du' : ''}${i === ansehen.ply ? ' angesehen' : ''}" data-ply="${i}">${sym}${esc(sanAnzeige(z.san[i]))}</span>`;
     };
     const zeilen = new Map();
     for (let i = 0; i < z.zuege.length; i++) {
@@ -655,8 +757,12 @@ export function zeige(root, params, app) {
       leiste += zelle(i);
     }
     const leisteEl = $('.zugleiste');
-    leisteEl.innerHTML = leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`;
+    // wie bei den Grossen: links und rechts im Streifen die Pfeile zum Blaettern (klebend, die Zuege rollen dazwischen)
+    leisteEl.innerHTML = `<button class="zl-pfeil zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button>`
+      + `<span class="zl-zuege">${leiste || `<span class="zugliste-leer">${esc(t('partie.zuege.leer'))}</span>`}</span>`
+      + `<button class="zl-pfeil zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button>`;
     leisteEl.scrollLeft = leisteEl.scrollWidth;
+    zeigeZugNav();
   }
 
   function zeichneKnoepfe() {
@@ -1560,6 +1666,7 @@ export function zeige(root, params, app) {
   }
 
   function drehen() {
+    schliesseAnsicht();
     loescheVorzuege();
     brett.dreheUm();
     balkenAusrichtung();
@@ -2306,11 +2413,12 @@ export function zeige(root, params, app) {
       pruefeSeite();
       return;
     }
-    // Brett zuerst: volle Breite minus Rand (2 x 10) und Sockel, ein Vielfaches von 8
+    // Brett zuerst: von Rand zu Rand (Flo 31.10.2026, Aufnahme von chess.com: "das ist viel groesser das Brett"), ohne
+    // Sockel; nur Koordinaten am Rand brauchen ihren Streifen. Ein Vielfaches von 8.
     const rs = getComputedStyle(rahmen);
     const sockelX = (parseFloat(rs.paddingLeft) || 0) + (parseFloat(rs.paddingRight) || 0);
     const sockelY = (parseFloat(rs.paddingTop) || 0) + (parseFloat(rs.paddingBottom) || 0);
-    const breit = Math.floor((inhaltEl.clientWidth - 2 * HANDY_RAND - sockelX) / 8) * 8;
+    const breit = Math.floor((inhaltEl.clientWidth - sockelX) / 8) * 8;
     // Zugstreifen zwischen Coach und Knoepfen erst ab 760 px Hoehe, darunter nach den Knoepfen (die Spalte scrollt)
     s.classList.toggle('streifen-unten', s.clientHeight < STREIFEN_AB);
     const setze = (g) => {
@@ -2580,6 +2688,8 @@ export function zeige(root, params, app) {
   return {
     verlasse() {
       if (weg) return;
+      schliesseAnsicht();
+      document.removeEventListener('keydown', zugTasten);
       // vor dem Abraeumen: Pakete raeumen ihre Buehnen-Sachen ab (danach tut die Buehne nichts mehr)
       sendeBeendet();
       sende('partie:verlassen', { laufId });

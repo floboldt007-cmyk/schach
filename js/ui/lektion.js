@@ -6,6 +6,10 @@
 //   zeige(root, params, app) -> { verlasse() }      params { id }  (unbekannte id: zur Uebersicht "lernen")
 //   zustand() -> { offen, id, phase, zuege, hinweise, sterne, grund, fen }   (Tests; mit ?test auch window.__lektion)
 //
+// Zugfolge (art 'folge', Eroeffnungen): Flo spielt seine Seite (l.farbe, Brett passend gedreht), der Computer antwortet mit
+// dem naechsten Zug der Folge, ohne Engine. Ein anderer Zug springt zurueck und wird gezaehlt (fehler); beim zweiten
+// Fehler am selben Zug zeigt ein Pfeil den Zug der Eroeffnung. Nach jedem richtigen Zug sagt ein Satz, warum man ihn
+// spielt (zug.<id>.<k>). Geschafft am Ende der Folge, Sterne nach Fehlern und Hinweisen (sterneFolge).
 // Ablauf: phase 'intro' (Idee in zwei, drei Saetzen, Knopf "Los geht's", Brett still) -> 'flo' (Flo zieht) -> 'gegner'
 // (Engine antwortet) -> ... -> 'ende' (geschafft: Sterne, gespeichert im Modul lernen, Ereignis lektion:beendet mit id
 // '<bereich>-<id>'; sonst ein Grund: patt, remis, zuViele, matt, verloren, bauerWeg). "Hinweis" zeigt den besten Zug
@@ -25,7 +29,7 @@ import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { laborFrei } from '../labor.js';
 import { t } from '../sprache.js';
-import { lektion, sterne, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel } from '../pakete/lernen/mattbilder.js';
+import { lektion, sterne, sterneFolge, grenze, merke, artVon, bereichVon, bilanz, pruefeZiel } from '../pakete/lernen/mattbilder.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import { sterneHtml } from './lernen.js';
 import '../sprachen/allgemein.js';
@@ -61,7 +65,9 @@ export function zeige(root, params, app) {
   const art = artVon(l);
   const nr = ber.lektionen.indexOf(l) + 1;
   const naechste = ber.lektionen[nr] || null;
-  const zielText = art === 'umwandeln' ? S('zielUmwandeln', { n: l.ziel }) : art === 'gewinnen' ? S('zielGewinnen', { n: l.ziel })
+  const folge = art === 'folge';
+  const flo = folge && l.farbe === 'b' ? 'b' : 'w';
+  const zielText = folge ? S('zielFolge', { n: l.ziel }) : art === 'umwandeln' ? S('zielUmwandeln', { n: l.ziel }) : art === 'gewinnen' ? S('zielGewinnen', { n: l.ziel })
     : art === 'halten' ? S('zielHalten', { n: l.ziel }) : l.ziel === 1 ? S('zielEins') : S('ziel', { n: l.ziel });
   const titel = S('titel.' + l.id);
   const einst = (() => { try { return typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
@@ -96,12 +102,13 @@ export function zeige(root, params, app) {
     const id = setTimeout(() => { timer.delete(id); if (!weg) fn(); }, Math.max(0, ms));
     timer.add(id);
   };
-  const st = { phase: 'intro', chess: new Chess(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null };
+  const st = { phase: 'intro', chess: new Chess(l.fen), zuege: 0, hinweise: 0, sterne: 0, grund: null, lauf: 0, start: null,
+    schritt: 0, fehler: 0, fehlerHier: 0 };
   aktiv = () => ({ offen: true, id: l.id, phase: st.phase, zuege: st.zuege, hinweise: st.hinweise, sterne: st.sterne, grund: st.grund,
-    fen: st.chess.fen() });
+    fen: st.chess.fen(), schritt: st.schritt, fehler: st.fehler });
 
   const brett = new Brett($('.ls-brett'), {
-    ausrichtung: 'w', figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
+    ausrichtung: flo, figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug,
     koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
   });
   const schach = () => (st.chess.inCheck() ? true : null);
@@ -157,6 +164,9 @@ export function zeige(root, params, app) {
     st.hinweise = 0;
     st.sterne = 0;
     st.grund = null;
+    st.schritt = 0;
+    st.fehler = 0;
+    st.fehlerHier = 0;
     st.phase = intro ? 'intro' : 'flo';
     s.dataset.phase = st.phase;
     brett.pfeile([]);
@@ -166,12 +176,84 @@ export function zeige(root, params, app) {
     leiseMeldung();
     if (intro) knoepfe([{ a: 'los', text: S('los'), primaer: true, vor: true }]);
     else spielKnoepfe();
+    // Zugfolge mit Schwarz: der Computer eroeffnet mit dem ersten Zug der Folge
+    if (folge && !intro && st.chess.turn() !== flo) {
+      st.phase = 'gegner';
+      s.dataset.phase = st.phase;
+      spielKnoepfe();
+      const lauf = st.lauf;
+      spaeter(() => { if (lauf === st.lauf) folgeGegner(); }, 450);
+    }
     erlaube();
+  }
+
+  // ---------- Zugfolge (Eroeffnungen) ----------
+  const ohneZeichen = (san) => String(san || '').replace(/[+#]$/, '');
+  // der erwartete Zug der Folge als { from, to } (fuer Pfeil und Erklaerung)
+  function erwartet() {
+    const san = l.folge[st.schritt];
+    if (!san) return null;
+    try { const c = new Chess(st.chess.fen()); const m = c.move(san); return m ? { von: m.from, nach: m.to, san: m.san } : null; } catch (e) { return null; }
+  }
+  // Zug in deutscher Kurzschrift fuer die Anzeige (Springer S, Laeufer L, Turm T, Dame D, Koenig K)
+  const sanDe = (san) => String(san || '').replace(/[NBRQK]/g, (x) => (S('figur.' + x) || x));
+  function folgeFloZug(von, nach, umw) {
+    let m = null;
+    try { m = st.chess.move({ from: von, to: nach, promotion: umw || 'q' }); } catch (e) { m = null; }
+    if (!m) return false;
+    if (ohneZeichen(m.san) !== ohneZeichen(l.folge[st.schritt])) {
+      // nicht der Zug dieser Eroeffnung: zuruecknehmen, zaehlen, erklaeren (beim zweiten Mal mit Pfeil)
+      st.chess.undo();
+      st.fehler++;
+      st.fehlerHier++;
+      spielKlang('raetsel-falsch');
+      const e = erwartet();
+      if (st.fehlerHier >= 2 && e) {
+        brett.pfeile([{ von: e.von, nach: e.nach, farbe: 'bester' }]);
+        meldung('hinweis', S('folge.zeig', { zug: sanDe(e.san) }), S('folge.zeigText'), `<span class="ls-symbol">${icon('hinweis')}</span>`);
+      } else meldung('fehler', S('folge.anders'), S('folge.andersText'), `<span class="ls-symbol">${icon('kreuz')}</span>`);
+      return false;
+    }
+    st.zuege++;
+    st.schritt++;
+    st.fehlerHier = 0;
+    st.phase = 'gezogen';
+    const k = st.zuege - 1;
+    spaeter(() => {
+      brett.pfeile([]);
+      zeichne(m);
+      zugKlang(m);
+      zaehler();
+      // warum dieser Zug (eigener Satz je Zug der Eroeffnung)
+      meldung('info', sanDe(m.san), S(`zug.${l.id}.${k}`));
+      if (st.schritt >= l.folge.length) { geschafft(); return; }
+      st.phase = 'gegner';
+      s.dataset.phase = st.phase;
+      erlaube();
+      spielKnoepfe();
+      const lauf = st.lauf;
+      spaeter(() => { if (lauf === st.lauf) folgeGegner(); }, 650);
+    }, 0);
+    return true;
+  }
+  function folgeGegner() {
+    if (weg || st.phase === 'ende') return;
+    let m = null;
+    try { m = st.chess.move(l.folge[st.schritt]); } catch (e) { m = null; }
+    if (!m) return;
+    st.schritt++;
+    zeichne(m, tempo() > 0);
+    zugKlang(m);
+    st.phase = 'flo';
+    s.dataset.phase = st.phase;
+    erlaube();
+    spielKnoepfe();
   }
 
   // Zug von Flo (Brett): true = angenommen
   function beiZug(von, nach, umw) {
     if (weg || st.phase !== 'flo') return false;
+    if (folge) return folgeFloZug(von, nach, umw);
     let m = null;
     try { m = st.chess.move({ from: von, to: nach, promotion: umw || 'q' }); } catch (e) { m = null; }
     if (!m) return false;
@@ -226,6 +308,13 @@ export function zeige(root, params, app) {
 
   async function hinweis() {
     if (st.phase !== 'flo') return;
+    if (folge) {
+      const e = erwartet();
+      st.hinweise++;
+      if (e) brett.pfeile([{ von: e.von, nach: e.nach, farbe: 'bester' }]);
+      meldung('hinweis', S('folge.zeig', { zug: sanDe(e ? e.san : '') }), S('hinweisSterne'), `<span class="ls-symbol">${icon('hinweis')}</span>`);
+      return;
+    }
     const lauf = st.lauf;
     const fen = st.chess.fen();
     st.hinweise++;
@@ -240,7 +329,8 @@ export function zeige(root, params, app) {
     st.phase = 'ende';
     s.dataset.phase = st.phase;
     // Halten: geschafft ist geschafft, Sterne nur nach Hinweisen
-    st.sterne = sterne({ ziel: l.ziel, zuege: art === 'halten' ? Math.min(st.zuege, l.ziel) : st.zuege, hinweise: st.hinweise });
+    st.sterne = folge ? sterneFolge({ fehler: st.fehler, hinweise: st.hinweise })
+      : sterne({ ziel: l.ziel, zuege: art === 'halten' ? Math.min(st.zuege, l.ziel) : st.zuege, hinweise: st.hinweise });
     erlaube();
     try { speichereModul(PAKET, merke(ladeModul(PAKET, {}), l.id, { sterne: st.sterne, zuege: st.zuege })); } catch (e) { console.error(e); }
     try {
@@ -248,8 +338,9 @@ export function zeige(root, params, app) {
     } catch (e) { console.error(e); }
     spielKlang('raetsel-richtig');
     const matt = st.chess.isCheckmate();
-    const kopfText = matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
-    const text = art === 'halten' ? S('geschafftText.halten')
+    const kopfText = folge ? S('geschafft.folge') : matt || art === 'matt' ? S('geschafft') : S('geschafft.' + art);
+    const text = folge ? (st.fehler === 0 ? S('geschafftText.folge0') : st.fehler === 1 ? S('geschafftText.folge1') : S('geschafftText.folge', { n: st.fehler }))
+      : art === 'halten' ? S('geschafftText.halten')
       : !(matt || art === 'matt') ? S('geschafftText.' + art, { n: st.zuege, ziel: l.ziel })
         : st.zuege === 1 ? S('geschafftEins') : S('geschafftText', { n: st.zuege, ziel: l.ziel });
     meldung('geschafft', kopfText, text, sterneHtml(st.sterne));
@@ -288,8 +379,8 @@ export function zeige(root, params, app) {
     anim($('.ls-brettzone'), [{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }], { d: 640, k: 'weich' });
     staffel(s.querySelectorAll('.ls-seite > *:not([hidden])'), { d: 560, v: 90, abstand: 60 });
   }
-  // Engine schon jetzt starten, damit der erste Gegenzug nicht auf den Start wartet
-  if (!(app.test && typeof window !== 'undefined' && window.__test && window.__test.lektionZug)) {
+  // Engine schon jetzt starten, damit der erste Gegenzug nicht auf den Start wartet (Zugfolge braucht keine)
+  if (!folge && !(app.test && typeof window !== 'undefined' && window.__test && window.__test.lektionZug)) {
     try { app.engine('bewertung').catch(() => {}); } catch (e) { /* egal */ }
   }
 

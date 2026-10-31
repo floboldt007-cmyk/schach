@@ -5,8 +5,10 @@
 //
 //   LEKTIONEN [{ id, stufe, fen, ziel }]   Mattbilder; ziel = Flos Zuege bis Matt bei bester Verteidigung, mit Stockfish
 //                                          nachgerechnet (werkzeuge/mattbilder-pruefen.mjs: kuerzeres aus Suche und Selbstspiel)
-//   BEREICHE [{ id, lektionen }]           'matt' (Mattbilder), 'end' (Endspiele, endspiele.js); ALLE = alle Lektionen
-//   ARTEN ['matt', 'umwandeln', 'gewinnen', 'halten']; artVon(l) (ohne art: 'matt'); bereichVon(l)
+//   BEREICHE [{ id, lektionen }]           'matt' (Mattbilder), 'end' (Endspiele, endspiele.js), 'eroeffnung' (Eroeffnungen,
+//                                          eroeffnungen.js); ALLE = alle Lektionen
+//   ARTEN ['matt', 'umwandeln', 'gewinnen', 'halten', 'folge']; artVon(l) (ohne art: 'matt'); bereichVon(l)
+//   sterneFolge({ fehler, hinweise }) -> 1 | 2 | 3   Zugfolge: 3 ohne Fehler und Hinweis, 2 bei hoechstens zwei, sonst 1
 //   STUFEN ['leicht', 'mittel', 'schwer', 'meister']
 //   lektion(id) -> Lektion | null          sucht in allen Bereichen
 //   sterne({ ziel, zuege, hinweise }) -> 1 | 2 | 3   3: hoechstens ziel + ziel/4 Zuege, 2: hoechstens 1,5 * ziel + 2;
@@ -23,6 +25,7 @@
 //   merke(roh, id, { sterne, zuege }) -> neuer Stand   bessere Sterne bleiben, weniger Zuege bleiben
 //   summe(st, bereichId?) -> { sterne, max, geschafft }   ohne bereichId ueber alle Bereiche
 import { ENDSPIELE } from './endspiele.js';
+import { EROEFFNUNGEN } from './eroeffnungen.js';
 
 export const STUFEN = Object.freeze(['leicht', 'mittel', 'schwer', 'meister']);
 
@@ -48,10 +51,11 @@ export const LEKTIONEN = Object.freeze([
   Object.freeze({ id: 'zwei-laeufer', stufe: 'schwer', fen: '8/8/8/4k3/8/8/8/2B1KB2 w - - 0 1', ziel: 18 }),
   Object.freeze({ id: 'laeufer-springer', stufe: 'meister', fen: '8/8/8/4k3/8/8/8/1N2KB2 w - - 0 1', ziel: 23 }),
 ]);
-export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten']);
+export const ARTEN = Object.freeze(['matt', 'umwandeln', 'gewinnen', 'halten', 'folge']);
 export const BEREICHE = Object.freeze([
   Object.freeze({ id: 'matt', lektionen: LEKTIONEN }),
   Object.freeze({ id: 'end', lektionen: ENDSPIELE }),
+  Object.freeze({ id: 'eroeffnung', lektionen: EROEFFNUNGEN }),
 ]);
 export const ALLE = Object.freeze(BEREICHE.flatMap((b) => b.lektionen));
 export const artVon = (l) => (l && l.art) || 'matt';
@@ -78,6 +82,7 @@ const vorsprung = (bl) => bl.b.mat - bl.w.mat;
 
 export function pruefeZiel(l, start, chess, { wann = 'flo', zuege = 0 } = {}) {
   const art = artVon(l);
+  if (art === 'folge') return null;   // der Zugfolge-Trainer (js/ui/lektion.js) zaehlt selbst
   const halten = art === 'halten';
   if (wann === 'flo') {
     if (chess.isCheckmate()) return 'geschafft';
@@ -113,6 +118,11 @@ export function sterne({ ziel, zuege, hinweise = 0 } = {}) {
   return s;
 }
 
+export function sterneFolge({ fehler = 0, hinweise = 0 } = {}) {
+  const n = Math.max(0, Math.round(Number(fehler) || 0)) + Math.max(0, Math.round(Number(hinweise) || 0));
+  return n === 0 ? 3 : n <= 2 ? 2 : 1;
+}
+
 export const grenze = (ziel) => Math.max(1, Math.round(Number(ziel) || 1)) * 2 + 10;
 
 export function pruefeLektion(l, Chess) {
@@ -128,6 +138,25 @@ export function pruefeLektion(l, Chess) {
   const teile = l.fen.split(' ');
   teile[1] = 'b'; teile[3] = '-';
   try { if (new Chess(teile.join(' ')).isCheck()) f.push(`${l.id}: Schwarz steht schon im Schach`); } catch (e) { /* oben gemeldet */ }
+  if (artVon(l) === 'folge') {
+    // Zugfolge: Flos Seite, jeder Zug legal und genau so geschrieben, wie chess.js ihn schreibt, der letzte gehoert Flo,
+    // ziel = Zahl seiner Zuege
+    if (l.farbe !== 'w' && l.farbe !== 'b') f.push(`${l.id}: farbe ${l.farbe}`);
+    const folge = Array.isArray(l.folge) ? l.folge : [];
+    if (folge.length < 2) f.push(`${l.id}: Folge zu kurz`);
+    const g = new Chess(l.fen);
+    let eigene = 0;
+    for (const san of folge) {
+      const dran = g.turn();
+      let m = null;
+      try { m = g.move(san); } catch (e) { m = null; }
+      if (!m) { f.push(`${l.id}: Zug ${san} nicht legal`); break; }
+      if (m.san !== san) f.push(`${l.id}: ${san} heisst bei chess.js ${m.san}`);
+      if (dran === l.farbe) eigene++;
+    }
+    if (folge.length && (folge.length - 1) % 2 !== (l.farbe === 'w' ? 0 : 1)) f.push(`${l.id}: der letzte Zug gehoert nicht Flo`);
+    if (eigene !== l.ziel) f.push(`${l.id}: ziel ${l.ziel}, aber ${eigene} eigene Zuege`);
+  }
   return f;
 }
 
