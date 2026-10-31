@@ -4,17 +4,20 @@
 //
 //   reiterIch({ app, fenster, jetzt }) -> { el, verlasse() }       Spielerkarte, deine besten Partien ueber alle Tafeln
 //       im Fenster ("Gesamt"), Rekordbuch mit Rechenstand
-//   reiterBots({ app, fenster, jetzt }) -> { el, verlasse() }      Tafel-Wahl (10 Leiter-Bots, Boss-Tafeln mit Eintraegen),
-//       die gewaehlte Tafel (hoechstens 10 Zeilen, davon 3 eigene, Freunde als Gaeste), Chronik, "Rekord angreifen"
+//   reiterBots({ app, fenster, jetzt }) -> { el, verlasse() }      zuerst die Uebersicht "Deine Gegner" (Flo 31.10.2026:
+//       "Die lange Liste ergibt irgendwie nicht so viel Sinn"): nur freigeschaltete Gegner und Tafeln mit Eintraegen, nach
+//       Welten, je Zeile Portraet, Name und dein Platz; ein Tipp oeffnet die Tafel (hoechstens 10 Zeilen, davon 3 eigene,
+//       Freunde als Gaeste, Chronik, "Rekord angreifen"), "Alle Gegner" fuehrt zurueck. Einstellung offen: Tafel offen.
 //   reiterFreunde({ app, jetzt }) -> { el, verlasse() }            Code teilen (Vorschau mit allem, was im Code steht),
 //       Code einlesen (pruefen, nachrechnen, eintragen), Freunde (hoechstens 12, ein Tipp loescht)
 //   huelle(id, name) -> section (leer, hidden)
 //   codeFuer(eintrag, tafelId, name) -> erzeugeCode-Ergebnis (auch fuer die Ueberhol-Post der Abrechnung)
-// Einstellungen (Komfort je Geraet, speichereModulEinstellungen('punkte')): { reiter, fenster, tafel, name }.
+// Einstellungen (Komfort je Geraet, speichereModulEinstellungen('punkte')): { reiter, fenster, tafel, offen, name }.
 import { anim, staffel, tempo } from '../../bewegung.js';
 import { icon } from '../../ui/icons.js';
 import { wischKanten } from '../../ui/bauteile.js';
-import { BOTS, botNachId } from '../../bots.js';
+import { BOTS, WELTEN, botNachId } from '../../bots.js';
+import { avatarVon } from '../../thema.js';
 import {
   ladePartie, ladeFortschritt, istFreigeschaltet, naechsterGegner, ladeModulEinstellungen, speichereModulEinstellungen, ladeEinstellungen,
 } from '../../storage.js';
@@ -232,29 +235,65 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
   const s = huelle('bots', t('p-punkte.reiter.bots'));
   s.hidden = false;
   let st = S.lade();
-  const wahl = tafelAuswahl(st);
+  const fortschritt = ladeFortschritt();
+  // nur Gegner, gegen die man spielen kann (freigeschaltet), und Tafeln, auf denen schon etwas steht
+  const wahl = tafelAuswahl(st).filter((x) => x.boss || (st.tafeln[x.id] && st.tafeln[x.id].eintraege.length)
+    || (x.stufe != null && istFreigeschaltet(x.stufe, fortschritt)));
   const gemerkt = einstellungen().tafel;
   // Standard: die gemerkte Tafel, sonst die mit dem juengsten eigenen Eintrag, sonst der naechste Gegner
   let aktiv = wahl.find((x) => x.id === gemerkt) ? gemerkt : null;
   if (!aktiv) {
-    const juengste = Object.values(st.tafeln).flatMap((t) => t.eintraege.map((e) => ({ id: t.id, t: e.t }))).sort((a, b) => b.t - a.t)[0];
+    const juengste = Object.values(st.tafeln).flatMap((tf) => tf.eintraege.map((e) => ({ id: tf.id, t: e.t }))).sort((a, b) => b.t - a.t)[0];
     aktiv = juengste ? juengste.id : 'bot:' + naechsterGegner().id;
   }
-  const leiste = el('div', 'bl-tafelwahl');
-  leiste.setAttribute('role', 'group');
-  leiste.setAttribute('aria-label', t('p-punkte.bots.wahl'));
-  leiste.innerHTML = wahl.map((x) => {
-    const hat = st.tafeln[x.id] && st.tafeln[x.id].eintraege.length;
-    return `<button class="chip bl-wahl dr" type="button" data-tafel="${esc(x.id)}" aria-pressed="false">${esc(x.name)}${hat ? '<i class="bl-punkt" aria-hidden="true"></i>' : ''}</button>`;
-  }).join('');
+  const liste = el('div', 'bl-gegner');
+  liste.setAttribute('role', 'list');
+  liste.setAttribute('aria-label', t('p-punkte.bots.alle'));
+  const tafelBox = el('div', 'bl-tafel-box');
+  const zurueck = el('button', 'knopf bl-alle dr', `${icon('zurueck')}${esc(t('p-punkte.bots.alle'))}`);
+  zurueck.type = 'button';
   const karte = el('article', 'bl-karte bl-tafel');
-  s.append(leiste, karte);
-  wischKanten(leiste);
+  tafelBox.append(zurueck, karte);
+  s.append(liste, tafelBox);
+
+  // eigene beste Zeile einer Tafel im Fenster (Platz und Punkte fuer die Uebersicht)
+  const meinBestes = (id) => {
+    const tf = st.tafeln[id];
+    if (!tf || !tf.eintraege.length) return null;
+    return T.zeilen(tf, { fenster, jetzt, gaeste: S.gaeste(st, id) }).find((r) => r.eigen) || null;
+  };
+  function zeigeListe() {
+    st = S.lade();
+    const gruppen = [];
+    for (const x of wahl) {
+      const b = botNachId(x.botId);
+      const key = x.boss ? 'boss' : 'welt' + (b && b.welt ? b.welt : 0);
+      let g = gruppen.find((y) => y.key === key);
+      if (!g) {
+        const w = !x.boss && b ? WELTEN.find((y) => y.nr === b.welt) : null;
+        g = { key, titel: x.boss ? t('p-punkte.boss') : w ? t('p-punkte.bots.welt', { nr: w.nr, name: w.name }) : '', teile: [] };
+        gruppen.push(g);
+      }
+      g.teile.push({ x, b });
+    }
+    liste.innerHTML = gruppen.map((g) => `${g.titel ? `<h3 class="ueberzeile bl-g-welt">${esc(g.titel)}</h3>` : ''}`
+      + g.teile.map(({ x, b }) => {
+        const r = meinBestes(x.id);
+        const zeile = r ? t('p-punkte.bots.platzWert', { platz: r.platz, wert: zahlText(r.w) }) : t('p-punkte.bots.keinEintrag');
+        return `<button class="bl-gegner-zeile dr${r ? ' mit-eintrag' : ''}" type="button" role="listitem" data-tafel="${esc(x.id)}"${x.id === aktiv ? ' aria-current="true"' : ''}>`
+          + `<span class="bl-g-av">${b ? `<img src="${esc(avatarVon(b))}" alt="" draggable="false">` : icon('podest')}</span>`
+          + `<span class="bl-g-mitte"><b>${esc(b && !x.boss ? b.name : x.name)}</b><span>${esc(zeile)}</span></span>`
+          + `<span class="bl-g-pfeil" aria-hidden="true">${icon('vor')}</span></button>`;
+      }).join('')).join('');
+    if (tempo() > 0) staffel(liste.querySelectorAll('.bl-gegner-zeile'), { d: 380, abstand: 30, von: 'translateY(8px)' });
+  }
 
   function zeichne(id, { erst = false } = {}) {
     st = S.lade();
     aktiv = id;
-    for (const k of leiste.querySelectorAll('.bl-wahl')) k.setAttribute('aria-pressed', k.dataset.tafel === id ? 'true' : 'false');
+    s.dataset.tafel = id;
+    karte.dataset.tafel = id;
+    for (const k of liste.querySelectorAll('.bl-gegner-zeile')) { if (k.dataset.tafel === id) k.setAttribute('aria-current', 'true'); else k.removeAttribute('aria-current'); }
     const tf = st.tafeln[id] || T.neueTafel(id);
     const zeilen = T.zeilen(tf, { fenster, jetzt, gaeste: S.gaeste(st, id) });
     const neu = new Set(st.neu);
@@ -279,21 +318,25 @@ export function reiterBots({ app, fenster = 'woche', jetzt = new Date() } = {}) 
     if (!erst && tempo() > 0) staffel(karte.querySelectorAll('.bl-zeile'), { d: 420, abstand: 40, von: 'translateY(8px)' });
     merkeGesehen(zeilen.filter((r) => r.eigen && neu.has(r.id)).map((r) => r.id));
   }
-  leiste.addEventListener('click', (ev) => {
-    const k = ev.target.closest('.bl-wahl');
-    if (!k || k.dataset.tafel === aktiv) return;
-    merkeEinstellung({ tafel: k.dataset.tafel });
+  liste.addEventListener('click', (ev) => {
+    const k = ev.target.closest('.bl-gegner-zeile');
+    if (!k) return;
+    merkeEinstellung({ tafel: k.dataset.tafel, offen: true });
     zeichne(k.dataset.tafel);
+    s.classList.add('zeigt-tafel');
+    if (s.getBoundingClientRect().top < 0) { try { s.scrollIntoView({ block: 'start' }); } catch (e) { /* egal */ } }
+  });
+  zurueck.addEventListener('click', () => {
+    merkeEinstellung({ offen: false });
+    s.classList.remove('zeigt-tafel');
   });
   bindeAnalyse(karte, app);
+  // Breit (iPad, Rechner): Liste links, Tafel rechts, beide zugleich. Schmal (Handy): erst die Liste, die Tafel nach einem
+  // Tipp; offen (Link aus Ergebnis oder Bot-Panel, oder zuletzt eine Tafel angesehen) zeigt gleich die Tafel
+  zeigeListe();
   zeichne(aktiv, { erst: true });
-  // gewaehlte Tafel in die Mitte der Leiste holen (Handy: waagrecht wischbar)
-  const zeigeWahl = () => {
-    const k = leiste.querySelector('.bl-wahl[aria-pressed="true"]');
-    if (k && leiste.scrollWidth > leiste.clientWidth) leiste.scrollLeft = Math.max(0, k.offsetLeft - leiste.clientWidth / 2 + k.offsetWidth / 2);
-  };
-  const uhr = setTimeout(zeigeWahl, 0);
-  return { el: s, verlasse() { clearTimeout(uhr); } };
+  s.classList.toggle('zeigt-tafel', einstellungen().offen === true);
+  return { el: s, verlasse() {} };
 }
 
 // ---------- Reiter Freunde: Codes teilen und einlesen ----------

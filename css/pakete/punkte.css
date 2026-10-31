@@ -126,7 +126,37 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 .bl-neu { flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-pille); background: var(--akzent-weich); color: var(--akzent-text);
   font-size: 12px; font-weight: 800; line-height: 20px; }
 
-/* Tafel-Wahl: Chips, auf dem Handy waagrecht wischbar */
+/* Reiter Bots (Flo 31.10.2026: "Die lange Liste ergibt irgendwie nicht so viel Sinn"): zuerst "Deine Gegner" nach Welten,
+   je Zeile Portraet, Name und Platz; ein Tipp oeffnet die Tafel, "Alle Gegner" fuehrt zurueck */
+.bl-gegner { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-content: start; }
+/* schmal: Liste oder Tafel; breit (ab 760 px): Liste links, Tafel rechts */
+@media (max-width: 759px) {
+  .bl-reiter[data-reiter="bots"]:not(.zeigt-tafel) > .bl-tafel-box { display: none; }
+  .bl-reiter[data-reiter="bots"].zeigt-tafel > .bl-gegner { display: none; }
+}
+@media (min-width: 760px) {
+  .bl-reiter[data-reiter="bots"]:not([hidden]) { grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .bl-reiter[data-reiter="bots"] .bl-gegner { grid-template-columns: 1fr; }
+  .bl-reiter[data-reiter="bots"] .knopf.bl-alle { display: none; }
+}
+.bl-gegner-zeile[aria-current="true"] { box-shadow: var(--s1), inset 0 0 0 2px var(--akzent); }
+.bl-g-welt { grid-column: 1 / -1; margin: 10px 4px 0; }
+.bl-g-welt:first-child { margin-top: 0; }
+.bl-gegner-zeile { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px 8px 8px; border: 0; border-radius: var(--r-l);
+  background: var(--flaeche); box-shadow: var(--s1), var(--kante); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.bl-gegner-zeile:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.bl-g-av { flex: none; width: 48px; height: 48px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: var(--flaeche-2); }
+.bl-g-av img { width: 100%; height: 100%; object-fit: cover; }
+.bl-g-mitte { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.bl-g-mitte b { font-size: 15.5px; font-weight: 800; overflow-wrap: anywhere; }
+.bl-g-mitte span { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.bl-gegner-zeile.mit-eintrag .bl-g-mitte span { color: var(--akzent-text); }
+.bl-g-pfeil { flex: none; color: var(--text-2); }
+.bl-g-pfeil .ico { width: 20px; height: 20px; }
+.bl-tafel-box { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.knopf.bl-alle { justify-self: start; min-height: var(--tipp); padding: 0 16px 0 10px; gap: 4px; }
+
+/* Tafel-Wahl (frueher Chips) */
 .bl-tafelwahl { display: flex; gap: 8px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px 2px 6px; }
 .bl-tafelwahl::-webkit-scrollbar { display: none; }
 .chip.bl-wahl { flex: none; position: relative; height: var(--tipp); padding: 0 16px; gap: 6px; font-size: 14px; font-weight: var(--gw-stark); cursor: pointer;
