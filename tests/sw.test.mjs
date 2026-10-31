@@ -210,6 +210,10 @@ function main() {
     ...alleDateien('assets/pieces/weltraum', /\.svg$/),
     ...alleDateien('assets/pieces/roboter', /\.svg$/),
     ...alleDateien('assets/pieces/naschwerk', /\.svg$/),
+    ...alleDateien('assets/pieces/zombies', /\.svg$/),
+    ...alleDateien('assets/pieces/geister', /\.svg$/),
+    ...alleDateien('assets/pieces/drachen', /\.svg$/),
+    ...alleDateien('assets/pieces/lavagolem', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte

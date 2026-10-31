@@ -42,8 +42,9 @@ export const LABOR_BRETTER = Object.freeze([
 // (werkzeuge/figuren-stile.mjs: Pixel, Geo)
 // danach (Video: Figuren als kleine Wesen) Moosgeister und Tiefsee mit Gesichtern, eigene Gestaltung
 // dann ("Du hast nur die Farben geaendert ... Feuer, Stein, Halloween, Christmas, Ostern"): Themen mit eigenen Koepfen und
-// Kronen (werkzeuge/figuren-themen.mjs), vorn in der Sammlung; dazu Weltraum, Roboter und Naschwerk ("denk dir was aus")
-export const LABOR_FIGUREN = Object.freeze(['feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
+// Kronen (werkzeuge/figuren-themen.mjs), vorn in der Sammlung; dazu Weltraum, Roboter und Naschwerk ("denk dir was aus"),
+// ganz vorn Drachen, Zombies, Geister und Lava-Golem ("Musst kreativ werden: Zombies, Golems, Geister, Drachen")
+export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'lavagolem', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
   'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
 export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
 

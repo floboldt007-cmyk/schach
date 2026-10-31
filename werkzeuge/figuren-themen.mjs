@@ -343,5 +343,144 @@ const NASCHWERK = {
   },
 };
 
+// ---------- Zombies (Flo 31.10.2026 spaet: "Musst kreativ werden: Zombies, Golems, Geister, Drachen ...") ----------
+// ungleiche Augen, Naehte, schiefe Kronen, eine Hand aus dem Turm; nichts Blutiges
+const naht = (x1, y1, x2, y2, n, farbe) => {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1, nx = (-dy / len) * 2.2, ny = (dx / len) * 2.2;
+  let t = '';
+  for (let i = 1; i <= n; i++) {
+    const x = x1 + (dx * i) / (n + 1), y = y1 + (dy * i) / (n + 1);
+    t += `M${(x - nx).toFixed(2)} ${(y - ny).toFixed(2)}L${(x + nx).toFixed(2)} ${(y + ny).toFixed(2)}`;
+  }
+  return `<path d="M${x1} ${y1}L${x2} ${y2}${t}" fill="none" stroke="${farbe}" stroke-width="1.3" stroke-linecap="round"/>`;
+};
+const ZOMBIES = {
+  w: { c0: '#F6FFEC', c1: '#DDEFC6', c2: '#B3D194', c3: '#728F55', l: '#26341A', d: '#4A3A2A', sklera: '#FFFBE0', pupille: '#2A2A1A', naht: '#3A2A1E',
+    krone: '#D8B24A', flicken: '#C9B98A', haar: '#4A3A2A' },
+  b: { c0: '#7F9A70', c1: '#566F4B', c2: '#364A30', c3: '#18240F', l: '#050A04', d: '#C6E59A', sklera: '#1A2410', pupille: '#D9FF5A', naht: '#C6E59A',
+    krone: '#9C8A44', flicken: '#4A5A38', haar: '#0C1208' },
+  kopf(fig, m, h) {
+    const auge = (x, y, r) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${m.sklera}" stroke="${m.l}" stroke-width="1.1"/><circle cx="${(x + r * 0.25).toFixed(2)}" cy="${(y + r * 0.2).toFixed(2)}" r="${(r * 0.42).toFixed(2)}" fill="${m.pupille}"/>`;
+    const nh = (x1, y1, x2, y2, n) => naht(x1, y1, x2, y2, n, m.naht);
+    if (fig === 'P') return `<g fill="${K}" ${L(m)}>${h.form('P', 4)}</g><circle cx="58.5" cy="40" r="3.6" fill="${m.flicken}" stroke="${m.l}" stroke-width=".9"/>`
+      + `<path d="M43 23.5c-1-3 0-5.5 2.4-6.6M46.5 22.4c.2-3 1.6-5 4-5.6M41 25.6c-2-1.6-2.8-3.8-2-6" fill="none" stroke="${m.haar}" stroke-width="1.8" stroke-linecap="round"/>`
+      + nh(41, 28.5, 56, 25.5, 3) + auge(44.5, 34.5, 4.6) + auge(56, 34, 3.1) + nh(44, 42, 56, 43, 3);
+    if (fig === 'R') return `<path d="M38.6 26V14.5l-1.6-4.2c-.4-1 .9-1.6 1.5-.7l1.6 2.6V7.6c0-1.1 1.6-1.1 1.6 0v4.4l.4-5.4c.1-1.1 1.7-1 1.6.1l-.3 5.6.9-4.4c.2-1 1.7-.8 1.5.3L45 14.4V26z" fill="${K}" ${L(m)}/>`
+      + `<path d="M27 39.5V18.5c0-1 .8-1.8 1.8-1.8h7.4c1 0 1.8.8 1.8 1.8V25h7V18.5c0-1 .8-1.8 1.8-1.8h6.4c1 0 1.8.8 1.8 1.8V25h7v-4.2l2.4-2.2 1.8 2.4 2.2-3.4 1.6 2.2v24.7z" fill="${Z}" ${L(m)}/>`
+      + `<path d="M31 34.5l3-3.2 2.6 1.6M60 22.5l-1.6 4 2 3" fill="none" stroke="${m.d}" stroke-width="1.2" stroke-linecap="round"/>`
+      + `<rect x="29" y="38" width="42" height="7.5" rx="3.2" fill="${Z}" ${L(m)}/>` + auge(42, 54, 5) + auge(58.5, 55, 3.6) + nh(43.5, 63.5, 57, 62.2, 3)
+      + `<circle cx="62" cy="68" r="3.2" fill="${m.flicken}" stroke="${m.l}" stroke-width=".9"/>`;
+    if (fig === 'B') return `<g fill="${K}" ${L(m)}>${h.form('B', 5)}</g>` + nh(56, 19.5, 46, 25.5, 3) + auge(45.5, 31, 3.7) + auge(55, 30.4, 2.7)
+      + nh(46, 38, 54.5, 37.4, 2) + `<circle cx="50" cy="8.5" r="5.2" fill="${m.sklera === '#1A2410' ? '#E9F2D0' : '#FFFDF0'}" ${L(m)}/>`
+      + `<circle cx="51.2" cy="9.4" r="2.5" fill="#6DBE45"/><circle cx="51.6" cy="9.8" r="1.1" fill="#111"/>`;
+    if (fig === 'Q') return `<g transform="rotate(-9 50 32)"><g fill="${m.krone}" ${L(m)}>${h.form('Q', 4)}</g><g fill="${m.krone}" ${L(m)}>${h.form('Q', 5)}</g></g>`
+      + `<path d="M38.5 30.5l2.6 3.4M60 24l-1.8 3.6" stroke="${m.l}" stroke-width="1.1" opacity=".6"/>`
+      + `<rect x="33.5" y="42" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + auge(43.6, 56, 4.6) + auge(56.4, 56.8, 3.4) + nh(45.5, 64.6, 55, 64, 3);
+    if (fig === 'K') return `<g fill="${K}" ${L(m)}>${h.form('K', 4)}</g>`
+      + `<g transform="rotate(10 50 22)"><path d="M41 26.5l-1.5-9 4.5 4 6-7 6 7 4.5-4-1.5 9z" fill="${m.krone}" ${L(m)}/><path d="M48.5 14.8V6.5h-3V3.8h3V1.2h3v2.6h3v2.7h-3v8.3z" fill="${m.krone}" ${L(m)}/></g>`
+      + auge(44.5, 33.6, 4.2) + auge(56, 33.2, 3) + nh(45.5, 39.4, 54.5, 39.8, 3) + nh(60, 27.5, 63.5, 37, 2);
+    if (fig === 'N') return `<path d="M61.5 19.5l3 1.5-1 3 3.6 1-1.4 3.6 3.6.6-2 3.6 3.4 1-2.2 3.4 3 1.6" fill="none" stroke="${m.haar}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`
+      + `<g fill="${Z}" ${L(m)}>${h.form('N', 2)}</g>` + auge(42.5, 29.5, 4.4) + nh(47, 51, 60, 44.5, 3) + nh(22.5, 46.2, 30, 45, 2)
+      + `<circle cx="55" cy="62" r="3.4" fill="${m.flicken}" stroke="${m.l}" stroke-width=".9"/>`;
+    return '';
+  },
+};
+
+// ---------- Geister: schwebende Laken mit Wellensaum, ganz eigene Formen; Weiss lavendel, Schwarz nachtblau mit Leuchtaugen ----------
+function geistLeib(top, w, unten, kopf = 'rund') {
+  const l = 50 - w, r = 50 + w, n = 4, s = (2 * w + 10) / n;
+  const seiteL = `M${l - 5} ${unten}C${l - 3} ${unten - 12} ${l} ${top + w + 14} ${l} ${top + w}`;
+  const oben = kopf === 'turm' ? `V${top}h8v5h7v-5h${(2 * w - 30).toFixed(1)}v5h7v-5h8V${top + w}`
+    : kopf === 'spitz' ? `C${l} ${top + w - 10} ${46} ${top + 6} 50 ${top}C54 ${top + 6} ${r} ${top + w - 10} ${r} ${top + w}`
+      : `A${w} ${w} 0 0 1 ${r} ${top + w}`;
+  let d = `${seiteL}${oben}C${r} ${top + w + 14} ${r + 3} ${unten - 12} ${r + 5} ${unten}`;
+  for (let i = 0; i < n; i++) {
+    const x0 = r + 5 - i * s;
+    d += `Q${(x0 - s / 4).toFixed(2)} ${unten + 6} ${(x0 - s / 2).toFixed(2)} ${unten}T${(x0 - s).toFixed(2)} ${unten}`;
+  }
+  return d + 'Z';
+}
+const GEISTER = {
+  w: { c0: '#FFFFFF', c1: '#F8F6FF', c2: '#DDD9F3', c3: '#A9A3D2', l: '#4B4478', d: '#7A72B0', auge: '#2A2450', glanz: '#FFFFFF', wange: '#FFB8D2', krone: '#F2C94C' },
+  b: { c0: '#8285C2', c1: '#53569A', c2: '#30336E', c3: '#15173A', l: '#05061A', d: '#7CF7FF', auge: '#7CF7FF', glanz: '#F0FFFF', wange: '#5A4E9E', krone: '#9C8AE0' },
+  defs: () => '<filter id="ge" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>',
+  kopf(fig, m) {
+    const leib = (d) => `<path d="${d}" fill="${K}" fill-opacity=".95" ${L(m)} filter="url(#ge)"/>`;
+    const augen = (pts, rx, ry, mund) => pts.map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${m.auge}"/><circle cx="${x - rx * 0.3}" cy="${y - ry * 0.35}" r="${rx * 0.32}" fill="${m.glanz}"/>`).join('')
+      + (mund ? `<ellipse cx="${mund[0]}" cy="${mund[1]}" rx="${mund[2]}" ry="${mund[3]}" fill="${m.auge}"/>` : '')
+      + pts.map(([x, y]) => `<ellipse cx="${x + (x < 50 ? -2.4 : 2.4)}" cy="${y + ry + 2.6}" rx="2.6" ry="1.4" fill="${m.wange}" opacity=".7"/>`).join('');
+    const krone = (y, mitKreuz) => (mitKreuz
+      ? `<path d="M40.5 ${y}l-1.6-8.5 5 3.8 6.1-7 6.1 7 5-3.8-1.6 8.5z" fill="${m.krone}" ${L(m)}/><path d="M48.5 ${y - 11.8}V${y - 19}h-3v-2.8h3v-2.8h3v2.8h3V${y - 19}h-3v7.2z" fill="${m.krone}" ${L(m)}/>`
+      : `<path d="M38.5 ${y}l-2.5-9.5 6.5 4.5 3.5-7.5 4 6.5 4-6.5 3.5 7.5 6.5-4.5-2.5 9.5z" fill="${m.krone}" ${L(m)}/>`
+        + `<g fill="${m.krone}" ${L(m)}><circle cx="36" cy="${y - 10}" r="2.2"/><circle cx="46" cy="${y - 12.5}" r="2.2"/><circle cx="54" cy="${y - 12.5}" r="2.2"/><circle cx="64" cy="${y - 10}" r="2.2"/></g>`);
+    let s = '';
+    if (fig === 'P') s = leib(geistLeib(34, 14, 84)) + augen([[44.5, 50], [55.5, 50]], 3, 4.2, [50, 59, 2.2, 2.8]);
+    if (fig === 'R') s = leib(geistLeib(20, 19, 86, 'turm')) + augen([[42, 44], [58, 44]], 3.6, 5, [50, 56, 3, 3.6]);
+    if (fig === 'B') s = leib(geistLeib(10, 15, 86, 'spitz')) + `<path d="M55.5 21 47 30" stroke="${m.d}" stroke-width="2" stroke-linecap="round"/>`
+      + augen([[44.5, 42], [55.5, 42]], 3.2, 4.6, [50, 52, 2.4, 3]);
+    if (fig === 'Q') s = krone(26, false) + leib(geistLeib(27, 17, 86)) + augen([[43.5, 46], [56.5, 46]], 3.4, 4.8, [50, 56.5, 2.6, 3.2]);
+    if (fig === 'K') s = krone(24, true) + leib(geistLeib(25, 17, 86)) + augen([[43.5, 45], [56.5, 45]], 3.4, 4.8, [50, 55.5, 2.6, 3.2]);
+    if (fig === 'N') {
+      const saum = 'M30.5 74h43l1.6 10Q71 90 67 84T59 84T51 84T43 84T35 84T29 84z';
+      s = `<path d="${saum}" fill="${K}" fill-opacity=".95" ${L(m)} filter="url(#ge)"/><g fill="${K}" fill-opacity=".95" ${L(m)} filter="url(#ge)">`
+        + '<path d="M30.5 75c1-8.5 4.6-15.6 11.4-21.6-3.6.2-7.6.4-11.4.9-4.2.5-8.6-1.1-9.6-5.2-.9-3.6.9-6.9 4-9.6l9.6-9.4c4.6-4.6 9.4-8.3 14.7-11l2.6-7.2 4.6 6c9.8 2.3 17.1 10.8 17.8 25 .5 10.6-1.2 21.3-1.7 32.1z"/></g>'
+        + augen([[42.5, 30]], 3.2, 4.4, [27, 45.5, 1.8, 2.2]);
+    }
+    return { ganz: s };
+  },
+};
+
+// ---------- Drachen: Schuppen, Hoerner, Fluegel, Schlitzaugen, Feuer; Weiss perlmutt mit tuerkisen Fluegeln, Schwarz dunkelrot ----------
+const DRACHEN = {
+  w: { c0: '#FFFFFF', c1: '#FBF3DC', c2: '#E9D29C', c3: '#B08A44', l: '#4A3010', d: '#BC9550', muster: 'schuppen', fl1: '#9EE3D8', fl2: '#2E9C8C',
+    horn: '#FFF6DE', auge: '#FFD54A', pupille: '#2A1A05', f1: '#FF7A1A', f2: '#FFE066' },
+  b: { c0: '#9A4A44', c1: '#682B28', c2: '#421614', c3: '#1A0605', l: '#000000', d: '#E07A4A', muster: 'schuppen', fl1: '#C0392B', fl2: '#4A0B08',
+    horn: '#E8D9B5', auge: '#FFC93A', pupille: '#1A0502', f1: '#FF5A1A', f2: '#FFD23F' },
+  defs: (m) => `<pattern id="mu" width="6" height="5" patternUnits="userSpaceOnUse"><path d="M0 5a3 3 0 0 1 6 0M-3 2.5a3 3 0 0 1 6 0M3 2.5a3 3 0 0 1 6 0" fill="none" stroke="${m.d}" stroke-width=".7" opacity=".6"/></pattern>`
+    + `<linearGradient id="flg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m.fl1}"/><stop offset="1" stop-color="${m.fl2}"/></linearGradient>`
+    + `<linearGradient id="dfe" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${m.f1}"/><stop offset="1" stop-color="${m.f2}"/></linearGradient>`,
+  kopf(fig, m, h) {
+    const schuppen = (inner) => `<g fill="url(#mu)">${inner}</g>`;
+    const teilK = (inner, fill = K) => `<g fill="${fill}" ${L(m)}>${inner}</g>` + schuppen(inner);
+    const fluegel = (x, y, sk, links) => `<g transform="translate(${x} ${y}) scale(${links ? -sk : sk} ${sk})"><path d="M0 0L15-13Q14-4 17 1Q12 0 11 5.5Q7 3 4.5 8.5Z" fill="url(#flg)" stroke="${m.l}" stroke-width="${(1.4 / sk).toFixed(2)}" stroke-linejoin="round"/>`
+      + `<path d="M0 0L17 1M0 0L11 5.5" fill="none" stroke="${m.l}" stroke-width="${(0.9 / sk).toFixed(2)}" opacity=".6"/></g>`;
+    const horn = (x, y, sk, links) => `<path transform="translate(${x} ${y}) scale(${links ? -sk : sk} ${sk})" d="M0 0c-1-4 0-8 3-11-.4 3.6.6 6.8 2.6 9.4z" fill="${m.horn}" stroke="${m.l}" stroke-width="${(1.2 / sk).toFixed(2)}" stroke-linejoin="round"/>`;
+    const auge = (x, y, r) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${(r * 0.85).toFixed(2)}" fill="${m.auge}" stroke="${m.l}" stroke-width="1"/><ellipse cx="${x}" cy="${y}" rx="${(r * 0.22).toFixed(2)}" ry="${(r * 0.75).toFixed(2)}" fill="${m.pupille}"/><circle cx="${(x - r * 0.4).toFixed(2)}" cy="${(y - r * 0.3).toFixed(2)}" r="${(r * 0.2).toFixed(2)}" fill="#FFFFFF"/>`;
+    const fe = (cx, by, hh, w) => `<path d="${flamme(cx, by, hh, w)}" fill="url(#dfe)" stroke="${m.l}" stroke-width="1"/>`;
+    if (fig === 'P') return fluegel(58, 40, 1, false) + fluegel(42, 40, 1, true) + horn(42, 26, 0.9, true) + horn(58, 26, 0.9, false)
+      + teilK('<circle cx="50" cy="35" r="13"/>') + `<ellipse cx="50" cy="42" rx="7" ry="4.6" fill="${Z}" ${L(m)}/>`
+      + `<g fill="${m.l}"><circle cx="47.6" cy="41.4" r=".9"/><circle cx="52.4" cy="41.4" r=".9"/></g>` + auge(44.5, 33, 3.6) + auge(55.5, 33, 3.6);
+    if (fig === 'R') return fluegel(66, 26, 1.15, false) + fluegel(34, 26, 1.15, true) + teilK(h.form('R', 4), Z)
+      + `<rect x="40.5" y="51.5" width="19" height="13" rx="6.5" fill="${m.c3}" ${L(m)}/>` + auge(46, 58, 2.7) + auge(54, 58, 2.7);
+    if (fig === 'B') return horn(44, 21, 1, true) + horn(56, 21, 1, false) + fe(50, 12, 11, 7) + teilK(h.form('B', 5))
+      + `<g fill="${m.l}"><circle cx="47.8" cy="16" r=".9"/><circle cx="52.2" cy="16" r=".9"/></g>` + auge(45, 28.5, 3.3) + auge(55, 28.5, 3.3)
+      + `<path d="M45 36.5q5 2.6 10 0" fill="none" stroke="${m.l}" stroke-width="1.3" stroke-linecap="round"/>`;
+    if (fig === 'Q') return fluegel(64, 42, 1.1, false) + fluegel(36, 42, 1.1, true)
+      + horn(36, 41, 1.1, true) + horn(43, 41, 1.45, true) + `<path d="M50 41c-2.6-5-2.2-11 0-16.5 2.2 5.5 2.6 11.5 0 16.5z" fill="${m.horn}" ${L(m)}/>` + horn(57, 41, 1.45, false) + horn(64, 41, 1.1, false)
+      + `<rect x="33.5" y="40" width="33" height="7" rx="3.5" fill="${Z}" ${L(m)}/>` + auge(43.8, 56, 4.2) + auge(56.2, 56, 4.2)
+      + `<path d="M45 64q5 2.6 10 0" fill="none" stroke="${m.l}" stroke-width="1.4" stroke-linecap="round"/><path d="M47 64.6l.9 2 .9-1.7zM51.2 64.9l.9 1.7.9-2z" fill="#FFFFFF"/>`;
+    if (fig === 'K') return fluegel(64, 40, 1.1, false) + fluegel(36, 40, 1.1, true) + `<g fill="${m.auge}" ${L(m)}>${h.form('K', 5)}</g>`
+      + horn(38, 31, 1.05, true) + horn(62, 31, 1.05, false) + teilK(h.form('K', 4)) + auge(44.5, 33.5, 3.8) + auge(55.5, 33.5, 3.8)
+      + `<path d="M45 39.6q5 2.4 10 0" fill="none" stroke="${m.l}" stroke-width="1.3" stroke-linecap="round"/>`;
+    if (fig === 'N') {
+      const zacken = [[63, 21, -10], [69, 29.5, 20], [72.5, 39.5, 40], [73.5, 50.5, 60]]
+        .map(([x, y, d]) => `<path transform="rotate(${d} ${x} ${y})" d="M${x - 4} ${y + 2}L${x} ${y - 7}L${x + 4} ${y + 2}z" fill="url(#flg)" stroke="${m.l}" stroke-width="1.2" stroke-linejoin="round"/>`).join('');
+      return fluegel(66, 58, 1.2, false) + zacken + horn(50, 15, 1.1, true) + teilK(h.form('N', 2), Z) + auge(42.5, 29.5, 4)
+        + `<g fill="${m.l}"><circle cx="24.6" cy="44" r="1"/></g><path d="M23.5 48.2l1.2 2 1.2-1.8 1.2 2 1.2-1.8" fill="none" stroke="#FFFFFF" stroke-width="1" stroke-linejoin="round"/>`
+        + `<g fill="${m.horn}" opacity=".7"><circle cx="17.5" cy="40" r="2.2"/><circle cx="13.6" cy="36.4" r="1.6"/><circle cx="10.8" cy="33.4" r="1.1"/></g>`;
+    }
+    return '';
+  },
+};
+
+// ---------- Lava-Golem: die Steingolems in neuen Farben (gluehende Risse, Feuerkristalle) ----------
+const LAVAGOLEM = {
+  ...STEIN,
+  w: { c0: '#FBF7F2', c1: '#E4DCD2', c2: '#BDB1A3', c3: '#7E7266', l: '#2E2620', d: '#F2600C', moos: '#FF8A1F', k1: '#FFF6C2', k2: '#FF6A00',
+    gesicht: { sklera: '#FFF4D6', pupille: '#B33A00', rand: '#2E2620' } },
+  b: { c0: '#4A4246', c1: '#2E282C', c2: '#1B1619', c3: '#080607', l: '#000000', d: '#FF7A1A', moos: '#FF5A1A', k1: '#FFE9A0', k2: '#FF3D00',
+    gesicht: { sklera: '#2A0A02', pupille: '#FFB23E', rand: '#000000', brauen: true } },
+};
+
 export const THEMEN = Object.freeze({ feuer: FEUER, stein: STEIN, halloween: HALLOWEEN, weihnachten: WEIHNACHTEN, ostern: OSTERN,
-  weltraum: WELTRAUM, roboter: ROBOTER, naschwerk: NASCHWERK });
+  weltraum: WELTRAUM, roboter: ROBOTER, naschwerk: NASCHWERK, zombies: ZOMBIES, geister: GEISTER, drachen: DRACHEN, lavagolem: LAVAGOLEM });
