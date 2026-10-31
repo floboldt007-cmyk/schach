@@ -108,3 +108,12 @@
   .ls-meldung { padding: 12px 14px; gap: 12px; }
   .ls-symbol { width: 38px; height: 38px; }
 }
+
+/* ---------- Bereichswahl und Art (Endspiele) ---------- */
+.ms-steuer { display: flex; justify-content: flex-start; }
+.ms-steuer .segment { width: min(100%, 420px); }
+.ms-bereich { display: flex; flex-direction: column; gap: 14px; }
+.ms-marken { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ms-art { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: var(--r-pille); font-size: 12px;
+  font-weight: 750; background: var(--flaeche-2); color: var(--text-2); box-shadow: var(--kante); }
+.ms-art[data-art="halten"] { background: var(--tinte); color: var(--auf-tinte); box-shadow: none; }
