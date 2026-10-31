@@ -319,7 +319,7 @@ function kreaturenBereich() {
   if (!istErfinder()) return null;
   const aktiv = kreaturAktiv(einstellungen(), true);
   return bereich({ id: 'kreaturen', name: T('kreaturen'), hinweis: T('kreaturenHinweis'), teile: KREATUREN.map((k) => ({
-    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true,
+    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, wahl: () => setze({ kreatur: k.id }),
     zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
   })) });
 }

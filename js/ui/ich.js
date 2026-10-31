@@ -25,6 +25,9 @@ import '../sprachen/rahmen.js';
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Speicher: der fuer das Sammeln reservierte Modulplatz 'sammeln' (storage.js MODUL_BUDGET), hier nur der gemerkte Bereich
 const MODUL = 'sammeln';
+// Ausruesten per Tipp (Flo 31.10.2026: "Warum kann ich die Klaenge nicht auswaehlen?"): ein Teil mit wahl() bekommt eine
+// Tippflaeche ueber der Karte; der Screen ruft wahl() und zeichnet den Bereich neu
+const WAHLEN = new WeakMap();   // section.sa-bereich -> Map(teil-id -> wahl)
 
 export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
   const s = document.createElement('section');
@@ -49,10 +52,14 @@ export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
     const schild = x.labor ? `<span class="sa-schild sa-labor">${esc(t('rahmen.sammlung.labor'))}</span>`
       : seltenheit && seltenheit !== 'frei' ? `<span class="sa-schild" data-seltenheit="${seltenheit}">${esc(t('rahmen.sammlung.selten.' + seltenheit))}</span>` : '';
     const bild = x.frei ? (x.bild || '') : x.bild ? `<span class="sa-geheim">${x.bild}</span><span class="sa-frage">?</span>` : '<span class="sa-frage">?</span>';
-    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}>
+    const waehlbar = x.frei && !x.an && typeof x.wahl === 'function';
+    const knopf = waehlbar ? `<button type="button" class="sa-wahl" aria-label="${esc(t('rahmen.sammlung.ausruesten', { name: x.name }))}"></button>` : '';
+    return `<div class="sa-teil" role="listitem" data-teil="${esc(x.id)}" data-zustand="${zustand}"${seltenheit ? ` data-seltenheit="${seltenheit}"` : ''}${waehlbar ? ' data-waehlbar' : ''}>${knopf}
       <span class="sa-bild" aria-hidden="true">${bild}${schild}</span>
       <span class="sa-text"><b>${esc(x.name)}</b><span class="sa-zeile">${esc(x.zeile || '')}</span>${balken}</span></div>`;
   }).join('')}</div>`).join('')}${hinweis ? `<p class="sa-hinweis">${esc(hinweis)}</p>` : ''}`;
+  const wahlen = new Map(teile.filter((x) => x.frei && !x.an && typeof x.wahl === 'function').map((x) => [String(x.id), x.wahl]));
+  if (wahlen.size) WAHLEN.set(s, wahlen);
   return s;
 }
 
@@ -80,6 +87,17 @@ function zeigeIch(root, params = {}, app) {
   try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
   s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
+  // Ausruesten per Tipp: wahl() des Teils, dann den Screen mit demselben Bereich neu zeichnen (Zeilen "Ausgeruestet")
+  ort.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.sa-wahl');
+    const teil = b && b.closest('.sa-teil');
+    const ber = teil && teil.closest('.sa-bereich');
+    const wahl = ber && WAHLEN.get(ber)?.get(teil.dataset.teil);
+    if (!wahl) return;
+    try { wahl(); } catch (e) { console.error(e); return; }
+    try { app.meldung?.(t('rahmen.sammlung.ausgeruestet', { name: teil.querySelector('.sa-text b')?.textContent || '' })); } catch (e) { /* egal */ }
+    try { app.gehe('ich', { bereich: ber.dataset.bereich }, { ersetzen: true }); } catch (e) { /* egal */ }
+  });
   const alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
   if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
   const teile = ort.querySelectorAll('.sa-teil');

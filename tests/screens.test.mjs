@@ -103,7 +103,8 @@ const ueberlauf = (seite) => seite.evaluate(() => {
   const raus = [...document.querySelectorAll('.screen *')].filter((el) => {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return false;
-    if (el.closest('.an-momente, .vl-dialog-hg')) return false;
+    // Leisten zum Wischen ragen absichtlich hinaus (Momente der Analyse, Menue der Einstellungen auf dem Handy)
+    if (el.closest('.an-momente, .vl-dialog-hg, .es-nav')) return false;
     return r.right > innerWidth + 1 || r.left < -1;
   }).slice(0, 3).map((el) => el.className.baseVal ?? el.className);
   return { doc, scr, raus };
@@ -665,6 +666,22 @@ async function testeEinstellungen(browser) {
   pruefe('Holz bleibt nach Neuladen', (await seite.locator('.es-brett[data-wert="holz"]').getAttribute('aria-checked')) === 'true'
     && (await seite.evaluate(() => document.documentElement.dataset.brett)) === 'holz');
   pruefe('Tiefe 16 bleibt nach Neuladen', (await seite.locator('.es-seg[data-wert="16"]').getAttribute('aria-checked')) === 'true');
+  // Menue (Flo 31.10.2026, "Das muss auch angepasst werden"): jeder Bereich mit eigenem Zeichen, auch die der Pakete,
+  // Spiel zuerst, Info zuletzt, die Markierung folgt dem Tippen; auf dem Handy als Leiste (vorher gar kein Menue)
+  const nav = await seite.evaluate(() => ({ punkte: [...document.querySelectorAll('.es-nav-punkt')].map((b) => b.dataset.ziel),
+    zeichen: document.querySelectorAll('.es-nav-punkt .es-nav-zeichen svg').length,
+    gruppen: [...document.querySelectorAll('.es-inhalt .es-gruppe')].filter((g) => !g.hidden && g.querySelector('h3')).length,
+    aktiv: document.querySelector('.es-nav-punkt[aria-current="true"]')?.dataset.ziel, sichtbar: getComputedStyle(document.querySelector('.es-nav')).display }));
+  pruefe('Menü: ein Punkt mit Zeichen je Bereich, Spiel zuerst und markiert, Info zuletzt, sichtbar', nav.punkte.length === nav.gruppen
+    && nav.zeichen === nav.punkte.length && nav.punkte[0] === 'es-g-spiel' && nav.punkte[nav.punkte.length - 1] === 'es-g-info'
+    && nav.aktiv === 'es-g-spiel' && nav.sichtbar !== 'none', nav);
+  await seite.click('.es-nav-punkt[data-ziel="es-g-info"]');
+  await warte(1500);
+  const infoOben = await seite.evaluate(() => ({ aktiv: document.querySelector('.es-nav-punkt[aria-current="true"]')?.dataset.ziel,
+    top: Math.round(document.querySelector('#es-g-info').getBoundingClientRect().top), ih: innerHeight }));
+  pruefe('Menü: Tipp auf „Info“ springt hin und markiert Info', infoOben.aktiv === 'es-g-info' && infoOben.top < infoOben.ih * 0.7, infoOben);
+  await seite.click('.es-nav-punkt[data-ziel="es-g-spiel"]');
+  await warte(1500);
 
   // wieder einschalten (Klick auf den Text der Zeile geht auch)
   await seite.click('.es-text[data-key="klang"]');

@@ -182,6 +182,8 @@ eigene Klänge (siehe unten und `assets/LIZENZ-KUNST.md`).
 - **Figuren** „cburnett“ von Colin M.L. Burnett: GPLv2 oder neuer (derselbe Satz wie bei Lichess).
 - **Figuren** „Blaupause“ (`assets/pieces/blaupause/`): abgeleitet aus „cburnett“ mit `werkzeuge/blaupause.mjs` (nur
   Farben getauscht, Hilfslinien ergänzt), darum ebenfalls GPLv2 oder neuer.
+- **Figuren** „Kürbis“, „Frost“ und „Gold“ (`assets/pieces/kuerbis/`, `frost/`, `gold/`): abgeleitet aus „cburnett“ mit
+  `werkzeuge/labor-figuren.mjs` (nur Farben getauscht), darum ebenfalls GPLv2 oder neuer.
 - **Schriften** (Look „Modern und klar“): **Manrope** (The Manrope Project Authors) und **Bricolage Grotesque**
   (The Bricolage Grotesque Project Authors), beide unter der SIL Open Font License 1.1, Lizenztexte in
   `assets/schriften/OFL-Manrope.txt` und `assets/schriften/OFL-Bricolage-Grotesque.txt`. Quelle: npm

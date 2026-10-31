@@ -184,7 +184,8 @@ export const STANDARD_EINSTELLUNGEN = Object.freeze({
 
 // Erlaubte Werte der Einstellungen (Aufzaehlungen); alles andere faellt auf den Standard zurueck
 export const EINSTELLUNG_WERTE = Object.freeze({
-  brett: Object.freeze(['nacht', 'gruen', 'holz']),
+  // dahinter die Bretter des Labors (js/labor.js, nur das Erfinder-Konto; app.js faellt fuer andere auf 'nacht')
+  brett: Object.freeze(['nacht', 'gruen', 'holz', 'kuerbis', 'frost', 'marmor', 'nussbaum', 'thron']),
   klangpaket: Object.freeze(['', 'holz', 'arcade']),
   klangstufe: Object.freeze(['alle', 'wichtig', 'aus']),
   musikMelodie: Object.freeze(['welt', 'karofelder', 'springerforst', 'turmstadt', 'gezeitenkueste', 'stockfisch-tiefe']),
@@ -194,7 +195,8 @@ export const EINSTELLUNG_WERTE = Object.freeze({
   modus: Object.freeze(['system', 'hell', 'dunkel']),
   koordLage: Object.freeze(['ecke', 'rand']),
   duellIntro: Object.freeze(['immer', 'besondere', 'aus']),
-  figuren: Object.freeze(['cburnett', 'blaupause']),   // blaupause nur mit Sonderstueck (js/figurensatz.js)
+  // blaupause nur mit Sonderstueck, kuerbis/frost/gold nur fuer den Erfinder (Labor, js/labor.js; beides js/figurensatz.js)
+  figuren: Object.freeze(['cburnett', 'blaupause', 'kuerbis', 'frost', 'gold']),
   coachStil: Object.freeze(['ausfuehrlich', 'knapp']),
   sprueche: Object.freeze(['an', 'wenig', 'aus']),
   datenfreigabe: Object.freeze(['aus', 'an']),

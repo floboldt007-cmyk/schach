@@ -79,6 +79,7 @@ import { setzeSprache, geraeteSprache, SPRACHEN, t } from './sprache.js';
 import './sprachen/allgemein.js';
 import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
+import { brettWahl } from './labor.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
@@ -125,7 +126,8 @@ function wendeEinstellungenAn(e) {
   setzeBewegung(e.bewegung);
   wendeThemaAn({ thema: e.thema, modus: e.modus }).catch((f) => console.error(f));
   const html = document.documentElement;
-  html.dataset.brett = e.brett;
+  // Labor-Bretter nur fuer den Erfinder (js/labor.js); andere sehen still das Standardbrett
+  html.dataset.brett = brettWahl(e.brett);
   html.dataset.koordinaten = e.koordinaten ? 'an' : 'aus';
   html.dataset.balken = e.balken ? 'an' : 'aus';
   html.dataset.live = e.liveBewertung ? 'an' : 'aus';

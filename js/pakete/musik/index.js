@@ -93,6 +93,8 @@ export function melodienTeile(fortschritt = ladeFortschritt(), e = einstellung()
       id: 'melodie-' + m.id, name: t('p-musik.welt.' + m.id), frei, an, bild: melodieKunst(i + 1),
       zeile: an ? t('p-musik.sammlung.an') : frei ? t('p-musik.sammlung.frei') : t('p-musik.sammlung.weg', { welt: t('p-musik.welt.' + m.id) }),
       fortschritt: frei || !sterne.length ? undefined : sterne.filter(Boolean).length / sterne.length,
+      // Ausruesten per Tipp in der Sammlung: diese Melodie, und die Musik geht an
+      wahl: frei && app ? () => { app.setzeEinstellungen({ musik: true, musikMelodie: m.id }); aktualisiere(); } : undefined,
     };
   });
 }
