@@ -3732,6 +3732,57 @@ async function testeU7(browser) {
     await kontext.close();
   }
 
+  // Flo 01.11.2026 abends (iPad quer, "flackert noch"): Die Coach-Karte glitt je Zug samt Hintergrund aus dem Unsichtbaren
+  // ein, kurz davor stand fuer Sekundenbruchteile "Coach schaut". Die geschlagenen Figuren wurden nach jedem Zug als neue
+  // Bilder angelegt (Safari zeigt neue Bilder gern einen Moment leer), und "denkt" schob die Figuren des Bots zur Seite.
+  {
+    gruppe = 'iPad ruhig: Coach und geschlagene Figuren';
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w: 1180, h: 820 });
+    await seite.evaluate(() => { window.__test = { botZug: () => { const v = window.__partie.chess().history({ verbose: true }); return { e2e4: 'd7d5', e4d5: 'd8d5', b1c3: 'd5a5' }[v[v.length - 1].lan] || null; } }; });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await h.warteFlo();
+    await seite.evaluate(() => {
+      const coach = document.querySelector('.partie .coach');
+      const r = window.__ruhe = { karte: [], neuGebaut: 0, zugUm: 0, warteNach: [] };
+      const iv = setInterval(() => { for (const a of coach.getAnimations()) if (!r.karte.includes(a.animationName)) r.karte.push(a.animationName || 'waapi'); }, 8);
+      r.stop = () => clearInterval(iv);
+      // erst den Zeitpunkt des eigenen Zugs (Zugliste neu, Bot am Zug), dann "Coach schaut" im selben oder einem spaeteren Schub
+      new MutationObserver((ms) => {
+        const jetzt = performance.now();
+        if (window.__partie.phase() === 'bot' && ms.some((m) => m.type === 'childList' && m.target.classList && m.target.classList.contains('zugliste'))) r.zugUm = jetzt;
+        for (const m of ms) {
+          if (m.type === 'childList' && m.target.classList && m.target.classList.contains('geschlagen-ort')) r.neuGebaut++;
+          if (m.type === 'attributes' && m.target === coach && coach.classList.contains('wartet') && !String(m.oldValue).includes('wartet')) r.warteNach.push(Math.round(jetzt - r.zugUm));
+        }
+      }).observe(document.querySelector('.screen.partie'), { subtree: true, childList: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+    });
+    await h.zugTippen('e2e4');
+    await seite.waitForFunction(() => window.__partie.z.zuege.length === 2 && window.__partie.phase() === 'flo', null, { timeout: 30000 });
+    await warte(300);
+    const ohneSchlag = await seite.evaluate(() => window.__ruhe.neuGebaut);
+    await h.zugTippen('e4d5');
+    await seite.waitForFunction(() => window.__partie.z.zuege.length === 4 && window.__partie.phase() === 'flo', null, { timeout: 30000 });
+    await warte(300);
+    const nachSchlaegen = await seite.evaluate(() => window.__ruhe.neuGebaut);
+    // Bot hat einen Bauern geschlagen: seine Figur in der Unterzeile steht still, waehrend er ueber den naechsten Zug "denkt"
+    const vorDenken = await seite.evaluate(() => { const i = document.querySelector('.spieler.gegner .geschlagen img'); return i ? Math.round(i.getBoundingClientRect().left) : null; });
+    await seite.evaluate(() => { window.__test.botAnhalten = true; });
+    await h.zugTippen('b1c3');
+    await seite.waitForFunction(() => document.querySelector('.screen.partie').classList.contains('bot-denkt') && document.querySelector('.spieler.gegner .denkt'), null, { timeout: 8000 });
+    const beimDenken = await seite.evaluate(() => { const i = document.querySelector('.spieler.gegner .geschlagen img'); return i ? Math.round(i.getBoundingClientRect().left) : null; });
+    await seite.evaluate(() => { window.__test.botAnhalten = false; });
+    await seite.waitForFunction(() => window.__partie.z.zuege.length === 6 && window.__partie.phase() === 'flo', null, { timeout: 30000 });
+    await seite.waitForFunction(() => window.__partie.z.live[4] && window.__partie.z.live[4].status === 'fertig', null, { timeout: 30000 });
+    await warte(500);
+    const r = await seite.evaluate(() => { window.__ruhe.stop(); return { karte: window.__ruhe.karte, warteNach: window.__ruhe.warteNach }; });
+    pruefe('Coach-Karte selbst blendet je Zug nicht mehr aus und ein (nur ihr Inhalt)', r.karte.length === 0, JSON.stringify(r));
+    pruefe('"Coach schaut" erst nach 0,4 s, ist die Bewertung schneller, wechselt die Karte nur einmal', r.warteNach.every((ms) => ms >= 380), JSON.stringify(r));
+    pruefe('Geschlagene Figuren: ohne Schlag nichts neu gebaut, je Schlag nur die geaenderte Zeile (1 + 2)', ohneSchlag === 0 && nachSchlaegen === 3, JSON.stringify({ ohneSchlag, nachSchlaegen }));
+    pruefe('Bot denkt: seine geschlagenen Figuren ruecken nicht zur Seite', vorDenken != null && vorDenken === beimDenken, JSON.stringify({ vorDenken, beimDenken }));
+    pruefe('iPad ruhig (Coach): keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // --- Ergebnis (PLAN 2.6): Schleier, Screen tritt zurueck, "Sieg!" mit goldenem Ausrufezeichen, kein Konfetti,
   //     Niederlage mit Lichtblick, Remis gold-neutral, Handy: Knoepfe untereinander, Hauptknopf zuerst ---
   for (const g of [{ w: 1180, h: 820 }, { w: 390, h: 844, handy: true }]) {
