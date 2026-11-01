@@ -112,9 +112,12 @@
 }
 
 /* ---------- Gegnersuche ---------- */
-.lb-suche { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
-  background: var(--schleier); }
-.lb-suche-karte { width: min(100%, 380px); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 20px; border-radius: var(--r-l);
+/* Flo 01.11.2026 (Handy): "Bin auf Gegner suchen gegangen, konnte danach nichts mehr anklicken". Die Karte ist nie mehr
+   abgeschnitten: ist sie hoeher als der Schirm, rollt die Suche selbst (margin: auto mittet sie nur, solange Platz ist),
+   und auf kurzen Schirmen wird der Radar kleiner. */
+.lb-suche { position: fixed; inset: 0; z-index: 90; display: flex; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); background: var(--schleier); }
+.lb-suche-karte { margin: auto; flex: none; width: min(100%, 380px); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 20px; border-radius: var(--r-l);
   background: var(--flaeche); box-shadow: var(--s3, var(--s2)), var(--kante); color: var(--text); text-align: center; }
 .lb-radar { position: relative; width: 200px; height: 150px; margin-bottom: 4px; }
 .lb-radar > i { position: absolute; top: -9px; bottom: -9px; left: 16px; right: 16px; border-radius: 50%; border: 2px solid var(--akzent); opacity: 0; animation: lb-puls 2.4s ease-out infinite; }
@@ -140,6 +143,14 @@
 .lb-suche-knoepfe .knopf { width: 100%; min-height: 48px; justify-content: center; }
 .lb-suche-knoepfe .knopf[hidden] { display: none; }
 
+@media (max-height: 640px) {
+  .lb-suche-karte { gap: 6px; padding: 18px 18px 16px; }
+  .lb-radar { width: 176px; height: 112px; margin-bottom: 0; }
+  .lb-ich, .lb-gegner { width: 60px; height: 60px; margin: -30px 0 0 -30px; }
+  .lb-suche[data-phase="gefunden"] .lb-ich { transform: translateX(-46px); }
+  .lb-suche[data-phase="gefunden"] .lb-gegner { transform: translateX(46px); }
+  .lb-suche-knoepfe { margin-top: 6px; }
+}
 html[data-bewegung="aus"] .lb-radar > i { animation: none; opacity: .35; transform: scale(.7); }
 html[data-bewegung="aus"] .lb-modus-pille, html[data-bewegung="aus"] .lb-ich, html[data-bewegung="aus"] .lb-gegner { transition: none; }
 @media (prefers-reduced-motion: reduce) {

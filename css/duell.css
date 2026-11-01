@@ -85,3 +85,31 @@
 .duell-zeit { position: absolute; left: 28px; right: 28px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); height: 3px; border-radius: 3px;
   background: color-mix(in srgb, var(--duell-auf-flo) 18%, transparent); overflow: hidden; }
 .duell-zeit i { display: block; height: 100%; background: var(--gold); transform-origin: 0 50%; transform: scaleX(0); }
+/* Lange Fassung im Hochformat (Flo 01.11.2026, Handy: "sieht komisch aus"): mit Titel und drei Abzeichen war der Inhalt
+   hoeher als der Schirm (Bot-Portraet oben abgeschnitten, Abzeichen unter "Tippen zum Starten"). Jetzt ist alles nach
+   der Bildschirmhoehe bemessen (svh, sonst vh), die Naht liegt hoeher (--naht), damit unter Flos Namen Platz fuer Titel
+   und Abzeichen bleibt, die Abzeichen stehen in einer Reihe, und unten bleibt Platz fuer den Hinweis und den Balken.
+   "gegen" sitzt genau auf der Naht: die Bot-Seite ist so hoch wie die Naht minus der halben Kreishoehe. */
+@media (orientation: portrait) {
+  .duell.lang { --naht: 41%; --gegen: clamp(52px, 8.5vh, 76px); --gegen: clamp(52px, 8.5svh, 76px); }
+  .duell.lang .duell-flo i { -webkit-clip-path: polygon(0 calc(var(--naht) + 3%), 100% calc(var(--naht) - 3%), 100% 100%, 0 100%);
+    clip-path: polygon(0 calc(var(--naht) + 3%), 100% calc(var(--naht) - 3%), 100% 100%, 0 100%); }
+  .duell.lang .duell-flo .naht {
+    -webkit-clip-path: polygon(0 calc(var(--naht) + 3% - 24px), 100% calc(var(--naht) - 3% - 24px), 100% calc(var(--naht) - 3%), 0 calc(var(--naht) + 3%));
+    clip-path: polygon(0 calc(var(--naht) + 3% - 24px), 100% calc(var(--naht) - 3% - 24px), 100% calc(var(--naht) - 3%), 0 calc(var(--naht) + 3%)); }
+  .duell.lang .duell-oben { top: calc(12px + env(safe-area-inset-top, 0px)); }
+  .duell.lang .duell-paar { height: 100%; }
+  .duell.lang .duell-paar .duell-seite { min-height: 0; gap: clamp(4px, 1.1vh, 12px); gap: clamp(4px, 1.1svh, 12px); }
+  .duell.lang .duell-paar .duell-seite:first-child { flex: 0 0 calc(var(--naht) - var(--gegen) / 2); padding: calc(56px + env(safe-area-inset-top, 0px)) 0 clamp(8px, 1.6vh, 18px); }
+  .duell.lang .duell-paar .duell-seite:last-child { flex: 1 1 0; padding: clamp(8px, 1.6vh, 18px) 0 calc(58px + env(safe-area-inset-bottom, 0px)); }
+  .duell.lang .duell-gegen { width: var(--gegen); height: var(--gegen); margin: 0; font-size: 12px; }
+  .duell.lang .duell-av { width: clamp(64px, 13vh, 172px); width: clamp(64px, 13svh, 172px); }
+  .duell.lang .duell-name { font-size: clamp(22px, 4vh, 38px); font-size: clamp(22px, 4svh, 38px); }
+  .duell.lang .duell-unter { font-size: 13px; }
+  .duell.lang .duell-titel { margin-top: 0; }
+  .duell.lang .duell-vitrine { flex-wrap: nowrap; width: 100%; max-width: 420px; gap: 6px; margin-top: 2px; }
+  .duell.lang .duell-orden { min-width: 0; }
+  .duell.lang .duell-orden.mit-bild { flex: 1 1 0; min-width: 0; max-width: 136px; padding: 6px 4px 7px; font-size: 12px; }
+  .duell.lang .duell-orden.mit-bild > svg { width: clamp(30px, 6vh, 54px); height: clamp(30px, 6vh, 54px); width: clamp(30px, 6svh, 54px); height: clamp(30px, 6svh, 54px); }
+  .duell.lang .duell-orden.mit-bild > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+}

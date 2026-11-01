@@ -7,7 +7,8 @@ BROWSER=webkit node tests/board.test.mjs
 BROWSER=webkit node tests/screens.test.mjs --ohne-bilder
 ```
 
-Die CI (`.github/workflows`, Job `webkit`) lässt `storage`, `board`, `screens` und `e2e` mit WebKit laufen und
+Die CI (`.github/workflows`, Job `webkit`) lässt `storage`, `board`, `screens`, `e2e`, `notfall`, `bericht` und seit 01.11.2026 `lobby` (Gegnersuche mit dem
+Finger, danach reagieren Lobby und Partie; Flo am Handy: "konnte danach nichts mehr anklicken") mit WebKit laufen und
 bewahrt Ausgabe und Screenshots bei einem Fehlschlag als Artefakt auf. Hier ist die Entwicklungsumgebung ohne
 WebKit (Download gesperrt), deshalb zeigt nur die CI, ob die Punkte unten wirklich grün sind.
 

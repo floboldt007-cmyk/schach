@@ -631,7 +631,8 @@ async function profilTeil(browser) {
   await p.s.locator('.detail [data-aktion="spielen"]').first().click();
   await p.s.waitForSelector('.duell.voll', { timeout: 5000 }).catch(() => {});
   const duell = await p.s.evaluate(() => ({ orden: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden')].map((x) => x.textContent),
-    bilder: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden.mit-bild > svg.sk-erfolg')].map((x) => Math.round(x.getBoundingClientRect().width)),
+    // Layout-Breite (getComputedStyle), nicht das Rechteck: das Abzeichen springt gerade mit scale(.7) herein
+    bilder: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden.mit-bild > svg.sk-erfolg')].map((x) => Math.round(parseFloat(getComputedStyle(x).width))),
     figur: document.querySelector('.duell.voll [data-rolle="flo"] svg')?.dataset.figur, titel: document.querySelectorAll('.duell.voll .duell-titel').length }));
   pruefe('Duell-Intro: unter Flo steht die Vitrine mit Abzeichen (Flo 01.11.2026), Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
     && duell.bilder.length === 1 && duell.bilder[0] >= 36 && duell.figur === 'Q' && duell.titel === 0, duell);
