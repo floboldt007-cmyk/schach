@@ -145,6 +145,7 @@ import { zeige as zeigeZuzweit } from './zuzweit.js';
 import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
+import { meinName } from '../konto.js';
 
 
 const SERIE = new Set(['bester', 'stark', 'brillant']);
@@ -458,9 +459,9 @@ export function zeige(root, params, app) {
         <div class="zugbox"><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
         <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
         <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
-        <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="Flo">
+        <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="${esc(meinName())}">
           <span class="av">${floAvatar(farbe)}</span>
-          <div class="name">Flo</div>
+          <div class="name">${esc(meinName())}</div>
           <div class="unter bot-meta"><span class="p-meta">${esc(farbeName(farbe))}</span><span class="geschlagen-ort" data-wer="flo"></span></div>
           ${uhrHtml('flo')}
         </div>

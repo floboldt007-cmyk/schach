@@ -20,6 +20,7 @@ import { istErfinder, hatSonderstueck, pionierNummer, ERFINDER } from '../../son
 import { WELTEN, botNachId } from '../../bots.js';
 import { istWeltFrei, ladePartien, wertet } from '../../storage.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
+import { meinName } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { teileErfolge, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
@@ -241,7 +242,7 @@ export function profilKarte({ app } = {}) {
   const tj = titelJetzt(erfolge);
   const titel = tj ? `<span class="pr-chip pr-chip-titel" data-art="${esc(tj.art)}" data-seltenheit="${esc(tj.seltenheit)}">${titelBild(tj, 'pr-titel-wappen')}<span>${esc(tj.name)}</span></span>` : '';
   k.innerHTML = `<div class="pr-kopf"><span class="pr-av">${floAvatar('w')}</span>
-      <div class="pr-name"><b>Flo</b><div class="pr-chips">${titel}</div><small class="pr-seit">${esc(seitText())}</small></div></div>
+      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}</div><small class="pr-seit">${esc(seitText())}</small></div></div>
     <button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
     <h4 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h4>
     <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"
