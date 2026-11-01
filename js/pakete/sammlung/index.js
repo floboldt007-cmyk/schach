@@ -5,7 +5,9 @@
 // Orte: ich:kopf Profil 10 und duell:profil? (profil.js); sammlung:bereich Erfinder 5 (nur mit Sonderstuecken, erfinder.js), Rahmen 35 (profil.js), Bretter 40, Klaenge 50, Erfolge 90, Shop 95 (Editionen, js/pakete/sammlung/shop.js)
 import { anbieten, waehle } from '../../orte.js';
 import { freischalten, bereich } from '../../ui/ich.js';
-import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul } from '../../storage.js';
+import { ladeEinstellungen, ladeFortschritt, gesamtSterne, besiegteBots, sterneZahl, ladeModul, ladePartien, wertet } from '../../storage.js';
+import { erspielteErfolge, merkeErspielteErfolge } from '../../profil.js';
+import { BEREICHE as SCHUL_BEREICHE, ALLE as SCHUL_LEKTIONEN, summe as schulSumme } from '../lernen/mattbilder.js';
 import { BOTS, WELTEN } from '../../bots.js';
 import { PAKETE_KLANG } from '../../sounds.js';
 import { klangKunst, brettKunst, erfolgKunst, erfolgSeltenheit } from '../../sammlung-kunst.js';
@@ -88,18 +90,57 @@ export function spielstand() {
 export const LIGA_STUFEN = 6;                       // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
 export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
 export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);
+export const SIEGE_ZIELE = Object.freeze([10, 50, 100]);
+export const SIEGESSERIE = 5;
+
+// Erfolge aus dem Partien-Archiv (nur wertende Partien): Sieg mit Schwarz und die beste Siegesfolge. Einmal geschafft,
+// bleiben sie (js/profil.js erspielteErfolge), auch wenn die Partie spaeter aus dem Archiv (300 Partien) faellt.
+export function partienStand(partien = null) {
+  let liste = [];
+  try { liste = (Array.isArray(partien) ? partien : ladePartien()).filter(wertet); } catch (e) { liste = []; }
+  // das Archiv kommt neueste zuerst
+  const zeit = (p) => String((p && p.datum) || '');
+  let folge = 0;
+  let beste = 0;
+  for (const p of [...liste].sort((a, b) => zeit(a).localeCompare(zeit(b)))) {
+    if (p && p.ergebnis === 'sieg') { folge += 1; beste = Math.max(beste, folge); } else folge = 0;
+  }
+  const neu = [];
+  if (liste.some((p) => p && p.ergebnis === 'sieg' && p.spielerFarbe === 'b')) neu.push('schwarz-sieg');
+  if (beste >= SIEGESSERIE) neu.push('siegesserie-' + SIEGESSERIE);
+  let gemerkt = [];
+  try { gemerkt = erspielteErfolge(); } catch (e) { gemerkt = []; }
+  if (neu.some((x) => !gemerkt.includes(x))) {
+    try { merkeErspielteErfolge(neu); } catch (e) { /* ohne Speicher nur fuer jetzt */ }
+    gemerkt = [...new Set([...gemerkt, ...neu])];
+  }
+  return { beste, frei: gemerkt };
+}
+
+// Meisterschule (Paket lernen): nur, solange sie im Labor steht (js/labor.js laborFrei), sonst gaebe es keinen Weg dahin
+export function schulStand(roh = undefined) {
+  if (roh === undefined) {
+    if (!laborFrei()) return null;
+    try { roh = ladeModul('lernen', {}); } catch (e) { roh = {}; }
+  }
+  return {
+    bereiche: SCHUL_BEREICHE.map((b) => ({ id: b.id, alle: b.lektionen.length, ...schulSumme(roh, b.id) })),
+    gesamt: { alle: SCHUL_LEKTIONEN.length, ...schulSumme(roh) },
+  };
+}
 
 // Erfolge nur aus dem Spielstand: Sieg, drei Sterne, je Welt alle Bots, alle Bots, alle Sterne, dazu (Flo 30.10.,
 // Profil mit Vitrine) Liga-Stufen, Serie und Level
-export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
+export function teileErfolge(f = ladeFortschritt(), z = spielstand(), pa = partienStand(), schule = schulStand()) {
   const besiegt = (b) => !!(f.bots[b.id] && f.bots[b.id].sterne[0]);
   const n = besiegteBots(f);
   const sterne = gesamtSterne(f);
   const dreiSterne = BOTS.some((b) => sterneZahl(b.id, f) === 3);
   // eigenes Abzeichen je Erfolg, gestaffelt nach Seltenheit (js/sammlung-kunst.js); der Stern bleibt nur Rueckfall
-  const gruppe = (id) => S('gruppe.' + (/^welt-/.test(id) ? 'welten' : /^liga-/.test(id) ? 'liga' : /^serie-/.test(id) ? 'serie' : /^level-/.test(id) ? 'level' : 'meilensteine'));
-  const erfolg = (id, frei, name, weg, fortschritt) => ({ id: 'erfolg-' + id, name, frei, zeile: frei ? S('geschafft') : weg,
-    bild: erfolgKunst(id) || sternBild, seltenheit: erfolgSeltenheit(id), fortschritt, gruppe: gruppe(id) });
+  const gruppe = (id) => S('gruppe.' + (/^welt-/.test(id) ? 'welten' : /^liga-/.test(id) ? 'liga' : /^serie-/.test(id) ? 'serie' : /^level-/.test(id) ? 'level'
+    : /^(siege-|schwarz-|siegesserie-|endgegner|alle-endgegner)/.test(id) ? 'partien' : /^schule-/.test(id) ? 'schule' : 'meilensteine'));
+  const erfolg = (id, frei, name, weg, fortschritt, labor = false) => ({ id: 'erfolg-' + id, name, frei, zeile: frei ? S('geschafft') : weg,
+    bild: erfolgKunst(id) || sternBild, seltenheit: erfolgSeltenheit(id), fortschritt, gruppe: gruppe(id), ...(labor ? { labor: true } : {}) });
   const aus = [
     erfolg('erster-sieg', n > 0, S('erfolg.ersterSieg'), S('erfolg.ersterSiegWeg')),
     erfolg('drei-sterne', dreiSterne, S('erfolg.dreiSterne'), S('erfolg.dreiSterneWeg')),
@@ -122,6 +163,37 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand()) {
   for (const n of LEVEL_ZIELE) {
     aus.push(erfolg('level-' + n, z.level >= n, S('erfolg.level', { n }), S('erfolg.levelWeg', { n: Math.min(z.level, n), alle: n }),
       Math.min(1, z.level / n)));
+  }
+  // Partien (Flo 01.11.2026: neue Errungenschaften): Siege aus dem Zaehler je Bot (bleibt immer), Schwarz und Folge aus
+  // dem Archiv (gemerkt), Endgegner aus dem Fortschritt
+  const siege = BOTS.reduce((a, b) => a + (Number(f.bots[b.id] && f.bots[b.id].siege) || 0), 0);
+  for (const n of SIEGE_ZIELE) {
+    aus.push(erfolg('siege-' + n, siege >= n, S('erfolg.siege', { n }), S('erfolg.siegeWeg', { n: Math.min(siege, n), alle: n }), Math.min(1, siege / n)));
+  }
+  const pf = (pa && Array.isArray(pa.frei)) ? pa.frei : [];
+  aus.push(erfolg('schwarz-sieg', pf.includes('schwarz-sieg'), S('erfolg.schwarzSieg'), S('erfolg.schwarzSiegWeg')));
+  const folge = Math.min(Number(pa && pa.beste) || 0, SIEGESSERIE);
+  const serieFrei = pf.includes('siegesserie-' + SIEGESSERIE);
+  aus.push(erfolg('siegesserie-' + SIEGESSERIE, serieFrei, S('erfolg.siegesserie', { alle: SIEGESSERIE }),
+    S('erfolg.siegesserieWeg', { n: folge, alle: SIEGESSERIE }), serieFrei ? 1 : folge / SIEGESSERIE));
+  const bosse = BOTS.filter((b) => b.endgegner);
+  const bossK = bosse.filter(besiegt).length;
+  aus.push(erfolg('endgegner', bossK > 0, S('erfolg.endgegner'), S('erfolg.endgegnerWeg')));
+  aus.push(erfolg('alle-endgegner', bosse.length > 0 && bossK === bosse.length, S('erfolg.alleEndgegner'),
+    S('erfolg.alleEndgegnerWeg', { n: bossK, alle: bosse.length }), bosse.length ? bossK / bosse.length : 0));
+  // Meisterschule: nur im Labor (schule null = nicht sichtbar)
+  if (schule) {
+    const name = { matt: 'schuleMatt', taktik: 'schuleTaktik', end: 'schuleEnd', eroeffnung: 'schuleEroeffnung' };
+    for (const b of schule.bereiche) {
+      if (!name[b.id] || !b.alle) continue;
+      aus.push(erfolg('schule-' + b.id, b.geschafft >= b.alle, S('erfolg.' + name[b.id]), S('erfolg.schuleBereichWeg', { n: b.geschafft, alle: b.alle }),
+        b.geschafft / b.alle, true));
+    }
+    const g = schule.gesamt;
+    aus.push(erfolg('schule-alle', g.alle > 0 && g.geschafft >= g.alle, S('erfolg.schuleAlle'), S('erfolg.schuleAlleWeg', { n: g.geschafft, alle: g.alle }),
+      g.alle ? g.geschafft / g.alle : 0, true));
+    aus.push(erfolg('schule-sterne', g.max > 0 && g.sterne >= g.max, S('erfolg.schuleSterne'), S('erfolg.schuleSterneWeg', { n: g.sterne, alle: g.max }),
+      g.max ? g.sterne / g.max : 0, true));
   }
   return aus;
 }

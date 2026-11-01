@@ -246,6 +246,7 @@ export const PAKETE_KLANG = Object.freeze({
 export const PAKETE_LABOR = Object.freeze({
   grusel: Object.freeze({ name: 'Grusel', pfad: 'assets/klang/grusel/' }),
   kristall: Object.freeze({ name: 'Kristall', pfad: 'assets/klang/kristall/' }),
+  juwel: Object.freeze({ name: 'Juwel', pfad: 'assets/klang/juwel/' }),
 });
 const paketVon = (p) => (Object.hasOwn(PAKETE_KLANG, p) ? PAKETE_KLANG[p] : Object.hasOwn(PAKETE_LABOR, p) ? PAKETE_LABOR[p] : null);
 export const KLANGGRUPPEN = Object.freeze(['brett', 'bewertung', 'feier', 'uhr', 'boss', 'finisher', 'bedienung']);

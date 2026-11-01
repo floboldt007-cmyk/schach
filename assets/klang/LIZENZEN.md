@@ -16,6 +16,10 @@ und Bilder steht in `assets/LIZENZ-KUNST.md`.
 `werkzeuge/labor-klaenge.mjs` aus den Holz-Klängen abgeleitet (Tonhöhe, Nachhall, Chor, Klangfarbe per ffmpeg).
 Darum ebenfalls eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
 
+**Labor-Klangset „Juwel“** (`juwel/`, 40 Dateien, nur im Erfinder-Konto): mit `werkzeuge/klang-juwel.mjs` ganz neu
+synthetisiert (Sinus- und Glastöne, gefiltertes Rauschen, eigener Hall), ohne Aufnahme und ohne fremdes Material. Ebenfalls
+eigene Werke von Flo, alle Rechte vorbehalten, Nutzung nur in der Schach-Arena.
+
 Es steckt keine fremde Aufnahme, kein Sample und kein Klang aus einer anderen App darin (weder chess.com
 noch lichess noch eine Klangbibliothek). Rechte Dritter an den Klängen gibt es deshalb nicht.
 

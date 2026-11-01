@@ -6,6 +6,7 @@ import { t } from '../../sprache.js';
 import { bereich } from '../../ui/ich.js';
 import { istErfinder } from '../../sonderstuecke.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
+import { emoteSvg } from '../../emote-kunst.js';
 import './texte.js';
 
 const MODUL = 'emotes';
@@ -52,7 +53,8 @@ const kreaturAktiv = (e = einstellungen(), erfinder = istErfinder()) => (erfinde
 function radEintraege(kreatur = null) {
   const eintrag = ([id]) => {
     const art = kreatur && KREATUR_EMOTES[id];
-    return { id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: art ? kreaturSvg(kreatur, art) : icon(id), kreatur: !!art };
+    // ohne Kreatur der bunte, bewegte Sticker (js/emote-kunst.js, Flo 01.11.2026), das Strichsymbol nur als Rueckfall
+    return { id, schluessel: 'emote.' + id, text: T('emote.' + id), svg: art ? kreaturSvg(kreatur, art) : (emoteSvg(id) || icon(id)), kreatur: !!art };
   };
   const alle = EMOTES.map(eintrag);
   return kreatur ? [...alle.filter((e) => e.kreatur).sort((a, b) => Object.keys(KREATUR_EMOTES).indexOf(a.id) - Object.keys(KREATUR_EMOTES).indexOf(b.id)), ...alle.filter((e) => !e.kreatur)] : alle;
@@ -308,17 +310,24 @@ function gruppe() {
   return el;
 }
 
-// Sammlung: die Kreaturen des Labors, nur fuer den Erfinder (andere sehen den Bereich erst, wenn Welten sie freischalten).
-// Gewaehlt wird nur hier (Flo 31.10.2026: nichts doppelt in den Einstellungen); ein zweiter Tipp auf die ausgeruestete
-// Kreatur nimmt sie ab, dann zeigen die Emotes wieder die Strichsymbole.
-function kreaturenBereich() {
-  if (!istErfinder()) return null;
+// Sammlung, Bereich Emotes (Flo 01.11.2026: "die Kreaturen gehoeren zu den Emotes"): oben die acht Sticker, darunter die
+// Kreaturen des Labors, nur fuer den Erfinder (andere sehen sie erst, wenn Welten sie freischalten). Gewaehlt wird die Kreatur
+// nur hier (Flo 31.10.2026: nichts doppelt in den Einstellungen); ein zweiter Tipp auf die ausgeruestete Kreatur nimmt sie
+// ab, dann zeigt das Rad wieder die Sticker.
+export function teileEmotes(erfinder = istErfinder()) {
+  const sticker = EMOTES.map(([id]) => ({ id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '', gruppe: T('gruppe.sticker'),
+    bild: emoteSvg(id) || icon(id) }));
+  if (!erfinder) return sticker;
   const aktiv = kreaturAktiv(einstellungen(), true);
-  return bereich({ id: 'kreaturen', name: T('kreaturen'), hinweis: T('kreaturenHinweis'), teile: KREATUREN.map((k) => ({
-    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, wahl: () => setze({ kreatur: k.id }),
-    abwahl: () => setze({ kreatur: null }),
+  return [...sticker, ...KREATUREN.map((k) => ({
+    id: 'kreatur-' + k.id, name: T('kreatur.' + k.id), frei: true, an: aktiv === k.id, labor: true, gruppe: T('kreaturen'),
+    wahl: () => setze({ kreatur: k.id }), abwahl: () => setze({ kreatur: null }),
     zeile: k.welt ? t(`bots.welten.${k.welt}.kurz`) : T('maskottchen'), bild: kreaturSvg(k.id, 'normal'),
-  })) });
+  }))];
+}
+function emoteBereich() {
+  const erfinder = istErfinder();
+  return bereich({ id: 'emotes', name: T('emotes'), teile: teileEmotes(erfinder), hinweis: erfinder ? T('kreaturenHinweis') : '' });
 }
 
 function ladeCss() {
@@ -332,11 +341,7 @@ anbieten('partie:aktionen', (k) => aktionsKnopf(k, 'chat'), { paket: MODUL, reih
 anbieten('partie:spieler-leiste', ({ buehne }) => { if (!einstellungen().an) return null; const e = document.createElement('span'); e.className = 'em-live sr'; e.setAttribute('aria-live', 'polite'); buehne.el.append(e); return e; }, { paket: MODUL, reihenfolge: 80 });
 anbieten('einstellungen:gruppen', () => gruppe(), { paket: MODUL, reihenfolge: 40 });
 // Sammlung (Reiter Ich): die Emotes des Rads, alle frei (weitere kommen erst mit dem Emote-Rad, funken/level.js)
-anbieten('sammlung:bereich', () => bereich({ id: 'emotes', name: T('emotes'), teile: EMOTES.map(([id, pfad]) => ({
-  id: 'emote-' + id, name: T('emote.' + id), frei: true, zeile: '',
-  bild: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${pfad}</svg>`,
-})) }), { paket: MODUL, reihenfolge: 20 });
-anbieten('sammlung:bereich', () => kreaturenBereich(), { paket: MODUL, reihenfolge: 21 });
+anbieten('sammlung:bereich', () => emoteBereich(), { paket: MODUL, reihenfolge: 20 });
 
 export {
   EMOTES, KREATUR_EMOTES, kreaturAktiv, radEintraege, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER,

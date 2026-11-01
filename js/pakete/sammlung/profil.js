@@ -7,20 +7,23 @@
 //   RAHMEN_LISTE -> [{ id, gruppe, name, weg? }]   in der Reihenfolge der Auswahl
 //   rahmenTeile(erfolge?) -> [{ id, name, frei, weg }]
 //   profilKarte({ app }) -> div.pr-karte          Ort ich:kopf
-//   duellProfil() -> { orden: [{ id, name }], titel } | null   Ort duell:profil?
+//   duellProfil() -> { orden: [{ id, name, bild, seltenheit }], titel, titelBild } | null   Ort duell:profil?
+//   titelJetzt() -> Titel | null               der getragene Titel (js/pakete/sammlung/titel.js aktuellerTitel)
+//   titelTeile() -> Teile des Bereichs Titel   Erfinder, Level-Titel, Erfolgs-Titel; Tipp traegt, zweiter Tipp nimmt ab
 import { anbieten } from '../../orte.js';
 import { bereich } from '../../ui/ich.js';
 import { sheet } from '../../ui/bauteile.js';
 import { floAvatar } from '../../thema.js';
 import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
-import { profilWahl, setzeProfilWahl, dabeiSeit, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
-import { istErfinder, hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
-import { WELTEN } from '../../bots.js';
-import { istWeltFrei } from '../../storage.js';
+import { profilWahl, setzeProfilWahl, dabeiSeit, erspielteTitel, merkeErspielteTitel, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
+import { istErfinder, hatSonderstueck, pionierNummer, ERFINDER } from '../../sonderstuecke.js';
+import { WELTEN, botNachId } from '../../bots.js';
+import { istWeltFrei, ladePartien, wertet } from '../../storage.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
-import { teileErfolge, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { teileErfolge, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
 import './texte.js';
 
 const PAKET = 'sammlung';
@@ -64,10 +67,44 @@ function vitrineTeile(erfolge = teileErfolge()) {
   return profilWahl().vitrine.map((id) => (id && frei.get(id)) || null);
 }
 
+// Titel (Flo 01.11.2026: Titel auch fuer Errungenschaften, eigenes Wappen je Titel)
+// Grundlage aller Titel: Level, Erfolge, Erfinder, Pionier-Nummer und die Koennen-Titel (neu erspielte werden gemerkt)
+function titelStand(erfolge = teileErfolge()) {
+  let level = 1;
+  try { level = spielstand().level; } catch (e) { level = 1; }
+  let koennen = erspielteTitel();
+  try {
+    const neu = koennenFrei(ladePartien().filter(wertet), (id) => (botNachId(id) || {}).elo || 0).filter((x) => !koennen.includes(x));
+    if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
+  } catch (e) { /* ohne Archiv nur die gemerkten */ }
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen };
+}
+export function titelJetzt(erfolge = teileErfolge()) {
+  return aktuellerTitel({ ...titelStand(erfolge), wahl: profilWahl().titel });
+}
+export function titelTeile(erfolge = teileErfolge()) {
+  const stand = titelStand(erfolge);
+  const jetzt = aktuellerTitel({ ...stand, wahl: profilWahl().titel });
+  const gruppe = { erfinder: S('gruppe.titelErfinder'), pionier: S('gruppe.titelErfinder'), level: S('gruppe.titelLevel'), erfolg: S('gruppe.titelErfolg'),
+    koennen: S('gruppe.titelKoennen') };
+  return titelListe(stand).map((x) => {
+    const an = !!jetzt && jetzt.id === x.id;
+    return { id: 'titel-' + x.id, name: x.name, frei: x.frei, an, gruppe: gruppe[x.art],
+      zeile: an ? (jetzt.gewaehlt ? S('titel.deiner') : S('titel.auto')) : x.frei ? S('titel.frei') : x.weg,
+      bild: titelBild(x, 'sk-titel'), seltenheit: x.seltenheit === 'einzig' ? 'einzig' : x.seltenheit, fortschritt: x.fortschritt,
+      wahl: () => setzeProfilWahl({ titel: x.id }), abwahl: an && jetzt.gewaehlt ? () => setzeProfilWahl({ titel: null }) : undefined };
+  });
+}
+
+// Beim Matchbeginn steht der Titel nur, wenn Flo ihn ausdruecklich traegt (oder als Erfinder): sonst bekaeme jede Partie
+// die volle Buehne (js/ui/duell.js, hatVitrine)
 export function duellProfil() {
-  const orden = vitrineTeile().filter(Boolean).map((e) => ({ id: e.id, name: e.name }));
-  const titel = istErfinder() ? S('erfinder.titel') : '';
-  return orden.length || titel ? { orden, titel } : null;
+  // Flo 01.11.2026: "die drei ausgewaehlten Errungenschaften sehen, auch den Titel": jede mit ihrem Abzeichen
+  const orden = vitrineTeile().filter(Boolean).map((e) => ({ id: e.id, name: e.name, bild: e.bild || '', seltenheit: e.seltenheit || 'frei' }));
+  const t = titelJetzt();
+  const zeigen = !!t && (t.gewaehlt || t.art === 'erfinder' || t.art === 'pionier');
+  const titel = zeigen ? t.name : '';
+  return orden.length || titel ? { orden, titel, titelBild: zeigen ? titelBild(t, 'duell-titel-wappen') : '' } : null;
 }
 
 function neuZeichnen(app) {
@@ -200,7 +237,9 @@ export function profilKarte({ app } = {}) {
   const vitrine = vitrineTeile(erfolge);
   const k = document.createElement('div');
   k.className = 'pr-karte';
-  const titel = istErfinder() ? `<span class="pr-chip pr-chip-titel">${esc(S('erfinder.titel'))}</span>` : '';
+  // der getragene Titel mit seinem Wappen (auch der Level-Titel, wenn keiner gewaehlt ist)
+  const tj = titelJetzt(erfolge);
+  const titel = tj ? `<span class="pr-chip pr-chip-titel" data-art="${esc(tj.art)}" data-seltenheit="${esc(tj.seltenheit)}">${titelBild(tj, 'pr-titel-wappen')}<span>${esc(tj.name)}</span></span>` : '';
   k.innerHTML = `<div class="pr-kopf"><span class="pr-av">${floAvatar('w')}</span>
       <div class="pr-name"><b>Flo</b><div class="pr-chips">${titel}</div><small class="pr-seit">${esc(seitText())}</small></div></div>
     <button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
@@ -216,6 +255,8 @@ export function profilKarte({ app } = {}) {
 
 anbieten('ich:kopf', ({ app }) => profilKarte({ app }), { reihenfolge: 10, paket: PAKET });
 anbieten('duell:profil?', () => duellProfil(), { reihenfolge: 10, paket: PAKET });
+anbieten('sammlung:bereich', () => bereich({ id: 'titel', name: S('titel'), teile: titelTeile(), hinweis: S('titel.hinweis') }),
+  { reihenfolge: 30, paket: PAKET });
 anbieten('sammlung:bereich', () => {
   const wahl = profilWahl();
   return bereich({ id: 'rahmen', name: S('rahmen'), teile: rahmenTeile().map((r) => ({

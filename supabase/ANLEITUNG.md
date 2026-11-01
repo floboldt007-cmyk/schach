@@ -246,6 +246,25 @@ sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgel
 Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
 1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
 
+## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
+
+Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den
+ersten 100 Konten (in der Reihenfolge der Anmeldung, das Erfinder-Konto zählt nicht mit) das Sonderstück
+`pionier-001` bis `pionier-100`. In der App heißt der Titel dann „Pionier Nr. 7“ (Sammlung, Bereich Titel). Wer keine
+Nummer hat, sieht den Titel gar nicht.
+
+1. Vorher müssen `supabase/schema.sql` und `supabase/werkstatt-schema.sql` eingespielt sein (Tabelle `sonderstuecke`,
+   dein Erfinder-Profil).
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/pionier-schema.sql` einfügen
+   und **Run** drücken. Die Datei darf mehrfach laufen. Alle schon vorhandenen Konten bekommen sofort ihre Nummer, neue
+   Konten beim Anmelden.
+3. Prüfen: `select stueck_id, nummer from public.sonderstuecke where stueck_id like 'pionier-%' order by nummer;` zeigt
+   die vergebenen Nummern.
+
+**Was der Server sicherstellt:** Nur die Datenbank vergibt Nummern (die App kann die Funktion nicht aufrufen), jede
+Nummer genau einmal, höchstens 100. Ein gelöschtes Konto gibt seine Nummer nicht frei. Geht bei der Vergabe etwas
+schief, klappt die Anmeldung trotzdem (nur ohne Nummer).
+
 ## Google-Anmeldung einrichten
 
 Die App hat in der Konto-Gruppe den Knopf „Mit Google anmelden“. Er leitet zu Supabase

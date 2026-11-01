@@ -9,8 +9,9 @@ import path from 'node:path';
 import { setzeSpeicher, MODUL_BUDGET, speichereModulEinstellungen } from '../js/storage.js';
 import {
   EMOTES, KREATUR_EMOTES, kreaturAktiv, radEintraege, SPERRZEIT, EMOTES_MAX, CHAT_ZUEGE, CHAT_JE_MINUTE, ANTWORTEN_MAX, ARTEN, ANTWORT_ART, ANTWORT_JE_ART, SPEICHER, antwortText, einstellungen,
-  neuerStand, pruefeStand, imFenster, emoteFrei, chatFrei, nachEmote, nachChat, nachEigenemZug,
+  neuerStand, pruefeStand, imFenster, emoteFrei, chatFrei, nachEmote, nachChat, nachEigenemZug, teileEmotes,
 } from '../js/pakete/emotes/index.js';
+import { EMOTE_STICKER, emoteSvg } from '../js/emote-kunst.js';
 import { DE, EN } from '../js/pakete/emotes/texte.js';
 import { KREATUREN, KREATUR_ARTEN, kreaturSvg } from '../js/kreaturen-kunst.js';
 import { setzeSprache, t } from '../js/sprache.js';
@@ -83,6 +84,24 @@ pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(c
     /prefers-reduced-motion: reduce\) \{ \.kreatur, \.kreatur \* \{ animation: none !important/.test(css) && /\.em-blase\.still \.kreatur/.test(css)
     && /\.em-wahl\.em-kreatur:not\(:hover\):not\(:focus-visible\) \.kreatur/.test(css) && /@keyframes kr-wink/.test(css));
   pruefe('Namen der Kreaturen auf Deutsch und Englisch', KREATUREN.every((k) => DE['kreatur.' + k.id] && EN['kreatur.' + k.id]));
+  // Sticker (Flo 01.11.2026: "mehr Muehe, auch animierte Emotes"): jedes Emote ein eigener, bewegter Sticker
+  const sticker = EMOTE_STICKER.map((id) => emoteSvg(id));
+  const klassen = (x) => [...new Set((x.match(/class="([^"]*es-[^"]*)"/g) || []).join(' ').match(/es-[a-z0-9-]+/g) || [])];
+  pruefe('Sticker: einer je Emote, eigene Verlaufs-Id je Aufruf, keine Luecken in der Zeichnung',
+    EMOTE_STICKER.join() === EMOTES.map((e) => e[0]).sort((a, b) => EMOTE_STICKER.indexOf(a) - EMOTE_STICKER.indexOf(b)).join() && EMOTE_STICKER.length === EMOTES.length
+    && sticker.every((x) => /^<svg class="emote-sticker" data-emote="[a-z]+" viewBox="0 0 64 64"/.test(x) && !/undefined|NaN/.test(x))
+    && emoteSvg('hallo') !== emoteSvg('hallo') && emoteSvg('lachen') === '', EMOTE_STICKER.join());
+  const ohneKeyframes = EMOTE_STICKER.filter((id, i) => !klassen(sticker[i]).some((k) => k !== 'es-motiv' && new RegExp(`\\.${k}\\b[^{]*\\{[^}]*animation:`).test(css)));
+  pruefe('Sticker: jeder bewegt sich (eine Klasse mit Animation in emotes.css), still bei reduzierter Bewegung und in der gedaempften Blase',
+    ohneKeyframes.length === 0 && /prefers-reduced-motion: reduce\) \{ \.emote-sticker, \.emote-sticker \* \{ animation: none !important/.test(css)
+    && /\.em-blase\.still \.emote-sticker/.test(css), ohneKeyframes.join());
+  pruefe('Rad ohne Kreatur zeigt die Sticker', radEintraege(null).every((e) => /class="emote-sticker"/.test(e.svg) && new RegExp(`data-emote="${e.id}"`).test(e.svg)));
+  const ohne = teileEmotes(false);
+  const mit = teileEmotes(true);
+  pruefe('Sammlung: Kreaturen gehoeren zu den Emotes (Gruppe unter den Stickern), nur fuer den Erfinder',
+    ohne.length === 8 && ohne.every((x) => x.frei && /emote-sticker/.test(x.bild) && x.gruppe === DE['gruppe.sticker'])
+    && mit.length === 8 + KREATUREN.length && mit.slice(8).every((x) => x.labor && x.gruppe === DE.kreaturen && /data-kreatur=/.test(x.bild) && typeof x.wahl === 'function'),
+    { ohne: ohne.length, mit: mit.length });
 }
 
 // Speicher: das reservierte Budget 'ausdruck', beide Schalter kommen nach dem Laden zurueck

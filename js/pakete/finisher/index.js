@@ -1,10 +1,9 @@
 // Paket Finisher: nutzt ausschliesslich den Aufruf-Ort partie:matt. Es aendert weder Partie noch Ergebnis.
-// Freischaltregel: Krone ist frei, Schachbrett-Welle ab Funken-Level 5, Fallender Koenig ab Level 10.
-// Als Erfinder (Flo, Sonderstueck vom Server) sind alle Stufen frei, unabhaengig vom Level.
-// Signatur gehoert zu Flos Erfinder-Profil (js/sonderstuecke.js): frei nur mit dem Sonderstueck vom Server; wer es nicht
-// hat, sieht es nicht in der Sammlung (kein leerer Platz).
-// Die festen Stufen sind nachvollziehbar, enthalten keinen Zufall und keine Kaufmoeglichkeit. Die Level-Leiter
-// (funken/level.js, Stuecke 'finisher-<id>') nennt genau diese Stufen; tests/funken.test.mjs vergleicht beide.
+// Labor (Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, erstmal, die kommen in den Shop"): Finisher sieht
+// und nutzt nur der Erfinder (Sonderstueck vom Server, js/sonderstuecke.js). Alle anderen haben keinen Finisher, keinen
+// Bereich in der Sammlung und keinen Schalter in den Einstellungen, bis der Shop sie anbietet. Die Level-Leiter
+// (funken/level.js) verspricht deshalb keine Finisher mehr.
+// Signatur gehoert zu Flos Erfinder-Profil: frei nur mit dem Sonderstueck vom Server.
 // Klang: den Siegesklang spielt die Partie selbst; der Finisher hat einen eigenen Klang in der Gruppe 'finisher'.
 import { anbieten } from '../../orte.js';
 import { ladeModul, ladeModulEinstellungen, speichereModulEinstellungen } from '../../storage.js';
@@ -26,11 +25,11 @@ if (typeof document !== 'undefined' && !document.querySelector('link[data-paket=
   document.head.appendChild(css);
 }
 export const FINISHER = Object.freeze([
-  Object.freeze({ id: 'aus', text: 'aus', level: 1, klang: null }),
-  Object.freeze({ id: 'krone', text: 'krone', level: 1, klang: 'finisher-glocke' }),
-  Object.freeze({ id: 'welle', text: 'welle', level: 5, klang: 'finisher-kreide' }),
-  Object.freeze({ id: 'koenig', text: 'koenig', level: 10, klang: 'finisher-tinte' }),
-  Object.freeze({ id: 'signatur', text: 'signatur', level: 1, klang: 'finisher-tinte', sonder: ERFINDER.finisher }),
+  Object.freeze({ id: 'aus', text: 'aus', klang: null }),
+  Object.freeze({ id: 'krone', text: 'krone', klang: 'finisher-glocke' }),
+  Object.freeze({ id: 'welle', text: 'welle', klang: 'finisher-kreide' }),
+  Object.freeze({ id: 'koenig', text: 'koenig', klang: 'finisher-tinte' }),
+  Object.freeze({ id: 'signatur', text: 'signatur', klang: 'finisher-tinte', sonder: ERFINDER.finisher }),
 ]);
 // was dieses Konto sehen darf: alle Stufen-Finisher, Sonderstuecke nur mit Besitz
 const sichtbar = (f) => !f.sonder || hatSonderstueck(f.sonder);
@@ -39,17 +38,20 @@ export function aktuellesLevel() {
   const st = ladeModul('funken', {});
   return Number.isInteger(st && st.level) ? Math.max(1, st.level) : 1;
 }
-export function istFrei(id, level = aktuellesLevel()) {
+// Labor: nur der Erfinder hat Finisher; das Level spielt keine Rolle mehr (Parameter bleibt fuer bestehende Aufrufe)
+export function istFrei(id) {
   const f = FINISHER.find((x) => x.id === id);
-  if (f && f.sonder) return hatSonderstueck(f.sonder);
-  // Erfinder: alles Ausruestbare frei (js/sonderstuecke.js)
-  if (f && istErfinder()) return true;
-  return !!f && level >= f.level;
+  if (!f) return false;
+  if (f.id === 'aus') return true;
+  if (f.sonder) return hatSonderstueck(f.sonder);
+  return istErfinder();
 }
 export function auswahl(level = aktuellesLevel()) {
   const e = ladeModulEinstellungen(MODUL, { auswahl: 'krone' }) || {};
-  return istFrei(e.auswahl, level) ? e.auswahl : 'krone';
+  if (istFrei(e.auswahl, level)) return e.auswahl;
+  return istErfinder() ? 'krone' : 'aus';
 }
+export const laborFinisher = () => istErfinder();
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -97,6 +99,7 @@ export function starteFinisher(ctx, id = auswahl()) {
 // Einstellungen (Flo 31.10.2026: "doppelt sich"): nur noch an oder aus. Welcher Finisher laeuft, waehlt man in der
 // Sammlung; "zuletzt" merkt sich die Wahl, damit Einschalten den vorigen Finisher zurueckbringt.
 function einstellungen() {
+  if (!laborFinisher()) return null;
   const el = document.createElement('section'); el.className = 'es-gruppe flaeche fi-einstellungen';
   const an = () => auswahl() !== 'aus';
   el.innerHTML = `<h3 class="es-titel">${esc(F('titel'))}</h3>
@@ -120,9 +123,10 @@ function einstellungen() {
 
 anbieten('partie:matt', (ctx) => starteFinisher(ctx), { paket: MODUL });
 anbieten('einstellungen:gruppen', einstellungen, { paket: MODUL, reihenfolge: 45 });
-// Sammlung (Reiter Ich): jeder Finisher mit Schloss und Stufe, der ausgewaehlte als "Ausgeruestet". Bild: der Moment
+// Sammlung (Reiter Ich), nur im Labor des Erfinders: jeder Finisher mit Schild "Labor", der ausgewaehlte als "Ausgeruestet". Bild: der Moment
 // des Finishers mit den echten Figuren des ausgeruesteten Satzes (js/sammlung-kunst.js, Flo 31.10.2026)
 anbieten('sammlung:bereich', () => {
+  if (!laborFinisher()) return null;
   const lv = aktuellesLevel();
   const gewaehlt = auswahl(lv);
   const figuren = new URL('../../../' + figurenPfad(), import.meta.url).href;
@@ -131,7 +135,7 @@ anbieten('sammlung:bereich', () => {
     // Tipp waehlt, ein zweiter Tipp auf den gewaehlten schaltet den Finisher aus (wie die Lobby-Musik)
     wahl: () => speichereModulEinstellungen(MODUL, { auswahl: x.id, zuletzt: x.id }),
     abwahl: () => speichereModulEinstellungen(MODUL, { auswahl: 'aus', zuletzt: x.id }),
-    zeile: gewaehlt === x.id ? F('gewaehlt') : istFrei(x.id, lv) ? F('frei') : F('level', { level: x.level }),
+    zeile: gewaehlt === x.id ? F('gewaehlt') : F('frei'), labor: true,
     bild: finisherKunst(x.id, figuren) || '',
   })) });
 }, { paket: MODUL, reihenfolge: 10 });

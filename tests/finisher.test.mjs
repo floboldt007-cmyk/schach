@@ -7,14 +7,12 @@ const { FINISHER, istFrei, auswahl, starteFinisher } = await import('../js/paket
 const { klang, KATALOG } = await import('../js/sounds.js');
 
 assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig', 'signatur']);
-// Signatur (Erfinder-Profil): nie ueber das Level, nur mit dem Sonderstueck des angemeldeten Kontos
-assert.equal(istFrei('signatur', 99), false, 'Signatur ohne Sonderstueck gesperrt');
-assert.equal(istFrei('krone', 1), true);
-assert.equal(istFrei('welle', 4), false);
-assert.equal(istFrei('welle', 5), true);
-assert.equal(istFrei('koenig', 9), false);
-assert.equal(istFrei('koenig', 10), true);
-assert.equal(auswahl(1), 'krone');
+// Labor (Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"): ohne Erfinder-Konto ist
+// kein Finisher frei, auch nicht ueber das Level, und die Wahl ist "aus"
+assert.equal(istFrei('signatur'), false, 'Signatur ohne Sonderstueck gesperrt');
+assert.ok(['krone', 'welle', 'koenig'].every((id) => !istFrei(id)), 'ohne Erfinder: kein Finisher frei');
+assert.equal(istFrei('aus'), true);
+assert.equal(auswahl(), 'aus', 'ohne Erfinder: kein Finisher nach dem Matt');
 
 // Kleines Schein-DOM fuer starteFinisher (Node): nur was der Effekt braucht
 class El {
@@ -83,11 +81,13 @@ assert.equal(istFrei('signatur', 1), true, 'Signatur: Flos Konto frei');
 const { speichereModulEinstellungen } = await import('../js/storage.js');
 speichereModulEinstellungen('finisher', { auswahl: 'signatur' });
 assert.equal(auswahl(1), 'signatur', 'Signatur waehlbar');
-assert.equal(istFrei('koenig', 1), false, 'nur Signatur, ohne Erfinder-Titel: Koenig weiter ab Level 10');
-// Erfinder (Titel-Sonderstueck): alle Stufen frei, unabhaengig vom Level
+assert.equal(istFrei('koenig'), false, 'nur Signatur, ohne Erfinder-Titel: Koenig gesperrt');
+// Erfinder (Titel-Sonderstueck): alle Finisher frei
 lager.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel', 'erfinder-finisher-signatur'] }));
-assert.ok(['welle', 'koenig'].every((id) => istFrei(id, 1)), 'Erfinder: Welle und Koenig auf Level 1 frei');
+assert.ok(['krone', 'welle', 'koenig'].every((id) => istFrei(id)), 'Erfinder: alle Finisher frei');
+speichereModulEinstellungen('finisher', { auswahl: 'welle' });
+assert.equal(auswahl(), 'welle', 'Erfinder: Welle waehlbar');
 lager.removeItem('schach-arena:konto:sitzung');
-assert.equal(istFrei('koenig', 1), false, 'Erfinder abgemeldet: wieder nach Level');
-assert.equal(auswahl(1), 'krone', 'nach dem Abmelden faellt die Wahl auf Krone zurueck');
-console.log('finisher.test.mjs: Freischaltungen, sichere Standardwahl, eigener Klang statt zweitem Sieg, abgebrochenes Signal ok');
+assert.equal(istFrei('koenig'), false, 'Erfinder abgemeldet: kein Finisher');
+assert.equal(auswahl(), 'aus', 'nach dem Abmelden: kein Finisher (Labor)');
+console.log('finisher.test.mjs: Labor (nur Erfinder), sichere Standardwahl, eigener Klang statt zweitem Sieg, abgebrochenes Signal ok');

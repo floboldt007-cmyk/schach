@@ -58,7 +58,8 @@ pruefe('Taktik: Springergabel, Bauerngabel, Spiess, Fesselung, gefesselte Dame u
   && taktikLauf('abzug-turm', ['Nc6+', 'Qe7', 'Nxe7', 'Kf7']) === ',,,geschafft' && taktikLauf('abzug', ['Nf7+', 'Ke7', 'Bxh8', 'Kxf7']) === ',,,geschafft');
 // Teil 2: Doppelschach, Doppeldrohung, Ueberlastung (auch der Rueckschlag endet im Matt), Ablenkung (Matt), Hinlenkung (Opfer)
 pruefe('Taktik Teil 2: Doppelschach, Doppeldrohung, Ueberlastung, Ablenkung und Hinlenkung (Turmopfer zaehlt nicht als verloren)',
-  taktikLauf('doppelschach', ['Nd6+', 'Kd7', 'Nxc8', 'Kxc8']) === ',,,geschafft' && taktikLauf('doppeldrohung', ['Qe4', 'g6', 'Qxa8', 'Kg7']) === ',,,geschafft'
+  taktikLauf('doppelschach', ['Nd6+', 'Kd7', 'Nxc8', 'Kxc8']) === ',,,geschafft' && taktikLauf('doppeldrohung', ['Qd3', 'g6', 'Qxb5', 'Kg7']) === ',,,geschafft'
+  && taktikLauf('doppeldrohung', ['Qd3', 'Nd4', 'Qxh7#']) === ',,geschafft'
   && taktikLauf('ueberlastung', ['Qxd5', 'Qf8']) === ',geschafft' && taktikLauf('ueberlastung', ['Qxd5', 'Qxd5', 'Re8#']) === ',,geschafft'
   && taktikLauf('ablenkung', ['Re8', 'Qxe8', 'Qg7#']) === ',,geschafft'
   && taktikLauf('hinlenkung', ['Rf8+', 'Kxf8', 'Nd7+', 'Ke7', 'Nxb6', 'Kd6']) === ',,,,,geschafft');
@@ -66,6 +67,39 @@ pruefe('Taktik Teil 2: das Opfer erlaubt nur den Turm, eine weitere verschenkte 
   taktikLauf('hinlenkung', ['Rf8+', 'Kxf8', 'Nc6', 'Qxc6', 'h3']) === ',,,,verloren');
 pruefe('Taktik: ein Zug ohne Gewinn ist noch nichts, eine verschenkte Dame ist gescheitert',
   taktikLauf('turm-spiess', ['h3', 'Kb4']) === ',' && taktikLauf('gabel-dame', ['Qd8+', 'Rxd8', 'h3']) === ',,verloren');
+// Vollsuche (01.11.2026, Flo: "Doppeldrohung gibt keinen Sinn, in 2 Zuegen geht nicht"): jede Taktik ist gegen JEDE
+// Verteidigung in ziel Zuegen zu schaffen (Matt oder nach dem Gegenzug mindestens gewinn Punkte, wie pruefeZiel), jedes
+// Mattbild bis Matt in 3 ist genau so lang wie angegeben. Schach und Schlagzuege zuerst, damit die Suche schnell findet.
+const WERT_T = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const matT = (c) => { let s = 0; for (const z of c.board()) for (const f of z) if (f) s += (f.color === 'w' ? 1 : -1) * WERT_T[f.type]; return s; };
+const sortiert = (c) => c.moves({ verbose: true }).sort((a, b) => ((/[+#]/.test(b.san) ? 2 : 0) + (b.captured ? 1 : 0)) - ((/[+#]/.test(a.san) ? 2 : 0) + (a.captured ? 1 : 0)));
+function taktikWeg(c, n, start, gewinn) {
+  for (const m of sortiert(c)) {
+    c.move(m);
+    let gut = c.isCheckmate();
+    if (!gut && !c.isDraw()) {
+      gut = c.moves().every((a) => { c.move(a); const r = !c.isCheckmate() && !c.isDraw() && (matT(c) - start >= gewinn || (n > 1 && !!taktikWeg(c, n - 1, start, gewinn))); c.undo(); return r; });
+    }
+    c.undo();
+    if (gut) return m.san;
+  }
+  return null;
+}
+function mattWeg(c, n) {
+  for (const m of sortiert(c)) {
+    c.move(m);
+    let gut = c.isCheckmate();
+    if (!gut && n > 1 && !c.isDraw()) gut = c.moves().every((a) => { c.move(a); const r = !!mattWeg(c, n - 1); c.undo(); return r; });
+    c.undo();
+    if (gut) return m.san;
+  }
+  return null;
+}
+const taktikFalsch = TAKTIK.filter((l) => { const c = new Chess(l.fen); return !taktikWeg(c, l.ziel, matT(c), l.gewinn); }).map((l) => l.id);
+pruefe('Vollsuche: jede Taktik ist gegen jede Verteidigung in ihrer Zugzahl zu schaffen', taktikFalsch.length === 0, taktikFalsch.join());
+const mattFalsch = LEKTIONEN.filter((l) => l.ziel <= 3).filter((l) => !mattWeg(new Chess(l.fen), l.ziel) || (l.ziel > 1 && mattWeg(new Chess(l.fen), l.ziel - 1)))
+  .map((l) => l.id);
+pruefe('Vollsuche: jedes Mattbild bis Matt in 3 hat genau die angegebene Zugzahl', mattFalsch.length === 0, mattFalsch.join());
 // Eroeffnungen (Zugfolge-Trainer): Flo spielt Weiss und Schwarz, jede Folge legal (pruefeLektion), Erklaerung je eigenem Zug
 pruefe('Eroeffnungen: Art folge, Weiss und Schwarz vertreten, Grundstellung, Stufen leicht und mittel',
   EROEFFNUNGEN.every((l) => l.art === 'folge' && ['w', 'b'].includes(l.farbe) && l.fen.startsWith('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w'))
