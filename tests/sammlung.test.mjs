@@ -325,9 +325,10 @@ async function erfinderTeil(browser) {
   await p.s.locator('.fi-schalter').click();
   pruefe('Einstellungen: Einschalten bringt den zuletzt gewählten Finisher zurück (Signatur)', (await fiStand()).auswahl === 'signatur'
     && await p.s.locator('.fi-schalter').getAttribute('aria-checked') === 'true', await fiStand());
-  // Kreatur (Labor): nur noch in der Sammlung, Tipp ruestet aus, zweiter Tipp nimmt sie ab
+  // Kreatur (Labor): nur noch in der Sammlung, Tipp ruestet aus, zweiter Tipp nimmt sie ab. Seit 01.11.2026 (Flo: "die
+  // Kreaturen gehoeren zu den Emotes") stehen sie im Bereich Emotes unter den Stickern
   const kreatur = () => p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:ausdruck') || '{}').kreatur ?? null);
-  await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'kreaturen' }));
+  await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'emotes' }));
   await p.s.waitForSelector('.sa-teil[data-teil="kreatur-kronli"]', { timeout: 15000 }).catch(() => {});
   await ruesteAus(p.s, 'kreatur-kronli');
   const kAn = await kreatur();
