@@ -3670,10 +3670,10 @@ async function testeU7(browser) {
     const { kontext, seite, fehler, h } = await u7Seite(browser);
     // Engines einmal warm (sonst dauert schon der Start laenger als 1,4 s)
     await h.starte({ botId: 'benno', farbe: 'w' });
-    const lauf = async (mitEreignis) => {
+    const lauf = async (mitEreignis, max = null) => {
       await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
       await seite.waitForSelector('.screen.arena');
-      await seite.evaluate(() => { document.documentElement.dataset.duell = 'laeuft'; window.__test = { botPause: 0, botZug: () => 'e2e4' }; window.__app.gehe('partie', { botId: 'benno', farbe: 'b' }); });
+      await seite.evaluate((m) => { document.documentElement.dataset.duell = 'laeuft'; if (m) document.documentElement.dataset.duellMax = m; window.__test = { botPause: 0, botZug: () => 'e2e4' }; window.__app.gehe('partie', { botId: 'benno', farbe: 'b' }); }, max);
       const t0 = Date.now();
       await warte(700);
       const frueh = (await h.zuege()).length;
@@ -3683,7 +3683,7 @@ async function testeU7(browser) {
       const r = await seite.evaluate(() => ({ zuege: window.__partie.z.zuege.length, duell: (window.__partie.protokoll.find((e) => e.typ === 'duell') || {}).grund,
         ms: (window.__partie.protokoll.find((e) => e.typ === 'duell') || {}).ms,
         ziele: !!document.querySelector('.spieler.gegner .av') && !!document.querySelector('.spieler.ich .av') }));
-      await seite.evaluate(() => { delete document.documentElement.dataset.duell; });
+      await seite.evaluate(() => { delete document.documentElement.dataset.duell; delete document.documentElement.dataset.duellMax; });
       return { frueh, dauer, ...r };
     };
     const a = await lauf(true);
@@ -3692,6 +3692,10 @@ async function testeU7(browser) {
     pruefe('Duell ohne Ereignis: der Bot wartet höchstens 1,4 s', b.frueh === 0 && b.zuege === 1 && b.duell === 'zeit' && b.dauer < 4000, JSON.stringify(b));
     pruefe('Duell-Vertrag streng: ohne Ereignis wartet die Partie 1,4 s (gemessen in der Seite), mit Ereignis endet das Warten mit dem Ereignis',
       b.ms >= 1390 && b.ms <= 1900 && a.ms >= 600 && a.ms < 1390, JSON.stringify([a.ms, b.ms]));
+    // lange Fassung (Titel und Errungenschaften, Flo 01.11.2026): das Intro nennt seine harte Grenze, die Partie wartet so lange
+    const c = await lauf(false, '2400');
+    pruefe('Duell lange Fassung (data-duell-max 2400): ohne Ereignis wartet die Partie 2,4 s statt 1,4 s',
+      c.frueh === 0 && c.zuege === 1 && c.duell === 'zeit' && c.ms >= 2390 && c.ms <= 2900, JSON.stringify(c));
     await seite.evaluate(() => { localStorage.removeItem('schach-arena:v1:laufend'); window.__app.gehe('arena'); });
     await seite.waitForSelector('.screen.arena');
     await seite.evaluate(() => { window.__test = { botPause: 0, botZug: () => 'e2e4' }; window.__app.gehe('partie', { botId: 'benno', farbe: 'b' }); });
