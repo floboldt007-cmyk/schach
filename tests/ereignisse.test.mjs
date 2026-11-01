@@ -186,7 +186,7 @@ function el(name) {
 const namen = (c) => c.kinder.map((k) => k.name).join(',');
 
 const ORT_TABELLE = {
-  'arena:kopf': 'dom', 'arena:panel-oben': 'dom', 'arena:panel-bot': 'dom', 'arena:start': 'aufruf',
+  'arena:kopf': 'dom', 'arena:modus': 'dom', 'arena:panel-oben': 'dom', 'arena:panel-bot': 'dom', 'arena:start': 'aufruf',
   'partie:begruessung?': 'wahl', 'ergebnis:karte': 'dom', 'analyse:coach': 'dom', 'analyse:oben': 'dom',
   'verlauf:seite': 'dom', 'einstellungen:gruppen': 'dom', 'einstellungen:klang': 'dom', 'app:erster-screen?': 'wahl',
   // W0+a (SPIELKONZEPT 6.2)
