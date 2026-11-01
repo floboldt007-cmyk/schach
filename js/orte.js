@@ -37,6 +37,7 @@
 
 export const ORTE = Object.freeze({
   'arena:kopf': 'dom',
+  'arena:modus': 'dom',                // Umschalter ueber der Karte (Paket lobby: Welten | Online, nur im Labor)
   'sammlung:bereich': 'dom',
   // Lobby-Musik in der Sammlung unter Klaenge (Flo 31.10.2026): Paket musik liefert die Teile, Paket sammlung zeigt sie
   'sammlung:musik?': 'wahl',
