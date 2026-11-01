@@ -44,9 +44,9 @@ pruefe('Wertung geschaetzt: ohne Sieg 400, sonst der staerkste besiegte Bot (auf
 const g0 = passenderBot(400, leer);
 pruefe('Vorschau-Gegner: ein freier Bot, nie ein Endgegner (ohne Fortschritt der erste)', g0 && !g0.endgegner && g0.id === BOTS[0].id, g0 && g0.id);
 const tab = ligaTabelle({ name: 'Du', punkte: 9 });
-pruefe('Liga-Vorschau: acht Plaetze, absteigend, drei Aufsteiger und zwei Absteiger, du bei Gleichstand hinter den anderen',
+pruefe('Liga-Vorschau: acht Plaetze, absteigend, drei Aufsteiger und kein Abstieg (Fairness), du bei Gleichstand hinter den anderen',
   tab.length === 8 && tab.every((z, i) => z.platz === i + 1 && (i === 0 || tab[i - 1].punkte >= z.punkte))
-  && tab.filter((z) => z.zone === 'auf').length === 3 && tab.filter((z) => z.zone === 'ab').length === 2
+  && tab.filter((z) => z.zone === 'auf').length === 3 && tab.every((z) => z.zone === 'auf' || z.zone === '')
   && tab.find((z) => z.du).platz === 5 && tab[3].name === 'Bauernsturm');
 pruefe('Liga-Vorschau: erfundene Namen, keine Elo-Zahl, kein Countdown', LIGA_BEISPIEL.length === 7
   && !/\d{4}/.test(LIGA_BEISPIEL.map((x) => x.name).join()) && !Object.values(DE).some((x) => /nur noch|endet in|countdown/i.test(x)));

@@ -14,7 +14,7 @@
 //   schaetzeWertung(fortschritt, bots?) -> Zahl    aus dem staerksten besiegten Bot (gerundet, 400 bis 2800)
 //   passenderBot(wertung, fortschritt, bots?) -> Bot   freier Bot (kein Endgegner) mit der naechsten Staerke
 //   LIGA_BEISPIEL [{ name, punkte }]                 erfundene Namen fuer die Vorschau der Liga-Tabelle
-//   ligaTabelle(eigeneZeile) -> [{ platz, name, punkte, du, zone }]   zone: auf | ab | ''
+//   ligaTabelle(eigeneZeile) -> [{ platz, name, punkte, du, zone }]   zone: auf | '' (kein Abstieg)
 //   modusLeiste(app, aktiv) -> HTMLElement | null  Umschalter Welten | Online (null ohne Labor)
 import { anbieten } from '../../orte.js';
 import { laborFrei } from '../../labor.js';
@@ -68,8 +68,8 @@ export const LIGA_BEISPIEL = Object.freeze([
 export function ligaTabelle(du = { name: '', punkte: 0 }, beispiel = LIGA_BEISPIEL) {
   const zeilen = [...beispiel.map((x) => ({ ...x, du: false })), { name: du.name, punkte: Number(du.punkte) || 0, du: true }]
     .sort((a, b) => b.punkte - a.punkte || (a.du ? 1 : 0) - (b.du ? 1 : 0));
-  const n = zeilen.length;
-  return zeilen.map((z, i) => ({ ...z, platz: i + 1, zone: i < 3 ? 'auf' : i >= n - 2 ? 'ab' : '' }));
+  // nur Aufstieg, nie Abstieg (tests/fairness.test.mjs Regel 9 und 10: keine Druck-Texte)
+  return zeilen.map((z, i) => ({ ...z, platz: i + 1, zone: i < 3 ? 'auf' : '' }));
 }
 
 export function ladeLobbyCss() {
