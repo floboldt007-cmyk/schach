@@ -164,8 +164,10 @@
 /* Stil "knapp" (Einstellung coachStil): nur der erste Satz, der Rest auf Antippen */
 .coach.hat-rest { cursor: pointer; }
 .coach.knapp:not(.offen) .c-rest { display: none; }
-/* Coach wechselt: die Karte gleitet ein, das Symbol federt (grobe Fehler ruhig, ohne Wackeln) */
-.coach.neu { animation: coach-ein var(--d-l) var(--feder-weich) both; }
+/* Coach wechselt: die Karte selbst bleibt stehen, nur der neue Inhalt blendet sanft auf; das Symbol federt (grobe Fehler
+   ruhig, ohne Wackeln). Frueher glitt die ganze Karte samt Hintergrund aus dem Unsichtbaren ein, je Zug: auf dem iPad quer
+   eine grosse Flaeche, die bei jedem Zug kurz verschwand (Flo 01.11.2026: "flackert noch, wenn der Bot Zuege macht"). */
+.coach.neu > .c-kopf, .coach.neu > .c-text, .coach.neu > .c-zusatz, .coach.neu > .coach-knoepfe { animation: coach-inhalt var(--d-m) var(--sanft) both; }
 .coach.neu > .c-symbol { animation: coach-symbol var(--d-l) var(--feder-hupf) calc(80ms * var(--tempo)) both; }
 .coach.neu.k-ungenau > .c-symbol, .coach.neu.k-fehler > .c-symbol, .coach.neu.k-verpasst > .c-symbol, .coach.neu.k-patzer > .c-symbol {
   animation: coach-ruhig var(--d-m) var(--sanft) calc(80ms * var(--tempo)) both; }
@@ -198,6 +200,7 @@
 @keyframes blase-ein { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes blase-weg { to { transform: scale(.9); opacity: 0; } }
 @keyframes coach-ein { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes coach-inhalt { from { opacity: .3; } }
 @keyframes overlay-ein { from { opacity: 0; } }
 @keyframes karte-ein { from { transform: translateY(24px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes combo { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -213,7 +216,8 @@
 @media (prefers-reduced-motion: reduce) {
   .seg-pille, .schalter i, .regler .knauf { transition: none; }
   .denkt i { animation: none; }
-  .coach.neu, .coach.neu > .c-symbol, .coach.neu .c-klasse, .coach.neu .combo, .sprechblase { animation-duration: 1ms; animation-delay: 0s; }
+  .coach.neu > .c-kopf, .coach.neu > .c-text, .coach.neu > .c-zusatz, .coach.neu > .coach-knoepfe, .coach.neu > .c-symbol, .coach.neu .c-klasse,
+  .coach.neu .combo, .sprechblase { animation-duration: 1ms; animation-delay: 0s; }
 }
 
 /* Handy dicht (Flo 01.11.2026): Umschalter flacher, die Tippflaeche bleibt 44 px */
