@@ -10,8 +10,12 @@
 //                                      kann den Koenig waehlen"): Motiv = Figur oder Kreatur (js/kreaturen-kunst.js),
 //                                      Hintergrund 'standard' (nach Spielfarbe) oder je Welt; frei schaltet das Paket sammlung
 //   NUR_ERFINDER, STANDARD_FIGUR       Koenig und Kronli nur fuer den Erfinder (js/sonderstuecke.js); alle anderen starten als Bauer
-//   profilWahl() -> { figur, grund, rahmen, vitrine: [id|null x3] }   figur: Motiv-Id (Figur oder Kreatur)
-//   setzeProfilWahl(teil)              merkt figur, grund, rahmen oder vitrine (unbekannte Werte fallen auf den Standard)
+//   profilWahl() -> { figur, grund, rahmen, vitrine: [id|null x3], titel }   figur: Motiv-Id (Figur oder Kreatur); titel:
+//                                      Id des gewaehlten Titels (Flo 01.11.2026: Titel auch fuer Errungenschaften) oder null
+//                                      (dann gilt der Level-Titel); ob er frei ist, weiss das Paket sammlung (titel.js)
+//   setzeProfilWahl(teil)              merkt figur, grund, rahmen, vitrine oder titel (unbekannte Werte fallen auf den Standard)
+//   erspielteTitel() -> [id], merkeErspielteTitel(ids)   Koennen-Titel, die einmal erspielt bleiben
+//   erspielteErfolge() -> [id], merkeErspielteErfolge(ids) Erfolge aus dem Partien-Archiv, die einmal erspielt bleiben
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien } from './storage.js';
@@ -63,6 +67,7 @@ export function profilWahl() {
     grund: GRUENDE.includes(e.grund) ? e.grund : 'standard',
     rahmen: RAHMEN[e.rahmen] ? e.rahmen : 'ohne',
     vitrine: vitrine.map((x) => (typeof x === 'string' && ID.test(x) ? x : null)),
+    titel: typeof e.titel === 'string' && ID.test(e.titel) ? e.titel : null,
   };
 }
 
@@ -78,9 +83,33 @@ export function setzeProfilWahl(teil = {}) {
   const sauber = { figur, grund: GRUENDE.includes(neu.grund) ? neu.grund : 'standard',
     rahmen: RAHMEN[neu.rahmen] ? neu.rahmen : 'ohne',
     vitrine: (Array.isArray(neu.vitrine) ? neu.vitrine : []).slice(0, 3).map((x) => (typeof x === 'string' && ID.test(x) ? x : null)) };
+  if (typeof neu.titel === 'string' && ID.test(neu.titel)) sauber.titel = neu.titel;
   if (TAG.test(roh.dabeiSeit)) sauber.dabeiSeit = roh.dabeiSeit;
   return speichereModulEinstellungen(MODUL, { ...alt, profil: sauber });
 }
+
+// Erspielte Koennen-Titel (js/pakete/sammlung/titel.js): einmal erspielt, bleiben sie, auch wenn die Partie spaeter aus
+// dem Archiv faellt (nichts verfaellt). Schluessel titelFrei neben profil im Modul 'sammeln'.
+// Dasselbe fuer Erfolge aus dem Partien-Archiv (Sieg mit Schwarz, Siegesserie; js/pakete/sammlung/index.js), Schluessel
+// erfolgeFrei.
+function gemerkt(schluessel) {
+  let alt = {};
+  try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
+  return Array.isArray(alt[schluessel]) ? [...new Set(alt[schluessel].filter((x) => typeof x === 'string' && ID.test(x)))].slice(0, 60) : [];
+}
+function merke(schluessel, ids) {
+  const bisher = gemerkt(schluessel);
+  const neu = [...new Set([...bisher, ...(Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string' && ID.test(x))])].slice(0, 60);
+  if (neu.length === bisher.length) return false;
+  let alt = {};
+  try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
+  try { speichereModulEinstellungen(MODUL, { ...alt, [schluessel]: neu }); } catch (f) { return false; }
+  return true;
+}
+export const erspielteTitel = () => gemerkt('titelFrei');
+export const merkeErspielteTitel = (ids = []) => merke('titelFrei', ids);
+export const erspielteErfolge = () => gemerkt('erfolgeFrei');
+export const merkeErspielteErfolge = (ids = []) => merke('erfolgeFrei', ids);
 
 const TAG = /^\d{4}-\d{2}-\d{2}$/;
 export function dabeiSeit() {

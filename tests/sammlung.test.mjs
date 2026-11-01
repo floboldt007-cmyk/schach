@@ -10,9 +10,14 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { setzeSpeicher } from '../js/storage.js';
-import { teileBretter, teileKlaenge, teileErfolge } from '../js/pakete/sammlung/index.js';
+import { teileBretter, teileKlaenge, teileErfolge, partienStand, schulStand, SIEGE_ZIELE } from '../js/pakete/sammlung/index.js';
 import { standText } from '../js/pakete/sammlung/shop.js';
-import { rahmenTeile, motivTeile, grundTeile } from '../js/pakete/sammlung/profil.js';
+import { rahmenTeile, motivTeile, grundTeile, titelTeile, duellProfil } from '../js/pakete/sammlung/profil.js';
+import { titelListe, aktuellerTitel, ERFOLGS_TITEL, KOENNEN_TITEL, koennenFrei } from '../js/pakete/sammlung/titel.js';
+import { erspielteTitel, merkeErspielteTitel, erspielteErfolge } from '../js/profil.js';
+import { ALLE as SCHUL_LEKTIONEN } from '../js/pakete/lernen/mattbilder.js';
+import { TITEL_ZEICHEN, titelWappen } from '../js/titel-kunst.js';
+import { TITEL as LEVEL_TITEL } from '../js/pakete/funken/level.js';
 import { profilWahl, setzeProfilWahl } from '../js/profil.js';
 import { floAvatar } from '../js/thema.js';
 import { finisherKunst } from '../js/sammlung-kunst.js';
@@ -91,14 +96,15 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
 const e0 = teileErfolge(leer, NULL_STAND);
-pruefe('Eigenes Bild: alle 21 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
+pruefe('Eigenes Bild: alle 28 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
   new Set(e0.map((x) => ohneIds(x.bild))).size === e0.length && e0.every((x) => /class="sk-erfolg"/.test(x.bild)));
 const rang = { frei: 0, selten: 1, episch: 2, legende: 3 };
 const sel = (id) => rang[e0.find((x) => x.id === 'erfolg-' + id).seltenheit];
 pruefe('Erfolge gestaffelt: je schwerer, desto seltener (erster Sieg < Welt 1 < Welt 3 < Welt 5, Liga 1 < 3 < 6, Serie 7 < 30 < 100)',
   sel('erster-sieg') < sel('welt-1') && sel('welt-1') < sel('welt-3') && sel('welt-3') < sel('welt-5')
   && sel('liga-1') < sel('liga-3') && sel('liga-3') < sel('liga-6') && sel('serie-7') < sel('serie-30') && sel('serie-30') < sel('serie-100'));
-pruefe('Erfolge ohne Partie: 21 (Bots, Liga, Serie, Level), alle gesperrt, mit Weg dahin', e0.length === 21 && e0.every((x) => !x.frei && x.zeile)
+pruefe('Erfolge ohne Partie: 28 (Bots, Liga, Serie, Level, Partien), ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 28
+  && !e0.some((x) => /^erfolg-schule-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
   && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt' && e0.find((x) => x.id === 'erfolg-liga-1').zeile === 'Erreiche Liga Bronze');
 const welt1 = BOTS.filter((b) => b.welt === 1);
 const f1 = { bots: Object.fromEntries(welt1.map((b, i) => [b.id, { sterne: [true, i === 0, i === 0] }])) };
@@ -119,7 +125,7 @@ pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga
   rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3').frei && rf('liga-3').weg === 'Erreiche Liga Gold'
   && !rf('welt-2').frei && !r1.some((r) => r.id === 'erfinder-blatt-0'), r1.map((r) => r.id + (r.frei ? '+' : '-')).join());
 pruefe('Profil: Standard Bauer (der Koenig gehoert dem Erfinder), Standard-Hintergrund, ohne Rahmen, leere Vitrine',
-  JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null] })
+  JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null], titel: null })
   && /wP\.svg/.test(floAvatar('w')) && !/stroke-width="8"/.test(floAvatar('w')));
 setzeProfilWahl({ figur: 'Q', rahmen: 'liga-2', vitrine: ['erfolg-welt-1', 'kaputt!', 'erfolg-liga-2', 'zuviel'] });
 pruefe('Profil: Figur Dame, Rahmen Silber, Vitrine hoechstens drei Plaetze, Unsinn faellt raus', profilWahl().figur === 'Q' && profilWahl().rahmen === 'liga-2'
@@ -152,6 +158,51 @@ setzeProfilWahl({ figur: 'P', grund: 'standard' });
 pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen',
   !e1.some((x) => /€|kauf|shop|verfügbar|nur noch/i.test(x.name + ' ' + x.zeile)));
 
+// Neue Errungenschaften (Flo 01.11.2026: "denk dir neue Errungenschaften aus, zum Beispiel wenn man alle Lektionen fertig hat")
+{
+  const bosse = BOTS.filter((b) => b.endgegner);
+  const f2 = { bots: Object.fromEntries(BOTS.map((b) => [b.id, { sterne: [b.id === bosse[0].id, false, false], siege: 2 }])) };
+  const e2 = teileErfolge(f2, NULL_STAND, { beste: 3, frei: ['schwarz-sieg'] }, null);
+  const fr = (id) => e2.find((x) => x.id === 'erfolg-' + id);
+  pruefe(`Partien: Siege aus dem Zaehler je Bot (${BOTS.length * 2}: 10 und 50 frei, 100 mit Weg), Sieg mit Schwarz, erster Endgegner, Folge 3 von 5`,
+    fr('siege-10').frei && fr('siege-50').frei && !fr('siege-100').frei && fr('siege-100').zeile === `${BOTS.length * 2} von 100 Siegen`
+    && fr('schwarz-sieg').frei && fr('endgegner').frei && !fr('alle-endgegner').frei && fr('alle-endgegner').zeile === `1 von ${bosse.length} Endgegnern besiegt`
+    && !fr('siegesserie-5').frei && fr('siegesserie-5').zeile === 'Beste Folge: 3 von 5' && Math.abs(fr('siegesserie-5').fortschritt - 0.6) < 1e-9
+    && SIEGE_ZIELE.join() === '10,50,100' && e2.filter((x) => x.gruppe === 'Partien').length === 7, e2.slice(21).map((x) => x.id + (x.frei ? '+' : '-') + x.zeile).join(' | '));
+  const st = schulStand({ lek: { [SCHUL_LEKTIONEN[0].id]: { s: 3, z: 2 } } });
+  const eS = teileErfolge(f2, NULL_STAND, { beste: 0, frei: [] }, st);
+  const sch = eS.filter((x) => /^erfolg-schule-/.test(x.id));
+  pruefe('Meisterschule (nur im Labor): je Bereich, alle Lektionen und alle Sterne, mit Labor-Marke und ehrlichem Stand',
+    sch.map((x) => x.id.slice(14)).join() === 'matt,taktik,end,eroeffnung,alle,sterne' && sch.every((x) => x.labor && !x.frei && x.gruppe === 'Meisterschule')
+    && sch.find((x) => x.id === 'erfolg-schule-alle').zeile === `1 von ${SCHUL_LEKTIONEN.length} Lektionen geschafft` && schulStand() === null, sch.map((x) => x.id + ':' + x.zeile).join(' | '));
+  const voll = {};
+  for (const l of SCHUL_LEKTIONEN) voll[l.id] = { s: 3, z: 1 };
+  const eV = teileErfolge(f2, NULL_STAND, { beste: 0, frei: [] }, schulStand({ lek: voll }));
+  pruefe('Meisterschule: alle Lektionen mit drei Sternen schaltet alle sechs frei', eV.filter((x) => /^erfolg-schule-/.test(x.id)).every((x) => x.frei));
+  const alleBilder = [...e2, ...sch];
+  pruefe('Neue Errungenschaften: jede mit eigenem Abzeichen, keine doppelt', alleBilder.every((x) => /class="sk-erfolg"/.test(x.bild))
+    && new Set(alleBilder.map((x) => ohneIds(x.bild))).size === alleBilder.length);
+  // Archiv: neueste zuerst; die Folge zaehlt in Zeitfolge, eine Niederlage oder ein Remis bricht sie
+  const p = (tag, ergebnis, farbe = 'w') => ({ id: 'p' + tag, datum: `2026-10-${String(tag).padStart(2, '0')}T10:00:00Z`, ergebnis, spielerFarbe: farbe, modus: 'normal', botId: BOTS[0].id });
+  const archiv = [p(9, 'sieg'), p(8, 'sieg', 'b'), p(7, 'sieg'), p(6, 'sieg'), p(5, 'sieg'), p(4, 'remis'), p(3, 'sieg'), p(2, 'sieg'), p(1, 'niederlage')];
+  const vorher = erspielteErfolge();
+  const ps = partienStand(archiv);
+  pruefe('Partien-Archiv: beste Folge 5 (das Remis bricht), Sieg mit Schwarz; beides wird gemerkt und bleibt ohne Archiv',
+    vorher.length === 0 && ps.beste === 5 && ps.frei.includes('schwarz-sieg') && ps.frei.includes('siegesserie-5')
+    && erspielteErfolge().includes('siegesserie-5') && partienStand([]).frei.includes('schwarz-sieg'), { vorher, ps });
+  setzeProfilWahl({ vitrine: ['erfolg-schwarz-sieg', null, null] });
+  const dp = duellProfil();
+  pruefe('Matchbeginn: die gewaehlte Errungenschaft kommt mit Abzeichen und Seltenheit', dp && dp.orden.length === 1 && dp.orden[0].name === 'Sieg mit Schwarz'
+    && /^<svg viewBox="0 0 120 120" class="sk-erfolg"/.test(dp.orden[0].bild) && dp.orden[0].seltenheit === 'frei', dp);
+  setzeProfilWahl({ vitrine: [null, null, null] });
+  pruefe('Partien-Archiv: Uebungs- und Zu-zweit-Partien zaehlen nicht', partienStand([{ ...p(20, 'sieg', 'b'), modus: 'uebung' }]).beste === 0);
+  const titelNeu = ERFOLGS_TITEL.filter((x) => /^(schwarz-sieg|siegesserie-5|endgegner|siege-100|alle-endgegner|schule-)/.test(x.erfolg));
+  pruefe('Neue Titel zu den neuen Errungenschaften (Schattenkoenig, Siegeszug, Bezwinger ...), die der Meisterschule nur im Labor',
+    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 2
+    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length
+    && titelListe({ erfolge: e2 }).find((x) => x.id === 'erfolg-schattenkoenig').frei);
+}
+
 // Shop: Stand einer Edition als ruhiger Satz, die Zahl nur, wenn der Server sie schickt (nur bei erhaeltlich)
 pruefe('Shop: Restzahl sieht bei 9 und bei 1 gleich aus', standText({ status: 'erhaeltlich', restzahl: 9, auflage: 10 }) === '9 von 10 verfügbar'
   && standText({ status: 'erhaeltlich', restzahl: 1, auflage: 10 }) === '1 von 10 verfügbar');
@@ -159,6 +210,72 @@ pruefe('Shop: ohne Restzahl vom Server keine Zahl', standText({ status: 'erhaelt
 pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText({ status: 'angekuendigt', verkauf_ab: '2026-12-01T10:00:00Z', auflage: 10 }) === 'Verkauf ab 01.12.2026'
   && standText({ status: 'ausverkauft', auflage: 10 }) === 'Alle 10 vergeben' && standText({ status: 'pausiert' }) === 'Verkauf pausiert'
   && standText({ status: 'beendet' }) === 'Verkauf beendet');
+
+// Titel (Flo 01.11.2026: "bessere Designs, Titel auch zu Errungenschaften, nicht nur bei den Leveln")
+{
+  const erfolge = [{ id: 'erfolg-erster-sieg', name: 'Erster Sieg', frei: true }, { id: 'erfolg-welt-1', name: 'Karofelder gemeistert', frei: false, fortschritt: .5 }];
+  const l = titelListe({ level: 12, erfolge, erfinder: false });
+  const lv = l.filter((x) => x.art === 'level');
+  const ef = l.filter((x) => x.art === 'erfolg');
+  pruefe('Titel: alle Level-Titel (frei nach Level) und je ein Erfolgs-Titel, ohne Erfinder kein Erfinder-Titel',
+    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor).length && !l.some((x) => x.art === 'erfinder'),
+    l.map((x) => x.id + (x.frei ? '+' : '-')).join());
+  pruefe('Titel: Erfolgs-Titel frei mit dem Erfolg, sonst mit Weg und Fortschritt',
+    ef.find((x) => x.id === 'erfolg-feuertaufe').frei && !ef.find((x) => x.id === 'erfolg-goldene-aehre').frei
+    && /Karofelder gemeistert/.test(ef.find((x) => x.id === 'erfolg-goldene-aehre').weg) && ef.find((x) => x.id === 'erfolg-goldene-aehre').fortschritt === .5);
+  const VERBOTEN_T = /meister|profi|experte|\belo\b|grandmaster|master|pro\b|expert/i;
+  pruefe('Titel: Namen ohne Meister, Profi, Experte oder Elo (Fairness 12), jeder Name eindeutig, Deutsch und Englisch',
+    l.every((x) => x.name && !VERBOTEN_T.test(x.name) && !x.name.startsWith('p-sammlung')) && new Set(l.map((x) => x.name)).size === l.length, l.map((x) => x.name).join());
+  const bilder = [...l, ...titelListe({ level: 100, erfolge: [], erfinder: true })].map((x) => titelWappen(x.zeichen, { farbe: x.farbe, seltenheit: x.seltenheit, n: x.n }));
+  pruefe('Titel: jedes Wappen gezeichnet, Zeichen bekannt, keine Luecken, eigene Verlaufs-Id je Aufruf',
+    bilder.every((b) => /^<svg class="titel-wappen" data-zeichen="[a-z0-9-]+"/.test(b) && !/undefined|NaN/.test(b))
+    && l.every((x) => TITEL_ZEICHEN.includes(x.zeichen)) && titelWappen('funke') !== titelWappen('funke') && titelWappen('gibtsnicht') === '');
+  pruefe('Titel: ab Legende ein Lorbeer um das Schild', /tw-lorbeer/.test(titelWappen('sonne', { seltenheit: 'legende' })) && !/tw-lorbeer/.test(titelWappen('funke', { seltenheit: 'frei' })));
+  const auto = aktuellerTitel({ level: 12, erfolge, erfinder: false, wahl: null });
+  const gew = aktuellerTitel({ level: 12, erfolge, erfinder: false, wahl: 'erfolg-feuertaufe' });
+  const zu = aktuellerTitel({ level: 12, erfolge, erfinder: false, wahl: 'erfolg-goldene-aehre' });
+  const er = aktuellerTitel({ level: 1, erfolge, erfinder: true, wahl: null });
+  pruefe('Titel: ohne Wahl der hoechste Level-Titel, gewaehlt nur wenn frei, beim Erfinder „Der Erfinder“',
+    auto.id === 'level-10' && !auto.gewaehlt && gew.id === 'erfolg-feuertaufe' && gew.gewaehlt && zu.id === 'level-10' && er.id === 'erfinder' && er.name === 'Der Erfinder',
+    { auto: auto.id, gew: gew.id, zu: zu.id, er: er.id });
+  // Wahl ueber das Profil: Tipp traegt, zweiter Tipp nimmt ab; der Matchbeginn zeigt den Titel nur, wenn er gewaehlt ist
+  setzeProfilWahl({ titel: null });
+  const vorher = duellProfil();
+  const teile = titelTeile();
+  const funke = teile.find((x) => x.id === 'titel-level-1');
+  funke.wahl();
+  const nachWahl = { wahl: profilWahl().titel, duell: duellProfil() };
+  const angelegt = titelTeile().find((x) => x.id === 'titel-level-1');
+  angelegt.abwahl();
+  pruefe('Titel: Tipp traegt (profilWahl.titel), Matchbeginn zeigt ihn mit Wappen, zweiter Tipp nimmt ab', vorher === null
+    && nachWahl.wahl === 'level-1' && nachWahl.duell && nachWahl.duell.titel === 'Funke' && /titel-wappen/.test(nachWahl.duell.titelBild)
+    && angelegt.an && typeof angelegt.abwahl === 'function' && profilWahl().titel === null && duellProfil() === null, nachWahl);
+  setzeProfilWahl({ titel: 'unsinn$' });
+  pruefe('Titel: unbekannte Werte werden nicht gespeichert', profilWahl().titel === null);
+  // Pionier (Flo 01.11.2026: "die ersten 100 Spieler bekommen einen Titel"): nur mit Nummer vom Server sichtbar
+  const mitPi = titelListe({ level: 1, erfolge: [], erfinder: false, pionier: 7 });
+  const ohnePi = titelListe({ level: 1, erfolge: [], erfinder: false, pionier: null });
+  pruefe('Pionier: mit Nummer sichtbar und frei („Pionier Nr. 7“), ohne Nummer gar nicht da, ohne Wahl der getragene Titel',
+    mitPi.some((x) => x.art === 'pionier' && x.frei && x.name === 'Pionier Nr. 7') && !ohnePi.some((x) => x.art === 'pionier')
+    && !titelListe({ pionier: 101 }).some((x) => x.art === 'pionier') && aktuellerTitel({ level: 20, pionier: 7 }).id === 'pionier'
+    && aktuellerTitel({ level: 20, pionier: 7, erfinder: true }).id === 'erfinder');
+  // Koennen-Titel aus den eigenen Partien
+  const zuege = (n) => new Array(n * 2).fill('e2e4');
+  const partien = [{ ergebnis: 'sieg', zuege: zuege(12), genauigkeit: 80, botId: 'a' }, { ergebnis: 'sieg', zuege: zuege(61), genauigkeit: 92, botId: 'b', hinweise: 0, zuruecknahmen: 0 },
+    { ergebnis: 'remis', zuege: zuege(30) }, { ergebnis: 'remis', zuege: zuege(30) }, { ergebnis: 'niederlage', zuege: zuege(5) }];
+  const k1 = koennenFrei(partien, (id) => (id === 'b' ? 1300 : 300));
+  pruefe('Können: Blitzschlag (≤ 15 Züge), Langer Atem (≥ 60), Feinschliff (≥ 90 %), Eigene Kraft (Elo ≥ 1200 ohne Hilfe); Gleichgewicht erst ab 3 Remis, Stammgast ab 100 Partien',
+    k1.join() === 'koennen-blitzschlag,koennen-langer-atem,koennen-feinschliff,koennen-eigene-kraft', k1);
+  pruefe('Können: Gleichgewicht mit 3 Remis, Stammgast mit 100 Partien, ohne Partien nichts',
+    koennenFrei([...partien, { ergebnis: 'remis', zuege: [] }]).includes('koennen-gleichgewicht')
+    && koennenFrei(new Array(100).fill({ ergebnis: 'niederlage', zuege: [] })).join() === 'koennen-stammgast' && koennenFrei([]).length === 0);
+  merkeErspielteTitel(['koennen-blitzschlag']);
+  merkeErspielteTitel(['koennen-blitzschlag', 'unsinn$']);
+  pruefe('Können: einmal erspielt bleibt gemerkt (ohne Doppel, nur gueltige Ids)', erspielteTitel().join() === 'koennen-blitzschlag', erspielteTitel());
+  const lk = titelListe({ level: 1, koennen: ['koennen-blitzschlag'] }).filter((x) => x.art === 'koennen');
+  pruefe('Können: sechs Titel, frei nur die erspielten, gesperrte mit Weg', lk.length === KOENNEN_TITEL.length && lk.filter((x) => x.frei).length === 1
+    && lk.find((x) => x.id === 'koennen-stammgast').weg === 'Spiele 100 Partien', lk.map((x) => x.id + (x.frei ? '+' : '-')).join());
+}
 
 // ---------------------------------------------------------------------------
 // Browser-Teil (volle App, alle Pakete)
@@ -292,9 +409,10 @@ async function erfinderTeil(browser) {
     const seg = [...document.querySelectorAll('.sa-steuer .seg')];
     return seg.length > 6 && seg.every((b, i) => b.getBoundingClientRect().width >= 90 && (i === 0 || b.getBoundingClientRect().left >= seg[i - 1].getBoundingClientRect().right - 1));
   }));
-  pruefe('Erfinder: alle Finisher frei, auch auf Level 1 (kein Schloss)', await p.s.evaluate(() => {
-    const z = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => x.dataset.zustand);
-    return z.length === 4 && !z.includes('zu');
+  pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
+    const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
+    return t.length === 4 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
+      && t.filter((x) => x.querySelector('.sa-bild svg.sk-finisher image[href*="/assets/pieces/"]')).length >= 3;
   }));
   await p.s.locator('.er-figuren').click();
   await p.s.waitForFunction(() => document.querySelector('.er-figuren')?.getAttribute('aria-pressed') === 'true', null, { timeout: 10000 }).catch(() => {});
@@ -355,9 +473,10 @@ async function erfinderTeil(browser) {
   quellen = await figurenQuellen(p.s);
   pruefe('Ohne Sonderstücke: Standardfiguren, auch wenn die Einstellung blaupause sagt', quellen.length === 32 && !quellen.some((q) => q.includes('blaupause')), quellen.slice(0, 3));
   await p.s.evaluate(() => window.__app.gehe('ich', { bereich: 'finisher' }));
-  await p.s.waitForSelector('.sa-bereich[data-bereich="finisher"] .sa-teil', { timeout: 15000 }).catch(() => {});
-  pruefe('Ohne Sonderstücke: keine Signatur bei den Finishern', await p.s.locator('.sa-teil[data-teil="finisher-signatur"]').count() === 0
-    && await p.s.locator('.sa-bereich[data-bereich="finisher"] .sa-teil').count() === 3);
+  await p.s.waitForSelector('.sa-screen', { timeout: 15000 }).catch(() => {});
+  await warte(500);
+  // Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"
+  pruefe('Ohne Sonderstücke: kein Finisher-Bereich (Labor, später Shop)', await p.s.locator('.sa-bereich[data-bereich="finisher"], .seg[data-wert="finisher"]').count() === 0);
   await p.k.close();
 }
 
@@ -512,9 +631,10 @@ async function profilTeil(browser) {
   await p.s.locator('.detail [data-aktion="spielen"]').first().click();
   await p.s.waitForSelector('.duell.voll', { timeout: 5000 }).catch(() => {});
   const duell = await p.s.evaluate(() => ({ orden: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden')].map((x) => x.textContent),
+    bilder: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden.mit-bild > svg.sk-erfolg')].map((x) => Math.round(x.getBoundingClientRect().width)),
     figur: document.querySelector('.duell.voll [data-rolle="flo"] svg')?.dataset.figur, titel: document.querySelectorAll('.duell.voll .duell-titel').length }));
-  pruefe('Duell-Intro: unter Flo steht die Vitrine, Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
-    && duell.figur === 'Q' && duell.titel === 0, duell);
+  pruefe('Duell-Intro: unter Flo steht die Vitrine mit Abzeichen (Flo 01.11.2026), Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
+    && duell.bilder.length === 1 && duell.bilder[0] >= 36 && duell.figur === 'Q' && duell.titel === 0, duell);
   pruefe('Profil: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 }
@@ -544,16 +664,20 @@ async function browserTeil() {
       await s.waitForSelector('.sa-screen', { timeout: 15000 });
       await warte(700);
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
-      pruefe(`${name}: acht Bereiche (Finisher, Emotes, Titel, Rahmen, Bretter, Klänge, Erfolge, Shop)`, bereiche === 'finisher,emotes,titel,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
+      pruefe(`${name}: sieben Bereiche (Emotes, Titel, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,rahmen,bretter,klaenge,erfolge,shop', bereiche);
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
       pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
-      const fin = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')].map((x) => ({
+      await s.locator('.sa-steuer .seg[data-wert="titel"]').click();
+      await warte(300);
+      const tit = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="titel"] .sa-teil')].map((x) => ({
         id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
-        bild: !!x.querySelector('.sa-bild svg.sk-finisher'), figur: x.querySelector('.sa-bild svg image')?.getAttribute('href') || '' })));
-      pruefe(`${name}: Finisher Krone ausgewählt, Welle und König geheimnisvoll (?) mit Level`, fin.length === 3 && fin[0].z === 'an'
-        && fin[1].z === 'zu' && fin[1].schloss && fin[1].zeile === 'Ab Level 5' && fin[2].zeile === 'Ab Level 10', fin);
-      pruefe(`${name}: Finisher mit eigenem Szenenbild und echten Figuren aus assets/pieces/`, fin.every((f) => f.bild && /\/assets\/pieces\/[wb][KN]\.svg$/.test(f.figur)), fin);
+        wappen: !!x.querySelector('.sa-bild svg.titel-wappen') })));
+      const funke = tit.find((x) => x.id === 'titel-level-1');
+      const glut = tit.find((x) => x.id === 'titel-level-5');
+      pruefe(`${name}: Titel mit Wappen: Funke getragen (automatisch), Glut geheimnisvoll (?) ab Level 5`, !!funke && funke.z === 'an' && funke.wappen
+        && glut.z === 'zu' && glut.schloss && glut.zeile === 'Ab Level 5' && tit.every((x) => x.wappen), tit.slice(0, 3));
       pruefe(`${name}: nur ein Bereich sichtbar`, await s.locator('.sa-bereich:not([hidden])').count() === 1);
       await s.locator('.sa-steuer .seg[data-wert="erfolge"]').click();
       await warte(400);
@@ -576,6 +700,8 @@ async function browserTeil() {
     const s = await k.newPage();
     await s.goto(`http://127.0.0.1:${PORT}/index.html?test&sprache=en#ich`);
     await s.waitForSelector('.sa-screen', { timeout: 30000 });
+    await s.locator('.sa-steuer .seg[data-wert="titel"]').click();
+    await warte(300);
     const text = await s.locator('.sa-screen').innerText();
     pruefe('Englisch: Collection, unlocked, From level', /Collection/.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();

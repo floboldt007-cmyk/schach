@@ -38,7 +38,6 @@ import * as S from './stand.js';
 import * as R from './rechnung.js';
 import * as L from './level.js';
 import * as A from './ansicht.js';
-import { bereich } from '../../ui/ich.js';
 import { protokolliere } from '../../protokoll.js';
 
 const PAKET = 'funken';
@@ -473,16 +472,8 @@ function registriere() {
   anbieten('arena:kopf', () => sicher(() => A.kopfChip({ st: ladeStand(), beiTipp: () => sicher(zeigeSpiegel, 'Spiegel') }), 'Kopf'),
     { reihenfolge: 5, paket: PAKET });
   anbieten('arena:heute', () => sicher(anbieterHeute, 'Heute'), { reihenfolge: 50, paket: PAKET });
-  // Sammlung (Reiter Ich): alle Titel der Level-Kurve, erreichte frei, der aktuelle als "Dein Titel"
-  anbieten('sammlung:bereich', () => sicher(() => {
-    const level = L.fortschritt(ladeStand().gesamt).level;
-    const jetzt = L.titelVon(level);
-    return bereich({ id: 'titel', name: tx('sammlung.titel'), teile: L.TITEL.map(([ab, name]) => ({
-      id: 'titel-' + ab, name: A.titelName(ab), frei: level >= ab, an: name === jetzt,
-      zeile: name === jetzt ? tx('sammlung.deiner') : level >= ab ? tx('sammlung.frei') : tx('sammlung.ab', { level: ab }),
-      bild: `<b class="sa-zahl">${ab}</b>`,
-    })) });
-  }, 'Sammlung'), { reihenfolge: 30, paket: PAKET });
+  // Sammlung: den Bereich Titel fuehrt seit 01.11.2026 das Paket sammlung (Level- und Erfolgs-Titel mit Wappen, waehlbar,
+  // js/pakete/sammlung/titel.js); es liest das Level aus dem Speicher dieses Pakets
   anbieten('arena:panel-bot', (k) => sicher(() => {
     if (!k || !k.bot || k.bot.stufe == null) return null;
     return A.faktorChip(faktorFuer({ botId: k.bot.id }));

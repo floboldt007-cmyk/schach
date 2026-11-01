@@ -84,6 +84,13 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
 .pr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pr-chip { font-size: 12.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: var(--flaeche-2); }
 .pr-chip-titel { color: #E0A22B; background: #1C1B19; }
+/* Titel mit Wappen (js/titel-kunst.js, Flo 01.11.2026: "bessere Designs"): Schild links, Name rechts, Glanz nach Seltenheit */
+.pr-chip-titel:has(.titel-wappen) { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; }
+.pr-chip-titel .titel-wappen { width: 24px; height: 24px; flex: none; }
+.pr-chip-titel[data-seltenheit="episch"] { box-shadow: 0 0 0 1px #9A7CFF; }
+.pr-chip-titel[data-seltenheit="legende"], .pr-chip-titel[data-seltenheit="einzig"] { box-shadow: 0 0 0 1px #E0A22B, 0 0 12px rgba(224, 162, 43, .35); }
+.sa-bild > svg.titel-wappen, .sa-geheim > svg.titel-wappen { width: 66px; height: 66px; }
+.titel-wappen { overflow: visible; }
 .pr-aendern { justify-self: start; }
 .pr-vitrine-titel { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--text-2); }
 .pr-vitrine { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
