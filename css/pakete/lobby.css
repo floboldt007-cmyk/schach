@@ -67,7 +67,6 @@
 .lb-tabelle li { display: grid; grid-template-columns: 26px 32px minmax(0, 1fr) 22px auto; align-items: center; gap: 10px; min-height: 44px; padding: 4px 12px 4px 10px;
   border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: inset 3px 0 0 transparent; }
 .lb-tabelle li[data-zone="auf"] { box-shadow: inset 3px 0 0 var(--gut); }
-.lb-tabelle li[data-zone="ab"] { box-shadow: inset 3px 0 0 var(--warn); }
 .lb-tabelle li[data-du] { background: color-mix(in srgb, var(--akzent) 16%, var(--flaeche-2)); }
 .lb-platz { font-weight: 800; color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
 .lb-av { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--flaeche);
@@ -78,7 +77,6 @@
 .lb-zone { display: grid; place-items: center; }
 .lb-zone .ico { width: 16px; height: 16px; }
 .lb-tabelle li[data-zone="auf"] .lb-zone { color: var(--gut); transform: rotate(-90deg); }
-.lb-tabelle li[data-zone="ab"] .lb-zone { color: var(--warn); transform: rotate(90deg); }
 .lb-punkte { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Mehr Spielarten */
