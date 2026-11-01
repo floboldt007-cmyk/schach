@@ -173,7 +173,6 @@
   .erg-genau.gross span { font-size: 13px; }
   .erg-bot .av { width: 36px; height: 36px; border-radius: 12px; }
   .erg-bot .sprechblase { font-size: 13.5px; }
-  .ergebnis-karte .abrechnung > * { padding-top: 10px; padding-bottom: 10px; }
   .erg-aktionen { position: sticky; z-index: 2; bottom: -18px; margin: 0 -16px -18px; padding: 10px 16px 8px;
     background-color: var(--flaeche); border-top: 1px solid var(--linie); border-radius: 0 0 26px 26px; }
   .erg-aktionen:not(:has(.erg-knoepfe:not(:empty))):has(.erg-lobby[hidden]) { display: none; }
