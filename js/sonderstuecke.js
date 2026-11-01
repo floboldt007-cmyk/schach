@@ -7,6 +7,7 @@
 //
 //   ERFINDER                        die vier Stuecke (Ids wie im SQL-Beispiel der Anleitung)
 //   hatSonderstueck(id) -> boolean  aus dem Merker, nur fuer das angemeldete Konto
+//   pionierNummer() -> 1..100 | null   Pionier-Titel der ersten 100 Konten (Server vergibt pionier-001 ... pionier-100)
 //   istErfinder() -> boolean        Flo, 30.10.2026: als Erfinder ist alles Ausruestbare immer frei (Finisher, Emotes,
 //                                   Bretter, Klaenge, Figuren); Erfolge, Level und Wertung bleiben erspielt. Jede neue
 //                                   Sperre fuer Ausruestbares fragt hier nach.
@@ -51,6 +52,13 @@ export function sonderstueckeBekannt() {
   return !!(uid && m && m.konto === uid);
 }
 export function istErfinder() { return hatSonderstueck(ERFINDER.titel); }
+// Pionier (Flo 01.11.2026: "die ersten 100 Spieler bekommen einen Titel"): Sonderstueck pionier-001 bis pionier-100,
+// vergeben nur vom Server (supabase/pionier-schema.sql); die Nummer steht im Namen
+export function pionierNummer() {
+  const id = sonderstuecke().find((x) => /^pionier-\d{3}$/.test(x));
+  const n = id ? Number(id.slice(8)) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 100 ? n : null;
+}
 
 export async function ladeSonderstuecke() {
   if (!sitzung()) return null;
