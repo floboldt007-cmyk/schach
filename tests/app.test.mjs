@@ -3705,6 +3705,30 @@ async function testeU7(browser) {
     await kontext.close();
   }
 
+  // Flo 01.11.2026 (iPad quer): "der Bildschirm flackert wieder, wenn der Bot Zuege macht". Die Gegnerkarte haelt ihre
+  // groesste Hoehe (ruhig); bei jeder neuen, kuerzeren Sprechblase sprangen Portraet und Name um bis zu 15 px nach unten.
+  gruppe = 'iPad ruhig';
+  for (const [w, hh] of [[1180, 820], [1024, 768]]) {
+    const { kontext, seite, fehler, h } = await u7Seite(browser, { w, h: hh });
+    await h.starte({ botId: 'benno', farbe: 'w' });
+    await warte(400);
+    const lage = await seite.evaluate(() => {
+      const karte = document.querySelector('.partie .spieler.gegner');
+      const ort = karte.querySelector('.blase-ort');
+      const oben = () => ({ av: Math.round(karte.querySelector('.av').getBoundingClientRect().top), name: Math.round(karte.querySelector('.name').getBoundingClientRect().top), karte: Math.round(karte.getBoundingClientRect().height) });
+      const blase = (t) => { ort.innerHTML = `<div class="sprechblase p-blase still">${t}</div>`; return oben(); };
+      const lang = blase('Ein langer Satz des Bots, der in der schmalen Spalte ueber drei Zeilen laeuft, damit die Karte so hoch wird wie bei den laengsten Saetzen.');
+      karte.style.minHeight = karte.offsetHeight + 'px';   // wie js/ui/partie.js ruhig: die Karte schrumpft nicht mehr
+      const kurz = blase('Hm.');
+      const leer = (ort.innerHTML = '', oben());
+      return { lang, kurz, leer };
+    });
+    pruefe(`${w} x ${hh}: neue Sprechblase, Portraet und Name der Gegnerkarte bleiben stehen (Karte haelt ihre Hoehe)`,
+      lage.lang.av === lage.kurz.av && lage.kurz.av === lage.leer.av && lage.lang.name === lage.kurz.name && lage.lang.karte === lage.kurz.karte, JSON.stringify(lage));
+    pruefe(`${w} x ${hh}: keine Konsolenfehler`, fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // --- Ergebnis (PLAN 2.6): Schleier, Screen tritt zurueck, "Sieg!" mit goldenem Ausrufezeichen, kein Konfetti,
   //     Niederlage mit Lichtblick, Remis gold-neutral, Handy: Knoepfe untereinander, Hauptknopf zuerst ---
   for (const g of [{ w: 1180, h: 820 }, { w: 390, h: 844, handy: true }]) {
