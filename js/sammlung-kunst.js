@@ -74,6 +74,17 @@ const KLANG = {
       + '<circle cx="60" cy="60" r="6" fill="#fff"/>'
       + funke(28, 30, 0.9, 0.2) + funke(92, 36, 0.7, 0.8) + funke(88, 90, 0.8, 1.3);
   },
+  // Juwel (Labor, Flo 01.11.2026: "Klaenge brauchen Dopamin"): geschliffener Edelstein, Facetten, Klangbogen und Funken
+  juwel: () => {
+    const g = id('j');
+    return `<defs>${verlauf(g, ['#FFE3F6', '#FF5FB8', '#8A2BE2'])}</defs>`
+      + '<ellipse cx="60" cy="98" rx="34" ry="7" fill="#3A1452" opacity=".3"/>'
+      + `<g class="rk rk-atmen" style="transform-origin:60px 60px"><path d="M34 44l12-16h28l12 16-26 46z" fill="url(#${g})" stroke="#5B1880" stroke-width="2.5" stroke-linejoin="round"/>`
+      + '<path d="M34 44h52M46 28l6 16 8-16 8 16 6-16M52 44l8 46 8-46" fill="none" stroke="#5B1880" stroke-width="1.6" stroke-linejoin="round" opacity=".7"/>'
+      + '<path d="M40 40l8-10h10l-6 12z" fill="#fff" opacity=".55"/></g>'
+      + [[14, 3.6, 0.85], [22, 3, 0.55]].map(([r, w, o]) => `<path class="rk rk-atmen" d="M${96} ${56 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#FF5FB8" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`).join('')
+      + funke(24, 30, 0.9, 0.2) + funke(90, 24, 0.7, 0.7) + funke(20, 78, 0.6, 1.1);
+  },
 };
 
 export function klangKunst(kid) {
