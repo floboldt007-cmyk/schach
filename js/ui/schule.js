@@ -69,7 +69,7 @@ export function zeige(root, params = {}, app) {
   const s = document.createElement('section');
   s.className = 'screen schule-screen';
   s.setAttribute('aria-label', S('titel'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '' })}
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '', seite: S('titel') })}
     <div class="schule-rumpf">
       ${seitenKopf({ ueber: S('ueber'), titel: S('titel'), text: S('beschreibung') })}
       <div class="sm-inhalt" data-ansicht="laedt"></div>

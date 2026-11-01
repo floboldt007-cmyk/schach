@@ -6,7 +6,7 @@
 //
 //   LABOR_BRETTER   [{ id, hell, dunkel, rand, welt?, muster? }]   Farben wie css/tokens.css html[data-brett="<id>"], rand
 //                   fuers Sammelbild; muster { h, d }: SVG-Inhalt je Feld (viewBox 100), gleich wie --feld-muster-* in tokens.css
-//   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/labor-figuren.mjs)
+//   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/figuren-3d.mjs, figuren-stile.mjs)
 //   LABOR_KLAENGE   ['grusel', 'kristall']    Klangsets unter assets/klang/<id>/ (werkzeuge/labor-klaenge.mjs, js/sounds.js)
 //   istLabor(art, id) -> boolean               art 'brett' | 'figuren' | 'klang'
 //   laborFrei() -> boolean                     nur der Erfinder
@@ -37,7 +37,16 @@ export const LABOR_BRETTER = Object.freeze([
     muster: Object.freeze({ h: "<g fill='none' stroke='rgba(60,110,140,.18)' stroke-width='1.6'><circle cx='24' cy='70' r='5'/><circle cx='34' cy='54' r='3'/><circle cx='76' cy='28' r='4'/></g>",
       d: "<g fill='none' stroke='rgba(225,245,255,.2)' stroke-width='2'><circle cx='26' cy='74' r='7'/><circle cx='38' cy='52' r='4'/><circle cx='44' cy='36' r='2.5'/><circle cx='74' cy='30' r='5'/></g>" }) }),
 ]);
-export const LABOR_FIGUREN = Object.freeze(['kuerbis', 'frost', 'gold']);
+// Flo 31.10.2026 abends ("coole Figur-Designs ... in mein Konto", dann "Bessere Designs"): gedrechselte Formen mit Licht
+// und Schatten (werkzeuge/figuren-3d.mjs: Elfenbein, Holz, Marmor, Gold, Glas, Neon, Frost, Kuerbis) und eigene Stile
+// (werkzeuge/figuren-stile.mjs: Pixel, Geo)
+// danach (Video: Figuren als kleine Wesen) Moosgeister und Tiefsee mit Gesichtern, eigene Gestaltung
+// dann ("Du hast nur die Farben geaendert ... Feuer, Stein, Halloween, Christmas, Ostern"): Themen mit eigenen Koepfen und
+// Kronen (werkzeuge/figuren-themen.mjs), vorn in der Sammlung; dazu Weltraum, Roboter und Naschwerk ("denk dir was aus"),
+// ganz vorn Drachen, Zombies, Geister und Lava-Golem ("Musst kreativ werden: Zombies, Golems, Geister, Drachen"),
+// danach Piraten, Aegypten, Wikinger und Dinos ("Denk dir mehr aus")
+export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
+  'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
 export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
 
 export function istLabor(art, id) {

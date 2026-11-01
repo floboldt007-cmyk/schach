@@ -255,7 +255,9 @@ async function testeLeiste(browser) {
     pruefe(oben ? 'quer ab 1021 px: oben' : 'Lage unten, schwebend (nicht im Kopf)', oben ? m.html === 'oben' : (m.html === 'unten' && !m.imKopf),
       JSON.stringify({ h: m.html }));
     if (!oben) {
-      pruefe('schwebt ueber dem Rand (14 px Abstand) und mittig', nah(m.ih - m.nav.b, 14, 1) && Math.abs((m.nav.l + m.nav.r) / 2 - m.iw / 2) < 2,
+      // Handy (bis 520 px) seit 01.11.2026 naeher am Rand (8 px, Flo: "man muss alles sehen ohne viel scrollen"), sonst 14 px
+      const abstand = vp.w <= 520 ? 8 : 14;
+      pruefe(`schwebt ueber dem Rand (${abstand} px Abstand) und mittig`, nah(m.ih - m.nav.b, abstand, 1) && Math.abs((m.nav.l + m.nav.r) / 2 - m.iw / 2) < 2,
         JSON.stringify(m.nav));
       pruefe('der Screen endet ueber der Leiste', m.screen.b <= m.nav.t + 0.5, JSON.stringify({ s: m.screen.b, n: m.nav.t }));
       // Schub 2: die Leiste kuerzt die Karte erst nach dem ersten Layout; der gewaehlte Gegner muss trotzdem ganz im Bild sein
