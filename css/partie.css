@@ -103,6 +103,12 @@
 /* ---------- Zugliste (Gitter mit Symbolen) und Zugstreifen ---------- */
 .partie .zugbox { display: flex; flex-direction: column; min-height: 96px; padding: 10px; border-radius: 22px;
   background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); }
+/* Kopf der Zugliste (quer): Pfeile zum Blaettern wie im Zugstreifen (Flo 01.11.2026, iPad: "den letzten Zug ansehen ist
+   noch nicht frei"), dazwischen "Zuege" */
+.partie .zb-kopf { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -4px 6px; }
+.partie .zb-titel { font-size: 13px; font-weight: 750; letter-spacing: .02em; color: var(--text-2); }
+.partie .zb-kopf .icon-knopf { width: var(--tap); height: var(--tap); }
+.partie .zb-kopf .icon-knopf:disabled { opacity: .4; cursor: default; }
 .zugliste { flex: 1; min-height: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr); align-content: start; gap: 4px 6px;
   overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .zugliste .nr { height: 34px; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px;
@@ -209,6 +215,13 @@
    (184 px). Ab 968 px Breite (jedes iPad quer) gilt wieder 31vw, dort aendert sich nichts. */
 @media (orientation: landscape) and (min-height: 481px) {
   .partie { --seite: clamp(248px, 31vw, 420px); --quer-rand: clamp(12px, 2.5vw, 24px); --quer-luecke: clamp(12px, 2vw, 20px); }
+}
+/* iPad quer (Flo 01.11.2026, mit Bildschirmfoto: "das Brett kann schon groesser sein"): Spalte 29vw statt 31vw (nie unter
+   300 px, damit sie nicht in die kompakte Form faellt), schmalere Raender und Luecke, oben und unten weniger Luft. Das Brett
+   fuellt jetzt die Hoehe: 1080 x 810 von 633 auf rund 680 px, 1024 x 768 von 595 auf rund 640 px. */
+@media (orientation: landscape) and (min-width: 1000px) and (min-height: 700px) {
+  .partie { --seite: clamp(300px, 29vw, 400px); --quer-rand: clamp(12px, 1.3vw, 24px); --quer-luecke: clamp(12px, 1.3vw, 20px); }
+  .partie .inhalt { padding-top: 12px; padding-bottom: 16px; }
 }
 /* schmale Spalte (unter 300 px): Karten, Uhr und Knoepfe eine Stufe kompakter, Namen duerfen zweizeilig werden */
 @container seite (max-width: 299px) {
