@@ -46,7 +46,7 @@ import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { anim, staffel, tempo, reduziert } from '../bewegung.js';
 import { segment } from './bauteile.js';
 import { hauptKopf, standardChips, verbindeKopf, kopfEintritt } from './seite.js';
-import { spieleDuell, duellArt } from './duell.js';
+import { spieleDuell } from './duell.js';
 import { t, zahl } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
@@ -815,9 +815,10 @@ export function zeige(root, params, app) {
     let erste = true;
     try { erste = !ladePartien().some((p) => p.botId === b.id); } catch (e) { erste = true; }
     const anlass = b.endgegner ? 'boss' : (erste ? 'erste' : null);
-    const art = duellArt({ einstellung, anlass, reduziert: reduziert() });
+    // die Art waehlt spieleDuell selbst (Flo 01.11.2026: "Warum ist die Animation weg, wenn man auf dem iPad eine Partie
+    // beginnt?"): nur dort kennt sie Flos Vitrine; mit Titel oder Errungenschaften gibt es dann jedes Mal die volle Buehne
     const von = detail.querySelector('.detail-kopf .av') || (knoten[idx(b.id)] && knoten[idx(b.id)].querySelector('.avatar'));
-    const duell = spieleDuell({ bot: b, farbe, anlass, von, art });
+    const duell = spieleDuell({ bot: b, farbe, anlass, von, einstellung });
     await duell.bereit;
     if (weg) return;
     app.gehe('partie', { botId: b.id, farbe });
