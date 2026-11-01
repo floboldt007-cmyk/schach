@@ -84,7 +84,7 @@
 // css/bauteile.css):
 //   Spielerkarten: eine Komponente .spieler fuer beide Lagen. Gegner: .spieler.gegner (Zusatzklassen .botbox,
 //   .botleiste-hoch, .botkarte fuer Tests und Pakete), erstes Kind .ort-gegner-leiste, dann .av (Portraet ueber
-//   thema.avatarVon), .info (.bot-name + Unterzeile .bot-meta mit Elo, .denkt-ort, .geschlagen-ort) und .uhr. Flo:
+//   thema.avatarVon), .info (.bot-name + Unterzeile .bot-meta mit Elo, .geschlagen-ort, .denkt-ort) und .uhr. Flo:
 //   .spieler.ich (Zusatzklassen .spielerleiste, .spieler-quer, .spieler-hoch): .av (thema.floAvatar), .name, danach
 //   .ort-spieler-leiste, Unterzeile, .uhr. Der Name wird nie mit "..." gekuerzt: passt er nicht in zwei Zeilen, steht
 //   der Rufname da (rufnameVon), der volle Name im aria-label der Karte. .av der Karten sind die Ziele des Portraetflugs
@@ -450,7 +450,7 @@ export function zeige(root, params, app) {
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
-            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="denkt-ort"></span><span class="geschlagen-ort" data-wer="bot"></span></div></div>
+            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
@@ -632,12 +632,16 @@ export function zeige(root, params, app) {
       const imgs = sortiere(liste).map((t) => {
         const neu = vor !== null && vor !== t;
         vor = t;
-        return `<img${neu ? ' class="neu-gruppe"' : ''} src="assets/pieces/${figFarbe}${t.toUpperCase()}.svg" alt="">`;
+        return `<img${neu ? ' class="neu-gruppe"' : ''} src="assets/pieces/${figFarbe}${t.toUpperCase()}.svg" alt="" decoding="sync">`;
       }).join('');
       return `<span class="geschlagen">${imgs}${plus > 0 ? `<span class="plus zahl">+${plus}</span>` : ''}</span>`;
     };
+    // Nur neu bauen, was sich geaendert hat: Safari zeigt neu angelegte Bilder oft einen Moment leer (iPad-Flackern)
     for (const ort of $$('.geschlagen-ort')) {
-      ort.innerHTML = ort.dataset.wer === 'flo' ? html(vonFlo, botFarbe, bilanz) : html(vonBot, farbe, -bilanz);
+      const neu = ort.dataset.wer === 'flo' ? html(vonFlo, botFarbe, bilanz) : html(vonBot, farbe, -bilanz);
+      if (ort._html === neu && ort.firstElementChild) continue;
+      ort._html = neu;
+      ort.innerHTML = neu;
     }
   }
 
@@ -861,6 +865,8 @@ export function zeige(root, params, app) {
   let zusaetze = [];   // Coach-Zusaetze der Pakete: { el, prio, nr }
   let zusatzNr = 0;
   function coachZeige(html, klassen, ply = null) {
+    clearTimeout(z.rechnetUhr);
+    z.rechnetUhr = null;
     coachEl.className = 'coach coach-karte ' + klassen;
     coachEl.innerHTML = html;
     zusaetze = [];
@@ -964,11 +970,24 @@ export function zeige(root, params, app) {
     coachZeige(`<span class="c-symbol c-icon">${icon('ziel')}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.dein'))}</span></div>
       <p class="c-text">${esc(t(z.zuege.length ? 'partie.coach.weiterText' : 'partie.coach.startText'))}</p>`, 'leer');
   }
-  function coachRechnet(ply) {
+  // iPad (Flo 01.11.2026 abends: flackert noch): Je Zug wechselte die Coach-Karte zweimal den Inhalt, erst "Coach schaut",
+  // Sekundenbruchteile spaeter die Bewertung. Die Warte-Anzeige kommt deshalb erst, wenn die Bewertung auf sich warten
+  // laesst (RECHNET_NACH ms); ist sie vorher fertig, wechselt die Karte nur einmal. sofort: beim Fortsetzen einer Partie.
+  const RECHNET_NACH = 400;
+  function coachRechnet(ply, { sofort = false } = {}) {
     if (!liveAn()) return;
-    coachZeige(`<span class="c-symbol c-warte"><span class="denkt grau"><i></i><i></i><i></i></span></span>
+    clearTimeout(z.rechnetUhr);
+    z.rechnetUhr = null;
+    const zeige = () => {
+      z.rechnetUhr = null;
+      const e = z.live[ply];
+      if (!liveAn() || (e && (e.status === 'fertig' || e.status === 'fehler')) || ply !== letzterFloPly()) return;
+      coachZeige(`<span class="c-symbol c-warte"><span class="denkt grau"><i></i><i></i><i></i></span></span>
       <div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.rechnet'))}</span><span class="c-zug">${esc(zugLabel(ply))}</span></div>
       <p class="c-text">${esc(t('partie.coach.rechnetText'))}</p>`, 'wartet', ply);
+    };
+    if (sofort) zeige();
+    else z.rechnetUhr = spaeter(zeige, RECHNET_NACH);
   }
   // COMBO: Präzise, Goldrichtig und Genial zaehlen; Buch, Pflichtzug und triviale Zuege
   // (Zurueckschlagen, Schachabwehr) sind neutral, solange sie nichts verschenken
@@ -2582,7 +2601,7 @@ export function zeige(root, params, app) {
   // Fortsetzen: lief die Bewertung des letzten eigenen Zugs noch, jetzt nachholen
   const nachholen = !!(laufend && fpStart >= 0 && !z.liveKlassen[fpStart]);
   if (nachholen) neuerLiveEintrag(fpStart);
-  if (nachholen && liveAn()) coachRechnet(fpStart);
+  if (nachholen && liveAn()) coachRechnet(fpStart, { sofort: true });
   else if (laufend && fpStart >= 0 && z.liveKlassen[fpStart] && liveAn()) {
     coachZeige(`<span class="c-symbol">${symbolSvg(z.liveKlassen[fpStart])}</span><div class="c-kopf"><span class="c-klasse">${esc(t('partie.coach.weiter'))}</span>
       <span class="c-zug">${esc(zugLabel(fpStart))}</span></div><p class="c-text">${esc(t('partie.coach.letzterZug', { wort: KLASSEN_WORT[z.liveKlassen[fpStart]] }))}</p>`,
