@@ -177,7 +177,9 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
    Seitentitel darunter entfaellt; beide bleiben fuer Vorleseprogramme im Dokument. Spart auf jeder Seite eine Zeile. */
 .haupt-kopf .kopf-seite { display: none; }
 @media (max-width: 520px) {
-  .haupt-kopf.mit-seite .marke-titel, .screen:has(> .haupt-kopf.mit-seite) .seiten-kopf {
+  /* die Marke ist auf diesen Seiten kein Titel (titelElement 'div'), die Ueberschrift h1 steckt im Seitenkopf */
+  .haupt-kopf.mit-seite .marke-titel { display: none; }
+  .screen:has(> .haupt-kopf.mit-seite) .seiten-kopf {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .haupt-kopf.mit-seite .marke-zeichen { display: none; }
   .haupt-kopf.mit-seite .kopf-seite { display: block; font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px;
