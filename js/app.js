@@ -94,7 +94,7 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'schule', 'lobby'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'lobby', 'schule'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
@@ -109,7 +109,7 @@ function titelVon(name) {
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt', 'schule', 'lobby']);
+  'werkstatt', 'lobby', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
