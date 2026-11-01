@@ -163,7 +163,8 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
    alles sehen ohne viel scrollen"): flacherer Kopf, kleinere Seitentitel ohne Ueberzeile (bleibt fuer Vorleseprogramme im
    Text), schmalere Reiter-Leiste naeher am Rand. Jede Tippflaeche bleibt mindestens 44 px. */
 @media (max-width: 520px) {
-  .screen .kopf.haupt-kopf { padding-top: 6px; min-height: 52px; }
+  /* 10 px oben: der Kopf gleitet beim Oeffnen 10 px von oben herein (kopfEintritt in js/ui/seite.js), er bleibt so im Bild */
+  .screen .kopf.haupt-kopf { padding-top: 10px; min-height: 54px; }
   .seiten-kopf { padding-top: 8px; padding-bottom: 0; }
   .seiten-kopf h1 { font-size: 23px; letter-spacing: -.02em; }
   .seiten-kopf .ueberzeile { display: none; }
