@@ -103,6 +103,12 @@
 /* ---------- Zugliste (Gitter mit Symbolen) und Zugstreifen ---------- */
 .partie .zugbox { display: flex; flex-direction: column; min-height: 96px; padding: 10px; border-radius: 22px;
   background-color: var(--flaeche); background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); }
+/* Kopf der Zugliste (quer): Pfeile zum Blaettern wie im Zugstreifen (Flo 01.11.2026, iPad: "den letzten Zug ansehen ist
+   noch nicht frei"), dazwischen "Zuege" */
+.partie .zb-kopf { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px -4px 6px; }
+.partie .zb-titel { font-size: 13px; font-weight: 750; letter-spacing: .02em; color: var(--text-2); }
+.partie .zb-kopf .icon-knopf { width: var(--tap); height: var(--tap); }
+.partie .zb-kopf .icon-knopf:disabled { opacity: .4; cursor: default; }
 .zugliste { flex: 1; min-height: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr); align-content: start; gap: 4px 6px;
   overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
 .zugliste .nr { height: 34px; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px;
