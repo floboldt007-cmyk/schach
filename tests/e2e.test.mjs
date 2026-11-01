@@ -119,7 +119,14 @@ async function neuerKontext(browser, { w = 1180, h = 820 } = {}) {
       const url = (m.location() && m.location().url) || '';
       fehler.push(m.text() + (url ? ' @ ' + url : ''));
     });
-    seite.on('pageerror', (e) => fehler.push('Seitenfehler: ' + e.message));
+    seite.on('pageerror', (e) => {
+      // WebKit meldet einen beim Neuladen abgebrochenen Abruf der eigenen Seite (z. B. ein Klang, der gerade laedt, waehrend
+      // die neue Version uebernimmt) als "<Adresse> due to access control checks." statt "Load request cancelled" (CI
+      // 31.10.2026, PR #120, zweimal mit verschiedenen Klaengen). Wie unten bei requestfailed kein Fehler; Abrufe anderer
+      // Adressen bleiben einer.
+      if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
+      fehler.push('Seitenfehler: ' + e.message);
+    });
     seite.on('requestfailed', (r) => {
       const grund = r.failure() ? r.failure().errorText : '?';
       // beim Neuladen abgebrochen: kein Fehler (Chromium ERR_ABORTED, WebKit: Load request cancelled, Firefox NS_BINDING_ABORTED)
