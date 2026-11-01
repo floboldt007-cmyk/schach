@@ -456,7 +456,7 @@ export function zeige(root, params, app) {
         </div>
         <div class="coach coach-karte leer"></div>
         <div class="sr zugansage" role="status" aria-live="polite" aria-atomic="true"></div>
-        <div class="zugbox"><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
+        <div class="zugbox"><div class="zb-kopf"><button class="icon-knopf zl-zurueck dr" type="button" data-aktion="zug-zurueck" aria-label="${esc(t('partie.zuege.zurueck'))}">${icon('zurueck')}</button><span class="zb-titel">${esc(t('partie.zuege.label'))}</span><button class="icon-knopf zl-vor dr" type="button" data-aktion="zug-vor" aria-label="${esc(t('partie.zuege.vor'))}">${icon('vor')}</button></div><div class="zugliste" aria-label="${esc(t('partie.zuege.label'))}"></div></div>
         <div class="zugleiste" aria-label="${esc(t('partie.zuege.label'))}"></div>
         <div class="pfeil-tipp" role="note" hidden><span class="pt-text"></span><button class="pt-ok dr" type="button" data-aktion="pfeil-tipp">${esc(t('partie.pfeil.ok'))}</button></div>
         <div class="spieler ich spielerleiste spieler-quer spieler-hoch" role="group" aria-label="${esc(meinName())}">
@@ -648,8 +648,10 @@ export function zeige(root, params, app) {
   function zeigeZugNav() {
     for (const x of $$('.zugliste .z[data-ply], .zugleiste .z[data-ply]')) x.classList.toggle('angesehen', Number(x.dataset.ply) === ansehen.ply);
     const n = z.verbose.length;
-    for (const b of $$('.zugleiste .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
-    for (const b of $$('.zugleiste .zl-vor')) b.disabled = ansehen.ply == null;
+    // Pfeile im Zugstreifen (hoch) und ueber der Zugliste (quer, Flo 01.11.2026: "den letzten Zug ansehen ist auf dem iPad
+    // noch nicht frei": quer gab es nur das Antippen in der Liste)
+    for (const b of $$('.zugleiste .zl-zurueck, .zugbox .zl-zurueck')) b.disabled = !n || ansehen.ply === -1;
+    for (const b of $$('.zugleiste .zl-vor, .zugbox .zl-vor')) b.disabled = ansehen.ply == null;
     // der angesehene Zug rollt in die Mitte des Streifens
     const an = $('.zugleiste .z.angesehen');
     if (an) { const zl = an.closest('.zugleiste'); zl.scrollLeft = an.offsetLeft - zl.clientWidth / 2 + an.offsetWidth / 2; }

@@ -22,8 +22,9 @@
 
 /* ---------- Screen ---------- */
 .lobby .lb-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 14px; width: min(100%, 1040px); margin: 0 auto;
-  padding: 6px var(--rand) calc(28px + var(--reiter-hoehe, 0px)); }
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 14px; width: 100%;
+  /* die ganze Breite rollt, die Spalte bleibt 1040 px (wie Premium und Meisterschule, Flo 01.11.2026) */
+  padding: 6px max(var(--rand), calc((100% - 1040px) / 2 + var(--rand))) calc(28px + var(--reiter-hoehe, 0px)); }
 .lobby .lb-rumpf > .lb-modus { justify-self: center; }
 .lb-karte { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 0; border-radius: var(--r-l); background-color: var(--flaeche);
   background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); color: var(--text); min-width: 0; }

@@ -219,6 +219,12 @@ async function browserTeil() {
         return { nebeneinander: b.left >= a.right - 1 && Math.abs(a.top - b.top) < 4, breit: document.documentElement.scrollWidth <= innerWidth + 1 };
       });
       pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
+      // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
+      await p.s.mouse.move(20, 600);
+      await p.s.mouse.wheel(0, 4000);
+      await warte(500);
+      const rollen = await p.s.evaluate(() => { const r = document.querySelector('.lb-rumpf'); return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight }; });
+      pruefe('iPad quer: am Rand gewischt rollt die Lobby bis ganz unten', rollen.max > 0 && rollen.st >= rollen.max - 1, rollen);
       await p.s.locator('.screen.lobby .lb-modus [data-modus="welten"]').click();
       await p.s.waitForSelector('.screen.arena .knoten', { timeout: 10000 });
       pruefe('Welten fuehrt zur Karte zurueck', await p.s.evaluate(() => location.hash === '#arena' && document.querySelector('.screen.arena .lb-modus')?.dataset.aktiv === 'welten'));

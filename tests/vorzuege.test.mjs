@@ -266,6 +266,17 @@ try {
   const a4 = await ansicht();
   await seite.keyboard.press('Escape');
   pruefe('Ansehen: Tastatur (Pfeil links zeigt den Zug davor, Escape zur Partie)', a4.schild === '2. Sf3' && !(await ansicht()).offen, a4);
+  // Flo 01.11.2026 (iPad quer): "den letzten Zug ansehen ist auf dem iPad noch nicht frei": quer war der Zugstreifen mit
+  // den Pfeilen verborgen. Jetzt stehen die Pfeile ueber der Zugliste (44 px), "zurueck" oeffnet den Zug davor
+  const zb = await seite.evaluate(() => { const k = document.querySelector('.screen.partie .zugbox .zl-zurueck'); const r = k && k.getBoundingClientRect();
+    return { da: !!k && getComputedStyle(k).display !== 'none' && r.height >= 44, vorAus: document.querySelector('.screen.partie .zugbox .zl-vor').disabled }; });
+  await seite.locator('.screen.partie .zugbox .zl-zurueck').click();
+  await seite.waitForSelector('.screen.partie .zug-ansicht');
+  const a5 = await ansicht();
+  const vorAn = await seite.evaluate(() => !document.querySelector('.screen.partie .zugbox .zl-vor').disabled);
+  await seite.keyboard.press('Escape');
+  pruefe('Quer: Pfeile ueber der Zugliste (44 px), zurueck zeigt den Zug davor, dann ist vor frei',
+    zb.da && zb.vorAus && a5.schild === '2. Sf3' && vorAn && !(await ansicht()).offen, { zb, a5, vorAn });
   // Der Plan ist leer: nach d2-d4 haelt der Bot an. Waehrenddessen ansehen, dann zieht er: die Ansicht geht zu
   await zug('d2d4');
   await seite.waitForFunction(() => window.__partie.phase() === 'bot');

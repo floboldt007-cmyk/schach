@@ -1223,7 +1223,12 @@ async function testeDuell(browser) {
     await warte(1900);
     const mitte = await seite.evaluate(() => ({ orden: [...document.querySelectorAll('.duell-orden')].map((o) => [o.textContent, +getComputedStyle(o).opacity]),
       titel: (document.querySelector('.duell-titel') || {}).textContent, tipp: (document.querySelector('.duell-tipp') || {}).textContent, zeit: !!document.querySelector('.duell-zeit'),
-      fertig: window.__fertig.length, block: Math.round(window.__block) }));
+      fertig: window.__fertig.length, block: Math.round(window.__block),
+      // Flo 01.11.2026 (iPad): "dass das Profil auf derselben Hoehe ist": beide Bilder auf einer Linie, "gegen" auf Bildmitte
+      hoehe: (() => { const r = (sel) => document.querySelector(sel).getBoundingClientRect(); const b = r('[data-rolle="bot"]'), f = r('[data-rolle="flo"]'), g = r('.duell-gegen');
+        return { bot: Math.round(b.top), flo: Math.round(f.top), gegenMitte: Math.round((g.top + g.bottom) / 2), bildMitte: Math.round((b.top + b.bottom) / 2) }; })() }));
+    pruefe('Quer mit Titel und Abzeichen: beide Portraets auf derselben Hoehe, "gegen" auf der Bildmitte',
+      Math.abs(mitte.hoehe.bot - mitte.hoehe.flo) <= 2 && Math.abs(mitte.hoehe.gegenMitte - mitte.hoehe.bildMitte) <= 3, JSON.stringify(mitte.hoehe));
     pruefe('Vitrine ohne Anlass: volle Buehne in der langen Fassung, nach 1,9 s steht sie noch, alle drei Errungenschaften lesbar',
       mitte.fertig === 0 && mitte.orden.length === 3 && mitte.orden.every(([, o]) => o > 0.95) && mitte.titel === 'Der Erfinder' && mitte.tipp === 'Tippen zum Starten' && mitte.zeit, JSON.stringify(mitte));
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 8000 });

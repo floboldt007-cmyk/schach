@@ -11,7 +11,8 @@
    ============================================================ */
 .duell { position: fixed; inset: 0; z-index: 60; overflow: hidden; outline: none; -webkit-tap-highlight-color: transparent; touch-action: none;
   /* Text auf der Bot-Farbe: weiss (--auf-akzent ist in beiden Modi weiss) oder Schiefer (--flo-grund), js/ui/duell.js waehlt */
-  --duell-text-hell: var(--auf-akzent); --duell-text-dunkel: var(--flo-grund); --duell-auf-flo: var(--auf-akzent); }
+  --duell-text-hell: var(--auf-akzent); --duell-text-dunkel: var(--flo-grund); --duell-auf-flo: var(--auf-akzent);
+  --duell-av: clamp(124px, 22vmin, 216px); }
 /* Kurzfassung: nur die Flieger, kein Abfangen; Vollfassung, sobald die Partie darunter steht (.durch, js/ui/duell.js) und
    im Portraetflug (.phase-2): Tipps gehen zur Partie durch (und beenden das Intro, Horcher am document) */
 .duell.kurz, .duell.durch, .duell.phase-2 { pointer-events: none; }
@@ -31,7 +32,7 @@
 .duell-seite { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; will-change: transform; color: var(--duell-text-dunkel); }
 .duell-seite.bot.hell { color: var(--duell-text-hell); }
 .duell-seite.flo { color: var(--duell-auf-flo); }
-.duell-av { width: clamp(124px, 22vmin, 216px); aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--flaeche-2);
+.duell-av { width: var(--duell-av); aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: var(--flaeche-2);
   box-shadow: 0 0 0 5px var(--flaeche), var(--s3); will-change: transform; }
 .duell-av img, .duell-av svg { width: 100%; height: 100%; display: block; }
 .duell-name { font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(26px, 4.4vmin, 42px); letter-spacing: var(--lw-titel); line-height: 1;
@@ -44,6 +45,13 @@
 .duell-chip { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: var(--r-pille); background: var(--flaeche); color: var(--text);
   font-size: 13px; font-weight: var(--gw-stark); letter-spacing: .02em; box-shadow: var(--s2); }
 .duell-tipp { position: absolute; right: 28px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); color: var(--duell-auf-flo); opacity: .86; font-size: 13.5px; font-weight: 700; }
+/* Querformat (Flo 01.11.2026, iPad: "das Profil auf derselben Hoehe"): Mit Titel und Abzeichen war Flos Seite hoeher, beide
+   Seiten standen mittig, Flos Bild lag rund 100 px ueber dem des Bots. Jetzt beginnen beide oben auf einer Linie, "gegen"
+   sitzt auf Hoehe der Bildmitte, Titel und Abzeichen haengen unter Flo. */
+@media (orientation: landscape) {
+  .duell-paar { align-items: flex-start; }
+  .duell-gegen { align-self: flex-start; margin-top: calc((var(--duell-av) - 76px) / 2); }
+}
 @media (orientation: portrait) {
   .duell-paar { flex-direction: column; width: 92vw; height: min(80vh, 860px); }
   .duell-paar .duell-seite:first-child { justify-content: flex-end; }
