@@ -3724,8 +3724,15 @@ async function testeU7(browser) {
     pruefe('Schleier ohne Weichzeichner, der Screen dahinter tritt zurück (scale .975)', /rgba?\(/.test(sieg.schleier) && (sieg.filter === 'none' || !sieg.filter) && sieg.zurueck && /matrix\(0\.975/.test(sieg.inh), JSON.stringify(sieg));
     const a = sieg.knoepfe.find((x) => x.ziel === 'analyse');
     const b = sieg.knoepfe.find((x) => x.ziel !== 'analyse');
-    pruefe(g.handy ? 'Handy: Knöpfe untereinander, „Zur Analyse“ (Zinnober) zuerst' : 'Knöpfe nebeneinander, „Zur Analyse“ in Zinnober', a && b && a.primaer
-      && (g.handy ? a.t < b.t - 10 : Math.abs(a.t - b.t) < 2 && a.l < b.l), JSON.stringify(sieg.knoepfe));
+    // Handy seit 01.11.2026 auch nebeneinander, fest am unteren Rand der Karte (Flo: "man sollte direkt die Lobby sehen")
+    pruefe(g.handy ? 'Handy: Knöpfe nebeneinander, „Zur Analyse“ (Zinnober) links' : 'Knöpfe nebeneinander, „Zur Analyse“ in Zinnober', a && b && a.primaer
+      && Math.abs(a.t - b.t) < 2 && a.l < b.l, JSON.stringify(sieg.knoepfe));
+    if (g.handy) {
+      const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
+        const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');
+        return { pos: getComputedStyle(a).position, lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
+      pruefe('Handy: Knopfleiste fest unten, „Zur Lobby“ ohne Scrollen zu sehen', fest.pos === 'sticky' && fest.lobbyImBild, JSON.stringify(fest));
+    }
     await bild(seite, `u7-ergebnis-sieg-${g.w}x${g.h}`);
     await h.tippe('.ergebnis-overlay .erg-zu');
     pruefe('Brett ansehen: der Screen tritt wieder vor', await seite.evaluate(() => !document.querySelector('.screen.partie').classList.contains('mit-ergebnis')));

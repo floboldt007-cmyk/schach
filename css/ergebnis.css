@@ -158,3 +158,26 @@
   .e-stern { width: 46px; height: 46px; }
   .erg-stern:nth-child(2) .e-stern { width: 56px; height: 56px; }
 }
+
+/* Handy (Flo 01.11.2026, Bild nach dem Aufgeben: "zu gross, man sollte danach direkt schon sehen: zur Lobby"):
+   die Knoepfe stehen fest am unteren Rand der Karte (Zur Analyse und Nochmal nebeneinander, darunter Zur Lobby), der Inhalt
+   darueber ist flacher und scrollt bei Bedarf darunter weg */
+.erg-aktionen { display: grid; gap: 4px; }
+@media (max-width: 600px) {
+  .ergebnis-karte { gap: 10px; padding-top: 16px; }
+  .niederlage .erg-wort { font-size: 26px; }
+  .erg-wort { font-size: 38px; }
+  .remis .erg-wort { font-size: 32px; }
+  .erg-unter { font-size: 14px; }
+  .erg-genau.gross b { font-size: 26px; margin: 0; }
+  .erg-genau.gross span { font-size: 13px; }
+  .erg-bot .av { width: 36px; height: 36px; border-radius: 12px; }
+  .erg-bot .sprechblase { font-size: 13.5px; }
+  .ergebnis-karte .abrechnung > * { padding-top: 10px; padding-bottom: 10px; }
+  .erg-aktionen { position: sticky; z-index: 2; bottom: -18px; margin: 0 -16px -18px; padding: 10px 16px 8px;
+    background-color: var(--flaeche); border-top: 1px solid var(--linie); border-radius: 0 0 26px 26px; }
+  .erg-aktionen:not(:has(.erg-knoepfe:not(:empty))):has(.erg-lobby[hidden]) { display: none; }
+  .erg-knoepfe { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .erg-knoepfe .knopf { min-height: 48px; font-size: 15px; padding: 0 8px; }
+  .erg-lobby { margin: 0 auto; }
+}

@@ -390,7 +390,7 @@ async function laborTeil(browser) {
   await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
-  pruefe('Labor: Klangsets Grusel und Kristall mit Schild', klaenge === 'klang-grusel,klang-kristall', klaenge);
+  pruefe('Labor: Klangsets Juwel, Grusel und Kristall mit Schild', klaenge === 'klang-juwel,klang-grusel,klang-kristall', klaenge);
   await ruesteAus(p.s, 'klang-grusel');
   pruefe('Labor: Grusel per Tipp gewählt und aktiv', await p.s.evaluate(async () => {
     const { klang } = await import('./js/sounds.js');

@@ -219,8 +219,8 @@ async function testeNode() {
 
   // Labor-Klangsets (nur Erfinder, js/labor.js; werkzeuge/labor-klaenge.mjs aus Holz): dieselben Namen, gueltige MP3, klein
   gruppe = 'Labor-Klaenge';
-  pruefe('PAKETE_LABOR: Grusel und Kristall, Ordner unter assets/klang/', JSON.stringify(Object.keys(PAKETE_LABOR)) === '["grusel","kristall"]'
-    && PAKETE_LABOR.grusel.pfad === 'assets/klang/grusel/' && PAKETE_LABOR.kristall.pfad === 'assets/klang/kristall/');
+  pruefe('PAKETE_LABOR: Grusel, Kristall und Juwel, Ordner unter assets/klang/', JSON.stringify(Object.keys(PAKETE_LABOR)) === '["grusel","kristall","juwel"]'
+    && PAKETE_LABOR.grusel.pfad === 'assets/klang/grusel/' && PAKETE_LABOR.kristall.pfad === 'assets/klang/kristall/' && PAKETE_LABOR.juwel.pfad === 'assets/klang/juwel/');
   for (const p of Object.keys(PAKETE_LABOR)) {
     const ordner = path.join(WURZEL, PAKETE_LABOR[p].pfad);
     const da = existsSync(ordner) ? readdirSync(ordner) : [];

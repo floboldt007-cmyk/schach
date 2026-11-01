@@ -7,7 +7,8 @@
 //   LABOR_BRETTER   [{ id, hell, dunkel, rand, welt?, muster? }]   Farben wie css/tokens.css html[data-brett="<id>"], rand
 //                   fuers Sammelbild; muster { h, d }: SVG-Inhalt je Feld (viewBox 100), gleich wie --feld-muster-* in tokens.css
 //   LABOR_FIGUREN   ['kuerbis', ...]          Saetze unter assets/pieces/<id>/ (werkzeuge/figuren-3d.mjs, figuren-stile.mjs)
-//   LABOR_KLAENGE   ['grusel', 'kristall']    Klangsets unter assets/klang/<id>/ (werkzeuge/labor-klaenge.mjs, js/sounds.js)
+//   LABOR_KLAENGE   ['juwel', 'grusel', 'kristall']  Klangsets unter assets/klang/<id>/ (werkzeuge/klang-juwel.mjs,
+//                   werkzeuge/labor-klaenge.mjs, js/sounds.js)
 //   istLabor(art, id) -> boolean               art 'brett' | 'figuren' | 'klang'
 //   laborFrei() -> boolean                     nur der Erfinder
 //   brettWahl(id) -> id                        ein Labor-Brett ohne Erfinder faellt still auf 'nacht'
@@ -47,7 +48,7 @@ export const LABOR_BRETTER = Object.freeze([
 // danach Piraten, Aegypten, Wikinger und Dinos ("Denk dir mehr aus")
 export const LABOR_FIGUREN = Object.freeze(['drachen', 'zombies', 'geister', 'lavagolem', 'piraten', 'aegypten', 'wikinger', 'dinos', 'feuer', 'stein', 'halloween', 'weihnachten', 'ostern', 'weltraum', 'roboter', 'naschwerk', 'moosgeister', 'tiefsee', 'elfenbein',
   'holz', 'marmor', 'gold', 'glas', 'neon', 'frost', 'kuerbis', 'pixel', 'geo']);
-export const LABOR_KLAENGE = Object.freeze(['grusel', 'kristall']);
+export const LABOR_KLAENGE = Object.freeze(['juwel', 'grusel', 'kristall']);
 
 export function istLabor(art, id) {
   if (art === 'brett') return LABOR_BRETTER.some((b) => b.id === id);
