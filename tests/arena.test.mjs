@@ -85,8 +85,9 @@ function nodeTeil() {
   pruefe('Vitrine (Titel oder Errungenschaften): besondere -> voll auch ohne Anlass; aus und reduziert bleiben aus',
     duellArt({ einstellung: 'besondere', anlass: null, vitrine: true }) === 'voll' && duellArt({ einstellung: 'aus', vitrine: true }) === 'aus'
     && duellArt({ einstellung: 'besondere', vitrine: true, reduziert: true }) === 'aus');
-  pruefe('lange Fassung: Haltephase mindestens 3 s, Flug passt vor die harte Grenze, hoechstens 4,5 s',
-    HALTE_VITRINE >= 3000 && HALTE_VITRINE + FLUG + 30 + 40 <= DAUER_VITRINE - 60 && DAUER_VITRINE <= 4500, JSON.stringify({ HALTE_VITRINE, DAUER_VITRINE }));
+  // Flo 01.11.2026 (Handy: "zu kurz"): eine Sekunde laenger; die Partie wartet ueber data-duell-max bis 6 s mit
+  pruefe('lange Fassung: Haltephase mindestens 4 s, Flug passt vor die harte Grenze, hoechstens 5,5 s',
+    HALTE_VITRINE >= 4000 && HALTE_VITRINE + FLUG + 30 + 40 <= DAUER_VITRINE - 60 && DAUER_VITRINE <= 5500, JSON.stringify({ HALTE_VITRINE, DAUER_VITRINE }));
   pruefe('unbekannte Einstellung wirkt wie besondere (Standard)', duellArt({ einstellung: 'xyz', anlass: 'erste' }) === 'voll' && duellArt({ einstellung: 'xyz', anlass: null }) === 'kurz' && duellArt() === 'kurz');
 
   gruppe = 'Portraets';
@@ -1248,6 +1249,57 @@ async function testeDuell(browser) {
     await seite.waitForFunction(() => window.__fertig.length > 0, null, { timeout: 3000 });
     const k = await seite.evaluate(() => ({ fertig: window.__fertig, screen: document.documentElement.dataset.screen }));
     pruefe('lange Fassung, Handy: ein Tipp startet sofort (uebersprungen, Partie da)', k.fertig[0].uebersprungen === true && Date.now() - t0 < 1500, JSON.stringify(k));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  // Handy, lange Fassung mit Titel und drei Abzeichen (Flo 01.11.2026: "sieht komisch aus", Portraet oben abgeschnitten,
+  // Abzeichen unter "Tippen zum Starten"): alles im Bild, Abzeichen in einer Reihe ueber dem Hinweis, "gegen" auf der Naht.
+  // Danach Zurueck waehrend des Intros ("Das vor und zurueck funktioniert nicht"): das Intro endet sofort, Vor fuehrt
+  // ohne stehengebliebene Buehne in die Partie.
+  for (const h of [568, 844]) {
+    gruppe = `Duell Handy ${h}`;
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h, handy: true, einstellungen: { duellIntro: 'besondere', klang: false } });
+    await seite.goto(BASIS + '#arena');
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(800);
+    await seite.evaluate(async () => {
+      const { erfolgKunst } = await import('./js/sammlung-kunst.js');
+      const o = (name, id, seltenheit) => ({ name, bild: erfolgKunst(id), seltenheit });
+      (await import('./js/orte.js')).anbieten('duell:profil?', () => ({ titel: 'Der Erfinder',
+        orden: [o('Welt 1 gemeistert', 'welt-1', 'selten'), o('Siegesserie 5', 'siegesserie-5', 'selten'), o('Alle Endgegner besiegt', 'alle-endgegner', 'episch')] }),
+      { reihenfolge: 1, paket: 'test-vitrine' });
+    });
+    await duellHorcher(seite);
+    await tippe(seite, '.detail [data-aktion="spielen"]');
+    await seite.waitForSelector('.duell.voll.lang', { timeout: 5000 });
+    await warte(2400);
+    const l = await seite.evaluate(() => {
+      const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const x = e.getBoundingClientRect(); return { l: x.left, t: x.top, r: x.right, b: x.bottom }; };
+      const orden = [...document.querySelectorAll('.duell-orden')].map((e) => { const x = e.getBoundingClientRect(); return { l: x.left, t: x.top, r: x.right, b: x.bottom, o: +getComputedStyle(e).opacity }; });
+      return { H: innerHeight, W: innerWidth, chip: r('.duell-chip'), bot: r('[data-rolle="bot"]'), gegen: r('.duell-gegen'), flo: r('[data-rolle="flo"]'), orden, tipp: r('.duell-tipp'),
+        bilder: document.querySelectorAll('.duell-orden.mit-bild > svg').length, fertig: window.__fertig.length };
+    });
+    const reihe = l.orden.length === 3 && l.orden.every((o) => Math.abs(o.t - l.orden[0].t) < 2 && o.l >= 0 && o.r <= l.W && o.o > 0.95);
+    // die Naht kreuzt die Mitte bei 41 % der Hoehe (css/duell.css --naht)
+    const gegenMitte = l.gegen ? (l.gegen.t + l.gegen.b) / 2 : -1;
+    pruefe('lange Fassung im Hochformat: Bot-Portraet unter dem Chip, Abzeichen mit Bild in einer Reihe ueber dem Hinweis, alles im Bild',
+      l.fertig === 0 && l.bot && l.chip && l.bot.t >= l.chip.b && reihe && l.bilder === 3 && l.orden.every((o) => o.b <= l.tipp.t) && l.tipp.b <= l.H, JSON.stringify(l));
+    pruefe('"gegen" sitzt auf der Naht, zwischen den Portraets', Math.abs(gegenMitte - 0.41 * l.H) <= 12 && l.bot.b <= l.gegen.t + 4 && l.flo.t >= l.gegen.b - 8, JSON.stringify({ gegenMitte, H: l.H }));
+    if (h === 568) {
+      await seite.waitForFunction(() => document.documentElement.dataset.screen === 'partie', null, { timeout: 5000 });
+      pruefe('lange Fassung nennt der Partie ihre harte Grenze (data-duell-max)', await seite.evaluate(() => document.documentElement.dataset.duellMax) === String(DAUER_VITRINE), '');
+      await seite.goBack();
+      await seite.waitForFunction(() => document.documentElement.dataset.screen === 'arena', null, { timeout: 5000 });
+      await warte(250);
+      const z = await seite.evaluate(() => ({ duell: !!document.querySelector('.duell'), attr: document.documentElement.dataset.duell || null, max: document.documentElement.dataset.duellMax || null,
+        fertig: window.__fertig, flieger: document.querySelectorAll('.duell-flieger').length }));
+      pruefe('Zurueck waehrend des Intros: Buehne sofort weg, Vertrag erfuellt (uebersprungen, Attribute weg)',
+        !z.duell && z.attr === null && z.max === null && z.flieger === 0 && z.fertig.length === 1 && z.fertig[0].uebersprungen === true, JSON.stringify(z));
+      await seite.goForward();
+      await seite.waitForFunction(() => document.documentElement.dataset.screen === 'partie', null, { timeout: 5000 });
+      await warte(250);
+      pruefe('danach Vor: Partie ohne stehengebliebene Buehne', await seite.evaluate(() => !document.querySelector('.duell') && window.__fertig.length === 1), '');
+    }
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

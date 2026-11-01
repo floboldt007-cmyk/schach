@@ -10,8 +10,9 @@
 //       'besondere' mit besonderem Anlass oder wenn Flo etwas zu zeigen hat (vitrine: Titel oder Errungenschaften); sonst
 //       'kurz' (0,4 s, nur der Portraetflug: Bot von seiner Station, Flo von seiner Figur auf der Karte in die Spielerleisten).
 //       Lange Fassung (Flo, 30.10.2026: "viel zu kurz, man kann nicht lesen, was er fuer Errungenschaften hat"): hat Flo
-//       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (3,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
-//       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (4,3 s). Tippen startet sofort.
+//       eine Vitrine, haelt die Vollfassung bis HALTE_VITRINE (4,3 s) statt HALTE_BIS, Titel und Errungenschaften kommen
+//       nacheinander, ein Balken zeigt die Zeit bis zum Start, harte Grenze DAUER_VITRINE (5,3 s). Tippen startet sofort.
+//       Seit 01.11.2026 (Flo, Handy: "zu kurz") haelt sie bis 4,3 s statt 3,3 s.
 //   spieleDuell({ bot, farbe, anlass, von, art?, einstellung? }) -> { bereit: Promise, fertig: Promise, ueberspringe(), art }
 //       bot aus bots.js, farbe Flos Farbe ('w' | 'b'), von das Element, aus dem die Buehne waechst (Portraet der
 //       Detail-Karte oder die Station; die Buehne nimmt die umgebende .detail, wenn es sie gibt). art kommt sonst aus
@@ -29,7 +30,10 @@
 // Vertrag mit der Partie (U7 baut die andere Seite): solange das Intro laeuft, steht
 // document.documentElement.dataset.duell = 'laeuft'; beim Ende (auch beim Ueberspringen) wird das Attribut entfernt
 // und document.dispatchEvent(new CustomEvent('duell:fertig', { detail: { art, uebersprungen } })) gesendet. Bei 'aus'
-// laeuft nichts: kein Attribut, kein Ereignis, aktivesDuell() ist null.
+// laeuft nichts: kein Attribut, kein Ereignis, aktivesDuell() ist null. In der langen Fassung steht zusaetzlich
+// document.documentElement.dataset.duellMax = harte Grenze in ms (die Partie wartet sonst hoechstens 1,4 s, js/ui/partie.js).
+// Zurueck/Vor (Flo 01.11.2026): landet die App waehrend des Intros auf einem anderen Screen als der Partie, endet es
+// sofort (uebersprungen), statt bis zur harten Grenze ueber dem neuen Screen zu stehen.
 // Die Ueberlagerung haengt an document.body (ausserhalb #app), wartet auf das Ereignis app:screen mit name 'partie'
 // (js/ereignisse.js) und fliegt die Portraets auf .screen.partie .spieler.gegner .av und .screen.partie .spieler.ich .av;
 // fehlen die Ziele (heutiger Partie-Screen), blendet sie nur aus. Tippen ueberspringt. Nur transform und opacity werden
@@ -60,10 +64,12 @@ export const FLUG = 440;
 const FLUG_VERSATZ = 30;                 // Flos Portraet startet etwas spaeter
 export const FLUG_MIN = 180;             // kuerzer lohnt kein Flug: dann blendet die Buehne nur aus
 const PUFFER = 60;                       // Abstand zur harten Grenze: der Flug endet spaetestens DAUER_MAX - PUFFER ms
-export const HALTE_VITRINE = 3300;       // lange Fassung: Haltephase zum Lesen der Vitrine
-export const DAUER_VITRINE = 4300;       // lange Fassung: harte Grenze
-const ORDEN_AB = 900;                    // lange Fassung: erste Errungenschaft (ms), dann je ORDEN_TAKT spaeter
-const ORDEN_TAKT = 300;
+// Flo 01.11.2026 (Handy): "die Animation am Handy ist zu kurz" -> eine Sekunde laenger als vorher (3,3 / 4,3 s);
+// Tippen startet weiterhin sofort
+export const HALTE_VITRINE = 4300;       // lange Fassung: Haltephase zum Lesen der Vitrine
+export const DAUER_VITRINE = 5300;       // lange Fassung: harte Grenze
+const ORDEN_AB = 800;                    // lange Fassung: erste Errungenschaft (ms), dann je ORDEN_TAKT spaeter
+const ORDEN_TAKT = 280;
 const jetzt = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 const KLANG_BEI = 430;                   // "gegen" schlaegt ein: Start-Klang (ms * zf)
 // Texte als Schluessel (Woerterbuecher allgemein und arena), gelesen beim Zeichnen
@@ -215,7 +221,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const lang = voll && hatVitrine;
   const halteBis = lang ? HALTE_VITRINE : HALTE_BIS;
   const dauerMax = lang ? DAUER_VITRINE : DAUER_MAX;
-  if (lang) ueber.classList.add('lang');
+  if (lang) { ueber.classList.add('lang'); html.dataset.duellMax = String(dauerMax); }
   const vitrine = voll && profil ? `${profil.titel ? `<div class="duell-titel">${typeof profil.titelBild === 'string' && profil.titelBild.startsWith('<svg class="titel-wappen') ? profil.titelBild : ''}<span>${esc(profil.titel)}</span></div>` : ''}${orden.length
     ? `<div class="duell-vitrine">${orden.map((o) => {
       // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
@@ -271,7 +277,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
     try { ueber.remove(); } catch (e) { /* egal */ }
     try { document.removeEventListener('pointerdown', tipp, true); } catch (e) { /* egal */ }
     if (aktiv && aktiv.ueber === ueber) aktiv = null;
-    if (html.dataset.duell === 'laeuft' && !aktiv) delete html.dataset.duell;
+    if (html.dataset.duell === 'laeuft' && !aktiv) { delete html.dataset.duell; delete html.dataset.duellMax; }
     const dauer = Math.round(jetzt() - t0);
     protokolliere({ art: gewaehlteArt, anlass, bot: bot.id, uebersprungen, ziele: zieleZahl, dauer, wechsel, partieAb, flugAb, flug: Math.round(flugDauer) });
     meldeBereit();
@@ -350,10 +356,18 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   // Die Partie ist da (app:screen partie, nach `bereit`): ein Bild warten, damit sie ihr Layout hat (Ziele messbar).
   // Ab dann gehen Tipps zur Partie durch (.durch); die Portraets fliegen am Ende der Haltephase, oder sofort, wenn sie
   // schon vorbei ist
+  // Zurueck/Vor (Flo 01.11.2026, Handy: "Das vor und zurueck funktioniert nicht"): ein anderer Screen als die Partie
+  // beendet das Intro sofort (vorher stand die Buehne bis zur harten Grenze ueber der Arena, die Partie kam beim Vor
+  // ohne Intro). Vor der Partie zaehlt nur ein Wechsel weg vom Start-Screen (die Arena darf sich neu zeichnen).
   const halteEnde = voll ? halteBis * zf : 0;
+  const startScreen = html.dataset.screen || null;
   const beiPartie = (d) => {
-    if (!d || d.name !== 'partie' || zuEnde) return;
-    if (abPartie) { try { abPartie(); } catch (e) { /* egal */ } abPartie = null; }
+    if (!d || zuEnde) return;
+    if (d.name !== 'partie') {
+      if (partieAb != null || d.name !== startScreen) ueberspringe();
+      return;
+    }
+    if (partieAb != null) return;
     partieAb = Math.round(jetzt() - t0);
     ueber.classList.add('durch');
     // kam die Partie so spaet, dass kein Flug mehr passt (langsames Geraet), nicht noch ein Bild warten

@@ -111,7 +111,8 @@
 //   Ring, 8 Funken, Lichtstreif, Brett hebt sich 1,2 % (.brett-rahmen.prisma), Klassenwort als Pille, COMBO in der
 //   Klassenfarbe (alles in .brett-effekte, nur transform und opacity). Grobe Fehler bleiben ruhig.
 //   Duell-Vertrag (U5): steht beim Start html[data-duell="laeuft"], ziehen Bot (und spaeter die Uhr) erst nach dem
-//   DOM-Ereignis duell:fertig auf document, hoechstens DUELL_MAX_MS (1,4 s).
+//   DOM-Ereignis duell:fertig auf document, hoechstens DUELL_MAX_MS (1,4 s), in der langen Fassung hoechstens
+//   html[data-duell-max] (js/ui/duell.js, bis 6 s).
 //   Ergebnis (2.6): Schleier ohne Weichzeichner, der Screen dahinter tritt zurueck (.mit-ergebnis), "Sieg!" mit
 //   goldenem Ausrufezeichen, Sterne als Symbole nacheinander (klang.stern), kein Konfetti, Niederlage ruhig mit
 //   Lichtblick-Karte (.erg-lichtblick: Flos bester Zug aus den Live-Klassen, nur wenn ergebnis:karte leer bleibt),
@@ -2515,7 +2516,10 @@ export function zeige(root, params, app) {
   const duellBereit = document.documentElement.dataset.duell === 'laeuft'
     ? new Promise((resolve) => {
       const seit = jetzt();
-      const u = setTimeout(() => fertig('zeit'), DUELL_MAX_MS);
+      // lange Fassung (Titel und Errungenschaften): das Intro nennt seine harte Grenze in data-duell-max (hoechstens 6 s),
+      // sonst liefen Uhr und Bot-Zug schon hinter der Buehne los
+      const max = Number(document.documentElement.dataset.duellMax);
+      const u = setTimeout(() => fertig('zeit'), max > DUELL_MAX_MS ? Math.min(max, 6000) : DUELL_MAX_MS);
       function fertig(grund) {
         clearTimeout(u);
         document.removeEventListener('duell:fertig', ereignis);
