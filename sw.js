@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 221;
-const STAND = '691739c76976';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 222;
+const STAND = 'dd02ef39dc59';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -78,6 +78,7 @@ const DATEIEN = [
   'js/sprachen/partie.js',
   'js/sprachen/raetsel.js',
   'js/sprachen/rahmen.js',
+  'js/sprachen/premium.js',
   // Welle C: Tagesraetsel (S1-5), mit seinen Raetseln (Inhalte unter daten/tagesraetsel/)
   'css/pakete/tagesraetsel.css',
   'js/pakete/tagesraetsel/index.js',
@@ -154,6 +155,7 @@ const DATEIEN = [
   'css/pakete/zuzweit.css',
   'css/sicherung.css',
   'css/daten.css',
+  'css/premium.css',
   'css/screens.css',
   'css/pakete/abo.css',
   'css/pakete/coach-ki.css',
@@ -202,6 +204,7 @@ const DATEIEN = [
   'js/ui/bauteile.js',
   'js/ui/duell.js',
   'js/ui/einstellungen.js',
+  'js/ui/premium.js',
   'js/ui/icons.js',
   'js/ui/partie.js',
   'js/ui/seite.js',

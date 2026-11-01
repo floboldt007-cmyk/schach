@@ -273,10 +273,19 @@ async function testeLeiste(browser) {
     pruefe('Reiter mindestens 44 x 44, Leiste im Bild', m.reiterKlein === 0 && m.nav.l >= 0 && m.nav.r <= m.iw, JSON.stringify(m.nav));
     pruefe('kein waagrechter Ueberlauf, Kopf passt', m.doc <= 0 && m.kopfUeber <= 0, JSON.stringify({ d: m.doc, k: m.kopfUeber }));
     if (vp.reiter.split(',').length > 2 && vp.w < 700) pruefe('vier Reiter auf dem Handy: gestapelt (Symbol ueber dem Wort), volle Breite', m.form === 'gestapelt' && /gestapelt/.test(m.klasse));
+    // Startseite neu (Flo 01.11.2026): auf dem Handy (bis 520 px) steht vorn die Premium-Krone, die Marke bleibt nur fuer
+    // Vorleseprogramme im Dokument; breiter steht der Titel ganz da
     const titel = await seite.evaluate(() => { const t = document.querySelector('.haupt-kopf .marke-titel'); const b = t.getBoundingClientRect();
-      return { ganz: t.scrollWidth <= t.clientWidth + 1, eineZeile: b.height < 34, ellipse: getComputedStyle(t).textOverflow, text: t.textContent, r: b.right, iw: innerWidth }; });
-    pruefe('Titel „Crownmate“ ganz, einzeilig, ohne Auslassungszeichen, im Bild', titel.ganz && titel.eineZeile && titel.ellipse !== 'ellipsis' && titel.r <= titel.iw,
-      JSON.stringify(titel));
+      const k = document.querySelector('.haupt-kopf .kopf-premium').getBoundingClientRect();
+      return { ganz: t.scrollWidth <= t.clientWidth + 1, eineZeile: b.height < 34, ellipse: getComputedStyle(t).textOverflow, text: t.textContent, r: b.right, iw: innerWidth,
+        krone: { l: Math.round(k.left), r: Math.round(k.right), h: Math.round(k.height), w: Math.round(k.width) } }; });
+    if (vp.w <= 520) {
+      pruefe('Handy: Premium-Krone vorn ganz im Bild (mindestens 44 px), Titel „Crownmate“ fuer Vorleser im Dokument',
+        titel.krone.l >= 0 && titel.krone.r <= titel.iw && titel.krone.h >= 44 && titel.krone.w >= 44 && titel.text === 'Crownmate', JSON.stringify(titel));
+    } else {
+      pruefe('Titel „Crownmate“ ganz, einzeilig, ohne Auslassungszeichen, im Bild', titel.ganz && titel.eineZeile && titel.ellipse !== 'ellipsis' && titel.r <= titel.iw,
+        JSON.stringify(titel));
+    }
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -406,7 +415,8 @@ async function testeKopf(browser) {
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 
-  // Handy: Mond aus (wie A), Titel ganz; viele Chips scrollen statt umzubrechen, ein Stummel wird ausgeblendet
+  // Handy (Startseite neu, Flo 01.11.2026): vorn die Premium-Krone, rechts Shop, Hell/Dunkel und Zahnrad; Verlauf und Klang
+  // treten zurueck; viele Chips scrollen statt umzubrechen, ein Stummel wird ausgeblendet
   gruppe = 'Kopf Handy';
   const h = await neueSeite(browser, { w: 375, h: 667, handy: true });
   await h.seite.goto(BASIS + '#arena');
@@ -416,11 +426,16 @@ async function testeKopf(browser) {
     const kopf = document.querySelector('.haupt-kopf');
     const t = kopf.querySelector('.marke-titel').getBoundingClientRect();
     const chips = kopf.querySelector('.kopf-chips');
-    return { mond: getComputedStyle(kopf.querySelector('[data-aktion="modus"]')).display, titelR: t.right, titelH: t.height,
-      chipsL: chips.getBoundingClientRect().left, ueber: kopf.scrollWidth - kopf.clientWidth, sterne: chips.firstElementChild.getBoundingClientRect().width <= chips.clientWidth + 1 };
+    const krone = kopf.querySelector('.kopf-premium').getBoundingClientRect();
+    const d = (sel) => { const e = kopf.querySelector(sel); return e ? getComputedStyle(e).display : 'fehlt'; };
+    return { mond: d('[data-aktion="modus"]'), shop: d('[data-aktion="shop"]'), verlauf: d('[data-aktion="verlauf"]'), klang: d('[data-aktion="klang"]'),
+      kroneB: krone.bottom, kroneH: krone.height, titelH: t.height, chipsT: chips.getBoundingClientRect().top, chipsW: chips.getBoundingClientRect().width,
+      kopfW: kopf.clientWidth, ueber: kopf.scrollWidth - kopf.clientWidth, sterne: chips.firstElementChild.getBoundingClientRect().width <= chips.clientWidth + 1 };
   });
-  pruefe('Mond auf dem Handy aus, Titel einzeilig und vor den Chips, kein Ueberlauf, Sterne-Chip ganz', hk.mond === 'none' && hk.titelH < 34
-    && hk.titelR <= hk.chipsL && hk.ueber <= 0 && hk.sterne, JSON.stringify(hk));
+  // zwei Zeilen: oben Krone, Shop, Hell/Dunkel, Zahnrad; darunter die Zahlen als volle Leiste
+  pruefe('Handy: Krone oben, Zahlen-Leiste darunter ueber die volle Breite, Shop und Mond da, Verlauf und Klang zurueck, kein Ueberlauf',
+    hk.mond === 'grid' && hk.shop === 'grid' && hk.verlauf === 'none' && hk.klang === 'none' && hk.kroneH >= 44 && hk.chipsT >= hk.kroneB
+    && hk.chipsW >= hk.kopfW - 40 && hk.ueber <= 0 && hk.sterne, JSON.stringify(hk));
   // viele Chips (wie Pakete am Ort arena:kopf): Zeile bleibt eine Zeile, Chips scrollen
   const viele = await h.seite.evaluate(() => {
     const chips = document.querySelector('.haupt-kopf .kopf-chips');
@@ -668,10 +683,63 @@ async function testeBauteile(browser) {
   }
 }
 
+// ---------- Premium und Shop (Startseite neu, Flo 01.11.2026) ----------
+async function testePremium(browser) {
+  gruppe = 'Premium';
+  const h = await neueSeite(browser, { w: 390, h: 844, handy: true });
+  await h.seite.goto(BASIS + '#arena');
+  await h.seite.waitForSelector('.screen.arena .knoten');
+  await h.seite.click('.haupt-kopf .kopf-premium');
+  await h.seite.waitForSelector('.screen.pm-screen .pm-plan');
+  await warte(700);
+  const p = await h.seite.evaluate(() => {
+    const plaene = [...document.querySelectorAll('.pm-plan')];
+    const kaufen = document.querySelector('.pm-kaufen');
+    return { hash: location.hash, plaene: plaene.map((b) => b.dataset.plan + ':' + b.getAttribute('aria-checked')).join(),
+      preise: plaene.map((b) => b.querySelector('.pm-preis').textContent), kaufen: { aus: kaufen.disabled, text: kaufen.textContent.trim() },
+      zeilen: document.querySelectorAll('.pm-vergleich [role="row"]').length, stand: document.querySelector('.pm-stand').dataset.art,
+      ueber: document.scrollingElement.scrollWidth - innerWidth, text: document.querySelector('.pm-screen').textContent.replace(/\s+/g, ' '),
+      klein: [...document.querySelectorAll('.pm-screen button')].filter((b) => { const r = b.getBoundingClientRect(); return r.width && (r.width < 44 || r.height < 44); }).length,
+      plaeneImBild: plaene.every((b) => b.getBoundingClientRect().bottom <= innerHeight), leiste: !!document.querySelector('.reiter-leiste:not([hidden]):not(.weg)') };
+  });
+  pruefe('Krone oeffnet Premium (#premium): drei Plaene, Jahr vorgewaehlt', p.hash === '#premium' && p.plaene === 'monat:false,jahr:true,immer:false', JSON.stringify(p.plaene));
+  pruefe('Preise nie im Code: "Preis folgt", Knopf "Bald verfügbar" gesperrt, Vorschau-Hinweis', p.preise.every((x) => x === 'Preis folgt') && p.kaufen.aus
+    && p.kaufen.text === 'Bald verfügbar' && p.stand === 'vorschau', JSON.stringify({ preise: p.preise, kaufen: p.kaufen, stand: p.stand }));
+  pruefe('Vergleich: Kopfzeile und 7 Zeilen', p.zeilen === 8, String(p.zeilen));
+  pruefe('kein Druck, kein Betrag (nur noch, letzte Chance, Euro, Komma-Preise)', !/nur noch|letzte chance|€|\bEUR\b|\d+,\d\d/i.test(p.text), p.text.slice(0, 120));
+  pruefe('Handy 390 x 844: Plaene ohne Scrollen im Bild, kein Ueberlauf, Knoepfe >= 44 px', p.plaeneImBild && p.ueber <= 0 && p.klein === 0, JSON.stringify(p));
+  // Plan waehlen per Tipp und Pfeiltaste
+  await h.seite.click('.pm-plan[data-plan="monat"]');
+  await h.seite.keyboard.press('ArrowRight');
+  const gewaehlt = await h.seite.evaluate(() => [...document.querySelectorAll('.pm-plan')].filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.dataset.plan).join());
+  pruefe('Plan per Tipp (Monat) und Pfeiltaste (weiter zu Jahr) waehlbar, immer genau einer', gewaehlt === 'jahr', gewaehlt);
+  await h.seite.click('.pm-screen .haupt-kopf [data-aktion="zurueck"]');
+  await h.seite.waitForSelector('.screen.arena .knoten');
+  pruefe('Zurueck fuehrt in die Arena', await h.seite.evaluate(() => location.hash === '#arena' || location.hash === ''));
+  pruefe('keine Konsolenfehler', h.fehler.length === 0, h.fehler.join(' | '));
+  await h.kontext.close();
+  // Shop-Knopf mit den Paketen (ohne &kern): oeffnet "Ich" beim Bereich Shop; dort steht der Verlauf im Kopf
+  const v = await neueSeite(browser, { w: 390, h: 844, handy: true });
+  await v.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
+  await v.seite.waitForSelector('.screen.arena .knoten');
+  await v.seite.click('.haupt-kopf [data-aktion="shop"]');
+  await v.seite.waitForSelector('.screen.sa-screen .sa-bereich[data-bereich="shop"]');
+  const sh = await v.seite.evaluate(() => ({ bereich: document.querySelector('.screen.sa-screen').dataset.bereich,
+    sichtbar: !document.querySelector('.sa-bereich[data-bereich="shop"]').hidden,
+    verlauf: getComputedStyle(document.querySelector('.sa-screen .haupt-kopf [data-aktion="verlauf"]')).display }));
+  pruefe('Shop oeffnet die Sammlung beim Bereich Shop, Verlauf-Knopf im Kopf von Ich', sh.bereich === 'shop' && sh.sichtbar && sh.verlauf !== 'none', JSON.stringify(sh));
+  await v.seite.click('.sa-screen .haupt-kopf [data-aktion="verlauf"]');
+  await v.seite.waitForSelector('.screen.vl-screen, .screen.verlauf', { timeout: 8000 }).catch(() => {});
+  pruefe('Verlauf aus Ich erreichbar', await v.seite.evaluate(() => location.hash.startsWith('#verlauf')));
+  pruefe('keine Konsolenfehler (mit Paketen)', v.fehler.length === 0, v.fehler.join(' | '));
+  await v.kontext.close();
+}
+
 async function browserTeil(browser) {
   await testeSprunglink(browser);
   await testeLeiste(browser);
   await testeKopf(browser);
+  await testePremium(browser);
   await testeTraining(browser);
   await testeBauteile(browser);
   gruppe = 'Netz';

@@ -94,12 +94,12 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'schule'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'schule'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
-  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', schule: 'Schulmodus',
+  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus',
 };
 // Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
 // titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen

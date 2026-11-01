@@ -48,6 +48,9 @@ const ICONS = {
   haus: '<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9.5h11V10"/><path d="M10 19.5v-5h4v5"/>',
   podest: '<path d="M3.5 20.5h17M4.5 20.5v-6h5v6M9.5 20.5V9h5v11.5M14.5 20.5v-4h5v4"/>',
   person: '<circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20.2a7.2 7.2 0 0 1 14.4 0"/>',
+  // Startseite neu (Flo 01.11.2026: "oben muss die Shop-Funktion sein ... die Premium-Version"): Krone (gefuellt) und Tasche
+  krone: '<path d="M4 8.2l4.1 3.5L12 5.3l3.9 6.4L20 8.2l-1.5 9.3h-13z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 20h13" stroke-width="2.2"/>',
+  laden: '<path d="M5.5 8.5h13l-1 11.5h-11z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>',
 };
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;
