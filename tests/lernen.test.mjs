@@ -269,6 +269,15 @@ async function erfinderTeil(browser) {
   pruefe('Übersicht: Bereichswahl steht auf Mattbilder, 20 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS
     && await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'matt', liste);
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // Flo 01.11.2026 (iPad): "bei den Lektionen kann ich nicht nach unten scrollen": neben der 860-px-Spalte rollte nichts.
+  // Am linken Rand gewischt (Mausrad) rollt die Liste jetzt bis ganz unten, die Spalte bleibt hoechstens 860 px
+  await p.s.mouse.move(20, 600);
+  await p.s.mouse.wheel(0, 4000);
+  await warte(500);
+  const rollen = await p.s.evaluate(() => { const r = document.querySelector('.ms-rumpf');
+    return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight, breite: Math.round(Math.max(...[...r.children].map((c) => c.getBoundingClientRect().width))) }; });
+  pruefe('Übersicht iPad quer: am Rand gewischt rollt die Liste bis ganz unten, Spalte höchstens 860 px', rollen.max > 0 && rollen.st >= rollen.max - 1 && rollen.breite <= 860, rollen);
+  await p.s.evaluate(() => { document.querySelector('.ms-rumpf').scrollTop = 0; });
 
   // Flo 31.10.2026 abends: "wenn ich in der Meisterschule auf eine Lektion tippe, springt er auf die Bots". Laedt die
   // Lektions-Datei nicht (etwa mitten im Wechsel auf eine neue Version), laedt die App einmal neu und oeffnet die Lektion,
