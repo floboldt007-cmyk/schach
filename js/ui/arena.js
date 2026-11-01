@@ -356,7 +356,10 @@ export function zeige(root, params, app) {
     ${hauptKopf({
     unter: alleBesiegt ? t('arena.kopf.bezwungen', { sterne: gesamtSterne(fortschritt), max: BOTS.length * 3 }) : t('arena.kopf.titel', { bots: BOTS.length }),
     chips: standardChips(fortschritt),
-    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
+    // Startseite neu (Flo 01.11.2026): Premium-Krone und Shop oben; auf dem Handy dazu Hell/Dunkel, Verlauf und Klang
+    // treten dort zurueck (Verlauf im Reiter Ich, Klang in den Einstellungen), css/navigation.css
+    premium: true,
+    knoepfe: [{ aktion: 'shop', icon: 'laden', label: t('rahmen.kopf.shop') }, { aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
   })}
     <div class="inhalt">
       <div class="karte" tabindex="-1" aria-label="${esc(t('arena.aria.karte'))}">
