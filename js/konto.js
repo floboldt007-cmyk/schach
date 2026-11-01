@@ -14,11 +14,15 @@ import { hoere } from './ereignisse.js';
 import { anbieten } from './orte.js';
 import { t, locale } from './sprache.js';
 import './sprachen/einstellungen.js';
+import './sprachen/allgemein.js';
 
 export const SITZUNG_SCHLUESSEL = 'schach-arena:konto:sitzung';
 export const SICHTBAR_SCHLUESSEL = 'schach-arena:konto:sichtbar';
 export const RUECKFALL_SCHLUESSEL = 'schach-arena:konto:rueckfall';
 export const ABGEGLICHEN_SCHLUESSEL = 'schach-arena:konto:abgeglichen';
+// Eigener Benutzername als Merker ({ konto, name }), damit Partie, Duell-Intro und Profilkarte ihn ohne Netz zeigen
+// (Flo 01.11.2026: "Ein Freund hat sich angemeldet ... der Account heisst Flo": dort stand fest "Flo").
+export const NAME_SCHLUESSEL = 'schach-arena:konto:name';
 // Eintraege, die ein frischer Start ohne jede Partie anlegt: Sie machen aus einem leeren Browser keinen Spielstand.
 const OHNE_SPIELSTAND = new Set(['schach-arena:v1:hinweis-installieren', 'schach-arena:v1:modul:start',
   'schach-arena:v1:modul:funken', 'schach-arena:v1:modul:punkte']);
@@ -140,7 +144,7 @@ let epoche = 0;
 export async function abmelden({ frist = 5000 } = {}) {
   const s = sitzung();
   epoche++;
-  try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); } catch (e) { /* egal */ }
+  try { lager().removeItem(SITZUNG_SCHLUESSEL); lager().removeItem(ABGEGLICHEN_SCHLUESSEL); lager().removeItem(NAME_SCHLUESSEL); } catch (e) { /* egal */ }
   try { if (s?.access_token) await mitFrist(anfrage('/auth/v1/logout?scope=local', { methode: 'POST', token: s.access_token }), frist); } catch (e) { /* lokal ist schon abgemeldet */ }
 }
 export function istAbgeglichen(s = sitzung()) {
@@ -194,7 +198,21 @@ export async function ladeCloudStand() {
 }
 export async function ladeProfil() {
   const s = await aktiveSitzung(); const d = await anfrage('/rest/v1/profile?select=*', { token: s.access_token });
-  return Array.isArray(d) ? (d[0] || null) : d;
+  const p = Array.isArray(d) ? (d[0] || null) : d;
+  if (p && p.benutzername) merkeName(p.benutzername, s);
+  return p;
+}
+// Eigener Benutzername der angemeldeten Nutzer-ID (aus dem Merker), sonst null; meinName() faellt auf "Du" / "You" zurueck.
+// Nie ein fester Name: jeder Spieler sieht sich selbst.
+export function eigenerName(s = sitzung()) {
+  const id = userId(s);
+  if (!id) return null;
+  const d = jsonLies(NAME_SCHLUESSEL);
+  return d && d.konto === id && NAME.test(String(d.name || '')) ? d.name : null;
+}
+export function meinName() { return eigenerName() || t('allgemein.du'); }
+function merkeName(name, s = sitzung()) {
+  try { const id = userId(s); if (id && NAME.test(String(name || ''))) lager().setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: id, name })); } catch (e) { /* nur Komfort */ }
 }
 export async function speichereCloudStand() {
   const e0 = epoche;
@@ -217,6 +235,7 @@ export async function speichereBenutzername(benutzername) {
     if (e.status === 409 || e.code === '23505') throw new Error(K('nameVergeben'));
     throw e;
   }
+  merkeName(benutzername, s);
   return benutzername;
 }
 function gueltigerStand(stand) {

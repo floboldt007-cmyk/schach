@@ -1,6 +1,6 @@
 import { setzeSpeicher } from '../js/storage.js';
 import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudStand, ladeCloudStand,
-  speichereBenutzername, setzeKontoFetch, sitzung, ladeStandAufGeraet, kontoFreigeschaltet,
+  speichereBenutzername, setzeKontoFetch, sitzung, eigenerName, meinName, ladeProfil, NAME_SCHLUESSEL, ladeStandAufGeraet, kontoFreigeschaltet,
   SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
   ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau,
   anmeldeUrl, anmeldewege, setzeAnmeldewege, mehrFortschritt,
@@ -48,6 +48,24 @@ pruefe('Hochladen mit Auth und Prefer', calls.at(-1).headers.Authorization.start
 }
 antworten.push({ status: 200, body: [{ stand: {}, format_version: 1 }] }); const cloud = await ladeCloudStand(); pruefe('Cloud laden', cloud.format_version === 1);
 antworten.push({ status: 409, body: { code: '23505' } }); let nameFehler = ''; try { await speichereBenutzername('Flo_1'); } catch(e) { nameFehler=e.message; } pruefe('belegter Benutzername freundlich', /vergeben/.test(nameFehler));
+{
+  // eigener Benutzername (Flo 01.11.2026: ein Freund sah "Flo" als seinen Namen): Merker je Nutzer-ID, sonst "Du"
+  localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
+  localStorage.removeItem(NAME_SCHLUESSEL);
+  pruefe('Name: ohne Benutzernamen heisst der Spieler "Du", nie "Flo"', eigenerName() === null && meinName() === 'Du');
+  setzeKontoFetch(async () => ({ ok: true, status: 201, async json() { return null; } }));
+  await speichereBenutzername('lena_spielt');
+  pruefe('Name: gespeicherter Benutzername gilt sofort', eigenerName() === 'lena_spielt' && meinName() === 'lena_spielt');
+  localStorage.setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: 'anderer', name: 'max_99' }));
+  pruefe('Name: der Merker einer anderen Nutzer-ID gilt nicht', eigenerName() === null && meinName() === 'Du');
+  setzeKontoFetch(async () => ({ ok: true, status: 200, async json() { return [{ user_id: 'u1', benutzername: 'max_99' }]; } }));
+  await ladeProfil();
+  pruefe('Name: Profil laden merkt den Benutzernamen', meinName() === 'max_99');
+  setzeKontoFetch(async () => ({ ok: true, status: 204, async json() { return null; } }));
+  await abmelden();
+  pruefe('Name: Abmelden vergisst ihn', localStorage.getItem(NAME_SCHLUESSEL) === null && meinName() === 'Du');
+  localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(session));
+}
 let offline = ''; setzeKontoFetch(async () => { throw new Error('offline'); }); try { await fordereCodeAn('a@b.de'); } catch(e) { offline=e.message; } pruefe('Offline-Fehler freundlich', /offline/.test(offline));
 localStorage.setItem('schach-arena:v1:partien', '[1]'); ladeStandAufGeraet({ format_version: 1, stand: { 'schach-arena:v1:partien': '[2]' } });
 pruefe('Cloud laden mit Rückfall-Sicherung', localStorage.getItem('schach-arena:v1:partien') === '[2]' && !!localStorage.getItem(RUECKFALL_SCHLUESSEL));

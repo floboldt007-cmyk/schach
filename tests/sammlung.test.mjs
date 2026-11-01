@@ -640,6 +640,26 @@ async function profilTeil(browser) {
   await p.k.close();
 }
 
+// Eigener Name (Flo 01.11.2026: "Ein Freund hat sich angemeldet ... der Account heisst Flo"): Profilkarte und Partie zeigen den
+// Benutzernamen des angemeldeten Kontos, ohne Namen "Du", nie fest "Flo"
+async function nameTeil(browser) {
+  let p = await shopSeite(browser, { sitzung: SITZUNG, bereich: null,
+    vorher: { 'schach-arena:konto:name': JSON.stringify({ konto: SITZUNG.user.id, name: 'lena_spielt' }) } });
+  await p.s.waitForSelector('.pr-karte', { timeout: 15000 });
+  const karte = await p.s.locator('.pr-name b').innerText();
+  await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
+  await p.s.waitForSelector('.screen.partie .spieler.ich .name', { timeout: 15000 });
+  const partie = await p.s.evaluate(() => ({ name: document.querySelector('.spieler.ich .name').textContent, aria: document.querySelector('.spieler.ich').getAttribute('aria-label') }));
+  pruefe('Mit Benutzernamen: Profilkarte und Partie zeigen ihn', karte === 'lena_spielt' && partie.name === 'lena_spielt' && partie.aria === 'lena_spielt', { karte, partie });
+  pruefe('Name: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.k.close();
+  p = await shopSeite(browser, { sitzung: SITZUNG, bereich: null });
+  await p.s.waitForSelector('.pr-karte', { timeout: 15000 });
+  const ohne = await p.s.locator('.pr-name b').innerText();
+  pruefe('Ohne Benutzernamen: "Du" statt eines fremden Namens', ohne === 'Du', ohne);
+  await p.k.close();
+}
+
 async function browserTeil() {
   const pw = ladePlaywright();
   const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
@@ -696,6 +716,7 @@ async function browserTeil() {
     await erfinderTeil(browser);
     await laborTeil(browser);
     await profilTeil(browser);
+    await nameTeil(browser);
     // Englisch
     const k = await browser.newContext({ viewport: { width: 1180, height: 820 }, serviceWorkers: 'block' });
     const s = await k.newPage();

@@ -45,6 +45,7 @@ import { anim, tempo } from '../bewegung.js';
 import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
 import { waehle } from '../orte.js';
+import { meinName } from '../konto.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
 
@@ -243,7 +244,7 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
           <div class="duell-gegen">${esc(t('arena.duell.gegen'))}</div>
           <div class="duell-seite flo">
             <div class="duell-av" data-rolle="flo">${floAvatar(f)}</div>
-            <div class="duell-name">Flo</div>
+            <div class="duell-name">${esc(meinName())}</div>
             <div class="duell-unter">${esc(t(FARBE_NAME[f]))}</div>${vitrine}
           </div>
         </div>

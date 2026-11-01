@@ -9,6 +9,8 @@ registriereTexte('allgemein', {
     weiss: 'Weiß', schwarz: 'Schwarz', 'weissAmZug': 'Weiß am Zug', 'schwarzAmZug': 'Schwarz am Zug',
     sieg: 'Sieg', niederlage: 'Niederlage', remis: 'Remis', einstellungen: 'Einstellungen',
     arena: 'Arena', training: 'Training', bestenliste: 'Bestenliste', analyse: 'Analyse', verlauf: 'Verlauf',
+    // eigener Name ohne Benutzername (Partie, Duell-Intro, Profilkarte; js/konto.js meinName)
+    du: 'Du',
   },
   en: {
     zurueck: 'Back', weiter: 'Next', fertig: 'Done', abbrechen: 'Cancel', ok: 'OK', schliessen: 'Close',
@@ -16,5 +18,6 @@ registriereTexte('allgemein', {
     weiss: 'White', schwarz: 'Black', 'weissAmZug': 'White to move', 'schwarzAmZug': 'Black to move',
     sieg: 'Win', niederlage: 'Loss', remis: 'Draw', einstellungen: 'Settings',
     arena: 'Arena', training: 'Training', bestenliste: 'Leaderboard', analyse: 'Analysis', verlauf: 'History',
+    du: 'You',
   },
 });
