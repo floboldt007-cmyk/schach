@@ -74,6 +74,14 @@
 .duell.lang .duell-vitrine { gap: 8px; margin-top: 10px; }
 .duell.lang .duell-orden { font-size: 14px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent); }
+/* Errungenschaften mit Abzeichen (js/sammlung-kunst.js, Flo 01.11.2026): Bild ueber dem Namen, je seltener, desto mehr Glanz */
+.duell-orden.mit-bild { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 8px 7px; min-width: 76px; max-width: 120px;
+  text-align: center; line-height: 1.2; }
+.duell-orden.mit-bild > svg { width: 40px; height: 40px; flex: none; overflow: visible; }
+.duell.lang .duell-orden.mit-bild { padding: 8px 10px 9px; min-width: 92px; }
+.duell.lang .duell-orden.mit-bild > svg { width: 54px; height: 54px; }
+.duell-orden.mit-bild[data-seltenheit="episch"], .duell-orden.mit-bild[data-seltenheit="legende"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent), 0 0 18px color-mix(in srgb, var(--gold) 28%, transparent); }
 .duell-zeit { position: absolute; left: 28px; right: 28px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); height: 3px; border-radius: 3px;
   background: color-mix(in srgb, var(--duell-auf-flo) 18%, transparent); overflow: hidden; }
 .duell-zeit i { display: block; height: 100%; background: var(--gold); transform-origin: 0 50%; transform: scaleX(0); }

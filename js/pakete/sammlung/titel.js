@@ -56,6 +56,14 @@ export const ERFOLGS_TITEL = Object.freeze([
   { erfolg: 'serie-7', id: 'wochenflamme', zeichen: 'serie', n: 7, farbe: ['#FFB27A', '#D2561E', '#8A3410'], seltenheit: 'frei' },
   { erfolg: 'serie-30', id: 'monatsfeuer', zeichen: 'serie', n: 30, farbe: ['#FF9A6A', '#B83A1E', '#7A2412'], seltenheit: 'episch' },
   { erfolg: 'serie-100', id: 'ewige-flamme', zeichen: 'serie', n: 100, farbe: ['#FF8A8A', '#8E1E2A', '#5A1018'], seltenheit: 'legende' },
+  // Partien und Meisterschule (Flo 01.11.2026); labor: nur, solange der Erfolg in der Liste steht (Meisterschule im Labor)
+  { erfolg: 'schwarz-sieg', id: 'schattenkoenig', zeichen: 'mond', farbe: ['#5A6478', '#1E2430', '#11151C'], seltenheit: 'frei' },
+  { erfolg: 'siegesserie-5', id: 'siegeszug', zeichen: 'pfeile', farbe: ['#FFB27A', '#C2401E', '#7E2412'], seltenheit: 'selten' },
+  { erfolg: 'endgegner', id: 'bezwinger', zeichen: 'schwert', farbe: ['#E88A8A', '#8E1E1E', '#5A1010'], seltenheit: 'selten' },
+  { erfolg: 'siege-100', id: 'siegesbanner', zeichen: 'banner', farbe: ['#FFE6A0', '#B8862A', '#7A5610'], seltenheit: 'episch' },
+  { erfolg: 'alle-endgegner', id: 'weltenbezwinger', zeichen: 'kronen', farbe: ['#D88AE8', '#5A1E8E', '#36105A'], seltenheit: 'legende' },
+  { erfolg: 'schule-alle', id: 'goldene-feder', zeichen: 'feder', farbe: ['#9CC4F0', '#1E4C8A', '#123058'], seltenheit: 'episch', labor: true },
+  { erfolg: 'schule-sterne', id: 'sternenschueler', zeichen: 'buch', farbe: ['#C9A8FF', '#4A2A8E', '#2A1858'], seltenheit: 'legende', labor: true },
 ].map((x) => Object.freeze(x)));
 const ERFINDER_TITEL = Object.freeze({ id: 'erfinder', zeichen: 'erfinder', farbe: ['#3A4252', '#14161C', '#0A0B0F'], seltenheit: 'einzig' });
 // Pionier (Flo 01.11.2026: "die ersten 100 Spieler bekommen einen Titel freigeschaltet"): vergibt nur der Server
@@ -90,7 +98,7 @@ export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier 
     return { id: 'level-' + ab, art: 'level', ab, name: S('titel.level.' + ab), frei: level >= ab, weg: S('titel.ab', { level: ab }),
       zeichen, farbe, seltenheit: levelSeltenheit(ab) };
   });
-  const ef = ERFOLGS_TITEL.map((x) => {
+  const ef = ERFOLGS_TITEL.filter((x) => !x.labor || nachId.has('erfolg-' + x.erfolg)).map((x) => {
     const e = nachId.get('erfolg-' + x.erfolg);
     return { id: 'erfolg-' + x.id, art: 'erfolg', name: S('titel.' + x.id), frei: !!(e && e.frei), weg: e ? S('titel.weg', { erfolg: e.name }) : '',
       fortschritt: e && !e.frei && Number.isFinite(e.fortschritt) ? e.fortschritt : undefined, zeichen: x.zeichen, n: x.n || 0, farbe: x.farbe, seltenheit: x.seltenheit };

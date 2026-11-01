@@ -7,7 +7,7 @@
 //   RAHMEN_LISTE -> [{ id, gruppe, name, weg? }]   in der Reihenfolge der Auswahl
 //   rahmenTeile(erfolge?) -> [{ id, name, frei, weg }]
 //   profilKarte({ app }) -> div.pr-karte          Ort ich:kopf
-//   duellProfil() -> { orden: [{ id, name }], titel, titelBild } | null   Ort duell:profil?
+//   duellProfil() -> { orden: [{ id, name, bild, seltenheit }], titel, titelBild } | null   Ort duell:profil?
 //   titelJetzt() -> Titel | null               der getragene Titel (js/pakete/sammlung/titel.js aktuellerTitel)
 //   titelTeile() -> Teile des Bereichs Titel   Erfinder, Level-Titel, Erfolgs-Titel; Tipp traegt, zweiter Tipp nimmt ab
 import { anbieten } from '../../orte.js';
@@ -99,9 +99,10 @@ export function titelTeile(erfolge = teileErfolge()) {
 // Beim Matchbeginn steht der Titel nur, wenn Flo ihn ausdruecklich traegt (oder als Erfinder): sonst bekaeme jede Partie
 // die volle Buehne (js/ui/duell.js, hatVitrine)
 export function duellProfil() {
-  const orden = vitrineTeile().filter(Boolean).map((e) => ({ id: e.id, name: e.name }));
+  // Flo 01.11.2026: "die drei ausgewaehlten Errungenschaften sehen, auch den Titel": jede mit ihrem Abzeichen
+  const orden = vitrineTeile().filter(Boolean).map((e) => ({ id: e.id, name: e.name, bild: e.bild || '', seltenheit: e.seltenheit || 'frei' }));
   const t = titelJetzt();
-  const zeigen = !!t && (t.gewaehlt || t.art === 'erfinder');
+  const zeigen = !!t && (t.gewaehlt || t.art === 'erfinder' || t.art === 'pionier');
   const titel = zeigen ? t.name : '';
   return orden.length || titel ? { orden, titel, titelBild: zeigen ? titelBild(t, 'duell-titel-wappen') : '' } : null;
 }

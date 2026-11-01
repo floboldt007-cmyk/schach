@@ -15,6 +15,7 @@
 //                                      (dann gilt der Level-Titel); ob er frei ist, weiss das Paket sammlung (titel.js)
 //   setzeProfilWahl(teil)              merkt figur, grund, rahmen, vitrine oder titel (unbekannte Werte fallen auf den Standard)
 //   erspielteTitel() -> [id], merkeErspielteTitel(ids)   Koennen-Titel, die einmal erspielt bleiben
+//   erspielteErfolge() -> [id], merkeErspielteErfolge(ids) Erfolge aus dem Partien-Archiv, die einmal erspielt bleiben
 //   dabeiSeit() -> 'JJJJ-MM-TT'         Flo 31.10.2026 ("wie lange jemand dabei ist"): Tag der ersten Partie, sonst des ersten
 //                                      Aufrufs; einmal gemerkt (bleibt beim Speichern der Wahl erhalten)
 import { ladeModulEinstellungen, speichereModulEinstellungen, ladePartien } from './storage.js';
@@ -89,20 +90,26 @@ export function setzeProfilWahl(teil = {}) {
 
 // Erspielte Koennen-Titel (js/pakete/sammlung/titel.js): einmal erspielt, bleiben sie, auch wenn die Partie spaeter aus
 // dem Archiv faellt (nichts verfaellt). Schluessel titelFrei neben profil im Modul 'sammeln'.
-export function erspielteTitel() {
+// Dasselbe fuer Erfolge aus dem Partien-Archiv (Sieg mit Schwarz, Siegesserie; js/pakete/sammlung/index.js), Schluessel
+// erfolgeFrei.
+function gemerkt(schluessel) {
   let alt = {};
   try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
-  return Array.isArray(alt.titelFrei) ? [...new Set(alt.titelFrei.filter((x) => typeof x === 'string' && ID.test(x)))].slice(0, 60) : [];
+  return Array.isArray(alt[schluessel]) ? [...new Set(alt[schluessel].filter((x) => typeof x === 'string' && ID.test(x)))].slice(0, 60) : [];
 }
-export function merkeErspielteTitel(ids = []) {
-  const bisher = erspielteTitel();
-  const neu = [...new Set([...bisher, ...ids.filter((x) => typeof x === 'string' && ID.test(x))])].slice(0, 60);
+function merke(schluessel, ids) {
+  const bisher = gemerkt(schluessel);
+  const neu = [...new Set([...bisher, ...(Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string' && ID.test(x))])].slice(0, 60);
   if (neu.length === bisher.length) return false;
   let alt = {};
   try { alt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (f) { alt = {}; }
-  try { speichereModulEinstellungen(MODUL, { ...alt, titelFrei: neu }); } catch (f) { return false; }
+  try { speichereModulEinstellungen(MODUL, { ...alt, [schluessel]: neu }); } catch (f) { return false; }
   return true;
 }
+export const erspielteTitel = () => gemerkt('titelFrei');
+export const merkeErspielteTitel = (ids = []) => merke('titelFrei', ids);
+export const erspielteErfolge = () => gemerkt('erfolgeFrei');
+export const merkeErspielteErfolge = (ids = []) => merke('erfolgeFrei', ids);
 
 const TAG = /^\d{4}-\d{2}-\d{2}$/;
 export function dabeiSeit() {

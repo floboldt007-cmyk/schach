@@ -217,7 +217,12 @@ export function spieleDuell({ bot, farbe = 'w', anlass = null, von = null, art =
   const dauerMax = lang ? DAUER_VITRINE : DAUER_MAX;
   if (lang) ueber.classList.add('lang');
   const vitrine = voll && profil ? `${profil.titel ? `<div class="duell-titel">${typeof profil.titelBild === 'string' && profil.titelBild.startsWith('<svg class="titel-wappen') ? profil.titelBild : ''}<span>${esc(profil.titel)}</span></div>` : ''}${orden.length
-    ? `<div class="duell-vitrine">${orden.map((o) => `<span class="duell-orden">${esc(o.name)}</span>`).join('')}</div>` : ''}` : '';
+    ? `<div class="duell-vitrine">${orden.map((o) => {
+      // Abzeichen nur, wenn es eines aus js/sammlung-kunst.js ist (eigenes SVG); sonst nur der Name wie bisher
+      const bild = typeof o.bild === 'string' && o.bild.startsWith('<svg viewBox="0 0 120 120" class="sk-erfolg"') ? o.bild : '';
+      const selten = ['frei', 'selten', 'episch', 'legende'].includes(o.seltenheit) ? o.seltenheit : 'frei';
+      return `<span class="duell-orden${bild ? ' mit-bild' : ''}" data-seltenheit="${selten}">${bild}<span>${esc(o.name)}</span></span>`;
+    }).join('')}</div>` : ''}` : '';
   if (voll) {
     ueber.innerHTML = `
       <div class="duell-buehne"></div>

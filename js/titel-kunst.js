@@ -131,6 +131,22 @@ const ZEICHEN = {
     + `<path d="M46 23h20l-4 6 4 6H46z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>${stern(30, 34, 7, 5, CREME)}${funke(70, 48, 3)}`,
   erfinder: () => `<circle cx="48" cy="50" r="15" fill="none" stroke="${GOLD}" stroke-width="6" stroke-dasharray="5 4.4"/><circle cx="48" cy="50" r="10" fill="#2A2F3A" stroke="${GOLD}" stroke-width="2"/>`
     + `${krone(48, 47, .55)}${funke(70, 28, 3.6, GOLD)}`,
+  // Neue Errungenschaften (Flo 01.11.2026): Banner (100 Siege), Mond mit Koenig (Sieg mit Schwarz), Pfeile (Siegesfolge),
+  // Schwert (Endgegner), drei Kronen (alle Endgegner), Feder (Meisterschule), Buch mit Sternen (alle Sterne der Schule)
+  banner: () => `<path d="M34 22V76" stroke="${TINTE}" stroke-width="2.6" stroke-linecap="round"/><path d="M34 24h32l-6 10 6 10H34z" fill="${ROT}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `${stern(48, 34, 5.5, 5, GOLD)}<circle cx="34" cy="21" r="3" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/>${funke(66, 60, 3.4)}`,
+  mond: () => `<path d="M62 24a24 24 0 1 0 6 38a19 19 0 1 1-6-38z" fill="${CREME}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round" opacity=".9"/>`
+    + `<path d="M46 28h4v4h4v4h-4v4h-4v-4h-4v-4h4z M40 44h16l-1 5c3 4 4 10 4 16H37c0-6 1-12 4-16zM36 66h24v5H36z" fill="${TINTE}" stroke="${CREME}" stroke-width="1.4" stroke-linejoin="round"/>`
+    + `${funke(70, 30, 3)}`,
+  pfeile: () => [0, 1, 2].map((i) => `<path d="M30 ${70 - i * 14}l18-12 18 12" fill="none" stroke="${i === 2 ? GOLD : CREME}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
+    + `<path d="M30 ${70 - 2 * 14}l18-12 18 12" fill="none" stroke="${TINTE}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>${funke(70, 24, 3)}`,
+  schwert: () => `<path d="M48 18l4 7v35h-8V25z" fill="#E6EAF0" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/><path d="M36 60h24v5H36z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `<path d="M45.5 65h5v9h-5z" fill="#8A5530" stroke="${TINTE}" stroke-width="1.8"/><circle cx="48" cy="76.5" r="3" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/>${funke(66, 34, 3.2)}`,
+  kronen: () => `${krone(30, 34, .55)}${krone(66, 34, .55)}${krone(48, 54, .8)}${funke(48, 24, 3.4)}`,
+  feder: () => `<path d="M68 18C52 20 38 32 33 50c-2 8-2 16 0 24 5-10 13-15 20-23 9-10 15-20 15-33z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `<path d="M66 21Q48 46 33 76" fill="none" stroke="${TINTE}" stroke-width="1.6" stroke-linecap="round"/><path d="M33 76l-3 6" stroke="${TINTE}" stroke-width="2.4" stroke-linecap="round"/>${funke(68, 58, 3.2)}`,
+  buch: () => `<path d="M22 46c9-4 17-4 25 2v26c-8-5-16-6-25-2z M74 46c-9-4-17-4-25 2v26c8-5 16-6 25-2z" fill="${CREME}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `${stern(32, 32, 5, 5, GOLD)}${stern(48, 25, 7, 5, GOLD)}${stern(64, 32, 5, 5, GOLD)}`,
 };
 export const TITEL_ZEICHEN = Object.freeze(Object.keys(ZEICHEN));
 

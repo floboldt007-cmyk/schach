@@ -10,11 +10,12 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { setzeSpeicher } from '../js/storage.js';
-import { teileBretter, teileKlaenge, teileErfolge } from '../js/pakete/sammlung/index.js';
+import { teileBretter, teileKlaenge, teileErfolge, partienStand, schulStand, SIEGE_ZIELE } from '../js/pakete/sammlung/index.js';
 import { standText } from '../js/pakete/sammlung/shop.js';
 import { rahmenTeile, motivTeile, grundTeile, titelTeile, duellProfil } from '../js/pakete/sammlung/profil.js';
 import { titelListe, aktuellerTitel, ERFOLGS_TITEL, KOENNEN_TITEL, koennenFrei } from '../js/pakete/sammlung/titel.js';
-import { erspielteTitel, merkeErspielteTitel } from '../js/profil.js';
+import { erspielteTitel, merkeErspielteTitel, erspielteErfolge } from '../js/profil.js';
+import { ALLE as SCHUL_LEKTIONEN } from '../js/pakete/lernen/mattbilder.js';
 import { TITEL_ZEICHEN, titelWappen } from '../js/titel-kunst.js';
 import { TITEL as LEVEL_TITEL } from '../js/pakete/funken/level.js';
 import { profilWahl, setzeProfilWahl } from '../js/profil.js';
@@ -95,14 +96,15 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
 const e0 = teileErfolge(leer, NULL_STAND);
-pruefe('Eigenes Bild: alle 21 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
+pruefe('Eigenes Bild: alle 28 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
   new Set(e0.map((x) => ohneIds(x.bild))).size === e0.length && e0.every((x) => /class="sk-erfolg"/.test(x.bild)));
 const rang = { frei: 0, selten: 1, episch: 2, legende: 3 };
 const sel = (id) => rang[e0.find((x) => x.id === 'erfolg-' + id).seltenheit];
 pruefe('Erfolge gestaffelt: je schwerer, desto seltener (erster Sieg < Welt 1 < Welt 3 < Welt 5, Liga 1 < 3 < 6, Serie 7 < 30 < 100)',
   sel('erster-sieg') < sel('welt-1') && sel('welt-1') < sel('welt-3') && sel('welt-3') < sel('welt-5')
   && sel('liga-1') < sel('liga-3') && sel('liga-3') < sel('liga-6') && sel('serie-7') < sel('serie-30') && sel('serie-30') < sel('serie-100'));
-pruefe('Erfolge ohne Partie: 21 (Bots, Liga, Serie, Level), alle gesperrt, mit Weg dahin', e0.length === 21 && e0.every((x) => !x.frei && x.zeile)
+pruefe('Erfolge ohne Partie: 28 (Bots, Liga, Serie, Level, Partien), ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 28
+  && !e0.some((x) => /^erfolg-schule-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
   && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt' && e0.find((x) => x.id === 'erfolg-liga-1').zeile === 'Erreiche Liga Bronze');
 const welt1 = BOTS.filter((b) => b.welt === 1);
 const f1 = { bots: Object.fromEntries(welt1.map((b, i) => [b.id, { sterne: [true, i === 0, i === 0] }])) };
@@ -156,6 +158,51 @@ setzeProfilWahl({ figur: 'P', grund: 'standard' });
 pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen',
   !e1.some((x) => /€|kauf|shop|verfügbar|nur noch/i.test(x.name + ' ' + x.zeile)));
 
+// Neue Errungenschaften (Flo 01.11.2026: "denk dir neue Errungenschaften aus, zum Beispiel wenn man alle Lektionen fertig hat")
+{
+  const bosse = BOTS.filter((b) => b.endgegner);
+  const f2 = { bots: Object.fromEntries(BOTS.map((b) => [b.id, { sterne: [b.id === bosse[0].id, false, false], siege: 2 }])) };
+  const e2 = teileErfolge(f2, NULL_STAND, { beste: 3, frei: ['schwarz-sieg'] }, null);
+  const fr = (id) => e2.find((x) => x.id === 'erfolg-' + id);
+  pruefe(`Partien: Siege aus dem Zaehler je Bot (${BOTS.length * 2}: 10 und 50 frei, 100 mit Weg), Sieg mit Schwarz, erster Endgegner, Folge 3 von 5`,
+    fr('siege-10').frei && fr('siege-50').frei && !fr('siege-100').frei && fr('siege-100').zeile === `${BOTS.length * 2} von 100 Siegen`
+    && fr('schwarz-sieg').frei && fr('endgegner').frei && !fr('alle-endgegner').frei && fr('alle-endgegner').zeile === `1 von ${bosse.length} Endgegnern besiegt`
+    && !fr('siegesserie-5').frei && fr('siegesserie-5').zeile === 'Beste Folge: 3 von 5' && Math.abs(fr('siegesserie-5').fortschritt - 0.6) < 1e-9
+    && SIEGE_ZIELE.join() === '10,50,100' && e2.filter((x) => x.gruppe === 'Partien').length === 7, e2.slice(21).map((x) => x.id + (x.frei ? '+' : '-') + x.zeile).join(' | '));
+  const st = schulStand({ lek: { [SCHUL_LEKTIONEN[0].id]: { s: 3, z: 2 } } });
+  const eS = teileErfolge(f2, NULL_STAND, { beste: 0, frei: [] }, st);
+  const sch = eS.filter((x) => /^erfolg-schule-/.test(x.id));
+  pruefe('Meisterschule (nur im Labor): je Bereich, alle Lektionen und alle Sterne, mit Labor-Marke und ehrlichem Stand',
+    sch.map((x) => x.id.slice(14)).join() === 'matt,taktik,end,eroeffnung,alle,sterne' && sch.every((x) => x.labor && !x.frei && x.gruppe === 'Meisterschule')
+    && sch.find((x) => x.id === 'erfolg-schule-alle').zeile === `1 von ${SCHUL_LEKTIONEN.length} Lektionen geschafft` && schulStand() === null, sch.map((x) => x.id + ':' + x.zeile).join(' | '));
+  const voll = {};
+  for (const l of SCHUL_LEKTIONEN) voll[l.id] = { s: 3, z: 1 };
+  const eV = teileErfolge(f2, NULL_STAND, { beste: 0, frei: [] }, schulStand({ lek: voll }));
+  pruefe('Meisterschule: alle Lektionen mit drei Sternen schaltet alle sechs frei', eV.filter((x) => /^erfolg-schule-/.test(x.id)).every((x) => x.frei));
+  const alleBilder = [...e2, ...sch];
+  pruefe('Neue Errungenschaften: jede mit eigenem Abzeichen, keine doppelt', alleBilder.every((x) => /class="sk-erfolg"/.test(x.bild))
+    && new Set(alleBilder.map((x) => ohneIds(x.bild))).size === alleBilder.length);
+  // Archiv: neueste zuerst; die Folge zaehlt in Zeitfolge, eine Niederlage oder ein Remis bricht sie
+  const p = (tag, ergebnis, farbe = 'w') => ({ id: 'p' + tag, datum: `2026-10-${String(tag).padStart(2, '0')}T10:00:00Z`, ergebnis, spielerFarbe: farbe, modus: 'normal', botId: BOTS[0].id });
+  const archiv = [p(9, 'sieg'), p(8, 'sieg', 'b'), p(7, 'sieg'), p(6, 'sieg'), p(5, 'sieg'), p(4, 'remis'), p(3, 'sieg'), p(2, 'sieg'), p(1, 'niederlage')];
+  const vorher = erspielteErfolge();
+  const ps = partienStand(archiv);
+  pruefe('Partien-Archiv: beste Folge 5 (das Remis bricht), Sieg mit Schwarz; beides wird gemerkt und bleibt ohne Archiv',
+    vorher.length === 0 && ps.beste === 5 && ps.frei.includes('schwarz-sieg') && ps.frei.includes('siegesserie-5')
+    && erspielteErfolge().includes('siegesserie-5') && partienStand([]).frei.includes('schwarz-sieg'), { vorher, ps });
+  setzeProfilWahl({ vitrine: ['erfolg-schwarz-sieg', null, null] });
+  const dp = duellProfil();
+  pruefe('Matchbeginn: die gewaehlte Errungenschaft kommt mit Abzeichen und Seltenheit', dp && dp.orden.length === 1 && dp.orden[0].name === 'Sieg mit Schwarz'
+    && /^<svg viewBox="0 0 120 120" class="sk-erfolg"/.test(dp.orden[0].bild) && dp.orden[0].seltenheit === 'frei', dp);
+  setzeProfilWahl({ vitrine: [null, null, null] });
+  pruefe('Partien-Archiv: Uebungs- und Zu-zweit-Partien zaehlen nicht', partienStand([{ ...p(20, 'sieg', 'b'), modus: 'uebung' }]).beste === 0);
+  const titelNeu = ERFOLGS_TITEL.filter((x) => /^(schwarz-sieg|siegesserie-5|endgegner|siege-100|alle-endgegner|schule-)/.test(x.erfolg));
+  pruefe('Neue Titel zu den neuen Errungenschaften (Schattenkoenig, Siegeszug, Bezwinger ...), die der Meisterschule nur im Labor',
+    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 2
+    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length
+    && titelListe({ erfolge: e2 }).find((x) => x.id === 'erfolg-schattenkoenig').frei);
+}
+
 // Shop: Stand einer Edition als ruhiger Satz, die Zahl nur, wenn der Server sie schickt (nur bei erhaeltlich)
 pruefe('Shop: Restzahl sieht bei 9 und bei 1 gleich aus', standText({ status: 'erhaeltlich', restzahl: 9, auflage: 10 }) === '9 von 10 verfügbar'
   && standText({ status: 'erhaeltlich', restzahl: 1, auflage: 10 }) === '1 von 10 verfügbar');
@@ -171,7 +218,7 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
   const lv = l.filter((x) => x.art === 'level');
   const ef = l.filter((x) => x.art === 'erfolg');
   pruefe('Titel: alle Level-Titel (frei nach Level) und je ein Erfolgs-Titel, ohne Erfinder kein Erfinder-Titel',
-    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.length && !l.some((x) => x.art === 'erfinder'),
+    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor).length && !l.some((x) => x.art === 'erfinder'),
     l.map((x) => x.id + (x.frei ? '+' : '-')).join());
   pruefe('Titel: Erfolgs-Titel frei mit dem Erfolg, sonst mit Weg und Fortschritt',
     ef.find((x) => x.id === 'erfolg-feuertaufe').frei && !ef.find((x) => x.id === 'erfolg-goldene-aehre').frei
@@ -583,9 +630,10 @@ async function profilTeil(browser) {
   await p.s.locator('.detail [data-aktion="spielen"]').first().click();
   await p.s.waitForSelector('.duell.voll', { timeout: 5000 }).catch(() => {});
   const duell = await p.s.evaluate(() => ({ orden: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden')].map((x) => x.textContent),
+    bilder: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden.mit-bild > svg.sk-erfolg')].map((x) => Math.round(x.getBoundingClientRect().width)),
     figur: document.querySelector('.duell.voll [data-rolle="flo"] svg')?.dataset.figur, titel: document.querySelectorAll('.duell.voll .duell-titel').length }));
-  pruefe('Duell-Intro: unter Flo steht die Vitrine, Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
-    && duell.figur === 'Q' && duell.titel === 0, duell);
+  pruefe('Duell-Intro: unter Flo steht die Vitrine mit Abzeichen (Flo 01.11.2026), Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
+    && duell.bilder.length === 1 && duell.bilder[0] >= 36 && duell.figur === 'Q' && duell.titel === 0, duell);
   pruefe('Profil: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 }
