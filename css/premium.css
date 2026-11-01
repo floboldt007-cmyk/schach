@@ -3,8 +3,13 @@
    zu Standard"). Farben nur aus den Tokens (css/themes/<id>.css); Gold traegt die Seite, die Akzentfarbe nur die Steine.
    Bewegung: Strahlenkranz dreht langsam, drei Funkel; html[data-bewegung="aus"] haelt alles an (css/tokens.css).
    ============================================================ */
+/* Flo 01.11.2026: "wenn man zu dem Abo geht (Premium), kann man nicht runterscrollen". Der Rumpf war hoechstens 760 px breit
+   und mittig: daneben (iPad quer je 210 px, hoch 30 px) lag nur der Screen mit overflow: hidden, dort rollte nichts. Jetzt
+   rollt die ganze Breite; die Spalte bleibt 760 px breit, gemittelt ueber den seitlichen Innenabstand. Unten Platz fuer den
+   Home-Balken des iPhones/iPads. */
 .pm-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-  width: 100%; max-width: 760px; margin: 0 auto; box-sizing: border-box; padding: 10px var(--rand) var(--a7);
+  width: 100%; box-sizing: border-box;
+  padding: 10px max(var(--rand), calc((100% - 760px) / 2 + var(--rand))) calc(var(--a7) + env(safe-area-inset-bottom, 0px));
   display: flex; flex-direction: column; gap: 14px; }
 /* nichts in der Spalte schrumpft (sonst schnitte overflow: hidden das Kopfbild und die Tabelle ab), der Rumpf scrollt */
 .pm-rumpf > * { flex: none; }
