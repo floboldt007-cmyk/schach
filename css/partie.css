@@ -168,6 +168,10 @@
   .partie .spieler.ich { order: 4; } .partie .spielknoepfe { order: 5; }
   .partie.vertauscht .spieler.ich { order: 0; } .partie.vertauscht .spieler.gegner { order: 4; }
   .partie .coach { min-height: 112px; align-content: start; }
+  /* Flo 01.11.2026 (iPad): "der Bildschirm flackert wieder, wenn der Bot Zuege macht". Die Gegnerkarte behaelt ihre
+     groesste Hoehe (js/ui/partie.js ruhig); ohne align-content verteilte das Gitter den Rest auf alle Zeilen, und bei
+     jeder neuen Sprechblase sprangen Portraet und Name um bis zu 15 px. Jetzt bleiben sie oben stehen. */
+  .partie .spieler { align-content: start; }
 }
 /* hohe Querformate (iPad Pro): alles eine Spur groesser */
 @container partie (orientation: landscape) and (min-height: 860px) {
