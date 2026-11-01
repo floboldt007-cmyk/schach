@@ -205,6 +205,19 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf.mit-reiter .kopf-premium { width: 46px; padding: 0; }
   .haupt-kopf.mit-reiter .kopf-premium span { display: none; }
 }
+/* iPad und kleine Fenster (521 bis 1399 px): Krone und Shop brauchen Platz, dafuer tritt in der Arena der Klang-Knopf
+   zurueck (er steht in den Einstellungen und in der Partie); so bleiben Sterne, Level und Serie ganz, auch in Safari */
+@media (min-width: 521px) and (max-width: 1399px) {
+  /* nur wenn es eng wird: mit drei und mehr Zahlen der Pakete (Sterne, Level, Serie) */
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .knopf-klang { display: none; }
+  /* Reiter oben (iPad quer): die Pille steht wie vor der Krone eng und ohne Symbole (.eng.enger) mittig im freien Platz
+     (.reiter-frei), damit Sterne, Level und Serie ihren vollen Platz behalten */
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-links { flex: 0 0 auto; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .rechts { flex: 0 1 auto; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-reiter-platz { flex: 1 1 auto; }
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter { padding: 0 14px; font-size: 14px; }
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter .ico { display: none; }
+}
 /* iPad hoch und kleine Fenster (521 bis 1020 px): ebenfalls nur die Krone, damit Sterne, Level und Serie ganz bleiben */
 @media (min-width: 521px) and (max-width: 1020px) {
   .haupt-kopf .kopf-premium { width: 46px; padding: 0; }
