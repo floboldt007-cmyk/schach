@@ -1116,7 +1116,7 @@ async function testeDuell(browser) {
         rolle: d.getAttribute('role'), screen: document.documentElement.dataset.screen };
     });
     pruefe('Ueberlagerung .duell.voll an body: Bot-Haelfte in Bot-Farbe, „gegen“, Namen, Elo und Farben, Chip „Stufe 3 · Erste Partie“', mitte.art === 'voll' && mitte.bot === 'paula' && mitte.anlass === 'erste' && mitte.buehne === mitte.bfRgb
-      && mitte.gegen === 'gegen' && mitte.botName === 'Postbotin Paula' && mitte.floName === 'Flo' && mitte.unter === 'Elo 300 · Schwarz' && mitte.chip === 'Stufe 3 · Erste Partie' && mitte.rolle === 'dialog', JSON.stringify(mitte));
+      && mitte.gegen === 'gegen' && mitte.botName === 'Postbotin Paula' && mitte.floName === 'Du' && mitte.unter === 'Elo 300 · Schwarz' && mitte.chip === 'Stufe 3 · Erste Partie' && mitte.rolle === 'dialog', JSON.stringify(mitte));
     pruefe('Portraets: Modern-Portraet des Bots, Flos weisser Bauer (Standard-Profilbild); Naht schraeg (quer)', mitte.portraet && mitte.koenig && /56%/.test(mitte.naht), JSON.stringify(mitte));
     pruefe('Vertrag: html[data-duell="laeuft"] solange das Intro laeuft', mitte.attr === 'laeuft');
     await warte(300);

@@ -81,7 +81,7 @@ import './sprachen/rahmen.js';
 import { linkAnmeldungFrisch } from './konto.js';
 import { brettWahl, klangWahl } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
-import { sitzung } from './konto.js';
+import { sitzung, eigenerName, ladeProfil } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
@@ -672,6 +672,7 @@ function gehe(name, params = {}, { ersetzen = null } = {}) {
   } catch (e) { /* z. B. file:// */ }
   tiefe = neueTiefe;
   pruefeSonderstuecke();
+  pruefeName();
   // eine bereitliegende neue Version uebernimmt beim Seitenwechsel (nicht ins Spiel hinein); der Verlauf steht schon auf
   // dem Ziel, nach dem Neuladen oeffnet also genau diese Seite
   if (wartenderSW && aktiviereSW && !SPIEL_SCREENS.has(name) && !imSpiel()) { aktiviereSW(wartenderSW); return; }
@@ -1098,6 +1099,23 @@ function pruefeSonderstuecke() {
   }).catch(() => { sonderFehlerBis = Date.now() + 60000; }).finally(() => { sonderLaeuft = false; });
 }
 
+// Eigener Benutzername (js/konto.js eigenerName): angemeldet und noch nicht gemerkt, einmal vom Server holen (Flo 01.11.2026:
+// ein Freund sah "Flo" als seinen Namen). Ohne Benutzernamen erst in 10 Minuten wieder fragen, nach einem Fehler in 1 Minute.
+let nameLaeuft = false;
+let nameBis = 0;
+function pruefeName() {
+  try {
+    if (nameLaeuft || Date.now() < nameBis || !sitzung() || eigenerName()) return;
+  } catch (e) { return; }
+  nameLaeuft = true;
+  ladeProfil().then(() => {
+    if (!eigenerName()) { nameBis = Date.now() + 600000; return; }
+    // die Profilkarte im Ich-Screen zeigt den Namen sofort (nicht mitten in eine Partie)
+    if (!aktuell || aktuell.name !== 'ich' || ladeNr !== ladeFertig) return;
+    zeigeScreen(aktuell.name, aktuell.params || {}, aktuell.hash);
+  }).catch(() => { nameBis = Date.now() + 60000; }).finally(() => { nameLaeuft = false; });
+}
+
 function ersterStart() {
   window.addEventListener('popstate', beiVerlauf);
   window.addEventListener('hashchange', () => {
@@ -1107,6 +1125,7 @@ function ersterStart() {
   sende('app:bereit', { app });
   beiVerlauf();
   pruefeSonderstuecke();
+  pruefeName();
   pruefeInstallation();
   // W0+a: Analysen ueber MAX_REVIEWS still entfernen (nach dem ersten Screen, bremst den Start nicht)
   setTimeout(() => { try { duenneAnalysenAus(); } catch (e) { /* egal */ } }, 0);
