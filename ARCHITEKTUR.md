@@ -497,6 +497,7 @@ export function setzeFehlerMelder(fn)            // fn(ort, paket, fehler) bekom
 | Ort | Art | Host (Datei, Stelle) | `kontext` | Reihenfolge |
 |---|---|---|---|---|
 | `arena:kopf` | DOM | `arena.js`, in `.kopf-chips` nach den zwei Chips | `{ app, fortschritt }` | 2A Rang 10 · 1D Kette 20 · 1C Training 30 |
+| `arena:modus` | DOM | `arena.js`, `.ort-arena-modus` zwischen Kopf und `.inhalt` | `{ app, fortschritt }` | Lobby (Umschalter Welten \| Online, nur Labor) 1 |
 | `arena:panel-oben` | DOM | `arena.js` `zeigeDetail()`, oben in `.detail` | `{ app, bot, fortschritt }` | W0 Nachlese 5 · 1D Willkommen 10 · 1D Heute-Karte 20 · 2D Sicherungs-Tipp 90 |
 | `arena:panel-bot` | DOM | `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | 2A Bilanz 10 · 2B Geheimnis und Erzfeind 20 |
 | `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
@@ -518,6 +519,7 @@ diesen Behaeltern nicht an ihre eigenen `data-aktion`-Knoepfe weiter: Pakete bin
 | Ort | Behaelter | genaue Stelle | gefuellt |
 |---|---|---|---|
 | `arena:kopf` | `.kopf-chips` selbst | nach den Chips Sterne und Pokal | einmal beim Aufbau |
+| `arena:modus` | `.ort-arena-modus` | zwischen Kopf und Karte, ohne Anbieter `hidden` | einmal beim Aufbau |
 | `arena:panel-oben` | `.detail > .ort-panel-oben` | erstes Kind des Panels (vor „Offene Partie“), zuerst die Nachlese | bei jedem `zeigeDetail()` (Botwahl) |
 | `arena:panel-bot` | `.ort-panel-bot` | direkt nach `.ziel-sterne` (seit U5 in jeder Lage sichtbar, das Panel scrollt) | bei jedem `zeigeDetail()` |
 | `arena:start` | keiner (Aufruf) | nach dem ersten `layout()` und der Freischalt-Animation | einmal; `verlasse()` beim Screen-Wechsel |

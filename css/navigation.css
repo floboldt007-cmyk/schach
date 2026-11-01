@@ -186,3 +186,61 @@ html[data-reiter="unten"] .toast-ort { bottom: calc(var(--reiter-h) + 6px); }
   .haupt-kopf.mit-seite .kopf-seite { display: block; font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px;
     letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; color: var(--text); }
 }
+
+/* ---------- Premium-Krone und Shop (Startseite neu, Flo 01.11.2026: "oben muss die Shop-Funktion sein, hell/dunkel,
+   die Premium-Version") ---------- */
+.haupt-kopf .kopf-premium { flex: none; height: 44px; min-width: 44px; margin: 0; padding: 0 15px 0 12px; border: 0;
+  border-radius: var(--r-pille); display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: inherit;
+  font-family: var(--display); font-weight: var(--gw-titel); font-size: 14.5px; letter-spacing: -.01em; white-space: nowrap;
+  color: var(--text); background: var(--gold-weich); box-shadow: inset 0 0 0 1.5px var(--gold), var(--s1); cursor: pointer;
+  transition: transform var(--d-s) var(--feder), box-shadow var(--d-s) var(--sanft); }
+.haupt-kopf .kopf-premium .ico { width: 20px; height: 20px; color: var(--gold); }
+.haupt-kopf .kopf-premium:hover { box-shadow: inset 0 0 0 2px var(--gold), var(--s2); }
+.haupt-kopf .kopf-premium:active { transform: scale(.96); }
+.haupt-kopf .kopf-premium:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+
+/* Reiter oben in der Kopfzeile (iPad quer): die Krone ohne Wort, damit die Reiter dort weiter Platz haben (app.js setzt
+   .mit-reiter vor dem Messen; passt es nicht, faellt die Leiste wie bisher nach unten und das Wort kehrt zurueck) */
+@media (max-width: 1399px) {
+  .haupt-kopf.mit-reiter .kopf-premium { width: 46px; padding: 0; }
+  .haupt-kopf.mit-reiter .kopf-premium span { display: none; }
+}
+/* iPad und kleine Fenster (521 bis 1399 px): Krone und Shop brauchen Platz, dafuer tritt in der Arena der Klang-Knopf
+   zurueck (er steht in den Einstellungen und in der Partie); so bleiben Sterne, Level und Serie ganz, auch in Safari */
+@media (min-width: 521px) and (max-width: 1399px) {
+  /* nur wenn es eng wird: mit drei und mehr Zahlen der Pakete (Sterne, Level, Serie) */
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .knopf-klang { display: none; }
+  /* Reiter oben (iPad quer): die Pille steht wie vor der Krone eng und ohne Symbole (.eng.enger) mittig im freien Platz
+     (.reiter-frei), damit Sterne, Level und Serie ihren vollen Platz behalten */
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-links { flex: 0 0 auto; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .rechts { flex: 0 1 auto; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .kopf-reiter-platz { flex: 1 1 auto; }
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter { padding: 0 14px; font-size: 14px; }
+  .haupt-kopf.mit-premium:has(.kopf-chips > :nth-child(3)) .reiter-leiste[data-lage="oben"] .reiter .ico { display: none; }
+}
+/* iPad hoch und kleine Fenster (521 bis 1020 px): ebenfalls nur die Krone, damit Sterne, Level und Serie ganz bleiben */
+@media (min-width: 521px) and (max-width: 1020px) {
+  .haupt-kopf .kopf-premium { width: 46px; padding: 0; }
+  .haupt-kopf .kopf-premium span { display: none; }
+  .haupt-kopf.mit-premium .marke-zeichen { display: none; }
+}
+
+/* Handy: vorn die Krone statt der Marke (die Marke bleibt fuer Vorleseprogramme im Dokument), rechts Shop, Hell/Dunkel und
+   Zahnrad; Verlauf (im Reiter Ich) und Klang (Einstellungen) treten zurueck. Jede Tippflaeche bleibt mindestens 44 px. */
+@media (max-width: 520px) {
+  .haupt-kopf.mit-premium .marke { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .haupt-kopf.mit-premium [data-aktion="verlauf"], .haupt-kopf.mit-premium .knopf-klang { display: none; }
+  .screen .haupt-kopf.mit-premium .knopf-thema { display: grid; }
+  .haupt-kopf.mit-premium .kopf-premium { height: var(--tipp); }
+  /* zwei Zeilen: oben Krone, Shop, Hell/Dunkel, Zahnrad; darunter die Zahlen (Sterne, Level, Serie) als volle Leiste, damit
+     alle drei ganz zu sehen sind (Zahlenruhe, Flo 23.10.) */
+  .screen .kopf.haupt-kopf.mit-premium { flex-wrap: wrap; row-gap: 8px; }
+  .haupt-kopf.mit-premium .rechts { display: contents; }
+  .haupt-kopf.mit-premium [data-aktion="shop"] { margin-left: auto; }
+  .screen .haupt-kopf.mit-premium .kopf-chips { order: 10; flex: 1 0 100%; margin-left: 0; justify-content: space-evenly; }
+}
+/* sehr schmal: nur die Krone */
+@media (max-width: 359px) {
+  .haupt-kopf .kopf-premium { width: var(--tipp); padding: 0; }
+  .haupt-kopf .kopf-premium span { display: none; }   /* der Name steht im aria-label */
+}

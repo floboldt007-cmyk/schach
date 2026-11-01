@@ -75,7 +75,9 @@ function zeigeIch(root, params = {}, app) {
   const s = document.createElement('section');
   s.className = 'screen sa-screen';
   s.setAttribute('aria-label', t('rahmen.sammlung.titel'));
-  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: t('rahmen.sammlung.titel') })}
+  // Verlauf (Flo 01.11.2026, Startseite neu): auf dem Handy steht er nicht mehr im Kopf der Arena, sondern hier bei "Ich"
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: t('rahmen.sammlung.titel'),
+    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }] })}
     <div class="sa-rumpf">
       ${seitenKopf({ titel: t('rahmen.sammlung.titel') })}
       <div class="sa-kopf-ort"></div>
@@ -85,6 +87,7 @@ function zeigeIch(root, params = {}, app) {
     </div>`;
   root.append(s);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  s.querySelector('.haupt-kopf [data-aktion="verlauf"]')?.addEventListener('click', () => app.gehe('verlauf'));
   let gemerkt = {};
   try { gemerkt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (e) { gemerkt = {}; }
   let aktiv = typeof params.bereich === 'string' ? params.bereich : gemerkt.bereich || null;

@@ -14,6 +14,9 @@
 //       knoepfe: [{ aktion, icon, label }] als .icon-knopf[data-aktion] vor Mond, Klang und Zahnrad.
 //       zurueck: Zurueck-Knopf links (.kopf-zurueck[data-aktion="zurueck"]); auf einem Reiter-Screen mit sichtbarer
 //       Leiste blendet css/navigation.css ihn aus (html[data-reiter-wurzel="ja"]).
+//       premium: Krone "Premium" neben der Marke (.kopf-premium[data-aktion="premium"], Flo 01.11.2026: "oben muss die
+//       Shop-Funktion sein, hell/dunkel, die Premium-Version"); verbindeKopf oeffnet damit den Screen premium. Ein
+//       eigener Knopf { aktion: 'shop' } oeffnet die Sammlung beim Bereich Shop.
 //   standardChips(fortschritt = ladeFortschritt()) -> HTML   Sterne (x / 90) und besiegte Bots (x / 30); Welten: aus BOTS
 //   seitenKopf({ ueber, titel, text }) -> HTML (div.seiten-kopf: Ueberzeile, grosser Titel h1.disp, Satz)
 //   verbindeKopf(wurzel, app, { beiZurueck, beiEinstellungen }) -> { verlasse() }
@@ -46,7 +49,7 @@ export function standardChips(fortschritt = null) {
 }
 
 export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurueck = false, chips = null, knoepfe = [],
-  modus = true, klang = true, einstellungen = true, titelElement = 'h1', seite = '' } = {}) {
+  modus = true, klang = true, einstellungen = true, titelElement = 'h1', seite = '', premium = false } = {}) {
   const tt = ['h1', 'h2', 'div'].includes(titelElement) ? titelElement : 'h1';
   const eigene = (Array.isArray(knoepfe) ? knoepfe : []).filter((k) => k && /^[a-z][a-z0-9-]*$/.test(String(k.aktion || '')));
   const zahl = eigene.length + (klang ? 1 : 0) + (einstellungen ? 1 : 0) + (zurueck ? 1 : 0);
@@ -54,6 +57,7 @@ export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurue
   if (zurueck) klassen.push('mit-zurueck');
   if (marke) klassen.push('mit-marke');
   if (seite) klassen.push('mit-seite');
+  if (premium) klassen.push('mit-premium');
   // drei und mehr Knoepfe: auf dem Handy werden das Zeichen der Marke und der zweite Chip weggelassen (css/navigation.css);
   // ist der Verlauf-Knopf der dritte, gilt das nicht, sobald Verlauf ein Reiter ist (dann ist der Knopf weg)
   if (zahl >= 3) klassen.push('voll');
@@ -69,6 +73,7 @@ export function hauptKopf({ titel = 'Crownmate', unter = '', marke = true, zurue
           ${marke ? `<span class="marke-zeichen" aria-hidden="true">${icon('bauer')}</span>` : ''}
           <div class="marke-text"><${tt} class="marke-titel logo">${esc(titel)}</${tt}>${unter ? `<div class="unter logo-unter">${esc(unter)}</div>` : ''}${seite ? `<div class="kopf-seite" aria-hidden="true">${esc(seite)}</div>` : ''}</div>
         </div>
+        ${premium ? `<button class="kopf-premium dr" type="button" data-aktion="premium" aria-label="${esc(t('rahmen.kopf.premiumLabel'))}">${icon('krone')}<span>${esc(t('rahmen.kopf.premium'))}</span></button>` : ''}
       </div>
       <div class="kopf-reiter-platz"></div>
       <div class="rechts">
@@ -120,6 +125,11 @@ export function verbindeKopf(wurzel, app, { beiZurueck = null, beiEinstellungen 
       beiZurueck();
     } else if (a === 'einstellungen' && typeof beiEinstellungen === 'function') {
       beiEinstellungen();
+    } else if (a === 'premium' && app && typeof app.gehe === 'function') {
+      try { klangDienst.spiele('schalter'); } catch (f) { /* still */ }
+      app.gehe('premium');
+    } else if (a === 'shop' && app && typeof app.gehe === 'function') {
+      app.gehe('ich', { bereich: 'shop' });
     }
   };
   wurzel.addEventListener('click', klick);
@@ -192,5 +202,6 @@ function wechsleModus(knopf, app) {
 export function kopfEintritt(wurzel) {
   const kopf = wurzel && wurzel.querySelector ? wurzel.querySelector('.haupt-kopf') : null;
   if (!kopf || tempo() === 0) return;
-  staffel([kopf.querySelector('.marke'), ...kopf.querySelectorAll('.rechts > *')].filter(Boolean), { von: 'translateY(-10px)', d: 480, abstand: 40 });
+  staffel([kopf.querySelector('.marke'), kopf.querySelector('.kopf-premium'), ...kopf.querySelectorAll('.rechts > *')].filter(Boolean),
+    { von: 'translateY(-10px)', d: 480, abstand: 40 });
 }

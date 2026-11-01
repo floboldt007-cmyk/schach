@@ -129,6 +129,18 @@
 .fk-linie { position: absolute; inset: 0; border-radius: var(--r-pille); background: var(--gold); transform-origin: left center;
   transform: scaleX(0); transition: transform var(--d-l) var(--gleiten); }
 
+/* iPad quer mit Premium-Krone und Reitern oben (Startseite neu, Flo 01.11.2026): dort ist die schmale Form fest. Sonst
+   haengt sie an der Reihenfolge zweier Messungen (diese Datei misst die Chip-Reihe, js/ui/seite.js nimmt einen Chip
+   zurueck, der nicht passt); WebKit mass in der CI zuerst den Kopf, und der Serien-Chip trat zurueck. Erst ab 1100 px: bei
+   1024 px wandern die Reiter sonst in den Kopf und nehmen der Serie den Platz (dort bleibt die Form der Messung). */
+@media (min-width: 1100px) and (max-width: 1399px) {
+  .screen .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .chip.fk-chip { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip :is(.fk-ico, .fk-chip-wort, .fk-mini) { display: none; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip .fk-chip-text b { display: inline-grid; place-items: center;
+    box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte);
+    color: var(--auf-tinte); font-size: 14px; line-height: 1; }
+}
+
 /* ---------- Handy ---------- */
 @media (max-width: 600px) {
   /* Kopf-Chip: schmale Form oben (.fk-schmal, auf dem Handy setzt ansicht.js sie immer) */

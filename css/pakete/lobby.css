@@ -1,0 +1,148 @@
+/* ============================================================
+   Crownmate · Online-Lobby (Paket lobby, Vorschau im Labor): Umschalter Welten | Online (Startseite und Lobby) und der
+   Screen js/ui/lobby.js. Nur Tokens (css/tokens.css, css/themes/<id>.css), hell und dunkel; das Labor-Schild wie in der
+   Meisterschule (Gold auf Tinte, gleich in beiden Modi). Haengt sich selbst ein (link[data-paket="lobby"]).
+   Handy eine Spalte; ab 900 px links "Schnell eine Partie", rechts Wertungen und Liga.
+   ============================================================ */
+
+/* ---------- Umschalter Welten | Online ---------- */
+.arena .ort-arena-modus { display: flex; justify-content: center; padding: 6px var(--rand) 10px; }
+.arena .ort-arena-modus[hidden] { display: none; }
+.lb-modus { position: relative; display: grid; grid-template-columns: 1fr 1fr; width: min(100%, 360px); height: 44px; padding: 3px;
+  border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); flex: none; }
+.lb-modus-pille { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: var(--r-pille); background: var(--tinte);
+  transition: transform var(--d-s, .2s) var(--sanft, ease); }
+.lb-modus[data-aktiv="online"] .lb-modus-pille { transform: translateX(100%); }
+.lb-modus-knopf { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px;
+  border: 0; border-radius: var(--r-pille); background: none; color: var(--text-2); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+.lb-modus-knopf[aria-pressed="true"] { color: var(--auf-tinte); }
+.lb-labor { display: inline-block; padding: 1px 7px; border-radius: var(--r-pille); font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  color: #F5C451; background: #1C1B19; }
+.lb-modus-knopf[aria-pressed="true"] .lb-labor { box-shadow: 0 0 0 1px #F5C451; }
+
+/* ---------- Screen ---------- */
+.lobby .lb-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 14px; width: min(100%, 1040px); margin: 0 auto;
+  padding: 6px var(--rand) calc(28px + var(--reiter-hoehe, 0px)); }
+.lobby .lb-rumpf > .lb-modus { justify-self: center; }
+.lb-karte { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 0; border-radius: var(--r-l); background-color: var(--flaeche);
+  background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); color: var(--text); min-width: 0; }
+.lb-karte h2, .lb-mehr h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
+.lb-karte .ueberzeile { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--akzent); }
+.lb-text { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.45; }
+
+/* Schnell eine Partie */
+.lb-spielen { gap: 14px; }
+.lb-spielen .ueberzeile + h2 { margin-top: -10px; }
+.lb-zeiten { display: flex; flex-direction: column; gap: 10px; }
+.lb-gruppe { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 10px; }
+.lb-gruppe-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14.5px; color: var(--text-2); }
+.lb-gruppe-name .ico { width: 18px; height: 18px; color: var(--akzent); }
+.lb-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lb-zeit { min-height: 48px; border: 0; border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: var(--kante); color: var(--text);
+  font: inherit; font-size: 17px; font-variant-numeric: tabular-nums; cursor: pointer;
+  transition: transform var(--d-s, .2s) var(--sanft, ease), background-color var(--d-s, .2s) var(--sanft, ease); }
+.lb-zeit b { font-weight: 800; }
+.lb-zeit:active { transform: scale(.97); }
+.lb-zeit[aria-checked="true"] { background: var(--akzent); color: var(--auf-akzent); box-shadow: var(--s1); }
+.lb-spielen .segment { align-self: stretch; }
+.lb-suchen { width: 100%; min-height: 56px; justify-content: space-between; font-size: 18px; padding: 0 20px; }
+.lb-zeile { margin: -4px 0 0; color: var(--text-2); font-size: 13.5px; font-weight: 650; text-align: center; }
+
+/* Wertungen */
+.lb-werte { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lb-wert { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: var(--r-m); background: var(--flaeche-2);
+  box-shadow: var(--kante); text-align: center; min-width: 0; }
+.lb-wert .ico { width: 20px; height: 20px; color: var(--akzent); }
+.lb-wert > span { font-size: 13px; font-weight: 750; color: var(--text-2); }
+.lb-wert b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lb-wert small { font-size: 12px; color: var(--text-3); }
+
+/* Online-Liga */
+.lb-liga-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.lb-liga-kopf > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lb-beispiel { flex: none; padding: 3px 9px; border-radius: var(--r-pille); background: var(--flaeche-2); color: var(--text-2); font-size: 12px; font-weight: 800;
+  box-shadow: var(--kante); }
+.lb-tabelle { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb-tabelle li { display: grid; grid-template-columns: 26px 32px minmax(0, 1fr) 22px auto; align-items: center; gap: 10px; min-height: 44px; padding: 4px 12px 4px 10px;
+  border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: inset 3px 0 0 transparent; }
+.lb-tabelle li[data-zone="auf"] { box-shadow: inset 3px 0 0 var(--gut); }
+.lb-tabelle li[data-du] { background: color-mix(in srgb, var(--akzent) 16%, var(--flaeche-2)); }
+.lb-platz { font-weight: 800; color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
+.lb-av { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--flaeche);
+  box-shadow: var(--kante); font-weight: 800; font-size: 14px; color: var(--text-2); }
+.lb-av > svg, .lb-av > img { width: 100%; height: 100%; display: block; }
+.lb-name { font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-tabelle li[data-du] .lb-name { font-weight: 800; }
+.lb-zone { display: grid; place-items: center; }
+.lb-zone .ico { width: 16px; height: 16px; }
+.lb-tabelle li[data-zone="auf"] .lb-zone { color: var(--gut); transform: rotate(-90deg); }
+.lb-punkte { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Mehr Spielarten */
+.lb-mehr { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lb-mehr-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
+.lb-modus-karte { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 76px; padding: 12px 16px;
+  font: inherit; text-align: left; cursor: pointer; flex-direction: row; }
+.lb-modus-karte > .ico { width: 26px; height: 26px; color: var(--akzent); }
+.lb-modus-karte > .ico:last-child { width: 18px; height: 18px; color: var(--text-3); }
+.lb-modus-karte > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lb-modus-karte b { font-weight: 800; font-size: 16px; }
+.lb-modus-karte small { color: var(--text-2); font-size: 13px; line-height: 1.35; }
+.lb-modus-karte:disabled { cursor: default; }
+.lb-modus-karte:disabled > .ico { color: var(--text-3); }
+.lb-bald { padding: 3px 9px; border-radius: var(--r-pille); background: var(--flaeche-2); color: var(--text-2); font-size: 12px; font-weight: 800; box-shadow: var(--kante); }
+
+/* iPad quer und groesser: zwei Spalten */
+@media (min-width: 900px) {
+  .lobby .lb-rumpf { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: 18px; }
+  .lobby .lb-rumpf > .lb-modus, .lobby .lb-rumpf > .lb-mehr { grid-column: 1 / -1; }
+  .lobby .lb-spielen { grid-row: span 2; align-self: start; }
+}
+/* Handy: Gruppe ueber den Zeiten, dichter */
+@media (max-width: 520px) {
+  .lobby .lb-rumpf { gap: 10px; padding-top: 2px; }
+  .lb-karte { padding: 14px; gap: 10px; border-radius: var(--r-m); }
+  .lb-karte h2, .lb-mehr h2 { font-size: 18px; }
+  .lb-gruppe { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .lb-zeit { min-height: 44px; font-size: 16px; }
+  .lb-wert { padding: 10px 4px; }
+  .lb-wert b { font-size: 21px; }
+  .arena .ort-arena-modus { padding: 2px var(--rand) 8px; }
+}
+
+/* ---------- Gegnersuche ---------- */
+.lb-suche { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  background: var(--schleier); }
+.lb-suche-karte { width: min(100%, 380px); display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 22px 20px; border-radius: var(--r-l);
+  background: var(--flaeche); box-shadow: var(--s3, var(--s2)), var(--kante); color: var(--text); text-align: center; }
+.lb-radar { position: relative; width: 200px; height: 150px; margin-bottom: 4px; }
+.lb-radar > i { position: absolute; top: -9px; bottom: -9px; left: 16px; right: 16px; border-radius: 50%; border: 2px solid var(--akzent); opacity: 0; animation: lb-puls 2.4s ease-out infinite; }
+.lb-radar > i:nth-child(2) { animation-delay: .8s; }
+.lb-radar > i:nth-child(3) { animation-delay: 1.6s; }
+@keyframes lb-puls { from { transform: scale(.36); opacity: .85; } to { transform: scale(1); opacity: 0; } }
+.lb-ich, .lb-gegner { position: absolute; top: 50%; left: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; overflow: hidden;
+  background: var(--flaeche-2); box-shadow: var(--s1), 0 0 0 3px var(--flaeche); transition: transform .45s var(--sanft, ease); }
+.lb-ich > svg, .lb-ich > img, .lb-gegner > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.lb-gegner { opacity: 0; }
+.lb-vs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(.6); opacity: 0; font-weight: 900; font-size: 15px;
+  letter-spacing: .06em; color: var(--akzent); transition: opacity .3s var(--sanft, ease) .2s, transform .3s var(--sanft, ease) .2s; }
+.lb-suche[data-phase="gefunden"] .lb-vs { opacity: 1; transform: translate(-50%, -50%); }
+.lb-suche[data-phase="gefunden"] .lb-radar > i { animation: none; opacity: 0; }
+.lb-suche[data-phase="gefunden"] .lb-ich { transform: translateX(-54px); }
+.lb-suche[data-phase="gefunden"] .lb-gegner { opacity: 1; transform: translateX(54px); }
+.lb-suche-titel { font-size: 20px; font-weight: 800; }
+.lb-suche-zeile { font-weight: 750; color: var(--text-2); font-size: 14.5px; }
+.lb-suche-text { color: var(--text-3); font-size: 13px; }
+.lb-suche[data-phase="gefunden"] .lb-suche-text { display: none; }
+.lb-gefunden-text { margin: 4px 0 0; color: var(--text-2); font-size: 14px; line-height: 1.45; }
+.lb-suche-knoepfe { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 10px; }
+.lb-suche-knoepfe .knopf { width: 100%; min-height: 48px; justify-content: center; }
+.lb-suche-knoepfe .knopf[hidden] { display: none; }
+
+html[data-bewegung="aus"] .lb-radar > i { animation: none; opacity: .35; transform: scale(.7); }
+html[data-bewegung="aus"] .lb-modus-pille, html[data-bewegung="aus"] .lb-ich, html[data-bewegung="aus"] .lb-gegner { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .lb-radar > i { animation: none; opacity: .35; transform: scale(.7); }
+  .lb-modus-pille, .lb-ich, .lb-gegner { transition: none; }
+}

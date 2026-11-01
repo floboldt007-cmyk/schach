@@ -66,29 +66,29 @@ export function istTitelLevel(level) {
   return TITEL.some(([ab]) => ab === level);
 }
 
-// Arten, die die App heute zeigen kann (Titel, Namensschild in js/ui/arena.js, Finisher, Grund-Emotes). Alle anderen
+// Arten, die die App heute zeigen kann (Titel, Namensschild in js/ui/arena.js, Grund-Emotes). Alle anderen
 // Arten (Zugspur, Rahmen, Banner, Wahl-Stuecke, Wappen, Brief) zeigt erst die Werkstatt: bis dahin kommt: 'werkstatt'.
-const MIT_ANZEIGE = new Set(['titel', 'sonst', 'finisher', 'emote']);
+const MIT_ANZEIGE = new Set(['titel', 'sonst', 'emote']);
 const WERKSTATT = 'werkstatt';
 const s = (art, id, name, kommt = MIT_ANZEIGE.has(art) ? null : WERKSTATT) =>
   Object.freeze(kommt ? { art, id, name, kommt } : { art, id, name });
 // Jedes Stueck: art (titel | zugspur | kartenrahmen | banner | brettrahmen | emote | finisher | figuren | oberflaeche
 // | wappen | wahl | brief | sonst), id (nur [a-z0-9-]), name (Anzeige), kommt (nur wenn die Anzeige erst spaeter kommt).
-// Alles nur Schmuck und Titel. Finisher-Stuecke 'finisher-<id>' muessen genau den Stufen in finisher/index.js
-// (FINISHER) entsprechen; Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'), alles ohne Anzeige
+// Alles nur Schmuck und Titel. Finisher stehen seit 01.11.2026 nicht mehr in der Leiter (Flo: "Finisher ins Labor, die
+// kommen in den Shop"); Emotes ueber Level 1 gibt es im Rad noch nicht (kommt: 'emote-rad'), alles ohne Anzeige
 // bekommt kommt: 'werkstatt' (MIT_ANZEIGE oben). Das prueft tests/funken.test.mjs gegen die Pakete.
 const RAD = 'emote-rad';
 export const BELOHNUNGEN = Object.freeze({
-  1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('finisher', 'finisher-krone', 'Finisher Krone'), s('emote', 'emotes-grund', 'Grund-Emotes im Emote-Rad')],
+  1: [s('titel', 'titel-funke', 'Titel Funke'), s('sonst', 'namensschild', 'Namensschild'), s('emote', 'emotes-grund', 'Grund-Emotes im Emote-Rad')],
   2: [s('zugspur', 'zugspur-bleistift', 'Zugspur Bleistift')],
   3: [s('kartenrahmen', 'kartenrahmen-fichte', 'Kartenrahmen Fichte')],
   4: [s('banner', 'banner-leinen', 'Banner-Stoff Leinen (6 Farben)')],
-  5: [s('titel', 'titel-glut', 'Titel Glut'), s('finisher', 'finisher-welle', 'Finisher Schachbrett-Welle')],
+  5: [s('titel', 'titel-glut', 'Titel Glut')],
   6: [s('zugspur', 'zugspur-kreide', 'Zugspur Kreidestrich')],
   7: [s('brettrahmen', 'brettrahmen-eiche', 'Brett-Rahmen Eiche')],
   8: [s('emote', 'emote-hut-ab', 'Emote „Hut ab“', RAD)],
   9: [s('kartenrahmen', 'kartenrahmen-leder', 'Kartenrahmen Leder')],
-  10: [s('titel', 'titel-fackeltraeger', 'Titel Fackelträger'), s('finisher', 'finisher-koenig', 'Finisher Fallender König'), s('wahl', 'wahl-figuren-1', 'Wahl: Figurensatz Chessnut, Merida oder Celtic')],
+  10: [s('titel', 'titel-fackeltraeger', 'Titel Fackelträger'), s('wahl', 'wahl-figuren-1', 'Wahl: Figurensatz Chessnut, Merida oder Celtic')],
   11: [s('banner', 'banner-wolle', 'Banner-Stoff Wolle')],
   12: [s('zugspur', 'zugspur-federkiel', 'Zugspur Federkiel')],
   13: [s('brettrahmen', 'brettrahmen-ahorn', 'Brett-Rahmen Ahorn')],

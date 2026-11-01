@@ -2026,8 +2026,8 @@ export function zeige(root, params, app) {
         <div class="erg-feier" hidden></div><div class="erg-karte-ort" hidden></div>
         <div class="erg-bot"><span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span><div class="sprechblase links"></div></div>
         <div class="erg-frei-ort"></div>
-        <div class="erg-knoepfe"></div>
-        <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button>
+        <div class="erg-aktionen"><div class="erg-knoepfe"></div>
+          <button class="erg-lobby" type="button" hidden>${icon('haus')}<span>${esc(t('partie.erg.lobby'))}</span></button></div>
       </div>`;
     o.querySelector('.erg-bot .sprechblase').textContent = (s.querySelector('.blase-ort .sprechblase') || {}).textContent || botSatz(bot, ergebnis === 'sieg' ? 'verliert' : ergebnis === 'niederlage' ? 'gewinnt' : 'remis') || '';
     // U7: Bot-Sprueche aus: auch kein Spruch im Ergebnis

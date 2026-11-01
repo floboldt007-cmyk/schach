@@ -1,0 +1,118 @@
+/* ============================================================
+   Screen "Premium" (js/ui/premium.js, Flo 01.11.2026: "die Premium-Version, monatlich und einmalig, Vorteile im Vergleich
+   zu Standard"). Farben nur aus den Tokens (css/themes/<id>.css); Gold traegt die Seite, die Akzentfarbe nur die Steine.
+   Bewegung: Strahlenkranz dreht langsam, drei Funkel; html[data-bewegung="aus"] haelt alles an (css/tokens.css).
+   ============================================================ */
+.pm-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  width: 100%; max-width: 760px; margin: 0 auto; box-sizing: border-box; padding: 10px var(--rand) var(--a7);
+  display: flex; flex-direction: column; gap: 14px; }
+/* nichts in der Spalte schrumpft (sonst schnitte overflow: hidden das Kopfbild und die Tabelle ab), der Rumpf scrollt */
+.pm-rumpf > * { flex: none; }
+
+/* ---------- Kopfbild: Wappen, Name, Satz, Stand ---------- */
+.pm-held { position: relative; isolation: isolate; overflow: hidden; display: grid; justify-items: center; gap: 6px; text-align: center;
+  padding: 16px 18px 18px; border-radius: var(--r-xl); background: var(--flaeche); box-shadow: var(--s2), var(--kante); }
+.pm-held::before { content: ''; position: absolute; z-index: -1; left: 50%; top: -30%; width: 150%; aspect-ratio: 1; transform: translateX(-50%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 22%, transparent), transparent 72%); pointer-events: none; }
+.pm-emblem { width: 116px; height: 116px; overflow: visible; }
+.pm-strahlen { transform-origin: 60px 60px; animation: pm-dreh 48s linear infinite; }
+.pm-strahlen path { stroke: var(--gold); stroke-width: 2.4; stroke-linecap: round; opacity: .5; }
+.pm-scheibe { fill: color-mix(in srgb, var(--gold) 16%, var(--flaeche)); stroke: var(--gold); stroke-width: 2.2; }
+.pm-scheibe-rand { fill: none; stroke: var(--gold); stroke-width: 1.2; stroke-dasharray: 1.5 3.2; opacity: .7; }
+.pm-krone { fill: var(--gold); stroke: var(--gold); stroke-width: 2.4; stroke-linejoin: round; }
+.pm-krone-band { fill: color-mix(in srgb, var(--gold) 78%, var(--text)); }
+.pm-spitze { fill: var(--gold); }
+.pm-stein { fill: var(--akzent); }
+.pm-stein-mitte { fill: var(--flaeche); stroke: var(--akzent); stroke-width: 2.6; }
+.pm-funkel { fill: var(--gold); transform-box: fill-box; transform-origin: center; animation: pm-funkeln 2.8s ease-in-out infinite; }
+.pm-funkel.f2 { animation-delay: .9s; }
+.pm-funkel.f3 { animation-delay: 1.8s; }
+@keyframes pm-dreh { to { transform: rotate(360deg); } }
+@keyframes pm-funkeln { 0%, 100% { transform: scale(.35); opacity: .25; } 50% { transform: scale(1); opacity: 1; } }
+
+.pm-titel { margin: 2px 0 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: 30px; letter-spacing: -.03em; line-height: 1.05;
+  color: var(--text); text-wrap: balance; }
+/* Gold als Schrift: im Hellen dunkler gemischt, damit es lesbar bleibt (grosse Schrift, mindestens 3 : 1) */
+.pm-titel-wort { color: color-mix(in srgb, var(--gold) 72%, var(--text)); }
+.pm-satz { margin: 0; max-width: 36ch; color: var(--text-2); font-weight: 600; font-size: 15px; line-height: 1.4; text-wrap: balance; }
+.pm-stand { margin: 6px 0 0; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--r-pille);
+  background: var(--flaeche-2); color: var(--text); font-weight: 650; font-size: 13.5px; line-height: 1.3; text-align: left; }
+.pm-stand .ico { width: 18px; height: 18px; flex: none; color: var(--text-2); }
+.pm-stand[data-art="erfinder"] { background: var(--gold-weich); box-shadow: inset 0 0 0 1.5px var(--gold); }
+.pm-stand[data-art="erfinder"] .ico { color: var(--gold); }
+
+/* ---------- Plaene ---------- */
+.pm-plaene { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 10px; }
+.pm-plan { position: relative; min-height: 112px; margin: 0; padding: 18px 6px 12px; border: 0; border-radius: var(--r-l);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; font: inherit;
+  color: var(--text); background: var(--flaeche); box-shadow: var(--s1), var(--kante); cursor: pointer;
+  transition: box-shadow var(--d-s) var(--sanft), background-color var(--d-s) var(--sanft); }
+.pm-plan:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.pm-plan[aria-checked="true"] { background: color-mix(in srgb, var(--gold) 10%, var(--flaeche)); box-shadow: inset 0 0 0 2.5px var(--gold), var(--s2); }
+.pm-plan-name { font-weight: 750; font-size: 14px; color: var(--text-2); }
+.pm-plan[aria-checked="true"] .pm-plan-name { color: var(--text); }
+.pm-preis { font-family: var(--display); font-weight: var(--gw-titel); font-size: 17px; letter-spacing: -.02em; line-height: 1.15; }
+.pm-plan-zeile { font-size: 12px; font-weight: 600; color: var(--text-2); line-height: 1.25; }
+.pm-plan-schild { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: var(--r-pille);
+  background: var(--gold); color: rgb(28 27 25); font-size: 12px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; box-shadow: var(--s1); }
+
+.pm-kaufen { width: 100%; margin-top: 2px; }
+.pm-kaufen .ico { width: 22px; height: 22px; }
+/* noch nichts zu kaufen: ruhig statt verblasst */
+.pm-kaufen:disabled { opacity: 1; color: var(--text-2); background: var(--flaeche-2); box-shadow: inset 0 0 0 1.5px var(--linie-2); }
+.pm-kaufen:disabled .ico { color: var(--gold); }
+.pm-klein { margin: -6px 4px 0; text-align: center; color: var(--text-2); font-size: 12.5px; font-weight: 600; line-height: 1.4; }
+
+/* ---------- Vergleich Standard / Premium ---------- */
+.pm-h2 { margin: 12px 2px -2px; font-family: var(--display); font-weight: var(--gw-titel); font-size: 19px; letter-spacing: -.02em; color: var(--text); }
+.pm-vergleich { border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); overflow: hidden; }
+.pm-v-zeile { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; min-height: 50px; }
+.pm-v-zeile + .pm-v-zeile { border-top: 1px solid var(--linie); }
+.pm-v-zeile > span { display: flex; align-items: center; padding: 9px 10px; font-size: 13.5px; line-height: 1.3; min-width: 0; }
+.pm-v-was { font-weight: 650; color: var(--text); }
+.pm-v-std, .pm-v-pre { justify-content: center; text-align: center; }
+.pm-v-std { color: var(--text-2); font-weight: 600; }
+.pm-v-pre { color: var(--text); font-weight: 750; background: color-mix(in srgb, var(--gold) 11%, transparent); }
+.pm-v-kopf { min-height: 44px; }
+.pm-v-kopf .pm-v-std { font-weight: 750; font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; }
+.pm-v-kopf .pm-v-pre { gap: 6px; font-family: var(--display); font-weight: var(--gw-titel); font-size: 14.5px; }
+.pm-v-kopf .pm-v-pre .ico { width: 18px; height: 18px; color: var(--gold); }
+.pm-v-ja { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--gut) 16%, transparent); }
+.pm-v-ja .ico { width: 17px; height: 17px; color: var(--gut); stroke-width: 2.6; }
+.pm-v-pre .pm-v-ja { background: color-mix(in srgb, var(--gold) 26%, transparent); }
+.pm-v-pre .pm-v-ja .ico { color: color-mix(in srgb, var(--gold) 70%, var(--text)); }
+.pm-v-nein { display: inline-block; width: 14px; height: 2.5px; border-radius: 2px; background: var(--text-3); opacity: .7; }
+
+/* ---------- Versprechen ---------- */
+.pm-zusagen { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pm-zusagen li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-m); background: var(--flaeche);
+  box-shadow: var(--s1), var(--kante); color: var(--text); font-weight: 600; font-size: 14px; line-height: 1.35; }
+.pm-z-ico { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 12px; background: var(--gold-weich); color: var(--gold); }
+.pm-z-ico .ico { width: 19px; height: 19px; }
+
+/* ---------- groessere Bildschirme ---------- */
+@media (min-width: 700px) {
+  .pm-rumpf { gap: 16px; padding-top: 18px; }
+  .pm-held { padding: 26px 24px 24px; }
+  .pm-emblem { width: 140px; height: 140px; }
+  .pm-titel { font-size: 40px; }
+  .pm-satz { font-size: 16.5px; }
+  .pm-plaene { gap: 14px; }
+  .pm-plan { min-height: 132px; }
+  .pm-preis { font-size: 21px; }
+  .pm-plan-name { font-size: 15px; }
+  .pm-plan-zeile { font-size: 13px; }
+  .pm-v-zeile > span { padding: 11px 16px; font-size: 14.5px; }
+  .pm-h2 { font-size: 22px; }
+}
+/* Handy schmal: Kopfbild flacher, damit die Plaene ohne Scrollen zu sehen sind */
+@media (max-width: 520px) {
+  .pm-held { padding: 12px 14px 14px; gap: 4px; }
+  .pm-emblem { width: 92px; height: 92px; }
+  .pm-titel { font-size: 26px; }
+  .pm-satz { font-size: 14px; }
+  .pm-plan { min-height: 104px; padding: 16px 4px 10px; }
+  .pm-preis { font-size: 15.5px; }
+  .pm-plan-name { font-size: 13.5px; }
+  .pm-v-zeile > span { padding: 8px 8px; font-size: 13px; }
+}

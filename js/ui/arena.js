@@ -46,7 +46,7 @@ import { botFarbe, avatarVon, floAvatar } from '../thema.js';
 import { anim, staffel, tempo, reduziert } from '../bewegung.js';
 import { segment } from './bauteile.js';
 import { hauptKopf, standardChips, verbindeKopf, kopfEintritt } from './seite.js';
-import { spieleDuell, duellArt } from './duell.js';
+import { spieleDuell } from './duell.js';
 import { t, zahl } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/arena.js';
@@ -356,8 +356,12 @@ export function zeige(root, params, app) {
     ${hauptKopf({
     unter: alleBesiegt ? t('arena.kopf.bezwungen', { sterne: gesamtSterne(fortschritt), max: BOTS.length * 3 }) : t('arena.kopf.titel', { bots: BOTS.length }),
     chips: standardChips(fortschritt),
-    knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
+    // Startseite neu (Flo 01.11.2026): Premium-Krone und Shop oben; auf dem Handy dazu Hell/Dunkel, Verlauf und Klang
+    // treten dort zurueck (Verlauf im Reiter Ich, Klang in den Einstellungen), css/navigation.css
+    premium: true,
+    knoepfe: [{ aktion: 'shop', icon: 'laden', label: t('rahmen.kopf.shop') }, { aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
   })}
+    <div class="ort-arena-modus" hidden></div>
     <div class="inhalt">
       <div class="karte" tabindex="-1" aria-label="${esc(t('arena.aria.karte'))}">
         <div class="karte-zieh-hinweis" aria-hidden="true" hidden>${esc(t('arena.karte.ziehen'))}</div>
@@ -419,6 +423,10 @@ export function zeige(root, params, app) {
   // Premium-Umbau U2: Hauptseiten-Kopf (Klang-Schalter, Hell/Dunkel, Zahnrad), js/ui/seite.js
   const kopfHandle = verbindeKopf(s, app, { beiEinstellungen: () => app.gehe('einstellungen') });
   orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
+  // Umschalter ueber der Karte (Paket lobby: Welten | Online, nur im Labor); ohne Anbieter unsichtbar
+  const ortModus = s.querySelector('.ort-arena-modus');
+  orte.modus = fuelle('arena:modus', ortModus, { app, fortschritt });
+  ortModus.hidden = orte.modus.anzahl === 0;
 
   // ---------- Stationen (nur die der gezeigten Welt) ----------
   let knoten = [];
@@ -815,9 +823,10 @@ export function zeige(root, params, app) {
     let erste = true;
     try { erste = !ladePartien().some((p) => p.botId === b.id); } catch (e) { erste = true; }
     const anlass = b.endgegner ? 'boss' : (erste ? 'erste' : null);
-    const art = duellArt({ einstellung, anlass, reduziert: reduziert() });
+    // die Art waehlt spieleDuell selbst (Flo 01.11.2026: "Warum ist die Animation weg, wenn man auf dem iPad eine Partie
+    // beginnt?"): nur dort kennt sie Flos Vitrine; mit Titel oder Errungenschaften gibt es dann jedes Mal die volle Buehne
     const von = detail.querySelector('.detail-kopf .av') || (knoten[idx(b.id)] && knoten[idx(b.id)].querySelector('.avatar'));
-    const duell = spieleDuell({ bot: b, farbe, anlass, von, art });
+    const duell = spieleDuell({ bot: b, farbe, anlass, von, einstellung });
     await duell.bereit;
     if (weg) return;
     app.gehe('partie', { botId: b.id, farbe });

@@ -74,6 +74,17 @@ const KLANG = {
       + '<circle cx="60" cy="60" r="6" fill="#fff"/>'
       + funke(28, 30, 0.9, 0.2) + funke(92, 36, 0.7, 0.8) + funke(88, 90, 0.8, 1.3);
   },
+  // Juwel (Labor, Flo 01.11.2026: "Klaenge brauchen Dopamin"): geschliffener Edelstein, Facetten, Klangbogen und Funken
+  juwel: () => {
+    const g = id('j');
+    return `<defs>${verlauf(g, ['#FFE3F6', '#FF5FB8', '#8A2BE2'])}</defs>`
+      + '<ellipse cx="60" cy="98" rx="34" ry="7" fill="#3A1452" opacity=".3"/>'
+      + `<g class="rk rk-atmen" style="transform-origin:60px 60px"><path d="M34 44l12-16h28l12 16-26 46z" fill="url(#${g})" stroke="#5B1880" stroke-width="2.5" stroke-linejoin="round"/>`
+      + '<path d="M34 44h52M46 28l6 16 8-16 8 16 6-16M52 44l8 46 8-46" fill="none" stroke="#5B1880" stroke-width="1.6" stroke-linejoin="round" opacity=".7"/>'
+      + '<path d="M40 40l8-10h10l-6 12z" fill="#fff" opacity=".55"/></g>'
+      + [[14, 3.6, 0.85], [22, 3, 0.55]].map(([r, w, o]) => `<path class="rk rk-atmen" d="M${96} ${56 - r * 0.7}a${r} ${r} 0 0 1 0 ${(r * 1.4).toFixed(1)}" fill="none" stroke="#FF5FB8" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`).join('')
+      + funke(24, 30, 0.9, 0.2) + funke(90, 24, 0.7, 0.7) + funke(20, 78, 0.6, 1.1);
+  },
 };
 
 export function klangKunst(kid) {
@@ -202,6 +213,11 @@ const SELTEN = {
   'liga-1': 'selten', 'liga-2': 'selten', 'liga-3': 'episch', 'liga-4': 'episch', 'liga-5': 'legende', 'liga-6': 'legende',
   'serie-7': 'selten', 'serie-30': 'episch', 'serie-100': 'legende',
   'level-10': 'selten', 'level-20': 'episch', 'level-30': 'legende',
+  // Partien und Meisterschule (Flo 01.11.2026: "denk dir neue Errungenschaften aus")
+  'siege-10': 'frei', 'siege-50': 'selten', 'siege-100': 'episch', 'schwarz-sieg': 'frei', 'siegesserie-5': 'selten',
+  'endgegner': 'selten', 'alle-endgegner': 'episch',
+  'schule-matt': 'selten', 'schule-taktik': 'selten', 'schule-end': 'selten', 'schule-eroeffnung': 'selten', 'schule-alle': 'episch',
+  'schule-sterne': 'legende',
 };
 export function erfolgSeltenheit(eid) {
   return SELTEN[eid] || 'frei';
@@ -356,6 +372,37 @@ function level(eid, n) {
     + `<text x="60" y="80" ${schrift} font-size="6.5" letter-spacing="1.6" fill="${art.zahl}" opacity=".7">LEVEL</text></g>` + funken(eid);
 }
 
+// Lorbeerzweig im Medaillon (seite 1 links, -1 rechts), von unten nach oben
+const zweig = (seite, farbe, r = 30, cy = 60) => Array.from({ length: 6 }, (_, i) => {
+  const a = Math.PI / 2 + seite * (0.42 + i * 0.3); const x = 60 + r * Math.cos(a); const y = cy + r * Math.sin(a);
+  const d = (a * 180) / Math.PI + (seite > 0 ? 55 : -55);
+  return `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx="5" ry="2.1" transform="rotate(${d.toFixed(1)} ${x.toFixed(2)} ${y.toFixed(2)})" fill="${farbe}"/>`;
+}).join('');
+// Siege zaehlen: Lorbeer und Zahl, Bronze 10, Silber 50, Gold 100 (ohne Wort im Bild, damit es in jeder Sprache passt)
+function siege(eid, n) {
+  const art = n >= 100 ? { rand: GOLD, hell: '#5A3F0A', dunkel: '#1E1403', blatt: '#FFE08A' }
+    : n >= 50 ? { rand: SILBER, hell: '#2E3A4C', dunkel: '#0E131B', blatt: '#E6EAF0' }
+      : { rand: BRONZE, hell: '#3A2414', dunkel: '#160B04', blatt: '#EBA978' };
+  const gz = id('z');
+  return hof(eid, art.rand[1]) + medaillon(art.rand, art.hell, art.dunkel)
+    + `<g opacity=".9">${zweig(1, art.blatt)}${zweig(-1, art.blatt)}</g>`
+    + stern(60, 38, 5, art.blatt, 'opacity=".9"')
+    + `<defs>${verlauf(gz, art.rand, 0, 1)}</defs><text x="60" y="${n >= 100 ? 70 : 71}" ${schrift} font-size="${n >= 100 ? 20 : 24}" letter-spacing="-.5" fill="url(#${gz})">${n}</text>`
+    + funken(eid);
+}
+// Schwert (Klinge mit Spitze, Parierstange, Griff, Knauf) um x = 60
+const schwert = (oben, unten, rand) => glyphe(`M60 ${oben}L63.5 ${oben + 7}V${unten - 14}H56.5V${oben + 7}Z`, rand)
+  + glyphe(`M48 ${unten - 14}H72V${unten - 10}H48Z`, rand) + glyphe(`M58 ${unten - 10}H62V${unten - 1}H58Z`, ['#6E3B17', '#3A1E0A'])
+  + `<circle cx="60" cy="${unten + 1.5}" r="3" fill="${rand[1]}"/>`;
+// kleine Krone an beliebiger Stelle (krone() steht immer bei x = 60)
+const kroneAn = (x, y, s, c = '#F5C451') => krone(+y.toFixed(1), s, c).replace('translate(60 ', `translate(${x.toFixed(1)} `);
+// Stufen der Siegesserie (fuenf Balken nach oben)
+const stufen = (farben) => { const g = id('s'); return `<defs>${verlauf(g, farben, 0, 1)}</defs>` + [0, 1, 2, 3, 4].map((i) => `<rect x="${(35.5 + i * 10).toFixed(1)}" y="${(76 - 8 - i * 7).toFixed(1)}" width="7.4" height="${8 + i * 7}" rx="1.6" fill="url(#${g})" opacity="${(0.55 + i * 0.1).toFixed(2)}"/>`).join(''); };
+// offenes Buch (Seiten mit Zeilen)
+const buch = (y = 0, farbe = '#F6EFE0', linie = '#8A6A3A') => `<g transform="translate(0 ${y})"><path d="M31 48c10-4 20-4 28 2v32c-8-5-18-6-28-2Z" fill="${farbe}"/><path d="M89 48c-10-4-20-4-28 2v32c8-5 18-6 28-2Z" fill="${farbe}"/>`
+  + [56, 62, 68].map((yy) => `<path d="M36 ${yy}c6-2 12-2 18 1M84 ${yy}c-6-2-12-2-18 1" fill="none" stroke="${linie}" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>`).join('')
+  + `<path d="M60 50v32" stroke="${linie}" stroke-width="1.2" opacity=".7"/></g>`;
+
 const ERFOLG = {
   'erster-sieg': () => medaillon(BRONZE, '#20304F', '#0B1222')
     + glyphe('M44 34h32v9c0 11-7 19-16 19s-16-8-16-19Z', GOLD)
@@ -370,6 +417,36 @@ const ERFOLG = {
   'alle-sterne': () => hof('alle-sterne', '#F5C451') + medaillon(GOLD, '#3D2C0C', '#140E03')
     + `<g class="rk rk-drehen-langsam" style="transform-origin:60px 60px" opacity=".85">${um(10, 28, (x, y) => stern(x, y, 2.6, '#FFE08A'))}</g>`
     + glyphe(starPfad(60, 60, 17), GOLD) + stern(60, 60, 7, '#FFF6D6', 'opacity=".75"') + funken('alle-sterne'),
+  // ---- Partien ----
+  'schwarz-sieg': () => medaillon(SILBER, '#2A2F3A', '#07080B')
+    + '<path d="M79 33a20 20 0 1 0 4 31a16 16 0 1 1-4-31Z" fill="#E6EAF0" opacity=".2"/>'
+    + figur(KOENIG, 46.8, 37, 1.1, '#14161C', '#E6EAF0') + stern(81, 42, 3, '#FFF6D6', 'opacity=".85"') + stern(37, 50, 2, '#FFF6D6', 'opacity=".6"'),
+  'siegesserie-5': () => hof('siegesserie-5', '#FF8A64') + medaillon(BRONZE, '#4A1E14', '#1A0805')
+    + stufen(['#FFE08A', '#FFA94D', '#D9461E']) + stern(79.2, 34, 4.5, '#FFF1C1') + plakette('5', BRONZE) + funken('siegesserie-5'),
+  endgegner: () => hof('endgegner', '#E8483B') + medaillon(SILBER, '#3A1616', '#140606')
+    + `<g transform="rotate(-16 60 82)" opacity=".95">${krone(82, 1.15, '#F5C451')}</g>` + schwert(26, 76, SILBER) + funken('endgegner'),
+  'alle-endgegner': () => hof('alle-endgegner', '#E8483B') + medaillon(GOLD, '#3A1616', '#140606')
+    + [-150, -120, -90, -60, -30].map((g) => { const a = (g * Math.PI) / 180; return kroneAn(60 + 30 * Math.cos(a), 64 + 30 * Math.sin(a), 0.42); }).join('')
+    + schwert(36, 86, GOLD) + funken('alle-endgegner'),
+  // ---- Meisterschule ----
+  'schule-matt': () => hof('schule-matt', '#8FD3FF') + medaillon(SILBER, '#1E2E48', '#0A1020')
+    + '<circle cx="60" cy="60" r="24" fill="none" stroke="#8FD3FF" stroke-width="1.2" opacity=".45"/>'
+    + `<g transform="translate(0 7) rotate(-78 60 58)">${figur(KOENIG, 45.6, 36, 1.2, '#F2E9D8', '#3A2A10')}</g>`
+    + '<path d="M40 82H80" stroke="#8FD3FF" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>',
+  'schule-taktik': () => hof('schule-taktik', '#C084FC') + medaillon(SILBER, '#2E1C4C', '#0F0820')
+    + glyphe('M66 24L44 62H57L50 96L78 52H64L72 24Z', GOLD),
+  'schule-end': () => hof('schule-end', '#9FE8DF') + medaillon(SILBER, '#14383A', '#061416')
+    + krone(36, 0.85, '#F5C451') + '<path d="M60 48V58M55 53L60 47L65 53" fill="none" stroke="#9FE8DF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    + figur(BAUER, 49.8, 60, 0.85, '#F2E9D8', '#3A2A10'),
+  'schule-eroeffnung': () => hof('schule-eroeffnung', '#F5C451') + medaillon(SILBER, '#3A2A12', '#140D04') + buch(-2)
+    + stern(60, 36, 4, '#FFE08A', 'opacity=".9"'),
+  'schule-alle': () => hof('schule-alle', '#F5C451') + medaillon(GOLD, '#3D2C0C', '#140E03')
+    + glyphe('M84 22C66 24 50 38 44 58C41 68 41 78 43 88C49 76 59 70 67 60C77 48 84 36 84 22Z', GOLD)
+    + '<path d="M82 25Q60 54 43 90" fill="none" stroke="#9C6B12" stroke-width="1.4" stroke-linecap="round"/>'
+    + [[74, 36, 64, 34], [69, 44, 57, 43], [64, 52, 52, 53], [76, 40, 78, 48], [70, 50, 72, 57]].map(([a, b, c, d]) => `<path d="M${a} ${b}L${c} ${d}" stroke="#9C6B12" stroke-width=".9" opacity=".7"/>`).join('')
+    + '<path d="M43 88L40 96" stroke="#FFF1C1" stroke-width="2" stroke-linecap="round"/>' + funken('schule-alle'),
+  'schule-sterne': () => hof('schule-sterne', '#F5C451') + medaillon(GOLD, '#3B2366', '#140A2A') + buch(10, '#FFF1C1', '#9C6B12')
+    + glyphe(starPfad(42, 42, 8), GOLD) + glyphe(starPfad(60, 34, 11), GOLD) + glyphe(starPfad(78, 42, 8), GOLD) + funken('schule-sterne'),
 };
 function starPfad(cx, cy, r, n = 5, innen = 0.45) {
   return Array.from({ length: n * 2 }, (_, i) => {
@@ -383,12 +460,13 @@ export function erfolgKunst(eid) {
   let inhalt = null;
   if (ERFOLG[s]) inhalt = ERFOLG[s]();
   else {
-    const m = /^(welt|liga|serie|level)-(\d+)$/.exec(s);
+    const m = /^(welt|liga|serie|level|siege)-(\d+)$/.exec(s);
     const n = m ? Number(m[2]) : 0;
     if (m && m[1] === 'welt' && WELT[n]) inhalt = welt(s, n);
     else if (m && m[1] === 'liga' && n >= 1 && LIGA[n]) inhalt = liga(s, n);
     else if (m && m[1] === 'serie' && SELTEN[s]) inhalt = serie(s, n);
     else if (m && m[1] === 'level' && SELTEN[s]) inhalt = level(s, n);
+    else if (m && m[1] === 'siege' && SELTEN[s]) inhalt = siege(s, n);
   }
   return inhalt ? svg(inhalt, 'sk-erfolg') : null;
 }
