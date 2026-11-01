@@ -172,13 +172,39 @@ async function browserTeil() {
       await p.s.keyboard.press('Escape');
       await warte(200);
       pruefe('Escape schliesst die Suche', await p.s.locator('.lb-suche').count() === 0);
-      await p.s.locator('.lb-suchen').click();
+      // Flo 01.11.2026 (Handy): "Bin auf Gegner suchen gegangen, konnte danach nichts mehr anklicken". Mit dem Finger wie
+      // auf dem Handy: Suche, Zurueck, danach reagiert die Lobby; Suche, Spielen, danach reagiert die Partie (auch in WebKit)
+      await p.s.tap('.lb-suchen');
       await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
-      await p.s.locator('.lb-spielen-bot').click();
+      await p.s.tap('.lb-abbrechen');
+      await warte(250);
+      await p.s.tap('.lb-zeit[data-zeit="5+0"]');
+      await warte(150);
+      const nachZurueck = await p.s.evaluate(() => ({ suche: document.querySelectorAll('.lb-suche').length, zeit: document.querySelector('.lb-zeit[aria-checked="true"]')?.dataset.zeit,
+        oben: (() => { const k = document.querySelector('.lb-suchen').getBoundingClientRect(); const e = document.elementFromPoint(k.left + k.width / 2, k.top + k.height / 2); return !!(e && e.closest('.lb-suchen')); })() }));
+      pruefe('Getippt: Zurueck schliesst die Suche, danach reagiert die Lobby (Bedenkzeit 5 + 0, Gegner suchen wieder oben)',
+        nachZurueck.suche === 0 && nachZurueck.zeit === '5+0' && nachZurueck.oben, nachZurueck);
+      await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
+      await p.s.tap('.lb-suchen');
+      await p.s.waitForSelector('.lb-suche[data-phase="gefunden"]', { timeout: 3000 });
+      await p.s.tap('.lb-spielen-bot');
       await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
       const partie = await p.s.evaluate(() => ({ screen: document.documentElement.dataset.screen, tempo: window.__partie.z.tempo, suche: !!document.querySelector('.lb-suche') }));
       pruefe('Gegen den Bot spielen: echte Partie mit derselben Uhr (10 + 0), die Suche ist weg',
         partie.screen === 'partie' && partie.tempo && partie.tempo.grund === 600 && partie.tempo.zuschlag === 0 && !partie.suche, partie);
+      await p.s.waitForFunction(() => window.__partie && window.__partie.bereit, null, { timeout: 15000 }).catch(() => {});
+      await warte(400);
+      const brett = await p.s.evaluate(() => {
+        const b = document.querySelector('.screen.partie .brett').getBoundingClientRect();
+        const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return { mitte: !!(e && e.closest('.screen.partie .brett')), ueber: [...document.body.children].filter((x) => x.id !== 'app' && getComputedStyle(x).position === 'fixed'
+          && getComputedStyle(x).pointerEvents !== 'none' && x.getBoundingClientRect().height > innerHeight / 2).map((x) => x.className) };
+      });
+      pruefe('In der Partie liegt nichts ueber dem Brett (keine Ueberlagerung faengt Tipps ab)', brett.mitte && brett.ueber.length === 0, brett);
+      await p.s.tap('.screen.partie [data-aktion="zurueck"]');
+      await warte(600);
+      const raus = await p.s.evaluate(() => ({ screen: document.documentElement.dataset.screen, dialog: !!document.querySelector('.dialog-ort [role="dialog"], .dialog-ort [role="alertdialog"], .dialog-ort .dialog, .sheet') }));
+      pruefe('Getippt: der Zurueck-Knopf der Partie reagiert (Rueckfrage oder zurueck)', raus.dialog || raus.screen !== 'partie', raus);
       pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
       await p.k.close();
     }
