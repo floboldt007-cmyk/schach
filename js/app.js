@@ -94,12 +94,12 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'schule'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'schule', 'lobby'];
 const TITEL = {
   arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
-  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', schule: 'Schulmodus',
+  spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', schule: 'Schulmodus', lobby: 'Online',
 };
 // Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
 // titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen
@@ -109,7 +109,7 @@ function titelVon(name) {
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt', 'schule']);
+  'werkstatt', 'schule', 'lobby']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -383,7 +383,7 @@ const REITER_ALLE = [['arena', 'Arena', 'pokal'], ['training', 'Training', 'ziel
   ['bestenliste', 'Bestenliste', 'podest'], ['ich', 'Ich', 'person']];
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
 const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich',
-  werkstatt: 'ich' };
+  werkstatt: 'ich', lobby: 'arena' };
 // Querformat ab 1021 px (iPad quer): die Leiste sitzt oben in der Kopfzeile, sonst schwebt sie unten (D5)
 const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
 

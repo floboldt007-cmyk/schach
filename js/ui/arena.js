@@ -358,6 +358,7 @@ export function zeige(root, params, app) {
     chips: standardChips(fortschritt),
     knoepfe: [{ aktion: 'verlauf', icon: 'verlauf', label: t('allgemein.verlauf') }],
   })}
+    <div class="ort-arena-modus" hidden></div>
     <div class="inhalt">
       <div class="karte" tabindex="-1" aria-label="${esc(t('arena.aria.karte'))}">
         <div class="karte-zieh-hinweis" aria-hidden="true" hidden>${esc(t('arena.karte.ziehen'))}</div>
@@ -419,6 +420,10 @@ export function zeige(root, params, app) {
   // Premium-Umbau U2: Hauptseiten-Kopf (Klang-Schalter, Hell/Dunkel, Zahnrad), js/ui/seite.js
   const kopfHandle = verbindeKopf(s, app, { beiEinstellungen: () => app.gehe('einstellungen') });
   orte.kopf = fuelle('arena:kopf', s.querySelector('.kopf-chips'), { app, fortschritt });
+  // Umschalter ueber der Karte (Paket lobby: Welten | Online, nur im Labor); ohne Anbieter unsichtbar
+  const ortModus = s.querySelector('.ort-arena-modus');
+  orte.modus = fuelle('arena:modus', ortModus, { app, fortschritt });
+  ortModus.hidden = orte.modus.anzahl === 0;
 
   // ---------- Stationen (nur die der gezeigten Welt) ----------
   let knoten = [];
