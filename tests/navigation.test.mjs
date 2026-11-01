@@ -718,6 +718,27 @@ async function testePremium(browser) {
   pruefe('Zurueck fuehrt in die Arena', await h.seite.evaluate(() => location.hash === '#arena' || location.hash === ''));
   pruefe('keine Konsolenfehler', h.fehler.length === 0, h.fehler.join(' | '));
   await h.kontext.close();
+  // Flo 01.11.2026: "beim Abo (Premium) kann man nicht runterscrollen": auf dem iPad rollte nur die mittlere 760-px-Spalte,
+  // daneben nichts. Jetzt rollt die ganze Breite (am Rand gewischt) bis zum letzten Block, die Spalte bleibt hoechstens 760 px
+  for (const [w, hh, x] of [[1180, 820, 40], [820, 1180, 12]]) {
+    const ip = await neueSeite(browser, { w, h: hh });
+    await ip.seite.goto(BASIS + '#premium');
+    await ip.seite.waitForSelector('.screen.pm-screen .pm-plan');
+    await warte(500);
+    await ip.seite.mouse.move(x, hh * 0.6);
+    await ip.seite.mouse.wheel(0, 3000);
+    await warte(500);
+    const r = await ip.seite.evaluate(() => {
+      const rumpf = document.querySelector('.pm-rumpf');
+      const unten = rumpf.lastElementChild.getBoundingClientRect().bottom;
+      const breite = Math.max(...[...rumpf.children].map((c) => c.getBoundingClientRect().width));
+      return { st: Math.round(rumpf.scrollTop), max: rumpf.scrollHeight - rumpf.clientHeight, unten: Math.round(unten), H: innerHeight, breite: Math.round(breite) };
+    });
+    pruefe(`iPad ${w} x ${hh}: am Rand gewischt rollt die Seite bis ganz unten, Spalte hoechstens 760 px`,
+      r.max > 0 && r.st >= r.max - 1 && r.unten <= r.H && r.breite <= 760, JSON.stringify(r));
+    pruefe(`iPad ${w} x ${hh}: keine Konsolenfehler`, ip.fehler.length === 0, ip.fehler.join(' | '));
+    await ip.kontext.close();
+  }
   // Shop-Knopf mit den Paketen (ohne &kern): oeffnet "Ich" beim Bereich Shop; dort steht der Verlauf im Kopf
   const v = await neueSeite(browser, { w: 390, h: 844, handy: true });
   await v.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
