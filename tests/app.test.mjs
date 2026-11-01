@@ -3342,12 +3342,15 @@ async function testeU7(browser) {
       await warte(300);
       const grundHell = await seite.evaluate(() => getComputedStyle(document.body).backgroundColor);
       pruefe('System hell -> dunkel -> hell: der Seitengrund folgt (dunkel #15171B, hell #F4F1EC)', grund === 'rgb(21, 23, 27)' && grundHell === 'rgb(244, 241, 236)', JSON.stringify([grund, grundHell]));
-      // iPad quer bleibt wie vorher: Spalte 31vw zwischen 300 und 420 px, Brett nach Hoehe oder Breite wie gehabt
+      // iPad quer (Flo 01.11.2026: "das Brett kann schon groesser sein"): Spalte 29vw zwischen 300 und 400 px, das Brett
+      // fuellt mindestens 83 % der Hoehe (vorher 1024 x 768: 77 %)
       for (const g of [{ w: 1180, h: 820 }, { w: 1024, h: 768 }]) {
         await seite.setViewportSize({ width: g.w, height: g.h });
         await warte(400);
-        const ip = await seite.evaluate(() => ({ spalte: document.querySelector('.partie .seite').getBoundingClientRect().width, iw: innerWidth }));
-        pruefe(`iPad quer ${g.w}x${g.h}: Spalte unverändert (31vw, 300 bis 420 px)`, Math.abs(ip.spalte - Math.min(420, Math.max(300, ip.iw * 0.31))) <= 1, JSON.stringify(ip));
+        const ip = await seite.evaluate(() => ({ spalte: document.querySelector('.partie .seite').getBoundingClientRect().width, iw: innerWidth, ih: innerHeight,
+          brett: document.querySelector('.partie .brett').getBoundingClientRect().height }));
+        pruefe(`iPad quer ${g.w}x${g.h}: Spalte 29vw (300 bis 400 px), Brett mindestens 83 % der Hoehe`,
+          Math.abs(ip.spalte - Math.min(400, Math.max(300, ip.iw * 0.29))) <= 1 && ip.brett >= 0.83 * ip.ih, JSON.stringify(ip));
       }
     }
     pruefe('Kleines Querfenster: keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
