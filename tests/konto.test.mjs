@@ -4,6 +4,7 @@ import { fordereCodeAn, pruefeCode, erneuereSitzung, abmelden, speichereCloudSta
   SICHTBAR_SCHLUESSEL, RUECKFALL_SCHLUESSEL, uebernimmLinkSitzung, googleAnmeldeUrl, meldeMitGoogleAn, aktiveSitzung, userId,
   ABGEGLICHEN_SCHLUESSEL, istAbgeglichen, hatSpielstand, gleicheNachAnmeldung, planeSicherung, linkAnmeldungFrisch, vorschau,
   anmeldeUrl, anmeldewege, setzeAnmeldewege, mehrFortschritt,
+  SYNC_SCHLUESSEL, VERDRAENGT_SCHLUESSEL, synchronisiere, standHash, verdraengterStand, holeVerdraengtZurueck, gemerkterStand, cloudStand,
  } from '../js/konto.js';
 import { SUPABASE_URL } from '../js/konto-config.js';
 
@@ -150,8 +151,10 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   planeSicherung(0); await warteKurz();
   pruefe('Ohne Abgleich lädt planeSicherung nichts hoch (anderer Tab, abgebrochener Dialog)', uploads() === 0 && !istAbgeglichen());
   antw.push(cloudMit(7)); const k = await gleicheNachAnmeldung(true);
-  pruefe('Abbruch-Wert (true) entscheidet keinen Konflikt: nichts geschrieben, Riegel bleibt zu', k?.konflikt === true && k.cloud.partien === 7 && k.geraet.partien === 2
-    && uploads() === 0 && !istAbgeglichen() && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 2, JSON.stringify(k));
+  // Flo 02.11.2026 ("immer der aktuelle Stand"): kein Dialog mehr, mehr Fortschritt gewinnt, der andere bleibt zurueckholbar
+  pruefe('Ohne Wahl entscheidet der Fortschritt: 7 Cloud-Partien schlagen 2 auf dem Gerät, kein Upload, Gerätestand zurückholbar',
+    k === 'cloud' && uploads() === 0 && istAbgeglichen() && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 7
+    && JSON.parse(verdraengterStand().stand['schach-arena:v1:partien']).length === 2, JSON.stringify(k));
   antw.push(cloudMit(7), { status: 201, body: null });
   pruefe('Wahl "geraet" lädt hoch und öffnet den Riegel für genau diese Nutzer-ID', (await gleicheNachAnmeldung('geraet')) === 'geraet' && uploads() === 1
     && istAbgeglichen() && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === 'u5');
@@ -216,7 +219,7 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
     setzeKontoFetch(async (url, opt) => { rufe.push({ url, ...opt }); const x = antw.shift() || { status: 200, body: [] }; return { ok: x.status < 400, status: x.status, async json() { return x.body; } }; });
   }
   // Safari nach dem Link: nur die Eintraege eines frischen Starts, keine Partie
-  leereV1();
+  leereV1(); localStorage.removeItem(SYNC_SCHLUESSEL);   // frischer Browser: weder Spielstand noch gemerkter Abgleich
   for (const k2 of ['hinweis-installieren', 'modul:start', 'modul:funken', 'modul:punkte']) localStorage.setItem('schach-arena:v1:' + k2, '{}');
   pruefe('Frischer Start ohne Partie ist kein Spielstand', !hatSpielstand());
   localStorage.setItem('schach-arena:konto:sitzung', sitzungVon('u5')); antw.push(cloudMit(7));
@@ -231,7 +234,8 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   pruefe('Neue Anmeldung per Code verlangt einen neuen Abgleich', localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null);
   leereV1(); localStorage.setItem('schach-arena:v1:partien', JSON.stringify([{ id: 'p1' }])); localStorage.setItem(ABGEGLICHEN_SCHLUESSEL, 'u5'); antw.push(cloudMit(3));
   const k2 = await gleicheNachAnmeldung();
-  pruefe('Ein gefundener Konflikt schließt den Riegel, auch mit altem Merker', k2?.konflikt === true && localStorage.getItem(ABGEGLICHEN_SCHLUESSEL) === null);
+  pruefe('Beide Seiten geändert: mehr Fortschritt gewinnt ohne Dialog (Cloud 3 Partien gegen 1 auf dem Gerät)',
+    k2 === 'cloud' && JSON.parse(localStorage.getItem('schach-arena:v1:partien')).length === 3 && istAbgeglichen(), JSON.stringify(k2));
   pruefe('Mit einer Partie oder einem anderen Eintrag zählt der Browser als Spielstand',
     hatSpielstand({ 'schach-arena:v1:partien': '[{"id":"x"}]' }) && hatSpielstand({ 'schach-arena:v1:serie': '{}' }) && !hatSpielstand({}));
   localStorage.removeItem(SICHTBAR_SCHLUESSEL);
@@ -239,6 +243,82 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   pruefe('Abgelaufener Link: Meldung beim Zeichnen der (immer sichtbaren) Konto-Gruppe, Installations-Hinweis wartet, Testbereiche bleiben zu',
     localStorage.getItem(SICHTBAR_SCHLUESSEL) === null && linkAnmeldungFrisch());
 }
+// Abgleich ueberall (Flo 02.11.2026: "Egal wo ich mich anmelde, in der App oder im Browser, es muss immer der aktuelle Stand sein")
+{
+  const rufe = []; let cloudZeile = null;
+  setzeKontoFetch(async (url, opt) => {
+    rufe.push({ url, ...opt });
+    if (url.includes('/rest/v1/spielstaende') && opt.method === 'POST') { cloudZeile = { ...JSON.parse(opt.body) }; return { ok: true, status: 201, async json() { return null; } }; }
+    if (url.includes('/rest/v1/spielstaende')) return { ok: true, status: 200, async json() { return cloudZeile ? [cloudZeile] : []; } };
+    return { ok: true, status: 204, async json() { return null; } };
+  });
+  const posts = () => rufe.filter((c) => c.method === 'POST' && c.url.endsWith('/rest/v1/spielstaende')).length;
+  const leere = () => { for (const k of [...Array(localStorage.length)].map((_, i) => localStorage.key(i))) if (k && k.startsWith('schach-arena:')) localStorage.removeItem(k); };
+  const sitz = JSON.stringify({ access_token: 'a.' + Buffer.from(JSON.stringify({ sub: 'g1', email: 'g1@b.de' })).toString('base64url') + '.x', refresh_token: 'rg1', expires_at: 9999999999 });
+  const stand = (partien, level = 1, funken = 0) => ({ 'schach-arena:v1:partien': JSON.stringify(Array.from({ length: partien }, (_, i) => ({ id: 'p' + i }))),
+    'schach-arena:v1:modul:funken': JSON.stringify({ level, gesamt: funken }) });
+  const setzeLokal = (st) => { for (const [k, v] of Object.entries(st)) localStorage.setItem(k, v); };
+  const lokalPartien = () => JSON.parse(localStorage.getItem('schach-arena:v1:partien') || '[]').length;
+  const cloudPartien = () => JSON.parse(cloudZeile?.stand?.['schach-arena:v1:partien'] || '[]').length;
+
+  leere(); localStorage.setItem('schach-arena:konto:sitzung', sitz);
+  pruefe('Fingerabdruck hängt nicht an der Reihenfolge der Schlüssel (jsonb sortiert in der Cloud um)',
+    standHash({ a: '1', b: '2' }) === standHash({ b: '2', a: '1' }) && standHash({ a: '1' }) !== standHash({ a: '2' }));
+  // iPad (Geraet A) legt den ersten Cloud-Stand an
+  setzeLokal(stand(3, 2, 300)); cloudZeile = null;
+  pruefe('Erster Abgleich ohne Cloud-Stand: hochladen und merken', (await synchronisiere()) === 'hochgeladen' && cloudPartien() === 3
+    && gemerkterStand('g1') === standHash(cloudStand()));
+  pruefe('Nichts geändert: keine zweite Sicherung', (await synchronisiere()) === 'gleich' && posts() === 1);
+  // Geraet spielt weiter
+  setzeLokal(stand(4, 2, 340));
+  pruefe('Nur das Gerät geändert: hochladen', (await synchronisiere()) === 'hochgeladen' && cloudPartien() === 4 && posts() === 2);
+  // ein anderes Geraet laedt hoch (Cloud aendert sich), dieses Geraet unveraendert
+  const merk = JSON.parse(JSON.stringify(cloudZeile.stand));
+  cloudZeile = { ...cloudZeile, stand: stand(6, 3, 500) };
+  pruefe('Nur die Cloud geändert: laden, ohne hochzuladen', (await synchronisiere()) === 'geladen' && lokalPartien() === 6 && posts() === 2
+    && gemerkterStand('g1') === standHash(stand(6, 3, 500)));
+  pruefe('Ein Abgleich, der nur lädt, verdrängt nichts', verdraengterStand() === null);
+  // In einer Partie (Ergebnis steht noch): nichts laden, nichts schreiben, spaeter
+  const vorSpaeter = localStorage.getItem('schach-arena:v1:partien');
+  cloudZeile = { ...cloudZeile, stand: stand(8, 3, 520) };
+  pruefe('In der Partie: der Abgleich lädt nicht, sondern wartet', (await synchronisiere({ laden: false })) === 'spaeter'
+    && localStorage.getItem('schach-arena:v1:partien') === vorSpaeter && gemerkterStand('g1') === standHash(stand(6, 3, 500)));
+  localStorage.setItem('schach-arena:v1:einstellungen:zuzweit', JSON.stringify({ weiss: 'Oma', schwarz: 'Opa' }));
+  pruefe('Danach lädt er, und die Namen fürs Spiel zu zweit bleiben auf dem Gerät', (await synchronisiere()) === 'geladen' && lokalPartien() === 8
+    && JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:zuzweit')).weiss === 'Oma');
+  // Beide geaendert: das Geraet hat mehr Funken -> Geraet gewinnt, Cloud-Stand zurueckholbar
+  setzeLokal(stand(7, 3, 620)); cloudZeile = { ...cloudZeile, stand: stand(6, 3, 560) };
+  pruefe('Beide geändert, Gerät mit mehr Funken: Gerät gewinnt, Cloud-Stand zurückholbar', (await synchronisiere()) === 'hochgeladen' && cloudPartien() === 7
+    && JSON.parse(verdraengterStand().stand['schach-arena:v1:modul:funken']).gesamt === 560);
+  // Beide geaendert, gleicher Fortschritt -> Cloud gewinnt (ohne Dialog), Geraetestand zurueckholbar
+  setzeLokal({ ...stand(7, 3, 620), 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'holz' }) });
+  cloudZeile = { ...cloudZeile, stand: { ...stand(7, 3, 620), 'schach-arena:v1:einstellungen': JSON.stringify({ brett: 'marmor' }) } };
+  pruefe('Beide geändert, gleicher Fortschritt: die Cloud gilt, kein Dialog', (await synchronisiere()) === 'geladen'
+    && JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).brett === 'marmor'
+    && JSON.parse(verdraengterStand().stand['schach-arena:v1:einstellungen']).brett === 'holz');
+  // Zurueckholen tauscht, und der naechste Abgleich laedt den zurueckgeholten Stand hoch
+  holeVerdraengtZurueck();
+  pruefe('Zurückholen: der ersetzte Stand ist wieder da, der jetzige liegt zurück', JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen')).brett === 'holz'
+    && JSON.parse(verdraengterStand().stand['schach-arena:v1:einstellungen']).brett === 'marmor');
+  pruefe('Nach dem Zurückholen lädt der Abgleich ihn hoch', (await synchronisiere()) === 'hochgeladen' && JSON.parse(cloudZeile.stand['schach-arena:v1:einstellungen']).brett === 'holz');
+  // "Alles zuruecksetzen" (Text: der leere Stand ersetzt auch die Cloud): hochladen, Cloud-Stand zurueckholbar
+  const vorher = cloudPartien();
+  for (const k of ['schach-arena:v1:partien', 'schach-arena:v1:modul:funken']) localStorage.removeItem(k);
+  pruefe('Zurücksetzen auf einem abgeglichenen Gerät: leerer Stand geht hoch, der alte bleibt zurückholbar',
+    (await synchronisiere()) === 'hochgeladen' && cloudPartien() === 0 && JSON.parse(verdraengterStand().stand['schach-arena:v1:partien']).length === vorher);
+  // Neues Geraet, nie abgeglichen, mit eigenem kleinen Stand: mehr Fortschritt der Cloud gewinnt
+  cloudZeile = { ...cloudZeile, stand: merk };
+  leere(); localStorage.setItem('schach-arena:konto:sitzung', sitz); setzeLokal(stand(1, 1, 20));
+  pruefe('Neues Gerät mit kleinem eigenem Stand: Cloud mit mehr Fortschritt gilt', (await synchronisiere()) === 'geladen' && lokalPartien() === 4);
+  // Zwei Aufrufe gleichzeitig teilen sich einen Lauf
+  const a = synchronisiere(); const b = synchronisiere();
+  pruefe('Gleichzeitige Abgleiche laufen nur einmal', a === b);
+  await a;
+  // Anderes Konto: der gemerkte Abgleich und der verdraengte Stand gelten nicht
+  pruefe('Gemerkter Abgleich und ersetzter Stand gelten nur für ihr Konto', gemerkterStand('anderes') === null && verdraengterStand('anderes') === null);
+  leere();
+}
+
 // Konto fuer alle (Flo 31.10.2026): Anmeldewege vom Server, Apple-Adresse, Empfehlung im Konflikt-Dialog
 {
   const apple = anmeldeUrl('apple', 'https://floboldt007-cmyk.github.io/schach/');
@@ -249,8 +329,9 @@ pruefe('Tote Sitzung: Text "Anmeldung abgelaufen", lokal abgemeldet und Riegel z
   setzeAnmeldewege({ email: true, google: true, apple: true });
   pruefe('Anmeldewege: zum Testen umschaltbar', anmeldewege().apple === true);
   setzeAnmeldewege(null);
-  pruefe('Mehr Fortschritt: erst Level, dann Partien, Gleichstand ohne Empfehlung',
+  pruefe('Mehr Fortschritt: erst Level, dann Funken, dann Partien, Gleichstand ohne Empfehlung',
     mehrFortschritt({ level: 5, partien: 3 }, { level: 2, partien: 40 }) === 'geraet' && mehrFortschritt({ level: 2, partien: 3 }, { level: 2, partien: 9 }) === 'cloud'
+    && mehrFortschritt({ level: 2, funken: 300, partien: 3 }, { level: 2, funken: 250, partien: 9 }) === 'geraet'
     && mehrFortschritt({ level: 3, partien: 7 }, { level: 3, partien: 7 }) === null && mehrFortschritt({}, { level: 4 }) === 'cloud');
   pruefe('Ohne #konto: Testbereiche bleiben zu (kontoFreigeschaltet), auch nach einer Anmeldung', (() => { localStorage.removeItem(SICHTBAR_SCHLUESSEL); return !kontoFreigeschaltet('#einstellungen'); })());
 }
