@@ -40,9 +40,9 @@ function pruefe(name, gut, detail = '') { gesamt++; if (gut) ok++; console.log(`
 const browser = await browserTyp(pw).launch({ headless: true });
 
 // Ein Browser-Speicher (Kontext) mit simuliertem Supabase. lokal: Eintraege, die vor dem ersten Laden im Speicher stehen.
-async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300 } = {}) {
+async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300, neuBereit = false } = {}) {
   const k = await browser.newContext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' });
-  const zustand = { cloud, uploads: [], otp: [], fehler: [] };
+  const zustand = { cloud, uploads: [], otp: [], fehler: [], neu: [] };
   await k.addInitScript((vorbelegt) => {
     try { Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => false }); } catch (e) { /* egal */ }
     // Meldungen (Toasts) mitschreiben: sie verschwinden nach gut 3 Sekunden wieder
@@ -57,6 +57,13 @@ async function speicher({ lokal = {}, cloud = cloudZeile(), verzoegerung = 300 }
   await k.route('**/*', async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.hostname === '127.0.0.1') return route.continue();
+    // Umzug (js/umzug.js): crownmate.de liefert die App erst, wenn neuBereit gesetzt ist
+    if (url.hostname === 'crownmate.de') {
+      zustand.neu.push(url.pathname);
+      if (!neuBereit) return route.abort();
+      if (url.pathname === '/manifest.webmanifest') return route.fulfill({ status: 200, contentType: 'application/manifest+json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ name: 'Crownmate' }) });
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>crownmate.de</title><p>neu</p>' });
+    }
     if (!url.hostname.endsWith('.supabase.co')) return route.abort();
     const antwort = (d, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(d) });
     if (url.pathname === '/auth/v1/otp') { zustand.otp.push(url.search); return antwort({}); }
@@ -165,6 +172,42 @@ try {
     pruefe('Nur Einstellungen: Cloud geladen ohne Dialog, Meldung „von deinem anderen Gerät geladen“', (await lokalePartien(s)) === 7 && (await dialogTitel(s)) === ''
       && /anderen Gerät geladen/.test(await s.evaluate(() => window.__toasts.join(' | '))), { dialog: await dialogTitel(s) });
     await k.close();
+  }
+  { // U. Umzug auf crownmate.de (js/umzug.js): schlaeft, bis die neue Adresse die App ausliefert
+    const UMZUG = BASIS + '&umzug=alt';
+    const ohneTipp = { 'schach-arena:v1:hinweis-installieren': '1' };   // der Installations-Tipp ist ein eigener Dialog
+    {
+      const { k, zustand } = await speicher({ lokal: ohneTipp });
+      const s = await seite(k, zustand, BASIS); await s.waitForTimeout(2600);
+      pruefe('Umzug: unter einer anderen Adresse als github.io fragt die App crownmate.de gar nicht erst', zustand.neu.length === 0 && (await dialogTitel(s)) === '', zustand.neu);
+      await k.close();
+    }
+    {
+      const { k, zustand } = await speicher({ lokal: ohneTipp });
+      const s = await seite(k, zustand, UMZUG); await s.waitForTimeout(2600);
+      pruefe('Umzug: crownmate.de noch nicht bereit (heute): kein Hinweis, keine Seitenfehler', zustand.neu.includes('/manifest.webmanifest')
+        && (await dialogTitel(s)) === '' && zustand.fehler.length === 0, { neu: zustand.neu, dialog: await dialogTitel(s), fehler: zustand.fehler });
+      await k.close();
+    }
+    {
+      const { k, zustand } = await speicher({ neuBereit: true, lokal: { ...ohneTipp, 'schach-arena:v1:partien': partienJson(2, 'pc-') } });
+      const s = await seite(k, zustand, UMZUG); await s.waitForTimeout(2600);
+      const text = await s.evaluate(() => document.querySelector('.dialog-ort:not(.weg), .dialog:not(.weg)')?.textContent || '');
+      pruefe('Umzug: crownmate.de bereit, ohne Konto: Hinweis „Crownmate ist umgezogen“ mit Rat zur Anmeldung', /Crownmate ist umgezogen/.test(await dialogTitel(s))
+        && /nur auf diesem Gerät/.test(text), { dialog: await dialogTitel(s), text });
+      await s.getByRole('button', { name: 'Zu crownmate.de' }).click(); await s.waitForTimeout(1200);
+      pruefe('Umzug: „Zu crownmate.de“ öffnet die neue Adresse', s.url() === 'https://crownmate.de/', s.url());
+      await k.close();
+    }
+    {
+      const sitz = JSON.stringify({ access_token: TOKEN, refresh_token: 'r1', expires_at: 9999999999, email: 'flo@example.invalid' });
+      const { k, zustand } = await speicher({ neuBereit: true, lokal: { ...ohneTipp, 'schach-arena:konto:sitzung': sitz } });
+      const s = await seite(k, zustand, UMZUG); await s.waitForTimeout(4200);
+      const text = await s.evaluate(() => document.querySelector('.dialog-ort:not(.weg), .dialog:not(.weg)')?.textContent || '');
+      pruefe('Umzug: angemeldet: Hinweis, dass der Spielstand mit demselben Konto mitkommt', /demselben Konto an, dann ist dein Spielstand sofort da/.test(text), text);
+      pruefe('Umzug: angemeldet: keine Seitenfehler', zustand.fehler.length === 0, zustand.fehler);
+      await k.close();
+    }
   }
   { // 4. Abgelaufener oder schon benutzter Link: Konto-Gruppe sichtbar, klare Meldung
     const { k, zustand } = await speicher();

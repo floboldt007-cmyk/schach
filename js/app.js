@@ -83,6 +83,7 @@ import { brettWahl, klangWahl } from './labor.js';
 import { ladeSonderstuecke, sonderstueckeBekannt, istErfinder } from './sonderstuecke.js';
 import { sitzung, eigenerName, ladeProfil } from './konto.js';
 import { uebernimmEinladungsLink } from './online.js';
+import { pruefeUmzug } from './umzug.js';
 import { uebernimmLink as uebernimmFreundLink } from './freunde.js';
 
 // icon bleibt hier exportiert (Rueckwaertskompatibel fuer die Screens)
@@ -1127,6 +1128,10 @@ function ersterStart() {
   pruefeSonderstuecke();
   pruefeName();
   pruefeInstallation();
+  // Umzug auf crownmate.de: schlaeft, bis die neue Adresse die App ausliefert (js/umzug.js). Im Test mit ?test&umzug=alt
+  setTimeout(() => {
+    pruefeUmzug({ app, test: TEST && new URLSearchParams(location.search).get('umzug') === 'alt' }).catch(() => {});
+  }, 1500);
   // W0+a: Analysen ueber MAX_REVIEWS still entfernen (nach dem ersten Screen, bremst den Start nicht)
   setTimeout(() => { try { duenneAnalysenAus(); } catch (e) { /* egal */ } }, 0);
   // erst nach dem Laden, damit das Vorladen des Caches den Start nicht bremst
