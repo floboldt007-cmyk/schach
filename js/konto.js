@@ -23,6 +23,18 @@ export const ABGEGLICHEN_SCHLUESSEL = 'schach-arena:konto:abgeglichen';
 // Eigener Benutzername als Merker ({ konto, name }), damit Partie, Duell-Intro und Profilkarte ihn ohne Netz zeigen
 // (Flo 01.11.2026: "Ein Freund hat sich angemeldet ... der Account heisst Flo": dort stand fest "Flo").
 export const NAME_SCHLUESSEL = 'schach-arena:konto:name';
+// Abgleich ueberall (Flo 02.11.2026: "Egal wo ich mich anmelde, in der App oder im Browser, es muss immer der aktuelle
+// Stand sein."). Jedes Geraet merkt sich je Konto den Fingerabdruck des Stands, den Geraet und Cloud beim letzten
+// Abgleich gemeinsam hatten ({ konto, hash }). Daran sieht synchronisiere(), wer sich seitdem geaendert hat: nur die
+// Cloud -> laden, nur das Geraet -> hochladen, beide -> der Stand mit mehr Fortschritt gilt, der andere bleibt gesichert.
+export const SYNC_SCHLUESSEL = 'schach-arena:konto:abgleich-stand';
+// Der Stand, der bei einem Abgleich mit Aenderungen auf beiden Seiten verloren hat ({ konto, datum, stand }), egal ob
+// Geraet oder Cloud. Einstellungen > Konto bietet ihn zum Zurueckholen an, damit keine Entscheidung endgueltig ist.
+export const VERDRAENGT_SCHLUESSEL = 'schach-arena:konto:verdraengt';
+// sessionStorage: nach dem Neuladen einmal "Spielstand von deinem anderen Geraet geladen" zeigen
+export const NACH_LADEN_SCHLUESSEL = 'schach-arena:konto:nach-laden';
+// Zeitstempel, wenn ein Tab einen anderen Stand aufs Geraet geladen hat: andere Tabs desselben Browsers laden dann neu
+export const GELADEN_SCHLUESSEL = 'schach-arena:konto:geladen';
 // Eintraege, die ein frischer Start ohne jede Partie anlegt: Sie machen aus einem leeren Browser keinen Spielstand.
 const OHNE_SPIELSTAND = new Set(['schach-arena:v1:hinweis-installieren', 'schach-arena:v1:modul:start',
   'schach-arena:v1:modul:funken', 'schach-arena:v1:modul:punkte']);
@@ -214,13 +226,13 @@ export function meinName() { return eigenerName() || t('allgemein.du'); }
 function merkeName(name, s = sitzung()) {
   try { const id = userId(s); if (id && NAME.test(String(name || ''))) lager().setItem(NAME_SCHLUESSEL, JSON.stringify({ konto: id, name })); } catch (e) { /* nur Komfort */ }
 }
-export async function speichereCloudStand() {
+export async function speichereCloudStand(stand = cloudStand()) {
   const e0 = epoche;
   const s = await aktiveSitzung(); const id = userId(s); if (!id) throw new Error(K('keineId'));
   // Waehrend des Erneuerns abgemeldet: nichts mehr hochladen
   if (epoche !== e0 || userId(sitzung()) !== id) throw new Error(K('nichtAngemeldet'));
   // nur Familie und System ("iPadOS Safari"), nie der volle User-Agent-String (Datensparsamkeit)
-  const daten = { user_id: id, stand: cloudStand(), format_version: SPEICHER_VERSION, geraet: geraetKurz() };
+  const daten = { user_id: id, stand, format_version: SPEICHER_VERSION, geraet: geraetKurz() };
   await anfrage('/rest/v1/spielstaende', { methode: 'POST', token: s.access_token, daten, prefer: 'resolution=merge-duplicates' });
   return new Date();
 }
@@ -242,13 +254,15 @@ function gueltigerStand(stand) {
   return stand && typeof stand === 'object' && !Array.isArray(stand)
     && Object.entries(stand).every(([k, v]) => k.startsWith('schach-arena:v1:') && typeof v === 'string');
 }
+// Eintraege, die nie in die Cloud gehen (cloudStand): Laden laesst sie auf dem Geraet stehen (Namen beim Spiel zu zweit)
+const NUR_LOKAL = new Set(['schach-arena:v1:einstellungen:zuzweit']);
 export function ladeStandAufGeraet(cloud) {
   if (!cloud || cloud.format_version !== SPEICHER_VERSION || !gueltigerStand(cloud.stand)) throw new Error(K('cloudFormat'));
   const vorher = lokalerStand();
   if (!jsonSchreib(RUECKFALL_SCHLUESSEL, { datum: new Date().toISOString(), stand: vorher })) throw new Error(K('rueckfallFehler'));
   const roh = rohSpeicher();
   try {
-    for (const k of roh.schluessel()) roh.entferne(k);
+    for (const k of roh.schluessel()) if (!NUR_LOKAL.has(k) || k in cloud.stand) roh.entferne(k);
     for (const [k, v] of Object.entries(cloud.stand)) if (!roh.schreib(k, v)) throw new Error('Schreiben fehlgeschlagen.');
   } catch (e) {
     for (const k of roh.schluessel()) roh.entferne(k);
@@ -258,11 +272,11 @@ export function ladeStandAufGeraet(cloud) {
   return true;
 }
 export function vorschau(stand) {
-  const s = stand?.stand || stand || {}; let partien = 0; let level = 1;
+  const s = stand?.stand || stand || {}; let partien = 0; let level = 1; let funken = 0;
   try { const p = JSON.parse(s['schach-arena:v1:partien']); partien = Array.isArray(p) ? p.length : 0; } catch (e) { /* leer */ }
   // Das Level fuehrt das Funken-Modul (frueher stand hier nur fortschritt.level, das es nicht gibt: immer Level 1)
-  try { const f = JSON.parse(s['schach-arena:v1:modul:funken']); level = Number(f?.level) || 1; } catch (e) { /* leer */ }
-  return { datum: stand?.aktualisiert_am || null, partien, level };
+  try { const f = JSON.parse(s['schach-arena:v1:modul:funken']); level = Number(f?.level) || 1; funken = Number(f?.gesamt) || 0; } catch (e) { /* leer */ }
+  return { datum: stand?.aktualisiert_am || null, partien, level, funken };
 }
 export function hatSpielstand(stand = lokalerStand()) {
   const v = vorschau(stand);
@@ -273,27 +287,115 @@ export function hatSpielstand(stand = lokalerStand()) {
 // wahl: nur 'geraet' oder 'cloud' entscheiden einen Konflikt. Alles andere (auch der Abbruch-Wert eines Dialogs)
 // laesst ihn offen: dann wird nichts geschrieben und der Riegel bleibt zu.
 // Liefert null, wenn waehrenddessen abgemeldet oder geloescht wurde: dann schreibt der Abgleich nichts mehr aufs Geraet.
+// Ohne Wahl entscheidet synchronisiere() selbst ('gleich' = beide Seiten hatten schon denselben Stand).
 export async function gleicheNachAnmeldung(wahl) {
+  if (wahl !== 'geraet' && wahl !== 'cloud') {
+    const r = await synchronisiere();
+    return r === 'geladen' ? 'cloud' : r === 'hochgeladen' ? 'geraet' : r;
+  }
   const e0 = epoche;
   const id0 = userId(sitzung());
   const gilt = () => epoche === e0 && !!id0 && userId(sitzung()) === id0;
   const cloud = await ladeCloudStand();
   if (!gilt()) return null;
-  if (!cloud) { await speichereCloudStand(); if (!gilt()) return null; merkeAbgleich(); return 'geraet'; }
-  if (!hatSpielstand()) { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
-  if (wahl === 'geraet') { await speichereCloudStand(); if (!gilt()) return null; merkeAbgleich(); return 'geraet'; }
-  if (wahl === 'cloud') { ladeStandAufGeraet(cloud); merkeAbgleich(); return 'cloud'; }
-  neueAnmeldung();   // Konflikt: Geraet und Cloud weichen ab, also Riegel zu, auch wenn ein alter Merker stand
-  return { konflikt: true, geraet: vorschau(lokalerStand()), cloud: vorschau(cloud) };
+  if (wahl === 'cloud' && cloud) { ladeStandAufGeraet(cloud); merkeSync(id0, standHash(cloud.stand)); andereTabsNeuLaden(); return 'cloud'; }
+  if (cloud && gueltigerStand(cloud.stand)) jsonSchreib(VERDRAENGT_SCHLUESSEL, { konto: id0, datum: new Date().toISOString(), stand: cloud.stand });
+  const stand = cloudStand();
+  await speichereCloudStand(stand); if (!gilt()) return null;
+  merkeSync(id0, standHash(stand)); return 'geraet';
 }
-export function planeSicherung(ms = 1200) { clearTimeout(timer); timer = setTimeout(() => { if (istAbgeglichen()) speichereCloudStand().catch(() => {}); }, ms); }
+
+// Fingerabdruck eines Stands: unabhaengig von der Reihenfolge der Schluessel (jsonb sortiert sie in der Cloud um)
+export function standHash(stand) {
+  const t = JSON.stringify(Object.keys(stand || {}).sort().map((k) => [k, stand[k]]));
+  let h1 = 0xdeadbeef; let h2 = 0x41c6ce57;
+  for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0') + ':' + t.length;
+}
+function merkeSync(id, hash) { if (id) jsonSchreib(SYNC_SCHLUESSEL, { konto: id, hash }); merkeAbgleich(); }
+export function gemerkterStand(id = userId(sitzung())) { const d = jsonLies(SYNC_SCHLUESSEL); return id && d && d.konto === id ? d.hash || null : null; }
+// Hat sich das Geraet seit dem letzten Abgleich geaendert? (fuer die Uhr: ohne Aenderung keine Anfrage)
+export function geraetGeaendert() { const h = gemerkterStand(); return !h || h !== standHash(cloudStand()); }
+
+// Der eine Abgleich fuer Start, Rueckkehr, Partie-Ende, "Jetzt sichern" und die Anmeldung. Liefert 'gleich',
+// 'hochgeladen', 'geladen' (dann neu laden: die Module halten ihren Stand im Arbeitsspeicher) oder null (waehrenddessen
+// abgemeldet). Fragt nie: Flo will ueberall ohne Dialog den aktuellen Stand. Laeuft nie doppelt.
+// laden: false (in einer Partie): Muesste der Abgleich laden, wartet er ('spaeter') und schreibt nichts.
+let syncLauf = null;
+export function synchronisiere({ laden = true } = {}) {
+  if (!syncLauf) syncLauf = sync(laden).finally(() => { syncLauf = null; });
+  return syncLauf;
+}
+async function sync(laden = true) {
+  const e0 = epoche;
+  const id0 = userId(sitzung());
+  if (!id0) return null;
+  const gilt = () => epoche === e0 && userId(sitzung()) === id0;
+  const cloud = await ladeCloudStand();
+  if (!gilt()) return null;
+  const lokal = cloudStand(); const hL = standHash(lokal);
+  const hoch = async () => { await speichereCloudStand(lokal); if (!gilt()) return null; merkeSync(id0, hL); return 'hochgeladen'; };
+  const lade = () => { if (!laden) return 'spaeter'; ladeStandAufGeraet(cloud); merkeSync(id0, hC); andereTabsNeuLaden(); return 'geladen'; };
+  if (!cloud) return hoch();
+  if (cloud.format_version !== SPEICHER_VERSION || !gueltigerStand(cloud.stand)) throw new Error(K('cloudFormat'));
+  const hC = standHash(cloud.stand);
+  const basis = gemerkterStand(id0);
+  if (hL === hC) { merkeSync(id0, hC); return 'gleich'; }
+  const geraet = lokalerStand();
+  const verdraengt = (stand) => jsonSchreib(VERDRAENGT_SCHLUESSEL, { konto: id0, datum: new Date().toISOString(), stand });
+  if (basis && hC === basis) {                              // nur das Geraet hat sich geaendert
+    // Weniger Fortschritt als in der Cloud (z. B. "Alles zuruecksetzen", das laut Text auch die Cloud leert): hochladen,
+    // aber den Cloud-Stand zurueckholbar behalten
+    if (mehrFortschritt(vorschau(geraet), vorschau(cloud)) === 'cloud') verdraengt(cloud.stand);
+    return hoch();
+  }
+  if ((basis && hL === basis) || !hatSpielstand(geraet)) return lade();   // nur die Cloud (oder ein leeres Geraet)
+  // Beide geaendert, oder dieses Geraet hat noch nie mit dem Konto abgeglichen: mehr Fortschritt (Level, Funken,
+  // Partien) gewinnt, bei Gleichstand die Cloud. Der Verlierer kommt nach VERDRAENGT_SCHLUESSEL (zurueckholbar).
+  if (mehrFortschritt(vorschau(geraet), vorschau(cloud)) !== 'geraet') { if (laden) verdraengt(geraet); return lade(); }
+  verdraengt(cloud.stand);
+  return hoch();
+}
+// Verdraengter Stand dieses Kontos (Vorschau fuer Einstellungen > Konto) und Zurueckholen: tauscht ihn mit dem Stand auf
+// dem Geraet. Der gemerkte Abgleich bleibt, also laedt der naechste Abgleich ihn als Geraete-Aenderung hoch.
+export function verdraengterStand(id = userId(sitzung())) {
+  const d = jsonLies(VERDRAENGT_SCHLUESSEL);
+  return id && d && d.konto === id && gueltigerStand(d.stand) ? d : null;
+}
+export function holeVerdraengtZurueck() {
+  const id = userId(sitzung()); const d = verdraengterStand(id);
+  if (!d) throw new Error(K('nichtsZurueck'));
+  const jetzt = lokalerStand();
+  ladeStandAufGeraet({ format_version: SPEICHER_VERSION, stand: d.stand });
+  jsonSchreib(VERDRAENGT_SCHLUESSEL, { konto: id, datum: new Date().toISOString(), stand: jetzt });
+  andereTabsNeuLaden();
+  return true;
+}
+export function planeSicherung(ms = 1200) {
+  clearTimeout(timer);
+  // Nach dem Partie-Ende steht noch das Ergebnis: dort nur hochladen, geladen wird danach im Hintergrund
+  timer = setTimeout(() => { if (istAbgeglichen()) synchronisiere({ laden: !imSpiel() }).then((r) => { if (r === 'geladen') neuLaden(); }).catch(() => {}); }, ms);
+}
+function andereTabsNeuLaden() { try { lager().setItem(GELADEN_SCHLUESSEL, String(Date.now())); } catch (e) { /* egal */ } }
+// Nach dem Laden eines anderen Stands neu starten, damit kein Modul seinen alten Stand zurueckschreibt
+let neuLadenFn = () => globalThis.location?.reload?.();
+export function setzeNeuLaden(fn) { neuLadenFn = fn || (() => globalThis.location?.reload?.()); }
+export function neuLaden() {
+  try { globalThis.sessionStorage?.setItem(NACH_LADEN_SCHLUESSEL, '1'); } catch (e) { /* nur Komfort */ }
+  neuLadenFn();
+}
 
 // Rueckfall, solange Supabase ohne eigenen SMTP-Versand einen Anmelde-Link statt des Codes schickt:
 // Der Link fuehrt mit #access_token=...&refresh_token=... zurueck auf die Seite (redirect_to aus fordereCodeAn).
 let abgleichOffen = false;
 let linkFehler = false;     // abgelaufener oder schon benutzter Link (#error=...): Meldung beim ersten Zeichnen
 let sitzungTot = false;     // die Sitzung ist auf dem Server abgelaufen: Meldung bleibt ueber das Neuzeichnen stehen
-export function linkAnmeldungFrisch() { return abgleichOffen || linkFehler; }
+// Auch direkt nach dem Neuladen wegen eines geladenen Stands: dann kein Installations-Hinweis darueber
+let frischGeladen = false;
+try { frischGeladen = globalThis.sessionStorage?.getItem(NACH_LADEN_SCHLUESSEL) === '1'; } catch (e) { /* egal */ }
+export function linkAnmeldungFrisch() { return abgleichOffen || linkFehler || frischGeladen; }
 export function uebernimmLinkSitzung(ort = globalThis.location, verlauf = globalThis.history) {
   let h = String(ort?.hash || '');
   // Google-Anmeldung: Supabase haengt die Antwort mit einem weiteren "#" an redirect_to an (#konto#access_token=...)
@@ -336,10 +438,11 @@ let wegeTest = null;
 export function setzeAnmeldewege(w = null) { wegeTest = w; }
 export function anmeldewege() { return wegeTest || ANMELDEWEGE; }
 
-// Welcher Stand hat mehr Fortschritt? Erst das Level, dann die Zahl der Partien. Gleich: null (keine Empfehlung).
+// Welcher Stand hat mehr Fortschritt? Erst das Level, dann die Funken, dann die Zahl der Partien. Gleich: null.
 export function mehrFortschritt(geraet, cloud) {
   const g = geraet || {}; const c = cloud || {};
   if ((g.level || 1) !== (c.level || 1)) return (g.level || 1) > (c.level || 1) ? 'geraet' : 'cloud';
+  if ((g.funken || 0) !== (c.funken || 0)) return (g.funken || 0) > (c.funken || 0) ? 'geraet' : 'cloud';
   if ((g.partien || 0) !== (c.partien || 0)) return (g.partien || 0) > (c.partien || 0) ? 'geraet' : 'cloud';
   return null;
 }
@@ -367,7 +470,7 @@ export function kontoGruppe({ app } = {}) {
     gezeichnetMit = !!s;
     el.innerHTML = `<h3 class="es-titel">${K('titel')}</h3>${s ? `<p>${K('angemeldetAls', { email: `<b>${escapeHtml(s.email || email)}</b>` })}</p>
       <label>${K('benutzername')} <input class="konto-name" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username"></label>
-      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
+      <div class="es-knoepfe"><button class="knopf primaer" data-konto="sichern">${K('sichern')}</button><button class="knopf" data-konto="abmelden">${K('abmelden')}</button></div>${verdraengtZeile()}` : `<label>${K('email')} <input class="konto-email" type="email" autocomplete="email" value="${escapeHtml(email)}"></label>
       <button class="knopf primaer" data-konto="code">${K('codeSenden')}</button><div class="konto-code" hidden><fieldset><legend>${K('code')}</legend><div class="konto-ziffern">
       ${[0, 1, 2, 3, 4, 5].map((i) => `<input aria-label="${K('ziffer', { nr: i + 1 })}" inputmode="numeric" ${i === 0 ? 'autocomplete="one-time-code"' : ''} maxlength="1" pattern="[0-9]">`).join('')}</div></fieldset><button class="knopf primaer" data-konto="pruefen">${K('anmelden')}</button></div>
       <p class="es-hilfe konto-oder">${K('oder')}</p><div class="es-knoepfe konto-anbieter"><button class="knopf konto-google" type="button" data-konto="google">${K('google')}</button>`
@@ -376,6 +479,12 @@ export function kontoGruppe({ app } = {}) {
       <p class="konto-status" aria-live="polite"${sitzungTot && !s ? ' data-fehler="ja"' : ''}>${!s ? (sitzungTot ? K('sitzungAbgelaufen') : '') : zuletzt ? K('zuletzt', { zeit: zuletzt }) : K('nochNicht')}</p>
       <p class="es-hilfe">${K('gespeichert')}${s ? ' ' + K('datenHinweis') : ''}</p>`;
     zeigeWege();
+  };
+  const verdraengtZeile = () => {
+    const d = verdraengterStand(); if (!d) return '';
+    const v = vorschau(d.stand);
+    return `<p class="es-hilfe konto-verdraengt">${K('verdraengt', { datum: new Date(d.datum).toLocaleString(locale()), level: v.level, partien: v.partien })}</p>`
+      + `<div class="es-knoepfe"><button class="knopf" type="button" data-konto="zurueckholen">${K('zurueckholen')}</button></div>`;
   };
   const zeigeWege = () => {
     const wege = anmeldewege();
@@ -388,14 +497,22 @@ export function kontoGruppe({ app } = {}) {
     const a = e.target.closest('[data-konto]')?.dataset.konto; if (!a) return;
     try {
       if (a === 'code') { email = el.querySelector('.konto-email').value; await fordereCodeAn(email); el.querySelector('.konto-code').hidden = false; melden(K('codeGesendet') + ' ' + K(alsApp() ? 'linkNichtInApp' : 'linkHier')); }
-      if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); }
+      if (a === 'pruefen') { const code = [...el.querySelectorAll('.konto-ziffern input')].map((x) => x.value).join(''); await pruefeCode(email, code); const abgleich = await gleicheNachAnmeldung(); render(); meldeAbgleich(abgleich); }
       if (a === 'sichern') {
         const name = el.querySelector('.konto-name').value; if (name) await speichereBenutzername(name);
-        // Ohne Abgleich auf diesem Geraet (z. B. der Tab, in dem der Link angefordert wurde) erst fragen, nie still hochladen
-        if (!istAbgeglichen()) { const abgleich = await gleicheNachAnmeldung(); render(); if (abgleich?.konflikt) konfliktDialog(abgleich); else if (abgleich) melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen')); return; }
-        const d = await speichereCloudStand(); zuletzt = d.toLocaleString(locale()); render();
+        // Nie blind hochladen (02.11.2026): Hat ein anderes Geraet inzwischen mehr geschafft, laedt "Jetzt sichern" dessen Stand
+        const abgleich = await gleicheNachAnmeldung(); if (abgleich === 'geraet' || abgleich === 'gleich') zuletzt = new Date().toLocaleString(locale());
+        render(); meldeAbgleich(abgleich);
       }
       if (a === 'abmelden') { await abmelden(); render(); }
+      if (a === 'zurueckholen') {
+        const d = verdraengterStand(); if (!d) { render(); return; }
+        const v = vorschau(d.stand);
+        const w = await app?.frage?.({ titel: K('zurueckTitel'), text: K('zurueckText', { level: v.level, partien: v.partien }),
+          knoepfe: [{ text: K('zurueckholen'), wert: 'ja', art: 'primaer' }], abbrechen: true });
+        if (w !== 'ja') return;
+        holeVerdraengtZurueck(); neuLaden();
+      }
       if (a === 'google') { melden(K('zuGoogle')); meldeMitGoogleAn(); }
       if (a === 'apple') { melden(K('zuApple')); meldeMitAnbieterAn('apple'); }
     } catch (f) { if (f?.serverDetails) console.error('Konto-Serverfehler', f.serverDetails); melden(f.message || t('einstellungen.nichtGeklappt'), true); }
@@ -411,6 +528,13 @@ export function kontoGruppe({ app } = {}) {
     e.preventDefault(); const felder = [...el.querySelectorAll('.konto-ziffern input')];
     code.split('').forEach((wert, i) => { if (felder[i]) felder[i].value = wert; }); felder[Math.min(code.length, 6) - 1]?.focus();
   });
+  // Ergebnis eines Abgleichs: 'cloud' heisst, ein anderer Stand liegt jetzt auf dem Geraet, also neu laden
+  const meldeAbgleich = (abgleich) => {
+    if (!abgleich) return;
+    if (abgleich.konflikt) return konfliktDialog(abgleich);
+    if (abgleich === 'cloud') return neuLaden();
+    melden(K(abgleich === 'gleich' ? 'aktuell' : 'hochgeladen'));
+  };
   async function konfliktDialog(k) {
     const c = k.cloud, g = k.geraet;
     const zahlen = { gp: g.partien, gl: g.level, cp: c.partien, cl: c.level };
@@ -425,7 +549,7 @@ export function kontoGruppe({ app } = {}) {
     if (w !== 'geraet' && w !== 'cloud') { melden(K('abgleichOffen')); return; }
     // Ein anderer Tab hat inzwischen entschieden: nicht noch einmal (womoeglich entgegengesetzt) schreiben
     if (istAbgeglichen()) { melden(K('schonAbgeglichen')); return; }
-    if (await gleicheNachAnmeldung(w)) melden(w === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
+    meldeAbgleich(await gleicheNachAnmeldung(w));
   }
   // Angemeldet, aber auf diesem Geraet noch nicht abgeglichen (Link-Tab, anderer Tab, abgebrochener Dialog, Sitzung von
   // vor dem Riegel): beim Zeichnen der Gruppe abgleichen, statt still nie mehr zu sichern.
@@ -435,8 +559,8 @@ export function kontoGruppe({ app } = {}) {
     abgleichLaeuft = true;
     gleicheNachAnmeldung().then((abgleich) => {
       render();
-      if (abgleich?.konflikt) return konfliktDialog(abgleich);
-      if (abgleich) melden(abgleich === 'cloud' ? K('cloudGeladen') : K('hochgeladen'));
+      if (abgleich === 'gleich') return;   // beim blossen Oeffnen der Gruppe nichts melden
+      meldeAbgleich(abgleich);
     }).catch((f) => melden(f.message || t('einstellungen.nichtGeklappt'), true)).finally(() => { abgleichLaeuft = false; });
   };
   render();
@@ -445,13 +569,40 @@ export function kontoGruppe({ app } = {}) {
   gleicheAb();
   // Abmelden von aussen (Konto loeschen in der Gruppe "Daten") oder Anmeldung in einem anderen Tab: neu zeichnen
   const uhr = setInterval(() => { if (!!sitzung() !== gezeichnetMit) { render(); gleicheAb(); } }, 1000);
-  return { el, verlasse() { clearInterval(uhr); if (istAbgeglichen()) speichereCloudStand().catch(() => {}); } };
+  return { el, verlasse() { clearInterval(uhr); planeSicherung(0); } };
 }
 function alsApp() {
   try { return globalThis.navigator?.standalone === true || !!globalThis.matchMedia?.('(display-mode: standalone)')?.matches; } catch (e) { return false; }
 }
 function escapeHtml(t) { return String(t || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+// Abgleich im Hintergrund (Flo 02.11.2026: "immer der aktuelle Stand"): beim Start, bei jeder Rueckkehr in die App und
+// alle 30 Sekunden, wenn sich auf dem Geraet etwas geaendert hat. Nie mitten in einer Partie, Lektion oder Online-Partie:
+// ein geladener Stand startet die App neu.
+let appRef = null;
+// Partie (auch zu zweit), Lektion, Online-Partie, Raetsel, Training und Spielanalyse: dort nie neu laden
+function imSpiel() { return /^#(partie|lektion|online\/partie|raetsel|training|analyse)/.test(String(globalThis.location?.hash || '')); }
+export function abgleichImHintergrund() {
+  try { if (!sitzung() || imSpiel()) return Promise.resolve(null); } catch (e) { return Promise.resolve(null); }
+  return synchronisiere().then((r) => { if (r === 'geladen') neuLaden(); return r; }).catch(() => null);
+}
+function nachLadenMelden() {
+  try {
+    if (globalThis.sessionStorage?.getItem(NACH_LADEN_SCHLUESSEL) !== '1') return;
+    globalThis.sessionStorage.removeItem(NACH_LADEN_SCHLUESSEL);
+    appRef?.meldung?.(K('geladenVonAnderem'));
+  } catch (e) { /* nur Komfort */ }
+}
+
 // Registrierung ist defensiv: Das Konto darf die Offline-App nie am Start hindern.
 try { uebernimmLinkSitzung(); kontoFreigeschaltet(); anbieten('einstellungen:gruppen', kontoGruppe, { reihenfolge: 5, paket: 'konto' }); hoere('partie:beendet', () => planeSicherung());
+  hoere('app:bereit', (d) => {
+    appRef = d?.app || null;
+    nachLadenMelden();
+    setTimeout(abgleichImHintergrund, 800);
+    setInterval(() => { try { if (globalThis.document?.visibilityState !== 'hidden' && sitzung() && geraetGeaendert()) abgleichImHintergrund(); } catch (e) { /* egal */ } }, 30000);
+  });
+  // Ein anderer Tab hat einen anderen Stand geladen: dieser Tab haelt den alten im Arbeitsspeicher, also neu laden
+  globalThis.addEventListener?.('storage', (e) => { if (e.key === GELADEN_SCHLUESSEL && e.newValue && !imSpiel()) neuLaden(); });
+  hoere('app:sichtbar', (d) => { if (d?.sichtbar) abgleichImHintergrund(); else { try { if (sitzung() && geraetGeaendert()) abgleichImHintergrund(); } catch (e) { /* egal */ } } });
 } catch (e) { /* App laeuft ohne Konto weiter */ }
