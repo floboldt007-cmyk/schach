@@ -284,9 +284,14 @@ html[data-screen="partie"] .toast-ort { top: calc(8px + env(safe-area-inset-top)
 .update-hinweis .knopf { min-height: 44px; padding: 0 14px; font-size: 15px; }
 .update-hinweis .icon-knopf { width: 44px; height: 44px; }
 @keyframes update-ein { from { transform: translate(-50%, -16px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
+@keyframes update-ein-unten { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 @media (max-width: 420px) {
-  /* unter den Kopf, damit Verlauf und Einstellungen frei bleiben */
-  .update-hinweis { gap: 6px; padding-left: 12px; top: calc(64px + env(safe-area-inset-top)); }
+  /* Handy: ueber der Reiter-Leiste. Oben verdeckte er Seitentitel und in der Partie die Gegner-Karte (Flo 05.11.2026);
+     unten bleiben Kopf, Verlauf und Einstellungen frei. In der Partie (keine Reiter-Leiste, unten die Spielknoepfe)
+     wartet er, bis sie verlassen wird. */
+  .update-hinweis { gap: 6px; padding-left: 12px; top: auto; animation-name: update-ein-unten;
+    bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + var(--reiter-hoehe, 52px) + 22px); }
+  html[data-screen="partie"] .update-hinweis { display: none; }
   .update-hinweis .u-text { font-size: 14px; }
   .update-hinweis .u-lang { display: none; }
 }
