@@ -42,6 +42,7 @@ const SUITEN = [
   { name: 'zuzweit', datei: 'zuzweit.test.mjs', args: [], exklusiv: 'fester Port 8886', was: 'Zu zweit: Namen, Uhr, Ergebnis und neutrale Analyse' },
   { name: 'daten', datei: 'daten.test.mjs', args: [], was: 'Datenfreigabe, Datenauskunft, Konto löschen (DSGVO)' },
   { name: 'server-abo', datei: 'server-abo.test.mjs', args: [], was: 'Abo: Stripe-Webhook und Schema-Vertrag (Server)' },
+  { name: 'server-abo-kasse', datei: 'server-abo-kasse.test.mjs', args: [], was: 'Abo: Kasse auf dem Server, Nutzer-ID nur aus der Anmeldung (Server)' },
   { name: 'abo', datei: 'abo.test.mjs', args: [], was: 'Abo „Crownmate Trainer“: Stand, Kauf, Blatt' },
   { name: 'server-coach', datei: 'server-coach.test.mjs', args: [], was: 'Frag den Coach: Edge Function, Prompt, Tageslimit (Server)' },
   { name: 'coach-ki', datei: 'coach-ki.test.mjs', args: [], was: 'Frag den Coach: Knopf und Antwort in der Analyse' },
@@ -94,7 +95,7 @@ const SUITEN = [
 // bekommen den Median, damit sie ohne Aenderung an dieser Tabelle aufgenommen werden koennen.
 const DAUERN = new Map([
   ['zeitwaechter', 4], ['konto', 0], ['online', 2], ['online-ui', 13], ['zuzweit', 15],
-  ['daten', 12], ['server-abo', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
+  ['daten', 12], ['server-abo', 0], ['server-abo-kasse', 0], ['abo', 33], ['server-coach', 29], ['coach-ki', 30],
   ['server-schule', 0], ['schule', 59], ['storage', 3], ['liga', 53], ['sicherung', 0],
   ['review', 2], ['ereignisse', 1], ['fairness', 1], ['spiel', 15], ['engine-bots', 104],
   ['board', 68], ['vorzuege', 17], ['sw', 0], ['thema', 55], ['klang', 12],
