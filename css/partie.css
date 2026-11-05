@@ -58,6 +58,13 @@
 .partie .spieler.ich > .av { background: var(--flo-grund); }
 @supports (color: color-mix(in srgb, red 50%, blue)) {
   .partie .spieler.gegner > .av { background: color-mix(in srgb, var(--bf, var(--flaeche-3)) 24%, var(--flaeche)); }
+  /* Flo 05.11.2026 ("sieht billig aus"): feiner Ring ums Bild in der Farbe des Bots; denkt der Bot, traegt seine Karte
+     einen Rand in dieser Farbe (wer am Zug ist, sieht man ohne zu lesen). Nur box-shadow, die Masse bleiben gleich. */
+  .partie .spieler.gegner > .av { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--bf, var(--linie-2)) 55%, transparent); }
+  .partie .spieler.ich > .av { box-shadow: inset 0 0 0 1.5px var(--linie-2); }
+  .partie .spieler.gegner { transition: box-shadow var(--d-m, .2s) ease; }
+  .partie.bot-denkt .spieler.gegner { box-shadow: var(--s1), var(--kante),
+    0 0 0 2px color-mix(in srgb, var(--bf, var(--akzent)) 70%, transparent); }
 }
 .partie .spieler.gegner > .info { grid-area: info; min-width: 0; }
 .partie .spieler .name { font-weight: 800; font-size: 16px; line-height: 1.25; color: var(--text); min-width: 0;
@@ -382,6 +389,11 @@
   /* Zugstreifen und Aktionen */
   .partie .zugleiste { height: var(--tap); min-height: var(--tap); padding: 0; }
   .partie .zugleiste .z { height: 32px; }
+  /* Flo 05.11.2026 ("Partie-Bildschirm schlecht"): Zugstreifen und Aktionen sitzen unten am Daumen; die freie Hoehe
+     liegt zwischen Coach und Streifen statt unter den Knoepfen */
+  .partie .inhalt { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .partie:not(.streifen-unten) .zugleiste { margin-top: auto; }
+  .partie.streifen-unten .spielknoepfe { margin-top: auto; }
   .partie .spielknoepfe { gap: 6px; }
   .partie .spielknoepfe > .knopf, .partie .spielknoepfe .ort-aktionen > .knopf { min-height: 48px; height: 48px; padding: 3px 2px; gap: 1px;
     border-radius: 14px; font-size: 12px; letter-spacing: -.01em; }
