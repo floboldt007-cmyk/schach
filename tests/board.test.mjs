@@ -815,6 +815,34 @@ async function testeFundament(browser) {
   const lt = await t.seite.evaluate(() => demo.abgelehntLog.splice(0));
   pruefe('abgelehnt per Finger: gefesselten Springer ziehen meldet c3-d5', JSON.stringify(lt) === '[{"von":"c3","nach":"d5","art":"ziehen"}]'
     && (await ht.figurSitzt('c3')), lt);
+  // Finger ueber einem erlaubten Ziel: die Figur bleibt unter dem Finger (kein Einrasten von Feld zu Feld), und das
+  // Brett wird pro Geste hoechstens einmal neu gemessen (nicht bei jeder Fingerbewegung)
+  await ht.setzeFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+  const e2 = await ht.mitte('e2');
+  const e3 = await ht.mitte('e3');
+  await t.seite.evaluate(() => {
+    const felder = document.querySelector('.brett-felder');
+    const echt = Element.prototype.getBoundingClientRect;
+    window.__messungen = 0;
+    Element.prototype.getBoundingClientRect = function () { if (this === felder) window.__messungen++; return echt.call(this); };
+    window.__echtRect = echt;
+  });
+  await finger.runter(e2.x, e2.y);
+  const punkte = [[e2.x + 4, e2.y - 12], [e2.x + 8, e2.y - 30], [e3.x + 11, e3.y + 7], [e3.x + 13, e3.y - 6], [e3.x + 9, e3.y - 9]];
+  for (const [x, y] of punkte) await finger.bewege(x, y);
+  const lage = await t.seite.evaluate(() => {
+    const f = document.querySelector('.brett > .figur.gezogen');
+    if (!f) return null;
+    const r = window.__echtRect.call(f);
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, messungen: window.__messungen };
+  });
+  const [fx, fy] = punkte[punkte.length - 1];
+  await finger.hoch(fx, fy);
+  await t.seite.evaluate(() => { Element.prototype.getBoundingClientRect = window.__echtRect; });
+  pruefe('Finger ueber erlaubtem Ziel: Figur bleibt unter dem Finger (Abstand < 2 px, kein Einrasten)',
+    !!lage && Math.abs(lage.x - fx) < 2 && Math.abs(lage.y - fy) < 2, { lage, finger: [fx, fy] });
+  pruefe('Ziehen misst das Brett hoechstens zweimal pro Geste (Anheben und Start), nicht bei jeder Bewegung',
+    !!lage && lage.messungen <= 2, lage);
   pruefe('Keine Konsolenfehler (Finger)', t.fehler.length === 0, t.fehler.join(' | '));
   await t.kontext.close();
 }
