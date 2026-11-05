@@ -105,7 +105,7 @@ const json = (e) => { try { return JSON.parse(e.koerper); } catch (x) { return n
     p.get('mode') === 'subscription' && p.get('line_items[0][price]') === 'price_ProbeMonat1' && p.get('line_items[0][quantity]') === '1'
     && p.get('customer_email') === MAIL && !p.has('customer'));
   pruefe('AGB-Zustimmung ist Pflicht, mit dem Widerrufs-Hinweis am Haekchen', p.get('consent_collection[terms_of_service]') === 'required'
-    && p.get('custom_text[terms_of_service_acceptance][message]') === ZUSTIMMUNG_TEXT && /356 Abs\. 5 BGB/.test(ZUSTIMMUNG_TEXT) && ZUSTIMMUNG_TEXT.length <= 1200);
+    && p.get('custom_text[terms_of_service_acceptance][message]') === ZUSTIMMUNG_TEXT && /357a Abs\. 2 BGB/.test(ZUSTIMMUNG_TEXT) && !/verliere/.test(ZUSTIMMUNG_TEXT) && ZUSTIMMUNG_TEXT.length <= 1200);
   pruefe('Rueckkehr in die Einstellungen der Live-Seite (Standard)', p.get('success_url') === 'https://floboldt007-cmyk.github.io/schach/#einstellungen'
     && p.get('cancel_url') === p.get('success_url'));
   // Ende-zu-Ende: Was Stripe aus dieser Sitzung meldet, ordnet der Webhook genau diesem Konto zu

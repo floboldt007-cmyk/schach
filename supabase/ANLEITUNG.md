@@ -345,7 +345,10 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    - **AGB-Adresse** in Stripe eintragen: **Einstellungen > Öffentliche Details > Nutzungsbedingungen**. Ohne sie lehnt
      Stripe die Bezahlseite ab, weil die Kasse die **Zustimmung zu den AGB** als Pflicht-Häkchen verlangt (nie
      vorausgewählt). Am Häkchen steht der Text `ZUSTIMMUNG_TEXT` aus `supabase/functions/_gemeinsam/abo-kasse.js`
-     (ausdrückliche Zustimmung zum sofortigen Beginn und Kenntnis, dass das Widerrufsrecht erlischt, § 356 Abs. 5 BGB).
+     (ausdrückliches Verlangen des sofortigen Beginns und Hinweis auf den anteiligen Betrag bei Widerruf, § 357a Abs. 2
+     BGB; das Widerrufsrecht erlischt bei einem Abo NICHT vorzeitig, § 356 Abs. 5 BGB verlangt vollständige Erbringung).
+     Vor dem Start braucht die App außerdem die Widerrufsfunktion „Vertrag widerrufen“ (§ 356a BGB) und die
+     Kündigungsschaltfläche „Verträge hier kündigen“ (§ 312k BGB); Stand: Rechtsprüfung 05.11.2026 im Vault.
      Dazu Stripe-Belege per E-Mail einschalten.
    - **Eingeschränkter Schlüssel:** **Entwickler > API-Schlüssel > Eingeschränkten Schlüssel erstellen**, Name zum
      Beispiel `crownmate-abo-kasse`, nur **Checkout Sessions: Schreiben**, alles andere **Keine**. Den Wert

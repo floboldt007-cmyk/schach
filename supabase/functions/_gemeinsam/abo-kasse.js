@@ -32,10 +32,14 @@ import { KOPF, bearer, stripeAufruf, stripeArt, rueckkehrAus } from './werkstatt
 export const MAX_KOERPER = 4096;
 export const FENSTER_MS = 10 * 60 * 1000;
 export const GUELTIG_MS = 45 * 60 * 1000;
-// Wortlaut wie im bisherigen Zahlungslink verlangt (supabase/ANLEITUNG.md, Abo Schritt 4). Rechtlich geprueft wird er
-// mit den Rechtstexten (Schritt 3 der Pruefung vom 05.11.2026); Aenderungen nur hier.
+// Rechtspruefung 05.11.2026: Das Abo ist eine Dienstleistung. Nach § 356 Abs. 5 BGB erlischt das Widerrufsrecht erst,
+// wenn sie VOLLSTAENDIG erbracht ist, bei einem Monatsabo also nicht in den 14 Tagen. Der fruehere Satz "ich verliere
+// damit mein Widerrufsrecht" war deshalb falsch. Richtig: Wer den sofortigen Beginn verlangt, schuldet bei einem
+// Widerruf anteiligen Wertersatz (§ 357a Abs. 2 BGB, Art. 246a § 1 Abs. 2 Satz 1 Nr. 3 EGBGB, EuGH C-641/19).
+// Aenderungen nur hier; die Widerrufsbelehrung selbst steht in den AGB.
 export const ZUSTIMMUNG_TEXT = 'Ich stimme den AGB zu und verlange ausdrücklich, dass Crownmate Trainer sofort beginnt. '
-  + 'Mir ist bekannt, dass ich damit mein Widerrufsrecht verliere (§ 356 Abs. 5 BGB).';
+  + 'Mir ist bekannt, dass ich bei einem Widerruf innerhalb von 14 Tagen für die Zeit bis dahin einen anteiligen Betrag '
+  + 'zahle (§ 357a Abs. 2 BGB).';
 
 const MUSTER = Object.freeze({
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
