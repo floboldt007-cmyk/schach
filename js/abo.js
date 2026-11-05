@@ -366,6 +366,45 @@ export async function kaufen({ produkt, oeffne } = {}) {
   return { ok: true, url };
 }
 
+// ---------- Kuendigen und Widerrufen (Edge Function abo-beenden, supabase/functions/_gemeinsam/abo-beenden.js) ----------
+// Pflichtknoepfe nach § 312k BGB (Kuendigen, auch ohne Anmeldung per Link aus der Mail) und § 356a BGB (Widerrufen).
+//   beendeAbo('kuendigen' | 'widerrufen') -> { ok, daten } | { ok: false, grund, text }   angemeldet
+//   fordereKuendigungsLink(email)         -> { ok } | { ok: false, grund, text }           ohne Anmeldung
+//   kuendigeMitLink(token)                -> wie beendeAbo                                 ohne Anmeldung
+export const BEENDEN_PFAD = '/functions/v1/abo-beenden';
+function beendenFehler(e) {
+  if (e && e.offline) return { ok: false, grund: 'offline', text: A('offline') };
+  return { ok: false, grund: (e && e.kennung) || (e && e.status === 401 ? 'anmeldung' : 'server'), text: (e && e.message) || '' };
+}
+export async function beendeAbo(aktion) {
+  if (aktion !== 'kuendigen' && aktion !== 'widerrufen') return { ok: false, grund: 'eingabe', text: '' };
+  try {
+    const sg = await gueltigeSitzung();
+    const d = await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion }, token: sg.access_token });
+    istPremium({ neu: true }).catch(() => {});
+    return { ok: true, daten: d || {} };
+  } catch (e) {
+    return beendenFehler(e);
+  }
+}
+export async function fordereKuendigungsLink(email) {
+  try {
+    await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion: 'link_anfordern', email: String(email || '').trim() } });
+    return { ok: true };
+  } catch (e) {
+    return beendenFehler(e);
+  }
+}
+export async function kuendigeMitLink(token) {
+  try {
+    const d = await anfrage(BEENDEN_PFAD, { methode: 'POST', daten: { aktion: 'link_kuendigen', token: String(token || '') } });
+    if (nutzerId()) istPremium({ neu: true }).catch(() => {});
+    return { ok: true, daten: d || {} };
+  } catch (e) {
+    return beendenFehler(e);
+  }
+}
+
 export async function verwalten({ produkt, oeffne = oeffneAdresse } = {}) {
   if (inStoreHuelle()) return { ok: false, grund: 'store' };
   const p = produkt === undefined ? await ladeProdukt() : produkt;

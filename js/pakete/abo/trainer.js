@@ -206,6 +206,12 @@ export function zeigeTrainer({ app = null } = {}) {
     const knoepfe = [];
     if (zustand === 'premium') {
       if (p && p.portalLink && !huelle) knoepfe.push(knopf(A('verwalten'), 'primaer', 'verwalten'));
+      // Pflichtknoepfe (§ 312k, § 356a BGB): immer sichtbar, solange ein Stripe-Abo laeuft. Ob die Widerrufsfrist noch
+      // laeuft, entscheidet der Server (abo-beenden, 409 frist_vorbei mit Hinweis aufs Kuendigen).
+      if (!huelle && st.quelle === 'stripe') {
+        if (st.status !== 'gekuendigt') knoepfe.push(knopf(A('kuendigenKnopf'), '', 'abo-kuendigen'));
+        knoepfe.push(knopf(A('widerrufenKnopf'), '', 'abo-widerrufen'));
+      }
     } else if (zustand === 'kaufbar') {
       knoepfe.push(knopf(A('kaufen'), 'primaer', 'kaufen'));
     } else if (zustand === 'alter') {
@@ -279,6 +285,12 @@ export function zeigeTrainer({ app = null } = {}) {
       meldung = '';
       bestaetigeKauf().then(() => aktualisiere()).catch(() => {});
       aktualisiere();
+      return;
+    }
+    if (a === 'abo-kuendigen' || a === 'abo-widerrufen') {
+      ende();
+      import('./kuendigen.js').then((m) => m.zeigeBeenden({ aktion: a === 'abo-widerrufen' ? 'widerrufen' : 'kuendigen' }))
+        .catch((f) => console.error('Kündigen-Blatt nicht geladen', f));
       return;
     }
     if (a === 'verwalten') {

@@ -183,6 +183,7 @@ const DATEIEN = [
   'js/abo.js',
   'js/pakete/abo/index.js',
   'js/pakete/abo/trainer.js',
+  'js/pakete/abo/kuendigen.js',
   'js/coach-ki.js',
   'js/pakete/coach-ki/index.js',
   'js/schule.js',
