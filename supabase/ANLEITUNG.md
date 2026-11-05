@@ -381,7 +381,9 @@ der Eltern geben, das mit der Fachperson klären und dann Texte und Altersfrage 
    Umsatzsteuer berechnet.“; vorher von einer Fachperson bestätigen lassen),
    `kauf_link` = Schalter „Kauf ist eingerichtet“ (geöffnet wird er nicht mehr, die Bezahlseite kommt von der Kasse):
    im Testmodus `https://buy.stripe.com/test_crownmate` (der Anfang `test_` zeigt in der App den Testmodus), live
-   `https://checkout.stripe.com/`, leer = kein Kauf-Knopf; `portal_link` = Link aus Schritt 5, `beschreibung` optional, `aktiv` = `false`
+   `https://checkout.stripe.com/`, leer = kein Kauf-Knopf. Schalter und `ABO_STRIPE_RK` müssen zum selben Modus
+   gehören (`test_`-Schalter mit `rk_test_`, Live-Schalter mit `rk_live_`), sonst verweigert die Kasse mit
+   „nicht eingerichtet“; beim Wechsel auf live also beides zusammen umstellen. `portal_link` = Link aus Schritt 5, `beschreibung` optional, `aktiv` = `false`
    (erst zum Probekauf in Schritt 10 und zum Start auf `true`). Es werden nur `https://`-Links angenommen. **Verkauft wird nur, was es gibt:** Unter „Im Trainer“ zeigt das Blatt
    nur Vorteile, deren Paket sich als fertig meldet (`registriereVorteil` in `js/abo.js`); alles andere steht unter
    „In Arbeit, noch nicht enthalten“. Solange kein Vorteil fertig ist, gibt es **keinen Kauf-Knopf**, auch mit

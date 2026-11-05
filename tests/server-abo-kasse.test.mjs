@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { MAX_KOERPER, FENSTER_MS, ZUSTIMMUNG_TEXT, kassenParameter, verarbeite } from '../supabase/functions/_gemeinsam/abo-kasse.js';
+import { MAX_KOERPER, FENSTER_MS, GUELTIG_MS, ZUSTIMMUNG_TEXT, kassenParameter, verarbeite } from '../supabase/functions/_gemeinsam/abo-kasse.js';
 import { auswerten, META_ABO_NUTZER } from '../supabase/functions/_gemeinsam/stripe.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,11 +31,13 @@ const UMGEBUNG = Object.freeze({ SUPABASE_URL: BASIS, SUPABASE_SERVICE_ROLE_KEY:
   ABO_STRIPE_RK: RK, ABO_STRIPE_PREIS: 'price_ProbeMonat1' });
 const T0 = Date.UTC(2026, 10, 5, 12);
 const KASSE_URL = 'https://checkout.stripe.com/c/pay/cs_test_Probe1#abc';
+const SCHALTER_TEST = [{ kauf_link: 'https://buy.stripe.com/test_crownmate' }];
+const SCHALTER_LIVE = [{ kauf_link: 'https://checkout.stripe.com/' }];
 
 // Gefaelschtes Netz: Antworten je Ziel, alle Aufrufe werden mitgeschrieben
 function netz(o = {}) {
   const s = { user: { id: UID, email: MAIL, email_confirmed_at: '2026-01-01T00:00:00Z' }, userStatus: 200, premium: false,
-    abo: [], stripe: [{ status: 200, daten: { id: 'cs_test_Probe1', url: KASSE_URL } }], ...o };
+    abo: [], produkt: SCHALTER_TEST, stripe: [{ status: 200, daten: { id: 'cs_test_Probe1', url: KASSE_URL } }], ...o };
   const aufrufe = [];
   const antwort = (status, daten) => ({ ok: status < 400, status, async json() { return daten; } });
   const f = async (url, opt = {}) => {
@@ -43,6 +45,7 @@ function netz(o = {}) {
     if (url === `${BASIS}/auth/v1/user`) return antwort(s.userStatus, s.userStatus === 200 ? s.user : { message: s.userMeldung || 'bad_jwt' });
     if (url === `${BASIS}/rest/v1/rpc/ist_premium_von`) return s.premiumFehler ? antwort(500, {}) : antwort(200, s.premium);
     if (url.startsWith(`${BASIS}/rest/v1/abos?`)) return antwort(200, s.abo);
+    if (url === `${BASIS}/rest/v1/produkte?select=kauf_link&id=eq.trainer`) return s.produktFehler ? antwort(500, {}) : antwort(200, s.produkt);
     if (url === 'https://api.stripe.com/v1/checkout/sessions') {
       const a = s.stripe.length > 1 ? s.stripe.shift() : s.stripe[0];
       if (a.netz) throw new Error('netz');
@@ -119,8 +122,30 @@ const json = (e) => { try { return JSON.parse(e.koerper); } catch (x) { return n
   pruefe('Doppelklick im selben Fenster: gleicher Key und gleiche Parameter; spaeter neuer Key',
     stripeAufrufe(k2)[0].headers['Idempotency-Key'] === st[0].headers['Idempotency-Key'] && stripeAufrufe(k2)[0].body === st[0].body
     && stripeAufrufe(k3)[0].headers['Idempotency-Key'] !== st[0].headers['Idempotency-Key']);
-  const live = netz();
-  pruefe('Live-Schluessel (rk_live_) ist erlaubt', (await lauf(live, { umgebung: { ...UMGEBUNG, ABO_STRIPE_RK: RK_LIVE } })).status === 200);
+  const ablauf = Number(p.get('expires_at'));
+  const vorlauf = ablauf * 1000 - T0;
+  pruefe('Bezahlseite laeuft ab: expires_at 35 bis 45 Minuten voraus, im Fenster gleich (Doppel-Abo-Schutz)',
+    Number.isInteger(ablauf) && vorlauf > 35 * 60 * 1000 && vorlauf <= GUELTIG_MS
+    && parameterVon(stripeAufrufe(k2)[0]).get('expires_at') === p.get('expires_at'), { vorlauf });
+  const spaet = netz();
+  const tSpaet = Math.floor(T0 / FENSTER_MS) * FENSTER_MS + FENSTER_MS - 1;
+  await lauf(spaet, { jetzt: tSpaet });
+  pruefe('auch am Fensterende noch mehr als 30 Minuten (Stripe-Mindestwert)',
+    Number(parameterVon(stripeAufrufe(spaet)[0]).get('expires_at')) * 1000 - tSpaet > 30 * 60 * 1000);
+  const live = netz({ produkt: SCHALTER_LIVE });
+  pruefe('Live-Schluessel (rk_live_) mit Live-Schalter ist erlaubt', (await lauf(live, { umgebung: { ...UMGEBUNG, ABO_STRIPE_RK: RK_LIVE } })).status === 200);
+  const liveTest = netz();
+  const e1 = await lauf(liveTest, { umgebung: { ...UMGEBUNG, ABO_STRIPE_RK: RK_LIVE } });
+  pruefe('Live-Schluessel neben Test-Schalter: 503 nicht_eingerichtet, keine Bezahlseite (sonst "Testmodus" bei echtem Geld)',
+    e1.status === 503 && json(e1).fehler === 'nicht_eingerichtet' && stripeAufrufe(liveTest).length === 0);
+  pruefe('Test-Schluessel neben Live-Schalter oder ohne Produktzeile: 503 nicht_eingerichtet',
+    json(await lauf(netz({ produkt: SCHALTER_LIVE }))).fehler === 'nicht_eingerichtet'
+    && json(await lauf(netz({ produkt: [] }))).fehler === 'nicht_eingerichtet');
+  pruefe('Produktzeile nicht lesbar: 503 server', json(await lauf(netz({ produktFehler: true }))).fehler === 'server');
+  const unbestaetigt = netz({ user: { id: UID, email: MAIL, email_confirmed_at: null } });
+  await lauf(unbestaetigt);
+  pruefe('unbestaetigte E-Mail geht nicht an Stripe', !parameterVon(stripeAufrufe(unbestaetigt)[0]).has('customer_email')
+    && !stripeAufrufe(unbestaetigt)[0].body.includes('example.invalid'));
   const eigene = netz();
   await lauf(eigene, { umgebung: { ...UMGEBUNG, ABO_RUECKKEHR: 'https://crownmate.de/' } });
   pruefe('eigene Rueckkehr-Adresse (ABO_RUECKKEHR)', parameterVon(stripeAufrufe(eigene)[0]).get('success_url') === 'https://crownmate.de/#einstellungen');
@@ -142,6 +167,12 @@ const json = (e) => { try { return JSON.parse(e.koerper); } catch (x) { return n
   pruefe('frueherer Stripe-Kunde bleibt derselbe (customer statt customer_email)', p.get('customer') === 'cus_Bisher1' && !p.has('customer_email'));
   const abfrage = k.aufrufe.find((a) => a.url.startsWith(`${BASIS}/rest/v1/abos?`));
   pruefe('Kunde wird ueber die ID aus der Anmeldung gesucht', abfrage && abfrage.url.includes(`user_id=eq.${UID}`) && abfrage.headers.apikey === DIENST);
+  const laeuft = netz({ abo: [{ kunde_id: 'cus_Bisher1', abo_id: 'sub_Neu1', stand_zeit: null }] });
+  const el = await lauf(laeuft);
+  pruefe('Kauf verbucht, Abo-Ereignis steht aus: 409 kauf_laeuft, keine zweite Bezahlseite',
+    el.status === 409 && json(el).fehler === 'kauf_laeuft' && stripeAufrufe(laeuft).length === 0);
+  pruefe('frueheres, beendetes Abo (stand_zeit gesetzt) darf neu kaufen',
+    (await lauf(netz({ abo: [{ kunde_id: 'cus_Bisher1', abo_id: 'sub_Alt1', stand_zeit: '2026-10-01T00:00:00Z' }] }))).status === 200);
   pruefe('kaputte kunde_id in der Tabelle wird nicht weitergegeben', !parameterVon(stripeAufrufe(await (async () => { const x = netz({ abo: [{ kunde_id: 'cus_; x' }] }); await lauf(x); return x; })())[0]).has('customer'));
 
   const wieder = netz({ stripe: [{ status: 500 }, { status: 200, daten: { id: 'cs_test_Probe1', url: KASSE_URL } }] });

@@ -78,7 +78,7 @@ async function nodeTeil() {
     await warte(1);
     if (url.includes(KASSE_PFAD)) {
       const st = server.kasseStatus || 200;
-      return { ok: st < 400, status: st, async json() { return st < 400 ? { kassen_url: server.kasseUrl || KASSE_URL } : { fehler: 'probe' }; } };
+      return { ok: st < 400, status: st, async json() { return st < 400 ? { kassen_url: server.kasseUrl || KASSE_URL } : { fehler: server.kasseFehler || 'probe' }; } };
     }
     const body = url.includes('/rpc/ist_premium') ? server.premium : url.includes('/abos?') ? server.abo : url.includes('/produkte?') ? server.produkt : null;
     return { ok: server.status < 400, status: server.status, async json() { return server.status < 400 ? body : { message: 'kaputt' }; } };
@@ -201,6 +201,21 @@ async function nodeTeil() {
   server.kasseStatus = 409;
   pruefe('Server: schon Premium -> grund schon_premium, nichts geoeffnet, kein Merker', (await kaufen({ produkt: p, oeffne })).grund === 'schon_premium'
     && geoeffnet.length === 0 && kaufGestartet() === null);
+  server.kasseFehler = 'kauf_laeuft';
+  pruefe('Server: Kauf wird verbucht -> grund kauf_laeuft, nichts geoeffnet, kein Merker', (await kaufen({ produkt: p, oeffne })).grund === 'kauf_laeuft'
+    && geoeffnet.length === 0 && kaufGestartet() === null);
+  server.kasseFehler = null;
+  {
+    // Eigenes leeres Fenster (ohne oeffne), das der Nutzer in der Wartezeit schliesst
+    server.kasseStatus = 200;
+    const altOpen = globalThis.open;
+    const w = { closed: false, geschlossen: 0, location: {}, close() { this.geschlossen++; } };
+    globalThis.open = () => { w.closed = true; return w; };
+    const r = await kaufen({ produkt: p });
+    globalThis.open = altOpen;
+    pruefe('Fenster in der Wartezeit geschlossen: grund kasse, keine Adresse gesetzt, kein Merker', r.grund === 'kasse'
+      && !w.location.href && kaufGestartet() === null);
+  }
   server.kasseStatus = 503;
   pruefe('Server oder Stripe gerade nicht: grund kasse', (await kaufen({ produkt: p, oeffne })).grund === 'kasse' && geoeffnet.length === 0);
   server.kasseStatus = 200;

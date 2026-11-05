@@ -255,7 +255,8 @@ end;
 $$;
 
 -- Ein ausgewertetes Stripe-Ereignis verbuchen (nur Service-Rolle). Die Parameter liefert
--- supabase/functions/_gemeinsam/stripe.js (auswerten): bei checkout.session.completed nutzer (client_reference_id) und
+-- supabase/functions/_gemeinsam/stripe.js (auswerten): bei checkout.session.completed nutzer (nur aus
+-- metadata.crownmate_abo_nutzer, gesetzt von der Edge Function abo-kasse; client_reference_id zaehlt nicht) und
 -- der vorlaeufige Stand (status, gueltig_bis), bei den uebrigen der Stand aus dem Abo bzw. der Rechnung.
 create or replace function public.abo_stripe_ereignis(
   ereignis_id text,

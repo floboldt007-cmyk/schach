@@ -11,13 +11,19 @@
 //   MAX_KOERPER = 4096          groessere Anfragen: 413 (die App schickt "{}", gebraucht wird nichts daraus)
 //   FENSTER_MS = 600000         Doppelklick und zweiter Tab innerhalb von 10 Minuten bekommen dieselbe Bezahlseite
 //                               (gleicher Idempotency-Key, gleiche Parameter)
+//   GUELTIG_MS = 2700000        Bezahlseite laeuft 45 Minuten nach Fensterbeginn ab (expires_at, also 35 bis 45 Minuten
+//                               nach dem Anlegen; Stripe verlangt mindestens 30). Sonst lebten alte Seiten 24 Stunden,
+//                               und wer zwei davon bezahlte, haette zwei Abos (Pruefer 05.11.2026).
 //   ZUSTIMMUNG_TEXT             Text am AGB-Haekchen der Bezahlseite (Pflicht-Haekchen, nie vorausgewaehlt)
-//   kassenParameter({ uid, preis, kunde, email, rueckkehr }) -> URLSearchParams   feste Reihenfolge (Idempotenz)
+//   kassenParameter({ uid, preis, kunde, email, rueckkehr, ablauf }) -> URLSearchParams   feste Reihenfolge (Idempotenz)
 //   verarbeite({ methode, koerper, autorisierung }, umgebung, { fetch, jetzt, protokoll }) -> Promise<{ status, kopf, koerper }>
 //       umgebung: { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY?, ABO_STRIPE_RK, ABO_STRIPE_PREIS, ABO_RUECKKEHR? }
 //       200 { kassen_url }   204 OPTIONS   401 'anmeldung'   400/413 'eingabe'   405 'methode'
-//       409 'schon_premium' (kein zweites Abo)   502 'stripe' (Stripe hat abgelehnt)
+//       409 'schon_premium' (kein zweites Abo) | 'kauf_laeuft' (Kauf verbucht, Abo-Ereignis von Stripe steht noch aus)
+//       502 'stripe' (Stripe hat abgelehnt)
 //       503 'nicht_eingerichtet' | 'server' | 'stripe' (Stripe nicht sicher erreicht)
+//       'nicht_eingerichtet' auch, wenn Schluessel und produkte.kauf_link nicht zum selben Modus gehoeren: Die App zeigt
+//       "Testmodus" nach kauf_link, also darf ein rk_live_ nie neben einem Test-Schalter stehen und umgekehrt.
 //       Die Antwort enthaelt nie Schluessel, Nutzer-ID oder E-Mail.
 
 import { dienstKopf, META_ABO_NUTZER } from './stripe.js';
@@ -25,6 +31,7 @@ import { KOPF, bearer, stripeAufruf, stripeArt, rueckkehrAus } from './werkstatt
 
 export const MAX_KOERPER = 4096;
 export const FENSTER_MS = 10 * 60 * 1000;
+export const GUELTIG_MS = 45 * 60 * 1000;
 // Wortlaut wie im bisherigen Zahlungslink verlangt (supabase/ANLEITUNG.md, Abo Schritt 4). Rechtlich geprueft wird er
 // mit den Rechtstexten (Schritt 3 der Pruefung vom 05.11.2026); Aenderungen nur hier.
 export const ZUSTIMMUNG_TEXT = 'Ich stimme den AGB zu und verlange ausdrücklich, dass Crownmate Trainer sofort beginnt. '
@@ -35,7 +42,8 @@ const MUSTER = Object.freeze({
   preis: /^price_[A-Za-z0-9]{1,200}$/,
   cus: /^cus_[A-Za-z0-9]{1,200}$/,
   cs: /^cs_(test|live)_[A-Za-z0-9]{1,300}$/,
-  kasse: /^https:\/\/checkout\.stripe\.com\/[^\s<>"'`]{1,2000}$/,
+  kasse: /^https:\/\/checkout\.stripe\.com\/[^\s<>"'`]{1,5000}$/,
+  testSchalter: /^https:\/\/buy\.stripe\.com\/test_/,
   email: /^[^\s@<>"']{1,200}@[^\s@<>"']{1,200}\.[A-Za-z]{2,63}$/,
 });
 
@@ -44,6 +52,7 @@ const TEXTE = Object.freeze({
   anmeldung: { de: 'Bitte melde dich an.', en: 'Please sign in.' },
   eingabe: { de: 'Die Anfrage ist ungültig.', en: 'The request is invalid.' },
   schon_premium: { de: 'Du hast den Trainer schon.', en: 'You already have the Trainer.' },
+  kauf_laeuft: { de: 'Dein Kauf wird gerade verbucht.', en: 'Your purchase is being processed.' },
   nicht_eingerichtet: { de: 'Der Kauf ist noch nicht eingerichtet.', en: 'Purchasing is not set up yet.' },
   stripe: { de: 'Die Bezahlseite ist gerade nicht erreichbar.', en: 'The payment page is not available right now.' },
   server: { de: 'Der Server ist gerade nicht erreichbar.', en: 'The server is not available right now.' },
@@ -59,7 +68,7 @@ function fehler(status, kennung) {
 
 // Feste Reihenfolge und nur Werte vom Server: Jeder Versuch im selben Fenster schickt genau dieselbe Anfrage, sonst
 // lehnte Stripe den Idempotency-Key ab. kunde (cus_) und email schliessen sich bei Stripe aus.
-export function kassenParameter({ uid, preis, kunde, email, rueckkehr }) {
+export function kassenParameter({ uid, preis, kunde, email, rueckkehr, ablauf }) {
   const p = new URLSearchParams();
   p.append('mode', 'subscription');
   p.append('line_items[0][price]', preis);
@@ -73,6 +82,7 @@ export function kassenParameter({ uid, preis, kunde, email, rueckkehr }) {
   p.append('consent_collection[terms_of_service]', 'required');
   p.append('custom_text[terms_of_service_acceptance][message]', ZUSTIMMUNG_TEXT);
   p.append('locale', 'auto');
+  if (Number.isInteger(ablauf) && ablauf > 0) p.append('expires_at', String(ablauf));
   p.append('success_url', `${rueckkehr}#einstellungen`);
   p.append('cancel_url', `${rueckkehr}#einstellungen`);
   return p;
@@ -88,14 +98,34 @@ async function rpc(holen, basis, schluessel, name, daten) {
   }
 }
 
-// Stripe-Kunde aus einem frueheren Abo: dann bleibt es ein Kunde (Rechnungen, Kundenportal an einer Stelle)
+// Stripe-Kunde aus einem frueheren Abo: dann bleibt es ein Kunde (Rechnungen, Kundenportal an einer Stelle).
+// laeuft: Der Kauf ist verbucht (abo_id gesetzt), das erste Abo-Ereignis aber noch nicht da (stand_zeit null), etwa bei
+// einer Lastschrift. ist_premium_von sagt dann noch nein, eine zweite Bezahlseite gaebe aber ein zweites Abo.
 async function bisherigerKunde(holen, basis, schluessel, uid) {
   try {
-    const r = await holen(`${basis}/rest/v1/abos?select=kunde_id&user_id=eq.${encodeURIComponent(uid)}`, { method: 'GET', headers: dienstKopf(schluessel) });
+    const r = await holen(`${basis}/rest/v1/abos?select=kunde_id,abo_id,stand_zeit&user_id=eq.${encodeURIComponent(uid)}`, { method: 'GET', headers: dienstKopf(schluessel) });
     if (!r || !r.ok) return { ok: false };
     const d = await r.json();
     const z = Array.isArray(d) ? d[0] : null;
-    return { ok: true, kunde: z && typeof z.kunde_id === 'string' && MUSTER.cus.test(z.kunde_id) ? z.kunde_id : null };
+    return {
+      ok: true,
+      kunde: z && typeof z.kunde_id === 'string' && MUSTER.cus.test(z.kunde_id) ? z.kunde_id : null,
+      laeuft: !!(z && typeof z.abo_id === 'string' && z.abo_id && z.stand_zeit == null),
+    };
+  } catch (e) {
+    return { ok: false };
+  }
+}
+
+// Modus des Schalters produkte.kauf_link (Zeile trainer): 'test', 'live' oder null (keine Zeile, kein Link)
+async function schalterModus(holen, basis, schluessel) {
+  try {
+    const r = await holen(`${basis}/rest/v1/produkte?select=kauf_link&id=eq.trainer`, { method: 'GET', headers: dienstKopf(schluessel) });
+    if (!r || !r.ok) return { ok: false };
+    const d = await r.json();
+    const z = Array.isArray(d) ? d[0] : null;
+    const link = z && typeof z.kauf_link === 'string' ? z.kauf_link.trim() : '';
+    return { ok: true, modus: !link ? null : MUSTER.testSchalter.test(link) ? 'test' : 'live' };
   } catch (e) {
     return { ok: false };
   }
@@ -156,11 +186,21 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
     if (!r || !r.ok) return fehler(503, 'server');
     const u = await r.json();
     uid = u && typeof u.id === 'string' && MUSTER.uuid.test(u.id) ? u.id.toLowerCase() : null;
-    email = u && typeof u.email === 'string' && MUSTER.email.test(u.email) ? u.email : null;
+    // Nur eine bestaetigte Adresse geht an Stripe (wie werkstatt.js): sonst bekaeme ein Fremder die Belege
+    const bestaetigt = !!(u && typeof u.email_confirmed_at === 'string' && u.email_confirmed_at);
+    email = bestaetigt && typeof u.email === 'string' && MUSTER.email.test(u.email) ? u.email : null;
   } catch (e) {
     return fehler(503, 'server');
   }
   if (!uid) return fehler(401, 'anmeldung');
+
+  // Schluessel und Schalter muessen zum selben Modus gehoeren (sonst zeigte die App "Testmodus" bei echtem Geld)
+  const schalter = await schalterModus(f, basis, dienst);
+  if (!schalter.ok) return fehler(503, 'server');
+  if (schalter.modus !== art) {
+    log(`abo-kasse nicht_eingerichtet modus ${art} ${schalter.modus || 'kein_link'}`);
+    return fehler(503, 'nicht_eingerichtet');
+  }
 
   // Kein zweites Abo fuer ein Konto, das schon Premium hat
   const premium = await rpc(f, basis, dienst, 'ist_premium_von', { uid });
@@ -168,8 +208,11 @@ export async function verarbeite({ methode, koerper, autorisierung } = {}, umgeb
   if (premium.wert === true) return fehler(409, 'schon_premium');
   const bisher = await bisherigerKunde(f, basis, dienst, uid);
   if (!bisher.ok) return fehler(503, 'server');
+  if (bisher.laeuft) return fehler(409, 'kauf_laeuft');
 
-  const parameter = kassenParameter({ uid, preis, kunde: bisher.kunde, email, rueckkehr });
+  const fensterBeginn = Math.floor(t / FENSTER_MS) * FENSTER_MS;
+  const ablauf = Math.floor((fensterBeginn + GUELTIG_MS) / 1000);
+  const parameter = kassenParameter({ uid, preis, kunde: bisher.kunde, email, rueckkehr, ablauf });
   const schluessel = `crownmate-abo-${uid}-${Math.floor(t / FENSTER_MS)}`;
   let s = await stripeAufruf(f, '/checkout/sessions', parameter, umgebung.ABO_STRIPE_RK, schluessel);
   if (!s.ok && s.wiederholen) {

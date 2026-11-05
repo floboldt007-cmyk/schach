@@ -143,7 +143,12 @@ async function anfrage(pfad, { methode = 'GET', daten, token } = {}) {
   }
   let d = null;
   if (r.status !== 204) { try { d = await r.json(); } catch (e) { /* leer */ } }
-  if (!r.ok) { const f = new Error((d && (d.message || d.msg)) || A('server', { status: r.status })); f.status = r.status; throw f; }
+  if (!r.ok) {
+    const f = new Error((d && (d.message || d.msg)) || A('server', { status: r.status }));
+    f.status = r.status;
+    f.kennung = d && typeof d.fehler === 'string' ? d.fehler : undefined;
+    throw f;
+  }
   return d;
 }
 
@@ -348,12 +353,14 @@ export async function kaufen({ produkt, oeffne } = {}) {
     const sg = await gueltigeSitzung();
     d = await anfrage(KASSE_PFAD, { methode: 'POST', daten: {}, token: sg.access_token });
   } catch (e) {
-    if (e && e.status === 409) return abbruch('schon_premium');
+    if (e && e.status === 409) return abbruch(e.kennung === 'kauf_laeuft' ? 'kauf_laeuft' : 'schon_premium');
     if (e && e.status === 401) return abbruch('abgemeldet');
     return abbruch(e && e.offline ? 'offline' : 'kasse');
   }
   const url = d && typeof d.kassen_url === 'string' && KASSE.test(d.kassen_url) ? d.kassen_url : null;
   if (!url) return abbruch('kasse');
+  // Fenster in der Wartezeit geschlossen: kein Kauf-Merker, sonst stuende "Bezahlseite offen" 30 Minuten lang da
+  if (fenster && fenster.closed) return abbruch('kasse');
   try { lager().setItem(KAUF_SCHLUESSEL, String(uhr())); } catch (e) { /* egal */ }
   zeige(url);
   return { ok: true, url };
