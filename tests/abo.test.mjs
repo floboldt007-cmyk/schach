@@ -296,9 +296,29 @@ async function nodeTeil() {
   pruefe('Capacitor im Browser (nicht nativ): normal', !inStoreHuelle());
   delete globalThis.Capacitor;
   pruefe('premiumHinweis ohne DOM (Node): null', premiumHinweis(null, 'x') === null);
+  {
+    // Pflichtknoepfe (§ 312k, § 356a BGB): Wortlaut zeichengenau, Deutsch wie im Gesetz
+    const { WORTE } = await import('../js/pakete/abo/kuendigen.js');
+    const { DE, EN } = await import('../js/pakete/abo/texte.js');
+    const { kuendigenAusAdresse } = await import('../js/pakete/abo/index.js');
+    pruefe('Pflichtwoerter: "Verträge hier kündigen", "jetzt kündigen", "Vertrag widerrufen", "Widerruf bestätigen"',
+      WORTE.kuendigen === 'Verträge hier kündigen' && WORTE.jetzt === 'jetzt kündigen' && WORTE.widerrufen === 'Vertrag widerrufen' && WORTE.bestaetigen === 'Widerruf bestätigen', WORTE);
+    pruefe('Texte (Deutsch) fuehren die Pflichtwoerter zeichengenau', DE.kuendigenKnopf === WORTE.kuendigen && DE.jetztKnopf === WORTE.jetzt
+      && DE.widerrufenKnopf === WORTE.widerrufen && DE.bestaetigenKnopf === WORTE.bestaetigen);
+    const fehlt = Object.keys(DE).filter((k) => !(k in EN)).concat(Object.keys(EN).filter((k) => !(k in DE)));
+    pruefe('Texte: Deutsch und Englisch haben dieselben Schluessel', fehlt.length === 0, fehlt);
+    const tok = 'a'.repeat(64);
+    pruefe('Adresse #kuendigen: Kuendigen-Blatt ohne Token', JSON.stringify(kuendigenAusAdresse('#kuendigen')) === JSON.stringify({ aktion: 'kuendigen', token: '' }));
+    pruefe('Adresse #kuendigen=<64 Hex>: Token wird uebernommen', kuendigenAusAdresse('#kuendigen=' + tok)?.token === tok);
+    pruefe('Adresse: kaputtes Token, fremder Hash und leer -> nichts', kuendigenAusAdresse('#kuendigen=xyz') === null
+      && kuendigenAusAdresse('#kuendigen=' + tok + 'a') === null && kuendigenAusAdresse('#arena') === null && kuendigenAusAdresse('') === null);
+    for (const d of ['impressum.html', 'impressum-en.html']) {
+      pruefe(`${d}: Link "./#kuendigen" (Kuendigen ohne Anmeldung)`, readFileSync(path.join(WURZEL, d), 'utf8').includes('href="./#kuendigen"'));
+    }
+  }
   const sw = readFileSync(path.join(WURZEL, 'sw.js'), 'utf8');
   pruefe('Dateien des Pakets schon im Offline-Cache (sw.js), damit das Eintragen in PAKETE nur eine Zeile ist',
-    ['js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'css/pakete/abo.css'].every((d) => sw.includes(`'${d}'`)));
+    ['js/abo.js', 'js/pakete/abo/index.js', 'js/pakete/abo/trainer.js', 'js/pakete/abo/kuendigen.js', 'css/pakete/abo.css'].every((d) => sw.includes(`'${d}'`)));
   await istPremium({ neu: true });
   localStorage.setItem(KAUF_SCHLUESSEL, String(jetzt));
   pruefe('aufraeumen angemeldet: nichts', aufraeumen() === false && !!localStorage.getItem(STAND_SCHLUESSEL));
@@ -770,6 +790,8 @@ async function browserTeil(browser) {
     const z = await blattZustand(seite);
     pruefe('Blatt: "Abo verwalten" statt Kauf', z.knoepfe[0] === 'Abo verwalten' && !z.knoepfe.includes('Trainer abschließen'), z);
     pruefe('Premium: kein Satz zum Alter (nichts mehr abzuschließen)', z.alter === '', z.alter);
+    pruefe('Premium (Stripe, schon gekündigt): "Vertrag widerrufen" da, "Verträge hier kündigen" nicht doppelt',
+      z.knoepfe.includes('Vertrag widerrufen') && !z.knoepfe.includes('Verträge hier kündigen'), z.knoepfe);
     pruefe('Handy: Blatt passt in die Breite, keine waagrechte Rolle', z.links >= 0 && z.rechts <= z.breite + 0.5 && z.ueber <= 0, z);
     await warte(600);
     await bild(seite, 'abo-premium-dunkel-handy');
@@ -781,6 +803,30 @@ async function browserTeil(browser) {
       === PRODUKT.portal_link + '?prefilled_email=' + encodeURIComponent(MAIL));
     const t = await fairPruefung(seite);
     pruefe('Fairness (Premium): kein Druck, kein Countdown', fair(t), t.text.slice(0, 200));
+    // Widerruf: Bestaetigungsseite mit Angaben und zweitem Knopf, abgeschickt wird hier nichts
+    await seite.click('.trainer-knoepfe [data-trainer="abo-widerrufen"]');
+    await seite.waitForSelector('.beenden-karte[data-modus="widerrufen"]');
+    // das Trainer-Blatt gleitet noch hinaus (260 ms), erst danach ist es weg
+    await seite.waitForFunction(() => !document.querySelector('.trainer-ort:not(.beenden-ort)'), null, { timeout: 3000 }).catch(() => {});
+    const b = await seite.evaluate(() => ({
+      titel: document.querySelector('#beenden-titel').textContent.trim(),
+      knoepfe: [...document.querySelectorAll('.beenden-knoepfe button')].map((x) => x.textContent.trim()),
+      angaben: document.querySelectorAll('.beenden-angaben dt').length,
+      trainerOffen: !!document.querySelector('.trainer-ort:not(.beenden-ort)'),
+    }));
+    pruefe('Widerruf: Titel "Vertrag widerrufen", Knopf "Widerruf bestätigen", fuenf Angaben, Trainer-Blatt zu',
+      b.titel === 'Vertrag widerrufen' && b.knoepfe[0] === 'Widerruf bestätigen' && b.angaben === 5 && !b.trainerOffen, b);
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.beenden-ort', { state: 'detached', timeout: 3000 });
+    pruefe('Widerruf-Blatt schliesst mit Escape', true);
+    await seite.click('.abo-gruppe [data-abo="kuendigen"]');
+    await seite.waitForSelector('.beenden-karte[data-modus="kuendigen"]');
+    const k = await seite.evaluate(() => [...document.querySelectorAll('.beenden-knoepfe button')].map((x) => x.textContent.trim()));
+    pruefe('Gruppe: "Verträge hier kündigen" fuehrt zur Bestaetigung mit "jetzt kündigen"', k[0] === 'jetzt kündigen', k);
+    await seite.keyboard.press('Escape');
+    await seite.waitForSelector('.beenden-ort', { state: 'detached', timeout: 3000 });
+    await seite.click('.abo-gruppe [data-abo="zeigen"]');
+    await seite.waitForFunction(() => document.querySelector('.trainer-karte')?.dataset.zustand === 'premium');
     // Screen-Wechsel schliesst das Blatt
     await seite.evaluate(() => { location.hash = '#arena'; });
     await seite.waitForSelector('.trainer-ort', { state: 'detached', timeout: 3000 });

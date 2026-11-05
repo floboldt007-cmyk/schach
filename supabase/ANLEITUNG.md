@@ -311,9 +311,9 @@ das Kundenportal von Stripe dient zum Kündigen, und die Edge Function `stripe-w
 **Vorher klären (keine Rechtsberatung):** Echte Zahlungen erst mit Gewerbe, Impressum, Datenschutzerklärung (Stripe
 nennen), AGB mit Widerrufsbelehrung für digitale Inhalte und geklärter Umsatzsteuer. Dazu der **Kündigungsbutton nach
 § 312k BGB**: Wer Abos über eine Website verkauft, braucht dort eine gut sichtbare Schaltfläche „Verträge hier kündigen“
-mit einer Bestätigungsseite; Gerichte haben eine vorgeschaltete Anmeldung als unzulässig angesehen. Die App hat bisher
-nur „Abo verwalten“ (angemeldet, Kundenportal von Stripe mit E-Mail-Login). Mit der Fachperson klären, was davon reicht;
-eine eigene Kündigungsseite bräuchte eine Edge Function mit einem Stripe-API-Schlüssel (eingeschränkt auf Abos). Bis
+mit einer Bestätigungsseite; Gerichte haben eine vorgeschaltete Anmeldung als unzulässig angesehen. Die App hat
+dafür die Edge Function `abo-beenden` (Abschnitt „Kündigen und Widerrufen“ unten): beide Knöpfe mit Bestätigungsseite,
+Kündigen auch ohne Anmeldung per Mail-Link. Mit der Fachperson klären, ob das so reicht. Bis
 dahin alles im **Testmodus** von Stripe ausprobieren: Dort fließt kein Geld.
 
 **Alter:** Crownmate ist ab 16 (`design/runde4/ENTSCHEIDUNGEN.md`). Ein Abo ist ein Vertrag mit laufenden Kosten; ohne
@@ -432,6 +432,40 @@ Normal ist eine leere Liste. Steht dort etwas, gehört der Kauf keinem Konto: wi
 Store-Hülle (Capacitor) braucht das Abo deshalb später einen eigenen Weg (z. B. ein Dienst wie RevenueCat, der beide
 Stores und das Web zusammenführt); bis dahin dort den Kauf-Knopf nicht anbieten. Die Regeln ändern sich: vor dem
 Store-Start aktuell prüfen.
+
+## Kündigen und Widerrufen (Pflichtknöpfe, Stand 06.11.2026)
+
+Gesetz: „Verträge hier kündigen“ (§ 312k BGB) und in den ersten 14 Tagen „Vertrag widerrufen“ (§ 356a BGB), jeweils mit
+Bestätigungsseite („jetzt kündigen“ bzw. „Widerruf bestätigen“) und Bestätigung per E-Mail mit Datum und Uhrzeit. Die App
+zeigt die Knöpfe im Blatt „Crownmate Trainer“ und in den Einstellungen; das Impressum verlinkt `./#kuendigen`, dort geht
+Kündigen auch **ohne Anmeldung**: E-Mail eingeben, ein Einmal-Link (60 Minuten gültig, höchstens 3 pro Stunde) kommt per
+Mail. Die Antwort ist immer gleich, ob es ein Abo gibt oder nicht. Server: `functions/abo-beenden/` mit der Logik in
+`functions/_gemeinsam/abo-beenden.js`, Mails über **Resend** (Server in der EU) mit `_gemeinsam/mail.js`.
+
+Erst einrichten, wenn das Abo aus dem Abschnitt oben läuft. Reihenfolge:
+
+1. **Resend-Konto** (macht Flo selbst): auf resend.com anmelden, **Region EU** wählen, Domain `crownmate.de` hinzufügen.
+   Resend zeigt danach DNS-Einträge (SPF, DKIM, meist auch MX für die Rückläufer-Adresse). Diese bei **INWX** unter
+   Domains > crownmate.de > Nameserver-Einträge genau so anlegen und in Resend auf „Verify“ warten.
+   **Auftragsverarbeitungsvertrag (DPA)** von Resend annehmen. In der Datenschutzerklärung Resend als Empfänger nennen
+   (Folgearbeit zu PR #140, nicht hier geändert).
+2. **API-Schlüssel:** In Resend **API Keys > Create**, Recht nur **Sending access**, nur für die Domain `crownmate.de`.
+   Der Wert beginnt mit `re_` und gehört nur in Schritt 4, nie in Dateien oder Chats.
+3. **Stripe-Schlüssel erweitern:** Den eingeschränkten Schlüssel `crownmate-abo-kasse` bearbeiten und zusätzlich
+   **Subscriptions: Schreiben**, **Charges: Lesen** und **Refunds: Schreiben** geben (für Kündigen, Widerruf und die
+   anteilige Erstattung nach § 357a Abs. 2 BGB). Alles andere bleibt **Keine**.
+4. **Geheimnisse setzen** (Terminal im Repo-Ordner):
+   `npx supabase secrets set RESEND_API_KEY=re_...`,
+   `npx supabase secrets set ABO_MAIL_ABSENDER="Crownmate <abo@crownmate.de>"` und
+   `npx supabase secrets set ABO_RUECKKEHR=https://floboldt007-cmyk.github.io/schach/` (später die eigene Domain).
+   `ABO_STRIPE_RK` ist schon gesetzt. Fehlt etwas, antwortet die Function mit `nicht_eingerichtet` und tut nichts.
+5. **Schema einspielen:** Im SQL-Editor von Supabase den Inhalt von `abo-beenden-schema.sql` ausführen, danach
+   `abo-beenden-rls-test.sql`. Erwartet: „Abo-Beenden-RLS-Test erfolgreich“ (der Test rollt am Ende alles zurück).
+6. **Bereitstellen:** `npx supabase functions deploy abo-beenden --no-verify-jwt` (die Function prüft die Anmeldung
+   selbst, weil der Link-Weg ohne Anmeldung funktionieren muss).
+7. **Im Testmodus ausprobieren:** Testabo abschließen, „Vertrag widerrufen“ (Erstattung im Stripe-Dashboard sichtbar,
+   Mail kommt an), neues Testabo, „Verträge hier kündigen“ (Abo endet zum Laufzeitende), dann abmelden und über das
+   Impressum den Link-Weg. Jeder Vorgang steht als Nachweis in der Tabelle `abo_vorgaenge`.
 
 ## „Frag den Coach“ (KI-Erklärungen im Trainer)
 
