@@ -806,6 +806,8 @@ async function browserTeil(browser) {
     // Widerruf: Bestaetigungsseite mit Angaben und zweitem Knopf, abgeschickt wird hier nichts
     await seite.click('.trainer-knoepfe [data-trainer="abo-widerrufen"]');
     await seite.waitForSelector('.beenden-karte[data-modus="widerrufen"]');
+    // das Trainer-Blatt gleitet noch hinaus (260 ms), erst danach ist es weg
+    await seite.waitForFunction(() => !document.querySelector('.trainer-ort:not(.beenden-ort)'), null, { timeout: 3000 }).catch(() => {});
     const b = await seite.evaluate(() => ({
       titel: document.querySelector('#beenden-titel').textContent.trim(),
       knoepfe: [...document.querySelectorAll('.beenden-knoepfe button')].map((x) => x.textContent.trim()),
