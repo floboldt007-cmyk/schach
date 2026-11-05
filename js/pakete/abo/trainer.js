@@ -232,14 +232,18 @@ export function zeigeTrainer({ app = null } = {}) {
     }
   }
 
-  // Kauf: ohne await bis zum Oeffnen (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
+  // Kauf: kaufen() oeffnet das Fenster noch im Klick (Nutzergeste), auch direkt aus "Ja, 18 oder älter"
   function kaufe() {
     kaufen({ produkt: produkt || null }).then((r) => {
       meldung = r.ok ? A('stripe')
         : r.grund === 'abgemeldet' ? zustandText('abgemeldet')
           : r.grund === 'alter' ? ''
-            : A('kaufFehler');
+            : r.grund === 'schon_premium' ? A('schonPremium')
+              : r.grund === 'offline' ? A('kaufOffline')
+                : A('kaufFehler');
       aktualisiere();
+      // Der Server kennt ein Abo, das die App noch nicht kannte: Stand sofort neu holen
+      if (r.grund === 'schon_premium') istPremium({ neu: true }).then(() => aktualisiere()).catch(() => {});
     });
   }
 

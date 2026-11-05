@@ -16,7 +16,7 @@ import path from 'node:path';
 import { setzeSpeicher } from '../js/storage.js';
 import { setzeKontoFetch, SITZUNG_SCHLUESSEL, lokalerStand } from '../js/konto.js';
 import {
-  istPremium, premiumStand, ladeProdukt, kaufAdresse, kaufen, verwalten, vergiss, premiumHinweis, setzeAboFetch, setzeAboUhr,
+  istPremium, premiumStand, ladeProdukt, KASSE_PFAD, kaufen, verwalten, vergiss, premiumHinweis, setzeAboFetch, setzeAboUhr,
   kaufGestartet, pruefeProdukt, inStoreHuelle, PRODUKT_ID, STAND_SCHLUESSEL, PRODUKT_SCHLUESSEL, KAUF_SCHLUESSEL, PRUEF_MS, PRODUKT_MS,
   ALTER_SCHLUESSEL, alterAngabe, setzeAlterAngabe, kaufOffen, kaufStand, bestaetigeKauf, setzeNachfragen, NACH_KAUF_MS, NACHFRAGEN_MS,
   registriereVorteil, vorteilBereit, produktOffline, istTestLink, aufraeumen, aboHinweisZumLoeschen, OHNE_HINWEIS_SCREENS,
@@ -48,6 +48,7 @@ const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const MAIL = 'flo.probe@example.invalid';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: MAIL }, email: MAIL };
+const KASSE_URL = 'https://checkout.stripe.com/c/pay/cs_test_Probe1#probe';
 const PRODUKT = { id: 'trainer', name: 'Crownmate Trainer', beschreibung: null, preis_text: 'Probe-Preistext je Monat',
   kauf_link: 'https://buy.stripe.example/probe-link?locale=de', portal_link: 'https://billing.stripe.example/p/login/probe' };
 // Texte, die auf einer Abo-Seite nie stehen duerfen (Auszug aus tests/fairness.test.mjs plus Kauf-Druck)
@@ -75,6 +76,10 @@ async function nodeTeil() {
     // beiRpc: Haken fuer die Serie nach dem Kauf, laeuft vor der Antwort (der Webhook kommt "zwischen" zwei Nachfragen)
     if (url.includes('/rpc/ist_premium') && typeof server.beiRpc === 'function') server.beiRpc();
     await warte(1);
+    if (url.includes(KASSE_PFAD)) {
+      const st = server.kasseStatus || 200;
+      return { ok: st < 400, status: st, async json() { return st < 400 ? { kassen_url: server.kasseUrl || KASSE_URL } : { fehler: 'probe' }; } };
+    }
     const body = url.includes('/rpc/ist_premium') ? server.premium : url.includes('/abos?') ? server.abo : url.includes('/produkte?') ? server.produkt : null;
     return { ok: server.status < 400, status: server.status, async json() { return server.status < 400 ? body : { message: 'kaputt' }; } };
   });
@@ -179,11 +184,6 @@ async function nodeTeil() {
   await ladeProdukt({ neu: true });
 
   // ---------- Kauf und Verwaltung ----------
-  const url = new URL(kaufAdresse(p, SITZUNG));
-  pruefe('Kauf-Adresse: kauf_link + client_reference_id (Nutzer-ID) + prefilled_email, vorhandene Parameter bleiben',
-    url.origin + url.pathname === 'https://buy.stripe.example/probe-link' && url.searchParams.get('client_reference_id') === UID
-    && url.searchParams.get('prefilled_email') === MAIL && url.searchParams.get('locale') === 'de', url.toString());
-  pruefe('Kauf-Adresse: ohne Anmeldung oder ohne Link keine Adresse', kaufAdresse(p, null) === null && kaufAdresse({ ...p, kaufLink: null }, SITZUNG) === null);
   let geoeffnet = [];
   const oeffne = (u) => geoeffnet.push(u);
   localStorage.removeItem(SITZUNG_SCHLUESSEL);
@@ -197,11 +197,27 @@ async function nodeTeil() {
   pruefe('Altersangabe einer anderen Person gilt nicht', alterAngabe() === null && (await kaufen({ produkt: p, oeffne })).grund === 'alter');
   pruefe('Altersangabe: nur ja/nein mit Nutzer-ID gespeichert, ausserhalb von schach-arena:v1:', setzeAlterAngabe(true) && alterAngabe() === true
     && JSON.stringify(JSON.parse(localStorage.getItem(ALTER_SCHLUESSEL))) === JSON.stringify({ uid: UID, ab18: true }) && !ALTER_SCHLUESSEL.startsWith('schach-arena:v1:'));
-  const versprechen = kaufen({ produkt: p, oeffne });
-  const sofort = geoeffnet.length;
-  const k = await versprechen;
-  pruefe('kaufen mit geladenem Produkt: Fenster sofort im Klick (ohne await), Kauf gemerkt', sofort === 1 && k.ok && geoeffnet[0] === k.url
-    && k.url.includes('client_reference_id=' + UID) && kaufGestartet() === jetzt && localStorage.getItem(KAUF_SCHLUESSEL) === String(jetzt));
+  // Fehlerwege zuerst (ohne Merker); der erfolgreiche Kauf danach setzt den Merker, auf dem die Serie unten aufbaut
+  server.kasseStatus = 409;
+  pruefe('Server: schon Premium -> grund schon_premium, nichts geoeffnet, kein Merker', (await kaufen({ produkt: p, oeffne })).grund === 'schon_premium'
+    && geoeffnet.length === 0 && kaufGestartet() === null);
+  server.kasseStatus = 503;
+  pruefe('Server oder Stripe gerade nicht: grund kasse', (await kaufen({ produkt: p, oeffne })).grund === 'kasse' && geoeffnet.length === 0);
+  server.kasseStatus = 200;
+  server.kasseUrl = 'https://boese.example/pay';
+  pruefe('fremde Adresse in der Server-Antwort wird nie geoeffnet: grund kasse', (await kaufen({ produkt: p, oeffne })).grund === 'kasse' && geoeffnet.length === 0);
+  server.kasseUrl = null;
+  server.offline = true;
+  pruefe('offline: grund offline', (await kaufen({ produkt: p, oeffne })).grund === 'offline' && geoeffnet.length === 0 && kaufGestartet() === null);
+  server.offline = false;
+  const vorKauf = aufrufe.length;
+  const k = await kaufen({ produkt: p, oeffne });
+  const kasse = aufrufe.slice(vorKauf).filter((a) => a.url.endsWith(KASSE_PFAD));
+  pruefe('kaufen: Bezahlseite vom Server (POST abo-kasse mit Anmelde-Token), geoeffnet, Kauf gemerkt', k.ok && k.url === KASSE_URL
+    && geoeffnet.length === 1 && geoeffnet[0] === KASSE_URL && kasse.length === 1 && kasse[0].method === 'POST'
+    && kasse[0].headers.Authorization === 'Bearer ' + SITZUNG.access_token && kasse[0].body === '{}'
+    && kaufGestartet() === jetzt && localStorage.getItem(KAUF_SCHLUESSEL) === String(jetzt));
+  pruefe('kaufen: keine Nutzer-ID in irgendeiner Adresse (Code-Check 05.11.2026)', !aufrufe.some((a) => a.url.includes('client_reference_id') || a.url.includes(UID)));
   geoeffnet = [];
   pruefe('kaufen ohne Produkt bzw. ohne Link: klare Gruende', (await kaufen({ produkt: null, oeffne })).grund === 'kein_produkt'
     && (await kaufen({ produkt: { ...p, kaufLink: null }, oeffne })).grund === 'kein_link' && geoeffnet.length === 0);
@@ -332,7 +348,8 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
     const u = r.request().url();
     anfragen.push({ url: u, methode: r.request().method(), kopf: r.request().headers() });
     if (srv.offline) return r.abort('internetdisconnected');
-    const body = u.includes('/rpc/ist_premium') ? srv.premium : u.includes('/rest/v1/abos?') ? srv.abo : u.includes('/rest/v1/produkte?') ? srv.produkt : {};
+    const body = u.includes('/rpc/ist_premium') ? srv.premium : u.includes('/rest/v1/abos?') ? srv.abo : u.includes('/rest/v1/produkte?') ? srv.produkt
+      : u.includes('/functions/v1/abo-kasse') ? { kassen_url: KASSE_URL } : {};
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
   await seite.addInitScript(({ konto, sitzung, vorher }) => {
@@ -342,7 +359,12 @@ async function neueSeite(browser, { w = 1180, h = 820, schema = 'light', bewegun
       for (const [k, v] of Object.entries(vorher || {})) localStorage.setItem(k, v);
     } catch (e) { /* egal */ }
     window.__geoeffnet = [];
-    window.open = (u) => { window.__geoeffnet.push(String(u)); return { opener: null }; };
+    window.__geschlossen = 0;
+    // Wie ein echtes Fenster: kaufen() oeffnet erst ein leeres (zaehlt nicht) und setzt dann location.href
+    window.open = (u) => {
+      if (u) window.__geoeffnet.push(String(u));
+      return { opener: null, close() { window.__geschlossen++; }, location: { set href(x) { window.__geoeffnet.push(String(x)); } } };
+    };
   }, { konto, sitzung, vorher });
   return { kontext, seite, fehler, anfragen, srv };
 }
@@ -536,8 +558,10 @@ async function browserTeil(browser) {
     await seite.click('.trainer-knoepfe [data-trainer="alter-ja"]');
     await seite.waitForFunction(() => window.__geoeffnet.length === 1);
     const u = new URL(await seite.evaluate(() => window.__geoeffnet[0]));
-    pruefe('Kauf oeffnet Stripe mit client_reference_id und prefilled_email', u.origin + u.pathname === 'https://buy.stripe.example/probe-link'
-      && u.searchParams.get('client_reference_id') === UID && u.searchParams.get('prefilled_email') === MAIL, u.toString());
+    const kasse = anfragen.filter((a) => a.url === SUPA + '/functions/v1/abo-kasse');
+    pruefe('Kauf: Bezahlseite vom Server (abo-kasse, mit Anmelde-Token) im vorab geoeffneten Fenster, keine ID in einer Adresse',
+      u.toString() === KASSE_URL && kasse.length === 1 && kasse[0].methode === 'POST' && kasse[0].kopf.authorization === 'Bearer ' + SITZUNG.access_token
+      && !anfragen.some((a) => a.url.includes('client_reference_id')), u.toString());
     await seite.waitForFunction(() => /Bezahlseite/.test(document.querySelector('.trainer-stand').textContent));
     pruefe('Kauf gemerkt (fuer die Rueckkehr), Antwort "18 oder älter" gemerkt', !!(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:kauf')))
       && JSON.parse(await seite.evaluate(() => localStorage.getItem('schach-arena:abo:alter'))).ab18 === true);
