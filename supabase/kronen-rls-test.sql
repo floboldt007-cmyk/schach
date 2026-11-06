@@ -61,8 +61,8 @@ declare
   s jsonb;
 begin
   s := public.kronen_mein_stand();
-  if (s->>'saison')::int <> 0 or (s->>'kronen')::int <> 0 or (s->>'stufe')::int <> 0 or (s->>'boden')::int <> 0
-     or (s->>'naechste')::int <> 100 then
+  if (s->>'saison')::int is distinct from 0 or (s->>'kronen')::int is distinct from 0 or (s->>'stufe')::int is distinct from 0 or (s->>'boden')::int is distinct from 0
+     or (s->>'naechste')::int is distinct from 100 then
     raise exception 'FEHLER: neuer Stand ohne Saisonstart falsch (%)', s;
   end if;
 end;
@@ -98,7 +98,7 @@ declare
   s jsonb;
 begin
   s := public.kronen_mein_stand();
-  if (s->>'saison')::int <> 1 or (s->>'kronen')::int <> 900 or (s->>'boden')::int <> 900 then
+  if (s->>'saison')::int is distinct from 1 or (s->>'kronen')::int is distinct from 900 or (s->>'boden')::int is distinct from 900 then
     raise exception 'FEHLER: Wechsel von Saison 0 auf 1 hat den Stand veraendert (%)', s;
   end if;
 end;
@@ -236,13 +236,13 @@ declare
   s jsonb;
 begin
   s := public.kronen_mein_stand();
-  if (s->>'saison')::int <> 2 or (s->>'kronen')::int <> 1400 or (s->>'boden')::int <> 1200
-     or (s->>'stufe')::int <> 14 or (s->>'naechste')::int <> 1500 then
+  if (s->>'saison')::int is distinct from 2 or (s->>'kronen')::int is distinct from 1400 or (s->>'boden')::int is distinct from 1200
+     or (s->>'stufe')::int is distinct from 14 or (s->>'naechste')::int is distinct from 1500 then
     raise exception 'FEHLER: Saisonwechsel 1750 ergibt nicht 1400 / Boden 1200 / Stufe 14 (%)', s;
   end if;
   -- zweiter Aufruf: nichts mehr
   s := public.kronen_mein_stand();
-  if (s->>'kronen')::int <> 1400 then
+  if (s->>'kronen')::int is distinct from 1400 then
     raise exception 'FEHLER: zweiter Aufruf hat erneut zurueckgestuft (%)', s;
   end if;
 end;
@@ -277,7 +277,7 @@ declare
   s jsonb;
 begin
   s := public.kronen_mein_stand();
-  if (s->>'saison')::int <> 3 or (s->>'kronen')::int <> 1100 or (s->>'boden')::int <> 900 then
+  if (s->>'saison')::int is distinct from 3 or (s->>'kronen')::int is distinct from 1100 or (s->>'boden')::int is distinct from 900 then
     raise exception 'FEHLER: zwei verpasste Saisons ergeben nicht 1100 / Boden 900 (%)', s;
   end if;
 end;
@@ -310,10 +310,10 @@ begin
   if public.kronen_rueckstufen(1750) <> 1400 or public.kronen_rueckstufen(250) <> 0 or public.kronen_rueckstufen(0) <> 0 then
     raise exception 'FEHLER: kronen_rueckstufen rechnet falsch';
   end if;
-  if (k->>'stufe_kronen')::int <> 100 or (k#>>'{kronen,ki,sieg}')::int <> 20 or (k#>>'{kronen,online,niederlage}')::int <> -15
-     or (k#>>'{kronen,bot,niederlage}')::int <> 0 or (k->>'bot_tagesgrenze')::int <> 10 or (k->>'ki_tagesgrenze')::int <> 20
-     or (k->>'ki_mindestdauer_s')::int <> 60 or (k->>'online_mindest_halbzuege')::int <> 4
-     or (k->>'paar_tagesgrenze')::int <> 3 or (k->>'saison_tage')::int <> 28 or (k->>'rueckstufung_stufen')::int <> 3 then
+  if (k->>'stufe_kronen')::int is distinct from 100 or (k#>>'{kronen,ki,sieg}')::int is distinct from 20 or (k#>>'{kronen,online,niederlage}')::int is distinct from -15
+     or (k#>>'{kronen,bot,niederlage}')::int is distinct from 0 or (k->>'bot_tagesgrenze')::int is distinct from 10 or (k->>'ki_tagesgrenze')::int is distinct from 20
+     or (k->>'ki_mindestdauer_s')::int is distinct from 60 or (k->>'online_mindest_halbzuege')::int is distinct from 4
+     or (k->>'paar_tagesgrenze')::int is distinct from 3 or (k->>'saison_tage')::int is distinct from 28 or (k->>'rueckstufung_stufen')::int is distinct from 3 then
     raise exception 'FEHLER: kronen_konstanten weicht vom Plan ab (%)', k;
   end if;
   if (select zaehler_an from public.kronen_schalter where id) then
@@ -767,6 +767,227 @@ begin
   begin
     perform public.online_suche_start('3+2');
     raise exception 'FEHLER: anon darf suchen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+reset role;
+
+-- ---------- 9. Bot- und KI-Gegner-Ergebnis (Task 5) ----------
+-- D: Bot-Leiter (Sieg, doppelt, Grenze 10, Eingabe), danach KI trotz voller Bot-Grenze. E: KI-Niederlage mit Liga-Boden,
+-- zu frueh, doppelt, fremd, erfunden, verfallen. F: KI-Grenze 20 (eine Buchung von gestern zaehlt nicht), danach Bot.
+-- Belege legt der Besitzer mit festen uuids an (00000000-0000-4000-8000-<nr, 12-stellig>), damit die Nutzer-Abschnitte
+-- sie ohne Testtabelle nennen koennen; eingeloest wird nur ueber kronen_ki_ergebnis.
+
+create function pg_temp.neuer_beleg(nr integer, uid uuid, alter_s integer)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r uuid := ('00000000-0000-4000-8000-' || lpad(nr::text, 12, '0'))::uuid;
+begin
+  insert into public.suche_ki_belege (ref, user_id, erstellt_am) values (r, uid, now() - make_interval(secs => alter_s));
+  return r;
+end;
+$$;
+create function pg_temp.beleg_alter(nr integer, alter_s integer)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.suche_ki_belege set erstellt_am = now() - make_interval(secs => alter_s)
+  where ref = ('00000000-0000-4000-8000-' || lpad(beleg_alter.nr::text, 12, '0'))::uuid;
+$$;
+revoke all on function pg_temp.neuer_beleg(integer, uuid, integer), pg_temp.beleg_alter(integer, integer) from public;
+
+do $$
+declare
+  d constant uuid := 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  e constant uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  f constant uuid := 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+  i integer;
+begin
+  perform pg_temp.setze_stand(d, 0, 1000, 30);
+  perform pg_temp.setze_stand(e, 305, 1000, 30);
+  perform pg_temp.setze_stand(f, 0, 1000, 30);
+  perform pg_temp.neuer_beleg(1, d, 61);    -- D: KI trotz voller Bot-Grenze
+  perform pg_temp.neuer_beleg(2, e, 61);    -- E: KI-Niederlage, danach doppelt
+  perform pg_temp.neuer_beleg(3, e, 30);    -- E: zu frueh
+  perform pg_temp.neuer_beleg(4, f, 61);    -- fremd (gehoert F, E versucht es)
+  perform pg_temp.neuer_beleg(5, e, 25200); -- E: verfallen (7 Stunden)
+  for i in 1..21 loop
+    perform pg_temp.neuer_beleg(100 + i, f, 61); -- F: Grenze
+  end loop;
+  -- F: eine KI-Buchung von gestern zaehlt nicht zur heutigen Grenze
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison, am)
+  values (f, 'ki', 'gestern-ki-buchung', 0, 0, now() - interval '30 hours');
+end;
+$$;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+  i integer;
+begin
+  -- Bot-Sieg +15
+  r := public.kronen_bot_ergebnis('partie-0001', 'sieg', 1200);
+  if (r->>'delta')::int is distinct from 15 or (r->>'kronen')::int is distinct from 15 then
+    raise exception 'FEHLER: Bot-Sieg: % (erwartet delta 15, kronen 15)', r;
+  end if;
+  -- Bot-Doppelt: gleiche ref -> keine zweite Buchung
+  r := public.kronen_bot_ergebnis('partie-0001', 'sieg', 1200);
+  if (r->>'delta')::int is distinct from 0 or (r->>'kronen')::int is distinct from 15 then
+    raise exception 'FEHLER: Bot-Doppelt: % (erwartet delta 0, kronen 15)', r;
+  end if;
+  -- Bot-Eingabe
+  if public.kronen_bot_ergebnis('partie-0002', 'sieg', 9999)->>'fehler' is distinct from 'KRONEN_EINGABE'
+     or public.kronen_bot_ergebnis('kurz', 'sieg', 1200)->>'fehler' is distinct from 'KRONEN_EINGABE'
+     or public.kronen_bot_ergebnis('partie-0002', 'gewonnen', 1200)->>'fehler' is distinct from 'KRONEN_EINGABE' then
+    raise exception 'FEHLER: Bot-Eingabe wird angenommen';
+  end if;
+  -- Bot-Grenze: 9 weitere gehen (zusammen 10), die 11. Meldung nicht
+  for i in 2..10 loop
+    r := public.kronen_bot_ergebnis('partie-' || lpad(i::text, 4, '0'), 'sieg', 1200);
+    if r ? 'fehler' then
+      raise exception 'FEHLER: Bot-Grenze: Meldung % abgelehnt (%)', i, r;
+    end if;
+  end loop;
+  r := public.kronen_bot_ergebnis('partie-0011', 'sieg', 1200);
+  if r->>'fehler' is distinct from 'KRONEN_GRENZE' then
+    raise exception 'FEHLER: Bot-Grenze: 11. Meldung am Tag nicht abgelehnt (%)', r;
+  end if;
+  -- KI-Grenze getrennt: 10 Bot-Buchungen sperren den KI-Gegner nicht
+  r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000001'::uuid, 'sieg');
+  if (r->>'delta')::int is distinct from 20 or (r->>'kronen')::int is distinct from 170 then
+    raise exception 'FEHLER: KI-Grenze getrennt: % (erwartet delta 20, kronen 170)', r;
+  end if;
+  -- kein Recht auf die internen Funktionen
+  begin
+    perform public.kronen_einfach_buchen('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'bot', 'selbst-gebucht', 'sieg');
+    raise exception 'FEHLER: kronen_einfach_buchen ist fuer Nutzer offen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  -- KI-Niederlage -10, Liga-Boden 300 gilt
+  r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000002'::uuid, 'niederlage');
+  if (r->>'kronen')::int is distinct from 300 or (r->>'delta')::int is distinct from -5 then
+    raise exception 'FEHLER: KI-Niederlage: % (erwartet 305 -> 300 durch den Liga-Boden)', r;
+  end if;
+  -- doppelt: derselbe Beleg ein zweites Mal
+  if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000002'::uuid, 'sieg')->>'fehler' is distinct from 'KRONEN_BELEG' then
+    raise exception 'FEHLER: KI-Beleg doppelt eingeloest';
+  end if;
+  -- fremd und erfunden
+  if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000004'::uuid, 'sieg')->>'fehler' is distinct from 'KRONEN_BELEG'
+     or public.kronen_ki_ergebnis(gen_random_uuid(), 'sieg')->>'fehler' is distinct from 'KRONEN_BELEG' then
+    raise exception 'FEHLER: fremder oder erfundener KI-Beleg angenommen';
+  end if;
+  -- verfallen (7 Stunden)
+  if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000005'::uuid, 'sieg')->>'fehler' is distinct from 'KRONEN_BELEG' then
+    raise exception 'FEHLER: verfallener KI-Beleg angenommen';
+  end if;
+  -- Eingabe
+  if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000003'::uuid, 'gewonnen')->>'fehler' is distinct from 'KRONEN_EINGABE'
+     or public.kronen_ki_ergebnis(null, 'sieg')->>'fehler' is distinct from 'KRONEN_EINGABE' then
+    raise exception 'FEHLER: KI-Eingabe wird angenommen';
+  end if;
+  -- zu frueh (30 s): keine Buchung, Beleg bleibt
+  if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000003'::uuid, 'sieg')->>'fehler' is distinct from 'KRONEN_ZU_FRUEH' then
+    raise exception 'FEHLER: KI-Beleg nach 30 s nicht als zu frueh abgelehnt';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select eingeloest from public.suche_ki_belege where ref = '00000000-0000-4000-8000-000000000003'::uuid)
+     or exists (select 1 from public.kronen_buchungen where ref = '00000000-0000-4000-8000-000000000003') then
+    raise exception 'FEHLER: zu frueh: Beleg eingeloest oder gebucht';
+  end if;
+  if (select eingeloest from public.suche_ki_belege where ref = '00000000-0000-4000-8000-000000000004'::uuid) then
+    raise exception 'FEHLER: fremder Versuch hat den Beleg von F eingeloest';
+  end if;
+  perform pg_temp.beleg_alter(3, 61);
+end;
+$$;
+set local role authenticated;
+do $$
+declare
+  r jsonb := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000003'::uuid, 'sieg');
+begin
+  if (r->>'delta')::int is distinct from 20 then
+    raise exception 'FEHLER: zu frueher Beleg nach 61 s nicht gebucht (%)', r;
+  end if;
+end;
+$$;
+
+select set_config('request.jwt.claims', '{"sub":"ffffffff-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+  i integer;
+begin
+  -- KI-Grenze: 20 Belege an einem Tag werden gebucht, der 21. nicht (die Buchung von gestern zaehlt nicht)
+  for i in 1..20 loop
+    r := public.kronen_ki_ergebnis(('00000000-0000-4000-8000-' || lpad((100 + i)::text, 12, '0'))::uuid, 'sieg');
+    if r ? 'fehler' then
+      raise exception 'FEHLER: KI-Grenze: Beleg % abgelehnt (%)', i, r;
+    end if;
+  end loop;
+  if (r->>'kronen')::int is distinct from 400 then
+    raise exception 'FEHLER: KI-Grenze: nach 20 Siegen % statt 400 Kronen', r->>'kronen';
+  end if;
+  r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000121'::uuid, 'sieg');
+  if r->>'fehler' is distinct from 'KRONEN_GRENZE' then
+    raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht abgelehnt (%)', r;
+  end if;
+  -- und umgekehrt: 20 KI-Buchungen sperren den Bot-Leiter nicht
+  r := public.kronen_bot_ergebnis('f-partie-0001', 'remis', 800);
+  if (r->>'delta')::int is distinct from 5 or (r->>'kronen')::int is distinct from 405 then
+    raise exception 'FEHLER: Bot nach voller KI-Grenze: % (erwartet delta 5, kronen 405)', r;
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if not (select eingeloest from public.suche_ki_belege where ref = '00000000-0000-4000-8000-000000000121'::uuid)
+     or exists (select 1 from public.kronen_buchungen where ref = '00000000-0000-4000-8000-000000000121') then
+    raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht eingeloest oder doch gebucht';
+  end if;
+  if (select kronen from public.kronen_stand where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 405 then
+    raise exception 'FEHLER: KI-Grenze: Stand von F veraendert';
+  end if;
+end;
+$$;
+
+-- anon darf keine Ergebnisse melden
+set local role anon;
+do $$
+begin
+  begin
+    perform public.kronen_bot_ergebnis('partie-anon', 'sieg', 1200);
+    raise exception 'FEHLER: anon darf ein Bot-Ergebnis melden';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    perform public.kronen_ki_ergebnis(gen_random_uuid(), 'sieg');
+    raise exception 'FEHLER: anon darf ein KI-Ergebnis melden';
   exception when insufficient_privilege then
     null;
   end;

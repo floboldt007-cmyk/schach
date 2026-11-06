@@ -308,6 +308,71 @@ async function integrationsTeil() {
   ab(); S.setzeSpeicher(null);
 }
 
+// Etappe B Task 5: das Liga-Paket meldet Kronen beim (abgefangenen) Server, nie mehr als einmal, nie ohne Konto
+async function kronenMeldeTeil() {
+  const { setzeOnlineFetch } = await import('../js/online.js');
+  // Meldungen der Partien aus integrationsTeil laufen verzoegert (das Paket laedt js/kronen.js erst beim Melden):
+  // erst ohne Konto auslaufen lassen, dann die Sitzung anlegen
+  await new Promise((r) => setTimeout(r, 300));
+  const speicher = new Map();
+  const lager = { getItem: (k) => speicher.get(k) ?? null, setItem: (k, v) => speicher.set(k, String(v)), removeItem: (k) => speicher.delete(k), key: (i) => [...speicher.keys()][i] ?? null, get length() { return speicher.size; } };
+  S.setzeSpeicher(lager);
+  const altLager = globalThis.localStorage;
+  globalThis.localStorage = lager;
+  const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f' })).toString('base64url') + '.x',
+    refresh_token: 'r1', expires_at: 9999999999, user: { id: '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f', email: 'probe@example.invalid' } };
+  speicher.set('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+  let aufrufe = [];
+  let netzFehlt = false;
+  setzeOnlineFetch(async (url, opt) => {
+    aufrufe.push({ name: (String(url).match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1], daten: opt && opt.body ? JSON.parse(opt.body) : null });
+    if (netzFehlt) throw new Error('offline');
+    return { ok: true, status: 200, json: async () => ({ delta: 15, kronen: 15, stufe: 0 }) };
+  });
+  const kurz = () => new Promise((r) => setTimeout(r, 150)); // das Paket laedt js/kronen.js erst beim Melden
+  const ende = (p, extra = {}) => {
+    const r = S.speicherePartie({ ...p, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'], modus: p.modus || 'normal' });
+    sende('partie:beendet', { laufId: 'lauf-' + p.id, partieId: r.partie.id, wertet: r.wertet, botId: p.botId, ergebnis: p.ergebnis, ...extra });
+    return r;
+  };
+  const KI = '11111111-2222-4333-8444-555555555555';
+  const rudi = BOTS.find((b) => b.id === 'rudi');
+  try {
+    S.speichereModul('liga', W.neuerStand(new Date()));
+    await browserPruefe('liga meldet Bot-Sieg an den Server (genau ein Aufruf, ref, ergebnis, bot_elo)', async () => {
+      const r = ende(partie('k-sieg')); sende('partie:beendet', { partieId: r.partie.id, wertet: true }); await kurz();
+      assert.equal(aufrufe.length, 1); assert.equal(aufrufe[0].name, 'kronen_bot_ergebnis');
+      assert.deepEqual(aufrufe[0].daten, { ref: r.partie.id, ergebnis: 'sieg', bot_elo: rudi.elo });
+    });
+    await browserPruefe('liga meldet nichts fuer eine ungewertete Partie (eigene Stellung)', async () => {
+      aufrufe = []; ende(partie('k-eigen', { startFen: '7k/8/5KQ1/8/8/8/8/8 w - - 0 1' }), { wertet: true }); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+    await browserPruefe('liga: Netzfehler beim Melden wirft nicht, die lokale Liga bucht trotzdem', async () => {
+      aufrufe = []; netzFehlt = true; const n = S.ladeModul('liga').wertung.n;
+      ende(partie('k-netz')); await kurz();
+      assert.equal(aufrufe.length, 1); assert.equal(S.ladeModul('liga').wertung.n, n + 1);
+      netzFehlt = false;
+    });
+    await browserPruefe('liga meldet KI-Gegner mit Beleg (kronen_ki_ergebnis, nie kronen_bot_ergebnis)', async () => {
+      aufrufe = []; ende(partie('k-ki', { ki: true, kiRef: KI, ergebnis: 'remis' })); await kurz();
+      assert.deepEqual(aufrufe, [{ name: 'kronen_ki_ergebnis', daten: { ki_ref: KI, ergebnis: 'remis' } }]);
+    });
+    await browserPruefe('liga meldet einen KI-Gegner ohne Beleg gar nicht', async () => {
+      aufrufe = []; ende(partie('k-ki-ohne', { ki: true })); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+    await browserPruefe('liga meldet ohne Konto nichts', async () => {
+      aufrufe = []; speicher.delete('schach-arena:konto:sitzung'); ende(partie('k-ohne-konto')); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+  } finally {
+    setzeOnlineFetch(null);
+    globalThis.localStorage = altLager;
+    S.setzeSpeicher(null);
+  }
+}
+
 const PROBE = `
 import '../liga/index.js';
 import { sende, hoere } from '../../ereignisse.js';
@@ -465,6 +530,7 @@ try {
       static now() { return DATUM.getTime(); }
     };
     await integrationsTeil();
+    await kronenMeldeTeil();
   } finally { globalThis.Date = EchteDate; }
   if (!process.argv.includes('--nur-node')) {
     let pw;
