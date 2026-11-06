@@ -271,7 +271,8 @@ async function erfinderTeil(browser) {
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   // Flo 01.11.2026 (iPad): "bei den Lektionen kann ich nicht nach unten scrollen": neben der 860-px-Spalte rollte nichts.
   // Am linken Rand gewischt (Mausrad) rollt die Liste jetzt bis ganz unten, die Spalte bleibt hoechstens 860 px
-  await p.s.mouse.move(20, 600);
+  // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
+  await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 600);
   await p.s.mouse.wheel(0, 4000);
   await warte(500);
   const rollen = await p.s.evaluate(() => { const r = document.querySelector('.ms-rumpf');
