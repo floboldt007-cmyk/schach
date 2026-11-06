@@ -1,11 +1,12 @@
-// Tests fuer die Startseite "heim" (Etappe A, Task 3): Rang-Ring mit Liga-Punkten und Stufe, drei Modus-Karten
-// (Online, Bots, Raetsel), ohne Scrollen auf dem kleinen Handy, erster Start ueber das Willkommen "start".
+// Tests fuer die Startseite "heim" (Etappe A, Task 3): Rang-Ring, drei Modus-Karten (Online, Bots, Raetsel), ohne
+// Scrollen auf dem kleinen Handy, erster Start ueber das Willkommen "start". Seit Etappe B, Task 7 zeigt der Ring Kronen
+// und Liga-Stufe (kronenLage), ohne Konto den Hinweis zum Konto, offline den zuletzt gemerkten Stand.
 // Node-Teil ohne Browser, danach Browser-Teil (Playwright, Chromium oder BROWSER=webkit) gegen index.html?test.
 //
 //   node tests/heim.test.mjs              alles
 //   node tests/heim.test.mjs --nur-node   ohne Browser
 //   PORT=8972 node tests/heim.test.mjs    eigener Port (Standard 8972)
-//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (390x844 hell und dunkel, 1180x820, 1440x900 hell und dunkel)
+//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (390x844 hell und dunkel, 1180x820, 1440x900 hell und dunkel, Kronen mit und ohne Konto)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -14,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
-import { neuerStand, STUFEN } from '../js/pakete/liga/wertung.js';
+import { neuerStand } from '../js/pakete/liga/wertung.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -124,55 +125,167 @@ const lage = (seite) => seite.evaluate(() => {
     scroll: document.querySelector('.heim-rumpf') ? document.querySelector('.heim-rumpf').scrollTop : 0 };
 });
 
+// Angemeldete Seite (Etappe B, Task 7): Supabase-Abrufe abgefangen; kronen_mein_stand liefert stand, bei 'offline' bricht
+// der Abruf ab. speicher wie bei neueSeite.
+const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
+const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
+const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1',
+  expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
+async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 844, schema = 'light' } = {}) {
+  const kontext = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block' });
+  const seite = await kontext.newPage();
+  const fehler = [];
+  seite.on('pageerror', (e) => fehler.push('pageerror: ' + e.message));
+  // ein absichtlich abgebrochener Abruf meldet der Browser selbst als Ladefehler: kein Fehler der App
+  seite.on('console', (m) => { if (m.type() === 'error' && !/favicon|404|Failed to load resource|ERR_FAILED|Load failed/.test(m.text())) fehler.push('console: ' + m.text()); });
+  await seite.route(SUPA + '/**', (r) => {
+    if (r.request().url().includes('/rpc/kronen_mein_stand')) {
+      if (stand === 'offline') return r.abort('failed');
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stand) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await seite.addInitScript(({ sitzung, speicher }) => {
+    if (sessionStorage.getItem('heim-probe')) return;
+    sessionStorage.setItem('heim-probe', '1');
+    localStorage.clear();
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+    for (const [k, v] of Object.entries(speicher)) localStorage.setItem(k, JSON.stringify(v));
+  }, { sitzung: SITZUNG, speicher });
+  await seite.goto(BASIS + '#heim');
+  return { kontext, seite, fehler };
+}
+const ringText = (seite) => seite.evaluate(() => ({ ring: document.querySelector('.heim-ring')?.textContent.replace(/\s+/g, ' ').trim(),
+  zahl: document.querySelector('.heim-ring .heim-zahl')?.textContent.trim(), liga: document.querySelector('.heim-liga')?.textContent.replace(/\s+/g, ' ').trim(),
+  voll: Number(document.querySelector('.heim-ring')?.dataset.anteil), bogen: document.querySelector('.heim-ring .heim-bogen')?.getAttribute('stroke-dashoffset'),
+  aria: document.querySelector('.heim-ring')?.getAttribute('aria-label'), link: document.querySelector('.heim-liga a')?.getAttribute('href') || null,
+  krone: !!document.querySelector('.heim-ring .heim-einheit svg') }));
+const ohneUnsinn = (r) => !/NaN|undefined|null/.test(JSON.stringify({ ring: r.ring, liga: r.liga, aria: r.aria }));
+// wartet, bis die Ring-Zahl einen Wert zeigt (der Server-Stand kommt nach dem ersten Zeichnen)
+const warteZahl = (seite, wert) => seite.waitForFunction((w) => document.querySelector('.heim-ring .heim-zahl')?.textContent.trim() === w, wert, { timeout: 8000 })
+  .then(() => true, () => false);
+
+async function testeKronenLage(browser) {
+  gruppe = 'kronenLage';
+  const { kontext, seite } = await neueSeite(browser, { hash: '#einstellungen' });
+  await seite.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
+  const r = await seite.evaluate(async () => {
+    const { kronenLage } = await import('/js/ui/heim.js');
+    return { leer: kronenLage(null), oben: kronenLage({ kronen: 1750, stufe: 17 }), silber: kronenLage({ saison: 1, kronen: 640, stufe: 6, boden: 600, naechste: 700 }),
+      kaputt: kronenLage({ kronen: 'x' }), liste: kronenLage([]), minus: kronenLage({ kronen: -40 }) };
+  });
+  const l = r.leer;
+  pruefe('kronenLage(null): 0, Holz III, ohne Konto, Anteil 0', l.kronen === 0 && l.stufe === 0 && l.liga === 'holz' && l.rang === 3 && l.ohneKonto === true && l.anteil === 0, JSON.stringify(l));
+  pruefe('kronenLage(1750): hoechste Stufe, naechste null, Anteil 1', r.oben.naechste === null && r.oben.anteil === 1 && r.oben.stufe === 17 && r.oben.ohneKonto === false, JSON.stringify(r.oben));
+  const s = r.silber;
+  pruefe('kronenLage(640): Silber III, noch 60, Anteil 0,4', s.kronen === 640 && s.stufe === 6 && s.liga === 'silber' && s.rang === 3 && s.naechste === 700 && s.fehlt === 60
+    && Math.abs(s.anteil - 0.4) < 1e-9 && s.ohneKonto === false, JSON.stringify(s));
+  pruefe('kronenLage mit Unsinn (Text, Liste, negativ): 0 und Holz III, aber mit Konto', [r.kaputt, r.liste, r.minus].every((x) => x.kronen === 0 && x.stufe === 0 && x.ohneKonto === false),
+    JSON.stringify([r.kaputt, r.liste, r.minus]));
+  await kontext.close();
+}
+
 async function testeRing(browser, heute) {
-  gruppe = 'zeigt-ring';
+  gruppe = 'ohne-konto';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
+    const { kontext, seite, fehler } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
     const da = await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-ring .heim-zahl')?.textContent.trim(),
-      liga: document.querySelector('.heim-liga')?.textContent.trim(), bogen: document.querySelector('.heim-ring .heim-bogen')?.getAttribute('stroke-dashoffset') }));
-    pruefe('ohne Liga-Stand: #heim zeigt den Ring mit 0', da && r.zahl === '0', JSON.stringify(r));
-    pruefe('ohne Liga-Stand: Stufe Holz, kein NaN', /^Holz\b/.test(r.liga || '') && !/NaN|undefined/.test(JSON.stringify(r)), JSON.stringify(r));
-    pruefe('ohne Liga-Stand: Zeile nennt den Abstand zur naechsten Stufe ("noch 100 bis Bronze")', /noch 100 bis Bronze/.test(r.liga || ''), r.liga);
-    pruefe('ohne Liga-Stand: Bogen ist eine Zahl', Number.isFinite(Number(r.bogen)), r.bogen);
+    const r = await ringText(seite);
+    pruefe('Ring zeigt 0 Kronen und Holz III (Liga-Punkte der Arena zaehlen nicht)', da && r.zahl === '0' && /Holz III/.test(r.ring), JSON.stringify(r));
+    pruefe('Kronen-Symbol im Ring', r.krone);
+    pruefe('Hinweis "Konto anlegen und Kronen sammeln" fuehrt zu #einstellungen/konto', r.liga === 'Konto anlegen und Kronen sammeln' && r.link === '#einstellungen/konto', JSON.stringify(r));
+    pruefe('kein NaN, undefined oder null, Bogen ist eine Zahl', ohneUnsinn(r) && Number.isFinite(Number(r.bogen)), JSON.stringify(r));
+    await seite.locator('.heim-liga a').click();
+    pruefe('Klick auf den Hinweis oeffnet die Einstellungen (Konto)', await istScreen(seite, 'einstellungen') && await seite.evaluate(() => location.hash) === '#einstellungen/konto');
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'mit-konto';
+  {
+    const { kontext, seite, fehler } = await kontoSeite(browser, { stand: { saison: 1, kronen: 640, stufe: 6, boden: 600, naechste: 700 }, speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const da = await warteZahl(seite, '640');
+    const r = await ringText(seite);
+    pruefe('Server-Stand 640: Ring zeigt 640 und Silber III', da && /640/.test(r.ring) && /Silber III/.test(r.ring), JSON.stringify(r));
+    pruefe('Zeile "noch 60 bis Silber II", kein Konto-Hinweis', r.liga === 'noch 60 bis Silber II' && r.link === null, JSON.stringify(r));
+    pruefe('Ring zu 40 % gefuellt', Math.abs(r.voll - 0.4) < 1e-9, String(r.voll));
+    pruefe('kein NaN, undefined oder null', ohneUnsinn(r), JSON.stringify(r));
+    const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
+    pruefe('Stand gemerkt (Modul kronen, mit Konto, startGemeldet unberuehrt)', gemerkt && gemerkt.konto === UID && gemerkt.stand && gemerkt.stand.kronen === 640 && gemerkt.startGemeldet === false,
+      JSON.stringify(gemerkt));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
+    const { kontext, seite } = await kontoSeite(browser, { stand: { saison: 1, kronen: 1760, stufe: 17, boden: 1500, naechste: null }, speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-ring .heim-zahl')?.textContent.trim(),
-      liga: document.querySelector('.heim-liga')?.textContent.trim(), voll: Number(document.querySelector('.heim-ring')?.dataset.anteil) }));
-    pruefe('290 Punkte: Zahl 290, Silber, noch 160 bis Gold', r.zahl === '290' && /^Silber\b/.test(r.liga) && /noch 160 bis Gold/.test(r.liga), JSON.stringify(r));
-    pruefe('290 Punkte: Ring zu 20 % gefuellt (40 von 200 zwischen Silber und Gold)', Math.abs(r.voll - 0.2) < 0.001, String(r.voll));
+    const da = await warteZahl(seite, '1.760');
+    const r = await ringText(seite);
+    pruefe('hoechste Stufe: 1.760, Krone I, "Höchste Stufe", Ring voll', da && /Krone I\b/.test(r.ring) && r.liga === 'Höchste Stufe' && r.voll === 1, JSON.stringify(r));
+    await kontext.close();
+  }
+  gruppe = 'offline';
+  {
+    const gemerkt = { [P + 'modul:kronen']: { konto: UID, stand: { saison: 1, kronen: 1250, stufe: 12, boden: 1200, naechste: 1300 }, startGemeldet: false } };
+    const { kontext, seite, fehler } = await kontoSeite(browser, { stand: 'offline', speicher: { ...gesehen(heute), ...gemerkt } });
+    await istScreen(seite, 'heim');
+    await warte(1200);
+    const r = await ringText(seite);
+    pruefe('offline: letzter gemerkter Stand 1250 (als "1.250"), Diamant III', r.zahl === '1.250' && /Diamant III/.test(r.ring) && r.liga === 'noch 50 bis Diamant II', JSON.stringify(r));
+    pruefe('offline: keine Fehler der App', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
   {
-    const oben = STUFEN[STUFEN.length - 1];
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(oben.schwelle + 50) } });
+    const fremd = { [P + 'modul:kronen']: { konto: 'anderes-konto', stand: { kronen: 900 }, startGemeldet: false } };
+    const { kontext, seite } = await kontoSeite(browser, { stand: 'offline', speicher: { ...gesehen(heute), ...fremd } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ liga: document.querySelector('.heim-liga')?.textContent.trim(), voll: Number(document.querySelector('.heim-ring')?.dataset.anteil) }));
-    pruefe('hoechste Stufe: Name ohne "noch ... bis", Ring voll', r.liga.startsWith(oben.name) && !/noch/.test(r.liga) && r.voll === 1, JSON.stringify(r));
+    await warte(1200);
+    const r = await ringText(seite);
+    pruefe('offline mit Stand eines anderen Kontos: 0 und Holz III, kein Konto-Hinweis', r.zahl === '0' && /Holz III/.test(r.ring) && r.link === null, JSON.stringify(r));
     await kontext.close();
   }
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: { stand: 999, kaputt: true } } });
-    const da = await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-zahl')?.textContent.trim(), liga: document.querySelector('.heim-liga')?.textContent.trim() }));
-    pruefe('fremder Speicherstand (anderer Rechenstand): Holz und 0 statt Absturz', da && r.zahl === '0' && /^Holz/.test(r.liga), JSON.stringify(r));
+    // erst den gemerkten Stand, dann der Server-Stand
+    const gemerkt = { [P + 'modul:kronen']: { konto: UID, stand: { kronen: 300 }, startGemeldet: true } };
+    const { kontext, seite } = await kontoSeite(browser, { stand: { saison: 1, kronen: 330, stufe: 3, boden: 300, naechste: 400 }, speicher: { ...gesehen(heute), ...gemerkt } });
+    await istScreen(seite, 'heim');
+    const da = await warteZahl(seite, '330');
+    const neu = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
+    pruefe('gemerkter Stand wird durch den Server-Stand ersetzt, startGemeldet bleibt erhalten', da && neu && neu.stand.kronen === 330 && neu.startGemeldet === true, JSON.stringify(neu));
     await kontext.close();
   }
   gruppe = 'englisch';
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290),
-      [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
+    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ liga: document.querySelector('.heim-liga')?.textContent.trim(),
-      karten: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()) }));
-    pruefe('Englisch: "Silver, 160 to Gold" und englische Karten', /^Silver, 160 to Gold/.test(r.liga) && r.karten.length === 3 && !r.karten.some((k) => /[äöüß]|spielen|besiegen/i.test(k)),
-      JSON.stringify(r));
+    const r = await ringText(seite);
+    const karten = await seite.evaluate(() => [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()));
+    pruefe('Englisch ohne Konto: "Wood III" und "Create an account and collect crowns"', /Wood III/.test(r.ring) && r.liga === 'Create an account and collect crowns', JSON.stringify(r));
+    pruefe('Englisch: englische Karten', karten.length === 3 && !karten.some((k) => /[äöüß]|spielen|besiegen/i.test(k)), JSON.stringify(karten));
     await kontext.close();
   }
+  {
+    const { kontext, seite } = await kontoSeite(browser, { stand: { saison: 1, kronen: 640, stufe: 6, boden: 600, naechste: 700 },
+      speicher: { ...gesehen(heute), [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
+    await istScreen(seite, 'heim');
+    await warteZahl(seite, '640');
+    const r = await ringText(seite);
+    pruefe('Englisch mit Konto: "Silver III", "60 to Silver II"', /Silver III/.test(r.ring) && r.liga === '60 to Silver II', JSON.stringify(r));
+    await kontext.close();
+  }
+}
+
+async function bilderKronen(browser, heute) {
+  if (!BILDER) return;
+  const a = await neueSeite(browser, { speicher: gesehen(heute) });
+  await istScreen(a.seite, 'heim');
+  await bild(a.seite, 'heim-kronen-390x844-hell-ohne-konto');
+  await a.kontext.close();
+  const b = await kontoSeite(browser, { stand: { saison: 1, kronen: 640, stufe: 6, boden: 600, naechste: 700 }, speicher: gesehen(heute) });
+  await istScreen(b.seite, 'heim');
+  await warteZahl(b.seite, '640');
+  await bild(b.seite, 'heim-kronen-390x844-hell-mit-konto');
+  await b.kontext.close();
 }
 
 async function testeKarten(browser, heute) {
@@ -248,7 +361,7 @@ async function testeOhneScrollen(browser, heute) {
       const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
       const grund = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
       const aus = [];
-      for (const el of document.querySelectorAll('.heim-screen .heim-zahl, .heim-screen .heim-liga, .heim-screen .heim-modus b, .heim-screen .heim-modus span, .heim-screen .heim-name, .heim-screen .heim-level, .heim-screen .heim-einheit')) {
+      for (const el of document.querySelectorAll('.heim-screen .heim-zahl, .heim-screen .heim-liga, .heim-screen .heim-modus b, .heim-screen .heim-modus span, .heim-screen .heim-name, .heim-screen .heim-level, .heim-screen .heim-einheit, .heim-screen .heim-liga a')) {
         if (!el.textContent.trim() || el.closest('[hidden]')) continue;
         const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
         const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -292,7 +405,9 @@ async function browserTeil(browser) {
   await seite.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
   const heute = await seite.evaluate(async () => (await import('/js/tag.js')).tagSchluessel());
   await kontext.close();
+  await testeKronenLage(browser);
   await testeRing(browser, heute);
+  await bilderKronen(browser, heute);
   await testeKarten(browser, heute);
   await testeOhneScrollen(browser, heute);
   await testeErsterStart(browser);

@@ -74,6 +74,9 @@
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
 .partie .spieler.ich > .unter { grid-area: unter; }
 .partie .spieler .p-meta { flex: none; }
+/* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
+.partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
+  border-radius: 999px; font-size: .72em; font-weight: 600; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
 .partie .spieler .denkt-ort { display: inline-flex; align-items: center; flex: none; }
 .partie .spieler .denkt { margin-left: 2px; }
 .partie .spieler > .ort-gegner-leiste { grid-area: leiste; margin-bottom: 8px; min-width: 0; }

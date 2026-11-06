@@ -18,7 +18,7 @@
 /* ---------- Rang-Ring ---------- */
 .heim-ring { position: relative; flex: none; width: clamp(120px, 24dvh, 208px); aspect-ratio: 1; margin: var(--a1) auto var(--a2);
   display: grid; place-items: center; }
-.heim-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.heim-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .heim-spur, .heim-bogen { fill: none; stroke-width: 8; }
 .heim-spur { stroke: var(--linie-2); }
 .heim-bogen { stroke: var(--gold); stroke-linecap: round; transition: stroke-dashoffset var(--d-xl) var(--gleiten); }
@@ -31,6 +31,14 @@
 /* ---------- Liga-Zeile: Stufen-Name in der lesbaren Goldfassung (>= 4,5:1 in hell und dunkel) ---------- */
 .heim-liga { flex: none; margin: 0 0 var(--a3); text-align: center; font-size: 14.5px; font-weight: 600; color: var(--text-2); }
 .heim-liga b { color: var(--kt-stark); font-weight: var(--gw-stark); }
+/* Kronen (Etappe B, Task 7): Symbol vor der Stufe im Ring; ohne Konto ist die Zeile ein Link zur Konto-Seite */
+.heim-einheit { display: inline-flex; align-items: center; gap: 5px; }
+.heim-einheit svg { flex: none; width: 16px; height: 16px; color: var(--kt-stark); }
+.heim-konto { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 2px;
+  /* 44 px Tippflaeche, die Zeile bleibt so hoch wie mit 28 px (Startseite ohne Scrollen ab 375x667) */
+  margin-block: calc((28px - var(--tipp)) / 2); color: var(--kt-stark); font-weight: var(--gw-stark);
+  text-decoration: underline; text-underline-offset: 3px; }
+.heim-konto:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------- Modus-Karten ---------- */
 .heim-modi { flex: none; display: flex; flex-direction: column; gap: 10px; width: 100%; }
@@ -55,6 +63,11 @@
 @media (max-height: 700px) {
   .heim-modus, .heim-modus.haupt { padding-top: 10px; padding-bottom: 10px; }
   .heim-modi { gap: 8px; }
+}
+/* Sehr niedrige Fenster (iPad im Browser 1000x590): seit die Kronen-Stufe unter der Zahl steht, braucht der Ring eine
+   Zeile mehr; kleinerer Ring, damit die dritte Karte ueber der schwebenden Leiste bleibt (heim.test ohne-scrollen) */
+@media (max-height: 620px) {
+  .heim-ring { width: clamp(108px, 19dvh, 208px); margin-top: 0; }
 }
 /* Breite Fenster: etwas mehr Luft, Inhalt bleibt in der Mitte */
 @media (min-width: 900px) and (min-height: 701px) {

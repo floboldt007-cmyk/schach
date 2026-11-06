@@ -9,7 +9,9 @@
 // DOM: section.screen.lobby > header.haupt-kopf, .lb-rumpf > .lb-modus, .lb-spielen (.lb-zeiten > .lb-gruppe >
 // button.lb-zeit[data-zeit][aria-checked], .segment[data-seg="lb-wertung"], button.lb-suchen), .lb-wertungen
 // (.lb-wert[data-art]), .lb-liga (ol.lb-tabelle > li[data-zone][data-du]), .lb-mehr (button.lb-modus-karte[data-ziel]);
-// waehrend der Suche .lb-suche[data-phase="suche"|"gefunden"]. Optik: css/pakete/lobby.css.
+// waehrend der Suche .lb-suche[data-phase="suche"|"gefunden"|"anmelden"|"fehler"]. Optik: css/pakete/lobby.css.
+// Gewertet (Etappe B Task 4): echte Gegnersuche ueber js/kronen.js; Treffer oeffnet die Online-Partie, nach 10 s
+// (window.__lobbyBotMs verkuerzt es im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { segment } from './bauteile.js';
 import { icon } from './icons.js';
@@ -19,6 +21,7 @@ import { ladeFortschritt } from '../storage.js';
 import { avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
 import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, ligaTabelle, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
+import { suche as kronenSuche, angemeldet as kronenAngemeldet, BOT_ERSATZ_MS } from '../kronen.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 
@@ -132,6 +135,7 @@ export function zeige(root, params, app) {
     if (!suche) return;
     for (const u of uhren) clearTimeout(u);
     uhren.clear();
+    if (suche.server) suche.server.stopp();
     const el = suche.el;
     suche = null;
     el.remove();
@@ -172,8 +176,40 @@ export function zeige(root, params, app) {
       if (el.dataset.phase === 'suche') spaeter(tick, 1000);
     };
     spaeter(tick, 1000);
+    const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
+    // Etappe B Task 4: gewertet = echte Gegnersuche auf dem Server (js/kronen.js), nach 10 s ein KI-Gegner mit Beleg;
+    // Freundschaft bleibt die Vorschau mit einem Bot ohne Kronen
+    if (gewertet) {
+      const text = el.querySelector('.lb-suche-text');
+      if (!kronenAngemeldet()) {
+        el.dataset.phase = 'anmelden';
+        el.querySelector('.lb-suche-titel').textContent = L('suche.anmelden');
+        text.textContent = L('suche.anmelden.text');
+      } else {
+        text.firstChild.textContent = L('suche.server') + ' · ';
+        const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__lobbyBotMs) ? window.__lobbyBotMs : BOT_ERSATZ_MS;
+        suche.server = kronenSuche(zeit.id, {
+          warteMs,
+          beiTreffer: (partieId) => {
+            if (!suche || suche.el !== el) return;
+            schliesseSuche();
+            app.gehe('online', { partieId });
+          },
+          beiBot: ({ kiRef }) => {
+            if (!suche || suche.el !== el) return;
+            schliesseSuche();
+            app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
+          },
+          beiFehler: () => {
+            if (!suche || suche.el !== el) return;
+            el.dataset.phase = 'fehler';
+            text.textContent = L('suche.fehler');
+          },
+        });
+      }
+    }
     const dauer = typeof window !== 'undefined' && Number.isFinite(window.__lobbySuche) ? window.__lobbySuche : SUCHDAUER;
-    spaeter(() => {
+    if (!gewertet) spaeter(() => {
       if (!suche || suche.el !== el) return;
       el.dataset.phase = 'gefunden';
       el.querySelector('.lb-suche-titel').textContent = L('gefunden.titel');
@@ -188,7 +224,6 @@ export function zeige(root, params, app) {
       if (e.target.closest('.lb-abbrechen') || e.target === el) schliesseSuche();
       else if (e.target.closest('.lb-spielen-bot')) {
         const b = suche.bot;
-        const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
         schliesseSuche();
         app.gehe('partie', { botId: b.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl });
       }
@@ -208,7 +243,7 @@ export function zeige(root, params, app) {
     verlasse() {
       for (const u of uhren) clearTimeout(u);
       uhren.clear();
-      if (suche) { suche.el.remove(); suche = null; }
+      if (suche) { if (suche.server) suche.server.stopp(); suche.el.remove(); suche = null; }
       kopf.verlasse();
     },
   };

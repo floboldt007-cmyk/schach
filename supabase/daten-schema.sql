@@ -299,7 +299,8 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- (den Stand selbst hat der Spieler schon lokal und ueber die Sicherung).
 -- ---------------------------------------------------------------------------
 -- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql), das Abo (abo-schema.sql), die Werkstatt
--- (werkstatt-schema.sql: Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstuecke) und das Anmeldeprotokoll
+-- (werkstatt-schema.sql: Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstuecke), die Liga mit Kronen
+-- (kronen-schema.sql) und das Anmeldeprotokoll
 -- kommen nur dazu, wenn es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne diese Schemata. Fehlt
 -- eines, stehen die Schluessel trotzdem da (null bzw. leere Liste). Vorher wird aufgeraeumt (alte Zaehler, und mit dem
 -- Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte Fehlversuche), damit die Auskunft nichts
@@ -319,6 +320,8 @@ declare
   werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
     'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
   freunde jsonb := jsonb_build_object('freundschaften', '[]'::jsonb, 'einladung', null, 'wochenpunkte', '[]'::jsonb);
+  kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'archiv', '[]'::jsonb, 'suche', null,
+    'ki_belege', '[]'::jsonb);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -376,6 +379,20 @@ begin
                  from public.wochenpunkte w where w.user_id = $1), ''[]''::jsonb))'
       into freunde using uid;
   end if;
+  -- Liga mit Kronen (kronen-schema.sql): eigener Stand, alle Buchungen, das Saison-Archiv, die laufende Gegnersuche und
+  -- die KI-Belege. Die Tageszaehler (zaehler_tag) haben keinen Personenbezug und gehoeren nicht hierher.
+  if to_regclass('public.kronen_stand') is not null then
+    execute 'select jsonb_build_object(
+               ''stand'', (select to_jsonb(s) - ''user_id'' from public.kronen_stand s where s.user_id = $1),
+               ''buchungen'', coalesce((select jsonb_agg(to_jsonb(b) - ''user_id'' order by b.am, b.id)
+                 from public.kronen_buchungen b where b.user_id = $1), ''[]''::jsonb),
+               ''archiv'', coalesce((select jsonb_agg(to_jsonb(a) - ''user_id'' order by a.saison)
+                 from public.kronen_archiv a where a.user_id = $1), ''[]''::jsonb),
+               ''suche'', (select to_jsonb(q) - ''user_id'' from public.suche_warteschlange q where q.user_id = $1),
+               ''ki_belege'', coalesce((select jsonb_agg(to_jsonb(k) - ''user_id'' order by k.erstellt_am)
+                 from public.suche_ki_belege k where k.user_id = $1), ''[]''::jsonb))'
+      into kronen using uid;
+  end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -408,6 +425,8 @@ begin
     'freigabe_widerruf', (select to_jsonb(w) from public.freigabe_widerrufe w where w.user_id = uid),
     -- Freunde: Freundschaften und Anfragen (mit Benutzername der anderen Seite), Einladungscode, Wochenwertung
     'freunde', freunde,
+    -- Liga mit Kronen: Stand, Buchungen, Saison-Archiv, laufende Gegnersuche, KI-Belege (leer ohne kronen-schema.sql)
+    'kronen', kronen,
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,

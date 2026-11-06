@@ -211,8 +211,9 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
      Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
      Datei „Meine Daten herunterladen“. Seit dem 29.10. auch die eigene Zeile aus `abos` (falls `abo-schema.sql`
      eingespielt ist) und die Werkstatt-Daten (Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstücke, falls
-     `werkstatt-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt hat, führt die Datei dafür
-     einmal neu aus.
+     `werkstatt-schema.sql` eingespielt ist). Seit dem 06.11. auch die Liga mit Kronen (Stand, Buchungen, Saison-Archiv,
+     Gegnersuche, KI-Belege, falls `kronen-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt
+     hat, führt die Datei dafür einmal neu aus.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
@@ -245,6 +246,44 @@ sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgel
 (auch nach Zurückziehen), höchstens 100 Freunde und offene Anfragen je Konto, höchstens 20 neue Anfragen am Tag. Ein
 Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
 1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
+
+## Liga mit Kronen (Stand 06.11.2026)
+
+Die Liga mit Kronen (Ring auf der Startseite, gewertete Gegnersuche in der Lobby, Kronen für Online-, KI- und
+Bot-Partien, Start-Liga aus der vorhandenen Elo) braucht `supabase/kronen-schema.sql`. Ohne die Datei zeigt die App mit
+Konto keinen Kronen-Stand vom Server, und „Gewertet“ in der Lobby endet mit einer Fehlermeldung. Alles andere läuft
+weiter, die lokale Liga ebenso.
+
+1. Vorher muss das Online-Schema eingerichtet sein, in der Reihenfolge aus „Online gegen Freunde“ und „Anti-Cheat
+   Etappe 1a“ (zuerst die Edge Function, dann das SQL). Die Kronen-Datei hängt an die Tabelle `partien_online` die
+   Spalte `gewertet` und einen Trigger an.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/kronen-schema.sql` einfügen
+   und **Run** drücken. Die Datei darf mehrfach laufen.
+3. Prüfen: den ganzen Inhalt von `supabase/kronen-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
+   mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück.
+4. Tageszähler (gebaut, aber aus): danach `supabase/zaehler-schema.sql` einspielen und mit
+   `supabase/zaehler-rls-test.sql` prüfen (ebenfalls Rollback am Ende).
+5. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch den
+   Kronen-Stand, alle Kronen-Buchungen, das Saison-Archiv, eine laufende Gegnersuche und die KI-Belege. Die Tageszähler
+   haben keinen Personenbezug und stehen dort nicht.
+6. **Erst beim Live-Gang:** den Start der ersten Saison setzen, immer ein Montag, der erste Montag nach dem Live-Gang:
+   `update public.kronen_schalter set saison_start = 'JJJJ-MM-TT';`
+   Bis dahin gilt Saison 0: Kronen werden gebucht, aber keine Saison wechselt, niemand wird zurückgestuft.
+
+**Was der Server sicherstellt:** Die Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
+Zugang für anon). Kronen gibt nur der Server, je Partie, Beleg und Saisonwechsel höchstens einmal. Online zählen nur
+gewertete Partien aus der Gegnersuche (Freundes-Partien über Einladungscode nicht), nicht unter 4 Halbzügen und
+höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20 Ergebnisse am Tag (Europe/
+Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach der Ausgabe. Die Start-Liga
+gilt einmal je Konto und nur vor der ersten Partie mit Kronen. Innerhalb einer Saison fällt niemand unter den Anfang
+seiner Liga. Mit dem Konto verschwindet alles.
+
+**Zähler:** `kronen_schalter.zaehler_an` bleibt `false`. Erst einschalten nach der Rechtsprüfung (§ 25 TDDDG, DSGVO)
+und mit einem Absatz in der Datenschutzerklärung.
+
+**Rückweg:** `supabase/kronen-zurueck.sql` entfernt alles wieder, auch die Zähler. Achtung: Alle Kronen-Stände,
+Buchungen und das Saison-Archiv sind danach weg. Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in
+der Datei).
 
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
