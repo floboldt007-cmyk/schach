@@ -11,7 +11,7 @@
 //   Ohne geladenen Paket-Einstieg (dienst.paketGeladen) geht es still zur Arena, wie bei einem fehlenden Paket-Screen.
 //   Ohne Angabe w1. Kommt Flo aus dem Raetsel-Bildschirm zurueck (Zurueck oder "Fertig"), gilt die Seite, die das Paket
 //   dafuer gemerkt hat (dienst.nimmRueck). Die aktuelle Seite steht in params.seite des eigenen Verlaufseintrags
-//   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Arena.
+//   (merkeSeite): Neuladen bleibt auf ihr. "Ich kenne mich aus" steht auf jeder Seite im Kopf und fuehrt zur Startseite heim.
 //   Liegt ein eigener Verlaufseintrag davor (history.state.tiefe > 0, z. B. aus den Einstellungen oder vom Hinweis in
 //   der Heute-Karte geoeffnet), hat der Kopf zusaetzlich "Zurueck" (app.zurueck); beim allerersten Start nicht.
 //   Das Willkommen gilt als gesehen, sobald es einmal da war (Modul start, gesehen), auch wenn Flo die App gleich schliesst.
@@ -302,7 +302,9 @@ export function zeige(root, params, app) {
     else if (was === 'ja' || was === 'einstufung-seite' || was === 'wiederholen') geheZu('einstufung');
     else if (was === 'nein') { D.setzeRueck('frage'); app.gehe('raetsel', { quelle: D.QUELLE_REGELN }); }
     else if (was === 'einstufung-start') { D.setzeRueck('einstufung'); app.gehe('raetsel', { quelle: D.QUELLE_EINSTUFUNG }); }
-    else if (was === 'raus' || was === 'arena') app.gehe('arena', {}, { ersetzen: true });
+    // Etappe A: "Ich kenne mich aus" fuehrt zur Startseite heim, der Knopf zur Arena bleibt bei der Arena
+    else if (was === 'raus') app.gehe('heim', {}, { ersetzen: true });
+    else if (was === 'arena') app.gehe('arena', {}, { ersetzen: true });
     else if (was === 'benno') spiele(D.ersterGegner().id);
     else if (was === 'leiter') spiele(naechsterGegner(ladeFortschritt()).id);
     else if (was === 'probe' || was === 'spielen') {

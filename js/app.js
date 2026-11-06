@@ -94,10 +94,10 @@ export { icon };
 const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
-const SCREENS = ['arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
+const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
   'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby', 'schule'];
 const TITEL = {
-  arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
+  heim: 'Start', arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',
@@ -384,7 +384,7 @@ const REITER_ALLE = [['arena', 'Arena', 'pokal'], ['training', 'Training', 'ziel
   ['bestenliste', 'Bestenliste', 'podest'], ['ich', 'Ich', 'person']];
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
 const REITER_VON = { arena: 'arena', training: 'training', raetsel: 'training', lernen: 'training', bestenliste: 'bestenliste', ich: 'ich',
-  werkstatt: 'ich', lobby: 'arena' };
+  werkstatt: 'ich', lobby: 'arena', heim: 'arena' };
 // Querformat ab 1021 px (iPad quer): die Leiste sitzt oben in der Kopfzeile, sonst schwebt sie unten (D5)
 const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
 
@@ -633,7 +633,8 @@ function ausHash(hash) {
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (name === 'einstellungen' && rest && /^[a-z0-9-]{1,24}$/.test(rest)) return { name, params: { seite: rest } };
   if (SCREENS.includes(name)) return { name, params: {} };
-  return { name: 'arena', params: {} };
+  // ohne Hash (frisches Oeffnen nach dem Willkommen): die Startseite heim; ein unbekannter Hash bleibt bei der Arena
+  return { name: name ? 'arena' : 'heim', params: {} };
 }
 
 // Nur einfache Werte in den Verlauf (structured clone)
@@ -751,7 +752,7 @@ async function zeigeScreen(name, params, hash) {
   aktuell = { name, params, hash, handle: null };
   ladeFertig = nr;
   document.documentElement.dataset.screen = name;
-  document.title = name === 'arena' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
+  document.title = name === 'arena' || name === 'heim' ? 'Crownmate' : `${titelVon(name)} · Crownmate`;
   window.scrollTo(0, 0);
   if (!modul) {
     if (TEST) console.info('Screen nicht geladen: ' + name, ladeFehler && ladeFehler.message);
