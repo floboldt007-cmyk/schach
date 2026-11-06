@@ -90,7 +90,7 @@ html[data-reiter-wurzel="ja"] .haupt-kopf .kopf-zurueck { display: none; }
 .reiter-leiste .reiter-marke { display: none; }
 .reiter-leiste .reiter { position: relative; z-index: 1; flex: 1 1 0; min-width: var(--tipp); min-height: var(--tipp); margin: 0; padding: 0 4px;
   border: 0; border-radius: 26px; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  font: inherit; font-weight: var(--gw-stark); font-size: 11px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
+  font: inherit; font-weight: var(--gw-stark); font-size: 12px; line-height: 1.1; color: var(--text-2); white-space: nowrap; cursor: pointer;
   transition: color var(--d-s) var(--sanft), transform var(--d-m) var(--feder); }
 .reiter-leiste .reiter .ico { width: 22px; height: 22px; stroke-width: 1.7; }
 .reiter-leiste .reiter.an { color: var(--kt-stark); }

@@ -318,7 +318,8 @@ async function browserTeil() {
       });
       pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
       // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
-      await p.s.mouse.move(20, 600);
+      // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
+      await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 600);
       await p.s.mouse.wheel(0, 4000);
       await warte(500);
       const rollen = await p.s.evaluate(() => { const r = document.querySelector('.lb-rumpf'); return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight }; });
