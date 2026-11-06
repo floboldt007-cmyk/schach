@@ -61,3 +61,14 @@
   .heim-screen .heim-rumpf { justify-content: center; padding-top: var(--a4); }
   .heim-modus { padding: 18px 20px; }
 }
+/* Querformat ab 1021 px (neben der Seitenleiste): zwei Spalten wie im Entwurf ipad-pc-v2, links Name, Ring und Liga-Zeile,
+   rechts die drei Karten */
+@media (min-width: 1021px) and (orientation: landscape) {
+  .heim-screen .heim-rumpf { display: grid; max-width: 1040px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-areas: "wer modi" "ring modi" "liga modi"; grid-template-rows: auto auto auto; align-content: start; align-items: center;
+    justify-items: center; column-gap: clamp(32px, 5vw, 72px); padding-top: 48px; }
+  .heim-wer { grid-area: wer; }
+  .heim-ring { grid-area: ring; width: clamp(180px, 34dvh, 280px); }
+  .heim-liga { grid-area: liga; margin-bottom: 0; }
+  .heim-modi { grid-area: modi; align-self: start; }
+}
