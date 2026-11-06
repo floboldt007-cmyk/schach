@@ -14,8 +14,13 @@
 //   meldeKiErgebnis({ kiRef, ergebnis }) -> Promise<{ delta, kronen, stufe } | null>             (Task 5, KI-Gegner)
 //     ergebnis 'sieg' | 'remis' | 'niederlage'. Ohne Konto, offline oder bei einer Absage des Servers (Grenze, Beleg,
 //     zu frueh) null ohne Fehler; nichts wird gespeichert oder nachgeholt (entschieden: ohne Konto keine Kronen).
+//   setzeStartLiga() -> Promise<void>   (Task 6) meldet die lokale Liga-Elo einmal je Konto und Geraet an kronen_start;
+//     Merker startGemeldet im Modul kronen. Ohne Konto, ohne gewertete Partie oder offline nichts (dann beim naechsten Mal).
 import { rpc } from './online.js';
 import { sitzung } from './konto.js';
+import { ladeModul, speichereModul } from './storage.js';
+import { normalisiereStand } from './pakete/liga/wertung.js';
+import { kronenSpeicher } from './pakete/liga/kronen.js';
 
 export const BOT_ERSATZ_MS = 10000; // entschieden 06.11.2026: nach 10 s ohne Mensch ein KI-Gegner
 
@@ -36,6 +41,29 @@ async function melde(name, daten) {
 export const meldeBotErgebnis = ({ partieId, ergebnis, botElo }) =>
   melde('kronen_bot_ergebnis', { ref: partieId, ergebnis, bot_elo: botElo });
 export const meldeKiErgebnis = ({ kiRef, ergebnis }) => melde('kronen_ki_ergebnis', { ki_ref: kiRef, ergebnis });
+
+// app:bereit und app:sichtbar kommen oft kurz nacheinander: ein laufender Start wird geteilt, nie doppelt gesendet
+let startLaeuft = null;
+export function setzeStartLiga() {
+  if (!startLaeuft) startLaeuft = startEinmal().finally(() => { startLaeuft = null; });
+  return startLaeuft;
+}
+
+async function startEinmal() {
+  const uid = sitzung()?.user?.id;
+  if (!angemeldet() || !uid) return;
+  const m = kronenSpeicher(ladeModul('kronen'));
+  if (m.konto === uid && m.startGemeldet) return;
+  // ohne gewertete Partie gibt es keine eigene Elo (nur den Startwert): dann beginnt das Konto in Holz
+  const liga = normalisiereStand(ladeModul('liga'), new Date());
+  if (!liga || !(liga.wertung.n > 0)) return;
+  let d;
+  try { d = await rpc('kronen_start', { elo: liga.wertung.wert }); } catch (e) { return; }
+  // gesetzt oder schon vorbei: beides beendet die Meldung; jede andere Antwort versucht es beim naechsten Mal
+  if (!d || typeof d !== 'object' || !(Number.isFinite(d.kronen) || d.fehler === 'KRONEN_START_VORBEI')) return;
+  const alt = kronenSpeicher(ladeModul('kronen'));
+  speichereModul('kronen', { konto: uid, stand: alt.konto === uid ? alt.stand : null, startGemeldet: true });
+}
 
 const partieVon = (d) => (d && typeof d === 'object' && typeof d.partie === 'string' ? d.partie : null);
 

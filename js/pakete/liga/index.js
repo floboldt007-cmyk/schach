@@ -65,11 +65,20 @@ function uebernehme(r, partieId) {
   geaendert(r.stand, r.aufstieg.length > 0);
 }
 
+// Etappe B Task 6: Start-Liga aus der lokalen Elo, sobald ein Konto da ist (ein eigenes Anmelde-Ereignis gibt es nicht).
+// Ohne gewertete Partie bleibt js/kronen.js ungeladen; den Merker je Konto prueft setzeStartLiga.
+function startLiga() {
+  const st = lese();
+  if (!st || !(st.wertung.n > 0)) return;
+  import('../../kronen.js').then((k) => k.setzeStartLiga()).catch(() => {});
+}
+
 hoere('app:bereit', sicher(() => {
   laufend.clear();
   saisonPruefen();
+  startLiga();
 }));
-hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) saisonPruefen(); }));
+hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) { saisonPruefen(); startLiga(); } }));
 hoere('app:screen', sicher(({ name }) => { if (name !== 'partie') saisonPruefen(); }));
 hoere('partie:gestartet', sicher((d) => {
   laufend.set(d.laufId, { wertet: d.wertet === true, hinweise: d.hinweise || 0, beendet: false });

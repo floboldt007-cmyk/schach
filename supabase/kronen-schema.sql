@@ -101,6 +101,10 @@ as $$
     'paar_tagesgrenze', 3,
     'saison_tage', 28,
     'rueckstufung_stufen', 3,
+    'klassen_grenzen', jsonb_build_array(0, 1000, 1200, 1400, 1600, 1900),
+    'start_elo_min', 400,
+    'start_elo_max', 2800,
+    'start_hoechste_liga', 4,
     'saison_start', (select s.saison_start from public.kronen_schalter s where s.id)
   );
 $$;
@@ -671,3 +675,53 @@ revoke all on function public.kronen_bot_ergebnis(text, text, integer) from publ
 revoke all on function public.kronen_ki_ergebnis(uuid, text) from public, anon, authenticated;
 grant execute on function public.kronen_bot_ergebnis(text, text, integer) to authenticated;
 grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated;
+
+-- ---------- Task 6: Start-Liga fuer Bestandsspieler ----------
+-- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI oder Bot): die Elo des Geraets, begrenzt auf
+-- 400 bis 2800, wird zum Anfang der Liga ihrer Spielklasse, hoechstens Diamant III (SQL-Gegenstueck zu
+-- startKronenAusElo in js/pakete/liga/kronen.js, Zahlen aus kronen_konstanten). Die Elo wird auch die Online-Elo.
+-- Antwort { delta, kronen, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_START_VORBEI' } ohne Aenderung.
+create or replace function public.kronen_start(elo integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  konst jsonb := public.kronen_konstanten();
+  st public.kronen_stand;
+  wert integer;
+  klasse integer;
+  neu integer;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  if kronen_start.elo is null then
+    return jsonb_build_object('fehler', 'KRONEN_EINGABE');
+  end if;
+  -- kronen_stand_sichern sperrt die Zeile (for update): gleichzeitige Starts und Buchungen laufen nacheinander
+  st := public.kronen_stand_sichern(uid);
+  if st.start_gesetzt
+     or exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle in ('online', 'ki', 'bot')) then
+    return jsonb_build_object('fehler', 'KRONEN_START_VORBEI');
+  end if;
+  wert := least(greatest(kronen_start.elo, (konst->>'start_elo_min')::integer), (konst->>'start_elo_max')::integer);
+  select count(*)::integer - 1 into klasse
+  from jsonb_array_elements_text(konst->'klassen_grenzen') g(grenze)
+  where wert >= g.grenze::integer;
+  neu := least(klasse, (konst->>'start_hoechste_liga')::integer)
+         * (konst->>'stufen_je_liga')::integer * (konst->>'stufe_kronen')::integer;
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
+  values (uid, 'start', 'start', neu - st.kronen, st.saison)
+  on conflict on constraint kronen_buchungen_einmal do nothing;
+  update public.kronen_stand s
+  set kronen = neu, boden = public.kronen_liga_boden(neu), elo = wert, start_gesetzt = true, aktualisiert_am = now()
+  where s.user_id = uid;
+  return jsonb_build_object('delta', neu - st.kronen, 'kronen', neu, 'stufe', public.kronen_stufe(neu));
+end;
+$$;
+
+revoke all on function public.kronen_start(integer) from public, anon, authenticated;
+grant execute on function public.kronen_start(integer) to authenticated;

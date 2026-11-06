@@ -995,4 +995,130 @@ end;
 $$;
 reset role;
 
+-- ---------- 10. Start-Liga (Task 6) ----------
+-- Vier neue Nutzer: G startet mit Elo 1450, H hat schon eine Bot-Partie, I schickt Unsinn und dann 99999, J 300.
+insert into auth.users (id, email)
+values
+  ('11111111-1111-4111-8111-111111111111', 'kronen-g@example.invalid'),
+  ('22222222-2222-4222-8222-222222222222', 'kronen-h@example.invalid'),
+  ('33333333-3333-4333-8333-333333333333', 'kronen-i@example.invalid'),
+  ('44444444-4444-4444-8444-444444444444', 'kronen-j@example.invalid');
+
+-- Start einmal: 1450 ist Klasse Gold (ab 1400), also 900 Kronen (Gold III); der zweite Aufruf aendert nichts
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.kronen_start(1450);
+  if r is distinct from '{"delta": 900, "kronen": 900, "stufe": 9}'::jsonb then
+    raise exception 'FEHLER: Start einmal: % statt 900 Kronen', r;
+  end if;
+  r := public.kronen_start(1900);
+  if r->>'fehler' is distinct from 'KRONEN_START_VORBEI' then
+    raise exception 'FEHLER: Start einmal: zweiter Aufruf %', r;
+  end if;
+  if (public.kronen_mein_stand()->>'kronen')::int is distinct from 900 then
+    raise exception 'FEHLER: Start einmal: Stand nach dem zweiten Aufruf veraendert';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.kronen_stand where user_id = '11111111-1111-4111-8111-111111111111'
+                 and kronen = 900 and boden = 900 and elo = 1450 and start_gesetzt) then
+    raise exception 'FEHLER: Start einmal: Stand von G (Boden, Elo, start_gesetzt) falsch';
+  end if;
+  if (select count(*) from public.kronen_buchungen where user_id = '11111111-1111-4111-8111-111111111111'
+      and quelle = 'start' and ref = 'start' and delta = 900) is distinct from 1::bigint then
+    raise exception 'FEHLER: Start einmal: Buchung start/start fehlt oder doppelt';
+  end if;
+end;
+$$;
+
+-- Start nach Partie: nach einer Bot-Buchung ist der Start vorbei
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.kronen_bot_ergebnis('partie-start-h', 'sieg', 1200);
+  if (r->>'kronen')::int is distinct from 15 then
+    raise exception 'FEHLER: Start nach Partie: Bot-Sieg %', r;
+  end if;
+  r := public.kronen_start(1900);
+  if r->>'fehler' is distinct from 'KRONEN_START_VORBEI' then
+    raise exception 'FEHLER: Start nach Partie: %', r;
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.kronen_stand where user_id = '22222222-2222-4222-8222-222222222222'
+                 and kronen = 15 and not start_gesetzt) then
+    raise exception 'FEHLER: Start nach Partie: Stand von H veraendert';
+  end if;
+end;
+$$;
+
+-- Start-Grenze: ohne Elo keine Aenderung; 99999 zaehlt wie 2800, also Diamant III (1200), nie Krone; 300 wie 400
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.kronen_start(null);
+  if r->>'fehler' is distinct from 'KRONEN_EINGABE' then
+    raise exception 'FEHLER: Start-Grenze: ohne Elo %', r;
+  end if;
+  r := public.kronen_start(99999);
+  if r is distinct from '{"delta": 1200, "kronen": 1200, "stufe": 12}'::jsonb then
+    raise exception 'FEHLER: Start-Grenze: 99999 ergibt %', r;
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb;
+begin
+  r := public.kronen_start(300);
+  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 0}'::jsonb then
+    raise exception 'FEHLER: Start-Grenze: 300 ergibt %', r;
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.kronen_stand where user_id = '33333333-3333-4333-8333-333333333333'
+                 and kronen = 1200 and boden = 1200 and elo = 2800 and start_gesetzt) then
+    raise exception 'FEHLER: Start-Grenze: Stand von I (Elo auf 2800 begrenzt) falsch';
+  end if;
+  if not exists (select 1 from public.kronen_stand where user_id = '44444444-4444-4444-8444-444444444444'
+                 and kronen = 0 and elo = 400 and start_gesetzt) then
+    raise exception 'FEHLER: Start-Grenze: Stand von J (Elo auf 400 begrenzt) falsch';
+  end if;
+end;
+$$;
+
+-- anon darf keinen Start setzen
+set local role anon;
+do $$
+begin
+  begin
+    perform public.kronen_start(1450);
+    raise exception 'FEHLER: anon darf kronen_start aufrufen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+reset role;
+
 rollback;

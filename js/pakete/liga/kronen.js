@@ -24,6 +24,8 @@ export const ONLINE_MINDEST_HALBZUEGE = 4;
 export const PAAR_TAGESGRENZE = 3;
 export const SAISON_TAGE = 28; // entschieden 06.11.2026: 4 Wochen; der Start ist eine Einstellung, kein Wert im Code
 export const RUECKSTUFUNG_STUFEN = 3; // entschieden 06.11.2026: eine ganze Liga zurueck
+// Start-Liga (Task 6): der Server begrenzt die gemeldete Elo auf diesen Bereich (kronen_start, kronen_konstanten)
+export const START_ELO_GRENZEN = Object.freeze([400, 2800]);
 
 const LIGA_KRONEN = STUFE_KRONEN * STUFEN_JE_LIGA;
 const MAX_INDEX = STUFEN_ANZAHL - 1;

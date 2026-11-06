@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   STUFE_KRONEN, STUFEN_JE_LIGA, STUFEN_ANZAHL, KRONEN, BOT_TAGESGRENZE, KI_TAGESGRENZE, KI_MINDESTDAUER_S,
-  SAISON_TAGE, RUECKSTUFUNG_STUFEN, ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE,
+  SAISON_TAGE, RUECKSTUFUNG_STUFEN, ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE, START_ELO_GRENZEN, LIGEN,
 } from '../js/pakete/liga/kronen.js';
+import { KLASSEN_GRENZEN } from '../js/pakete/liga/wertung.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const lies = (d) => readFileSync(path.join(WURZEL, d), 'utf8');
@@ -77,7 +78,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const grants = [...sql.matchAll(/grant execute on function public\.([a-z_]+)\(([^)]*)\) to ([a-z_]+)/g)].map((m) => `${m[1]}->${m[3]}`);
   const ERLAUBT = ['kronen_mein_stand->authenticated', 'kronen_konstanten->authenticated',
     'online_suche_start->authenticated', 'online_suche_stand->authenticated', 'online_suche_ende->authenticated',
-    'kronen_bot_ergebnis->authenticated', 'kronen_ki_ergebnis->authenticated'];
+    'kronen_bot_ergebnis->authenticated', 'kronen_ki_ergebnis->authenticated', 'kronen_start->authenticated'];
   pruefe('nur freigegebene Funktionen fuer Nutzer, nie fuer anon', grants.every((g) => ERLAUBT.includes(g)) && !grants.some((g) => g.endsWith('anon')), grants);
   pruefe('alle Funktionen mit security definer haben search_path leer',
     funktionen.filter((f) => /security definer/.test(f.kopf)).every((f) => /set search_path = ''/.test(f.kopf)));
@@ -153,6 +154,25 @@ const fn = (name) => funktionen.find((f) => f.name === name);
       && /kronen_konstanten\(\) #>> array\['kronen', art, ergebnis\]/.test(einfach));
   pruefe('Tagesgrenzen zaehlen ab Mitternacht Europe/Berlin', /kronen_heute\(\)::timestamp at time zone 'Europe\/Berlin'/.test(fn('kronen_heute_anzahl')?.rumpf || ''));
   pruefe('RLS-Test ruft Bot- und KI-Ergebnis auf', test.includes('public.kronen_bot_ergebnis(') && test.includes('public.kronen_ki_ergebnis('));
+}
+
+// ---------- Start-Liga (Task 6) ----------
+{
+  const k = fn('kronen_konstanten')?.rumpf || '';
+  const zahl = (schluessel) => Number((k.match(new RegExp(`'${schluessel}',\\s*(-?\\d+)`)) || [])[1]);
+  const grenzen = ((k.match(/'klassen_grenzen',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
+  pruefe('Start-Liga: Klassengrenzen, Elo-Grenzen und hoechste Start-Liga gleich',
+    JSON.stringify(grenzen) === JSON.stringify(KLASSEN_GRENZEN) && zahl('start_elo_min') === START_ELO_GRENZEN[0]
+      && zahl('start_elo_max') === START_ELO_GRENZEN[1] && zahl('start_hoechste_liga') === LIGEN.indexOf('diamant'),
+    { sql: [grenzen, zahl('start_elo_min'), zahl('start_elo_max'), zahl('start_hoechste_liga')], js: [KLASSEN_GRENZEN, START_ELO_GRENZEN] });
+  const start = fn('kronen_start')?.rumpf || '';
+  pruefe('kronen_start: nur ohne gesetzten Start und ohne Partie mit Kronen, sonst KRONEN_START_VORBEI',
+    /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
+      && start.indexOf("'KRONEN_START_VORBEI'") < start.indexOf('insert into public.kronen_buchungen'));
+  pruefe('kronen_start: Buchung start/start, Stand mit Boden, Elo und start_gesetzt',
+    /values \(uid, 'start', 'start', neu - st\.kronen, st\.saison\)/.test(start)
+      && /boden = public\.kronen_liga_boden\(neu\), elo = wert, start_gesetzt = true/.test(start));
+  pruefe('RLS-Test ruft kronen_start auf', test.includes('public.kronen_start('));
 }
 
 // ---------- RLS-Test deckt ab ----------

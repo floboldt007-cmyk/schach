@@ -327,8 +327,9 @@ async function kronenMeldeTeil() {
   setzeOnlineFetch(async (url, opt) => {
     aufrufe.push({ name: (String(url).match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1], daten: opt && opt.body ? JSON.parse(opt.body) : null });
     if (netzFehlt) throw new Error('offline');
-    return { ok: true, status: 200, json: async () => ({ delta: 15, kronen: 15, stufe: 0 }) };
+    return { ok: true, status: 200, json: async () => antwort || { delta: 15, kronen: 15, stufe: 0 } };
   });
+  let antwort = null;
   const kurz = () => new Promise((r) => setTimeout(r, 150)); // das Paket laedt js/kronen.js erst beim Melden
   const ende = (p, extra = {}) => {
     const r = S.speicherePartie({ ...p, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'], modus: p.modus || 'normal' });
@@ -361,6 +362,48 @@ async function kronenMeldeTeil() {
     await browserPruefe('liga meldet einen KI-Gegner ohne Beleg gar nicht', async () => {
       aufrufe = []; ende(partie('k-ki-ohne', { ki: true })); await kurz();
       assert.equal(aufrufe.length, 0);
+    });
+    // Task 6: Start-Liga. Bis hier hat die lokale Liga gewertete Partien, also eine eigene Elo.
+    const UID = sitzung.user.id;
+    const k = await import('../js/kronen.js');
+    const { setzeKontoFetch } = await import('../js/konto.js');
+    const merker = () => S.ladeModul('kronen');
+    const vergiss = () => S.speichereModul('kronen', { konto: null, stand: null, startGemeldet: false });
+    const starts = () => aufrufe.filter((a) => a.name === 'kronen_start');
+    await browserPruefe('setzeStartLiga sendet lokale Elo einmal (zwei Aufrufe, ein RPC), Merker je Konto', async () => {
+      aufrufe = []; vergiss(); const elo = S.ladeModul('liga').wertung.wert;
+      await Promise.all([k.setzeStartLiga(), k.setzeStartLiga()]); await k.setzeStartLiga();
+      assert.deepEqual(aufrufe, [{ name: 'kronen_start', daten: { elo } }]);
+      assert.deepEqual(merker(), { konto: UID, stand: null, startGemeldet: true });
+    });
+    await browserPruefe('setzeStartLiga: offline kein Merker, beim naechsten Mal nachgeholt', async () => {
+      aufrufe = []; vergiss(); netzFehlt = true;
+      await k.setzeStartLiga(); assert.equal(merker().startGemeldet, false);
+      netzFehlt = false; await k.setzeStartLiga();
+      assert.equal(starts().length, 2); assert.equal(merker().startGemeldet, true);
+    });
+    await browserPruefe('setzeStartLiga: KRONEN_START_VORBEI setzt den Merker, KRONEN_EINGABE nicht', async () => {
+      aufrufe = []; vergiss(); antwort = { fehler: 'KRONEN_EINGABE' };
+      await k.setzeStartLiga(); assert.equal(merker().startGemeldet, false);
+      antwort = { fehler: 'KRONEN_START_VORBEI' }; await k.setzeStartLiga();
+      assert.equal(starts().length, 2); assert.equal(merker().startGemeldet, true);
+      antwort = null;
+    });
+    await browserPruefe('setzeStartLiga: Merker eines anderen Kontos zaehlt nicht', async () => {
+      aufrufe = []; S.speichereModul('kronen', { konto: 'anderes-konto', stand: { kronen: 900 }, startGemeldet: true });
+      await k.setzeStartLiga();
+      assert.equal(starts().length, 1); assert.deepEqual(merker(), { konto: UID, stand: null, startGemeldet: true });
+    });
+    await browserPruefe('Liga-Paket startet die Start-Liga bei app:sichtbar', async () => {
+      aufrufe = []; vergiss();
+      setzeKontoFetch(async () => { throw new Error('offline'); }); // der Konto-Abgleich bei app:sichtbar bleibt so im Test
+      try { sende('app:sichtbar', { sichtbar: true }); await kurz(); } finally { setzeKontoFetch(null); }
+      assert.equal(starts().length, 1); assert.equal(merker().startGemeldet, true);
+    });
+    await browserPruefe('setzeStartLiga ohne gewertete Partie sendet nichts', async () => {
+      aufrufe = []; vergiss(); const alt = S.ladeModul('liga'); S.speichereModul('liga', W.neuerStand(new Date()));
+      try { await k.setzeStartLiga(); } finally { S.speichereModul('liga', alt); }
+      assert.equal(aufrufe.length, 0); assert.equal(merker().startGemeldet, false);
     });
     await browserPruefe('liga meldet ohne Konto nichts', async () => {
       aufrufe = []; speicher.delete('schach-arena:konto:sitzung'); ende(partie('k-ohne-konto')); await kurz();
