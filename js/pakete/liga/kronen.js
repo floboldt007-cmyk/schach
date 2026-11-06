@@ -77,6 +77,15 @@ export function neueSaisonKronen(kronen) {
   return { kronen: ziel, boden: ligaBoden(ziel) };
 }
 
+// Modul-Speicher "kronen" (js/storage.js), geprueft beim Lesen: { konto, stand, startGemeldet }. stand ist der letzte
+// Server-Stand (kronen_mein_stand) und gilt nur fuer dasselbe Konto; die Startseite zeigt ihn sofort und offline (Task 7).
+// startGemeldet ist der Merker fuer die Start-Liga (Task 6), nur ein echtes boolean zaehlt.
+export function kronenSpeicher(roh) {
+  const o = roh && typeof roh === 'object' && !Array.isArray(roh) ? roh : {};
+  const st = o.stand && typeof o.stand === 'object' && !Array.isArray(o.stand) && Number.isFinite(o.stand.kronen) ? o.stand : null;
+  return { konto: typeof o.konto === 'string' && o.konto ? o.konto : null, stand: st, startGemeldet: o.startGemeldet === true };
+}
+
 // Bestandsspieler: Spielklasse aus der Elo (KLASSEN_GRENZEN) wird zum Anfang der Liga (Stufe III), hoechstens Diamant III.
 export function startKronenAusElo(elo) {
   let klasse = 0;

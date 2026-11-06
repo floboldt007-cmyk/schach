@@ -111,6 +111,8 @@ export const MODUL_BUDGET = Object.freeze({
   teilen: 2000,
   // Welle C: Tagesraetsel (S1-5): Ergebnisse der letzten 60 Tage, "Ein Wort"
   tagesraetsel: 4000,
+  // Etappe B: letzter Kronen-Stand je Konto und Start-Merker (js/pakete/liga/kronen.js kronenSpeicher)
+  kronen: 1000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;

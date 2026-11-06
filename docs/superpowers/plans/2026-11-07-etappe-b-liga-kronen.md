@@ -244,6 +244,8 @@
 - [ ] **Step 4:** `node tests/heim.test.mjs`, `node tests/fairness.test.mjs`, `node tests/thema.test.mjs` → ok; `BROWSER=webkit node tests/heim.test.mjs` → ok.
 - [ ] **Step 5:** Commit `Startseite: Ring zeigt Kronen und Liga-Stufe`.
 
+**Umsetzungsnotiz Task 7 (06.11.2026, mit dem Orchestrator abgestimmt):** (a) Der Hinweis ohne Konto fuehrt nach `#einstellungen/konto`, nicht nach `#konto`: `#konto` ist keine Seite (ein unbekannter Hash landet in der Arena), sondern nur der Test-Schalter `kontoFreigeschaltet` in `js/konto.js`. (b) Ein Modul `kronen` gab es nicht; es steht jetzt in `MODUL_BUDGET` (`js/storage.js`, 1.000 Zeichen, `tests/storage.test.mjs` zaehlt 25 Module). Inhalt `{ konto, stand, startGemeldet }`, gelesen ueber `kronenSpeicher()` in `js/pakete/liga/kronen.js`; der Stand gilt nur fuer dasselbe Konto. `startGemeldet` (nur ein echtes boolean zaehlt) ist der Merker fuer Task 6, der damit kein eigenes Modul anlegt; Task 7 setzt ihn nie, erhaelt ihn aber beim Merken. (c) Ausser den genannten Dateien geaendert: `js/storage.js`, `js/pakete/liga/kronen.js` (`kronenSpeicher`), `tests/storage.test.mjs`, `tests/kronen.test.mjs`; in `css/heim.css` gilt die Ring-Regel jetzt nur fuer das direkte `svg` (`.heim-ring > svg`), sonst lag das Kronen-Symbol ueber der Zahl.
+
 ### Task 8: Tageszaehler (gebaut, AUS)
 
 **Files:**
