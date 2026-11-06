@@ -17,7 +17,7 @@
 - Ligen: Holz, Bronze, Silber, Gold, Diamant, Krone, je 3 Stufen (III, II, I aufsteigend) = 18 Stufen.
 - Saison 4 Wochen (28 Tage), Start montags 00:00 Europe/Berlin, Serverzeit (`now() at time zone 'Europe/Berlin'`), nie Geraetezeit. Der erste Saisonstart ist eine Einstellung (`kronen_schalter.saison_start`, beim Live-Gang auf den ersten Montag danach gesetzt), kein fester Wert im Code; solange er leer ist, laeuft Saison 0 ohne Wechsel.
 - Boden-Schutz: Innerhalb einer Saison faellt niemand unter den Anfang der in dieser Saison erreichten Liga (Holz 0, Bronze 300, Silber 600, Gold 900, Diamant 1200, Krone 1500). Innerhalb einer Liga kann man Kronen verlieren.
-- Drei Quellen mit eigenen Werten: Mensch (Gegnersuche) +30/+10/-15, KI-Gegner aus der Gegnersuche (Bot nach 10 s) +20/+5/-10 ohne Tagesgrenze, Bot-Leiter +15/+5/0 mit Tagesgrenze 10.
+- Drei Quellen mit eigenen Werten: Mensch (Gegnersuche) +30/+10/-15, KI-Gegner aus der Gegnersuche (Bot nach 10 s) +20/+5/-10 mit eigener Obergrenze 20 Partien pro Tag und nur gegen Suchbeleg, der fruehestens 60 s nach Ausgabe einloesbar ist, Bot-Leiter +15/+5/0 mit Tagesgrenze 10.
 - Elo bleibt unsichtbar (nur fuer die Gegnersuche, Anzeige im Profil kommt mit Etappe 4b).
 - Bot-Ersatz nach 10 Sekunden Suche, sichtbar markiert mit "KI-Gegner" / "AI opponent", nie als Mensch getarnt. Sieg gegen Bot gibt weniger Kronen als gegen Menschen.
 - Zaehler (5d): nur Tagessummen je Schluessel, keine Nutzer-ID, keine Geraete-Kennung, keine Cookies, kein Dritter. Gebaut, aber AUS (`kronen_schalter.zaehler_an = false`) bis Rechtspruefung und Datenschutz-Absatz.
@@ -68,7 +68,9 @@
   - `LIGEN = ['holz','bronze','silber','gold','diamant','krone']`
   - `STUFEN_JE_LIGA = 3`, `STUFE_KRONEN = 100` (Kronen je Stufe), `STUFEN_ANZAHL = 18`
   - `KRONEN = { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 } }`
-  - `BOT_TAGESGRENZE = 10` (nur Quelle `bot`, gewertete Ergebnisse je Tag; `ki` hat keine Grenze)
+  - `BOT_TAGESGRENZE = 10` (Quelle `bot`, gewertete Ergebnisse je Tag, Europe/Berlin)
+  - `KI_TAGESGRENZE = 20` (Quelle `ki`, gewertete Ergebnisse je Tag, Europe/Berlin)
+  - `KI_MINDESTDAUER_S = 60` (ein Suchbeleg ist fruehestens 60 s nach Ausgabe einloesbar)
   - `SAISON_TAGE = 28` (der Start kommt als Parameter, siehe `saisonAm`)
   - `RUECKSTUFUNG_STUFEN = 3`
   - `stufeVon(kronen: number) -> { index: 0..17, liga: string, rang: 3|2|1, boden: number, naechste: number|null }` (`boden` = Anfang der Stufe)
@@ -112,7 +114,7 @@
 - `kronen-zurueck.sql`: `drop function` aller `kronen_*` und `drop trigger` aus Task 3, dann `drop table kronen_buchungen, kronen_archiv, kronen_stand, kronen_schalter`, dann `alter table partien_online drop column if exists gewertet` (aus Task 3) und `drop table if exists suche_warteschlange, zaehler_tag` (aus Task 4 und 8). Nur Strukturen, keine Daten zurueck: Kopf-Kommentar sagt das ausdruecklich.
 
 - [ ] **Step 1: Failing test** `tests/kronen-vertrag.test.mjs`:
-  - liest `supabase/kronen-schema.sql`, zieht den `jsonb_build_object` aus `kronen_konstanten()` per Regex und vergleicht jeden Wert mit dem Export aus `js/pakete/liga/kronen.js` (`STUFE_KRONEN`, alle neun Werte aus `KRONEN.online/ki/bot`, `BOT_TAGESGRENZE`, `SAISON_TAGE`, `RUECKSTUFUNG_STUFEN`).
+  - liest `supabase/kronen-schema.sql`, zieht den `jsonb_build_object` aus `kronen_konstanten()` per Regex und vergleicht jeden Wert mit dem Export aus `js/pakete/liga/kronen.js` (`STUFE_KRONEN`, alle neun Werte aus `KRONEN.online/ki/bot`, `BOT_TAGESGRENZE`, `KI_TAGESGRENZE`, `KI_MINDESTDAUER_S`, `SAISON_TAGE`, `RUECKSTUFUNG_STUFEN`).
   - weder `kronen.js` noch `kronen-schema.sql` enthaelt ein festes Saison-Startdatum (`/20\d\d-\d\d-\d\d/` kommt im Schema nur in Kommentaren vor, in `kronen.js` gar nicht).
   - jede `create or replace function public.kronen_*` und `online_suche_*`/`zaehler_*` aus dem Schema kommt in `kronen-rls-test.sql` vor.
   - jede Tabelle aus `kronen-schema.sql` hat `enable row level security` und steht in `kronen-zurueck.sql` in einem `drop`.
@@ -164,7 +166,7 @@
   - `suche_warteschlange (user_id uuid pk references auth.users on delete cascade, zeit text not null check (zeit ~ '^[0-9]{1,3}\+[0-9]{1,2}$'), elo int not null, seit timestamptz not null default now())`
   - `online_suche_start(zeit text) returns jsonb`: sucht unter `for update skip locked` den aeltesten Wartenden mit gleicher `zeit` und `abs(elo - eigene) <= 200 + 50 * Sekunden_gewartet` (Sekunden des laenger Wartenden); gefunden → legt `partien_online` mit `gewertet = true`, `status = 'laeuft'`, Farben zufaellig an, loescht beide Zeilen, liefert `{ partie: uuid }`; sonst eigene Zeile anlegen und `{ wartet: true }`.
   - `online_suche_stand() returns jsonb`: `{ partie }` wenn man inzwischen gepaart wurde (letzte gewertete laufende Partie mit eigener Beteiligung juenger als 60 s), sonst `{ wartet: true }`.
-  - `online_suche_ende(ki boolean default false) returns jsonb`: eigene Zeile loeschen (Abbruch oder Bot-Ersatz). Mit `ki = true` und nur, wenn die eigene Zeile mindestens 10 s alt war und es keine Paarung gab, legt sie einen Beleg `suche_ki_belege (ref uuid pk default gen_random_uuid(), user_id uuid not null references auth.users on delete cascade, erstellt_am timestamptz not null default now(), eingeloest boolean not null default false)` an und liefert `{ ki_ref: uuid }`; sonst `{}`. Belege aelter als 6 Stunden verfallen (Aufraeumen in `online_suche_start`). Grund: KI-Gegner-Ergebnisse haben keine Tagesgrenze, der Server bucht sie deshalb nur gegen einen echten Suchbeleg (Task 5).
+  - `online_suche_ende(ki boolean default false) returns jsonb`: eigene Zeile loeschen (Abbruch oder Bot-Ersatz). Mit `ki = true` und nur, wenn die eigene Zeile mindestens 10 s alt war und es keine Paarung gab, legt sie einen Beleg `suche_ki_belege (ref uuid pk default gen_random_uuid(), user_id uuid not null references auth.users on delete cascade, erstellt_am timestamptz not null default now(), eingeloest boolean not null default false)` an und liefert `{ ki_ref: uuid }`; sonst `{}`. Belege aelter als 6 Stunden verfallen (Aufraeumen in `online_suche_start`). Grund: Der Server bucht KI-Gegner-Ergebnisse nur gegen einen echten Suchbeleg, mit Mindestdauer und Tagesgrenze (Task 5).
   - Zeilen aelter als 2 Minuten raeumt `online_suche_start` mit weg.
 - Produces (JS, `js/kronen.js`):
   - `holeStand() -> Promise<{saison,kronen,stufe,boden,naechste}>` (ruft `kronen_mein_stand`)
@@ -193,13 +195,13 @@
 **Interfaces:**
 - Produces (SQL):
   - `kronen_bot_ergebnis(ref text, ergebnis text, bot_elo int) returns jsonb` (Bot-Leiter) → `{ delta, kronen, stufe }` oder `{ fehler: 'KRONEN_GRENZE' | 'KRONEN_EINGABE' }`. Prueft `ergebnis in ('sieg','remis','niederlage')`, `bot_elo between 200 and 3200`, `char_length(ref) between 8 and 64`; zaehlt `quelle='bot'`-Buchungen des Tages (Europe/Berlin) gegen `BOT_TAGESGRENZE` (10); `on conflict do nothing` auf `(user_id,'bot',ref)`; Werte aus `KRONEN.bot`.
-  - `kronen_ki_ergebnis(ki_ref uuid, ergebnis text) returns jsonb` (KI-Gegner aus der Gegnersuche) → `{ delta, kronen, stufe }` oder `{ fehler: 'KRONEN_BELEG' | 'KRONEN_EINGABE' }`. Nur mit eigenem, nicht eingeloesten, unverfallenen Beleg aus `suche_ki_belege`; loest ihn ein; keine Tagesgrenze; Buchung `quelle='ki'`, `ref = ki_ref::text`; Werte aus `KRONEN.ki`.
+  - `kronen_ki_ergebnis(ki_ref uuid, ergebnis text) returns jsonb` (KI-Gegner aus der Gegnersuche) → `{ delta, kronen, stufe }` oder `{ fehler: 'KRONEN_BELEG' | 'KRONEN_ZU_FRUEH' | 'KRONEN_GRENZE' | 'KRONEN_EINGABE' }`. Pruefreihenfolge: Eingabe → eigener, nicht eingeloester, unverfallener Beleg aus `suche_ki_belege` (`KRONEN_BELEG`) → `now() - erstellt_am >= KI_MINDESTDAUER_S` (`KRONEN_ZU_FRUEH`, Beleg bleibt uneingeloest und kann spaeter eingeloest werden) → Zahl der `quelle='ki'`-Buchungen des Tages (Europe/Berlin) `< KI_TAGESGRENZE` (`KRONEN_GRENZE`, Beleg wird eingeloest, damit er nicht morgen nachgebucht wird). Erst dann einloesen und buchen: `quelle='ki'`, `ref = ki_ref::text`, Werte aus `KRONEN.ki`.
 - Produces (JS) in `js/kronen.js`, ohne Konto oder offline jeweils `null` ohne Fehler, nichts wird gespeichert oder nachgeholt (entschieden: ohne Konto keine Kronen):
   - `meldeBotErgebnis({ partieId: string, ergebnis, botElo }) -> Promise<{delta,kronen,stufe}|null>`
   - `meldeKiErgebnis({ kiRef: string, ergebnis }) -> Promise<{delta,kronen,stufe}|null>`
 - `liga/index.js`: im vorhandenen `partie:beendet`-Hoerer nach `buchePartie` zusaetzlich: hat die Partie `p.kiRef` → `meldeKiErgebnis`, sonst nur wenn `wertet(p)` und Bot in `LEITER` → `meldeBotErgebnis({ partieId: p.id, ergebnis, botElo: bot.elo })`.
 
-- [ ] **Step 1: Failing SQL-Abschnitte**: "Bot-Sieg" (+15), "Bot-Doppelt" (gleiche `ref` zweimal → eine Buchung), "Bot-Grenze" (11. Meldung am Tag → `KRONEN_GRENZE`, Stand unveraendert), "Bot-Eingabe" (`bot_elo 9999` → `KRONEN_EINGABE`), "KI-Sieg" (mit Beleg +20, Beleg danach eingeloest), "KI-Niederlage" (mit Beleg -10, Liga-Boden gilt), "KI ohne Grenze" (12 Belege an einem Tag → 12 Buchungen), "KI-Beleg doppelt/fremd/erfunden" (zweite Einloesung, Beleg von B, zufaellige uuid → `KRONEN_BELEG`, keine Buchung), "KI-Beleg verfallen" (Testhilfe setzt `erstellt_am` 7 h zurueck → `KRONEN_BELEG`), "anon" (kein Aufruf beider RPCs).
+- [ ] **Step 1: Failing SQL-Abschnitte**: "Bot-Sieg" (+15), "Bot-Doppelt" (gleiche `ref` zweimal → eine Buchung), "Bot-Grenze" (11. Meldung am Tag → `KRONEN_GRENZE`, Stand unveraendert), "Bot-Eingabe" (`bot_elo 9999` → `KRONEN_EINGABE`), "KI-Sieg" (Beleg per Testhilfe 61 s alt, +20, Beleg danach eingeloest), "KI-Niederlage" (mit Beleg -10, Liga-Boden gilt), "KI zu frueh" (Beleg 30 s alt → `KRONEN_ZU_FRUEH`, keine Buchung, Beleg uneingeloest; nach Testhilfe auf 61 s → Buchung), "KI-Grenze" (20 Belege an einem Tag → 20 Buchungen, der 21. → `KRONEN_GRENZE`, Stand unveraendert, Beleg eingeloest; eine `quelle='ki'`-Buchung von gestern zaehlt nicht mit), "KI-Grenze getrennt" (10 Bot-Leiter-Buchungen am Tag sperren KI-Buchungen nicht und umgekehrt), "KI-Beleg doppelt/fremd/erfunden" (zweite Einloesung, Beleg von B, zufaellige uuid → `KRONEN_BELEG`, keine Buchung), "KI-Beleg verfallen" (Testhilfe setzt `erstellt_am` 7 h zurueck → `KRONEN_BELEG`), "anon" (kein Aufruf beider RPCs).
 - [ ] **Step 2: Failing Node-Test** in `tests/liga.test.mjs`: `liga meldet Bot-Sieg an den Server` – Fake-`fetch` faengt `/rest/v1/rpc/kronen_bot_ergebnis` ab; nach gewerteter Leiter-Partie genau ein Aufruf mit `{ref: partieId, ergebnis: 'sieg', bot_elo: <elo>}`; ungewertete Partie (Hinweis-Modus) → kein Aufruf; Fake wirft Netzfehler → keine Ausnahme, lokale Liga trotzdem gebucht. Dazu `liga meldet KI-Gegner mit Beleg` – Partie mit `kiRef` → genau ein Aufruf `kronen_ki_ergebnis` mit `{ki_ref, ergebnis}`, kein Aufruf `kronen_bot_ergebnis`.
 - [ ] **Step 3:** Run → FAIL.
 - [ ] **Step 4:** Implementieren.
@@ -275,12 +277,12 @@
 
 ## Entschieden 06.11.2026 (Claude im Auftrag von Flo)
 
-1. **Kronen je Ergebnis:** Mensch aus der Gegnersuche +30 / +10 / -15. KI-Gegner aus der Gegnersuche (Bot nach 10 s) +20 / +5 / -10, ohne Tagesgrenze, nur gegen Suchbeleg (Task 4/5). Bot-Leiter +15 / +5 / 0.
+1. **Kronen je Ergebnis:** Mensch aus der Gegnersuche +30 / +10 / -15. KI-Gegner aus der Gegnersuche (Bot nach 10 s) +20 / +5 / -10, nur gegen Suchbeleg (Task 4/5), Beleg fruehestens 60 s nach Ausgabe einloesbar, hoechstens 20 gewertete KI-Partien pro Tag (Europe/Berlin; Ergaenzung des Orchestrators, weil ein Client mit gueltigem Beleg jedes Ergebnis melden und alle 10 s einen neuen Beleg holen koennte). Bot-Leiter +15 / +5 / 0.
    **Boden-Schutz:** Innerhalb einer Saison nie unter den Anfang der in dieser Saison erreichten Liga (Holz 0, Bronze 300, Silber 600, Gold 900, Diamant 1200, Krone 1500); Tests in Task 1 und Task 3.
 2. **Kronen je Stufe:** 100, Krone I ab 1700.
 3. **Rueckstufung am Saisonende:** 3 Stufen (eine ganze Liga), auf den Anfang der Zielstufe.
 4. **Start der ersten Saison:** kein fester Wert im Code. Einstellung `kronen_schalter.saison_start` (muss ein Montag sein), beim Live-Gang auf den ersten Montag danach gesetzt; bis dahin Saison 0 ohne Wechsel.
-5. **Bot-Tagesgrenze:** 10 gewertete Bot-Leiter-Ergebnisse pro Tag (gilt nicht fuer KI-Gegner aus der Gegnersuche).
+5. **Tagesgrenzen:** 10 gewertete Bot-Leiter-Ergebnisse und, getrennt davon, 20 gewertete KI-Gegner-Ergebnisse pro Tag.
 6. **Ohne Konto:** keine Kronen, kein Nachbuchen. Der Ring zeigt "Konto anlegen und Kronen sammeln" / "Create an account and collect crowns" (Task 7).
 7. **Freundes-Partien** ueber Einladungscode geben keine Kronen (`gewertet = false`).
 8. **Elo-Fenster der Gegnersuche:** +-200, je Sekunde Wartezeit 50 breiter; nach 10 s KI-Gegner.
