@@ -780,6 +780,9 @@ export function zeige(root, params, app) {
     $('.spielknoepfe > [data-aktion="aufgeben"]').disabled = ende;
     const h = $('.spielknoepfe > [data-aktion="hinweis"]');
     h.classList.toggle('stufe-2', am && z.hinweisFen === z.chess.fen() && z.hinweisStufe >= 1);
+    // Uhr dessen am Zug hervorheben (dunkle Flaeche, helle Ziffern); jeder Phasenwechsel kommt hier vorbei
+    const amZug = ende ? null : z.chess.turn() === farbe ? floKarte : gegnerKarte;
+    for (const k of [gegnerKarte, floKarte]) k.querySelector('.uhr')?.classList.toggle('am-zug', k === amZug);
   }
 
   function setzeDenkt(an) {
@@ -2523,9 +2526,9 @@ export function zeige(root, params, app) {
     // die Karten der Spalte wachsen mit ihrem Inhalt (Coach, Blase): dann neu pruefen, ob die Spalte passt
     if (seiteEl) for (const k of seiteEl.children) layoutRo.observe(k);
   }
-  // Handy: Zahl des waagrechten Balkens nur auf Antippen
+  // Hochformat (Handy und iPad): Zahl des waagrechten Balkens nur auf Antippen
   balken.addEventListener('click', () => {
-    if (!istHandy()) return;
+    if (lage() !== 'hoch') return;
     balken.classList.add('zeigt-zahl');
     clearTimeout(z.balkenUhr);
     z.balkenUhr = spaeter(() => balken.classList.remove('zeigt-zahl'), 2200);
