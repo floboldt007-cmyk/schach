@@ -3,9 +3,9 @@
 -- Drei kurzlebige Nutzer: A, B und C. Jeder Fehler bricht mit "FEHLER: ..." ab; ohne Fehler endet der Lauf mit ROLLBACK.
 -- Abschnitte: 1 Stand ohne Saisonstart, Start in der Zukunft und Start dieser Woche; 1b Saisonstart nur montags;
 -- 2 keine Tabellenrechte fuer Nutzer; 3 anon darf nichts; 4 Saisongrenze (Archiv, Rueckstufung, nur einmal, mehrere
--- verpasste Saisons); 5 reine Rechenfunktionen und Konstanten.
--- Spaetere Tasks des Plans (Online-Wertung, Gegnersuche, Bot- und KI-Ergebnis, Start-Liga, Zaehler) haengen hier
--- eigene Abschnitte an.
+-- verpasste Saisons); 5 reine Rechenfunktionen und Konstanten; 6 Online-Wertung (Sieg, nur einmal, Liga-Boden,
+-- abgebrochen, ungewertet, Remis, Buchung fuer Nutzer gesperrt).
+-- Spaetere Tasks des Plans (Gegnersuche, Bot- und KI-Ergebnis, Start-Liga, Zaehler) haengen hier eigene Abschnitte an.
 begin;
 
 insert into auth.users (id, email)
@@ -312,7 +312,8 @@ begin
   end if;
   if (k->>'stufe_kronen')::int <> 100 or (k#>>'{kronen,ki,sieg}')::int <> 20 or (k#>>'{kronen,online,niederlage}')::int <> -15
      or (k#>>'{kronen,bot,niederlage}')::int <> 0 or (k->>'bot_tagesgrenze')::int <> 10 or (k->>'ki_tagesgrenze')::int <> 20
-     or (k->>'ki_mindestdauer_s')::int <> 60 or (k->>'saison_tage')::int <> 28 or (k->>'rueckstufung_stufen')::int <> 3 then
+     or (k->>'ki_mindestdauer_s')::int <> 60 or (k->>'online_mindest_halbzuege')::int <> 4
+     or (k->>'paar_tagesgrenze')::int <> 3 or (k->>'saison_tage')::int <> 28 or (k->>'rueckstufung_stufen')::int <> 3 then
     raise exception 'FEHLER: kronen_konstanten weicht vom Plan ab (%)', k;
   end if;
   if (select zaehler_an from public.kronen_schalter where id) then
@@ -320,5 +321,457 @@ begin
   end if;
 end;
 $$;
+
+-- ---------- 6. Online-Ergebnis (Task 3): Kronen und Elo bei gewerteten Partien ----------
+-- Hilfen als Besitzer: Stand setzen und eine Partie anlegen (der Insert-Trigger macht sie zur offenen Einladung,
+-- das folgende Update setzt Spieler, Wertung und 'laeuft' wie spaeter die Gegnersuche).
+create function pg_temp.setze_stand(uid uuid, k integer, e integer, n integer)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  select public.kronen_stand_sichern(uid);
+  update public.kronen_stand
+  set saison = public.kronen_saison_heute(), kronen = k, boden = public.kronen_liga_boden(k), elo = e, elo_n = n
+  where user_id = uid;
+$$;
+
+create function pg_temp.neue_partie(w uuid, s uuid, gew boolean)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  p uuid;
+begin
+  insert into public.partien_online (erstellt_von, fen) values (w, 'egal') returning id into p;
+  -- 4 Halbzuege: gerade genug fuer eine Wertung (Task 3b); kuerzere Partien setzt Abschnitt 7 selbst
+  update public.partien_online set weiss = w, schwarz = s, gewertet = gew, status = 'laeuft', zuege = 'e4 e5 Nf3 Nc6'
+  where id = p;
+  return p;
+end;
+$$;
+
+create function pg_temp.beende(p uuid, erg text, g text)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.partien_online set status = 'beendet', ergebnis = erg, grund = g where id = p;
+$$;
+
+revoke all on function pg_temp.setze_stand(uuid, integer, integer, integer), pg_temp.neue_partie(uuid, uuid, boolean),
+  pg_temp.beende(uuid, text, text) from public;
+
+do $$
+declare
+  a constant uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  b constant uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  p uuid;
+  sa public.kronen_stand;
+  sb public.kronen_stand;
+begin
+  -- Online-Sieg: A (weiss) schlaegt B, beide 1000 Elo und neu (K=40)
+  perform pg_temp.setze_stand(a, 0, 1000, 0);
+  perform pg_temp.setze_stand(b, 0, 1000, 0);
+  p := pg_temp.neue_partie(a, b, true);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  select * into sa from public.kronen_stand where user_id = a;
+  select * into sb from public.kronen_stand where user_id = b;
+  if sa.kronen <> 30 or sb.kronen <> 0 then
+    raise exception 'FEHLER: Online-Sieg: Kronen A % / B % (erwartet 30 / 0)', sa.kronen, sb.kronen;
+  end if;
+  if sa.elo <= 1000 or sb.elo >= 1000 or (sa.elo - 1000) + (sb.elo - 1000) <> 0 or sa.elo <> 1020 then
+    raise exception 'FEHLER: Online-Sieg: Elo A % / B % (erwartet 1020 / 980)', sa.elo, sb.elo;
+  end if;
+  if sa.elo_n <> 1 or sb.elo_n <> 1 then
+    raise exception 'FEHLER: Online-Sieg: Partienzahl fuer Elo nicht erhoeht';
+  end if;
+
+  -- Nur einmal: dieselbe Partie noch einmal beenden (Trigger feuert erneut) bucht nichts doppelt
+  update public.partien_online set status = 'laeuft' where id = p;
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if (select count(*) from public.kronen_buchungen where quelle = 'online' and ref = p::text) <> 2
+     or (select kronen from public.kronen_stand where user_id = a) <> 30
+     or (select elo from public.kronen_stand where user_id = a) <> 1020 then
+    raise exception 'FEHLER: Online-Ergebnis wurde doppelt gebucht';
+  end if;
+
+  -- Liga-Boden: B steht bei 310 (Bronze III, Boden 300) und verliert als Weiss
+  perform pg_temp.setze_stand(b, 310, 1000, 20);
+  p := pg_temp.neue_partie(b, a, true);
+  perform pg_temp.beende(p, '0-1', 'aufgabe');
+  if (select kronen from public.kronen_stand where user_id = b) <> 300 then
+    raise exception 'FEHLER: Liga-Boden: B faellt unter 300';
+  end if;
+
+  -- Abgebrochen (ergebnis null): keine Buchung, Elo unveraendert
+  select * into sa from public.kronen_stand where user_id = a;
+  p := pg_temp.neue_partie(a, b, true);
+  perform pg_temp.beende(p, null, 'abgebrochen');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select elo from public.kronen_stand where user_id = a) <> sa.elo
+     or (select kronen from public.kronen_stand where user_id = a) <> sa.kronen then
+    raise exception 'FEHLER: abgebrochene Partie wurde gewertet';
+  end if;
+
+  -- Ungewertet (Einladung unter Freunden): keine Buchung
+  p := pg_temp.neue_partie(a, b, false);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select kronen from public.kronen_stand where user_id = a) <> sa.kronen then
+    raise exception 'FEHLER: ungewertete Partie wurde gewertet';
+  end if;
+
+  -- Remis bei gleicher Elo: beide +10, Elo bleibt
+  perform pg_temp.setze_stand(a, 0, 1200, 30);
+  perform pg_temp.setze_stand(b, 0, 1200, 30);
+  p := pg_temp.neue_partie(a, b, true);
+  perform pg_temp.beende(p, '1/2-1/2', 'remis');
+  select * into sa from public.kronen_stand where user_id = a;
+  select * into sb from public.kronen_stand where user_id = b;
+  if sa.kronen <> 10 or sb.kronen <> 10 or sa.elo <> 1200 or sb.elo <> 1200 then
+    raise exception 'FEHLER: Remis: A %/% B %/% (erwartet 10/1200 je)', sa.kronen, sa.elo, sb.kronen, sb.elo;
+  end if;
+end;
+$$;
+
+-- Nutzer duerfen die Buchung nicht selbst ausloesen
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform public.kronen_online_buchen('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', gen_random_uuid(), 1, 1000);
+    raise exception 'FEHLER: kronen_online_buchen ist fuer Nutzer offen';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    update public.partien_online set gewertet = true;
+    raise exception 'FEHLER: Nutzer koennen gewertet setzen';
+  exception when insufficient_privilege then
+    null;
+  end;
+  -- Spieler setzt das Ergebnis seiner Partie selbst: verboten, also keine Kronen (Ergebnisse nur ueber Server-Funktionen)
+  begin
+    update public.partien_online set status = 'beendet', ergebnis = '1-0', grund = 'matt';
+    raise exception 'FEHLER: Nutzer koennen ein Ergebnis selbst eintragen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+reset role;
+
+-- ---------- 7. Schutz gegen Absprache (Task 3b): kurze Partien, Paar-Grenze ----------
+-- A und C (A und B haben in Abschnitt 6 heute schon 3 gewertete Partien gespielt).
+do $$
+declare
+  a constant uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  b constant uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  c constant uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  p uuid;
+  i integer;
+  sa public.kronen_stand;
+begin
+  perform pg_temp.setze_stand(a, 0, 1000, 30);
+  perform pg_temp.setze_stand(c, 0, 1000, 30);
+
+  -- Kurz: Aufgabe nach 3 Halbzuegen, Remis nach 2, Zeitablauf nach 0 -> nichts gebucht, Partie trotzdem beendet
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = 'e4 e5 Nf3' where id = p;
+  perform pg_temp.beende(p, '1-0', 'aufgabe');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select status from public.partien_online where id = p) <> 'beendet' then
+    raise exception 'FEHLER: kurze Partie (3 Halbzuege) wurde gewertet oder nicht beendet';
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = 'e4 e5' where id = p;
+  perform pg_temp.beende(p, '1/2-1/2', 'remis');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text) then
+    raise exception 'FEHLER: Remis nach 2 Halbzuegen wurde gewertet';
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = '' where id = p;
+  perform pg_temp.beende(p, '0-1', 'zeit');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text) then
+    raise exception 'FEHLER: Zeitablauf ohne Zug wurde gewertet';
+  end if;
+  select * into sa from public.kronen_stand where user_id = a;
+  if sa.kronen <> 0 or sa.elo <> 1000 or sa.elo_n <> 30 then
+    raise exception 'FEHLER: kurze Partien haben Kronen oder Elo veraendert (%/%/%)', sa.kronen, sa.elo, sa.elo_n;
+  end if;
+
+  -- Paar-Grenze: 3 gewertete Partien A gegen C zaehlen (Farben wechseln), die 4. nicht
+  for i in 1..3 loop
+    if i = 2 then
+      p := pg_temp.neue_partie(c, a, true);
+      perform pg_temp.beende(p, '0-1', 'matt');
+    else
+      p := pg_temp.neue_partie(a, c, true);
+      perform pg_temp.beende(p, '1-0', 'matt');
+    end if;
+  end loop;
+  select * into sa from public.kronen_stand where user_id = a;
+  if sa.kronen <> 90 or sa.elo_n <> 33 then
+    raise exception 'FEHLER: Paar-Grenze: die ersten 3 Partien zaehlen nicht alle (Kronen %, Partien %)', sa.kronen, sa.elo_n;
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select kronen from public.kronen_stand where user_id = a) <> 90
+     or (select elo from public.kronen_stand where user_id = a) <> sa.elo then
+    raise exception 'FEHLER: Paar-Grenze: die 4. Partie am Tag gegen denselben Gegner wurde gewertet';
+  end if;
+  if (select status from public.partien_online where id = p) <> 'beendet' then
+    raise exception 'FEHLER: Paar-Grenze: die 4. Partie ist nicht beendet';
+  end if;
+
+  -- die Grenze gilt je Paar: B gegen C zaehlt weiter
+  perform pg_temp.setze_stand(b, 0, 1000, 30);
+  p := pg_temp.neue_partie(b, c, true);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if (select count(*) from public.kronen_buchungen where ref = p::text) <> 2 then
+    raise exception 'FEHLER: Paar-Grenze trifft ein anderes Paar';
+  end if;
+end;
+$$;
+
+-- ---------- 8. Gegnersuche (Task 4) ----------
+-- Drei weitere Nutzer D, E, F (A und B sind nach der Paarung in einer laufenden Partie). In einer Transaktion steht
+-- now() still: Wartezeit entsteht nur, wenn pg_temp.setze_seit die Zeile in die Vergangenheit legt.
+insert into auth.users (id, email)
+values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'kronen-d@example.invalid'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'kronen-e@example.invalid'),
+  ('ffffffff-ffff-4fff-8fff-ffffffffffff', 'kronen-f@example.invalid');
+
+create function pg_temp.setze_seit(uid uuid, sekunden integer)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.suche_warteschlange set seit = now() - make_interval(secs => sekunden) where user_id = uid;
+$$;
+revoke all on function pg_temp.setze_seit(uuid, integer) from public;
+
+do $$
+begin
+  perform pg_temp.setze_stand('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0, 1000, 30);
+  perform pg_temp.setze_stand('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 0, 1050, 30);
+  perform pg_temp.setze_stand('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 0, 1600, 30);
+end;
+$$;
+
+-- Paarung: A und B suchen beide 3+2
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Paarung: A allein wartet nicht';
+  end if;
+  begin
+    perform public.online_suche_start('3 Minuten');
+    raise exception 'FEHLER: Gegnersuche nimmt eine falsche Zeit an';
+  exception when others then
+    if sqlerrm <> 'KRONEN_EINGABE' then raise; end if;
+  end;
+  begin
+    perform 1 from public.suche_warteschlange;
+    raise exception 'FEHLER: Nutzer lesen die Warteschlange';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'partie') is null then
+    raise exception 'FEHLER: Paarung: B findet A nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb := public.online_suche_stand();
+begin
+  if r->>'partie' is null then
+    raise exception 'FEHLER: Paarung: A erfaehrt nichts von der Partie (%)', r;
+  end if;
+  -- A sieht die Partie ueber die bestehende Lese-Policy
+  if not exists (select 1 from public.partien_online where id = (r->>'partie')::uuid and gewertet and status = 'laeuft') then
+    raise exception 'FEHLER: Paarung: A sieht keine gewertete laufende Partie';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select count(*) from public.partien_online p
+      where p.gewertet and p.status = 'laeuft' and p.bedenkzeit_s = 180 and p.inkrement_s = 2
+        and 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' in (p.weiss, p.schwarz)
+        and 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' in (p.weiss, p.schwarz)) <> 1 then
+    raise exception 'FEHLER: Paarung: nicht genau eine Partie A gegen B mit 3+2';
+  end if;
+  if exists (select 1 from public.suche_warteschlange) then
+    raise exception 'FEHLER: Paarung: Warteschlange nicht leer';
+  end if;
+end;
+$$;
+
+-- Andere Zeit: D 3+2, E 10+0 -> beide warten; Abbruch: Zeile weg, kein Beleg
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: andere Zeit: D wartet nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('10+0')->>'wartet') is distinct from 'true'
+     or (public.online_suche_stand()->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: andere Zeit: D und E wurden gepaart';
+  end if;
+  if public.online_suche_ende() <> '{}'::jsonb then
+    raise exception 'FEHLER: Abbruch: E bekommt etwas zurueck';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+begin
+  if public.online_suche_ende(false) <> '{}'::jsonb then
+    raise exception 'FEHLER: Abbruch: D bekommt etwas zurueck';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.suche_warteschlange) or exists (select 1 from public.suche_ki_belege) then
+    raise exception 'FEHLER: Abbruch: Zeile oder Beleg bleibt';
+  end if;
+end;
+$$;
+
+-- Elo-Fenster: C (1600) und E (1000) suchen 5+0: sofort zu weit (600 > 200); C wartet 9 s -> 650 -> Paarung
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('5+0')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Elo-Fenster: C wartet nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('5+0')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Elo-Fenster: 600 Unterschied sofort gepaart';
+  end if;
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 9);
+set local role authenticated;
+do $$
+begin
+  if (public.online_suche_stand()->>'partie') is null then
+    raise exception 'FEHLER: Elo-Fenster: nach 9 s Wartezeit (Fenster 650) keine Paarung';
+  end if;
+end;
+$$;
+
+-- KI-Beleg: F sucht, nach 10 s ohne Treffer gibt online_suche_ende(true) einen Beleg; nach 3 s keinen
+select set_config('request.jwt.claims', '{"sub":"ffffffff-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
+do $$
+begin
+  perform public.online_suche_start('1+0');
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('ffffffff-ffff-4fff-8fff-ffffffffffff', 10);
+set local role authenticated;
+do $$
+declare
+  r jsonb := public.online_suche_ende(true);
+begin
+  if r->>'ki_ref' is null then
+    raise exception 'FEHLER: KI-Beleg: nach 10 s kein Beleg (%)', r;
+  end if;
+  perform public.online_suche_start('1+0');
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('ffffffff-ffff-4fff-8fff-ffffffffffff', 3);
+set local role authenticated;
+do $$
+begin
+  if public.online_suche_ende(true) ? 'ki_ref' then
+    raise exception 'FEHLER: KI-Beleg: nach 3 s schon ein Beleg';
+  end if;
+  -- F sucht erneut, damit C gleich eine fremde Zeile vor sich hat
+  perform public.online_suche_start('1+0');
+end;
+$$;
+
+-- Fremde Zeile: C sieht weder Zeilen noch Belege von F und kann F nicht aus der Suche nehmen
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform 1 from public.suche_ki_belege;
+    raise exception 'FEHLER: Nutzer lesen KI-Belege';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    delete from public.suche_warteschlange;
+    raise exception 'FEHLER: Nutzer loeschen in der Warteschlange';
+  exception when insufficient_privilege then
+    null;
+  end;
+  perform public.online_suche_ende(true);
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select count(*) from public.suche_warteschlange where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 1 then
+    raise exception 'FEHLER: fremde Zeile: F wurde aus der Suche genommen';
+  end if;
+  if (select count(*) from public.suche_ki_belege where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 1
+     or exists (select 1 from public.suche_ki_belege where user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
+    raise exception 'FEHLER: KI-Belege falsch (F genau einer, C keiner)';
+  end if;
+end;
+$$;
+
+-- anon darf nicht suchen
+set local role anon;
+do $$
+begin
+  begin
+    perform public.online_suche_start('3+2');
+    raise exception 'FEHLER: anon darf suchen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+reset role;
 
 rollback;
