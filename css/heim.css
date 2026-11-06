@@ -34,7 +34,9 @@
 /* Kronen (Etappe B, Task 7): Symbol vor der Stufe im Ring; ohne Konto ist die Zeile ein Link zur Konto-Seite */
 .heim-einheit { display: inline-flex; align-items: center; gap: 5px; }
 .heim-einheit svg { flex: none; width: 16px; height: 16px; color: var(--kt-stark); }
-.heim-konto { display: inline-block; padding: 4px 2px; color: var(--kt-stark); font-weight: var(--gw-stark);
+.heim-konto { display: inline-flex; align-items: center; min-height: var(--tipp); padding: 0 2px;
+  /* 44 px Tippflaeche, die Zeile bleibt so hoch wie mit 28 px (Startseite ohne Scrollen ab 375x667) */
+  margin-block: calc((28px - var(--tipp)) / 2); color: var(--kt-stark); font-weight: var(--gw-stark);
   text-decoration: underline; text-underline-offset: 3px; }
 .heim-konto:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: 4px; }
 

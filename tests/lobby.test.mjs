@@ -60,7 +60,9 @@ pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welte
   const quelle = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/ui/lobby.js'), 'utf8');
   pruefe('KI-Gegner nach 10 s: BOT_ERSATZ_MS 10000, die Lobby nimmt ihn ohne Testschalter',
     BOT_ERSATZ_MS === 10000 && /window\.__lobbyBotMs : BOT_ERSATZ_MS;/.test(quelle));
-  pruefe('Texte fuer die Gegnersuche: KI-Gegner und Anmelde-Hinweis', DE.ki === 'KI-Gegner' && EN.ki === 'AI opponent'
+  const kern = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/sprachen/partie.js'), 'utf8');
+  // das Abzeichen steht in den Kern-Texten (partie.kiGegner): der Kern laedt ohne Pakete keine Paket-Datei
+  pruefe('Texte fuer die Gegnersuche: KI-Gegner (Kern) und Anmelde-Hinweis', /kiGegner: 'KI-Gegner'/.test(kern) && /kiGegner: 'AI opponent'/.test(kern) && !('ki' in DE)
     && DE['suche.anmelden'] === 'Zum Suchen anmelden');
 }
 
@@ -234,7 +236,8 @@ async function browserTeil() {
     // Etappe B Task 4: gewertete Gegnersuche ueber den (abgefangenen) Server, KI-Gegner nach der Wartezeit
     {
       const KI = '11111111-2222-4333-8444-555555555555';
-      const BOT_MS = 1500;
+      // die Suche fragt den Server je Sekunde (alleMs 1000): erst 1 s nach der Start-Antwort kommt online_suche_stand
+      const BOT_MS = 3000;
       const antwort = (treffer) => (name, daten) => {
         if (name === 'online_suche_ende') return daten && daten.ki ? { ki_ref: KI } : {};
         if (name === 'online_suche_stand' && treffer && treffer()) return { partie: 'p1' };
@@ -249,7 +252,7 @@ async function browserTeil() {
         const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
         await zurLobby(p);
         await p.s.locator('.lb-suchen').click();
-        await warte(BOT_MS - 500);
+        await warte(BOT_MS - 800);
         const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name) };
         pruefe('suche: Bot erst nach der Wartezeit (vorher Suche beim Server, kein Bot)', frueh.suche === 1 && frueh.screen === 'lobby'
           && p.aufrufe[0]?.name === 'online_suche_start' && p.aufrufe[0].daten?.zeit === '3+2' && frueh.namen.includes('online_suche_stand')

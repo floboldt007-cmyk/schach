@@ -145,7 +145,6 @@ import { zeige as zeigeZuzweit } from './zuzweit.js';
 import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
-import '../pakete/lobby/texte.js'; // Abzeichen "KI-Gegner" (p-lobby.ki), auch beim Fortsetzen ohne Lobby
 import { meinName } from '../konto.js';
 
 
@@ -454,7 +453,7 @@ export function zeige(root, params, app) {
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
-            <div class="unter bot-meta">${z.ki ? `<span class="ki-abzeichen">${esc(t('p-lobby.ki'))}</span>` : ''}<span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
+            <div class="unter bot-meta">${z.ki ? `<span class="ki-abzeichen">${esc(t('partie.kiGegner'))}</span>` : ''}<span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>

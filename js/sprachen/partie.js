@@ -7,6 +7,7 @@ registriereTexte('partie', {
   de: {
     // Zahlen
     prozent: '{wert} %',
+    kiGegner: 'KI-Gegner', // Abzeichen eines KI-Gegners aus der Gegnersuche (Etappe B)
     // Screen und Kopf
     'screen.label': 'Partie gegen {name}',
     'kopf.zurueck': 'Zurück zur Arena',
@@ -163,6 +164,7 @@ registriereTexte('partie', {
   },
   en: {
     prozent: '{wert}%',
+    kiGegner: 'AI opponent',
     'screen.label': 'Game against {name}',
     'kopf.zurueck': 'Back to the Arena',
     'kopf.brettfarbe': 'Board color',
