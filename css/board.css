@@ -59,6 +59,10 @@
   container-type: inline-size;  /* cqw = Prozent der Brettbreite (Koordinaten, Ringe) */
   border-radius: var(--brett-radius);
   overflow: hidden;
+  /* Dauerhaft eigene Ebene (Flo-Video iPad 06.11.2026): beim Bot-Zug blendet .lage.zuletzt per Animation ein, und
+     iOS-Safari baute dafuer die abgerundete Clip-Ebene um; etwa 4 Frames lang fehlten alle Felder (nur Figuren und
+     Zug-Toenung sichtbar). Mit fester Ebene wird sie nicht mehr auf- und abgebaut. Regel in tests/board.test.mjs. */
+  transform: translateZ(0);
 }
 .brett .feld { position: absolute; width: 12.5%; height: 12.5%; }
 .brett .feld.h { background: var(--b-hell); }
