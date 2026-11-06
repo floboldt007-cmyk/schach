@@ -162,6 +162,10 @@ async function testeDesktop(browser) {
   pruefe('Weiss unten: a8 oben links, h1 unten rechts', a8.x < h1.x && a8.y < h1.y);
   pruefe('Brett quadratisch', Math.abs(a8.b.width - a8.b.height) < 0.6);
   pruefe('Brett ohne overflow:hidden (Abzeichen am Rand)', (await seite.evaluate(() => getComputedStyle(document.querySelector('#brett')).overflow)) === 'visible');
+  // Flackern iPad (Flo-Video 06.11.2026): die Felder brauchen eine feste eigene Ebene, sonst fehlen sie in iOS-Safari
+  // fuer einige Frames, wenn beim Bot-Zug die Zug-Toenung einblendet
+  const felderEbene = await seite.evaluate(() => getComputedStyle(document.querySelector('#brett > .brett-felder')).transform);
+  pruefe('Felder auf eigener Ebene (transform an .brett-felder)', felderEbene !== 'none', felderEbene);
 
   // Tippen-Tippen
   await h.klickFeld('e2');
