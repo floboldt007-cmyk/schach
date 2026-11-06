@@ -459,8 +459,13 @@
    Querformat ab 561 px Hoehe: nur das Brett steht links und ist so hoch wie der Bildschirm; Navigation, Coach und die
    rechte Spalte stehen rechts untereinander (vorher lagen Navigation und Coach unter dem Brett und kosteten 336 px Hoehe).
    Hochformat: iPad mit schmalerem Rand, Handy von Rand zu Rand mit waagrechtem Bewertungsbalken ueber dem Brett.
+   Erst ab 920 px Breite: die rechte Spalte ist mindestens --an-rechts-min (32vw) breit, und die Navigation braucht dort
+   4 x 44 px + Zugstand 84 px + Luecken = 292 px (32vw >= 292 ab 913 px). Darunter (590 x 580) bleibt die alte Lage, dort
+   blendet @container an-links den Zugstand aus; mit .an-links als display: contents greift das nicht mehr.
+   Der Coach hat eine feste Hoehe und scrollt: wuchs er mit dem Text jedes Zuges, rutschte die Kurve darunter beim
+   Ziehen unter dem Finger weg.
    ============================================================ */
-@media (orientation: landscape) and (min-height: 561px) {
+@media (orientation: landscape) and (min-height: 561px) and (min-width: 920px) {
   .an-screen {
     --an-brett: min(calc(100vh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
     --an-brett: min(calc(100dvh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
@@ -469,8 +474,14 @@
   .an-links { display: contents; }
   .an-brettzone { grid-column: 1; grid-row: 1 / 4; align-self: start; }
   .an-navi { grid-column: 2; grid-row: 1; }
-  .an-coach { grid-column: 2; grid-row: 2; max-height: 40dvh; }
+  .an-coach { grid-column: 2; grid-row: 2; height: clamp(120px, 24dvh, 220px); max-height: none; }
   .an-rechts { grid-column: 2; grid-row: 3; }
+}
+/* Klassen zweispaltig erst ab 480 px Spaltenbreite: neben dem grossen Brett ist die Spalte auf dem iPad Pro (1366 x 1024)
+   426 px breit, und die zweite Spalte ragte rechts aus dem Fenster */
+@container an-rechts (max-width: 480px) {
+  .an-kl-raster { display: flex; flex-direction: column; }
+  .an-kl-kopf2, .an-kl-platz { display: none; }
 }
 @media (orientation: portrait) and (min-width: 521px) {
   .an-screen { --an-brett: min(calc(100vw - 32px - var(--an-balken) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 880px); }
