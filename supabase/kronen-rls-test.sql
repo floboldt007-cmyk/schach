@@ -453,6 +453,13 @@ begin
   exception when insufficient_privilege then
     null;
   end;
+  -- Spieler setzt das Ergebnis seiner Partie selbst: verboten, also keine Kronen (Ergebnisse nur ueber Server-Funktionen)
+  begin
+    update public.partien_online set status = 'beendet', ergebnis = '1-0', grund = 'matt';
+    raise exception 'FEHLER: Nutzer koennen ein Ergebnis selbst eintragen';
+  exception when insufficient_privilege then
+    null;
+  end;
 end;
 $$;
 reset role;
