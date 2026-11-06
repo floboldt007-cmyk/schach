@@ -9,6 +9,7 @@ registriereTexte('rahmen', {
   de: {
     zumInhalt: 'Zum Inhalt springen',
     // Titel der Screens (document.title "<Titel> · Crownmate", Platzhalter)
+    'titel.heim': 'Start',
     'titel.arena': 'Arena',
     'titel.partie': 'Partie',
     'titel.analyse': 'Spielanalyse',
@@ -122,6 +123,7 @@ registriereTexte('rahmen', {
   },
   en: {
     zumInhalt: 'Skip to content',
+    'titel.heim': 'Home',
     'titel.arena': 'Arena',
     'titel.partie': 'Game',
     'titel.analyse': 'Game analysis',
