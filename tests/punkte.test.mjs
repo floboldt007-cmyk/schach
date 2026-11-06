@@ -1004,7 +1004,7 @@ async function testeBrowser(browser) {
   await seite.waitForSelector('.screen.arena');
   await warte(400);
   const leiste = await seite.evaluate(() => [...document.querySelectorAll('.reiter-leiste [data-reiter]')].map((b) => b.dataset.reiter).join());
-  pruefe('Reiter „Bestenliste“ in der Leiste (Testmodus ?reiter=bestenliste)', leiste === 'arena,bestenliste', leiste);
+  pruefe('Reiter „Bestenliste“ in der Leiste (Testmodus ?reiter=bestenliste)', leiste === 'heim,arena,bestenliste', leiste);
   await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
   await seite.waitForSelector('.screen.bl-screen .bl-reiter:not([hidden])');
   await warte(700);

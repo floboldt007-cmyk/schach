@@ -27,8 +27,8 @@ export const PAKETE = Object.freeze(['sicherung', 'daten', 'pakete/liga/index', 
 // nur in einer Woche erspielbare Trophaee widersprechen den Fairness-Regeln, es fehlt ein Archiv (Ultracode-Pruefung 30.10.).
 // Ohne das Paket gibt es auch kein Funken-Wochenende (funken liest den Spielplan nur auf sein Signal).
 
-// W0+a: Reiter der unteren Leiste, die schon einen Screen haben (Arena ist immer dabei). Erlaubt sind 'training',
-// 'bestenliste' und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
+// W0+a: Reiter der Leiste, die schon einen Screen haben (Start und Bots sind immer dabei). Erlaubt sind
+// 'bestenliste' (Liga) und 'ich'. Leer: keine Leiste (so bleibt die App ohne Pakete unveraendert). Nur die Integration
 // traegt hier etwas ein, sobald der Screen des Reiters da ist, z. B.
-//   export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
-export const REITER = Object.freeze(['training', 'bestenliste', 'ich']);
+//   export const REITER = Object.freeze(['bestenliste', 'ich']);
+export const REITER = Object.freeze(['bestenliste', 'ich']);
