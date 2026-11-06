@@ -364,9 +364,10 @@ function main() {
   const paketScreens = ((app.match(/const PAKET_SCREENS = new Set\(\[([^\]]+)\]\)/) || [, ''])[1].match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
   const kernScreens = screens.filter((s) => !paketScreens.includes(s));
   const screenFehlt = kernScreens.map((s) => `js/ui/${s}.js`).filter((d) => !menge.has(d));
-  // Kern: arena, partie, analyse, verlauf, einstellungen, (seit U2) training, online und (seit 01.11.2026) premium
-  pruefe('Alle Screen-Module im Cache', kernScreens.length === 8 && kernScreens.includes('training') && kernScreens.includes('online')
-    && kernScreens.includes('premium') && screenFehlt.length === 0, screenFehlt.join(', '));
+  // Kern: arena, partie, analyse, verlauf, einstellungen, (seit U2) training, online, (seit 01.11.2026) premium
+  // und (seit 06.11.2026, Etappe A) die Startseite heim
+  pruefe('Alle Screen-Module im Cache', kernScreens.length === 9 && kernScreens.includes('training') && kernScreens.includes('online')
+    && kernScreens.includes('premium') && kernScreens.includes('heim') && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
   pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; B3: schule; lobby; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',

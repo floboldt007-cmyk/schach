@@ -10,7 +10,7 @@
 // Nachbesserung (Pruefer-Befunde): Zugwiederholung (dieselbe Stellung nur einmal je Partie), Rueckfall am selben Tag,
 // "fuer immer geloest" zaehlt jede Karte einmal, Vorschau statt voller Rechnung im Hoerer (Zeit), Modul einer neueren App
 // (keine Feier-Zeile), versuch 0 bei sofort gezeigter Loesung, Mini-Bretter gedreht, Statuszeile nach dem Loesen,
-// Fokus-Rahmen nur fuer die Tastatur, Einstieg ueber den Reiter Training (mit REITER per Route).
+// Fokus-Rahmen nur fuer die Tastatur, Einstieg ueber den Reiter Start und die Karte Raetsel (mit REITER per Route).
 //
 //   node tests/kartei.test.mjs                 alles
 //   node tests/kartei.test.mjs --nur-node      ohne Browser
@@ -918,7 +918,7 @@ async function browserTeil(browser) {
   gruppe = 'PAKETE';
   const pr = await neueSeite(browser);
   await pr.seite.route('**/js/erweiterungen.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript',
-    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze(['training']);\n` }));
+    body: `export const PAKETE = Object.freeze(['sicherung', '${ERW}']);\nexport const REITER = Object.freeze(['bestenliste', 'ich']);\n` }));
   await pr.seite.goto(`http://127.0.0.1:${PORT}/index.html#training`);
   await pr.seite.waitForSelector('.training-gitter .kt-karte', { timeout: 20000 });
   const prod = await pr.seite.evaluate(async () => {
@@ -926,12 +926,13 @@ async function browserTeil(browser) {
     return { training: o.angeboten('training:karten'), css: !!document.querySelector('link[data-paket="kartei"]'), h2: document.querySelector('.kt-karte h2').textContent };
   });
   pruefe('ohne ?test aus PAKETE geladen: Karte im Training ("Noch keine Karten"), eigenes CSS', prod.training === 1 && prod.css && prod.h2 === 'Noch keine Karten', JSON.stringify(prod));
-  // Einstieg ueber die Leiste: erst mit 'training' in REITER (Entscheidung der Integration, hier per Route gesetzt)
+  // Einstieg ueber die Leiste: Reiter Start, dort die Karte Raetsel (seit Etappe A ist Training kein Reiter mehr)
   await pr.seite.evaluate(() => { location.hash = '#arena'; });
   await pr.seite.waitForSelector('.screen.arena', { timeout: 20000 });
-  await pr.seite.locator('.reiter-leiste:not([hidden]) [data-reiter="training"]').click({ timeout: 10000 });
+  await pr.seite.locator('.reiter-leiste:not([hidden]) [data-reiter="heim"]').click({ timeout: 10000 });
+  await pr.seite.locator('.heim-screen [data-aktion="heim-raetsel"]').click({ timeout: 10000 });
   const ueberLeiste = await pr.seite.waitForSelector('.training-gitter .kt-karte', { timeout: 10000 }).then(() => true, () => false);
-  pruefe('mit REITER ["training"]: Arena, Reiter Training, dort die Karte der Kartei', ueberLeiste && await pr.seite.evaluate(() => location.hash === '#training'));
+  pruefe('mit REITER: Arena, Reiter Start, Karte Raetsel, dort die Karte der Kartei', ueberLeiste && await pr.seite.evaluate(() => location.hash === '#training'));
   pruefe('keine Konsolenfehler (Produktion)', pr.fehler.length === 0, pr.fehler.join(' | '));
   await pr.kontext.close();
 }

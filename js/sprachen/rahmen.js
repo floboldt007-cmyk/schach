@@ -9,6 +9,7 @@ registriereTexte('rahmen', {
   de: {
     zumInhalt: 'Zum Inhalt springen',
     // Titel der Screens (document.title "<Titel> · Crownmate", Platzhalter)
+    'titel.heim': 'Start',
     'titel.arena': 'Arena',
     'titel.partie': 'Partie',
     'titel.analyse': 'Spielanalyse',
@@ -31,10 +32,9 @@ registriereTexte('rahmen', {
     bereich: 'Bereich',
     // Reiter-Leiste
     'reiter.label': 'Bereiche',
-    'reiter.arena': 'Arena',
-    'reiter.training': 'Training',
-    'reiter.verlauf': 'Verlauf',
-    'reiter.bestenliste': 'Bestenliste',
+    'reiter.heim': 'Start',
+    'reiter.arena': 'Bots',
+    'reiter.bestenliste': 'Liga',
     'reiter.ich': 'Ich',
     // Kopf der Hauptseiten
     'kopf.sterneTitel': 'Gesammelte Sterne',
@@ -122,6 +122,7 @@ registriereTexte('rahmen', {
   },
   en: {
     zumInhalt: 'Skip to content',
+    'titel.heim': 'Home',
     'titel.arena': 'Arena',
     'titel.partie': 'Game',
     'titel.analyse': 'Game analysis',
@@ -143,10 +144,9 @@ registriereTexte('rahmen', {
     'titel.premium': 'Premium',
     bereich: 'Section',
     'reiter.label': 'Sections',
-    'reiter.arena': 'Arena',
-    'reiter.training': 'Training',
-    'reiter.verlauf': 'History',
-    'reiter.bestenliste': 'Leaderboard',
+    'reiter.heim': 'Home',
+    'reiter.arena': 'Bots',
+    'reiter.bestenliste': 'League',
     'reiter.ich': 'Me',
     'kopf.sterneTitel': 'Stars collected',
     'kopf.sterne': 'Stars:',

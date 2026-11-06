@@ -518,14 +518,14 @@ async function browserTeil(browser) {
   await warteSeite(seite, 'frage', 20000);
   pruefe('Neuladen auf der Frage: wieder die Frage (Seite im Verlaufseintrag), Hash #start', (await sz(seite)).seite === 'frage'
     && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
-  // "Einfuehrung ueberspringen" -> Arena; der zweite Start zeigt kein Willkommen
+  // "Einfuehrung ueberspringen" -> Startseite heim (Etappe A); der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
-  await seite.waitForSelector('.screen.arena .knoten', { timeout: 15000 });
-  pruefe('"Einführung überspringen" fuehrt zur Arena', await seite.evaluate(() => location.hash) === '#arena');
+  await seite.waitForSelector('.heim-screen .heim-ring', { timeout: 15000 });
+  pruefe('"Einführung überspringen" fuehrt zur Startseite heim', await seite.evaluate(() => location.hash) === '#heim');
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
   await warte(300);
-  pruefe('zweiter Start (ohne Hash): kein Willkommen, sondern die Arena', await seite.evaluate(() => location.hash === '#arena' && !!document.querySelector('.screen.arena')
+  pruefe('zweiter Start (ohne Hash): kein Willkommen, sondern die Startseite heim', await seite.evaluate(() => location.hash === '#heim' && !!document.querySelector('.heim-screen')
     && !document.querySelector('.st-screen')));
   // gespeicherte Partie: kein Willkommen, auch wenn es nie gezeigt wurde
   await seite.evaluate((P) => {
@@ -535,7 +535,7 @@ async function browserTeil(browser) {
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
   await warte(300);
-  pruefe('mit gespeicherter Partie (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen') && location.hash === '#arena'));
+  pruefe('mit gespeicherter Partie (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen') && location.hash === '#heim'));
   // nur Fortschritt, keine Partienliste (z. B. nur teilweise wiederhergestellt): auch kein allererster Start
   await seite.evaluate((P) => {
     localStorage.clear();
@@ -545,7 +545,7 @@ async function browserTeil(browser) {
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
   await warte(300);
   pruefe('nur Fortschritt mit 5 Partien, keine Partienliste (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen')
-    && location.hash === '#arena'));
+    && location.hash === '#heim'));
   // Ueberspringen auf Seite 1
   await seite.evaluate(() => localStorage.clear());
   await seite.goto(BASIS);
