@@ -48,6 +48,7 @@ const SUITEN = [
   { name: 'server-schule', datei: 'server-schule.test.mjs', args: [], was: 'Schulmodus: Schema-Vertrag, Rechte, Grenzen (Server)' },
   { name: 'schule', datei: 'schule.test.mjs', args: [], was: 'Schulmodus: Lehrkraft-Ansicht, Beitreten, Heute-Karte, Melden' },
   { name: 'server-werkstatt', datei: 'server-werkstatt.test.mjs', args: [], was: 'Limitierte Editionen: Kasse, Webhook, Schema-Vertrag (Server, Testmodus)' },
+  { name: 'kronen-vertrag', datei: 'kronen-vertrag.test.mjs', args: [], was: 'Liga mit Kronen: Schema-Vertrag mit js/pakete/liga/kronen.js, Rechte, Rueckweg (Server)' },
   { name: 'storage', datei: 'storage.test.mjs', args: [], was: 'Speicher, Sterne, Freischaltung' },
   { name: 'liga', datei: 'liga.test.mjs', args: [], exklusiv: 'fester Port 8847', was: 'Arena-Wertung, Spielklassen, Saison und Vereinsmeisterschaft' },
   { name: 'sicherung', datei: 'sicherung.test.mjs', args: [], was: 'Export, Import und Sicherungshinweis' },

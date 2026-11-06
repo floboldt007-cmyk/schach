@@ -13,7 +13,9 @@
 -- Der Server entscheidet: Nutzer haben keine Tabellenrechte, sie lesen ihren Stand nur ueber kronen_mein_stand().
 -- Einspielen: nach supabase/online-schema.sql im SQL Editor ausfuehren. Wiederholbar (mehrfach ausfuehren schadet nicht).
 -- Pruefen: supabase/kronen-rls-test.sql (rollt am Ende alles zurueck). Rueckweg: supabase/kronen-zurueck.sql.
--- Rein additiv: neue Tabellen und Funktionen, keine bestehende Tabelle wird hier geaendert, keine Zeilen werden umgeschrieben.
+-- Fast rein additiv: neue Tabellen und Funktionen. Einzige Aenderung an Bestehendem (Task 3): die Spalte
+-- partien_online.gewertet (Vorgabe false, alte Zeilen bleiben ungewertet) und der Trigger kronen_nach_partie darauf.
+-- Keine Zeilen werden umgeschrieben.
 
 create table if not exists public.kronen_schalter (
   id boolean primary key default true,
@@ -256,3 +258,83 @@ revoke all on function public.kronen_stand_sichern(uuid) from public, anon, auth
 revoke all on function public.kronen_mein_stand() from public, anon, authenticated;
 grant execute on function public.kronen_mein_stand() to authenticated;
 grant execute on function public.kronen_konstanten() to authenticated;
+
+-- ---------- Task 3: Online-Ergebnis bucht Kronen und Elo ----------
+-- Nur Partien aus der Gegnersuche (Task 4) zaehlen; Einladungs-Partien unter Freunden bleiben ohne Kronen.
+-- Einzige Aenderung an einer bestehenden Tabelle; Rueckweg in kronen-zurueck.sql.
+alter table public.partien_online add column if not exists gewertet boolean not null default false;
+
+-- Bucht eine Online-Partie fuer einen Spieler: Kronen mit Liga-Boden, Elo neu. Je Partie und Konto hoechstens einmal
+-- (kronen_buchungen_einmal); nur bei einer neuen Buchung aendert sich der Stand. In der Buchung steht die
+-- tatsaechliche Aenderung (bei 0 Kronen ist eine Niederlage eine Buchung mit 0).
+create or replace function public.kronen_online_buchen(uid uuid, partie uuid, punkte numeric, gegner_elo integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st public.kronen_stand;
+  nominal integer;
+  neu integer;
+  k integer;
+  erwartet numeric;
+  neu_elo integer;
+  gebucht integer;
+begin
+  st := public.kronen_stand_sichern(uid);
+  -- Zahlen aus kronen_konstanten (eine Quelle, Vertragstest mit js/pakete/liga/kronen.js)
+  nominal := (public.kronen_konstanten() #>> array['kronen', 'online',
+    case punkte when 1 then 'sieg' when 0 then 'niederlage' else 'remis' end])::integer;
+  neu := greatest(st.boden, 0, st.kronen + nominal);
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
+  values (uid, 'online', partie::text, neu - st.kronen, st.saison)
+  on conflict (user_id, quelle, ref) do nothing;
+  get diagnostics gebucht = row_count;
+  if gebucht = 0 then
+    return;
+  end if;
+  k := case when st.elo_n < 15 then 40 else 32 end;
+  erwartet := 1 / (1 + power(10::numeric, (gegner_elo - st.elo)::numeric / 400));
+  neu_elo := least(4000, greatest(100, st.elo + round(k * (punkte - erwartet))::integer));
+  update public.kronen_stand s
+  set kronen = neu, boden = greatest(st.boden, public.kronen_liga_boden(neu)), elo = neu_elo, elo_n = st.elo_n + 1,
+      aktualisiert_am = now()
+  where s.user_id = uid;
+end;
+$$;
+
+-- Trigger-Funktion: beide Elo-Werte werden VOR der ersten Buchung gelesen, damit B gegen den alten Wert von A rechnet
+create or replace function public.kronen_bei_partie_ende()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  elo_w integer;
+  elo_s integer;
+  punkte_w numeric;
+begin
+  if new.weiss is null or new.schwarz is null then
+    return null;
+  end if;
+  elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
+  elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
+  punkte_w := case new.ergebnis when '1-0' then 1 when '0-1' then 0 else 0.5 end;
+  perform public.kronen_online_buchen(new.weiss, new.id, punkte_w, elo_s);
+  perform public.kronen_online_buchen(new.schwarz, new.id, 1 - punkte_w, elo_w);
+  return null;
+end;
+$$;
+
+-- Abgebrochene und strittige Partien (ergebnis null) und Einladungs-Partien (gewertet false) feuern gar nicht
+drop trigger if exists kronen_nach_partie on public.partien_online;
+create trigger kronen_nach_partie
+after update of status on public.partien_online
+for each row
+when (new.status = 'beendet' and old.status <> 'beendet' and new.gewertet and new.ergebnis is not null)
+execute function public.kronen_bei_partie_ende();
+
+revoke all on function public.kronen_online_buchen(uuid, uuid, numeric, integer) from public, anon, authenticated;
+revoke all on function public.kronen_bei_partie_ende() from public, anon, authenticated;

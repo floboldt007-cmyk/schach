@@ -23,6 +23,7 @@ $$;
 
 -- spaetere Tasks (Plan Task 3 bis 8)
 drop function if exists public.kronen_bei_partie_ende();
+drop function if exists public.kronen_online_buchen(uuid, uuid, numeric, integer);
 drop function if exists public.online_suche_start(text);
 drop function if exists public.online_suche_stand();
 drop function if exists public.online_suche_ende(boolean);
