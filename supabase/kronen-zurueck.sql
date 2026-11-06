@@ -27,6 +27,8 @@ drop function if exists public.kronen_online_buchen(uuid, uuid, numeric, integer
 drop function if exists public.online_suche_start(text);
 drop function if exists public.online_suche_stand();
 drop function if exists public.online_suche_ende(boolean);
+drop function if exists public.online_suche_paaren(uuid);
+drop function if exists public.online_suche_partie(uuid);
 drop function if exists public.kronen_bot_ergebnis(text, text, integer);
 drop function if exists public.kronen_ki_ergebnis(uuid, text);
 drop function if exists public.kronen_start(integer);

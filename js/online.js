@@ -143,7 +143,8 @@ async function aktiveSitzung() {
   if (!sitzung()?.access_token) throw new Error(FEHLER_TEXTE.ONLINE_NICHT_ANGEMELDET);
   return kontoSitzung();
 }
-async function rpc(name, daten) {
+// exportiert fuer js/kronen.js (Gegnersuche, Kronen-Stand): dieselbe Sitzung, dieselben Fehlertexte
+export async function rpc(name, daten) {
   const s = await aktiveSitzung();
   return anfrage(`/rest/v1/rpc/${name}`, { methode: 'POST', token: s.access_token, daten });
 }

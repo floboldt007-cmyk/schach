@@ -63,7 +63,9 @@ const fn = (name) => funktionen.find((f) => f.name === name);
 
 // ---------- Rechte und RLS ----------
 {
-  const TABELLEN = ['kronen_schalter', 'kronen_stand', 'kronen_buchungen', 'kronen_archiv'];
+  const TABELLEN = [...sql.matchAll(/create table if not exists public\.([a-z_]+)/g)].map((m) => m[1]);
+  pruefe('alle Tabellen erfasst (Kronen und Gegnersuche)', ['kronen_schalter', 'kronen_stand', 'kronen_buchungen', 'kronen_archiv',
+    'suche_warteschlange', 'suche_ki_belege'].every((t) => TABELLEN.includes(t)), TABELLEN);
   pruefe('RLS an allen Kronen-Tabellen', TABELLEN.every((t) => new RegExp(`alter table public\\.${t} enable row level security`).test(sql)));
   pruefe('keine Policies (Nutzer sehen keine Zeile direkt)', !/create policy/i.test(sql));
   pruefe('Tabellenrechte fuer anon und authenticated entzogen',
@@ -73,7 +75,8 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const ohneRevoke = sigs.filter((s) => !sql.includes(`revoke all on function public.${s} from public, anon, authenticated`));
   pruefe(`jede der ${sigs.length} Funktionen ist zuerst fuer alle gesperrt`, ohneRevoke.length === 0, ohneRevoke);
   const grants = [...sql.matchAll(/grant execute on function public\.([a-z_]+)\(([^)]*)\) to ([a-z_]+)/g)].map((m) => `${m[1]}->${m[3]}`);
-  const ERLAUBT = ['kronen_mein_stand->authenticated', 'kronen_konstanten->authenticated'];
+  const ERLAUBT = ['kronen_mein_stand->authenticated', 'kronen_konstanten->authenticated',
+    'online_suche_start->authenticated', 'online_suche_stand->authenticated', 'online_suche_ende->authenticated'];
   pruefe('nur freigegebene Funktionen fuer Nutzer, nie fuer anon', grants.every((g) => ERLAUBT.includes(g)) && !grants.some((g) => g.endsWith('anon')), grants);
   pruefe('alle Funktionen mit security definer haben search_path leer',
     funktionen.filter((f) => /security definer/.test(f.kopf)).every((f) => /set search_path = ''/.test(f.kopf)));
@@ -107,6 +110,25 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Liga-Boden bei Online-Niederlage beachtet', /greatest\(st\.boden, 0, st\.kronen \+ nominal\)/.test(buchen));
   pruefe('Elo: K=40 unter 15 Partien, sonst 32, Grenzen 100 bis 4000',
     /st\.elo_n < 15 then 40 else 32/.test(buchen) && /least\(4000, greatest\(100,/.test(buchen));
+}
+
+// ---------- Gegnersuche (Task 4) ----------
+{
+  const paaren = fn('online_suche_paaren')?.rumpf || '';
+  pruefe('Paarung unter skip locked, Fenster 200 plus 50 je Sekunde des laenger Wartenden',
+    /for update skip locked/.test(paaren) && /200 \+ 50 \* extract\(epoch from now\(\) - least\(q\.seit, ich\.seit\)\)/.test(paaren));
+  pruefe('Paarung legt eine gewertete laufende Partie an und leert beide Zeilen',
+    /gewertet = true, status = 'laeuft'/.test(paaren) && /delete from public\.suche_warteschlange q where q\.user_id in \(uid, g\.user_id\)/.test(paaren));
+  const ende = fn('online_suche_ende')?.rumpf || '';
+  pruefe('KI-Beleg nur nach 10 s Suche ohne Paarung', /seit_war <= now\(\) - interval '10 seconds'/.test(ende)
+    && /online_suche_partie\(uid\) is null/.test(ende));
+  const start = fn('online_suche_start')?.rumpf || '';
+  pruefe('Aufraeumen: Suchen nach 2 Minuten, Belege nach 6 Stunden',
+    /interval '2 minutes'/.test(start) && /interval '6 hours'/.test(start));
+  pruefe('Zeit-Pruefregel gleich in Tabelle und Funktion', sql.includes("check (zeit ~ '^[0-9]{1,3}\\+[0-9]{1,2}$')")
+    && start.includes("zeit !~ '^[0-9]{1,3}\\+[0-9]{1,2}$'"));
+  const genutzt = ['online_suche_start', 'online_suche_stand', 'online_suche_ende'];
+  pruefe('RLS-Test ruft die Such-Funktionen auf', genutzt.every((f) => test.includes(`public.${f}(`)));
 }
 
 // ---------- RLS-Test deckt ab ----------

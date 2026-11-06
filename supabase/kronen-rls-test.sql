@@ -541,4 +541,237 @@ begin
 end;
 $$;
 
+-- ---------- 8. Gegnersuche (Task 4) ----------
+-- Drei weitere Nutzer D, E, F (A und B sind nach der Paarung in einer laufenden Partie). In einer Transaktion steht
+-- now() still: Wartezeit entsteht nur, wenn pg_temp.setze_seit die Zeile in die Vergangenheit legt.
+insert into auth.users (id, email)
+values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'kronen-d@example.invalid'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'kronen-e@example.invalid'),
+  ('ffffffff-ffff-4fff-8fff-ffffffffffff', 'kronen-f@example.invalid');
+
+create function pg_temp.setze_seit(uid uuid, sekunden integer)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.suche_warteschlange set seit = now() - make_interval(secs => sekunden) where user_id = uid;
+$$;
+revoke all on function pg_temp.setze_seit(uuid, integer) from public;
+
+do $$
+begin
+  perform pg_temp.setze_stand('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0, 1000, 30);
+  perform pg_temp.setze_stand('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 0, 1050, 30);
+  perform pg_temp.setze_stand('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 0, 1600, 30);
+end;
+$$;
+
+-- Paarung: A und B suchen beide 3+2
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Paarung: A allein wartet nicht';
+  end if;
+  begin
+    perform public.online_suche_start('3 Minuten');
+    raise exception 'FEHLER: Gegnersuche nimmt eine falsche Zeit an';
+  exception when others then
+    if sqlerrm <> 'KRONEN_EINGABE' then raise; end if;
+  end;
+  begin
+    perform 1 from public.suche_warteschlange;
+    raise exception 'FEHLER: Nutzer lesen die Warteschlange';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'partie') is null then
+    raise exception 'FEHLER: Paarung: B findet A nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
+do $$
+declare
+  r jsonb := public.online_suche_stand();
+begin
+  if r->>'partie' is null then
+    raise exception 'FEHLER: Paarung: A erfaehrt nichts von der Partie (%)', r;
+  end if;
+  -- A sieht die Partie ueber die bestehende Lese-Policy
+  if not exists (select 1 from public.partien_online where id = (r->>'partie')::uuid and gewertet and status = 'laeuft') then
+    raise exception 'FEHLER: Paarung: A sieht keine gewertete laufende Partie';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select count(*) from public.partien_online p
+      where p.gewertet and p.status = 'laeuft' and p.bedenkzeit_s = 180 and p.inkrement_s = 2
+        and 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' in (p.weiss, p.schwarz)
+        and 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' in (p.weiss, p.schwarz)) <> 1 then
+    raise exception 'FEHLER: Paarung: nicht genau eine Partie A gegen B mit 3+2';
+  end if;
+  if exists (select 1 from public.suche_warteschlange) then
+    raise exception 'FEHLER: Paarung: Warteschlange nicht leer';
+  end if;
+end;
+$$;
+
+-- Andere Zeit: D 3+2, E 10+0 -> beide warten; Abbruch: Zeile weg, kein Beleg
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('3+2')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: andere Zeit: D wartet nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('10+0')->>'wartet') is distinct from 'true'
+     or (public.online_suche_stand()->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: andere Zeit: D und E wurden gepaart';
+  end if;
+  if public.online_suche_ende() <> '{}'::jsonb then
+    raise exception 'FEHLER: Abbruch: E bekommt etwas zurueck';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+begin
+  if public.online_suche_ende(false) <> '{}'::jsonb then
+    raise exception 'FEHLER: Abbruch: D bekommt etwas zurueck';
+  end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.suche_warteschlange) or exists (select 1 from public.suche_ki_belege) then
+    raise exception 'FEHLER: Abbruch: Zeile oder Beleg bleibt';
+  end if;
+end;
+$$;
+
+-- Elo-Fenster: C (1600) und E (1000) suchen 5+0: sofort zu weit (600 > 200); C wartet 9 s -> 650 -> Paarung
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('5+0')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Elo-Fenster: C wartet nicht';
+  end if;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  if (public.online_suche_start('5+0')->>'wartet') is distinct from 'true' then
+    raise exception 'FEHLER: Elo-Fenster: 600 Unterschied sofort gepaart';
+  end if;
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 9);
+set local role authenticated;
+do $$
+begin
+  if (public.online_suche_stand()->>'partie') is null then
+    raise exception 'FEHLER: Elo-Fenster: nach 9 s Wartezeit (Fenster 650) keine Paarung';
+  end if;
+end;
+$$;
+
+-- KI-Beleg: F sucht, nach 10 s ohne Treffer gibt online_suche_ende(true) einen Beleg; nach 3 s keinen
+select set_config('request.jwt.claims', '{"sub":"ffffffff-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
+do $$
+begin
+  perform public.online_suche_start('1+0');
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('ffffffff-ffff-4fff-8fff-ffffffffffff', 10);
+set local role authenticated;
+do $$
+declare
+  r jsonb := public.online_suche_ende(true);
+begin
+  if r->>'ki_ref' is null then
+    raise exception 'FEHLER: KI-Beleg: nach 10 s kein Beleg (%)', r;
+  end if;
+  perform public.online_suche_start('1+0');
+end;
+$$;
+reset role;
+select pg_temp.setze_seit('ffffffff-ffff-4fff-8fff-ffffffffffff', 3);
+set local role authenticated;
+do $$
+begin
+  if public.online_suche_ende(true) ? 'ki_ref' then
+    raise exception 'FEHLER: KI-Beleg: nach 3 s schon ein Beleg';
+  end if;
+  -- F sucht erneut, damit C gleich eine fremde Zeile vor sich hat
+  perform public.online_suche_start('1+0');
+end;
+$$;
+
+-- Fremde Zeile: C sieht weder Zeilen noch Belege von F und kann F nicht aus der Suche nehmen
+select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform 1 from public.suche_ki_belege;
+    raise exception 'FEHLER: Nutzer lesen KI-Belege';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    delete from public.suche_warteschlange;
+    raise exception 'FEHLER: Nutzer loeschen in der Warteschlange';
+  exception when insufficient_privilege then
+    null;
+  end;
+  perform public.online_suche_ende(true);
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select count(*) from public.suche_warteschlange where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 1 then
+    raise exception 'FEHLER: fremde Zeile: F wurde aus der Suche genommen';
+  end if;
+  if (select count(*) from public.suche_ki_belege where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 1
+     or exists (select 1 from public.suche_ki_belege where user_id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') then
+    raise exception 'FEHLER: KI-Belege falsch (F genau einer, C keiner)';
+  end if;
+end;
+$$;
+
+-- anon darf nicht suchen
+set local role anon;
+do $$
+begin
+  begin
+    perform public.online_suche_start('3+2');
+    raise exception 'FEHLER: anon darf suchen';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+reset role;
+
 rollback;

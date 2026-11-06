@@ -362,3 +362,192 @@ execute function public.kronen_bei_partie_ende();
 
 revoke all on function public.kronen_online_buchen(uuid, uuid, numeric, integer) from public, anon, authenticated;
 revoke all on function public.kronen_bei_partie_ende() from public, anon, authenticated;
+
+-- ---------- Task 4: Gegnersuche, Bot nach 10 Sekunden als KI-Gegner ----------
+-- Wer sucht, steht hier (eine Zeile je Konto). Nur intern: Nutzer suchen ueber online_suche_start/_stand/_ende.
+create table if not exists public.suche_warteschlange (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  zeit text not null,
+  elo integer not null,
+  seit timestamptz not null default now(),
+  -- Minuten + Zuschlag in Sekunden, z. B. '3+2'
+  constraint suche_warteschlange_zeit check (zeit ~ '^[0-9]{1,3}\+[0-9]{1,2}$')
+);
+create index if not exists suche_warteschlange_zeit_seit on public.suche_warteschlange (zeit, seit);
+
+-- Beleg fuer einen KI-Gegner: nur wer wirklich mindestens 10 s ohne Treffer gesucht hat, bekommt einen; Task 5 bucht
+-- KI-Ergebnisse nur gegen einen solchen Beleg (Mindestdauer, Tagesgrenze). Belege verfallen nach 6 Stunden.
+create table if not exists public.suche_ki_belege (
+  ref uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  erstellt_am timestamptz not null default now(),
+  eingeloest boolean not null default false
+);
+create index if not exists suche_ki_belege_user on public.suche_ki_belege (user_id, erstellt_am);
+
+alter table public.suche_warteschlange enable row level security;
+alter table public.suche_ki_belege enable row level security;
+revoke all on table public.suche_warteschlange, public.suche_ki_belege from anon, authenticated, public;
+
+-- Gewertete laufende Partie, in die das Konto in den letzten 60 s gepaart wurde (sonst null)
+create or replace function public.online_suche_partie(uid uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p.id from public.partien_online p
+  where p.gewertet and p.status = 'laeuft' and uid in (p.weiss, p.schwarz) and p.erstellt_am > now() - interval '60 seconds'
+  order by p.erstellt_am desc
+  limit 1;
+$$;
+
+-- Paart das Konto mit dem am laengsten Wartenden gleicher Bedenkzeit im Elo-Fenster: +-200, je Sekunde Wartezeit des
+-- laenger Wartenden 50 breiter. Treffer: gewertete Partie mit zufaelligen Farben, beide Zeilen weg. Sonst null.
+-- Intern; laeuft bei online_suche_start UND bei jeder Abfrage online_suche_stand (zwei, die genau gleichzeitig
+-- anfangen, sehen sich beim Start noch nicht, und das Fenster waechst nur, wenn spaeter erneut gepaart wird).
+create or replace function public.online_suche_paaren(uid uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ich public.suche_warteschlange;
+  g public.suche_warteschlange;
+  minuten integer;
+  zuschlag integer;
+  w uuid;
+  s uuid;
+  p uuid;
+begin
+  select * into ich from public.suche_warteschlange q where q.user_id = uid for update skip locked;
+  if ich.user_id is null then
+    return null;
+  end if;
+  select * into g from public.suche_warteschlange q
+  where q.user_id <> uid and q.zeit = ich.zeit
+    and abs(q.elo - ich.elo) <= 200 + 50 * extract(epoch from now() - least(q.seit, ich.seit))
+  order by q.seit
+  limit 1
+  for update skip locked;
+  if g.user_id is null then
+    return null;
+  end if;
+  minuten := split_part(ich.zeit, '+', 1)::integer;
+  zuschlag := split_part(ich.zeit, '+', 2)::integer;
+  if random() < 0.5 then
+    w := uid; s := g.user_id;
+  else
+    w := g.user_id; s := uid;
+  end if;
+  -- der Insert-Trigger macht daraus eine offene Partie mit vollen Uhren; danach wie online_tritt_bei auf 'laeuft'
+  insert into public.partien_online (erstellt_von, fen, bedenkzeit_s, inkrement_s)
+  values (g.user_id, 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', minuten * 60, zuschlag)
+  returning id into p;
+  update public.partien_online t
+  set weiss = w, schwarz = s, gewertet = true, status = 'laeuft', am_zug = 'w', letzter_zug_am = clock_timestamp(),
+      remis_angebot = null
+  where t.id = p;
+  delete from public.suche_warteschlange q where q.user_id in (uid, g.user_id);
+  return p;
+end;
+$$;
+
+-- Suche starten (oder fortsetzen: dieselbe Zeit behaelt die Wartezeit). Antwort { partie } oder { wartet: true }.
+create or replace function public.online_suche_start(zeit text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  st public.kronen_stand;
+  p uuid;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  -- erst die Form, dann die Zahl (ein "or" garantiert keine Reihenfolge, der Cast wuerde sonst selbst scheitern)
+  if zeit is null or zeit !~ '^[0-9]{1,3}\+[0-9]{1,2}$' then
+    raise exception 'KRONEN_EINGABE';
+  end if;
+  if split_part(zeit, '+', 1)::integer not between 1 and 180 then
+    raise exception 'KRONEN_EINGABE';
+  end if;
+  -- aufraeumen: verlassene Suchen nach 2 Minuten, Belege nach 6 Stunden
+  delete from public.suche_warteschlange q where q.seit < now() - interval '2 minutes';
+  delete from public.suche_ki_belege b where b.erstellt_am < now() - interval '6 hours';
+  p := public.online_suche_partie(uid);
+  if p is not null then
+    return jsonb_build_object('partie', p);
+  end if;
+  st := public.kronen_stand_sichern(uid);
+  insert into public.suche_warteschlange as q (user_id, zeit, elo) values (uid, zeit, st.elo)
+  on conflict (user_id) do update
+  set zeit = excluded.zeit, elo = excluded.elo, seit = case when q.zeit = excluded.zeit then q.seit else now() end;
+  p := public.online_suche_paaren(uid);
+  if p is not null then
+    return jsonb_build_object('partie', p);
+  end if;
+  return jsonb_build_object('wartet', true);
+end;
+$$;
+
+-- Abfrage waehrend der Suche: { partie }, sobald gepaart, sonst { wartet: true }
+create or replace function public.online_suche_stand()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  p uuid;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  p := coalesce(public.online_suche_partie(uid), public.online_suche_paaren(uid));
+  if p is not null then
+    return jsonb_build_object('partie', p);
+  end if;
+  return jsonb_build_object('wartet', true);
+end;
+$$;
+
+-- Suche beenden (Abbruch oder Bot-Ersatz). Mit ki = true und nur nach mindestens 10 s ohne Paarung: Beleg { ki_ref }.
+create or replace function public.online_suche_ende(ki boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  seit_war timestamptz;
+  r uuid;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  delete from public.suche_warteschlange q where q.user_id = uid returning q.seit into seit_war;
+  if ki is true and seit_war is not null and seit_war <= now() - interval '10 seconds'
+     and public.online_suche_partie(uid) is null then
+    insert into public.suche_ki_belege (user_id) values (uid) returning ref into r;
+    return jsonb_build_object('ki_ref', r);
+  end if;
+  return '{}'::jsonb;
+end;
+$$;
+
+revoke all on function public.online_suche_partie(uuid) from public, anon, authenticated;
+revoke all on function public.online_suche_paaren(uuid) from public, anon, authenticated;
+revoke all on function public.online_suche_start(text) from public, anon, authenticated;
+revoke all on function public.online_suche_stand() from public, anon, authenticated;
+revoke all on function public.online_suche_ende(boolean) from public, anon, authenticated;
+grant execute on function public.online_suche_start(text) to authenticated;
+grant execute on function public.online_suche_stand() to authenticated;
+grant execute on function public.online_suche_ende(boolean) to authenticated;

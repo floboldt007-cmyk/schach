@@ -131,7 +131,7 @@ import { anim, tempo, taktFaktor } from '../bewegung.js';
 import { halteKnopf, toastLeeren } from './bauteile.js';
 import {
   speichereLaufendePartie, ladeLaufendePartie, loescheLaufendePartie, speicherePartie, ergaenzeAnalyse, aktualisierePartie,
-  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten,
+  ladePartien, GENAUIGKEIT_STERN, BESTWERT_MIN_ZUEGE, eigeneZuege, MODI, EXTRA_MAX, wertet, pruefeSeed, pruefeBoss, pruefeLiga, pruefeTempo, pruefeZeiten, pruefeKiRef,
 } from '../storage.js';
 import { sende } from '../ereignisse.js';
 import { fuelle, waehle, angeboten } from '../orte.js';
@@ -145,6 +145,7 @@ import { zeige as zeigeZuzweit } from './zuzweit.js';
 import { t, sprache } from '../sprache.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/partie.js';
+import '../pakete/lobby/texte.js'; // Abzeichen "KI-Gegner" (p-lobby.ki), auch beim Fortsetzen ohne Lobby
 import { meinName } from '../konto.js';
 
 
@@ -330,6 +331,9 @@ export function zeige(root, params, app) {
     boss: modus === 'boss' ? pruefeBoss(quelle.boss) : null,
     liga: pruefeLiga(quelle.liga),
     tempo: pruefeTempo(quelle.tempo),
+    // Etappe B Task 4: Bot als Ersatz aus der Gegnersuche (KI-Gegner), mit Beleg fuer die Kronen (Task 5)
+    ki: quelle.ki === true,
+    kiRef: quelle.ki === true ? pruefeKiRef(quelle.kiRef) : null,
     zeiten: pruefeZeiten(laufend && laufend.zeiten),
     finisher: false,
     effektGemerkt: null,
@@ -450,7 +454,7 @@ export function zeige(root, params, app) {
         <div class="spieler gegner botbox botleiste-hoch botkarte" role="group" aria-label="${esc(bot.name)}">
           <span class="av"><img src="${esc(avatarVon(bot))}" alt=""></span>
           <div class="info"><div class="name bot-name">${esc(bot.name)}</div>
-            <div class="unter bot-meta"><span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
+            <div class="unter bot-meta">${z.ki ? `<span class="ki-abzeichen">${esc(t('p-lobby.ki'))}</span>` : ''}<span class="p-meta">${esc(botMeta())}</span><span class="geschlagen-ort" data-wer="bot"></span><span class="denkt-ort"></span></div></div>
           ${uhrHtml('bot')}
           <div class="blase-ort" aria-live="polite" data-leer="${esc(bot.kurz || '')}"></div>
         </div>
@@ -1767,6 +1771,8 @@ export function zeige(root, params, app) {
     if (z.liga) f.liga = { ...z.liga };
     if (z.tempo) f.tempo = { ...z.tempo };
     if (z.zeiten) f.zeiten = z.zeiten.slice();
+    if (z.ki) f.ki = true;
+    if (z.kiRef) f.kiRef = z.kiRef;
     return f;
   }
   function speichereLaufend() {
