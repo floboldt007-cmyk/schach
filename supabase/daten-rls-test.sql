@@ -165,6 +165,12 @@ begin
      or not (d ? 'anmeldeprotokoll') then
     raise exception 'FEHLER: meine_daten ohne partien_online, freigabe_widerruf oder anmeldeprotokoll: %', d;
   end if;
+  -- Liga mit Kronen immer als Objekt mit Listen (leer, wenn kronen-schema.sql fehlt)
+  if jsonb_typeof(d -> 'kronen') is distinct from 'object' or jsonb_typeof(d -> 'kronen' -> 'buchungen') is distinct from 'array'
+     or jsonb_typeof(d -> 'kronen' -> 'archiv') is distinct from 'array' or jsonb_typeof(d -> 'kronen' -> 'ki_belege') is distinct from 'array'
+     or not (d -> 'kronen' ? 'stand') or not (d -> 'kronen' ? 'suche') then
+    raise exception 'FEHLER: meine_daten ohne kronen (stand, buchungen, archiv, suche, ki_belege): %', d;
+  end if;
   -- Zaehler der Mengenbremse (A hat eine Partie und ein Nutzungsereignis geteilt), Fehlversuche immer als Liste
   if jsonb_typeof(d -> 'mengenzaehler') <> 'array'
      or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z

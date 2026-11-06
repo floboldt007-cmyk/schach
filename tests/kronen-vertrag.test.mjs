@@ -185,6 +185,24 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('RLS-Test prueft gesperrte Wege mit insufficient_privilege', /exception when insufficient_privilege/.test(test));
 }
 
+// ---------- Datenauskunft (meine_daten in daten-schema.sql) ----------
+{
+  const daten = ohneKommentare(lies('supabase/daten-schema.sql'));
+  // jede Kronen-Tabelle mit Bezug auf ein Konto steht in der Auskunft, nur die eigenen Zeilen
+  const mitKonto = [...sql.matchAll(/create table if not exists public\.([a-z_]+) \(([\s\S]*?)\n\);/g)]
+    .filter((m) => /user_id uuid[^,]*references auth\.users/.test(m[2])).map((m) => m[1]);
+  const fehlt = mitKonto.filter((t) => !new RegExp(`from public\\.${t} [a-z] where [a-z]\\.user_id = \\$1`).test(daten));
+  pruefe(`meine_daten zeigt alle ${mitKonto.length} Kronen-Tabellen mit Konto (nur eigene Zeilen)`, mitKonto.length === 5 && fehlt.length === 0, { mitKonto, fehlt });
+  pruefe('meine_daten: Schluessel kronen immer da, Abschnitt nur mit eingespieltem kronen-schema.sql',
+    /to_regclass\('public\.kronen_stand'\)/.test(daten) && /'kronen', kronen,/.test(daten)
+      && /kronen jsonb := jsonb_build_object\('stand', null, 'buchungen', '\[\]'::jsonb, 'archiv', '\[\]'::jsonb, 'suche', null,\s*'ki_belege', '\[\]'::jsonb\)/.test(daten));
+  pruefe('meine_daten: Tageszaehler ohne Personenbezug nicht in der Auskunft', !/zaehler_tag/.test(daten));
+  pruefe('daten-rls-test prueft den Schluessel kronen', /d -> 'kronen'/.test(lies('supabase/daten-rls-test.sql')));
+  const a = lies('supabase/ANLEITUNG.md');
+  const abschnitt = a.slice(a.indexOf('## Liga mit Kronen'), a.indexOf('\n## ', a.indexOf('## Liga mit Kronen') + 5));
+  pruefe('ANLEITUNG Liga mit Kronen: daten-schema.sql danach neu einspielen', abschnitt.includes('`supabase/daten-schema.sql` noch einmal ausführen'));
+}
+
 // ---------- Rueckweg ----------
 {
   const fehlt = funktionen.map((f) => `${f.name}(${f.typen.join(', ')})`).filter((s) => !zurueck.includes(`drop function if exists public.${s};`));

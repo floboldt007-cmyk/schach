@@ -211,8 +211,9 @@ ihre Daten herunterladen und ihr Konto selbst löschen.
      Archiv, Nutzung, Widerruf, Online-Partien falls eingespielt, Anmeldeprotokoll), als JSON. Daraus baut die App die
      Datei „Meine Daten herunterladen“. Seit dem 29.10. auch die eigene Zeile aus `abos` (falls `abo-schema.sql`
      eingespielt ist) und die Werkstatt-Daten (Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstücke, falls
-     `werkstatt-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt hat, führt die Datei dafür
-     einmal neu aus.
+     `werkstatt-schema.sql` eingespielt ist). Seit dem 06.11. auch die Liga mit Kronen (Stand, Buchungen, Saison-Archiv,
+     Gegnersuche, KI-Belege, falls `kronen-schema.sql` eingespielt ist). Wer `daten-schema.sql` schon früher eingespielt
+     hat, führt die Datei dafür einmal neu aus.
    - Funktion `freigabe_widerrufen()`: Die App ruft sie beim Ausschalten des Schalters. Sie löscht Archiv und Nutzung des
      Aufrufers und merkt sich den Zeitpunkt in `freigabe_widerrufe` (für Nutzer nicht direkt lesbar).
    - Mengenbremse: Ein Konto kann höchstens 300 Partien und 2000 Nutzungsereignisse in 24 Stunden schreiben (Trigger,
@@ -253,15 +254,19 @@ Bot-Partien, Start-Liga aus der vorhandenen Elo) braucht `supabase/kronen-schema
 Konto keinen Kronen-Stand vom Server, und „Gewertet“ in der Lobby endet mit einer Fehlermeldung. Alles andere läuft
 weiter, die lokale Liga ebenso.
 
-1. Vorher muss `supabase/online-schema.sql` eingespielt sein (Tabelle `partien_online`; die Kronen-Datei hängt dort die
-   Spalte `gewertet` und einen Trigger an).
+1. Vorher muss das Online-Schema eingerichtet sein, in der Reihenfolge aus „Online gegen Freunde“ und „Anti-Cheat
+   Etappe 1a“ (zuerst die Edge Function, dann das SQL). Die Kronen-Datei hängt an die Tabelle `partien_online` die
+   Spalte `gewertet` und einen Trigger an.
 2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/kronen-schema.sql` einfügen
    und **Run** drücken. Die Datei darf mehrfach laufen.
 3. Prüfen: den ganzen Inhalt von `supabase/kronen-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
    mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück.
 4. Tageszähler (gebaut, aber aus): danach `supabase/zaehler-schema.sql` einspielen und mit
    `supabase/zaehler-rls-test.sql` prüfen (ebenfalls Rollback am Ende).
-5. **Erst beim Live-Gang:** den Start der ersten Saison setzen, immer ein Montag, der erste Montag nach dem Live-Gang:
+5. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch den
+   Kronen-Stand, alle Kronen-Buchungen, das Saison-Archiv, eine laufende Gegnersuche und die KI-Belege. Die Tageszähler
+   haben keinen Personenbezug und stehen dort nicht.
+6. **Erst beim Live-Gang:** den Start der ersten Saison setzen, immer ein Montag, der erste Montag nach dem Live-Gang:
    `update public.kronen_schalter set saison_start = 'JJJJ-MM-TT';`
    Bis dahin gilt Saison 0: Kronen werden gebucht, aber keine Saison wechselt, niemand wird zurückgestuft.
 
