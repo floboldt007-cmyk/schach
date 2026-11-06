@@ -10,6 +10,10 @@
 //     der Server keinen Beleg gab: dann spielt man ohne Kronen). Nach einem Treffer nie mehr beiBot. stopp() bricht ab
 //     (genau ein online_suche_ende). beiFehler(e), wenn der Start scheitert (offline, abgemeldet).
 //   BOT_ERSATZ_MS = 10000
+//   meldeBotErgebnis({ partieId, ergebnis, botElo }) -> Promise<{ delta, kronen, stufe } | null>   (Task 5, Bot-Leiter)
+//   meldeKiErgebnis({ kiRef, ergebnis }) -> Promise<{ delta, kronen, stufe } | null>             (Task 5, KI-Gegner)
+//     ergebnis 'sieg' | 'remis' | 'niederlage'. Ohne Konto, offline oder bei einer Absage des Servers (Grenze, Beleg,
+//     zu frueh) null ohne Fehler; nichts wird gespeichert oder nachgeholt (entschieden: ohne Konto keine Kronen).
 import { rpc } from './online.js';
 import { sitzung } from './konto.js';
 
@@ -20,6 +24,18 @@ export const angemeldet = () => !!sitzung()?.access_token;
 export async function holeStand() {
   return rpc('kronen_mein_stand', {});
 }
+
+async function melde(name, daten) {
+  if (!angemeldet()) return null;
+  try {
+    const d = await rpc(name, daten);
+    if (!d || typeof d !== 'object' || typeof d.fehler === 'string' || !Number.isFinite(d.kronen)) return null;
+    return { delta: d.delta, kronen: d.kronen, stufe: d.stufe };
+  } catch (e) { return null; }
+}
+export const meldeBotErgebnis = ({ partieId, ergebnis, botElo }) =>
+  melde('kronen_bot_ergebnis', { ref: partieId, ergebnis, bot_elo: botElo });
+export const meldeKiErgebnis = ({ kiRef, ergebnis }) => melde('kronen_ki_ergebnis', { ki_ref: kiRef, ergebnis });
 
 const partieVon = (d) => (d && typeof d === 'object' && typeof d.partie === 'string' ? d.partie : null);
 

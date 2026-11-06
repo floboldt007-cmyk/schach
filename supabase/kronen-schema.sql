@@ -551,3 +551,123 @@ revoke all on function public.online_suche_ende(boolean) from public, anon, auth
 grant execute on function public.online_suche_start(text) to authenticated;
 grant execute on function public.online_suche_stand() to authenticated;
 grant execute on function public.online_suche_ende(boolean) to authenticated;
+
+-- ---------- Task 5: Bot- und KI-Gegner-Ergebnis ----------
+-- Gemeinsame Buchung fuer Bot-Leiter und KI-Gegner: Kronen mit Liga-Boden, je (Konto, Quelle, ref) hoechstens einmal.
+-- Antwort { delta, kronen, stufe }; eine schon gebuchte ref liefert den Stand mit delta 0. Nur intern.
+-- Parameter heissen bewusst nicht quelle/ref: gleichnamige Spalten waeren in PL/pgSQL sonst mehrdeutig.
+create or replace function public.kronen_einfach_buchen(uid uuid, art text, schluessel text, ergebnis text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st public.kronen_stand;
+  nominal integer := (public.kronen_konstanten() #>> array['kronen', art, ergebnis])::integer;
+  neu integer;
+  gebucht integer;
+begin
+  st := public.kronen_stand_sichern(uid);
+  neu := greatest(st.boden, 0, st.kronen + nominal);
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
+  values (uid, art, schluessel, neu - st.kronen, st.saison)
+  on conflict on constraint kronen_buchungen_einmal do nothing;
+  get diagnostics gebucht = row_count;
+  if gebucht = 0 then
+    return jsonb_build_object('delta', 0, 'kronen', st.kronen, 'stufe', public.kronen_stufe(st.kronen));
+  end if;
+  update public.kronen_stand s
+  set kronen = neu, boden = greatest(st.boden, public.kronen_liga_boden(neu)), aktualisiert_am = now()
+  where s.user_id = uid;
+  return jsonb_build_object('delta', neu - st.kronen, 'kronen', neu, 'stufe', public.kronen_stufe(neu));
+end;
+$$;
+
+-- Buchungen einer Quelle heute (Europe/Berlin), fuer die Tagesgrenzen. Nur intern.
+create or replace function public.kronen_heute_anzahl(uid uuid, art text)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select count(*)::integer from public.kronen_buchungen b
+  where b.user_id = uid and b.quelle = art
+    and b.am >= (public.kronen_heute()::timestamp at time zone 'Europe/Berlin');
+$$;
+
+-- Ergebnis gegen einen Bot der Leiter. ref ist die Partie-ID des Geraets; hoechstens 10 Buchungen am Tag.
+-- Antwort { delta, kronen, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_GRENZE' }.
+create or replace function public.kronen_bot_ergebnis(ref text, ergebnis text, bot_elo integer)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  if ergebnis is null or ergebnis not in ('sieg', 'remis', 'niederlage') or bot_elo is null or bot_elo not between 200 and 3200
+     or ref is null or char_length(ref) not between 8 and 64 then
+    return jsonb_build_object('fehler', 'KRONEN_EINGABE');
+  end if;
+  -- je Konto nacheinander, damit die Grenze auch bei gleichzeitigen Meldungen haelt
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('kronen-melden:' || uid::text));
+  if exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle = 'bot' and b.ref = kronen_bot_ergebnis.ref) then
+    return public.kronen_einfach_buchen(uid, 'bot', ref, ergebnis); -- schon gebucht: Stand mit delta 0
+  end if;
+  if public.kronen_heute_anzahl(uid, 'bot') >= (public.kronen_konstanten()->>'bot_tagesgrenze')::integer then
+    return jsonb_build_object('fehler', 'KRONEN_GRENZE');
+  end if;
+  return public.kronen_einfach_buchen(uid, 'bot', ref, ergebnis);
+end;
+$$;
+
+-- Ergebnis gegen einen KI-Gegner aus der Gegnersuche, nur gegen einen eigenen Beleg (online_suche_ende(true)).
+-- Reihenfolge: Eingabe -> Beleg (eigener, nicht eingeloest, juenger als 6 h) -> Mindestdauer 60 s (Beleg bleibt) ->
+-- Tagesgrenze 20 (Beleg wird eingeloest, damit er nicht morgen nachgebucht wird) -> einloesen und buchen.
+-- Antwort { delta, kronen, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_BELEG' | 'KRONEN_ZU_FRUEH' | 'KRONEN_GRENZE' }.
+create or replace function public.kronen_ki_ergebnis(ki_ref uuid, ergebnis text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  uid uuid := auth.uid();
+  beleg public.suche_ki_belege;
+begin
+  if uid is null then
+    raise exception 'KRONEN_ANMELDUNG';
+  end if;
+  if ki_ref is null or ergebnis is null or ergebnis not in ('sieg', 'remis', 'niederlage') then
+    return jsonb_build_object('fehler', 'KRONEN_EINGABE');
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('kronen-melden:' || uid::text));
+  select * into beleg from public.suche_ki_belege b
+  where b.ref = ki_ref and b.user_id = uid and not b.eingeloest and b.erstellt_am > now() - interval '6 hours'
+  for update;
+  if beleg.ref is null then
+    return jsonb_build_object('fehler', 'KRONEN_BELEG');
+  end if;
+  if now() - beleg.erstellt_am < make_interval(secs => (public.kronen_konstanten()->>'ki_mindestdauer_s')::integer) then
+    return jsonb_build_object('fehler', 'KRONEN_ZU_FRUEH');
+  end if;
+  update public.suche_ki_belege b set eingeloest = true where b.ref = ki_ref;
+  if public.kronen_heute_anzahl(uid, 'ki') >= (public.kronen_konstanten()->>'ki_tagesgrenze')::integer then
+    return jsonb_build_object('fehler', 'KRONEN_GRENZE');
+  end if;
+  return public.kronen_einfach_buchen(uid, 'ki', ki_ref::text, ergebnis);
+end;
+$$;
+
+revoke all on function public.kronen_einfach_buchen(uuid, text, text, text) from public, anon, authenticated;
+revoke all on function public.kronen_heute_anzahl(uuid, text) from public, anon, authenticated;
+revoke all on function public.kronen_bot_ergebnis(text, text, integer) from public, anon, authenticated;
+revoke all on function public.kronen_ki_ergebnis(uuid, text) from public, anon, authenticated;
+grant execute on function public.kronen_bot_ergebnis(text, text, integer) to authenticated;
+grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated;

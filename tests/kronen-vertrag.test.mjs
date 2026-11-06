@@ -76,7 +76,8 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe(`jede der ${sigs.length} Funktionen ist zuerst fuer alle gesperrt`, ohneRevoke.length === 0, ohneRevoke);
   const grants = [...sql.matchAll(/grant execute on function public\.([a-z_]+)\(([^)]*)\) to ([a-z_]+)/g)].map((m) => `${m[1]}->${m[3]}`);
   const ERLAUBT = ['kronen_mein_stand->authenticated', 'kronen_konstanten->authenticated',
-    'online_suche_start->authenticated', 'online_suche_stand->authenticated', 'online_suche_ende->authenticated'];
+    'online_suche_start->authenticated', 'online_suche_stand->authenticated', 'online_suche_ende->authenticated',
+    'kronen_bot_ergebnis->authenticated', 'kronen_ki_ergebnis->authenticated'];
   pruefe('nur freigegebene Funktionen fuer Nutzer, nie fuer anon', grants.every((g) => ERLAUBT.includes(g)) && !grants.some((g) => g.endsWith('anon')), grants);
   pruefe('alle Funktionen mit security definer haben search_path leer',
     funktionen.filter((f) => /security definer/.test(f.kopf)).every((f) => /set search_path = ''/.test(f.kopf)));
@@ -129,6 +130,29 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     && start.includes("zeit !~ '^[0-9]{1,3}\\+[0-9]{1,2}$'"));
   const genutzt = ['online_suche_start', 'online_suche_stand', 'online_suche_ende'];
   pruefe('RLS-Test ruft die Such-Funktionen auf', genutzt.every((f) => test.includes(`public.${f}(`)));
+}
+
+// ---------- Bot- und KI-Ergebnis (Task 5) ----------
+{
+  const bot = fn('kronen_bot_ergebnis')?.rumpf || '';
+  pruefe('Bot-Ergebnis: Eingabe (Ergebnis, bot_elo 200 bis 3200, ref 8 bis 64), Grenze aus bot_tagesgrenze',
+    /bot_elo not between 200 and 3200/.test(bot) && /char_length\(ref\) not between 8 and 64/.test(bot)
+      && /'bot_tagesgrenze'/.test(bot) && /'KRONEN_GRENZE'/.test(bot) && /'KRONEN_EINGABE'/.test(bot));
+  const ki = fn('kronen_ki_ergebnis')?.rumpf || '';
+  const stelle = (s) => ki.indexOf(s);
+  pruefe('KI-Ergebnis: Reihenfolge Eingabe, Beleg, zu frueh, Grenze, dann einloesen und buchen',
+    stelle("'KRONEN_EINGABE'") > 0 && stelle("'KRONEN_EINGABE'") < stelle("'KRONEN_BELEG'") && stelle("'KRONEN_BELEG'") < stelle("'KRONEN_ZU_FRUEH'")
+      && stelle("'KRONEN_ZU_FRUEH'") < stelle('set eingeloest = true') && stelle('set eingeloest = true') < stelle("'KRONEN_GRENZE'")
+      && stelle("'KRONEN_GRENZE'") < stelle("kronen_einfach_buchen(uid, 'ki'"), ki.length);
+  pruefe('KI-Beleg: eigener, nicht eingeloest, juenger als 6 Stunden, Mindestdauer aus ki_mindestdauer_s, Grenze aus ki_tagesgrenze',
+    /b\.user_id = uid and not b\.eingeloest and b\.erstellt_am > now\(\) - interval '6 hours'/.test(ki)
+      && /'ki_mindestdauer_s'/.test(ki) && /'ki_tagesgrenze'/.test(ki));
+  const einfach = fn('kronen_einfach_buchen')?.rumpf || '';
+  pruefe('Bot/KI-Buchung: einmal je ref, Liga-Boden, Kronen aus kronen_konstanten',
+    /on conflict on constraint kronen_buchungen_einmal do nothing/.test(einfach) && /greatest\(st\.boden, 0, st\.kronen \+ nominal\)/.test(einfach)
+      && /kronen_konstanten\(\) #>> array\['kronen', art, ergebnis\]/.test(einfach));
+  pruefe('Tagesgrenzen zaehlen ab Mitternacht Europe/Berlin', /kronen_heute\(\)::timestamp at time zone 'Europe\/Berlin'/.test(fn('kronen_heute_anzahl')?.rumpf || ''));
+  pruefe('RLS-Test ruft Bot- und KI-Ergebnis auf', test.includes('public.kronen_bot_ergebnis(') && test.includes('public.kronen_ki_ergebnis('));
 }
 
 // ---------- RLS-Test deckt ab ----------
