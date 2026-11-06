@@ -18,7 +18,7 @@
 /* ---------- Rang-Ring ---------- */
 .heim-ring { position: relative; flex: none; width: clamp(120px, 24dvh, 208px); aspect-ratio: 1; margin: var(--a1) auto var(--a2);
   display: grid; place-items: center; }
-.heim-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.heim-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .heim-spur, .heim-bogen { fill: none; stroke-width: 8; }
 .heim-spur { stroke: var(--linie-2); }
 .heim-bogen { stroke: var(--gold); stroke-linecap: round; transition: stroke-dashoffset var(--d-xl) var(--gleiten); }
@@ -31,6 +31,12 @@
 /* ---------- Liga-Zeile: Stufen-Name in der lesbaren Goldfassung (>= 4,5:1 in hell und dunkel) ---------- */
 .heim-liga { flex: none; margin: 0 0 var(--a3); text-align: center; font-size: 14.5px; font-weight: 600; color: var(--text-2); }
 .heim-liga b { color: var(--kt-stark); font-weight: var(--gw-stark); }
+/* Kronen (Etappe B, Task 7): Symbol vor der Stufe im Ring; ohne Konto ist die Zeile ein Link zur Konto-Seite */
+.heim-einheit { display: inline-flex; align-items: center; gap: 5px; }
+.heim-einheit svg { flex: none; width: 16px; height: 16px; color: var(--kt-stark); }
+.heim-konto { display: inline-block; padding: 4px 2px; color: var(--kt-stark); font-weight: var(--gw-stark);
+  text-decoration: underline; text-underline-offset: 3px; }
+.heim-konto:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------- Modus-Karten ---------- */
 .heim-modi { flex: none; display: flex; flex-direction: column; gap: 10px; width: 100%; }

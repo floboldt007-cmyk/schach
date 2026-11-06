@@ -85,6 +85,18 @@ pruefe('startKronenAusElo: Liga-Anfang nach Elo, nie direkt Krone', () => {
   assert.equal(K.startKronenAusElo(NaN), 0);
 });
 
+pruefe('kronenSpeicher: Modul kronen { konto, stand, startGemeldet } (Task 7, Task 6 nutzt startGemeldet)', () => {
+  assert.deepEqual(K.kronenSpeicher(null), { konto: null, stand: null, startGemeldet: false });
+  assert.deepEqual(K.kronenSpeicher('kaputt'), { konto: null, stand: null, startGemeldet: false });
+  assert.deepEqual(K.kronenSpeicher({ konto: 'u1', stand: { kronen: 640, stufe: 6 }, startGemeldet: true }),
+    { konto: 'u1', stand: { kronen: 640, stufe: 6 }, startGemeldet: true });
+  // startGemeldet nur als echtes boolean, Stand nur als Objekt mit Kronen-Zahl
+  assert.equal(K.kronenSpeicher({ konto: 'u1', startGemeldet: 'ja' }).startGemeldet, false);
+  assert.equal(K.kronenSpeicher({ konto: 'u1', stand: { kronen: 'x' } }).stand, null);
+  assert.equal(K.kronenSpeicher({ konto: 'u1', stand: [1] }).stand, null);
+  assert.equal(K.kronenSpeicher({ konto: 42 }).konto, null);
+});
+
 const fehler = ergebnisse.filter((e) => !e.ok).length;
 console.log(`\n${ergebnisse.length - fehler} von ${ergebnisse.length} ok`);
 if (fehler) process.exitCode = 1;
