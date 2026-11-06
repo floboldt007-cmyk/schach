@@ -312,7 +312,8 @@ begin
   end if;
   if (k->>'stufe_kronen')::int <> 100 or (k#>>'{kronen,ki,sieg}')::int <> 20 or (k#>>'{kronen,online,niederlage}')::int <> -15
      or (k#>>'{kronen,bot,niederlage}')::int <> 0 or (k->>'bot_tagesgrenze')::int <> 10 or (k->>'ki_tagesgrenze')::int <> 20
-     or (k->>'ki_mindestdauer_s')::int <> 60 or (k->>'saison_tage')::int <> 28 or (k->>'rueckstufung_stufen')::int <> 3 then
+     or (k->>'ki_mindestdauer_s')::int <> 60 or (k->>'online_mindest_halbzuege')::int <> 4
+     or (k->>'paar_tagesgrenze')::int <> 3 or (k->>'saison_tage')::int <> 28 or (k->>'rueckstufung_stufen')::int <> 3 then
     raise exception 'FEHLER: kronen_konstanten weicht vom Plan ab (%)', k;
   end if;
   if (select zaehler_an from public.kronen_schalter where id) then
@@ -346,7 +347,9 @@ declare
   p uuid;
 begin
   insert into public.partien_online (erstellt_von, fen) values (w, 'egal') returning id into p;
-  update public.partien_online set weiss = w, schwarz = s, gewertet = gew, status = 'laeuft' where id = p;
+  -- 4 Halbzuege: gerade genug fuer eine Wertung (Task 3b); kuerzere Partien setzt Abschnitt 7 selbst
+  update public.partien_online set weiss = w, schwarz = s, gewertet = gew, status = 'laeuft', zuege = 'e4 e5 Nf3 Nc6'
+  where id = p;
   return p;
 end;
 $$;
@@ -463,5 +466,79 @@ begin
 end;
 $$;
 reset role;
+
+-- ---------- 7. Schutz gegen Absprache (Task 3b): kurze Partien, Paar-Grenze ----------
+-- A und C (A und B haben in Abschnitt 6 heute schon 3 gewertete Partien gespielt).
+do $$
+declare
+  a constant uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  b constant uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  c constant uuid := 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  p uuid;
+  i integer;
+  sa public.kronen_stand;
+begin
+  perform pg_temp.setze_stand(a, 0, 1000, 30);
+  perform pg_temp.setze_stand(c, 0, 1000, 30);
+
+  -- Kurz: Aufgabe nach 3 Halbzuegen, Remis nach 2, Zeitablauf nach 0 -> nichts gebucht, Partie trotzdem beendet
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = 'e4 e5 Nf3' where id = p;
+  perform pg_temp.beende(p, '1-0', 'aufgabe');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select status from public.partien_online where id = p) <> 'beendet' then
+    raise exception 'FEHLER: kurze Partie (3 Halbzuege) wurde gewertet oder nicht beendet';
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = 'e4 e5' where id = p;
+  perform pg_temp.beende(p, '1/2-1/2', 'remis');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text) then
+    raise exception 'FEHLER: Remis nach 2 Halbzuegen wurde gewertet';
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  update public.partien_online set zuege = '' where id = p;
+  perform pg_temp.beende(p, '0-1', 'zeit');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text) then
+    raise exception 'FEHLER: Zeitablauf ohne Zug wurde gewertet';
+  end if;
+  select * into sa from public.kronen_stand where user_id = a;
+  if sa.kronen <> 0 or sa.elo <> 1000 or sa.elo_n <> 30 then
+    raise exception 'FEHLER: kurze Partien haben Kronen oder Elo veraendert (%/%/%)', sa.kronen, sa.elo, sa.elo_n;
+  end if;
+
+  -- Paar-Grenze: 3 gewertete Partien A gegen C zaehlen (Farben wechseln), die 4. nicht
+  for i in 1..3 loop
+    if i = 2 then
+      p := pg_temp.neue_partie(c, a, true);
+      perform pg_temp.beende(p, '0-1', 'matt');
+    else
+      p := pg_temp.neue_partie(a, c, true);
+      perform pg_temp.beende(p, '1-0', 'matt');
+    end if;
+  end loop;
+  select * into sa from public.kronen_stand where user_id = a;
+  if sa.kronen <> 90 or sa.elo_n <> 33 then
+    raise exception 'FEHLER: Paar-Grenze: die ersten 3 Partien zaehlen nicht alle (Kronen %, Partien %)', sa.kronen, sa.elo_n;
+  end if;
+  p := pg_temp.neue_partie(a, c, true);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if exists (select 1 from public.kronen_buchungen where ref = p::text)
+     or (select kronen from public.kronen_stand where user_id = a) <> 90
+     or (select elo from public.kronen_stand where user_id = a) <> sa.elo then
+    raise exception 'FEHLER: Paar-Grenze: die 4. Partie am Tag gegen denselben Gegner wurde gewertet';
+  end if;
+  if (select status from public.partien_online where id = p) <> 'beendet' then
+    raise exception 'FEHLER: Paar-Grenze: die 4. Partie ist nicht beendet';
+  end if;
+
+  -- die Grenze gilt je Paar: B gegen C zaehlt weiter
+  perform pg_temp.setze_stand(b, 0, 1000, 30);
+  p := pg_temp.neue_partie(b, c, true);
+  perform pg_temp.beende(p, '1-0', 'matt');
+  if (select count(*) from public.kronen_buchungen where ref = p::text) <> 2 then
+    raise exception 'FEHLER: Paar-Grenze trifft ein anderes Paar';
+  end if;
+end;
+$$;
 
 rollback;

@@ -18,6 +18,10 @@ export const KRONEN = Object.freeze({
 export const BOT_TAGESGRENZE = 10; // entschieden 06.11.2026: gewertete Bot-Leiter-Ergebnisse je Tag (Europe/Berlin)
 export const KI_TAGESGRENZE = 20; // entschieden 06.11.2026: gewertete KI-Gegner-Ergebnisse je Tag (Europe/Berlin)
 export const KI_MINDESTDAUER_S = 60; // entschieden 06.11.2026: Suchbeleg fruehestens 60 s nach Ausgabe einloesbar
+// entschieden 06.11.2026 (Orchestrator, Schutz gegen Absprache zweier Konten): Online-Partien mit weniger als 4 Halbzuegen
+// und ab der 4. gewerteten Partie am Tag (Europe/Berlin) gegen denselben Gegner bleiben ohne Kronen und ohne Elo
+export const ONLINE_MINDEST_HALBZUEGE = 4;
+export const PAAR_TAGESGRENZE = 3;
 export const SAISON_TAGE = 28; // entschieden 06.11.2026: 4 Wochen; der Start ist eine Einstellung, kein Wert im Code
 export const RUECKSTUFUNG_STUFEN = 3; // entschieden 06.11.2026: eine ganze Liga zurueck
 

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   STUFE_KRONEN, STUFEN_JE_LIGA, STUFEN_ANZAHL, KRONEN, BOT_TAGESGRENZE, KI_TAGESGRENZE, KI_MINDESTDAUER_S,
-  SAISON_TAGE, RUECKSTUFUNG_STUFEN,
+  SAISON_TAGE, RUECKSTUFUNG_STUFEN, ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE,
 } from '../js/pakete/liga/kronen.js';
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,6 +48,10 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     zahl('bot_tagesgrenze') === BOT_TAGESGRENZE && zahl('ki_tagesgrenze') === KI_TAGESGRENZE
       && zahl('ki_mindestdauer_s') === KI_MINDESTDAUER_S && zahl('saison_tage') === SAISON_TAGE
       && zahl('rueckstufung_stufen') === RUECKSTUFUNG_STUFEN);
+  pruefe('Schutz gegen Absprache gleich (Mindest-Halbzuege 4, Paar-Grenze 3)',
+    zahl('online_mindest_halbzuege') === ONLINE_MINDEST_HALBZUEGE && zahl('paar_tagesgrenze') === PAAR_TAGESGRENZE
+      && ONLINE_MINDEST_HALBZUEGE === 4 && PAAR_TAGESGRENZE === 3,
+    [zahl('online_mindest_halbzuege'), zahl('paar_tagesgrenze')]);
   // die Rechenfunktionen benutzen dieselben Zahlen
   pruefe('kronen_stufe rechnet mit 100 je Stufe und hoechstens Stufe 17',
     /least\(17,\s*kronen \/ 100\)/.test(fn('kronen_stufe')?.rumpf || '') && STUFEN_ANZAHL - 1 === 17 && STUFE_KRONEN === 100);
@@ -85,6 +89,15 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     /new\.gewertet/.test(trig) && /new\.ergebnis is not null/.test(trig) && /new\.status = 'beendet'/.test(trig)
       && /old\.status <> 'beendet'/.test(trig), trig);
   pruefe('Trigger ruft kronen_bei_partie_ende', /execute function public\.kronen_bei_partie_ende\(\)/.test(trig));
+  const ende = fn('kronen_bei_partie_ende')?.rumpf || '';
+  pruefe('kurze Partien ohne Wertung (Halbzuege gegen online_mindest_halbzuege)',
+    /halbzuege < \(konst->>'online_mindest_halbzuege'\)::integer then\s*return null;/.test(ende));
+  pruefe('Paar-Grenze je Tag, gesperrt je Paar gegen Gleichzeitigkeit',
+    /heute_paar >= \(konst->>'paar_tagesgrenze'\)::integer then\s*return null;/.test(ende)
+      && /pg_advisory_xact_lock/.test(ende) && /kronen_heute\(\)/.test(ende));
+  const abschnitt7 = lies('supabase/kronen-rls-test.sql');
+  pruefe('RLS-Test prueft kurze Partien und die Grenze genau bei 3/4',
+    /kurze Partie \(3 Halbzuege\)/.test(abschnitt7) && /die 4\. Partie am Tag/.test(abschnitt7) && /for i in 1\.\.3 loop/.test(abschnitt7));
   const buchen = fn('kronen_online_buchen')?.rumpf || '';
   pruefe('Online-Buchung hoechstens einmal je Partie und Konto',
     /on conflict \(user_id, quelle, ref\) do nothing/.test(buchen) && /'online', partie::text/.test(buchen)

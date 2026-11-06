@@ -288,3 +288,4 @@
 8. **Elo-Fenster der Gegnersuche:** +-200, je Sekunde Wartezeit 50 breiter; nach 10 s KI-Gegner.
 9. **Saison-Belohnungen** kommen mit Etappe 4b; diese Etappe speichert nur `kronen_archiv`.
 10. **Zaehler** bleibt aus (`zaehler_an = false`) bis Rechtspruefung (§ 25 TDDDG, DSGVO) und Absatz in der Datenschutzerklaerung.
+11. **Schutz gegen Absprache (Task 3b, Ergaenzung des Orchestrators, Kronen-Regeln von Flo uebertragen):** Online-Partien mit weniger als 4 Halbzuegen (Aufgabe, Remis-Annahme oder Zeitablauf) und ab der 4. gewerteten Partie am Tag (Europe/Berlin) gegen denselben Gegner bleiben ohne Kronen und ohne Elo; die Partie wird normal beendet und bleibt im Verlauf. Grund: zwei eigene Konten koennten sich in der Gegnersuche paaren und sofort aufgeben. Konstanten `online_mindest_halbzuege` 4 und `paar_tagesgrenze` 3 in `kronen_konstanten` und `js/pakete/liga/kronen.js` (Vertragstest), RLS-Test Abschnitt 7 mit der Grenze genau bei 3/4.

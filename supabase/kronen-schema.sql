@@ -97,6 +97,8 @@ as $$
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
     'ki_mindestdauer_s', 60,
+    'online_mindest_halbzuege', 4,
+    'paar_tagesgrenze', 3,
     'saison_tage', 28,
     'rueckstufung_stufen', 3,
     'saison_start', (select s.saison_start from public.kronen_schalter s where s.id)
@@ -304,7 +306,10 @@ begin
 end;
 $$;
 
--- Trigger-Funktion: beide Elo-Werte werden VOR der ersten Buchung gelesen, damit B gegen den alten Wert von A rechnet
+-- Trigger-Funktion: beide Elo-Werte werden VOR der ersten Buchung gelesen, damit B gegen den alten Wert von A rechnet.
+-- Schutz gegen Absprache zweier Konten (Task 3b): Partien mit weniger als 4 Halbzuegen (sofort aufgeben, Remis
+-- annehmen, Zeit ablaufen lassen) und ab der 4. gewerteten Partie am Tag gegen denselben Gegner bleiben ohne Kronen
+-- und Elo. Die Partie selbst bleibt beendet und im Verlauf.
 create or replace function public.kronen_bei_partie_ende()
 returns trigger
 language plpgsql
@@ -315,8 +320,27 @@ declare
   elo_w integer;
   elo_s integer;
   punkte_w numeric;
+  konst jsonb := public.kronen_konstanten();
+  halbzuege integer;
+  heute_paar integer;
 begin
   if new.weiss is null or new.schwarz is null then
+    return null;
+  end if;
+  halbzuege := case when new.zuege = '' then 0 else array_length(string_to_array(new.zuege, ' '), 1) end;
+  if halbzuege < (konst->>'online_mindest_halbzuege')::integer then
+    return null;
+  end if;
+  -- je Paar nacheinander, damit zwei gleichzeitig endende Partien nicht beide als dritte zaehlen
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('kronen-paar:' || least(new.weiss, new.schwarz)::text
+    || ':' || greatest(new.weiss, new.schwarz)::text));
+  select count(*) into heute_paar
+  from public.kronen_buchungen b
+  join public.partien_online p on p.id::text = b.ref
+  where b.user_id = new.weiss and b.quelle = 'online' and p.id <> new.id
+    and (p.weiss = new.schwarz or p.schwarz = new.schwarz)
+    and (b.am at time zone 'Europe/Berlin')::date = public.kronen_heute();
+  if heute_paar >= (konst->>'paar_tagesgrenze')::integer then
     return null;
   end if;
   elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
