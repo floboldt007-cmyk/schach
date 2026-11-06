@@ -2138,16 +2138,16 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     await seite.route('**/js/ui/ich.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_ICH }));
-    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=training,bestenliste,ich#arena`);
+    await seite.goto(`http://127.0.0.1:${PORT}/index.html?test&kern&reiter=bestenliste,ich#arena`);
     await seite.waitForSelector('.screen.arena');
     const l1 = await seite.evaluate(() => {
       const n = document.querySelector('.reiter-leiste');
       return n && { hidden: n.hidden, reiter: [...n.querySelectorAll('[data-reiter]')].map((b) => b.dataset.reiter + (b.getAttribute('aria-current') === 'page' ? '*' : '')).join(),
         html: document.documentElement.dataset.reiter, imKopf: !!n.closest('.haupt-kopf'), oben: Math.round(n.getBoundingClientRect().top) };
     });
-    // Premium-Umbau U2 (Flo D5): im Querformat ab 1021 px sitzt die Leiste oben in der Kopfzeile (vorher unten, html "an")
-    pruefe('Leiste (Testmodus ?reiter=training,bestenliste,ich): Arena, Training, Bestenliste, Ich, Arena aktiv, quer oben im Kopf', !!l1 && !l1.hidden
-      && l1.reiter === 'arena*,training,bestenliste,ich' && l1.html === 'oben' && l1.imKopf && l1.oben < 82, JSON.stringify(l1));
+    // Etappe A (Konzept 2026-11-06): im Querformat ab 1021 px ist die Leiste eine Seitenleiste links (vorher oben im Kopf)
+    pruefe('Leiste (Testmodus ?reiter=bestenliste,ich): Start, Bots, Liga, Ich, Bots aktiv, quer als Seitenleiste', !!l1 && !l1.hidden
+      && l1.reiter === 'heim,arena*,bestenliste,ich' && l1.html === 'seite' && !l1.imKopf, JSON.stringify(l1));
     await seite.locator('.reiter-leiste [data-reiter="ich"]').click();
     await seite.waitForSelector('.screen.ich-test');
     pruefe('Leiste: Reiter Ich öffnet den Ich-Screen und ist aktiv', (await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter)) === 'ich'
@@ -2156,11 +2156,13 @@ async function testeSpielFundament(browser) {
     await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
     pruefe('Leiste: Bestenliste ohne Screen geht still zur Arena, Leiste bleibt', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
       && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
-    // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle), der Reiter oeffnet ihn
-    await seite.locator('.reiter-leiste [data-reiter="training"]').click();
+    // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle); seit Etappe A erreicht man es ueber die Startseite
+    await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
+    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.locator('[data-aktion="heim-raetsel"]').click();
     await seite.waitForSelector('.screen.training-screen');
-    pruefe('Leiste: Reiter Training oeffnet die Training-Huelle und ist aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
-      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'training' && location.hash === '#training'));
+    pruefe('Leiste: Training ueber die Startseite, Reiter Start bleibt aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
+      && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'heim' && location.hash === '#training'));
     // Premium-Umbau U2 (Flo D2): mit Ich gehoert der Verlauf zum Reiter Ich; versteckt ist die Leiste auf Screens ohne Reiter
     // (Einstellungen), dort faehrt sie weg und ist danach hidden
     await seite.evaluate(() => window.__app.gehe('verlauf'));
@@ -2173,10 +2175,10 @@ async function testeSpielFundament(browser) {
     pruefe('Leiste: auf Screens ohne Reiter (Einstellungen) versteckt', await seite.evaluate(() => document.querySelector('.reiter-leiste').hidden && !document.documentElement.dataset.reiter));
     await seite.goto(`http://127.0.0.1:${PORT}/index.html?reiter=verlauf#arena`);
     await seite.waitForSelector('.screen.arena');
-    // mit fest eingetragenen REITER (seit der Sammlung 30.10.: Training, Bestenliste, Ich) gibt es die Leiste, aber ?reiter
-    // fuegt ohne ?test nichts hinzu
+    // mit fest eingetragenen REITER (seit Etappe A: Liga und Ich, dazu immer Start und Bots) gibt es die Leiste, aber
+    // ?reiter fuegt ohne ?test nichts hinzu
     pruefe('Leiste: ohne ?test genau die festen Reiter, ?reiter bleibt wirkungslos', await seite.evaluate(() =>
-      [...document.querySelectorAll('.reiter-leiste [data-reiter]')].map((b) => b.dataset.reiter).join() === 'arena,training,bestenliste,ich'));
+      [...document.querySelectorAll('.reiter-leiste [data-reiter]')].map((b) => b.dataset.reiter).join() === 'heim,arena,bestenliste,ich'));
     const echte = fehler.filter((f) => !/404|Failed to fetch dynamically imported module|ui\/training\.js/.test(f));
     pruefe('Leiste: keine anderen Konsolenfehler', echte.length === 0, echte.join(' | '));
     await kontext.close();
@@ -2556,7 +2558,7 @@ async function testeSpielFundament(browser) {
     for (const vp of FORMATE) {
       const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, touch: true, handy: !!vp.handy });
       await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
-      await seite.goto(MIT_W0PLUS('wpheute&reiter=training,bestenliste,ich') + '#arena');
+      await seite.goto(MIT_W0PLUS('wpheute&reiter=bestenliste,ich') + '#arena');
       await seite.waitForSelector('.screen.arena .detail .wp-heute');
       await warte(400);
       const r = await seite.evaluate(() => {
@@ -2584,15 +2586,15 @@ async function testeSpielFundament(browser) {
         return { lage: document.documentElement.dataset.reiter, leisteOben: Math.round(leiste.top), screenUnten: Math.round(screen.bottom), geprueft, verdeckt,
           spielen: !!spTreffer && sp.contains(spTreffer) };
       });
-      // Premium-Umbau U2 (Flo D5): quer (1180) oben in der Kopfzeile, hoch und Handy unten; unten endet der Screen ueber ihr
-      const lageSoll = vp.name === 'quer' ? 'oben' : 'unten';
+      // Etappe A (Konzept 2026-11-06): quer (1180) Seitenleiste links, hoch und Handy unten; unten endet der Screen ueber ihr
+      const lageSoll = vp.name === 'quer' ? 'seite' : 'unten';
       if (r.lage !== lageSoll || (r.lage === 'unten' && r.screenUnten > r.leisteOben) || r.verdeckt.length || r.geprueft < 5 || !r.spielen) {
         falsch.push(`${vp.name} ${JSON.stringify(r)}`);
       }
       if (fehler.length) falsch.push(`${vp.name} Konsole: ${fehler.join(' | ')}`);
       await kontext.close();
     }
-    pruefe('Leiste (quer oben im Kopf, hoch und Handy unten): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
+    pruefe('Leiste (quer Seitenleiste, hoch und Handy unten): der Screen endet über der Leiste, kein bedienbares Element liegt darunter, SPIELEN erreichbar',
       falsch.length === 0, falsch.join(' || '));
   }
   // Schub 2b (Entscheidung 17.10.): Screen werkstatt (Paket werkstatt), gehoert zum Reiter Ich

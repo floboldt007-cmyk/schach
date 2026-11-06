@@ -5,7 +5,7 @@
 //   node tests/heim.test.mjs              alles
 //   node tests/heim.test.mjs --nur-node   ohne Browser
 //   PORT=8972 node tests/heim.test.mjs    eigener Port (Standard 8972)
-//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (390x844 hell und dunkel, 1180x820)
+//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (390x844 hell und dunkel, 1180x820, 1440x900 hell und dunkel)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -231,7 +231,8 @@ async function testeKarten(browser, heute) {
 
 async function testeOhneScrollen(browser, heute) {
   gruppe = 'ohne-scrollen';
-  for (const [w, h, schema] of [[375, 667, 'light'], [375, 667, 'dark'], [390, 844, 'light'], [390, 844, 'dark'], [1180, 820, 'light'], [1000, 590, 'light']]) {
+  for (const [w, h, schema] of [[375, 667, 'light'], [375, 667, 'dark'], [390, 844, 'light'], [390, 844, 'dark'], [1180, 820, 'light'], [1440, 900, 'light'],
+    [1440, 900, 'dark'], [1000, 590, 'light']]) {
     const { kontext, seite } = await neueSeite(browser, { w, h, schema, speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
     await istScreen(seite, 'heim');
     await warte(700);
@@ -256,8 +257,18 @@ async function testeOhneScrollen(browser, heute) {
       return aus;
     });
     pruefe(`${w}x${h} ${schema}: Texte lesbar (Kontrast ab 4,5:1)`, schlecht.length === 0, schlecht.join('; '));
+    if (w >= 1021 && w > h) {
+      // ab 1021 px quer zwei Spalten wie im Entwurf ipad-pc-v2: Ring links, Karten rechts, alles rechts der Seitenleiste
+      const z = await seite.evaluate(() => {
+        const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
+        return { seite: document.documentElement.dataset.reiter, nav: r('.reiter-leiste'), ring: r('.heim-ring'), karte: r('.heim-modus'), letzte: r('.heim-modus:last-of-type') };
+      });
+      pruefe(`${w}x${h} ${schema}: zwei Spalten, Ring links neben den Karten, rechts der Seitenleiste`, z.seite === 'seite' && !!z.ring && !!z.karte
+        && z.ring.r <= z.karte.l && z.ring.l >= z.nav.r && z.ring.t < z.letzte.b && z.ring.b > z.karte.t, JSON.stringify(z));
+    }
     if (w === 390 && h === 844) await bild(seite, `heim-390x844-${schema === 'dark' ? 'dunkel' : 'hell'}`);
     if (w === 1180) await bild(seite, 'heim-1180x820-hell');
+    if (w === 1440) await bild(seite, `heim-1440x900-${schema === 'dark' ? 'dunkel' : 'hell'}`);
     if (w === 1000) await bild(seite, 'heim-1000x590-hell');
     await kontext.close();
   }

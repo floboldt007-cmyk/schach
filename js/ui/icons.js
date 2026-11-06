@@ -51,6 +51,8 @@ const ICONS = {
   // Startseite neu (Flo 01.11.2026: "oben muss die Shop-Funktion sein ... die Premium-Version"): Krone (gefuellt) und Tasche
   krone: '<path d="M4 8.2l4.1 3.5L12 5.3l3.9 6.4L20 8.2l-1.5 9.3h-13z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 20h13" stroke-width="2.2"/>',
   laden: '<path d="M5.5 8.5h13l-1 11.5h-11z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>',
+  // Glas-Leiste (Konzept 2026-11-06, Entwurf online-shop .dock): Reiter Liga als Kronen-Umriss
+  liga: '<path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" stroke-linejoin="round"/>',
 };
 
 const NAME = /^[a-z][a-z0-9-]{0,39}$/;
