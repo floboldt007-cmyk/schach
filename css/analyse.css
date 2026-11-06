@@ -453,3 +453,41 @@
   .an-stand { display: none; }
   .an-navi { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* ============================================================
+   Etappe A (Flo 06.11.2026: "bei der Analyse ist das Schachbrett zu klein"), gemessen in tests/brettgroesse.test.mjs.
+   Querformat ab 561 px Hoehe: nur das Brett steht links und ist so hoch wie der Bildschirm; Navigation, Coach und die
+   rechte Spalte stehen rechts untereinander (vorher lagen Navigation und Coach unter dem Brett und kosteten 336 px Hoehe).
+   Hochformat: iPad mit schmalerem Rand, Handy von Rand zu Rand mit waagrechtem Bewertungsbalken ueber dem Brett.
+   ============================================================ */
+@media (orientation: landscape) and (min-height: 561px) {
+  .an-screen {
+    --an-brett: min(calc(100vh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+    --an-brett: min(calc(100dvh - var(--kopf-hoehe) - 32px - var(--an-sicher)), calc(100vw - 36px - 20px - 34px - var(--an-rechts-min) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 860px);
+  }
+  .an-inhalt { grid-template-rows: auto auto minmax(0, 1fr); row-gap: 12px; }
+  .an-links { display: contents; }
+  .an-brettzone { grid-column: 1; grid-row: 1 / 4; align-self: start; }
+  .an-navi { grid-column: 2; grid-row: 1; }
+  .an-coach { grid-column: 2; grid-row: 2; max-height: 40dvh; }
+  .an-rechts { grid-column: 2; grid-row: 3; }
+}
+@media (orientation: portrait) and (min-width: 521px) {
+  .an-screen { --an-brett: min(calc(100vw - 32px - var(--an-balken) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 880px); }
+  .an-screen.ohne-balken { --an-brett: min(calc(100vw - 32px), 880px); }
+}
+@media (orientation: portrait) and (max-width: 520px) {
+  .an-screen, .an-screen.ohne-balken { --an-balken: 0px; --an-brett: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); }
+  .an-inhalt { width: 100%; padding-inline: 10px; }
+  .an-brettzone { flex-direction: column; gap: 6px; margin-inline: -10px; }
+  .an-brett-rahmen { width: var(--an-brett); padding: 0; border-radius: 0; box-shadow: none; }
+  .an-brett-rahmen::after { display: none; }
+  .an-brett-rahmen .brett { --brett-radius: 0px; }
+  /* Balken waagrecht: Weiss waechst von links (data-unten = Farbe auf der linken Seite) */
+  .an-evalbalken { width: auto; height: 12px; margin-inline: 10px; border-radius: 6px; }
+  .an-eb-unten { top: 0; bottom: 0; right: auto; width: var(--w, 50%); height: auto; }
+  .an-eb-unten::before { top: 0; bottom: 0; left: auto; right: -1px; width: 2px; height: auto; }
+  .an-eb-mitte { top: 0; bottom: 0; left: 50%; right: auto; width: 1px; height: auto; }
+  .an-eb-wert, .an-eb-wert[data-seite="oben"] { top: 1px; bottom: auto; left: 6px; right: auto; text-align: left; }
+  .an-eb-wert[data-seite="oben"] { left: auto; right: 6px; text-align: right; }
+}
