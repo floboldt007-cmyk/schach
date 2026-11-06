@@ -62,6 +62,11 @@
   .heim-modus, .heim-modus.haupt { padding-top: 10px; padding-bottom: 10px; }
   .heim-modi { gap: 8px; }
 }
+/* Sehr niedrige Fenster (iPad im Browser 1000x590): seit die Kronen-Stufe unter der Zahl steht, braucht der Ring eine
+   Zeile mehr; kleinerer Ring, damit die dritte Karte ueber der schwebenden Leiste bleibt (heim.test ohne-scrollen) */
+@media (max-height: 620px) {
+  .heim-ring { width: clamp(108px, 19dvh, 208px); margin-top: 0; }
+}
 /* Breite Fenster: etwas mehr Luft, Inhalt bleibt in der Mitte */
 @media (min-width: 900px) and (min-height: 701px) {
   .heim-screen .heim-rumpf { justify-content: center; padding-top: var(--a4); }
