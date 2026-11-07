@@ -140,6 +140,8 @@
   nach Art. 28 DSGVO auf Grundlage eines Auftragsverarbeitungsvertrags <span class="platz">[abgeschlossen am Datum]</span>.
   Supabase ist ein Unternehmen außerhalb der EU; ein Zugriff von dort ist über die
   <span class="platz">[Standardvertragsklauseln im Auftragsverarbeitungsvertrag / weitere Garantien prüfen]</span> abgesichert.
+  Einige Aufgaben erledigen Server-Programme von Supabase (Edge Functions): die Prüfung der Züge in Online-Partien und im
+  Rätsel-Duell sowie der Coach. Auch sie laufen in Frankfurt, denn die App legt die Region bei jedem Aufruf fest.
   Die Anmelde-E-Mails versendet <span class="platz">[Name des E-Mail-Dienstes, Anschrift, Auftragsverarbeitung]</span>.</p>
   <p><b>Anmeldung mit Google (freiwillig):</b> Statt mit einem Code per E-Mail kannst du dich mit deinem Google-Konto anmelden.
   Dann leitet die App dich zu Google weiter. Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland, erfährt
@@ -226,8 +228,7 @@
   er im Duell nicht. Der KI-Gegner ist kein Mensch, sondern wird vom Server berechnet; er ist in der App als KI
   gekennzeichnet. Unbeteiligte sehen kein Duell.</p>
   <p>Diese Daten sind für das Duell erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in
-  Frankfurt. Deine Züge prüft ein Server-Programm von Supabase (Edge Function). Auch die Edge Functions laufen in Frankfurt:
-  Die App legt die Region bei jedem Aufruf fest. Ausgewertet wird jedes Duell auf dem
+  Frankfurt. Deine Züge prüft eine Edge Function, ebenfalls in Frankfurt (siehe „Wo und durch wen“). Ausgewertet wird jedes Duell auf dem
   Server: beim nächsten Abruf und zusätzlich alle 10 Minuten durch einen Zeitplaner in der Datenbank (pg_cron), damit ein
   Duell auch dann endet, wenn niemand mehr die App öffnet. Die Gegnersuche löschen wir nach 2 Minuten ohne Partner,
   Einladungen, die niemand angenommen hat, nach 24 Stunden. Beendete Duelle bleiben gespeichert, bis eines der beiden

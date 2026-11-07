@@ -139,6 +139,8 @@
   on the basis of a data processing agreement <span class="platz">[Date the agreement was concluded]</span>.
   Supabase is a company outside the EU; access from outside the EU is safeguarded by
   <span class="platz">[Check Standard Contractual Clauses in the data processing agreement / other safeguards]</span>.
+  Some tasks are handled by Supabase server programs (Edge Functions): checking moves in online games and in the puzzle
+  duel, and the coach. They also run in Frankfurt, because the app sets the region on every call.
   Sign-in emails are sent by <span class="platz">[Email service name, address, data processing agreement]</span>.</p>
   <p><b>Sign in with Google (optional):</b> Instead of using an email code, you can sign in with your Google account.
   The app redirects you to Google. Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland, learns that you
@@ -224,8 +226,7 @@
   duel. The AI opponent is not a person but is calculated by the server; the app marks it as AI. Uninvolved people cannot
   see any duel.</p>
   <p>This data is necessary for the duel (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
-  just like your account. Your moves are checked by a Supabase server program (Edge Function). The Edge Functions also run in Frankfurt:
-  the app sets the region on every call. Every duel is evaluated on the server:
+  just like your account. Your moves are checked by an Edge Function, also in Frankfurt (see "Where and by whom"). Every duel is evaluated on the server:
   at the next request and additionally every 10 minutes by a scheduler in the database (pg_cron), so that a duel also
   ends when nobody opens the app any more. We delete a matchmaking search after 2 minutes without a partner and
   invitations nobody accepted after 24 hours. Finished duels remain stored until one of the two accounts is deleted; the

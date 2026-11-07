@@ -5,3 +5,6 @@ design/**/*.png
 # App-Store-Huelle (Capacitor): kopierte Web-App und installierte Pakete
 native/www/
 native/node_modules/
+
+# Supabase CLI: Zwischenstand und Projekt-Verknuepfung (supabase link), gehoert nie ins Repo
+supabase/.temp/
