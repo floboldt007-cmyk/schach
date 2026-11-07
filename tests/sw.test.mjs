@@ -222,6 +222,8 @@ function main() {
     ...alleDateien('assets/pieces/dinos', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
+    // Wappen der Kronen-Liga (Wochen-Gruppen 07.11.2026, werkzeuge/liga-wappen.mjs): Startseite und Reiter Gruppe
+    ...alleDateien('assets/liga', /\.svg$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte
     // eines Pakets unter daten/<paket>/ erst mit dem Paket (pk.pflicht); daten/beispiel/ wird nie ausgeliefert
     ...alleDateien('daten', /\.json$/),
