@@ -15,13 +15,13 @@ ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App b
 
 | Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
-| 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → **Enable** (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | Schalter steht auf an. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
+| 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → die Erweiterung `pg_cron` einschalten (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | `select extname from pg_extension where extname = 'pg_cron';` ergibt eine Zeile. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
 | 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300` |
 | 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
-| 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, unten `Karte-RLS-Test erfolgreich` |
-| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Unter **Messages** steht `Server-Lauf alle 10 Minuten eingeplant` (mit Cron). `select jobname, schedule from cron.job;` zeigt `raetsel-duell-auswerten` mit `*/10 * * * *` |
-| 6 | Rätsel-Duell, Rätsel | `raetsel-duell-daten.sql` (etwa 460 KB) | `select count(*) from public.duell_raetsel;` ergibt `3040` |
-| 7 | Rätsel-Duell, Edge Function | im Terminal im Projektordner: `npx supabase functions deploy raetsel-duell` | Unter **Edge Functions** steht `raetsel-duell` |
+| 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, der Editor meldet „Success“ |
+| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
+| 6 | Rätsel-Duell, Rätsel | `raetsel-duell-daten.sql` (464.528 Byte, 7 Blöcke) | `select count(*) from public.duell_raetsel;` ergibt `3040` |
+| 7 | Rätsel-Duell, Edge Function | im Terminal, drei Befehle (siehe „Schritt 7 im Terminal“ unten) | Unter **Edge Functions** steht `raetsel-duell` |
 | 8 | Rätsel-Duell prüfen | `raetsel-duell-rls-test.sql` | kein `FEHLER:`, `ROLLBACK` |
 | 9 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
 | 10 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
@@ -32,10 +32,27 @@ Liga (2), das Duell (5) bucht seine Kronen über die Liga (2). Die Datenauskunft
 Teile mit ausgibt.
 
 **Tipps:**
-- Lehnt der SQL Editor in Schritt 6 die große Datei ab, steht im Abschnitt „Rätsel-Duell“ unten, wie man sie teilt.
-- Schritt 7 braucht einmal das Terminal. Claude kann ihn am PC zusammen mit Flo machen. Weist das Gateway das Token ab,
-  mit `--no-verify-jwt` noch einmal hochladen (die Function prüft die Anmeldung selbst).
+- Meldungen aus `raise notice` zeigt der SQL Editor meist nicht an. Darum prüft diese Liste nie über solche Meldungen,
+  sondern über eine Abfrage oder darüber, dass kein Fehler kommt (ein `FEHLER:` erscheint immer rot).
+- Lehnt der SQL Editor in Schritt 6 die große Datei ab: Sie besteht aus 7 Blöcken, jeder beginnt mit
+  `insert into public.duell_raetsel` und endet mit `on conflict (id) do nothing;`. Dann die Blöcke einzeln einfügen
+  und ausführen (je etwa 75 KB). Doppelt ausgeführte Blöcke schaden nicht.
 - Sagt die App danach „noch nicht eingerichtet“: Schritt 10 noch einmal.
+
+**Schritt 7 im Terminal** (Stand geprüft am 07.11.2026: Node 24.19, npx 11.17, Supabase CLI 3.0.0 liegt am PC im
+npm-Speicher, Docker ist nicht installiert, angemeldet und verknüpft ist die CLI noch nicht):
+1. Ordner: Die Function `raetsel-duell` gibt es erst ab dem Stand `etappe-b`, im Ordner `C:\Users\Flo\Documents\KI\schach`
+   auf `main` fehlt sie noch. Claude öffnet am PC dafür einen Ordner mit diesem Stand und sagt den Pfad.
+2. Im Terminal in diesem Ordner nacheinander:
+   ```
+   npx supabase@3.0.0 login
+   npx supabase@3.0.0 functions deploy raetsel-duell --remote=usaamcqypmvgqmsbfecb --use-api
+   ```
+   `login` öffnet den Browser, dort mit dem Supabase-Konto bestätigen (kein Token abtippen, nichts in eine Datei
+   schreiben). `--remote=…` nennt das Projekt direkt, ein `supabase link` ist damit nicht nötig. `--use-api` packt die
+   Function bei Supabase statt mit Docker. Fragt die CLI „Deploy … ?“, mit `y` bestätigen.
+3. Weist das Gateway beim Test das Token ab, denselben Befehl mit `--no-verify-jwt` dahinter noch einmal (die Function
+   prüft die Anmeldung selbst).
 
 **Danach in der App testen:**
 - Mit einem Konto eine Bot-Partie spielen: Auf der Startseite erscheint der Ring „Bauer III · Platz … von 30“. In der
@@ -417,26 +434,32 @@ auf dem Server noch nicht eingerichtet.“; alles andere läuft weiter.
    einschalten (englisch „Enable“). Ältere Dashboards haben das unter **Database** → **Extensions**: dort nach
    `pg_cron` suchen und den Schalter umlegen. Wozu: Alle 10 Minuten wertet der Server dann jedes Duell aus, dessen
    Zeit um ist. So entgeht niemand einer Niederlage, nur weil er die App zumacht.
-   - **Verfügbar im kostenlosen Tarif?** Die Supabase-Doku (abgerufen 07.11.2026) nennt für Cron keine Einschränkung
-     nach Tarif, sagt es aber auch nicht ausdrücklich. Prüfen: Lässt sich der Schalter umlegen, geht es.
+   - **Verfügbar im kostenlosen Tarif?** Nicht amtlich belegt. Die Supabase-Doku (https://supabase.com/docs/guides/cron
+     und https://supabase.com/docs/guides/cron/install, abgerufen 07.11.2026, 22 Uhr) beschreibt nur den Weg „Cron
+     Postgres Module unter Integrations, dann die Erweiterung `pg_cron` einschalten“ und nennt keinen Tarif, weder
+     als Grenze noch als Zusage. Sie empfiehlt höchstens 8 gleichzeitige Jobs und höchstens 10 Minuten je Lauf; das
+     Duell braucht einen Job mit einem kurzen Lauf. Prüfen: Lässt sich der Schalter umlegen, geht es. Achtung: Ein
+     kostenloses Projekt, das Supabase wegen Inaktivität pausiert, pausiert auch seine Cron-Läufe.
    - **Geht es nicht:** einfach weitermachen. Dann werten weiterhin Abfrage, Suche, Einladung und Beitritt aus; nur wer
      nie wieder ein Duell anfängt, behält eine vermiedene Niederlage. Ausweg ohne pg_cron (nicht gebaut): ein
      geplanter GitHub-Actions-Lauf, der eine kleine Edge Function aufruft.
    - Wer Cron erst nach Schritt 3 einschaltet, führt Schritt 3 danach einfach noch einmal aus.
 3. **SQL Editor** → **New query** → den ganzen Inhalt von `supabase/raetsel-duell-schema.sql` → **Run**. Die Datei darf
-   mehrfach laufen. Unten unter **Messages** steht dann `Server-Lauf alle 10 Minuten eingeplant` (mit Cron) oder
-   `pg_cron ist nicht eingeschaltet` (ohne). Prüfen mit Cron: `select jobname, schedule from cron.job;` zeigt
+   mehrfach laufen. Die Datei meldet per `raise notice`, ob sie den Server-Lauf eingeplant hat; der SQL Editor zeigt
+   solche Meldungen aber meist nicht an. Darum prüfen mit Cron: `select jobname, schedule from cron.job;` zeigt
    `raetsel-duell-auswerten` mit `*/10 * * * *`. Ob die Läufe klappen, zeigt
    `select status, start_time from cron.job_run_details order by start_time desc limit 5;` (Status `succeeded`).
 4. Den ganzen Inhalt von `supabase/raetsel-duell-daten.sql` ausführen: rund 3.000 Rätsel aus der Lichess-Datenbank
    (CC0, Quelle und Abrufdatum stehen oben in der Datei). Wiederholbar, doppelte Rätsel werden übersprungen. Die Datei
-   ist etwa 460 KB groß; ob der SQL Editor sie in einem Stück annimmt, ist nicht geprüft. Lehnt er sie ab, die Datei in
-   zwei Hälften teilen (jede Hälfte braucht die Zeile `insert into … values` am Anfang und `on conflict do nothing;`
-   am Ende) oder sie über `psql` mit der Verbindungszeichenkette aus **Project Settings → Database** einspielen.
+   ist 464.528 Byte groß. Eine amtliche Grenze für den SQL Editor nennt die Supabase-Doku nicht; ein Supabase-Mitarbeiter
+   nannte 2022 eine Grenze von 1 MB je Anfrage (https://github.com/supabase/cli/issues/274), die Datei liegt darunter.
+   Lehnt der Editor sie trotzdem ab: Sie besteht aus 7 eigenständigen Blöcken (je 500 Rätsel, der letzte 40), jeder
+   beginnt mit `insert into public.duell_raetsel` und endet mit `on conflict (id) do nothing;`. Dann die Blöcke einzeln
+   einfügen und ausführen; ein doppelt ausgeführter Block schadet nicht.
    Prüfen: `select count(*) from public.duell_raetsel;` muss 3040 ergeben.
-5. **Edge Function hochladen:** im Terminal im Projektordner `npx supabase functions deploy raetsel-duell` (wie
-   `online-zug`: keine Secrets nötig, chess.js 1.4.0 holt Supabase selbst; weist schon das Gateway das Token ab, mit
-   `--no-verify-jwt` neu hochladen, die Function prüft die Anmeldung selbst).
+5. **Edge Function hochladen:** die Befehle unter „Schritt 7 im Terminal“ ganz oben (wie `online-zug`: keine Secrets
+   nötig, chess.js 1.4.0 holt Supabase selbst; weist schon das Gateway das Token ab, mit `--no-verify-jwt` neu
+   hochladen, die Function prüft die Anmeldung selbst).
 6. Prüfen: den ganzen Inhalt von `supabase/raetsel-duell-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler
    beginnt mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück. Der Test prüft die Function nicht:
    Unter **Edge Functions** muss `raetsel-duell` stehen.
