@@ -13,7 +13,7 @@ import path from 'node:path';
 import { browserTyp } from './browser.mjs';
 
 // Dieselben Groessen wie GROESSEN in ansicht.test.mjs (nicht importiert: der Import wuerde jene Suite mitstarten)
-const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['ipad-hoch', 820, 1180], ['ipad-quer', 1180, 820],
+const GROESSEN = [['handy-klein', 375, 667], ['handy', 390, 844], ['handy-quer', 667, 375], ['ipad-hoch', 820, 1180], ['ipad-quer', 1180, 820],
   ['ipad-browser', 1000, 590], ['pc', 1440, 900]];
 
 const require = createRequire(import.meta.url);
@@ -25,6 +25,19 @@ const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 // Mindestbreite des Bretts in Pixeln je Groesse (Name aus GROESSEN)
 const ANALYSE_MIN = { 'handy-klein': 360, handy: 386, 'ipad-hoch': 760, 'ipad-quer': 680, 'ipad-browser': 470, pc: 700 };
 const PARTIE_MIN = { handy: 384, 'ipad-hoch': 780, 'ipad-quer': 720, 'ipad-browser': 500, pc: 760 };
+// Zu zweit (Flo 07.11.2026: "Das ganze Bild kann das Schachbrett sein"), vorher 343 / 358 / 266 / 672 / 512 / 282 / 592 px.
+// Gemessen nach dem Umbau 323 / 390 / 281 / 780 / 724 / 494 / 804 px. Dazu: kein Knopf ausserhalb des Fensters, nichts scrollt.
+const ZUZWEIT_MIN = { 'handy-klein': 315, handy: 386, 'handy-quer': 275, 'ipad-hoch': 770, 'ipad-quer': 715, 'ipad-browser': 485, pc: 790 };
+const ZUZWEIT = { modus: 'zuzweit', zuzweit: { weiss: 'Anna', schwarz: 'Ben', drehen: false } };
+const UHR = { grund: 600, zuschlag: 0 };
+
+// Knoepfe ganz im Fenster? Und scrollt der Rumpf (Zu zweit .zz-rumpf) oder die Seite?
+const knoepfeImBild = (s, knopf, rumpf) => s.evaluate(({ knopf, rumpf }) => {
+  const kn = [...document.querySelectorAll(knopf)].filter((e) => e.offsetParent).map((e) => e.getBoundingClientRect());
+  const r = rumpf && document.querySelector(rumpf);
+  return { knoepfe: kn.length, raus: kn.filter((b) => b.top < 0 || b.bottom > innerHeight + 0.5 || b.right > innerWidth + 0.5).length,
+    scrollt: (r ? r.scrollHeight - r.clientHeight : 0) + (document.documentElement.scrollHeight - innerHeight) };
+}, { knopf, rumpf });
 
 function ladePlaywright() {
   for (const k of [process.env.PLAYWRIGHT_PFAD, 'playwright', '/opt/node-tools/node_modules/playwright'].filter(Boolean)) {
@@ -83,7 +96,7 @@ try {
   browser = await browserTyp(ladePlaywright()).launch();
   const PARTIE = await rechnePartie(browser);
   for (const [gname, w, h] of GROESSEN) {
-    if (!(gname in ANALYSE_MIN) && !(gname in PARTIE_MIN)) continue;
+    if (!(gname in ANALYSE_MIN) && !(gname in PARTIE_MIN) && !(gname in ZUZWEIT_MIN)) continue;
     const k = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, serviceWorkers: 'block',
       timezoneId: 'Europe/Berlin', locale: 'de-DE', hasTouch: w < 1300 });
     const s = await k.newPage();
@@ -103,8 +116,34 @@ try {
       await warte(1500);
       const b = await s.evaluate(() => Math.round(document.querySelector('.brett-rahmen > .brett').getBoundingClientRect().width));
       pruefe(`Partie @ ${gname} (${w}x${h}): Brett mindestens ${PARTIE_MIN[gname]} px`, b >= PARTIE_MIN[gname], `${b} px`);
+      const kn = await knoepfeImBild(s, '.spielknoepfe .knopf', null);
+      pruefe(`Partie @ ${gname} (${w}x${h}): alle Knoepfe ganz im Fenster`, kn.knoepfe >= 3 && kn.raus === 0, JSON.stringify(kn));
     }
     await k.close();
+    // Zu zweit und (quer) die Bot-Partie mit Uhr, wie die Online-Partie: je in eigenem Kontext (keine laufende Partie dazwischen)
+    const faelle = [];
+    if (gname in ZUZWEIT_MIN) faelle.push(['Zu zweit', { ...ZUZWEIT, tempo: null }], ['Zu zweit mit Uhr', { ...ZUZWEIT, tempo: UHR }]);
+    if (gname === 'ipad-quer' || gname === 'handy-quer') faelle.push(['Partie mit Uhr', { botId: 'benno', tempo: UHR }]);
+    for (const [fall, params] of faelle) {
+      const kz = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, serviceWorkers: 'block',
+        timezoneId: 'Europe/Berlin', locale: 'de-DE', hasTouch: w < 1300 });
+      const sz = await kz.newPage();
+      await sz.goto(BASIS + '#arena');
+      await sz.waitForFunction(() => window.__app && document.documentElement.dataset.screen === 'arena', null, { timeout: 30000 });
+      await sz.evaluate((p) => window.__app.gehe('partie', p), params);
+      const zz = !!params.modus;
+      const brettSel = zz ? '.zz-brett' : '.brett-rahmen > .brett';
+      await sz.waitForSelector(brettSel, { timeout: 20000 });
+      await warte(1500);
+      if (zz) {
+        const b = await sz.evaluate((sel) => Math.round(document.querySelector(sel).getBoundingClientRect().width), brettSel);
+        pruefe(`${fall} @ ${gname} (${w}x${h}): Brett mindestens ${ZUZWEIT_MIN[gname]} px`, b >= ZUZWEIT_MIN[gname], `${b} px`);
+      }
+      const kn = await knoepfeImBild(sz, zz ? '.zz-spielbereich > .zz-aktionen .knopf' : '.spielknoepfe .knopf', zz ? '.zz-rumpf' : null);
+      pruefe(`${fall} @ ${gname} (${w}x${h}): alle Knoepfe ganz im Fenster${zz ? ', nichts scrollt' : ''}`,
+        kn.knoepfe >= 3 && kn.raus === 0 && (!zz || kn.scrollt <= 0), JSON.stringify(kn));
+      await kz.close();
+    }
   }
 } catch (e) {
   pruefe('Brettgroesse laeuft durch', false, e.message);
