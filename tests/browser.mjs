@@ -43,7 +43,9 @@ async function seitenFinger({ ereignisse, bild }) {
       width: 16, height: 16, pressure: ende ? 0 : 0.5,
     }));
     if (ende) delete finger.ziel[id];
-    if (bild && i < ereignisse.length - 1) await new Promise((fertig) => requestAnimationFrame(() => fertig()));
+    // Aufsetzen und erste Bewegung ohne Pause: die erste Bewegung ab 8 px loescht die Halte-Uhr (board.js), und ein
+    // Bild dazwischen dauerte im CI-WebKit bis 474 ms. Erst danach je Schritt ein Bild.
+    if (bild && i > 0 && i < ereignisse.length - 1) await new Promise((fertig) => requestAnimationFrame(() => fertig()));
   }
 }
 

@@ -580,8 +580,9 @@ async function testeTouch(browser) {
       });
     },
   });
+  const zeitZug = await finger.seitAufsetzen();
   await warte(200);
-  pruefe('Ziehen per Finger: Figur folgt, vergroessert', mitten.gezogen && mitten.beruehrung && mitten.groesser > 1.2, JSON.stringify(mitten));
+  pruefe('Ziehen per Finger: Figur folgt, vergroessert', mitten.gezogen && mitten.beruehrung && mitten.groesser > 1.2, JSON.stringify({ ...mitten, zeitZug }));
   pruefe('Ziehen per Finger: Figur bleibt unter dem Finger', mitten.versatz < 3, JSON.stringify(mitten));
   pruefe('Ziehen per Finger: Zielfeld hervorgehoben', mitten.ueber);
   pruefe('Ziehen per Finger Sg8-f6', (await h.figur('f6')) === 'bN' && (await h.figurSitzt('f6')) && !(await h.figur('g8')));
