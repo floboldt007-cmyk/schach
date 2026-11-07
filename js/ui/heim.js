@@ -5,13 +5,15 @@
 //
 //   zeige(root, params, app) -> { verlasse() }
 //   zeigeHeim(app) -> section   baut nur den Screen (ohne einzuhaengen), fuer zeige() und Tests
-//   kronenLage(stand | null) -> { kronen, stufe, liga, rang, naechste, fehlt, anteil, ohneKonto }   rein
+//   kronenLage(stand | null) -> { kronen, stufe, liga, rang, platz, n, ziel, anteil, ohneKonto }   rein
 //   ligaLage() -> Liga-Punkte der Arena (Paket liga), bleibt fuer die Arena; der Ring zeigt sie nicht mehr
 //
-// Kronen (Etappe B, Task 7): Der Ring zeigt die Kronen und die Liga-Stufe ("Silber III") mit dem Kronen-Symbol, die
-// Zeile darunter "noch <n> bis <naechste Stufe>". Erst den gemerkten Stand (Modul kronen, nur fuer dasselbe Konto)
+// Kronen (Etappe B, Task 7; Wochen-Gruppen 07.11.2026): Der Ring zeigt die Kronen dieser Woche mit dem Kronen-Symbol,
+// die Zeile darunter Stufe und Platz ("Läufer II · Platz 3 von 30", Flo 07.11.). Der Bogen fuellt sich bis zu den
+// Kronen auf Platz 5 (ziel, der letzte Aufstiegsplatz); auf Platz 1 bis 5 ist er voll. Ohne Gruppe in dieser Woche:
+// "Läufer II · Spiel eine Partie für deine Gruppe". Erst den gemerkten Stand (Modul kronen, nur fuer dasselbe Konto)
 // sofort zeichnen, dann den Server-Stand (js/kronen.js holeStand) nachladen und merken; offline bleibt der gemerkte.
-// Ohne Konto: 0 und Holz III, die Zeile ist der Link "Konto anlegen und Kronen sammeln" nach #einstellungen/konto
+// Ohne Konto: 0 und Bauer III, die Zeile ist der Link "Konto anlegen und Kronen sammeln" nach #einstellungen/konto
 // (#konto ist keine Seite, nur der Test-Schalter in js/konto.js). Nie NaN: jeder kaputte Stand gilt als 0.
 // Ziele: heim-online -> lobby (wenn freigeschaltet, js/labor.js laborFrei) sonst online (Link-Duell);
 // heim-bots -> arena; heim-raetsel -> training (das vorhandene Raetsel-Training).
@@ -27,9 +29,9 @@ import { BOTS } from '../bots.js';
 import { meinName, sitzung } from '../konto.js';
 import { holeStand, angemeldet } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
-import { stufeVon, STUFE_KRONEN, kronenSpeicher } from '../pakete/liga/kronen.js';
+import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
-import '../pakete/liga/texte.js';
+import { stufenName } from '../pakete/liga/texte.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 
@@ -37,11 +39,11 @@ registriereTexte('heim', {
   de: {
     aria: 'Start',
     level: 'Level {level}',
-    noch: 'noch {n} bis {naechste}',
-    oben: 'Höchste Stufe',
+    woche: 'diese Woche',
+    platz: '{stufe} · Platz {platz} von {n}',
+    ohneGruppe: '{stufe} · Spiel eine Partie für deine Gruppe',
     ohneKonto: 'Konto anlegen und Kronen sammeln',
-    ringLabel: '{kronen} Kronen, {stufe}',
-    'liga.holz': 'Holz', 'liga.bronze': 'Bronze', 'liga.silber': 'Silber', 'liga.gold': 'Gold', 'liga.diamant': 'Diamant', 'liga.krone': 'Krone',
+    ringLabel: '{kronen} Kronen diese Woche, {zeile}',
     'online.titel': 'Online spielen',
     'online.text': 'Gegner in deiner Stärke, zählt für die Liga',
     'bots.titel': 'Bots besiegen',
@@ -52,11 +54,11 @@ registriereTexte('heim', {
   en: {
     aria: 'Home',
     level: 'Level {level}',
-    noch: '{n} to {naechste}',
-    oben: 'Top tier',
+    woche: 'this week',
+    platz: '{stufe} · Place {platz} of {n}',
+    ohneGruppe: '{stufe} · Play a game to join your group',
     ohneKonto: 'Create an account and collect crowns',
-    ringLabel: '{kronen} crowns, {stufe}',
-    'liga.holz': 'Wood', 'liga.bronze': 'Bronze', 'liga.silber': 'Silver', 'liga.gold': 'Gold', 'liga.diamant': 'Diamond', 'liga.krone': 'Crown',
+    ringLabel: '{kronen} crowns this week, {zeile}',
     'online.titel': 'Play online',
     'online.text': 'Opponents at your level, counts for the league',
     'bots.titel': 'Beat the bots',
@@ -88,18 +90,21 @@ export function ligaLage() {
   return { punkte, stufe, naechste: naechste ? stufe + 1 : null, fehlt: naechste ? Math.max(0, naechste.schwelle - punkte) : 0, anteil };
 }
 
-// Kronen-Stand vom Server (oder gemerkt) als Ring-Lage; null heisst ohne Konto. Jeder kaputte Wert gilt als 0.
+// Kronen-Stand vom Server (oder gemerkt) als Ring-Lage; null heisst ohne Konto. Jeder kaputte Wert gilt als 0 bzw.
+// als "ohne Gruppe" (platz null).
+const ganz = (v, min, max) => { const x = Number(v); return Number.isFinite(x) ? Math.min(max, Math.max(min, Math.floor(x))) : null; };
 export function kronenLage(stand) {
-  const roh = stand && typeof stand === 'object' ? Number(stand.kronen) : 0;
-  const kronen = Number.isFinite(roh) && roh > 0 ? Math.floor(roh) : 0;
-  const s = stufeVon(kronen);
-  const oben = s.naechste == null;
-  return { kronen, stufe: s.index, liga: s.liga, rang: s.rang, naechste: s.naechste, fehlt: oben ? 0 : s.naechste - kronen,
-    anteil: oben ? 1 : Math.min(1, Math.max(0, (kronen - s.boden) / STUFE_KRONEN)), ohneKonto: stand == null };
+  const o = stand && typeof stand === 'object' && !Array.isArray(stand) ? stand : {};
+  const kronen = ganz(o.kronen, 0, Number.MAX_SAFE_INTEGER) ?? 0;
+  const s = stufeInfo(ganz(o.stufe, 0, 17) ?? 0);
+  const n = ganz(o.n, 1, 1000) ?? GRUPPE_GROESSE;
+  const platz = o.platz == null ? null : ganz(o.platz, 1, n);
+  const ziel = o.ziel == null ? null : ganz(o.ziel, 0, Number.MAX_SAFE_INTEGER);
+  let anteil = 0;
+  if (platz != null && platz <= AUFSTIEG_PLAETZE) anteil = 1;
+  else if (platz != null && ziel > 0) anteil = Math.min(1, kronen / ziel);
+  return { kronen, stufe: s.index, liga: s.liga, rang: s.rang, platz, n, ziel, anteil, ohneKonto: stand == null };
 }
-
-const ROEMISCH = ['', 'I', 'II', 'III'];
-const stufenText = (index) => { const s = stufeVon(index * STUFE_KRONEN); return `${t('heim.liga.' + s.liga)} ${ROEMISCH[s.rang]}`; };
 
 // Erste Lage ohne Netz: ohne Konto null, sonst der gemerkte Stand dieses Kontos (oder 0)
 function ersteLage() {
@@ -113,18 +118,20 @@ function merke(stand) {
   const uid = sitzung()?.user?.id;
   if (!uid) return;
   const alt = kronenSpeicher(ladeModul('kronen'));
-  const st = { saison: stand.saison, kronen: stand.kronen, stufe: stand.stufe, boden: stand.boden, naechste: stand.naechste };
+  const st = { kronen: stand.kronen, stufe: stand.stufe, platz: stand.platz ?? null, ziel: stand.ziel ?? null, n: stand.n };
   speichereModul('kronen', { konto: uid, stand: st, startGemeldet: alt.konto === uid ? alt.startGemeldet : false });
 }
 
 // Ring, Mitte und Zeile aus einer Lage; dieselben Teile baut zeigeHeim zuerst und zeichne() spaeter neu
 function ringTeile(lg) {
-  const stufe = stufenText(lg.stufe);
-  let zeile;
-  if (lg.ohneKonto) zeile = `<a class="heim-konto" href="#einstellungen/konto">${esc(t('heim.ohneKonto'))}</a>`;
-  else if (lg.naechste == null) zeile = esc(t('heim.oben'));
-  else zeile = esc(t('heim.noch', { n: '\u0000', naechste: '\u0001' })).replace('\u0000', esc(zahl(lg.fehlt))).replace('\u0001', `<b>${esc(stufenText(lg.stufe + 1))}</b>`);
-  return { stufe, zeile, label: t('heim.ringLabel', { kronen: zahl(lg.kronen), stufe }), versatz: (UMFANG * (1 - lg.anteil)).toFixed(2) };
+  const name = stufenName(lg.stufe);
+  let text;
+  if (lg.ohneKonto) text = t('heim.ohneKonto');
+  else if (lg.platz != null) text = t('heim.platz', { stufe: name, platz: zahl(lg.platz), n: zahl(lg.n) });
+  else text = t('heim.ohneGruppe', { stufe: name });
+  const zeile = lg.ohneKonto ? `<a class="heim-konto" href="#einstellungen/konto">${esc(text)}</a>` : esc(text);
+  return { stufe: t('heim.woche'), zeile, label: t('heim.ringLabel', { kronen: zahl(lg.kronen), zeile: text }),
+    versatz: (UMFANG * (1 - lg.anteil)).toFixed(2) };
 }
 
 function zeichne(s, lg) {

@@ -1,11 +1,12 @@
 -- Prueft supabase/kronen-schema.sql im Supabase SQL Editor (als Besitzer, wie dort ueblich). Alles wird am Ende
--- zurueckgerollt, auch der Saisonstart in kronen_schalter.
--- Drei kurzlebige Nutzer: A, B und C. Jeder Fehler bricht mit "FEHLER: ..." ab; ohne Fehler endet der Lauf mit ROLLBACK.
--- Abschnitte: 1 Stand ohne Saisonstart, Start in der Zukunft und Start dieser Woche; 1b Saisonstart nur montags;
--- 2 keine Tabellenrechte fuer Nutzer; 3 anon darf nichts; 4 Saisongrenze (Archiv, Rueckstufung, nur einmal, mehrere
--- verpasste Saisons); 5 reine Rechenfunktionen und Konstanten; 6 Online-Wertung (Sieg, nur einmal, Liga-Boden,
--- abgebrochen, ungewertet, Remis, Buchung fuer Nutzer gesperrt).
--- Spaetere Tasks des Plans (Gegnersuche, Bot- und KI-Ergebnis, Start-Liga, Zaehler) haengen hier eigene Abschnitte an.
+-- zurueckgerollt. Drei kurzlebige Nutzer A, B und C, spaeter weitere. Jeder Fehler bricht mit "FEHLER: ..." ab; ohne
+-- Fehler endet der Lauf mit ROLLBACK.
+-- Abschnitte: 1 neuer Stand (Bauer III, ohne Gruppe); 2 keine Tabellenrechte fuer Nutzer; 3 anon darf nichts;
+-- 4 Wochengrenze (Sonntag 23:59 alte Woche, Montag 00:00 neue, auch an der Zeitumstellung); 5 Konstanten;
+-- 6 Online-Wertung; 7 Schutz gegen Absprache; 8 Gegnersuche; 9 Bot- und KI-Ergebnis; 10 Start-Liga;
+-- 11 Wochen-Gruppen (Beitritt bei der ersten Krone, 31. Person in neuer Gruppe, Bots bis 30, Anzeige ohne fremde
+-- Kennungen); 12 Wochen-Abrechnung (5 auf, 5 ab, Raender Bauer III und Koenig I, Belohnungen genau einmal,
+-- Aufstiegs-Banner, zweiter Aufruf aendert nichts).
 begin;
 
 insert into auth.users (id, email)
@@ -14,106 +15,37 @@ values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'kronen-b@example.invalid'),
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'kronen-c@example.invalid');
 
--- Testhilfen (nur in dieser Sitzung, verschwinden mit dem rollback). Sie laufen als Besitzer (security definer),
--- weil angemeldete Nutzer weder kronen_schalter noch kronen_stand aendern duerfen.
-create function pg_temp.setze_start(d date)
-returns void
-language sql
-security definer
-set search_path = ''
-as $$
-  update public.kronen_schalter set saison_start = d where id;
-$$;
-
-create function pg_temp.setze_saison(uid uuid, nr integer, k integer)
-returns void
-language sql
-security definer
-set search_path = ''
-as $$
-  update public.kronen_stand
-  set saison = nr, kronen = k, boden = public.kronen_liga_boden(k)
-  where user_id = uid;
-$$;
-
--- Montag dieser Woche in Europe/Berlin (als Besitzer: kronen_heute ist fuer Nutzer gesperrt)
-create function pg_temp.montag()
-returns date
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select public.kronen_heute() - (extract(isodow from public.kronen_heute())::integer - 1);
-$$;
-
-revoke all on function pg_temp.setze_start(date), pg_temp.setze_saison(uuid, integer, integer), pg_temp.montag() from public;
-
--- Ausgangslage: kein Saisonstart (wie direkt nach dem Einspielen)
-select pg_temp.setze_start(null);
-
--- ---------- 1. Stand ohne Saisonstart, Start in der Zukunft, Start dieser Woche ----------
+-- ---------- 1. Neuer Stand: Bauer III, keine Gruppe, keine Kronen ----------
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 
 do $$
 declare
   s jsonb;
+  g jsonb;
 begin
   s := public.kronen_mein_stand();
-  if (s->>'saison')::int is distinct from 0 or (s->>'kronen')::int is distinct from 0 or (s->>'stufe')::int is distinct from 0 or (s->>'boden')::int is distinct from 0
-     or (s->>'naechste')::int is distinct from 100 then
-    raise exception 'FEHLER: neuer Stand ohne Saisonstart falsch (%)', s;
+  if (s->>'stufe')::int is distinct from 0 or (s->>'kronen')::int is distinct from 0 or s->>'platz' is not null
+     or (s->>'n')::int is distinct from 30 or s->>'woche' is null then
+    raise exception 'FEHLER: neuer Stand falsch (%)', s;
+  end if;
+  -- Lesen allein bringt kein Konto in eine Gruppe (Flo 07.11.2026: erst mit der ersten Krone)
+  g := public.liga_meine_gruppe();
+  if g->>'gruppe' is not null or jsonb_array_length(g->'mitglieder') <> 0 or (g->>'stufe')::int is distinct from 0
+     or (g->>'ende')::date - (g->>'woche')::date <> 6 or jsonb_array_length(g->'belohnung') < 1
+     or jsonb_typeof(g->'offen') is distinct from 'array' then
+    raise exception 'FEHLER: Gruppe ohne Buchung falsch (%)', g;
   end if;
 end;
 $$;
 
--- als Besitzer (Saisonstart und kronen_saison_heute sind fuer Nutzer gesperrt)
 reset role;
 do $$
 begin
-  -- Start naechste Woche: weiter Saison 0
-  perform pg_temp.setze_start(pg_temp.montag() + 7);
-  if public.kronen_saison_heute() <> 0 then
-    raise exception 'FEHLER: Saisonstart in der Zukunft ergibt nicht Saison 0';
+  if exists (select 1 from public.liga_mitglieder where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+     or exists (select 1 from public.liga_gruppen) then
+    raise exception 'FEHLER: Lesen hat eine Gruppe angelegt';
   end if;
-  -- Start diese Woche: Saison 1
-  perform pg_temp.setze_start(pg_temp.montag());
-  if public.kronen_saison_heute() <> 1 then
-    raise exception 'FEHLER: Saisonstart diese Woche ergibt nicht Saison 1 (%)', public.kronen_saison_heute();
-  end if;
-  -- Saisonzahl an festen Tagen relativ zum Start
-  if public.kronen_saison_am(pg_temp.montag() - 1) <> 0 or public.kronen_saison_am(pg_temp.montag() + 27) <> 1
-     or public.kronen_saison_am(pg_temp.montag() + 28) <> 2 then
-    raise exception 'FEHLER: kronen_saison_am rechnet die Saisongrenze falsch';
-  end if;
-  perform pg_temp.setze_saison('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0, 900);
-end;
-$$;
-
--- der Wechsel von 0 auf 1 stuft nicht zurueck und archiviert nichts
-set local role authenticated;
-do $$
-declare
-  s jsonb;
-begin
-  s := public.kronen_mein_stand();
-  if (s->>'saison')::int is distinct from 1 or (s->>'kronen')::int is distinct from 900 or (s->>'boden')::int is distinct from 900 then
-    raise exception 'FEHLER: Wechsel von Saison 0 auf 1 hat den Stand veraendert (%)', s;
-  end if;
-end;
-$$;
-
--- ---------- 1b. Saisonstart nur montags ----------
-reset role;
-do $$
-begin
-  begin
-    perform pg_temp.setze_start(pg_temp.montag() + 1);
-    raise exception 'FEHLER: Saisonstart an einem Dienstag angenommen';
-  exception
-    when check_violation then null;
-  end;
 end;
 $$;
 
@@ -130,14 +62,14 @@ begin
     when insufficient_privilege then null;
   end;
   begin
-    update public.kronen_stand set kronen = 1700 where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    raise exception 'FEHLER: A konnte den eigenen Stand direkt aendern';
+    update public.kronen_stand set stufe = 17 where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    raise exception 'FEHLER: A konnte die eigene Stufe direkt aendern';
   exception
     when insufficient_privilege then null;
   end;
   begin
-    insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
-    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'online', 'erfunden-0001', 30, 1);
+    insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'online', 'erfunden-0001', 30, current_date);
     raise exception 'FEHLER: A konnte sich selbst Kronen buchen';
   exception
     when insufficient_privilege then null;
@@ -149,8 +81,27 @@ begin
     when insufficient_privilege then null;
   end;
   begin
-    perform 1 from public.kronen_archiv;
-    raise exception 'FEHLER: A konnte kronen_archiv lesen';
+    perform 1 from public.liga_gruppen;
+    raise exception 'FEHLER: A konnte liga_gruppen lesen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform 1 from public.liga_mitglieder;
+    raise exception 'FEHLER: A konnte liga_mitglieder lesen (fremde Gruppen)';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    update public.liga_mitglieder set kronen = 9999;
+    raise exception 'FEHLER: A konnte Wochen-Kronen direkt aendern';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.liga_belohnungen (user_id, woche, stufe, platz, art, menge)
+    values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', current_date, 0, 1, 'taler', 9999);
+    raise exception 'FEHLER: A konnte sich eine Belohnung schreiben';
   exception
     when insufficient_privilege then null;
   end;
@@ -163,6 +114,24 @@ begin
   begin
     perform public.kronen_stand_sichern('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
     raise exception 'FEHLER: A konnte die interne Funktion kronen_stand_sichern aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform public.liga_buchen('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 500);
+    raise exception 'FEHLER: A konnte liga_buchen aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform public.liga_abrechnen();
+    raise exception 'FEHLER: A konnte liga_abrechnen aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    perform 1 from public.liga_rangliste(1, true);
+    raise exception 'FEHLER: A konnte liga_rangliste einer beliebigen Gruppe aufrufen';
   exception
     when insufficient_privilege then null;
   end;
@@ -195,6 +164,12 @@ begin
     when insufficient_privilege then null;
   end;
   begin
+    perform public.liga_meine_gruppe();
+    raise exception 'FEHLER: anon konnte liga_meine_gruppe aufrufen';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
     perform public.kronen_konstanten();
     raise exception 'FEHLER: anon konnte kronen_konstanten aufrufen';
   exception
@@ -220,100 +195,59 @@ begin
   exception
     when others then if sqlerrm <> 'KRONEN_ANMELDUNG' then raise; end if;
   end;
+  begin
+    perform public.liga_meine_gruppe();
+    raise exception 'FEHLER: liga_meine_gruppe ohne Nutzerkennung angenommen';
+  exception
+    when others then if sqlerrm <> 'KRONEN_ANMELDUNG' then raise; end if;
+  end;
 end;
 $$;
 
--- ---------- 4. Saisongrenze ----------
--- Start vor 28 Tagen: heute ist Saison 2. A stand in Saison 1 bei 1750 (Krone I).
-reset role;
-select pg_temp.setze_start(pg_temp.montag() - 28);
-select pg_temp.setze_saison('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 1, 1750);
-
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-do $$
-declare
-  s jsonb;
-begin
-  s := public.kronen_mein_stand();
-  if (s->>'saison')::int is distinct from 2 or (s->>'kronen')::int is distinct from 1400 or (s->>'boden')::int is distinct from 1200
-     or (s->>'stufe')::int is distinct from 14 or (s->>'naechste')::int is distinct from 1500 then
-    raise exception 'FEHLER: Saisonwechsel 1750 ergibt nicht 1400 / Boden 1200 / Stufe 14 (%)', s;
-  end if;
-  -- zweiter Aufruf: nichts mehr
-  s := public.kronen_mein_stand();
-  if (s->>'kronen')::int is distinct from 1400 then
-    raise exception 'FEHLER: zweiter Aufruf hat erneut zurueckgestuft (%)', s;
-  end if;
-end;
-$$;
-
+-- ---------- 4. Wochengrenze (Europe/Berlin, auch an der Zeitumstellung) ----------
 reset role;
 do $$
 begin
-  if not exists (select 1 from public.kronen_archiv
-                 where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and saison = 1 and kronen = 1750 and stufe = 17) then
-    raise exception 'FEHLER: Archivzeile fuer Saison 1 fehlt oder ist falsch';
+  -- Sonntag 23:59 gehoert zur alten Woche, Montag 00:00 zur neuen (Winterzeit-Beginn am 25.10.2026)
+  if public.liga_woche_am('2026-10-25 23:59:00 Europe/Berlin'::timestamptz) <> '2026-10-19'::date
+     or public.liga_woche_am('2026-10-26 00:00:00 Europe/Berlin'::timestamptz) <> '2026-10-26'::date
+     -- Sommerzeit-Beginn am 29.03.2026
+     or public.liga_woche_am('2026-03-29 23:59:59 Europe/Berlin'::timestamptz) <> '2026-03-23'::date
+     or public.liga_woche_am('2026-03-30 00:00:00 Europe/Berlin'::timestamptz) <> '2026-03-30'::date
+     -- Sonntag 23:30 in Berlin ist in UTC schon Sonntag 22:30, Montag 00:30 in Berlin ist in UTC noch Sonntag
+     or public.liga_woche_am('2026-11-08 23:30:00+00'::timestamptz) <> '2026-11-09'::date then
+    raise exception 'FEHLER: liga_woche_am rechnet die Wochengrenze falsch';
   end if;
-  if (select count(*) from public.kronen_buchungen
-      where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and quelle = 'saison') <> 1
-     or (select delta from public.kronen_buchungen
-         where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and quelle = 'saison') <> -350 then
-    raise exception 'FEHLER: Saison-Buchung nicht genau einmal mit -350';
+  if extract(isodow from public.liga_woche_heute()) <> 1 then
+    raise exception 'FEHLER: liga_woche_heute ist kein Montag';
   end if;
+  if public.liga_wochen_anteil(public.liga_woche_heute() - 7) <> 1
+     or public.liga_wochen_anteil(public.liga_woche_heute() + 7) <> 0
+     or public.liga_wochen_anteil(public.liga_woche_heute()) not between 0 and 1 then
+    raise exception 'FEHLER: liga_wochen_anteil ausserhalb 0 bis 1';
+  end if;
+  -- eine Gruppe muss an einem Montag beginnen
+  begin
+    insert into public.liga_gruppen (woche, stufe) values (public.liga_woche_heute() + 1, 0);
+    raise exception 'FEHLER: Gruppe an einem Dienstag angenommen';
+  exception
+    when check_violation then null;
+  end;
 end;
 $$;
 
--- B hat zwei Saisons verpasst: Saison 1 bei 1750, heute Saison 3 -> 1750 -> 1400 -> 1100, nur Saison 1 im Archiv
-select pg_temp.setze_start(pg_temp.montag() - 56);
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","role":"authenticated"}', true);
-select public.kronen_mein_stand();
-reset role;
-select pg_temp.setze_saison('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 1, 1750);
-set local role authenticated;
-do $$
-declare
-  s jsonb;
-begin
-  s := public.kronen_mein_stand();
-  if (s->>'saison')::int is distinct from 3 or (s->>'kronen')::int is distinct from 1100 or (s->>'boden')::int is distinct from 900 then
-    raise exception 'FEHLER: zwei verpasste Saisons ergeben nicht 1100 / Boden 900 (%)', s;
-  end if;
-end;
-$$;
-reset role;
-do $$
-begin
-  if (select count(*) from public.kronen_archiv where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') <> 1
-     or (select count(*) from public.kronen_buchungen
-         where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' and quelle = 'saison') <> 2 then
-    raise exception 'FEHLER: verpasste Saisons: Archiv oder Buchungen falsch';
-  end if;
-end;
-$$;
-
--- ---------- 5. Reine Rechenfunktionen und Konstanten ----------
+-- ---------- 5. Konstanten ----------
 do $$
 declare
   k jsonb := public.kronen_konstanten();
 begin
-  if public.kronen_stufe(0) <> 0 or public.kronen_stufe(99) <> 0 or public.kronen_stufe(100) <> 1
-     or public.kronen_stufe(1700) <> 17 or public.kronen_stufe(99999) <> 17 or public.kronen_stufe(-5) <> 0
-     or public.kronen_stufe(null) <> 0 then
-    raise exception 'FEHLER: kronen_stufe rechnet falsch';
-  end if;
-  if public.kronen_liga_boden(299) <> 0 or public.kronen_liga_boden(310) <> 300 or public.kronen_liga_boden(1550) <> 1500
-     or public.kronen_liga_boden(1750) <> 1500 then
-    raise exception 'FEHLER: kronen_liga_boden rechnet falsch';
-  end if;
-  if public.kronen_rueckstufen(1750) <> 1400 or public.kronen_rueckstufen(250) <> 0 or public.kronen_rueckstufen(0) <> 0 then
-    raise exception 'FEHLER: kronen_rueckstufen rechnet falsch';
-  end if;
-  if (k->>'stufe_kronen')::int is distinct from 100 or (k#>>'{kronen,ki,sieg}')::int is distinct from 20 or (k#>>'{kronen,online,niederlage}')::int is distinct from -15
-     or (k#>>'{kronen,bot,niederlage}')::int is distinct from 0 or (k->>'bot_tagesgrenze')::int is distinct from 10 or (k->>'ki_tagesgrenze')::int is distinct from 20
-     or (k->>'ki_mindestdauer_s')::int is distinct from 60 or (k->>'online_mindest_halbzuege')::int is distinct from 4
-     or (k->>'paar_tagesgrenze')::int is distinct from 3 or (k->>'saison_tage')::int is distinct from 28 or (k->>'rueckstufung_stufen')::int is distinct from 3 then
+  if (k#>>'{kronen,ki,sieg}')::int is distinct from 20 or (k#>>'{kronen,online,niederlage}')::int is distinct from -15
+     or (k#>>'{kronen,bot,niederlage}')::int is distinct from 0 or (k->>'bot_tagesgrenze')::int is distinct from 10
+     or (k->>'ki_tagesgrenze')::int is distinct from 20 or (k->>'ki_mindestdauer_s')::int is distinct from 60
+     or (k->>'online_mindest_halbzuege')::int is distinct from 4 or (k->>'paar_tagesgrenze')::int is distinct from 3
+     or (k->>'gruppe_groesse')::int is distinct from 30 or (k->>'aufstieg_plaetze')::int is distinct from 5
+     or (k->>'abstieg_plaetze')::int is distinct from 5 or jsonb_array_length(k->'bot_ziel_max') <> 6
+     or k->'belohnung'->0->>'art' is distinct from 'banner' or k ? 'saison_tage' or k ? 'stufe_kronen' then
     raise exception 'FEHLER: kronen_konstanten weicht vom Plan ab (%)', k;
   end if;
   if (select zaehler_an from public.kronen_schalter where id) then
@@ -333,7 +267,7 @@ set search_path = ''
 as $$
   select public.kronen_stand_sichern(uid);
   update public.kronen_stand
-  set saison = public.kronen_saison_heute(), kronen = k, boden = public.kronen_liga_boden(k), elo = e, elo_n = n
+  set kronen = k, elo = e, elo_n = n
   where user_id = uid;
 $$;
 
@@ -400,12 +334,22 @@ begin
     raise exception 'FEHLER: Online-Ergebnis wurde doppelt gebucht';
   end if;
 
-  -- Liga-Boden: B steht bei 310 (Bronze III, Boden 300) und verliert als Weiss
+  -- Wochen-Kronen nie unter 0: B hat diese Woche 0 (eine Niederlage) und verliert als Weiss erneut; Buchung mit 0,
+  -- die Summe (310) bleibt, A hat danach 60 in der Woche
   perform pg_temp.setze_stand(b, 310, 1000, 20);
   p := pg_temp.neue_partie(b, a, true);
   perform pg_temp.beende(p, '0-1', 'aufgabe');
-  if (select kronen from public.kronen_stand where user_id = b) <> 300 then
-    raise exception 'FEHLER: Liga-Boden: B faellt unter 300';
+  if (select kronen from public.kronen_stand where user_id = b) <> 310
+     or (select kronen from public.liga_mitglieder where user_id = b) <> 0
+     or (select delta from public.kronen_buchungen where user_id = b and ref = p::text) <> 0
+     or (select kronen from public.liga_mitglieder where user_id = a) <> 60 then
+    raise exception 'FEHLER: Wochen-Kronen: B unter 0 oder A nicht 60 (B %, A %)',
+      (select kronen from public.liga_mitglieder where user_id = b), (select kronen from public.liga_mitglieder where user_id = a);
+  end if;
+  -- beide sind mit der ersten Buchung in dieselbe Gruppe dieser Woche gekommen (Bauer III)
+  if (select count(distinct gruppe) from public.liga_mitglieder where user_id in (a, b)) <> 1
+     or (select g.stufe from public.liga_gruppen g join public.liga_mitglieder m on m.gruppe = g.id where m.user_id = a) <> 0 then
+    raise exception 'FEHLER: A und B nicht in einer Bauer-III-Gruppe';
   end if;
 
   -- Abgebrochen (ergebnis null): keine Buchung, Elo unveraendert
@@ -775,7 +719,7 @@ $$;
 reset role;
 
 -- ---------- 9. Bot- und KI-Gegner-Ergebnis (Task 5) ----------
--- D: Bot-Leiter (Sieg, doppelt, Grenze 10, Eingabe), danach KI trotz voller Bot-Grenze. E: KI-Niederlage mit Liga-Boden,
+-- D: Bot-Leiter (Sieg, doppelt, Grenze 10, Eingabe), danach KI trotz voller Bot-Grenze. E: KI-Niederlage bei 0 Wochen-Kronen,
 -- zu frueh, doppelt, fremd, erfunden, verfallen. F: KI-Grenze 20 (eine Buchung von gestern zaehlt nicht), danach Bot.
 -- Belege legt der Besitzer mit festen uuids an (00000000-0000-4000-8000-<nr, 12-stellig>), damit die Nutzer-Abschnitte
 -- sie ohne Testtabelle nennen koennen; eingeloest wird nur ueber kronen_ki_ergebnis.
@@ -823,8 +767,8 @@ begin
     perform pg_temp.neuer_beleg(100 + i, f, 61); -- F: Grenze
   end loop;
   -- F: eine KI-Buchung von gestern zaehlt nicht zur heutigen Grenze
-  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison, am)
-  values (f, 'ki', 'gestern-ki-buchung', 0, 0, now() - interval '30 hours');
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche, am)
+  values (f, 'ki', 'gestern-ki-buchung', 0, public.liga_woche_am(now() - interval '30 hours'), now() - interval '30 hours');
 end;
 $$;
 
@@ -882,10 +826,11 @@ do $$
 declare
   r jsonb;
 begin
-  -- KI-Niederlage -10, Liga-Boden 300 gilt
+  -- KI-Niederlage -10 bei 0 Wochen-Kronen: bleibt 0 (nie unter 0), Buchung mit 0, E ist trotzdem in einer Gruppe
   r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000002'::uuid, 'niederlage');
-  if (r->>'kronen')::int is distinct from 300 or (r->>'delta')::int is distinct from -5 then
-    raise exception 'FEHLER: KI-Niederlage: % (erwartet 305 -> 300 durch den Liga-Boden)', r;
+  if (r->>'kronen')::int is distinct from 0 or (r->>'delta')::int is distinct from 0 or (r->>'stufe')::int is distinct from 0
+     or public.liga_meine_gruppe()->>'gruppe' is null then
+    raise exception 'FEHLER: KI-Niederlage: % (erwartet 0 Wochen-Kronen, delta 0, mit Gruppe)', r;
   end if;
   -- doppelt: derselbe Beleg ein zweites Mal
   if public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000002'::uuid, 'sieg')->>'fehler' is distinct from 'KRONEN_BELEG' then
@@ -948,17 +893,19 @@ begin
       raise exception 'FEHLER: KI-Grenze: Beleg % abgelehnt (%)', i, r;
     end if;
   end loop;
-  if (r->>'kronen')::int is distinct from 400 then
-    raise exception 'FEHLER: KI-Grenze: nach 20 Siegen % statt 400 Kronen', r->>'kronen';
+  -- 20 x 20 waeren 400, der Schummel-Schutz deckelt Bot- und KI-Gewinne bei 300 je Woche
+  if (r->>'kronen')::int is distinct from 300 or not (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: KI-Grenze: nach 20 Siegen % statt 300 Kronen (gedeckelt)', r->>'kronen';
   end if;
   r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000121'::uuid, 'sieg');
   if r->>'fehler' is distinct from 'KRONEN_GRENZE' then
     raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht abgelehnt (%)', r;
   end if;
-  -- und umgekehrt: 20 KI-Buchungen sperren den Bot-Leiter nicht
+  -- und umgekehrt: 20 KI-Buchungen sperren den Bot-Leiter nicht (keine Tagesgrenze), aber der Wochen-Deckel von 300
+  -- fuer Bot und KI zusammen ist voll: angenommen mit delta 0
   r := public.kronen_bot_ergebnis('f-partie-0001', 'remis', 800);
-  if (r->>'delta')::int is distinct from 5 or (r->>'kronen')::int is distinct from 405 then
-    raise exception 'FEHLER: Bot nach voller KI-Grenze: % (erwartet delta 5, kronen 405)', r;
+  if r ? 'fehler' or (r->>'delta')::int is distinct from 0 or (r->>'kronen')::int is distinct from 300 then
+    raise exception 'FEHLER: Bot nach voller KI-Grenze: % (erwartet delta 0, kronen 300)', r;
   end if;
 end;
 $$;
@@ -969,7 +916,7 @@ begin
      or exists (select 1 from public.kronen_buchungen where ref = '00000000-0000-4000-8000-000000000121') then
     raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht eingeloest oder doch gebucht';
   end if;
-  if (select kronen from public.kronen_stand where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 405 then
+  if (select kronen from public.kronen_stand where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 300 then
     raise exception 'FEHLER: KI-Grenze: Stand von F veraendert';
   end if;
 end;
@@ -1004,7 +951,7 @@ values
   ('33333333-3333-4333-8333-333333333333', 'kronen-i@example.invalid'),
   ('44444444-4444-4444-8444-444444444444', 'kronen-j@example.invalid');
 
--- Start einmal: 1450 ist Klasse Gold (ab 1400), also 900 Kronen (Gold III); der zweite Aufruf aendert nichts
+-- Start einmal: 1450 ist Klasse Gold (ab 1400), gedeckelt auf Laeufer III (Stufe 6), ohne Kronen; der zweite Aufruf aendert nichts
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
 do $$
@@ -1012,14 +959,14 @@ declare
   r jsonb;
 begin
   r := public.kronen_start(1450);
-  if r is distinct from '{"delta": 900, "kronen": 900, "stufe": 9}'::jsonb then
-    raise exception 'FEHLER: Start einmal: % statt 900 Kronen', r;
+  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 6}'::jsonb then
+    raise exception 'FEHLER: Start einmal: % statt Stufe 6', r;
   end if;
   r := public.kronen_start(1900);
   if r->>'fehler' is distinct from 'KRONEN_START_VORBEI' then
     raise exception 'FEHLER: Start einmal: zweiter Aufruf %', r;
   end if;
-  if (public.kronen_mein_stand()->>'kronen')::int is distinct from 900 then
+  if (public.kronen_mein_stand()->>'stufe')::int is distinct from 6 then
     raise exception 'FEHLER: Start einmal: Stand nach dem zweiten Aufruf veraendert';
   end if;
 end;
@@ -1028,11 +975,11 @@ reset role;
 do $$
 begin
   if not exists (select 1 from public.kronen_stand where user_id = '11111111-1111-4111-8111-111111111111'
-                 and kronen = 900 and boden = 900 and elo = 1450 and start_gesetzt) then
-    raise exception 'FEHLER: Start einmal: Stand von G (Boden, Elo, start_gesetzt) falsch';
+                 and stufe = 6 and kronen = 0 and elo = 1450 and start_gesetzt) then
+    raise exception 'FEHLER: Start einmal: Stand von G (Stufe, Elo, start_gesetzt) falsch';
   end if;
   if (select count(*) from public.kronen_buchungen where user_id = '11111111-1111-4111-8111-111111111111'
-      and quelle = 'start' and ref = 'start' and delta = 900) is distinct from 1::bigint then
+      and quelle = 'start' and ref = 'start' and delta = 0) is distinct from 1::bigint then
     raise exception 'FEHLER: Start einmal: Buchung start/start fehlt oder doppelt';
   end if;
 end;
@@ -1065,7 +1012,7 @@ begin
 end;
 $$;
 
--- Start-Grenze: ohne Elo keine Aenderung; 99999 zaehlt wie 2800, also Diamant III (1200), nie Krone; 300 wie 400
+-- Start-Grenze: ohne Elo keine Aenderung; 99999 zaehlt wie 2800 und startet trotzdem nur in Laeufer III (Stufe 6); 300 wie 400
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
 do $$
@@ -1077,7 +1024,7 @@ begin
     raise exception 'FEHLER: Start-Grenze: ohne Elo %', r;
   end if;
   r := public.kronen_start(99999);
-  if r is distinct from '{"delta": 1200, "kronen": 1200, "stufe": 12}'::jsonb then
+  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 6}'::jsonb then
     raise exception 'FEHLER: Start-Grenze: 99999 ergibt %', r;
   end if;
 end;
@@ -1097,11 +1044,11 @@ reset role;
 do $$
 begin
   if not exists (select 1 from public.kronen_stand where user_id = '33333333-3333-4333-8333-333333333333'
-                 and kronen = 1200 and boden = 1200 and elo = 2800 and start_gesetzt) then
+                 and stufe = 6 and kronen = 0 and elo = 2800 and start_gesetzt) then
     raise exception 'FEHLER: Start-Grenze: Stand von I (Elo auf 2800 begrenzt) falsch';
   end if;
   if not exists (select 1 from public.kronen_stand where user_id = '44444444-4444-4444-8444-444444444444'
-                 and kronen = 0 and elo = 400 and start_gesetzt) then
+                 and stufe = 0 and kronen = 0 and elo = 400 and start_gesetzt) then
     raise exception 'FEHLER: Start-Grenze: Stand von J (Elo auf 400 begrenzt) falsch';
   end if;
 end;
@@ -1117,6 +1064,262 @@ begin
   exception when insufficient_privilege then
     null;
   end;
+end;
+$$;
+reset role;
+
+-- ---------- 11. Wochen-Gruppen ----------
+-- 31 Nutzer in Springer III (Stufe 3) buchen nacheinander: die ersten 30 kommen in eine Gruppe, der 31. in eine neue.
+insert into auth.users (id, email)
+select gen_random_uuid(), 'liga-' || lpad(i::text, 2, '0') || '@example.invalid' from generate_series(1, 31) as i;
+
+create function pg_temp.liga_nutzer(i integer)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select u.id from auth.users u where u.email = 'liga-' || lpad(i::text, 2, '0') || '@example.invalid';
+$$;
+revoke all on function pg_temp.liga_nutzer(integer) from public;
+
+do $$
+declare
+  i integer;
+  g1 bigint;
+  g2 bigint;
+begin
+  for i in 1..31 loop
+    perform public.kronen_stand_sichern(pg_temp.liga_nutzer(i));
+    update public.kronen_stand set stufe = 3 where user_id = pg_temp.liga_nutzer(i);
+    perform public.liga_buchen(pg_temp.liga_nutzer(i), i * 10);
+  end loop;
+  select gruppe into g1 from public.liga_mitglieder where user_id = pg_temp.liga_nutzer(1);
+  select gruppe into g2 from public.liga_mitglieder where user_id = pg_temp.liga_nutzer(31);
+  if (select count(*) from public.liga_mitglieder where gruppe = g1) <> 30 or g2 = g1
+     or (select count(*) from public.liga_gruppen where woche = public.liga_woche_heute() and stufe = 3) <> 2 then
+    raise exception 'FEHLER: 30 je Gruppe: die 31. Person ist nicht in einer neuen Gruppe';
+  end if;
+  -- volle Gruppe ohne Bots; eine Person allein bekommt 29 Bots mit verschiedenen Namen, ihre Kronen bleiben im Rahmen
+  -- (Springer: Wochenziel 0 bis 250) und liegen nie ueber dem vollen Wochenziel
+  if (select count(*) from public.liga_bots(g1, false)) <> 0 or (select count(*) from public.liga_rangliste(g1, false)) <> 30 then
+    raise exception 'FEHLER: volle Gruppe hat Bots';
+  end if;
+  if (select count(*) from public.liga_bots(g2, false)) <> 29 or (select count(distinct name) from public.liga_bots(g2, false)) <> 29
+     or (select count(*) from public.liga_rangliste(g2, false)) <> 30
+     or exists (select 1 from public.liga_bots(g2, false) j join public.liga_bots(g2, true) v on v.nr = j.nr
+                where j.kronen > v.kronen or v.kronen < 0 or v.kronen > 250) then
+    raise exception 'FEHLER: Bots fuellen die Gruppe nicht richtig auf';
+  end if;
+  -- zweite Buchung derselben Woche: gleiche Gruppe, Kronen zusammengezaehlt
+  perform public.liga_buchen(pg_temp.liga_nutzer(31), 5);
+  if (select kronen from public.liga_mitglieder where user_id = pg_temp.liga_nutzer(31)) <> 315
+     or (select count(*) from public.liga_mitglieder where user_id = pg_temp.liga_nutzer(31)) <> 1 then
+    raise exception 'FEHLER: zweite Buchung derselben Woche falsch';
+  end if;
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', pg_temp.liga_nutzer(31), 'role', 'authenticated')::text, true);
+end;
+$$;
+
+-- Anzeige fuer Nutzer 31: 30 Zeilen, eigene Zeile, Bots mit Namen und KI-Kennzeichen, keine Kennungen anderer
+set local role authenticated;
+do $$
+declare
+  g jsonb;
+  s jsonb;
+  ich jsonb;
+begin
+  g := public.liga_meine_gruppe();
+  s := public.kronen_mein_stand();
+  select e into ich from jsonb_array_elements(g->'mitglieder') e where (e->>'ich')::boolean;
+  if jsonb_array_length(g->'mitglieder') <> 30 or (g->>'platz')::int is distinct from 1 or ich is null
+     or (ich->>'kronen')::int <> 315 or (ich->>'ki')::boolean or (ich->>'platz')::int <> 1 then
+    raise exception 'FEHLER: eigene Gruppe falsch (%)', g;
+  end if;
+  if (select count(*) from jsonb_array_elements(g->'mitglieder') e where (e->>'ki')::boolean and e->>'name' is not null) <> 29 then
+    raise exception 'FEHLER: Bots ohne Namen oder ohne KI-Kennzeichen';
+  end if;
+  if g::text ~ '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-' then
+    raise exception 'FEHLER: liga_meine_gruppe gibt Nutzerkennungen heraus';
+  end if;
+  if (s->>'platz')::int is distinct from 1 or (s->>'kronen')::int is distinct from 315 or (s->>'stufe')::int is distinct from 3 then
+    raise exception 'FEHLER: kronen_mein_stand passt nicht zur Gruppe (%)', s;
+  end if;
+  -- ziel = Kronen auf Platz 5 der eigenen Gruppe (fuer den Ring)
+  if (s->>'ziel')::int is distinct from (select (e->>'kronen')::int from jsonb_array_elements(g->'mitglieder') e
+                                          where (e->>'platz')::int = 5) then
+    raise exception 'FEHLER: ziel ist nicht der Kronen-Stand auf Platz 5 (%)', s;
+  end if;
+end;
+$$;
+reset role;
+
+-- ---------- 12. Wochen-Abrechnung ----------
+-- Vergangene Wochen mit den Nutzern 1 bis 30 (Kronen i * 10, also Nutzer 30 auf Platz 1, Nutzer 1 auf Platz 30) und
+-- ohne Bots. Jede Runde: Gruppe anlegen, abrechnen, pruefen.
+create function pg_temp.alte_gruppe(wochen integer, st integer)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  gid bigint;
+  w date := public.liga_woche_heute() - 7 * wochen;
+begin
+  insert into public.liga_gruppen (woche, stufe, saat) values (w, st, 4242) returning id into gid;
+  insert into public.liga_mitglieder (gruppe, user_id, woche, kronen)
+  select gid, pg_temp.liga_nutzer(i), w, i * 10 from generate_series(1, 30) as i;
+  return gid;
+end;
+$$;
+create function pg_temp.stufe_von(i integer)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select s.stufe from public.kronen_stand s where s.user_id = pg_temp.liga_nutzer(i);
+$$;
+revoke all on function pg_temp.alte_gruppe(integer, integer), pg_temp.stufe_von(integer) from public;
+
+do $$
+declare
+  w7 date := public.liga_woche_heute() - 7;
+  zahl integer;
+begin
+  -- Koenig I (17): oben bleibt 17, unten 16
+  perform pg_temp.alte_gruppe(3, 17);
+  perform public.liga_abrechnen();
+  if pg_temp.stufe_von(30) <> 17 or pg_temp.stufe_von(26) <> 17 or pg_temp.stufe_von(25) <> 17 or pg_temp.stufe_von(6) <> 17
+     or pg_temp.stufe_von(5) <> 16 or pg_temp.stufe_von(1) <> 16 then
+    raise exception 'FEHLER: Abrechnung Koenig I falsch';
+  end if;
+  -- Bauer III (0): oben 1, unten bleibt 0
+  perform pg_temp.alte_gruppe(2, 0);
+  perform public.liga_abrechnen();
+  if pg_temp.stufe_von(30) <> 1 or pg_temp.stufe_von(26) <> 1 or pg_temp.stufe_von(25) <> 0 or pg_temp.stufe_von(5) <> 0
+     or pg_temp.stufe_von(1) <> 0 then
+    raise exception 'FEHLER: Abrechnung Bauer III falsch';
+  end if;
+  -- Springer I (5): Platz 1 bis 5 nach Laeufer III (6, neue Liga: Aufstiegs-Banner), letzte 5 nach Springer II (4)
+  perform pg_temp.alte_gruppe(1, 5);
+  perform public.liga_abrechnen();
+  if pg_temp.stufe_von(30) <> 6 or pg_temp.stufe_von(26) <> 6 or pg_temp.stufe_von(25) <> 5 or pg_temp.stufe_von(6) <> 5
+     or pg_temp.stufe_von(5) <> 4 or pg_temp.stufe_von(1) <> 4 then
+    raise exception 'FEHLER: Abrechnung Springer I falsch';
+  end if;
+  -- Belohnungen der letzten Woche: Platz 1 Banner, 2 = 120, 3 = 100, 4 und 5 = 80, 6 bis 10 = 40, 11 bis 20 = 20, danach nichts
+  if (select art || menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(30) and woche = w7 and art <> 'aufstieg-banner') <> 'banner1'
+     or (select menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(29) and woche = w7 and art = 'taler') <> 120
+     or (select menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(28) and woche = w7 and art = 'taler') <> 100
+     or (select menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(26) and woche = w7 and art = 'taler') <> 80
+     or (select menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(25) and woche = w7) <> 40
+     or (select menge from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(11) and woche = w7) <> 20
+     or exists (select 1 from public.liga_belohnungen where user_id = pg_temp.liga_nutzer(10) and woche = w7)
+     or (select count(*) from public.liga_belohnungen where woche = w7 and art <> 'aufstieg-banner') <> 20
+     or (select count(*) from public.liga_belohnungen where woche = w7 and art = 'aufstieg-banner' and stufe = 6) <> 5
+     or exists (select 1 from public.liga_belohnungen where ausgezahlt) then
+    raise exception 'FEHLER: Belohnungen der Woche falsch';
+  end if;
+  -- Aufstiegs-Banner je Liga nur einmal: noch einmal Springer I -> Laeufer III bringt keinen zweiten
+  perform pg_temp.alte_gruppe(4, 5);
+  perform public.liga_abrechnen();
+  if (select count(*) from public.liga_belohnungen where art = 'aufstieg-banner') <> 5 then
+    raise exception 'FEHLER: Aufstiegs-Banner doppelt vergeben';
+  end if;
+  -- zweiter Aufruf aendert nichts, die Gruppen dieser Woche bleiben offen
+  select count(*) into zahl from public.liga_belohnungen;
+  update public.kronen_stand set stufe = 2 where user_id = pg_temp.liga_nutzer(30);
+  perform public.liga_abrechnen();
+  if (select count(*) from public.liga_belohnungen) <> zahl or pg_temp.stufe_von(30) <> 2
+     or exists (select 1 from public.liga_gruppen where woche < public.liga_woche_heute() and not abgerechnet)
+     or exists (select 1 from public.liga_gruppen where woche = public.liga_woche_heute() and abgerechnet) then
+    raise exception 'FEHLER: Abrechnung laeuft zweimal oder rechnet die laufende Woche ab';
+  end if;
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', pg_temp.liga_nutzer(30), 'role', 'authenticated')::text, true);
+end;
+$$;
+
+-- Nutzer 30 sieht seine gemerkten Belohnungen (4 Platz-1-Banner, 1 Aufstiegs-Banner), noch nicht ausgezahlt
+set local role authenticated;
+do $$
+declare
+  g jsonb := public.liga_meine_gruppe();
+begin
+  if jsonb_array_length(g->'offen') <> 5
+     or (select count(*) from jsonb_array_elements(g->'offen') e where e->>'art' = 'banner') <> 4 then
+    raise exception 'FEHLER: offene Belohnungen falsch (%)', g->'offen';
+  end if;
+end;
+$$;
+reset role;
+
+-- Groesste saat: die Bot-Namen rechnen ohne Ueberlauf (sonst stuende jede Kronen-Funktion still)
+do $$
+declare
+  gid bigint;
+begin
+  insert into public.liga_gruppen (woche, stufe, saat) values (public.liga_woche_heute() + 7, 5, 2147483646)
+  returning id into gid;
+  if (select count(*) from public.liga_bots(gid, true) b where b.name is not null) <> 30 then
+    raise exception 'FEHLER: Bots bei groesster saat falsch';
+  end if;
+end;
+$$;
+
+-- ---------- 13. Schummel-Schutz ----------
+-- Bot- und KI-Gewinne bringen zusammen hoechstens 300 Kronen je Woche. Gegenprobe Wochengrenze: 300 aus der Vorwoche
+-- sperren nichts (am Montag wieder frei). Online-Kronen zaehlen nicht gegen den Deckel.
+insert into auth.users (id, email) values ('55555555-5555-4555-8555-555555555555', 'kronen-deckel@example.invalid');
+do $$
+declare
+  uid uuid := '55555555-5555-4555-8555-555555555555';
+  wo date := public.liga_woche_heute();
+  r jsonb;
+begin
+  perform public.kronen_stand_sichern(uid);
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche) values
+    (uid, 'bot', 'vorwoche-1', 300, wo - 7),
+    (uid, 'online', '00000000-0000-4000-8000-000000000001', 500, wo);
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-0', 'sieg');
+  if (r->>'delta')::int is distinct from 15 or (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: Deckel: Vorwoche oder Online-Kronen sperren die neue Woche (%)', r;
+  end if;
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche) values (uid, 'ki', 'deckel-alt', 275, wo);
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-1', 'sieg');
+  if (r->>'delta')::int is distinct from 10 or not (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: Deckel: der Rest bis 300 ist falsch (%)', r;
+  end if;
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-2', 'sieg');
+  if (r->>'delta')::int is distinct from 0 then
+    raise exception 'FEHLER: Deckel: Bot-Sieg ueber 300 gebucht (%)', r;
+  end if;
+  r := public.kronen_einfach_buchen(uid, 'ki', 'deckel-3', 'sieg');
+  if (r->>'delta')::int is distinct from 0 then
+    raise exception 'FEHLER: Deckel: KI-Sieg ueber 300 gebucht (%)', r;
+  end if;
+  if public.liga_bot_ki_genutzt(uid, wo) <> 300 or public.liga_bot_ki_genutzt(uid, wo + 7) <> 0 then
+    raise exception 'FEHLER: Deckel: Zaehlung je Woche falsch';
+  end if;
+  if (select kronen from public.liga_mitglieder where user_id = uid and woche = wo) <> 25 then
+    raise exception 'FEHLER: Deckel: Wochen-Kronen der Gruppe falsch';
+  end if;
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}', true);
+do $$
+declare
+  g jsonb := public.liga_meine_gruppe();
+begin
+  if g->'bot_ki' is distinct from '{"genutzt": 300, "max": 300}'::jsonb then
+    raise exception 'FEHLER: Deckel: liga_meine_gruppe zeigt %', g->'bot_ki';
+  end if;
 end;
 $$;
 reset role;

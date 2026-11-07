@@ -1,44 +1,41 @@
--- Liga mit Kronen, Etappe B Task 2: Stand, Buchungen, Saison-Archiv und Schalter.
--- Plan: docs/superpowers/plans/2026-11-07-etappe-b-liga-kronen.md. Die Zahlen stehen gleich in js/pakete/liga/kronen.js
--- (Vertragstest tests/kronen-vertrag.test.mjs); alle Zahlen entschieden 06.11.2026.
+-- Liga mit Kronen, Etappe B: Stufe, Wochen-Gruppen, Buchungen, Belohnungen und Schalter.
+-- Plan: docs/superpowers/plans/2026-11-07-etappe-b-liga-kronen.md (Abschnitt "Umbau Wochen-Gruppen 07.11."). Die Zahlen
+-- stehen gleich in js/pakete/liga/kronen.js (Vertragstest tests/kronen-vertrag.test.mjs).
 --
--- Kronen sind die einzige sichtbare Rang-Zahl. 18 Stufen (Holz, Bronze, Silber, Gold, Diamant, Krone, je III, II, I),
--- 100 Kronen je Stufe, Krone I ab 1700. Saison 28 Tage ab einem Montag, Europe/Berlin, Serverzeit. Der erste Start ist
--- eine Einstellung (kronen_schalter.saison_start): leer = Saison 0, kein Wechsel. Beim Live-Gang setzen:
---   update public.kronen_schalter set saison_start = '<erster Montag nach dem Live-Gang>';
--- Saisonwechsel: das Ergebnis der alten Saison geht ins Archiv, die Kronen fallen um 3 Stufen auf den Anfang der
--- Zielstufe. Der Wechsel von Saison 0 auf 1 stuft nicht zurueck (die Start-Liga aus Task 6 bleibt erhalten).
--- Innerhalb einer Saison faellt niemand unter den Anfang der erreichten Liga (Spalte boden; gebucht wird ab Task 3).
+-- Liga neu (Flo 07.11.2026, Konzept Abschnitt 5a): 18 Stufen, die Ligen heissen wie Figuren (Bauer, Springer, Laeufer,
+-- Turm, Dame, Koenig, je III, II, I; Farben Holz bis Krone). Jede Woche (Montag 00:00 bis Sonntag 24:00, Europe/Berlin,
+-- Serverzeit) spielt man in einer Gruppe von 30 derselben Stufe; gezaehlt werden die Kronen der Woche. Platz 1 bis 5
+-- steigen eine Stufe auf, die letzten 5 eine ab. Leere Plaetze fuellen Bots mit KI-Kennzeichen (virtuell, ohne Zeilen,
+-- fest aus der Gruppen-Saat). In eine Gruppe kommt ein Konto mit der ersten Buchung der Woche (Flo 07.11.2026), nie beim
+-- blossen Lesen. Je Platz gibt es eine Belohnung (Banner, Taler); der Server merkt sie sich in liga_belohnungen,
+-- ausgezahlt wird, sobald es Taler und eine Banner-Sammlung gibt (Flo 07.11.2026). Die 4-Wochen-Saison entfaellt.
+-- Abrechnung ohne Cron und ohne Edge Function: jeder Aufruf rechnet zuerst alle Gruppen frueherer Wochen ab, die noch
+-- offen sind (liga_abrechnen, nacheinander und nur einmal).
 --
--- Der Server entscheidet: Nutzer haben keine Tabellenrechte, sie lesen ihren Stand nur ueber kronen_mein_stand().
--- Einspielen: nach supabase/online-schema.sql im SQL Editor ausfuehren. Wiederholbar (mehrfach ausfuehren schadet nicht).
+-- Der Server entscheidet: Nutzer haben keine Tabellenrechte, sie lesen nur ueber kronen_mein_stand() und
+-- liga_meine_gruppe(). Einspielen: nach supabase/online-schema.sql im SQL Editor ausfuehren. Wiederholbar.
 -- Pruefen: supabase/kronen-rls-test.sql (rollt am Ende alles zurueck). Rueckweg: supabase/kronen-zurueck.sql.
--- Fast rein additiv: neue Tabellen und Funktionen. Einzige Aenderung an Bestehendem (Task 3): die Spalte
+-- Fast rein additiv: neue Tabellen und Funktionen. Einzige Aenderung an Bestehendem: die Spalte
 -- partien_online.gewertet (Vorgabe false, alte Zeilen bleiben ungewertet) und der Trigger kronen_nach_partie darauf.
--- Keine Zeilen werden umgeschrieben.
 
 create table if not exists public.kronen_schalter (
   id boolean primary key default true,
   zaehler_an boolean not null default false,
-  saison_start date,
-  constraint kronen_schalter_eine_zeile check (id),
-  -- eine Saison beginnt immer montags (ISO-Wochentag 1)
-  constraint kronen_schalter_montag check (saison_start is null or extract(isodow from saison_start) = 1)
+  constraint kronen_schalter_eine_zeile check (id)
 );
 insert into public.kronen_schalter (id) values (true) on conflict (id) do nothing;
 
+-- stufe 0 (Bauer III) bis 17 (Koenig I); kronen ist die Summe aller Wochen (nie unter 0, nur fuer das Profil)
 create table if not exists public.kronen_stand (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  saison integer not null default 0,
+  stufe integer not null default 0,
   kronen integer not null default 0,
-  boden integer not null default 0,
   elo integer not null default 1000,
   elo_n integer not null default 0,
   start_gesetzt boolean not null default false,
   aktualisiert_am timestamptz not null default now(),
-  constraint kronen_stand_saison check (saison >= 0),
+  constraint kronen_stand_stufe check (stufe between 0 and 17),
   constraint kronen_stand_kronen check (kronen >= 0),
-  constraint kronen_stand_boden check (boden >= 0 and boden <= kronen),
   constraint kronen_stand_elo check (elo between 100 and 4000),
   constraint kronen_stand_elo_n check (elo_n >= 0)
 );
@@ -49,35 +46,69 @@ create table if not exists public.kronen_buchungen (
   quelle text not null,
   ref text not null,
   delta integer not null,
-  saison integer not null,
+  woche date not null,
   am timestamptz not null default now(),
-  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start', 'saison')),
+  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start')),
   constraint kronen_buchungen_ref check (char_length(ref) between 1 and 64),
-  -- jede Partie, jeder Beleg und jeder Saisonwechsel wird je Konto hoechstens einmal gebucht
+  -- jede Partie und jeder Beleg wird je Konto hoechstens einmal gebucht
   constraint kronen_buchungen_einmal unique (user_id, quelle, ref)
 );
--- fuer die Tagesgrenzen (Task 5): Buchungen je Konto, Quelle und Zeit
+-- fuer die Tagesgrenzen: Buchungen je Konto, Quelle und Zeit
 create index if not exists kronen_buchungen_tag on public.kronen_buchungen (user_id, quelle, am);
 
-create table if not exists public.kronen_archiv (
-  user_id uuid not null references auth.users (id) on delete cascade,
-  saison integer not null,
-  kronen integer not null,
+-- Eine Gruppe je Woche und Stufe, bei Bedarf mehrere (je 30 Menschen). saat macht die Bots fest (Namen, Wochenziel).
+create table if not exists public.liga_gruppen (
+  id bigserial primary key,
+  woche date not null,
   stufe integer not null,
-  primary key (user_id, saison),
-  constraint kronen_archiv_stufe check (stufe between 0 and 17)
+  saat integer not null default (floor(random() * 2147483647))::integer,
+  abgerechnet boolean not null default false,
+  angelegt_am timestamptz not null default now(),
+  constraint liga_gruppen_stufe check (stufe between 0 and 17),
+  constraint liga_gruppen_saat check (saat >= 0),
+  constraint liga_gruppen_montag check (extract(isodow from woche) = 1)
+);
+create index if not exists liga_gruppen_woche on public.liga_gruppen (woche, stufe, abgerechnet);
+
+-- kronen sind die Kronen dieser Woche (nie unter 0); je Konto und Woche genau eine Gruppe
+create table if not exists public.liga_mitglieder (
+  gruppe bigint not null references public.liga_gruppen (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  woche date not null,
+  kronen integer not null default 0,
+  beigetreten timestamptz not null default now(),
+  primary key (gruppe, user_id),
+  constraint liga_mitglieder_einmal unique (user_id, woche),
+  constraint liga_mitglieder_kronen check (kronen >= 0)
+);
+
+-- Belohnung je Woche und Art (Platz-Belohnung, dazu ein Banner beim ersten Aufstieg in eine Liga); ausgezahlt kommt spaeter
+create table if not exists public.liga_belohnungen (
+  id bigserial primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  woche date not null,
+  stufe integer not null,
+  platz integer not null,
+  art text not null,
+  menge integer not null,
+  ausgezahlt boolean not null default false,
+  constraint liga_belohnungen_art check (art in ('banner', 'taler', 'aufstieg-banner')),
+  constraint liga_belohnungen_einmal unique (user_id, woche, art)
 );
 
 alter table public.kronen_schalter enable row level security;
 alter table public.kronen_stand enable row level security;
 alter table public.kronen_buchungen enable row level security;
-alter table public.kronen_archiv enable row level security;
+alter table public.liga_gruppen enable row level security;
+alter table public.liga_mitglieder enable row level security;
+alter table public.liga_belohnungen enable row level security;
 -- keine Policies: ohne Policy sieht ein Nutzer keine Zeile; dazu kein Tabellenrecht (Supabase vergibt sonst Standardrechte)
-revoke all on table public.kronen_schalter, public.kronen_stand, public.kronen_buchungen, public.kronen_archiv
+revoke all on table public.kronen_schalter, public.kronen_stand, public.kronen_buchungen, public.liga_gruppen,
+  public.liga_mitglieder, public.liga_belohnungen from anon, authenticated, public;
+revoke all on sequence public.kronen_buchungen_id_seq, public.liga_gruppen_id_seq, public.liga_belohnungen_id_seq
   from anon, authenticated, public;
-revoke all on sequence public.kronen_buchungen_id_seq from anon, authenticated, public;
 
--- Alle Zahlen an einer Stelle (Vertragstest mit js/pakete/liga/kronen.js), dazu der eingestellte Saisonstart
+-- Alle Zahlen an einer Stelle (Vertragstest mit js/pakete/liga/kronen.js)
 create or replace function public.kronen_konstanten()
 returns jsonb
 language sql
@@ -86,7 +117,6 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
-    'stufe_kronen', 100,
     'stufen_je_liga', 3,
     'stufen_anzahl', 18,
     'kronen', jsonb_build_object(
@@ -96,16 +126,31 @@ as $$
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
+    -- Bot- und KI-Gewinne zusammen je Woche und Konto (Flo 07.11.2026, Schummel-Schutz), Online-Kronen frei
+    'bot_ki_wochen_max', 300,
     'ki_mindestdauer_s', 60,
     'online_mindest_halbzuege', 4,
     'paar_tagesgrenze', 3,
-    'saison_tage', 28,
-    'rueckstufung_stufen', 3,
     'klassen_grenzen', jsonb_build_array(0, 1000, 1200, 1400, 1600, 1900),
     'start_elo_min', 400,
     'start_elo_max', 2800,
-    'start_hoechste_liga', 4,
-    'saison_start', (select s.saison_start from public.kronen_schalter s where s.id)
+    -- Start hoechstens Laeufer III (Flo 07.11.2026): die Geraete-Elo ist nur eine Behauptung des Clients
+    'start_hoechste_liga', 2,
+    -- Wochen-Gruppen (Flo 07.11.2026): 30 Plaetze, 5 auf, 5 ab
+    'gruppe_groesse', 30,
+    'aufstieg_plaetze', 5,
+    'abstieg_plaetze', 5,
+    -- Belohnung je Platz (Claudes Annahme 07.11.2026, Flo kann sie aendern): Platz 1 Banner, dann fallende Taler-Stapel
+    'belohnung', jsonb_build_array(
+      jsonb_build_object('von', 1, 'bis', 1, 'art', 'banner', 'menge', 1),
+      jsonb_build_object('von', 2, 'bis', 2, 'art', 'taler', 'menge', 120),
+      jsonb_build_object('von', 3, 'bis', 3, 'art', 'taler', 'menge', 100),
+      jsonb_build_object('von', 4, 'bis', 5, 'art', 'taler', 'menge', 80),
+      jsonb_build_object('von', 6, 'bis', 10, 'art', 'taler', 'menge', 40),
+      jsonb_build_object('von', 11, 'bis', 20, 'art', 'taler', 'menge', 20)
+    ),
+    -- Wochenziel eines Bots: 0 bis zu diesem Wert, je Liga (Bauer bis Koenig); nach den ersten Wochen nachschaerfen
+    'bot_ziel_max', jsonb_build_array(150, 250, 350, 450, 600, 800)
   );
 $$;
 
@@ -119,68 +164,131 @@ as $$
   select (now() at time zone 'Europe/Berlin')::date;
 $$;
 
--- Saisonnummer an einem Tag: 0 ohne Start oder vor dem Start, sonst 1, 2, ... je 28 Tage
-create or replace function public.kronen_saison_am(tag date)
-returns integer
+-- Montag der Woche eines Zeitpunkts (Europe/Berlin); Sonntag 23:59 gehoert zur alten, Montag 00:00 zur neuen Woche
+create or replace function public.liga_woche_am(t timestamptz)
+returns date
+language sql
+stable
+set search_path = ''
+as $$
+  select (date_trunc('week', t at time zone 'Europe/Berlin'))::date;
+$$;
+
+create or replace function public.liga_woche_heute()
+returns date
+language sql
+stable
+set search_path = ''
+as $$
+  select public.liga_woche_am(now());
+$$;
+
+-- Wie viel der Woche schon vergangen ist, 0 bis 1 (fuer die Bot-Kronen); fruehere Wochen sind 1
+create or replace function public.liga_wochen_anteil(woche date)
+returns numeric
+language sql
+stable
+set search_path = ''
+as $$
+  select least(1, greatest(0,
+    extract(epoch from ((now() at time zone 'Europe/Berlin') - woche::timestamp)) / 604800.0))::numeric;
+$$;
+
+-- Bots einer Gruppe: so viele, wie Menschen fehlen (Nummern 1 bis 30 - n). Name und Wochenziel kommen fest aus der
+-- Saat; 30 Namen und Schritt 7 (teilerfremd zu 30) geben in einer Gruppe nie zweimal denselben Namen. voll = Wochenende
+-- (volles Ziel, fuer die Abrechnung), sonst der Anteil der vergangenen Woche.
+create or replace function public.liga_bots(gid bigint, voll boolean)
+returns table (nr integer, name text, kronen integer)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  -- ohne Schalter-Zeile ebenfalls 0 (nie NULL)
-  select coalesce((
-    select case
-      when s.saison_start is null or tag is null or tag < s.saison_start then 0
-      else (tag - s.saison_start) / 28 + 1
-    end
-    from public.kronen_schalter s
-    where s.id
-  ), 0);
+  with g as (select * from public.liga_gruppen x where x.id = gid),
+  k as (select public.kronen_konstanten() as w),
+  n as (select count(*)::integer as menschen from public.liga_mitglieder m where m.gruppe = gid)
+  select s.nr,
+    (array['Ada', 'Bela', 'Cleo', 'Dario', 'Emil', 'Fiona', 'Greta', 'Hugo', 'Ida', 'Jonas', 'Kira', 'Luca', 'Mila',
+      'Nils', 'Olga', 'Paul', 'Quinn', 'Rosa', 'Sven', 'Tilda', 'Udo', 'Vera', 'Wim', 'Xenia', 'Yuri', 'Zora', 'Arne',
+      'Bruno', 'Carla', 'Dina'])[1 + ((g.saat::bigint + s.nr * 7) % 30)::integer],
+    round((case when voll then 1 else public.liga_wochen_anteil(g.woche) end)
+      * (abs(pg_catalog.hashtext(g.saat::text || ':' || s.nr::text)::bigint)
+         % (((k.w -> 'bot_ziel_max') ->> (g.stufe / 3))::integer + 1)))::integer
+  from g, k, n, generate_series(1, greatest(0, (k.w ->> 'gruppe_groesse')::integer - n.menschen)) as s(nr);
 $$;
 
-create or replace function public.kronen_saison_heute()
-returns integer
+-- Rangliste einer Gruppe: Kronen absteigend, bei Gleichstand Menschen vor Bots, dann der fruehere Beitritt
+create or replace function public.liga_rangliste(gid bigint, voll boolean)
+returns table (platz integer, user_id uuid, nr integer, kronen integer, ki boolean)
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select public.kronen_saison_am(public.kronen_heute());
+  select (row_number() over (order by r.kronen desc, r.ki, r.beigetreten, r.nr))::integer, r.user_id, r.nr, r.kronen, r.ki
+  from (
+    select m.user_id, null::integer as nr, m.kronen, false as ki, m.beigetreten
+    from public.liga_mitglieder m where m.gruppe = gid
+    union all
+    select null::uuid, b.nr, b.kronen, true, null::timestamptz from public.liga_bots(gid, voll) b
+  ) r;
 $$;
 
--- Stufe 0 (Holz III) bis 17 (Krone I); unsinnige Eingaben ergeben 0
-create or replace function public.kronen_stufe(kronen integer)
-returns integer
-language sql
-immutable
+-- Rechnet alle Gruppen frueherer Wochen ab, die noch offen sind: Platz 1 bis 5 eine Stufe auf (hoechstens Koenig I),
+-- die letzten 5 eine ab (nie unter Bauer III), Bots zaehlen mit (volles Wochenziel). Je Mensch die Platz-Belohnung,
+-- beim ersten Aufstieg in eine neue Liga dazu ein Banner. Nacheinander (Sperre) und je Gruppe genau einmal.
+create or replace function public.liga_abrechnen()
+returns void
+language plpgsql
+security definer
 set search_path = ''
 as $$
-  select case when kronen is null or kronen < 0 then 0 else least(17, kronen / 100) end;
+declare
+  k jsonb := public.kronen_konstanten();
+  groesse integer := (k ->> 'gruppe_groesse')::integer;
+  auf integer := (k ->> 'aufstieg_plaetze')::integer;
+  ab integer := (k ->> 'abstieg_plaetze')::integer;
+  heute date := public.liga_woche_heute();
+  g public.liga_gruppen;
+  r record;
+  neu integer;
+  b jsonb;
+begin
+  if not exists (select 1 from public.liga_gruppen x where not x.abgerechnet and x.woche < heute) then
+    return;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('liga-abrechnen'));
+  for g in select * from public.liga_gruppen x where not x.abgerechnet and x.woche < heute order by x.woche, x.id for update
+  loop
+    for r in select * from public.liga_rangliste(g.id, true) l where not l.ki
+    loop
+      neu := case
+        when r.platz <= auf then least(17, g.stufe + 1)
+        when r.platz > groesse - ab then greatest(0, g.stufe - 1)
+        else g.stufe end;
+      update public.kronen_stand s set stufe = neu, aktualisiert_am = now() where s.user_id = r.user_id;
+      select e into b from jsonb_array_elements(k -> 'belohnung') e
+      where r.platz between (e ->> 'von')::integer and (e ->> 'bis')::integer limit 1;
+      if b is not null then
+        insert into public.liga_belohnungen (user_id, woche, stufe, platz, art, menge)
+        values (r.user_id, g.woche, g.stufe, r.platz, b ->> 'art', (b ->> 'menge')::integer)
+        on conflict on constraint liga_belohnungen_einmal do nothing;
+      end if;
+      -- erster Aufstieg in eine neue Liga (Stufe III der naechsten Figur): ein Banner, je Liga nur einmal im Leben
+      if neu > g.stufe and neu % 3 = 0 and not exists (
+        select 1 from public.liga_belohnungen x
+        where x.user_id = r.user_id and x.art = 'aufstieg-banner' and x.stufe = neu) then
+        insert into public.liga_belohnungen (user_id, woche, stufe, platz, art, menge)
+        values (r.user_id, g.woche, neu, r.platz, 'aufstieg-banner', 1)
+        on conflict on constraint liga_belohnungen_einmal do nothing;
+      end if;
+    end loop;
+    update public.liga_gruppen x set abgerechnet = true where x.id = g.id;
+  end loop;
+end;
 $$;
 
--- Anfang der Liga der Stufe (Holz 0, Bronze 300, Silber 600, Gold 900, Diamant 1200, Krone 1500)
-create or replace function public.kronen_liga_boden(kronen integer)
-returns integer
-language sql
-immutable
-set search_path = ''
-as $$
-  select (public.kronen_stufe(kronen) / 3) * 300;
-$$;
-
--- Rueckstufung zum Saisonende: 3 Stufen tiefer, auf den Anfang der Zielstufe, nie unter 0
-create or replace function public.kronen_rueckstufen(kronen integer)
-returns integer
-language sql
-immutable
-set search_path = ''
-as $$
-  select greatest(0, public.kronen_stufe(kronen) - 3) * 100;
-$$;
-
--- Legt den Stand eines Kontos an und fuehrt faellige Saisonwechsel aus. Nur intern (kronen_mein_stand, spaetere Tasks).
--- Ruht ein Konto mehrere Saisons, wird je verpasster Saison einmal zurueckgestuft; ins Archiv kommt nur die Saison,
--- in der das Konto zuletzt stand (die ruhenden Saisons haben kein eigenes Ergebnis).
+-- Legt den Stand eines Kontos an, nachdem faellige Wochen abgerechnet sind. Nur intern.
 create or replace function public.kronen_stand_sichern(uid uuid)
 returns public.kronen_stand
 language plpgsql
@@ -189,47 +297,81 @@ set search_path = ''
 as $$
 declare
   st public.kronen_stand;
-  heute_nr integer := public.kronen_saison_heute();
-  alt integer;
-  neu integer;
-  nr integer;
 begin
   if uid is null then
     raise exception 'KRONEN_ANMELDUNG';
   end if;
-  insert into public.kronen_stand (user_id, saison) values (uid, heute_nr) on conflict (user_id) do nothing;
+  perform public.liga_abrechnen();
+  insert into public.kronen_stand (user_id) values (uid) on conflict (user_id) do nothing;
   select * into st from public.kronen_stand k where k.user_id = uid for update;
-  if st.saison >= heute_nr then
-    return st;
-  end if;
-  -- Saison 0 (vor dem ersten Start) wird weder archiviert noch zurueckgestuft
-  if st.saison > 0 then
-    insert into public.kronen_archiv (user_id, saison, kronen, stufe)
-    values (uid, st.saison, st.kronen, public.kronen_stufe(st.kronen))
-    on conflict (user_id, saison) do nothing;
-  end if;
-  alt := st.kronen;
-  neu := st.kronen;
-  nr := st.saison;
-  while nr < heute_nr loop
-    nr := nr + 1;
-    if nr > 1 then
-      neu := public.kronen_rueckstufen(neu);
-      insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
-      values (uid, 'saison', 'saison-' || nr, neu - alt, nr)
-      on conflict (user_id, quelle, ref) do nothing;
-      alt := neu;
-    end if;
-  end loop;
-  update public.kronen_stand k
-  set saison = heute_nr, kronen = neu, boden = public.kronen_liga_boden(neu), aktualisiert_am = now()
-  where k.user_id = uid
-  returning * into st;
   return st;
 end;
 $$;
 
--- Der eigene Stand fuer die App (Startseite, Lobby)
+-- Bucht eine Aenderung in die Gruppe dieser Woche; ohne Gruppe tritt das Konto der aeltesten Gruppe seiner Stufe mit
+-- weniger als 30 Menschen bei (sonst einer neuen). Sperre je Woche und Stufe: nie 31 Menschen in einer Gruppe.
+-- Antwort: die tatsaechliche Aenderung der Wochen-Kronen. Nur intern, nach kronen_stand_sichern (Stand gesperrt).
+create or replace function public.liga_buchen(uid uuid, nominal integer)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  -- Uhrzeit des Aufrufs, nicht des Transaktionsbeginns: eine Partie, die Sonntag 23:59 beginnt und Montag endet,
+  -- bucht in die neue Woche (die alte ist dann womoeglich schon abgerechnet)
+  wo date := public.liga_woche_am(pg_catalog.clock_timestamp());
+  st public.kronen_stand;
+  m public.liga_mitglieder;
+  gid bigint;
+  neu integer;
+  fertig boolean;
+begin
+  select * into st from public.kronen_stand k where k.user_id = uid;
+  select * into m from public.liga_mitglieder x where x.user_id = uid and x.woche = wo for update;
+  if m.gruppe is null then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('liga-gruppe:' || wo::text || ':' || st.stufe::text));
+    select g.id into gid from public.liga_gruppen g
+    where g.woche = wo and g.stufe = st.stufe and not g.abgerechnet
+      and (select count(*) from public.liga_mitglieder x where x.gruppe = g.id)
+          < (public.kronen_konstanten() ->> 'gruppe_groesse')::integer
+    order by g.id limit 1;
+    if gid is null then
+      insert into public.liga_gruppen (woche, stufe) values (wo, st.stufe) returning id into gid;
+    end if;
+    insert into public.liga_mitglieder (gruppe, user_id, woche) values (gid, uid, wo) returning * into m;
+  end if;
+  -- Gemeinsame Sperre gegen liga_abrechnen (die sperrt die Gruppe for update): nie in eine schon abgerechnete Gruppe
+  select g.abgerechnet into fertig from public.liga_gruppen g where g.id = m.gruppe for share;
+  if fertig then
+    return 0;
+  end if;
+  neu := greatest(0, m.kronen + nominal);
+  update public.liga_mitglieder x set kronen = neu where x.gruppe = m.gruppe and x.user_id = uid;
+  update public.kronen_stand s set kronen = greatest(0, s.kronen + (neu - m.kronen)), aktualisiert_am = now()
+  where s.user_id = uid;
+  return neu - m.kronen;
+end;
+$$;
+
+-- Platz und Wochen-Kronen eines Kontos in dieser Woche (null ohne Gruppe), dazu ziel: die Kronen auf dem letzten
+-- Aufstiegsplatz (Platz 5) der Gruppe, daran fuellt sich der Ring der Startseite. Nur intern.
+create or replace function public.liga_mein_platz(uid uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('gruppe', m.gruppe, 'kronen', m.kronen,
+    'platz', (select r.platz from public.liga_rangliste(m.gruppe, false) r where r.user_id = uid),
+    'ziel', (select r.kronen from public.liga_rangliste(m.gruppe, false) r
+             where r.platz = (public.kronen_konstanten() ->> 'aufstieg_plaetze')::integer))
+  from public.liga_mitglieder m where m.user_id = uid and m.woche = public.liga_woche_heute();
+$$;
+
+-- Der eigene Stand fuer die App (Startseite, Lobby): Stufe, Wochen-Kronen, Platz von n und ziel (Kronen auf Platz 5);
+-- ohne Gruppe platz und ziel null
 create or replace function public.kronen_mein_stand()
 returns jsonb
 language plpgsql
@@ -238,31 +380,105 @@ set search_path = ''
 as $$
 declare
   st public.kronen_stand;
-  stufe integer;
+  p jsonb;
 begin
   st := public.kronen_stand_sichern(auth.uid());
-  stufe := public.kronen_stufe(st.kronen);
+  p := public.liga_mein_platz(st.user_id);
   return jsonb_build_object(
-    'saison', st.saison,
-    'kronen', st.kronen,
-    'stufe', stufe,
-    'boden', st.boden,
-    'naechste', case when stufe < 17 then (stufe + 1) * 100 else null end
+    'stufe', st.stufe,
+    'kronen', coalesce((p ->> 'kronen')::integer, 0),
+    'platz', (p ->> 'platz')::integer,
+    'ziel', (p ->> 'ziel')::integer,
+    'n', (public.kronen_konstanten() ->> 'gruppe_groesse')::integer,
+    'woche', public.liga_woche_heute()
   );
 end;
 $$;
 
--- Rechte: alles zu, nur Stand und Konstanten fuer angemeldete Nutzer
+-- Name eines Mitglieds: Benutzername aus profile (nie die E-Mail); ohne Tabelle oder Namen null (die App zeigt "Spieler")
+create or replace function public.liga_name(uid uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  n text;
+begin
+  if to_regclass('public.profile') is null then
+    return null;
+  end if;
+  execute 'select benutzername from public.profile where user_id = $1' into n using uid;
+  return n;
+end;
+$$;
+
+-- Die eigene Gruppe dieser Woche fuer den Liga-Reiter: { woche, ende, stufe, gruppe, platz, n, mitglieder, belohnung,
+-- offen }. mitglieder [{ platz, name, kronen, ki, ich }] in Rangfolge; ohne Gruppe gruppe null und mitglieder [].
+-- offen sind gemerkte, noch nicht ausgezahlte Belohnungen [{ woche, platz, art, menge }].
+create or replace function public.liga_meine_gruppe()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  st public.kronen_stand;
+  k jsonb := public.kronen_konstanten();
+  wo date := public.liga_woche_heute();
+  m public.liga_mitglieder;
+  liste jsonb := '[]'::jsonb;
+  mein_platz integer;
+begin
+  st := public.kronen_stand_sichern(auth.uid());
+  select * into m from public.liga_mitglieder x where x.user_id = st.user_id and x.woche = wo;
+  if m.gruppe is not null then
+    select coalesce(jsonb_agg(jsonb_build_object(
+        'platz', r.platz,
+        'name', case when r.ki then b.name else public.liga_name(r.user_id) end,
+        'kronen', r.kronen, 'ki', r.ki, 'ich', r.user_id is not distinct from st.user_id) order by r.platz), '[]'::jsonb)
+      into liste
+    from public.liga_rangliste(m.gruppe, false) r
+    left join public.liga_bots(m.gruppe, false) b on r.ki and b.nr = r.nr;
+    select r.platz into mein_platz from public.liga_rangliste(m.gruppe, false) r where r.user_id = st.user_id;
+  end if;
+  return jsonb_build_object(
+    'woche', wo,
+    'ende', wo + 6,
+    'stufe', st.stufe,
+    'gruppe', m.gruppe,
+    'platz', mein_platz,
+    'n', (k ->> 'gruppe_groesse')::integer,
+    'mitglieder', liste,
+    'belohnung', k -> 'belohnung',
+    -- Schummel-Schutz: Bot- und KI-Gewinne dieser Woche gegen den Deckel (der Client zeigt "diese Woche voll")
+    'bot_ki', jsonb_build_object('genutzt', public.liga_bot_ki_genutzt(st.user_id, wo),
+      'max', (k ->> 'bot_ki_wochen_max')::integer),
+    'offen', coalesce((select jsonb_agg(jsonb_build_object('woche', x.woche, 'platz', x.platz, 'art', x.art, 'menge', x.menge)
+                         order by x.woche, x.art)
+                       from public.liga_belohnungen x where x.user_id = st.user_id and not x.ausgezahlt), '[]'::jsonb)
+  );
+end;
+$$;
+
+-- Rechte: alles zu, nur Stand, Gruppe und Konstanten fuer angemeldete Nutzer
 revoke all on function public.kronen_konstanten() from public, anon, authenticated;
 revoke all on function public.kronen_heute() from public, anon, authenticated;
-revoke all on function public.kronen_saison_am(date) from public, anon, authenticated;
-revoke all on function public.kronen_saison_heute() from public, anon, authenticated;
-revoke all on function public.kronen_stufe(integer) from public, anon, authenticated;
-revoke all on function public.kronen_liga_boden(integer) from public, anon, authenticated;
-revoke all on function public.kronen_rueckstufen(integer) from public, anon, authenticated;
+revoke all on function public.liga_woche_am(timestamptz) from public, anon, authenticated;
+revoke all on function public.liga_woche_heute() from public, anon, authenticated;
+revoke all on function public.liga_wochen_anteil(date) from public, anon, authenticated;
+revoke all on function public.liga_bots(bigint, boolean) from public, anon, authenticated;
+revoke all on function public.liga_rangliste(bigint, boolean) from public, anon, authenticated;
+revoke all on function public.liga_abrechnen() from public, anon, authenticated;
 revoke all on function public.kronen_stand_sichern(uuid) from public, anon, authenticated;
+revoke all on function public.liga_buchen(uuid, integer) from public, anon, authenticated;
+revoke all on function public.liga_mein_platz(uuid) from public, anon, authenticated;
+revoke all on function public.liga_name(uuid) from public, anon, authenticated;
 revoke all on function public.kronen_mein_stand() from public, anon, authenticated;
+revoke all on function public.liga_meine_gruppe() from public, anon, authenticated;
 grant execute on function public.kronen_mein_stand() to authenticated;
+grant execute on function public.liga_meine_gruppe() to authenticated;
 grant execute on function public.kronen_konstanten() to authenticated;
 
 -- ---------- Task 3: Online-Ergebnis bucht Kronen und Elo ----------
@@ -270,9 +486,9 @@ grant execute on function public.kronen_konstanten() to authenticated;
 -- Einzige Aenderung an einer bestehenden Tabelle; Rueckweg in kronen-zurueck.sql.
 alter table public.partien_online add column if not exists gewertet boolean not null default false;
 
--- Bucht eine Online-Partie fuer einen Spieler: Kronen mit Liga-Boden, Elo neu. Je Partie und Konto hoechstens einmal
--- (kronen_buchungen_einmal); nur bei einer neuen Buchung aendert sich der Stand. In der Buchung steht die
--- tatsaechliche Aenderung (bei 0 Kronen ist eine Niederlage eine Buchung mit 0).
+-- Bucht eine Online-Partie fuer einen Spieler: Kronen in die Wochen-Gruppe (liga_buchen), Elo neu. Je Partie und Konto
+-- hoechstens einmal (kronen_buchungen_einmal); nur bei einer neuen Buchung aendert sich der Stand. In der Buchung steht
+-- die tatsaechliche Aenderung der Wochen-Kronen (bei 0 Kronen ist eine Niederlage eine Buchung mit 0).
 create or replace function public.kronen_online_buchen(uid uuid, partie uuid, punkte numeric, gegner_elo integer)
 returns void
 language plpgsql
@@ -282,7 +498,6 @@ as $$
 declare
   st public.kronen_stand;
   nominal integer;
-  neu integer;
   k integer;
   erwartet numeric;
   neu_elo integer;
@@ -292,20 +507,20 @@ begin
   -- Zahlen aus kronen_konstanten (eine Quelle, Vertragstest mit js/pakete/liga/kronen.js)
   nominal := (public.kronen_konstanten() #>> array['kronen', 'online',
     case punkte when 1 then 'sieg' when 0 then 'niederlage' else 'remis' end])::integer;
-  neu := greatest(st.boden, 0, st.kronen + nominal);
-  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
-  values (uid, 'online', partie::text, neu - st.kronen, st.saison)
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
+  values (uid, 'online', partie::text, 0, public.liga_woche_heute())
   on conflict (user_id, quelle, ref) do nothing;
   get diagnostics gebucht = row_count;
   if gebucht = 0 then
     return;
   end if;
+  update public.kronen_buchungen b set delta = public.liga_buchen(uid, nominal)
+  where b.user_id = uid and b.quelle = 'online' and b.ref = partie::text;
   k := case when st.elo_n < 15 then 40 else 32 end;
   erwartet := 1 / (1 + power(10::numeric, (gegner_elo - st.elo)::numeric / 400));
   neu_elo := least(4000, greatest(100, st.elo + round(k * (punkte - erwartet))::integer));
   update public.kronen_stand s
-  set kronen = neu, boden = greatest(st.boden, public.kronen_liga_boden(neu)), elo = neu_elo, elo_n = st.elo_n + 1,
-      aktualisiert_am = now()
+  set elo = neu_elo, elo_n = st.elo_n + 1, aktualisiert_am = now()
   where s.user_id = uid;
 end;
 $$;
@@ -347,11 +562,22 @@ begin
   if heute_paar >= (konst->>'paar_tagesgrenze')::integer then
     return null;
   end if;
-  elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
-  elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
-  punkte_w := case new.ergebnis when '1-0' then 1 when '0-1' then 0 else 0.5 end;
-  perform public.kronen_online_buchen(new.weiss, new.id, punkte_w, elo_s);
-  perform public.kronen_online_buchen(new.schwarz, new.id, 1 - punkte_w, elo_w);
+  -- Kronen sind Beiwerk: ein Fehler (auch ein Deadlock) nimmt nur die Buchung zurueck, nie das Partieende.
+  -- Staende immer in fester Reihenfolge (kleinere ID zuerst) sperren, damit sich Partien nicht gegenseitig blockieren.
+  begin
+    if new.weiss < new.schwarz then
+      elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
+      elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
+    else
+      elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
+      elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
+    end if;
+    punkte_w := case new.ergebnis when '1-0' then 1 when '0-1' then 0 else 0.5 end;
+    perform public.kronen_online_buchen(new.weiss, new.id, punkte_w, elo_s);
+    perform public.kronen_online_buchen(new.schwarz, new.id, 1 - punkte_w, elo_w);
+  exception when others then
+    raise warning 'kronen_bei_partie_ende %: %', new.id, sqlerrm;
+  end;
   return null;
 end;
 $$;
@@ -557,9 +783,25 @@ grant execute on function public.online_suche_stand() to authenticated;
 grant execute on function public.online_suche_ende(boolean) to authenticated;
 
 -- ---------- Task 5: Bot- und KI-Gegner-Ergebnis ----------
--- Gemeinsame Buchung fuer Bot-Leiter und KI-Gegner: Kronen mit Liga-Boden, je (Konto, Quelle, ref) hoechstens einmal.
--- Antwort { delta, kronen, stufe }; eine schon gebuchte ref liefert den Stand mit delta 0. Nur intern.
--- Parameter heissen bewusst nicht quelle/ref: gleichnamige Spalten waeren in PL/pgSQL sonst mehrdeutig.
+-- Gemeinsame Buchung fuer Bot-Leiter und KI-Gegner: Kronen in die Wochen-Gruppe, je (Konto, Quelle, ref) hoechstens
+-- einmal. Antwort { delta, kronen, stufe } mit den Wochen-Kronen; eine schon gebuchte ref liefert den Stand mit delta 0.
+-- Nur intern. Parameter heissen bewusst nicht quelle/ref: gleichnamige Spalten waeren in PL/pgSQL sonst mehrdeutig.
+-- Schummel-Schutz (Flo 07.11.2026): Bot- und KI-Ergebnisse meldet der Client selbst, deshalb bringen sie zusammen
+-- hoechstens bot_ki_wochen_max Kronen je Woche (nur Gewinne zaehlen). Online-Kronen prueft der Server, sie sind frei.
+-- Antwort zusaetzlich bot_ki_voll: true, sobald der Deckel erreicht ist.
+
+-- Bot- und KI-Gewinne eines Kontos in einer Woche. Nur intern.
+create or replace function public.liga_bot_ki_genutzt(uid uuid, wo date)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(b.delta) filter (where b.delta > 0), 0)::integer from public.kronen_buchungen b
+  where b.user_id = uid and b.quelle in ('bot', 'ki') and b.woche = wo;
+$$;
+
 create or replace function public.kronen_einfach_buchen(uid uuid, art text, schluessel text, ergebnis text)
 returns jsonb
 language plpgsql
@@ -568,23 +810,30 @@ set search_path = ''
 as $$
 declare
   st public.kronen_stand;
-  nominal integer := (public.kronen_konstanten() #>> array['kronen', art, ergebnis])::integer;
-  neu integer;
+  konst jsonb := public.kronen_konstanten();
+  nominal integer := (konst #>> array['kronen', art, ergebnis])::integer;
+  deckel integer := (konst ->> 'bot_ki_wochen_max')::integer;
+  -- dieselbe Uhr wie liga_buchen: die Buchung zaehlt in der Woche, in die sie gebucht wird
+  wo date := public.liga_woche_am(pg_catalog.clock_timestamp());
+  d integer := 0;
   gebucht integer;
 begin
+  -- kronen_stand_sichern sperrt den Stand: Buchungen eines Kontos laufen nacheinander, der Deckel haelt
   st := public.kronen_stand_sichern(uid);
-  neu := greatest(st.boden, 0, st.kronen + nominal);
-  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
-  values (uid, art, schluessel, neu - st.kronen, st.saison)
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
+  values (uid, art, schluessel, 0, wo)
   on conflict on constraint kronen_buchungen_einmal do nothing;
   get diagnostics gebucht = row_count;
-  if gebucht = 0 then
-    return jsonb_build_object('delta', 0, 'kronen', st.kronen, 'stufe', public.kronen_stufe(st.kronen));
+  if gebucht > 0 then
+    if nominal > 0 then
+      nominal := least(nominal, greatest(0, deckel - public.liga_bot_ki_genutzt(uid, wo)));
+    end if;
+    -- auch mit 0 (gedeckelt oder Niederlage): die erste Partie der Woche bringt das Konto in seine Gruppe
+    d := public.liga_buchen(uid, nominal);
+    update public.kronen_buchungen b set delta = d where b.user_id = uid and b.quelle = art and b.ref = schluessel;
   end if;
-  update public.kronen_stand s
-  set kronen = neu, boden = greatest(st.boden, public.kronen_liga_boden(neu)), aktualisiert_am = now()
-  where s.user_id = uid;
-  return jsonb_build_object('delta', neu - st.kronen, 'kronen', neu, 'stufe', public.kronen_stufe(neu));
+  return jsonb_build_object('delta', d, 'kronen', coalesce((public.liga_mein_platz(uid) ->> 'kronen')::integer, 0),
+    'stufe', st.stufe, 'bot_ki_voll', public.liga_bot_ki_genutzt(uid, wo) >= deckel);
 end;
 $$;
 
@@ -670,6 +919,7 @@ end;
 $$;
 
 revoke all on function public.kronen_einfach_buchen(uuid, text, text, text) from public, anon, authenticated;
+revoke all on function public.liga_bot_ki_genutzt(uuid, date) from public, anon, authenticated;
 revoke all on function public.kronen_heute_anzahl(uuid, text) from public, anon, authenticated;
 revoke all on function public.kronen_bot_ergebnis(text, text, integer) from public, anon, authenticated;
 revoke all on function public.kronen_ki_ergebnis(uuid, text) from public, anon, authenticated;
@@ -678,9 +928,10 @@ grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated
 
 -- ---------- Task 6: Start-Liga fuer Bestandsspieler ----------
 -- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI oder Bot): die Elo des Geraets, begrenzt auf
--- 400 bis 2800, wird zum Anfang der Liga ihrer Spielklasse, hoechstens Diamant III (SQL-Gegenstueck zu
--- startKronenAusElo in js/pakete/liga/kronen.js, Zahlen aus kronen_konstanten). Die Elo wird auch die Online-Elo.
--- Antwort { delta, kronen, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_START_VORBEI' } ohne Aenderung.
+-- 400 bis 2800, wird zur Stufe III der Liga ihrer Spielklasse, hoechstens Dame III (SQL-Gegenstueck zu
+-- startStufeAusElo in js/pakete/liga/kronen.js, Zahlen aus kronen_konstanten). Die Elo wird auch die Online-Elo.
+-- Kronen gibt es dafuer keine (die Buchung 'start' mit 0 ist nur der Merker).
+-- Antwort { delta: 0, kronen: 0, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_START_VORBEI' } ohne Aenderung.
 create or replace function public.kronen_start(elo integer)
 returns jsonb
 language plpgsql
@@ -711,15 +962,14 @@ begin
   select count(*)::integer - 1 into klasse
   from jsonb_array_elements_text(konst->'klassen_grenzen') g(grenze)
   where wert >= g.grenze::integer;
-  neu := least(klasse, (konst->>'start_hoechste_liga')::integer)
-         * (konst->>'stufen_je_liga')::integer * (konst->>'stufe_kronen')::integer;
-  insert into public.kronen_buchungen (user_id, quelle, ref, delta, saison)
-  values (uid, 'start', 'start', neu - st.kronen, st.saison)
+  neu := least(klasse, (konst->>'start_hoechste_liga')::integer) * (konst->>'stufen_je_liga')::integer;
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
+  values (uid, 'start', 'start', 0, public.liga_woche_heute())
   on conflict on constraint kronen_buchungen_einmal do nothing;
   update public.kronen_stand s
-  set kronen = neu, boden = public.kronen_liga_boden(neu), elo = wert, start_gesetzt = true, aktualisiert_am = now()
+  set stufe = neu, elo = wert, start_gesetzt = true, aktualisiert_am = now()
   where s.user_id = uid;
-  return jsonb_build_object('delta', neu - st.kronen, 'kronen', neu, 'stufe', public.kronen_stufe(neu));
+  return jsonb_build_object('delta', 0, 'kronen', 0, 'stufe', neu);
 end;
 $$;
 

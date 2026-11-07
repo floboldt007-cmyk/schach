@@ -1013,8 +1013,10 @@ async function testeBrowser(browser) {
     && await seite.evaluate(() => location.hash) === '#bestenliste');
   const reiterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-reiter .seg')].map((s) => s.dataset.wert + ':' + s.textContent.trim()).join());
   const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster .seg')].map((s) => s.dataset.wert + (s.getAttribute('aria-checked') === 'true' ? '*' : '')).join());
-  pruefe('Kopf über hauptKopf, Reiter Ich · Bots · Freunde (Ort bestenliste:reiter), Fenster Woche · Monat · Allzeit (Standard Woche)',
-    await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'ich:Ich,bots:Bots,freunde:Freunde' && fensterIds === 'woche*,monat,allzeit', [reiterIds, fensterIds]);
+  // seit 07.11.2026 Freunde vor Ich (Reihenfolge 8); die Gruppe (Paket liga) fehlt hier (&kern), dann oeffnet Ich
+  pruefe('Kopf über hauptKopf, Reiter Freunde · Ich · Bots (Ort bestenliste:reiter, Standard Ich ohne Paket liga), Fenster Woche · Monat · Allzeit (Standard Woche)',
+    await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'freunde:Freunde,ich:Ich,bots:Bots' && fensterIds === 'woche*,monat,allzeit'
+      && await seite.locator('.bl-screen').getAttribute('data-reiter') === 'ich', [reiterIds, fensterIds]);
   pruefe('Leer: ein ruhiger Satz und „Jetzt spielen“ statt leerer Tabellen, kein leeres Rekordbuch, keine Erklärsätze im Kopf',
     /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-gesamt').innerText())
     && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
@@ -1500,7 +1502,7 @@ async function testeBrowser(browser) {
     await s.waitForFunction(() => window.__huelle && window.__huelle.bereit === true, null, { timeout: 15000 });
     const r = await s.evaluate(() => ({ anzahl: window.__huelle.anzahl, fehler: window.__huelle.fehler,
       reiter: [...document.querySelectorAll('.huelle-ort > .bl-reiter')].map((x) => x.dataset.reiter + (x.hidden ? '' : '*')).join() }));
-    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'ich,bots*,freunde'
+    pruefe('bestenliste:reiter in der Test-Hülle: drei Anbieter, nur Bots gefüllt (Kontext reiter, fenster)', r.anzahl === 3 && r.reiter === 'freunde,ich,bots*'
       && r.fehler.length === 0, r);
     pruefe('Test-Hülle: keine Konsolenfehler', f.length === 0, f.join(' | '));
     await k.close();

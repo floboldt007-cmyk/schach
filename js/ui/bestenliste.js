@@ -6,12 +6,12 @@
 //
 //   zeige(root, params, app) -> { verlasse() }       erst nach freischalten(), sonst undefined
 //   freischalten()                                   nur js/pakete/punkte/index.js, einmal beim Laden
-//   params: { reiter?: 'ich' | 'bots' | ..., fenster?: 'woche' | 'monat' | 'allzeit' }
+//   params: { reiter?: 'gruppe' | 'ich' | 'freunde' | 'bots' | ..., fenster?: 'woche' | 'monat' | 'allzeit' }
 //
 // Aufbau: header.kopf.haupt-kopf (js/ui/seite.js), darunter .bl-rumpf (scrollt) mit .seiten-kopf, der Steuerzeile
 // .bl-steuer (Segment der Reiter aus den Anbietern, Segment der Fenster Woche / Monat / Allzeit, Standard Woche) und dem
 // Behaelter .bl-ort des Orts bestenliste:reiter (Kontext { app, reiter, fenster }). Jeder Anbieter liefert ein
-// section.bl-reiter[data-reiter][data-name] (Reihenfolge: Ich 10 / Bots 20 / Liga 30 / Raetsel 40 / Freunde 50; mit
+// section.bl-reiter[data-reiter][data-name] (Reihenfolge: Gruppe 5 (Paket liga, Standard) / Freunde 8 / Ich 10 / Bots 20; mit
 // data-ohne-fenster blendet der Host das Fenster-Segment aus, solange dieser Reiter gewaehlt ist); ist sein
 // Reiter nicht gewaehlt, eine leere Huelle (hidden), aus der die Reiterzeile entsteht. Wechsel von Reiter oder Fenster
 // fuellt den Ort neu. Ohne Anbieter: eine ruhige Karte .bl-leer-screen. Gemerkt je Geraet (Modul-Einstellungen punkte).
@@ -51,7 +51,7 @@ function zeigeBestenliste(root, params = {}, app) {
 
   let gemerkt = {};
   try { gemerkt = ladeModulEinstellungen('punkte', {}) || {}; } catch (e) { gemerkt = {}; }
-  let reiter = typeof params.reiter === 'string' ? params.reiter : (gemerkt.reiter || 'ich');
+  let reiter = typeof params.reiter === 'string' ? params.reiter : (gemerkt.reiter || 'gruppe');
   let fenster = FENSTER.some((f) => f.id === params.fenster) ? params.fenster : (FENSTER.some((f) => f.id === gemerkt.fenster) ? gemerkt.fenster : 'woche');
   const merke = () => {
     try { speichereModulEinstellungen('punkte', { ...(ladeModulEinstellungen('punkte', {}) || {}), reiter, fenster }); } catch (e) { /* Komfort */ }
@@ -75,9 +75,10 @@ function zeigeBestenliste(root, params = {}, app) {
       gefuellt = { anzahl: 0, verlasse() {} };
     }
     const alle = [...ort.querySelectorAll(':scope > [data-reiter]')];
-    // gewaehlter Reiter nicht angeboten: der erste, und neu fuellen (dann liefert er seinen Inhalt)
+    // gewaehlter Reiter nicht angeboten (z. B. Gruppe ohne Paket liga): Ich, sonst der erste, und neu fuellen (dann
+    // liefert er seinen Inhalt)
     if (alle.length && !alle.some((x) => x.dataset.reiter === reiter)) {
-      reiter = alle[0].dataset.reiter;
+      reiter = (alle.find((x) => x.dataset.reiter === 'ich') || alle[0]).dataset.reiter;
       fuelleOrt({ erst });
       return;
     }

@@ -7,8 +7,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
-  STUFE_KRONEN, STUFEN_JE_LIGA, STUFEN_ANZAHL, KRONEN, BOT_TAGESGRENZE, KI_TAGESGRENZE, KI_MINDESTDAUER_S,
-  SAISON_TAGE, RUECKSTUFUNG_STUFEN, ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE, START_ELO_GRENZEN, LIGEN,
+  STUFEN_JE_LIGA, STUFEN_ANZAHL, KRONEN, BOT_TAGESGRENZE, KI_TAGESGRENZE, KI_MINDESTDAUER_S,
+  ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE, START_ELO_GRENZEN, START_HOECHSTE_LIGA, LIGEN,
+  GRUPPE_GROESSE, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE, BELOHNUNG, BOT_ZIEL_MAX, BOT_KI_WOCHEN_MAX,
 } from '../js/pakete/liga/kronen.js';
 import { KLASSEN_GRENZEN } from '../js/pakete/liga/wertung.js';
 
@@ -21,7 +22,7 @@ function pruefe(name, bedingung, info) {
   if (bedingung) { ok++; console.log('ok     ' + name); } else console.log('FEHLER ' + name + (info !== undefined ? '  -> ' + JSON.stringify(info) : ''));
 }
 
-const ohneKommentare = (t) => t.split('\n').map((z) => z.replace(/--.*$/, '')).join('\n');
+const ohneKommentare = (t) => t.replace(/\r/g, '').split('\n').map((z) => z.replace(/--.*$/, '')).join('\n');
 const sql = ohneKommentare(lies('supabase/kronen-schema.sql'));
 const test = ohneKommentare(lies('supabase/kronen-rls-test.sql'));
 const zurueck = ohneKommentare(lies('supabase/kronen-zurueck.sql'));
@@ -36,37 +37,58 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const k = fn('kronen_konstanten')?.rumpf || '';
   const zahl = (schluessel) => Number((k.match(new RegExp(`'${schluessel}',\\s*(-?\\d+)`)) || [])[1]);
   pruefe('kronen_konstanten vorhanden', !!k);
-  pruefe('Stufen gleich (Kronen je Stufe, Stufen je Liga, Anzahl)',
-    zahl('stufe_kronen') === STUFE_KRONEN && zahl('stufen_je_liga') === STUFEN_JE_LIGA && zahl('stufen_anzahl') === STUFEN_ANZAHL,
-    [zahl('stufe_kronen'), zahl('stufen_je_liga'), zahl('stufen_anzahl')]);
+  pruefe('Stufen gleich (Stufen je Liga, Anzahl)',
+    zahl('stufen_je_liga') === STUFEN_JE_LIGA && zahl('stufen_anzahl') === STUFEN_ANZAHL,
+    [zahl('stufen_je_liga'), zahl('stufen_anzahl')]);
   for (const quelle of ['online', 'ki', 'bot']) {
     const zeile = (k.match(new RegExp(`'${quelle}',\\s*jsonb_build_object\\(([^)]*)\\)`)) || [])[1] || '';
     const wert = (e) => Number((zeile.match(new RegExp(`'${e}',\\s*(-?\\d+)`)) || [])[1]);
     pruefe(`Kronen fuer ${quelle} gleich`, ['sieg', 'remis', 'niederlage'].every((e) => wert(e) === KRONEN[quelle][e]),
       { sql: zeile.trim(), js: KRONEN[quelle] });
   }
-  pruefe('Tagesgrenzen, Mindestdauer, Saisonlaenge und Rueckstufung gleich',
+  pruefe('Tagesgrenzen und Mindestdauer gleich',
     zahl('bot_tagesgrenze') === BOT_TAGESGRENZE && zahl('ki_tagesgrenze') === KI_TAGESGRENZE
-      && zahl('ki_mindestdauer_s') === KI_MINDESTDAUER_S && zahl('saison_tage') === SAISON_TAGE
-      && zahl('rueckstufung_stufen') === RUECKSTUFUNG_STUFEN);
+      && zahl('ki_mindestdauer_s') === KI_MINDESTDAUER_S);
+  pruefe('Saison, Kronen je Stufe und Rueckstufung entfallen (Wochen-Gruppen 07.11.2026)',
+    !/'(saison_tage|stufe_kronen|rueckstufung_stufen|saison_start)'/.test(k));
+  pruefe('Wochen-Gruppe gleich (30 Plaetze, 5 auf, 5 ab)',
+    zahl('gruppe_groesse') === GRUPPE_GROESSE && zahl('aufstieg_plaetze') === AUFSTIEG_PLAETZE
+      && zahl('abstieg_plaetze') === ABSTIEG_PLAETZE,
+    [zahl('gruppe_groesse'), zahl('aufstieg_plaetze'), zahl('abstieg_plaetze')]);
+  const belohnung = [...((k.match(/'belohnung',\s*jsonb_build_array\(([\s\S]*?)\n\s*\),/) || [])[1] || '')
+    .matchAll(/'von', (\d+), 'bis', (\d+), 'art', '([a-z]+)', 'menge', (\d+)/g)]
+    .map((m) => ({ von: Number(m[1]), bis: Number(m[2]), art: m[3], menge: Number(m[4]) }));
+  pruefe('Belohnung je Platz gleich', JSON.stringify(belohnung) === JSON.stringify(BELOHNUNG), belohnung);
+  const botZiel = ((k.match(/'bot_ziel_max',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
+  pruefe('Bot-Wochenziel je Liga gleich', JSON.stringify(botZiel) === JSON.stringify(BOT_ZIEL_MAX) && botZiel.length === LIGEN.length, botZiel);
+  pruefe('Deckel Bot- und KI-Kronen je Woche gleich (300)', zahl('bot_ki_wochen_max') === BOT_KI_WOCHEN_MAX && BOT_KI_WOCHEN_MAX === 300,
+    zahl('bot_ki_wochen_max'));
   pruefe('Schutz gegen Absprache gleich (Mindest-Halbzuege 4, Paar-Grenze 3)',
     zahl('online_mindest_halbzuege') === ONLINE_MINDEST_HALBZUEGE && zahl('paar_tagesgrenze') === PAAR_TAGESGRENZE
       && ONLINE_MINDEST_HALBZUEGE === 4 && PAAR_TAGESGRENZE === 3,
     [zahl('online_mindest_halbzuege'), zahl('paar_tagesgrenze')]);
-  // die Rechenfunktionen benutzen dieselben Zahlen
-  pruefe('kronen_stufe rechnet mit 100 je Stufe und hoechstens Stufe 17',
-    /least\(17,\s*kronen \/ 100\)/.test(fn('kronen_stufe')?.rumpf || '') && STUFEN_ANZAHL - 1 === 17 && STUFE_KRONEN === 100);
-  pruefe('kronen_liga_boden: 3 Stufen je Liga, 300 Kronen je Liga',
-    /\/ 3\) \* 300/.test(fn('kronen_liga_boden')?.rumpf || '') && STUFEN_JE_LIGA * STUFE_KRONEN === 300);
-  pruefe('kronen_rueckstufen: 3 Stufen tiefer', /- 3\) \* 100/.test(fn('kronen_rueckstufen')?.rumpf || '') && RUECKSTUFUNG_STUFEN === 3);
-  pruefe('Saisonlaenge 28 in kronen_saison_am', /\/ 28 \+ 1/.test(fn('kronen_saison_am')?.rumpf || ''));
+  // die Rechenfunktionen benutzen dieselben Zahlen und Raender wie js/pakete/liga/kronen.js (zoneVon)
+  const abr = fn('liga_abrechnen')?.rumpf || '';
+  pruefe('liga_abrechnen: Platz bis aufstieg_plaetze eine Stufe hoch (hoechstens 17), die letzten abstieg_plaetze runter (nie unter 0)',
+    /when r\.platz <= auf then least\(17, g\.stufe \+ 1\)/.test(abr) && /when r\.platz > groesse - ab then greatest\(0, g\.stufe - 1\)/.test(abr)
+      && STUFEN_ANZAHL - 1 === 17);
+  pruefe('liga_abrechnen: nur fruehere Wochen, einmal (Sperre und abgerechnet), Bots zaehlen beim Platz mit',
+    /x\.woche < heute/.test(abr) && /pg_advisory_xact_lock/.test(abr) && /set abgerechnet = true/.test(abr)
+      && /liga_rangliste\(g\.id, true\) l where not l\.ki/.test(abr));
+  pruefe('Woche Montag bis Sonntag in Europe/Berlin', /date_trunc\('week', t at time zone 'Europe\/Berlin'\)/.test(fn('liga_woche_am')?.rumpf || ''));
+  const lb = fn('liga_buchen')?.rumpf || '';
+  pruefe('liga_buchen: Beitritt unter Sperre je Woche und Stufe, hoechstens gruppe_groesse Menschen, Wochen-Kronen nie unter 0',
+    /pg_advisory_xact_lock/.test(lb) && /< \(public\.kronen_konstanten\(\) ->> 'gruppe_groesse'\)::integer/.test(lb)
+      && /greatest\(0, m\.kronen \+ nominal\)/.test(lb));
+  pruefe('Stufen erst mit kronen_stand_sichern abgerechnet', /perform public\.liga_abrechnen\(\)/.test(fn('kronen_stand_sichern')?.rumpf || ''));
 }
 
 // ---------- Rechte und RLS ----------
 {
   const TABELLEN = [...sql.matchAll(/create table if not exists public\.([a-z_]+)/g)].map((m) => m[1]);
-  pruefe('alle Tabellen erfasst (Kronen und Gegnersuche)', ['kronen_schalter', 'kronen_stand', 'kronen_buchungen', 'kronen_archiv',
-    'suche_warteschlange', 'suche_ki_belege'].every((t) => TABELLEN.includes(t)), TABELLEN);
+  pruefe('alle Tabellen erfasst (Kronen, Wochen-Gruppen und Gegnersuche)', ['kronen_schalter', 'kronen_stand', 'kronen_buchungen',
+    'liga_gruppen', 'liga_mitglieder', 'liga_belohnungen', 'suche_warteschlange', 'suche_ki_belege'].every((t) => TABELLEN.includes(t))
+    && !TABELLEN.includes('kronen_archiv'), TABELLEN);
   pruefe('RLS an allen Kronen-Tabellen', TABELLEN.every((t) => new RegExp(`alter table public\\.${t} enable row level security`).test(sql)));
   pruefe('keine Policies (Nutzer sehen keine Zeile direkt)', !/create policy/i.test(sql));
   pruefe('Tabellenrechte fuer anon und authenticated entzogen',
@@ -76,7 +98,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const ohneRevoke = sigs.filter((s) => !sql.includes(`revoke all on function public.${s} from public, anon, authenticated`));
   pruefe(`jede der ${sigs.length} Funktionen ist zuerst fuer alle gesperrt`, ohneRevoke.length === 0, ohneRevoke);
   const grants = [...sql.matchAll(/grant execute on function public\.([a-z_]+)\(([^)]*)\) to ([a-z_]+)/g)].map((m) => `${m[1]}->${m[3]}`);
-  const ERLAUBT = ['kronen_mein_stand->authenticated', 'kronen_konstanten->authenticated',
+  const ERLAUBT = ['kronen_mein_stand->authenticated', 'liga_meine_gruppe->authenticated', 'kronen_konstanten->authenticated',
     'online_suche_start->authenticated', 'online_suche_stand->authenticated', 'online_suche_ende->authenticated',
     'kronen_bot_ergebnis->authenticated', 'kronen_ki_ergebnis->authenticated', 'kronen_start->authenticated'];
   pruefe('nur freigegebene Funktionen fuer Nutzer, nie fuer anon', grants.every((g) => ERLAUBT.includes(g)) && !grants.some((g) => g.endsWith('anon')), grants);
@@ -109,7 +131,8 @@ const fn = (name) => funktionen.find((f) => f.name === name);
       && /unique \(user_id, quelle, ref\)/.test(sql));
   pruefe('Stand aendert sich nur bei neuer Buchung', /get diagnostics gebucht = row_count/.test(buchen) && /if gebucht = 0 then\s*return;/.test(buchen));
   pruefe('Online-Kronen kommen aus kronen_konstanten', /kronen_konstanten\(\) #>> array\['kronen', 'online'/.test(buchen));
-  pruefe('Liga-Boden bei Online-Niederlage beachtet', /greatest\(st\.boden, 0, st\.kronen \+ nominal\)/.test(buchen));
+  pruefe('Online-Kronen gehen in die Wochen-Gruppe (Beleg mit der tatsaechlichen Aenderung)',
+    /set delta = public\.liga_buchen\(uid, nominal\)/.test(buchen) && !/boden/.test(buchen));
   pruefe('Elo: K=40 unter 15 Partien, sonst 32, Grenzen 100 bis 4000',
     /st\.elo_n < 15 then 40 else 32/.test(buchen) && /least\(4000, greatest\(100,/.test(buchen));
 }
@@ -149,9 +172,13 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     /b\.user_id = uid and not b\.eingeloest and b\.erstellt_am > now\(\) - interval '6 hours'/.test(ki)
       && /'ki_mindestdauer_s'/.test(ki) && /'ki_tagesgrenze'/.test(ki));
   const einfach = fn('kronen_einfach_buchen')?.rumpf || '';
-  pruefe('Bot/KI-Buchung: einmal je ref, Liga-Boden, Kronen aus kronen_konstanten',
-    /on conflict on constraint kronen_buchungen_einmal do nothing/.test(einfach) && /greatest\(st\.boden, 0, st\.kronen \+ nominal\)/.test(einfach)
-      && /kronen_konstanten\(\) #>> array\['kronen', art, ergebnis\]/.test(einfach));
+  pruefe('Bot/KI-Buchung: einmal je ref, in die Wochen-Gruppe, Kronen aus kronen_konstanten',
+    /on conflict on constraint kronen_buchungen_einmal do nothing/.test(einfach) && /d := public\.liga_buchen\(uid, nominal\)/.test(einfach)
+      && /konst #>> array\['kronen', art, ergebnis\]/.test(einfach));
+  pruefe('Schummel-Schutz: Bot- und KI-Gewinne serverseitig auf bot_ki_wochen_max je Woche gedeckelt',
+    /nominal := least\(nominal, greatest\(0, deckel - public\.liga_bot_ki_genutzt\(uid, wo\)\)\)/.test(einfach)
+      && /deckel integer := \(konst ->> 'bot_ki_wochen_max'\)::integer/.test(einfach)
+      && /b\.quelle in \('bot', 'ki'\) and b\.woche = wo/.test(fn('liga_bot_ki_genutzt')?.rumpf || ''));
   pruefe('Tagesgrenzen zaehlen ab Mitternacht Europe/Berlin', /kronen_heute\(\)::timestamp at time zone 'Europe\/Berlin'/.test(fn('kronen_heute_anzahl')?.rumpf || ''));
   pruefe('RLS-Test ruft Bot- und KI-Ergebnis auf', test.includes('public.kronen_bot_ergebnis(') && test.includes('public.kronen_ki_ergebnis('));
 }
@@ -163,23 +190,28 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const grenzen = ((k.match(/'klassen_grenzen',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
   pruefe('Start-Liga: Klassengrenzen, Elo-Grenzen und hoechste Start-Liga gleich',
     JSON.stringify(grenzen) === JSON.stringify(KLASSEN_GRENZEN) && zahl('start_elo_min') === START_ELO_GRENZEN[0]
-      && zahl('start_elo_max') === START_ELO_GRENZEN[1] && zahl('start_hoechste_liga') === LIGEN.indexOf('diamant'),
+      && zahl('start_elo_max') === START_ELO_GRENZEN[1] && zahl('start_hoechste_liga') === START_HOECHSTE_LIGA
+      && START_HOECHSTE_LIGA === LIGEN.indexOf('laeufer'),
     { sql: [grenzen, zahl('start_elo_min'), zahl('start_elo_max'), zahl('start_hoechste_liga')], js: [KLASSEN_GRENZEN, START_ELO_GRENZEN] });
   const start = fn('kronen_start')?.rumpf || '';
   pruefe('kronen_start: nur ohne gesetzten Start und ohne Partie mit Kronen, sonst KRONEN_START_VORBEI',
     /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
       && start.indexOf("'KRONEN_START_VORBEI'") < start.indexOf('insert into public.kronen_buchungen'));
-  pruefe('kronen_start: Buchung start/start, Stand mit Boden, Elo und start_gesetzt',
-    /values \(uid, 'start', 'start', neu - st\.kronen, st\.saison\)/.test(start)
-      && /boden = public\.kronen_liga_boden\(neu\), elo = wert, start_gesetzt = true/.test(start));
+  pruefe('kronen_start: Beleg start/start ohne Kronen, Stufe III der Liga, Elo und start_gesetzt',
+    /values \(uid, 'start', 'start', 0, public\.liga_woche_heute\(\)\)/.test(start)
+      && /neu := least\(klasse, \(konst->>'start_hoechste_liga'\)::integer\) \* \(konst->>'stufen_je_liga'\)::integer/.test(start)
+      && /set stufe = neu, elo = wert, start_gesetzt = true/.test(start));
   pruefe('RLS-Test ruft kronen_start auf', test.includes('public.kronen_start('));
 }
 
 // ---------- RLS-Test deckt ab ----------
 {
-  const ABSCHNITTE = ['Online-Sieg', 'Nur einmal', 'Liga-Boden', 'Abgebrochen', 'Ungewertet', 'Remis'];
-  pruefe('RLS-Test hat die Online-Abschnitte', ABSCHNITTE.every((a) => test.includes(a) || lies('supabase/kronen-rls-test.sql').includes(a)));
-  const genutzt = ['kronen_mein_stand', 'kronen_konstanten', 'kronen_stand_sichern', 'kronen_online_buchen'];
+  const ABSCHNITTE = ['Online-Sieg', 'Nur einmal', 'Wochen-Kronen nie unter 0', 'Abgebrochen', 'Ungewertet', 'Remis',
+    'Wochengrenze', 'Wochen-Gruppen', 'Wochen-Abrechnung'];
+  const roh = lies('supabase/kronen-rls-test.sql');
+  pruefe('RLS-Test hat die Online- und Liga-Abschnitte', ABSCHNITTE.every((a) => roh.includes(a)), ABSCHNITTE.filter((a) => !roh.includes(a)));
+  const genutzt = ['kronen_mein_stand', 'kronen_konstanten', 'kronen_stand_sichern', 'kronen_online_buchen',
+    'liga_meine_gruppe', 'liga_abrechnen', 'liga_buchen', 'liga_bots', 'liga_rangliste', 'liga_woche_am'];
   pruefe('RLS-Test ruft die Funktionen auf', genutzt.every((f) => test.includes(`public.${f}(`)), genutzt.filter((f) => !test.includes(`public.${f}(`)));
   pruefe('RLS-Test rollt zurueck', /\brollback;\s*$/.test(test.trimEnd() + '\n'));
   pruefe('RLS-Test prueft gesperrte Wege mit insufficient_privilege', /exception when insufficient_privilege/.test(test));
@@ -191,11 +223,11 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   // jede Kronen-Tabelle mit Bezug auf ein Konto steht in der Auskunft, nur die eigenen Zeilen
   const mitKonto = [...sql.matchAll(/create table if not exists public\.([a-z_]+) \(([\s\S]*?)\n\);/g)]
     .filter((m) => /user_id uuid[^,]*references auth\.users/.test(m[2])).map((m) => m[1]);
-  const fehlt = mitKonto.filter((t) => !new RegExp(`from public\\.${t} [a-z] where [a-z]\\.user_id = \\$1`).test(daten));
-  pruefe(`meine_daten zeigt alle ${mitKonto.length} Kronen-Tabellen mit Konto (nur eigene Zeilen)`, mitKonto.length === 5 && fehlt.length === 0, { mitKonto, fehlt });
+  const fehlt = mitKonto.filter((t) => !new RegExp(`from public\\.${t} ([a-z])( join public\\.[a-z_]+ [a-z] on [a-z.]+ = [a-z.]+)? where \\1\\.user_id = \\$1`).test(daten));
+  pruefe(`meine_daten zeigt alle ${mitKonto.length} Kronen-Tabellen mit Konto (nur eigene Zeilen)`, mitKonto.length === 6 && fehlt.length === 0, { mitKonto, fehlt });
   pruefe('meine_daten: Schluessel kronen immer da, Abschnitt nur mit eingespieltem kronen-schema.sql',
     /to_regclass\('public\.kronen_stand'\)/.test(daten) && /'kronen', kronen,/.test(daten)
-      && /kronen jsonb := jsonb_build_object\('stand', null, 'buchungen', '\[\]'::jsonb, 'archiv', '\[\]'::jsonb, 'suche', null,\s*'ki_belege', '\[\]'::jsonb\)/.test(daten));
+      && /kronen jsonb := jsonb_build_object\('stand', null, 'buchungen', '\[\]'::jsonb, 'gruppen', '\[\]'::jsonb,\s*'belohnungen', '\[\]'::jsonb, 'suche', null, 'ki_belege', '\[\]'::jsonb\)/.test(daten));
   pruefe('meine_daten: Tageszaehler ohne Personenbezug nicht in der Auskunft', !/zaehler_tag/.test(daten));
   pruefe('daten-rls-test prueft den Schluessel kronen', /d -> 'kronen'/.test(lies('supabase/daten-rls-test.sql')));
   const a = lies('supabase/ANLEITUNG.md');

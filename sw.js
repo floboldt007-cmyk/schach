@@ -7,8 +7,8 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 248;
-const STAND = '729d34960c95';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 249;
+const STAND = '253f497203b3';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
@@ -95,6 +95,13 @@ const DATEIEN = [
   'js/pakete/liga/index.js',
   'js/pakete/liga/wertung.js',
   'js/pakete/liga/kronen.js',
+  'js/pakete/liga/gruppe.js',
+  'assets/liga/bauer.svg',
+  'assets/liga/springer.svg',
+  'assets/liga/laeufer.svg',
+  'assets/liga/turm.svg',
+  'assets/liga/dame.svg',
+  'assets/liga/koenig.svg',
   // Stufe 2: Spielsysteme (P1 bis P3) und Welle A
   'css/pakete/funken.css',
   'js/pakete/funken/ansicht.js',

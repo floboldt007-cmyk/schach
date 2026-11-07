@@ -1,10 +1,10 @@
 -- Rueckweg fuer supabase/kronen-schema.sql (Liga mit Kronen, Etappe B).
--- ACHTUNG: Das entfernt nur die STRUKTUR. Alle Kronen-Staende, Buchungen, das Saison-Archiv, die Suchwarteschlange,
+-- ACHTUNG: Das entfernt nur die STRUKTUR. Alle Kronen-Staende, Buchungen, Wochen-Gruppen, gemerkten Belohnungen, die Suchwarteschlange,
 -- die KI-Belege und die Tageszaehler sind danach weg; nichts davon kommt durch erneutes Einspielen zurueck.
 -- Vorher sichern, wenn es echte Daten gibt (im SQL Editor, Datum einsetzen):
 --   create table public._backup_kronen_stand_JJJJMMTT as select * from public.kronen_stand;
 --   create table public._backup_kronen_buchungen_JJJJMMTT as select * from public.kronen_buchungen;
---   create table public._backup_kronen_archiv_JJJJMMTT as select * from public.kronen_archiv;
+--   create table public._backup_liga_belohnungen_JJJJMMTT as select * from public.liga_belohnungen;
 -- Die Sicherungstabellen haben keine Rechte fuer anon/authenticated (revoke all ... from anon, authenticated, public)
 -- und werden nach 30 Tagen von Hand geloescht.
 --
@@ -32,14 +32,25 @@ drop function if exists public.online_suche_partie(uuid);
 drop function if exists public.kronen_bot_ergebnis(text, text, integer);
 drop function if exists public.kronen_ki_ergebnis(uuid, text);
 drop function if exists public.kronen_einfach_buchen(uuid, text, text, text);
+drop function if exists public.liga_bot_ki_genutzt(uuid, date);
 drop function if exists public.kronen_heute_anzahl(uuid, text);
 drop function if exists public.kronen_start(integer);
 drop function if exists public.zaehler_erhoehe(text, integer);
 drop function if exists public.zaehler_an();
 
--- Task 2
+-- Task 2 und Wochen-Gruppen (07.11.2026); die Saison-Funktionen der ersten Fassung mit, falls sie je eingespielt war
+drop function if exists public.liga_meine_gruppe();
 drop function if exists public.kronen_mein_stand();
+drop function if exists public.liga_name(uuid);
+drop function if exists public.liga_mein_platz(uuid);
+drop function if exists public.liga_buchen(uuid, integer);
 drop function if exists public.kronen_stand_sichern(uuid);
+drop function if exists public.liga_abrechnen();
+drop function if exists public.liga_rangliste(bigint, boolean);
+drop function if exists public.liga_bots(bigint, boolean);
+drop function if exists public.liga_wochen_anteil(date);
+drop function if exists public.liga_woche_heute();
+drop function if exists public.liga_woche_am(timestamptz);
 drop function if exists public.kronen_rueckstufen(integer);
 drop function if exists public.kronen_liga_boden(integer);
 drop function if exists public.kronen_stufe(integer);
@@ -52,6 +63,9 @@ drop table if exists public.zaehler_tag;
 drop table if exists public.suche_ki_belege;
 drop table if exists public.suche_warteschlange;
 drop table if exists public.kronen_buchungen;
+drop table if exists public.liga_belohnungen;
+drop table if exists public.liga_mitglieder;
+drop table if exists public.liga_gruppen;
 drop table if exists public.kronen_archiv;
 drop table if exists public.kronen_stand;
 drop table if exists public.kronen_schalter;
