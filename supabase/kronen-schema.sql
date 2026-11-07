@@ -207,7 +207,7 @@ as $$
   select s.nr,
     (array['Ada', 'Bela', 'Cleo', 'Dario', 'Emil', 'Fiona', 'Greta', 'Hugo', 'Ida', 'Jonas', 'Kira', 'Luca', 'Mila',
       'Nils', 'Olga', 'Paul', 'Quinn', 'Rosa', 'Sven', 'Tilda', 'Udo', 'Vera', 'Wim', 'Xenia', 'Yuri', 'Zora', 'Arne',
-      'Bruno', 'Carla', 'Dina'])[1 + ((g.saat + s.nr * 7) % 30)],
+      'Bruno', 'Carla', 'Dina'])[1 + ((g.saat::bigint + s.nr * 7) % 30)::integer],
     round((case when voll then 1 else public.liga_wochen_anteil(g.woche) end)
       * (abs(pg_catalog.hashtext(g.saat::text || ':' || s.nr::text)::bigint)
          % (((k.w -> 'bot_ziel_max') ->> (g.stufe / 3))::integer + 1)))::integer
@@ -315,18 +315,21 @@ security definer
 set search_path = ''
 as $$
 declare
-  wo date := public.liga_woche_heute();
+  -- Uhrzeit des Aufrufs, nicht des Transaktionsbeginns: eine Partie, die Sonntag 23:59 beginnt und Montag endet,
+  -- bucht in die neue Woche (die alte ist dann womoeglich schon abgerechnet)
+  wo date := public.liga_woche_am(pg_catalog.clock_timestamp());
   st public.kronen_stand;
   m public.liga_mitglieder;
   gid bigint;
   neu integer;
+  fertig boolean;
 begin
   select * into st from public.kronen_stand k where k.user_id = uid;
   select * into m from public.liga_mitglieder x where x.user_id = uid and x.woche = wo for update;
   if m.gruppe is null then
     perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('liga-gruppe:' || wo::text || ':' || st.stufe::text));
     select g.id into gid from public.liga_gruppen g
-    where g.woche = wo and g.stufe = st.stufe
+    where g.woche = wo and g.stufe = st.stufe and not g.abgerechnet
       and (select count(*) from public.liga_mitglieder x where x.gruppe = g.id)
           < (public.kronen_konstanten() ->> 'gruppe_groesse')::integer
     order by g.id limit 1;
@@ -334,6 +337,11 @@ begin
       insert into public.liga_gruppen (woche, stufe) values (wo, st.stufe) returning id into gid;
     end if;
     insert into public.liga_mitglieder (gruppe, user_id, woche) values (gid, uid, wo) returning * into m;
+  end if;
+  -- Gemeinsame Sperre gegen liga_abrechnen (die sperrt die Gruppe for update): nie in eine schon abgerechnete Gruppe
+  select g.abgerechnet into fertig from public.liga_gruppen g where g.id = m.gruppe for share;
+  if fertig then
+    return 0;
   end if;
   neu := greatest(0, m.kronen + nominal);
   update public.liga_mitglieder x set kronen = neu where x.gruppe = m.gruppe and x.user_id = uid;
@@ -548,11 +556,22 @@ begin
   if heute_paar >= (konst->>'paar_tagesgrenze')::integer then
     return null;
   end if;
-  elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
-  elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
-  punkte_w := case new.ergebnis when '1-0' then 1 when '0-1' then 0 else 0.5 end;
-  perform public.kronen_online_buchen(new.weiss, new.id, punkte_w, elo_s);
-  perform public.kronen_online_buchen(new.schwarz, new.id, 1 - punkte_w, elo_w);
+  -- Kronen sind Beiwerk: ein Fehler (auch ein Deadlock) nimmt nur die Buchung zurueck, nie das Partieende.
+  -- Staende immer in fester Reihenfolge (kleinere ID zuerst) sperren, damit sich Partien nicht gegenseitig blockieren.
+  begin
+    if new.weiss < new.schwarz then
+      elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
+      elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
+    else
+      elo_s := (public.kronen_stand_sichern(new.schwarz)).elo;
+      elo_w := (public.kronen_stand_sichern(new.weiss)).elo;
+    end if;
+    punkte_w := case new.ergebnis when '1-0' then 1 when '0-1' then 0 else 0.5 end;
+    perform public.kronen_online_buchen(new.weiss, new.id, punkte_w, elo_s);
+    perform public.kronen_online_buchen(new.schwarz, new.id, 1 - punkte_w, elo_w);
+  exception when others then
+    raise warning 'kronen_bei_partie_ende %: %', new.id, sqlerrm;
+  end;
   return null;
 end;
 $$;

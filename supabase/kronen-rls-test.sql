@@ -1257,4 +1257,17 @@ end;
 $$;
 reset role;
 
+-- Groesste saat: die Bot-Namen rechnen ohne Ueberlauf (sonst stuende jede Kronen-Funktion still)
+do $$
+declare
+  gid bigint;
+begin
+  insert into public.liga_gruppen (woche, stufe, saat) values (public.liga_woche_heute() + 7, 5, 2147483646)
+  returning id into gid;
+  if (select count(*) from public.liga_bots(gid, true) b where b.name is not null) <> 30 then
+    raise exception 'FEHLER: Bots bei groesster saat falsch';
+  end if;
+end;
+$$;
+
 rollback;
