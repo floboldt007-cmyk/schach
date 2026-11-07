@@ -1,7 +1,7 @@
 // Screen "lobby" (Paket lobby, Flo 01.11.2026): die Online-Lobby als Vorschau im Labor. Oben der Umschalter Welten | Online
 // (wie auf der Startseite), darunter "Schnell eine Partie" mit Bedenkzeiten (Blitz, Schnellschach, Klassisch), Gewertet
 // oder Freundschaft und "Gegner suchen"; dann die eigenen Wertungen (geschaetzt), die Online-Liga (Beispiel-Tabelle) und
-// weitere Spielarten (Gegen Freunde echt, Turniere und Raetsel-Duell bald). Die Gegnersuche zeigt den Radar und endet
+// weitere Spielarten (Gegen Freunde und Raetsel-Duell echt, Turniere bald). Die Gegnersuche zeigt den Radar und endet
 // ehrlich mit einem Bot in passender Staerke und derselben Uhr (echte Partie). params: { zeit } (z. B. '3+2').
 // Nur im Labor (js/labor.js laborFrei); sonst still zur Arena wie ein fehlender Paket-Screen.
 //
@@ -86,7 +86,7 @@ export function zeige(root, params, app) {
         <div class="lb-mehr-liste">
           <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="online">${icon('person')}<span><b>${esc(L('freunde.titel'))}</b><small>${esc(L('freunde.text'))}</small></span>${icon('vor')}</button>
           <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="turniere" disabled>${icon('pokal')}<span><b>${esc(L('turniere.titel'))}</b><small>${esc(L('turniere.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
-          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell" disabled>${icon('ziel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span><span class="lb-bald">${esc(L('bald'))}</span></button>
+          <button type="button" class="lb-karte lb-modus-karte dr" data-ziel="duell">${icon('ziel')}<span><b>${esc(L('duell.titel'))}</b><small>${esc(L('duell.text'))}</small></span>${icon('vor')}</button>
         </div>
       </section>
     </div>`;
@@ -127,6 +127,8 @@ export function zeige(root, params, app) {
   s.querySelector('.lb-mehr').addEventListener('click', (e) => {
     const k = e.target.closest('.lb-modus-karte');
     if (k && !k.disabled && k.dataset.ziel === 'online') app.gehe('online');
+    // Etappe 5: Raetsel-Duell (eigener Screen js/ui/raetsel-duell.js)
+    if (k && !k.disabled && k.dataset.ziel === 'duell') app.gehe('raetsel-duell');
   });
 
   // ---------- Gegnersuche (Vorschau) ----------

@@ -173,8 +173,8 @@ async function browserTeil() {
       pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), Liga mit dir und Beispiel-Schild',
         lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
         && lobby.liga === 8 && lobby.du && lobby.beispiel === 'Beispiel', lobby);
-      pruefe('Lobby: Gegen Freunde offen, Turniere und Raetsel-Duell bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
-        lobby.mehr.join() === 'online+,turniere-,duell-' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
+      pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
+        lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
       await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
       // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
       await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();

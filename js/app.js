@@ -94,12 +94,14 @@ const PAKETE = erweiterungen.PAKETE;
 const REITER = erweiterungen.REITER;
 
 const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen', 'training', 'start', 'online',
-  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby', 'schule'];
+  'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby',
+  'raetsel-duell', 'schule'];
 const TITEL = {
   heim: 'Start', arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',
+  'raetsel-duell': 'Rätsel-Duell',
 };
 // Englische Version: TITEL bleibt die deutsche Quelle (gleich js/sprachen/rahmen.js 'titel.<screen>'); gezeigt wird
 // titelVon(name) = t('rahmen.titel.<screen>') beim Zeichnen, null fuer einen unbekannten Screen
@@ -109,7 +111,7 @@ function titelVon(name) {
 // Screens aus Paketen (Runde 4, W0+a): fehlt die Datei, geht es ohne Hinweis zur Arena. Premium-Umbau U2: 'training' ist
 // Kern-Screen (Huelle fuer training:karten) und steht deshalb nicht mehr hier.
 const PAKET_SCREENS = new Set(['start', 'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle',
-  'werkstatt', 'lobby', 'schule']);
+  'werkstatt', 'lobby', 'raetsel-duell', 'schule']);
 const TEST = typeof location !== 'undefined' && /[?&]test\b/.test(location.search);
 // Texte aus den Woerterbuechern in HTML einsetzen
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -385,7 +387,7 @@ const REITER_FEST = new Set(['heim', 'arena']);
 // fruehere Reiter: im Testmodus (?reiter=training oder verlauf) schalten sie nur die Leiste ein, ohne eigenen Reiter
 const REITER_FRUEHER = new Set(['training', 'verlauf']);
 // Screens, die zu einem Reiter gehoeren (dort ist die Leiste sichtbar, wenn es sie gibt); verlauf: reiterVon()
-const REITER_VON = { heim: 'heim', arena: 'arena', lobby: 'heim', training: 'heim', raetsel: 'heim', lernen: 'heim', bestenliste: 'bestenliste',
+const REITER_VON = { heim: 'heim', arena: 'arena', lobby: 'heim', 'raetsel-duell': 'heim', training: 'heim', raetsel: 'heim', lernen: 'heim', bestenliste: 'bestenliste',
   ich: 'ich', werkstatt: 'ich' };
 // Querformat ab 1021 px (iPad quer, PC): Seitenleiste links (Entwurf ipad-pc-v2 .nav), sonst schwebt sie unten (.dock)
 const OBEN_MQ = '(min-width: 1021px) and (orientation: landscape)';
@@ -576,6 +578,8 @@ let tiefe = 0;         // Anzahl eigener Eintraege im Browser-Verlauf vor dem ak
 
 function hashFuer(name, params) {
   if (name === 'online' && params?.partieId) return '#online/partie/' + encodeURIComponent(params.partieId);
+  // Raetsel-Duell per Freundes-Link: #raetsel-duell/CODE (Etappe 5)
+  if (name === 'raetsel-duell' && typeof params?.code === 'string' && /^[A-Z0-9]{6}$/.test(params.code)) return '#raetsel-duell/' + params.code;
   if (name === 'analyse' && params && params.partieId) return '#analyse/' + encodeURIComponent(params.partieId);
   // Einstellungen auf dem Handy: ein Bereich als eigene Seite (js/ui/einstellungen.js), Zurueck fuehrt zur Liste
   if (name === 'einstellungen' && params && typeof params.seite === 'string' && /^[a-z0-9-]{1,24}$/.test(params.seite)) return '#einstellungen/' + params.seite;
@@ -586,6 +590,7 @@ function ausHash(hash) {
   const h = String(hash || '').replace(/^#\/?/, '');
   const [name, rest] = h.split('/');
   if (name === 'online' && rest === 'partie') return { name, params: { partieId: decodeURIComponent(h.split('/')[2] || '') } };
+  if (name === 'raetsel-duell' && rest && /^[A-Za-z0-9]{6}$/.test(rest)) return { name, params: { code: rest.toUpperCase() } };
   if (name === 'analyse') return rest ? { name, params: { partieId: decodeURIComponent(rest) } } : { name: 'verlauf', params: {} };
   if (name === 'einstellungen' && rest && /^[a-z0-9-]{1,24}$/.test(rest)) return { name, params: { seite: rest } };
   if (SCREENS.includes(name)) return { name, params: {} };

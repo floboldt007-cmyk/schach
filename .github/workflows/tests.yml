@@ -59,6 +59,8 @@ jobs:
         run: node tests/server-kronen.test.mjs
       - name: Zaehler-SQL ausfuehren
         run: node tests/server-zaehler.test.mjs
+      - name: Raetsel-Duell-SQL ausfuehren
+        run: node tests/server-raetsel-duell.test.mjs
 
   webkit:
     # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test

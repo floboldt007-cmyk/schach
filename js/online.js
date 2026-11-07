@@ -148,6 +148,12 @@ export async function rpc(name, daten) {
   const s = await aktiveSitzung();
   return anfrage(`/rest/v1/rpc/${name}`, { methode: 'POST', token: s.access_token, daten });
 }
+// exportiert fuer js/raetsel-duell.js (Edge Function raetsel-duell): POST an eine Edge Function mit derselben Sitzung.
+// Unbekannte Kennungen (DUELL_...) stehen im Fehler unter detail.
+export async function edgeFunktion(pfad, daten) {
+  const s = await aktiveSitzung();
+  return anfrage(pfad, { methode: 'POST', token: s.access_token, daten });
+}
 // PostgREST liefert eine einzelne Zeile als Objekt, setof als Liste: beides annehmen. Antworten mit jsonb (zuerst
 // online_tritt_bei) melden einen Fehler ohne raise als { fehler: 'ONLINE_...' }: daraus wird derselbe Fehler wie aus
 // einer Serverkennung (Satz, kennung, Originaltext in detail). Eine unbekannte Kennung zeigt nie den rohen Text.
