@@ -2,7 +2,7 @@
 // (Playwright) in der vollen App. Als Erfinder (Sitzung und Sonderstuecke im Speicher, Supabase per page.route gefaelscht):
 // Karte im Training, Uebersicht mit 20 Mattbildern und Bereichswahl, Endspiel Quadratregel gehalten, Lektion Grundreihe gespielt (Matt in 1, 3 Sterne, gespeichert, Karte zaehlt),
 // Lektion Dame mit gefaelschter Verteidigung (window.__test.lektionZug): Hinweis, Neu starten, Gegenzug, Patt-Ende.
-// Ohne Labor (anderes Konto): keine Karte, #lernen und #lektion fuehren zur Arena.
+// Gratis-Spieler (anderes Konto, kein Abo): Karte da, leichte Lektionen und Proben offen, der Rest mit Schloss (zugang.js).
 //   node tests/lernen.test.mjs            Node und Browser
 //   node tests/lernen.test.mjs --nur-node nur der Node-Teil
 import { spawn } from 'node:child_process';
@@ -117,6 +117,20 @@ pruefe('Texte: Titel und Idee je Lektion auf Deutsch und Englisch', fehltText.le
 pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche',
   JSON.stringify(Object.keys(DE).sort()) === JSON.stringify(Object.keys(EN).sort())
   && ![...Object.values(DE), ...Object.values(EN)].some((v) => /[–—]/.test(v)));
+
+// Zugang (07.11.2026, FAHRPLAN Abschnitt 6): leicht gratis, je Bereich eine mittlere Probe, der Rest im Trainer
+{
+  const z = await import('../js/pakete/lernen/zugang.js');
+  const { VORTEILE } = await import('../js/pakete/abo/trainer.js');
+  const zahl = z.zahlen();
+  pruefe('Zugang: 23 leichte plus 4 Proben gratis, 31 im Trainer', zahl.gratis === 27 && zahl.abo === 31
+    && ALLE.filter((l) => l.stufe === 'leicht').length === 23, JSON.stringify(zahl));
+  pruefe('Zugang: je Bereich genau eine Probe, jede eine mittlere Lektion aus ihrem Bereich',
+    BEREICHE.every((b) => b.lektionen.filter(z.istProbe).length === 1 && b.lektionen.some((l) => l.id === z.PROBE[b.id] && l.stufe === 'mittel')));
+  pruefe('Zugang: ohne Konto offen ist genau, was gratis ist', ALLE.every((l) => z.istOffen(l) === z.istGratis(l)));
+  const v = VORTEILE.find((x) => x.id === z.VORTEIL);
+  pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (31)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
+}
 
 // Die Muster stimmen: die bekannten Mattfuehrungen enden in diesen Stellungen wirklich matt
 function spiele(fen, zuege) {
@@ -267,7 +281,7 @@ async function erfinderTeil(browser) {
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const liste = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
   pruefe('Übersicht: Bereichswahl steht auf Mattbilder, 20 Lektionen in der Reihenfolge der Daten', liste === LEKTIONEN_IDS
-    && await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'matt', liste);
+    && await p.s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich') === 'matt', liste);
   pruefe('Übersicht: kein waagrechtes Scrollen', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   // Flo 01.11.2026 (iPad): "bei den Lektionen kann ich nicht nach unten scrollen": neben der 860-px-Spalte rollte nichts.
   // Am linken Rand gewischt (Mausrad) rollt die Liste jetzt bis ganz unten, die Spalte bleibt hoechstens 860 px
@@ -330,16 +344,16 @@ async function erfinderTeil(browser) {
     const b = document.querySelector('.ms-lektion[data-id="grundreihe"]');
     return !!b && b.hasAttribute('data-geschafft') && b.querySelectorAll('.ms-sterne > i.an').length === 3 && /Dein Bestes: 1 Zug/.test(b.innerText);
   }));
-  pruefe('Übersicht: Gesamt 3 von 60 Sternen', /3 von 60 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
+  pruefe('Übersicht: Gesamt 3 von 60 Sternen', /^3\s*\/\s*60$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()));
 
   // Endspiele: Bereich wechseln, Quadratregel halten (die gefaelschte Verteidigung zieht den ersten legalen Zug, also den König)
   await setzeVerteidigung(p.s);
-  await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="end"]').click();
+  await p.s.locator('.ms-bkarte[data-bereich="end"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="quadrat"]', { timeout: 8000 }).catch(() => {});
   const endListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
   pruefe('Endspiele: Liste in der Reihenfolge der Daten, Art „Halten“ an der Quadratregel, eigene Sternzahl',
     endListe === ENDSPIELE.map((l) => l.id).join() && /Halten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText())
-    && /0 von 33 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()), endListe);
+    && /^0\s*\/\s*33$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), endListe);
   await p.s.locator('.ms-lektion[data-id="quadrat"]').click();
   await warteLz(p.s, "z.id === 'quadrat' && z.phase === 'intro'");
   const status = await p.s.locator('.ls-status').innerText();
@@ -357,15 +371,15 @@ async function erfinderTeil(browser) {
   await p.s.locator('.ls-aktionen [data-a="uebersicht"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="quadrat"][data-geschafft]', { timeout: 10000 }).catch(() => {});
   pruefe('Zur Übersicht: zurück im Bereich Endspiele, Quadratregel „Gehalten“',
-    await p.s.locator('.segment[data-seg="ms-bereich"]').getAttribute('data-wert') === 'end'
+    await p.s.locator('.ms-bkarte[aria-pressed="true"]').getAttribute('data-bereich') === 'end'
     && /Gehalten/.test(await p.s.locator('.ms-lektion[data-id="quadrat"]').innerText()));
   // Taktik (31.10.2026): Springergabel mit Sc6+ und Sxa7, geschafft erst nach dem Gegenzug
-  await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="taktik"]').click();
+  await p.s.locator('.ms-bkarte[data-bereich="taktik"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="gabel-springer"]', { timeout: 8000 }).catch(() => {});
   const taktikListe = await p.s.evaluate(() => [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join());
   pruefe('Taktik: Liste in der Reihenfolge der Daten, Art „Taktik“, 0 von 48 Sternen', taktikListe === TAKTIK.map((l) => l.id).join()
     && /Taktik/.test(await p.s.locator('.ms-lektion[data-id="gabel-springer"]').innerText())
-    && /0 von 48 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()), taktikListe);
+    && /^0\s*\/\s*48$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()), taktikListe);
   await p.s.locator('.ms-lektion[data-id="gabel-springer"]').click();
   await warteLz(p.s, "z.id === 'gabel-springer' && z.phase === 'intro'");
   const tStatus = await p.s.locator('.ls-status').innerText();
@@ -405,12 +419,12 @@ async function erfinderTeil(browser) {
   pruefe('Neu starten: Ausgangsstellung, Zähler und Hinweise auf null', z.zuege === 0 && z.hinweise === 0 && z.fen === lektion('dame').fen, z);
   // Eroeffnungen: Italienisch mit Weiss (ein falscher Zug zweimal, dann Pfeil), Skandinavisch mit Schwarz (Brett gedreht)
   await p.s.evaluate(() => window.__app.gehe('lernen'));
-  await p.s.waitForSelector('.segment[data-seg="ms-bereich"] [data-wert="eroeffnung"]', { timeout: 10000 }).catch(() => {});
-  await p.s.locator('.segment[data-seg="ms-bereich"] [data-wert="eroeffnung"]').click();
+  await p.s.waitForSelector('.ms-bkarte[data-bereich="eroeffnung"]', { timeout: 10000 }).catch(() => {});
+  await p.s.locator('.ms-bkarte[data-bereich="eroeffnung"]').click();
   await p.s.waitForSelector('.ms-lektion[data-id="italienisch"]', { timeout: 8000 }).catch(() => {});
   pruefe('Eröffnungen: Liste in der Reihenfolge der Daten, Art „Zugfolge“, 0 von 33 Sternen', await p.s.evaluate(() =>
     [...document.querySelectorAll('.ms-lektion')].map((b) => b.dataset.id).join()) === EROEFFNUNGEN.map((l) => l.id).join()
-    && /Zugfolge/.test(await p.s.locator('.ms-lektion[data-id="italienisch"]').innerText()) && /0 von 33 Sternen/.test(await p.s.locator('.ms-gesamt').innerText()));
+    && /Zugfolge/.test(await p.s.locator('.ms-lektion[data-id="italienisch"]').innerText()) && /^0\s*\/\s*33$/.test((await p.s.locator('.ms-bkarte[aria-pressed="true"] .ms-bk-sterne').innerText()).trim()));
   await p.s.locator('.ms-lektion[data-id="italienisch"]').click();
   await warteLz(p.s, "z.id === 'italienisch' && z.phase === 'intro'");
   pruefe('Eröffnung: Titel, Ziel „Spiel die 5 Züge der Eröffnung“', /Italienische Partie/.test(await p.s.locator('.ls-status').innerText())
@@ -504,17 +518,54 @@ async function erfinderTeil(browser) {
   await q.k.close();
 }
 
-async function ohneLaborTeil(browser) {
+// Gratis-Spieler (07.11.2026, FAHRPLAN Abschnitt 6): angemeldet, kein Erfinder, kein Abo. Leichte Lektionen und je eine
+// Probe offen, der Rest mit Schloss; ein Tipp aufs Schloss zeigt den Trainer-Hinweis, ein direkter Aufruf fuehrt zurueck
+async function gratisTeil(browser) {
   const p = await seite(browser, { erfinder: false });
-  await warte(600);
-  pruefe('Ohne Labor: keine Meisterschule-Karte im Training', await p.s.locator('.ms-karte').count() === 0);
-  await p.s.evaluate(() => window.__app.gehe('lernen'));
-  await p.s.waitForSelector('.arena', { timeout: 10000 }).catch(() => {});
-  pruefe('Ohne Labor: #lernen führt zur Arena', await p.s.evaluate(() => location.hash.startsWith('#arena') || !!document.querySelector('.screen.arena, .arena')));
-  await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'grundreihe' }));
-  await warte(600);
-  pruefe('Ohne Labor: #lektion führt zur Arena, kein Lektions-Bildschirm', await p.s.locator('.ls-screen .brett').count() === 0);
-  pruefe('Ohne Labor: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.s.waitForSelector('.ms-karte', { timeout: 15000 }).catch(() => {});
+  const karte = await p.s.evaluate(() => document.querySelector('.ms-karte')?.innerText || '');
+  pruefe('Gratis: Meisterschule-Karte im Training, ohne Labor-Schild, „27 davon sind gratis“', /27 davon sind gratis/.test(karte) && !/Labor/i.test(karte), karte);
+  await p.s.locator('.ms-karte .ms-oeffnen').click();
+  await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
+  const r = await p.s.evaluate(() => ({
+    gesperrt: [...document.querySelectorAll('.ms-lektion[data-gesperrt]')].map((b) => b.dataset.id),
+    probe: document.querySelector('.ms-lektion[data-id="erstickt"]')?.innerText || '',
+    probeOffen: !document.querySelector('.ms-lektion[data-id="erstickt"]')?.hasAttribute('data-gesperrt'),
+    schloss: document.querySelectorAll('.ms-lektion[data-gesperrt] .ms-schloss').length,
+    kopf: document.querySelector('.ms-kopf-sterne')?.innerText || '',
+    karten: document.querySelectorAll('.ms-bkarte').length,
+    gruppen: [...document.querySelectorAll('.ms-gruppe > h3')].map((h) => h.textContent).join('|'),
+  }));
+  pruefe('Gratis: Mattbilder mit 13 Schlössern (20 minus 6 leicht minus Probe), Probe „Ersticktes Matt“ offen mit Marke',
+    r.gesperrt.length === 13 && r.schloss === 13 && !r.gesperrt.includes('grundreihe') && r.probeOffen && /Gratis-Probe/.test(r.probe), r);
+  pruefe('Gratis: Kopf zeigt die Sterne der Meisterschule (0 / 174), vier Bereichskarten, Gruppen nach Stufe',
+    /0\s*\/\s*174/.test(r.kopf) && r.karten === 4 && /Leicht · gratis\|Mittel\|Schwer und Meister/.test(r.gruppen), r);
+  await p.s.locator('.ms-lektion[data-id="anderssen"]').click();
+  await p.s.waitForSelector('.ms-liste .premium-hinweis', { timeout: 5000 }).catch(() => {});
+  pruefe('Gratis: Tipp aufs Schloss zeigt den Trainer-Hinweis unter der Zeile, keine Lektion',
+    await p.s.locator('.ms-lektion[data-id="anderssen"] + .premium-hinweis').count() === 1
+    && await p.s.evaluate(() => document.documentElement.dataset.screen === 'lernen'));
+  await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'philidor' }));
+  await p.s.waitForSelector('.ms-bkarte[data-bereich="end"][aria-pressed="true"]', { timeout: 10000 }).catch(() => {});
+  pruefe('Gratis: gesperrte Lektion per Aufruf führt zur Übersicht im selben Bereich, kein Brett',
+    await p.s.locator('.ls-screen .brett').count() === 0 && await p.s.locator('.ms-bkarte[data-bereich="end"][aria-pressed="true"]').count() === 1);
+  // letzte leichte Eroeffnung: "Weiter" fuehrt zur Probe, daneben "Naechste Lektion im Trainer"
+  await p.s.evaluate(() => window.__app.gehe('lektion', { id: 'skandinavisch' }));
+  await warteLz(p.s, "z.id === 'skandinavisch' && z.phase === 'intro'");
+  await setzeVerteidigung(p.s);
+  await p.s.locator('.ls-aktionen [data-a="los"]').click();
+  for (const [i, u] of ['d7d5', 'd8d5', 'd5a5', 'g8f6'].entries()) {
+    await warteLz(p.s, `z.phase === 'flo' && z.zuege === ${i}`);
+    await ziehe(p.s, u);
+  }
+  await warteLz(p.s, "z.phase === 'ende'");
+  pruefe('Gratis: nach der letzten leichten Lektion „Weiter“ und „Nächste Lektion im Trainer“, kein Werbetext in der Meldung',
+    await p.s.locator('.ls-aktionen [data-a="weiter"]').count() === 1 && /Nächste Lektion im Trainer/.test(await p.s.locator('.ls-aktionen [data-a="trainer"]').innerText())
+    && await p.s.locator('.ls-screen .premium-hinweis').count() === 0);
+  await p.s.locator('.ls-aktionen [data-a="weiter"]').click();
+  await warteLz(p.s, "z.id === 'legal-falle'");
+  pruefe('Gratis: „Weiter“ springt zur Gratis-Probe Legal-Falle', (await lz(p.s)).id === 'legal-falle');
+  pruefe('Gratis: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 }
 
@@ -541,7 +592,7 @@ async function browserTeil() {
     await warteAufServer(`http://127.0.0.1:${PORT}/index.html`);
     browser = await browserTyp(ladePlaywright()).launch();
     await erfinderTeil(browser);
-    await ohneLaborTeil(browser);
+    await gratisTeil(browser);
     await neuesGeraetTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
