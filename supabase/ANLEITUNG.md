@@ -285,6 +285,48 @@ und mit einem Absatz in der Datenschutzerklärung.
 Buchungen und das Saison-Archiv sind danach weg. Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in
 der Datei).
 
+## Visitenkarte, Erfolge und Taler (Stand 07.11.2026)
+
+Die Visitenkarte (Banner, Profilbild, Name, Titel, Kronen-Stufe, drei ausgestellte Erfolge) steht im Profil „Ich“, im
+Moment „Gegner gefunden“ der Lobby und in den Spielerleisten. Die Erfolge haben jetzt je drei Stufen (Bronze, Silber,
+Gold); jede Stufe zahlt Taler, Gold schaltet einen Titel oder ein Banner frei. Ohne Konto bleibt alles auf dem Gerät.
+Mit Konto braucht es `supabase/karte-schema.sql`. Fehlt die Datei, läuft die App wie bisher, nur sieht der Gegner in einer
+Online-Partie keine Karte (dann steht dort „Gegner“ mit dem Start-Banner).
+
+1. Vorher müssen `schema.sql` (Profil mit Benutzername), das Online-Schema und `kronen-schema.sql` eingespielt sein
+   (Abschnitt „Liga mit Kronen“ oben). Die Karte liest den Benutzernamen, die Online-Partien und die Kronen.
+2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/karte-schema.sql` einfügen und
+   **Run** drücken. Die Datei darf mehrfach laufen.
+3. Prüfen: den ganzen Inhalt von `supabase/karte-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
+   mit `FEHLER:`), unten steht die Meldung `Karte-RLS-Test erfolgreich`, der Lauf endet mit `ROLLBACK`, es bleibt nichts
+   zurück.
+4. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch die
+   Erfolgs-Stufen, alle Taler-Buchungen, die eigenen Banner und die gewählte Karte (Schlüssel `karte`).
+5. **Vor dem Live-Gang nach main:** die Datenschutzerklärung prüfen. Im selben Stand steht ein markierter Entwurf
+   (`datenschutz.html`, `datenschutz-en.html`, Abschnitt „Visitenkarte“): Benutzername, Titel, Banner, Profilbild,
+   Kronen-Stufe und die ausgestellten Erfolge sieht der Gegner einer gemeinsamen Online-Partie.
+
+**Was der Server sicherstellt:** Die vier Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
+Zugang für anon). Das Gerät meldet nur, welche Stufe es erreicht hat; der Server bucht jede Stufe genau einmal und der
+Reihe nach (Silber nur nach Bronze), zahlt die Taler dabei aus und schreibt bei Gold das Gold-Banner gut. Die Liga-Erfolge
+meldet niemand: die leitet der Server selbst aus den Kronen ab. Liga-Banner (Platz 1 der Wochen-Gruppe, erster Aufstieg,
+Konzept 5a) schreibt nur der Server gut, über `karte_banner_gutschreiben`; die Vergabe baut der Liga-Umbau, bis dahin
+bekommt niemand ein Liga-Banner. Das Gerät darf diese Funktion nicht aufrufen. Titel, Profilbild,
+Hintergrund und Rahmen kommen nur aus festen Listen (kein Freitext, keine Stücke des Erfinders, keine Labor-Rahmen), ein
+Banner nur aus dem eigenen Besitz. Die Karte eines Spielers bekommt nur, wer mit ihm in derselben Online-Partie sitzt.
+Erfolge, Titel und Banner kann man nie kaufen: kein Kauf und kein Abo führt dorthin. Mit dem Konto verschwindet alles.
+
+**Bekannte Grenze:** Die Stufen aus Bot-Partien, Rätseln, Serie und Level rechnet das Gerät. Ein Spieler, der seinen
+Spielstand von Hand fälscht, kann sich diese Stufen also melden. Der Schaden bleibt klein: Taler kaufen später nur
+Erspielbares, und Liga-Stufen und Liga-Banner bucht allein der Server. Eine Tagesgrenze gibt es bewusst nicht, weil es
+insgesamt nur 30 Stufen gibt. Dasselbe gilt für Titel: der Server prüft nur, dass der Titel aus der festen Liste stammt,
+nicht ob der Spieler ihn erspielt hat (Titel hängen an Level und Erfolgen, die das Gerät rechnet). Ein Schummler kann
+also einen Titel aus der Liste zeigen, den er nicht hat; Freitext ist ausgeschlossen.
+
+**Rückweg:** `supabase/karte-zurueck.sql` entfernt alles wieder. Achtung: gebuchte Stufen, Taler, Banner und die
+gewählten Karten sind danach weg (die Liga-Stufen leitet der Server beim nächsten Aufruf neu ab, die übrigen Stufen
+meldet das Gerät neu, gutgeschriebene Liga-Banner sind ohne Sicherung weg). Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in der Datei).
+
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
 Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den

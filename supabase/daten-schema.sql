@@ -300,7 +300,7 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- ---------------------------------------------------------------------------
 -- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql), das Abo (abo-schema.sql), die Werkstatt
 -- (werkstatt-schema.sql: Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstuecke), die Liga mit Kronen
--- (kronen-schema.sql) und das Anmeldeprotokoll
+-- (kronen-schema.sql), die Visitenkarte mit Erfolgen und Talern (karte-schema.sql) und das Anmeldeprotokoll
 -- kommen nur dazu, wenn es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne diese Schemata. Fehlt
 -- eines, stehen die Schluessel trotzdem da (null bzw. leere Liste). Vorher wird aufgeraeumt (alte Zaehler, und mit dem
 -- Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte Fehlversuche), damit die Auskunft nichts
@@ -322,6 +322,7 @@ declare
   freunde jsonb := jsonb_build_object('freundschaften', '[]'::jsonb, 'einladung', null, 'wochenpunkte', '[]'::jsonb);
   kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'archiv', '[]'::jsonb, 'suche', null,
     'ki_belege', '[]'::jsonb);
+  karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -393,6 +394,19 @@ begin
                  from public.suche_ki_belege k where k.user_id = $1), ''[]''::jsonb))'
       into kronen using uid;
   end if;
+  -- Visitenkarte und Erfolge (karte-schema.sql, Etappe 4b): erreichte Stufen, alle Taler-Buchungen, eigene Banner und die
+  -- gewaehlte Karte (Banner, Titel, Vitrine, Profilbild)
+  if to_regclass('public.karte_stufen') is not null then
+    execute 'select jsonb_build_object(
+               ''stufen'', coalesce((select jsonb_agg(to_jsonb(s) - ''user_id'' order by s.familie, s.stufe)
+                 from public.karte_stufen s where s.user_id = $1), ''[]''::jsonb),
+               ''taler'', coalesce((select jsonb_agg(to_jsonb(t) - ''user_id'' order by t.am, t.id)
+                 from public.taler_buchungen t where t.user_id = $1), ''[]''::jsonb),
+               ''banner'', coalesce((select jsonb_agg(to_jsonb(b) - ''user_id'' order by b.banner)
+                 from public.banner_besitz b where b.user_id = $1), ''[]''::jsonb),
+               ''wahl'', (select to_jsonb(w) - ''user_id'' from public.karte_wahl w where w.user_id = $1))'
+      into karte using uid;
+  end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -427,6 +441,8 @@ begin
     'freunde', freunde,
     -- Liga mit Kronen: Stand, Buchungen, Saison-Archiv, laufende Gegnersuche, KI-Belege (leer ohne kronen-schema.sql)
     'kronen', kronen,
+    -- Visitenkarte und Erfolge: Stufen, Taler-Buchungen, Banner, gewaehlte Karte (leer ohne karte-schema.sql)
+    'karte', karte,
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,

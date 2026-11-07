@@ -44,6 +44,10 @@ export const ORTE = Object.freeze({
   // Profil (Flo 30.10.2026): Karte oben im Reiter Ich, Vitrine fuer das Duell-Intro
   'ich:kopf': 'dom',
   'duell:profil?': 'wahl',
+  // Visitenkarte (Etappe 4b): die eigene Karte fuer Lobby und Partie (js/ui/visitenkarte.js eigeneKarte), Paket sammlung
+  'karte:eigene?': 'wahl',
+  // dieselbe Karte fuer einen anderen Spieler aus den Server-Daten (Kontext { daten }: karte_von aus supabase/karte-schema.sql)
+  'karte:fremde?': 'wahl',
   'arena:panel-oben': 'dom',
   'arena:panel-bot': 'dom',
   'arena:start': 'aufruf',

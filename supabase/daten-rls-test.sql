@@ -165,6 +165,12 @@ begin
      or not (d ? 'anmeldeprotokoll') then
     raise exception 'FEHLER: meine_daten ohne partien_online, freigabe_widerruf oder anmeldeprotokoll: %', d;
   end if;
+  -- Visitenkarte immer als Objekt mit Listen (leer, wenn karte-schema.sql fehlt)
+  if jsonb_typeof(d -> 'karte') is distinct from 'object' or jsonb_typeof(d -> 'karte' -> 'stufen') is distinct from 'array'
+     or jsonb_typeof(d -> 'karte' -> 'taler') is distinct from 'array' or jsonb_typeof(d -> 'karte' -> 'banner') is distinct from 'array'
+     or not (d -> 'karte' ? 'wahl') then
+    raise exception 'FEHLER: meine_daten ohne karte (stufen, taler, banner, wahl): %', d;
+  end if;
   -- Liga mit Kronen immer als Objekt mit Listen (leer, wenn kronen-schema.sql fehlt)
   if jsonb_typeof(d -> 'kronen') is distinct from 'object' or jsonb_typeof(d -> 'kronen' -> 'buchungen') is distinct from 'array'
      or jsonb_typeof(d -> 'kronen' -> 'archiv') is distinct from 'array' or jsonb_typeof(d -> 'kronen' -> 'ki_belege') is distinct from 'array'

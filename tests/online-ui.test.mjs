@@ -29,7 +29,7 @@ let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehn
 // Antwort auf die naechste Strittig-Meldung: null wie der Server, 'netz' ohne Verbindung, 'beendet' wenn der Gegner
 // gerade vorher die Zeit reklamiert hat (Wettlauf, siehe Konzept Anti-Cheat L5)
 let strittigAntwort = null;
-const partien = new Map(), calls = [], fehler = [], unerwartet = [];
+const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
   const c = new Chess(); for (const u of zuege.split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
@@ -111,6 +111,13 @@ try {
     }
     // Datenfreigabe ist aus; die Kontodarstellung fragt den aktuellen Freigabestand ab.
     if (/freigabe/.test(url.pathname)) return antwort([]);
+    // Etappe 4b: Visitenkarten (js/karte.js). Beim Start meldet das Konto Stufen und Wahl; die Partie fragt beide Karten.
+    if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
+    if (rpc === 'karte_der_partie') {
+      karteFragen.push(body.partie);
+      const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
+      return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
+    }
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -304,6 +311,15 @@ try {
   await seite.goto(start + '#online/KLM234'); await seite.locator('[name="code"]').waitFor();
   pruefe('Angemeldeter Link fuellt den Code direkt aus', await seite.locator('[name="code"]').inputValue() === 'KLM234');
   await seite.getByRole('button', { name: 'Beitreten', exact: true }).click(); await bereit();
+  // Etappe 4b: Visitenkarten in den Spielerleisten (Banner, Name, Titel aus karte_der_partie)
+  await seite.waitForFunction(() => document.querySelectorAll('.on-spieler.mit-banner').length === 2, null, { timeout: 8000 }).catch(() => {});
+  const leisten = await seite.evaluate(() => [...document.querySelectorAll('.on-spieler')].map((x) => ({ name: x.querySelector('b')?.textContent,
+    titel: x.querySelector('.on-titel')?.textContent || '', banner: /saison-silber\.svg/.test(x.querySelector('.on-banner')?.style.backgroundImage || '') })));
+  // ?kern laedt das Paket sammlung nicht: der Titel faellt dann bewusst weg (Ort karte:fremde? ohne Anbieter);
+  // mit Paket loest tests/karte.test.mjs den Titel auf
+  pruefe('Etappe 4b: beide Spielerleisten mit Banner und Namen vom Server, ohne Paket sammlung kein Titel', leisten.length === 2
+    && leisten.every((l) => l.banner && !l.titel)
+    && leisten.some((l) => l.name === 'Gegner_2') && leisten.some((l) => l.name === 'Spieler_1') && karteFragen.includes(direkt.id), { leisten, karteFragen });
   for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height }); await seite.evaluate(modus => window.__app.setzeEinstellungen({ modus }), modus);
     await seite.waitForFunction(modus => document.documentElement.dataset.modus === modus, modus);

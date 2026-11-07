@@ -54,7 +54,8 @@
 //   zug:abgelehnt { laufId, von, nach, art, figur, fen }: aus board.js beiAbgelehnt, nur wenn Flo am Zug ist.
 //   ergebnis:karte-Kontext zusaetzlich boss; die Abrechnungs-Huelle (ergebnis:abrechnung) haengt sich dort mit
 //   Reihenfolge 3 ein (js/ui/abrechnung.js).
-//   Buehne zusaetzlich: boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
+//   Buehne zusaetzlich: ki (true bei einem KI-Gegner der Liga, params.ki; Etappe 4b: Visitenkarten-Streifen in den
+//   Spielerleisten), boss (eingefroren oder null), seed, zeigt(name) -> boolean fuer die Anzeigen
 //   'zaehlwerk' | 'funkenlinie' | 'lebensleiste' | 'balken' (Einstellungen der App), platz(name) -> HTMLElement
 //   fuer 'zaehlwerk' (.p-zaehlwerk im Kopf) und 'funkenlinie' (.p-funkenlinie unten am Brett-Rahmen); der Platz
 //   ist versteckt, solange die Einstellung aus ist, und folgt ihr. Nach partie:verlassen: platz -> null.
@@ -2340,7 +2341,7 @@ export function zeige(root, params, app) {
     return el;
   }
   const buehne = Object.freeze({
-    laufId, bot, farbe, modus: z.modus, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
+    laufId, bot, farbe, modus: z.modus, ki: z.ki === true, ziel: z.ziel ? Object.freeze({ ...z.ziel }) : null,
     boss: z.boss ? Object.freeze({ ...z.boss }) : null, seed: z.seed,
     zeigt, platz,
     el: s, effekte: effekteEl, rahmen, brett, get reduziert() { return reduziert(); },

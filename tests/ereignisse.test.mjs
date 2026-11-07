@@ -199,7 +199,7 @@ const ORT_TABELLE = {
   // Sammlung (Reiter Ich, Flo 30.10.2026): ein Bereich je Anbieter, Host js/ui/ich.js
   'sammlung:bereich': 'dom',
   // Profil (Flo 30.10.2026): Host js/ui/ich.js und js/ui/duell.js
-  'ich:kopf': 'dom', 'duell:profil?': 'wahl',
+  'ich:kopf': 'dom', 'duell:profil?': 'wahl', 'karte:eigene?': 'wahl', 'karte:fremde?': 'wahl',
   // Lobby-Musik in der Sammlung unter Klaenge (Flo 31.10.2026): Paket musik liefert, Paket sammlung zeigt
   'sammlung:musik?': 'wahl',
 };

@@ -1522,8 +1522,8 @@ async function testeErweiterungen(browser) {
   pruefe('zug:bewertet nach zug:gespielt desselben Zugs', p.filter((e) => e.name === 'zug:bewertet').every((b) => pn.indexOf('zug:bewertet') > pn.indexOf('zug:gespielt')
     && p.some((g) => g.name === 'zug:gespielt' && g.ply === b.ply && g.uci === b.uci)));
   pruefe('laufId = "l" + gestartet, gleich in allen Partie-Ereignissen', /^l\d{4}-\d\d-\d\dT/.test(gest.laufId) && p.filter((e) => 'laufId' in e).every((e) => e.laufId === gest.laufId), gest.laufId);
-  // W0+a: dazu boss, seed, zeigt, platz
-  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'laufId',
+  // W0+a: dazu boss, seed, zeigt, platz; Etappe 4b: ki (KI-Gegner der gewerteten Suche, Banner-Streifen)
+  pruefe('partie:gestartet: Bühne mit der ganzen API', JSON.stringify(gest.buehne) === JSON.stringify(['blase', 'boss', 'bot', 'brett', 'coachZusatz', 'effekte', 'el', 'farbe', 'feld', 'gemerkt', 'ki', 'laufId',
     'liveAn', 'merke', 'modus', 'phase', 'platz', 'rahmen', 'reduziert', 'seed', 'spaeter', 'zeigt', 'ziel']) && gest.fortgesetzt === false && gest.modus === 'normal' && gest.botStufe === 2, JSON.stringify(gest));
   pruefe('partie:gestartet: wertet, hinweise und zuruecknahmen (Stand beim Start)', gest.wertet === true && gest.hinweise === 0 && gest.zuruecknahmen === 0, JSON.stringify(gest));
   const gesp = p.filter((e) => e.name === 'zug:gespielt');
