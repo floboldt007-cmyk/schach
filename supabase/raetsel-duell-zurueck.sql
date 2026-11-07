@@ -12,6 +12,20 @@ drop function if exists public.duell_suche_start();
 drop function if exists public.duell_suche_paaren(uuid);
 drop function if exists public.duell_suche_duell(uuid);
 drop function if exists public.duell_spieler_json(integer, integer, timestamptz);
+-- zuerst den Server-Lauf ausplanen (nur wenn pg_cron da ist und der Job existiert)
+do $cron$
+declare
+  da boolean := false;
+begin
+  if pg_catalog.to_regclass('cron.job') is not null then
+    execute $sql$select exists (select 1 from cron.job where jobname = 'raetsel-duell-auswerten')$sql$ into da;
+    if da then
+      execute $sql$select cron.unschedule('raetsel-duell-auswerten')$sql$;
+    end if;
+  end if;
+end;
+$cron$;
+drop function if exists public.duell_alle_faelligen_auswerten();
 drop function if exists public.duell_faellige_auswerten(uuid);
 drop function if exists public.duell_auswerten(uuid);
 drop function if exists public.duell_anlegen(text, uuid, uuid, integer);

@@ -381,6 +381,35 @@ begin
 end;
 $$;
 
+-- Server-Lauf ueber ALLE Konten (pg_cron alle 10 Minuten, siehe Ende der Datei): wertet jedes laufende Duell aus,
+-- dessen Zeit samt Gnadenfrist um ist. So entgeht niemand einer Niederlage, nur weil er nie wieder abfragt oder
+-- spielt (Flo, 07.11.2026). Antwort: Zahl der dabei beendeten Duelle. Nur fuer den Besitzer (pg_cron), nie fuer Nutzer.
+create or replace function public.duell_alle_faelligen_auswerten()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k jsonb := public.duell_konstanten();
+  x uuid;
+  n integer := 0;
+begin
+  for x in
+    select d.id from public.duelle d
+    where d.status = 'laeuft'
+      and d.start_am + make_interval(secs => d.dauer_s + (k->>'gnade_s')::integer) <= now()
+    order by d.start_am
+    limit 500
+  loop
+    if (public.duell_auswerten(x)).status = 'beendet' then
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+
 -- Aktuelles Raetsel eines Spielers fuer die Anzeige: { nr, fen, bisher } (bisher = schon gespielte Halbzuege), nie die
 -- Loesung. null, wenn alle Raetsel durch sind.
 create or replace function public.duell_raetsel_anzeige(d public.duelle, s public.duell_spieler)
@@ -764,6 +793,7 @@ revoke all on function public.duell_ratings(public.duelle) from public, anon, au
 revoke all on function public.duell_ki_jetzt(public.duelle) from public, anon, authenticated;
 revoke all on function public.duell_auswerten(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.duell_faellige_auswerten(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.duell_alle_faelligen_auswerten() from public, anon, authenticated, service_role;
 revoke all on function public.duell_raetsel_anzeige(public.duelle, public.duell_spieler) from public, anon, authenticated;
 revoke all on function public.duell_spieler_json(integer, integer, timestamptz) from public, anon, authenticated;
 revoke all on function public.duell_suche_duell(uuid) from public, anon, authenticated;
@@ -786,3 +816,20 @@ grant execute on function public.duell_beitreten(text) to authenticated;
 grant execute on function public.duell_stand(uuid) to authenticated;
 grant execute on function public.duell_zug_lage(uuid, uuid) to service_role;
 grant execute on function public.duell_zug_verbuchen(uuid, uuid, integer, integer, boolean, boolean, timestamptz) to service_role;
+
+-- ---------- Server-Lauf alle 10 Minuten (pg_cron) ----------
+-- Nur wenn pg_cron eingeschaltet ist (Supabase-Dashboard: Integrations > Cron, ANLEITUNG Abschnitt Raetsel-Duell).
+-- Gleicher Name = Job wird ersetzt (Supabase-Doku: "This will replace the existing job via upsert"), die Datei bleibt
+-- also wiederholbar. Ohne pg_cron nur ein Hinweis; die Auswertung bei Abfrage, Suche, Einladung und Beitritt laeuft
+-- trotzdem. Alle 10 Minuten statt taeglich: eine Niederlage steht so spaetestens nach gut 10 Minuten in der Liga.
+do $cron$
+begin
+  if pg_catalog.to_regnamespace('cron') is not null then
+    execute $sql$select cron.schedule('raetsel-duell-auswerten', '*/10 * * * *',
+      'select public.duell_alle_faelligen_auswerten()')$sql$;
+    raise notice 'Raetsel-Duell: Server-Lauf alle 10 Minuten eingeplant (raetsel-duell-auswerten)';
+  else
+    raise notice 'Raetsel-Duell: pg_cron ist nicht eingeschaltet, kein Server-Lauf eingeplant (ANLEITUNG lesen)';
+  end if;
+end;
+$cron$;

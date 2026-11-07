@@ -4,7 +4,7 @@
 -- Abschnitte: 1 Rechte; 2 Raetsel-Folge; 3 KI-Verlauf; 4 Gegnersuche und Stand; 5 Zuege (richtig, mehrzuegig, falsch,
 -- veraltet, Zeit); 6 Auswertung und Kronen; 7 ohne Zug keine Kronen; 8 Paar-Grenze; 9 KI-Gegner; 10 Freundschaft;
 -- 11 Start-Liga nach einem Duell; 12 Fremde sehen nichts; 13 Gnadenfrist, Auswertung ohne Abfrage, Grenzen fuer
--- Einladungen und Codes.
+-- Einladungen und Codes; 14 Server-Lauf (pg_cron) ohne Aufruf des Spielers.
 -- Die Uhr steht in einer Transaktion still (now() ist der Beginn): die Testhilfen schieben deshalb Startzeit und
 -- Wartezeit zurueck, statt zu warten.
 begin;
@@ -694,6 +694,51 @@ begin
      or public.duell_beitreten((select code from t_code)) is distinct from '{"fehler": "DUELL_ZU_VIELE_VERSUCHE"}'::jsonb then
     raise exception 'FEHLER: nach 20 falschen Codes nicht gesperrt';
   end if;
+end;
+$$;
+reset role;
+
+-- ---------- 14. Server-Lauf (pg_cron) wertet liegen gelassene Duelle ohne jeden Aufruf des Spielers aus ----------
+create temp table t_cron (id uuid, jung uuid);
+do $$
+declare
+  d uuid := public.duell_anlegen('ki', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', null, 3000);
+  j uuid := public.duell_anlegen('ki', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', null, 3000);
+  n integer;
+begin
+  insert into t_cron values (d, j);
+  perform pg_temp.zurueck(d, 10);
+  perform pg_temp.zug('dddddddd-dddd-4ddd-8ddd-dddddddddddd', d, 0, 0, false, false, 5);
+  perform pg_temp.zurueck(d, 190);
+  -- das zweite Duell laeuft noch (gerade gestartet): bleibt unberuehrt
+  perform pg_temp.zurueck(j, 10);
+  n := public.duell_alle_faelligen_auswerten();
+  -- direkt in der Tabelle geprueft (Lehre: duell_stand wertet selbst aus und taugt nicht als Beleg)
+  if (select status from public.duelle where id = d) <> 'beendet' then
+    raise exception 'FEHLER: Server-Lauf wertet ein liegen gelassenes Duell nicht aus';
+  end if;
+  if (select status from public.duelle where id = j) <> 'laeuft' then
+    raise exception 'FEHLER: Server-Lauf beendet ein laufendes Duell';
+  end if;
+  if n < 1 then
+    raise exception 'FEHLER: Server-Lauf meldet keine Auswertung (%)', n;
+  end if;
+  -- ein zweiter Lauf aendert nichts mehr (wiederholbar)
+  if public.duell_alle_faelligen_auswerten() <> 0 then
+    raise exception 'FEHLER: zweiter Server-Lauf wertet erneut aus';
+  end if;
+end;
+$$;
+-- nur der Server darf ihn aufrufen
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform public.duell_alle_faelligen_auswerten();
+    raise exception 'FEHLER: Nutzer rufen den Server-Lauf auf';
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 reset role;
