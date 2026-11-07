@@ -40,7 +40,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Stufen gleich (Stufen je Liga, Anzahl)',
     zahl('stufen_je_liga') === STUFEN_JE_LIGA && zahl('stufen_anzahl') === STUFEN_ANZAHL,
     [zahl('stufen_je_liga'), zahl('stufen_anzahl')]);
-  for (const quelle of ['online', 'ki', 'bot']) {
+  for (const quelle of ['online', 'ki', 'bot', 'duell', 'duell_ki']) {
     const zeile = (k.match(new RegExp(`'${quelle}',\\s*jsonb_build_object\\(([^)]*)\\)`)) || [])[1] || '';
     const wert = (e) => Number((zeile.match(new RegExp(`'${e}',\\s*(-?\\d+)`)) || [])[1]);
     pruefe(`Kronen fuer ${quelle} gleich`, ['sieg', 'remis', 'niederlage'].every((e) => wert(e) === KRONEN[quelle][e]),
@@ -175,10 +175,11 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Bot/KI-Buchung: einmal je ref, in die Wochen-Gruppe, Kronen aus kronen_konstanten',
     /on conflict on constraint kronen_buchungen_einmal do nothing/.test(einfach) && /d := public\.liga_buchen\(uid, nominal\)/.test(einfach)
       && /konst #>> array\['kronen', art, ergebnis\]/.test(einfach));
-  pruefe('Schummel-Schutz: Bot- und KI-Gewinne serverseitig auf bot_ki_wochen_max je Woche gedeckelt',
-    /nominal := least\(nominal, greatest\(0, deckel - public\.liga_bot_ki_genutzt\(uid, wo\)\)\)/.test(einfach)
+  pruefe('Schummel-Schutz: Bot-, KI- und KI-Duell-Gewinne serverseitig auf bot_ki_wochen_max je Woche gedeckelt, Menschen-Duell frei',
+    /if nominal > 0 and art in \('bot', 'ki', 'duell_ki'\) then/.test(einfach)
+      && /nominal := least\(nominal, greatest\(0, deckel - public\.liga_bot_ki_genutzt\(uid, wo\)\)\)/.test(einfach)
       && /deckel integer := \(konst ->> 'bot_ki_wochen_max'\)::integer/.test(einfach)
-      && /b\.quelle in \('bot', 'ki'\) and b\.woche = wo/.test(fn('liga_bot_ki_genutzt')?.rumpf || ''));
+      && /b\.quelle in \('bot', 'ki', 'duell_ki'\) and b\.woche = wo/.test(fn('liga_bot_ki_genutzt')?.rumpf || ''));
   pruefe('Tagesgrenzen zaehlen ab Mitternacht Europe/Berlin', /kronen_heute\(\)::timestamp at time zone 'Europe\/Berlin'/.test(fn('kronen_heute_anzahl')?.rumpf || ''));
   pruefe('RLS-Test ruft Bot- und KI-Ergebnis auf', test.includes('public.kronen_bot_ergebnis(') && test.includes('public.kronen_ki_ergebnis('));
 }
@@ -195,7 +196,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     { sql: [grenzen, zahl('start_elo_min'), zahl('start_elo_max'), zahl('start_hoechste_liga')], js: [KLASSEN_GRENZEN, START_ELO_GRENZEN] });
   const start = fn('kronen_start')?.rumpf || '';
   pruefe('kronen_start: nur ohne gesetzten Start und ohne Partie mit Kronen, sonst KRONEN_START_VORBEI',
-    /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
+    /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot', 'duell', 'duell_ki'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
       && start.indexOf("'KRONEN_START_VORBEI'") < start.indexOf('insert into public.kronen_buchungen'));
   pruefe('kronen_start: Beleg start/start ohne Kronen, Stufe III der Liga, Elo und start_gesetzt',
     /values \(uid, 'start', 'start', 0, public\.liga_woche_heute\(\)\)/.test(start)

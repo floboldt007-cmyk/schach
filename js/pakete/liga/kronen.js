@@ -16,6 +16,9 @@ export const KRONEN = Object.freeze({
   online: Object.freeze({ sieg: 30, remis: 10, niederlage: -15 }),
   ki: Object.freeze({ sieg: 20, remis: 5, niederlage: -10 }),
   bot: Object.freeze({ sieg: 15, remis: 5, niederlage: 0 }),
+  // Etappe 5, Raetsel-Duell (supabase/raetsel-duell-schema.sql): gegen Menschen wie online, gegen den KI-Gegner wie ki
+  duell: Object.freeze({ sieg: 30, remis: 10, niederlage: -15 }),
+  duell_ki: Object.freeze({ sieg: 20, remis: 5, niederlage: -10 }),
 });
 export const BOT_TAGESGRENZE = 10; // entschieden 06.11.2026: gewertete Bot-Leiter-Ergebnisse je Tag (Europe/Berlin)
 export const KI_TAGESGRENZE = 20; // entschieden 06.11.2026: gewertete KI-Gegner-Ergebnisse je Tag (Europe/Berlin)

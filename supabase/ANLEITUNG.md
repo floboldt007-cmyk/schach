@@ -345,6 +345,68 @@ also einen Titel aus der Liste zeigen, den er nicht hat; Freitext ist ausgeschlo
 gewählten Karten sind danach weg (die Liga-Stufen leitet der Server beim nächsten Aufruf neu ab, die übrigen Stufen
 meldet das Gerät neu, gutgeschriebene Liga-Banner sind ohne Sicherung weg). Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in der Datei).
 
+## Rätsel-Duell (Stand 07.11.2026)
+
+Das Rätsel-Duell (Lobby-Karte „Rätsel-Duell“, vorerst nur im Labor) braucht drei SQL-Dateien und die Edge Function
+`raetsel-duell`. Ohne sie sagt die App beim Suchen oder Beitreten „Das ging gerade nicht …“ bzw. „Das Rätsel-Duell ist
+auf dem Server noch nicht eingerichtet.“; alles andere läuft weiter.
+
+**Für Flo, genau in dieser Reihenfolge:**
+
+1. Vorher muss die Liga mit Kronen eingerichtet sein (Abschnitt oben). **`supabase/kronen-schema.sql` noch einmal
+   ausführen:** Die Datei lässt jetzt auch die Kronen-Quellen `duell` und `duell_ki` zu und kennt deren Werte.
+2. **Zeitplaner einschalten (pg_cron), VOR Schritt 3:** Im Supabase-Dashboard links auf **Integrations** → **Cron** →
+   einschalten (englisch „Enable“). Ältere Dashboards haben das unter **Database** → **Extensions**: dort nach
+   `pg_cron` suchen und den Schalter umlegen. Wozu: Alle 10 Minuten wertet der Server dann jedes Duell aus, dessen
+   Zeit um ist. So entgeht niemand einer Niederlage, nur weil er die App zumacht.
+   - **Verfügbar im kostenlosen Tarif?** Die Supabase-Doku (abgerufen 07.11.2026) nennt für Cron keine Einschränkung
+     nach Tarif, sagt es aber auch nicht ausdrücklich. Prüfen: Lässt sich der Schalter umlegen, geht es.
+   - **Geht es nicht:** einfach weitermachen. Dann werten weiterhin Abfrage, Suche, Einladung und Beitritt aus; nur wer
+     nie wieder ein Duell anfängt, behält eine vermiedene Niederlage. Ausweg ohne pg_cron (nicht gebaut): ein
+     geplanter GitHub-Actions-Lauf, der eine kleine Edge Function aufruft.
+   - Wer Cron erst nach Schritt 3 einschaltet, führt Schritt 3 danach einfach noch einmal aus.
+3. **SQL Editor** → **New query** → den ganzen Inhalt von `supabase/raetsel-duell-schema.sql` → **Run**. Die Datei darf
+   mehrfach laufen. Unten unter **Messages** steht dann `Server-Lauf alle 10 Minuten eingeplant` (mit Cron) oder
+   `pg_cron ist nicht eingeschaltet` (ohne). Prüfen mit Cron: `select jobname, schedule from cron.job;` zeigt
+   `raetsel-duell-auswerten` mit `*/10 * * * *`. Ob die Läufe klappen, zeigt
+   `select status, start_time from cron.job_run_details order by start_time desc limit 5;` (Status `succeeded`).
+4. Den ganzen Inhalt von `supabase/raetsel-duell-daten.sql` ausführen: rund 3.000 Rätsel aus der Lichess-Datenbank
+   (CC0, Quelle und Abrufdatum stehen oben in der Datei). Wiederholbar, doppelte Rätsel werden übersprungen. Die Datei
+   ist etwa 460 KB groß; ob der SQL Editor sie in einem Stück annimmt, ist nicht geprüft. Lehnt er sie ab, die Datei in
+   zwei Hälften teilen (jede Hälfte braucht die Zeile `insert into … values` am Anfang und `on conflict do nothing;`
+   am Ende) oder sie über `psql` mit der Verbindungszeichenkette aus **Project Settings → Database** einspielen.
+   Prüfen: `select count(*) from public.duell_raetsel;` muss 3040 ergeben.
+5. **Edge Function hochladen:** im Terminal im Projektordner `npx supabase functions deploy raetsel-duell` (wie
+   `online-zug`: keine Secrets nötig, chess.js 1.4.0 holt Supabase selbst; weist schon das Gateway das Token ab, mit
+   `--no-verify-jwt` neu hochladen, die Function prüft die Anmeldung selbst).
+6. Prüfen: den ganzen Inhalt von `supabase/raetsel-duell-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler
+   beginnt mit `FEHLER:`), der Lauf endet mit `ROLLBACK`, es bleibt nichts zurück. Der Test prüft die Function nicht:
+   Unter **Edge Functions** muss `raetsel-duell` stehen.
+7. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch die
+   eigenen Duelle und eine laufende Duell-Suche (ohne die Rätsel-Folge eines laufenden Duells).
+8. Falls die App danach „noch nicht eingerichtet“ sagt: im SQL Editor einmal `notify pgrst, 'reload schema';`.
+9. **Testen:** im Labor mit zwei Konten „Mit einem Freund“ (Einladung und Code), dann „Gegner suchen“ allein: nach
+   10 Sekunden kommt der KI-Gegner. Unter **Edge Functions > raetsel-duell > Logs** stehen nur kurze Zeilen ohne Namen
+   oder Züge.
+
+**Was der Server sicherstellt:** Das Gerät schickt nur „Duell und Zug“. Rätsel-Folge, Zeit, 5 Sekunden Abzug je
+falschem Zug, die Ergebnisse des KI-Gegners und die Wertung rechnet der Server; die Lösungen verlassen ihn nie, das Gerät
+sieht nur das aktuelle Rätsel. Ein Zug nach dem eigenen Ende zählt nicht, zwei gleichzeitige Züge laufen nacheinander.
+Ausgewertet wird 3 Sekunden nach dem Ende, damit ein rechtzeitig abgeschickter Zug noch ankommt. Wer ein verlorenes
+Duell liegen lässt und nicht mehr abfragt, wird mit eingeschaltetem Cron nach spätestens gut 10 Minuten gewertet,
+sonst spätestens bei seiner nächsten Suche, Einladung oder seinem nächsten Beitritt.
+Kronen: gegen einen Menschen +30 / +10 / −15, gegen den KI-Gegner +20 / +5 / −10, je Duell und Konto höchstens einmal,
+höchstens 20 KI-Duelle am Tag und 3 gewertete Duelle am Tag gegen dieselbe Person, ohne einen eigenen Zug keine Kronen.
+Freundschaft per Code bringt keine Kronen; höchstens 5 offene Einladungen, höchstens 20 falsche Codes am Tag. Den
+KI-Gegner legt nur der Server an, und erst nach 10 Sekunden echter Suche. Mit dem Konto verschwindet alles.
+
+**Ehrliche Grenze:** Wer nebenher eine Engine oder die öffentliche Lichess-Datenbank befragt, findet die Lösungen. Das
+kann kein Server verhindern; die Regeln oben begrenzen nur, wie viele Kronen so jemand holen kann.
+
+**Rückweg:** `supabase/raetsel-duell-zurueck.sql` plant zuerst den Server-Lauf aus (falls Cron an ist) und entfernt
+dann alle Duelle, Duell-Rätsel und Duell-Funktionen. Cron selbst bleibt eingeschaltet, das stört nicht. Schon
+gebuchte Kronen aus Duellen bleiben stehen. Die Function danach im Dashboard unter **Edge Functions** löschen.
+
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 
 Flo: „Die ersten 100 Spieler bekommen einen Titel freigeschaltet.“ Die Datei `supabase/pionier-schema.sql` gibt den

@@ -1303,10 +1303,19 @@ begin
   if (r->>'delta')::int is distinct from 0 then
     raise exception 'FEHLER: Deckel: KI-Sieg ueber 300 gebucht (%)', r;
   end if;
+  -- Raetsel-Duell: gegen den KI-Gegner zaehlt es zum Deckel, gegen einen Menschen nicht
+  r := public.kronen_einfach_buchen(uid, 'duell_ki', 'deckel-4', 'sieg');
+  if (r->>'delta')::int is distinct from 0 then
+    raise exception 'FEHLER: Deckel: KI-Duell-Sieg ueber 300 gebucht (%)', r;
+  end if;
+  r := public.kronen_einfach_buchen(uid, 'duell', 'deckel-5', 'sieg');
+  if (r->>'delta')::int is distinct from 30 then
+    raise exception 'FEHLER: Deckel: Menschen-Duell gedeckelt (%)', r;
+  end if;
   if public.liga_bot_ki_genutzt(uid, wo) <> 300 or public.liga_bot_ki_genutzt(uid, wo + 7) <> 0 then
     raise exception 'FEHLER: Deckel: Zaehlung je Woche falsch';
   end if;
-  if (select kronen from public.liga_mitglieder where user_id = uid and woche = wo) <> 25 then
+  if (select kronen from public.liga_mitglieder where user_id = uid and woche = wo) <> 55 then
     raise exception 'FEHLER: Deckel: Wochen-Kronen der Gruppe falsch';
   end if;
 end;

@@ -323,6 +323,7 @@ declare
   kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'gruppen', '[]'::jsonb,
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
   karte jsonb := jsonb_build_object('stufen', '[]'::jsonb, 'taler', '[]'::jsonb, 'banner', '[]'::jsonb, 'wahl', null);
+  duelle jsonb := jsonb_build_object('duelle', '[]'::jsonb, 'suche', null);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -411,6 +412,17 @@ begin
                ''wahl'', (select to_jsonb(w) - ''user_id'' from public.karte_wahl w where w.user_id = $1))'
       into karte using uid;
   end if;
+  -- Raetsel-Duell (raetsel-duell-schema.sql): die eigenen Duelle mit dem eigenen Stand darin und die laufende Suche.
+  -- Ohne Saat und Raetsel-Folge: beide sind keine Daten ueber das Konto, und waehrend eines laufenden Duells verrieten
+  -- sie die kommenden Raetsel (Schummelschutz).
+  if to_regclass('public.duell_spieler') is not null then
+    execute 'select jsonb_build_object(
+               ''duelle'', coalesce((select jsonb_agg((to_jsonb(x) - ''seed'' - ''raetsel'') || jsonb_build_object(''mein_stand'',
+                   to_jsonb(s) - ''user_id'' - ''duell'') order by x.erstellt_am)
+                 from public.duell_spieler s join public.duelle x on x.id = s.duell where s.user_id = $1), ''[]''::jsonb),
+               ''suche'', (select to_jsonb(q) - ''user_id'' from public.duell_warteschlange q where q.user_id = $1))'
+      into duelle using uid;
+  end if;
   begin
     execute 'select coalesce(jsonb_agg(jsonb_build_object(''am'', e.created_at, ''aktion'', e.payload ->> ''action'',
                ''ip'', e.ip_address) order by e.created_at), ''[]''::jsonb)
@@ -447,6 +459,8 @@ begin
     'kronen', kronen,
     -- Visitenkarte und Erfolge: Stufen, Taler-Buchungen, Banner, gewaehlte Karte (leer ohne karte-schema.sql)
     'karte', karte,
+    -- Raetsel-Duell: eigene Duelle mit eigenem Stand, laufende Suche (leer ohne raetsel-duell-schema.sql)
+    'raetsel_duell', duelle,
     'partien_online', online,
     -- Fehlversuche beim Beitreten zu Online-Partien (Zahl je Tag; leer, wenn online-schema.sql fehlt)
     'online_versuche', versuche,

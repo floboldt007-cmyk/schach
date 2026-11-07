@@ -84,6 +84,8 @@ export const SCREEN_PAKET = Object.freeze({
   werkstatt: 'werkstatt',
   // Online-Lobby als Vorschau im Labor (Paket lobby, 01.11.2026)
   lobby: 'lobby',
+  // Raetsel-Duell (Etappe 5): Screen und Optik gehoeren zur Lobby
+  'raetsel-duell': 'lobby',
   // Welle B3: Lehrkraft-Ansicht des Schulmodus (Paket schule)
   schule: 'schule',
 });
@@ -374,8 +376,8 @@ function main() {
     && kernScreens.includes('premium') && kernScreens.includes('heim') && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
-  pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; B3: schule; lobby; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
-    JSON.stringify(paketScreens) === '["start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt","lobby","schule"]'
+  pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; B3: schule; lobby; Etappe 5: raetsel-duell; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
+    JSON.stringify(paketScreens) === '["start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt","lobby","raetsel-duell","schule"]'
     && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');

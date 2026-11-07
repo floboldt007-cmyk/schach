@@ -48,11 +48,16 @@ create table if not exists public.kronen_buchungen (
   delta integer not null,
   woche date not null,
   am timestamptz not null default now(),
-  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start')),
+  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start', 'duell', 'duell_ki')),
   constraint kronen_buchungen_ref check (char_length(ref) between 1 and 64),
   -- jede Partie und jeder Beleg wird je Konto hoechstens einmal gebucht
   constraint kronen_buchungen_einmal unique (user_id, quelle, ref)
 );
+-- Etappe 5 (Raetsel-Duell, supabase/raetsel-duell-schema.sql) bucht als 'duell' und 'duell_ki'. Fuer schon
+-- eingespielte Tabellen wird die Pruefung hier ersetzt (wiederholbar; alte Zeilen erfuellen sie weiter).
+alter table public.kronen_buchungen drop constraint if exists kronen_buchungen_quelle;
+alter table public.kronen_buchungen add constraint kronen_buchungen_quelle
+  check (quelle in ('online', 'ki', 'bot', 'start', 'duell', 'duell_ki'));
 -- fuer die Tagesgrenzen: Buchungen je Konto, Quelle und Zeit
 create index if not exists kronen_buchungen_tag on public.kronen_buchungen (user_id, quelle, am);
 
@@ -122,7 +127,9 @@ as $$
     'kronen', jsonb_build_object(
       'online', jsonb_build_object('sieg', 30, 'remis', 10, 'niederlage', -15),
       'ki', jsonb_build_object('sieg', 20, 'remis', 5, 'niederlage', -10),
-      'bot', jsonb_build_object('sieg', 15, 'remis', 5, 'niederlage', 0)
+      'bot', jsonb_build_object('sieg', 15, 'remis', 5, 'niederlage', 0),
+      'duell', jsonb_build_object('sieg', 30, 'remis', 10, 'niederlage', -15),
+      'duell_ki', jsonb_build_object('sieg', 20, 'remis', 5, 'niederlage', -10)
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
@@ -791,10 +798,11 @@ grant execute on function public.online_suche_ende(boolean) to authenticated;
 -- einmal. Antwort { delta, kronen, stufe } mit den Wochen-Kronen; eine schon gebuchte ref liefert den Stand mit delta 0.
 -- Nur intern. Parameter heissen bewusst nicht quelle/ref: gleichnamige Spalten waeren in PL/pgSQL sonst mehrdeutig.
 -- Schummel-Schutz (Flo 07.11.2026): Bot- und KI-Ergebnisse meldet der Client selbst, deshalb bringen sie zusammen
--- hoechstens bot_ki_wochen_max Kronen je Woche (nur Gewinne zaehlen). Online-Kronen prueft der Server, sie sind frei.
+-- hoechstens bot_ki_wochen_max Kronen je Woche (nur Gewinne zaehlen). Das KI-Raetsel-Duell (duell_ki) zaehlt mit, weil
+-- es gegen keinen Menschen geht. Online-Partien und Raetsel-Duelle gegen Menschen (duell) sind frei.
 -- Antwort zusaetzlich bot_ki_voll: true, sobald der Deckel erreicht ist.
 
--- Bot- und KI-Gewinne eines Kontos in einer Woche. Nur intern.
+-- Gewinne aus Bot, KI-Gegner und KI-Raetsel-Duell eines Kontos in einer Woche. Nur intern.
 create or replace function public.liga_bot_ki_genutzt(uid uuid, wo date)
 returns integer
 language sql
@@ -803,7 +811,7 @@ security definer
 set search_path = ''
 as $$
   select coalesce(sum(b.delta) filter (where b.delta > 0), 0)::integer from public.kronen_buchungen b
-  where b.user_id = uid and b.quelle in ('bot', 'ki') and b.woche = wo;
+  where b.user_id = uid and b.quelle in ('bot', 'ki', 'duell_ki') and b.woche = wo;
 $$;
 
 create or replace function public.kronen_einfach_buchen(uid uuid, art text, schluessel text, ergebnis text)
@@ -829,7 +837,7 @@ begin
   on conflict on constraint kronen_buchungen_einmal do nothing;
   get diagnostics gebucht = row_count;
   if gebucht > 0 then
-    if nominal > 0 then
+    if nominal > 0 and art in ('bot', 'ki', 'duell_ki') then
       nominal := least(nominal, greatest(0, deckel - public.liga_bot_ki_genutzt(uid, wo)));
     end if;
     -- auch mit 0 (gedeckelt oder Niederlage): die erste Partie der Woche bringt das Konto in seine Gruppe
@@ -931,8 +939,8 @@ grant execute on function public.kronen_bot_ergebnis(text, text, integer) to aut
 grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated;
 
 -- ---------- Task 6: Start-Liga fuer Bestandsspieler ----------
--- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI oder Bot): die Elo des Geraets, begrenzt auf
--- 400 bis 2800, wird zur Stufe III der Liga ihrer Spielklasse, hoechstens Dame III (SQL-Gegenstueck zu
+-- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI, Bot oder Raetsel-Duell): die Elo des Geraets,
+-- begrenzt auf 400 bis 2800, wird zur Stufe III der Liga ihrer Spielklasse, hoechstens Laeufer III (SQL-Gegenstueck zu
 -- startStufeAusElo in js/pakete/liga/kronen.js, Zahlen aus kronen_konstanten). Die Elo wird auch die Online-Elo.
 -- Kronen gibt es dafuer keine (die Buchung 'start' mit 0 ist nur der Merker).
 -- Antwort { delta: 0, kronen: 0, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_START_VORBEI' } ohne Aenderung.
@@ -959,7 +967,7 @@ begin
   -- kronen_stand_sichern sperrt die Zeile (for update): gleichzeitige Starts und Buchungen laufen nacheinander
   st := public.kronen_stand_sichern(uid);
   if st.start_gesetzt
-     or exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle in ('online', 'ki', 'bot')) then
+     or exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle in ('online', 'ki', 'bot', 'duell', 'duell_ki')) then
     return jsonb_build_object('fehler', 'KRONEN_START_VORBEI');
   end if;
   wert := least(greatest(kronen_start.elo, (konst->>'start_elo_min')::integer), (konst->>'start_elo_max')::integer);

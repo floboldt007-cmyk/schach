@@ -10,11 +10,13 @@ function pruefe(name, fn) {
   catch (e) { ergebnisse.push({ name, ok: false }); console.error('FEHLER ' + name + ': ' + e.message); }
 }
 
-pruefe('Konstanten wie entschieden (06.11. Kronen, 07.11. Wochen-Gruppen)', () => {
+pruefe('Konstanten wie entschieden (06.11. Kronen, 07.11. Wochen-Gruppen und Raetsel-Duell)', () => {
   assert.deepEqual(K.LIGEN, ['bauer', 'springer', 'laeufer', 'turm', 'dame', 'koenig']);
   assert.deepEqual(K.FARBEN, ['holz', 'bronze', 'silber', 'gold', 'diamant', 'krone']);
   assert.equal(K.STUFEN_JE_LIGA, 3); assert.equal(K.STUFEN_ANZAHL, 18);
-  assert.deepEqual(K.KRONEN, { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 } });
+  assert.deepEqual(K.KRONEN, { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 },
+    // Etappe 5 (07.11.2026): Raetsel-Duell gegen Menschen wie online, gegen den KI-Gegner wie ki
+    duell: { sieg: 30, remis: 10, niederlage: -15 }, duell_ki: { sieg: 20, remis: 5, niederlage: -10 } });
   assert.equal(K.BOT_TAGESGRENZE, 10); assert.equal(K.KI_TAGESGRENZE, 20); assert.equal(K.KI_MINDESTDAUER_S, 60);
   assert.equal(K.GRUPPE_GROESSE, 30); assert.equal(K.AUFSTIEG_PLAETZE, 5); assert.equal(K.ABSTIEG_PLAETZE, 5);
   assert.equal(K.BOT_ZIEL_MAX.length, K.LIGEN.length);
