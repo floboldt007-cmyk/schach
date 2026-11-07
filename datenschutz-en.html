@@ -175,9 +175,61 @@
   picture, background, frame and up to three achievements on show). Without an account, all of this stays on your device.
   This data is necessary for the app's features (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in
   Frankfurt, just like your account.</p>
-  <p>Your player card is visible only to the person playing the same online game with you: your username, title, banner,
-  profile picture, crown tier and the achievements on show. Other users and visitors without an account cannot see it.
+  <p>Your player card is visible only to the person playing the same online game with you (invited or via matchmaking):
+  your username, title, banner, profile picture, league tier and the achievements on show. Your weekly league group and
+  your opponents in the puzzle duel cannot see it, nor can other users or visitors without an account.
   Download my data includes this data. If your account is deleted, it is deleted automatically too.</p>
+
+  <!-- DRAFT stage B (league with weekly groups): legal review by Flo before going live on main -->
+  <h3>League with crowns and weekly groups (draft)</h3>
+  <p>With an account, you take part in the league. For this we store:</p>
+  <ul>
+    <li>your league tier (Pawn III to King I), your total crowns and an estimate of your playing strength (Elo) with the
+    number of games it is based on,</li>
+    <li>every crown entry with its source (online game, bot ladder, AI opponent, starting league, puzzle duel against a
+    person or against the AI), the ID of the game or duel, the change, the week and the time. The limits against abuse
+    (how many games count per day and how many crowns from bot and AI games count per week at most) are derived from these
+    entries; there are no separate counters,</li>
+    <li>for each week your group (week, tier), your crowns in that week and when you joined. You only join a group with your
+    first crown of the week,</li>
+    <li>the reward for your place at the end of the week (week, tier, place, type and amount) and whether it has been
+    credited,</li>
+    <li>during matchmaking: that you are searching, since when, with which time control and your playing strength (Elo),
+    so that an opponent of similar strength can be found. If no person is found, you receive a voucher for a game against
+    the AI opponent.</li>
+  </ul>
+  <p><b>Who sees what:</b> The up to 30 members of your weekly group see your username (without a username it says
+  "Player"), your place and your crowns this week. They see nothing else, in particular not your email address, your
+  player card, your Elo or your individual entries. Free places in the group are filled by computer-controlled players;
+  they are marked "AI", and no person is behind them. Other groups and visitors without an account cannot see your group.</p>
+  <p>This data is necessary for the league (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
+  just like your account. The database itself calculates the weekly result (place, promotion and relegation, reward). We
+  delete a matchmaking search after 2 minutes without a partner and unused AI vouchers after 6 hours, each at the next
+  clean-up. Tier, entries, past weekly groups and rewards remain stored until you delete your account; they are then
+  deleted automatically. Download my data includes all of this.
+  <span class="platz">[Have a professional confirm keeping past weeks until account deletion]</span></p>
+
+  <!-- DRAFT stage B (puzzle duel): legal review by Flo before going live on main -->
+  <h3>Puzzle duel (draft)</h3>
+  <p>In the puzzle duel, two players solve the same chess puzzles for three minutes. With an account, we store for each
+  duel the type (rated, between friends or against the AI), the account IDs of both players, for a duel between friends
+  the invitation code, the order of the puzzles, start, duration, status and result, and for each player how many puzzles
+  were solved and how many mistakes were made, the number of moves and the time of the last move. During matchmaking we
+  store that you are searching, since when and your playing strength (Elo), so that an opponent of similar strength can be
+  found. Crowns you win are entered as in the league; the daily limits (at most 20 duels against the AI and 3 rated duels
+  against the same person per day) are derived from these entries. Wrongly entered invitation codes are counted as for
+  online games.</p>
+  <p><b>Who sees what:</b> During and after the duel, your opponent only sees how many puzzles you solved, how many
+  mistakes you made and when your time ends. They do not see your username, your player card or your email address in the
+  duel. The AI opponent is not a person but is calculated by the server; the app marks it as AI. Uninvolved people cannot
+  see any duel.</p>
+  <p>This data is necessary for the duel (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
+  just like your account. Your moves are checked by a Supabase server program (Edge Function)
+  <span class="platz">[Check the location of Edge Functions with Supabase]</span>. Every duel is evaluated on the server:
+  at the next request and additionally every 10 minutes by a scheduler in the database (pg_cron), so that a duel also
+  ends when nobody opens the app any more. We delete a matchmaking search after 2 minutes without a partner and
+  invitations nobody accepted after 24 hours. Finished duels remain stored until one of the two accounts is deleted; the
+  duel is then deleted for both. Download my data includes your duels with your own status in them.</p>
 
   <h3>Online games with friends</h3>
   <p>When you play a friend online, we store both account IDs, the moves, current position, chess clock, invitation code,
