@@ -38,7 +38,7 @@ export const FAMILIEN = Object.freeze([
     alt: ['serie-7', 'serie-30', 'serie-100'] },
   { id: 'level', gruppe: 'level', ziele: fest(10, 20, 30), wert: (s) => s.level, gold: { titel: 'level-30' },
     alt: ['level-10', 'level-20', 'level-30'] },
-  // Kronen-Stufen (js/pakete/liga/kronen.js, 0 = Holz III): Silber III ab 6, Gold III ab 9, Krone III ab 15
+  // Liga-Stufen (kronen_stand.stufe, js/pakete/liga/kronen.js, 0 = Bauer III): Laeufer III ab 6, Turm III ab 9, Koenig III ab 15
   { id: 'liga', gruppe: 'liga', ziele: fest(6, 9, 15), wert: (s) => (Number.isInteger(s.ligaStufe) ? s.ligaStufe : -1),
     gold: { titel: 'erfolg-ligakrone' }, alt: ['liga-1', 'liga-2', 'liga-3', 'liga-4', 'liga-5', 'liga-6'], server: true },
 ].map((f) => Object.freeze({ ...f, gold: Object.freeze(f.gold), alt: Object.freeze(f.alt) })));

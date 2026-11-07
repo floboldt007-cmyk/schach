@@ -11,8 +11,8 @@
 -- BEKANNTE GRENZE (Flo 07.11.2026 so entschieden): Bot-, Raetsel-, Serie- und Level-Stufen meldet das Geraet, weil diese
 -- Partien nur dort laufen; ein geuebter Schummler kann sie vortaeuschen. Begrenzt ist das durch die feste Zahl der
 -- Stufen (10 Familien, je 3) und weil Taler nur Erspielbares kaufen. Die Liga-Stufen leitet der Server selbst aus
--- kronen_stand und kronen_archiv ab; die meldet niemand. Liga-Banner schreibt nur der Server gut
--- (karte_banner_gutschreiben, aufgerufen vom Liga-Umbau nach Konzept 5a).
+-- kronen_stand.stufe und den Wochen-Gruppen (liga_mitglieder, liga_gruppen) ab; die meldet niemand. Liga-Banner schreibt
+-- nur der Server gut (karte_banner_gutschreiben, aufgerufen von liga_abrechnen in kronen-schema.sql).
 --
 -- Wer die Karte eines anderen sieht: nur der Gegner einer gemeinsamen Online-Partie (karte_der_partie), mit
 -- Benutzername. Datenschutz-Text dazu: datenschutz.html (Entwurf, Rechtspruefung vor dem Live-Gang).
@@ -98,11 +98,13 @@ as $$
       'level', jsonb_build_object('titel', 'level-30'),
       'liga', jsonb_build_object('titel', 'erfolg-ligakrone', 'server', true)
     ),
-    -- Kronen-Stufen (kronen_stufe) fuer Bronze, Silber, Gold der Familie liga: Silber III, Gold III, Krone III
+    -- Liga-Stufen (kronen_stand.stufe, 0 = Bauer III) fuer Bronze, Silber, Gold der Familie liga: Laeufer III, Turm III,
+    -- Koenig III (gleiche Farben wie frueher Silber III, Gold III, Krone III)
     'liga_ziele', jsonb_build_array(6, 9, 15),
     'start_banner', 'start',
-    -- Liga-Banner (Bilder aus assets/banner, Ids bleiben): vergibt kuenftig der Liga-Umbau (Konzept 5a, Platz 1 der
-    -- Wochen-Gruppe, erster Aufstieg) ueber karte_banner_gutschreiben. Welche Liga welches Banner bekommt, entscheidet er.
+    -- Liga-Banner (Bilder aus assets/banner, Ids bleiben), je Liga eins in der Reihenfolge Bauer bis Koenig (Farben Holz
+    -- bis Krone): liga_abrechnen schreibt es ueber karte_banner_gutschreiben gut, sobald eine Woche ein Banner bringt
+    -- (Platz 1 der Wochen-Gruppe, erster Aufstieg in eine Liga), immer das Banner der Liga der Gruppe.
     'liga_banner', jsonb_build_array('saison-holz', 'saison-bronze', 'saison-silber', 'saison-gold', 'saison-diamant', 'saison-krone'),
     'titel', jsonb_build_array(
       'level-1', 'level-5', 'level-10', 'level-15', 'level-20', 'level-25', 'level-30', 'level-35', 'level-40', 'level-45',
@@ -184,15 +186,19 @@ begin
   end if;
   insert into public.banner_besitz (user_id, banner, quelle) values (uid, k ->> 'start_banner', 'start') on conflict do nothing;
   insert into public.karte_wahl (user_id) values (uid) on conflict (user_id) do nothing;
-  -- Kronen: beste Stufe dieser Saison und aller archivierten (kronen-schema.sql muss eingespielt sein)
+  -- Kronen: beste Stufe aus dem Stand und allen Wochen-Gruppen, in denen das Konto war (kronen-schema.sql muss
+  -- eingespielt sein). Die Stufe sinkt nach einer schwachen Woche, eine einmal erreichte Erfolgs-Stufe bleibt.
   select greatest(
-    coalesce((select public.kronen_stufe(s.kronen) from public.kronen_stand s where s.user_id = uid), -1),
-    coalesce((select max(a.stufe) from public.kronen_archiv a where a.user_id = uid), -1)
+    coalesce((select s.stufe from public.kronen_stand s where s.user_id = uid), -1),
+    coalesce((select max(g.stufe) from public.liga_mitglieder m join public.liga_gruppen g on g.id = m.gruppe
+              where m.user_id = uid), -1)
   ) into beste;
   for i in 1..3 loop
     exit when beste < (k -> 'liga_ziele' ->> (i - 1))::integer;
     perform public.karte_buche_stufe(uid, 'liga', i);
   end loop;
+  -- Liga-Banner, die die Abrechnung gemerkt hat, bevor es dieses Schema gab
+  perform public.karte_liga_banner_nachtragen(uid);
 end;
 $$;
 
@@ -216,6 +222,35 @@ begin
   insert into public.banner_besitz (user_id, banner, quelle) values (uid, banner, 'liga') on conflict do nothing;
   get diagnostics n = row_count;
   return n > 0;
+end;
+$$;
+
+-- Zahlt die gemerkten Liga-Banner eines Kontos aus (liga_belohnungen art 'banner' = Platz 1 der Wochen-Gruppe,
+-- 'aufstieg-banner' = erster Aufstieg in eine Liga): je Zeile das Banner der Liga dieser Stufe (stufe / 3, Bauer bis
+-- Koenig = Holz bis Krone), danach ausgezahlt. Taler bleiben gemerkt, die zahlt eine spaetere Etappe aus.
+-- Aufgerufen von liga_abrechnen (kronen-schema.sql) und karte_sichern. Nur intern.
+create or replace function public.karte_liga_banner_nachtragen(uid uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k jsonb := public.karte_konstanten();
+  r record;
+  n integer := 0;
+begin
+  for r in select x.woche, x.art, x.stufe from public.liga_belohnungen x
+           where x.user_id = uid and x.art in ('banner', 'aufstieg-banner') and not x.ausgezahlt
+           order by x.woche, x.art for update
+  loop
+    if public.karte_banner_gutschreiben(uid, k -> 'liga_banner' ->> (r.stufe / 3)) then
+      n := n + 1;
+    end if;
+    update public.liga_belohnungen x set ausgezahlt = true
+    where x.user_id = uid and x.woche = r.woche and x.art = r.art;
+  end loop;
+  return n;
 end;
 $$;
 
@@ -341,7 +376,7 @@ declare
 begin
   select * into w from public.karte_wahl x where x.user_id = uid;
   select p.benutzername into name from public.profile p where p.user_id = uid;
-  select public.kronen_stufe(s.kronen) into stufe from public.kronen_stand s where s.user_id = uid;
+  select s.stufe into stufe from public.kronen_stand s where s.user_id = uid;
   return jsonb_build_object(
     'name', name,
     -- ein Banner, das nicht (mehr) im Besitz ist, zeigt das Start-Banner
@@ -389,6 +424,7 @@ revoke all on function public.karte_in_liste(text, text) from public, anon, auth
 revoke all on function public.karte_buche_stufe(uuid, text, integer) from public, anon, authenticated;
 revoke all on function public.karte_sichern(uuid) from public, anon, authenticated;
 revoke all on function public.karte_banner_gutschreiben(uuid, text) from public, anon, authenticated;
+revoke all on function public.karte_liga_banner_nachtragen(uuid) from public, anon, authenticated;
 revoke all on function public.karte_mein_stand() from public, anon, authenticated;
 revoke all on function public.karte_melde_stufen(jsonb) from public, anon, authenticated;
 revoke all on function public.karte_waehle(text, text, text[], text, text, text) from public, anon, authenticated;

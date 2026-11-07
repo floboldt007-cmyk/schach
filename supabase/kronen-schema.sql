@@ -282,6 +282,10 @@ begin
         values (r.user_id, g.woche, neu, r.platz, 'aufstieg-banner', 1)
         on conflict on constraint liga_belohnungen_einmal do nothing;
       end if;
+      -- Banner gleich in die Sammlung (karte-schema.sql, falls eingespielt; sonst holt karte_sichern sie spaeter nach)
+      if pg_catalog.to_regprocedure('public.karte_liga_banner_nachtragen(uuid)') is not null then
+        perform public.karte_liga_banner_nachtragen(r.user_id);
+      end if;
     end loop;
     update public.liga_gruppen x set abgerechnet = true where x.id = g.id;
   end loop;

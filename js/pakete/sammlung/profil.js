@@ -25,7 +25,7 @@ import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
 import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText } from '../../ui/visitenkarte.js';
-import { kronenSpeicher, stufeVon as kronenStufe } from '../liga/kronen.js';
+import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
 import { familieVonAlt, FAMILIEN } from './stufen.js';
@@ -97,7 +97,8 @@ export function eigenesBanner(uid = kontoId()) {
 function eigeneKronenStufe(uid = kontoId()) {
   try {
     const k = kronenSpeicher(ladeModul('kronen'));
-    return uid && k.konto === uid && k.stand ? kronenStufe(k.stand.kronen).index : null;
+    // Wochen-Gruppen: die Stufe steht im Stand (stand.kronen sind nur die Kronen dieser Woche)
+    return uid && k.konto === uid && k.stand && Number.isInteger(k.stand.stufe) ? stufeInfo(k.stand.stufe).index : null;
   } catch (e) { return null; }
 }
 export function eigeneKartenDaten() {

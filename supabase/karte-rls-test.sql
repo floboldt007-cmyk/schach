@@ -15,22 +15,29 @@ insert into public.profile (user_id, benutzername)
 values ('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'karte_a'), ('b1b1b1b1-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'karte_b');
 
 -- Testhilfen als Besitzer (Nutzer duerfen weder Kronen noch Partien direkt schreiben)
-create function pg_temp.setze_kronen(uid uuid, k integer)
+create function pg_temp.setze_stufe(uid uuid, st integer)
 returns void
 language sql
 security definer
 set search_path = ''
 as $$
-  insert into public.kronen_stand (user_id, kronen, boden) values (uid, k, 0)
-  on conflict (user_id) do update set kronen = excluded.kronen, boden = 0;
+  insert into public.kronen_stand (user_id, stufe) values (uid, st)
+  on conflict (user_id) do update set stufe = excluded.stufe;
 $$;
-create function pg_temp.archiv(uid uuid, nr integer, st integer)
+-- eine schon abgerechnete Wochen-Gruppe der Vorwoche in Stufe st, ohne Belohnung
+create function pg_temp.alte_gruppe(uid uuid, st integer)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = ''
 as $$
-  insert into public.kronen_archiv (user_id, saison, kronen, stufe) values (uid, nr, st * 100, st);
+declare
+  gid bigint;
+begin
+  insert into public.liga_gruppen (woche, stufe, abgerechnet) values (public.liga_woche_heute() - 7, st, true)
+  returning id into gid;
+  insert into public.liga_mitglieder (gruppe, user_id, woche) values (gid, uid, public.liga_woche_heute() - 7);
+end;
 $$;
 create function pg_temp.partie()
 returns uuid
@@ -48,7 +55,7 @@ begin
   return p;
 end;
 $$;
-revoke all on function pg_temp.setze_kronen(uuid, integer), pg_temp.archiv(uuid, integer, integer), pg_temp.partie() from public;
+revoke all on function pg_temp.setze_stufe(uuid, integer), pg_temp.alte_gruppe(uuid, integer), pg_temp.partie() from public;
 create temp table karte_test_partie as select pg_temp.partie() as id;
 grant select on karte_test_partie to authenticated, anon;
 
@@ -119,15 +126,15 @@ $$;
 reset role;
 
 -- ---------- 3. Liga-Stufen aus den Kronen, Liga-Banner nur per Gutschrift ----------
-select pg_temp.setze_kronen('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 950);
-select pg_temp.archiv('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 1, 7);
+select pg_temp.setze_stufe('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 9);
+select pg_temp.alte_gruppe('a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 7);
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"a1a1a1a1-aaaa-4aaa-8aaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 do $$
 declare
   s jsonb := public.karte_mein_stand();
 begin
-  -- 950 Kronen = Stufe 9 (Gold III): liga Bronze und Silber. Das Archiv gibt KEIN Banner (Konzept 5a, keine Saison-Ende-Vergabe)
+  -- Stufe 9 (Turm III): liga Bronze und Silber. Eine fruehere Gruppe ohne Belohnung gibt KEIN Banner (Konzept 5a)
   if (s -> 'stufen' ->> 'liga')::integer <> 2 then raise exception 'FEHLER: Liga-Stufen aus Kronen %', s; end if;
   if (s -> 'banner') ? 'saison-silber' then raise exception 'FEHLER: Banner aus dem Archiv %', s; end if;
   if (s ->> 'taler')::integer <> 260 + 70 then raise exception 'FEHLER: Liga-Stufen zahlen keine Taler %', s; end if;
@@ -303,6 +310,50 @@ begin
   exception when insufficient_privilege then
     null;
   end;
+end;
+$$;
+reset role;
+
+-- ---------- 7. Liga-Banner aus der Wochen-Abrechnung ----------
+-- C allein in einer Gruppe der Vorwoche (Springer II, Stufe 5) mit uneinholbar vielen Kronen: Platz 1 bringt das
+-- Banner der Gruppen-Liga (Springer = saison-bronze), der Aufstieg nach Laeufer III das Banner von Laeufer
+-- (saison-silber). liga_abrechnen schreibt beide gut, die Taler bleiben gemerkt.
+do $$
+declare
+  uid uuid := 'c1c1c1c1-cccc-4ccc-8ccc-cccccccccccc';
+  gid bigint;
+begin
+  perform public.karte_sichern(uid);
+  insert into public.kronen_stand (user_id, stufe) values (uid, 5) on conflict (user_id) do update set stufe = 5;
+  insert into public.liga_gruppen (woche, stufe) values (public.liga_woche_heute() - 7, 5) returning id into gid;
+  insert into public.liga_mitglieder (gruppe, user_id, woche, kronen) values (gid, uid, public.liga_woche_heute() - 7, 100000);
+  perform public.liga_abrechnen();
+  if (select stufe from public.kronen_stand where user_id = uid) <> 6 then
+    raise exception 'FEHLER: Liga-Banner: Aufstieg fehlt';
+  end if;
+  if (select array_agg(banner order by banner) from public.banner_besitz where user_id = uid and quelle = 'liga')
+     is distinct from array['saison-bronze', 'saison-silber'] then
+    raise exception 'FEHLER: Liga-Banner nicht gutgeschrieben (%)',
+      (select array_agg(banner) from public.banner_besitz where user_id = uid);
+  end if;
+  if exists (select 1 from public.liga_belohnungen where user_id = uid and art <> 'taler' and not ausgezahlt) then
+    raise exception 'FEHLER: Liga-Banner nicht als ausgezahlt markiert';
+  end if;
+  -- Nachtragen ist idempotent: nichts Neues, keine doppelten Banner
+  if public.karte_liga_banner_nachtragen(uid) <> 0
+     or (select count(*) from public.banner_besitz where user_id = uid and quelle = 'liga') <> 2 then
+    raise exception 'FEHLER: Liga-Banner doppelt nachgetragen';
+  end if;
+end;
+$$;
+-- Das Geraet darf nicht nachtragen
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"c1c1c1c1-cccc-4ccc-8ccc-cccccccccccc","role":"authenticated"}', true);
+do $$
+begin
+  perform public.karte_liga_banner_nachtragen('c1c1c1c1-cccc-4ccc-8ccc-cccccccccccc');
+  raise exception 'FEHLER: karte_liga_banner_nachtragen vom Geraet aufrufbar';
+exception when insufficient_privilege then null;
 end;
 $$;
 reset role;

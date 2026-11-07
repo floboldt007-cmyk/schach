@@ -18,7 +18,7 @@ import { waehle } from '../orte.js';
 import { t } from '../sprache.js';
 import { floAvatar, profilAvatar, avatarVon } from '../thema.js';
 import { profilWahl } from '../profil.js';
-import { stufeVon } from '../pakete/liga/kronen.js';
+import { stufeInfo } from '../pakete/liga/kronen.js';
 import '../pakete/sammlung/karte-texte.js';
 
 const K = (k, w) => t('p-karte.' + k, w);
@@ -52,14 +52,14 @@ export function botBanner(bot) {
   return BOT_BANNER[h % BOT_BANNER.length];
 }
 
-// EINZIGE Zuordnung Kronen-Liga -> angezeigter Liga-Name (Konzept 5a: Bauer bis Koenig, je Stufe I-III). Der Liga-Umbau
-// stellt hier um, wenn die Kronen-Stufen selbst umbenannt werden; die Texte stehen in karte-texte.js unter liga.*.
+// EINZIGE Zuordnung Liga-Farbe -> angezeigter Liga-Name (Konzept 5a: Bauer bis Koenig, je Stufe I-III; Farben Holz bis
+// Krone wie die Banner). Die Stufe ist kronen_stand.stufe (0 = Bauer III); die Texte stehen in karte-texte.js unter liga.*.
 export const LIGA_NAMEN = Object.freeze({ holz: 'bauer', bronze: 'springer', silber: 'laeufer', gold: 'turm', diamant: 'dame', krone: 'koenig' });
 const ROEMISCH = ['', 'I', 'II', 'III'];
 export function kronenText(index) {
   if (!Number.isInteger(index) || index < 0) return '';
-  const s = stufeVon(index * 100);
-  return `${K('liga.' + (LIGA_NAMEN[s.liga] || s.liga))} ${ROEMISCH[s.rang]}`;
+  const s = stufeInfo(index);
+  return `${K('liga.' + (LIGA_NAMEN[s.farbe] || s.liga))} ${ROEMISCH[s.rang]}`;
 }
 
 export function botKarte(bot) {

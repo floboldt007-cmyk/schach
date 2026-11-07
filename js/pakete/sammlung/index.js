@@ -19,7 +19,7 @@ import { shopBereich } from './shop.js';
 import { erfinderBereich } from './erfinder.js';
 import { hoere } from '../../ereignisse.js';
 import { ladeBesitz, abgleichen, zaehleRaetsel } from '../../besitz.js';
-import { kronenSpeicher, stufeVon as kronenStufe } from '../liga/kronen.js';
+import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { FAMILIEN, familienStand } from './stufen.js';
 import { zeigeStufen } from './moment.js';
 import { titelJetzt, talerJetzt } from './profil.js';
@@ -219,7 +219,8 @@ export function stufenStand(f = ladeFortschritt(), z = spielstand(), pa = partie
   let ligaStufe = -1;
   try {
     const k = kronenSpeicher(ladeModul('kronen', {}));
-    if (k.stand) ligaStufe = kronenStufe(k.stand.kronen).index;
+    // Wochen-Gruppen: die Stufe steht im Stand (stand.kronen sind nur die Kronen dieser Woche)
+    if (k.stand && Number.isInteger(k.stand.stufe)) ligaStufe = stufeInfo(k.stand.stufe).index;
   } catch (e) { ligaStufe = -1; }
   return {
     // jeder besiegte Bot (Stern) ist mindestens ein Sieg, auch in Spielstaenden ohne Siegzaehler
