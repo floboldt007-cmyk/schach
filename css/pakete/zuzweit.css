@@ -10,7 +10,6 @@
 .zz-start .zz-schalter { display: flex; align-items: center; min-height: var(--tipp); gap: var(--a3); }
 .zz-schalter input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--akzent); }
 .zz-hinweis { color: var(--text-2); font-size: var(--fs-klein); }
-.zz-spielbereich { display: grid; gap: var(--a3); width: min(100%, 680px, calc(100dvh - 300px)); min-width: min(100%, 280px); margin: auto; }
 .zz-spieler { display: flex; align-items: center; gap: var(--a3); padding: var(--a2) var(--a3); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
 .zz-spieler > img { width: 44px; height: 44px; flex-shrink: 0; background: var(--feld-hell); border-radius: var(--r-s); }
 .zz-name { display: grid; flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -18,12 +17,68 @@
 .zz-gegenueber { transform: rotate(180deg); }
 .zz-spieler .uhr { flex-shrink: 0; }
 .zz-spieler .uhr[hidden] { display: none; }
-.partie .zz-rahmen { width: 100%; }
 .zz-brett { width: 100%; aspect-ratio: 1; }
 .zz-status { margin: 0; text-align: center; min-height: 1.5em; }
 .zz-aktionen { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--a3); }
 .zz-aktionen .knopf { min-height: var(--tipp); }
-.zz-zuege { max-height: 4em; overflow: auto; color: var(--text-2); font-size: var(--fs-klein); }
+/* hoch feste Hoehe (--zz-zuege, sonst schrumpft das Brett mit jedem Zug), quer fuellt die Liste den Rest der Spalte */
+.zz-zuege { overflow: auto; color: var(--text-2); font-size: var(--fs-klein); line-height: 1.4; }
 .zz-ergebnis { padding: var(--a4); text-align: center; }
 .zz-ergebnis h3 { overflow-wrap: anywhere; }
 .zz-ergebnis[hidden] { display: none; }
+/* Partie (Flo 07.11.2026: "Das ganze Bild kann das Schachbrett sein"): nichts scrollt, das Brett nimmt, was frei ist.
+   Die Brettkante --zz-brett rechnet aus dem Rumpf (Container zz). Hoch eine Spalte in Brettbreite: Schwarz, Brett,
+   Weiss direkt aneinander, die freie Hoehe danach (naeher am Daumen, Konzept Abschnitt 7), unten Status, Knoepfe und
+   Zuege. Dafuer haben diese Zeilen hoch feste Hoehen (--zz-reserve). Quer wie die Bot-Partie (Konzept Abschnitt 8):
+   Brett links so hoch wie der Rumpf, rechts eine Spalte mit Schwarz oben, Status und Zuegen, Weiss und den Knoepfen
+   unten. Das Ergebnis liegt ueber dem Brett, damit am Ende nichts springt. */
+.zz-rumpf:has(> .zz-spielbereich) { overflow: hidden; padding: var(--a2) var(--a4) var(--a3); container: zz / size; }
+.zz-spielbereich { --zz-luecke: var(--a2); --zz-karte: 62px; --zz-zeile: 24px; --zz-knopf: 48px; --zz-zuege: 36px;
+  --zz-reserve: calc(2 * var(--zz-karte) + var(--zz-zeile) + var(--zz-knopf) + var(--zz-zuege) + 6 * var(--zz-luecke));
+  --zz-brett: min(100cqw, calc(100cqh - var(--zz-reserve)));
+  display: grid; gap: var(--zz-luecke); height: 100%; justify-content: center;
+  grid-template-columns: var(--zz-brett); grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "oben" "brett" "unten" "." "status" "aktionen" "zuege"; }
+.zz-oben { grid-area: oben; }
+.zz-unten { grid-area: unten; }
+.zz-feld { grid-area: brett; }
+.zz-status { grid-area: status; }
+.zz-spielbereich > .zz-aktionen { grid-area: aktionen; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.zz-spielbereich > .zz-aktionen .knopf { min-width: 0; padding-left: var(--a2); padding-right: var(--a2); white-space: normal; line-height: 1.15; }
+.zz-zuege { grid-area: zuege; }
+.zz-spielbereich > .zz-ergebnis { grid-area: brett; align-self: end; z-index: 5; margin: var(--a3); box-shadow: var(--s2, var(--s1)); }
+@media (orientation: portrait) {
+  .zz-spielbereich > .zz-spieler { height: var(--zz-karte); }
+  .zz-status { height: var(--zz-zeile); min-height: 0; line-height: var(--zz-zeile); }
+  .zz-spielbereich > .zz-aktionen .knopf { height: var(--zz-knopf); min-height: 0; }
+  .zz-zuege { height: var(--zz-zuege); }
+}
+/* niedrige Hochformate (kleines Handy): Karten knapper, damit das Brett nicht schrumpft */
+@media (orientation: portrait) and (max-height: 720px) {
+  .zz-spielbereich { --zz-karte: 52px; }
+  .zz-spieler { padding-top: var(--a1); padding-bottom: var(--a1); }
+  .zz-spieler > img { width: 36px; height: 36px; }
+}
+@media (orientation: landscape) {
+  .zz-spielbereich { --zz-seite: clamp(220px, 29vw, 400px);
+    --zz-brett: min(100cqh, calc(100cqw - var(--zz-seite) - var(--zz-luecke)));
+    gap: var(--zz-luecke) var(--a4);
+    grid-template-columns: var(--zz-brett) var(--zz-seite); grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "brett oben" "brett status" "brett zuege" "brett unten" "brett aktionen"; }
+  .zz-zuege { min-height: 0; }
+}
+/* niedrige Querfenster (Handy quer): Karten ohne Bild, kleine Uhr, sonst ragten Weiss und die Knoepfe aus dem Bild */
+@media (orientation: landscape) and (max-height: 500px) {
+  .zz-rumpf:has(> .zz-spielbereich) { padding-top: var(--a1); padding-bottom: var(--a2); }
+  .zz-spieler { padding: var(--a1) var(--a2); }
+  .zz-spieler > img { display: none; }
+  .zz-spieler .uhr { min-width: 66px; height: 36px; padding: 0 9px; border-radius: 11px; font-size: 17px; }
+}
+/* Handy hoch: Brett von Rand zu Rand wie in der Bot-Partie, Karten und Knoepfe behalten ihren Rand */
+@media (orientation: portrait) and (max-width: 600px) {
+  .zz-rumpf:has(> .zz-spielbereich) { padding: var(--a2) 0 calc(var(--a2) + env(safe-area-inset-bottom)); }
+  .zz-spielbereich > :not(.zz-feld) { margin-left: var(--rand-brett-handy); margin-right: var(--rand-brett-handy); }
+  .zz-spielbereich > .zz-ergebnis { margin: var(--a3); }
+  .zz-spielbereich > .zz-aktionen { gap: var(--a2); }
+  .zz-spielbereich > .zz-aktionen .knopf { font-size: var(--fs-klein); }
+}

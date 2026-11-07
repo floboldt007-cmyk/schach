@@ -2113,7 +2113,8 @@ async function testeSpielFundament(browser) {
   {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 1180, h: 820, touch: true });
     const falsch = [];
-    for (const name of ['bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle']) {
+    // lernen und lektion stehen seit 07.11.2026 allen offen (Meisterschule, js/pakete/lernen/zugang.js), tests/lernen.test.mjs
+    for (const name of ['bestenliste', 'raetsel', 'ich', 'spielplan', 'spielhalle']) {
       await seite.goto(BASIS + '#' + name);
       // w0plus-a-fix: nur der Hash aendert sich (gleiches Dokument), die alte Arena steht noch, bis der Router den Import
       // des fehlenden Screens abgeschlossen hat; deshalb auf den Hash warten (vorher Wackler unter Last: "raetsel")
@@ -2122,7 +2123,7 @@ async function testeSpielFundament(browser) {
       const r = await seite.evaluate(() => ({ hash: location.hash, platzhalter: !!document.querySelector('.screen.platzhalter') }));
       if (r.hash !== '#arena' || r.platzhalter) falsch.push(name);
     }
-    pruefe('Neue Paket-Screens (bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle) ohne Datei: still zur Arena, kein Platzhalter', falsch.length === 0, falsch.join());
+    pruefe('Neue Paket-Screens (bestenliste, raetsel, ich, spielplan, spielhalle) ohne Datei: still zur Arena, kein Platzhalter', falsch.length === 0, falsch.join());
     await seite.evaluate(() => window.__app.gehe('spielplan'));
     await seite.waitForFunction(() => location.hash === '#arena' && !!document.querySelector('.screen.arena'));
     pruefe('gehe("spielplan") ohne Paket: Arena', await seite.locator('.screen.platzhalter').count() === 0);
