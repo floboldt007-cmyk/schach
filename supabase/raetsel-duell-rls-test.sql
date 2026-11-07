@@ -3,7 +3,8 @@
 -- zurueckgerollt. Drei kurzlebige Nutzer: A, B und C. Jeder Fehler bricht mit "FEHLER: ..." ab.
 -- Abschnitte: 1 Rechte; 2 Raetsel-Folge; 3 KI-Verlauf; 4 Gegnersuche und Stand; 5 Zuege (richtig, mehrzuegig, falsch,
 -- veraltet, Zeit); 6 Auswertung und Kronen; 7 ohne Zug keine Kronen; 8 Paar-Grenze; 9 KI-Gegner; 10 Freundschaft;
--- 11 Start-Liga nach einem Duell; 12 Fremde sehen nichts.
+-- 11 Start-Liga nach einem Duell; 12 Fremde sehen nichts; 13 Gnadenfrist, Auswertung ohne Abfrage, Grenzen fuer
+-- Einladungen und Codes.
 -- Die Uhr steht in einer Transaktion still (now() ist der Beginn): die Testhilfen schieben deshalb Startzeit und
 -- Wartezeit zurueck, statt zu warten.
 begin;
@@ -570,6 +571,128 @@ do $$
 begin
   if public.duell_stand((select id from t_duell)) is distinct from '{"fehler": "DUELL_UNBEKANNT"}'::jsonb then
     raise exception 'FEHLER: Fremder sieht ein Duell';
+  end if;
+end;
+$$;
+reset role;
+
+-- ---------- 13. Gnadenfrist, Auswertung ohne Abfrage, Grenzen fuer Einladungen und Codes ----------
+-- (Pruefer-Befunde vom 07.11.2026: Wer nach einem verlorenen KI-Duell nie mehr abfragt, darf der Niederlage nicht
+-- entgehen; ein Zug, der vor dem Ende ankam, darf nicht an einer gleichzeitigen Auswertung scheitern.)
+create temp table t_gnade (id uuid);
+grant select, insert on t_gnade to authenticated;
+do $$
+declare
+  b uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  d uuid := public.duell_anlegen('ki', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', null, 3000);
+  r jsonb;
+begin
+  insert into t_gnade values (d);
+  perform pg_temp.zurueck(d, 10);
+  -- B macht einen falschen Zug (eigenes Ende damit 175 s), die starke KI loest viel
+  perform pg_temp.zug(b, d, 0, 0, false, false, 5);
+  -- Uhr bis kurz nach beiden Enden (KI 180 s, B 175 s), aber noch in der Gnadenfrist von 3 s
+  perform pg_temp.zurueck(d, 174);
+  perform public.duell_auswerten(d);
+  if (select status from public.duelle where id = d) <> 'laeuft' then
+    raise exception 'FEHLER: in der Gnadenfrist schon ausgewertet';
+  end if;
+  -- ein Zug, der bei 174 s ankam (vor dem eigenen Ende 175 s), wird jetzt noch verbucht
+  r := pg_temp.zug(b, d, 1, 0, false, false, 174);
+  if (r->>'fehler')::int <> 2 then
+    raise exception 'FEHLER: rechtzeitig angekommener Zug in der Gnadenfrist verworfen: %', r;
+  end if;
+  -- Gnadenfrist vorbei; B fragt NICHT ab
+  perform pg_temp.zurueck(d, 5);
+  if (select status from public.duelle where id = d) <> 'laeuft' or pg_temp.buchungen(b, 'duell_ki') <> 0 then
+    raise exception 'FEHLER: Ausgangslage fuer die Auswertung ohne Abfrage stimmt nicht';
+  end if;
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  -- die naechste Suche wertet das liegen gelassene Duell zuerst aus
+  perform public.duell_suche_start();
+  perform public.duell_suche_ende(false);
+end;
+$$;
+reset role;
+-- geprueft direkt in der Tabelle (duell_stand wertet selbst aus und taugt hier nicht als Beleg)
+do $$
+begin
+  if (select status from public.duelle where id = (select id from t_gnade)) <> 'beendet' then
+    raise exception 'FEHLER: liegen gelassenes KI-Duell nicht beendet';
+  end if;
+  if pg_temp.buchungen('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'duell_ki') <> 1 then
+    raise exception 'FEHLER: Niederlage im liegen gelassenen KI-Duell nicht gebucht';
+  end if;
+end;
+$$;
+-- ein zweites liegen gelassenes Duell, diesmal ohne jede Abfrage nur ueber duell_einladen ausgewertet
+create temp table t_gnade2 (id uuid);
+grant select, insert on t_gnade2 to authenticated;
+do $$
+declare
+  d uuid := public.duell_anlegen('ki', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', null, 3000);
+begin
+  insert into t_gnade2 values (d);
+  perform pg_temp.zurueck(d, 10);
+  perform pg_temp.zug('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', d, 0, 0, false, false, 5);
+  perform pg_temp.zurueck(d, 190);
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee","role":"authenticated"}', true);
+do $$
+begin
+  perform public.duell_einladen();
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select status from public.duelle where id = (select id from t_gnade2)) <> 'beendet'
+     or pg_temp.buchungen('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'duell_ki') <> 2 then
+    raise exception 'FEHLER: duell_einladen wertet liegen gelassene Duelle nicht aus';
+  end if;
+end;
+$$;
+-- Grenzen: hoechstens 5 offene Einladungen, hoechstens 20 falsche Codes am Tag (danach auch ein richtiger nicht)
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","role":"authenticated"}', true);
+create temp table t_code (code text);
+grant select, insert on t_code to authenticated;
+do $$
+begin
+  insert into t_code values (public.duell_einladen()->>'code');
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"ffffffff-ffff-4fff-8fff-ffffffffffff","role":"authenticated"}', true);
+do $$
+declare
+  i integer;
+  r jsonb;
+begin
+  for i in 1..5 loop
+    r := public.duell_einladen();
+    if not (r ? 'code') then
+      raise exception 'FEHLER: Einladung % von 5 abgelehnt: %', i, r;
+    end if;
+  end loop;
+  if public.duell_einladen() is distinct from '{"fehler": "DUELL_ZU_VIELE_EINLADUNGEN"}'::jsonb then
+    raise exception 'FEHLER: sechste offene Einladung angenommen';
+  end if;
+  -- C hat in Abschnitt 10 schon einen falschen Code verbraucht: bis 20 weiter "DUELL_CODE", dann gesperrt
+  for i in 2..20 loop
+    if public.duell_beitreten('ZZZZZZ') is distinct from '{"fehler": "DUELL_CODE"}'::jsonb then
+      raise exception 'FEHLER: falscher Code % nicht als DUELL_CODE abgelehnt', i;
+    end if;
+  end loop;
+  if public.duell_beitreten('ZZZZZZ') is distinct from '{"fehler": "DUELL_ZU_VIELE_VERSUCHE"}'::jsonb
+     or public.duell_beitreten((select code from t_code)) is distinct from '{"fehler": "DUELL_ZU_VIELE_VERSUCHE"}'::jsonb then
+    raise exception 'FEHLER: nach 20 falschen Codes nicht gesperrt';
   end if;
 end;
 $$;

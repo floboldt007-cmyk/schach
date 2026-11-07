@@ -12,6 +12,7 @@ drop function if exists public.duell_suche_start();
 drop function if exists public.duell_suche_paaren(uuid);
 drop function if exists public.duell_suche_duell(uuid);
 drop function if exists public.duell_spieler_json(integer, integer, timestamptz);
+drop function if exists public.duell_faellige_auswerten(uuid);
 drop function if exists public.duell_auswerten(uuid);
 drop function if exists public.duell_anlegen(text, uuid, uuid, integer);
 drop function if exists public.duell_ende_am(timestamptz, integer, integer);

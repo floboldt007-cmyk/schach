@@ -319,6 +319,9 @@ auf dem Server noch nicht eingerichtet.“; alles andere läuft weiter.
 **Was der Server sicherstellt:** Das Gerät schickt nur „Duell und Zug“. Rätsel-Folge, Zeit, 5 Sekunden Abzug je
 falschem Zug, die Ergebnisse des KI-Gegners und die Wertung rechnet der Server; die Lösungen verlassen ihn nie, das Gerät
 sieht nur das aktuelle Rätsel. Ein Zug nach dem eigenen Ende zählt nicht, zwei gleichzeitige Züge laufen nacheinander.
+Ausgewertet wird 3 Sekunden nach dem Ende, damit ein rechtzeitig abgeschickter Zug noch ankommt. Wer ein verlorenes
+Duell liegen lässt und nicht mehr abfragt, wird spätestens bei seiner nächsten Suche, Einladung oder seinem nächsten
+Beitritt gewertet.
 Kronen: gegen einen Menschen +30 / +10 / −15, gegen den KI-Gegner +20 / +5 / −10, je Duell und Konto höchstens einmal,
 höchstens 20 KI-Duelle am Tag und 3 gewertete Duelle am Tag gegen dieselbe Person, ohne einen eigenen Zug keine Kronen.
 Freundschaft per Code bringt keine Kronen; höchstens 5 offene Einladungen, höchstens 20 falsche Codes am Tag. Den

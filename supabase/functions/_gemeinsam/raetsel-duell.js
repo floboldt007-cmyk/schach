@@ -6,8 +6,8 @@
 //   1. prueft die Anmeldung ueber /auth/v1/user und vertraut nur dieser Antwort,
 //   2. holt mit dem Service-Schluessel die Lage des Spielers MIT Loesung (duell_zug_lage; die Loesung verlaesst den
 //      Server nie),
-//   3. spielt die schon gespielten Halbzuege nach und prueft den Zug mit chess.js: richtig ist der Loesungszug, im
-//      letzten eigenen Zug auch jedes andere Matt (wie bei Lichess). Ein illegaler Zug zaehlt nicht (422, kein Abzug),
+//   3. spielt die schon gespielten Halbzuege nach und prueft den Zug mit chess.js: richtig ist der Loesungszug, und
+//      jedes Matt loest das Raetsel sofort, in welchem Zug auch immer (wie bei Lichess). Ein illegaler Zug zaehlt nicht (422, kein Abzug),
 //   4. verbucht ueber duell_zug_verbuchen mit dem Stand, auf dem sie geprueft hat, und der gemessenen Ankunft. Zeit,
 //      Abzug, naechstes Raetsel und veralteten Stand entscheidet die Datenbank.
 // Ins Protokoll kommen nur Kennungen, nie Nutzer, Zuege, Stellungen oder Schluessel.

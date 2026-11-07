@@ -88,7 +88,8 @@ alter table public.duell_warteschlange enable row level security;
 revoke all on table public.duell_raetsel, public.duelle, public.duell_spieler, public.duell_warteschlange
   from anon, authenticated, public;
 
--- Alle Zahlen an einer Stelle (gespiegelt in js/pakete/raetsel-duell/logik.js, Vertragstest tests/raetsel-duell.test.mjs)
+-- Alle Zahlen an einer Stelle (gespiegelt in js/pakete/lobby/raetsel-duell.js, Vertragstest tests/raetsel-duell.test.mjs).
+-- gnade_s: so lange nach dem Ende wartet die Auswertung, damit ein Zug, der vor dem Ende ankam, noch verbucht wird.
 create or replace function public.duell_konstanten()
 returns jsonb
 language sql
@@ -106,7 +107,8 @@ as $$
     'ki_warte_s', 10,
     'ki_tagesgrenze', 20,
     'paar_tagesgrenze', 3,
-    'einladung_stunden', 24
+    'einladung_stunden', 24,
+    'gnade_s', 3
   );
 $$;
 
@@ -289,29 +291,32 @@ declare
   fa integer;
   fb integer;
   erg text;
-  quelle text;
   paar integer;
+  gnade interval := make_interval(secs => (k->>'gnade_s')::integer);
 begin
+  -- Sperrfolge wie duell_zug_verbuchen: erst das Duell, dann die Spieler (kein Verklemmen). Die Spieler-Zeilen mit
+  -- for update, damit kein Zug zwischen Lesen und Werten verloren geht.
   select * into d from public.duelle x where x.id = duell_auswerten.duell for update;
   if d.id is null or d.status <> 'laeuft' then
     return d;
   end if;
-  select * into sa from public.duell_spieler s where s.duell = d.id and s.user_id = d.a;
+  select * into sa from public.duell_spieler s where s.duell = d.id and s.user_id = d.a for update;
+  -- ausgewertet wird erst gnade_s nach dem Ende: ein Zug, der vor dem Ende ankam, kommt so noch an
   if d.art = 'ki' then
     ki := public.duell_ki_verlauf(d.seed, d.ki_elo, public.duell_ratings(d), d.dauer_s);
     gb := (ki->>'geloest')::integer;
     fb := (ki->>'fehler')::integer;
     -- die KI ist fertig, wenn die ganze Zeit um ist
-    if now() < d.start_am + make_interval(secs => d.dauer_s)
-       or now() < public.duell_ende_am(d.start_am, d.dauer_s, sa.fehler) then
+    if now() < d.start_am + make_interval(secs => d.dauer_s) + gnade
+       or now() < public.duell_ende_am(d.start_am, d.dauer_s, sa.fehler) + gnade then
       return d;
     end if;
   else
-    select * into sb from public.duell_spieler s where s.duell = d.id and s.user_id = d.b;
+    select * into sb from public.duell_spieler s where s.duell = d.id and s.user_id = d.b for update;
     gb := sb.geloest;
     fb := sb.fehler;
-    if now() < public.duell_ende_am(d.start_am, d.dauer_s, sa.fehler)
-       or now() < public.duell_ende_am(d.start_am, d.dauer_s, sb.fehler) then
+    if now() < public.duell_ende_am(d.start_am, d.dauer_s, sa.fehler) + gnade
+       or now() < public.duell_ende_am(d.start_am, d.dauer_s, sb.fehler) + gnade then
       return d;
     end if;
   end if;
@@ -349,6 +354,30 @@ begin
   perform public.kronen_einfach_buchen(d.b, 'duell', d.id::text,
     case erg when 'b' then 'sieg' when 'a' then 'niederlage' else 'remis' end);
   return d;
+end;
+$$;
+
+-- Wertet alle laufenden Duelle eines Kontos aus, deren Zeit samt Gnadenfrist um ist. Laeuft am Anfang jeder Suche,
+-- Einladung und jedes Beitritts: Wer ein verlorenes Duell liegen laesst und nie mehr abfragt, entgeht der Niederlage
+-- damit nicht, sobald er das naechste Duell will (Pruefer-Befund 07.11.2026).
+create or replace function public.duell_faellige_auswerten(uid uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k jsonb := public.duell_konstanten();
+  x uuid;
+begin
+  for x in
+    select d.id from public.duelle d
+    where d.status = 'laeuft' and uid in (d.a, d.b)
+      and d.start_am + make_interval(secs => d.dauer_s + (k->>'gnade_s')::integer) <= now()
+    order by d.start_am
+  loop
+    perform public.duell_auswerten(x);
+  end loop;
 end;
 $$;
 
@@ -441,6 +470,7 @@ begin
   if uid is null then
     raise exception 'DUELL_ANMELDUNG';
   end if;
+  perform public.duell_faellige_auswerten(uid);
   delete from public.duell_warteschlange q where q.seit < now() - interval '2 minutes';
   d := public.duell_suche_duell(uid);
   if d is not null then
@@ -496,6 +526,7 @@ begin
   if uid is null then
     raise exception 'DUELL_ANMELDUNG';
   end if;
+  perform public.duell_faellige_auswerten(uid);
   delete from public.duell_warteschlange q where q.user_id = uid returning q.seit, q.elo into seit_war, elo_war;
   if ki is true and seit_war is not null
      and seit_war <= now() - make_interval(secs => (public.duell_konstanten()->>'ki_warte_s')::integer)
@@ -521,6 +552,7 @@ begin
   if uid is null then
     raise exception 'DUELL_ANMELDUNG';
   end if;
+  perform public.duell_faellige_auswerten(uid);
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('duell-einladen:' || uid::text));
   delete from public.duelle x where x.status = 'offen'
     and x.erstellt_am < now() - make_interval(hours => (public.duell_konstanten()->>'einladung_stunden')::integer);
@@ -550,6 +582,7 @@ begin
   if uid is null then
     raise exception 'DUELL_ANMELDUNG';
   end if;
+  perform public.duell_faellige_auswerten(uid);
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('online_versuche:' || uid::text, 0));
   if coalesce((select v.anzahl from public.online_versuche v where v.user_id = uid and v.tag = heute), 0) >= 20 then
     return jsonb_build_object('fehler', 'DUELL_ZU_VIELE_VERSUCHE');
@@ -682,7 +715,8 @@ declare
   s public.duell_spieler;
   zeit timestamptz;
 begin
-  select * into d from public.duelle x where x.id = duell_zug_verbuchen.duell;
+  -- for share: eine gleichzeitige Auswertung (for update) wartet, bis dieser Zug verbucht ist, und umgekehrt
+  select * into d from public.duelle x where x.id = duell_zug_verbuchen.duell for share;
   select * into s from public.duell_spieler x where x.duell = duell_zug_verbuchen.duell and x.user_id = nutzer for update;
   if d.id is null or s.user_id is null then
     raise exception 'DUELL_UNBEKANNT';
@@ -729,6 +763,7 @@ revoke all on function public.duell_ende_am(timestamptz, integer, integer) from 
 revoke all on function public.duell_ratings(public.duelle) from public, anon, authenticated;
 revoke all on function public.duell_ki_jetzt(public.duelle) from public, anon, authenticated;
 revoke all on function public.duell_auswerten(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.duell_faellige_auswerten(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.duell_raetsel_anzeige(public.duelle, public.duell_spieler) from public, anon, authenticated;
 revoke all on function public.duell_spieler_json(integer, integer, timestamptz) from public, anon, authenticated;
 revoke all on function public.duell_suche_duell(uuid) from public, anon, authenticated;
