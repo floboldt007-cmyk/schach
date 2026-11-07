@@ -35,6 +35,7 @@ const DATEIEN = [
   'js/pakete/lernen/mattbilder.js',
   'js/pakete/lernen/endspiele.js',
   'js/pakete/lernen/texte.js',
+  'js/pakete/lernen/zugang.js',
   'js/ui/lernen.js',
   'css/pakete/lobby.css',
   'js/pakete/lobby/index.js',
