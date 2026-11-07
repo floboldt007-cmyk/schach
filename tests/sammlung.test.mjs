@@ -125,7 +125,7 @@ pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga
   rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3').frei && rf('liga-3').weg === 'Erreiche Liga Gold'
   && !rf('welt-2').frei && !r1.some((r) => r.id === 'erfinder-blatt-0'), r1.map((r) => r.id + (r.frei ? '+' : '-')).join());
 pruefe('Profil: Standard Bauer (der Koenig gehoert dem Erfinder), Standard-Hintergrund, ohne Rahmen, leere Vitrine',
-  JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null], titel: null })
+  JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null], titel: null, banner: 'start' })
   && /wP\.svg/.test(floAvatar('w')) && !/stroke-width="8"/.test(floAvatar('w')));
 setzeProfilWahl({ figur: 'Q', rahmen: 'liga-2', vitrine: ['erfolg-welt-1', 'kaputt!', 'erfolg-liga-2', 'zuviel'] });
 pruefe('Profil: Figur Dame, Rahmen Silber, Vitrine hoechstens drei Plaetze, Unsinn faellt raus', profilWahl().figur === 'Q' && profilWahl().rahmen === 'liga-2'
@@ -331,9 +331,13 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
   }, { sitzung, vorher });
   await s.goto(BASIS + '#ich');
   await s.waitForSelector('.sa-screen', { timeout: 30000 });
+  // Etappe 4b: beim Start gebuchte Stufen zeigt "Ich" als Freischalt-Moment; wegtippen, wie ein Spieler es tut
+  await warte(400);
+  let moment = 0;
+  while (moment < 12 && await s.locator('.st-moment .st-weiter').count()) { moment++; await s.locator('.st-moment .st-weiter').first().click(); await warte(250); }
   if (bereich) await s.locator(`.sa-steuer .seg[data-wert="${bereich}"]`).click();
   await warte(500);
-  return { k, s, srv, anfragen, fehlerListe };
+  return { k, s, srv, anfragen, fehlerListe, moment };
 }
 
 async function shopTeil(browser) {
@@ -576,6 +580,7 @@ async function profilTeil(browser) {
   const p = await shopSeite(browser, { bereich: 'rahmen', vorher: { 'schach-arena:v1:fortschritt': JSON.stringify(sieg),
     'schach-arena:v1:einstellungen': JSON.stringify({ duellIntro: 'immer', klang: false }) } });
   await p.s.waitForSelector('.pr-karte', { timeout: 15000 }).catch(() => {});
+  pruefe('Freischalt-Moment: der erste Sieg zeigt sich beim Öffnen von „Ich“', p.moment >= 1, p.moment);
   const vorher = await p.s.evaluate(() => ({ karte: !!document.querySelector('.pr-karte'), figur: document.querySelector('.pr-av svg')?.dataset.figur,
     leer: document.querySelectorAll('.pr-orden.leer').length, oben: !!document.querySelector('.sa-kopf-ort .pr-karte') }));
   pruefe('Profil: Karte oben im Reiter „Ich“, Bauer als Bild, drei leere Plätze', vorher.karte && vorher.oben && vorher.figur === 'P' && vorher.leer === 3, vorher);
@@ -615,16 +620,20 @@ async function profilTeil(browser) {
   await p.s.locator('.pr-orden[data-platz="0"]').click();
   await p.s.waitForSelector('.pr-orden-knopf', { timeout: 5000 });
   const auswahl = await p.s.evaluate(() => [...document.querySelectorAll('.pr-orden-knopf')].map((x) => x.dataset.erfolg));
-  pruefe('Vitrine: zur Wahl steht nur Erspieltes (hier: Erster Sieg)', auswahl.join() === 'erfolg-erster-sieg', auswahl);
-  await p.s.locator('.pr-orden-knopf[data-erfolg="erfolg-erster-sieg"]').click();
+  // Etappe 4b: die Vitrine zeigt Erfolgs-Familien mit Stufe (erster Sieg = Siegeszug Bronze)
+  pruefe('Vitrine: zur Wahl steht nur Erspieltes (hier: Siegeszug Bronze)', auswahl.join() === 'stufe-siege', auswahl);
+  await p.s.locator('.pr-orden-knopf[data-erfolg="stufe-siege"]').click();
   await p.s.locator('.pr-blatt .sheet-knoepfe button', { hasText: 'Fertig' }).click();
   await p.s.waitForSelector('.pr-orden:not(.leer)', { timeout: 5000 }).catch(() => {});
-  pruefe('Vitrine: Platz 1 zeigt „Erster Sieg“', /Erster Sieg/.test(await p.s.locator('.pr-orden[data-platz="0"]').innerText()));
+  pruefe('Vitrine: Platz 1 zeigt „Siegeszug“ mit Stufe Bronze', await p.s.evaluate(() => {
+    const o = document.querySelector('.pr-orden[data-platz="0"]');
+    return !!o && /Siegeszug/.test(o.textContent) && o.dataset.stufe === '1';
+  }));
   pruefe('Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   await p.s.reload();
   await p.s.waitForSelector('.pr-karte', { timeout: 15000 });
   pruefe('Profil bleibt nach dem Neuladen', await p.s.evaluate(() => document.querySelector('.pr-av svg')?.dataset.figur === 'Q'
-    && /Erster Sieg/.test(document.querySelector('.pr-orden[data-platz="0"]')?.textContent || '')));
+    && /Siegeszug/.test(document.querySelector('.pr-orden[data-platz="0"]')?.textContent || '')));
   await p.s.evaluate(() => window.__app.gehe('arena'));
   await p.s.waitForSelector('.detail [data-aktion="spielen"]', { timeout: 15000 });
   await warte(600);
@@ -634,7 +643,7 @@ async function profilTeil(browser) {
     // Layout-Breite (getComputedStyle), nicht das Rechteck: das Abzeichen springt gerade mit scale(.7) herein
     bilder: [...document.querySelectorAll('.duell.voll .duell-seite.flo .duell-orden.mit-bild > svg.sk-erfolg')].map((x) => Math.round(parseFloat(getComputedStyle(x).width))),
     figur: document.querySelector('.duell.voll [data-rolle="flo"] svg')?.dataset.figur, titel: document.querySelectorAll('.duell.voll .duell-titel').length }));
-  pruefe('Duell-Intro: unter Flo steht die Vitrine mit Abzeichen (Flo 01.11.2026), Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Erster Sieg'
+  pruefe('Duell-Intro: unter Flo steht die Vitrine mit Abzeichen (Flo 01.11.2026), Avatar ist die Dame, ohne Erfinder kein Titel', duell.orden.join() === 'Siegeszug'
     && duell.bilder.length === 1 && duell.bilder[0] >= 36 && duell.figur === 'Q' && duell.titel === 0, duell);
   pruefe('Profil: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
@@ -686,7 +695,7 @@ async function browserTeil() {
       await warte(700);
       const bereiche = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich')].map((x) => x.dataset.bereich).join());
       // ohne Erfinder-Konto keine Finisher (Labor, Flo 01.11.2026)
-      pruefe(`${name}: sieben Bereiche (Emotes, Titel, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,rahmen,bretter,klaenge,erfolge,shop', bereiche);
+      pruefe(`${name}: acht Bereiche (Emotes, Titel, Banner, Rahmen, Bretter, Klänge, Erfolge, Shop), keine Finisher`, bereiche === 'emotes,titel,banner,rahmen,bretter,klaenge,erfolge,shop', bereiche);
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
       pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
@@ -702,8 +711,9 @@ async function browserTeil() {
       pruefe(`${name}: nur ein Bereich sichtbar`, await s.locator('.sa-bereich:not([hidden])').count() === 1);
       await s.locator('.sa-steuer .seg[data-wert="erfolge"]').click();
       await warte(400);
+      // Etappe 4b: Erfolge in drei Stufen, die Zeile nennt den Weg zur naechsten Stufe
       pruefe(`${name}: Erfolge gewählt, Weg dahin sichtbar`, await s.locator('.sa-bereich[data-bereich="erfolge"]:not([hidden])').count() === 1
-        && /Besiege einen Bot/.test(await s.locator('.sa-bereich[data-bereich="erfolge"]').innerText()));
+        && /0 von 1 Siege gegen Bots bis Bronze/.test(await s.locator('.sa-bereich[data-bereich="erfolge"]').innerText()));
       const quer = await s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
       pruefe(`${name}: kein waagrechtes Scrollen der Seite`, quer);
       await s.reload();

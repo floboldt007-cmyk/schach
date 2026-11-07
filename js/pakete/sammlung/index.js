@@ -17,8 +17,14 @@ import { figurenSatz, figurenPfad } from '../../figurensatz.js';
 import { hatSonderstueck, ERFINDER } from '../../sonderstuecke.js';
 import { shopBereich } from './shop.js';
 import { erfinderBereich } from './erfinder.js';
-import './profil.js';
+import { hoere } from '../../ereignisse.js';
+import { ladeBesitz, abgleichen, zaehleRaetsel } from '../../besitz.js';
+import { kronenSpeicher, stufeVon as kronenStufe } from '../liga/kronen.js';
+import { FAMILIEN, familienStand } from './stufen.js';
+import { zeigeStufen } from './moment.js';
+import { titelJetzt, talerJetzt } from './profil.js';
 import './texte.js';
+import './karte-texte.js';
 
 const PAKET = 'sammlung';
 const S = (k, w) => t('p-sammlung.' + k, w);
@@ -84,6 +90,11 @@ export function spielstand() {
     .filter((x) => Number.isInteger(x) && x >= 0);
   const serie = sicher('serie', {});
   const funken = sicher('funken', {});
+  // Etappe 4b: Gold der Familie Ligaaufstieg (Krone III) verspricht den Titel Ligakrone, der am alten Erfolg liga-6
+  // haengt; deshalb zaehlt die gebuchte Gold-Stufe wie die hoechste Stufe der alten Liga
+  let ligaGold = false;
+  try { ligaGold = ladeBesitz().stufen.liga === 3; } catch (e) { ligaGold = false; }
+  if (ligaGold) stufen.push(LIGA_STUFEN);
   return { ligaBest: stufen.length ? Math.max(...stufen) : 0, serieBest: Number.isInteger(serie.best) ? serie.best : 0,
     level: Number.isInteger(funken.level) ? funken.level : 1 };
 }
@@ -198,6 +209,92 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand(), pa = parti
   return aus;
 }
 
+// Etappe 4b: der Stand, aus dem die Erfolgs-Familien ihre Stufen lesen (js/pakete/sammlung/stufen.js); dieselben Quellen
+// wie teileErfolge, dazu der Raetsel-Zaehler (js/besitz.js) und die Kronen-Stufe des letzten Server-Stands
+export function stufenStand(f = ladeFortschritt(), z = spielstand(), pa = partienStand()) {
+  const besiegt = (b) => !!(f.bots[b.id] && f.bots[b.id].sterne[0]);
+  const bosse = BOTS.filter((b) => b.endgegner);
+  let raetsel = 0;
+  try { raetsel = ladeBesitz().raetsel.n; } catch (e) { raetsel = 0; }
+  let ligaStufe = -1;
+  try {
+    const k = kronenSpeicher(ladeModul('kronen', {}));
+    if (k.stand) ligaStufe = kronenStufe(k.stand.kronen).index;
+  } catch (e) { ligaStufe = -1; }
+  return {
+    // jeder besiegte Bot (Stern) ist mindestens ein Sieg, auch in Spielstaenden ohne Siegzaehler
+    siege: Math.max(besiegteBots(f), BOTS.reduce((a, b) => a + (Number(f.bots[b.id] && f.bots[b.id].siege) || 0), 0)),
+    besiegt: besiegteBots(f), botsAlle: BOTS.length,
+    welten: WELTEN.filter((w) => { const bs = BOTS.filter((b) => b.welt === w.nr); return bs.length > 0 && bs.every(besiegt); }).length,
+    weltenAlle: WELTEN.length,
+    sterne: gesamtSterne(f), sterneAlle: BOTS.length * 3,
+    endgegner: bosse.filter(besiegt).length, endgegnerAlle: bosse.length,
+    siegesfolge: Number(pa && pa.beste) || 0, raetsel, serie: z.serieBest, level: z.level, ligaStufe,
+  };
+}
+
+// Bild je Familie und Stufe: ein Abzeichen ihrer alten Erfolge (js/sammlung-kunst.js), Bronze das leichteste, Gold das
+// schwerste (sonst traegt Bronze schon die "100"); Ring in der Stufenfarbe (CSS)
+const familienBild = (fam, stufe = 3) => {
+  const f = FAMILIEN.find((x) => x.id === fam);
+  const n = f ? f.alt.length : 0;
+  const alt = n ? f.alt[Math.round((Math.max(1, Math.min(3, stufe)) - 1) * (n - 1) / 2)] : '';
+  return erfolgKunst(alt) || sternBild;
+};
+const K = (k, w) => t('p-karte.' + k, w);
+const SELTEN = ['frei', 'selten', 'episch', 'legende'];
+
+// Teile des Bereichs Erfolge: je Familie eins, mit Stufe und Zeile bis zur naechsten Stufe
+export function teileErfolgsStufen(stand = stufenStand(), gemerkt = ladeBesitz().stufen) {
+  return familienStand(stand, gemerkt).map((x) => {
+    const n = Math.min(x.wert, x.naechstes ?? x.wert);
+    const zeile = x.stufe === 3 ? K('zeile.gold') : x.familie === 'liga' && x.stufe === 0 ? K('zeile.liga') : x.stufe === 0
+      ? K('zeile.start', { n, ziel: x.naechstes, was: K('was.' + x.familie) })
+      : K('zeile.weiter', { stufe: K('stufe.' + x.stufe), n, ziel: x.naechstes, naechste: K('stufe.' + (x.stufe + 1)) });
+    const vorher = x.stufe > 0 ? x.ziele[x.stufe - 1] : 0;
+    return { id: 'stufe-' + x.familie, familie: x.familie, stufe: x.stufe, name: K('fam.' + x.familie), frei: x.stufe > 0,
+      zeile, bild: familienBild(x.familie, x.stufe), seltenheit: SELTEN[x.stufe], gruppe: S('gruppe.' + x.gruppe),
+      fortschritt: x.naechstes && x.familie !== 'liga' ? Math.max(0, Math.min(1, (x.wert - vorher) / Math.max(1, x.naechstes - vorher))) : undefined };
+  });
+}
+
+// Name und Abzeichen einer Familie fuer die Karte eines anderen Spielers (seine Stufe kommt vom Server)
+export function familienOrden(familie, stufe = 3) {
+  if (!FAMILIEN.some((x) => x.id === familie)) return null;
+  return { name: K('fam.' + familie), bild: familienBild(familie, stufe) };
+}
+
+// Freischalt-Moment (Konzept 5b): neue Stufen nach einer Partie, einem Raetsel und beim Start sofort buchen; gezeigt
+// werden sie im Reiter "Ich" (sofort, wenn er offen ist). Der Moment ist ein Dialog und legt sich so nie ungefragt
+// ueber Ergebnis, Analyse oder Partie (dort wuerde er Knoepfe wie "Als Bild teilen" verdecken).
+// Mit Konto meldet js/karte.js danach Stufen und Karte an den Server (beim Start immer, sonst nur bei neuen Stufen);
+// ohne Konto kehrt der Abgleich dort sofort zurueck.
+let wartend = [];
+function pruefeStufen({ start = false } = {}) {
+  let neu = [];
+  try { neu = abgleichen(stufenStand()); } catch (e) { neu = []; }
+  wartend.push(...neu);
+  if (document.documentElement.dataset.screen === 'ich') zeigeWartende();
+  if (start || neu.length) karteAbgleichen();
+}
+function zeigeWartende() {
+  if (!wartend.length) return;
+  const liste = wartend;
+  wartend = [];
+  zeigeStufen(liste);
+}
+export function karteAbgleichen() {
+  let titel = null;
+  try { titel = (titelJetzt() || {}).id || null; } catch (e) { titel = null; }
+  return import('../../karte.js').then((k) => k.abgleichKonto({ titel })).catch(() => null);
+}
+if (typeof window !== 'undefined') {
+  hoere('raetsel:geloest', (d) => { try { zaehleRaetsel(d); } catch (e) { /* ohne Speicher nicht gezaehlt */ } pruefeStufen(); });
+  hoere('partie:beendet', () => pruefeStufen());
+  hoere('app:bereit', () => pruefeStufen({ start: true }));
+  hoere('app:screen', (d) => { if (d && d.name === 'ich') zeigeWartende(); });
+}
+
 freischalten();
 anbieten('sammlung:bereich', ({ app }) => erfinderBereich({ app }), { reihenfolge: 5, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'bretter', name: S('bretter'), teile: teileBretter(undefined, app) }), { reihenfolge: 40, paket: PAKET });
@@ -207,5 +304,7 @@ anbieten('sammlung:bereich', ({ app }) => {
   return teile.length > 1 ? bereich({ id: 'figuren', name: S('figuren'), teile }) : null;
 }, { reihenfolge: 45, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => bereich({ id: 'klaenge', name: S('klaenge'), teile: teileKlaenge(undefined, app) }), { reihenfolge: 50, paket: PAKET });
-anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolge() }), { reihenfolge: 90, paket: PAKET });
+// Etappe 4b: jede Stufe zahlt Taler; der Stand steht als Hinweis ueber den Erfolgen (mit Konto der des Servers)
+anbieten('sammlung:bereich', () => bereich({ id: 'erfolge', name: S('erfolge'), teile: teileErfolgsStufen(),
+  hinweis: K('taler.stand', { n: talerJetzt() }) }), { reihenfolge: 90, paket: PAKET });
 anbieten('sammlung:bereich', ({ app }) => shopBereich({ app }), { reihenfolge: 95, paket: PAKET });

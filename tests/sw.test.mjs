@@ -180,6 +180,8 @@ function main() {
     // Lobby-Musik: Melodien als eigene Datei (assets/klang/MUSIK-LIZENZ.md), offline noetig
     ...alleDateien('assets/klang', /^melodien\.json$/),
     ...alleDateien('assets/avatare/modern', /\.(svg|png)$/),
+    // Etappe 4b: Banner der Visitenkarte (Start, Saison, Gold-Erfolge, KI-Gegner) offline; Shop-Banner erst mit dem Shop
+    ...alleDateien('assets/banner', /^(start|saison-[a-z]+|erfolg-[a-z]+|bot-[a-z]+)\.svg$/),
     // Portraets der Wochen-Bosse (offline, auch solange das Paket aus ist: es liegt schon in DATEIEN)
     ...alleDateien('assets/avatare/bosse', /\.(svg|png)$/),
     ...alleDateien('js', /\.js$/),

@@ -18,6 +18,8 @@ import { figurenPfad } from '../figurensatz.js';
 import { sanAnzeige } from '../review.js';
 import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
+import { karteDerPartie } from '../karte.js';
+import { fremdeKarte, bannerUrl } from './visitenkarte.js';
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -63,6 +65,7 @@ export function zeige(root, params, app) {
   let weg = false, busy = false, blockiert = false, widerspruch = false, beobachter = null, brett = null, p = null, chess = null, wartend = null;
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
+  let kartenDaten = null, kartenPartie = null;
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
   const fehler = e => { melde(e?.message || O('fehler')); };
   const oeffne = partie => { if (!weg) { online.vergissEinladung(); app.gehe('online', { partieId: partie.id }); } };
@@ -190,12 +193,26 @@ export function zeige(root, params, app) {
     sperre();
     meldeStrittigVonSelbst();
   }
+  // Etappe 4b: die Visitenkarten beider Spieler (js/karte.js, nur fuer die Teilnehmer dieser Partie) bringen Banner, Name
+  // und Titel in die Spielerleisten; bis sie da sind (oder ohne Antwort) bleibt es bei "Ich" und "Freund"
   function karten() {
     if (!brett) return;
+    if (p.id && kartenPartie !== p.id) {
+      kartenPartie = p.id;
+      kartenDaten = null;
+      const id = p.id;
+      karteDerPartie(id, { frist: 8000 }).then((d) => { if (d && !weg && p && p.id === id) { kartenDaten = d; karten(); } });
+    }
     const eigen = online.meineFarbe(p);
     for (const [ort, f] of [['oben', andere(eigen)], ['unten', eigen]]) {
-      const name = f === eigen ? profil?.benutzername || O('ich') : O('freund');
-      inhalt.querySelector('.on-' + ort).innerHTML = `<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b><span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
+      const roh = kartenDaten && (f === 'w' ? kartenDaten.w : kartenDaten.s);
+      const k = roh ? fremdeKarte(roh) : null;
+      const name = k && roh.name ? k.name : f === eigen ? profil?.benutzername || O('ich') : O('freund');
+      const banner = k ? `<span class="on-banner" aria-hidden="true" style="background-image:url('${bannerUrl(k.banner)}')"></span>` : '';
+      const titel = k && k.titel ? `<small class="on-titel">${esc(k.titel.name)}</small>` : '';
+      const el = inhalt.querySelector('.on-' + ort);
+      el.classList.toggle('mit-banner', !!banner);
+      el.innerHTML = `${banner}<img src="${new URL(`assets/pieces/${f}K.svg`, WURZEL).href}" alt=""><div><b>${esc(name)}</b>${titel}<span>${f === 'w' ? O('weiss') : O('schwarz')}</span></div>
         <span class="uhr zahl" data-farbe="${f}"${p.bedenkzeit_s == null ? ' hidden' : ''}></span>`;
     }
     tick();

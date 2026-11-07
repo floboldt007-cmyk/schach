@@ -254,8 +254,10 @@ async function browserTeil() {
         await p.s.locator('.lb-suchen').click();
         await warte(BOT_MS - 800);
         const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name) };
+        // nur die Suche zaehlt: der Karten-Abgleich (karte_melde_stufen, Etappe 4b) darf beim Start davor laufen
+        const sucheAufrufe = p.aufrufe.filter((a) => a.name.startsWith('online_suche'));
         pruefe('suche: Bot erst nach der Wartezeit (vorher Suche beim Server, kein Bot)', frueh.suche === 1 && frueh.screen === 'lobby'
-          && p.aufrufe[0]?.name === 'online_suche_start' && p.aufrufe[0].daten?.zeit === '3+2' && frueh.namen.includes('online_suche_stand')
+          && sucheAufrufe[0]?.name === 'online_suche_start' && sucheAufrufe[0].daten?.zeit === '3+2' && frueh.namen.includes('online_suche_stand')
           && !frueh.namen.includes('online_suche_ende'), frueh);
         await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
         const ki = await p.s.evaluate(() => ({ abz: document.querySelector('.screen.partie .ki-abzeichen')?.textContent, ki: window.__partie.z.ki,

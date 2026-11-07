@@ -15,6 +15,27 @@ const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
+  'js/besitz.js',
+  'js/karte.js',
+  'js/ui/visitenkarte.js',
+  'css/visitenkarte.css',
+  'js/pakete/sammlung/stufen.js',
+  'js/pakete/sammlung/moment.js',
+  'js/pakete/sammlung/karte-texte.js',
+  'assets/banner/bot-datenstrom.svg',
+  'assets/banner/bot-schaltkreis.svg',
+  'assets/banner/bot-zahnwerk.svg',
+  'assets/banner/erfolg-raetselmeister.svg',
+  'assets/banner/erfolg-seriensieger.svg',
+  'assets/banner/erfolg-turmbezwinger.svg',
+  'assets/banner/saison-bronze.svg',
+  'assets/banner/saison-diamant.svg',
+  'assets/banner/saison-gold.svg',
+  'assets/banner/saison-holz.svg',
+  'assets/banner/saison-krone.svg',
+  'assets/banner/saison-silber.svg',
+  'assets/banner/start.svg',
   'js/pakete/lernen/taktik.js',
   'js/pakete/lernen/eroeffnungen.js',
   'daten/boss/spielplan.json',
