@@ -1,74 +1,122 @@
 /* ============================================================
-   Crownmate · Startseite "heim" (Etappe A, Task 3; Konzept 2026-11-06, Entwurf startseite-v4)
-   Struktur: js/ui/heim.js. Nur Tokens (css/tokens.css, css/themes/<id>.css), keine festen Farben:
-   hell ist Standard, dunkel kommt ueber data-modus aus dem Theme. Bewegung nur ueber die Dauer-Tokens (--tempo).
-   Ruhige Ordnung: Ring, eine Zeile Liga, drei Karten. Auf dem kleinen Handy (375 x 667) passt alles ohne Scrollen
-   ueber die Leiste; der Ring wird dafuer mit der Hoehe kleiner.
+   Crownmate · Startseite "heim" (Konzept 2026-11-06, Abschnitt 12; Entwuerfe start-ipad-v2 und start-ipad-quer)
+   Struktur: js/ui/heim.js. Nur Tokens (css/tokens.css, css/themes/<id>.css), keine festen Farben: hell ist Standard,
+   dunkel kommt ueber data-modus aus dem Theme. Die Buehne hat eigene Tokens (--buehne*), die in beiden Modi dunkel sind.
+   Bewegung nur ueber die Dauer-Tokens; das einmalige Hereingleiten der Buehne steuert heim.js ueber bewegung.js.
+   Anordnung: Handy untereinander (Brett ueber dem Text), iPad hoch eine Spalte (Brett neben dem Text),
+   quer ab 900 px zwei Spalten (links Gruss und Buehne, das Brett so gross wie moeglich, rechts Als Naechstes und Wege).
    ============================================================ */
 .heim-screen .heim-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain; display: flex; flex-direction: column; align-items: center;
-  width: 100%; max-width: 560px; margin: 0 auto; padding: var(--a2) var(--rand) var(--a5); box-sizing: border-box; }
+  overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--a4);
+  width: 100%; max-width: 720px; margin: 0 auto; padding: var(--a3) var(--rand) var(--a5); box-sizing: border-box; }
+.heim-links, .heim-rechts { display: flex; flex-direction: column; gap: var(--a4); min-width: 0; }
+.heim-links { container: heimlinks / inline-size; }
 
-/* ---------- Name und Level ---------- */
-.heim-wer { flex: none; display: flex; align-items: baseline; justify-content: center; gap: 10px; min-width: 0; max-width: 100%; }
-.heim-name { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-weight: var(--gw-titel);
-  font-size: 20px; letter-spacing: -.02em; color: var(--text); }
-.heim-level { flex: none; font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+/* ---------- Kopf: Tage-Serie, dezent ---------- */
+.heim-serie { gap: 8px; }
+.heim-punkt { width: 8px; height: 8px; border-radius: 50%; background: var(--akzent); }
 
-/* ---------- Rang-Ring ---------- */
-.heim-ring { position: relative; flex: none; width: clamp(120px, 24dvh, 208px); aspect-ratio: 1; margin: var(--a1) auto var(--a2);
-  display: grid; place-items: center; }
-.heim-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.heim-spur, .heim-bogen { fill: none; stroke-width: 8; }
-.heim-spur { stroke: var(--linie-2); }
-.heim-bogen { stroke: var(--gold); stroke-linecap: round; transition: stroke-dashoffset var(--d-xl) var(--gleiten); }
-.heim-ring[data-anteil="0"] .heim-bogen { stroke-linecap: butt; }
-.heim-mitte { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
-.heim-zahl { font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(30px, 5.4dvh, 46px); letter-spacing: -.03em; line-height: 1;
-  font-variant-numeric: tabular-nums; color: var(--text); }
-.heim-einheit { font-size: 13px; font-weight: 700; color: var(--text-2); }
+/* ---------- Gruss ---------- */
+.heim-gruss small { display: block; font-size: 13.5px; font-weight: 600; color: var(--text-2); }
+.heim-gruss h1 { margin: 4px 0 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(22px, 3.2vw, 30px);
+  letter-spacing: -.02em; line-height: 1.15; color: var(--text); }
 
-/* ---------- Liga-Zeile: Stufen-Name in der lesbaren Goldfassung (>= 4,5:1 in hell und dunkel) ---------- */
-.heim-liga { flex: none; margin: 0 0 var(--a3); text-align: center; font-size: 14.5px; font-weight: 600; color: var(--text-2); }
-.heim-liga b { color: var(--kt-stark); font-weight: var(--gw-stark); }
+/* ---------- Buehne: dunkle Karte ---------- */
+.heim-buehne { --heim-brett: 220px; display: grid; grid-template-columns: var(--heim-brett) minmax(0, 1fr); gap: var(--a4); align-items: center;
+  padding: var(--a4); border-radius: var(--r-xl); color: var(--auf-buehne);
+  background: linear-gradient(160deg, var(--buehne), var(--buehne-2)); box-shadow: var(--s2, none), 0 0 0 1px var(--buehne-kante); }
+.heim-brett { width: var(--heim-brett); }
+.heim-buehne[data-art="gegner"] { grid-template-columns: auto minmax(0, 1fr); }
+.heim-mini { width: 100%; box-shadow: var(--s2, none); }
+.heim-portraet { justify-self: center; width: min(var(--heim-brett), 150px); aspect-ratio: 1; border-radius: 50%; overflow: hidden;
+  background: var(--bot-farbe); box-shadow: 0 0 0 3px var(--gold); }
+.heim-portraet img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.heim-buehne-text { display: flex; flex-direction: column; gap: var(--a2); min-width: 0; }
+.heim-ueber { font-size: 13px; font-weight: 600; color: var(--auf-buehne-2); overflow-wrap: anywhere; }
+.heim-lage, .heim-gegner { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(19px, 2.4vw, 24px);
+  line-height: 1.2; letter-spacing: -.01em; color: var(--auf-buehne); overflow-wrap: anywhere; }
+.heim-gegner .zahl { font-variant-numeric: tabular-nums; }
+.heim-spielweise { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--auf-buehne-2); }
+.heim-balken { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--auf-buehne-2); }
+.heim-balken[hidden] { display: none; }
+.heim-balken-spur { flex: 1; height: 6px; border-radius: var(--r-pille); overflow: hidden;
+  background: color-mix(in srgb, var(--auf-buehne) 16%, transparent); }
+.heim-balken-wert { display: block; height: 100%; border-radius: inherit; background: var(--gut); transition: width var(--d-l) var(--gleiten); }
+.heim-los { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: var(--a2); min-height: 52px; padding: 12px 16px;
+  border: 0; border-radius: var(--r-knopf-gross, var(--r-l)); cursor: pointer; font: inherit; font-size: 16px; font-weight: var(--gw-stark);
+  background: var(--gold); color: var(--kg-stark); box-shadow: var(--s2, none);
+  transition: transform var(--d-s) var(--feder-weich), filter var(--d-s) var(--gleiten); }
+.heim-los .ico, .heim-los svg { width: 18px; height: 18px; }
+.heim-los:hover { filter: brightness(1.05); }
+.heim-los:active { transform: scale(.98); }
+.heim-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 
-/* ---------- Modus-Karten ---------- */
-.heim-modi { flex: none; display: flex; flex-direction: column; gap: 10px; width: 100%; }
-.heim-modus { display: flex; align-items: center; gap: 14px; width: 100%; min-height: var(--tipp); padding: 14px 16px; text-align: left; cursor: pointer;
+/* ---------- Als Naechstes ---------- */
+.heim-naechstes h3 { margin: 0 4px var(--a2); font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+.heim-liste { border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1, none), var(--kante); overflow: hidden; }
+.heim-zeile { display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--tipp); padding: 12px 16px; border: 0;
+  background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.heim-zeile + .heim-zeile { border-top: 1px solid var(--linie); }
+.heim-zeile:focus-visible { outline: var(--fokus); outline-offset: -3px; }
+.heim-zeile-bild { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--gold-weich); color: var(--kt-stark); }
+.heim-zeile-bild svg { width: 22px; height: 22px; }
+.heim-zeile-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.heim-zeile-text b { font-size: 15px; font-weight: var(--gw-stark); }
+.heim-zeile-text span { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.heim-zeile-balken { flex: none; width: 84px; height: 6px; border-radius: var(--r-pille); overflow: hidden; background: var(--linie-2); }
+.heim-zeile-balken span { display: block; height: 100%; background: var(--gold); }
+
+/* ---------- Drei Wege: schlicht, nur das Symbol farbig ---------- */
+.heim-wege { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.heim-modus { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: var(--tipp); padding: 12px; text-align: left; cursor: pointer;
   border: 0; border-radius: var(--r-l); background-color: var(--flaeche); background-image: var(--textur-flaeche, none);
   box-shadow: var(--s1, none), var(--kante); color: var(--text); font: inherit;
   transition: transform var(--d-s) var(--feder-weich), box-shadow var(--d-s) var(--gleiten); }
+.heim-modus:active { transform: scale(.98); }
 .heim-modus:focus-visible { outline: var(--fokus); outline-offset: 3px; }
-.heim-symbol { flex: none; display: grid; place-items: center; width: 36px; height: 36px; color: var(--kt-stark); }
-.heim-symbol .ico, .heim-symbol svg { width: 26px; height: 26px; }
-.heim-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.heim-text b { font-size: 16px; font-weight: var(--gw-stark); color: var(--text); }
-.heim-text span { font-size: 13.5px; font-weight: 600; color: var(--text-2); }
-/* Hauptknopf Online: Goldfuellung; Schrift in der dunklen Fassung fuer Gold (--kg-stark, in beiden Modi gleich) */
-.heim-modus.haupt { padding: 16px; background: var(--gold); box-shadow: var(--s2, none); color: var(--kg-stark); }
-.heim-modus.haupt .heim-symbol, .heim-modus.haupt .heim-text b, .heim-modus.haupt .heim-text span { color: var(--kg-stark); }
+.heim-symbol { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--auf-akzent); }
+.heim-symbol svg { width: 20px; height: 20px; }
+.heim-modus[data-weg="online"] .heim-symbol { background: var(--akzent); }
+.heim-modus[data-weg="raetsel"] .heim-symbol { background: var(--gut); color: var(--kg-stark); }
+.heim-modus[data-weg="zuzweit"] .heim-symbol { background: var(--gold); color: var(--kg-stark); }
+.heim-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.heim-text b { font-size: 15px; font-weight: var(--gw-stark); color: var(--text); }
+.heim-text span { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 
-/* Shop-Hinweise kommen mit dem Wochen-Shop (in dieser Etappe ausgeblendet) */
-.heim-shop[hidden] { display: none !important; }
+/* ---------- Schmale linke Spalte (Handy, iPad quer neben der Seitenleiste): Brett ueber dem Text ----------
+   Erst ab 640 px Spaltenbreite steht das Brett neben dem Text (iPad hoch, breite Fenster); darunter waere es neben dem
+   Text kleiner als darueber. Die Hoehe begrenzt das Brett so, dass auf dem iPad nichts scrollt. */
+@container heimlinks (max-width: 639px) {
+  .heim-buehne { grid-template-columns: minmax(0, 1fr); --heim-brett: min(100cqw - 2 * var(--a4), 32dvh); justify-items: stretch; }
+  .heim-brett { justify-self: center; }
+  .heim-buehne[data-art="gegner"] { grid-template-columns: auto minmax(0, 1fr); --heim-brett: 96px; }
+}
+@media (max-width: 560px) {
+  .heim-screen .heim-rumpf { gap: var(--a3); }
+  .heim-modus { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+}
 
-/* Niedrige Fenster (kleines Handy, iPad quer mit Browserleisten): Karten enger */
-@media (max-height: 700px) {
-  .heim-modus, .heim-modus.haupt { padding-top: 10px; padding-bottom: 10px; }
-  .heim-modi { gap: 8px; }
+/* ---------- iPad hoch: eine Spalte, Brett neben dem Text ---------- */
+@media (min-width: 700px) and (orientation: portrait) {
+  .heim-screen .heim-rumpf { padding-top: var(--a5); justify-content: safe center; }
+  .heim-buehne { --heim-brett: clamp(240px, 40vw, 330px); padding: var(--a5); }
+  .heim-buehne[data-art="gegner"] { --heim-brett: 150px; }
 }
-/* Breite Fenster: etwas mehr Luft, Inhalt bleibt in der Mitte */
-@media (min-width: 900px) and (min-height: 701px) {
-  .heim-screen .heim-rumpf { justify-content: center; padding-top: var(--a4); }
-  .heim-modus { padding: 18px 20px; }
+
+/* ---------- Quer ab 900 px: zwei Spalten, links waechst die Buehne mit, nichts scrollt auf dem iPad ---------- */
+@media (min-width: 900px) and (orientation: landscape) {
+  .heim-screen .heim-rumpf { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); align-items: start;
+    max-width: 1240px; column-gap: clamp(24px, 3vw, 44px); padding-top: var(--a4); }
+  .heim-rechts { padding-top: calc(13.5px * 1.5 + var(--a1)); }
+  .heim-wege { grid-template-columns: minmax(0, 1fr); }
+  .heim-modus { padding: 16px; gap: 16px; }
+  /* Brett so gross, wie Spalte und Fensterhoehe (ohne Kopf, Gruss und Text der Buehne) erlauben */
+  .heim-buehne { --heim-brett: max(220px, min(100cqw - 2 * var(--a5) - var(--a4) - 230px, 100dvh - 300px)); padding: var(--a5); }
+  .heim-buehne[data-art="gegner"] { --heim-brett: clamp(120px, 22cqw, 180px); }
 }
-/* Querformat ab 1021 px (neben der Seitenleiste): zwei Spalten wie im Entwurf ipad-pc-v2, links Name, Ring und Liga-Zeile,
-   rechts die drei Karten */
-@media (min-width: 1021px) and (orientation: landscape) {
-  .heim-screen .heim-rumpf { display: grid; max-width: 1040px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    grid-template-areas: "wer modi" "ring modi" "liga modi"; grid-template-rows: auto auto auto; align-content: start; align-items: center;
-    justify-items: center; column-gap: clamp(32px, 5vw, 72px); padding-top: 48px; }
-  .heim-wer { grid-area: wer; }
-  .heim-ring { grid-area: ring; width: clamp(180px, 34dvh, 280px); }
-  .heim-liga { grid-area: liga; margin-bottom: 0; }
-  .heim-modi { grid-area: modi; align-self: start; }
+@container heimlinks (max-width: 639px) {
+  @media (min-width: 900px) and (orientation: landscape) {
+    .heim-buehne[data-art="partie"] { --heim-brett: max(220px, min(100cqw - 2 * var(--a5), 100dvh - 430px)); }
+  }
 }
