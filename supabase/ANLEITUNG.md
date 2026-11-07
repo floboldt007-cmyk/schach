@@ -1,3 +1,59 @@
+# Supabase-Rutsch Etappe B (Liga, Banner, Rätsel-Duell)
+
+Stand 07.11.2026. Diese Liste bringt alles aus Etappe B in einem Rutsch auf den Server: die Liga mit Wochen-Gruppen,
+die Visitenkarte mit Bannern und Erfolgen und das Rätsel-Duell. Die ausführlichen Erklärungen stehen weiter unten in den
+Abschnitten „Liga mit Kronen“, „Visitenkarte, Erfolge und Taler“ und „Rätsel-Duell“; hier steht nur die Reihenfolge.
+
+**So läuft jeder SQL-Schritt:** Im Supabase-Dashboard links **SQL Editor** → **New query** → den **ganzen** Inhalt der
+genannten Datei aus dem Ordner `supabase/` einfügen → **Run**. Jede Schema-Datei darf mehrfach laufen. Eine Prüf-Datei
+(`…-rls-test.sql`) räumt am Ende selbst auf (`ROLLBACK`). Jeder Fehler aus einer Prüf-Datei beginnt mit `FEHLER:`.
+Kommt einer, **anhalten** und nicht weitermachen, sondern Claude die Meldung zeigen.
+
+**Vorher:** Die Grundeinrichtung ist schon da (`schema.sql`, Online-Schema mit der Edge Function `online-zug`, siehe
+die Abschnitte darunter). Diesen Stand erst dann einspielen, wenn die App mit diesem Stand live gehen soll: Die alte App
+ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App braucht sie.
+
+| Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
+| --- | --- | --- | --- |
+| 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → **Enable** (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | Schalter steht auf an. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
+| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300` |
+| 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
+| 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, unten `Karte-RLS-Test erfolgreich` |
+| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Unter **Messages** steht `Server-Lauf alle 10 Minuten eingeplant` (mit Cron). `select jobname, schedule from cron.job;` zeigt `raetsel-duell-auswerten` mit `*/10 * * * *` |
+| 6 | Rätsel-Duell, Rätsel | `raetsel-duell-daten.sql` (etwa 460 KB) | `select count(*) from public.duell_raetsel;` ergibt `3040` |
+| 7 | Rätsel-Duell, Edge Function | im Terminal im Projektordner: `npx supabase functions deploy raetsel-duell` | Unter **Edge Functions** steht `raetsel-duell` |
+| 8 | Rätsel-Duell prüfen | `raetsel-duell-rls-test.sql` | kein `FEHLER:`, `ROLLBACK` |
+| 9 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
+| 10 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
+
+**Warum genau diese Reihenfolge:** Cron muss vor Schritt 5 an sein, sonst plant das Duell keinen Server-Lauf ein (wer
+Cron später einschaltet, führt Schritt 5 einfach noch einmal aus). Die Karte (4) liest Stufen und Wochen-Gruppen der
+Liga (2), das Duell (5) bucht seine Kronen über die Liga (2). Die Datenauskunft (9) kommt zuletzt, weil sie alle drei
+Teile mit ausgibt.
+
+**Tipps:**
+- Lehnt der SQL Editor in Schritt 6 die große Datei ab, steht im Abschnitt „Rätsel-Duell“ unten, wie man sie teilt.
+- Schritt 7 braucht einmal das Terminal. Claude kann ihn am PC zusammen mit Flo machen. Weist das Gateway das Token ab,
+  mit `--no-verify-jwt` noch einmal hochladen (die Function prüft die Anmeldung selbst).
+- Sagt die App danach „noch nicht eingerichtet“: Schritt 10 noch einmal.
+
+**Danach in der App testen:**
+- Mit einem Konto eine Bot-Partie spielen: Auf der Startseite erscheint der Ring „Bauer III · Platz … von 30“. In der
+  Liga steht der Reiter „Gruppe“ mit 30 Plätzen, freie Plätze tragen „KI“.
+- Im Labor ein Rätsel-Duell gegen den KI-Gegner spielen: Nach 10 Sekunden Suche kommt der Gegner.
+- Im Profil „Ich“ erscheint die Visitenkarte mit Start-Banner.
+
+**Rückweg (nur nach einer Sicherung, die Befehle stehen oben in jeder Datei):**
+1. Rätsel-Duell: `raetsel-duell-zurueck.sql`, danach unter **Edge Functions** `raetsel-duell` löschen.
+2. Karte: `karte-zurueck.sql`.
+3. Zähler: `zaehler-zurueck.sql`.
+4. Liga: `kronen-zurueck.sql`.
+5. `daten-schema.sql` noch einmal ausführen (die Datenauskunft lässt die fehlenden Teile dann leer).
+
+Immer in dieser umgekehrten Reihenfolge. Wichtig: Alle Kronen, Gruppen, Banner, Taler und Duelle sind danach weg.
+
+---
+
 # Supabase für „Konto light“ einrichten
 
 Diese Schritte passieren im Supabase-Dashboard. Menübezeichnungen können nach einem Dashboard-Update leicht anders
@@ -290,8 +346,8 @@ nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-
 nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
 Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
 der Ausgabe. **Schummel-Schutz:** Bot- und KI-Ergebnisse meldet das Gerät selbst, deshalb bringen sie zusammen
-höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`); ab Montag ist der Deckel wieder frei, Online-Kronen
-zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
+höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`, KI-Rätsel-Duelle zählen mit); ab Montag ist der Deckel
+wieder frei, Online-Kronen und Rätsel-Duelle gegen Menschen zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
 meldet) gilt einmal je Konto und nur vor der
 ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem
 Konto verschwindet alles.
@@ -327,9 +383,11 @@ Online-Partie keine Karte (dann steht dort „Gegner“ mit dem Start-Banner).
 **Was der Server sicherstellt:** Die vier Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
 Zugang für anon). Das Gerät meldet nur, welche Stufe es erreicht hat; der Server bucht jede Stufe genau einmal und der
 Reihe nach (Silber nur nach Bronze), zahlt die Taler dabei aus und schreibt bei Gold das Gold-Banner gut. Die Liga-Erfolge
-meldet niemand: die leitet der Server selbst aus den Kronen ab. Liga-Banner (Platz 1 der Wochen-Gruppe, erster Aufstieg,
-Konzept 5a) schreibt nur der Server gut, über `karte_banner_gutschreiben`; die Vergabe baut der Liga-Umbau, bis dahin
-bekommt niemand ein Liga-Banner. Das Gerät darf diese Funktion nicht aufrufen. Titel, Profilbild,
+meldet niemand: die leitet der Server selbst aus der Liga-Stufe und den Wochen-Gruppen ab. Liga-Banner (Platz 1 der
+Wochen-Gruppe, erster Aufstieg in eine Liga, Konzept 5a) schreibt nur der Server gut: die Wochen-Abrechnung ruft
+`karte_liga_banner_nachtragen` auf, die über `karte_banner_gutschreiben` das Banner der Liga bucht (Bauer bis König =
+Holz bis Krone). Banner aus Wochen, die vor dem Einspielen dieser Datei abgerechnet wurden, kommen beim nächsten Blick auf
+die Karte nach. Das Gerät darf keine dieser Funktionen aufrufen. Titel, Profilbild,
 Hintergrund und Rahmen kommen nur aus festen Listen (kein Freitext, keine Stücke des Erfinders, keine Labor-Rahmen), ein
 Banner nur aus dem eigenen Besitz. Die Karte eines Spielers bekommt nur, wer mit ihm in derselben Online-Partie sitzt.
 Erfolge, Titel und Banner kann man nie kaufen: kein Kauf und kein Abo führt dorthin. Mit dem Konto verschwindet alles.
@@ -397,6 +455,8 @@ Duell liegen lässt und nicht mehr abfragt, wird mit eingeschaltetem Cron nach s
 sonst spätestens bei seiner nächsten Suche, Einladung oder seinem nächsten Beitritt.
 Kronen: gegen einen Menschen +30 / +10 / −15, gegen den KI-Gegner +20 / +5 / −10, je Duell und Konto höchstens einmal,
 höchstens 20 KI-Duelle am Tag und 3 gewertete Duelle am Tag gegen dieselbe Person, ohne einen eigenen Zug keine Kronen.
+Gewinne aus KI-Duellen zählen zum Wochen-Deckel von 300 Kronen für Bot und KI (Abschnitt „Liga mit Kronen“), Duelle
+gegen Menschen nicht.
 Freundschaft per Code bringt keine Kronen; höchstens 5 offene Einladungen, höchstens 20 falsche Codes am Tag. Den
 KI-Gegner legt nur der Server an, und erst nach 10 Sekunden echter Suche. Mit dem Konto verschwindet alles.
 
