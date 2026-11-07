@@ -196,6 +196,30 @@ async function testeBuehne(browser, heute) {
   }
   gruppe = 'buehne-leer';
   {
+    // iPad hoch ohne Partie: "Deine Leiter" mit den drei Bots nach dem naechsten Gegner (aus BOTS, aufsteigend)
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const b = await seite.evaluate(() => ({ sichtbar: !!document.querySelector('.heim-leiter')?.offsetParent,
+      elo: parseInt(document.querySelector('.heim-gegner .zahl')?.textContent.replace(/\D/g, ''), 10),
+      bots: [...document.querySelectorAll('.heim-leiter-bot')].map((x) => ({ name: x.querySelector('b')?.textContent.trim(),
+        elo: parseInt(x.querySelector('small')?.textContent.replace(/\D/g, ''), 10), bild: !!x.querySelector('img')?.getAttribute('src') })),
+      portraet: document.querySelector('.heim-portraet')?.getBoundingClientRect().width }));
+    pruefe('iPad hoch, leer: Bot-Bild gross (mindestens 200 px)', b.portraet >= 200, String(b.portraet));
+    pruefe('iPad hoch, leer: "Deine Leiter" mit drei Bots (Bild, Name, Staerke), staerker als der naechste Gegner und aufsteigend',
+      b.sichtbar && b.bots.length === 3 && b.bots.every((x) => x.name && x.bild && x.elo > b.elo)
+      && b.bots[0].elo <= b.bots[1].elo && b.bots[1].elo <= b.bots[2].elo, JSON.stringify(b));
+    await seite.locator('[data-aktion="heim-leiter"]').click();
+    pruefe('Deine Leiter oeffnet die Bot-Leiter (arena)', await istScreen(seite, 'arena'));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite } = await neueSeite(browser, { speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    pruefe('Handy: "Deine Leiter" bleibt weg (kein Platz)', !(await seite.evaluate(() => !!document.querySelector('.heim-leiter')?.offsetParent)));
+    await kontext.close();
+  }
+  {
     const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => ({ art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
@@ -322,8 +346,13 @@ async function testeGroessen(browser, heute) {
       }
       pruefe(`${name}: nichts seitlich drueber`, await seite.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth));
       if (partie) {
-        const min = { 820: 300, 1180: 360, 1024: 300, 1440: 360, 390: 240, 375: 190 }[w];
+        const min = { 820: 520, 1180: 360, 1024: 300, 1440: 360, 390: 240, 375: 190 }[w];
         pruefe(`${name}: Brett mindestens ${min} px`, m.brett && m.brett.w >= min, String(m.brett && m.brett.w));
+      }
+      if (w === 820) {
+        // iPad hoch: oben ausgerichtet (Gruss direkt unter dem Kopf, keine senkrechte Zentrierung)
+        const oben = await seite.evaluate(() => document.querySelector('.heim-gruss').getBoundingClientRect().top);
+        pruefe(`${name}: Inhalt beginnt oben (Gruss unter 140 px)`, oben < 140, String(oben));
       }
       // Lesbarkeit: Kontrast der Texte auf ihrer Flaeche (mindestens 4,5:1), auch auf der dunklen Buehne
       const schlecht = await seite.evaluate(() => {

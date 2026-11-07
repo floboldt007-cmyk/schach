@@ -22,7 +22,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
 import { laborFrei } from '../labor.js';
-import { botNachId } from '../bots.js';
+import { BOTS, botNachId } from '../bots.js';
 import { eigenerName } from '../konto.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
 import * as serieStand from '../pakete/serie/stand.js';
@@ -67,6 +67,7 @@ registriereTexte('heim', {
     balken: 'Bewertung {wert}',
     weiter: 'Weiterspielen',
     naechsterGegner: 'Nächster Gegner auf deiner Leiter',
+    leiter: 'Deine Leiter',
     spielen: 'Spielen',
     naechstes: 'Als Nächstes',
     'liga.noch': 'Noch {n} Liga-Punkte bis {naechste}',
@@ -110,6 +111,7 @@ registriereTexte('heim', {
     balken: 'Evaluation {wert}',
     weiter: 'Continue',
     naechsterGegner: 'Next opponent on your ladder',
+    leiter: 'Your ladder',
     spielen: 'Play',
     naechstes: 'Up next',
     'liga.noch': '{n} league points to {naechste}',
@@ -229,6 +231,20 @@ function buehneGegner(bot) {
     </div>`;
 }
 
+// "Deine Leiter" (nur ohne laufende Partie): die drei Bots nach dem naechsten Gegner, nur aus BOTS; danach keiner -> weg
+function leiterZeile(bot) {
+  const danach = [...BOTS].sort((a, c) => a.stufe - c.stufe).filter((b) => b.stufe > bot.stufe).slice(0, 3);
+  if (!danach.length) return '';
+  return `<section class="heim-leiter" aria-labelledby="heim-leiter-titel">
+      <h3 id="heim-leiter-titel">${esc(t('heim.leiter'))}</h3>
+      <button class="heim-leiter-liste dr" type="button" data-aktion="heim-leiter">
+        ${danach.map((b) => `<span class="heim-leiter-bot" style="--bot-farbe: var(--bot-${esc(b.id)}, var(--gold))">
+          <img src="${esc(b.avatar)}" alt="" draggable="false"><span><b>${esc(b.name)}</b><small class="zahl">${esc(zahl(b.elo))}</small></span>
+        </span>`).join('')}
+      </button>
+    </section>`;
+}
+
 // "Als Naechstes": Kandidaten mit Rang (1 offene Herausforderung, 2 Belohnung kurz vor dem Ziel, 3 Liga-Platz), hoechstens
 // zwei. Heute gibt es Daten nur fuer den Liga-Platz; die anderen Raenge kommen mit ihren Quellen (Online-Server, Belohnungen).
 function naechsteZeilen() {
@@ -270,6 +286,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
           <h3 id="heim-naechstes-titel">${esc(t('heim.naechstes'))}</h3>
           <div class="heim-liste">${zeilen.map((z) => z.html).join('')}</div>
         </section>` : ''}
+        ${partie ? '' : leiterZeile(bot)}
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
             <span class="heim-symbol" aria-hidden="true">${icon(ic)}</span>
@@ -287,6 +304,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
       else app.gehe('partie', { botId: laufend.botId, farbe: laufend.spielerFarbe, fortsetzen: true });
     } else if (a === 'heim-spielen') app.gehe('partie', { botId: k.dataset.bot });
     else if (a === 'heim-liga') app.gehe('bestenliste');
+    else if (a === 'heim-leiter') app.gehe('arena');
     else if (a === 'heim-online') app.gehe(laborFrei() ? 'lobby' : 'online');
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
