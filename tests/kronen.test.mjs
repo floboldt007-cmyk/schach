@@ -12,7 +12,9 @@ function pruefe(name, fn) {
 pruefe('Konstanten wie entschieden 06.11.2026', () => {
   assert.deepEqual(K.LIGEN, ['holz', 'bronze', 'silber', 'gold', 'diamant', 'krone']);
   assert.equal(K.STUFEN_JE_LIGA, 3); assert.equal(K.STUFE_KRONEN, 100); assert.equal(K.STUFEN_ANZAHL, 18);
-  assert.deepEqual(K.KRONEN, { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 } });
+  assert.deepEqual(K.KRONEN, { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 },
+    // Etappe 5 (07.11.2026): Raetsel-Duell gegen Menschen wie online, gegen den KI-Gegner wie ki
+    duell: { sieg: 30, remis: 10, niederlage: -15 }, duell_ki: { sieg: 20, remis: 5, niederlage: -10 } });
   assert.equal(K.BOT_TAGESGRENZE, 10); assert.equal(K.KI_TAGESGRENZE, 20); assert.equal(K.KI_MINDESTDAUER_S, 60);
   assert.equal(K.SAISON_TAGE, 28); assert.equal(K.RUECKSTUFUNG_STUFEN, 3);
 });
