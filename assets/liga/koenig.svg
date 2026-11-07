@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120" role="img" aria-hidden="true">
+<defs><linearGradient id="w-koenig-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C1A6F6"/><stop offset="1" stop-color="#7650D2"/></linearGradient><radialGradient id="w-koenig-l" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="#F7D77E" stop-opacity=".55"/><stop offset="1" stop-color="#F7D77E" stop-opacity="0"/></radialGradient></defs>
+<circle cx="50" cy="66" r="48" fill="url(#w-koenig-l)"/>
+<path d="M50 20 L86 30 V64 C86 90 69 106 50 114 C31 106 14 90 14 64 V30 Z" fill="url(#w-koenig-s)" stroke="#E3BC4E" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M50 26 L80 34 V64 C80 85 66 99 50 106" fill="none" stroke="#EBDFFF" stroke-width="2" opacity=".55" stroke-linecap="round"/>
+<g fill="#F7D77E"><path d="M47.5 36h5v5h5v5h-5v5h-5v-5h-5v-5h5z"/><path d="M38 84l2-14c-5-4-6-9-3-13 4-5 9-5 13 0 4-5 9-5 13 0 3 4 2 9-3 13l2 14z"/><rect x="35" y="86" width="30" height="6" rx="3"/></g>
+<path d="M34 18 L38 4 L44 12 L50 2 L56 12 L62 4 L66 18 Z" fill="#F2C94C" stroke="#B5862A" stroke-width="1.6" stroke-linejoin="round"/>
+</svg>

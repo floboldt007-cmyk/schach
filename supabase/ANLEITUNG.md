@@ -247,16 +247,29 @@ sehen nur Benutzername, Wochenpunkte und Partienzahl, nie die E-Mail. Eine abgel
 Einladungslink gilt 7 Tage, ein neuer ersetzt den alten. Die Wochenwertung sinkt nie und hat grobe Grenzen (höchstens
 1000 Partien, je Partie höchstens 100.000 Punkte). Mit dem Konto verschwindet alles.
 
-## Liga mit Kronen (Stand 06.11.2026)
+## Liga mit Kronen (Stand 07.11.2026, Wochen-Gruppen)
 
-Die Liga mit Kronen (Ring auf der Startseite, gewertete Gegnersuche in der Lobby, Kronen für Online-, KI- und
-Bot-Partien, Start-Liga aus der vorhandenen Elo) braucht `supabase/kronen-schema.sql`. Ohne die Datei zeigt die App mit
-Konto keinen Kronen-Stand vom Server, und „Gewertet“ in der Lobby endet mit einer Fehlermeldung. Alles andere läuft
-weiter, die lokale Liga ebenso.
+Die Liga mit Kronen (Ring auf der Startseite, Reiter „Gruppe“ in der Liga, gewertete Gegnersuche in der Lobby, Kronen
+für Online-, KI- und Bot-Partien, Start-Liga aus der vorhandenen Elo) braucht `supabase/kronen-schema.sql`. Ohne die
+Datei zeigt die App mit Konto keinen Kronen-Stand und keine Gruppe vom Server, und „Gewertet“ in der Lobby endet mit
+einer Fehlermeldung. Alles andere läuft weiter, die lokale Liga ebenso.
+
+**So funktioniert die Liga seit dem 07.11.2026:** 18 Stufen, die Ligen heißen wie Figuren (Bauer, Springer, Läufer,
+Turm, Dame, König, je III, II, I). Jede Woche (Montag bis Sonntag 24 Uhr, Europe/Berlin) spielt man in einer Gruppe mit
+30 Plätzen derselben Stufe. In die Gruppe kommt man mit der ersten Partie der Woche, die Kronen bringt. Freie Plätze
+füllen Computer-Gegner, in der App mit „KI“ gekennzeichnet; sie stehen nicht als Zeilen in der Datenbank, sondern
+werden aus einer Zufallszahl der Gruppe berechnet. Nach der Woche steigen Platz 1 bis 5 eine Stufe auf (höchstens
+König I), die letzten 5 eine ab (nie unter Bauer III). Jeder Platz bis 20 bekommt eine Belohnung (Platz 1 ein Banner,
+danach Taler); der Server merkt sie sich, ausgezahlt wird später mit dem Shop. Eine Saison über vier Wochen gibt es
+nicht mehr.
+
+**Abrechnung ohne Zeitplan:** Die Woche rechnet sich beim nächsten Aufruf selbst ab (`liga_abrechnen()`, bei jeder
+Buchung und jedem Blick auf Stand oder Gruppe). Es braucht kein `pg_cron`, keinen Zeitplan und keine Edge Function.
 
 1. Vorher muss das Online-Schema eingerichtet sein, in der Reihenfolge aus „Online gegen Freunde“ und „Anti-Cheat
    Etappe 1a“ (zuerst die Edge Function, dann das SQL). Die Kronen-Datei hängt an die Tabelle `partien_online` die
-   Spalte `gewertet` und einen Trigger an.
+   Spalte `gewertet` und einen Trigger an. Für die Namen in der Gruppe sollte auch `supabase/schema.sql` (Tabelle `profile` mit den Benutzernamen)
+   eingespielt sein; ohne es zeigt die App „Spieler“.
 2. Im Supabase-Dashboard → **SQL Editor** → **New query** den ganzen Inhalt von `supabase/kronen-schema.sql` einfügen
    und **Run** drücken. Die Datei darf mehrfach laufen.
 3. Prüfen: den ganzen Inhalt von `supabase/kronen-rls-test.sql` ausführen. Erwartung: kein Fehler (jeder Fehler beginnt
@@ -264,26 +277,28 @@ weiter, die lokale Liga ebenso.
 4. Tageszähler (gebaut, aber aus): danach `supabase/zaehler-schema.sql` einspielen und mit
    `supabase/zaehler-rls-test.sql` prüfen (ebenfalls Rollback am Ende).
 5. Danach `supabase/daten-schema.sql` noch einmal ausführen: Die Datenauskunft („Meine Daten“) zeigt dann auch den
-   Kronen-Stand, alle Kronen-Buchungen, das Saison-Archiv, eine laufende Gegnersuche und die KI-Belege. Die Tageszähler
-   haben keinen Personenbezug und stehen dort nicht.
-6. **Erst beim Live-Gang:** den Start der ersten Saison setzen, immer ein Montag, der erste Montag nach dem Live-Gang:
-   `update public.kronen_schalter set saison_start = 'JJJJ-MM-TT';`
-   Bis dahin gilt Saison 0: Kronen werden gebucht, aber keine Saison wechselt, niemand wird zurückgestuft.
+   Kronen-Stand, alle Kronen-Buchungen, die eigenen Wochen-Gruppen (Woche, Stufe, eigene Kronen, ohne die anderen
+   Mitglieder), die gemerkten Belohnungen, eine laufende Gegnersuche und die KI-Belege. Die Tageszähler haben keinen
+   Personenbezug und stehen dort nicht.
+
+Einen Saisonstart muss niemand mehr setzen: Die erste Woche beginnt mit der ersten Partie nach dem Einspielen.
 
 **Was der Server sicherstellt:** Die Tabellen sind nur über die Funktionen erreichbar (keine direkten Rechte, kein
-Zugang für anon). Kronen gibt nur der Server, je Partie, Beleg und Saisonwechsel höchstens einmal. Online zählen nur
-gewertete Partien aus der Gegnersuche (Freundes-Partien über Einladungscode nicht), nicht unter 4 Halbzügen und
-höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20 Ergebnisse am Tag (Europe/
-Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach der Ausgabe. Die Start-Liga
-gilt einmal je Konto und nur vor der ersten Partie mit Kronen. Innerhalb einer Saison fällt niemand unter den Anfang
-seiner Liga. Mit dem Konto verschwindet alles.
+Zugang für anon). Kronen gibt nur der Server, je Partie und Beleg höchstens einmal; jede Gruppe wird genau einmal
+abgerechnet, jede Belohnung genau einmal gemerkt. Eine Gruppe hat nie mehr als 30 Menschen. Die Wochen-Kronen fallen
+nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-Partien über Einladungscode nicht),
+nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
+Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
+der Ausgabe. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Dame III) gilt einmal je Konto und nur vor der
+ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem
+Konto verschwindet alles.
 
 **Zähler:** `kronen_schalter.zaehler_an` bleibt `false`. Erst einschalten nach der Rechtsprüfung (§ 25 TDDDG, DSGVO)
 und mit einem Absatz in der Datenschutzerklärung.
 
-**Rückweg:** `supabase/kronen-zurueck.sql` entfernt alles wieder, auch die Zähler. Achtung: Alle Kronen-Stände,
-Buchungen und das Saison-Archiv sind danach weg. Nur nach einer Sicherung ausführen (die Befehle dafür stehen oben in
-der Datei).
+**Rückweg:** `supabase/kronen-zurueck.sql` entfernt alles wieder, auch die Zähler und die Wochen-Gruppen. Achtung: Alle
+Kronen-Stände, Buchungen, Gruppen und gemerkten Belohnungen sind danach weg. Nur nach einer Sicherung ausführen (die
+Befehle dafür stehen oben in der Datei).
 
 ## Pionier-Titel für die ersten 100 Konten (Stand 01.11.2026)
 

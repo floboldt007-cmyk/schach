@@ -2,7 +2,9 @@
 // Der Server entscheidet (supabase/kronen-schema.sql); diese Datei ruft nur seine Funktionen auf. Die Zahlen und die
 // reine Rechnung stehen in js/pakete/liga/kronen.js.
 //
-//   holeStand() -> Promise<{ saison, kronen, stufe, boden, naechste }>   (kronen_mein_stand; ohne Konto ein Fehler)
+//   holeStand() -> Promise<{ stufe, kronen, platz, ziel, n, woche }>   (kronen_mein_stand; Wochen-Kronen, Platz in der
+//     Gruppe dieser Woche, ziel = Kronen auf Platz 5; ohne Gruppe platz und ziel null; ohne Konto ein Fehler)
+//   holeGruppe() -> Promise<{ woche, ende, stufe, gruppe, platz, n, mitglieder, belohnung, offen }>   (liga_meine_gruppe)
 //   angemeldet() -> boolean                                                 Sitzung vorhanden (ohne Konto keine Suche)
 //   suche(zeit, { warteMs, alleMs, beiTreffer, beiBot, beiFehler }) -> { stopp() }
 //     zeit wie '3+2'. Fragt alle alleMs, ob gepaart; ein Treffer ruft beiTreffer(partieId). Nach warteMs ohne Treffer
@@ -30,6 +32,10 @@ export async function holeStand() {
   return rpc('kronen_mein_stand', {});
 }
 
+export async function holeGruppe() {
+  return rpc('liga_meine_gruppe', {});
+}
+
 async function melde(name, daten) {
   if (!angemeldet()) return null;
   try {
@@ -54,7 +60,7 @@ async function startEinmal() {
   if (!angemeldet() || !uid) return;
   const m = kronenSpeicher(ladeModul('kronen'));
   if (m.konto === uid && m.startGemeldet) return;
-  // ohne gewertete Partie gibt es keine eigene Elo (nur den Startwert): dann beginnt das Konto in Holz
+  // ohne gewertete Partie gibt es keine eigene Elo (nur den Startwert): dann beginnt das Konto in Bauer III
   const liga = normalisiereStand(ladeModul('liga'), new Date());
   if (!liga || !(liga.wertung.n > 0)) return;
   let d;

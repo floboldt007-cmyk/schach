@@ -12,6 +12,7 @@ import {
   normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
 import { saisonKarte, verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
+import { reiterGruppe, huelleGruppe } from './gruppe.js';
 import { protokolliere } from '../../protokoll.js';
 
 const MODUL = 'liga';
@@ -146,4 +147,7 @@ if (typeof document !== 'undefined') {
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });
   anbieten('verlauf:seite', sicher(() => verlaufKarte(kontext)), { reihenfolge: 20, paket: MODUL });
+  // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
+  anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
+    { reihenfolge: 5, paket: MODUL });
 }

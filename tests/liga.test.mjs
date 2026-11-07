@@ -562,6 +562,153 @@ async function browserTeil(browser, start) {
   }
 }
 
+// Wochen-Gruppen (07.11.2026): Reiter "Gruppe" der Bestenliste mit abgefangenem Server (liga_meine_gruppe).
+// Gruppe Laeufer II (Stufe 7), du auf Platz 3, 27 Menschen und 3 Bots ("KI"), dazu eine gemerkte Belohnung.
+function probeGruppe({ platz = 3, stufe = 7 } = {}) {
+  const mitglieder = [];
+  for (let p = 1; p <= 30; p++) {
+    const ki = p === 6 || p === 18 || p === 27;
+    mitglieder.push({ platz: p, name: p === platz ? 'flo' : (ki ? ['Rosa', 'Udo', 'Kira'][[6, 18, 27].indexOf(p)] : 'Spieler ' + p),
+      kronen: 400 - p * 12, ki, ich: p === platz });
+  }
+  return { woche: '2026-11-02', ende: '2026-11-08', stufe, gruppe: 41, platz, n: 30, mitglieder,
+    belohnung: [], offen: [{ woche: '2026-10-26', platz: 4, art: 'taler', menge: 80 }] };
+}
+const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
+const GR_UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
+const GR_SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: GR_UID })).toString('base64url') + '.x', refresh_token: 'r1',
+  expires_at: 9999999999, user: { id: GR_UID, email: 'probe@example.invalid' } };
+
+async function gruppeSeite(browser, start, { antwort, konto = true, w = 390, h = 844, modus = 'hell', sprache = 'de' }) {
+  const kontext = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700, reducedMotion: 'reduce', serviceWorkers: 'block' });
+  const page = await kontext.newPage();
+  const fehler = [];
+  page.on('pageerror', (e) => fehler.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) fehler.push(m.text()); });
+  const rpc = [];
+  await page.route(SUPA + '/**', (r) => {
+    const name = (r.request().url().match(/\/rpc\/([a-z_]+)/) || [])[1];
+    if (name) rpc.push(name);
+    if (name === 'liga_meine_gruppe') {
+      if (antwort === 'fehler') return r.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"kaputt"}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await kontext.addInitScript(({ sitzung, modus, sprache }) => {
+    if (sessionStorage.getItem('gruppe-probe')) return;
+    sessionStorage.setItem('gruppe-probe', '1');
+    localStorage.clear();
+    if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+    localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ modus, sprache, spracheGewaehlt: true, bewegung: 'aus', klang: false,
+      duellIntro: 'aus' }));
+  }, { sitzung: konto ? GR_SITZUNG : null, modus, sprache });
+  await page.goto(start + '?test#bestenliste');
+  await page.waitForSelector('.lg-gr[data-zustand]:not([data-zustand="laedt"])', { timeout: 15000 });
+  return { kontext, page, fehler, rpc };
+}
+
+async function gruppeTeil(browser, start) {
+  {
+    const { kontext, page, fehler, rpc } = await gruppeSeite(browser, start, { antwort: probeGruppe() });
+    try {
+      await browserPruefe('Gruppe: ist der erste Reiter und Standard, Freunde gleich dahinter, ohne Zeitfenster', async () => {
+        const reiter = await page.locator('.bl-steuer-reiter [role="radio"], .bl-steuer-reiter button').allInnerTexts();
+        assert.deepEqual(reiter.slice(0, 2).map((x) => x.trim()), ['Gruppe', 'Freunde'], JSON.stringify(reiter));
+        assert.equal(await page.locator('.bl-screen').getAttribute('data-reiter'), 'gruppe');
+        assert.ok(await page.locator('.bl-steuer-fenster').isHidden());
+        assert.ok(rpc.includes('liga_meine_gruppe'));
+      });
+      await browserPruefe('Gruppe: Buehne mit Wappen, "Läufer II", "Platz 3 von 30", Aufstiegskurs, naechste Stufe Läufer I', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Platz 3 von 30');
+        assert.match(await page.locator('.lg-gr-zone').innerText(), /Auf Aufstiegskurs/);
+        assert.match(await page.locator('.lg-gr-naechste').innerText(), /Läufer I$/);
+        assert.match(await page.locator('.lg-gr-wappen').getAttribute('src'), /assets\/liga\/laeufer\.svg$/);
+        assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
+        assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
+        assert.match(await page.locator('.lg-gr-offen').innerText(), /1 Belohnungen/);
+      });
+      await browserPruefe('Gruppe: Abschnitte 5 / 20 / 5, "Eine Stufe tiefer" statt Druck-Wort, eigene Zeile gold', async () => {
+        const n = (z) => page.locator(`.lg-gr-abschnitt[data-zone="${z}"] .lg-gr-zeile`).count();
+        assert.deepEqual([await n('auf'), await n('bleib'), await n('ab')], [5, 20, 5]);
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="ab"] h3').innerText(), 'Eine Stufe tiefer');
+        assert.ok(!/Abstieg/i.test(await page.locator('.lg-gr').innerText()));
+        assert.equal(await page.locator('.lg-gr-zeile.ich').count(), 1);
+        assert.equal(await page.locator('.lg-gr-zeile.ich .lg-gr-platz').innerText(), '3');
+        assert.equal(await page.locator('.lg-gr-zeile.ich .lg-gr-name b').innerText(), 'Du');
+      });
+      await browserPruefe('Gruppe: Bots tragen "KI", Bleiben eingeklappt bis zum Knopf', async () => {
+        assert.equal(await page.locator('.lg-gr-zeile[data-ki] .lg-gr-ki').count(), 3);
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="bleib"] .lg-gr-zeile:visible').count(), 1);
+        const mehr = page.locator('.lg-gr-mehr');
+        assert.equal(await mehr.innerText(), '19 weitere anzeigen');
+        await mehr.click();
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="bleib"] .lg-gr-zeile:visible').count(), 20);
+        assert.equal(await mehr.getAttribute('aria-expanded'), 'true');
+      });
+      await browserPruefe('Gruppe: Belohnungs-Kacheln bis Platz 20 (Banner fuer Platz 1), Tipp zeigt den Inhalt', async () => {
+        assert.equal(await page.locator('.lg-gr-lohn').count(), 20);
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="1"] .lg-gr-lohn').getAttribute('data-art'), 'banner');
+        const lohn = page.locator('.lg-gr-zeile.ich .lg-gr-lohn');
+        await lohn.click();
+        assert.equal(await lohn.getAttribute('aria-expanded'), 'true');
+        assert.match(await page.locator('.lg-gr-zeile.ich .lg-gr-info').innerText(), /Belohnung für Platz 3: 100 Taler/);
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="21"] .lg-gr-lohn').count(), 0);
+      });
+      await browserPruefe('Gruppe: keine Konsolenfehler, kein NaN, keine Kennung', async () => {
+        assert.deepEqual(fehler, []);
+        const text = await page.locator('.lg-gr').innerText();
+        assert.ok(!/NaN|undefined|null|[0-9a-f]{8}-[0-9a-f]{4}-/.test(text), text.slice(0, 200));
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe(), konto: false });
+    try {
+      await browserPruefe('Gruppe ohne Konto: ruhige Karte mit Link zum Konto, kein Server-Abruf der Gruppe', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'ohne-konto');
+        assert.match(await page.locator('.lg-gr-karte p').innerText(), /Gruppe mit 30 Plätzen/);
+        assert.equal(await page.locator('.lg-gr-konto').getAttribute('href'), '#einstellungen/konto');
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const leer = { woche: '2026-11-02', ende: '2026-11-08', stufe: 3, gruppe: null, platz: null, n: 30, mitglieder: [], belohnung: [], offen: [] };
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: leer });
+    try {
+      await browserPruefe('Gruppe ohne Partie diese Woche: Buehne Springer III mit Einladung, keine Liste', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'leer');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Springer III');
+        assert.match(await page.locator('.lg-gr-titel p').innerText(), /Spiel eine Partie/);
+        assert.equal(await page.locator('.lg-gr-liste').count(), 0);
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page, fehler } = await gruppeSeite(browser, start, { antwort: 'fehler' });
+    try {
+      await browserPruefe('Gruppe bei Server-Fehler: ruhige Fehlerkarte, App laeuft weiter', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'fehler');
+        assert.ok(!fehler.some((f) => /pageerror|TypeError/.test(f)), fehler.join(' | '));
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe({ platz: 28, stufe: 17 }), sprache: 'en', modus: 'dunkel' });
+    try {
+      await browserPruefe('Gruppe englisch, dunkel, Koenig I auf Platz 28: "King I", "Place 28 of 30", ruhiges Abzeichen', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'King I');
+        assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Place 28 of 30');
+        assert.equal(await page.locator('.lg-gr-zone').getAttribute('data-zone'), 'ab');
+        assert.match(await page.locator('.lg-gr-zone').innerText(), /Everything is open until Sunday/);
+        assert.equal(await page.locator('.lg-gr-naechste').count(), 0, 'ueber Koenig I gibt es nichts');
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="auf"]').count(), 0, 'in Koenig I steigt niemand auf');
+      });
+    } finally { await kontext.close(); }
+  }
+}
+
 let server, browser;
 try {
   nodeTeil();
@@ -594,6 +741,7 @@ try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8847, '127.0.0.1', resolve); });
     browser = await browserTyp(pw).launch();
     await browserTeil(browser, 'http://127.0.0.1:8847/index.html');
+    await gruppeTeil(browser, 'http://127.0.0.1:8847/index.html');
   }
 } catch (e) {
   ergebnisse.push({ name: 'Testlauf', ok: false }); console.error('FEHLER Testlauf: ' + e.stack);

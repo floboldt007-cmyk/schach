@@ -5,8 +5,9 @@
 // wertung.js selbst (gleiche Zeichen).
 // Englisch: Wertung = rating, Spielklasse = class, Liga-Stufe = tier, Saison = season, Liga-Punkte = league points.
 // Die Restdauer der Saison steht ruhig als "79 days to go" (deutsch "noch 79 Tage"), nie als Countdown mit Uhrzeit.
-import { registriereTexte } from '../../sprache.js';
+import { registriereTexte, t } from '../../sprache.js';
 import { KLASSEN, STUFEN } from './wertung.js';
+import { stufeInfo } from './kronen.js';
 
 const klassenDe = Object.fromEntries(KLASSEN.map((name, i) => ['klasse.' + i, name]));
 const stufenDe = Object.fromEntries(STUFEN.map((s, i) => ['stufe.' + i, s.name]));
@@ -85,6 +86,40 @@ export const DE = {
   'verlauf.saison': 'Saison {nr}: {stufe}',
   'verlauf.punkte': '{punkte} Punkte · Rechenstand {stand}',
   'verlauf.fuss': 'Arena-Wertung mit Verlustschutz · Rechenstand {stand}. Die Bot-Skala ist vorläufig.',
+  // Kronen-Liga mit Wochen-Gruppen (kronen.js LIGEN, Umbau 07.11.2026). Ruhige Fakten, kein Druck (fairness Regel 9/10):
+  // der untere Abschnitt heisst "Eine Stufe tiefer", die Woche "Ende am Sonntag"
+  'kliga.bauer': 'Bauer', 'kliga.springer': 'Springer', 'kliga.laeufer': 'Läufer', 'kliga.turm': 'Turm', 'kliga.dame': 'Dame',
+  'kliga.koenig': 'König',
+  'gruppe.reiter': 'Gruppe',
+  'gruppe.aria': 'Deine Gruppe dieser Woche',
+  'gruppe.platz': 'Platz {platz} von {n}',
+  'gruppe.zone.auf': 'Auf Aufstiegskurs',
+  'gruppe.zone.bleib': 'Bleibt in {stufe}',
+  'gruppe.zone.ab': 'Bis Sonntag ist alles offen',
+  'gruppe.naechste': 'Nächste Stufe: {stufe}',
+  'gruppe.ende': 'Ende am Sonntag, {datum}',
+  'gruppe.auf': 'Aufstieg',
+  'gruppe.bleib': 'Bleiben',
+  'gruppe.ab': 'Eine Stufe tiefer',
+  'gruppe.mehr': '{n} weitere anzeigen',
+  'gruppe.weniger': 'Weniger anzeigen',
+  'gruppe.ki': 'KI',
+  'gruppe.kiLang': 'Computer-Gegner',
+  'gruppe.spieler': 'Spieler',
+  'gruppe.du': 'Du',
+  'gruppe.kronen': '{n} Kronen',
+  'gruppe.banner': 'Banner',
+  'gruppe.bannerText': 'Ein Banner für deine Sammlung',
+  'gruppe.taler': '{n} Taler',
+  'gruppe.talerText': '{n} Taler für deine Sammlung',
+  'gruppe.belohnung': 'Belohnung für Platz {platz}',
+  'gruppe.gemerkt': 'Wird gemerkt und mit dem Shop gutgeschrieben.',
+  'gruppe.keine': 'Ab Platz 21 ohne Belohnung, die Kronen zählen trotzdem.',
+  'gruppe.offen': 'Gemerkt: {n} Belohnungen aus früheren Wochen',
+  'gruppe.ohneKonto': 'Mit einem Konto spielst du jede Woche in einer Gruppe mit {n} Plätzen.',
+  'gruppe.kontoLink': 'Konto anlegen',
+  'gruppe.leer': 'Spiel eine Partie, dann kommst du in deine Gruppe für diese Woche.',
+  'gruppe.fehler': 'Die Gruppe lädt gerade nicht. Später noch einmal versuchen.',
   ...klassenDe,
   ...stufenDe,
 };
@@ -170,6 +205,45 @@ export const EN = {
   'stufe.4': 'Platinum',
   'stufe.5': 'Diamond',
   'stufe.6': 'Crown',
+  'kliga.bauer': 'Pawn', 'kliga.springer': 'Knight', 'kliga.laeufer': 'Bishop', 'kliga.turm': 'Rook', 'kliga.dame': 'Queen',
+  'kliga.koenig': 'King',
+  'gruppe.reiter': 'Group',
+  'gruppe.aria': 'Your group this week',
+  'gruppe.platz': 'Place {platz} of {n}',
+  'gruppe.zone.auf': 'On track to move up',
+  'gruppe.zone.bleib': 'Stays in {stufe}',
+  'gruppe.zone.ab': 'Everything is open until Sunday',
+  'gruppe.naechste': 'Next tier: {stufe}',
+  'gruppe.ende': 'Ends on Sunday, {datum}',
+  'gruppe.auf': 'Moving up',
+  'gruppe.bleib': 'Staying',
+  'gruppe.ab': 'One tier down',
+  'gruppe.mehr': 'Show {n} more',
+  'gruppe.weniger': 'Show less',
+  'gruppe.ki': 'AI',
+  'gruppe.kiLang': 'Computer opponent',
+  'gruppe.spieler': 'Player',
+  'gruppe.du': 'You',
+  'gruppe.kronen': '{n} crowns',
+  'gruppe.banner': 'Banner',
+  'gruppe.bannerText': 'A banner for your collection',
+  'gruppe.taler': '{n} coins',
+  'gruppe.talerText': '{n} coins for your collection',
+  'gruppe.belohnung': 'Reward for place {platz}',
+  'gruppe.gemerkt': 'Saved and credited once the shop opens.',
+  'gruppe.keine': 'No reward from place 21, your crowns still count.',
+  'gruppe.offen': 'Saved: {n} rewards from earlier weeks',
+  'gruppe.ohneKonto': 'With an account you play in a group of {n} every week.',
+  'gruppe.kontoLink': 'Create an account',
+  'gruppe.leer': 'Play a game and you join your group for this week.',
+  'gruppe.fehler': 'The group is not loading right now. Please try again later.',
 };
 
 registriereTexte('p-liga', { de: DE, en: EN });
+
+// Name einer Kronen-Stufe wie "Läufer II" (0 Bauer III bis 17 König I), in der eingestellten Sprache
+const ROEMISCH = ['', 'I', 'II', 'III'];
+export function stufenName(index) {
+  const s = stufeInfo(index);
+  return `${t('p-liga.kliga.' + s.liga)} ${ROEMISCH[s.rang]}`;
+}

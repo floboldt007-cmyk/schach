@@ -1,4 +1,5 @@
-// Etappe B, Task 1: reine Kronen-Rechnung (Stufen, Saison, Buchung, Rueckstufung, Start aus Elo). Ohne DOM, ohne Uhr.
+// Etappe B: reine Kronen- und Liga-Rechnung (Stufen-Namen, Zonen der Wochen-Gruppe, Belohnung, Start aus Elo). Ohne DOM,
+// ohne Uhr. Umbau Wochen-Gruppen 07.11.2026 (Konzept Abschnitt 5a).
 // node tests/kronen.test.mjs
 import assert from 'node:assert/strict';
 import * as K from '../js/pakete/liga/kronen.js';
@@ -9,37 +10,46 @@ function pruefe(name, fn) {
   catch (e) { ergebnisse.push({ name, ok: false }); console.error('FEHLER ' + name + ': ' + e.message); }
 }
 
-pruefe('Konstanten wie entschieden 06.11.2026', () => {
-  assert.deepEqual(K.LIGEN, ['holz', 'bronze', 'silber', 'gold', 'diamant', 'krone']);
-  assert.equal(K.STUFEN_JE_LIGA, 3); assert.equal(K.STUFE_KRONEN, 100); assert.equal(K.STUFEN_ANZAHL, 18);
+pruefe('Konstanten wie entschieden (06.11. Kronen, 07.11. Wochen-Gruppen)', () => {
+  assert.deepEqual(K.LIGEN, ['bauer', 'springer', 'laeufer', 'turm', 'dame', 'koenig']);
+  assert.deepEqual(K.FARBEN, ['holz', 'bronze', 'silber', 'gold', 'diamant', 'krone']);
+  assert.equal(K.STUFEN_JE_LIGA, 3); assert.equal(K.STUFEN_ANZAHL, 18);
   assert.deepEqual(K.KRONEN, { online: { sieg: 30, remis: 10, niederlage: -15 }, ki: { sieg: 20, remis: 5, niederlage: -10 }, bot: { sieg: 15, remis: 5, niederlage: 0 } });
   assert.equal(K.BOT_TAGESGRENZE, 10); assert.equal(K.KI_TAGESGRENZE, 20); assert.equal(K.KI_MINDESTDAUER_S, 60);
-  assert.equal(K.SAISON_TAGE, 28); assert.equal(K.RUECKSTUFUNG_STUFEN, 3);
+  assert.equal(K.GRUPPE_GROESSE, 30); assert.equal(K.AUFSTIEG_PLAETZE, 5); assert.equal(K.ABSTIEG_PLAETZE, 5);
+  assert.equal(K.BOT_ZIEL_MAX.length, K.LIGEN.length);
+  // die Saison ist entfallen
+  assert.equal(K.SAISON_TAGE, undefined); assert.equal(K.STUFE_KRONEN, undefined);
 });
 
-pruefe('stufeVon: Grenzen, Krone I, Unsinn wird Holz III', () => {
-  assert.deepEqual(K.stufeVon(0), { index: 0, liga: 'holz', rang: 3, boden: 0, naechste: 100 });
-  assert.equal(K.stufeVon(99).index, 0);
-  assert.equal(K.stufeVon(100).index, 1);
-  const kroneI = K.stufeVon(1700);
-  assert.equal(kroneI.index, 17); assert.equal(kroneI.liga, 'krone'); assert.equal(kroneI.rang, 1); assert.equal(kroneI.naechste, null);
-  assert.equal(K.stufeVon(99999).index, 17);
-  assert.equal(K.stufeVon(-5).index, 0);
-  assert.equal(K.stufeVon(NaN).index, 0);
+pruefe('stufeInfo: Bauer III bis Koenig I, Farbe je Liga, Unsinn wird Bauer III', () => {
+  assert.deepEqual(K.stufeInfo(0), { index: 0, liga: 'bauer', farbe: 'holz', rang: 3 });
+  assert.deepEqual(K.stufeInfo(7), { index: 7, liga: 'laeufer', farbe: 'silber', rang: 2 });
+  assert.deepEqual(K.stufeInfo(17), { index: 17, liga: 'koenig', farbe: 'krone', rang: 1 });
+  assert.equal(K.stufeInfo(99).index, 17);
+  assert.equal(K.stufeInfo(-3).index, 0);
+  assert.equal(K.stufeInfo(NaN).index, 0);
+  assert.equal(K.naechsteStufe(17), null); assert.equal(K.naechsteStufe(4), 5);
+  assert.equal(K.vorigeStufe(0), null); assert.equal(K.vorigeStufe(4), 3);
 });
 
-pruefe('ligaBoden: Anfang der Liga', () => {
-  assert.equal(K.ligaBoden(0), 0); assert.equal(K.ligaBoden(299), 0); assert.equal(K.ligaBoden(505), 300);
-  assert.equal(K.ligaBoden(1400), 1200); assert.equal(K.ligaBoden(1750), 1500);
+pruefe('zoneVon: 1 bis 5 auf, 26 bis 30 ab, Raender Koenig I und Bauer III wie der Server', () => {
+  const st = { stufe: 7 };
+  assert.deepEqual([1, 5, 6, 25, 26, 30].map((p) => K.zoneVon(p, st)), ['auf', 'auf', 'bleib', 'bleib', 'ab', 'ab']);
+  assert.equal(K.zoneVon(1, { stufe: 17 }), 'bleib');
+  assert.equal(K.zoneVon(30, { stufe: 0 }), 'bleib');
+  assert.equal(K.zoneVon(30, { stufe: 17 }), 'ab');
+  assert.equal(K.zoneVon(0, st), 'bleib');
+  assert.equal(K.zoneVon(undefined, st), 'bleib');
 });
 
-pruefe('bucheKronen: Boden-Schutz je Liga, Boden faellt nie', () => {
-  assert.deepEqual(K.bucheKronen({ kronen: 310, boden: 300 }, -15), { kronen: 300, boden: 300 });
-  assert.deepEqual(K.bucheKronen({ kronen: 520, boden: 300 }, -15), { kronen: 505, boden: 300 });
-  assert.deepEqual(K.bucheKronen({ kronen: 290, boden: 0 }, 30), { kronen: 320, boden: 300 });
-  assert.deepEqual(K.bucheKronen({ kronen: 250, boden: 0 }, -15), { kronen: 235, boden: 0 });
-  assert.deepEqual(K.bucheKronen({ kronen: 5, boden: 0 }, -15), { kronen: 0, boden: 0 });
-  assert.deepEqual(K.bucheKronen({ kronen: 1550, boden: 1500 }, -100), { kronen: 1500, boden: 1500 });
+pruefe('belohnungFuer: Banner fuer Platz 1, fallende Taler, ab Platz 21 nichts', () => {
+  assert.deepEqual(K.belohnungFuer(1), { von: 1, bis: 1, art: 'banner', menge: 1 });
+  const taler = [2, 3, 4, 5, 6, 10, 11, 20].map((p) => K.belohnungFuer(p).menge);
+  assert.deepEqual(taler, [120, 100, 80, 80, 40, 40, 20, 20]);
+  assert.ok(taler.every((m, i) => i === 0 || m <= taler[i - 1]), 'Taler fallen mit dem Platz');
+  assert.equal(K.belohnungFuer(21), null);
+  assert.equal(K.belohnungFuer(0), null);
 });
 
 pruefe('kronenFuer: drei Quellen, Unbekanntes gibt 0', () => {
@@ -52,45 +62,21 @@ pruefe('kronenFuer: drei Quellen, Unbekanntes gibt 0', () => {
   assert.equal(K.kronenFuer('fremd', 'sieg'), 0);
 });
 
-pruefe('saisonAm: 28 Tage ab Start, Grenze genau am Montag', () => {
-  assert.deepEqual(K.saisonAm('2026-11-30', '2026-11-30'), { nr: 1, start: '2026-11-30', ende: '2026-12-28' });
-  assert.equal(K.saisonAm('2026-12-27', '2026-11-30').nr, 1);
-  assert.equal(K.saisonAm('2026-12-28', '2026-11-30').nr, 2);
-  assert.deepEqual(K.saisonAm('2026-12-28', '2026-11-30'), { nr: 2, start: '2026-12-28', ende: '2027-01-25' });
-  assert.equal(K.saisonAm('2026-11-01', '2026-11-30').nr, 0);
-  assert.deepEqual(K.saisonAm('2026-12-01', null), { nr: 0, start: null, ende: null });
+pruefe('startStufeAusElo: Stufe III der Liga nach Elo, hoechstens Dame III', () => {
+  assert.equal(K.startStufeAusElo(999), 0);
+  assert.equal(K.startStufeAusElo(1000), 3);
+  assert.equal(K.startStufeAusElo(1200), 6);
+  assert.equal(K.startStufeAusElo(1450), 9);
+  assert.equal(K.startStufeAusElo(1600), 12);
+  assert.equal(K.startStufeAusElo(2400), 12);
+  assert.equal(K.startStufeAusElo(NaN), 0);
 });
 
-pruefe('saisonAm: Sommerzeit-Umstellung verschiebt die Grenze nicht (Kalendertage, keine Stunden)', () => {
-  // 2027-03-28 ist die Umstellung auf Sommerzeit; mit Start 2026-11-30 laeuft Saison 5 vom 2027-03-22 bis 2027-04-18
-  assert.equal(K.saisonAm('2027-04-18', '2026-11-30').nr, 5);
-  assert.equal(K.saisonAm('2027-04-19', '2026-11-30').nr, 6);
-  assert.equal(K.saisonAm('2027-03-28', '2026-11-30').start, '2027-03-22');
-});
-
-pruefe('neueSaisonKronen: drei Stufen zurueck auf den Anfang der Zielstufe', () => {
-  assert.deepEqual(K.neueSaisonKronen(1750), { kronen: 1400, boden: 1200 });
-  assert.deepEqual(K.neueSaisonKronen(250), { kronen: 0, boden: 0 });
-  assert.deepEqual(K.neueSaisonKronen(0), { kronen: 0, boden: 0 });
-});
-
-pruefe('startKronenAusElo: Liga-Anfang nach Elo, nie direkt Krone', () => {
-  assert.equal(K.startKronenAusElo(999), 0);
-  assert.equal(K.startKronenAusElo(1000), 300);
-  assert.equal(K.startKronenAusElo(1200), 600);
-  assert.equal(K.startKronenAusElo(1400), 900);
-  assert.equal(K.startKronenAusElo(1600), 1200);
-  assert.equal(K.startKronenAusElo(1900), 1200);
-  assert.equal(K.startKronenAusElo(2400), 1200);
-  assert.equal(K.startKronenAusElo(NaN), 0);
-});
-
-pruefe('kronenSpeicher: Modul kronen { konto, stand, startGemeldet } (Task 7, Task 6 nutzt startGemeldet)', () => {
+pruefe('kronenSpeicher: Modul kronen { konto, stand, startGemeldet }', () => {
   assert.deepEqual(K.kronenSpeicher(null), { konto: null, stand: null, startGemeldet: false });
   assert.deepEqual(K.kronenSpeicher('kaputt'), { konto: null, stand: null, startGemeldet: false });
-  assert.deepEqual(K.kronenSpeicher({ konto: 'u1', stand: { kronen: 640, stufe: 6 }, startGemeldet: true }),
-    { konto: 'u1', stand: { kronen: 640, stufe: 6 }, startGemeldet: true });
-  // startGemeldet nur als echtes boolean, Stand nur als Objekt mit Kronen-Zahl
+  assert.deepEqual(K.kronenSpeicher({ konto: 'u1', stand: { kronen: 64, stufe: 6, platz: 3, n: 30 }, startGemeldet: true }),
+    { konto: 'u1', stand: { kronen: 64, stufe: 6, platz: 3, n: 30 }, startGemeldet: true });
   assert.equal(K.kronenSpeicher({ konto: 'u1', startGemeldet: 'ja' }).startGemeldet, false);
   assert.equal(K.kronenSpeicher({ konto: 'u1', stand: { kronen: 'x' } }).stand, null);
   assert.equal(K.kronenSpeicher({ konto: 'u1', stand: [1] }).stand, null);

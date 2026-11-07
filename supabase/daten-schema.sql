@@ -320,8 +320,8 @@ declare
   werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
     'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
   freunde jsonb := jsonb_build_object('freundschaften', '[]'::jsonb, 'einladung', null, 'wochenpunkte', '[]'::jsonb);
-  kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'archiv', '[]'::jsonb, 'suche', null,
-    'ki_belege', '[]'::jsonb);
+  kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'gruppen', '[]'::jsonb,
+    'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
 begin
   if uid is null then
     raise exception 'Nicht angemeldet' using errcode = '42501';
@@ -379,15 +379,19 @@ begin
                  from public.wochenpunkte w where w.user_id = $1), ''[]''::jsonb))'
       into freunde using uid;
   end if;
-  -- Liga mit Kronen (kronen-schema.sql): eigener Stand, alle Buchungen, das Saison-Archiv, die laufende Gegnersuche und
-  -- die KI-Belege. Die Tageszaehler (zaehler_tag) haben keinen Personenbezug und gehoeren nicht hierher.
+  -- Liga mit Kronen (kronen-schema.sql): eigener Stand, alle Buchungen, die eigenen Wochen-Gruppen (Woche, Stufe, eigene
+  -- Kronen; die anderen Mitglieder nicht), gemerkte Belohnungen, die laufende Gegnersuche und die KI-Belege. Die
+  -- Tageszaehler (zaehler_tag) haben keinen Personenbezug und gehoeren nicht hierher.
   if to_regclass('public.kronen_stand') is not null then
     execute 'select jsonb_build_object(
                ''stand'', (select to_jsonb(s) - ''user_id'' from public.kronen_stand s where s.user_id = $1),
                ''buchungen'', coalesce((select jsonb_agg(to_jsonb(b) - ''user_id'' order by b.am, b.id)
                  from public.kronen_buchungen b where b.user_id = $1), ''[]''::jsonb),
-               ''archiv'', coalesce((select jsonb_agg(to_jsonb(a) - ''user_id'' order by a.saison)
-                 from public.kronen_archiv a where a.user_id = $1), ''[]''::jsonb),
+               ''gruppen'', coalesce((select jsonb_agg(jsonb_build_object(''woche'', m.woche, ''stufe'', g.stufe,
+                   ''kronen'', m.kronen, ''beigetreten'', m.beigetreten) order by m.woche)
+                 from public.liga_mitglieder m join public.liga_gruppen g on g.id = m.gruppe where m.user_id = $1), ''[]''::jsonb),
+               ''belohnungen'', coalesce((select jsonb_agg(to_jsonb(l) - ''user_id'' order by l.woche, l.id)
+                 from public.liga_belohnungen l where l.user_id = $1), ''[]''::jsonb),
                ''suche'', (select to_jsonb(q) - ''user_id'' from public.suche_warteschlange q where q.user_id = $1),
                ''ki_belege'', coalesce((select jsonb_agg(to_jsonb(k) - ''user_id'' order by k.erstellt_am)
                  from public.suche_ki_belege k where k.user_id = $1), ''[]''::jsonb))'

@@ -94,6 +94,13 @@ const DATEIEN = [
   'js/pakete/liga/index.js',
   'js/pakete/liga/wertung.js',
   'js/pakete/liga/kronen.js',
+  'js/pakete/liga/gruppe.js',
+  'assets/liga/bauer.svg',
+  'assets/liga/springer.svg',
+  'assets/liga/laeufer.svg',
+  'assets/liga/turm.svg',
+  'assets/liga/dame.svg',
+  'assets/liga/koenig.svg',
   // Stufe 2: Spielsysteme (P1 bis P3) und Welle A
   'css/pakete/funken.css',
   'js/pakete/funken/ansicht.js',
