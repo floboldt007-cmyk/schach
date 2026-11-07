@@ -4,7 +4,7 @@
 // fuer alle (FAHRPLAN Abschnitt 6): leichte Lektionen und je eine Probe gratis, der Rest im Trainer (js/pakete/lernen/zugang.js).
 //
 // Orte und Ereignisse:
-//   training:karten   (reihenfolge 3) Karte "Meisterschule" mit Sternen, fuer alle; das Labor-Schild nur beim Erfinder
+//   training:karten   (reihenfolge 0, vor dem Tagesraetsel) Karte "Meisterschule" mit Sternen, fuer alle; das Labor-Schild nur beim Erfinder
 //   lektion:beendet   sendet js/ui/lektion.js nach einer geschafften Lektion: { id: '<bereich>-<id>', ringe } (Vertrag in ARCHITEKTUR.md;
 //                     1 Stern = gelernt, 2 = sicher, 3 = gemeistert); das Paket funken bucht daraus Lern-Funken
 // Speicher: Modul lernen (js/storage.js MODUL_BUDGET), Aufbau in mattbilder.js stand().
@@ -54,5 +54,5 @@ try { registriereVorteil(VORTEIL); } catch (e) { console.error(e); }
 try {
   anbieten('training:karten', (k) => {
     try { return k && k.app ? trainingKarte(k.app) : null; } catch (e) { console.error(e); return null; }
-  }, { reihenfolge: 3, paket: PAKET });
+  }, { reihenfolge: 0, paket: PAKET });
 } catch (e) { console.error(e); }
