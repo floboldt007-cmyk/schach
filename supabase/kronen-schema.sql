@@ -51,11 +51,16 @@ create table if not exists public.kronen_buchungen (
   delta integer not null,
   saison integer not null,
   am timestamptz not null default now(),
-  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start', 'saison')),
+  constraint kronen_buchungen_quelle check (quelle in ('online', 'ki', 'bot', 'start', 'saison', 'duell', 'duell_ki')),
   constraint kronen_buchungen_ref check (char_length(ref) between 1 and 64),
   -- jede Partie, jeder Beleg und jeder Saisonwechsel wird je Konto hoechstens einmal gebucht
   constraint kronen_buchungen_einmal unique (user_id, quelle, ref)
 );
+-- Etappe 5 (Raetsel-Duell, supabase/raetsel-duell-schema.sql) bucht als 'duell' und 'duell_ki'. Fuer schon
+-- eingespielte Tabellen wird die Pruefung hier ersetzt (wiederholbar; alte Zeilen erfuellen sie weiter).
+alter table public.kronen_buchungen drop constraint if exists kronen_buchungen_quelle;
+alter table public.kronen_buchungen add constraint kronen_buchungen_quelle
+  check (quelle in ('online', 'ki', 'bot', 'start', 'saison', 'duell', 'duell_ki'));
 -- fuer die Tagesgrenzen (Task 5): Buchungen je Konto, Quelle und Zeit
 create index if not exists kronen_buchungen_tag on public.kronen_buchungen (user_id, quelle, am);
 
@@ -92,7 +97,9 @@ as $$
     'kronen', jsonb_build_object(
       'online', jsonb_build_object('sieg', 30, 'remis', 10, 'niederlage', -15),
       'ki', jsonb_build_object('sieg', 20, 'remis', 5, 'niederlage', -10),
-      'bot', jsonb_build_object('sieg', 15, 'remis', 5, 'niederlage', 0)
+      'bot', jsonb_build_object('sieg', 15, 'remis', 5, 'niederlage', 0),
+      'duell', jsonb_build_object('sieg', 30, 'remis', 10, 'niederlage', -15),
+      'duell_ki', jsonb_build_object('sieg', 20, 'remis', 5, 'niederlage', -10)
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
@@ -677,7 +684,7 @@ grant execute on function public.kronen_bot_ergebnis(text, text, integer) to aut
 grant execute on function public.kronen_ki_ergebnis(uuid, text) to authenticated;
 
 -- ---------- Task 6: Start-Liga fuer Bestandsspieler ----------
--- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI oder Bot): die Elo des Geraets, begrenzt auf
+-- Einmal je Konto und nur vor der ersten Partie mit Kronen (online, KI, Bot oder Raetsel-Duell): die Elo des Geraets, begrenzt auf
 -- 400 bis 2800, wird zum Anfang der Liga ihrer Spielklasse, hoechstens Diamant III (SQL-Gegenstueck zu
 -- startKronenAusElo in js/pakete/liga/kronen.js, Zahlen aus kronen_konstanten). Die Elo wird auch die Online-Elo.
 -- Antwort { delta, kronen, stufe } oder { fehler: 'KRONEN_EINGABE' | 'KRONEN_START_VORBEI' } ohne Aenderung.
@@ -704,7 +711,7 @@ begin
   -- kronen_stand_sichern sperrt die Zeile (for update): gleichzeitige Starts und Buchungen laufen nacheinander
   st := public.kronen_stand_sichern(uid);
   if st.start_gesetzt
-     or exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle in ('online', 'ki', 'bot')) then
+     or exists (select 1 from public.kronen_buchungen b where b.user_id = uid and b.quelle in ('online', 'ki', 'bot', 'duell', 'duell_ki')) then
     return jsonb_build_object('fehler', 'KRONEN_START_VORBEI');
   end if;
   wert := least(greatest(kronen_start.elo, (konst->>'start_elo_min')::integer), (konst->>'start_elo_max')::integer);

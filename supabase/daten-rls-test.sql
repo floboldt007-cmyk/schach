@@ -171,6 +171,11 @@ begin
      or not (d -> 'kronen' ? 'stand') or not (d -> 'kronen' ? 'suche') then
     raise exception 'FEHLER: meine_daten ohne kronen (stand, buchungen, archiv, suche, ki_belege): %', d;
   end if;
+  -- Raetsel-Duell immer als Objekt mit Liste (leer, wenn raetsel-duell-schema.sql fehlt)
+  if jsonb_typeof(d -> 'raetsel_duell') is distinct from 'object' or jsonb_typeof(d -> 'raetsel_duell' -> 'duelle') is distinct from 'array'
+     or not (d -> 'raetsel_duell' ? 'suche') then
+    raise exception 'FEHLER: meine_daten ohne raetsel_duell (duelle, suche): %', d;
+  end if;
   -- Zaehler der Mengenbremse (A hat eine Partie und ein Nutzungsereignis geteilt), Fehlversuche immer als Liste
   if jsonb_typeof(d -> 'mengenzaehler') <> 'array'
      or (select coalesce(sum((z ->> 'anzahl')::integer), 0) from jsonb_array_elements(d -> 'mengenzaehler') z

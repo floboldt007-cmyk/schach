@@ -39,7 +39,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Stufen gleich (Kronen je Stufe, Stufen je Liga, Anzahl)',
     zahl('stufe_kronen') === STUFE_KRONEN && zahl('stufen_je_liga') === STUFEN_JE_LIGA && zahl('stufen_anzahl') === STUFEN_ANZAHL,
     [zahl('stufe_kronen'), zahl('stufen_je_liga'), zahl('stufen_anzahl')]);
-  for (const quelle of ['online', 'ki', 'bot']) {
+  for (const quelle of ['online', 'ki', 'bot', 'duell', 'duell_ki']) {
     const zeile = (k.match(new RegExp(`'${quelle}',\\s*jsonb_build_object\\(([^)]*)\\)`)) || [])[1] || '';
     const wert = (e) => Number((zeile.match(new RegExp(`'${e}',\\s*(-?\\d+)`)) || [])[1]);
     pruefe(`Kronen fuer ${quelle} gleich`, ['sieg', 'remis', 'niederlage'].every((e) => wert(e) === KRONEN[quelle][e]),
@@ -167,7 +167,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
     { sql: [grenzen, zahl('start_elo_min'), zahl('start_elo_max'), zahl('start_hoechste_liga')], js: [KLASSEN_GRENZEN, START_ELO_GRENZEN] });
   const start = fn('kronen_start')?.rumpf || '';
   pruefe('kronen_start: nur ohne gesetzten Start und ohne Partie mit Kronen, sonst KRONEN_START_VORBEI',
-    /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
+    /st\.start_gesetzt/.test(start) && /b\.quelle in \('online', 'ki', 'bot', 'duell', 'duell_ki'\)/.test(start) && /'KRONEN_START_VORBEI'/.test(start)
       && start.indexOf("'KRONEN_START_VORBEI'") < start.indexOf('insert into public.kronen_buchungen'));
   pruefe('kronen_start: Buchung start/start, Stand mit Boden, Elo und start_gesetzt',
     /values \(uid, 'start', 'start', neu - st\.kronen, st\.saison\)/.test(start)
