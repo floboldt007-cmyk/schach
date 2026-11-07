@@ -1,11 +1,12 @@
-// Tests fuer die Startseite "heim" (Etappe A, Task 3): Rang-Ring mit Liga-Punkten und Stufe, drei Modus-Karten
-// (Online, Bots, Raetsel), ohne Scrollen auf dem kleinen Handy, erster Start ueber das Willkommen "start".
+// Tests fuer die Startseite "heim" (Konzept 2026-11-06, Abschnitt 12): Buehne mit laufender Partie (Mini-Brett, Lage,
+// Bewertung, Weiterspielen) oder naechstem Gegner, "Als Naechstes" (Liga-Zeile, ohne Daten weg), drei Wege (Online,
+// Lernen, Zu zweit), ohne Scrollen auf dem iPad, hell und dunkel lesbar, erster Start ueber das Willkommen "start".
 // Node-Teil ohne Browser, danach Browser-Teil (Playwright, Chromium oder BROWSER=webkit) gegen index.html?test.
 //
 //   node tests/heim.test.mjs              alles
 //   node tests/heim.test.mjs --nur-node   ohne Browser
 //   PORT=8972 node tests/heim.test.mjs    eigener Port (Standard 8972)
-//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (390x844 hell und dunkel, 1180x820, 1440x900 hell und dunkel)
+//   HEIM_BILDER=<ordner>                  legt dort Bildschirmfotos ab (iPhone, iPad hoch und quer, hell und dunkel, mit und ohne Partie)
 //
 // Playwright: Pfad per Umgebungsvariable PLAYWRIGHT_PFAD, sonst 'playwright' oder /opt/node-tools.
 import { spawn } from 'node:child_process';
@@ -114,52 +115,156 @@ const bild = async (seite, name) => {
   await seite.screenshot({ path: path.join(BILDER, name + '.png') });
 };
 
-// Lage des Rings, der Karten und der Leiste
+// Laufende Partie (wie storage.js speichereLaufendePartie): Italienisch nach 5 Zuegen, Weiss am Zug
+const ZUEGE = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6', 'd2d3', 'f8c5', 'c2c3', 'd7d6'];
+const laufend = (extra = {}) => ({ botId: 'greta', spielerFarbe: 'w', startFen: null, zuege: ZUEGE, hinweise: 0, zuruecknahmen: 0,
+  liveKlassen: [], gestartet: new Date().toISOString(), modus: 'normal', extra: {}, ...extra });
+
+// Lage der Buehne, des Bretts, aller Knoepfe und der Leiste
 const lage = (seite) => seite.evaluate(() => {
-  const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { t: b.top, b: b.bottom, l: b.left, r: b.right }; };
+  const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { t: b.top, b: b.bottom, l: b.left, r: b.right, w: b.width }; };
   const nav = document.querySelector('.reiter-leiste');
   const navSichtbar = !!nav && !nav.hidden && getComputedStyle(nav).display !== 'none';
-  return { ring: r(document.querySelector('.heim-ring')), karten: [...document.querySelectorAll('.heim-modus')].map(r),
+  const rumpf = document.querySelector('.heim-rumpf');
+  return { buehne: r(document.querySelector('.heim-buehne')), brett: r(document.querySelector('.heim-mini')),
+    knoepfe: [...document.querySelectorAll('.heim-rumpf button')].map(r),
     leiste: navSichtbar && document.documentElement.dataset.reiter === 'unten' ? r(nav) : null, ih: innerHeight, iw: innerWidth,
-    scroll: document.querySelector('.heim-rumpf') ? document.querySelector('.heim-rumpf').scrollTop : 0 };
+    ueber: rumpf ? rumpf.scrollHeight - rumpf.clientHeight : 0 };
 });
 
-async function testeRing(browser, heute) {
-  gruppe = 'zeigt-ring';
+async function testeBuehne(browser, heute) {
+  gruppe = 'buehne-partie';
   {
-    const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: { ...gesehen(heute), [P + 'laufend']: laufend() } });
     const da = await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-ring .heim-zahl')?.textContent.trim(),
-      liga: document.querySelector('.heim-liga')?.textContent.trim(), bogen: document.querySelector('.heim-ring .heim-bogen')?.getAttribute('stroke-dashoffset') }));
-    pruefe('ohne Liga-Stand: #heim zeigt den Ring mit 0', da && r.zahl === '0', JSON.stringify(r));
-    pruefe('ohne Liga-Stand: Stufe Holz, kein NaN', /^Holz\b/.test(r.liga || '') && !/NaN|undefined/.test(JSON.stringify(r)), JSON.stringify(r));
-    pruefe('ohne Liga-Stand: Zeile nennt den Abstand zur naechsten Stufe ("noch 100 bis Bronze")', /noch 100 bis Bronze/.test(r.liga || ''), r.liga);
-    pruefe('ohne Liga-Stand: Bogen ist eine Zahl', Number.isFinite(Number(r.bogen)), r.bogen);
+    const b = await seite.evaluate(() => {
+      const fig = (f) => document.querySelector(`.heim-brett .brett > img.figur[data-feld="${f}"]`)?.dataset.figur || '';
+      const src = document.querySelector('.heim-brett .brett > img.figur')?.getAttribute('src') || '';
+      return { art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
+        felder: document.querySelectorAll('.heim-brett .brett .feld').length, a8: fig('a8'), e1: fig('e1'), c4: fig('c4'),
+        satz: src.slice(0, src.lastIndexOf('/') + 1), zuletzt: document.querySelectorAll('.heim-brett .lage.zuletzt').length,
+        greifbar: getComputedStyle(document.querySelector('.heim-brett .brett')).pointerEvents,
+        ueber: document.querySelector('.heim-ueber')?.textContent.trim(), lage: document.querySelector('.heim-lage')?.textContent.trim(),
+        knopf: document.querySelector('.heim-los')?.textContent.trim() };
+    });
+    pruefe('laufende Partie: Buehne zeigt die Partie, "Deine Partie wartet."', da && b.art === 'partie' && b.titel === 'Deine Partie wartet.', JSON.stringify(b));
+    pruefe('echtes Brett der App mit 64 Feldern und der Stellung (a8 Turm schwarz, e1 Koenig weiss, c4 Laeufer weiss)',
+      b.felder === 64 && b.a8 === 'bR' && b.e1 === 'wK' && b.c4 === 'wB', JSON.stringify(b));
+    pruefe('nur zum Ansehen (keine Zeiger-Ereignisse auf dem Brett)', b.greifbar === 'none', b.greifbar);
+    pruefe('letzter Zug markiert (zwei Felder)', b.zuletzt === 2, String(b.zuletzt));
+    pruefe('Gegner und Elo genannt, Taste Weiterspielen', /Greta/.test(b.ueber) && /Bot/.test(b.ueber) && b.knopf === 'Weiterspielen', JSON.stringify(b));
+    pruefe('Satz zur Lage nennt, wer am Zug ist', /am Zug/.test(b.lage), b.lage);
+    const bw = await seite.waitForFunction(() => { const x = document.querySelector('.heim-balken'); return x && !x.hidden; }, null, { timeout: 30000 }).then(() => true, () => false);
+    const nach = await seite.evaluate(() => ({ lage: document.querySelector('.heim-lage')?.textContent.trim(),
+      w: parseFloat(document.querySelector('.heim-balken-wert')?.style.width), zahl: document.querySelector('.heim-balken-zahl')?.textContent.trim() }));
+    pruefe('nach der Engine: Bewertungsbalken sichtbar, Satz mit Lage', bw && Number.isFinite(nach.w) && nach.w > 0 && nach.w < 100
+      && /^[+-]/.test(nach.zahl) && /, du bist am Zug$/.test(nach.lage), JSON.stringify(nach));
+    await seite.locator('[data-aktion="heim-weiter"]').click();
+    pruefe('Weiterspielen setzt die Partie fort (gegen Greta, dieselben 10 Zuege)', await istScreen(seite, 'partie')
+      && await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.z.bot.id === 'greta'
+        && window.__partie.chess().history().length === 10, null, { timeout: 20000 }).then(() => true, () => false));
+    const satzPartie = await seite.evaluate(() => { const x = document.querySelector('.screen.partie .brett > img.figur')?.getAttribute('src') || ''; return x.slice(0, x.lastIndexOf('/') + 1); });
+    pruefe('Startseite zeigt denselben Figurensatz wie das Partie-Brett', !!b.satz && b.satz === satzPartie, b.satz + ' / ' + satzPartie);
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
   {
+    // Mit Schwarz: Brett aus Sicht von Schwarz (oben links h1, der weisse Turm)
+    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'laufend']: laufend({ spielerFarbe: 'b', zuege: ZUEGE.slice(0, 9) }) } });
+    await istScreen(seite, 'heim');
+    const b = await seite.evaluate(() => {
+      const brett = document.querySelector('.heim-brett .brett');
+      const h1 = brett?.querySelector('img.figur[data-feld="h1"]');
+      const rb = brett?.getBoundingClientRect(), rf = h1?.getBoundingClientRect();
+      return { sicht: brett?.dataset.ausrichtung, h1: h1?.dataset.figur, obenLinks: !!(rb && rf) && rf.left - rb.left < rb.width / 8 && rf.top - rb.top < rb.height / 8,
+        lage: document.querySelector('.heim-lage')?.textContent.trim() };
+    });
+    pruefe('mit Schwarz: Brett gedreht (oben links der weisse Turm h1), "Du bist am Zug"', b.sicht === 'b' && b.h1 === 'wR' && b.obenLinks
+      && b.lage.startsWith('Du bist am Zug'), JSON.stringify(b));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute),
+      [P + 'laufend']: laufend({ modus: 'zuzweit', botId: null, zuzweit: { weiss: 'Anna', schwarz: 'Ben', drehen: false } }) } });
+    await istScreen(seite, 'heim');
+    const b = await seite.evaluate(() => ({ ueber: document.querySelector('.heim-ueber')?.textContent.trim(), lage: document.querySelector('.heim-lage')?.textContent.trim() }));
+    pruefe('Zu zweit: "Anna gegen Ben", "Weiß am Zug"', /Anna gegen Ben/.test(b.ueber) && b.lage.startsWith('Weiß am Zug'), JSON.stringify(b));
+    await seite.locator('[data-aktion="heim-weiter"]').click();
+    pruefe('Zu zweit: Weiterspielen oeffnet die Partie Zu zweit', await istScreen(seite, 'partie')
+      && await seite.waitForSelector('.zz-brett', { timeout: 15000 }).then(() => true, () => false));
+    await kontext.close();
+  }
+  gruppe = 'buehne-leer';
+  {
+    // iPad hoch ohne Partie: "Deine Leiter" mit den drei Bots nach dem naechsten Gegner (aus BOTS, aufsteigend)
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const b = await seite.evaluate(() => ({ sichtbar: !!document.querySelector('.heim-leiter')?.offsetParent,
+      elo: parseInt(document.querySelector('.heim-gegner .zahl')?.textContent.replace(/\D/g, ''), 10),
+      bots: [...document.querySelectorAll('.heim-leiter-bot')].map((x) => ({ name: x.querySelector('b')?.textContent.trim(),
+        elo: parseInt(x.querySelector('small')?.textContent.replace(/\D/g, ''), 10), bild: !!x.querySelector('img')?.getAttribute('src') })),
+      portraet: document.querySelector('.heim-portraet')?.getBoundingClientRect().width }));
+    pruefe('iPad hoch, leer: Bot-Bild gross (mindestens 200 px)', b.portraet >= 200, String(b.portraet));
+    pruefe('iPad hoch, leer: "Deine Leiter" mit drei Bots (Bild, Name, Staerke), staerker als der naechste Gegner und aufsteigend',
+      b.sichtbar && b.bots.length === 3 && b.bots.every((x) => x.name && x.bild && x.elo > b.elo)
+      && b.bots[0].elo <= b.bots[1].elo && b.bots[1].elo <= b.bots[2].elo, JSON.stringify(b));
+    await seite.locator('[data-aktion="heim-leiter"]').click();
+    pruefe('Deine Leiter oeffnet die Bot-Leiter (arena)', await istScreen(seite, 'arena'));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite } = await neueSeite(browser, { speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    pruefe('Handy: "Deine Leiter" bleibt weg (kein Platz)', !(await seite.evaluate(() => !!document.querySelector('.heim-leiter')?.offsetParent)));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const b = await seite.evaluate(() => ({ art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
+      name: document.querySelector('.heim-gegner')?.textContent.trim(), bild: !!document.querySelector('.heim-portraet img'),
+      satz: document.querySelector('.heim-spielweise')?.textContent.trim(), bot: document.querySelector('[data-aktion="heim-spielen"]')?.dataset.bot,
+      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes') }));
+    pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && /·\s*\d/.test(b.name || '')
+      && !!b.satz && !!b.bot && !b.brett, JSON.stringify(b));
+    pruefe('keine Partie: anderer Titel', b.titel && b.titel !== 'Deine Partie wartet.', b.titel);
+    pruefe('ohne Liga-Stand: "Als Naechstes" fehlt ganz (keine leeren Platzhalter)', !b.naechstes);
+    await seite.locator('[data-aktion="heim-spielen"]').click();
+    pruefe('Spielen startet eine Partie gegen diesen Bot', await istScreen(seite, 'partie')
+      && await seite.waitForFunction((id) => window.__partie && window.__partie.bereit === true && window.__partie.z.bot.id === id
+        && window.__partie.chess().history().length === 0, b.bot, { timeout: 20000 }).then(() => true, () => false));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+}
+
+async function testeNaechstes(browser, heute) {
+  gruppe = 'als-naechstes';
+  {
     const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-ring .heim-zahl')?.textContent.trim(),
-      liga: document.querySelector('.heim-liga')?.textContent.trim(), voll: Number(document.querySelector('.heim-ring')?.dataset.anteil) }));
-    pruefe('290 Punkte: Zahl 290, Silber, noch 160 bis Gold', r.zahl === '290' && /^Silber\b/.test(r.liga) && /noch 160 bis Gold/.test(r.liga), JSON.stringify(r));
-    pruefe('290 Punkte: Ring zu 20 % gefuellt (40 von 200 zwischen Silber und Gold)', Math.abs(r.voll - 0.2) < 0.001, String(r.voll));
+    const r = await seite.evaluate(() => ({ zeilen: document.querySelectorAll('.heim-naechstes .heim-zeile').length,
+      text: document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim(), balken: parseFloat(document.querySelector('.heim-zeile-balken span')?.style.width) }));
+    pruefe('290 Punkte: eine Zeile "Silber, noch 160 Liga-Punkte bis Gold", Balken 20 %', r.zeilen === 1 && /^Silber\s*Noch 160 Liga-Punkte bis Gold/.test(r.text)
+      && r.balken === 20, JSON.stringify(r));
+    await seite.locator('[data-aktion="heim-liga"]').click();
+    pruefe('Liga-Zeile oeffnet die Bestenliste', await istScreen(seite, 'bestenliste'));
     await kontext.close();
   }
   {
     const oben = STUFEN[STUFEN.length - 1];
     const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(oben.schwelle + 50) } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ liga: document.querySelector('.heim-liga')?.textContent.trim(), voll: Number(document.querySelector('.heim-ring')?.dataset.anteil) }));
-    pruefe('hoechste Stufe: Name ohne "noch ... bis", Ring voll', r.liga.startsWith(oben.name) && !/noch/.test(r.liga) && r.voll === 1, JSON.stringify(r));
+    const r = await seite.evaluate(() => document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim());
+    pruefe('hoechste Stufe: ohne "noch", "Hoechste Stufe erreicht"', /Höchste Stufe erreicht/.test(r || '') && !/Noch/.test(r || ''), r);
     await kontext.close();
   }
   {
     const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: { stand: 999, kaputt: true } } });
     const da = await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zahl: document.querySelector('.heim-zahl')?.textContent.trim(), liga: document.querySelector('.heim-liga')?.textContent.trim() }));
-    pruefe('fremder Speicherstand (anderer Rechenstand): Holz und 0 statt Absturz', da && r.zahl === '0' && /^Holz/.test(r.liga), JSON.stringify(r));
+    const r = await seite.evaluate(() => document.querySelector('.heim-rumpf')?.textContent || '');
+    pruefe('fremder Speicherstand: kein Absturz, kein NaN', da && !/NaN|undefined/.test(r));
     await kontext.close();
   }
   gruppe = 'englisch';
@@ -167,38 +272,31 @@ async function testeRing(browser, heute) {
     const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290),
       [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ liga: document.querySelector('.heim-liga')?.textContent.trim(),
-      karten: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()) }));
-    pruefe('Englisch: "Silver, 160 to Gold" und englische Karten', /^Silver, 160 to Gold/.test(r.liga) && r.karten.length === 3 && !r.karten.some((k) => /[äöüß]|spielen|besiegen/i.test(k)),
-      JSON.stringify(r));
+    const r = await seite.evaluate(() => ({ zeile: document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim(),
+      wege: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()), titel: document.querySelector('.heim-gruss h1')?.textContent.trim() }));
+    pruefe('Englisch: Liga-Zeile, Titel und Wege englisch', /160 league points to Gold/.test(r.zeile) && r.titel === 'Ready for the next game?'
+      && r.wege.join() === 'Online,Learn,Two players', JSON.stringify(r));
     await kontext.close();
   }
 }
 
-async function testeKarten(browser, heute) {
-  gruppe = 'drei-karten';
+async function testeWege(browser, heute) {
+  gruppe = 'drei-wege';
   const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
   await istScreen(seite, 'heim');
-  const k = await seite.evaluate(() => [...document.querySelectorAll('.heim-modus')].map((e) => ({ aktion: e.dataset.aktion, haupt: e.classList.contains('haupt'),
+  const k = await seite.evaluate(() => [...document.querySelectorAll('.heim-modus')].map((e) => ({ aktion: e.dataset.aktion,
     knopf: e.tagName, w: e.getBoundingClientRect().width, h: e.getBoundingClientRect().height })));
-  pruefe('genau drei .heim-modus, die erste mit Klasse haupt', k.length === 3 && k[0].haupt && !k[1].haupt && !k[2].haupt, JSON.stringify(k));
-  pruefe('Reihenfolge Online, Bots, Raetsel', k.map((x) => x.aktion).join() === 'heim-online,heim-bots,heim-raetsel', k.map((x) => x.aktion).join());
-  pruefe('Karten sind Knoepfe mit mindestens 44 px', k.every((x) => x.knopf === 'BUTTON' && x.h >= 44 && x.w >= 44), JSON.stringify(k));
-  pruefe('Shop-Zeile in dieser Etappe ausgeblendet', await seite.evaluate(() => { const s = document.querySelector('.heim-shop'); return !s || s.hidden; }));
+  pruefe('Reihenfolge Online, Lernen, Zu zweit', k.map((x) => x.aktion).join() === 'heim-online,heim-raetsel,heim-zuzweit', k.map((x) => x.aktion).join());
+  pruefe('Wege sind Knoepfe mit mindestens 44 px', k.every((x) => x.knopf === 'BUTTON' && x.h >= 44 && x.w >= 44), JSON.stringify(k));
   pruefe('Premium-Krone im Kopf', await seite.locator('.heim-screen .haupt-kopf [data-aktion="premium"]').count() === 1);
-  const wer = await seite.evaluate(() => { const n = document.querySelector('.heim-name'), l = document.querySelector('.heim-level');
-    const sicht = (e) => !!e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden';
-    return { name: n?.textContent.trim(), level: l?.textContent.trim(), sicht: sicht(n) && sicht(l) }; });
-  pruefe('Name und Level sichtbar (ohne Konto "Du", "Level 1")', wer.sicht && wer.name === 'Du' && wer.level === 'Level 1', JSON.stringify(wer));
-
-  gruppe = 'karten-ziele';
-  await seite.locator('[data-aktion="heim-bots"]').click();
-  pruefe('Bots besiegen oeffnet die Arena', await istScreen(seite, 'arena'));
-  await seite.goBack();
-  pruefe('Zurueck aus der Arena: wieder heim', await istScreen(seite, 'heim'));
+  pruefe('Ruhe: keine roten Zahlen-Punkte, kein Countdown', await seite.evaluate(() => !document.querySelector('.heim-screen .punkt-neu, .heim-screen .badge, .heim-screen [data-countdown]')));
   await seite.locator('[data-aktion="heim-raetsel"]').click();
-  pruefe('Raetsel oeffnet das Raetsel-Training', await istScreen(seite, 'training'));
+  pruefe('Lernen oeffnet das Training (Raetsel und Meisterschule)', await istScreen(seite, 'training'));
   await seite.goBack();
+  pruefe('Zurueck: wieder heim', await istScreen(seite, 'heim'));
+  await seite.locator('[data-aktion="heim-zuzweit"]').click();
+  pruefe('Zu zweit oeffnet die Partie Zu zweit', await istScreen(seite, 'partie') && await seite.waitForSelector('.zz-screen', { timeout: 15000 }).then(() => true, () => false));
+  await seite.goto(BASIS + '#heim');
   await istScreen(seite, 'heim');
   await seite.locator('[data-aktion="heim-online"]').click();
   pruefe('Online ohne Freischaltung (kein Labor) oeffnet das Link-Duell', await istScreen(seite, 'online'));
@@ -229,48 +327,60 @@ async function testeKarten(browser, heute) {
   await k2.close();
 }
 
-async function testeOhneScrollen(browser, heute) {
-  gruppe = 'ohne-scrollen';
-  for (const [w, h, schema] of [[375, 667, 'light'], [375, 667, 'dark'], [390, 844, 'light'], [390, 844, 'dark'], [1180, 820, 'light'], [1440, 900, 'light'],
-    [1440, 900, 'dark'], [1000, 590, 'light']]) {
-    const { kontext, seite } = await neueSeite(browser, { w, h, schema, speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
-    await istScreen(seite, 'heim');
-    await warte(700);
-    const m = await lage(seite);
-    const unten = m.leiste ? m.leiste.t : m.ih;
-    const alle = [m.ring, ...m.karten];
-    const ok = alle.length === 4 && alle.every((x) => x && x.t >= 0 && x.b <= unten + 0.5 && x.l >= 0 && x.r <= m.iw + 0.5);
-    pruefe(`${w}x${h} ${schema}: Ring und drei Karten ganz sichtbar ueber der Leiste`, ok, JSON.stringify({ unten, alle }));
-    pruefe(`${w}x${h} ${schema}: nichts seitlich drueber`, await seite.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth));
-    // Lesbarkeit: Kontrast der Texte auf ihrer Flaeche (mindestens 4,5:1)
-    const schlecht = await seite.evaluate(() => {
-      const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
-      const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-      const grund = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
-      const aus = [];
-      for (const el of document.querySelectorAll('.heim-screen .heim-zahl, .heim-screen .heim-liga, .heim-screen .heim-modus b, .heim-screen .heim-modus span, .heim-screen .heim-name, .heim-screen .heim-level, .heim-screen .heim-einheit')) {
-        if (!el.textContent.trim() || el.closest('[hidden]')) continue;
-        const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
-        const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-        if (k < 4.5) aus.push(el.className + ' ' + k.toFixed(2));
+async function testeGroessen(browser, heute) {
+  gruppe = 'groessen';
+  // iPad hoch und quer, PC: nichts scrollt, alle Knoepfe ueber der Leiste. Handy: darf scrollen, aber nichts seitlich drueber.
+  for (const [w, h, ipad] of [[820, 1180, true], [1180, 820, true], [1024, 768, true], [1440, 900, true], [390, 844, false], [375, 667, false]]) {
+    for (const schema of ['light', 'dark']) for (const partie of [true, false]) {
+      const speicher = { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' } };
+      if (partie) speicher[P + 'laufend'] = laufend();
+      const { kontext, seite } = await neueSeite(browser, { w, h, schema, speicher });
+      await istScreen(seite, 'heim');
+      await warte(700);
+      const m = await lage(seite);
+      const name = `${w}x${h} ${schema === 'dark' ? 'dunkel' : 'hell'} ${partie ? 'Partie' : 'leer'}`;
+      if (ipad) {
+        const unten = m.leiste ? m.leiste.t : m.ih;
+        pruefe(`${name}: nichts scrollt, alle Knoepfe ganz sichtbar`, m.ueber <= 0 && m.knoepfe.every((x) => x.t >= 0 && x.b <= unten + 0.5 && x.r <= m.iw + 0.5),
+          JSON.stringify({ ueber: m.ueber, unten, knoepfe: m.knoepfe }));
       }
-      return aus;
-    });
-    pruefe(`${w}x${h} ${schema}: Texte lesbar (Kontrast ab 4,5:1)`, schlecht.length === 0, schlecht.join('; '));
-    if (w >= 1021 && w > h) {
-      // ab 1021 px quer zwei Spalten wie im Entwurf ipad-pc-v2: Ring links, Karten rechts, alles rechts der Seitenleiste
-      const z = await seite.evaluate(() => {
-        const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
-        return { seite: document.documentElement.dataset.reiter, nav: r('.reiter-leiste'), ring: r('.heim-ring'), karte: r('.heim-modus'), letzte: r('.heim-modus:last-of-type') };
+      pruefe(`${name}: nichts seitlich drueber`, await seite.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth));
+      if (partie) {
+        const min = { 820: 520, 1180: 360, 1024: 300, 1440: 360, 390: 240, 375: 190 }[w];
+        pruefe(`${name}: Brett mindestens ${min} px`, m.brett && m.brett.w >= min, String(m.brett && m.brett.w));
+      }
+      if (w === 820) {
+        // iPad hoch: oben ausgerichtet (Gruss direkt unter dem Kopf, keine senkrechte Zentrierung)
+        const oben = await seite.evaluate(() => document.querySelector('.heim-gruss').getBoundingClientRect().top);
+        pruefe(`${name}: Inhalt beginnt oben (Gruss unter 140 px)`, oben < 140, String(oben));
+      }
+      // Lesbarkeit: Kontrast der Texte auf ihrer Flaeche (mindestens 4,5:1), auch auf der dunklen Buehne
+      const schlecht = await seite.evaluate(() => {
+        const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+        // Verlauf der Buehne: die hellere der beiden Farben zaehlt (schlechtester Fall fuer helle Schrift)
+        const grund = (el) => { for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); const g = cs.backgroundImage.match(/rgba?\([^)]*\)/g);
+          if (g && g.length) return g.map(rgb).sort((a, b) => lum(b) - lum(a))[0];
+          const c = rgb(cs.backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
+        const aus = [];
+        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
+          if (!el.textContent.trim() || el.closest('[hidden]')) continue;
+          const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
+          const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+          if (k < 4.5) aus.push(el.className + ' ' + k.toFixed(2));
+        }
+        return aus;
       });
-      pruefe(`${w}x${h} ${schema}: zwei Spalten, Ring links neben den Karten, rechts der Seitenleiste`, z.seite === 'seite' && !!z.ring && !!z.karte
-        && z.ring.r <= z.karte.l && z.ring.l >= z.nav.r && z.ring.t < z.letzte.b && z.ring.b > z.karte.t, JSON.stringify(z));
+      pruefe(`${name}: Texte lesbar (Kontrast ab 4,5:1)`, schlecht.length === 0, schlecht.join('; '));
+      if (w === 1180 || w === 1440) {
+        const z = await seite.evaluate(() => { const r = (s) => { const e = document.querySelector(s); const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top }; };
+          return { links: r('.heim-buehne'), rechts: r('.heim-wege') }; });
+        pruefe(`${name}: zwei Spalten, Buehne links, Wege rechts`, z.links.r <= z.rechts.l, JSON.stringify(z));
+      }
+      const datei = { 390: 'iphone', 820: 'ipad-hoch', 1180: 'ipad-quer' }[w];
+      if (datei) await bild(seite, `heim-${datei}-${schema === 'dark' ? 'dunkel' : 'hell'}-${partie ? 'partie' : 'leer'}`);
+      await kontext.close();
     }
-    if (w === 390 && h === 844) await bild(seite, `heim-390x844-${schema === 'dark' ? 'dunkel' : 'hell'}`);
-    if (w === 1180) await bild(seite, 'heim-1180x820-hell');
-    if (w === 1440) await bild(seite, `heim-1440x900-${schema === 'dark' ? 'dunkel' : 'hell'}`);
-    if (w === 1000) await bild(seite, 'heim-1000x590-hell');
-    await kontext.close();
   }
 }
 
@@ -292,9 +402,10 @@ async function browserTeil(browser) {
   await seite.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
   const heute = await seite.evaluate(async () => (await import('/js/tag.js')).tagSchluessel());
   await kontext.close();
-  await testeRing(browser, heute);
-  await testeKarten(browser, heute);
-  await testeOhneScrollen(browser, heute);
+  await testeBuehne(browser, heute);
+  await testeNaechstes(browser, heute);
+  await testeWege(browser, heute);
+  await testeGroessen(browser, heute);
   await testeErsterStart(browser);
 }
 

@@ -128,6 +128,13 @@ pruefe('Texte: alle Schluessel in beiden Sprachen, keine langen Gedankenstriche'
   pruefe('Zugang: je Bereich genau eine Probe, jede eine mittlere Lektion aus ihrem Bereich',
     BEREICHE.every((b) => b.lektionen.filter(z.istProbe).length === 1 && b.lektionen.some((l) => l.id === z.PROBE[b.id] && l.stufe === 'mittel')));
   pruefe('Zugang: ohne Konto offen ist genau, was gratis ist', ALLE.every((l) => z.istOffen(l) === z.istGratis(l)));
+  // Willkommenswoche: 7 Tage ab dem ersten Willkommen (modul:start.gesehen), danach wieder Schloss; ohne den Tag keine Woche
+  pruefe('Willkommenswoche: am ersten Tag und am siebten offen, am achten nicht, ohne Tag nie',
+    z.inWillkommenswoche({ gesehen: '2026-11-07', heute: '2026-11-07' }) && z.inWillkommenswoche({ gesehen: '2026-11-01', heute: '2026-11-07' })
+    && !z.inWillkommenswoche({ gesehen: '2026-10-31', heute: '2026-11-07' }) && !z.inWillkommenswoche({ gesehen: null, heute: '2026-11-07' })
+    && !z.inWillkommenswoche({ gesehen: '2026-11-08', heute: '2026-11-07' }) && z.willkommenBis('2026-11-07') === '2026-11-13' && z.willkommenBis('kaputt') === null);
+  pruefe('Zugang: Marke „Trainer“ genau für die 31 Lektionen, die nicht gratis sind', ALLE.filter(z.istImTrainer).length === 31
+    && ALLE.every((l) => z.istImTrainer(l) === !z.istGratis(l)));
   const v = VORTEILE.find((x) => x.id === z.VORTEIL);
   pruefe('Trainer-Blatt: Vorteil Meisterschule nennt die richtige Zahl (31)', !!v && v.text.includes(String(zahl.abo) + ' Lektionen'), v && v.text);
 }
@@ -223,7 +230,7 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 const ERFINDER_ZEILEN = ['erfinder-banner-blatt-0', 'erfinder-titel', 'erfinder-figuren-blaupause', 'erfinder-finisher-signatur']
   .map((stueck_id) => ({ stueck_id }));
 
-async function seite(browser, { erfinder = true, merker = true, groesse = { width: 1180, height: 820 }, hash = '#training' } = {}) {
+async function seite(browser, { erfinder = true, merker = true, groesse = { width: 1180, height: 820 }, hash = '#training', gesehenVor = null } = {}) {
   const k = await browser.newContext({ viewport: groesse, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -231,15 +238,22 @@ async function seite(browser, { erfinder = true, merker = true, groesse = { widt
   s.on('console', (m) => { if (m.type() === 'error') fehlerListe.push(m.text()); });
   await s.route(SUPA + '/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(r.request().url().includes('/rest/v1/sonderstuecke') && erfinder ? ERFINDER_ZEILEN : []) }));
-  await s.addInitScript(({ sitzung, erfinder, merker, uid }) => {
+  await s.addInitScript(({ sitzung, erfinder, merker, uid, gesehenVor }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder && merker) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
+      // Willkommenswoche: der Tag des ersten Willkommens, gesehenVor Tage vor heute (Ortszeit)
+      if (gesehenVor != null) {
+        const d = new Date();
+        d.setDate(d.getDate() - gesehenVor);
+        const z2 = (n) => String(n).padStart(2, '0');
+        localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}` }));
+      }
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, erfinder, merker, uid: UID });
+  }, { sitzung: SITZUNG, erfinder, merker, uid: UID, gesehenVor });
   await s.goto(BASIS + hash);
   await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
   await warte(600);
@@ -569,6 +583,34 @@ async function gratisTeil(browser) {
   await p.k.close();
 }
 
+// Willkommenswoche (07.11.2026): ein neuer Spieler (erstes Willkommen heute) spielt eine Woche lang alles, die
+// Trainer-Lektionen tragen weiter ihre Marke; zehn Tage spaeter sind die Schloesser zurueck und die Zeile weg
+async function willkommenTeil(browser) {
+  const p = await seite(browser, { erfinder: false, gesehenVor: 0, hash: '#lernen' });
+  await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
+  const r = await p.s.evaluate(() => ({
+    zeile: document.querySelector('.ms-bereiche + .ms-willkommen')?.innerText || '',
+    gesperrt: document.querySelectorAll('.ms-lektion[data-gesperrt]').length,
+    trainer: document.querySelectorAll('.ms-lektion .ms-marke[data-marke="trainer"]').length,
+    anderssen: document.querySelector('.ms-lektion[data-id="anderssen"] .ms-sterne') != null,
+  }));
+  pruefe('Willkommenswoche: Zeile mit Datum unter den Bereichskarten, keine Schlösser, Marke „Trainer“ bleibt (13 Mattbilder)',
+    /Willkommenswoche: Bis .+ ist alles offen/.test(r.zeile) && r.gesperrt === 0 && r.trainer === 13 && r.anderssen, r);
+  await p.s.locator('.ms-lektion[data-id="anderssen"]').click();
+  await warteLz(p.s, "z.id === 'anderssen'");
+  pruefe('Willkommenswoche: eine Trainer-Lektion startet', (await lz(p.s)).id === 'anderssen'
+    && await p.s.locator('.ls-screen .brett').count() === 1);
+  pruefe('Willkommenswoche: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+  await p.k.close();
+
+  const q = await seite(browser, { erfinder: false, gesehenVor: 10, hash: '#lernen' });
+  await q.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
+  const r2 = await q.s.evaluate(() => ({ zeile: document.querySelectorAll('.ms-willkommen').length,
+    gesperrt: document.querySelectorAll('.ms-lektion[data-gesperrt]').length }));
+  pruefe('Nach der Woche: Schlösser zurück (13 Mattbilder), keine Willkommenszeile', r2.zeile === 0 && r2.gesperrt === 13, r2);
+  await q.k.close();
+}
+
 // Flo 31.10.2026 abends ("beim Handy habe ich die Lektionen immer noch nicht"): auf einem neuen Geraet angemeldet, noch
 // keine Server-Antwort im Merker. Die App fragt beim Start nach; das Training zeigt die Meisterschule, ohne dass erst die
 // Sammlung offen war.
@@ -593,6 +635,7 @@ async function browserTeil() {
     browser = await browserTyp(ladePlaywright()).launch();
     await erfinderTeil(browser);
     await gratisTeil(browser);
+    await willkommenTeil(browser);
     await neuesGeraetTeil(browser);
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);

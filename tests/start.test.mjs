@@ -520,7 +520,7 @@ async function browserTeil(browser) {
     && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
   // "Einfuehrung ueberspringen" -> Startseite heim (Etappe A); der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
-  await seite.waitForSelector('.heim-screen .heim-ring', { timeout: 15000 });
+  await seite.waitForSelector('.heim-screen .heim-buehne', { timeout: 15000 });
   pruefe('"Einführung überspringen" fuehrt zur Startseite heim', await seite.evaluate(() => location.hash) === '#heim');
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
