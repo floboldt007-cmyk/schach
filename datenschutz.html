@@ -226,8 +226,8 @@
   er im Duell nicht. Der KI-Gegner ist kein Mensch, sondern wird vom Server berechnet; er ist in der App als KI
   gekennzeichnet. Unbeteiligte sehen kein Duell.</p>
   <p>Diese Daten sind für das Duell erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in
-  Frankfurt. Deine Züge prüft ein Server-Programm von Supabase (Edge Function)
-  <span class="platz">[Standort der Edge Functions laut Supabase prüfen]</span>. Ausgewertet wird jedes Duell auf dem
+  Frankfurt. Deine Züge prüft ein Server-Programm von Supabase (Edge Function). Auch die Edge Functions laufen in Frankfurt:
+  Die App legt die Region bei jedem Aufruf fest. Ausgewertet wird jedes Duell auf dem
   Server: beim nächsten Abruf und zusätzlich alle 10 Minuten durch einen Zeitplaner in der Datenbank (pg_cron), damit ein
   Duell auch dann endet, wenn niemand mehr die App öffnet. Die Gegnersuche löschen wir nach 2 Minuten ohne Partner,
   Einladungen, die niemand angenommen hat, nach 24 Stunden. Beendete Duelle bleiben gespeichert, bis eines der beiden
@@ -239,6 +239,9 @@
   die Schachuhr, den Einladungscode und die Zeitpunkte der Partie. Nur die beiden Spieler können die Partie lesen;
   eine offene Einladung sieht zunächst nur ihr Ersteller. Diese Daten sind für die gemeinsame Partie erforderlich
   (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in Frankfurt.</p>
+  <p>Dasselbe gilt für Partien aus der Gegnersuche der Liga: Dort bringt der Server dich mit einem Menschen ähnlicher
+  Spielstärke zusammen (statt über einen Einladungscode), und die Partie zählt für die Liga (Abschnitt „Liga mit Kronen
+  und Wochen-Gruppen“). Was während der Suche gespeichert wird, steht dort.</p>
   <p>Unter „Meine Daten herunterladen“ erhältst du auch deine Online-Partien. Wird eines der beteiligten Konten
   gelöscht, werden die zugehörigen Online-Partien automatisch mitgelöscht (Kaskade). Die Partien bleiben sonst im
   Konto gespeichert. Technische Protokolle und Datensicherungen unterliegen den in Abschnitt 5 genannten Fristen.</p>

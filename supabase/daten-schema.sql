@@ -455,7 +455,7 @@ begin
     'freigabe_widerruf', (select to_jsonb(w) from public.freigabe_widerrufe w where w.user_id = uid),
     -- Freunde: Freundschaften und Anfragen (mit Benutzername der anderen Seite), Einladungscode, Wochenwertung
     'freunde', freunde,
-    -- Liga mit Kronen: Stand, Buchungen, Saison-Archiv, laufende Gegnersuche, KI-Belege (leer ohne kronen-schema.sql)
+    -- Liga mit Kronen: Stand, Buchungen, Wochen-Gruppen, Belohnungen, laufende Gegnersuche, KI-Belege (leer ohne kronen-schema.sql)
     'kronen', kronen,
     -- Visitenkarte und Erfolge: Stufen, Taler-Buchungen, Banner, gewaehlte Karte (leer ohne karte-schema.sql)
     'karte', karte,

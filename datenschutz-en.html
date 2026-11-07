@@ -224,8 +224,8 @@
   duel. The AI opponent is not a person but is calculated by the server; the app marks it as AI. Uninvolved people cannot
   see any duel.</p>
   <p>This data is necessary for the duel (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
-  just like your account. Your moves are checked by a Supabase server program (Edge Function)
-  <span class="platz">[Check the location of Edge Functions with Supabase]</span>. Every duel is evaluated on the server:
+  just like your account. Your moves are checked by a Supabase server program (Edge Function). The Edge Functions also run in Frankfurt:
+  the app sets the region on every call. Every duel is evaluated on the server:
   at the next request and additionally every 10 minutes by a scheduler in the database (pg_cron), so that a duel also
   ends when nobody opens the app any more. We delete a matchmaking search after 2 minutes without a partner and
   invitations nobody accepted after 24 hours. Finished duels remain stored until one of the two accounts is deleted; the
@@ -236,6 +236,9 @@
   and game timestamps. Only the two players can read the game; an open invitation is initially visible only to its creator.
   This data is necessary to play together (Art. 6 Abs. 1 lit. b DSGVO, GDPR) and is stored with Supabase in Frankfurt,
   just like your account.</p>
+  <p>The same applies to games from league matchmaking: there the server pairs you with a person of similar playing
+  strength (instead of an invitation code), and the game counts for the league (section "League with crowns and weekly
+  groups"). What is stored during the search is described there.</p>
   <p>Download my data also includes your online games. If either participating account is deleted, its associated online
   games are automatically deleted too (cascading deletion). Otherwise, games remain stored in the account.
   Technical server logs and backups follow the retention periods described in section 5.</p>
