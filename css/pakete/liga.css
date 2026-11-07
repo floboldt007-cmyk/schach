@@ -114,7 +114,7 @@
 .lg-gr-zone .ico { width: 16px; height: 16px; }
 .lg-gr-naechste { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; opacity: .82; }
 .lg-gr-naechste img { width: 20px; height: auto; }
-.lg-gr-ende, .lg-gr-offen { margin: 0; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.lg-gr-ende, .lg-gr-offen, .lg-gr-botvoll { margin: 0; padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--text-2); }
 
 .lg-gr-liste { display: grid; min-width: 0; border-radius: var(--r-xl); background: var(--flaeche); box-shadow: var(--kante); overflow: hidden; }
 .lg-gr-abschnitt + .lg-gr-abschnitt { border-top: 1px solid var(--linie); }

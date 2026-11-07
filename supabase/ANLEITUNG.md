@@ -289,7 +289,10 @@ abgerechnet, jede Belohnung genau einmal gemerkt. Eine Gruppe hat nie mehr als 3
 nie unter 0. Online zählen nur gewertete Partien aus der Gegnersuche (Freundes-Partien über Einladungscode nicht),
 nicht unter 4 Halbzügen und höchstens 3 am Tag gegen denselben Gegner. Bot-Leiter höchstens 10, KI-Gegner höchstens 20
 Ergebnisse am Tag (Europe/Berlin); ein KI-Ergebnis zählt nur mit einem eigenen Suchbeleg, frühestens 60 Sekunden nach
-der Ausgabe. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Dame III) gilt einmal je Konto und nur vor der
+der Ausgabe. **Schummel-Schutz:** Bot- und KI-Ergebnisse meldet das Gerät selbst, deshalb bringen sie zusammen
+höchstens 300 Kronen je Woche und Konto (`bot_ki_wochen_max`); ab Montag ist der Deckel wieder frei, Online-Kronen
+zählen nie dagegen. Die Start-Liga (Stufe III der Liga zur Elo, höchstens Läufer III, egal welche Elo das Gerät
+meldet) gilt einmal je Konto und nur vor der
 ersten Partie mit Kronen. Andere sehen in der Gruppe nur Benutzername und Kronen, nie eine Kennung oder E-Mail. Mit dem
 Konto verschwindet alles.
 

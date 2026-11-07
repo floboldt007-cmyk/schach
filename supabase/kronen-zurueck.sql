@@ -32,6 +32,7 @@ drop function if exists public.online_suche_partie(uuid);
 drop function if exists public.kronen_bot_ergebnis(text, text, integer);
 drop function if exists public.kronen_ki_ergebnis(uuid, text);
 drop function if exists public.kronen_einfach_buchen(uuid, text, text, text);
+drop function if exists public.liga_bot_ki_genutzt(uuid, date);
 drop function if exists public.kronen_heute_anzahl(uuid, text);
 drop function if exists public.kronen_start(integer);
 drop function if exists public.zaehler_erhoehe(text, integer);

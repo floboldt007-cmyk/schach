@@ -96,7 +96,9 @@ export function gruppeLage(d) {
     .sort((a, b) => a.platz - b.platz);
   const platz = Number.isInteger(d.platz) ? d.platz : (mitglieder.find((m) => m.ich) || {}).platz || null;
   const offen = Array.isArray(d.offen) ? d.offen.filter((o) => o && typeof o === 'object').length : 0;
-  return { stufe, n, platz, gruppe: d.gruppe == null ? null : d.gruppe, ende: typeof d.ende === 'string' ? d.ende : null, mitglieder, offen };
+  // Schummel-Schutz: der Server deckelt Bot- und KI-Kronen je Woche; hier nur der ruhige Hinweis, wenn der Deckel voll ist
+  const botKiVoll = !!d.bot_ki && Number.isFinite(d.bot_ki.max) && d.bot_ki.max > 0 && Number(d.bot_ki.genutzt) >= d.bot_ki.max;
+  return { stufe, n, platz, gruppe: d.gruppe == null ? null : d.gruppe, ende: typeof d.ende === 'string' ? d.ende : null, mitglieder, offen, botKiVoll };
 }
 
 function buehne(lg) {
@@ -155,6 +157,7 @@ export function reiterGruppe({ app } = {}) {
     s.innerHTML = `${buehne(lg)}
       ${ende ? `<p class="lg-gr-ende">${esc(ende)}</p>` : ''}
       ${lg.offen ? `<p class="lg-gr-offen">${esc(T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
+      ${lg.botKiVoll ? `<p class="lg-gr-botvoll">${esc(T('botVoll'))}</p>` : ''}
       ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}`;
     s.dataset.zustand = lg.gruppe != null ? 'gruppe' : 'leer';
   }

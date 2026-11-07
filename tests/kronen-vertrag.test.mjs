@@ -9,7 +9,7 @@ import path from 'node:path';
 import {
   STUFEN_JE_LIGA, STUFEN_ANZAHL, KRONEN, BOT_TAGESGRENZE, KI_TAGESGRENZE, KI_MINDESTDAUER_S,
   ONLINE_MINDEST_HALBZUEGE, PAAR_TAGESGRENZE, START_ELO_GRENZEN, START_HOECHSTE_LIGA, LIGEN,
-  GRUPPE_GROESSE, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE, BELOHNUNG, BOT_ZIEL_MAX,
+  GRUPPE_GROESSE, AUFSTIEG_PLAETZE, ABSTIEG_PLAETZE, BELOHNUNG, BOT_ZIEL_MAX, BOT_KI_WOCHEN_MAX,
 } from '../js/pakete/liga/kronen.js';
 import { KLASSEN_GRENZEN } from '../js/pakete/liga/wertung.js';
 
@@ -61,6 +61,8 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Belohnung je Platz gleich', JSON.stringify(belohnung) === JSON.stringify(BELOHNUNG), belohnung);
   const botZiel = ((k.match(/'bot_ziel_max',\s*jsonb_build_array\(([^)]*)\)/) || [])[1] || '').split(',').map((z) => Number(z.trim()));
   pruefe('Bot-Wochenziel je Liga gleich', JSON.stringify(botZiel) === JSON.stringify(BOT_ZIEL_MAX) && botZiel.length === LIGEN.length, botZiel);
+  pruefe('Deckel Bot- und KI-Kronen je Woche gleich (300)', zahl('bot_ki_wochen_max') === BOT_KI_WOCHEN_MAX && BOT_KI_WOCHEN_MAX === 300,
+    zahl('bot_ki_wochen_max'));
   pruefe('Schutz gegen Absprache gleich (Mindest-Halbzuege 4, Paar-Grenze 3)',
     zahl('online_mindest_halbzuege') === ONLINE_MINDEST_HALBZUEGE && zahl('paar_tagesgrenze') === PAAR_TAGESGRENZE
       && ONLINE_MINDEST_HALBZUEGE === 4 && PAAR_TAGESGRENZE === 3,
@@ -172,7 +174,11 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   const einfach = fn('kronen_einfach_buchen')?.rumpf || '';
   pruefe('Bot/KI-Buchung: einmal je ref, in die Wochen-Gruppe, Kronen aus kronen_konstanten',
     /on conflict on constraint kronen_buchungen_einmal do nothing/.test(einfach) && /d := public\.liga_buchen\(uid, nominal\)/.test(einfach)
-      && /kronen_konstanten\(\) #>> array\['kronen', art, ergebnis\]/.test(einfach));
+      && /konst #>> array\['kronen', art, ergebnis\]/.test(einfach));
+  pruefe('Schummel-Schutz: Bot- und KI-Gewinne serverseitig auf bot_ki_wochen_max je Woche gedeckelt',
+    /nominal := least\(nominal, greatest\(0, deckel - public\.liga_bot_ki_genutzt\(uid, wo\)\)\)/.test(einfach)
+      && /deckel integer := \(konst ->> 'bot_ki_wochen_max'\)::integer/.test(einfach)
+      && /b\.quelle in \('bot', 'ki'\) and b\.woche = wo/.test(fn('liga_bot_ki_genutzt')?.rumpf || ''));
   pruefe('Tagesgrenzen zaehlen ab Mitternacht Europe/Berlin', /kronen_heute\(\)::timestamp at time zone 'Europe\/Berlin'/.test(fn('kronen_heute_anzahl')?.rumpf || ''));
   pruefe('RLS-Test ruft Bot- und KI-Ergebnis auf', test.includes('public.kronen_bot_ergebnis(') && test.includes('public.kronen_ki_ergebnis('));
 }
@@ -185,7 +191,7 @@ const fn = (name) => funktionen.find((f) => f.name === name);
   pruefe('Start-Liga: Klassengrenzen, Elo-Grenzen und hoechste Start-Liga gleich',
     JSON.stringify(grenzen) === JSON.stringify(KLASSEN_GRENZEN) && zahl('start_elo_min') === START_ELO_GRENZEN[0]
       && zahl('start_elo_max') === START_ELO_GRENZEN[1] && zahl('start_hoechste_liga') === START_HOECHSTE_LIGA
-      && START_HOECHSTE_LIGA === LIGEN.indexOf('dame'),
+      && START_HOECHSTE_LIGA === LIGEN.indexOf('laeufer'),
     { sql: [grenzen, zahl('start_elo_min'), zahl('start_elo_max'), zahl('start_hoechste_liga')], js: [KLASSEN_GRENZEN, START_ELO_GRENZEN] });
   const start = fn('kronen_start')?.rumpf || '';
   pruefe('kronen_start: nur ohne gesetzten Start und ohne Partie mit Kronen, sonst KRONEN_START_VORBEI',

@@ -564,7 +564,7 @@ async function browserTeil(browser, start) {
 
 // Wochen-Gruppen (07.11.2026): Reiter "Gruppe" der Bestenliste mit abgefangenem Server (liga_meine_gruppe).
 // Gruppe Laeufer II (Stufe 7), du auf Platz 3, 27 Menschen und 3 Bots ("KI"), dazu eine gemerkte Belohnung.
-function probeGruppe({ platz = 3, stufe = 7 } = {}) {
+function probeGruppe({ platz = 3, stufe = 7, botKi = { genutzt: 120, max: 300 } } = {}) {
   const mitglieder = [];
   for (let p = 1; p <= 30; p++) {
     const ki = p === 6 || p === 18 || p === 27;
@@ -572,7 +572,7 @@ function probeGruppe({ platz = 3, stufe = 7 } = {}) {
       kronen: 400 - p * 12, ki, ich: p === platz });
   }
   return { woche: '2026-11-02', ende: '2026-11-08', stufe, gruppe: 41, platz, n: 30, mitglieder,
-    belohnung: [], offen: [{ woche: '2026-10-26', platz: 4, art: 'taler', menge: 80 }] };
+    belohnung: [], offen: [{ woche: '2026-10-26', platz: 4, art: 'taler', menge: 80 }], bot_ki: botKi };
 }
 const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
 const GR_UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
@@ -628,6 +628,7 @@ async function gruppeTeil(browser, start) {
         assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
         assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
         assert.match(await page.locator('.lg-gr-offen').innerText(), /1 Belohnungen/);
+        assert.equal(await page.locator('.lg-gr-botvoll').count(), 0, '120 von 300 Bot-Kronen: kein Hinweis');
       });
       await browserPruefe('Gruppe: Abschnitte 5 / 20 / 5, "Eine Stufe tiefer" statt Druck-Wort, eigene Zeile gold', async () => {
         const n = (z) => page.locator(`.lg-gr-abschnitt[data-zone="${z}"] .lg-gr-zeile`).count();
@@ -695,7 +696,8 @@ async function gruppeTeil(browser, start) {
     } finally { await kontext.close(); }
   }
   {
-    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe({ platz: 28, stufe: 17 }), sprache: 'en', modus: 'dunkel' });
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe({ platz: 28, stufe: 17, botKi: { genutzt: 300, max: 300 } }),
+      sprache: 'en', modus: 'dunkel' });
     try {
       await browserPruefe('Gruppe englisch, dunkel, Koenig I auf Platz 28: "King I", "Place 28 of 30", ruhiges Abzeichen', async () => {
         assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'King I');
@@ -704,6 +706,11 @@ async function gruppeTeil(browser, start) {
         assert.match(await page.locator('.lg-gr-zone').innerText(), /Everything is open until Sunday/);
         assert.equal(await page.locator('.lg-gr-naechste').count(), 0, 'ueber Koenig I gibt es nichts');
         assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="auf"]').count(), 0, 'in Koenig I steigt niemand auf');
+      });
+      await browserPruefe('Gruppe: Bot-Kronen-Deckel voll (300 von 300): ruhiger Hinweis in Grau wie "Ends on Sunday", nie rot', async () => {
+        assert.equal(await page.locator('.lg-gr-botvoll').innerText(), 'Bot crowns are full for this week. Online games still count.');
+        const farbe = (s) => page.locator(s).evaluate((e) => getComputedStyle(e).color);
+        assert.equal(await farbe('.lg-gr-botvoll'), await farbe('.lg-gr-ende'));
       });
     } finally { await kontext.close(); }
   }

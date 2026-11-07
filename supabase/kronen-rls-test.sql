@@ -893,17 +893,19 @@ begin
       raise exception 'FEHLER: KI-Grenze: Beleg % abgelehnt (%)', i, r;
     end if;
   end loop;
-  if (r->>'kronen')::int is distinct from 400 then
-    raise exception 'FEHLER: KI-Grenze: nach 20 Siegen % statt 400 Kronen', r->>'kronen';
+  -- 20 x 20 waeren 400, der Schummel-Schutz deckelt Bot- und KI-Gewinne bei 300 je Woche
+  if (r->>'kronen')::int is distinct from 300 or not (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: KI-Grenze: nach 20 Siegen % statt 300 Kronen (gedeckelt)', r->>'kronen';
   end if;
   r := public.kronen_ki_ergebnis('00000000-0000-4000-8000-000000000121'::uuid, 'sieg');
   if r->>'fehler' is distinct from 'KRONEN_GRENZE' then
     raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht abgelehnt (%)', r;
   end if;
-  -- und umgekehrt: 20 KI-Buchungen sperren den Bot-Leiter nicht
+  -- und umgekehrt: 20 KI-Buchungen sperren den Bot-Leiter nicht (keine Tagesgrenze), aber der Wochen-Deckel von 300
+  -- fuer Bot und KI zusammen ist voll: angenommen mit delta 0
   r := public.kronen_bot_ergebnis('f-partie-0001', 'remis', 800);
-  if (r->>'delta')::int is distinct from 5 or (r->>'kronen')::int is distinct from 405 then
-    raise exception 'FEHLER: Bot nach voller KI-Grenze: % (erwartet delta 5, kronen 405)', r;
+  if r ? 'fehler' or (r->>'delta')::int is distinct from 0 or (r->>'kronen')::int is distinct from 300 then
+    raise exception 'FEHLER: Bot nach voller KI-Grenze: % (erwartet delta 0, kronen 300)', r;
   end if;
 end;
 $$;
@@ -914,7 +916,7 @@ begin
      or exists (select 1 from public.kronen_buchungen where ref = '00000000-0000-4000-8000-000000000121') then
     raise exception 'FEHLER: KI-Grenze: 21. Beleg nicht eingeloest oder doch gebucht';
   end if;
-  if (select kronen from public.kronen_stand where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 405 then
+  if (select kronen from public.kronen_stand where user_id = 'ffffffff-ffff-4fff-8fff-ffffffffffff') <> 300 then
     raise exception 'FEHLER: KI-Grenze: Stand von F veraendert';
   end if;
 end;
@@ -949,7 +951,7 @@ values
   ('33333333-3333-4333-8333-333333333333', 'kronen-i@example.invalid'),
   ('44444444-4444-4444-8444-444444444444', 'kronen-j@example.invalid');
 
--- Start einmal: 1450 ist Klasse Gold (ab 1400), also Turm III (Stufe 9), ohne Kronen; der zweite Aufruf aendert nichts
+-- Start einmal: 1450 ist Klasse Gold (ab 1400), gedeckelt auf Laeufer III (Stufe 6), ohne Kronen; der zweite Aufruf aendert nichts
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
 do $$
@@ -957,14 +959,14 @@ declare
   r jsonb;
 begin
   r := public.kronen_start(1450);
-  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 9}'::jsonb then
-    raise exception 'FEHLER: Start einmal: % statt Stufe 9', r;
+  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 6}'::jsonb then
+    raise exception 'FEHLER: Start einmal: % statt Stufe 6', r;
   end if;
   r := public.kronen_start(1900);
   if r->>'fehler' is distinct from 'KRONEN_START_VORBEI' then
     raise exception 'FEHLER: Start einmal: zweiter Aufruf %', r;
   end if;
-  if (public.kronen_mein_stand()->>'stufe')::int is distinct from 9 then
+  if (public.kronen_mein_stand()->>'stufe')::int is distinct from 6 then
     raise exception 'FEHLER: Start einmal: Stand nach dem zweiten Aufruf veraendert';
   end if;
 end;
@@ -973,7 +975,7 @@ reset role;
 do $$
 begin
   if not exists (select 1 from public.kronen_stand where user_id = '11111111-1111-4111-8111-111111111111'
-                 and stufe = 9 and kronen = 0 and elo = 1450 and start_gesetzt) then
+                 and stufe = 6 and kronen = 0 and elo = 1450 and start_gesetzt) then
     raise exception 'FEHLER: Start einmal: Stand von G (Stufe, Elo, start_gesetzt) falsch';
   end if;
   if (select count(*) from public.kronen_buchungen where user_id = '11111111-1111-4111-8111-111111111111'
@@ -1010,7 +1012,7 @@ begin
 end;
 $$;
 
--- Start-Grenze: ohne Elo keine Aenderung; 99999 zaehlt wie 2800, also Dame III (Stufe 12), nie Koenig; 300 wie 400
+-- Start-Grenze: ohne Elo keine Aenderung; 99999 zaehlt wie 2800 und startet trotzdem nur in Laeufer III (Stufe 6); 300 wie 400
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
 do $$
@@ -1022,7 +1024,7 @@ begin
     raise exception 'FEHLER: Start-Grenze: ohne Elo %', r;
   end if;
   r := public.kronen_start(99999);
-  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 12}'::jsonb then
+  if r is distinct from '{"delta": 0, "kronen": 0, "stufe": 6}'::jsonb then
     raise exception 'FEHLER: Start-Grenze: 99999 ergibt %', r;
   end if;
 end;
@@ -1042,7 +1044,7 @@ reset role;
 do $$
 begin
   if not exists (select 1 from public.kronen_stand where user_id = '33333333-3333-4333-8333-333333333333'
-                 and stufe = 12 and kronen = 0 and elo = 2800 and start_gesetzt) then
+                 and stufe = 6 and kronen = 0 and elo = 2800 and start_gesetzt) then
     raise exception 'FEHLER: Start-Grenze: Stand von I (Elo auf 2800 begrenzt) falsch';
   end if;
   if not exists (select 1 from public.kronen_stand where user_id = '44444444-4444-4444-8444-444444444444'
@@ -1269,5 +1271,57 @@ begin
   end if;
 end;
 $$;
+
+-- ---------- 13. Schummel-Schutz ----------
+-- Bot- und KI-Gewinne bringen zusammen hoechstens 300 Kronen je Woche. Gegenprobe Wochengrenze: 300 aus der Vorwoche
+-- sperren nichts (am Montag wieder frei). Online-Kronen zaehlen nicht gegen den Deckel.
+insert into auth.users (id, email) values ('55555555-5555-4555-8555-555555555555', 'kronen-deckel@example.invalid');
+do $$
+declare
+  uid uuid := '55555555-5555-4555-8555-555555555555';
+  wo date := public.liga_woche_heute();
+  r jsonb;
+begin
+  perform public.kronen_stand_sichern(uid);
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche) values
+    (uid, 'bot', 'vorwoche-1', 300, wo - 7),
+    (uid, 'online', '00000000-0000-4000-8000-000000000001', 500, wo);
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-0', 'sieg');
+  if (r->>'delta')::int is distinct from 15 or (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: Deckel: Vorwoche oder Online-Kronen sperren die neue Woche (%)', r;
+  end if;
+  insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche) values (uid, 'ki', 'deckel-alt', 275, wo);
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-1', 'sieg');
+  if (r->>'delta')::int is distinct from 10 or not (r->>'bot_ki_voll')::boolean then
+    raise exception 'FEHLER: Deckel: der Rest bis 300 ist falsch (%)', r;
+  end if;
+  r := public.kronen_einfach_buchen(uid, 'bot', 'deckel-2', 'sieg');
+  if (r->>'delta')::int is distinct from 0 then
+    raise exception 'FEHLER: Deckel: Bot-Sieg ueber 300 gebucht (%)', r;
+  end if;
+  r := public.kronen_einfach_buchen(uid, 'ki', 'deckel-3', 'sieg');
+  if (r->>'delta')::int is distinct from 0 then
+    raise exception 'FEHLER: Deckel: KI-Sieg ueber 300 gebucht (%)', r;
+  end if;
+  if public.liga_bot_ki_genutzt(uid, wo) <> 300 or public.liga_bot_ki_genutzt(uid, wo + 7) <> 0 then
+    raise exception 'FEHLER: Deckel: Zaehlung je Woche falsch';
+  end if;
+  if (select kronen from public.liga_mitglieder where user_id = uid and woche = wo) <> 25 then
+    raise exception 'FEHLER: Deckel: Wochen-Kronen der Gruppe falsch';
+  end if;
+end;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated"}', true);
+do $$
+declare
+  g jsonb := public.liga_meine_gruppe();
+begin
+  if g->'bot_ki' is distinct from '{"genutzt": 300, "max": 300}'::jsonb then
+    raise exception 'FEHLER: Deckel: liga_meine_gruppe zeigt %', g->'bot_ki';
+  end if;
+end;
+$$;
+reset role;
 
 rollback;

@@ -62,13 +62,13 @@ pruefe('kronenFuer: drei Quellen, Unbekanntes gibt 0', () => {
   assert.equal(K.kronenFuer('fremd', 'sieg'), 0);
 });
 
-pruefe('startStufeAusElo: Stufe III der Liga nach Elo, hoechstens Dame III', () => {
+pruefe('startStufeAusElo: Stufe III der Liga nach Elo, hoechstens Laeufer III', () => {
   assert.equal(K.startStufeAusElo(999), 0);
   assert.equal(K.startStufeAusElo(1000), 3);
   assert.equal(K.startStufeAusElo(1200), 6);
-  assert.equal(K.startStufeAusElo(1450), 9);
-  assert.equal(K.startStufeAusElo(1600), 12);
-  assert.equal(K.startStufeAusElo(2400), 12);
+  assert.equal(K.startStufeAusElo(1450), 6);
+  assert.equal(K.startStufeAusElo(1600), 6);
+  assert.equal(K.startStufeAusElo(2400), 6);
   assert.equal(K.startStufeAusElo(NaN), 0);
 });
 

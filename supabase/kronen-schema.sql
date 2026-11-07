@@ -126,13 +126,16 @@ as $$
     ),
     'bot_tagesgrenze', 10,
     'ki_tagesgrenze', 20,
+    -- Bot- und KI-Gewinne zusammen je Woche und Konto (Flo 07.11.2026, Schummel-Schutz), Online-Kronen frei
+    'bot_ki_wochen_max', 300,
     'ki_mindestdauer_s', 60,
     'online_mindest_halbzuege', 4,
     'paar_tagesgrenze', 3,
     'klassen_grenzen', jsonb_build_array(0, 1000, 1200, 1400, 1600, 1900),
     'start_elo_min', 400,
     'start_elo_max', 2800,
-    'start_hoechste_liga', 4,
+    -- Start hoechstens Laeufer III (Flo 07.11.2026): die Geraete-Elo ist nur eine Behauptung des Clients
+    'start_hoechste_liga', 2,
     -- Wochen-Gruppen (Flo 07.11.2026): 30 Plaetze, 5 auf, 5 ab
     'gruppe_groesse', 30,
     'aufstieg_plaetze', 5,
@@ -449,6 +452,9 @@ begin
     'n', (k ->> 'gruppe_groesse')::integer,
     'mitglieder', liste,
     'belohnung', k -> 'belohnung',
+    -- Schummel-Schutz: Bot- und KI-Gewinne dieser Woche gegen den Deckel (der Client zeigt "diese Woche voll")
+    'bot_ki', jsonb_build_object('genutzt', public.liga_bot_ki_genutzt(st.user_id, wo),
+      'max', (k ->> 'bot_ki_wochen_max')::integer),
     'offen', coalesce((select jsonb_agg(jsonb_build_object('woche', x.woche, 'platz', x.platz, 'art', x.art, 'menge', x.menge)
                          order by x.woche, x.art)
                        from public.liga_belohnungen x where x.user_id = st.user_id and not x.ausgezahlt), '[]'::jsonb)
@@ -780,6 +786,22 @@ grant execute on function public.online_suche_ende(boolean) to authenticated;
 -- Gemeinsame Buchung fuer Bot-Leiter und KI-Gegner: Kronen in die Wochen-Gruppe, je (Konto, Quelle, ref) hoechstens
 -- einmal. Antwort { delta, kronen, stufe } mit den Wochen-Kronen; eine schon gebuchte ref liefert den Stand mit delta 0.
 -- Nur intern. Parameter heissen bewusst nicht quelle/ref: gleichnamige Spalten waeren in PL/pgSQL sonst mehrdeutig.
+-- Schummel-Schutz (Flo 07.11.2026): Bot- und KI-Ergebnisse meldet der Client selbst, deshalb bringen sie zusammen
+-- hoechstens bot_ki_wochen_max Kronen je Woche (nur Gewinne zaehlen). Online-Kronen prueft der Server, sie sind frei.
+-- Antwort zusaetzlich bot_ki_voll: true, sobald der Deckel erreicht ist.
+
+-- Bot- und KI-Gewinne eines Kontos in einer Woche. Nur intern.
+create or replace function public.liga_bot_ki_genutzt(uid uuid, wo date)
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(sum(b.delta) filter (where b.delta > 0), 0)::integer from public.kronen_buchungen b
+  where b.user_id = uid and b.quelle in ('bot', 'ki') and b.woche = wo;
+$$;
+
 create or replace function public.kronen_einfach_buchen(uid uuid, art text, schluessel text, ergebnis text)
 returns jsonb
 language plpgsql
@@ -788,21 +810,30 @@ set search_path = ''
 as $$
 declare
   st public.kronen_stand;
-  nominal integer := (public.kronen_konstanten() #>> array['kronen', art, ergebnis])::integer;
+  konst jsonb := public.kronen_konstanten();
+  nominal integer := (konst #>> array['kronen', art, ergebnis])::integer;
+  deckel integer := (konst ->> 'bot_ki_wochen_max')::integer;
+  -- dieselbe Uhr wie liga_buchen: die Buchung zaehlt in der Woche, in die sie gebucht wird
+  wo date := public.liga_woche_am(pg_catalog.clock_timestamp());
   d integer := 0;
   gebucht integer;
 begin
+  -- kronen_stand_sichern sperrt den Stand: Buchungen eines Kontos laufen nacheinander, der Deckel haelt
   st := public.kronen_stand_sichern(uid);
   insert into public.kronen_buchungen (user_id, quelle, ref, delta, woche)
-  values (uid, art, schluessel, 0, public.liga_woche_heute())
+  values (uid, art, schluessel, 0, wo)
   on conflict on constraint kronen_buchungen_einmal do nothing;
   get diagnostics gebucht = row_count;
   if gebucht > 0 then
+    if nominal > 0 then
+      nominal := least(nominal, greatest(0, deckel - public.liga_bot_ki_genutzt(uid, wo)));
+    end if;
+    -- auch mit 0 (gedeckelt oder Niederlage): die erste Partie der Woche bringt das Konto in seine Gruppe
     d := public.liga_buchen(uid, nominal);
     update public.kronen_buchungen b set delta = d where b.user_id = uid and b.quelle = art and b.ref = schluessel;
   end if;
   return jsonb_build_object('delta', d, 'kronen', coalesce((public.liga_mein_platz(uid) ->> 'kronen')::integer, 0),
-    'stufe', st.stufe);
+    'stufe', st.stufe, 'bot_ki_voll', public.liga_bot_ki_genutzt(uid, wo) >= deckel);
 end;
 $$;
 
@@ -888,6 +919,7 @@ end;
 $$;
 
 revoke all on function public.kronen_einfach_buchen(uuid, text, text, text) from public, anon, authenticated;
+revoke all on function public.liga_bot_ki_genutzt(uuid, date) from public, anon, authenticated;
 revoke all on function public.kronen_heute_anzahl(uuid, text) from public, anon, authenticated;
 revoke all on function public.kronen_bot_ergebnis(text, text, integer) from public, anon, authenticated;
 revoke all on function public.kronen_ki_ergebnis(uuid, text) from public, anon, authenticated;

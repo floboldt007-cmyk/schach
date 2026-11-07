@@ -26,7 +26,7 @@ export const ONLINE_MINDEST_HALBZUEGE = 4;
 export const PAAR_TAGESGRENZE = 3;
 // Start-Liga (Task 6): der Server begrenzt die gemeldete Elo auf diesen Bereich (kronen_start, kronen_konstanten)
 export const START_ELO_GRENZEN = Object.freeze([400, 2800]);
-export const START_HOECHSTE_LIGA = 4; // Dame III
+export const START_HOECHSTE_LIGA = 2; // Laeufer III (Flo 07.11.2026: Geraete-Elo ist nur eine Behauptung)
 // Wochen-Gruppen (Flo 07.11.2026)
 export const GRUPPE_GROESSE = 30;
 export const AUFSTIEG_PLAETZE = 5;
@@ -42,6 +42,9 @@ export const BELOHNUNG = Object.freeze([
 ]);
 // Wochenziel eines Bots: 0 bis zu diesem Wert, je Liga (nur fuer den Vertragstest; die Bots rechnet der Server)
 export const BOT_ZIEL_MAX = Object.freeze([150, 250, 350, 450, 600, 800]);
+// Schummel-Schutz (Flo 07.11.2026): Bot- und KI-Gewinne zusammen hoechstens so viele Kronen je Woche, der Server
+// erzwingt das (kronen_einfach_buchen); hier nur fuer die Anzeige "diese Woche voll"
+export const BOT_KI_WOCHEN_MAX = 300;
 
 const MAX_INDEX = STUFEN_ANZAHL - 1;
 const zahl = (v) => (Number.isFinite(v) ? v : 0);
@@ -86,7 +89,7 @@ export function kronenSpeicher(roh) {
   return { konto: typeof o.konto === 'string' && o.konto ? o.konto : null, stand: st, startGemeldet: o.startGemeldet === true };
 }
 
-// Bestandsspieler: Spielklasse aus der Elo (KLASSEN_GRENZEN) wird zur Stufe III ihrer Liga, hoechstens Dame III.
+// Bestandsspieler: Spielklasse aus der Elo (KLASSEN_GRENZEN) wird zur Stufe III ihrer Liga, hoechstens Laeufer III.
 export function startStufeAusElo(elo) {
   let klasse = 0;
   KLASSEN_GRENZEN.forEach((grenze, i) => { if (zahl(elo) >= grenze) klasse = i; });
