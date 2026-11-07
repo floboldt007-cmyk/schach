@@ -24,7 +24,7 @@ import { sitzung, aktiveSitzung, kontoFreigeschaltet } from './konto.js';
 
 export const NAME = /^[A-Za-z0-9_]{3,20}$/;
 const CODE = /^[0-9a-f]{16}$/;
-export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
+export const LINK_BASIS = 'https://crownmate.de/';
 export const CODE_SCHLUESSEL = 'schach-arena:konto:freund-einladung';
 
 let fetchFn = (...a) => fetch(...a);

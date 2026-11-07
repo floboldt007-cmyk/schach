@@ -121,7 +121,7 @@ pruefe('stripeArt: nur eingeschraenkte Schluessel, Test und Live unterschieden, 
 pruefe('rueckkehrAus: Standard die Live-Seite, nur https ohne # und ?', rueckkehrAus('') === RUECKKEHR_STANDARD
   && rueckkehrAus('https://probe.example/schach/') === 'https://probe.example/schach/' && rueckkehrAus('http://probe.example/') === null
   && rueckkehrAus('javascript:alert(1)') === null && rueckkehrAus('https://probe.example/#x') === null
-  && RUECKKEHR_STANDARD === 'https://floboldt007-cmyk.github.io/schach/');
+  && RUECKKEHR_STANDARD === 'https://crownmate.de/');
 pruefe('projektKennung: 16 Hex-Zeichen aus dem Host (gleich mit und ohne Schraegstrich oder Pfad), je Projekt verschieden, ohne Adresse null',
   /^[0-9a-f]{16}$/.test(PROJEKT) && PROJEKT === await projektKennung('https://probe.supabase.example')
   && PROJEKT === await projektKennung('HTTPS://PROBE.supabase.example/rest/v1') && /^[0-9a-f]{16}$/.test(PROJEKT_B) && PROJEKT_B !== PROJEKT
