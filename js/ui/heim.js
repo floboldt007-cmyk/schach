@@ -39,8 +39,8 @@ registriereTexte('heim', {
     'online.text': 'Gegner in deiner Stärke, zählt für die Liga',
     'bots.titel': 'Bots besiegen',
     'bots.text': '{n} Gegner, jeder spielt anders',
-    'raetsel.titel': 'Rätsel',
-    'raetsel.text': 'Täglich neue Aufgaben, in Ruhe gelöst',
+    'raetsel.titel': 'Lernen',
+    'raetsel.text': 'Rätsel und Meisterschule, in Ruhe gelöst',
   },
   en: {
     aria: 'Home',
@@ -53,8 +53,8 @@ registriereTexte('heim', {
     'online.text': 'Opponents at your level, counts for the league',
     'bots.titel': 'Beat the bots',
     'bots.text': '{n} opponents, each plays differently',
-    'raetsel.titel': 'Puzzles',
-    'raetsel.text': 'New puzzles every day, solved at your pace',
+    'raetsel.titel': 'Learn',
+    'raetsel.text': 'Puzzles and master school, at your own pace',
   },
 });
 
