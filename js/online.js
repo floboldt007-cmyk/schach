@@ -57,7 +57,7 @@ const O = (k, w) => t('online.' + k, w);
 import { sitzung, erneuereSitzung, aktiveSitzung as kontoSitzung, userId, kontoFreigeschaltet } from './konto.js';
 
 export const EINLADUNG_SCHLUESSEL = 'schach-arena:online:einladung';
-export const LINK_BASIS = 'https://floboldt007-cmyk.github.io/schach/';
+export const LINK_BASIS = 'https://crownmate.de/';
 export const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 // Edge Function, die jeden Zug prueft und verbucht (supabase/functions/online-zug, Anti-Cheat Etappe 1a)
 export const ZUG_PFAD = '/functions/v1/online-zug';

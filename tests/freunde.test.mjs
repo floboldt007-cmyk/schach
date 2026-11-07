@@ -76,7 +76,7 @@ const vorher = calls.length;
 pruefe('nutzeEinladung: Unsinn ohne Anfrage', (await nutzeEinladung('#freund/zzz')).ergebnis === 'ungueltig' && calls.length === vorher);
 
 pruefe('Link: Adresse ohne Hash und Suche', einladungsLink(CODE, 'https://a.b/schach/index.html?x=1#arena') === `https://a.b/schach/index.html#freund/${CODE}`);
-pruefe('Link: ohne Browser die feste Adresse', einladungsLink(CODE) === `https://floboldt007-cmyk.github.io/schach/#freund/${CODE}`);
+pruefe('Link: ohne Browser die feste Adresse', einladungsLink(CODE) === `https://crownmate.de/#freund/${CODE}`);
 pruefe('Link: falscher Code wirft', await fehlerVon(() => einladungsLink('abc')) === 'ungueltig');
 pruefe('codeAusLink', codeAusLink(`#freund/${CODE}`) === CODE && codeAusLink(CODE) === CODE && codeAusLink(`#freund/${CODE}x`) === null
   && codeAusLink('#online/ABC234') === null && codeAusLink('') === null);
