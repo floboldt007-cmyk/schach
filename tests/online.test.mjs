@@ -415,7 +415,7 @@ anmelden();
 {
   pruefe('einladungsLink: Basis plus #online/CODE', einladungsLink('abc234', 'https://floboldt007-cmyk.github.io/schach/') === 'https://floboldt007-cmyk.github.io/schach/#online/ABC234');
   pruefe('einladungsLink: alter Hash der Basis wird entfernt', einladungsLink('ABC234', 'https://floboldt007-cmyk.github.io/schach/#arena') === 'https://floboldt007-cmyk.github.io/schach/#online/ABC234');
-  pruefe('einladungsLink: ohne location die Live-Adresse', einladungsLink('ABC234') === `${LINK_BASIS}#online/ABC234` && LINK_BASIS === 'https://floboldt007-cmyk.github.io/schach/');
+  pruefe('einladungsLink: ohne location die Live-Adresse', einladungsLink('ABC234') === `${LINK_BASIS}#online/ABC234` && LINK_BASIS === 'https://crownmate.de/');
   globalThis.location = { origin: 'http://localhost:9400', pathname: '/schach/', hash: '#arena' };
   pruefe('einladungsLink: Basis aus location', einladungsLink('ABC234') === 'http://localhost:9400/schach/#online/ABC234');
   globalThis.location = { origin: 'null', pathname: '/x/index.html', hash: '' };
