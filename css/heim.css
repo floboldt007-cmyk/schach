@@ -28,6 +28,8 @@
 .heim-brett { width: var(--heim-brett); }
 .heim-buehne[data-art="gegner"] { grid-template-columns: auto minmax(0, 1fr); }
 .heim-mini { width: 100%; box-shadow: var(--s2, none); }
+/* echtes Brett der App, nur zum Ansehen: kein Greifen, Tipps und Wischen gehen an die Seite (Scrollen auf dem Handy) */
+.heim-brett .brett { pointer-events: none; }
 .heim-portraet { justify-self: center; width: min(var(--heim-brett), 150px); aspect-ratio: 1; border-radius: 50%; overflow: hidden;
   background: var(--bot-farbe); box-shadow: 0 0 0 3px var(--gold); }
 .heim-portraet img { display: block; width: 100%; height: 100%; object-fit: cover; }

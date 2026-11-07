@@ -138,15 +138,19 @@ async function testeBuehne(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: { ...gesehen(heute), [P + 'laufend']: laufend() } });
     const da = await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => {
-      const bild = (f) => { const i = [...document.querySelectorAll('.heim-mini i')][f]; const img = i && i.querySelector('img'); return img ? img.getAttribute('src').split('/').pop() : ''; };
+      const fig = (f) => document.querySelector(`.heim-brett .brett > img.figur[data-feld="${f}"]`)?.dataset.figur || '';
+      const src = document.querySelector('.heim-brett .brett > img.figur')?.getAttribute('src') || '';
       return { art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
-        felder: document.querySelectorAll('.heim-mini i').length, a8: bild(0), e1: bild(60), c4: bild(34), zuletzt: document.querySelectorAll('.heim-mini i.z').length,
+        felder: document.querySelectorAll('.heim-brett .brett .feld').length, a8: fig('a8'), e1: fig('e1'), c4: fig('c4'),
+        satz: src.slice(0, src.lastIndexOf('/') + 1), zuletzt: document.querySelectorAll('.heim-brett .lage.zuletzt').length,
+        greifbar: getComputedStyle(document.querySelector('.heim-brett .brett')).pointerEvents,
         ueber: document.querySelector('.heim-ueber')?.textContent.trim(), lage: document.querySelector('.heim-lage')?.textContent.trim(),
         knopf: document.querySelector('.heim-los')?.textContent.trim() };
     });
     pruefe('laufende Partie: Buehne zeigt die Partie, "Deine Partie wartet."', da && b.art === 'partie' && b.titel === 'Deine Partie wartet.', JSON.stringify(b));
-    pruefe('echtes Mini-Brett mit 64 Feldern und Figuren-Bildern (a8 Turm schwarz, e1 Koenig weiss, c4 Laeufer weiss)',
-      b.felder === 64 && b.a8 === 'bR.svg' && b.e1 === 'wK.svg' && b.c4 === 'wB.svg', JSON.stringify(b));
+    pruefe('echtes Brett der App mit 64 Feldern und der Stellung (a8 Turm schwarz, e1 Koenig weiss, c4 Laeufer weiss)',
+      b.felder === 64 && b.a8 === 'bR' && b.e1 === 'wK' && b.c4 === 'wB', JSON.stringify(b));
+    pruefe('nur zum Ansehen (keine Zeiger-Ereignisse auf dem Brett)', b.greifbar === 'none', b.greifbar);
     pruefe('letzter Zug markiert (zwei Felder)', b.zuletzt === 2, String(b.zuletzt));
     pruefe('Gegner und Elo genannt, Taste Weiterspielen', /Greta/.test(b.ueber) && /Bot/.test(b.ueber) && b.knopf === 'Weiterspielen', JSON.stringify(b));
     pruefe('Satz zur Lage nennt, wer am Zug ist', /am Zug/.test(b.lage), b.lage);
@@ -159,6 +163,8 @@ async function testeBuehne(browser, heute) {
     pruefe('Weiterspielen setzt die Partie fort (gegen Greta, dieselben 10 Zuege)', await istScreen(seite, 'partie')
       && await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true && window.__partie.z.bot.id === 'greta'
         && window.__partie.chess().history().length === 10, null, { timeout: 20000 }).then(() => true, () => false));
+    const satzPartie = await seite.evaluate(() => { const x = document.querySelector('.screen.partie .brett > img.figur')?.getAttribute('src') || ''; return x.slice(0, x.lastIndexOf('/') + 1); });
+    pruefe('Startseite zeigt denselben Figurensatz wie das Partie-Brett', !!b.satz && b.satz === satzPartie, b.satz + ' / ' + satzPartie);
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
@@ -166,9 +172,15 @@ async function testeBuehne(browser, heute) {
     // Mit Schwarz: Brett aus Sicht von Schwarz (oben links h1, der weisse Turm)
     const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'laufend']: laufend({ spielerFarbe: 'b', zuege: ZUEGE.slice(0, 9) }) } });
     await istScreen(seite, 'heim');
-    const b = await seite.evaluate(() => ({ eck: [...document.querySelectorAll('.heim-mini i')][0]?.querySelector('img')?.getAttribute('src').split('/').pop(),
-      lage: document.querySelector('.heim-lage')?.textContent.trim() }));
-    pruefe('mit Schwarz: Brett gedreht (oben links der weisse Turm h1), "Du bist am Zug"', b.eck === 'wR.svg' && b.lage.startsWith('Du bist am Zug'), JSON.stringify(b));
+    const b = await seite.evaluate(() => {
+      const brett = document.querySelector('.heim-brett .brett');
+      const h1 = brett?.querySelector('img.figur[data-feld="h1"]');
+      const rb = brett?.getBoundingClientRect(), rf = h1?.getBoundingClientRect();
+      return { sicht: brett?.dataset.ausrichtung, h1: h1?.dataset.figur, obenLinks: !!(rb && rf) && rf.left - rb.left < rb.width / 8 && rf.top - rb.top < rb.height / 8,
+        lage: document.querySelector('.heim-lage')?.textContent.trim() };
+    });
+    pruefe('mit Schwarz: Brett gedreht (oben links der weisse Turm h1), "Du bist am Zug"', b.sicht === 'b' && b.h1 === 'wR' && b.obenLinks
+      && b.lage.startsWith('Du bist am Zug'), JSON.stringify(b));
     await kontext.close();
   }
   {

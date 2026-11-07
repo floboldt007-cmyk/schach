@@ -17,9 +17,10 @@
 // .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik: css/heim.css, nur Tokens.
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
-import { miniBrett } from './bauteile.js';
+import { Brett } from '../board.js';
+import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
-import { ladeModul, ladeLaufendePartie, naechsterGegner } from '../storage.js';
+import { ladeModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
 import { laborFrei } from '../labor.js';
 import { botNachId } from '../bots.js';
 import { eigenerName } from '../konto.js';
@@ -177,7 +178,7 @@ function lageSatz(cp, mate, sicht = 'w') {
   return { art, anteil, wert };
 }
 
-// Stellung der laufenden Partie: { fen, amZug, zuletzt: [von, nach] } oder null (kaputte Daten)
+// Stellung der laufenden Partie: { fen, amZug, zuletzt: [von, nach], schach } oder null (kaputte Daten)
 function stellung(laufend) {
   try {
     const c = laufend.startFen ? new Chess(laufend.startFen) : new Chess();
@@ -187,14 +188,10 @@ function stellung(laufend) {
       if (!m) return null;
       letzter = [m.from, m.to];
     }
-    return { fen: c.fen(), amZug: c.turn(), zuletzt: letzter || [] };
+    return { fen: c.fen(), amZug: c.turn(), zuletzt: letzter || [], schach: c.inCheck() };
   } catch (e) { return null; }
 }
 
-// Brett aus Sicht von Schwarz: miniBrett kennt keine Ausrichtung, also Feldreihenfolge umdrehen (die Feldfarben stimmen,
-// h1 und a8 sind beide hell)
-const dreheFen = (fen) => fen.split(' ')[0].split('').reverse().join('');
-const dreheFeld = (f) => 'hgfedcba'['abcdefgh'.indexOf(f[0])] + (9 - Number(f[1]));
 const sichtVon = (laufend) => (laufend.modus !== 'zuzweit' && laufend.spielerFarbe === 'b' ? 'b' : 'w');
 
 // "Du bist am Zug" (gross = Satzanfang); in Zu zweit "Weiss am Zug"
@@ -208,14 +205,12 @@ function zugText(laufend, st, bot, gross) {
 function buehnePartie(laufend, st) {
   const zuzweit = laufend.modus === 'zuzweit';
   const bot = zuzweit ? null : botNachId(laufend.botId);
-  const sicht = sichtVon(laufend);
-  const fen = sicht === 'b' ? dreheFen(st.fen) : st.fen;
-  const zuletzt = sicht === 'b' ? st.zuletzt.map(dreheFeld) : st.zuletzt;
   const namen = laufend.zuzweit || {};
   const ueber = zuzweit
     ? t('heim.zuzweit', { weiss: namen.weiss || t('heim.weiss'), schwarz: namen.schwarz || t('heim.schwarz') })
     : t('heim.gegen', { name: bot ? bot.name : '', elo: bot ? zahl(bot.elo) : '' });
-  return `<div class="heim-brett">${miniBrett(fen, { zuletzt, klasse: 'heim-mini' })}</div>
+  // das Brett selbst baut zeigeHeim (echtes Brett der App, nur zum Ansehen)
+  return `<div class="heim-brett"><div class="heim-mini"></div></div>
     <div class="heim-buehne-text">
       <small class="heim-ueber">${esc(ueber)}</small>
       <h2 class="heim-lage" aria-live="polite">${esc(zugText(laufend, st, bot, true))}</h2>
@@ -296,7 +291,15 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
   });
-  if (partie) s._bewertung = { fen: st.fen, sicht: sichtVon(laufend), laufend, st };
+  if (partie) {
+    // dasselbe Brett wie in der Partie (Figurensatz, Brettfarben, Koordinaten aus den Einstellungen), nur zum Ansehen:
+    // keine Zuege, keine Pfeile, Tipps gehen durch (pointer-events in heim.css)
+    const e = ladeEinstellungen();
+    s._brett = new Brett(s.querySelector('.heim-mini'), { ausrichtung: sichtVon(laufend), figurenPfad: figurenPfad(e),
+      koordinaten: e.koordinaten, koordLage: e.koordLage, pfeile: false });
+    s._brett.setzeStellung(st.fen, { animieren: false, letzterZug: st.zuletzt.length ? st.zuletzt : null, schach: st.schach ? true : null });
+    s._bewertung = { fen: st.fen, sicht: sichtVon(laufend), laufend, st };
+  }
   return s;
 }
 
@@ -344,6 +347,7 @@ export function zeige(root, params, app) {
     verlasse() {
       weg = true;
       try { kopf.verlasse(); } catch (e) { /* egal */ }
+      if (s._brett) s._brett.zerstoere();
     },
   };
 }
