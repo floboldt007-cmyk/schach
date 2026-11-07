@@ -4,7 +4,8 @@
 // Endspielen die Art, Sterne. Seit 07.11.2026 fuer alle (FAHRPLAN Abschnitt 6, js/pakete/lernen/zugang.js): Gratis-Lektionen
 // oeffnen die Lektion (Screen "lektion", params { id }); Abo-Lektionen bleiben sichtbar, mit Schloss statt Sternen, und ein
 // Tipp darauf zeigt den ruhigen Trainer-Hinweis (js/abo.js premiumHinweis: nur als Antwort auf einen Tipp, nie von selbst).
-// Der Kopf zeigt die Sterne der Meisterschule statt der Arena-Zaehler.
+// Der Kopf zeigt die Sterne der Meisterschule statt der Arena-Zaehler. In der Willkommenswoche (zugang.js) ist alles offen,
+// die Trainer-Lektionen tragen weiter ihre Marke, und eine Zeile p.ms-willkommen nennt das Datum, bis wann.
 //
 //   zeige(root, params, app) -> { verlasse() }
 // DOM: section.screen.ms-screen > header.haupt-kopf, .ms-rumpf > .ms-bereiche > button.ms-bkarte[data-bereich][aria-pressed],
@@ -16,10 +17,10 @@ import { miniBrett } from './bauteile.js';
 import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
 import { ladeModul } from '../storage.js';
-import { t } from '../sprache.js';
+import { t, datum } from '../sprache.js';
 import { istPremium, premiumHinweis } from '../abo.js';
 import { BEREICHE, artVon, stand, summe } from '../pakete/lernen/mattbilder.js';
-import { istOffen, istGratis, istProbe } from '../pakete/lernen/zugang.js';
+import { istOffen, istGratis, istProbe, istImTrainer, inWillkommenswoche, willkommenBis } from '../pakete/lernen/zugang.js';
 import { ladeLernenCss, PAKET } from '../pakete/lernen/index.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
@@ -50,6 +51,16 @@ export function zeige(root, params, app) {
       <p class="ms-bald">${esc(S('naechste', { liste: S('bereiche') }))}</p>
     </div>`;
   const karten = s.querySelector('.ms-bereiche');
+  // Willkommenswoche: eine ruhige Zeile mit dem Datum (kein Countdown), unter den Bereichskarten
+  const woche = inWillkommenswoche();
+  if (woche) {
+    const p = document.createElement('p');
+    p.className = 'ms-willkommen';
+    p.innerHTML = `${icon('stern')}<span></span>`;
+    const [j, m, tg] = willkommenBis().split('-').map(Number);
+    p.querySelector('span').textContent = S('willkommen', { datum: datum(new Date(j, m - 1, tg, 12), { weekday: 'long', day: 'numeric', month: 'numeric' }) });
+    karten.after(p);
+  }
   const inhalt = s.querySelector('.ms-bereich');
 
   function zeichneKarten() {
@@ -71,7 +82,8 @@ export function zeige(root, params, app) {
     const art = artVon(l);
     const offen = istOffen(l);
     const bestes = !e ? '' : art === 'halten' ? S('gehalten') : e.z === 1 ? S('bestesEins') : S('bestes', { n: e.z });
-    const marke = !offen ? `<span class="ms-marke" data-marke="trainer">${esc(S('trainer'))}</span>`
+    // "Trainer" auch in der Willkommenswoche: man soll wissen, was man gerade geschenkt bekommt
+    const marke = istImTrainer(l) && (!offen || woche) ? `<span class="ms-marke" data-marke="trainer">${esc(S('trainer'))}</span>`
       : istProbe(l) && l.stufe !== 'leicht' ? `<span class="ms-marke" data-marke="probe">${esc(S('gratisProbe'))}</span>` : '';
     return `<li><button class="ms-lektion" type="button" data-id="${l.id}"${e ? ' data-geschafft' : ''}${offen ? '' : ' data-gesperrt'}${istProbe(l) ? ' data-probe' : ''}
         ${offen ? '' : `aria-label="${esc(S('titel.' + l.id) + ', ' + S('gesperrt'))}"`}>
