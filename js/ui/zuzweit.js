@@ -123,7 +123,7 @@ function partie(root, quelle, app, fortgesetzt) {
   s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-zz="zurueck">${t('allgemein.training')}</button><h2>${Z('titel')}</h2></header>
     <div class="zz-rumpf"><div class="zz-spielbereich">
       <div class="zz-spieler zz-oben" role="group"></div>
-      <div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div>
+      <div class="zz-feld"><div class="brett-rahmen zz-rahmen"><div class="brett zz-brett"></div></div></div>
       <div class="zz-spieler zz-unten" role="group"></div>
       <p class="zz-status" role="status"></p>
       <div class="zz-aktionen"><button class="knopf" type="button" data-zz="zugzurueck">${Z('zugZurueck')}</button><button class="knopf" type="button" data-zz="remis">${Z('remisAnbieten')}</button><button class="knopf" type="button" data-zz="aufgeben">${Z('aufgeben')}</button></div>
