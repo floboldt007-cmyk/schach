@@ -7,6 +7,7 @@ import { bereich } from '../../ui/ich.js';
 import { istErfinder } from '../../sonderstuecke.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
 import { emoteSvg } from '../../emote-kunst.js';
+import { klang } from '../../sounds.js';
 import './texte.js';
 
 const MODUL = 'emotes';
@@ -47,7 +48,8 @@ const setze = (teil) => speichereModulEinstellungen(SPEICHER, { ...einstellungen
 // ---------- Kreaturen (js/kreaturen-kunst.js) ----------
 // Vier Emotes des Rads zeigt die gewaehlte Kreatur statt des Strichsymbols; Id, Text und Bot-Antwort bleiben gleich.
 // Erst im Labor: nur das Erfinder-Konto waehlt und sieht sie (Flo 30.10.2026); spaeter schaltet die Welt sie frei.
-const KREATUR_EMOTES = Object.freeze({ hallo: 'winken', staunen: 'staunen', denken: 'denken', gut: 'verbeugen' });
+// Die Verbeugung gehoert zu Respekt (Flo 08.11.2026: Respekt, Gut gespielt und Fehler sagen drei verschiedene Dinge)
+const KREATUR_EMOTES = Object.freeze({ hallo: 'winken', staunen: 'staunen', denken: 'denken', respekt: 'verbeugen' });
 const kreaturAktiv = (e = einstellungen(), erfinder = istErfinder()) => (erfinder && e.kreatur ? e.kreatur : null);
 // Eintraege des Rads: mit Kreatur stehen ihre vier Emotes vorn (eine Reihe), die Strichsymbole danach
 function radEintraege(kreatur = null) {
@@ -293,6 +295,8 @@ function aktionsKnopf(k, art) {
       if (e.kreatur) { inhalt.className = 'em-mit-kreatur'; inhalt.innerHTML = e.svg + `<span class="em-text"><span>${esc(e.text)}</span></span>`; }
       else { inhalt.className = 'em-text'; inhalt.innerHTML = (e.svg || '') + `<span>${esc(e.text)}</span>`; }
       kartenBlase(buehne, 'flo', 'em-eigen', inhalt, 1800);
+      // leiser Pop beim Senden eines Emotes (Gruppe Bedienung, ueber die Klang-Einstellungen abschaltbar)
+      if (istEmote) klang.spiele('klick');
       vorlesen(buehne, T('gesendet', { text: e.text }));
       if (antwortet) zeigeAntwort(k, e.schluessel, nr);
       frische(buehne);

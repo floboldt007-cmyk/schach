@@ -6,11 +6,11 @@ setzeSpeicher(new Speicher());
 const { FINISHER, istFrei, auswahl, starteFinisher } = await import('../js/pakete/finisher/index.js');
 const { klang, KATALOG } = await import('../js/sounds.js');
 
-assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig', 'signatur']);
+assert.deepEqual(FINISHER.map((x) => x.id), ['aus', 'krone', 'welle', 'koenig', 'kronensturz', 'signatur']);
 // Labor (Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"): ohne Erfinder-Konto ist
 // kein Finisher frei, auch nicht ueber das Level, und die Wahl ist "aus"
 assert.equal(istFrei('signatur'), false, 'Signatur ohne Sonderstueck gesperrt');
-assert.ok(['krone', 'welle', 'koenig'].every((id) => !istFrei(id)), 'ohne Erfinder: kein Finisher frei');
+assert.ok(['krone', 'welle', 'koenig', 'kronensturz'].every((id) => !istFrei(id)), 'ohne Erfinder: kein Finisher frei');
 assert.equal(istFrei('aus'), true);
 assert.equal(auswahl(), 'aus', 'ohne Erfinder: kein Finisher nach dem Matt');
 
@@ -84,7 +84,7 @@ assert.equal(auswahl(1), 'signatur', 'Signatur waehlbar');
 assert.equal(istFrei('koenig'), false, 'nur Signatur, ohne Erfinder-Titel: Koenig gesperrt');
 // Erfinder (Titel-Sonderstueck): alle Finisher frei
 lager.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: 'u-flo', ids: ['erfinder-titel', 'erfinder-finisher-signatur'] }));
-assert.ok(['krone', 'welle', 'koenig'].every((id) => istFrei(id)), 'Erfinder: alle Finisher frei');
+assert.ok(['krone', 'welle', 'koenig', 'kronensturz'].every((id) => istFrei(id)), 'Erfinder: alle Finisher frei');
 speichereModulEinstellungen('finisher', { auswahl: 'welle' });
 assert.equal(auswahl(), 'welle', 'Erfinder: Welle waehlbar');
 lager.removeItem('schach-arena:konto:sitzung');

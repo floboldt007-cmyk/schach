@@ -26,7 +26,7 @@ import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
 import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
-import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, titelDaten, schulStand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
 import { familieVonAlt, FAMILIEN } from './stufen.js';
 import './texte.js';
@@ -54,7 +54,8 @@ function rahmenListe() {
 export function rahmenTeile(erfolge = teileErfolge()) {
   const nachId = new Map(erfolge.map((e) => [e.id, e]));
   const erfinder = istErfinder();
-  return rahmenListe().map((r) => {
+  // Rahmen der alten Saison-Liga nur, wenn der Erfolg erspielt ist (teileErfolge zeigt ihn sonst nicht mehr)
+  return rahmenListe().filter((r) => erfinder || !/^erfolg-liga-/.test(r.erfolg || '') || nachId.has(r.erfolg)).map((r) => {
     const e = r.erfolg ? nachId.get(r.erfolg) : null;
     const frei = erfinder || !r.erfolg || !!(e && e.frei);
     return { id: r.id, gruppe: r.gruppe, name: r.name, frei, weg: frei ? '' : (e ? e.zeile : ''), fortschritt: e && Number.isFinite(e.fortschritt) ? e.fortschritt : null,
@@ -110,7 +111,7 @@ export function eigeneKartenDaten() {
 }
 // Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel
 export function titelVonId(id) {
-  const x = titelListe({ level: 1000 }).find((y) => y.id === id);
+  const x = titelListe({ level: 1000, alle: true }).find((y) => y.id === id);
   return x ? { name: x.name, bild: titelBild(x, 'vk-wappen') } : null;
 }
 
@@ -145,11 +146,14 @@ function titelStand(erfolge = teileErfolge()) {
   let level = 1;
   try { level = spielstand().level; } catch (e) { level = 1; }
   let koennen = erspielteTitel();
+  let schule = null;
+  try { schule = schulStand(); } catch (e) { schule = null; }
   try {
-    const neu = koennenFrei(ladePartien().filter(wertet), (id) => (botNachId(id) || {}).elo || 0).filter((x) => !koennen.includes(x));
+    const neu = koennenFrei(ladePartien().filter(wertet), (id) => (botNachId(id) || {}).elo || 0, titelDaten(undefined, schule))
+      .filter((x) => !koennen.includes(x));
     if (neu.length) { merkeErspielteTitel(neu); koennen = [...koennen, ...neu]; }
   } catch (e) { /* ohne Archiv nur die gemerkten */ }
-  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen };
+  return { level, erfolge, erfinder: istErfinder(), pionier: pionierNummer(), koennen, labor: !!schule };
 }
 export function titelJetzt(erfolge = teileErfolge()) {
   return aktuellerTitel({ ...titelStand(erfolge), wahl: profilWahl().titel });

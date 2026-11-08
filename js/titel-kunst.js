@@ -147,6 +147,39 @@ const ZEICHEN = {
     + `<path d="M66 21Q48 46 33 76" fill="none" stroke="${TINTE}" stroke-width="1.6" stroke-linecap="round"/><path d="M33 76l-3 6" stroke="${TINTE}" stroke-width="2.4" stroke-linecap="round"/>${funke(68, 58, 3.2)}`,
   buch: () => `<path d="M22 46c9-4 17-4 25 2v26c-8-5-16-6-25-2z M74 46c-9-4-17-4-25 2v26c8-5 16-6 25-2z" fill="${CREME}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
     + `${stern(32, 32, 5, 5, GOLD)}${stern(48, 25, 7, 5, GOLD)}${stern(64, 32, 5, 5, GOLD)}`,
+  // Titel vom 08.11.2026: Krone ueber einem Kissen (Kroenung), Fuchskopf (Raetsel), Kompass (Welten), Tafel mit der 1,
+  // Pokal (Rekorde), Beutel mit Sternen, Lupe ueber einer Karte (Fehler-Kartei), aufgeschlagenes Kapitel mit Haken,
+  // zwei gekreuzte Klingen ueber einem Bot-Kopf (Erzfeind)
+  kroenung: () => `<path d="M26 66c0-6 10-9 22-9s22 3 22 9-10 9-22 9-22-3-22-9z" fill="${ROT}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `<path d="M30 66h36" stroke="${GOLD}" stroke-width="1.6" opacity=".7"/>${krone(48, 42, .9)}${funke(70, 26, 3.6)}${funke(26, 32, 2.8)}`,
+  fuchs: () => `<path d="M28 24l10 16h20l10-16 2 22c0 14-10 26-22 30-12-4-22-16-22-30z" fill="#F07A2A" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<path d="M34 56c4 8 9 13 14 16 5-3 10-8 14-16-5 2-9 3-14 3s-9-1-14-3z" fill="${CREME}"/>`
+    + `<circle cx="40" cy="48" r="2.6" fill="${TINTE}"/><circle cx="56" cy="48" r="2.6" fill="${TINTE}"/><path d="M45 62h6l-3 3z" fill="${TINTE}"/>`
+    + `<text x="66" y="30" font-family="system-ui, sans-serif" font-weight="900" font-size="14" fill="${GOLD}" stroke="${TINTE}" stroke-width=".8">?</text>`,
+  kompass: () => `<circle cx="48" cy="50" r="22" fill="${CREME}" stroke="${TINTE}" stroke-width="2.2"/><circle cx="48" cy="50" r="17" fill="none" stroke="${TINTE}" stroke-width="1" opacity=".4"/>`
+    + `<path d="M48 30l6 20h-12z" fill="${ROT}" stroke="${TINTE}" stroke-width="1.6" stroke-linejoin="round"/><path d="M48 70l-6-20h12z" fill="#8C97AB" stroke="${TINTE}" stroke-width="1.6" stroke-linejoin="round"/>`
+    + `<circle cx="48" cy="50" r="2.6" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.2"/>${funke(70, 28, 3.2)}`,
+  tafel: () => `<rect x="26" y="30" width="44" height="34" rx="3" fill="#2E4A3A" stroke="#8A5530" stroke-width="4"/><path d="M38 70l-4 8M58 70l4 8" stroke="#8A5530" stroke-width="3" stroke-linecap="round"/>`
+    + `<text x="48" y="58" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="900" font-size="24" fill="${GOLD}">1</text>${krone(48, 22, .45)}`,
+  pokal: () => `<path d="M34 24h28v10c0 10-6 17-14 18-8-1-14-8-14-18z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<path d="M34 28h-7c0 8 4 12 9 13M62 28h7c0 8-4 12-9 13" fill="none" stroke="${TINTE}" stroke-width="2.2" stroke-linecap="round"/>`
+    + `<path d="M45 52h6v10h-6z" fill="${GOLD_TIEF}" stroke="${TINTE}" stroke-width="1.8"/><path d="M36 62h24v8H36z" fill="#8A5530" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `${stern(48, 36, 5, 5, CREME)}${funke(70, 22, 3)}`,
+  sternbeutel: () => `<path d="M38 36c-8 6-14 16-14 24 0 10 10 16 24 16s24-6 24-16c0-8-6-18-14-24z" fill="#8A5A30" stroke="${TINTE}" stroke-width="2.2" stroke-linejoin="round"/>`
+    + `<path d="M38 36h20l-4-6H42z" fill="#A86B3C" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `${stern(48, 58, 7, 5, GOLD)}${stern(36, 22, 5, 5, GOLD)}${stern(60, 20, 4, 5, GOLD)}`,
+  lupe: () => `<rect x="26" y="26" width="30" height="40" rx="3" fill="${CREME}" stroke="${TINTE}" stroke-width="2" transform="rotate(-8 41 46)"/>`
+    + `<path d="M31 38h18M31 46h14M31 54h16" stroke="${TINTE}" stroke-width="1.6" opacity=".45" transform="rotate(-8 41 46)"/>`
+    + `<circle cx="56" cy="52" r="11" fill="#BFF0FF" fill-opacity=".55" stroke="${TINTE}" stroke-width="3"/><path d="M64 60l9 10" stroke="#8A5530" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="M51 52l4 4 7-8" fill="none" stroke="${ROT}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  kapitel: () => `<path d="M22 40c9-4 17-4 25 2v30c-8-5-16-6-25-2z M74 40c-9-4-17-4-25 2v30c8-5 16-6 25-2z" fill="${CREME}" stroke="${TINTE}" stroke-width="2" stroke-linejoin="round"/>`
+    + `<path d="M27 50h14M27 57h12M55 50h14M55 57h12" stroke="${TINTE}" stroke-width="1.4" opacity=".4"/>`
+    + `<circle cx="48" cy="28" r="9" fill="${GOLD}" stroke="${TINTE}" stroke-width="2"/><path d="M44 28l3 3 6-6" fill="none" stroke="${TINTE}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`,
+  erzfeind: () => `<rect x="34" y="44" width="28" height="24" rx="6" fill="#8C97AB" stroke="${TINTE}" stroke-width="2.2"/><path d="M48 44v-6" stroke="${TINTE}" stroke-width="2"/>`
+    + `<circle cx="48" cy="36" r="3" fill="${ROT}" stroke="${TINTE}" stroke-width="1.4"/><circle cx="42" cy="54" r="3" fill="${TINTE}"/><circle cx="54" cy="54" r="3" fill="${TINTE}"/>`
+    + `<path d="M42 62h12" stroke="${TINTE}" stroke-width="2" stroke-linecap="round"/>`
+    + `<path d="M24 22l20 20M72 22L52 42" stroke="#E6EAF0" stroke-width="4" stroke-linecap="round"/><path d="M24 22l20 20M72 22L52 42" stroke="${TINTE}" stroke-width="1" stroke-linecap="round" opacity=".5"/>`
+    + `${funke(48, 22, 3.4, GOLD)}`,
 };
 export const TITEL_ZEICHEN = Object.freeze(Object.keys(ZEICHEN));
 
