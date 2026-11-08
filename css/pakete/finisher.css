@@ -1,11 +1,17 @@
 /* Finisher: Look A, nur transform und opacity bewegen. Die Effektflaeche begrenzt alles aufs Brett. */
 .finisher { position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--akzent); }
-.fi-krone, .fi-koenig { position: absolute; left: var(--fx); top: var(--fy); width: 12.5%; height: 12.5%; display: grid; place-items: center;
+.fi-krone, .fi-koenig, .fi-sturz { position: absolute; left: var(--fx); top: var(--fy); width: 12.5%; height: 12.5%; display: grid; place-items: center;
   font-family: serif; font-size: clamp(24px, 7cqw, 56px); line-height: 1; transform: translate(-50%, -50%); color: var(--akzent); text-shadow: 0 1px 0 var(--flaeche); }
 .fi-krone { animation: fi-krone 1.25s var(--gleiten) both; }
 .fi-glanz { position: absolute; left: var(--fx); top: var(--fy); font-size: clamp(16px, 4cqw, 32px); color: var(--gold);
   animation: fi-glanz .65s .65s var(--gleiten) both; }
 .fi-koenig { transform-origin: 50% 85%; animation: fi-koenig 1.55s var(--sanft) both; }
+/* Kronensturz: die Krone hebt vom Koenig ab, faellt neben ihn, rollt ein Stueck aus und bleibt schraeg liegen */
+.fi-sturz { transform-origin: 50% 70%; animation: fi-sturz 1.6s var(--sanft) both; }
+@keyframes fi-sturz { 0% { transform: translate(-50%, -125%) rotate(0); opacity: 0; } 14% { transform: translate(-50%, -125%) rotate(0); opacity: 1; }
+  48% { transform: translate(-5%, -40%) rotate(70deg); opacity: 1; } 62% { transform: translate(5%, -50%) rotate(98deg); }
+  74%, 88% { transform: translate(25%, -45%) rotate(118deg); opacity: 1; } 100% { transform: translate(25%, -45%) rotate(118deg); opacity: 0; } }
+.finisher.ist-ruhig .fi-sturz { transform: translate(25%, -45%) rotate(118deg); }
 .finisher-welle i { position: absolute; left: calc(var(--x) * 12.5%); top: calc(var(--y) * 12.5%); width: 12.5%; height: 12.5%;
   border: 1px solid var(--linie-2); background: var(--akzent-weich); opacity: 0; animation: fi-welle .7s var(--v) var(--gleiten) both; }
 @keyframes fi-krone { 0% { transform: translate(-50%, -180%); opacity: 0; } 32%, 82% { transform: translate(-50%, -50%); opacity: 1; } 100% { transform: translate(-50%, -50%); opacity: 0; } }

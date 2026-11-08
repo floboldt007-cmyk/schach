@@ -1,64 +1,19 @@
 // Woerterbuch des Pakets liga (Englische Version, Teil 2). Schluessel t('p-liga.x'); de = die bisherigen deutschen Texte
 // woertlich. Rein, ohne DOM.
-// Spielklassen und Liga-Stufen bleiben in wertung.js als deutsche Daten (KLASSEN, STUFEN[i].name; liga:geaendert sendet
-// den deutschen Stufen-Namen weiter). Angezeigt werden sie ueber ihre Nummer: 'klasse.<i>', 'stufe.<i>'; de kommt aus
-// wertung.js selbst (gleiche Zeichen).
-// Englisch: Wertung = rating, Spielklasse = class, Liga-Stufe = tier, Saison = season, Liga-Punkte = league points.
-// Die Restdauer der Saison steht ruhig als "79 days to go" (deutsch "noch 79 Tage"), nie als Countdown mit Uhrzeit.
+// Eine Liga (Flo 08.11.2026): angezeigt wird nur noch die Kronen-Liga. Von der alten Saison-Liga bleiben die Stufen-Namen
+// fuer die verdienten Abzeichen im Verlauf ('stufe.<i>', de aus wertung.js STUFEN[i].name). Die Spielklasse traegt keinen
+// Figurennamen mehr ("Springer" gehoert der Kronen-Liga), sie steht nur als Wertungszahl da.
+// Englisch: Wertung = rating, Liga-Stufe = tier, Saison = season.
 import { registriereTexte, t } from '../../sprache.js';
-import { KLASSEN, STUFEN } from './wertung.js';
+import { STUFEN } from './wertung.js';
 import { stufeInfo } from './kronen.js';
 
-const klassenDe = Object.fromEntries(KLASSEN.map((name, i) => ['klasse.' + i, name]));
 const stufenDe = Object.fromEntries(STUFEN.map((s, i) => ['stufe.' + i, s.name]));
 
 export const DE = {
-  // Feier
-  'feier.klasse': 'AUFSTIEG: {klasse}',
-  'feier.klasseText': '{n} wertende Partien · Wertung ≈ {wert}',
-  'feier.liga': 'LIGA-AUFSTIEG: {stufe}',
-  'feier.ligaText': 'Saison {nr} · {punkte} Liga-Punkte',
   // Wertung
   wert: '≈ {wert} ± {u}',
   wertVorlaeufig: '≈ {wert} ± {u} · vorläufig',
-  // Kreuztabelle
-  'tabelle.titel': 'Du gegen die Bots',
-  'tabelle.bot': 'Bot',
-  'tabelle.bestes': 'Bestes Ergebnis',
-  'tabelle.punkte': 'Punkte',
-  'tabelle.gespielt': 'Gespielt',
-  'tabelle.offen': 'Offen',
-  // Details
-  'details.saison': 'Jede Saison zählt dein bestes Ergebnis gegen jeden Bot: Sieg 3 Punkte, Remis 1 Punkt. Du wählst, wann du spielst.',
-  'details.verein': 'Vereinsmeisterschaft: {punkte} von {max} Punkten',
-  'details.wertungen': 'Deine Wertungen',
-  'details.normal.eins': 'Normal: {wert} · {n} Partien',
-  'details.normal.mehr': 'Normal: {wert} · {n} Partien',
-  'details.blitz.eins': 'Blitz: {wert} · {n} Partien',
-  'details.blitz.mehr': 'Blitz: {wert} · {n} Partien',
-  'details.schutz': 'Die Arena-Wertung hat einen Verlustschutz. Negative Elo-Schritte werden als 0 gebucht. Diese vorläufige Bot-Skala ist keine Online-Wertung und noch nicht geeicht.',
-  'details.blitzRegel': 'Blitz zählt bei weniger als 10 Minuten Grundzeit getrennt. Ohne Uhr zählt die normale Wertung. Hinweise halbieren den K-Faktor: 40 für die ersten 15 Partien, danach 24.',
-  'details.klasse': 'Die Spielklasse gehört zur normalen Wertung. Ab 10 Partien kannst du aufsteigen; deine höchste Klasse bleibt.',
-  'details.grenzen': 'Klassen ab Wertung 1000 / 1200 / 1400 / 1600 / 1900: Springer / Läufer / Turm / Dame / König. Diese Grenzen sind vorläufig.',
-  'details.punkteTitel': 'So zählen Liga-Punkte',
-  'details.punkte': 'Sieg: 10 Punkte plus 1 je angefangenen 100 Punkten stärkerem Bot, höchstens 25. Remis: 0 bis +12, Niederlage: −2 bis −20, je nach Stärke des Bots (gegen einen schwächeren kostet sie mehr). Dazu zählt die Genauigkeit: ab 90 % +8, ab 80 % +5, ab 70 % +2, unter 60 % −4, unter 50 % −8, unter 40 % −12. Ein Sieg bringt immer mindestens +2. Die Schwelle deiner erreichten Stufe bleibt erhalten.',
-  'details.stufe': '{name} {schwelle}',
-  'details.dauer': 'Eine Saison dauert 12 Wochen. Danach wird dein Abzeichen im Archiv bewahrt. Die nächste Saison beginnt eine Stufe darunter; Holz bleibt Holz. Bei längeren Pausen geschieht das einmal.',
-  'details.zaehlt': 'Es zählen neue wertende Partien aus der Grundstellung gegen die Leiter-Bots. Übungen, eigene Stellungen, freie Partien und Bosse zählen nicht.',
-  // Saison-Karte
-  'karte.label': 'Saison-Liga',
-  'karte.neu': 'Neue Saison, neue Chance. Dein Level und deine Spielklasse bleiben.',
-  'karte.verstanden': 'Verstanden',
-  'karte.titel': 'Liga {stufe}',
-  'karte.saison': 'Saison {nr} · bis {datum}',
-  'karte.vorStart': 'Saison 1 · ab 19.10.2026',
-  'karte.beginnt': 'Die Saison beginnt am Startmontag',
-  'karte.fortschritt': 'Fortschritt zu {stufe}',
-  'karte.erreicht': '{stufe} erreicht',
-  'karte.weg': '{punkte} von {schwelle} Punkten bis {stufe}',
-  'karte.oben': '{punkte} Punkte · {stufe}, die höchste Liga',
-  'karte.regel': 'Sieg 3 Punkte · Remis 1 Punkt · dein bestes Ergebnis je Bot zählt',
-  'karte.club': '{siege} von {n} Bots geschlagen',
   // Bilanz im Panel
   'bilanz.text': 'Du gegen {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} Sieg',
@@ -67,12 +22,7 @@ export const DE = {
   'bilanz.remis.mehr': '{n} Remis',
   'bilanz.niederlagen.eins': '{n} Niederlagen',
   'bilanz.niederlagen.mehr': '{n} Niederlagen',
-  // Abrechnung im Ergebnis
-  'abr.liga': 'Liga {diff} · {stufe}',
-  'leiter.titel': 'Alle Ligen', 'leiter.ab': 'ab {n} Punkten', 'leiter.erreicht': 'erreicht', 'leiter.hier': 'Du · {punkte}', 'leiter.noch': 'noch {n}',
-  'abr.titel': 'Liga', 'abr.stand': '{stufe} · {punkte} Punkte', 'abr.weg': 'noch {n} bis {stufe}', 'abr.oben': 'Höchste Stufe',
-  'abr.ergebnis.sieg': 'Sieg', 'abr.ergebnis.remis': 'Remis', 'abr.ergebnis.niederlage': 'Niederlage',
-  'abr.genau': 'Genauigkeit {g} %', 'abr.genauOhne': 'Genauigkeit', 'abr.geschuetzt': 'Stufe geschützt',
+  // Abrechnung im Ergebnis (nur die Wertung, Liga-Punkte gibt es seit 08.11.2026 nicht mehr)
   'abr.blitz': 'Blitz-Wertung {diff}',
   'abr.arena': 'Arena-Wertung {diff}',
   // Verlauf
@@ -80,9 +30,8 @@ export const DE = {
   'kurve.label': 'Verlauf der normalen Arena-Wertung',
   'kurve.titel': 'Arena-Wertung: {a} bis {b}',
   'kurve.text': '{a} → {b} · letzte {n} normale Partien',
-  'verlauf.titel': 'Wertung und Saison-Archiv',
-  'verlauf.abzeichen': 'Deine Saison-Abzeichen',
-  'verlauf.leer': 'Dein erstes Saison-Abzeichen erscheint hier nach der Saison.',
+  'verlauf.titel': 'Deine Arena-Wertung',
+  'verlauf.abzeichen': 'Deine Abzeichen der alten Saison-Liga',
   'verlauf.saison': 'Saison {nr}: {stufe}',
   'verlauf.punkte': '{punkte} Punkte · Rechenstand {stand}',
   'verlauf.fuss': 'Arena-Wertung mit Verlustschutz · Rechenstand {stand}. Die Bot-Skala ist vorläufig.',
@@ -121,52 +70,12 @@ export const DE = {
   'gruppe.kontoLink': 'Konto anlegen',
   'gruppe.leer': 'Spiel eine Partie, dann kommst du in deine Gruppe für diese Woche.',
   'gruppe.fehler': 'Die Gruppe lädt gerade nicht. Später noch einmal versuchen.',
-  ...klassenDe,
   ...stufenDe,
 };
 
 export const EN = {
-  'feier.klasse': 'PROMOTED: {klasse}',
-  'feier.klasseText': '{n} rated games · rating ≈ {wert}',
-  'feier.liga': 'LEAGUE PROMOTION: {stufe}',
-  'feier.ligaText': 'Season {nr} · {punkte} league points',
   wert: '≈ {wert} ± {u}',
   wertVorlaeufig: '≈ {wert} ± {u} · provisional',
-  'tabelle.titel': 'You vs. the bots',
-  'tabelle.bot': 'Bot',
-  'tabelle.bestes': 'Best result',
-  'tabelle.punkte': 'Points',
-  'tabelle.gespielt': 'Played',
-  'tabelle.offen': 'Open',
-  'details.saison': 'Each season counts your best result against every bot: a win is 3 points, a draw 1 point. You choose when you play.',
-  'details.verein': 'Club championship: {punkte} of {max} points',
-  'details.wertungen': 'Your ratings',
-  'details.normal.eins': 'Standard: {wert} · {n} game',
-  'details.normal.mehr': 'Standard: {wert} · {n} games',
-  'details.blitz.eins': 'Blitz: {wert} · {n} game',
-  'details.blitz.mehr': 'Blitz: {wert} · {n} games',
-  'details.schutz': 'Your Arena rating has loss protection: negative Elo steps count as 0. This provisional bot scale is not an online rating and isn’t calibrated yet.',
-  'details.blitzRegel': 'Blitz counts separately with less than 10 minutes of base time. Without a clock, the standard rating counts. Hints halve the K-factor: 40 for the first 15 games, then 24.',
-  'details.klasse': 'Your class belongs to the standard rating. After 10 games you can move up; your highest class stays.',
-  'details.grenzen': 'Classes from rating 1000 / 1200 / 1400 / 1600 / 1900: Knight / Bishop / Rook / Queen / King. These thresholds are provisional.',
-  'details.punkteTitel': 'How league points work',
-  'details.punkte': 'Win: 10 points, plus 1 for every 100 rating points (or part of 100) the bot is stronger, up to 25. Draw: 0 to +12, loss: −2 to −20, depending on the bot (losing to a weaker bot costs more). Accuracy counts too: 90% or more +8, 80% +5, 70% +2, below 60% −4, below 50% −8, below 40% −12. A win always brings at least +2. Your points never drop below the threshold of a tier you have reached.',
-  'details.stufe': '{name} {schwelle}',
-  'details.dauer': 'A season lasts 12 weeks. Afterward, your badge is kept in the archive. The next season starts one tier lower; Wood stays Wood. After a longer break, this happens only once.',
-  'details.zaehlt': 'New rated games from the starting position against the ladder bots count. Practice, custom positions, free play and bosses don’t count.',
-  'karte.label': 'Season league',
-  'karte.neu': 'New season, fresh start. Your level and your class stay.',
-  'karte.verstanden': 'Got it',
-  'karte.titel': '{stufe} league',
-  'karte.saison': 'Season {nr} · until {datum}',
-  'karte.vorStart': 'Season 1 · from Oct 19, 2026',
-  'karte.beginnt': 'The season starts on its first Monday',
-  'karte.fortschritt': 'Progress to {stufe}',
-  'karte.erreicht': '{stufe} reached',
-  'karte.weg': '{punkte} of {schwelle} points to {stufe}',
-  'karte.oben': '{punkte} points · {stufe}, the top league',
-  'karte.regel': 'Win 3 points · draw 1 point · your best result per bot counts',
-  'karte.club': '{siege} of {n} bots beaten',
   'bilanz.text': 'You vs. {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} win',
   'bilanz.siege.mehr': '{n} wins',
@@ -174,31 +83,19 @@ export const EN = {
   'bilanz.remis.mehr': '{n} draws',
   'bilanz.niederlagen.eins': '{n} loss',
   'bilanz.niederlagen.mehr': '{n} losses',
-  'abr.liga': 'League {diff} · {stufe}',
-  'leiter.titel': 'All leagues', 'leiter.ab': 'from {n} points', 'leiter.erreicht': 'reached', 'leiter.hier': 'You · {punkte}', 'leiter.noch': '{n} to go',
-  'abr.titel': 'League', 'abr.stand': '{stufe} · {punkte} points', 'abr.weg': '{n} to {stufe}', 'abr.oben': 'Top tier',
-  'abr.ergebnis.sieg': 'Win', 'abr.ergebnis.remis': 'Draw', 'abr.ergebnis.niederlage': 'Loss',
-  'abr.genau': 'Accuracy {g}%', 'abr.genauOhne': 'Accuracy', 'abr.geschuetzt': 'Tier protected',
   'abr.blitz': 'Blitz rating {diff}',
   'abr.arena': 'Arena rating {diff}',
   'kurve.leer': 'Your rating curve grows with your next standard games.',
   'kurve.label': 'History of your standard Arena rating',
   'kurve.titel': 'Arena rating: {a} to {b}',
   'kurve.text': '{a} → {b} · last {n} standard games',
-  'verlauf.titel': 'Rating and season archive',
-  'verlauf.abzeichen': 'Your season badges',
-  'verlauf.leer': 'Your first season badge will appear here after the season.',
+  'verlauf.titel': 'Your Arena rating',
+  'verlauf.abzeichen': 'Your badges from the old season league',
   'verlauf.saison': 'Season {nr}: {stufe}',
   'verlauf.punkte': '{punkte} points · scoring version {stand}',
   'verlauf.fuss': 'Arena rating with loss protection · scoring version {stand}. The bot scale is provisional.',
-  // Spielklassen (wertung.js KLASSEN): die Figuren vom Bauern bis zum Koenig
-  'klasse.0': 'Pawn class',
-  'klasse.1': 'Knight class',
-  'klasse.2': 'Bishop class',
-  'klasse.3': 'Rook class',
-  'klasse.4': 'Queen class',
-  'klasse.5': 'King class',
-  // Liga-Stufen (wertung.js STUFEN): Holz bis Gold wie im Deutschen, oben die Krone statt "Meister"
+  // Stufen der alten Saison-Liga (wertung.js STUFEN), nur noch fuer die Abzeichen im Verlauf: Holz bis Gold wie im
+  // Deutschen, oben die Krone statt "Meister"
   'stufe.0': 'Wood',
   'stufe.1': 'Bronze',
   'stufe.2': 'Silver',

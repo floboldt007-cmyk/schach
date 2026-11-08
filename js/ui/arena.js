@@ -459,10 +459,16 @@ export function zeige(root, params, app) {
   }
   baueKnoten();
 
+  // "Bot 2 von 6" (Flo 08.11.2026): Platz in der eigenen Welt statt "Stufe 8", "Stufe" gehoert allein der Kronen-Liga
+  function platzInWelt(b) {
+    const welt = BOTS.filter((x) => x.welt === b.welt);
+    return { nr: welt.findIndex((x) => x.id === b.id) + 1, anzahl: welt.length };
+  }
+
   function knotenLabel(b, z) {
     const zustand = { besiegt: 'besiegt', aktuell: 'aktuell', offen: neuEingezogen(b) ? 'neu' : b.endgegner ? 'endgegner' : 'offen', gesperrt: 'gesperrt' }[z];
     const sterne = fortschritt.bots[b.id].sterne;
-    const werte = { stufe: b.stufe, name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
+    const werte = { ...platzInWelt(b), name: b.name, elo: b.elo, zustand: t('arena.zustand.' + zustand) };
     return z === 'besiegt' ? t('arena.knoten.labelSterne', { ...werte, sterne: sterne.filter(Boolean).length }) : t('arena.knoten.label', werte);
   }
 
@@ -678,7 +684,7 @@ export function zeige(root, params, app) {
         <div class="detail-kopf">
           <div class="av"><img src="${esc(avatarVon(b))}" alt=""></div>
           <div class="detail-name">
-            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { stufe: b.stufe, status }))}</div>
+            <div class="ueberzeile detail-ueber${z === 'aktuell' ? ' akz' : ''}">${esc(t('arena.detail.ueber', { ...platzInWelt(b), status }))}</div>
             <div class="detail-welt">${esc(t('arena.detail.welt', { nr: b.welt, name: (WELTEN.find((w) => w.nr === b.welt) || {}).name || '' }))}</div>
             <h2 class="disp">${esc(b.name)}</h2>
             <div class="elo zahl">Elo ${b.elo} · ${esc(b.titel)}</div>

@@ -51,8 +51,10 @@ export const ERFOLGS_TITEL = Object.freeze([
   { erfolg: 'welt-5', id: 'tiefenlicht', zeichen: 'welt-5', farbe: ['#5E8CC8', '#14284A', '#0B1830'], seltenheit: 'legende' },
   { erfolg: 'alle-bots', id: 'bot-schreck', zeichen: 'krone', farbe: ['#FF9D92', '#B8321F', '#7C1E12'], seltenheit: 'legende' },
   { erfolg: 'alle-sterne', id: 'sternenkrone', zeichen: 'sternenkrone', farbe: ['#E0C8FF', '#5A2FB8', '#3A1C80'], seltenheit: 'legende' },
-  { erfolg: 'liga-3', id: 'goldlorbeer', zeichen: 'lorbeer', farbe: ['#FFE6A0', '#C8901E', '#86600E'], seltenheit: 'selten' },
-  { erfolg: 'liga-6', id: 'ligakrone', zeichen: 'ligakrone', farbe: ['#CFB8FF', '#4E2BA6', '#2E1868'], seltenheit: 'legende' },
+  // alte Saison-Liga (Flo 08.11.2026, eine Liga): Goldlorbeer sieht nur, wer ihn erspielt hat; die Ligakrone kommt auch
+  // ueber die Kronen-Liga (Gold der Familie liga, Koenig III) und zeigt dann diesen Weg
+  { erfolg: 'liga-3', id: 'goldlorbeer', zeichen: 'lorbeer', farbe: ['#FFE6A0', '#C8901E', '#86600E'], seltenheit: 'selten', nurErspielt: true },
+  { erfolg: 'liga-6', id: 'ligakrone', zeichen: 'ligakrone', farbe: ['#CFB8FF', '#4E2BA6', '#2E1868'], seltenheit: 'legende', wegOhne: 'titel.weg.ligakrone' },
   { erfolg: 'serie-7', id: 'wochenflamme', zeichen: 'serie', n: 7, farbe: ['#FFB27A', '#D2561E', '#8A3410'], seltenheit: 'frei' },
   { erfolg: 'serie-30', id: 'monatsfeuer', zeichen: 'serie', n: 30, farbe: ['#FF9A6A', '#B83A1E', '#7A2412'], seltenheit: 'episch' },
   { erfolg: 'serie-100', id: 'ewige-flamme', zeichen: 'serie', n: 100, farbe: ['#FF8A8A', '#8E1E2A', '#5A1018'], seltenheit: 'legende' },
@@ -83,27 +85,46 @@ export const KOENNEN_TITEL = Object.freeze([
   { id: 'eigene-kraft', zeichen: 'berg', farbe: ['#C8D2E2', '#4A5A78', '#2C364C'], seltenheit: 'episch',
     pruef: (l, eloVon) => l.some((p) => sieg(p) && !p.hinweise && !p.zuruecknahmen && (eloVon(p.botId) || 0) >= 1200) },
   { id: 'stammgast', zeichen: 'stammgast', farbe: ['#F0C890', '#A8662A', '#6E3E14'], seltenheit: 'selten', pruef: (l) => l.length >= 100 },
+  // Flo 08.11.2026 (Startklar-Durchsicht, alle Vorschlaege von U): jeder Titel erklaert eine Zahl, die es schon gibt. Sie lesen
+  // den dritten Wert d (./index.js titelDaten), nur Daten aus dem Browser. Aufsteiger, Stammspieler der Gruppe und Duellant
+  // brauchen Daten, die nur der Server hat (Wochen-Abrechnung, Duell-Ergebnisse), und fehlen deshalb hier.
+  { id: 'kroenung', zeichen: 'kroenung', farbe: ['#FFE9A8', '#C8901E', '#7A5610'], seltenheit: 'legende', pruef: (l, e, d) => d.kronenStufe >= KRONEN_KOENIG },
+  { id: 'raetselfuchs', zeichen: 'fuchs', farbe: ['#FFC285', '#D2611E', '#8A3A10'], seltenheit: 'episch', pruef: (l, e, d) => d.raetsel >= 100 },
+  { id: 'weltenwanderer', zeichen: 'kompass', farbe: ['#A8D8C8', '#2F7A6A', '#1C4E44'], seltenheit: 'selten',
+    pruef: (l, e, d) => d.weltenAlle > 0 && d.weltenMitSieg >= d.weltenAlle },
+  { id: 'tafelkoenig', zeichen: 'tafel', farbe: ['#FFE6A0', '#B8862A', '#6E4E14'], seltenheit: 'episch', pruef: (l, e, d) => d.platz1 >= 5 },
+  { id: 'rekordjaeger', zeichen: 'pokal', farbe: ['#FFD27A', '#C2561A', '#7E3410'], seltenheit: 'selten', pruef: (l, e, d) => d.rekorde >= 10 },
+  { id: 'sterne-sammler', zeichen: 'sternbeutel', farbe: ['#D6C2FF', '#6A3FD0', '#40238C'], seltenheit: 'selten', pruef: (l, e, d) => d.sterneWelt === true },
+  { id: 'fehlerjaeger', zeichen: 'lupe', farbe: ['#9EDCF0', '#2A7A98', '#174E64'], seltenheit: 'selten', pruef: (l, e, d) => d.kartei >= 50 },
+  { id: 'musterschueler', zeichen: 'kapitel', farbe: ['#9CC4F0', '#1E4C8A', '#123058'], seltenheit: 'episch', labor: true, pruef: (l, e, d) => d.schulKapitel >= 1 },
+  { id: 'erzfeind', zeichen: 'erzfeind', farbe: ['#E88A8A', '#8E1E2A', '#5A1018'], seltenheit: 'episch', pruef: (l, e, d) => d.erzfeind >= 1 },
 ].map((x) => Object.freeze(x)));
+// Kronen-Liga: Koenig III ist Stufe 15 (js/pakete/liga/kronen.js, 0 = Bauer III)
+const KRONEN_KOENIG = 15;
 // Was die Koennen-Titel verlangen (fuer die Zeile unter einem gesperrten Titel)
-const KOENNEN_ZIEL = Object.freeze({ blitzschlag: 15, 'langer-atem': 60, gleichgewicht: 3, feinschliff: 90, 'eigene-kraft': 1200, stammgast: 100 });
+const KOENNEN_ZIEL = Object.freeze({ blitzschlag: 15, 'langer-atem': 60, gleichgewicht: 3, feinschliff: 90, 'eigene-kraft': 1200, stammgast: 100,
+  raetselfuchs: 100, tafelkoenig: 5, rekordjaeger: 10, fehlerjaeger: 50 });
 
-export function koennenFrei(partien = [], eloVon = () => 0) {
-  return KOENNEN_TITEL.filter((x) => { try { return x.pruef(partien, eloVon); } catch (e) { return false; } }).map((x) => 'koennen-' + x.id);
+// daten: was die neuen Titel lesen (./index.js titelDaten); fehlt es, zaehlt jede Bedingung dort als nicht erfuellt
+export function koennenFrei(partien = [], eloVon = () => 0, daten = {}) {
+  return KOENNEN_TITEL.filter((x) => { try { return x.pruef(partien, eloVon, daten || {}) === true; } catch (e) { return false; } }).map((x) => 'koennen-' + x.id);
 }
 
-export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [] } = {}) {
+// labor: die Meisterschule steht im Labor (./index.js schulStand); ihr Titel erscheint nur dann oder wenn er erspielt ist.
+// alle: jeder Titel der festen Liste, auch ausgeblendete (Titel eines anderen Spielers, profil.js titelVonId)
+export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier = null, koennen = [], labor = false, alle = false } = {}) {
   const nachId = new Map(erfolge.map((e) => [e.id, e]));
   const lv = LEVEL_TITEL.map(([ab]) => {
     const [zeichen, farbe] = LEVEL_KUNST[ab] || ['funke', LEVEL_KUNST[1][1]];
     return { id: 'level-' + ab, art: 'level', ab, name: S('titel.level.' + ab), frei: level >= ab, weg: S('titel.ab', { level: ab }),
       zeichen, farbe, seltenheit: levelSeltenheit(ab) };
   });
-  const ef = ERFOLGS_TITEL.filter((x) => !x.labor || nachId.has('erfolg-' + x.erfolg)).map((x) => {
+  const ef = ERFOLGS_TITEL.filter((x) => alle || !(x.labor || x.nurErspielt) || nachId.has('erfolg-' + x.erfolg)).map((x) => {
     const e = nachId.get('erfolg-' + x.erfolg);
-    return { id: 'erfolg-' + x.id, art: 'erfolg', name: S('titel.' + x.id), frei: !!(e && e.frei), weg: e ? S('titel.weg', { erfolg: e.name }) : '',
+    return { id: 'erfolg-' + x.id, art: 'erfolg', name: S('titel.' + x.id), frei: !!(e && e.frei), weg: e ? S('titel.weg', { erfolg: e.name }) : x.wegOhne ? S(x.wegOhne) : '',
       fortschritt: e && !e.frei && Number.isFinite(e.fortschritt) ? e.fortschritt : undefined, zeichen: x.zeichen, n: x.n || 0, farbe: x.farbe, seltenheit: x.seltenheit };
   });
-  const kn = KOENNEN_TITEL.map((x) => ({ id: 'koennen-' + x.id, art: 'koennen', name: S('titel.' + x.id), frei: koennen.includes('koennen-' + x.id),
+  const kn = KOENNEN_TITEL.filter((x) => alle || !x.labor || labor || koennen.includes('koennen-' + x.id)).map((x) => ({ id: 'koennen-' + x.id, art: 'koennen', name: S('titel.' + x.id), frei: koennen.includes('koennen-' + x.id),
     weg: S('titel.weg.' + x.id, { n: KOENNEN_ZIEL[x.id] }), zeichen: x.zeichen, farbe: x.farbe, seltenheit: x.seltenheit }));
   const er = erfinder ? [{ ...ERFINDER_TITEL, art: 'erfinder', name: S('erfinder.titel'), frei: true, weg: '' }] : [];
   const pi = Number.isInteger(pionier) && pionier >= 1 && pionier <= 100
@@ -111,8 +132,8 @@ export function titelListe({ level = 1, erfolge = [], erfinder = false, pionier 
   return [...er, ...pi, ...lv, ...ef, ...kn];
 }
 
-export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [] } = {}) {
-  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen });
+export function aktuellerTitel({ level = 1, erfolge = [], erfinder = false, wahl = null, pionier = null, koennen = [], labor = false } = {}) {
+  const liste = titelListe({ level, erfolge, erfinder, pionier, koennen, labor });
   const gewaehlt = wahl ? liste.find((x) => x.id === wahl && x.frei) : null;
   if (gewaehlt) return { ...gewaehlt, gewaehlt: true };
   // ohne Wahl: Erfinder, sonst Pionier, sonst der hoechste Level-Titel
