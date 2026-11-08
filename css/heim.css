@@ -116,6 +116,50 @@
   .heim-modus { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
 }
 
+/* ---------- Handy hoch: alles auf einen Bildschirm (Flo 08.11.2026: "unten abgeschnitten, man muss scrollen") ----------
+   Das Brett der Partie steht klein neben dem Satz zur Lage (wie das Portraet ohne Partie), Balken und Knopf gehen ueber
+   die ganze Breite der Buehne; die drei Wege werden flacher. Auf niedrigen Handys (iPhone SE) treten der Untertitel der
+   Wege und die Spielweise des Bots zurueck, der Gruss wird eine Zeile. */
+@media (max-width: 560px) and (orientation: portrait) {
+  .heim-screen .heim-rumpf { padding-top: var(--a2); padding-bottom: var(--a3); }
+  .heim-links, .heim-rechts { gap: var(--a3); }
+  .heim-gruss h1 { margin-top: 2px; font-size: 22px; }
+  .heim-buehne, .heim-buehne[data-art="gegner"] { --heim-brett: clamp(96px, 30vw, 120px); grid-template-columns: var(--heim-brett) minmax(0, 1fr);
+    column-gap: var(--a3); row-gap: var(--a2); align-items: center; padding: var(--a3); }
+  .heim-buehne .heim-buehne-text { display: contents; }
+  .heim-buehne > .heim-brett, .heim-buehne > .heim-portraet { grid-row: 1 / span 3; grid-column: 1; align-self: center; }
+  .heim-portraet { width: var(--heim-brett); }
+  .heim-buehne .heim-buehne-text > * { grid-column: 2; min-width: 0; }
+  .heim-buehne[data-art="partie"] .heim-ueber { align-self: end; }
+  .heim-buehne[data-art="partie"] .heim-lage { grid-row: 2 / span 2; align-self: start; font-size: 18px; }
+  .heim-buehne .heim-buehne-text > .heim-balken, .heim-buehne .heim-buehne-text > .heim-los { grid-column: 1 / -1; grid-row: auto; }
+  .heim-buehne .heim-los { margin-top: 0; min-height: 48px; padding-block: 10px; }
+  .heim-gegner { font-size: 19px; }
+  .heim-spielweise { font-size: 13px; line-height: 1.35; }
+  .heim-naechstes h3 { margin-bottom: var(--a1); }
+  .heim-zeile { padding-block: 8px; }
+  .heim-wege { gap: 8px; }
+  .heim-modus { gap: 6px; padding: 10px; }
+  .heim-symbol { width: 32px; height: 32px; border-radius: 10px; }
+  .heim-symbol svg { width: 18px; height: 18px; }
+  .heim-text { gap: 2px; }
+  .heim-text b { font-size: 14.5px; }
+}
+/* niedrige Handys (iPhone 13 in Safari mit Leisten, 375 x 667): die Wege nur mit Namen */
+@media (max-width: 560px) and (orientation: portrait) and (max-height: 720px) {
+  .heim-text > span { display: none; }
+}
+/* iPhone SE: Gruss eine Zeile, die Wege als flache Zeile (Symbol neben dem Namen), ohne Spielweise des Bots */
+@media (max-width: 560px) and (orientation: portrait) and (max-height: 620px) {
+  .heim-gruss small { display: none; }
+  .heim-gruss h1 { margin-top: 0; font-size: 20px; }
+  .heim-spielweise { display: none; }
+  .heim-modus { flex-direction: row; align-items: center; gap: 6px; padding: 6px 8px; min-height: 48px; }
+  .heim-symbol { width: 28px; height: 28px; border-radius: 9px; }
+  .heim-symbol svg { width: 16px; height: 16px; }
+  .heim-text b { font-size: 13.5px; line-height: 1.15; }
+}
+
 /* ---------- iPad hoch: eine Spalte, oben beginnend; die Buehne fuellt die Hoehe ----------
    Partie: Brett ueber dem Text, so breit wie die Buehne, begrenzt durch die Fensterhoehe (nichts scrollt).
    Ohne Partie: grosses Bot-Bild oben, Text und Spielen darunter, darunter "Deine Leiter". */

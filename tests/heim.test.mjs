@@ -468,8 +468,9 @@ async function testeWege(browser, heute) {
 
 async function testeGroessen(browser, heute) {
   gruppe = 'groessen';
-  // iPad hoch und quer, PC: nichts scrollt, alle Knoepfe ueber der Leiste. Handy: darf scrollen, aber nichts seitlich drueber.
-  for (const [w, h, ipad] of [[820, 1180, true], [1180, 820, true], [1024, 768, true], [1440, 900, true], [390, 844, false], [375, 667, false]]) {
+  // iPad hoch und quer, PC und Handy: nichts scrollt, alle Knoepfe ueber der Leiste (Handy seit Flo 08.11.2026: "unten
+  // abgeschnitten, man muss scrollen"; 390 x 664 ist das iPhone 13 in Safari mit Leisten, 320 x 568 das iPhone SE)
+  for (const [w, h] of [[820, 1180], [1180, 820], [1024, 768], [1440, 900], [390, 844], [390, 664], [375, 667], [320, 568]]) {
     for (const schema of ['light', 'dark']) for (const partie of [true, false]) {
       // mit Konto und Kronen-Stand: die Liga-Zeile unter "Als Naechstes" ist da (der volle Fall)
       const speicher = { ...gesehen(heute), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' } };
@@ -480,14 +481,13 @@ async function testeGroessen(browser, heute) {
       await warte(700);
       const m = await lage(seite);
       const name = `${w}x${h} ${schema === 'dark' ? 'dunkel' : 'hell'} ${partie ? 'Partie' : 'leer'}`;
-      if (ipad) {
-        const unten = m.leiste ? m.leiste.t : m.ih;
-        pruefe(`${name}: nichts scrollt, alle Knoepfe ganz sichtbar`, m.ueber <= 0 && m.knoepfe.every((x) => x.t >= 0 && x.b <= unten + 0.5 && x.r <= m.iw + 0.5),
-          JSON.stringify({ ueber: m.ueber, unten, knoepfe: m.knoepfe }));
-      }
+      const unten = m.leiste ? m.leiste.t : m.ih;
+      pruefe(`${name}: nichts scrollt, alle Knoepfe ganz sichtbar`, m.ueber <= 0 && m.knoepfe.every((x) => x.t >= 0 && x.b <= unten + 0.5 && x.r <= m.iw + 0.5),
+        JSON.stringify({ ueber: m.ueber, unten, knoepfe: m.knoepfe }));
       pruefe(`${name}: nichts seitlich drueber`, await seite.evaluate(() => document.scrollingElement.scrollWidth <= innerWidth));
       if (partie) {
-        const min = { 820: 520, 1180: 360, 1024: 300, 1440: 360, 390: 240, 375: 190 }[w];
+        // Handy: das Brett steht klein neben dem Satz zur Lage (seit 08.11.2026), damit alles auf einen Bildschirm passt
+        const min = { 820: 520, 1180: 360, 1024: 300, 1440: 360, 390: 96, 375: 96, 320: 96 }[w];
         pruefe(`${name}: Brett mindestens ${min} px`, m.brett && m.brett.w >= min, String(m.brett && m.brett.w));
       }
       if (w === 820) {
