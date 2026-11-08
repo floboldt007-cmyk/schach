@@ -87,8 +87,39 @@
 
 .bl-reiter { display: grid; gap: 18px; min-width: 0; }
 .bl-reiter[hidden] { display: none; }
-.bl-reiter[data-reiter="ich"] { grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); align-items: start; }
-.bl-reiter[data-reiter="ich"] > .bl-spieler { grid-row: span 2; }
+.bl-reiter[data-reiter="ich"] { max-width: 760px; gap: 14px; }
+/* Ich A (G-002): Kronen dieser Woche, die beste Partie, dann der Knopf zu allem Weiteren */
+.bl-kronen { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 16px 20px; }
+.bl-kronen[hidden] { display: none; }
+.bl-kronen[data-zustand="ohne-konto"] { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+.bl-kr-wappen { width: 72px; height: auto; }
+.bl-kr-text { display: grid; gap: 6px; min-width: 0; }
+.bl-kr-zahl { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
+.bl-kr-zahl b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 60px; letter-spacing: -.03em; line-height: 1; }
+.bl-kr-zahl span { display: inline-flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 700; color: var(--text); }
+.bl-kr-zahl .ico { width: 22px; height: 22px; color: var(--gold); }
+.bl-kr-platz, .bl-kr-satz { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+.bl-kr-balken { display: block; height: 8px; margin-top: 6px; border-radius: 4px; background: var(--flaeche-3); overflow: hidden; }
+.bl-kr-balken i { display: block; height: 100%; border-radius: inherit; background: var(--gut); }
+.bl-ich-beste { gap: 10px; }
+.bl-ib-zeile { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 56px; margin: 0;
+  padding: 4px; border: 0; border-radius: var(--r-m); background: none; color: inherit; font: inherit; text-align: start; }
+button.bl-ib-zeile { cursor: pointer; }
+button.bl-ib-zeile:focus-visible, .bl-ich-alle:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+.bl-ib-bild { width: 48px; height: 48px; border-radius: var(--r-m); object-fit: cover; display: grid; place-items: center; background: var(--flaeche-3); }
+.bl-ib-mitte { display: grid; gap: 2px; min-width: 0; }
+.bl-ib-mitte b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-ib-punkte { display: grid; justify-items: end; }
+.bl-ib-punkte b { font-family: var(--display); font-weight: var(--gw-titel); font-size: 22px; }
+.bl-ib-punkte small { font-size: 13px; font-weight: 650; color: var(--text-2); }
+.bl-ich-alle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 60px; margin: 0; padding: 0 20px;
+  border: 0; border-radius: var(--r-xl); background: var(--flaeche); box-shadow: var(--s2), var(--kante); color: var(--text); font: inherit;
+  font-size: 17px; font-weight: var(--gw-stark); text-align: start; cursor: pointer; }
+.bl-ich-alle .ico { flex: none; width: 20px; height: 20px; }
+.bl-ich-alle[aria-expanded="true"] .ico { transform: rotate(90deg); }
+.bl-ich-mehr { display: grid; gap: 14px; min-width: 0; }
+.bl-ich-mehr[hidden] { display: none; }
+.bl-ich-zeitraum { display: flex; }
 .bl-reiter[data-reiter="freunde"] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .bl-reiter[data-reiter="freunde"] > .bl-freunde { grid-column: 1 / -1; }
 
@@ -237,8 +268,7 @@ button.bl-z-innen:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 
 /* ---------- iPad hoch und schmaler: eine Spalte ---------- */
 @media (max-width: 900px) {
-  .bl-reiter[data-reiter="ich"], .bl-reiter[data-reiter="freunde"] { grid-template-columns: minmax(0, 1fr); }
-  .bl-reiter[data-reiter="ich"] > .bl-spieler { grid-row: auto; }
+  .bl-reiter[data-reiter="freunde"] { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Handy ---------- */

@@ -936,6 +936,13 @@ function hilfen(seite) {
       await seite.locator(`.bl-steuer-fenster .seg[data-wert="${id}"]`).click();
       await warte(500);
     },
+    // Reiter Ich (G-002, eine Zahl): alles Weitere liegt hinter "Alle Partien, Rekorde und Zeitraeume"
+    async ichAlle() {
+      const k = seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-alle');
+      if (await k.getAttribute('aria-expanded') !== 'true') await k.click();
+      await seite.waitForSelector('.bl-ich-mehr:not([hidden]) .bl-spieler');
+      await warte(200);
+    },
   };
   return h;
 }
@@ -1018,9 +1025,31 @@ async function testeBrowser(browser) {
     await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'freunde:Freunde,ich:Ich,bots:Bots' && fensterIds === 'woche*,monat,allzeit'
       && await seite.locator('.bl-screen').getAttribute('data-reiter') === 'ich', [reiterIds, fensterIds]);
   pruefe('Leer: ein ruhiger Satz und „Jetzt spielen“ statt leerer Tabellen, kein leeres Rekordbuch, keine Erklärsätze im Kopf',
-    /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-gesamt').innerText())
-    && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
+    /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText())
+    && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
     && !/ganz ohne Server|Jede Zeile eine echte Partie|wie treu/.test(await seite.locator('.bl-screen').innerText()));
+  // G-002 (Flos Wahl "Ich A"): eine Zahl oben, der Rest hinter einem Knopf; der Zeitraum steht erst im aufgeklappten Teil
+  pruefe('Ich eingeklappt: Knopf „Alle Partien, Rekorde und Zeiträume“, kein Zeitraum-Schalter, keine Zähler und keine Liste',
+    (await seite.locator('.bl-ich-alle').innerText()).trim() === 'Alle Partien, Rekorde und Zeiträume'
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'false'
+    && await seite.locator('.bl-steuer-fenster').isHidden() && await seite.locator('.bl-spieler:visible').count() === 0
+    && await seite.locator('.bl-gesamt:visible').count() === 0);
+  pruefe('Ohne Konto: Kronen-Karte mit ruhigem Satz und Link zum Konto, keine Kronen-Zahl',
+    await seite.locator('.bl-kronen[data-zustand="ohne-konto"] .bl-kr-konto').getAttribute('href') === '#einstellungen/konto'
+    && await seite.locator('.bl-kr-zahl').count() === 0);
+  await h.ichAlle();
+  pruefe('Ich aufgeklappt: Zeitraum Woche · Monat · Allzeit, Spielerkarte und „Diese Woche noch keine Partie“',
+    await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg').count() === 3
+    && await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[aria-checked="true"]').getAttribute('data-wert') === 'woche'
+    && /Diese Woche noch keine Partie/.test(await seite.locator('.bl-ich-mehr .bl-gesamt').innerText()));
+  await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[data-wert="allzeit"]').click();
+  await warte(300);
+  pruefe('Zeitraum im aufgeklappten Teil: Allzeit wechselt die Liste, der Teil bleibt offen',
+    /Noch keine Partie/.test(await seite.locator('.bl-ich-mehr .bl-gesamt').innerText())
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'true');
+  await seite.locator('.bl-ich-mehr .bl-ich-zeitraum .seg[data-wert="woche"]').click();
+  await seite.locator('.bl-ich-alle').click();
+  await warte(200);
   await h.reiter('bots');
   const leerBots = await seite.locator('.bl-tafel').innerText();
   pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
@@ -1120,6 +1149,11 @@ async function testeBrowser(browser) {
   pruefe('Zeile antippen springt in die Analyse dieser Partie, an den Moment mit dem größten Ausschlag', an.da && an.hash === '#analyse/' + encodeURIComponent(e1.id)
     && Number.isInteger(mPly) && an.gesehen[0] === mPly, { an, mPly });
   await h.bestenliste({ reiter: 'ich' });
+  const beste = await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText();
+  pruefe('Reiter Ich oben: „Deine beste Partie diese Woche“ mit Tafel-Punkten, der Rest eingeklappt',
+    /Deine beste Partie diese Woche/i.test(beste) && new RegExp(zahlText(e1.w)).test(beste) && /Tafel-Punkte/.test(beste)
+    && await seite.locator('.bl-ich-alle').getAttribute('aria-expanded') === 'false', beste);
+  await h.ichAlle();
   const ich = await seite.locator('.bl-reiter[data-reiter="ich"]').innerText();
   pruefe('Reiter Ich: beste Partie groß („Punkte auf Lukas’ Tafel“), Rekorde, Platz 1, Tafeln und „Deine besten Partien“ über alle Tafeln', /0\s*Rekorde/.test(ich) && /1\s*Tafeln/.test(ich)
     && /Punkte auf Lukas’ Tafel/.test(ich)
@@ -1170,6 +1204,7 @@ async function testeBrowser(browser) {
   await bild(seite, 'ergebnis-rekord');
   await h.schliesseErgebnis();
   await h.bestenliste({ reiter: 'ich' });
+  await h.ichAlle();
   pruefe('Rekordbuch: neuer Wert, alter Wert durchgestrichen (Rechenstand steht nur bei alten Regeln dabei)', !/Rechenstand/.test(await seite.locator('.bl-rekordbuch').innerText())
     && (await seite.locator('.bl-rekordbuch s').first().innerText()).trim() === '1.000');
 

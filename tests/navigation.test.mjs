@@ -832,11 +832,14 @@ async function testePremium(browser) {
   await v.seite.goto(`http://127.0.0.1:${PORT}/index.html?test#arena`);
   await v.seite.waitForSelector('.screen.arena .knoten');
   await v.seite.click('.haupt-kopf [data-aktion="shop"]');
-  await v.seite.waitForSelector('.screen.sa-screen .sa-bereich[data-bereich="shop"]');
+  // G-002 (Sammlung B): der Shop oeffnet als Blatt ueber der Sammlung
+  await v.seite.waitForSelector('.sa-blatt .sa-bereich[data-bereich="shop"]');
   const sh = await v.seite.evaluate(() => ({ bereich: document.querySelector('.screen.sa-screen').dataset.bereich,
     sichtbar: !document.querySelector('.sa-bereich[data-bereich="shop"]').hidden,
     verlauf: getComputedStyle(document.querySelector('.sa-screen .haupt-kopf [data-aktion="verlauf"]')).display }));
   pruefe('Shop oeffnet die Sammlung beim Bereich Shop, Verlauf-Knopf im Kopf von Ich', sh.bereich === 'shop' && sh.sichtbar && sh.verlauf !== 'none', JSON.stringify(sh));
+  await v.seite.click('.sa-blatt .sheet-knoepfe button');
+  await v.seite.waitForSelector('.sa-blatt', { state: 'detached', timeout: 8000 }).catch(() => {});
   await v.seite.click('.sa-screen .haupt-kopf [data-aktion="verlauf"]');
   await v.seite.waitForSelector('.screen.vl-screen, .screen.verlauf', { timeout: 8000 }).catch(() => {});
   pruefe('Verlauf aus Ich erreichbar', await v.seite.evaluate(() => location.hash.startsWith('#verlauf')));

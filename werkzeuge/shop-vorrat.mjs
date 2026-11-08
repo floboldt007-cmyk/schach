@@ -115,7 +115,8 @@ const SCHMUCK = {
 const SETS = [
   { id: 'lampion', name: 'Lampion', seltenheit: 'Episch', rund: true, text: 'Gedrechselte Laternen mit warmem Glimmen in der Mitte.',
     w: { h: '#FFF3D6', m: '#FFC86B', d: '#E0782E', l: '#5C2408', deko: '#B5461B', akz: '#FFE9A8' },
-    b: { h: '#4B3C8F', m: '#2B2160', d: '#130E33', l: '#A894FF', deko: '#FF9E5E', akz: '#FFB36B' } },
+    // dunkle Seite dunkler (G-002, Ausreisser 07.11.: lila Figuren mit zu wenig Kontrast)
+    b: { h: '#382B70', m: '#1E1648', d: '#0B0722', l: '#A894FF', deko: '#FF9E5E', akz: '#FFB36B' } },
   { id: 'sternwarte', name: 'Sternwarte', seltenheit: 'Episch', rund: true, text: 'Mondsilber gegen Nachthimmel, mit goldenen Funkelsternen.',
     w: { h: '#FFFFFF', m: '#E3E8F4', d: '#A9B4CF', l: '#27304F', deko: '#C79A2E' },
     b: { h: '#33437A', m: '#1C2650', d: '#0A1030', l: '#9FB2E8', deko: '#F2C84B' } },
@@ -124,7 +125,8 @@ const SETS = [
     b: { h: '#6A5A4A', m: '#3E332A', d: '#1E1813', l: '#C9A27A', deko: '#D9A65C' } },
   { id: 'kristall', name: 'Kristall', seltenheit: 'Episch', rund: false, text: 'Geschliffene Figuren aus Eis und Amethyst.',
     w: { f: '#DDF6FF', l: '#1F4F6E', deko: '#5FAFD6' },
-    b: { f: '#4A2A78', l: '#C8A8FF', deko: '#B98AFF' } },
+    // dunkle Seite dunkler (G-002, Ausreisser 07.11.)
+    b: { f: '#2C1650', l: '#C8A8FF', deko: '#B98AFF' } },
   { id: 'origami', name: 'Origami', seltenheit: 'Episch', rund: false, text: 'Gefaltetes Papier, hell und kohlegrau, mit rotem Siegel.',
     w: { f: '#FBF6EC', l: '#3A3328', deko: '#B9AA8E', akz: '#E2553B' },
     b: { f: '#34363D', l: '#B9BCC7', deko: '#6A6D76', akz: '#E2553B' } },
@@ -173,9 +175,12 @@ const BRETTER = [
     muster: () => je([...HELL, ...DUNKEL], (x, y) => `<path d="M${x} ${y + 3}q5.5 2 11 0M${x} ${y + 7.5}q5.5-2 11 0" fill="none" stroke="rgba(90,52,24,.16)" stroke-width=".5"/>`) },
   { id: 'kupfer', name: 'Kupfer', seltenheit: 'Selten', hell: '#F2D3B8', dunkel: '#B4643A', rand: '#4A2412', text: 'Gehaemmertes Kupfer mit Nieten im Rahmen.',
     muster: () => '', rahmen: () => '<g fill="#D99A6C">' + [[3, 3], [97, 3], [3, 97], [97, 97], [50, 3], [50, 97], [3, 50], [97, 50]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.3"/>`).join('') + '</g>' },
-  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#DDE9F2', dunkel: '#263A5C', rand: '#0D1626', text: 'Nordlicht zieht als Schleier ueber das Brett.',
+  // G-002 (Ausreisser 07.11.): Felder waren unter dem Schleier schlecht zu unterscheiden; jetzt hellere helle und dunklere
+  // dunkle Felder, das Nordlicht liegt nur im Rahmen und als feine Kante um das Feld
+  { id: 'aurora', name: 'Aurora', seltenheit: 'Episch', hell: '#E8F1F7', dunkel: '#1E3050', rand: '#0D1626', text: 'Nordlicht zieht als Schleier um das Brett.',
     muster: () => '', defs: '<linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3BE8B0"/><stop offset=".5" stop-color="#4C6EF5"/><stop offset="1" stop-color="#B565F0"/></linearGradient>',
-    ueber: '<rect x="6" y="6" width="88" height="88" fill="url(#a)" opacity=".38"/>' },
+    ueber: '<path d="M0 6a6 6 0 0 1 6-6h88a6 6 0 0 1 6 6v88a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6zM6 6v88h88V6z" fill="url(#a)" fill-rule="evenodd" opacity=".85"/>'
+      + '<rect x="6" y="6" width="88" height="88" fill="none" stroke="url(#a)" stroke-width=".8"/>' },
   { id: 'kronsaal', name: 'Kronsaal', seltenheit: 'Exklusiv', hell: '#F3E3B6', dunkel: '#7A1F2E', rand: '#B8862B', text: 'Sonder-Brett: Weinrot und Gold mit Kronen im Feld.',
     muster: () => je(DUNKEL, (x, y) => `<path d="M${x + 3} ${y + 7.5}V${y + 4}l1.5 1.5 1-2 1 2 1.5-1.5v3.5z" fill="rgba(232,190,90,.5)"/>`),
     rahmen: () => '<rect x="3.2" y="3.2" width="93.6" height="93.6" rx="4" fill="none" stroke="#F3D27A" stroke-width=".9"/><rect x="6" y="6" width="88" height="88" fill="none" stroke="#5A3A08" stroke-width=".7"/>' },
@@ -195,7 +200,8 @@ function STERN5(r) {
   return `M${p.map(pt).join('L')}Z`;
 }
 const KRONE_KLEIN = 'M-7 4v-8l3.5 4L0-6l3.5 4L7-4v8z';
-const KONFETTI_FARBEN = ['#FF5D73', '#FFC233', '#4C6EF5', '#2BC48A', '#B565F0'];
+// G-002 (Ausreisser 07.11.: zu bunt): nur Gold- und Akzentfarben der App
+const KONFETTI_FARBEN = ['#FFC233', '#E9B949', '#C9461F', '#F3D27A', '#A97B1F'];
 const EFFEKTE = [
   { id: 'wellenring', name: 'Wellenring', art: 'zug', seltenheit: 'Häufig', text: 'Zwei Ringe laufen vom Zielfeld nach aussen.',
     svg: () => '<g fill="none" stroke="#5B8CFF" stroke-width="3">' + [0, -0.7].map((s) => `<circle cx="50" cy="50" r="6">${anim('r', '6;42', 1.4, s)}${anim('opacity', '1;0', 1.4, s)}</circle>`).join('') + '</g><circle cx="50" cy="50" r="4" fill="#5B8CFF"/>' },
@@ -206,7 +212,7 @@ const EFFEKTE = [
   { id: 'pixelstaub', name: 'Pixelstaub', art: 'zug', seltenheit: 'Häufig', text: 'Kleine Pixel stieben auseinander.',
     svg: () => '<g stroke="#2B1A66" stroke-width=".8">' + Array.from({ length: 10 }, (_, i) => { const w = (i * 2 * Math.PI) / 10, dx = n(34 * Math.cos(w)), dy = n(34 * Math.sin(w)), s = -i * 0.11;
       return `<rect x="47.5" y="47.5" width="5" height="5" fill="${i % 2 ? '#5BD1FF' : '#9C6BFF'}">${bewegt('translate', `0 0;${dx} ${dy}`, 1.2, s)}${anim('opacity', '1;0', 1.2, s)}</rect>`; }).join('') + '</g>' },
-  { id: 'konfetti', name: 'Konfetti', art: 'sieg', seltenheit: 'Selten', text: 'Bunte Schnipsel regnen ueber das Brett.',
+  { id: 'konfetti', name: 'Konfetti', art: 'sieg', seltenheit: 'Selten', text: 'Goldene Schnipsel regnen ueber das Brett.',
     svg: () => '<g stroke="#22223A" stroke-width=".6">' + Array.from({ length: 14 }, (_, i) => { const x = 6 + ((i * 37) % 88), d = 1.8 + (i % 4) * 0.35, s = -((i * 0.53) % d);
       return `<rect x="${x}" y="-4" width="4" height="8" rx="1" fill="${KONFETTI_FARBEN[i % 5]}">${bewegt('translate', `0 -12;${(i % 3) * 6 - 6} 112`, d, s)}${bewegt('rotate', `0 ${x + 2} 0;${i % 2 ? 360 : -360} ${x + 2} 0`, d, s, true)}</rect>`; }).join('') + '</g>' },
   { id: 'lichtsaeule', name: 'Lichtsäule', art: 'sieg', seltenheit: 'Selten', text: 'Ein Lichtstrahl steigt ueber dem Koenig auf.',

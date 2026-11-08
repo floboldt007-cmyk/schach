@@ -44,6 +44,7 @@ registriereTexte('p-sammlung', {
     'liga.1': 'Bronze', 'liga.2': 'Silber', 'liga.3': 'Gold', 'liga.4': 'Platin', 'liga.5': 'Diamant', 'liga.6': 'Meister',
     // Shop (Editionen): ruhige Fakten, kein Druck (tests/fairness.test.mjs)
     'shop.name': 'Shop', 'shop.anmelden': 'Editionen gibt es mit Konto und ab 18 Jahren.', 'shop.zumKonto': 'Zum Konto',
+    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Kaufen mit Konto, ab 18 Jahren',
     'shop.laedt': 'Editionen werden geladen …', 'shop.alterFrage': 'Editionen kaufen kann, wer 18 oder älter ist.',
     'shop.alterJa': 'Ich bin 18 oder älter', 'shop.fehler': 'Das hat gerade nicht geklappt. Versuch es später noch einmal.',
     'shop.vorbereitung': 'Die erste Edition ist in Vorbereitung. Sie erscheint hier mit Datum, bevor der Verkauf beginnt.',
@@ -120,6 +121,7 @@ registriereTexte('p-sammlung', {
     'figur.K': 'King', 'figur.Q': 'Queen', 'figur.R': 'Rook', 'figur.B': 'Bishop', 'figur.N': 'Knight', 'figur.P': 'Pawn',
     'liga.1': 'Bronze', 'liga.2': 'Silver', 'liga.3': 'Gold', 'liga.4': 'Platinum', 'liga.5': 'Diamond', 'liga.6': 'Master',
     'shop.name': 'Shop', 'shop.anmelden': 'Editions need an account and are for ages 18 and up.', 'shop.zumKonto': 'Go to account',
+    'shop.gastUeber': 'Edition', 'shop.gastKlein': 'Buy with an account, ages 18 and up',
     'shop.laedt': 'Loading editions …', 'shop.alterFrage': 'Editions can be bought by people aged 18 or older.',
     'shop.alterJa': 'I am 18 or older', 'shop.fehler': 'That did not work just now. Please try again later.',
     'shop.vorbereitung': 'The first edition is being prepared. It will appear here with a date before sales begin.',

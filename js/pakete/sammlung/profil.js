@@ -24,7 +24,7 @@ import { meinName, sitzung, userId } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
 import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
-import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText } from '../../ui/visitenkarte.js';
+import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText, LIGA_NAMEN } from '../../ui/visitenkarte.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
 import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
@@ -116,7 +116,11 @@ export function titelVonId(id) {
 
 // Banner der Sammlung: Start immer, Gold-Erfolge und Saison-Banner (vom Server); nichts davon ist kaeuflich
 function bannerWeg(id) {
-  if (id.startsWith('saison-')) return KT('b.weg.saison');
+  if (id.startsWith('saison-')) {
+    const stufe = LIGA_NAMEN[id.slice(7)];
+    // in die unterste Stufe steigt niemand auf: dort gibt es das Banner nur fuer Platz 1
+    return !stufe ? KT('b.weg.saison') : KT(stufe === 'bauer' ? 'b.weg.stufeUnten' : 'b.weg.stufe', { stufe: KT('liga.' + stufe) });
+  }
   const f = FAMILIEN.find((x) => x.gold.banner === id);
   return f ? KT('b.weg.erfolg', { name: KT('fam.' + f.id) }) : '';
 }
