@@ -300,7 +300,9 @@ grant execute on function public.konto_loeschen() to authenticated;
 -- ---------------------------------------------------------------------------
 -- Online-Partien und Fehlversuche beim Beitreten (online-schema.sql), das Abo (abo-schema.sql), die Werkstatt
 -- (werkstatt-schema.sql: Altersangabe, Besitz, Reservierungen, Zustimmungen, Sonderstuecke), die Liga mit Kronen
--- (kronen-schema.sql), die Visitenkarte mit Erfolgen und Talern (karte-schema.sql) und das Anmeldeprotokoll
+-- (kronen-schema.sql), die Visitenkarte mit Erfolgen und Talern (karte-schema.sql), seit 09.11.2026 auch die
+-- Stripe-Ereignisse zum Abo, Editions-Ereignisse, Frag den Coach (coach-schema.sql), der Schulmodus (schule-schema.sql)
+-- und das Anmeldeprotokoll
 -- kommen nur dazu, wenn es sie gibt: Die Datei laeuft so in jeder Reihenfolge und auch ohne diese Schemata. Fehlt
 -- eines, stehen die Schluessel trotzdem da (null bzw. leere Liste). Vorher wird aufgeraeumt (alte Zaehler, und mit dem
 -- Online-Schema online_aufraeumen: alte Einladungen, haengende Partien, alte Fehlversuche), damit die Auskunft nichts
@@ -317,8 +319,12 @@ declare
   versuche jsonb := '[]'::jsonb;
   protokoll jsonb := '[]'::jsonb;
   abo jsonb := null;
+  abo_ereignisse jsonb := '[]'::jsonb;
   werkstatt jsonb := jsonb_build_object('altersangabe', null, 'besitz', '[]'::jsonb, 'reservierungen', '[]'::jsonb,
-    'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb);
+    'edition_zustimmungen', '[]'::jsonb, 'sonderstuecke', '[]'::jsonb, 'edition_ereignisse', '[]'::jsonb);
+  coach jsonb := jsonb_build_object('nutzung', '[]'::jsonb);
+  schule jsonb := jsonb_build_object('geleitete_klassen', '[]'::jsonb, 'mitgliedschaften', '[]'::jsonb,
+    'beitrittsversuche', '[]'::jsonb);
   freunde jsonb := jsonb_build_object('freundschaften', '[]'::jsonb, 'einladung', null, 'wochenpunkte', '[]'::jsonb);
   kronen jsonb := jsonb_build_object('stand', null, 'buchungen', '[]'::jsonb, 'gruppen', '[]'::jsonb,
     'belohnungen', '[]'::jsonb, 'suche', null, 'ki_belege', '[]'::jsonb);
@@ -352,6 +358,36 @@ begin
   if to_regclass('public.abos') is not null then
     execute 'select to_jsonb(a) from public.abos a where a.user_id = $1' into abo using uid;
   end if;
+  -- Stripe-Ereignisse zum Abo: mit Konto-Verweis oder ueber die eigene Kundennummer (frueh eingegangene haben noch keinen)
+  if to_regclass('public.stripe_ereignisse') is not null then
+    execute 'select coalesce(jsonb_agg(to_jsonb(e) order by e.erstellt, e.id), ''[]''::jsonb)
+             from public.stripe_ereignisse e where e.user_id = $1
+               or e.kunde_id in (select a.kunde_id from public.abos a where a.user_id = $1 and a.kunde_id is not null)'
+      into abo_ereignisse using uid;
+  end if;
+  -- Frag den Coach (coach-schema.sql): Zahl der Fragen je Tag
+  if to_regclass('public.coach_nutzung') is not null then
+    execute 'select jsonb_build_object(''nutzung'', coalesce((select jsonb_agg(jsonb_build_object(''tag'', c.tag,
+               ''anzahl'', c.anzahl) order by c.tag) from public.coach_nutzung c where c.user_id = $1), ''[]''::jsonb))'
+      into coach using uid;
+  end if;
+  -- Schulmodus (schule-schema.sql): selbst geleitete Klassen mit ihren Aufgaben (ohne die Mitglieder, das sind andere
+  -- Personen), die eigenen Mitgliedschaften mit dem eigenen Fortschritt und die Fehlversuche beim Beitreten
+  if to_regclass('public.klassen') is not null then
+    execute 'select jsonb_build_object(
+               ''geleitete_klassen'', coalesce((select jsonb_agg((to_jsonb(k) - ''leitung'') || jsonb_build_object(''aufgaben'',
+                   coalesce((select jsonb_agg(to_jsonb(a) - ''klasse'' order by a.erstellt_am)
+                     from public.klassen_aufgaben a where a.klasse = k.id), ''[]''::jsonb)) order by k.erstellt_am)
+                 from public.klassen k where k.leitung = $1), ''[]''::jsonb),
+               ''mitgliedschaften'', coalesce((select jsonb_agg(jsonb_build_object(''klasse'', k.name,
+                   ''anzeigename'', m.anzeigename, ''beigetreten_am'', m.beigetreten_am,
+                   ''fortschritt'', (select to_jsonb(f) - ''mitglied'' - ''klasse'' from public.klassen_fortschritt f
+                     where f.mitglied = m.id)) order by m.beigetreten_am)
+                 from public.klassen_mitglieder m join public.klassen k on k.id = m.klasse where m.user_id = $1), ''[]''::jsonb),
+               ''beitrittsversuche'', coalesce((select jsonb_agg(jsonb_build_object(''tag'', v.tag, ''anzahl'', v.anzahl)
+                   order by v.tag) from public.schule_versuche v where v.user_id = $1), ''[]''::jsonb))'
+      into schule using uid;
+  end if;
   -- Werkstatt: alles zum Konto, auch Zahlungs- und Sitzungskennungen (es sind die eigenen Daten)
   if to_regclass('public.besitz') is not null then
     execute 'select jsonb_build_object(
@@ -363,7 +399,10 @@ begin
                ''edition_zustimmungen'', coalesce((select jsonb_agg(to_jsonb(z) order by z.zeitpunkt)
                  from public.edition_zustimmungen z where z.user_id = $1), ''[]''::jsonb),
                ''sonderstuecke'', coalesce((select jsonb_agg(to_jsonb(s) order by s.stueck_id)
-                 from public.sonderstuecke s where s.user_id = $1), ''[]''::jsonb))'
+                 from public.sonderstuecke s where s.user_id = $1), ''[]''::jsonb),
+               ''edition_ereignisse'', coalesce((select jsonb_agg(to_jsonb(e) order by e.erstellt, e.id)
+                 from public.edition_ereignisse e join public.reservierungen r on r.id = e.reservierung_id
+                 where r.user_id = $1), ''[]''::jsonb))'
       into werkstatt using uid;
   end if;
   -- Freunde (freunde-schema.sql): Freundschaften und Anfragen mit dem Benutzernamen der anderen Seite, der eigene
@@ -472,6 +511,12 @@ begin
        from public.daten_zaehler z where z.user_id = uid),
       '[]'::jsonb),
     'abo', abo,
+    -- Stripe-Ereignisse zum Abo (leer ohne abo-schema.sql)
+    'abo_ereignisse', abo_ereignisse,
+    -- Frag den Coach: Fragen je Tag (leer ohne coach-schema.sql)
+    'coach', coach,
+    -- Schulmodus: geleitete Klassen mit Aufgaben, eigene Mitgliedschaften mit Fortschritt, Beitrittsversuche
+    'schule', schule,
     -- Anmeldeprotokoll von Supabase (Zeitpunkt, Art, IP); null, wenn die Funktion es nicht lesen darf
     'anmeldeprotokoll', protokoll
   ) || werkstatt;
