@@ -2159,7 +2159,7 @@ async function testeSpielFundament(browser) {
       && document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter === 'arena'));
     // Premium-Umbau U2 (PLAN 2.10): Training ist Kern-Screen (Huelle); seit Etappe A erreicht man es ueber die Startseite
     await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     await seite.locator('[data-aktion="heim-raetsel"]').click();
     await seite.waitForSelector('.screen.training-screen');
     pruefe('Leiste: Training ueber die Startseite, Reiter Start bleibt aktiv', await seite.evaluate(() => !document.querySelector('.reiter-leiste').hidden
