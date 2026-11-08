@@ -76,6 +76,7 @@ registriereTexte('heim', {
     naechsterGegner: 'Nächster Gegner auf deiner Leiter',
     leiter: 'Deine Leiter',
     spielen: 'Spielen',
+    elo: 'Elo {elo}',
     naechstes: 'Als Nächstes',
     'liga.platz': 'Platz {platz} von {n}',
     'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
@@ -121,6 +122,7 @@ registriereTexte('heim', {
     naechsterGegner: 'Next opponent on your ladder',
     leiter: 'Your ladder',
     spielen: 'Play',
+    elo: 'Elo {elo}',
     naechstes: 'Up next',
     'liga.platz': 'Place {platz} of {n}',
     'liga.ohneGruppe': 'Play a game to join your group',
@@ -135,7 +137,7 @@ registriereTexte('heim', {
 });
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'person']];
+const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'personen']];
 const BEWERTUNG_TIEFE = 10;
 
 // Punkte und Stufe der laufenden Saison; jeder Fehler ergibt Holz und 0. vorhanden: es gibt einen Liga-Stand
@@ -234,7 +236,8 @@ function buehneGegner(bot) {
   return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(bot.avatar)}" alt="" draggable="false"></div>
     <div class="heim-buehne-text">
       <small class="heim-ueber">${esc(t('heim.naechsterGegner'))}</small>
-      <h2 class="heim-gegner">${esc(bot.name)} <span class="zahl">· ${esc(zahl(bot.elo))}</span></h2>
+      <div class="heim-name"><h2 class="heim-gegner">${esc(bot.name)}</h2>
+        <small class="heim-elo zahl">${esc(t('heim.elo', { elo: zahl(bot.elo) }))}</small></div>
       ${bot.kurz ? `<p class="heim-spielweise">${esc(bot.kurz)}</p>` : ''}
       <button class="heim-los dr" type="button" data-aktion="heim-spielen" data-bot="${esc(bot.id)}">${icon('play')}<span>${esc(t('heim.spielen'))}</span></button>
     </div>`;

@@ -551,7 +551,11 @@ export function zeige(root, params, app) {
       const fMax = Math.max(...ys);
       // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
       const oben = kn * 0.65 + (kompakt ? 70 : 118);
-      const unten = kn * 0.61 + (kompakt ? 26 : 36);
+      // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
+      // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
+      // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
+      const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
+      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
@@ -605,6 +609,9 @@ export function zeige(root, params, app) {
     return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
   }
   function stelleFlo([x, y]) {
+    // ganz in der Karte (Handy kompakt: am Start ragte die Figur links ueber den Rand)
+    const r = (floFigur.offsetWidth || 36) / 2 + 8;
+    if (masse.w > 2 * r) x = Math.min(masse.w - r, Math.max(r, x));
     floFigur.style.left = x.toFixed(1) + 'px';
     floFigur.style.top = y.toFixed(1) + 'px';
   }

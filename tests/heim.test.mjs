@@ -201,7 +201,7 @@ async function testeBuehne(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => ({ sichtbar: !!document.querySelector('.heim-leiter')?.offsetParent,
-      elo: parseInt(document.querySelector('.heim-gegner .zahl')?.textContent.replace(/\D/g, ''), 10),
+      elo: parseInt(document.querySelector('.heim-elo')?.textContent.replace(/\D/g, ''), 10),
       bots: [...document.querySelectorAll('.heim-leiter-bot')].map((x) => ({ name: x.querySelector('b')?.textContent.trim(),
         elo: parseInt(x.querySelector('small')?.textContent.replace(/\D/g, ''), 10), bild: !!x.querySelector('img')?.getAttribute('src') })),
       portraet: document.querySelector('.heim-portraet')?.getBoundingClientRect().width }));
@@ -224,11 +224,17 @@ async function testeBuehne(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => ({ art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
-      name: document.querySelector('.heim-gegner')?.textContent.trim(), bild: !!document.querySelector('.heim-portraet img'),
+      name: document.querySelector('.heim-gegner')?.textContent.trim(), elo: document.querySelector('.heim-elo')?.textContent.trim(),
+      nameZeilen: (() => { const h = document.querySelector('.heim-gegner'); return h ? Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)) : 0; })(),
+      bild: !!document.querySelector('.heim-portraet img'),
       satz: document.querySelector('.heim-spielweise')?.textContent.trim(), bot: document.querySelector('[data-aktion="heim-spielen"]')?.dataset.bot,
-      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes') }));
-    pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && /·\s*\d/.test(b.name || '')
+      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes'),
+      symbol: document.querySelector('[data-weg="zuzweit"] .heim-symbol svg')?.querySelectorAll('circle').length }));
+    pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && !!b.name && /^Elo \d/.test(b.elo || '')
       && !!b.satz && !!b.bot && !b.brett, JSON.stringify(b));
+    // Handy-Runde 08.11.2026 (Befunde 10 und 11): Elo als eigene Zeile, der Name allein bricht nicht um; Zu zweit zeigt zwei Personen
+    pruefe('Handy: Name ohne Elo in einer Zeile ("Vogelscheuche Willi"), Elo darunter', !/\d/.test(b.name || '') && b.nameZeilen === 1, JSON.stringify(b));
+    pruefe('Kachel Zu zweit: Symbol mit zwei Personen', b.symbol === 2, String(b.symbol));
     pruefe('keine Partie: anderer Titel', b.titel && b.titel !== 'Deine Partie wartet.', b.titel);
     pruefe('ohne Liga-Stand: "Als Naechstes" fehlt ganz (keine leeren Platzhalter)', !b.naechstes);
     await seite.locator('[data-aktion="heim-spielen"]').click();
@@ -498,7 +504,7 @@ async function testeGroessen(browser, heute) {
           if (g && g.length) return g.map(rgb).sort((a, b) => lum(b) - lum(a))[0];
           const c = rgb(cs.backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
         const aus = [];
-        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
+        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-elo, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
           if (!el.textContent.trim() || el.closest('[hidden]')) continue;
           const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
           const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
