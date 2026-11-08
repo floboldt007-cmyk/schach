@@ -57,7 +57,7 @@ export const DE = {
   'karte.erreicht': '{stufe} erreicht',
   'karte.weg': '{punkte} von {schwelle} Punkten bis {stufe}',
   'karte.oben': '{punkte} Punkte · {stufe}, die höchste Liga',
-  'karte.regel': 'Sieg 3 Punkte · Remis 1 Punkt · dein bestes Ergebnis je Bot zählt',
+  'karte.regel': 'Jede wertende Partie zählt: Ein Sieg bringt Liga-Punkte, eine Niederlage kostet welche. Stärkere Bots und genaues Spiel zählen mit.',
   'karte.club': '{siege} von {n} Bots geschlagen',
   // Bilanz im Panel
   'bilanz.text': 'Du gegen {name}: {siege} · {remis} · {niederlagen}',
@@ -165,7 +165,7 @@ export const EN = {
   'karte.erreicht': '{stufe} reached',
   'karte.weg': '{punkte} of {schwelle} points to {stufe}',
   'karte.oben': '{punkte} points · {stufe}, the top league',
-  'karte.regel': 'Win 3 points · draw 1 point · your best result per bot counts',
+  'karte.regel': 'Every rated game counts: a win earns league points, a loss costs some. Stronger bots and accurate play count too.',
   'karte.club': '{siege} of {n} bots beaten',
   'bilanz.text': 'You vs. {name}: {siege} · {remis} · {niederlagen}',
   'bilanz.siege.eins': '{n} win',

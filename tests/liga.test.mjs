@@ -459,7 +459,7 @@ async function browserTeil(browser, start) {
         assert.match(await page.locator('.liga-titel').innerText(), /^Liga Holz$/);
         assert.match(await page.locator('.liga-unter').innerText(), /^Saison 1 · bis 10\. Januar$/);
         assert.match(await page.locator('.liga-weg').innerText(), /von 100 Punkten bis Bronze/);
-        assert.match(await page.locator('.liga-regel').innerText(), /Sieg 3 Punkte · Remis 1 Punkt/);
+        assert.match(await page.locator('.liga-regel').innerText(), /Ein Sieg bringt Liga-Punkte, eine Niederlage kostet welche/);
         assert.ok(!/noch \d+ Tag/.test(await page.locator('.liga-karte').innerText()), 'kein Countdown');
         assert.ok(await page.locator('.liga-karte .liga-wertung').isHidden(), 'Wertung erst in den Details');
         assert.match(await page.locator('.liga-karte .liga-wertung').textContent(), /Springerklasse.*1190.*111.*vorläufig/);

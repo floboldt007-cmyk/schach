@@ -22,6 +22,7 @@ import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
 import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
 import { holeStand, suche as kronenSuche, BOT_ERSATZ_MS } from '../kronen.js';
+import { klang, zugKlangName } from '../sounds.js';
 
 // Bedenkzeiten der Gegnersuche (dieselben Kennungen wie die Lobby, js/pakete/lobby/index.js ZEITEN)
 const SUCH_ZEITEN = Object.freeze([
@@ -79,6 +80,9 @@ export function zeige(root, params, app) {
   let strittigFaellig = false;
   let profil = null, uhrTimer = null, zeitPruefung = 0;
   let kartenDaten = null, kartenPartie = null;
+  // Klang: gehoert = Halbzuege, die schon geklungen haben; uhrGewarnt = Uhr-Warnung dieser Partie gespielt
+  let gehoert = 0, uhrGewarnt = false;
+  const ton = name => { try { klang.spiele(name); } catch (e) { /* Klang ist nie wichtig genug fuer einen Fehler */ } };
   const melde = text => { if (!weg) { status.textContent = text; status.hidden = !text; } };
   const fehler = e => { melde(e?.message || O('fehler')); };
   const oeffne = partie => { if (!weg) { online.vergissEinladung(); app.gehe('online', { partieId: partie.id }); } };
@@ -187,7 +191,7 @@ export function zeige(root, params, app) {
     const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__onlineBotMs) ? window.__onlineBotMs : BOT_ERSATZ_MS;
     suche = kronenSuche(zeit.id, {
       warteMs,
-      beiTreffer: (partieId) => { suche = null; if (!weg) app.gehe('online', { partieId }); },
+      beiTreffer: (partieId) => { suche = null; if (!weg) { ton('start'); app.gehe('online', { partieId }); } },
       // nach 10 s ohne Menschen ein KI-Gegner in passender Staerke, wie in der Lobby (dort steht die Wahl des Bots)
       beiBot: async ({ kiRef }) => {
         suche = null;
@@ -238,7 +242,9 @@ export function zeige(root, params, app) {
       sperre(); return;
     }
     const neuerWiderspruch = !r.passt && !widerspruch;
+    const alt = p;
     p = neu; chess = r.chess; widerspruch = !r.passt;
+    klingt(alt);
     if (neuerWiderspruch && p.status === 'laeuft') { melde(O('stellungFehler')); strittigFaellig = true; }
     if (p.status === 'offen') {
       inhalt.innerHTML = `<section class="on-karte on-einladung flaeche"><h3>${esc(O('einladungTitel'))}</h3><p class="on-code zahl">${esc(p.code)}</p>
@@ -261,6 +267,22 @@ export function zeige(root, params, app) {
     }
     sperre();
     meldeStrittigVonSelbst();
+  }
+  // Klaenge wie in der Partie (js/sounds.js zugKlangName): der Zug des Freundes, sobald er ankommt (der eigene klang
+  // schon in beiZug); das Ende einmal beim Wechsel von "laeuft" auf "beendet" (Sieg, Niederlage, Remis; strittig und
+  // nicht nachvollziehbar bleiben still); Start, wenn der Freund der offenen Einladung beitritt. Beim Laden still.
+  function klingt(alt) {
+    const n = chess.history().length;
+    if (!alt || alt.id !== p.id) { gehoert = n; return; }
+    if (alt.status === 'offen' && p.status === 'laeuft') ton('start');
+    if (n > gehoert && p.status === 'laeuft' && !widerspruch) {
+      const m = chess.history({ verbose: true }).at(-1);
+      ton(zugKlangName(m, chess.inCheck()));
+    }
+    gehoert = n;
+    if (alt.status !== 'laeuft' || p.status !== 'beendet' || !p.ergebnis || p.grund === 'strittig') return;
+    if (widerspruch || !endePasst(p, chess)) return;
+    try { klang.ende(p.ergebnis === '1/2-1/2' ? null : (p.ergebnis === '1-0' ? 'w' : 'b') === online.meineFarbe(p)); } catch (e) { /* still */ }
   }
   // Etappe 4b: die Visitenkarten beider Spieler (js/karte.js, nur fuer die Teilnehmer dieser Partie) bringen Banner, Name
   // und Titel in die Spielerleisten; bis sie da sind (oder ohne Antwort) bleibt es bei "Ich" und "Freund"
@@ -296,6 +318,10 @@ export function zeige(root, params, app) {
     for (const el of inhalt.querySelectorAll('.uhr')) {
       const f = el.dataset.farbe;
       el.textContent = uhrText(rest(f)); el.classList.toggle('laeuft', p.status === 'laeuft' && p.am_zug === f && online.zuegeListe(p).length >= 2);
+    }
+    // Uhr-Warnung einmal je Partie, sobald die eigene laufende Uhr unter 20 s faellt (wie in der Partie)
+    if (!uhrGewarnt && p.status === 'laeuft' && online.binAmZug(p) && online.zuegeListe(p).length >= 2 && rest(online.meineFarbe(p)) < 20000) {
+      uhrGewarnt = true; ton('uhr-warnung');
     }
     if (blockiert || busy || widerspruch || p.status !== 'laeuft' || Date.now() < zeitPruefung) return;
     const halbzuege = online.zuegeListe(p).length;
@@ -349,6 +375,9 @@ export function zeige(root, params, app) {
     try { m = chess.move({ from: von, to: nach, promotion: umwandlung || 'q' }); } catch (e) { return false; }
     // Nur der Zug geht an den Server; ob er gilt und wie die Partie danach steht, entscheidet er (Etappe 1a)
     const daten = { uci: m.lan };
+    // der eigene Zug klingt sofort; endet die Partie mit ihm, kommt nur der Ende-Klang, sobald der Server bestaetigt
+    gehoert = chess.history().length;
+    if (!chess.isGameOver()) ton(zugKlangName(m, chess.inCheck()));
     queueMicrotask(() => { if (!weg) { zeichne(); aktion(() => online.sendeZug(p.id, daten)); } });
     // Sofort sperren, damit auch im selben Ereignis kein zweiter Zug durchkommt.
     brett.erlaubeZuege(null);

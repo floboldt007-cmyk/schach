@@ -37,9 +37,9 @@ registriereTexte('p-sammlung', {
     'profil.aendern': 'Profilbild ändern', 'profil.figur': 'Figur', 'profil.rahmen': 'Rahmen',
     'profil.dabeiSeit': 'Dabei seit {datum}', 'profil.kreatur': 'Kreatur', 'profil.grund': 'Hintergrund', 'grund.standard': 'Standard', 'grund.weg': 'Erreiche {welt}', 'kreatur.weg': '{welt}: {stand}',
     'kreatur.karo': 'Karo', 'kreatur.stups': 'Stups', 'kreatur.zinni': 'Zinni', 'kreatur.klippa': 'Klippa', 'kreatur.glimm': 'Glimm', 'kreatur.kronli': 'Kronli',
-    'profil.vitrine': 'Vitrine', 'profil.vitrineHilfe': 'Drei Errungenschaften, die du beim Partiebeginn zeigst. Antippen zum Wählen.',
-    'profil.leer': 'Erfolg zeigen', 'profil.waehle': 'Errungenschaft wählen', 'profil.leeren': 'Platz leeren', 'profil.fertig': 'Fertig',
-    'profil.keine': 'Noch keine Errungenschaft. Gewinn deine erste Partie, dann füllt sich die Vitrine.',
+    'profil.vitrine': 'Vitrine', 'profil.vitrineHilfe': 'Drei Erfolge, die du beim Partiebeginn zeigst. Antippen zum Wählen.',
+    'profil.leer': 'Erfolg zeigen', 'profil.waehle': 'Erfolg wählen', 'profil.leeren': 'Platz leeren', 'profil.fertig': 'Fertig',
+    'profil.keine': 'Noch kein Erfolg. Gewinn deine erste Partie, dann füllt sich die Vitrine.',
     'figur.K': 'König', 'figur.Q': 'Dame', 'figur.R': 'Turm', 'figur.B': 'Läufer', 'figur.N': 'Springer', 'figur.P': 'Bauer',
     'liga.1': 'Bronze', 'liga.2': 'Silber', 'liga.3': 'Gold', 'liga.4': 'Platin', 'liga.5': 'Diamant', 'liga.6': 'Meister',
     // Shop (Editionen): ruhige Fakten, kein Druck (tests/fairness.test.mjs)
