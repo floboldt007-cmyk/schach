@@ -2634,7 +2634,7 @@ async function testeSpielFundament(browser) {
       const sl = document.querySelector('.ort-spieler-leiste');
       const ak = document.querySelector('.ort-aktionen');
       return { spieler: sl.hidden && getComputedStyle(sl).display === 'none', aktionen: ak.hidden && getComputedStyle(ak).display === 'none',
-        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button').length,
+        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button:not(.sk-pfeil)').length,
         klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
     });
     // Seit 30.10. abends ohne "Zuruecknehmen": drei Grundknoepfe (Hinweis, Drehen, Aufgeben)
@@ -2960,7 +2960,7 @@ async function testeViewport(browser, vp) {
   const brett = await h.innen('.screen.partie .brett');
   pruefe('Brett quadratisch und groß', brett && Math.abs(brett.w - brett.h) < 2 && brett.w >= Math.min(brett.iw, brett.ih) * 0.5, JSON.stringify(brett));
   const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf, .screen.partie .kopf .icon-knopf')]
-    .map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
+    .filter((k) => k.getClientRects().length).map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
   pruefe('Tippflächen >= 44 px', knoepfe);
   const textUeber = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf span')]
     .filter((s) => s.scrollWidth > s.clientWidth + 1 || s.getBoundingClientRect().right > s.closest('.knopf').getBoundingClientRect().right + 1).map((s) => s.textContent));

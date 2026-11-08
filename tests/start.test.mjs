@@ -555,10 +555,15 @@ async function browserTeil(browser) {
     const sk = document.querySelector('.st-klasse').getBoundingClientRect();
     const br = document.querySelector('.st-sockel').getBoundingClientRect();
     return { unten: document.querySelectorAll('[data-st="ueberspringen"]').length, oben: document.querySelectorAll('[data-st="raus"]').length,
-      unterBrett: sk.top >= br.bottom - 0.5 };
+      unterBrett: sk.top >= br.bottom - 0.5 || sk.left >= br.right - 0.5 };
   });
   pruefe('Seite 1: nur "Einfuehrung ueberspringen" oben, kein zweiter Knopf unten', eins.unten === 0 && eins.oben === 1, eins);
-  pruefe('Seite 1: Schild unter dem Brett, nicht auf den Figuren', eins.unterBrett, eins);
+  pruefe('Seite 1: Schild unter oder neben dem Brett, nicht auf den Figuren', eins.unterBrett, eins);
+  // weiter zur Frage (frueher ueber "Ueberspringen" unten): dreimal Weiter
+  for (const naechste of ['w2', 'w3', 'frage']) {
+    await seite.locator('[data-st="weiter"]').click();
+    await warteSeite(seite, naechste);
+  }
 
   // ---------- Regel-Hilfe ----------
   gruppe = 'Regel-Hilfe';
