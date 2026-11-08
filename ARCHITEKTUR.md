@@ -1599,7 +1599,7 @@ Stand; bei Aufstieg laeuft er ueber, der Ring schliesst sich, die Zahl klappt um
 `data-fertig`; Antippen zeigt die Aufschluesselung), `arena:kopf` 5 (Chip `.fk-chip[role=button]` "Level n" mit
 Mini-Balken, oeffnet per Antippen, Enter oder Leertaste den Funken-Spiegel; so hoch wie die Chips Sterne und Pokal, die
 Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; **Form nach Platz**: ganz, solange die
-Chip-Reihe ihn ohne Ueberlauf fasst, sonst und auf dem Handy bis 600 px nur die Zahl im Emblem, `.fk-schmal`; gemessen nach
+Chip-Reihe ihn ohne Ueberlauf fasst, sonst und auf dem Handy bis 600 px "Lv" und die Zahl im Emblem (`.fk-chip-kurz`, Flo 08.11.2026), `.fk-schmal`; gemessen nach
 dem Einhaengen und per ResizeObserver am Kopf, die Form wechselt im naechsten Bild; so ist er im iPad-Hochformat 744 bis
 834 px ganz sichtbar), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
 z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20

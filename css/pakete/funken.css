@@ -65,8 +65,11 @@
    Emblem (SPIELKONZEPT 3.1 "kleine Zahl im Emblem", wie in Abrechnung, Verlauf und Spieler-Leiste; Wort und Titel stehen
    im aria-label). Die Tippflaeche bleibt ueber ::before mindestens 44 px breit. */
 .screen .haupt-kopf .chip.fk-chip.fk-schmal { gap: 5px; padding: 0 6px 0 8px; min-width: 41px; justify-content: center; }
-/* das Funken-Symbol bleibt vor der Zahl, sonst stand dort eine unerklaerte "1" (Handy-Runde 08.11.2026, Befund 7) */
+/* das Funken-Symbol bleibt vor der Zahl, sonst stand dort eine unerklaerte "1" (Handy-Runde 08.11.2026, Befund 7);
+   dazu sichtbar "Lv" vor dem Emblem (Flo 08.11.2026: "Lv 1" statt nur "1") */
 .fk-chip.fk-schmal .fk-chip-wort, .fk-chip.fk-schmal .fk-mini { display: none; }
+.fk-chip-kurz { display: none; }
+.fk-chip.fk-schmal .fk-chip-kurz { display: inline; margin-right: 4px; }
 .fk-chip.fk-schmal .fk-chip-text b { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px;
   padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); font-size: 14px; line-height: 1; }
 /* Level an Flos Namen: das Wort steht dabei (Handy-Runde K, 08.11.2026: eine nackte "1" erklaerte sich nicht) */
@@ -138,6 +141,7 @@
 @media (min-width: 1100px) and (max-width: 1399px) {
   .screen .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .chip.fk-chip { gap: 0; padding: 0 6px; min-width: 41px; justify-content: center; }
   .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip :is(.fk-ico, .fk-chip-wort, .fk-mini) { display: none; }
+  .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip .fk-chip-kurz { display: inline; margin-right: 4px; }
   .haupt-kopf.mit-premium.mit-reiter:has(.kopf-chips > :nth-child(3)) .fk-chip .fk-chip-text b { display: inline-grid; place-items: center;
     box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte);
     color: var(--auf-tinte); font-size: 14px; line-height: 1; }

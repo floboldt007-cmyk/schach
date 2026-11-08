@@ -444,7 +444,7 @@ Alle drei Juroren warnen vor der Zahlenflut (237 Ideen bringen über zehn Zahlen
 
 | Sichtbar im Kopf der Arena | Was es misst | Kann es sinken? |
 |---|---|---|
-| **Level** (kleine Zahl im Emblem, mit Titel) | wie weit: Erfahrung aus Funken | nie |
+| **Level** („Lv“ und kleine Zahl im Emblem, mit Titel; Flo 08.11.2026: „Lv 1“ statt nur „1“) | wie weit: Erfahrung aus Funken | nie |
 | **Arena-Wertung** (≈ 1184 ± 60, im Rahmen der Spielklasse) | wie stark: ehrliche Elo-Wertung gegen die geeichten Bots | ja, die Zahl darf schwanken; die angezeigte Spielklasse sinkt nie |
 | **Serie** (♙ 12) | wie treu: Schachtage in Serie (Tage mit Tageswerk, einzelne freie Tage unterbrechen nicht) | nie zurück auf 0, sie ruht höchstens |
 

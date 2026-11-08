@@ -1336,7 +1336,9 @@ async function testeBrowser(browser) {
     const form = (s) => s.evaluate(() => {
       const c = document.querySelector('.haupt-kopf .fk-chip');
       const w = c && c.querySelector('.fk-chip-wort');
-      return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none' };
+      const kz = c && c.querySelector('.fk-chip-kurz');
+      return { schmal: !!c && c.classList.contains('fk-schmal'), wort: !!w && getComputedStyle(w).display !== 'none',
+        kurz: !!kz && getComputedStyle(kz).display !== 'none' && kz.textContent.trim() === 'Lv' };
     });
     const passt = (m) => m.rolle && m.ganz && m.tipp.w >= 44 && m.tipp.h >= 44 && m.oben === 1 && Math.abs(m.sicht.h - m.sterne.h) <= 1;
     // frisch geladen im Hochformat des iPad mini (744 x 1133): ganz sichtbar. Seit der Zahlenruhe (Flo 23.10.) tritt
@@ -1371,8 +1373,9 @@ async function testeBrowser(browser) {
     const zurueck = { ...(await s.evaluate(kopfChipMass)), ...(await form(s)) };
     pruefe('iPad hoch (744, 768, 810, 834 px): Level-Chip ganz sichtbar, Tippfläche mindestens 44 x 44, eine Oberkante, so hoch wie Sterne',
       [744, 768, 810, 834].every((w) => passt(mass[w])), mass);
-    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 600 px schmal (nur die Zahl, ganz sichtbar), zurück auf 1180 px wieder ganz',
-      passt(breit) && !breit.schmal && breit.wort && mass[600].schmal && !mass[600].wort && passt(mass[600]) && passt(zurueck) && !zurueck.schmal && zurueck.wort,
+    pruefe('Form folgt dem Platz: 1180 px ganz („Level n“ mit Balken), 600 px schmal („Lv n“, Flo 08.11.2026, ganz sichtbar), zurück auf 1180 px wieder ganz',
+      passt(breit) && !breit.schmal && breit.wort && !breit.kurz && mass[600].schmal && !mass[600].wort && mass[600].kurz && passt(mass[600])
+      && passt(zurueck) && !zurueck.schmal && zurueck.wort && !zurueck.kurz,
     { breit, m600: mass[600], zurueck });
     pruefe('Größenwechsel: keine Konsolenfehler (keine ResizeObserver-Schleife)', f.length === 0, f.join(' | '));
     await k.close();
