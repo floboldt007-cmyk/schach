@@ -1015,13 +1015,24 @@ async function testeBrowser(browser) {
     && Math.abs(kopfMass.sicht.h - kopfMass.sterne.h) <= 1 && kopfMass.oben === 1 && kopfMass.ganz && kopfMass.knoepfeKopf, kopfMass);
   const tipp = await seite.evaluate(() => Math.round(document.querySelector('.fk-heute .fk-zuenden').getBoundingClientRect().height));
   pruefe('Tippfläche „Zünden“ mindestens 44 px', tipp >= 44, tipp);
-  pruefe('arena:panel-bot: Faktor vor der Partie („Einstieg · Funken × 1“)', (await seite.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Einstieg · Funken × 1');
   await bild(seite, 'arena-frisch');
   await h.tippe('.fk-chip');
   await seite.waitForSelector('.fk-spiegel-ort .fk-spiegel');
   await warte(500);
   const vorn = await seite.locator('.fk-spiegel').innerText();
-  pruefe('Funken-Spiegel vorn nur Level, Balken, heute und als Nächstes; Tagesbogen und Rückenwind zugeklappt', /Level 1 · Funke/.test(vorn)
+  // T-3: Rueckenwind mit "Zuenden" und der Faktor gegen den naechsten Gegner stehen sichtbar im Spiegel (vorher Heute-Karte und Panel)
+  const jetzt = await seite.evaluate(() => {
+    const j = document.querySelector('.fk-spiegel .fk-s-jetzt');
+    const z = j && j.querySelector('.fk-heute .fk-zuenden');
+    const r = z && z.getBoundingClientRect();
+    return { da: !!j, vorMehr: !!(j && j.compareDocumentPosition(document.querySelector('.fk-spiegel .fk-s-mehr')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      text: j ? j.querySelector('.fk-h-text')?.textContent.trim() : '', zuenden: r ? Math.round(r.height) : 0,
+      gegner: j ? j.querySelector('.fk-s-gegner')?.textContent.trim() : '', faktor: j ? j.querySelector('.fk-faktor')?.textContent.trim() : '' };
+  });
+  pruefe('Funken-Spiegel: Rückenwind-Zeile mit „Zünden“ (mindestens 44 px) vor „Mehr“, Faktor gegen den nächsten Gegner („Einstieg · Funken × 1“)',
+    jetzt.da && jetzt.vorMehr && /^Neu für dich: eine Rückenwind-Karte\./.test(jetzt.text) && jetzt.zuenden >= 44
+    && /^Nächster Gegner: .*Willi/.test(jetzt.gegner) && jetzt.faktor === 'Einstieg · Funken × 1', jetzt);
+  pruefe('Funken-Spiegel vorn Level, Balken, heute und als Nächstes; Tagesbogen und Rückenwind-Stand zugeklappt', /Level 1 · Funke/.test(vorn)
     && /Level 5: Titel Glut/.test(vorn) && /Mehr zu deinen Funken/.test(vorn) && !/Heute zählen noch/.test(vorn) && !/Rückenwind-Karte im Fach/.test(vorn), vorn.slice(0, 300));
   await seite.locator('.fk-spiegel .fk-s-mehr summary').click();
   const spiegel = await seite.locator('.fk-spiegel').innerText();
@@ -1198,14 +1209,22 @@ async function testeBrowser(browser) {
     await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
-    await alteOrte(s);
-    pruefe('Lukas nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
+    // T-3: der Faktor steht nur noch im Spiegel und gilt dem naechsten Gegner (Maxi); fuer Lukas bleibt die Rechnung
+    pruefe('Lukas nach 12 Siegen: Rechnung „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', await s.evaluate(() => {
+      const f = window.__funken.R.faktorVon(-400, 12);
+      return f.name === 'Training' && f.faktor === 0.5;
+    }));
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
-    await alteOrte(s);
-    pruefe('Maxi: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
+    await hh.tippe('.fk-chip');
+    await s.waitForSelector('.fk-spiegel-ort .fk-spiegel');
+    pruefe('Maxi als nächster Gegner: im Spiegel „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', await s.evaluate(() =>
+      document.querySelector('.fk-spiegel .fk-s-gegner')?.textContent.trim().startsWith('Nächster Gegner: Maxi')
+      && document.querySelector('.fk-spiegel .fk-s-faktor .fk-faktor')?.textContent.trim() === 'Herausforderung · Funken × 1,25'));
+    await s.locator('.fk-spiegel .fk-schliessen').click();
+    await s.waitForFunction(() => !document.querySelector('.fk-spiegel-ort'), null, { timeout: 2000 }).catch(() => {});
     // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });

@@ -14,7 +14,7 @@
 //             Reihenfolge 10 (vorn) nur fuer die Fairness-Sperre und die einmaligen Momente (logik.js VORN), alles
 //             andere auf 60 (hinten), also hinter den Begruessungen anderer Pakete (Funken: Level-Gruss auf 40). Beide
 //             rechnen dieselbe Wahl (einmal je Kontext) und liefern sie nie beide.
-//             arena:panel-bot (20, Erzfeind-Zeile .gd-erzfeind), ergebnis:karte (50, .gd-revanche-zeile mit Knopf,
+//             arena:steckbrief (20, Erzfeind-Zeile .gd-erzfeind im Steckbrief des Bots), ergebnis:karte (50, .gd-revanche-zeile mit Knopf,
 //             data-art="knopf": eine reine Knopf-Zeile, kein Inhalt; Vorschlag fuer den Host in ARCHITEKTUR.md)
 // Ereignisse: partie:beendet (synchron: Erzfeind-Feier vor den Feier-Zeilen des Overlays), partie:analysiert (genialer
 //             Zug und Patzer des Bots aus der Spielanalyse merken), app:screen und speicher:zurueckgesetzt (gemerkte
@@ -187,7 +187,8 @@ function registriere() {
     }, 'Begruessung ' + platz), { reihenfolge: L.REIHENFOLGE[platz], paket: L.PAKET });
   }
 
-  anbieten('arena:panel-bot', (k) => sicher(() => {
+  // Erzfeind-Zeile im Steckbrief des Bots (T-3; vorher arena:panel-bot, seit Variante A ohne Host)
+  anbieten('arena:steckbrief', (k) => sicher(() => {
     if (!k || !k.bot || k.bot.stufe == null) return null;
     const e = L.erzfeind(k.fortschritt || ladeFortschritt());
     return e && e.botId === k.bot.id ? erzfeindZeile(e) : null;

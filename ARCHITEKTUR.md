@@ -499,7 +499,7 @@ export function setzeFehlerMelder(fn)            // fn(ort, paket, fehler) bekom
 | `arena:kopf` | DOM | `arena.js`, in `.kopf-chips` nach den zwei Chips | `{ app, fortschritt }` | 2A Rang 10 · 1D Kette 20 · 1C Training 30 |
 | `arena:modus` | DOM | `arena.js`, `.ort-arena-modus` zwischen Kopf und `.inhalt` | `{ app, fortschritt }` | Lobby (Umschalter Welten \| Online, nur Labor) 1 |
 | `arena:panel-oben` | DOM | **seit Variante A (08.11.2026) ohne Host** (das Panel zeigt oben nur noch die Nachlese); vorher `arena.js` `zeigeDetail()`, oben in `.detail` | `{ app, bot, fortschritt }` | W0 Nachlese 5 · 1D Willkommen 10 · 1D Heute-Karte 20 · 2D Sicherungs-Tipp 90 |
-| `arena:panel-bot` | DOM | **seit Variante A (08.11.2026) ohne Host**; vorher `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | 2A Bilanz 10 · 2B Geheimnis und Erzfeind 20 |
+| `arena:panel-bot` | DOM | **seit Variante A (08.11.2026) ohne Host**; vorher `arena.js` `zeigeDetail()`, nach `.ziel-sterne` | `{ app, bot, fortschritt }` | Liga-Bilanz 15 · Punkte-Tafel 40 (beide seit T-3 im Liga-Reiter Bots: Bilanz ueber der Tafel des Bots); Erzfeind und Faktor sind umgezogen (`arena:steckbrief`, Funken-Spiegel); das Bot-Geheimnis (2B) ist nur geplant |
 | `arena:start` | Aufruf | `arena.js`, einmal nach dem ersten `layout()` | `{ app, s, karte, scrolleZu(botId, sanft), neuId }` | 2D Kamerafahrt 10 |
 | `arena:karte-boss` | DOM | `arena.js` (U5), `.ort-karte-boss` am Zelt des Wochen-Boss auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | S1-6 Boss |
 | `arena:karte-event` | DOM | `arena.js` (U5), `.ort-karte-event` an der Fahne (Burgturm) auf der Weltkarte | `{ app, fortschritt, karte, scrolleZu }` | Events |
@@ -1022,8 +1022,9 @@ fuelle(...) -> { anzahl, verlasse(), fertig, wartend }
 ```
 | Ort | Art | Host (Datei, Behaelter) | Kontext | Reihenfolge (Paket) |
 |---|---|---|---|---|
-| `heim:naechstes` | DOM | `heim.js`: `.heim-naechstes > .heim-liste` unter den Wegen (Variante A, 08.11.2026), danach die Liga-Zeile; ohne Zeile `hidden`. Sichtbar je nach Hoehe 1 bis 3 Zeilen (`css/heim.css`) | `{ app, tag, zeile({ symbol, titel, text, label, beiTipp, paket }) }` | Klassen-Aufgabe 5 · Serie 10 · Tagesraetsel 20 · Kartei 25 |
-| `arena:heute` | DOM | **seit Variante A (08.11.2026) ohne Host**, Anbieter bleiben angemeldet. Vorher `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Klassen-Aufgabe 35 (B3) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Ueberhol-Kompass 60 (S3-7) · Neu fuer dich 70 (S2-7) |
+| `heim:naechstes` | DOM | `heim.js`: `.heim-naechstes > .heim-liste` unter den Wegen (Variante A, 08.11.2026), danach die Liga-Zeile; ohne Zeile `hidden`. Sichtbar je nach Hoehe 1 bis 3 Zeilen (`css/heim.css`) | `{ app, tag, zeile({ symbol, titel, text, label, beiTipp, paket }) }` | Klassen-Aufgabe 5 · Wochen-Boss 6 · Funken-Wochenende 7 (Boss, `data-art="event"`) · Neu fuer dich 8 (T-3, 09.11.2026) · Serie 10 · Tagesraetsel 20 · Kartei 25; die Reihenfolge ist die Prioritaet, wenn nur 1 bis 3 Zeilen passen |
+| `arena:steckbrief` | DOM | `arena.js` `zeigeSteckbrief()` (T-3, 09.11.2026): Blatt `.sheet-karte.steckbrief` beim Antippen des Gegnerbilds (`button.av[data-aktion="steckbrief"]`), `.ort-steckbrief` nach den Merkmal-Kacheln; ohne Zeilen `hidden`, beim Schliessen abgeraeumt | `{ app, bot, fortschritt }` | Erzfeind 20 (gedaechtnis) |
+| `arena:heute` | DOM | **seit Variante A (08.11.2026) ohne Host**, Anbieter bleiben angemeldet. Vorher `arena.js` `zeigeDetail()`: `section.heute-karte` direkt nach `.ort-panel-oben`, Kopf „Heute · Donnerstag“, Zeilen in `.ort-heute`; ohne Zeilen `hidden` | `{ app, bot, fortschritt, tag, woche }` | Serie 10 (S1-4) · Tagesraetsel 20 (S1-5) · Boss 30 (S1-6) · Klassen-Aufgabe 35 (B3) · Tagesaufgaben 40 (S1-4) · Rueckenwind 50 (S1-1) · Neu fuer dich 70 (S2-7); der Ueberhol-Kompass 60 (S3-7) ist nur geplant, es gibt keinen Anbieter. Boss und Neu fuer dich stehen seit T-3 auch unter `heim:naechstes` |
 | `partie:gegner-leiste` | DOM | `partie.js` beim Start: `.ort-gegner-leiste`, quer erstes Kind von `.botbox`, hoch erstes Kind von `.botleiste-hoch` als eigene Zeile ueber Avatar und Namen, hoechstens 16 px hoch (w0plus-a-fix: vorher in `.info`, das auf dem Handy mit der Sprechblase verschwand); wandert beim Drehen mit, `data-lage`; ohne Anbieter `hidden`, mit Anbieter `.partie.mit-gegner-leiste` | `{ app, buehne, bot, farbe, modus, boss, lage() }` | Lebensleiste (S1-6) |
 | `partie:spieler-leiste` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-spieler-leiste` an Flos Namen, quer in `.spieler-quer` nach dem Namensblock, hoch in `.spieler-hoch` nach `.name` (wandert mit, `data-lage`); eine Zeile, nicht hoeher als der Name; ohne Anbieter `hidden` | wie `partie:gegner-leiste` | Flamme des Siegeslaufs (Paket `siegeslauf`) · Level-Emblem (S1-1) |
 | `partie:aktionen` | DOM | w0plus-a-fix (Schub 2b): `partie.js` beim Start: `.ort-aktionen` (`display: contents`) in `.spielknoepfe` vor „Aufgeben“; hoechstens 2 Knoepfe (weitere: console.warn, entfernt), die Reihe bekommt je Knopf eine Spalte (`data-aktionen`, engere Beschriftung); Klicks binden die Pakete selbst (auch ein `data-aktion` im Paket loest nie eine Aktion des Hosts aus); ohne Anbieter `hidden`, Reihe unveraendert | `{ app, buehne, bot, farbe, modus, boss }` | Emote-Rad und Schnell-Chat (Paket `ausdruck`) |
@@ -1602,8 +1603,9 @@ Mini-Balken, oeffnet per Antippen, Enter oder Leertaste den Funken-Spiegel; so h
 Tippflaeche reicht per `::before` 3 px darueber und darunter, also >= 44 px; **Form nach Platz**: ganz, solange die
 Chip-Reihe ihn ohne Ueberlauf fasst, sonst und auf dem Handy bis 600 px "Lv" und die Zahl im Emblem (`.fk-chip-kurz`, Flo 08.11.2026), `.fk-schmal`; gemessen nach
 dem Einhaengen und per ResizeObserver am Kopf, die Form wechselt im naechsten Bild; so ist er im iPad-Hochformat 744 bis
-834 px ganz sichtbar), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden"), `arena:panel-bot` 30 (`.fk-faktor`,
-z. B. "Herausforderung · Funken × 1,25"), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
+834 px ganz sichtbar), `arena:heute` 50 (`.fk-heute`: Rueckenwind und "Zünden", seit Variante A ohne Host; seit T-3 steht dieselbe Zeile mit
+"Zünden" und der Faktor gegen den naechsten Gegner (`.fk-faktor`, z. B. "Herausforderung · Funken × 1,25") sichtbar im
+Funken-Spiegel, `.fk-s-jetzt`), `verlauf:seite` 5 (`.fk-karte` "Level und Funken"), `partie:spieler-leiste` 20
 (`.fk-spieler`), `spielplan:tage` 20 (`.fk-spielplan`), `partie:begruessung?` 40 (Anlass `funken-level`, einmal nach einem
 Aufstieg). Funkenlinie `.fk-linie` in `buehne.platz('funkenlinie')`, nur mit der Anzeige "Funkenlinie" (Standard aus).
 
@@ -2621,7 +2623,7 @@ ein). Test: `tests/gedaechtnis.test.mjs`, dazu die Zeilen „Bot-Ton“ in `test
   `return karteOrt.anzahl - karteOrtEl.querySelectorAll(':scope > [data-art="knopf"]').length;` (fertige Patches fuer den
   heutigen Stand und fuer U7 liegen beim Integrations-Patch). Inhalt (Lernpunkt, Abrechnung) verdraengt den Tipp weiter.
   `tests/gedaechtnis.test.mjs` prueft beide Staende: ohne Regel kein Tipp neben der Revanche, mit Regel genau einer.
-- **Erzfeind (Ort `arena:panel-bot`, Reihenfolge 20):** `.gd-erzfeind` „Dein Erzfeind · 1 Sieg · 4 Niederlagen“ beim
+- **Erzfeind (Ort `arena:steckbrief`, Reihenfolge 20; bis T-3 `arena:panel-bot`):** `.gd-erzfeind` „Dein Erzfeind · 1 Sieg · 4 Niederlagen“ beim
   Leiter-Bot mit den meisten Niederlagen von Flo laut Fortschritt (wertende Partien, fuer immer gezaehlt), mindestens 3
   und mehr Niederlagen als Siege; Gleichstand: groessere Differenz, dann die hoehere Stufe aus `BOTS` (nicht die
   Reihenfolge der Schluessel im Fortschritt); Schluessel, die kein Leiter-Bot sind, zaehlen nicht. **Feier:** Bei `partie:beendet`
