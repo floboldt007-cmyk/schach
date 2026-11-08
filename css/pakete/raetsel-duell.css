@@ -41,8 +41,9 @@
 
 /* ---------- Duell ---------- */
 .rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 170px), 640px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.rd-leiste { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; width: var(--rd-b); min-width: 0; }
-.rd-seite { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche);
+/* beide Spieler-Kaesten gleich hoch, Zahlen und Balken unten auf einer Linie, auch wenn "KI-Gegner · 1200" umbricht */
+.rd-leiste { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 10px; width: var(--rd-b); min-width: 0; }
+.rd-seite { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0; padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche);
   box-shadow: var(--s1), var(--kante); }
 .rd-seite[data-wer="gegner"] { text-align: right; }
 /* bricht um statt abzuschneiden: "KI-Gegner · 1200" muss auf dem Handy ganz lesbar bleiben (Kennzeichnung) */
@@ -56,7 +57,7 @@
 .rd-balken > i { display: block; height: 100%; background: var(--gut); transform: scaleX(0); transform-origin: 0 50%;
   transition: transform var(--d-m, .3s) var(--sanft, ease); }
 .rd-seite[data-wer="gegner"] .rd-balken > i { background: var(--akzent); transform-origin: 100% 50%; }
-.rd-uhr { min-width: 84px; padding: 8px 12px; border-radius: var(--r-m); background: var(--tinte); color: var(--auf-tinte); text-align: center;
+.rd-uhr { align-self: center; min-width: 84px; padding: 8px 12px; border-radius: var(--r-m); background: var(--tinte); color: var(--auf-tinte); text-align: center;
   font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: var(--s1); }
 .raetsel-duell[data-phase="zeit_um"] .rd-uhr, .raetsel-duell[data-phase="vorlauf"] .rd-uhr { background: var(--flaeche-2); color: var(--text-2); }
 
@@ -66,9 +67,11 @@
 
 .rd-zeile { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; width: var(--rd-b); min-height: 44px; margin: 0; font-size: 14.5px; color: var(--text-2); }
 .rd-nr { font-weight: 800; color: var(--text); }
-.rd-meldung { margin-left: auto; font-weight: 750; color: var(--text); }
-.rd-meldung[data-art="richtig"] { color: var(--text); box-shadow: inset 0 -3px 0 var(--gut); }
-.rd-meldung[data-art="falsch"] { color: var(--text); box-shadow: inset 0 -3px 0 var(--warn); }
+/* Rueckmeldung als Schild mit Farbpunkt, nicht unterstrichen (sah aus wie ein Link) */
+.rd-meldung { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-weight: 750; color: var(--text); }
+.rd-meldung:is([data-art="richtig"], [data-art="falsch"]) { padding: 4px 12px; border-radius: var(--r-pille); background: var(--flaeche-2); }
+.rd-meldung:is([data-art="richtig"], [data-art="falsch"])::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gut); }
+.rd-meldung[data-art="falsch"]::before { background: var(--warn); }
 
 /* ---------- Ende ---------- */
 .rd-ende { align-items: center; text-align: center; padding: 28px 18px; }
@@ -78,6 +81,8 @@
 .rd-ende h2 { font-size: 26px; }
 .rd-ende-stand { margin: 0; font-size: 18px; font-weight: 800; color: var(--text); }
 .rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
+/* beide Knoepfe mittig beschriftet (vorher stand "Nochmal" links, "Zur Lobby" mittig) */
+.rd-knoepfe .knopf, .rd-karte .rd-knoepfe .knopf.primaer { justify-content: center; padding: 0 12px; }
 
 /* Handy quer und kleine Hoehe: Leiste kompakter */
 @container rd (max-height: 560px) {
