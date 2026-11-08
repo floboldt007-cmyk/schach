@@ -230,7 +230,7 @@ const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 999
 const ERFINDER_ZEILEN = ['erfinder-banner-blatt-0', 'erfinder-titel', 'erfinder-figuren-blaupause', 'erfinder-finisher-signatur']
   .map((stueck_id) => ({ stueck_id }));
 
-async function seite(browser, { erfinder = true, merker = true, groesse = { width: 1180, height: 820 }, hash = '#training', gesehenVor = null } = {}) {
+async function seite(browser, { erfinder = true, merker = true, groesse = { width: 1180, height: 820 }, hash = '#training', gesehen = null, uhr = null } = {}) {
   const k = await browser.newContext({ viewport: groesse, serviceWorkers: 'block', timezoneId: 'Europe/Berlin' });
   const s = await k.newPage();
   const fehlerListe = [];
@@ -238,22 +238,19 @@ async function seite(browser, { erfinder = true, merker = true, groesse = { widt
   s.on('console', (m) => { if (m.type() === 'error') fehlerListe.push(m.text()); });
   await s.route(SUPA + '/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify(r.request().url().includes('/rest/v1/sonderstuecke') && erfinder ? ERFINDER_ZEILEN : []) }));
-  await s.addInitScript(({ sitzung, erfinder, merker, uid, gesehenVor }) => {
+  await s.addInitScript(({ sitzung, erfinder, merker, uid, gesehen }) => {
     try {
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder && merker) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
-      // Willkommenswoche: der Tag des ersten Willkommens, gesehenVor Tage vor heute (Ortszeit)
-      if (gesehenVor != null) {
-        const d = new Date();
-        d.setDate(d.getDate() - gesehenVor);
-        const z2 = (n) => String(n).padStart(2, '0');
-        localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ gesehen: `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}` }));
-      }
+      // Willkommenswoche: der Tag des ersten Willkommens als fester Schluessel, passend zur festen Uhr (uhr)
+      if (gesehen) localStorage.setItem('schach-arena:v1:modul:start', JSON.stringify({ gesehen }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, erfinder, merker, uid: UID, gesehenVor });
+  }, { sitzung: SITZUNG, erfinder, merker, uid: UID, gesehen });
+  // feste Uhr: der App-Tag beginnt erst um 4:00 (js/tag.js), ein Lauf kurz nach Mitternacht darf nichts kippen
+  if (uhr) await s.clock.setFixedTime(uhr);
   await s.goto(BASIS + hash);
   await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen'), null, { timeout: 30000 });
   await warte(600);
@@ -584,9 +581,12 @@ async function gratisTeil(browser) {
 }
 
 // Willkommenswoche (07.11.2026): ein neuer Spieler (erstes Willkommen heute) spielt eine Woche lang alles, die
-// Trainer-Lektionen tragen weiter ihre Marke; zehn Tage spaeter sind die Schloesser zurueck und die Zeile weg
+// Trainer-Lektionen tragen weiter ihre Marke; zehn Tage spaeter sind die Schloesser zurueck und die Zeile weg.
+// Feste Uhr (09.11.2026): am 08.11. kurz nach Mitternacht lief der Test mit dem Kalenderdatum rot, obwohl die App
+// vor 4:00 noch den Vortag zaehlt und den Willkommenstag selbst genauso schreibt.
+const MITTAG = new Date('2026-11-09T12:00:00+01:00');
 async function willkommenTeil(browser) {
-  const p = await seite(browser, { erfinder: false, gesehenVor: 0, hash: '#lernen' });
+  const p = await seite(browser, { erfinder: false, gesehen: '2026-11-09', hash: '#lernen', uhr: MITTAG });
   await p.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const r = await p.s.evaluate(() => ({
     zeile: document.querySelector('.ms-bereiche + .ms-willkommen')?.innerText || '',
@@ -603,12 +603,21 @@ async function willkommenTeil(browser) {
   pruefe('Willkommenswoche: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
   await p.k.close();
 
-  const q = await seite(browser, { erfinder: false, gesehenVor: 10, hash: '#lernen' });
+  const q = await seite(browser, { erfinder: false, gesehen: '2026-10-30', hash: '#lernen', uhr: MITTAG });
   await q.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
   const r2 = await q.s.evaluate(() => ({ zeile: document.querySelectorAll('.ms-willkommen').length,
     gesperrt: document.querySelectorAll('.ms-lektion[data-gesperrt]').length }));
   pruefe('Nach der Woche: Schlösser zurück (13 Mattbilder), keine Willkommenszeile', r2.zeile === 0 && r2.gesperrt === 13, r2);
   await q.k.close();
+
+  // Nachtfall: 09.11. um 00:53 ist fuer die App noch der 08.11.; ein an diesem App-Tag geschriebenes Willkommen oeffnet die Woche
+  const n = await seite(browser, { erfinder: false, gesehen: '2026-11-08', hash: '#lernen', uhr: new Date('2026-11-09T00:53:00+01:00') });
+  await n.s.waitForSelector('.ms-screen .ms-lektion', { timeout: 15000 }).catch(() => {});
+  const r3 = await n.s.evaluate(() => ({ zeile: document.querySelector('.ms-bereiche + .ms-willkommen')?.innerText || '',
+    gesperrt: document.querySelectorAll('.ms-lektion[data-gesperrt]').length }));
+  pruefe('Willkommenswoche nach Mitternacht (vor 4 Uhr zählt der Vortag): Zeile da, keine Schlösser',
+    /Willkommenswoche: Bis .+ ist alles offen/.test(r3.zeile) && r3.gesperrt === 0, r3);
+  await n.k.close();
 }
 
 // Flo 31.10.2026 abends ("beim Handy habe ich die Lektionen immer noch nicht"): auf einem neuen Geraet angemeldet, noch
