@@ -116,7 +116,7 @@ async function nodeTeil() {
   gruppe = 'Aufgaben';
   const auf = L.alsAufgaben(so);
   pruefe('ids tragen Tag und Teil', auf.map((a) => a.id).join() === '2026-10-25:0,2026-10-25:1' && L.teileId('2026-10-25:1').index === 1 && L.teileId('quatsch') === null);
-  pruefe('Text am Sonntag: "Teil 1 von 2 · Rätsel 7 · Sonntag"', /^Teil 1 von 2 · Rätsel 7 · Sonntag · Matt in 1$/.test(auf[0].text), auf[0].text);
+  pruefe('Text am Sonntag ohne "Teil 1 von 2" (steht schon oben im Bildschirm): "Rätsel 7 · Sonntag · Matt in 1"', /^Rätsel 7 · Sonntag · Matt in 1$/.test(auf[0].text), auf[0].text);
   const mi = L.alsAufgaben(L.tagDaten(D, '2026-10-21'))[0];
   pruefe('ohne eigenen Titel (der Bildschirm zeigt "Finde den besten Zug" und die Seite am Zug selbst)', !('titel' in mi) && !('titel' in auf[0]));
   pruefe('nur offene Teile, wenn gewuenscht', L.alsAufgaben(so, { nur: [1] }).map((a) => a.id).join() === '2026-10-25:1');
@@ -266,7 +266,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -570,7 +570,7 @@ async function browserTeil(browser) {
   await bereite(zw.seite, { modul: { v: 1, tage: { [heute]: { e: [[0, 1]] } } } });
   await zw.seite.waitForSelector('.tr-karte .tr-los', { timeout: 10000 });
   const zp = await zw.seite.locator('.tr-karte p').textContent();
-  pruefe('Karte zeigt den offenen Teil 2 (nicht den gelösten Teil 1)', zp === 'Weiß am Zug, Matt in 2, Teil 2 von 2. Für alle dasselbe.', zp);
+  pruefe('Karte zeigt den offenen Teil 2 (nicht den gelösten Teil 1)', zp === 'Weiß am Zug: Matt in 2. Aufgabe 2 von 2. Für alle dasselbe.', zp);
   await zw.seite.locator('.tr-karte .tr-los').click();
   await warteZustand(zw.seite, 'z.offen && z.phase === "flo"');
   const zr = await zw.seite.evaluate(() => window.__raetsel.zustand());

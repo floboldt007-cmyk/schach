@@ -483,11 +483,11 @@ async function testeWege(browser, heute) {
   await seite.goto(BASIS + '#heim');
   await istScreen(seite, 'heim');
   await seite.locator('[data-aktion="heim-online"]').click();
-  pruefe('Online ohne Freischaltung (kein Labor) oeffnet das Link-Duell', await istScreen(seite, 'online'));
+  pruefe('Online ohne Freischaltung oeffnet die Online-Seite (zwei Tueren)', await istScreen(seite, 'online'));
   pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
   await kontext.close();
 
-  // Mit Freischaltung (Erfinder, wie tests/lobby.test.mjs): Online-Lobby
+  // Mit Freischaltung (Erfinder): seit Flo 08.11.2026 dieselbe Online-Seite fuer alle, keine Labor-Lobby mehr
   const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
   const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
   const token = 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x';
@@ -507,7 +507,7 @@ async function testeWege(browser, heute) {
   await s2.goto(BASIS + '#heim');
   await istScreen(s2, 'heim');
   await s2.locator('[data-aktion="heim-online"]').click();
-  pruefe('Online mit Freischaltung oeffnet die Online-Lobby', await istScreen(s2, 'lobby'));
+  pruefe('Online mit Freischaltung oeffnet ebenfalls die Online-Seite', await istScreen(s2, 'online'));
   await k2.close();
 }
 

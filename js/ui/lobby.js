@@ -1,14 +1,14 @@
 // Screen "lobby" (Paket lobby, Flo 01.11.2026): die Online-Lobby als Vorschau im Labor. Oben der Umschalter Welten | Online
 // (wie auf der Startseite), darunter "Schnell eine Partie" mit Bedenkzeiten (Blitz, Schnellschach, Klassisch), Gewertet
-// oder Freundschaft und "Gegner suchen"; dann die eigenen Wertungen (geschaetzt), die Online-Liga (Beispiel-Tabelle) und
-// weitere Spielarten (Gegen Freunde und Raetsel-Duell echt, Turniere bald). Die Gegnersuche zeigt den Radar und endet
+// oder Freundschaft und "Gegner suchen"; dann die eigenen Wertungen (geschaetzt) und weitere Spielarten (die
+// Beispiel-Liga mit erfundenen Namen ist seit Flo 08.11.2026 weg, die echte Liga steht im Liga-Reiter) (Gegen Freunde und Raetsel-Duell echt, Turniere bald). Die Gegnersuche zeigt den Radar und endet
 // ehrlich mit einem Bot in passender Staerke und derselben Uhr (echte Partie). params: { zeit } (z. B. '3+2').
 // Nur im Labor (js/labor.js laborFrei); sonst still zur Arena wie ein fehlender Paket-Screen.
 //
 //   zeige(root, params, app) -> { verlasse() }
 // DOM: section.screen.lobby > header.haupt-kopf, .lb-rumpf > .lb-modus, .lb-spielen (.lb-zeiten > .lb-gruppe >
 // button.lb-zeit[data-zeit][aria-checked], .segment[data-seg="lb-wertung"], button.lb-suchen), .lb-wertungen
-// (.lb-wert[data-art]), .lb-liga (ol.lb-tabelle > li[data-zone][data-du]), .lb-mehr (button.lb-modus-karte[data-ziel]);
+// (.lb-wert[data-art]), .lb-mehr (button.lb-modus-karte[data-ziel]);
 // waehrend der Suche .lb-suche[data-phase="suche"|"gefunden"|"anmelden"|"fehler"]. Optik: css/pakete/lobby.css.
 // Gewertet (Etappe B Task 4): echte Gegnersuche ueber js/kronen.js; Treffer oeffnet die Online-Partie, nach 10 s
 // (window.__lobbyBotMs verkuerzt es im Test) startet die Partie gegen den passenden Bot als KI-Gegner (params ki, kiRef).
@@ -20,7 +20,7 @@ import { laborFrei } from '../labor.js';
 import { ladeFortschritt } from '../storage.js';
 import { avatarVon, floAvatar } from '../thema.js';
 import { t } from '../sprache.js';
-import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, ligaTabelle, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
+import { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste, ladeLobbyCss } from '../pakete/lobby/index.js';
 import { suche as kronenSuche, angemeldet as kronenAngemeldet, BOT_ERSATZ_MS } from '../kronen.js';
 import { karteDerPartie } from '../karte.js';
 import { visitenkarte, eigeneKarte, fremdeKarte, botKarte, karteVomServer } from './visitenkarte.js';
@@ -56,7 +56,6 @@ export function zeige(root, params, app) {
 
   const zeitKnopf = (z) => `<button type="button" class="lb-zeit dr" role="radio" data-zeit="${z.id}" aria-checked="${z.id === zeit.id}"
     aria-label="${esc(L('zeit.aria', { art: L('art.' + z.art), min: Math.round(z.grund / 60), plus: z.zuschlag }))}"><b>${esc(zeitText(z))}</b></button>`;
-  const tabelle = ligaTabelle({ name: L('du'), punkte: 0 });
   s.innerHTML = `${hauptKopf({ unter: L('unter'), premium: true })}
     <div class="lb-rumpf">
       <div class="lb-modus-ort"></div>
@@ -76,15 +75,6 @@ export function zeige(root, params, app) {
         <div class="lb-werte">${ARTEN.map((art) => `<div class="lb-wert" data-art="${art}">${icon(ART_ICON[art])}<span>${esc(L('art.' + art))}</span>
           <b class="zahl">${wertung}</b><small>${esc(L('geschaetzt'))}</small></div>`).join('')}</div>
         <p class="lb-text">${esc(L('wertungen.text'))}</p>
-      </section>
-      <section class="lb-karte lb-liga" aria-labelledby="lb-liga-titel">
-        <div class="lb-liga-kopf"><div><span class="ueberzeile">${esc(L('liga.ueber'))}</span><h2 id="lb-liga-titel">${esc(L('liga.titel'))}</h2></div>
-          <span class="lb-beispiel">${esc(L('beispiel'))}</span></div>
-        <ol class="lb-tabelle">${tabelle.map((z) => `<li data-zone="${z.zone}"${z.du ? ' data-du' : ''}>
-          <span class="lb-platz zahl">${z.platz}</span><span class="lb-av" aria-hidden="true">${z.du ? floAvatar('w') : esc([...z.name][0] || '?')}</span>
-          <span class="lb-name">${esc(z.name)}</span>${z.zone ? `<span class="lb-zone">${icon('pfeil')}<span class="sr">${esc(L('zone.' + z.zone))}</span></span>` : '<span></span>'}
-          <b class="lb-punkte zahl">${esc(L('punkte', { n: z.punkte }))}</b></li>`).join('')}</ol>
-        <p class="lb-text">${esc(L('liga.text'))}</p>
       </section>
       <section class="lb-mehr" aria-labelledby="lb-mehr-titel">
         <h2 id="lb-mehr-titel">${esc(L('mehr.titel'))}</h2>

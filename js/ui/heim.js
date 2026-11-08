@@ -12,7 +12,7 @@
 //   (intern) lageSatz(cp, mate, sicht) -> { art, anteil, wert }   Bewertung (Sicht Weiss) als Lage-Art, Balken und Zahl
 //
 // Ziele: Weiterspielen -> partie (fortsetzen, wie app.js pruefeZiel; Zu zweit wie pakete/zuzweit), Spielen -> partie
-// gegen naechsterGegner(); heim-online -> lobby (laborFrei) sonst online; heim-raetsel (Lernen) -> training (dort steht
+// gegen naechsterGegner(); heim-online -> online (fuer alle, Flo 08.11.2026); heim-raetsel (Lernen) -> training (dort steht
 // die Meisterschule oben, #150); heim-zuzweit -> partie Zu zweit; Liga-Zeile -> bestenliste.
 // Liga-Zeile (Etappe B, Wochen-Gruppen; L 08.11.2026: der fruehere Ring als Zeile unter "Als Naechstes"): Stufe
 // ("Läufer II") und "Platz 3 von 30" bzw. "Spiel eine Partie für deine Gruppe", Balken bis Platz 5. Erst der gemerkte
@@ -26,7 +26,6 @@ import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
-import { laborFrei } from '../labor.js';
 import { BOTS, botNachId } from '../bots.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet } from '../kronen.js';
@@ -380,7 +379,8 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     } else if (a === 'heim-spielen') app.gehe('partie', { botId: k.dataset.bot });
     else if (a === 'heim-liga') app.gehe('bestenliste');
     else if (a === 'heim-leiter') app.gehe('arena');
-    else if (a === 'heim-online') app.gehe(laborFrei() ? 'lobby' : 'online');
+    // Flo 08.11.2026: die neue Online-Seite (Partie und Raetsel-Duell) fuer alle; die Lobby bleibt Labor-Vorschau
+    else if (a === 'heim-online') app.gehe('online');
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
   });
