@@ -68,6 +68,8 @@
 .zz-namen summary small { font-weight: 600; color: var(--text-2); }
 .zz-namen summary:focus-visible { outline: var(--fokus); outline-offset: 2px; border-radius: var(--r-l); }
 .zz-namen-felder { display: grid; gap: var(--a3); padding: 0 var(--a4) var(--a4); }
+/* zugeklappt ohne Box: Chrome legt den Inhalt geschlossener details sonst unsichtbar unter die Leiste (tests/ansicht "unten frei") */
+.zz-namen:not([open]) .zz-namen-felder { display: none; }
 .zz-namen-felder label { display: grid; gap: var(--a2); font-weight: var(--gw-stark); color: var(--text); }
 .zz-namen-felder input { width: 100%; min-height: var(--tipp); padding: var(--a3); box-sizing: border-box; border: 1px solid var(--linie-2); border-radius: var(--r-s);
   background: var(--flaeche); color: var(--text); font: inherit; }
