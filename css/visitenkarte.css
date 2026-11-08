@@ -73,8 +73,15 @@
 /* ---------- Profil "Ich": Banner im Kopf der Karte ---------- */
 .pr-karte .pr-kopf { position: relative; overflow: hidden; min-height: 112px; padding: 12px 14px; margin: -14px -14px 0; border-radius: var(--r-l, 18px) var(--r-l, 18px) 0 0; }
 .pr-karte .pr-kopf > :not(.pr-banner) { position: relative; z-index: 1; }
-.pr-banner { position: absolute; inset: 0; z-index: 0; background-color: #14161C; background-size: cover; background-position: 30% center; }
-.pr-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0%, rgba(10, 12, 16, .55) 40%, rgba(10, 12, 16, .8) 100%); }
+/* G-001: alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200). Mit "cover" lag es auf iPad und
+   Handy unter Name und Titel-Schild. Jetzt in fester Hoehe (4:1, mindestens 120 px, also 480 px breit) und so verschoben, dass das
+   Motiv (x 0,267 * 480 = 128 px) hinter der Mitte des Profilbilds (--pr-motiv) verschwindet. Rechts davon fuellt die Grundfarbe,
+   unter dem dunklen Verlauf (80 %) ist der Uebergang nicht zu sehen. */
+.pr-banner { position: absolute; inset: 0; z-index: 0; background-color: #14161C; background-repeat: no-repeat;
+  background-size: auto max(120px, 100%); background-position: calc(var(--pr-motiv, 52px) - 128px) calc(50% - 8px); }
+/* der Verlauf endet deckend in der Grundfarbe, kurz bevor das Bild endet (Bildende = --pr-motiv + 352 px): keine Kante auf breiten Karten */
+.pr-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0, rgba(10, 12, 16, .55) 140px,
+  rgba(10, 12, 16, .8) 260px, #14161C calc(var(--pr-motiv, 52px) + 340px)); }
 .pr-karte .pr-kopf .pr-av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); }
 .pr-karte .pr-kopf .pr-name b, .pr-karte .pr-kopf .pr-seit { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .pr-chip.pr-chip-krone { color: #FFFFFF; background: rgba(255, 255, 255, .16); }
