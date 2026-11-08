@@ -60,7 +60,11 @@ export const ORTE = Object.freeze({
   'einstellungen:klang': 'dom',
   'app:erster-screen?': 'wahl',
   // W0+a "Spiel-Fundament" (SPIELKONZEPT 6.2), Hosts und Kontexte in ARCHITEKTUR.md "W0+a: Spiel-Fundament"
+  // seit Variante A (Flo 08.11.2026) ohne Host: das Bots-Panel zeigt nur noch den Gegner
   'arena:heute': 'dom',
+  // Startseite "Als Naechstes" (Variante A, Flo 08.11.2026): Tagesziele als je eine Zeile unter den Wegen, Host
+  // js/ui/heim.js. Kontext { app, tag, zeile({ symbol, titel, text, label, beiTipp, paket }) -> button.heim-zeile }
+  'heim:naechstes': 'dom',
   'partie:gegner-leiste': 'dom',
   'partie:matt': 'aufruf',
   'ergebnis:abrechnung': 'dom',

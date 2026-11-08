@@ -12,6 +12,8 @@
 //   arena:heute             (reihenfolge 35) die naechste offene Aufgabe einer Klasse, ruhig, mit Termin statt Countdown;
 //                           nur aus dem Zwischenspeicher (kein Netz im Anbieter). Bei einer Bot-Aufgabe ein Knopf zum Bot
 //                           (nur wenn er frei und nicht schon gewaehlt ist), bei Raetseln "Ueben" (Training).
+//                           Seit Variante A (08.11.2026) ohne Host; sichtbar ist die Aufgabe auf der Startseite:
+//   heim:naechstes          (reihenfolge 5) dieselbe Aufgabe als eine Zeile unter "Als Naechstes" (heimZeile).
 //   partie:beendet          Fortschritt melden, gebuendelt (planeMeldung in js/schule.js), offline still
 //   raetsel:geloest         richtig geloeste Raetsel fuer Raetsel-Aufgaben zaehlen (merkeRaetsel), dann melden
 //   speicher:zurueckgesetzt neuer Stand nach "Fortschritt zuruecksetzen" (die Lehrkraft sieht keinen alten)
@@ -261,6 +263,34 @@ export function heuteZeile({ app = null, bot = null, fortschritt = null } = {}) 
   return el;
 }
 
+// ---------- Zeile auf der Startseite (heim:naechstes, Variante A 08.11.2026: zuerst, weil es ein Auftrag der Lehrkraft ist) ----------
+// Nur mit offener Aufgabe. Tippen: Bot-Aufgabe zum freien Bot (sonst zur Bot-Leiter), Raetsel-Aufgabe ins Training.
+export function heimZeile({ app = null, zeile = null } = {}) {
+  if (typeof document === 'undefined' || typeof zeile !== 'function' || !kontoFreigeschaltet() || !nutzerId()) return null;
+  const o = offeneAufgabe();
+  if (!o) return null;
+  const { klasse, aufgabe, stand } = o;
+  const teile = [zielText(aufgabe)];
+  if (aufgabe.art !== 'bot') teile.push(S('fortschritt', { n: stand.stand, ziel: stand.ziel }));
+  const f = faelligText(aufgabe.faellig);
+  if (f) teile.push(f);
+  teile.push(klasse.name);
+  const ziel = aufgabe.ziel || {};
+  const zielBot = BOTS.find((b) => b.id === ziel.bot);
+  let frei = false;
+  try { frei = !!zielBot && istFreigeschaltet(zielBot.stufe, ladeFortschritt()); } catch (e) { frei = false; }
+  const k = zeile({
+    symbol: icon(ICON), titel: aufgabe.titel, text: teile.join(' · '), label: `${aufgabe.titel} · ${teile.join(' · ')}`, paket: 'schule',
+    beiTipp: () => {
+      if (!app || typeof app.gehe !== 'function') return;
+      if (aufgabe.art === 'raetsel') app.gehe('training');
+      else app.gehe('arena', aufgabe.art === 'bot' && frei ? { waehle: ziel.bot } : {});
+    },
+  });
+  k.dataset.aufgabe = aufgabe.id;
+  return k;
+}
+
 // ---------- Einhaengen ----------
 const sicher = (fn) => { try { return fn(); } catch (e) { console.error('Paket schule', e); return null; } };
 // eine vorgemerkte Meldung nachholen: ohne Buendel-Wartezeit, aber hoechstens eine je Minute (wie nach einer Partie)
@@ -271,6 +301,7 @@ function sendeOffene() {
 try {
   anbieten('einstellungen:gruppen', schuleGruppe, { reihenfolge: 8, paket: 'schule' });
   anbieten('arena:heute', heuteZeile, { reihenfolge: 35, paket: 'schule' });
+  anbieten('heim:naechstes', (k) => sicher(() => heimZeile(k)), { reihenfolge: 5, paket: 'schule' });
   hoere('partie:beendet', () => { sicher(() => planeMeldung()); });
   hoere('raetsel:geloest', (d) => { sicher(() => { if (merkeRaetsel(d)) planeMeldung(); }); });
   hoere('speicher:zurueckgesetzt', () => { sicher(() => planeMeldung()); });

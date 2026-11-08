@@ -97,7 +97,7 @@ const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen
   'bestenliste', 'raetsel', 'lernen', 'lektion', 'ich', 'spielplan', 'spielhalle', 'werkstatt', 'premium', 'lobby',
   'raetsel-duell', 'schule'];
 const TITEL = {
-  heim: 'Start', arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
+  heim: 'Start', arena: 'Bots', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
   training: 'Lernen', start: 'Willkommen', online: 'Online',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',

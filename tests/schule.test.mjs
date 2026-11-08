@@ -967,66 +967,48 @@ async function browserTeil(browser) {
     await kontext.close();
   }
 
-  // ---------- Heute-Karte in der Arena ----------
-  gruppe = 'Heute-Karte';
+  // ---------- Aufgabe auf der Startseite ("Als Naechstes", vorher Heute-Karte in der Arena) ----------
+  gruppe = 'Startseite';
   {
     const srv = serverMitKlasse();
     srv.mitglieder.push({ id: uuid(41), klasse: uuid(1), uid: UID_A, anzeigename: 'Anna', beigetreten_am: new Date().toISOString() });
     const stand = rpcAntwort(srv, 'schule_meine_klassen', UID_A, {}).body;
     const vorher = { 'schach-arena:schule:stand': { uid: UID_A, daten: stand, geholtAm: Date.now() }, 'schach-arena:v1:fortschritt': fortschrittBisEdda() };
     const { kontext, seite, fehler } = await neueSeite(browser, { sitzung: A, srv, vorher });
-    await bereit(seite, '#arena');
-    await seite.waitForSelector('.heute-karte:not([hidden]) .sm-heute', { timeout: 20000 });
-    await cssDa(seite);
-    // Thorsten ist der naechste Gegner und schon gewaehlt: kein Knopf; mit Lukas im Panel steht "Zu Thorsten" da
-    const ohneKnopf = await seite.evaluate(() => ({ bot: document.querySelector('.arena .detail .detail-name')?.textContent || '',
-      knopf: document.querySelectorAll('.sm-heute .sm-heute-los').length }));
-    pruefe('Thorsten schon gewaehlt: Zeile ohne Knopf', /Ritter Thorsten/.test(ohneKnopf.bot) && ohneKnopf.knopf === 0, ohneKnopf);
-    await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }, { ersetzen: true }));
-    await seite.waitForFunction(() => /Lukas/.test(document.querySelector('.arena .detail .detail-name')?.textContent || '') && document.querySelector('.sm-heute'), null, { timeout: 10000 });
-    const z = await seite.evaluate(() => {
-      const el = document.querySelector('.sm-heute');
-      return { titel: el.querySelector('b').textContent, text: el.querySelector('.sm-heute-text').textContent.replace(/\s+/g, ' '), knopf: el.querySelector('.sm-heute-los')?.textContent || null,
-        breit: el.scrollWidth <= el.clientWidth + 1, art: el.dataset.art };
-    });
-    pruefe('Knoepfe: der sichtbare Text steht im zugaenglichen Namen (WCAG 2.5.3)', await seite.evaluate(() => [...document.querySelectorAll('.sm-heute button')]
-      .every((k) => !k.hasAttribute('aria-label') || k.getAttribute('aria-label').includes(k.textContent.trim()))));
-    pruefe('Heute-Karte: naechste Aufgabe mit Ziel, Termin, Klasse (zuletzt) und Knopf zum Bot', z.titel === 'Gabeln mit Thorsten'
-      && z.text.includes('Gabeln mit Thorsten · Ritter Thorsten besiegen · bis ') && z.text.endsWith('· Q1 Schach-AG') && z.knopf === 'Zu Thorsten' && z.art === 'bot' && fair(z.text), z);
-    const sicht = await seite.evaluate(() => {
-      const z = document.querySelector('.sm-heute .sm-heute-ziel');
-      const t = document.querySelector('.sm-heute .sm-heute-text').getBoundingClientRect();
-      const r = document.createRange();
-      r.selectNodeContents(z);
-      const teile = [...r.getClientRects()];
-      return { text: z.innerText.replace(/\s+/g, ' '), innen: teile.length > 0 && teile.every((x) => x.left >= t.left - 1 && x.right <= t.right + 1 && x.bottom <= t.bottom + 1) };
-    });
-    pruefe('iPad neben "Zu Thorsten": Ziel, Termin und Klasse ganz zu sehen (zweite Zeile, nichts abgeschnitten)', sicht.innen && /bis \S+ \d\d\.\d\d\./.test(sicht.text)
-      && sicht.text.endsWith('Q1 Schach-AG'), sicht);
+    // Variante A (08.11.2026): die Aufgabe steht auf der Startseite unter "Als Naechstes", als erste Zeile
+    const SM = '.heim-naechstes:not([hidden]) [data-paket="schule"]';
+    await bereit(seite, '#heim');
+    await seite.waitForSelector(SM, { timeout: 20000 });
+    const z = await seite.evaluate((SM) => {
+      const el = document.querySelector(SM);
+      return { erste: el === el.parentElement.firstElementChild, titel: el.querySelector('b').textContent, text: el.querySelector('.heim-zeile-text > span').textContent,
+        aria: el.getAttribute('aria-label'), art: el.dataset.aufgabe ? 'da' : null };
+    }, SM);
+    pruefe('Startseite: Aufgabe als erste Zeile mit Ziel, Termin und Klasse (zuletzt)', z.erste && z.titel === 'Gabeln mit Thorsten'
+      && /^Ritter Thorsten besiegen · bis /.test(z.text) && z.text.endsWith('· Q1 Schach-AG') && z.aria === `Gabeln mit Thorsten · ${z.text}` && z.art && fair(z.text), z);
     await bild(seite, 'heute-aufgabe-ipad-hell');
-    await seite.click('.sm-heute-los');
+    await seite.click(SM);
     await seite.waitForFunction(() => /Thorsten/.test(document.querySelector('.arena .detail .detail-name')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
     const gewaehlt = await seite.evaluate(() => document.querySelector('.arena .detail .detail-name')?.textContent || '');
-    pruefe('"Zu Thorsten" waehlt Ritter Thorsten in der Arena (dann ohne eigenen Knopf)', /Ritter Thorsten/.test(gewaehlt)
-      && (await seite.locator('.sm-heute .sm-heute-los').count()) === 0, gewaehlt);
-    // Thorsten besiegt: die Raetsel-Aufgabe ist dran, Knopf "Ueben" fuehrt ins Training
-    await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('arena', {}, { ersetzen: true }); }, fortschrittBisEdda(true));
-    await seite.waitForFunction(() => document.querySelector('.sm-heute')?.dataset.art === 'raetsel', null, { timeout: 10000 });
-    const r = await seite.evaluate(() => ({ text: document.querySelector('.sm-heute').innerText.replace(/\s+/g, ' '), knopf: document.querySelector('.sm-heute-los')?.textContent }));
-    pruefe('Bot-Aufgabe erledigt: die Raetsel-Aufgabe mit "0 von 2" und "Üben"', r.text.includes('Zwei Rätsel') && r.text.includes('0 von 2') && r.knopf === 'Üben', r);
-    await seite.click('.sm-heute-los');
+    pruefe('Tippen waehlt Ritter Thorsten bei den Bots', /Ritter Thorsten/.test(gewaehlt), gewaehlt);
+    // Thorsten besiegt: die Raetsel-Aufgabe ist dran, Tippen fuehrt ins Training
+    await seite.evaluate((f) => { localStorage.setItem('schach-arena:v1:fortschritt', JSON.stringify(f)); window.__app.gehe('heim', {}, { ersetzen: true }); }, fortschrittBisEdda(true));
+    await seite.waitForFunction((SM) => /Zwei Rätsel/.test(document.querySelector(SM)?.textContent || ''), SM, { timeout: 10000 });
+    const r = await seite.evaluate((SM) => document.querySelector(SM).textContent.replace(/\s+/g, ' '), SM);
+    pruefe('Bot-Aufgabe erledigt: die Raetsel-Aufgabe mit "0 von 2"', r.includes('Zwei Rätsel') && r.includes('0 von 2'), r);
+    await seite.click(SM);
     await seite.waitForFunction(() => document.documentElement.dataset.screen === 'training', null, { timeout: 10000 });
-    pruefe('"Üben" fuehrt ins Training', true);
+    pruefe('Raetsel-Aufgabe fuehrt ins Training', true);
     // Raetsel geloest (Ereignis wie vom Raetsel-Paket): zaehlt, beide erledigt, keine Zeile mehr
     await seite.evaluate(async () => {
       const { sende } = await import('./js/ereignisse.js');
       sende('raetsel:geloest', { id: 'r-1', richtig: true, versuch: 1, quelle: 'tag', wertung: null });
       sende('raetsel:geloest', { id: 'r-2', richtig: true, versuch: 1, quelle: 'tag', wertung: null });
-      window.__app.gehe('arena', {}, { ersetzen: true });
+      window.__app.gehe('heim', {}, { ersetzen: true });
     });
-    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'arena');
+    await seite.waitForFunction(() => document.documentElement.dataset.screen === 'heim');
     await warte(400);
-    pruefe('alle Aufgaben erledigt: keine Zeile in der Heute-Karte', (await seite.locator('.sm-heute').count()) === 0);
+    pruefe('alle Aufgaben erledigt: keine Zeile auf der Startseite', (await seite.locator('.heim-naechstes [data-paket="schule"]').count()) === 0);
     pruefe('keine Fehler', fehler.length === 0, fehler);
     await kontext.close();
   }

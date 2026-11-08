@@ -108,7 +108,7 @@ function seite(name) {
       // Welten: je Welt ihr Endgegner mit der Nummer der Welt (dreissig Portraets passten nicht in eine Reihe)
       bild: `<div class="st-leiter">${WELTEN.map((w) => { const b = endgegnerDerWelt(w.nr) || erster; return `<span class="st-bot${w.nr === 1 ? ' st-erster' : ''}" style="${farben(b)}" title="${esc(w.name)}">
           <img src="${esc(avatarVon(b))}" alt="" draggable="false"><b class="zahl">${w.nr}</b></span>`; }).join('')}</div>
-        <div class="st-leiter-fuss"><span>${T('w2.start', { name: esc(erster.name) })}</span><span>${T('w2.ziel', { name: esc(letzter.name) })}</span></div>`,
+        <div class="st-leiter-fuss"><span>${T('w2.fuss', { welten: esc(zahlWort(WELTEN.length)) })}</span></div>`,
       text: `<div class="ueberzeile">${T('w2.ueber')}</div>
         <h1 class="disp st-titel" tabindex="-1">${T('w2.titel', { bots: esc(zahlWort(BOTS.length)), welten: esc(zahlWort(WELTEN.length).toLowerCase()) })}</h1>
         <p>${T('w2.text', { erster: esc(erster.name), bis: esc(bisZu(letzter.name)) })}</p>

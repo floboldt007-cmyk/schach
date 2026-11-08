@@ -178,6 +178,8 @@
 .an-g-wert { font-family: var(--display); font-size: 36px; font-weight: var(--gw-titel); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 .an-ich-wert { color: var(--text); }
 .an-g-leer { font-size: 16px; color: var(--text-2); }
+/* "zu kurz" bleibt klein, auch wo die schmalen Spalten unten die Zahl verkleinern (sonst 27 px, ragte ins Portraet) */
+.an-g-wert.an-g-leer { font-size: 16px; }
 /* Flo 30.10. abends ("sieht billig aus"): Genauigkeit in der Farbe ihrer Guete mit Messbalken, Ergebnis als farbige Pille,
    die Karte leicht in der Farbe des Ergebnisses getoent */
 .an-g-wert small { margin-left: 2px; font-size: .5em; font-weight: 750; letter-spacing: 0; color: var(--text-2); }
