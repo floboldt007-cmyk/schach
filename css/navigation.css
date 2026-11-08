@@ -52,8 +52,15 @@
    Kapsel mit feinen Trennstrichen statt als lose Einzel-Pillen; was nicht ganz passt, tritt zurueck (seite.js) */
 .screen .haupt-kopf .kopf-chips { gap: 0; padding: 3px 2px; border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
 .screen .haupt-kopf .kopf-chips > .chip { position: relative; background: transparent; box-shadow: none; }
-.screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { content: ''; position: absolute; left: 0; top: 11px; bottom: 11px; width: 1px;
+/* G-001 (jeder Knopf mind. 44 px): die Chips der Kapsel sind selbst 44 hoch (der Level-Chip ist ein Knopf, alle bleiben
+   gleich hoch); der negative Rand haelt die Kapsel und die Trennstriche so hoch wie bisher (40 px, Handy 38 px) */
+.screen .haupt-kopf .kopf-chips > .chip { height: 44px; margin-block: -2px; }
+.screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 1px;
   background: var(--linie-2, var(--linie)); pointer-events: none; }
+@media (max-width: 700px) {
+  .screen .haupt-kopf .kopf-chips > .chip { margin-block: -3px; }
+  .screen .haupt-kopf .kopf-chips > .chip:not(:first-child)::after { top: 14px; bottom: 14px; }
+}
 .screen .haupt-kopf .kopf-chips > .chip:hover { background: var(--flaeche-2); }
 .screen .haupt-kopf .kopf-knopf { flex: none; width: 46px; height: 46px; border-radius: var(--r-m); border: 0; box-shadow: var(--s1), var(--kante); }
 .haupt-kopf .kopf-knopf .ico { width: 22px; height: 22px; }

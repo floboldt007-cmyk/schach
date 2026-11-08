@@ -562,7 +562,8 @@ export function zeige(root, params, app) {
     masse = { w, h, s: sk, y0, hy };
     weltEl.style.width = w + 'px';
     weltEl.style.height = h + 'px';
-    weltEl.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
+    // mindestens 44 px Tippflaeche je Station (G-001: auf dem iPhone SE massen sie 43 px)
+    weltEl.style.setProperty('--kn-basis', Math.max(44, Math.round(76 * sk)) + 'px');
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
@@ -612,6 +613,11 @@ export function zeige(root, params, app) {
     // ganz in der Karte (Handy kompakt: am Start ragte die Figur links ueber den Rand)
     const r = (floFigur.offsetWidth || 36) / 2 + 8;
     if (masse.w > 2 * r) x = Math.min(masse.w - r, Math.max(r, x));
+    // am Start schob das Einklemmen die Figur auf schmalen Karten halb hinter die erste Station, deren Rand sie
+    // abschnitt (iPhone SE, 08.11.2026): so dicht an ihr bleibt sie unsichtbar
+    const [sx, sy] = LAGEN[lageModus || modus].stationen[0];
+    const rk = 76 * masse.s * (LBOTS[0].id === aktuellId ? 1.22 : 1) / 2;
+    floFigur.classList.toggle('verdeckt', Math.hypot(x - sx * masse.w, y - yVon(sy)) < rk + r - 8);
     floFigur.style.left = x.toFixed(1) + 'px';
     floFigur.style.top = y.toFixed(1) + 'px';
   }
