@@ -13,7 +13,8 @@
 // Sendet:  tag:gezaehlt { tag, quelle, serie, kapitel } einmal je Tag beim ersten Tageswerk (bringt nie Funken),
 //          serie:geaendert { tag, lauf, meilenstein, ruht, kapitel, rekord, gesamt, heute } nach jedem gezaehlten Tag, jeder
 //          Aenderung am Siegeslauf und einmal nach app:bereit (tag = Schachtage in Serie wie "Tag 12", heute = Tagesschluessel).
-// Orte:    arena:heute 10 (Bauernmarsch als Bild, was heute zaehlt, Umwandlung waehlen), arena:kopf 20 (Chip "Bauer 12", Flamme ab 3),
+// Orte:    heim:naechstes 10 (eine Zeile "Bauernmarsch", solange heute offen oder eine Umwandlung wartet; seit Variante A
+//          08.11.2026 der sichtbare Platz), arena:heute 10 (ohne Host: Bauernmarsch als Bild, Umwandlung waehlen), arena:kopf 20 (Chip "Bauer 12", Flamme ab 3),
 //          ergebnis:abrechnung 40 (Zeile "Tag 12 - Bauernmarsch" nur am ersten Werk des Tages, Siegeslauf), partie:spieler-leiste 30
 //          (Flamme an Flos Namen ab 3 Siegen), einstellungen:gruppen 20 (Gruppe Bauernmarsch: anzeigen, streng, leise, Ruhetag).
 // Feier:   umwandlung (gross 66, Klang umwandlung), meilenstein (gross 72, Plakette mit Zeitraum und Beweis, Klang siegel),
@@ -25,7 +26,7 @@ import { EREIGNISSE, hoere, sende } from '../../ereignisse.js';
 import { anbieten, angeboten } from '../../orte.js';
 import { melde } from '../../feier.js';
 import { botNachId } from '../../bots.js';
-import { registriereIcon } from '../../ui/icons.js';
+import { icon, registriereIcon } from '../../ui/icons.js';
 import { ladeFortschritt, hoechsteFreieStufe, ladePartien, eigeneZuege } from '../../storage.js';
 import { tagSchluessel, addiereTage } from '../../tag.js';
 import { klang } from '../../sounds.js';
@@ -252,6 +253,23 @@ function anbieterHeute(k) {
   return zeile;
 }
 
+// Startseite "Als Naechstes" (heim:naechstes, Variante A 08.11.2026): eine Zeile, solange heute etwas offen ist. Eine
+// offene Umwandlung zuerst (Tippen oeffnet das Serien-Blatt mit der Wahl), sonst das Tageswerk (Tippen: Training, ohne
+// Training das Blatt). Gezaehlt, Pause oder Ruhetag: keine Zeile.
+function anbieterHeim(k) {
+  const einst = S.einstellungen();
+  const zeile = k && k.zeile;
+  if (!einst.anzeigen || typeof zeile !== 'function') return null;
+  const app = k.app;
+  const lg = T.lage(S.lade(), heute(), einst);
+  const wahl = lg.offeneWahl > 0;
+  if (!wahl && (lg.heuteGezaehlt || lg.pause || lg.ruhetag)) return null;
+  const training = !wahl && !!app && sicher(() => angeboten('training:karten') > 0, 'Training') === true;
+  const text = t(wahl ? 'p-serie.wahl.label' : 'p-serie.heute.offen');
+  return zeile({ symbol: icon('se-bauer'), titel: t('p-serie.name'), text, label: `${t('p-serie.name')} · ${text}`, paket: PAKET,
+    beiTipp: () => sicher(() => (training ? app.gehe('training') : zeigeBlatt()), 'Startseite') });
+}
+
 function zeigeBlatt() {
   // Ansicht des Blatts (start, ruhe, mehr, regeln): bleibt beim Neuzeichnen nach Ruhetag oder Pause stehen
   let ansicht = 'start';
@@ -417,6 +435,7 @@ function registriere() {
   }
 
   anbieten('arena:heute', (k) => sicher(() => anbieterHeute(k), 'Heute'), { reihenfolge: 10, paket: PAKET });
+  anbieten('heim:naechstes', (k) => sicher(() => anbieterHeim(k), 'Startseite'), { reihenfolge: 10, paket: PAKET });
   anbieten('arena:kopf', () => sicher(anbieterKopf, 'Kopf'), { reihenfolge: 20, paket: PAKET });
   anbieten('ergebnis:abrechnung', (k) => sicher(() => anbieterAbrechnung(k), 'Abrechnung'), { reihenfolge: 40, paket: PAKET });
   anbieten('partie:spieler-leiste', () => sicher(anbieterSpieler, 'Spieler-Leiste'), { reihenfolge: 30, paket: PAKET });

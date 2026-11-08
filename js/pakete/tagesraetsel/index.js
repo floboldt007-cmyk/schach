@@ -290,6 +290,18 @@ function heuteZeile(app, tag) {
   return el;
 }
 
+// Startseite "Als Naechstes" (heim:naechstes, Variante A 08.11.2026): dieselbe Lage als eine Zeile, Tippen loest
+function heimZeile(app, tag, zeile) {
+  if (typeof zeile !== 'function') return null;
+  if (!daten) { ladeSpaeter(); return null; }
+  const td = heuteDaten(tag);
+  if (!td || stand(td).fertig) return null;
+  const a = td.aufgaben[L.ersteOffene(roh(), td)];
+  const text = t('p-tagesraetsel.heute.text', { nummer: td.nummer, zuege: L.zuegeText(a) });
+  return zeile({ symbol: icon('tagesraetsel'), titel: t('p-tagesraetsel.name'), text,
+    label: `${t('p-tagesraetsel.name')} · ${text} · ${t('p-tagesraetsel.karte.loesen')}`, paket: L.PAKET, beiTipp: (ev) => oeffne(app, ev) });
+}
+
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
   try {
@@ -310,6 +322,8 @@ function registriere() {
   registriereRaetselQuelle(L.PAKET, quelle());
   anbieten('training:karten', (k) => sicher(() => (k && k.app ? trainingKarte(k.app) : null), 'Training'), { reihenfolge: 5, paket: L.PAKET });
   anbieten('arena:heute', (k) => sicher(() => (k && k.app ? heuteZeile(k.app, typeof k.tag === 'string' ? k.tag : heute()) : null), 'Heute'),
+    { reihenfolge: 20, paket: L.PAKET });
+  anbieten('heim:naechstes', (k) => sicher(() => (k && k.app ? heimZeile(k.app, typeof k.tag === 'string' ? k.tag : heute(), k.zeile) : null), 'Startseite'),
     { reihenfolge: 20, paket: L.PAKET });
   ladeDaten();
 }

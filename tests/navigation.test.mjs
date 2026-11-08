@@ -573,7 +573,7 @@ async function testeTraining(browser) {
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();
     await seite.waitForSelector('.screen.arena .knoten');
-    pruefe('„Zur Arena“ fuehrt in die Arena', await seite.evaluate(() => location.hash) === '#arena');
+    pruefe('„Zu den Bots“ fuehrt zu den Bots', await seite.evaluate(() => location.hash) === '#arena');
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

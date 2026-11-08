@@ -256,6 +256,16 @@ function heuteZeile(app, tag) {
   return el;
 }
 
+// Startseite "Als Naechstes" (heim:naechstes, Variante A 08.11.2026): eine Zeile, nur wenn Karten faellig sind
+function heimZeile(app, tag, zeile) {
+  if (typeof zeile !== 'function') return null;
+  const st = L.stand(roh(), tag);
+  if (!st.faellig) return null;
+  const text = t('p-kartei.faellig', { n: st.faellig });
+  return zeile({ symbol: icon('kartei'), titel: t('p-kartei.titel'), text,
+    label: `${t('p-kartei.titel')} · ${text} · ${t('p-kartei.ueben')}`, paket: L.PAKET, beiTipp: (ev) => oeffne(app, ev) });
+}
+
 // ---------- Einhaengen (defensiv) ----------
 function ladeCss() {
   try {
@@ -276,6 +286,8 @@ function registriere() {
 
   anbieten('training:karten', (k) => sicher(() => (k && k.app ? trainingKarte(k.app) : null), 'Training'), { reihenfolge: 10, paket: L.PAKET });
   anbieten('arena:heute', (k) => sicher(() => (k && k.app ? heuteZeile(k.app, typeof k.tag === 'string' ? k.tag : heute()) : null), 'Heute'),
+    { reihenfolge: 25, paket: L.PAKET });
+  anbieten('heim:naechstes', (k) => sicher(() => (k && k.app ? heimZeile(k.app, typeof k.tag === 'string' ? k.tag : heute(), k.zeile) : null), 'Startseite'),
     { reihenfolge: 25, paket: L.PAKET });
 
   hoere('partie:analysiert', (d) => sicher(() => {
