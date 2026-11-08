@@ -564,6 +564,9 @@ function probeGruppe({ platz = 3, stufe = 7, botKi = { genutzt: 120, max: 300 } 
     mitglieder.push({ platz: p, name: p === platz ? 'flo' : (ki ? ['Rosa', 'Udo', 'Kira'][[6, 18, 27].indexOf(p)] : 'Spieler ' + p),
       kronen: 400 - p * 12, ki, ich: p === platz });
   }
+  // G-002: Profilbild und Banner (supabase/liga-bild-schema.sql); Platz 4 traegt ein unbekanntes Banner -> Start-Banner
+  Object.assign(mitglieder[1], { motiv: 'Q', grund: 'welt-1', rahmen: 'liga-2', banner: 'saison-gold' });
+  Object.assign(mitglieder[3], { motiv: 'karo', grund: 'standard', rahmen: 'ohne', banner: 'fremd' });
   return { woche: '2026-11-02', ende: '2026-11-08', stufe, gruppe: 41, platz, n: 30, mitglieder,
     belohnung: [], offen: [{ woche: '2026-10-26', platz: 4, art: 'taler', menge: 80 }], bot_ki: botKi };
 }
@@ -620,7 +623,7 @@ async function gruppeTeil(browser, start) {
         assert.match(await page.locator('.lg-gr-wappen').getAttribute('src'), /assets\/liga\/laeufer\.svg$/);
         assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
         assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
-        assert.match(await page.locator('.lg-gr-offen').innerText(), /1 Belohnungen/);
+        assert.match(await page.locator('.lg-gr-offen').innerText(), /Gemerkt: 1 Belohnung aus einer früheren Woche/);
         assert.equal(await page.locator('.lg-gr-botvoll').count(), 0, '120 von 300 Bot-Kronen: kein Hinweis');
       });
       await browserPruefe('Gruppe: Abschnitte 5 / 20 / 5, "Eine Stufe tiefer" statt Druck-Wort, eigene Zeile gold', async () => {
@@ -649,6 +652,34 @@ async function gruppeTeil(browser, start) {
         assert.equal(await lohn.getAttribute('aria-expanded'), 'true');
         assert.match(await page.locator('.lg-gr-zeile.ich .lg-gr-info').innerText(), /Belohnung für Platz 3: 100 Taler/);
         assert.equal(await page.locator('.lg-gr-zeile[data-platz="21"] .lg-gr-lohn').count(), 0);
+      });
+      await browserPruefe('Gruppe (G-002): Bild und Banner-Streifen je Mensch, Initialen ohne Bild, unbekanntes Banner wird Start', async () => {
+        const z2 = page.locator('.lg-gr-zeile[data-platz="2"]');
+        assert.equal(await z2.getAttribute('data-banner'), 'saison-gold');
+        assert.equal(await z2.locator('.lg-gr-streifen').count(), 1);
+        assert.equal(await z2.locator('.lg-gr-avatar.bild').count(), 1);
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="4"]').getAttribute('data-banner'), 'start');
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="1"] .lg-gr-avatar.bild').count(), 0, 'ohne Bild: Initialen');
+        const hoehen = await page.locator('.lg-gr-zeile:visible .lg-gr-wer').evaluateAll((l) => l.map((b) => b.getBoundingClientRect().height));
+        assert.ok(hoehen.length > 0 && hoehen.every((x) => x >= 44), JSON.stringify(hoehen));
+      });
+      await browserPruefe('Gruppe (G-002): Tipp auf eine Zeile oeffnet die Mini-Karte mit Platz, Kronen und Stufe', async () => {
+        await page.locator('.lg-gr-zeile[data-platz="2"] .lg-gr-wer').click();
+        await page.waitForSelector('.lg-mini-blatt');
+        assert.equal((await page.locator('.lg-mini-blatt h3').innerText()).trim(), 'Spieler 2');
+        const werte = await page.locator('.lg-mini-blatt .lg-mini-werte').innerText();
+        assert.match(werte, /Platz[\s\S]*2/);
+        assert.match(werte, /376/);
+        assert.match(werte, /Läufer II/);
+        assert.match(await page.locator('.lg-mini-satz').innerText(), /Titel und Erfolge sieht nur/);
+        assert.equal(await page.locator('.lg-mini-blatt .lg-mini-av.bild').count(), 1);
+        await page.locator('.lg-mini-blatt .sheet-knoepfe button').click();
+        await page.waitForSelector('.lg-mini-blatt', { state: 'detached' });
+        await page.locator('.lg-gr-zeile[data-platz="6"] .lg-gr-wer').click();
+        await page.waitForSelector('.lg-mini-blatt');
+        assert.equal(await page.locator('.lg-mini-blatt .lg-mini-ki').count(), 1);
+        await page.locator('.lg-mini-blatt .sheet-knoepfe button').click();
+        await page.waitForSelector('.lg-mini-blatt', { state: 'detached' });
       });
       await browserPruefe('Gruppe: keine Konsolenfehler, kein NaN, keine Kennung', async () => {
         assert.deepEqual(fehler, []);
