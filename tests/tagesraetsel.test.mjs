@@ -385,10 +385,12 @@ async function browserTeil(browser) {
   pruefe('Archiv-Knopf mit der Zahl offener Tage', karte.archiv === `Archiv · ${td.nummer - 1}`, karte.archiv);
   await bild(seite, 'ipad-hell-training');
 
-  await seite.evaluate(() => { location.hash = '#arena'; });
-  await seite.waitForSelector('.screen.arena', { timeout: 10000 });
-  const zeile = await seite.waitForSelector('.heute-karte:not([hidden]) .tr-heute', { timeout: 8000 }).then(() => true, () => false);
-  pruefe('Zeile in der Heute-Karte der Arena', zeile && /Rätsel \d+/.test(await seite.locator('.tr-heute-text').textContent()));
+  // Variante A (08.11.2026): die Zeile steht auf der Startseite unter "Als Naechstes" (Ort heim:naechstes)
+  await seite.evaluate(() => { location.hash = '#heim'; });
+  await seite.waitForSelector('.heim-screen', { timeout: 10000 });
+  const HZ = '.heim-naechstes:not([hidden]) [data-paket="tagesraetsel"]';
+  const zeile = await seite.waitForSelector(HZ, { timeout: 8000 }).then(() => true, () => false);
+  pruefe('Zeile auf der Startseite unter "Als Nächstes"', zeile && /Rätsel \d+/.test(await seite.locator(HZ + ' .heim-zeile-text').textContent()));
 
   // Ereignisse mitschreiben
   await seite.evaluate(async () => {
@@ -398,7 +400,7 @@ async function browserTeil(browser) {
     E.hoere('raetsel:geloest', (d) => window.__tr_ev.push(d));
     E.hoere('raetsel:wort', (d) => window.__tr_wort.push(d));
   });
-  await seite.locator('.tr-heute-los').click();
+  await seite.locator(HZ).click();
   await warteZustand(seite, 'z.offen && z.quelle === "tagesraetsel" && z.phase === "flo"');
   let rz = await seite.evaluate(() => window.__raetsel.zustand());
   pruefe('Lösen öffnet den Rätsel-Bildschirm mit den Aufgaben von heute', rz.gesamt === td.aufgaben.length && rz.aufgabe === `${heute}:0`, rz);
@@ -469,10 +471,13 @@ async function browserTeil(browser) {
   const nachher = await seite.evaluate(() => ({ p: document.querySelector('.tr-karte p').textContent, teilen: !!document.querySelector('.tr-karte .tr-teilen'),
     los: !!document.querySelector('.tr-karte .tr-los') }));
   pruefe('Karte danach: "Gelöst. Morgen kommt das nächste.", Teilen statt Lösen', nachher.p === 'Gelöst. Morgen kommt das nächste.' && nachher.teilen && !nachher.los, nachher);
+  await seite.evaluate(() => { location.hash = '#heim'; });
+  await seite.waitForSelector('.heim-screen', { timeout: 10000 });
+  await warte(400);
+  pruefe('Zeile auf der Startseite ist nach dem Lösen weg', await seite.locator('.heim-naechstes [data-paket="tagesraetsel"]').count() === 0);
   await seite.evaluate(() => { location.hash = '#arena'; });
   await seite.waitForSelector('.screen.arena', { timeout: 10000 });
   await warte(400);
-  pruefe('Heute-Zeile ist nach dem Lösen weg', await seite.locator('.tr-heute').count() === 0);
   await seite.locator('.fk-chip').click();
   await seite.waitForSelector('.fk-s-wort');
   pruefe('Spiegel zeigt eigene Zeile Motiv erkannt mit gebuchter Menge', await seite.locator('.fk-s-wort').textContent() === '+5 Funken'
@@ -593,9 +598,9 @@ async function browserTeil(browser) {
   await bereite(ohne.seite);
   await ohne.seite.waitForFunction(() => /jeden Tag ein Rätsel/.test((document.querySelector('.tr-karte h2') || {}).textContent || ''), null, { timeout: 10000 });
   pruefe('ruhige Karte statt Fehler', await ohne.seite.locator('.tr-karte .tr-los').count() === 0);
-  await ohne.seite.evaluate(() => { location.hash = '#arena'; });
-  await ohne.seite.waitForSelector('.screen.arena', { timeout: 10000 });
-  pruefe('keine Heute-Zeile', await ohne.seite.locator('.tr-heute').count() === 0);
+  await ohne.seite.evaluate(() => { location.hash = '#heim'; });
+  await ohne.seite.waitForSelector('.heim-screen', { timeout: 10000 });
+  pruefe('keine Zeile auf der Startseite', await ohne.seite.locator('.heim-naechstes [data-paket="tagesraetsel"]').count() === 0);
   pruefe('keine Konsolenfehler (bis auf die fehlende Datei)', ohne.fehler.length === 0, ohne.fehler.join(' | '));
   await ohne.kontext.close();
   gruppe = '';

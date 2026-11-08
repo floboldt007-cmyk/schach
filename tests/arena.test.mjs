@@ -477,14 +477,17 @@ async function testeKarteQuer(browser) {
       blase: d.querySelector('.sprechblase').textContent.trim().length, segment: !!d.querySelector('.farbwahl.segment[role="radiogroup"]'),
       weiss: d.querySelectorAll('.farbwahl [data-farbe="w"][aria-checked="true"]').length, farben: [...d.querySelectorAll('.farbwahl [data-farbe]')].map((b) => b.dataset.farbe).join(),
       spielenDrin: !!d.querySelector('[data-aktion="spielen"]'), spielenText: d.querySelector('[data-aktion="spielen"]').textContent.trim(),
-      botOrtNachZielen: !!ziel && ziel.nextElementSibling && ziel.nextElementSibling.classList.contains('ort-panel-bot'),
+      farbeNachZielen: !!ziel && !!ziel.nextElementSibling && ziel.nextElementSibling.classList.contains('wahl-farbe'),
+      ohneHost: d.querySelectorAll('.heute-karte, .ort-panel-bot, .merkmale, .bilanz').length,
       tempo: !!d.querySelector('.ort-tempo'), bilanz: d.querySelectorAll('.bilanz b').length, miniSterne: d.querySelectorAll('.mini-sterne .stern').length,
       sternSvg: !!d.querySelector('.ziel-sterne b svg') && !/★/.test(d.textContent), ueberFarbe: getComputedStyle(d.querySelector('.detail-ueber')).color, akzentText: getComputedStyle(document.documentElement).getPropertyValue('--akzent-text').trim() };
   });
   pruefe('Kopf: Ueberzeile „Stufe 3 · Nächster Gegner“ in --akzent-text, Welt, Name, „Elo 300 · Die Eilige“', panel.h2 === 'Postbotin Paula' && panel.ueber === 'Stufe 3 · Nächster Gegner' && panel.elo === 'Elo 300 · Die Eilige'
     && panel.welt === 'Welt 1 · Die Karofelder' && panel.ueberFarbe === 'rgb(184, 62, 26)', JSON.stringify(panel));
-  pruefe('Orte: .ort-panel-oben erstes Kind, section.heute-karte danach, .ort-panel-bot direkt nach .ziel-sterne, .ort-tempo da', panel.kinder[0] === 'ort-panel-oben' && panel.kinder[1] === 'heute-karte' && panel.botOrtNachZielen && panel.tempo, panel.kinder.join());
-  pruefe('Steckbrief 3 Kacheln, Bedingungen 3 (keine erreicht), Spruch-Karte, Bilanz 4 Zahlen, Sterne als SVG', panel.merkmale === 3 && panel.ziele === 3 && panel.an === 0 && panel.blase > 5 && panel.bilanz === 4 && panel.miniSterne === 0 && panel.sternSvg, JSON.stringify(panel));
+  // Variante A (Flo 08.11.2026): das Panel zeigt nur den naechsten Gegner. Heute-Karte, panel-bot, Steckbrief und Bilanz sind weg
+  pruefe('Orte (Variante A): .ort-panel-oben erstes Kind (nur Nachlese), keine Heute-Karte, kein panel-bot, die Farbwahl direkt nach .ziel-sterne, .ort-tempo da',
+    panel.kinder[0] === 'ort-panel-oben' && panel.ohneHost === 0 && panel.farbeNachZielen && panel.tempo, panel.kinder.join());
+  pruefe('Kein Steckbrief, Bedingungen 3 (keine erreicht), Spruch-Karte, keine Bilanz, Sterne als SVG', panel.merkmale === 0 && panel.ziele === 3 && panel.an === 0 && panel.blase > 5 && panel.bilanz === 0 && panel.miniSterne === 0 && panel.sternSvg, JSON.stringify(panel));
   pruefe('Farbe als Segment (bauteile.segment) mit w, zufall, b; Weiß vorgewaehlt', panel.segment && panel.farben === 'w,zufall,b' && panel.weiss === 1, panel.farben);
   pruefe('Spielen-Knopf im Panel: „Spielen gegen Paula“', panel.spielenDrin && panel.spielenText === 'Spielen gegen Paula', panel.spielenText);
   const waehleStation = async (id) => {
@@ -563,27 +566,25 @@ async function testeOrte(browser) {
     const drin = (e) => { const r = e.getBoundingClientRect(); return r.left >= kb.left && r.right <= kb.right && r.top >= kb.top && r.bottom <= kb.bottom; };
     return {
       kopf: el('arena:kopf') && el('arena:kopf').parentElement.classList.contains('kopf-chips') && el('arena:kopf').previousElementSibling.classList.contains('chip-pokal'),
-      oben: el('arena:panel-oben') && el('arena:panel-oben').parentElement === d.firstElementChild && !d.firstElementChild.hidden,
-      heute: el('arena:heute') && el('arena:heute').closest('section.heute-karte') === d.children[1] && !d.children[1].hidden,
-      bot: el('arena:panel-bot') && el('arena:panel-bot').parentElement.classList.contains('ort-panel-bot') && el('arena:panel-bot').parentElement.previousElementSibling.classList.contains('ziel-sterne') && !el('arena:panel-bot').parentElement.hidden,
+      // Variante A: panel-oben, heute und panel-bot haben keinen Host mehr (Anbieter bleiben angemeldet, zeigen nichts)
+      ohneHost: !el('arena:panel-oben') && !el('arena:heute') && !el('arena:panel-bot'),
       boss: el('arena:karte-boss') && el('arena:karte-boss').parentElement.classList.contains('ort-karte-boss') && sichtbar(el('arena:karte-boss')) && drin(el('arena:karte-boss')),
       event: el('arena:karte-event') && el('arena:karte-event').parentElement.classList.contains('ort-karte-event') && sichtbar(el('arena:karte-event')) && drin(el('arena:karte-event')),
       kontexte: window.__u5.kontexte, start: window.__u5.start,
     };
   });
   pruefe('arena:kopf in .kopf-chips nach den zwei Chips', o.kopf);
-  pruefe('arena:panel-oben erstes Kind, arena:heute direkt danach (sichtbar), arena:panel-bot nach .ziel-sterne', o.oben && o.heute && o.bot, JSON.stringify([o.oben, o.heute, o.bot]));
+  pruefe('Variante A: arena:panel-oben, arena:heute und arena:panel-bot werden im Bots-Panel nicht gefuellt', o.ohneHost);
   pruefe('arena:karte-boss und arena:karte-event auf der Karte sichtbar (innerhalb der Karte)', o.boss && o.event, JSON.stringify([o.boss, o.event]));
-  pruefe('Kontexte: Panel-Orte { app, bot, fortschritt }, Heute { app, bot, fortschritt, tag, woche }, Karte { app, fortschritt, karte, scrolleZu }',
-    JSON.stringify(o.kontexte['arena:panel-oben']) === '["app","bot","fortschritt"]' && JSON.stringify(o.kontexte['arena:panel-bot']) === '["app","bot","fortschritt"]'
-    && JSON.stringify(o.kontexte['arena:heute']) === '["app","bot","fortschritt","tag","woche"]' && JSON.stringify(o.kontexte['arena:kopf']) === '["app","fortschritt"]'
+  pruefe('Kontexte: Kopf { app, fortschritt }, Karte { app, fortschritt, karte, scrolleZu }; die Panel-Orte werden nicht mehr gerufen',
+    !o.kontexte['arena:panel-oben'] && !o.kontexte['arena:panel-bot'] && !o.kontexte['arena:heute'] && JSON.stringify(o.kontexte['arena:kopf']) === '["app","fortschritt"]'
     && JSON.stringify(o.kontexte['arena:karte-boss']) === '["app","fortschritt","karte","scrolleZu"]' && JSON.stringify(o.kontexte['arena:karte-event']) === '["app","fortschritt","karte","scrolleZu"]', JSON.stringify(o.kontexte));
   pruefe('arena:start: { app, s, karte, scrolleZu, neuId }, karte ist der Scroll-Behaelter .karte', o.start && JSON.stringify(o.start.schluessel) === '["app","karte","neuId","s","scrolleZu"]' && o.start.karteIstScrollBehaelter && o.start.scrolleZu === 'function' && o.start.neuId === null, JSON.stringify(o.start));
   // Bot wechseln: Panel-Orte werden neu gefuellt, Karten-Orte bleiben; verlassen raeumt auf
   await tippe(seite, '.knoten[data-bot="benno"]');
   await warte(700);
   const n = await seite.evaluate(() => ({ panel: document.querySelectorAll('.detail .u5-test').length, karte: document.querySelectorAll('.karte .u5-test').length, kopf: document.querySelectorAll('.kopf-chips .u5-test').length }));
-  pruefe('nach dem Botwechsel: je ein Element je Ort (nichts doppelt)', n.panel === 3 && n.karte === 2 && n.kopf === 1, JSON.stringify(n));
+  pruefe('nach dem Botwechsel: je ein Element je Ort (nichts doppelt)', n.panel === 0 && n.karte === 2 && n.kopf === 1, JSON.stringify(n));
   await bild(seite, 'arena-orte-1180x820');
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await seite.waitForFunction(() => document.documentElement.dataset.screen === 'verlauf');

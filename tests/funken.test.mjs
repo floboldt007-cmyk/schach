@@ -18,6 +18,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { alteOrte } from './ohne-host.mjs';
 import { setzeSpeicher, ladeFortschritt, statistik, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/storage.js';
 import { hoere, sende } from '../js/ereignisse.js';
 import { fuerOverlay } from '../js/feier.js';
@@ -897,6 +898,7 @@ function hilfen(seite) {
       await seite.evaluate(() => window.__app.gehe('arena'));
       await seite.waitForSelector('.screen.arena');
       await warte(500);
+      await alteOrte(seite);   // Heute-Karte und panel-bot nur im Test (Variante A, tests/ohne-host.mjs)
     },
     // wartet, bis die Abrechnungszeile ihr Endbild zeigt (Wert wie im Speicher)
     async abrFertig(ms = 8000) {
@@ -1195,11 +1197,13 @@ async function testeBrowser(browser) {
     await warte(500);
     await hh.tippe('.knoten[data-bot="benno"]');
     await warte(300);
+    await alteOrte(s);
     pruefe('Lukas nach 12 Siegen: „Training · Funken × 0,5“ (Lage 600 = Elo 200 + 400, Abstand −400)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Training · Funken × 0,5');
     await hh.tippe('.weltwahl .ww-pfeil[data-richtung="1"]');
     await warte(500);
     await hh.tippe('.knoten[data-bot="kalle"]');
     await warte(300);
+    await alteOrte(s);
     pruefe('Maxi: „Herausforderung · Funken × 1,25“ (Elo 800, Abstand +200)', (await s.locator('.ort-panel-bot .fk-faktor').innerText()).trim() === 'Herausforderung · Funken × 1,25');
     // Antippen der Ergebnis-Karte zeigt sofort alles (auch die Funken-Zeile springt auf ihr Endbild)
     await hh.planBot();

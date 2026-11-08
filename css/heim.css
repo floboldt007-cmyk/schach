@@ -72,6 +72,11 @@
 .heim-zeile-text span { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .heim-zeile-balken { flex: none; width: 84px; height: 6px; border-radius: var(--r-pille); overflow: hidden; background: var(--linie-2); }
 .heim-zeile-balken span { display: block; height: 100%; background: var(--gold); }
+.heim-zeile-pfeil { flex: none; display: grid; place-items: center; color: var(--text-2); }
+.heim-zeile-pfeil svg { width: 18px; height: 18px; }
+.heim-naechstes[hidden] { display: none; }
+/* Text der Zeile einzeilig, damit jede Zeile gleich hoch ist (die ganze Zeile steht im aria-label) */
+.heim-zeile-text b, .heim-zeile-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Deine Leiter (nur ohne Partie und nur dort, wo Platz ist: iPad hoch) ---------- */
 .heim-leiter { display: none; }
@@ -145,9 +150,15 @@
   .heim-text { gap: 2px; }
   .heim-text b { font-size: 14.5px; }
 }
+/* "Als Naechstes" auf dem Handy: so viele Zeilen, wie unter die Wege passen (die Reihenfolge der Pakete entscheidet,
+   die uebrigen stehen im Reiter Lernen bzw. Liga) */
+@media (max-width: 560px) and (orientation: portrait) {
+  .heim-liste > .heim-zeile:nth-child(n + 4) { display: none; }
+}
 /* niedrige Handys (iPhone 13 in Safari mit Leisten, 375 x 667): die Wege nur mit Namen */
 @media (max-width: 560px) and (orientation: portrait) and (max-height: 720px) {
   .heim-text > span { display: none; }
+  .heim-liste > .heim-zeile:nth-child(n + 2) { display: none; }
 }
 /* iPhone SE: Gruss eine Zeile, die Wege als flache Zeile (Symbol neben dem Namen), ohne Spielweise des Bots */
 @media (max-width: 560px) and (orientation: portrait) and (max-height: 620px) {
@@ -165,6 +176,8 @@
    Ohne Partie: grosses Bot-Bild oben, Text und Spielen darunter, darunter "Deine Leiter". */
 @media (min-width: 700px) and (orientation: portrait) {
   .heim-screen .heim-rumpf { padding-top: var(--a4); }
+  /* das grosse Brett braucht die Hoehe: "Als Naechstes" hier mit einer Zeile (wie auf niedrigen Handys) */
+  .heim-liste > .heim-zeile:nth-child(n + 2) { display: none; }
   .heim-buehne { grid-template-columns: minmax(0, 1fr); padding: var(--a5); justify-items: stretch;
     --heim-brett: max(300px, min(100cqw - 2 * var(--a5), 100dvh - 630px)); }
   .heim-brett { justify-self: center; }

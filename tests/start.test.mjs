@@ -407,6 +407,25 @@ async function bereite(seite, { modul = null, partien = null, fortschritt = null
   await seite.reload();
   const ziel = { '#arena': '.screen.arena .knoten', '#einstellungen': '.es-screen .st-gruppe', '#start': '.st-screen .st-titel' }[hash] || '#app > .screen:not(.lade-screen)';
   await seite.waitForFunction((sel) => !!window.__app && !!document.querySelector('link[data-paket="start"]') && !!document.querySelector(sel), ziel, { timeout: 20000 });
+  if (hash === '#arena') await heuteKarte(seite);
+}
+
+// Seit Variante A (08.11.2026) hat arena:heute keinen Host mehr: "Neu fuer dich" ist fuer Spieler nicht sichtbar. Damit
+// die Logik geprueft bleibt, bis die Zeile einen neuen Platz bekommt, setzt der Test die Heute-Karte an ihre alte Stelle im
+// Bots-Panel (nach .ort-panel-oben) und fuellt sie wie frueher arena.js; ohne Zeilen bleibt sie versteckt.
+async function heuteKarte(seite) {
+  await seite.waitForSelector('.screen.arena .detail .ort-panel-oben', { state: 'attached', timeout: 20000 });
+  await seite.evaluate(async () => {
+    const { fuelle } = await import('/js/orte.js');
+    document.querySelector('#test-heute')?.remove();
+    const k = document.createElement('section');
+    k.id = 'test-heute';
+    k.className = 'heute-karte';
+    k.innerHTML = '<div class="hk-kopf">Heute</div><div class="ort-heute"></div>';
+    document.querySelector('.screen.arena .detail .ort-panel-oben').after(k);
+    const r = fuelle('arena:heute', k.querySelector('.ort-heute'), { app: window.__app });
+    k.hidden = r.anzahl === 0;
+  });
 }
 
 const sz = (seite) => seite.evaluate(() => (window.__start ? window.__start.zustand() : { offen: false }));
@@ -623,7 +642,7 @@ async function browserTeil(browser) {
   const nr = await seite.evaluate(() => ({ ueber: document.querySelector('.st-text .ueberzeile').textContent, h1: document.querySelector('.st-titel').textContent,
     knoepfe: [...document.querySelectorAll('.st-knoepfe .knopf')].map((k) => k.textContent.trim()) }));
   pruefe('"Fertig": zurueck zum Willkommen, Seite "Bereit für deine erste Partie?" mit Willi', nr.ueber === 'Regel-Hilfe geschafft' && nr.h1 === 'Bereit für deine erste Partie?'
-    && nr.knoepfe.join('|') === 'Gegen Vogelscheuche Willi spielen|Einstufung machen|Zur Arena', JSON.stringify(nr));
+    && nr.knoepfe.join('|') === 'Gegen Vogelscheuche Willi spielen|Einstufung machen|Zu den Bots', JSON.stringify(nr));
   await bild(seite, 'nach-regeln-ipad');
   await seite.locator('[data-st="benno"]').click();
   await seite.waitForFunction(() => !!window.__partie && document.querySelector('.screen.partie'), null, { timeout: 15000 });
@@ -724,8 +743,8 @@ async function browserTeil(browser) {
   pruefe('"Fertig": Seite "Deine Empfehlung" mit Portraet, Ergebnis, Begruendung und Hinweis, dass die Probepartie nicht wertet', em.h1 === 'Starte gegen Lisa Läufer'
     && em.portraet === 'Lisa Läufer' && em.chips.join('|') === '6 von 8 gelöst|5 im ersten Versuch' && em.grund.length === 4 && /Probepartie wertet nicht/.test(em.notiz)
     && /Vogelscheuche Willi dein nächster Gegner/.test(em.notiz), JSON.stringify(em));
-  pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zur Arena', em.knoepfe.join('|')
-    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Vogelscheuche Willi|Einstufung wiederholen|Zur Arena', em.knoepfe.join('|'));
+  pruefe('Knoepfe: Probepartie (wertet nicht), Leiter, Einstufung wiederholen, Zu den Bots', em.knoepfe.join('|')
+    === 'Probepartie gegen Lisa Läufer wertet nicht|Leiter: Vogelscheuche Willi|Einstufung wiederholen|Zu den Bots', em.knoepfe.join('|'));
   await seite.reload();
   await warteSeite(seite, 'empfehlung', 20000);
   pruefe('Neuladen auf der Empfehlung: wieder die Empfehlung (nicht Seite 1)', (await sz(seite)).seite === 'empfehlung'
@@ -814,6 +833,7 @@ async function browserTeil(browser) {
     && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('analyse'));
   await n.seite.evaluate(() => window.__app.gehe('arena', {}, { ersetzen: true }));
   await n.seite.waitForSelector('.screen.arena .knoten');
+  await heuteKarte(n.seite);
   pruefe('am selben Tag kein zweiter Hinweis', await zeile(n.seite) === null);
   // naechster Tag: die Einstufung; Ausblenden
   const gestern = await vor(-1);
@@ -829,6 +849,7 @@ async function browserTeil(browser) {
     && (await modulImBrowser(n.seite)).fahrplan.erledigt.includes('einstufung'));
   await n.seite.reload();
   await n.seite.waitForSelector('.screen.arena .knoten');
+  await heuteKarte(n.seite);
   pruefe('nach dem Neuladen am selben Tag: nichts', await zeile(n.seite) === null);
   // abschaltbar
   mm = await modulImBrowser(n.seite);
@@ -930,6 +951,7 @@ async function browserTeil(browser) {
     }, { modul, kartei, fort: fortK(partien), P });
     await s.reload();
     await s.waitForFunction(() => !!window.__app && !!document.querySelector('.screen.arena .knoten') && !!document.querySelector('link[data-paket="start"]'), null, { timeout: 20000 });
+    await heuteKarte(s);
     await warte(600);
   }
   const messeK = (s) => s.evaluate(async () => {

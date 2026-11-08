@@ -20,6 +20,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { alteOrte } from './ohne-host.mjs';
 import { setzeSpeicher, MODUL_BUDGET, speicherePartie, ladeModul } from '../js/storage.js';
 import { hoere, sende, EREIGNISSE } from '../js/ereignisse.js';
 import { fuerOverlay, melde } from '../js/feier.js';
@@ -1072,20 +1073,21 @@ async function testeBrowser(browser) {
     && !(await h.klaenge()).includes('rekord'));
   await h.tippe('.pk-abr-knopf');
   const det = await seite.locator('.pk-details').innerText();
-  pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, kurzer Sieg ohne Ergebnis-Bonus, Verwertung) und „Zur Bestenliste“',
+  pruefe('Antippen zeigt die Aufschlüsselung (Züge, Theorie, kurzer Sieg ohne Ergebnis-Bonus, Verwertung) und „Zur Liga“',
     await seite.locator('.pk-details:not([hidden])').count() === 1 && /Züge \(\d+ offen\)/.test(det) && /Theorie/.test(det)
-    && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1, det);
+    && /Vor dem 10\. eigenen Zug beendet: kein Ergebnis-Bonus/.test(det) && /Verwertung/.test(det) && await seite.locator('.pk-zur-liste').count() === 1
+    && (await seite.locator('.pk-zur-liste').innerText()).trim() === 'Zur Liga', det);
   await bild(seite, 'ergebnis-erster-eintrag');
   const fensterGemerkt = () => seite.evaluate(() => (JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen:punkte') || '{}') || {}).fenster ?? null);
   const fensterVorher = await fensterGemerkt();
   await h.tippe('.pk-zur-liste');
   await seite.waitForSelector('.bl-reiter[data-reiter="bots"]:not([hidden])');
   await warte(600);
-  pruefe('„Zur Bestenliste“ öffnet den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
+  pruefe('„Zur Liga“ öffnet den Reiter Bots mit Lukas’ Tafel', /Lukas’ Tafel/.test(await seite.locator('.bl-tafel h2').innerText())
     && await seite.locator('.bl-tafel').getAttribute('data-tafel') === 'bot:benno');
   // Pruefer-Befund (klein): der Platz der Abrechnung gilt Allzeit, also oeffnet "Zur Bestenliste" die Tafel in Allzeit
   // (nicht im gemerkten Fenster, Standard Woche); gemerkt wird dabei kein Fenster
-  pruefe('„Zur Bestenliste“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
+  pruefe('„Zur Liga“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
     await seite.locator('.bl-screen').getAttribute('data-fenster') === 'allzeit'
     && await seite.locator('.bl-steuer-fenster .seg[aria-checked="true"]').getAttribute('data-wert') === 'allzeit'
     && fensterVorher !== 'allzeit' && await fensterGemerkt() === fensterVorher, { fensterVorher, jetzt: await fensterGemerkt() });
@@ -1129,8 +1131,11 @@ async function testeBrowser(browser) {
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'hilde' }));
   await seite.waitForSelector('.screen.arena .detail');
   await warte(500);
+  await alteOrte(seite);   // panel-bot nur im Test (Variante A, tests/ohne-host.mjs)
   const ohnePanel = await seite.locator('.ort-panel-bot .pk-panel').count();
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await warte(500);
+  await alteOrte(seite);
   await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
   // Seit U5 gleitet das Detail-Panel beim Wechsel des Bots herein (transform): erst messen, wenn es steht
   // (nur endliche Animationen im Panel, die Weltkarte hat Dauer-Animationen)
@@ -1208,6 +1213,8 @@ async function testeBrowser(browser) {
   await h.bestenliste({ reiter: 'bots' });
   const gast = await seite.evaluate(() => [...document.querySelectorAll('.bl-tafel .bl-zeile')].map((z) => z.dataset.platz + ':' + z.querySelector('.bl-z-name').textContent.trim()));
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
+  await warte(500);
+  await alteOrte(seite);
   await seite.waitForSelector('.screen.arena .ort-panel-bot .pk-panel', { timeout: 10000 }).catch(() => {});
   pruefe('Bot-Panel mit Gast auf der Tafel: dazu „· Platz 1“', /^Lukas’ Tafel · Bestwert [\d.]+ · Platz 1$/.test((await seite.locator('.ort-panel-bot .pk-panel').textContent()).trim()));
   await h.bestenliste({ reiter: 'bots' });

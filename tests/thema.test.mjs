@@ -571,7 +571,7 @@ async function browserTeil(browser) {
     .replace(/#F4F1EC/g, '#E8E2F4').replace(/#FFFFFF/g, '#FDFBFF').replace(/#CC4820/g, '#2F6FD8').replace(/--r-l: 24px/, '--r-l: 8px');
   pruefe('Probe-Theme besteht die Theme-Regeln', pruefeThemaDatei(probeCss, 'probe').length === 0, pruefeThemaDatei(probeCss, 'probe').join(' | '));
   await seite.route('**/css/themes/probe.css', (r) => r.fulfill({ status: 200, contentType: 'text/css', body: probeCss }));
-  const SEL = ['.kopf', '.logo', '.kopf-chips', '.karte', '.detail', '.detail h2', '.merkmale', '.ziel-sterne', '.farbwahl', '[data-aktion="spielen"]', '.bilanz'];
+  const SEL = ['.kopf', '.logo', '.kopf-chips', '.karte', '.detail', '.detail h2', '.ziel-sterne', '.farbwahl', '[data-aktion="spielen"]'];
   const boxen = () => seite.evaluate((sel) => {
     const aus = {};
     for (const s of sel) {

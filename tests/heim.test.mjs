@@ -228,7 +228,7 @@ async function testeBuehne(browser, heute) {
       nameZeilen: (() => { const h = document.querySelector('.heim-gegner'); return h ? Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)) : 0; })(),
       bild: !!document.querySelector('.heim-portraet img'),
       satz: document.querySelector('.heim-spielweise')?.textContent.trim(), bot: document.querySelector('[data-aktion="heim-spielen"]')?.dataset.bot,
-      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes'),
+      brett: !!document.querySelector('.heim-mini'), liga: !!document.querySelector('.heim-naechstes [data-aktion="heim-liga"]'),
       symbol: document.querySelector('[data-weg="zuzweit"] .heim-symbol svg')?.querySelectorAll('circle').length }));
     pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && !!b.name && /^Elo \d/.test(b.elo || '')
       && !!b.satz && !!b.bot && !b.brett, JSON.stringify(b));
@@ -236,7 +236,7 @@ async function testeBuehne(browser, heute) {
     pruefe('Handy: Name ohne Elo in einer Zeile ("Vogelscheuche Willi"), Elo darunter', !/\d/.test(b.name || '') && b.nameZeilen === 1, JSON.stringify(b));
     pruefe('Kachel Zu zweit: Symbol mit zwei Personen', b.symbol === 2, String(b.symbol));
     pruefe('keine Partie: anderer Titel', b.titel && b.titel !== 'Deine Partie wartet.', b.titel);
-    pruefe('ohne Liga-Stand: "Als Naechstes" fehlt ganz (keine leeren Platzhalter)', !b.naechstes);
+    pruefe('ohne Liga-Stand: keine Liga-Zeile unter "Als Naechstes"', !b.liga);
     await seite.locator('[data-aktion="heim-spielen"]').click();
     pruefe('Spielen startet eine Partie gegen diesen Bot', await istScreen(seite, 'partie')
       && await seite.waitForFunction((id) => window.__partie && window.__partie.bereit === true && window.__partie.z.bot.id === id
@@ -280,14 +280,15 @@ async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 8
   return { kontext, seite, fehler };
 }
 const STAND = { stufe: 7, kronen: 64, platz: 9, ziel: 160, n: 30, woche: '2026-11-02' };
-// Liga-Zeile unter "Als Naechstes": Stufe (b), Platz-Text, Balken, Beschriftung
-const zeile = (seite) => seite.evaluate(() => {
-  const z = document.querySelector('.heim-naechstes .heim-zeile');
-  return { zeilen: document.querySelectorAll('.heim-naechstes .heim-zeile').length, stufe: z?.querySelector('.heim-zeile-text b')?.textContent.trim() || null,
+// Liga-Zeile unter "Als Naechstes" (seit Variante A nach den Zeilen der Pakete): Stufe (b), Platz-Text, Balken, Beschriftung
+const LIGA = '.heim-naechstes [data-aktion="heim-liga"]';
+const zeile = (seite) => seite.evaluate((LIGA) => {
+  const z = document.querySelector(LIGA);
+  return { zeilen: document.querySelectorAll(LIGA).length, stufe: z?.querySelector('.heim-zeile-text b')?.textContent.trim() || null,
     text: z?.querySelector('.heim-zeile-text > span')?.textContent.trim() || null, balken: parseFloat(z?.querySelector('.heim-zeile-balken span')?.style.width),
     aria: z?.getAttribute('aria-label') || null, rumpf: document.querySelector('.heim-rumpf')?.textContent || '' };
-});
-const warteZeile = (seite, text) => seite.waitForFunction((x) => document.querySelector('.heim-naechstes .heim-zeile-text > span')?.textContent.trim() === x, text, { timeout: 8000 })
+}, LIGA);
+const warteZeile = (seite, text) => seite.waitForFunction(([x, LIGA]) => document.querySelector(LIGA + ' .heim-zeile-text > span')?.textContent.trim() === x, [text, LIGA], { timeout: 8000 })
   .then(() => true, () => false);
 // sichtbare Texte ohne NaN, undefined oder null (eine fehlende Zeile liefert selbst null, das ist kein Unsinn)
 const ohneUnsinn = (r) => [r.stufe, r.text, r.aria].filter((x) => x != null).every((x) => !/NaN|undefined|null/.test(x)) && !/NaN|undefined/.test(r.rumpf);
@@ -322,7 +323,7 @@ async function testeNaechstes(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
     await istScreen(seite, 'heim');
     const r = await zeile(seite);
-    pruefe('ohne Konto: "Als Naechstes" fehlt ganz, keine Liga-Zeile', r.zeilen === 0 && !(await seite.locator('.heim-naechstes').count()), JSON.stringify(r));
+    pruefe('ohne Konto: keine Liga-Zeile', r.zeilen === 0, JSON.stringify(r));
     pruefe('kein NaN oder undefined', ohneUnsinn(r));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
@@ -381,7 +382,7 @@ async function testeNaechstes(browser, heute) {
     await istScreen(seite, 'heim');
     await warte(1200);
     const r = await zeile(seite);
-    pruefe('offline mit Stand eines anderen Kontos: keine Liga-Zeile (still)', r.zeilen === 0 && !(await seite.locator('.heim-naechstes').count()), JSON.stringify(r));
+    pruefe('offline mit Stand eines anderen Kontos: keine Liga-Zeile (still)', r.zeilen === 0, JSON.stringify(r));
     await kontext.close();
   }
   {
@@ -417,6 +418,50 @@ async function testeNaechstes(browser, heute) {
       && sonst.wege.join() === 'Online,Learn,Two players', JSON.stringify({ r, sonst }));
     await kontext.close();
   }
+}
+
+// Variante A (Flo 08.11.2026): die Tagesziele stehen unter "Als Naechstes" (Ort heim:naechstes), unter den Wegen; das
+// Bots-Panel zeigt nur noch den Gegner (keine Merkmale, keine Bilanz, keine Heute-Karte, kein Bot-Ort)
+async function testeTagesziele(browser, heute) {
+  gruppe = 'tagesziele';
+  const { kontext, seite, fehler } = await kontoSeite(browser, { stand: STAND, speicher: gesehen(heute) });
+  await istScreen(seite, 'heim');
+  await warteZeile(seite, 'Platz 9 von 30');
+  await seite.waitForSelector('.heim-naechstes [data-paket="tagesraetsel"]', { timeout: 8000 }).catch(() => {});
+  const r = await seite.evaluate(() => {
+    const n = document.querySelector('.heim-naechstes');
+    const zeilen = [...n.querySelectorAll('.heim-zeile')];
+    return { sichtbar: !n.hidden, unterWegen: n.previousElementSibling?.classList.contains('heim-wege'),
+      reihe: zeilen.map((z) => z.dataset.paket || z.dataset.aktion), knoepfe: zeilen.every((z) => z.tagName === 'BUTTON' && z.getBoundingClientRect().height >= 44),
+      marsch: [...(zeilen[0]?.querySelectorAll('.heim-zeile-text > *') || [])].map((e) => e.textContent.trim()).join(' | '),
+      raetsel: [...n.querySelectorAll('[data-paket="tagesraetsel"] .heim-zeile-text > *')].map((e) => e.textContent.trim()).join(' | '),
+      aria: zeilen.map((z) => z.getAttribute('aria-label')) };
+  });
+  pruefe('"Als Naechstes" steht unter den drei Wegen', r.sichtbar && r.unterWegen, JSON.stringify(r));
+  pruefe('Reihenfolge: Bauernmarsch (Tageswerk), Tagesraetsel, dann die Liga', r.reihe.join() === 'serie,tagesraetsel,heim-liga', r.reihe.join());
+  pruefe('Bauernmarsch: "Heute noch offen · Tageswerk in 5 Minuten"', r.marsch === 'Bauernmarsch | Heute noch offen · Tageswerk in 5 Minuten', r.marsch);
+  pruefe('Tagesraetsel: Nummer und Zuege', /^Tagesrätsel \| Rätsel \d+, in \d+ (Zug|Zügen)$/.test(r.raetsel || ''), r.raetsel);
+  pruefe('jede Zeile ein Knopf ab 44 px mit Beschriftung', r.knoepfe && r.aria.every((a) => a && !/undefined|NaN/.test(a)), JSON.stringify(r.aria));
+  await seite.locator('.heim-naechstes [data-paket="serie"]').click();
+  pruefe('Bauernmarsch oeffnet das Training (Tageswerk in 5 Minuten)', await istScreen(seite, 'training'));
+  await seite.goBack();
+  await istScreen(seite, 'heim');
+  await seite.waitForSelector('.heim-naechstes [data-paket="tagesraetsel"]', { timeout: 8000 }).catch(() => {});
+  await seite.locator('.heim-naechstes [data-paket="tagesraetsel"]').click();
+  pruefe('Tagesraetsel oeffnet das Raetsel', await istScreen(seite, 'raetsel'));
+  // Bots: nur Karte und Gegner
+  await seite.evaluate(() => window.__app.gehe('arena'));
+  await istScreen(seite, 'arena');
+  const p = await seite.evaluate(() => { const d = document.querySelector('.arena .detail');
+    return { merkmale: d.querySelectorAll('.merkmal').length, bilanz: d.querySelectorAll('.bilanz').length, heute: d.querySelectorAll('.heute-karte').length,
+      botOrt: d.querySelectorAll('.ort-panel-bot').length, liga: d.querySelectorAll('.ort-panel-oben > :not(.nachlese)').length,
+      kopf: !!d.querySelector('.detail-kopf h2'), spruch: !!d.querySelector('.spruch'), ziele: d.querySelectorAll('.ziel-sterne > div').length,
+      farbe: !!d.querySelector('.farbwahl'), spielen: !!d.querySelector('[data-aktion="spielen"]') }; });
+  pruefe('Bots-Panel: Kopf, Spruch, drei Stern-Ziele, Farbe, Spielen', p.kopf && p.spruch && p.ziele === 3 && p.farbe && p.spielen, JSON.stringify(p));
+  pruefe('Bots-Panel: keine Merkmale, keine Bilanz, keine Heute-Karte, kein Bot-Ort, keine Liga-Karte',
+    p.merkmale + p.bilanz + p.heute + p.botOrt + p.liga === 0, JSON.stringify(p));
+  pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+  await kontext.close();
 }
 
 async function testeWege(browser, heute) {
@@ -546,6 +591,7 @@ async function browserTeil(browser) {
   await testeBuehne(browser, heute);
   await testeKronenLage(browser);
   await testeNaechstes(browser, heute);
+  await testeTagesziele(browser, heute);
   await testeWege(browser, heute);
   await testeGroessen(browser, heute);
   await testeErsterStart(browser);
