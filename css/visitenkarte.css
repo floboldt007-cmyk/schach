@@ -118,8 +118,9 @@
 .st-karte[data-stufe="2"] { border-color: var(--st-silber); }
 .st-karte[data-stufe="3"] { border-color: var(--st-gold); box-shadow: 0 0 0 1px var(--st-gold), 0 12px 40px rgba(224, 162, 43, .35); }
 .st-ueber { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .02em; }
-.st-bild { display: grid; place-items: center; width: 88px; height: 88px; }
-.st-bild svg { width: 88px; height: 88px; }
+/* nur in der Karte: .st-bild heisst auch das Bild der Einfuehrung (js/ui/start.js), dort machte die Regel es 88 x 88 px */
+.st-karte .st-bild { display: grid; place-items: center; width: 88px; height: 88px; }
+.st-karte .st-bild svg { width: 88px; height: 88px; }
 .st-name { font-family: var(--display); font-weight: var(--gw-titel, 800); font-size: 22px; }
 .st-stufe { font-weight: 800; font-size: 15px; }
 .st-karte[data-stufe="1"] .st-stufe { color: var(--st-bronze); }

@@ -12,7 +12,7 @@
 //   (intern) lageSatz(cp, mate, sicht) -> { art, anteil, wert }   Bewertung (Sicht Weiss) als Lage-Art, Balken und Zahl
 //
 // Ziele: Weiterspielen -> partie (fortsetzen, wie app.js pruefeZiel; Zu zweit wie pakete/zuzweit), Spielen -> partie
-// gegen naechsterGegner(); heim-online -> lobby (laborFrei) sonst online; heim-raetsel (Lernen) -> training (dort steht
+// gegen naechsterGegner(); heim-online -> online (fuer alle, Flo 08.11.2026); heim-raetsel (Lernen) -> training (dort steht
 // die Meisterschule oben, #150); heim-zuzweit -> partie Zu zweit; Liga-Zeile -> bestenliste.
 // Liga-Zeile (Etappe B, Wochen-Gruppen; L 08.11.2026: der fruehere Ring als Zeile unter "Als Naechstes"): Stufe
 // ("Läufer II") und "Platz 3 von 30" bzw. "Spiel eine Partie für deine Gruppe", Balken bis Platz 5. Erst der gemerkte
@@ -26,7 +26,6 @@ import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
 import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
-import { laborFrei } from '../labor.js';
 import { BOTS, botNachId } from '../bots.js';
 import { eigenerName, sitzung } from '../konto.js';
 import { holeStand, angemeldet } from '../kronen.js';
@@ -35,6 +34,7 @@ import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../
 import * as serieStand from '../pakete/serie/stand.js';
 import { lage as serieLage } from '../pakete/serie/tag.js';
 import { tagSchluessel } from '../tag.js';
+import { fuelle } from '../orte.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
 import { stufenName } from '../pakete/liga/texte.js';
@@ -290,37 +290,49 @@ function merke(stand) {
   speichereModul('kronen', { konto: uid, stand: st, startGemeldet: alt.konto === uid ? alt.startGemeldet : false });
 }
 
-// "Als Naechstes": Kandidaten mit Rang (1 offene Herausforderung, 2 Belohnung kurz vor dem Ziel, 3 Liga-Platz), hoechstens
-// zwei. Heute gibt es Daten nur fuer den Liga-Platz (Kronen der Wochen-Gruppe, Etappe B); die anderen Raenge kommen mit
-// ihren Quellen (Online-Server, Belohnungen). Ruhig: kein Countdown, kein roter Punkt.
-function naechsteZeilen(lg) {
-  const zeilen = [];
-  if (lg && !lg.ohneKonto) {
-    const stufe = stufenName(lg.stufe);
-    const text = lg.platz != null ? t('heim.liga.platz', { platz: zahl(lg.platz), n: zahl(lg.n) }) : t('heim.liga.ohneGruppe');
-    const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) });
-    zeilen.push({ rang: 3, html: `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" aria-label="${esc(label)}">
+// "Als Naechstes" (Variante A, Flo 08.11.2026: die Tagesziele ziehen aus dem Bots-Panel hierher, unter die Wege): zuerst
+// die Zeilen der Pakete am Ort heim:naechstes (Tageswerk 10, Tagesraetsel 20, Kartei 25, je nur solange heute offen), dann
+// der Liga-Platz (Kronen der Wochen-Gruppe, Etappe B). Wie viele Zeilen sichtbar sind, entscheidet css/heim.css nach der
+// Fensterhoehe (auf dem Handy scrollt nichts). Ruhig: kein Countdown, kein roter Punkt. Ohne Zeile entfaellt der Abschnitt.
+function ligaZeile(lg) {
+  if (!lg || lg.ohneKonto) return '';
+  const stufe = stufenName(lg.stufe);
+  const text = lg.platz != null ? t('heim.liga.platz', { platz: zahl(lg.platz), n: zahl(lg.n) }) : t('heim.liga.ohneGruppe');
+  const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) });
+  return `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" aria-label="${esc(label)}">
         <span class="heim-zeile-bild" aria-hidden="true">${icon('liga')}</span>
         <span class="heim-zeile-text"><b>${esc(stufe)}</b><span>${esc(text)}</span></span>
         <span class="heim-zeile-balken" aria-hidden="true"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
-      </button>` });
-  }
-  return zeilen.sort((a, b) => a.rang - b.rang).slice(0, 2);
+      </button>`;
 }
 
-function naechstesHtml(zeilen) {
-  return zeilen.length ? `<section class="heim-naechstes" aria-labelledby="heim-naechstes-titel">
-          <h3 id="heim-naechstes-titel">${esc(t('heim.naechstes'))}</h3>
-          <div class="heim-liste">${zeilen.map((z) => z.html).join('')}</div>
-        </section>` : '';
+// Zeile fuer die Pakete (Kontext zeile() am Ort heim:naechstes): dieselbe Form wie die Liga-Zeile, rechts ein Pfeil
+function paketZeile({ symbol = '', titel = '', text = '', label = '', beiTipp, paket = '' } = {}) {
+  const k = document.createElement('button');
+  k.type = 'button';
+  k.className = 'heim-zeile dr';
+  if (paket) k.dataset.paket = paket;
+  if (label) k.setAttribute('aria-label', label);
+  k.innerHTML = `<span class="heim-zeile-bild" aria-hidden="true">${symbol}</span>
+      <span class="heim-zeile-text"><b>${esc(titel)}</b><span>${esc(text)}</span></span>
+      <span class="heim-zeile-pfeil" aria-hidden="true">${icon('vor')}</span>`;
+  if (typeof beiTipp === 'function') k.addEventListener('click', (e) => { e.stopPropagation(); beiTipp(e); });
+  return k;
 }
 
-// Abschnitt "Als Naechstes" neu zeichnen (Server-Stand kam nach dem ersten Zeichnen); fehlt er, kommt er nach oben rechts
-function zeichneNaechstes(s, lg) {
-  const html = naechstesHtml(naechsteZeilen(lg));
-  const alt = s.querySelector('.heim-naechstes');
-  if (alt) { if (html) alt.outerHTML = html; else alt.remove(); return; }
-  if (html) s.querySelector('.heim-rechts').insertAdjacentHTML('afterbegin', html);
+// Abschnitt sichtbar, sobald eine Zeile drinsteht
+function zeigeNaechstes(s) {
+  const n = s.querySelector('.heim-naechstes');
+  n.hidden = !n.querySelector('.heim-zeile');
+}
+
+// Liga-Zeile neu zeichnen (Server-Stand kam nach dem ersten Zeichnen); die Zeilen der Pakete bleiben stehen
+function zeichneLiga(s, lg) {
+  const alt = s.querySelector('.heim-liste [data-aktion="heim-liga"]');
+  if (alt) alt.remove();
+  const html = ligaZeile(lg);
+  if (html) s.querySelector('.heim-liste').insertAdjacentHTML('beforeend', html);
+  zeigeNaechstes(s);
 }
 
 export function zeigeHeim(app, { jetzt = new Date() } = {}) {
@@ -332,7 +344,6 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const chips = tage > 0
     ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: zahl(tage) }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: zahl(tage) }))}</span>`
     : '';
-  const zeilen = naechsteZeilen(ersteLage());
   const s = document.createElement('section');
   s.className = 'screen heim-screen';
   s.setAttribute('aria-label', t('heim.aria'));
@@ -343,7 +354,6 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
         <div class="heim-buehne" data-art="${partie ? 'partie' : 'gegner'}">${partie ? buehnePartie(laufend, st) : buehneGegner(bot)}</div>
       </div>
       <div class="heim-rechts">
-        ${naechstesHtml(zeilen)}
         ${partie ? '' : leiterZeile(bot)}
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
@@ -351,8 +361,14 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
             <span class="heim-text"><b>${esc(t('heim.' + id + '.titel'))}</b><span>${esc(t('heim.' + id + '.text'))}</span></span>
           </button>`).join('')}
         </div>
+        <section class="heim-naechstes" aria-labelledby="heim-naechstes-titel" hidden>
+          <h3 id="heim-naechstes-titel">${esc(t('heim.naechstes'))}</h3>
+          <div class="heim-liste"></div>
+        </section>
       </div>
     </div>`;
+  s._orte = fuelle('heim:naechstes', s.querySelector('.heim-liste'), { app, tag: tagSchluessel(jetzt), zeile: paketZeile });
+  zeichneLiga(s, ersteLage());
   s.querySelector('.heim-rumpf').addEventListener('click', (e) => {
     const k = e.target.closest('[data-aktion]');
     if (!k) return;
@@ -363,7 +379,8 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
     } else if (a === 'heim-spielen') app.gehe('partie', { botId: k.dataset.bot });
     else if (a === 'heim-liga') app.gehe('bestenliste');
     else if (a === 'heim-leiter') app.gehe('arena');
-    else if (a === 'heim-online') app.gehe(laborFrei() ? 'lobby' : 'online');
+    // Flo 08.11.2026: die neue Online-Seite (Partie und Raetsel-Duell) fuer alle; die Lobby bleibt Labor-Vorschau
+    else if (a === 'heim-online') app.gehe('online');
     else if (a === 'heim-raetsel') app.gehe('training');
     else if (a === 'heim-zuzweit') app.gehe('partie', { modus: 'zuzweit' });
   });
@@ -425,13 +442,14 @@ export function zeige(root, params, app) {
       const stand = Array.isArray(d) ? d[0] : d;
       if (!stand || typeof stand !== 'object' || !Number.isFinite(Number(stand.kronen))) return;
       merke(stand);
-      if (!weg && s.isConnected) zeichneNaechstes(s, kronenLage(stand));
+      if (!weg && s.isConnected) zeichneLiga(s, kronenLage(stand));
     }, () => {});
   }
   return {
     verlasse() {
       weg = true;
       try { kopf.verlasse(); } catch (e) { /* egal */ }
+      try { s._orte.verlasse(); } catch (e) { /* egal */ }
       if (s._brett) s._brett.zerstoere();
     },
   };

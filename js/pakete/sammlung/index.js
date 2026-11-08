@@ -20,6 +20,7 @@ import { erfinderBereich } from './erfinder.js';
 import { hoere } from '../../ereignisse.js';
 import { ladeBesitz, abgleichen, zaehleRaetsel } from '../../besitz.js';
 import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
+import { lade as ladePunkte, tafelStatistik } from '../punkte/stand.js';
 import { FAMILIEN, familienStand } from './stufen.js';
 import { zeigeStufen } from './moment.js';
 import { titelJetzt, talerJetzt } from './profil.js';
@@ -98,7 +99,32 @@ export function spielstand() {
   return { ligaBest: stufen.length ? Math.max(...stufen) : 0, serieBest: Number.isInteger(serie.best) ? serie.best : 0,
     level: Number.isInteger(funken.level) ? funken.level : 1 };
 }
-export const LIGA_STUFEN = 6;                       // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
+
+// Was die Koennen-Titel vom 08.11.2026 lesen (Flo: zwoelf neue Titel, jeder erklaert eine vorhandene Zahl). Nur Daten, die
+// der Browser schon hat, nur lesen; jede kaputte Quelle zaehlt als 0. Fortschritt (Welten, Sterne), Kronen-Stufe des
+// letzten Server-Stands, Raetsel-Zaehler (js/besitz.js, Tagesraetsel), Tafeln und Rekorde (Paket punkte), richtig
+// geloeste Karten der Fehler-Kartei, fertige Kapitel der Meisterschule (nur im Labor) und bezwungene Erzfeinde (Modul bots).
+export function titelDaten(f = ladeFortschritt(), schule = schulStand()) {
+  const sicher = (fn, ersatz) => { try { const x = fn(); return x == null ? ersatz : x; } catch (e) { return ersatz; } };
+  const zahl = (x) => (Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
+  const besiegt = (b) => !!(f.bots[b.id] && f.bots[b.id].sterne[0]);
+  const welten = WELTEN.map((w) => BOTS.filter((b) => b.welt === w.nr)).filter((bs) => bs.length);
+  const tafel = sicher(() => tafelStatistik(ladePunkte()), {});
+  const kartei = sicher(() => ladeModul('kartei', null), {});
+  const bots = sicher(() => ladeModul('bots', null), {});
+  const erzfeind = bots && bots.erzfeind && typeof bots.erzfeind === 'object' && !Array.isArray(bots.erzfeind) ? bots.erzfeind : {};
+  return {
+    kronenStufe: sicher(() => { const k = kronenSpeicher(ladeModul('kronen', {})); return k.stand && Number.isInteger(k.stand.stufe) ? stufeInfo(k.stand.stufe).index : -1; }, -1),
+    raetsel: zahl(sicher(() => ladeBesitz().raetsel.n, 0)),
+    weltenMitSieg: sicher(() => welten.filter((bs) => bs.some(besiegt)).length, 0), weltenAlle: welten.length,
+    sterneWelt: sicher(() => welten.some((bs) => bs.every((b) => sterneZahl(b.id, f) === 3)), false),
+    platz1: zahl(tafel.platz1), rekorde: zahl(tafel.rekorde),
+    kartei: zahl(kartei && kartei.zaehler && kartei.zaehler.richtig),
+    schulKapitel: schule ? schule.bereiche.filter((b) => b.alle > 0 && b.geschafft >= b.alle).length : 0,
+    erzfeind: Object.keys(erzfeind).length,
+  };
+}
+export const LIGA_STUFEN = 6;                      // Bronze bis Meister (Paket liga, STUFEN 1 bis 6)
 export const SERIE_ZIELE = Object.freeze([7, 30, 100]);
 export const LEVEL_ZIELE = Object.freeze([10, 20, 30]);
 export const SIEGE_ZIELE = Object.freeze([10, 50, 100]);
@@ -164,8 +190,10 @@ export function teileErfolge(f = ladeFortschritt(), z = spielstand(), pa = parti
     aus.push(erfolg('welt-' + w.nr, bots.length > 0 && k === bots.length, S('erfolg.welt', { name: w.name }),
       S('erfolg.weltWeg', { n: k, alle: bots.length }), bots.length ? k / bots.length : 0));
   }
+  // Alte Saison-Liga (Flo 08.11.2026, eine Liga): wer eine Stufe erreicht hat, behaelt den Erfolg; alle anderen sehen
+  // ihn nicht mehr, weil er nicht mehr zu erspielen ist (die Kronen-Liga zaehlt in der Familie liga, ./stufen.js)
   for (let s = 1; s <= LIGA_STUFEN; s++) {
-    aus.push(erfolg('liga-' + s, z.ligaBest >= s, S('erfolg.liga', { stufe: S('liga.' + s) }), S('erfolg.ligaWeg', { stufe: S('liga.' + s) })));
+    if (z.ligaBest >= s) aus.push(erfolg('liga-' + s, z.ligaBest >= s, S('erfolg.liga', { stufe: S('liga.' + s) }), S('erfolg.ligaWeg', { stufe: S('liga.' + s) })));
   }
   for (const n of SERIE_ZIELE) {
     aus.push(erfolg('serie-' + n, z.serieBest >= n, S('erfolg.serie', { n }), S('erfolg.serieWeg', { n: Math.min(z.serieBest, n), alle: n }),

@@ -74,7 +74,7 @@ registriereTexte('p-serie', {
     'brief.365': 'Ein ganzes Jahr Schach. Ich habe nachgerechnet: Das ist kein Zufall mehr.',
     // Feier (index.js)
     'feier.umwandlung': 'Umwandlung! Deine {nr}. Figur zieht in die Ehrenreihe.',
-    'feier.umwandlungText': 'Wähle sie in der Arena: Dame, Turm, Läufer oder Springer.',
+    'feier.umwandlungText': 'Wähle sie auf der Startseite: Dame, Turm, Läufer oder Springer.',
     'feier.marsch': 'Tag {n} der Serie',
     doppelKurz: 'Willkommen zurück. Doppelschritt.',
     // Umwandlung waehlen
@@ -84,7 +84,7 @@ registriereTexte('p-serie', {
     'wahl.figur': '{name} wählen',
     // Abrechnung
     'abr.serie': 'Serie',
-    'abr.umwandlung': 'Umwandlung! Figur in der Arena wählen.',
+    'abr.umwandlung': 'Umwandlung! Figur auf der Startseite wählen.',
     // Kalender
     'art.gezaehlt': 'gezählt',
     'art.reise': 'gezählt (Reise-Regel)',
@@ -246,7 +246,7 @@ registriereTexte('p-serie', {
     'brief.100': 'A hundred chess days! I am having a banner embroidered. My steed has never carried one like it.',
     'brief.365': 'A whole year of chess. I did the math: this is no coincidence anymore.',
     'feier.umwandlung': 'Promotion! Piece #{nr} joins your honor row.',
-    'feier.umwandlungText': 'Choose it in the Arena: queen, rook, bishop, or knight.',
+    'feier.umwandlungText': 'Choose it on the home screen: queen, rook, bishop, or knight.',
     'feier.marsch': 'Day {n} of your streak',
     doppelKurz: 'Welcome back. Double step.',
     'wahl.label': 'Promotion: choose a piece',
@@ -254,7 +254,7 @@ registriereTexte('p-serie', {
     'wahl.text': 'Promotion! Your piece joins the honor row. Which one will it be?',
     'wahl.figur': 'Choose {name}',
     'abr.serie': 'Streak',
-    'abr.umwandlung': 'Promotion! Choose your piece in the Arena.',
+    'abr.umwandlung': 'Promotion! Choose your piece on the home screen.',
     'art.gezaehlt': 'counted',
     'art.reise': 'counted (travel rule)',
     'art.bruecke': 'bridge',

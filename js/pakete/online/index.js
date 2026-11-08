@@ -10,7 +10,8 @@ anbieten('training:karten', ({ app }) => {
   if (!kontoFreigeschaltet()) return null;
   const el = document.createElement('article'); el.className = 't-karte online-karte';
   el.innerHTML = `<div><h2>${esc(O('titel'))}</h2><p>${esc(O('karte'))}</p></div><div class="t-fuss"><button class="knopf primaer" type="button">${esc(O('spielen'))}</button></div>`;
-  el.querySelector('button').addEventListener('click', () => app.gehe('online'));
+  // oeffnet die Online-Seite mit aufgeklappter Freunde-Zeile (Einladen, Code, Meine Partien)
+  el.querySelector('button').addEventListener('click', () => app.gehe('online', { freunde: true }));
   return el;
 }, { paket: 'online', reihenfolge: 65 });
 

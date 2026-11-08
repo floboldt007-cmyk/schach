@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
 const warten = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function serverBereit() {
   for (let i = 0; i < 50; i++) {
-    try { if ((await fetch(START)).ok) return; } catch (e) { /* Server faehrt noch hoch */ }
+    try { const r = await fetch(START); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* Server faehrt noch hoch */ }
     await warten(100);
   }
   throw new Error(`Server auf Port ${PORT} startet nicht`);

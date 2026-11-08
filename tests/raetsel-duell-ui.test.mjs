@@ -1,7 +1,8 @@
 // Raetsel-Duell (Etappe 5), Browser-Teil: der Screen js/ui/raetsel-duell.js in der vollen App gegen einen
 // nachgebauten Server (rpc duell_* und Edge Function raetsel-duell). Spielt ein Duell gegen den KI-Gegner bis zur
 // Wertung (richtige Zuege, ein Raetsel mit Gegenantwort, Farbwechsel, ein falscher Zug mit 5 s Abzug, Stand des
-// Gegners live), dazu Freundschaft per Link, falscher Code, ohne Konto und ohne Labor.
+// Gegners live), dazu Freundschaft per Link, falscher Code, ohne Konto und ohne Labor (seit 08.11.2026 fuer alle frei,
+// Einstieg auch ueber die Online-Tuer mit sofortiger Suche und sichtbarer Restzeit).
 //   node tests/raetsel-duell-ui.test.mjs                    iPhone 390x844 hell und iPad 820x1180 dunkel
 //   node tests/raetsel-duell-ui.test.mjs --bilder=<ordner>  dazu Bilder (iPhone und iPad, je hell und dunkel)
 // Die echten Regeln (Zeit, Abzug, Wertung, Kronen) prueft tests/server-raetsel-duell.test.mjs gegen das SQL; hier
@@ -149,7 +150,8 @@ async function tippe(s, feld) {
   await warte(120);
 }
 async function zieh(s, uci) { await tippe(s, uci.slice(0, 2)); await tippe(s, uci.slice(2, 4)); }
-const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`).innerText();
+// textContent: sichtbar ist nur die Zahl, "gelöst" steht fuer Vorleser daneben (Kopf an Kopf, 08.11.2026)
+const geloest = (s, wer) => s.locator(`.rd-seite[data-wer="${wer}"] .rd-geloest`).textContent();
 async function warteBis(s, fn, arg, ms = 6000) { await s.waitForFunction(fn, arg, { timeout: ms }); }
 const bildName = (geraet, schema, teil) => `raetsel-duell-${geraet}-${schema === 'dark' ? 'dunkel' : 'hell'}-${teil}`;
 async function bild(s, name) { if (BILDER) await s.screenshot({ path: path.join(BILDER, name + '.png') }); }
@@ -238,6 +240,8 @@ async function duellGegenKi(browser, { geraet, breite, hoehe, schema }) {
       return { sek: m * 60 + x, fehler: document.querySelector('.rd-seite[data-wer="ich"] .rd-fehlerzahl').textContent,
         text: document.querySelector('.rd-meldung').textContent, nr: document.querySelector('.rd-nr').textContent };
     });
+    pruefe('Reihe unter dem Brett: drei gruen (geloest), dann ein rot (Fehler)', await s.evaluate(() =>
+      [...document.querySelectorAll('.rd-spiel .rd-reihe li')].map((li) => li.dataset.art || '-').slice(0, 5).join('') === 'gggr-'));
     pruefe('Falscher Zug: 1 Fehler, Uhr springt um 5 s zurueck, Meldung nennt den Abzug, Raetsel 5 kommt',
       nachFehler.fehler === '1 Fehler' && vorher - nachFehler.sek >= 5 && vorher - nachFehler.sek <= 7 && /5 Sekunden/.test(nachFehler.text) && /5/.test(nachFehler.nr), { vorher, ...nachFehler });
     pruefe('Zuege an die Edge Function: nur { duell, zug }, nie Zeit oder Ergebnis vom Geraet',
@@ -319,7 +323,10 @@ async function nebenwege(browser) {
     gruppe = 'Falscher Code';
     const p = await seite(browser, { breite: 390, hoehe: 844, srv: neuerServer(), rpc: (name) => (name === 'duell_beitreten' ? { fehler: 'DUELL_CODE' } : undefined) });
     try {
-      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"] #rd-code-feld', { timeout: 30000 });
+      // Kopf an Kopf (Flo 08.11.2026): das Code-Feld klappt erst mit "Code eingeben" auf
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-code-zeigen', { timeout: 30000 });
+      pruefe('Code-Feld ist zu, bis man "Code eingeben" tippt', await p.s.locator('#rd-code-feld').isHidden());
+      await p.s.locator('.rd-code-zeigen').click();
       await p.s.locator('#rd-code-feld').fill('ZZZ999');
       await p.s.locator('.rd-beitreten').click();
       await p.s.waitForSelector('.rd-fehler:not([hidden])', { timeout: 3000 });
@@ -332,24 +339,33 @@ async function nebenwege(browser) {
     gruppe = 'Ohne Konto';
     const p = await seite(browser, { breite: 390, hoehe: 844, angemeldet: false, erfinder: true });
     try {
-      // Solange das Duell im Labor steckt, ist es ohne Konto nie frei (das Labor braucht das Erfinder-Konto). Die
-      // Ansicht "konto" (Hinweis mit Knopf) greift erst, wenn das Duell aus dem Labor kommt.
-      await p.s.waitForSelector('.screen.arena', { timeout: 30000 });
+      // Seit Flo 08.11.2026 ist das Duell fuer alle frei: ohne Konto der Hinweis mit dem Weg zum Konto, kein Serveraufruf
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="konto"] .rd-konto', { timeout: 30000 });
       await warte(500);
-      pruefe('Ohne Konto: Labor zu, also zur Arena, kein Duell-Screen, keine duell-Aufrufe', await p.s.locator('.screen.raetsel-duell .rd-rumpf > *').count() === 0
+      pruefe('Ohne Konto: Hinweis und Knopf zum Konto, keine duell-Aufrufe', await p.s.locator('.rd-konto').isVisible()
         && p.aufrufe.every((a) => !/^duell_/.test(a.name)));
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }
-  // Ohne Labor: das Duell ist noch nicht freigegeben und fuehrt zur Arena
+  // Ohne Labor (Flo 08.11.2026: Duell fuer alle): Start mit dem Suchknopf; ueber die Online-Tuer (params.suchen) startet
+  // die gewertete Suche sofort und zaehlt die Restzeit bis zum KI-Gegner sichtbar herunter (Ring und Satz)
   {
     gruppe = 'Ohne Labor';
-    const p = await seite(browser, { breite: 390, hoehe: 844, erfinder: false });
+    const p = await seite(browser, { breite: 390, hoehe: 844, erfinder: false, rpc: (name) => (/^duell_suche_/.test(name) ? {} : undefined) });
     try {
-      await p.s.waitForSelector('.screen.arena', { timeout: 30000 });
-      await warte(500);
-      pruefe('Ohne Labor: zur Arena, kein Duell-Screen, keine duell-Aufrufe', await p.s.locator('.screen.raetsel-duell .rd-rumpf > *').count() === 0
-        && p.aufrufe.every((a) => !/^duell_/.test(a.name)));
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"] .rd-suchen', { timeout: 30000 });
+      await warte(300);
+      pruefe('Ohne Labor: Duell-Start mit "Gegner suchen · gewertet", keine duell-Aufrufe vor dem Tippen',
+        /gewertet/.test(await p.s.locator('.rd-suchen').innerText()) && p.aufrufe.every((a) => !/^duell_/.test(a.name)));
+      await p.s.evaluate(() => { window.__duellKiMs = 60000; window.__app.gehe('raetsel-duell', { suchen: true }); });
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="suche"] .rd-rest', { timeout: 5000 });
+      await warte(1300);
+      const rest = await p.s.evaluate(() => ({ text: document.querySelector('.rd-rest').textContent,
+        ring: Number(document.querySelector('.rd-warten .rd-ring-rest').getAttribute('stroke-dashoffset')) }));
+      pruefe('Online-Tuer: Suche startet sofort, Restzeit zaehlt sichtbar (Noch 58/59 s, Ring laeuft)', /^Noch 5[89] s/.test(rest.text) && rest.ring > 0
+        && p.aufrufe.some((a) => a.name === 'duell_suche_start'), rest);
+      await p.s.locator('.rd-abbrechen').click();
+      await p.s.waitForSelector('.screen.raetsel-duell[data-phase="start"]', { timeout: 3000 });
       pruefe('Keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
     } finally { await p.k.close(); }
   }

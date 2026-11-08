@@ -625,6 +625,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await warte(150);
@@ -705,7 +706,7 @@ function hilfen(seite) {
       await seite.waitForFunction(() => window.__partie && window.__partie.phase() === 'flo', null, { timeout: ms });
     },
     async starte(params) {
-      await seite.evaluate((p) => window.__app.gehe('partie', p), params);
+      await seite.evaluate((p) => { document.querySelector('#test-heute')?.remove(); window.__app.gehe('partie', p); }, params);
       await seite.waitForFunction(() => window.__partie && window.__partie.bereit === true, null, { timeout: 30000 });
     },
     async plan(p) {
@@ -757,6 +758,31 @@ function hilfen(seite) {
       await seite.evaluate(() => window.__app.gehe('arena'));
       await seite.waitForSelector('.screen.arena');
       await warte(500);
+      await h.heuteKarte();
+    },
+    // Seit Variante A (08.11.2026) hat arena:heute keinen Host mehr. Die Heute-Karte des Pakets bleibt registriert und
+    // wird hier fuer den Test in einen eigenen Behaelter gefuellt (fest am unteren Rand), damit ihre Logik geprueft bleibt,
+    // bis sie wieder einen Platz bekommt. Sichtbar ist fuer Spieler nur die Zeile auf der Startseite (Gruppe "Startseite").
+    async heuteKarte() {
+      await seite.evaluate(async () => {
+        const { fuelle } = await import('./js/orte.js');
+        document.querySelector('#test-heute')?.remove();
+        const k = document.createElement('section');
+        k.id = 'test-heute';
+        k.className = 'heute-karte';
+        k.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:30;background:Canvas';
+        const o = document.createElement('div');
+        o.className = 'ort-heute';
+        k.append(o);
+        document.body.append(k);
+        fuelle('arena:heute', o, { app: window.__app });
+      });
+      await warte(100);
+    },
+    async heim() {
+      await seite.evaluate(() => { document.querySelector('#test-heute')?.remove(); window.__app.gehe('heim'); });
+      await seite.waitForSelector('.heim-screen');
+      await warte(400);
     },
     async abrFertig(ms = 8000) {
       await seite.waitForSelector('.ergebnis-overlay .se-abr[data-fertig="1"]', { timeout: ms }).catch(() => {});
@@ -795,8 +821,20 @@ async function testeBrowser(browser) {
   gruppe = 'Arena frisch';
   const { kontext, seite, fehler } = await neueSeite(browser);
   const h = hilfen(seite);
-  await seite.goto(MIT() + '#arena');
-  await seite.waitForSelector('.screen.arena .heute-karte:not([hidden]) .se-heute');
+  // Startseite (Variante A): die sichtbare Zeile "Bauernmarsch · Heute noch offen" unter "Als Naechstes"
+  const SZ = '.heim-naechstes:not([hidden]) [data-paket="serie"]';
+  await seite.goto(MIT() + '#heim');
+  await seite.waitForSelector(SZ, { timeout: 10000 });
+  pruefe('heim:naechstes: Zeile „Bauernmarsch · Heute noch offen · Tageswerk in 5 Minuten“ (als erste, ohne Klassen-Aufgabe)',
+    (await seite.locator(SZ).innerText()).replace(/\s+/g, ' ').includes('Bauernmarsch Heute noch offen · Tageswerk in 5 Minuten')
+    && await seite.evaluate((s) => document.querySelector('.heim-liste').firstElementChild === document.querySelector(s), SZ)
+    && await seite.locator(SZ).getAttribute('aria-label') === 'Bauernmarsch · Heute noch offen · Tageswerk in 5 Minuten');
+  await seite.locator(SZ).click();
+  pruefe('Ohne Trainings-Karten öffnet die Zeile das Serien-Blatt', await seite.waitForSelector('.se-blatt-ort .se-blatt', { timeout: 3000 }).then(() => true, () => false));
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.se-blatt-ort'), null, { timeout: 2000 }).catch(() => {});
+  await h.arena();
+  await seite.waitForSelector('#test-heute .se-heute');
   await warte(400);
   pruefe('arena:kopf: noch kein Chip (erst ab dem ersten gezählten Tag)', await seite.locator('.se-chip').count() === 0);
   const neuText = await seite.locator('.se-heute').innerText();
@@ -842,6 +880,9 @@ async function testeBrowser(browser) {
   pruefe('Heute-Karte: „Tageswerk geschafft. Alles Weitere ist Kür.“, Tag 1', /Tageswerk geschafft\. Alles Weitere ist Kür\./.test(geschafft) && /Tag 1/.test(geschafft), geschafft);
   const s2 = await h.streifen('.se-heute');
   pruefe('Heute hervorgehoben: das Feld des Bauern', s2.feld === 1 && s2.heute === 1 && s2.naechstes === -1, s2);
+  await h.heim();
+  pruefe('Startseite: nach dem Tageswerk keine Bauernmarsch-Zeile mehr', await seite.locator('.heim-naechstes [data-paket="serie"]').count() === 0);
+  await h.arena();
 
   // ---------- 4. Serien-Blatt ----------
   gruppe = 'Serien-Blatt';
@@ -969,6 +1010,17 @@ async function testeBrowser(browser) {
   pruefe('Heute-Karte: Umwandlung wählen (Dame, Turm, Läufer, Springer; je mindestens 44 x 44)', await seite.locator('.se-heute .se-wahl .se-wahl-knopf').count() === 4
     && await seite.evaluate(() => [...document.querySelectorAll('.se-wahl-knopf')].every((k) => k.getBoundingClientRect().width >= 44 && k.getBoundingClientRect().height >= 44)));
   await bild(seite, 'arena-wahl');
+  // sichtbarer Weg seit Variante A: Startseite "Umwandlung: Figur wählen" -> Serien-Blatt mit der Wahl
+  await h.heim();
+  const SW = '.heim-naechstes:not([hidden]) [data-paket="serie"]';
+  pruefe('Startseite: offene Umwandlung als Zeile „Umwandlung: Figur wählen“ (auch wenn heute schon gezählt)',
+    await seite.locator(SW).count() === 1 && /Umwandlung: Figur wählen/.test(await seite.locator(SW).innerText()));
+  await seite.locator(SW).click();
+  await seite.waitForSelector('.se-blatt .se-wahl .se-wahl-knopf', { timeout: 3000 }).catch(() => {});
+  pruefe('Die Zeile öffnet das Serien-Blatt mit den vier Figuren', await seite.locator('.se-blatt .se-wahl .se-wahl-knopf').count() === 4);
+  await seite.keyboard.press('Escape');
+  await seite.waitForFunction(() => !document.querySelector('.se-blatt-ort'), null, { timeout: 2000 }).catch(() => {});
+  await h.arena();
   await seite.evaluate(() => { window.__klaenge = []; });
   await h.tippe('.se-heute .se-wahl-knopf[data-figur="S"]');
   await warte(300);
@@ -1042,7 +1094,9 @@ async function testeBrowser(browser) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser);
     const hh = hilfen(s);
     await s.goto(MIT() + '#arena');
-    await s.waitForSelector('.screen.arena .se-heute');
+    await s.waitForSelector('.screen.arena');
+    await hh.heuteKarte();
+    await s.waitForSelector('#test-heute .se-heute');
     await s.evaluate(async () => {
       const tg = await import('./js/tag.js');
       const S = window.__serie;
@@ -1068,7 +1122,9 @@ async function testeBrowser(browser) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { reduziert: true });
     const hh = hilfen(s);
     await s.goto(MIT() + '#arena');
-    await s.waitForSelector('.screen.arena .se-heute');
+    await s.waitForSelector('.screen.arena');
+    await hh.heuteKarte();
+    await s.waitForSelector('#test-heute .se-heute');
     await hh.klangSpion();
     await hh.spiele(LANG_ZUEGE, LANG_PLAN, { warteAuf: '.ergebnis-overlay .se-abr' });
     const sofort = await s.evaluate(() => {
@@ -1088,7 +1144,9 @@ async function testeBrowser(browser) {
     const { kontext: k, seite: s, fehler: f } = await neueSeite(browser, { w, h: hgt, handy: name === 'handy', farbe: name === 'handy' ? 'dark' : 'light' });
     const hh = hilfen(s);
     await s.goto(MIT() + '#arena');
-    await s.waitForSelector('.screen.arena .se-heute');
+    await s.waitForSelector('.screen.arena');
+    await hh.heuteKarte();
+    await s.waitForSelector('#test-heute .se-heute');
     await hh.setze({ tage: [-12, -11, -10, -9, -8, -7, -5, -4, -3, -2, -1], felder: 11, lauf: { n: 4, best: 4, ms: [3] } });
     await hh.arena();
     const mass = await s.evaluate(() => {
