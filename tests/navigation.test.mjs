@@ -196,7 +196,7 @@ async function testeLeiste(browser) {
     gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true, schema });
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     await warte(400);
     const m = await lageMessen(seite);
     pruefe('Lage unten, schwebend, nicht im Kopf', m.html === 'unten' && m.sichtbar && !m.imKopf, JSON.stringify({ h: m.html, k: m.imKopf }));
@@ -273,7 +273,7 @@ async function testeLeiste(browser) {
         f();
       });
       await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
-      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-ring'), null, { timeout: 10000 }).catch(() => {});
+      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-buehne'), null, { timeout: 10000 }).catch(() => {});
       await warte(800);
       m = await lageMessen(seite);
       const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.oben; });
@@ -325,7 +325,7 @@ async function testeLeiste(browser) {
     pruefe('Verlauf gehoert zu Ich: Ich aktiv, Zurueck-Knopf da', m.reiter.includes('ich*') && m.wurzel === 'nein'
       && await seite.locator('.vl-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: m.reiter, w: m.wurzel }));
     await seite.evaluate(() => window.__app.gehe('heim'));
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     m = await lageMessen(seite);
     pruefe('auf heim: Start aktiv, Wurzel (kein Zurueck)', m.reiter.includes('heim*') && m.wurzel === 'ja' && !(await seite.locator('.heim-screen .kopf-zurueck').isVisible()),
       JSON.stringify({ r: m.reiter, w: m.wurzel }));
@@ -339,7 +339,7 @@ async function testeLeiste(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
     // Browser ohne backdrop-filter nachstellen: CSS.supports meldet ihn nicht, die @supports-Regel prueft der Node-Teil
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     const ersatz = await seite.evaluate(() => {
       const regeln = [];
       for (const s of document.styleSheets) { try { for (const r of s.cssRules) if (r.conditionText && /not/.test(r.conditionText) && /backdrop-filter/.test(r.conditionText)) regeln.push(r.cssText); } catch (e) { /* fremd */ } }
