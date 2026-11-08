@@ -67,13 +67,14 @@ const PAKET_ICON = Object.freeze([['konto-gruppe', 'konto'], ['daten-gruppe', 'd
 // Reihenfolge (Flo 31.10.2026): Spielen zuerst, Sprache und Info unten
 const KERN_ORDNUNG = Object.freeze(['spiel', 'anzeige', 'klang', 'coach', 'bewegung']);
 // G-002 (08.11.2026): die Gruppen der Pakete erst zum Spielen (Emotes, Finisher, Bauernmarsch, Erste Schritte), dann
-// Konto, Abo, Daten und Sicherung beisammen direkt vor "Fortschritt" (vorher stand Bauernmarsch zwischen Daten und
-// Sicherung). Unbekannte Gruppen bleiben bei den Spiel-Gruppen.
-const PAKET_ORDNUNG = Object.freeze(['em-einstellungen', 'fi-einstellungen', 'se-es', 'st-gruppe', 'schule-gruppe', 'konto-gruppe', 'abo-gruppe',
-  'daten-gruppe', 'si-gruppe']);
+// Konto, Daten, Trainer (Abo), Klasse und Sicherung beisammen direkt vor "Fortschritt" (vorher stand Bauernmarsch
+// zwischen Daten und Sicherung; "Klasse" bleibt direkt unter Konto, Daten und Trainer). Unbekannte Gruppen bleiben bei
+// den Spiel-Gruppen.
+const PAKET_ORDNUNG = Object.freeze(['em-einstellungen', 'fi-einstellungen', 'se-es', 'st-gruppe', 'konto-gruppe', 'daten-gruppe', 'abo-gruppe',
+  'schule-gruppe', 'si-gruppe']);
 const paketRang = (g) => {
   const i = PAKET_ORDNUNG.findIndex((k) => g.classList.contains(k));
-  return i >= 0 ? i : PAKET_ORDNUNG.indexOf('schule-gruppe') + 0.5;
+  return i >= 0 ? i : PAKET_ORDNUNG.indexOf('st-gruppe') + 0.5;
 };
 const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
 
