@@ -9,7 +9,8 @@
    (Flo 31.10., Handy: die Namen lagen uebereinander); --n setzt segment() in js/ui/bauteile.js */
 .sa-steuer { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sa-steuer::-webkit-scrollbar { display: none; }
-.sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 104px)); }
+/* G-001: 84 statt 104 px je Reiter, damit auf dem iPad (hoch 810 px, quer 1080 px) alle Reiter in die Zeile passen statt rechts herauszulaufen */
+.sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 84px)); }
 /* Handy-Runde 08.11.: auf dem Handy liefen die hinteren Reiter rechts aus dem Bild, ohne dass man es sah. Dort stehen
    alle Bereiche jetzt in Zeilen zu vier (nichts versteckt, nichts zu wischen); die gleitende Pille braucht eine Zeile,
    darum traegt hier der gewaehlte Reiter selbst die Flaeche. Ab 760 px bleibt es bei einer Zeile mit Pille. */

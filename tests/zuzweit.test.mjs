@@ -95,8 +95,8 @@ try {
   });
   pruefe('Startblatt: "Los" in der Buehne oben (sichtbar ohne Scrollen), zwei Koenige, Namen eingeklappt, Zurueck-Symbol', blatt.los && blatt.los.text === 'Los'
     && blatt.los.t + blatt.los.h <= blatt.ih && blatt.koenige === 2 && blatt.namenZu && blatt.zurueck, JSON.stringify(blatt));
-  pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (Schalter 52x32 in 56 px hoher Zeile)', blatt.ziele.length >= 7
-    && blatt.ziele.every((z) => (z.h >= 44 && z.w >= 44) || (/^$|INPUT/.test(z.k) && z.w >= 44 && z.h >= 32)), JSON.stringify(blatt.ziele));
+  pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (auch der Schalter: Feld 52x44, Spur 52x32)', blatt.ziele.length >= 7
+    && blatt.ziele.every((z) => z.h >= 44 && z.w >= 44), JSON.stringify(blatt.ziele));
   pruefe('Startblatt: nichts seitlich drueber', blatt.quer);
   await start();
   const fortschritt = await seite.evaluate(() => localStorage.getItem('schach-arena:v1:fortschritt'));
