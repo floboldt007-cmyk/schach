@@ -435,7 +435,7 @@ async function erfinderTeil(browser) {
   }));
   pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
     const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
-    return t.length === 4 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
+    return t.length === 5 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
       && t.filter((x) => x.querySelector('.sa-bild svg.sk-finisher image[href*="/assets/pieces/"]')).length >= 3;
   }));
   await p.s.locator('.er-figuren').click();

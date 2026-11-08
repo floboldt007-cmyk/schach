@@ -46,7 +46,7 @@ export const EN = {
   'grund.zuegeEnde': 'One phrase per {n} of your moves: no more in this game.',
   'grund.minute': 'At most {n} phrases per minute. Ready again shortly.',
   'emote.daumen': 'Thumbs up', 'emote.applaus': 'Applause', 'emote.staunen': 'Surprised', 'emote.denken': 'Thinking',
-  'emote.respekt': 'Respect', 'emote.hallo': 'Hello', 'emote.gut': 'Good game', 'emote.uff': 'Oops, my mistake',
+  'emote.respekt': 'Respect', 'emote.hallo': 'Hello', 'emote.gut': 'Good game', 'emote.uff': 'Oops, my bad',
   'chat.0': 'Good luck!', 'chat.1': 'Good move!', 'chat.2': 'Let me think for a moment.', 'chat.3': 'Good game!', 'chat.4': 'Thanks!', 'chat.5': 'Another game?',
   'antwort.gruss.0': 'Hello!', 'antwort.gruss.1': 'Good to see you!', 'antwort.gruss.2': 'Have fun!',
   'antwort.gleichfalls.0': 'Thanks, you too!', 'antwort.gleichfalls.1': 'You too, have fun!', 'antwort.gleichfalls.2': 'Same to you!',
