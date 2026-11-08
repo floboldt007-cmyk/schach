@@ -295,7 +295,7 @@
   box-shadow: var(--s2); z-index: 4; pointer-events: none; }
 .arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
 /* Endgegner: Krone ueber der Station (ueber der Fahne, wenn er der naechste ist) */
-.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 2px 9px 3px;
+.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(calc(-50% + var(--krone-dx, 0px))); white-space: nowrap; padding: 2px 9px 3px;
   border-radius: var(--r-pille); font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
   box-shadow: var(--kante); z-index: 3; pointer-events: none; }
 .arena .knoten.besiegt .boss-krone { bottom: calc(100% + 30px); }

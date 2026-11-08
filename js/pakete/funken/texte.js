@@ -68,6 +68,7 @@ export const DE = {
   // Chip im Kopf
   'chip.label': 'Level {level}, {titel}: {wert} von {kostet} Funken bis Level {naechstes}',
   'chip.wort': 'Level ',
+  'chip.kurz': 'Lv',
   // Funken-Spiegel
   'spiegel.titel': 'Funken-Spiegel',
   'lern.wort': 'Motiv erkannt',
@@ -214,6 +215,7 @@ export const EN = {
   'abr.summe': '{a} this game · {b} sparks in total',
   'chip.label': 'Level {level}, {titel}: {wert} of {kostet} sparks to Level {naechstes}',
   'chip.wort': 'Level ',
+  'chip.kurz': 'Lv',
   'spiegel.titel': 'Spark overview',
   'lern.wort': 'Motif spotted',
   'spiegel.wortWert': '+{n} sparks',

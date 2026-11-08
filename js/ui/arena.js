@@ -575,6 +575,15 @@ export function zeige(root, params, app) {
     lage.stationen.forEach((p, i) => setze(knoten[i], p));
     setze(s.querySelector('.ort-karte-boss'), lage.boss);
     setze(s.querySelector('.ort-karte-event'), lage.event);
+    // das Schild "Endgegner" ganz in der Karte (iPhone SE, 08.11.2026: links vom Kartenrand angeschnitten); gerechnet
+    // aus Lage und Breite, nicht aus dem Bild, denn Stationen koennen gerade einschweben
+    lage.stationen.forEach(([fx], i) => {
+      const krone = knoten[i].querySelector('.boss-krone');
+      if (!krone) return;
+      const halb = krone.offsetWidth / 2, x = fx * w, rand = 6;
+      const dx = Math.max(0, rand + halb - x) - Math.max(0, x + halb - (w - rand));
+      krone.style.setProperty('--krone-dx', dx.toFixed(1) + 'px');
+    });
     stelleFlo(floPosition());
     // im Querformat (und kompakt) scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
