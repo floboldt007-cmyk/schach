@@ -1,7 +1,7 @@
 // Emote-Kreaturen (Flo 30.10.2026 abends: "Mit den Emotes koennen es verschiedene Figuren sein oder Kreaturen, muessen
 // keine Schachfiguren sein, eben in meinem Stil"; auf die Frage, welche zuerst: "Alle"). Jede Welt hat ihre Kreatur,
-// dazu Kronli als Maskottchen. Jede Kreatur zeigt vier Emotes: Hallo (winken), Staunen, Nachdenken, Gut gespielt
-// (verbeugen). Nichts davon spottet: kein Lachen, kein Weinen (SPIELKONZEPT 3.9).
+// dazu Kronli als Maskottchen. Jede Kreatur zeigt vier Emotes: Hallo (winken), Staunen, Nachdenken, Respekt
+// (verbeugen, seit 08.11.2026; vorher Gut gespielt). Nichts davon spottet: kein Lachen, kein Weinen (SPIELKONZEPT 3.9).
 // Erst im Labor des Erfinder-Kontos (js/pakete/emotes/index.js); spaeter schaltet die Welt ihre Kreatur frei.
 //
 //   KREATUREN                               [{ id, welt, farbe }]  welt: Id aus js/sprachen/bots.js (welten) oder null

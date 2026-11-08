@@ -1606,7 +1606,7 @@ async function testeErweiterungen(browser) {
   const nl = await seite.evaluate(() => {
     const n = document.querySelector('.detail .ort-panel-oben .nachlese');
     return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent),
-      vorDemOrt: n.parentElement.firstElementChild === n && !!n.parentElement.querySelector('.w0-test') && !!n.parentElement.querySelector('.liga-karte') } : null;
+      vorDemOrt: n.parentElement.firstElementChild === n && !!n.parentElement.querySelector('.w0-test') } : null;
   });
   pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, vor den Paketen', nl && /Seit deiner letzten Partie/.test(nl.titel)
     && JSON.stringify(nl.zeilen) === '["GROSS B","Zeile E"]' && nl.vorDemOrt, JSON.stringify(nl));

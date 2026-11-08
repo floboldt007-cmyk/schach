@@ -3,7 +3,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim } from '../bewegung.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
@@ -140,6 +140,7 @@ function partie(root, quelle, app, fortgesetzt) {
   let seit = gespeichertUhr && Number.isFinite(gespeichertUhr.seit) ? Math.min(Date.now(), gespeichertUhr.seit) : Date.now();
   let weg = false, fragt = false, gespeichert = null, drehenAnimation = null;
   let uhrTimer;
+  const gewarnt = {};   // Uhr-Warnung schon gespielt je Farbe
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
@@ -187,6 +188,8 @@ function partie(root, quelle, app, fortgesetzt) {
       el.classList.toggle('laeuft', !!tempo && chess.turn() === f);
       el.classList.toggle('warn', !!tempo && ms < 20000);
       el.setAttribute('aria-label', `${name(f)}: ${uhrText(ms)}`);
+      // einmal je Seite, wenn ihre laufende Uhr unter 20 s faellt
+      if (tempo && ms < 20000 && chess.turn() === f && !gewarnt[f]) { gewarnt[f] = true; try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ } }
     }
   }
   function zeichne(animieren = true) {
@@ -222,7 +225,7 @@ function partie(root, quelle, app, fortgesetzt) {
     queueMicrotask(() => {
       if (weg) return;
       brett.loescheNutzerPfeile(); zeichne();
-      if (!pruefeEnde()) { try { klang.spiele(chess.inCheck() ? 'schach' : m.captured ? 'schlagen' : 'zug'); } catch (e) { /* still */ } }
+      if (!pruefeEnde()) { try { klang.spiele(zugKlangName(m, chess.inCheck())); } catch (e) { /* still */ } }
     });
     return true;
   }
@@ -240,6 +243,8 @@ function partie(root, quelle, app, fortgesetzt) {
     z.phase = 'ende'; clearInterval(uhrTimer); brett.erlaubeZuege(null);
     app.schliesseDialog?.();
     const ergebnis = gewinner === 'w' ? 'sieg' : gewinner === 'b' ? 'niederlage' : 'remis';
+    // beide sitzen am selben Geraet: ein Sieg klingt fuer den Gewinner (Sieg-Klang), ein Remis wie ein Remis
+    try { klang.ende(gewinner ? true : null); } catch (e) { /* still */ }
     gespeichert = speicherePartie({ modus: 'zuzweit', zuzweit: namen, botId: null, spielerFarbe: 'w',
       zuege: z.zuege.slice(), san: z.san.slice(), zeiten: z.zeiten.slice(), tempo, gestartet, ergebnis, grund,
       hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });

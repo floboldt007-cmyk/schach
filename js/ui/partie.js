@@ -2438,6 +2438,11 @@ export function zeige(root, params, app) {
         el.dataset.sek = String(sek);
         anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
       }
+      // Uhr-Warnung einmal je Partie, sobald Flos laufende Uhr unter 20 s faellt (die Bot-Uhr bleibt still)
+      if (warn && laeuft && wer === 'flo' && !el.dataset.gewarnt) {
+        el.dataset.gewarnt = '1';
+        try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ }
+      }
     },
   });
 

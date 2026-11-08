@@ -127,15 +127,16 @@ export function normalisiereStand(daten, datum) {
   if (d.stand !== RECHENSTAND) return null;
   const st = neuerStand(datum);
   const w = objekt(d.wertung), b = objekt(w.blitz), k = objekt(d.klasse), s = objekt(d.saison);
+  const ende = d.saisonEnde === true;
   st.wertung = { n: ganz(w.n), wert: ganz(w.wert, STARTWERT), blitz: { n: ganz(b.n), wert: ganz(b.wert, STARTWERT) } };
   st.klasse = { erreicht: klasseZahl(k.erreicht), momente: [...new Set((Array.isArray(k.momente) ? k.momente : []).filter((v) => Number.isInteger(v) && v > 0 && v < KLASSEN.length))] };
-  const nr = ganz(s.nr, st.saison.nr, 35000);
+  const nr = ende ? 0 : ganz(s.nr, st.saison.nr, 35000);
   const start = addiereTage(SAISON_1_START, Math.max(0, nr - 1) * SAISON_TAGE);
   const punkte = ganz(s.punkte);
   const stufe = Math.max(stufeZahl(s.stufe), ligaStufe(punkte));
   st.saison = { nr, start, punkte: Math.max(punkte, STUFEN[stufe].schwelle), stufe, partien: ganz(s.partien),
     momente: [...new Set((Array.isArray(s.momente) ? s.momente : []).filter((v) => Number.isInteger(v) && v > 0 && v < STUFEN.length))] };
-  st.archiv = (Array.isArray(d.archiv) ? d.archiv : []).filter((a) => a && Number.isInteger(a.nr) && a.nr > 0 && a.nr < nr)
+  st.archiv = (Array.isArray(d.archiv) ? d.archiv : []).filter((a) => a && Number.isInteger(a.nr) && a.nr > 0 && (ende || a.nr < nr))
     .map((a) => ({ nr: a.nr, stufe: stufeZahl(a.stufe), punkte: ganz(a.punkte), stand: ganz(a.stand, RECHENSTAND) }));
   st.archiv = [...new Map(st.archiv.map((a) => [a.nr, a])).values()].sort((a, b) => a.nr - b.nr);
   for (const [id, v] of Object.entries(objekt(d.meisterschaft))) {
@@ -147,11 +148,30 @@ export function normalisiereStand(daten, datum) {
   // Ergebnis]. Belege vor dem 30.10.2026 haben 10 Felder (ohne Ergebnis, Qualitaet nur +2 ab 80 %).
   st.belege = (Array.isArray(d.belege) ? d.belege : []).filter((r) => Array.isArray(r) && (r.length === 10 || r.length === 11)
     && typeof r[0] === 'string' && r[0].length <= 40 && r.slice(1).every(Number.isFinite)).slice(-BELEGE_MAX).map((r) => r.slice());
-  if (d.wechsel && Number.isInteger(d.wechsel.von) && Number.isInteger(d.wechsel.nach)) st.wechsel = { von: d.wechsel.von, nach: d.wechsel.nach };
+  if (ende) st.saisonEnde = true;
+  else if (d.wechsel && Number.isInteger(d.wechsel.von) && Number.isInteger(d.wechsel.nach)) st.wechsel = { von: d.wechsel.von, nach: d.wechsel.nach };
+  return st;
+}
+
+// Saison-Liga beendet (Flo 08.11.2026, "eine Liga"): es zaehlt nur noch die Kronen-Liga (js/kronen.js). Die laufende Saison
+// kommt einmal als Abzeichen ins Archiv (nur mit gespielter Partie oder Punkten), danach gibt es keine Saison, keine
+// Liga-Punkte und keine Vereinsmeisterschaft mehr. Wertung, Klasse, Kurve und Belege bleiben. Rein und idempotent; die
+// Rechenfunktionen oben bleiben unveraendert (ein Stand ohne saisonEnde rechnet wie bisher).
+export function beendeSaisonLiga(stand) {
+  if (!stand || stand.saisonEnde === true) return stand;
+  const st = kopie(stand), s = st.saison;
+  if (s.nr > 0 && (s.punkte > 0 || s.partien > 0) && !st.archiv.some((a) => a.nr === s.nr)) {
+    st.archiv.push({ nr: s.nr, stufe: s.stufe, punkte: s.punkte, stand: RECHENSTAND });
+  }
+  st.saison = { nr: 0, start: SAISON_1_START, punkte: 0, stufe: 0, partien: 0, momente: [] };
+  st.meisterschaft = {};
+  delete st.wechsel;
+  st.saisonEnde = true;
   return st;
 }
 
 export function wechsleSaison(stand, datum) {
+  if (stand.saisonEnde === true) return { stand, wechsel: false };
   const jetzt = saisonAm(datum);
   if (jetzt.nr <= stand.saison.nr) return { stand, wechsel: false };
   const st = kopie(stand), alt = st.saison;
@@ -241,6 +261,8 @@ export function bucheGenauigkeit(stand, partieId, genauigkeit) {
   if (!vorher || vorher[5] || !Number.isFinite(genauigkeit) || genauigkeit < 0 || genauigkeit > 100) return { stand, gebucht: false, aufstieg: [] };
   const st = kopie(stand), r = belegFuer(st, partieId);
   r[5] = 1;
+  // Nach dem Ende der Saison-Liga aendert eine spaete Analyse weder Archiv noch Saison (nur der Merker "analysiert")
+  if (st.saisonEnde === true) return { stand: st, gebucht: true, aufstieg: [] };
   const altStufe = st.saison.stufe;
   const letzte = st.archiv[st.archiv.length - 1];
   const laufend = r[1] === st.saison.nr;

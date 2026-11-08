@@ -39,6 +39,7 @@
 //   PAKETE_KLANG                  { holz: { name, pfad }, arcade: { name, pfad } }
 //   KLANGGRUPPEN, KLANGSTUFEN     erlaubte Gruppen (Einstellung klanggruppen) und Stufen
 //   klassenKlang(k, info)         -> { name, stufe? } | null (rein, die Abbildung von klang.klasse)
+//   zugKlangName(m, imSchach)     -> 'schach' | 'umwandlung' | 'rochade' | 'schlagen' | 'zug' (rein, fuer jedes Brett)
 //   klang.einstellen(e)           liest klang, klangpaket ('' = Standard der Ansicht, modern: arcade),
 //                                 lautstaerke, klangstufe, klanggruppen, thema; plant das Vorladen 1 s spaeter
 //   klang.setzePaket(id)          '' | 'holz' | 'arcade'; laedt vor (wenn das Vorladen schon lief) und gibt die
@@ -279,9 +280,20 @@ export function klassenKlang(k, info = {}) {
   }
 }
 
+// Klang eines Zugs, auf jedem Brett gleich (Partie, Zu zweit, Online, Raetsel, Lektion): Schach (auch Matt) vor
+// Umwandlung vor Rochade vor Schlagen vor Zug. m: Zug von chess.js (verbose, flags 'k'/'q' = Rochade), imSchach: die
+// Gegenseite steht danach im Schach
+export function zugKlangName(m, imSchach = false) {
+  if (imSchach) return 'schach';
+  if (m && m.promotion) return 'umwandlung';
+  if (m && typeof m.flags === 'string' && /[kq]/.test(m.flags)) return 'rochade';
+  if (m && m.captured) return 'schlagen';
+  return 'zug';
+}
+
 // ---------- Zustand ----------
 
-let paket = null;          // aktives Paket (null: noch nicht eingestellt, nur Synth)
+let paket = null;         // aktives Paket (null: noch nicht eingestellt, nur Synth)
 let gewaehlt = '';         // Wahl in den Einstellungen ('' = Standard der Ansicht)
 let thema = 'modern';
 const puffer = new Map();  // datei -> AudioBuffer (nur das aktive Paket)
