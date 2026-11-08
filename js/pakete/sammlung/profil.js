@@ -18,14 +18,19 @@ import { rahmenSvg, RAHMEN_KUNST } from '../../rahmen-kunst.js';
 import { profilWahl, setzeProfilWahl, dabeiSeit, erspielteTitel, merkeErspielteTitel, FIGUREN, RAHMEN, KREATUR_MOTIVE, GRUENDE, NUR_ERFINDER } from '../../profil.js';
 import { istErfinder, hatSonderstueck, pionierNummer, ERFINDER } from '../../sonderstuecke.js';
 import { WELTEN, botNachId } from '../../bots.js';
-import { istWeltFrei, ladePartien, wertet } from '../../storage.js';
+import { istWeltFrei, ladePartien, wertet, ladeModul } from '../../storage.js';
 import { KREATUREN, kreaturSvg } from '../../kreaturen-kunst.js';
-import { meinName } from '../../konto.js';
+import { meinName, sitzung, userId } from '../../konto.js';
 import { profilGrund } from '../../sammlung-kunst.js';
 import { t, locale } from '../../sprache.js';
-import { teileErfolge, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
+import { ladeBesitz, eigeneBanner, talerLokal, serverStand } from '../../besitz.js';
+import { visitenkarte, botKarte, karteVomServer, bannerUrl, MENSCHEN_BANNER, kronenText } from '../../ui/visitenkarte.js';
+import { kronenSpeicher, stufeInfo } from '../liga/kronen.js';
+import { teileErfolge, teileErfolgsStufen, familienOrden, karteAbgleichen, spielstand, LIGA_STUFEN, SERIE_ZIELE } from './index.js';
 import { titelListe, aktuellerTitel, titelBild, koennenFrei } from './titel.js';
+import { familieVonAlt, FAMILIEN } from './stufen.js';
 import './texte.js';
+import './karte-texte.js';
 
 const PAKET = 'sammlung';
 const S = (k, w) => t('p-sammlung.' + k, w);
@@ -62,10 +67,72 @@ function rahmenBild(id) {
   return rahmenSvg(id, { klasse: 'pr-rahmen-bild' });
 }
 
-// Errungenschaften der Vitrine, die (noch) frei sind; ein Platz mit einem nicht mehr freien Erfolg bleibt leer
-function vitrineTeile(erfolge = teileErfolge()) {
+// Errungenschaften der Vitrine, die (noch) frei sind; ein Platz mit einem nicht mehr freien Erfolg bleibt leer.
+// Etappe 4b: ausgestellt werden Erfolgs-Familien mit ihrer Stufe ('stufe-<familie>'); ein frueher gespeicherter
+// Einzel-Erfolg zeigt seine Familie, einer ohne Familie (z. B. Sieg mit Schwarz) bleibt wie bisher stehen.
+function vitrineTeile(erfolge = teileErfolge(), stufen = teileErfolgsStufen()) {
   const frei = new Map(erfolge.filter((e) => e.frei).map((e) => [e.id, e]));
-  return profilWahl().vitrine.map((id) => (id && frei.get(id)) || null);
+  const fam = new Map(stufen.filter((s) => s.frei).map((s) => [s.id, s]));
+  const schon = new Set();
+  return profilWahl().vitrine.map((id) => {
+    if (!id) return null;
+    const f = id.startsWith('stufe-') ? id.slice(6) : familieVonAlt(id);
+    // Familie mit Stufe vor dem alten Einzel-Erfolg; ohne Stufe bleibt der alte frei gewesene Erfolg stehen
+    const e = (f && fam.get('stufe-' + f)) || (!id.startsWith('stufe-') && frei.get(id)) || null;
+    if (!e || schon.has(e.id)) return null;
+    schon.add(e.id);
+    return e;
+  });
+}
+
+// ---------- Visitenkarte (Etappe 4b) ----------
+const KT = (k, w) => t('p-karte.' + k, w);
+const kontoId = () => { try { return userId(sitzung() || {}); } catch (e) { return null; } };
+
+// das getragene Banner, wenn es (noch) gehoert, sonst das Start-Banner
+export function eigenesBanner(uid = kontoId()) {
+  const w = profilWahl().banner;
+  return eigeneBanner(ladeBesitz(), uid).includes(w) ? w : 'start';
+}
+function eigeneKronenStufe(uid = kontoId()) {
+  try {
+    const k = kronenSpeicher(ladeModul('kronen'));
+    // Wochen-Gruppen: die Stufe steht im Stand (stand.kronen sind nur die Kronen dieser Woche)
+    return uid && k.konto === uid && k.stand && Number.isInteger(k.stand.stufe) ? stufeInfo(k.stand.stufe).index : null;
+  } catch (e) { return null; }
+}
+export function eigeneKartenDaten() {
+  const erfolge = teileErfolge();
+  const tj = titelJetzt(erfolge);
+  return { name: meinName(), ki: false, banner: eigenesBanner(), avatar: floAvatar('w'), kronenStufe: eigeneKronenStufe(),
+    titel: tj ? { name: tj.name, bild: titelBild(tj, 'vk-wappen') } : null,
+    orden: vitrineTeile(erfolge).filter(Boolean).map((e) => ({ name: e.name, bild: e.bild || '', stufe: e.stufe })) };
+}
+// Titel eines anderen Spielers (Id vom Server): Name und Wappen aus der festen Liste, unbekannte Ids ohne Titel
+export function titelVonId(id) {
+  const x = titelListe({ level: 1000 }).find((y) => y.id === id);
+  return x ? { name: x.name, bild: titelBild(x, 'vk-wappen') } : null;
+}
+
+// Banner der Sammlung: Start immer, Gold-Erfolge und Saison-Banner (vom Server); nichts davon ist kaeuflich
+function bannerWeg(id) {
+  if (id.startsWith('saison-')) return KT('b.weg.saison');
+  const f = FAMILIEN.find((x) => x.gold.banner === id);
+  return f ? KT('b.weg.erfolg', { name: KT('fam.' + f.id) }) : '';
+}
+export function bannerTeile(uid = kontoId()) {
+  const eigen = eigeneBanner(ladeBesitz(), uid);
+  const an = eigenesBanner(uid);
+  return MENSCHEN_BANNER.map((id) => {
+    const frei = eigen.includes(id);
+    return { id: 'banner-' + id, name: KT('b.' + id), frei, an: an === id, zeile: an === id ? KT('karte.bannerAn') : frei ? KT('karte.bannerFrei') : bannerWeg(id),
+      bild: `<img class="sk-banner" src="${bannerUrl(id)}" alt="">`, seltenheit: id === 'start' ? 'frei' : id.startsWith('saison-') ? 'episch' : 'legende',
+      wahl: frei ? () => { setzeProfilWahl({ banner: id }); karteAbgleichen(); } : undefined };
+  });
+}
+export function talerJetzt(uid = kontoId()) {
+  const s = uid ? serverStand(uid) : null;
+  return s ? s.taler : talerLokal();
 }
 
 // Titel (Flo 01.11.2026: Titel auch fuer Errungenschaften, eigenes Wappen je Titel)
@@ -93,7 +160,8 @@ export function titelTeile(erfolge = teileErfolge()) {
     return { id: 'titel-' + x.id, name: x.name, frei: x.frei, an, gruppe: gruppe[x.art],
       zeile: an ? (jetzt.gewaehlt ? S('titel.deiner') : S('titel.auto')) : x.frei ? S('titel.frei') : x.weg,
       bild: titelBild(x, 'sk-titel'), seltenheit: x.seltenheit === 'einzig' ? 'einzig' : x.seltenheit, fortschritt: x.fortschritt,
-      wahl: () => setzeProfilWahl({ titel: x.id }), abwahl: an && jetzt.gewaehlt ? () => setzeProfilWahl({ titel: null }) : undefined };
+      wahl: () => { setzeProfilWahl({ titel: x.id }); karteAbgleichen(); },
+      abwahl: an && jetzt.gewaehlt ? () => { setzeProfilWahl({ titel: null }); karteAbgleichen(); } : undefined };
   });
 }
 
@@ -108,7 +176,10 @@ export function duellProfil() {
   return orden.length || titel ? { orden, titel, titelBild: zeigen ? titelBild(t, 'duell-titel-wappen') : '' } : null;
 }
 
+// nach jedem Blatt der Profil-Wahl (Bild, Hintergrund, Rahmen, Vitrine, Banner): neu zeichnen und die Karte an den
+// Server geben, damit der naechste Gegner den neuen Stand sieht (ohne Konto kehrt der Abgleich sofort zurueck)
 function neuZeichnen(app) {
+  karteAbgleichen();
   try { app?.gehe?.('ich', {}, { ersetzen: true }); } catch (e) { /* egal */ }
 }
 
@@ -200,14 +271,16 @@ function waehleAussehen(app) {
     .then(() => neuZeichnen(app)).catch(() => {});
 }
 
+// Etappe 4b: zur Wahl stehen die erreichten Erfolgs-Familien (mit Stufe), nie etwas Gekauftes
 function waehleOrden(app, platz) {
-  const erfolge = teileErfolge().filter((e) => e.frei);
+  const erfolge = teileErfolgsStufen().filter((e) => e.frei);
   const wahl = profilWahl();
+  const jetzt = vitrineTeile()[platz];
   const inhalt = document.createElement('div');
   inhalt.className = 'pr-orden-wahl';
   inhalt.innerHTML = erfolge.length
-    ? erfolge.map((e) => `<button type="button" class="pr-orden-knopf" data-erfolg="${esc(e.id)}" aria-pressed="${wahl.vitrine[platz] === e.id}">
-      <span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b></button>`).join('')
+    ? erfolge.map((e) => `<button type="button" class="pr-orden-knopf" data-erfolg="${esc(e.id)}" data-stufe="${e.stufe}" aria-pressed="${!!jetzt && jetzt.id === e.id}">
+      <span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b><small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small></button>`).join('')
     : `<p class="pr-leer-text">${esc(S('profil.keine'))}</p>`;
   inhalt.addEventListener('click', (ev) => {
     const b = ev.target.closest('.pr-orden-knopf');
@@ -226,6 +299,26 @@ function waehleOrden(app, platz) {
   }).catch(() => {});
 }
 
+// Banner der Karte waehlen: nur Eigenes ist waehlbar, Gesperrtes nennt seinen Weg (Gold-Erfolg, Saison)
+function waehleBanner(app) {
+  const inhalt = document.createElement('div');
+  inhalt.className = 'pr-banner-wahl-liste';
+  inhalt.innerHTML = bannerTeile().map((b) => `<button type="button" class="pr-banner-knopf" data-banner="${esc(b.id.slice(7))}" aria-pressed="${b.an}"
+    ${b.frei ? '' : 'disabled'}>${b.bild}<b>${esc(b.name)}</b><small>${esc(b.zeile)}</small></button>`).join('')
+    + `<p class="pr-hilfe">${esc(KT('banner.hinweis'))}</p>`;
+  inhalt.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.pr-banner-knopf');
+    if (!b || b.disabled) return;
+    setzeProfilWahl({ banner: b.dataset.banner });
+    for (const x of inhalt.querySelectorAll('.pr-banner-knopf')) {
+      x.setAttribute('aria-pressed', String(x === b));
+      if (!x.disabled) x.querySelector('small').textContent = x === b ? KT('karte.bannerAn') : KT('karte.bannerFrei');
+    }
+  });
+  sheet({ titel: KT('karte.banner'), inhalt, klasse: 'pr-blatt', knoepfe: [{ text: S('profil.fertig'), wert: true, art: 'primaer' }], abbrechen: true })
+    .then(() => neuZeichnen(app)).catch(() => {});
+}
+
 // "Dabei seit Okt. 2026" (Flo 31.10.2026: "soll man im Profil sehen koennen, wie lange jemand dabei ist")
 export function seitText(tag = dabeiSeit()) {
   let monat = tag.slice(0, 7);
@@ -238,24 +331,42 @@ export function profilKarte({ app } = {}) {
   const vitrine = vitrineTeile(erfolge);
   const k = document.createElement('div');
   k.className = 'pr-karte';
+  // Etappe 4b: die Karte traegt das gewaehlte Banner (Kopf mit weisser Schrift auf der dunklen Bannerseite)
+  const banner = eigenesBanner();
+  k.dataset.banner = banner;
   // der getragene Titel mit seinem Wappen (auch der Level-Titel, wenn keiner gewaehlt ist)
   const tj = titelJetzt(erfolge);
   const titel = tj ? `<span class="pr-chip pr-chip-titel" data-art="${esc(tj.art)}" data-seltenheit="${esc(tj.seltenheit)}">${titelBild(tj, 'pr-titel-wappen')}<span>${esc(tj.name)}</span></span>` : '';
-  k.innerHTML = `<div class="pr-kopf"><span class="pr-av">${floAvatar('w')}</span>
-      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}</div><small class="pr-seit">${esc(seitText())}</small></div></div>
-    <button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
+  const krone = kronenText(eigeneKronenStufe());
+  k.innerHTML = `<div class="pr-kopf"><span class="pr-banner" aria-hidden="true" style="background-image:url('${bannerUrl(banner)}')"></span>
+      <span class="pr-av">${floAvatar('w')}</span>
+      <div class="pr-name"><b>${esc(meinName())}</b><div class="pr-chips">${titel}${krone ? `<span class="pr-chip pr-chip-krone">${esc(krone)}</span>` : ''}</div>
+        <small class="pr-seit">${esc(seitText())}</small></div></div>
+    <div class="pr-knoepfe"><button type="button" class="knopf pr-aendern">${esc(S('profil.aendern'))}</button>
+      <button type="button" class="knopf pr-banner-wahl">${esc(KT('karte.banner'))}</button></div>
     <h4 class="pr-vitrine-titel">${esc(S('profil.vitrine'))}</h4>
-    <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"
-      aria-label="${esc(e ? e.name : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>`
+    <div class="pr-vitrine">${vitrine.map((e, i) => `<button type="button" class="pr-orden${e ? '' : ' leer'}" data-platz="${i}"${e && e.stufe ? ` data-stufe="${e.stufe}"` : ''}
+      aria-label="${esc(e ? (e.stufe ? `${e.name}, ${KT('stufe.' + e.stufe)}` : e.name) : S('profil.leer'))}">${e ? `<span class="pr-orden-bild" aria-hidden="true">${e.bild}</span><b>${esc(e.name)}</b>${e.stufe ? `<small class="pr-orden-stufe">${esc(KT('stufe.' + e.stufe))}</small>` : ''}`
       : `<span class="pr-plus" aria-hidden="true">+</span><small>${esc(S('profil.leer'))}</small>`}</button>`).join('')}</div>
     <p class="pr-hilfe">${esc(S('profil.vitrineHilfe'))}</p>`;
   k.querySelector('.pr-aendern').addEventListener('click', () => waehleAussehen(app));
+  k.querySelector('.pr-banner-wahl').addEventListener('click', () => waehleBanner(app));
   for (const b of k.querySelectorAll('.pr-orden')) b.addEventListener('click', () => waehleOrden(app, Number(b.dataset.platz)));
   return k;
 }
 
 anbieten('ich:kopf', ({ app }) => profilKarte({ app }), { reihenfolge: 10, paket: PAKET });
 anbieten('duell:profil?', () => duellProfil(), { reihenfolge: 10, paket: PAKET });
+// Etappe 4b: die eigene Karte fuer Lobby und Partie; Spielerleisten nur gegen einen KI-Gegner der Liga (Bot-Leiter-Partien
+// zeigen den Bot wie bisher, Online-Partien zeichnet js/ui/online.js selbst)
+anbieten('karte:eigene?', () => eigeneKartenDaten(), { reihenfolge: 10, paket: PAKET });
+anbieten('karte:fremde?', ({ daten }) => karteVomServer(daten, { orden: familienOrden, titel: titelVonId }), { reihenfolge: 10, paket: PAKET });
+anbieten('partie:spieler-leiste', ({ buehne }) => (buehne && buehne.ki ? visitenkarte(eigeneKartenDaten(), { groesse: 'streifen' }) : null),
+  { reihenfolge: 5, paket: PAKET });
+anbieten('partie:gegner-leiste', ({ buehne, bot }) => (buehne && buehne.ki ? visitenkarte(botKarte(bot), { groesse: 'streifen' }) : null),
+  { reihenfolge: 5, paket: PAKET });
+anbieten('sammlung:bereich', () => bereich({ id: 'banner', name: KT('banner'), teile: bannerTeile(), hinweis: KT('banner.hinweis') }),
+  { reihenfolge: 32, paket: PAKET });
 anbieten('sammlung:bereich', () => bereich({ id: 'titel', name: S('titel'), teile: titelTeile(), hinweis: S('titel.hinweis') }),
   { reihenfolge: 30, paket: PAKET });
 anbieten('sammlung:bereich', () => {
@@ -263,6 +374,6 @@ anbieten('sammlung:bereich', () => {
   return bereich({ id: 'rahmen', name: S('rahmen'), teile: rahmenTeile().map((r) => ({
     id: 'rahmen-' + r.id, name: r.name, frei: r.frei, an: wahl.rahmen === r.id,
     zeile: wahl.rahmen === r.id ? S('an') : r.frei ? S('frei') : r.weg, bild: rahmenBild(r.id),
-    fortschritt: r.fortschritt, seltenheit: r.seltenheit, labor: r.labor, wahl: () => setzeProfilWahl({ rahmen: r.id }),
+    fortschritt: r.fortschritt, seltenheit: r.seltenheit, labor: r.labor, wahl: () => { setzeProfilWahl({ rahmen: r.id }); karteAbgleichen(); },
   })) });
 }, { reihenfolge: 35, paket: PAKET });

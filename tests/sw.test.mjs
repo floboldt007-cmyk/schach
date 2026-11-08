@@ -84,6 +84,8 @@ export const SCREEN_PAKET = Object.freeze({
   werkstatt: 'werkstatt',
   // Online-Lobby als Vorschau im Labor (Paket lobby, 01.11.2026)
   lobby: 'lobby',
+  // Raetsel-Duell (Etappe 5): Screen und Optik gehoeren zur Lobby
+  'raetsel-duell': 'lobby',
   // Welle B3: Lehrkraft-Ansicht des Schulmodus (Paket schule)
   schule: 'schule',
 });
@@ -180,6 +182,8 @@ function main() {
     // Lobby-Musik: Melodien als eigene Datei (assets/klang/MUSIK-LIZENZ.md), offline noetig
     ...alleDateien('assets/klang', /^melodien\.json$/),
     ...alleDateien('assets/avatare/modern', /\.(svg|png)$/),
+    // Etappe 4b: Banner der Visitenkarte (Start, Saison, Gold-Erfolge, KI-Gegner) offline; Shop-Banner erst mit dem Shop
+    ...alleDateien('assets/banner', /^(start|saison-[a-z]+|erfolg-[a-z]+|bot-[a-z]+)\.svg$/),
     // Portraets der Wochen-Bosse (offline, auch solange das Paket aus ist: es liegt schon in DATEIEN)
     ...alleDateien('assets/avatare/bosse', /\.(svg|png)$/),
     ...alleDateien('js', /\.js$/),
@@ -222,6 +226,8 @@ function main() {
     ...alleDateien('assets/pieces/dinos', /\.svg$/),
     ...alleDateien('assets/avatare', /\.(svg|png)$/),
     ...alleDateien('assets/icons', /\.(svg|png)$/),
+    // Wappen der Kronen-Liga (Wochen-Gruppen 07.11.2026, werkzeuge/liga-wappen.mjs): Startseite und Reiter Gruppe
+    ...alleDateien('assets/liga', /\.svg$/),
     // W0+a: statische Inhalte direkt unter daten/ (gehoeren keinem Paket) muessen sofort in den Cache; die Inhalte
     // eines Pakets unter daten/<paket>/ erst mit dem Paket (pk.pflicht); daten/beispiel/ wird nie ausgeliefert
     ...alleDateien('daten', /\.json$/),
@@ -370,8 +376,8 @@ function main() {
     && kernScreens.includes('premium') && kernScreens.includes('heim') && screenFehlt.length === 0, screenFehlt.join(', '));
   // vorhandene Paket-Screens muessen erst in den Cache, wenn ihr Paket eingebunden ist (sonst nur Hinweis oben)
   const paketFehlt = paketScreens.map((s) => `js/ui/${s}.js`).filter((d) => pk.pflicht.includes(d) && !menge.has(d));
-  pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; B3: schule; lobby; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
-    JSON.stringify(paketScreens) === '["start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt","lobby","schule"]'
+  pruefe('Paket-Screens (start; W0+a: bestenliste, raetsel, lernen, lektion, ich, spielplan, spielhalle, werkstatt; B3: schule; lobby; Etappe 5: raetsel-duell; training seit U2 Kern) im Router, die eingebundener Pakete im Cache',
+    JSON.stringify(paketScreens) === '["start","bestenliste","raetsel","lernen","lektion","ich","spielplan","spielhalle","werkstatt","lobby","raetsel-duell","schule"]'
     && JSON.stringify(Object.keys(SCREEN_PAKET)) === JSON.stringify(paketScreens)
     && paketScreens.every((s) => screens.includes(s)) && paketFehlt.length === 0, paketFehlt.join(', ') || JSON.stringify(paketScreens));
   const engine = readFileSync(path.join(WURZEL, 'js/engine.js'), 'utf8');

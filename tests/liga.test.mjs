@@ -308,6 +308,114 @@ async function integrationsTeil() {
   ab(); S.setzeSpeicher(null);
 }
 
+// Etappe B Task 5: das Liga-Paket meldet Kronen beim (abgefangenen) Server, nie mehr als einmal, nie ohne Konto
+async function kronenMeldeTeil() {
+  const { setzeOnlineFetch } = await import('../js/online.js');
+  // Meldungen der Partien aus integrationsTeil laufen verzoegert (das Paket laedt js/kronen.js erst beim Melden):
+  // erst ohne Konto auslaufen lassen, dann die Sitzung anlegen
+  await new Promise((r) => setTimeout(r, 300));
+  const speicher = new Map();
+  const lager = { getItem: (k) => speicher.get(k) ?? null, setItem: (k, v) => speicher.set(k, String(v)), removeItem: (k) => speicher.delete(k), key: (i) => [...speicher.keys()][i] ?? null, get length() { return speicher.size; } };
+  S.setzeSpeicher(lager);
+  const altLager = globalThis.localStorage;
+  globalThis.localStorage = lager;
+  const sitzung = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f' })).toString('base64url') + '.x',
+    refresh_token: 'r1', expires_at: 9999999999, user: { id: '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f', email: 'probe@example.invalid' } };
+  speicher.set('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+  let aufrufe = [];
+  let netzFehlt = false;
+  setzeOnlineFetch(async (url, opt) => {
+    aufrufe.push({ name: (String(url).match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1], daten: opt && opt.body ? JSON.parse(opt.body) : null });
+    if (netzFehlt) throw new Error('offline');
+    return { ok: true, status: 200, json: async () => antwort || { delta: 15, kronen: 15, stufe: 0 } };
+  });
+  let antwort = null;
+  const kurz = () => new Promise((r) => setTimeout(r, 150)); // das Paket laedt js/kronen.js erst beim Melden
+  const ende = (p, extra = {}) => {
+    const r = S.speicherePartie({ ...p, spielerFarbe: 'w', zuege: ['e2e4', 'e7e5'], modus: p.modus || 'normal' });
+    sende('partie:beendet', { laufId: 'lauf-' + p.id, partieId: r.partie.id, wertet: r.wertet, botId: p.botId, ergebnis: p.ergebnis, ...extra });
+    return r;
+  };
+  const KI = '11111111-2222-4333-8444-555555555555';
+  const rudi = BOTS.find((b) => b.id === 'rudi');
+  try {
+    S.speichereModul('liga', W.neuerStand(new Date()));
+    await browserPruefe('liga meldet Bot-Sieg an den Server (genau ein Aufruf, ref, ergebnis, bot_elo)', async () => {
+      const r = ende(partie('k-sieg')); sende('partie:beendet', { partieId: r.partie.id, wertet: true }); await kurz();
+      assert.equal(aufrufe.length, 1); assert.equal(aufrufe[0].name, 'kronen_bot_ergebnis');
+      assert.deepEqual(aufrufe[0].daten, { ref: r.partie.id, ergebnis: 'sieg', bot_elo: rudi.elo });
+    });
+    await browserPruefe('liga meldet nichts fuer eine ungewertete Partie (eigene Stellung)', async () => {
+      aufrufe = []; ende(partie('k-eigen', { startFen: '7k/8/5KQ1/8/8/8/8/8 w - - 0 1' }), { wertet: true }); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+    await browserPruefe('liga: Netzfehler beim Melden wirft nicht, die lokale Liga bucht trotzdem', async () => {
+      aufrufe = []; netzFehlt = true; const n = S.ladeModul('liga').wertung.n;
+      ende(partie('k-netz')); await kurz();
+      assert.equal(aufrufe.length, 1); assert.equal(S.ladeModul('liga').wertung.n, n + 1);
+      netzFehlt = false;
+    });
+    await browserPruefe('liga meldet KI-Gegner mit Beleg (kronen_ki_ergebnis, nie kronen_bot_ergebnis)', async () => {
+      aufrufe = []; ende(partie('k-ki', { ki: true, kiRef: KI, ergebnis: 'remis' })); await kurz();
+      assert.deepEqual(aufrufe, [{ name: 'kronen_ki_ergebnis', daten: { ki_ref: KI, ergebnis: 'remis' } }]);
+    });
+    await browserPruefe('liga meldet einen KI-Gegner ohne Beleg gar nicht', async () => {
+      aufrufe = []; ende(partie('k-ki-ohne', { ki: true })); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+    // Task 6: Start-Liga. Bis hier hat die lokale Liga gewertete Partien, also eine eigene Elo.
+    const UID = sitzung.user.id;
+    const k = await import('../js/kronen.js');
+    const { setzeKontoFetch } = await import('../js/konto.js');
+    const merker = () => S.ladeModul('kronen');
+    const vergiss = () => S.speichereModul('kronen', { konto: null, stand: null, startGemeldet: false });
+    const starts = () => aufrufe.filter((a) => a.name === 'kronen_start');
+    await browserPruefe('setzeStartLiga sendet lokale Elo einmal (zwei Aufrufe, ein RPC), Merker je Konto', async () => {
+      aufrufe = []; vergiss(); const elo = S.ladeModul('liga').wertung.wert;
+      await Promise.all([k.setzeStartLiga(), k.setzeStartLiga()]); await k.setzeStartLiga();
+      assert.deepEqual(aufrufe, [{ name: 'kronen_start', daten: { elo } }]);
+      assert.deepEqual(merker(), { konto: UID, stand: null, startGemeldet: true });
+    });
+    await browserPruefe('setzeStartLiga: offline kein Merker, beim naechsten Mal nachgeholt', async () => {
+      aufrufe = []; vergiss(); netzFehlt = true;
+      await k.setzeStartLiga(); assert.equal(merker().startGemeldet, false);
+      netzFehlt = false; await k.setzeStartLiga();
+      assert.equal(starts().length, 2); assert.equal(merker().startGemeldet, true);
+    });
+    await browserPruefe('setzeStartLiga: KRONEN_START_VORBEI setzt den Merker, KRONEN_EINGABE nicht', async () => {
+      aufrufe = []; vergiss(); antwort = { fehler: 'KRONEN_EINGABE' };
+      await k.setzeStartLiga(); assert.equal(merker().startGemeldet, false);
+      antwort = { fehler: 'KRONEN_START_VORBEI' }; await k.setzeStartLiga();
+      assert.equal(starts().length, 2); assert.equal(merker().startGemeldet, true);
+      antwort = null;
+    });
+    await browserPruefe('setzeStartLiga: Merker eines anderen Kontos zaehlt nicht', async () => {
+      aufrufe = []; S.speichereModul('kronen', { konto: 'anderes-konto', stand: { kronen: 900 }, startGemeldet: true });
+      await k.setzeStartLiga();
+      assert.equal(starts().length, 1); assert.deepEqual(merker(), { konto: UID, stand: null, startGemeldet: true });
+    });
+    await browserPruefe('Liga-Paket startet die Start-Liga bei app:sichtbar', async () => {
+      aufrufe = []; vergiss();
+      setzeKontoFetch(async () => { throw new Error('offline'); }); // der Konto-Abgleich bei app:sichtbar bleibt so im Test
+      try { sende('app:sichtbar', { sichtbar: true }); await kurz(); } finally { setzeKontoFetch(null); }
+      assert.equal(starts().length, 1); assert.equal(merker().startGemeldet, true);
+    });
+    await browserPruefe('setzeStartLiga ohne gewertete Partie sendet nichts', async () => {
+      aufrufe = []; vergiss(); const alt = S.ladeModul('liga'); S.speichereModul('liga', W.neuerStand(new Date()));
+      try { await k.setzeStartLiga(); } finally { S.speichereModul('liga', alt); }
+      assert.equal(aufrufe.length, 0); assert.equal(merker().startGemeldet, false);
+    });
+    await browserPruefe('liga meldet ohne Konto nichts', async () => {
+      aufrufe = []; speicher.delete('schach-arena:konto:sitzung'); ende(partie('k-ohne-konto')); await kurz();
+      assert.equal(aufrufe.length, 0);
+    });
+  } finally {
+    setzeOnlineFetch(null);
+    globalThis.localStorage = altLager;
+    S.setzeSpeicher(null);
+  }
+}
+
 const PROBE = `
 import '../liga/index.js';
 import { sende, hoere } from '../../ereignisse.js';
@@ -454,6 +562,160 @@ async function browserTeil(browser, start) {
   }
 }
 
+// Wochen-Gruppen (07.11.2026): Reiter "Gruppe" der Bestenliste mit abgefangenem Server (liga_meine_gruppe).
+// Gruppe Laeufer II (Stufe 7), du auf Platz 3, 27 Menschen und 3 Bots ("KI"), dazu eine gemerkte Belohnung.
+function probeGruppe({ platz = 3, stufe = 7, botKi = { genutzt: 120, max: 300 } } = {}) {
+  const mitglieder = [];
+  for (let p = 1; p <= 30; p++) {
+    const ki = p === 6 || p === 18 || p === 27;
+    mitglieder.push({ platz: p, name: p === platz ? 'flo' : (ki ? ['Rosa', 'Udo', 'Kira'][[6, 18, 27].indexOf(p)] : 'Spieler ' + p),
+      kronen: 400 - p * 12, ki, ich: p === platz });
+  }
+  return { woche: '2026-11-02', ende: '2026-11-08', stufe, gruppe: 41, platz, n: 30, mitglieder,
+    belohnung: [], offen: [{ woche: '2026-10-26', platz: 4, art: 'taler', menge: 80 }], bot_ki: botKi };
+}
+const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
+const GR_UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
+const GR_SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: GR_UID })).toString('base64url') + '.x', refresh_token: 'r1',
+  expires_at: 9999999999, user: { id: GR_UID, email: 'probe@example.invalid' } };
+
+async function gruppeSeite(browser, start, { antwort, konto = true, w = 390, h = 844, modus = 'hell', sprache = 'de' }) {
+  const kontext = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: w < 700, reducedMotion: 'reduce', serviceWorkers: 'block' });
+  const page = await kontext.newPage();
+  const fehler = [];
+  page.on('pageerror', (e) => fehler.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) fehler.push(m.text()); });
+  const rpc = [];
+  await page.route(SUPA + '/**', (r) => {
+    const name = (r.request().url().match(/\/rpc\/([a-z_]+)/) || [])[1];
+    if (name) rpc.push(name);
+    if (name === 'liga_meine_gruppe') {
+      if (antwort === 'fehler') return r.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"kaputt"}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(antwort) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await kontext.addInitScript(({ sitzung, modus, sprache }) => {
+    if (sessionStorage.getItem('gruppe-probe')) return;
+    sessionStorage.setItem('gruppe-probe', '1');
+    localStorage.clear();
+    if (sitzung) localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+    localStorage.setItem('schach-arena:v1:einstellungen', JSON.stringify({ modus, sprache, spracheGewaehlt: true, bewegung: 'aus', klang: false,
+      duellIntro: 'aus' }));
+  }, { sitzung: konto ? GR_SITZUNG : null, modus, sprache });
+  await page.goto(start + '?test#bestenliste');
+  await page.waitForSelector('.lg-gr[data-zustand]:not([data-zustand="laedt"])', { timeout: 15000 });
+  return { kontext, page, fehler, rpc };
+}
+
+async function gruppeTeil(browser, start) {
+  {
+    const { kontext, page, fehler, rpc } = await gruppeSeite(browser, start, { antwort: probeGruppe() });
+    try {
+      await browserPruefe('Gruppe: ist der erste Reiter und Standard, Freunde gleich dahinter, ohne Zeitfenster', async () => {
+        const reiter = await page.locator('.bl-steuer-reiter [role="radio"], .bl-steuer-reiter button').allInnerTexts();
+        assert.deepEqual(reiter.slice(0, 2).map((x) => x.trim()), ['Gruppe', 'Freunde'], JSON.stringify(reiter));
+        assert.equal(await page.locator('.bl-screen').getAttribute('data-reiter'), 'gruppe');
+        assert.ok(await page.locator('.bl-steuer-fenster').isHidden());
+        assert.ok(rpc.includes('liga_meine_gruppe'));
+      });
+      await browserPruefe('Gruppe: Buehne mit Wappen, "Läufer II", "Platz 3 von 30", Aufstiegskurs, naechste Stufe Läufer I', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Läufer II');
+        assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Platz 3 von 30');
+        assert.match(await page.locator('.lg-gr-zone').innerText(), /Auf Aufstiegskurs/);
+        assert.match(await page.locator('.lg-gr-naechste').innerText(), /Läufer I$/);
+        assert.match(await page.locator('.lg-gr-wappen').getAttribute('src'), /assets\/liga\/laeufer\.svg$/);
+        assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
+        assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
+        assert.match(await page.locator('.lg-gr-offen').innerText(), /1 Belohnungen/);
+        assert.equal(await page.locator('.lg-gr-botvoll').count(), 0, '120 von 300 Bot-Kronen: kein Hinweis');
+      });
+      await browserPruefe('Gruppe: Abschnitte 5 / 20 / 5, "Eine Stufe tiefer" statt Druck-Wort, eigene Zeile gold', async () => {
+        const n = (z) => page.locator(`.lg-gr-abschnitt[data-zone="${z}"] .lg-gr-zeile`).count();
+        assert.deepEqual([await n('auf'), await n('bleib'), await n('ab')], [5, 20, 5]);
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="ab"] h3').innerText(), 'Eine Stufe tiefer');
+        assert.ok(!/Abstieg/i.test(await page.locator('.lg-gr').innerText()));
+        assert.equal(await page.locator('.lg-gr-zeile.ich').count(), 1);
+        assert.equal(await page.locator('.lg-gr-zeile.ich .lg-gr-platz').innerText(), '3');
+        assert.equal(await page.locator('.lg-gr-zeile.ich .lg-gr-name b').innerText(), 'Du');
+      });
+      await browserPruefe('Gruppe: Bots tragen "KI", Bleiben eingeklappt bis zum Knopf', async () => {
+        assert.equal(await page.locator('.lg-gr-zeile[data-ki] .lg-gr-ki').count(), 3);
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="bleib"] .lg-gr-zeile:visible').count(), 1);
+        const mehr = page.locator('.lg-gr-mehr');
+        assert.equal(await mehr.innerText(), '19 weitere anzeigen');
+        await mehr.click();
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="bleib"] .lg-gr-zeile:visible').count(), 20);
+        assert.equal(await mehr.getAttribute('aria-expanded'), 'true');
+      });
+      await browserPruefe('Gruppe: Belohnungs-Kacheln bis Platz 20 (Banner fuer Platz 1), Tipp zeigt den Inhalt', async () => {
+        assert.equal(await page.locator('.lg-gr-lohn').count(), 20);
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="1"] .lg-gr-lohn').getAttribute('data-art'), 'banner');
+        const lohn = page.locator('.lg-gr-zeile.ich .lg-gr-lohn');
+        await lohn.click();
+        assert.equal(await lohn.getAttribute('aria-expanded'), 'true');
+        assert.match(await page.locator('.lg-gr-zeile.ich .lg-gr-info').innerText(), /Belohnung für Platz 3: 100 Taler/);
+        assert.equal(await page.locator('.lg-gr-zeile[data-platz="21"] .lg-gr-lohn').count(), 0);
+      });
+      await browserPruefe('Gruppe: keine Konsolenfehler, kein NaN, keine Kennung', async () => {
+        assert.deepEqual(fehler, []);
+        const text = await page.locator('.lg-gr').innerText();
+        assert.ok(!/NaN|undefined|null|[0-9a-f]{8}-[0-9a-f]{4}-/.test(text), text.slice(0, 200));
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe(), konto: false });
+    try {
+      await browserPruefe('Gruppe ohne Konto: ruhige Karte mit Link zum Konto, kein Server-Abruf der Gruppe', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'ohne-konto');
+        assert.match(await page.locator('.lg-gr-karte p').innerText(), /Gruppe mit 30 Plätzen/);
+        assert.equal(await page.locator('.lg-gr-konto').getAttribute('href'), '#einstellungen/konto');
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const leer = { woche: '2026-11-02', ende: '2026-11-08', stufe: 3, gruppe: null, platz: null, n: 30, mitglieder: [], belohnung: [], offen: [] };
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: leer });
+    try {
+      await browserPruefe('Gruppe ohne Partie diese Woche: Buehne Springer III mit Einladung, keine Liste', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'leer');
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'Springer III');
+        assert.match(await page.locator('.lg-gr-titel p').innerText(), /Spiel eine Partie/);
+        assert.equal(await page.locator('.lg-gr-liste').count(), 0);
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page, fehler } = await gruppeSeite(browser, start, { antwort: 'fehler' });
+    try {
+      await browserPruefe('Gruppe bei Server-Fehler: ruhige Fehlerkarte, App laeuft weiter', async () => {
+        assert.equal(await page.locator('.lg-gr').getAttribute('data-zustand'), 'fehler');
+        assert.ok(!fehler.some((f) => /pageerror|TypeError/.test(f)), fehler.join(' | '));
+      });
+    } finally { await kontext.close(); }
+  }
+  {
+    const { kontext, page } = await gruppeSeite(browser, start, { antwort: probeGruppe({ platz: 28, stufe: 17, botKi: { genutzt: 300, max: 300 } }),
+      sprache: 'en', modus: 'dunkel' });
+    try {
+      await browserPruefe('Gruppe englisch, dunkel, Koenig I auf Platz 28: "King I", "Place 28 of 30", ruhiges Abzeichen', async () => {
+        assert.equal(await page.locator('.lg-gr-titel h2').innerText(), 'King I');
+        assert.equal(await page.locator('.lg-gr-titel p').innerText(), 'Place 28 of 30');
+        assert.equal(await page.locator('.lg-gr-zone').getAttribute('data-zone'), 'ab');
+        assert.match(await page.locator('.lg-gr-zone').innerText(), /Everything is open until Sunday/);
+        assert.equal(await page.locator('.lg-gr-naechste').count(), 0, 'ueber Koenig I gibt es nichts');
+        assert.equal(await page.locator('.lg-gr-abschnitt[data-zone="auf"]').count(), 0, 'in Koenig I steigt niemand auf');
+      });
+      await browserPruefe('Gruppe: Bot-Kronen-Deckel voll (300 von 300): ruhiger Hinweis in Grau wie "Ends on Sunday", nie rot', async () => {
+        assert.equal(await page.locator('.lg-gr-botvoll').innerText(), 'Bot crowns are full for this week. Online games still count.');
+        const farbe = (s) => page.locator(s).evaluate((e) => getComputedStyle(e).color);
+        assert.equal(await farbe('.lg-gr-botvoll'), await farbe('.lg-gr-ende'));
+      });
+    } finally { await kontext.close(); }
+  }
+}
+
 let server, browser;
 try {
   nodeTeil();
@@ -465,6 +727,7 @@ try {
       static now() { return DATUM.getTime(); }
     };
     await integrationsTeil();
+    await kronenMeldeTeil();
   } finally { globalThis.Date = EchteDate; }
   if (!process.argv.includes('--nur-node')) {
     let pw;
@@ -485,6 +748,7 @@ try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(8847, '127.0.0.1', resolve); });
     browser = await browserTyp(pw).launch();
     await browserTeil(browser, 'http://127.0.0.1:8847/index.html');
+    await gruppeTeil(browser, 'http://127.0.0.1:8847/index.html');
   }
 } catch (e) {
   ergebnisse.push({ name: 'Testlauf', ok: false }); console.error('FEHLER Testlauf: ' + e.stack);

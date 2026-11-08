@@ -111,6 +111,10 @@ export const MODUL_BUDGET = Object.freeze({
   teilen: 2000,
   // Welle C: Tagesraetsel (S1-5): Ergebnisse der letzten 60 Tage, "Ein Wort"
   tagesraetsel: 4000,
+  // Etappe B: letzter Kronen-Stand je Konto und Start-Merker (js/pakete/liga/kronen.js kronenSpeicher)
+  kronen: 1000,
+  // Etappe 4b: Erfolgs-Stufen, Taler-Buch, Raetsel-Zaehler und letzter Server-Besitz (js/besitz.js)
+  besitz: 12000,
 });
 // Einstellungen eines Pakets (Klangstufe, Ruhetag, Schalter ...) in Zeichen
 export const MODUL_EINSTELLUNGEN_MAX = 2000;
@@ -546,6 +550,11 @@ export function pruefeLiga(l) {
   if (typeof l.saison !== 'string' || !ID_RE.test(l.saison) || !Number.isInteger(l.runde) || l.runde < 1 || l.runde > 99) return null;
   return { saison: l.saison, runde: l.runde };
 }
+// Etappe B Task 4: Beleg der Gegnersuche fuer einen KI-Gegner (uuid vom Server), Task 5 meldet damit das Ergebnis
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export function pruefeKiRef(r) {
+  return typeof r === 'string' && UUID_RE.test(r) ? r : null;
+}
 // Felder setzen oder (falsch/leer) entfernen
 function setzeOderWeg(p, feld, wert) {
   if (wert == null) delete p[feld];
@@ -558,6 +567,8 @@ function normalisiereSpiel(p) {
   setzeOderWeg(p, 'zeiten', pruefeZeiten(p.zeiten, Array.isArray(p.zuege) ? p.zuege.length : 2000));
   setzeOderWeg(p, 'boss', p.modus === 'boss' ? pruefeBoss(p.boss) : null);
   setzeOderWeg(p, 'liga', pruefeLiga(p.liga));
+  setzeOderWeg(p, 'ki', p.ki === true ? true : null);
+  setzeOderWeg(p, 'kiRef', p.ki === true ? pruefeKiRef(p.kiRef) : null);
   return p;
 }
 

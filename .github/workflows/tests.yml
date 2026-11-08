@@ -41,6 +41,29 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
 
+  sql:
+    # Fuehrt die Kronen-SQL wirklich aus (PGlite = Postgres als WebAssembly, ohne Netz zu einer Datenbank).
+    # Ersetzt nicht den einmaligen Lauf von supabase/kronen-rls-test.sql im Supabase SQL Editor vor dem Einspielen.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: PGlite installieren
+        run: |
+          # Feste Version (Abhaengigkeits-Gate 06.11.2026): 0.5.11 vom 21.10.2026, keine Installations-Skripte, keine
+          # Abhaengigkeiten; nur hier, ohne package.json. Ein Update kommt nur bewusst.
+          npm install --no-save --ignore-scripts @electric-sql/pglite@0.5.11
+      - name: Kronen-SQL ausfuehren
+        run: node tests/server-kronen.test.mjs
+      - name: Zaehler-SQL ausfuehren
+        run: node tests/server-zaehler.test.mjs
+      - name: Karte-SQL ausfuehren
+        run: node tests/server-karte.test.mjs
+      - name: Raetsel-Duell-SQL ausfuehren
+        run: node tests/server-raetsel-duell.test.mjs
+
   webkit:
     # Fest auf 24.04: Mit dem Wechsel von ubuntu-latest auf 26.04 (29.10.2026) kam die Figur im Brett-Test
     # (setzeDauer 400) unter WebKit nicht mehr nach 520 ms an (gleiche Playwright-WebKit v2370, aber deren Build fuer 26.04). Offen: Ursache klaeren.

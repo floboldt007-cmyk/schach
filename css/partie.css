@@ -74,6 +74,9 @@
   white-space: nowrap; font-size: 13px; font-weight: 650; color: var(--text-2); }
 .partie .spieler.ich > .unter { grid-area: unter; }
 .partie .spieler .p-meta { flex: none; }
+/* Etappe B Task 4: Bot als Ersatz aus der Gegnersuche, ehrlich gekennzeichnet (Text in Schriftfarbe, nur ein Rahmen) */
+.partie .spieler .ki-abzeichen { flex: none; display: inline-block; margin-inline-end: .4em; padding: 0 .45em; border: 1px solid currentColor;
+  border-radius: 999px; font-size: .72em; font-weight: 600; line-height: 1.5; vertical-align: middle; white-space: nowrap; }
 .partie .spieler .denkt-ort { display: inline-flex; align-items: center; flex: none; }
 .partie .spieler .denkt { margin-left: 2px; }
 .partie .spieler > .ort-gegner-leiste { grid-area: leiste; margin-bottom: 8px; min-width: 0; }
@@ -150,6 +153,11 @@
 /* Ring ragt ueber die Symbolhoehe hinaus, die Beschriftung bleibt auf einer Linie mit den Nachbarn */
 .partie .spielknoepfe .halte-symbol { width: 32px; height: 32px; margin: -4px 0; }
 .partie .spielknoepfe .halte-symbol > .ico { width: 20px; height: 20px; }
+/* Pfeile in der Knopfreihe (Handy-Runde K, 08.11.2026): Zug zurueck und vor als schmale Spalten links und rechts. Nur wo
+   der Zugstreifen unter den Knoepfen liegt (Handy unter 760 px Hoehe, iPad hoch, Regeln weiter unten); dort lag er mit
+   seinen Pfeilen unter dem Bildschirmrand. Sonst unsichtbar. */
+.partie .spielknoepfe > .knopf.sk-pfeil { display: none; }
+.partie .spielknoepfe > .knopf.sk-pfeil:disabled .ico { opacity: .4; }
 /* Halten zum Aufgeben: der Knopf faerbt sich wie im Bauteil (die Knopf-Regel oben ist sonst spezifischer) */
 .partie .spielknoepfe > .knopf.halte-knopf.haelt { background: var(--warn-weich); }
 .partie .spielknoepfe .hinweis-k.stufe-2 { box-shadow: inset 0 0 0 1.5px var(--text), var(--s1); }
@@ -317,6 +325,10 @@
   .partie .p-blase { min-height: 100%; display: flex; align-items: center; padding: 8px 12px; font-size: 14px; line-height: 1.3;
     box-shadow: var(--s1), var(--kante); transform-origin: 0 calc(var(--av) / 2); }
   .partie .p-blase::before { left: -5px; top: calc(var(--av) / 2 - 4px); transform: rotate(-45deg); }
+  /* Name und Unterzeile treten zurueck, solange die Blase spricht: an den runden Ecken der Blase schauten sonst Reste
+     des Namens heraus (Handy-Runde K, 08.11.2026) */
+  .partie .spieler.gegner > .info { transition: opacity calc(160ms * var(--tempo, 1)); }
+  .partie.hat-blase .spieler.gegner > .info { opacity: 0; }
   /* Bewertungsbalken hoch (Handy und iPad) waagrecht ueber dem Brett (--balken hoch, volle Breite, Weiss von links,
      gedreht von rechts), Zahl auf Antippen (js/ui/partie.js) */
   .partie .evalbalken { width: 100%; height: var(--balken); border-radius: var(--r-pille); overflow: visible; cursor: pointer;
@@ -374,6 +386,9 @@
      Uhr drei Zeilen ueber Luecke und Balken, ohne die Figuren zu beruehren. */
   .partie .spieler.gegner > .blase-ort { top: -4px; bottom: -4px; }
   .partie .p-blase { padding: 5px 10px; font-size: 13px; line-height: 1.25; }
+  /* schmale Handys (iPhone SE, 320 px): drei Zeilen passen nur dichter in die Karte, sonst lag die Blase ueber dem
+     Bewertungsbalken (Handy-Runde K, 08.11.2026) */
+  @media (max-width: 360px) { .partie .p-blase { padding: 3px 9px; font-size: 12px; line-height: 1.2; } }
   /* Coach: eine feste Hoehe (das Brett springt nie), Text eine Zeile, ab 760 px Hoehe zwei; bei Platznot nur die
      Kopfzeile (.coach-eng); Antippen zeigt den Rest (.offen, die Spalte scrollt dann) */
   .partie .coach { height: 58px; padding: 8px 12px; border-radius: 16px; align-content: start; overflow: hidden; column-gap: 8px; }
@@ -414,6 +429,23 @@
   .partie .spielknoepfe .knopf .ico { width: 20px; height: 20px; }
   .partie .spielknoepfe .halte-symbol { width: 26px; height: 26px; margin: -3px 0; }
   .partie .spielknoepfe .halte-symbol > .ico { width: 17px; height: 17px; }
+}
+
+/* Pfeile in der Knopfreihe einschalten (Abschnitt "Aktionen" oben): iPad hoch immer, Handy nur mit Streifen unten. Der
+   Zugstreifen behaelt seine Zuege (Antippen, die Spalte scrollt), seine eigenen Pfeile entfallen dort. */
+@media (orientation: portrait) and (min-width: 601px) {
+  .partie .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie .zugleiste .zl-pfeil { display: none; }
+}
+@media (orientation: portrait) and (max-width: 600px) {
+  .partie.streifen-unten .spielknoepfe > .knopf.sk-pfeil { display: flex; }
+  .partie.streifen-unten .spielknoepfe { grid-template-columns: var(--tap) repeat(3, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="1"] { grid-template-columns: var(--tap) repeat(4, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .spielknoepfe[data-aktionen="2"] { grid-template-columns: var(--tap) repeat(5, minmax(0, 1fr)) var(--tap); }
+  .partie.streifen-unten .zugleiste .zl-pfeil { display: none; }
 }
 
 /* ---------- Pfeil-Tipp (einmal je Geraet, js/ui/partie.js PFEIL_TIPP_MERKER): ruhige Zeile unter dem Brett ----------

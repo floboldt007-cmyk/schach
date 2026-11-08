@@ -7,14 +7,35 @@
 //   node tests/sw.test.mjs --aktualisieren   (zaehlt hoch und setzt STAND neu).
 // Die neue Version wartet, bis die App neu startet oder Flo im Hinweis "Neu laden" tippt
 // (Nachricht 'aktivieren', siehe js/app.js).
-const VERSION = 250;
-const STAND = '39a80db13be7';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
+const VERSION = 262;
+const STAND = 'aff52f6fc610';   // Pruefsumme ueber alle DATEIEN (tests/sw.test.mjs prueft sie)
 const PRAEFIX = 'schach-arena-';
 const CACHE = PRAEFIX + 'v' + VERSION;
 const BASIS = new URL('./', self.location).pathname;   // z. B. /schach/
 
 // Alle Dateien der App, relativ zu sw.js (tests/sw.test.mjs vergleicht mit dem Projektordner)
 const DATEIEN = [
+  // Etappe 4b: Visitenkarte, Erfolgs-Stufen, Taler; Banner ohne Shop (der kommt spaeter)
+  'js/besitz.js',
+  'js/karte.js',
+  'js/ui/visitenkarte.js',
+  'css/visitenkarte.css',
+  'js/pakete/sammlung/stufen.js',
+  'js/pakete/sammlung/moment.js',
+  'js/pakete/sammlung/karte-texte.js',
+  'assets/banner/bot-datenstrom.svg',
+  'assets/banner/bot-schaltkreis.svg',
+  'assets/banner/bot-zahnwerk.svg',
+  'assets/banner/erfolg-raetselmeister.svg',
+  'assets/banner/erfolg-seriensieger.svg',
+  'assets/banner/erfolg-turmbezwinger.svg',
+  'assets/banner/saison-bronze.svg',
+  'assets/banner/saison-diamant.svg',
+  'assets/banner/saison-gold.svg',
+  'assets/banner/saison-holz.svg',
+  'assets/banner/saison-krone.svg',
+  'assets/banner/saison-silber.svg',
+  'assets/banner/start.svg',
   'js/pakete/lernen/taktik.js',
   'js/pakete/lernen/eroeffnungen.js',
   'daten/boss/spielplan.json',
@@ -41,6 +62,11 @@ const DATEIEN = [
   'js/pakete/lobby/index.js',
   'js/pakete/lobby/texte.js',
   'js/ui/lobby.js',
+  'css/pakete/raetsel-duell.css',
+  'js/pakete/lobby/raetsel-duell.js',
+  'js/pakete/lobby/raetsel-duell-texte.js',
+  'js/ui/raetsel-duell.js',
+  'js/raetsel-duell.js',
   'js/ui/lektion.js',
   'css/pakete/sammlung.css',
   'js/pakete/sammlung/index.js',
@@ -94,6 +120,14 @@ const DATEIEN = [
   'js/pakete/liga/ansicht.js',
   'js/pakete/liga/index.js',
   'js/pakete/liga/wertung.js',
+  'js/pakete/liga/kronen.js',
+  'js/pakete/liga/gruppe.js',
+  'assets/liga/bauer.svg',
+  'assets/liga/springer.svg',
+  'assets/liga/laeufer.svg',
+  'assets/liga/turm.svg',
+  'assets/liga/dame.svg',
+  'assets/liga/koenig.svg',
   // Stufe 2: Spielsysteme (P1 bis P3) und Welle A
   'css/pakete/funken.css',
   'js/pakete/funken/ansicht.js',
@@ -192,6 +226,8 @@ const DATEIEN = [
   'js/nachholen.js',
   'js/online.js',
   'js/freunde.js',
+  'js/kronen.js',
+  'js/zaehler.js',
   'js/openings.js',
   'js/orte.js',
   'js/review.js',

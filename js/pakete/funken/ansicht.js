@@ -8,7 +8,7 @@
 //       der Ring schliesst sich, die Zahl klappt um, Klang "level") und Aufschluesselung auf Antippen.
 //   kopfChip({ st, beiTipp }) -> { el, verlasse() }      Chip .fk-chip[role=button] "Level 12" mit Mini-Balken (arena:kopf),
 //                                                        Tippflaeche >= 44 px ueber ::before; reicht der Platz in der
-//                                                        Chip-Reihe nicht (und auf dem Handy), .fk-schmal: nur die Zahl
+//                                                        Chip-Reihe nicht (und auf dem Handy), .fk-schmal: "Lv 12"
 //   spielerEmblem({ st }) -> HTMLElement                 kleines Level-Emblem an Flos Namen (partie:spieler-leiste)
 //   verlaufKarte({ st, botName, beiMehr }) -> HTMLElement Karte "Level und Funken" (verlauf:seite)
 //   heuteZeile({ st, wochenende, beiZuenden }) -> HTMLElement | null   Rueckenwind in der Heute-Karte (arena:heute)
@@ -349,7 +349,7 @@ export function abrechnungsZeile({ eintrag: e, botName = tx('denBot'), schonGeze
 // antippbar: role="button" mit Tastatur (Enter, Leertaste); die Tippflaeche reicht per ::before 3 px ueber und unter den
 // Chip (40 px Chip -> 46 px, auf dem Handy 38 px -> 44 px; --tipp), so viel Rand laesst die Chip-Reihe.
 // Form nach Platz: ganz ("Level 12" mit Mini-Balken), solange die Chip-Reihe ihn ohne Ueberlauf fasst, sonst schmal
-// (.fk-schmal: nur die Zahl im Emblem, SPIELKONZEPT 3.1); auf dem Handy (bis HANDY_BREITE) immer schmal. Gemessen nach
+// (.fk-schmal: "Lv" und die Zahl im Emblem, SPIELKONZEPT 3.1, Flo 08.11.2026); auf dem Handy (bis HANDY_BREITE) immer schmal. Gemessen nach
 // dem Einhaengen und bei jeder Groessenaenderung des Kopfs, hoechstens einmal je Bild (wie js/ui/seite.js die Chips
 // misst): so passt er auch im iPad-Hochformat (744 bis 833 px) und wenn spaeter weitere Chips dazukommen.
 const HANDY_BREITE = '(max-width: 600px)';
@@ -375,7 +375,7 @@ export function kopfChip({ st, beiTipp } = {}) {
   const titel = titelName(fs.level);
   b.title = tx('levelTitel', { level: fs.level, titel });
   b.setAttribute('aria-label', tx('chip.label', { level: fs.level, titel, wert: zahlText(fs.inLevel), kostet: zahlText(fs.kostet), naechstes: fs.level + 1 }));
-  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">${esc(tx('chip.wort'))}</span><b class="zahl">${fs.level}</b></span>`
+  b.innerHTML = `${icon('funke', 'fk-ico')}<span class="fk-chip-text"><span class="fk-chip-wort">${esc(tx('chip.wort'))}</span><span class="fk-chip-kurz">${esc(tx('chip.kurz'))}</span><b class="zahl">${fs.level}</b></span>`
     + `<span class="fk-mini" aria-hidden="true"><i style="transform:scaleX(${fs.anteil.toFixed(4)})"></i></span>`;
   if (typeof beiTipp === 'function') {
     b.addEventListener('click', beiTipp);
@@ -425,7 +425,9 @@ export function kopfChip({ st, beiTipp } = {}) {
 
 export function spielerEmblem({ st } = {}) {
   const fs = L.fortschritt(st.gesamt);
-  const s = el('span', 'fk-spieler', `<b class="zahl">${fs.level}</b>`);
+  // "Level 1" statt einer nackten "1" (Handy-Runde K, 08.11.2026); das Wort kommt aus dem Text, die Zahl bleibt fett
+  const [vor, nach = ''] = tx('level', { level: '§' }).split('§');
+  const s = el('span', 'fk-spieler', `${esc(vor)}<b class="zahl">${fs.level}</b>${esc(nach)}`);
   s.dataset.paket = 'funken';
   s.title = tx('levelTitel', { level: fs.level, titel: titelName(fs.level) });
   s.setAttribute('aria-label', tx('level', { level: fs.level }));

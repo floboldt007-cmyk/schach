@@ -106,7 +106,7 @@ async function nodeTeil() {
   const a = await frageCoach(e);
   const q = aufrufe[0];
   pruefe('Antwort: ok mit Text, Modell, rest', a.ok && a.text === ANTWORT && a.modell === 'claude-opus-5-5' && a.rest === 12 && a.gemerkt === false, a);
-  pruefe('Anfrage: POST an /functions/v1/coach mit Token, apikey und JSON', q.url === SUPA + COACH_PFAD && q.method === 'POST'
+  pruefe('Anfrage: POST an /functions/v1/coach (Region Frankfurt) mit Token, apikey und JSON', q.url === SUPA + COACH_PFAD + '?forceFunctionRegion=eu-central-1' && q.method === 'POST'
     && q.headers.Authorization === 'Bearer ' + SITZUNG.access_token && !!q.headers.apikey && q.headers['Content-Type'] === 'application/json');
   const body = JSON.parse(q.body);
   pruefe('Anfrage: nur erlaubte Felder, keine E-Mail, keine Nutzer-ID', Object.keys(body).every((k) => ERLAUBT.includes(k)) && !q.body.includes(MAIL)

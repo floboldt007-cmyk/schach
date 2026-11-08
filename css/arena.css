@@ -295,7 +295,7 @@
   box-shadow: var(--s2); z-index: 4; pointer-events: none; }
 .arena .knoten .fahne::after { content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--akzent); }
 /* Endgegner: Krone ueber der Station (ueber der Fahne, wenn er der naechste ist) */
-.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); white-space: nowrap; padding: 2px 9px 3px;
+.arena .knoten .boss-krone { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(calc(-50% + var(--krone-dx, 0px))); white-space: nowrap; padding: 2px 9px 3px;
   border-radius: var(--r-pille); font-size: 12px; font-weight: var(--gw-titel); letter-spacing: .2em; color: var(--akzent-text); background: var(--flaeche);
   box-shadow: var(--kante); z-index: 3; pointer-events: none; }
 .arena .knoten.besiegt .boss-krone { bottom: calc(100% + 30px); }
@@ -312,6 +312,7 @@
 .arena .flo-figur { position: absolute; width: 36px; height: 36px; margin: -18px 0 0 -18px; border-radius: 50%; overflow: hidden; z-index: 4; pointer-events: none;
   box-shadow: 0 0 0 2.5px var(--flaeche), 0 0 0 4px var(--flo-grund), var(--s2); }
 .arena .flo-figur svg { width: 100%; height: 100%; display: block; }
+.arena .flo-figur.verdeckt { visibility: hidden; }
 /* Plaetze auf der Karte fuer spaeter (Orte arena:karte-boss am Zelt, arena:karte-event an der Fahne) */
 .arena .ort-karte-boss, .arena .ort-karte-event { position: absolute; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .arena .ort-karte-boss[hidden], .arena .ort-karte-event[hidden] { display: none; }

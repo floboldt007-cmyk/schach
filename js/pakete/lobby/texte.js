@@ -49,6 +49,10 @@ export const DE = {
   'gefunden.text': 'Vorschau: Echte Online-Gegner kommen mit dem Server. Bis dahin spielst du mit derselben Uhr gegen {bot} ({elo}).',
   'gefunden.spielen': 'Gegen {bot} spielen',
   zurueck: 'Zurück',
+  'suche.anmelden': 'Zum Suchen anmelden',
+  'suche.anmelden.text': 'Gewertete Partien gegen Menschen brauchen ein Konto. Freundschaftspartien gehen auch ohne.',
+  'suche.server': 'Gegner aus der ganzen Welt, nach 10 Sekunden ein KI-Gegner',
+  'suche.fehler': 'Die Suche geht gerade nicht. Prüfe die Verbindung und versuche es gleich noch einmal.',
 };
 
 export const EN = {
@@ -98,6 +102,10 @@ export const EN = {
   'gefunden.text': 'Preview: real online opponents arrive with the server. Until then you play {bot} ({elo}) with the same clock.',
   'gefunden.spielen': 'Play {bot}',
   zurueck: 'Back',
+  'suche.anmelden': 'Sign in to search',
+  'suche.anmelden.text': 'Rated games against people need an account. Casual games work without one.',
+  'suche.server': 'Opponents from all over the world, an AI opponent after 10 seconds',
+  'suche.fehler': 'Searching is not possible right now. Check your connection and try again in a moment.',
 };
 
 registriereTexte('p-lobby', { de: DE, en: EN });

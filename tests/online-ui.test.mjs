@@ -29,7 +29,9 @@ let browser, kontext, ok = 0, gesamt = 0, stamp = Date.now(), nummer = 0, ablehn
 // Antwort auf die naechste Strittig-Meldung: null wie der Server, 'netz' ohne Verbindung, 'beendet' wenn der Gegner
 // gerade vorher die Zeit reklamiert hat (Wettlauf, siehe Konzept Anti-Cheat L5)
 let strittigAntwort = null;
-const partien = new Map(), calls = [], fehler = [], unerwartet = [];
+// Handy-Runde 08.11.: kennt der Server die Liga (kronen_mein_stand)? Ohne sie zeigt Online "kommt bald" statt der Suche
+let ligaDa = false;
+const partien = new Map(), calls = [], fehler = [], unerwartet = [], karteFragen = [];
 const aktualisieren = p => { p.aktualisiert_am = new Date(++stamp).toISOString(); return p; };
 function partie({ farbe = 'w', status = 'laeuft', zuege = '', zeit = null, code = 'ABC234' } = {}) {
   const c = new Chess(); for (const u of zuege.split(' ').filter(Boolean)) c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
@@ -66,6 +68,8 @@ try {
       return antwort(p && (!seit || p.aktualisiert_am > seit) ? [p] : []);
     }
     const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
+    if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 0, kronen: 0, platz: null, ziel: null, n: 30, woche: '2026-11-02' })
+      : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
     if (rpc === 'online_erstelle') {
       const neu = partie({ farbe: body.farbe === 'b' ? 'b' : 'w', status: 'offen', zeit: body.bedenkzeit_s, code: 'DEF567' });
@@ -111,6 +115,13 @@ try {
     }
     // Datenfreigabe ist aus; die Kontodarstellung fragt den aktuellen Freigabestand ab.
     if (/freigabe/.test(url.pathname)) return antwort([]);
+    // Etappe 4b: Visitenkarten (js/karte.js). Beim Start meldet das Konto Stufen und Wahl; die Partie fragt beide Karten.
+    if (rpc === 'karte_melde_stufen' || rpc === 'karte_waehle') return antwort({ taler: 0, stufen: {}, banner: ['start'], wahl: { banner: 'start' } });
+    if (rpc === 'karte_der_partie') {
+      karteFragen.push(body.partie);
+      const karte = (name, du) => ({ name, banner: 'saison-silber', titel: 'erfolg-feuertaufe', vitrine: [], motiv: 'Q', grund: 'standard', rahmen: 'ohne', kronen_stufe: 7, du });
+      return antwort(p ? { w: karte(p.weiss === 'u1' ? 'Spieler_1' : 'Gegner_2', p.weiss === 'u1'), s: karte(p.schwarz === 'u1' ? 'Spieler_1' : 'Gegner_2', p.schwarz === 'u1') } : {});
+    }
     unerwartet.push(url.pathname); return antwort([]);
   });
   await kontext.addInitScript(() => {
@@ -134,7 +145,14 @@ try {
   const eingeladen = partie({ status: 'offen' }); eingeladen.weiss = 'u2'; eingeladen.erstellt_von = 'u2';
   await seite.goto(start + '#online/abc234');
   await knopf('konto').waitFor();
-  pruefe('Ohne Anmeldung: Hinweis und gemerkter Link, keine Server-Anfrage', (await seite.locator('.online-screen').innerText()).includes('Für Partien gegen Freunde brauchst du ein Konto')
+  pruefe('Ohne Anmeldung: Titel Online, zwei erklaerende Karten (Gegnersuche, Freunde), Konto anlegen', await seite.evaluate(() => ({
+    titel: document.querySelector('.online-screen .seiten-kopf h1')?.textContent,
+    karten: [...document.querySelectorAll('.online-screen .on-art')].map((k) => k.dataset.art).join(),
+    knopf: document.querySelector('[data-online="konto"]')?.textContent.trim(),
+    zurueck: !!document.querySelector('.online-screen .kopf-zurueck'),
+    alt: !!document.querySelector('[data-online="training"]') })).then((r) => r.titel === 'Online' && r.karten === 'suche,freunde'
+      && r.knopf === 'Konto anlegen' && r.zurueck && !r.alt));
+  pruefe('Ohne Anmeldung: Hinweis und gemerkter Link, keine Server-Anfrage', (await seite.locator('.online-screen').innerText()).includes('Anmelden geht mit einem Code per E-Mail')
     && await seite.evaluate(() => localStorage.getItem('schach-arena:online:einladung') === 'ABC234') && calls.length === 0);
   await knopf('konto').click(); await seite.locator('.konto-email').fill('spieler@example.invalid');
   await seite.locator('[data-konto="code"]').click();
@@ -145,6 +163,12 @@ try {
   await seite.getByRole('button', { name: 'Zur Einladung', exact: true }).click();
   await seite.locator('[name="code"]').waitFor();
   pruefe('Einladung nach echter Code-Anmeldung wieder angeboten', await seite.locator('[name="code"]').inputValue() === 'ABC234');
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="suche"]')?.dataset.zustand === 'bald').catch(() => {});
+  pruefe('Ohne Liga auf dem Server: Gegnersuche ruhig "kommt bald", ohne Suchknopf, ohne Fehlermeldung', await seite.evaluate(() => {
+    const k = document.querySelector('.on-art[data-art="suche"]');
+    return k?.dataset.zustand === 'bald' && /kommt bald/.test(k.textContent) && k.querySelector('[data-online="suchen"]').hidden
+      && k.querySelector('.on-zeiten').hidden && document.querySelector('.on-meldung').hidden;
+  }));
   await seite.getByRole('button', { name: 'Beitreten', exact: true }).click(); await bereit();
   pruefe('Beitritt: eigene schwarze Seite unten, Merker geloescht', await seite.evaluate(() => window.__online.brett().ausrichtung === 'b' && !localStorage.getItem('schach-arena:online:einladung')));
   zug(eingeladen, 'e2e4');
@@ -304,6 +328,15 @@ try {
   await seite.goto(start + '#online/KLM234'); await seite.locator('[name="code"]').waitFor();
   pruefe('Angemeldeter Link fuellt den Code direkt aus', await seite.locator('[name="code"]').inputValue() === 'KLM234');
   await seite.getByRole('button', { name: 'Beitreten', exact: true }).click(); await bereit();
+  // Etappe 4b: Visitenkarten in den Spielerleisten (Banner, Name, Titel aus karte_der_partie)
+  await seite.waitForFunction(() => document.querySelectorAll('.on-spieler.mit-banner').length === 2, null, { timeout: 8000 }).catch(() => {});
+  const leisten = await seite.evaluate(() => [...document.querySelectorAll('.on-spieler')].map((x) => ({ name: x.querySelector('b')?.textContent,
+    titel: x.querySelector('.on-titel')?.textContent || '', banner: /saison-silber\.svg/.test(x.querySelector('.on-banner')?.style.backgroundImage || '') })));
+  // ?kern laedt das Paket sammlung nicht: der Titel faellt dann bewusst weg (Ort karte:fremde? ohne Anbieter);
+  // mit Paket loest tests/karte.test.mjs den Titel auf
+  pruefe('Etappe 4b: beide Spielerleisten mit Banner und Namen vom Server, ohne Paket sammlung kein Titel', leisten.length === 2
+    && leisten.every((l) => l.banner && !l.titel)
+    && leisten.some((l) => l.name === 'Gegner_2') && leisten.some((l) => l.name === 'Spieler_1') && karteFragen.includes(direkt.id), { leisten, karteFragen });
   for (const [width, height] of [[1180, 820], [820, 1180], [390, 844]]) for (const modus of ['hell', 'dunkel']) {
     await seite.setViewportSize({ width, height }); await seite.evaluate(modus => window.__app.setzeEinstellungen({ modus }), modus);
     await seite.waitForFunction(modus => document.documentElement.dataset.modus === modus, modus);
@@ -315,7 +348,7 @@ try {
     const masse = await seite.evaluate(() => {
       const b = document.querySelector('.on-brett').getBoundingClientRect();
       return { quer: document.documentElement.scrollWidth <= innerWidth, brett: b.x >= 0 && b.right <= innerWidth + 1 && b.y >= 0 && b.bottom <= innerHeight + 1,
-        knoepfe: [...document.querySelectorAll('.online-screen button')].every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler img').length === 2 };
+        knoepfe: [...document.querySelectorAll('.online-screen button')].filter(b => b.getClientRects().length > 0).every(b => b.getBoundingClientRect().height >= 44), karten: document.querySelectorAll('.on-spieler img').length === 2 };
     });
     pruefe(`${width}x${height} ${modus}: Brett, Spielerkarten und Tippflaechen passen`, Object.values(masse).every(Boolean), masse);
     if (process.env.BILDER) { mkdirSync(process.env.BILDER, { recursive: true }); await seite.screenshot({ path: path.join(process.env.BILDER, `online-${width}-${modus}.png`) }); }
@@ -327,6 +360,16 @@ try {
   await seite.getByRole('button', { name: 'Einladung erstellen', exact: true }).click(); await seite.locator('.on-code').waitFor();
   pruefe('Training und Einladungsformular: Farbe und 15+10 an den Server', calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.bedenkzeit_s === 900
     && calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.inkrement_s === 10);
+  ligaDa = true;
+  await seite.evaluate(() => window.__app.gehe('online'));
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="suche"]')?.dataset.zustand === 'bereit').catch(() => {});
+  pruefe('Mit Liga auf dem Server: Gegnersuche mit drei Bedenkzeiten und Suchknopf', await seite.evaluate(() => {
+    const k = document.querySelector('.on-art[data-art="suche"]');
+    return k?.dataset.zustand === 'bereit' && !k.querySelector('[data-online="suchen"]').hidden && !k.querySelector('.on-zeiten').hidden
+      && k.querySelectorAll('.on-zeiten [data-zeit]').length === 3 && k.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit === '3+2';
+  }));
+  await seite.locator('.on-zeiten [data-zeit="10+0"]').click();
+  pruefe('Bedenkzeit waehlbar (genau eine gewaehlt)', await seite.evaluate(() => [...document.querySelectorAll('.on-zeiten [aria-checked="true"]')].map((b) => b.dataset.zeit).join() === '10+0'));
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }

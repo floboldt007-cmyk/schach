@@ -140,6 +140,8 @@
   nach Art. 28 DSGVO auf Grundlage eines Auftragsverarbeitungsvertrags <span class="platz">[abgeschlossen am Datum]</span>.
   Supabase ist ein Unternehmen außerhalb der EU; ein Zugriff von dort ist über die
   <span class="platz">[Standardvertragsklauseln im Auftragsverarbeitungsvertrag / weitere Garantien prüfen]</span> abgesichert.
+  Einige Aufgaben erledigen Server-Programme von Supabase (Edge Functions): die Prüfung der Züge in Online-Partien und im
+  Rätsel-Duell sowie der Coach. Auch sie laufen in Frankfurt, denn die App legt die Region bei jedem Aufruf fest.
   Die Anmelde-E-Mails versendet <span class="platz">[Name des E-Mail-Dienstes, Anschrift, Auftragsverarbeitung]</span>.</p>
   <p><b>Anmeldung mit Google (freiwillig):</b> Statt mit einem Code per E-Mail kannst du dich mit deinem Google-Konto anmelden.
   Dann leitet die App dich zu Google weiter. Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland, erfährt
@@ -169,11 +171,80 @@
   nach deren Fristen automatisch gelöscht <span class="platz">[Fristen laut Supabase prüfen: Server-Logs, Datensicherungen]</span>
   und bis dahin nicht weiter verwendet. Der Spielstand auf deinem Gerät bleibt davon unberührt.</p>
 
+  <!-- ENTWURF Etappe 4b (Visitenkarte): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <h3>Visitenkarte, Erfolge und Taler (Entwurf)</h3>
+  <p>Mit Konto speichern wir, welche Erfolgs-Stufen (Bronze, Silber, Gold) du erreicht hast, die Taler, die diese Stufen
+  dir gutgeschrieben haben, welche Banner du besitzt und wie deine Visitenkarte aussieht (Banner, Titel aus einer festen
+  Liste, Profilbild, Hintergrund, Rahmen und bis zu drei ausgestellte Erfolge). Ohne Konto bleibt das alles nur auf deinem
+  Gerät. Diese Daten sind für die Funktionen der App erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto
+  bei Supabase in Frankfurt.</p>
+  <p>Deine Visitenkarte sieht nur, wer mit dir in derselben Online-Partie sitzt (eingeladen oder über die Gegnersuche):
+  dein Benutzername, Titel, Banner, Profilbild, deine Liga-Stufe und die ausgestellten Erfolge. Deine Wochen-Gruppe in der
+  Liga und deine Gegner im Rätsel-Duell sehen sie nicht, ebenso wenig andere Nutzer und Besucher ohne Konto.
+  Unter „Meine Daten herunterladen“ erhältst du diese Daten mit. Wird dein Konto gelöscht, werden sie automatisch
+  mitgelöscht.</p>
+
+  <!-- ENTWURF Etappe B (Liga mit Wochen-Gruppen): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <h3>Liga mit Kronen und Wochen-Gruppen (Entwurf)</h3>
+  <p>Mit Konto nimmst du an der Liga teil. Dafür speichern wir:</p>
+  <ul>
+    <li>deine Liga-Stufe (Bauer III bis König I), die Summe deiner Kronen und eine Schätzung deiner Spielstärke (Elo) mit
+    der Zahl der Partien, aus denen sie berechnet ist,</li>
+    <li>jede Kronen-Buchung mit Quelle (Online-Partie, Bot-Leiter, KI-Gegner, Start-Liga, Rätsel-Duell gegen Menschen oder
+    gegen die KI), Kennung der Partie oder des Duells, Änderung, Woche und Zeitpunkt. Aus diesen Buchungen ergeben sich auch
+    die Grenzen gegen Missbrauch (wie viele Partien am Tag zählen und wie viele Kronen aus Bot- und KI-Partien je Woche
+    höchstens zählen); dafür gibt es keine eigenen Zähler,</li>
+    <li>je Woche deine Gruppe (Woche, Stufe), deine Kronen in dieser Woche und den Zeitpunkt deines Beitritts. In eine Gruppe
+    kommst du erst mit der ersten Krone der Woche,</li>
+    <li>die Belohnung für deinen Platz am Wochenende (Woche, Stufe, Platz, Art und Menge) und ob sie schon gutgeschrieben ist,</li>
+    <li>während der Gegnersuche: dass du suchst, seit wann, mit welcher Bedenkzeit und deine Spielstärke (Elo), damit ein ähnlich starker Gegner
+    gefunden wird. Findet sich kein Mensch, erhältst du
+    einen Beleg für eine Partie gegen den KI-Gegner.</li>
+  </ul>
+  <p><b>Wer was sieht:</b> Die bis zu 30 Mitglieder deiner Wochen-Gruppe sehen deinen Benutzernamen (ohne Benutzernamen
+  steht dort „Spieler“), deinen Platz und deine Kronen dieser Woche. Mehr sehen sie nicht, insbesondere nicht deine
+  E-Mail-Adresse, deine Visitenkarte, deine Elo oder deine einzelnen Buchungen. Freie Plätze in der Gruppe füllen
+  computergesteuerte Mitspieler; sie tragen die Kennzeichnung „KI“, dahinter steht kein Mensch. Andere Gruppen und
+  Besucher ohne Konto sehen deine Gruppe nicht.</p>
+  <p>Diese Daten sind für die Liga erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in
+  Frankfurt. Die Wochen-Abrechnung (Platz, Auf- und Abstieg, Belohnung) rechnet die Datenbank selbst. Die Gegnersuche
+  löschen wir nach 2 Minuten ohne Partner, nicht eingelöste KI-Belege nach 6 Stunden, jeweils beim nächsten Aufräumen.
+  Frühere Wochen-Gruppen, deine Plätze darin und deine Belohnungen löschen wir automatisch, sobald die Woche mehr als
+  52 Wochen (ein Jahr) zurückliegt, jeweils beim nächsten Aufräumen. Banner aus diesen Wochen kommen vorher in deine
+  Sammlung; noch nicht ausgezahlte Taler aus diesen Wochen verfallen dabei. Deine Stufe, deine Kronen-Summe und deine
+  Buchungen bleiben gespeichert, bis du dein Konto löschst; dann werden sie automatisch mitgelöscht. Unter „Meine Daten
+  herunterladen“ erhältst du alles, was zu diesem Zeitpunkt gespeichert ist.</p>
+
+  <!-- ENTWURF Etappe B (Raetsel-Duell): Rechtspruefung durch Flo vor dem Live-Gang nach main -->
+  <h3>Rätsel-Duell (Entwurf)</h3>
+  <p>Im Rätsel-Duell lösen zwei Spieler drei Minuten lang dieselben Schach-Rätsel. Mit Konto speichern wir je Duell die
+  Art (gewertet, unter Freunden oder gegen die KI), die Konto-Kennungen beider Spieler, bei einem Duell unter Freunden den
+  Einladungscode, die Reihenfolge der Rätsel, Beginn, Dauer, Stand und Ergebnis, und je Spieler, wie viele Rätsel gelöst
+  und wie viele Fehler gemacht wurden, die Zahl der Züge und den Zeitpunkt des letzten Zugs. Während der Gegnersuche
+  speichern wir, dass du suchst, seit wann und deine Spielstärke (Elo), damit ein ähnlich starker Gegner gefunden wird.
+  Gewonnene Kronen werden wie in der Liga gebucht; daraus ergeben sich auch die Tagesgrenzen (höchstens 20 Duelle gegen die
+  KI und 3 gewertete Duelle gegen dieselbe Person am Tag). Falsch eingegebene Einladungscodes zählen wie bei den
+  Online-Partien mit.</p>
+  <p><b>Wer was sieht:</b> Dein Gegner sieht während und nach dem Duell nur, wie viele Rätsel du gelöst hast, wie viele
+  Fehler du gemacht hast und wann deine Zeit endet. Deinen Benutzernamen, deine Visitenkarte und deine E-Mail-Adresse sieht
+  er im Duell nicht. Der KI-Gegner ist kein Mensch, sondern wird vom Server berechnet; er ist in der App als KI
+  gekennzeichnet. Unbeteiligte sehen kein Duell.</p>
+  <p>Diese Daten sind für das Duell erforderlich (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in
+  Frankfurt. Deine Züge prüft eine Edge Function, ebenfalls in Frankfurt (siehe „Wo und durch wen“). Ausgewertet wird jedes Duell auf dem
+  Server: beim nächsten Abruf und zusätzlich alle 10 Minuten durch einen Zeitplaner in der Datenbank (pg_cron), damit ein
+  Duell auch dann endet, wenn niemand mehr die App öffnet. Die Gegnersuche löschen wir nach 2 Minuten ohne Partner,
+  Einladungen, die niemand angenommen hat, nach 24 Stunden. Beendete Duelle bleiben gespeichert, bis eines der beiden
+  Konten gelöscht wird; dann wird das Duell für beide mitgelöscht. Unter „Meine Daten herunterladen“ erhältst du deine
+  Duelle mit deinem Stand darin.</p>
+
   <h3>Online-Partien gegen Freunde</h3>
   <p>Wenn du mit einem Freund online spielst, speichern wir die beiden Konto-IDs, die Züge, die aktuelle Stellung,
   die Schachuhr, den Einladungscode und die Zeitpunkte der Partie. Nur die beiden Spieler können die Partie lesen;
   eine offene Einladung sieht zunächst nur ihr Ersteller. Diese Daten sind für die gemeinsame Partie erforderlich
   (Art. 6 Abs. 1 lit. b DSGVO) und liegen wie dein Konto bei Supabase in Frankfurt.</p>
+  <p>Dasselbe gilt für Partien aus der Gegnersuche der Liga: Dort bringt der Server dich mit einem Menschen ähnlicher
+  Spielstärke zusammen (statt über einen Einladungscode), und die Partie zählt für die Liga (Abschnitt „Liga mit Kronen
+  und Wochen-Gruppen“). Was während der Suche gespeichert wird, steht dort.</p>
   <p>Unter „Meine Daten herunterladen“ erhältst du auch deine Online-Partien. Wird eines der beteiligten Konten
   gelöscht, werden die zugehörigen Online-Partien automatisch mitgelöscht (Kaskade). Die Partien bleiben sonst im
   Konto gespeichert. Technische Protokolle und Datensicherungen unterliegen den in Abschnitt 5 genannten Fristen.</p>

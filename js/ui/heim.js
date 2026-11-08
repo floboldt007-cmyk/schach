@@ -7,12 +7,17 @@
 //
 //   zeige(root, params, app) -> { verlasse() }
 //   zeigeHeim(app, { jetzt }) -> section   baut nur den Screen (ohne einzuhaengen), fuer zeige() und Tests
-//   ligaLage() -> { vorhanden, punkte, stufe, naechste, fehlt, anteil }   Liga-Stand der laufenden Saison (nur lesend)
+//   ligaLage() -> { vorhanden, punkte, stufe, naechste, fehlt, anteil }   Liga-Punkte der Arena (nur lesend, nicht angezeigt)
+//   kronenLage(stand | null) -> { kronen, stufe, liga, rang, platz, n, ziel, anteil, ohneKonto }   rein
 //   (intern) lageSatz(cp, mate, sicht) -> { art, anteil, wert }   Bewertung (Sicht Weiss) als Lage-Art, Balken und Zahl
 //
 // Ziele: Weiterspielen -> partie (fortsetzen, wie app.js pruefeZiel; Zu zweit wie pakete/zuzweit), Spielen -> partie
 // gegen naechsterGegner(); heim-online -> lobby (laborFrei) sonst online; heim-raetsel (Lernen) -> training (dort steht
 // die Meisterschule oben, #150); heim-zuzweit -> partie Zu zweit; Liga-Zeile -> bestenliste.
+// Liga-Zeile (Etappe B, Wochen-Gruppen; L 08.11.2026: der fruehere Ring als Zeile unter "Als Naechstes"): Stufe
+// ("Läufer II") und "Platz 3 von 30" bzw. "Spiel eine Partie für deine Gruppe", Balken bis Platz 5. Erst der gemerkte
+// Stand (Modul kronen, nur fuer dasselbe Konto), dann der Server-Stand (js/kronen.js holeStand), gemerkt. Ohne Konto
+// oder ohne jeden Stand entfaellt die Zeile still.
 // DOM: section.screen.heim-screen > header.haupt-kopf, .heim-rumpf > .heim-links (.heim-gruss, .heim-buehne[data-art]),
 // .heim-rechts (.heim-naechstes?, .heim-wege > button.heim-modus[data-aktion]). Optik: css/heim.css, nur Tokens.
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
@@ -20,17 +25,19 @@ import { icon } from './icons.js';
 import { Brett } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim, tempo } from '../bewegung.js';
-import { ladeModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
+import { ladeModul, speichereModul, ladeLaufendePartie, naechsterGegner, ladeEinstellungen } from '../storage.js';
 import { laborFrei } from '../labor.js';
 import { BOTS, botNachId } from '../bots.js';
-import { eigenerName } from '../konto.js';
+import { eigenerName, sitzung } from '../konto.js';
+import { holeStand, angemeldet } from '../kronen.js';
 import { normalisiereStand, ligaStufe, STUFEN } from '../pakete/liga/wertung.js';
+import { stufeInfo, kronenSpeicher, AUFSTIEG_PLAETZE, GRUPPE_GROESSE } from '../pakete/liga/kronen.js';
 import * as serieStand from '../pakete/serie/stand.js';
 import { lage as serieLage } from '../pakete/serie/tag.js';
 import { tagSchluessel } from '../tag.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { t, zahl, registriereTexte } from '../sprache.js';
-import '../pakete/liga/texte.js';
+import { stufenName } from '../pakete/liga/texte.js';
 import '../sprachen/allgemein.js';
 import '../sprachen/rahmen.js';
 
@@ -69,9 +76,11 @@ registriereTexte('heim', {
     naechsterGegner: 'Nächster Gegner auf deiner Leiter',
     leiter: 'Deine Leiter',
     spielen: 'Spielen',
+    elo: 'Elo {elo}',
     naechstes: 'Als Nächstes',
-    'liga.noch': 'Noch {n} Liga-Punkte bis {naechste}',
-    'liga.oben': 'Höchste Stufe erreicht',
+    'liga.platz': 'Platz {platz} von {n}',
+    'liga.ohneGruppe': 'Spiel eine Partie für deine Gruppe',
+    'liga.label': '{stufe}, {zeile}, {kronen} Kronen diese Woche',
     'online.titel': 'Online',
     'online.text': 'Schnellpartie',
     'raetsel.titel': 'Lernen',
@@ -113,9 +122,11 @@ registriereTexte('heim', {
     naechsterGegner: 'Next opponent on your ladder',
     leiter: 'Your ladder',
     spielen: 'Play',
+    elo: 'Elo {elo}',
     naechstes: 'Up next',
-    'liga.noch': '{n} league points to {naechste}',
-    'liga.oben': 'Top tier reached',
+    'liga.platz': 'Place {platz} of {n}',
+    'liga.ohneGruppe': 'Play a game to join your group',
+    'liga.label': '{stufe}, {zeile}, {kronen} crowns this week',
     'online.titel': 'Online',
     'online.text': 'Quick game',
     'raetsel.titel': 'Learn',
@@ -126,7 +137,7 @@ registriereTexte('heim', {
 });
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'person']];
+const WEGE = [['online', 'blitz'], ['raetsel', 'ziel'], ['zuzweit', 'personen']];
 const BEWERTUNG_TIEFE = 10;
 
 // Punkte und Stufe der laufenden Saison; jeder Fehler ergibt Holz und 0. vorhanden: es gibt einen Liga-Stand
@@ -225,7 +236,8 @@ function buehneGegner(bot) {
   return `<div class="heim-portraet" style="--bot-farbe: var(--bot-${esc(bot.id)}, var(--gold))"><img src="${esc(bot.avatar)}" alt="" draggable="false"></div>
     <div class="heim-buehne-text">
       <small class="heim-ueber">${esc(t('heim.naechsterGegner'))}</small>
-      <h2 class="heim-gegner">${esc(bot.name)} <span class="zahl">· ${esc(zahl(bot.elo))}</span></h2>
+      <div class="heim-name"><h2 class="heim-gegner">${esc(bot.name)}</h2>
+        <small class="heim-elo zahl">${esc(t('heim.elo', { elo: zahl(bot.elo) }))}</small></div>
       ${bot.kurz ? `<p class="heim-spielweise">${esc(bot.kurz)}</p>` : ''}
       <button class="heim-los dr" type="button" data-aktion="heim-spielen" data-bot="${esc(bot.id)}">${icon('play')}<span>${esc(t('heim.spielen'))}</span></button>
     </div>`;
@@ -245,21 +257,70 @@ function leiterZeile(bot) {
     </section>`;
 }
 
+// Kronen-Stand vom Server (oder gemerkt) als Lage der Liga-Zeile; null heisst ohne Konto. Jeder kaputte Wert gilt als 0
+// bzw. als "ohne Gruppe" (platz null). anteil: Weg bis zu den Kronen auf Platz 5 (ziel, der letzte Aufstiegsplatz), auf
+// Platz 1 bis 5 voll.
+const ganz = (v, min, max) => { const x = Number(v); return Number.isFinite(x) ? Math.min(max, Math.max(min, Math.floor(x))) : null; };
+export function kronenLage(stand) {
+  const o = stand && typeof stand === 'object' && !Array.isArray(stand) ? stand : {};
+  const kronen = ganz(o.kronen, 0, Number.MAX_SAFE_INTEGER) ?? 0;
+  const s = stufeInfo(ganz(o.stufe, 0, 17) ?? 0);
+  const n = ganz(o.n, 1, 1000) ?? GRUPPE_GROESSE;
+  const platz = o.platz == null ? null : ganz(o.platz, 1, n);
+  const ziel = o.ziel == null ? null : ganz(o.ziel, 0, Number.MAX_SAFE_INTEGER);
+  let anteil = 0;
+  if (platz != null && platz <= AUFSTIEG_PLAETZE) anteil = 1;
+  else if (platz != null && ziel > 0) anteil = Math.min(1, kronen / ziel);
+  return { kronen, stufe: s.index, liga: s.liga, rang: s.rang, platz, n, ziel, anteil, ohneKonto: stand == null };
+}
+
+// Erste Lage ohne Netz: der gemerkte Stand dieses Kontos; ohne Konto oder ohne gemerkten Stand null (Zeile entfaellt)
+function ersteLage() {
+  if (!angemeldet()) return null;
+  const m = kronenSpeicher(ladeModul('kronen'));
+  const uid = sitzung()?.user?.id;
+  return m.stand && uid && m.konto === uid ? kronenLage(m.stand) : null;
+}
+
+function merke(stand) {
+  const uid = sitzung()?.user?.id;
+  if (!uid) return;
+  const alt = kronenSpeicher(ladeModul('kronen'));
+  const st = { kronen: stand.kronen, stufe: stand.stufe, platz: stand.platz ?? null, ziel: stand.ziel ?? null, n: stand.n };
+  speichereModul('kronen', { konto: uid, stand: st, startGemeldet: alt.konto === uid ? alt.startGemeldet : false });
+}
+
 // "Als Naechstes": Kandidaten mit Rang (1 offene Herausforderung, 2 Belohnung kurz vor dem Ziel, 3 Liga-Platz), hoechstens
-// zwei. Heute gibt es Daten nur fuer den Liga-Platz; die anderen Raenge kommen mit ihren Quellen (Online-Server, Belohnungen).
-function naechsteZeilen() {
+// zwei. Heute gibt es Daten nur fuer den Liga-Platz (Kronen der Wochen-Gruppe, Etappe B); die anderen Raenge kommen mit
+// ihren Quellen (Online-Server, Belohnungen). Ruhig: kein Countdown, kein roter Punkt.
+function naechsteZeilen(lg) {
   const zeilen = [];
-  const lg = ligaLage();
-  if (lg.vorhanden) {
-    const text = lg.naechste == null ? t('heim.liga.oben')
-      : t('heim.liga.noch', { n: zahl(lg.fehlt), naechste: t('p-liga.stufe.' + lg.naechste) });
-    zeilen.push({ rang: 3, html: `<button class="heim-zeile dr" type="button" data-aktion="heim-liga">
+  if (lg && !lg.ohneKonto) {
+    const stufe = stufenName(lg.stufe);
+    const text = lg.platz != null ? t('heim.liga.platz', { platz: zahl(lg.platz), n: zahl(lg.n) }) : t('heim.liga.ohneGruppe');
+    const label = t('heim.liga.label', { stufe, zeile: text, kronen: zahl(lg.kronen) });
+    zeilen.push({ rang: 3, html: `<button class="heim-zeile dr" type="button" data-aktion="heim-liga" aria-label="${esc(label)}">
         <span class="heim-zeile-bild" aria-hidden="true">${icon('liga')}</span>
-        <span class="heim-zeile-text"><b>${esc(t('p-liga.stufe.' + lg.stufe))}</b><span>${esc(text)}</span></span>
+        <span class="heim-zeile-text"><b>${esc(stufe)}</b><span>${esc(text)}</span></span>
         <span class="heim-zeile-balken" aria-hidden="true"><span style="width: ${Math.round(lg.anteil * 100)}%"></span></span>
       </button>` });
   }
   return zeilen.sort((a, b) => a.rang - b.rang).slice(0, 2);
+}
+
+function naechstesHtml(zeilen) {
+  return zeilen.length ? `<section class="heim-naechstes" aria-labelledby="heim-naechstes-titel">
+          <h3 id="heim-naechstes-titel">${esc(t('heim.naechstes'))}</h3>
+          <div class="heim-liste">${zeilen.map((z) => z.html).join('')}</div>
+        </section>` : '';
+}
+
+// Abschnitt "Als Naechstes" neu zeichnen (Server-Stand kam nach dem ersten Zeichnen); fehlt er, kommt er nach oben rechts
+function zeichneNaechstes(s, lg) {
+  const html = naechstesHtml(naechsteZeilen(lg));
+  const alt = s.querySelector('.heim-naechstes');
+  if (alt) { if (html) alt.outerHTML = html; else alt.remove(); return; }
+  if (html) s.querySelector('.heim-rechts').insertAdjacentHTML('afterbegin', html);
 }
 
 export function zeigeHeim(app, { jetzt = new Date() } = {}) {
@@ -271,7 +332,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
   const chips = tage > 0
     ? `<span class="chip zahl heim-serie" title="${esc(t('heim.serieTitel', { n: zahl(tage) }))}"><i class="heim-punkt" aria-hidden="true"></i>${esc(t('heim.serie', { n: zahl(tage) }))}</span>`
     : '';
-  const zeilen = naechsteZeilen();
+  const zeilen = naechsteZeilen(ersteLage());
   const s = document.createElement('section');
   s.className = 'screen heim-screen';
   s.setAttribute('aria-label', t('heim.aria'));
@@ -282,10 +343,7 @@ export function zeigeHeim(app, { jetzt = new Date() } = {}) {
         <div class="heim-buehne" data-art="${partie ? 'partie' : 'gegner'}">${partie ? buehnePartie(laufend, st) : buehneGegner(bot)}</div>
       </div>
       <div class="heim-rechts">
-        ${zeilen.length ? `<section class="heim-naechstes" aria-labelledby="heim-naechstes-titel">
-          <h3 id="heim-naechstes-titel">${esc(t('heim.naechstes'))}</h3>
-          <div class="heim-liste">${zeilen.map((z) => z.html).join('')}</div>
-        </section>` : ''}
+        ${naechstesHtml(zeilen)}
         ${partie ? '' : leiterZeile(bot)}
         <div class="heim-wege">
           ${WEGE.map(([id, ic]) => `<button class="heim-modus dr" type="button" data-aktion="heim-${id}" data-weg="${id}">
@@ -361,6 +419,15 @@ export function zeige(root, params, app) {
     anim(s.querySelector('.heim-buehne'), [{ opacity: 0, transform: 'translateY(18px)' }, { opacity: 1, transform: 'none' }], { d: 620 });
   }
   bewerte(s, app, () => weg);
+  // Kronen-Stand nachladen; offline oder bei einer unbrauchbaren Antwort bleibt der gemerkte Stand (oder keine Zeile)
+  if (angemeldet()) {
+    holeStand().then((d) => {
+      const stand = Array.isArray(d) ? d[0] : d;
+      if (!stand || typeof stand !== 'object' || !Number.isFinite(Number(stand.kronen))) return;
+      merke(stand);
+      if (!weg && s.isConnected) zeichneNaechstes(s, kronenLage(stand));
+    }, () => {});
+  }
   return {
     verlasse() {
       weg = true;

@@ -12,6 +12,7 @@ import {
   normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
 import { saisonKarte, verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
+import { reiterGruppe, huelleGruppe } from './gruppe.js';
 import { protokolliere } from '../../protokoll.js';
 
 const MODUL = 'liga';
@@ -65,11 +66,20 @@ function uebernehme(r, partieId) {
   geaendert(r.stand, r.aufstieg.length > 0);
 }
 
+// Etappe B Task 6: Start-Liga aus der lokalen Elo, sobald ein Konto da ist (ein eigenes Anmelde-Ereignis gibt es nicht).
+// Ohne gewertete Partie bleibt js/kronen.js ungeladen; den Merker je Konto prueft setzeStartLiga.
+function startLiga() {
+  const st = lese();
+  if (!st || !(st.wertung.n > 0)) return;
+  import('../../kronen.js').then((k) => k.setzeStartLiga()).catch(() => {});
+}
+
 hoere('app:bereit', sicher(() => {
   laufend.clear();
   saisonPruefen();
+  startLiga();
 }));
-hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) saisonPruefen(); }));
+hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) { saisonPruefen(); startLiga(); } }));
 hoere('app:screen', sicher(({ name }) => { if (name !== 'partie') saisonPruefen(); }));
 hoere('partie:gestartet', sicher((d) => {
   laufend.set(d.laufId, { wertet: d.wertet === true, hinweise: d.hinweise || 0, beendet: false });
@@ -81,6 +91,19 @@ hoere('hilfe:genutzt', sicher((d) => {
 hoere('partie:verlassen', sicher(({ laufId }) => { laufend.delete(laufId); }));
 hoere('speicher:zurueckgesetzt', sicher(() => { laufend.clear(); }));
 
+// Etappe B Task 5: Kronen beim Server melden, je Partie einmal je Sitzung (der Server zaehlt ohnehin nur einmal).
+// Ein KI-Gegner aus der Gegnersuche meldet nur mit Beleg und nie als Bot-Leiter; ohne Konto oder offline still nichts.
+// js/kronen.js kommt erst beim Melden dazu: das Paket zieht so Konto und Online nicht schon beim Laden mit.
+const gemeldet = new Set();
+function meldeKronen(p, bot) {
+  if (gemeldet.has(p.id)) return;
+  gemeldet.add(p.id);
+  if (p.ki === true && !p.kiRef) return;
+  import('../../kronen.js').then((k) => (p.ki === true
+    ? k.meldeKiErgebnis({ kiRef: p.kiRef, ergebnis: p.ergebnis })
+    : k.meldeBotErgebnis({ partieId: p.id, ergebnis: p.ergebnis, botElo: bot.elo }))).catch(() => {});
+}
+
 hoere('partie:beendet', sicher((d) => {
   const l = laufend.get(d.laufId);
   if (l) l.beendet = true;
@@ -90,6 +113,7 @@ hoere('partie:beendet', sicher((d) => {
   const p = ladePartie(d.partieId);
   if (!p || !wertet(p) || !LEITER.has(p.botId)) return;
   const bot = botNachId(p.botId), st = lese();
+  meldeKronen(p, bot);
   if (!st) return;
   const partie = { ...p, hinweise: Math.max(p.hinweise || 0, d.hinweise || 0, l?.hinweise || 0) };
   uebernehme(buchePartie(st, partie, bot.elo, new Date()), p.id);
@@ -123,4 +147,7 @@ if (typeof document !== 'undefined') {
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });
   anbieten('verlauf:seite', sicher(() => verlaufKarte(kontext)), { reihenfolge: 20, paket: MODUL });
+  // Wochen-Gruppe der Kronen-Liga (07.11.2026): erster Reiter der Bestenliste, Freunde (Paket punkte, 8) gleich dahinter
+  anbieten('bestenliste:reiter', sicher((k) => (k && k.reiter === 'gruppe' ? reiterGruppe(k) : { el: huelleGruppe(), verlasse() {} })),
+    { reihenfolge: 5, paket: MODUL });
 }

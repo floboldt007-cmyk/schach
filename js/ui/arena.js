@@ -551,14 +551,19 @@ export function zeige(root, params, app) {
       const fMax = Math.max(...ys);
       // Krone und Fahne des Endgegners unter der Weltwahl; kompakt ist die Weltwahl kleiner und die Karte flach
       const oben = kn * 0.65 + (kompakt ? 70 : 118);
-      const unten = kn * 0.61 + (kompakt ? 26 : 36);
+      // kompakt: ist die unterste Station die aktuelle (vergroessert), braucht ihr Schild mehr Rand, sonst schneidet die
+      // runde Ecke der Karte es ab (Handy-Runde 08.11.2026: "Willi 100"); sonst bleibt der Rand knapp, weil jeder Pixel
+      // hier die Stationen enger zusammenrueckt (SE: Sterne auf dem Schild der Station darueber)
+      const untenAktuell = LBOTS[ys.indexOf(fMax)]?.id === aktuellId;
+      const unten = kn * 0.61 + (kompakt ? (untenAktuell ? 42 : 26) : 36);
       hy = Math.min(h, (h - oben - unten) / (fMax - fMin));
       y0 = oben - fMin * hy;
     }
     masse = { w, h, s: sk, y0, hy };
     weltEl.style.width = w + 'px';
     weltEl.style.height = h + 'px';
-    weltEl.style.setProperty('--kn-basis', Math.round(76 * sk) + 'px');
+    // mindestens 44 px Tippflaeche je Station (G-001: auf dem iPhone SE massen sie 43 px)
+    weltEl.style.setProperty('--kn-basis', Math.max(44, Math.round(76 * sk)) + 'px');
     const punkte = lage.stationen.map(([fx, fy]) => [fx * w, yVon(fy)]);
     const start = [lage.start[0] * w, yVon(lage.start[1])];
     const neuIdx = neuId ? idx(neuId) : -1;
@@ -570,6 +575,15 @@ export function zeige(root, params, app) {
     lage.stationen.forEach((p, i) => setze(knoten[i], p));
     setze(s.querySelector('.ort-karte-boss'), lage.boss);
     setze(s.querySelector('.ort-karte-event'), lage.event);
+    // das Schild "Endgegner" ganz in der Karte (iPhone SE, 08.11.2026: links vom Kartenrand angeschnitten); gerechnet
+    // aus Lage und Breite, nicht aus dem Bild, denn Stationen koennen gerade einschweben
+    lage.stationen.forEach(([fx], i) => {
+      const krone = knoten[i].querySelector('.boss-krone');
+      if (!krone) return;
+      const halb = krone.offsetWidth / 2, x = fx * w, rand = 6;
+      const dx = Math.max(0, rand + halb - x) - Math.max(0, x + halb - (w - rand));
+      krone.style.setProperty('--krone-dx', dx.toFixed(1) + 'px');
+    });
     stelleFlo(floPosition());
     // im Querformat (und kompakt) scrollt die Karte nicht: ein Rest aus dem Hochformat wuerde sie verschieben
     if (quer) { karte.scrollTop = 0; s.querySelector('.inhalt').scrollTop = 0; }
@@ -605,6 +619,14 @@ export function zeige(root, params, app) {
     return [fx * masse.w + kn * gross * 0.52, yVon(fy) - kn * gross * 0.28];
   }
   function stelleFlo([x, y]) {
+    // ganz in der Karte (Handy kompakt: am Start ragte die Figur links ueber den Rand)
+    const r = (floFigur.offsetWidth || 36) / 2 + 8;
+    if (masse.w > 2 * r) x = Math.min(masse.w - r, Math.max(r, x));
+    // am Start schob das Einklemmen die Figur auf schmalen Karten halb hinter die erste Station, deren Rand sie
+    // abschnitt (iPhone SE, 08.11.2026): so dicht an ihr bleibt sie unsichtbar
+    const [sx, sy] = LAGEN[lageModus || modus].stationen[0];
+    const rk = 76 * masse.s * (LBOTS[0].id === aktuellId ? 1.22 : 1) / 2;
+    floFigur.classList.toggle('verdeckt', Math.hypot(x - sx * masse.w, y - yVon(sy)) < rk + r - 8);
     floFigur.style.left = x.toFixed(1) + 'px';
     floFigur.style.top = y.toFixed(1) + 'px';
   }

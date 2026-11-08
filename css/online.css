@@ -1,8 +1,22 @@
 /* Online-Partien nutzen dieselben Theme-Tokens wie das lokale Brett. */
 .online-screen { display: flex; flex-direction: column; min-height: 0; }
-.online-screen > .kopf { flex-shrink: 0; gap: var(--a3); }
-.online-screen h2 { margin: 0; font-size: var(--fs-h2); }
-.on-rumpf { flex: 1; overflow: auto; min-height: 0; padding: var(--a4); }
+.online-screen > .kopf { flex-shrink: 0; }
+.on-rumpf { flex: 1; overflow: auto; min-height: 0; padding: var(--a4); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* Handy-Runde 08.11.: Startseite von Online im Stil von Lernen (Seitenkopf, Karten .t-karte aus css/training.css) */
+.on-inhalt > .seiten-kopf { padding-left: 0; padding-right: 0; }
+.on-gitter { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--a4); margin-bottom: var(--a4); }
+.on-art, .on-konto { margin-bottom: var(--a4); }
+.on-gitter > .on-art { margin-bottom: 0; }
+.on-symbol { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--akzent-weich); color: var(--akzent-text); }
+.on-symbol .ico { width: 24px; height: 24px; }
+.on-art[data-art="freunde"] .on-symbol { background: var(--grund-2); color: var(--text); }
+.on-art[data-zustand="bald"] .on-suche-text { color: var(--text-2); }
+.on-zeiten[hidden], .on-art [hidden] { display: none; }
+.on-zeiten { --n: 3; }
+.on-zeiten .seg[aria-checked="true"] { background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
+:root[data-modus="dunkel"] .on-zeiten .seg[aria-checked="true"] { background: var(--flaeche-3); }
+@media (prefers-color-scheme: dark) { :root[data-modus="system"] .on-zeiten .seg[aria-checked="true"] { background: var(--flaeche-3); } }
+.on-art .t-fuss { justify-content: flex-start; }
 .on-inhalt, .on-meldung { max-width: 960px; margin: 0 auto; }
 .on-meldung { padding: var(--a4); border: 1px solid var(--linie); border-radius: var(--r-m); background: var(--flaeche); }
 .on-start { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--a4); }

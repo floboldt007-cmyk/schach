@@ -37,7 +37,11 @@
 .heim-ueber { font-size: 13px; font-weight: 600; color: var(--auf-buehne-2); overflow-wrap: anywhere; }
 .heim-lage, .heim-gegner { margin: 0; font-family: var(--display); font-weight: var(--gw-titel); font-size: clamp(19px, 2.4vw, 24px);
   line-height: 1.2; letter-spacing: -.01em; color: var(--auf-buehne); overflow-wrap: anywhere; }
-.heim-gegner .zahl { font-variant-numeric: tabular-nums; }
+/* Elo als eigene kleine Zeile unter dem Namen (Handy-Runde 08.11.2026: "Willi · 100" brach unschoen um); Name und Elo
+   ein Block ohne Abstand dazwischen, damit die Buehne kaum hoeher wird (iPad hoch hat nur wenig Luft) */
+.heim-name { display: flex; flex-direction: column; min-width: 0; }
+.heim-elo { display: block; margin-top: -1px; font-size: 13px; line-height: 1.15; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--auf-buehne-2); }
 .heim-spielweise { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--auf-buehne-2); }
 .heim-balken { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--auf-buehne-2); }
 .heim-balken[hidden] { display: none; }

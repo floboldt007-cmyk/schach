@@ -22,7 +22,7 @@ const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen training-screen';
-  s.setAttribute('aria-label', t('allgemein.training'));
+  s.setAttribute('aria-label', t('rahmen.training.titel'));
   s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', seite: t('rahmen.training.titel') })}
     <div class="training-rumpf">
       ${seitenKopf({ ueber: t('rahmen.training.ueber'), titel: t('rahmen.training.titel'), text: t('rahmen.training.text') })}

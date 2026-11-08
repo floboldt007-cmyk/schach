@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120" role="img" aria-hidden="true">
+<defs><linearGradient id="w-bauer-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B98656"/><stop offset="1" stop-color="#7A4E2E"/></linearGradient></defs>
+
+<path d="M50 20 L86 30 V64 C86 90 69 106 50 114 C31 106 14 90 14 64 V30 Z" fill="url(#w-bauer-s)" stroke="#5E3B22" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M50 26 L80 34 V64 C80 85 66 99 50 106" fill="none" stroke="#E2B98E" stroke-width="2" opacity=".55" stroke-linecap="round"/>
+<g fill="#3F2716"><circle cx="50" cy="52" r="7.5"/><path d="M44 60h12c0 6 3 12 7 18l2 6H35l2-6c4-6 7-12 7-18z"/><rect x="35" y="86" width="30" height="6" rx="3"/></g>
+
+</svg>

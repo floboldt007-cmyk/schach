@@ -1,5 +1,6 @@
 // Tests fuer die Startseite "heim" (Konzept 2026-11-06, Abschnitt 12): Buehne mit laufender Partie (Mini-Brett, Lage,
-// Bewertung, Weiterspielen) oder naechstem Gegner, "Als Naechstes" (Liga-Zeile, ohne Daten weg), drei Wege (Online,
+// Bewertung, Weiterspielen) oder naechstem Gegner, "Als Naechstes" (Liga-Zeile der Wochen-Gruppe aus dem Kronen-Stand,
+// Etappe B; ohne Konto oder ohne Stand weg), drei Wege (Online,
 // Lernen, Zu zweit), ohne Scrollen auf dem iPad, hell und dunkel lesbar, erster Start ueber das Willkommen "start".
 // Node-Teil ohne Browser, danach Browser-Teil (Playwright, Chromium oder BROWSER=webkit) gegen index.html?test.
 //
@@ -15,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
-import { neuerStand, STUFEN } from '../js/pakete/liga/wertung.js';
+import { neuerStand } from '../js/pakete/liga/wertung.js';
 
 const require = createRequire(import.meta.url);
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -200,7 +201,7 @@ async function testeBuehne(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 820, h: 1180, speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => ({ sichtbar: !!document.querySelector('.heim-leiter')?.offsetParent,
-      elo: parseInt(document.querySelector('.heim-gegner .zahl')?.textContent.replace(/\D/g, ''), 10),
+      elo: parseInt(document.querySelector('.heim-elo')?.textContent.replace(/\D/g, ''), 10),
       bots: [...document.querySelectorAll('.heim-leiter-bot')].map((x) => ({ name: x.querySelector('b')?.textContent.trim(),
         elo: parseInt(x.querySelector('small')?.textContent.replace(/\D/g, ''), 10), bild: !!x.querySelector('img')?.getAttribute('src') })),
       portraet: document.querySelector('.heim-portraet')?.getBoundingClientRect().width }));
@@ -223,11 +224,17 @@ async function testeBuehne(browser, heute) {
     const { kontext, seite, fehler } = await neueSeite(browser, { speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
     const b = await seite.evaluate(() => ({ art: document.querySelector('.heim-buehne')?.dataset.art, titel: document.querySelector('.heim-gruss h1')?.textContent.trim(),
-      name: document.querySelector('.heim-gegner')?.textContent.trim(), bild: !!document.querySelector('.heim-portraet img'),
+      name: document.querySelector('.heim-gegner')?.textContent.trim(), elo: document.querySelector('.heim-elo')?.textContent.trim(),
+      nameZeilen: (() => { const h = document.querySelector('.heim-gegner'); return h ? Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight)) : 0; })(),
+      bild: !!document.querySelector('.heim-portraet img'),
       satz: document.querySelector('.heim-spielweise')?.textContent.trim(), bot: document.querySelector('[data-aktion="heim-spielen"]')?.dataset.bot,
-      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes') }));
-    pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && /·\s*\d/.test(b.name || '')
+      brett: !!document.querySelector('.heim-mini'), naechstes: !!document.querySelector('.heim-naechstes'),
+      symbol: document.querySelector('[data-weg="zuzweit"] .heim-symbol svg')?.querySelectorAll('circle').length }));
+    pruefe('keine Partie: naechster Gegner der Leiter mit Bild, Name, Staerke und Spielweise', b.art === 'gegner' && b.bild && !!b.name && /^Elo \d/.test(b.elo || '')
       && !!b.satz && !!b.bot && !b.brett, JSON.stringify(b));
+    // Handy-Runde 08.11.2026 (Befunde 10 und 11): Elo als eigene Zeile, der Name allein bricht nicht um; Zu zweit zeigt zwei Personen
+    pruefe('Handy: Name ohne Elo in einer Zeile ("Vogelscheuche Willi"), Elo darunter', !/\d/.test(b.name || '') && b.nameZeilen === 1, JSON.stringify(b));
+    pruefe('Kachel Zu zweit: Symbol mit zwei Personen', b.symbol === 2, String(b.symbol));
     pruefe('keine Partie: anderer Titel', b.titel && b.titel !== 'Deine Partie wartet.', b.titel);
     pruefe('ohne Liga-Stand: "Als Naechstes" fehlt ganz (keine leeren Platzhalter)', !b.naechstes);
     await seite.locator('[data-aktion="heim-spielen"]').click();
@@ -239,43 +246,175 @@ async function testeBuehne(browser, heute) {
   }
 }
 
+// Angemeldete Seite (Etappe B, Wochen-Gruppen): Supabase-Abrufe abgefangen; kronen_mein_stand liefert stand, bei
+// 'offline' bricht der Abruf ab. Sonst wie neueSeite.
+const SUPA = 'https://usaamcqypmvgqmsbfecb.supabase.co';
+const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
+const SITZUNG = { access_token: 'a.' + Buffer.from(JSON.stringify({ sub: UID })).toString('base64url') + '.x', refresh_token: 'r1',
+  expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
+async function kontoSeite(browser, { stand = null, speicher = {}, w = 390, h = 844, schema = 'light' } = {}) {
+  const kontext = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: schema, deviceScaleFactor: 1, hasTouch: true, serviceWorkers: 'block' });
+  const seite = await kontext.newPage();
+  const fehler = [];
+  seite.on('pageerror', (e) => {
+    if (/ due to access control checks\.?$/.test(e.message) && e.message.includes(`127.0.0.1:${PORT}/`)) return;
+    fehler.push('pageerror: ' + e.message);
+  });
+  // ein absichtlich abgebrochener Abruf meldet der Browser selbst als Ladefehler: kein Fehler der App
+  seite.on('console', (m) => { if (m.type() === 'error' && !/favicon|404|Failed to load resource|ERR_FAILED|Load failed/.test(m.text())) fehler.push('console: ' + m.text()); });
+  await seite.route(SUPA + '/**', (r) => {
+    if (r.request().url().includes('/rpc/kronen_mein_stand')) {
+      if (stand === 'offline') return r.abort('failed');
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stand) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await seite.addInitScript(({ sitzung, speicher }) => {
+    if (sessionStorage.getItem('heim-probe')) return;
+    sessionStorage.setItem('heim-probe', '1');
+    localStorage.clear();
+    localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
+    for (const [k, v] of Object.entries(speicher)) localStorage.setItem(k, JSON.stringify(v));
+  }, { sitzung: SITZUNG, speicher });
+  await seite.goto(BASIS + '#heim');
+  return { kontext, seite, fehler };
+}
+const STAND = { stufe: 7, kronen: 64, platz: 9, ziel: 160, n: 30, woche: '2026-11-02' };
+// Liga-Zeile unter "Als Naechstes": Stufe (b), Platz-Text, Balken, Beschriftung
+const zeile = (seite) => seite.evaluate(() => {
+  const z = document.querySelector('.heim-naechstes .heim-zeile');
+  return { zeilen: document.querySelectorAll('.heim-naechstes .heim-zeile').length, stufe: z?.querySelector('.heim-zeile-text b')?.textContent.trim() || null,
+    text: z?.querySelector('.heim-zeile-text > span')?.textContent.trim() || null, balken: parseFloat(z?.querySelector('.heim-zeile-balken span')?.style.width),
+    aria: z?.getAttribute('aria-label') || null, rumpf: document.querySelector('.heim-rumpf')?.textContent || '' };
+});
+const warteZeile = (seite, text) => seite.waitForFunction((x) => document.querySelector('.heim-naechstes .heim-zeile-text > span')?.textContent.trim() === x, text, { timeout: 8000 })
+  .then(() => true, () => false);
+// sichtbare Texte ohne NaN, undefined oder null (eine fehlende Zeile liefert selbst null, das ist kein Unsinn)
+const ohneUnsinn = (r) => [r.stufe, r.text, r.aria].filter((x) => x != null).every((x) => !/NaN|undefined|null/.test(x)) && !/NaN|undefined/.test(r.rumpf);
+
+async function testeKronenLage(browser) {
+  gruppe = 'kronenLage';
+  const { kontext, seite } = await neueSeite(browser, { hash: '#einstellungen' });
+  await seite.waitForFunction(() => !!window.__app, null, { timeout: 20000 });
+  const r = await seite.evaluate(async () => {
+    const { kronenLage } = await import('/js/ui/heim.js');
+    return { leer: kronenLage(null), oben: kronenLage({ kronen: 410, stufe: 17, platz: 2, ziel: 300, n: 30 }),
+      mitte: kronenLage({ kronen: 64, stufe: 7, platz: 9, ziel: 160, n: 30 }), ohneGruppe: kronenLage({ kronen: 0, stufe: 7, platz: null, ziel: null, n: 30 }),
+      kaputt: kronenLage({ kronen: 'x', stufe: 'y', platz: 'z' }), liste: kronenLage([]), minus: kronenLage({ kronen: -40, stufe: -3 }) };
+  });
+  const l = r.leer;
+  pruefe('kronenLage(null): 0, Bauer III, ohne Konto, Anteil 0', l.kronen === 0 && l.stufe === 0 && l.liga === 'bauer' && l.rang === 3 && l.ohneKonto === true && l.anteil === 0, JSON.stringify(l));
+  pruefe('kronenLage Platz 2: voll (Aufstiegsplatz), Koenig I', r.oben.anteil === 1 && r.oben.stufe === 17 && r.oben.liga === 'koenig' && r.oben.platz === 2, JSON.stringify(r.oben));
+  const s = r.mitte;
+  pruefe('kronenLage Platz 9 mit 64 von 160 bis Platz 5: Laeufer II, Anteil 0,4', s.kronen === 64 && s.stufe === 7 && s.liga === 'laeufer' && s.rang === 2 && s.platz === 9
+    && Math.abs(s.anteil - 0.4) < 1e-9 && s.ohneKonto === false, JSON.stringify(s));
+  pruefe('kronenLage ohne Gruppe: platz null, Anteil 0', r.ohneGruppe.platz === null && r.ohneGruppe.anteil === 0, JSON.stringify(r.ohneGruppe));
+  pruefe('kronenLage mit Unsinn (Text, Liste, negativ): 0, Bauer III, ohne Gruppe, aber mit Konto',
+    [r.kaputt, r.liste, r.minus].every((x) => x.kronen === 0 && x.stufe === 0 && x.platz === null && x.ohneKonto === false),
+    JSON.stringify([r.kaputt, r.liste, r.minus]));
+  await kontext.close();
+}
+
 async function testeNaechstes(browser, heute) {
-  gruppe = 'als-naechstes';
+  gruppe = 'ohne-konto';
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
+    // Liga-Punkte der Arena (Paket liga) zaehlen nicht: ohne Konto keine Liga-Zeile und kein Abschnitt
+    const { kontext, seite, fehler } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290) } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zeilen: document.querySelectorAll('.heim-naechstes .heim-zeile').length,
-      text: document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim(), balken: parseFloat(document.querySelector('.heim-zeile-balken span')?.style.width) }));
-    pruefe('290 Punkte: eine Zeile "Silber, noch 160 Liga-Punkte bis Gold", Balken 20 %', r.zeilen === 1 && /^Silber\s*Noch 160 Liga-Punkte bis Gold/.test(r.text)
-      && r.balken === 20, JSON.stringify(r));
+    const r = await zeile(seite);
+    pruefe('ohne Konto: "Als Naechstes" fehlt ganz, keine Liga-Zeile', r.zeilen === 0 && !(await seite.locator('.heim-naechstes').count()), JSON.stringify(r));
+    pruefe('kein NaN oder undefined', ohneUnsinn(r));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  gruppe = 'mit-konto';
+  {
+    const { kontext, seite, fehler } = await kontoSeite(browser, { stand: STAND, speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const da = await warteZeile(seite, 'Platz 9 von 30');
+    const r = await zeile(seite);
+    pruefe('Server-Stand: eine Zeile "Läufer II" / "Platz 9 von 30"', da && r.zeilen === 1 && r.stufe === 'Läufer II' && r.text === 'Platz 9 von 30', JSON.stringify(r));
+    pruefe('Balken zu 40 % (64 von 160 Kronen auf Platz 5)', r.balken === 40, String(r.balken));
+    pruefe('Beschriftung nennt Stufe, Platz und Kronen', r.aria === 'Läufer II, Platz 9 von 30, 64 Kronen diese Woche', r.aria);
+    pruefe('kein NaN, undefined oder null', ohneUnsinn(r), JSON.stringify(r));
+    pruefe('Ruhe: kein Countdown, kein roter Punkt', await seite.evaluate(() => !document.querySelector('.heim-naechstes .punkt-neu, .heim-naechstes .badge, .heim-naechstes [data-countdown]')));
+    const gemerkt = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
+    pruefe('Stand gemerkt (Modul kronen, mit Konto, Platz und Ziel, startGemeldet unberuehrt)', gemerkt && gemerkt.konto === UID && gemerkt.stand
+      && gemerkt.stand.kronen === 64 && gemerkt.stand.platz === 9 && gemerkt.stand.ziel === 160 && gemerkt.startGemeldet === false,
+      JSON.stringify(gemerkt));
     await seite.locator('[data-aktion="heim-liga"]').click();
-    pruefe('Liga-Zeile oeffnet die Bestenliste', await istScreen(seite, 'bestenliste'));
+    pruefe('Liga-Zeile oeffnet die Liga (bestenliste)', await istScreen(seite, 'bestenliste'));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }
   {
-    const oben = STUFEN[STUFEN.length - 1];
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(oben.schwelle + 50) } });
+    const { kontext, seite } = await kontoSeite(browser, { stand: { stufe: 17, kronen: 1760, platz: 1, ziel: 900, n: 30 }, speicher: gesehen(heute) });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim());
-    pruefe('hoechste Stufe: ohne "noch", "Hoechste Stufe erreicht"', /Höchste Stufe erreicht/.test(r || '') && !/Noch/.test(r || ''), r);
+    const da = await warteZeile(seite, 'Platz 1 von 30');
+    const r = await zeile(seite);
+    pruefe('hoechste Stufe auf Platz 1: "König I", Balken voll', da && r.stufe === 'König I' && r.balken === 100, JSON.stringify(r));
     await kontext.close();
   }
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: { stand: 999, kaputt: true } } });
+    const { kontext, seite } = await kontoSeite(browser, { stand: { stufe: 3, kronen: 0, platz: null, ziel: null, n: 30 }, speicher: gesehen(heute) });
+    await istScreen(seite, 'heim');
+    const da = await warteZeile(seite, 'Spiel eine Partie für deine Gruppe');
+    const r = await zeile(seite);
+    pruefe('ohne Gruppe diese Woche: "Springer III" / "Spiel eine Partie für deine Gruppe", Balken leer',
+      da && r.stufe === 'Springer III' && r.balken === 0 && ohneUnsinn(r), JSON.stringify(r));
+    await kontext.close();
+  }
+  gruppe = 'offline';
+  {
+    const gemerkt = { [P + 'modul:kronen']: { konto: UID, stand: { kronen: 1250, stufe: 12, platz: 4, ziel: 1100, n: 30 }, startGemeldet: false } };
+    const { kontext, seite, fehler } = await kontoSeite(browser, { stand: 'offline', speicher: { ...gesehen(heute), ...gemerkt } });
+    await istScreen(seite, 'heim');
+    await warte(1200);
+    const r = await zeile(seite);
+    pruefe('offline: letzter gemerkter Stand, "Dame III" / "Platz 4 von 30"', r.stufe === 'Dame III' && r.text === 'Platz 4 von 30', JSON.stringify(r));
+    pruefe('offline: keine Fehler der App', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+  {
+    const fremd = { [P + 'modul:kronen']: { konto: 'anderes-konto', stand: { kronen: 900, stufe: 9, platz: 2 }, startGemeldet: false } };
+    const { kontext, seite } = await kontoSeite(browser, { stand: 'offline', speicher: { ...gesehen(heute), ...fremd } });
+    await istScreen(seite, 'heim');
+    await warte(1200);
+    const r = await zeile(seite);
+    pruefe('offline mit Stand eines anderen Kontos: keine Liga-Zeile (still)', r.zeilen === 0 && !(await seite.locator('.heim-naechstes').count()), JSON.stringify(r));
+    await kontext.close();
+  }
+  {
+    // erst der gemerkte Stand, dann der Server-Stand
+    const gemerkt = { [P + 'modul:kronen']: { konto: UID, stand: { kronen: 30, stufe: 7, platz: 12, ziel: 160, n: 30 }, startGemeldet: true } };
+    const { kontext, seite } = await kontoSeite(browser, { stand: { ...STAND, kronen: 33 }, speicher: { ...gesehen(heute), ...gemerkt } });
+    await istScreen(seite, 'heim');
+    const da = await warteZeile(seite, 'Platz 9 von 30');
+    const neu = await seite.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:modul:kronen') || 'null'));
+    const r = await zeile(seite);
+    pruefe('gemerkter Stand wird durch den Server-Stand ersetzt, startGemeldet bleibt, weiter eine Zeile', da && r.zeilen === 1
+      && neu && neu.stand.kronen === 33 && neu.startGemeldet === true, JSON.stringify({ neu, r }));
+    await kontext.close();
+  }
+  {
+    const { kontext, seite } = await kontoSeite(browser, { stand: { kaputt: true }, speicher: gesehen(heute) });
     const da = await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => document.querySelector('.heim-rumpf')?.textContent || '');
-    pruefe('fremder Speicherstand: kein Absturz, kein NaN', da && !/NaN|undefined/.test(r));
+    await warte(1200);
+    const r = await zeile(seite);
+    pruefe('unbrauchbare Server-Antwort: keine Zeile, kein Absturz, kein NaN', da && r.zeilen === 0 && ohneUnsinn(r), JSON.stringify(r));
     await kontext.close();
   }
   gruppe = 'englisch';
   {
-    const { kontext, seite } = await neueSeite(browser, { speicher: { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290),
-      [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
+    const { kontext, seite } = await kontoSeite(browser, { stand: STAND,
+      speicher: { ...gesehen(heute), [P + 'einstellungen']: { sprache: 'en', spracheGewaehlt: true } } });
     await istScreen(seite, 'heim');
-    const r = await seite.evaluate(() => ({ zeile: document.querySelector('.heim-zeile')?.textContent.replace(/\s+/g, ' ').trim(),
-      wege: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()), titel: document.querySelector('.heim-gruss h1')?.textContent.trim() }));
-    pruefe('Englisch: Liga-Zeile, Titel und Wege englisch', /160 league points to Gold/.test(r.zeile) && r.titel === 'Ready for the next game?'
-      && r.wege.join() === 'Online,Learn,Two players', JSON.stringify(r));
+    const da = await warteZeile(seite, 'Place 9 of 30');
+    const r = await zeile(seite);
+    const sonst = await seite.evaluate(() => ({ wege: [...document.querySelectorAll('.heim-modus b')].map((b) => b.textContent.trim()),
+      titel: document.querySelector('.heim-gruss h1')?.textContent.trim() }));
+    pruefe('Englisch: "Bishop II" / "Place 9 of 30", Titel und Wege englisch', da && r.stufe === 'Bishop II' && sonst.titel === 'Ready for the next game?'
+      && sonst.wege.join() === 'Online,Learn,Two players', JSON.stringify({ r, sonst }));
     await kontext.close();
   }
 }
@@ -332,10 +471,12 @@ async function testeGroessen(browser, heute) {
   // iPad hoch und quer, PC: nichts scrollt, alle Knoepfe ueber der Leiste. Handy: darf scrollen, aber nichts seitlich drueber.
   for (const [w, h, ipad] of [[820, 1180, true], [1180, 820, true], [1024, 768, true], [1440, 900, true], [390, 844, false], [375, 667, false]]) {
     for (const schema of ['light', 'dark']) for (const partie of [true, false]) {
-      const speicher = { ...gesehen(heute), [P + 'modul:liga']: ligaMit(290), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' } };
+      // mit Konto und Kronen-Stand: die Liga-Zeile unter "Als Naechstes" ist da (der volle Fall)
+      const speicher = { ...gesehen(heute), [P + 'einstellungen']: { modus: schema === 'dark' ? 'dunkel' : 'hell' } };
       if (partie) speicher[P + 'laufend'] = laufend();
-      const { kontext, seite } = await neueSeite(browser, { w, h, schema, speicher });
+      const { kontext, seite } = await kontoSeite(browser, { w, h, schema, speicher, stand: STAND });
       await istScreen(seite, 'heim');
+      await warteZeile(seite, 'Platz 9 von 30');
       await warte(700);
       const m = await lage(seite);
       const name = `${w}x${h} ${schema === 'dark' ? 'dunkel' : 'hell'} ${partie ? 'Partie' : 'leer'}`;
@@ -363,7 +504,7 @@ async function testeGroessen(browser, heute) {
           if (g && g.length) return g.map(rgb).sort((a, b) => lum(b) - lum(a))[0];
           const c = rgb(cs.backgroundColor); if (c.length >= 3 && (c[3] === undefined || c[3] > 0.5)) return c; } return [255, 255, 255]; };
         const aus = [];
-        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
+        for (const el of document.querySelectorAll('.heim-screen .heim-gruss small, .heim-screen .heim-gruss h1, .heim-screen .heim-ueber, .heim-screen .heim-lage, .heim-screen .heim-gegner, .heim-screen .heim-elo, .heim-screen .heim-spielweise, .heim-screen .heim-balken-zahl, .heim-screen .heim-los span, .heim-screen .heim-naechstes h3, .heim-screen .heim-zeile-text b, .heim-screen .heim-zeile-text span, .heim-screen .heim-modus b, .heim-screen .heim-text span')) {
           if (!el.textContent.trim() || el.closest('[hidden]')) continue;
           const a = lum(rgb(getComputedStyle(el).color)), b = lum(grund(el));
           const k = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -403,6 +544,7 @@ async function browserTeil(browser) {
   const heute = await seite.evaluate(async () => (await import('/js/tag.js')).tagSchluessel());
   await kontext.close();
   await testeBuehne(browser, heute);
+  await testeKronenLage(browser);
   await testeNaechstes(browser, heute);
   await testeWege(browser, heute);
   await testeGroessen(browser, heute);

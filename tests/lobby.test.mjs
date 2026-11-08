@@ -55,6 +55,16 @@ pruefe('Texte: Deutsch und Englisch mit denselben Schluesseln, keine langen Geda
 const ZUGWORTE = /brilliant|great move|blunder|inaccuracy|mistake|best move|excellent|book move/i;
 pruefe('Englisch ohne Zugklassen-Woerter', !Object.values(EN).some((x) => ZUGWORTE.test(x)));
 pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welten') === null);
+{
+  const { BOT_ERSATZ_MS } = await import('../js/kronen.js');
+  const quelle = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/ui/lobby.js'), 'utf8');
+  pruefe('KI-Gegner nach 10 s: BOT_ERSATZ_MS 10000, die Lobby nimmt ihn ohne Testschalter',
+    BOT_ERSATZ_MS === 10000 && /window\.__lobbyBotMs : BOT_ERSATZ_MS;/.test(quelle));
+  const kern = (await import('node:fs')).readFileSync(path.join(WURZEL, 'js/sprachen/partie.js'), 'utf8');
+  // das Abzeichen steht in den Kern-Texten (partie.kiGegner): der Kern laedt ohne Pakete keine Paket-Datei
+  pruefe('Texte fuer die Gegnersuche: KI-Gegner (Kern) und Anmelde-Hinweis', /kiGegner: 'KI-Gegner'/.test(kern) && /kiGegner: 'AI opponent'/.test(kern) && !('ki' in DE)
+    && DE['suche.anmelden'] === 'Zum Suchen anmelden');
+}
 
 // ---------------------------------------------------------------------------
 // Browser-Teil
@@ -78,26 +88,39 @@ const UID = '0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f';
 const token = (sub) => 'a.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.x';
 const SITZUNG = { access_token: token(UID), refresh_token: 'r1', expires_at: 9999999999, user: { id: UID, email: 'probe@example.invalid' } };
 
-async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena' }) {
+// rpc(name, daten) beantwortet abgefangene Aufrufe von /rest/v1/rpc/<name> (Etappe B: Gegnersuche); jeder Aufruf
+// landet in aufrufe. botMs verkuerzt die Wartezeit bis zum KI-Gegner (window.__lobbyBotMs, sonst 10 s).
+async function seite(browser, { erfinder, breite = 390, hoehe = 844, hash = 'arena', rpc = null, botMs = null }) {
   const k = await browser.newContext({ viewport: { width: breite, height: hoehe }, serviceWorkers: 'block', hasTouch: true });
   const s = await k.newPage();
   const fehlerListe = [];
+  const aufrufe = [];
   s.on('pageerror', (e) => fehlerListe.push(e.message));
   s.on('console', (m) => { if (m.type() === 'error') fehlerListe.push('konsole: ' + m.text()); });
-  await s.route(SUPA + '/**', (r) => r.fulfill({ status: 200, contentType: 'application/json',
-    body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) }));
-  await s.addInitScript(({ sitzung, uid, erfinder }) => {
+  await s.route(SUPA + '/**', (r) => {
+    const name = (r.request().url().match(/\/rest\/v1\/rpc\/([a-z_]+)/) || [])[1];
+    if (name && rpc) {
+      let daten = null;
+      try { daten = r.request().postDataJSON(); } catch (e) { /* ohne Rumpf */ }
+      aufrufe.push({ name, daten, um: Date.now() });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rpc(name, daten) ?? []) });
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(r.request().url().includes('sonderstuecke') && erfinder ? [{ stueck_id: 'erfinder-titel' }] : []) });
+  });
+  await s.addInitScript(({ sitzung, uid, erfinder, botMs }) => {
     try {
       window.__lobbySuche = 300;
+      if (botMs != null) window.__lobbyBotMs = botMs;
       if (sessionStorage.getItem('probe-start')) return;
       sessionStorage.setItem('probe-start', '1');
       localStorage.clear();
       localStorage.setItem('schach-arena:konto:sitzung', JSON.stringify(sitzung));
       if (erfinder) localStorage.setItem('schach-arena:konto:sonderstuecke', JSON.stringify({ konto: uid, ids: ['erfinder-titel'] }));
     } catch (e) { /* egal */ }
-  }, { sitzung: SITZUNG, uid: UID, erfinder });
+  }, { sitzung: SITZUNG, uid: UID, erfinder, botMs });
   await s.goto(`${BASIS}#${hash}`);
-  return { k, s, fehlerListe };
+  return { k, s, fehlerListe, aufrufe };
 }
 
 async function browserTeil() {
@@ -150,9 +173,11 @@ async function browserTeil() {
       pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), Liga mit dir und Beispiel-Schild',
         lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
         && lobby.liga === 8 && lobby.du && lobby.beispiel === 'Beispiel', lobby);
-      pruefe('Lobby: Gegen Freunde offen, Turniere und Raetsel-Duell bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
-        lobby.mehr.join() === 'online+,turniere-,duell-' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
+      pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
+        lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
       await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
+      // Etappe B Task 4: gewertet sucht jetzt echt auf dem Server; die Vorschau mit Bot bleibt bei Freundschaft
+      await p.s.locator('.lb-spielen [data-wert="freundschaft"]').click();
       const zeile = await p.s.locator('.lb-zeile').innerText();
       pruefe('Bedenkzeit 10 + 0 waehlen: Haken wandert, Zeile nennt Schnellschach', await p.s.locator('.lb-zeit[aria-checked="true"]').getAttribute('data-zeit') === '10+0'
         && /Schnellschach/.test(zeile), zeile);
@@ -207,6 +232,84 @@ async function browserTeil() {
       pruefe('Getippt: der Zurueck-Knopf der Partie reagiert (Rueckfrage oder zurueck)', raus.dialog || raus.screen !== 'partie', raus);
       pruefe('Erfinder: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
       await p.k.close();
+    }
+    // Etappe B Task 4: gewertete Gegnersuche ueber den (abgefangenen) Server, KI-Gegner nach der Wartezeit
+    {
+      const KI = '11111111-2222-4333-8444-555555555555';
+      // die Suche fragt den Server je Sekunde (alleMs 1000): erst 1 s nach der Start-Antwort kommt online_suche_stand
+      const BOT_MS = 3000;
+      const antwort = (treffer) => (name, daten) => {
+        if (name === 'online_suche_ende') return daten && daten.ki ? { ki_ref: KI } : {};
+        if (name === 'online_suche_stand' && treffer && treffer()) return { partie: 'p1' };
+        if (name === 'online_suche_start' || name === 'online_suche_stand') return { wartet: true };
+        return [];
+      };
+      const zurLobby = async (p) => { await p.s.waitForSelector('.screen.lobby .lb-spielen', { timeout: 30000 }); await warte(500); };
+      const screen = (p) => p.s.evaluate(() => document.documentElement.dataset.screen);
+
+      // Bot erst nach der Wartezeit
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS - 800);
+        const frueh = { suche: await p.s.locator('.lb-suche[data-phase="suche"]').count(), screen: await screen(p), namen: p.aufrufe.map((a) => a.name) };
+        // nur die Suche zaehlt: der Karten-Abgleich (karte_melde_stufen, Etappe 4b) darf beim Start davor laufen
+        const sucheAufrufe = p.aufrufe.filter((a) => a.name.startsWith('online_suche'));
+        pruefe('suche: Bot erst nach der Wartezeit (vorher Suche beim Server, kein Bot)', frueh.suche === 1 && frueh.screen === 'lobby'
+          && sucheAufrufe[0]?.name === 'online_suche_start' && sucheAufrufe[0].daten?.zeit === '3+2' && frueh.namen.includes('online_suche_stand')
+          && !frueh.namen.includes('online_suche_ende'), frueh);
+        await p.s.waitForFunction(() => window.__partie && window.__partie.z, null, { timeout: 15000 });
+        const ki = await p.s.evaluate(() => ({ abz: document.querySelector('.screen.partie .ki-abzeichen')?.textContent, ki: window.__partie.z.ki,
+          ref: window.__partie.z.kiRef, tempo: window.__partie.z.tempo, suche: !!document.querySelector('.lb-suche') }));
+        const enden = p.aufrufe.filter((a) => a.name === 'online_suche_ende');
+        pruefe('suche: danach Partie mit Abzeichen "KI-Gegner", Beleg gemerkt, gleiche Uhr 3 + 2, genau ein Ende mit ki',
+          ki.abz === 'KI-Gegner' && ki.ki === true && ki.ref === KI && ki.tempo?.grund === 180 && ki.tempo?.zuschlag === 2 && !ki.suche
+          && enden.length === 1 && enden[0].daten?.ki === true, { ki, enden });
+        pruefe('suche: keine Seitenfehler', p.fehlerListe.length === 0, p.fehlerListe.join(' | '));
+        await p.k.close();
+      }
+      // Treffer schlaegt Bot
+      {
+        let start = 0;
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(() => start && Date.now() - start > 500) });
+        await zurLobby(p);
+        start = Date.now();
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS + 1200);
+        const st = { screen: await screen(p), partie: await p.s.evaluate(() => !!(window.__partie && window.__partie.z && window.__partie.z.ki)),
+          namen: p.aufrufe.map((a) => a.name) };
+        pruefe('suche: Treffer schlaegt Bot (Online-Partie offen, kein KI-Gegner, kein Ende-Aufruf)', st.screen === 'online' && !st.partie
+          && !st.namen.includes('online_suche_ende'), st);
+        await p.k.close();
+      }
+      // Abbruch
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.locator('.lb-suchen').click();
+        await warte(300);
+        await p.s.locator('.lb-abbrechen').click();
+        await warte(BOT_MS + 800);
+        const enden = p.aufrufe.filter((a) => a.name === 'online_suche_ende');
+        pruefe('suche: Abbruch ruft genau einmal online_suche_ende (ohne ki), danach kein Bot',
+          enden.length === 1 && enden[0].daten?.ki === false && (await screen(p)) === 'lobby' && await p.s.locator('.lb-suche').count() === 0, enden);
+        await p.k.close();
+      }
+      // ohne Konto
+      {
+        const p = await seite(browser, { erfinder: true, hash: 'lobby', botMs: BOT_MS, rpc: antwort(null) });
+        await zurLobby(p);
+        await p.s.evaluate(() => localStorage.removeItem('schach-arena:konto:sitzung'));
+        await p.s.locator('.lb-suchen').click();
+        await warte(BOT_MS + 500);
+        const st = await p.s.evaluate(() => ({ phase: document.querySelector('.lb-suche')?.dataset.phase,
+          titel: document.querySelector('.lb-suche-titel')?.textContent, screen: document.documentElement.dataset.screen }));
+        pruefe('suche: ohne Konto Hinweis "Zum Suchen anmelden", kein Aufruf beim Server, kein Bot',
+          st.phase === 'anmelden' && st.titel === 'Zum Suchen anmelden' && st.screen === 'lobby'
+          && !p.aufrufe.some((a) => a.name.startsWith('online_suche')), { st, aufrufe: p.aufrufe.map((a) => a.name) });
+        await p.k.close();
+      }
     }
     // iPad quer: zwei Spalten, Welten fuehrt zurueck zur Karte
     {
