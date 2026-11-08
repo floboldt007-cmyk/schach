@@ -191,6 +191,33 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
+  // ---------- Handy-Runde 08.11.: wo bin ich? Leiste und aktiver Reiter je Screen, Seitenname = Kachel- bzw. Reitername ----------
+  gruppe = 'Leiste je Screen (Handy 390)';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    const stand = async (name, params) => {
+      await seite.evaluate(([n, p]) => window.__app.gehe(n, p), [name, params || {}]);
+      await seite.waitForFunction((n) => document.documentElement.dataset.screen === n, name).catch(() => {});
+      await warte(300);
+      const m = await lageMessen(seite);
+      return { leiste: m.sichtbar && !m.klasse.split(' ').includes('weg'), reiter: m.reiter, h1: await seite.evaluate(() => document.querySelector('#app > .screen .seiten-kopf h1')?.textContent || '') };
+    };
+    let r = await stand('online');
+    pruefe('Online (ohne Partie): Leiste bleibt, Start aktiv, Seite heisst Online', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Online', JSON.stringify(r));
+    r = await stand('online', { partieId: '00000000-0000-4000-8000-000000000001' });
+    pruefe('Online-Partie: keine Leiste (das Brett braucht den Platz)', !r.leiste, JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit' });
+    pruefe('Zu-zweit-Startblatt: Leiste bleibt, Start aktiv', r.leiste && r.reiter.includes('heim*'), JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A', schwarz: 'B' } });
+    pruefe('Zu-zweit-Partie: keine Leiste', !r.leiste, JSON.stringify(r));
+    r = await stand('training');
+    pruefe('Lernen (Kachel auf Start): Seite heisst Lernen, Start aktiv', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Lernen', JSON.stringify(r));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // ---------- Handy: schwebende Glas-Kapsel unten (Konzept 2026-11-06, Entwurf .dock) ----------
   for (const schema of ['light', 'dark']) {
     gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
@@ -539,8 +566,8 @@ async function testeTraining(browser) {
       leer: !document.querySelector('.training-leer').hidden, gitter: document.querySelector('.training-gitter').hidden,
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
-    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Crownmate' && !r.platzhalter, JSON.stringify(r));
-    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
+    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Lernen · Crownmate' && !r.platzhalter, JSON.stringify(r));
+    pruefe('Seitenkopf „Üben ohne Druck“ / „Lernen“ (wie die Kachel auf Start), die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Lernen'
       && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();

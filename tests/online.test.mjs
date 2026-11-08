@@ -534,7 +534,7 @@ anmelden();
   pruefe('app.js uebernimmt Einladungen vor dem Routing und registriert den Online-Screen',
     /import \{ uebernimmEinladungsLink \} from '\.\/online\.js'/.test(quelle('js/app.js'))
     && /const einladung = uebernimmEinladungsLink\(\);\s*const ziel = einladung/.test(quelle('js/app.js'))
-    && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Gegen Freunde'/.test(quelle('js/app.js')));
+    && /const SCREENS = \[[^\]]*'online'/.test(quelle('js/app.js')) && /online: 'Online'/.test(quelle('js/app.js')));
   const eigene = quelle('js/online.js');
   pruefe('online.js importiert nur Konfiguration, Konto und Sprache, nie app.js, partie.js oder arena.js', [...eigene.matchAll(/from '([^']+)'/g)].map((x) => x[1]).sort().join(',') === './konto-config.js,./konto.js,./sprache.js'
     && [...eigene.matchAll(/import '([^']+)'/g)].map((x) => x[1]).join(',') === './sprachen/online.js');

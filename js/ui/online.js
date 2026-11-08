@@ -20,6 +20,15 @@ import { sitzung, ladeProfil, kontoFreigeschaltet } from '../konto.js';
 import * as online from '../online.js';
 import { karteDerPartie } from '../karte.js';
 import { fremdeKarte, bannerUrl } from './visitenkarte.js';
+import { hauptKopf, seitenKopf, verbindeKopf } from './seite.js';
+import { holeStand, suche as kronenSuche, BOT_ERSATZ_MS } from '../kronen.js';
+
+// Bedenkzeiten der Gegnersuche (dieselben Kennungen wie die Lobby, js/pakete/lobby/index.js ZEITEN)
+const SUCH_ZEITEN = Object.freeze([
+  { id: '3+2', art: 'blitz', grund: 180, zuschlag: 2 },
+  { id: '10+0', art: 'schnell', grund: 600, zuschlag: 0 },
+  { id: '15+10', art: 'lang', grund: 900, zuschlag: 10 },
+]);
 
 const WURZEL = new URL('../../', import.meta.url);
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -55,9 +64,13 @@ export function zeige(root, params, app) {
     link.dataset.online = ''; document.head.append(link);
   }
   const s = document.createElement('section'); s.className = 'screen online-screen'; s.setAttribute('aria-label', O('titel'));
-  s.innerHTML = `<header class="kopf"><button class="knopf" type="button" data-online="training">${esc(O('training'))}</button><h2>${esc(O('titel'))}</h2></header>`
+  // Handy-Runde 08.11.: Kopf wie Lernen und Ich (Zurueck = woher man kam, Titel "Online"); ohne laufende Partie bleibt
+  // die Leiste unten stehen (js/app.js reiterVon)
+  s.innerHTML = `${hauptKopf({ zurueck: true, titelElement: 'div', chips: '', seite: O('titel') })}`
     + `<div class="on-rumpf"><p class="on-meldung" role="status" hidden></p><div class="on-inhalt"></div></div>`;
   root.append(s);
+  const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
+  let suche = null;
   const inhalt = s.querySelector('.on-inhalt'), status = s.querySelector('.on-meldung');
   // blockiert: abgemeldet oder fremde Partie (nichts mehr senden). widerspruch: die Serverstellung passt nicht zu den
   // Zuegen; keine Zuege und keine Zeit-Reklamation mehr, aber "Strittig melden" und "Aufgeben" bleiben bedienbar.
@@ -107,11 +120,17 @@ export function zeige(root, params, app) {
       e => melde(e?.kennung === 'ONLINE_PARTIE_BEENDET' ? e.message : `${e?.message || O('fehler')} ${O('strittigVonHand')}`));
     melde(O('stellungFehler')); // aktion leert die Zeile beim Start; waehrend der Meldung bleibt der Grund sichtbar
   }
+  // Die zwei Wege, online zu spielen, als Karten im Stil von Lernen (ohne Konto erklaerend, mit Konto bedienbar)
+  const artKarte = (art, symbol, rumpf) => `<section class="t-karte on-art" data-art="${art}">
+      <span class="on-symbol" aria-hidden="true">${icon(symbol)}</span><h2>${esc(O(art + '.titel'))}</h2>${rumpf}</section>`;
   function start() {
     if (!sitzung()?.access_token) {
-      inhalt.innerHTML = `<section class="on-karte flaeche"><h3>${esc(O('zusammen'))}</h3><p>${esc(O('konto'))}</p>`
+      inhalt.innerHTML = `${seitenKopf({ ueber: O('ueber'), titel: O('titel'), text: O('einleitung') })}
+        <div class="on-gitter">${artKarte('suche', 'krone', `<p>${esc(O('suche.erklaert'))}</p>`)}
+        ${artKarte('freunde', 'person', `<p>${esc(O('freunde.erklaert'))}</p>`)}</div>
+        <section class="t-karte on-konto"><h2>${esc(O('konto.titel'))}</h2><p>${esc(O('konto'))}</p>`
         + (online.gemerkteEinladung() ? `<p>${esc(O('merker'))}</p>` : '')
-        + `<button class="knopf primaer" type="button" data-online="konto">${esc(O('einstellungen'))}</button></section>`;
+        + `<div class="t-fuss"><button class="knopf primaer dr" type="button" data-online="konto">${esc(O('konto.knopf'))} ${icon('vor')}</button></div></section>`;
       return;
     }
     if (params.partieId) {
@@ -128,7 +147,15 @@ export function zeige(root, params, app) {
       return;
     }
     const code = online.gemerkteEinladung() || '';
-    inhalt.innerHTML = `<div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>${esc(O('einladen'))}</h3>
+    // Gegnersuche fuer die Liga (dieselbe Suche wie die Lobby, js/kronen.js): erst zeigen, wenn der Server die Liga kennt
+    // (kronen_mein_stand antwortet); sonst ein ruhiger Hinweis "kommt bald", kein Fehler
+    inhalt.innerHTML = `${seitenKopf({ ueber: O('ueber'), titel: O('titel'), text: O('einleitung') })}
+      ${artKarte('suche', 'krone', `<p class="on-suche-text">${esc(O('suche.pruefen'))}</p>
+        <div class="segment on-zeiten" role="radiogroup" aria-label="${esc(O('bedenkzeit'))}" hidden>${SUCH_ZEITEN.map((z, i) =>
+          `<button class="seg" type="button" role="radio" data-zeit="${z.id}" aria-checked="${i === 0}">${esc(z.id.replace('+', ' + '))}<small>${esc(O('zeit.' + z.art))}</small></button>`).join('')}</div>
+        <div class="t-fuss"><button class="knopf primaer dr" type="button" data-online="suchen" hidden>${esc(O('suche.knopf'))} ${icon('vor')}</button>
+          <button class="knopf dr" type="button" data-online="suche-stopp" hidden>${esc(O('suche.abbrechen'))}</button></div>`)}
+      <div class="on-start"><form class="on-karte flaeche" data-form="einladen"><h3>${esc(O('einladen'))}</h3>
       <label>${esc(O('farbe'))}<select name="farbe"><option value="w">${esc(O('weiss'))}</option><option value="b">${esc(O('schwarz'))}</option><option value="zufall" selected>${esc(O('zufall'))}</option></select></label>
       <label>${esc(O('bedenkzeit'))}<select name="tempo"><option value="ohne">${esc(O('ohneUhr'))}</option><option value="5">5+0</option><option value="10">10+0</option><option value="15">15+10</option></select></label>
       <button class="knopf primaer" type="submit">${esc(O('erstellen'))}</button></form>
@@ -137,6 +164,48 @@ export function zeige(root, params, app) {
       <section class="on-karte flaeche"><h3>${esc(O('meine'))}</h3><p class="on-liste">${esc(O('ladeListe'))}</p><button class="knopf" type="button" data-online="liste">${esc(O('aktualisieren'))}</button></section>`;
     inhalt.querySelector('[name="code"]').addEventListener('input', e => { e.target.value = online.normalisiereCode(e.target.value).slice(0, 6); });
     ladeListe();
+    pruefeSuche();
+  }
+  const sucheKarte = () => inhalt.querySelector('.on-art[data-art="suche"]');
+  function sucheZustand(zustand, text) {
+    const k = sucheKarte(); if (!k || weg) return;
+    k.dataset.zustand = zustand;
+    k.querySelector('.on-suche-text').textContent = text;
+    k.querySelector('.on-zeiten').hidden = zustand !== 'bereit';
+    k.querySelector('[data-online="suchen"]').hidden = zustand !== 'bereit';
+    k.querySelector('[data-online="suche-stopp"]').hidden = zustand !== 'sucht';
+  }
+  async function pruefeSuche() {
+    try { await holeStand(); sucheZustand('bereit', O('suche.erklaert')); }
+    catch (e) { sucheZustand('bald', O('suche.bald')); }
+  }
+  function starteSuche() {
+    const k = sucheKarte(); if (!k || suche) return;
+    const zeit = SUCH_ZEITEN.find(z => z.id === k.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit) || SUCH_ZEITEN[0];
+    const tempoWahl = { grund: zeit.grund, zuschlag: zeit.zuschlag };
+    sucheZustand('sucht', O('suche.laeuft'));
+    const warteMs = typeof window !== 'undefined' && Number.isFinite(window.__onlineBotMs) ? window.__onlineBotMs : BOT_ERSATZ_MS;
+    suche = kronenSuche(zeit.id, {
+      warteMs,
+      beiTreffer: (partieId) => { suche = null; if (!weg) app.gehe('online', { partieId }); },
+      // nach 10 s ohne Menschen ein KI-Gegner in passender Staerke, wie in der Lobby (dort steht die Wahl des Bots)
+      beiBot: async ({ kiRef }) => {
+        suche = null;
+        if (weg) return;
+        let bot = null;
+        try { const l = await import('../pakete/lobby/index.js'); bot = l.passenderBot(l.schaetzeWertung()); } catch (e) { bot = null; }
+        if (weg) return;
+        if (!bot) { sucheZustand('bereit', O('suche.erklaert')); melde(O('fehler')); return; }
+        app.gehe('partie', { botId: bot.id, farbe: Math.random() < 0.5 ? 'w' : 'b', tempo: tempoWahl, ki: true, ...(kiRef ? { kiRef } : {}) });
+      },
+      beiFehler: (e) => { suche = null; sucheZustand('bereit', O('suche.erklaert')); melde(e?.message || O('fehler')); },
+    });
+  }
+  function stoppeSuche() {
+    if (!suche) return;
+    try { suche.stopp(); } catch (e) { /* egal */ }
+    suche = null;
+    sucheZustand('bereit', O('suche.erklaert'));
   }
   async function ladeListe() {
     await aktion(() => online.meinePartien({ beendete: true }), liste => {
@@ -296,7 +365,12 @@ export function zeige(root, params, app) {
     const knopf = e.target.closest('button'); if (!knopf || weg) return;
     if (knopf.dataset.partie) { app.gehe('online', { partieId: knopf.dataset.partie }); return; }
     const a = knopf.dataset.online;
-    if (a === 'training') { app.gehe('training'); return; }
+    if (knopf.dataset.zeit) {
+      for (const z of knopf.parentNode.querySelectorAll('[data-zeit]')) z.setAttribute('aria-checked', String(z === knopf));
+      return;
+    }
+    if (a === 'suchen') { starteSuche(); return; }
+    if (a === 'suche-stopp') { stoppeSuche(); return; }
     if (a === 'liste-zurueck') { app.gehe('online'); return; }
     if (a === 'konto') { kontoFreigeschaltet('#konto'); app.gehe('einstellungen', { seite: 'konto' }); return; }
     if (a === 'liste') { ladeListe(); return; }
@@ -329,5 +403,5 @@ export function zeige(root, params, app) {
   });
   if (app.test) window.__online = { partie: () => p, chess: () => chess, brett: () => brett, blockiert: () => blockiert, widerspruch: () => widerspruch, busy: () => busy, rest };
   start();
-  return { verlasse() { weg = true; beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
+  return { verlasse() { weg = true; if (suche) { try { suche.stopp(); } catch (e) { /* egal */ } suche = null; } kopf.verlasse(); beobachter?.stop(); clearInterval(uhrTimer); brett?.zerstoere(); if (app.test) delete window.__online; } };
 }

@@ -10,6 +10,20 @@
 .sa-steuer { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sa-steuer::-webkit-scrollbar { display: none; }
 .sa-steuer .segment { min-width: max(100%, calc(var(--n, 6) * 104px)); }
+/* Handy-Runde 08.11.: auf dem Handy liefen die hinteren Reiter rechts aus dem Bild, ohne dass man es sah. Dort stehen
+   alle Bereiche jetzt in Zeilen zu vier (nichts versteckt, nichts zu wischen); die gleitende Pille braucht eine Zeile,
+   darum traegt hier der gewaehlte Reiter selbst die Flaeche. Ab 760 px bleibt es bei einer Zeile mit Pille. */
+@media (max-width: 759px) {
+  .sa-steuer { overflow: visible; }
+  .sa-steuer .segment { min-width: 0; grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 4px; }
+  .sa-steuer .seg-pille { display: none; }
+  .sa-steuer .seg { padding: 4px 3px; overflow-wrap: anywhere; }
+  .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 2px 6px -1px rgba(0, 0, 0, .08), var(--kante); }
+  :root[data-modus="dunkel"] .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
+@media (max-width: 759px) and (prefers-color-scheme: dark) {
+  :root[data-modus="system"] .sa-steuer .seg[aria-checked="true"] { background: var(--flaeche-3); }
+}
 .sa-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .sa-teil { display: grid; gap: 10px; padding: 12px; border-radius: var(--r-l, 18px); background: var(--flaeche); border: 1px solid var(--linie);
   box-shadow: var(--s1); min-width: 0; }
