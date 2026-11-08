@@ -48,8 +48,8 @@ try {
   const knopf = name => seite.locator(`[data-zz="${name}"]`);
   async function start(tempo = 'ohne', drehen = false) {
     await merke();
-    await seite.evaluate(() => window.__app.gehe('training'));
-    await seite.getByRole('button', { name: 'Zu zweit spielen', exact: true }).click();
+    // Flo 08.11.2026: keine Karte mehr unter Lernen, Einstieg ist die Startseite (heim-zuzweit)
+    await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
     // Namen sind eingeklappt (Handy-Runde 08.11.2026), Bedenkzeit sind Pillen (Radio-Knoepfe)
     await seite.locator('.zz-namen summary').click();
     await seite.locator('[name="weiss"]').fill('Anna');
@@ -77,7 +77,9 @@ try {
     await seite.locator('.zz-ergebnis:not([hidden])').waitFor();
   }
   await seite.goto('http://127.0.0.1:8886/?test#training');
-  await seite.getByRole('button', { name: 'Zu zweit spielen' }).click();
+  await seite.waitForFunction(() => !!window.__app);
+  pruefe('Lernen: keine Karte "Zu zweit" mehr (Flo 08.11.2026, Zu zweit ist kein Lernen)', await seite.evaluate(() => !document.querySelector('.zz-karte')));
+  await seite.evaluate(() => window.__app.gehe('heim')); await seite.locator('[data-aktion="heim-zuzweit"]').click();
   await seite.locator('[name="weiss"]').waitFor({ state: 'attached' });
   pruefe('Startblatt: Namen, vier Bedenkzeiten (Ohne Uhr gewaehlt), Drehen aus', await seite.evaluate(() => document.querySelector('[name="weiss"]').value === 'Weiß'
     && document.querySelector('[name="schwarz"]').value === 'Schwarz' && document.querySelector('[name="weiss"]').maxLength === 20
@@ -86,15 +88,16 @@ try {
   // Handy-Runde 08.11.2026 (Befund 3): Stil der Startseite, grosser Start oben, Namen eingeklappt, Ziele ab 44 px
   const blatt = await seite.evaluate(() => {
     const r = (el) => el.getBoundingClientRect();
-    const los = document.querySelector('.zz-buehne .zz-los');
+    const los = document.querySelector('.zz-start > .zz-los');
+    const namen = document.querySelector('.zz-namen');
     const ziele = [...document.querySelectorAll('.zz-startblatt .zz-los, .zz-startblatt .zz-pille span, .zz-startblatt .zz-schalter input, .zz-startblatt .zz-namen summary, .zz-startblatt .kopf-zurueck')]
       .filter((e) => e.offsetParent).map((e) => ({ k: e.className || e.tagName, w: Math.round(r(e).width), h: Math.round(r(e).height) }));
-    return { los: los ? { t: r(los).top, h: r(los).height, text: los.textContent.trim() } : null, namenZu: !document.querySelector('.zz-namen').open,
+    return { los: los ? { t: r(los).top, h: r(los).height, text: los.textContent.trim(), unterNamen: r(los).top >= r(namen).bottom } : null, namenZu: !document.querySelector('.zz-namen').open,
       zurueck: !!document.querySelector('.zz-startblatt .kopf-zurueck'), koenige: document.querySelectorAll('.zz-paar img').length, ziele,
       quer: document.scrollingElement.scrollWidth <= innerWidth, ih: innerHeight };
   });
-  pruefe('Startblatt: "Los" in der Buehne oben (sichtbar ohne Scrollen), zwei Koenige, Namen eingeklappt, Zurueck-Symbol', blatt.los && blatt.los.text === 'Los'
-    && blatt.los.t + blatt.los.h <= blatt.ih && blatt.koenige === 2 && blatt.namenZu && blatt.zurueck, JSON.stringify(blatt));
+  pruefe('Startblatt: "Los" unter den Einstellungen (Flo 08.11.2026) und sichtbar ohne Scrollen, zwei Koenige, Namen eingeklappt, Zurueck-Symbol', blatt.los && blatt.los.text === 'Los'
+    && blatt.los.unterNamen && blatt.los.t + blatt.los.h <= blatt.ih && blatt.koenige === 2 && blatt.namenZu && blatt.zurueck, JSON.stringify(blatt));
   pruefe('Startblatt: alle Ziele mindestens 44 px hoch und breit (auch der Schalter: Feld 52x44, Spur 52x32)', blatt.ziele.length >= 7
     && blatt.ziele.every((z) => z.h >= 44 && z.w >= 44), JSON.stringify(blatt.ziele));
   pruefe('Startblatt: nichts seitlich drueber', blatt.quer);
