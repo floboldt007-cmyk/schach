@@ -98,7 +98,7 @@ const SCREENS = ['heim', 'arena', 'partie', 'analyse', 'verlauf', 'einstellungen
   'raetsel-duell', 'schule'];
 const TITEL = {
   heim: 'Start', arena: 'Arena', partie: 'Partie', analyse: 'Spielanalyse', verlauf: 'Verlauf', einstellungen: 'Einstellungen',
-  training: 'Training', start: 'Willkommen', online: 'Gegen Freunde',
+  training: 'Lernen', start: 'Willkommen', online: 'Online',
   bestenliste: 'Bestenliste', raetsel: 'Rätsel', lernen: 'Lernen', lektion: 'Lektion', ich: 'Ich', spielplan: 'Spielplan',
   spielhalle: 'Spielhalle', werkstatt: 'Werkstatt', premium: 'Premium', schule: 'Schulmodus', lobby: 'Online',
   'raetsel-duell': 'Rätsel-Duell',
@@ -412,9 +412,14 @@ export function reiterListe(suche = typeof location !== 'undefined' ? location.s
   return an ? REITER_ALLE.filter(([n]) => REITER_FEST.has(n) || aus.has(n)).map(([n]) => n) : [];
 }
 
-// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg)
-export function reiterVon(screen, liste = reiterListe()) {
+// Reiter, zu dem ein Screen gehoert (null: keiner, dort ist die Leiste weg). Handy-Runde 08.11.: Online (ohne laufende
+// Partie) und das Zu-zweit-Startblatt (Partie mit modus zuzweit, ohne Partie und ohne Fortsetzen) gehoeren zu Start;
+// sobald eine Partie laeuft (partieId, zuzweit, fortsetzen), ist die Leiste weg.
+export function reiterVon(screen, liste = reiterListe(), params = {}) {
+  const p = params && typeof params === 'object' ? params : {};
   if (screen === 'verlauf') return liste.includes('ich') ? 'ich' : null;
+  if (screen === 'online') return p.partieId ? null : 'heim';
+  if (screen === 'partie') return p.modus === 'zuzweit' && !p.zuzweit && !p.fortsetzen ? 'heim' : null;
   return Object.prototype.hasOwnProperty.call(REITER_VON, screen) ? REITER_VON[screen] : null;
 }
 
@@ -534,9 +539,9 @@ function versteckeReiter() {
   if (nav.parentNode !== document.body) document.body.append(nav);
 }
 
-function zeigeReiter(screen) {
+function zeigeReiter(screen, params = {}) {
   const liste = reiterListe();
-  const aktiv = screen ? reiterVon(screen, liste) : null;
+  const aktiv = screen ? reiterVon(screen, liste, params) : null;
   if (!liste.length || !aktiv) {
     versteckeReiter();
     return;
@@ -758,7 +763,7 @@ async function zeigeScreen(name, params, hash) {
     return;
   }
   richteSprunglinkEin(root);
-  zeigeReiter(name);
+  zeigeReiter(name, params || {});
   sende('app:screen', { name, params: params || {} });
 }
 

@@ -409,9 +409,15 @@ async function erfinderTeil(browser) {
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  pruefe('Handy: Reiter der Sammlung nicht gequetscht (jeder mindestens 90 px, keiner überlappt den nächsten)', await p.s.evaluate(() => {
-    const seg = [...document.querySelectorAll('.sa-steuer .seg')];
-    return seg.length > 6 && seg.every((b, i) => b.getBoundingClientRect().width >= 90 && (i === 0 || b.getBoundingClientRect().left >= seg[i - 1].getBoundingClientRect().right - 1));
+  // Handy-Runde 08.11.: auf dem Handy in Zeilen zu vier statt rechts aus dem Bild (nichts versteckt, nichts zu wischen)
+  pruefe('Handy: alle Reiter der Sammlung sichtbar (Zeilen zu vier, jeder mindestens 70 px, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate(() => {
+    const seg = [...document.querySelectorAll('.sa-steuer .seg')].map((b) => b.getBoundingClientRect());
+    const steuer = document.querySelector('.sa-steuer');
+    const ueber = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    return seg.length > 6 && seg.every((r) => r.width >= 70 && r.left >= 0 && r.right <= innerWidth + 1)
+      && seg.every((r, i) => seg.every((q, j) => i === j || !ueber(r, q)))
+      && new Set(seg.map((r) => Math.round(r.top))).size === Math.ceil(seg.length / 4)
+      && steuer.scrollWidth <= steuer.clientWidth + 1;
   }));
   pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
     const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
@@ -735,7 +741,7 @@ async function browserTeil() {
     await s.locator('.sa-steuer .seg[data-wert="titel"]').click();
     await warte(300);
     const text = await s.locator('.sa-screen').innerText();
-    pruefe('Englisch: Collection, unlocked, From level', /Collection/.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
+    pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();
   } catch (e) {
     pruefe('Browser-Teil läuft durch', false, e.message);
