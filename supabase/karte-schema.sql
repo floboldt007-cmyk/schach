@@ -115,7 +115,11 @@ as $$
       'erfolg-siegeszug', 'erfolg-bezwinger', 'erfolg-siegesbanner', 'erfolg-weltenbezwinger', 'erfolg-goldene-feder',
       'erfolg-sternenschueler',
       'koennen-blitzschlag', 'koennen-langer-atem', 'koennen-gleichgewicht', 'koennen-feinschliff', 'koennen-eigene-kraft',
-      'koennen-stammgast'
+      'koennen-stammgast',
+      -- Titel vom 08.11.2026 (js/pakete/sammlung/titel.js KOENNEN_TITEL); bis zum Einspielen lehnt der Server sie ab und
+      -- die Karte zeigt keinen Titel (js/karte.js abgleichEinmal, zweiter Versuch ohne Titel)
+      'koennen-kroenung', 'koennen-raetselfuchs', 'koennen-weltenwanderer', 'koennen-tafelkoenig', 'koennen-rekordjaeger',
+      'koennen-sterne-sammler', 'koennen-fehlerjaeger', 'koennen-musterschueler', 'koennen-erzfeind'
     ),
     -- Profilbild ohne die Stuecke nur fuer den Erfinder (Koenig, Kronli) und ohne Labor-Rahmen
     'motive', jsonb_build_array('Q', 'R', 'B', 'N', 'P', 'karo', 'stups', 'zinni', 'klippa', 'glimm'),

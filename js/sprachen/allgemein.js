@@ -8,7 +8,7 @@ registriereTexte('allgemein', {
     ja: 'Ja', nein: 'Nein', an: 'An', aus: 'Aus', speichern: 'Speichern', loeschen: 'Löschen', teilen: 'Teilen',
     weiss: 'Weiß', schwarz: 'Schwarz', 'weissAmZug': 'Weiß am Zug', 'schwarzAmZug': 'Schwarz am Zug',
     sieg: 'Sieg', niederlage: 'Niederlage', remis: 'Remis', einstellungen: 'Einstellungen',
-    arena: 'Arena', training: 'Training', bestenliste: 'Bestenliste', analyse: 'Analyse', verlauf: 'Verlauf',
+    arena: 'Bots', training: 'Training', bestenliste: 'Liga', analyse: 'Analyse', verlauf: 'Verlauf',
     // eigener Name ohne Benutzername (Partie, Duell-Intro, Profilkarte; js/konto.js meinName)
     du: 'Du',
   },
@@ -17,7 +17,7 @@ registriereTexte('allgemein', {
     ja: 'Yes', nein: 'No', an: 'On', aus: 'Off', speichern: 'Save', loeschen: 'Delete', teilen: 'Share',
     weiss: 'White', schwarz: 'Black', 'weissAmZug': 'White to move', 'schwarzAmZug': 'Black to move',
     sieg: 'Win', niederlage: 'Loss', remis: 'Draw', einstellungen: 'Settings',
-    arena: 'Arena', training: 'Training', bestenliste: 'Leaderboard', analyse: 'Analysis', verlauf: 'History',
+    arena: 'Bots', training: 'Training', bestenliste: 'League', analyse: 'Analysis', verlauf: 'History',
     du: 'You',
   },
 });

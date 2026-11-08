@@ -907,6 +907,9 @@ export function zeige(root, params, app) {
     if (!ruhig.has(coachEl)) reserviereCoach();
     for (const el of [coachEl, s.querySelector('.spieler.gegner'), s.querySelector('.spielknoepfe')]) {
       if (!el || !el.isConnected || el.classList.contains('offen')) continue;
+      // Handy: der Coach hat feste Hoehen, die layout() je nach Platz waehlt (.coach-eng); gemerkt blieben 76 px aus dem
+      // ersten Bild, auf dem iPhone SE lagen die Knoepfe dann unter dem Rand (08.11.2026)
+      if (el === coachEl && istHandy()) continue;
       const h = el.offsetHeight;
       if (h > (ruhig.get(el) || 0)) { ruhig.set(el, h); el.style.minHeight = h + 'px'; }
     }
@@ -2437,6 +2440,11 @@ export function zeige(root, params, app) {
       if (warn && laeuft && el.dataset.sek !== String(sek)) {
         el.dataset.sek = String(sek);
         anim(el, [{ transform: 'scale(1.045)' }, { transform: 'none' }], { d: 380, k: 'sanft' });
+      }
+      // Uhr-Warnung einmal je Partie, sobald Flos laufende Uhr unter 20 s faellt (die Bot-Uhr bleibt still)
+      if (warn && laeuft && wer === 'flo' && !el.dataset.gewarnt) {
+        el.dataset.gewarnt = '1';
+        try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ }
       }
     },
   });

@@ -2,8 +2,13 @@
 // nicht, welche gibt es ueberhaupt. So mit einem Schloss ... Fuer Erfolge gilt das Gleiche und alles andere auch."
 //
 // Gehoert dem Paket sammlung (PAKET_SCREENS 'ich' in js/app.js): zeige gibt es erst, wenn das Paket freischalten() ruft.
-// Host der Orte ich:kopf (Profil, Kontext { app }) und sammlung:bereich (Kontext { app }). Jeder Anbieter liefert ein Element aus bereich(); der Screen zeigt
-// einen Bereich zur Zeit (Segment, gemerkt je Geraet) und oben "N von M freigeschaltet" ueber alle Bereiche.
+// Host der Orte ich:kopf (Profil, Kontext { app }) und sammlung:bereich (Kontext { app }). Jeder Anbieter liefert ein Element aus bereich().
+// Ausruestung mit Plaetzen (G-002, Flos Wahl "Sammlung B" 08.11.2026; vorher acht Reiter): oben "N von M freigeschaltet",
+// dann die Plaetze untereinander in zwei Gruppen, "So sehen dich andere" (Banner, Titel, Rahmen) und "Am Brett" (Bretter,
+// Figuren, Klaenge, Emotes, Finisher; unbekannte Bereiche dahinter). Jeder Platz (button.sa-platz[data-bereich]) zeigt das
+// Getragene und "frei / alle"; ein Tipp oeffnet den Bereich als Blatt (.sheet-karte.sa-blatt), darin wird wie bisher
+// ausgeruestet. Darunter zwei grosse Knoepfe (button.sa-gross) fuer Erfolge und Shop, die ebenso als Blatt aufgehen.
+// Die Bereiche selbst liegen versteckt in .sa-ort und wandern fuer die Dauer des Blatts hinein.
 // Gezeigt wird nur, was es in der App wirklich gibt; gesperrte Stuecke tragen ein Schloss und den Weg dahin.
 //
 //   bereich({ id, name, teile, hinweis }) -> section.sa-bereich[data-bereich][data-name]
@@ -13,23 +18,28 @@
 //       | 'episch' | 'legende' | 'einzig' (Leuchten und Schild); labor: nur fuer den Erfinder (Schild "Labor")
 //     hinweis: ein Satz unter dem Raster (z. B. was erst mit der Werkstatt kommt)
 //   zeige(root, params, app) -> { verlasse() }   erst nach freischalten(); params: { bereich?, oben?, ruhig? }
+//       bereich: dieses Blatt gleich oeffnen (z. B. "shop" von der Startseite)
 //       oben: Scroll-Stand der Sammlung (nach dem Ausruesten bleibt die Seite, wo sie war; Flo 31.10.2026: "wenn ich
 //       auf die Lobby klicke, springt der nach oben"), ruhig: ohne Einflug-Bewegung neu zeichnen
 //   freischalten()                                nur js/pakete/sammlung/index.js
 import { fuelle } from '../orte.js';
 import { hauptKopf, seitenKopf, verbindeKopf, kopfEintritt } from './seite.js';
-import { segment, wischKanten } from './bauteile.js';
+import { sheet, schliesseSheet } from './bauteile.js';
+import { icon } from './icons.js';
 import { staffel, tempo } from '../bewegung.js';
-import { ladeModulEinstellungen, speichereModulEinstellungen } from '../storage.js';
 import { t } from '../sprache.js';
 import '../sprachen/rahmen.js';
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Speicher: der fuer das Sammeln reservierte Modulplatz 'sammeln' (storage.js MODUL_BUDGET), hier nur der gemerkte Bereich
-const MODUL = 'sammeln';
 // Ausruesten per Tipp (Flo 31.10.2026: "Warum kann ich die Klaenge nicht auswaehlen?"): ein Teil mit wahl() bekommt eine
 // Tippflaeche ueber der Karte; der Screen ruft wahl() und zeichnet den Bereich neu
 const WAHLEN = new WeakMap();   // section.sa-bereich -> Map(teil-id -> wahl)
+// Plaetze je Gruppe (Reihenfolge der Anzeige); Erfolge und Shop sind die grossen Knoepfe unten
+const PLAETZE = Object.freeze([
+  Object.freeze({ id: 'andere', bereiche: Object.freeze(['banner', 'titel', 'rahmen']) }),
+  Object.freeze({ id: 'amBrett', bereiche: Object.freeze(['bretter', 'figuren', 'klaenge', 'emotes', 'finisher']) }),
+]);
+const GROSS = Object.freeze(['erfolge', 'shop']);
 
 export function bereich({ id, name, teile = [], hinweis = '' } = {}) {
   const s = document.createElement('section');
@@ -88,20 +98,23 @@ function zeigeIch(root, params = {}, app) {
   root.append(s);
   const kopf = verbindeKopf(s, app, { beiZurueck: () => app.zurueck(), beiEinstellungen: () => app.gehe('einstellungen') });
   s.querySelector('.haupt-kopf [data-aktion="verlauf"]')?.addEventListener('click', () => app.gehe('verlauf'));
-  let gemerkt = {};
-  try { gemerkt = ladeModulEinstellungen(MODUL, {}) || {}; } catch (e) { gemerkt = {}; }
-  let aktiv = typeof params.bereich === 'string' ? params.bereich : gemerkt.bereich || null;
   const ort = s.querySelector('.sa-ort');
+  ort.hidden = true;
+  const platzOrt = s.querySelector('.sa-steuer');
+  platzOrt.className = 'sa-plaetze';
   let gefuellt = { anzahl: 0, verlasse() {} };
   let kopfOrt = { anzahl: 0, verlasse() {} };
+  // offenes Blatt: { id, huelle } (die Huelle haelt den Bereich, solange das Blatt offen ist)
+  let blatt = null;
   // Profil oben (Ort ich:kopf, Paket sammlung), ohne Anbieter bleibt die Stelle leer
   try { kopfOrt = fuelle('ich:kopf', s.querySelector('.sa-kopf-ort'), { app }); } catch (e) { console.error(e); }
   s.querySelector('.sa-kopf-ort').hidden = !kopfOrt.anzahl;
   try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); }
-  // Ausruesten per Tipp: wahl() des Teils, dann nur die Bereiche (und das Profil oben) an Ort und Stelle neu zeichnen.
-  // Vorher wurde der ganze Screen neu aufgebaut und die Scroll-Stelle danach wiederhergestellt; auf dem iPad (Safari)
-  // sah man dabei kurz den Anfang der Seite (Flo 31.10.2026 abends: "auf dem iPad springt es immer noch nach oben").
-  ort.addEventListener('click', (ev) => {
+  const bereiche = () => [...ort.querySelectorAll(':scope > .sa-bereich'), ...(blatt ? blatt.huelle.querySelectorAll(':scope > .sa-bereich') : [])];
+
+  // Ausruesten per Tipp: wahl() des Teils, dann Bereiche (und das Profil oben) an Ort und Stelle neu zeichnen; das offene
+  // Blatt bekommt den neu gezeichneten Bereich
+  function beiWahl(ev) {
     const b = ev.target.closest('.sa-wahl');
     const teil = b && b.closest('.sa-teil');
     const ber = teil && teil.closest('.sa-bereich');
@@ -110,30 +123,89 @@ function zeigeIch(root, params = {}, app) {
     try { wahl.fn(); } catch (e) { console.error(e); return; }
     const name = teil.querySelector('.sa-text b')?.textContent || '';
     try { app.meldung?.(t(wahl.ab ? 'rahmen.sammlung.ausgeschaltet' : 'rahmen.sammlung.ausgeruestet', { name })); } catch (e) { /* egal */ }
-    aktiv = ber.dataset.bereich;
     zeichneNeu();
-  });
-  let alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
-  if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
+  }
+  ort.addEventListener('click', beiWahl);
+
   const stand = s.querySelector('.sa-stand');
   const zeigeStand = () => {
-    const teile = ort.querySelectorAll('.sa-teil');
-    const frei = ort.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length;
-    stand.textContent = teile.length ? t('rahmen.sammlung.stand', { frei, alle: teile.length }) : t('rahmen.sammlung.leer');
+    const alle = bereiche();
+    const teile = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil').length, 0);
+    const frei = alle.reduce((n, x) => n + x.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length, 0);
+    stand.textContent = teile ? t('rahmen.sammlung.stand', { frei, alle: teile }) : t('rahmen.sammlung.leer');
     // Fortschritt als Balken unter der Zeile (Flo 30.10.: "21 von 67" sichtbar machen)
-    stand.style.setProperty('--anteil', teile.length ? (frei / teile.length).toFixed(3) : '0');
+    stand.style.setProperty('--anteil', teile ? (frei / teile).toFixed(3) : '0');
   };
-  zeigeStand();
-  const zeigeBereich = () => {
-    for (const x of alle) x.hidden = x.dataset.bereich !== aktiv;
-    s.dataset.bereich = aktiv || '';
-  };
-  // Nach dem Ausruesten: Profil und Bereiche neu fuellen, die Hoehe haelt so lange, die Scroll-Stelle bleibt (im selben
-  // Durchlauf, vor dem naechsten Bild); keine Einflug-Bewegung
+
+  // ein Platz: Bild und Name des Getragenen, "frei / alle", Pfeil
+  function platzHtml(x, gross = false) {
+    const teile = [...x.querySelectorAll('.sa-teil')];
+    const frei = teile.filter((y) => y.dataset.zustand !== 'zu').length;
+    // ohne Getragenes (z. B. Emote-Sticker, alle zugleich im Rad): das erste freie Stueck und die ersten zwei Namen
+    const an = teile.find((y) => y.dataset.zustand === 'an');
+    const freie = teile.filter((y) => y.dataset.zustand === 'frei');
+    const vorne = an || freie[0];
+    const bild = vorne ? vorne.querySelector('.sa-bild') : null;
+    const kopie = bild ? bild.cloneNode(true) : null;
+    if (kopie) for (const sch of kopie.querySelectorAll('.sa-schild')) sch.remove();
+    const nameVon = (y) => y.querySelector('.sa-text b')?.textContent || '';
+    const anName = an ? nameVon(an) : freie.length ? freie.slice(0, 2).map(nameVon).join(', ') + (freie.length > 2 ? ' …' : '') : '';
+    const name = x.dataset.name || x.dataset.bereich;
+    const zahl = `${frei} / ${teile.length}`;
+    const label = t('rahmen.sammlung.platzLabel', { name, an: anName || t('rahmen.sammlung.nichts'), zahl });
+    if (gross) {
+      return `<button type="button" class="sa-gross" data-bereich="${esc(x.dataset.bereich)}" aria-haspopup="dialog" aria-label="${esc(label)}">
+        <span class="sa-gross-name">${esc(name)}</span><small class="zahl">${esc(zahl)}</small>${icon('pfeil')}</button>`;
+    }
+    return `<button type="button" class="sa-platz" data-bereich="${esc(x.dataset.bereich)}" aria-haspopup="dialog" aria-label="${esc(label)}">
+      <span class="sa-platz-bild" aria-hidden="true">${kopie ? kopie.innerHTML : ''}</span>
+      <span class="sa-platz-text"><b>${esc(name)}</b><span>${esc(anName || t('rahmen.sammlung.nichts'))}</span></span>
+      <small class="sa-platz-zahl zahl" aria-hidden="true">${esc(zahl)}</small>${icon('pfeil')}</button>`;
+  }
+  function zeichnePlaetze() {
+    const alle = bereiche();
+    const nachId = new Map(alle.map((x) => [x.dataset.bereich, x]));
+    const vergeben = new Set(GROSS);
+    const gruppen = PLAETZE.map((g) => ({ id: g.id, liste: g.bereiche.filter((id) => nachId.has(id)).map((id) => { vergeben.add(id); return nachId.get(id); }) }));
+    // Bereiche ohne festen Platz (z. B. Erfinder, Lobby-Musik): am Ende von "Am Brett"
+    gruppen[1].liste.push(...alle.filter((x) => !vergeben.has(x.dataset.bereich)));
+    const gross = GROSS.filter((id) => nachId.has(id)).map((id) => nachId.get(id));
+    platzOrt.innerHTML = gruppen.filter((g) => g.liste.length).map((g) => `<section class="sa-platz-gruppe" data-gruppe="${g.id}">
+        <h3 class="sa-platz-titel">${esc(t('rahmen.sammlung.' + g.id))}</h3>
+        <div class="sa-platz-liste">${g.liste.map((x) => platzHtml(x)).join('')}</div></section>`).join('')
+      + (gross.length ? `<div class="sa-gross-reihe">${gross.map((x) => platzHtml(x, true)).join('')}</div>` : '');
+  }
+  platzOrt.addEventListener('click', (ev) => {
+    const k = ev.target.closest('[data-bereich]');
+    if (k) oeffne(k.dataset.bereich);
+  });
+
+  // Blatt eines Bereichs: der Bereich wandert hinein, beim Schliessen zurueck nach .sa-ort
+  function oeffne(id) {
+    const x = [...ort.querySelectorAll(':scope > .sa-bereich')].find((y) => y.dataset.bereich === id);
+    if (!x) return;
+    const huelle = document.createElement('div');
+    huelle.className = 'sa-blatt-inhalt';
+    huelle.addEventListener('click', beiWahl);
+    x.hidden = false;
+    huelle.append(x);
+    blatt = { id, huelle };
+    s.dataset.bereich = id;
+    sheet({ titel: x.dataset.name || id, inhalt: huelle, klasse: 'sa-blatt', knoepfe: [{ text: t('rahmen.sammlung.fertig'), wert: true }], abbrechen: false })
+      .then(() => {
+        if (!blatt || blatt.huelle !== huelle) return;
+        for (const y of huelle.querySelectorAll(':scope > .sa-bereich')) { y.hidden = true; ort.append(y); }
+        blatt = null;
+        s.dataset.bereich = '';
+        zeichnePlaetze();
+        zeigeStand();
+      });
+  }
+
+  // Nach dem Ausruesten: Profil und Bereiche neu fuellen, die Scroll-Stelle bleibt; keine Einflug-Bewegung
   function zeichneNeu() {
     const rumpf = s.querySelector('.sa-rumpf');
     const oben = rumpf.scrollTop;
-    ort.style.minHeight = ort.offsetHeight + 'px';
     try { kopfOrt.verlasse(); } catch (e) { console.error(e); }
     try { gefuellt.verlasse(); } catch (e) { console.error(e); }
     const kopfEl = s.querySelector('.sa-kopf-ort');
@@ -142,33 +214,21 @@ function zeigeIch(root, params = {}, app) {
     try { kopfOrt = fuelle('ich:kopf', kopfEl, { app }); } catch (e) { console.error(e); kopfOrt = { anzahl: 0, verlasse() {} }; }
     kopfEl.hidden = !kopfOrt.anzahl;
     try { gefuellt = fuelle('sammlung:bereich', ort, { app }); } catch (e) { console.error(e); gefuellt = { anzahl: 0, verlasse() {} }; }
-    alle = [...ort.querySelectorAll(':scope > .sa-bereich')];
-    if (!alle.some((x) => x.dataset.bereich === aktiv)) aktiv = alle.length ? alle[0].dataset.bereich : null;
-    zeigeBereich();
+    for (const x of ort.querySelectorAll(':scope > .sa-bereich')) x.hidden = true;
+    if (blatt) {
+      const x = [...ort.querySelectorAll(':scope > .sa-bereich')].find((y) => y.dataset.bereich === blatt.id);
+      if (x) { x.hidden = false; blatt.huelle.replaceChildren(x); }
+    }
+    zeichnePlaetze();
     zeigeStand();
-    ort.style.minHeight = '';
     rumpf.scrollTop = oben;
   }
-  if (alle.length > 1) {
-    const seg = segment({ name: 'sa-bereich', label: t('rahmen.sammlung.bereiche'), wert: aktiv,
-      optionen: alle.map((x) => ({ id: x.dataset.bereich, text: x.dataset.name })),
-      beiWahl: (id) => {
-        aktiv = id;
-        zeigeBereich();
-        try { speichereModulEinstellungen(MODUL, { ...(ladeModulEinstellungen(MODUL, {}) || {}), bereich: id }); } catch (e) { /* Komfort */ }
-        const sichtbar = alle.find((x) => !x.hidden);
-        if (sichtbar && tempo() > 0) staffel(sichtbar.querySelectorAll('.sa-teil'), { d: 360, abstand: 25, von: 'translateY(8px)' });
-      } });
-    const steuer = s.querySelector('.sa-steuer');
-    steuer.append(seg.el);
-    wischKanten(steuer);
-    // Handy: die Leiste wischt waagrecht; der gewaehlte Reiter steht beim Oeffnen in der Mitte, nicht ausserhalb
-    requestAnimationFrame(() => {
-      const an = seg.el.querySelector('[aria-checked="true"]');
-      if (an && steuer.scrollWidth > steuer.clientWidth) steuer.scrollLeft = Math.max(0, an.offsetLeft - (steuer.clientWidth - an.offsetWidth) / 2);
-    });
-  }
-  zeigeBereich();
+
+  for (const x of ort.querySelectorAll(':scope > .sa-bereich')) x.hidden = true;
+  zeichnePlaetze();
+  zeigeStand();
+  s.dataset.bereich = '';
+  if (typeof params.bereich === 'string') requestAnimationFrame(() => oeffne(params.bereich));
   const oben = Number(params.oben);
   if (Number.isFinite(oben) && oben > 0) {
     const rumpf = s.querySelector('.sa-rumpf');
@@ -178,10 +238,11 @@ function zeigeIch(root, params = {}, app) {
   }
   if (tempo() > 0 && !params.ruhig) {
     kopfEintritt(s);
-    staffel(s.querySelectorAll('.seiten-kopf > *, .sa-stand, .sa-steuer'), { d: 520, v: 60, abstand: 50 });
+    staffel(s.querySelectorAll('.seiten-kopf > *, .sa-stand, .sa-platz-gruppe, .sa-gross-reihe'), { d: 520, v: 60, abstand: 50 });
   }
   return {
     verlasse() {
+      if (blatt) schliesseSheet();
       try { gefuellt.verlasse(); } catch (e) { console.error(e); }
       try { kopfOrt.verlasse(); } catch (e) { console.error(e); }
       kopf.verlasse();

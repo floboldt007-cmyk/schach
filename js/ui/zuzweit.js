@@ -3,7 +3,7 @@ import { Chess } from '../../vendor/chess/chess.js';
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
 import { anim } from '../bewegung.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { sanAnzeige } from '../review.js';
 import { sende } from '../ereignisse.js';
 import {
@@ -53,7 +53,7 @@ export function zeige(root, params, app) {
 }
 
 // Startblatt im Stil der Startseite (Handy-Runde 08.11.2026, Befund 3): Kopf mit Zurueck-Symbol, dunkle Buehne mit
-// beiden Koenigen (Figurensatz der App) und grossem "Los" oben, darunter Bedenkzeit als Pillen, "Brett drehen" als
+// beiden Koenigen (Figurensatz der App), darunter Bedenkzeit als Pillen, "Brett drehen" als
 // Schalter und die Namen eingeklappt (freiwillig). Alle Ziele mindestens 44 px. Die Leiste unten gehoert zur
 // Navigation (js/app.js) und fehlt hier bewusst.
 const ZEITEN = [['ohne', null], ['5', '5+0'], ['10', '10+0'], ['15', '15+10']];
@@ -72,7 +72,6 @@ function startblatt(root, app) {
           <small class="zz-ueber">${esc(Z('ueber'))}</small>
           <h2 class="zz-titel">${esc(Z('amBrett'))}</h2>
           <p class="zz-einleitung">${esc(Z('einleitung'))}</p>
-          <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
         </div>
       </div>
       <fieldset class="zz-zeiten"><legend>${esc(Z('bedenkzeit'))}</legend>
@@ -86,6 +85,7 @@ function startblatt(root, app) {
           <label>${esc(Z('nameSchwarz'))}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
         </div>
       </details>
+      <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
       <p class="zz-hinweis">${esc(Z('hinweis'))}</p>
     </form></div>`;
   root.append(s);
@@ -140,6 +140,7 @@ function partie(root, quelle, app, fortgesetzt) {
   let seit = gespeichertUhr && Number.isFinite(gespeichertUhr.seit) ? Math.min(Date.now(), gespeichertUhr.seit) : Date.now();
   let weg = false, fragt = false, gespeichert = null, drehenAnimation = null;
   let uhrTimer;
+  const gewarnt = {};   // Uhr-Warnung schon gespielt je Farbe
   const s = document.createElement('section');
   s.className = 'screen partie zz-screen'; s.dataset.modus = 'zuzweit';
   s.setAttribute('aria-label', Z('amBrett'));
@@ -187,6 +188,8 @@ function partie(root, quelle, app, fortgesetzt) {
       el.classList.toggle('laeuft', !!tempo && chess.turn() === f);
       el.classList.toggle('warn', !!tempo && ms < 20000);
       el.setAttribute('aria-label', `${name(f)}: ${uhrText(ms)}`);
+      // einmal je Seite, wenn ihre laufende Uhr unter 20 s faellt
+      if (tempo && ms < 20000 && chess.turn() === f && !gewarnt[f]) { gewarnt[f] = true; try { klang.spiele('uhr-warnung'); } catch (e) { /* still */ } }
     }
   }
   function zeichne(animieren = true) {
@@ -222,7 +225,7 @@ function partie(root, quelle, app, fortgesetzt) {
     queueMicrotask(() => {
       if (weg) return;
       brett.loescheNutzerPfeile(); zeichne();
-      if (!pruefeEnde()) { try { klang.spiele(chess.inCheck() ? 'schach' : m.captured ? 'schlagen' : 'zug'); } catch (e) { /* still */ } }
+      if (!pruefeEnde()) { try { klang.spiele(zugKlangName(m, chess.inCheck())); } catch (e) { /* still */ } }
     });
     return true;
   }
@@ -240,6 +243,8 @@ function partie(root, quelle, app, fortgesetzt) {
     z.phase = 'ende'; clearInterval(uhrTimer); brett.erlaubeZuege(null);
     app.schliesseDialog?.();
     const ergebnis = gewinner === 'w' ? 'sieg' : gewinner === 'b' ? 'niederlage' : 'remis';
+    // beide sitzen am selben Geraet: ein Sieg klingt fuer den Gewinner (Sieg-Klang), ein Remis wie ein Remis
+    try { klang.ende(gewinner ? true : null); } catch (e) { /* still */ }
     gespeichert = speicherePartie({ modus: 'zuzweit', zuzweit: namen, botId: null, spielerFarbe: 'w',
       zuege: z.zuege.slice(), san: z.san.slice(), zeiten: z.zeiten.slice(), tempo, gestartet, ergebnis, grund,
       hinweise: 0, zuruecknahmen: 0, liveKlassen: [], genauigkeit: null, genauigkeitBot: null });

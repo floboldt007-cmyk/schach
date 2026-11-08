@@ -59,27 +59,6 @@
 .lb-wert b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .lb-wert small { font-size: 12px; color: var(--text-3); }
 
-/* Online-Liga */
-.lb-liga-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.lb-liga-kopf > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.lb-beispiel { flex: none; padding: 3px 9px; border-radius: var(--r-pille); background: var(--flaeche-2); color: var(--text-2); font-size: 12px; font-weight: 800;
-  box-shadow: var(--kante); }
-.lb-tabelle { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.lb-tabelle li { display: grid; grid-template-columns: 26px 32px minmax(0, 1fr) 22px auto; align-items: center; gap: 10px; min-height: 44px; padding: 4px 12px 4px 10px;
-  border-radius: var(--r-m); background: var(--flaeche-2); box-shadow: inset 3px 0 0 transparent; }
-.lb-tabelle li[data-zone="auf"] { box-shadow: inset 3px 0 0 var(--gut); }
-.lb-tabelle li[data-du] { background: color-mix(in srgb, var(--akzent) 16%, var(--flaeche-2)); }
-.lb-platz { font-weight: 800; color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
-.lb-av { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; overflow: hidden; background: var(--flaeche);
-  box-shadow: var(--kante); font-weight: 800; font-size: 14px; color: var(--text-2); }
-.lb-av > svg, .lb-av > img { width: 100%; height: 100%; display: block; }
-.lb-name { font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-tabelle li[data-du] .lb-name { font-weight: 800; }
-.lb-zone { display: grid; place-items: center; }
-.lb-zone .ico { width: 16px; height: 16px; }
-.lb-tabelle li[data-zone="auf"] .lb-zone { color: var(--gut); transform: rotate(-90deg); }
-.lb-punkte { font-weight: 800; font-variant-numeric: tabular-nums; }
-
 /* Mehr Spielarten */
 .lb-mehr { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .lb-mehr-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }

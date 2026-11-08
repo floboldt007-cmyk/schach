@@ -145,10 +145,10 @@
       "art": "brett",
       "name": "Aurora",
       "seltenheit": "Episch",
-      "text": "Nordlicht zieht als Schleier ueber das Brett.",
+      "text": "Nordlicht zieht als Schleier um das Brett.",
       "datei": "assets/shop/bretter/aurora.svg",
-      "hell": "#DDE9F2",
-      "dunkel": "#263A5C",
+      "hell": "#E8F1F7",
+      "dunkel": "#1E3050",
       "rand": "#0D1626"
     },
     {
@@ -204,7 +204,7 @@
       "anlass": "sieg",
       "name": "Konfetti",
       "seltenheit": "Selten",
-      "text": "Bunte Schnipsel regnen ueber das Brett.",
+      "text": "Goldene Schnipsel regnen ueber das Brett.",
       "datei": "assets/shop/effekte/konfetti.svg"
     },
     {

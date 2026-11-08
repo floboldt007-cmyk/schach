@@ -68,7 +68,9 @@ try {
       return antwort(p && (!seit || p.aktualisiert_am > seit) ? [p] : []);
     }
     const rpc = url.pathname.split('/').at(-1), p = partien.get(body.partie);
-    if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 0, kronen: 0, platz: null, ziel: null, n: 30, woche: '2026-11-02' })
+    // Gegnersuche (js/kronen.js): niemand da, die Suche wartet; "Gleich gegen die KI" beendet sie mit ki false
+    if (rpc === 'online_suche_start' || rpc === 'online_suche_stand' || rpc === 'online_suche_ende') return antwort({});
+    if (rpc === 'kronen_mein_stand') return ligaDa ? antwort({ stufe: 7, kronen: 140, platz: 3, ziel: 120, n: 30, woche: '2026-11-02' })
       : route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }) });
     if (rpc === 'online_meine') return antwort([...partien.values()].filter(p => p.status !== 'beendet'));
     if (rpc === 'online_erstelle') {
@@ -145,13 +147,17 @@ try {
   const eingeladen = partie({ status: 'offen' }); eingeladen.weiss = 'u2'; eingeladen.erstellt_von = 'u2';
   await seite.goto(start + '#online/abc234');
   await knopf('konto').waitFor();
-  pruefe('Ohne Anmeldung: Titel Online, zwei erklaerende Karten (Gegnersuche, Freunde), Konto anlegen', await seite.evaluate(() => ({
+  // Flo 08.11.2026 (Konzept 1 A): ohne Konto dieselben zwei Tueren, aber nur als Erklaerung: kein Knopf, kein Schatten
+  // (Befund V 6: vorher sahen die Karten tippbar aus); der einzige Knopf ist "Konto anlegen"
+  pruefe('Ohne Anmeldung: Titel Online, zwei erklaerende Tueren (Partie, Raetsel-Duell) ohne Knopf und Schatten, Konto anlegen', await seite.evaluate(() => ({
     titel: document.querySelector('.online-screen .seiten-kopf h1')?.textContent,
     karten: [...document.querySelectorAll('.online-screen .on-art')].map((k) => k.dataset.art).join(),
+    knoepfeInTueren: document.querySelectorAll('.online-screen .on-art button').length,
+    schatten: [...document.querySelectorAll('.online-screen .on-art')].map((k) => getComputedStyle(k).boxShadow).filter((x) => x !== 'none').length,
     knopf: document.querySelector('[data-online="konto"]')?.textContent.trim(),
     zurueck: !!document.querySelector('.online-screen .kopf-zurueck'),
-    alt: !!document.querySelector('[data-online="training"]') })).then((r) => r.titel === 'Online' && r.karten === 'suche,freunde'
-      && r.knopf === 'Konto anlegen' && r.zurueck && !r.alt));
+    alt: !!document.querySelector('[data-online="training"]') })).then((r) => r.titel === 'Online' && r.karten === 'partie,duell'
+      && r.knoepfeInTueren === 0 && r.schatten === 0 && r.knopf === 'Konto anlegen' && r.zurueck && !r.alt));
   pruefe('Ohne Anmeldung: Hinweis und gemerkter Link, keine Server-Anfrage', (await seite.locator('.online-screen').innerText()).includes('Anmelden geht mit einem Code per E-Mail')
     && await seite.evaluate(() => localStorage.getItem('schach-arena:online:einladung') === 'ABC234') && calls.length === 0);
   await knopf('konto').click(); await seite.locator('.konto-email').fill('spieler@example.invalid');
@@ -163,11 +169,11 @@ try {
   await seite.getByRole('button', { name: 'Zur Einladung', exact: true }).click();
   await seite.locator('[name="code"]').waitFor();
   pruefe('Einladung nach echter Code-Anmeldung wieder angeboten', await seite.locator('[name="code"]').inputValue() === 'ABC234');
-  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="suche"]')?.dataset.zustand === 'bald').catch(() => {});
-  pruefe('Ohne Liga auf dem Server: Gegnersuche ruhig "kommt bald", ohne Suchknopf, ohne Fehlermeldung', await seite.evaluate(() => {
-    const k = document.querySelector('.on-art[data-art="suche"]');
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bald').catch(() => {});
+  pruefe('Ohne Liga auf dem Server: Gegnersuche ruhig "kommt bald", ohne Suchknopf, ohne Fehlermeldung, ohne Liga-Streifen', await seite.evaluate(() => {
+    const k = document.querySelector('.on-art[data-art="partie"]');
     return k?.dataset.zustand === 'bald' && /kommt bald/.test(k.textContent) && k.querySelector('[data-online="suchen"]').hidden
-      && k.querySelector('.on-zeiten').hidden && document.querySelector('.on-meldung').hidden;
+      && k.querySelector('.on-zeiten').hidden && document.querySelector('.on-meldung').hidden && document.querySelector('.on-liga').hidden;
   }));
   await seite.getByRole('button', { name: 'Beitreten', exact: true }).click(); await bereit();
   pruefe('Beitritt: eigene schwarze Seite unten, Merker geloescht', await seite.evaluate(() => window.__online.brett().ausrichtung === 'b' && !localStorage.getItem('schach-arena:online:einladung')));
@@ -361,15 +367,57 @@ try {
   pruefe('Training und Einladungsformular: Farbe und 15+10 an den Server', calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.bedenkzeit_s === 900
     && calls.filter(c => c.pfad.endsWith('online_erstelle')).at(-1)?.body.inkrement_s === 10);
   ligaDa = true;
+  // ohne gemerkte Einladung bleibt die Freunde-Zeile zu (so sieht ein Spieler die Seite normalerweise)
+  await seite.evaluate(() => localStorage.removeItem('schach-arena:online:einladung'));
   await seite.evaluate(() => window.__app.gehe('online'));
-  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="suche"]')?.dataset.zustand === 'bereit').catch(() => {});
+  await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit').catch(() => {});
   pruefe('Mit Liga auf dem Server: Gegnersuche mit drei Bedenkzeiten und Suchknopf', await seite.evaluate(() => {
-    const k = document.querySelector('.on-art[data-art="suche"]');
+    const k = document.querySelector('.on-art[data-art="partie"]');
     return k?.dataset.zustand === 'bereit' && !k.querySelector('[data-online="suchen"]').hidden && !k.querySelector('.on-zeiten').hidden
       && k.querySelectorAll('.on-zeiten [data-zeit]').length === 3 && k.querySelector('.on-zeiten [aria-checked="true"]')?.dataset.zeit === '3+2';
   }));
   await seite.locator('.on-zeiten [data-zeit="10+0"]').click();
   pruefe('Bedenkzeit waehlbar (genau eine gewaehlt)', await seite.evaluate(() => [...document.querySelectorAll('.on-zeiten [aria-checked="true"]')].map((b) => b.dataset.zeit).join() === '10+0'));
+  // Handybreite (Lehre aus Auftrag V: die Online-Pruefung lief nur auf 1180 px). iPhone 13, hell und dunkel: Liga-Streifen,
+  // zwei Tueren, jeder Suchen-Knopf traegt "gewertet", Freunde-Zeile; alles ohne Scrollen und ohne Beispiel-Liga.
+  for (const modus of ['hell', 'dunkel']) {
+    await seite.setViewportSize({ width: 390, height: 844 }); await seite.evaluate(m => window.__app.setzeEinstellungen({ modus: m }), modus);
+    await seite.evaluate(() => window.__app.gehe('online'));
+    await seite.waitForFunction(() => document.querySelector('.on-art[data-art="partie"]')?.dataset.zustand === 'bereit' && !document.querySelector('.on-liga').hidden);
+    const handy = await seite.evaluate(() => {
+      const rumpf = document.querySelector('.online-screen .on-rumpf');
+      const leiste = document.querySelector('.reiter-leiste');
+      const unten = leiste && leiste.getClientRects().length ? leiste.getBoundingClientRect().top : innerHeight;
+      const zeile = document.querySelector('.on-freunde-zeile').getBoundingClientRect();
+      const knoepfe = [...document.querySelectorAll('.on-tuer-knopf')].map((b) => b.textContent.trim());
+      return { scroll: rumpf.scrollHeight - rumpf.clientHeight, quer: document.documentElement.scrollWidth <= innerWidth,
+        freundeSichtbar: zeile.bottom <= unten + 1, knoepfe, gewertet: knoepfe.length === 2 && knoepfe.every((t) => /gewertet/.test(t)),
+        freundeZu: !document.querySelector('.on-freunde').open, liga: document.querySelector('.on-liga').textContent.replace(/\s+/g, ' ').trim(),
+        beispiel: /Beispiel|Turmfalke|Rochade77/.test(document.querySelector('.online-screen').textContent),
+        klein: [...document.querySelectorAll('.online-screen .on-inhalt button, .online-screen .on-freunde-zeile')].filter((b) => b.getClientRects().length && b.getBoundingClientRect().height < 44).map((b) => b.className) };
+    });
+    pruefe(`iPhone 13 ${modus}: Online passt ohne Scrollen (Liga-Streifen, zwei Tueren, Freunde-Zeile), Suchen-Knoepfe "gewertet", keine Beispiel-Liga`,
+      handy.scroll <= 1 && handy.quer && handy.freundeSichtbar && handy.gewertet && handy.freundeZu && /Platz 3 von 30/.test(handy.liga) && /140/.test(handy.liga)
+      && !handy.beispiel && handy.klein.length === 0, handy);
+    if (process.env.BILDER) await seite.screenshot({ path: path.join(process.env.BILDER, `online-tueren-390-${modus}.png`) });
+  }
+  // Gegnersuche Partie (Konzept 3 A): Ring mit Restzeit, "Gleich gegen die KI" startet ohne Server eine Uebungspartie
+  await seite.evaluate(() => { window.__onlineBotMs = 60000; });
+  await seite.locator('.on-zeiten [data-zeit="10+0"]').click();
+  await knopf('suchen').click();
+  await seite.locator('.on-suche:not([hidden])').waitFor();
+  await seite.waitForTimeout(1300);
+  const suchend = await seite.evaluate(() => ({ rest: document.querySelector('.on-rest').textContent, kopfWeg: document.querySelector('.on-art[data-art="partie"] .on-tuer-kopf').hidden,
+    ring: Number(document.querySelector('.on-ring-rest').getAttribute('stroke-dashoffset')), hinweis: document.querySelector('.on-ki-hinweis').textContent }));
+  pruefe('Suche: Restzeit zaehlt sichtbar herunter (Satz und Ring), "zaehlt nicht fuer die Liga" steht am KI-Knopf', /^Noch 5[89] s/.test(suchend.rest)
+    && suchend.ring > 0 && suchend.kopfWeg && /nicht für die Liga/.test(suchend.hinweis), suchend);
+  await knopf('ki-jetzt').click();
+  await seite.waitForFunction(() => location.hash.startsWith('#partie'));
+  const geschaut = await seite.evaluate(() => history.state?.params || null);
+  pruefe('"Gleich gegen die KI": Suche beim Server beendet (ki false), Uebungspartie mit 10+0 gegen einen Bot, ohne KI-Beleg',
+    calls.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === false) && !calls.some((c) => c.pfad.endsWith('online_suche_ende') && c.body.ki === true)
+    && geschaut?.modus === 'uebung' && geschaut?.tempo?.grund === 600 && !geschaut?.ki && !!geschaut?.botId, geschaut);
+  await seite.evaluate(() => { delete window.__onlineBotMs; });
   pruefe('Keine Seitenfehler oder unerwarteten API-Aufrufe', !fehler.length && !unerwartet.length, { fehler, unerwartet });
 } catch (e) { pruefe('Ablauf ohne Abbruch', false, e.stack); }
 finally { await kontext?.close(); await browser?.close(); await new Promise(r => server.close(r)); }

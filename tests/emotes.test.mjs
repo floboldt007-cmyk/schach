@@ -71,13 +71,13 @@ pruefe('Handy und reduzierte Bewegung sind gestaltet', /max-width: 420px/.test(c
   const a = kreaturSvg('glimm', 'normal'); const b = kreaturSvg('glimm', 'normal');
   pruefe('Jedes Bild hat eigene Verlaufs-Ids (zwei Glimm auf einer Seite stoeren sich nicht)', ids(a).length === 2 && ids(a).every((i) => !ids(b).includes(i)) && ids(a).every((i) => a.includes(`url(#${i})`)));
   pruefe('Kein Spott-Ausdruck bei den Kreaturen, unbekannte Kreatur ergibt kein Bild', !KREATUR_ARTEN.some((x) => /lach|wein|gaehn|spott/.test(x)) && kreaturSvg('drache') === '');
-  pruefe('Kreatur zeigt Hallo, Staunen, Nachdenken und Gut gespielt; Id, Text und Bot-Antwort bleiben die des Emotes',
-    Object.keys(KREATUR_EMOTES).join() === 'hallo,staunen,denken,gut' && Object.keys(KREATUR_EMOTES).every((id) => EMOTES.some(([e]) => e === id) && ARTEN['emote.' + id])
+  pruefe('Kreatur zeigt Hallo, Staunen, Nachdenken und Respekt (Verbeugung); Id, Text und Bot-Antwort bleiben die des Emotes',
+    Object.keys(KREATUR_EMOTES).join() === 'hallo,staunen,denken,respekt' && Object.keys(KREATUR_EMOTES).every((id) => EMOTES.some(([e]) => e === id) && ARTEN['emote.' + id])
     && Object.values(KREATUR_EMOTES).every((x) => KREATUR_ARTEN.includes(x)));
   pruefe('Labor: nur das Erfinder-Konto bekommt die Kreatur', kreaturAktiv({ kreatur: 'karo' }, true) === 'karo' && kreaturAktiv({ kreatur: 'karo' }, false) === null && kreaturAktiv({ kreatur: null }, true) === null);
   const rad = radEintraege('glimm');
-  pruefe('Rad mit Kreatur: acht Eintraege, die Kreatur vorn (Hallo, Staunen, Nachdenken, Gut gespielt), danach die Strichsymbole',
-    rad.length === 8 && rad.slice(0, 4).map((e) => e.id).join() === 'hallo,staunen,denken,gut' && rad.slice(0, 4).every((e) => e.kreatur && /data-kreatur="glimm"/.test(e.svg))
+  pruefe('Rad mit Kreatur: acht Eintraege, die Kreatur vorn (Hallo, Staunen, Nachdenken, Respekt), danach die Strichsymbole',
+    rad.length === 8 && rad.slice(0, 4).map((e) => e.id).join() === 'hallo,staunen,denken,respekt' && rad.slice(0, 4).every((e) => e.kreatur && /data-kreatur="glimm"/.test(e.svg))
     && rad.slice(4).every((e) => !e.kreatur && !/kreatur/.test(e.svg)) && rad.every((e) => e.schluessel === 'emote.' + e.id && e.text === t('p-emotes.emote.' + e.id)), rad.map((e) => e.id));
   pruefe('Rad ohne Kreatur wie bisher', radEintraege(null).map((e) => e.id).join() === EMOTES.map((e) => e[0]).join() && radEintraege(null).every((e) => !e.kreatur));
   pruefe('Kreaturen bewegen sich nur, wo es passt: still bei reduzierter Bewegung und gedaempft, im Rad erst beim Zeigen',
@@ -238,7 +238,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -508,7 +508,7 @@ async function kreaturTeil(browser) {
   await seite.locator('.em-aktion[data-emote-aktion="emotes"]').click({ timeout: 5000 });
   const rad = await seite.evaluate(() => [...document.querySelectorAll('.em-popup .em-wahl')].map((b) => b.dataset.wert + (b.classList.contains('em-kreatur') ? ':' + (b.querySelector('svg.kreatur') || { dataset: {} }).dataset.art : '')));
   pruefe('Browser Labor: im Rad steht Kronli vorn (winken, staunen, denken, verbeugen), danach die Strichsymbole',
-    rad.slice(0, 4).join() === 'hallo:winken,staunen:staunen,denken:denken,gut:verbeugen' && rad.length === 8 && rad.slice(4).every((x) => !x.includes(':')), rad);
+    rad.slice(0, 4).join() === 'hallo:winken,staunen:staunen,denken:denken,respekt:verbeugen' && rad.length === 8 && rad.slice(4).every((x) => !x.includes(':')), rad);
   await seite.locator('.em-popup .em-wahl[data-wert="hallo"]').click({ timeout: 5000 });
   await warte(200);
   const blase = await seite.evaluate(() => { const k = document.querySelector('.em-blase.em-eigen svg.kreatur'); return k ? { art: k.dataset.art, anim: getComputedStyle(k).animationName, b: Math.round(k.getBoundingClientRect().width) } : null; });

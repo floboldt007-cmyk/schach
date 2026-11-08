@@ -172,7 +172,7 @@ async function browserTeil() {
   const server = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: WURZEL, stdio: 'ignore' });
   let browser;
   try {
-    for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
+    for (let i = 0; i < 60; i++) { try { const r = await fetch(`http://127.0.0.1:${PORT}/index.html`); await r.arrayBuffer(); if (r.ok) break; } catch (e) { /* noch nicht */ } await warte(150); }
     browser = await browserTyp(pw).launch();
     // abgemeldet: Satz, Weg zum Konto, Codes offen, keine Anfrage
     let p = await seiteMit(browser);

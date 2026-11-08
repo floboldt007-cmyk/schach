@@ -90,6 +90,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await new Promise((r) => setTimeout(r, 150));
@@ -288,7 +289,7 @@ async function testeArena(seite, h) {
   pruefe('Kopf-Chips 0/90 und 0/30', /0\s*\/ 90/.test(await seite.locator('.kopf .chip').first().innerText()) && /0\s*\/ 30/.test(await seite.locator('.kopf .chip').nth(1).innerText()));
   pruefe('Kopfzeile: "Fünf Welten, 30 Bots"', /Fünf Welten, 30 Bots/.test(await seite.locator('.kopf').innerText()));
   pruefe('Panel zeigt Willi', /Vogelscheuche Willi/.test(await seite.locator('.detail h2').innerText()));
-  pruefe('Panel: drei Merkmal-Kacheln', await seite.locator('.detail .merkmal').count() === 3);
+  pruefe('Panel (Variante A): kein Steckbrief, keine Bilanz', await seite.locator('.detail .merkmal, .detail .bilanz').count() === 0);
   pruefe('Panel: drei Stern-Ziele', await seite.locator('.detail .ziel-sterne > div').count() === 3);
   pruefe('Panel: Begrüßung als Sprechblase', (await seite.locator('.detail .sprechblase').innerText()).length > 5);
 
@@ -1443,19 +1444,20 @@ async function testeErweiterungen(browser) {
     const botOrt = d.querySelector('.ort-panel-bot');
     return {
       kopf: chips.length === 3 && chips[2].matches('.w0-test[data-ort="arena:kopf"]') && chips[0].matches('.chip') && chips[1].matches('.chip'),
-      oben: d.firstElementChild === oben && !oben.hidden && !!oben.querySelector('.w0-test[data-ort="arena:panel-oben"]'),
-      bot: !!botOrt && !botOrt.hidden && botOrt.previousElementSibling.matches('.ziel-sterne') && !!botOrt.querySelector('.w0-test[data-ort="arena:panel-bot"]'),
+      // Variante A (08.11.2026): panel-oben (nur noch Nachlese) und panel-bot werden nicht gefuellt
+      oben: d.firstElementChild === oben && !oben.querySelector('.w0-test[data-ort="arena:panel-oben"]'),
+      bot: !botOrt && !d.querySelector('.w0-test[data-ort="arena:panel-bot"]'),
       blase: d.querySelector('.sprechblase').textContent,
       start: window.__w0.start,
       kontexte: window.__w0.kontexte,
     };
   });
   pruefe('Ort arena:kopf: nach den zwei Chips', arena.kopf);
-  pruefe('Ort arena:panel-oben: ganz oben im Panel', arena.oben);
-  pruefe('Ort arena:panel-bot: nach den Stern-Zielen', arena.bot);
+  pruefe('Variante A: Ort arena:panel-oben ohne Host (der Behaelter oben traegt nur die Nachlese)', arena.oben);
+  pruefe('Variante A: Ort arena:panel-bot ohne Host', arena.bot);
   pruefe('Aufruf-Ort arena:start mit kontext { app, karte, neuId, s, scrolleZu }', JSON.stringify(arena.start) === '["app","karte","neuId","s","scrolleZu"]', JSON.stringify(arena.start));
-  pruefe('Kontexte arena:kopf / panel', JSON.stringify(arena.kontexte['arena:kopf']) === '["app","fortschritt"]'
-    && JSON.stringify(arena.kontexte['arena:panel-oben']) === '["app","bot","fortschritt"]', JSON.stringify(arena.kontexte));
+  pruefe('Kontexte arena:kopf; panel-oben wird nicht gerufen', JSON.stringify(arena.kontexte['arena:kopf']) === '["app","fortschritt"]'
+    && !arena.kontexte['arena:panel-oben'], JSON.stringify(arena.kontexte));
   pruefe('Wahl-Ort partie:begruessung? auch im Arena-Panel (mit Platzhalter)', /Hallo Flo, schön dich zu sehen!/.test(arena.blase), arena.blase);
 
   // Wertende Partie (Schaefermatt) mit Hinweis und Zuruecknahme
@@ -1605,9 +1607,10 @@ async function testeErweiterungen(browser) {
   const nl = await seite.evaluate(() => {
     const n = document.querySelector('.detail .ort-panel-oben .nachlese');
     return n ? { titel: n.querySelector('.nl-titel').textContent, zeilen: [...n.querySelectorAll('.nl-zeile b')].map((b) => b.textContent),
-      vorDemOrt: n.parentElement.firstElementChild === n && !!n.parentElement.querySelector('.w0-test') && !!n.parentElement.querySelector('.liga-karte') } : null;
+      // Variante A (08.11.2026): oben steht nur noch die Nachlese, keine Paket-Zeile und keine Liga-Karte
+      vorDemOrt: n.parentElement.firstElementChild === n && !n.parentElement.querySelector('.w0-test') && !n.parentElement.querySelector('.liga-karte') } : null;
   });
-  pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, vor den Paketen', nl && /Seit deiner letzten Partie/.test(nl.titel)
+  pruefe('Nachlese oben im Arena-Panel „Seit deiner letzten Partie“, allein (Variante A)', nl && /Seit deiner letzten Partie/.test(nl.titel)
     && JSON.stringify(nl.zeilen) === '["GROSS B","Zeile E"]' && nl.vorDemOrt, JSON.stringify(nl));
   await seite.evaluate(() => window.__app.gehe('verlauf'));
   await seite.waitForSelector('.screen.vl-screen');
@@ -1616,7 +1619,8 @@ async function testeErweiterungen(browser) {
   pruefe('Nachlese nur einmal', await seite.locator('.detail .nachlese').count() === 0);
   await h.tippe('.knoten[data-bot="hilde"]');
   await h.tippe('.knoten[data-bot="benno"]');
-  pruefe('Panel neu gezeichnet: Orte je einmal', await seite.locator('.detail .w0-test').count() === 2);
+  pruefe('Panel neu gezeichnet: keine Paket-Elemente im Panel (Variante A), der Kopf-Ort genau einmal', await seite.locator('.detail .w0-test').count() === 0
+    && await seite.locator('.kopf-chips .w0-test').count() === 1);
 
   // Uebungs-Partie: keine Sterne, Chip, Kopf, Knoepfe, extra ueber die Buehne
   gruppe = 'Erweiterungen: Übung';
@@ -2228,25 +2232,15 @@ async function testeSpielFundament(browser) {
     const h = hilfen(seite, { touch: true });
     await seite.goto(BASIS + '#arena');
     await seite.waitForSelector('.screen.arena .detail');
-    pruefe('Heute-Karte ohne Paket: versteckt (kein Pixel anders)', await seite.evaluate(() => {
-      const k = document.querySelector('.arena .detail > .heute-karte');
-      return !!k && k.hidden && getComputedStyle(k).display === 'none' && k.previousElementSibling.matches('.ort-panel-oben');
-    }));
+    pruefe('Variante A: keine Heute-Karte im Bots-Panel', await seite.evaluate(() => !document.querySelector('.arena .detail .heute-karte')));
     await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
     await seite.goto(MIT_W0PLUS('wpheute&wpleiste&wpabr') + '#arena');
-    await seite.waitForSelector('.screen.arena .detail .wp-heute');
-    const heute = await seite.evaluate(() => {
-      const k = document.querySelector('.arena .detail > .heute-karte');
-      return { sichtbar: !k.hidden, kopf: k.querySelector('.hk-kopf').textContent, zeile: !!k.querySelector('.ort-heute > .wp-heute'),
-        nachOben: k.previousElementSibling.matches('.ort-panel-oben'), kontext: window.__wp.kontexte['arena:heute'], tag: window.__wp.tag };
-    });
-    const tage = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-    pruefe('arena:heute: Heute-Karte nach .ort-panel-oben, Kopf "Heute · Wochentag", Zeile des Pakets', heute.sichtbar && heute.zeile && heute.nachOben
-      && /^Heute · (Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag)$/.test(heute.kopf), JSON.stringify(heute));
-    pruefe('arena:heute: Kontext { app, bot, fortschritt, tag, woche }, Wochentag passt zum Tag', JSON.stringify(heute.kontext) === '["app","bot","fortschritt","tag","woche"]'
-      && /^\d{4}-\d\d-\d\d$/.test(heute.tag) && heute.kopf.endsWith(tage[(new Date(heute.tag + 'T12:00:00').getDay() + 6) % 7]), JSON.stringify(heute));
+    await seite.waitForSelector('.screen.arena .knoten');
+    await warte(600);
     await seite.locator('.arena .knoten[data-bot="benno"]').click();
-    pruefe('arena:heute: bei jeder Botwahl neu gefüllt (genau eine Zeile)', await seite.locator('.arena .detail .wp-heute').count() === 1);
+    await warte(400);
+    pruefe('Variante A: arena:heute hat keinen Host, die Zeile des Pakets erscheint nirgends und der Anbieter wird nicht gerufen',
+      await seite.locator('.wp-heute').count() === 0 && await seite.evaluate(() => !window.__wp.kontexte['arena:heute']));
 
     // Partie: Gegner-Leiste, Plaetze, abgelehnter Zug
     await seite.evaluate(() => localStorage.removeItem('schach-arena:v1:laufend'));
@@ -2560,7 +2554,7 @@ async function testeSpielFundament(browser) {
       const { kontext, seite, fehler } = await neueSeite(browser, { w: vp.w, h: vp.h, touch: true, handy: !!vp.handy });
       await seite.route('**/js/pakete/w0plus-test/index.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: TEST_PAKET_W0PLUS }));
       await seite.goto(MIT_W0PLUS('wpheute&reiter=bestenliste,ich') + '#arena');
-      await seite.waitForSelector('.screen.arena .detail .wp-heute');
+      await seite.waitForSelector('.screen.arena .detail [data-aktion="spielen"]');
       await warte(400);
       const r = await seite.evaluate(() => {
         const leiste = document.querySelector('.reiter-leiste').getBoundingClientRect();
@@ -3822,7 +3816,8 @@ async function testeU7(browser) {
       const fest = await seite.evaluate(() => { const k = document.querySelector('.ergebnis-karte').getBoundingClientRect();
         const l = document.querySelector('.erg-lobby').getBoundingClientRect(); const a = document.querySelector('.erg-aktionen');
         return { pos: getComputedStyle(a).position, lobbyImBild: l.height >= 44 && l.top >= k.top && l.bottom <= k.bottom + 1 && l.bottom <= innerHeight }; });
-      pruefe('Handy: Knopfleiste fest unten, „Zur Lobby“ ohne Scrollen zu sehen', fest.pos === 'sticky' && fest.lobbyImBild, JSON.stringify(fest));
+      pruefe('Handy: Knopfleiste fest unten, „Zu den Bots“ ohne Scrollen zu sehen', fest.pos === 'sticky' && fest.lobbyImBild
+        && (await seite.locator('.erg-lobby').innerText()).trim() === 'Zu den Bots', JSON.stringify(fest));
     }
     await bild(seite, `u7-ergebnis-sieg-${g.w}x${g.h}`);
     await h.tippe('.ergebnis-overlay .erg-zu');

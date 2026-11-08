@@ -96,16 +96,18 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
 const e0 = teileErfolge(leer, NULL_STAND);
-pruefe('Eigenes Bild: alle 28 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
-  new Set(e0.map((x) => ohneIds(x.bild))).size === e0.length && e0.every((x) => /class="sk-erfolg"/.test(x.bild)));
+// Saison-Liga beendet (Flo 08.11.2026, "Unerreichte ausblenden"): Liga-Erfolge zeigt die Sammlung nur, wenn erspielt
+const eL = teileErfolge(leer, { ...NULL_STAND, ligaBest: 6 });
+pruefe('Eigenes Bild: alle 28 Erfolge verschieden (mit erspielter Liga), keiner mit dem alten Sammel-Stern', eL.length === 28
+  && new Set(eL.map((x) => ohneIds(x.bild))).size === eL.length && eL.every((x) => /class="sk-erfolg"/.test(x.bild)));
 const rang = { frei: 0, selten: 1, episch: 2, legende: 3 };
-const sel = (id) => rang[e0.find((x) => x.id === 'erfolg-' + id).seltenheit];
+const sel = (id) => rang[eL.find((x) => x.id === 'erfolg-' + id).seltenheit];
 pruefe('Erfolge gestaffelt: je schwerer, desto seltener (erster Sieg < Welt 1 < Welt 3 < Welt 5, Liga 1 < 3 < 6, Serie 7 < 30 < 100)',
   sel('erster-sieg') < sel('welt-1') && sel('welt-1') < sel('welt-3') && sel('welt-3') < sel('welt-5')
   && sel('liga-1') < sel('liga-3') && sel('liga-3') < sel('liga-6') && sel('serie-7') < sel('serie-30') && sel('serie-30') < sel('serie-100'));
-pruefe('Erfolge ohne Partie: 28 (Bots, Liga, Serie, Level, Partien), ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 28
-  && !e0.some((x) => /^erfolg-schule-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
-  && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt' && e0.find((x) => x.id === 'erfolg-liga-1').zeile === 'Erreiche Liga Bronze');
+pruefe('Erfolge ohne Partie: 22 (Bots, Serie, Level, Partien), keine unerreichte Liga, ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 22
+  && !e0.some((x) => /^erfolg-(schule|liga)-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
+  && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt');
 const welt1 = BOTS.filter((b) => b.welt === 1);
 const f1 = { bots: Object.fromEntries(welt1.map((b, i) => [b.id, { sterne: [true, i === 0, i === 0] }])) };
 const e1 = teileErfolge(f1, { ligaBest: 2, serieBest: 7, level: 12 });
@@ -115,14 +117,14 @@ pruefe('Erfolge nach Welt 1: erster Sieg, drei Sterne, Welt 1 frei; Welt 2 und a
 const alle = e1.find((x) => x.id === 'erfolg-alle-bots');
 pruefe('Fortschritt ehrlich: 6 von 30 Bots (0,2), Sterne nach Zahl', alle.zeile === '6 von 30 besiegt' && Math.abs(alle.fortschritt - 0.2) < 1e-9
   && e1.find((x) => x.id === 'erfolg-alle-sterne').zeile === `8 von ${BOTS.length * 3} Sternen`);
-pruefe('Erfolge Liga, Serie, Level: Bronze und Silber, 7 Tage, Level 10 frei; Gold, 30 Tage, Level 20 mit Weg',
-  frei('erfolg-liga-1') && frei('erfolg-liga-2') && !frei('erfolg-liga-3') && frei('erfolg-serie-7') && !frei('erfolg-serie-30')
+pruefe('Erfolge Liga, Serie, Level: Bronze und Silber, 7 Tage, Level 10 frei; Gold gar nicht da (Saison-Liga beendet); 30 Tage, Level 20 mit Weg',
+  frei('erfolg-liga-1') && frei('erfolg-liga-2') && !e1.some((x) => x.id === 'erfolg-liga-3') && frei('erfolg-serie-7') && !frei('erfolg-serie-30')
   && frei('erfolg-level-10') && !frei('erfolg-level-20') && e1.find((x) => x.id === 'erfolg-serie-30').zeile === 'Längste Serie: 7 von 30 Tagen');
 // Rahmen: frei ueber denselben Erfolg; ohne und Holz immer, Blatt 0 nur mit Sonderstueck
 const r1 = rahmenTeile(e1);
 const rf = (id) => r1.find((r) => r.id === id);
-pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga Gold mit Weg, kein Blatt 0 ohne Sonderstueck',
-  rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3').frei && rf('liga-3').weg === 'Erreiche Liga Gold'
+pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga Gold ausgeblendet, kein Blatt 0 ohne Sonderstueck',
+  rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3')
   && !rf('welt-2').frei && !r1.some((r) => r.id === 'erfinder-blatt-0'), r1.map((r) => r.id + (r.frei ? '+' : '-')).join());
 pruefe('Profil: Standard Bauer (der Koenig gehoert dem Erfinder), Standard-Hintergrund, ohne Rahmen, leere Vitrine',
   JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null], titel: null, banner: 'start' })
@@ -198,8 +200,8 @@ pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen
   pruefe('Partien-Archiv: Uebungs- und Zu-zweit-Partien zaehlen nicht', partienStand([{ ...p(20, 'sieg', 'b'), modus: 'uebung' }]).beste === 0);
   const titelNeu = ERFOLGS_TITEL.filter((x) => /^(schwarz-sieg|siegesserie-5|endgegner|siege-100|alle-endgegner|schule-)/.test(x.erfolg));
   pruefe('Neue Titel zu den neuen Errungenschaften (Schattenkoenig, Siegeszug, Bezwinger ...), die der Meisterschule nur im Labor',
-    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 2
-    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length
+    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 3
+    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 1
     && titelListe({ erfolge: e2 }).find((x) => x.id === 'erfolg-schattenkoenig').frei);
 }
 
@@ -218,7 +220,7 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
   const lv = l.filter((x) => x.art === 'level');
   const ef = l.filter((x) => x.art === 'erfolg');
   pruefe('Titel: alle Level-Titel (frei nach Level) und je ein Erfolgs-Titel, ohne Erfinder kein Erfinder-Titel',
-    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor).length && !l.some((x) => x.art === 'erfinder'),
+    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor && !x.nurErspielt).length && !l.some((x) => x.art === 'erfinder'),
     l.map((x) => x.id + (x.frei ? '+' : '-')).join());
   pruefe('Titel: Erfolgs-Titel frei mit dem Erfolg, sonst mit Weg und Fortschritt',
     ef.find((x) => x.id === 'erfolg-feuertaufe').frei && !ef.find((x) => x.id === 'erfolg-goldene-aehre').frei
@@ -273,8 +275,20 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
   merkeErspielteTitel(['koennen-blitzschlag', 'unsinn$']);
   pruefe('Können: einmal erspielt bleibt gemerkt (ohne Doppel, nur gueltige Ids)', erspielteTitel().join() === 'koennen-blitzschlag', erspielteTitel());
   const lk = titelListe({ level: 1, koennen: ['koennen-blitzschlag'] }).filter((x) => x.art === 'koennen');
-  pruefe('Können: sechs Titel, frei nur die erspielten, gesperrte mit Weg', lk.length === KOENNEN_TITEL.length && lk.filter((x) => x.frei).length === 1
-    && lk.find((x) => x.id === 'koennen-stammgast').weg === 'Spiele 100 Partien', lk.map((x) => x.id + (x.frei ? '+' : '-')).join());
+  pruefe('Können: alle Titel ausser Labor, frei nur die erspielten, gesperrte mit Weg', lk.length === KOENNEN_TITEL.filter((x) => !x.labor).length && lk.filter((x) => x.frei).length === 1
+    && lk.find((x) => x.id === 'koennen-stammgast').weg === 'Spiele 100 Partien' && lk.find((x) => x.id === 'koennen-raetselfuchs').weg === 'Löse 100 Tagesrätsel'
+    && !lk.some((x) => x.id === 'koennen-musterschueler') && titelListe({ level: 1, labor: true }).some((x) => x.id === 'koennen-musterschueler'), lk.map((x) => x.id + (x.frei ? '+' : '-')).join());
+  // Neue Titel (Flo 08.11.2026) nur aus Daten, die der Browser schon hat; je Bedingung knapp darunter nichts, genau darauf alles
+  const voll = { kronenStufe: 15, raetsel: 100, weltenMitSieg: 5, weltenAlle: 5, sterneWelt: true, platz1: 5, rekorde: 10, kartei: 50, labor: true, schulKapitel: 1, erzfeind: 1 };
+  const knapp = { kronenStufe: 14, raetsel: 99, weltenMitSieg: 4, weltenAlle: 5, sterneWelt: false, platz1: 4, rekorde: 9, kartei: 49, labor: true, schulKapitel: 0, erzfeind: 0 };
+  const neun = ['kroenung', 'raetselfuchs', 'weltenwanderer', 'tafelkoenig', 'rekordjaeger', 'sterne-sammler', 'fehlerjaeger', 'musterschueler', 'erzfeind'].map((x) => 'koennen-' + x);
+  pruefe('Neue Titel: alle neun genau an der Schwelle frei, knapp darunter keiner, ohne Daten keiner, Weltenwanderer nie ohne Welten',
+    neun.every((x) => koennenFrei([], null, voll).includes(x)) && koennenFrei([], null, knapp).length === 0 && koennenFrei([], null, {}).length === 0
+    && !koennenFrei([], null, { weltenMitSieg: 0, weltenAlle: 0 }).includes('koennen-weltenwanderer'), koennenFrei([], null, voll));
+  pruefe('Neue Titel: Namen eindeutig, DE und EN, ohne Meister/Profi/Experte', (() => {
+    const de = titelListe({ level: 1, labor: true, alle: true }).filter((x) => neun.includes(x.id));
+    return de.length === 9 && de.every((x) => x.name && !/^p-sammlung|titel\./.test(x.name) && !VERBOTEN_T.test(x.name) && TITEL_ZEICHEN.includes(x.zeichen));
+  })());
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +297,7 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -335,7 +349,7 @@ async function shopSeite(browser, { sitzung = null, server = {}, bereich = 'shop
   await warte(400);
   let moment = 0;
   while (moment < 12 && await s.locator('.st-moment .st-weiter').count()) { moment++; await s.locator('.st-moment .st-weiter').first().click(); await warte(250); }
-  if (bereich) await s.locator(`.sa-steuer .seg[data-wert="${bereich}"]`).click();
+  if (bereich) await waehle(s, bereich);
   await warte(500);
   return { k, s, srv, anfragen, fehlerListe, moment };
 }
@@ -348,6 +362,10 @@ async function shopTeil(browser) {
     && !p.anfragen.some((a) => a.url.includes('edition_staende')), text);
   const zaehl = await p.s.evaluate(() => ({ stand: document.querySelector('.sa-stand').textContent, alle: document.querySelectorAll('.sa-teil').length,
     frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
+  pruefe('Shop abgemeldet: Stücke ausgegraut zu sehen, ohne Kauf-Knopf und ohne Preis', await p.s.evaluate(() => {
+    const k = [...document.querySelectorAll('.sh-gast .sh-karte[data-gast]')];
+    return k.length > 0 && !document.querySelector('.sh-bereich .sh-kaufen') && k.every((x) => !/€|Taler/.test(x.textContent));
+  }));
   pruefe('Shop zählt nicht in „freigeschaltet“ mit', zaehl.stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet`, zaehl);
   await p.s.locator('.sh-bereich .knopf').click();
   await p.s.waitForSelector('.konto-gruppe', { timeout: 15000 }).catch(() => {});
@@ -398,30 +416,29 @@ const figurenQuellen = (s) => s.evaluate(() => [...document.querySelectorAll('im
 async function erfinderTeil(browser) {
   // Flos Konto mit allen vier Zeilen: der Bereich erscheint nach der Antwort des Servers von selbst
   let p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: ERFINDER_ZEILEN }, bereich: null });
-  await p.s.waitForSelector('.sa-bereich[data-bereich="erfinder"]:not([hidden])', { timeout: 15000 }).catch(() => {});
+  await p.s.waitForSelector('.sa-platz[data-bereich="erfinder"]', { timeout: 15000 }).catch(() => {});
+  const plaetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-platz, .sa-gross')].map((b) => b.getBoundingClientRect()));
+  await waehle(p.s, 'erfinder');
   const info = await p.s.evaluate(() => {
     const b = document.querySelector('.sa-bereich[data-bereich="erfinder"]');
     return b && { teile: [...b.querySelectorAll('.sa-teil')].map((x) => x.dataset.teil).join(), chips: [...b.querySelectorAll('.er-chip')].map((x) => x.textContent).join('|'),
-      knopf: b.querySelector('.er-figuren')?.textContent, erster: document.querySelector('.sa-steuer .seg')?.dataset.wert, sichtbar: !b.hidden };
+      knopf: b.querySelector('.er-figuren')?.textContent, platz: !!document.querySelector('.sa-platz[data-bereich="erfinder"]'), sichtbar: !b.hidden && !!b.closest('.sa-blatt') };
   });
-  pruefe('Erfinder: eigener Bereich (zuerst, gewählt) mit Banner, Titel, Blaupause und Signatur', !!info && info.sichtbar && info.erster === 'erfinder'
+  pruefe('Erfinder: eigener Platz, öffnet als Blatt mit Banner, Titel, Blaupause und Signatur', !!info && info.sichtbar && info.platz
     && info.teile === ERFINDER_ZEILEN.map((z) => z.stueck_id).join(), info);
   pruefe('Erfinder: „Der Erfinder“ und „Nr. 0 · 1 von 1“, Knopf für die Blaupause', !!info && info.chips === 'Der Erfinder|Nr. 0 · 1 von 1'
     && info.knopf === 'Blaupause-Figuren benutzen', info);
   pruefe('Erfinder: Profil passt aufs Handy', await p.s.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
-  // Handy-Runde 08.11.: auf dem Handy in Zeilen zu vier statt rechts aus dem Bild (nichts versteckt, nichts zu wischen)
-  pruefe('Handy: alle Reiter der Sammlung sichtbar (Zeilen zu vier, jeder mindestens 70 px, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate(() => {
-    const seg = [...document.querySelectorAll('.sa-steuer .seg')].map((b) => b.getBoundingClientRect());
-    const steuer = document.querySelector('.sa-steuer');
+  // G-002 (Sammlung B): Plaetze statt Reiter; auf dem Handy alle im Bild, gross genug, ohne Ueberlappung
+  pruefe('Handy: alle Plätze der Sammlung sichtbar (mindestens 44 px hoch, keiner überlappt, nichts ragt rechts heraus)', await p.s.evaluate((seg) => {
     const ueber = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
-    return seg.length > 6 && seg.every((r) => r.width >= 70 && r.left >= 0 && r.right <= innerWidth + 1)
-      && seg.every((r, i) => seg.every((q, j) => i === j || !ueber(r, q)))
-      && new Set(seg.map((r) => Math.round(r.top))).size === Math.ceil(seg.length / 4)
-      && steuer.scrollWidth <= steuer.clientWidth + 1;
-  }));
+    const st = document.querySelector('.sa-plaetze');
+    return seg.length > 6 && seg.every((r) => r.height >= 44 && r.left >= 0 && r.right <= innerWidth + 1)
+      && seg.every((r, i) => seg.every((q, j) => i === j || !ueber(r, q))) && st.scrollWidth <= st.clientWidth + 1;
+  }, plaetze), plaetze.length);
   pruefe('Erfinder: alle Finisher frei (Labor, mit Schild), auch auf Level 1 (kein Schloss), mit Szenenbild und echten Figuren', await p.s.evaluate(() => {
     const t = [...document.querySelectorAll('.sa-bereich[data-bereich="finisher"] .sa-teil')];
-    return t.length === 4 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
+    return t.length === 5 && !t.some((x) => x.dataset.zustand === 'zu') && t.every((x) => x.querySelector('.sa-labor'))
       && t.filter((x) => x.querySelector('.sa-bild svg.sk-finisher image[href*="/assets/pieces/"]')).length >= 3;
   }));
   await p.s.locator('.er-figuren').click();
@@ -477,7 +494,7 @@ async function erfinderTeil(browser) {
   p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: [] }, bereich: null,
     vorher: { 'schach-arena:v1:einstellungen': JSON.stringify({ figuren: 'blaupause' }) } });
   await warte(800);
-  pruefe('Ohne Sonderstücke: kein Erfinder-Bereich und kein leerer Platz', await p.s.locator('.sa-bereich[data-bereich="erfinder"], .seg[data-wert="erfinder"]').count() === 0);
+  pruefe('Ohne Sonderstücke: kein Erfinder-Bereich und kein leerer Platz', await p.s.locator('.sa-bereich[data-bereich="erfinder"], .sa-platz[data-bereich="erfinder"]').count() === 0);
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
   quellen = await figurenQuellen(p.s);
@@ -486,12 +503,23 @@ async function erfinderTeil(browser) {
   await p.s.waitForSelector('.sa-screen', { timeout: 15000 }).catch(() => {});
   await warte(500);
   // Flo 01.11.2026: "Finisher ins Labor, nur ich soll die sehen, die kommen in den Shop"
-  pruefe('Ohne Sonderstücke: kein Finisher-Bereich (Labor, später Shop)', await p.s.locator('.sa-bereich[data-bereich="finisher"], .seg[data-wert="finisher"]').count() === 0);
+  pruefe('Ohne Sonderstücke: kein Finisher-Bereich (Labor, später Shop)', await p.s.locator('.sa-bereich[data-bereich="finisher"], .sa-platz[data-bereich="finisher"]').count() === 0);
   await p.k.close();
 }
 
 // Ausruesten per Tipp: die Sammlung zeichnet danach neu (app.gehe ... ersetzen), erst dann steht das Teil auf "an".
 // Darauf warten, sonst misst der Test zwischen Einstellung und neuem Bild (CI, PR #103)
+// Sammlung B (G-002): jeder Bereich liegt hinter einem Platz und oeffnet als Blatt; ein offenes Blatt erst schliessen
+async function waehle(s, id) {
+  if (await s.locator('.sa-blatt').count()) {
+    await s.locator('.sa-blatt .sheet-knoepfe button').first().click();
+    await s.waitForSelector('.sa-blatt', { state: 'detached', timeout: 10000 }).catch(() => {});
+  }
+  await s.locator(`.sa-platz[data-bereich="${id}"], .sa-gross[data-bereich="${id}"]`).first().click();
+  await s.waitForSelector(`.sa-blatt .sa-bereich[data-bereich="${id}"]:not([hidden])`, { timeout: 10000 });
+  await warte(300);
+}
+
 async function ruesteAus(s, teil) {
   await s.locator(`.sa-teil[data-teil="${teil}"] .sa-wahl`).click();
   await s.waitForFunction((t) => document.querySelector(`.sa-teil[data-teil="${t}"]`)?.dataset.zustand === 'an', teil, { timeout: 10000 }).catch(() => {});
@@ -500,9 +528,8 @@ async function ruesteAus(s, teil) {
 // Labor (Flo 31.10.2026): Bretter und Figuren nur im Erfinder-Konto, mit Schild "Labor"; Ausruesten per Tipp in der Sammlung
 async function laborTeil(browser) {
   let p = await shopSeite(browser, { sitzung: SITZUNG, server: { sonder: ERFINDER_ZEILEN }, bereich: null });
-  await p.s.waitForSelector('.sa-bereich[data-bereich="erfinder"]:not([hidden])', { timeout: 15000 }).catch(() => {});
-  await p.s.locator('.sa-steuer .seg[data-wert="bretter"]').click();
-  await warte(300);
+  await p.s.waitForSelector('.sa-platz[data-bereich="erfinder"]', { timeout: 15000 }).catch(() => {});
+  await waehle(p.s, 'bretter');
   const bretter = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="bretter"] .sa-teil')]
     .map((x) => ({ id: x.dataset.teil, labor: !!x.querySelector('.sa-labor'), wahl: !!x.querySelector('.sa-wahl') })));
   const lab = bretter.filter((b) => b.labor).map((b) => b.id).join();
@@ -510,13 +537,11 @@ async function laborTeil(browser) {
   await ruesteAus(p.s, 'brett-kuerbis');
   pruefe('Labor: Tipp rüstet das Kürbis-Brett aus', await p.s.evaluate(() => document.documentElement.dataset.brett === 'kuerbis'
     && document.querySelector('.sa-teil[data-teil="brett-kuerbis"]')?.dataset.zustand === 'an'));
-  await p.s.locator('.sa-steuer .seg[data-wert="figuren"]').click();
-  await warte(300);
+  await waehle(p.s, 'figuren');
   const saetze = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="figuren"] .sa-teil')].map((x) => x.dataset.teil).join());
   pruefe('Labor: Figurensätze Klassisch, Blaupause, dann Drachen, Zombies, Geister, Lava-Golem, Piraten, Ägypten, Wikinger, Dinos, Feuer, Stein, Halloween, Weihnachten, Ostern, Weltraum, Roboter, Naschwerk, Moosgeister, Tiefsee und die Materialien', saetze === 'figuren-cburnett,figuren-blaupause,figuren-drachen,figuren-zombies,figuren-geister,figuren-lavagolem,figuren-piraten,figuren-aegypten,figuren-wikinger,figuren-dinos,figuren-feuer,figuren-stein,figuren-halloween,figuren-weihnachten,figuren-ostern,figuren-weltraum,figuren-roboter,figuren-naschwerk,figuren-moosgeister,figuren-tiefsee,figuren-elfenbein,figuren-holz,figuren-marmor,figuren-gold,figuren-glas,figuren-neon,figuren-frost,figuren-kuerbis,figuren-pixel,figuren-geo', saetze);
   await ruesteAus(p.s, 'figuren-kuerbis');
-  await p.s.locator('.sa-steuer .seg[data-wert="klaenge"]').click();
-  await warte(300);
+  await waehle(p.s, 'klaenge');
   await ruesteAus(p.s, 'klang-holz');
   pruefe('Ausrüsten: Klangset per Tipp gewählt', await p.s.evaluate(() => JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}').klangpaket) === 'holz');
   const klaenge = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="klaenge"] .sa-teil')].filter((x) => x.querySelector('.sa-labor')).map((x) => x.dataset.teil).join());
@@ -531,16 +556,20 @@ async function laborTeil(browser) {
   const obenVor = await p.s.evaluate(() => {
     document.querySelector('.sa-teil[data-teil="melodie-karofelder"]').scrollIntoView({ block: 'center' });
     document.querySelector('.sa-screen').dataset.alt = '1';
-    return document.querySelector('.sa-rumpf').scrollTop;
+    const b = document.querySelector('.sa-blatt');
+    return { st: b.scrollTop, roll: b.scrollHeight > b.clientHeight + 40,
+      top: Math.round(document.querySelector('.sa-teil[data-teil="melodie-karofelder"]').getBoundingClientRect().top) };
   });
   await ruesteAus(p.s, 'melodie-karofelder');
   await warte(300);
-  const obenNach = await p.s.evaluate(() => document.querySelector('.sa-rumpf').scrollTop);
-  pruefe('Ausrüsten: die Sammlung springt nicht nach oben, sie bleibt an der Melodie', obenVor > 0 && Math.abs(obenNach - obenVor) <= 30,
-    { obenVor, obenNach });
+  const obenNach = await p.s.evaluate(() => ({ st: document.querySelector('.sa-blatt').scrollTop,
+    top: Math.round(document.querySelector('.sa-teil[data-teil="melodie-karofelder"]').getBoundingClientRect().top) }));
+  // Sammlung B: das Blatt scrollt in sich; die Melodie bleibt an ihrer Stelle (gerollt oder nicht)
+  pruefe('Ausrüsten: das Blatt springt nicht nach oben, es bleibt an der Melodie', (!obenVor.roll || obenVor.st > 0)
+    && Math.abs(obenNach.top - obenVor.top) <= 30 && Math.abs(obenNach.st - obenVor.st) <= 30, { obenVor, obenNach });
   // iPad (Flo 31.10. abends: "springt immer noch nach oben"): kein Neuaufbau des Screens mehr, nur die Karten werden neu gezeichnet
   pruefe('Ausrüsten: derselbe Screen bleibt stehen (kein Neuaufbau), die Stelle stimmt aufs Pixel',
-    await p.s.evaluate(() => document.querySelector('.sa-screen')?.dataset.alt === '1') && Math.abs(obenNach - obenVor) <= 1, { obenVor, obenNach });
+    await p.s.evaluate(() => document.querySelector('.sa-screen')?.dataset.alt === '1') && Math.abs(obenNach.top - obenVor.top) <= 1, { obenVor, obenNach });
   pruefe('Lobby-Musik: Tipp auf Karofelder schaltet sie ein', await p.s.evaluate(() => {
     const e = JSON.parse(localStorage.getItem('schach-arena:v1:einstellungen') || '{}');
     return e.musik === true && e.musikMelodie === 'karofelder';
@@ -567,7 +596,7 @@ async function laborTeil(browser) {
     return klang.vorrat().paket === 'arcade' && !document.querySelector('[data-teil="klang-grusel"]');
   }));
   pruefe('Ohne Labor: Brett bleibt Nacht, keine Labor-Teile, kein Figuren-Bereich', await p.s.evaluate(() => document.documentElement.dataset.brett === 'nacht'
-    && !document.querySelector('.sa-labor') && !document.querySelector('.seg[data-wert="figuren"]')));
+    && !document.querySelector('.sa-labor') && !document.querySelector('.sa-platz[data-bereich="figuren"]')));
   await p.s.evaluate(() => window.__app.gehe('partie', { botId: 'benno', farbe: 'w' }));
   await p.s.waitForSelector('img.figur', { timeout: 20000 }).catch(() => {});
   quellen = await figurenQuellen(p.s);
@@ -593,12 +622,14 @@ async function profilTeil(browser) {
   const rahmen = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="rahmen"] .sa-teil')].map((x) => ({
     id: x.dataset.teil, z: x.dataset.zustand, zeile: x.querySelector('.sa-zeile')?.textContent })));
   const r = (id) => rahmen.find((x) => x.id === 'rahmen-' + id) || {};
-  pruefe('Rahmen: ohne an, Holz frei, Liga Gold und Serie 30 mit Schloss und Weg', r('ohne').z === 'an' && r('holz').z !== 'zu'
-    && r('liga-3').z === 'zu' && r('liga-3').zeile === 'Erreiche Liga Gold' && r('serie-30').z === 'zu' && /30/.test(r('serie-30').zeile || '')
+  pruefe('Rahmen: ohne an, Holz frei, unerreichte Liga-Rahmen ausgeblendet, Serie 30 mit Schloss und Weg', r('ohne').z === 'an' && r('holz').z !== 'zu'
+    && !rahmen.some((x) => /^rahmen-liga-/.test(x.id)) && r('serie-30').z === 'zu' && /30/.test(r('serie-30').zeile || '')
     && !rahmen.some((x) => x.id === 'rahmen-erfinder-blatt-0'), rahmen);
+  await p.s.locator('.sa-blatt .sheet-knoepfe button').first().click();
+  await p.s.waitForSelector('.sa-blatt', { state: 'detached', timeout: 10000 }).catch(() => {});
   await p.s.locator('.pr-aendern').click();
   await p.s.waitForSelector('.pr-blatt .pr-figur', { timeout: 5000 });
-  pruefe('Profil-Blatt: gesperrter Rahmen ist nicht wählbar', await p.s.locator('.pr-rahmen[data-rahmen="liga-3"]').isDisabled());
+  pruefe('Profil-Blatt: gesperrter Rahmen ist nicht wählbar', await p.s.locator('.pr-rahmen[data-rahmen="serie-30"]').isDisabled());
   // das Blatt gleitet herein: erst messen, wenn es steht
   await p.s.waitForFunction(() => { const b = document.querySelector('.pr-blatt .sheet-knoepfe button'); return !!b && b.getBoundingClientRect().bottom <= innerHeight; },
     null, { timeout: 3000 }).catch(() => {});
@@ -705,8 +736,7 @@ async function browserTeil() {
       const stand = await s.locator('.sa-stand').innerText();
       const zaehl = await s.evaluate(() => ({ alle: document.querySelectorAll('.sa-teil').length, frei: document.querySelectorAll('.sa-teil:not([data-zustand="zu"])').length }));
       pruefe(`${name}: Zähler „N von M freigeschaltet“ passt zu den Karten`, stand === `${zaehl.frei} von ${zaehl.alle} freigeschaltet` && zaehl.frei < zaehl.alle, { stand, zaehl });
-      await s.locator('.sa-steuer .seg[data-wert="titel"]').click();
-      await warte(300);
+      await waehle(s, 'titel');
       const tit = await s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="titel"] .sa-teil')].map((x) => ({
         id: x.dataset.teil, z: x.dataset.zustand, schloss: !!x.querySelector('.sa-bild .sa-frage'), zeile: x.querySelector('.sa-zeile').textContent,
         wappen: !!x.querySelector('.sa-bild svg.titel-wappen') })));
@@ -715,8 +745,7 @@ async function browserTeil() {
       pruefe(`${name}: Titel mit Wappen: Funke getragen (automatisch), Glut geheimnisvoll (?) ab Level 5`, !!funke && funke.z === 'an' && funke.wappen
         && glut.z === 'zu' && glut.schloss && glut.zeile === 'Ab Level 5' && tit.every((x) => x.wappen), tit.slice(0, 3));
       pruefe(`${name}: nur ein Bereich sichtbar`, await s.locator('.sa-bereich:not([hidden])').count() === 1);
-      await s.locator('.sa-steuer .seg[data-wert="erfolge"]').click();
-      await warte(400);
+      await waehle(s, 'erfolge');
       // Etappe 4b: Erfolge in drei Stufen, die Zeile nennt den Weg zur naechsten Stufe
       pruefe(`${name}: Erfolge gewählt, Weg dahin sichtbar`, await s.locator('.sa-bereich[data-bereich="erfolge"]:not([hidden])').count() === 1
         && /0 von 1 Siege gegen Bots bis Bronze/.test(await s.locator('.sa-bereich[data-bereich="erfolge"]').innerText()));
@@ -724,7 +753,10 @@ async function browserTeil() {
       pruefe(`${name}: kein waagrechtes Scrollen der Seite`, quer);
       await s.reload();
       await s.waitForSelector('.sa-screen', { timeout: 15000 });
-      pruefe(`${name}: gewählter Bereich bleibt nach dem Neuladen`, await s.locator('.sa-bereich[data-bereich="erfolge"]:not([hidden])').count() === 1);
+      // Sammlung B: nach dem Neuladen wieder die Uebersicht (kein Blatt offen, alle Bereiche zu)
+      await warte(400);
+      pruefe(`${name}: nach dem Neuladen die Übersicht mit Plätzen, kein Blatt offen`, await s.locator('.sa-blatt').count() === 0
+        && await s.locator('.sa-platz').count() >= 6 && await s.locator('.sa-bereich:not([hidden])').count() === 0);
       pruefe(`${name}: keine Konsolenfehler`, fehlerListe.length === 0, fehlerListe.join(' | '));
       await k.close();
     }
@@ -738,9 +770,8 @@ async function browserTeil() {
     const s = await k.newPage();
     await s.goto(`http://127.0.0.1:${PORT}/index.html?test&sprache=en#ich`);
     await s.waitForSelector('.sa-screen', { timeout: 30000 });
-    await s.locator('.sa-steuer .seg[data-wert="titel"]').click();
-    await warte(300);
-    const text = await s.locator('.sa-screen').innerText();
+    await waehle(s, 'titel');
+    const text = (await s.locator('.sa-screen').innerText()) + '\n' + (await s.locator('.sa-blatt').innerText());
     pruefe('Englisch: Me (Reitername), unlocked, From level', /^Me$/m.test(text) && /of \d+ unlocked/.test(text) && /From level 5/.test(text), text.slice(0, 200));
     await k.close();
   } catch (e) {

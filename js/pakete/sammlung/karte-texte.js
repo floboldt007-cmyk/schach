@@ -21,11 +21,13 @@ registriereTexte('p-karte', {
     // Liga-Namen nach Konzept 5a; welche Kronen-Liga welchen Namen zeigt, steht in js/ui/visitenkarte.js LIGA_NAMEN
     'liga.bauer': 'Bauer', 'liga.springer': 'Springer', 'liga.laeufer': 'Läufer', 'liga.turm': 'Turm', 'liga.dame': 'Dame', 'liga.koenig': 'König',
     'gefunden.los': 'Gleich geht es los',
-    // Banner-Ids saison-* bleiben (Bilder aus dem Vorrat); vergeben werden sie kuenftig in der Liga (Konzept 5a)
-    'b.start': 'Erster Zug', 'b.saison-holz': 'Holz', 'b.saison-bronze': 'Bronze', 'b.saison-silber': 'Silber',
-    'b.saison-gold': 'Gold', 'b.saison-diamant': 'Diamant', 'b.saison-krone': 'Krone',
+    // Banner-Ids saison-* bleiben (Bilder aus dem Vorrat und Server); benannt nach der Liga-Stufe, je Stufe genau eines
+    // (G-002, Flos Wahl 08.11.2026; Zuordnung Farbe -> Stufe in js/ui/visitenkarte.js LIGA_NAMEN)
+    'b.start': 'Erster Zug', 'b.saison-holz': 'Bauern-Banner', 'b.saison-bronze': 'Springer-Banner', 'b.saison-silber': 'Läufer-Banner',
+    'b.saison-gold': 'Turm-Banner', 'b.saison-diamant': 'Damen-Banner', 'b.saison-krone': 'Königs-Banner',
     'b.erfolg-raetselmeister': 'Rätselmeister', 'b.erfolg-seriensieger': 'Seriensieger', 'b.erfolg-turmbezwinger': 'Turmbezwinger',
-    'b.weg.saison': 'Aus der Liga: Platz 1 der Wochen-Gruppe oder erster Aufstieg', 'b.weg.erfolg': 'Gold-Stufe: {name}',
+    'b.weg.saison': 'Aus der Liga: Platz 1 der Wochen-Gruppe oder erster Aufstieg',
+    'b.weg.stufe': 'Aus der Liga: Platz 1 in {stufe} oder Aufstieg nach {stufe}', 'b.weg.stufeUnten': 'Aus der Liga: Platz 1 einer Gruppe in {stufe}', 'b.weg.erfolg': 'Gold-Stufe: {name}',
   },
   en: {
     'stufe.0': 'Not yet', 'stufe.1': 'Bronze', 'stufe.2': 'Silver', 'stufe.3': 'Gold',
@@ -45,9 +47,10 @@ registriereTexte('p-karte', {
     'karte.banner': 'Choose banner', 'karte.bannerFrei': 'Unlocked', 'karte.bannerAn': 'Worn',
     'liga.bauer': 'Pawn', 'liga.springer': 'Knight', 'liga.laeufer': 'Bishop', 'liga.turm': 'Rook', 'liga.dame': 'Queen', 'liga.koenig': 'King',
     'gefunden.los': 'Starting in a moment',
-    'b.start': 'First move', 'b.saison-holz': 'Wood', 'b.saison-bronze': 'Bronze', 'b.saison-silber': 'Silver',
-    'b.saison-gold': 'Gold', 'b.saison-diamant': 'Diamond', 'b.saison-krone': 'Crown',
+    'b.start': 'First move', 'b.saison-holz': 'Pawn banner', 'b.saison-bronze': 'Knight banner', 'b.saison-silber': 'Bishop banner',
+    'b.saison-gold': 'Rook banner', 'b.saison-diamant': 'Queen banner', 'b.saison-krone': 'King banner',
     'b.erfolg-raetselmeister': 'Puzzle master', 'b.erfolg-seriensieger': 'Streak winner', 'b.erfolg-turmbezwinger': 'Tower breaker',
-    'b.weg.saison': 'From the league: first place in the weekly group or a first promotion', 'b.weg.erfolg': 'Gold tier: {name}',
+    'b.weg.saison': 'From the league: first place in the weekly group or a first promotion',
+    'b.weg.stufe': 'From the league: first place in {stufe} or promotion to {stufe}', 'b.weg.stufeUnten': 'From the league: first place in a {stufe} group', 'b.weg.erfolg': 'Gold tier: {name}',
   },
 });

@@ -124,17 +124,30 @@
 .lg-gr-abschnitt[data-zone="ab"] h3 { color: var(--warn); }
 .lg-gr-abschnitt h3 .ico { width: 16px; height: 16px; }
 .lg-gr-abschnitt ol { margin: 0; padding: 0; list-style: none; }
-.lg-gr-zeile { display: grid; grid-template-columns: 28px 40px minmax(0, 1fr) auto 44px; align-items: center; gap: 10px; min-height: 56px;
-  padding: 6px 12px 6px 16px; }
+.lg-gr-zeile { position: relative; isolation: isolate; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 44px; align-items: center;
+  gap: 10px; min-height: 60px; padding: 6px 12px 6px 16px; }
+/* Banner als Streifen links (G-002 Liga A): hinter Platz und Bild, laeuft vor dem Namen aus, damit der Name immer auf der
+   Flaeche steht (Kontrast unabhaengig vom Banner) */
+.lg-gr-streifen { position: absolute; inset: 0 auto 0 0; z-index: -1; width: 132px; background: center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, black 0, black 38%, transparent 82%); mask-image: linear-gradient(90deg, black 0, black 38%, transparent 82%);
+  opacity: .9; pointer-events: none; }
+.lg-gr-zeile[data-banner] .lg-gr-platz { justify-self: center; min-width: 26px; padding: 1px 4px; border-radius: var(--r-s);
+  background: color-mix(in srgb, var(--flaeche) 86%, transparent); }
+.lg-gr-wer { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 48px; margin: 0; padding: 0 6px 0 0; border: 0; border-radius: var(--r-m);
+  background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.lg-gr-wer:focus-visible { outline: var(--fokus); outline-offset: 2px; }
+@media (hover: hover) { .lg-gr-wer:hover .lg-gr-name b { text-decoration: underline; text-underline-offset: 3px; } }
 .lg-gr-zeile[hidden] { display: none; }
 .lg-gr-zeile + .lg-gr-zeile { border-top: 1px solid var(--linie); }
 .lg-gr-zeile.ich { background: var(--gold-weich); box-shadow: inset 4px 0 0 var(--gold); }
 .lg-gr-platz { font-family: var(--display); font-weight: var(--gw-titel); font-size: 16px; color: var(--text-2); text-align: center;
   font-variant-numeric: tabular-nums; }
 .lg-gr-zeile.ich .lg-gr-platz { color: var(--text); }
-.lg-gr-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--flaeche-3); color: var(--text);
+.lg-gr-avatar { flex: none; display: grid; place-items: center; width: 40px; height: 40px; overflow: hidden; border-radius: 50%; background: var(--flaeche-3); color: var(--text);
   box-shadow: inset 0 0 0 2px var(--linie-2); font-size: 13px; font-weight: var(--gw-titel); }
 .lg-gr-zeile.ich .lg-gr-avatar { background: var(--gold); color: var(--auf-akzent); box-shadow: none; }
+.lg-gr-avatar.bild, .lg-gr-zeile.ich .lg-gr-avatar.bild { background: none; box-shadow: 0 0 0 2px var(--flaeche); }
+.lg-gr-avatar.bild svg { display: block; width: 100%; height: 100%; }
 .lg-gr-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lg-gr-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--text); }
 .lg-gr-ki { flex: none; padding: 1px 6px; border-radius: var(--r-s); background: var(--flaeche-3); color: var(--text-2); font-size: 11px;
@@ -150,7 +163,7 @@
 .lg-gr-lohn:focus-visible, .lg-gr-mehr:focus-visible, .lg-gr-konto:focus-visible { outline: var(--fokus); outline-offset: 2px; }
 /* in der eigenen (goldenen) Zeile ist der Akzent-Ring zu schwach: Textfarbe (design-beweis 07.11., dunkel 2,43:1) */
 .lg-gr-lohn:focus-visible { outline: 2.5px solid var(--text); }
-.lg-gr-info { grid-column: 3 / -1; margin: 0 0 4px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
+.lg-gr-info { grid-column: 2 / -1; margin: 0 0 4px; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--text-2); }
 .lg-gr-info[hidden] { display: none; }
 .lg-gr-mehr { display: block; width: 100%; min-height: var(--tipp); margin: 0; border: 0; border-top: 1px solid var(--linie); background: none;
   color: var(--text-2); font: inherit; font-size: 14px; font-weight: var(--gw-stark); cursor: pointer; }
@@ -160,3 +173,24 @@
 .lg-gr-karte p { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
 .lg-gr-karte[data-zustand="laedt"] p:empty { min-height: 1.4em; }
 .lg-gr-karte-symbol .ico { width: 28px; height: 28px; color: var(--gold); }
+
+/* Mini-Karte (G-002 Liga A): Blatt von unten; Reihenfolge Griff, Banner mit Bild, Name (Titel des Blatts), Werte, Knopf */
+.sheet-karte.lg-mini-blatt { display: flex; flex-direction: column; overflow: hidden; text-align: start; }
+.lg-mini-blatt .sheet-griff { position: relative; z-index: 1; order: 0; background: color-mix(in srgb, var(--flaeche) 75%, transparent); }
+.lg-mini-kopf { order: 1; position: relative; display: grid; margin: -31px -22px 0; }
+.lg-mini-blatt h3 { order: 2; margin-top: 10px; overflow-wrap: anywhere; }
+.lg-mini { order: 3; display: grid; gap: 12px; margin: 14px 0 4px; }
+.lg-mini-blatt .sheet-knoepfe { order: 4; }
+.lg-mini-banner { display: block; height: 104px; background: var(--flaeche-3) center / cover no-repeat; }
+.lg-mini-av { width: 76px; height: 76px; margin: -44px 0 0 22px; font-size: 24px; box-shadow: 0 0 0 4px var(--flaeche); }
+.lg-mini-ki { position: absolute; left: 110px; bottom: 6px; }
+.lg-mini-werte { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.lg-mini-werte div { display: grid; justify-items: center; gap: 2px; min-width: 0; padding: 10px 6px; border-radius: var(--r-m); background: var(--flaeche-3);
+  text-align: center; }
+.lg-mini-werte dt { order: 2; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.lg-mini-werte dd { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-family: var(--display); font-size: 18px; font-weight: var(--gw-titel);
+  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lg-mini-werte dd .ico { width: 15px; height: 15px; color: var(--gold); }
+.lg-mini-werte dd img { width: 18px; height: auto; }
+.sheet-karte .lg-mini-satz { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--text-2); }
+.lg-mini-werte .lg-mini-stufe dd { font-size: 15px; white-space: normal; justify-content: center; text-align: center; line-height: 1.15; }

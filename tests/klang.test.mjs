@@ -152,7 +152,7 @@ function leseMp3(b) {
 // Node
 // =====================================================================
 async function testeNode() {
-  const { KATALOG, PAKETE_KLANG, PAKETE_LABOR, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang } = await import('../js/sounds.js');
+  const { KATALOG, PAKETE_KLANG, PAKETE_LABOR, KLANGGRUPPEN, KLANGSTUFEN, klassenKlang, zugKlangName } = await import('../js/sounds.js');
   gruppe = 'Katalog';
   const namen = Object.keys(KATALOG);
   pruefe('33 Namen wie in PLAN 3.2, eingefroren', namen.length === 33 && JSON.stringify([...namen].sort()) === JSON.stringify(Object.keys(SOLL).sort())
@@ -260,6 +260,22 @@ async function testeNode() {
   pruefe('ungenau -> ungenau, fehler und verpasst -> fehler, patzer -> patzer', fall('ungenau') === '{"name":"ungenau"}' && fall('fehler') === '{"name":"fehler"}'
     && fall('verpasst') === '{"name":"fehler"}' && fall('patzer') === '{"name":"patzer"}' && fall('patzer', { trivial: true }) === '{"name":"patzer"}');
   pruefe('exzellent, gut, buch, erzwungen und Unbekanntes still', ['exzellent', 'gut', 'buch', 'erzwungen', 'gibtsnicht', undefined].every((k) => klassenKlang(k, { serie: 9 }) === null));
+
+  // Zugklang auf jedem Brett gleich (Partie, Zu zweit, Online, Raetsel, Lektion), echte Zuege aus chess.js
+  {
+    const { Chess } = await import('../vendor/chess/chess.js');
+    const zk = (fen, zug) => { const c = new Chess(fen); const m = c.move(zug); return zugKlangName(m, c.inCheck()); };
+    pruefe('zugKlangName: Zug, Schlagen, Rochade (kurz und lang), Umwandlung, Schach, Umwandlung mit Schach',
+      zk(undefined, 'e4') === 'zug'
+      && zk('rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2', 'exd5') === 'schlagen'
+      && zk('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'O-O') === 'rochade'
+      && zk('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1', 'O-O-O') === 'rochade'
+      && zk('8/P6k/8/8/8/8/8/K7 w - - 0 1', 'a8=N') === 'umwandlung'
+      && zk('4k3/8/8/8/8/8/8/R3K3 w - - 0 1', 'Ra8+') === 'schach'
+      && zk('8/P7/8/8/8/8/8/K3k3 w - - 0 1', 'a8=Q') === 'umwandlung'
+      && zk('4k3/P7/8/8/8/8/8/K7 w - - 0 1', 'a8=Q+') === 'schach'
+      && zugKlangName(null) === 'zug');
+  }
 
   await testeLogik();
 }

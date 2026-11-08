@@ -124,8 +124,8 @@ export function alsAufgaben(td, { nur = null } = {}) {
     id: `${td.tag}:${i}`,
     fen: a.fen,
     loesung: a.loesung.slice(),
-    text: t(zwei ? 'p-tagesraetsel.aufgabe.textTeil' : 'p-tagesraetsel.aufgabe.text',
-      { teil: i + 1, nummer: td.nummer, tag: wochentagName(td.wochentag), zuege: zuegeText(a) }),
+    // ohne "Teil 1 von 2": das zeigt der Raetsel-Bildschirm schon oben und in den Punkten (Flo 08.11.2026, Befund 8)
+    text: t('p-tagesraetsel.aufgabe.text', { nummer: td.nummer, tag: wochentagName(td.wochentag), zuege: zuegeText(a) }),
     hinweis: a.matt ? t('p-tagesraetsel.hinweis.matt', { n: a.matt }) : t('p-tagesraetsel.hinweis.zwang'),
   }));
 }

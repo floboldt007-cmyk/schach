@@ -27,7 +27,7 @@ import { figurenPfad } from '../figurensatz.js';
 import { Chess } from '../../vendor/chess/chess.js';
 import { hauptKopf, verbindeKopf, kopfEintritt } from './seite.js';
 import { icon } from './icons.js';
-import { klang } from '../sounds.js';
+import { klang, zugKlangName } from '../sounds.js';
 import { anim, staffel, tempo, takt } from '../bewegung.js';
 import { ladeEinstellungen, ladeModul, speichereModul } from '../storage.js';
 import { sende } from '../ereignisse.js';
@@ -152,9 +152,7 @@ export function zeige(root, params, app) {
   const leiseMeldung = () => { meldungEl.hidden = true; meldungEl.innerHTML = ''; };
 
   function zugKlang(m) {
-    if (st.chess.isCheckmate() || st.chess.inCheck()) spielKlang('schach');
-    else if (m && m.captured) spielKlang('schlagen');
-    else spielKlang('zug');
+    spielKlang(zugKlangName(m, st.chess.inCheck()));
   }
 
   // Engine-Zug fuer die Stellung (Verteidigung oder Hinweis); im Testmodus aus window.__test.lektionZug

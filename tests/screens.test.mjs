@@ -42,6 +42,7 @@ async function warteAufServer(url, ms = 10000) {
   while (Date.now() < ende) {
     try {
       const r = await fetch(url);
+      await r.arrayBuffer();
       if (r.ok) return;
     } catch (e) { /* noch nicht da */ }
     await new Promise((r) => setTimeout(r, 150));
@@ -411,8 +412,8 @@ async function testePruefrunde(browser, d) {
   const verlorenId = await verlorenVs(naechster, 9);
   await oeffne(seite, `screen=analyse&partieId=${verlorenId}`);
   const knoepfe = await kopfKnoepfe();
-  pruefe(`Niederlage gegen den nächsten Gegner (${naechster}): "Nochmal" primär, "Arena" statt "Nächster Gegner"`,
-    knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /Arena/.test(k.text))
+  pruefe(`Niederlage gegen den nächsten Gegner (${naechster}): "Nochmal" primär, "Bots" statt "Nächster Gegner"`,
+    knoepfe.some((k) => k.a === 'nochmal' && k.primaer) && knoepfe.some((k) => k.a === 'weiter' && /^(Zu den )?Bots$/.test(k.text))
     && !knoepfe.some((k) => /Nächster Gegner/.test(k.text)), JSON.stringify(knoepfe));
   // Niederlage gegen einen Bot, der nicht der nächste Gegner ist (Lukas, weit unter dem höchsten Sieg): "Nächster Gegner" bleibt der Hauptknopf
   pruefe('Lukas ist hier nicht der nächste Gegner', naechster !== 'benno', naechster);

@@ -28,7 +28,8 @@ function pruefe(name, wert, info = '') {
 const lager = new Map();
 setzeSpeicher({ getItem: (k) => (lager.has(k) ? lager.get(k) : null), setItem: (k, v) => lager.set(k, String(v)), removeItem: (k) => lager.delete(k),
   key: (i) => [...lager.keys()][i] ?? null, get length() { return lager.size; } });
-const { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, ligaTabelle, LIGA_BEISPIEL, modusLeiste } = await import('../js/pakete/lobby/index.js');
+const lobbyModul = await import('../js/pakete/lobby/index.js');
+const { ZEITEN, ARTEN, STANDARD_ZEIT, zeitText, schaetzeWertung, passenderBot, modusLeiste } = lobbyModul;
 const { DE, EN } = await import('../js/pakete/lobby/texte.js');
 
 pruefe('Bedenkzeiten: Blitz, Schnellschach, Klassisch; Standard 3 + 2; gueltig fuer die Partie-Uhr',
@@ -43,13 +44,10 @@ pruefe('Wertung geschaetzt: ohne Sieg 400, sonst der staerkste besiegte Bot (auf
   && schaetzeWertung(sieg([stark.id])) <= 2800);
 const g0 = passenderBot(400, leer);
 pruefe('Vorschau-Gegner: ein freier Bot, nie ein Endgegner (ohne Fortschritt der erste)', g0 && !g0.endgegner && g0.id === BOTS[0].id, g0 && g0.id);
-const tab = ligaTabelle({ name: 'Du', punkte: 9 });
-pruefe('Liga-Vorschau: acht Plaetze, absteigend, drei Aufsteiger und kein Abstieg (Fairness), du bei Gleichstand hinter den anderen',
-  tab.length === 8 && tab.every((z, i) => z.platz === i + 1 && (i === 0 || tab[i - 1].punkte >= z.punkte))
-  && tab.filter((z) => z.zone === 'auf').length === 3 && tab.every((z) => z.zone === 'auf' || z.zone === '')
-  && tab.find((z) => z.du).platz === 5 && tab[3].name === 'Bauernsturm');
-pruefe('Liga-Vorschau: erfundene Namen, keine Elo-Zahl, kein Countdown', LIGA_BEISPIEL.length === 7
-  && !/\d{4}/.test(LIGA_BEISPIEL.map((x) => x.name).join()) && !Object.values(DE).some((x) => /nur noch|endet in|countdown/i.test(x)));
+// Flo 08.11.2026: die Beispiel-Liga mit erfundenen Namen ist weg (sie widersprach der echten Liga im Liga-Reiter)
+pruefe('Keine Beispiel-Liga mehr: weder Tabelle noch erfundene Namen noch "Beispiel"-Text; kein Countdown', !('ligaTabelle' in lobbyModul)
+  && !('LIGA_BEISPIEL' in lobbyModul) && !('beispiel' in DE) && !('liga.titel' in DE)
+  && !Object.values(DE).some((x) => /Turmfalke|Rochade77|nur noch|endet in|countdown/i.test(x)));
 pruefe('Texte: Deutsch und Englisch mit denselben Schluesseln, keine langen Gedankenstriche',
   Object.keys(DE).sort().join() === Object.keys(EN).sort().join() && ![...Object.values(DE), ...Object.values(EN)].some((x) => /[–—]/.test(x)));
 const ZUGWORTE = /brilliant|great move|blunder|inaccuracy|mistake|best move|excellent|book move/i;
@@ -72,7 +70,7 @@ pruefe('Umschalter ohne Labor: nichts (null)', modusLeiste({ gehe() {} }, 'welte
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -164,15 +162,14 @@ async function browserTeil() {
         aktiv: document.querySelector('.screen.lobby .lb-modus')?.dataset.aktiv,
         zeiten: [...document.querySelectorAll('.lb-zeit')].map((b) => b.dataset.zeit + (b.getAttribute('aria-checked') === 'true' ? '*' : '')),
         werte: [...document.querySelectorAll('.lb-wert')].map((w) => w.dataset.art + ':' + w.querySelector('b').textContent),
-        liga: document.querySelectorAll('.lb-tabelle li').length, du: document.querySelector('.lb-tabelle li[data-du]')?.textContent.includes('Du'),
-        beispiel: document.querySelector('.lb-beispiel')?.textContent, mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
+        liga: document.querySelectorAll('.lb-liga, .lb-tabelle li').length, beispiel: /Beispiel|Turmfalke/.test(document.querySelector('.screen.lobby').textContent), mehr: [...document.querySelectorAll('.lb-modus-karte')].map((b) => b.dataset.ziel + (b.disabled ? '-' : '+')),
         reiter: document.querySelector('.reiter-leiste .reiter[aria-current="page"], .reiter-leiste .reiter.aktiv')?.dataset.reiter || null,
         hash: location.hash, breit: document.documentElement.scrollWidth <= innerWidth + 1,
         klein: [...document.querySelectorAll('.lb-zeit, .lb-suchen, .lb-modus-karte')].filter((e) => e.getBoundingClientRect().height < 44).length,
       }));
-      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), Liga mit dir und Beispiel-Schild',
+      pruefe('Lobby: Online aktiv, sechs Bedenkzeiten (3 + 2 gewaehlt), drei Wertungen (400), keine Beispiel-Liga (Flo 08.11.2026)',
         lobby.aktiv === 'online' && lobby.zeiten.join() === '3+0,3+2*,5+0,10+0,15+10,30+0' && lobby.werte.join() === 'blitz:400,schnell:400,klassisch:400'
-        && lobby.liga === 8 && lobby.du && lobby.beispiel === 'Beispiel', lobby);
+        && lobby.liga === 0 && !lobby.beispiel, lobby);
       pruefe('Lobby: Gegen Freunde und Raetsel-Duell offen, Turniere bald; Hash #lobby; nichts breiter als das Handy; Tippflaechen ab 44 px',
         lobby.mehr.join() === 'online+,turniere-,duell+' && lobby.hash === '#lobby' && lobby.breit && lobby.klein === 0, lobby);
       await p.s.locator('.lb-zeit[data-zeit="10+0"]').click();
@@ -324,7 +321,10 @@ async function browserTeil() {
       pruefe('iPad quer: Spielen links, Wertungen rechts daneben', lage.nebeneinander && lage.breit, lage);
       // am Rand gewischt rollt die Lobby (vorher nur die 1040-px-Spalte in der Mitte, Flo 01.11.2026 bei Premium und Lektionen)
       // seit der Seitenleiste (Etappe A) beginnt der Rand des Screens rechts neben ihr
-      await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 600);
+      // seit die Beispiel-Liga weg ist (Flo 08.11.2026) passt die Lobby auf 820 px Hoehe: zum Rollen-Test niedriger machen
+      await p.s.setViewportSize({ width: 1180, height: 520 });
+      await warte(300);
+      await p.s.mouse.move(await p.s.evaluate(() => (document.querySelector('.reiter-leiste[data-lage="seite"]')?.getBoundingClientRect().right ?? 0) + 20), 400);
       await p.s.mouse.wheel(0, 4000);
       await warte(500);
       const rollen = await p.s.evaluate(() => { const r = document.querySelector('.lb-rumpf'); return { st: Math.round(r.scrollTop), max: r.scrollHeight - r.clientHeight }; });

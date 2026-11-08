@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { browserTyp } from './browser.mjs';
+import { alteOrte } from './ohne-host.mjs';
 import { BOTS as LEITER } from '../js/bots.js';
 
 const require = createRequire(import.meta.url);
@@ -483,7 +484,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -731,6 +732,7 @@ async function browserTeil(browser) {
   fortschritt: fortschritt(4, { kalle: { partien: 5, siege: 1, niederlagen: 4 }, benno: { partien: 3, siege: 1, niederlagen: 2 } }) });
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
   await seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+  await alteOrte(seite);   // panel-bot nur im Test (Variante A, tests/ohne-host.mjs)
   const ez = await seite.evaluate(() => {
     const o = document.querySelector('.detail .ort-panel-bot');
     const e = o && o.querySelector(':scope > .gd-erzfeind');
@@ -744,6 +746,7 @@ async function browserTeil(browser) {
   await seite.screenshot({ path: path.join(BILDER, 'panel-erzfeind-ipad.png') });
   await seite.evaluate(() => window.__app.gehe('arena', { waehle: 'benno' }));
   await seite.waitForFunction(() => /Lukas/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+  await alteOrte(seite);
   pruefe('anderer Bot (Lukas, 2 Niederlagen): keine Zeile, Ort versteckt', await seite.evaluate(() => {
     const o = document.querySelector('.detail .ort-panel-bot');
     return !o.querySelector('.gd-erzfeind') && o.hidden;
@@ -882,8 +885,8 @@ async function browserTeil(browser) {
       partie('kalle', 'sieg', 4), partie('kalle', 'niederlage', 5)], fortschritt: fortschritt(4, { kalle: { partien: 5, siege: 1, niederlagen: 4 } }),
     einstellungen: { modus: dunkel ? 'dunkel' : 'hell' } });
     await h.seite.evaluate(() => window.__app.gehe('arena', { waehle: 'kalle' }));
-    await h.seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || '') && !!document.querySelector('.detail .gd-erzfeind'),
-      null, { timeout: 10000 });
+    await h.seite.waitForFunction(() => /Maxi/.test((document.querySelector('.detail h2') || {}).textContent || ''), null, { timeout: 10000 });
+    await alteOrte(h.seite);   // panel-bot nur im Test (Variante A)
     // auf dem Handy stehen Sprechblase und Ort arena:panel-bot hinter "Mehr" (.detail.offen, css/app.css): aufklappen wie Flo,
     // sonst waeren beide display:none und jede Pruefung der Masse leer
     // Seit der Weltkarte (U5) gibt es am Handy kein "Mehr" mehr: das Panel zeigt alles und rollt. Den alten Weg gibt es nur

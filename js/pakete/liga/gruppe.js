@@ -13,6 +13,11 @@
 // Belohnungs-Kachel button.lg-gr-lohn (Banner fuer Platz 1, Taler-Stapel danach); ein Tipp klappt darunter den Inhalt
 // auf (p.lg-gr-info). Ohne Konto, ohne Gruppe und bei einem Fehler eine ruhige Karte .lg-gr-karte[data-zustand].
 // Ruhige Texte (fairness Regel 9/10): kein Countdown, kein "Abstieg", nur Fakten.
+// Profilbild und Banner je Zeile (G-002, Flos Wahl "Liga A" 08.11.2026): das Banner liegt als Streifen links mit Verlauf
+// hinter dem Bild, der Name steht auf der Flaeche (Kontrast). Ein Tipp auf Bild und Name (button.lg-gr-wer) oeffnet die
+// Mini-Karte (Blatt .lg-mini: Banner, Bild, Name, Platz, Kronen, Stufe). Bild und Banner anderer Spieler liefert
+// liga_meine_gruppe erst mit supabase/liga-bild-schema.sql; ohne sie Initialen wie bisher, die eigene Zeile zeigt immer
+// das eigene Bild. Titel und Erfolge zeigt die Liga nie (Datenschutzerklaerung Abschnitt Liga, "Wer was sieht").
 //
 // js/kronen.js kommt erst beim Zeichnen dazu (wie beim Melden in index.js): das Paket zieht Konto und Online nicht schon
 // beim Laden mit.
@@ -20,6 +25,13 @@ import { icon } from '../../ui/icons.js';
 import { t, zahl, datum } from '../../sprache.js';
 import { stufeInfo, naechsteStufe, zoneVon, belohnungFuer, GRUPPE_GROESSE } from './kronen.js';
 import { stufenName } from './texte.js';
+
+// Bild, Banner und Blatt erst laden, wenn die Gruppe gezeichnet wird: statisch importiert zoegen sie ueber profil.js das
+// Konto mit (setInterval nach app:bereit), und das Paket bliebe nicht leicht (tests/liga.test.mjs endete nie)
+let B = null;
+const ladeBild = () => Promise.all([import('../../ui/visitenkarte.js'), import('../../thema.js'), import('../../ui/bauteile.js')])
+  .then(([v, th, ui]) => { B = { bannerUrl: v.bannerUrl, botBanner: v.botBanner, eigeneKarte: v.eigeneKarte, MENSCHEN_BANNER: v.MENSCHEN_BANNER,
+    profilAvatar: th.profilAvatar, sheet: ui.sheet }; });
 
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const T = (k, w) => t('p-liga.gruppe.' + k, w);
@@ -67,21 +79,64 @@ function lohnBild(b) {
 const lohnText = (b) => (b.art === 'banner' ? T('bannerText') : T('talerText', { n: zahl(b.menge) }));
 const lohnKurz = (b) => (b.art === 'banner' ? T('banner') : T('taler', { n: zahl(b.menge) }));
 
+// Bild und Banner einer Zeile: eigene Zeile aus der eigenen Karte, Menschen vom Server (geprueft in gruppeLage),
+// KI-Mitspieler ein festes Bot-Banner und Initialen, sonst Initialen ohne Banner
+function bildVon(m, name) {
+  if (m.ich) {
+    let k = null;
+    try { k = B.eigeneKarte(); } catch (e) { k = null; }
+    if (k && k.avatar) return { avatar: k.avatar, banner: k.banner || 'start' };
+  }
+  if (m.bild) return { avatar: B.profilAvatar({ figur: m.bild.motiv, grund: m.bild.grund, rahmen: m.bild.rahmen }, 'w'), banner: m.bild.banner };
+  return { avatar: esc(initialen(name)), banner: m.ki ? B.botBanner({ id: m.name }) : null, initialen: true };
+}
+
 function zeile(m) {
   const name = m.ich ? T('du') : (m.name || T('spieler'));
+  const bild = bildVon(m, m.ich ? (m.name || name) : name);
   const b = belohnungFuer(m.platz);
   const lohn = b
     ? `<button class="lg-gr-lohn" type="button" data-art="${esc(b.art)}" aria-expanded="false"
         aria-label="${esc(T('belohnung', { platz: zahl(m.platz) }) + ': ' + lohnKurz(b))}">${lohnBild(b)}</button>`
     : '<span class="lg-gr-lohn-leer" aria-hidden="true"></span>';
   const info = b ? `<p class="lg-gr-info" hidden>${esc(T('belohnung', { platz: zahl(m.platz) }))}: ${esc(lohnText(b))}. ${esc(T('gemerkt'))}</p>` : '';
-  return `<li class="lg-gr-zeile${m.ich ? ' ich' : ''}" data-platz="${esc(m.platz)}"${m.ki ? ' data-ki="1"' : ''}>
+  return `<li class="lg-gr-zeile${m.ich ? ' ich' : ''}" data-platz="${esc(m.platz)}"${m.ki ? ' data-ki="1"' : ''}${bild.banner ? ` data-banner="${esc(bild.banner)}"` : ''}>
+    ${bild.banner ? `<span class="lg-gr-streifen" aria-hidden="true" style="background-image:url('${B.bannerUrl(bild.banner)}')"></span>` : ''}
     <span class="lg-gr-platz">${esc(zahl(m.platz))}</span>
-    <span class="lg-gr-avatar" style="--h:${farbe(m.name)}" aria-hidden="true">${esc(initialen(m.ich ? (m.name || name) : name))}</span>
-    <span class="lg-gr-name"><b>${esc(name)}</b>${m.ki ? `<span class="lg-gr-ki" title="${esc(T('kiLang'))}">${esc(T('ki'))}</span>` : ''}</span>
+    <button class="lg-gr-wer" type="button" aria-haspopup="dialog" aria-label="${esc(T('mini.oeffnen', { name }))}">
+      <span class="lg-gr-avatar${bild.initialen ? '' : ' bild'}" style="--h:${farbe(m.name)}" aria-hidden="true">${bild.avatar}</span>
+      <span class="lg-gr-name"><b>${esc(name)}</b>${m.ki ? `<span class="lg-gr-ki" title="${esc(T('kiLang'))}">${esc(T('ki'))}</span>` : ''}</span>
+    </button>
     <span class="lg-gr-kronen" aria-label="${esc(T('kronen', { n: zahl(m.kronen) }))}">${esc(zahl(m.kronen))}${icon('krone')}</span>
     ${lohn}${info}
   </li>`;
+}
+
+// Profilbild und Banner eines Menschen (supabase/liga-bild-schema.sql); nur bekannte Formen, sonst null (dann Initialen).
+// profilAvatar prueft Figur, Hintergrund und Rahmen noch einmal gegen die eigenen Listen.
+const ID = /^[A-Za-z0-9-]{1,40}$/;
+function bildDaten(m) {
+  if (m.ki === true || typeof m.motiv !== 'string' || !ID.test(m.motiv)) return null;
+  return { motiv: m.motiv, grund: ID.test(m.grund || '') ? m.grund : 'standard', rahmen: ID.test(m.rahmen || '') ? m.rahmen : 'ohne',
+    banner: B && B.MENSCHEN_BANNER.includes(m.banner) ? m.banner : 'start' };
+}
+
+// Mini-Karte einer Zeile als Blatt: Banner, Bild, Name, dann Platz, Kronen und Stufe; ein Satz, was die Liga nicht zeigt
+function miniKarte(m, lg) {
+  const name = m.ich ? T('du') : (m.name || T('spieler'));
+  const bild = bildVon(m, m.ich ? (m.name || name) : name);
+  // zwei Teile um den Titel des Blatts (den Namen): oben Banner und Bild, unten Werte und Satz (Reihenfolge per CSS order)
+  const el = document.createElement('template');
+  el.innerHTML = `<div class="lg-mini-kopf"><span class="lg-mini-banner" aria-hidden="true"${bild.banner ? ` style="background-image:url('${B.bannerUrl(bild.banner)}')"` : ''}></span>
+    <span class="lg-mini-av lg-gr-avatar${bild.initialen ? '' : ' bild'}" style="--h:${farbe(m.name)}" aria-hidden="true">${bild.avatar}</span>
+    ${m.ki ? `<span class="lg-gr-ki lg-mini-ki" title="${esc(T('kiLang'))}">${esc(T('ki'))}</span>` : ''}</div>
+    <div class="lg-mini"><dl class="lg-mini-werte">
+      <div><dt>${esc(T('mini.platz'))}</dt><dd>${esc(zahl(m.platz))}.</dd></div>
+      <div><dt>${esc(T('mini.kronen'))}</dt><dd>${esc(zahl(m.kronen))}${icon('krone')}</dd></div>
+      <div class="lg-mini-stufe"><dt>${esc(T('mini.stufe'))}</dt><dd><img src="${esc(wappenUrl(lg.stufe))}" alt="" width="20" height="24">${esc(stufenName(lg.stufe))}</dd></div>
+    </dl>
+    <p class="lg-mini-satz">${esc(m.ki ? T('mini.ki') : m.ich ? T('mini.ich') : T('mini.satz'))}</p></div>`;
+  return B.sheet({ titel: name, inhalt: el.content, klasse: 'lg-mini-blatt', knoepfe: [{ text: T('mini.zu'), wert: true }], abbrechen: false });
 }
 
 // Antwort des Servers pruefen; alles Unbrauchbare gilt als Fehler (nie NaN, nie eine fremde Kennung in der Anzeige)
@@ -92,7 +147,7 @@ export function gruppeLage(d) {
   const mitglieder = (Array.isArray(d.mitglieder) ? d.mitglieder : [])
     .filter((m) => m && typeof m === 'object' && Number.isInteger(m.platz) && m.platz > 0)
     .map((m) => ({ platz: m.platz, name: typeof m.name === 'string' ? m.name.slice(0, 30) : '', kronen: Number.isFinite(m.kronen) ? Math.max(0, Math.floor(m.kronen)) : 0,
-      ki: m.ki === true, ich: m.ich === true }))
+      ki: m.ki === true, ich: m.ich === true, bild: bildDaten(m) }))
     .sort((a, b) => a.platz - b.platz);
   const platz = Number.isInteger(d.platz) ? d.platz : (mitglieder.find((m) => m.ich) || {}).platz || null;
   const offen = Array.isArray(d.offen) ? d.offen.filter((o) => o && typeof o === 'object').length : 0;
@@ -153,16 +208,25 @@ export function reiterGruppe({ app } = {}) {
       <p>${esc(text)}</p>${link ? `<a class="knopf primaer lg-gr-konto" href="#einstellungen/konto">${esc(T('kontoLink'))}</a>` : ''}</article>`;
   };
   function zeichne(lg) {
+    lage = lg;
     const ende = endeText(lg);
     s.innerHTML = `${buehne(lg)}
       ${ende ? `<p class="lg-gr-ende">${esc(ende)}</p>` : ''}
-      ${lg.offen ? `<p class="lg-gr-offen">${esc(T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
+      ${lg.offen ? `<p class="lg-gr-offen">${esc(lg.offen === 1 ? T('offenEins') : T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
       ${lg.botKiVoll ? `<p class="lg-gr-botvoll">${esc(T('botVoll'))}</p>` : ''}
       ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}`;
     s.dataset.zustand = lg.gruppe != null ? 'gruppe' : 'leer';
   }
 
+  let lage = null;
   s.addEventListener('click', (e) => {
+    const wer = e.target.closest('.lg-gr-wer');
+    if (wer && lage) {
+      const platz = Number(wer.closest('.lg-gr-zeile').dataset.platz);
+      const m = lage.mitglieder.find((x) => x.platz === platz);
+      if (m) miniKarte(m, lage);
+      return;
+    }
     const mehr = e.target.closest('.lg-gr-mehr');
     if (mehr) {
       const offen = mehr.getAttribute('aria-expanded') !== 'true';
@@ -182,7 +246,7 @@ export function reiterGruppe({ app } = {}) {
 
   karte('laedt', '', false);
   s.dataset.zustand = 'laedt';
-  import('../../kronen.js').then((k) => {
+  Promise.all([import('../../kronen.js'), ladeBild()]).then(([k]) => {
     if (weg) return;
     if (!k.angemeldet()) { karte('ohne-konto', T('ohneKonto', { n: zahl(GRUPPE_GROESSE) }), true); s.dataset.zustand = 'ohne-konto'; return; }
     return k.holeGruppe().then((d) => {
