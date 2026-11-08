@@ -1333,4 +1333,87 @@ end;
 $$;
 reset role;
 
+-- ---------- 14. Aufbewahrung: Wochen ueber 52 Wochen zurueck werden geloescht ----------
+-- Gruppen vor 53, 52 und 51 Wochen (abgerechnet, mit Belohnungen, eine davon nicht ausgezahlt). Geloescht wird nur die
+-- vor 53 Wochen; Stand und Buchungen bleiben. Gegenprobe: vor dem Aufruf sind die Zeilen da.
+create function pg_temp.stand_bild()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'stand', (select jsonb_agg(to_jsonb(s) order by s.user_id) from public.kronen_stand s),
+    'buchungen', (select jsonb_agg(to_jsonb(b) order by b.id) from public.kronen_buchungen b));
+$$;
+revoke all on function pg_temp.stand_bild() from public;
+do $$
+declare
+  heute date := public.liga_woche_heute();
+  g53 bigint;
+  g52 bigint;
+  g51 bigint;
+  vorher jsonb;
+  r jsonb;
+begin
+  g53 := pg_temp.alte_gruppe(53, 3);
+  g52 := pg_temp.alte_gruppe(52, 3);
+  g51 := pg_temp.alte_gruppe(51, 3);
+  update public.liga_gruppen set abgerechnet = true where id in (g53, g52, g51);
+  insert into public.liga_belohnungen (user_id, woche, stufe, platz, art, menge, ausgezahlt) values
+    (pg_temp.liga_nutzer(30), heute - 53 * 7, 3, 1, 'banner', 1, true),
+    (pg_temp.liga_nutzer(29), heute - 53 * 7, 3, 2, 'taler', 120, false),
+    (pg_temp.liga_nutzer(29), heute - 52 * 7, 3, 2, 'taler', 120, false),
+    (pg_temp.liga_nutzer(29), heute - 51 * 7, 3, 2, 'taler', 120, false);
+  -- Gegenprobe: ohne den Aufruf liegt die alte Woche noch da
+  if not exists (select 1 from public.liga_gruppen where id = g53)
+     or (select count(*) from public.liga_mitglieder where gruppe = g53) <> 30
+     or (select count(*) from public.liga_belohnungen where woche = heute - 53 * 7) <> 2 then
+    raise exception 'FEHLER: Aufbewahrung: Testdaten fehlen schon vor dem Aufruf';
+  end if;
+  vorher := pg_temp.stand_bild();
+  r := public.liga_alte_wochen_loeschen();
+  if r is distinct from '{"gruppen": 1, "plaetze": 30, "belohnungen": 2, "davon_nicht_ausgezahlt": 1}'::jsonb then
+    raise exception 'FEHLER: Aufbewahrung: Antwort falsch (%)', r;
+  end if;
+  if exists (select 1 from public.liga_gruppen where woche < heute - 52 * 7)
+     or exists (select 1 from public.liga_mitglieder where woche < heute - 52 * 7)
+     or exists (select 1 from public.liga_belohnungen where woche < heute - 52 * 7) then
+    raise exception 'FEHLER: Aufbewahrung: Woche vor 53 Wochen nicht geloescht';
+  end if;
+  if not exists (select 1 from public.liga_gruppen where id = g52) or not exists (select 1 from public.liga_gruppen where id = g51)
+     or (select count(*) from public.liga_mitglieder where gruppe in (g52, g51)) <> 60
+     or (select count(*) from public.liga_belohnungen where woche in (heute - 52 * 7, heute - 51 * 7)) <> 2 then
+    raise exception 'FEHLER: Aufbewahrung: Wochen vor 52 oder 51 Wochen geloescht';
+  end if;
+  if pg_temp.stand_bild() is distinct from vorher then
+    raise exception 'FEHLER: Aufbewahrung: Stand oder Buchungen veraendert';
+  end if;
+  -- wiederholbar: ein zweiter Lauf loescht nichts
+  r := public.liga_alte_wochen_loeschen();
+  if (r->>'gruppen')::int <> 0 or (r->>'belohnungen')::int <> 0 then
+    raise exception 'FEHLER: Aufbewahrung: zweiter Lauf loescht noch (%)', r;
+  end if;
+  -- Ausloeser ohne Cron: die Wochen-Abrechnung loescht mit (offene Gruppe der Vorwoche, alte Gruppe vor 60 Wochen)
+  g53 := pg_temp.alte_gruppe(60, 3);
+  update public.liga_gruppen set abgerechnet = true where id = g53;
+  insert into public.liga_gruppen (woche, stufe) values (heute - 7, 3);
+  perform public.liga_abrechnen();
+  if exists (select 1 from public.liga_gruppen where id = g53) then
+    raise exception 'FEHLER: Aufbewahrung: die Wochen-Abrechnung loescht alte Wochen nicht';
+  end if;
+end;
+$$;
+-- nur der Server: angemeldete Nutzer duerfen nicht loeschen lassen
+set local role authenticated;
+do $$
+begin
+  perform public.liga_alte_wochen_loeschen();
+  raise exception 'FEHLER: Aufbewahrung: authenticated darf liga_alte_wochen_loeschen aufrufen';
+exception when insufficient_privilege then null;
+end;
+$$;
+reset role;
+
 rollback;

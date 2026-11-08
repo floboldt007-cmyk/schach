@@ -16,18 +16,18 @@ ruft die neuen Funktionen nicht auf, das schadet also nicht, aber die neue App b
 | Nr. | Was | Datei oder Ort | Prüfen (Erwartung) |
 | --- | --- | --- | --- |
 | 1 | Zeitplaner einschalten | Dashboard → **Integrations** → **Cron** → die Erweiterung `pg_cron` einschalten (ältere Dashboards: **Database** → **Extensions** → `pg_cron`) | `select extname from pg_extension where extname = 'pg_cron';` ergibt eine Zeile. Geht es im Tarif nicht: weiter, das Duell wertet dann bei der nächsten Suche aus |
-| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300` |
+| 2 | Liga mit Kronen | `kronen-schema.sql` | `kronen-rls-test.sql`: kein `FEHLER:`, endet mit `ROLLBACK`. Kurzprobe: `select public.kronen_konstanten() ->> 'bot_ki_wochen_max';` ergibt `300`. Mit Cron zeigt `select jobname, schedule from cron.job;` auch `liga-alte-wochen-loeschen` mit `17 3 * * *` |
 | 3 | Tageszähler (bleiben aus) | `zaehler-schema.sql` | `zaehler-rls-test.sql`: kein `FEHLER:`, `ROLLBACK` |
 | 4 | Visitenkarte, Erfolge, Banner | `karte-schema.sql` | `karte-rls-test.sql`: kein `FEHLER:`, der Editor meldet „Success“ |
-| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
+| 5 | Rätsel-Duell, Teil 1 | `raetsel-duell-schema.sql` | Mit Cron: `select jobname, schedule from cron.job;` zeigt jetzt zusätzlich `raetsel-duell-auswerten` mit `*/10 * * * *` (ohne Cron meldet diese Abfrage, dass es `cron.job` nicht gibt; das ist dann richtig) |
 | 6 | Rätsel-Duell, Rätsel | `raetsel-duell-daten.sql` (464.528 Byte, 7 Blöcke) | `select count(*) from public.duell_raetsel;` ergibt `3040` |
 | 7 | Rätsel-Duell, Edge Function | im Terminal, drei Befehle (siehe „Schritt 7 im Terminal“ unten) | Unter **Edge Functions** steht `raetsel-duell` |
 | 8 | Rätsel-Duell prüfen | `raetsel-duell-rls-test.sql` | kein `FEHLER:`, `ROLLBACK` |
 | 9 | Datenauskunft auf den neuen Stand | `daten-schema.sql` (noch einmal) | `daten-rls-test.sql`: unten `Daten-RLS-Test erfolgreich` |
 | 10 | App neu einlesen lassen | `notify pgrst, 'reload schema';` | keine Meldung nötig |
 
-**Warum genau diese Reihenfolge:** Cron muss vor Schritt 5 an sein, sonst plant das Duell keinen Server-Lauf ein (wer
-Cron später einschaltet, führt Schritt 5 einfach noch einmal aus). Die Karte (4) liest Stufen und Wochen-Gruppen der
+**Warum genau diese Reihenfolge:** Cron muss vor Schritt 2 und 5 an sein, sonst planen Liga und Duell keinen
+Server-Lauf ein (wer Cron später einschaltet, führt Schritt 2 und 5 einfach noch einmal aus). Die Karte (4) liest Stufen und Wochen-Gruppen der
 Liga (2), das Duell (5) bucht seine Kronen über die Liga (2). Die Datenauskunft (9) kommt zuletzt, weil sie alle drei
 Teile mit ausgibt.
 
@@ -338,6 +338,13 @@ nicht mehr.
 
 **Abrechnung ohne Zeitplan:** Die Woche rechnet sich beim nächsten Aufruf selbst ab (`liga_abrechnen()`, bei jeder
 Buchung und jedem Blick auf Stand oder Gruppe). Es braucht kein `pg_cron`, keinen Zeitplan und keine Edge Function.
+
+**Aufbewahrung (Flo 08.11.2026):** Am Ende jeder Wochen-Abrechnung löscht `liga_alte_wochen_loeschen()` die
+Wochen-Gruppen, Plätze und Belohnungen von Wochen, die mehr als 52 Wochen zurückliegen (auch nicht ausgezahlte Taler).
+Vorher bekommt jedes betroffene Konto seine Liga-Erfolge und noch offenen Banner aus diesen Wochen gutgeschrieben (wenn
+`karte-schema.sql` eingespielt ist). Stufe, Kronen-Summe, Elo und die Buchungen bleiben bis zur Kontolöschung. Ist
+`pg_cron` eingeschaltet, läuft das zusätzlich jeden Tag um 03:17 Uhr (UTC) als Job `liga-alte-wochen-loeschen`; ohne
+`pg_cron` reicht die Abrechnung. Wer Cron erst später einschaltet, führt `kronen-schema.sql` danach noch einmal aus.
 
 1. Vorher muss das Online-Schema eingerichtet sein, in der Reihenfolge aus „Online gegen Freunde“ und „Anti-Cheat
    Etappe 1a“ (zuerst die Edge Function, dann das SQL). Die Kronen-Datei hängt an die Tabelle `partien_online` die

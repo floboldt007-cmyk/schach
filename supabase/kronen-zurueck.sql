@@ -46,6 +46,20 @@ drop function if exists public.liga_mein_platz(uuid);
 drop function if exists public.liga_buchen(uuid, integer);
 drop function if exists public.kronen_stand_sichern(uuid);
 drop function if exists public.liga_abrechnen();
+-- Aufbewahrung: erst den taeglichen Lauf ausplanen (nur wenn pg_cron da ist und der Job existiert), dann die Funktion
+do $cron$
+declare
+  da boolean := false;
+begin
+  if pg_catalog.to_regclass('cron.job') is not null then
+    execute $sql$select exists (select 1 from cron.job where jobname = 'liga-alte-wochen-loeschen')$sql$ into da;
+    if da then
+      execute $sql$select cron.unschedule('liga-alte-wochen-loeschen')$sql$;
+    end if;
+  end if;
+end;
+$cron$;
+drop function if exists public.liga_alte_wochen_loeschen();
 drop function if exists public.liga_rangliste(bigint, boolean);
 drop function if exists public.liga_bots(bigint, boolean);
 drop function if exists public.liga_wochen_anteil(date);

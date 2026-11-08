@@ -241,6 +241,55 @@ as $$
   ) r;
 $$;
 
+-- Aufbewahrung (Flo 08.11.2026): Wochen-Gruppen (liga_gruppen), die Plaetze darin (liga_mitglieder) und die
+-- Belohnungen (liga_belohnungen, auch nicht ausgezahlte) von Wochen, die mehr als 52 Wochen vor der laufenden Woche
+-- liegen, werden geloescht. Der Stand (kronen_stand) bleibt, ebenso die Buchungen (kronen_buchungen): kronen_start
+-- erkennt an ihnen, dass ein Konto schon gespielt hat, wenn start_gesetzt noch false ist. Vorher bekommt jedes
+-- betroffene Konto ueber karte_sichern (falls karte-schema.sql eingespielt ist) seine Erfolgs-Stufen aus diesen Wochen
+-- und die noch nicht ausgezahlten Banner. Nur abgerechnete Gruppen. Laeuft am Ende jeder Wochen-Abrechnung und, falls
+-- pg_cron eingeschaltet ist, zusaetzlich taeglich (unten). Wiederholbar. Antwort: geloeschte Zeilen je Tabelle.
+create index if not exists liga_belohnungen_woche on public.liga_belohnungen (woche);
+
+create or replace function public.liga_alte_wochen_loeschen()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  grenze date := public.liga_woche_heute() - 52 * 7;
+  uid uuid;
+  n_gruppen integer;
+  n_plaetze integer;
+  n_belohnungen integer;
+  n_offen integer;
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('liga-abrechnen'));
+  if pg_catalog.to_regprocedure('public.karte_sichern(uuid)') is not null then
+    for uid in
+      select m.user_id from public.liga_mitglieder m join public.liga_gruppen g on g.id = m.gruppe
+      where g.woche < grenze and g.abgerechnet
+      union
+      select l.user_id from public.liga_belohnungen l where l.woche < grenze and not l.ausgezahlt
+    loop
+      perform public.karte_sichern(uid);
+    end loop;
+  end if;
+  select count(*)::integer into n_plaetze from public.liga_mitglieder m join public.liga_gruppen g on g.id = m.gruppe
+  where g.woche < grenze and g.abgerechnet;
+  select count(*)::integer into n_offen from public.liga_belohnungen l where l.woche < grenze and not l.ausgezahlt;
+  delete from public.liga_belohnungen l where l.woche < grenze;
+  get diagnostics n_belohnungen = row_count;
+  -- die Plaetze gehen mit der Gruppe (on delete cascade)
+  delete from public.liga_gruppen g where g.woche < grenze and g.abgerechnet;
+  get diagnostics n_gruppen = row_count;
+  return jsonb_build_object('gruppen', n_gruppen, 'plaetze', n_plaetze, 'belohnungen', n_belohnungen,
+    'davon_nicht_ausgezahlt', n_offen);
+end;
+$$;
+
+revoke all on function public.liga_alte_wochen_loeschen() from public, anon, authenticated, service_role;
+
 -- Rechnet alle Gruppen frueherer Wochen ab, die noch offen sind: Platz 1 bis 5 eine Stufe auf (hoechstens Koenig I),
 -- die letzten 5 eine ab (nie unter Bauer III), Bots zaehlen mit (volles Wochenziel). Je Mensch die Platz-Belohnung,
 -- beim ersten Aufstieg in eine neue Liga dazu ein Banner. Nacheinander (Sperre) und je Gruppe genau einmal.
@@ -296,6 +345,8 @@ begin
     end loop;
     update public.liga_gruppen x set abgerechnet = true where x.id = g.id;
   end loop;
+  -- einmal je neuer Woche: Wochen ueber 52 Wochen zurueck loeschen (Aufbewahrung oben)
+  perform public.liga_alte_wochen_loeschen();
 end;
 $$;
 
@@ -987,3 +1038,14 @@ $$;
 
 revoke all on function public.kronen_start(integer) from public, anon, authenticated;
 grant execute on function public.kronen_start(integer) to authenticated;
+
+-- Aufbewahrung: mit pg_cron zusaetzlich taeglich um 03:17 (UTC), damit alte Wochen auch in einer Woche ohne
+-- Abrechnung verschwinden. Ohne pg_cron reicht die Abrechnung. Gleicher Name = ersetzt, also wiederholbar.
+do $cron$
+begin
+  if pg_catalog.to_regnamespace('cron') is not null then
+    execute $sql$select cron.schedule('liga-alte-wochen-loeschen', '17 3 * * *',
+      'select public.liga_alte_wochen_loeschen()')$sql$;
+  end if;
+end;
+$cron$;

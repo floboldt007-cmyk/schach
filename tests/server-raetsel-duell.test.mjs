@@ -116,17 +116,24 @@ create function cron.unschedule(n text) returns boolean language sql as $$
   delete from cron.job where jobname = n returning true;
 $$;`;
   let g = await lauf(cdb, 'Attrappe mit cron', ATTRAPPE + CRON);
-  for (const datei of ['supabase/online-schema.sql', 'supabase/kronen-schema.sql', 'supabase/raetsel-duell-schema.sql',
-    'supabase/raetsel-duell-schema.sql']) {
+  for (const datei of ['supabase/online-schema.sql', 'supabase/kronen-schema.sql', 'supabase/kronen-schema.sql',
+    'supabase/raetsel-duell-schema.sql', 'supabase/raetsel-duell-schema.sql']) {
     g = g || await lauf(cdb, datei, lies(datei));
   }
-  const jobs = g ? [] : (await cdb.query(`select jobname, schedule, command from cron.job`)).rows;
-  pruefe('pg_cron: Server-Lauf alle 10 Minuten eingeplant, auch nach zweimal Einspielen genau ein Job',
-    !g && jobs.length === 1 && jobs[0].jobname === 'raetsel-duell-auswerten' && jobs[0].schedule === '*/10 * * * *'
-    && jobs[0].command === 'select public.duell_alle_faelligen_auswerten()', g || JSON.stringify(jobs));
+  const jobs = g ? [] : (await cdb.query(`select jobname, schedule, command from cron.job order by jobname`)).rows;
+  pruefe('pg_cron: Server-Lauf alle 10 Minuten und Aufbewahrung taeglich, auch nach zweimal Einspielen je genau ein Job',
+    !g && jobs.length === 2
+    && jobs[0].jobname === 'liga-alte-wochen-loeschen' && jobs[0].schedule === '17 3 * * *'
+    && jobs[0].command === 'select public.liga_alte_wochen_loeschen()'
+    && jobs[1].jobname === 'raetsel-duell-auswerten' && jobs[1].schedule === '*/10 * * * *'
+    && jobs[1].command === 'select public.duell_alle_faelligen_auswerten()', g || JSON.stringify(jobs));
+  const namen = async () => (await cdb.query(`select jobname from cron.job order by jobname`)).rows.map((r) => r.jobname).join(',');
   g = g || await lauf(cdb, 'raetsel-duell-zurueck.sql', lies('supabase/raetsel-duell-zurueck.sql'));
-  const rest = g ? null : (await cdb.query(`select count(*)::int as n from cron.job`)).rows[0].n;
-  pruefe('pg_cron: der Rueckweg plant den Server-Lauf wieder aus', !g && rest === 0, g || rest);
+  const rest = g ? null : await namen();
+  pruefe('pg_cron: der Duell-Rueckweg plant nur den Duell-Lauf aus', !g && rest === 'liga-alte-wochen-loeschen', g || rest);
+  g = g || await lauf(cdb, 'kronen-zurueck.sql', lies('supabase/kronen-zurueck.sql'));
+  const rest2 = g ? null : await namen();
+  pruefe('pg_cron: der Kronen-Rueckweg plant die Aufbewahrung aus', !g && rest2 === '', g || rest2);
   await cdb.close();
 }
 

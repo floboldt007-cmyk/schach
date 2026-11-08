@@ -358,5 +358,38 @@ end;
 $$;
 reset role;
 
+-- ---------- 8. Aufbewahrung: alte Wochen loeschen nimmt keine Erfolge und keine Banner mit ----------
+-- D war vor 53 Wochen in Turm III (Stufe 9), heute Bauer III, hat die Karte seitdem nie geoeffnet, und sein Platz-1-Banner
+-- von damals ist noch nicht ausgezahlt. liga_alte_wochen_loeschen (kronen-schema.sql) bucht vorher ueber karte_sichern
+-- die Liga-Stufen 1 und 2 (Ziele 6 und 9) und das Banner von Turm (saison-gold); danach ist die alte Woche weg.
+insert into auth.users (id, email) values ('d1d1d1d1-dddd-4ddd-8ddd-dddddddddddd', 'karte-d@example.invalid');
+do $$
+declare
+  uid uuid := 'd1d1d1d1-dddd-4ddd-8ddd-dddddddddddd';
+  w date := public.liga_woche_heute() - 53 * 7;
+  gid bigint;
+begin
+  insert into public.kronen_stand (user_id, stufe) values (uid, 0);
+  insert into public.liga_gruppen (woche, stufe, abgerechnet) values (w, 9, true) returning id into gid;
+  insert into public.liga_mitglieder (gruppe, user_id, woche, kronen) values (gid, uid, w, 500);
+  insert into public.liga_belohnungen (user_id, woche, stufe, platz, art, menge) values (uid, w, 9, 1, 'banner', 1);
+  if exists (select 1 from public.karte_stufen where user_id = uid) then
+    raise exception 'FEHLER: Aufbewahrung: Testkonto hat schon Stufen';
+  end if;
+  perform public.liga_alte_wochen_loeschen();
+  if exists (select 1 from public.liga_gruppen where id = gid)
+     or exists (select 1 from public.liga_belohnungen where user_id = uid) then
+    raise exception 'FEHLER: Aufbewahrung: alte Woche nicht geloescht';
+  end if;
+  if (select array_agg(stufe order by stufe) from public.karte_stufen where user_id = uid and familie = 'liga')
+     is distinct from array[1, 2] then
+    raise exception 'FEHLER: Aufbewahrung: Liga-Stufen aus der alten Woche verloren';
+  end if;
+  if not exists (select 1 from public.banner_besitz where user_id = uid and banner = 'saison-gold' and quelle = 'liga') then
+    raise exception 'FEHLER: Aufbewahrung: nicht ausgezahltes Banner verloren';
+  end if;
+end;
+$$;
+
 do $$ begin raise notice 'Karte-RLS-Test erfolgreich'; end; $$;
 rollback;
