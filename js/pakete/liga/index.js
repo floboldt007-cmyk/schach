@@ -2,16 +2,14 @@
 // Keine Engine-Arbeit, kein Zugriff auf fremde Screen-Elemente. Fehler bleiben im Paket.
 import { hoere, sende } from '../../ereignisse.js';
 import { anbieten } from '../../orte.js';
-import { melde } from '../../feier.js';
 import { BOTS, botNachId } from '../../bots.js';
 import { ladeModul, speichereModul, ladePartie, wertet, MODUL_BUDGET, eigeneZuege, BESTWERT_MIN_ZUEGE } from '../../storage.js';
 import { registriereIcon } from '../../ui/icons.js';
-import { t } from '../../sprache.js';
 import './texte.js';
 import {
-  normalisiereStand, wechsleSaison, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
+  normalisiereStand, beendeSaisonLiga, buchePartie, bucheGenauigkeit, belegFuer, imBudget, STUFEN,
 } from './wertung.js';
-import { saisonKarte, verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
+import { verlaufKarte, botBilanz, abrechnungsZeile } from './ansicht.js';
 import { reiterGruppe, huelleGruppe } from './gruppe.js';
 import { protokolliere } from '../../protokoll.js';
 
@@ -26,7 +24,9 @@ function sicher(fn) {
   };
 }
 
-const lese = () => normalisiereStand(ladeModul(MODUL), new Date());
+// Eine Liga (Flo 08.11.2026): es zaehlt nur die Kronen-Liga. Jeder gelesene Stand ist ein beendeter Saison-Stand
+// (wertung.js beendeSaisonLiga); Wertung, Kurve, Belege und die Saison-Abzeichen im Archiv bleiben.
+const lese = () => { const st = normalisiereStand(ladeModul(MODUL), new Date()); return st && beendeSaisonLiga(st); };
 
 function geaendert(st, aufstieg = false) {
   // Empfaenger erhalten eigene Daten und koennen den gespeicherten Zustand nicht veraendern.
@@ -39,31 +39,22 @@ function speichere(st) {
   return speichereModul(MODUL, klein).ok;
 }
 
-function saisonPruefen() {
-  if ([...laufend.values()].some((l) => !l.beendet)) return;
-  const st = lese();
-  if (!st) return;
-  const r = wechsleSaison(st, new Date());
-  if (r.wechsel && speichere(r.stand)) geaendert(r.stand);
+// Migration im Browser: ein gespeicherter Stand ohne Merker saisonEnde wird einmal beendet und gespeichert (die laufende
+// Saison kommt als Abzeichen ins Archiv). Ohne gespeicherten Stand entsteht nichts. Ein Stand aus einer neueren App
+// (normalisiereStand null) bleibt unberuehrt.
+function migriere() {
+  const roh = ladeModul(MODUL);
+  if (roh == null) return;
+  const st = normalisiereStand(roh, new Date());
+  if (!st || st.saisonEnde === true) return;
+  const neu = beendeSaisonLiga(st);
+  if (speichere(neu)) geaendert(neu);
 }
 
-function feiere(r, partieId) {
-  for (const a of r.aufstieg) {
-    const klasse = a.art === 'klasse';
-    melde({
-      partieId, quelle: klasse ? 'klasse' : 'liga-saison',
-      titel: klasse ? t('p-liga.feier.klasse', { klasse: t('p-liga.klasse.' + a.stufe) }) : t('p-liga.feier.liga', { stufe: t('p-liga.stufe.' + a.stufe) }),
-      text: klasse ? t('p-liga.feier.klasseText', { n: r.stand.wertung.n, wert: r.stand.wertung.wert })
-        : t('p-liga.feier.ligaText', { nr: r.stand.saison.nr, punkte: r.stand.saison.punkte }),
-      symbol: klasse ? 'bauer' : 'liga-wappen', klang: 'rekord',
-    });
-  }
-}
-
-function uebernehme(r, partieId) {
+// Keine Feier mehr: Liga-Punkte gibt es nicht, und die Spielklasse zeigt keinen Figurennamen mehr (Flo 08.11.2026)
+function uebernehme(r) {
   if (!r.gebucht || !speichere(r.stand)) return;
-  feiere(r, partieId);
-  geaendert(r.stand, r.aufstieg.length > 0);
+  geaendert(r.stand, false);
 }
 
 // Etappe B Task 6: Start-Liga aus der lokalen Elo, sobald ein Konto da ist (ein eigenes Anmelde-Ereignis gibt es nicht).
@@ -76,11 +67,10 @@ function startLiga() {
 
 hoere('app:bereit', sicher(() => {
   laufend.clear();
-  saisonPruefen();
+  migriere();
   startLiga();
 }));
-hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) { saisonPruefen(); startLiga(); } }));
-hoere('app:screen', sicher(({ name }) => { if (name !== 'partie') saisonPruefen(); }));
+hoere('app:sichtbar', sicher(({ sichtbar }) => { if (sichtbar) startLiga(); }));
 hoere('partie:gestartet', sicher((d) => {
   laufend.set(d.laufId, { wertet: d.wertet === true, hinweise: d.hinweise || 0, beendet: false });
 }));
@@ -116,20 +106,19 @@ hoere('partie:beendet', sicher((d) => {
   meldeKronen(p, bot);
   if (!st) return;
   const partie = { ...p, hinweise: Math.max(p.hinweise || 0, d.hinweise || 0, l?.hinweise || 0) };
-  uebernehme(buchePartie(st, partie, bot.elo, new Date()), p.id);
+  uebernehme(buchePartie(st, partie, bot.elo, new Date()));
 }));
 
 hoere('partie:analysiert', sicher((d) => {
   if (d.wertet !== true) return;
   const st = lese(), p = ladePartie(d.partieId);
-  // Nachholen einer alten Partie darf keine zweite Wertung und keine neue Saison-Partie erzeugen.
+  // Nachholen einer alten Partie darf keine zweite Wertung erzeugen.
   if (!st || !p || !wertet(p) || !belegFuer(st, p.id)) return;
-  const frisch = wechsleSaison(st, new Date()).stand;
   const genauigkeit = p.genauigkeitQuelle === 'analyse' && Number.isFinite(p.genauigkeit)
     ? p.genauigkeit : d.review?.genauigkeit?.[p.spielerFarbe];
   // Zu kurze Partien zeigen keine Genauigkeit ("zu kurz"), dann zaehlt sie auch in der Liga nicht
   if (eigeneZuege(p) < BESTWERT_MIN_ZUEGE) return;
-  uebernehme(bucheGenauigkeit(frisch, p.id, genauigkeit), p.id);
+  uebernehme(bucheGenauigkeit(st, p.id, genauigkeit));
 }));
 
 if (typeof document !== 'undefined') {
@@ -141,9 +130,8 @@ if (typeof document !== 'undefined') {
     document.head.append(css);
     registriereIcon('liga-wappen', '<path d="M5 4h14v8c0 4-4 7-7 9-3-2-7-5-7-9z"/><path d="m8 9 4 3 4-3M8 14l4 3 4-3"/>');
   })();
-  const kontext = { lese, bots: BOTS, saisonPruefen: sicher(saisonPruefen),
-    verstanden: sicher(() => { const st = lese(); if (st) { delete st.wechsel; if (speichere(st)) geaendert(st); } }) };
-  anbieten('arena:panel-oben', sicher(() => saisonKarte(kontext)), { reihenfolge: 30, paket: MODUL });
+  const kontext = { lese };
+  // Die Saison-Liga-Karte der Bots-Seite (Ort arena:panel-oben) entfaellt mit der einen Liga (Flo 08.11.2026)
   anbieten('arena:panel-bot', sicher((k) => botBilanz(k)), { reihenfolge: 15, paket: MODUL });
   anbieten('ergebnis:abrechnung', sicher((k) => abrechnungsZeile(k, lese())), { reihenfolge: 30, paket: MODUL });
   anbieten('verlauf:seite', sicher(() => verlaufKarte(kontext)), { reihenfolge: 20, paket: MODUL });

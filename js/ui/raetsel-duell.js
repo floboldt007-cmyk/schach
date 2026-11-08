@@ -171,7 +171,7 @@ export function zeige(root, params, app) {
 
   function starteDuell(id) {
     aufraeumen();
-    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false });
+    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, gesehen: false });
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
         <div class="rd-leiste">${seiteHtml('ich')}<div class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(KONST.DAUER_S * 1000)}</div>${seiteHtml('gegner')}</div>
@@ -198,6 +198,8 @@ export function zeige(root, params, app) {
       d.versatz = versatzAus(st.jetzt, Date.now());
       d.st = st;
       if (st.status === 'beendet' || st.status === 'abgebrochen') { zeigeEnde(st); return; }
+      // Start-Klang, sobald das Duell zum ersten Mal laeuft (Gegner gefunden, Einladung angenommen), wie vor einer Partie
+      if (!d.gesehen) { d.gesehen = true; try { klang.spiele('start'); } catch (e) { /* ohne Klang */ } }
       if (!d.wartet) setzeRaetsel(st.raetsel);
       zeichneLeiste();
     }
@@ -313,6 +315,10 @@ export function zeige(root, params, app) {
     phase('beendet');
     const g = st.gegner || { geloest: 0 };
     const erg = st.ergebnis || 'remis';
+    // Ende-Klang nur, wenn das Duell hier gelaufen ist (nicht beim Oeffnen eines alten Duells) und nicht abgebrochen wurde
+    if (d.gesehen && st.status === 'beendet') {
+      try { klang.ende(erg === 'sieg' ? true : erg === 'niederlage' ? false : null); } catch (e) { /* ohne Klang */ }
+    }
     let kronen = D('ende.ohne');
     if (st.art !== 'freundschaft') kronen = st.kronen_delta ? D('ende.kronen', { delta: kronenText(st.kronen_delta) }) : D('ende.keinekronen');
     rumpf.innerHTML = `<section class="rd-karte rd-ende" data-ergebnis="${esc(erg)}" aria-live="polite">

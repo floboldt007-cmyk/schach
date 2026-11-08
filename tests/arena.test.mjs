@@ -430,8 +430,8 @@ async function testeKarteQuer(browser) {
     && document.querySelector('.knoten[data-bot="hilde"] .k-name').textContent === 'Oma Hilde' && document.querySelector('.knoten[data-bot="hilde"] .k-meta').textContent === '500'
     && document.querySelector('.knoten[data-bot="fridolin"] .k-nr').textContent === '1' && document.querySelector('.knoten[data-bot="janine"] .k-nr').textContent === '6'));
   const labels = await seite.evaluate(() => ['benno', 'paula', 'hilde', 'janine'].map((id) => document.querySelector(`.knoten[data-bot="${id}"]`).getAttribute('aria-label')));
-  pruefe('aria-label wie bisher („Stufe n: Name, Elo x, Zustand, k von 3 Sternen“), der offene Endgegner „direkt herausfordern“', labels[0] === 'Stufe 2: Bauer Lukas, Elo 200, besiegt, 2 von 3 Sternen' && labels[1] === 'Stufe 3: Postbotin Paula, Elo 300, nächster Gegner'
-    && labels[2] === 'Stufe 5: Oma Hilde, Elo 500, gesperrt' && labels[3] === 'Stufe 6: Janine vom Scheunenclub, Elo 600, Endgegner, direkt herausfordern', labels.join(' | '));
+  pruefe('aria-label wie bisher („Bot n von 6: Name, Elo x, Zustand, k von 3 Sternen“), der offene Endgegner „direkt herausfordern“', labels[0] === 'Bot 2 von 6: Bauer Lukas, Elo 200, besiegt, 2 von 3 Sternen' && labels[1] === 'Bot 3 von 6: Postbotin Paula, Elo 300, nächster Gegner'
+    && labels[2] === 'Bot 5 von 6: Oma Hilde, Elo 500, gesperrt' && labels[3] === 'Bot 6 von 6: Janine vom Scheunenclub, Elo 600, Endgegner, direkt herausfordern', labels.join(' | '));
   pruefe('Portraets der Stationen und des Panels aus assets/avatare/modern/', await seite.evaluate(() => [...document.querySelectorAll('.knoten .avatar img')].every((i, n) => i.src.endsWith(`/assets/avatare/modern/${document.querySelectorAll('.knoten')[n].dataset.bot}.svg`))
     && document.querySelector('.detail .detail-kopf .av img').src.endsWith('/assets/avatare/modern/paula.svg')));
   const atmen = await seite.evaluate(() => {
@@ -482,7 +482,7 @@ async function testeKarteQuer(browser) {
       tempo: !!d.querySelector('.ort-tempo'), bilanz: d.querySelectorAll('.bilanz b').length, miniSterne: d.querySelectorAll('.mini-sterne .stern').length,
       sternSvg: !!d.querySelector('.ziel-sterne b svg') && !/★/.test(d.textContent), ueberFarbe: getComputedStyle(d.querySelector('.detail-ueber')).color, akzentText: getComputedStyle(document.documentElement).getPropertyValue('--akzent-text').trim() };
   });
-  pruefe('Kopf: Ueberzeile „Stufe 3 · Nächster Gegner“ in --akzent-text, Welt, Name, „Elo 300 · Die Eilige“', panel.h2 === 'Postbotin Paula' && panel.ueber === 'Stufe 3 · Nächster Gegner' && panel.elo === 'Elo 300 · Die Eilige'
+  pruefe('Kopf: Ueberzeile „Bot 3 von 6 · Nächster Gegner“ in --akzent-text, Welt, Name, „Elo 300 · Die Eilige“', panel.h2 === 'Postbotin Paula' && panel.ueber === 'Bot 3 von 6 · Nächster Gegner' && panel.elo === 'Elo 300 · Die Eilige'
     && panel.welt === 'Welt 1 · Die Karofelder' && panel.ueberFarbe === 'rgb(184, 62, 26)', JSON.stringify(panel));
   // Variante A (Flo 08.11.2026): das Panel zeigt nur den naechsten Gegner. Heute-Karte, panel-bot, Steckbrief und Bilanz sind weg
   pruefe('Orte (Variante A): .ort-panel-oben erstes Kind (nur Nachlese), keine Heute-Karte, kein panel-bot, die Farbwahl direkt nach .ziel-sterne, .ort-tempo da',
@@ -498,10 +498,10 @@ async function testeKarteQuer(browser) {
       gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, pressed: document.querySelector(`.knoten[data-bot="${i}"]`).getAttribute('aria-pressed') + document.querySelector('.knoten[data-bot="paula"]').getAttribute('aria-pressed') }), id);
   };
   const wahl = await waehleStation('benno');
-  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Lukas, Besiegt, 2 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Lukas' && wahl.ueber === 'Stufe 2 · Besiegt' && wahl.an === 2 && wahl.mini === 2
+  pruefe('Wahl einer besiegten Station aktualisiert das Panel (Lukas, Besiegt, 2 Ziele erreicht, Revanche)', wahl.h2 === 'Bauer Lukas' && wahl.ueber === 'Bot 2 von 6 · Besiegt' && wahl.an === 2 && wahl.mini === 2
     && wahl.spielen === 'Revanche gegen Lukas' && wahl.gewaehlt === 'benno' && wahl.pressed === 'truefalse', JSON.stringify(wahl));
   const wahl3 = await waehleStation('fridolin');
-  pruefe('alle drei Ziele erreicht (Willi, 3 Sterne, Revanche)', wahl3.h2 === 'Vogelscheuche Willi' && wahl3.ueber === 'Stufe 1 · Besiegt' && wahl3.an === 3 && wahl3.mini === 3
+  pruefe('alle drei Ziele erreicht (Willi, 3 Sterne, Revanche)', wahl3.h2 === 'Vogelscheuche Willi' && wahl3.ueber === 'Bot 1 von 6 · Besiegt' && wahl3.an === 3 && wahl3.mini === 3
     && wahl3.spielen === 'Revanche gegen Willi' && wahl3.gewaehlt === 'fridolin' && wahl3.pressed === 'truefalse', JSON.stringify(wahl3));
   await tippe(seite, '.knoten[data-bot="gustav"]');
   await seite.waitForSelector('.toast');
@@ -869,8 +869,8 @@ async function testeWelten(browser) {
       welt: document.querySelector('.detail-welt').textContent, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(),
       gewaehlt: document.querySelector('.knoten.gewaehlt').dataset.bot, offen: document.querySelector('.knoten[data-bot="janine"]').classList.contains('offen'),
       toast: document.querySelectorAll('.toast').length }));
-    pruefe('Endgegner offen: Janine ist ohne Sieg ueber Maik und Hilde waehlbar (Panel „Stufe 6 · Endgegner · direkt herausfordern“, Spielen gegen Janine), keine Sperr-Meldung',
-      jan.h2 === 'Janine vom Scheunenclub' && jan.ueber === 'Stufe 6 · Endgegner · direkt herausfordern' && jan.welt === 'Welt 1 · Die Karofelder' && jan.spielen === 'Spielen gegen Janine'
+    pruefe('Endgegner offen: Janine ist ohne Sieg ueber Maik und Hilde waehlbar (Panel „Bot 6 von 6 · Endgegner · direkt herausfordern“, Spielen gegen Janine), keine Sperr-Meldung',
+      jan.h2 === 'Janine vom Scheunenclub' && jan.ueber === 'Bot 6 von 6 · Endgegner · direkt herausfordern' && jan.welt === 'Welt 1 · Die Karofelder' && jan.spielen === 'Spielen gegen Janine'
       && jan.gewaehlt === 'janine' && jan.offen && jan.toast === 0, JSON.stringify(jan));
     // Pfeil „Vor“ (mit dem Finger): Welt 2 ist gesperrt, die Karte zeigt sie als ruhige Silhouette mit Sperre
     await tippe(seite, '.ww-pfeil[data-richtung="1"]');
@@ -941,14 +941,14 @@ async function testeWelten(browser) {
         zustaende: [...document.querySelectorAll('.welt .knoten')].map((k) => k.dataset.bot + '=' + ['besiegt', 'aktuell', 'offen', 'gesperrt'].find((z) => k.classList.contains(z))).join() };
     });
     pruefe('Schild NEU nur an Willi (frei, unbesiegt, unter dem besten Sieg): offen, ohne Schloss und in Farbe, Beschriftung „neu eingezogen“',
-      n.neu === 'fridolin:NEU' && n.fridolin && n.schloss === 0 && n.grau === 'none' && n.label === 'Stufe 1: Vogelscheuche Willi, Elo 100, neu eingezogen', JSON.stringify(n));
+      n.neu === 'fridolin:NEU' && n.fridolin && n.schloss === 0 && n.grau === 'none' && n.label === 'Bot 1 von 6: Vogelscheuche Willi, Elo 100, neu eingezogen', JSON.stringify(n));
     pruefe('Zustaende nach Lukas-Sieg: Willi offen, Lukas besiegt, Paula aktuell, Maik und Hilde gesperrt, Janine offen', n.zustaende === 'fridolin=offen,benno=besiegt,paula=aktuell,gustav=gesperrt,hilde=gesperrt,janine=offen', n.zustaende);
     const kl = await kartenLage(seite);
     pruefe('Schild NEU liegt innerhalb der Karte und ueberdeckt keine andere Station', kl.ueber.length === 0 && kl.raus.length === 0, JSON.stringify(kl));
     await tippe(seite, '.knoten[data-bot="fridolin"]');
     await warte(700);
     const pf = await seite.evaluate(() => ({ ueber: document.querySelector('.detail-ueber').textContent, spielen: document.querySelector('[data-aktion="spielen"]').textContent.trim(), toast: document.querySelectorAll('.toast').length }));
-    pruefe('Tipp auf den neu eingezogenen Bot waehlt ihn: „Stufe 1 · Neu eingezogen“, Spielen gegen Willi', pf.ueber === 'Stufe 1 · Neu eingezogen' && pf.spielen === 'Spielen gegen Willi' && pf.toast === 0, JSON.stringify(pf));
+    pruefe('Tipp auf den neu eingezogenen Bot waehlt ihn: „Bot 1 von 6 · Neu eingezogen“, Spielen gegen Willi', pf.ueber === 'Bot 1 von 6 · Neu eingezogen' && pf.spielen === 'Spielen gegen Willi' && pf.toast === 0, JSON.stringify(pf));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
   }

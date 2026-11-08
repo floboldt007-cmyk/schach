@@ -29,6 +29,8 @@ export const FINISHER = Object.freeze([
   Object.freeze({ id: 'krone', text: 'krone', klang: 'finisher-glocke' }),
   Object.freeze({ id: 'welle', text: 'welle', klang: 'finisher-kreide' }),
   Object.freeze({ id: 'koenig', text: 'koenig', klang: 'finisher-tinte' }),
+  // Kronensturz (Flo 08.11.2026): die Krone faellt vom mattgesetzten Koenig, rollt aus und bleibt liegen; Klang wie Krone
+  Object.freeze({ id: 'kronensturz', text: 'kronensturz', klang: 'finisher-glocke' }),
   Object.freeze({ id: 'signatur', text: 'signatur', klang: 'finisher-tinte', sonder: ERFINDER.finisher }),
 ]);
 // was dieses Konto sehen darf: alle Stufen-Finisher, Sonderstuecke nur mit Besitz
@@ -65,7 +67,7 @@ export function starteFinisher(ctx, id = auswahl()) {
   // schon abgebrochen (frueher Tipp): ohne Klang und Animation sofort fertig, das Ergebnis wartet nicht
   if (ctx.signal && ctx.signal.aborted) return { fertig: Promise.resolve(), verlasse: () => {} };
   const reduziert = !!ctx.reduziert;
-  const ziel = id === 'koenig' ? ctx.koenigFeld : (ctx.letzterZug && ctx.letzterZug.nach);
+  const ziel = id === 'koenig' || id === 'kronensturz' ? ctx.koenigFeld : (ctx.letzterZug && ctx.letzterZug.nach);
   const p = punkt(ctx.buehne, ziel);
   const el = document.createElement('div');
   el.className = `finisher finisher-${id}${reduziert ? ' ist-ruhig' : ''}`;
@@ -74,6 +76,7 @@ export function starteFinisher(ctx, id = auswahl()) {
   el.style.setProperty('--fx', `${p.x}%`); el.style.setProperty('--fy', `${p.y}%`);
   if (id === 'krone') el.innerHTML = '<span class="fi-krone">♛</span><span class="fi-glanz">✦</span>';
   if (id === 'koenig') el.innerHTML = '<span class="fi-koenig">♚</span>';
+  if (id === 'kronensturz') el.innerHTML = '<span class="fi-sturz">♛</span>';
   // Signatur: ein goldener Namenszug und eine Linie unter der Partie, darunter "Nr. 0"
   if (id === 'signatur') el.innerHTML = '<svg class="fi-signatur" viewBox="0 0 100 40"><path class="fi-zug" d="M10 26c9-2 16-12 20-21 2 9-2 18 2 20s9-12 11-16c0 7 2 12 11 12 6 0 10-4 14-8"/>'
     + '<path class="fi-linie" d="M8 34h84"/></svg><span class="fi-nr">Nr. 0</span>';
