@@ -211,7 +211,7 @@ pruefe('Ziel Halten: Remis und geschlagener Bauer geschafft, Ziel-Zuege geschaff
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);

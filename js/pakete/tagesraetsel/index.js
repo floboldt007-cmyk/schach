@@ -241,10 +241,10 @@ function fuelleKarte(el, app) {
   el.innerHTML = `<span class="ueberzeile">${esc(t('p-tagesraetsel.karte.ueber', { tag: L.wochentagName(td.wochentag) }))}</span>
     ${mini(a.fen)}
     <div class="tr-kopf"><h2>${esc(t('p-tagesraetsel.karte.nummer', { nummer: td.nummer }))}</h2>
-      <span class="tr-punkte" role="img" aria-label="${esc(t('p-tagesraetsel.karte.schwierigkeit', { stufe, max: L.STUFEN }))}">${L.punkte(stufe)}</span></div>
+      <span class="tr-stufe"><span aria-hidden="true">${esc(t('p-tagesraetsel.karte.stufe'))}</span><span class="tr-punkte" role="img" aria-label="${esc(t('p-tagesraetsel.karte.schwierigkeit', { stufe, max: L.STUFEN }))}">${L.punkte(stufe)}</span></span></div>
     <p>${st.fertig
       ? esc(st.geloest ? t('p-tagesraetsel.karte.geloest') : t('p-tagesraetsel.karte.geschafft'))
-      : esc(t('p-tagesraetsel.karte.text', { amZug: L.amZugText(a.fen), zuege: L.zuegeText(a), teil: teilText }))}</p>
+      : esc(t('p-tagesraetsel.karte.text', { amZug: L.amZugText(a.fen), ziel: a.matt ? t('p-tagesraetsel.matt', { n: a.matt }) : t('p-tagesraetsel.karte.ziel', { n: Math.ceil(a.loesung.length / 2) }), teil: teilText }))}</p>
     <div class="t-fuss">
       ${offenArchiv ? `<button class="knopf dr tr-archiv" type="button">${esc(t('p-tagesraetsel.karte.archiv', { n: offenArchiv }))}</button>` : '<span></span>'}
       ${st.fertig

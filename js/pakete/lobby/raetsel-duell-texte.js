@@ -60,6 +60,18 @@ export const DE = {
   'fehler.DUELL_NICHT_EINGERICHTET': 'Das Rätsel-Duell ist auf dem Server noch nicht eingerichtet.',
   'fehler.allgemein': 'Das ging gerade nicht. Prüfe die Verbindung und versuche es gleich noch einmal.',
   brett: 'Brett des Rätsels',
+  // "Kopf an Kopf" (Flo 08.11.2026, Konzept 2 A)
+  'kachel.gleich': 'gleiche Rätsel',
+  'kachel.zeit': '3 Minuten',
+  'kachel.strafe': '−5 s',
+  'kachel.fehler': 'pro Fehler',
+  'suchen.gewertet': 'Gegner suchen · gewertet',
+  'einladen.kurz': 'Einladen',
+  'code.zeigen': 'Code eingeben',
+  'suche.rest': 'Noch {s} s, dann übernimmt ein KI-Gegner',
+  'reihe.aria': 'Deine Rätsel: {geloest} gelöst, {fehler} Fehler',
+  vs: 'gegen',
+  fertig: 'Fertig',
 };
 
 export const EN = {
@@ -120,6 +132,17 @@ export const EN = {
   'fehler.DUELL_NICHT_EINGERICHTET': 'The puzzle duel is not set up on the server yet.',
   'fehler.allgemein': 'That did not work just now. Check your connection and try again in a moment.',
   brett: 'Puzzle board',
+  'kachel.gleich': 'same puzzles',
+  'kachel.zeit': '3 minutes',
+  'kachel.strafe': '−5 s',
+  'kachel.fehler': 'per mistake',
+  'suchen.gewertet': 'Find opponent · rated',
+  'einladen.kurz': 'Invite',
+  'code.zeigen': 'Enter code',
+  'suche.rest': '{s} s left, then an AI opponent steps in',
+  'reihe.aria': 'Your puzzles: {geloest} solved, {fehler} mistakes',
+  vs: 'versus',
+  fertig: 'Done',
 };
 
 registriereTexte('p-duell', { de: DE, en: EN });

@@ -53,7 +53,7 @@ export function zeige(root, params, app) {
 }
 
 // Startblatt im Stil der Startseite (Handy-Runde 08.11.2026, Befund 3): Kopf mit Zurueck-Symbol, dunkle Buehne mit
-// beiden Koenigen (Figurensatz der App) und grossem "Los" oben, darunter Bedenkzeit als Pillen, "Brett drehen" als
+// beiden Koenigen (Figurensatz der App), darunter Bedenkzeit als Pillen, "Brett drehen" als
 // Schalter und die Namen eingeklappt (freiwillig). Alle Ziele mindestens 44 px. Die Leiste unten gehoert zur
 // Navigation (js/app.js) und fehlt hier bewusst.
 const ZEITEN = [['ohne', null], ['5', '5+0'], ['10', '10+0'], ['15', '15+10']];
@@ -72,7 +72,6 @@ function startblatt(root, app) {
           <small class="zz-ueber">${esc(Z('ueber'))}</small>
           <h2 class="zz-titel">${esc(Z('amBrett'))}</h2>
           <p class="zz-einleitung">${esc(Z('einleitung'))}</p>
-          <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
         </div>
       </div>
       <fieldset class="zz-zeiten"><legend>${esc(Z('bedenkzeit'))}</legend>
@@ -86,6 +85,7 @@ function startblatt(root, app) {
           <label>${esc(Z('nameSchwarz'))}<input name="schwarz" maxlength="20" value="${esc(anzeigeName(namen.schwarz))}" autocomplete="off"></label>
         </div>
       </details>
+      <button class="zz-los dr" type="submit">${icon('play')}<span>${esc(Z('los'))}</span></button>
       <p class="zz-hinweis">${esc(Z('hinweis'))}</p>
     </form></div>`;
   root.append(s);

@@ -191,7 +191,7 @@ function ladePlaywright() {
 async function warteAufServer(url, ms = 10000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) {
-    try { const r = await fetch(url); if (r.ok) return; } catch (e) { /* noch nicht da */ }
+    try { const r = await fetch(url); await r.arrayBuffer(); if (r.ok) return; } catch (e) { /* noch nicht da */ }
     await warte(150);
   }
   throw new Error('Server startet nicht: ' + url);
@@ -425,7 +425,7 @@ async function schrittZwei(browser) {
       await seite.waitForSelector('.sm-beitreten:not([hidden])');
       await pruefeAnsicht('klasse-beitreten', '.schule-gruppe');
       await pruefeAnsicht('daten-sicherung', '.es-inhalt');
-      await seite.evaluate(() => window.__app.gehe('online'));
+      await seite.evaluate(() => window.__app.gehe('online', { freunde: true }));
       await seite.waitForSelector('.on-start');
       await pruefeAnsicht('online-formular', '.online-screen');
       await seite.evaluate(() => window.__app.gehe('schule'));
