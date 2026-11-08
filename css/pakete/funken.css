@@ -69,9 +69,10 @@
 .fk-chip.fk-schmal .fk-chip-wort, .fk-chip.fk-schmal .fk-mini { display: none; }
 .fk-chip.fk-schmal .fk-chip-text b { display: inline-grid; place-items: center; box-sizing: border-box; min-width: 26px; height: 26px;
   padding: 0 5px; border-radius: var(--r-pille); background: var(--tinte); color: var(--auf-tinte); font-size: 14px; line-height: 1; }
-.fk-spieler { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 18px; padding: 0 5px; border-radius: var(--r-pille);
-  background: var(--tinte); color: var(--auf-tinte); }
-.fk-spieler b { font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+/* Level an Flos Namen: das Wort steht dabei (Handy-Runde K, 08.11.2026: eine nackte "1" erklaerte sich nicht) */
+.fk-spieler { display: inline-block; flex: none; min-width: 20px; height: 18px; padding: 0 7px; border-radius: var(--r-pille);
+  background: var(--tinte); color: var(--auf-tinte); font-size: 12px; font-weight: 700; line-height: 18px; white-space: nowrap; }
+.fk-spieler b { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* ---------- Faktor vor der Partie (arena:panel-bot) ---------- */
 .chip.fk-faktor { align-self: flex-start; max-width: 100%; height: 30px; gap: 6px; padding: 0 12px; font-size: 13px; font-weight: 700; color: var(--text);

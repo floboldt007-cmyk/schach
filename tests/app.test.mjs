@@ -2634,7 +2634,7 @@ async function testeSpielFundament(browser) {
       const sl = document.querySelector('.ort-spieler-leiste');
       const ak = document.querySelector('.ort-aktionen');
       return { spieler: sl.hidden && getComputedStyle(sl).display === 'none', aktionen: ak.hidden && getComputedStyle(ak).display === 'none',
-        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button').length,
+        spalten: getComputedStyle(reihe).gridTemplateColumns.split(' ').length, attr: reihe.dataset.aktionen === undefined, knoepfe: reihe.querySelectorAll('button:not(.sk-pfeil)').length,
         klasse: document.querySelector('.screen.partie').classList.contains('mit-gegner-leiste') };
     });
     // Seit 30.10. abends ohne "Zuruecknehmen": drei Grundknoepfe (Hinweis, Drehen, Aufgeben)
@@ -2960,7 +2960,7 @@ async function testeViewport(browser, vp) {
   const brett = await h.innen('.screen.partie .brett');
   pruefe('Brett quadratisch und groß', brett && Math.abs(brett.w - brett.h) < 2 && brett.w >= Math.min(brett.iw, brett.ih) * 0.5, JSON.stringify(brett));
   const knoepfe = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf, .screen.partie .kopf .icon-knopf')]
-    .map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
+    .filter((k) => k.getClientRects().length).map((k) => k.getBoundingClientRect()).every((r) => r.width >= 44 && r.height >= 44));
   pruefe('Tippflächen >= 44 px', knoepfe);
   const textUeber = await seite.evaluate(() => [...document.querySelectorAll('.screen.partie .spielknoepfe .knopf span')]
     .filter((s) => s.scrollWidth > s.clientWidth + 1 || s.getBoundingClientRect().right > s.closest('.knopf').getBoundingClientRect().right + 1).map((s) => s.textContent));
@@ -3132,6 +3132,12 @@ async function testeU7(browser) {
       } else {
         pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
+        // Handy-Runde K (08.11.2026): Zug zurueck und vor liegen dann in der Knopfreihe, im Bild und antippbar
+        const pf = await seite.evaluate(() => [...document.querySelectorAll('.partie .spielknoepfe > .sk-pfeil')].map((e) => {
+          const b = e.getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          return { a: e.dataset.aktion, w: Math.round(b.width), unten: Math.round(b.bottom), trifft: !!t && e.contains(t) }; }));
+        pruefe('Unter 760 px Höhe: Zug zurück und vor in der Knopfreihe, im Bild', pf.length === 2 && pf.every((p) => p.w >= 44 && p.unten <= m.ih && p.trifft)
+          && pf[0].a === 'zug-zurueck' && pf[1].a === 'zug-vor', JSON.stringify(pf));
       }
       pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
       // unter 700 px Hoehe (390 x 664) reicht die Hoehe nicht ganz: erst wird der Coach einzeilig, dann das Brett hoechstens
