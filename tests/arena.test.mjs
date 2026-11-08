@@ -657,12 +657,21 @@ async function testeHochformate(browser) {
       const fw = document.querySelector('.wahl-farbe').getBoundingClientRect();
       const sp = document.querySelector('.detail [data-aktion="spielen"]').getBoundingClientRect();
       const inh = document.querySelector('.arena .inhalt').getBoundingClientRect();
+      // Handy-Runde 08.11.2026 (Befund 7): das Schild der aktuellen Station unten frei von der runden Ecke (Radius der
+      // Karte), Flos Figur ganz in der Karte
+      const radius = parseFloat(getComputedStyle(karte).borderBottomLeftRadius) || 0;
+      const schild = document.querySelector('.knoten.aktuell .k-schild')?.getBoundingClientRect();
+      const flo = document.querySelector('.flo-figur').getBoundingClientRect();
       return { kompakt: document.querySelector('.arena').classList.contains('karte-kompakt'), knoten: document.querySelectorAll('.knoten').length,
         scrollt: karte.scrollHeight > karte.clientHeight + 2, drin, hinweis: document.querySelectorAll('.karte-zieh-hinweis:not([hidden])').length,
-        farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1 };
+        farbeVorKnopf: fw.bottom <= sp.top + 1, knopfDrin: sp.bottom <= inh.bottom + 1,
+        schildAbstand: schild ? Math.round(kb.bottom - schild.bottom) : null, radius, floLinks: Math.round(flo.left - kb.left), floRechts: Math.round(kb.right - flo.right) };
     });
     pruefe('ganze Welt auf einen Blick: sechs Stationen samt Schild in der Karte, Karte scrollt nicht, kein Zieh-Hinweis',
       k.kompakt && k.knoten === 6 && !k.scrollt && k.drin && k.hinweis === 0, JSON.stringify(k));
+    pruefe('Schild der aktuellen Station unten mindestens halben Eckenradius ueber dem Kartenrand (nicht abgeschnitten)',
+      k.schildAbstand != null && k.schildAbstand >= k.radius / 2, JSON.stringify(k));
+    pruefe('Flos Figur ganz in der Karte (links und rechts mindestens 4 px Rand)', k.floLinks >= 4 && k.floRechts >= 4, JSON.stringify(k));
     pruefe('darunter ohne Scrollen: Gegner, Farbwahl und Spielen-Knopf (Farbe ueber dem Knopf)', k.farbeVorKnopf && k.knopfDrin, JSON.stringify(k));
     pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
     await kontext.close();
