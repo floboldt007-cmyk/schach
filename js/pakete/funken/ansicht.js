@@ -425,7 +425,9 @@ export function kopfChip({ st, beiTipp } = {}) {
 
 export function spielerEmblem({ st } = {}) {
   const fs = L.fortschritt(st.gesamt);
-  const s = el('span', 'fk-spieler', `<b class="zahl">${fs.level}</b>`);
+  // "Level 1" statt einer nackten "1" (Handy-Runde K, 08.11.2026); das Wort kommt aus dem Text, die Zahl bleibt fett
+  const [vor, nach = ''] = tx('level', { level: '§' }).split('§');
+  const s = el('span', 'fk-spieler', `${esc(vor)}<b class="zahl">${fs.level}</b>${esc(nach)}`);
   s.dataset.paket = 'funken';
   s.title = tx('levelTitel', { level: fs.level, titel: titelName(fs.level) });
   s.setAttribute('aria-label', tx('level', { level: fs.level }));

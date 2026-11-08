@@ -1235,7 +1235,7 @@ async function testeBrowser(browser) {
     await hh.planBot();
     await hh.starte({ botId: 'benno', farbe: 'w' });
     await hh.warteFlo();
-    pruefe('partie:spieler-leiste: Level-Emblem an Flos Namen', (await s.locator('.ort-spieler-leiste .fk-spieler').first().innerText()).trim() === '1');
+    pruefe('partie:spieler-leiste: Level-Emblem an Flos Namen', (await s.locator('.ort-spieler-leiste .fk-spieler').first().innerText()).trim() === 'Level 1');
     await hh.zugTippen('e2e4');
     await s.waitForFunction(() => { const l = document.querySelector('.p-funkenlinie .fk-linie'); return l && /matrix\((0\.0[1-9]|0\.[1-9])/.test(getComputedStyle(l).transform); }, null, { timeout: 30000 }).catch(() => {});
     const an = await s.evaluate(() => {

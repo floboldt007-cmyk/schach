@@ -3132,6 +3132,12 @@ async function testeU7(browser) {
       } else {
         pruefe('Unter 760 px Höhe: Zugstreifen nach den Aktionen, durch Scrollen der Spalte erreichbar', m.streifenUnten && m.streifen.t >= m.knoepfe.b - 0.5 && m.scrollt > 0,
           JSON.stringify([m.streifen, m.knoepfe, m.scrollt]));
+        // Handy-Runde K (08.11.2026): Zug zurueck und vor liegen dann in der Knopfreihe, im Bild und antippbar
+        const pf = await seite.evaluate(() => [...document.querySelectorAll('.partie .spielknoepfe > .sk-pfeil')].map((e) => {
+          const b = e.getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          return { a: e.dataset.aktion, w: Math.round(b.width), unten: Math.round(b.bottom), trifft: !!t && e.contains(t) }; }));
+        pruefe('Unter 760 px Höhe: Zug zurück und vor in der Knopfreihe, im Bild', pf.length === 2 && pf.every((p) => p.w >= 44 && p.unten <= m.ih && p.trifft)
+          && pf[0].a === 'zug-zurueck' && pf[1].a === 'zug-vor', JSON.stringify(pf));
       }
       pruefe('Kopf: Rufname „Maxi“, keine Brettwahl auf dem Handy', m.kopfTitel === 'Maxi' && !m.brettwahl, JSON.stringify([m.kopfTitel, m.brettwahl]));
       // unter 700 px Hoehe (390 x 664) reicht die Hoehe nicht ganz: erst wird der Coach einzeilig, dann das Brett hoechstens

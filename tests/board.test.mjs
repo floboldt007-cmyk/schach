@@ -922,7 +922,16 @@ async function testeOptik(browser) {
   pruefe('Koordinate "8" endet innerhalb von 20 % der Feldecke', ecke.zahlRechts <= 0.2 && ecke.zahlUnten <= 0.2 && ecke.imFeld, JSON.stringify(ecke));
   pruefe('Koordinate "a" sitzt unten rechts innerhalb von 20 %', ecke.buchstLinks <= 0.2 && ecke.buchstOben <= 0.2, JSON.stringify(ecke));
   pruefe('Koordinaten Gewicht 700, Groesse 10 bis 12 px (Ansicht: nie unter 10 px)', ecke.gewicht === '700' && ecke.groesse >= 10 && ecke.groesse <= 12, JSON.stringify(ecke));
-  pruefe('Koordinaten in der Gegenfeldfarbe', ecke.zahlFarbe === ecke.dunkel && ecke.buchstFarbe === ecke.hell, JSON.stringify(ecke));
+  // Handy-Runde K (08.11.2026): nicht mehr exakt die Gegenfeldfarbe (auf dunklen Feldern kaum lesbar, 2,8:1), sondern
+  // auf dem eigenen Feld mindestens 3:1 (helles Feld: dunkler als das dunkle Feld; dunkles Feld: weiss)
+  const rgb = (c) => { const m = String(c).match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/); if (m) return m.slice(1, 4).map(Number);
+    return String(c).match(/[\d.]+/g).slice(0, 3).map((x) => Number(x) / 255); };
+  const lum = (c) => { const [r, g, b] = rgb(c).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const kontrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const kz = kontrast(ecke.zahlFarbe, ecke.hell);
+  const kb = kontrast(ecke.buchstFarbe, ecke.dunkel);
+  pruefe('Koordinaten auf dem eigenen Feld lesbar (Kontrast >= 3:1, hell und dunkel)', kz >= 3 && kb >= 3 && lum(ecke.zahlFarbe) < lum(ecke.dunkel),
+    JSON.stringify({ kz: kz.toFixed(2), kb: kb.toFixed(2), ...ecke }));
   // Feld unten rechts (h1, gedreht a8): das Brett-Eck ist abgerundet; der Buchstabe (unteres Viertel seiner Box, wo der Fuss
   // des Zeichens steht) liegt ganz innerhalb des Rundes (Pruefer U6: das "h" wurde angeschnitten), beide Ausrichtungen
   // Dazu der Vergleich mit dem Nachbarfeld (g1, gedreht b8): rechts gleich weit vom Feldrand, sonst stuende der Buchstabe

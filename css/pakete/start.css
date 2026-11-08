@@ -61,7 +61,7 @@
 .st-sockel { position: relative; width: min(100%, 380px); padding: var(--sockel-rand); border-radius: var(--r-sockel);
   background-color: var(--sockel); background-image: var(--textur-sockel, none); box-shadow: var(--s-brett), var(--kante); }
 .st-sockel .mini { width: 100%; border-radius: var(--r-brett); box-shadow: none; }
-.st-klasse { position: absolute; right: -14px; top: 20%; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
+.st-klasse { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
   border-radius: var(--r-pille); background: var(--flaeche); box-shadow: var(--s2), var(--kante); font-size: 14.5px; font-weight: 800; color: var(--kt-bester); }
 .st-klasse i { width: 12px; height: 12px; border-radius: var(--r-pille); background: var(--k-bester); }
 
@@ -151,7 +151,10 @@
   .st-text { gap: 12px; }
   .st-text p { font-size: 15px; }
   .st-sockel { width: min(100%, 220px); }
-  .st-klasse { right: -8px; height: 32px; padding: 0 12px; font-size: 13px; }
+  .st-klasse { height: 32px; padding: 0 12px; font-size: 13px; }
+  /* Seite 1: das Schild steht neben dem kleinen Brett (Handy-Runde K, 08.11.2026), nicht darauf */
+  .st-buehne[data-seite="w1"] .st-bild { width: 100%; height: auto; flex-direction: row; justify-content: flex-start; }
+  .st-buehne[data-seite="w1"] .st-sockel { flex: none; width: min(58%, 220px); }
   .st-leiter { gap: 8px; }
   .st-kacheln { gap: 8px; }
   .st-kachel { padding: 10px 12px; }
