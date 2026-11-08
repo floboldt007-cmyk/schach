@@ -69,24 +69,28 @@ const MOTIVE = {
     <path d="M26 45.5q5 1.6 11-1.6" fill="none" stroke="${TINTE}" stroke-width="2.6" stroke-linecap="round"/>${backen(40)}
     <g fill="${WEISS}" stroke="${TINTE}" stroke-width="1.4"><circle class="es-punkt es-p1" cx="48" cy="17" r="2.4"/><circle class="es-punkt es-p2" cx="53.5" cy="11" r="3.1"/>
       <circle class="es-punkt es-p3" cx="59" cy="4.5" r="3.8"/></g>`,
-  // eine Krone verneigt sich (Respekt), mit Funkeln
-  respekt: () => `<g class="es-verneig" style="transform-origin:16px 46px">
-      <path d="M14 46 11 24l9.5 8L32 16l11.5 16 9.5-8-3 22z" fill="${GOLD}" stroke="${TINTE}" stroke-width="2.4" stroke-linejoin="round"/>
-      <path d="M14.5 46h35v6h-35z" fill="${GOLD_TIEF}" stroke="${TINTE}" stroke-width="2.4" stroke-linejoin="round"/>
-      <circle cx="32" cy="38" r="3.4" fill="#E2412F" stroke="${TINTE}" stroke-width="1.6"/><circle cx="22" cy="40" r="2.1" fill="#4FA3F0"/><circle cx="42" cy="40" r="2.1" fill="#4FA3F0"/>
-      <circle cx="11" cy="23.5" r="2.4" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/><circle cx="32" cy="15.5" r="2.6" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/>
-      <circle cx="53" cy="23.5" r="2.4" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/></g>
-    ${funkel(52, 12, 4.4)}${funkel(9, 12, 3, 'es-funkel es-spaet')}`,
-  // grosser Stern, der sich freut, mit Funkeln
-  gut: () => `<g class="es-stern" style="transform-origin:32px 33px"><path d="M32 8.5l6.6 13.4 14.8 2.1-10.7 10.4 2.5 14.7L32 42.2l-13.2 6.9 2.5-14.7L10.6 24l14.8-2.1z"
-      fill="${GOLD}" stroke="${TINTE}" stroke-width="2.4" stroke-linejoin="round"/>
-      <path d="M26 31.5q1.6-2 3.2 0M34.8 31.5q1.6-2 3.2 0" fill="none" stroke="${TINTE}" stroke-width="2" stroke-linecap="round"/>
-      <path d="M28.5 36.5q3.5 3.4 7 0" fill="${TINTE}" stroke="${TINTE}" stroke-width="1.6" stroke-linejoin="round"/></g>
-    ${funkel(53, 47, 4.4)}${funkel(11, 48, 3.4, 'es-funkel es-spaet')}${funkel(53, 10, 3, 'es-funkel es-spaeter')}`,
-  // erleichtert: Augen zu, kleiner Mund, Schweisstropfen rutscht
-  uff: () => `<path d="M16.5 28q5.5-4.6 11 0M36.5 28q5.5-4.6 11 0" fill="none" stroke="${TINTE}" stroke-width="2.6" stroke-linecap="round"/>
-    <path d="M17 20q4.4-2.4 9 0M38 20q4.4-2.4 9 0" fill="none" stroke="${TINTE}" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
-    <ellipse cx="32" cy="43" rx="4.4" ry="3.4" fill="${TINTE}"/>${backen(36)}
+  // Respekt (Flo 08.11.2026, Lob-Trio entflochten): ein Bauer verbeugt sich, mit Funkeln
+  respekt: () => `<g class="es-verneig" style="transform-origin:30px 52px">${umriss(
+    '<circle cx="31" cy="17.5" r="7.2"/><path d="M25.5 25h11l-2 4.5h-7z"/><path d="M26.5 29.5h9c1 7 3.6 12.4 7.6 16.5H18.9c4-4.1 6.6-9.5 7.6-16.5z"/>'
+    + '<rect x="15.5" y="45.5" width="31" height="6.5" rx="3.2"/>')}
+    <path d="M23 34.5q8 2 16 0" fill="none" stroke="${TINTE}" stroke-width="1.4" stroke-linecap="round" opacity=".5"/></g>
+    ${funkel(52, 14, 4.4)}${funkel(49, 44, 3, 'es-funkel es-spaet')}`,
+  // Gut gespielt: zwei Koenige reichen sich die Hand (Handschlag in der Mitte), mit Funkeln
+  gut: () => {
+    const koenig = (x) => umriss(`<rect x="${x - 1.3}" y="8" width="2.6" height="9" rx="1.2"/><rect x="${x - 4}" y="10.6" width="8" height="2.6" rx="1.2"/>`
+      + `<path d="M${x - 6} 18h12l-1.6 6h-8.8z"/><path d="M${x - 4.6} 24h9.2c.6 7 2.4 12 5 15.5h-19.2c2.6-3.5 4.4-8.5 5-15.5z"/>`
+      + `<rect x="${x - 9}" y="39" width="18" height="5.6" rx="2.8"/>`, 4);
+    return `<g class="es-hops" style="transform-origin:32px 50px">${koenig(17)}${koenig(47)}
+      <path d="M22 31.5q5-3 10 0 5 3 10 0" fill="none" stroke="${TINTE}" stroke-width="5.4" stroke-linecap="round"/>
+      <path d="M22 31.5q5-3 10 0 5 3 10 0" fill="none" stroke="${GOLD}" stroke-width="2.6" stroke-linecap="round"/>
+      <ellipse cx="32" cy="31.5" rx="4.2" ry="3.4" fill="${GOLD}" stroke="${TINTE}" stroke-width="1.6"/></g>
+      ${funkel(32, 15, 4)}${funkel(53, 52, 3, 'es-funkel es-spaet')}${funkel(11, 52, 3, 'es-funkel es-spaeter')}`;
+  },
+  // "Oh nein, mein Fehler" (frueher "Uff"): an sich selbst gerichtet, verlegen zusammengekniffene Augen, schiefer Mund,
+  // Schweisstropfen rutscht; spottet nie ueber den Gegner
+  uff: () => `<path d="M17 24.5l7 3.5-7 3.5M47 24.5l-7 3.5 7 3.5" fill="none" stroke="${TINTE}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M16.5 17.5q4.4-1.4 9 1M38.5 18.5q4.6-2.4 9-1" fill="none" stroke="${TINTE}" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
+    <path d="M25 44q3.5-3 7 0t7 0" fill="none" stroke="${TINTE}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>${backen(37)}
     <g class="es-tropfen"><path d="M50 13c3 4.4 4.6 7 4.6 9.2a4.6 4.6 0 0 1-9.2 0c0-2.2 1.6-4.8 4.6-9.2z" fill="#9FD8FF" stroke="${TINTE}" stroke-width="1.8" stroke-linejoin="round"/>
       <path d="M48.3 22.2a2 2 0 0 0 1.6 2" stroke="${WEISS}" stroke-width="1.4" stroke-linecap="round" fill="none"/></g>
     <g class="es-puste" fill="none" stroke="${WEISS}" stroke-width="2.2" stroke-linecap="round"><path d="M38 48q4 1.6 7.5-.6M39.5 53q3.4.8 6-1"/></g>`,

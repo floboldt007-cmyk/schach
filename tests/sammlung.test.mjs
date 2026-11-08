@@ -96,16 +96,18 @@ pruefe('Brett-Vorschau: echte Figuren aus assets/pieces/ (Koenige und Bauern bei
 const leer = { bots: {} };
 const NULL_STAND = { ligaBest: 0, serieBest: 0, level: 1 };
 const e0 = teileErfolge(leer, NULL_STAND);
-pruefe('Eigenes Bild: alle 28 Erfolge verschieden, keiner mit dem alten Sammel-Stern',
-  new Set(e0.map((x) => ohneIds(x.bild))).size === e0.length && e0.every((x) => /class="sk-erfolg"/.test(x.bild)));
+// Saison-Liga beendet (Flo 08.11.2026, "Unerreichte ausblenden"): Liga-Erfolge zeigt die Sammlung nur, wenn erspielt
+const eL = teileErfolge(leer, { ...NULL_STAND, ligaBest: 6 });
+pruefe('Eigenes Bild: alle 28 Erfolge verschieden (mit erspielter Liga), keiner mit dem alten Sammel-Stern', eL.length === 28
+  && new Set(eL.map((x) => ohneIds(x.bild))).size === eL.length && eL.every((x) => /class="sk-erfolg"/.test(x.bild)));
 const rang = { frei: 0, selten: 1, episch: 2, legende: 3 };
-const sel = (id) => rang[e0.find((x) => x.id === 'erfolg-' + id).seltenheit];
+const sel = (id) => rang[eL.find((x) => x.id === 'erfolg-' + id).seltenheit];
 pruefe('Erfolge gestaffelt: je schwerer, desto seltener (erster Sieg < Welt 1 < Welt 3 < Welt 5, Liga 1 < 3 < 6, Serie 7 < 30 < 100)',
   sel('erster-sieg') < sel('welt-1') && sel('welt-1') < sel('welt-3') && sel('welt-3') < sel('welt-5')
   && sel('liga-1') < sel('liga-3') && sel('liga-3') < sel('liga-6') && sel('serie-7') < sel('serie-30') && sel('serie-30') < sel('serie-100'));
-pruefe('Erfolge ohne Partie: 28 (Bots, Liga, Serie, Level, Partien), ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 28
-  && !e0.some((x) => /^erfolg-schule-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
-  && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt' && e0.find((x) => x.id === 'erfolg-liga-1').zeile === 'Erreiche Liga Bronze');
+pruefe('Erfolge ohne Partie: 22 (Bots, Serie, Level, Partien), keine unerreichte Liga, ohne Labor keine Meisterschule, alle gesperrt, mit Weg dahin', e0.length === 22
+  && !e0.some((x) => /^erfolg-(schule|liga)-/.test(x.id)) && e0.every((x) => !x.frei && x.zeile)
+  && e0.find((x) => x.id === 'erfolg-alle-bots').zeile === '0 von 30 besiegt');
 const welt1 = BOTS.filter((b) => b.welt === 1);
 const f1 = { bots: Object.fromEntries(welt1.map((b, i) => [b.id, { sterne: [true, i === 0, i === 0] }])) };
 const e1 = teileErfolge(f1, { ligaBest: 2, serieBest: 7, level: 12 });
@@ -115,14 +117,14 @@ pruefe('Erfolge nach Welt 1: erster Sieg, drei Sterne, Welt 1 frei; Welt 2 und a
 const alle = e1.find((x) => x.id === 'erfolg-alle-bots');
 pruefe('Fortschritt ehrlich: 6 von 30 Bots (0,2), Sterne nach Zahl', alle.zeile === '6 von 30 besiegt' && Math.abs(alle.fortschritt - 0.2) < 1e-9
   && e1.find((x) => x.id === 'erfolg-alle-sterne').zeile === `8 von ${BOTS.length * 3} Sternen`);
-pruefe('Erfolge Liga, Serie, Level: Bronze und Silber, 7 Tage, Level 10 frei; Gold, 30 Tage, Level 20 mit Weg',
-  frei('erfolg-liga-1') && frei('erfolg-liga-2') && !frei('erfolg-liga-3') && frei('erfolg-serie-7') && !frei('erfolg-serie-30')
+pruefe('Erfolge Liga, Serie, Level: Bronze und Silber, 7 Tage, Level 10 frei; Gold gar nicht da (Saison-Liga beendet); 30 Tage, Level 20 mit Weg',
+  frei('erfolg-liga-1') && frei('erfolg-liga-2') && !e1.some((x) => x.id === 'erfolg-liga-3') && frei('erfolg-serie-7') && !frei('erfolg-serie-30')
   && frei('erfolg-level-10') && !frei('erfolg-level-20') && e1.find((x) => x.id === 'erfolg-serie-30').zeile === 'Längste Serie: 7 von 30 Tagen');
 // Rahmen: frei ueber denselben Erfolg; ohne und Holz immer, Blatt 0 nur mit Sonderstueck
 const r1 = rahmenTeile(e1);
 const rf = (id) => r1.find((r) => r.id === id);
-pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga Gold mit Weg, kein Blatt 0 ohne Sonderstueck',
-  rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3').frei && rf('liga-3').weg === 'Erreiche Liga Gold'
+pruefe('Rahmen: Kein Rahmen und Holz frei, Liga Silber und Karofelder frei, Liga Gold ausgeblendet, kein Blatt 0 ohne Sonderstueck',
+  rf('ohne').frei && rf('holz').frei && rf('liga-2').frei && rf('welt-1').frei && !rf('liga-3')
   && !rf('welt-2').frei && !r1.some((r) => r.id === 'erfinder-blatt-0'), r1.map((r) => r.id + (r.frei ? '+' : '-')).join());
 pruefe('Profil: Standard Bauer (der Koenig gehoert dem Erfinder), Standard-Hintergrund, ohne Rahmen, leere Vitrine',
   JSON.stringify(profilWahl()) === JSON.stringify({ figur: 'P', grund: 'standard', rahmen: 'ohne', vitrine: [null, null, null], titel: null, banner: 'start' })
@@ -198,8 +200,8 @@ pruefe('Nichts zum Kaufen: kein Preis, kein Shop, keine Restzahl in den Erfolgen
   pruefe('Partien-Archiv: Uebungs- und Zu-zweit-Partien zaehlen nicht', partienStand([{ ...p(20, 'sieg', 'b'), modus: 'uebung' }]).beste === 0);
   const titelNeu = ERFOLGS_TITEL.filter((x) => /^(schwarz-sieg|siegesserie-5|endgegner|siege-100|alle-endgegner|schule-)/.test(x.erfolg));
   pruefe('Neue Titel zu den neuen Errungenschaften (Schattenkoenig, Siegeszug, Bezwinger ...), die der Meisterschule nur im Labor',
-    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 2
-    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length
+    titelNeu.length === 7 && titelListe({ erfolge: e2 }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 3
+    && titelListe({ erfolge: [...e2, ...sch] }).filter((x) => x.art === 'erfolg').length === ERFOLGS_TITEL.length - 1
     && titelListe({ erfolge: e2 }).find((x) => x.id === 'erfolg-schattenkoenig').frei);
 }
 
@@ -218,7 +220,7 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
   const lv = l.filter((x) => x.art === 'level');
   const ef = l.filter((x) => x.art === 'erfolg');
   pruefe('Titel: alle Level-Titel (frei nach Level) und je ein Erfolgs-Titel, ohne Erfinder kein Erfinder-Titel',
-    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor).length && !l.some((x) => x.art === 'erfinder'),
+    lv.length === LEVEL_TITEL.length && lv.filter((x) => x.frei).map((x) => x.ab).join() === '1,5,10' && ef.length === ERFOLGS_TITEL.filter((x) => !x.labor && !x.nurErspielt).length && !l.some((x) => x.art === 'erfinder'),
     l.map((x) => x.id + (x.frei ? '+' : '-')).join());
   pruefe('Titel: Erfolgs-Titel frei mit dem Erfolg, sonst mit Weg und Fortschritt',
     ef.find((x) => x.id === 'erfolg-feuertaufe').frei && !ef.find((x) => x.id === 'erfolg-goldene-aehre').frei
@@ -273,8 +275,20 @@ pruefe('Shop: angekündigt mit Datum, ausverkauft, pausiert, beendet', standText
   merkeErspielteTitel(['koennen-blitzschlag', 'unsinn$']);
   pruefe('Können: einmal erspielt bleibt gemerkt (ohne Doppel, nur gueltige Ids)', erspielteTitel().join() === 'koennen-blitzschlag', erspielteTitel());
   const lk = titelListe({ level: 1, koennen: ['koennen-blitzschlag'] }).filter((x) => x.art === 'koennen');
-  pruefe('Können: sechs Titel, frei nur die erspielten, gesperrte mit Weg', lk.length === KOENNEN_TITEL.length && lk.filter((x) => x.frei).length === 1
-    && lk.find((x) => x.id === 'koennen-stammgast').weg === 'Spiele 100 Partien', lk.map((x) => x.id + (x.frei ? '+' : '-')).join());
+  pruefe('Können: alle Titel ausser Labor, frei nur die erspielten, gesperrte mit Weg', lk.length === KOENNEN_TITEL.filter((x) => !x.labor).length && lk.filter((x) => x.frei).length === 1
+    && lk.find((x) => x.id === 'koennen-stammgast').weg === 'Spiele 100 Partien' && lk.find((x) => x.id === 'koennen-raetselfuchs').weg === 'Löse 100 Tagesrätsel'
+    && !lk.some((x) => x.id === 'koennen-musterschueler') && titelListe({ level: 1, labor: true }).some((x) => x.id === 'koennen-musterschueler'), lk.map((x) => x.id + (x.frei ? '+' : '-')).join());
+  // Neue Titel (Flo 08.11.2026) nur aus Daten, die der Browser schon hat; je Bedingung knapp darunter nichts, genau darauf alles
+  const voll = { kronenStufe: 15, raetsel: 100, weltenMitSieg: 5, weltenAlle: 5, sterneWelt: true, platz1: 5, rekorde: 10, kartei: 50, labor: true, schulKapitel: 1, erzfeind: 1 };
+  const knapp = { kronenStufe: 14, raetsel: 99, weltenMitSieg: 4, weltenAlle: 5, sterneWelt: false, platz1: 4, rekorde: 9, kartei: 49, labor: true, schulKapitel: 0, erzfeind: 0 };
+  const neun = ['kroenung', 'raetselfuchs', 'weltenwanderer', 'tafelkoenig', 'rekordjaeger', 'sterne-sammler', 'fehlerjaeger', 'musterschueler', 'erzfeind'].map((x) => 'koennen-' + x);
+  pruefe('Neue Titel: alle neun genau an der Schwelle frei, knapp darunter keiner, ohne Daten keiner, Weltenwanderer nie ohne Welten',
+    neun.every((x) => koennenFrei([], null, voll).includes(x)) && koennenFrei([], null, knapp).length === 0 && koennenFrei([], null, {}).length === 0
+    && !koennenFrei([], null, { weltenMitSieg: 0, weltenAlle: 0 }).includes('koennen-weltenwanderer'), koennenFrei([], null, voll));
+  pruefe('Neue Titel: Namen eindeutig, DE und EN, ohne Meister/Profi/Experte', (() => {
+    const de = titelListe({ level: 1, labor: true, alle: true }).filter((x) => neun.includes(x.id));
+    return de.length === 9 && de.every((x) => x.name && !/^p-sammlung|titel\./.test(x.name) && !VERBOTEN_T.test(x.name) && TITEL_ZEICHEN.includes(x.zeichen));
+  })());
 }
 
 // ---------------------------------------------------------------------------
@@ -593,12 +607,12 @@ async function profilTeil(browser) {
   const rahmen = await p.s.evaluate(() => [...document.querySelectorAll('.sa-bereich[data-bereich="rahmen"] .sa-teil')].map((x) => ({
     id: x.dataset.teil, z: x.dataset.zustand, zeile: x.querySelector('.sa-zeile')?.textContent })));
   const r = (id) => rahmen.find((x) => x.id === 'rahmen-' + id) || {};
-  pruefe('Rahmen: ohne an, Holz frei, Liga Gold und Serie 30 mit Schloss und Weg', r('ohne').z === 'an' && r('holz').z !== 'zu'
-    && r('liga-3').z === 'zu' && r('liga-3').zeile === 'Erreiche Liga Gold' && r('serie-30').z === 'zu' && /30/.test(r('serie-30').zeile || '')
+  pruefe('Rahmen: ohne an, Holz frei, unerreichte Liga-Rahmen ausgeblendet, Serie 30 mit Schloss und Weg', r('ohne').z === 'an' && r('holz').z !== 'zu'
+    && !rahmen.some((x) => /^rahmen-liga-/.test(x.id)) && r('serie-30').z === 'zu' && /30/.test(r('serie-30').zeile || '')
     && !rahmen.some((x) => x.id === 'rahmen-erfinder-blatt-0'), rahmen);
   await p.s.locator('.pr-aendern').click();
   await p.s.waitForSelector('.pr-blatt .pr-figur', { timeout: 5000 });
-  pruefe('Profil-Blatt: gesperrter Rahmen ist nicht wählbar', await p.s.locator('.pr-rahmen[data-rahmen="liga-3"]').isDisabled());
+  pruefe('Profil-Blatt: gesperrter Rahmen ist nicht wählbar', await p.s.locator('.pr-rahmen[data-rahmen="serie-30"]').isDisabled());
   // das Blatt gleitet herein: erst messen, wenn es steht
   await p.s.waitForFunction(() => { const b = document.querySelector('.pr-blatt .sheet-knoepfe button'); return !!b && b.getBoundingClientRect().bottom <= innerHeight; },
     null, { timeout: 3000 }).catch(() => {});
