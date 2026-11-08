@@ -1008,7 +1008,7 @@ async function testeBrowser(browser) {
   await seite.locator('.reiter-leiste [data-reiter="bestenliste"]').click();
   await seite.waitForSelector('.screen.bl-screen .bl-reiter:not([hidden])');
   await warte(700);
-  pruefe('Reiter öffnet die Bestenliste (Titel, aktiv, #bestenliste)', await seite.evaluate(() => document.title) === 'Bestenliste · Crownmate'
+  pruefe('Reiter öffnet die Bestenliste (Titel, aktiv, #bestenliste)', await seite.evaluate(() => document.title) === 'Liga · Crownmate'
     && await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter) === 'bestenliste'
     && await seite.evaluate(() => location.hash) === '#bestenliste');
   const reiterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-reiter .seg')].map((s) => s.dataset.wert + ':' + s.textContent.trim()).join());

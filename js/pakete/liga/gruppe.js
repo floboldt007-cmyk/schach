@@ -156,7 +156,7 @@ export function reiterGruppe({ app } = {}) {
     const ende = endeText(lg);
     s.innerHTML = `${buehne(lg)}
       ${ende ? `<p class="lg-gr-ende">${esc(ende)}</p>` : ''}
-      ${lg.offen ? `<p class="lg-gr-offen">${esc(T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
+      ${lg.offen ? `<p class="lg-gr-offen">${esc(lg.offen === 1 ? T('offenEins') : T('offen', { n: zahl(lg.offen) }))}</p>` : ''}
       ${lg.botKiVoll ? `<p class="lg-gr-botvoll">${esc(T('botVoll'))}</p>` : ''}
       ${lg.gruppe != null && lg.mitglieder.length ? `<div class="lg-gr-liste">${liste(lg)}</div>` : ''}`;
     s.dataset.zustand = lg.gruppe != null ? 'gruppe' : 'leer';

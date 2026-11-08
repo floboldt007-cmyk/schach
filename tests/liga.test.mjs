@@ -627,7 +627,7 @@ async function gruppeTeil(browser, start) {
         assert.match(await page.locator('.lg-gr-wappen').getAttribute('src'), /assets\/liga\/laeufer\.svg$/);
         assert.ok(await page.locator('.lg-gr-wappen').evaluate((i) => i.complete && i.naturalWidth > 0), 'Wappen geladen');
         assert.equal(await page.locator('.lg-gr-ende').innerText(), 'Ende am Sonntag, 08.11.');
-        assert.match(await page.locator('.lg-gr-offen').innerText(), /1 Belohnungen/);
+        assert.match(await page.locator('.lg-gr-offen').innerText(), /Gemerkt: 1 Belohnung aus einer früheren Woche/);
         assert.equal(await page.locator('.lg-gr-botvoll').count(), 0, '120 von 300 Bot-Kronen: kein Hinweis');
       });
       await browserPruefe('Gruppe: Abschnitte 5 / 20 / 5, "Eine Stufe tiefer" statt Druck-Wort, eigene Zeile gold', async () => {
