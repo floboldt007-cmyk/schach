@@ -87,8 +87,11 @@
 /* Feld unten rechts: das Brett-Eck ist abgerundet (--brett-radius), der Buchstabe rueckt nur nach oben ins Rund. Nicht
    nach links: dort stuende er hinter dem Fuss der Figur (Turm auf h1), auf dem Handy unsichtbar. */
 .brett .feld .koord.buchst.ecke { bottom: calc(1px + var(--brett-radius) * .15); }
-.brett .feld.h .koord { color: var(--b-dunkel); }
-.brett .feld.d .koord { color: var(--b-hell); }
+/* Handy-Runde K (08.11.2026): in der Farbe des anderen Feldes waren die Buchstaben auf dunklen Feldern kaum lesbar
+   (Brett "nacht" 2,8:1). Jetzt eine Spur dunkler auf hellen Feldern und weiss mit leichtem Schatten auf dunklen
+   (nacht 4,6:1 und 3,5:1), der Schatten traegt sie auch ueber den Fuss einer Figur. */
+.brett .feld.h .koord { color: color-mix(in srgb, var(--b-dunkel) 72%, #000); }
+.brett .feld.d .koord { color: #fff; text-shadow: 0 0 2px rgba(0, 0, 0, .3); }
 
 /* Koordinaten, Lage "rand": ausserhalb der Felder im Sockel (der Sockel bekommt links und unten --koord-rand Platz,
    css/app.css .brett-rahmen:has(> .brett.koord-rand)) */

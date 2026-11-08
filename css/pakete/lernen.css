@@ -38,6 +38,8 @@
 .ms-bk-sterne .von, .ms-bk-gratis { opacity: .72; }
 .ms-bk-balken { display: block; height: 5px; border-radius: var(--r-pille); background: var(--linie); overflow: hidden; }
 .ms-bkarte[aria-pressed="true"] .ms-bk-balken { background: rgba(255, 255, 255, .22); }
+.ms-willkommen { display: flex; align-items: center; gap: 8px; margin: 12px 2px 0; color: var(--text-2); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.ms-willkommen .ico { flex: none; width: 16px; height: 16px; color: var(--stern); }
 .ms-bk-balken > i { display: block; height: 100%; border-radius: inherit; background: var(--stern); }
 .ms-gruppe { display: flex; flex-direction: column; gap: 8px; }
 .ms-gruppe > h3 { margin: 6px 2px 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }

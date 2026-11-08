@@ -191,12 +191,39 @@ async function testeLeiste(browser) {
     await kontext.close();
   }
 
+  // ---------- Handy-Runde 08.11.: wo bin ich? Leiste und aktiver Reiter je Screen, Seitenname = Kachel- bzw. Reitername ----------
+  gruppe = 'Leiste je Screen (Handy 390)';
+  {
+    const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
+    await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
+    await seite.waitForSelector('.heim-screen');
+    const stand = async (name, params) => {
+      await seite.evaluate(([n, p]) => window.__app.gehe(n, p), [name, params || {}]);
+      await seite.waitForFunction((n) => document.documentElement.dataset.screen === n, name).catch(() => {});
+      await warte(300);
+      const m = await lageMessen(seite);
+      return { leiste: m.sichtbar && !m.klasse.split(' ').includes('weg'), reiter: m.reiter, h1: await seite.evaluate(() => document.querySelector('#app > .screen .seiten-kopf h1')?.textContent || '') };
+    };
+    let r = await stand('online');
+    pruefe('Online (ohne Partie): Leiste bleibt, Start aktiv, Seite heisst Online', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Online', JSON.stringify(r));
+    r = await stand('online', { partieId: '00000000-0000-4000-8000-000000000001' });
+    pruefe('Online-Partie: keine Leiste (das Brett braucht den Platz)', !r.leiste, JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit' });
+    pruefe('Zu-zweit-Startblatt: Leiste bleibt, Start aktiv', r.leiste && r.reiter.includes('heim*'), JSON.stringify(r));
+    r = await stand('partie', { modus: 'zuzweit', zuzweit: { weiss: 'A', schwarz: 'B' } });
+    pruefe('Zu-zweit-Partie: keine Leiste', !r.leiste, JSON.stringify(r));
+    r = await stand('training');
+    pruefe('Lernen (Kachel auf Start): Seite heisst Lernen, Start aktiv', r.leiste && r.reiter.includes('heim*') && r.h1 === 'Lernen', JSON.stringify(r));
+    pruefe('keine Konsolenfehler', fehler.length === 0, fehler.join(' | '));
+    await kontext.close();
+  }
+
   // ---------- Handy: schwebende Glas-Kapsel unten (Konzept 2026-11-06, Entwurf .dock) ----------
   for (const schema of ['light', 'dark']) {
     gruppe = `glas-leiste Handy 390 ${schema === 'dark' ? 'dunkel' : 'hell'}`;
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true, schema });
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     await warte(400);
     const m = await lageMessen(seite);
     pruefe('Lage unten, schwebend, nicht im Kopf', m.html === 'unten' && m.sichtbar && !m.imKopf, JSON.stringify({ h: m.html, k: m.imKopf }));
@@ -273,7 +300,7 @@ async function testeLeiste(browser) {
         f();
       });
       await seite.locator('.reiter-leiste [data-reiter="heim"]').click();
-      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-ring'), null, { timeout: 10000 }).catch(() => {});
+      await seite.waitForFunction(() => location.hash === '#heim' && !!document.querySelector('.heim-screen .heim-buehne'), null, { timeout: 10000 }).catch(() => {});
       await warte(800);
       m = await lageMessen(seite);
       const abtast = await seite.evaluate(() => { window.__pilleAbtast.an = false; return window.__pilleAbtast.oben; });
@@ -325,7 +352,7 @@ async function testeLeiste(browser) {
     pruefe('Verlauf gehoert zu Ich: Ich aktiv, Zurueck-Knopf da', m.reiter.includes('ich*') && m.wurzel === 'nein'
       && await seite.locator('.vl-screen .kopf-zurueck').isVisible(), JSON.stringify({ r: m.reiter, w: m.wurzel }));
     await seite.evaluate(() => window.__app.gehe('heim'));
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     m = await lageMessen(seite);
     pruefe('auf heim: Start aktiv, Wurzel (kein Zurueck)', m.reiter.includes('heim*') && m.wurzel === 'ja' && !(await seite.locator('.heim-screen .kopf-zurueck').isVisible()),
       JSON.stringify({ r: m.reiter, w: m.wurzel }));
@@ -339,7 +366,7 @@ async function testeLeiste(browser) {
     const { kontext, seite, fehler } = await neueSeite(browser, { w: 390, h: 844, handy: true });
     // Browser ohne backdrop-filter nachstellen: CSS.supports meldet ihn nicht, die @supports-Regel prueft der Node-Teil
     await seite.goto(`${BASIS}&reiter=bestenliste,ich#heim`);
-    await seite.waitForSelector('.heim-screen .heim-ring');
+    await seite.waitForSelector('.heim-screen .heim-buehne');
     const ersatz = await seite.evaluate(() => {
       const regeln = [];
       for (const s of document.styleSheets) { try { for (const r of s.cssRules) if (r.conditionText && /not/.test(r.conditionText) && /backdrop-filter/.test(r.conditionText)) regeln.push(r.cssText); } catch (e) { /* fremd */ } }
@@ -539,8 +566,8 @@ async function testeTraining(browser) {
       leer: !document.querySelector('.training-leer').hidden, gitter: document.querySelector('.training-gitter').hidden,
       h1: document.querySelector('.seiten-kopf h1').textContent, ueber: document.querySelector('.seiten-kopf .ueberzeile').textContent,
       zurueck: !!document.querySelector('.kopf-zurueck') && getComputedStyle(document.querySelector('.kopf-zurueck')).display !== 'none' }));
-    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Training · Crownmate' && !r.platzhalter, JSON.stringify(r));
-    pruefe('Seitenkopf „Üben ohne Druck“ / „Training“, die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Training'
+    pruefe('#training ist Kern-Screen: Huelle statt Arena, kein Platzhalter', r.hash === '#training' && r.titel === 'Lernen · Crownmate' && !r.platzhalter, JSON.stringify(r));
+    pruefe('Seitenkopf „Üben ohne Druck“ / „Lernen“ (wie die Kachel auf Start), die einzige Ueberschrift h1', r.ueber === 'Üben ohne Druck' && r.h1 === 'Lernen'
       && await seite.locator('.screen.training-screen h1').count() === 1, JSON.stringify(r));
     pruefe('ohne Anbieter: ruhige Karte, Gitter versteckt; ohne Reiter ein Zurueck-Knopf', r.leer && r.gitter && r.zurueck, JSON.stringify(r));
     await seite.locator('.training-leer [data-aktion="arena"]').click();

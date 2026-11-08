@@ -520,7 +520,7 @@ async function browserTeil(browser) {
     && await seite.evaluate(() => location.hash === '#start' && history.state && history.state.params && history.state.params.seite === 'frage'));
   // "Einfuehrung ueberspringen" -> Startseite heim (Etappe A); der zweite Start zeigt kein Willkommen
   await seite.locator('.st-raus').click();
-  await seite.waitForSelector('.heim-screen .heim-ring', { timeout: 15000 });
+  await seite.waitForSelector('.heim-screen .heim-buehne', { timeout: 15000 });
   pruefe('"Einführung überspringen" fuehrt zur Startseite heim', await seite.evaluate(() => location.hash) === '#heim');
   await seite.goto(BASIS);
   await seite.waitForSelector('#app > .screen:not(.lade-screen)', { timeout: 20000 });
@@ -546,13 +546,24 @@ async function browserTeil(browser) {
   await warte(300);
   pruefe('nur Fortschritt mit 5 Partien, keine Partienliste (und nie gesehen): kein Willkommen', await seite.evaluate(() => !document.querySelector('.st-screen')
     && location.hash === '#heim'));
-  // Ueberspringen auf Seite 1
+  // Handy-Runde K (08.11.2026): ein Knopf zum Ueberspringen, nicht zwei ("Einfuehrung ueberspringen" oben bleibt), und
+  // das Schild "Praezise" steht unter dem Brett statt auf den Figuren
   await seite.evaluate(() => localStorage.clear());
   await seite.goto(BASIS);
   await seite.waitForSelector('.st-screen .st-titel', { timeout: 20000 });
-  await seite.locator('[data-st="ueberspringen"]').click();
-  await warteSeite(seite, 'frage');
-  pruefe('Ueberspringen auf Seite 1 fuehrt direkt zur Frage', (await sz(seite)).seite === 'frage');
+  const eins = await seite.evaluate(() => {
+    const sk = document.querySelector('.st-klasse').getBoundingClientRect();
+    const br = document.querySelector('.st-sockel').getBoundingClientRect();
+    return { unten: document.querySelectorAll('[data-st="ueberspringen"]').length, oben: document.querySelectorAll('[data-st="raus"]').length,
+      unterBrett: sk.top >= br.bottom - 0.5 || sk.left >= br.right - 0.5 };
+  });
+  pruefe('Seite 1: nur "Einfuehrung ueberspringen" oben, kein zweiter Knopf unten', eins.unten === 0 && eins.oben === 1, eins);
+  pruefe('Seite 1: Schild unter oder neben dem Brett, nicht auf den Figuren', eins.unterBrett, eins);
+  // weiter zur Frage (frueher ueber "Ueberspringen" unten): dreimal Weiter
+  for (const naechste of ['w2', 'w3', 'frage']) {
+    await seite.locator('[data-st="weiter"]').click();
+    await warteSeite(seite, naechste);
+  }
 
   // ---------- Regel-Hilfe ----------
   gruppe = 'Regel-Hilfe';

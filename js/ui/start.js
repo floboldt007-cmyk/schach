@@ -91,12 +91,13 @@ function bisZu(name) {
 function seite(name) {
   if (name === 'w1') {
     return {
-      bild: `<div class="st-sockel">${miniBrett(FEN_WILLKOMMEN, { zuletzt: ['f8', 'c5'] })}
-          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || T('praezise'))}</span></div>`,
+      // das Schild steht unter dem Brett, nicht darauf (Handy-Runde K, 08.11.2026: es verdeckte schwarze Bauern)
+      bild: `<div class="st-sockel">${miniBrett(FEN_WILLKOMMEN, { zuletzt: ['f8', 'c5'] })}</div>
+          <span class="st-klasse"><i></i>${esc(KLASSEN_NAME.bester || T('praezise'))}</span>`,
       text: `<div class="ueberzeile">${T('w1.ueber')}</div>
         <h1 class="disp st-titel" tabindex="-1">${T('w1.titel')}</h1>
         <p>${T('w1.text')}</p>
-        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}</div>`,
     };
   }
   if (name === 'w2') {
@@ -111,7 +112,7 @@ function seite(name) {
       text: `<div class="ueberzeile">${T('w2.ueber')}</div>
         <h1 class="disp st-titel" tabindex="-1">${T('w2.titel', { bots: esc(zahlWort(BOTS.length)), welten: esc(zahlWort(WELTEN.length).toLowerCase()) })}</h1>
         <p>${T('w2.text', { erster: esc(erster.name), bis: esc(bisZu(letzter.name)) })}</p>
-        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}${knopf('ueberspringen', T('ueberspringen'), { art: 'leise' })}</div>`,
+        <div class="st-knoepfe">${knopf('weiter', t('allgemein.weiter'), { art: 'primaer' })}</div>`,
     };
   }
   if (name === 'w3') {
