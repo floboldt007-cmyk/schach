@@ -14,8 +14,21 @@
   border: 1px solid var(--linie); color: var(--text); box-shadow: var(--s1, none); }
 .vk-banner { display: block; background-color: #14161C; background-size: cover; background-position: 30% center; background-repeat: no-repeat; }
 .vk > .vk-banner { position: absolute; inset: 0 0 auto 0; height: 100px; }
-/* dunkler Verlauf nach rechts, damit die weisse Schrift auch auf hellen Motiven lesbar bleibt */
-.vk > .vk-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0%, rgba(10, 12, 16, .55) 45%, rgba(10, 12, 16, .78) 100%); }
+/* G-001: gemeinsame Regel fuer alle Banner-Flaechen mit Text links (Profilkopf "Ich", Visitenkarte, Spielerzeile online).
+   Alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200); mit "cover" lag es je nach Breite unter
+   Name und Titel-Schild. Darum feste Hoehe --banner-h (4:1, Vorgabe 120 px, also 480 px breit), so verschoben, dass das Motiv
+   (x 0,267 * Breite = 1,067 * Hoehe) hinter der Mitte des Profilbilds liegt: --banner-motiv setzt jede Flaeche selbst. Der dunkle
+   Verlauf (fuer weisse Schrift) endet deckend in der Grundfarbe, bevor das Bild endet (Bildende = --banner-motiv + 2,93 * Hoehe). */
+.pr-banner, .vk:not([data-groesse="streifen"]) > .vk-banner, .on-spieler.mit-banner > .on-banner { background-color: #14161C; background-repeat: no-repeat;
+  background-size: auto max(var(--banner-h, 120px), 100%);
+  background-position: calc(var(--banner-motiv, 52px) - var(--banner-h, 120px) * 1.067) calc(50% - var(--banner-h, 120px) / 15); }
+.pr-banner::after, .vk > .vk-banner::after, .on-spieler.mit-banner > .on-banner::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0, rgba(10, 12, 16, .55) calc(var(--banner-h, 120px) * 1.17),
+    rgba(10, 12, 16, .8) calc(var(--banner-h, 120px) * 2.17), #14161C calc(var(--banner-motiv, 52px) + var(--banner-h, 120px) * 2.83)); }
+/* Mitte des Profilbilds ab linker Kante: Visitenkarte 14 + 64 / 2, Spielerzeile 12 + 44 / 2 (Profilkopf: 52, Handy 40 in sammlung.css).
+   Die Spielerzeile ist nur 74 px hoch und ihr Bild 44 px: dort ein kleineres Banner, damit das Motiv hinter der Figur bleibt. */
+.vk { --banner-motiv: 46px; }
+.on-spieler { --banner-motiv: 34px; --banner-h: 76px; }
 .vk-kopf { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 100px; padding: 10px 14px; }
 .vk-av { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); background: #2C3038; }
 .vk-av svg, .vk-av img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -65,7 +78,6 @@
 /* ---------- Online-Partie: Banner hinter der Spielerleiste ---------- */
 .on-spieler.mit-banner { position: relative; overflow: hidden; border-radius: var(--r-m, 14px); padding-inline: 10px; }
 .on-spieler.mit-banner > .on-banner { position: absolute; inset: 0; z-index: 0; }
-.on-spieler.mit-banner > .on-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 12, 16, .25), rgba(10, 12, 16, .8)); }
 .on-spieler.mit-banner > :not(.on-banner) { position: relative; z-index: 1; }
 .on-spieler.mit-banner > div { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .on-titel { display: block; font-size: 12px; font-weight: 700; color: #F2C66B; }
@@ -73,15 +85,7 @@
 /* ---------- Profil "Ich": Banner im Kopf der Karte ---------- */
 .pr-karte .pr-kopf { position: relative; overflow: hidden; min-height: 112px; padding: 12px 14px; margin: -14px -14px 0; border-radius: var(--r-l, 18px) var(--r-l, 18px) 0 0; }
 .pr-karte .pr-kopf > :not(.pr-banner) { position: relative; z-index: 1; }
-/* G-001: alle Banner tragen ihr Motiv bei gut einem Viertel der Breite (x 300 bis 330 von 1200). Mit "cover" lag es auf iPad und
-   Handy unter Name und Titel-Schild. Jetzt in fester Hoehe (4:1, mindestens 120 px, also 480 px breit) und so verschoben, dass das
-   Motiv (x 0,267 * 480 = 128 px) hinter der Mitte des Profilbilds (--pr-motiv) verschwindet. Rechts davon fuellt die Grundfarbe,
-   unter dem dunklen Verlauf (80 %) ist der Uebergang nicht zu sehen. */
-.pr-banner { position: absolute; inset: 0; z-index: 0; background-color: #14161C; background-repeat: no-repeat;
-  background-size: auto max(120px, 100%); background-position: calc(var(--pr-motiv, 52px) - 128px) calc(50% - 8px); }
-/* der Verlauf endet deckend in der Grundfarbe, kurz bevor das Bild endet (Bildende = --pr-motiv + 352 px): keine Kante auf breiten Karten */
-.pr-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 12, 16, .15) 0, rgba(10, 12, 16, .55) 140px,
-  rgba(10, 12, 16, .8) 260px, #14161C calc(var(--pr-motiv, 52px) + 340px)); }
+.pr-banner { position: absolute; inset: 0; z-index: 0; }
 .pr-karte .pr-kopf .pr-av { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85), 0 2px 8px rgba(0, 0, 0, .45); }
 .pr-karte .pr-kopf .pr-name b, .pr-karte .pr-kopf .pr-seit { color: var(--vk-schrift); text-shadow: var(--vk-schatten); }
 .pr-chip.pr-chip-krone { color: #FFFFFF; background: rgba(255, 255, 255, .16); }

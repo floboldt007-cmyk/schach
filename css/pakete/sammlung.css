@@ -231,7 +231,7 @@ html[data-bewegung="aus"] .er-krone { animation: none; }
    uebersichtlich") */
 @media (max-width: 520px) {
   .pr-av { width: 52px; height: 52px; }
-  .pr-karte { --pr-motiv: 40px; }
+  .pr-karte { --banner-motiv: 40px; }
   .pr-orden { min-height: 58px; padding: 6px 4px; gap: 2px; }
   .pr-orden-bild { width: 28px; height: 28px; }
   .pr-plus { font-size: 20px; line-height: 28px; }
