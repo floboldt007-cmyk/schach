@@ -1,13 +1,17 @@
 // Screen "raetsel-duell" (Etappe 5, Paket lobby): zwei Spieler loesen gleichzeitig dieselben Raetsel, fest 3 Minuten.
-// Einstieg ist die Karte "Raetsel-Duell" unter "Mehr Spielarten" in der Lobby (nur im Labor, wie die Lobby selbst) und der
-// Link #raetsel-duell/CODE (Freundschaft). Der Server entscheidet alles (js/raetsel-duell.js); dieser Screen zeigt nur:
-// Start (Regeln, Gegner suchen, Einladung, Code), Warten (Suche, Einladung), Duell (beide Staende live, eigene Uhr nach
-// Serverzeit, Brett) und Ende (Wertung, Kronen, Nochmal). params: { code } aus dem Link.
+// Seit Flo 08.11.2026 fuer alle (nicht mehr nur Labor): Einstieg ist die Tuer "Raetsel-Duell" auf der Online-Seite
+// (params.suchen startet die gewertete Suche sofort), die Lobby-Karte im Labor und der Link #raetsel-duell/CODE
+// (Freundschaft). Der Server entscheidet alles (js/raetsel-duell.js); dieser Screen zeigt nur:
+// Start (dunkle Buehne "Kopf an Kopf": beide Avatare, 3:00, drei Kacheln, Gegner suchen; darunter Mit einem Freund),
+// Warten (Suche mit sichtbarer Restzeit bis zum KI-Gegner, Einladung), Duell (Avatar, Zahl, Uhr als Ring, Zahl, Avatar;
+// darunter das Brett und die Reihe der eigenen Raetsel: gruen geloest, rot Fehler) und Ende (Krone ueber dem Sieger,
+// grosser Stand, Kronen-Schild, dieselbe Reihe, Nochmal und Fertig). params: { code } aus dem Link, { suchen }.
 //
 //   zeige(root, params, app) -> { verlasse() }
 // DOM: section.screen.raetsel-duell[data-phase="start"|"konto"|"suche"|"einladung"|"vorlauf"|"laeuft"|"zeit_um"|"beendet"]
-//   > header.haupt-kopf, .rd-rumpf > .rd-start | .rd-warten | .rd-spiel (.rd-leiste > .rd-seite[data-wer="ich"|"gegner"],
-//   .rd-uhr; .rd-brettzone .rd-brett; .rd-zeile) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
+//   > header.haupt-kopf, .rd-rumpf > .rd-start (.rd-buehne > .rd-regeln li x3, .rd-suchen; .rd-freund) | .rd-warten
+//   | .rd-spiel (.rd-leiste > .rd-seite[data-wer="ich"|"gegner"], .rd-ring > .rd-uhr; .rd-brettzone .rd-brett; .rd-zeile;
+//   .rd-reihe) | .rd-ende. Optik: css/pakete/raetsel-duell.css.
 // Tests: window.__duellKiMs verkuerzt die 10 s bis zum KI-Gegner, window.__duellAbfrageMs die Abfrage (Standard 1 s).
 import { Brett, zielKarte } from '../board.js';
 import { figurenPfad } from '../figurensatz.js';
@@ -16,9 +20,10 @@ import { hauptKopf, verbindeKopf } from './seite.js';
 import { icon } from './icons.js';
 import { klang } from '../sounds.js';
 import { anim, tempo } from '../bewegung.js';
-import { laborFrei } from '../labor.js';
 import { ladeEinstellungen } from '../storage.js';
 import { kontoFreigeschaltet } from '../konto.js';
+import { avatarVon, floAvatar } from '../thema.js';
+import { BOTS } from '../bots.js';
 import { t } from '../sprache.js';
 import { KONST, versatzAus, restMs, uhrText, phaseAus, anteil, stellungAus, duellLink, kronenText } from '../pakete/lobby/raetsel-duell.js';
 import * as server from '../raetsel-duell.js';
@@ -29,6 +34,8 @@ const D = (k, w) => t('p-duell.' + k, w);
 const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const WURZEL = new URL('../../', import.meta.url);
 const testZahl = (n, std) => (typeof window !== 'undefined' && Number.isFinite(window[n]) ? window[n] : std);
+const RING = 2 * Math.PI * 44;
+const DAUER_MS = KONST.DAUER_S * 1000;
 
 function ladeCss() {
   try {
@@ -47,16 +54,23 @@ function fehlerText(e) {
   return s && s !== 'p-duell.fehler.' + k ? s : D('fehler.allgemein');
 }
 
+// Bild des KI-Gegners: der Leiter-Bot mit der naechsten Staerke (nur das Gesicht, die Staerke steht als Zahl daneben)
+function kiBild(elo) {
+  const leiter = BOTS.filter((b) => !b.endgegner && Number.isFinite(Number(b.elo)));
+  if (!leiter.length) return '';
+  const ziel = Number.isInteger(elo) ? elo : 1200;
+  const bot = leiter.reduce((a, b) => (Math.abs(b.elo - ziel) < Math.abs(a.elo - ziel) ? b : a));
+  return `<img src="${esc(avatarVon(bot))}" alt="">`;
+}
+const ringSvg = (klasse) => `<svg class="${klasse}" viewBox="0 0 100 100" aria-hidden="true"><circle class="rd-ring-spur" cx="50" cy="50" r="44"/>`
+  + `<circle class="rd-ring-rest" cx="50" cy="50" r="44" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="0"/></svg>`;
+
 export function zeige(root, params, app) {
   const s = document.createElement('section');
   s.className = 'screen raetsel-duell';
   s.setAttribute('aria-label', D('name'));
   root.append(s);
   let weg = false;
-  if (!laborFrei()) {
-    setTimeout(() => { if (!weg) app.gehe('arena', {}, { ersetzen: true }); }, 0);
-    return { verlasse() { weg = true; } };
-  }
   ladeCss();
   const einst = (() => { try { return app && typeof app.einstellungen === 'function' ? app.einstellungen() : ladeEinstellungen(); } catch (e) { return {}; } })();
   s.innerHTML = `${hauptKopf({ titel: D('name'), unter: D('unter'), zurueck: true, chips: '', marke: false })}<div class="rd-rumpf"></div>`;
@@ -68,8 +82,8 @@ export function zeige(root, params, app) {
   const stoppeUhren = () => { for (const u of uhren) clearTimeout(u); uhren.clear(); };
   let suche = null;
   let brett = null;
-  // laufendes Duell
-  const d = { id: null, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false };
+  // laufendes Duell; reihe: eigene Raetsel in Reihenfolge, 'g' geloest, 'r' Fehler (nur dieses Geraet, nur Anzeige)
+  const d = { id: null, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [] };
 
   const phase = (p) => { s.dataset.phase = p; };
   function aufraeumen() {
@@ -77,6 +91,12 @@ export function zeige(root, params, app) {
     if (suche) { suche.stopp(); suche = null; }
     if (brett) { try { brett.zerstoere(); } catch (e) { /* egal */ } brett = null; }
   }
+  const ichBild = () => `<span class="rd-av" aria-hidden="true">${floAvatar('w')}</span>`;
+  const reiheHtml = () => {
+    const felder = [...d.reihe, ...Array(Math.max(0, 8 - d.reihe.length)).fill('')];
+    const geloest = d.reihe.filter((x) => x === 'g').length;
+    return `<ol class="rd-reihe" aria-label="${esc(D('reihe.aria', { geloest, fehler: d.reihe.length - geloest }))}">${felder.map((x) => `<li${x ? ` data-art="${x}"` : ''}></li>`).join('')}</ol>`;
+  };
 
   // ---------- Start ----------
   function zeigeStart(meldung) {
@@ -90,19 +110,34 @@ export function zeige(root, params, app) {
       return;
     }
     phase('start');
-    rumpf.innerHTML = `<section class="rd-karte rd-regeln" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t">${esc(D('regeln.titel'))}</h2>
-        <ol class="rd-liste"><li>${esc(D('regeln.1'))}</li><li>${esc(D('regeln.2'))}</li><li>${esc(D('regeln.3'))}</li></ol></section>
-      <section class="rd-karte" aria-labelledby="rd-gew-t"><h2 id="rd-gew-t">${esc(D('gewertet.titel'))}</h2><p class="rd-text">${esc(D('gewertet.text'))}</p>
-        <button type="button" class="knopf primaer dr rd-suchen">${esc(D('suchen'))}${icon('vor')}</button></section>
-      <section class="rd-karte" aria-labelledby="rd-fr-t"><h2 id="rd-fr-t">${esc(D('freund.titel'))}</h2><p class="rd-text">${esc(D('freund.text'))}</p>
-        <button type="button" class="knopf dr rd-einladen">${esc(D('einladen'))}</button>
-        <form class="rd-code" novalidate><label for="rd-code-feld">${esc(D('code.label'))}</label>
+    const codeOffen = !!(meldung || (params && params.code));
+    rumpf.innerHTML = `<div class="rd-start">
+      <section class="rd-buehne" aria-labelledby="rd-regeln-t"><h2 id="rd-regeln-t" class="sr">${esc(D('regeln.titel'))}</h2>
+        <div class="rd-paar">${ichBild()}<b class="rd-vs" aria-label="${esc(D('vs'))}">VS</b><span class="rd-av rd-av-frage" aria-hidden="true">?</span></div>
+        <b class="rd-gross zahl" aria-hidden="true">${uhrText(DAUER_MS)}</b>
+        <ul class="rd-regeln">
+          <li><span class="rd-kachel-bild" aria-hidden="true">${icon('ziel')}</span><span aria-hidden="true">${esc(D('kachel.gleich'))}</span><span class="sr">${esc(D('regeln.1'))}</span></li>
+          <li><span class="rd-kachel-bild" aria-hidden="true">${icon('verlauf')}</span><span aria-hidden="true">${esc(D('kachel.zeit'))}</span><span class="sr">${esc(D('regeln.2'))}</span></li>
+          <li><b class="rd-kachel-bild zahl" aria-hidden="true">${esc(D('kachel.strafe'))}</b><span aria-hidden="true">${esc(D('kachel.fehler'))}</span><span class="sr">${esc(D('regeln.3'))}</span></li>
+        </ul>
+        <button type="button" class="rd-los dr rd-suchen">${esc(D('suchen.gewertet'))}</button>
+      </section>
+      <section class="rd-karte rd-freund" aria-labelledby="rd-fr-t"><h2 id="rd-fr-t">${esc(D('freund.titel'))}</h2><p class="rd-text">${esc(D('freund.text'))}</p>
+        <div class="rd-knoepfe"><button type="button" class="knopf dr rd-einladen">${esc(D('einladen.kurz'))}</button>
+          <button type="button" class="knopf dr rd-code-zeigen" aria-expanded="${codeOffen}" aria-controls="rd-code-form">${esc(D('code.zeigen'))}</button></div>
+        <form class="rd-code" id="rd-code-form" novalidate${codeOffen ? '' : ' hidden'}><label for="rd-code-feld">${esc(D('code.label'))}</label>
           <div class="rd-code-zeile"><input id="rd-code-feld" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9"
             inputmode="text" value="${esc(params && params.code ? params.code : '')}">
           <button type="submit" class="knopf dr rd-beitreten">${esc(D('beitreten'))}</button></div></form>
-        <p class="rd-fehler" role="alert"${meldung ? '' : ' hidden'}>${esc(meldung || '')}</p></section>`;
+        <p class="rd-fehler" role="alert"${meldung ? '' : ' hidden'}>${esc(meldung || '')}</p></section></div>`;
     rumpf.querySelector('.rd-suchen').addEventListener('click', starteSuche);
     rumpf.querySelector('.rd-einladen').addEventListener('click', ladeEin);
+    rumpf.querySelector('.rd-code-zeigen').addEventListener('click', (e) => {
+      const form = rumpf.querySelector('.rd-code');
+      form.hidden = !form.hidden;
+      e.currentTarget.setAttribute('aria-expanded', String(!form.hidden));
+      if (!form.hidden) rumpf.querySelector('#rd-code-feld').focus();
+    });
     rumpf.querySelector('.rd-code').addEventListener('submit', (e) => {
       e.preventDefault();
       tritteBei(rumpf.querySelector('#rd-code-feld').value);
@@ -111,16 +146,29 @@ export function zeige(root, params, app) {
   const startFehler = (e) => { if (!weg) zeigeStart(fehlerText(e)); };
 
   // ---------- Suche ----------
+  // Restzeit bis zum KI-Gegner sichtbar (Flo 08.11.2026, Frage 2 c): Ring und Satz; die Wartezeit selbst fuehrt der Server
   function starteSuche() {
     aufraeumen();
     phase('suche');
-    rumpf.innerHTML = `<section class="rd-karte rd-warten" aria-live="polite"><div class="rd-radar" aria-hidden="true"><i></i><i></i>${icon('ziel')}</div>
-      <h2>${esc(D('suche.titel'))}</h2><p class="rd-text">${esc(D('suche.text'))}</p>
+    const warteMs = Math.max(1, testZahl('__duellKiMs', server.KI_ERSATZ_MS));
+    const beginn = Date.now();
+    rumpf.innerHTML = `<section class="rd-karte rd-warten" aria-live="polite"><div class="rd-radar">${ringSvg('rd-ring-bild')}${ichBild()}</div>
+      <h2>${esc(D('suche.titel'))}</h2><p class="rd-text rd-rest"></p>
       <button type="button" class="knopf dr rd-abbrechen">${esc(D('abbrechen'))}</button></section>`;
+    const restEl = rumpf.querySelector('.rd-rest');
+    const ringEl = rumpf.querySelector('.rd-ring-rest');
+    const zeigeRest = () => {
+      if (s.dataset.phase !== 'suche') return;
+      const rest = Math.max(0, warteMs - (Date.now() - beginn));
+      restEl.textContent = D('suche.rest', { s: Math.ceil(rest / 1000) });
+      ringEl.setAttribute('stroke-dashoffset', (RING * (1 - rest / warteMs)).toFixed(2));
+      if (rest > 0) spaeter(zeigeRest, 250);
+    };
+    zeigeRest();
     rumpf.querySelector('.rd-abbrechen').addEventListener('click', () => zeigeStart());
     rumpf.querySelector('.rd-abbrechen').focus();
     suche = server.suche({
-      warteMs: testZahl('__duellKiMs', server.KI_ERSATZ_MS),
+      warteMs,
       beiTreffer: (id) => { suche = null; starteDuell(id); },
       beiKi: (id) => { suche = null; starteDuell(id); },
       beiFehler: (e) => { suche = null; startFehler(e); },
@@ -163,20 +211,23 @@ export function zeige(root, params, app) {
   }
 
   // ---------- Duell ----------
+  // Kopf an Kopf: Avatar, Zahl (gross, "gelöst" nur fuer Vorleser), Name und Fehler klein, duenner Balken
   function seiteHtml(wer) {
-    return `<div class="rd-seite" data-wer="${wer}"><span class="rd-name"></span>
-      <span class="rd-zahlen"><b class="rd-geloest zahl"></b><small class="rd-fehlerzahl"></small></span>
+    const bild = wer === 'ich' ? ichBild() : '<span class="rd-av rd-av-frage" aria-hidden="true">?</span>';
+    return `<div class="rd-seite" data-wer="${wer}">${bild}<span class="rd-zahlen"><b class="rd-geloest zahl"></b>
+      <span class="rd-name"></span><small class="rd-fehlerzahl"></small></span>
       <span class="rd-balken" aria-hidden="true"><i></i></span></div>`;
   }
 
   function starteDuell(id) {
     aufraeumen();
-    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false });
+    Object.assign(d, { id, st: null, versatz: 0, chess: null, nr: 0, schritt: -1, wartet: false, meldung: null, abfrage: false, reihe: [] });
     phase('vorlauf');
     rumpf.innerHTML = `<div class="rd-spiel">
-        <div class="rd-leiste">${seiteHtml('ich')}<div class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(KONST.DAUER_S * 1000)}</div>${seiteHtml('gegner')}</div>
+        <div class="rd-leiste">${seiteHtml('ich')}<div class="rd-ring">${ringSvg('rd-ring-bild')}<span class="rd-uhr zahl" role="timer" aria-live="off">${uhrText(DAUER_MS)}</span></div>${seiteHtml('gegner')}</div>
         <div class="rd-brettzone"><div class="brett-rahmen rd-rahmen"><div class="rd-brett" aria-label="${esc(D('brett'))}"></div></div></div>
         <p class="rd-zeile" role="status"><span class="rd-nr"></span><span class="rd-amzug"></span><span class="rd-meldung"></span></p>
+        <div class="rd-reihe-ort">${reiheHtml()}</div>
       </div>`;
     brett = new Brett(rumpf.querySelector('.rd-brett'), {
       ausrichtung: 'w', figurenPfad: new URL(figurenPfad(einst), WURZEL).href, beiZug, koordinaten: einst.koordinaten !== false, autoDame: einst.autoDame !== false,
@@ -184,6 +235,7 @@ export function zeige(root, params, app) {
     hole();
     tick();
   }
+  const zeichneReihe = () => { const ort = rumpf.querySelector('.rd-reihe-ort'); if (ort) ort.innerHTML = reiheHtml(); };
 
   // Abfrage alle 1 s: Gegner live, Ende; das eigene Raetsel nur, wenn gerade kein Zug unterwegs ist
   async function hole() {
@@ -209,9 +261,11 @@ export function zeige(root, params, app) {
     const p = phaseAus(d.st, d.versatz, Date.now());
     const uhr = rumpf.querySelector('.rd-uhr');
     if (!uhr) return;
-    const rest = p === 'vorlauf' ? KONST.DAUER_S * 1000 - d.st.ich.fehler * KONST.STRAFE_S * 1000 : restMs(d.st.ich.ende_am, d.versatz, Date.now());
+    const rest = p === 'vorlauf' ? DAUER_MS - d.st.ich.fehler * KONST.STRAFE_S * 1000 : restMs(d.st.ich.ende_am, d.versatz, Date.now());
     uhr.textContent = uhrText(rest);
     uhr.setAttribute('aria-label', D('uhr.aria', { zeit: uhrText(rest) }));
+    const ring = rumpf.querySelector('.rd-ring .rd-ring-rest');
+    if (ring) ring.setAttribute('stroke-dashoffset', (RING * (1 - Math.min(1, rest / DAUER_MS))).toFixed(2));
     if (s.dataset.phase !== p) {
       phase(p);
       if (p === 'laeuft' && !d.wartet) setzeRaetsel(d.st.raetsel, { neu: true });
@@ -228,14 +282,22 @@ export function zeige(root, params, app) {
       const el = rumpf.querySelector(`.rd-seite[data-wer="${wer}"]`);
       if (!el) return;
       el.querySelector('.rd-name').textContent = name;
-      el.querySelector('.rd-geloest').textContent = D('geloest', { n: x.geloest });
-      el.querySelector('.rd-fehlerzahl').textContent = D('fehler', { n: x.fehler });
+      // sichtbar nur die Zahl; "gelöst" fuer Vorleser (der Text bleibt "2 gelöst")
+      el.querySelector('.rd-geloest').innerHTML = `${esc(String(x.geloest))}<span class="sr">${esc(D('geloest', { n: x.geloest }).slice(String(x.geloest).length))}</span>`;
+      el.querySelector('.rd-fehlerzahl').textContent = x.fehler ? D('fehler', { n: x.fehler }) : '';
       el.querySelector('.rd-balken > i').style.transform = `scaleX(${anteil(x.geloest, wer === 'ich' ? g.geloest : st.ich.geloest)})`;
     };
     seite('ich', st.ich, D('du'));
     const gName = st.art === 'ki' ? (Number.isInteger(g.elo) ? D('ki.elo', { elo: g.elo }) : D('ki')) : st.art === 'freundschaft' ? D('freund') : D('gegner');
     seite('gegner', g, gName);
-    rumpf.querySelector('.rd-seite[data-wer="gegner"]').dataset.ki = st.art === 'ki' ? 'ja' : 'nein';
+    const gs = rumpf.querySelector('.rd-seite[data-wer="gegner"]');
+    const ki = st.art === 'ki' ? 'ja' : 'nein';
+    if (gs.dataset.ki !== ki) {
+      gs.dataset.ki = ki;
+      const av = gs.querySelector('.rd-av');
+      av.classList.remove('rd-av-frage');
+      av.innerHTML = st.art === 'ki' ? kiBild(g.elo) : icon('person');
+    }
   }
 
   function zeigeMeldung(art, text) {
@@ -289,6 +351,7 @@ export function zeige(root, params, app) {
       if (r.richtig) {
         try { klang.spiele(r.fertig ? 'raetsel-richtig' : 'zug'); } catch (e) { /* ohne Klang */ }
         zeigeMeldung('richtig', r.fertig ? D('richtig') : D('weiter'));
+        if (r.fertig) { d.reihe.push('g'); zeichneReihe(); }
         // die Antwort des Gegners bzw. das naechste Raetsel kurz nach dem eigenen Zug. Ohne neu: hat die Abfrage die
         // Stellung schon gesetzt, bliebe sonst eine Auswahl nicht stehen, die schnell danach getippt wurde
         spaeter(() => setzeRaetsel(d.st.raetsel), r.fertig ? 380 : 260);
@@ -296,6 +359,7 @@ export function zeige(root, params, app) {
       }
       try { klang.spiele('raetsel-falsch'); } catch (e) { /* ohne Klang */ }
       zeigeMeldung('falsch', D('falsch'));
+      d.reihe.push('r'); zeichneReihe();
       spaeter(() => setzeRaetsel(d.st.raetsel), 420);
       return false;
     }, (e) => {
@@ -315,21 +379,30 @@ export function zeige(root, params, app) {
     const erg = st.ergebnis || 'remis';
     let kronen = D('ende.ohne');
     if (st.art !== 'freundschaft') kronen = st.kronen_delta ? D('ende.kronen', { delta: kronenText(st.kronen_delta) }) : D('ende.keinekronen');
-    rumpf.innerHTML = `<section class="rd-karte rd-ende" data-ergebnis="${esc(erg)}" aria-live="polite">
-        <span class="rd-ende-symbol" aria-hidden="true">${icon(erg === 'sieg' ? 'krone' : erg === 'remis' ? 'haken' : 'ziel')}</span>
+    const gegnerBild = st.art === 'ki' ? kiBild(g.elo) : icon('person');
+    const krone = `<span class="rd-krone" aria-hidden="true">${icon('krone')}</span>`;
+    rumpf.innerHTML = `<section class="rd-ende" data-ergebnis="${esc(erg)}" aria-live="polite">
+        <div class="rd-paar rd-ende-paar">
+          <span class="rd-ende-wer" data-sieger="${erg === 'sieg'}">${erg === 'sieg' ? krone : ''}${ichBild()}</span>
+          <b class="rd-vs" aria-hidden="true">VS</b>
+          <span class="rd-ende-wer" data-sieger="${erg === 'niederlage'}">${erg === 'niederlage' ? krone : ''}<span class="rd-av" aria-hidden="true">${gegnerBild}</span></span>
+        </div>
         <h2>${esc(D('ende.' + erg))}</h2>
-        <p class="rd-ende-stand zahl">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
-        <p class="rd-text">${esc(kronen)}</p>
-        <div class="rd-knoepfe"><button type="button" class="knopf primaer dr rd-nochmal">${esc(D('nochmal'))}</button>
-          <button type="button" class="knopf dr rd-lobby">${esc(D('lobby'))}</button></div></section>`;
+        <b class="rd-gross zahl" aria-hidden="true">${esc(String(st.ich.geloest))} : ${esc(String(g.geloest))}</b>
+        <p class="rd-text rd-kronen">${esc(kronen)}</p>
+        <p class="rd-ende-stand">${esc(D('ende.stand', { ich: st.ich.geloest, gegner: g.geloest }))}</p>
+        ${reiheHtml()}
+        <div class="rd-knoepfe"><button type="button" class="rd-los dr rd-nochmal">${esc(D('nochmal'))}</button>
+          <button type="button" class="knopf dr rd-fertig">${esc(D('fertig'))}</button></div></section>`;
     rumpf.querySelector('.rd-nochmal').addEventListener('click', () => (st.art === 'freundschaft' ? zeigeStart() : starteSuche()));
-    rumpf.querySelector('.rd-lobby').addEventListener('click', () => app.gehe('lobby'));
+    rumpf.querySelector('.rd-fertig').addEventListener('click', () => app.gehe('online'));
     rumpf.querySelector('.rd-nochmal').focus();
     if (tempo() > 0) anim(rumpf.querySelector('.rd-ende'), [{ opacity: 0, transform: 'translateY(16px) scale(.97)' }, { opacity: 1, transform: 'none' }], { d: 420, k: 'weich' });
   }
 
   zeigeStart();
   if (params && params.code && server.angemeldet()) tritteBei(params.code);
+  else if (params && params.suchen && server.angemeldet()) starteSuche();
   return {
     verlasse() {
       weg = true;

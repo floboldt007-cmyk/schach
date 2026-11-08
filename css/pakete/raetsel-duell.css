@@ -1,23 +1,56 @@
 /* ============================================================
    Crownmate · Raetsel-Duell (Etappe 5, Paket lobby; js/ui/raetsel-duell.js). Nur Tokens (css/tokens.css,
-   css/themes/<id>.css), hell und dunkel ueber das Theme. Handy eine Spalte: oben beide Spieler mit der eigenen Uhr in der
-   Mitte, darunter das Brett von Rand zu Rand, darunter die Zeile mit Raetsel-Nummer und Rueckmeldung. iPad und PC:
-   dieselbe Ordnung, das Brett bis 640 px. Haengt sich selbst ein (link[data-paket="raetsel-duell"]).
+   css/themes/<id>.css), hell und dunkel ueber das Theme. "Kopf an Kopf" (Flo 08.11.2026, Konzept 2 A): Start als dunkle
+   Buehne wie die Startseite (beide Avatare, grosse 3:00, drei Kacheln, goldener Knopf), im Duell oben Avatar, Zahl,
+   Uhr als Ring, Zahl, Avatar, darunter das Brett von Rand zu Rand, die Zeile und die Reihe der eigenen Raetsel. Ende
+   wieder als Buehne mit Krone ueber dem Sieger. iPad und PC: dieselbe Ordnung, das Brett bis 640 px.
+   Haengt sich selbst ein (link[data-paket="raetsel-duell"]).
    ============================================================ */
 .raetsel-duell .rd-rumpf { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 14px; width: 100%; container: rd / size;
   padding: 6px max(var(--rand), calc((100% - 720px) / 2 + var(--rand))) calc(24px + var(--reiter-hoehe, 0px)); }
 
+.rd-start { display: grid; gap: 14px; min-width: 0; }
 .rd-karte { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: var(--r-l); background-color: var(--flaeche);
   background-image: var(--textur-flaeche, none); box-shadow: var(--s1), var(--kante); color: var(--text); min-width: 0; }
 .rd-karte h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
 .rd-text { margin: 0; color: var(--text-2); font-size: 14.5px; line-height: 1.45; }
-.rd-liste { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 14.5px; line-height: 1.45; }
 .rd-karte .knopf { min-height: 52px; }
 .rd-karte .knopf.primaer { justify-content: space-between; padding: 0 20px; font-size: 17px; }
 
+/* ---------- Buehne (Start und Ende) ---------- */
+.rd-buehne, .rd-ende { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 22px 18px; border-radius: var(--r-xl, var(--r-l));
+  background: linear-gradient(160deg, var(--buehne), var(--buehne-2)); color: var(--auf-buehne); box-shadow: var(--s2, var(--s1)), 0 0 0 1px var(--buehne-kante);
+  text-align: center; min-width: 0; }
+.rd-paar { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.rd-vs { font-size: 26px; font-weight: 900; letter-spacing: .02em; color: var(--gold, var(--akzent)); }
+.rd-av { display: grid; place-items: center; flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden;
+  box-shadow: 0 0 0 3px var(--gold, var(--akzent)); background: var(--flaeche-2); color: var(--text-2); }
+.rd-av > svg, .rd-av > img { width: 100%; height: 100%; display: block; }
+.rd-av > .ico { width: 55%; height: 55%; }
+.rd-av-frage { background: rgba(255, 255, 255, .1); color: var(--auf-buehne-2); font-size: 30px; font-weight: 800; }
+.rd-gross { font-size: 56px; font-weight: 900; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.rd-regeln { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; margin: 0; padding: 0; list-style: none; }
+.rd-regeln li { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 76px; padding: 10px 6px;
+  border-radius: var(--r-m); background: rgba(255, 255, 255, .07); color: var(--auf-buehne-2); font-size: 13px; font-weight: 650; line-height: 1.25; }
+.rd-kachel-bild { display: grid; place-items: center; height: 24px; color: var(--auf-buehne); font-size: 18px; font-weight: 850; }
+.rd-kachel-bild .ico { width: 22px; height: 22px; }
+/* goldener Hauptknopf auf der Buehne, wie "Los" bei Zu zweit */
+.rd-los { display: flex; align-items: center; justify-content: center; align-self: stretch; min-height: 52px; padding: 12px 16px; border: 0;
+  border-radius: var(--r-knopf-gross, var(--r-l)); cursor: pointer; font: inherit; font-size: 17px; font-weight: 800;
+  background: var(--gold); color: var(--kg-stark); box-shadow: var(--s2, none);
+  transition: transform var(--d-s) var(--feder-weich), filter var(--d-s) var(--gleiten); }
+.rd-los:hover { filter: brightness(1.05); }
+.rd-los:active { transform: scale(.98); }
+.rd-los:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
+
+/* Mit einem Freund: Einladen und Code eingeben nebeneinander */
+.rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
+.rd-knoepfe .knopf { justify-content: center; padding: 0 12px; min-height: 52px; }
+
 /* Code eingeben */
 .rd-code { display: flex; flex-direction: column; gap: 6px; }
+.rd-code[hidden] { display: none; }
 .rd-code label { font-size: 13.5px; font-weight: 750; color: var(--text-2); }
 .rd-code-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .rd-code input { min-height: 48px; min-width: 0; padding: 0 14px; border-radius: var(--r-m); background: var(--flaeche-2);
@@ -29,37 +62,45 @@
   box-shadow: inset 3px 0 0 var(--warn); }
 .rd-fehler[hidden] { display: none; }
 
-/* Warten: Suche und Einladung */
+/* Warten: Suche (Ring mit Restzeit) und Einladung */
 .rd-warten { align-items: center; text-align: center; padding: 28px 18px; }
 .rd-warten .knopf { align-self: stretch; }
-.rd-radar { position: relative; display: grid; place-items: center; width: 120px; height: 120px; color: var(--akzent); }
-.rd-radar .ico { width: 34px; height: 34px; }
-.rd-radar > i { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--akzent); opacity: 0; animation: rd-puls 2.4s ease-out infinite; }
-.rd-radar > i:nth-child(2) { animation-delay: 1.2s; }
-@keyframes rd-puls { from { transform: scale(.4); opacity: .85; } to { transform: scale(1); opacity: 0; } }
+.rd-radar { position: relative; display: grid; place-items: center; width: 120px; height: 120px; }
+.rd-radar .rd-av { width: 76px; height: 76px; }
+.rd-ring-bild { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.rd-ring-bild circle { fill: none; stroke-width: 6; }
+.rd-ring-spur { stroke: var(--linie-2); }
+.rd-ring-rest { stroke: var(--akzent); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
 .rd-code-gross { font-size: 40px; font-weight: 800; letter-spacing: .14em; color: var(--text); }
 
 /* ---------- Duell ---------- */
-.rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 170px), 640px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
-/* beide Spieler-Kaesten gleich hoch, Zahlen und Balken unten auf einer Linie, auch wenn "KI-Gegner · 1200" umbricht */
-.rd-leiste { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 10px; width: var(--rd-b); min-width: 0; }
-.rd-seite { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0; padding: 10px 12px; border-radius: var(--r-m); background: var(--flaeche);
-  box-shadow: var(--s1), var(--kante); }
-.rd-seite[data-wer="gegner"] { text-align: right; }
+.rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 200px), 640px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+/* Kopf an Kopf: Avatar, Zahl | Ring-Uhr | Zahl, Avatar; beide Seiten gleich hoch */
+.rd-leiste { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; width: var(--rd-b); min-width: 0;
+  padding: 10px 12px; border-radius: var(--r-l); background: var(--flaeche); box-shadow: var(--s1), var(--kante); }
+/* Reihe 1 Avatar und Zahl, darunter Name (ganze Breite, damit "KI-Gegner · 1200" nicht dreifach umbricht), Fehler, Balken */
+.rd-seite { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; row-gap: 2px; min-width: 0; }
+.rd-zahlen { display: contents; }
+.rd-seite .rd-av { width: 44px; height: 44px; grid-row: 1; grid-column: 1; box-shadow: 0 0 0 2px var(--gold, var(--akzent)); }
+.rd-seite .rd-geloest { grid-row: 1; grid-column: 2; }
+.rd-seite .rd-name, .rd-seite .rd-fehlerzahl { grid-column: 1 / -1; }
+.rd-seite[data-wer="gegner"] { grid-template-columns: minmax(0, 1fr) auto; text-align: right; }
+.rd-seite[data-wer="gegner"] .rd-av { grid-column: 2; }
+.rd-seite[data-wer="gegner"] .rd-geloest { grid-column: 1; justify-self: end; }
+.rd-geloest { font-size: 26px; font-weight: 900; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
 /* bricht um statt abzuschneiden: "KI-Gegner · 1200" muss auf dem Handy ganz lesbar bleiben (Kennzeichnung) */
-.rd-name { font-size: 13px; font-weight: 800; line-height: 1.25; color: var(--text-2); overflow-wrap: anywhere; text-wrap: balance; }
+.rd-name { font-size: 12.5px; font-weight: 750; line-height: 1.25; color: var(--text-2); overflow-wrap: anywhere; text-wrap: balance; }
 .rd-seite[data-ki="ja"] .rd-name { color: var(--akzent-text, var(--text-2)); }
-.rd-zahlen { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.rd-seite[data-wer="gegner"] .rd-zahlen { justify-content: flex-end; }
-.rd-geloest { font-size: 18px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
-.rd-fehlerzahl { font-size: 12.5px; color: var(--text-2); }
-.rd-balken { display: block; height: 6px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
+.rd-fehlerzahl { font-size: 11.5px; color: var(--text-2); }
+.rd-fehlerzahl:empty { display: none; }
+.rd-balken { grid-column: 1 / -1; display: block; height: 4px; border-radius: var(--r-pille); background: var(--linie-2); overflow: hidden; }
 .rd-balken > i { display: block; height: 100%; background: var(--gut); transform: scaleX(0); transform-origin: 0 50%;
   transition: transform var(--d-m, .3s) var(--sanft, ease); }
 .rd-seite[data-wer="gegner"] .rd-balken > i { background: var(--akzent); transform-origin: 100% 50%; }
-.rd-uhr { align-self: center; min-width: 84px; padding: 8px 12px; border-radius: var(--r-m); background: var(--tinte); color: var(--auf-tinte); text-align: center;
-  font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: var(--s1); }
-.raetsel-duell[data-phase="zeit_um"] .rd-uhr, .raetsel-duell[data-phase="vorlauf"] .rd-uhr { background: var(--flaeche-2); color: var(--text-2); }
+.rd-ring { position: relative; display: grid; place-items: center; width: 78px; height: 78px; }
+.rd-uhr { position: relative; font-size: 19px; font-weight: 850; color: var(--text); font-variant-numeric: tabular-nums; }
+.raetsel-duell[data-phase="zeit_um"] .rd-uhr, .raetsel-duell[data-phase="vorlauf"] .rd-uhr { color: var(--text-2); }
+.raetsel-duell[data-phase="vorlauf"] .rd-ring-rest { stroke: var(--linie-2); }
 
 .rd-brettzone { width: var(--rd-b); }
 .rd-rahmen { width: var(--rd-b); }
@@ -73,27 +114,38 @@
 .rd-meldung:is([data-art="richtig"], [data-art="falsch"])::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--gut); }
 .rd-meldung[data-art="falsch"]::before { background: var(--warn); }
 
+/* Reihe der eigenen Raetsel: gruen geloest, rot Fehler, leer noch offen */
+.rd-reihe-ort { width: var(--rd-b); }
+.rd-reihe { display: grid; grid-template-columns: repeat(auto-fill, minmax(24px, 1fr)); gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }
+.rd-reihe li { height: 8px; border-radius: var(--r-pille); background: var(--linie-2); }
+.rd-reihe li[data-art="g"] { background: var(--gut); }
+.rd-reihe li[data-art="r"] { background: var(--warn); }
+
 /* ---------- Ende ---------- */
-.rd-ende { align-items: center; text-align: center; padding: 28px 18px; }
-.rd-ende-symbol { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--flaeche-2); color: var(--akzent); }
-.rd-ende-symbol .ico { width: 32px; height: 32px; }
-.rd-ende[data-ergebnis="sieg"] .rd-ende-symbol { background: var(--akzent); color: var(--auf-akzent); }
-.rd-ende h2 { font-size: 26px; }
-.rd-ende-stand { margin: 0; font-size: 18px; font-weight: 800; color: var(--text); }
-.rd-knoepfe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-self: stretch; }
-/* beide Knoepfe mittig beschriftet (vorher stand "Nochmal" links, "Zur Lobby" mittig) */
-.rd-knoepfe .knopf, .rd-karte .rd-knoepfe .knopf.primaer { justify-content: center; padding: 0 12px; }
+.rd-ende-paar { align-items: flex-end; }
+.rd-ende-wer { position: relative; display: grid; justify-items: center; gap: 2px; }
+.rd-ende-wer .rd-av { width: 64px; height: 64px; }
+.rd-ende-wer[data-sieger="true"] .rd-av { width: 96px; height: 96px; box-shadow: 0 0 0 4px var(--gold, var(--akzent)); }
+.rd-krone { display: grid; place-items: center; color: var(--gold, var(--akzent)); }
+.rd-krone .ico { width: 30px; height: 30px; }
+.rd-ende h2 { margin: 0; font-size: 28px; font-weight: 850; color: var(--auf-buehne); }
+.rd-ende-stand { margin: -6px 0 0; font-size: 14px; color: var(--auf-buehne-2); }
+.rd-ende .rd-kronen { padding: 6px 16px; border-radius: var(--r-pille); background: var(--gold); color: var(--kg-stark); font-size: 15px; font-weight: 800; }
+.rd-ende .rd-reihe li { background: rgba(255, 255, 255, .14); }
+.rd-ende .rd-reihe li[data-art="g"] { background: var(--gut); }
+.rd-ende .rd-reihe li[data-art="r"] { background: var(--warn); }
+.rd-ende .rd-knoepfe .knopf { background: rgba(255, 255, 255, .1); color: var(--auf-buehne); border-color: transparent; }
+.rd-ende .rd-knoepfe .knopf:focus-visible { outline: 3px solid var(--auf-buehne); outline-offset: 3px; }
 
 /* Handy quer und kleine Hoehe: Leiste kompakter */
 @container rd (max-height: 560px) {
-  .rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 130px), 640px); gap: 8px; }
-  .rd-seite { padding: 6px 10px; }
-  .rd-uhr { font-size: 22px; padding: 6px 10px; }
+  .rd-spiel { --rd-b: min(calc(100cqw - 2 * var(--rand)), calc(100cqh - 150px), 640px); gap: 8px; }
+  .rd-leiste { padding: 6px 10px; }
+  .rd-ring { width: 60px; height: 60px; }
+  .rd-uhr { font-size: 16px; }
 }
 
-html[data-bewegung="aus"] .rd-radar > i { animation: none; opacity: .35; transform: scale(.7); }
-html[data-bewegung="aus"] .rd-balken > i { transition: none; }
+html[data-bewegung="aus"] .rd-ring-rest, html[data-bewegung="aus"] .rd-balken > i { transition: none; }
 @media (prefers-reduced-motion: reduce) {
-  .rd-radar > i { animation: none; opacity: .35; transform: scale(.7); }
-  .rd-balken > i { transition: none; }
+  .rd-ring-rest, .rd-balken > i { transition: none; }
 }
