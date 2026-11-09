@@ -938,7 +938,7 @@ function hilfen(seite) {
       await warte(500);
     },
     async fenster(id) {
-      await seite.locator(`.bl-steuer-fenster .seg[data-wert="${id}"]`).click();
+      await seite.locator('.bl-steuer-fenster select[name="bl-fenster"]').selectOption(id);
       await warte(500);
     },
     // Reiter Ich (G-002, eine Zahl): alles Weitere liegt hinter "Alle Partien, Rekorde und Zeitraeume"
@@ -1024,11 +1024,23 @@ async function testeBrowser(browser) {
     && await seite.evaluate(() => document.querySelector('.reiter-leiste [aria-current="page"]').dataset.reiter) === 'bestenliste'
     && await seite.evaluate(() => location.hash) === '#bestenliste');
   const reiterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-reiter .seg')].map((s) => s.dataset.wert + ':' + s.textContent.trim()).join());
-  const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster .seg')].map((s) => s.dataset.wert + (s.getAttribute('aria-checked') === 'true' ? '*' : '')).join());
+  const fensterIds = await seite.evaluate(() => [...document.querySelectorAll('.bl-steuer-fenster select[name="bl-fenster"] option')].map((o) => o.value + (o.selected ? '*' : '')).join());
   // seit 07.11.2026 Freunde vor Ich (Reihenfolge 8); die Gruppe (Paket liga) fehlt hier (&kern), dann oeffnet Ich
   pruefe('Kopf über hauptKopf, Reiter Freunde · Ich · Bots (Ort bestenliste:reiter, Standard Ich ohne Paket liga), Fenster Woche · Monat · Allzeit (Standard Woche)',
     await seite.locator('.bl-screen .haupt-kopf').count() === 1 && reiterIds === 'freunde:Freunde,ich:Ich,bots:Bots' && fensterIds === 'woche*,monat,allzeit'
       && await seite.locator('.bl-screen').getAttribute('data-reiter') === 'ich', [reiterIds, fensterIds]);
+  // Flos Wahl U8 und U9 (09.11.2026), gemessen am PC (1180 px): eine Segment-Leiste (die Reiter), der Zeitraum als Auswahlfeld
+  // mit Tipp-Hoehe; der Liga-Kopf zeigt wie am Handy nur die Sternzahl, kein "/ 90" und keinen Pokal-Chip "/ 30"
+  const steuer = await seite.evaluate(() => {
+    const sel = document.querySelector('.bl-steuer-fenster select[name="bl-fenster"]');
+    const sicht = [...document.querySelectorAll('.bl-screen .haupt-kopf .kopf-chips > *')].filter((c) => c.getClientRects().length);
+    return { leisten: document.querySelectorAll('.bl-steuer [role="radiogroup"]').length, segInFenster: document.querySelectorAll('.bl-steuer-fenster .seg').length,
+      hoehe: sel ? Math.round(sel.getBoundingClientRect().height) : 0, name: sel?.labels?.[0]?.textContent.trim() || '',
+      kopf: sicht.map((c) => c.innerText.replace(/\s+/g, ' ').trim()).join(' | ') };
+  });
+  pruefe('U8: eine Segment-Leiste, Zeitraum als Auswahlfeld mit Namen (im Reiter Ich ausgeblendet)',
+    steuer.leisten === 1 && steuer.segInFenster === 0 && steuer.hoehe === 0 && steuer.name.length > 0, steuer);
+  pruefe('U9: Liga-Kopf am PC nur mit Sternen, ohne Zahlen "/ 90" und "/ 30"', !/\//.test(steuer.kopf), steuer.kopf);
   pruefe('Leer: ein ruhiger Satz und „Jetzt spielen“ statt leerer Tabellen, kein leeres Rekordbuch, keine Erklärsätze im Kopf',
     /Diese Woche noch keine Partie/.test(await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste').innerText())
     && await seite.locator('.bl-reiter[data-reiter="ich"] .bl-ich-beste .bl-spielen').count() === 1 && await seite.locator('.bl-rekordbuch').count() === 0
@@ -1057,6 +1069,9 @@ async function testeBrowser(browser) {
   await seite.locator('.bl-ich-alle').click();
   await warte(200);
   await h.reiter('bots');
+  // U8: im Reiter Bots ist das Auswahlfeld sichtbar und mindestens so hoch wie ein Tippziel (44 px)
+  const selHoehe = await seite.evaluate(() => Math.round(document.querySelector('.bl-steuer-fenster select[name="bl-fenster"]')?.getBoundingClientRect().height || 0));
+  pruefe('U8: Reiter Bots zeigt das Zeitraum-Auswahlfeld, mindestens 44 px hoch', selHoehe >= 44, selHoehe);
   const leerBots = await seite.locator('.bl-tafel').innerText();
   pruefe('Bots leer: Tafel des nächsten Gegners (Willi) mit Satz und „Erste Partie: Willi, Weiß“', /Willis Tafel/.test(leerBots) && /Noch keine Partie auf Willis Tafel/.test(leerBots)
     && /Erste Partie: Willi, Weiß/.test(leerBots), leerBots);
@@ -1127,7 +1142,7 @@ async function testeBrowser(browser) {
   // (nicht im gemerkten Fenster, Standard Woche); gemerkt wird dabei kein Fenster
   pruefe('„Zur Liga“ nach „Platz/Erster Eintrag“: Zeitraum Allzeit (wie der Platz der Abrechnung), das gemerkte Fenster bleibt unberührt',
     await seite.locator('.bl-screen').getAttribute('data-fenster') === 'allzeit'
-    && await seite.locator('.bl-steuer-fenster .seg[aria-checked="true"]').getAttribute('data-wert') === 'allzeit'
+    && await seite.locator('.bl-steuer-fenster select[name="bl-fenster"]').inputValue() === 'allzeit'
     && fensterVorher !== 'allzeit' && await fensterGemerkt() === fensterVorher, { fensterVorher, jetzt: await fensterGemerkt() });
 
   // ---------- 5. Bestenliste mit Daten ----------
